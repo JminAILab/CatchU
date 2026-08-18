@@ -1,0 +1,41 @@
+
+# ===== Secrets =====
+# .env.example만 예외로 추적 — 어떤 변수가 필요한지는 공유, 값은 공유 금지
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+credentials.json
+*-service-account.json
+
+# ===== 로컬 탐색 격리 =====
+_sandbox/
+
+# ===== 안전망 =====
+# 앱별 .gitignore가 있지만, 루트에서 실수로 install한 경우를 잡는다
+node_modules/
+__pycache__/
+
+# ===== macOS =====
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+*.icloud
+
+# ===== Windows =====
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+*.stackdump
+
+# ===== IDE =====
+.idea/
+.vscode/*
+!.vscode/extensions.json

@@ -1,0 +1,51 @@
+
+# byte-compiled
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# packaging
+build/
+dist/
+sdist/
+eggs/
+.eggs/
+*.egg-info/
+*.egg
+MANIFEST
+
+# virtualenv — 워커 루트에만 앵커링 (아래 주석 참조)
+.venv/
+env/
+ENV/
+/bin/
+/include/
+/lib/
+/lib64/
+/Scripts/
+/pyvenv.cfg
+pip-selfcheck.json
+
+# testing / lint / type
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.hypothesis/
+
+# tooling
+.ipynb_checkpoints/
+profile_default/
+poetry.toml
+.pdm.toml
+cython_debug/
+.pyre/
+.pytype/
+pyrightconfig.json
