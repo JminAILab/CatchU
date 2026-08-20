@@ -12,6 +12,7 @@ credentials.json
 
 # ===== 로컬 탐색 격리 =====
 _sandbox/
+_notes/
 
 # ===== 안전망 =====
 # 앱별 .gitignore가 있지만, 루트에서 실수로 install한 경우를 잡는다
