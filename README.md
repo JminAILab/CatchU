@@ -16,7 +16,7 @@
 
 ## 문서
 
-정본은 [`docs/`](docs)에 있다. 진행 상태는 `docs/CatchU_현재상태.md`.
+팀 문서 정본은 [`docs/`](docs)에 있다. 문서 목록과 읽는 순서는 [`docs/README.md`](docs/README.md).
 
 ## 팀
 
