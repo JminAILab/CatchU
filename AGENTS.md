@@ -1,3 +1,22 @@
+# CatchU 팀 지침
+
+이 절은 팀이 관리한다. 아래의 AI-DLC 관리 블록(HTML 주석 표식 BEGIN/END 사이)은 AI-DLC가 관리하며 `aidlc config`(refresh) 때 블록 안만 교체된다. 블록 안은 직접 고치지 않는다. Codex는 이 파일과 하위 폴더의 `AGENTS.md`를 이어 붙여 읽으므로(합산 32 KiB 한도) 이 절은 짧게 유지하고 상세는 `docs/`를 가리킨다.
+
+## 저장소 지도
+
+- `web/` `api/` `worker/`: 배포 단위(현재 자리표시자). 스택 표기는 검토안이며, 확정 전에는 특정 스택을 전제로 코드를 만들지 않는다.
+- `docs/`: 팀 문서 정본 안내. 문서 목록·지위·우선순위는 `docs/README.md`. `docs/보관/`은 인용하지 않는다.
+- `docs/ai-dlc-input/`: AI-DLC 시작 시점(2026-09-09) 입력 스냅샷. `docs/ai-dlc/`: AI-DLC 설치·운영 안내.
+- `aidlc/`: AI-DLC 워크플로우 기록. 승인된 요구사항은 `aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md`. 과거 승인 기록은 소급 수정하지 않는다.
+- `.codex/` `.agents/`: AI-DLC 하네스. 변경은 필요한 범위로 제한하고 이유·검증·refresh 후 재적용 방법을 커밋 메시지에 남긴다.
+
+## 규칙
+
+- 브랜치·머지·커밋: `docs/CatchU_레포_컨벤션.md`. 작업 브랜치는 `영역/작업내용`, `dev`·`main`에는 PR·승인 1건·merge commit으로만 반영하고 squash·rebase 머지는 쓰지 않는다. 커밋은 접두사 5종(`feat` `fix` `refactor` `docs` `chore`) 필수 + 바꾼 이유 한 줄.
+- 회의·소통 운영: `docs/CatchU_그라운드룰_2026-08-04.md`.
+- 언어: 대화·문서·커밋 설명은 한국어. 커밋 접두사와 코드 식별자는 영문.
+- AI-DLC 워크플로우 진행 중에는 계획되지 않은 `aidlc` 버전 변경을 하지 않는다. 기계 버전은 프로젝트 스탬프와 맞춘다(`aidlc doctor`).
+
 <!-- BEGIN AI-DLC:agents -->
 # AI-DLC on Codex CLI
 
