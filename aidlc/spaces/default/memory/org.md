@@ -6,25 +6,33 @@
 
 ## Way of Working
 
-We use **trunk-based development**. All work merges to `main` via
-short-lived feature branches (typically resolved within 1-2 days).
-Long-lived branches accumulate merge debt; we avoid them.
+We follow the team repository convention in `docs/CatchU_레포_컨벤션.md`
+(confirmed 2026-08-24): a `main` (release) / `dev` (integration) branch
+model, short-lived work branches named `<area>/<topic>`, and **merge
+commits only** into `dev` and `main` through GitHub pull requests with one
+approval. Squash and rebase merges into protected branches are disabled at
+the repository level: intermediate commits and pull-request boundaries are
+product data for CatchU's evidence-card pipeline, so we do not flatten them.
 
-For Construction worktrees, the worktree base branch is `main` and the
-merge target is `main`.
+For Construction worktrees, the worktree base branch is the current intent
+work branch (an `<area>/<intent>` integration branch agreed as an exception
+to the convention's "no intermediate integration branch" rule), and the
+merge target is that same branch — never `main` or `dev` directly. Bolt
+branches merge back with a merge commit (`--strategy merge`); the squash
+strategy is not used, and intermediate Bolt commits must survive on the
+intent branch. Protected branches receive the intent branch only through a
+pull request with a merge commit. Parent-branch refresh (`git rebase dev`)
+happens at Bolt boundaries, not while a Bolt is in flight.
 
-If our project requires multiple environments (staging, production), we
-still keep one trunk and gate releases via tags or environment-specific
-deployment configs — not via long-lived release branches.
+Commits created by the framework follow the team prefix rule
+(`feat|fix|refactor|docs|chore:` + a one-line reason in Korean) wherever
+the tooling allows; where a fixed message is unavoidable, the exception is
+recorded in the repository convention. The tooling may bypass local git
+hooks (`--no-verify`), so rule compliance is verified in pull-request CI
+once required status checks are enabled.
 
-We **squash-merge** Bolt branches into `main`. Each Bolt becomes one
-commit on the trunk, named by the Bolt slug, with the full Bolt commit
-history preserved on the source branch until the worktree is discarded.
-
-Squash gives us a clean linear `main` history that maps 1:1 to
-delivery-planning's Bolt sequence. We accept the trade-off of losing
-intermediate commits on `main` because the audit log preserves the full
-event sequence anyway.
+Multiple environments (staging, production) are handled by `main` vs `dev`
+plus deployment configuration — not by additional long-lived branches.
 
 ## Walking Skeleton
 
