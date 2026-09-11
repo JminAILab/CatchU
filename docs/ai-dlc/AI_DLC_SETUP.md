@@ -2,6 +2,8 @@
 
 작성일: 2026-09-09
 
+> 이동 안내(2026-09-11): 이 문서는 저장소 루트에서 `docs/ai-dlc/`로 옮겼다. 본문의 `docs/…`, `aidlc/…`, `.codex/…` 경로와 트리 그림은 저장소 루트 기준이다. AI-DLC 하네스는 루트에 설치돼 있으며 이 문서는 안내일 뿐이다.
+
 이 묶음은 CatchU 저장소에 옮길 입력 자료와 시작 프롬프트다. AI-DLC 프로그램이나 실행 설정은 포함하지 않는다. 현재 준비 폴더에서는 Codex CLI 0.153.4를 확인했으며, `aidlc` 명령과 Git 저장소는 확인되지 않았다. 아래 설치·설정·워크플로우 시작은 아직 수행하지 않았다.
 
 ## Codex에 설정 작업을 맡기기
@@ -38,10 +40,10 @@ CatchU/                             ← 실제 프로젝트 루트
 
 | 입력 | 사용하는 방법 |
 |---|---|
-| [시작 문서](docs/ai-dlc-input/CatchU_AI-DLC_start_draft.md) | 팀이 먼저 읽을 기본 입력. 현재 방향·유지 결정·제약 확인 |
-| [이용 흐름과 범위](docs/ai-dlc-input/CatchU_scope_and_journeys.md) | 흐름 검토와 질문·답변 확인. Q2의 미결 상태와 4절의 만족도 조사 방안 확인 |
-| [요구사항 초안](docs/ai-dlc-input/CatchU_requirements_draft.md) | AI-DLC에서 검토·수정할 후보. 승인된 요구사항으로 자동 간주하지 않음 |
-| [v10 참고 원문](docs/ai-dlc-input/CatchU_v10_reference.md) | 과거 합의와 상세 기획을 찾아볼 보관 자료. 첫 입력 전체를 대신하지 않음 |
+| [시작 문서](../ai-dlc-input/CatchU_AI-DLC_start_draft.md) | 팀이 먼저 읽을 기본 입력. 현재 방향·유지 결정·제약 확인 |
+| [이용 흐름과 범위](../ai-dlc-input/CatchU_scope_and_journeys.md) | 흐름 검토와 질문·답변 확인. Q2의 미결 상태와 4절의 만족도 조사 방안 확인 |
+| [요구사항 초안](../ai-dlc-input/CatchU_requirements_draft.md) | AI-DLC에서 검토·수정할 후보. 승인된 요구사항으로 자동 간주하지 않음 |
+| [v10 참고 원문](../ai-dlc-input/CatchU_v10_reference.md) | 과거 합의와 상세 기획을 찾아볼 보관 자료. 첫 입력 전체를 대신하지 않음 |
 
 기획 문서 전체를 `AGENTS.md`에 넣을 필요는 없다. Codex는 `AGENTS.md`를 작업 지침으로 읽으므로, 프로젝트 자료는 위 폴더에 두고 프롬프트에서 읽을 순서와 역할을 알려주는 구성을 제안한다. [OpenAI의 AGENTS.md 안내](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
 
