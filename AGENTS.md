@@ -4,9 +4,9 @@
 
 ## 저장소 지도
 
-- `web/` `api/` `worker/`: 배포 단위(현재 자리표시자). 스택은 2026-09-13 확정 — Next.js·NestJS·FastAPI, 배포는 네이버 클라우드 플랫폼(NCP). 근거는 `docs/ai-dlc-input-mvp/CatchU_mvp_input.md`.
+- `web/` `api/` `worker/`: 배포 단위(현재 자리표시자). 스택 표기는 검토안이며, 확정 전에는 특정 스택을 전제로 코드를 만들지 않는다.
 - `docs/`: 팀 문서 정본 안내. 문서 목록·지위·우선순위는 `docs/README.md`. 삭제된 옛 문서는 git 이력에서 찾지 않는 한 존재하지 않는 것으로 취급한다.
-- `docs/ai-dlc-input/`: AI-DLC 시작 시점(2026-09-09) 입력 스냅샷이며 **현행 기준이 아니다**. 승인된 산출물이 출처로 인용하므로 남겨 두지만, 새 작업의 근거로 읽지 않고 내용을 수정하지 않는다. `docs/ai-dlc-input-mvp/`: 두 번째 intent(10월 MVP)의 입력. 팀장 결정과 제안을 담으며 승인 기록이 아니다. `docs/ai-dlc/`: AI-DLC 설치·운영 안내.
+- `docs/ai-dlc-input/`: AI-DLC 시작 시점(2026-09-09) 입력 스냅샷이며 **현행 기준이 아니다**. 승인된 산출물이 출처로 인용하므로 남겨 두지만, 새 작업의 근거로 읽지 않고 내용을 수정하지 않는다. `docs/ai-dlc/`: AI-DLC 설치·운영 안내.
 - `aidlc/`: AI-DLC 워크플로우 기록. 승인된 요구사항은 `aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md`. 과거 승인 기록은 소급 수정하지 않는다.
 - `.codex/` `.agents/`: AI-DLC 하네스. 변경은 필요한 범위로 제한하고 이유·검증·refresh 후 재적용 방법을 커밋 메시지에 남긴다.
 
@@ -16,12 +16,6 @@
 - 회의·소통 운영: `docs/CatchU_그라운드룰_2026-08-04.md`.
 - 언어: 대화·문서·커밋 설명은 한국어. 커밋 접두사와 코드 식별자는 영문.
 - AI-DLC 워크플로우 진행 중에는 계획되지 않은 `aidlc` 버전 변경을 하지 않는다. 기계 버전은 프로젝트 스탬프와 맞춘다(`aidlc doctor`).
-
-## AI의 작업 관리
-
-- 작업 착수·검토 요청·종료 시 `docs/CatchU_작업관리.md`를 읽고 적용한다. Codex와 Claude Code의 상세 작업관리 규칙은 이 문서 한 곳에서 관리한다.
-- 사용자가 맡긴 실행 작업의 이슈·Projects 갱신은 AI가 함께 처리한다. 논의·초안만 요청한 경우에는 원격에 등록하지 않는다. 최초 Project 연결·권한 설정은 별도이며, 미연결 상태를 등록 성공으로 보고하지 않는다.
-- 이슈 양식은 `.github/ISSUE_TEMPLATE/`, PR 양식은 `.github/pull_request_template.md`를 사용한다. CLI/API로 작성할 때도 같은 항목을 채운다. Projects의 완료와 AI-DLC 공식 승인은 구분한다.
 
 <!-- BEGIN AI-DLC:agents -->
 # AI-DLC on Codex CLI
