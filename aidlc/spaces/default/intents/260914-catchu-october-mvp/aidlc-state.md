@@ -13,8 +13,8 @@
 - **Practices Affirmed Timestamp**:
 
 ## Scope Configuration
-- **Stages to Execute**: 0.1, 0.2, 0.3, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7
-- **Stages to Skip**: 2.1 (reverse-engineering — greenfield)
+- **Stages to Execute**: 0.1, 0.2, 0.3, 1.1, 1.3, 1.4, 1.6, 1.7, 2.2, 2.3, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6
+- **Stages to Skip**: 2.1 (reverse-engineering — greenfield), 1.2 (market-research), 1.5 (team-formation), 2.4 (user-stories), 2.5 (refined-mockups), 4.7 (feedback-optimization)
 - **Depth**: Standard
 - **Test Strategy**: Standard
 - **Review Override**: 
@@ -27,7 +27,7 @@
 - **Build System**: Unknown
 
 ## Execution Plan Summary
-- **Total Stages**: 32
+- **Total Stages**: 27
 - **Completed**: 3
 - **In Progress**: intent-capture
 
@@ -53,10 +53,10 @@
 
 ### IDEATION PHASE
 - [-] intent-capture — EXECUTE
-- [ ] market-research — EXECUTE
+- [ ] market-research — SKIP
 - [ ] feasibility — EXECUTE
 - [ ] scope-definition — EXECUTE
-- [ ] team-formation — EXECUTE
+- [ ] team-formation — SKIP
 - [ ] rough-mockups — EXECUTE
 - [ ] approval-handoff — EXECUTE
 
@@ -64,8 +64,8 @@
 - [ ] reverse-engineering — SKIP
 - [ ] practices-discovery — EXECUTE
 - [ ] requirements-analysis — EXECUTE
-- [ ] user-stories — EXECUTE
-- [ ] refined-mockups — EXECUTE
+- [ ] user-stories — SKIP
+- [ ] refined-mockups — SKIP
 - [ ] domain-design — EXECUTE
 - [ ] units-generation — EXECUTE
 - [ ] contract-design — EXECUTE
@@ -88,14 +88,14 @@ Per unit: [TBD]
 - [ ] observability-setup — EXECUTE
 - [ ] incident-response — EXECUTE
 - [ ] performance-validation — EXECUTE
-- [ ] feedback-optimization — EXECUTE
+- [ ] feedback-optimization — SKIP
 
 ## Current Status
 - **Lifecycle Phase**: IDEATION
 - **Current Stage**: intent-capture
-- **Next Stage**: market-research
+- **Next Stage**: feasibility
 - **Status**: Running
-- **Last Updated**: 2026-09-14T02:35:15Z
+- **Last Updated**: 2026-09-14T04:20:57Z
 
 ## Session Resume Point
 - **Last Completed Stage**: state-init
