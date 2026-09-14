@@ -4,9 +4,9 @@
 
 ## 저장소 지도
 
-- `web/` `api/` `worker/`: 배포 단위(현재 자리표시자). 스택 표기는 검토안이며, 확정 전에는 특정 스택을 전제로 코드를 만들지 않는다.
+- `web/` `api/` `worker/`: 배포 단위(현재 자리표시자). 스택은 2026-09-13 확정 — Next.js·NestJS·FastAPI, 배포는 네이버 클라우드 플랫폼(NCP). 근거는 `docs/ai-dlc-input-mvp/CatchU_mvp_input.md`.
 - `docs/`: 팀 문서 정본 안내. 문서 목록·지위·우선순위는 `docs/README.md`. 삭제된 옛 문서는 git 이력에서 찾지 않는 한 존재하지 않는 것으로 취급한다.
-- `docs/ai-dlc-input/`: AI-DLC 시작 시점(2026-09-09) 입력 스냅샷이며 **현행 기준이 아니다**. 승인된 산출물이 출처로 인용하므로 남겨 두지만, 새 작업의 근거로 읽지 않고 내용을 수정하지 않는다. `docs/ai-dlc/`: AI-DLC 설치·운영 안내.
+- `docs/ai-dlc-input/`: AI-DLC 시작 시점(2026-09-09) 입력 스냅샷이며 **현행 기준이 아니다**. 승인된 산출물이 출처로 인용하므로 남겨 두지만, 새 작업의 근거로 읽지 않고 내용을 수정하지 않는다. `docs/ai-dlc-input-mvp/`: 두 번째 intent(10월 MVP)의 입력. 팀장 결정과 제안을 담으며 승인 기록이 아니다. `docs/ai-dlc/`: AI-DLC 설치·운영 안내.
 - `aidlc/`: AI-DLC 워크플로우 기록. 승인된 요구사항은 `aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md`. 과거 승인 기록은 소급 수정하지 않는다.
 - `.codex/` `.agents/`: AI-DLC 하네스. 변경은 필요한 범위로 제한하고 이유·검증·refresh 후 재적용 방법을 커밋 메시지에 남긴다.
 
