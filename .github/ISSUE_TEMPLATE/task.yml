@@ -1,0 +1,57 @@
+name: "작업 등록"
+description: "10월 MVP 설계·구현·공통 준비 작업의 결과와 완료 기준을 정리합니다."
+labels: ["mvp-october"]
+body:
+  - type: markdown
+    attributes:
+      value: "팀 작업관리 규칙은 docs/CatchU_작업관리.md를 따릅니다. 담당·일정은 합의 전 확정하지 않습니다."
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 목적
+      description: "누구의 어떤 문제를 해결하는가?"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 범위
+      description: "이번 작업에 포함할 행동과 필요한 경계를 적습니다."
+    validations:
+      required: true
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: 결과물
+      description: "문서·화면·API 등 검토할 결과물과 작성 후 링크."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 기준
+      description: "다른 사람이 확인할 수 있는 조건을 체크리스트로 적습니다."
+      placeholder: "- [ ] 주요 행동·예외·다른 담당 화면으로의 이동을 설명할 수 있다."
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: 근거
+      description: "관련 FR/NFR·문서 링크·절·기준 커밋. 미작성·미확정은 표시하고 ID를 만들지 않습니다."
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 선행 조건과 미결
+      description: "선행 이슈·API/데이터/권한 합의·막힌 이유. 없으면 없음. 본문과 별도로 실제 의존성 관계를 연결합니다."
+    validations:
+      required: true
+  - type: textarea
+    id: ownership
+    attributes:
+      label: 담당과 분류 제안
+      description: "담당 제안·검토 상대·기능 영역·우선순위. 실제 배정과 Project 필드는 합의·확인 후 설정합니다."
+    validations:
+      required: true

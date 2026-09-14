@@ -17,6 +17,12 @@
 - 언어: 대화·문서·커밋 설명은 한국어. 커밋 접두사와 코드 식별자는 영문.
 - AI-DLC 워크플로우 진행 중에는 계획되지 않은 `aidlc` 버전 변경을 하지 않는다. 기계 버전은 프로젝트 스탬프와 맞춘다(`aidlc doctor`).
 
+## AI의 작업 관리
+
+- 작업 착수·검토 요청·종료 시 `docs/CatchU_작업관리.md`를 읽고 적용한다. Codex와 Claude Code의 상세 작업관리 규칙은 이 문서 한 곳에서 관리한다.
+- 사용자가 맡긴 실행 작업의 이슈·Projects 갱신은 AI가 함께 처리한다. 논의·초안만 요청한 경우에는 원격에 등록하지 않는다. 최초 Project 연결·권한 설정은 별도이며, 미연결 상태를 등록 성공으로 보고하지 않는다.
+- 이슈 양식은 `.github/ISSUE_TEMPLATE/`, PR 양식은 `.github/pull_request_template.md`를 사용한다. CLI/API로 작성할 때도 같은 항목을 채운다. Projects의 완료와 AI-DLC 공식 승인은 구분한다.
+
 <!-- BEGIN AI-DLC:agents -->
 # AI-DLC on Codex CLI
 
