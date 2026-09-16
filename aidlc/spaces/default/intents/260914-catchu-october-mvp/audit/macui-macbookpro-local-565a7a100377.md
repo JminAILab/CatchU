@@ -228,3 +228,71 @@
 **Context**: ideation > feasibility > feasibility-questions.md
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-09-16T05:16:53Z
+**Event**: DECISION_RECORDED
+**Stage**: feasibility
+**Decision**: Q13: 추가 조사·검증에 실제 배정 가능한 집중 작업 시간(또는 인일)과 결과 확인 날짜는 어느 정도인가요? 미확정이면 확보 여부를 판단할 날짜를 알려주세요. 기존 평일 가용 조건은 재질문하지 않으며 추가 실행 승인이 아닙니다.
+**Options**: 배정 가능 — 시간/인일과 결과 확인 날짜 명시,현재 배정 불가 — 일정 재검토 필요,아직 미확정 — 확보 여부를 판단할 날짜 명시,X. Other (please specify)
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-16T05:26:25Z
+**Event**: HUMAN_TURN
+**Session**: 01a0a788-bf25-7d00-8a14-dcd7028acd33
+
+---
+
+## Question Answered
+**Timestamp**: 2026-09-16T05:28:36Z
+**Event**: QUESTION_ANSWERED
+**Stage**: feasibility
+**Details**: API-only로 누락 자료를 전부 복구하는 것이 이번 MVP의 필수 목표인지 의문이다.\n현재로서는 이를 독립적인 8~16시간 선행 조사 과제로 확정하지 말아줘.\n\n제품 목표는 모든 diff의 완전 복원이 아니라 근거에 맞는 경험 설명이다.\n이번 package-lock.json 누락 7건이 실제 경험 후보의 설명에 어떤 영향을\n주는지 먼저 판단하고, 영향이 확인된 범위만 추가 검토해줘.\n\n누락·잘림 탐지와 근거 범위 제한은 유지한다.\n다만 모든 누락 복구를 필수화하지 말고,\n핵심 근거가 부족한 경우 추가 수집·설명 제한·후보 보류 중\n어떤 처리가 적절한지 후속 설계 항목으로 정리해줘.\n\nAPI-only나 Git 병행 어느 쪽도 아직 확정하지 않는다.\n기존 요구사항에 전량 수집·복구를 요구하는 근거가 있다면\n정확한 항목과 이번 누락의 관계를 먼저 제시해줘.\n\n이를 반영해 feasibility의 필수 선행 작업과 시간 추정을 조정해줘.
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-16T05:31:24Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-16T05:32:31Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Guardrail Loaded
+**Timestamp**: 2026-09-16T05:32:45Z
+**Event**: GUARDRAIL_LOADED
+**Scope**: all
+**Path**: .codex/aidlc-rules/
+**Rule count**: 7
+
+---
+
+## Health Check
+**Timestamp**: 2026-09-16T05:32:45Z
+**Event**: HEALTH_CHECKED
+**Request**: /aidlc --doctor
+**Details**: 60 passed, 0 failed
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-16T05:33:22Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
