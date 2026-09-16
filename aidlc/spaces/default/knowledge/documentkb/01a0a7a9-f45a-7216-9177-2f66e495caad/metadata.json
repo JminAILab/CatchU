@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "01a0a7a9-f45a-7216-9177-2f66e495caad",
+  "source": {
+    "kind": "managed",
+    "path": "documents/CatchU_feasibility_최소실험_2026-09-16.md"
+  },
+  "sha256": "0dfedc32580dfb58422dadc9fc37d997b45f1284c94b29519c3688860cec759a",
+  "bytes": 44871,
+  "indexed_at": "2026-09-16T04:46:35.803Z",
+  "extraction": {
+    "state": "extracted",
+    "extractor": {
+      "name": "builtin-text",
+      "version": "1"
+    },
+    "chars": 24474,
+    "truncated": false,
+    "source_revision": "0dfedc32580dfb58422dadc9fc37d997b45f1284c94b29519c3688860cec759a"
+  },
+  "summary": {
+    "state": "absent"
+  },
+  "content": "documentkb/01a0a7a9-f45a-7216-9177-2f66e495caad/content.md",
+  "content_sha256": "0dfedc32580dfb58422dadc9fc37d997b45f1284c94b29519c3688860cec759a",
+  "related_intent_ids": [
+    "01a09dc4-cc12-774d-8813-47bcf51644de"
+  ],
+  "content_trust": "untrusted",
+  "content_handling": "data-not-instructions"
+}
