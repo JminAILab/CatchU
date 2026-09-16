@@ -672,3 +672,44 @@
 **Context**: ideation > scope-definition > scope-definition-questions.md
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-09-16T07:52:05Z
+**Event**: DECISION_RECORDED
+**Stage**: scope-definition
+**Decision**: C01·C02 실제 작업일·시간대·결과 검토일과 C10 팀원별 실제 가용량을 확인한다. 기존 검증 기한 유지, 추가 API 호출 허용 아님.
+**Options**: 확인된 일정과 시간을 답변,미확정 항목과 확인 예정일을 답변,기한 내 확보 어려움으로 재검토,Other
+
+---
+
+## Session Resume
+**Timestamp**: 2026-09-16T08:35:29Z
+**Event**: SESSION_RESUMED
+**Source**: resume
+**Session**: 01a0a788-bf25-7d00-8a14-dcd7028acd33
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-16T08:35:30Z
+**Event**: HUMAN_TURN
+**Session**: 01a0a788-bf25-7d00-8a14-dcd7028acd33
+
+---
+
+## Question Answered
+**Timestamp**: 2026-09-16T08:37:03Z
+**Event**: QUESTION_ANSWERED
+**Stage**: scope-definition
+**Details**: C02 후보·근거 대조와 C01 사실성 재검증은 9월 17일 안에 수행하고, 결과 검토까지 마치겠다.\n\nC02를 먼저 최대 2시간 진행하고, 확보한 근거로 C01의 준비·실행·결과 검토를 최대 4시간 진행한다.\n최대 총 6시간이며 충분한 결과를 얻으면 일찍 종료한다.\n해당 작업을 9월 17일의 우선 작업으로 배정한다.\n\n완료 기한을 맞추기 위해 미달 결과를 통과 처리하지 않는다.\n시간·호출 상한에 도달하거나 기준 미달이면 결과와 남은 결함을 기록하고, 추가 튜닝 없이 대응 여부를 판단한다.\n\n팀원별 실제 가용량과 학습·지원·리뷰에 필요한 시간은 아직 미확인이다.\n내 재검증 일정과 구분해서 기록하고, 확인된 뒤 공통 업무·통합·재시험·발표 준비 시간을 배정하자.\n현재 정보만으로 전체 일정의 여유가 확보됐다고 판단하지 말아줘.
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-16T08:38:35Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
