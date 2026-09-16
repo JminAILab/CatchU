@@ -21,16 +21,23 @@ const snapshot = () => {
   };
   visit(record);
   files.push(join(project, '.codex/tools/data/aidlc-stamp.json'));
+  const machine = '/Users/ljm/.local/share/aidlc';
+  for (const file of ['active-version', 'active-executable', 'versions/2.8.1/aidlc', 'versions/2.8.1/version.json', 'versions/2.8.1/runtime-integrity.json']) {
+    files.push(join(machine, file));
+  }
+  files.push(join(project, 'aidlc/spaces/default/intents/active-intent'));
   return files.sort().map((path) => [path, createHash('sha256').update(readFileSync(path)).digest('hex')]);
 };
 const before = snapshot();
-const run = (args, ok, expected) => {
+let count = 0;
+const run = (args, ok, expected, code = ok ? 0 : 1) => {
   const result = spawnSync(executable, args, { cwd: project, encoding: 'utf8', timeout: 30000 });
   assert.ifError(result.error);
   assert.equal(result.signal, null);
-  assert.equal(result.status, ok ? 0 : 1, result.stderr);
+  assert.equal(result.status, code, result.stderr);
   assert.match(result.stdout + result.stderr, expected);
   assert.doesNotMatch(result.stdout + result.stderr, /does not export main/);
+  count++;
 };
 run(['--version'], true, /aidlc 2\.8\.1 \(runtime 2\.8\.1\)/);
 const base = ['engine', 'review-brief'];
@@ -41,5 +48,11 @@ run([...base, 'review', '--stage', 'feasibility', '--why', 'first'], true, /\*\*
 run([...base, 'summary', '--stage', 'feasibility'], false, /requires --questions-file/);
 run([...base, 'summary', '--stage', 'feasibility', '--questions-file', 'AGENTS.md'], false, /must exist inside the active intent record/);
 run([...base, 'context', '--stage', 'not-a-stage'], false, /Unknown stage/);
+run([...base, 'summary', '--stage', 'feasibility', '--questions-file', questions, '--project-dir', project], true, /\*\*Looks correct\*\*/);
+run([...base, 'summary', '--stage', 'feasibility', '--questions-file', `${dirname(questions)}/missing.md`], false, /must exist inside the active intent record/);
+run([...base, 'summary', '--stage', 'feasibility', '--questions-file', 'aidlc/spaces/default/intents/260909-catchu-definition-review/ideation/intent-capture/intent-capture-questions.md'], false, /must exist inside the active intent record/);
+run([...base, 'summary', '--stage', 'feasibility', '--questions-file', `${dirname(questions)}/../../../../../../../../AGENTS.md`], false, /must exist inside the active intent record/);
+run([...base, 'summary', '--stage', 'feasibility', '--questions-file', questions, '--project-dir', project, '--project-dir', project], false, /may be specified only once/, 2);
+run([...base, 'approve', '--stage', 'feasibility'], false, /unknown verb 'approve'/, 2);
 assert.deepEqual(snapshot(), before, '검사 중 intent 기록 또는 버전 스탬프가 변경됐습니다.');
-console.log('PASS: 7개 명령 검사; intent 전체 기록·버전 스탬프 내용/파일 목록 불변.');
+console.log(`PASS: ${count}개 명령 검사; intent 전체 기록·활성 커서·버전 포인터·배포 바이너리·무결성 메타데이터·스탬프 불변.`);
