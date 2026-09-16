@@ -762,3 +762,36 @@
 **Context**: ideation > scope-definition > scope-definition-questions.md
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-09-16T14:10:24Z
+**Event**: DECISION_RECORDED
+**Stage**: scope-definition
+**Decision**: Q4: 팀원별 순시간·학습/지원/리뷰·공통 업무 시간을 언제 확인할 수 있나요? 9/17 기존 팀 확인 자리 또는 다른 일시/이미 확인된 값을 선택. Q5: 기존 기능 담당 중심 A안을 팀 검토 출발안으로 사용할까요, 운영/통합 취합·배포 지원은 가용량 확인 후 별도 배분하는 B안으로 갈까요? 최종 배정·단계 승인이 아닙니다.
+**Options**: Q4 9/17 기존 자리에서 확인,Q4 다른 일시,Q4 이미 확인된 값,Q5 A안으로 팀 검토,Q5 가용량 확인 후 별도 배분,Other
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-16T15:05:11Z
+**Event**: HUMAN_TURN
+**Session**: 01a0a788-bf25-7d00-8a14-dcd7028acd33
+
+---
+
+## Question Answered
+**Timestamp**: 2026-09-16T15:05:46Z
+**Event**: QUESTION_ANSWERED
+**Stage**: scope-definition
+**Details**: Q4: 작업 시간은 9/13 답변과 달라진 것이 없다. 활동별 비중은 기존 결정대로 첫 통합 흐름 뒤에 조정한다.\nQ5: 공통 업무는 9/17 회의에서 팀원 2·3이 원하는 일을 고르게 한 뒤 답하겠다. #24의 A안은 예시로만 둔다.\n회의 결과를 보내기 전까지 범위 확정·산출물 작성·다음 단계 진행은 하지 않는다.\n9/17 C02·C01 재검증은 계획대로 진행하며, 실제 호출은 시작할 때 따로 허용하겠다.
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-16T15:06:37Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
