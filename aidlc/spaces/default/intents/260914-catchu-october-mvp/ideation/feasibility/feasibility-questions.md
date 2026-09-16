@@ -253,7 +253,7 @@ ljm0850이 본인 구현·조율·최종 LLM 선정 업무와 겹치지 않게 *
 
 ## Consolidated Summary Confirmation
 
-진행 상태: 요약은 작성했으나 설치된 `aidlc engine review-brief summary`가 `aidlc-review-brief.ts does not export main(argv)`로 실패해 작성 전 확인 질문은 아직 제시하지 않았다. `aidlc doctor`는 버전2.8.1 및 설치 무결성 통과를 보고했으나 이 오류의 해결을 확인하지 못했다. 버전 변경·직접 우회·자체 승인 없이 보류한다. 아래 빈 답변은 승인/거절이 아니다.
+진행 상태(2026-09-16 후속): 기존 `review-brief` 등록 누락으로 보류했던 요약 안내는 사용자 허용 아래 동일 2.8.1 전용 진입점으로 정상화했다. 원본 배포 바이너리·무결성 기준은 그대로이며 기존 CLI·활성 intent·질문 경로 검증을 실행한다. 잘못된 입력 거부를 포함한13개 검사와 검사 중 intent 기록·활성 커서·버전/무결성 자료 불변을 확인했고 doctor는0 problems이다. 설치 변경·원복·refresh 기록은 `docs/ai-dlc/2026-09-16_review-brief_설치점검.md`, 별도 수정 커밋은 `5d5f627`이다. 아래 요약의 별도 작성 전 확인을 요청하며, 설치 수정 허용을 이 질문의 답변이나 feasibility 공식 승인으로 처리하지 않는다. 아래 빈 답변은 승인/거절이 아니다.
 
 확인 대상은 Q1~Q13의 기존 답변과 최신 정정으로, 아래 기준으로 feasibility-assessment.md·constraint-register.md·raid-log.md를 작성해도 되는지다. 이는 산출물 **작성 전 확인**이며 feasibility 공식 승인, 서비스 방식 채택, 추가 호출/모델변경/인프라 생성 승인이 아니다.
 
