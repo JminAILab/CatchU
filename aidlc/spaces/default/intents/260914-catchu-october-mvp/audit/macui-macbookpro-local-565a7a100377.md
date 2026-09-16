@@ -713,3 +713,36 @@
 **Context**: ideation > scope-definition > scope-definition-questions.md
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-09-16T08:41:41Z
+**Event**: DECISION_RECORDED
+**Stage**: scope-definition
+**Decision**: Q3 변경 영향 확인: 짧더라도 충분근거 새 초안은 사실 수정 없이 활용 가능해야 한다는 기존 C01 기준·자료 보호·기존 완료 기한을 유지하면서 9/17 C02 최대 2시간·후보 2~3건, C01 최대 4시간·회귀 1건과 새 사례 2건의 3호출 제한을 적용할까요? Scope Definition 전체 승인이나 검증 통과 판정은 아닙니다.
+**Options**: 이 대조와 기존 수용 기준 유지로 적용,적용안 수정 요청,Other
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-16T13:38:42Z
+**Event**: HUMAN_TURN
+**Session**: 01a0a788-bf25-7d00-8a14-dcd7028acd33
+
+---
+
+## Question Answered
+**Timestamp**: 2026-09-16T13:39:39Z
+**Event**: QUESTION_ANSWERED
+**Stage**: scope-definition
+**Details**: 1. 기존 수용 기준을 유지하며 이대로 적용해줘.\n\n'사실 수정 없이 활용 가능'은 짧은 초안의 사실 주장과 기여 귀속이\n제공된 근거에 맞는다는 의미로 적용한다.\n문장의 완성도·풍부함·취향 차이로 고칠 부분이 없어야 한다는 기준으로\n확대하지 말아줘.\n\n새 사례 2건은 기존 구성대로 충분근거 1건·부분근거 1건으로 한다.\n충분근거 사례에서는 근거와 연결된 실제 변경·기여 설명이 있는 초안인지 확인하고,\n모든 내용을 '확인 불가'로 처리한 결과는 성공으로 계산하지 않는다.\n\n9월 17일, 최대 총 6시간·3호출의 상한을 유지한다.\n상한에 도달하거나 기준에 미달하면 자동 재튜닝 없이 결과와 대응안을 보고하고,\n추가 작업 여부는 내가 판단하겠다.\n실제 호출은 실행 전에 자료 범위·모델·예산을 확인한 뒤 따로 허용하겠다.\n\n이번 확인은 변경 적용 확인이며 Scope Definition 전체 승인은 아니다.
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-16T13:40:32Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
