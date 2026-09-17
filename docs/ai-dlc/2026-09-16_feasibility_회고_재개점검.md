@@ -112,3 +112,13 @@ a58b7e324cf7b1d62fc70cb793300b460e3967295cdec7d269823c5f5f43ccef  raid-log.md
 | 실행 판단 | 확인 결과와 필요한 변경·검증·원복안을 설명한 뒤 업데이트 실행 여부를 별도 확인. 미해결 호환성/기록 보존 위험을 숨기고 자동 갱신하거나 다음 단계 작업을 시작하지 않음 |
 
 feasibility의 공식 승인 기록과 다음 단계 실제 착수는 구분한다. 이 운영 문서의 검토 요청 때문에 기존 workflow-plan 또는 승인 기록을 직접 수정하지 않는다.
+
+## 2026-09-17 Scope Definition 회고 준비 — 현재 단계 누락 복구
+
+- 실패 명령: `aidlc engine learnings surface --slug scope-definition`, exit 1, `stage "scope-definition" not found in runtime-graph.json`.
+- 이번에는 현재 worktree의 파일은 **존재했지만 scope-definition 항목이 없었다**. 9/16의 파일 자체 누락과 구분한다. 자동 갱신이 누락된 내부 원인까지 확정하지 않는다.
+- CWD `/Users/ljm/Desktop/github/CatchU-feasibility`, 활성 intent `260914-catchu-october-mvp`를 확인했다. `aidlc doctor`: 2.8.1, 0 problems / 업데이트·미커밋 기록 경고 2건, 무결성 검사 12개 통과. 업데이트 권고는 실행하지 않았다.
+- 기존 2.8.1 복구 기록에 따라 **`aidlc engine runtime compile`**을 실행했고, 반환된 `written`은 현재 worktree의 `aidlc/spaces/default/intents/260914-catchu-october-mvp/runtime-graph.json`이었다. 재생성 뒤 scope-definition 항목 존재를 확인했다. `graph compile`은 실행하지 않았고 두 명령을 혼동하지 않는다.
+- 복구 전후 상태·계획·scope-document·intent-backlog·질문 기록의 SHA-256이 각각 동일했다. 상태 `546b0f13b66fcc20299c5946ca05c33a2a8e8b58137a8cae9186a3fb3dc729e3`, 계획 `ab8b5ee4b23a4c793e1489c7767cae76f26d1ad01745591fa41e9e0171fe5abe` 유지. 승인/감사 기록 직접 편집, 하네스/바이너리/버전 변경 없음.
+- 재검증 `learnings surface --slug scope-definition`: exit 0, 올바른 space/intent, `memory_entries_total:0`, `candidates:[]`, `parked_open_questions:[]`. 첫 실패를 후보 0건으로 처리하지 않았다. 기존 산출물을 재사용해 추가 의견 질문으로 복귀하며 Scope 공식 승인은 아직 받지 않았다.
+- 로컬 파생 파일만 공식 재생성했으므로 코드 패치 원복·refresh 재적용 대상은 없다. 이 내용은 **2.8.1 장애·복구 이력**이며 후속 버전의 상시 규칙/센서로 등록하지 않는다. 기존 2.9.0 설치 보류 결정 유지. #37·PR #58에 연결한다.
