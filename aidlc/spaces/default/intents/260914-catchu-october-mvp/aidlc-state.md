@@ -55,7 +55,7 @@
 - [x] intent-capture — EXECUTE
 - [ ] market-research — SKIP
 - [x] feasibility — EXECUTE
-- [-] scope-definition — EXECUTE
+- [?] scope-definition — EXECUTE
 - [ ] team-formation — SKIP
 - [ ] rough-mockups — EXECUTE
 - [ ] approval-handoff — EXECUTE
@@ -95,7 +95,7 @@ Per unit: [TBD]
 - **Current Stage**: scope-definition
 - **Next Stage**: rough-mockups
 - **Status**: Running
-- **Last Updated**: 2026-09-16T07:28:17Z
+- **Last Updated**: 2026-09-17T06:44:04Z
 
 ## Session Resume Point
 - **Last Completed Stage**: feasibility
