@@ -122,3 +122,13 @@ feasibility의 공식 승인 기록과 다음 단계 실제 착수는 구분한�
 - 복구 전후 상태·계획·scope-document·intent-backlog·질문 기록의 SHA-256이 각각 동일했다. 상태 `546b0f13b66fcc20299c5946ca05c33a2a8e8b58137a8cae9186a3fb3dc729e3`, 계획 `ab8b5ee4b23a4c793e1489c7767cae76f26d1ad01745591fa41e9e0171fe5abe` 유지. 승인/감사 기록 직접 편집, 하네스/바이너리/버전 변경 없음.
 - 재검증 `learnings surface --slug scope-definition`: exit 0, 올바른 space/intent, `memory_entries_total:0`, `candidates:[]`, `parked_open_questions:[]`. 첫 실패를 후보 0건으로 처리하지 않았다. 기존 산출물을 재사용해 추가 의견 질문으로 복귀하며 Scope 공식 승인은 아직 받지 않았다.
 - 로컬 파생 파일만 공식 재생성했으므로 코드 패치 원복·refresh 재적용 대상은 없다. 이 내용은 **2.8.1 장애·복구 이력**이며 후속 버전의 상시 규칙/센서로 등록하지 않는다. 기존 2.9.0 설치 보류 결정 유지. #37·PR #58에 연결한다.
+
+## 2026-09-18 PR #68 작업 폴더 재개 점검 — 파생 파일 복구와 훅 확인 분리
+
+- 기존 폴더 `/Users/ljm/Desktop/github/CatchU-feasibility`는 `codex/mvp-feasibility-resume` / `d787f8803c09ba761e806a83f2e49296f40a1109`, 기존 미커밋 감사 기록을 보존했다. 이 폴더의 `aidlc doctor`는 0 problems / 2 warnings였다.
+- PR #68 후속 문서 작업 위치는 `/private/tmp/catchu-c01-c02-acceptance-review`, 브랜치 `docs/c01-c02-acceptance-review`, 점검 시작 HEAD `c17babb0d49d8d9375cd355ebc00a4e5b7fd7686`이다. 두 폴더의 활성 intent는 `260914-catchu-october-mvp`이며 Scope 승인·Rough Mockups 진행 상태가 일치한다. 새 intent를 만들거나 기존 폴더의 변경을 옮겨 덮어쓰지 않았다.
+- 이 후속 폴더에 Git 제외 `runtime-graph.json`이 없었다. 기존 **2.8.1 공식 `aidlc engine runtime compile`**로 재생성했고 `written`은 위 후속 폴더의 현재 intent 아래였다. `graph compile`이나 파일 수동 복사는 사용하지 않았다. 재검사에서 runtime-graph 누락 경고는 해소됐다.
+- 후속 폴더의 doctor는 **1 problem / 2 warnings**다. 남은 오류는 `Hooks have never executed although this workflow has progressed 7 stages`이며 공식 안내는 훅 등록/신뢰 설정 확인 후 하네스를 완전히 재시작하는 것이다. 기존 폴더의 정상 결과와 구분한다. 파일/설정 존재만으로 이 폴더에서 훅이 실행됐다고 보거나 설치 전체가 손상됐다고 단정하지 않는다.
+- 2.8.1 버전·프로젝트 검사·무결성 12개는 유지됐다. 단계 상태·계획·승인 산출물은 HEAD 대비 변경 없음. 상태 SHA-256 `7caeb6f0045b14d48497c25611b1c8094e7826f96963dac8266184d2db3de8cc`, 계획 `ab8b5ee4b23a4c793e1489c7767cae76f26d1ad01745591fa41e9e0171fe5abe`. 도구가 자동 생성한 진단/감사 기록은 보존한다.
+- 문서 준비·원격 제출물 검토는 계속하되 이 폴더에서 공식 확인/승인을 기록하기 전 실제 세션 시작·훅 상태를 정상 확인해야 한다. 훅 성공 기록을 수동 생성하거나 검사를 우회하지 않는다. 사용자에게 이 작업 위치에서 세션을 재개하도록 안내하고 재검사한다. 이번 점검은 세션 재시작 성공·C01 예외 승인·Rough Mockups 완료가 아니다.
+- 바이너리/하네스 패치·업데이트·refresh는 없으므로 새 코드 원복·재적용 대상도 없다. 2.8.1 한정 장애 기록이며 후속 버전 상시 규칙으로 등록하지 않는다. 버전 검토는 진행 중 workflow에 대한 공식 지원 경로가 확인되거나 workflow 종료 시점까지 보류한다. #37·PR #68에 연결한다.
