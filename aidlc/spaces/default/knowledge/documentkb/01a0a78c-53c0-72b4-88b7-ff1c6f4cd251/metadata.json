@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "01a0a78c-53c0-72b4-88b7-ff1c6f4cd251",
+  "source": {
+    "kind": "managed",
+    "path": "documents/CatchU_PoC_분석_1차_2026-09-14_부록_파일해시.md"
+  },
+  "sha256": "250b0eb9e1e4d44c8450c5f73bebba6c5e608c18d07190f7b804e0e228153d89",
+  "bytes": 7738,
+  "indexed_at": "2026-09-16T00:09:46.685Z",
+  "extraction": {
+    "state": "extracted",
+    "extractor": {
+      "name": "builtin-text",
+      "version": "1"
+    },
+    "chars": 7503,
+    "truncated": false,
+    "source_revision": "250b0eb9e1e4d44c8450c5f73bebba6c5e608c18d07190f7b804e0e228153d89"
+  },
+  "summary": {
+    "state": "absent"
+  },
+  "content": "documentkb/01a0a78c-53c0-72b4-88b7-ff1c6f4cd251/content.md",
+  "content_sha256": "250b0eb9e1e4d44c8450c5f73bebba6c5e608c18d07190f7b804e0e228153d89",
+  "related_intent_ids": [
+    "01a09dc4-cc12-774d-8813-47bcf51644de"
+  ],
+  "content_trust": "untrusted",
+  "content_handling": "data-not-instructions"
+}

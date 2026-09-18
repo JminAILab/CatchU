@@ -4,33 +4,36 @@ labels: ["mvp-october"]
 body:
   - type: markdown
     attributes:
-      value: "팀 작업관리 규칙은 docs/CatchU_작업관리.md를 따릅니다. 담당·일정은 합의 전 확정하지 않습니다."
+      value: "판단 기준은 docs/CatchU_작업관리.md §4 `이슈 본문`을 따릅니다. 담당·일정은 합의 전 확정하지 않습니다. [조건부] 칸은 해당 없으면 비워서 지웁니다."
   - type: textarea
-    id: purpose
+    id: summary
     attributes:
-      label: 목적
-      description: "누구의 어떤 문제를 해결하는가?"
+      label: 요약
+      description: "만들거나 바꿀 것과 예정 결과물. 검토를 요청할 때 실제 링크로 갱신합니다. 배경은 「왜」, 완료 조건은 「완료 기준」에 쓰고 여기서 되풀이하지 않습니다."
+      placeholder: |-
+        - 무엇을: 분석 실패·재요청 화면의 흐름과 와이어프레임 초안
+        - 결과물: 초안 문서와 검토 PR (작성 후 링크)
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: 왜
+      description: "누구의 어떤 문제를 해결하는가. 짧은 문장이나 목록으로 쓰고 한 항목에는 한 가지만 씁니다."
     validations:
       required: true
   - type: textarea
     id: scope
     attributes:
       label: 범위
-      description: "이번 작업에 포함할 행동과 필요한 경계를 적습니다."
-    validations:
-      required: true
-  - type: textarea
-    id: deliverables
-    attributes:
-      label: 결과물
-      description: "문서·화면·API 등 검토할 결과물과 작성 후 링크."
+      description: "포함할 행동과 필요한 경계. 제외는 범위나 승인 여부를 오해할 수 있을 때만 씁니다."
     validations:
       required: true
   - type: textarea
     id: acceptance
     attributes:
       label: 완료 기준
-      description: "다른 사람이 확인할 수 있는 조건을 체크리스트로 적습니다."
+      description: "다른 사람이 확인할 수 있는 조건을 체크리스트로 씁니다. 한 항목에 한 조건만 쓰고, 설계 서술은 결과물 문서에 둡니다."
       placeholder: "- [ ] 주요 행동·예외·다른 담당 화면으로의 이동을 설명할 수 있다."
     validations:
       required: true
@@ -38,20 +41,16 @@ body:
     id: sources
     attributes:
       label: 근거
-      description: "관련 FR/NFR·문서 링크·절·기준 커밋. 미작성·미확정은 표시하고 ID를 만들지 않습니다."
+      description: "작업 판단에 필요한 결정 요지와 직접 출처를 뜻과 함께 씁니다. 전체 대응표·보조 링크·상세 이력은 <details>로 접고, 짧으면 접기를 만들지 않습니다. 확정된 ID만 쓰며 설계 미작성·적용 ID 미확정은 그대로 표시하고, 승인 원문 전체를 복사하지 않습니다."
     validations:
       required: true
   - type: textarea
     id: dependencies
     attributes:
       label: 선행 조건과 미결
-      description: "선행 이슈·API/데이터/권한 합의·막힌 이유. 없으면 없음. 본문과 별도로 실제 의존성 관계를 연결합니다."
-    validations:
-      required: true
+      description: "[조건부] 확인은 항상 수행합니다. 없음을 확인했으면 이 칸을 비워 지웁니다. 확인하지 못했으면 없음으로 적지 말고 미확인으로 표시합니다. 실제 선행 이슈는 본문과 별도로 blocked by 관계도 설정합니다."
   - type: textarea
     id: ownership
     attributes:
       label: 담당과 분류 제안
-      description: "담당 제안·검토 상대·기능 영역·우선순위. 실제 배정과 Project 필드는 합의·확인 후 설정합니다."
-    validations:
-      required: true
+      description: "[조건부] 담당·분류 결정이 필요할 때만 씁니다. 확정되면 Project 필드에 반영하고 제안 문구는 지웁니다. 필드로 표현할 수 없는 협업·검토 역할은 남깁니다."
