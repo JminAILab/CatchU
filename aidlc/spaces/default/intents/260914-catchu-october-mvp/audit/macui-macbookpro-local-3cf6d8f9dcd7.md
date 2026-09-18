@@ -360,3 +360,111 @@
 **Details**: 팀원 1은 ljm0850. PoC #19는 사용자가 다른 LLM 도움으로 별도 수행하고 이 세션은 정본·리비전·실행 결과·미검증 사항을 받아 필수 입력 검토한다. NCP 팀 계정 수령·Admin 권한 확인 완료. 서버 생성·접속은 미확인이고 실행 요청이 아니다.
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-09-14T07:50:27Z
+**Event**: DECISION_RECORDED
+**Stage**: feasibility
+**Decision**: 환경 준비 서버 생성·접속 검증의 실행·검토 담당과 기존 평일 가용량에서 달라진 제약 확인
+**Options**: 자유 응답
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-14T07:56:58Z
+**Event**: HUMAN_TURN
+**Session**: 01a09e8a-a237-7790-99f7-42eb57b38de8
+
+---
+
+## Question Answered
+**Timestamp**: 2026-09-14T07:57:47Z
+**Event**: QUESTION_ANSWERED
+**Stage**: feasibility
+**Details**: 1. 환경 준비의 실행 담당과 결과 검토 담당은 나(ljm0850)이다. 2. 기존 가용량 조건 외 추가 제약은 없음. 추석 연휴(9/24~26)와 발표(10/1~2)는 기존 기록대로 유지하고, 발표 자료·리허설 준비 시간은 delivery-planning에서 구현 가용량과 분리해 잡아줘.
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-09-14T07:59:35Z
+**Event**: DECISION_RECORDED
+**Stage**: feasibility
+**Decision**: 서비스용 LLM API 선정·이용 조건 확인 책임과 Google OAuth 준비 상태·담당 확인
+**Options**: 자유 응답
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-14T08:05:04Z
+**Event**: HUMAN_TURN
+**Session**: 01a09e8a-a237-7790-99f7-42eb57b38de8
+
+---
+
+## Question Answered
+**Timestamp**: 2026-09-14T08:05:47Z
+**Event**: QUESTION_ANSWERED
+**Stage**: feasibility
+**Details**: 서비스용 LLM API의 제공자·모델·계정 등급은 미정이고 미확인. 후보는 Claude·OpenAI·업스테이지 Solar 유지. 선정과 이용 조건 확인 담당은 [팀원 1 / 미정, #24에서 배분]. requirements-analysis OQ11 답변까지, 늦어도 Catch 설명 초안 생성 구현과 실제 사용자 자료 전송 전에 결정. NFR2 학습 미사용 약관 보장 유료 등급 및 약관 근거·확인 날짜 기록 유지. Google OAuth 앱 등록·설정 시작 전, 팀원 2 담당·실제 GitHub 계정 확인 후 배정. 리디렉션 URI는 NCP 도메인 확정과 연계해 #24에 기록.
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-09-14T08:05:53Z
+**Event**: DECISION_RECORDED
+**Stage**: feasibility
+**Decision**: LLM API 선정·이용 조건 확인 담당 원문의 [팀원 1 / 미정, #24에서 배분]이 팀원 1 확정인지 미정 유지인지 확인
+**Options**: 자유 응답
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-14T08:07:39Z
+**Event**: HUMAN_TURN
+**Session**: 01a09e8a-a237-7790-99f7-42eb57b38de8
+
+---
+
+## Question Answered
+**Timestamp**: 2026-09-14T08:08:07Z
+**Event**: QUESTION_ANSWERED
+**Stage**: feasibility
+**Details**: LLM 선정·이용 조건 확인 담당은 팀원 1(ljm0850)로 확정한다. 결정 시점은 앞서 말한 대로다.
+
+---
+
+## Session End
+**Timestamp**: 2026-09-15T00:40:26Z
+**Event**: SESSION_ENDED
+**Reason**: inferred — Codex has no SessionEnd event (D-4); reconciled at next SessionStart. Prior session 01a09e8a-a237-7790-99f7-42eb57b38de8 last seen 2026-09-14T07:21:30.526Z.
+
+---
+
+## Session Resume
+**Timestamp**: 2026-09-15T01:38:10Z
+**Event**: SESSION_RESUMED
+**Source**: resume
+**Session**: 01a09e8a-a237-7790-99f7-42eb57b38de8
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-15T01:38:11Z
+**Event**: HUMAN_TURN
+**Session**: 01a09e8a-a237-7790-99f7-42eb57b38de8
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-15T01:39:16Z
+**Event**: HUMAN_TURN
+**Session**: 01a09e8a-a237-7790-99f7-42eb57b38de8
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-15T01:39:57Z
+**Event**: HUMAN_TURN
+**Session**: 01a09e8a-a237-7790-99f7-42eb57b38de8
+
+---
