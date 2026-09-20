@@ -16,7 +16,7 @@ body:
     id: behavior
     attributes:
       label: 기대 동작과 실제 동작
-      description: "어떤 동작을 기대했으며 실제로 무엇이 발생했는가?"
+      description: "어떤 동작을 기대했으며 실제로 무엇이 발생했는가? 기대 동작의 근거가 되는 이슈 완료 기준·승인된 제품 행동·합의된 계약을 관련 근거 칸에 연결합니다. 미확정이면 그대로 표시합니다."
     validations:
       required: true
   - type: textarea
