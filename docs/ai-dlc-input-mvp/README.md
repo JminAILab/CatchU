@@ -2,6 +2,7 @@
 
 두 번째 AI-DLC intent(10월 링크 주 경로 MVP의 설계·구현)에 넣는 입력 문서다. **현행 기준이 아니다.** 현행 요구사항은 `aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md`(2026-09-11 승인)이고, 이 문서는 그 요구사항이 후속 결정으로 남긴 항목에 대한 팀장 결정과 제안을 담는다.
 
+- [`CatchU_web_개발준비안.md`](CatchU_web_개발준비안.md) — #74 모의 시연 적용 범위·기존 제안과의 차이·완료 기준·준비 상태·남은 확인. 실제 서비스용 제안을 별도로 보존한 사용자 검토 초안.
 - [`2026-09-16_meeting-decisions.md`](2026-09-16_meeting-decisions.md) — 알림·DM·홈·수신자 헤더와 이력서의 회의 결정 및 미결. 화면별 초안이 함께 참조한다.
 - [`CatchU_mvp_input.md`](CatchU_mvp_input.md) — 목적·완료 조건과 발표 대안, 기존 팀장 결정과 실행 여건, 10월 요구사항 발췌·적용 범위, 결정 항목별 필요 시점, 구현·검증 계획 제안, PoC 검토 방침, AI-DLC 진행 요청.
 - [`2026-09-14_followup.md`](2026-09-14_followup.md) — 팀원 2·3·4의 담당 작업 진행에 대한 회의 결과, 두 번째 intent 시작 요청, 인증·홈 진입 팀장 확인 포함. 연결 계약·공통 및 미배정 작업은 미결이며, 공식 계획·설계·단계 승인과 구분한다.
