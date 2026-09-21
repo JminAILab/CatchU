@@ -126,7 +126,7 @@ L03 [링크 중단] → 성공 확인 후 L03 중단 표시, 수신자는 다음
 
 [결정] 9/16 오전 회의와 dev에 반영된 [공통 기준 §3](2026-09-16_meeting-decisions.md#3-공유-링크-방문자-헤더)에 따라 **로그인 여부와 관계없이 V01~V03은 일반 서비스와 다른 헤더**를 사용한다. 발행자용 내 자산·공유 링크 관리 메뉴를 그대로 노출하지 않는다. 자료 열람에 기업 로그인을 필수로 요구하지 않는다(FR4.2).
 
-**팀원 3 제안 — 팀원 2 검토 전:** 2026-09-20 작성자 검토 의견에 따라 10월은 브랜드 표시만 제공하고 로그인·프로필 연결은 12월로 분리한다. #55의 [수신자 헤더 요청](https://github.com/JminAILab/CatchU/issues/55#issuecomment-5682475502)·[9/16 기록](https://github.com/JminAILab/CatchU/issues/55#issuecomment-5691646180)과 #51의 [프로필 모달 결정](https://github.com/JminAILab/CatchU/issues/51#issuecomment-5691666738)을 근거로 한 검토안이며 팀 합의 완료를 뜻하지 않는다.
+**팀원 3 제안 — 팀원 2 검토 전:** 2026-09-20 작성자 검토 의견에 따라 10월은 브랜드 표시만 제공하고 로그인·프로필 연결은 12월로 분리한다. 이는 공통 기준 §3의 기존 검토안인 ‘아이콘 + 우측 로그인’과 다른, **‘10월은 이동 없는 브랜드 표시만, 로그인·프로필 연결은 12월로 분리하는 새 제안’**이다. #55의 [수신자 헤더 요청](https://github.com/JminAILab/CatchU/issues/55#issuecomment-5682475502)·[9/16 기록](https://github.com/JminAILab/CatchU/issues/55#issuecomment-5691646180)과 #51의 [프로필 모달 결정](https://github.com/JminAILab/CatchU/issues/51#issuecomment-5691666738)을 근거로 한 검토안이며 팀 합의 완료를 뜻하지 않는다.
 
 ```text
 10월 수신자 공통: CatchU 브랜드 아이콘          (우측 버튼 없음)
