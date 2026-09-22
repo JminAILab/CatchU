@@ -1,5 +1,23 @@
 # Ideation → Inception 정합성 점검
 
+## 2026-09-22 사본 조건 변경의 연결 점검 — 인계 최종 승인 전
+
+[현재 인계 확인](../ideation/approval-handoff/approval-handoff-questions.md)의 공식 식별자 `59f1f1ecbb182c06ed2427464246a61c53537cac97c80217b299dfe5955441f8`에 따른 추가 점검이다. [직전 점검본](../archive/2026-09-22T124901Z-approval-handoff-copy-boundary/phase-check-ideation.md)과 아래 과거 결과·승인 전 표현을 보존한다. 현행 기준은 [제약 등록부](../ideation/feasibility/constraint-register.md)·[범위](../ideation/scope-definition/scope-document.md)·[백로그](../ideation/scope-definition/intent-backlog.md)·[화면 확인](../ideation/rough-mockups/rough-mockups-questions.md) 및 9/22 Feasibility 20:58:40 KST·Scope 21:25:41 KST·Rough Mockups 21:49:01 KST [승인 감사](../audit/macui-macbookpro-local-de1289503add.md)다.
+
+| 연결 대상 | 이번 점검 | 남는 경계 |
+|---|---|---|
+| 의도 → M01~M07 → IB01~IB07 | 범위·순서·담당·완료 기준을 바꾸지 않아 아래 7개 문서 연결표 재사용 | 연결률은 실행 성공률이 아님. 실제 분석·NCP 배포/영속/복구·전체 MVP 완료 기준 유지 |
+| 제약 → Scope/IB02 → 인계 | [인계 요약](../ideation/approval-handoff/initiative-brief.md)·[결정 기록](../ideation/approval-handoff/decision-log.md)이 과거 자료 사용 / 비의존 새 구현 / 새 실제 자료 처리의 세 구분을 동일하게 연결 | 과거 자료 접근/시험 재사용은 불허 유지. 비의존 구현의 사본 식별 단독 차단 해제는 다른 설계/착수·실자료 처리 허가가 아님 |
+| 동일 식별 불확실성 | 입력/fixture 출처·과거 자료 의존을 담당자의 기존 설계/계약 검토로 연결하고 같은 위험 판단 반복 금지 | 의존 불명 경로만 보류/합성 분리. 실제 관련 사본·자료 의존·조건 위반이라는 새 사실의 영향 범위만 재검토 |
+| 사본 미확인과 실제 처리 의무 | 보조 7개 관련성 미확인·문서 승인 차단의 한정 예외와 실제 관련 사본 미처리를 구분 | 완료는 지정한 로컬 후보 3개 삭제 확인만. 실제 관련 사본의 9/23 23:59 KST 또는 더 이른 Domain 승인/관련 착수 전 의무·기한 유지. 전수 조사·삭제 경위 규명 요구 없음 |
+| C01/C02·화면 R-01 | 기존 제한 수용·기준 미달의 한계와 화면 R-01 해석 조건 수용을 유지 | 옛 문구 수정·Resolved 아님. 기존 화면·흐름의 해시와 독립 검토 결과를 재사용하고 Domain의 해결된 R-01과 구분 |
+| C03·다음 단계 | 사용자 경계 수용 완료와 F·B/E·A/E/F 담당자 경계 검토 미완료를 구분 | 담당 검토 결과·미결 담당/시점은 Domain 승인 전, 이식 실행 담당은 채택 코드 착수 전. 서비스 모델 및 다른 조건·Domain 최종 승인 별도 |
+
+인계 요약·결정 기록의 기존 전체 본문이 보관본과 동일함을 대조했다. 두 파일의 자동 ARTIFACT_UPDATED(21:58:41/21:58:42 KST)가 현재 확인 식별자와 연결됐다. 인계 산출물·질문 파일 required-sections 3건과 선언된 상위 입력 7종의 upstream-coverage는 통과했다. 과거 위험 수용·회고·Q1~Q8·ADR·보류 정책을 재사용하며 새 독립 reviewer가 지정되지 않은 이 인계 점검을 독립 심사나 실제 UI/API/안전성 시험으로 표현하지 않는다.
+
+이번 기록은 문서 정합성 점검이며 Approval & Handoff 최종 승인·상 경계의 공식 완료를 대신하지 않는다. 공식 감사·상태 이벤트는 정상 절차가 기록하고 수동 생성하지 않는다. 추가 사본 조회/열람/복구/삭제·실험 호출·구현/CI·모델/버전 변경은 수행하지 않는다. 기존 초기 입력의 존재 차이 안내를 없애려는 초기화·재승인이 아니며 PR #68/#80 분리도 유지한다.
+
+
 ## 2026-09-22 C01/C02 후속 적용 점검
 
 점검 범위는 [이번 인계 요약 확인](../ideation/approval-handoff/approval-handoff-questions.md)에 따른 승인 상태·해석 관계의 추가다. 아래 9/21 점검 본문·수치·미확인·승인 전 표시는 당시 기록으로 보존하고 [기존 판본](../archive/2026-09-22-approval-handoff-reuse/phase-check-ideation.md)과 구분한다. 현재 적용은 [9/22 자동 승인 감사](../audit/macui-macbookpro-local-de1289503add.md), [가능성 평가](../ideation/feasibility/feasibility-assessment.md), [범위](../ideation/scope-definition/scope-document.md), [백로그](../ideation/scope-definition/intent-backlog.md), [화면 재사용 확인](../ideation/rough-mockups/rough-mockups-questions.md)에 따른다.
