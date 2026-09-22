@@ -150,4 +150,4 @@ Practices Discovery는 사용자 Approve 후 **22:40:19 KST 공식 관행 반영
 - Looks correct
 - Request changes
 
-[Answer]:
+[Answer]: Looks correct
