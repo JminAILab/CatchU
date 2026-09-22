@@ -62,7 +62,7 @@
 
 ### INCEPTION PHASE
 - [ ] reverse-engineering — SKIP
-- [-] practices-discovery — EXECUTE
+- [?] practices-discovery — EXECUTE
 - [ ] requirements-analysis — EXECUTE
 - [ ] user-stories — SKIP
 - [ ] refined-mockups — SKIP
@@ -95,7 +95,7 @@ Per unit: [TBD]
 - **Current Stage**: practices-discovery
 - **Next Stage**: requirements-analysis
 - **Status**: Running
-- **Last Updated**: 2026-09-22T13:04:45Z
+- **Last Updated**: 2026-09-22T13:34:01Z
 
 ## Session Resume Point
 - **Last Completed Stage**: approval-handoff

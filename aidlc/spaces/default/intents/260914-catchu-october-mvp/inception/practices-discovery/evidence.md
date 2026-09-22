@@ -1,5 +1,18 @@
 # Practices Discovery — 출처와 확인 기록
 
+## 2026-09-22 사본 조건 승인 후 관행 최소 통합 — 최종 승인 전
+
+[현재 요약 확인](practices-discovery-questions.md)의 `Looks correct`가 공식 식별자 `e75b65240a49769b7e6822fdcaca4a2fef58a98b1fd6b017e2175246748231d6`로 등록된 뒤 리드가 네 산출물을 최소 통합했다. 기준 HEAD는 `b87c56555aeac6504944f514d14c4aa5528c329f`, 브랜치는 `docs/domain-design-reuse-20260922`다. 현재 수정은 미커밋 변경을 포함하므로 HEAD만으로 통합본 전체를 식별하지 않는다. [직전 네 산출물·질문·지원 기여](../../archive/2026-09-22T131107Z-practices-copy-boundary/)를 보존하며 아래 이전 지위·확인 식별자·조사·검토·회고는 당시 기록으로 남긴다. 현재 확인은 Practices 최종 승인·관행 승격이나 실행 허가가 아니다.
+
+- **현재 승인 근거:** Feasibility 20:58:40 KST·Scope 21:25:41 KST·Rough Mockups 21:49:01 KST·Approval & Handoff 22:04:45 KST의 9/22 승인을 적용한다. [최신 인계](../../ideation/approval-handoff/initiative-brief.md)·[결정 기록](../../ideation/approval-handoff/decision-log.md)·[제약 등록부](../../ideation/feasibility/constraint-register.md)와 [승인 감사](../../audit/macui-macbookpro-local-de1289503add.md)를 연결한다. C01 기준 미달/R1 한 건 예외·C02 제한 수용의 한계와 Rough Mockups R-01 해석 조건 수용은 유지하며 기존 Domain Design R-01 해결과 구분한다.
+- **최소 수정:** team-practices의 Testing Posture에 보조 7개/실제 관련 사본과 C03 담당 검토 구분 2항, Code Style에 세 자료 구분/반복 판단 방지 2항을 추가했다. Way of Working·Walking Skeleton·Deployment와 Q1~Q3·기존 담당 책임·필수 10개·금지 8개는 재사용한다. discovered-rules에는 기존 사본 삭제 의무의 적용 관계 ALWAYS 1개만 추가해 공식 승격 대상으로 삼는다. 이 항목은 이미 승인된 조건의 연결이며 새 정책·위험 수용 판단이 아니다.
+- **자료와 반복 판단:** 과거 원문·발췌·생성 응답·저장 결과의 접근/복구/복사/전송/실행·시험 자료 사용은 불허다. 승인 문서·비원문 결론·합성 자료 기반 비의존 새 코드·시험·모의 연결은 같은 식별 미완료만으로 차단하지 않는다. 새 실제 수집·생성·전송·실자료 시험의 동의·모델·계약·안전성·별도 실행 조건은 유지한다. 기존 비식별 우선 원칙은 과거 자료 가공 허가가 아니며 PoC 소스 채택은 C03로 판단한다. 입력·fixture 출처와 자료 의존은 기존 담당 설계/계약 검토에 연결하고 불명확한 경로만 보류/분리한다. 같은 식별 불확실성만으로 구현 직전 판단을 반복하지 않으며 실제 관련 사본 잔존·과거 자료 의존·조건 위반의 새 사실이 생긴 범위만 재검토한다.
+- **사본 상태:** 완료는 **지정한 로컬 후보 3개 삭제 확인**만이며 보조 7개 관련성 미확인은 유지한다. 실제 관련 사본 미처리의 의무·기한은 **2026-09-23 23:59 KST 또는 더 이른 Domain Design 승인/관련 구현 착수 전**이다. 추가 접근을 허용하지 않으며 전수 부재/무관함 증명·일반 가능성 위치 조사·A 삭제 경위·공급자 물리 삭제 증명을 새 조건으로 만들지 않는다. 처리 증거는 재사용 허가가 아니다.
+- **C03와 미결:** 사용자 재사용/재설계 경계 수용은 완료이나 F 함수/소스·입력/fixture 의존, B/E 등록·저장·전달, A/E/F 요청·동의·귀속의 실제 담당 검토는 미완료다. 검토 결과·미결 담당/결정 시점은 Domain Design 승인 전, 실제 이식 실행 담당은 채택 코드 착수 전에 연결한다. 전체 상세 API·시험 구현을 지금 요구하지 않는다. 실패 후 보완·동의 재사용·재분석·기존 Catch/링크 변경 보류와 서비스 LLM 미선정을 유지한다.
+- **기존 검토와 이번 한정 검토:** [리드 제안](../../archive/2026-09-22-practices-copy-boundary-proposal.md)을 [품질](contributions/aidlc-quality-agent.md)·[개발](contributions/aidlc-developer-agent.md)·[보안](contributions/aidlc-devsecops-agent.md)이 서로의 의견 없이 자료 사용 조건의 변경 영향만 독립 검토했다. 세 기여의 말미 기록은 모두 AGREE이며 새 쟁점·추가 질문이 없다. 기존 전면 검토와 지적 해소는 재사용하고 이전 기여 본문을 보존했다. 이는 AI의 문서 영향 검토이며 C03 사람 담당자 수용, 실제 코드/fixture 비의존성 또는 제품 시험 통과 증거가 아니다.
+- **링크와 검증 범위:** 기존 고정 HTTPS 근거 링크를 유지하고 승격되는 다섯 관행 절에 새 상대 링크를 넣지 않았다. 기존 사본·실험 원문 또는 메타데이터에 접근하지 않았고 제품 시험·CI·API 호출·스캔·배포·버전 변경을 하지 않았다. 현재 확인과 네 파일의 자동 저장 연결·센서·원본/승격 대상 링크 검사 및 최종 승인 요청은 오케스트레이터의 후속 검증이며 이 기록에서 통과를 미리 선언하지 않는다. team/project 메모리·질문·지원 기여·상태·감사는 직접 수정하지 않았다.
+- **Timestamp 이력:** 직전 값 `Discovered: 2026-09-22T07:22:38Z at commit 08c428847c4084dac0dace3b1c0cf52d963378c9`는 [보존본](../../archive/2026-09-22T131107Z-practices-copy-boundary/practices-discovery-timestamp.md)에 그대로 남겼다. 현재 timestamp는 이번 최종 통합 시각과 기준 HEAD를 기록하며 미커밋 산출물을 포함한다.
+
 ## 2026-09-22 승인 인계 후 재사용·변경 영향 통합
 
 기준 HEAD는 `08c428847c4084dac0dace3b1c0cf52d963378c9`, 브랜치는 `codex/mvp-recovery-20260922`다. 이번 통합은 미커밋 변경을 포함하므로 HEAD만으로 수정본 전체를 식별하지 않는다. 아래 과거 조사·지원 검토·확인 식별자와 당시 미확인·승인 전 표기는 원문 그대로 보존하며 현재 상태를 뜻하지 않는다. [이전 판본](../../archive/2026-09-22-practices-reuse/evidence.md)과 기존 승인·회고를 재사용한다. 이번 `Looks correct`는 [현재 질문 파일](practices-discovery-questions.md)의 작성 전 확인이고, 부모가 공식 등록 성공을 전달한 summary authorization id는 `0fa3dd0c7374bac2ccc112804f4243a2063b17fc1c0dee210512aaae393e8176`이다. 이번 단계 최종 승인·공식 관행 반영·외부 실행 권한과 구분한다.
