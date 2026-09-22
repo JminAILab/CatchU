@@ -83,7 +83,7 @@ Does this all look correct before I generate the artifact?
 
 이번 인계는 사용자가 승인한 C01/C02 변경 및 화면 재사용의 적용 관계만 다룬다. 기존 입력 복구의 존재 차이를 없애기 위한 재승인이나 초기화 재수행이 아니다. 과거 입력·판본·승인·회고는 보존하며 제품 질문과 위험 수용 의사를 다시 묻지 않는다. [이전 인계 기록 보존본](../../archive/2026-09-22-approval-handoff-reuse/approval-handoff-questions.md)과 같은 디렉터리의 기존 인계 요약·결정 기록·단계 간 점검본을 보존했다.
 
-## Consolidated Summary Confirmation
+## 2026-09-22 C01/C02 후속 적용 요약 확인 — 과거 기록 보존
 
 **작성 목적·최소 범위:** 기존 인계 내용을 재작성하지 않고, initiative-brief.md와 decision-log.md에 9/22 승인 조건의 후속 적용 기록만 추가한다. verification/phase-check-ideation.md에는 해당 변경의 문서 연결 점검 결과만 추가한다. 이 질문 파일은 필요한 확인·인계 절차 기록이며 기존 Q1~Q6과 과거 답변을 그대로 보존한다.
 
@@ -101,3 +101,28 @@ Does this all look correct before I generate the artifact?
 - Request changes
 
 [Answer]: Looks correct
+
+## 2026-09-22 사본 조건 변경 이후 인계 준비
+
+Feasibility 사본 조건 수정본은 20:58:40 KST, Scope는 21:25:41 KST, Rough Mockups 재사용 검증본은 **21:49:01 KST** 공식 승인됐다. [현재 승인 감사](../../audit/macui-macbookpro-local-de1289503add.md)와 [화면의 최신 확인](../rough-mockups/rough-mockups-questions.md)을 근거로 다음 적용 관계만 연결한다. Rough Mockups의 이번 승인은 R-01의 해석 조건 수용을 유지하며 옛 문구 수정·Resolved로 처리하지 않는다. 기존 화면·흐름의 해시와 독립 검토 결과도 재사용한다.
+
+인계 두 산출물·질문 파일과 단계 간 점검 기록의 직전 판본은 [이력 보관](../../archive/2026-09-22T124901Z-approval-handoff-copy-boundary/approval-handoff-questions.md)에 동일 내용으로 보존했다. 기존 Q1~Q6·D01~D20·과거 확인/승인·회고와 위험 수용은 다시 묻거나 소급 수정하지 않는다. 이전 복구 입력의 존재 차이 안내를 없애기 위한 재승인이 아니라 승인된 사본 조건 변경의 공식 후속 인계다. 현재 요약은 아직 확인 전이며 이번 Rough Mockups Approve로 대신하지 않는다.
+
+## Consolidated Summary Confirmation
+
+**최소 수정 대상:** initiative-brief.md에는 최신 조건의 짧은 적용 안내, decision-log.md에는 D18/사본과 C03·현재 화면 승인에 연결되는 날짜 있는 후속 기록만 추가한다. verification/phase-check-ideation.md에는 같은 변경의 연결 점검만 추가한다. 기존 목적·M01~M07/IB01~IB07·우선순위·담당·완료 기준·D01~D20·검토 결과는 재사용하고 과거 본문을 보존한다.
+
+**승인된 자료 사용 구분:** 과거 실험 원문·발췌·응답·저장 결과의 접근·복구·전송·실행/시험 자료 사용은 허용하지 않는다. 승인 문서·비원문 검토 결론·합성 자료 기반의 과거 자료 비의존 새 코드·시험·모의 연결은 보조 7개 식별 미완료만으로 차단하지 않는다. 새 실제 자료 수집·생성·외부 전송·실자료 시험에는 기존 동의·모델·계약·안전성·별도 실행 허용 조건을 유지한다. 상세 적용은 [제약 등록부](../feasibility/constraint-register.md)와 [승인 Scope](../scope-definition/scope-document.md)·[백로그](../scope-definition/intent-backlog.md)를 연결한다.
+
+**반복 판단 방지와 잔여 사본:** 동일한 식별 불확실성만으로 같은 판단을 구현 직전에 반복하지 않는다. 담당자의 기존 설계/계약 검토에서 입력·fixture 출처와 과거 자료 의존을 확인하며 불명확한 경로만 보류하거나 합성/모의 경로로 분리한다. 실제 관련 사본 잔존·과거 자료 의존·조건 위반이라는 새 사실이 생기면 영향 범위만 재검토한다. 보조 7개는 관련성 미확인이고 완료는 지정한 로컬 후보 3개 삭제 확인만이다. 실제 관련 사본 미처리의 의무·기한인 2026-09-23 23:59 KST 또는 더 이른 Domain Design 승인/관련 착수 전은 유지한다. 전수 조사·A 삭제 경위 규명·공급자 물리 삭제 증명을 새 조건으로 추가하지 않는다.
+
+**기존 승인·책임·보류:** C01 기준 미달/R1 한 건 예외와 C02 제한 수용의 한계는 최신 9/22 승인 기준을 유지한다. Rough Mockups R-01은 해석 조건 수용이며 Domain Design의 해결된 R-01과 구분한다. C03 사용자 경계 수용은 완료지만 F의 함수/소스·자료 의존, B/E 등록/저장/전달, A/E/F 동의/귀속 담당자 검토는 남는다. 담당별 설계·구현·시험, 최소 연결 첫 결과 별도 승인, 전체 MVP 완료 기준, 서비스 모델 미선정과 관련 착수/외부 처리 조건을 유지한다. 기존 Q1~Q8·ADR·PR #72·후속 확정 제품 정책과 실패 후 보완·동의 재사용·재분석·기존 Catch와 링크 변경 보류를 재사용한다.
+
+**확인 후 절차:** 위 내용을 최소 저장한 뒤 과거 본문 보존·현재 확인의 자동 저장 연결·참조/문서 정합성을 검증한다. 기존 회고·위험 수용을 재사용하고 Approval & Handoff 최종 승인은 따로 요청한다. 이 단계에는 별도 독립 reviewer가 지정되지 않았으므로 문서 점검을 새 독립 심사로 표현하지 않는다. PR #68/#80 분리를 유지하며 이번 확인은 C03 담당자 검토·Domain Design 최종 승인·구현/CI·외부 호출·사본 추가 접근/복구/삭제·버전 변경 허가가 아니다.
+
+인계 요약·결정 기록과 단계 간 점검에 위 최신 조건의 적용 관계만 최소 반영해도 될까요?
+
+- Looks correct
+- Request changes
+
+[Answer]:

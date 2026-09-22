@@ -7,7 +7,7 @@
 - **Scope**: feature
 - **Start Date**: 2026-09-14T02:35:15Z
 - **State Version**: 8
-- **Active Agent**: aidlc-design-agent
+- **Active Agent**: aidlc-delivery-agent
 - **Worktree Path**:
 - **Bolt Refs**:
 - **Practices Affirmed Timestamp**: 2026-09-22T08:03:52Z
@@ -28,8 +28,8 @@
 
 ## Execution Plan Summary
 - **Total Stages**: 27
-- **Completed**: 6
-- **In Progress**: rough-mockups
+- **Completed**: 7
+- **In Progress**: approval-handoff
 
 ## Runtime State
 - **Revision Count**: 2
@@ -57,8 +57,8 @@
 - [x] feasibility — EXECUTE
 - [x] scope-definition — EXECUTE
 - [ ] team-formation — SKIP
-- [?] rough-mockups — EXECUTE
-- [ ] approval-handoff — EXECUTE
+- [x] rough-mockups — EXECUTE
+- [-] approval-handoff — EXECUTE
 
 ### INCEPTION PHASE
 - [ ] reverse-engineering — SKIP
@@ -92,12 +92,12 @@ Per unit: [TBD]
 
 ## Current Status
 - **Lifecycle Phase**: IDEATION
-- **Current Stage**: rough-mockups
-- **Next Stage**: approval-handoff
+- **Current Stage**: approval-handoff
+- **Next Stage**: practices-discovery
 - **Status**: Running
-- **Last Updated**: 2026-09-22T12:41:23Z
+- **Last Updated**: 2026-09-22T12:49:01Z
 
 ## Session Resume Point
-- **Last Completed Stage**: scope-definition
-- **Next Action**: Execute Rough Mockups
+- **Last Completed Stage**: rough-mockups
+- **Next Action**: Execute Approval & Handoff
 - **Pending Artifacts**: none
