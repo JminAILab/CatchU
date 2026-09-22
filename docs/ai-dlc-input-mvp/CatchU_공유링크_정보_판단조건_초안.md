@@ -120,7 +120,7 @@
 
 ### 4-1. 공개 프로필과 수정 내용의 반영
 
-**근거:** [PR #67 팀장 결정](https://github.com/JminAILab/CatchU/pull/67#pullrequestreview-5259842104), 후속 입력 「팀장 확인 (2026-09-20): 기본 프로필·Catch 본문의 기준 시점」([#73 검토 고정본 01c441a](https://github.com/JminAILab/CatchU/blob/01c441aed9f0f6d195ee3f2620c548c0fe609af7/docs/ai-dlc-input-mvp/2026-09-14_followup.md)). **2026-09-20 확인 시 #73은 dev 미병합**이며, 정책 결정과 문서 병합 상태를 구분합니다.
+**근거:** [PR #67 팀장 결정](https://github.com/JminAILab/CatchU/pull/67#pullrequestreview-5259842104), 후속 입력 [팀장 확인 (2026-09-20): 기본 프로필·Catch 본문의 기준 시점](2026-09-14_followup.md#팀장-확인-2026-09-20-기본-프로필catch-본문의-기준-시점). **2026-09-22 확인 시 #73의 dev 병합과 이 작업 브랜치의 dev 반영을 완료**했으며, 아래 정책과 §7-2의 기대 결과를 병합된 후속 입력과 대조했습니다.
 
 **첫 MVP에 적용할 결정**
 
