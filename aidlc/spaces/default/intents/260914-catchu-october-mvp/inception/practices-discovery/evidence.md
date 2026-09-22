@@ -1,5 +1,17 @@
 # Practices Discovery — 출처와 확인 기록
 
+## 2026-09-22 승인 인계 후 재사용·변경 영향 통합
+
+기준 HEAD는 `08c428847c4084dac0dace3b1c0cf52d963378c9`, 브랜치는 `codex/mvp-recovery-20260922`다. 이번 통합은 미커밋 변경을 포함하므로 HEAD만으로 수정본 전체를 식별하지 않는다. 아래 과거 조사·지원 검토·확인 식별자와 당시 미확인·승인 전 표기는 원문 그대로 보존하며 현재 상태를 뜻하지 않는다. [이전 판본](../../archive/2026-09-22-practices-reuse/evidence.md)과 기존 승인·회고를 재사용한다. 이번 `Looks correct`는 [현재 질문 파일](practices-discovery-questions.md)의 작성 전 확인이고, 부모가 공식 등록 성공을 전달한 summary authorization id는 `0fa3dd0c7374bac2ccc112804f4243a2063b17fc1c0dee210512aaae393e8176`이다. 이번 단계 최종 승인·공식 관행 반영·외부 실행 권한과 구분한다.
+
+- **승인 적용:** [9/22 승인 인계](../../ideation/approval-handoff/initiative-brief.md), [결정 기록](../../ideation/approval-handoff/decision-log.md), [가능성 평가](../../ideation/feasibility/feasibility-assessment.md), [Scope 조건](../../ideation/scope-definition/scope-document.md)을 적용한다. C01 기준 미달은 유지하며 R1 문맥 줄 오귀속 한 건만 필수 추가 튜닝·재호출 선행 사유에서 제외한다. 결함 해결·C01 통과나 새 결함·입력/생성 방식 변경·누출의 포괄 예외가 아니며 근거 없는 설명 공개를 허용하지 않는다. C02는 제출 후보 확보·설명 제한만 제한 수용한다. 독립 원문 대조·C02 2시간/총 6시간 준수·청구·자료 보호 전체 통과는 미확인이고 확인 불가 시간은 재추정·재질문하지 않는다.
+- **사본·승인 경계:** 기존 삭제 확인 기록에 따른 **지정한 로컬 후보 3개 삭제 확인**(9/22 13:31:34 KST)만 완료다. 나머지 관련 여부·전체 정리는 미확인이고 C03 경계 수용·Domain Design 최종 승인은 별도다. 기한은 9/23 23:59 KST 또는 더 이른 Domain Design 승인/관련 착수 전이다. Rough Mockups R-01은 해석 조건 수용(Accepted risk)이며 기존 Domain Design R-01 해결과 구분한다. 이번 통합에서 원문·세션·사본을 추가 열람·복구·삭제하지 않았다.
+- **링크 교정:** Code Style의 `evidence.md` 상대 링크는 원래 산출물 폴더에서는 존재하는 정본에 연결되지만 공식 승격 시 `memory/evidence.md`로 바뀌어 대상이 없다. 해당 한 구절에 저장소 루트 기준 `aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/evidence.md`를 명시하고 [공유 판본의 검사 근거](https://github.com/JminAILab/CatchU/blob/08c428847c4084dac0dace3b1c0cf52d963378c9/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/evidence.md#보안-검사-준비-상태와-후속-위치)를 병기했다. 저장소 경로는 현재 정본을, 고정 URL은 PR #68에 공유된 `08c4288`의 보안 검사 근거 절을 지칭한다. 그 절의 내용은 이번 수정에서 그대로 재사용하며 고정 판본을 최신 전체 상태로 표시하지 않는다. HTTPS 절대 URL은 원본·승격본 위치의 영향을 받지 않는다. 메모리를 직접 고치지 않았으며 실제 대상 확인·승격 예측 검사는 부모가 수행하고 최종 승인 뒤 실제 공식 승격본을 확인한다.
+- **재사용 검사:** 기존 지원 기여 3개의 Collaborator 식별자와 Contribution·Positions 절을 확인했다. 공식 복구 절차에 따라 완료된 지원 검토·Q1~Q3·기존 회고·위험 수용을 재사용하며 전면 재검토·제품 질문을 반복하지 않는다. Mandated 10개·Forbidden 8개, Methodology custom과 Ordering, 담당별 책임·나머지 관행·보안 검사 근거 절은 변경하지 않는다. 새 지원 재검토나 제품 검사 통과를 주장하지 않는다. 현재 memory/team.md의 다섯 관행과 project.md의 기존 규칙을 재실행 기준으로 읽었으며, 아래 T행의 주석 템플릿 관측은 최초 조사 당시 상태다.
+- **담당자 잔여 검토:** C03의 기존 유지/수정/제외 표는 재사용하되 F의 구체 기술 채택 제안과 B/E의 연결·계약 검토, 공통 경계 수용은 별도다. A/E 요청·동의 연결, F의 허용 범위 내 처리·결과 의미, E를 통한 전달과 B의 서비스 자료 관리, B/C의 사용자 확인·별도 공개 선택 및 표시 연결은 담당자 후속 설계·계약에서 검토한다. 담당별 주요 시나리오·기대 결과·실패 조건과 첫 최소 연결 범위·순서·실제/모의 방식도 후속으로 남긴다. 실패 후 보완·동의 재사용·재분석·기존 Catch/링크 변경 보류와 서비스 LLM 미선정을 유지한다.
+
+수정 범위는 네 산출물의 현재 지위·C01/C02 및 사본 상태·링크 한 구절·이번 증거 추가·통합 timestamp다. 제품 구현·CI·환경 구축·배포·추가 LLM/PoC 호출·버전 변경은 수행하지 않았고 PR 공유를 구현 착수 승인으로 사용하지 않는다. 기존 복구 입력 존재 차이의 비차단 안내와 초기화 Untracked는 그대로 보존한다. 이번 공식 변경 영향 확인을 그 표시 해소를 위한 재승인·초기화 재수행으로 처리하지 않는다.
+
 ## 조사 범위와 지위
 
 2026-09-22 KST · Step 5 최종 통합. 리드 `aidlc-pipeline-deploy-agent`가 최초 초안, 세 지원자의 독립 검토, Q1~Q3와 `Looks correct` 작성 전 확인을 통합했다. 단계 최종 승인·관행 승격은 아직 없다. 로컬 기준 HEAD는 `1ff52ae43628975d368b2d5d9955ab4ca183c21e`, 작업 브랜치는 부모가 확인한 `codex/mvp-recovery-20260922`이다. 기존 변경을 포함한 읽기 결과이며 새 제품 시험 결과가 아니다.

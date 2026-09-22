@@ -181,7 +181,7 @@ feasibility의 공식 승인 기록과 다음 단계 실제 착수는 구분한�
 
 ### 2026-09-22 Practices Discovery 요약 재확인 후 — 산출물 감사 연결 누락
 
-- 최초 최종 승인 요청은 `SUMMARY_ARTIFACT_UNAUTHORIZED`로 거부됐다. 사용자가 내용과 Q1~Q3를 유지한 1회 재확인을 선택해 [별도 재확인 질문 기록](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/practices-discovery-reconfirmation-questions.md)을 만들었다. 기존 질문의 `Looks correct`, 회고의 `Nothing to add`, 과거 승인·감사 기록은 소급 수정하지 않았다.
+- 최초 최종 승인 요청은 `SUMMARY_ARTIFACT_UNAUTHORIZED`로 거부됐다. 사용자가 내용과 Q1~Q3를 유지한 1회 재확인을 선택해 [별도 재확인 질문 기록](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-practices-reuse/practices-discovery-reconfirmation-questions.md)을 만들었다. 기존 질문의 `Looks correct`, 회고의 `Nothing to add`, 과거 승인·감사 기록은 소급 수정하지 않았다.
 - 재확인의 `Looks correct`는 공식 `log answer --checkpoint summary-confirmation`으로 정상 기록됐다. 감사 시각은 `2026-09-22T00:12:12Z`(09:12:12 KST), 새 Summary Authorization Id는 `528920bba0a058f19f67a858360a3396f1f13e14103669f84733e6f5bfa26e51`이다. 확인 답변이 없는 상태와 구분한다.
 - 담당 리드는 네 산출물을 셸 실행 도구의 Python `Path.write_bytes()`로 재저장했고 전후 SHA-256 일치를 확인했다. `team-practices.md`는 `ee899579eac50ca17c7dda8a08ea1e3ef67961b4342c16c82b8e9b52889873d7`, `discovered-rules.md`는 `ebf169c1255f54ed2a128883db30be14361d9deacbd8dbcb1ac3d36e7d699ffe`, `evidence.md`는 `167381082675278875d4e6fd00de03f52f23a8f2c2268a26db95077d799f7fbb`, `practices-discovery-timestamp.md`는 `2c592f57ae156e63355f46681dd1d7231871c0bdcff685c40e5c1a512129ef4f`다. 내용과 발견 시각은 바꾸지 않았다.
 - 그러나 전체 감사 shard를 대조했을 때 위 네 산출물의 `ARTIFACT_CREATED`/`ARTIFACT_UPDATED` 기록은 없었다. 새 확인 뒤에는 `00:12:50Z`의 `SUBAGENT_COMPLETED`만 있으며 산출물 저장과 새 확인을 잇는 감사 기록이 없다. 질문 파일의 전용 편집은 `00:12:06Z`에 `ARTIFACT_UPDATED`로 관측됐다. 재저장 이후 진단에서도 `write-audit-log`와 `run-sensors`의 마지막 실행은 이 질문 편집 시각이었다. [해당 감사 기록](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/audit/macui-macbookpro-local-de1289503add.md).
@@ -205,3 +205,28 @@ feasibility의 공식 승인 기록과 다음 단계 실제 착수는 구분한�
 - 이어 공식 `report --stage practices-discovery --result approved --user-input 'Approve'`가 `00:23:39Z`에 `GATE_APPROVED`·`STAGE_COMPLETED`와 네 산출물의 Validation Basis를 기록했다. 상태는 Practices Discovery 완료, Requirements Analysis 진행 중으로 전환됐다. 첫 intent와 과거 승인·확인·회고 기록은 보존됐다.
 - 기존 관행 산출물 4개·지원 검토 기여 3개를 재사용했다. 문서 본문의 작성 당시 ‘승인 전’ 표기를 소급 변경하지 않으며 현재 승인 여부는 위 공식 감사 기록을 따른다. 이전·현재 확인 식별자 차이에 대한 비차단 안내도 이력으로 보존한다.
 - 공식 다음 단계 지시를 받아 기존 승인 요구사항·M01~M07·화면 통합·인계의 적용 차이를 읽었다. 서비스용 LLM 선정은 feasibility Q5에서 이번 요구사항 단계의 OQ11 답변 시까지로 정한 미결이므로 현재 선정 상태 확인부터 진행한다. 실험 모델을 최종 선정으로 간주하지 않으며 추가 호출·구현·CI·환경 구축·버전 변경은 하지 않았다.
+
+### 2026-09-22 인계 후 재사용 검토 — 과거 재확인 파일의 이력 보관 복구
+
+- 이번 `SUMMARY_RECEIPT_MISSING`은 현재 확인의 소실이나 산출물 저장 감사 누락이 아니었다. 2.8.1 판정 코드는 단계 폴더 바로 아래의 모든 `*-questions.md`에 이번 단계 시작 이후의 확인을 요구한다. 현재 질문의 확인은 `2026-09-22T07:21:39Z`에 있으나 과거 재확인 파일의 마지막 확인 `00:12:12Z`는 이번 시작 `06:48:53Z`보다 앞서 있어 그 파일에서 거부됐다. 이 원인은 사용자가 한정 허용한 읽기 전용 코드 조사와 기존 감사 대조로 확인했다.
+- 사용자는 과거 재확인 파일 1개의 동일 내용 이동, 이 문서의 기존 클릭 링크 대상 1곳 교정, 이동 기록 추가를 명시적으로 허용했다. 이동 전 Q1~Q3와 과거 통합 요약·답변이 현재 질문 파일에 그대로 보존됐고 이번 변경 영향 확인도 포함됨을 확인했다. 현재 질문의 확인 내용 해시는 `b5afac41e5994d52528daea4bd49a0b204bf7d9597f88817861c3cb9ce1d3dfb`로 공식 확인과 일치한다.
+- 원래 경로: `aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/practices-discovery-reconfirmation-questions.md`.
+- 보관 경로: `aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-practices-reuse/practices-discovery-reconfirmation-questions.md`.
+- 이동 전후 동일 파일 바이트 SHA-256: `fd5ef4faa06a4abf4f57911250b473de97fbf0264a7f6603394000069393c0bc`. 전용 `apply_patch` 이동 후 `2026-09-22T07:52:42Z`(16:52:42 KST)에 원래 경로 부재·보관 파일 존재·해시 일치를 확인했다. 보관 폴더는 재귀 탐색하지 않는 현재 질문 검사 범위 밖이며 단계 폴더에는 현재 질문 파일 1개만 남았다.
+- 보관 파일 내부의 상대 링크 `practices-discovery-questions.md`는 같은 보관 폴더에 이미 있던 당시 질문 판본으로 연결된다. 이 판본은 공유 커밋 `08c428847c4084dac0dace3b1c0cf52d963378c9`와 동일하다. 이 문서의 기존 문장은 유지하고 링크 목적지만 보관 경로로 교정했다. 과거 감사의 원래 경로는 역사적 식별자로 보존하며 이 경로 대응 기록으로 새 위치를 추적한다.
+- 현재 확인 식별자 `0fa3dd0c7374bac2ccc112804f4243a2063b17fc1c0dee210512aaae393e8176`과 산출물 4개의 기존 자동 저장 연결을 재사용한다. 새 요약 확인·임의 산출물 재저장·수동 감사 생성·상태 초기화·코드/훅/버전 변경을 하지 않는다. Q1~Q3·필수/금지 규칙·담당 책임·회고와 C01/C02 적용 관계를 유지하며 C03·남은 사본 확인·Domain Design 최종 승인 조건은 미해결로 남긴다.
+- 현재 기록 시점에는 이동 후 연결 검증과 공식 승인 요청 1회 재시도가 남아 있다. 단계 최종 승인과 팀 관행 승격은 별도 사용자 승인 후에만 진행한다.
+
+후속 검증·승인 요청 결과:
+
+- 이동 후 원본 부재·보관 파일의 동일 바이트 해시, 복구 문서의 교정 링크와 보관 파일 내부 링크를 확인했다. 현재 질문 파일·산출물 4개·현재 확인 registry의 전체 바이트가 이동 전과 동일하고, 네 산출물의 최신 자동 저장 이벤트는 모두 `0fa3dd0c7374bac2ccc112804f4243a2063b17fc1c0dee210512aaae393e8176`에 연결돼 있다. 과거 감사 shard 6개의 기존 바이트 구간도 보존됐다. 복구 문서의 과거 본문은 허용된 링크 목적지 1곳 외에는 변경하지 않았고 범위 한정 `git diff --check`를 통과했다.
+- 이동 도구의 정상 자동 감사는 `07:52:14Z`에 원래 경로를 대상으로 `ARTIFACT_UPDATED`를 남겼다. 이를 과거 확인의 새 등록이나 산출물 4개의 재저장으로 해석하지 않는다. 실제 파일 위치와 내용의 이동은 위 원래/보관 경로·동일 바이트 해시로 검증했다.
+- 검증 후 공식 `aidlc engine orchestrate report --stage practices-discovery --result awaiting-approval`을 한 번 실행했고 성공했다. `2026-09-22T07:54:31Z`(16:54:31 KST)에 `STAGE_AWAITING_APPROVAL`이 생성돼 `[?] practices-discovery`로 최종 승인 대기가 열렸다. 이번 응답에는 `SUMMARY_RECEIPT_MISSING`이나 새 변경 수용 안내가 없었다. 현재 확인과 기존 산출물을 그대로 사용했으며 단계 최종 승인·관행 승격·다음 단계 착수는 하지 않았다.
+
+### 2026-09-22 재사용 관행 최종 승인·공식 반영 및 요구사항 변경 영향 확인
+
+- 사용자의 별도 `Approve`와 다음 단계 진행 요청에 따라 공식 `practices-promote`가 `2026-09-22T08:03:52Z`(17:03:52 KST)에 `PRACTICES_AFFIRMED`를 기록했다. `memory/team.md`의 관행 5개 절을 반영했고 필수·금지 규칙은 중복 추가 0건이다. `memory/project.md`의 SHA-256은 `03d88e62eb98f95a6dfca485e067baa41ac1ab02a2412908b8397535df814185`로 유지됐다. 메모리는 직접 수정하지 않았다.
+- 원본 `team-practices.md`와 실제 승격된 `memory/team.md` 양쪽에 같은 `08c4288` 고정 evidence 링크와 `보안 검사 준비 상태와 후속 위치` 앵커가 있음을 확인했다. 해당 공유 판본의 검사 근거 절은 현재 evidence의 그 절과 동일하다. 현재 정본 경로와 공유 판본의 검사 근거 링크를 구분하며, 고정 링크를 최신 상태 전체의 판본이라고 표시하지 않는다.
+- 이어 공식 승인 보고가 `08:04:10Z`(17:04:10 KST)에 `GATE_APPROVED`·`STAGE_COMPLETED`를 기록하고 Requirements Analysis를 시작했다. Q1~Q3·지원 기여 3개·필수 10개/금지 8개·담당 책임·기존 확인/회고·C01/C02 한정 적용과 나머지 조건을 유지한다. 원본 문서의 작성 당시 표기와 과거 승인 사건을 소급 변경하지 않는다.
+- Requirements Analysis의 기존 요구사항·질문을 재사용하는 공식 `modify` 기록을 남겼다. 기존 `requirements.md`의 FR/NFR/OQ ID·M01~M07·FR4.1의 R-01 수정·서비스 모델 미선정·담당 책임은 유지 가능하다. 필요한 최소 갱신은 적용 상태/출처 설명, 선정 표의 C02 수용 지위, C01/C02 현재 상태 행, 지정 사본 3개와 나머지 미확인의 구분이다. C03·사본 나머지·Domain Design 최종 승인 등 다른 조건을 해결로 바꾸지 않는다.
+- 수정 전 요구사항·질문 판본은 [요구사항 이력 보관](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-requirements-reuse/)에 복사했다. 질문 파일의 기존 답변·과거 요약을 보존하고 날짜 있는 변경 영향/수정 요약과 빈 확인 답변을 추가했다. `08:08:38Z`에 공식 요약 질문을 등록했다. 요구사항 본문은 아직 변경하지 않았고 새 요약 확인·수정·독립 재검토·요구사항 단계 최종 승인은 남아 있다. 제품 정책·서비스 모델·위험 수용·회고를 재질문하지 않는다.

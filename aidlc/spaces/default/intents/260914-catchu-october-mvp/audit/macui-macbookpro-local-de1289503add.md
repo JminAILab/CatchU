@@ -2585,3 +2585,359 @@
 **Stage**: approval-handoff
 
 ---
+
+## Human Turn
+**Timestamp**: 2026-09-22T07:11:31Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-09-22T07:15:53Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-pipeline-deploy-agent
+**Agent ID**: 01a0c7f5-eabd-7a90-86ad-2a6c14d955f4
+**Message**: 읽기 전용 검토 완료입니다. 네 규칙 파일과 역할·공통 지식, 단계·복구 절차를 읽었습니다. 파일 수정·상태 변경·호출은 하지 않았습니다.\n\n**최소 수정안**\n\n| 파일 | 정확한 범위 | 제안 |\n|---|---|---|\n| `team-practices.md` | 지위 문단, Testing Posture 마지막 문단(현재 32행), Code Style 
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-22T07:16:47Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-practices-reuse/team-practices.md
+**Context**: archive > 2026-09-22-practices-reuse > team-practices.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-22T07:16:47Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-practices-reuse/discovered-rules.md
+**Context**: archive > 2026-09-22-practices-reuse > discovered-rules.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-22T07:16:48Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-practices-reuse/evidence.md
+**Context**: archive > 2026-09-22-practices-reuse > evidence.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-22T07:16:48Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-practices-reuse/practices-discovery-timestamp.md
+**Context**: archive > 2026-09-22-practices-reuse > practices-discovery-timestamp.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-22T07:16:48Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-practices-reuse/practices-discovery-questions.md
+**Context**: archive > 2026-09-22-practices-reuse > practices-discovery-questions.md
+
+---
+
+## Artifact Reused
+**Timestamp**: 2026-09-22T07:16:49Z
+**Event**: ARTIFACT_REUSED
+**Stage**: practices-discovery
+**Decision**: modify
+**Artifacts**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/team-practices.md,aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/discovered-rules.md,aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/evidence.md,aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/practices-discovery-timestamp.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-22T07:17:55Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/practices-discovery-questions.md
+**Context**: inception > practices-discovery > practices-discovery-questions.md
+**Summary Authorization Id**: 528920bba0a058f19f67a858360a3396f1f13e14103669f84733e6f5bfa26e51
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-09-22T07:18:09Z
+**Event**: DECISION_RECORDED
+**Stage**: practices-discovery
+**Decision**: 기존 Q1~Q3·지원 기여·회고를 재사용하고 C01/C02 승인 적용·근거 경로의 최소 수정 범위가 맞습니까?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/practices-discovery-questions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-22T07:21:26Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-22T07:21:39Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/practices-discovery-questions.md
+**Context**: inception > practices-discovery > practices-discovery-questions.md
+**Summary Authorization Id**: 528920bba0a058f19f67a858360a3396f1f13e14103669f84733e6f5bfa26e51
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-09-22T07:21:39Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: practices-discovery
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/practices-discovery-questions.md
+**Questions SHA-256**: b5afac41e5994d52528daea4bd49a0b204bf7d9597f88817861c3cb9ce1d3dfb
+**Hash Scope**: confirmed-content-v1
+**Summary Authorization Id**: 0fa3dd0c7374bac2ccc112804f4243a2063b17fc1c0dee210512aaae393e8176
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-22T07:24:58Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/team-practices.md
+**Context**: inception > practices-discovery > team-practices.md
+**Summary Authorization Id**: 0fa3dd0c7374bac2ccc112804f4243a2063b17fc1c0dee210512aaae393e8176
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-22T07:24:58Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/discovered-rules.md
+**Context**: inception > practices-discovery > discovered-rules.md
+**Summary Authorization Id**: 0fa3dd0c7374bac2ccc112804f4243a2063b17fc1c0dee210512aaae393e8176
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-22T07:24:59Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/evidence.md
+**Context**: inception > practices-discovery > evidence.md
+**Summary Authorization Id**: 0fa3dd0c7374bac2ccc112804f4243a2063b17fc1c0dee210512aaae393e8176
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-22T07:24:59Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/practices-discovery-timestamp.md
+**Context**: inception > practices-discovery > practices-discovery-timestamp.md
+**Summary Authorization Id**: 0fa3dd0c7374bac2ccc112804f4243a2063b17fc1c0dee210512aaae393e8176
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-09-22T07:26:23Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-pipeline-deploy-agent
+**Agent ID**: 01a0c7f5-eabd-7a90-86ad-2a6c14d955f4
+**Message**: 네 산출물의 최종 통합을 **native apply_patch**로 완료했습니다. 변경은 18행 추가·6행 삭제이며, 메모리·질문·상태·감사·지원 기여는 수정하지 않았습니다.\n\n- C01/C02의 9/22 승인 적용, 사본 3개만 삭제 확인, 나머지 조건 미해결을 반영했습니다.\n- Code Style에는 저장소 정본 경로와 **공유 판본의 검사 근거** 고
+
+---
+
+## Practices Discovered
+**Timestamp**: 2026-09-22T07:27:09Z
+**Event**: PRACTICES_DISCOVERED
+**Sources Scanned**: 08c4288 기존 산출물·Q1~Q3·지원 기여 3개·9/22 승인 인계·고정 evidence 링크; 새 실험 호출 없음
+**Drafts**: team-practices.md, discovered-rules.md, evidence.md, practices-discovery-timestamp.md
+
+---
+
+## Guardrail Loaded
+**Timestamp**: 2026-09-22T07:27:40Z
+**Event**: GUARDRAIL_LOADED
+**Scope**: all
+**Path**: .codex/aidlc-rules/
+**Rule count**: 7
+
+---
+
+## Health Check
+**Timestamp**: 2026-09-22T07:27:40Z
+**Event**: HEALTH_CHECKED
+**Request**: /aidlc --doctor
+**Details**: 60 passed, 0 failed
+
+---
+
+## Session Compacted
+**Timestamp**: 2026-09-22T07:31:30Z
+**Event**: SESSION_COMPACTED
+**Current Stage**: practices-discovery
+**State Validity**: valid
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-22T07:37:24Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-22T07:45:01Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-22T07:51:01Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-22T07:52:14Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/practices-discovery/practices-discovery-reconfirmation-questions.md
+**Context**: inception > practices-discovery > practices-discovery-reconfirmation-questions.md
+**Summary Authorization Id**: 0fa3dd0c7374bac2ccc112804f4243a2063b17fc1c0dee210512aaae393e8176
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-09-22T07:54:31Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: practices-discovery
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-22T08:03:20Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Practices Affirmed
+**Timestamp**: 2026-09-22T08:03:52Z
+**Event**: PRACTICES_AFFIRMED
+**Affirming User**: ljm0850
+**Sections Written**: Way of Working, Walking Skeleton, Testing Posture, Deployment, Code Style
+**Mandated Rules Appended**: 0
+**Forbidden Rules Appended**: 0
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-09-22T08:04:10Z
+**Event**: GATE_APPROVED
+**Stage**: practices-discovery
+**User Input**: Approve
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-09-22T08:04:10Z
+**Event**: STAGE_COMPLETED
+**Stage**: practices-discovery
+**Validation Basis**: {"graphContract":"sha256:886af627a0fea6d271a662e4a54b4c5993ecee715d6144d46d4a58c2bc3d19bb","inputs":[],"outputs":[{"artifact":"discovered-rules","contentHash":"sha256:6d86deabcb5dad2feb7954a508c904a10bc544673e8fba44834a7404961083df","instanceCount":1,"presentCount":1,"producer":"practices-discovery","required":true,"structureHash":"sha256:96ab92e3da5066695c90edc56ab2ca3173493d9aad60a0ef496922082d1772ee"},{"artifact":"evidence","contentHash":"sha256:ac343f88423faa65071792043b6ba492bc508508efee869e54871454842ba33b","instanceCount":1,"presentCount":1,"producer":"practices-discovery","required":true,"structureHash":"sha256:6614ae916cbe8d68f432d7b42206956837b9d1bbda2af0044e873938d1c016fc"},{"artifact":"practices-discovery-timestamp","contentHash":"sha256:47e378e21a8a3f4cce4bf2fd4e400211fddd920e7f6c78fb658a6bd4c80a3fef","instanceCount":1,"presentCount":1,"producer":"practices-discovery","required":true,"structureHash":"sha256:96479cd19c4b2e8876110837d126d34dc7456940644321004fea3350ecb4b86a"},{"artifact":"team-practices","contentHash":"sha256:7e7ddea03ee644c36f2b92b94646bdc76ea89f4af5a894f14f6fdaaf112d07a0","instanceCount":1,"presentCount":1,"producer":"practices-discovery","required":true,"structureHash":"sha256:11ce35988068e0312d2497bc158c217089b0629ef24722257617280f4ad0564f"}],"projectType":"greenfield","schema":3}
+**Details**: Stage Practices Discovery approved by gate
+
+---
+
+## Stage Start
+**Timestamp**: 2026-09-22T08:04:10Z
+**Event**: STAGE_STARTED
+**Stage**: requirements-analysis
+**Agent**: aidlc-product-agent
+
+---
+
+## Memory Empty
+**Timestamp**: 2026-09-22T08:04:11Z
+**Event**: MEMORY_EMPTY
+**Stage**: practices-discovery
+
+---
+
+## Artifact Reused
+**Timestamp**: 2026-09-22T08:07:21Z
+**Event**: ARTIFACT_REUSED
+**Stage**: requirements-analysis
+**Decision**: modify
+**Artifacts**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md,aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements-analysis-questions.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-22T08:07:47Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-requirements-reuse/requirements.md
+**Context**: archive > 2026-09-22-requirements-reuse > requirements.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-22T08:07:48Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-requirements-reuse/requirements-analysis-questions.md
+**Context**: archive > 2026-09-22-requirements-reuse > requirements-analysis-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-22T08:08:37Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements-analysis-questions.md
+**Context**: inception > requirements-analysis > requirements-analysis-questions.md
+**Summary Authorization Id**: 13c7ef97c40d0357c14cd06a12ee0e0f077fa22add4abab9935c00c376b8b1c0
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-09-22T08:08:38Z
+**Event**: DECISION_RECORDED
+**Stage**: requirements-analysis
+**Decision**: Does this all look correct before I generate the requirements artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements-analysis-questions.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-22T08:11:21Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-practices-reuse/README.md
+**Context**: archive > 2026-09-22-practices-reuse > README.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-22T08:11:22Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/archive/2026-09-22-requirements-reuse/README.md
+**Context**: archive > 2026-09-22-requirements-reuse > README.md
+
+---

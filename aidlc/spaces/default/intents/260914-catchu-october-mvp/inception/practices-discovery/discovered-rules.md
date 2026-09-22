@@ -2,7 +2,7 @@
 
 ## 지위와 근거
 
-Practices Discovery Step 5 통합본. 아래 제약은 intent `260914-catchu-october-mvp`에 적용하는 기존 사용자 지시·승인 인계·레포 규칙과 [Q1~Q3 및 작성 전 확인](practices-discovery-questions.md)에 근거한다. 단계 최종 승인·memory 승격 전이며 PR #72 전체를 승인한 것은 아니다. 기한이 있는 조건과 미결 상태는 해당 증거·공식 후속 결정에 따라 갱신하며 영구 미해결 규칙으로 고정하지 않는다. 근거는 [evidence.md](evidence.md), [인계 결정](../../ideation/approval-handoff/decision-log.md), [기존 답변](../../ideation/approval-handoff/approval-handoff-questions.md), [승인 계획](../../workflow-plan.md)이다.
+2026-09-22 KST · Practices Discovery Step 5 재사용·변경 영향 통합본. 아래 제약은 intent `260914-catchu-october-mvp`에 적용하는 기존 사용자 지시·승인 인계·레포 규칙과 [Q1~Q3 및 이번 작성 전 확인](practices-discovery-questions.md)에 근거한다. Mandated 10개·Forbidden 8개와 기존 승인·승격을 보존하며 이번 변경의 단계 최종 승인·공식 관행 반영은 별도다. PR #72 전체를 승인한 것은 아니다. [이전 판본](../../archive/2026-09-22-practices-reuse/discovered-rules.md)을 보존하고, 기한이 있는 조건과 미결 상태는 해당 증거·공식 후속 결정에 따라 갱신하며 영구 미해결 규칙으로 고정하지 않는다. 근거는 [evidence.md](evidence.md), [인계 결정](../../ideation/approval-handoff/decision-log.md), [기존 답변](../../ideation/approval-handoff/approval-handoff-questions.md), [승인 계획](../../workflow-plan.md)이다.
 
 ## Mandated
 
@@ -30,4 +30,4 @@ Practices Discovery Step 5 통합본. 아래 제약은 intent `260914-catchu-oct
 
 ## 제약으로 승격하지 않은 항목
 
-PR #72의 브랜치 변경안은 Q1에 따라 후속 검토로 남기고 현행 규칙을 유지한다. 공통 작업·검사·오류/로그 절차와 Q2의 custom 순서·Q3의 최소 연결 방식을 반영했지만 구체 검사 도구·버전·계약은 미정이다. org의 80% 라인 커버리지·머지 전 CI를 유지한다. 수동 배포 지시와 org 자동 staging 배포 기본의 차이는 사용자 지시를 따르되 원본의 적용 관계가 수정됐다고 주장하지 않는다. 현재 C01 미달/R1 예외 적용 대기·C02 독립 대조/시간 상한 미확인·사본 삭제 완료 미확인은 evidence의 관측 상태이며 위 조건 이행 증거가 나오면 갱신한다.
+PR #72의 브랜치 변경안은 Q1에 따라 후속 검토로 남기고 현행 규칙을 유지한다. 공통 작업·검사·오류/로그 절차와 Q2의 custom 순서·Q3의 최소 연결 방식을 반영했지만 구체 검사 도구·버전·계약은 미정이다. org의 80% 라인 커버리지·머지 전 CI를 유지한다. 수동 배포 지시와 org 자동 staging 배포 기본의 차이는 사용자 지시를 따르되 원본의 적용 관계가 수정됐다고 주장하지 않는다. 9/22 승인 인계에 따라 C01 기준 미달을 유지한 R1 한 건의 필수 추가 튜닝·재호출 예외와 C02 제출 후보 확보·설명 제한의 제한 수용을 적용한다. 독립 원문 대조·시간 상한·청구·자료 보호 전체 통과는 미확인이고 확인 불가 시간은 재추정·재질문하지 않는다. 사본은 9/22 13:31:34 KST의 '지정한 로컬 후보 3개 삭제 확인'만 완료이며 나머지 관련 여부·전체 정리는 미확인이다. C03·Domain Design 최종 승인과 기존 기한·관련 착수 조건은 유지한다. 관측 상태와 후속 검토는 evidence에 구분하며 위 필수·금지 규칙을 변경하거나 새 실행 권한으로 전용하지 않는다.
