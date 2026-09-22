@@ -3363,3 +3363,18 @@
 **Options**: 경계 수용,수정 요청
 
 ---
+
+## Human Turn
+**Timestamp**: 2026-09-22T09:30:56Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Question Answered
+**Timestamp**: 2026-09-22T09:31:19Z
+**Event**: QUESTION_ANSWERED
+**Stage**: domain-design
+**Details**: 1. 경계 수용. 함수별 채택과 상세 설계는 담당자 제안·검토로 유지해 주세요.
+
+---
