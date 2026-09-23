@@ -8,7 +8,7 @@ Next.js로 만드는 10월 MVP의 사용자 화면이다. 로그인·프로필·
 
 | 항목 | 값 | 근거 |
 |---|---|---|
-| Node.js | 24.21.0 (`.node-version`, `package.json` `engines`) | 9/23 회의 공통 결정 |
+| Node.js | 24.21.0 고정. `package.json` `engines` + `.npmrc`의 `engine-strict=true`로 다른 버전에서는 `npm ci`가 실패한다 | 9/23 회의 공통 결정 |
 | npm | 11 이상. 잠금 파일은 `package-lock.json` | [#81](https://github.com/JminAILab/CatchU/issues/81) 공통 설정 |
 | 포트 | 3000 (api 3001, worker 8000) | [#81](https://github.com/JminAILab/CatchU/issues/81) 공통 설정 |
 | Next.js / React | 16.3.6 / 19.2.8 | `package.json` |
@@ -17,10 +17,23 @@ Next.js로 만드는 10월 MVP의 사용자 화면이다. 로그인·프로필·
 
 ## 설치
 
+**Node.js 24.21.0 준비** — 설치된 버전이 다르면 `npm ci`가 `engine-strict`로 실패한다.
+
+| 도구 | 명령 | 비고 |
+|---|---|---|
+| nvm (macOS/Linux) | `nvm install 24.21.0 && nvm use 24.21.0` | nvm은 `.node-version`을 읽지 않으므로 버전을 직접 적는다 |
+| nvm-windows | `nvm install 24.21.0` → `nvm use 24.21.0` | 관리자 권한 터미널 |
+| fnm | `fnm install 24.21.0`, 이후 `fnm use`가 `.node-version`을 읽음 | |
+| 설치 프로그램 | https://nodejs.org 에서 24.21.0 | |
+
+확인: `node -v` → `v24.21.0`, `npm -v` → 11 이상.
+
 ```bash
 cd web
 npm ci
 ```
+
+`npm ci` 중 `unrs-resolver` 설치 스크립트(allow-scripts) 미승인 경고가 나오지만 승인하지 않아도 lint·빌드·실행이 통과한다(Windows·macOS 확인). 그대로 두면 된다.
 
 `npm ci`는 `package-lock.json`과 정확히 같은 버전을 설치한다. 의존성을 추가·변경할 때만 `npm install`을 쓰고, 바뀐 `package-lock.json`을 함께 커밋한다.
 
@@ -32,7 +45,7 @@ npm ci
 | 배포용 빌드 | `npm run build` | `.next/` 생성, 오류 없이 종료 |
 | 빌드 결과 실행 | `npm run start` | `npm run build` 뒤에만 가능. 주소는 개발 서버와 같음 |
 
-종료는 서버를 띄운 터미널에서 `Ctrl+C`. 포트 3000이 이미 사용 중이면 `PORT=3001 npm run dev`처럼 임시로 바꾸되, 팀 공통 포트는 3000이다.
+종료는 서버를 띄운 터미널에서 `Ctrl+C`. 포트 3000이 이미 사용 중이면 `npm run dev -- -p 3001`처럼 실행 인자로 임시로 바꾸되(Windows·macOS 공통), 팀 공통 포트는 3000이다. `.env`·`.env.local`의 `PORT`는 적용되지 않는다.
 
 ## 검사
 
@@ -41,7 +54,7 @@ npm ci
 | `npm run lint` | ESLint (`eslint-config-next` core-web-vitals + typescript) | 조건문 안의 React Hook 호출 |
 | `npm run typecheck` | `tsc --noEmit`. 생성 파일(`next-env.d.ts`, `.next/types`) 없이도 통과해야 함 | `const n: number = "x"` |
 | `npm run build` | 프로덕션 빌드 | 빌드 중 타입·import 오류 |
-| `npm run check:run` | `scripts/smoke.mjs`: 빌드 결과를 `next start`로 띄워 `GET /`가 200이고 본문에 "CatchU web"이 있는지 확인 후 종료. **`npm run build` 이후에만 실행** | 서버 미기동, 200 아님, 본문 불일치 |
+| `npm run check:run` | `scripts/smoke.mjs`: 포트가 비어 있는지 확인한 뒤 빌드 결과를 `next start`로 띄우고, Ready 출력 후 `GET /`가 200이고 본문에 "CatchU web"이 있는지 확인하고 종료(전체 30초 제한). **`npm run build` 이후에만, 개발 서버를 끈 상태에서 실행** | 포트 사용 중, 서버 미기동, 200 아님, 본문 불일치, 30초 초과 |
 | `npm run check` | 위 4개를 순서대로 실행 | 하나라도 실패하면 중단 |
 
 PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 적는다.
@@ -63,7 +76,8 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `scripts/smoke.mjs` | 최소 실행 검사(`check:run`) |
 | `package.json` / `package-lock.json` | 의존성·스크립트·Node 버전 고정 |
 | `.node-version` | Node.js 버전(버전 관리 도구용) |
-| `.env.example` | 환경변수 목록 예시 |
+| `.env.example` | 환경변수 목록 예시(포트는 여기서 못 바꿈) |
+| `.npmrc` | `engine-strict=true` — Node 버전 강제 |
 | `next.config.ts`, `tsconfig.json`, `eslint.config.mjs` | Next.js·TypeScript·ESLint 설정(create-next-app 기본값) |
 | `.gitignore` | `node_modules/`, `.next/`, `next-env.d.ts` 등 생성물 제외 |
 
