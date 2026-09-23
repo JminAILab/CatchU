@@ -8,7 +8,7 @@ FastAPI 기반 worker의 최소 실행 골격이다. 현재 구현은 `GET /heal
 
 | 구분 | 기준 |
 |---|---|
-| Python | `3.13.15` (`.python-version`) |
+| Python | `3.12.10` (`.python-version`과 `requires-python`에 고정) |
 | 가상환경·의존성 관리 | `uv` (`0.12.18` 기준) |
 | 웹 앱·서버 | FastAPI `0.141.1`, Uvicorn `0.53.0` |
 | 정적·서식·타입 검사 | Ruff `0.16.8`, mypy `2.3.1` |
@@ -38,7 +38,7 @@ macOS에서 Homebrew를 사용한다면:
 brew install uv
 ```
 
-설치 후 새 터미널을 열고 `uv --version`으로 확인한다. Homebrew는 설치 시점의 버전을 사용한다. 기준 버전으로 재현해야 할 때는 위 버전 지정 설치 방법을 사용한다. 오래된 uv는 이 프로젝트의 Python 버전을 자동 설치하지 못할 수 있다.
+설치 후 새 터미널을 열고 `uv --version`으로 확인한다. Homebrew는 설치 시점의 버전을 사용한다. 기준 버전으로 재현해야 할 때는 위 버전 지정 설치 방법을 사용한다.
 
 이후 모든 명령은 **저장소의 `worker/` 디렉터리**에서 실행한다.
 
