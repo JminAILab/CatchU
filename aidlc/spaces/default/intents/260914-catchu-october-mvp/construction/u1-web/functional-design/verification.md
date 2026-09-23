@@ -26,3 +26,9 @@
 독립 검토 1회 READY, Minor 1건. [검토 사본](review.md)은 공식 기록 body를 보존한다. R-01 New: 수신 접근 행의 PASSWORD_REQUIRED/INVALID를 정확한 LINK_PASSWORD_REQUIRED/LINK_PASSWORD_INVALID로 표기해야 한다. 최종 승인 판단에 제시하며, 해결/위험 수용으로 바꾸지 않는다.
 
 2026-09-23T08:11:59Z에 UNIT_COMPLETED(u1-web, wave)가 성공했다. 이후 공식 조회는 세 Unit 작성 완료 후 Functional 단계 최종 확인 대상으로 전환했다. 단계 승인/intent 종료는 아직 하지 않았다.
+
+## R-01 한정 수정·재검토
+
+사용자 Request Changes에 따라 수신 접근 행의 PASSWORD_REQUIRED/INVALID 한 곳만 LINK_PASSWORD_REQUIRED/LINK_PASSWORD_INVALID로 바꿨다. 그 교체 외 functional-spec 본문과 traceability는 수정 전 HEAD와 바이트 비교로 동일함을 확인했다. 계약과 worker는 변경하지 않았다.
+
+[재검토 사본](review-revision-1.md): READY / R-01 Resolved / 신규 지적 0. 과거 리뷰는 보존하고 새 revision attempt의 별도 검토 기록을 연결했다. 기존 회고·추적 검사 한계·B 담당 확인 조건은 유지하며 단계 최종 승인은 별도다.

@@ -34,7 +34,8 @@ erDiagram
 |---|---|---|
 | F1 회원/연동 | 1 JWT 주체 확인 → 2 A 계정/프로필·현재 연동 조회 → 3 허용 필드 응답/자가 입력 저장 | 타인 자원 은닉; 실제 OAuth/자격정보 수명 OQ-A1. 개발용 로그인 #87과 실제 제공자 연결 구분 |
 | F2 새 요청 | 1 인증/형식·멱등 키 검사 → 2 현재 연동·저장소/고지/범위 확인 → 3 회원 단위 ACTIVE·선행 이력 판정 → 4 요청·새 동의·첫 시도·멱등 연결 한 번에 저장 → 5 202 → 6 허용된 전송 연결로 요청 전달 | 동일 키 충돌 409. 동일 저장소 ACTIVE는 새 행 없이 기존 작업 200; 다른 저장소는 409. 영속 접수 실패는 202 불가. 전송 불확실은 새 요청이 아님 |
-| F3 수신 | 1 식별 가능성 검사 → 2 스키마/맥락 대조 → 3 수신/반영 키·동일 payload 판정 → 4 E 메타데이터 저장 → 5 Receipt → 6 B 전달 | 세 ID 중 하나라도 식별 불가면 Receipt 없음. 맥락 오류/다른 payload/늦은 시도는 기존 값 보존. Receipt ACCEPTED는 B 반영 완료 아님 |
+| F3 Result 수신 | 1 식별 가능성 검사 → 2 스키마/맥락 대조 → 3 수신/반영 키·동일 payload 판정 → 4 E 메타데이터 저장 → 5 Receipt → 6 B 전달 | 세 ID 중 하나라도 식별 불가면 Receipt 없음. 맥락 오류/다른 payload/늦은 시도는 기존 값 보존. Receipt ACCEPTED는 B 반영 완료 아님 |
+| F3-P ProcessingEvent 수신 | 1 자체 스키마 검사 → 2 requestId/attemptId의 요청·현재 시도 맥락 확인 → 3 F 진행 관측 반영 | BR2.15 적용. resultId/ResultReceipt를 요구하거나 생성하지 않으며, 늦은 진행 이벤트로 종결 상태를 되돌리지 않음 |
 | F4 등록/반영 | 1 E가 허용 후보를 B에 전달 → 2 B 기준/동일 작업 검사 → 3 Catch·근거·초안/질문·후보 등록 연결 원자 저장 또는 기존 참조 → 4 B가 catchId/본인 열람 준비 반환 → 5 E가 등록 ID·준비/반영/종결 기록 | B 저장 성공 뒤 E 실패는 등록 연결에서 복원. 일부 후보만 처리했으면 나머지 해결 전 APPLIED/CLOSED로 만들지 않음. 반영 복구는 새 분석 호출이 아님 |
 | F5 본인 확인/공개 | 1 본인 Catch 조회 → 2 근거·기여 확인 PUT → 3 web이 지금 공개 제안 → 4 사용자가 별도 PUBLIC PUT → 5 현재 확인/보호 재검사 후 저장 | 초안 없어도 나머지 조건 충족이면 가능. 최초 PRIVATE, 확인만으로 공개 안 함. PRIVATE·mismatch PUT은 별도 현재 상태 지정 |
 | F6 링크 발급/중단 | 1 본인+operation 멱등 → 2 회원 단위 현재 유효 링크 조회 → 3 trim 제목/5개 검사 → 4 발급 시각+30일·선택 비밀번호 참조·멱등 연결 저장 → 5 본인 중단 요청 시 stoppedAt 기록 | 만료/중단 링크는 검사 제외. 시간 기반 상태 유도. 중단은 Catch를 숨기거나 지우지 않음 |
@@ -48,7 +49,7 @@ erDiagram
 | 대상 | 전이 | 조건 |
 |---|---|---|
 | request | 생성 → ACCEPTED / ACTIVE | 요청·동의·첫 시도 원자 저장 |
-| processing | QUEUED → RUNNING 또는 UNCERTAIN | F의 검증된 진행 또는 실행 여부 불명 |
+| processing | QUEUED → RUNNING 또는 UNCERTAIN | BR2.15로 검증한 F 진행 또는 실행 여부 불명. RECEIVED는 수신 관측이며 그 자체를 RUNNING/종결로 치환하지 않음; ResultReceipt 조건 미적용 |
 | processing | RUNNING/UNCERTAIN/QUEUED → 종결 enum | 맥락에 맞는 종결 결과; 결과가 진행 알림보다 먼저 도착해도 허용 |
 | processing | 종결 → 동일 종결 유지 | 중복 수신은 동일 의미. 뒤늦은 RUNNING/UNCERTAIN으로 되돌리지 않음 |
 | application | NOT_READY → PENDING → APPLYING → APPLIED | 결과 수신 → 실제 반영 → 모든 후보/실패 의미 반영 확인 |
@@ -92,7 +93,7 @@ retry.allowed는 [계약](../../../inception/contract-design/contract-summary.md
 | 업무 | rules.md |
 |---|---|
 | 본인·연동/동의 | BR2.1·BR2.2 |
-| 접수/재요청·처리/반영 | BR2.3~BR2.6 |
+| 접수/재요청·처리/반영 | BR2.3~BR2.6·BR2.15 |
 | 등록/초안·질문/공개·보호 | BR2.7~BR2.10 |
 | 현재 공개 집합·링크/비밀번호 | BR2.11~BR2.13 |
 | 오류/멱등·응답 형식 | BR2.14 |
@@ -119,4 +120,3 @@ retry.allowed는 [계약](../../../inception/contract-design/contract-summary.md
 [작성 확인](functional-design-questions.md) · [추적표](traceability.json) · [Unit](../../../inception/units-generation/unit-of-work.md) · [Unit 매핑](../../../inception/units-generation/unit-of-work-story-map.md) · [requirements](../../../inception/requirements-analysis/requirements.md) · [components](../../../inception/domain-design/components.md) · [API](../../../inception/contract-design/contract-summary.md) · [common](../../../inception/contract-design/common.yaml) · [회원](../../../inception/contract-design/member-api.yaml) · [수신자](../../../inception/contract-design/recipient-api.yaml) · [worker](../../../inception/contract-design/worker-messages.yaml) · [Delivery](../../../inception/delivery-planning/bolt-plan.md).
 
 R-01/R-02 수정본 90bf289 사용. [단독 실행](../../../inception/contract-design/single-r01-r02-verification.md)은 공식 완료 불가로 열린 상태를 유지하며 PR #89 담당 리뷰로 확인한다. 상류 승인/문구는 다시 쓰지 않는다. 첫 연결 결과 M1 승인과 Functional 전체 최종 승인은 별도다. 자료 조건: [#37](https://github.com/JminAILab/CatchU/issues/37).
-

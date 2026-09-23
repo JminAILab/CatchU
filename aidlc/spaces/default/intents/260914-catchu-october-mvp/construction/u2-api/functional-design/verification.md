@@ -32,3 +32,11 @@
 2026-09-23T07:49:53Z에 UNIT_COMPLETED(u2-api, wave)가 성공했고 다음 대상으로 u1-web이 반환됐다. 이는 Unit 작업 정리 기록이며 R-01 수용·Functional 단계 최종 승인이 아니다.
 
 최종 staged 공백 검사에는 자동 감사 메시지의 trailing whitespace 1건과 문서 끝 빈 줄 안내가 남았다. 자동 감사와 검토 고정본을 직접 고치지 않고 그대로 보존하며, 공백 검사 통과로 기록하지 않는다.
+
+## R-01 한정 수정·재검토
+
+사용자 Request Changes에 따라 BR2.5는 Result 전용으로 명확히 하고 ProcessingEvent 전용 BR2.15를 분리했다. 진행 이벤트의 필수 6개 필드·상태·맥락 검사와 종결 상태 보존을 계약에 연결하며 resultId/ResultReceipt를 적용하지 않는다. Result의 기존 세 ID·Receipt 규칙은 유지했다. 관련 F3/F3-P·상태/규칙 요약과 FR1.4 target만 함께 연결했다.
+
+YAML/JSON 검사에서 규칙 15개·FR 19개·target 누락/고아 0, 기존 나머지 규칙 13개 동일을 확인했다. 계약 2개·worker 폴더 파일 8개·api entities는 수정 전 HEAD와 동일하고 별도 미커밋 11개도 유지했다. 기존 추적 센서 한계는 그대로 남긴다.
+
+[재검토 사본](review-revision-1.md): 새 revision attempt의 iteration 1, READY / R-01 Resolved / 신규 지적 0. 최초 iteration 2 요청은 절차가 새 attempt의 1을 요구해 거부됐고, 안내한 1로 등록에 성공했다. 질문 재확인·상태 초기화·과거 검토/감사 수정은 하지 않았다. 기존 회고를 재사용하며 최종 승인·B 담당 확인은 별도다.

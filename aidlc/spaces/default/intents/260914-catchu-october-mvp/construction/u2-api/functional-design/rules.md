@@ -39,11 +39,11 @@ rules:
     violation: "409 RETRY_NOT_ALLOWED/REANALYSIS_DEFERRED; 요청 ID 생략 우회 금지, timeout/조회 실패는 근거 아님"
     source: ["FR1.4"]
   - id: BR2.5
-    statement: "수신 식별·맥락·중복 검사와 반영 완료를 분리한다"
+    statement: "Result 수신 식별·맥락·중복 검사와 반영 완료를 분리한다"
     category: validation
     applies_to: ["AnalysisAttempt","ResultApplicationRecord"]
-    trigger: "F 진행/결과 수신"
-    logic: "IF 세 ID가 비어 있지 않은 문자열이고 스키마/요청/시도/본인/저장소/동의/범위가 맞으면 수락; 동일 ID/의미는 중복으로 수렴"
+    trigger: "F Result 수신"
+    logic: "IF resultId/requestId/attemptId 세 ID가 비어 있지 않은 문자열이고 스키마/요청/시도/본인/저장소/동의/범위가 맞으면 수락; 동일 ID/의미는 중복으로 수렴"
     violation: "식별 불가면 Receipt 없이 비원문 거부 기록만; 식별 가능 오류는 REJECTED; 충돌/늦은 시도는 보존·격리, ACCEPTED는 등록 완료 아님"
     source: ["FR1.4"]
   - id: BR2.6
@@ -118,6 +118,14 @@ rules:
     logic: "IF 본인+operation+키+정규화 본문 동일이면 기존 응답/자원, 다르면 거부; 회원 목록 items/page, 수신자 목록 profile/catches/page; 모든 응답 no-store"
     violation: "409 IDEMPOTENCY_CONFLICT; 원문/토큰/비밀번호/내부 스택 제외, 0건과 오류 구분, 응답 불명 새 키 자동 재전송 없음"
     source: ["FR1.4","FR4.3","FR11.1"]
+  - id: BR2.15
+    statement: "ProcessingEvent는 자체 필드와 요청 맥락으로 검사한다"
+    category: validation
+    applies_to: ["AnalysisAttempt"]
+    trigger: "F ProcessingEvent 수신"
+    logic: "IF schemaVersion=1, 비어 있지 않은 messageId/requestId/attemptId, state=RECEIVED/RUNNING/UNCERTAIN, date-time observedAt 및 추가 필드 금지 검사를 통과하고 요청/현재 시도 맥락이 맞으면 F 진행 관측으로 반영; 순서가 뒤바뀌어도 종결 상태를 되돌리지 않음"
+    violation: "자체 스키마/맥락 오류는 진행 상태에 반영하지 않음. resultId를 요구하거나 Result의 세 ID·ResultReceipt 조건을 적용하지 않으며 ResultReceipt를 생성하지 않음"
+    source: ["FR1.4"]
 ```
 
 ## 규칙 요약
@@ -125,7 +133,7 @@ rules:
 | 규칙 | 경계 |
 |---|---|
 | BR2.1·BR2.2 | A 본인/연동, E 새 동의·접수 |
-| BR2.3~BR2.6 | E 동시 요청·재요청·수신/처리/반영 |
+| BR2.3~BR2.6·BR2.15 | E 동시 요청·재요청·Result 수신/반영과 ProcessingEvent 처리 |
 | BR2.7~BR2.10 | B 등록·근거·생성 상태·확인/공개·보호 |
 | BR2.11~BR2.13 | C 현재 자료·링크 제약·접근 분기 |
 | BR2.14 | API 멱등·오류·회원/수신자 DTO 경계 |
@@ -133,4 +141,3 @@ rules:
 ## 추적 정보
 
 [requirements](../../../inception/requirements-analysis/requirements.md) · [Unit 매핑](../../../inception/units-generation/unit-of-work-story-map.md) · [API 계약](../../../inception/contract-design/contract-summary.md) · [entities](entities.md) · [추적표](traceability.json).
-

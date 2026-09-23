@@ -6721,3 +6721,287 @@
 **Options**: Nothing to add,Add a note
 
 ---
+
+## Human Turn
+**Timestamp**: 2026-09-23T08:20:58Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Question Answered
+**Timestamp**: 2026-09-23T08:21:05Z
+**Event**: QUESTION_ANSWERED
+**Stage**: functional-design
+**Details**: Nothing to add
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-09-23T08:21:07Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: functional-design
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-23T08:23:58Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Gate Rejected
+**Timestamp**: 2026-09-23T08:24:11Z
+**Event**: GATE_REJECTED
+**Stage**: functional-design
+**Feedback**: api BR2.5를 ProcessingEvent와 Result 수신 규칙으로 구분하고 web 비밀번호 분기 코드를 계약 그대로 수정한다. 계약·worker·다른 내용은 유지하며 api/web 변경 범위만 재검토한다.
+
+---
+
+## Stage Revising
+**Timestamp**: 2026-09-23T08:24:11Z
+**Event**: STAGE_REVISING
+**Stage**: functional-design
+**Revision count**: 4
+**Feedback**: api BR2.5를 ProcessingEvent와 Result 수신 규칙으로 구분하고 web 비밀번호 분기 코드를 계약 그대로 수정한다. 계약·worker·다른 내용은 유지하며 api/web 변경 범위만 재검토한다.
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T08:25:15Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md
+**Context**: construction > u2-api > functional-design > rules.md
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T08:25:17Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md
+**Context**: construction > u2-api > functional-design > rules.md
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T08:25:17Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/traceability.json
+**Context**: construction > u2-api > functional-design > traceability.json
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-09-23T08:25:17Z
+**Event**: SENSOR_FIRED
+**Fire id**: a63d4e1c
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Output path**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/traceability.json
+
+---
+
+## Sensor Failed
+**Timestamp**: 2026-09-23T08:25:17Z
+**Event**: SENSOR_FAILED
+**Fire id**: a63d4e1c
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Output path**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/traceability.json
+**Detail path**: aidlc/spaces/default/intents/260914-catchu-october-mvp/.aidlc-sensors/functional-design/traceability-a63d4e1c.md
+**Findings count**: 23
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T08:25:17Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md
+**Context**: construction > u2-api > functional-design > functional-spec.md
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T08:25:18Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md
+**Context**: construction > u1-web > functional-design > functional-spec.md
+**Summary Authorization Id**: b89cc5f02df0a9508bb4f3904ff7fbb3892ae8708633e11e6a481c672ea7af00
+
+---
+
+## Error Logged
+**Timestamp**: 2026-09-23T08:25:39Z
+**Event**: ERROR_LOGGED
+**Tool**: aidlc-log
+**Command**: aidlc-log engine log review --stage functional-design --unit u2-api --reviewer aidlc-architecture-reviewer-agent --iteration 2
+**Error**: Cannot start review iteration 2 for "functional-design" because the next iteration is 1. Retry with --iteration 1.
+
+---
+
+## Review Requested
+**Timestamp**: 2026-09-23T08:25:50Z
+**Event**: REVIEW_REQUESTED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u2-api
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:0ea1cd4ef37b138ff17196dac5efb7371cdd98fa43e11c5943a26f23d6fa52fb
+**Request Id**: review:f5a64d9f896444d0e3c8a5a55e356b03
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T08:25:51Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/.aidlc-reviewer-dispatch.json
+**Context**: .aidlc-reviewer-dispatch.json
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T08:27:33Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/.aidlc-reviews/functional-design/units/u2-api/d532a411210b77b9/1.review.md
+**Context**: .aidlc-reviews > functional-design > units > u2-api > d532a411210b77b9 > 1.review.md
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-09-23T08:27:39Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: 01a0cd25-894c-7fe3-a5ac-3d88971b9e21
+**Message**: **Reviewer:** aidlc-architecture-reviewer-agent\n**Verdict:** READY — R-01 **Resolved**, 신규 지적 없음.\n\n지정 api 재검토 파일에 기록했습니다. Result/ProcessingEvent 규칙 분리와 필수 6개 필드, 상태·흐름·FR1.4 연결을 확인했습니다. FR 19개와 기존 나머지
+
+---
+
+## Review Completed
+**Timestamp**: 2026-09-23T08:27:55Z
+**Event**: REVIEW_COMPLETED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u2-api
+**Iteration**: 1
+**Verdict**: READY
+**Request Fingerprint**: sha256:0ea1cd4ef37b138ff17196dac5efb7371cdd98fa43e11c5943a26f23d6fa52fb
+**Artifact Fingerprint**: sha256:0ea1cd4ef37b138ff17196dac5efb7371cdd98fa43e11c5943a26f23d6fa52fb
+**Request Id**: review:f5a64d9f896444d0e3c8a5a55e356b03
+**Review Record**: .aidlc-reviews/functional-design/units/u2-api/d532a411210b77b9/1.json
+**Review Record Digest**: sha256:2d87786619f7f40d558a6966e10e0316185fcff643b238b8baf301005e975d5a
+
+---
+
+## Review Requested
+**Timestamp**: 2026-09-23T08:27:55Z
+**Event**: REVIEW_REQUESTED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u1-web
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:c9d556abdb2e98f6f090a0f32e759ec5582f0406286539b193749df07d05e1c7
+**Request Id**: review:c55569c763ce7aa71e54b8d657fb87d3
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T08:28:03Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/.aidlc-reviewer-dispatch.json
+**Context**: .aidlc-reviewer-dispatch.json
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T08:28:47Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/review-revision-1.md
+**Context**: construction > u2-api > functional-design > review-revision-1.md
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T08:28:48Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/verification.md
+**Context**: construction > u2-api > functional-design > verification.md
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T08:29:01Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/.aidlc-reviews/functional-design/units/u1-web/d532a411210b77b9/1.review.md
+**Context**: .aidlc-reviews > functional-design > units > u1-web > d532a411210b77b9 > 1.review.md
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-09-23T08:29:06Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: 01a0cd25-894c-7fe3-a5ac-3d88971b9e21
+**Message**: **Reviewer:** aidlc-architecture-reviewer-agent\n**Verdict:** READY — R-01 **Resolved**, 신규 지적 없음.\n\n지정 web 재검토 파일에 기록했습니다. 오류 코드 한 곳의 정확한 교체만 반영됐고, 나머지 본문과 추적표는 바이트 비교로 보존을 확인했습니다.
+
+---
+
+## Review Completed
+**Timestamp**: 2026-09-23T08:29:31Z
+**Event**: REVIEW_COMPLETED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u1-web
+**Iteration**: 1
+**Verdict**: READY
+**Request Fingerprint**: sha256:c9d556abdb2e98f6f090a0f32e759ec5582f0406286539b193749df07d05e1c7
+**Artifact Fingerprint**: sha256:c9d556abdb2e98f6f090a0f32e759ec5582f0406286539b193749df07d05e1c7
+**Request Id**: review:c55569c763ce7aa71e54b8d657fb87d3
+**Review Record**: .aidlc-reviews/functional-design/units/u1-web/d532a411210b77b9/1.json
+**Review Record Digest**: sha256:68c47b43beb37e9ae25d39e9eb4e566a789ed4d127e18a7fc9cca73e3e750577
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T08:29:32Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/review-revision-1.md
+**Context**: construction > u1-web > functional-design > review-revision-1.md
+**Summary Authorization Id**: b89cc5f02df0a9508bb4f3904ff7fbb3892ae8708633e11e6a481c672ea7af00
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T08:29:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/verification.md
+**Context**: construction > u1-web > functional-design > verification.md
+**Summary Authorization Id**: b89cc5f02df0a9508bb4f3904ff7fbb3892ae8708633e11e6a481c672ea7af00
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-23T08:31:45Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---

@@ -30,7 +30,7 @@
 | APPLY_FAILED/RECOVERING | 처리 결과와 서비스 반영 실패/복구 상태를 구분 | 분석 실패 재요청으로 전환 |
 | FAILED·APPLIED·CLOSED | 서버 retry.allowed가 true인 경우만 사용자 재요청 안내 | 과거 동의 재사용, 선행 이력 검사 우회 |
 | 확인/공개 저장 중 → 응답 | 동일 상태 변경의 진행·성공·실패 표시; 실제 서버 값 기준 | 확인만으로 PUBLIC 표시, 거부된 공개를 성공 처리 |
-| 수신 접근 | LINK_UNAVAILABLE는 없는/중단/만료 공통 안내. 유효 링크의 PASSWORD_REQUIRED/INVALID는 비밀번호 분기 | 존재/중단/만료 상세 사유 노출, grant만으로 현재 권한 우회 |
+| 수신 접근 | LINK_UNAVAILABLE는 없는/중단/만료 공통 안내. 유효 링크의 LINK_PASSWORD_REQUIRED/LINK_PASSWORD_INVALID는 비밀번호 분기 | 존재/중단/만료 상세 사유 노출, grant만으로 현재 권한 우회 |
 
 수신자 목록의 정상 0건은 200 응답의 빈 catches이며 조회 실패 500과 구분한다. 숨김·타인·없는 Catch 상세는 RESOURCE_UNAVAILABLE 공통 안내다. 다음 조회마다 현재 권한을 적용하며 이미 열린 화면을 실시간 회수하는 기능은 약속하지 않는다.
 
