@@ -33,7 +33,7 @@ cd web
 npm ci
 ```
 
-`npm ci` 중 `unrs-resolver` 설치 스크립트(allow-scripts) 미승인 경고가 나오지만 승인하지 않아도 lint·빌드·실행이 통과한다(Windows·macOS 확인). 그대로 두면 된다.
+`npm ci` 중 `unrs-resolver` 설치 스크립트(allow-scripts) 미승인 경고가 나온다. 설치 스크립트를 승인하지 않아도 된다. Windows에서 전체 검사를 통과했고, macOS에서는 팀장이 lint 통과를 확인했다.
 
 `npm ci`는 `package-lock.json`과 정확히 같은 버전을 설치한다. 의존성을 추가·변경할 때만 `npm install`을 쓰고, 바뀐 `package-lock.json`을 함께 커밋한다.
 
