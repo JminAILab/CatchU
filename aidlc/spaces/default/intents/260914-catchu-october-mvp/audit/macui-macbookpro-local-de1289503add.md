@@ -5335,3 +5335,55 @@
 **Context**: inception > contract-design > contract-design-questions.md
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-09-23T05:13:25Z
+**Event**: DECISION_RECORDED
+**Stage**: contract-design
+**Decision**: Contract Q1 실패 후 새 요청 허용 범위; Q2 다른 저장소 동시 분석 접수
+**Options**: Q1 A: 유효 결과 없는 확정 실패만 새 동의·새 요청,Q1 B: 유효 부분 결과까지 확대할 정책 추가 결정,Q1 X: Other,Q2 A: 사용자당 진행 중 1개,Q2 B: 저장소별 진행 중 1개로 여러 저장소 접수,Q2 X: Other
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-23T05:15:53Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T05:18:16Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md
+**Context**: inception > contract-design > contract-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T05:18:17Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/domain-design/2026-09-23-followup.md
+**Context**: inception > domain-design > 2026-09-23-followup.md
+**Summary Authorization Id**: 98173161ee3699660df890b1c98f14c35c5f6eac799a23726a56e0eb559ec9b7
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T05:18:44Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md
+**Context**: inception > contract-design > contract-design-questions.md
+
+---
+
+## Question Answered
+**Timestamp**: 2026-09-23T05:18:45Z
+**Event**: QUESTION_ANSWERED
+**Stage**: contract-design
+**Details**: Q1 A, Q2 A. Q1: 재분석·동의 재사용·기존 Catch 변경이 보류이므로, 유효 결과·등록 Catch가 없는 확정 실패만 새 동의로 새 요청을 만든다. Q2: 10월 MVP는 사용자당 진행 중 1개. 같은 저장소 재요청은 기존 작업을 반환한다(#23 Q5). 확대는 이후 계약 수정 이슈로 다룬다.
+
+---
