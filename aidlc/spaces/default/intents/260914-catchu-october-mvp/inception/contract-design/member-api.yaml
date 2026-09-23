@@ -1,0 +1,333 @@
+openapi: "3.0.3"
+info: {"title":"CatchU 회원 API v1","version":"1.0.0"}
+servers: [{"url":"/v1"}]
+security: [{"AccessJWT":[]}]
+paths:
+  "/me":
+    get:
+      operationId: "getMe"
+      summary: "getMe"
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/Member"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/me/profile":
+    put:
+      operationId: "replaceProfile"
+      summary: "자가 입력 기본 프로필 전체 저장; 공개 항목 상세는 OQ-A2"
+      requestBody: {"required":true,"content":{"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/Profile"}}}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/Profile"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/me/repositories":
+    get:
+      operationId: "listEligibleRepositories"
+      summary: "연동 계정의 선정 지원 공개 저장소만 제공"
+      parameters:
+        - {"name":"cursor","in":"query","schema":{"type":"string"}}
+        - {"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                additionalProperties: false
+                required: ["items","page"]
+                properties:
+                  items: {"type":"array","items":{"$ref":"./common.yaml#/components/schemas/Repository"}}
+                  page: {"$ref":"./common.yaml#/components/schemas/PageInfo"}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/analysis-notice":
+    get:
+      operationId: "getAnalysisNotice"
+      summary: "현재 고지; 실제 자료 처리 조건 충족을 대신하지 않음"
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                additionalProperties: false
+                required: ["noticeRevision","text"]
+                properties: {"noticeRevision":{"type":"string","minLength":1},"text":{"type":"string"}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/analysis-requests":
+    get:
+      operationId: "listAnalysisRequests"
+      summary: "listAnalysisRequests"
+      parameters:
+        - {"name":"cursor","in":"query","schema":{"type":"string"}}
+        - {"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                additionalProperties: false
+                required: ["items","page"]
+                properties:
+                  items: {"type":"array","items":{"$ref":"./common.yaml#/components/schemas/AnalysisStatus"}}
+                  page: {"$ref":"./common.yaml#/components/schemas/PageInfo"}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+    post:
+      operationId: "createAnalysisRequest"
+      summary: "createAnalysisRequest"
+      parameters:
+        - 
+          name: "Idempotency-Key"
+          in: "header"
+          required: true
+          schema: {"type":"string","minLength":1,"maxLength":128}
+          description: "사용자·operation 범위 키. 응답 불명은 같은 키·같은 본문으로 조회/재접수하며 다른 본문은 409."
+      requestBody: {"required":true,"content":{"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/AnalysisCreate"}}}}
+      responses:
+        "200":
+          description: "동일 저장소 진행 중 작업 또는 멱등 재응답"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/AnalysisStatus"}}}
+        "202":
+          description: "새 요청 접수"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/AnalysisStatus"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/analysis-requests/{requestId}":
+    parameters: [{"name":"requestId","in":"path","required":true,"schema":{"type":"string","minLength":1}}]
+    get:
+      operationId: "getAnalysisRequest"
+      summary: "getAnalysisRequest"
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/AnalysisStatus"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/catches":
+    get:
+      operationId: "listCatches"
+      summary: "listCatches"
+      parameters:
+        - {"name":"cursor","in":"query","schema":{"type":"string"}}
+        - {"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+        - {"name":"sourceRequestId","in":"query","schema":{"type":"string","minLength":1}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                additionalProperties: false
+                required: ["items","page"]
+                properties:
+                  items: {"type":"array","items":{"$ref":"./common.yaml#/components/schemas/Catch"}}
+                  page: {"$ref":"./common.yaml#/components/schemas/PageInfo"}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/catches/{catchId}":
+    parameters: [{"name":"catchId","in":"path","required":true,"schema":{"type":"string","minLength":1}}]
+    get:
+      operationId: "getCatch"
+      summary: "getCatch"
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/Catch"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/catches/{catchId}/confirmation":
+    parameters: [{"name":"catchId","in":"path","required":true,"schema":{"type":"string","minLength":1}}]
+    put:
+      operationId: "confirmCatch"
+      summary: "본인의 명시적 확인; 공개하지 않음"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              additionalProperties: false
+              required: ["workFactsConfirmed","contributionConfirmed"]
+              properties: {"workFactsConfirmed":{"type":"boolean","enum":[true]},"contributionConfirmed":{"type":"boolean","enum":[true]}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/Catch"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/catches/{catchId}/visibility":
+    parameters: [{"name":"catchId","in":"path","required":true,"schema":{"type":"string","minLength":1}}]
+    put:
+      operationId: "setCatchVisibility"
+      summary: "PUBLIC은 확인/현재 보호 조건을 원자적으로 검사; PRIVATE은 숨김"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              additionalProperties: false
+              required: ["visibility"]
+              properties: {"visibility":{"type":"string","enum":["PRIVATE","PUBLIC"]}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/Catch"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/catches/{catchId}/mismatch":
+    parameters: [{"name":"catchId","in":"path","required":true,"schema":{"type":"string","minLength":1}}]
+    put:
+      operationId: "setCatchMismatch"
+      summary: "불일치 표시만 변경; 본문/공개/생성 상태 불변"
+      requestBody:
+        required: true
+        content:
+          "application/json": {"schema":{"type":"object","additionalProperties":false,"required":["mismatch"],"properties":{"mismatch":{"type":"boolean"}}}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/Catch"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/share-links":
+    get:
+      operationId: "listShareLinks"
+      summary: "listShareLinks"
+      parameters:
+        - {"name":"cursor","in":"query","schema":{"type":"string"}}
+        - {"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                additionalProperties: false
+                required: ["items","page"]
+                properties:
+                  items: {"type":"array","items":{"$ref":"./common.yaml#/components/schemas/ShareLink"}}
+                  page: {"$ref":"./common.yaml#/components/schemas/PageInfo"}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+    post:
+      operationId: "createShareLink"
+      summary: "createShareLink"
+      parameters:
+        - 
+          name: "Idempotency-Key"
+          in: "header"
+          required: true
+          schema: {"type":"string","minLength":1,"maxLength":128}
+          description: "사용자·operation 범위 키. 응답 불명은 같은 키·같은 본문으로 조회/재접수하며 다른 본문은 409."
+      requestBody: {"required":true,"content":{"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/ShareCreate"}}}}
+      responses:
+        "200":
+          description: "동일 멱등 키의 기존 발급 결과"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/ShareLink"}}}
+        "201":
+          description: "발급"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/ShareLink"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/share-links/{linkId}/stop":
+    parameters: [{"name":"linkId","in":"path","required":true,"schema":{"type":"string","minLength":1}}]
+    put:
+      operationId: "stopShareLink"
+      summary: "중단은 반복 가능; 복구·제목/비밀번호 변경 API 없음"
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/ShareLink"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+components: {"securitySchemes":{"AccessJWT":{"type":"http","scheme":"bearer","bearerFormat":"JWT"}}}

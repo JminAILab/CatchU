@@ -5387,3 +5387,228 @@
 **Details**: Q1 A, Q2 A. Q1: 재분석·동의 재사용·기존 Catch 변경이 보류이므로, 유효 결과·등록 Catch가 없는 확정 실패만 새 동의로 새 요청을 만든다. Q2: 10월 MVP는 사용자당 진행 중 1개. 같은 저장소 재요청은 기존 작업을 반환한다(#23 Q5). 확대는 이후 계약 수정 이슈로 다룬다.
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-09-23T05:21:12Z
+**Event**: DECISION_RECORDED
+**Stage**: contract-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-23T05:27:31Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T05:27:56Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md
+**Context**: inception > contract-design > contract-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-09-23T05:27:56Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: contract-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md
+**Questions SHA-256**: ae6ca329283ef5dbd79bb715a93f14838c44ff4e8fe61a693b195b06f2c3cdb8
+**Hash Scope**: confirmed-content-v1
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T05:31:13Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml
+**Context**: inception > contract-design > common.yaml
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T05:31:13Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml
+**Context**: inception > contract-design > member-api.yaml
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T05:31:13Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/recipient-api.yaml
+**Context**: inception > contract-design > recipient-api.yaml
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T05:31:14Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml
+**Context**: inception > contract-design > worker-messages.yaml
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T05:31:46Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml
+**Context**: inception > contract-design > common.yaml
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T05:31:46Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml
+**Context**: inception > contract-design > member-api.yaml
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T05:31:46Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/recipient-api.yaml
+**Context**: inception > contract-design > recipient-api.yaml
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T05:31:47Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml
+**Context**: inception > contract-design > worker-messages.yaml
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T05:35:08Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T05:36:08Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Review Requested
+**Timestamp**: 2026-09-23T05:37:23Z
+**Event**: REVIEW_REQUESTED
+**Stage**: contract-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:f5d7d5ae6f3e23fd32a1f8c04161737f63499651cde1b86a1f44da92cf3dd247
+**Request Id**: review:dd11b95f69cc64d5b2ef28f2d7aa3919
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T05:39:02Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/verification.md
+**Context**: inception > contract-design > verification.md
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T05:40:28Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/.aidlc-reviews/contract-design/stage/b328e1c04d633e4a/1.review.md
+**Context**: .aidlc-reviews > contract-design > stage > b328e1c04d633e4a > 1.review.md
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-09-23T05:40:46Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: 01a0c98b-6ec1-7ce0-a723-f6893a9ded5a
+**Message**: **Reviewer:** aidlc-architecture-reviewer-agent\n\n**READY** — 지정 리뷰 파일을 작성했습니다.\n\n- **R-01 Major:** 식별자가 없는 잘못된 worker 결과에 대한 `SCHEMA_INVALID` 응답 경계가 불명확합니다.\n- **R-02 Minor:** 목록 공통 규칙의 `items`와 수신자 스키마
+
+---
+
+## Review Completed
+**Timestamp**: 2026-09-23T05:40:55Z
+**Event**: REVIEW_COMPLETED
+**Stage**: contract-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Iteration**: 1
+**Verdict**: READY
+**Request Fingerprint**: sha256:f5d7d5ae6f3e23fd32a1f8c04161737f63499651cde1b86a1f44da92cf3dd247
+**Artifact Fingerprint**: sha256:f5d7d5ae6f3e23fd32a1f8c04161737f63499651cde1b86a1f44da92cf3dd247
+**Request Id**: review:dd11b95f69cc64d5b2ef28f2d7aa3919
+**Review Record**: .aidlc-reviews/contract-design/stage/b328e1c04d633e4a/1.json
+**Review Record Digest**: sha256:fad3645a3940ecb08ff538897470f0a9ea7a9e9ffcf7f64c16ba42b9f50adb6b
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T05:41:33Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/review.md
+**Context**: inception > contract-design > review.md
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T05:41:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/verification.md
+**Context**: inception > contract-design > verification.md
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T05:42:31Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/verification.md
+**Context**: inception > contract-design > verification.md
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
