@@ -1,47 +1,82 @@
 # web — 사용자 화면
 
-Next.js로 만드는 첫 MVP의 사용자 화면이다. 로그인·프로필·GitHub 연동, 홈·분석 상태, 본인 자산 확인·공개/숨김, 공유 링크·수신자 열람 흐름을 다룬다. 세부 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준을 확인한다.
+Next.js로 만드는 10월 MVP의 사용자 화면이다. 로그인·프로필·GitHub 연동, 홈·분석 상태, 본인 자산 확인·공개/숨김, 공유 링크·수신자 열람 흐름을 다룬다. 적용 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 담당 이슈의 완료 기준으로 확인한다.
 
-> **초기화 전 준비안:** 아래는 준비·검증할 항목이며, 실행 가능한 명령이나 검사 통과 기록이 아니다. 초기화 후 실제 설정과 확인 결과에 맞춰 이 README를 갱신한다.
+이 README는 [#82 web 최소 실행 골격](https://github.com/JminAILab/CatchU/issues/82) 기준이다. 기능 화면·API 연결·인증은 아직 없고, 각 기능 이슈에서 추가한다.
 
-## 작업 시작
+## 요구 환경
 
-- [공통 작업관리](../docs/CatchU_작업관리.md)를 읽고 해당 이슈의 범위·완료 기준·관련 계약을 확인한다.
-- web 초기화 담당과 기능 담당은 다를 수 있다. 한 기능의 작업 범위에 web과 api가 함께 포함될 수 있으므로 이슈에서 수정 범위와 연결 상대를 확인한다.
-- 착수·브랜치·기술·검사 기준은 [코딩 운영](../docs/CatchU_작업관리.md#코딩-운영)을 따른다. [아키텍처 검토초안 PR #70](https://github.com/JminAILab/CatchU/pull/70)은 설계 입력으로 참고한다.
-
-## 실행·검증 준비 항목
-
-초기화 시 사용할 도구와 명령을 정하고, 작업 디렉터리·필요 환경·성공 확인 방법을 함께 기록한다. 기능 검사에는 이슈 완료 기준에서 확인한 기대 결과를 사용한다.
-
-| 구분 | 준비하고 확인할 내용 |
-|---|---|
-| 설치 | Node.js·Next.js 버전, 패키지 관리자·잠금 파일, 의존성 설치 방법 |
-| 개발 실행 | 개발 서버 시작·종료, 접속 주소, API 주소와 필요한 설정, API 없이 확인 가능한 모의 응답 범위 |
-| 정적·타입 검사 | 채택한 정적 검사·타입 검사와 설정. 도구와 실제 명령은 초기화에서 확정 |
-| 관련 단위 테스트 | 변경한 화면 상태·입력·사용자 조작의 기대 결과. 필요한 사례를 기능 구현과 함께 추가 |
-| 관련 통합 테스트 | API 계약과 연결한 화면 동작·오류 안내. 실제 API와 모의 응답 사용을 구분 |
-| 빌드·실행 확인 | 배포용 빌드와 필요한 화면의 실행 가능성. 빌드 성공과 사용자 흐름 확인을 구분 |
-
-화면 문구·배치 변경은 영향을 받은 화면과 조작을 확인한다. 공개·숨김이나 권한과 연결되는 변경은 본인·수신자 화면의 관련 정상·거부·실패 동작까지 검사 범위를 고른다. 모든 변경에서 전체 테스트를 반복하지 않는다.
-
-## 아직 필요한 입력
-
-| 필요한 입력 | 결정할 곳 | 결정 전 가능한 작업 |
+| 항목 | 값 | 근거 |
 |---|---|---|
-| Node.js·Next.js 버전, 패키지 관리자, 검사·테스트 도구 | web 초기화 이슈·PR에서 제안, 공통 설정 영향은 공통 준비 담당과 조율 | 기존 파일과 제약 확인, 도구·설정 제안 |
-| 화면별 API 요청·응답, 인증·오류·분석 상태 의미 | 기능 이슈와 API 연결 계약; 연결 쟁점은 [#23](https://github.com/JminAILab/CatchU/issues/23) | 화면 흐름·상태·연결 질문 정리, 허용된 범위의 모의 화면 |
-| API 접속 환경, 환경변수 이름, 실제·모의 연결 전환 | api 실행 안내와 공통 개발 환경 준비 작업 | 필요한 설정 목록·접속 확인 항목 정리 |
-| 모듈·공통 컴포넌트 경계 | 후속 설계와 해당 기능·공통 변경 검토 | 재사용 후보와 영향 범위 제안 |
+| Node.js | 24.21.0 (`.node-version`, `package.json` `engines`) | 9/23 회의 공통 결정 |
+| npm | 11 이상. 잠금 파일은 `package-lock.json` | [#81](https://github.com/JminAILab/CatchU/issues/81) 공통 설정 |
+| 포트 | 3000 (api 3001, worker 8000) | [#81](https://github.com/JminAILab/CatchU/issues/81) 공통 설정 |
+| Next.js / React | 16.3.6 / 19.2.8 | `package.json` |
 
-## 초기화 후 이 README에 채울 안내
+모든 명령은 `web/` 디렉터리에서 실행한다. 저장소 루트에는 `package.json`이 없다(워크스페이스 미사용).
 
-- 설치·개발 실행·검사·빌드 명령과 각각의 실행 위치, 필요한 버전.
-- 환경변수 이름·용도·준비 경로와 비밀값 없는 `.env.example`. 브라우저에 노출되는 설정의 범위.
-- 정상 시작 시 확인할 주소·화면, 종료 방법, 흔한 실패의 확인 위치.
-- API·인증 등 필요한 연결 대상과 모의로 대체할 수 있는 범위.
-- 캐시·자료를 지우는 초기화 명령이 있다면 삭제 대상과 다시 준비할 항목.
+## 설치
 
-브라우저 로그는 개발 중 필요한 진단에 한정하고 민감정보를 출력하지 않는다. Next.js 서버 측 오류는 서버 로그에서 확인하며, 브라우저 로그와 구분해 안내한다. 기록·공유 시 자료 보호는 공통 작업관리를 따른다.
+```bash
+cd web
+npm ci
+```
 
-개발 준비 완료는 공통 작업관리의 확인 목록으로 판단한다. 확인한 사람·환경·기준 커밋, 작성자 외 재현 여부와 실제·모의 연결 범위는 초기화 이슈·PR에 남긴다. 로컬 실행 확인과 NCP 배포 검증은 각각 기록한다.
+`npm ci`는 `package-lock.json`과 정확히 같은 버전을 설치한다. 의존성을 추가·변경할 때만 `npm install`을 쓰고, 바뀐 `package-lock.json`을 함께 커밋한다.
+
+## 실행
+
+| 목적 | 명령 | 확인 |
+|---|---|---|
+| 개발 서버 | `npm run dev` | http://localhost:3000 에 "CatchU web" 화면. 파일 수정 시 자동 반영 |
+| 배포용 빌드 | `npm run build` | `.next/` 생성, 오류 없이 종료 |
+| 빌드 결과 실행 | `npm run start` | `npm run build` 뒤에만 가능. 주소는 개발 서버와 같음 |
+
+종료는 서버를 띄운 터미널에서 `Ctrl+C`. 포트 3000이 이미 사용 중이면 `PORT=3001 npm run dev`처럼 임시로 바꾸되, 팀 공통 포트는 3000이다.
+
+## 검사
+
+| 명령 | 내용 | 실패 예 |
+|---|---|---|
+| `npm run lint` | ESLint (`eslint-config-next` core-web-vitals + typescript) | 조건문 안의 React Hook 호출 |
+| `npm run typecheck` | `tsc --noEmit`. 생성 파일(`next-env.d.ts`, `.next/types`) 없이도 통과해야 함 | `const n: number = "x"` |
+| `npm run build` | 프로덕션 빌드 | 빌드 중 타입·import 오류 |
+| `npm run check:run` | `scripts/smoke.mjs`: 빌드 결과를 `next start`로 띄워 `GET /`가 200이고 본문에 "CatchU web"이 있는지 확인 후 종료. **`npm run build` 이후에만 실행** | 서버 미기동, 200 아님, 본문 불일치 |
+| `npm run check` | 위 4개를 순서대로 실행 | 하나라도 실패하면 중단 |
+
+PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 적는다.
+
+## 환경변수
+
+현재 골격은 필수 환경변수가 없다. `.env.example`에 이름·용도·필수/선택을 적고, 실제 값은 `.env.local`(커밋 금지)에 둔다.
+
+- 이름이 `NEXT_PUBLIC_`으로 시작하는 변수만 브라우저에 노출된다. 비밀값·토큰은 이 이름으로 두지 않는다.
+- 그 밖의 변수는 서버(Node.js)에서만 읽힌다.
+- API 주소·인증 관련 변수는 해당 기능 이슈에서 `.env.example`에 추가한다.
+
+## 파일 역할
+
+| 경로 | 역할 |
+|---|---|
+| `src/app/layout.tsx` | 루트 레이아웃(`<html lang="ko">`, 기본 메타데이터) |
+| `src/app/page.tsx` | `/` 기본 화면. 골격 확인용 문구만 있음 |
+| `scripts/smoke.mjs` | 최소 실행 검사(`check:run`) |
+| `package.json` / `package-lock.json` | 의존성·스크립트·Node 버전 고정 |
+| `.node-version` | Node.js 버전(버전 관리 도구용) |
+| `.env.example` | 환경변수 목록 예시 |
+| `next.config.ts`, `tsconfig.json`, `eslint.config.mjs` | Next.js·TypeScript·ESLint 설정(create-next-app 기본값) |
+| `.gitignore` | `node_modules/`, `.next/`, `next-env.d.ts` 등 생성물 제외 |
+
+## 코드 추가 위치
+
+- 화면(라우트): `src/app/<경로>/page.tsx`. 예: 공유 링크 수신자 화면은 `src/app/s/[token]/page.tsx`처럼 이슈에서 정한 경로를 따른다.
+- 여러 화면이 함께 쓰는 컴포넌트: `src/components/`.
+- API 호출·오류 응답 해석 등 화면과 분리되는 로직: `src/lib/`. 오류 응답 공통 형식은 [#88](https://github.com/JminAILab/CatchU/issues/88)에서 추가한다.
+- 디렉터리는 필요할 때 만들고, 담당 화면 밖의 공통 구조 변경은 이슈에서 먼저 조율한다.
+
+## 작업 규칙
+
+- 착수·브랜치·기록·검토 기준은 [공통 작업관리](../docs/CatchU_작업관리.md)를 따른다.
+- 화면 문구·상태는 각 흐름 초안(`docs/ai-dlc-input-mvp/`)과 승인 요구사항을 근거로 하고, 요청 중·저장 중을 성공으로, 조회 실패를 데이터 없음으로 표시하지 않는다.
+- 브라우저 로그에는 민감정보를 출력하지 않는다.
+- 로컬 실행 확인과 NCP 배포 검증은 각각 기록한다.
