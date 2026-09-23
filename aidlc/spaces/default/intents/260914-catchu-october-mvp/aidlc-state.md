@@ -34,6 +34,7 @@
 ## Runtime State
 - **Revision Count**: 3
 
+- **Skeleton Stance**: off
 ## Phase Progress
 <!-- Status values: Pending, Active, Verified, Skipped -->
 

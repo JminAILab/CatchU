@@ -27,3 +27,13 @@
 거부 응답은 승인본 복원 또는 일반 contract-design 단계 재개를 복구안으로 제시했다. 이는 이번 단독 수정만 수행하고 상류를 재개하지 않는 범위에 맞지 않아 실행하지 않았다. 현재 확인과 수정본을 보존한 채 공식 --single 확인 연결 복구 경로를 확인해야 한다. 같은 확인/검토 호출을 원인 확인 없이 반복하지 않는다.
 
 기존 main-workflow의 Accepted risk 이력과 과거 검토는 보존한다. Functional의 본 흐름 포인터는 Delivery 승인으로 이동했지만 Functional 작업은 아직 시작하지 않았다. PR #89 본문도 변경하지 않았다.
+
+## 사용자 확인 원인과 후속 결정 — 2026-09-23
+
+사용자가 별도 조사로 확인한 원인: aidlc-lib.ts의 summaryQuestionFiles/questionFilesInDir는 단계 폴더의 모든 *-questions.md를 검사 대상으로 삼는다. 단독 실행에서는 각 파일에 single-stage 워크플로 영수증을 요구한다. 본 흐름 승인 기록인 contract-design-questions.md에는 single-stage 영수증이 없으므로, 이 폴더에서는 --single의 검토 기록과 report --single이 항상 거부된다. 이번 확인·수정의 결함이 아니라 엔진 결함이다. 이 세션에서 코드를 추가 조사하거나 거부 호출을 재실행한 결과가 아니라 사용자가 제공한 원인 확인을 기록한다. 앞 절의 당시 미확정 진단은 이력으로 보존한다.
+
+**공식 단독 완료 불가, R-01·R-02 수정본(90bf289)은 PR #89 담당 리뷰로 확인.**
+
+단독 실행은 완료 처리하지 않고 열린 상태로 둔다. 재호출·질문 파일 이동·영수증 추가 생성·검사 우회는 하지 않는다. 사용자 지시에 따라 본 흐름의 next로 Functional Design을 시작하며, 열린 단독 실행 때문에 차단되면 우회 없이 중단한다. PR #89 본문과 과거 승인·위험 수용·감사 기록은 수정하지 않는다.
+
+실행 결과: 본 흐름 next는 열린 단독 실행으로 차단되지 않았다. contract-design·delivery-planning 변경 감지는 advisory로 남겼으며 상류를 재개하지 않았다. Functional Design의 기본 Unit 반복은 u3-worker부터 반환됐다. 코딩 게이트를 두지 않는 기존 결정에 맞춰 내장 walking-skeleton 코딩 절차는 off로 기록했고, Delivery의 M1 첫 연결 결과 승인 1회와 Functional 단계 최종 승인은 그대로 유지한다.
