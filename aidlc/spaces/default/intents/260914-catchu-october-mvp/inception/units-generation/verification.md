@@ -4,7 +4,7 @@
 
 - 작성 전 확인 91064e502481f2fb5ea6a665fc288ae731d82ffef26cc947f31160c398a2b0f4 등록 성공. 네 산출물의 자동 ARTIFACT_CREATED 및 매핑표 수정의 ARTIFACT_UPDATED가 이 식별자에 연결됐다.
 - 기존 배포 단위 3개·도메인 구성요소 7개, FR 59개(OK 22 / Deferred 33 / N/A 4)를 추적한다.
-- 필수 절/의존 YAML 검사 통과(edge_block=ok), 상위 입력 참조 검사 통과, git diff --check 통과.
+- 필수 절/의존 YAML 검사 통과(edge_block=ok), 상위 입력 참조 검사 통과. 신규 파일까지 포함한 최종 공백 검사에서는 Unit 정의·의존·traceability의 끝 빈 줄 안내가 남았다. 검토 판본 고정을 유지하며 전체 공백 검사 통과로 표기하지 않는다.
 - Domain Design·상류 승인 문서는 수정하지 않았다. 기존 별도 웹 시연 intent와 intents.json 미커밋 변경은 커밋 대상에서 제외한다.
 - #80이 dev에 병합됨을 확인했다(13f0327). 새 PR은 dev 기준이며 이 세션에서 #80을 병합하거나 base를 바꾸지 않았다.
 
