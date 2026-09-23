@@ -26,7 +26,7 @@
 
 아래 이름은 도메인 식별자다. 코드 패키지·DB 테이블·필드 타입·허용값·관계 수량·API/메시지 계약은 아니다. A~I와 배포 Unit을 일대일 고정하지 않는다. 기존 Next.js·NestJS·FastAPI/NCP 수동 배포는 유지하되 서버 수·DB/큐 엔진·호출 경로의 구체 구현·버전을 선택하지 않는다. [R, P]
 
-2026-09-22 후속 적용: feasibility·Scope·인계·Practices 및 Requirements Analysis 수정본의 17:45:56 KST 승인을 기준으로 C01/C02와 사본 확인의 현재 상태만 갱신한다. Q1~Q8·기존 구조/소유/연결·해결된 FR2.1 R-01과 추적표는 그대로 재사용한다. 수정 전 판본은 [이력 보관](../../archive/2026-09-22-domain-reuse/components.md)에 남겼다. 현재 요약 확인은 문서의 최소 갱신 기준이며 C03 경계 수용·남은 사본 확인·Domain Design 최종 승인을 대신하지 않는다. [Q, R, H, C]
+현재 적용: feasibility·Scope·인계·Practices 및 Requirements Analysis 수정본의 2026-09-22 **23:20:01 KST 승인**을 기준으로 한다. Q1~Q8·기존 구조/소유/연결·해결된 FR2.1 R-01과 추적표는 그대로 재사용한다. 이전 적용 시점은 [이력 보관](../../archive/2026-09-22-domain-reuse/components.md)과 과거 승인 기록에 보존한다. C03 사용자 경계 수용은 완료이며, 남은 담당자 검토·사본 조건·Domain Design 최종 승인은 별도다. [Q, R, H, C]
 
 ## Sources
 
@@ -301,7 +301,7 @@ components:
         interaction: "발행자 링크 관리 화면"
       -
         component: "RecipientExperience"
-        interaction: "해당 링크 요청에서 허용한 수신자 응답과 거부 사유 조회"
+        interaction: "해당 링크 요청에서 허용한 수신자 응답과 접근 판정 결과 조회"
     external_dependencies:
       -
         name: "서비스 영속 저장 경계"
@@ -345,12 +345,12 @@ components:
   -
     name: "RecipientExperience"
     summary: "C — 비로그인 링크 수신자 화면"
-    behaviour: "ShareAccess가 허용한 프로필·근거·기여만 표시한다. 초안 부재를 생성된 설명으로 꾸미지 않는다. 비밀번호·중단·만료·빈 공개 자료와 조회 실패를 구분하며 별도 로그인/구독 조건을 추가하지 않는다."
+    behaviour: "ShareAccess가 허용한 프로필·근거·기여만 표시한다. 초안 부재를 생성된 설명으로 꾸미지 않는다. 없는 URL·중단·만료는 수신자에게 공통 안내를 제공하고 비밀번호 분기는 유지한다. 빈 공개 자료와 조회 실패를 구분하며 별도 로그인/구독 조건을 추가하지 않는다."
     responsibilities: ["수신자 링크 진입·접근 조건 입력·열람","B/C가 합의할 초안 없는 공개 자료 표현"]
     depends_on:
       -
         component: "ShareAccess"
-        interaction: "해당 링크 요청에서 허용한 수신자 응답과 거부 사유 조회"
+        interaction: "해당 링크 요청에서 허용한 수신자 응답과 접근 판정 결과 조회"
         style: "sync"
     dependents: []
     external_dependencies: []

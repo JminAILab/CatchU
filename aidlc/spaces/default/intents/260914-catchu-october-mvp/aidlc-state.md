@@ -13,9 +13,9 @@
 - **Practices Affirmed Timestamp**: 2026-09-22T13:40:19Z
 
 ## Scope Configuration
-- **Stages to Execute**: 0.1, 0.2, 0.3, 1.1, 1.3, 1.4, 1.6, 1.7, 2.2, 2.3, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6
-- **Stages to Skip**: 2.1 (reverse-engineering — greenfield), 1.2 (market-research), 1.5 (team-formation), 2.4 (user-stories), 2.5 (refined-mockups), 4.7 (feedback-optimization)
-- **Depth**: Standard
+- **Stages to Execute**: 0.1, 0.2, 0.3, 1.1, 1.3, 1.4, 1.6, 1.7, 2.2, 2.3, 2.6, 2.7, 2.8, 2.9, 3.1
+- **Stages to Skip**: 2.1 (reverse-engineering — greenfield), 1.2 (market-research), 1.5 (team-formation), 2.4 (user-stories), 2.5 (refined-mockups), 4.7 (feedback-optimization), 3.2 (nfr-requirements), 3.3 (nfr-design), 3.4 (infrastructure-design), 3.5 (code-generation), 3.6 (build-and-test), 3.7 (ci-pipeline), 4.1 (deployment-pipeline), 4.2 (environment-provisioning), 4.3 (deployment-execution), 4.4 (observability-setup), 4.5 (incident-response), 4.6 (performance-validation)
+- **Depth**: Minimal
 - **Test Strategy**: Standard
 - **Review Override**: 
 - **Change Control**: relaxed (from scope feature)
@@ -27,12 +27,12 @@
 - **Build System**: Unknown
 
 ## Execution Plan Summary
-- **Total Stages**: 27
+- **Total Stages**: 15
 - **Completed**: 10
 - **In Progress**: domain-design
 
 ## Runtime State
-- **Revision Count**: 2
+- **Revision Count**: 3
 
 ## Phase Progress
 <!-- Status values: Pending, Active, Verified, Skipped -->
@@ -41,7 +41,7 @@
 - **Ideation**: Verified
 - **Inception**: Active
 - **Construction**: Pending
-- **Operation**: Pending
+- **Operation**: Skipped
 
 ## Stage Progress
 <!-- Checkbox states: [ ] not started, [-] in progress, [?] awaiting approval (gate open), [R] revising (user rejected gate), [x] completed, [S] skipped via --stage/--phase jump -->
@@ -66,7 +66,7 @@
 - [x] requirements-analysis — EXECUTE
 - [ ] user-stories — SKIP
 - [ ] refined-mockups — SKIP
-- [-] domain-design — EXECUTE
+- [R] domain-design — EXECUTE
 - [ ] units-generation — EXECUTE
 - [ ] contract-design — EXECUTE
 - [ ] delivery-planning — EXECUTE
@@ -74,20 +74,20 @@
 ### CONSTRUCTION PHASE
 Per unit: [TBD]
 - [ ] functional-design — EXECUTE
-- [ ] nfr-requirements — EXECUTE
-- [ ] nfr-design — EXECUTE
-- [ ] infrastructure-design — EXECUTE
-- [ ] code-generation — EXECUTE
-- [ ] build-and-test — EXECUTE
-- [ ] ci-pipeline — EXECUTE
+- [ ] nfr-requirements — SKIP
+- [ ] nfr-design — SKIP
+- [ ] infrastructure-design — SKIP
+- [ ] code-generation — SKIP
+- [ ] build-and-test — SKIP
+- [ ] ci-pipeline — SKIP
 
 ### OPERATION PHASE
-- [ ] deployment-pipeline — EXECUTE
-- [ ] environment-provisioning — EXECUTE
-- [ ] deployment-execution — EXECUTE
-- [ ] observability-setup — EXECUTE
-- [ ] incident-response — EXECUTE
-- [ ] performance-validation — EXECUTE
+- [ ] deployment-pipeline — SKIP
+- [ ] environment-provisioning — SKIP
+- [ ] deployment-execution — SKIP
+- [ ] observability-setup — SKIP
+- [ ] incident-response — SKIP
+- [ ] performance-validation — SKIP
 - [ ] feedback-optimization — SKIP
 
 ## Current Status
@@ -95,7 +95,7 @@ Per unit: [TBD]
 - **Current Stage**: domain-design
 - **Next Stage**: units-generation
 - **Status**: Running
-- **Last Updated**: 2026-09-22T14:20:01Z
+- **Last Updated**: 2026-09-23T04:07:31Z
 
 ## Session Resume Point
 - **Last Completed Stage**: requirements-analysis
