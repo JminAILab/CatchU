@@ -139,6 +139,13 @@ components:
         finishedAt: {"type":"string","format":"date-time"}
     ResultReceipt:
       type: "object"
+      description: >-
+        resultId·requestId·attemptId 세 식별자가 각각 비어 있지 않은 문자열로 읽히는
+        메시지에만 보낸다. 하나라도 누락·빈 값·잘못된 타입이면 Receipt 없이 거부
+        기록만 남기며, 식별자를 임의 생성하거나 추정해 채우지 않는다. 세 식별자는
+        유효하나 다른 필드가 스키마에 맞지 않으면 REJECTED/SCHEMA_INVALID를 보낼 수
+        있다. 식별 가능과 맥락 일치는 별개이며 기존 요청·동의·범위 검사를 유지한다.
+        거부 기록에 원문·비밀값을 남기지 않는다. 기록 저장소·보관·전송 방식은 미정이다.
       additionalProperties: false
       required: ["schemaVersion","messageId","resultId","requestId","attemptId","disposition","code"]
       properties:

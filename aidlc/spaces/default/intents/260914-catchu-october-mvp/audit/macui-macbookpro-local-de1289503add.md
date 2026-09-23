@@ -5929,3 +5929,114 @@
 **Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-09-23T07:04:43Z
+**Event**: DECISION_RECORDED
+**Stage**: contract-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-r01-r02-questions.md
+**Workflow**: single-stage:contract-design
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-23T07:05:57Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T07:06:09Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-r01-r02-questions.md
+**Context**: inception > contract-design > single-r01-r02-questions.md
+**Summary Authorization Id**: 3923df789b12fca3d5382915a0c4d2e548ab910a2e945bc4417e961dd0af7248
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-09-23T07:06:17Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: contract-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-r01-r02-questions.md
+**Questions SHA-256**: 9a13c88871ae24050dad796ed47e6eec07b61fac6c43e0c1f282054bddbeb754
+**Hash Scope**: confirmed-content-v1
+**Workflow**: single-stage:contract-design
+**Summary Authorization Id**: 0d0b6eea631db0607d4c5b084ae4dde347a94043c8d03d40b58da10657a8c03e
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T07:06:54Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 0d0b6eea631db0607d4c5b084ae4dde347a94043c8d03d40b58da10657a8c03e
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T07:06:54Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml
+**Context**: inception > contract-design > worker-messages.yaml
+**Summary Authorization Id**: 0d0b6eea631db0607d4c5b084ae4dde347a94043c8d03d40b58da10657a8c03e
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-09-23T07:07:02Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: contract-design
+**Checkpoint**: review-receipt
+**Changed**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md
+**Recorded**: sha256:f5d7d5ae6f3e23fd32a1f8c04161737f63499651cde1b86a1f44da92cf3dd247
+**Current**: sha256:50e43844324fb34b6fd705e210c118a7ce53dca6e5034a351a6f83334bb339b0
+**Details**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md changed after it was reviewed. Continuing to the gate with the diff (Change Control: relaxed).
+
+---
+
+## Error Logged
+**Timestamp**: 2026-09-23T07:07:02Z
+**Event**: ERROR_LOGGED
+**Tool**: aidlc-log
+**Command**: aidlc-log engine log review --stage contract-design --single --reviewer aidlc-architecture-reviewer-agent --iteration 1
+**Error**: Cannot start review for "contract-design": no fresh human-backed consolidated summary confirmation is recorded. Present the summary, then run `aidlc-log.ts answer --checkpoint summary-confirmation --stage contract-design --single --details "Looks correct" after the human responds.\n{"kind":"ask","ask_type":"guard-recovery","response_route":"execute-remedy","question":"The next action for \"contract-design\" would be refused. Choose one authority-preserving recovery action.","stage":"contract-design","reason_codes":["SUMMARY_RECEIPT_MISSING"],"remedies":[{"op":"restore-or-jump","action":"This stage is already approved; restore the reviewed source state, or jump back with /aidlc --stage contract-design to redo it.","command":"bun .codex/tools/aidlc-orchestrate.ts next --stage contract-design","requiresHuman":true,"executableNow":true}]}
+
+---
+
+## Guardrail Loaded
+**Timestamp**: 2026-09-23T07:07:27Z
+**Event**: GUARDRAIL_LOADED
+**Scope**: all
+**Path**: .codex/aidlc-rules/
+**Rule count**: 7
+
+---
+
+## Health Check
+**Timestamp**: 2026-09-23T07:07:27Z
+**Event**: HEALTH_CHECKED
+**Request**: /aidlc --doctor
+**Details**: 60 passed, 0 failed
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T07:09:01Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-r01-r02-verification.md
+**Context**: inception > contract-design > single-r01-r02-verification.md
+**Summary Authorization Id**: 0d0b6eea631db0607d4c5b084ae4dde347a94043c8d03d40b58da10657a8c03e
+
+---

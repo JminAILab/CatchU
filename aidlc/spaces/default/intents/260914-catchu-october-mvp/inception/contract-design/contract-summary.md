@@ -48,7 +48,7 @@ components:
 - 회원 경로는 `Authorization: Bearer <CatchU Access JWT>`가 필요하다. `memberId`는 검증한 토큰에서 얻으며 본문에서 지정하지 않는다. Guard 통과 뒤 기능 담당이 자원 소유·연동·동의를 검사한다. 다른 회원의 자원과 없는 자원은 동일 404/RESOURCE_UNAVAILABLE이다.
 - Google 실제 로그인/GitHub OAuth·refresh·로그아웃의 제공자/쿠키 경로는 OQ-A1이다. 이 문서는 Access JWT 소비 계약을 고정하며 미합의 OAuth callback 등을 작동하는 계약으로 꾸미지 않는다. #87 개발용 로그인은 명시 설정에서만 켜고 production에서는 거부한다. 운영 OpenAPI에 개발 로그인 경로를 추가하지 않는다.
 - 프로필은 displayName·introduction·desiredRole·skills를 자가 입력으로 취급한다. 값이 없는 문자열은 빈 문자열, 기술은 빈 배열이다. 서비스 기본값/길이 제한은 A의 기능 설계로 보완하며 공개 투영은 OQ-A2의 A/C 확인 대상이다.
-- 모든 목록은 `items`와 `page.nextCursor`(마지막은 null)를 반환한다. opaque cursor는 소유자/필터 경계에 묶이며 현재 권한을 다시 검사한다. cursor는 공개 상태 스냅샷이나 영구 접근권이 아니다. 기본 20·최대 100개는 v1 페이지 규격이다.
+- 회원 목록은 `items`와 `page.nextCursor`(마지막은 null)를 반환한다. 이 `items`·`page` 규칙은 회원 목록에만 적용되며 수신자 목록 응답은 `profile`·`catches`·`page`다. opaque cursor는 소유자/필터 경계에 묶이며 현재 권한을 다시 검사한다. cursor는 공개 상태 스냅샷이나 영구 접근권이 아니다. 기본 20·최대 100개는 v1 페이지 규격이다.
 
 ## 분석 접수·상태·재요청
 
@@ -155,8 +155,10 @@ components:
 | Request | E가 영속 요청/새 동의에 연결한 requestId·attemptId·memberId·repositoryId·consentId와 허용 scope를 제공. scope의 허용 자료 종류는 요청마다 한정하며 전체 종류 열거가 수집 허가가 아님 |
 | ProcessingEvent | RECEIVED/RUNNING은 F 관측, UNCERTAIN은 실행 불명. 순서 역전으로 종결 상태를 되돌리지 않음. 전달 방식·실행 불명 해소는 #77 |
 | Result | 후보는 근거/기여와 실패 분리 확인을 충족한 것만. notProvided의 근거 부족/기준 미달과 failures의 수집/생성 오류를 구분. schemaVersion=1 |
-| ResultReceipt | E의 형식·맥락 검사 후 ACCEPTED/DUPLICATE/REJECTED. ACCEPTED는 DB/Catch 등록 완료가 아니며 E application이 별도로 표시 |
+| ResultReceipt | resultId·requestId·attemptId를 모두 식별할 수 있는 메시지에만 전송. E의 형식·맥락 검사 후 ACCEPTED/DUPLICATE/REJECTED. ACCEPTED는 DB/Catch 등록 완료가 아니며 E application이 별도로 표시 |
 | mock 연결 | 같은 Request/Result를 합성 fixture·가짜 생성기로 연결. sourceMode=MOCK를 유지하고 실제 분석 성공으로 표시하지 않음. 제공자명·모델명·SDK·API 키 의존 필드 없음 |
+
+ResultReceipt의 식별 가능 조건은 resultId·requestId·attemptId 세 필드가 각각 비어 있지 않은 문자열로 읽히는 것이다. 하나라도 누락·빈 값·잘못된 타입이어서 식별할 수 없으면 Receipt 없이 거부 기록만 남긴다. Receipt를 만들려고 식별자를 임의 생성하거나 추정해 채우지 않는다. 세 식별자는 유효하나 다른 필드가 스키마에 맞지 않으면 REJECTED/SCHEMA_INVALID Receipt를 보낼 수 있다. 식별 가능과 맥락 일치는 별개이며 기존 요청·동의·범위 검사를 통과해야 수락한다. 거부 기록에는 원문·비밀값을 남기지 않고, 기록 저장소·보관 및 전송 방식은 이번에 정하지 않는다.
 
 credentialContextReference는 A/F 계약에서 해석할 작업 맥락의 식별자이며 토큰/권한 자체가 아니다. 메시지에 GitHub/LLM 비밀값을 넣지 않는다. 외부 입력의 memberId·consentId는 신뢰하지 않고 E의 접수 정본과 일치할 때만 처리/반영한다. F는 지정 scope 밖으로 확장하지 않는다. 수신 schema 검사·맥락 대조·중복 판정은 외부 실행을 일으키지 않는다.
 
