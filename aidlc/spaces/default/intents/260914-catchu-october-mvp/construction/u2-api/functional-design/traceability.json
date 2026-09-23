@@ -1,0 +1,128 @@
+{
+  "stage": "functional-design",
+  "unit": "u2-api",
+  "upstream_ids": [
+    "FR1",
+    "FR3",
+    "FR4",
+    "FR11",
+    "FR1.1",
+    "FR1.4",
+    "FR1.5",
+    "FR3.1",
+    "FR3.2",
+    "FR3.4",
+    "FR3.5",
+    "FR4.1",
+    "FR4.2",
+    "FR4.3",
+    "FR4.4",
+    "FR4.5",
+    "FR11.1",
+    "FR11.2",
+    "FR11.3"
+  ],
+  "coverage": [
+    {
+      "id": "FR1",
+      "status": "OK",
+      "target": "BR2.2"
+    },
+    {
+      "id": "FR3",
+      "status": "OK",
+      "target": "BR2.11"
+    },
+    {
+      "id": "FR4",
+      "status": "OK",
+      "target": "BR2.9"
+    },
+    {
+      "id": "FR11",
+      "status": "OK",
+      "target": "BR2.1"
+    },
+    {
+      "id": "FR1.1",
+      "status": "OK",
+      "target": "BR2.2 BR2.3"
+    },
+    {
+      "id": "FR1.4",
+      "status": "OK",
+      "target": "BR2.2 BR2.3 BR2.4 BR2.5 BR2.6 BR2.7 BR2.14"
+    },
+    {
+      "id": "FR1.5",
+      "status": "OK",
+      "target": "BR2.10"
+    },
+    {
+      "id": "FR3.1",
+      "status": "OK",
+      "target": "BR2.11"
+    },
+    {
+      "id": "FR3.2",
+      "status": "OK",
+      "target": "BR2.11 BR2.13"
+    },
+    {
+      "id": "FR3.4",
+      "status": "OK",
+      "target": "BR2.10 BR2.11"
+    },
+    {
+      "id": "FR3.5",
+      "status": "OK",
+      "target": "BR2.7 BR2.8 BR2.9"
+    },
+    {
+      "id": "FR4.1",
+      "status": "OK",
+      "target": "BR2.9"
+    },
+    {
+      "id": "FR4.2",
+      "status": "OK",
+      "target": "BR2.11 BR2.13"
+    },
+    {
+      "id": "FR4.3",
+      "status": "OK",
+      "target": "BR2.12 BR2.14"
+    },
+    {
+      "id": "FR4.4",
+      "status": "OK",
+      "target": "BR2.12 BR2.13"
+    },
+    {
+      "id": "FR4.5",
+      "status": "OK",
+      "target": "BR2.13"
+    },
+    {
+      "id": "FR11.1",
+      "status": "OK",
+      "target": "BR2.1 BR2.14"
+    },
+    {
+      "id": "FR11.2",
+      "status": "OK",
+      "target": "BR2.1"
+    },
+    {
+      "id": "FR11.3",
+      "status": "OK",
+      "target": "BR2.1"
+    }
+  ],
+  "notes": [
+    "User Stories SKIP: 주 배정 api FR 19개만 추적하며 US ID를 만들지 않음.",
+    "FR2.1/FR2.2는 worker 주책임이고 BR2.7/BR2.8이 E 전달·B 서비스 정본 연결을 보완한다.",
+    "보류/N/A 및 상위 묶음의 부분 적용은 Unit 매핑을 그대로 따른다; 개발/최종 승인 완료 의미 아님."
+  ]
+}
+

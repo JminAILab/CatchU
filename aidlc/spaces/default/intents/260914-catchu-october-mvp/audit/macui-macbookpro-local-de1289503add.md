@@ -6286,3 +6286,240 @@
 **Summary Authorization Id**: 4c0f1711a7a025293a116aa38829bd4ede6618620e365dac6412138dbd127099
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-09-23T07:30:58Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-design-questions.md
+**Unit**: u2-api
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-23T07:32:17Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T07:32:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-design-questions.md
+**Context**: construction > u2-api > functional-design > functional-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-09-23T07:32:33Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: functional-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-design-questions.md
+**Questions SHA-256**: e4c3c83ca06048a08967896272e56f9412af7b54e109614c18bb4aeb8b66c6c5
+**Hash Scope**: confirmed-content-v1
+**Unit**: u2-api
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Session Compacted
+**Timestamp**: 2026-09-23T07:32:34Z
+**Event**: SESSION_COMPACTED
+**Current Stage**: functional-design
+**State Validity**: valid
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T07:43:02Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md
+**Context**: construction > u2-api > functional-design > entities.md
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T07:43:03Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md
+**Context**: construction > u2-api > functional-design > rules.md
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T07:43:04Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md
+**Context**: construction > u2-api > functional-design > functional-spec.md
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T07:43:05Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/traceability.json
+**Context**: construction > u2-api > functional-design > traceability.json
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-09-23T07:43:05Z
+**Event**: SENSOR_FIRED
+**Fire id**: 27591805
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Output path**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/traceability.json
+
+---
+
+## Sensor Failed
+**Timestamp**: 2026-09-23T07:43:05Z
+**Event**: SENSOR_FAILED
+**Fire id**: 27591805
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Output path**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/traceability.json
+**Detail path**: aidlc/spaces/default/intents/260914-catchu-october-mvp/.aidlc-sensors/functional-design/traceability-27591805.md
+**Findings count**: 23
+
+---
+
+## Human Turn
+**Timestamp**: 2026-09-23T07:44:54Z
+**Event**: HUMAN_TURN
+**Session**: 01a0c498-1dcc-7161-b59f-fe1b86a07771
+
+---
+
+## Review Requested
+**Timestamp**: 2026-09-23T07:45:52Z
+**Event**: REVIEW_REQUESTED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u2-api
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:a57a3d1230700bfcc1b166da980ca615ca6a5d64f5fbb456ccf2d364209a42c2
+**Request Id**: review:cf7b345a76132e27323cf9b5535ea7cb
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T07:46:01Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/.aidlc-reviewer-dispatch.json
+**Context**: .aidlc-reviewer-dispatch.json
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T07:48:38Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/.aidlc-reviews/functional-design/units/u2-api/293fc02209740e3c/1.review.md
+**Context**: .aidlc-reviews > functional-design > units > u2-api > 293fc02209740e3c > 1.review.md
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-09-23T07:48:47Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: 01a0cd25-894c-7fe3-a5ac-3d88971b9e21
+**Message**: **Reviewer:** aidlc-architecture-reviewer-agent\n**Verdict:** READY — Major 1건, Critical 0건.\n\n지정 `u2-api/.../1.review.md`에 기록했습니다. R-01: BR2.5가 `resultId` 없는 ProcessingEvent에도 Result의 세 ID·Receipt 조건을 
+
+---
+
+## Review Completed
+**Timestamp**: 2026-09-23T07:49:11Z
+**Event**: REVIEW_COMPLETED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u2-api
+**Iteration**: 1
+**Verdict**: READY
+**Request Fingerprint**: sha256:a57a3d1230700bfcc1b166da980ca615ca6a5d64f5fbb456ccf2d364209a42c2
+**Artifact Fingerprint**: sha256:a57a3d1230700bfcc1b166da980ca615ca6a5d64f5fbb456ccf2d364209a42c2
+**Request Id**: review:cf7b345a76132e27323cf9b5535ea7cb
+**Review Record**: .aidlc-reviews/functional-design/units/u2-api/293fc02209740e3c/1.json
+**Review Record Digest**: sha256:7ed81dd4507811fa0890b75875ad667401448447637d39cf52369422650afefe
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T07:49:52Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/review.md
+**Context**: construction > u2-api > functional-design > review.md
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T07:49:53Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/verification.md
+**Context**: construction > u2-api > functional-design > verification.md
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-09-23T07:49:53Z
+**Event**: UNIT_COMPLETED
+**Stage**: functional-design
+**Unit**: u2-api
+**Run floor**: STAGE_STARTED:2026-09-23T07:02:00Z#1
+**Mode**: wave
+**Wave memory entries**: 0
+**Artifact Fingerprint**: sha256:a57a3d1230700bfcc1b166da980ca615ca6a5d64f5fbb456ccf2d364209a42c2
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-09-23T07:51:22Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-design-questions.md
+**Context**: construction > u1-web > functional-design > functional-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-09-23T07:51:23Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-design-questions.md
+**Unit**: u1-web
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-09-23T07:51:34Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/verification.md
+**Context**: construction > u2-api > functional-design > verification.md
+**Summary Authorization Id**: d33b7e35a83b4d87697643c0c92aad82b30c7214a4fcf36ffc81486ea76a595b
+
+---
