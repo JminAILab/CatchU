@@ -1,0 +1,35 @@
+[project]
+name = "catchu-worker"
+version = "0.1.0"
+description = "CatchU 수집·분석 worker 실행 기반"
+requires-python = "==3.12.10"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn==0.53.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2==2.13.0",
+    "mypy==2.3.1",
+    "pytest==9.1.1",
+    "ruff==0.16.8",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app", "tests"]
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
