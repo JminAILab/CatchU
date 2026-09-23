@@ -1,0 +1,145 @@
+{
+  "stage": "functional-design",
+  "unit": "u1-web",
+  "upstream_ids": [
+    "FR1",
+    "FR2",
+    "FR3",
+    "FR4",
+    "FR11",
+    "FR1.1",
+    "FR1.4",
+    "FR1.5",
+    "FR2.1",
+    "FR2.2",
+    "FR3.1",
+    "FR3.2",
+    "FR3.4",
+    "FR3.5",
+    "FR4.1",
+    "FR4.2",
+    "FR4.3",
+    "FR4.4",
+    "FR4.5",
+    "FR11.1",
+    "FR11.2",
+    "FR11.3"
+  ],
+  "coverage": [
+    {
+      "id": "FR1",
+      "status": "OK",
+      "target": "W1 W2 W3 W8"
+    },
+    {
+      "id": "FR2",
+      "status": "OK",
+      "target": "W3 W4"
+    },
+    {
+      "id": "FR3",
+      "status": "OK",
+      "target": "W4 W6 W7"
+    },
+    {
+      "id": "FR4",
+      "status": "OK",
+      "target": "W5 W6 W7"
+    },
+    {
+      "id": "FR11",
+      "status": "OK",
+      "target": "W1"
+    },
+    {
+      "id": "FR1.1",
+      "status": "OK",
+      "target": "W1 W2"
+    },
+    {
+      "id": "FR1.4",
+      "status": "OK",
+      "target": "W2 W3 W8"
+    },
+    {
+      "id": "FR1.5",
+      "status": "OK",
+      "target": "W5 W7"
+    },
+    {
+      "id": "FR2.1",
+      "status": "OK",
+      "target": "W3 W4"
+    },
+    {
+      "id": "FR2.2",
+      "status": "OK",
+      "target": "W4"
+    },
+    {
+      "id": "FR3.1",
+      "status": "OK",
+      "target": "W6"
+    },
+    {
+      "id": "FR3.2",
+      "status": "OK",
+      "target": "W7"
+    },
+    {
+      "id": "FR3.4",
+      "status": "OK",
+      "target": "W5 W7"
+    },
+    {
+      "id": "FR3.5",
+      "status": "OK",
+      "target": "W4 W5"
+    },
+    {
+      "id": "FR4.1",
+      "status": "OK",
+      "target": "W5"
+    },
+    {
+      "id": "FR4.2",
+      "status": "OK",
+      "target": "W6 W7"
+    },
+    {
+      "id": "FR4.3",
+      "status": "OK",
+      "target": "W6"
+    },
+    {
+      "id": "FR4.4",
+      "status": "OK",
+      "target": "W6 W7"
+    },
+    {
+      "id": "FR4.5",
+      "status": "OK",
+      "target": "W6 W7"
+    },
+    {
+      "id": "FR11.1",
+      "status": "OK",
+      "target": "W1"
+    },
+    {
+      "id": "FR11.2",
+      "status": "OK",
+      "target": "W1"
+    },
+    {
+      "id": "FR11.3",
+      "status": "OK",
+      "target": "W1"
+    }
+  ],
+  "notes": [
+    "ui Unit은 entities/rules 산출 대상이 아니다. target W1~W8은 functional-spec.md의 실제 화면 흐름 ID이며 BR/US ID를 만들어 검사를 우회하지 않는다.",
+    "Units의 web 관련 현재 적용 FR 22개를 추적한다. 업무 정본/생성 주책임은 api/worker에 유지한다.",
+    "상위 FR 묶음의 부분 적용과 Deferred/N/A는 기존 Unit 매핑을 따른다. 구현 완료나 담당자 승인을 뜻하지 않는다."
+  ]
+}
