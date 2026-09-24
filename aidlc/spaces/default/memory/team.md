@@ -9,7 +9,7 @@
 
 ## Way of Working
 
-- 공통 작업 절차는 `docs/CatchU_작업관리.md`를 따른다. 10월 MVP 코딩은 그 문서의 「코딩 운영」대로 AI-DLC Construction 코드 생성 단계를 거치지 않고 이슈 → `영역/작업내용` 브랜치 → `dev` PR → 작성자 외 승인 1건 → merge commit으로 진행한다. 보호 브랜치에 squash·rebase 머지는 쓰지 않는다.
+- 공통 작업 절차는 `docs/CatchU_작업관리.md`를 따른다. 10월 MVP 코딩은 그 문서의 「코딩 운영」대로 이슈 → `영역/작업내용` 브랜치 → `dev` PR → 작성자 외 승인 1건 → merge commit으로 머지한다. AI-DLC 코드 생성은 담당자가 요청할 때만 쓰며, 써도 머지는 이 흐름을 따른다. 보호 브랜치에 squash·rebase 머지는 쓰지 않는다.
 - 각 담당자는 10월 MVP 요구사항(`aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md`) 담당표의 자기 영역 설계·구현·시험을 맡는다. 미배정 공통 업무를 팀원 1이나 초기화 담당에게 자동 배정하지 않는다.
 - 승인된 화면·설계 제출물은 다시 만들지 않고 재사용한다. 안내 문구를 없애려고 승인된 상류 단계를 재승인·재수행하지 않는다.
 
