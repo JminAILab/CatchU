@@ -194,7 +194,7 @@ technical_records:
     constraints: ["unique(requestId, attemptId, resultId); 현재 시도당 검증된 종결 결과 하나", "시도/요청/본인/저장소/동의/범위/sourceMode 일치 후만 생성", "다른 payload/늦은 시도는 기존 기록을 덮어쓰지 않음"]
   - name: CandidateRegistration
     owner: "B 판정 정본, E 결과 연결"
-    description: "후보별 등록 또는 기존 동일 작업 참조; B 저장 뒤 E 실패의 재진입 키"
+    description: "후보별 등록 또는 기존 동일 작업 참조; 재전달·반영 복구 때의 재진입 키"
     attributes:
       - {name: registrationId, type: id, required: true, unique: true, primary: true}
       - {name: applicationRecordId, type: id, required: true, references: ResultApplicationRecord.applicationRecordId}
@@ -229,7 +229,7 @@ relationships:
 | 키·참조 | PK/FK·필수 값·enum·복합 유일성을 마이그레이션에 포함. 소유자/요청 일치는 복합 참조 또는 같은 트랜잭션 검증으로 보장. 외부 ID는 F 테이블 FK로 만들지 않음 |
 | 요청 생성 | 요청·동의·첫 시도 ID를 미리 할당하고 한 트랜잭션에서 연결. 순환 FK는 커밋 시 참조 검사가 가능한 매핑으로 해결하고 중간 미완료 행을 노출하지 않음. ACTIVE 회원 단위 유일성을 최종 방어로 유지 |
 | 시간 조건 | valid(t) 제목/개수 판정과 발급을 같은 회원에 직렬화하고 동일 판정 시각을 사용. 시간 의존 조건은 정적 unique만으로 완료 처리하지 않음. 만료된 제목 재사용 가능; 활성 표시용 파생 플래그 지연에 의존하지 않음 |
-| 등록·반영 | 후보 키/작업 키 동시 충돌은 같은 Catch 참조로 수렴. B의 Catch+근거+CandidateRegistration 원자 저장 뒤 E 반영 실패 시 그 연결을 재사용. 결과 payload fingerprint는 안전한 정규화 의미 비교이며 원문 결과 저장을 대체하지 않음 |
+| 등록·반영 | 후보 키/작업 키 동시 충돌은 같은 Catch 참조로 수렴. B의 Catch+근거+CandidateRegistration과 E 반영 완료 기록은 F4의 한 트랜잭션으로 저장. 실패·커밋 뒤 응답·확인 유실은 [functional-spec의 두 경우](functional-spec.md#동시성과-일관성)를 따름. 결과 payload fingerprint는 안전한 정규화 의미 비교이며 원문 결과 저장을 대체하지 않음 |
 | 보안·보관 | secret-reference/fingerprint의 암호·키 관리와 응답 재생 저장 상세는 담당 설계. 삭제 cascade/TTL을 추정하지 않음. Redis만의 유실 가능한 락/키를 영속 중복 방지 정본으로 삼지 않음 |
 
 MemberProfile의 desiredRole/skills는 기존 jobRole/technologyTags의 API 명칭 매핑이다. 공개 프로필·Catch restriction·링크 state·registeredCatchIds는 정본에서 유도하므로 중복 열이 아니다. Account/GitHub 인증 세부 상태를 새 제품 정책으로 확대하지 않는다.
