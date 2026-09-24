@@ -97,6 +97,7 @@ entities:
     description: "등록된 작업·기여·초안·최소 질문의 서비스 정본"
     attributes:
       - {name: catchId, type: id, required: true, unique: true, primary: true}
+      - {name: title, type: string, required: true, min_length: 1, constraints: "F가 생성한 값을 저장하며 구직자는 수정할 수 없음"}
       - {name: ownerId, type: id, required: true, references: MemberAccount.memberId}
       - {name: sourceRequestId, type: id, required: true, references: AnalysisRequest.requestId}
       - {name: sourceResultId, type: external-id, required: true}
@@ -121,7 +122,7 @@ entities:
       - "등록 Catch는 CatchEvidence 1개 이상과 원자적으로 준비; evidenceReferences 속성 없음"
       - "GENERATED일 때만 draftContent 문자열; FAILED/NOT_GENERATED이면 null"
       - "최소 질문 실패/미생성은 상태 보존; 수신자 공개와 답변 저장 없음"
-      - "repositoryId는 sourceRequest에서 유도; restriction은 해당 RepositoryProtection으로 현재 계산"
+      - "repositoryId는 sourceRequest에서 유도해 회원 Catch 응답 필드와 목록의 repositoryId 필터에 사용; CatchAsset에 repositoryId 칼럼을 추가하지 않음. restriction은 해당 RepositoryProtection으로 현재 계산"
   - name: CatchEvidence
     owner: B
     description: "등록 Catch의 근거 사본 정본; F 임시 저장의 영구 접근에 의존하지 않음"

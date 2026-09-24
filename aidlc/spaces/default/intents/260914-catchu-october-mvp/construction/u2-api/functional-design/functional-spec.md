@@ -84,7 +84,7 @@ retry.allowed는 [계약](../../../inception/contract-design/contract-summary.md
 | Member/Profile/GitHubConnection | A 모델. MemberProfile public 투영의 fieldSource=SELF_REPORTED |
 | AnalysisStatus | Request+현재 Attempt+Consent+CandidateRegistration의 한 판본. resultId는 E 메타데이터 외부 참조 |
 | Catch | B 정본+CatchEvidence 1:N; source*는 최초 등록 출처. 다른 후보의 EXISTING 참조가 이를 교체하지 않음 |
-| PublicCatch | catchId/workFacts/subjectContribution/evidence/draft만; 최소 질문·확인·불일치·요청/결과/후보 ID 제외 |
+| PublicCatch | catchId/title/workFacts/subjectContribution/evidence/draft만; 최소 질문·확인·불일치·요청/결과/후보 ID 제외 |
 | ShareLink | 현재 시각에서 state, 비밀번호 참조로 passwordRequired, 토큰 경로로 url. 제목은 수신자에게 보내지 않음 |
 | 목록/오류 | 회원 items/page, 수신자 profile/catches/page. cursor는 본인/필터에 묶고 매 요청 권한 재판정; 기본20/최대100. no-store 및 code/message/details는 common.yaml 그대로 |
 
@@ -105,7 +105,7 @@ retry.allowed는 [계약](../../../inception/contract-design/contract-summary.md
 | OQ-A1/A2 | 2 A·3 C: 실제 OAuth/자격정보 수명·프로필 투영 확인. 실제 인증/공개 연결 전; #87 개발용 로그인은 별도 |
 | OQ-F1/L | 1 F/H·2 A/E: F 임시 결과 위치/수명과 손실 없는 전달, #77 이후 전송. 제공자는 팀장이 실제 연결 전 선정. F 서비스 DB 제외 유지 |
 | OQ-F2 | 1 F 제안·4 B/2 E 검토: workIdentity의 네임스페이스/범위·충돌 판별. 실제 중복 등록 판정 전 |
-| OQ-B1 | 4 B·2 E: B 등록/기존 참조·준비 응답과 트랜잭션 구현. 이 ERD 제약 안의 함수/구현은 개발 이슈, 관계/유일성 변경은 계약 수정 |
+| OQ-B1 (결정) | 2026-09-24 팀장 결정: B 등록(Catch·근거·등록 연결)과 E 반영 완료 기록을 한 트랜잭션으로 저장한다. 수신 기록은 그 전에 E가 저장한다. 등록 함수의 입출력과 테이블 생성 순서는 E↔B 등록 개발 이슈에서 정한다. |
 | OQ-B2/B3 | 팀장·B/E/F/C: 보완·재분석·동의 재사용·기존 Catch/링크 변경·원본 재공개/보관은 보류. 보호 관측 경로/오류 판단은 해당 실제 연결 전 |
 | OQ-C1 | 3 C: grant 수명/저장·비밀번호 제한·응답 시간 은닉. 실제 보호 연결 전; 임의 grant 테이블/TTL을 이 ERD에 확정하지 않음 |
 

@@ -153,10 +153,12 @@ paths:
     get:
       operationId: "listCatches"
       summary: "listCatches"
+      description: "repositoryId와 sourceRequestId를 함께 주면 두 조건을 모두 만족하는 본인 Catch만 반환한다."
       parameters:
         - {"name":"cursor","in":"query","schema":{"type":"string"}}
         - {"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
         - {"name":"sourceRequestId","in":"query","schema":{"type":"string","minLength":1}}
+        - {"name":"repositoryId","in":"query","required":false,"schema":{"type":"string","minLength":1}}
       responses:
         "200":
           description: "성공"

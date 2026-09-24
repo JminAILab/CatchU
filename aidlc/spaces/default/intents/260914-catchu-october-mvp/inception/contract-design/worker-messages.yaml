@@ -70,6 +70,7 @@ components:
       additionalProperties: false
       required:
         - "candidateId"
+        - "title"
         - "workIdentity"
         - "workFacts"
         - "subjectContribution"
@@ -81,6 +82,7 @@ components:
         - "reflection"
       properties:
         candidateId: {"type":"string","minLength":1}
+        title: {"type":"string","minLength":1}
         workIdentity: {"type":"string","minLength":1}
         workFacts: {"type":"array","items":{"type":"string"}}
         subjectContribution: {"type":"string"}

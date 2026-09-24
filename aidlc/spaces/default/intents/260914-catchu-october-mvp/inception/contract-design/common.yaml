@@ -152,6 +152,8 @@ components:
       additionalProperties: false
       required:
         - "catchId"
+        - "title"
+        - "repositoryId"
         - "sourceRequestId"
         - "sourceResultId"
         - "sourceCandidateId"
@@ -167,6 +169,8 @@ components:
         - "sourceMode"
       properties:
         catchId: {"type":"string","minLength":1}
+        title: {"type":"string","minLength":1}
+        repositoryId: {"type":"string","minLength":1}
         sourceRequestId: {"type":"string","minLength":1}
         sourceResultId: {"type":"string","minLength":1}
         sourceCandidateId: {"type":"string","minLength":1}
@@ -187,9 +191,10 @@ components:
     PublicCatch:
       type: "object"
       additionalProperties: false
-      required: ["catchId","workFacts","subjectContribution","evidence","draft"]
+      required: ["catchId","title","workFacts","subjectContribution","evidence","draft"]
       properties:
         catchId: {"type":"string","minLength":1}
+        title: {"type":"string","minLength":1}
         workFacts: {"type":"array","items":{"type":"string"}}
         subjectContribution: {"type":"string"}
         evidence: {"type":"array","items":{"$ref":"#/components/schemas/PublicEvidence"}}

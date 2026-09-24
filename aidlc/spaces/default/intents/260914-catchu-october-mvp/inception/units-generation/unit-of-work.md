@@ -14,7 +14,7 @@
 
 | Unit | 구성요소 | 소유·제공 경계 | 담당 |
 |---|---|---|---|
-| U1 web | MemberExperience, RecipientExperience | 회원의 입력·진행·확인·공개 관리 화면, 비로그인 수신자 표시. 업무 정본·접근 판정은 api | 팀원 2 A/E 화면, 3 C/D, 4 B |
+| U1 web | MemberExperience, RecipientExperience | 회원의 입력·진행·확인·공개 관리 화면, 비로그인 수신자 표시. 업무 정본·접근 판정은 api | 팀원 2 A 화면, 3 C/D(내 자산 저장소 연결 관리 포함), 4 B(내 자산 페이지·Catch 목록·상세) |
 | U2 api | IdentityProfile, AnalysisCoordinator, CatchRegistry, ShareAccess | A 계정/연동, E 요청–동의/처리·반영 진행, B Catch/근거·초안/최소 질문 서비스 정본, C 링크/현재 접근 판단 | 팀원 2 A/E, 3 C, 4 B |
 | U3 worker | EvidenceAnalysis | F의 허용 범위 분석·근거/기여·후보·초안·최소 질문 생성과 결과 의미. Catch 등록·서비스 DB 저장은 api | 팀원 1 F |
 
