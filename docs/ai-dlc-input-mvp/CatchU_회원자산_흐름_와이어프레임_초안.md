@@ -2,6 +2,8 @@
 
 작성일: 2026-09-14 · 수정일: 2026-09-23 · 판본: v0.10 · 지위: **공동 검토용 화면 초안 / 후속 설계 입력**
 
+> **현재 내 자산 화면 구조 안내:** 현재 내 자산 화면 구조는 [9/24 팀장 결정 — 「B 계약 확인·내 자산 화면 구조」(PR #97)](https://github.com/JminAILab/CatchU/blob/3434ffc86af53cc3e24deab6649cd28f43055895/docs/ai-dlc-input-mvp/2026-09-14_followup.md#L112-L142)과 [최신 web 기능 설계 — 「내 자산 화면 구조」(PR #89)](https://github.com/JminAILab/CatchU/blob/b4199641ac0d8679005cf63de264d17aecb1c04f/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md#L20-L49)를 따른다. 아래 기존 와이어프레임의 화면 배치·진입 경로는 해당 기준과 함께 읽으며, 대체된 배치를 현행 화면 구조로 해석하지 않는다.
+
 이 문서는 작성자(팀원 2, `yeongyeon1802`)의 기존 초안을 재사용한 검토 자료다. 이번 판은 **A 로그인·프로필·GitHub 연동과 D 진입·복귀**, **E 분석 요청·상태의 후속 설계 입력**을 보완한다. B 자산 원문은 인계 자료이며 작성자에게 B 개발 책임을 추가하지 않는다. 팀 합의 사항은 출처와 함께 반영하며, 이 초안 작성 자체는 별도 intent 생성이나 공식 단계 진행·승인, 새로운 제품 정책 확정을 의미하지 않는다. PC 웹의 상자·텍스트·버튼 배치만 표현하며 실제 코드·API·저장·분석 결과는 포함하지 않는다.
 
 ## 1. 근거와 읽는 방법
