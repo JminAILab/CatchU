@@ -1,0 +1,160 @@
+openapi: "3.0.3"
+info: {"title":"CatchU api–worker 메시지 스키마 v1","version":"1.0.0","description":"형식 전용. paths가 비어 있으며 HTTP/큐/저장소를 선택하지 않는다. 전송은 #77 이후."}
+paths: {}
+components:
+  schemas:
+    Scope:
+      type: "object"
+      additionalProperties: false
+      required: ["revision","repositoryId","allowedResourceTypes","selectionReference"]
+      properties:
+        revision: {"type":"string","minLength":1}
+        repositoryId: {"type":"string","minLength":1}
+        allowedResourceTypes: {"type":"array","items":{"type":"string","enum":["COMMIT","PULL_REQUEST","ISSUE"]}}
+        selectionReference: {"type":"string","minLength":1}
+    Request:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "schemaVersion"
+        - "messageId"
+        - "requestId"
+        - "attemptId"
+        - "memberId"
+        - "repositoryId"
+        - "consentId"
+        - "noticeRevision"
+        - "consentedAt"
+        - "allowedScope"
+        - "credentialContextReference"
+        - "sourceMode"
+        - "requestedAt"
+      properties:
+        schemaVersion: {"type":"string","enum":["1"]}
+        messageId: {"type":"string","minLength":1}
+        requestId: {"type":"string","minLength":1}
+        attemptId: {"type":"string","minLength":1}
+        memberId: {"type":"string","minLength":1}
+        repositoryId: {"type":"string","minLength":1}
+        consentId: {"type":"string","minLength":1}
+        noticeRevision: {"type":"string","minLength":1}
+        consentedAt: {"type":"string","format":"date-time"}
+        allowedScope: {"$ref":"#/components/schemas/Scope"}
+        credentialContextReference: {"type":"string","minLength":1}
+        sourceMode: {"type":"string","enum":["MOCK","LIVE"]}
+        requestedAt: {"type":"string","format":"date-time"}
+    ProcessingEvent:
+      type: "object"
+      additionalProperties: false
+      required: ["schemaVersion","messageId","requestId","attemptId","state","observedAt"]
+      properties:
+        schemaVersion: {"type":"string","enum":["1"]}
+        messageId: {"type":"string","minLength":1}
+        requestId: {"type":"string","minLength":1}
+        attemptId: {"type":"string","minLength":1}
+        state: {"type":"string","enum":["RECEIVED","RUNNING","UNCERTAIN"]}
+        observedAt: {"type":"string","format":"date-time"}
+    Evidence:
+      type: "object"
+      additionalProperties: false
+      required: ["evidenceId","sourceUrl","sourceRevision","representedFacts","contributionScope","coverageLimits"]
+      properties:
+        evidenceId: {"type":"string","minLength":1}
+        sourceUrl: {"type":"string","format":"uri"}
+        sourceRevision: {"type":"string"}
+        representedFacts: {"type":"array","items":{"type":"string"}}
+        contributionScope: {"type":"string"}
+        coverageLimits: {"type":"array","items":{"type":"string"}}
+    Candidate:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "candidateId"
+        - "title"
+        - "workIdentity"
+        - "workFacts"
+        - "subjectContribution"
+        - "groupingBasis"
+        - "groupingLimitations"
+        - "eligibility"
+        - "evidence"
+        - "draft"
+        - "reflection"
+      properties:
+        candidateId: {"type":"string","minLength":1}
+        title: {"type":"string","minLength":1}
+        workIdentity: {"type":"string","minLength":1}
+        workFacts: {"type":"array","items":{"type":"string"}}
+        subjectContribution: {"type":"string"}
+        groupingBasis: {"type":"string"}
+        groupingLimitations: {"type":"array","items":{"type":"string"}}
+        eligibility:
+          type: "object"
+          additionalProperties: false
+          required: ["workFactsVerified","contributionVerified","independentOfFailures"]
+          properties:
+            workFactsVerified: {"type":"boolean","enum":[true]}
+            contributionVerified: {"type":"boolean","enum":[true]}
+            independentOfFailures: {"type":"boolean","enum":[true]}
+        evidence: {"type":"array","items":{"$ref":"#/components/schemas/Evidence"},"minItems":1}
+        draft: {"$ref":"./common.yaml#/components/schemas/Draft"}
+        reflection: {"$ref":"./common.yaml#/components/schemas/Reflection"}
+    RejectedSummary:
+      type: "object"
+      additionalProperties: false
+      required: ["reason","count"]
+      properties: {"reason":{"type":"string","enum":["INSUFFICIENT_EVIDENCE","BELOW_CRITERIA","UNDETERMINED"]},"count":{"type":"integer","minimum":0}}
+    Result:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "schemaVersion"
+        - "messageId"
+        - "resultId"
+        - "requestId"
+        - "attemptId"
+        - "memberId"
+        - "repositoryId"
+        - "consentId"
+        - "scopeRevision"
+        - "sourceMode"
+        - "outcome"
+        - "candidates"
+        - "notProvided"
+        - "failures"
+        - "finishedAt"
+      properties:
+        schemaVersion: {"type":"string","enum":["1"]}
+        messageId: {"type":"string","minLength":1}
+        resultId: {"type":"string","minLength":1}
+        requestId: {"type":"string","minLength":1}
+        attemptId: {"type":"string","minLength":1}
+        memberId: {"type":"string","minLength":1}
+        repositoryId: {"type":"string","minLength":1}
+        consentId: {"type":"string","minLength":1}
+        scopeRevision: {"type":"string","minLength":1}
+        sourceMode: {"type":"string","enum":["MOCK","LIVE"]}
+        outcome: {"type":"string","enum":["SUCCEEDED","EMPTY","PARTIAL_FAILED","FAILED"]}
+        candidates: {"type":"array","items":{"$ref":"#/components/schemas/Candidate"}}
+        notProvided: {"type":"array","items":{"$ref":"#/components/schemas/RejectedSummary"}}
+        failures: {"type":"array","items":{"$ref":"./common.yaml#/components/schemas/Failure"}}
+        finishedAt: {"type":"string","format":"date-time"}
+    ResultReceipt:
+      type: "object"
+      description: >-
+        resultId·requestId·attemptId 세 식별자가 각각 비어 있지 않은 문자열로 읽히는
+        메시지에만 보낸다. 하나라도 누락·빈 값·잘못된 타입이면 Receipt 없이 거부
+        기록만 남기며, 식별자를 임의 생성하거나 추정해 채우지 않는다. 세 식별자는
+        유효하나 다른 필드가 스키마에 맞지 않으면 REJECTED/SCHEMA_INVALID를 보낼 수
+        있다. 식별 가능과 맥락 일치는 별개이며 기존 요청·동의·범위 검사를 유지한다.
+        거부 기록에 원문·비밀값을 남기지 않는다. 기록 저장소·보관·전송 방식은 미정이다.
+      additionalProperties: false
+      required: ["schemaVersion","messageId","resultId","requestId","attemptId","disposition","code"]
+      properties:
+        schemaVersion: {"type":"string","enum":["1"]}
+        messageId: {"type":"string","minLength":1}
+        resultId: {"type":"string","minLength":1}
+        requestId: {"type":"string","minLength":1}
+        attemptId: {"type":"string","minLength":1}
+        disposition: {"type":"string","enum":["ACCEPTED","DUPLICATE","REJECTED"]}
+        code: {"type":"string","enum":["OK","ALREADY_RECEIVED","CONTEXT_MISMATCH","STALE_ATTEMPT","PAYLOAD_CONFLICT","SCHEMA_INVALID"]}

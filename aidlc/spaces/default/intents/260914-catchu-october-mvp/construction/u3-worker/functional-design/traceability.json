@@ -1,0 +1,31 @@
+{
+  "stage": "functional-design",
+  "unit": "u3-worker",
+  "upstream_ids": [
+    "FR2",
+    "FR2.1",
+    "FR2.2"
+  ],
+  "coverage": [
+    {
+      "id": "FR2",
+      "status": "OK",
+      "target": "BR3.1 BR3.5"
+    },
+    {
+      "id": "FR2.1",
+      "status": "OK",
+      "target": "BR3.1 BR3.2 BR3.3 BR3.4"
+    },
+    {
+      "id": "FR2.2",
+      "status": "OK",
+      "target": "BR3.4 BR3.5"
+    }
+  ],
+  "notes": [
+    "User Stories SKIP. unit-of-work-story-map의 주 Unit U3에 배정된 FR을 사용한다.",
+    "관련 Unit FR1.1/FR1.4 경계는 규칙의 출처로 재사용하며 주 책임을 E에서 F로 옮기지 않는다.",
+    "OK는 문서 추적이며 구현·실제 호출·제품 시험 완료가 아니다."
+  ]
+}
