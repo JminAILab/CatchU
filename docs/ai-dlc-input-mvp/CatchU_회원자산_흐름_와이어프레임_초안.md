@@ -2,6 +2,8 @@
 
 작성일: 2026-09-14 · 수정일: 2026-09-23 · 판본: v0.10 · 지위: **공동 검토용 화면 초안 / 후속 설계 입력**
 
+> **현재 내 자산 화면 구조 안내:** 현재 내 자산 화면 구조는 [9/24 팀장 결정 — 「B 계약 확인·내 자산 화면 구조」(PR #97)](https://github.com/JminAILab/CatchU/blob/3434ffc86af53cc3e24deab6649cd28f43055895/docs/ai-dlc-input-mvp/2026-09-14_followup.md#L112-L142)과 [최신 web 기능 설계 — 「내 자산 화면 구조」(PR #89)](https://github.com/JminAILab/CatchU/blob/b4199641ac0d8679005cf63de264d17aecb1c04f/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md#L20-L49)를 따른다. 아래 기존 와이어프레임의 화면 배치·진입 경로는 해당 기준과 함께 읽으며, 대체된 배치를 현행 화면 구조로 해석하지 않는다.
+
 이 문서는 작성자(팀원 2, `yeongyeon1802`)의 기존 초안을 재사용한 검토 자료다. 이번 판은 **A 로그인·프로필·GitHub 연동과 D 진입·복귀**, **E 분석 요청·상태의 후속 설계 입력**을 보완한다. B 자산 원문은 인계 자료이며 작성자에게 B 개발 책임을 추가하지 않는다. 팀 합의 사항은 출처와 함께 반영하며, 이 초안 작성 자체는 별도 intent 생성이나 공식 단계 진행·승인, 새로운 제품 정책 확정을 의미하지 않는다. PC 웹의 상자·텍스트·버튼 배치만 표현하며 실제 코드·API·저장·분석 결과는 포함하지 않는다.
 
 ## 1. 근거와 읽는 방법
@@ -67,7 +69,7 @@
 | [PR #67 v0.5 §4-1·§4-4](https://github.com/JminAILab/CatchU/blob/4b39d54212b0132e0620a0402f0c9531f383c372/docs/ai-dlc-input-mvp/CatchU_공유링크_정보_판단조건_초안.md), 팀원 3 / [팀장 9/20 결정](https://github.com/JminAILab/CatchU/pull/67#pullrequestreview-5259842104) | 결정 반영・미결 | 공개 항목은 표시 이름·한 줄 소개·직무·기술 스택·GitHub 계정. 현재 공개 허용 프로필을 제공하고 수정은 기존 링크의 다음 조회에 반영. **Catch 본문은 같은 팀장 리뷰의 별도 결정:** 해당 Catch의 생성 결과를 유지하고 직접 문구 편집·재생성·링크별 본문 사본은 도입하지 않음. 공개 권한은 요청 시점에 확인하며 숨긴 Catch는 기존 링크에서도 제외. GitHub 해제·삭제·재공개 처리와 완료 분석 재분석·재분석 결과/새 공개 자산의 기존 링크 반영은 미결. 프로필은 §2·W02·§6, Catch 본문 기준은 §5.3에서 구분 |
 | [PR #70 공통 아키텍처 보완본 §3·§6·§7](https://github.com/JminAILab/CatchU/blob/d399553b7e441d23d7ca35ad63816b9402928033/docs/ai-dlc-input-mvp/CatchU_공통_아키텍처_검토초안.md) `d399553`, 팀원 1 / [9/22 답변](https://github.com/JminAILab/CatchU/pull/70#issuecomment-5769968672) | PR #70 답변·보완본에 반영된 방향과 계약 미결 구분 | 서비스 반영 후 완료, 주기적 조회, 기존 진행 작업 반환·명시 재요청 새 작업, 전체 실행 1개 방향을 E 입력에 대조. 서비스 DB 반영 대기·복구 중도 진행 중으로 판단하고 같은 사용자·같은 저장소 재요청에는 기존 작업 반환. 실패 확정 증거·판정 시점, worker 알림·실행 불확실 판단은 #23 Q4·Q5 기술 미결. 새 요청의 제품상 허용 조건·새 동의·사용자별 요청 제한은 아래 PR #89 답변을 적용하며 전체 worker 실행 방향과 구분. F 결과 의미표 원문·세부 계약은 미확인. §5.5·§6 |
 
-**재요청·담당·제출 현황 갱신 (2026-09-23):** [PR #79 팀장 리뷰](https://github.com/JminAILab/CatchU/pull/79#issuecomment-5791316403)와 [PR #89 `25eeeaf` Q1·Q2 사용자 답변](https://github.com/JminAILab/CatchU/blob/25eeeaf/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md)를 §5.4·§5.5·§6 Q5·S16/S17에 반영했다. B는 팀원 4(@leechaeah)이며 연결 검토는 별도다. [#23 E 상태표 제출·Q6 정정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-5787076387)에서 `71494da` 상태표 제출과 Q6 정정이 확인됐다. 그 댓글 당시 미결이던 새 동의·다른 저장소 동시 요청은 PR #89 답변으로 갱신한다. 이번 추가 정정은 아직 로컬 작업본이며 기존 제출 판본에 포함됐다고 표시하지 않는다.
+**재요청·담당·제출 현황 갱신 (2026-09-23):** [PR #79 팀장 리뷰](https://github.com/JminAILab/CatchU/pull/79#issuecomment-5791316403)와 [PR #89 `25eeeaf` Q1·Q2 사용자 답변](https://github.com/JminAILab/CatchU/blob/25eeeaf/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md)를 §5.4·§5.5·§6 Q5·S16/S17에 반영했다. B는 팀원 4(@leechaeah)이며 연결 검토는 별도다. [#23 E 상태표 제출·Q6 정정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-5787076387)에서 `71494da` 상태표 제출과 Q6 정정이 확인됐다. 그 댓글 당시 미결이던 새 동의·다른 저장소 동시 요청은 PR #89 답변으로 갱신한다. 이번 재요청·동시 요청 기준 보완은 [PR #79](https://github.com/JminAILab/CatchU/pull/79)에 반영됐으며, 기존 #23 E 상태표 제출 판본(`71494da`)과 구분한다.
 
 **B 인계 원문을 읽는 범위:** 아래 §2~§7의 자산·대표 관련 기존 표현은 위 범위 구분과 함께 읽는다. W03~W06 상자·행동 설명 및 §5.3은 이번 판에서 다시 설계하지 않았다. 과거 상자·흐름에 남은 [대표 구성]·W06 이동은 B 인계용이며 현행 10월 진입 버튼 표시안이 아니다. 10월 대표 진입점 숨김은 내 자산 내부까지 포함하는 W02-P의 #55 합의 기록을 따른다. 과거 화면의 버튼은 인계 자료로 보존한다. 구 헤더/빈 상태의 [홈으로]는 자산 GitHub 탭 repo 연결로 정합성을 맞출 인계 차이이며 현재 A 흐름의 근거가 아니다. 대표 보완·내부 선택 공유를 첫 MVP의 필수 행동으로 읽지 않는다. 인계 원문의 ‘기본 프로필·Catch 본문 버전 미정’은 위 9/20 리뷰의 두 별도 결정으로 구체화됐다. 프로필은 현재 공개 허용 내용과 수정 반영(W02), Catch 본문은 생성 결과 유지와 직접 편집·재생성·링크별 사본 미도입(§5.3)을 따른다. 저장·조회 계약과 재분석 결과 반영은 미결이다. 종료 후보는 제안하지 않으며 #20 전체 종료·B 인계 수용은 남아 있다.
 
@@ -684,7 +686,7 @@ A↔C의 공개 프로필은 §2·W02와 팀장 9/20 결정에 맞춘다. 10월 
 
 ### 5.5 E 후속 설계 입력 — 분석 요청·상태의 의미
 
-**[후속 설계 입력 / 반영된 방향·화면 제안·미결 구분]** D가 사용자에게 보여 줄 의미와 E/F의 사실 출처를 나눈다. 아래 용어는 화면·설계 검토용이며 API 필드·상태 enum·DB·큐 계약이 아니다. E 상태 의미표는 이 절에서 관리하며 §6은 기존 #23 Q1~Q6의 문서 반영 현황을 정리한다. [#23 E 상태표 제출·Q6 정정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-5787076387)로 `71494da`의 상태표 제출과 Q6 정정이 확인됐다. 이번 PR #89 결정에 따른 추가 정정은 로컬 작업본이며 기존 제출 완료와 구분한다.
+**[후속 설계 입력 / 반영된 방향·화면 제안·미결 구분]** D가 사용자에게 보여 줄 의미와 E/F의 사실 출처를 나눈다. 아래 용어는 화면·설계 검토용이며 API 필드·상태 enum·DB·큐 계약이 아니다. E 상태 의미표는 이 절에서 관리하며 §6은 기존 #23 Q1~Q6의 문서 반영 현황을 정리한다. [#23 E 상태표 제출·Q6 정정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-5787076387)로 `71494da`의 상태표 제출과 Q6 정정이 확인됐다. 이번 재요청·동시 요청 기준 보완은 [PR #79](https://github.com/JminAILab/CatchU/pull/79)에 반영됐으며, 기존 #23 E 상태표 제출 판본(`71494da`)과 구분한다.
 
 **근거와 적용 수준:** 승인 범위 M01/M05/M06·FR1.4의 동의/권한·중복 방지·기존 자료 보존, 후속 입력의 명시적 사용자 재요청을 유지한다. A-01 v0.3·A-02 v0.6·A-03 v0.5의 접수 불명·재조회 표현을 재사용한다. [PR #70 보완본 `d399553b7e441d23d7ca35ad63816b9402928033` §3/§6](https://github.com/JminAILab/CatchU/blob/d399553b7e441d23d7ca35ad63816b9402928033/docs/ai-dlc-input-mvp/CatchU_공통_아키텍처_검토초안.md)과 [2026-09-22 답변](https://github.com/JminAILab/CatchU/pull/70#issuecomment-5769968672), 최신 PR 본문의 리뷰 반영 설명을 대조했다. [PR #79 팀장 리뷰](https://github.com/JminAILab/CatchU/pull/79#issuecomment-5791316403)가 연결한 [PR #89 `25eeeaf` Q1·Q2 사용자 답변](https://github.com/JminAILab/CatchU/blob/25eeeaf/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md)를 재요청·동시 요청 기준으로 추가 적용한다. 아래 사용자 결정 반영은 계약 전체 최종 승인·공식 API 형식 확정·구현 완료를 뜻하지 않는다. F 결과 의미표 원문은 미확인 상태다.
 
@@ -738,7 +740,7 @@ A↔C의 공개 프로필은 §2·W02와 팀장 9/20 결정에 맞춘다. 10월 
 
 ## 6. 연결 검토 현황
 
-협의 질문·답변은 [#23 기존 충돌표](https://github.com/JminAILab/CatchU/issues/23#issuecomment-5733334145)와 해당 이슈에서 관리한다. 아래는 현재 문서의 반영 위치와 남은 한계다. **결정 반영·작성자 제안·미반영을 구분하며, 문서 반영은 담당자 합의·이슈 답변 게시·구현 완료를 뜻하지 않는다.** [#23 E 상태표 제출·Q6 정정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-5787076387)에 기존 상태표(`71494da`)와 Q6 정정이 제출됐다. 이번 PR #89 결정 반영은 추가 로컬 정정이며 기존 제출 판본과 구분한다.
+협의 질문·답변은 [#23 기존 충돌표](https://github.com/JminAILab/CatchU/issues/23#issuecomment-5733334145)와 해당 이슈에서 관리한다. 아래는 현재 문서의 반영 위치와 남은 한계다. **결정 반영·작성자 제안·미반영을 구분하며, 문서 반영은 담당자 합의·이슈 답변 게시·구현 완료를 뜻하지 않는다.** [#23 E 상태표 제출·Q6 정정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-5787076387)에 기존 상태표(`71494da`)와 Q6 정정이 제출됐다. 이번 재요청·동시 요청 기준 보완은 [PR #79](https://github.com/JminAILab/CatchU/pull/79)에 반영됐으며, 기존 #23 E 상태표 제출 판본(`71494da`)과 구분한다.
 
 | 관련 이슈·Q번호 | 현재 문서 반영 내용·위치 | 남은 확인·미반영 사항 |
 |---|---|---|
@@ -835,7 +837,7 @@ A↔C의 공개 프로필은 §2·W02와 팀장 9/20 결정에 맞춘다. 10월 
 | S20 B/대표/G·수신자 헤더 경계 | 최소 B 인계, 대표 후속, G 10월 제외. 일반 프로필 모달을 수신자에게 자동 적용하지 않음 | §1.3·W02-P 적용 범위 구분. B 원작성 기여 보존 |
 | S21 헤더 적용 경계·10월 표시·클릭 | **#55 합의:** 로그인 일반/발행자 헤더는 로고·내 자산·공유 링크·채용공고 / 오른쪽 알림·프로필. 두 메뉴 모두 비활성 표시(클릭 시 안내창). 각각 클릭하면 현재 화면 위 작은 안내창에 ‘개발 중인 기능입니다’+[확인], [확인] 후 안내창 닫기·기존 화면 유지·별도 페이지 이동 없음. 비로그인 홈은 로고·Google 시작, 로고는 각 홈으로 이동. 수신자 V01~V03은 인증 무관 이동 없는 브랜드, V03 본문의 V02 복귀 유지 | W02-P·H01·§1.2·§6 및 #55 9/23 합의와 대응. 비활성은 기능 미제공이며 클릭 불가 아님. 10월 알림 목록/배지/설정 없음, 툴팁은 합의 밖. 안내창 추가 닫기 조작·12월 수신자 연결/설정은 미결. 대표 내부 진입 숨김과 구분. 문서상 대조이며 구현 시험 아님 |
 
-**이번 #20 소작업 판단:** 재사용/변경/후속 구분(§1.3), A 흐름, E 의미표(§5.5), 연결 검토 현황(§6)과 관련 문서 시나리오를 정리했다. 기존 E 상태표·Q6 정정은 [#23 E 상태표 제출·Q6 정정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-5787076387)로 제출됐고, 기존 헤더·프로필 반영은 [PR #79 C/D 승인 리뷰](https://github.com/JminAILab/CatchU/pull/79#pullrequestreview-5286870357)에서 C/D 문서 일치가 확인됐다. 이번 재요청·동시 요청 정정은 로컬 작업본이며 새 커밋·원격 제출·재검토는 아직 없다. #20 전체 완료·B 인계 수용·#23 계약 완료와 구분한다.
+**이번 #20 소작업 판단:** 재사용/변경/후속 구분(§1.3), A 흐름, E 의미표(§5.5), 연결 검토 현황(§6)과 관련 문서 시나리오를 정리했다. 기존 E 상태표·Q6 정정은 [#23 E 상태표 제출·Q6 정정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-5787076387)로 제출됐고, 기존 헤더·프로필 반영은 [PR #79 C/D 승인 리뷰](https://github.com/JminAILab/CatchU/pull/79#pullrequestreview-5286870357)에서 C/D 문서 일치가 확인됐다. 이번 재요청·동시 요청 기준 보완은 [PR #79](https://github.com/JminAILab/CatchU/pull/79)에 반영됐으며, 기존 #23 E 상태표 제출 판본(`71494da`)과 구분한다. #20 전체 완료·B 인계 수용·#23 계약 완료와 구분한다.
 
 ## 8. 초안 변경 이력
 
