@@ -3,6 +3,11 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { NestFactory } = require('@nestjs/core');
 const { AppModule } = require('../dist/app.module');
+const { randomBytes } = require('node:crypto');
+
+process.env.AUTH_JWT_SECRET = randomBytes(32).toString('hex');
+process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = '60';
+delete process.env.DEV_LOGIN_ENABLED;
 
 test('GET /health는 외부 의존 없이 200과 status만 반환한다', { timeout: 10000 }, async (t) => {
   const app = await NestFactory.create(AppModule, { logger: false, abortOnError: false });

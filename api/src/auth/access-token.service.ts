@@ -1,0 +1,51 @@
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { jwtVerify, SignJWT } from 'jose';
+import { AUTH_CONFIG, AuthConfig } from './auth.config';
+
+// #87 내부 토큰 형식. 기능 코드는 이 값이나 JWT claim에 의존하지 않는다.
+const ISSUER = 'catchu-api';
+const AUDIENCE = 'catchu-member-api';
+
+export function isMemberId(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.trim() === value;
+}
+
+@Injectable()
+export class AccessTokenService {
+  constructor(@Inject(AUTH_CONFIG) private readonly config: AuthConfig) {}
+
+  async issue(memberId: string) {
+    if (!isMemberId(memberId)) throw new UnauthorizedException();
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const accessToken = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setSubject(memberId)
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(issuedAt + this.config.accessTokenTtlSeconds)
+      .sign(this.config.signingKey);
+    return { accessToken, tokenType: 'Bearer', expiresIn: this.config.accessTokenTtlSeconds };
+  }
+
+  async verify(token: string): Promise<string> {
+    try {
+      const { payload } = await jwtVerify(token, this.config.signingKey, {
+        algorithms: ['HS256'],
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        typ: 'JWT',
+        requiredClaims: ['sub', 'exp', 'iat'],
+      });
+      if (!isMemberId(payload.sub) || !Number.isSafeInteger(payload.iat) ||
+          !Number.isSafeInteger(payload.exp) || payload.iat! > Math.floor(Date.now() / 1000) ||
+          payload.exp! <= payload.iat!) {
+        throw new UnauthorizedException();
+      }
+      return payload.sub;
+    } catch {
+      // 라이브러리 오류, 헤더, 토큰을 응답이나 로그에 전달하지 않는다.
+      throw new UnauthorizedException();
+    }
+  }
+}
