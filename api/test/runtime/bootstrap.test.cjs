@@ -121,6 +121,7 @@ for (const [label, file, expected] of [
   ['서명 키 공란', { AUTH_JWT_SECRET: '' }, 'AUTH_JWT_SECRET'],
   ['수명 누락', { AUTH_ACCESS_TOKEN_TTL_SECONDS: undefined }, 'AUTH_ACCESS_TOKEN_TTL_SECONDS'],
   ['잘못된 수명', { AUTH_ACCESS_TOKEN_TTL_SECONDS: '-1' }, 'AUTH_ACCESS_TOKEN_TTL_SECONDS'],
+  ['DB 비밀번호 누락', { DB_PASSWORD: undefined }, 'DB_PASSWORD'],
 ]) {
   test(`main: ${label}이면 기동하지 않고 실패 종료한다`, { timeout: 15000 }, async (t) => {
     const server = await launch(t, { file });
@@ -129,3 +130,11 @@ for (const [label, file, expected] of [
     assert.equal(server.logs().includes(server.secret), false);
   });
 }
+
+test('main: DB에 접속할 수 없으면 기동하지 않고 DB 안내와 함께 실패 종료한다', { timeout: 15000 }, async (t) => {
+  const server = await launch(t, { file: { DB_PORT: String(await unusedPort()) } });
+  assert.equal(await server.closed, 1);
+  assert.ok(server.logs().includes('DB에 접속하지 못했습니다'), 'DB 접속 실패를 안내한다');
+  assert.equal(server.logs().includes(process.env.DB_PASSWORD), false, '로그에 DB 비밀번호가 없다');
+  assert.equal(server.logs().includes(server.secret), false);
+});
