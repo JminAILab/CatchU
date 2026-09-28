@@ -28,7 +28,26 @@ class ProbeController {
   emptyDetails() { throw new ApiError('INVALID_REQUEST', { details: { other: 1 } }); }
   customMessage() { throw new ApiError('RETRY_NOT_ALLOWED', { message: '결과가 이미 있어 다시 요청할 수 없습니다.' }); }
   boom() { throw new Error(`SELECT * FROM members WHERE token='${FAKE_SECRET}'`); }
-  apiBoom() { const error = new ApiError('INTERNAL_ERROR'); error.stack = `ApiError: ${FAKE_SECRET}\n${FAKE_SECRET}\n    at ProbeController.apiBoom (test:1:1)`; throw error; }
+  apiBoom() { throw new ApiError('INTERNAL_ERROR'); }
+  multilineBoom() { throw new Error(`외부 처리 오류\n    at token=${FAKE_SECRET}\n${FAKE_SECRET}`); }
+  trimmedMessage() {
+    const error = new Error(`외부 처리 오류\n    at token=${FAKE_SECRET}`);
+    void error.stack; // 스택 문자열이 만들어진 뒤
+    error.message = '외부 처리 오류'; // 메시지만 첫 줄로 줄인 경우
+    throw error;
+  }
+  mimicMessage() {
+    const error = new Error(`외부 처리 오류\n    at query (token=${FAKE_SECRET}:1:1)`);
+    void error.stack; // 스택 문자열이 만들어진 뒤
+    error.message = '외부 처리 오류'; // 메시지만 첫 줄로 줄이고, 남은 줄이 코드 위치 형식을 흉내 내는 경우
+    throw error;
+  }
+  brokenStack() {
+    const error = new Error(FAKE_SECRET);
+    Object.defineProperty(error, 'stack', { get() { throw new Error(FAKE_SECRET); } });
+    throw error;
+  }
+  staleStack() { const error = new Error('안전한 메시지'); error.stack = `Error: ${FAKE_SECRET}\n    at token=${FAKE_SECRET}\n    at ProbeController.staleStack (test:1:1)`; throw error; }
   tooLarge() { throw new PayloadTooLargeException(); }
   tokenBoom() { return this.boom(); }
   forbidden() { throw new ForbiddenException(); }
@@ -49,6 +68,11 @@ publicRoute(Get('empty-details'), 'emptyDetails');
 publicRoute(Get('custom-message'), 'customMessage');
 publicRoute(Get('boom'), 'boom');
 publicRoute(Get('api-boom'), 'apiBoom');
+publicRoute(Get('multiline-boom'), 'multilineBoom');
+publicRoute(Get('trimmed-message'), 'trimmedMessage');
+publicRoute(Get('stale-stack'), 'staleStack');
+publicRoute(Get('mimic-message'), 'mimicMessage');
+publicRoute(Get('broken-stack'), 'brokenStack');
 publicRoute(Get('too-large'), 'tooLarge');
 publicRoute(Get('token/:token'), 'tokenBoom');
 publicRoute(Get('forbidden'), 'forbidden');
@@ -59,6 +83,17 @@ Body()(ProbeController.prototype, 'echo', 0);
 route(Get('protected'), 'protectedRoute');
 class ProbeModule {}
 Module({ imports: [AppModule], controllers: [ProbeController] })(ProbeModule);
+
+// 코드 위치는 함수 이름 없이 `at 파일:줄:칸`으로 남는다. 이 파일에서 해당 코드가 있는 줄로 확인한다.
+const SOURCE_LINES = require('node:fs').readFileSync(__filename, 'utf8').split('\n');
+const lineOf = (marker) => {
+  const index = SOURCE_LINES.findIndex((line) => line.includes(marker));
+  assert.ok(index >= 0, `표식 없음: ${marker}`);
+  return index + 1;
+};
+// offset: 표식 줄에서 오류를 만드는 줄까지의 거리
+const frameAt = (marker, offset = 0) => new RegExp(`    at test/errors\\.test\\.cjs:${lineOf(marker) + offset}:\\d+`);
+const ANY_OWN_FRAME = /at test\/errors\.test\.cjs:\d+:\d+/;
 
 async function start(t) {
   const logs = [];
@@ -130,13 +165,13 @@ test('예상 밖 예외는 500 일반 안내만 응답하고 원인은 서버 �
   });
   const body = assertErrorShape(res, 500, 'INTERNAL_ERROR');
   assert.deepEqual(body, { code: 'INTERNAL_ERROR', message: '처리 중 오류가 발생했습니다.' });
-  for (const leaked of [FAKE_SECRET, 'SELECT', 'stack', 'at ProbeController']) {
+  for (const leaked of [FAKE_SECRET, 'SELECT', 'stack', 'errors.test.cjs']) {
     assert.equal(res.text.includes(leaked), false, `응답에 ${leaked} 없음`);
   }
 
   const log = logs.join('\n');
   assert.match(log, /\[error\] GET \/v1\/__test\/boom → 500 INTERNAL_ERROR \(Error\)/, '원인을 서버 로그에서 찾을 수 있다');
-  assert.match(log, /at ProbeController\.boom/, '스택을 서버 로그에 남긴다');
+  assert.match(log, frameAt('  boom() {'), '코드 위치를 서버 로그에 남긴다');
   for (const leaked of [FAKE_SECRET, 'SELECT', 'header-fake-token', 'cookie-fake', 'query-fake-token']) {
     assert.equal(log.includes(leaked), false, `로그에 ${leaked} 없음`);
   }
@@ -227,6 +262,51 @@ test('ApiError 5xx도 메시지 대신 코드 위치를 기록하며 URL의 토�
   assertErrorShape(await request(`/v1/__test/token/${FAKE_SECRET}`), 500, 'INTERNAL_ERROR');
   assertErrorShape(await request(`/unknown/${FAKE_SECRET}`), 404, 'RESOURCE_UNAVAILABLE');
   const log = logs.join('\n');
-  assert.match(log, /at ProbeController.apiBoom/);
+  assert.match(log, frameAt('  apiBoom() {'), 'ApiError도 코드 위치를 남긴다');
+  assert.equal(log.includes('처리 중 오류가 발생했습니다.'), false, '메시지를 로그에 남기지 않는다');
   assert.equal(log.includes(FAKE_SECRET), false);
+});
+
+test('여러 줄 오류 메시지는 코드 위치처럼 보여도 로그에 남기지 않는다', { timeout: 10000 }, async (t) => {
+  const { request, logs } = await start(t);
+  const res = await request('/v1/__test/multiline-boom');
+  assertErrorShape(res, 500, 'INTERNAL_ERROR');
+  assert.equal(res.text.includes(FAKE_SECRET), false, '응답에 메시지 없음');
+
+  const log = logs.join('\n');
+  assert.match(log, /\[error\] GET \/v1\/__test\/multiline-boom → 500 INTERNAL_ERROR \(Error\)/);
+  assert.match(log, frameAt('  multilineBoom() {'), '실제 코드 위치는 남긴다');
+  for (const leaked of [FAKE_SECRET, 'token=', '외부 처리 오류']) {
+    assert.equal(log.includes(leaked), false, `로그에 ${leaked} 없음`);
+  }
+});
+
+test('스택 생성 뒤 메시지를 줄여도 원문은 남기지 않고 실제 코드 위치만 남긴다', { timeout: 10000 }, async (t) => {
+  const { request, logs } = await start(t);
+  // 남은 줄이 코드 위치 형식이 아닌 경우와, 코드 위치 형식을 흉내 내는 경우
+  for (const [path, marker] of [['trimmed-message', '  trimmedMessage() {'], ['mimic-message', '  mimicMessage() {']]) {
+    logs.length = 0;
+    assertErrorShape(await request(`/v1/__test/${path}`), 500, 'INTERNAL_ERROR');
+    const log = logs.join('\n');
+    assert.match(log, new RegExp(`\\[error\\] GET /v1/__test/${path} → 500 INTERNAL_ERROR \\(Error\\)`), `${path}: 오류 발생은 기록한다`);
+    assert.match(log, frameAt(marker, 1), `${path}: 오류를 만든 실제 위치를 남긴다`);
+    for (const leaked of [FAKE_SECRET, 'token=', '외부 처리 오류', 'query (']) {
+      assert.equal(log.includes(leaked), false, `${path}: 로그에 ${leaked} 없음`);
+    }
+  }
+});
+
+test('수집 기록이 없거나 스택 접근이 실패하면 코드 위치를 생략하고 응답은 유지한다', { timeout: 10000 }, async (t) => {
+  const { request, logs } = await start(t);
+  // 스택을 먼저 덮어쓴 경우, 스택 접근 자체가 예외를 던지는 경우
+  for (const path of ['stale-stack', 'broken-stack']) {
+    logs.length = 0;
+    assertErrorShape(await request(`/v1/__test/${path}`), 500, 'INTERNAL_ERROR');
+    const log = logs.join('\n');
+    assert.match(log, new RegExp(`\\[error\\] GET /v1/__test/${path} → 500 INTERNAL_ERROR \\(Error\\)`), `${path}: 오류 발생은 기록한다`);
+    assert.doesNotMatch(log, ANY_OWN_FRAME, `${path}: 문자열 파싱으로 위치를 만들지 않는다`);
+    for (const leaked of [FAKE_SECRET, 'token=']) {
+      assert.equal(log.includes(leaked), false, `${path}: 로그에 ${leaked} 없음`);
+    }
+  }
 });

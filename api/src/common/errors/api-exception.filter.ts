@@ -2,6 +2,7 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from '@n
 import { AbstractHttpAdapter, HttpAdapterHost } from '@nestjs/core';
 import { ApiError, ErrorBody, ErrorDetails } from './api-error';
 import { DEFAULT_ERROR_MESSAGES, ErrorCode } from './error-codes';
+import { collectedFrames } from './stack-frames';
 
 interface Resolved {
   status: number;
@@ -17,7 +18,8 @@ interface RequestLike {
 
 /**
  * 모든 예외를 명세의 {code, message, details?} 형식과 Cache-Control: no-store로 응답한다.
- * 로그에는 메서드·등록 경로·예외 이름과 코드 위치만 남기고, 헤더·본문·쿼리·토큰은 남기지 않는다.
+ * 로그에는 메서드·등록 경로·예외 이름과 코드 위치만 남기고, 헤더·본문·쿼리·토큰·오류 메시지는 남기지 않는다.
+ * 코드 위치는 stack-frames.ts가 스택 문자열과 분리해 수집한 파일·줄·칸이다.
  */
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
@@ -41,7 +43,7 @@ export function writeErrorResponse(adapter: AbstractHttpAdapter, request: Reques
   const where = `${request.method ?? '?'} ${safePath(request)}`;
 
   if (log === 'error') {
-    const frames = exception instanceof Error ? exception.stack?.split('\n').slice(1).filter((line) => /^\s+at /.test(line)).join('\n') : undefined;
+    const frames = exception instanceof Error ? collectedFrames(exception) : undefined;
     logger.error(`${where} → ${status} ${body.code} (${name})`, frames);
   } else if (log === 'warn') {
     logger.warn(`${where} → ${status} ${body.code} (${name})`);
