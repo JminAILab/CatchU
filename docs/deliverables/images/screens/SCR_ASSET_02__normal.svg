@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif">
+<rect x="0" y="0" width="1200" height="750" fill="#ffffff"/>
+<rect x="0.5" y="0.5" width="1199" height="70" rx="0" fill="#ffffff" stroke="#999999" stroke-width="1"/>
+<text x="30" y="44" font-size="18" font-weight="bold" fill="#111111" text-anchor="start">CatchU</text>
+<text x="615" y="42" font-size="16" font-weight="bold" fill="#111111" text-anchor="start">내 자산</text>
+<text x="700" y="42" font-size="16" font-weight="normal" fill="#111111" text-anchor="start">공유 링크</text>
+<rect x="800" y="16" width="140" height="38" rx="3" fill="#f2f2f2" stroke="#aaaaaa" stroke-width="1"/>
+<text x="870" y="40" font-size="14" font-weight="normal" fill="#666666" text-anchor="middle">채용공고 · 준비 중</text>
+<rect x="955" y="16" width="120" height="38" rx="3" fill="#f2f2f2" stroke="#cccccc" stroke-width="1"/>
+<text x="1015" y="40" font-size="14" font-weight="normal" fill="#666666" text-anchor="middle">알림 · 준비 중</text>
+<rect x="1090" y="16" width="80" height="38" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="1130.0" y="40.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">프로필</text>
+<text x="40" y="118" font-size="18" font-weight="bold" fill="#111111" text-anchor="start">내 자산</text>
+<rect x="1010" y="92" width="150" height="40" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="1085.0" y="117.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">링크 발행으로</text>
+<rect x="40" y="152" width="110" height="42" rx="0" fill="#ffffff" stroke="#cccccc" stroke-width="1"/>
+<text x="95.0" y="179" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">Catch</text>
+<rect x="160" y="152" width="170" height="42" rx="0" fill="#f2f2f2" stroke="#cccccc" stroke-width="1"/>
+<text x="245.0" y="179" font-size="15" font-weight="normal" fill="#666666" text-anchor="middle">포트폴리오 · 준비 중</text>
+<rect x="340" y="152" width="170" height="42" rx="0" fill="#f2f2f2" stroke="#cccccc" stroke-width="1"/>
+<text x="425.0" y="179" font-size="15" font-weight="normal" fill="#666666" text-anchor="middle">자기소개서 · 준비 중</text>
+<rect x="520" y="152" width="150" height="42" rx="0" fill="#f2f2f2" stroke="#999999" stroke-width="1"/>
+<text x="595.0" y="179" font-size="15" font-weight="bold" fill="#111111" text-anchor="middle">이력서 · 준비 중</text>
+<rect x="520" y="191" width="150" height="4" rx="0" fill="#333333" stroke="none"/>
+<line x1="40" y1="195" x2="1160" y2="195" stroke="#999999" stroke-width="1"/>
+<circle cx="670" cy="152" r="13" fill="#111111"/>
+<text x="670" y="157" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<circle cx="150" cy="152" r="13" fill="#111111"/>
+<text x="150" y="157" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<rect x="40" y="230" width="1120" height="110" rx="0" fill="#f7f7f7" stroke="#999999" stroke-width="1" stroke-dasharray="5,4"/>
+<text x="64" y="272" font-size="16" font-weight="bold" fill="#111111" text-anchor="start">더 다양한 자산을 준비하고 있습니다.</text>
+<text x="64" y="304" font-size="15" font-weight="normal" fill="#333333" text-anchor="start">포트폴리오·자기소개서·이력서 관리 기능이 추가될 예정입니다.</text>
+<circle cx="350" cy="262" r="13" fill="#111111"/>
+<text x="350" y="267" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<rect x="40" y="400" width="1120" height="150" rx="0" fill="#fafafa" stroke="#bbbbbb" stroke-width="1" stroke-dasharray="5,4"/>
+<text x="64" y="434" font-size="15" font-weight="bold" fill="#555555" text-anchor="start">설계 메모(화면에 표시하지 않음)</text>
+<text x="64" y="464" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">· 포트폴리오·자기소개서·이력서 세 탭은 모두 같은 준비 중 안내만 보인다. 업로드·목록·저장 기능은 없다(9/24 결정).</text>
+<text x="64" y="492" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">· 저장소 연결 관리 영역과 Catch 목록은 Catch 탭에만 있다. 안내 문구는 v2.2 검토초안의 문구를 따른 제안이다.</text>
+<text x="64" y="520" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">· 12월 계획판에서는 자기소개서·포트폴리오·이력서 탭(SCR_ASSET_54~56, 미승인 계획)으로 대체한다.</text>
+<rect x="0.5" y="0.5" width="1199" height="749" rx="0" fill="none" stroke="#999999" stroke-width="1"/>
+</svg>

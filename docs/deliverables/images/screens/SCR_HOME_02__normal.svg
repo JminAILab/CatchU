@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif">
+<rect x="0" y="0" width="1200" height="750" fill="#ffffff"/>
+<rect x="0.5" y="0.5" width="1199" height="70" rx="0" fill="#ffffff" stroke="#999999" stroke-width="1"/>
+<text x="30" y="44" font-size="18" font-weight="bold" fill="#111111" text-anchor="start">CatchU</text>
+<text x="615" y="42" font-size="16" font-weight="normal" fill="#111111" text-anchor="start">내 자산</text>
+<text x="700" y="42" font-size="16" font-weight="normal" fill="#111111" text-anchor="start">공유 링크</text>
+<rect x="800" y="16" width="140" height="38" rx="3" fill="#f2f2f2" stroke="#aaaaaa" stroke-width="1"/>
+<text x="870" y="40" font-size="14" font-weight="normal" fill="#666666" text-anchor="middle">채용공고 · 준비 중</text>
+<rect x="955" y="16" width="120" height="38" rx="3" fill="#f2f2f2" stroke="#cccccc" stroke-width="1"/>
+<text x="1015" y="40" font-size="14" font-weight="normal" fill="#666666" text-anchor="middle">알림 · 준비 중</text>
+<rect x="1090" y="16" width="80" height="38" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="1130.0" y="40.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">프로필</text>
+<text x="40" y="122" font-size="18" font-weight="bold" fill="#111111" text-anchor="start">김가람님, 안녕하세요.</text>
+<text x="40" y="152" font-size="15" font-weight="normal" fill="#333333" text-anchor="start">내 기록을 확인하고 공유할 경험을 준비하세요.</text>
+<circle cx="250" cy="112" r="13" fill="#111111"/>
+<text x="250" y="117" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<rect x="40" y="180" width="1120" height="60" rx="0" fill="#ffffff" stroke="#999999" stroke-width="1"/>
+<rect x="600" y="180" width="560" height="60" rx="0" fill="#eeeeee" stroke="#999999" stroke-width="1"/>
+<rect x="600" y="236" width="560" height="4" rx="0" fill="#333333" stroke="none"/>
+<text x="64" y="216" font-size="16" font-weight="normal" fill="#555555" text-anchor="start">1. GitHub 연결</text>
+<text x="624" y="216" font-size="16" font-weight="bold" fill="#111111" text-anchor="start">현재 단계 · 2. 레포 연결</text>
+<circle cx="1160" cy="180" r="13" fill="#111111"/>
+<text x="1160" y="185" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<rect x="40" y="270" width="1120" height="160" rx="0" fill="#ffffff" stroke="#999999" stroke-width="1"/>
+<text x="64" y="310" font-size="18" font-weight="bold" fill="#111111" text-anchor="start">분석할 저장소를 연결해 주세요.</text>
+<text x="64" y="344" font-size="15" font-weight="normal" fill="#333333" text-anchor="start">내 자산 Catch 탭의 저장소 연결 관리에서 저장소를 선택하고 분석 내용에 동의합니다.</text>
+<rect x="64" y="368" width="210" height="40" rx="3" fill="#333333" stroke="#333333" stroke-width="1"/>
+<text x="169.0" y="393.4" font-size="15" font-weight="normal" fill="#ffffff" text-anchor="middle">내 자산에서 레포 연결</text>
+<circle cx="345" cy="300" r="13" fill="#111111"/>
+<text x="345" y="305" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<circle cx="274" cy="366" r="13" fill="#111111"/>
+<text x="274" y="371" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
+<rect x="40" y="470" width="1120" height="190" rx="0" fill="#fafafa" stroke="#bbbbbb" stroke-width="1" stroke-dasharray="5,4"/>
+<text x="64" y="504" font-size="15" font-weight="bold" fill="#555555" text-anchor="start">설계 메모(화면에 표시하지 않음)</text>
+<text x="64" y="534" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">· GitHub 미연동이 확인되면 현재 단계가 '1. GitHub 연결'로 바뀌고, 버튼은 GitHub 연결 화면(SCR_PROF_04)으로 이동한다.</text>
+<text x="64" y="562" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">· 연결된 저장소(분석 요청이 접수된 저장소)가 1개 이상이면 이 안내 대신 '레포 연결 후' 구성을 쓴다. 그 구성은 미정(#22).</text>
+<text x="64" y="590" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">· 홈은 GitHub 연동 여부와 연결된 저장소 유무만 확인한다. 분석 진행·결과 상자는 두지 않는다(BR-24).</text>
+<text x="64" y="618" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">· 버튼 목적지는 9/24 결정으로 '자산 GitHub 탭'에서 'Catch 탭의 저장소 연결 관리'로 바뀌었다. 버튼 문구는 제안.</text>
+<text x="64" y="646" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">· 조회 중·조회 실패를 미연동이나 저장소 없음으로 단정하지 않는다.</text>
+<rect x="0.5" y="0.5" width="1199" height="749" rx="0" fill="none" stroke="#999999" stroke-width="1"/>
+</svg>

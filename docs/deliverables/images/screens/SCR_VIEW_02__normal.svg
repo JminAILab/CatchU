@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif">
+<rect x="0" y="0" width="1200" height="750" fill="#ffffff"/>
+<rect x="0.5" y="0.5" width="1199" height="70" rx="0" fill="#ffffff" stroke="#999999" stroke-width="1"/>
+<text x="30" y="44" font-size="18" font-weight="bold" fill="#111111" text-anchor="start">CatchU</text>
+<circle cx="120" cy="26" r="13" fill="#111111"/>
+<text x="120" y="31" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<rect x="40" y="100" width="58" height="58" rx="0" fill="#eeeeee" stroke="#999999" stroke-width="1"/>
+<circle cx="69" cy="129" r="6" fill="none" stroke="#666666" stroke-width="1.5"/>
+<text x="120" y="122" font-size="18" font-weight="bold" fill="#111111" text-anchor="start">김가람</text>
+<text x="120" y="152" font-size="15" font-weight="normal" fill="#111111" text-anchor="start">작업 기록을 근거와 함께 정리합니다.</text>
+<text x="120" y="180" font-size="14" font-weight="normal" fill="#111111" text-anchor="start">백엔드 개발 · TypeScript · Node.js — 직접 입력한 정보</text>
+<text x="120" y="206" font-size="14" font-weight="normal" fill="#666666" text-anchor="start">GitHub · sample-garam</text>
+<circle cx="200" cy="112" r="13" fill="#111111"/>
+<text x="200" y="117" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<circle cx="520" cy="174" r="13" fill="#111111"/>
+<text x="520" y="179" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<line x1="40" y1="240" x2="1160" y2="240" stroke="#999999" stroke-width="1"/>
+<text x="40" y="288" font-size="18" font-weight="bold" fill="#111111" text-anchor="start">공개 GitHub 자산</text>
+<circle cx="200" cy="280" r="13" fill="#111111"/>
+<text x="200" y="285" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
+<line x1="40" y1="310" x2="1160" y2="310" stroke="#999999" stroke-width="1"/>
+<text x="40" y="348" font-size="17" font-weight="bold" fill="#111111" text-anchor="start">빈 목록 응답 형식 정리</text>
+<text x="40" y="376" font-size="14" font-weight="normal" fill="#666666" text-anchor="start">작업 사실 · 본인 기여 · 연결 근거 · 설명</text>
+<rect x="1040" y="336" width="120" height="40" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="1100.0" y="361.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">상세 보기</text>
+<line x1="40" y1="402" x2="1160" y2="402" stroke="#cccccc" stroke-width="1"/>
+<circle cx="250" cy="340" r="13" fill="#111111"/>
+<text x="250" y="345" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">5</text>
+<circle cx="1160" cy="334" r="13" fill="#111111"/>
+<text x="1160" y="339" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">6</text>
+<text x="40" y="440" font-size="17" font-weight="bold" fill="#111111" text-anchor="start">날짜 입력 누락 검사 추가</text>
+<text x="40" y="468" font-size="14" font-weight="normal" fill="#666666" text-anchor="start">작업 사실 · 본인 기여 · 연결 근거</text>
+<rect x="1040" y="428" width="120" height="40" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="1100.0" y="453.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">상세 보기</text>
+<line x1="40" y1="494" x2="1160" y2="494" stroke="#cccccc" stroke-width="1"/>
+<rect x="540" y="520" width="120" height="40" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="600.0" y="545.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">더 보기</text>
+<circle cx="660" cy="518" r="13" fill="#111111"/>
+<text x="660" y="523" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">7</text>
+<rect x="40" y="600" width="1120" height="136" rx="0" fill="#fafafa" stroke="#bbbbbb" stroke-width="1" stroke-dasharray="5,4"/>
+<text x="64" y="632" font-size="15" font-weight="bold" fill="#555555" text-anchor="start">설계 메모(화면에 표시하지 않음)</text>
+<text x="64" y="660" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">· 링크 제목, 생각해볼 질문, 확인·불일치 표시, 내부 ID는 수신자에게 보이지 않는다(PublicCatch 계약).</text>
+<text x="64" y="686" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">· v2.2 V02의 자료 탭·AI 화면 요약·JD 선택은 12월 검토안이므로 10월 그림에서 뺐다. 이름·저장소는 합성 예시다.</text>
+<text x="64" y="712" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">· GitHub 계정 줄은 9/20 팀장 결정의 공개 항목이나 수신자 API v1(PublicProfile)에는 필드가 없다(OQ-A2에서 확인).</text>
+<rect x="0.5" y="0.5" width="1199" height="749" rx="0" fill="none" stroke="#999999" stroke-width="1"/>
+</svg>

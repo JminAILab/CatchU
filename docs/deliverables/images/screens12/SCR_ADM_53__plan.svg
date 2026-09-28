@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1000" viewBox="0 0 1200 1000" font-family="Apple SD Gothic Neo, AppleSDGothicNeo, Malgun Gothic, sans-serif">
+  <rect x="0" y="0" width="1200" height="1000" fill="#ffffff"/>
+  <rect x="0.5" y="0.5" width="1199" height="999" fill="none" stroke="#999999"/>
+
+  <!-- 1. 관리자 페이지 메뉴 -->
+  <rect x="0.5" y="0.5" width="1199" height="64" fill="#f2f2f2" stroke="#999999"/>
+  <text x="24" y="40" font-size="20" font-weight="700" fill="#222222">CatchU 관리자</text>
+  <text x="200" y="39" font-size="15" fill="#444444">지표</text>
+  <text x="256" y="39" font-size="15" fill="#444444">운영 기록</text>
+  <text x="346" y="39" font-size="15" font-weight="700" fill="#222222">신고 처리</text>
+  <line x1="346" y1="48" x2="410" y2="48" stroke="#222222" stroke-width="2"/>
+  <text x="440" y="39" font-size="15" fill="#444444">기업 등록</text>
+  <text x="530" y="39" font-size="15" fill="#444444">채용공고</text>
+  <text x="608" y="39" font-size="15" fill="#444444">문의</text>
+  <text x="662" y="39" font-size="15" fill="#444444">마일리지</text>
+  <text x="1176" y="39" font-size="14" fill="#555555" text-anchor="end">운영자</text>
+  <text x="1090" y="39" font-size="12" fill="#888888" text-anchor="end">메뉴 구성은 제안안</text>
+
+  <!-- 2. 처리 대기 목록 -->
+  <rect x="24" y="84" width="300" height="880" fill="#fafafa" stroke="#999999"/>
+  <text x="44" y="118" font-size="18" font-weight="700" fill="#222222">처리 대기 신고</text>
+  <text x="304" y="118" font-size="14" fill="#555555" text-anchor="end">3건</text>
+  <rect x="40" y="136" width="268" height="72" fill="#e6e6e6" stroke="#666666" stroke-width="2"/>
+  <text x="56" y="164" font-size="15" font-weight="700" fill="#222222">#0012 · DM · 반복 발송</text>
+  <text x="56" y="190" font-size="13" fill="#555555">접수 3시간 전 · 대기</text>
+  <rect x="40" y="216" width="268" height="72" fill="#ffffff" stroke="#bbbbbb"/>
+  <text x="56" y="244" font-size="15" fill="#222222">#0013 · 포스팅 · 광고성 글</text>
+  <text x="56" y="270" font-size="13" fill="#555555">접수 2시간 전 · 대기</text>
+  <rect x="40" y="296" width="268" height="72" fill="#ffffff" stroke="#bbbbbb"/>
+  <text x="56" y="324" font-size="15" fill="#222222">#0014 · DM · 부적절한 표현</text>
+  <text x="56" y="350" font-size="13" fill="#555555">접수 1시간 전 · 대기</text>
+  <text x="44" y="400" font-size="12" fill="#888888">목록 정렬·필터 기준 미정</text>
+
+  <!-- 3. 신고 내용 -->
+  <rect x="344" y="84" width="832" height="120" fill="#fafafa" stroke="#999999"/>
+  <text x="368" y="116" font-size="18" font-weight="700" fill="#222222">신고 #0012 · DM</text>
+  <text x="368" y="146" font-size="14" fill="#333333">신고한 회원: 회원 A(구직자)</text>
+  <text x="368" y="172" font-size="14" fill="#333333">신고된 회원: 회원 B(기업 회원)</text>
+  <text x="700" y="146" font-size="14" fill="#333333">신고 사유: 반복 발송</text>
+  <text x="700" y="172" font-size="14" fill="#333333">접수: 3시간 전</text>
+  <text x="1156" y="190" font-size="12" fill="#888888" text-anchor="end">신고 접수 경로는 미정</text>
+
+  <!-- 4. 전후 맥락 -->
+  <rect x="344" y="220" width="832" height="220" fill="#fafafa" stroke="#999999"/>
+  <text x="368" y="252" font-size="18" font-weight="700" fill="#222222">전후 맥락 — 신고된 메시지 앞뒤</text>
+  <rect x="368" y="268" width="420" height="40" rx="6" fill="#ffffff" stroke="#bbbbbb"/>
+  <text x="384" y="293" font-size="14" fill="#444444">회원 B: 안내 메시지 (합성 예시)</text>
+  <rect x="728" y="316" width="424" height="40" rx="6" fill="#eeeeee" stroke="#bbbbbb"/>
+  <text x="744" y="341" font-size="14" fill="#444444">회원 A: 더 받지 않겠다는 답장 (합성 예시)</text>
+  <rect x="368" y="364" width="420" height="52" rx="6" fill="#ffffff" stroke="#333333" stroke-width="2.5"/>
+  <text x="384" y="386" font-size="14" fill="#222222">회원 B: 같은 내용 재발송 (합성 예시)</text>
+  <text x="384" y="406" font-size="12" font-weight="700" fill="#222222">신고된 메시지</text>
+
+  <!-- 5. 양측 이력 -->
+  <rect x="344" y="456" width="408" height="128" fill="#fafafa" stroke="#999999"/>
+  <text x="368" y="488" font-size="16" font-weight="700" fill="#222222">신고된 회원 이력</text>
+  <text x="368" y="516" font-size="14" fill="#333333">이전 신고 2건 · 경고 1회</text>
+  <text x="368" y="542" font-size="14" fill="#333333">최근 조치: 경고(사유 기록 있음)</text>
+  <text x="368" y="568" font-size="12" fill="#888888">합성 예시</text>
+  <rect x="768" y="456" width="408" height="128" fill="#fafafa" stroke="#999999"/>
+  <text x="792" y="488" font-size="16" font-weight="700" fill="#222222">신고한 회원 이력</text>
+  <text x="792" y="516" font-size="14" fill="#333333">이전 신고 0건 · 조치 이력 없음</text>
+  <text x="792" y="568" font-size="12" fill="#888888">합성 예시</text>
+
+  <!-- 6. 유사 건 처리 결과 -->
+  <rect x="344" y="600" width="832" height="124" fill="#fafafa" stroke="#999999"/>
+  <text x="368" y="632" font-size="16" font-weight="700" fill="#222222">유사 건 처리 결과</text>
+  <line x1="368" y1="646" x2="1152" y2="646" stroke="#cccccc"/>
+  <text x="368" y="672" font-size="14" fill="#333333">#0007 · DM 반복 발송</text>
+  <text x="620" y="672" font-size="14" fill="#333333">경고</text>
+  <text x="720" y="672" font-size="14" fill="#555555">사유: 첫 위반, 발송 중단 안내</text>
+  <text x="368" y="704" font-size="14" fill="#333333">#0003 · DM 반복 발송</text>
+  <text x="620" y="704" font-size="14" fill="#333333">이용 제한</text>
+  <text x="720" y="704" font-size="14" fill="#555555">사유: 경고 뒤 같은 행위 반복</text>
+  <text x="1156" y="704" font-size="12" fill="#888888" text-anchor="end">합성 예시</text>
+
+  <!-- 7. 조치 선택 -->
+  <rect x="344" y="740" width="832" height="224" fill="#fafafa" stroke="#999999"/>
+  <text x="368" y="772" font-size="16" font-weight="700" fill="#222222">조치 선택</text>
+  <circle cx="378" cy="800" r="9" fill="#ffffff" stroke="#333333" stroke-width="2"/>
+  <circle cx="378" cy="800" r="4.5" fill="#333333"/>
+  <text x="394" y="805" font-size="15" fill="#222222">경고</text>
+  <circle cx="470" cy="800" r="9" fill="#ffffff" stroke="#666666" stroke-width="2"/>
+  <text x="486" y="805" font-size="15" fill="#222222">이용 제한</text>
+  <circle cx="590" cy="800" r="9" fill="#ffffff" stroke="#666666" stroke-width="2"/>
+  <text x="606" y="805" font-size="15" fill="#222222">정지</text>
+  <rect x="690" y="784" width="200" height="32" fill="#eeeeee" stroke="#cccccc"/>
+  <text x="704" y="805" font-size="13" fill="#999999">제한 기간(이용 제한 시)</text>
+  <text x="906" y="805" font-size="12" fill="#888888">단계·기간·해제 기준 미정</text>
+
+  <!-- 8. 사유 입력 -->
+  <text x="384" y="846" font-size="16" font-weight="700" fill="#222222">사유(필수)</text>
+  <rect x="368" y="858" width="600" height="80" fill="#ffffff" stroke="#999999"/>
+  <text x="384" y="884" font-size="14" fill="#888888">조치 사유를 적습니다. 다음 유사 건 처리 때 함께 보입니다.</text>
+
+  <!-- 9. 처리 완료 -->
+  <rect x="992" y="894" width="160" height="44" rx="4" fill="#333333" stroke="#333333"/>
+  <text x="1072" y="922" font-size="16" font-weight="700" fill="#ffffff" text-anchor="middle">처리 완료</text>
+
+  <text x="24" y="988" font-size="12" fill="#888888">12월 계획 · 흑백 와이어프레임 · 합성 예시 · 미승인(12월 intent 요구사항 분석 전) · 회원 A·B는 가상의 회원</text>
+
+  <!-- 번호 원 -->
+  <g font-size="13" font-weight="700" text-anchor="middle">
+    <circle cx="178" cy="16" r="13" fill="#333333"/><text x="178" y="21" fill="#ffffff">1</text>
+    <circle cx="24" cy="84" r="13" fill="#333333"/><text x="24" y="89" fill="#ffffff">2</text>
+    <circle cx="344" cy="84" r="13" fill="#333333"/><text x="344" y="89" fill="#ffffff">3</text>
+    <circle cx="344" cy="220" r="13" fill="#333333"/><text x="344" y="225" fill="#ffffff">4</text>
+    <circle cx="344" cy="456" r="13" fill="#333333"/><text x="344" y="461" fill="#ffffff">5</text>
+    <circle cx="344" cy="600" r="13" fill="#333333"/><text x="344" y="605" fill="#ffffff">6</text>
+    <circle cx="344" cy="740" r="13" fill="#333333"/><text x="344" y="745" fill="#ffffff">7</text>
+    <circle cx="366" cy="841" r="13" fill="#333333"/><text x="366" y="846" fill="#ffffff">8</text>
+    <circle cx="988" cy="894" r="13" fill="#333333"/><text x="988" y="899" fill="#ffffff">9</text>
+  </g>
+</svg>

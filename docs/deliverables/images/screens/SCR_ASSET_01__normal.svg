@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" font-family="Apple SD Gothic Neo, Noto Sans KR, sans-serif">
+<rect x="0" y="0" width="1200" height="900" fill="#ffffff"/>
+<rect x="0.5" y="0.5" width="1199" height="70" rx="0" fill="#ffffff" stroke="#999999" stroke-width="1"/>
+<text x="30" y="44" font-size="18" font-weight="bold" fill="#111111" text-anchor="start">CatchU</text>
+<text x="615" y="42" font-size="16" font-weight="bold" fill="#111111" text-anchor="start">내 자산</text>
+<text x="700" y="42" font-size="16" font-weight="normal" fill="#111111" text-anchor="start">공유 링크</text>
+<rect x="800" y="16" width="140" height="38" rx="3" fill="#f2f2f2" stroke="#aaaaaa" stroke-width="1"/>
+<text x="870" y="40" font-size="14" font-weight="normal" fill="#666666" text-anchor="middle">채용공고 · 준비 중</text>
+<rect x="955" y="16" width="120" height="38" rx="3" fill="#f2f2f2" stroke="#cccccc" stroke-width="1"/>
+<text x="1015" y="40" font-size="14" font-weight="normal" fill="#666666" text-anchor="middle">알림 · 준비 중</text>
+<rect x="1090" y="16" width="80" height="38" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="1130.0" y="40.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">프로필</text>
+<text x="40" y="118" font-size="18" font-weight="bold" fill="#111111" text-anchor="start">내 자산</text>
+<rect x="1010" y="92" width="150" height="40" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="1085.0" y="117.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">링크 발행으로</text>
+<rect x="40" y="152" width="110" height="42" rx="0" fill="#ffffff" stroke="#999999" stroke-width="1"/>
+<text x="95.0" y="179" font-size="15" font-weight="bold" fill="#111111" text-anchor="middle">Catch</text>
+<rect x="40" y="191" width="110" height="4" rx="0" fill="#333333" stroke="none"/>
+<rect x="160" y="152" width="170" height="42" rx="0" fill="#f2f2f2" stroke="#cccccc" stroke-width="1"/>
+<text x="245.0" y="179" font-size="15" font-weight="normal" fill="#666666" text-anchor="middle">포트폴리오 · 준비 중</text>
+<rect x="340" y="152" width="170" height="42" rx="0" fill="#f2f2f2" stroke="#cccccc" stroke-width="1"/>
+<text x="425.0" y="179" font-size="15" font-weight="normal" fill="#666666" text-anchor="middle">자기소개서 · 준비 중</text>
+<rect x="520" y="152" width="150" height="42" rx="0" fill="#f2f2f2" stroke="#cccccc" stroke-width="1"/>
+<text x="595.0" y="179" font-size="15" font-weight="normal" fill="#666666" text-anchor="middle">이력서 · 준비 중</text>
+<line x1="40" y1="195" x2="1160" y2="195" stroke="#999999" stroke-width="1"/>
+<circle cx="130" cy="108" r="13" fill="#111111"/>
+<text x="130" y="113" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+<circle cx="1160" cy="92" r="13" fill="#111111"/>
+<text x="1160" y="97" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+<circle cx="40" cy="152" r="13" fill="#111111"/>
+<text x="40" y="157" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+<rect x="40" y="220" width="1120" height="82" rx="0" fill="#f7f7f7" stroke="#999999" stroke-width="1"/>
+<text x="64" y="252" font-size="16" font-weight="bold" fill="#111111" text-anchor="start">GitHub 저장소 연결 관리</text>
+<text x="64" y="282" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">저장소를 연결하고 분석 상태를 확인합니다.</text>
+<rect x="1020" y="241" width="120" height="40" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="1080.0" y="266.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">연결 관리</text>
+<circle cx="275" cy="244" r="13" fill="#111111"/>
+<text x="275" y="249" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">4</text>
+<circle cx="1140" cy="239" r="13" fill="#111111"/>
+<text x="1140" y="244" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">5</text>
+<text x="40" y="358" font-size="15" font-weight="normal" fill="#111111" text-anchor="start">저장소</text>
+<rect x="100" y="332" width="320" height="40" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="116" y="358" font-size="15" font-weight="normal" fill="#111111" text-anchor="start">전체 저장소</text>
+<path d="M 396 348 l 8 8 l 8 -8" stroke="#333333" stroke-width="2" fill="none"/>
+<circle cx="420" cy="332" r="13" fill="#111111"/>
+<text x="420" y="337" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">6</text>
+<text x="40" y="404" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">공개·숨기기는 기존 공유 링크의 다음 열람부터 적용됩니다.</text>
+<circle cx="470" cy="398" r="13" fill="#111111"/>
+<text x="470" y="403" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">7</text>
+<line x1="40" y1="420" x2="1160" y2="420" stroke="#999999" stroke-width="1"/>
+<text x="40" y="456" font-size="17" font-weight="bold" fill="#111111" text-anchor="start">빈 목록 응답 형식 정리</text>
+<text x="40" y="480" font-size="14" font-weight="normal" fill="#666666" text-anchor="start">sample-lab/record-board</text>
+<rect x="40" y="490" width="82" height="24" rx="2" fill="#f7f7f7" stroke="#777777" stroke-width="1"/>
+<text x="81.0" y="507" font-size="14" font-weight="normal" fill="#111111" text-anchor="middle">확인 완료</text>
+<rect x="128" y="490" width="42" height="24" rx="2" fill="#f7f7f7" stroke="#777777" stroke-width="1"/>
+<text x="149.0" y="507" font-size="14" font-weight="normal" fill="#111111" text-anchor="middle">공개</text>
+<rect x="1040" y="450" width="120" height="40" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="1100.0" y="475.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">상세 보기</text>
+<line x1="40" y1="524" x2="1160" y2="524" stroke="#cccccc" stroke-width="1"/>
+<circle cx="250" cy="448" r="13" fill="#111111"/>
+<text x="250" y="453" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">8</text>
+<circle cx="250" cy="475" r="13" fill="#111111"/>
+<text x="250" y="480" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">9</text>
+<circle cx="186" cy="502" r="13" fill="#111111"/>
+<text x="186" y="507" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">10</text>
+<circle cx="1160" cy="448" r="13" fill="#111111"/>
+<text x="1160" y="453" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">11</text>
+<text x="40" y="560" font-size="17" font-weight="bold" fill="#111111" text-anchor="start">날짜 입력 누락 검사 추가</text>
+<text x="40" y="584" font-size="14" font-weight="normal" fill="#666666" text-anchor="start">sample-lab/record-board</text>
+<rect x="40" y="594" width="69" height="24" rx="2" fill="#f7f7f7" stroke="#777777" stroke-width="1"/>
+<text x="74.5" y="611" font-size="14" font-weight="normal" fill="#111111" text-anchor="middle">확인 전</text>
+<rect x="115" y="594" width="55" height="24" rx="2" fill="#f7f7f7" stroke="#777777" stroke-width="1"/>
+<text x="142.5" y="611" font-size="14" font-weight="normal" fill="#111111" text-anchor="middle">미공개</text>
+<rect x="1040" y="554" width="120" height="40" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="1100.0" y="579.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">상세 보기</text>
+<line x1="40" y1="628" x2="1160" y2="628" stroke="#cccccc" stroke-width="1"/>
+<text x="40" y="664" font-size="17" font-weight="bold" fill="#111111" text-anchor="start">작업 목록 정렬 기준 추가</text>
+<text x="40" y="688" font-size="14" font-weight="normal" fill="#666666" text-anchor="start">sample-lab/task-notes</text>
+<rect x="40" y="698" width="69" height="24" rx="2" fill="#f7f7f7" stroke="#777777" stroke-width="1"/>
+<text x="74.5" y="715" font-size="14" font-weight="normal" fill="#111111" text-anchor="middle">확인 전</text>
+<rect x="115" y="698" width="55" height="24" rx="2" fill="#f7f7f7" stroke="#777777" stroke-width="1"/>
+<text x="142.5" y="715" font-size="14" font-weight="normal" fill="#111111" text-anchor="middle">미공개</text>
+<rect x="176" y="698" width="135" height="24" rx="2" fill="#f7f7f7" stroke="#777777" stroke-width="1"/>
+<text x="243.5" y="715" font-size="14" font-weight="normal" fill="#111111" text-anchor="middle">불일치 표시 있음</text>
+<rect x="1040" y="658" width="120" height="40" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="1100.0" y="683.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">상세 보기</text>
+<line x1="40" y1="732" x2="1160" y2="732" stroke="#cccccc" stroke-width="1"/>
+<rect x="540" y="752" width="120" height="40" rx="3" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+<text x="600.0" y="777.4" font-size="15" font-weight="normal" fill="#111111" text-anchor="middle">더 보기</text>
+<circle cx="660" cy="750" r="13" fill="#111111"/>
+<text x="660" y="755" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">12</text>
+<text x="40" y="830" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">설계 메모: 필터와 상세 모달은 주소 파라미터로 유지해 새로고침·뒤로 가기·재로그인 뒤에도 같은 화면을 연다(파라미터 이름은 팀원 4 결정).</text>
+<text x="40" y="856" font-size="14" font-weight="normal" fill="#555555" text-anchor="start">그림 속 제목·저장소는 합성 예시다. 필터 모양(드롭다운 등)과 배지 표현은 제안이며 확정 디자인이 아니다.</text>
+<rect x="0.5" y="0.5" width="1199" height="899" rx="0" fill="none" stroke="#999999" stroke-width="1"/>
+</svg>
