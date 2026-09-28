@@ -1,5 +1,5 @@
 type GenerationStatus = 'GENERATED' | 'FAILED' | 'NOT_GENERATED';
-type SourceMode = 'MOCK' | 'LIVE';
+export type SourceMode = 'MOCK' | 'LIVE';
 
 interface CandidateEvidence {
   readonly evidenceId: string;
