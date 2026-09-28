@@ -12,13 +12,12 @@ interface Resolved {
 
 interface RequestLike {
   method?: string;
-  originalUrl?: string;
-  url?: string;
+  route?: { path?: unknown };
 }
 
 /**
  * 모든 예외를 명세의 {code, message, details?} 형식과 Cache-Control: no-store로 응답한다.
- * 로그에는 메서드·경로(쿼리 제외)·예외 이름만 남기고, 헤더·본문·쿼리·토큰은 남기지 않는다.
+ * 로그에는 메서드·등록 경로·예외 이름과 코드 위치만 남기고, 헤더·본문·쿼리·토큰은 남기지 않는다.
  */
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
@@ -42,7 +41,8 @@ export function writeErrorResponse(adapter: AbstractHttpAdapter, request: Reques
   const where = `${request.method ?? '?'} ${safePath(request)}`;
 
   if (log === 'error') {
-    logger.error(`${where} → ${status} ${body.code} (${name})`, exception instanceof Error ? exception.stack : undefined);
+    const frames = exception instanceof Error ? exception.stack?.split('\n').slice(1).filter((line) => /^\s+at /.test(line)).join('\n') : undefined;
+    logger.error(`${where} → ${status} ${body.code} (${name})`, frames);
   } else if (log === 'warn') {
     logger.warn(`${where} → ${status} ${body.code} (${name})`);
   }
@@ -61,12 +61,12 @@ function resolve(exception: unknown): Resolved {
     };
   }
 
-  // ── 아래는 명세에 코드가 없는 예외의 잠정 처리다. 확정은 #88에서 결정한다. ──
+  // 명세 밖 예외는 #88의 2026-09-28 팀장 결정을 따른다.
 
   // 요청 본문 해석 단계(body-parser)의 오류: 잘못된 JSON·본문 크기 초과 등
   const parser = bodyParserStatus(exception);
   if (parser !== undefined) {
-    if (parser === 413) return reject(413, 'INVALID_REQUEST', '요청 본문이 너무 큽니다.');
+    if (parser === 413) return reject(400, 'INVALID_REQUEST', '요청 본문이 너무 큽니다.');
     return reject(400, 'INVALID_REQUEST');
   }
 
@@ -75,7 +75,7 @@ function resolve(exception: unknown): Resolved {
     if (status === 400) return reject(400, 'INVALID_REQUEST');
     if (status === 401) return reject(401, 'AUTH_REQUIRED');
     if (status === 404) return reject(404, 'RESOURCE_UNAVAILABLE');
-    if (status === 413) return reject(413, 'INVALID_REQUEST', '요청 본문이 너무 큽니다.');
+    if (status === 413) return reject(400, 'INVALID_REQUEST', '요청 본문이 너무 큽니다.');
     if (status >= 400 && status < 500) {
       // 코드 없는 403·409 등: 상태는 보존하되 분기할 코드가 없으므로 일반 실패로 알린다.
       return { status, body: base('INTERNAL_ERROR'), log: 'warn' };
@@ -117,6 +117,6 @@ function bodyParserStatus(exception: unknown): number | undefined {
 }
 
 function safePath(request: RequestLike): string {
-  const raw = request.originalUrl ?? request.url ?? '';
-  return raw.split('?')[0] || '/';
+  // 실제 URL에는 수신자 링크 token이 들어갈 수 있으므로 등록된 경로 틀만 남긴다.
+  return typeof request.route?.path === 'string' ? request.route.path : '[unmatched]';
 }

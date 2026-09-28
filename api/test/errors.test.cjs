@@ -2,7 +2,7 @@ require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { randomBytes } = require('node:crypto');
 const { test } = require('node:test');
-const { Controller, Get, Post, Body, Module, ForbiddenException, ConflictException, UnauthorizedException } = require('@nestjs/common');
+const { Controller, Get, Post, Body, Module, ForbiddenException, ConflictException, UnauthorizedException, PayloadTooLargeException } = require('@nestjs/common');
 const { NestFactory } = require('@nestjs/core');
 const { AppModule } = require('../dist/app.module');
 const { configureApp } = require('../dist/app.setup');
@@ -28,6 +28,9 @@ class ProbeController {
   emptyDetails() { throw new ApiError('INVALID_REQUEST', { details: { other: 1 } }); }
   customMessage() { throw new ApiError('RETRY_NOT_ALLOWED', { message: '결과가 이미 있어 다시 요청할 수 없습니다.' }); }
   boom() { throw new Error(`SELECT * FROM members WHERE token='${FAKE_SECRET}'`); }
+  apiBoom() { const error = new ApiError('INTERNAL_ERROR'); error.stack = `ApiError: ${FAKE_SECRET}\n${FAKE_SECRET}\n    at ProbeController.apiBoom (test:1:1)`; throw error; }
+  tooLarge() { throw new PayloadTooLargeException(); }
+  tokenBoom() { return this.boom(); }
   forbidden() { throw new ForbiddenException(); }
   conflict() { throw new ConflictException(); }
   unauthorized() { throw new UnauthorizedException(); }
@@ -45,6 +48,9 @@ publicRoute(Get('violations'), 'violations');
 publicRoute(Get('empty-details'), 'emptyDetails');
 publicRoute(Get('custom-message'), 'customMessage');
 publicRoute(Get('boom'), 'boom');
+publicRoute(Get('api-boom'), 'apiBoom');
+publicRoute(Get('too-large'), 'tooLarge');
+publicRoute(Get('token/:token'), 'tokenBoom');
 publicRoute(Get('forbidden'), 'forbidden');
 publicRoute(Get('conflict'), 'conflict');
 publicRoute(Get('unauthorized'), 'unauthorized');
@@ -131,7 +137,7 @@ test('예상 밖 예외는 500 일반 안내만 응답하고 원인은 서버 �
   const log = logs.join('\n');
   assert.match(log, /\[error\] GET \/v1\/__test\/boom → 500 INTERNAL_ERROR \(Error\)/, '원인을 서버 로그에서 찾을 수 있다');
   assert.match(log, /at ProbeController\.boom/, '스택을 서버 로그에 남긴다');
-  for (const leaked of ['header-fake-token', 'cookie-fake', 'query-fake-token']) {
+  for (const leaked of [FAKE_SECRET, 'SELECT', 'header-fake-token', 'cookie-fake', 'query-fake-token']) {
     assert.equal(log.includes(leaked), false, `로그에 ${leaked} 없음`);
   }
 });
@@ -142,7 +148,7 @@ test('업무 거부(ApiError 4xx)는 서버 오류 로그를 남기지 않는다
   assert.equal(logs.some((l) => l.startsWith('[error]') || l.startsWith('[warn]')), false);
 });
 
-test('요청 본문 오류와 없는 경로도 같은 형식으로 응답한다(잠정 — #88 결정 대기)', { timeout: 10000 }, async (t) => {
+test('요청 본문 오류와 없는 경로는 9/28 결정의 형식으로 응답한다', { timeout: 10000 }, async (t) => {
   const { request, logs } = await start(t);
   const post = (body) => request('/v1/__test/echo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
 
@@ -151,7 +157,8 @@ test('요청 본문 오류와 없는 경로도 같은 형식으로 응답한다(
   assert.equal(truncated.text.includes('JSON'), false, 'JSON 해석기 문구를 내보내지 않는다');
 
   assertErrorShape(await post('{a:1}'), 400, 'INVALID_REQUEST');
-  assertErrorShape(await post(JSON.stringify({ pad: 'x'.repeat(200 * 1024) })), 413, 'INVALID_REQUEST');
+  assert.equal(assertErrorShape(await post(JSON.stringify({ pad: 'x'.repeat(200 * 1024) })), 400, 'INVALID_REQUEST').message, '요청 본문이 너무 큽니다.');
+  assertErrorShape(await request('/v1/__test/too-large'), 400, 'INVALID_REQUEST');
 
   const missing = await request('/no-such-path');
   assertErrorShape(missing, 404, 'RESOURCE_UNAVAILABLE');
@@ -160,7 +167,7 @@ test('요청 본문 오류와 없는 경로도 같은 형식으로 응답한다(
   assert.equal(logs.some((l) => l.startsWith('[error]')), false, '클라이언트 오류는 서버 오류로 기록하지 않는다');
 });
 
-test('코드 없는 HttpException은 상태를 보존하고 일반 코드로 응답한다(잠정 — #88 결정 대기)', { timeout: 10000 }, async (t) => {
+test('코드 없는 HttpException은 9/28 결정대로 상태를 보존하고 일반 코드로 응답한다', { timeout: 10000 }, async (t) => {
   const { request, logs } = await start(t);
   assertErrorShape(await request('/v1/__test/forbidden'), 403, 'INTERNAL_ERROR');
   assertErrorShape(await request('/v1/__test/conflict'), 409, 'INTERNAL_ERROR');
@@ -210,6 +217,16 @@ test('/v1 밖의 없는 경로와 본문 오류도 HTML이 아닌 같은 형식�
   assert.equal(missing.text.includes('<html'), false);
   const post = (p, body) => request(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
   assertErrorShape(await post('/nope', '{"a":'), 400, 'INVALID_REQUEST');
-  assertErrorShape(await post('/nope', JSON.stringify({ pad: 'x'.repeat(200 * 1024) })), 413, 'INVALID_REQUEST');
+  assertErrorShape(await post('/nope', JSON.stringify({ pad: 'x'.repeat(200 * 1024) })), 400, 'INVALID_REQUEST');
   assertErrorShape(await request('/health', { method: 'DELETE' }), 404, 'RESOURCE_UNAVAILABLE');
+});
+
+test('ApiError 5xx도 메시지 대신 코드 위치를 기록하며 URL의 토큰을 남기지 않는다', async (t) => {
+  const { request, logs } = await start(t);
+  assertErrorShape(await request('/v1/__test/api-boom'), 500, 'INTERNAL_ERROR');
+  assertErrorShape(await request(`/v1/__test/token/${FAKE_SECRET}`), 500, 'INTERNAL_ERROR');
+  assertErrorShape(await request(`/unknown/${FAKE_SECRET}`), 404, 'RESOURCE_UNAVAILABLE');
+  const log = logs.join('\n');
+  assert.match(log, /at ProbeController.apiBoom/);
+  assert.equal(log.includes(FAKE_SECRET), false);
 });
