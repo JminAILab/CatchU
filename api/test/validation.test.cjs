@@ -7,6 +7,7 @@ const { NestFactory } = require('@nestjs/core');
 const { IsInt, IsNotEmpty, IsString, MaxLength, ValidateNested } = require('class-validator');
 const { Type } = require('class-transformer');
 const { AppModule } = require('../dist/app.module');
+const { configureApp } = require('../dist/app.setup');
 const { Public } = require('../dist/auth/auth.decorators');
 
 process.env.AUTH_JWT_SECRET = randomBytes(32).toString('hex');
@@ -38,12 +39,12 @@ class ProbeModule {}
 Module({ imports: [AppModule], controllers: [ProbeController] })(ProbeModule);
 
 async function start(t) {
-  const app = await NestFactory.create(ProbeModule, { logger: false, abortOnError: false });
+  const app = await configureApp(await NestFactory.create(ProbeModule, { logger: false, abortOnError: false }));
   t.after(() => app.close());
   await app.listen(0, '127.0.0.1');
   const url = await app.getUrl();
   return async (body) => {
-    const res = await fetch(`${url}/__test/create`, {
+    const res = await fetch(`${url}/v1/__test/create`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       signal: AbortSignal.timeout(3000),
     });

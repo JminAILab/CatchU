@@ -1,5 +1,5 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from '@nestjs/common';
-import { HttpAdapterHost } from '@nestjs/core';
+import { AbstractHttpAdapter, HttpAdapterHost } from '@nestjs/core';
 import { ApiError, ErrorBody, ErrorDetails } from './api-error';
 import { DEFAULT_ERROR_MESSAGES, ErrorCode } from './error-codes';
 
@@ -22,28 +22,33 @@ interface RequestLike {
  */
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger('ApiExceptionFilter');
-
   constructor(private readonly adapterHost: HttpAdapterHost) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
-    const request = http.getRequest<RequestLike>();
-    const response = http.getResponse<unknown>();
-    const { status, body, log } = resolve(exception);
-    const name = exception instanceof Error ? exception.name : typeof exception;
-    const where = `${request.method ?? '?'} ${safePath(request)}`;
-
-    if (log === 'error') {
-      this.logger.error(`${where} → ${status} ${body.code} (${name})`, exception instanceof Error ? exception.stack : undefined);
-    } else if (log === 'warn') {
-      this.logger.warn(`${where} → ${status} ${body.code} (${name})`);
-    }
-
-    const adapter = this.adapterHost.httpAdapter;
-    adapter.setHeader(response, 'Cache-Control', 'no-store');
-    adapter.reply(response, body, status);
+    writeErrorResponse(this.adapterHost.httpAdapter, http.getRequest<RequestLike>(), http.getResponse<unknown>(), exception);
   }
+}
+
+const logger = new Logger('ApiExceptionFilter');
+
+/**
+ * 예외 하나를 명세 형식으로 응답하고 로그를 남긴다.
+ * Nest 필터와, Nest 밖에서 끝나는 요청(전역 접두사 밖의 없는 경로 등)의 대비 처리가 함께 쓴다.
+ */
+export function writeErrorResponse(adapter: AbstractHttpAdapter, request: RequestLike, response: unknown, exception: unknown): void {
+  const { status, body, log } = resolve(exception);
+  const name = exception instanceof Error ? exception.name : typeof exception;
+  const where = `${request.method ?? '?'} ${safePath(request)}`;
+
+  if (log === 'error') {
+    logger.error(`${where} → ${status} ${body.code} (${name})`, exception instanceof Error ? exception.stack : undefined);
+  } else if (log === 'warn') {
+    logger.warn(`${where} → ${status} ${body.code} (${name})`);
+  }
+
+  adapter.setHeader(response, 'Cache-Control', 'no-store');
+  adapter.reply(response, body, status);
 }
 
 function resolve(exception: unknown): Resolved {
