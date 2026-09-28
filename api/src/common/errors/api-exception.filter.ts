@@ -1,4 +1,27 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  BadGatewayException,
+  BadRequestException,
+  Catch,
+  ConflictException,
+  ExceptionFilter,
+  ForbiddenException,
+  GatewayTimeoutException,
+  GoneException,
+  HttpException,
+  InternalServerErrorException,
+  Logger,
+  MethodNotAllowedException,
+  NotAcceptableException,
+  NotFoundException,
+  NotImplementedException,
+  PayloadTooLargeException,
+  RequestTimeoutException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+  UnprocessableEntityException,
+  UnsupportedMediaTypeException,
+} from '@nestjs/common';
 import { AbstractHttpAdapter, HttpAdapterHost } from '@nestjs/core';
 import { ApiError, ErrorBody, ErrorDetails } from './api-error';
 import { DEFAULT_ERROR_MESSAGES, ErrorCode } from './error-codes';
@@ -18,7 +41,8 @@ interface RequestLike {
 
 /**
  * 모든 예외를 명세의 {code, message, details?} 형식과 Cache-Control: no-store로 응답한다.
- * 로그에는 메서드·등록 경로·예외 이름과 코드 위치만 남기고, 헤더·본문·쿼리·토큰·오류 메시지는 남기지 않는다.
+ * 로그에는 메서드·등록 경로·예외 분류명과 코드 위치만 남기고, 헤더·본문·쿼리·토큰·오류 메시지는 남기지 않는다.
+ * 예외 분류명은 error.name 원문이 아니라 허용 목록의 고정 분류명이다(errorKind, instanceof 기반 분류).
  * 코드 위치는 stack-frames.ts가 스택 문자열과 분리해 수집한 파일·줄·칸이다.
  */
 @Catch()
@@ -39,7 +63,7 @@ const logger = new Logger('ApiExceptionFilter');
  */
 export function writeErrorResponse(adapter: AbstractHttpAdapter, request: RequestLike, response: unknown, exception: unknown): void {
   const { status, body, log } = resolve(exception);
-  const name = exception instanceof Error ? exception.name : typeof exception;
+  const name = errorKind(exception);
   const where = `${request.method ?? '?'} ${safePath(request)}`;
 
   if (log === 'error') {
@@ -116,6 +140,53 @@ function bodyParserStatus(exception: unknown): number | undefined {
     return undefined;
   }
   return typeof status === 'number' && status >= 400 && status < 500 ? status : 400;
+}
+
+/**
+ * 로그에 남길 예외 분류명. `error.name`과 `constructor.name`은 실행 중에 바꾸거나 계산된 이름으로 만들 수 있어
+ * 원문을 쓰지 않는다. instanceof로 아래 허용 목록을 앞에서부터 확인해 처음 맞는 고정 분류명을 쓴다.
+ * instanceof는 상속도 포함하므로 목록 밖의 하위 클래스는 가장 가까운 상위 분류(HttpException·Error 등)로 기록된다.
+ * 판별 중 예외가 나도 응답은 계속한다.
+ */
+const ERROR_KINDS: readonly (readonly [abstract new (...args: never[]) => object, string])[] = [
+  [ApiError, 'ApiError'],
+  [BadRequestException, 'BadRequestException'],
+  [UnauthorizedException, 'UnauthorizedException'],
+  [ForbiddenException, 'ForbiddenException'],
+  [NotFoundException, 'NotFoundException'],
+  [MethodNotAllowedException, 'MethodNotAllowedException'],
+  [NotAcceptableException, 'NotAcceptableException'],
+  [RequestTimeoutException, 'RequestTimeoutException'],
+  [ConflictException, 'ConflictException'],
+  [GoneException, 'GoneException'],
+  [PayloadTooLargeException, 'PayloadTooLargeException'],
+  [UnsupportedMediaTypeException, 'UnsupportedMediaTypeException'],
+  [UnprocessableEntityException, 'UnprocessableEntityException'],
+  [InternalServerErrorException, 'InternalServerErrorException'],
+  [NotImplementedException, 'NotImplementedException'],
+  [BadGatewayException, 'BadGatewayException'],
+  [ServiceUnavailableException, 'ServiceUnavailableException'],
+  [GatewayTimeoutException, 'GatewayTimeoutException'],
+  [HttpException, 'HttpException'],
+  [TypeError, 'TypeError'],
+  [RangeError, 'RangeError'],
+  [SyntaxError, 'SyntaxError'],
+  [ReferenceError, 'ReferenceError'],
+  [EvalError, 'EvalError'],
+  [URIError, 'URIError'],
+  [Error, 'Error'],
+];
+
+function errorKind(exception: unknown): string {
+  try {
+    if (bodyParserStatus(exception) !== undefined) return 'BodyParserError';
+    for (const [type, kind] of ERROR_KINDS) {
+      if (exception instanceof type) return kind;
+    }
+    return exception === null ? 'null' : typeof exception;
+  } catch {
+    return 'unknown';
+  }
 }
 
 function safePath(request: RequestLike): string {

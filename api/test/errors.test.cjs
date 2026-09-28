@@ -47,6 +47,21 @@ class ProbeController {
     Object.defineProperty(error, 'stack', { get() { throw new Error(FAKE_SECRET); } });
     throw error;
   }
+  renamedError() {
+    const error = new Error('일반 메시지');
+    error.name = `Error\n token=${FAKE_SECRET}`; // 이름에 개행과 외부 값이 섞인 경우
+    throw error;
+  }
+  renamedForbidden() {
+    const error = new ForbiddenException();
+    error.name = `ForbiddenException\n token=${FAKE_SECRET}`;
+    throw error;
+  }
+  namedClass() {
+    // 계산된 이름으로 만든 클래스: constructor.name에도 외부 값이 들어간다.
+    const Named = { [`token=${FAKE_SECRET}`]: class extends TypeError {} }[`token=${FAKE_SECRET}`];
+    throw new Named('일반 메시지');
+  }
   staleStack() { const error = new Error('안전한 메시지'); error.stack = `Error: ${FAKE_SECRET}\n    at token=${FAKE_SECRET}\n    at ProbeController.staleStack (test:1:1)`; throw error; }
   tooLarge() { throw new PayloadTooLargeException(); }
   tokenBoom() { return this.boom(); }
@@ -73,6 +88,9 @@ publicRoute(Get('trimmed-message'), 'trimmedMessage');
 publicRoute(Get('stale-stack'), 'staleStack');
 publicRoute(Get('mimic-message'), 'mimicMessage');
 publicRoute(Get('broken-stack'), 'brokenStack');
+publicRoute(Get('renamed-error'), 'renamedError');
+publicRoute(Get('renamed-forbidden'), 'renamedForbidden');
+publicRoute(Get('named-class'), 'namedClass');
 publicRoute(Get('too-large'), 'tooLarge');
 publicRoute(Get('token/:token'), 'tokenBoom');
 publicRoute(Get('forbidden'), 'forbidden');
@@ -308,5 +326,32 @@ test('수집 기록이 없거나 스택 접근이 실패하면 코드 위치를 
     for (const leaked of [FAKE_SECRET, 'token=']) {
       assert.equal(log.includes(leaked), false, `${path}: 로그에 ${leaked} 없음`);
     }
+  }
+});
+
+test('예외 이름은 원문 대신 허용 목록의 고정 분류명으로 기록한다', { timeout: 10000 }, async (t) => {
+  const { request, logs } = await start(t);
+  // [경로, 기대 상태, 기대 코드, 로그 수준, 기대 분류명]
+  const cases = [
+    ['renamed-error', 500, 'INTERNAL_ERROR', 'error', 'Error'],
+    ['renamed-forbidden', 403, 'INTERNAL_ERROR', 'warn', 'ForbiddenException'],
+    ['named-class', 500, 'INTERNAL_ERROR', 'error', 'TypeError'],
+  ];
+  for (const [path, status, code, level, kind] of cases) {
+    logs.length = 0;
+    const res = await request(`/v1/__test/${path}`);
+    assertErrorShape(res, status, code);
+    assert.equal(res.text.includes(FAKE_SECRET), false, `${path}: 응답에 이름 원문 없음`);
+
+    const entry = logs.find((line) => line.startsWith(`[${level}] GET /v1/__test/${path}`));
+    assert.ok(entry, `${path}: ${level} 로그를 남긴다`);
+    assert.match(entry, new RegExp(`→ ${status} ${code} \\(${kind}\\)`), `${path}: 고정 분류명 ${kind}`);
+    const log = logs.join('\n');
+    for (const leaked of [FAKE_SECRET, 'token=']) {
+      assert.equal(log.includes(leaked), false, `${path}: 로그에 ${leaked} 없음`);
+    }
+    // 오류 이름에 넣은 개행·가짜 값이 섞이지 않았는지 첫 줄에서 확인한다: 분류명 바로 뒤에는 코드 위치나 로거 문맥만 온다.
+    // 코드 위치 사이의 정상 개행은 검사 대상이 아니다.
+    assert.match(entry.split('\n')[0], new RegExp(`\\(${kind}\\)(?: {5}at | ApiExceptionFilter$|$)`), `${path}: 분류명 뒤에 이름 원문 없음`);
   }
 });
