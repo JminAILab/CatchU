@@ -60,6 +60,7 @@ throw new ApiError('ANALYSIS_IN_PROGRESS', { details: { existingRequestId: reque
 | TypeScript / ts-node                    | `5.9.3` / `10.9.2`              |
 | ESLint / @eslint/js / typescript-eslint | `10.11.0` / `10.0.1` / `8.70.1` |
 | jose (Access JWT 서명·검증)            | `6.2.12`                       |
+| ajv / ajv-formats / yaml (테스트 전용, worker 메시지 스키마 검사) | `8.20.0` / `3.0.1` / `2.9.1` |
 
 직접 의존성은 `package.json`, 전이 의존성을 포함한 설치본은 `package-lock.json`으로 고정한다. 전역 Nest CLI나 루트 workspace는 필요하지 않다.
 
@@ -125,6 +126,7 @@ curl.exe -i http://127.0.0.1:3001/health
 | `npm run typecheck` | 산출물 생성 없이 TypeScript 타입 검사                                                                                |
 | `npm test`          | 빌드 후 `test/**/*.test.cjs` 전체 탐색. health·인증 HTTP 테스트 및 실제 main 진입점의 설정 로딩/기동 실패 검사. 서버·임시 설정은 검사 후 정리 |
 | `npm run build`     | `src/`를 `dist/`로 컴파일                                                                                            |
+| `node --test test/worker-messages.test.cjs` | 빌드 없이 [M1 합성 결과 세트](../worker/fixtures/m1-synthetic/README.md)의 사례·음성 대조가 worker와 같은 스키마 판정을 내는지만 검사. `npm test`에도 포함 |
 | `npm start`         | `dist/main.js` 실행. 먼저 빌드 필요                                                                                  |
 
 ```powershell
@@ -156,6 +158,8 @@ npm start
 | `test/health.test.cjs`                  | 빌드된 앱의 최소 HTTP 실행 검사                    |
 | `test/auth.test.cjs`                    | 테스트 안에만 보호 컨트롤러 구성, 인증 정상·거부 및 로그 비노출 검사 |
 | `test/runtime/bootstrap.test.cjs`       | 소스/빌드 main의 실제 설정 로딩·기동·실패 종료 검사 |
+| `test/worker-messages.test.cjs`         | M1 합성 결과 세트의 worker 메시지 스키마 v1 판정 검사 |
+| `test/helpers/worker-messages.cjs`      | 테스트 전용 메시지 검사 도우미. 계약 YAML·합성 세트를 원본 경로에서 읽음. 운영 코드에서 쓰지 않음 |
 | `tsconfig.json` / `tsconfig.build.json` | 엄격한 타입 검사, 데코레이터, 빌드 설정            |
 | `eslint.config.mjs`                     | TypeScript·JavaScript 정적 검사                    |
 | `.env.example`                          | 인증 필수 설정과 실행 선택 설정. 비밀값은 공란 |
