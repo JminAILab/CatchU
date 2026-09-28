@@ -4,6 +4,7 @@ import {
   SourceMode,
   prepareNewCatchContent,
 } from './new-catch-content';
+import { CatchRegistrationInputError, CatchRegistrationInputField } from './registration-input-error';
 
 // worker Candidate의 필요한 속성을 표현한 B 내부 타입이다. 수신 DTO를 대신하지 않는다.
 export interface RegistrationCandidate extends CatchContentSource {
@@ -27,22 +28,22 @@ export interface PreparedWorkGroup {
   }[];
 }
 
-function assertString(value: unknown, field: string, nonempty = false): asserts value is string {
+function assertString(value: unknown, field: CatchRegistrationInputField, nonempty = false): asserts value is string {
   if (typeof value !== 'string' || (nonempty && value.length === 0)) {
-    throw new TypeError(`Invalid candidate field: ${field}`);
+    throw new CatchRegistrationInputError('INVALID_INPUT', field);
   }
 }
 
-function assertStrings(value: unknown, field: string, nonempty = false): asserts value is string[] {
+function assertStrings(value: unknown, field: CatchRegistrationInputField, nonempty = false): asserts value is string[] {
   if (!Array.isArray(value) || (nonempty && value.length === 0)) {
-    throw new TypeError(`Invalid candidate field: ${field}`);
+    throw new CatchRegistrationInputError('INVALID_INPUT', field);
   }
   for (const item of value) assertString(item, field);
 }
 
 function validateCandidate(candidate: RegistrationCandidate): void {
   if (!candidate || typeof candidate !== 'object') {
-    throw new TypeError('Invalid registration candidate');
+    throw new CatchRegistrationInputError('INVALID_INPUT', 'candidate');
   }
   assertString(candidate.candidateId, 'candidateId', true);
   assertString(candidate.title, 'title', true);
@@ -56,36 +57,34 @@ function validateCandidate(candidate: RegistrationCandidate): void {
     || candidate.eligibility?.contributionVerified !== true
     || candidate.eligibility?.independentOfFailures !== true) {
     // 부적합 후보를 조용히 제외해 결과 0건/전체 반영 완료로 바꾸지 않는다.
-    throw new TypeError('Candidate registration requirements are not met');
+    throw new CatchRegistrationInputError('REGISTRATION_INELIGIBLE', 'eligibility');
   }
 
-  if (!candidate.draft || !candidate.reflection) {
-    throw new TypeError('Missing candidate generation state');
-  }
+  if (!candidate.draft) throw new CatchRegistrationInputError('INVALID_INPUT', 'draft');
+  if (!candidate.reflection) throw new CatchRegistrationInputError('INVALID_INPUT', 'reflection');
   assertStrings(candidate.reflection.questions, 'reflection.questions');
 
   if (!Array.isArray(candidate.evidence) || candidate.evidence.length === 0) {
-    throw new TypeError('Candidate evidence is required');
+    throw new CatchRegistrationInputError('INVALID_INPUT', 'evidence');
   }
   const evidenceIds = new Set<string>();
   for (const evidence of candidate.evidence) {
     if (!evidence || typeof evidence !== 'object') {
-      throw new TypeError('Invalid candidate evidence');
+      throw new CatchRegistrationInputError('INVALID_INPUT', 'evidence');
     }
     assertString(evidence.evidenceId, 'evidence.evidenceId', true);
-    assertString(evidence.sourceUrl, 'evidence.sourceUrl', true);
-    try {
-      // URL을 조회하거나 변환해 저장하지 않는다. 출처 일치는 실제 연결에서 검사한다.
-      new URL(evidence.sourceUrl);
-    } catch {
-      throw new TypeError('Invalid candidate field: evidence.sourceUrl');
+    const sourceUrl = evidence.sourceUrl;
+    assertString(sourceUrl, 'evidence.sourceUrl', true);
+    // URL을 조회하거나 변환해 저장하지 않는다. 출처 일치는 실제 연결에서 검사한다.
+    if (!URL.canParse(sourceUrl)) {
+      throw new CatchRegistrationInputError('INVALID_INPUT', 'evidence.sourceUrl');
     }
     assertString(evidence.sourceRevision, 'evidence.sourceRevision', true);
     assertStrings(evidence.representedFacts, 'evidence.representedFacts', true);
     assertString(evidence.contributionScope, 'evidence.contributionScope');
     assertStrings(evidence.coverageLimits, 'evidence.coverageLimits');
     if (evidenceIds.has(evidence.evidenceId)) {
-      throw new TypeError('Duplicate evidence ID within a candidate');
+      throw new CatchRegistrationInputError('INVALID_INPUT', 'evidence.evidenceId');
     }
     evidenceIds.add(evidence.evidenceId);
   }
@@ -101,9 +100,9 @@ export function prepareRegistrationBatch(
   candidates: readonly RegistrationCandidate[],
   sourceMode: SourceMode,
 ): PreparedWorkGroup[] {
-  if (!Array.isArray(candidates)) throw new TypeError('Candidates must be an array');
+  if (!Array.isArray(candidates)) throw new CatchRegistrationInputError('INVALID_INPUT', 'candidates');
   if (sourceMode !== 'MOCK' && sourceMode !== 'LIVE') {
-    throw new TypeError('sourceMode must be MOCK or LIVE');
+    throw new CatchRegistrationInputError('INVALID_INPUT', 'sourceMode');
   }
 
   const candidateIds = new Set<string>();
@@ -111,7 +110,7 @@ export function prepareRegistrationBatch(
   for (const candidate of candidates) {
     validateCandidate(candidate);
     if (candidateIds.has(candidate.candidateId)) {
-      throw new TypeError('Duplicate candidate ID within a result');
+      throw new CatchRegistrationInputError('INVALID_INPUT', 'candidateId');
     }
     candidateIds.add(candidate.candidateId);
     const prepared = {

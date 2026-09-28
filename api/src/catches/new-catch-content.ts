@@ -1,3 +1,5 @@
+import { CatchRegistrationInputError } from './registration-input-error';
+
 type GenerationStatus = 'GENERATED' | 'FAILED' | 'NOT_GENERATED';
 export type SourceMode = 'MOCK' | 'LIVE';
 
@@ -67,20 +69,20 @@ export function prepareNewCatchContent(
   sourceMode: SourceMode,
 ): NewCatchContent {
   if (sourceMode !== 'MOCK' && sourceMode !== 'LIVE') {
-    throw new TypeError('sourceMode must be MOCK or LIVE');
+    throw new CatchRegistrationInputError('INVALID_INPUT', 'sourceMode');
   }
   if (!isGenerationStatus(candidate.draft.status)) {
-    throw new TypeError('draft.status is invalid');
+    throw new CatchRegistrationInputError('INVALID_INPUT', 'draft.status');
   }
   if (!isGenerationStatus(candidate.reflection.status)) {
-    throw new TypeError('reflection.status is invalid');
+    throw new CatchRegistrationInputError('INVALID_INPUT', 'reflection.status');
   }
   if (candidate.draft.status === 'GENERATED') {
     if (typeof candidate.draft.content !== 'string') {
-      throw new TypeError('GENERATED draft requires string content');
+      throw new CatchRegistrationInputError('INVALID_INPUT', 'draft.content');
     }
   } else if (candidate.draft.content !== null) {
-    throw new TypeError('Failed or ungenerated draft requires null content');
+    throw new CatchRegistrationInputError('INVALID_INPUT', 'draft.content');
   }
 
   return {

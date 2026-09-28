@@ -1,6 +1,17 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { prepareNewCatchContent } = require('../../dist/catches/new-catch-content');
+const { CatchRegistrationInputError } = require('../../dist/catches/registration-input-error');
+
+function invalidInput(field) {
+  return (error) => {
+    assert.ok(error instanceof CatchRegistrationInputError);
+    assert.ok(error instanceof TypeError);
+    assert.equal(error.reason, 'INVALID_INPUT');
+    assert.equal(error.field, field);
+    return true;
+  };
+}
 
 // 이 변환 함수만 검사하는 합성 값이다. #103의 공용 Result 세트를 대체하지 않는다.
 function candidate() {
@@ -69,18 +80,34 @@ test('생성 상태와 본문이 모순되면 임의 보정하지 않고 거부�
     { status: 'NOT_GENERATED', content: '' },
     { status: 'UNKNOWN', content: null },
   ]) {
-    assert.throws(() => prepareNewCatchContent({ ...candidate(), draft }, 'MOCK'), TypeError);
+    assert.throws(
+      () => prepareNewCatchContent({ ...candidate(), draft }, 'MOCK'),
+      invalidInput(draft.status === 'UNKNOWN' ? 'draft.status' : 'draft.content'),
+    );
   }
   const input = candidate();
   input.reflection.status = 'UNKNOWN';
-  assert.throws(() => prepareNewCatchContent(input, 'MOCK'), TypeError);
+  assert.throws(() => prepareNewCatchContent(input, 'MOCK'), invalidInput('reflection.status'));
 });
 
 test('MOCK/LIVE를 보존하고 알 수 없는 생성 방식을 실제 분석으로 바꾸지 않는다', () => {
   for (const mode of ['MOCK', 'LIVE']) {
     assert.equal(prepareNewCatchContent(candidate(), mode).asset.sourceMode, mode);
   }
-  assert.throws(() => prepareNewCatchContent(candidate(), 'UNKNOWN'), TypeError);
+  assert.throws(() => prepareNewCatchContent(candidate(), 'UNKNOWN'), invalidInput('sourceMode'));
+});
+
+test('변환 중 발생한 일반 Error와 TypeError는 입력 거부로 재분류하지 않는다', () => {
+  for (const ErrorType of [Error, TypeError]) {
+    const input = candidate();
+    const unexpected = new ErrorType('synthetic unexpected failure');
+    Object.defineProperty(input.draft, 'status', { get() { throw unexpected; } });
+    assert.throws(() => prepareNewCatchContent(input, 'MOCK'), (error) => {
+      assert.equal(error, unexpected);
+      assert.equal(error instanceof CatchRegistrationInputError, false);
+      return true;
+    });
+  }
 });
 
 test('변환 전후 배열을 공유하지 않아 후보 변경이 준비한 근거를 바꾸지 않는다', () => {
