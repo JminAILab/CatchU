@@ -17,7 +17,7 @@ api의 E 수신 처리와 B 등록 시험이 함께 쓰는 worker 메시지 합�
 | `results/*.json` | 종결 결과(Result) 템플릿 7개 |
 | `events/*.json` | 진행 관측(ProcessingEvent) 템플릿 2개 |
 
-스키마 원본은 복사하지 않고 경로로 읽는다: [`worker-messages.yaml`](../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml), [`common.yaml`](../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml). 검사 코드는 worker `app/contract/`에 있다.
+스키마 원본은 복사하지 않고 경로로 읽는다: [`worker-messages.yaml`](../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml), [`common.yaml`](../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml). 검사 코드는 worker `app/contract/`와 api `test/helpers/worker-messages.cjs`에 있다.
 
 ## 사례표
 
@@ -50,7 +50,7 @@ api와 worker는 같은 메시지에 같은 판정을 내야 한다(`cases.json`
 | `SCHEMA_INVALID` | 세 식별자는 읽히지만 다른 필드가 스키마에 맞지 않는다 |
 
 - 세 이름은 새 계약 코드가 아니라 양쪽 테스트가 비교하는 기대값 이름이다. 식별 가능성은 Result에만 따지고, 그다음에 스키마를 검사한다.
-- OpenAPI `nullable: true`는 검사 전에 null 허용으로 바꾼다. date-time·uri 형식도 검사한다. 음성 대조(`negativeControls`)가 형식 검사가 실제로 동작하는지 확인한다.
+- OpenAPI `nullable: true`는 검사 전에 null 허용으로 바꾼다. date-time·uri 형식도 검사하며, date-time은 RFC 3339대로 날짜와 시각 사이에 `T`만 허용한다. 음성 대조(`negativeControls`)가 형식 검사가 실제로 동작하는지 확인한다.
 - 오류는 위치(JSON Pointer)와 어긴 키워드만 남기고 원문 값은 남기지 않는다.
 
 ## ID 채우기
@@ -86,3 +86,4 @@ api와 worker는 같은 메시지에 같은 판정을 내야 한다(`cases.json`
 ## 검사
 
 - worker(`worker/`에서): `uv run --locked pytest`가 `tests/test_worker_messages.py`로 사례·음성 대조를 검사한다.
+- api(`api/`에서): `npm test`가 `test/worker-messages.test.cjs`로 같은 사례·음성 대조를 검사한다.

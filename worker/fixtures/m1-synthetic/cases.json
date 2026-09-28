@@ -231,6 +231,13 @@
       "check": {"verdict": "SCHEMA_INVALID", "errorsInclude": [{"path": "/finishedAt", "keyword": "format"}]}
     },
     {
+      "id": "date-time-space-separator",
+      "file": "results/succeeded-one-candidate.json",
+      "schema": "Result",
+      "patch": [{"op": "replace", "path": "/finishedAt", "value": "2026-10-01 00:30:00Z"}],
+      "check": {"verdict": "SCHEMA_INVALID", "errorsInclude": [{"path": "/finishedAt", "keyword": "format"}]}
+    },
+    {
       "id": "invalid-uri",
       "file": "results/succeeded-one-candidate.json",
       "schema": "Result",
