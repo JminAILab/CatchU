@@ -43,6 +43,10 @@ throw new ApiError('ANALYSIS_IN_PROGRESS', { details: { existingRequestId: reque
 
 전역 설정은 `configureApp`에 모았다. 기능 경로는 `/v1` 아래, `GET /health`는 접두사 없이 유지하며 성공·오류 응답에 `Cache-Control: no-store`를 붙인다. `npm test`는 실제 로컬 HTTP 서버에서 위 상태/본문/헤더/로그, ValidationPipe, 인증 Guard를 검증한다. 오류 재현 전용 경로는 `test/errors.test.cjs`에만 있고 제품 앱에 추가하지 않는다.
 
+## B 본인 Catch 조회 준비 — #130
+
+[`src/catches/owner-catch-response.ts`](src/catches/owner-catch-response.ts)는 Catch·원 요청·근거·보호 판단을 본인용 응답으로 매핑하는 순수 함수다. [사용 범위와 실제 조회 연결 순서](docs/catch-owner-read-preparation.md)에 응답 출처·소유권 대조·오류 구분과 남은 검사를 정리했다. 현재 `/v1/catches` 경로·DB 조회·인증 연결은 구현하지 않았으며 실제 조회 API의 완성을 뜻하지 않는다.
+
 ## 작업 시작
 
 - [공통 작업관리](../docs/CatchU_작업관리.md)를 읽고 해당 이슈의 범위·완료 기준·관련 계약을 확인한다.
