@@ -1,7 +1,7 @@
 # #105 — 분석 결과를 Catch로 저장하는 연결안
 
-> 검토용 제안 v0.1 · 2026-09-28 · 작성: leechaeah(B)
-> 기준: `9093d2e452dbcdcd746265758abc9e7f41ff9527`. 기존 계약·ERD의 행동과 유일성을 유지한다. 아래 함수 형태, 물리 구현과 작성 분담은 E 담당과 확인할 제안이며, 실행 코드나 DB 검증 결과가 아니다.
+> 검토용 제안 v0.2 · 2026-09-28 · 작성: leechaeah(B)
+> 기준: `9093d2e452dbcdcd746265758abc9e7f41ff9527`. 기존 계약·ERD의 행동과 유일성을 유지한다. 아래 등록 함수 형태, 물리 구현과 작성 분담은 E 담당과 확인할 제안이며 DB 검증 결과가 아니다. 독립적으로 구현한 본문 변환 함수의 범위는 §2에 구분한다.
 
 ## 1. 이번에 맞출 일
 
@@ -57,6 +57,15 @@ E는 스키마, 현재 시도, 회원·저장소·동의·범위·sourceMode, �
 | applicationRecordId, candidateId, 판정 결과 | CandidateRegistration | catchId·CREATED/EXISTING·ownerViewReady와 함께 저장 |
 
 repositoryId는 원 요청에서 유도한다. CatchAsset에 별도 저장소 컬럼이나 등록된 Catch ID 배열을 추가하지 않는다. 위 표와 §6의 기대 결과는 E 담당의 답을 기다리는 동안에도 B가 구현 준비에 사용할 수 있다.
+
+### 구현한 내부 준비 코드
+
+[prepareNewCatchContent](../src/catches/new-catch-content.ts)는 위 대응표 중 새 Catch의 본문·근거·초기 상태만 만든다. `CatchContentSource`는 이 변환에 필요한 부분 타입이며 E↔B 호출 계약을 확정하거나 Candidate 전체 검증을 대신하지 않는다.
+
+- 생성 상태·본문의 모순은 내부 `TypeError`로 거부한다. 실패·미생성을 성공으로 바꾸거나 내용을 만들어 채우지 않는다.
+- 새 카드의 확인·불일치는 false, 공개 상태는 PRIVATE로 고정한다. 입력과 출력의 배열은 공유하지 않는다.
+- 소유권·등록 적합성·중복 판정, registrationAssessment, DB ID·저장·후보 연결·열람 준비 상태는 포함하지 않는다. 기존 Catch 갱신에도 사용하지 않는다.
+- [단위 검사](../test/catches/new-catch-content.test.cjs)는 함수 전용 합성 값으로 위 기준을 확인한다. E 호출부 연결과 아래 DB 통합 사례는 선행 기반·담당 합의 후 구현한다.
 
 ## 3. B가 E에 돌려줄 값
 

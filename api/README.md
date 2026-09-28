@@ -129,7 +129,11 @@ npm start
 
 ### B Catch 등록 연결 준비 — #105
 
-[분석 결과를 Catch로 저장하는 연결안](docs/catch-registration-proposal.md)은 E가 B에 넘길 값, B의 반환값, 하나의 트랜잭션으로 저장할 순서와 네 테이블의 작성 분담을 정리한 **검토용 제안**이다. 실행 가능한 등록 함수·DB 구현은 아직 없다. E 담당과의 입출력·분담 확인, #86 DB 기반·#103 합성 자료·#104 선행 테이블에 맞춰 구현한다.
+[분석 결과를 Catch로 저장하는 연결안](docs/catch-registration-proposal.md)은 E가 B에 넘길 값, B의 반환값, 하나의 트랜잭션으로 저장할 순서와 네 테이블의 작성 분담을 정리한 **검토용 제안**이다. 등록 함수·DB 구현은 아직 없다. E 담당과의 입출력·분담 확인, #86 DB 기반·#103 합성 자료·#104 선행 테이블에 맞춰 구현한다.
+
+[새 Catch 본문 변환 함수](src/catches/new-catch-content.ts) `prepareNewCatchContent`는 등록 조건을 검사한 후보의 본문·근거를 새 Catch용 값으로 변환하는 B 내부 준비 코드다. 새 카드의 확인·불일치는 `false`, 공개 상태는 `PRIVATE`로 고정하고, 생성 실패 상태와 근거·출처·MOCK/LIVE를 보존한다. DB ID나 열람 준비 상태를 만들지 않으며 기존 Catch 갱신에 사용하지 않는다. 호출부와는 아직 연결하지 않았다.
+
+검사는 `npm test`에 포함한다. 빌드 후 `node --test test/catches/new-catch-content.test.cjs`로 이 함수만 검사할 수도 있다. 이 파일의 합성 값은 단위 검사 전용이며 #103의 공용 Result 자료, 소유권·등록 적합성·중복 판정, DB 원자성·동시성 검증을 대체하지 않는다.
 
 ## 인증 기반 사용과 후속 경계 — #87
 
