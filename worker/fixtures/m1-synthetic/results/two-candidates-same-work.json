@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "1",
+  "messageId": "message-{{caseId}}-{{attemptId}}-result",
+  "resultId": "result-{{caseId}}-{{attemptId}}",
+  "requestId": "{{requestId}}",
+  "attemptId": "{{attemptId}}",
+  "memberId": "{{memberId}}",
+  "repositoryId": "{{repositoryId}}",
+  "consentId": "{{consentId}}",
+  "scopeRevision": "{{scopeRevision}}",
+  "sourceMode": "MOCK",
+  "outcome": "SUCCEEDED",
+  "candidates": [
+    {
+      "candidateId": "candidate-{{caseId}}-{{attemptId}}-1",
+      "title": "합성 작업 C: 알림 목록 페이지 나누기",
+      "workIdentity": "synthetic-work-{{caseId}}-c",
+      "workFacts": [
+        "합성 PR 1건이 알림 목록에 페이지 나누기를 추가했다"
+      ],
+      "subjectContribution": "합성 회원이 PR을 작성했다",
+      "groupingBasis": "합성 PR 단위",
+      "groupingLimitations": [
+        "합성 자료라 실제 저장소 기록과 대조하지 않았다"
+      ],
+      "eligibility": {
+        "workFactsVerified": true,
+        "contributionVerified": true,
+        "independentOfFailures": true
+      },
+      "evidence": [
+        {
+          "evidenceId": "evidence-{{caseId}}-{{attemptId}}-1-1",
+          "sourceUrl": "https://example.invalid/catchu-synthetic-owner/catchu-synthetic-repo/pull/3",
+          "sourceRevision": "synthetic-revision-11",
+          "representedFacts": [
+            "합성 PR 1건이 페이지 나누기를 추가했다"
+          ],
+          "contributionScope": "PR 작성",
+          "coverageLimits": [
+            "리뷰 댓글은 포함하지 않았다"
+          ]
+        }
+      ],
+      "draft": {
+        "status": "GENERATED",
+        "content": "합성 설명 초안: 로그인 실패 안내 문구를 사용자가 원인을 알 수 있게 정리했다."
+      },
+      "reflection": {
+        "status": "GENERATED",
+        "questions": [
+          "합성 질문: 문구를 바꾸게 된 계기는 무엇이었나요?"
+        ]
+      }
+    },
+    {
+      "candidateId": "candidate-{{caseId}}-{{attemptId}}-2",
+      "title": "합성 작업 C: 알림 목록 페이지 크기 조정",
+      "workIdentity": "synthetic-work-{{caseId}}-c",
+      "workFacts": [
+        "합성 커밋 1건이 알림 목록 페이지 크기를 조정했다"
+      ],
+      "subjectContribution": "합성 회원이 커밋 1건을 작성했다",
+      "groupingBasis": "합성 커밋 단위",
+      "groupingLimitations": [
+        "합성 자료라 실제 저장소 기록과 대조하지 않았다"
+      ],
+      "eligibility": {
+        "workFactsVerified": true,
+        "contributionVerified": true,
+        "independentOfFailures": true
+      },
+      "evidence": [
+        {
+          "evidenceId": "evidence-{{caseId}}-{{attemptId}}-2-1",
+          "sourceUrl": "https://example.invalid/catchu-synthetic-owner/catchu-synthetic-repo/commit/synthetic-revision-21",
+          "sourceRevision": "synthetic-revision-21",
+          "representedFacts": [
+            "합성 커밋 1건이 페이지 크기를 조정했다"
+          ],
+          "contributionScope": "커밋 1건",
+          "coverageLimits": [
+            "PR 연결은 확인하지 않았다"
+          ]
+        }
+      ],
+      "draft": {
+        "status": "NOT_GENERATED",
+        "content": null
+      },
+      "reflection": {
+        "status": "NOT_GENERATED",
+        "questions": []
+      }
+    }
+  ],
+  "notProvided": [],
+  "failures": [],
+  "finishedAt": "2026-10-01T00:30:00Z"
+}

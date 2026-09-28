@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1",
+  "messageId": "message-{{caseId}}-{{attemptId}}-result",
+  "resultId": "result-{{caseId}}-{{attemptId}}",
+  "requestId": "{{requestId}}",
+  "attemptId": "{{attemptId}}",
+  "memberId": "{{memberId}}",
+  "repositoryId": "{{repositoryId}}",
+  "consentId": "{{consentId}}",
+  "scopeRevision": "{{scopeRevision}}",
+  "sourceMode": "MOCK",
+  "outcome": "FAILED",
+  "candidates": [],
+  "notProvided": [],
+  "failures": [
+    {
+      "stage": "COLLECTION",
+      "code": "COLLECTION_FETCH_FAILED",
+      "message": "합성 실패: 저장소 자료를 가져오지 못했다"
+    }
+  ],
+  "finishedAt": "2026-10-01T00:30:00Z"
+}
