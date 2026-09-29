@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { setImmediate } from "node:timers/promises";
+import { readApiResponse } from "../src/lib/api-response.ts";
 import { createCatchApi } from "../src/features/assets/catch-api.ts";
 import { createAssetsStore } from "../src/features/assets/assets-store.ts";
 import { previewCatches } from "../src/features/assets/fixtures.ts";
@@ -42,6 +44,65 @@ test("401·공통 접근 불가 오류는 의미를 유지하고 정상 빈 목�
   assert.equal(store.getSnapshot().listState, "ready");
   assert.deepEqual(store.getSnapshot().items, []);
 });
+
+for (const code of ["AUTH_REQUIRED", "AUTH_INVALID"]) {
+  const error = { kind: "api-error", status: 401, code, message: "인증이 필요합니다." };
+  const unauthorized = () => Response.json({ code, message: error.message }, { status: 401 });
+
+  test(`${code}: 첫 목록의 HTTP 401은 오류이며 수동 재조회한 정상 0건과 구분한다`, async () => {
+    let calls = 0;
+    const store = createAssetsStore(createCatchApi(() => readApiResponse(++calls === 1
+      ? unauthorized() : Response.json({ items: [], page: { nextCursor: null } }))));
+    await store.refresh("repo-a");
+    assert.equal(store.getSnapshot().listState, "error");
+    assert.deepEqual(store.getSnapshot().listError, error);
+    assert.deepEqual(store.getSnapshot().items, []);
+    assert.equal(store.getSnapshot().nextCursor, null);
+    await setImmediate();
+    assert.equal(calls, 1);
+
+    await store.refresh("repo-a");
+    assert.equal(calls, 2);
+    assert.equal(store.getSnapshot().listState, "ready");
+    assert.equal(store.getSnapshot().listError, null);
+    assert.deepEqual(store.getSnapshot().items, []);
+  });
+
+  test(`${code}: 상세 재조회의 HTTP 401은 이전 상세를 제거하고 오류를 유지한다`, async () => {
+    let calls = 0;
+    const store = createAssetsStore(createCatchApi(() => readApiResponse(++calls === 1
+      ? Response.json(item("c")) : unauthorized())));
+    await store.openDetail("c");
+    assert.equal(store.getSnapshot().detail.catchId, "c");
+    const refresh = store.openDetail("c", true);
+    assert.equal(store.getSnapshot().detail, undefined);
+    await refresh;
+    assert.equal(store.getSnapshot().detailState, "error");
+    assert.deepEqual(store.getSnapshot().detailError, error);
+    assert.equal(store.getSnapshot().detail, undefined);
+    await setImmediate();
+    assert.equal(calls, 2);
+  });
+
+  test(`${code}: 더 보기의 HTTP 401은 기존 목록과 cursor를 보존하고 자동 재시도하지 않는다`, async () => {
+    const paths = [];
+    const store = createAssetsStore(createCatchApi((path) => {
+      paths.push(path);
+      return readApiResponse(paths.length === 1
+        ? Response.json({ items: [item("kept")], page: { nextCursor: "opaque-next" } }) : unauthorized());
+    }));
+    await store.refresh("repo-a");
+    await store.loadMore();
+    assert.equal(store.getSnapshot().listState, "ready");
+    assert.equal(store.getSnapshot().moreState, "error");
+    assert.deepEqual(store.getSnapshot().listError, error);
+    assert.deepEqual(store.getSnapshot().items, [item("kept")]);
+    assert.equal(store.getSnapshot().nextCursor, "opaque-next");
+    assert.equal(paths[1], "/catches?limit=20&repositoryId=repo-a&cursor=opaque-next");
+    await setImmediate();
+    assert.equal(paths.length, 2);
+  });
+}
 
 test("늦게 도착한 이전 필터 응답을 버리고 이전 요청을 중단한다", async () => {
   const first = deferred(); const second = deferred(); const calls = [];
