@@ -40,3 +40,18 @@ B 담당의 화면을 서버 연결 전에 검토하는 개발용 미리보기�
 - [9/24 후속 결정](../../../../docs/ai-dlc-input-mvp/2026-09-14_followup.md): 불일치가 확인·공개를 자동 변경하지 않으며, 미공개와 숨김은 별도 값이 아니다.
 
 기준 판본은 `dev`의 `4de4118`이다. API 계약·공식 AI-DLC 기록은 변경하지 않았다.
+
+## 목록 API 연결 구성 (#168)
+
+`AssetsConnected`는 #106의 인증 가드 안에 넣는 화면이다. 로그인·토큰 저장·제품 경로는 이 기능에서 만들지 않는다. 회원이 바뀌거나 로그아웃하면 부모가 화면을 해제하고 새 회원은 새 `key`로 마운트해야 한다. `api` 인스턴스는 렌더마다 새로 만들지 않는다.
+
+- `createCatchApi(transport)`: transport는 `/catches` 상대 경로와 method/body/signal/cache를 받아 공통 `ApiResult`를 반환한다. #106이 API 기준 주소·`/v1`·Bearer·401 인증 만료를 처리하고, `readApiResponse`로 응답을 해석한다. PUT의 객체 body는 transport에서 JSON으로 직렬화한다.
+- `AssetsConnected`: `repositoryId`·`catchId`를 주소와 맞추며 필터 변경과 뒤로 가기 때 다시 조회한다. 목록에 아직 없는 Catch도 별도 상세 GET으로 연다. 저장소 이름은 Catch 데이터에 없으므로 `repositories`로 공급한다. 이름이 준비되지 않았다고 서버가 반환한 Catch를 숨기지 않는다.
+- `assets-store`: 필터별 cursor 초기화, 이전 응답 무시·요청 중단, 동시 재조회 합치기, 다음 페이지 실패 시 기존 목록 유지, 같은 Catch 중복 제거를 담당한다. 조회 실패를 합성 자료나 정상 0건으로 대체하지 않는다.
+- D 슬롯의 `onShowRepository(repositoryId)`는 필터 적용·상세 닫기·목록 재조회, `onClosed()`는 현재 필터 재조회다. 저장소 보기로 닫으면 `onClosed`를 추가 호출하지 않는다. 같은 저장소를 다시 골라도 재조회한다. D가 모달을 열기 직전에 `onOpen()`을 호출해 Catch 상세를 먼저 닫는 경계를 추가 제안한다. D의 실제 모달 구현은 #153에 남아 있다.
+
+개발 모드의 `/preview/assets-connected`는 같은 연결 컴포넌트에 **모의 응답**을 주입한다. 더 보기, 저장소 관리 콜백, 상세 직접 진입을 확인할 수 있다. `failure=all` 또는 `failure=detail`을 주소에 넣으면 조회 오류를 재현한다. 이 주소도 프로덕션에서는 404이며 실제 인증·API·DB 검증 증거가 아니다.
+
+검사: `npm test`에서 응답 계약과 요청 순서 역전·필터/페이지·조회 실패를 검사한다. 전체 검사는 `web/README.md`의 `npm run check`를 따른다. #106의 실제 회원 화면 및 #153의 실제 모달 조립은 별도 연결 검증이 필요하다.
+
+실제 B HTTP 연결 검사는 `web/`에서 `node scripts/catches-api-smoke.mjs`로 실행한다. API를 먼저 빌드하고 `CATCH_API_ROOT`에 해당 `api/` 절대 경로를 지정한다(생략하면 `../api`). DB 설정은 API README의 테스트 DB 환경 변수를 사용하며 이름은 `_test`로 끝나야 한다. 검사기는 무작위 스키마와 합성 A/E 입력을 만들고 종료 시 자기 스키마를 제거한다. 실데이터 DB에 실행하지 않는다. 이 검사는 B API·JWT·PostgreSQL 연결을 확인하지만 #106의 실제 로그인 페이지와 D 모달, 실제 worker 분석은 확인하지 않는다.
