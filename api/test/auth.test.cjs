@@ -6,6 +6,7 @@ const { Controller, Get, Module } = require('@nestjs/common');
 const { NestFactory } = require('@nestjs/core');
 const { SignJWT } = require('jose');
 const { AppModule } = require('../dist/app.module');
+const { configureApp } = require('../dist/app.setup');
 const { CurrentMemberId, Public } = require('../dist/auth/auth.decorators');
 const { readAuthConfig } = require('../dist/auth/auth.config');
 
@@ -50,16 +51,16 @@ async function start(t, overrides = {}) {
       }
     }
   });
-  app = await NestFactory.create(ProbeModule, { logger, abortOnError: false });
+  app = await configureApp(await NestFactory.create(ProbeModule, { logger, abortOnError: false }));
   await app.listen(0, '127.0.0.1');
   const url = await app.getUrl();
   const request = (path, options = {}) => fetch(`${url}${path}`, {
     ...options, signal: AbortSignal.timeout(3000),
   });
-  const login = (body = { memberId: 'test-member-87' }) => request('/auth/dev-login', {
+  const login = (body = { memberId: 'test-member-87' }) => request('/v1/auth/dev-login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
-  const protectedRequest = (token, path = '/__test/member') => request(path, {
+  const protectedRequest = (token, path = '/v1/__test/member') => request(path, {
     headers: token === undefined ? {} : { Authorization: `Bearer ${token}` },
   });
   const sign = (claims = {}, algorithm = 'HS256') => new SignJWT({
@@ -74,8 +75,8 @@ test('토큰 없는 보호 API는 401, health와 명시적 공개 경로는 200'
   const server = await start(t);
   assert.equal((await server.protectedRequest()).status, 401);
   assert.equal((await server.request('/health')).status, 200);
-  assert.equal((await server.request('/__test/public')).status, 200);
-  assert.equal((await server.request('/__test/member', { headers: { Authorization: 'Basic invalid' } })).status, 401);
+  assert.equal((await server.request('/v1/__test/public')).status, 200);
+  assert.equal((await server.request('/v1/__test/member', { headers: { Authorization: 'Basic invalid' } })).status, 401);
 });
 
 test('개발 로그인 토큰의 회원 ID를 읽으며 요청 입력으로 대체하지 않는다', async (t) => {
@@ -86,10 +87,10 @@ test('개발 로그인 토큰의 회원 ID를 읽으며 요청 입력으로 대�
   const { accessToken, tokenType, expiresIn } = await response.json();
   assert.equal(tokenType, 'Bearer');
   assert.equal(expiresIn, 60);
-  const member = await server.protectedRequest(accessToken, '/__test/member?memberId=someone-else');
+  const member = await server.protectedRequest(accessToken, '/v1/__test/member?memberId=someone-else');
   assert.equal(member.status, 200);
   assert.deepEqual(await member.json(), { memberId: 'test-member-87' });
-  assert.equal((await server.request('/__test/member?memberId=test-member-87')).status, 401);
+  assert.equal((await server.request('/v1/__test/member?memberId=test-member-87')).status, 401);
 });
 
 test('변조·만료 토큰과 필수 값 없는 토큰을 401로 거부하고 토큰을 기록하지 않는다', async (t) => {

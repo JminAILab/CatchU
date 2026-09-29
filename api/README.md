@@ -2,7 +2,43 @@
 
 NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준을 확인한다.
 
-현재 구현은 외부 서비스 연결 없이 실행되는 `GET /health`와 [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. 실제 로그인·회원 DB·제품 기능·worker 연결은 후속 작업이다.
+현재 구현은 외부 서비스 연결 없이 실행되는 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88)다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. 실제 로그인·회원 DB·제품 기능·worker 연결은 후속 작업이다.
+
+## 공통 오류 처리 — API 명세 v1
+
+정본은 [API 명세 v1 공통 오류·요청 안전성](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#공통-오류요청-안전성)과 [common.yaml의 Error](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml)다. 오류 본문은 `{code, message, details?}`이며 화면은 문구 대신 `code`로 분기한다. `details`는 `violations: [{field, reason}]`와 `existingRequestId`만 허용한다. 입력값·SQL·stack·토큰을 응답에 넣지 않는다.
+
+| 기본 구분 | HTTP | 코드 |
+|---|---|---|
+| 입력 | 400 | INVALID_REQUEST, VALIDATION_FAILED |
+| 미인증·수신자 비밀번호 | 401 | AUTH_REQUIRED, AUTH_INVALID, LINK_PASSWORD_REQUIRED, LINK_PASSWORD_INVALID |
+| 권한·선행 조건 | 403 | GITHUB_CONNECTION_REQUIRED, REPOSITORY_NOT_ALLOWED, CONSENT_REQUIRED |
+| 없음·열람 불가 | 404 | RESOURCE_UNAVAILABLE, LINK_UNAVAILABLE |
+| 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED |
+| 서버 오류 | 500 | INTERNAL_ERROR |
+
+기능에서는 `src/common/errors`의 `ApiError`를 던진다. HTTP 상태는 코드에 따라 정해진다.
+
+```typescript
+import { ApiError } from '../common/errors'; // 현재 파일 위치에 맞게 상대 경로 조정
+
+throw new ApiError('CONSENT_REQUIRED');
+// 진행 중 요청을 안내할 때:
+throw new ApiError('ANALYSIS_IN_PROGRESS', { details: { existingRequestId: requestId } });
+```
+
+새 오류 코드는 계약 변경 이슈로 상태·의미·문구를 합의한 뒤 `error-codes.ts`의 상태/기본 문구, 이 표, 기능 테스트를 함께 추가한다. 과거 승인 문서를 소급 수정하지 않는다. 기존 코드의 사용자 문구를 지정할 때도 내부 예외의 message를 그대로 전달하지 않는다.
+
+전역 ValidationPipe는 class-validator 데코레이터가 있는 DTO 클래스의 검증 실패·추가 필드를 `400 VALIDATION_FAILED`와 필드/규칙 이름으로 응답한다. `unknown`·인터페이스·직접 수동 검증은 DTO 검증 대상이 아니다.
+
+[9/28 팀장 결정](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5861430583)에 따라 명세 밖 예외를 처리한다.
+
+- 코드 없는 403·409는 상태를 유지하고 `INTERNAL_ERROR`와 경고 로그를 남긴다. 업무 코드가 있는 거부는 `ApiError`를 사용한다.
+- 본문 크기 초과(413 예외 포함)는 `400 INVALID_REQUEST`, 안내는 `요청 본문이 너무 큽니다.`다.
+- 없는 경로는 `404 RESOURCE_UNAVAILABLE`이다. `/v1` 밖에서도 HTML 대신 같은 형식으로 응답한다.
+- 예상 밖 예외는 `500 INTERNAL_ERROR`와 일반 안내다. 5xx 로그는 `ApiError`를 포함해 예외 분류명과 코드 위치(`파일:줄:칸`)만 남긴다. 분류명은 `error.name` 원문이 아니라 `instanceof` 기반으로 고른 허용 목록의 고정 분류명(`ApiError`·`ForbiddenException`·`TypeError`·`Error` 등)이며, 목록 밖의 하위 클래스는 가장 가까운 상위 분류로 기록한다. 코드 위치는 stack 문자열이 아니라 V8의 구조화된 호출 위치에서 따로 수집하므로 원문 메시지가 섞이지 않으며, 함수 이름은 기록하지 않는다. 수집 기록이 없으면 위치를 생략한다(`src/common/errors/stack-frames.ts`). 요청 주소는 토큰이 들어가는 실제 경로 대신 등록된 경로 틀만 기록하고, 없으면 `[unmatched]`로 표시한다.
+
+전역 설정은 `configureApp`에 모았다. 기능 경로는 `/v1` 아래, `GET /health`는 접두사 없이 유지하며 성공·오류 응답에 `Cache-Control: no-store`를 붙인다. `npm test`는 실제 로컬 HTTP 서버에서 위 상태/본문/헤더/로그, ValidationPipe, 인증 Guard를 검증한다. 오류 재현 전용 경로는 `test/errors.test.cjs`에만 있고 제품 앱에 추가하지 않는다.
 
 ## 작업 시작
 
@@ -139,9 +175,9 @@ npm start
 
 작업 브랜치는 `api/auth-foundation`, 구현 시작 기준은 `origin/dev`의 `9b67570a0e220a81de2e33f8a8deabb3b8e5d34e`다. 앞의 초기화 기준은 #83의 과거 기록이며 이번 인증 작업 기준과 구분한다.
 
-기준은 [회원 인증 계약 M](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)과 [#87의 #104 경계 안내](https://github.com/JminAILab/CatchU/issues/87#issuecomment-5815415143)다. `Authorization: Bearer <CatchU Access JWT>`를 검증해 회원 ID를 요청 내부에 저장한다. 현재 토큰 없음·잘못된 서명·만료·필수 식별 값 누락은 일반 NestJS `UnauthorizedException`으로 401을 반환하며, [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88) 연결은 아직 반영하지 않았다.
+기준은 [회원 인증 계약 M](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)과 [#87의 #104 경계 안내](https://github.com/JminAILab/CatchU/issues/87#issuecomment-5815415143)다. `Authorization: Bearer <CatchU Access JWT>`를 검증해 회원 ID를 요청 내부에 저장한다. 현재 토큰 없음·잘못된 서명·만료·필수 식별 값 누락은 일반 NestJS `UnauthorizedException`을 던지며, #88 필터가 모두 `401 AUTH_REQUIRED` 형식으로 응답한다.
 
-#88 담당자가 공통 예외 이름과 사용 예시를 공유하면, 토큰 없음은 `AUTH_REQUIRED`, 변조·만료는 `AUTH_INVALID`로 연결하고 관련 테스트를 보완할 예정이다. `/v1` 전역 설정 연결에 따른 호출 주소·테스트·README 재현 안내도 그때 함께 확인한다. 아래 기존 자동 테스트 통과 기록은 현재 인증 구현에 대한 결과이며, #88 연결 후 통합 검증은 아직 수행하지 않았다.
+토큰 없음 `AUTH_REQUIRED`와 변조·만료 `AUTH_INVALID`의 구분은 #87 후속 작업이다. 개발 로그인의 추가 필드를 `VALIDATION_FAILED`로 구분하는 작업도 #87에 남는다. #88은 기존 인증 동작을 유지하며 공통 응답 형식과 `/v1` 경로 연결을 검사한다. 아래 날짜별 과거 검증 기록은 당시 상태를 나타낸다.
 
 기능 컨트롤러에는 Guard를 다시 붙일 필요가 없다. `@CurrentMemberId()`만 사용하며 JWT claim, 개발 로그인 플래그, 요청 body/query의 회원 ID에 의존하지 않는다. 이 인증 통과는 회원 행의 존재, GitHub 연동, 분석 동의, 자원 소유권을 보장하지 않는다. 각 후속 기능에서 해당 계약에 따른 검사가 필요하다.
 
@@ -159,7 +195,7 @@ export class ExamplePublicController {
 }
 ```
 
-개발 전용 `POST /auth/dev-login`은 JSON `{ "memberId": "검토용-회원-ID" }` 하나만 받아 `accessToken`, `tokenType: "Bearer"`, `expiresIn`(초)을 반환한다. 비어 있거나 공백인 ID·다른 타입·추가 필드는 400이다. 기본 비활성 및 `NODE_ENV=production`에서는 403이며 토큰을 발급하지 않는다. 설정 변경은 서버 재시작 후 반영된다. 공개 경로 표시가 있어도 이 개발 로그인 차단 조건을 먼저 검사한다.
+개발 전용 `POST /v1/auth/dev-login`은 JSON `{ "memberId": "검토용-회원-ID" }` 하나만 받아 `accessToken`, `tokenType: "Bearer"`, `expiresIn`(초)을 반환한다. 비어 있거나 공백인 ID·다른 타입·추가 필드는 현재 `400 INVALID_REQUEST`다. 기본 비활성 및 `NODE_ENV=production`에서는 `403 INTERNAL_ERROR`이며 토큰을 발급하지 않는다. 설정 변경은 서버 재시작 후 반영된다. 공개 경로 표시가 있어도 이 개발 로그인 차단 조건을 먼저 검사한다.
 
 현재 내부 토큰 구현은 HS256, 발급자 `catchu-api`, 대상 `catchu-member-api`, `sub` 회원 ID와 `iat`·`exp`를 서명·검증한다. 서명 알고리즘을 제한하고 비어 있는/공백 회원 ID, 누락된 만료·발급 시각, 잘못된 대상·발급자도 거부한다. 이는 #87 개발 기반의 내부 형식이며 기능 코드의 의존 대상이나 실제 OAuth 발급 계약이 아니다. 토큰 원문과 검증 라이브러리의 상세 오류는 로그·오류 응답에 포함하지 않는다.
 
@@ -190,17 +226,17 @@ export class AuthCheckController {
 ```powershell
 # 토큰 없이 보호 경로: HTTP 401 확인
 try {
-  Invoke-RestMethod -Uri http://127.0.0.1:3001/auth-check
+  Invoke-RestMethod -Uri http://127.0.0.1:3001/v1/auth-check
 } catch {
   Write-Output ('HTTP ' + [int]$_.Exception.Response.StatusCode)
 }
 
 # 개발 로그인 응답 전체를 출력하지 않는다.
-$authReply = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:3001/auth/dev-login `
+$authReply = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:3001/v1/auth/dev-login `
   -ContentType 'application/json' -Body '{"memberId":"review-member-87"}'
 $authHeaders = @{ Authorization = 'Bearer ' + $authReply.accessToken }
 try {
-  Invoke-RestMethod -Uri http://127.0.0.1:3001/auth-check -Headers $authHeaders
+  Invoke-RestMethod -Uri http://127.0.0.1:3001/v1/auth-check -Headers $authHeaders
 } finally {
   Remove-Variable authReply, authHeaders -ErrorAction SilentlyContinue
 }
