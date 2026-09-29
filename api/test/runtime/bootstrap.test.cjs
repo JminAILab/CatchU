@@ -93,7 +93,7 @@ for (const source of [false, true]) {
   test(`${source ? '개발 소스' : '빌드'} main: env 파일의 인증 설정으로 기동·발급·종료`, { timeout: 15000 }, async (t) => {
     const server = await launch(t, { source });
     await server.ready();
-    const response = await server.request('/auth/dev-login', {
+    const response = await server.request('/v1/auth/dev-login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ memberId: 'bootstrap-member' }),
     });
@@ -109,7 +109,7 @@ for (const source of [false, true]) {
 test('main: 터미널 production 설정이 env 파일보다 우선하여 개발 로그인을 거부한다', { timeout: 15000 }, async (t) => {
   const server = await launch(t, { environment: { NODE_ENV: 'production' } });
   await server.ready();
-  const response = await server.request('/auth/dev-login', {
+  const response = await server.request('/v1/auth/dev-login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ memberId: 'bootstrap-member' }),
   });

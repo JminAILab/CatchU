@@ -7,7 +7,8 @@ const { NestFactory } = require('@nestjs/core');
 const { SignJWT } = require('jose');
 const { DevAnalysisInjection, readDevInjectionConfig } = require('../../dist/analysis-receiver/dev-analysis-injection');
 const { AnalysisReceiverModule } = require('../../dist/analysis-receiver/analysis-receiver.module');
-const { AuthModule } = require('../../dist/auth/auth.module');
+const { AppModule } = require('../../dist/app.module');
+const { configureApp } = require('../../dist/app.setup');
 const { CurrentMemberId } = require('../../dist/auth/auth.decorators');
 const { CONTRACT_DIR, context, harness, result, event } = require('../helpers/receiver-harness.cjs');
 
@@ -105,7 +106,7 @@ async function server(t, overrides) {
   const logger = Object.fromEntries(['log', 'error', 'warn', 'debug', 'verbose', 'fatal'].map((level) =>
     [level, (...args) => logs.push(JSON.stringify(args))]));
   class TestModule {}
-  Module({ imports: [AuthModule, AnalysisReceiverModule.register({ store: setup.store, contractDirectory: CONTRACT_DIR })],
+  Module({ imports: [AppModule, AnalysisReceiverModule.register({ store: setup.store, contractDirectory: CONTRACT_DIR })],
     controllers: [InjectionProbeController] })(TestModule);
   let app;
   t.after(async () => {
@@ -116,7 +117,7 @@ async function server(t, overrides) {
       }
     }
   });
-  app = await NestFactory.create(TestModule, { logger, abortOnError: false });
+  app = await configureApp(await NestFactory.create(TestModule, { logger, abortOnError: false }));
   await app.listen(0, '127.0.0.1');
   const url = await app.getUrl();
   const post = (path, body, token) => fetch(`${url}${path}`, { method: 'POST',
@@ -131,10 +132,10 @@ async function server(t, overrides) {
 test('#87 Guard/CurrentMemberId와 연결한 테스트 전용 주입: 인증 없음/타인 차단, 본인 정상', async (t) => {
   const app = await server(t);
   const body = { kind: 'Result', template: template(), caseId: 'case', memberId: 'other-member' };
-  const path = '/__test/analysis/test-request/message';
+  const path = '/v1/__test/analysis/test-request/message';
   assert.equal((await app.post(path, body)).status, 401);
-  const own = await (await app.post('/auth/dev-login', { memberId: 'test-member' })).json();
-  const other = await (await app.post('/auth/dev-login', { memberId: 'other-member' })).json();
+  const own = await (await app.post('/v1/auth/dev-login', { memberId: 'test-member' })).json();
+  const other = await (await app.post('/v1/auth/dev-login', { memberId: 'other-member' })).json();
   assert.equal((await app.post(path, { ...body, memberId: 'test-member' }, other.accessToken)).status, 404);
   const accepted = await (await app.post(path, body, own.accessToken)).json();
   assert.equal(accepted.receipt.disposition, 'ACCEPTED');
@@ -148,14 +149,14 @@ test('#87 Guard/CurrentMemberId와 연결한 테스트 전용 주입: 인증 없
 
 test('Nest 조립 시 주입 설정 없음이면 인증해도 거부한다', async (t) => {
   const app = await server(t, { DEV_ANALYSIS_INJECTION_ENABLED: undefined });
-  const own = await (await app.post('/auth/dev-login', { memberId: 'test-member' })).json();
-  assert.equal((await app.post('/__test/analysis/test-request/message',
+  const own = await (await app.post('/v1/auth/dev-login', { memberId: 'test-member' })).json();
+  assert.equal((await app.post('/v1/__test/analysis/test-request/message',
     { kind: 'Result', template: template(), caseId: 'case' }, own.accessToken)).status, 403);
 });
 
 test('Nest 조립 시 production + 주입 설정 true라도 인증된 주입을 거부한다', async (t) => {
   const app = await server(t, { NODE_ENV: 'production' });
-  assert.equal((await app.post('/__test/analysis/test-request/message',
+  assert.equal((await app.post('/v1/__test/analysis/test-request/message',
     { kind: 'Result', template: template(), caseId: 'case' }, await app.issueTestToken())).status, 403);
   assert.equal(app.store.commits, 0);
 });
