@@ -19,6 +19,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
   let origin;
   let tokens;
   let registerCandidates;
+  let publicCatches;
   const issuedTokens = new Map();
   const envKeys = ['AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV'];
   let previousEnv;
@@ -59,6 +60,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
     await app.listen(0, '127.0.0.1');
     origin = await app.getUrl();
     tokens = app.get(AccessTokenService);
+    publicCatches = app.get(require('../../dist/catches/public-catch-store').PublicCatchStore);
   });
 
   after(async () => {
@@ -167,6 +169,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
   const detailPath = (catchId) => '/v1/catches/' + catchId;
   const confirmPath = (catchId) => detailPath(catchId) + '/confirmation';
   const mismatchPath = (catchId) => detailPath(catchId) + '/mismatch';
+  const visibilityPath = (catchId) => detailPath(catchId) + '/visibility';
   const ids = (items) => items.map((item) => item.catchId).sort();
 
   test('개발 로그인 HTTP 토큰의 실제 회원 UUID로 본인 조회·확인하고 타인 접근을 거부한다', async () => {
@@ -307,6 +310,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
       ['/v1/catches', {}], [detailPath(own.catchId), {}],
       [confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }],
       [mismatchPath(own.catchId), { method: 'PUT', body: { mismatch: true } }],
+      [visibilityPath(own.catchId), { method: 'PUT', body: { visibility: 'PUBLIC' } }],
     ]) failure(await request(undefined, path, options), 401, 'AUTH_REQUIRED');
     failure(await request(own.ownerId, '/catches'), 404, 'RESOURCE_UNAVAILABLE');
   });
@@ -321,6 +325,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
         [detailPath(catchId), {}],
         [confirmPath(catchId), { method: 'PUT', body: CONFIRMED }],
         [mismatchPath(catchId), { method: 'PUT', body: { mismatch: true } }],
+        [visibilityPath(catchId), { method: 'PUT', body: { visibility: 'PUBLIC' } }],
       ]) {
         const error = failure(await request(own.ownerId, path, options), 404, 'RESOURCE_UNAVAILABLE');
         if (expected) assert.deepEqual(error, expected);
@@ -506,6 +511,206 @@ describe('본인 Catch HTTP·PostgreSQL', {
     ]) {
       failure(await request(own.ownerId, path, { method: 'PUT', body }), 500, 'INTERNAL_ERROR');
       assert.deepEqual(await snapshot(), beforeState);
+    }
+  });
+
+  async function changeVisibility(own, visibility) {
+    return request(own.ownerId, visibilityPath(own.catchId), { method: 'PUT', body: { visibility } });
+  }
+
+  async function publish(own) {
+    success(await request(own.ownerId, confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }));
+    return success(await changeVisibility(own, 'PUBLIC'));
+  }
+
+  test('공개 PUT은 PUBLIC/PRIVATE만 받고 추가 필드·쿼리·잘못된 본문을 거절한다', async () => {
+    const own = await seed();
+    const beforeState = await snapshot();
+    for (const body of [{}, null, [], { visibility: true }, { visibility: 'public' },
+      { visibility: 'HIDDEN' }, { visibility: null }, { visibility: 'PUBLIC', ownerId: own.ownerId },
+      { visibility: 'PUBLIC', workFactsConfirmed: true }]) {
+      failure(await request(own.ownerId, visibilityPath(own.catchId), { method: 'PUT', body }), 400, 'INVALID_REQUEST');
+    }
+    failure(await request(own.ownerId, visibilityPath(own.catchId) + '?ownerId=' + own.ownerId,
+      { method: 'PUT', body: { visibility: 'PUBLIC' } }), 400, 'INVALID_REQUEST');
+    failure(await request(own.ownerId, visibilityPath(own.catchId),
+      { method: 'PUT', rawBody: '{"visibility":' }), 400, 'INVALID_REQUEST');
+    assert.deepEqual(await snapshot(), beforeState);
+  });
+
+  test('두 확인 항목을 모두 저장하기 전에는 409이며 PRIVATE을 유지한다', async () => {
+    const own = await seed();
+    for (const flags of [[false, false], [true, false], [false, true]]) {
+      await db.query('UPDATE catch_asset SET work_facts_confirmed = $2, contribution_confirmed = $3 WHERE catch_id = $1',
+        [own.catchId, ...flags]);
+      const beforeState = await snapshot();
+      failure(await changeVisibility(own, 'PUBLIC'), 409, 'CONFIRMATION_REQUIRED');
+      assert.deepEqual(await snapshot(), beforeState);
+    }
+  });
+
+  test('생성·확인 후에는 비공개, 별도 공개 후 노출, 숨긴 뒤 다음 공개 조회에서 제외된다', async () => {
+    const own = await seed();
+    const empty = { catches: [], page: { nextCursor: null } };
+    assert.deepEqual(await publicCatches.list(own.ownerId, {}), empty);
+    success(await request(own.ownerId, confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }));
+    assert.deepEqual(await publicCatches.list(own.ownerId, {}), empty);
+    const beforeState = await snapshot();
+    const published = success(await changeVisibility(own, 'PUBLIC'));
+    assert.equal(published.visibility, 'PUBLIC');
+    const expected = { ...beforeState, assets: [{ ...beforeState.assets[0], visibility: 'PUBLIC' }] };
+    assert.deepEqual(await snapshot(), expected);
+    assert.deepEqual(success(await changeVisibility(own, 'PUBLIC')), published);
+    assert.deepEqual(await snapshot(), expected);
+    assert.deepEqual(ids((await publicCatches.list(own.ownerId, {})).catches), [own.catchId]);
+    assert.equal((await publicCatches.get(own.ownerId, own.catchId)).catchId, own.catchId);
+    const hidden = success(await changeVisibility(own, 'PRIVATE'));
+    assert.equal(hidden.visibility, 'PRIVATE');
+    assert.deepEqual(await publicCatches.list(own.ownerId, {}), empty);
+    await assert.rejects(publicCatches.get(own.ownerId, own.catchId), { status: 404 });
+    assert.deepEqual(success(await changeVisibility(own, 'PRIVATE')), hidden);
+    assert.deepEqual(await snapshot(), beforeState);
+  });
+
+  test('불일치 표시와 초안·질문 생성 실패는 독립적이며 공개 필드만 전달한다', async () => {
+    for (const status of ['GENERATED', 'FAILED', 'NOT_GENERATED']) {
+      const source = candidate();
+      source.draft = { status, content: status === 'GENERATED' ? '[합성] 공개 초안' : null };
+      source.reflection = { status: 'FAILED', questions: [] };
+      const own = await seed({ source });
+      success(await request(own.ownerId, mismatchPath(own.catchId), { method: 'PUT', body: { mismatch: true } }));
+      await publish(own);
+      const result = await publicCatches.get(own.ownerId, own.catchId);
+      assert.deepEqual(result, {
+        catchId: own.catchId, title: source.title, workFacts: source.workFacts,
+        subjectContribution: source.subjectContribution,
+        evidence: source.evidence.map(({ sourceUrl, sourceRevision, representedFacts, contributionScope, coverageLimits }) =>
+          ({ sourceUrl, sourceRevision, representedFacts, contributionScope, coverageLimits })),
+        draft: source.draft,
+      });
+      assert.deepEqual((await publicCatches.list(own.ownerId, {})).catches, [result]);
+      assert.equal((await asset(own.catchId)).mismatch, true);
+    }
+  });
+
+  test('현재 원본 보호가 제한되면 공개는 409, 수신자는 제외, 본인 조회·숨김은 가능하다', async () => {
+    const own = await seed();
+    await publish(own);
+    await db.query("UPDATE repository_protection SET applied_restriction = 'SOURCE_PRIVATE' WHERE owner_id = $1", [own.ownerId]);
+    const beforeState = await snapshot();
+    failure(await changeVisibility(own, 'PUBLIC'), 409, 'SOURCE_RESTRICTED');
+    assert.deepEqual(await snapshot(), beforeState);
+    assert.deepEqual(await publicCatches.list(own.ownerId, {}), { catches: [], page: { nextCursor: null } });
+    await assert.rejects(publicCatches.get(own.ownerId, own.catchId), { status: 404 });
+    assert.equal(success(await request(own.ownerId, detailPath(own.catchId))).restriction, 'SOURCE_PRIVATE');
+    assert.equal(success(await changeVisibility(own, 'PRIVATE')).visibility, 'PRIVATE');
+    // 확인되지 않은 자료에도 숨김은 허용한다.
+    await db.query('UPDATE catch_asset SET work_facts_confirmed = false, contribution_confirmed = false WHERE catch_id = $1', [own.catchId]);
+    assert.equal(success(await changeVisibility(own, 'PRIVATE')).visibility, 'PRIVATE');
+  });
+
+  test('수신자 상세에서 숨김·타인·없는·원본 제한 Catch는 동일한 404이다', async () => {
+    const own = await seed();
+    const foreign = await seed();
+    await publish(foreign);
+    for (const catchId of [own.catchId, foreign.catchId, randomUUID(), 'not-a-uuid']) {
+      await assert.rejects(publicCatches.get(own.ownerId, catchId), { status: 404, message: 'Not Found' });
+    }
+    await publish(own);
+    await db.query("UPDATE repository_protection SET applied_restriction = 'SOURCE_PRIVATE' WHERE owner_id = $1", [own.ownerId]);
+    await assert.rejects(publicCatches.get(own.ownerId, own.catchId), { status: 404, message: 'Not Found' });
+    assert.deepEqual(await publicCatches.list(own.ownerId, {}), { catches: [], page: { nextCursor: null } });
+  });
+
+  test('수신자 페이지는 현재 허용 집합을 조회하고 숨김·보호 변경을 다음 페이지에도 적용한다', async () => {
+    const own = await seed({ count: 5 });
+    for (const catchId of own.catchIds) await publish({ ...own, catchId });
+    const sorted = own.catchIds.sort();
+    const first = await publicCatches.list(own.ownerId, { limit: '1' });
+    assert.deepEqual(ids(first.catches), [sorted[0]]);
+    await changeVisibility({ ...own, catchId: sorted[1] }, 'PRIVATE');
+    const rest = await publicCatches.list(own.ownerId, { limit: '100', cursor: first.page.nextCursor });
+    assert.deepEqual(ids(rest.catches), sorted.slice(2));
+    assert.equal(rest.page.nextCursor, null);
+    await db.query("UPDATE repository_protection SET applied_restriction = 'SOURCE_PRIVATE' WHERE owner_id = $1", [own.ownerId]);
+    assert.deepEqual(await publicCatches.list(own.ownerId, { cursor: first.page.nextCursor }),
+      { catches: [], page: { nextCursor: null } });
+  });
+
+  test('수신자 커서는 본인용·다른 소유자와 섞이지 않고 잘못된 필터를 거절한다', async () => {
+    const own = await seed({ count: 2 });
+    for (const catchId of own.catchIds) await publish({ ...own, catchId });
+    const foreign = await seed();
+    const first = await publicCatches.list(own.ownerId, { limit: '1' });
+    const owner = success(await request(own.ownerId, queryPath({ limit: '1' })));
+    for (const input of [{ cursor: owner.page.nextCursor }, { limit: '101' }, { limit: 20 }, { limit: ['1','2'] },
+      { cursor: 'invalid' }, { repositoryId: own.repositoryId }, { ownerId: foreign.ownerId }, null, []]) {
+      await assert.rejects(publicCatches.list(own.ownerId, input), { status: 400 });
+    }
+    await assert.rejects(publicCatches.list(foreign.ownerId, { cursor: first.page.nextCursor }), { status: 400 });
+    failure(await request(own.ownerId, queryPath({ cursor: first.page.nextCursor })), 400, 'INVALID_REQUEST');
+  });
+
+  test('보호 행 누락·DB 오류·응답 무결성 오류를 공개 가능이나 빈 결과로 보정하지 않는다', async () => {
+    const own = await seed();
+    await publish(own);
+    await db.query('DELETE FROM repository_protection WHERE owner_id = $1', [own.ownerId]);
+    const beforeState = await snapshot();
+    failure(await changeVisibility(own, 'PUBLIC'), 500, 'INTERNAL_ERROR');
+    await assert.rejects(publicCatches.list(own.ownerId, {}), { name: 'CatchReadIntegrityError' });
+    await assert.rejects(publicCatches.get(own.ownerId, own.catchId), { name: 'CatchReadIntegrityError' });
+    assert.deepEqual(await snapshot(), beforeState);
+    await db.query('ALTER TABLE catch_asset RENAME TO public_test_unavailable_asset');
+    try {
+      await assert.rejects(publicCatches.list(own.ownerId, {}), { name: 'QueryFailedError' });
+      await assert.rejects(publicCatches.get(own.ownerId, own.catchId), { name: 'QueryFailedError' });
+    } finally { await db.query('ALTER TABLE public_test_unavailable_asset RENAME TO catch_asset'); }
+  });
+
+  test('공개 저장·응답 매핑에 실패하면 PUBLIC 변경을 롤백한다', async () => {
+    const own = await seed();
+    success(await request(own.ownerId, confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }));
+    const beforeState = await snapshot();
+    await db.query("ALTER TABLE catch_asset ADD CONSTRAINT public_test_reject_public CHECK (visibility = 'PRIVATE')");
+    try {
+      failure(await changeVisibility(own, 'PUBLIC'), 500, 'INTERNAL_ERROR');
+      assert.deepEqual(await snapshot(), beforeState);
+    } finally { await db.query('ALTER TABLE catch_asset DROP CONSTRAINT public_test_reject_public'); }
+    await db.query('UPDATE catch_evidence SET source_url = $1 WHERE catch_id = $2', ['invalid-uri', own.catchId]);
+    const invalidState = await snapshot();
+    failure(await changeVisibility(own, 'PUBLIC'), 500, 'INTERNAL_ERROR');
+    assert.deepEqual(await snapshot(), invalidState);
+  });
+
+  async function waitForBlockedQuery(pattern) {
+    const deadline = Date.now() + 3000;
+    while (Date.now() < deadline) {
+      const rows = await db.query(`SELECT 1 FROM pg_stat_activity WHERE datname = current_database()
+        AND pid <> pg_backend_pid() AND state = 'active' AND wait_event_type = 'Lock' AND query LIKE $1`, [pattern]);
+      if (rows.length > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.fail('검사 대상 쿼리가 DB 잠금에서 대기하지 않았습니다.');
+  }
+
+  test('보호 변경이 먼저 잠그면 공개 요청은 대기 후 최신 제한을 읽고 409로 거절한다', async () => {
+    const own = await seed();
+    success(await request(own.ownerId, confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }));
+    const writer = db.createQueryRunner();
+    await writer.connect();
+    await writer.startTransaction();
+    let pending;
+    try {
+      await writer.query("UPDATE repository_protection SET applied_restriction = 'SOURCE_PRIVATE' WHERE owner_id = $1", [own.ownerId]);
+      pending = changeVisibility(own, 'PUBLIC');
+      await waitForBlockedQuery('%repository_protection%FOR SHARE%');
+      await writer.commitTransaction();
+      failure(await pending, 409, 'SOURCE_RESTRICTED');
+      assert.equal((await asset(own.catchId)).visibility, 'PRIVATE');
+    } finally {
+      if (writer.isTransactionActive) await writer.rollbackTransaction();
+      if (pending) await pending;
+      await writer.release();
     }
   });
 });

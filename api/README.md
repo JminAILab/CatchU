@@ -225,6 +225,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 [Catch 등록 안내](docs/catch-registration-proposal.md)에서 저장 규칙, E 연결 조건, DB 적용·검사 방법을 확인한다.
 
+### B Catch 공개·숨김 — #165
+
+[`PUT /v1/catches/{catchId}/visibility`](src/catches/owner-catches.controller.ts)는 본인 확인·현재 보호 조건을 검사해 공개하거나 숨긴다. C는 `CatchesModule`이 내보내는 `PublicCatchStore`를 사용해 현재 공개 자료만 조회한다. 호출 책임, 입력·반환 형태, 오류와 검증 범위는 [공개·숨김 연결 안내](docs/catch-visibility.md)를 따른다.
+
 ## 인증 기반 사용과 후속 경계 — #87
 
 [api 코딩 규약](CONVENTIONS.md#인증-기반-사용과-후속-경계--87)에 있다.
