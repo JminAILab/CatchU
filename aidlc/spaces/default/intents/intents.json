@@ -12,5 +12,12 @@
     "dirName": "260914-catchu-october-mvp",
     "scope": "feature",
     "status": "complete"
+  },
+  {
+    "uuid": "01a0d734-bd22-7c19-89ad-e507aa0d9c26",
+    "slug": "intent-12",
+    "dirName": "260925-intent-12",
+    "scope": "feature",
+    "status": "in-flight"
   }
 ]
