@@ -88,12 +88,14 @@ async function createCatchDbFixture(config) {
     await control.query(`CREATE SCHEMA "${schema}"`);
     created = true;
     const { CreateCatchAssets1790600000000 } = require('../../dist/database/migrations/1790600000000-CreateCatchAssets');
+    const { CreateRepositoryProtection1790601000000 } = require('../../dist/database/migrations/1790601000000-CreateRepositoryProtection');
     const { CatchAssetEntity } = require('../../dist/catches/entities/catch-asset.entity');
     const { CatchEvidenceEntity } = require('../../dist/catches/entities/catch-evidence.entity');
     const { CandidateRegistrationEntity } = require('../../dist/catches/entities/candidate-registration.entity');
+    const { RepositoryProtectionEntity } = require('../../dist/catches/entities/repository-protection.entity');
     dataSource = new DataSource({
-      ...config, schema, entities: [CatchAssetEntity, CatchEvidenceEntity, CandidateRegistrationEntity],
-      migrations: [CreateCatchAssets1790600000000],
+      ...config, schema, entities: [CatchAssetEntity, CatchEvidenceEntity, CandidateRegistrationEntity, RepositoryProtectionEntity],
+      migrations: [CreateCatchAssets1790600000000, CreateRepositoryProtection1790601000000],
       extra: { options: `-c TimeZone=UTC -c search_path=${schema}` },
     });
     await dataSource.initialize();
@@ -103,9 +105,9 @@ async function createCatchDbFixture(config) {
       dataSource, schema, close,
       async reset() {
         await dataSource.query(`TRUNCATE candidate_registration, catch_evidence, catch_asset,
-          result_application_record, analysis_attempt, analysis_request, member_account CASCADE`);
+          repository_protection, result_application_record, analysis_attempt, analysis_request, member_account CASCADE`);
       },
-      async receipt(overrides = {}) {
+      async receipt(overrides = {}, { repositoryId = 'synthetic-repository', protection = 'NONE' } = {}) {
         const input = {
           applicationRecordId: randomUUID(), requestId: randomUUID(), attemptId: randomUUID(),
           resultId: `synthetic-result-${randomUUID()}`, ownerId: randomUUID(),
@@ -114,12 +116,24 @@ async function createCatchDbFixture(config) {
         await dataSource.transaction(async (manager) => {
           await manager.query('INSERT INTO member_account(member_id) VALUES ($1) ON CONFLICT DO NOTHING', [input.ownerId]);
           await manager.query(`INSERT INTO analysis_request(request_id, member_id, repository_id, current_attempt_id)
-            VALUES ($1, $2, $3, $4)`, [input.requestId, input.ownerId, 'synthetic-repository', input.attemptId]);
+            VALUES ($1, $2, $3, $4)`, [input.requestId, input.ownerId, repositoryId, input.attemptId]);
           await manager.query(`INSERT INTO analysis_attempt(attempt_id, request_id, source_mode)
             VALUES ($1, $2, $3)`, [input.attemptId, input.requestId, input.sourceMode]);
           await manager.query(`INSERT INTO result_application_record
             (application_record_id, request_id, attempt_id, result_id, payload_fingerprint) VALUES ($1,$2,$3,$4,$5)`,
           [input.applicationRecordId, input.requestId, input.attemptId, input.resultId, 'synthetic-fingerprint']);
+          // 정상 시험을 위한 명시적인 합성 관측이다. 제품이 누락된 판단을 NONE으로 채우는 동작이 아니다.
+          // 보호 부재 시험은 protection: null로 이 준비 자체를 생략한다.
+          if (protection !== null) {
+            await manager.query(`INSERT INTO repository_protection
+              (protection_id, owner_id, repository_id, applied_restriction,
+               confirmed_source_state, observation_provenance, observed_at)
+              VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)
+              ON CONFLICT (owner_id, repository_id) DO NOTHING`,
+            [randomUUID(), input.ownerId, repositoryId, protection,
+              JSON.stringify({ synthetic: true, visibility: protection === 'SOURCE_PRIVATE' ? 'PRIVATE' : 'PUBLIC' }),
+              JSON.stringify({ fixture: 'catch-db-fixture', synthetic: true }), '2026-10-01T00:00:00Z']);
+          }
         });
         return input;
       },

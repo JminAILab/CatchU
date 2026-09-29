@@ -106,6 +106,41 @@ describe('Catch 등록 PostgreSQL', {
     assert.deepEqual(attempt, { application: 'PENDING', owner_results_ready: false }, 'B는 E 완료 상태를 쓰지 않는다');
   });
 
+  test('원 요청 저장소의 보호 판단이 없으면 이번 등록 전체를 롤백하고 준비됐다고 기록하지 않는다', async () => {
+    const input = await fixture.receipt({
+      candidates: [candidate(), candidate('synthetic-candidate-2', 'synthetic-work-2')],
+    }, { protection: null });
+    await assert.rejects(apply(input), contextError('CATCH_NOT_READY'));
+    await empty();
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM repository_protection'))[0].n, 0,
+      '서비스가 보호 판단을 임의로 만들어서는 안 된다');
+    assert.deepEqual((await db.query('SELECT application, owner_results_ready FROM analysis_attempt'))[0], {
+      application: 'PENDING', owner_results_ready: false,
+    });
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM result_application_record'))[0].n, 1);
+  });
+
+  test('SOURCE_PRIVATE 보호가 있어도 본인 열람 준비는 허용하며 보호 판단을 바꾸지 않는다', async () => {
+    const input = await fixture.receipt({}, { protection: 'SOURCE_PRIVATE' });
+    const protectionBefore = await db.query('SELECT * FROM repository_protection');
+    const first = await apply(input);
+    assert.equal(first[0].ownerViewReady, true);
+    assert.equal(first[0].disposition, 'CREATED');
+    assert.deepEqual(await apply(input), first);
+    assert.equal((await db.query('SELECT visibility FROM catch_asset'))[0].visibility, 'PRIVATE');
+    assert.deepEqual(await db.query('SELECT * FROM repository_protection'), protectionBefore);
+    assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 1 });
+  });
+
+  test('다른 소유자의 같은 저장소 보호 판단은 본인의 누락 판단을 대신하지 않는다', async () => {
+    const input = await fixture.receipt({}, { protection: null });
+    const other = await fixture.receipt();
+    assert.notEqual(other.ownerId, input.ownerId);
+    await assert.rejects(apply(input), contextError('CATCH_NOT_READY'));
+    await empty();
+    assert.deepEqual(await db.query('SELECT owner_id FROM repository_protection'), [{ owner_id: other.ownerId }]);
+  });
+
   test('생성 실패·미생성 상태는 등록 후에도 보존한다', async () => {
     const source = candidate();
     source.draft = { status: 'FAILED', content: null };
@@ -147,6 +182,35 @@ describe('Catch 등록 PostgreSQL', {
     const first = await apply(input);
     assert.deepEqual(await apply(input), first);
     assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 1 });
+  });
+
+  test('보호 판단이 없어진 뒤 재전달되면 과거 ready 값을 성공으로 다시 반환하지 않는다', async () => {
+    const input = await fixture.receipt();
+    await apply(input);
+    const beforeAssets = await db.query('SELECT * FROM catch_asset');
+    const beforeEvidence = await db.query('SELECT * FROM catch_evidence');
+    const beforeRegistrations = await db.query('SELECT * FROM candidate_registration');
+    await db.query('DELETE FROM repository_protection WHERE owner_id = $1', [input.ownerId]);
+    await assert.rejects(apply(input), contextError('CATCH_NOT_READY'));
+    assert.deepEqual(await db.query('SELECT * FROM catch_asset'), beforeAssets);
+    assert.deepEqual(await db.query('SELECT * FROM catch_evidence'), beforeEvidence);
+    assert.deepEqual(await db.query('SELECT * FROM candidate_registration'), beforeRegistrations);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM repository_protection'))[0].n, 0);
+  });
+
+  test('기존 Catch 참조는 새 요청 저장소가 아닌 원 요청 저장소의 보호 판단을 확인한다', async () => {
+    const original = await fixture.receipt();
+    const [created] = await apply(original);
+    await db.query('DELETE FROM repository_protection WHERE owner_id = $1', [original.ownerId]);
+    const next = await fixture.receipt({
+      ownerId: original.ownerId, candidates: [candidate('synthetic-next-candidate')],
+    }, { repositoryId: 'synthetic-other-repository', protection: 'NONE' });
+    await assert.rejects(apply(next), contextError('CATCH_NOT_READY'));
+    assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 1 });
+    assert.deepEqual(await db.query('SELECT catch_id, application_record_id FROM candidate_registration'), [{
+      catch_id: created.catchId, application_record_id: original.applicationRecordId,
+    }]);
+    assert.deepEqual(await db.query('SELECT repository_id FROM repository_protection'), [{ repository_id: 'synthetic-other-repository' }]);
   });
 
   test('유효한 대문자 UUID도 같은 맥락으로 등록·재호출하며 입력을 바꾸지 않는다', async () => {
@@ -332,8 +396,7 @@ describe('Catch 등록 PostgreSQL', {
       const input = await fixture.receipt({
         requestId: message.requestId, attemptId: message.attemptId, resultId: message.resultId,
         ownerId: message.memberId, sourceMode: message.sourceMode, candidates: message.candidates,
-      });
-      await db.query('UPDATE analysis_request SET repository_id = $1 WHERE request_id = $2', [message.repositoryId, input.requestId]);
+      }, { repositoryId: message.repositoryId, protection: 'NONE' });
       await db.query('UPDATE analysis_attempt SET processing = $1 WHERE attempt_id = $2', [message.outcome, input.attemptId]);
 
       const first = await apply(input);
@@ -373,7 +436,10 @@ describe('Catch 등록 PostgreSQL', {
     await apply(input);
     await db.undoLastMigration();
     try {
-      for (const table of ['catch_asset', 'catch_evidence', 'candidate_registration']) {
+      assert.equal((await db.query('SELECT to_regclass($1)::text AS relation', [`${fixture.schema}.repository_protection`]))[0].relation, null);
+      assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 1 }, '보호 마이그레이션의 down은 등록 자료를 지우지 않는다');
+      await db.undoLastMigration();
+      for (const table of ['catch_asset', 'catch_evidence', 'candidate_registration', 'repository_protection']) {
         assert.equal((await db.query('SELECT to_regclass($1)::text AS relation', [`${fixture.schema}.${table}`]))[0].relation, null);
       }
       for (const table of ['member_account', 'analysis_request', 'analysis_attempt', 'result_application_record']) {
@@ -383,5 +449,7 @@ describe('Catch 등록 PostgreSQL', {
       await db.runMigrations();
     }
     await empty();
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM repository_protection'))[0].n, 0,
+      '보호 마이그레이션 up은 기존 회원·요청에 NONE을 임의로 채우지 않는다');
   });
 });

@@ -55,8 +55,20 @@ function validateContext(input: CatchRegistrationInput): void {
 }
 
 async function assertReady(manager: EntityManager, asset: CatchAssetEntity): Promise<void> {
-  const owners: { member_id: string }[] = await manager.query('SELECT member_id FROM analysis_request WHERE request_id = $1', [asset.sourceRequestId]);
-  if (owners[0]?.member_id !== asset.ownerId) throw new CatchRegistrationContextError('CATCH_NOT_READY');
+  // 기존 Catch를 참조해도 새 요청이 아닌 원 요청 저장소의 보호 판단을 확인한다.
+  // 본인 열람은 NONE/SOURCE_PRIVATE 모두 허용하며 판단 부재를 NONE으로 채우지 않는다.
+  const readiness: { member_id: string; applied_restriction: string }[] = await manager.query(`
+    SELECT request.member_id, protection.applied_restriction
+      FROM analysis_request request
+      JOIN repository_protection protection
+        ON protection.owner_id = request.member_id AND protection.repository_id = request.repository_id
+     WHERE request.request_id = $1
+       FOR SHARE OF protection
+  `, [asset.sourceRequestId]);
+  if (readiness.length !== 1 || readiness[0].member_id !== asset.ownerId
+    || !['NONE', 'SOURCE_PRIVATE'].includes(readiness[0].applied_restriction)) {
+    throw new CatchRegistrationContextError('CATCH_NOT_READY');
+  }
   const evidenceCount = await manager.getRepository(CatchEvidenceEntity).countBy({ catchId: asset.catchId });
   if (evidenceCount === 0) throw new CatchRegistrationContextError('CATCH_NOT_READY');
 }
