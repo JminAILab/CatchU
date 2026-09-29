@@ -65,11 +65,24 @@ export function createCatchApi(transport: MemberTransport) {
           && v.items.every((item) => !repositoryId || item.repositoryId === repositoryId)
           && record(v.page) && (v.page.nextCursor === null || nonempty(v.page.nextCursor)));
     },
+    update(catchId: string, change: CatchChange) {
+      const body = change.kind === "confirmation" ? { workFactsConfirmed: true, contributionConfirmed: true }
+        : change.kind === "mismatch" ? { mismatch: change.mismatch } : { visibility: change.visibility };
+      return request(`/catches/${encodeURIComponent(catchId)}/${change.kind}`, { method: "PUT", cache: "no-store", body },
+        (v): v is CatchAsset => isCatch(v) && v.catchId === catchId
+          && (change.kind === "confirmation" ? v.confirmation.workFactsConfirmed && v.confirmation.contributionConfirmed
+            : change.kind === "mismatch" ? v.mismatch === change.mismatch : v.visibility === change.visibility));
+    },
     detail(catchId: string, signal?: AbortSignal) {
       return request(`/catches/${encodeURIComponent(catchId)}`, { method: "GET", cache: "no-store", signal },
         (v): v is CatchAsset => isCatch(v) && v.catchId === catchId);
     },
   };
 }
+export type CatchChange =
+  | { kind: "confirmation" }
+  | { kind: "mismatch"; mismatch: boolean }
+  | { kind: "visibility"; visibility: "PRIVATE" | "PUBLIC" };
+
 export type CatchApi = ReturnType<typeof createCatchApi>;
 

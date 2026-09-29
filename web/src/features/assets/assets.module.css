@@ -88,3 +88,11 @@
 
 .pagination { margin-top: 24px; text-align: center; }
 .preview button:disabled { opacity: 0.6; cursor: wait; }
+
+.actions { margin-top: 28px; border-top: 1px solid var(--line); }
+.actionSection { margin-top: 24px; }
+.actionSection label { display: block; margin: 10px 0; font-size: 14px; }
+.actionSection button { margin: 8px 0; }
+.actionSection input { margin-right: 8px; }
+.actionError { padding: 16px; background: #fff1dc; margin-top: 20px; }
+.dialog button:disabled { opacity: .55; cursor: not-allowed; }

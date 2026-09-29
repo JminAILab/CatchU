@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { AssetsView, assetTabs, type AssetTab } from "./assets-view";
+import { CatchActions } from "./catch-actions";
 import { createAssetsStore } from "./assets-store";
 import { catchErrorText, type CatchApi } from "./catch-api";
 import type { RepositoryOption } from "./types";
@@ -69,6 +70,10 @@ export function AssetsConnected({ api, repositories, repositoryManagement }: Pro
         detailState={detailMatches ? snapshot.detailState : "loading"}
         detailMessage={catchErrorText(snapshot.detailError)}
         detailItem={detailMatches ? snapshot.detail : undefined}
+        detailActions={detailMatches && snapshot.detail ? <CatchActions key={snapshot.detail.catchId}
+          item={snapshot.detail} mutation={snapshot.mutation}
+          onChange={(change) => { void store.update(change); }}
+          onReload={() => { if (catchId) void store.openDetail(catchId, true); }} /> : null}
         selectedId={visibleCatchId}
         hasMore={listMatches && snapshot.nextCursor !== null} moreState={snapshot.moreState}
         onLoadMore={() => { void store.loadMore(); }}

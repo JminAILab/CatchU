@@ -83,8 +83,37 @@ try {
   assert.equal(store.getSnapshot().detail, undefined);
   const unauth = createCatchApi(async (url) => readApiResponse(fetch(origin + "/v1" + url)));
   assert.equal((await unauth.detail(own[0].catchId)).code, "AUTH_REQUIRED");
+  await store.refresh("synthetic-repo-a");
+  await store.openDetail(own[0].catchId);
+  const publicStore = app.get(require(path.join(apiRoot, "dist/catches/public-catch-store")).PublicCatchStore);
+  assert.equal((await publicStore.list(owner, {})).catches.length, 0);
+  await store.update({ kind: "confirmation" });
+  assert.equal(store.getSnapshot().detail.confirmation.workFactsConfirmed, true);
+  assert.equal(store.getSnapshot().detail.visibility, "PRIVATE");
+  assert.equal((await publicStore.list(owner, {})).catches.length, 0);
+  await store.update({ kind: "visibility", visibility: "PUBLIC" });
+  assert.equal(store.getSnapshot().detail.visibility, "PUBLIC");
+  assert.equal((await publicStore.list(owner, {})).catches[0].catchId, own[0].catchId);
+  await store.update({ kind: "mismatch", mismatch: true });
+  assert.equal(store.getSnapshot().detail.mismatch, true);
+  assert.equal(store.getSnapshot().detail.visibility, "PUBLIC");
+  await store.update({ kind: "mismatch", mismatch: false });
+  assert.equal(store.getSnapshot().detail.mismatch, false);
+  await store.update({ kind: "visibility", visibility: "PRIVATE" });
+  assert.equal(store.getSnapshot().detail.visibility, "PRIVATE");
+  assert.equal((await publicStore.list(owner, {})).catches.length, 0);
+  // 화면의 마지막 조회 뒤 보호 상태가 변해도 API 거절을 성공으로 표시하지 않는다.
+  await db.query("UPDATE repository_protection SET applied_restriction = 'SOURCE_PRIVATE' WHERE owner_id = $1 AND repository_id = $2",
+    [owner, "synthetic-repo-a"]);
+  await store.update({ kind: "visibility", visibility: "PUBLIC" });
+  assert.equal(store.getSnapshot().mutation.error.code, "SOURCE_RESTRICTED");
+  assert.equal(store.getSnapshot().detail.visibility, "PRIVATE");
+  await store.openDetail(own[0].catchId, true);
+  assert.equal(store.getSnapshot().detail.restriction, "SOURCE_PRIVATE");
+  const foreignMutation = await api.update(foreign[0].catchId, { kind: "confirmation" });
+  assert.equal(foreignMutation.code, "RESOURCE_UNAVAILABLE");
   store.dispose();
-  console.log("통과: B web 호출 경계 → 실제 Nest HTTP·JWT·PostgreSQL 목록/필터/21건 페이지/0건/직접 상세/타인 거부/미인증 거부 (A/E·worker는 합성)");
+  console.log("통과: B web 호출 경계 → 실제 Nest HTTP·JWT·PostgreSQL 목록/필터/21건 페이지/0건/직접 상세/확인·별도 공개·불일치·숨김/C 공개 자료 제외/보호 거절/타인·미인증 거부 (A/E·worker는 합성)");
 } finally {
   try { if (app) await app.close(); } finally { if (fixture) await fixture.close(); }
 }
