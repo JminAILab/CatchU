@@ -33,6 +33,7 @@ from app.processing import (
     synthetic_request,
 )
 from app.processing.__main__ import main
+from app.processing.generation import GenerationStatus
 from app.processing.request_check import AcceptedContext, SourceMode
 
 
@@ -333,18 +334,56 @@ def test_not_generated_draft_is_null_and_not_a_failure() -> None:
     assert result["outcome"] == "SUCCEEDED"
 
 
-def test_draft_content_exists_only_when_generated() -> None:
-    failure = GenerationFailure("DRAFT_FAILED", "합성 실패")
+DRAFT_FAILURE = GenerationFailure("DRAFT_FAILED", "합성 실패")
+
+
+@pytest.mark.parametrize("content", [None, "", "   "])
+def test_generated_draft_needs_text(content: str | None) -> None:
     with pytest.raises(ValueError):
-        DraftOutcome("GENERATED")
+        DraftOutcome("GENERATED", content=content)
+
+
+@pytest.mark.parametrize("content", ["", "   ", "합성 본문"])
+@pytest.mark.parametrize("status", ["FAILED", "NOT_GENERATED"])
+def test_draft_without_generation_has_null_content(
+    status: GenerationStatus, content: str
+) -> None:
+    failure = DRAFT_FAILURE if status == "FAILED" else None
     with pytest.raises(ValueError):
-        DraftOutcome("GENERATED", content=" ")
-    with pytest.raises(ValueError):
-        DraftOutcome("NOT_GENERATED", content="합성 본문")
-    with pytest.raises(ValueError):
-        DraftOutcome("FAILED", content="합성 본문", failure=failure)
+        DraftOutcome(status, content=content, failure=failure)
+
+
+@pytest.mark.parametrize(
+    ("draft", "status", "content"),
+    [
+        (DraftOutcome("GENERATED", content="합성 본문"), "GENERATED", "합성 본문"),
+        (DraftOutcome("FAILED", failure=DRAFT_FAILURE), "FAILED", None),
+        (DraftOutcome("NOT_GENERATED"), "NOT_GENERATED", None),
+        (DraftOutcome.generated("합성 본문"), "GENERATED", "합성 본문"),
+        (DraftOutcome.failed("DRAFT_FAILED", "합성 실패"), "FAILED", None),
+        (DraftOutcome.not_generated(), "NOT_GENERATED", None),
+    ],
+)
+def test_valid_draft_outcomes_are_kept(
+    draft: DraftOutcome, status: str, content: str | None
+) -> None:
+    candidate = replace(BASE_CANDIDATE, draft=draft)
+
+    result = _result_of(GenerationOutput(candidates=(candidate,)))
+
+    assert result["candidates"][0]["draft"] == {"status": status, "content": content}
+
+
+def test_failure_detail_belongs_only_to_failed_draft() -> None:
     with pytest.raises(ValueError):
         DraftOutcome("FAILED")
+    with pytest.raises(ValueError):
+        DraftOutcome("NOT_GENERATED", failure=DRAFT_FAILURE)
+    with pytest.raises(ValueError):
+        DraftOutcome("GENERATED", content="합성 본문", failure=DRAFT_FAILURE)
+
+
+def test_questions_exist_only_when_generated() -> None:
     with pytest.raises(ValueError):
         ReflectionOutcome("NOT_GENERATED", questions=("합성 질문",))
 

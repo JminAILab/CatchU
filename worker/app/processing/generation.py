@@ -31,17 +31,18 @@ def _has_text(value: str | None) -> bool:
 
 @dataclass(frozen=True)
 class DraftOutcome:
-    """설명 초안의 생성 상태. 본문은 GENERATED일 때만 있다."""
+    """설명 초안의 생성 상태. 본문은 GENERATED일 때만 있고, 그 밖에는 None이다."""
 
     status: GenerationStatus
     content: str | None = None
     failure: GenerationFailure | None = None
 
     def __post_init__(self) -> None:
-        if (self.status == "GENERATED") != _has_text(self.content):
-            raise ValueError(
-                "초안 본문은 GENERATED일 때만 비어 있지 않은 문자열로 둔다"
-            )
+        if self.status == "GENERATED" and not _has_text(self.content):
+            raise ValueError("GENERATED 초안에는 비어 있지 않은 본문이 있어야 한다")
+        if self.status != "GENERATED" and self.content is not None:
+            # 빈 문자열·공백도 본문으로 전달되므로 None만 허용한다.
+            raise ValueError("FAILED·NOT_GENERATED 초안의 본문은 None이어야 한다")
         if (self.status == "FAILED") != (self.failure is not None):
             raise ValueError("실패 정보는 FAILED일 때만 둔다")
 
