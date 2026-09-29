@@ -2,7 +2,7 @@
 
 Next.js로 만드는 10월 MVP의 사용자 화면이다. 로그인·프로필·GitHub 연동, 홈·분석 상태, 본인 자산 확인·공개/숨김, 공유 링크·수신자 열람 흐름을 다룬다. 적용 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 담당 이슈의 완료 기준으로 확인한다.
 
-이 README는 [#82 web 최소 실행 골격](https://github.com/JminAILab/CatchU/issues/82) 기준이다. 기능 화면·API 연결·인증은 아직 없고, 각 기능 이슈에서 추가한다.
+이 README는 [#82 web 최소 실행 골격](https://github.com/JminAILab/CatchU/issues/82)과 [#106 공통 기반](https://github.com/JminAILab/CatchU/issues/106) PR①(레이아웃·헤더·주소·공통 표시) 기준이다. API 호출·토큰·회원 경로 가드는 #106 PR②, 각 화면은 기능 이슈에서 추가한다.
 
 ## 요구 환경
 
@@ -72,8 +72,15 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 
 | 경로 | 역할 |
 |---|---|
-| `src/app/layout.tsx` | 루트 레이아웃(`<html lang="ko">`, 기본 메타데이터) |
-| `src/app/page.tsx` | `/` 기본 화면. 골격 확인용 문구만 있음 |
+| `src/app/layout.tsx` | 루트 레이아웃(`<html lang="ko">`, 기본 메타데이터, `globals.css`) |
+| `src/app/globals.css` | 전역 기본값과 공통 색·폭 변수. 화면 스타일은 넣지 않는다 |
+| `src/app/(guest)/`, `(member)/`, `s/` | 화면 묶음별 레이아웃(헤더). 아래 「공통 레이아웃」 참조 |
+| `src/app/(guest)/page.tsx` | `/` 기본 화면. 서비스 소개는 #155에서 채운다 |
+| `src/app/preview/common/` | 헤더·상태 표시 개발용 미리보기(`npm run dev`에서만) |
+| `src/components/header/` | 로그인·비로그인·수신자 헤더와 프로필 메뉴 |
+| `src/components/notice-dialog/` | 채용공고·알림 안내창 |
+| `src/components/status/` | 불러오는 중·조회 실패·정상 0건 공통 표시 |
+| `src/lib/routes.ts` | 페이지 주소 상수. 아래 「페이지 주소」 표와 함께 고친다 |
 | `scripts/smoke.mjs` | 최소 실행 검사(`check:run`) |
 | `package.json` / `package-lock.json` | 의존성·스크립트·Node 버전 고정 |
 | `.node-version` | Node.js 버전(버전 관리 도구용) |
@@ -84,10 +91,53 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 
 ## 코드 추가 위치
 
-- 화면(라우트): `src/app/<경로>/page.tsx`. 예: 공유 링크 수신자 화면은 `src/app/s/[token]/page.tsx`처럼 이슈에서 정한 경로를 따른다.
+- 화면(라우트): 아래 「페이지 주소」의 주소를 쓰고, 헤더에 맞는 묶음 폴더 안에 둔다. 예: 내 자산은 `src/app/(member)/assets/page.tsx`, 수신자 링크는 `src/app/s/[token]/page.tsx`.
 - 여러 화면이 함께 쓰는 컴포넌트: `src/components/`.
 - API 호출·오류 응답 해석 등 화면과 분리되는 로직: `src/lib/`. `api-response.ts`가 [#88](https://github.com/JminAILab/CatchU/issues/88)의 응답 해석을 제공한다.
 - 디렉터리는 필요할 때 만들고, 담당 화면 밖의 공통 구조 변경은 이슈에서 먼저 조율한다.
+
+## 공통 레이아웃 (#106 PR①)
+
+헤더는 화면 묶음 폴더의 `layout.tsx`가 붙인다. 괄호 폴더는 주소에 나타나지 않는다. 화면 파일을 알맞은 묶음에 두면 헤더를 따로 넣지 않아도 된다. **폴더 배치는 인증 판정이 아니다.** `(member)`에 두어도 토큰 없는 접근을 막지 않으며, 토큰 확인 중·미인증 상태의 헤더와 보호 화면 노출은 PR②의 회원 경로 가드에서 처리한다.
+
+| 묶음 폴더 | 헤더 | 구성 (#55 10월 헤더 합의) |
+|---|---|---|
+| `src/app/(guest)/` | 비로그인 일반 | 왼쪽 로고(→ `/`) / 오른쪽 [Google로 시작하기](→ 로그인 진입). 내 자산·공유 링크·프로필은 없음 |
+| `src/app/(member)/` | 로그인 일반·발행자 | 왼쪽 로고(→ `/home`)·내 자산·공유 링크·채용공고 / 오른쪽 알림·프로필. 대표 구성 진입점은 10월에 없음 |
+| `src/app/s/` | 공유 링크 수신자 | 이동 없는 CatchU 브랜드만. 로그인 여부와 무관하며 로그인·프로필 버튼 없음 |
+
+- **채용공고·알림:** 흐리게 표시하되 누를 수 있다(`disabled`를 쓰지 않는다). 누르면 현재 화면 위 안내창에 '개발 중인 기능입니다'와 [확인]을 띄우고, [확인]은 안내창만 닫는다. 열리면 [확인]에 초점이 가고, Tab은 안내창 밖으로 나가지 않으며, 닫으면 누른 메뉴로 초점이 돌아간다. X·Esc·바깥 클릭 닫기는 #55 미결이라 두지 않았다.
+- **프로필:** 누르면 근처에 [프로필 보기](→ `/profile`)·[로그아웃] 메뉴가 열린다(#51). 로그아웃 요청·세션 처리는 PR②에서 `MemberHeader`의 `onLogout`으로 연결한다. 그전에는 [로그아웃]이 '연결 전' 표시와 함께 누를 수 없는 상태(`aria-disabled`)로 보인다.
+- **조회 상태:** `src/components/status/status.tsx`의 세 컴포넌트를 쓴다. 불러오는 중은 `LoadingState`, `readApiResponse`가 `lookup-failed`를 돌려주면 `LookupFailedState`, 성공 응답의 빈 목록일 때만 `EmptyState`다. 조회 실패를 0건으로, 요청 중을 성공으로 표시하지 않는다.
+- **스타일:** 컴포넌트 옆 CSS Modules(`*.module.css`)를 쓴다. 공통 색·폭은 `globals.css`의 `--color-*`·`--content-width` 변수를 쓴다. `globals.css`가 `body` 기본 여백을 없애므로 화면에서 여백을 되돌리는 음수 여백은 필요 없다.
+- **미리보기:** `npm run dev` 뒤 `http://localhost:3000/preview/common`에서 세 헤더와 상태 표시를 모의 상태로 확인한다. 로그인 헤더는 실제 화면 상태(로그아웃 연결 전)와 모의 로그아웃 연결을 나란히 보여 준다. 배포용 실행에서는 404다. `127.0.0.1` 주소로 열면 개발 서버가 화면 스크립트를 막아 버튼이 동작하지 않으므로 `localhost`로 연다.
+
+## 페이지 주소
+
+**정본은 이 표이며, `src/lib/routes.ts`와 함께 고친다.** 구분: **확정** 결정 문서에 있음 / **제안** 담당자 확인 전 안 / **미정** 담당자가 정함. `[token]`·`[catchId]`·`…`는 자리표시자다. 근거: [9/24 팀장 결정](../docs/ai-dlc-input-mvp/2026-09-14_followup.md), [web 기능 설계 「내 자산 화면 구조」](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md), #55 「10월 헤더 합의」, [#106 주소 표 초안](https://github.com/JminAILab/CatchU/issues/106#issuecomment-5865962875).
+
+| 주소 | 화면 | 담당 | 로그인 | 구분 | 비고 |
+|---|---|---|---|---|---|
+| `/` | 서비스 소개 | D | 불필요 | 제안 | 로그아웃 성공 후 비로그인 홈 이동은 확정(#55) |
+| `/login` | 로그인 진입 | A / 틀 D | 불필요 | 제안 | 회원 경로 가드의 이동 목적지(PR②) |
+| `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 Catch 탭 저장소 연결 관리로 이동(확정) |
+| `/profile/setup` | 최초 프로필 입력 (W02) | A | 필요 | 제안 | 저장 성공 후 `/home` |
+| `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지 |
+| `/profile/edit` | 프로필 수정 (W02) | A | 필요 | 제안 | 저장·취소 후 `/profile`로 복귀 |
+| `/profile/github` | GitHub 연동 (W02-G) | A | 필요 | 제안 | 성공 후 Catch 탭 저장소 연결 관리로 복귀(확정) |
+| `/assets` | 내 자산 (Catch 탭) | B / 연결 관리 D | 필요 | 제안 | Catch 탭을 기본으로 표시. 준비 중 탭의 주소(`tab`) 반영 여부는 미정 |
+| `/assets?repositoryId=…` | 저장소 필터 | B | 필요 | 제안 | PR #156의 B 제안. 값은 저장소 식별자 |
+| `/assets?catchId=…` | Catch 상세 모달 | B | 필요 | 제안 | PR #156 제안: 닫으면 `catchId`만 제거하고 필터 유지. 새로고침·뒤로 가기·재로그인 후 상태 유지는 확정 |
+| `/links` | 링크 목록·발급·복사·중단 | C | 필요 | 제안 | 발급은 이 페이지의 폼·모달로 처리 |
+| `/s/[token]` | 수신자 링크 | C | 불필요 | 제안 | 수신자 전용 헤더 |
+| `/s/[token]/catches/[catchId]` | 수신자 Catch 상세 | C | 불필요 | 제안 | 직접 진입해도 접근 판정·비밀번호 확인 후 표시 |
+
+**주소 원칙(제안, PR②에서 적용):**
+- 토큰 없이 회원 경로에 들어오거나 회원 API가 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 `/login`으로 보낸다. 수신자 비밀번호 401은 수신자 화면에서 처리한다.
+- `GET /v1/me` 성공 시 `profile.displayName`이 빈 문자열이면 `/profile/setup`으로 보낸다. 조회 중에는 판단을 미루고, 조회 실패는 다시 불러오기로 처리한다. 이미 `/profile/setup`이면 다시 보내지 않는다.
+- 복귀 주소는 `/login?next=<인코딩한 경로>`로 넘기고 서비스 안 회원 경로만 허용한다. 토큰·grant는 주소에 넣지 않는다.
+- 이름이 저장된 회원만 로그인 후 `next`로 복귀한다. 유효하지 않은 `next`는 `/home`으로 보내며, 최초 프로필 입력(`/profile/setup`)을 거친 경우에도 `/home`으로 이동한다.
+- 저장소 연결 관리는 별도 주소 없이 `/assets` 안 모달이다. 모달 열림의 주소 반영과 연동 복귀 때 자동 열기는 #153에서 정한다.
 
 ## 공통 응답 해석 (#88)
 
