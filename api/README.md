@@ -526,7 +526,7 @@ Codex가 Windows 환경에서 위 구현 시작 커밋을 기준으로 작성한
 
 ## #147 공유 링크 발급 구현 상태
 
-DB 없이 확정할 수 있는 규칙을 `src/share-links/`에 두었다. 각 파일은 `npm test`가 `test/` 아래 같은 이름의 검사로 함께 확인한다.
+발급 API 연결 전에 확정할 수 있는 규칙과 발급 판정을 `src/share-links/`에 두었다. 각 파일은 `npm test`가 `test/`(DB가 필요한 판정은 `test/db/`) 아래 같은 이름의 검사로 함께 확인한다.
 
 | 파일 | 내용 |
 |---|---|
@@ -534,11 +534,14 @@ DB 없이 확정할 수 있는 규칙을 `src/share-links/`에 두었다. 각 �
 | `link-password.ts` | 비밀번호 검증값(ERD `passwordProtectionReference`). Node 내장 `scrypt`(N=2^15, r=8, p=1), 16바이트 salt, 상수 시간 비교. 저장값에 매개변수를 함께 적어 강도를 올려도 기존 값을 검증한다. 비밀번호는 trim·대소문자·유니코드 정규화를 하지 않는다. 깨진 저장값은 `false`로 숨기지 않고 `PasswordVerifierFormatError`(서버 오류)로 알린다 |
 | `link-token.ts` | 256비트 난수 토큰(base64url 43자), 토큰 형식 확인, web 기준 주소 + `/s/<token>` 수신자 URL 조립. 기준 주소는 http·https만, 쿼리·조각·계정 정보는 거부 |
 | `share-create-fingerprint.ts` | 멱등 처리용 본문 지문(ERD `requestFingerprint`)과 같은 키 재요청 판정. 지문은 제목과 비밀번호 **설정 여부**만 담고 비밀번호 원문·해시를 담지 않는다. 같은 키로 다시 온 비밀번호는 저장된 검증값으로 비교한다. 기록과 링크의 비밀번호 설정 여부가 어긋나면 409가 아닌 서버 오류로 올린다 |
+| `share-link.entity.ts` | ShareLink 엔티티(ERD). 상태 칼럼 없이 `stoppedAt`·현재 시각으로 상태를 구한다. DB 제약: 제목 1자 이상, `expires_at = issued_at + 720시간`, 중단 시각 ≥ 발급 시각, 토큰 유일. **토큰 저장 방식은 미확정**이다. 현재는 목록·발급 응답의 `url`을 다시 만들기 위해 토큰 자체를 저장하는 제안안으로 구현했으며, 마이그레이션 생성 전에 확정한다(PR #162 「정해야 할 것」) |
+| `share-link-state.ts` | 상태 판정 ACTIVE·STOPPED·EXPIRED. 중단이 만료보다 우선하며, 만료 시각과 같은 순간은 만료다(#148 9/29 결정). 중단 API(#148)도 이 함수를 쓴다 |
+| `share-link-issuance.ts` | 발급 판정·저장 `issueShareLink(manager, command)`. 호출하는 쪽 트랜잭션의 manager만 쓴다. 같은 회원의 발급은 PostgreSQL 트랜잭션 advisory lock으로 커밋까지 직렬화하고 다른 회원은 막지 않는다. **발급 시각은 잠금을 얻은 뒤에 정한다**(시각은 `clock` 인자로 받고 기본은 서버 현재 시각). 잠금을 기다리는 동안 만료된 링크를 유효로 세지 않고, 만료도 실제 저장 시점부터 30일이 된다. 그 시각 기준 유효 링크만으로 판정하며 제목 중복(`LINK_TITLE_CONFLICT`)을 한도(`LINK_LIMIT_REACHED`, 5개)보다 먼저 돌려준다(#23 9/28 결정). 잠금 전에 찍힌 스냅샷으로 판정하지 않도록 READ COMMITTED가 아닌 트랜잭션·트랜잭션 밖 호출은 거부한다. 비밀번호 해시는 잠금 시간을 줄이려고 트랜잭션 밖에서 미리 계산한다 |
 
 비밀번호 원문·검증값은 API 응답에 포함하지 않는다. 링크 토큰은 계약상 공유 URL(발급·목록 응답의 `url`)에만 포함하며, 별도 필드·로그·오류 메시지에는 노출하지 않는다. 입력 검증 결과와 위 함수들의 반환값을 로그에 그대로 쓰지 않는다.
 
 **같은 키 재요청 처리 순서(발급 API 연결 시 필수):** `shareCreateFingerprint()`는 비밀번호가 달라도 같은 지문을 만든다(의도한 설계). 따라서 멱등 기록의 지문 일치만으로 기존 응답을 돌려주면 안 된다. 반드시 **기존 멱등 기록과 연결된 링크 조회 → `isSameShareCreate()` → 같으면 기존 응답(200), 다르면 409 `IDEMPOTENCY_CONFLICT`** 순서로 처리한다. 연결 뒤 같은 키·다른 비밀번호가 409인지 HTTP 테스트로 확인한다.
 
-HTTP 컨트롤러·ShareLink 엔티티와 마이그레이션·멱등 기록 저장에는 아직 연결하지 않았다. 회원·멱등 테이블은 [#104](https://github.com/JminAILab/CatchU/issues/104)에서 만들며, ShareLink가 회원을 참조하므로 마이그레이션은 #104 병합 뒤 생성한다. 수신자 URL의 web 기준 주소는 공유 URL 전용 설정 하나로 두고, 여러 개일 수 있는 CORS 허용 출처([#106](https://github.com/JminAILab/CatchU/issues/106) PR②)와 따로 관리한다. 변수 이름은 발급 API 연결 때 정한다. 인증 Guard는 기존 #87 구현을 재사용한다.
+HTTP 컨트롤러·ShareLink 마이그레이션·멱등 기록 저장에는 아직 연결하지 않았다. 회원·멱등 테이블은 [#104](https://github.com/JminAILab/CatchU/issues/104)에서 만들며, ShareLink가 회원을 참조하므로 회원 외래 키와 마이그레이션은 #104 병합 뒤 생성한다. **엔티티만 있고 마이그레이션이 없는 상태로 병합하지 않는다.** 병합되면 다른 담당자의 `migration:generate` 결과에 `share_link` 생성이 섞인다. 수신자 URL의 web 기준 주소는 공유 URL 전용 설정 하나로 두고, 여러 개일 수 있는 CORS 허용 출처([#106](https://github.com/JminAILab/CatchU/issues/106) PR②)와 따로 관리한다. 변수 이름은 발급 API 연결 때 정한다. 인증 Guard는 기존 #87 구현을 재사용한다.
 
-단위 검사 통과만으로 동시 발급의 5개 한도·제목 유일성, 동일 키 재응답, 트랜잭션 롤백, 마이그레이션 적용·되돌림을 검증한 것은 아니다. 실제 DB 검사와 HTTP 응답 검사는 해당 연결 뒤 수행하며 결과는 #147의 PR에 기록한다.
+`test/db/share-link-issuance.test.cjs`는 엔티티 정의로 테스트 DB에 `share_link`를 만들어 발급 판정(제목 중복·한도·중단·만료 제외, 동시 발급, 회원별 직렬화, 잠금 대기 중 만료, 롤백)을 확인하고 테이블을 지운다. 회원 행이 없는 합성 `ownerId`를 쓰므로 #104 실제 연결 검증이 아니다. 남은 작업: #104 연결과 회원 외래 키, 실제 회원 행으로 하는 통합 테스트, 동일 키 재응답, HTTP 응답, 마이그레이션 적용·되돌림. 실제 DB 검사와 HTTP 응답 검사는 해당 연결 뒤 수행하며 결과는 #147의 PR에 기록한다.
