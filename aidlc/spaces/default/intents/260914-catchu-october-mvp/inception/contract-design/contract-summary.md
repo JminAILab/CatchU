@@ -107,7 +107,7 @@ components:
     LinkGrant: {$ref: "./recipient-api.yaml#/components/securitySchemes/LinkGrant"}
 ```
 
-- 판정 순서는 링크 존재/중단/만료 → 비밀번호 시도 제한 → 비밀번호 조건 → 현재 허용 자료다. 없는 URL·중단·만료는 동일 404/LINK_UNAVAILABLE와 “이 링크는 열람할 수 없습니다.”이며 details를 생략한다. 비밀번호 입력 전에 적용한다. 이 판정은 수신자 조회/unlock 경로에만 적용하고 발행자의 중단 PUT에는 적용하지 않는다(중단 응답은 아래 발급·중단 규칙).
+- 판정 순서는 링크 존재/중단/만료 → 비밀번호 시도 제한(unlock에만) → 비밀번호 조건 → 현재 허용 자료다. 시도 제한은 비밀번호를 제출하는 unlock에만 적용하고 grant로 조회하는 GET에는 적용하지 않는다. 없는 URL·중단·만료는 동일 404/LINK_UNAVAILABLE와 “이 링크는 열람할 수 없습니다.”이며 details를 생략한다. 비밀번호 입력 전에 적용한다. 이 판정은 수신자 조회/unlock 경로에만 적용하고 발행자의 중단 PUT에는 적용하지 않는다(중단 응답은 아래 발급·중단 규칙).
 - 유효 링크의 비밀번호 미확인/무효 grant는 401/LINK_PASSWORD_REQUIRED, 잘못된 비밀번호는 401/LINK_PASSWORD_INVALID다. unlock 성공은 링크 한정 opaque grant를 반환하며 X-Link-Grant로 제시한다. 비밀번호 미설정 링크는 grant 없이 조회한다. 그 링크의 불필요한 unlock 요청은 400/INVALID_REQUEST다. 비밀번호 시도 제한에 걸린 동안은 올바른 비밀번호도 429/LINK_UNLOCK_LIMITED로 거부하고 남은 초를 Retry-After 헤더로 보낸다.
 - grant는 링크에 묶이며 회원 JWT·영구 접근권이 아니다. 매 조회/unlock에서 현재 링크/권한을 다시 검사하고 grant만으로 중단·만료를 우회하지 못한다. 저장·수명·시도 제한은 C 설계 OQ-C1이다.
 - 정상 목록은 **링크 소유자의 현재 공개 Catch 전체**를 페이지로 제공한다. 링크–자산 join/snapshot/선택 목록을 만들지 않는다. 현재 허용 자료 0개는 200+빈 배열, 자료 조회 실패는 500이며 빈 자료로 대체하지 않는다.
