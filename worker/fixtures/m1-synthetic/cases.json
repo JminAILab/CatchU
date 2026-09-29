@@ -1,0 +1,269 @@
+{
+  "fixtureVersion": "1",
+  "schemaSource": {
+    "workerMessages": "aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml",
+    "common": "aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml"
+  },
+  "fillFields": ["caseId", "requestId", "attemptId", "memberId", "repositoryId", "consentId", "scopeRevision"],
+  "expectedStatus": "초안 — 처리 종결값·수신 확인은 E, 등록은 B 담당의 확인 전",
+  "cases": [
+    {
+      "caseId": "succeeded-one-candidate",
+      "issueName": "적합 후보 1건(SUCCEEDED)",
+      "delivery": "IN_ORDER",
+      "messages": [
+        {
+          "file": "results/succeeded-one-candidate.json",
+          "schema": "Result",
+          "check": {"verdict": "VALID", "unidentifiedFields": []},
+          "expected": {
+            "processingAfter": "SUCCEEDED",
+            "receipt": {"disposition": "ACCEPTED", "code": "OK"},
+            "registration": "NEW_CATCH",
+            "catchesAfter": 1
+          },
+          "note": "후보 1건이 새 PRIVATE Catch 1개가 된다. 수신 확인 ACCEPTED는 등록 완료를 뜻하지 않는다."
+        }
+      ]
+    },
+    {
+      "caseId": "empty",
+      "issueName": "정상 0건(EMPTY)",
+      "delivery": "IN_ORDER",
+      "messages": [
+        {
+          "file": "results/empty.json",
+          "schema": "Result",
+          "check": {"verdict": "VALID", "unidentifiedFields": []},
+          "expected": {
+            "processingAfter": "EMPTY",
+            "receipt": {"disposition": "ACCEPTED", "code": "OK"},
+            "registration": "NONE",
+            "catchesAfter": 0
+          },
+          "note": "근거 부족은 notProvided에 있고 failures는 비어 있다. 오류가 아니다."
+        }
+      ]
+    },
+    {
+      "caseId": "partial-failed",
+      "issueName": "부분 실패(PARTIAL_FAILED)",
+      "delivery": "IN_ORDER",
+      "messages": [
+        {
+          "file": "results/partial-failed.json",
+          "schema": "Result",
+          "check": {"verdict": "VALID", "unidentifiedFields": []},
+          "expected": {
+            "processingAfter": "PARTIAL_FAILED",
+            "receipt": {"disposition": "ACCEPTED", "code": "OK"},
+            "registration": "NEW_CATCH",
+            "catchesAfter": 1
+          },
+          "note": "적합 후보 1건은 등록하고, 수집 실패 1건은 failures로 남는다."
+        }
+      ]
+    },
+    {
+      "caseId": "failed",
+      "issueName": "실패(FAILED)",
+      "delivery": "IN_ORDER",
+      "messages": [
+        {
+          "file": "results/failed.json",
+          "schema": "Result",
+          "check": {"verdict": "VALID", "unidentifiedFields": []},
+          "expected": {
+            "processingAfter": "FAILED",
+            "receipt": {"disposition": "ACCEPTED", "code": "OK"},
+            "registration": "NONE",
+            "catchesAfter": 0
+          },
+          "note": "후보 없이 수집 실패만 있다. Failure.code는 COLLECTION_FETCH_FAILED다."
+        }
+      ]
+    },
+    {
+      "caseId": "unidentifiable",
+      "issueName": "식별 불가(세 ID 중 누락)",
+      "delivery": "IN_ORDER",
+      "messages": [
+        {
+          "file": "results/unidentifiable-missing-attempt-id.json",
+          "schema": "Result",
+          "check": {"verdict": "UNIDENTIFIABLE", "unidentifiedFields": ["attemptId"]},
+          "expected": {
+            "processingAfter": "QUEUED",
+            "receipt": null,
+            "registration": "NONE",
+            "catchesAfter": 0
+          },
+          "note": "attemptId가 없어 수신 확인 없이 거부 기록만 남긴다. 식별자를 추정해 채우지 않는다."
+        }
+      ]
+    },
+    {
+      "caseId": "redelivery",
+      "issueName": "같은 결과 재전달",
+      "delivery": "IN_ORDER",
+      "messages": [
+        {
+          "file": "results/succeeded-one-candidate.json",
+          "schema": "Result",
+          "check": {"verdict": "VALID", "unidentifiedFields": []},
+          "expected": {
+            "processingAfter": "SUCCEEDED",
+            "receipt": {"disposition": "ACCEPTED", "code": "OK"},
+            "registration": "NEW_CATCH",
+            "catchesAfter": 1
+          },
+          "note": "첫 전달."
+        },
+        {
+          "file": "results/succeeded-one-candidate.json",
+          "schema": "Result",
+          "check": {"verdict": "VALID", "unidentifiedFields": []},
+          "expected": {
+            "processingAfter": "SUCCEEDED",
+            "receipt": {"disposition": "DUPLICATE", "code": "ALREADY_RECEIVED"},
+            "registration": "SAME_CATCH",
+            "catchesAfter": 1
+          },
+          "note": "같은 채움 값으로 만든 같은 메시지를 다시 보낸다. 새 Catch 없이 첫 전달과 같은 catchId를 돌려준다."
+        }
+      ]
+    },
+    {
+      "caseId": "same-id-different-content",
+      "issueName": "같은 ID의 다른 내용",
+      "delivery": "IN_ORDER",
+      "messages": [
+        {
+          "file": "results/succeeded-one-candidate.json",
+          "schema": "Result",
+          "check": {"verdict": "VALID", "unidentifiedFields": []},
+          "expected": {
+            "processingAfter": "SUCCEEDED",
+            "receipt": {"disposition": "ACCEPTED", "code": "OK"},
+            "registration": "NEW_CATCH",
+            "catchesAfter": 1
+          },
+          "note": "첫 전달."
+        },
+        {
+          "file": "results/same-id-different-content.json",
+          "schema": "Result",
+          "check": {"verdict": "VALID", "unidentifiedFields": []},
+          "expected": {
+            "processingAfter": "SUCCEEDED",
+            "receipt": {"disposition": "REJECTED", "code": "PAYLOAD_CONFLICT"},
+            "registration": "NONE",
+            "catchesAfter": 1
+          },
+          "note": "resultId는 같고 후보 내용이 다르다. 첫 결과의 수신 기록과 Catch 본문을 바꾸지 않는다."
+        }
+      ]
+    },
+    {
+      "caseId": "two-candidates-same-work",
+      "issueName": "두 후보가 같은 작업",
+      "delivery": "IN_ORDER",
+      "messages": [
+        {
+          "file": "results/two-candidates-same-work.json",
+          "schema": "Result",
+          "check": {"verdict": "VALID", "unidentifiedFields": []},
+          "expected": {
+            "processingAfter": "SUCCEEDED",
+            "receipt": {"disposition": "ACCEPTED", "code": "OK"},
+            "registration": "SHARED_CATCH",
+            "catchesAfter": 1
+          },
+          "note": "두 후보의 workIdentity가 같아 Catch 1개를 함께 참조한다. 두 번째 후보는 초안이 생성되지 않았다(content null)."
+        }
+      ]
+    },
+    {
+      "caseId": "progress-events",
+      "issueName": "진행 알림(RUNNING·UNCERTAIN)",
+      "delivery": "SEPARATE_REQUESTS",
+      "messages": [
+        {
+          "file": "events/running.json",
+          "schema": "ProcessingEvent",
+          "check": {"verdict": "VALID", "unidentifiedFields": []},
+          "expected": {
+            "processingAfter": "RUNNING",
+            "receipt": null,
+            "registration": "NONE",
+            "catchesAfter": 0
+          },
+          "note": "새로 접수한 요청(QUEUED)에 보낸다. 진행 알림에는 수신 확인을 만들지 않는다."
+        },
+        {
+          "file": "events/uncertain.json",
+          "schema": "ProcessingEvent",
+          "check": {"verdict": "VALID", "unidentifiedFields": []},
+          "expected": {
+            "processingAfter": "UNCERTAIN",
+            "receipt": null,
+            "registration": "NONE",
+            "catchesAfter": 0
+          },
+          "note": "running.json과 다른 새 요청(QUEUED)에 보낸다. 진행 알림에는 수신 확인을 만들지 않는다."
+        }
+      ]
+    }
+  ],
+  "negativeControls": [
+    {
+      "id": "missing-title",
+      "file": "results/succeeded-one-candidate.json",
+      "schema": "Result",
+      "patch": [{"op": "remove", "path": "/candidates/0/title"}],
+      "check": {"verdict": "SCHEMA_INVALID", "errorsInclude": [{"path": "/candidates/0", "keyword": "required"}]}
+    },
+    {
+      "id": "invalid-date-time",
+      "file": "results/succeeded-one-candidate.json",
+      "schema": "Result",
+      "patch": [{"op": "replace", "path": "/finishedAt", "value": "2026-10-01 00:30"}],
+      "check": {"verdict": "SCHEMA_INVALID", "errorsInclude": [{"path": "/finishedAt", "keyword": "format"}]}
+    },
+    {
+      "id": "date-time-space-separator",
+      "file": "results/succeeded-one-candidate.json",
+      "schema": "Result",
+      "patch": [{"op": "replace", "path": "/finishedAt", "value": "2026-10-01 00:30:00Z"}],
+      "check": {"verdict": "SCHEMA_INVALID", "errorsInclude": [{"path": "/finishedAt", "keyword": "format"}]}
+    },
+    {
+      "id": "invalid-uri",
+      "file": "results/succeeded-one-candidate.json",
+      "schema": "Result",
+      "patch": [{"op": "replace", "path": "/candidates/0/evidence/0/sourceUrl", "value": "not a uri"}],
+      "check": {"verdict": "SCHEMA_INVALID", "errorsInclude": [{"path": "/candidates/0/evidence/0/sourceUrl", "keyword": "format"}]}
+    },
+    {
+      "id": "empty-evidence",
+      "file": "results/succeeded-one-candidate.json",
+      "schema": "Result",
+      "patch": [{"op": "replace", "path": "/candidates/0/evidence", "value": []}],
+      "check": {"verdict": "SCHEMA_INVALID", "errorsInclude": [{"path": "/candidates/0/evidence", "keyword": "minItems"}]}
+    },
+    {
+      "id": "empty-result-id",
+      "file": "results/succeeded-one-candidate.json",
+      "schema": "Result",
+      "patch": [{"op": "replace", "path": "/resultId", "value": ""}],
+      "check": {"verdict": "UNIDENTIFIABLE", "unidentifiedFields": ["resultId"]}
+    },
+    {
+      "id": "non-string-request-id",
+      "file": "results/succeeded-one-candidate.json",
+      "schema": "Result",
+      "patch": [{"op": "replace", "path": "/requestId", "value": 101}],
+      "check": {"verdict": "UNIDENTIFIABLE", "unidentifiedFields": ["requestId"]}
+    }
+  ]
+}

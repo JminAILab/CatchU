@@ -13,6 +13,7 @@ FastAPI 기반 worker의 최소 실행 골격이다. 현재 구현은 `GET /heal
 | 웹 앱·서버 | FastAPI `0.141.1`, Uvicorn `0.53.0` |
 | 정적·서식·타입 검사 | Ruff `0.16.8`, mypy `2.3.1` |
 | 테스트 | pytest `9.1.1`, HTTPX2 `2.13.0` |
+| 메시지 스키마 검사 | jsonschema `4.26.0`, referencing `0.37.0`, PyYAML `6.0.3`, 형식 검사 rfc3339-validator `0.1.4`·rfc3986-validator `0.1.1` |
 
 직접 의존성과 검사 설정은 `pyproject.toml`, 전체 의존성의 해석 결과는 `uv.lock`에 둔다. `--locked`는 두 파일이 맞지 않으면 실행을 중단하여 의존성이 조용히 바뀌지 않게 한다. 패키지 배포를 하지 않는 앱(`package = false`)이므로 별도 빌드 명령은 없다.
 
@@ -99,7 +100,7 @@ uv run --locked mypy
 uv run --locked pytest
 ```
 
-Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인한다. 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
+Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
 
 검사 결과·실행 환경·기준 커밋·작성자 외 재현 여부는 초기화 이슈·PR에 남긴다. 이 README의 명령과 기대 결과 자체가 검사 통과 기록은 아니다. 로컬 확인과 NCP 배포 검증은 각각 기록한다.
 
@@ -110,6 +111,9 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `app/__init__.py` | 앱 Python 모듈의 경계 |
 | `app/main.py` | FastAPI 앱과 `/health` 경로 |
 | `tests/test_health.py` | 헬스체크 계약 검사 |
+| `app/contract/` | api–worker 메시지 스키마 v1 검사(계약 YAML을 원본 경로에서 읽음), 세 ID 식별 판정, 합성 템플릿 채우기 |
+| `fixtures/m1-synthetic/` | E·B 시험이 함께 쓰는 M1 합성 결과 세트와 사례별 기대 결과([안내](fixtures/m1-synthetic/README.md)) |
+| `tests/test_worker_messages.py` | 합성 사례·음성 대조의 스키마 판정 검사 |
 | `pyproject.toml` | 프로젝트 의존성·개발 도구·검사 설정 |
 | `uv.lock` | 실행·개발 의존성의 잠금 파일. 저장소에 함께 커밋 |
 | `.python-version` | 로컬에서 사용할 Python 버전 |

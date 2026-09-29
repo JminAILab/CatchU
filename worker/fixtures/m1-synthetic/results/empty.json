@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1",
+  "messageId": "message-{{caseId}}-{{attemptId}}-result",
+  "resultId": "result-{{caseId}}-{{attemptId}}",
+  "requestId": "{{requestId}}",
+  "attemptId": "{{attemptId}}",
+  "memberId": "{{memberId}}",
+  "repositoryId": "{{repositoryId}}",
+  "consentId": "{{consentId}}",
+  "scopeRevision": "{{scopeRevision}}",
+  "sourceMode": "MOCK",
+  "outcome": "EMPTY",
+  "candidates": [],
+  "notProvided": [
+    {
+      "reason": "INSUFFICIENT_EVIDENCE",
+      "count": 1
+    }
+  ],
+  "failures": [],
+  "finishedAt": "2026-10-01T00:30:00Z"
+}

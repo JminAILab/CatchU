@@ -5,6 +5,11 @@ description = "CatchU 수집·분석 worker 실행 기반"
 requires-python = "==3.12.10"
 dependencies = [
     "fastapi==0.141.1",
+    "jsonschema==4.26.0",
+    "pyyaml==6.0.3",
+    "referencing==0.37.0",
+    "rfc3339-validator==0.1.4",
+    "rfc3986-validator==0.1.1",
     "uvicorn==0.53.0",
 ]
 
@@ -14,6 +19,8 @@ dev = [
     "mypy==2.3.1",
     "pytest==9.1.1",
     "ruff==0.16.8",
+    "types-jsonschema==4.26.0.20260518",
+    "types-pyyaml==6.0.12.20260906",
 ]
 
 [tool.uv]

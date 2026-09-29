@@ -161,6 +161,7 @@ curl.exe -i http://127.0.0.1:3001/health
 | `npm test`          | 빌드 후 테스트 DB에 마이그레이션을 적용하고 `test/**/*.test.cjs`를 한 파일씩 실행. health·인증 HTTP, 실제 main 진입점의 설정 로딩/기동 실패, DB 규약·테스트 DB, 분석 수신·개발 주입 대역 검사. **테스트 DB 필요**(「DB 테스트」). 서버·임시 설정은 검사 후 정리 |
 | `npm run test:analysis-fixtures` | 별도 준비한 #103 공용 합성 자료로 수신 처리 검사. 자료 경로는 아래 #139 절 참고. 자료가 없으면 실패하며 묵시적으로 생략하지 않음 |
 | `npm run build`     | 이전 `dist/`를 지운 뒤 `src/`를 `dist/`로 컴파일. 소스에서 지운 엔티티·마이그레이션이 `dist/`에 남아 탐색되지 않게 한다 |
+| `node --test test/worker-messages.test.cjs` | 빌드 없이 [M1 합성 결과 세트](../worker/fixtures/m1-synthetic/README.md)의 사례·음성 대조가 worker와 같은 스키마 판정을 내는지만 검사. `npm test`에도 포함 |
 | `npm start`         | `dist/main.js` 실행. 먼저 빌드 필요                                                                                  |
 | `npm run migration:run` / `migration:revert` / `migration:generate` | 개발 DB(`.env`의 `DB_*`)에 마이그레이션 적용·마지막 1개 되돌리기·엔티티와의 차이로 새 마이그레이션 생성(「엔티티와 마이그레이션」) |
 
@@ -229,6 +230,8 @@ DB를 쓰는 테스트를 추가할 때:
 | `scripts/clean-dist.cjs`                | `npm run build`의 첫 단계: 이전 빌드 결과 `dist/` 삭제 |
 | `test/support/test-database.cjs`        | 테스트 DB 접속, `_test` 이름 확인, 테스트 사이 자료 초기화 |
 | `test/db/*.test.cjs`                    | DB 규약으로 생성되는 SQL, 시각 왕복, 테스트 DB 격리, 트랜잭션 전달, 재빌드 뒤 지운 마이그레이션 미탐색 검사 |
+| `test/worker-messages.test.cjs`         | M1 합성 결과 세트의 worker 메시지 스키마 v1 판정 검사 |
+| `test/helpers/worker-messages.cjs`      | 테스트 전용 메시지 검사 도우미. 계약 YAML·합성 세트를 원본 경로에서 읽음. 운영 코드에서 쓰지 않음 |
 | `tsconfig.json` / `tsconfig.build.json` | 엄격한 타입 검사, 데코레이터, 빌드 설정            |
 | `eslint.config.mjs`                     | TypeScript·JavaScript 정적 검사                    |
 | `.env.example`                          | 인증·DB 필수 설정과 실행·테스트 DB 선택 설정. 인증 비밀값은 공란, DB 값은 로컬 컨테이너 전용 |
