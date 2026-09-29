@@ -526,8 +526,19 @@ Codex가 Windows 환경에서 위 구현 시작 커밋을 기준으로 작성한
 
 ## #147 공유 링크 발급 구현 상태
 
-`src/share-links/share-create.ts`는 회원 API의 `ShareCreate`와 ERD의 발급 기간에 따른 입력 검증·제목 trim·30×24시간 만료 계산이다. `npm test`가 `test/share-create.test.cjs`를 함께 실행한다. 비밀번호는 입력 검증 중에만 전달하며, 검증 오류에는 입력값을 넣지 않는다. 이 함수의 반환값을 로그·DB·API 응답에 그대로 쓰지 않는다.
+DB 없이 확정할 수 있는 규칙을 `src/share-links/`에 두었다. 각 파일은 `npm test`가 `test/` 아래 같은 이름의 검사로 함께 확인한다.
 
-현재 HTTP 컨트롤러·비밀번호 해시 저장·ShareLink 마이그레이션·멱등 처리에는 연결하지 않았다. [#86](https://github.com/JminAILab/CatchU/issues/86)의 DB 기반, [#88](https://github.com/JminAILab/CatchU/issues/88)의 공통 오류, [#104](https://github.com/JminAILab/CatchU/issues/104)의 회원·멱등 구현을 연결한 뒤 같은 작업에서 발급 API를 완성한다. 인증 Guard는 기존 #87 구현을 재사용한다.
+| 파일 | 내용 |
+|---|---|
+| `share-create.ts` | 회원 API `ShareCreate` 입력 검증, 제목만 trim, 발급 시각부터 정확히 30×24시간 만료 |
+| `link-password.ts` | 비밀번호 검증값(ERD `passwordProtectionReference`). Node 내장 `scrypt`(N=2^15, r=8, p=1), 16바이트 salt, 상수 시간 비교. 저장값에 매개변수를 함께 적어 강도를 올려도 기존 값을 검증한다. 비밀번호는 trim·대소문자·유니코드 정규화를 하지 않는다. 깨진 저장값은 `false`로 숨기지 않고 `PasswordVerifierFormatError`(서버 오류)로 알린다 |
+| `link-token.ts` | 256비트 난수 토큰(base64url 43자), 토큰 형식 확인, web 기준 주소 + `/s/<token>` 수신자 URL 조립. 기준 주소는 http·https만, 쿼리·조각·계정 정보는 거부 |
+| `share-create-fingerprint.ts` | 멱등 처리용 본문 지문(ERD `requestFingerprint`)과 같은 키 재요청 판정. 지문은 제목과 비밀번호 **설정 여부**만 담고 비밀번호 원문·해시를 담지 않는다. 같은 키로 다시 온 비밀번호는 저장된 검증값으로 비교한다. 기록과 링크의 비밀번호 설정 여부가 어긋나면 409가 아닌 서버 오류로 올린다 |
 
-단위 검사 통과만으로 동시 발급의 5개 한도·제목 유일성, 비밀번호의 안전한 영속 저장, 동일 키 재응답, 트랜잭션 롤백, 마이그레이션 적용·되돌림을 검증한 것은 아니다. 실제 DB 검사와 HTTP 응답 검사는 해당 연결 뒤 수행하며 결과는 #147의 PR에 기록한다.
+비밀번호 원문·검증값은 API 응답에 포함하지 않는다. 링크 토큰은 계약상 공유 URL(발급·목록 응답의 `url`)에만 포함하며, 별도 필드·로그·오류 메시지에는 노출하지 않는다. 입력 검증 결과와 위 함수들의 반환값을 로그에 그대로 쓰지 않는다.
+
+**같은 키 재요청 처리 순서(발급 API 연결 시 필수):** `shareCreateFingerprint()`는 비밀번호가 달라도 같은 지문을 만든다(의도한 설계). 따라서 멱등 기록의 지문 일치만으로 기존 응답을 돌려주면 안 된다. 반드시 **기존 멱등 기록과 연결된 링크 조회 → `isSameShareCreate()` → 같으면 기존 응답(200), 다르면 409 `IDEMPOTENCY_CONFLICT`** 순서로 처리한다. 연결 뒤 같은 키·다른 비밀번호가 409인지 HTTP 테스트로 확인한다.
+
+HTTP 컨트롤러·ShareLink 엔티티와 마이그레이션·멱등 기록 저장에는 아직 연결하지 않았다. 회원·멱등 테이블은 [#104](https://github.com/JminAILab/CatchU/issues/104)에서 만들며, ShareLink가 회원을 참조하므로 마이그레이션은 #104 병합 뒤 생성한다. 수신자 URL의 web 기준 주소는 공유 URL 전용 설정 하나로 두고, 여러 개일 수 있는 CORS 허용 출처([#106](https://github.com/JminAILab/CatchU/issues/106) PR②)와 따로 관리한다. 변수 이름은 발급 API 연결 때 정한다. 인증 Guard는 기존 #87 구현을 재사용한다.
+
+단위 검사 통과만으로 동시 발급의 5개 한도·제목 유일성, 동일 키 재응답, 트랜잭션 롤백, 마이그레이션 적용·되돌림을 검증한 것은 아니다. 실제 DB 검사와 HTTP 응답 검사는 해당 연결 뒤 수행하며 결과는 #147의 PR에 기록한다.
