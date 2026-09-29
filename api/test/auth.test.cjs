@@ -71,12 +71,45 @@ async function start(t, overrides = {}) {
   return { request, login, protectedRequest, sign, logs, secret };
 }
 
-test('토큰 없는 보호 API는 401, health와 명시적 공개 경로는 200', async (t) => {
+async function assertAuthError(response, code) {
+  assert.equal(response.status, 401);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  const body = await response.json();
+  assert.equal(body.code, code);
+  assert.deepEqual(Object.keys(body).sort(), ['code', 'message']);
+  const message = code === 'AUTH_REQUIRED'
+    ? '로그인이 필요합니다.'
+    : '로그인 정보가 유효하지 않습니다. 다시 로그인해 주세요.';
+  assert.ok(body.message === message, '인증 오류에는 고정 안내만 담는다');
+}
+
+test('토큰 없는 보호 API는 AUTH_REQUIRED, health와 명시적 공개 경로는 200', async (t) => {
   const server = await start(t);
-  assert.equal((await server.protectedRequest()).status, 401);
-  assert.equal((await server.request('/health')).status, 200);
-  assert.equal((await server.request('/v1/__test/public')).status, 200);
-  assert.equal((await server.request('/v1/__test/member', { headers: { Authorization: 'Basic invalid' } })).status, 401);
+  await assertAuthError(await server.protectedRequest(), 'AUTH_REQUIRED');
+  for (const path of ['/health', '/v1/__test/public']) {
+    const response = await server.request(path);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+  }
+  for (const path of ['/auth/dev-login', '/v1/health']) {
+    const response = await server.request(path, { method: path.includes('login') ? 'POST' : 'GET' });
+    assert.equal(response.status, 404);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+  }
+});
+
+test('존재하지만 잘못된 Authorization 헤더는 AUTH_INVALID이며 원문을 노출하지 않는다', async (t) => {
+  const server = await start(t);
+  const marker = 'synthetic-header-value-87';
+  for (const authorization of [
+    '', 'Bearer', `Basic ${marker}`, `Bearer ${marker} extra`,
+    `Bearer ${marker},other`, `Bearer  ${marker}`, `Bearer\t${marker}`,
+  ]) {
+    await assertAuthError(await server.request('/v1/__test/member', {
+      headers: { Authorization: authorization },
+    }), 'AUTH_INVALID');
+  }
+  assert.equal(server.logs.join('\n').includes(marker), false, '잘못된 인증 헤더도 로그에 남기지 않는다');
 });
 
 test('개발 로그인 토큰의 회원 ID를 읽으며 요청 입력으로 대체하지 않는다', async (t) => {
@@ -89,11 +122,14 @@ test('개발 로그인 토큰의 회원 ID를 읽으며 요청 입력으로 대�
   assert.equal(expiresIn, 60);
   const member = await server.protectedRequest(accessToken, '/v1/__test/member?memberId=someone-else');
   assert.equal(member.status, 200);
+  assert.equal(member.headers.get('cache-control'), 'no-store');
   assert.deepEqual(await member.json(), { memberId: 'test-member-87' });
-  assert.equal((await server.request('/v1/__test/member?memberId=test-member-87')).status, 401);
+  await assertAuthError(await server.request('/v1/__test/member?memberId=test-member-87'), 'AUTH_REQUIRED');
+  const lowerCase = await server.request('/v1/__test/member', { headers: { authorization: `bearer ${accessToken}` } });
+  assert.equal(lowerCase.status, 200, '인증 스킴의 기존 대소문자 무시 처리를 유지한다');
 });
 
-test('변조·만료 토큰과 필수 값 없는 토큰을 401로 거부하고 토큰을 기록하지 않는다', async (t) => {
+test('변조·만료·필수 값 오류 토큰은 AUTH_INVALID이며 토큰·JWT 오류를 노출하지 않는다', async (t) => {
   const server = await start(t);
   const { accessToken } = await (await server.login()).json();
   const pieces = accessToken.split('.');
@@ -110,17 +146,19 @@ test('변조·만료 토큰과 필수 값 없는 토큰을 401로 거부하고 �
     await server.sign({ iss: 'another-issuer' }),
     await server.sign({ aud: 'another-service' }),
     await server.sign({}, 'HS384'),
+    'invalid.jwt.value',
   ];
   for (const token of tokens) {
     const response = await server.protectedRequest(token);
-    assert.equal(response.status, 401);
-    assert.equal((await response.text()).includes(token), false, '오류 응답에 토큰을 노출하지 않는다');
+    await assertAuthError(response, 'AUTH_INVALID');
   }
   assert.equal((await server.protectedRequest(accessToken)).status, 200);
   assert.ok(server.logs.length > 0, '실제 Nest 로그가 수집돼야 한다');
   for (const sensitive of [accessToken, server.secret, ...tokens]) {
     assert.equal(server.logs.join('\n').includes(sensitive), false, '서버 로그에 토큰·키를 노출하지 않는다');
   }
+  assert.equal(/JWTExpired|JWTClaimValidationFailed|ERR_JWT|ERR_JWS|claim timestamp check failed/.test(server.logs.join('\n')), false,
+    'JWT 라이브러리의 내부 오류를 로그로 전달하지 않는다');
 });
 
 for (const [label, overrides] of [
@@ -131,17 +169,61 @@ for (const [label, overrides] of [
 ]) {
   test(`개발 로그인 거부: ${label}`, async (t) => {
     const server = await start(t, overrides);
-    assert.equal((await server.login()).status, 403);
+    for (const body of [
+      { memberId: 'test-member-87' }, {}, { memberId: ' id ', admin: true }, [],
+      { memberId: 'valid-member', constructor: 'extra' },
+    ]) {
+      const response = await server.login(body);
+      assert.equal(response.status, 403, '비활성·운영 차단은 DTO 검증보다 먼저 적용한다');
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      const denied = await response.json();
+      assert.equal(denied.code, 'INTERNAL_ERROR', '전용 거부 코드 미결: 기존 #88 처리를 유지한다');
+      assert.equal('accessToken' in denied, false);
+      assert.equal(denied.details, undefined);
+    }
     assert.equal((await server.request('/health')).status, 200);
     assert.equal((await server.protectedRequest()).status, 401);
   });
 }
 
-test('개발 로그인은 유효한 회원 ID 하나만 받는다', async (t) => {
+test('개발 로그인의 잘못된 회원 ID는 VALIDATION_FAILED와 필드·규칙 이름으로 응답한다', async (t) => {
   const server = await start(t);
-  for (const body of [{}, { memberId: '' }, { memberId: ' ' }, { memberId: 87 }, { memberId: 'id', admin: true }]) {
-    assert.equal((await server.login(body)).status, 400);
+  for (const body of [
+    {}, { memberId: '' }, { memberId: ' ' }, { memberId: ' id' }, { memberId: 'id ' },
+    { memberId: 87 }, { memberId: null }, { memberId: true }, { memberId: {} }, { memberId: [] },
+  ]) {
+    const response = await server.login(body);
+    assert.equal(response.status, 400);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    const invalid = await response.json();
+    assert.equal(invalid.code, 'VALIDATION_FAILED');
+    assert.deepEqual(invalid.details, { violations: [{ field: 'memberId', reason: 'isMemberId' }] });
   }
+});
+
+test('개발 로그인은 추가 필드를 제거해 통과시키지 않고 입력값 없이 검증 오류로 거부한다', async (t) => {
+  const server = await start(t);
+  const marker = 'synthetic-extra-value-87';
+  const response = await server.login({ memberId: 'valid-member', admin: marker });
+  assert.equal(response.status, 400);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  const body = await response.json();
+  assert.equal(body.code, 'VALIDATION_FAILED');
+  assert.deepEqual(body.details, { violations: [{ field: 'admin', reason: 'whitelistValidation' }] });
+  assert.equal(JSON.stringify(body).includes(marker), false);
+  assert.equal(server.logs.join('\n').includes(marker), false);
+  for (const field of ['constructor', '__proto__']) {
+    const reserved = await server.login({ memberId: 'valid-member', [field]: marker });
+    assert.equal(reserved.status, 400, '변환기가 지우는 필드도 추가 입력으로 거부한다');
+    const invalid = await reserved.json();
+    assert.equal(reserved.headers.get('cache-control'), 'no-store');
+    assert.equal(invalid.code, 'VALIDATION_FAILED');
+    assert.deepEqual(invalid.details, { violations: [{ field, reason: 'whitelistValidation' }] });
+    assert.equal(JSON.stringify(invalid).includes(marker), false);
+  }
+  const array = await server.login([{ memberId: 'valid-member' }]);
+  assert.equal(array.status, 400);
+  assert.equal((await array.json()).code, 'VALIDATION_FAILED');
 });
 
 test('비밀값 기본값이 없고 수명·서명 키 설정 오류에 실제 값을 노출하지 않는다', () => {
