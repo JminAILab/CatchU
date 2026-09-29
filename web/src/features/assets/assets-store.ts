@@ -148,8 +148,9 @@ export function createAssetsStore(api: CatchApi) {
       if (version !== mutationVersion) return;
       // 저장 전/중의 GET 응답이 저장 결과를 덮어쓰지 않게 무효화한다.
       if (state.selectedId === catchId) { ++detailVersion; detailAbort?.abort(); detailTask = undefined; }
+      const reloadList = state.listState === "loading" || pendingRefresh?.version === listVersion;
       ++listVersion; listAbort?.abort(); listAbort = new AbortController(); listTask = moreTask = undefined;
-      const reloadList = state.listState === "loading";
+      pendingRefresh = undefined;
       if (result.kind === "success") {
         emit({
           items: state.items.map((entry) => entry.catchId === catchId ? result.data : entry),

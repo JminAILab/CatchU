@@ -189,6 +189,34 @@ test("같은 조회 중 D 갱신 요청이 반복되어도 후속 조회 하나�
   assert.deepEqual(store.getSnapshot().items.map((v) => v.catchId), ["new"]);
 });
 
+for (const saved of [true, false]) {
+  test(`D 갱신 예약 직전의 목록과 저장 ${saved ? "성공" : "실패"} 응답이 겹쳐도 새 Catch를 읽는다`, async () => {
+    const old = deferred(); const writeResponse = deferred(); let lists = 0; let writes = 0;
+    const current = { ...item("existing"), mismatch: saved };
+    const store = createAssetsStore(createCatchApi(async (url, options) => {
+      if (options.method === "PUT") { writes++; return writeResponse.promise; }
+      if (url.startsWith("/catches?")) return ++lists === 1 ? old.promise : page([current, item("new")]);
+      return success(item("existing"));
+    }));
+    await store.openDetail("existing");
+    const initial = store.refresh("repo-a");
+    const write = store.update({ kind: "mismatch", mismatch: true });
+    store.setManagementOpen(true);
+    store.setManagementOpen(false);
+    const closed = store.invalidateList("repo-a");
+    // 같은 턴에 목록을 먼저 완료해 ready 상태와 아직 실행 전인 갱신 예약이 겹치게 한다.
+    old.resolve(page([item("existing")]));
+    writeResponse.resolve(saved ? success(current) : fail);
+    await Promise.all([initial, write, closed]);
+    await store.selectRepository("repo-a");
+    assert.equal(lists, 2);
+    assert.equal(writes, 1);
+    assert.deepEqual(store.getSnapshot().items.map((entry) => entry.catchId), ["existing", "new"]);
+    assert.equal(store.getSnapshot().items[0].mismatch, saved);
+    assert.equal(store.getSnapshot().mutation.status, saved ? "success" : "error");
+  });
+}
+
 test("필터가 바뀌면 이전 저장소에 예약된 D 갱신을 버린다", async () => {
   const old = deferred(); const paths = [];
   const store = createAssetsStore(createCatchApi(async (path) => {
