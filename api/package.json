@@ -15,15 +15,18 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "npm run build && node --test \"test/**/*.test.cjs\"",
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "test:catches:db": "npm run build && node scripts/test-catches-db.cjs"
   },
   "dependencies": {
     "@nestjs/common": "12.0.4",
     "@nestjs/core": "12.0.4",
     "@nestjs/platform-express": "12.0.4",
     "jose": "6.2.12",
+    "pg": "8.23.0",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "typeorm": "1.1.1"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
