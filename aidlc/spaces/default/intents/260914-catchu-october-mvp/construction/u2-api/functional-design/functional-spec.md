@@ -38,7 +38,7 @@ erDiagram
 | F3-P ProcessingEvent 수신 | 1 자체 스키마 검사 → 2 requestId/attemptId의 요청·현재 시도 맥락 확인 → 3 F 진행 관측 반영 | BR2.15 적용. resultId/ResultReceipt를 요구하거나 생성하지 않으며, 늦은 진행 이벤트로 종결 상태를 되돌리지 않음 |
 | F4 등록/반영 | 1 E가 허용 후보를 B에 전달 → 2 B 기준/동일 작업 검사 → 3 B의 Catch·근거·초안/질문·후보 등록 연결 저장 또는 기존 참조 → 4 B가 catchId/본인 열람 준비 반환 → 5 E가 등록 ID·준비/반영/종결 기록. 3~5단계를 한 트랜잭션으로 묶음 | 반영 트랜잭션 실패는 해당 변경을 전부 되돌리고 APPLY_FAILED; 같은 결과로 반영을 처음부터 다시 하며 유일성 키로 Catch 중복 방지, F 재실행 없음. 커밋 뒤 응답·확인 유실은 재전달·재시도 시 기존 등록 연결을 참조해 같은 catchId 반환. 일부 후보만 처리했으면 나머지 해결 전 APPLIED/CLOSED로 만들지 않음. 반영 복구는 새 분석 호출이 아님 |
 | F5 본인 확인/공개 | 1 본인 Catch 조회 → 2 근거·기여 확인 PUT → 3 web이 지금 공개 제안 → 4 사용자가 별도 PUBLIC PUT → 5 현재 확인/보호 재검사 후 저장 | 초안 없어도 나머지 조건 충족이면 가능. 최초 PRIVATE, 확인만으로 공개 안 함. PRIVATE·mismatch PUT은 별도 현재 상태 지정 |
-| F6 링크 발급/중단 | 1 본인+operation 멱등 → 2 회원 단위 현재 유효 링크 조회 → 3 trim 제목/5개 검사 → 4 발급 시각+30일·선택 비밀번호 참조·멱등 연결 저장 → 5 본인 중단 요청 시 stoppedAt 기록 | 만료/중단 링크는 검사 제외. 시간 기반 상태 유도. 중단은 Catch를 숨기거나 지우지 않음 |
+| F6 링크 발급/중단 | 1 본인+operation 멱등 → 2 회원 단위 현재 유효 링크 조회 → 3 trim 제목/5개 검사 → 4 발급 시각+30일·선택 비밀번호 참조·멱등 연결 저장 → 5 본인 중단 요청 시 stoppedAt 기록 | 만료/중단 링크는 검사 제외. 시간 기반 상태 유도. 중단은 Catch를 숨기거나 지우지 않음. 이미 중단·만료된 링크의 중단 요청은 stoppedAt을 기록하지 않고 현재 상태를 200으로 반환 |
 | F7 수신자 | 1 링크 존재/중단/만료 공통 판정 → 2 필요 시 비밀번호/grant → 3 현재 소유자·PUBLIC·보호 제한 없는 집합 → 4 목록/상세 허용 투영 | 링크 불가 404 동일 문구. 유효 비밀번호 분기는 401 유지. 숨김/타인/없는 Catch 상세 404. 정상 0건 200, 조회 오류 500 |
 | F8 실패 재요청 | 1 서버가 확정 실패·결과 없음·닫힘 판단 → 2 사용자가 현재 고지/범위에 새 동의 → 3 F2에서 원 요청 이력 재검사 → 4 새 ID 생성 | 정상 0건/부분 유효 결과/실행 불명/반영 미해결은 대상 아님. retryOfRequestId 생략으로 우회 못 함 |
 
@@ -56,7 +56,7 @@ erDiagram
 | application | APPLYING → APPLY_FAILED → RECOVERING → APPLIED 또는 APPLY_FAILED | 반영 오류·실제 복구 시작·재진입 결과. 이 동안 ACTIVE |
 | lifecycle | ACTIVE → CLOSED | APPLIED이고 추가 처리/반영/복구 없음. 실행 불명은 CLOSED 불가 |
 | Catch | PRIVATE → PUBLIC / PUBLIC → PRIVATE | 본인 별도 선택; PUBLIC 시 확인 두 값과 현재 보호 검사. confirmation은 visibility를 바꾸지 않음 |
-| ShareLink | ACTIVE → STOPPED 또는 EXPIRED | 중단 시각 존재 또는 현재시각>=만료. 중단/만료 뒤 재개 API 없음 |
+| ShareLink | ACTIVE → STOPPED 또는 EXPIRED | 중단 시각 존재 또는 현재시각>=만료. 중단/만료 뒤 재개 API 없음. STOPPED·EXPIRED에서 나가는 전이 없음(중단 뒤 만료 시각이 지나도 STOPPED, 만료 링크 중단은 EXPIRED 유지) |
 
 processing 종결 의미: 후보≥1/실패0=SUCCEEDED, 후보0/실패0=EMPTY, 후보≥1/실패≥1=PARTIAL_FAILED, 후보0/실패≥1=FAILED. 근거 부족/등록 기준 미달은 notProvided로 구분한다. 초기 count=0은 종결 0건이 아니므로 processing과 함께 해석한다.
 
