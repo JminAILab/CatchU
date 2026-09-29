@@ -9,7 +9,7 @@ body:
     id: summary
     attributes:
       label: 요약
-      description: "만들거나 바꿀 것과 예정 결과물. 검토를 요청할 때 실제 링크로 갱신합니다. 배경은 「왜」, 완료 조건은 「완료 기준」에 쓰고 여기서 되풀이하지 않습니다."
+      description: "만들거나 바꿀 것과 예정 결과물. 검토를 요청할 때 실제 링크로 갱신합니다. 배경이 따로 필요하면 「왜」에, 완료 조건은 「완료 기준」에 쓰고 여기서 되풀이하지 않습니다."
       placeholder: |-
         - 무엇을: 분석 실패·재요청 화면의 흐름과 와이어프레임 초안
         - 결과물: 초안 문서와 검토 PR (작성 후 링크)
@@ -19,9 +19,7 @@ body:
     id: why
     attributes:
       label: 왜
-      description: "누구의 어떤 문제를 해결하는가. 짧은 문장이나 목록으로 쓰고 한 항목에는 한 가지만 씁니다."
-    validations:
-      required: true
+      description: "[조건부] 누구의 어떤 문제를 해결하는가. 요약만으로 이유가 드러나면 비워서 지웁니다."
   - type: textarea
     id: scope
     attributes:
@@ -41,7 +39,7 @@ body:
     id: sources
     attributes:
       label: 근거
-      description: "작업 판단에 필요한 결정 요지와 직접 출처를 뜻과 함께 씁니다. 전체 대응표·보조 링크·상세 이력은 <details>로 접고, 짧으면 접기를 만들지 않습니다. 확정된 ID만 쓰며 설계 미작성·적용 ID 미확정은 그대로 표시하고, 승인 원문 전체를 복사하지 않습니다."
+      description: "구현·판단에 필요한 명세(요구사항·API·ERD·화면)와 결정을 직접 링크하고 필요한 뜻만 씁니다. 판본이 중요하면 커밋 고정 링크를 씁니다. 판단에 쓰지 않는 ID 대응표·원문 복사는 하지 않습니다."
     validations:
       required: true
   - type: textarea
