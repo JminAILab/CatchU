@@ -228,12 +228,11 @@ test('코드 없는 HttpException은 9/28 결정대로 상태를 보존하고 �
   assert.ok(logs.some((l) => l.startsWith('[warn]') && l.includes('ForbiddenException')), '코드 누락을 경고로 남긴다');
 });
 
-test('인증 Guard(#87)의 401도 필터를 거쳐 같은 형식으로 응답한다(AUTH 코드 구분은 #87 후속)', { timeout: 10000 }, async (t) => {
+test('인증 Guard(#87)의 토큰 없음·잘못된 토큰은 공통 필터에서 다른 AUTH 코드로 응답한다', { timeout: 10000 }, async (t) => {
   const { request, logs } = await start(t);
   assertErrorShape(await request('/v1/__test/protected'), 401, 'AUTH_REQUIRED');
   const forged = await request('/v1/__test/protected', { headers: { Authorization: 'Bearer forged.fake.token' } });
-  // #87이 AUTH_INVALID로 나눠 던지기 전까지는 위조 토큰도 AUTH_REQUIRED로 나간다.
-  assertErrorShape(forged, 401, 'AUTH_REQUIRED');
+  assertErrorShape(forged, 401, 'AUTH_INVALID');
   assert.equal(logs.join('\n').includes('forged.fake.token'), false, '토큰을 로그에 남기지 않는다');
 });
 
