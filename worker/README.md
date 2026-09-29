@@ -1,6 +1,6 @@
 # worker — 수집·분석 처리
 
-FastAPI 기반 worker의 최소 실행 골격이다. 현재 구현은 `GET /health`이며 HTTP `200`과 `{"status":"ok"}`를 반환한다. 실제 GitHub 수집·분석, DB·큐·LLM 연결, Docker·CI·NCP 배포는 후속 작업이다.
+FastAPI 기반 worker의 최소 실행 골격이다. HTTP 경로는 `GET /health`뿐이며 HTTP `200`과 `{"status":"ok"}`를 반환한다. 분석 요청 검사와 합성(MOCK) 결과 생성은 내부 함수로만 있다([요청 검사와 합성 결과 생성](#요청-검사와-합성-결과-생성)). 실제 GitHub 수집·분석, DB·큐·LLM 연결, Docker·CI·NCP 배포는 후속 작업이다.
 
 작업 범위는 [#84](https://github.com/JminAILab/CatchU/issues/84), 공통 착수·브랜치·검사·PR 기준은 [코딩 운영](../docs/CatchU_작업관리.md#코딩-운영)을 따른다. worker 초기화 담당이 이후 분석 기능과 공통 환경까지 자동으로 맡는 것은 아니다.
 
@@ -89,6 +89,52 @@ Windows PowerShell에서는 `curl.exe -i http://127.0.0.1:8000/health`를 사용
 | `Address already in use` | 이전에 띄운 worker나 다른 프로세스가 `8000` 포트를 쓰는지 확인하고 해당 실행을 종료 |
 | 잠금 파일 불일치 | 브랜치의 `pyproject.toml`과 `uv.lock`을 함께 받았는지 확인. 의존성 변경 시 두 파일을 함께 갱신하여 리뷰 |
 
+## 요청 검사와 합성 결과 생성
+
+[#113](https://github.com/JminAILab/CatchU/issues/113)의 범위다. E가 보낸 분석 요청(`Request`)을 검사하고, 가짜 생성기로 [메시지 스키마 v1](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml)에 맞는 종결 결과(`Result`)를 만든다. 외부 호출·제공자 SDK·API 키가 없고 결과는 항상 `sourceMode: MOCK`이다. 공개 HTTP 경로나 큐 없이 `app.processing.process_request` 함수로 부른다.
+
+1. **요청 검사**: 스키마 v1을 검사한 뒤 E가 접수한 기록(요청·현재 시도·회원·저장소·동의·허용 범위·`sourceMode`)과 필드마다 대조한다. 하나라도 다르면 생성기를 부르지 않고 거부한다. 거부는 사유와 어긋난 위치만 호출한 쪽에 돌려주며, 계약에 요청 거부 메시지가 없으므로 E에 보내는 메시지는 없다.
+2. **진행 알림**: 검사를 통과하면 `RECEIVED`, 생성 직전에 `RUNNING`을 알린다.
+3. **생성**: 생성기를 한 번 부른다. 생성기가 실행 여부를 확인하지 못했거나(상태 조회 오류) 시간이 초과되면 `UNCERTAIN`만 알리고 결과를 만들지 않는다. 실패로 확정하지 않고 다시 생성하지도 않는다.
+4. **결과 조합**: 요청의 식별자·맥락을 그대로 옮긴다. 종결값은 후보와 실패의 수로 정한다(후보만 있으면 SUCCEEDED, 둘 다 없으면 EMPTY, 둘 다 있으면 PARTIAL_FAILED, 실패만 있으면 FAILED). 근거 부족·기준 미달은 `notProvided`, 수집·생성 오류는 `failures`에 넣는다. 초안·질문을 만들지 못해도 후보는 남기고 초안 본문은 `null`, 실패는 `failures`에 넣는다. 제목을 만들지 못하면 `workFacts` 첫 항목을 제목으로 쓴다.
+
+`credentialContextReference`는 형식만 확인해 넘긴다. 이 값이 있다고 요청을 받아들이지 않으며, 실제 해석과 대조는 자격정보 연결 작업에서 한다.
+
+### 개발용 실행
+
+`worker/`에서 합성 요청 하나를 처리해 진행 알림과 결과를 JSON으로 출력한다. 아무 데도 보내거나 저장하지 않는다.
+
+```sh
+uv run --locked python -m app.processing succeeded-one-candidate
+```
+
+| 시나리오 | 기대 결과 |
+|---|---|
+| `succeeded-one-candidate` | SUCCEEDED, 후보 1건 |
+| `empty` | EMPTY, 근거 부족 1건(`notProvided`) |
+| `partial-failed` | PARTIAL_FAILED, 후보 1건과 수집 실패 1건 |
+| `failed` | FAILED, 수집 실패만 |
+| `two-candidates-same-work` | SUCCEEDED, 같은 작업의 후보 2건. 두 번째 후보는 초안 미생성(`null`) |
+| `draft-failed` | PARTIAL_FAILED, 후보 유지·초안 `null`·초안 실패 1건 |
+| `reflection-failed` | PARTIAL_FAILED, 후보 유지·질문 없음·질문 실패 1건 |
+| `title-failed` | SUCCEEDED, 제목이 `workFacts` 첫 항목 |
+| `execution-unknown` | 결과 없음(`null`), 마지막 알림 `UNCERTAIN` |
+
+- 처음 다섯 개는 [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 같은 이름 템플릿과 결과가 같다. 개발용 실행에서는 `finishedAt`·`observedAt`만 실행 시각이다. 나머지는 `succeeded-one-candidate` 템플릿에서 한 부분만 바꿨다.
+- 요청 값은 `context.sample.json`을 쓰고, 표본에 없는 요청 필드(고지 판본·허용 자료 종류·선정 참조·자격정보 맥락 참조·시각)만 `app/processing/synthetic.py`의 합성 값으로 채운다.
+
+### MOCK 범위와 남은 실제 연결
+
+이 결과는 실제 분석 성공, 실제 자료 검증, Catch 저장·열람 준비 완료를 뜻하지 않는다. 수신 확인은 E, Catch 등록은 B가 판단한다.
+
+| 남은 실제 연결 | 이슈 |
+|---|---|
+| 허용 GitHub 자료 수집, 자격정보 참조의 해석·대조 | [#116](https://github.com/JminAILab/CatchU/issues/116) · [#117](https://github.com/JminAILab/CatchU/issues/117) |
+| 후보 묶음·본인 기여 확인·작업 동일성 판별 | [#111](https://github.com/JminAILab/CatchU/issues/111) · [#118](https://github.com/JminAILab/CatchU/issues/118) |
+| 초안·질문 생성과 서비스 LLM | [#119](https://github.com/JminAILab/CatchU/issues/119) · [#120](https://github.com/JminAILab/CatchU/issues/120) |
+| 요청 수신·진행 알림 전달·결과 보존과 재전달, 실제 전송 | [#121](https://github.com/JminAILab/CatchU/issues/121) · [#77](https://github.com/JminAILab/CatchU/issues/77) |
+| E 수신·개발용 주입, B 등록 | [#139](https://github.com/JminAILab/CatchU/issues/139) · [#105](https://github.com/JminAILab/CatchU/issues/105) |
+
 ## 변경 후 검사
 
 다음 명령을 `worker/`에서 실행한다.
@@ -100,7 +146,7 @@ uv run --locked mypy
 uv run --locked pytest
 ```
 
-Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
+Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 요청 검사와 합성 결과 생성은 거부 조건, 시나리오별 결과, 실행 불명 처리를 확인하며, 네트워크 연결을 막은 상태에서도 모든 시나리오가 끝나는지 본다. 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
 
 검사 결과·실행 환경·기준 커밋·작성자 외 재현 여부는 초기화 이슈·PR에 남긴다. 이 README의 명령과 기대 결과 자체가 검사 통과 기록은 아니다. 로컬 확인과 NCP 배포 검증은 각각 기록한다.
 
@@ -114,6 +160,9 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `app/contract/` | api–worker 메시지 스키마 v1 검사(계약 YAML을 원본 경로에서 읽음), 세 ID 식별 판정, 합성 템플릿 채우기 |
 | `fixtures/m1-synthetic/` | E·B 시험이 함께 쓰는 M1 합성 결과 세트와 사례별 기대 결과([안내](fixtures/m1-synthetic/README.md)) |
 | `tests/test_worker_messages.py` | 합성 사례·음성 대조의 스키마 판정 검사 |
+| `app/processing/` | 요청 검사(`request_check.py`), 제공자 비종속 생성 인터페이스(`generation.py`), 결과 조합(`result.py`), 처리 순서(`pipeline.py`), 가짜 생성기와 합성 요청(`fake_generator.py`·`synthetic.py`), 개발용 실행(`__main__.py`) |
+| `tests/test_request_check.py` | 요청 형식·접수 맥락 불일치·지난 시도의 거부 검사 |
+| `tests/test_processing.py` | 종결값·미제공과 실패 구분·초안/질문/제목 실패·진행 알림과 실행 불명·외부 호출 없음 검사 |
 | `pyproject.toml` | 프로젝트 의존성·개발 도구·검사 설정 |
 | `uv.lock` | 실행·개발 의존성의 잠금 파일. 저장소에 함께 커밋 |
 | `.python-version` | 로컬에서 사용할 Python 버전 |
