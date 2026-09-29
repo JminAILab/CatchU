@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { configureApp } from './app.setup';
 
 async function bootstrap(): Promise<void> {
   const portValue = process.env.PORT ?? '3001';
@@ -10,7 +11,7 @@ async function bootstrap(): Promise<void> {
     throw new Error('PORT는 1~65535 사이의 정수여야 합니다.');
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = await configureApp(await NestFactory.create(AppModule));
   app.enableShutdownHooks();
   await app.listen(port, '127.0.0.1');
   Logger.log(`API 실행: http://127.0.0.1:${port}/health`, 'Bootstrap');

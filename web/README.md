@@ -55,7 +55,8 @@ npm ci
 | `npm run typecheck` | `tsc --noEmit`. 생성 파일(`next-env.d.ts`, `.next/types`) 없이도 통과해야 함 | `const n: number = "x"` |
 | `npm run build` | 프로덕션 빌드 | 빌드 중 타입·import 오류 |
 | `npm run check:run` | `scripts/smoke.mjs`: 포트가 비어 있는지 확인한 뒤 빌드 결과를 `next start`로 띄우고, Ready 출력 후 `GET /`가 200이고 본문에 "CatchU web"이 있는지 확인하고 종료(전체 30초 제한). **`npm run build` 이후에만, 개발 서버를 끈 상태에서 실행** | 포트 사용 중, 서버 미기동, 200 아님, 본문 불일치, 30초 초과 |
-| `npm run check` | 위 4개를 순서대로 실행 | 하나라도 실패하면 중단 |
+| `npm test` | Node 기본 테스트 도구로 공통 응답 해석 검사 | 오류를 빈 목록으로 처리, HTTP 상태·code 소실 |
+| `npm run check` | lint → typecheck → test → build → check:run | 하나라도 실패하면 중단 |
 
 PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 적는다.
 
@@ -85,8 +86,27 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 
 - 화면(라우트): `src/app/<경로>/page.tsx`. 예: 공유 링크 수신자 화면은 `src/app/s/[token]/page.tsx`처럼 이슈에서 정한 경로를 따른다.
 - 여러 화면이 함께 쓰는 컴포넌트: `src/components/`.
-- API 호출·오류 응답 해석 등 화면과 분리되는 로직: `src/lib/`. 오류 응답 공통 형식은 [#88](https://github.com/JminAILab/CatchU/issues/88)에서 추가한다.
+- API 호출·오류 응답 해석 등 화면과 분리되는 로직: `src/lib/`. `api-response.ts`가 [#88](https://github.com/JminAILab/CatchU/issues/88)의 응답 해석을 제공한다.
 - 디렉터리는 필요할 때 만들고, 담당 화면 밖의 공통 구조 변경은 이슈에서 먼저 조율한다.
+
+## 공통 응답 해석 (#88)
+
+`src/lib/api-response.ts`의 `readApiResponse`에 `Response` 또는 fetch Promise를 전달한다. 네트워크 실패까지 처리하려면 fetch를 먼저 await하지 않고 Promise를 그대로 넘긴다.
+
+```typescript
+import { readApiResponse } from '@/lib/api-response';
+
+const result = await readApiResponse(fetch(url, options));
+// result.kind === 'success': data는 unknown. 기능별 스키마를 확인한 뒤 사용한다.
+// result.kind === 'api-error': status와 code로 안내를 결정한다.
+// result.kind === 'lookup-failed': 조회 실패를 표시한다. 빈 결과로 바꾸지 않는다.
+```
+
+정본은 [API 명세 v1](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)과 공통 Error 스키마다. 추가 필드는 무시하며 알려진 details만 전달한다. 새로운 업무 code도 문자열 그대로 보존하고, 화면에서 모르는 코드는 일반 오류 안내로 처리한다. 오류 응답의 필수 형식 위반·JSON 해석 실패·네트워크 실패는 `LOOKUP_FAILED`다. HTTP 응답을 받았다면 상태를 보존하고, 네트워크 실패는 `status: null`이다.
+
+정상 JSON은 그대로 반환하며 `EMPTY`·`PARTIAL_FAILED`·`FAILED` 같은 분석 결과를 HTTP 오류로 바꾸지 않는다. 204는 성공 데이터 null이다. 함수는 기능별 성공 스키마를 검증하지 않으므로 화면에서 확인해야 한다. 401도 회원 인증과 링크 비밀번호 오류를 code로 구분하며 자동 로그인 이동·토큰 처리·재시도는 하지 않는다. 해당 API 클라이언트 연결은 #106 범위다. 함수는 요청/응답이나 예외를 로그에 출력하지 않는다.
+
+테스트는 새 의존성 없이 Node.js 24의 TypeScript 타입 제거와 `node --test`를 사용한다. 현재 package의 모듈 형식 미지정으로 `.ts`를 ES module로 재해석한다는 Node 경고가 나올 수 있으며, 테스트 실패는 아니다.
 
 ## 작업 규칙
 
