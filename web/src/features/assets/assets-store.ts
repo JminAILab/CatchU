@@ -29,6 +29,7 @@ export function createAssetsStore(api: CatchApi) {
   let listAbort: AbortController | undefined;
   let detailAbort: AbortController | undefined;
   let listTask: Promise<void> | undefined;
+  let pendingRefresh: { version: number; task: Promise<void> } | undefined;
   let moreTask: Promise<void> | undefined;
   let detailTask: Promise<void> | undefined;
   const seenCursors = new Set<string>();
@@ -42,6 +43,7 @@ export function createAssetsStore(api: CatchApi) {
   function refresh(repositoryId = state.repositoryId ?? ""): Promise<void> {
     if (listTask && state.repositoryId === repositoryId) return listTask;
     const version = ++listVersion;
+    pendingRefresh = undefined;
     listAbort?.abort();
     const abort = new AbortController();
     listAbort = abort;
@@ -56,6 +58,18 @@ export function createAssetsStore(api: CatchApi) {
       } else emit({ listState: "error", listError: result });
     }).finally(() => { if (listTask === task) listTask = undefined; });
     listTask = task;
+    return task;
+  }
+  /** D 활동 전에 시작한 조회가 있으면 완료 후 새 조회를 한 번 예약한다. */
+  function invalidateList(repositoryId = state.repositoryId ?? ""): Promise<void> {
+    if (!listTask || state.repositoryId !== repositoryId) return refresh(repositoryId);
+    const version = listVersion;
+    if (pendingRefresh?.version === version) return pendingRefresh.task;
+    const task = listTask.then(() => {
+      if (version !== listVersion) return;
+      return refresh(repositoryId);
+    }).finally(() => { if (pendingRefresh?.task === task) pendingRefresh = undefined; });
+    pendingRefresh = { version, task };
     return task;
   }
   function selectRepository(repositoryId: string) {
@@ -105,6 +119,7 @@ export function createAssetsStore(api: CatchApi) {
     ++listVersion; ++detailVersion;
     listAbort?.abort(); detailAbort?.abort();
     listTask = moreTask = detailTask = undefined;
+    pendingRefresh = undefined;
     // StrictMode의 effect 재시작 시에도 첫 조회를 다시 실행한다.
     emit({ repositoryId: null, selectedId: null, items: [], detail: undefined, listState: "loading" });
   }
@@ -112,7 +127,7 @@ export function createAssetsStore(api: CatchApi) {
     getSnapshot: () => state,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     setManagementOpen(open: boolean) { if (open) void openDetail(null); emit({ managementOpen: open }); },
-    selectRepository, refresh, loadMore, openDetail, dispose,
+    selectRepository, refresh, invalidateList, loadMore, openDetail, dispose,
   };
 }
 export type AssetsStore = ReturnType<typeof createAssetsStore>;

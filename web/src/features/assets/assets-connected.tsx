@@ -49,11 +49,11 @@ export function AssetsConnected({ api, repositories, repositoryManagement }: Pro
   }
   const bindings: RepositoryManagementBindings = {
     onOpen() { store.setManagementOpen(true); changeQuery({ catchId: null }); },
-    onClosed() { store.setManagementOpen(false); void store.refresh(repositoryId); },
+    onClosed() { store.setManagementOpen(false); void store.invalidateList(repositoryId); },
     onShowRepository(id) {
       store.setManagementOpen(false);
       changeQuery({ repositoryId: id || null, catchId: null, tab: null });
-      void store.refresh(id);
+      void store.invalidateList(id);
     },
   };
   // URL 변경 직후 effect가 실행되기 전에도 이전 저장소/상세를 잠깐 보여 주지 않는다.

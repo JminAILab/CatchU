@@ -97,6 +97,96 @@ test("동시 재조회와 더 보기 중복 클릭을 합치고, 같은 저장�
   assert.deepEqual(store.getSnapshot().items.map((v) => v.catchId), ["b"]);
 });
 
+test("D 모달을 닫으면 모달 활동 전 조회가 끝난 뒤 새 Catch 목록을 읽는다", async () => {
+  const old = deferred(); let serverItems = []; let calls = 0;
+  const store = createAssetsStore(createCatchApi(async () => ++calls === 1 ? old.promise : page(serverItems)));
+  const initial = store.refresh("repo-a");
+  store.setManagementOpen(true);
+  serverItems = [item("new")];
+  store.setManagementOpen(false);
+  const closed = store.invalidateList("repo-a");
+  assert.equal(calls, 1);
+  old.resolve(page([]));
+  await Promise.all([initial, closed]);
+  assert.equal(calls, 2);
+  assert.equal(store.getSnapshot().managementOpen, false);
+  assert.deepEqual(store.getSnapshot().items.map((v) => v.catchId), ["new"]);
+});
+
+test("같은 조회 중 D 갱신 요청이 반복되어도 후속 조회 하나로 합친다", async () => {
+  const old = deferred(); const fresh = deferred(); let calls = 0;
+  const store = createAssetsStore(createCatchApi(async () => ++calls === 1 ? old.promise : fresh.promise));
+  const initial = store.refresh("repo-a");
+  const one = store.invalidateList("repo-a");
+  const two = store.invalidateList("repo-a");
+  assert.equal(one, two);
+  assert.equal(calls, 1);
+  old.resolve(page([])); await initial;
+  assert.equal(calls, 2);
+  fresh.resolve(page([item("new")])); await Promise.all([one, two]);
+  assert.equal(calls, 2);
+  assert.deepEqual(store.getSnapshot().items.map((v) => v.catchId), ["new"]);
+});
+
+test("필터가 바뀌면 이전 저장소에 예약된 D 갱신을 버린다", async () => {
+  const old = deferred(); const paths = [];
+  const store = createAssetsStore(createCatchApi(async (path) => {
+    paths.push(path);
+    return path.includes("repo-a") ? old.promise : page([item("b", "repo-b")]);
+  }));
+  const initial = store.refresh("repo-a");
+  const closed = store.invalidateList("repo-a");
+  await store.selectRepository("repo-b");
+  old.resolve(page([item("old")])); await Promise.all([initial, closed]);
+  assert.equal(paths.length, 2);
+  assert.equal(store.getSnapshot().repositoryId, "repo-b");
+  assert.deepEqual(store.getSnapshot().items.map((v) => v.catchId), ["b"]);
+});
+
+test("dispose 후 같은 저장소로 돌아와도 이전 D 갱신 예약과 응답을 버린다", async () => {
+  const old = deferred(); const calls = [];
+  const store = createAssetsStore(createCatchApi(async (_path, options) => {
+    calls.push(options);
+    return calls.length === 1 ? old.promise : page([item("new")]);
+  }));
+  const initial = store.refresh("repo-a");
+  const closed = store.invalidateList("repo-a");
+  store.dispose();
+  assert.equal(calls[0].signal.aborted, true);
+  await store.selectRepository("repo-a");
+  old.resolve(page([item("old")])); await Promise.all([initial, closed]);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(store.getSnapshot().items.map((v) => v.catchId), ["new"]);
+});
+
+test("이전 조회가 실패해도 사용자가 요청한 D 갱신은 한 번 실행하고 실패하면 멈춘다", async () => {
+  const old = deferred(); let calls = 0;
+  const store = createAssetsStore(createCatchApi(async () => ++calls === 1 ? old.promise : calls === 2 ? fail : page([item("new")])));
+  const initial = store.refresh("repo-a");
+  const closed = store.invalidateList("repo-a");
+  old.resolve(fail); await Promise.all([initial, closed]);
+  assert.equal(calls, 2);
+  assert.equal(store.getSnapshot().listState, "error");
+  await store.refresh("repo-a");
+  assert.equal(calls, 3);
+  assert.deepEqual(store.getSnapshot().items.map((v) => v.catchId), ["new"]);
+});
+
+test("후속 조회가 시작된 뒤 새 D 갱신이 오면 그 조회 뒤에도 한 번 더 읽는다", async () => {
+  const old = deferred(); const fresh = deferred(); let calls = 0;
+  const store = createAssetsStore(createCatchApi(async () => ++calls === 1 ? old.promise : calls === 2 ? fresh.promise : page([item("latest")])));
+  const initial = store.refresh("repo-a");
+  const firstChange = store.invalidateList("repo-a");
+  old.resolve(page([])); await initial;
+  assert.equal(calls, 2);
+  const secondChange = store.invalidateList("repo-a");
+  assert.equal(secondChange, store.invalidateList("repo-a"));
+  fresh.resolve(page([item("before-second-change")]));
+  await Promise.all([firstChange, secondChange]);
+  assert.equal(calls, 3);
+  assert.deepEqual(store.getSnapshot().items.map((v) => v.catchId), ["latest"]);
+});
+
 test("반복 cursor를 거절하고 페이지 경계의 같은 Catch는 최신 값 하나만 유지한다", async () => {
   let n = 0;
   const store = createAssetsStore(createCatchApi(async () => ++n === 1
