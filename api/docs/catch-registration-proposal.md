@@ -79,7 +79,15 @@ B의 의도적인 거부에는 고정 reason/field만 넣는다. 후보 원문·
 
 ## 6. 검사 실행
 
-순수 함수·기존 API 검사는 `npm test`, 실제 B 저장 검사는 `npm run test:catches:db`다. DB 검사는 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 모두 지정한다. DB 이름은 `_test`로 끝나야 한다. 일반 검사에서 설정이 없으면 DB 검사는 건너뛴 것으로 표시하고, 명시 DB 검사에서 누락/잘못된 설정은 실패한다.
+전체 검사는 공통 DB 실행기를 사용하는 `npm test`이며, B DB 검사도 생략하지 않는다. 공통 실행기가 `.env`·환경변수·테스트 기본값으로 확정한 `DB_*`를 그대로 사용하고 `_test` 이름을 다시 확인한다. B 저장 검사만 실행하는 `npm run test:catches:db`는 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, `TEST_DB_PASSWORD`, `TEST_DB_NAME`을 모두 지정한다. 설정 누락이나 잘못된 DB 이름은 실패한다. 전체 마이그레이션 적용은 #104·E 선행 테이블이 필요하며, 제품 코드가 합성 테이블을 만들지는 않는다.
+
+실제 A/E 테이블 없이 전체 검사를 재현할 때는 **새로 만든 폐기 가능한 전용 테스트 DB**에 한해 아래 검사 전용 helper로 최소 선행 테이블을 먼저 준비한다. `DB_*`를 그 전용 `_test` DB에 지정하고, 전체 검사에 쓰는 `TEST_DB_*`도 같은 대상으로 지정해야 한다. 기존 제품/개발 DB에는 실행하지 않는다. 테이블이 이미 있으면 덮어쓰지 않고 실패한다. 이 합성 스키마 준비는 실제 A/E 연결 완료가 아니며, 공통 실행기나 제품 마이그레이션에 자동 준비를 넣지 않는다.
+
+```powershell
+# api에서 npm run build 후, 위 전용 테스트 DB 설정으로 한 번만 실행
+node -e "const {openTestDataSource}=require('./test/support/test-database.cjs'); const {createUpstreamTables}=require('./test/support/catch-db-fixture.cjs'); (async()=>{const db=await openTestDataSource(); try{await createUpstreamTables(db);}finally{await db.destroy();}})().catch(e=>{console.error(e);process.exitCode=1;});"
+npm test
+```
 
 검사 fixture는 임의 이름의 격리 스키마에 **테스트용** A/E 최소 테이블을 먼저 만들고 실제 B 마이그레이션을 적용한다. 정상 등록 자료에는 합성 관측의 보호 판단을 명시적으로 준비한다. 종료 시 자신이 만든 스키마만 정리한다. 기존 public 스키마나 제품 DB를 초기화하지 않는다.
 

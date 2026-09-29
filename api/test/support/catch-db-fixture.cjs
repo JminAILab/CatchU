@@ -2,9 +2,16 @@ const { randomUUID } = require('node:crypto');
 
 const TEST_KEYS = ['TEST_DB_HOST', 'TEST_DB_PORT', 'TEST_DB_USER', 'TEST_DB_PASSWORD', 'TEST_DB_NAME'];
 
-// 일반 검사에서 DB 설정이 전혀 없으면 건너뛴다. 명시 실행/부분 설정은 조용히 건너뛰지 않는다.
+// npm test는 공통 실행기가 확정한 DB_*를 사용한다. B 전용 명령만 TEST_DB_*를 직접 받는다.
 function readCatchTestDatabase(env = process.env) {
-  if (env.CATCH_DB_TEST_REQUIRED !== '1' && TEST_KEYS.every((key) => env[key] === undefined)) return undefined;
+  if (env.CATCH_DB_TEST_REQUIRED !== '1') {
+    require('reflect-metadata');
+    const { readDatabaseConfig } = require('../../dist/database/database.config');
+    const { assertTestDatabaseName } = require('./test-database.cjs');
+    const config = readDatabaseConfig(env);
+    assertTestDatabaseName(config.database);
+    return { type: 'postgres', ...config, synchronize: false, logging: false, connectTimeoutMS: 5000 };
+  }
   const missing = TEST_KEYS.filter((key) => !env[key]);
   if (missing.length) throw new Error(`Catch DB 검사에 필요한 설정: ${missing.join(', ')}`);
   if (!env.TEST_DB_NAME.endsWith('_test')) throw new Error('TEST_DB_NAME은 _test로 끝나야 합니다.');
@@ -37,6 +44,8 @@ function candidate(candidateId = 'synthetic-candidate-1', workIdentity = 'synthe
 
 /** A/E 구현의 대체물이 아닌 B의 FK·맥락 검사를 위한 최소 합성 스키마다. */
 async function createUpstreamTables(dataSource) {
+  const { assertTestDatabaseName } = require('./test-database.cjs');
+  assertTestDatabaseName(dataSource.options.database);
   await dataSource.query(`CREATE TABLE member_account (
     member_id uuid PRIMARY KEY, account_state varchar NOT NULL DEFAULT 'ACTIVE'
   )`);
@@ -104,8 +113,8 @@ async function createCatchDbFixture(config) {
     return {
       dataSource, schema, close,
       async reset() {
-        await dataSource.query(`TRUNCATE candidate_registration, catch_evidence, catch_asset,
-          repository_protection, result_application_record, analysis_attempt, analysis_request, member_account CASCADE`);
+        const { resetTestDatabase } = require('./test-database.cjs');
+        await resetTestDatabase(dataSource);
       },
       async receipt(overrides = {}, { repositoryId = 'synthetic-repository', protection = 'NONE' } = {}) {
         const input = {
@@ -144,4 +153,4 @@ async function createCatchDbFixture(config) {
   }
 }
 
-module.exports = { candidate, readCatchTestDatabase, createCatchDbFixture };
+module.exports = { candidate, readCatchTestDatabase, createCatchDbFixture, createUpstreamTables };

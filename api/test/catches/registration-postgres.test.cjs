@@ -27,7 +27,6 @@ function fillWorkerTemplate(template, values) {
 
 // #104/E 구현이 아닌 합성 선행 테이블과 실제 PostgreSQL에서 B 저장·제약·트랜잭션만 검증한다.
 describe('Catch 등록 PostgreSQL', {
-  skip: config ? false : 'TEST_DB_* 미설정: 실제 DB 검사는 npm run test:catches:db로 실행',
   concurrency: false, timeout: 60000,
 }, () => {
   let fixture;

@@ -10,7 +10,7 @@ process.env.AUTH_JWT_SECRET = randomBytes(32).toString('hex');
 process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = '60';
 delete process.env.DEV_LOGIN_ENABLED;
 
-test('GET /health는 외부 의존 없이 200과 status만 반환한다', { timeout: 10000 }, async (t) => {
+test('GET /health는 200과 status만 반환한다', { timeout: 10000 }, async (t) => {
   const app = await configureApp(await NestFactory.create(AppModule, { logger: false, abortOnError: false }));
   t.after(() => app.close());
   // 다른 개발 서버와 충돌하지 않도록 테스트에서만 임의의 로컬 포트를 사용한다.
