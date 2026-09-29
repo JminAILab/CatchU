@@ -31,19 +31,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
 
     fixture = await createCatchDbFixture(config);
     db = fixture.dataSource;
-    const { CreateRepositoryProtection1790601000000 } = require('../../dist/database/migrations/1790601000000-CreateRepositoryProtection');
-    const runner = db.createQueryRunner();
-    try {
-      await runner.connect();
-      await runner.startTransaction();
-      await new CreateRepositoryProtection1790601000000().up(runner);
-      await runner.commitTransaction();
-    } catch (error) {
-      if (runner.isTransactionActive) await runner.rollbackTransaction();
-      throw error;
-    } finally {
-      await runner.release();
-    }
+    // 공용 B fixture가 Catch와 보호 판단 마이그레이션을 함께 적용한다.
 
     const { Global, Module } = require('@nestjs/common');
     const { APP_INTERCEPTOR, NestFactory } = require('@nestjs/core');
