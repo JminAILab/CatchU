@@ -107,8 +107,8 @@ components:
     LinkGrant: {$ref: "./recipient-api.yaml#/components/securitySchemes/LinkGrant"}
 ```
 
-- 판정 순서는 링크 존재/중단/만료 → 비밀번호 조건 → 현재 허용 자료다. 없는 URL·중단·만료는 동일 404/LINK_UNAVAILABLE와 “이 링크는 열람할 수 없습니다.”이며 details를 생략한다. 비밀번호 입력 전에 적용한다. 이 판정은 수신자 조회/unlock 경로에만 적용하고 발행자의 중단 PUT에는 적용하지 않는다(중단 응답은 아래 발급·중단 규칙).
-- 유효 링크의 비밀번호 미확인/무효 grant는 401/LINK_PASSWORD_REQUIRED, 잘못된 비밀번호는 401/LINK_PASSWORD_INVALID다. unlock 성공은 링크 한정 opaque grant를 반환하며 X-Link-Grant로 제시한다. 비밀번호 미설정 링크는 grant 없이 조회한다. 그 링크의 불필요한 unlock 요청은 400/INVALID_REQUEST다.
+- 판정 순서는 링크 존재/중단/만료 → 비밀번호 시도 제한(unlock에만) → 비밀번호 조건 → 현재 허용 자료다. 시도 제한은 비밀번호를 제출하는 unlock에만 적용하고 grant로 조회하는 GET에는 적용하지 않는다. 없는 URL·중단·만료는 동일 404/LINK_UNAVAILABLE와 “이 링크는 열람할 수 없습니다.”이며 details를 생략한다. 비밀번호 입력 전에 적용한다. 이 판정은 수신자 조회/unlock 경로에만 적용하고 발행자의 중단 PUT에는 적용하지 않는다(중단 응답은 아래 발급·중단 규칙).
+- 유효 링크의 비밀번호 미확인/무효 grant는 401/LINK_PASSWORD_REQUIRED, 잘못된 비밀번호는 401/LINK_PASSWORD_INVALID다. unlock 성공은 링크 한정 opaque grant를 반환하며 X-Link-Grant로 제시한다. 비밀번호 미설정 링크는 grant 없이 조회한다. 그 링크의 불필요한 unlock 요청은 400/INVALID_REQUEST다. 비밀번호 시도 제한에 걸린 동안은 올바른 비밀번호도 429/LINK_UNLOCK_LIMITED로 거부하고 남은 초를 Retry-After 헤더로 보낸다.
 - grant는 링크에 묶이며 회원 JWT·영구 접근권이 아니다. 매 조회/unlock에서 현재 링크/권한을 다시 검사하고 grant만으로 중단·만료를 우회하지 못한다. 저장·수명·시도 제한은 C 설계 OQ-C1이다.
 - 정상 목록은 **링크 소유자의 현재 공개 Catch 전체**를 페이지로 제공한다. 링크–자산 join/snapshot/선택 목록을 만들지 않는다. 현재 허용 자료 0개는 200+빈 배열, 자료 조회 실패는 500이며 빈 자료로 대체하지 않는다.
 - 직접 Catch 조회는 같은 링크 소유자의 현재 PUBLIC·보호 제한 없음만 허용한다. 숨김·타인 소유·없음은 동일 404/RESOURCE_UNAVAILABLE “현재 열람할 수 없는 자료입니다.”이다. 비밀번호 미확인이면 Catch 존재를 검사해 알리지 않고 먼저 비밀번호 분기를 적용한다.
@@ -128,6 +128,7 @@ components:
 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED | 접수 충돌/보류. 기존 작업 ID는 본인에게만 |
 | 409 | IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED | 키 재사용 본문 충돌·공개 조건 실패 |
 | 409 | LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED | trim 제목 중복·유효 링크 5개 한도 |
+| 429 | LINK_UNLOCK_LIMITED | 수신자 비밀번호 시도 제한. 남은 초는 Retry-After 헤더 |
 | 500 | INTERNAL_ERROR | 서버·조회 실패. “처리 중 오류가 발생했습니다.” |
 
 오류 JSON은 `{code, message, details?}`다. details는 명세의 violations 또는 existingRequestId만 사용하고 원문 입력값·비밀번호·token·stack·SQL·내부 제공자 응답을 넣지 않는다. web은 message 문구 비교가 아닌 code로 분기한다. 예상 밖 응답/네트워크 실패는 로컬 LOOKUP_FAILED로 분류하고 빈 결과나 작업 실패로 치환하지 않는다. #88의 전역 필터·ValidationPipe·web 해석 함수가 이 정본을 따른다.
@@ -184,7 +185,7 @@ credentialContextReference는 A/F 계약에서 해석할 작업 맥락의 식별
 | OQ-B1 M/W (결정) | 2026-09-24 팀장 결정: B 등록(Catch·근거·등록 연결)과 E 반영 완료 기록을 한 트랜잭션으로 저장한다. 수신 기록은 그 전에 E가 저장한다. 등록 함수의 입출력과 테이블 생성 순서는 E↔B 등록 개발 이슈에서 정한다. | 트랜잭션 경계 확정. 실제 등록 연결의 함수 입출력·테이블 생성 순서는 개발 이슈에서 보완; 계약·ERD 관계와 유일성 유지 |
 | OQ-B2 W/B | 실패 후 초안/최소 질문 보완·동의 재사용·재분석·기존 Catch/링크 변경: 팀장 + B/E/F/C, 해당 기능 추가 전 | 보완/재분석 endpoint를 제공하지 않음. Q1 허용 실패 재요청과 기존 공개는 별개 |
 | OQ-B3 P | 원본 상태 관측 경로·주기/오류 처리·원본 재공개/연동 해제/보관: A/B/F/H, 해당 실제 보호 연결 전 | 관측이 필요한 실제 자료 공개. 확인된 SOURCE_PRIVATE 차단 규칙은 고정 |
-| OQ-C1 P | grant 수명/브라우저 저장·비밀번호 시도 제한과 응답 시간 은닉 검증: C/3, 실제 비밀번호 연결 전 | 실제 보호 구현. 링크 중단/만료의 현재 판정과 401/404 계약 유지 |
+| OQ-C1 P (결정) | 2026-09-29 결정(#150): 차단 응답은 429/LINK_UNLOCK_LIMITED와 Retry-After로 계약에 반영한다. grant 형식·수명·브라우저 보관·시도 제한 값과 비밀번호 저장 방식은 C/3 설계로 정했다(#150 결정 댓글). 응답 시간 은닉은 보장하지 않고 응답 코드·본문 동일성만 검사한다. 실제 비밀번호 연결(#150·#152) 검증 뒤 닫는다 | 실제 보호 구현. 링크 중단/만료의 현재 판정과 401/404 계약 유지, 429는 unlock 시도 제한에만 |
 | OQ-L W | 서비스 제공자·모델·조건: 팀장/1, 개발 중후반 실제 제공자 연결 전 | 실제 제공자 연결. SDK 없는 가짜 생성기 계약은 가능 |
 
 ## 담당자 확인 요청

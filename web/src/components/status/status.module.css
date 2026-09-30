@@ -1,0 +1,39 @@
+.box,
+.failed {
+  padding: 28px 24px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.failed {
+  border-color: #e6c3bf;
+  background: #fdf6f5;
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.failed .title {
+  color: var(--color-danger);
+}
+
+.text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-muted);
+}
+
+.retry {
+  margin-top: 16px;
+  padding: 8px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+}

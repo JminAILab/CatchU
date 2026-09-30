@@ -238,7 +238,7 @@ components:
         representedFacts: {"type":"array","items":{"type":"string"}}
         contributionScope: {"type":"string"}
         coverageLimits: {"type":"array","items":{"type":"string"}}
-  headers: {"NoStore":{"description":"회원·수신자 응답에 Cache-Control: no-store","schema":{"type":"string","enum":["no-store"]}}}
+  headers: {"NoStore":{"description":"회원·수신자 응답에 Cache-Control: no-store","schema":{"type":"string","enum":["no-store"]}},"RetryAfter":{"description":"차단 해제까지 남은 초","schema":{"type":"integer","minimum":1}}}
   responses:
     Error400:
       description: "오류 코드 표 및 경계 규칙 참조"
@@ -259,6 +259,10 @@ components:
     Error409:
       description: "오류 코드 표 및 경계 규칙 참조"
       headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"}}
+      content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}
+    Error429:
+      description: "오류 코드 표 및 경계 규칙 참조"
+      headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"},"Retry-After":{"$ref":"#/components/headers/RetryAfter"}}
       content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}
     Error500:
       description: "오류 코드 표 및 경계 규칙 참조"
