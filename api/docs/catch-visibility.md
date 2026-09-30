@@ -35,6 +35,8 @@ const catchDetail = await publicCatches.get(link.ownerId, catchId);
 
 `api/`에서 `TEST_DB_HOST/PORT/USER/PASSWORD/NAME`을 설정한 뒤 `npm run test:catches:db`로 실행한다. DB 이름은 `_test`로 끝나야 한다. 기존 등록 테스트의 공용 worker 합성 자료까지 검사하려면 `CATCH_WORKER_FIXTURE_ROOT`도 설정한다.
 
-검사는 실제 Nest HTTP·인증 토큰·PostgreSQL·B 마이그레이션을 사용한다. A/E 테이블과 분석 결과·보호 관찰은 명시적인 합성 fixture이며, PublicCatchStore는 링크 접근이 허용된 C 호출부 대신 직접 호출한다. 공개·숨김 반복, 권한, 공개 필드, 페이지 중 숨김/보호 변경, 저장/조회 실패, 보호 갱신과 공개 요청의 동시성을 검사한다.
+검사는 실제 Nest HTTP·개발 로그인·PostgreSQL과 회원·분석 기반 및 B 마이그레이션을 사용한다. 개발 로그인으로 생성된 회원 UUID와 발급 토큰으로 미확인 공개 거절 → 확인 후 PRIVATE 유지 → 별도 PUBLIC 변경 → 타인 변경 거절 → PRIVATE 변경을 검사하고, 공개·숨김이 다음 수신자 내부 조회에 반영되는지 확인한다.
+
+분석 요청·동의·시도는 실제 기반 엔티티에 합성 자료를 넣으며, 아직 연결하지 않은 E의 결과 수신 기록 테이블·완료 처리는 SQL 시험 대역이다. 분석 후보·근거·원본 보호 관찰도 명시적인 합성 자료다. PublicCatchStore는 링크 접근이 허용된 C 호출부 대신 직접 호출한다. 이 밖에 공개·숨김 반복, 권한, 공개 필드, 페이지 중 숨김/보호 변경, 저장/조회 실패, 보호 갱신과 공개 요청의 동시성을 검사한다.
 
 실제 Google/GitHub·분석 결과·원본 관찰 공급, C의 링크·비밀번호 HTTP 경로와의 종단 연결, 화면 연결·NCP 배포는 이 검사에 포함하지 않는다. C 수신자 API 연결은 #151, 실제 원본 보호 관찰 공급은 #129 B08에서 이어간다.

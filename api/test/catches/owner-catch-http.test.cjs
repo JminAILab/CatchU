@@ -172,7 +172,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
   const visibilityPath = (catchId) => detailPath(catchId) + '/visibility';
   const ids = (items) => items.map((item) => item.catchId).sort();
 
-  test('개발 로그인 HTTP 토큰의 실제 회원 UUID로 본인 조회·확인하고 타인 접근을 거부한다', async () => {
+  test('개발 로그인 회원이 조회·확인·공개·숨김하고 타인 변경은 거부하며 수신자 조회에 반영한다', async () => {
     // 실제 개발 로그인 경로를 사용한다. Google 인증과 E 분석 수신은 이 시험의 범위가 아니다.
     const login = async (identifier) => {
       const body = success(await request(undefined, '/v1/auth/dev-login', {
@@ -197,6 +197,12 @@ describe('본인 Catch HTTP·PostgreSQL', {
       items: [detail], page: { nextCursor: null },
     });
     assert.deepEqual(await snapshot(), beforeRead);
+    const emptyPublic = { catches: [], page: { nextCursor: null } };
+    failure(await request(undefined, visibilityPath(own.catchId), {
+      headers: owner.headers, method: 'PUT', body: { visibility: 'PUBLIC' },
+    }), 409, 'CONFIRMATION_REQUIRED');
+    assert.deepEqual(await snapshot(), beforeRead);
+    assert.deepEqual(await publicCatches.list(owner.memberId, {}), emptyPublic);
     const confirmed = success(await request(undefined, confirmPath(own.catchId), {
       headers: owner.headers, method: 'PUT', body: CONFIRMED,
     }));
@@ -205,6 +211,15 @@ describe('본인 Catch HTTP·PostgreSQL', {
     assert.deepEqual(await asset(own.catchId), {
       ...beforeRead.assets[0], work_facts_confirmed: true, contribution_confirmed: true,
     });
+    assert.deepEqual(await publicCatches.list(owner.memberId, {}), emptyPublic);
+    const published = success(await request(undefined, visibilityPath(own.catchId), {
+      headers: owner.headers, method: 'PUT', body: { visibility: 'PUBLIC' },
+    }));
+    assert.equal(published.visibility, 'PUBLIC');
+    assert.deepEqual(published.confirmation, CONFIRMED);
+    // C의 링크 인증 경로는 대체하지 않는다. 허용된 링크 소유자 ID로 호출하는 내부 조회만 검사한다.
+    assert.deepEqual(ids((await publicCatches.list(owner.memberId, {})).catches), [own.catchId]);
+    assert.equal((await publicCatches.get(owner.memberId, own.catchId)).catchId, own.catchId);
     const beforeForeign = await snapshot();
     assert.deepEqual(success(await request(undefined, '/v1/catches', { headers: other.headers })), {
       items: [], page: { nextCursor: null },
@@ -213,8 +228,21 @@ describe('본인 Catch HTTP·PostgreSQL', {
       [detailPath(own.catchId), {}],
       [confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }],
       [mismatchPath(own.catchId), { method: 'PUT', body: { mismatch: true } }],
+      [visibilityPath(own.catchId), { method: 'PUT', body: { visibility: 'PRIVATE' } }],
+      [visibilityPath(own.catchId), { method: 'PUT', body: { visibility: 'PUBLIC' } }],
     ]) failure(await request(undefined, path, { ...options, headers: other.headers }), 404, 'RESOURCE_UNAVAILABLE');
     assert.deepEqual(await snapshot(), beforeForeign);
+    const hidden = success(await request(undefined, visibilityPath(own.catchId), {
+      headers: owner.headers, method: 'PUT', body: { visibility: 'PRIVATE' },
+    }));
+    assert.equal(hidden.visibility, 'PRIVATE');
+    assert.deepEqual(hidden.confirmation, CONFIRMED);
+    assert.deepEqual(await publicCatches.list(owner.memberId, {}), emptyPublic);
+    await assert.rejects(publicCatches.get(owner.memberId, own.catchId), { status: 404 });
+    assert.deepEqual(await snapshot(), {
+      ...beforeRead,
+      assets: [{ ...beforeRead.assets[0], work_facts_confirmed: true, contribution_confirmed: true }],
+    });
   });
 
   test('본인 목록·상세는 계약 필드를 반환하며 조회로 DB를 바꾸지 않는다', async () => {
