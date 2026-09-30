@@ -33,8 +33,10 @@ export function createIdempotencyKeyHolder(generate: () => string = createIdempo
 /**
  * 재전송 키를 버려도 되는 결과인지. 성공과, 서버가 판정해 돌려준 4xx 업무 거부만 확정으로 본다.
  * 조회 실패(네트워크·형식 오류)와 5xx는 서버가 저장했는지 알 수 없으므로 키를 유지한다.
+ * 401은 인증 단계에서 거부돼 이 요청을 처리하지 않았다는 뜻일 뿐, 앞서 보낸 같은 키 요청의 저장 여부는 알려 주지 않는다.
+ * 그래서 키를 유지한다. 로그인 뒤 이어 쓰는 것은 같은 회원·같은 생성 요청일 때만이며, 자동으로 다시 보내지 않는다.
  */
 export function isSettledResult(result: ApiResult): boolean {
   if (result.kind === "success") return true;
-  return result.kind === "api-error" && result.status >= 400 && result.status < 500;
+  return result.kind === "api-error" && result.status >= 400 && result.status < 500 && result.status !== 401;
 }
