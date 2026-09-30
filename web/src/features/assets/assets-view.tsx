@@ -14,6 +14,13 @@ export const assetTabs: { id: AssetTab; label: string }[] = [
 ];
 
 type AssetsViewProps = {
+  dataMode?: "preview" | "api";
+  detailItem?: CatchAsset;
+  listMessage?: string;
+  detailMessage?: string;
+  hasMore?: boolean;
+  moreState?: "idle" | "loading" | "error";
+  onLoadMore?: () => void;
   items: readonly CatchAsset[];
   repositories: readonly RepositoryOption[];
   repositoryId: string;
@@ -81,7 +88,7 @@ export function AssetsView(props: AssetsViewProps) {
     previousSelectedRef.current = selectedId;
   }, [selectedId]);
   const visibleItems = items.filter((item) => !repositoryId || item.repositoryId === repositoryId);
-  const selected = items.find((item) => item.catchId === selectedId);
+  const selected = props.dataMode === "api" ? props.detailItem : items.find((item) => item.catchId === selectedId);
   const selectedRepository = repositories.find((repo) => repo.repositoryId === repositoryId);
 
   return (
@@ -114,7 +121,7 @@ export function AssetsView(props: AssetsViewProps) {
               <label className={styles.filter}>저장소
                 <select value={repositoryId} onChange={(event) => props.onRepositoryChange(event.target.value)}>
                   <option value="">전체 저장소</option>
-                  {repositoryId && !selectedRepository && <option value={repositoryId}>알 수 없는 저장소</option>}
+                  {repositoryId && !selectedRepository && <option value={repositoryId}>저장소 이름 확인 전</option>}
                   {repositories.map((repo) => <option key={repo.repositoryId} value={repo.repositoryId}>{repo.name}</option>)}
                 </select>
               </label>
@@ -124,9 +131,9 @@ export function AssetsView(props: AssetsViewProps) {
               <StateMessage title="Catch를 불러오고 있습니다">목록을 확인하고 있어요. 잠시만 기다려 주세요.</StateMessage>
             ) : listState === "error" ? (
               <StateMessage title="Catch 목록을 불러오지 못했습니다" retry={props.onRetryList}>
-                조회에 문제가 생겼습니다. Catch가 없다는 뜻은 아닙니다.
+                {props.listMessage ?? "조회에 문제가 생겼습니다. Catch가 없다는 뜻은 아닙니다."}
               </StateMessage>
-            ) : repositoryId && !selectedRepository ? (
+            ) : props.dataMode !== "api" && repositoryId && !selectedRepository ? (
               <StateMessage title="저장소를 찾을 수 없습니다">필터에서 다른 저장소를 선택해 주세요.</StateMessage>
             ) : visibleItems.length === 0 ? (
               <StateMessage title={repositoryId ? "이 저장소에서 표시할 Catch가 없습니다" : "아직 표시할 Catch가 없습니다"}>
@@ -134,7 +141,7 @@ export function AssetsView(props: AssetsViewProps) {
               </StateMessage>
             ) : (
               <>
-                <p className={styles.count} aria-live="polite">{visibleItems.length}개의 Catch</p>
+                <p className={styles.count} aria-live="polite">{props.dataMode === "api" ? "불러온 " : ""}{visibleItems.length}개의 Catch</p>
                 <ul className={styles.grid}>
                   {visibleItems.map((item) => (
                     <li key={item.catchId} className={styles.card}>
@@ -151,6 +158,12 @@ export function AssetsView(props: AssetsViewProps) {
                 </ul>
               </>
             )}
+            {listState === "ready" && props.hasMore && <div className={styles.pagination}>
+              {props.moreState === "error" && <p role="alert">{props.listMessage ?? "다음 목록을 불러오지 못했습니다."}</p>}
+              <button className={styles.secondaryButton} disabled={props.moreState === "loading"} onClick={props.onLoadMore}>
+                {props.moreState === "loading" ? "불러오는 중…" : props.moreState === "error" ? "다음 목록 다시 불러오기" : "더 보기"}
+              </button>
+            </div>}
           </section>
         </>
       )}
@@ -158,13 +171,15 @@ export function AssetsView(props: AssetsViewProps) {
       {selectedId && tab === "catch" && (
         <CatchDetail key={selectedId} item={selected} state={detailState}
           repositoryName={repositories.find((repo) => repo.repositoryId === selected?.repositoryId)?.name}
-          onClose={props.onClose} onRetry={props.onRetryDetail} />
+          onClose={props.onClose} onRetry={props.onRetryDetail} dataMode={props.dataMode} errorMessage={props.detailMessage} />
       )}
     </main>
   );
 }
 
-function CatchDetail({ item, state, repositoryName, onClose, onRetry }: {
+function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage }: {
+  dataMode?: "preview" | "api";
+  errorMessage?: string;
   item?: CatchAsset;
   state: LoadState;
   repositoryName?: string;
@@ -183,17 +198,17 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry }: {
     <dialog ref={dialogRef} className={styles.dialog} aria-labelledby="catch-detail-title"
       onCancel={(event) => { event.preventDefault(); onClose(); }}>
       <div className={styles.dialogHeading}>
-        <div><p className={styles.eyebrow}>CATCH DETAIL · 임시 데이터</p><h2 id="catch-detail-title">Catch 상세</h2></div>
+        <div><p className={styles.eyebrow}>CATCH DETAIL{dataMode === "preview" ? " · 임시 데이터" : ""}</p><h2 id="catch-detail-title">Catch 상세</h2></div>
         <button className={styles.secondaryButton} autoFocus onClick={onClose}>닫기</button>
       </div>
       {state === "loading" ? <StateMessage title="상세 내용을 불러오고 있습니다">근거와 설명을 확인하고 있어요.</StateMessage>
-        : state === "error" ? <StateMessage title="상세 내용을 불러오지 못했습니다" retry={onRetry}>현재는 결과를 확인할 수 없습니다. 다시 불러와 주세요.</StateMessage>
+        : state === "error" ? <StateMessage title="상세 내용을 불러오지 못했습니다" retry={onRetry}>{errorMessage ?? "현재는 결과를 확인할 수 없습니다. 다시 불러와 주세요."}</StateMessage>
         : !item ? <StateMessage title="이 Catch를 열 수 없습니다">목록으로 돌아가 확인할 Catch를 다시 선택해 주세요.</StateMessage>
         : <>
           <p className={styles.repository}>{repositoryName ?? "저장소 정보 없음"}</p>
           <h3 className={styles.detailTitle}>{item.title}</h3>
           <StatusBadges item={item} />
-          <p className={styles.readOnlyNotice}>예시 자료입니다. 확인·불일치·공개 설정은 바뀌지 않습니다.</p>
+          <p className={styles.readOnlyNotice}>{dataMode === "preview" ? "예시 자료입니다. 확인·불일치·공개 설정은 바뀌지 않습니다." : item.sourceMode === "MOCK" ? "합성 자료로 생성된 Catch입니다. 실제 분석 결과와 구분해 확인해 주세요." : "확인과 공개 선택은 별도입니다."}</p>
           <section className={styles.detailSection}><h3>작업에서 확인된 사실</h3>
             {item.workFacts.length ? <ul>{item.workFacts.map((fact, index) => <li key={index}>{fact}</li>)}</ul> : <p>제공된 작업 사실이 없습니다.</p>}
           </section>
@@ -202,8 +217,9 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry }: {
             {item.evidence.length === 0 ? <p>제공된 근거가 없습니다.</p> : item.evidence.map((evidence, index) => (
               <article key={evidence.catchEvidenceId} className={styles.evidence}>
                 <h4>근거 {index + 1}</h4>
-                <p className={styles.sourceUrl}>{evidence.sourceUrl}</p>
-                <p className={styles.small}>가상 근거 주소 · 외부 연결 없음 · 판본 {evidence.sourceRevision}</p>
+                <p className={styles.sourceUrl}>{dataMode === "api" && item.sourceMode === "LIVE" && safeEvidenceUrl(evidence.sourceUrl)
+                  ? <a href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer">원본 근거 열기</a> : evidence.sourceUrl}</p>
+                <p className={styles.small}>{dataMode === "preview" || item.sourceMode === "MOCK" ? "가상 근거 주소 · 외부 연결 없음 · " : ""}판본 {evidence.sourceRevision}</p>
                 <ul>{evidence.representedFacts.map((fact, factIndex) => <li key={factIndex}>{fact}</li>)}</ul>
                 <p><strong>기여 범위:</strong> {evidence.contributionScope}</p>
                 {evidence.coverageLimits.length > 0 && <div><strong>이 근거로 알 수 없는 것</strong><ul>{evidence.coverageLimits.map((limit, limitIndex) => <li key={limitIndex}>{limit}</li>)}</ul></div>}
@@ -231,4 +247,8 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry }: {
       <div className={styles.dialogFooter}><button className={styles.primaryButton} onClick={onClose}>목록으로 돌아가기</button></div>
     </dialog>
   );
+}
+
+function safeEvidenceUrl(value: string) {
+  try { const url = new URL(value); return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password; } catch { return false; }
 }
