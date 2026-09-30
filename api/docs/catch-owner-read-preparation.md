@@ -1,6 +1,6 @@
 # 본인 Catch 조회·확인·불일치 API — #130·#131
 
-> 2026-09-29 · 실제 NestJS 라우트와 PostgreSQL 조회/저장 구현. A/E 선행 자료 및 보호 판단 공급은 해당 담당 코드와 연결해야 한다.
+> 2026-09-30 · 실제 NestJS 라우트와 PostgreSQL 조회/저장 구현. #104의 실제 회원·분석 테이블을 사용하며 E 수신·완료 호출과 보호 관찰 공급은 별도 연결 사항이다.
 
 ## 동작
 
@@ -37,15 +37,17 @@ B 저장 테이블/등록은 #105(PR #143), A/E 회원·원 요청·시도는 #1
 
 [`RepositoryProtection`](../src/catches/entities/repository-protection.entity.ts)과 [`CreateRepositoryProtection1790601000000`](../src/database/migrations/1790601000000-CreateRepositoryProtection.ts)은 B의 명시적인 보호 판단 저장 공간이다. 관측/판정이 없다고 NONE 행을 만들어 채우지 않는다. 같은 소유자·원 저장소의 보호 행이 없으면 조회는 500으로 실패한다. 이 초기 판단의 실제 공급과 원본 관측/복구는 후속 연결 사항이다. 테스트는 합성 관측을 명시해서 NONE/SOURCE_PRIVATE를 넣는다.
 
-마이그레이션은 회원 및 B Catch 선행 테이블 이후 적용한다. 실제 A/E 엔티티가 추가되면 외부 FK 메타데이터와 마이그레이션 timestamp 순서를 대조한다. `migration:generate`의 FK 삭제 제안을 검토 없이 적용하지 않는다.
+적용 순서는 #104 회원·분석 기반 → E 수신 기록 → B Catch·근거·후보 연결·보호 판단 테이블이다. #143에서 Catch 소유자·원 요청·보호 판단 소유자의 외래 키 메타데이터를 실제 회원·분석 엔티티와 연결했다. E 수신 기록 엔티티가 제공되면 후보 연결의 나머지 외부 FK 메타데이터와 적용 순서를 함께 대조한다. `migration:generate`의 FK 삭제 제안을 검토 없이 적용하지 않는다.
 
 ## 검사
 
-`api/`에서 `npm run typecheck`, `npm run lint`, `npm run test:catches:db`를 실행한다. 명시 DB 검사는 TEST_DB_HOST/PORT/USER/PASSWORD/NAME 다섯 값을 요구하며 이름은 `_test`로 끝나야 한다. 임의 스키마에 A/E 최소 테스트 테이블, 실제 B 등록·보호 마이그레이션을 적용하고 종료 시 자신의 스키마만 정리한다.
+`api/`에서 `npm run typecheck`, `npm run lint`, `npm run test:catches:db`를 실행한다. 명시 DB 검사는 TEST_DB_HOST/PORT/USER/PASSWORD/NAME 다섯 값을 요구하며 이름은 `_test`로 끝나야 한다. 임의 스키마에 실제 회원·동의·요청·시도 기반 마이그레이션, E 수신 테이블 대역, 실제 B 등록·보호 마이그레이션을 순서대로 적용하고 종료 시 자신의 스키마만 정리한다.
 
-[`owner-catch-http.test.cjs`](../test/catches/owner-catch-http.test.cjs)는 실제 JWT Guard·공통 오류·Nest 라우트·PostgreSQL을 연결한다. 본인/타인/미인증, 필터/페이지/입력 거부, 상태 분리·반복 요청, DB 조회/변경 실패·응답 무결성 실패 롤백을 검사한다. A/E 자료는 합성 대역이며 실제 로그인·E 수신·worker 전체 연결을 검증한 것은 아니다.
+[`owner-catch-http.test.cjs`](../test/catches/owner-catch-http.test.cjs)는 실제 JWT Guard·공통 오류·Nest 라우트·PostgreSQL을 연결한다. 본인/타인/미인증, 필터/페이지/입력 거부, 상태 분리·반복 요청, DB 조회/변경 실패·응답 무결성 실패 롤백을 검사한다. 저장소는 처음 동의·요청을 만들 때 지정하며 이후 동의와 다른 저장소로 바꾸지 않는다. 같은 회원의 후속 요청은 앞선 요청의 완료·종료를 시험에서 명시한다. 입력은 합성 자료이고 E 수신·완료 처리는 시험 대역이다. 실제 Google/GitHub 로그인·E 수신·worker 전체 연결을 검증한 것은 아니다.
 
-공통 `npm test`는 테스트 실행 전 제품 마이그레이션을 적용한다. 아직 실제 A/E 테이블이 없는 환경에서는 먼저 **폐기 가능한 빈 테스트 DB에 테스트용 선행 테이블**을 준비해야 한다. 제품 DB에 이 대역을 적용하지 않는다. 판본별 결과와 재현 조건은 PR에 남긴다.
+공통 `npm test`는 테스트 실행 전 제품 마이그레이션을 적용한다. **폐기 가능한 빈 테스트 DB**에서 [등록 연결 설명의 검사 실행](catch-registration-proposal.md#6-검사-실행)에 따라 실제 기반 마이그레이션과 E 수신 테이블 대역을 먼저 준비한다. 제품 DB에는 이 대역을 적용하지 않는다. 판본별 결과와 재현 조건은 PR에 남긴다.
+
+개발 로그인 HTTP가 실제 회원 행의 UUID로 발급한 토큰을 그대로 사용해 본인 목록·상세·확인 저장과 다른 회원의 접근 거부를 확인한다. 테스트 환경에서만 개발 로그인을 켜며, 테스트가 끝나면 설정을 복원한다. 이는 실제 외부 OAuth 또는 브라우저의 로그인 화면 검증과 구분한다.
 
 ## 근거
 

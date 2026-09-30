@@ -7,7 +7,8 @@ const { candidate, readCatchTestDatabase, createCatchDbFixture } = require('../s
 const config = readCatchTestDatabase();
 const CONFIRMED = { workFactsConfirmed: true, contributionConfirmed: true };
 
-// 실제 Nest HTTP·PostgreSQL·B 코드를 연결한다. A/E 선행 자료만 합성 스키마다.
+// 실제 Nest HTTP·PostgreSQL·회원/분석 기반·B 코드를 연결한다.
+// E 수신 기록·완료 처리·보호 관측은 SQL 시험 대역이며 실제 분석 수신이나 Google 로그인을 검증하지 않는다.
 describe('본인 Catch HTTP·PostgreSQL', {
   skip: config ? false : 'TEST_DB_* 미설정: 실제 DB 검사는 명시 DB 검사에서 실행',
   concurrency: false, timeout: 120000,
@@ -27,11 +28,11 @@ describe('본인 Catch HTTP·PostgreSQL', {
     process.env.AUTH_JWT_SECRET = randomBytes(32).toString('hex');
     process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = '600';
     process.env.NODE_ENV = 'test';
-    delete process.env.DEV_LOGIN_ENABLED;
+    process.env.DEV_LOGIN_ENABLED = 'true';
 
     fixture = await createCatchDbFixture(config);
     db = fixture.dataSource;
-    // 공용 B fixture가 Catch와 보호 판단 마이그레이션을 함께 적용한다.
+    // 실제 회원·분석 기반과 B 마이그레이션을 적용하며 E 수신 기록만 시험 대역이다.
 
     const { Global, Module } = require('@nestjs/common');
     const { APP_INTERCEPTOR, NestFactory } = require('@nestjs/core');
@@ -133,22 +134,15 @@ describe('본인 Catch HTTP·PostgreSQL', {
       const key = randomUUID();
       return candidate('synthetic-candidate-' + key, 'synthetic-work-' + index + '-' + key);
     });
-    const input = await fixture.receipt({ ownerId, candidates });
-    await db.query('UPDATE analysis_request SET repository_id = $1 WHERE request_id = $2',
-      [repositoryId, input.requestId]);
-    // 합성 관측에서 확인한 NONE/SOURCE_PRIVATE를 명시한다. 행 부재를 NONE으로 보정하지 않는다.
-    await db.query(`INSERT INTO repository_protection
-      (protection_id, owner_id, repository_id, confirmed_source_state, observation_provenance, observed_at, applied_restriction)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
-      ON CONFLICT (owner_id, repository_id) DO UPDATE SET
-        confirmed_source_state = EXCLUDED.confirmed_source_state,
-        observation_provenance = EXCLUDED.observation_provenance,
-        observed_at = EXCLUDED.observed_at,
-        applied_restriction = EXCLUDED.applied_restriction`,
-    [randomUUID(), ownerId, repositoryId,
-      { state: restriction === 'SOURCE_PRIVATE' ? 'PRIVATE' : 'PUBLIC', synthetic: true },
-      { kind: 'SYNTHETIC_FIXTURE' }, new Date('2026-09-29T00:00:00Z'), restriction]);
-    const results = await db.transaction((manager) => registerCandidates(manager, input));
+    // 요청과 불변 동의가 같은 저장소를 참조하도록 생성 시 전달한다. 보호 관측도 명시적인 시험 자료다.
+    const input = await fixture.receipt({ ownerId, candidates }, { repositoryId, protection: restriction });
+    const results = await db.transaction(async (manager) => {
+      const registered = await registerCandidates(manager, input);
+      // 본인 조회용 완료 상태를 E 처리 대역으로 준비한다. 이후 같은 회원의 새 요청도 ACTIVE 1개 제약을 지킨다.
+      await manager.query("UPDATE analysis_attempt SET application = 'APPLIED', owner_results_ready = true WHERE attempt_id = $1", [input.attemptId]);
+      await manager.query("UPDATE analysis_request SET lifecycle = 'CLOSED' WHERE request_id = $1", [input.requestId]);
+      return registered;
+    });
     return { ...input, repositoryId, restriction, catchId: results[0].catchId,
       catchIds: results.map((result) => result.catchId) };
   }
@@ -160,6 +154,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
       registrations: await db.query('SELECT * FROM candidate_registration ORDER BY registration_id'),
       protection: await db.query('SELECT * FROM repository_protection ORDER BY protection_id'),
       requests: await db.query('SELECT * FROM analysis_request ORDER BY request_id'),
+      consents: await db.query('SELECT * FROM analysis_consent ORDER BY consent_id'),
       attempts: await db.query('SELECT * FROM analysis_attempt ORDER BY attempt_id'),
     };
   }
@@ -173,6 +168,51 @@ describe('본인 Catch HTTP·PostgreSQL', {
   const confirmPath = (catchId) => detailPath(catchId) + '/confirmation';
   const mismatchPath = (catchId) => detailPath(catchId) + '/mismatch';
   const ids = (items) => items.map((item) => item.catchId).sort();
+
+  test('개발 로그인 HTTP 토큰의 실제 회원 UUID로 본인 조회·확인하고 타인 접근을 거부한다', async () => {
+    // 실제 개발 로그인 경로를 사용한다. Google 인증과 E 분석 수신은 이 시험의 범위가 아니다.
+    const login = async (identifier) => {
+      const body = success(await request(undefined, '/v1/auth/dev-login', {
+        method: 'POST', body: { memberId: identifier },
+      }));
+      assert.equal(body.tokenType, 'Bearer');
+      const memberId = await tokens.verify(body.accessToken);
+      assert.match(memberId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      assert.notEqual(memberId, identifier);
+      assert.deepEqual(await db.query('SELECT identity_reference FROM member_account WHERE member_id = $1', [memberId]),
+        [{ identity_reference: 'catchu:dev-login:' + identifier }]);
+      return { memberId, headers: { Authorization: 'Bearer ' + body.accessToken } };
+    };
+    const owner = await login('synthetic-owner-http-login');
+    const other = await login('synthetic-other-http-login');
+    assert.notEqual(owner.memberId, other.memberId);
+    const own = await seed({ ownerId: owner.memberId });
+    const beforeRead = await snapshot();
+    const detail = success(await request(undefined, detailPath(own.catchId), { headers: owner.headers }));
+    assert.equal(detail.catchId, own.catchId);
+    assert.deepEqual(success(await request(undefined, '/v1/catches', { headers: owner.headers })), {
+      items: [detail], page: { nextCursor: null },
+    });
+    assert.deepEqual(await snapshot(), beforeRead);
+    const confirmed = success(await request(undefined, confirmPath(own.catchId), {
+      headers: owner.headers, method: 'PUT', body: CONFIRMED,
+    }));
+    assert.deepEqual(confirmed.confirmation, CONFIRMED);
+    assert.equal(confirmed.visibility, 'PRIVATE');
+    assert.deepEqual(await asset(own.catchId), {
+      ...beforeRead.assets[0], work_facts_confirmed: true, contribution_confirmed: true,
+    });
+    const beforeForeign = await snapshot();
+    assert.deepEqual(success(await request(undefined, '/v1/catches', { headers: other.headers })), {
+      items: [], page: { nextCursor: null },
+    });
+    for (const [path, options] of [
+      [detailPath(own.catchId), {}],
+      [confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }],
+      [mismatchPath(own.catchId), { method: 'PUT', body: { mismatch: true } }],
+    ]) failure(await request(undefined, path, { ...options, headers: other.headers }), 404, 'RESOURCE_UNAVAILABLE');
+    assert.deepEqual(await snapshot(), beforeForeign);
+  });
 
   test('본인 목록·상세는 계약 필드를 반환하며 조회로 DB를 바꾸지 않는다', async () => {
     const own = await seed();
