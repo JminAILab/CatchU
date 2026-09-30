@@ -2,7 +2,7 @@
 
 NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준을 확인한다.
 
-현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 저장소 연결 전 독립 로직으로 제공하며 `AppModule`에는 등록하지 않는다. [#104 회원·분석 선행 테이블](https://github.com/JminAILab/CatchU/issues/104)과 개발 회원·합성 연동·공통 멱등 처리를 제공한다. 기능 API는 [#147 공유 링크 발급](https://github.com/JminAILab/CatchU/issues/147)(`POST /v1/share-links`)이 있다. 실제 로그인·나머지 기능 API·worker 연결은 후속 작업이다.
+현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 저장소 연결 전 독립 로직으로 제공하며 `AppModule`에는 등록하지 않는다. [#104 회원·분석 선행 테이블](https://github.com/JminAILab/CatchU/issues/104)과 개발 회원·합성 연동·공통 멱등 처리를 제공한다. 기능 API는 [#147 공유 링크 발급](https://github.com/JminAILab/CatchU/issues/147)(`POST /v1/share-links`)과 [#148 목록·중단](https://github.com/JminAILab/CatchU/issues/148)(`GET /v1/share-links`, `PUT /v1/share-links/{linkId}/stop`)이 있다. 실제 로그인·나머지 기능 API·worker 연결은 후속 작업이다.
 
 ## 공통 오류 처리 — API 명세 v1
 
@@ -634,7 +634,8 @@ Codex가 Windows 환경에서 위 구현 시작 커밋을 기준으로 작성한
 
 | 파일 | 내용 |
 |---|---|
-| `share-links.controller.ts`·`share-links.service.ts`·`share-links.module.ts` | 발급 API. 신규 201, 같은 키·같은 본문 재요청 200. 응답은 회원 API `ShareLink` |
+| `share-links.controller.ts`·`share-links.service.ts`·`share-links.module.ts` | 발급(신규 201, 같은 키·같은 본문 재요청 200)·목록·중단 API. 응답은 회원 API `ShareLink` |
+| `share-link-list.ts` | 목록 쿼리(`cursor`·`limit`) 검사와 소유자에 묶인 cursor |
 | `share-links.config.ts` | `SHARE_LINK_WEB_BASE_URL`(「설치와 환경변수」) |
 | `share-link-response.ts` | 응답 구성. 상태는 응답 시각으로 구하고, 토큰은 `url` 안에만 넣는다 |
 | `share-create.ts` | `ShareCreate` 입력 검증(제목만 trim), 발급 시각부터 정확히 30×24시간 만료 |
@@ -654,6 +655,24 @@ Codex가 Windows 환경에서 위 구현 시작 커밋을 기준으로 작성한
    - 같은 키: 지문이 다르면 409. 지문이 같아도 기록이 가리키는 링크를 읽어 `isSameShareCreate`로 비밀번호까지 비교한다. 비밀번호만 달라도 `409 IDEMPOTENCY_CONFLICT`이고, 같으면 그 링크를 현재 상태로 200 응답한다(중단됐으면 `STOPPED`). 기록과 링크가 어긋나면 409가 아니라 500이다.
 4. 응답 구성까지 같은 트랜잭션이다. 거절·실패하면 링크와 멱등 기록이 함께 롤백되어 같은 키를 다시 쓸 수 있다.
 
+### 목록·중단 — #148
+
+- **목록** `GET /v1/share-links`: 본인 링크만 발행 시각 최신순, 같은 시각이면 `linkId` 역순이다(동일 시각 정렬은 제안). `limit`은 1~100(기본 20), `page.nextCursor`는 마지막 페이지에서 null. 0개는 `items: []`인 정상 응답이다. 상태는 응답 시각으로 구한다.
+  - 쿼리는 `cursor`·`limit`만 받는다. 다른 이름, 같은 이름 반복, 범위 밖 `limit`, 고치거나 다른 회원의 `cursor`는 `400 VALIDATION_FAILED`(reason `whitelistValidation`·`isInt`·`min`·`max`·`isCursor`)이며 입력값을 담지 않는다.
+  - cursor는 소유자와 위치만 담은 불투명 문자열이다. 권한을 담지 않으므로 매 요청 인증된 회원의 링크만 다시 조회한다.
+- **중단** `PUT /v1/share-links/{linkId}/stop`: #148 9/29 팀장 결정 표를 따른다. 업무 판정은 200과 404를 쓴다(입력 오류 400·인증 오류 401·서버 오류 500은 별도).
+
+| 경우 | 응답 |
+|---|---|
+| 본인 유효 링크 | 200, `STOPPED`(중단 시각 기록) |
+| 본인 링크 반복 중단 | 200, 처음 `stoppedAt` 유지(만료 시각이 지나도 `STOPPED`) |
+| 본인 만료 링크 | 200, 중단 처리 없이 `EXPIRED` |
+| 타인 링크·없는 링크·UUID 형식이 아닌 ID | 404 `RESOURCE_UNAVAILABLE`(소유 확인을 상태 확인보다 먼저) |
+| 본문(객체·배열·문자열 등 종류 무관)이나 쿼리가 붙은 요청 | 400 `VALIDATION_FAILED`(reason `isEmpty`·`whitelistValidation`). JSON 원시값은 해석 단계에서 400 `INVALID_REQUEST` |
+
+  - 링크 행을 `FOR UPDATE`로 잠가 동시 중단도 같은 `stoppedAt` 하나로 모은다. `share_link` 행만 바꾸며 Catch 내용·공개 상태는 건드리지 않는다.
+- 세 API 모두 회원 UUID가 아니거나 회원 행이 없는 토큰은 `401 AUTH_INVALID`다(발급과 같은 확인, PR #162 「확인받을 것」 2).
+
 ### 테이블
 
 마이그레이션 `1790745895865-CreateShareLink`가 `share_link`와 두 외래 키를 만든다. #104(`1790500000000`) 뒤, B(`1790600000000`)와는 서로 참조하지 않는다.
@@ -672,5 +691,6 @@ Codex가 Windows 환경에서 위 구현 시작 커밋을 기준으로 작성한
 ### 검사
 
 - `test/db/share-links-api.test.cjs`: 실제 앱·테스트 DB·개발 로그인 회원으로 HTTP 검증. 201·200·409(비밀번호만·제목·비밀번호 유무 차이), 제목 중복·한도·중단 제목 재사용, 동시 같은 키 5건 → 1개, 동시 다른 키 7건 → 5개, 회원별 범위, 인증·키·입력 오류, 회원 UUID가 아니거나 회원 행이 없는 토큰 401, 기록·링크 불일치 500, 비밀번호·토큰 로그 비노출.
+- `test/db/share-links-manage-api.test.cjs`: 목록·중단 HTTP 검증. 빈 목록, 본인 링크만, 최신순·동일 시각 정렬, cursor 페이지(빠짐·중복 없음), 상태 3종, 쿼리 오류, 첫·반복 중단(처음 `stoppedAt` 유지), 만료 링크 중단, 중단 뒤 만료, 타인·없는·형식 오류 ID 동일 404, 본문(객체·배열·원시값·비JSON)·쿼리 400, 동시 중단 5건, 인증 오류, 목록 조회 DB 오류 500.
 - `test/db/share-link-issuance.test.cjs`: 마이그레이션한 스키마·외래 키, 발급 판정(중단·만료 제외, 만료 경계, 동시 발급, 회원별 직렬화, 잠금 대기 중 만료, 롤백).
 - 단위: `test/share-create*.test.cjs`, `test/link-*.test.cjs`, `test/share-link-state.test.cjs`, `test/share-links-config.test.cjs`.

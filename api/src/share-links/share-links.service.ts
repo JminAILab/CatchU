@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { ApiError } from '../common/errors';
 import { runIdempotentCreation } from '../member-analysis/idempotent-creation';
 import { hashLinkPassword } from './link-password';
@@ -8,12 +8,34 @@ import { validateShareCreate } from './share-create';
 import { isSameShareCreate, shareCreateFingerprint } from './share-create-fingerprint';
 import { Clock, issueShareLink } from './share-link-issuance';
 import { ShareLink } from './share-link.entity';
+import { encodeShareLinkCursor, parseShareLinkListQuery } from './share-link-list';
 import { ShareLinkResponse, toShareLinkResponse } from './share-link-response';
 import { SHARE_LINKS_CONFIG, ShareLinksConfig } from './share-links.config';
 
 export const SHARE_LINKS_CLOCK = Symbol('SHARE_LINKS_CLOCK');
 
 const MEMBER_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+export interface ShareLinkPage {
+  items: ShareLinkResponse[];
+  page: { nextCursor: string | null };
+}
+
+const UUID_PATTERN = MEMBER_ID_PATTERN;
+
+/** 현재 인증 Guard(#87)는 회원 UUID 형식과 회원 행 존재까지 확인하지 않는다. UUID가 아닌 토큰(#104 이전 개발 토큰)은 DB에 닿기 전에 거른다. */
+function assertMemberIdFormat(memberId: string): void {
+  if (!MEMBER_ID_PATTERN.test(memberId)) throw new ApiError('AUTH_INVALID');
+}
+
+/**
+ * 회원 행이 없는 토큰은 외래 키 오류(500)나 거짓 빈 목록이 되기 전에 401로 끝낸다. 다른 DB 오류는 그대로 서버 오류로 둔다.
+ * FOR KEY SHARE로 요청이 끝날 때까지 회원 행 삭제를 막는다.
+ */
+async function assertMemberExists(manager: EntityManager, memberId: string): Promise<void> {
+  const member = await manager.query('SELECT 1 FROM member_account WHERE member_id = $1 FOR KEY SHARE', [memberId]);
+  if (member.length === 0) throw new ApiError('AUTH_INVALID');
+}
 
 export interface CreateShareLinkResult {
   /** 같은 키·같은 본문의 재요청이면 true(200), 새 발급이면 false(201) */
@@ -35,8 +57,7 @@ export class ShareLinksService {
    */
   async create(memberId: string, idempotencyKey: string | undefined, body: unknown): Promise<CreateShareLinkResult> {
     const { webBaseUrl } = this.config;
-    // 현재 인증 Guard(#87)는 회원 UUID 형식과 회원 행 존재까지 확인하지 않는다. UUID가 아닌 토큰(#104 이전 개발 토큰)은 DB에 닿기 전에 거른다.
-    if (!MEMBER_ID_PATTERN.test(memberId)) throw new ApiError('AUTH_INVALID');
+    assertMemberIdFormat(memberId);
     // 키 길이 등 나머지 형식은 공통 멱등 처리가 같은 400으로 검사한다.
     if (typeof idempotencyKey !== 'string') throw new ApiError('INVALID_REQUEST');
     const validation = validateShareCreate(body);
@@ -48,10 +69,7 @@ export class ShareLinksService {
     const linkToken = generateLinkToken();
 
     const { replayed, response } = await this.dataSource.transaction('READ COMMITTED', async (manager) => {
-      // 회원 행이 없는 토큰은 외래 키 오류(500)가 되기 전에 401로 끝낸다. 다른 DB 오류는 그대로 서버 오류로 둔다.
-      // FOR KEY SHARE로 발급이 끝날 때까지 회원 행 삭제를 막는다.
-      const member = await manager.query('SELECT 1 FROM member_account WHERE member_id = $1 FOR KEY SHARE', [memberId]);
-      if (member.length === 0) throw new ApiError('AUTH_INVALID');
+      await assertMemberExists(manager, memberId);
       return runIdempotentCreation(manager, {
         memberId, operation: 'createShareLink', key: idempotencyKey, requestFingerprint: shareCreateFingerprint(input),
       }, {
@@ -75,5 +93,57 @@ export class ShareLinksService {
       });
     });
     return { replayed, link: response };
+  }
+
+  /**
+   * 내 링크 목록(GET /v1/share-links). 본인 링크만 발행 시각 최신순(같으면 linkId 역순)으로 돌려준다.
+   * 상태는 저장하지 않고 응답 시각으로 구한다. 0개는 정상 빈 목록(`items: []`)이다.
+   */
+  async list(memberId: string, query: Record<string, unknown>): Promise<ShareLinkPage> {
+    assertMemberIdFormat(memberId);
+    const { limit, after } = parseShareLinkListQuery(memberId, query);
+    return this.dataSource.transaction('READ COMMITTED', async (manager) => {
+      await assertMemberExists(manager, memberId);
+      const qb = manager.getRepository(ShareLink).createQueryBuilder('link')
+        .where('link.ownerId = :memberId', { memberId })
+        .orderBy('link.issuedAt', 'DESC').addOrderBy('link.linkId', 'DESC')
+        .take(limit + 1);
+      if (after) {
+        qb.andWhere('(link.issuedAt, link.linkId) < (:issuedAt, :linkId)', { issuedAt: after.issuedAt, linkId: after.linkId });
+      }
+      const rows = await qb.getMany();
+      const now = this.clock();
+      const items = rows.slice(0, limit);
+      const last = items.at(-1);
+      return {
+        items: items.map((link) => toShareLinkResponse(link, this.config.webBaseUrl, now)),
+        page: { nextCursor: rows.length > limit && last ? encodeShareLinkCursor(memberId, last) : null },
+      };
+    });
+  }
+
+  /**
+   * 링크 중단(PUT /v1/share-links/{linkId}/stop). #148 9/29 팀장 결정 표를 따른다.
+   * - 소유 확인을 상태 확인보다 먼저 한다. 타인·없는 링크·UUID 형식이 아닌 ID는 같은 404 RESOURCE_UNAVAILABLE이다.
+   * - 유효 링크는 중단한다. 이미 중단한 링크는 처음 `stoppedAt`을 그대로 두고, 만료 링크는 중단 처리 없이 EXPIRED로 둔다. 모두 200.
+   * - 링크 행만 바꾸며 Catch 내용·공개 상태는 건드리지 않는다.
+   */
+  async stop(memberId: string, linkId: string): Promise<ShareLinkResponse> {
+    assertMemberIdFormat(memberId);
+    if (!UUID_PATTERN.test(linkId)) throw new ApiError('RESOURCE_UNAVAILABLE');
+    return this.dataSource.transaction('READ COMMITTED', async (manager) => {
+      await assertMemberExists(manager, memberId);
+      const repository = manager.getRepository(ShareLink);
+      // 같은 링크의 동시 중단이 서로 다른 stoppedAt을 쓰지 않도록 행을 잠근다.
+      const link = await repository.createQueryBuilder('link').setLock('pessimistic_write')
+        .where('link.linkId = :linkId AND link.ownerId = :memberId', { linkId, memberId }).getOne();
+      if (!link) throw new ApiError('RESOURCE_UNAVAILABLE');
+      const now = this.clock();
+      if (link.stoppedAt === null && now.getTime() < link.expiresAt.getTime()) {
+        link.stoppedAt = now;
+        await repository.update({ linkId: link.linkId }, { stoppedAt: now });
+      }
+      return toShareLinkResponse(link, this.config.webBaseUrl, now);
+    });
   }
 }
