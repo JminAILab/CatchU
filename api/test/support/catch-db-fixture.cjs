@@ -42,28 +42,20 @@ function candidate(candidateId = 'synthetic-candidate-1', workIdentity = 'synthe
   };
 }
 
-/** A/E 구현의 대체물이 아닌 B의 FK·맥락 검사를 위한 최소 합성 스키마다. */
+/** 실제 회원·분석 기반을 적용한다. E 수신 기록만 아직 구현되지 않은 명시적 SQL 시험 대역이다. */
 async function createUpstreamTables(dataSource) {
   const { assertTestDatabaseName } = require('./test-database.cjs');
+  const { DataSource } = require('typeorm');
+  const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
   assertTestDatabaseName(dataSource.options.database);
-  await dataSource.query(`CREATE TABLE member_account (
-    member_id uuid PRIMARY KEY, account_state varchar NOT NULL DEFAULT 'ACTIVE'
-  )`);
-  await dataSource.query(`CREATE TABLE analysis_request (
-    request_id uuid PRIMARY KEY, member_id uuid NOT NULL REFERENCES member_account(member_id),
-    repository_id text NOT NULL, current_attempt_id uuid NOT NULL,
-    lifecycle varchar NOT NULL DEFAULT 'ACTIVE' CHECK (lifecycle IN ('ACTIVE', 'CLOSED'))
-  )`);
-  await dataSource.query(`CREATE TABLE analysis_attempt (
-    attempt_id uuid PRIMARY KEY, request_id uuid NOT NULL REFERENCES analysis_request(request_id),
-    source_mode varchar NOT NULL CHECK (source_mode IN ('MOCK', 'LIVE')),
-    processing varchar NOT NULL DEFAULT 'SUCCEEDED',
-    application varchar NOT NULL DEFAULT 'PENDING'
-      CHECK (application IN ('NOT_READY', 'PENDING', 'APPLYING', 'RECOVERING', 'APPLIED', 'APPLY_FAILED')),
-    owner_results_ready boolean NOT NULL DEFAULT false, eligible_candidate_count integer NOT NULL DEFAULT 1
-  )`);
-  await dataSource.query(`ALTER TABLE analysis_request ADD CONSTRAINT fixture_current_attempt
-    FOREIGN KEY (current_attempt_id) REFERENCES analysis_attempt(attempt_id) DEFERRABLE INITIALLY DEFERRED`);
+  // 공통 npm test가 이어서 runMigrations해도 기반을 중복 생성하지 않도록 이력도 남긴다.
+  const foundation = new DataSource({ ...dataSource.options, migrations: [CreateMemberAnalysisFoundation1790500000000] });
+  try {
+    await foundation.initialize();
+    await foundation.runMigrations();
+  } finally {
+    if (foundation.isInitialized) await foundation.destroy();
+  }
   await dataSource.query(`CREATE TABLE result_application_record (
     application_record_id uuid PRIMARY KEY,
     request_id uuid NOT NULL REFERENCES analysis_request(request_id),
@@ -102,8 +94,15 @@ async function createCatchDbFixture(config) {
     const { CatchEvidenceEntity } = require('../../dist/catches/entities/catch-evidence.entity');
     const { CandidateRegistrationEntity } = require('../../dist/catches/entities/candidate-registration.entity');
     const { RepositoryProtectionEntity } = require('../../dist/catches/entities/repository-protection.entity');
+    const { MemberAccount, MemberProfile, GitHubConnection, AnalysisRequest, AnalysisConsent,
+      AnalysisAttempt, IdempotencyRecord } = require('../../dist/member-analysis/member-analysis.entity');
+    const { SnakeNamingStrategy } = require('../../dist/database/snake-naming.strategy');
     dataSource = new DataSource({
-      ...config, schema, entities: [CatchAssetEntity, CatchEvidenceEntity, CandidateRegistrationEntity, RepositoryProtectionEntity],
+      ...config, schema, namingStrategy: new SnakeNamingStrategy(),
+      entities: [MemberAccount, MemberProfile, GitHubConnection, AnalysisRequest, AnalysisConsent,
+        AnalysisAttempt, IdempotencyRecord, CatchAssetEntity, CatchEvidenceEntity,
+        CandidateRegistrationEntity, RepositoryProtectionEntity],
+      // 되돌리기 검사는 B 마이그레이션만 취소하여 실제 선행 테이블의 보존을 확인한다.
       migrations: [CreateCatchAssets1790600000000, CreateRepositoryProtection1790601000000],
       extra: { options: `-c TimeZone=UTC -c search_path=${schema}` },
     });
@@ -122,12 +121,27 @@ async function createCatchDbFixture(config) {
           resultId: `synthetic-result-${randomUUID()}`, ownerId: randomUUID(),
           sourceMode: 'MOCK', candidates: [candidate()], ...overrides,
         };
-        await dataSource.transaction(async (manager) => {
-          await manager.query('INSERT INTO member_account(member_id) VALUES ($1) ON CONFLICT DO NOTHING', [input.ownerId]);
-          await manager.query(`INSERT INTO analysis_request(request_id, member_id, repository_id, current_attempt_id)
-            VALUES ($1, $2, $3, $4)`, [input.requestId, input.ownerId, repositoryId, input.attemptId]);
-          await manager.query(`INSERT INTO analysis_attempt(attempt_id, request_id, source_mode)
-            VALUES ($1, $2, $3)`, [input.attemptId, input.requestId, input.sourceMode]);
+        await dataSource.transaction('READ COMMITTED', async (manager) => {
+          const consentId = randomUUID();
+          const now = new Date('2026-10-01T00:00:00Z');
+          await manager.query(`INSERT INTO member_account(member_id, identity_reference, account_state)
+            VALUES ($1, $2, 'ACTIVE') ON CONFLICT (member_id) DO NOTHING`,
+          [input.ownerId, `synthetic:catch-db-fixture:${input.ownerId.toLowerCase()}`]);
+          // worker 공용 합성 자료가 지정한 ID를 보존하고 순환 FK 세 행을 같은 트랜잭션에 준비한다.
+          // 이전 ACTIVE 요청은 자동으로 종료하지 않는다. 후속 요청 시험이 종료를 명시해야 한다.
+          await manager.insert(AnalysisRequest, {
+            requestId: input.requestId, memberId: input.ownerId, repositoryId, consentId,
+            currentAttemptId: input.attemptId, submittedAt: now, updatedAt: now,
+          });
+          await manager.insert(AnalysisConsent, {
+            consentId, requestId: input.requestId, memberId: input.ownerId, repositoryId,
+            accepted: true, noticeRevision: 'synthetic-notice', scopeRevision: 'synthetic-scope',
+            consentedScope: { synthetic: true }, consentedAt: now,
+          });
+          await manager.insert(AnalysisAttempt, {
+            attemptId: input.attemptId, requestId: input.requestId, sourceMode: input.sourceMode,
+            processing: 'SUCCEEDED', application: 'PENDING', eligibleCandidateCount: input.candidates.length,
+          });
           await manager.query(`INSERT INTO result_application_record
             (application_record_id, request_id, attempt_id, result_id, payload_fingerprint) VALUES ($1,$2,$3,$4,$5)`,
           [input.applicationRecordId, input.requestId, input.attemptId, input.resultId, 'synthetic-fingerprint']);

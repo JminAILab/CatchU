@@ -1,15 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import { Check, Column, Entity, PrimaryColumn, Unique } from 'typeorm';
+import { Check, Column, Entity, ForeignKey, PrimaryColumn, Unique } from 'typeorm';
+import { MemberAccount } from '../../member-analysis/member-analysis.entity';
 
 @Entity('repository_protection')
 @Unique('uq_repository_protection_owner_repository', ['ownerId', 'repositoryId'])
+@ForeignKey(() => MemberAccount, ['ownerId'], ['memberId'], { name: 'fk_repository_protection_owner_id' })
 @Check('ck_repository_protection_repository_id', 'char_length("repository_id") >= 1')
 @Check('ck_repository_protection_restriction', '"applied_restriction" IN (\'NONE\', \'SOURCE_PRIVATE\')')
 export class RepositoryProtectionEntity {
   @PrimaryColumn({ name: 'protection_id', type: 'uuid' })
   protectionId: string = randomUUID();
 
-  // 회원 엔티티에 의존하지 않고 공통 테이블 참조를 마이그레이션의 FK로 보장한다.
   @Column({ name: 'owner_id', type: 'uuid' })
   ownerId!: string;
 

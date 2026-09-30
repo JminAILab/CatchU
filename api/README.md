@@ -337,7 +337,7 @@ async save(manager: EntityManager, input: Input): Promise<void> {
 
 같은 작업 식별값이어도 기존 Catch의 원 저장소·MOCK/LIVE가 새 요청·시도와 다르면 `CONTEXT_MISMATCH`로 전체 반영을 거부한다. 이미 저장된 후보 연결을 재반영할 때도 대조하며 기존 Catch·수신 기록은 보존한다. E의 실제 실패 기록과 복구 연결은 별도다.
 
-실제 B PostgreSQL 검사는 `TEST_DB_HOST/PORT/USER/PASSWORD/NAME`을 지정하고 `npm run test:catches:db`로 실행한다. 이름이 `_test`로 끝나는 DB에 임의 스키마를 만들며, 테스트용 A/E 선행 테이블 위에 실제 B 마이그레이션을 적용한다. 제품 A/E 호출부나 전체 분석 연결을 대신하지 않는다. 일반 `npm test`에서도 B DB 검사를 생략하지 않으며, 공통 실행기가 전달한 테스트 DB 설정을 사용한다. 전체 마이그레이션 적용에는 #104 및 E의 선행 테이블이 먼저 필요하다. 아직 없는 선행 테이블을 제품 코드가 자동 생성하지 않는다.
+실제 B PostgreSQL 검사는 `TEST_DB_HOST/PORT/USER/PASSWORD/NAME`을 지정하고 `npm run test:catches:db`로 실행한다. 이름이 `_test`로 끝나는 DB의 임의 스키마에 #104의 실제 회원·분석 기반 마이그레이션과 B 마이그레이션을 적용한다. 입력 자료·보호 관찰과 E 수신 기록·완료 호출은 검사 대역이며, 전체 분석 연결을 대신하지 않는다. 실제 동의·요청·시도의 순환 FK와 회원당 활성 요청 하나 제약을 유지한다. 일반 `npm test`에서도 B DB 검사를 생략하지 않으며 공통 실행기의 테스트 DB 설정을 사용한다. 전체 검사 재현은 [등록 연결 설명의 검사 실행](docs/catch-registration-proposal.md#6-검사-실행)을 따른다. 제품 마이그레이션은 E 수신 테이블이 없으면 실패하며 대역을 자동 생성하지 않는다.
 
 ## 인증 기반 사용과 후속 경계 — #87
 

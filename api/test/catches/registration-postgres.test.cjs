@@ -25,7 +25,8 @@ function fillWorkerTemplate(template, values) {
   });
 }
 
-// #104/E 구현이 아닌 합성 선행 테이블과 실제 PostgreSQL에서 B 저장·제약·트랜잭션만 검증한다.
+// 실제 회원·분석 기반과 PostgreSQL에서 B 저장·제약·트랜잭션을 검증한다.
+// E 수신 기록·완료 처리·보호 관측은 명시적인 SQL 시험 대역이며 실제 E 연결을 증명하지 않는다.
 describe('Catch 등록 PostgreSQL', {
   concurrency: false, timeout: 60000,
 }, () => {
@@ -47,6 +48,11 @@ describe('Catch 등록 PostgreSQL', {
   beforeEach(async () => { await fixture.reset(); });
 
   const apply = (input) => db.transaction((manager) => registerCandidates(manager, input));
+  // 등록 이후의 E 완료 상태를 시험이 명시한다. fixture.receipt는 기존 요청을 자동 종료하지 않는다.
+  const completeApplication = (input) => db.transaction(async (manager) => {
+    await manager.query("UPDATE analysis_attempt SET application = 'APPLIED', owner_results_ready = true WHERE attempt_id = $1", [input.attemptId]);
+    await manager.query("UPDATE analysis_request SET lifecycle = 'CLOSED' WHERE request_id = $1", [input.requestId]);
+  });
   const bCounts = async () => {
     const [row] = await db.query(`SELECT
       (SELECT count(*)::int FROM catch_asset) AS assets,
@@ -62,6 +68,7 @@ describe('Catch 등록 PostgreSQL', {
     evidence: await db.query('SELECT * FROM catch_evidence ORDER BY catch_evidence_id'),
     registrations: await db.query('SELECT * FROM candidate_registration ORDER BY registration_id'),
     requests: await db.query('SELECT * FROM analysis_request ORDER BY request_id'),
+    consents: await db.query('SELECT * FROM analysis_consent ORDER BY consent_id'),
     attempts: await db.query('SELECT * FROM analysis_attempt ORDER BY attempt_id'),
     receipts: await db.query('SELECT * FROM result_application_record ORDER BY application_record_id'),
   });
@@ -75,6 +82,31 @@ describe('Catch 등록 PostgreSQL', {
     assert.equal(error.driverError.code, code);
     return true;
   };
+
+  test('실제 요청·동의·시도는 지정 ID로 연결되며 기존 ACTIVE 요청을 자동 종료하지 않는다', async () => {
+    const ids = { ownerId: randomUUID(), requestId: randomUUID(), attemptId: randomUUID() };
+    const input = await fixture.receipt(ids);
+    assert.equal(input.ownerId, ids.ownerId);
+    assert.equal(input.requestId, ids.requestId);
+    assert.equal(input.attemptId, ids.attemptId);
+    const [context] = await db.query(`SELECT request.member_id, request.request_id, request.current_attempt_id,
+        consent.accepted, consent.repository_id, consent.consented_scope, attempt.source_mode
+      FROM analysis_request request
+      JOIN analysis_consent consent ON consent.consent_id = request.consent_id
+      JOIN analysis_attempt attempt ON attempt.attempt_id = request.current_attempt_id`);
+    assert.deepEqual(context, {
+      member_id: ids.ownerId, request_id: ids.requestId, current_attempt_id: ids.attemptId,
+      accepted: true, repository_id: 'synthetic-repository', consented_scope: { synthetic: true }, source_mode: 'MOCK',
+    });
+    const before = await storedState();
+    await assert.rejects(fixture.receipt({ ownerId: input.ownerId }), databaseError('23505'));
+    assert.deepEqual(await storedState(), before, '후속 seed 실패가 기존 요청·동의·시도·수신 기록을 바꾸지 않는다');
+    await apply(input);
+    await completeApplication(input);
+    const next = await fixture.receipt({ ownerId: input.ownerId });
+    assert.notEqual(next.requestId, input.requestId);
+    assert.deepEqual(await db.query("SELECT request_id FROM analysis_request WHERE lifecycle = 'ACTIVE'"), [{ request_id: next.requestId }]);
+  });
 
   test('새 후보는 PRIVATE Catch·근거·후보 연결을 함께 저장한다', async () => {
     const input = await fixture.receipt();
@@ -208,6 +240,7 @@ describe('Catch 등록 PostgreSQL', {
   test('기존 Catch의 저장소 불일치는 원 요청의 보호 판단 부재보다 먼저 거부한다', async () => {
     const original = await fixture.receipt();
     const [created] = await apply(original);
+    await completeApplication(original);
     await db.query('DELETE FROM repository_protection WHERE owner_id = $1', [original.ownerId]);
     const next = await fixture.receipt({
       ownerId: original.ownerId, candidates: [candidate('synthetic-next-candidate')],
@@ -238,6 +271,7 @@ describe('Catch 등록 PostgreSQL', {
   test('같은 sourceMode·저장소의 다른 요청과 재반영은 기존 본문·출처·공개·확인·근거를 보존한다', async () => {
     const original = await fixture.receipt();
     const [first] = await apply(original);
+    await completeApplication(original);
     await db.query(`UPDATE catch_asset SET visibility = 'PUBLIC', work_facts_confirmed = true,
       contribution_confirmed = true, mismatch = true WHERE catch_id = $1`, [first.catchId]);
     const beforeAsset = await db.query('SELECT * FROM catch_asset');
@@ -266,6 +300,7 @@ describe('Catch 등록 PostgreSQL', {
     test(`같은 소유자·작업의 기존 Catch와 ${label}가 다르면 새 연결을 거부한다`, async () => {
       const original = await fixture.receipt();
       await apply(original);
+      await completeApplication(original);
       const next = await fixture.receipt({
         ownerId: original.ownerId, sourceMode, candidates: [candidate('synthetic-next-candidate')],
       }, { repositoryId });
@@ -281,6 +316,7 @@ describe('Catch 등록 PostgreSQL', {
     test(`저장된 후보 연결도 기존 Catch와 ${label}가 다르면 재반영을 거부한다`, async () => {
       const original = await fixture.receipt();
       const [created] = await apply(original);
+      await completeApplication(original);
       const next = await fixture.receipt({
         ownerId: original.ownerId, sourceMode, candidates: [candidate('synthetic-next-candidate')],
       }, { repositoryId });
@@ -289,8 +325,7 @@ describe('Catch 등록 PostgreSQL', {
         (registration_id, application_record_id, candidate_id, catch_id, disposition, owner_view_ready)
         VALUES ($1,$2,$3,$4,'EXISTING',true)`,
       [randomUUID(), next.applicationRecordId, next.candidates[0].candidateId, created.catchId]);
-      await db.query("UPDATE analysis_attempt SET application = 'APPLIED', owner_results_ready = true");
-      await db.query("UPDATE analysis_request SET lifecycle = 'CLOSED'");
+      await completeApplication(next);
       const before = await storedState();
 
       await assert.rejects(apply(next), contextError('CONTEXT_MISMATCH'));
@@ -302,8 +337,7 @@ describe('Catch 등록 PostgreSQL', {
     test(`앞 그룹 저장 뒤 기존 Catch의 ${label}가 충돌하면 전체 롤백하고 E·수신 기록을 보존한다`, async () => {
       const original = await fixture.receipt({ candidates: [candidate('synthetic-original', 'synthetic-z-work')] });
       await apply(original);
-      await db.query("UPDATE analysis_attempt SET application = 'APPLIED', owner_results_ready = true WHERE attempt_id = $1", [original.attemptId]);
-      await db.query("UPDATE analysis_request SET lifecycle = 'CLOSED' WHERE request_id = $1", [original.requestId]);
+      await completeApplication(original);
       const next = await fixture.receipt({
         ownerId: original.ownerId, sourceMode,
         candidates: [candidate('synthetic-new', 'synthetic-a-work'), candidate('synthetic-conflict', 'synthetic-z-work')],
@@ -336,6 +370,7 @@ describe('Catch 등록 PostgreSQL', {
   test('기존 Catch의 원 요청 소유자가 다르면 재호출과 다른 요청의 참조를 거부한다', async () => {
     const original = await fixture.receipt();
     const [created] = await apply(original);
+    await completeApplication(original);
     const otherOwner = await fixture.receipt();
     // 단일 FK만으로 잡히지 않는 owner/sourceRequest 불일치가 이미 저장된 경우를 재현한다.
     await db.query('UPDATE catch_asset SET source_request_id = $1 WHERE catch_id = $2', [otherOwner.requestId, created.catchId]);
@@ -385,7 +420,7 @@ describe('Catch 등록 PostgreSQL', {
     await assert.rejects(db.transaction(async (manager) => {
       await registerCandidates(manager, input);
       await manager.query("UPDATE analysis_request SET lifecycle = 'CLOSED' WHERE request_id = $1", [input.requestId]);
-      // 합성 E 테이블의 CHECK 위반으로 실제 PostgreSQL 저장 실패를 일으킨다.
+      // 실제 분석 시도의 CHECK 위반으로 E 완료 처리 대역의 저장 실패를 일으킨다.
       await manager.query("UPDATE analysis_attempt SET application = 'INVALID_FIXTURE', owner_results_ready = true WHERE attempt_id = $1", [input.attemptId]);
     }), databaseError('23514'));
     await db.query("UPDATE analysis_attempt SET application = 'APPLY_FAILED' WHERE attempt_id = $1", [input.attemptId]);
@@ -395,6 +430,23 @@ describe('Catch 등록 PostgreSQL', {
     });
     assert.equal((await db.query('SELECT lifecycle FROM analysis_request'))[0].lifecycle, 'ACTIVE');
     assert.equal((await db.query('SELECT count(*)::int AS n FROM result_application_record'))[0].n, 1);
+  });
+
+  test('지연 FK가 커밋에서 실패해도 B 저장과 E 완료 변경을 함께 롤백한다', async () => {
+    const input = await fixture.receipt();
+    const before = await storedState();
+    let reachedCommit = false;
+    await assert.rejects(db.transaction(async (manager) => {
+      await registerCandidates(manager, input);
+      await manager.query("UPDATE analysis_attempt SET application = 'APPLIED', owner_results_ready = true WHERE attempt_id = $1", [input.attemptId]);
+      await manager.query("UPDATE analysis_request SET lifecycle = 'CLOSED', current_attempt_id = $1 WHERE request_id = $2", [randomUUID(), input.requestId]);
+      assert.equal((await manager.query('SELECT count(*)::int AS n FROM catch_asset'))[0].n, 1,
+        'B 저장은 같은 트랜잭션 안에 존재한다');
+      reachedCommit = true;
+    }), databaseError('23503'));
+    assert.equal(reachedCommit, true, '본문의 SQL은 통과하고 deferred FK를 확인하는 커밋에서 실패한다');
+    assert.deepEqual(await storedState(), before);
+    await empty();
   });
 
   test('활성 트랜잭션 밖에서는 저장을 거부한다', async () => {
@@ -431,12 +483,19 @@ describe('Catch 등록 PostgreSQL', {
     assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 1 });
   });
 
-  test('서로 다른 수신 기록이 같은 작업을 동시에 등록해도 하나의 Catch로 수렴한다', async () => {
+  test('완료된 수신 기록 재전달과 후속 요청의 같은 작업 등록이 겹쳐도 기존 Catch를 보존한다', async () => {
     const first = await fixture.receipt();
+    const created = await apply(first);
+    await completeApplication(first);
     const second = await fixture.receipt({ ownerId: first.ownerId });
+    const beforeAssets = await db.query('SELECT * FROM catch_asset');
+    const beforeEvidence = await db.query('SELECT * FROM catch_evidence');
     const [left, right] = await Promise.all([apply(first), apply(second)]);
+    assert.deepEqual(left, created, '완료된 수신 기록은 최초 CREATED 판정을 재생한다');
     assert.equal(left[0].catchId, right[0].catchId);
-    assert.deepEqual([left[0].disposition, right[0].disposition].sort(), ['CREATED', 'EXISTING']);
+    assert.equal(right[0].disposition, 'EXISTING');
+    assert.deepEqual(await db.query('SELECT * FROM catch_asset'), beforeAssets);
+    assert.deepEqual(await db.query('SELECT * FROM catch_evidence'), beforeEvidence);
     assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 2 });
   });
 
@@ -457,6 +516,8 @@ describe('Catch 등록 PostgreSQL', {
     await assert.rejects(insert(randomUUID(), 'synthetic-new-candidate', result.catchId), databaseError('23503'));
     await assert.rejects(insert(input.applicationRecordId, 'synthetic-new-candidate', randomUUID()), databaseError('23503'));
     await assert.rejects(insert(input.applicationRecordId, input.candidates[0].candidateId, result.catchId), databaseError('23505'));
+    await assert.rejects(db.query('UPDATE catch_asset SET owner_id = $1 WHERE catch_id = $2', [randomUUID(), result.catchId]), databaseError('23503'));
+    await assert.rejects(db.query('UPDATE catch_asset SET source_request_id = $1 WHERE catch_id = $2', [randomUUID(), result.catchId]), databaseError('23503'));
     await assert.rejects(db.query("UPDATE catch_asset SET visibility = 'INVALID_FIXTURE'"), databaseError('23514'));
     assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 1 });
   });
@@ -527,7 +588,7 @@ describe('Catch 등록 PostgreSQL', {
       for (const table of ['catch_asset', 'catch_evidence', 'candidate_registration', 'repository_protection']) {
         assert.equal((await db.query('SELECT to_regclass($1)::text AS relation', [`${fixture.schema}.${table}`]))[0].relation, null);
       }
-      for (const table of ['member_account', 'analysis_request', 'analysis_attempt', 'result_application_record']) {
+      for (const table of ['member_account', 'analysis_request', 'analysis_consent', 'analysis_attempt', 'result_application_record']) {
         assert.equal((await db.query(`SELECT count(*)::int AS n FROM ${table}`))[0].n, 1);
       }
     } finally {

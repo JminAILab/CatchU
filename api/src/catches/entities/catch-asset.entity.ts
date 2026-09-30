@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { Check, Column, Entity, PrimaryColumn, Unique } from 'typeorm';
+import { Check, Column, Entity, ForeignKey, PrimaryColumn, Unique } from 'typeorm';
+import { AnalysisRequest, MemberAccount } from '../../member-analysis/member-analysis.entity';
 
 export type CatchGenerationStatus = 'GENERATED' | 'FAILED' | 'NOT_GENERATED';
 export type CatchSourceMode = 'MOCK' | 'LIVE';
@@ -17,6 +18,8 @@ export interface RegistrationAssessment {
 @Entity('catch_asset')
 @Unique(['ownerId', 'workIdentity'])
 @Unique(['sourceRequestId', 'sourceResultId', 'sourceCandidateId'])
+@ForeignKey(() => MemberAccount, ['ownerId'], ['memberId'], { name: 'fk_catch_asset_owner_id' })
+@ForeignKey(() => AnalysisRequest, ['sourceRequestId'], ['requestId'], { name: 'fk_catch_asset_source_request_id' })
 @Check('char_length("title") >= 1')
 @Check('char_length("source_result_id") >= 1')
 @Check('char_length("source_candidate_id") >= 1')
@@ -38,7 +41,6 @@ export class CatchAssetEntity {
   @Column({ name: 'title', type: 'text' })
   title!: string;
 
-  // A/E 엔티티가 연결되기 전까지 외부 참조는 마이그레이션의 FK로 보장한다.
   @Column({ name: 'owner_id', type: 'uuid' })
   ownerId!: string;
 

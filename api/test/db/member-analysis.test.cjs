@@ -384,7 +384,12 @@ test('접수한 동의 변경과 재요청 선행 참조의 역방향 변경을 
 test('일곱 테이블은 빈 스키마에 up/down/re-up 가능하고 엔티티와 생성 DDL이 일치',async()=>{
   const schema='test_104_'+randomUUID().replaceAll('-','');
   await db.query('CREATE SCHEMA "'+schema+'"');
-  const isolated=await openTestDataSource({schema,extra:{options:'-c search_path='+schema+' -c TimeZone=UTC'}});
+  const {CreateMemberAnalysisFoundation1790500000000}=require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
+  // 후속 기능의 엔티티·마이그레이션이 추가돼도 이 검사는 회원·분석 기반만 되돌린다.
+  const isolated=await openTestDataSource({schema,
+    entities:[MemberAccount,MemberProfile,GitHubConnection,AnalysisRequest,AnalysisConsent,AnalysisAttempt,IdempotencyRecord],
+    migrations:[CreateMemberAnalysisFoundation1790500000000],
+    extra:{options:'-c search_path='+schema+' -c TimeZone=UTC'}});
   try {
     await isolated.runMigrations();
     const tables=await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema]);
