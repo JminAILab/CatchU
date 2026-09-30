@@ -15,6 +15,7 @@ NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 
 | 권한·선행 조건 | 403 | GITHUB_CONNECTION_REQUIRED, REPOSITORY_NOT_ALLOWED, CONSENT_REQUIRED |
 | 없음·열람 불가 | 404 | RESOURCE_UNAVAILABLE, LINK_UNAVAILABLE |
 | 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED |
+| 수신자 비밀번호 시도 제한 | 429 | LINK_UNLOCK_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds })`) |
 | 서버 오류 | 500 | INTERNAL_ERROR |
 
 기능에서는 `src/common/errors`의 `ApiError`를 던진다. HTTP 상태는 코드에 따라 정해진다.
@@ -92,6 +93,7 @@ npm ci
 | 선택 | `DEV_LOGIN_ENABLED` | 비활성 | 정확히 `true`일 때만 개발 로그인 활성화 요청 |
 | 선택 | `DEV_ANALYSIS_INJECTION_ENABLED` | 비활성 | 분석 주입 모듈을 조립한 경우에만 사용. 정확히 `true`이고 `NODE_ENV`가 `development` 또는 `test`여야 허용. 이 설정만으로 HTTP 경로가 생기지 않음 |
 | 선택 | `NODE_ENV` | 미지정 | 운영 배포에서는 반드시 `production`. 개발 로그인 플래그보다 우선하여 거부 |
+| 운영 필수 | `LINK_GRANT_SECRET` | 개발·테스트는 실행마다 임시 키 | 비밀번호 링크 열람 증표(grant) 서명 키. 32바이트 무작위 값의 64자리 hex이며 `AUTH_JWT_SECRET`과 달라야 한다. `production`에서 없거나 형식이 틀리면 기동 실패 |
 | 운영 필수 | `SHARE_LINK_WEB_BASE_URL` | 개발·테스트 `http://localhost:3000` | 공유 링크 `url`(`<이 값>/s/<token>`)을 만들 web 주소. `production`에서 없거나, http(s)가 아니거나 쿼리·조각·계정 정보가 있으면 기동 실패. CORS 허용 출처와 따로 둔다 |
 | 필수 | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 없음 | 개발 DB 접속. 로컬 값은 「로컬 DB 준비」의 `docker run`과 `.env.example`이 같다. `DB_PORT`는 정수 `1~65535` |
 | 선택 | `TEST_DB_HOST` / `TEST_DB_PORT` / `TEST_DB_USER` / `TEST_DB_PASSWORD` / `TEST_DB_NAME` | `127.0.0.1` / `5433` / `catchu` / `catchu_local` / `catchu_test` | `npm test`가 쓰는 테스트 DB(「DB 테스트」). 이름은 `_test`로 끝나야 함 |
@@ -654,6 +656,36 @@ Codex가 Windows 환경에서 위 구현 시작 커밋을 기준으로 작성한
    - 같은 키: 지문이 다르면 409. 지문이 같아도 기록이 가리키는 링크를 읽어 `isSameShareCreate`로 비밀번호까지 비교한다. 비밀번호만 달라도 `409 IDEMPOTENCY_CONFLICT`이고, 같으면 그 링크를 현재 상태로 200 응답한다(중단됐으면 `STOPPED`). 기록과 링크가 어긋나면 409가 아니라 500이다.
 4. 응답 구성까지 같은 트랜잭션이다. 거절·실패하면 링크와 멱등 기록이 함께 롤백되어 같은 키를 다시 쓸 수 있다.
 
+### 수신자 비밀번호 확인·접근 판정 — #150
+
+grant 형식·수명·보관·시도 제한은 [#150 9/29 결정](https://github.com/JminAILab/CatchU/issues/150#issuecomment-5883572995), 차단 응답은 #173 계약을 따른다. 회원 JWT를 쓰지 않는다(`@Public()`).
+
+| 파일 | 내용 |
+|---|---|
+| `public-links.controller.ts` | `POST /v1/public/links/{token}/unlock` |
+| `link-access.service.ts` | 링크 판정·unlock·수신 조회용 `assertReadable(token, grant)`(#151이 쓴다) |
+| `link-grant.ts` | grant 서명·검증(HMAC-SHA256, `LINK_GRANT_SECRET`). 링크 ID·만료만 담고 서버에 저장하지 않는다 |
+| `unlock-limiter.ts` | 링크·접속지 단위 시도 제한과 직렬화(프로세스 메모리) |
+
+**unlock 판정 순서**
+
+| 순서 | 조건 | 응답 |
+|---|---|---|
+| 1 | 토큰 형식이 틀림·없음·중단·만료 | 404 `LINK_UNAVAILABLE`, 고정 문구, `details` 없음(비밀번호 검사 전) |
+| 2 | 비밀번호 없는 링크 | 400 `INVALID_REQUEST` |
+| 3 | 본문이 `{ password: 비어 있지 않은 문자열 }`이 아님 | 400 `VALIDATION_FAILED`(세지 않음). 차단 중이어도 400 |
+| 4 | 이 링크·접속지가 이미 차단 중 | 429 `LINK_UNLOCK_LIMITED`, `Retry-After`=차단 종료까지 남은 초(올림). 대기열보다 먼저 판정. 맞는 비밀번호도 거부하고 해시를 계산하지 않는다 |
+| 5 | 같은 링크·접속지에 실행 중 포함 3개가 이미 걸려 있음 | 429 `LINK_UNLOCK_LIMITED`, `Retry-After: 1`(검사하지 않음) |
+| 5′ | (차례가 오면) 차단 중이거나, 기록 자리(1만 개)가 모두 유효한 기록으로 차 새 키를 받을 수 없음 | 429 `LINK_UNLOCK_LIMITED`, `Retry-After`=차단 종료 또는 가장 이른 기록 만료까지. 전체 용량 초과 시 거절은 승인 대기 정책(PR #150 「확인받을 것」 2) |
+| 6 | 비밀번호 틀림 | 401 `LINK_PASSWORD_INVALID`(실패 1회) |
+| 7 | 맞음 | 200 `{ grant }`, 그 링크·접속지의 실패 기록 초기화(방어적 재확인에서 차단이 보이면 429, grant 없음) |
+
+- **grant:** 발급 후 2시간, 링크 만료를 넘지 않는다. 링크 ID가 다르거나 서명·형식이 틀리거나 만료되면 무효다. web은 `X-Link-Grant` 헤더로 보내고 링크별 `sessionStorage`에 둔다(#152).
+- **수신 조회 판정(`assertReadable`):** 매 요청 1번 판정을 다시 한 뒤, 비밀번호 링크는 이 링크의 유효한 grant가 없으면 401 `LINK_PASSWORD_REQUIRED`다. grant가 있어도 중단·만료는 404다. 시도 제한은 적용하지 않는다.
+- **직렬화:** 같은 링크·접속지의 요청은 한 번에 하나씩 5′~7단계를 한다. 실행 중 1개를 포함해 최대 3개까지 걸 수 있다. 동시에 몰아 보내도 차단 전 검사는 10번을 넘지 않는다.
+- **시도 제한:** 같은 링크·같은 접속지에서 15분 안에 10번 틀리면 그 시각부터 15분 차단한다. 차단 중 요청은 세지 않아 기간이 늘어나지 않고, 풀리면 처음부터 센다. 접속지는 직접 연결 주소다. 부하분산기를 두면 배포에서 신뢰 프록시를 설정해야 하며, 하지 않으면 모든 수신자가 같은 주소로 보여 한 사람의 실패가 그 링크 전체를 막는다. 프로세스 메모리라 재시작하면 초기화되고, 서버·프로세스가 늘면 차단이 헐거워진다. 기록은 1만 개가 상한이다. 새 링크·접속지는 검사 전에 자리를 예약하고, 자리가 없으면 만료된 기록만 정리한다. 창 안 실패 기록과 유효한 차단은 지우지 않으며, 그래도 자리가 없으면 새 키를 검사 없이 429로 거절한다. 이 경우 특정 링크·접속지의 실패 때문에 다른 정상 수신자도 막힐 수 있어, 거절 정책과 오류 코드는 팀장 확인 대기다.
+- **응답 시간:** 없음·중단·만료는 같은 조회 경로를 타고, 차단되지 않은 검증만 해시를 한 번 계산한다. 응답 시간이 같다고 보장하지 않는다. 2026-09-30 로컬 측정(직렬화 적용 판본, 각 25회 중앙값): 404 2.0ms, 400 2.1ms, 429 1.9ms, 401 94.0ms, 200 91.6ms. 해시를 계산하는 401·200만 느리고, 링크 존재 여부(404)는 비밀번호 없는 링크(400)·차단(429)과 비슷하다.
+
 ### 테이블
 
 마이그레이션 `1790745895865-CreateShareLink`가 `share_link`와 두 외래 키를 만든다. #104(`1790500000000`) 뒤, B(`1790600000000`)와는 서로 참조하지 않는다.
@@ -672,5 +704,6 @@ Codex가 Windows 환경에서 위 구현 시작 커밋을 기준으로 작성한
 ### 검사
 
 - `test/db/share-links-api.test.cjs`: 실제 앱·테스트 DB·개발 로그인 회원으로 HTTP 검증. 201·200·409(비밀번호만·제목·비밀번호 유무 차이), 제목 중복·한도·중단 제목 재사용, 동시 같은 키 5건 → 1개, 동시 다른 키 7건 → 5개, 회원별 범위, 인증·키·입력 오류, 회원 UUID가 아니거나 회원 행이 없는 토큰 401, 기록·링크 불일치 500, 비밀번호·토큰 로그 비노출.
+- `test/db/public-links-unlock.test.cjs`: unlock HTTP(200·401·404 동일 본문·400 두 종류·429와 `Retry-After`·차단 중 400/429 구분·다른 링크 비차단·동시 15회)와 늦은 성공 429와 수신 조회 판정(grant 필요·다른 링크 grant 무효·중단·만료 우회 불가), 비밀번호·grant·토큰 로그 비노출. 단위: `test/link-grant.test.cjs`, `test/unlock-limiter.test.cjs`.
 - `test/db/share-link-issuance.test.cjs`: 마이그레이션한 스키마·외래 키, 발급 판정(중단·만료 제외, 만료 경계, 동시 발급, 회원별 직렬화, 잠금 대기 중 만료, 롤백).
 - 단위: `test/share-create*.test.cjs`, `test/link-*.test.cjs`, `test/share-link-state.test.cjs`, `test/share-links-config.test.cjs`.

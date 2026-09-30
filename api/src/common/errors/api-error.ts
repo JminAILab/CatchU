@@ -23,11 +23,19 @@ export interface ErrorBody {
 export class ApiError extends HttpException {
   readonly code: ErrorCode;
   readonly details?: ErrorDetails;
+  /** 차단 해제까지 남은 초. 공통 필터가 `Retry-After` 헤더로 보낸다(계약 Error429). 본문에는 넣지 않는다. */
+  readonly retryAfterSeconds?: number;
 
-  constructor(code: ErrorCode, options: { message?: string; details?: ErrorDetails } = {}) {
+  constructor(code: ErrorCode, options: { message?: string; details?: ErrorDetails; retryAfterSeconds?: number } = {}) {
     const message = options.message ?? DEFAULT_ERROR_MESSAGES[code];
     super({ code, message }, ERROR_STATUS[code]);
     this.code = code;
     this.details = options.details;
+    if (options.retryAfterSeconds !== undefined) {
+      if (!Number.isSafeInteger(options.retryAfterSeconds) || options.retryAfterSeconds < 1) {
+        throw new TypeError('retryAfterSeconds must be a positive integer');
+      }
+      this.retryAfterSeconds = options.retryAfterSeconds;
+    }
   }
 }
