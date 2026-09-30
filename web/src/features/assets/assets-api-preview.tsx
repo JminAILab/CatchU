@@ -8,22 +8,41 @@ import { previewCatches, previewRepositories } from "./fixtures";
 import styles from "./assets.module.css";
 
 // 합성 응답을 API 경계로 전달하는 개발 도구. 인증·실제 서버 연결을 가장하지 않는다.
-const api = createCatchApi(async (path) => {
+const records = new Map(previewCatches.map((item) => [item.catchId, structuredClone(item)]));
+const api = createCatchApi(async (path, options) => {
   await new Promise((resolve) => setTimeout(resolve, 180));
   const mode = new URLSearchParams(window.location.search).get("failure");
   if (mode === "all" || (mode === "detail" && !path.startsWith("/catches?"))) {
     return readApiResponse(Response.json({ code: "INTERNAL_ERROR", message: "모의 오류" }, { status: 500 }));
   }
   const url = new URL(path, "https://fixture.invalid");
+  if (options.method === "PUT") {
+    if (mode === "save") return readApiResponse(Response.json({ code: "INTERNAL_ERROR", message: "모의 저장 실패" }, { status: 500 }));
+    const parts = url.pathname.split("/");
+    const catchId = decodeURIComponent(parts[2]);
+    const current = records.get(catchId);
+    if (!current) return readApiResponse(Response.json({ code: "RESOURCE_UNAVAILABLE", message: "열 수 없음" }, { status: 404 }));
+    if (parts[3] === "visibility" && options.body?.visibility === "PUBLIC") {
+      if (!current.confirmation.workFactsConfirmed || !current.confirmation.contributionConfirmed)
+        return readApiResponse(Response.json({ code: "CONFIRMATION_REQUIRED", message: "확인 필요" }, { status: 409 }));
+      if (current.restriction === "SOURCE_PRIVATE")
+        return readApiResponse(Response.json({ code: "SOURCE_RESTRICTED", message: "보호됨" }, { status: 409 }));
+    }
+    const updated = parts[3] === "confirmation" ? { ...current, confirmation: { workFactsConfirmed: true, contributionConfirmed: true } }
+      : parts[3] === "mismatch" ? { ...current, mismatch: options.body?.mismatch === true }
+      : { ...current, visibility: options.body?.visibility === "PUBLIC" ? "PUBLIC" as const : "PRIVATE" as const };
+    records.set(catchId, updated);
+    return readApiResponse(Response.json(updated));
+  }
   if (url.pathname === "/catches") {
-    const filtered = previewCatches.filter((item) => !url.searchParams.get("repositoryId") || item.repositoryId === url.searchParams.get("repositoryId"));
+    const filtered = [...records.values()].filter((item) => !url.searchParams.get("repositoryId") || item.repositoryId === url.searchParams.get("repositoryId"));
     const offset = url.searchParams.get("cursor") === "mock-next-page" ? 2 : 0;
     return readApiResponse(Response.json({
       items: filtered.slice(offset, offset + 2),
       page: { nextCursor: offset === 0 && filtered.length > 2 ? "mock-next-page" : null },
     }));
   }
-  const item = previewCatches.find((v) => v.catchId === decodeURIComponent(url.pathname.split("/").at(-1) ?? ""));
+  const item = records.get(decodeURIComponent(url.pathname.split("/").at(-1) ?? ""));
   return readApiResponse(item ? Response.json(item)
     : Response.json({ code: "RESOURCE_UNAVAILABLE", message: "열 수 없음" }, { status: 404 }));
 });
@@ -47,12 +66,12 @@ function ManagementPreview({ bindings }: { bindings: RepositoryManagementBinding
 }
 
 export function AssetsApiPreview() {
-  return <>
+  return <div className={`${styles.preview} ${styles.standalonePreview}`}>
     <aside className={styles.previewToolbar}><div><strong>내 자산 API 연결 동작 · 모의 응답</strong>
       <p>자료와 응답은 모두 예시입니다. 실제 로그인·API·DB 연결 검증 화면이 아닙니다.</p>
-      <p>조회 실패는 주소에 failure=all, 상세만 실패는 failure=detail을 추가해 확인합니다.</p></div></aside>
+      <p>조회 실패는 failure=all, 상세 실패는 failure=detail, 저장 실패는 failure=save로 확인합니다. 저장은 메모리의 합성 자료에만 적용되고 새로고침하면 초기화됩니다.</p></div></aside>
     <AssetsConnected api={api} repositories={previewRepositories}
       repositoryManagement={(bindings) => <ManagementPreview bindings={bindings} />} />
-  </>;
+  </div>;
 }
 
