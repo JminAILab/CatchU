@@ -37,6 +37,8 @@ export function AssetsConnected({ api, repositories, repositoryManagement }: Pro
   useEffect(() => () => store.dispose(), [store]);
   useEffect(() => { void store.selectRepository(repositoryId); }, [repositoryId, store]);
   useEffect(() => {
+    // 탭/뒤로 가기로 D 슬롯이 해제되면 열림 상태만 정리한다. 일반 닫기 재조회와 구분한다.
+    if (tab !== "catch" && snapshot.managementOpen) store.setManagementOpen(false);
     void store.openDetail(tab === "catch" && !snapshot.managementOpen ? catchId : null);
   }, [catchId, tab, snapshot.managementOpen, store]);
 
