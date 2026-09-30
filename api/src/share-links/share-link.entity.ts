@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { Check, Column, Entity, Index, PrimaryColumn } from 'typeorm';
+import { Check, Column, Entity, ForeignKey, Index, PrimaryColumn, Unique } from 'typeorm';
 import { lengthBetween } from '../database/checks';
+import { MemberAccount } from '../member-analysis/member-analysis.entity';
 
 /** 발급 시각부터 정확히 30×24시간(ERD ShareLink). */
 export const SHARE_LINK_TTL_HOURS = 720;
@@ -12,9 +13,12 @@ export const SHARE_LINK_TTL_HOURS = 720;
  * - 유효 링크의 제목 유일·5개 한도는 시간에 따라 달라지므로 정적 unique로 풀지 않고,
  *   회원 단위로 직렬화한 트랜잭션에서 판정한다(share-link-issuance.ts).
  * - 비밀번호 원문·열람 증표(grant)는 저장하지 않는다. `passwordProtectionReference`는 scrypt 검증값이다.
- * - `ownerId`의 회원 외래 키는 회원 테이블(#104)이 생긴 뒤 마이그레이션과 함께 추가한다.
+ * - `unique(linkId, ownerId)`는 멱등 기록이 (linkId, memberId)로 이 링크를 참조해, 기록의 회원과 링크 소유자가
+ *   같음을 DB에서도 보장하기 위한 것이다(IdempotencyRecord의 외래 키).
  */
 @Entity('share_link')
+@ForeignKey(() => MemberAccount, ['ownerId'], ['memberId'])
+@Unique(['linkId', 'ownerId'])
 @Check(lengthBetween('title', 1))
 @Check(`"expires_at" = "issued_at" + interval '${SHARE_LINK_TTL_HOURS} hours'`)
 @Check('"stopped_at" IS NULL OR "stopped_at" >= "issued_at"')
@@ -31,10 +35,9 @@ export class ShareLink {
   title!: string;
 
   /**
-   * 수신자 URL의 토큰을 찾는 키.
-   * 미확정: 현재는 목록·발급 응답의 `url`을 다시 만들기 위해 토큰 자체를 저장하는 제안안으로 구현했다(PR #162 「정해야 할 것」 1).
-   * ERD `secret-lookup-key`와의 해석을 확인해 3-3 마이그레이션 생성 전에 확정하며, 바뀌면 이 칼럼과 발급 테스트를 함께 고친다.
-   * 로그·오류·별도 응답 필드에는 노출하지 않는다.
+   * 수신자 URL의 토큰(ERD `secret-lookup-key`). 토큰 자체를 저장한다(제안, PR #162 리뷰에서 A·E 확인 대기).
+   * 목록·발급·같은 키 재요청 응답이 모두 `url`을 다시 만들어야 해서, 되돌릴 수 없는 해시로는 저장하지 않는다.
+   * 암호화 보관은 키 관리 방식이 정해지지 않아 쓰지 않는다. 대신 `url` 밖(별도 응답 필드·로그·오류)에는 내보내지 않는다.
    */
   @Column({ type: 'text', unique: true })
   linkTokenReference!: string;
