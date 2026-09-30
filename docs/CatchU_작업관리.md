@@ -244,13 +244,13 @@ AI가 §4의 착수 안내에 따라 기존 작업을 확인하고 필요한 질
 | 진행 | 이슈 → `영역/작업내용` 브랜치 → `dev` PR → 작성자 외 승인 1건 → merge commit |
 | AI-DLC | 요구사항·설계·계약(API 명세·ERD)의 승인 원본과 마일스톤 승인 기록에 쓴다. 코딩에는 담당자가 요청할 때만 쓰며, 단계 승인을 머지 조건으로 삼지 않고 `aidlc/` 기록은 코드 PR과 별도 PR로 올린다 |
 | 착수 | AI-DLC 단계 승인을 기다리지 않고 이슈의 선행 조건을 확인한 뒤 시작한다. 실제 자료 접근·외부 전송은 [자료와 실행 로그](#자료와-실행-로그)의 허용 조건을 따른다 |
-| 기준 문서 | [요구사항](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md)과 [API 명세](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)·[ERD](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md). 부족·오류는 이슈로 올리고, 수정은 AI-DLC로 `aidlc/`의 API 명세·ERD를 고쳐 PR로 반영한다. API·메시지 명세의 연결 방식·사용 조건이나 ERD의 데이터 제약을 바꾸면 계약 수정이다. 요청·응답 필드와 필수 여부, 경로·메서드, 메시지 형식, 상태 의미·권한, DB 관계·유일성이 그 예다. 같은 계약 안의 내부 구현은 담당자가 정한다. 영역 사이의 연결은 기존 명세·코드와 먼저 올라온 관련 PR을 참고해 구현하고, 연결 차이는 당사자가 PR 리뷰에서 명세와 수정 부담을 기준으로 조정한 뒤 병합한다. 재작업이 클 것으로 예상되는 연결 미정 사항만 구현 전에 논의한다 |
+| 기준 문서 | [요구사항](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md)과 [API 명세](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)·[ERD](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md). 부족·오류는 이슈로 올리고, 수정은 AI-DLC로 `aidlc/`의 API 명세·ERD를 고쳐 PR로 반영한다. 응답 필드·상태 의미·권한·DB 관계와 유일성 변경만 계약 수정이며, 같은 계약 안의 내부 구현은 담당자가 정한다. 영역 사이의 연결은 기존 명세·코드와 먼저 올라온 관련 PR을 참고해 구현하고, 연결 차이는 당사자가 PR 리뷰에서 명세와 수정 부담을 기준으로 조정한 뒤 병합한다. 재작업이 클 것으로 예상되는 연결 미정 사항만 구현 전에 논의한다 |
 | 기술 | PostgreSQL·TypeORM·Redis를 쓴다. 큐(BullMQ)는 [#77](https://github.com/JminAILab/CatchU/issues/77) 검증까지 연결하지 않고 뼈대에는 헬스체크만 둔다. 서비스 LLM(요구사항 C06)은 개발 중후반, 실제 제공자 연결 전에 선정한다. 그 전에는 제공자 SDK·API 키 없이 제공자 비종속 인터페이스와 가짜 생성기로 개발한다 |
 | 검사 | 80% 라인 커버리지·머지 전 CI는 CI 도입을 별도 이슈에서 정할 때까지 머지 조건이 아니며, 뼈대 작업에 CI를 넣지 않는다. 검사와 결과 보고는 [검사 선택과 결과 보고](#검사-선택과-결과-보고)를 따른다 |
 
 ## 8. 유지보수와 결정 이력
 
-상세 절차는 이 문서만 고치고, 작업별 읽기 경로는 AGENTS.md에서 관리하며 CLAUDE.md는 이를 참조한다. AGENTS.md의 AI-DLC BEGIN/END 블록은 수정하지 않는다. refresh 후 팀 관리 절의 작업관리 링크와 CLAUDE.md의 import가 남아 있는지 확인하고, 누락됐다면 같은 진입 지침만 복원한다. 프레임워크 블록에 복사하지 않는다.
+상세 절차는 이 문서만 고치고, 작업별 읽기 경로는 AGENTS.md에서 관리하며 CLAUDE.md는 이를 참조한다. 참조한 절 제목·경로를 바꾸면 AGENTS.md 표와 해당 링크도 함께 고친다. AGENTS.md의 AI-DLC BEGIN/END 블록은 수정하지 않는다. refresh 후 팀 관리 절의 작업관리 링크·읽기 표와 CLAUDE.md의 import가 남아 있는지 확인하고, 누락됐다면 해당 진입 지침·표를 복원한다. 프레임워크 블록에 복사하지 않는다.
 
 - 2026-09-14 — Codex·Claude Code가 공통 작업관리 기준을 읽도록 적용 준비안과 이슈·PR 양식을 작성. 담당·일정 확정 및 원격 Project 생성·연결은 포함하지 않음.
 - 2026-09-14 — 사용자가 Projects 사용법을 몰라도 작업을 시작하도록, 일상적인 작업 의도에서 AI가 먼저 기존 작업을 조회하고 필요한 질문 1~2개를 던지는 착수 안내를 추가했다. 이미 답한 내용·확정 제품 행동은 다시 묻지 않으며, 와이어프레임 초안도 실행 작업으로 구분했다.
@@ -269,4 +269,5 @@ AI가 §4의 착수 안내에 따라 기존 작업을 확인하고 필요한 질
 - 2026-09-28 — 팀장 결정으로 §3의 '주 작업은 사람당 진행 중 하나를 기본'이라는 문장을 삭제했다. 9/14 초안에 근거 기록 없이 들어간 문장이며, 한 사람이 여러 작업을 병렬로 진행하는 실제 운영과 맞지 않는다.
 - 2026-09-28 — 팀장이 담당 사이의 연결을 매번 해석·전달하고, 전체 검증표 검토가 작은 API 연결의 대기 조건이 되던 부담을 줄이려고 §4 「진행·검토」·「코딩 전 범위와 기존 변경 확인」과 §7 「코딩 운영」의 기존 항목을 교체·보완했다(새 항목 없음). 계약 PR 병합 뒤 비어 있던 API 명세·ERD 링크도 채웠다. 같은 PR에서 명세가 있으면 별도 준비 산출물 없이 구현하는 기본 흐름, 필요할 때만 질문, 준비된 일부 선행의 관계 해제를 해당 문장에 넣고 이슈·PR 양식의 반복 칸을 줄였다.
 
-- 2026-09-30 — [#189](https://github.com/JminAILab/CatchU/issues/189)에서 비AI-DLC 공통 지침을 점검해 AGENTS.md의 서비스·승인 문서 안내를 갱신하고 작업별 읽기 경로를 연결했다. 계약 수정은 API·메시지 명세·ERD의 약속 변경으로 정의해 요청 필드·경로·메시지 변경의 누락을 없앴다. 버그 양식의 담당·분류를 조건부로 맞추고 PR의 실제 검사 증거 기록 조건을 명확히 했다. 기존 우선순위 질문·승인·머지 정책은 유지한다.
+- 2026-09-30 — [#189](https://github.com/JminAILab/CatchU/issues/189)에서 비AI-DLC 공통 지침을 점검했다. AGENTS.md의 서비스·승인 문서 안내를 갱신하고, 착수·검토·종료 시 공통 문서를 읽도록 하던 안내를 작업에 해당하는 절을 실제로 읽는 표로 구체화했다. CLAUDE.md는 표를 참조하고 이 절에서 정본·읽기 경로의 유지보수 위치를 명시했다. 9/16에 보류한 버그 양식은 공통 규칙과의 정합성을 위해 담당·분류를 조건부로 맞추고 합성 초안을 시험했다. 실제 버그 등록 사례의 검증은 남아 있다. PR의 검사 증거 기록 조건도 명확히 했으며 기존 우선순위 질문·승인·머지 정책은 유지한다.
+- 2026-09-30 — 교차 검토 후 사용자가 기존 계약 분류를 유지하도록 결정했다. [시험안 635549e](https://github.com/JminAILab/CatchU/commit/635549edf5ca38d4acc2a36d2b7a0efed7a15a13)의 요청 필드·경로·메시지 등을 포함하는 확대 문구를 철회하고, §7에 [9/23 후속 결정](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/domain-design/2026-09-23-followup.md)과 [계약 소유 규칙](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#contract-ownership-rules)의 기존 분류를 복원했다. 확대 필요성은 미채택 제안이며 별도 결정 없이 운영 기준으로 적용하지 않는다. 과거 승인 원본은 수정하지 않았다. 기존 이슈·PR 본문 변경과 계약 문서 수정의 읽기 경로, 절 제목·refresh 시 표 보존 안내를 보완했다.
