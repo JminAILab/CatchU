@@ -450,6 +450,7 @@ try {
 
 - operation: `createAnalysisRequest` 또는 `createShareLink`. key는 1~128자다.
 - request_fingerprint: 작업별 정규화한 입력의 **SHA-256 소문자 64자리 hex text**. 링크는 C의 `shareCreateFingerprint`(제목·비밀번호 설정 여부)를 그대로 사용한다. 비밀번호 원문·해시를 지문에 넣지 않는다.
+- 형식 오류는 값의 출처에 따라 구분한다. 사용자 입력인 `Idempotency-Key`는 `400 INVALID_REQUEST`, 서버가 정하는 operation·생성하는 requestFingerprint는 `500 INTERNAL_ERROR`다. 오류 응답에 내부 값이나 지문을 포함하지 않는다. 정상 형식의 지문이 기존 요청과 다르거나 `isSame`의 비동기 비교 결과가 false이면 기존 `409 IDEMPOTENCY_CONFLICT`를 유지한다.
 - request_id/link_id: operation에 맞는 하나만 저장한다. 공통 함수가 연결 자원의 회원도 대조한다. request_id의 회원 일치는 DB 복합 FK로도 보장한다.
 - response_reference: 안전한 응답 재구성 참조(text). 예를 들어 자원 UUID를 저장하고 readResponse에서 원본 자원을 다시 읽는다. 요청/응답 원문, 비밀번호·토큰을 이 열에 직렬화하지 않는다.
 - isSame: 지문이 같은 재요청에서도 **항상 await하는 필수 비교 함수**다. C는 같은 manager로 기존 링크를 조회한 뒤 `isSameShareCreate`로 비밀번호까지 비교한다. false만 `409 IDEMPOTENCY_CONFLICT`이며 DB 오류·기록 불일치는 서버 오류로 전달한다.

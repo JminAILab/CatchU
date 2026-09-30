@@ -173,10 +173,100 @@ test('같은 키 순차·동시 호출은 자원 하나와 동일 응답, 비교
   assert.equal(await db.getRepository(IdempotencyRecord).count(),1);
 });
 
+test('멱등 생성 HTTP 오류는 사용자 키 400·서버 내부 값 500·기존 요청 충돌 409로 구분하고 값을 노출하지 않음', async (t) => {
+  const { Controller, Post, Module } = require('@nestjs/common');
+  const { NestFactory } = require('@nestjs/core');
+  const { ErrorsModule } = require('../../dist/common/errors/errors.module');
+  const { DEFAULT_ERROR_MESSAGES } = require('../../dist/common/errors/error-codes');
+  const { configureApp } = require('../../dist/app.setup');
+  const id = await dev().resolveMember('error-classification');
+  const secret = 'test-only-private-value';
+  let currentKey = key(id);
+  let comparisons = 0;
+  let same = true;
+  const cb = callbacks(id, { async isSame() { comparisons++; return same; } });
+  // 서버 내부 값은 테스트가 지정한다. 제품 API나 사용자 입력 필드를 추가하지 않는다.
+  class ProbeController {
+    create() { return transaction(m => runIdempotentCreation(m, currentKey, cb)); }
+  }
+  Controller('__test/idempotency')(ProbeController);
+  Post()(ProbeController.prototype, 'create', Object.getOwnPropertyDescriptor(ProbeController.prototype, 'create'));
+  class ProbeModule {}
+  Module({ imports: [ErrorsModule], controllers: [ProbeController] })(ProbeModule);
+  const logs = [];
+  const logger = Object.fromEntries(['log', 'error', 'warn', 'debug', 'verbose', 'fatal'].map(level =>
+    [level, (...args) => logs.push(args.map(String).join(' '))]));
+  const app = await NestFactory.create(ProbeModule, { logger, abortOnError: false });
+  t.after(() => app.close());
+  await configureApp(app);
+  await app.listen(0, '127.0.0.1');
+  const url = await app.getUrl();
+  const request = async (status, code) => {
+    const response = await fetch(url + '/v1/__test/idempotency', { method: 'POST', signal: AbortSignal.timeout(3000) });
+    assert.equal(response.status, status);
+    const body = await response.json();
+    if (code) {
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.deepEqual(body, { code, message: DEFAULT_ERROR_MESSAGES[code] });
+    }
+    return body;
+  };
+  for (const invalidKey of [undefined, null, 42, '', 'x'.repeat(129), '😀'.repeat(129)]) {
+    currentKey = key(id, { key: invalidKey });
+    await request(400, 'INVALID_REQUEST');
+  }
+  for (const operation of [undefined, null, '', 'createanalysisrequest', secret]) {
+    currentKey = key(id, { operation });
+    await request(500, 'INTERNAL_ERROR');
+  }
+  for (const requestFingerprint of [undefined, null, 42, '', secret, 'a'.repeat(63), 'a'.repeat(65),
+    'A'.repeat(64), 'g'.repeat(64), { toString: () => fingerprint('body-1') }]) {
+    currentKey = key(id, { requestFingerprint });
+    await request(500, 'INTERNAL_ERROR');
+  }
+  for (const type of [AnalysisRequest, AnalysisConsent, AnalysisAttempt, IdempotencyRecord]) {
+    assert.equal(await db.getRepository(type).count(), 0);
+  }
+  currentKey = key(id);
+  const first = await request(201);
+  assert.equal(first.replayed, false);
+  // 기존 키에서도 잘못된 내부 값은 409가 아닌 500이며 비교 함수 실행 전에 거부한다.
+  currentKey = key(id, { requestFingerprint: secret });
+  await request(500, 'INTERNAL_ERROR');
+  currentKey = key(id, { requestFingerprint: fingerprint('different') });
+  await request(409, 'IDEMPOTENCY_CONFLICT');
+  assert.equal(comparisons, 0);
+  currentKey = key(id);
+  same = false;
+  await request(409, 'IDEMPOTENCY_CONFLICT');
+  assert.equal(comparisons, 1);
+  same = true;
+  const replay = await request(201);
+  assert.equal(replay.replayed, true);
+  assert.deepEqual(replay.response, first.response);
+  assert.equal(comparisons, 2);
+  for (const type of [AnalysisRequest, AnalysisConsent, AnalysisAttempt, IdempotencyRecord]) {
+    assert.equal(await db.getRepository(type).count(), 1);
+  }
+  const output = logs.join('\n');
+  assert.ok(output.includes('500 INTERNAL_ERROR'));
+  for (const privateValue of [secret, fingerprint('body-1'), fingerprint('different')]) {
+    assert.equal(output.includes(privateValue), false);
+  }
+});
+
+test('멱등 키의 1자·128자 경계와 유니코드 문자 수 검증을 유지', async () => {
+  for (const validKey of ['x', 'x'.repeat(128), '😀'.repeat(128)]) {
+    const id = await dev().resolveMember(randomUUID());
+    const result = await transaction(m => runIdempotentCreation(m, key(id, { key: validKey }), callbacks(id)));
+    assert.equal(result.replayed, false);
+  }
+});
+
 test('다른 지문·동일 지문에서 비동기 비교 false는 충돌, 비교 예외는 서버 오류 그대로', async () => {
   const id=await dev().resolveMember('compare');
   await transaction(m=>runIdempotentCreation(m,key(id),callbacks(id)));
-  const conflict=e=>e.code==='IDEMPOTENCY_CONFLICT';
+  const conflict=e=>e.code==='IDEMPOTENCY_CONFLICT' && e.getStatus()===409;
   await assert.rejects(transaction(m=>runIdempotentCreation(m,key(id,{requestFingerprint:fingerprint('different')}),callbacks(id))),conflict);
   await assert.rejects(transaction(m=>runIdempotentCreation(m,key(id),callbacks(id,{async isSame(){return false;}}))),conflict);
   await assert.rejects(transaction(m=>runIdempotentCreation(m,key(id),callbacks(id,{async isSame(){throw new Error('inconsistent verifier');}}))),/inconsistent verifier/);

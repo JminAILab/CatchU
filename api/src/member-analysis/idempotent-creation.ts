@@ -51,9 +51,14 @@ export async function runIdempotentCreation<T>(
   manager: EntityManager, input: CreationKey, callbacks: CreationCallbacks<T>,
 ): Promise<{ replayed: boolean; response: T }> {
   await requireCreationTransaction(manager);
+  if (typeof input.key !== 'string' || [...input.key].length < 1 || [...input.key].length > 128) {
+    throw new ApiError('INVALID_REQUEST');
+  }
+  // operation과 지문은 서버 내부 값이다. 원문을 오류 메시지에 포함하지 않는다.
   if (!['createAnalysisRequest', 'createShareLink'].includes(input.operation) ||
-      typeof input.key !== 'string' || [...input.key].length < 1 || [...input.key].length > 128 ||
-      !/^[0-9a-f]{64}$/.test(input.requestFingerprint)) throw new ApiError('INVALID_REQUEST');
+      typeof input.requestFingerprint !== 'string' || !/^[0-9a-f]{64}$/.test(input.requestFingerprint)) {
+    throw new ApiError('INTERNAL_ERROR');
+  }
   // JSON tuple로 키 경계 충돌을 피한다. 해시 충돌은 추가 대기만 만들며 자료를 합치지 않는다.
   const lock = JSON.stringify(['catchu:idempotency', input.memberId, input.operation, input.key]);
   await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [lock]);
