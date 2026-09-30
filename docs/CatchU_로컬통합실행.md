@@ -1,6 +1,6 @@
 # CatchU 로컬 통합 실행 안내
 
-> **지위: 안내** · 한 컴퓨터에서 PostgreSQL·api·worker·web을 함께 띄우는 로컬 개발용 순서다. 작성자가 macOS에서 따라 해 확인했고, 작성자 외 재현과 web 화면을 거친 로그인 확인은 남아 있다([#107][i107]). 각 서비스의 설치·검사 상세는 서비스 README가 정본이다.
+> **지위: 안내** · 한 컴퓨터에서 PostgreSQL·api·worker·web을 함께 띄우는 로컬 개발용 순서다. 작성자가 macOS에서, 작성자 외 1명이 Windows의 새 작업 폴더에서 1~4단계와 끄는 순서를 따라 해 확인했다([PR #174 리뷰][r174]). web 화면을 거친 로그인 확인은 남아 있다([#107][i107]). 각 서비스의 설치·검사 상세는 서비스 README가 정본이다.
 
 ## 한눈에 보기
 
@@ -168,3 +168,4 @@ Dockerfile·Compose, NCP 배포·복구([#24][i24]), 실제 큐 연결([#77][i77
 [i77]: https://github.com/JminAILab/CatchU/issues/77
 [i106]: https://github.com/JminAILab/CatchU/issues/106
 [i107]: https://github.com/JminAILab/CatchU/issues/107
+[r174]: https://github.com/JminAILab/CatchU/pull/174#pullrequestreview-5349715690
