@@ -6,11 +6,14 @@
 
 | 문서 | 무엇인가 | 지위 |
 |---|---|---|
+| [12월 승인 문서 안내](CatchU_12월_승인문서_안내.md) | 승인 요구사항·사용자 스토리·마감 구분·후속 미결·승인 및 정지 기록의 읽기 순서 | **안내** · 승인 원본은 `aidlc/`, 제품 구현·일정 검증 완료를 뜻하지 않음 |
 | [web 모의 시연 팀원 착수 안내](web-mock-demo/README.md) | 9/30 합성 시연의 승인 계획·검사 지침 공유본과 팀원별 첫 작업 | **기록** · 중단 (09-24 팀장 결정) · 09-21 승인 판본의 공유용 사본, 소급 수정하지 않음 |
 | [`CatchU_그라운드룰_2026-08-04.md`](CatchU_그라운드룰_2026-08-04.md) | 회의 운영·소통·작업 방식 등 팀이 합의한 운영 규칙 | 확정 (08-04) |
 | [`CatchU_레포_컨벤션.md`](CatchU_레포_컨벤션.md) | 레포 구조·브랜치·머지·커밋 메시지 규칙과 그렇게 정한 근거 | 확정 (08-24) · §2 임시 통합 브랜치 운영안과 관련 변경은 **검토용** (09-20) |
 | [`CatchU_작업관리.md`](CatchU_작업관리.md) | Codex·Claude Code의 공통 작업·코딩·검증·PR 절차와 개발 준비 확인 | **적용 준비안** (09-20 보완) · 코딩 운영은 09-23 팀장 결정 · 담당·일정·환경 준비 완료를 뜻하지 않음 |
+| [`CatchU_로컬통합실행.md`](CatchU_로컬통합실행.md) | 한 컴퓨터에서 PostgreSQL·api·worker·web을 함께 띄우는 순서, 정상 확인·끄는 방법, 서비스끼리 맞출 설정값 | **안내** (09-29) · macOS(작성자)·Windows(작성자 외 1명)에서 재현했고 web 화면 로그인 확인은 남음 · 배포 검증을 뜻하지 않음 |
 | [`CatchU_통합검증표.md`](CatchU_통합검증표.md) | 첫 연결과 전체 MVP의 연결별 시나리오·기대 결과·담당·선행·실행 증거 칸과 담당별 확인 기록 | **초안** (09-28) · 승인된 API 명세 v1(9093d2e)의 파생 검증 기준, 계약과 어긋나면 계약이 이김 · 실행 결과는 미실행이며 통합 통과·M1 승인·MVP 완료를 뜻하지 않음 |
+| [`CatchU_수집통제_임시자료.md`](CatchU_수집통제_임시자료.md) | 실제 GitHub 수집 전에 정할 허용 범위·안전 통제, A→F 자격정보 인계, F 임시 자료의 위치·수명·삭제와 검증 사례 | **제안** (09-29) · 수집 방식(API만 씀)·결과 보존 14일·통제 실행 담당은 09-29 팀장 결정이고 나머지는 제안 · 승인된 API 명세 v1(9093d2e)의 파생 설계, 계약과 어긋나면 계약이 이김 · 자원·시간 상한 수치는 제안이고 실제 수집 허용을 뜻하지 않음 |
 | [`카드생성논리_상세설명.md`](카드생성논리_상세설명.md) | 증거카드가 만들어지는 과정 — 수집·묶음·카드 추출 단계를 풀어 쓴 문서 | v2 (08-12) · 실제 레포 3개로 검증 |
 | [`증거카드_이상형과_추출방법.md`](증거카드_이상형과_추출방법.md) | 카드가 완성되면 어떤 모습인가 — PoC 이전의 이상형 정의와 필드별 추출 방법 | **기록** (PoC 이전) |
 | [`CatchU_KPI_성공기준_v4_1.md`](CatchU_KPI_성공기준_v4_1.md) | 무엇을 성공으로 볼지와 그것을 어떻게 잴지 — KPI·측정 설계·실패 조건 | **초안** v4.1 (09-03 개정) · 🔲 4건 미확정 |
@@ -45,7 +48,9 @@ PR 본문에, 판본은 git 이력에 남는다.
 ## AI-DLC 산출물과의 관계
 
 - `docs/`는 팀의 현행 기준과 문서 안내를 관리한다. AI-DLC 산출물의 원본과 승인 이력은 `aidlc/`에서 관리한다(`aidlc/spaces/default/intents/<intent>/`의 단계별 폴더와 `audit/`). 원본을 두 곳에 복제해 수정하지 않는다.
-- 현재 승인된 요구사항: `aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md` (2026-09-11 승인 · 기능 요구사항 45 · 비기능 8 · 후속 결정 16). 질문·답변 기록은 같은 폴더의 `requirements-analysis-questions.md`.
+- 초기 제품 정의의 승인 요구사항: [첫 intent 요구사항](../aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md) (2026-09-11 승인). 이후 10월 MVP와 12월 범위의 적용 기준은 각각의 후속 승인 문서에서 확인한다. 과거 승인 원본은 보존한다.
+- 10월 MVP 구현 기준: [10월 요구사항](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md)와 해당 intent의 승인된 설계·계약 및 후속 결정을 사용한다.
+- 12월 확장 기준: [12월 요구사항](../aidlc/spaces/default/intents/260925-intent-12/inception/requirements-analysis/requirements.md)과 [사용자 스토리](../aidlc/spaces/default/intents/260925-intent-12/inception/user-stories/stories.md)는 2026-09-28 승인됐다. 읽기 순서·마감 구분·적용 경계는 [12월 승인 문서 안내](CatchU_12월_승인문서_안내.md)를 따른다. 12월의 명시적 정정은 그 범위에 적용하며, 이번 공유만으로 10월 구현 계약을 변경하지 않는다.
 - 10월 MVP에 적용하는 범위·순서·착수 조건은 후속 intent의 [scope-document.md](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)·[intent-backlog.md](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/intent-backlog.md)와 연결된 후속 결정을 확인한다. 산출물에 남은 작성 당시 지위와 현재 승인 여부를 구분하고, 승인 여부는 해당 intent의 `aidlc-state.md`·`audit/` 기록에서 확인한다.
 - 승인된 AI-DLC 산출물이 `docs/`의 기존 기준을 대체하는 경우, 대체 대상·범위·적용 시점·승인 근거를 해당 `docs/` 문서의 본문이나 「결정 이력」에 명시한다. 명시되지 않은 충돌에는 자동 우선순위를 적용하지 않고 미결로 표시해 Slack에 올린다.
 - 현재 명시된 항목: 레포 컨벤션 §1의 Next.js·NestJS·FastAPI와 배포 대상 NCP는 2026-09-13 확정이다(해당 문서 결정 이력 및 [MVP 입력](ai-dlc-input-mvp/CatchU_mvp_input.md) 참조). KPI v4.1의 초안 지위는 그대로다. AI-DLC의 후속 intent에서 검토 자료로 쓰려면 입력 문서에 필요한 내용·지위·출처·기준 커밋을 옮겨 적는다. 링크만으로는 AI-DLC가 원문을 읽지 않는다.
