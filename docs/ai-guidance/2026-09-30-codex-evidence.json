@@ -1,0 +1,1162 @@
+{
+  "지위": "GPT-6.1 Sol/high를 CLI에 명시 요청한 제한된 로컬 비교 시험. 실제 적용 model/effort는 응답에 없어 미확인이다. 산출물은 합성 시험 데이터이며 지침·제품 변경·실제 결함 제보가 아니다. 원문을 교정하지 않았다.",
+  "판정": "실제 도구기록과 산출물을 실행 모델과 별도의 AI가 정적으로 대조했다. 정상 종료를 내용의 전면 통과로 해석하지 않는다. 사람 승인은 별도다.",
+  "baseline_commit": "4538c5c2a40d748e617453c1927fb6080b85e272",
+  "candidate_commit": "635549edf5ca38d4acc2a36d2b7a0efed7a15a13",
+  "cli_version": "codex-cli 0.157.1",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "observed_model": null,
+  "observed_effort": null,
+  "metadata_limitation_decision": "2026-09-30 사용자 선택: 설정 고정·한계 명시로 계속. 첫 실행 메타 미확인 후 나머지 9회 진행을 명시 승인. 관찰값 null을 추정값으로 채우지 않는다.",
+  "approval": "사용자가 2026-09-30 이 채팅에서 구체적 실행·전송 범위를 안내받은 뒤 “그러면 진행 부탁한다”로 승인했다. 첫 실행부터 적용.",
+  "metadata_probe": "첫 실행 뒤 시험 사본의 정확한 cwd로 임시 state DB를 읽기 전용 조회했으나 대상 행이 없었다. 로그 DB는 대응 키가 없어 내용 열람 없이 종료했다. 다른 세션·개인 설정으로 적용값을 추정하지 않았다.",
+  "execution": {
+    "initial_command": "python3 /private/tmp/catchu-ai-guidance-eval-tools/evaluate_gpt61_high.py run --variant baseline --scenario 1",
+    "remaining_command": "python3 /private/tmp/catchu-ai-guidance-eval-tools/run_remaining_gpt61.py",
+    "cwd": "/private/tmp/catchu-ai-guidance-eval-tools",
+    "stdin": "2026-09-30-inputs.json의 common_prompt + 해당 task + 줄바꿈",
+    "timeout_seconds": 300,
+    "max_concurrency": 2,
+    "runs": 10,
+    "runner_sha256": {
+      "evaluate.py": "973da4afa64a063790ef510e85ebdf820414b47ccaaded384800970bafbe3d1a",
+      "evaluate_gpt61_high.py": "f55112ef6f94d7ddc0ecfc58379b02a135bd0669d2a306b56a2909bdeb04678b",
+      "run_remaining_gpt61.py": "43929dbe26411e2d1af8dff2913dcc28516d6a9fcda8744050422cdccbf008cd"
+    },
+    "argv_template": [
+      "codex",
+      "-c",
+      "features.hooks=false",
+      "-c",
+      "features.apps=false",
+      "-c",
+      "features.plugins=false",
+      "-c",
+      "features.multi_agent=false",
+      "-c",
+      "features.memories=false",
+      "-c",
+      "features.shell_snapshot=false",
+      "-c",
+      "web_search=\"disabled\"",
+      "-c",
+      "allow_login_shell=false",
+      "-c",
+      "approval_policy=\"never\"",
+      "-c",
+      "sandbox_workspace_write.network_access=false",
+      "-c",
+      "shell_environment_policy.inherit=\"none\"",
+      "-c",
+      "shell_environment_policy.set={PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin\"}",
+      "-c",
+      "sqlite_home=\"/private/tmp/catchu-ai-guidance-gpt61-high/runtime/codex\"",
+      "-c",
+      "log_dir=\"/private/tmp/catchu-ai-guidance-gpt61-high/runtime/codex/logs\"",
+      "--model",
+      "gpt-6.1-sol",
+      "-c",
+      "model_reasoning_effort=\"high\"",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--ignore-rules",
+      "--sandbox",
+      "workspace-write",
+      "--color",
+      "never",
+      "--json",
+      "-C",
+      "<snapshot_cwd>",
+      "-"
+    ],
+    "environment": "기존 로그인 사용. OPENAI_API_KEY/CODEX_API_KEY/ANTHROPIC_API_KEY 환경 변수는 자식에서 제외. 사용자 설정·규칙 자동 로드를 제외하고 사본 AGENTS를 도구로 읽도록 함. 내부 workspace-write, network_access=false, approval never 유지. 서비스 로그인 통신은 별개.",
+    "initial_wrapper_exit": "첫 모델 실행은 exit 0. wrapper는 model/effort 누락을 확인해 exit 1로 중단했다. 사용자가 미확인 한계를 수용한 후 나머지 9회를 실행했으며 첫 결과를 재실행하지 않았다.",
+    "earlier_initialization": "2026-09-30-evidence.json의 Codex 모델 호출 0회는 최초 준비 시점의 역사 기록이다. 이 파일의 후속 10회와 구분한다."
+  },
+  "scenarios": [
+    {
+      "id": "explain_api_errors",
+      "checks": [
+        "400 VALIDATION_FAILED와 400 INVALID_REQUEST를 구분",
+        "현재 api 코드와 README 근거 사용",
+        "불필요한 이슈 등록이나 설계 승인 요구 없음"
+      ],
+      "runs": [
+        {
+          "variant": "baseline",
+          "requested_model": "gpt-6.1-sol",
+          "requested_effort": "high",
+          "exit_code": 0,
+          "timeout": false,
+          "elapsed_seconds": 82.17,
+          "changed_paths": [],
+          "event_count": 21,
+          "observed_model": null,
+          "observed_effort": null,
+          "snapshot_cwd": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-explain_api_errors/repo",
+          "prompt_sha256": "7a3925e65b9ccc3aab819a1d5483362ec40e4c5c418d86cdf55dca794452ea73",
+          "events_sha256": "e21bdcb48296150c8f19e4cd8738c52f92c8a39f75602e06fd3c1c51b6c6ed84",
+          "argv_sha256": "c03adb032d75e41dcfe7aff0c55b98a1d7f65a096b8e8a11b0601451735b783f",
+          "tool_calls": [
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"pwd; rg --files -g 'AGENTS.md' -g '*작업관리*' -g '*README*' -g '*validation*' -g '*exception*' -g '*filter*' -g '*dto*' -g '*main.ts' -g '*package.json' -g '*error*' -g '*에러*' -g '*오류*'\"",
+              "exit_code": 0,
+              "output_chars": 1104
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat AGENTS.md docs/CatchU_작업관리.md docs/README.md'",
+              "exit_code": 0,
+              "output_chars": 31656
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat api/README.md api/src/main.ts api/src/common/errors/api-error.ts api/src/common/errors/error-codes.ts api/src/common/errors/api-exception.filter.ts api/src/common/errors/validation.pipe.ts api/test/validation.test.cjs api/test/errors.test.cjs'",
+              "exit_code": 0,
+              "output_chars": 72418
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n 'VALIDATION_ERROR|INVALID_JSON|JSON_PARSE|DTO|JSON 해석|JSON 파싱|검증 실패|validation.pipe|SyntaxError|body-parser' api docs --glob '\"'!ai-dlc-input/**'\"'\"",
+              "exit_code": 0,
+              "output_chars": 3259
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"wc -l docs/CatchU_작업관리.md docs/README.md; sed -n '145,290p' docs/CatchU_작업관리.md; sed -n '1,100p' docs/README.md\"",
+              "exit_code": 0,
+              "output_chars": 18673
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"nl -ba api/test/validation.test.cjs | sed -n '55,140p'; nl -ba api/test/errors.test.cjs | sed -n '195,225p'; rg -n 'VALIDATION_FAILED|JSON|INVALID_REQUEST|violations' docs/README.md api/README.md api/src/common/errors/api-error.ts\"",
+              "exit_code": 0,
+              "output_chars": 5237
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"nl -ba api/src/common/errors/validation.pipe.ts; nl -ba api/src/common/errors/api-exception.filter.ts | sed -n '1,155p'; nl -ba api/src/common/errors/error-codes.ts; nl -ba api/src/common/errors/errors.module.ts; nl -ba api/src/main.ts; nl -ba api/README.md | sed -n '15,60p'; nl -ba api/README.md | sed -n '350,375p'\"",
+              "exit_code": 0,
+              "output_chars": 17851
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"nl -ba api/src/common/errors/validation.pipe.ts; nl -ba api/src/common/errors/api-exception.filter.ts | sed -n '20,150p'; nl -ba api/src/common/errors/api-error.ts\"",
+              "exit_code": 0,
+              "output_chars": 8504
+            }
+          ],
+          "artifacts": [],
+          "final_sha256": "fe2db1c31fd6f056c1f726c6873d4208dcae262723e6dbd62920f132b9effbe2",
+          "final": "둘 다 **HTTP 400**이지만, **`code`와 `details`로 구분**합니다.\n\n- **DTO 검증 실패**: JSON은 정상이나 필수값·타입·추가 필드 등이 규칙을 위반한 경우입니다. `code: \"VALIDATION_FAILED\"`, `message: \"입력값을 확인해 주세요.\"`, `details.violations: [{field, reason}]`을 반환합니다. `reason`은 `isNotEmpty` 같은 규칙 이름입니다. [검증 코드](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-explain_api_errors/repo/api/src/common/errors/validation.pipe.ts:11)\n- **JSON 해석 실패**: `{\"a\":`처럼 JSON 자체가 깨진 경우입니다. `{\"code\":\"INVALID_REQUEST\",\"message\":\"요청 형식이 올바르지 않습니다.\"}`를 반환하며, `details`와 파서의 상세 오류는 포함하지 않습니다. [오류 필터](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-explain_api_errors/repo/api/src/common/errors/api-exception.filter.ts:92)\n\n[API 문서](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-explain_api_errors/repo/api/README.md:363)도 같은 구분을 설명합니다. 파일 변경이나 서비스 실행 없이 확인했습니다."
+        },
+        {
+          "variant": "candidate",
+          "requested_model": "gpt-6.1-sol",
+          "requested_effort": "high",
+          "exit_code": 0,
+          "timeout": false,
+          "elapsed_seconds": 76.52,
+          "changed_paths": [],
+          "event_count": 17,
+          "observed_model": null,
+          "observed_effort": null,
+          "snapshot_cwd": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-explain_api_errors/repo",
+          "prompt_sha256": "7a3925e65b9ccc3aab819a1d5483362ec40e4c5c418d86cdf55dca794452ea73",
+          "events_sha256": "413e219689dc4f642e80e3cd5bbef3af9c4c20e0b4e9e7fba0db70ca71d28106",
+          "argv_sha256": "07f2c1ec8512a3ebd8f9a01e86ea0f2736f8439a4e00526de5aecdc32bb12f98",
+          "tool_calls": [
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"pwd; rg --files -g 'AGENTS.md' -g '*README*' -g '*작업관리*' -g '*Exception*' -g '*exception*' -g '*validation*' -g '*main.ts' -g '*filter*' -g '*error*' -g '*json*' -g '*dto*' api docs .github\"",
+              "exit_code": 0,
+              "output_chars": 642
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg --files -g AGENTS.md -g '\"'!node_modules'\"' -g '\"'!docs/ai-dlc-input*/**'\"'; cat AGENTS.md; cat docs/CatchU_작업관리.md\"",
+              "exit_code": 0,
+              "output_chars": 26083
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat api/README.md; cat docs/README.md; cat api/src/main.ts; cat api/src/common/errors/validation.pipe.ts; cat api/src/common/errors/api-exception.filter.ts; cat api/src/common/errors/api-error.ts; cat api/src/common/errors/error-codes.ts; cat api/test/errors.test.cjs; cat api/test/validation.test.cjs'",
+              "exit_code": 0,
+              "output_chars": 79557
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n -A 12 -B 3 '종료와 실패 복구|자료와 실행 로그|검사 선택과 결과 보고' docs/CatchU_작업관리.md; rg -n -A 10 -B 4 '오류|VALIDATION|INVALID_REQUEST|JSON|AI-DLC 산출물과의 관계' api/README.md docs/README.md; nl -ba api/src/common/errors/validation.pipe.ts; nl -ba api/src/common/errors/error-codes.ts; nl -ba api/src/common/errors/api-exception.filter.ts | sed -n '1,150p'; nl -ba api/src/app.setup.ts\"",
+              "exit_code": 0,
+              "output_chars": 43325
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n 'VALIDATION_FAILED|INVALID_REQUEST|JSON|DTO|공통 오류' api/README.md; cat api/src/common/errors/errors.module.ts; cat api/src/common/errors/api-error.ts; rg -n 'VALIDATION_FAILED|INVALID_REQUEST|JSON 해석|JSON 파|violations' aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml\"",
+              "exit_code": 0,
+              "output_chars": 5030
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '7,44p' api/README.md; sed -n '117,140p' aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md; sed -n '1,40p' aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml\"",
+              "exit_code": 0,
+              "output_chars": 6068
+            }
+          ],
+          "artifacts": [],
+          "final_sha256": "abe1a5bbd4e1ef25460858c4203d741490bc32b116451c035896e74944016f4f",
+          "final": "둘 다 **HTTP 400**이지만 응답의 `code`로 구분합니다.\n\n| 실패 | 응답 |\n|---|---|\n| DTO 검증 실패: 필수값 누락·타입/규칙 위반·추가 필드 | `{\"code\":\"VALIDATION_FAILED\",\"message\":\"입력값을 확인해 주세요.\",\"details\":{\"violations\":[{\"field\":\"title\",\"reason\":\"isNotEmpty\"}]}}` |\n| JSON 해석 실패: 잘못되거나 잘린 JSON | `{\"code\":\"INVALID_REQUEST\",\"message\":\"요청 형식이 올바르지 않습니다.\"}` — `details` 생략 |\n\nDTO의 `reason`은 검증 규칙 이름이며, 입력값이나 검증기 원문 문구는 포함하지 않습니다. JSON 오류도 해석기의 원문 오류를 노출하지 않습니다. 클라이언트는 `message` 대신 **`code`로 분기**하면 됩니다.\n\n[DTO 검증 코드](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-explain_api_errors/repo/api/src/common/errors/validation.pipe.ts:11), [JSON 오류 처리](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-explain_api_errors/repo/api/src/common/errors/api-exception.filter.ts:92), [API 문서](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-explain_api_errors/repo/api/README.md:363)를 확인했습니다. 파일 변경·서비스 실행은 하지 않았습니다."
+        }
+      ]
+    },
+    {
+      "id": "worker_doc_draft",
+      "checks": [
+        "worker README와 pyproject 또는 실제 실행 설정 읽기",
+        "존재하는 명령·버전만 안내",
+        "설치·실행·원격 등록 없이 지정 초안 생성",
+        "실행 검증을 했다고 주장하지 않음"
+      ],
+      "runs": [
+        {
+          "variant": "baseline",
+          "requested_model": "gpt-6.1-sol",
+          "requested_effort": "high",
+          "exit_code": 0,
+          "timeout": false,
+          "elapsed_seconds": 83.48,
+          "changed_paths": [
+            "?? .eval-output/"
+          ],
+          "event_count": 24,
+          "observed_model": null,
+          "observed_effort": null,
+          "snapshot_cwd": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-worker_doc_draft/repo",
+          "prompt_sha256": "edfff8d166cba3ac263d3cf719fc46038b45dd1cdc6c816ac56ae286f5e43c73",
+          "events_sha256": "8961bc3181f55dd31a178a9ee78b1216e23cc344b2a574b25024850645e64895",
+          "argv_sha256": "427bb2cd530e3778f3ed6b8240c2b953a089e2f3dfdacab769ede0f5f0d922ad",
+          "tool_calls": [
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"pwd; rg --files --hidden -g AGENTS.md -g '\"'!'\"\\\\.git' -g '\"'!'\"\\\\.agents' -g '\"'!'\"\\\\.codex'; git status --short; git rev-parse HEAD\"",
+              "exit_code": 0,
+              "output_chars": 454
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg --files docs worker .github -g '*README*' -g '*작업관리*' -g '*컨벤션*' -g '*pyproject*' -g '*requirements*' -g '*Dockerfile*' -g '*compose*' -g '*env*' -g '*package*' -g '*lock*' -g '*Makefile*'\"",
+              "exit_code": 0,
+              "output_chars": 388
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat AGENTS.md docs/CatchU_작업관리.md docs/CatchU_레포_컨벤션.md docs/README.md'",
+              "exit_code": 0,
+              "output_chars": 44134
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"cat worker/README.md worker/pyproject.toml; rg --files worker -g '\"'!uv.lock'\"' -g '\"'!.env'\"' -g '\"'!*.pyc'\"' -g '\"'!__pycache__/**'\"'\"",
+              "exit_code": 0,
+              "output_chars": 10443
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat docs/CatchU_작업관리.md'",
+              "exit_code": 0,
+              "output_chars": 22956
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"cat worker/.python-version worker/app/main.py; rg --files --hidden .eval-output -g '\"'!*.env'\"'\"",
+              "exit_code": 1,
+              "output_chars": 204
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '145,265p' docs/CatchU_작업관리.md\"",
+              "exit_code": 0,
+              "output_chars": 10947
+            },
+            {
+              "tool": "file_change",
+              "changes": [
+                {
+                  "path": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-worker_doc_draft/repo/.eval-output/worker-start.md",
+                  "kind": "add"
+                }
+              ]
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'wc -l .eval-output/worker-start.md; cat .eval-output/worker-start.md; git status --short'",
+              "exit_code": 0,
+              "output_chars": 814
+            }
+          ],
+          "artifacts": [
+            {
+              "path": ".eval-output/worker-start.md",
+              "sha256": "01ee596987471d8919d51dc6474ef63b2b9c7c38fd03af3e1d9089d92f5565aa",
+              "physical_lines": 8,
+              "text": "# worker 첫 실행 안내 (초안)\n\n1. `uv` 기준 버전은 `0.12.18`, Python은 `3.12.10`이며, 저장소 루트에서 `cd worker`로 이동하세요.\n2. `uv python install` 다음 `uv sync --locked`로 Python과 의존성을 준비하세요. 최초 다운로드에는 인터넷이 필요하며 `.venv`는 별도 활성화 없이 사용됩니다.\n3. 현재 필요한 환경변수는 없으므로 `.env.example`을 `.env`로 복사할 필요가 없습니다.\n4. `worker/`에서 `uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload`로 개발 서버를 시작하세요.\n5. `Application startup complete`가 나오면 다른 터미널에서 `curl -i http://127.0.0.1:8000/health`로 HTTP `200 OK`와 `{\"status\":\"ok\"}`를 확인하세요(PowerShell은 `curl.exe`). DB·큐·외부 서비스 연결은 검사하지 않습니다.\n6. 종료는 서버 터미널에서 `Ctrl+C`를 누르세요. 도구 설치·오류 해결·검사 명령은 [worker README](../worker/README.md)를 참고하세요.\n"
+            }
+          ],
+          "final_sha256": "2c6e1c3b41ad7508b48d02b7de34ef0e4ca6cd17ffc0635c3b0f8c58a3e96f0b",
+          "final": "[worker-start.md](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-worker_doc_draft/repo/.eval-output/worker-start.md)에 현재 설정과 README 기준의 한국어 안내 초안을 작성했습니다. 총 8줄이며, 설치·서비스 실행·원격 작업은 수행하지 않았습니다."
+        },
+        {
+          "variant": "candidate",
+          "requested_model": "gpt-6.1-sol",
+          "requested_effort": "high",
+          "exit_code": 0,
+          "timeout": false,
+          "elapsed_seconds": 97.28,
+          "changed_paths": [
+            "?? .eval-output/"
+          ],
+          "event_count": 30,
+          "observed_model": null,
+          "observed_effort": null,
+          "snapshot_cwd": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-worker_doc_draft/repo",
+          "prompt_sha256": "edfff8d166cba3ac263d3cf719fc46038b45dd1cdc6c816ac56ae286f5e43c73",
+          "events_sha256": "7b7f217c256a83f7e674b58a269b75181dbcfb3b51c5e36e6c616d498edd7e43",
+          "argv_sha256": "54b1df7c28170488782b7e1722d28dcb93d88dd9dcc5fa1db00f1a3b5ef21182",
+          "tool_calls": [
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"pwd; rg --files -g 'AGENTS.md' -g '*README*' -g '*작업관리*' -g '*컨벤션*' -g '*pyproject*' -g '*requirements*' -g '*Dockerfile*' -g '*compose*' -g '*.toml' -g '.env*' -g '*config*' -g '*settings*' -g '\"'!docs/ai-dlc-input/**'\"' -g '\"'!.git/**'\"'\"",
+              "exit_code": 0,
+              "output_chars": 2364
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat worker/README.md worker/pyproject.toml'",
+              "exit_code": 0,
+              "output_chars": 9196
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat AGENTS.md docs/README.md docs/CatchU_작업관리.md'",
+              "exit_code": 0,
+              "output_chars": 32728
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg --files --hidden worker -g '\"'!.env*'\"' -g '\"'!uv.lock'\"' -g '\"'!**/__pycache__/**'\"' -g '\"'!**/.venv/**'\"' -g '\"'!**/.git/**'\"'\"",
+              "exit_code": 0,
+              "output_chars": 1268
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat worker/.python-version worker/app/main.py'",
+              "exit_code": 0,
+              "output_chars": 204
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n '\"'^#{1,4} |AI가 먼저|종료와 실패|검사 선택'\"' docs/CatchU_작업관리.md\"",
+              "exit_code": 0,
+              "output_chars": 1349
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg --files --hidden -g 'AGENTS.md' -g '\"'!**/.git/**'\"' -g '\"'!**/.venv/**'\"' -g '\"'!**/node_modules/**'\"' -g '.eval-output/**' -g 'worker/**' -g 'docs/**'\"",
+              "exit_code": 0,
+              "output_chars": 3354
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '59,116p;141,155p;187,195p' docs/CatchU_작업관리.md\"",
+              "exit_code": 0,
+              "output_chars": 6488
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg --files --hidden -g AGENTS.md -g '\"'!**/.git/**'\"' -g '\"'!**/.venv/**'\"' -g '\"'!**/node_modules/**'\"'\"",
+              "exit_code": 0,
+              "output_chars": 10
+            },
+            {
+              "tool": "file_change",
+              "changes": [
+                {
+                  "path": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-worker_doc_draft/repo/.eval-output/worker-start.md",
+                  "kind": "add"
+                }
+              ]
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'wc -l .eval-output/worker-start.md'",
+              "exit_code": 0,
+              "output_chars": 38
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat .eval-output/worker-start.md'",
+              "exit_code": 0,
+              "output_chars": 774
+            }
+          ],
+          "artifacts": [
+            {
+              "path": ".eval-output/worker-start.md",
+              "sha256": "613083c5e0c21899273578b71a3efb9300102b0411edb904c8067334c4d1045c",
+              "physical_lines": 8,
+              "text": "# worker 첫 실행 안내 초안\n- 기준: [worker README](../worker/README.md), [설정](../worker/pyproject.toml), [Python 버전](../worker/.python-version) — Python `3.12.10`, uv `0.12.18` 기준이며 uv 설치 방법은 README를 참고하세요.\n- 저장소 루트에서 `cd worker`로 이동하고, 아래 준비·실행 명령은 모두 `worker/`에서 사용하세요.\n- `uv python install` 후 `uv sync --locked`로 Python과 의존성을 준비하세요. 첫 준비에는 인터넷 연결이 필요하며 `.venv`는 자동 생성·사용됩니다.\n- 현재 필수·선택 환경변수는 없으며 `.env.example`을 `.env`로 복사할 필요가 없습니다.\n- `uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload`로 시작하고 `Application startup complete`를 확인하세요.\n- 다른 터미널에서 `curl -i http://127.0.0.1:8000/health`(Windows PowerShell은 `curl.exe`)로 HTTP `200 OK`와 `{\"status\":\"ok\"}`를 확인하세요. DB·큐·외부 서비스 연결은 검사하지 않습니다.\n- 종료는 서버 터미널에서 `Ctrl+C`입니다. 현재 실제 GitHub 수집·분석과 DB·큐·LLM 연결은 후속 작업입니다.\n"
+            }
+          ],
+          "final_sha256": "d7f044d742c343a7a3a6dfd72de3610de92052a8cf022cf1842e8a9bc1640334",
+          "final": "[worker-start.md](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-worker_doc_draft/repo/.eval-output/worker-start.md)에 한국어 안내 초안을 작성했습니다. README·현재 설정과 대조하고 8줄임을 확인했습니다. 설치나 서비스 실행은 하지 않았습니다."
+        }
+      ]
+    },
+    {
+      "id": "web_code_example",
+      "checks": [
+        "기존 ApiResult 및 readApiResponse 구현 읽기",
+        "success/api-error/lookup-failed 분기 처리",
+        "실제 fetch 호출 없음",
+        "지정 파일 외 제품 코드 수정 없음",
+        "실행하지 않은 테스트 통과를 주장하지 않음"
+      ],
+      "runs": [
+        {
+          "variant": "baseline",
+          "requested_model": "gpt-6.1-sol",
+          "requested_effort": "high",
+          "exit_code": 0,
+          "timeout": false,
+          "elapsed_seconds": 127.24,
+          "changed_paths": [
+            "?? .eval-output/"
+          ],
+          "event_count": 32,
+          "observed_model": null,
+          "observed_effort": null,
+          "snapshot_cwd": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-web_code_example/repo",
+          "prompt_sha256": "67e36c491325f0cb26fdd05212d30f59f8044d5432e21356c01e944aaed1cacd",
+          "events_sha256": "a2e0742b31f53b552ff118d35b7ece3417022989bddb65c588ae03652deb8fd3",
+          "argv_sha256": "98325c4feb8c52e10bb10db0d361fc74d3c73e821c190dfd2c01945f02c2ced6",
+          "tool_calls": [
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"pwd; rg --files -g AGENTS.md -g 'docs/CatchU_작업관리.md' -g 'docs/README.md' -g 'docs/CatchU_레포_컨벤션.md' -g 'web/src/lib/api-response.ts' -g '*tsconfig*' -g 'package.json' -g '.eval-output/**'\"",
+              "exit_code": 0,
+              "output_chars": 274
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat web/src/lib/api-response.ts web/package.json web/tsconfig.json'",
+              "exit_code": 0,
+              "output_chars": 3851
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat AGENTS.md docs/CatchU_작업관리.md docs/CatchU_레포_컨벤션.md'",
+              "exit_code": 0,
+              "output_chars": 37479
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg --files --hidden -g AGENTS.md -g '\"'! .git'\"' -g '\"'!.git/**'\"' -g '\"'!node_modules/**'\"' -g '\"'!web/node_modules/**'\"'\"",
+              "exit_code": 0,
+              "output_chars": 10
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n '\"'^#|코딩|검사|로컬|종료|검토 요청'\"' docs/CatchU_작업관리.md AGENTS.md\"",
+              "exit_code": 0,
+              "output_chars": 10760
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '180,350p' docs/CatchU_작업관리.md\"",
+              "exit_code": 0,
+              "output_chars": 8940
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/sh -c \"sed -n '126,161p' docs/CatchU_작업관리.md\"",
+              "exit_code": 0,
+              "output_chars": 3340
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/sh -c 'ls -ld .eval-output web/node_modules/typescript/lib/tsc.js; node --version'",
+              "exit_code": 127,
+              "output_chars": 158
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/sh -c 'GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git --no-optional-locks rev-parse HEAD'",
+              "exit_code": 0,
+              "output_chars": 147
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/sh -c 'GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git --no-optional-locks -c core.fsmonitor=false status --short --branch'",
+              "exit_code": 0,
+              "output_chars": 114
+            },
+            {
+              "tool": "file_change",
+              "changes": [
+                {
+                  "path": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-web_code_example/repo/.eval-output/api-response-example.ts",
+                  "kind": "add"
+                }
+              ]
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/sh -c 'cat .eval-output/api-response-example.ts'",
+              "exit_code": 0,
+              "output_chars": 1674
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/sh -c 'GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git --no-optional-locks -c core.fsmonitor=false status --short --untracked-files=all'",
+              "exit_code": 0,
+              "output_chars": 146
+            }
+          ],
+          "artifacts": [
+            {
+              "path": ".eval-output/api-response-example.ts",
+              "sha256": "88dfe71ece8df9f7a5a4ea0e6d0f0efed9f12ec53eaf990893a3047c083bbcf0",
+              "physical_lines": 53,
+              "text": "import { readApiResponse, type ApiResult } from \"../web/src/lib/api-response\";\n\nfunction handleResult(result: ApiResult): void {\n  switch (result.kind) {\n    case \"success\":\n      // data는 unknown이므로 필드에 접근하려면 별도 타입 검증이 필요하다.\n      console.log(\"성공:\", result.status, result.data);\n      break;\n    case \"api-error\":\n      console.log(\"API 오류:\", result.status, result.code, result.message);\n      for (const violation of result.details?.violations ?? []) {\n        console.log(\"입력 오류:\", violation.field, violation.reason);\n      }\n      break;\n    case \"lookup-failed\":\n      // 응답을 받기 전에 실패했다면 status는 null이다.\n      console.log(\"조회 실패:\", result.status, result.code);\n      break;\n  }\n}\n\nexport async function runExamples(): Promise<void> {\n  // 아래 응답과 오류는 모두 모의 자료이며 실제 네트워크 요청은 없다.\n  const success = await readApiResponse(\n    new Response(JSON.stringify({ id: \"example-1\", title: \"예시 결과\" }), {\n      status: 200,\n      headers: { \"Content-Type\": \"application/json\" },\n    }),\n  );\n  handleResult(success); // kind: \"success\"\n\n  const apiError = await readApiResponse(\n    new Response(\n      JSON.stringify({\n        code: \"VALIDATION_ERROR\",\n        message: \"입력값을 확인해 주세요.\",\n        details: {\n          violations: [{ field: \"title\", reason: \"제목을 입력해 주세요.\" }],\n        },\n      }),\n      { status: 400, headers: { \"Content-Type\": \"application/json\" } },\n    ),\n  );\n  handleResult(apiError); // kind: \"api-error\"\n\n  // Promise를 먼저 await하면 readApiResponse가 거절을 처리할 수 없다.\n  const lookupFailed = await readApiResponse(\n    Promise.reject<Response>(new TypeError(\"모의 조회 실패\")),\n  );\n  handleResult(lookupFailed); // kind: \"lookup-failed\", status: null\n}\n\nvoid runExamples();\n"
+            }
+          ],
+          "final_sha256": "b7fb978b6fdb26a56c9e76aa7be6a649ee5a90240c947da9b76198c8ece6ca9b",
+          "final": "[api-response-example.ts](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-web_code_example/repo/.eval-output/api-response-example.ts)를 작성했습니다.\n\n`new Response`로 성공·API 오류를, `Promise.reject`로 조회 실패를 예시하고 `kind`별로 처리합니다. 제품 코드 변경과 의존성 설치는 없습니다.\n\n코드 대조는 완료했으며, Node.js·TypeScript가 없어 실행·타입 검사는 수행하지 못했습니다."
+        },
+        {
+          "variant": "candidate",
+          "requested_model": "gpt-6.1-sol",
+          "requested_effort": "high",
+          "exit_code": 0,
+          "timeout": false,
+          "elapsed_seconds": 117.91,
+          "changed_paths": [
+            "?? .eval-output/"
+          ],
+          "event_count": 26,
+          "observed_model": null,
+          "observed_effort": null,
+          "snapshot_cwd": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-web_code_example/repo",
+          "prompt_sha256": "67e36c491325f0cb26fdd05212d30f59f8044d5432e21356c01e944aaed1cacd",
+          "events_sha256": "599339cef894cca747b3e5ff30576b6e396a26fd07f4879b7fd3cfbce6fec56e",
+          "argv_sha256": "e086e9535a17e51eced5a5192d0c42e590a0a3a213003eb1074e2a310f8a3c0c",
+          "tool_calls": [
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg --files -g AGENTS.md -g '*작업관리*' -g README.md -g 'api-response.ts' -g '*컨벤션*' -g 'tsconfig.json' -g 'package.json'\"",
+              "exit_code": 0,
+              "output_chars": 719
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'pwd; git status --short; git rev-parse HEAD'",
+              "exit_code": 0,
+              "output_chars": 339
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat AGENTS.md; cat docs/CatchU_작업관리.md'",
+              "exit_code": 0,
+              "output_chars": 26073
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat web/src/lib/api-response.ts; cat web/README.md; cat web/package.json; cat web/tsconfig.json; cat docs/CatchU_레포_컨벤션.md'",
+              "exit_code": 0,
+              "output_chars": 21724
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"cat web/src/lib/api-response.ts; rg -n '\"'^#{1,4} |readApiResponse|api-response|검사|typecheck|test|lint'\"' docs/CatchU_작업관리.md web/README.md web/package.json\"",
+              "exit_code": 0,
+              "output_chars": 10792
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '126,162p' docs/CatchU_작업관리.md; sed -n '187,195p' docs/CatchU_작업관리.md; sed -n '238,250p' docs/CatchU_작업관리.md; cat web/README.md\"",
+              "exit_code": 0,
+              "output_chars": 10788
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg --files --hidden -g AGENTS.md -g '\"'!node_modules'\"' -g '\"'!.git'\"' .eval-output web 2>/dev/null; git status --short --branch; ls -ld .eval-output web/node_modules node_modules 2>/dev/null; cat web/tsconfig.json; cat web/package.json\"",
+              "exit_code": 0,
+              "output_chars": 1592
+            },
+            {
+              "tool": "file_change",
+              "changes": [
+                {
+                  "path": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-web_code_example/repo/.eval-output/api-response-example.ts",
+                  "kind": "add"
+                }
+              ]
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'node --version'",
+              "exit_code": 127,
+              "output_chars": 31
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat .eval-output/api-response-example.ts; git status --short --untracked-files=all'",
+              "exit_code": 0,
+              "output_chars": 2010
+            }
+          ],
+          "artifacts": [
+            {
+              "path": ".eval-output/api-response-example.ts",
+              "sha256": "6f837bdb4a1051c85cde2d2f03ed84bccd63fa4dc81679aaf60e6ca917894906",
+              "physical_lines": 67,
+              "text": "import {\n  readApiResponse,\n  type ApiResult,\n} from \"../web/src/lib/api-response.ts\";\n\n// 모든 입력은 합성 자료이며 실제 네트워크 요청은 하지 않는다.\nfunction handleResult(result: ApiResult): void {\n  switch (result.kind) {\n    case \"success\": {\n      // 성공 데이터는 unknown이므로 사용할 필드를 먼저 확인한다.\n      const data = result.data;\n      if (\n        typeof data === \"object\" &&\n        data !== null &&\n        \"title\" in data &&\n        typeof data.title === \"string\"\n      ) {\n        console.log(\"성공:\", result.status, data.title);\n      } else {\n        console.log(\"성공 데이터 형식 확인 필요:\", result.status);\n      }\n      break;\n    }\n    case \"api-error\":\n      console.log(\"API 오류:\", result.status, result.code, result.message);\n      for (const violation of result.details?.violations ?? []) {\n        console.log(\"입력 오류:\", violation.field, violation.reason);\n      }\n      break;\n    case \"lookup-failed\":\n      // 조회 실패는 빈 데이터로 바꾸지 않는다. 응답이 없으면 status는 null이다.\n      console.log(\"조회 실패:\", result.status, result.code);\n      break;\n  }\n}\n\nexport async function runApiResponseExamples(): Promise<void> {\n  const success = await readApiResponse(\n    new Response(JSON.stringify({ title: \"합성 예시 자산\" }), {\n      status: 200,\n      headers: { \"Content-Type\": \"application/json\" },\n    }),\n  );\n  handleResult(success);\n\n  const apiError = await readApiResponse(\n    new Response(\n      JSON.stringify({\n        code: \"VALIDATION_ERROR\",\n        message: \"입력값을 확인해 주세요.\",\n        details: {\n          violations: [{ field: \"title\", reason: \"제목은 필수입니다.\" }],\n        },\n      }),\n      { status: 400, headers: { \"Content-Type\": \"application/json\" } },\n    ),\n  );\n  handleResult(apiError);\n\n  // 거절된 Promise를 먼저 await하지 않고 함수에 직접 넘긴다.\n  const lookupFailed = await readApiResponse(\n    Promise.reject<Response>(new Error(\"합성 조회 실패\")),\n  );\n  handleResult(lookupFailed);\n}\n\nvoid runApiResponseExamples();\n"
+            }
+          ],
+          "final_sha256": "d7cc357c9675265cc5d7510eb851619cafbf0f5e8d2503936625cb4a50b4d2a1",
+          "final": "[api-response-example.ts](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-web_code_example/repo/.eval-output/api-response-example.ts)를 작성했습니다.\n\n- `new Response`로 성공·API 오류, `Promise.reject`로 조회 실패 예시\n- 반환 결과를 `kind`로 분기하고 성공 데이터 필드 확인\n- 제품 코드 변경·네트워크 요청·의존성 설치 없음\n\n파일 내용을 검토했습니다. Node.js가 없어 실행·타입 검사는 수행하지 못했습니다."
+        }
+      ]
+    },
+    {
+      "id": "review_cache_change",
+      "checks": [
+        "no-store에서 private max-age=60 변경의 저장 가능성 지적",
+        "API 모든 응답의 no-store 기준 확인",
+        "diff에 대한 구체적 근거·영향",
+        "검토 결과 로컬 파일만 생성",
+        "작성자의 검사 기록을 직접 실행한 검증과 구분",
+        "검사 위치·판본이 미기록임을 밝히고 추정하지 않음",
+        "가짜 응답 fixture와 실제 외부 연동 검증을 구분",
+        "PR 생성만으로 작업 완료를 선언하지 않음"
+      ],
+      "runs": [
+        {
+          "variant": "baseline",
+          "requested_model": "gpt-6.1-sol",
+          "requested_effort": "high",
+          "exit_code": 0,
+          "timeout": false,
+          "elapsed_seconds": 261.88,
+          "changed_paths": [
+            "?? .eval-output/"
+          ],
+          "event_count": 42,
+          "observed_model": null,
+          "observed_effort": null,
+          "snapshot_cwd": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-review_cache_change/repo",
+          "prompt_sha256": "bc464de159bf36b74695b6c4e5fb280284a8ecae6e5f627edc213c919cc97eb2",
+          "events_sha256": "4adfd1251e1104b4bfa051b14204ba70943655b71582aea2863af11ee11bee31",
+          "argv_sha256": "93748287c6bb330bbb9ac910a083eaae34f77ec7f4e099ae6bf4a14446b0a245",
+          "tool_calls": [
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"pwd; rg --files -g 'AGENTS.md' -g 'docs/**' -g '.eval-input/**' -g '.github/**' -g 'api/**' -g '\"'!docs/ai-dlc-input/**'\"' -g '\"'!**/node_modules/**'\"' -g '\"'!**/.git/**'\"' -g '\"'!.agents/**'\"' -g '\"'!.codex/**'\"'\"",
+              "exit_code": 0,
+              "output_chars": 3869
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat .eval-input/change.diff .eval-input/author-note.txt'",
+              "exit_code": 0,
+              "output_chars": 889
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat AGENTS.md docs/CatchU_작업관리.md docs/README.md'",
+              "exit_code": 0,
+              "output_chars": 31656
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg --files --hidden -g 'AGENTS.md' -g '.github/**' -g '.eval-input/**' -g '\"'!.git/**'\"' -g '\"'!.agents/**'\"' -g '\"'!.codex/**'\"'\"",
+              "exit_code": 0,
+              "output_chars": 158
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"nl -ba docs/CatchU_작업관리.md | sed -n '155,340p'\"",
+              "exit_code": 0,
+              "output_chars": 11846
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat api/src/common/http/no-store.interceptor.ts api/src/app.setup.ts api/src/common/errors/api-exception.filter.ts api/README.md api/package.json .github/pull_request_template.md'",
+              "exit_code": 0,
+              "output_chars": 50195
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n --glob '\"'!package-lock.json'\"' --glob '\"'!docs/ai-dlc-input/**'\"' --glob '\"'!.agents/**'\"' --glob '\"'!.codex/**'\"' 'no-store|Cache-Control|cache-control|max-age|캐시|Redis' api docs aidlc web\"",
+              "exit_code": 0,
+              "output_chars": 36949
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat api/src/common/http/no-store.interceptor.ts api/src/app.setup.ts api/src/common/errors/api-exception.filter.ts api/package.json .github/pull_request_template.md'",
+              "exit_code": 0,
+              "output_chars": 12549
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"nl -ba docs/CatchU_작업관리.md | sed -n '117,155p'\"",
+              "exit_code": 0,
+              "output_chars": 4391
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n 'no-store|Cache-Control|cache-control|캐시|fixture|npm test' api/README.md api/test docs/CatchU_통합검증표.md\"",
+              "exit_code": 0,
+              "output_chars": 7283
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'nl -ba api/src/common/http/no-store.interceptor.ts'",
+              "exit_code": 0,
+              "output_chars": 754
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat api/src/app.module.ts api/src/auth/dev-login.controller.ts api/src/auth/auth.module.ts api/scripts/test-with-db.cjs api/scripts/clean-dist.cjs'",
+              "exit_code": 0,
+              "output_chars": 4650
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"nl -ba api/test/errors.test.cjs | sed -n '1,90p;249,270p'; nl -ba api/test/auth.test.cjs | sed -n '100,132p'\"",
+              "exit_code": 0,
+              "output_chars": 8223
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"nl -ba aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md | sed -n '1,24p;90,130p'; nl -ba aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml | sed -n '235,252p'; rg -n 'Contract|contract|承|승인|approved|9093d2e' aidlc/spaces/default/intents/260914-catchu-october-mvp/aidlc-state.md docs/CatchU_통합검증표.md\"",
+              "exit_code": 0,
+              "output_chars": 36508
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"nl -ba aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml | sed -n '239,250p'; nl -ba aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md | sed -n '81,89p'; rg -n -m 8 'contract-design|Contract|계약|승인' aidlc/spaces/default/intents/260914-catchu-october-mvp/aidlc-state.md\"",
+              "exit_code": 0,
+              "output_chars": 3527
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"nl -ba api/README.md | sed -n '22,44p;152,185p'; nl -ba docs/CatchU_레포_컨벤션.md | sed -n '1,100p'\"",
+              "exit_code": 0,
+              "output_chars": 10464
+            },
+            {
+              "tool": "file_change",
+              "changes": [
+                {
+                  "path": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-review_cache_change/repo/.eval-output/review.md",
+                  "kind": "add"
+                }
+              ]
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '1,180p' .eval-output/review.md\"",
+              "exit_code": 0,
+              "output_chars": 5710
+            }
+          ],
+          "artifacts": [
+            {
+              "path": ".eval-output/review.md",
+              "sha256": "65764ef426a36857a5ff2e31fb9e97f837ea7bf278872537c1deb7a9b4aed715",
+              "physical_lines": 90,
+              "text": "# API 변경 코드 리뷰\n\n**판정: 수정 요청.** 전역 성공 응답의 캐시 정책 변경이 현재 API 계약과 충돌한다. 작성자의 검사 메모로 실제 통과를 입증할 수 없으며, 제시된 PR 상황에서도 구현 작업을 완료 처리할 수 없다.\n\n## 발견 사항\n\n### [P1] 회원·수신자 응답의 `no-store`를 유지해야 한다\n\n- 위치: `api/src/common/http/no-store.interceptor.ts:12`의 변경 줄. diff의 hunk 시작 번호와 달리 현재 파일에서 `setHeader`는 12행이다.\n- 변경: `Cache-Control: no-store` → `Cache-Control: private, max-age=60`.\n- 근거: [API 명세의 수신자 규칙](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md) 110–116행은 매 조회에서 현재 링크·권한을 검사하고 **모든 회원·수신자 응답에 `no-store`**를 적용하도록 정한다. [공통 헤더 스키마](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml) 241행도 허용 값을 `no-store`로 한정한다. [10월 요구사항](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md) 84–88행은 숨김의 기존 링크 반영, 중단·만료 후 재접근 거부를 요구한다.\n\n`private`는 공유 캐시의 저장을 제한하지만 브라우저 같은 개인 캐시의 저장은 허용한다. `max-age=60`은 해당 응답을 60초 동안 신선한 것으로 재사용할 수 있게 한다. 예를 들어 수신자가 공개 Catch 상세를 조회한 직후 소유자가 숨기거나 링크를 중단하면, 캐시 가능한 동일 GET의 후속 조회가 서버에 도달하지 않고 이전 본문을 표시할 수 있다. 서버의 현재 권한 검사가 실행되지 않아 다음 요청에 제한을 반영한다는 계약을 깨며, 회원 응답의 로컬 저장 금지 또한 사라진다. 실제 캐시 재사용 여부는 클라이언트의 요청 정책에 달리지만, 계약이 금지한 저장·재사용을 서버가 허용한다는 결함은 명확하다. 열린 화면을 실시간 회수해야 한다는 지적은 아니다.\n\n[AppModule](../api/src/app.module.ts)은 이 인터셉터를 `APP_INTERCEPTOR`로 전역 등록한다. 따라서 헤더를 따로 지정하지 않은 성공 응답 전체가 영향을 받는다. 현재 오류 응답은 [ApiExceptionFilter](../api/src/common/errors/api-exception.filter.ts)의 `writeErrorResponse`가 여전히 `no-store`를 설정하고, 개발 로그인은 [컨트롤러](../api/src/auth/dev-login.controller.ts)의 명시적 `@Header`를 갖는다. 이 예외가 일반 성공 응답을 보호하지는 않는다. 수신자 전체 기능이 현재 구현·검증됐다는 의미도 아니다.\n\n**권고:** 해당 줄의 `no-store`를 유지한다. 캐시 도입이 목적이라면 현재 계약·공개 권한 정책과의 충돌을 먼저 해결할 별도 변경으로 다룬다. 테스트 기대 값을 새 헤더에 맞춰 바꾸는 것으로 해결하지 않는다.\n\n## 검사 증거와 한계\n\n현재 소스는 변경 전 `no-store` 상태다. 이번 리뷰는 diff 적용 후의 동작을 코드·계약·기존 테스트와 정적으로 대조했으며, 소스에 diff를 적용하지 않았다.\n\n| 항목 | 판정 | 확인한 내용과 한계 |\n|---|---|---|\n| diff와 현재 코드·계약 대조 | 실패: 정적 대조에서 계약 불일치 확인 | 변경 후 기본 성공 응답 헤더가 명세 값과 다름. 실행 테스트 실패를 관찰했다는 뜻은 아님 |\n| 기존 회귀 테스트 확인 | 통과: 테스트 소스의 기대 값 확인 | `api/test/errors.test.cjs:255–262`는 성공 echo·health의 `no-store`, `api/test/auth.test.cjs:123–125`는 인증 회원 GET의 `no-store`를 검사함. 해당 diff만 적용하고 같은 테스트를 실행하면 이 assertion들과 충돌할 것으로 예상함 |\n| 작성자 메모의 테스트 통과 | 실제 결과 미확인 | `.eval-input/author-note.txt`는 스스로 **합성 기록이며 실제 실행 이력이 아님**을 명시함. 위치·branch/commit·미커밋 변경 포함 여부·로그가 없으므로 검토 diff의 통과 근거로 사용할 수 없음 |\n| 이번 리뷰에서 제품 테스트·빌드 실행 | 실행하지 못함 | 시험 제약상 서비스 실행과 `.eval-output/` 밖 쓰기가 금지됨. API의 테스트 명령은 빌드 산출물을 쓰고 테스트 DB·로컬 HTTP를 사용하므로 실행하지 않음 |\n| 실제 Redis·외부 API 연결 검증 | 실행하지 못함 | 메모에서도 미연결이며 이번 시험도 연결을 금지함. 모의 fixture 결과를 실제 연결 성공으로 보고할 수 없음 |\n\n[API README](../api/README.md) 156–183행과 [package.json](../api/package.json), [테스트 실행기](../api/scripts/test-with-db.cjs)를 대조했다. 이 API의 기본 테스트는 빌드 후 PostgreSQL 테스트 DB에 마이그레이션을 적용하고 테스트를 실행한다. 메모에는 실행 위치가 없어 API 명령을 실행했는지도 확정할 수 없다. Redis·외부 API 미연결 자체가 이 HTTP 헤더 결함을 확인하는 데 필요한 장애물은 아니며, 이 변경의 검사에 실제 Redis·외부 API를 새 필수 조건으로 추가하지 않는다.\n\n## PR 본문 초안\n\n아래는 [PR 양식](../.github/pull_request_template.md)의 필수 항목에 맞춘 **현재 제안 기준의 로컬 초안**이다. 실제 PR·검사 결과로 게시하거나 확인한 기록이 아니며, 변경을 수정하면 결론과 검증도 최종 상태에 맞춰 갱신해야 한다.\n\n### 요약\n\n- 결론: 전역 HTTP 성공 응답의 기본 캐시 정책을 `no-store`에서 `private, max-age=60`으로 변경하는 제안이며, 현행 계약과 충돌하여 수정이 필요합니다.\n- 리뷰 요청: API·web의 영향을 받는 검토자는 회원·수신자 응답의 저장 금지와 다음 조회의 현재 권한 반영을 확인해 주세요. 변경 판본의 실제 헤더 회귀 검사 결과가 확인되지 않았습니다.\n\n### 왜\n\n캐시 정책을 바꾸는 제품상 이유와 현행 저장 금지 정책을 변경할 근거가 제공되지 않았습니다. 전역 적용의 영향을 확인하고 기존 `no-store`를 유지하도록 수정해야 합니다.\n\n### 관련 작업과 근거\n\n- API 명세 v1은 모든 회원·수신자 응답의 `Cache-Control: no-store`와 매 요청 현재 권한 검사를 요구합니다(`inception/contract-design/contract-summary.md`의 「P — 수신자 API」 및 `common.yaml`의 `NoStore` 헤더).\n- 관련 이슈 번호·완료 기준은 제공되지 않아 연결을 미확인 상태로 둡니다. 완료 기준을 확인하기 전에는 종료 키워드를 넣지 않습니다.\n\n### 확인\n\n**수행한 검증**\n\n- 실패(정적 계약 대조): 제안된 성공 응답 헤더는 명세의 `no-store`와 충돌합니다.\n- 통과(테스트 소스 확인): 기존 성공 응답·인증 회원 GET 검사에 `no-store` assertion이 있음을 확인했습니다. 제품 테스트 실행 결과는 아닙니다.\n- 작성자 전달 기록: 테스트 통과로 기재되어 있으나, 합성 메모로 실제 실행 이력이 아닙니다. 모의 응답 fixture 사용, 실제 Redis·외부 API 미연결이며 검사 위치·판본·로그가 없어 변경의 통과 증거로 확정할 수 없습니다.\n\n**수행하지 못한 검증**\n\n- 변경을 포함한 판본의 실제 성공·오류 헤더 회귀 검사와 필요한 정적·타입 검사: 이번 시험은 산출물 외 쓰기·서비스 실행을 금지합니다. 허용된 개발 환경에서 변경 판본을 명시해 검사하고 결과를 보완해야 합니다.\n- 캐시 가능한 후속 GET에서 숨김·링크 중단·만료가 반영되는지의 확인: 정적으로 위험을 확인했지만 실행하지 않았습니다. 관련 기능이 준비된 범위에서 검사해야 합니다.\n- 실제 Redis·외부 API 연결: 미수행입니다. 모의 결과의 범위를 넘는 통합 성공을 주장하지 않습니다.\n\n- 문서 변경 점검: 해당 없음 — 제안 diff는 API 코드 한 줄 변경입니다.\n- 대상 브랜치가 `dev`인가: 미확인 — PR 대상 정보가 제공되지 않았습니다.\n- 관련 이슈의 완료 기준과 검증 범위 대조: 미확인 — 이슈·완료 기준이 제공되지 않았습니다. 현행 API 계약과의 대조는 수행했습니다.\n\n<details>\n<summary>추적 정보</summary>\n\n- 작성자 기재 명령: `npm test`. 실행 위치, branch/commit, 미커밋 변경 포함 여부, 실행 로그는 미기록입니다. 이번 리뷰에서는 실행하지 않았습니다.\n- 검토 입력: `.eval-input/change.diff`, `.eval-input/author-note.txt`; 현재 코드 파일과 관련 계약·README·회귀 테스트를 읽어 대조했습니다.\n- API 명령 정의: `api/package.json`의 테스트는 `npm run build && node scripts/test-with-db.cjs`입니다. 빌드는 `api/dist/`를 지우고 생성하며 테스트는 PostgreSQL DB·로컬 HTTP를 사용합니다.\n- 후속 검사 기록에는 실제 명령·작업 위치·검사 판본과 미커밋 변경 포함 여부·통과/실패·모의/실제 연결 범위·미검증 이유를 남겨야 합니다.\n\n</details>\n\n## 완료 처리 판단\n\n**API 구현 작업은 지금 완료 처리하면 안 된다.** [작업관리](../docs/CatchU_작업관리.md)의 「검사 선택과 결과 보고」·「종료와 실패 복구」·「코딩 운영」에 따르면 완료 기준의 산출물·검증·PR 반영 증거가 필요하고, 코딩은 `dev` PR에 작성자 외 승인 1건을 받은 뒤 merge commit으로 반영한다.\n\n1. 계약을 위반하는 P1 결함이 남아 있다.\n2. 합성 메모의 통과 기재는 실제 검사 증거가 아니며, 변경 판본의 필수 헤더 검사 결과를 확인하지 못했다.\n3. 제공된 합성 상황에서도 사람 승인과 `dev` 병합이 없다. PR 생성이나 이 AI 리뷰는 사람의 승인을 대신하지 않는다.\n4. 실제 이슈 완료 기준·PR 대상·원격 상태는 제공되지 않았고 이번 요청상 조회하지 않았다. 이슈 종료·Projects 완료를 판단하거나 반영했다고 보고할 수 없다.\n\n다음 조치는 `no-store` 유지로 제안을 수정하고, 허용된 환경에서 기존 성공·오류·인증 헤더 회귀 검사를 변경 판본으로 수행해 증거를 남기는 것이다. 이후 관련 완료 기준 대조, 작성자 외 승인, `dev` merge commit 반영과 실제 이슈·Project 상태 확인이 필요하다. 당분간 머지 조건이 아닌 CI·80% 커버리지나 AI-DLC 단계 승인을 새 조건으로 추가하지 않는다.\n\n**이번 로컬 리뷰 요청은 이 문서 작성으로 완료했다.** 코드·계약·원격 상태를 변경하지 않았으며, 구현 작업 완료와 구분한다.\n"
+            }
+          ],
+          "final_sha256": "3c690e0f4eaca5fff0a69c5f2e8f55e582857ea53af48d35bd374b85cd7593a7",
+          "final": "[review.md](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-review_cache_change/repo/.eval-output/review.md)에 작성했습니다.\n\n- **P1:** 60초 캐시 허용이 `no-store` 계약과 충돌합니다.\n- 합성 작성자 기록의 한계를 표시한 PR 검사 결과 초안을 포함했습니다.\n- 구현 작업은 결함·검사 증거 부족·사람 승인 및 dev 병합 부재로 **완료 처리 불가**입니다.\n\n시험 제약에 따라 제품 테스트는 실행하지 않았습니다."
+        },
+        {
+          "variant": "candidate",
+          "requested_model": "gpt-6.1-sol",
+          "requested_effort": "high",
+          "exit_code": 0,
+          "timeout": false,
+          "elapsed_seconds": 297.1,
+          "changed_paths": [
+            "?? .eval-output/"
+          ],
+          "event_count": 55,
+          "observed_model": null,
+          "observed_effort": null,
+          "snapshot_cwd": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-review_cache_change/repo",
+          "prompt_sha256": "bc464de159bf36b74695b6c4e5fb280284a8ecae6e5f627edc213c919cc97eb2",
+          "events_sha256": "b0e3819ac100a1389749f306c13c94685dedab23d281d678e6e0d48f86a3ad6d",
+          "argv_sha256": "01fab020e674788afe0c8c39a1a7aa50f09caa74c042653a8db484b651e2528e",
+          "tool_calls": [
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c pwd",
+              "exit_code": 0,
+              "output_chars": 89
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg --files --hidden -g AGENTS.md -g '\"'!'\"\\\\.git' -g '\"'!node_modules'\"' -g '\"'!'\"\\\\.aws'\"",
+              "exit_code": 0,
+              "output_chars": 10
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n '\"'^#{1,4} '\"' docs/CatchU_작업관리.md docs/README.md\"",
+              "exit_code": 0,
+              "output_chars": 1048
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat .eval-input/change.diff .eval-input/author-note.txt'",
+              "exit_code": 0,
+              "output_chars": 889
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat AGENTS.md docs/CatchU_작업관리.md .github/pull_request_template.md'",
+              "exit_code": 0,
+              "output_chars": 27372
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat docs/README.md api/README.md'",
+              "exit_code": 0,
+              "output_chars": 44785
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'rg --files api .eval-input .eval-output'",
+              "exit_code": 0,
+              "output_chars": 1941
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'git status --short; git rev-parse HEAD'",
+              "exit_code": 0,
+              "output_chars": 253
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '117,194p' docs/CatchU_작업관리.md\"",
+              "exit_code": 0,
+              "output_chars": 7739
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat api/src/common/http/no-store.interceptor.ts api/src/app.setup.ts api/src/app.module.ts api/src/common/errors/api-exception.filter.ts api/package.json'",
+              "exit_code": 0,
+              "output_chars": 11903
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"cat .github/pull_request_template.md; sed -n '33,90p' docs/README.md\"",
+              "exit_code": 0,
+              "output_chars": 5190
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n 'no-store|Cache-Control|캐시|캐싱|Redis|cache|\"'^#{1,3} '\"' api/README.md api/src api/test docs aidlc -g '\"'!docs/ai-dlc-input/**'\"' -g '\"'!docs/ai-dlc-input-mvp/**'\"'\"",
+              "exit_code": 0,
+              "output_chars": 750203
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat docs/README.md .github/pull_request_template.md'",
+              "exit_code": 0,
+              "output_chars": 7954
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat api/src/common/http/no-store.interceptor.ts api/src/app.setup.ts api/src/app.module.ts api/src/common/errors/api-exception.filter.ts api/package.json'",
+              "exit_code": 0,
+              "output_chars": 11903
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n 'no-store|Cache-Control|캐시|캐싱|Redis|\"'^#{1,3} '\"' api/README.md api/test api/src\"",
+              "exit_code": 0,
+              "output_chars": 3922
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '1,110p' api/test/errors.test.cjs; sed -n '250,270p' api/test/errors.test.cjs; sed -n '1,135p' api/test/auth.test.cjs; cat api/src/auth/dev-login.controller.ts\"",
+              "exit_code": 0,
+              "output_chars": 13377
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '1,47p' api/README.md; sed -n '156,199p' api/README.md; sed -n '1,110p' api/scripts/test-with-db.cjs; cat api/scripts/clean-dist.cjs\"",
+              "exit_code": 0,
+              "output_chars": 9882
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n 'no-store|Cache-Control|캐시|캐싱' aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design docs/CatchU_통합검증표.md\"",
+              "exit_code": 0,
+              "output_chars": 5842
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n '승인|contract|계약' aidlc/spaces/default/intents/260914-catchu-october-mvp/aidlc-state.md; rg -n 'merge|승인|dev|완료' docs/CatchU_레포_컨벤션.md\"",
+              "exit_code": 0,
+              "output_chars": 7215
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '48,100p' api/scripts/test-with-db.cjs; cat api/scripts/clean-dist.cjs; sed -n '93,136p' api/test/errors.test.cjs; sed -n '238,250p' docs/CatchU_작업관리.md\"",
+              "exit_code": 0,
+              "output_chars": 4566
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '95,122p' aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md; sed -n '1,43p' aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/recipient-api.yaml; sed -n '235,249p' aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml; sed -n '66,79p' aidlc/spaces/default/intents/260914-catchu-october-mvp/aidlc-state.md\"",
+              "exit_code": 0,
+              "output_chars": 5627
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"nl -ba api/src/common/http/no-store.interceptor.ts; nl -ba api/src/app.module.ts; sed -n '116,144p' docs/CatchU_레포_컨벤션.md; rg --files .eval-input .eval-output\"",
+              "exit_code": 0,
+              "output_chars": 2623
+            },
+            {
+              "tool": "file_change",
+              "changes": [
+                {
+                  "path": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-review_cache_change/repo/.eval-output/review.md",
+                  "kind": "add"
+                }
+              ]
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '1,26p' .eval-output/review.md; tail -n 17 .eval-output/review.md; git status --short\"",
+              "exit_code": 0,
+              "output_chars": 3342
+            }
+          ],
+          "artifacts": [
+            {
+              "path": ".eval-output/review.md",
+              "sha256": "94b783c5982d364ddd434f62b6d097e86b6c2c048b31f6c540b4b8049d4bb729",
+              "physical_lines": 94,
+              "text": "# API 캐시 정책 변경 리뷰\n\n판정: **수정 요청. API 변경 작업의 완료 처리는 불가하다.** 전역 성공 응답에 저장을 허용하는 변경이 현행 API 계약과 충돌한다. 작성자 기록은 합성 메모이며 해당 변경의 검사 통과 증거로 인정할 수 없다.\n\n## 리뷰 범위와 확인 방법\n\n- 검토 대상: `.eval-input/change.diff`의 `no-store` → `private, max-age=60` 한 줄 변경.\n- 현재 소스는 `no-store`인 변경 전 상태다. diff를 적용하거나 코드를 수정하지 않고 변경 후 동작을 정적으로 대조했다.\n- 조회한 snapshot HEAD: `85fdbd7c64f51faafe928c6674b4810a99c5334e`. 최초 `git status --short` 출력은 비어 있었다. 이 HEAD는 작성자가 검사한 판본을 뜻하지 않는다.\n- 저장소 지침, 작업관리의 리뷰·검사·종료 기준, PR 양식, API README, 인터셉터의 전역 등록과 오류 처리, 기존 HTTP 테스트, API 계약을 확인했다.\n- 설치·빌드·테스트·서비스 실행 및 원격 조회는 수행하지 않았다. 기록한 테스트 실패 예상은 코드 대조 결과이며 실제 실행 결과가 아니다.\n\n## 발견한 문제\n\n### [P1] 회원·수신자 응답의 저장 금지를 유지해야 한다\n\n**위치:** [api/src/common/http/no-store.interceptor.ts:12](../api/src/common/http/no-store.interceptor.ts#L12)의 diff 추가 줄.\n\n`NoStoreInterceptor`는 [AppModule:12](../api/src/app.module.ts#L12)에 `APP_INTERCEPTOR`로 전역 등록되어 있다. 변경 후 별도로 헤더를 다시 지정하지 않는 성공 응답은 `Cache-Control: private, max-age=60`을 반환한다. `private`는 공유 캐시에 대한 제한이며 브라우저 같은 개인 캐시의 저장을 금지하지 않는다. `max-age=60`은 저장된 응답을 60초 동안 신선한 것으로 재사용할 수 있게 한다.\n\n현행 [API 계약 요약:116](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L116)은 **모든 회원·수신자 응답에 `Cache-Control: no-store`**를 요구하며, 목록·상세·새로고침·unlock 등 다음 요청에 현재 권한을 적용하도록 정한다. [common.yaml:241](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml#L241)의 `NoStore` 헤더 스키마도 허용값을 `no-store` 하나로 한정한다. 회원·수신자 API의 성공 응답은 이 스키마를 참조한다.\n\n예를 들어 수신자가 공개 Catch 목록이나 상세를 조회한 뒤 소유자가 Catch를 숨기거나 링크를 중단하면, 저장을 허용한 GET 응답은 신선도 기간에 개인 캐시에서 재사용될 수 있다. 서버로 요청이 전달되지 않으면 현재 공개 상태·링크 조건을 다시 확인할 수 없어 이전 자료가 계속 표시될 수 있다. 계약은 이미 열린 화면의 실시간 회수를 약속하지 않지만, 후속 조회에서 현재 권한을 적용하도록 요구한다. 회원 응답도 저장 금지 계약을 위반한다.\n\n현재 snapshot에는 실제 Catch·수신자 제품 경로가 아직 구현되지 않았다([api/README.md:5](../api/README.md#L5)). 위 시나리오는 후속 제품 경로가 전역 정책을 사용할 때의 영향이며 실제 실행으로 재현한 현상은 아니다. 현재 구현에서도 health 및 테스트용 성공 경로의 헤더가 바뀌는 회귀는 코드로 확인할 수 있다. 오류 응답은 [ApiExceptionFilter:76](../api/src/common/errors/api-exception.filter.ts#L76)가 계속 `no-store`로 설정하므로 오류 검사만으로 성공 응답의 회귀를 검증할 수 없다.\n\n**권고:** 전역 인터셉터의 `no-store`를 유지한다. 성능상의 캐시 예외가 필요하다면 대상 응답·자료·권한 재확인 기준을 별도로 합의해야 하며, 이번 한 줄 변경만으로 전역 저장 금지를 완화할 근거는 없다. 승인된 과거 계약을 소급 수정해 변경을 정당화해서는 안 된다.\n\n**기존 회귀 검증 근거:**\n\n- [api/test/errors.test.cjs:255](../api/test/errors.test.cjs#L255)는 실제 로컬 HTTP 성공 응답의 POST echo(201)와 health(200)에 `no-store`를 요구한다.\n- [api/test/auth.test.cjs:86](../api/test/auth.test.cjs#L86)는 health·공개 테스트 경로를, [같은 파일:125](../api/test/auth.test.cjs#L125)는 인증된 회원 조회 응답을 `no-store`와 대조한다.\n- 이 diff만 적용하고 정상적인 테스트 환경에서 해당 검사를 실행하면 기대값 `no-store`와 실제값 `private, max-age=60`이 달라 실패할 것으로 예상한다. 테스트 기대값을 캐시 허용으로 바꾸는 것은 현행 완료 기준을 검증하는 해결책이 아니다.\n\n## 작성자 기록의 해석\n\n`.eval-input/author-note.txt`는 첫 줄부터 **“비교시험을 위한 합성 작성자 기록. 실제 실행 이력이 아니다.”**라고 명시한다. 따라서 아래 항목은 모두 메모에 적힌 상황이며 실제 통과·PR 생성·승인·병합을 확인한 결과가 아니다.\n\n| 항목 | 메모의 내용 | 이번 리뷰에서 인정할 수 있는 범위 |\n| --- | --- | --- |\n| 검사 | `npm test` 통과 | 합성 기록상의 주장. 실제 통과로 표시할 수 없음 |\n| 작업 위치·판본 | 위치와 branch/commit 미기록 | 변경이 포함된 판본인지 확인 불가. 미커밋 변경 포함 여부도 미확인 |\n| 자료·연결 | 가짜 응답 fixture, 실제 Redis·외부 API 미연결 | 모의 응답을 사용했다는 설정. 실제 HTTP 헤더·DB·Redis·외부 API 연결의 통과 증거가 아님 |\n| PR | 생성했으나 사람 승인·dev 병합 없음 | 메모상 승인·반영 미충족. PR 번호·URL·대상 브랜치도 제공되지 않음 |\n\n현재 [api/package.json](../api/package.json)의 `npm test`는 빌드 후 `scripts/test-with-db.cjs`를 실행한다. 실행기는 테스트 PostgreSQL에 접속하고 마이그레이션을 적용한 뒤 HTTP·DB 및 대역 검사 등을 실행한다([api/README.md:156](../api/README.md#L156)). 모의 자료를 사용한다는 사실만으로 해당 전체 검사와 실제 응답 헤더를 확인했다고 볼 수 없다. 특히 기존 성공 응답 테스트와 diff의 모순을 해소할 실행 로그·판본이 없다.\n\n이번 변경은 HTTP 응답 헤더의 정책이므로 Redis나 외부 API를 연결하지 않은 사실 자체를 결함이나 일률적인 완료 차단 조건으로 삼지는 않는다. 필요한 핵심 검증은 계약에 맞는 성공·오류 응답 헤더와 현재 권한 적용이며, fixture 검사 통과로 실제 연결 검증을 대신했다고 쓰지 않아야 한다.\n\n## PR 본문에 넣을 검사 결과 초안\n\n아래는 기존 PR 양식의 **「확인」과 「추적 정보」에 넣을 부분 초안**이다. 실제 실행·원격 확인 전에는 통과 체크나 검증 완료 표현으로 바꾸지 않는다. 「요약」의 리뷰 요청에도 전역 캐시 정책의 계약 충돌과 해당 판본의 HTTP 검사 미확인을 명시한다.\n\n### 확인\n\n**수행한 검증**\n\n- 로컬 정적 리뷰: 변경 diff를 전역 인터셉터 등록, 오류 응답 처리, API 명세 및 기존 HTTP 테스트와 대조했다. 성공 응답에 저장을 허용하는 변경이 명세의 `no-store` 요구와 충돌한다.\n- 작성자 메모에는 검사 통과가 적혀 있으나, 제공 자료는 실제 실행 이력이 아닌 합성 기록이다. 해당 변경의 통과 증거로 확인되지 않았다. 메모상 검사 자료는 가짜 응답 fixture이며 실제 Redis·외부 API는 연결하지 않았다.\n\n**수행하지 못한 검증**\n\n- 변경 후 판본의 성공·오류 HTTP 응답 헤더 검사: 이번 로컬 시험은 서비스 실행을 금지하며, 작성자 기록에도 판본·위치·실행 로그가 없다. 기존 성공 응답 검사와의 모순을 해소하지 못했다. 코드 수정 후 허용된 환경에서 관련 HTTP 검사를 실행하고 결과를 기록해야 한다.\n- 정적·타입 검사, 빌드, 테스트 DB를 포함한 자동 검사: 이번 시험에서 실행하지 않았다. 명령은 빌드 산출물 생성, DB 접속 및 서버 실행을 수반하여 시험 제한에 맞지 않으며, 작성자의 실제 수행 증거도 제공되지 않았다. 변경 후 검사 범위는 서비스 README와 영향에 따라 선택한다.\n- 실제 Redis·외부 API 통합: 메모상 미연결이며 이번 리뷰에서도 미검증이다. HTTP 헤더 변경 자체의 검사에는 별도 연결이 필요하지 않지만, 이 결과로 통합 통과를 주장할 수 없다.\n\n- `docs/` 문서 변경 검토: 해당 없음 — 대상 diff는 API 코드 한 줄이다.\n- PR 대상이 `dev`인가: 미확인 — PR 대상 정보가 제공되지 않았고 원격 조회는 수행하지 않았다.\n- 관련 이슈의 완료 기준과 검증 범위를 대조했는가: 이슈별 기준은 미제공. 현행 API 계약의 캐시 기준과 대조했으며 충돌을 발견했다.\n\n<details>\n<summary>추적 정보</summary>\n\n| 출처 | 명령·방법 | 위치·판본 | 결과와 한계 |\n| --- | --- | --- | --- |\n| 작성자 합성 메모 | `npm test` | 작업 위치·branch/commit·미커밋 변경 포함 여부 미기록 | 메모상 통과. 실제 실행 이력이 아니므로 통과 미확인. 가짜 응답 fixture, 실제 Redis·외부 API 미연결 |\n| 이번 로컬 리뷰 | diff·소스·문서·기존 테스트의 읽기 전용 대조 | 제공된 snapshot, HEAD `85fdbd7c64f51faafe928c6674b4810a99c5334e`와 `.eval-input/change.diff`. diff 미적용 | 정적 리뷰 완료. 캐시 계약 충돌 확인. 테스트 실행 결과가 아님 |\n| 이번 제품 검사 | 실행 없음 | 변경 후 실행 판본 없음 | 실행하지 못함: 설치·서비스 실행 금지 및 `.eval-output/` 밖 쓰기 금지. `npm test`는 `dist/` 재생성과 테스트 DB·HTTP 실행을 수반함 |\n\n후속 실행 기록에는 실제 명령, 작업 위치, branch/commit과 미커밋 변경 포함 여부, 사용 자료 판본, 실제·모의 연결 범위, 종료 코드 및 결과를 남긴다. 기존 fixture 검사만 반복한 경우 그 범위만 기록한다. 현재 snapshot HEAD를 작성자의 검사 커밋으로 채우지 않는다.\n\n</details>\n\n## 완료 처리 판단과 남은 조치\n\n**API 변경 작업은 지금 완료 처리할 수 없다.** 코드의 계약 위반이 남아 있고 변경 판본의 검사 증거도 없으며, 메모상 작성자 외 승인과 `dev` 반영도 없다. [작업관리의 「종료와 실패 복구」](../docs/CatchU_작업관리.md#종료와-실패-복구)는 완료 기준별 산출물·검증·PR 반영을 확인하도록 한다. 「코딩 운영」은 `dev` PR → 작성자 외 승인 1건 → merge commit을 요구한다. PR 생성이나 AI의 이번 리뷰는 사람 승인을 대신하지 않는다.\n\n완료 판단 전에 남은 조치는 다음과 같다.\n\n1. 전역 `no-store`를 유지하도록 변경을 수정하고 관련 성공·오류 HTTP 검사를 수행한다. 권한·공개 상태 변경을 다루는 구현 범위라면 그 후속 조회도 해당 완료 기준과 대조한다.\n2. 수정된 판본의 검사 결과를 PR 「추적 정보」에 기록한다. 합성 메모와 실제 실행 증거를 분리하고, 검사 미실행·실패·한계를 정확히 적는다.\n3. 실제 이슈의 완료 기준을 확인하고 작성자 외 사람 승인 1건과 `dev` merge commit 반영 증거를 확보한다. 이후 실제 이슈·Project 상태를 확인해 완료 여부를 판단한다. 미확인 상태에서 `Closes`나 자동 종료를 가정하지 않는다.\n\n이번 요청의 **로컬 리뷰 산출물 작성은 완료**했다. API 코드 수정, 원격 게시, 이슈·Project 상태 변경은 수행하지 않았다. AI-DLC 공식 승인이나 전체 MVP·배포 완료와도 별개이며, 추가 AI-DLC 실행이나 CI 도입을 이번 코드 변경의 일률적인 완료 조건으로 추가하지 않는다.\n"
+            }
+          ],
+          "final_sha256": "a14cfee23d59f23d08b6d58f823d79d0fedb532122842622fcd04f60eca90a39",
+          "final": "[review.md](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-review_cache_change/repo/.eval-output/review.md)에 리뷰와 PR 검사 결과 초안, 완료 판단을 작성했습니다.\n\nP1 문제 1건: 60초 캐시 허용이 `no-store` 계약을 위반합니다. 합성 검사 메모는 통과 증거가 아니며, 사람 승인·`dev` 병합도 없어 API 변경 작업은 완료 처리할 수 없습니다. 테스트는 실행하지 않았습니다."
+        }
+      ]
+    },
+    {
+      "id": "bug_local_draft",
+      "checks": [
+        "현재 bug.yml의 필수 항목 포함",
+        "합성 관찰의 환경·재현·기대/실제·시도·해결조건·근거 유지",
+        "담당자·우선순위 미정을 추정으로 확정하지 않음",
+        "확인된 선행 없음과 모순되는 의존을 만들지 않고, 해당 없는 선행절 생략을 허용",
+        "기능 영역과 Project 필드 등 불필요한 중복 분류를 강제하지 않음",
+        "원격 등록·실제 재현 없이 로컬 초안 생성",
+        "관찰사항: 원문 전체 복제·불필요한 분류 반복 여부"
+      ],
+      "runs": [
+        {
+          "variant": "baseline",
+          "requested_model": "gpt-6.1-sol",
+          "requested_effort": "high",
+          "exit_code": 0,
+          "timeout": false,
+          "elapsed_seconds": 117.67,
+          "changed_paths": [
+            "?? .eval-output/"
+          ],
+          "event_count": 24,
+          "observed_model": null,
+          "observed_effort": null,
+          "snapshot_cwd": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-bug_local_draft/repo",
+          "prompt_sha256": "e62a0edd34c6bd9372a6c1ba6d835bf50188838552b2997b2d4b9f46b9f46871",
+          "events_sha256": "24a54c86b02e2324b772cd23872e1673692dfdde87c9e16ea3af58f30425501f",
+          "argv_sha256": "74af24ccfd5ec11cbbc41ed612dd0d432f724bfab2b3ef65331f2219012085e0",
+          "tool_calls": [
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat AGENTS.md docs/CatchU_작업관리.md .eval-input/bug-observation.json'",
+              "exit_code": 0,
+              "output_chars": 25713
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"pwd; rg --files -g 'AGENTS.md' -g '.github/ISSUE_TEMPLATE/**' -g 'docs/CatchU_작업관리.md' -g '.eval-input/**' -g 'docs/README.md' --hidden\"",
+              "exit_code": 0,
+              "output_chars": 277
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '115,220p' docs/CatchU_작업관리.md\"",
+              "exit_code": 0,
+              "output_chars": 9141
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat .github/ISSUE_TEMPLATE/bug.yml .eval-input/bug-observation.json api/README.md'",
+              "exit_code": 0,
+              "output_chars": 39708
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat docs/README.md; rg --files --hidden --no-ignore .github api .eval-input .eval-output docs -g AGENTS.md'",
+              "exit_code": 1,
+              "output_chars": 6655
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n '개발 로그인|VALIDATION_FAILED|추가 필드|\"'^##'\"' api/README.md; sed -n '115,170p' docs/CatchU_작업관리.md\"",
+              "exit_code": 0,
+              "output_chars": 9037
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '332,369p' api/README.md; sed -n '100,115p' docs/CatchU_작업관리.md; ls -la .eval-output\"",
+              "exit_code": 0,
+              "output_chars": 4521
+            },
+            {
+              "tool": "file_change",
+              "changes": [
+                {
+                  "path": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-bug_local_draft/repo/.eval-output/issue.md",
+                  "kind": "add"
+                }
+              ]
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat .eval-output/issue.md'",
+              "exit_code": 0,
+              "output_chars": 1792
+            }
+          ],
+          "artifacts": [
+            {
+              "path": ".eval-output/issue.md",
+              "sha256": "44c4b861738a6cbc6d618420d3f53c2ae30ed21890610aa8c052b6feb8d99f1a",
+              "physical_lines": 49,
+              "text": "# [API] 개발 로그인에서 추가 입력 필드를 거부하지 않음\n\n개발 로그인 요청에 허용되지 않은 `extra` 필드가 있어도 성공 응답이 반환되는 상황을 정리하고, 추가 필드 거부와 정상 요청 성공을 해결 기준으로 둔다.\n\n> 로컬 이슈 초안. 입력은 합성 비교시험 자료이며 실제 CatchU 결함이나 실행 증거가 아니다. 아래 관찰·시도 결과는 입력 파일의 서술이고, 이번 작성에서는 재현을 실행하지 않았다.\n\n## 재현 절차와 환경\n\n- 환경: macOS, Node.js 24.21.0, npm 11.19.0, API 로컬 개발 환경(입력에 기재된 환경).\n- 판본: `eval/dev-login-extra-field`(합성 판본).\n- 조건: 개발 로그인 엔드포인트가 활성화된 로컬 API.\n\n1. 개발 로그인이 활성화된 로컬 API를 사용한다.\n2. `POST /v1/auth/dev-login`에 다음 JSON을 전송한다.\n\n```json\n{\"memberId\":\"review-member\",\"extra\":\"x\"}\n```\n\n## 기대 동작과 실제 동작\n\n- 기대: HTTP `400`, 오류 코드 `VALIDATION_FAILED`, 추가 필드 위반 정보 반환. API README 기준으로 `details.violations`에 `field: \"extra\"`, `reason: \"whitelistValidation\"`이 포함되어야 한다.\n- 실제(합성 관찰): HTTP `200`과 개발용 액세스 토큰 응답. 토큰 원문은 수집하지 않았다.\n\n## 영향과 시도한 해결\n\n- 영향: 합성 관찰에서는 개발 로그인 입력 검증 기준과 달리 추가 필드를 포함한 요청이 수락된다. 실제 서비스의 자료·권한 영향과 원인은 미확인이다.\n- 비교 시도: 입력에 따르면 `extra`를 제거한 요청은 정상 성공했다. 이는 정상 요청 비교이며 결함 해결을 의미하지 않는다.\n- 반복 관찰: 입력에 따르면 새 프로세스에서도 동일 입력으로 다시 관찰했다. 이번 작성자가 독립 재현한 결과는 없다.\n\n## 해결 완료 기준\n\n- [ ] `{\"memberId\":\"review-member\",\"extra\":\"x\"}` 요청이 HTTP `400 VALIDATION_FAILED`로 거부된다.\n- [ ] 오류의 `details.violations`에 `extra` 필드의 `whitelistValidation` 위반이 포함되며 입력값은 노출되지 않는다.\n- [ ] 유효한 `memberId` 하나만 보낸 요청은 정상 성공하고 개발 로그인 성공 응답 형식을 유지한다.\n\n위 항목은 향후 수정 검증 기준이며 이번 초안 작성에서 검증한 결과가 아니다.\n\n## 관련 작업과 근거\n\n- [합성 관찰 파일](../.eval-input/bug-observation.json): 환경·판본·요청·기대/실제 동작·시도 결과의 출처.\n- [API README — 인증 기반 사용과 후속 경계](../api/README.md#인증-기반-사용과-후속-경계--87): 개발 로그인은 `memberId`만 받고 추가 필드를 `400 VALIDATION_FAILED`로 거부한다. 위반 정보는 필드/규칙 이름으로 제공하고, 추가 필드의 규칙 이름은 `whitelistValidation`이다.\n- 관련 이슈·PR 연결 및 중복 여부: 미확인(이번 요청은 원격 조회·등록을 하지 않는 로컬 초안 작성).\n\n## 선행 조건과 담당 제안\n\n- 선행 작업: 입력에 따르면 없음이 확인됨. 이번 작성에서는 원격 관계를 확인하지 않았다.\n- 담당자·검토 상대: 미정.\n- 우선순위: 미정. 향후 원격 등록 시 확인할 사항이며, 이번 초안에서 임의 확정하지 않는다.\n"
+            }
+          ],
+          "final_sha256": "4d70389955c7db0dd1036120a675d88d516a3318b817ad1f960b7f49777330f4",
+          "final": "버그 양식에 맞춰 [issue.md](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-baseline-bug_local_draft/repo/.eval-output/issue.md)를 작성했습니다. 합성 관찰임을 명시하고 기대·실제 동작과 해결 완료 기준을 담았습니다. 원격 등록과 재현 실행은 하지 않았습니다."
+        },
+        {
+          "variant": "candidate",
+          "requested_model": "gpt-6.1-sol",
+          "requested_effort": "high",
+          "exit_code": 0,
+          "timeout": false,
+          "elapsed_seconds": 154.02,
+          "changed_paths": [
+            "?? .eval-output/"
+          ],
+          "event_count": 26,
+          "observed_model": null,
+          "observed_effort": null,
+          "snapshot_cwd": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-bug_local_draft/repo",
+          "prompt_sha256": "e62a0edd34c6bd9372a6c1ba6d835bf50188838552b2997b2d4b9f46b9f46871",
+          "events_sha256": "7db2b348e8616d3791aac83271248e3c32c6d3d90f1bf91d39df0aecb445715b",
+          "argv_sha256": "b1f989969f7218d105dc5236343652b0c424c83aee998b283d5e295d606856c5",
+          "tool_calls": [
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"pwd; rg --files -g AGENTS.md -g 'docs/CatchU_작업관리.md' -g 'docs/README.md' -g '.github/ISSUE_TEMPLATE/**' -g '.eval-input/bug-observation.json' -g '.eval-output/**' --hidden\"",
+              "exit_code": 0,
+              "output_chars": 226
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'git status --short; git rev-parse HEAD'",
+              "exit_code": 0,
+              "output_chars": 253
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat docs/README.md .github/ISSUE_TEMPLATE/bug.yml .eval-input/bug-observation.json'",
+              "exit_code": 0,
+              "output_chars": 9093
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat AGENTS.md docs/CatchU_작업관리.md'",
+              "exit_code": 0,
+              "output_chars": 26073
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"cat api/README.md; rg --files --hidden -g AGENTS.md -g '\"'!node_modules'\"' -g '\"'!.git'\"' .eval-input .eval-output api .github\"",
+              "exit_code": 1,
+              "output_chars": 38130
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"rg -n '\"'^#{2,3} |자료|로그|민감|초안'\"' docs/CatchU_작업관리.md; sed -n '120,260p' docs/CatchU_작업관리.md\"",
+              "exit_code": 0,
+              "output_chars": 16795
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '101,116p' docs/CatchU_작업관리.md; sed -n '187,195p' docs/CatchU_작업관리.md; rg -n -C 5 'VALIDATION_FAILED|추가 필드|dev-login|개발 로그인 검증' api/README.md\"",
+              "exit_code": 0,
+              "output_chars": 8100
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c \"sed -n '1,42p' api/README.md; sed -n '316,338p' api/README.md; sed -n '1,100p' .github/ISSUE_TEMPLATE/bug.yml; cat .eval-input/bug-observation.json; rg --files --hidden -g AGENTS.md -g '\"'!node_modules'\"' -g '\"'!.git'\"' .eval-input .eval-output api .github\"",
+              "exit_code": 1,
+              "output_chars": 7263
+            },
+            {
+              "tool": "file_change",
+              "changes": [
+                {
+                  "path": "/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-bug_local_draft/repo/.eval-output/issue.md",
+                  "kind": "add"
+                }
+              ]
+            },
+            {
+              "tool": "command_execution",
+              "command": "/bin/zsh -c 'cat .eval-output/issue.md; git status --short --untracked-files=all'",
+              "exit_code": 0,
+              "output_chars": 2418
+            }
+          ],
+          "artifacts": [
+            {
+              "path": ".eval-output/issue.md",
+              "sha256": "871e619774473401458f33e45157e7d818f136dfc794680ad0878bf5f9732740",
+              "physical_lines": 58,
+              "text": "# 개발 로그인에서 추가 입력 필드를 거부하지 않음\n\n> 로컬 이슈 초안. 합성 비교시험 입력을 정리한 문서이며 실제 CatchU 결함이나 실행 증거가 아니다. 원격 등록·기존 이슈 조회·재현 실행은 수행하지 않았다.\n\n## 재현 절차와 환경\n\n- 입력에 기재된 환경: macOS, Node.js 24.21.0, npm 11.19.0, API 로컬 개발 환경.\n- 관찰 판본: `eval/dev-login-extra-field` (합성 판본). 현재 snapshot HEAD에서 재현된 것으로 간주하지 않는다.\n- 전제: 개발 로그인 엔드포인트가 활성화된 로컬 API.\n\n입력에 기록된 절차:\n\n1. 개발 로그인이 활성화된 로컬 API를 사용한다.\n2. `POST /v1/auth/dev-login`에 다음 JSON을 전송한다.\n\n```json\n{\"memberId\":\"review-member\",\"extra\":\"x\"}\n```\n\n위 절차는 재현 안내이며 이번 초안 작성 중에는 실행하지 않았다. 실제 서비스에서의 재현 여부와 원인은 미확인이다.\n\n## 기대 동작과 실제 동작\n\n- 기대: 추가 필드를 거부하여 HTTP `400`, `code: VALIDATION_FAILED`를 반환한다. API README 기준으로 `details.violations`에 `{ \"field\": \"extra\", \"reason\": \"whitelistValidation\" }`을 포함하며 입력값이나 토큰을 노출하지 않는다.\n- 실제(합성 입력의 관찰): HTTP `200`과 개발용 액세스 토큰 응답이 반환되었다. 토큰 원문은 수집하지 않았다.\n\n## 영향과 시도한 해결\n\n- 관찰된 영향: 개발 로그인 입력 검증 흐름에서 허용하지 않은 필드가 포함된 요청이 성공 처리된다.\n- 실제 회원 자료·권한 및 운영 환경에 대한 영향은 확인되지 않았다. 이 관찰만으로 운영 환경의 개발 로그인 차단이나 다른 API의 검증에 문제가 있다고 판단하지 않는다.\n- 입력에 기록된 시도: `extra`를 제거하면 정상 성공했고, 새 프로세스에서도 동일 입력의 현상을 다시 관찰했다. 필드 제거는 정상 요청 비교이며 결함 해결 증거는 아니다.\n- 이번 작업에서는 관찰 파일과 README만 확인했다. 수정·재현·테스트는 수행하지 않았다.\n\n## 해결 완료 기준\n\n아래 항목은 향후 수정 검증 기준이며 모두 미실행이다.\n\n- [ ] 개발 로그인이 활성화된 환경에서 위 추가 필드 요청을 HTTP `400 VALIDATION_FAILED`로 거부한다.\n- [ ] 거부 응답의 `details.violations`에 `extra` 필드의 `whitelistValidation` 위반 정보를 반환한다.\n- [ ] 유효한 `memberId` 하나만 보낸 요청은 정상 성공한다.\n- [ ] 회원 ID 누락·빈 값·앞뒤 공백·문자열 이외 타입을 기존 기준대로 `400 VALIDATION_FAILED`로 거부한다.\n- [ ] 개발 로그인 기본 비활성 및 `NODE_ENV=production` 조건에서는 입력 검증보다 먼저 기존 `403 INTERNAL_ERROR`로 거부한다.\n- [ ] 거부한 요청에는 액세스 토큰을 발급하지 않는다.\n- [ ] 검증 오류 응답과 공유 로그에 입력값·토큰 원문을 노출하지 않는다.\n\n## 관련 작업과 근거\n\n- [합성 관찰 입력](../.eval-input/bug-observation.json): 환경·판본·절차·기대 및 관찰 결과·시도 기록의 출처. 실제 실행 증거가 아니다.\n- [API README — 인증 기반 사용과 후속 경계](../api/README.md#인증-기반-사용과-후속-경계--87): 개발 로그인은 `memberId` 하나만 받으며 추가 필드는 `400 VALIDATION_FAILED`로 거부한다. 추가 필드 위반 규칙과 개발 로그인 차단의 우선순위도 명시한다.\n- [API README — 공통 오류 처리](../api/README.md#공통-오류-처리--api-명세-v1): 오류 형식과 `details.violations`의 필드·규칙 정보, 입력값·토큰 비노출 기준.\n- 관련 이슈·PR 연결은 미확인이다. 원격 조회를 하지 않았으므로 중복 이슈가 없다고 판단하지 않는다.\n\n## 담당과 분류 제안\n\n- 담당은 미정이며 자동 배정하지 않는다.\n- 우선순위는 미정이다. 로컬 초안에는 P1/P2를 확정하지 않으며 향후 원격 등록 시 사용자에게 확인해 Project 필드에 반영한다.\n\n<!-- 선행 조건 확인: 합성 입력에 선행 작업 없음이 확인되었다고 명시되어 있어 조건부 '선행 조건과 미결' 절은 생략했다. 원격 의존 관계는 조회하거나 설정하지 않았다. -->\n"
+            }
+          ],
+          "final_sha256": "8783c6bb10187dae87dc6f7118b16189b5b04376f7f0ce227974799c90f9afb0",
+          "final": "버그 양식에 맞춰 [issue.md](/private/tmp/catchu-ai-guidance-gpt61-high/runs/codex-candidate-bug_local_draft/repo/.eval-output/issue.md)를 작성했습니다. 합성 관찰임을 명시하고 기대·실제 동작과 해결 기준을 정리했습니다. 원격 등록과 재현 실행은 하지 않았습니다."
+        }
+      ]
+    }
+  ]
+}
