@@ -6,7 +6,8 @@ import { createCatchApi } from "../src/features/assets/catch-api.ts";
 import { createAssetsStore } from "../src/features/assets/assets-store.ts";
 import { readApiResponse } from "../src/lib/api-response.ts";
 
-// 실행할 API는 B의 API PR을 포함해야 한다. A/E·worker 입력은 일회용 합성 자료다.
+// 실행할 API는 실제 회원·분석 기반과 B의 API PR을 포함해야 한다.
+// 개발 로그인 HTTP·실제 DB 제약을 사용하고 E 완료 처리·보호 관측·worker 입력은 일회용 시험 대역으로 준비한다.
 const apiRoot = path.resolve(process.env.CATCH_API_ROOT ?? "../api");
 const require = createRequire(path.join(apiRoot, "package.json"));
 require("reflect-metadata");
@@ -25,7 +26,7 @@ const { registerCandidates } = require(path.join(apiRoot, "dist/catches/registra
 process.env.AUTH_JWT_SECRET = randomBytes(32).toString("hex");
 process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = "600";
 process.env.NODE_ENV = "test";
-delete process.env.DEV_LOGIN_ENABLED;
+process.env.DEV_LOGIN_ENABLED = "true";
 let fixture;
 let app;
 try {
@@ -41,21 +42,43 @@ try {
   await configureApp(app);
   await app.listen(0, "127.0.0.1");
   const origin = await app.getUrl();
-  const owner = randomUUID();
+  async function login(identifier) {
+    const response = await fetch(origin + "/v1/auth/dev-login", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberId: identifier }), signal: AbortSignal.timeout(5000),
+    });
+    assert.equal(response.status, 200, "실제 개발 로그인 HTTP 요청이 성공해야 한다");
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    const body = await response.json();
+    assert.equal(body.tokenType, "Bearer");
+    assert.equal(typeof body.accessToken, "string");
+    const memberId = await app.get(AccessTokenService).verify(body.accessToken);
+    assert.match(memberId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    assert.notEqual(memberId, identifier);
+    assert.deepEqual(await db.query("SELECT identity_reference FROM member_account WHERE member_id = $1", [memberId]),
+      [{ identity_reference: "catchu:dev-login:" + identifier }]);
+    return { memberId, accessToken: body.accessToken };
+  }
+  const ownerSession = await login("synthetic-b-smoke-owner");
+  const otherSession = await login("synthetic-b-smoke-other");
+  const owner = ownerSession.memberId;
+  assert.notEqual(owner, otherSession.memberId);
   async function seed(ownerId, repositoryId, count) {
     const candidates = Array.from({ length: count }, () => candidate("candidate-" + randomUUID(), "work-" + randomUUID()));
-    const input = await fixture.receipt({ ownerId, candidates });
-    await db.query("UPDATE analysis_request SET repository_id = $1 WHERE request_id = $2", [repositoryId, input.requestId]);
-    await db.query(`INSERT INTO repository_protection
-      (protection_id, owner_id, repository_id, confirmed_source_state, observation_provenance, observed_at, applied_restriction)
-      VALUES ($1,$2,$3,$4,$5,$6,'NONE')`,
-      [randomUUID(), ownerId, repositoryId, { state: "PUBLIC", synthetic: true }, { kind: "SYNTHETIC_FIXTURE" }, new Date()]);
-    return db.transaction((manager) => registerCandidates(manager, input));
+    // 요청과 불변 동의가 처음부터 같은 저장소를 가리키며 보호 관측도 명시적인 합성 자료다.
+    const input = await fixture.receipt({ ownerId, candidates }, { repositoryId, protection: "NONE" });
+    return db.transaction(async (manager) => {
+      const registered = await registerCandidates(manager, input);
+      // E 완료 처리 대역을 같은 트랜잭션에 기록해 다음 요청도 회원별 ACTIVE 1개 제약을 지킨다.
+      await manager.query("UPDATE analysis_attempt SET application = 'APPLIED', owner_results_ready = true WHERE attempt_id = $1", [input.attemptId]);
+      await manager.query("UPDATE analysis_request SET lifecycle = 'CLOSED' WHERE request_id = $1", [input.requestId]);
+      return registered;
+    });
   }
   const own = await seed(owner, "synthetic-repo-a", 21);
   await seed(owner, "synthetic-repo-b", 1);
-  const foreign = await seed(randomUUID(), "synthetic-repo-a", 1);
-  const token = (await app.get(AccessTokenService).issue(owner)).accessToken;
+  const foreign = await seed(otherSession.memberId, "synthetic-repo-a", 1);
+  const token = ownerSession.accessToken;
   let authorization = "Bearer " + token;
   let putCount = 0;
   const transport = async (url, options) => {
@@ -109,7 +132,7 @@ try {
   assert.equal(store.getSnapshot().detail.visibility, "PRIVATE");
   assert.equal((await publicStore.list(owner, {})).catches.length, 0);
   // #176의 실제 JWT 거절을 B가 빈 목록·저장 성공으로 바꾸지 않는지 확인한다.
-  // 토큰은 이 검사 프로세스의 메모리에만 두며 A 회원 클라이언트·OAuth 연결을 대신하지 않는다.
+  // 정상 토큰은 개발 로그인 HTTP 응답을 사용하며 메모리에만 둔다. 회원 클라이언트·Google OAuth는 이 검사 범위가 아니다.
   const now = Math.floor(Date.now() / 1000);
   const expiredToken = await new SignJWT({}).setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setSubject(owner).setIssuer("catchu-api").setAudience("catchu-member-api")
@@ -217,7 +240,7 @@ try {
   const foreignMutation = await api.update(foreign[0].catchId, { kind: "confirmation" });
   assert.equal(foreignMutation.code, "RESOURCE_UNAVAILABLE");
   store.dispose();
-  console.log("통과: B web 호출 경계 → 실제 Nest HTTP·JWT·PostgreSQL 목록/필터/21건 페이지/0건/직접 상세/확인·별도 공개·불일치·숨김/C 공개 자료 제외/보호 거절/타인 거부 + 인증 오류 4종 목록·상세/인증 오류 3종 × 저장 4종 대상 Catch 행 무변경·반복 차단·인증 복구 후 수동 재시도 (A/E·worker는 합성, 회원 클라이언트·OAuth 미연결)");
+  console.log("통과: 실제 개발 로그인 HTTP → B web 호출 경계 → Nest HTTP·JWT·회원/분석 기반·PostgreSQL 목록/필터/21건 페이지/0건/직접 상세/확인·별도 공개·불일치·숨김/C 공개 자료 제외/보호 거절/타인 거부 + 인증 오류 4종 목록·상세/인증 오류 3종 × 저장 4종 대상 Catch 행 무변경·반복 차단·인증 복구 후 수동 재시도 (자료는 합성, E 완료 처리·보호 관측·worker는 시험 대역, 회원 클라이언트·Google OAuth·C 수신자 HTTP 미연결)");
 } finally {
   try { if (app) await app.close(); } finally { if (fixture) await fixture.close(); }
 }

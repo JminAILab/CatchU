@@ -66,12 +66,12 @@ function ManagementPreview({ bindings }: { bindings: RepositoryManagementBinding
 }
 
 export function AssetsApiPreview() {
-  return <>
+  return <div className={`${styles.preview} ${styles.standalonePreview}`}>
     <aside className={styles.previewToolbar}><div><strong>내 자산 API 연결 동작 · 모의 응답</strong>
       <p>자료와 응답은 모두 예시입니다. 실제 로그인·API·DB 연결 검증 화면이 아닙니다.</p>
       <p>조회 실패는 failure=all, 상세 실패는 failure=detail, 저장 실패는 failure=save로 확인합니다. 저장은 메모리의 합성 자료에만 적용되고 새로고침하면 초기화됩니다.</p></div></aside>
     <AssetsConnected api={api} repositories={previewRepositories}
       repositoryManagement={(bindings) => <ManagementPreview bindings={bindings} />} />
-  </>;
+  </div>;
 }
 

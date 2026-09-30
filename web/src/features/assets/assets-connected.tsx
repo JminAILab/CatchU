@@ -68,7 +68,7 @@ export function AssetsConnected({ api, repositories, repositoryManagement }: Pro
       <AssetsView dataMode="api" items={listMatches ? snapshot.items : []}
         repositories={repositories} repositoryId={repositoryId} tab={tab}
         listState={listMatches ? snapshot.listState : "loading"}
-        listMessage={catchErrorText(snapshot.listError)}
+        listMessage={catchErrorText(snapshot.listError, "list")}
         detailState={detailMatches ? snapshot.detailState : "loading"}
         detailMessage={catchErrorText(snapshot.detailError)}
         detailItem={detailMatches ? snapshot.detail : undefined}

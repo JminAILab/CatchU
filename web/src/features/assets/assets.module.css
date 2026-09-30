@@ -4,11 +4,11 @@
   --line: #dce2e9;
   color: var(--ink);
   background: #f7f8fa;
-  min-height: 100vh;
   font-family: Arial, "Malgun Gothic", sans-serif;
   line-height: 1.6;
   margin: 0;
 }
+.standalonePreview { min-height: 100vh; }
 .preview *, .dialog * { box-sizing: border-box; }
 .preview button, .preview select, .dialog button { font: inherit; }
 .preview button, .dialog button { cursor: pointer; }
