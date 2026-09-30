@@ -2,7 +2,7 @@
 
 NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준을 확인한다.
 
-현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 저장소 연결 전 독립 로직으로 제공하며 `AppModule`에는 등록하지 않는다. 실제 로그인·기능 테이블(회원 등)·제품 기능·worker 연결은 후속 작업이다.
+현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 저장소 연결 전 독립 로직으로 제공하며 `AppModule`에는 등록하지 않는다. [#104 회원·분석 선행 테이블](https://github.com/JminAILab/CatchU/issues/104)과 개발 회원·합성 연동·공통 멱등 처리를 제공한다. 실제 로그인·기능 API·worker 연결은 후속 작업이다.
 
 ## 공통 오류 처리 — API 명세 v1
 
@@ -212,7 +212,7 @@ DB를 쓰는 테스트를 추가할 때:
 | `src/auth/auth.decorators.ts`          | `@CurrentMemberId()` 접근자와 `@Public()` 제외 표시 |
 | `src/auth/access-token.service.ts`     | JWT 서명·검증과 필수 claim 검사. 기능 코드와 분리 |
 | `src/auth/auth.config.ts`              | 인증 환경설정 검증. 기본 키 없음, 운영 개발 로그인 차단 |
-| `src/auth/dev-login.controller.ts`     | 개발용 토큰 발급. 기본 비활성, 회원 DB 조회 없음 |
+| `src/auth/dev-login.controller.ts`     | 개발 식별 문자열을 회원·기본 프로필에 연결하고 실제 회원 UUID로 토큰 발급. 기본 비활성 |
 | `src/analysis-receiver/analysis-receiver.service.ts` | 진행/결과 수신, 맥락·중복·순서 검사, 커밋 이후 수신 확인 |
 | `src/analysis-receiver/receiver.types.ts` | 메시지 타입과 DB 연결용 `ReceiverStore` 트랜잭션 경계 |
 | `src/analysis-receiver/worker-message.validator.ts` | 계약 YAML에서 한 번 컴파일한 스키마 검사. 입력 보정·외부 참조 다운로드 없음 |
@@ -368,7 +368,7 @@ export class ExamplePublicController {
 
 현재 내부 토큰 구현은 HS256, 발급자 `catchu-api`, 대상 `catchu-member-api`, `sub` 회원 ID와 `iat`·`exp`를 서명·검증한다. 서명 알고리즘을 제한하고 비어 있는/공백 회원 ID, 누락된 만료·발급 시각, 잘못된 대상·발급자도 거부한다. 이는 #87 개발 기반의 내부 형식이며 기능 코드의 의존 대상이나 실제 OAuth 발급 계약이 아니다. 토큰 원문과 검증 라이브러리의 상세 오류는 로그·오류 응답에 포함하지 않는다.
 
-[#104](https://github.com/JminAILab/CatchU/issues/104)에서 개발 로그인에 받은 ID와 회원 행을 연결한다. 지금은 받은 ID를 그대로 사용하는 대역이며 회원·프로필 행 생성, DB 조회, 개발 GitHub 연동 대역은 없다. 이 연결을 바꿔도 기능 코드의 `@CurrentMemberId()` 사용 방식은 유지한다. 실제 Google/GitHub 로그인, Refresh Token·재발급·로그아웃, 소유권 검사, 쿠키·CORS·CSRF와 실제 발급 정책은 이번 범위 밖이다.
+[#104](https://github.com/JminAILab/CatchU/issues/104)의 개발 회원 공급자가 받은 문자열을 개발 전용 identityReference에 연결하고 회원·기본 프로필·최초 합성 연동을 준비한다. 토큰에는 실제 회원 UUID를 사용하며 기능 코드의 `@CurrentMemberId()` 사용 방식은 유지한다. 상세는 「회원·분석 선행 테이블과 멱등 처리 — #104」를 따른다. 실제 Google/GitHub 로그인, Refresh Token·재발급·로그아웃, 소유권 검사, 쿠키·CORS·CSRF와 실제 발급 정책은 이번 범위 밖이다.
 
 ## 검토자 재현 — README만 보고 보호 API 추가·호출
 
@@ -411,8 +411,97 @@ try {
 }
 ```
 
-4. 인증 후 `memberId`가 `review-member-87`인지, 토큰 없이 `/health`는 200인지 확인한다. 아래 검증 전에 `NODE_ENV`와 `DEV_LOGIN_ENABLED`의 기존 값·설정 유무를 터미널 환경변수와 `.env`별로 기록하고, 검토 후 원래 상태로 복원한다. 필수 인증 키와 토큰 수명 설정은 유지하며, 비밀값이나 환경변수 전체를 출력하지 않는다. **기본 비활성화:** 서버를 종료하고 터미널 환경변수와 `.env` 양쪽에서 `DEV_LOGIN_ENABLED`를 제거한 뒤 재시작하여 개발 로그인이 403인지 확인한다. **운영 환경 거부:** 서버를 종료하고 터미널에서 `NODE_ENV=production`, `DEV_LOGIN_ENABLED=true`로 설정한 뒤 재시작하여 개발 로그인이 403인지 확인한다.
+4. 인증 후 `memberId`가 UUID이고 같은 `review-member-87` 문자열로 재로그인해도 동일한 UUID인지, 토큰 없이 `/health`는 200인지 확인한다. 아래 검증 전에 `NODE_ENV`와 `DEV_LOGIN_ENABLED`의 기존 값·설정 유무를 터미널 환경변수와 `.env`별로 기록하고, 검토 후 원래 상태로 복원한다. 필수 인증 키와 토큰 수명 설정은 유지하며, 비밀값이나 환경변수 전체를 출력하지 않는다. **기본 비활성화:** 서버를 종료하고 터미널 환경변수와 `.env` 양쪽에서 `DEV_LOGIN_ENABLED`를 제거한 뒤 재시작하여 개발 로그인이 403인지 확인한다. **운영 환경 거부:** 서버를 종료하고 터미널에서 `NODE_ENV=production`, `DEV_LOGIN_ENABLED=true`로 설정한 뒤 재시작하여 개발 로그인이 403인지 확인한다.
 5. 검토용 컨트롤러와 등록만 제거하고 검사 명령을 실행한다. 기존 파일은 통째로 되돌리지 않는다. 서버를 `Ctrl+C`로 종료하고 이 재현에서 추가한 환경변수만 정리하거나 터미널을 닫는다. 비밀값·토큰 없이 검토 환경, 검토 판본, HTTP 상태와 ID 일치 여부만 공유한다. 작성자 외 재현 완료 여부는 실제 검토자의 확인을 기다린다.
+
+
+## 회원·분석 선행 테이블과 멱등 처리 — #104
+
+[ERD v1](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md), [구현 계획](https://github.com/JminAILab/CatchU/issues/104#issuecomment-5896005086), [공유 링크 비교 조건](https://github.com/JminAILab/CatchU/issues/104#issuecomment-5884501159)을 구현한다. E 접수·조회 API, A 프로필·실제 연동 API, B/C 테이블·결과 수신 저장은 포함하지 않는다.
+
+### 테이블 참조와 저장
+
+[`member-analysis.entity.ts`](src/member-analysis/member-analysis.entity.ts)의 엔티티를 import해서 **호출자가 넘긴 EntityManager**로 읽고 저장한다. 기능이 별도 DataSource나 중복 회원·멱등 테이블을 만들지 않는다.
+
+| 엔티티 / 테이블 | 키·연결 |
+| --- | --- |
+| MemberAccount / member_account | member_id UUID, identity_reference 유일. account_state는 내부 인증 판단 값이며 새 공개 enum이 아님 |
+| MemberProfile / member_profile | profile_id UUID, member_id FK·유일. 회원 생성 시 빈 문자열·빈 skills·SELF_REPORTED로 함께 준비 |
+| GitHubConnection / github_connection | connection_id UUID, member_id FK·유일. 실제 토큰 없이 외부 계정·자격정보 참조만 저장 |
+| AnalysisRequest / analysis_request | request_id UUID, member_id FK. ACTIVE 회원 부분 유일 인덱스. 동의·현재 시도 필수 |
+| AnalysisConsent / analysis_consent | consent_id UUID, request_id 유일. 요청·회원·저장소를 복합 FK로 대조. accepted=true, 동의 판본·범위는 접수 뒤 변경 불가 |
+| AnalysisAttempt / analysis_attempt | attempt_id UUID, request_id FK. processing/application 분리, source_mode·후보 수·안전한 failures·실패 확정 참조 |
+| IdempotencyRecord / idempotency_record | idempotency_id UUID, (member_id, operation, key) 유일. operation별 request_id 또는 link_id 하나와 response_reference 필수 |
+
+순환 FK는 `DEFERRABLE INITIALLY DEFERRED`다. 요청·새 동의·첫 시도를 모두 쓰지 않으면 **콜백 실행이 끝나도 커밋에서 실패**한다. `insertInitialAnalysis(manager, input)`은 ID를 먼저 만들고 세 행을 저장하는 내부 기반이며 접수 권한·현재 연동·고지/범위·ACTIVE 이력·재요청 자격 판정을 대신하지 않는다. 호출하는 E 접수 API가 그 판정을 수행한 뒤 사용한다. 이 함수는 신규 저장만 제공하며 재요청·worker 전송 API를 추가하지 않는다.
+
+동의 불변성과 재요청 선행 참조 불변성은 마이그레이션의 트리거로도 보호한다. 재요청 참조는 이미 존재하는 요청만 가리킬 수 있고 이후 다른 선행 요청으로 바꿀 수 없어 자기 참조·순환을 만들 수 없다. 본인·같은 저장소는 복합 FK로 검사한다. **확정 실패·등록 결과 없음 등 재요청 허용 판단은 #138의 접수 로직**에 남는다. 트리거·enum 제약 통과를 재요청 허가로 취급하지 않는다.
+
+### 개발 회원과 합성 GitHub 연결
+
+개발 로그인 body의 `memberId` 이름은 유지하지만 값은 **개발 식별 문자열**이다. `catchu:dev-login:` 네임스페이스의 identityReference로 회원을 찾거나 생성하고, 커밋된 **실제 member_id UUID**를 JWT에 싣는다. 같은 문자열의 반복·동시 로그인은 같은 회원과 기본 프로필을 사용한다. 기존 프로필·연결 상태를 덮어쓰지 않으며, 기존 회원의 필수 프로필이 없으면 오류로 처리한다. 실제 제공자 연동 시 개발 네임스페이스와 분리해야 한다.
+
+`DevMemberService`는 `AuthModule`에서 export한다. `readConnection(인증된 memberId)`은 개발 회원의 현재 합성 연결과 선정 저장소, sourceMode=MOCK을 반환한다. [지정 표본](../worker/fixtures/m1-synthetic/context.sample.json)의 repositoryId=`synthetic-repo-0001`, allowedScopeRevision=`00000000-0000-4000-8000-000000000201`을 사용하며 테스트가 표본 일치를 검사한다. 요청·동의·시도 ID를 표본에서 복사하지 않는다. 현재 대역은 GitHub 네트워크 호출·실제 접근권한·분석 동의를 제공하지 않는다. #136과 E 접수에서 이 내부 공급자를 연결한다.
+
+회원·기본 프로필·최초 합성 CONNECTED 행은 한 트랜잭션이다. `DEV_LOGIN_ENABLED=true` 설정을 공유하며, 기본 비활성·production에서는 회원 준비와 대역 조회 모두 거부한다. 기존 실제 연동을 합성 연결로 덮어쓰지 않는다. 토큰 검증 Guard는 매 요청 DB 조회를 추가하지 않았으므로, 기존 문자열 토큰은 다시 개발 로그인하여 UUID 토큰으로 바꿔야 한다. 기능은 여전히 `@CurrentMemberId()`만 사용하고 자원 존재·소유권을 별도로 확인한다.
+
+### 멱등 생성 호출
+
+[`runIdempotentCreation`](src/member-analysis/idempotent-creation.ts)은 활성 **READ COMMITTED** 트랜잭션의 manager를 받는다. (회원, operation, key)의 트랜잭션 잠금으로 키를 예약한 후 자원 생성·멱등 기록·응답 구성을 함께 처리한다. 유일 인덱스가 최종 중복 방어다. 예약 중간 행을 커밋하지 않으며, 실패 후 동일 키로 다시 요청할 수 있다.
+
+- operation: `createAnalysisRequest` 또는 `createShareLink`. key는 1~128자다.
+- request_fingerprint: 작업별 정규화한 입력의 **SHA-256 소문자 64자리 hex text**. 링크는 C의 `shareCreateFingerprint`(제목·비밀번호 설정 여부)를 그대로 사용한다. 비밀번호 원문·해시를 지문에 넣지 않는다.
+- 형식 오류는 값의 출처에 따라 구분한다. 사용자 입력인 `Idempotency-Key`는 `400 INVALID_REQUEST`, 서버가 정하는 operation·생성하는 requestFingerprint는 `500 INTERNAL_ERROR`다. 오류 응답에 내부 값이나 지문을 포함하지 않는다. 정상 형식의 지문이 기존 요청과 다르거나 `isSame`의 비동기 비교 결과가 false이면 기존 `409 IDEMPOTENCY_CONFLICT`를 유지한다.
+- request_id/link_id: operation에 맞는 하나만 저장한다. 공통 함수가 연결 자원의 회원도 대조한다. request_id의 회원 일치는 DB 복합 FK로도 보장한다.
+- response_reference: 안전한 응답 재구성 참조(text). 예를 들어 자원 UUID를 저장하고 readResponse에서 원본 자원을 다시 읽는다. 요청/응답 원문, 비밀번호·토큰을 이 열에 직렬화하지 않는다.
+- isSame: 지문이 같은 재요청에서도 **항상 await하는 필수 비교 함수**다. C는 같은 manager로 기존 링크를 조회한 뒤 `isSameShareCreate`로 비밀번호까지 비교한다. false만 `409 IDEMPOTENCY_CONFLICT`이며 DB 오류·기록 불일치는 서버 오류로 전달한다.
+- create/readResponse: 모두 받은 manager를 사용한다. readResponse 실패도 신규 자원·멱등 기록을 함께 롤백한다. 예외를 트랜잭션 내부에서 삼키지 않는다.
+
+다음은 기능 담당자가 채울 콜백의 호출 형태다(제품 API 추가 예시가 아님).
+
+```typescript
+const result = await dataSource.transaction('READ COMMITTED', (manager) =>
+  runIdempotentCreation(manager, {
+    memberId, operation: 'createShareLink', key, requestFingerprint,
+  }, {
+    create: async (sameManager) => {
+      const link = await issueShareLink(sameManager, command);
+      return { requestId: null, linkId: link.linkId, responseReference: link.linkId };
+    },
+    isSame: async (sameManager, record) => {
+      const link = await sameManager.findOneByOrFail(ShareLink, { linkId: record.linkId! });
+      return isSameShareCreate(input, {
+        requestFingerprint: record.requestFingerprint,
+        passwordVerifier: link.passwordProtectionReference,
+      });
+    },
+    readResponse: async (sameManager, record) =>
+      buildOwnerLinkResponse(sameManager, record.responseReference),
+  }),
+);
+// 여기까지 성공한 뒤 응답: result.replayed와 operation 계약에 맞는 HTTP 상태 사용.
+```
+
+C의 기존 회원 단위 발급 잠금은 create 안에서 획득한다. 호출 순서는 공통 멱등 키 잠금 → 작업별 회원 잠금이며, 밖에서 반대 순서로 잠그지 않는다. 다른 키의 동시 링크 발급 제한은 C 함수의 책임이다. E의 같은 저장소 ACTIVE 처리·다른 저장소 거부도 멱등 키가 다른 경우의 업무 판정으로 남는다.
+
+### 적용 순서와 후속 연결
+
+`1790500000000-CreateMemberAnalysisFoundation`은 [PR #143의 B 마이그레이션](https://github.com/JminAILab/CatchU/pull/143) `1790600000000`보다 먼저 적용된다. 고정 선행 순서를 위해 작성 시각 대신 이 순서 번호를 사용했다.
+
+1. #104의 일곱 테이블.
+2. #105 E 담당의 ResultApplicationRecord(이 PR에 미포함). timestamp는 위 두 마이그레이션 사이여야 한다.
+3. PR #143 Catch/근거/후보 연결/보호 판단 테이블.
+4. [PR #157 본인 조회·확인](https://github.com/JminAILab/CatchU/pull/157)의 원 요청→회원·저장소 대조와 실제 자료 연결.
+
+B는 `member_account.member_id`, `analysis_request.request_id/member_id/repository_id/current_attempt_id`, `analysis_attempt.attempt_id/request_id/source_mode`를 참조할 수 있다. B의 외부 FK 엔티티 메타데이터 연결과 전체 적용 순서는 해당 연결 PR에서 다시 검사한다. ResultApplicationRecord·ReceiverStore·B 호출·보호 관찰 공급이 없으므로 이번 선행 테이블만으로 #143/#157 전체 연결 완료가 아니다.
+
+ShareLink 생성 마이그레이션과 `idempotency_record.link_id → share_link.link_id` FK·엔티티 메타데이터 추가는 **C 담당**이다. 공통 함수의 link 소유자 조회는 실제 C 테이블이 준비된 뒤 사용한다. 되돌릴 때는 B/C·수신 기록의 종속 FK/테이블을 먼저 되돌린다. #104 down은 자기 일곱 테이블·트리거만 제거하며 CASCADE로 후속 테이블을 지우지 않는다.
+
+### 검사와 검토
+
+전용 `_test` DB에서 `npm test`를 실행한다. `test/db/member-analysis.test.cjs`는 빈 스키마 up/down/re-up·엔티티 일치, 필수/유일/FK/enum, 중간 요청 커밋 거부, 반복·동시 로그인과 ACTIVE·멱등 요청, 생성·응답·커밋 실패 롤백을 검사한다. 실제 HTTP 개발 로그인에서 얻은 UUID로 분석 FK 저장도 확인한다. 같은 지문·다른 비밀번호는 테스트용 C 최소 테이블/비교 콜백으로 검사하며 실제 링크 API·scrypt 연결 검증은 C PR에 남긴다. 기존 #87·#139 검사는 UUID 회원 연결에 맞춰 유지한다.
+
+다른 담당자의 실제 E 접수/C 발급·B 등록·worker·OAuth 통합과 사람 리뷰는 자동 검사 통과로 대신하지 않는다.
 
 ## 분석 메시지 수신과 개발용 주입 — #139
 

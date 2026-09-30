@@ -4,7 +4,7 @@ const { randomBytes } = require('node:crypto');
 const { test } = require('node:test');
 const { Body, Controller, Module, Param, Post, Inject } = require('@nestjs/common');
 const { NestFactory } = require('@nestjs/core');
-const { SignJWT } = require('jose');
+const { SignJWT, decodeJwt } = require('jose');
 const { DevAnalysisInjection, readDevInjectionConfig } = require('../../dist/analysis-receiver/dev-analysis-injection');
 const { AnalysisReceiverModule } = require('../../dist/analysis-receiver/analysis-receiver.module');
 const { AppModule } = require('../../dist/app.module');
@@ -136,10 +136,12 @@ test('#87 Guard/CurrentMemberId와 연결한 테스트 전용 주입: 인증 없
   assert.equal((await app.post(path, body)).status, 401);
   const own = await (await app.post('/v1/auth/dev-login', { memberId: 'test-member' })).json();
   const other = await (await app.post('/v1/auth/dev-login', { memberId: 'other-member' })).json();
+  const memberId = decodeJwt(own.accessToken).sub;
+  app.store.state.context.memberId = memberId; // 실제 회원 UUID, 분석 접수는 기존 메모리 대역.
   assert.equal((await app.post(path, { ...body, memberId: 'test-member' }, other.accessToken)).status, 404);
   const accepted = await (await app.post(path, body, own.accessToken)).json();
   assert.equal(accepted.receipt.disposition, 'ACCEPTED');
-  assert.equal(accepted.accepted.result.memberId, 'test-member');
+  assert.equal(accepted.accepted.result.memberId, memberId);
   const rejected = await app.post(path, { ...body, template: { ...template(), extra: 'synthetic-secret-marker' } }, own.accessToken);
   assert.equal((await rejected.json()).receipt.code, 'SCHEMA_INVALID');
   for (const sensitive of [own.accessToken, other.accessToken, 'synthetic-secret-marker']) {
