@@ -4,7 +4,7 @@ labels: ["mvp-october"]
 body:
   - type: markdown
     attributes:
-      value: "30분 이상 해결하지 못한 버그는 기존 이슈를 확인해 작성·갱신하고 Slack으로 도움을 요청합니다. 비밀번호·토큰·개인 자료 원문은 첨부하지 않습니다."
+      value: "판단 기준은 [공통 작업관리 §4 이슈 본문](https://github.com/JminAILab/CatchU/blob/dev/docs/CatchU_작업관리.md#이슈-본문)을 따릅니다. 30분 이상 해결하지 못한 버그는 기존 이슈를 확인해 작성·갱신하고 Slack으로 도움을 요청합니다. 비밀번호·토큰·개인 자료 원문은 첨부하지 않습니다. 담당·일정은 합의 전 확정하지 않으며, [조건부] 칸은 해당 없으면 비워서 지웁니다."
   - type: textarea
     id: reproduction
     attributes:
@@ -41,9 +41,12 @@ body:
     validations:
       required: true
   - type: textarea
-    id: coordination
+    id: dependencies
     attributes:
-      label: 선행 조건과 담당 제안
-      description: "막힌 이유·필요한 조치·담당/검토 상대·영역·우선순위 제안. 미정이면 미정."
-    validations:
-      required: true
+      label: 선행 조건과 미결
+      description: "[조건부] 확인은 항상 수행합니다. 없음을 확인했으면 이 칸을 비워 지웁니다. 확인하지 못했으면 없음으로 적지 말고 미확인으로 표시합니다. 실제 선행 이슈는 본문과 별도로 blocked by 관계도 설정합니다."
+  - type: textarea
+    id: ownership
+    attributes:
+      label: 담당과 분류 제안
+      description: "[조건부] 담당·분류 결정이 필요할 때만 씁니다. 확정되면 Project 필드에 반영하고 제안 문구는 지웁니다. 필드로 표현할 수 없는 협업·검토 역할은 남깁니다."
