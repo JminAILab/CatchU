@@ -115,6 +115,20 @@ def repository_full_name(data: object) -> str:
     return _text(_object(data), "full_name")
 
 
+def repository_is_public(data: object) -> bool:
+    """저장소 응답이 공개 저장소라고 하는가.
+
+    필수 항목 `private`가 거짓이고, 선택 항목 `visibility`가 있으면 그것도 public이어야 한다.
+    `private`가 없거나 참·거짓이 아니면 공개로 추정하지 않고 모양 오류로 둔다.
+    """
+    repository = _object(data)
+    private = repository.get("private")
+    if not isinstance(private, bool):
+        raise MalformedResponse("private: 참·거짓이 아니다")
+    visibility = _optional_text(repository, "visibility")
+    return not private and visibility in (None, "public")
+
+
 def commit(item: object, status: DetailStatus) -> CommitRecord:
     """커밋 목록의 항목. 변경 내용은 상세 조회에서 채운다."""
     data = _object(item)

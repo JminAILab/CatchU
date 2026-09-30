@@ -27,6 +27,7 @@ from github_synthetic import (
     file_json,
     issue_json,
     pull_json,
+    repository_json,
     respond,
     sha,
     standard_routes,
@@ -207,6 +208,62 @@ def test_response_for_another_repository_stops_collection() -> None:
 
     assert _codes(outcome) == [FailureCode.SCOPE_INCONSISTENT]
     assert transport.paths == [BASE]
+
+
+def _metadata_without(key: str) -> dict[str, object]:
+    data: dict[str, object] = repository_json()
+    del data[key]
+    return data
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        repository_json(),
+        # visibility는 GitHub 응답의 선택 항목이다. 필수 항목 private가 공개를 말한다.
+        _metadata_without("visibility"),
+    ],
+)
+def test_public_repository_is_collected(metadata: dict[str, object]) -> None:
+    routes = standard_routes()
+    routes[BASE] = respond(metadata)
+
+    outcome, transport = _run(routes)
+
+    assert outcome.completed
+    assert transport.paths == STANDARD_ORDER
+
+
+@pytest.mark.parametrize(
+    ("metadata", "code"),
+    [
+        # 토큰으로 접근되더라도 비공개 저장소는 수집하지 않는다.
+        (
+            repository_json(private=True, visibility="private"),
+            FailureCode.REPOSITORY_UNREACHABLE,
+        ),
+        (repository_json(private=True), FailureCode.REPOSITORY_UNREACHABLE),
+        (repository_json(visibility="internal"), FailureCode.REPOSITORY_UNREACHABLE),
+        (repository_json(visibility="private"), FailureCode.REPOSITORY_UNREACHABLE),
+        # 공개 여부를 확인할 수 없으면 공개로 추정하지 않는다.
+        (_metadata_without("private"), FailureCode.COLLECTION_FETCH_FAILED),
+        (repository_json(private=None), FailureCode.COLLECTION_FETCH_FAILED),
+        (repository_json(private="false"), FailureCode.COLLECTION_FETCH_FAILED),
+        (repository_json(visibility=0), FailureCode.COLLECTION_FETCH_FAILED),
+    ],
+)
+def test_repository_not_confirmed_public_stops_before_any_listing(
+    metadata: dict[str, object], code: FailureCode
+) -> None:
+    routes = standard_routes()
+    routes[BASE] = respond(metadata)
+
+    outcome, transport = _run(routes)
+
+    assert _codes(outcome) == [code]
+    # 저장소 확인 뒤 커밋·PR·이슈의 목록·상세를 부르지 않았다.
+    assert transport.paths == [BASE]
+    assert (outcome.commits, outcome.pull_requests, outcome.issues) == ((), (), ())
 
 
 def test_stop_on_a_later_page_keeps_the_pages_already_received() -> None:

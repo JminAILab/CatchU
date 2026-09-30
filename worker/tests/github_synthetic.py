@@ -173,13 +173,17 @@ def account_json(account: GitHubAccount | None) -> dict[str, Any] | None:
     }
 
 
-def repository_json(full_name: str = f"{OWNER}/{NAME}") -> dict[str, Any]:
+def repository_json(
+    full_name: str = f"{OWNER}/{NAME}", **changes: Any
+) -> dict[str, Any]:
     return {
         "id": 424242,
         "full_name": full_name,
         "private": False,
+        "visibility": "public",
         "html_url": f"{EVIL}/repo",
         "url": f"{EVIL}/api/repo",
+        **changes,
     }
 
 

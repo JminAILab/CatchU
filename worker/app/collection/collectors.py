@@ -103,7 +103,7 @@ def list_pages(
 
 
 def verify_repository(gateway: GitHubGateway, paths: RepositoryPaths) -> None:
-    """대상 저장소에 접근되고, 응답이 요청한 저장소인지 확인한다."""
+    """대상 저장소에 접근되고, 응답이 요청한 공개 저장소인지 확인한다."""
     fetched = gateway.get(paths.metadata())
     if isinstance(fetched, Oversized):
         raise stop(
@@ -116,6 +116,15 @@ def verify_repository(gateway: GitHubGateway, paths: RepositoryPaths) -> None:
         raise stop(
             FailureCode.SCOPE_INCONSISTENT,
             "GitHub가 요청한 저장소가 아닌 저장소를 돌려줘 수집을 멈췄다",
+        )
+    with _reading():
+        public = normalize.repository_is_public(fetched.data)
+    if not public:
+        # 수집 대상은 공개 저장소뿐이다. 토큰으로 접근된다고 비공개 자료를 모으지 않는다.
+        # 비공개 읽기 권한이 없는 토큰이 받을 404와 같은 코드로 둔다.
+        raise stop(
+            FailureCode.REPOSITORY_UNREACHABLE,
+            "공개 저장소가 아니어서 자료를 조회하지 않고 수집을 멈췄다",
         )
 
 
