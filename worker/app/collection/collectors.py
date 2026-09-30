@@ -81,13 +81,22 @@ def list_pages(
     page_path: PagePath,
     max_items: int,
     take: Callable[[list[object]], None],
+    *,
+    allow_empty_repository: bool = False,
 ) -> ListingEnd:
-    """쪽 번호를 F가 올리며 최대 max_items개까지 읽고, 받은 쪽마다 take에 넘긴다."""
+    """쪽 번호를 F가 올리며 최대 max_items개까지 읽고, 받은 쪽마다 take에 넘긴다.
+
+    allow_empty_repository면 첫 쪽의 빈 Git 저장소 응답을 0건으로 받는다. 앞쪽에 항목이
+    있었다면 빈 저장소가 아니므로 둘째 쪽부터는 받지 않는다.
+    """
     per_page = min(MAX_PER_PAGE, max_items)
     seen = 0
     page = 1
     while True:
-        fetched = gateway.get(page_path(page, per_page))
+        fetched = gateway.get(
+            page_path(page, per_page),
+            allow_empty_repository=allow_empty_repository and page == 1,
+        )
         if isinstance(fetched, Oversized):
             return ListingEnd(more_beyond_range=False, oversized=True)
         room = max_items - seen
@@ -178,7 +187,14 @@ class CommitCollector:
                 status = details.status_for(self._account.same_account(record.author))
                 data.commits.append(replace(record, changes_status=status))
 
-        end = list_pages(gateway, self._paths.commits, self._limits.max_commits, take)
+        # 빈 Git 저장소면 GitHub는 커밋 목록에 409를 준다. 커밋 0건이며 다른 종류는 계속 본다.
+        end = list_pages(
+            gateway,
+            self._paths.commits,
+            self._limits.max_commits,
+            take,
+            allow_empty_repository=True,
+        )
         if end.more_beyond_range:
             data.limit(
                 "COMMIT",

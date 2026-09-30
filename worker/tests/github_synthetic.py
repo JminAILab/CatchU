@@ -187,6 +187,17 @@ def repository_json(
     }
 
 
+# GitHub가 빈 Git 저장소의 커밋 목록에 주는 문구.
+EMPTY_REPOSITORY_MESSAGE = "Git Repository is empty."
+
+
+def empty_repository(message: str = EMPTY_REPOSITORY_MESSAGE) -> HttpResponse:
+    """빈 Git 저장소의 커밋 목록 응답(409). 문구를 바꾸면 다른 충돌 응답이다."""
+    return respond(
+        {"message": message, "documentation_url": f"{EVIL}/docs"}, status=409
+    )
+
+
 def commit_json(
     number: int,
     author: GitHubAccount | None,

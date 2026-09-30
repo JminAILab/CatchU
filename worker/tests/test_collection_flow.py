@@ -28,6 +28,7 @@ from github_synthetic import (
     StaticSelections,
     commit_detail_json,
     commit_json,
+    empty_repository,
     file_json,
     issue_json,
     oversized,
@@ -375,6 +376,29 @@ def test_normal_collection_without_records_is_empty_not_failed() -> None:
     assert outcome.completed
     assert (outcome.failures, outcome.coverage_limits) == ((), ())
     assert _compose(outcome, with_candidate=False)["outcome"] == "EMPTY"
+
+
+def test_empty_git_repository_is_zero_commits_and_other_types_continue() -> None:
+    routes: dict[str, Reply] = {
+        BASE: respond(repository_json()),
+        f"{BASE}/commits?per_page=100&page=1": empty_repository(),
+        PULLS: respond([]),
+        ISSUES: respond([issue_json(20, MEMBER)]),
+    }
+
+    outcome, transport = _run(routes)
+
+    # 빈 저장소 응답은 수집 실패도 한계도 아니다. 뒤의 PR·이슈 목록을 계속 부른다.
+    assert outcome.completed
+    assert (outcome.failures, outcome.coverage_limits) == ((), ())
+    assert transport.paths == [
+        BASE,
+        f"{BASE}/commits?per_page=100&page=1",
+        PULLS,
+        ISSUES,
+    ]
+    assert outcome.commits == ()
+    assert [issue.number for issue in outcome.issues] == [20]
 
 
 @pytest.mark.parametrize(

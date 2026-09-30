@@ -24,6 +24,7 @@ from github_synthetic import (
     commit_detail_json,
     commit_json,
     credential_context,
+    empty_repository,
     file_json,
     issue_json,
     pull_json,
@@ -49,6 +50,7 @@ from app.collection.failures import CollectionStopped
 from app.collection.gateway import GitHubGateway, has_next_page
 from app.collection.transport import HttpResponse, TransportError, TransportTimeout
 
+COMMITS = f"{BASE}/commits?per_page=100&page=1"
 PULLS = f"{BASE}/pulls?state=all&sort=created&direction=desc&per_page=100&page=1"
 ISSUES = f"{BASE}/issues?state=all&sort=created&direction=desc&per_page=100&page=1"
 
@@ -188,6 +190,73 @@ def test_failed_call_stops_without_retry_and_keeps_collected_records(
     limits = {(limit.resource_type, limit.message) for limit in outcome.coverage_limits}
     assert ("PULL_REQUEST", "수집이 멈춰 PR 목록을 확인하지 못했다") in limits
     assert ("ISSUE", "수집이 멈춰 이슈 목록을 확인하지 못했다") in limits
+
+
+@pytest.mark.parametrize(
+    ("route", "reply", "code"),
+    [
+        # 빈 저장소가 아닌 충돌, 문구가 다른 409, 본문을 읽을 수 없는 409.
+        (COMMITS, status_only(409), FailureCode.COLLECTION_FETCH_FAILED),
+        (
+            COMMITS,
+            empty_repository("Git Repository is empty"),
+            FailureCode.COLLECTION_FETCH_FAILED,
+        ),
+        (
+            COMMITS,
+            HttpResponse(409, {}, b"Git Repository is empty.", 24),
+            FailureCode.COLLECTION_FETCH_FAILED,
+        ),
+        (
+            COMMITS,
+            HttpResponse(409, {}, None, 0),
+            FailureCode.COLLECTION_FETCH_FAILED,
+        ),
+        # 빈 저장소 응답을 받는 곳은 커밋 목록뿐이다.
+        (PULLS, empty_repository(), FailureCode.COLLECTION_FETCH_FAILED),
+        (ISSUES, empty_repository(), FailureCode.COLLECTION_FETCH_FAILED),
+        # 커밋 목록의 다른 실패 응답은 그대로다.
+        (COMMITS, status_only(429), FailureCode.RATE_LIMITED),
+        (
+            COMMITS,
+            status_only(403, {"x-ratelimit-remaining": "0"}),
+            FailureCode.RATE_LIMITED,
+        ),
+        (COMMITS, status_only(403), FailureCode.REPOSITORY_UNREACHABLE),
+        (COMMITS, status_only(500), FailureCode.COLLECTION_FETCH_FAILED),
+        (COMMITS, status_only(503), FailureCode.COLLECTION_FETCH_FAILED),
+        (
+            COMMITS,
+            TransportTimeout("합성 시간 초과"),
+            FailureCode.COLLECTION_FETCH_FAILED,
+        ),
+    ],
+)
+def test_other_conflicts_and_failures_still_stop_collection(
+    route: str, reply: Reply, code: FailureCode
+) -> None:
+    routes = standard_routes()
+    routes[route] = reply
+
+    outcome, transport = _run(routes)
+
+    assert _codes(outcome) == [code]
+    assert transport.paths[-1] == route
+    assert transport.paths.count(route) == 1
+
+
+def test_empty_repository_reply_after_the_first_commit_page_still_stops() -> None:
+    # 앞쪽에 커밋이 있었으면 빈 저장소가 아니다.
+    routes = standard_routes()
+    routes[COMMITS] = respond(
+        [commit_json(100 + n, MEMBER) for n in range(100)], next_page=True
+    )
+    routes[f"{BASE}/commits?per_page=100&page=2"] = empty_repository()
+
+    outcome, _ = _run(routes)
+
+    assert _codes(outcome) == [FailureCode.COLLECTION_FETCH_FAILED]
+    assert len(outcome.commits) == 100
 
 
 def test_malformed_response_stops_collection() -> None:

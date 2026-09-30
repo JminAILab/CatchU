@@ -60,6 +60,21 @@ def has_next_page(link_header: str | None) -> bool:
     return False
 
 
+# GitHub가 빈 Git 저장소의 커밋 목록에 409와 함께 주는 문구.
+EMPTY_REPOSITORY_MESSAGE = "Git Repository is empty."
+
+
+def is_empty_repository(response: HttpResponse) -> bool:
+    """빈 Git 저장소라는 409 응답인가. 문구가 다르거나 본문을 읽을 수 없으면 아니다."""
+    if response.status != 409 or response.body is None:
+        return False
+    try:
+        data = json.loads(response.body)
+    except (ValueError, RecursionError):
+        return False
+    return isinstance(data, dict) and data.get("message") == EMPTY_REPOSITORY_MESSAGE
+
+
 def failure_for(response: HttpResponse) -> CollectionFailure | None:
     """성공(200)이 아닌 응답의 실패. 원인이 다른 응답은 다른 코드로 둔다."""
     status, headers = response.status, response.headers
@@ -120,7 +135,10 @@ class GitHubGateway:
         self._clock = clock
         self._limits = limits
 
-    def get(self, path: ApiPath) -> Fetched | Oversized:
+    def get(
+        self, path: ApiPath, *, allow_empty_repository: bool = False
+    ) -> Fetched | Oversized:
+        """allow_empty_repository면 빈 Git 저장소 응답을 실패가 아닌 빈 목록으로 돌려준다."""
         if self._token is None:
             raise RuntimeError("닫힌 수집 연결")
         if self._clock() >= self._expires_at:
@@ -158,6 +176,8 @@ class GitHubGateway:
             ) from None
         self._budget.add_received(response.received_bytes)
         self._budget.raise_if_past_deadline()
+        if allow_empty_repository and is_empty_repository(response):
+            return Fetched([], has_next_page=False)
         failure = failure_for(response)
         if failure is not None:
             raise CollectionStopped(failure)
