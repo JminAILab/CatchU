@@ -103,12 +103,12 @@ rules:
     violation: "409 LINK_LIMIT_REACHED/LINK_TITLE_CONFLICT; 중단/만료된 링크는 검사 집합에서 제외; 중단 PUT의 타인·없는 링크는 404 RESOURCE_UNAVAILABLE이고 403·409를 쓰지 않음"
     source: ["FR4.3","FR4.4"]
   - id: BR2.13
-    statement: "없는 링크·중단·만료는 공통 안내하고 비밀번호 분기는 유지한다"
+    statement: "없는 링크·중단·만료는 공통 안내하고 비밀번호 분기와 시도 제한을 유지한다"
     category: authorization
     applies_to: ["ShareLink"]
     trigger: "모든 수신자 조회/unlock"
-    logic: "IF 링크 불가면 먼저 공통 404; 유효 링크이면 비밀번호/grant 검사 후 현재 자료 확인"
-    violation: "404 LINK_UNAVAILABLE, 비밀번호 401 LINK_PASSWORD_REQUIRED/INVALID; grant만으로 중단/만료 우회 금지"
+    logic: "IF 링크 불가면 먼저 공통 404; 유효 링크이면 unlock 시도 제한을 먼저 확인하고 차단 중이면 비밀번호를 검사하지 않고 거부; 차단이 아니면 비밀번호/grant 검사 후 현재 자료 확인"
+    violation: "404 LINK_UNAVAILABLE, 비밀번호 401 LINK_PASSWORD_REQUIRED/INVALID, 차단 429 LINK_UNLOCK_LIMITED(남은 초는 Retry-After 헤더); grant만으로 중단/만료 우회 금지"
     source: ["FR3.2","FR4.2","FR4.4","FR4.5"]
   - id: BR2.14
     statement: "재전송 안전성과 응답 경계를 지킨다"

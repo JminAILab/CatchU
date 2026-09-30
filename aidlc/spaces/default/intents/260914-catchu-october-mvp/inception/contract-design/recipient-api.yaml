@@ -21,6 +21,7 @@ paths:
         "400": {"$ref":"./common.yaml#/components/responses/Error400"}
         "401": {"$ref":"./common.yaml#/components/responses/Error401"}
         "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "429": {"$ref":"./common.yaml#/components/responses/Error429"}
         "500": {"$ref":"./common.yaml#/components/responses/Error500"}
   "/public/links/{token}":
     parameters: [{"name":"token","in":"path","required":true,"schema":{"type":"string","minLength":1}}]
