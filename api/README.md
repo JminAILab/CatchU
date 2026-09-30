@@ -207,6 +207,7 @@ DB를 쓰는 테스트를 추가할 때:
 | `src/health/health.controller.ts`       | `GET /health` 응답                                 |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
 | `src/auth/access-token.guard.ts`       | Bearer 토큰 검증 후 요청에 인증 회원 정보 저장 |
+| `src/auth/dev-login.guard.ts` / `dev-login.dto.ts` | 개발 로그인 실행 제한을 먼저 검사하고 기존 회원 ID 조건·추가 필드를 공통 입력 검증에 연결 |
 | `src/auth/auth.decorators.ts`          | `@CurrentMemberId()` 접근자와 `@Public()` 제외 표시 |
 | `src/auth/access-token.service.ts`     | JWT 서명·검증과 필수 claim 검사. 기능 코드와 분리 |
 | `src/auth/auth.config.ts`              | 인증 환경설정 검증. 기본 키 없음, 운영 개발 로그인 차단 |
@@ -329,11 +330,18 @@ async save(manager: EntityManager, input: Input): Promise<void> {
 
 ## 인증 기반 사용과 후속 경계 — #87
 
-작업 브랜치는 `api/auth-foundation`, 구현 시작 기준은 `origin/dev`의 `9b67570a0e220a81de2e33f8a8deabb3b8e5d34e`다. 앞의 초기화 기준은 #83의 과거 기록이며 이번 인증 작업 기준과 구분한다.
+초기 인증 기반의 작업 브랜치는 `api/auth-foundation`, 구현 시작 기준은 `origin/dev`의 `9b67570a0e220a81de2e33f8a8deabb3b8e5d34e`다. 앞의 초기화 기준은 #83의 과거 기록이다. 아래 공통 오류 연결은 #132 병합 후 #87의 후속 보완이며, 기존 날짜별 검증 기록과 구분한다.
 
-기준은 [회원 인증 계약 M](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)과 [#87의 #104 경계 안내](https://github.com/JminAILab/CatchU/issues/87#issuecomment-5815415143)다. `Authorization: Bearer <CatchU Access JWT>`를 검증해 회원 ID를 요청 내부에 저장한다. 현재 토큰 없음·잘못된 서명·만료·필수 식별 값 누락은 일반 NestJS `UnauthorizedException`을 던지며, #88 필터가 모두 `401 AUTH_REQUIRED` 형식으로 응답한다.
+기준은 [회원 인증 계약 M](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)과 [#87의 #104 경계 안내](https://github.com/JminAILab/CatchU/issues/87#issuecomment-5815415143)다. `Authorization: Bearer <CatchU Access JWT>`를 검증해 회원 ID를 요청 내부에 저장한다. 인증 코드는 [#88의 공통 예외 사용법](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5863346290)에 따라 `ApiError`를 던지고 기존 전역 필터가 응답 형식·상태·`no-store`를 적용한다.
 
-토큰 없음 `AUTH_REQUIRED`와 변조·만료 `AUTH_INVALID`의 구분은 #87 후속 작업이다. 개발 로그인의 추가 필드를 `VALIDATION_FAILED`로 구분하는 작업도 #87에 남는다. #88은 기존 인증 동작을 유지하며 공통 응답 형식과 `/v1` 경로 연결을 검사한다. 아래 날짜별 과거 검증 기록은 당시 상태를 나타낸다.
+| 상황 | 현재 응답 |
+| --- | --- |
+| Authorization 헤더 없음 | `401 AUTH_REQUIRED` |
+| 헤더는 있으나 빈 값·Basic 방식·빈 Bearer·공백/쉼표로 잘못 구성된 Bearer | `401 AUTH_INVALID` |
+| JWT 형식·서명·만료·발급자/대상·필수 회원 식별 값 오류 | `401 AUTH_INVALID` |
+| 개발 로그인 회원 ID 오류·추가 필드 | `400 VALIDATION_FAILED`, `details.violations=[{field,reason}]` |
+
+인증 오류의 응답·로그에 토큰이나 JWT 라이브러리의 원문 오류를 전달하지 않는다. 헤더 형식 오류의 세부 코드는 기존 명세에 없었던 경계로, 이번 후속 작업에서 사용자 확인을 받아 위처럼 구현했으며 PR의 연결 검토 대상이다. 개발 로그인 입력 검증은 기존 전역 ValidationPipe를 재사용한다. `memberId` 조건 위반의 reason은 `isMemberId`, 추가 필드는 `whitelistValidation`이며 입력값을 담지 않는다. 아래 날짜별 과거 검증 기록은 당시 상태를 나타낸다.
 
 기능 컨트롤러에는 Guard를 다시 붙일 필요가 없다. `@CurrentMemberId()`만 사용하며 JWT claim, 개발 로그인 플래그, 요청 body/query의 회원 ID에 의존하지 않는다. 이 인증 통과는 회원 행의 존재, GitHub 연동, 분석 동의, 자원 소유권을 보장하지 않는다. 각 후속 기능에서 해당 계약에 따른 검사가 필요하다.
 
@@ -351,7 +359,11 @@ export class ExamplePublicController {
 }
 ```
 
-개발 전용 `POST /v1/auth/dev-login`은 JSON `{ "memberId": "검토용-회원-ID" }` 하나만 받아 `accessToken`, `tokenType: "Bearer"`, `expiresIn`(초)을 반환한다. 비어 있거나 공백인 ID·다른 타입·추가 필드는 현재 `400 INVALID_REQUEST`다. 기본 비활성 및 `NODE_ENV=production`에서는 `403 INTERNAL_ERROR`이며 토큰을 발급하지 않는다. 설정 변경은 서버 재시작 후 반영된다. 공개 경로 표시가 있어도 이 개발 로그인 차단 조건을 먼저 검사한다.
+개발 전용 `POST /v1/auth/dev-login`은 JSON `{ "memberId": "검토용-회원-ID" }` 하나만 받아 `accessToken`, `tokenType: "Bearer"`, `expiresIn`(초)을 반환한다. 회원 ID는 비어 있지 않고 앞뒤 공백이 없는 문자열이어야 하며, 임의로 trim하거나 다른 타입을 문자열로 바꾸지 않는다. 누락·빈 값·앞뒤 공백·다른 타입·추가 필드는 `400 VALIDATION_FAILED`와 위반 필드/규칙으로 응답한다. JSON 해석 단계의 오류는 기존 공통 처리인 `400 INVALID_REQUEST`를 유지한다.
+
+기본 비활성 및 `NODE_ENV=production`에서는 입력 DTO 검사보다 먼저 `403 INTERNAL_ERROR`로 거부하며 토큰을 발급하지 않는다. 설정 변경은 서버 재시작 후 반영된다. 이는 [9/28 팀장 결정](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5861430583)의 코드 없는 403 처리이며, 개발 로그인 전용 거부 코드는 [기존 협의 항목](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5863346527)으로 남아 있다. 새 오류 코드를 추가하거나 전용 코드 합의가 끝난 것으로 취급하지 않는다.
+
+개발 로그인 Guard는 실행 제한 확인 후, DTO 변환기가 제거하는 `constructor`·`__proto__` 입력도 추가 필드 오류로 거부한다. 그 밖의 필드 검증은 기존 전역 ValidationPipe가 담당한다.
 
 현재 내부 토큰 구현은 HS256, 발급자 `catchu-api`, 대상 `catchu-member-api`, `sub` 회원 ID와 `iat`·`exp`를 서명·검증한다. 서명 알고리즘을 제한하고 비어 있는/공백 회원 ID, 누락된 만료·발급 시각, 잘못된 대상·발급자도 거부한다. 이는 #87 개발 기반의 내부 형식이며 기능 코드의 의존 대상이나 실제 OAuth 발급 계약이 아니다. 토큰 원문과 검증 라이브러리의 상세 오류는 로그·오류 응답에 포함하지 않는다.
 

@@ -1,5 +1,6 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { jwtVerify, SignJWT } from 'jose';
+import { ApiError } from '../common/errors';
 import { AUTH_CONFIG, AuthConfig } from './auth.config';
 
 // #87 내부 토큰 형식. 기능 코드는 이 값이나 JWT claim에 의존하지 않는다.
@@ -15,7 +16,7 @@ export class AccessTokenService {
   constructor(@Inject(AUTH_CONFIG) private readonly config: AuthConfig) {}
 
   async issue(memberId: string) {
-    if (!isMemberId(memberId)) throw new UnauthorizedException();
+    if (!isMemberId(memberId)) throw new ApiError('AUTH_INVALID');
     const issuedAt = Math.floor(Date.now() / 1000);
     const accessToken = await new SignJWT({})
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
@@ -40,12 +41,12 @@ export class AccessTokenService {
       if (!isMemberId(payload.sub) || !Number.isSafeInteger(payload.iat) ||
           !Number.isSafeInteger(payload.exp) || payload.iat! > Math.floor(Date.now() / 1000) ||
           payload.exp! <= payload.iat!) {
-        throw new UnauthorizedException();
+        throw new ApiError('AUTH_INVALID');
       }
       return payload.sub;
     } catch {
       // 라이브러리 오류, 헤더, 토큰을 응답이나 로그에 전달하지 않는다.
-      throw new UnauthorizedException();
+      throw new ApiError('AUTH_INVALID');
     }
   }
 }
