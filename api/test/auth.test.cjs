@@ -24,7 +24,7 @@ class ProbeModule {}
 Module({ imports: [AppModule], controllers: [ProbeController] })(ProbeModule);
 
 async function start(t, overrides = {}) {
-  const envKeys = ['AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV'];
+  const envKeys = ['AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'SHARE_LINK_WEB_BASE_URL'];
   const before = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
   const secret = randomBytes(32).toString('hex');
   const settings = {
@@ -168,7 +168,8 @@ for (const [label, overrides] of [
   ['설정 없음', { DEV_LOGIN_ENABLED: undefined }],
   ['명시적 비활성', { DEV_LOGIN_ENABLED: 'false' }],
   ['정확한 true가 아닌 값', { DEV_LOGIN_ENABLED: '1' }],
-  ['운영 환경에서 활성화 요청', { NODE_ENV: 'production' }],
+  // production은 공유 URL 주소가 필수(#147)라 합성 주소를 함께 준다.
+  ['운영 환경에서 활성화 요청', { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example' }],
 ]) {
   test(`개발 로그인 거부: ${label}`, async (t) => {
     const server = await start(t, overrides);

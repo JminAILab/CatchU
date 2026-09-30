@@ -4,38 +4,44 @@ export interface ShareCreateInput {
 }
 
 export interface ShareCreateViolation {
-  field: 'body' | 'title' | 'password';
-  reason: string;
+  field: string;
+  /** 위반한 규칙 이름. 공통 ValidationPipe와 같은 방식이며 입력값을 담지 않는다. */
+  reason: 'isObject' | 'whitelistValidation' | 'isString' | 'isNotEmpty';
 }
 
 export type ShareCreateValidation =
   | { valid: true; value: ShareCreateInput }
   | { valid: false; violations: ShareCreateViolation[] };
 
-// HTTP 오류 매핑은 #88의 공통 경계에서 수행한다. 입력값은 오류에 포함하지 않는다.
+// 400 VALIDATION_FAILED의 details.violations로 그대로 쓴다. 입력값은 오류에 포함하지 않는다.
 export function validateShareCreate(body: unknown): ShareCreateValidation {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-    return { valid: false, violations: [{ field: 'body', reason: '객체가 필요합니다.' }] };
+    return { valid: false, violations: [{ field: 'body', reason: 'isObject' }] };
   }
 
   const input = body as Record<string, unknown>;
   const violations: ShareCreateViolation[] = [];
+  // 임의 필드 이름은 응답에 반사하지 않고 body 한 건으로 알린다.
   if (Object.keys(input).some((key) => key !== 'title' && key !== 'password')) {
-    violations.push({ field: 'body', reason: '허용되지 않은 필드가 있습니다.' });
+    violations.push({ field: 'body', reason: 'whitelistValidation' });
   }
-  const title = typeof input.title === 'string' ? input.title.trim() : '';
-  if (title.length === 0) {
-    violations.push({ field: 'title', reason: '공백이 아닌 제목을 입력해 주세요.' });
+  if (typeof input.title !== 'string') {
+    violations.push({ field: 'title', reason: 'isString' });
+  } else if (input.title.trim().length === 0) {
+    violations.push({ field: 'title', reason: 'isNotEmpty' });
   }
   const hasPassword = Object.hasOwn(input, 'password');
-  if (hasPassword && (typeof input.password !== 'string' || input.password.length === 0)) {
-    violations.push({ field: 'password', reason: '비밀번호를 지정하면 비어 있지 않은 문자열이어야 합니다.' });
+  if (hasPassword && typeof input.password !== 'string') {
+    violations.push({ field: 'password', reason: 'isString' });
+  } else if (hasPassword && input.password === '') {
+    violations.push({ field: 'password', reason: 'isNotEmpty' });
   }
   if (violations.length > 0) {
     return { valid: false, violations };
   }
 
   // 계약은 제목만 trim한다. 비밀번호의 공백·대소문자는 그대로 보존한다.
+  const title = (input.title as string).trim();
   return {
     valid: true,
     value: hasPassword ? { title, password: input.password as string } : { title },
