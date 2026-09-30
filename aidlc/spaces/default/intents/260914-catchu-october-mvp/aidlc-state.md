@@ -18,7 +18,7 @@
 - **Depth**: Minimal
 - **Test Strategy**: Standard
 - **Review Override**: 
-- **Change Control**: relaxed (from scope feature)
+- **Guard Policy**: relaxed (from scope feature)
 
 ## Workspace State
 - **Project Root**: .
