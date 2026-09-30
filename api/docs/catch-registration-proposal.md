@@ -1,6 +1,6 @@
 # 분석 결과 → Catch 등록 연결 — #105
 
-> v0.7 · 2026-09-29. B의 저장 구현과 내부 호출 규약. E의 실제 수신·반영 호출부 연결은 별도다.
+> v0.8 · 2026-09-30. B의 저장 구현과 내부 호출 규약. E의 실제 수신·반영 호출부 연결은 별도다.
 
 ## 1. 구현 범위
 
@@ -43,10 +43,12 @@ await dataSource.transaction(async (manager) => {
 3. 같은 owner/workIdentity의 잠금을 작업 키 순으로 잡는다. 제목이나 겹친 근거로 작업 키를 새로 만들지 않는다.
 4. 신규 작업은 전달 순서상 첫 적합 후보의 내용을 저장하고, 이후 같은 작업 후보는 그 Catch를 참조한다. 후보 본문을 합치지 않는다. 저장된 판단에는 적합성 표시와 묶음 근거·한계를 남긴다.
 5. 새 Catch의 확인 두 값·불일치는 false, 공개 상태는 PRIVATE다. 생성 실패/미생성, 원 출처, MOCK/LIVE를 보존한다. 근거와 원 요청 저장소의 보호 판단을 확인한 다음 등록 연결을 저장한다.
-6. 기존 Catch를 참조할 때 본문·근거·원 출처·확인·불일치·공개 상태를 덮어쓰지 않는다. 원 요청 소유자·근거·원 요청 저장소의 보호 판단도 다시 확인한다. 새 요청 저장소의 보호 행으로 대신하지 않는다.
-7. 같은 수신 기록의 재호출도 열람 준비를 다시 검사하고, 저장된 후보 집합과 작업 키가 일치하면 최초 판정(CREATED 포함)을 그대로 반환한다. 일부 후보만 재전달해 기존 연결을 축소하지 않는다. 같은 ID의 다른 원문을 거부하는 fingerprint 검사는 E 책임이다.
+6. 기존 Catch를 참조할 때 원 요청의 저장소와 Catch의 MOCK/LIVE가 이번 요청·시도의 맥락과 같은지 먼저 대조한다. 다르면 `CatchRegistrationContextError('CONTEXT_MISMATCH')`로 전체 반영을 거부한다. 본문·근거·원 출처·확인·불일치·공개 상태를 덮어쓰지 않는다. 원 요청 소유자·근거·원 요청 저장소의 보호 판단도 다시 확인한다. 새 요청 저장소의 보호 행으로 대신하지 않는다.
+7. 같은 수신 기록의 재호출도 저장소·MOCK/LIVE와 열람 준비를 다시 검사하고, 저장된 후보 집합과 작업 키가 일치하면 최초 판정(CREATED 포함)을 그대로 반환한다. 일부 후보만 재전달해 기존 연결을 축소하지 않는다. 같은 ID의 다른 원문을 거부하는 fingerprint 검사는 E 책임이다.
 
 DB의 `(owner_id, work_identity)`, 원 요청·결과·후보 키, `(application_record_id, candidate_id)` 유일성이 최종 중복 방어다. INSERT 충돌은 PostgreSQL을 오류 상태로 만들지 않는 `ON CONFLICT DO NOTHING` 뒤 맥락에 맞는 기존 Catch를 조회한다. 맞는 Catch가 없으면 거부한다. DB 실패를 무시하고 다음 후보를 처리하지 않는다.
+
+저장소·MOCK/LIVE 대조는 잘못된 기존 Catch 연결을 막는 검사다. `workIdentity`는 여전히 불투명한 문자열이며 B가 형식을 강제하거나 다시 계산하지 않는다. 원본·포크를 어떤 작업으로 판별할지와 PR #180의 전체 기준 채택을 이 검사로 결정하지 않는다.
 
 ## 4. 테이블과 적용 순서
 
@@ -75,6 +77,8 @@ A/E 엔티티를 연결하기 전 외부 FK는 마이그레이션에만 있다. 
 
 B의 의도적인 거부에는 고정 reason/field만 넣는다. 후보 원문·ID·URL을 오류 안내에 넣지 않는다. DB 예외 원문에는 query/parameters가 포함될 수 있으므로 외부 응답·로그에 그대로 싣지 않는다. E가 이 내부 타입을 분류·기록하는 연결은 E 호출부에서 검토한다. 새로운 공개 오류 코드가 아니다.
 
+저장소·MOCK/LIVE 불일치도 기존 내부 `CONTEXT_MISMATCH`로 전달한다. 정상 `EXISTING`이나 후보 0건으로 바꾸지 않는다. 묶음 뒤쪽에서 발견해도 이번 Catch·근거·후보 연결과 같은 트랜잭션의 E 완료 기록은 함께 롤백한다. 기존 Catch와 먼저 저장한 수신 결과는 보존하며, 롤백 후 E 실패 기록·복구 연결은 후속 구현에서 확인한다.
+
 같은 결과가 계속 반영 실패할 때의 운영 복구는 미정이며 후보 삭제·원문 수정·자동 재분석으로 해결하지 않는다. B의 receipt 잠금 외에 E가 현재 시도/생성 방식 값을 변경하는 경로를 만들면 공유 잠금 순서와 불변성을 맞춘다. 현재 MVP는 새 요청에 새 시도를 만든다.
 
 ## 6. 검사 실행
@@ -97,10 +101,12 @@ npm test
 
 - [#105](https://github.com/JminAILab/CatchU/issues/105): 등록 함수·원자 저장·중복/실패 검증과 분담.
 - [PR #143 팀장 결정](https://github.com/JminAILab/CatchU/pull/143#issuecomment-5865277945), [E 담당 동의](https://github.com/JminAILab/CatchU/pull/143#issuecomment-5865412468): 빈 후보 거부·전체 롤백·논리 입출력·테이블 분담.
+- [PR #180 B 검토](https://github.com/JminAILab/CatchU/pull/180#pullrequestreview-5360213061), [E 검토](https://github.com/JminAILab/CatchU/pull/180#pullrequestreview-5360422822): 기존 Catch와 새 요청의 저장소·MOCK/LIVE 불일치는 반영을 거부하고 기존 자료·수신 결과를 보존한다. 내부 오류는 이 설명의 기존 타입을 재사용하며 실제 E 처리와 복구는 별도다.
 - [계약 요약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md): B 등록과 E/F 반영 경계.
 - [API 기능 설계](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md), [ERD](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md), [업무 규칙](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md): 원자성·속성·유일성·등록 적합성.
 - [worker 메시지](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml): 입력 후보의 정본.
 
+- v0.8 (2026-09-30): 기존 Catch의 저장소·MOCK/LIVE를 신규 참조·재반영 모두에서 대조하고, 불일치 시 내부 맥락 오류로 전체 반영을 거부한다. 작업 식별값 생성 규칙이나 공개 계약은 바꾸지 않는다.
 - v0.7 (2026-09-29): 본인 조회의 필수 보호 판단을 등록·재호출 준비 검사에도 적용하고, 보호 판단 엔티티·마이그레이션과 최초 공급 조건을 추가했다. 보호 행이 없는데 열람 준비 완료를 반환하던 불일치를 막는다.
 - v0.6 (2026-09-29): B 엔티티·마이그레이션·실제 등록 함수·PostgreSQL 검사 추가. 내부 구현 설명을 실행 코드에 맞추고 실제 E 통합 경계를 유지했다.
 - v0.5 (2026-09-28): 준비 함수 입력 거부 타입과 고정 이유·필드 추가. E 수용·DB 오류 분류·복구는 미결로 유지했다.

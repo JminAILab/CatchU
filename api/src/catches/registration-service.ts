@@ -39,6 +39,7 @@ interface ReceiptContext {
   attempt_id: string;
   result_id: string;
   member_id: string;
+  repository_id: string;
   current_attempt_id: string;
   attempt_request_id: string;
   source_mode: SourceMode;
@@ -54,7 +55,17 @@ function validateContext(input: CatchRegistrationInput): void {
   }
 }
 
-async function assertReady(manager: EntityManager, asset: CatchAssetEntity): Promise<void> {
+async function assertReady(
+  manager: EntityManager, asset: CatchAssetEntity, context: ReceiptContext,
+): Promise<void> {
+  // workIdentity는 해석하지 않는다. 같은 값이라도 저장소/방식이 다르면 참조를 거부한다.
+  const originalRequests: { repository_id: string }[] = await manager.query(`
+    SELECT repository_id FROM analysis_request WHERE request_id = $1
+  `, [asset.sourceRequestId]);
+  if (originalRequests.length !== 1) throw new CatchRegistrationContextError('CATCH_NOT_READY');
+  if (originalRequests[0].repository_id !== context.repository_id || asset.sourceMode !== context.source_mode) {
+    throw new CatchRegistrationContextError('CONTEXT_MISMATCH');
+  }
   // 기존 Catch를 참조해도 새 요청이 아닌 원 요청 저장소의 보호 판단을 확인한다.
   // 본인 열람은 NONE/SOURCE_PRIVATE 모두 허용하며 판단 부재를 NONE으로 채우지 않는다.
   const readiness: { member_id: string; applied_restriction: string }[] = await manager.query(`
@@ -94,7 +105,7 @@ export async function registerCandidates(
   // 같은 수신 기록의 재호출을 직렬화한다. 다른 owner/request로 바꿔 호출해도 거부한다.
   const contexts: ReceiptContext[] = await manager.query(`
     SELECT receipt.request_id, receipt.attempt_id, receipt.result_id,
-           request.member_id, request.current_attempt_id,
+           request.member_id, request.repository_id, request.current_attempt_id,
            attempt.request_id AS attempt_request_id, attempt.source_mode
       FROM result_application_record receipt
       JOIN analysis_request request ON request.request_id = receipt.request_id
@@ -125,7 +136,7 @@ export async function registerCandidates(
       if (!candidate || !asset || candidate.workIdentity !== asset.workIdentity || !registration.ownerViewReady) {
         throw new CatchRegistrationContextError('REGISTRATION_MISMATCH');
       }
-      await assertReady(manager, asset);
+      await assertReady(manager, asset, context);
       results.push({ candidateId: registration.candidateId, catchId: registration.catchId,
         disposition: registration.disposition, ownerViewReady: registration.ownerViewReady });
     }
@@ -163,7 +174,7 @@ export async function registerCandidates(
       // 원 후보 unique 키가 다른 작업과 충돌한 경우 임의의 Catch에 연결하지 않는다.
       if (!asset) throw new CatchRegistrationContextError('REGISTRATION_MISMATCH');
     }
-    await assertReady(manager, asset);
+    await assertReady(manager, asset, context);
     for (const candidate of group.candidates) {
       const disposition = candidate.candidateId === createdCandidateId ? 'CREATED' : 'EXISTING';
       await registrations.insert({
