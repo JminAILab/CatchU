@@ -18,7 +18,7 @@ export type RepositoryManagementBindings = {
 };
 
 type Props = {
-  /** 인증된 회원이 바뀌면 부모는 이 컴포넌트도 새 key로 마운트한다. */
+  /** AssetsMemberBoundary 안에 조립해 회원 전환 때 이 컴포넌트도 새로 마운트한다. */
   api: CatchApi;
   repositories: readonly RepositoryOption[];
   repositoryManagement: (bindings: RepositoryManagementBindings) => ReactNode;

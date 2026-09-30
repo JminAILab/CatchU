@@ -43,7 +43,7 @@ B 담당의 화면을 서버 연결 전에 검토하는 개발용 미리보기�
 
 ## 목록 API 연결 구성 (#168)
 
-`AssetsConnected`는 #106의 인증 가드 안에 넣는 화면이다. 로그인·토큰 저장·제품 경로는 이 기능에서 만들지 않는다. 회원이 바뀌거나 로그아웃하면 부모가 화면을 해제하고 새 회원은 새 `key`로 마운트해야 한다. `api` 인스턴스는 렌더마다 새로 만들지 않는다.
+`AssetsConnected`는 #106의 인증 가드 안에 넣는 화면이다. 로그인·토큰 저장·제품 경로는 이 기능에서 만들지 않는다. 회원이 바뀌거나 로그아웃하면 `AssetsMemberBoundary`로 화면을 해제하고 새 회원은 새 세대로 마운트한다(아래 연결 방법). `api` 인스턴스는 렌더마다 새로 만들지 않는다.
 
 - `createCatchApi(transport)`: transport는 `/catches` 상대 경로와 method/body/signal/cache를 받아 공통 `ApiResult`를 반환한다. #106이 API 기준 주소·`/v1`·Bearer·401 인증 만료를 처리하고, `readApiResponse`로 응답을 해석한다. PUT의 객체 body는 transport에서 JSON으로 직렬화한다.
 - `AssetsConnected`: `repositoryId`·`catchId`를 주소와 맞추며 필터 변경과 뒤로 가기 때 다시 조회한다. 목록에 아직 없는 Catch도 별도 상세 GET으로 연다. 저장소 이름은 Catch 데이터에 없으므로 `repositories`로 공급한다. 이름이 준비되지 않았다고 서버가 반환한 Catch를 숨기지 않는다.
@@ -72,3 +72,24 @@ CatchActions는 작업 사실·기여를 각각 체크한 뒤 confirmation을 �
 배포용 미리보기 차단은 빌드 후 `node scripts/catches-preview-smoke.mjs`로 재현한다(PORT 기본 3119). 전용 서버를 띄워 두 미리보기 경로의 404를 확인하고 검사 프로세스만 종료한다.
 
 실제 회원 페이지 조립·공통 조회 컴포넌트 적용·준비 중 탭의 제품 URL 반영은 #106과 검토한다.
+
+## 회원 전환 경계 (#169)
+
+`AssetsMemberBoundary`는 #106 회원 가드 안에서 B 화면을 감싸는 연결 부품이다. 공통 토큰 저장소의 `get()`·`subscribe()`를 받아 토큰이 없으면 자식을 표시하지 않고, 토큰이 바뀌면 하위 화면을 새로 마운트한다. 토큰은 React key·DOM·URL·영구 저장소에 넣지 않고 메모리에서 변경 여부만 비교한다. 같은 토큰의 중복 설정은 화면을 초기화하지 않는다. 토큰 갱신도 안전하게 새 세션으로 취급한다.
+
+아래는 공통 인증 PR #185의 `accessTokenStore`·`api.member`를 사용하는 **클라이언트 컴포넌트의 조립 예시**다. 이 PR에서 로그인 코드나 제품 `/assets` 경로를 추가하지 않는다.
+
+```tsx
+const catches = createCatchApi(api.member); // 모듈 수준의 안정적인 인스턴스
+
+<MemberGuard>
+  <AssetsMemberBoundary tokens={accessTokenStore}>
+    <MemberAssets />
+  </AssetsMemberBoundary>
+</MemberGuard>
+```
+
+`MemberAssets` 안에서 회원별 저장소 자료를 조회하고 `AssetsConnected`와 D 슬롯을 함께 조립한다. 회원별 자료를 경계 밖 부모에 저장해 이전 회원의 props를 다시 전달하면 안 된다. 외부 캐시를 쓰는 경우에도 회원 단위 분리·해제는 별도로 필요하다. 로그인 이동·401 토큰 제거는 공통 가드·API 클라이언트 책임이며 이 경계는 인증 권한을 판정하지 않는다.
+
+화면 해제는 이미 보낸 PUT의 서버 처리를 취소한다는 뜻이 아니다. 기존 `assets-store.dispose()`가 늦은 GET/PUT 응답을 버리며 새 화면은 새 store로 조회한다. 로그인 복귀만으로 확인·불일치·공개·숨김 요청을 다시 보내지 않는다.
+검사 범위: `npm test`의 회원 경계 8개 사례는 세대 변경·구독 해제와 store 생명주기를 검사한다. React 재마운트·공통 인증 연결은 별도로 PR #185 `6302c2f`의 토큰 저장소·API 클라이언트를 임시 페이지에 넣고 모의 HTTP로 확인했다. 이전 회원의 지연 GET/PUT 전달, 이전 회원의 늦은 401, 현재 회원 401의 화면 제거, 재로그인 후 PUT 횟수 유지가 통과했다. 검사 중 토큰·회원·Catch는 모두 합성이고 실제 Google 로그인·API·DB·D 모달 연결 증거는 아니다. 임시 페이지와 공통 인증 복사본은 커밋하지 않았다. 제품 조립 후 같은 시나리오를 실제 개발 로그인·B API와 다시 확인해야 한다.
