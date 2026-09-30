@@ -513,6 +513,42 @@ ShareLink 생성 마이그레이션과 `idempotency_record.link_id → share_lin
 
 다른 담당자의 실제 E 접수/C 발급·B 등록·worker·OAuth 통합과 사람 리뷰는 자동 검사 통과로 대신하지 않는다.
 
+## E 수신 기록과 Catch 반영 연결 — #105
+
+`src/result-application/`은 수신 이후의 내부 반영 서비스다. `ResultApplicationRecord`는 UUID 수신 기록 ID·요청/시도 ID, 외부 결과 ID(text), SHA-256 지문, 수신 시각만 저장한다. F 결과 원문이나 비밀값은 저장하지 않는다. 시도당 수신 하나, 요청/시도/결과 유일성, 시도와 요청의 복합 FK를 적용한다.
+
+### 적용 순서와 작업 판본
+
+마이그레이션은 `1790500000000`의 #104 회원·분석 기반 → `1790550000000`의 E 수신 기록 → `1790600000000`의 B Catch·근거·후보 연결 → `1790601000000`의 보호 판단 순서다. 되돌리기는 역순이며 E의 down은 E 테이블만 삭제한다. B의 후보 연결은 실제 E 수신 기록 UUID를 참조한다.
+
+이번 로컬 작업은 미병합 [PR #143의 16302527450a43bf9e6a24b7cad69dd6c199d696](https://github.com/JminAILab/CatchU/commit/16302527450a43bf9e6a24b7cad69dd6c199d696)을 선행 판본으로 사용한다. 그 판본의 B 코드·마이그레이션·시험 helper는 E 구현 변경이 아니다. #184 기반은 해당 판본에 포함돼 있다. 향후 E 테이블 선반영 PR과 B 등록/E 호출부 연결 PR을 나눌 수 있으나, 별도 PR 구성·병합 순서 합의가 완료됐다고 기록하지 않는다. E 테이블만 제공할 때는 엔티티·마이그레이션만 분리하며 B를 import하는 호출부는 B 제공 이후에 적용한다.
+
+### 호출과 오류 처리
+
+```ts
+import { ResultApplicationService } from './result-application/result-application.service';
+
+// #139 어댑터가 수신 기록을 별도 트랜잭션으로 저장·커밋한 뒤 전달할 accepted 값.
+// 이 작업은 그 실제 수신 어댑터를 제공하지 않는다.
+const applied = await new ResultApplicationService(dataSource).apply(accepted);
+// 이 시점은 B 저장과 E 완료 상태의 최종 커밋 이후다.
+// applied.registeredCatchIds / ownerResultsReady / registrations를 내부 호출부에서 사용한다.
+```
+
+E는 READ COMMITTED 트랜잭션에서 요청 → 현재 시도 → 수신 기록 순서로 잠근다. 저장된 수신 지문을 기존 #164의 `resultFingerprint`로 대조하고 회원·저장소·시도·동의·허용 범위 판본·자료 모드·종결 상태를 확인한다. 입력은 첫 await 전에 복제한다. B의 `registerCandidates`에 같은 EntityManager를 전달하고, 모든 후보의 반환값과 실제 후보 연결이 일치할 때만 APPLIED/CLOSED를 기록한다. 등록 ID는 후보 연결의 서로 다른 Catch ID로 유도한다. 본인 열람 준비는 B가 준비됐다고 반환한 등록이 있을 때만 true이며, 정상 0건/실패 결과의 APPLIED가 열람 준비 true를 뜻하지 않는다. 부분 실패의 처리 종결값과 failures도 그대로 유지한다.
+
+보호 판단은 B가 현재 회원·원 저장소에 대해 조회한다. E는 판단을 새로 공급하거나 누락을 NONE으로 채우지 않는다. 등록 거부는 기존 `CatchRegistrationInputError`/`CatchRegistrationContextError`, DB 오류는 기존 QueryFailedError 등 원래 타입으로 전달하며 공개 API 오류 코드를 추가하지 않는다. 일반 공통 필터를 통하는 내부 오류는 안전한 500 응답을 사용한다. 입력·맥락 거부를 정상 0건으로 바꾸지 않는다.
+
+저장 중/커밋 오류는 B 저장·E 완료 변경을 전부 롤백하고, 앞서 커밋한 수신 기록과 기존 Catch를 보존한다. 롤백 후 별도 트랜잭션에서 같은 결과·현재 시도이고 아직 ACTIVE/미반영일 때만 APPLY_FAILED와 고정 실패 분류를 기록한다. B 입력·맥락 오류는 기존 reason, QueryFailedError는 STORAGE_UNAVAILABLE, 그 밖의 오류는 APPLICATION_FAILED로 구분하는 내부 기록이며 새 공개 오류 계약이 아니다. 일반 오류를 DB 장애나 등록 부적합으로 단정하지 않는다. 뒤늦은 실패는 APPLIED/CLOSED 또는 다른 현재 시도를 덮어쓰지 않는다. 실패 기록도 실패하면 `ApplicationFailureRecordingError`에 두 내부 오류를 보존해 호출자에게 전달한다. 후보 원문·DB 오류 원문을 실패 안내에 넣지 않으며 이를 그대로 응답/로그에 직렬화하지 않는다.
+
+같은 결과의 명시적 재반영은 저장된 후보 연결을 재사용해 Catch ID를 유지한다. APPLY_FAILED 재진입은 같은 결과 반영 복구이며 새 분석 실행이 아니다. 이 서비스는 자동 재시도·복구 스케줄러를 제공하지 않는다. 반복 실패의 복구 정책, 보호 판단 최초 공급, 결과 원문 보존/재전달은 후속 연결 사항이다.
+
+### 검사와 #139 후속 연결
+
+전용 `_test` DB에서 `npm test -- test/db/result-application.test.cjs`를 실행한다. 실제 #104·E·B 마이그레이션을 적용하며 #103 공용 결과로 정상·0건·부분 실패·실패, 동일 작업/결과 재반영·동시 반영, 중간 저장/커밋 실패·전체 롤백·수신 보존, 실패 기록 자체의 실패와 뒤늦은 실패 방지를 검사한다. 수신 기록과 명시적 보호 관찰은 시험 준비 단계에서 넣는다. 기존 B 검사의 SQL E 대역은 그대로 보존하고 신규 검사와 구분한다. 실제 수신부터 등록까지의 전체 연결 검증이 아니다.
+
+#139는 기존 ReceiverStore의 `saveResult`를 이 엔티티/마이그레이션에 연결해 수신 메타데이터와 PENDING 종결 상태를 별도 커밋해야 한다. 수신 성공 Receipt 반환과 그 뒤 E apply 호출을 분리하고, 진행 이벤트의 수신 관측·실제 접수 맥락 개발 주입은 해당 작업에서 연결한다. 결과 원문은 accepted 또는 합의된 보존 공급자로 전달해야 하며 수신 메타데이터에서 복원할 수 없다. #138 접수·#140 상태 조회·worker/큐·OAuth와 실제 보호 판단 공급은 이번 구현에서 제외한다.
+
 ## 분석 메시지 수신과 개발용 주입 — #139
 
 이 구현은 [#139의 독립 준비 범위](https://github.com/JminAILab/CatchU/issues/139)다. 기준은 [메시지 계약](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml), [수신·상태 전이 정본](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름), [수신 기록 모델](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)이다. 실제 큐/worker 연결이나 HTTP 주입 API를 추가하지 않는다.
