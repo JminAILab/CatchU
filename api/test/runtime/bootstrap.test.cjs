@@ -20,7 +20,24 @@ async function unusedPort() {
   return port;
 }
 
-async function launch(t, { source = false, file = {}, environment = {} } = {}) {
+async function ipv6LoopbackAvailable() {
+  const socket = createServer();
+  try {
+    await new Promise((resolve, reject) => {
+      socket.once('error', reject);
+      socket.listen(0, '::1', resolve);
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (socket.listening) await new Promise((resolve) => socket.close(resolve));
+  }
+}
+
+const urlOf = (address, port) => `http://${address.includes(':') ? `[${address}]` : address}:${port}`;
+
+async function launch(t, { source = false, file = {}, environment = {}, address = '127.0.0.1' } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'catchu-auth-test-'));
   const envPath = join(directory, '.env');
   const secret = randomBytes(32).toString('hex');
@@ -33,7 +50,7 @@ async function launch(t, { source = false, file = {}, environment = {} } = {}) {
       if (child && child.exitCode === null && child.signalCode === null) child.kill();
       if (closed) await closed;
       if (child) {
-        await assert.rejects(fetch(`http://127.0.0.1:${port}/health`, {
+        await assert.rejects(fetch(`${urlOf(address, port)}/health`, {
           signal: AbortSignal.timeout(1000),
         }), '검증용 프로세스 종료 후 포트가 닫혀야 한다');
       }
@@ -49,6 +66,7 @@ async function launch(t, { source = false, file = {}, environment = {} } = {}) {
     DEV_LOGIN_ENABLED: 'true',
     NODE_ENV: 'development',
     PORT: String(port),
+    BIND_HOST: undefined, // 터미널의 값이 섞이지 않게 기본은 두지 않는다
     ...file,
   };
   await writeFile(envPath, Object.entries(settings)
@@ -67,11 +85,11 @@ async function launch(t, { source = false, file = {}, environment = {} } = {}) {
     child.once('error', reject);
     child.once('close', (code) => resolve(code));
   });
-  const request = (path, options = {}) => fetch(`http://127.0.0.1:${port}${path}`, {
+  const request = (path, options = {}) => fetch(`${urlOf(address, port)}${path}`, {
     ...options, signal: AbortSignal.timeout(1000),
   });
   return {
-    request, closed, logs: () => output, secret,
+    request, closed, logs: () => output, secret, port,
     async ready() {
       // 소스 실행은 ts-node가 DB 엔티티와 기능 모듈까지 컴파일한다. 제품 기동 SLA 검사가 아니다.
       const deadline = Date.now() + (source ? 10000 : 5000);
@@ -124,6 +142,7 @@ for (const [label, file, expected] of [
   ['수명 누락', { AUTH_ACCESS_TOKEN_TTL_SECONDS: undefined }, 'AUTH_ACCESS_TOKEN_TTL_SECONDS'],
   ['잘못된 수명', { AUTH_ACCESS_TOKEN_TTL_SECONDS: '-1' }, 'AUTH_ACCESS_TOKEN_TTL_SECONDS'],
   ['DB 비밀번호 누락', { DB_PASSWORD: undefined }, 'DB_PASSWORD'],
+  ['바인딩 주소 형식 오류', { BIND_HOST: 'localhost' }, 'BIND_HOST'],
 ]) {
   test(`main: ${label}이면 기동하지 않고 실패 종료한다`, { timeout: 15000 }, async (t) => {
     const server = await launch(t, { file });
@@ -140,3 +159,17 @@ test('main: DB에 접속할 수 없으면 기동하지 않고 DB 안내와 함�
   assert.equal(server.logs().includes(process.env.DB_PASSWORD), false, '로그에 DB 비밀번호가 없다');
   assert.equal(server.logs().includes(server.secret), false);
 });
+
+for (const [label, file, open, other] of [
+  ['BIND_HOST 미설정', {}, '127.0.0.1', '::1'],
+  ['BIND_HOST=::1', { BIND_HOST: '::1' }, '::1', '127.0.0.1'],
+]) {
+  test(`main: ${label}이면 ${open}에서만 응답한다`, { timeout: 15000 }, async (t) => {
+    if (!(await ipv6LoopbackAvailable())) return t.skip('IPv6 루프백(::1)을 쓸 수 없는 환경');
+    const server = await launch(t, { file, address: open });
+    await server.ready();
+    await assert.rejects(fetch(`${urlOf(other, server.port)}/health`, {
+      signal: AbortSignal.timeout(1000),
+    }), `${other}에는 열리지 않아야 한다`);
+  });
+}

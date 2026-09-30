@@ -1,4 +1,5 @@
-import { createParamDecorator, ExecutionContext, SetMetadata, UnauthorizedException } from '@nestjs/common';
+import { createParamDecorator, ExecutionContext, SetMetadata } from '@nestjs/common';
+import { ApiError } from '../common/errors';
 
 export const PUBLIC_ROUTE = Symbol('PUBLIC_ROUTE');
 export const AUTHENTICATED_MEMBER = Symbol('AUTHENTICATED_MEMBER');
@@ -16,7 +17,7 @@ export const CurrentMemberId = createParamDecorator(
   (_data: unknown, context: ExecutionContext): string => {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const member = request[AUTHENTICATED_MEMBER];
-    if (!member) throw new UnauthorizedException();
+    if (!member) throw new ApiError('AUTH_REQUIRED');
     return member.memberId;
   },
 );

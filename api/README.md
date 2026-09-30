@@ -2,7 +2,7 @@
 
 NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준을 확인한다.
 
-현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 저장소 연결 전 독립 로직으로 제공하며 `AppModule`에는 등록하지 않는다. 실제 로그인·기능 테이블(회원 등)·제품 기능·worker 연결은 후속 작업이다.
+현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 저장소 연결 전 독립 로직으로 제공하며 `AppModule`에는 등록하지 않는다. [#104 회원·분석 선행 테이블](https://github.com/JminAILab/CatchU/issues/104)과 개발 회원·합성 연동·공통 멱등 처리를 제공한다. 실제 로그인·기능 API·worker 연결은 후속 작업이다.
 
 ## 공통 오류 처리 — API 명세 v1
 
@@ -86,6 +86,7 @@ npm ci
 | 구분 | 이름   | 기본값 | 의미                             |
 | ---- | ------ | ------ | -------------------------------- |
 | 선택 | `PORT` | `3001` | HTTP 포트. 정수 `1~65535`만 허용 |
+| 선택 | `BIND_HOST` | `127.0.0.1` | HTTP 바인딩 주소. IP 주소만 허용하고 `localhost` 같은 이름은 기동 실패. `0.0.0.0`은 같은 네트워크의 다른 기기에서도 접속되므로 컨테이너 등 필요할 때만 쓴다 |
 | 필수 | `AUTH_JWT_SECRET` | 없음 | 안전한 난수 32바이트를 64자리 hex로 표현한 서명 키. 환경별로 별도 준비 |
 | 필수 | `AUTH_ACCESS_TOKEN_TTL_SECONDS` | 없음 | Access JWT 수명(초). 양의 안전한 정수이며 현재 시각과 합산 가능해야 함 |
 | 선택 | `DEV_LOGIN_ENABLED` | 비활성 | 정확히 `true`일 때만 개발 로그인 활성화 요청 |
@@ -142,7 +143,7 @@ PostgreSQL 주 버전: 로컬·테스트는 `postgres:16`이다. NCP Cloud DB fo
 npm run start:dev
 ```
 
-기본 주소는 `http://127.0.0.1:3001`이다. Node watch가 소스 변경 시 재시작한다. 별도 터미널에서 다음을 실행한다.
+기본 주소는 `http://127.0.0.1:3001`이다(`BIND_HOST`·`PORT`로 바꾼다). Node watch가 소스 변경 시 재시작한다. 별도 터미널에서 다음을 실행한다.
 
 ```powershell
 curl.exe -i http://127.0.0.1:3001/health
@@ -161,6 +162,7 @@ curl.exe -i http://127.0.0.1:3001/health
 | `npm test`          | 빌드 후 테스트 DB에 마이그레이션을 적용하고 `test/**/*.test.cjs`를 한 파일씩 실행. health·인증 HTTP, 실제 main 진입점의 설정 로딩/기동 실패, DB 규약·테스트 DB, 분석 수신·개발 주입 대역 검사. **테스트 DB 필요**(「DB 테스트」). 서버·임시 설정은 검사 후 정리 |
 | `npm run test:analysis-fixtures` | 별도 준비한 #103 공용 합성 자료로 수신 처리 검사. 자료 경로는 아래 #139 절 참고. 자료가 없으면 실패하며 묵시적으로 생략하지 않음 |
 | `npm run build`     | 이전 `dist/`를 지운 뒤 `src/`를 `dist/`로 컴파일. 소스에서 지운 엔티티·마이그레이션이 `dist/`에 남아 탐색되지 않게 한다 |
+| `node --test test/worker-messages.test.cjs` | 빌드 없이 [M1 합성 결과 세트](../worker/fixtures/m1-synthetic/README.md)의 사례·음성 대조가 worker와 같은 스키마 판정을 내는지만 검사. `npm test`에도 포함 |
 | `npm start`         | `dist/main.js` 실행. 먼저 빌드 필요                                                                                  |
 | `npm run migration:run` / `migration:revert` / `migration:generate` | 개발 DB(`.env`의 `DB_*`)에 마이그레이션 적용·마지막 1개 되돌리기·엔티티와의 차이로 새 마이그레이션 생성(「엔티티와 마이그레이션」) |
 
@@ -174,7 +176,7 @@ npm start
 
 빌드 후 실행도 개발 실행과 같은 주소·응답을 확인하고 같은 방법으로 종료한다. 개발 서버와 빌드 서버를 같은 포트에서 동시에 실행하지 않는다. 테스트는 실제 로컬 HTTP와 테스트 DB를 쓰며, 외부 서비스·제품 기능·소유권·worker 연결 검증은 포함하지 않는다. 테스트는 매번 무작위 키를 생성하므로 실제 비밀값이 필요하지 않고, `.env`에서는 `TEST_DB_*`만 읽는다.
 
-[#95 후속 참고](https://github.com/JminAILab/CatchU/pull/95)에 따라 기존 빌드를 유지하면서 하위 폴더까지 테스트 탐색을 확대했다. `test/runtime/bootstrap.test.cjs`는 실제 소스/빌드 진입점을 실행해 env 파일 적용, 터미널의 운영 환경 설정 우선, 필수 인증 설정 누락·공란·잘못된 수명, DB 비밀번호 누락·DB 접속 불가에 따른 실패 종료를 검사한다. 개발 watch의 자동 재시작과 배포 바인딩 변경은 이번 추가 검사 범위가 아니다.
+[#95 후속 참고](https://github.com/JminAILab/CatchU/pull/95)에 따라 기존 빌드를 유지하면서 하위 폴더까지 테스트 탐색을 확대했다. `test/runtime/bootstrap.test.cjs`는 실제 소스/빌드 진입점을 실행해 env 파일 적용, 터미널의 운영 환경 설정 우선, 필수 인증 설정 누락·공란·잘못된 수명, DB 비밀번호 누락·DB 접속 불가에 따른 실패 종료를 검사한다. `BIND_HOST`가 없으면 `127.0.0.1`에만, `::1`로 주면 그 주소에만 열리는지와 IP가 아닌 값의 실패 종료도 검사한다(IPv6 루프백이 없는 환경에서는 두 주소 비교 검사를 건너뛴다). 개발 watch의 자동 재시작은 검사 범위가 아니다.
 
 ## DB 테스트
 
@@ -206,10 +208,11 @@ DB를 쓰는 테스트를 추가할 때:
 | `src/health/health.controller.ts`       | `GET /health` 응답                                 |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
 | `src/auth/access-token.guard.ts`       | Bearer 토큰 검증 후 요청에 인증 회원 정보 저장 |
+| `src/auth/dev-login.guard.ts` / `dev-login.dto.ts` | 개발 로그인 실행 제한을 먼저 검사하고 기존 회원 ID 조건·추가 필드를 공통 입력 검증에 연결 |
 | `src/auth/auth.decorators.ts`          | `@CurrentMemberId()` 접근자와 `@Public()` 제외 표시 |
 | `src/auth/access-token.service.ts`     | JWT 서명·검증과 필수 claim 검사. 기능 코드와 분리 |
 | `src/auth/auth.config.ts`              | 인증 환경설정 검증. 기본 키 없음, 운영 개발 로그인 차단 |
-| `src/auth/dev-login.controller.ts`     | 개발용 토큰 발급. 기본 비활성, 회원 DB 조회 없음 |
+| `src/auth/dev-login.controller.ts`     | 개발 식별 문자열을 회원·기본 프로필에 연결하고 실제 회원 UUID로 토큰 발급. 기본 비활성 |
 | `src/analysis-receiver/analysis-receiver.service.ts` | 진행/결과 수신, 맥락·중복·순서 검사, 커밋 이후 수신 확인 |
 | `src/analysis-receiver/receiver.types.ts` | 메시지 타입과 DB 연결용 `ReceiverStore` 트랜잭션 경계 |
 | `src/analysis-receiver/worker-message.validator.ts` | 계약 YAML에서 한 번 컴파일한 스키마 검사. 입력 보정·외부 참조 다운로드 없음 |
@@ -229,6 +232,8 @@ DB를 쓰는 테스트를 추가할 때:
 | `scripts/clean-dist.cjs`                | `npm run build`의 첫 단계: 이전 빌드 결과 `dist/` 삭제 |
 | `test/support/test-database.cjs`        | 테스트 DB 접속, `_test` 이름 확인, 테스트 사이 자료 초기화 |
 | `test/db/*.test.cjs`                    | DB 규약으로 생성되는 SQL, 시각 왕복, 테스트 DB 격리, 트랜잭션 전달, 재빌드 뒤 지운 마이그레이션 미탐색 검사 |
+| `test/worker-messages.test.cjs`         | M1 합성 결과 세트의 worker 메시지 스키마 v1 판정 검사 |
+| `test/helpers/worker-messages.cjs`      | 테스트 전용 메시지 검사 도우미. 계약 YAML·합성 세트를 원본 경로에서 읽음. 운영 코드에서 쓰지 않음 |
 | `tsconfig.json` / `tsconfig.build.json` | 엄격한 타입 검사, 데코레이터, 빌드 설정            |
 | `eslint.config.mjs`                     | TypeScript·JavaScript 정적 검사                    |
 | `.env.example`                          | 인증·DB 필수 설정과 실행·테스트 DB 선택 설정. 인증 비밀값은 공란, DB 값은 로컬 컨테이너 전용 |
@@ -336,11 +341,18 @@ async save(manager: EntityManager, input: Input): Promise<void> {
 
 ## 인증 기반 사용과 후속 경계 — #87
 
-작업 브랜치는 `api/auth-foundation`, 구현 시작 기준은 `origin/dev`의 `9b67570a0e220a81de2e33f8a8deabb3b8e5d34e`다. 앞의 초기화 기준은 #83의 과거 기록이며 이번 인증 작업 기준과 구분한다.
+초기 인증 기반의 작업 브랜치는 `api/auth-foundation`, 구현 시작 기준은 `origin/dev`의 `9b67570a0e220a81de2e33f8a8deabb3b8e5d34e`다. 앞의 초기화 기준은 #83의 과거 기록이다. 아래 공통 오류 연결은 #132 병합 후 #87의 후속 보완이며, 기존 날짜별 검증 기록과 구분한다.
 
-기준은 [회원 인증 계약 M](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)과 [#87의 #104 경계 안내](https://github.com/JminAILab/CatchU/issues/87#issuecomment-5815415143)다. `Authorization: Bearer <CatchU Access JWT>`를 검증해 회원 ID를 요청 내부에 저장한다. 현재 토큰 없음·잘못된 서명·만료·필수 식별 값 누락은 일반 NestJS `UnauthorizedException`을 던지며, #88 필터가 모두 `401 AUTH_REQUIRED` 형식으로 응답한다.
+기준은 [회원 인증 계약 M](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)과 [#87의 #104 경계 안내](https://github.com/JminAILab/CatchU/issues/87#issuecomment-5815415143)다. `Authorization: Bearer <CatchU Access JWT>`를 검증해 회원 ID를 요청 내부에 저장한다. 인증 코드는 [#88의 공통 예외 사용법](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5863346290)에 따라 `ApiError`를 던지고 기존 전역 필터가 응답 형식·상태·`no-store`를 적용한다.
 
-토큰 없음 `AUTH_REQUIRED`와 변조·만료 `AUTH_INVALID`의 구분은 #87 후속 작업이다. 개발 로그인의 추가 필드를 `VALIDATION_FAILED`로 구분하는 작업도 #87에 남는다. #88은 기존 인증 동작을 유지하며 공통 응답 형식과 `/v1` 경로 연결을 검사한다. 아래 날짜별 과거 검증 기록은 당시 상태를 나타낸다.
+| 상황 | 현재 응답 |
+| --- | --- |
+| Authorization 헤더 없음 | `401 AUTH_REQUIRED` |
+| 헤더는 있으나 빈 값·Basic 방식·빈 Bearer·공백/쉼표로 잘못 구성된 Bearer | `401 AUTH_INVALID` |
+| JWT 형식·서명·만료·발급자/대상·필수 회원 식별 값 오류 | `401 AUTH_INVALID` |
+| 개발 로그인 회원 ID 오류·추가 필드 | `400 VALIDATION_FAILED`, `details.violations=[{field,reason}]` |
+
+인증 오류의 응답·로그에 토큰이나 JWT 라이브러리의 원문 오류를 전달하지 않는다. 헤더 형식 오류의 세부 코드는 기존 명세에 없었던 경계로, 이번 후속 작업에서 사용자 확인을 받아 위처럼 구현했으며 PR의 연결 검토 대상이다. 개발 로그인 입력 검증은 기존 전역 ValidationPipe를 재사용한다. `memberId` 조건 위반의 reason은 `isMemberId`, 추가 필드는 `whitelistValidation`이며 입력값을 담지 않는다. 아래 날짜별 과거 검증 기록은 당시 상태를 나타낸다.
 
 기능 컨트롤러에는 Guard를 다시 붙일 필요가 없다. `@CurrentMemberId()`만 사용하며 JWT claim, 개발 로그인 플래그, 요청 body/query의 회원 ID에 의존하지 않는다. 이 인증 통과는 회원 행의 존재, GitHub 연동, 분석 동의, 자원 소유권을 보장하지 않는다. 각 후속 기능에서 해당 계약에 따른 검사가 필요하다.
 
@@ -358,11 +370,15 @@ export class ExamplePublicController {
 }
 ```
 
-개발 전용 `POST /v1/auth/dev-login`은 JSON `{ "memberId": "검토용-회원-ID" }` 하나만 받아 `accessToken`, `tokenType: "Bearer"`, `expiresIn`(초)을 반환한다. 비어 있거나 공백인 ID·다른 타입·추가 필드는 현재 `400 INVALID_REQUEST`다. 기본 비활성 및 `NODE_ENV=production`에서는 `403 INTERNAL_ERROR`이며 토큰을 발급하지 않는다. 설정 변경은 서버 재시작 후 반영된다. 공개 경로 표시가 있어도 이 개발 로그인 차단 조건을 먼저 검사한다.
+개발 전용 `POST /v1/auth/dev-login`은 JSON `{ "memberId": "검토용-회원-ID" }` 하나만 받아 `accessToken`, `tokenType: "Bearer"`, `expiresIn`(초)을 반환한다. 회원 ID는 비어 있지 않고 앞뒤 공백이 없는 문자열이어야 하며, 임의로 trim하거나 다른 타입을 문자열로 바꾸지 않는다. 누락·빈 값·앞뒤 공백·다른 타입·추가 필드는 `400 VALIDATION_FAILED`와 위반 필드/규칙으로 응답한다. JSON 해석 단계의 오류는 기존 공통 처리인 `400 INVALID_REQUEST`를 유지한다.
+
+기본 비활성 및 `NODE_ENV=production`에서는 입력 DTO 검사보다 먼저 `403 INTERNAL_ERROR`로 거부하며 토큰을 발급하지 않는다. 설정 변경은 서버 재시작 후 반영된다. 이는 [9/28 팀장 결정](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5861430583)의 코드 없는 403 처리이며, 개발 로그인 전용 거부 코드는 [기존 협의 항목](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5863346527)으로 남아 있다. 새 오류 코드를 추가하거나 전용 코드 합의가 끝난 것으로 취급하지 않는다.
+
+개발 로그인 Guard는 실행 제한 확인 후, DTO 변환기가 제거하는 `constructor`·`__proto__` 입력도 추가 필드 오류로 거부한다. 그 밖의 필드 검증은 기존 전역 ValidationPipe가 담당한다.
 
 현재 내부 토큰 구현은 HS256, 발급자 `catchu-api`, 대상 `catchu-member-api`, `sub` 회원 ID와 `iat`·`exp`를 서명·검증한다. 서명 알고리즘을 제한하고 비어 있는/공백 회원 ID, 누락된 만료·발급 시각, 잘못된 대상·발급자도 거부한다. 이는 #87 개발 기반의 내부 형식이며 기능 코드의 의존 대상이나 실제 OAuth 발급 계약이 아니다. 토큰 원문과 검증 라이브러리의 상세 오류는 로그·오류 응답에 포함하지 않는다.
 
-[#104](https://github.com/JminAILab/CatchU/issues/104)에서 개발 로그인에 받은 ID와 회원 행을 연결한다. 지금은 받은 ID를 그대로 사용하는 대역이며 회원·프로필 행 생성, DB 조회, 개발 GitHub 연동 대역은 없다. 이 연결을 바꿔도 기능 코드의 `@CurrentMemberId()` 사용 방식은 유지한다. 실제 Google/GitHub 로그인, Refresh Token·재발급·로그아웃, 소유권 검사, 쿠키·CORS·CSRF와 실제 발급 정책은 이번 범위 밖이다.
+[#104](https://github.com/JminAILab/CatchU/issues/104)의 개발 회원 공급자가 받은 문자열을 개발 전용 identityReference에 연결하고 회원·기본 프로필·최초 합성 연동을 준비한다. 토큰에는 실제 회원 UUID를 사용하며 기능 코드의 `@CurrentMemberId()` 사용 방식은 유지한다. 상세는 「회원·분석 선행 테이블과 멱등 처리 — #104」를 따른다. 실제 Google/GitHub 로그인, Refresh Token·재발급·로그아웃, 소유권 검사, 쿠키·CORS·CSRF와 실제 발급 정책은 이번 범위 밖이다.
 
 ## 검토자 재현 — README만 보고 보호 API 추가·호출
 
@@ -405,8 +421,97 @@ try {
 }
 ```
 
-4. 인증 후 `memberId`가 `review-member-87`인지, 토큰 없이 `/health`는 200인지 확인한다. 아래 검증 전에 `NODE_ENV`와 `DEV_LOGIN_ENABLED`의 기존 값·설정 유무를 터미널 환경변수와 `.env`별로 기록하고, 검토 후 원래 상태로 복원한다. 필수 인증 키와 토큰 수명 설정은 유지하며, 비밀값이나 환경변수 전체를 출력하지 않는다. **기본 비활성화:** 서버를 종료하고 터미널 환경변수와 `.env` 양쪽에서 `DEV_LOGIN_ENABLED`를 제거한 뒤 재시작하여 개발 로그인이 403인지 확인한다. **운영 환경 거부:** 서버를 종료하고 터미널에서 `NODE_ENV=production`, `DEV_LOGIN_ENABLED=true`로 설정한 뒤 재시작하여 개발 로그인이 403인지 확인한다.
+4. 인증 후 `memberId`가 UUID이고 같은 `review-member-87` 문자열로 재로그인해도 동일한 UUID인지, 토큰 없이 `/health`는 200인지 확인한다. 아래 검증 전에 `NODE_ENV`와 `DEV_LOGIN_ENABLED`의 기존 값·설정 유무를 터미널 환경변수와 `.env`별로 기록하고, 검토 후 원래 상태로 복원한다. 필수 인증 키와 토큰 수명 설정은 유지하며, 비밀값이나 환경변수 전체를 출력하지 않는다. **기본 비활성화:** 서버를 종료하고 터미널 환경변수와 `.env` 양쪽에서 `DEV_LOGIN_ENABLED`를 제거한 뒤 재시작하여 개발 로그인이 403인지 확인한다. **운영 환경 거부:** 서버를 종료하고 터미널에서 `NODE_ENV=production`, `DEV_LOGIN_ENABLED=true`로 설정한 뒤 재시작하여 개발 로그인이 403인지 확인한다.
 5. 검토용 컨트롤러와 등록만 제거하고 검사 명령을 실행한다. 기존 파일은 통째로 되돌리지 않는다. 서버를 `Ctrl+C`로 종료하고 이 재현에서 추가한 환경변수만 정리하거나 터미널을 닫는다. 비밀값·토큰 없이 검토 환경, 검토 판본, HTTP 상태와 ID 일치 여부만 공유한다. 작성자 외 재현 완료 여부는 실제 검토자의 확인을 기다린다.
+
+
+## 회원·분석 선행 테이블과 멱등 처리 — #104
+
+[ERD v1](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md), [구현 계획](https://github.com/JminAILab/CatchU/issues/104#issuecomment-5896005086), [공유 링크 비교 조건](https://github.com/JminAILab/CatchU/issues/104#issuecomment-5884501159)을 구현한다. E 접수·조회 API, A 프로필·실제 연동 API, B/C 테이블·결과 수신 저장은 포함하지 않는다.
+
+### 테이블 참조와 저장
+
+[`member-analysis.entity.ts`](src/member-analysis/member-analysis.entity.ts)의 엔티티를 import해서 **호출자가 넘긴 EntityManager**로 읽고 저장한다. 기능이 별도 DataSource나 중복 회원·멱등 테이블을 만들지 않는다.
+
+| 엔티티 / 테이블 | 키·연결 |
+| --- | --- |
+| MemberAccount / member_account | member_id UUID, identity_reference 유일. account_state는 내부 인증 판단 값이며 새 공개 enum이 아님 |
+| MemberProfile / member_profile | profile_id UUID, member_id FK·유일. 회원 생성 시 빈 문자열·빈 skills·SELF_REPORTED로 함께 준비 |
+| GitHubConnection / github_connection | connection_id UUID, member_id FK·유일. 실제 토큰 없이 외부 계정·자격정보 참조만 저장 |
+| AnalysisRequest / analysis_request | request_id UUID, member_id FK. ACTIVE 회원 부분 유일 인덱스. 동의·현재 시도 필수 |
+| AnalysisConsent / analysis_consent | consent_id UUID, request_id 유일. 요청·회원·저장소를 복합 FK로 대조. accepted=true, 동의 판본·범위는 접수 뒤 변경 불가 |
+| AnalysisAttempt / analysis_attempt | attempt_id UUID, request_id FK. processing/application 분리, source_mode·후보 수·안전한 failures·실패 확정 참조 |
+| IdempotencyRecord / idempotency_record | idempotency_id UUID, (member_id, operation, key) 유일. operation별 request_id 또는 link_id 하나와 response_reference 필수 |
+
+순환 FK는 `DEFERRABLE INITIALLY DEFERRED`다. 요청·새 동의·첫 시도를 모두 쓰지 않으면 **콜백 실행이 끝나도 커밋에서 실패**한다. `insertInitialAnalysis(manager, input)`은 ID를 먼저 만들고 세 행을 저장하는 내부 기반이며 접수 권한·현재 연동·고지/범위·ACTIVE 이력·재요청 자격 판정을 대신하지 않는다. 호출하는 E 접수 API가 그 판정을 수행한 뒤 사용한다. 이 함수는 신규 저장만 제공하며 재요청·worker 전송 API를 추가하지 않는다.
+
+동의 불변성과 재요청 선행 참조 불변성은 마이그레이션의 트리거로도 보호한다. 재요청 참조는 이미 존재하는 요청만 가리킬 수 있고 이후 다른 선행 요청으로 바꿀 수 없어 자기 참조·순환을 만들 수 없다. 본인·같은 저장소는 복합 FK로 검사한다. **확정 실패·등록 결과 없음 등 재요청 허용 판단은 #138의 접수 로직**에 남는다. 트리거·enum 제약 통과를 재요청 허가로 취급하지 않는다.
+
+### 개발 회원과 합성 GitHub 연결
+
+개발 로그인 body의 `memberId` 이름은 유지하지만 값은 **개발 식별 문자열**이다. `catchu:dev-login:` 네임스페이스의 identityReference로 회원을 찾거나 생성하고, 커밋된 **실제 member_id UUID**를 JWT에 싣는다. 같은 문자열의 반복·동시 로그인은 같은 회원과 기본 프로필을 사용한다. 기존 프로필·연결 상태를 덮어쓰지 않으며, 기존 회원의 필수 프로필이 없으면 오류로 처리한다. 실제 제공자 연동 시 개발 네임스페이스와 분리해야 한다.
+
+`DevMemberService`는 `AuthModule`에서 export한다. `readConnection(인증된 memberId)`은 개발 회원의 현재 합성 연결과 선정 저장소, sourceMode=MOCK을 반환한다. [지정 표본](../worker/fixtures/m1-synthetic/context.sample.json)의 repositoryId=`synthetic-repo-0001`, allowedScopeRevision=`00000000-0000-4000-8000-000000000201`을 사용하며 테스트가 표본 일치를 검사한다. 요청·동의·시도 ID를 표본에서 복사하지 않는다. 현재 대역은 GitHub 네트워크 호출·실제 접근권한·분석 동의를 제공하지 않는다. #136과 E 접수에서 이 내부 공급자를 연결한다.
+
+회원·기본 프로필·최초 합성 CONNECTED 행은 한 트랜잭션이다. `DEV_LOGIN_ENABLED=true` 설정을 공유하며, 기본 비활성·production에서는 회원 준비와 대역 조회 모두 거부한다. 기존 실제 연동을 합성 연결로 덮어쓰지 않는다. 토큰 검증 Guard는 매 요청 DB 조회를 추가하지 않았으므로, 기존 문자열 토큰은 다시 개발 로그인하여 UUID 토큰으로 바꿔야 한다. 기능은 여전히 `@CurrentMemberId()`만 사용하고 자원 존재·소유권을 별도로 확인한다.
+
+### 멱등 생성 호출
+
+[`runIdempotentCreation`](src/member-analysis/idempotent-creation.ts)은 활성 **READ COMMITTED** 트랜잭션의 manager를 받는다. (회원, operation, key)의 트랜잭션 잠금으로 키를 예약한 후 자원 생성·멱등 기록·응답 구성을 함께 처리한다. 유일 인덱스가 최종 중복 방어다. 예약 중간 행을 커밋하지 않으며, 실패 후 동일 키로 다시 요청할 수 있다.
+
+- operation: `createAnalysisRequest` 또는 `createShareLink`. key는 1~128자다.
+- request_fingerprint: 작업별 정규화한 입력의 **SHA-256 소문자 64자리 hex text**. 링크는 C의 `shareCreateFingerprint`(제목·비밀번호 설정 여부)를 그대로 사용한다. 비밀번호 원문·해시를 지문에 넣지 않는다.
+- 형식 오류는 값의 출처에 따라 구분한다. 사용자 입력인 `Idempotency-Key`는 `400 INVALID_REQUEST`, 서버가 정하는 operation·생성하는 requestFingerprint는 `500 INTERNAL_ERROR`다. 오류 응답에 내부 값이나 지문을 포함하지 않는다. 정상 형식의 지문이 기존 요청과 다르거나 `isSame`의 비동기 비교 결과가 false이면 기존 `409 IDEMPOTENCY_CONFLICT`를 유지한다.
+- request_id/link_id: operation에 맞는 하나만 저장한다. 공통 함수가 연결 자원의 회원도 대조한다. request_id의 회원 일치는 DB 복합 FK로도 보장한다.
+- response_reference: 안전한 응답 재구성 참조(text). 예를 들어 자원 UUID를 저장하고 readResponse에서 원본 자원을 다시 읽는다. 요청/응답 원문, 비밀번호·토큰을 이 열에 직렬화하지 않는다.
+- isSame: 지문이 같은 재요청에서도 **항상 await하는 필수 비교 함수**다. C는 같은 manager로 기존 링크를 조회한 뒤 `isSameShareCreate`로 비밀번호까지 비교한다. false만 `409 IDEMPOTENCY_CONFLICT`이며 DB 오류·기록 불일치는 서버 오류로 전달한다.
+- create/readResponse: 모두 받은 manager를 사용한다. readResponse 실패도 신규 자원·멱등 기록을 함께 롤백한다. 예외를 트랜잭션 내부에서 삼키지 않는다.
+
+다음은 기능 담당자가 채울 콜백의 호출 형태다(제품 API 추가 예시가 아님).
+
+```typescript
+const result = await dataSource.transaction('READ COMMITTED', (manager) =>
+  runIdempotentCreation(manager, {
+    memberId, operation: 'createShareLink', key, requestFingerprint,
+  }, {
+    create: async (sameManager) => {
+      const link = await issueShareLink(sameManager, command);
+      return { requestId: null, linkId: link.linkId, responseReference: link.linkId };
+    },
+    isSame: async (sameManager, record) => {
+      const link = await sameManager.findOneByOrFail(ShareLink, { linkId: record.linkId! });
+      return isSameShareCreate(input, {
+        requestFingerprint: record.requestFingerprint,
+        passwordVerifier: link.passwordProtectionReference,
+      });
+    },
+    readResponse: async (sameManager, record) =>
+      buildOwnerLinkResponse(sameManager, record.responseReference),
+  }),
+);
+// 여기까지 성공한 뒤 응답: result.replayed와 operation 계약에 맞는 HTTP 상태 사용.
+```
+
+C의 기존 회원 단위 발급 잠금은 create 안에서 획득한다. 호출 순서는 공통 멱등 키 잠금 → 작업별 회원 잠금이며, 밖에서 반대 순서로 잠그지 않는다. 다른 키의 동시 링크 발급 제한은 C 함수의 책임이다. E의 같은 저장소 ACTIVE 처리·다른 저장소 거부도 멱등 키가 다른 경우의 업무 판정으로 남는다.
+
+### 적용 순서와 후속 연결
+
+`1790500000000-CreateMemberAnalysisFoundation`은 [PR #143의 B 마이그레이션](https://github.com/JminAILab/CatchU/pull/143) `1790600000000`보다 먼저 적용된다. 고정 선행 순서를 위해 작성 시각 대신 이 순서 번호를 사용했다.
+
+1. #104의 일곱 테이블.
+2. #105 E 담당의 ResultApplicationRecord(이 PR에 미포함). timestamp는 위 두 마이그레이션 사이여야 한다.
+3. PR #143 Catch/근거/후보 연결/보호 판단 테이블.
+4. [PR #157 본인 조회·확인](https://github.com/JminAILab/CatchU/pull/157)의 원 요청→회원·저장소 대조와 실제 자료 연결.
+
+B는 `member_account.member_id`, `analysis_request.request_id/member_id/repository_id/current_attempt_id`, `analysis_attempt.attempt_id/request_id/source_mode`를 참조할 수 있다. B의 외부 FK 엔티티 메타데이터 연결과 전체 적용 순서는 해당 연결 PR에서 다시 검사한다. ResultApplicationRecord·ReceiverStore·B 호출·보호 관찰 공급이 없으므로 이번 선행 테이블만으로 #143/#157 전체 연결 완료가 아니다.
+
+ShareLink 생성 마이그레이션과 `idempotency_record.link_id → share_link.link_id` FK·엔티티 메타데이터 추가는 **C 담당**이다. 공통 함수의 link 소유자 조회는 실제 C 테이블이 준비된 뒤 사용한다. 되돌릴 때는 B/C·수신 기록의 종속 FK/테이블을 먼저 되돌린다. #104 down은 자기 일곱 테이블·트리거만 제거하며 CASCADE로 후속 테이블을 지우지 않는다.
+
+### 검사와 검토
+
+전용 `_test` DB에서 `npm test`를 실행한다. `test/db/member-analysis.test.cjs`는 빈 스키마 up/down/re-up·엔티티 일치, 필수/유일/FK/enum, 중간 요청 커밋 거부, 반복·동시 로그인과 ACTIVE·멱등 요청, 생성·응답·커밋 실패 롤백을 검사한다. 실제 HTTP 개발 로그인에서 얻은 UUID로 분석 FK 저장도 확인한다. 같은 지문·다른 비밀번호는 테스트용 C 최소 테이블/비교 콜백으로 검사하며 실제 링크 API·scrypt 연결 검증은 C PR에 남긴다. 기존 #87·#139 검사는 UUID 회원 연결에 맞춰 유지한다.
+
+다른 담당자의 실제 E 접수/C 발급·B 등록·worker·OAuth 통합과 사람 리뷰는 자동 검사 통과로 대신하지 않는다.
 
 ## 분석 메시지 수신과 개발용 주입 — #139
 
@@ -468,6 +573,7 @@ try {
 
 - `EADDRINUSE`: 지정 포트가 사용 중인지 확인하고 자신이 실행한 이전 서버를 종료하거나 선택 포트를 바꾼다. 다른 사람의 프로세스를 임의 종료하지 않는다.
 - `PORT` 오류: `.env`와 현재 터미널 환경의 값을 확인한다.
+- `BIND_HOST는 IP 주소여야 합니다`: `localhost` 같은 이름 대신 `127.0.0.1`·`::1`·`0.0.0.0`처럼 IP로 적는다. 빈 값도 실패한다.
 - 인증 설정 오류: 오류에 나온 변수 이름을 기준으로 누락·형식을 확인한다. 키·토큰 값은 출력하거나 공유하지 않는다. 개발 로그인 403은 플래그와 운영 환경 차단 조건을 확인한다.
 - `DB 설정이 없습니다: DB_...`: `.env`나 터미널 환경에 `DB_*`가 있는지 확인한다(`.env.example` 참고).
 - `DB에 접속하지 못했습니다(...)`: `docker ps`로 DB 컨테이너가 실행 중인지 보고, 멈춰 있으면 `docker start catchu-db`. `ECONNREFUSED`면 주소·포트를, `password authentication failed`면 `DB_USER`·`DB_PASSWORD`가 볼륨을 처음 만들 때의 값과 같은지 확인한다.
@@ -487,7 +593,7 @@ try {
 | 결과 검사·자산 저장·작업 완료 반영, 중복·실패 처리의 책임 | E·B·F 연결 계약과 실제 기능 담당자 간 합의                                                       | 책임 경계·반영 순서의 초안과 미결 정리. api 초기화 담당에게 자동 배정하지 않음 |
 | 인증·외부 서비스·큐의 개발·테스트 환경                    | 관련 계약과 공통 환경 준비 작업                                                                  | 필요한 설정·계정·실제 연결 검증 범위 정리                                      |
 
-DB는 「로컬 DB 준비」·「DB 테스트」로 준비한다. 큐의 공통 준비 방법은 공통 환경 준비 작업에서 마련하고, api 쪽에서는 필요한 접속·실행 조건을 제공한다. 각 사용자는 그 안내로 자신의 환경을 준비한다. DB 모델·마이그레이션·메시지 처리 구현은 해당 기능의 책임과 계약에 따라 나눈다. 연결을 추가할 때 환경변수·공통 준비 안내·실제 및 모의 연결 범위와 자료 변경 명령의 영향을 문서화한다.
+DB는 「로컬 DB 준비」·「DB 테스트」로 준비한다. web·api·worker·PostgreSQL을 함께 띄우는 순서와 서비스끼리 맞출 설정값은 [로컬 통합 실행 안내](../docs/CatchU_로컬통합실행.md)에 있다. 큐의 공통 준비 방법은 공통 환경 준비 작업에서 마련하고, api 쪽에서는 필요한 접속·실행 조건을 제공한다. 각 사용자는 그 안내로 자신의 환경을 준비한다. DB 모델·마이그레이션·메시지 처리 구현은 해당 기능의 책임과 계약에 따라 나눈다. 연결을 추가할 때 환경변수·공통 준비 안내·실제 및 모의 연결 범위와 자료 변경 명령의 영향을 문서화한다.
 
 서버 로그는 요청 처리·분석 작업 상태·결과 반영·실패를 구분해 확인할 수 있게 준비한다. 로깅 도구와 식별자 전달 형식은 후속 설정·계약에서 정하며, 기록·공유 시 자료 보호는 공통 작업관리를 따른다.
 
