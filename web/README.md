@@ -79,7 +79,8 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `.node-version` | Node.js 버전(버전 관리 도구용) |
 | `.env.example` | 환경변수 목록 예시(포트는 여기서 못 바꿈) |
 | `.npmrc` | `engine-strict=true` — Node 버전 강제 |
-| `next.config.ts`, `tsconfig.json`, `eslint.config.mjs` | Next.js·TypeScript·ESLint 설정(create-next-app 기본값) |
+| `next.config.ts` | Next.js 설정. `agentRules: false`로 `npm run dev`가 `web/`에 `AGENTS.md`·`CLAUDE.md`를 자동으로 만들지 않게 한다 |
+| `tsconfig.json`, `eslint.config.mjs` | TypeScript·ESLint 설정(create-next-app 기본값) |
 | `.gitignore` | `node_modules/`, `.next/`, `next-env.d.ts` 등 생성물 제외 |
 
 ## 코드 추가 위치
@@ -111,6 +112,7 @@ const result = await readApiResponse(fetch(url, options));
 ## 작업 규칙
 
 - 착수·브랜치·기록·검토 기준은 [공통 작업관리](../docs/CatchU_작업관리.md)를 따른다.
+- Next.js 16은 이전 판과 API·파일 규칙이 달라진 부분이 있다. 사람이든 AI든 Next.js 코드를 쓰기 전에 설치된 판본의 문서 `node_modules/next/dist/docs/`를 확인한다.
 - 화면 문구·상태는 각 흐름 초안(`docs/ai-dlc-input-mvp/`)과 승인 요구사항을 근거로 하고, 요청 중·저장 중을 성공으로, 조회 실패를 데이터 없음으로 표시하지 않는다.
 - 브라우저 로그에는 민감정보를 출력하지 않는다.
 - 로컬 실행 확인과 NCP 배포 검증은 각각 기록한다.
