@@ -93,9 +93,9 @@ Windows PowerShell에서는 `curl.exe -i http://127.0.0.1:8000/health`를 사용
 
 [#113](https://github.com/JminAILab/CatchU/issues/113)의 범위다. E가 보낸 분석 요청(`Request`)을 검사하고, 가짜 생성기로 [메시지 스키마 v1](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml)에 맞는 종결 결과(`Result`)를 만든다. 외부 호출·제공자 SDK·API 키가 없고 결과는 항상 `sourceMode: MOCK`이다. 공개 HTTP 경로나 큐 없이 `app.processing.process_request` 함수로 부른다.
 
-1. **요청 검사**: 스키마 v1을 검사한 뒤 E가 접수한 기록(요청·현재 시도·회원·저장소·동의·허용 범위·`sourceMode`)과 필드마다 대조한다. 하나라도 다르면 생성기를 부르지 않고 거부한다. 거부는 사유와 어긋난 위치만 호출한 쪽에 돌려주며, 계약에 요청 거부 메시지가 없으므로 E에 보내는 메시지는 없다.
+1. **요청 검사**: 스키마 v1을 검사한 뒤 E가 접수한 기록(요청·현재 시도·회원·저장소·동의·허용 범위·`sourceMode`)과 필드마다 대조한다. 하나라도 다르면 생성기를 부르지 않고 거부한다. 거부는 사유와 어긋난 위치만 호출한 쪽에 돌려주며, 계약에 요청 거부 메시지가 없으므로 E에 보내는 메시지는 없다. 따라서 E의 요청은 접수 상태(`QUEUED`)로 남는다.
 2. **진행 알림**: 검사를 통과하면 `RECEIVED`, 생성 직전에 `RUNNING`을 알린다.
-3. **생성**: 생성기를 한 번 부른다. 생성기가 실행 여부를 확인하지 못했거나(상태 조회 오류) 시간이 초과되면 `UNCERTAIN`만 알리고 결과를 만들지 않는다. 실패로 확정하지 않고 다시 생성하지도 않는다.
+3. **생성**: 생성기를 한 번 부른다. 생성기가 실행 여부를 확인하지 못했거나(상태 조회 오류) 시간이 초과되면 `UNCERTAIN`만 알리고 결과를 만들지 않는다. 실패로 확정하지 않고 다시 생성하지도 않는다. 이 `UNCERTAIN`은 항상 `RUNNING` 뒤에 가고, E의 [상태 전이 정본](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본)에는 `RUNNING`에서 `UNCERTAIN`으로 가는 전이가 없으므로 E의 처리 상태는 `RUNNING`으로 남는다.
 4. **결과 조합**: 요청의 식별자·맥락을 그대로 옮긴다. 종결값은 후보와 실패의 수로 정한다(후보만 있으면 SUCCEEDED, 둘 다 없으면 EMPTY, 둘 다 있으면 PARTIAL_FAILED, 실패만 있으면 FAILED). 근거 부족·기준 미달은 `notProvided`, 수집·생성 오류는 `failures`에 넣는다. 초안·질문을 만들지 못해도 후보는 남기고 초안 본문은 `null`, 실패는 `failures`에 넣는다. 제목을 만들지 못하면 `workFacts` 첫 항목을 제목으로 쓴다.
 
 `credentialContextReference`는 형식만 확인해 넘긴다. 이 값이 있다고 요청을 받아들이지 않으며, 실제 해석과 대조는 자격정보 연결 작업에서 한다.
