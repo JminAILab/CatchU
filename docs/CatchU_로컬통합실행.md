@@ -117,7 +117,7 @@ curl -s http://localhost:3000/ | grep -o 'CatchU web'
 
 1. `api/.env`에 `CORS_ALLOWED_ORIGINS=http://localhost:3000`을 넣고 api를 다시 켠다. 개발용 로그인에는 `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development`가 필요하다.
 2. `web/.env.example`을 참고해 `web/.env.local`에 `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3001`과 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`를 넣는다. 기존 파일은 덮어쓰지 않는다. 값을 바꾸면 web을 다시 켠다.
-3. `http://localhost:3000/login`에서 개발용 회원 ID를 입력한다. 성공하면 `/home`으로, 회원 경로에서 왔다면 검증된 `next`로 돌아간다.
+3. `http://localhost:3000/login`에서 개발용 식별 문자열을 입력한다. api가 해당 회원을 찾거나 만들어 로그인하며, 요청 필드 이름은 `memberId`다. 성공하면 `/home`으로, 회원 경로에서 왔다면 검증된 `next`로 돌아간다.
 4. 새로고침하면 메모리 토큰이 사라져 다시 로그인한다. 로그아웃하면 `/`로 이동한다. 이름 미저장 회원의 최초 입력 이동은 `GET /v1/me`(#135) 연결 뒤 확인한다.
 
 기능 화면은 [web README 「API 호출」](../web/README.md#api-호출-106-pr②)의 `api.member`·`api.recipient`를 사용한다. 회원 호출만 Bearer 토큰을 첨부하고, 수신자 비밀번호 차단의 `Retry-After`는 `retryAfterSeconds`로 전달한다. 실제 보호 기능 API가 없는 상태의 검증은 2단계의 임시 확인용 경로를 사용하며, 이것을 제품 기능 연결 완료로 세지 않는다. 토큰 값을 화면·로그·공유 자료에 남기지 않는다.

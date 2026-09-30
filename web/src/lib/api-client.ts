@@ -31,6 +31,11 @@ export type MemberRequest = {
   signal?: AbortSignal;
 };
 
+export type DevLoginRequest = {
+  /** 로그인 화면을 떠나면 취소한다. 취소된 응답은 토큰에 반영하지 않는다. */
+  signal?: AbortSignal;
+};
+
 export type RecipientRequest = {
   method?: "GET" | "POST";
   body?: unknown;
@@ -51,8 +56,11 @@ export type ApiClient = {
   member(path: string, request?: MemberRequest): Promise<ClientResult>;
   /** 수신자 API. 회원 토큰을 붙이지 않는다. 비밀번호 차단(429)이면 결과에 retryAfterSeconds가 붙는다. */
   recipient(path: string, request?: RecipientRequest): Promise<ClientResult>;
-  /** 개발용 로그인(#87). 성공하면 토큰을 메모리에 보관하고, 결과에는 토큰을 담지 않는다. */
-  devLogin(memberId: string): Promise<ClientResult>;
+  /**
+   * 개발용 로그인(#87). 성공하면 토큰을 메모리에 보관하고, 결과에는 토큰을 담지 않는다.
+   * 가장 늦게 시작한 로그인의 응답만 반영한다. 먼저 보낸 로그인이 늦게 도착하거나 취소됐으면 토큰을 바꾸지 않고 조회 실패로 돌려준다.
+   */
+  devLogin(memberId: string, request?: DevLoginRequest): Promise<ClientResult>;
 };
 
 /** http(s) 주소만 받고 끝 슬래시를 뗀다. 쿼리·해시·계정 정보가 있거나 `/v1`로 끝나면 설정 오류(null)다. */
@@ -73,6 +81,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function createApiClient(options: ApiClientOptions): ApiClient {
   const baseUrl = normalizeApiBaseUrl(options.baseUrl);
   const fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
+  let latestLogin = 0;
 
   async function send(
     path: string, method: string, headers: Record<string, string>, body: unknown, signal?: AbortSignal,
@@ -124,8 +133,11 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       return send(path, request.method ?? "GET", headers, request.body, request.signal);
     },
 
-    async devLogin(memberId) {
-      const result = await send("/auth/dev-login", "POST", {}, { memberId });
+    async devLogin(memberId, request = {}) {
+      const attempt = ++latestLogin;
+      const result = await send("/auth/dev-login", "POST", {}, { memberId }, request.signal);
+      // 그사이 다른 로그인을 시작했거나 화면이 취소했으면, 늦게 온 응답으로 현재 세션을 바꾸지 않는다.
+      if (attempt !== latestLogin || request.signal?.aborted) return LOOKUP_FAILED;
       if (result.kind !== "success") return result;
       const data = result.data;
       if (!isRecord(data) || typeof data.accessToken !== "string" || data.accessToken.length === 0 || data.tokenType !== "Bearer") {

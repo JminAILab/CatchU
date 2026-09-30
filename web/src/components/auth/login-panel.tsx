@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { ApiResult } from "@/lib/api-response";
 import { api, devLoginEnabled } from "@/lib/api";
 import { afterLoginPath } from "@/lib/member-navigation";
@@ -11,7 +11,7 @@ function devLoginErrorMessage(result: Exclude<ApiResult, { kind: "success" }>): 
   if (result.kind === "lookup-failed") {
     return "서버에 연결하지 못했습니다. api 실행 상태와 주소(NEXT_PUBLIC_API_BASE_URL), api의 CORS_ALLOWED_ORIGINS에 이 화면 주소가 있는지 확인해 주세요.";
   }
-  if (result.code === "VALIDATION_FAILED") return "회원 ID를 확인해 주세요. 비어 있거나 앞뒤에 공백이 있으면 안 됩니다.";
+  if (result.code === "VALIDATION_FAILED") return "식별 문자열을 확인해 주세요. 비어 있거나 앞뒤에 공백이 있으면 안 됩니다.";
   if (result.status === 403) return "api에서 개발용 로그인이 꺼져 있습니다. api의 DEV_LOGIN_ENABLED·NODE_ENV를 확인해 주세요.";
   return "로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
@@ -26,13 +26,20 @@ export function LoginPanel() {
   const [memberId, setMemberId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const loginAbort = useRef<AbortController | null>(null);
+
+  // 응답 전에 화면을 떠나면 로그인을 취소한다. 늦게 온 응답이 토큰을 바꾸거나 다른 화면에서 이동시키지 않게 한다.
+  useEffect(() => () => loginAbort.current?.abort(), []);
 
   async function handleDevLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
     setSubmitting(true);
     setError(null);
-    const result = await api.devLogin(memberId);
+    const abort = new AbortController();
+    loginAbort.current = abort;
+    const result = await api.devLogin(memberId, { signal: abort.signal });
+    if (abort.signal.aborted) return;
     if (result.kind === "success") {
       // 이름 저장 여부는 GET /v1/me(#135) 연결 전이라 알 수 없다(null).
       const next = new URLSearchParams(window.location.search).get("next");
@@ -55,10 +62,10 @@ export function LoginPanel() {
         {devLoginEnabled && (
           <section className={styles.devSection} aria-labelledby={`${inputId}-title`}>
             <h2 id={`${inputId}-title`} className={styles.devTitle}>개발용 로그인</h2>
-            <p className={styles.devNotice}>개발 환경에서만 보입니다. 입력한 회원 ID로 개발용 토큰을 받습니다.</p>
+            <p className={styles.devNotice}>개발 환경에서만 보입니다. 개발용 식별 문자열을 입력하면 해당 회원을 찾거나 만들어 로그인합니다.</p>
             <form onSubmit={handleDevLogin} noValidate>
               <label className={styles.field} htmlFor={inputId}>
-                회원 ID
+                개발용 식별 문자열
                 <input
                   id={inputId}
                   className={styles.input}
