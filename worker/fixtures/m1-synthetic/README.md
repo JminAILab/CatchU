@@ -85,5 +85,9 @@ api와 worker는 같은 메시지에 같은 판정을 내야 한다(`cases.json`
 
 ## 검사
 
+기본 검사는 같은 자료에 대해 worker와 api가 같은 **스키마 판정**을 내리는지 확인한다.
+
 - worker(`worker/`에서): `uv run --locked pytest`가 `tests/test_worker_messages.py`로 사례·음성 대조를 검사한다.
 - api(`api/`에서): `npm test`가 `test/worker-messages.test.cjs`로 같은 사례·음성 대조를 검사한다.
+
+자료나 수신 로직을 바꿔 **수신 확인·처리 상태 전이**에 영향을 주는 작업이면, `api/`에서 `npm run test:analysis-fixtures`도 실행한다. 이 검사는 공용 자료를 실제 수신 모듈에 주입해 `cases.json`의 수신 확인과 처리 상태 기대값을 대조하며, `npm test`에는 포함되지 않는다. 요청·저장은 합성 대역을 사용하므로 실제 DB·worker 전송이나 B의 Catch 등록을 검증한 것으로 보고하지 않는다. 별도 자료 판본 지정과 검사 범위는 [api README의 내부 주입 사용과 검사](../../../api/README.md#내부-주입-사용과-검사)를 따른다.
