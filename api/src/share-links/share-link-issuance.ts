@@ -39,7 +39,7 @@ function assertCommand(command: IssueShareLinkCommand): void {
 }
 
 /**
- * 링크를 발급한다. 호출하는 쪽이 연 트랜잭션의 manager로만 DB를 쓴다(api README 「트랜잭션 규약」).
+ * 링크를 발급한다. 호출하는 쪽이 연 트랜잭션의 manager로만 DB를 쓴다(api/CONVENTIONS.md 「트랜잭션 규약」).
  *
  * 1. 같은 회원의 발급을 트랜잭션 끝까지 직렬화한다(PostgreSQL 트랜잭션 advisory lock). 다른 회원은 막지 않는다.
  * 2. 잠금을 얻은 **뒤에** 발급 시각을 정한다. 잠금을 기다리는 동안 만료된 링크를 유효로 잘못 세지 않고,
