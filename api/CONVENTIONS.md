@@ -1,6 +1,6 @@
 # api 코딩 규약
 
-api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 사용 규약이다. 설치·실행·검사와 [공통 오류 처리(ApiError·오류 코드 추가)](README.md#공통-오류-처리--api-명세-v1)는 [api README](README.md), 기능별 동작과 연결은 `api/docs/<기능>.md`에 있다.
+api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 사용 규약이다. 설치·실행·검사와 [공통 오류 처리(ApiError·오류 코드 추가)](README.md#공통-오류-처리--api-명세-v1)는 [api README](README.md), 기능별 동작과 연결은 `api/docs/<기능>.md`에 있다. 새 규약은 이 문서에 쓰고, 이미 있는 규약은 적힌 곳에서 고친다.
 
 본문이 가리키는 다른 파일의 절: 「로컬 DB 준비」와 #87 절의 '앞의 초기화 기준'(「초기화 기준과 도구」)은 README, 「회원·분석 선행 테이블과 멱등 처리 — #104」는 [docs/member-analysis.md](docs/member-analysis.md), #87 절의 '날짜별 검증 기록'은 [docs/verification-records.md](docs/verification-records.md)에 있다.
 
