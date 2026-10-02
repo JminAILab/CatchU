@@ -38,7 +38,7 @@
 
 이 수정안은 #23의 C 후속 설계 입력입니다. 실제 endpoint·DB·계약 승인, 구현 착수 또는 C01/C02 수용을 뜻하지 않습니다.
 
-이력서·자기소개서·포트폴리오는 **12월 범위**이므로 10월 발행 정보와 화면에는 포함하지 않습니다. 서류 관련 후속 결정은 [#56](https://github.com/JminAILab/CatchU/issues/56#issuecomment-5692700641)에서 관리합니다.
+이력서·자기소개서·포트폴리오는 **12월 범위**이므로 10월 발행 정보와 화면에는 포함하지 않습니다. 서류 관련 결정은 [12월 요구사항](../../aidlc/spaces/default/intents/260925-intent-12/inception/requirements-analysis/requirements.md)을 따르고, 이력서 결정 경위는 [#56](https://github.com/JminAILab/CatchU/issues/56#issuecomment-5885936603)(2026-09-29 종료)에 있습니다.
 
 **읽을 근거:** [승인 요구사항](../../aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md), [MVP 입력](CatchU_mvp_input.md), [9/14·9/15 후속 입력](2026-09-14_followup.md), [공유 링크 화면 초안](CatchU_공유링크_흐름_와이어프레임_초안.md). ‘링크 초안’에서 재사용한 기존 제안의 출처는 최초 작성 기준 dev [`2a1966d`](https://github.com/JminAILab/CatchU/commit/2a1966d56fcc507ea2d5ef2432469b52e23d6962)입니다. 최신 첫 MVP와 차이가 있으면 위 범위 구분을 우선합니다.
 

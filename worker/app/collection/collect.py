@@ -1,0 +1,296 @@
+"""요청 한 건의 GitHub 자료 수집 순서.
+
+허용 자료 종류 → 자격정보 맥락 → 선택 범위를 모두 확인한 뒤에야 연결을 열고 첫 GitHub
+호출을 한다. 저장소 확인 → 허용 종류별 목록 → 상세 순으로 부르고, 멈추면 그때까지 모은
+자료와 실패 하나를 함께 돌려준다. 성공·실패·예외 모두 연결을 닫고 자격정보를 놓는다.
+원문은 메모리에만 두며 디스크에 쓰지 않는다.
+
+후보·Catch를 만들지 않는다. 결과 조합에는 `stage_failures()`를 `GenerationOutput.failures`에
+더해 넘기며, 그러면 수집 실패가 있는 결과는 EMPTY가 되지 않는다.
+"""
+
+import logging
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime
+
+from app.collection import evidence
+from app.collection.api_paths import RepositoryPaths
+from app.collection.budget import CollectionBudget
+from app.collection.collectors import (
+    CollectedData,
+    Collector,
+    CommitCollector,
+    IssueCollector,
+    PullRequestCollector,
+    verify_repository,
+)
+from app.collection.credentials import (
+    CredentialContext,
+    CredentialResolver,
+    check_credential,
+)
+from app.collection.failures import (
+    CollectionFailure,
+    CollectionStopped,
+    FailureCode,
+)
+from app.collection.gateway import GitHubGateway
+from app.collection.identifiers import GitHubAccount, RepositoryCoordinates
+from app.collection.limits import PROPOSED_LIMITS, CollectionLimits
+from app.collection.records import (
+    RESOURCE_TYPES,
+    CommitRecord,
+    CoverageLimit,
+    IssueRecord,
+    PullRequestRecord,
+    ResourceType,
+)
+from app.collection.selection import SelectionResolver, check_selection
+from app.collection.transport import Transport
+from app.processing.generation import StageFailure
+from app.processing.request_check import CheckedRequest
+
+logger = logging.getLogger(__name__)
+
+Clock = Callable[[], datetime]
+
+_TYPE_NAMES = {"COMMIT": "커밋", "PULL_REQUEST": "PR", "ISSUE": "이슈"}
+
+
+@dataclass(frozen=True)
+class CollectionOutcome:
+    """수집한 기록과 한계, 수집 실패. 자격정보·토큰·응답 원문은 담지 않는다."""
+
+    allowed_resource_types: frozenset[ResourceType]
+    selection_reference: str
+    # 첫 호출 전 검사에서 멈췄으면 None이다.
+    repository: RepositoryCoordinates | None = None
+    linked_account: GitHubAccount | None = None
+    commits: tuple[CommitRecord, ...] = ()
+    pull_requests: tuple[PullRequestRecord, ...] = ()
+    issues: tuple[IssueRecord, ...] = ()
+    coverage_limits: tuple[CoverageLimit, ...] = ()
+    failures: tuple[CollectionFailure, ...] = ()
+    calls: int = 0
+    received_bytes: int = 0
+
+    @property
+    def completed(self) -> bool:
+        """필요한 조회를 상한·오류 없이 마쳤는가. False면 확인이 중단된 것이다."""
+        return not self.failures
+
+    def stage_failures(self) -> tuple[StageFailure, ...]:
+        return tuple(failure.as_stage_failure() for failure in self.failures)
+
+    def shared_limits(self, resource_type: ResourceType) -> tuple[str, ...]:
+        return tuple(
+            limit.message
+            for limit in self.coverage_limits
+            if limit.resource_type == resource_type
+        )
+
+    def evidence_for(
+        self, record: CommitRecord | PullRequestRecord | IssueRecord
+    ) -> evidence.EvidenceBasis:
+        if self.repository is None or self.linked_account is None:
+            raise ValueError("수집하지 않은 결과에는 근거가 없다")
+        repository, account = self.repository, self.linked_account
+        if isinstance(record, CommitRecord):
+            return evidence.commit_evidence(
+                record,
+                repository=repository,
+                linked_account=account,
+                shared_limits=self.shared_limits("COMMIT"),
+            )
+        if isinstance(record, PullRequestRecord):
+            return evidence.pull_request_evidence(
+                record,
+                repository=repository,
+                linked_account=account,
+                shared_limits=self.shared_limits("PULL_REQUEST"),
+            )
+        return evidence.issue_evidence(
+            record,
+            repository=repository,
+            linked_account=account,
+            shared_limits=self.shared_limits("ISSUE"),
+        )
+
+
+def _collectors(
+    allowed: frozenset[ResourceType],
+    paths: RepositoryPaths,
+    account: GitHubAccount,
+    limits: CollectionLimits,
+) -> list[Collector]:
+    # 허용 목록에 있는 종류만 만든다. 없는 종류의 API는 부를 수단이 없다.
+    available: dict[ResourceType, Collector] = {
+        "COMMIT": CommitCollector(paths, account, limits),
+        "PULL_REQUEST": PullRequestCollector(paths, account, limits),
+        "ISSUE": IssueCollector(paths, limits),
+    }
+    return [available[kind] for kind in RESOURCE_TYPES if kind in allowed]
+
+
+def _allowed_types(request: CheckedRequest) -> frozenset[ResourceType]:
+    return frozenset(
+        kind for kind in RESOURCE_TYPES if kind in request.allowed_resource_types
+    )
+
+
+def _refuse(
+    request: CheckedRequest,
+    allowed: frozenset[ResourceType],
+    failure: CollectionFailure,
+) -> CollectionOutcome:
+    logger.warning(
+        "첫 GitHub 호출 전에 수집하지 않음: requestId=%s attemptId=%s code=%s",
+        request.request_id,
+        request.attempt_id,
+        failure.code,
+    )
+    return CollectionOutcome(
+        allowed_resource_types=allowed,
+        selection_reference=request.selection_reference,
+        failures=(failure,),
+    )
+
+
+def _run(
+    collectors: list[Collector],
+    gateway: GitHubGateway,
+    paths: RepositoryPaths,
+    data: CollectedData,
+) -> CollectionFailure | None:
+    """저장소 확인 → 목록 → 상세. 멈추면 실패와, 확인하지 못한 종류의 한계를 남긴다."""
+    listed: set[ResourceType] = set()
+    try:
+        verify_repository(gateway, paths)
+        for collector in collectors:
+            collector.collect_list(gateway, data)
+            listed.add(collector.resource_type)
+        for collector in collectors:
+            collector.collect_details(gateway, data)
+    except CollectionStopped as stopped:
+        for collector in collectors:
+            kind = collector.resource_type
+            if kind in listed:
+                continue
+            received = data.count(kind)
+            data.limit(
+                kind,
+                f"수집이 멈춰 {_TYPE_NAMES[kind]} 목록을 {received}건까지만 확인했다"
+                if received
+                else f"수집이 멈춰 {_TYPE_NAMES[kind]} 목록을 확인하지 못했다",
+            )
+        return stopped.failure
+    return None
+
+
+def collect(
+    request: CheckedRequest,
+    *,
+    credentials: CredentialResolver,
+    selections: SelectionResolver,
+    open_transport: Callable[[], Transport],
+    clock: Clock,
+    limits: CollectionLimits = PROPOSED_LIMITS,
+    started_at: datetime | None = None,
+) -> CollectionOutcome:
+    """요청 하나의 허용 범위 안에서 GitHub 자료를 모은다.
+
+    started_at은 수집 시간 상한의 기준 시각이다(기본: 지금). 연결은 모든 사전 검사를
+    통과한 뒤에만 open_transport로 연다. 예상하지 못한 예외는 결과로 바꾸지 않고 올린다.
+    """
+    started = clock() if started_at is None else started_at
+    allowed = _allowed_types(request)
+    if not allowed:
+        return _refuse(
+            request,
+            allowed,
+            CollectionFailure(
+                FailureCode.NO_ALLOWED_RESOURCE_TYPE,
+                "허용된 자료 종류가 없어 수집하지 않았다",
+            ),
+        )
+    context = check_credential(request, credentials, now=started, limits=limits)
+    if isinstance(context, CollectionFailure):
+        return _refuse(request, allowed, context)
+    selected = check_selection(request, selections)
+    if isinstance(selected, CollectionFailure):
+        return _refuse(request, allowed, selected)
+
+    return _collect_with(
+        request, allowed, context, open_transport, clock, limits, started
+    )
+
+
+def _collect_with(
+    request: CheckedRequest,
+    allowed: frozenset[ResourceType],
+    context: CredentialContext,
+    open_transport: Callable[[], Transport],
+    clock: Clock,
+    limits: CollectionLimits,
+    started: datetime,
+) -> CollectionOutcome:
+    paths = RepositoryPaths(context.repository)
+    budget = CollectionBudget(limits, clock=clock, started_at=started)
+    data = CollectedData()
+    logger.info(
+        "수집 시작: requestId=%s attemptId=%s types=%s",
+        request.request_id,
+        request.attempt_id,
+        ",".join(sorted(allowed)),
+    )
+    transport = open_transport()
+    gateway: GitHubGateway | None = None
+    try:
+        gateway = GitHubGateway(
+            transport,
+            token=context.access_token,
+            expires_at=context.expires_at,
+            budget=budget,
+            clock=clock,
+            limits=limits,
+        )
+        failure = _run(
+            _collectors(allowed, paths, context.linked_account, limits),
+            gateway,
+            paths,
+            data,
+        )
+    finally:
+        # 성공·실패·예외 모두 자격정보를 놓고 연결을 닫는다.
+        if gateway is not None:
+            gateway.close()
+        else:
+            transport.close()
+    logger.log(
+        logging.WARNING if failure else logging.INFO,
+        "수집 종료: requestId=%s attemptId=%s completed=%s code=%s calls=%d bytes=%d "
+        "commits=%d pullRequests=%d issues=%d",
+        request.request_id,
+        request.attempt_id,
+        failure is None,
+        failure.code if failure else "-",
+        budget.calls,
+        budget.received_bytes,
+        len(data.commits),
+        len(data.pull_requests),
+        len(data.issues),
+    )
+    return CollectionOutcome(
+        allowed_resource_types=allowed,
+        selection_reference=request.selection_reference,
+        repository=context.repository,
+        linked_account=context.linked_account,
+        commits=tuple(data.commits),
+        pull_requests=tuple(data.pull_requests),
+        issues=tuple(data.issues),
+        coverage_limits=tuple(data.coverage_limits),
+        failures=(failure,) if failure else (),
+        calls=budget.calls,
+        received_bytes=budget.received_bytes,
+    )
