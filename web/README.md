@@ -2,7 +2,7 @@
 
 Next.js로 만드는 10월 MVP의 사용자 화면이다. 로그인·프로필·GitHub 연동, 홈·분석 상태, 본인 자산 확인·공개/숨김, 공유 링크·수신자 열람 흐름을 다룬다. 적용 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 담당 이슈의 완료 기준으로 확인한다.
 
-이 README는 [#82 web 최소 실행 골격](https://github.com/JminAILab/CatchU/issues/82)과 [#106 공통 기반](https://github.com/JminAILab/CatchU/issues/106) PR①(레이아웃·헤더·주소·공통 표시) 기준이다. API 호출·토큰·회원 경로 가드는 #106 PR②, 각 화면은 기능 이슈에서 추가한다.
+이 README는 [#82 web 최소 실행 골격](https://github.com/JminAILab/CatchU/issues/82)과 [#106 공통 기반](https://github.com/JminAILab/CatchU/issues/106) PR①(레이아웃·헤더·주소·공통 표시)과 PR②(API 호출·토큰·로그인 진입·회원 경로 가드) 기준이다. 각 화면은 기능 이슈에서 추가한다.
 
 ## 요구 환경
 
@@ -62,11 +62,17 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 
 ## 환경변수
 
-현재 골격은 필수 환경변수가 없다. `.env.example`에 이름·용도·필수/선택을 적고, 실제 값은 `.env.local`(커밋 금지)에 둔다.
+`.env.example`에 이름·용도·필수/선택을 적고, 내 값은 `.env.local`(커밋 금지)에 둔다. 로컬 개발은 `.env.example`을 `.env.local`로 복사하면 된다.
+
+| 구분 | 이름 | 예시 값 | 의미 |
+|---|---|---|---|
+| API 호출 시 필수 | `NEXT_PUBLIC_API_BASE_URL` | `http://127.0.0.1:3001` | api 기준 주소. `/v1`은 넣지 않는다(호출 함수가 붙인다). 없거나 잘못되면 호출하지 않고 조회 실패로 돌려준다 |
+| 선택 | `NEXT_PUBLIC_DEV_LOGIN_ENABLED` | `true` | 정확히 `true`일 때만 `/login`에 개발용 로그인을 보인다. api의 `DEV_LOGIN_ENABLED`가 꺼져 있으면 로그인은 403이다 |
 
 - 이름이 `NEXT_PUBLIC_`으로 시작하는 변수만 브라우저에 노출된다. 비밀값·토큰은 이 이름으로 두지 않는다.
+- `NEXT_PUBLIC_` 값은 `npm run dev`·`npm run build`를 시작할 때 읽힌다. 바꾸면 다시 시작한다.
+- web과 api의 출처가 다르므로 api의 `CORS_ALLOWED_ORIGINS`에 web을 여는 주소(`http://localhost:3000`)를 둔다([api README 「환경변수」](../api/README.md)). `127.0.0.1:3000`처럼 다른 주소로 열면 브라우저가 요청을 막는다.
 - 그 밖의 변수는 서버(Node.js)에서만 읽힌다.
-- API 주소·인증 관련 변수는 해당 기능 이슈에서 `.env.example`에 추가한다.
 
 ## 파일 역할
 
@@ -94,12 +100,13 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 
 - 화면(라우트): 아래 「페이지 주소」의 주소를 쓰고, 헤더에 맞는 묶음 폴더 안에 둔다. 예: 내 자산은 `src/app/(member)/assets/page.tsx`, 수신자 링크는 `src/app/s/[token]/page.tsx`.
 - 여러 화면이 함께 쓰는 컴포넌트: `src/components/`.
-- API 호출·오류 응답 해석 등 화면과 분리되는 로직: `src/lib/`. `api-response.ts`가 [#88](https://github.com/JminAILab/CatchU/issues/88)의 응답 해석을 제공한다.
+- API 호출·오류 응답 해석 등 화면과 분리되는 로직: `src/lib/`. `api.ts`가 API 호출 함수(아래 「API 호출」), `api-response.ts`가 [#88](https://github.com/JminAILab/CatchU/issues/88)의 응답 해석을 제공한다.
+- 회원 경로를 새 최상위 주소로 추가하면 `src/lib/member-navigation.ts`의 복귀 허용 목록(`MEMBER_PATH_PREFIXES`)에도 넣는다. 목록에 없으면 로그인 후 그 주소로 돌아오지 않고 `/home`으로 간다.
 - 디렉터리는 필요할 때 만들고, 담당 화면 밖의 공통 구조 변경은 이슈에서 먼저 조율한다.
 
 ## 공통 레이아웃 (#106 PR①)
 
-헤더는 화면 묶음 폴더의 `layout.tsx`가 붙인다. 괄호 폴더는 주소에 나타나지 않는다. 화면 파일을 알맞은 묶음에 두면 헤더를 따로 넣지 않아도 된다. **폴더 배치는 인증 판정이 아니다.** `(member)`에 두어도 토큰 없는 접근을 막지 않으며, 토큰 확인 중·미인증 상태의 헤더와 보호 화면 노출은 PR②의 회원 경로 가드에서 처리한다.
+헤더는 화면 묶음 폴더의 `layout.tsx`가 붙인다. 괄호 폴더는 주소에 나타나지 않는다. 화면 파일을 알맞은 묶음에 두면 헤더를 따로 넣지 않아도 된다. **폴더 배치는 인증 판정이 아니다.** `(member)`에 두어도 토큰 없는 접근을 막지 않으며, 토큰 없는 접근은 `(member)/layout.tsx`의 회원 경로 가드(`src/components/auth/member-guard.tsx`)가 막으며, 그동안 헤더와 화면을 그리지 않는다.
 
 | 묶음 폴더 | 헤더 | 구성 (#55 10월 헤더 합의) |
 |---|---|---|
@@ -108,7 +115,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/s/` | 공유 링크 수신자 | 이동 없는 CatchU 브랜드만. 로그인 여부와 무관하며 로그인·프로필 버튼 없음 |
 
 - **채용공고·알림:** 흐리게 표시하되 누를 수 있다(`disabled`를 쓰지 않는다). 누르면 현재 화면 위 안내창에 '개발 중인 기능입니다'와 [확인]을 띄운다. 열리면 [확인]에 초점이 가고, Tab은 안내창 밖으로 나가지 않는다.
-- **프로필:** 누르면 근처에 [프로필 보기](→ `/profile`)·[로그아웃] 메뉴가 열린다(#51). 로그아웃 요청·세션 처리는 PR②에서 `MemberHeader`의 `onLogout`으로 연결한다. 그전에는 [로그아웃]이 '연결 전' 표시와 함께 누를 수 없는 상태(`aria-disabled`)로 보인다.
+- **프로필:** 누르면 근처에 [프로필 보기](→ `/profile`)·[로그아웃] 메뉴가 열린다(#51). [로그아웃]은 메모리 토큰을 지우고 비로그인 홈(`/`)으로 보낸다. 서버 세션·Refresh Token은 아직 없다(OQ-A1). `MemberHeader`에 `onLogout`을 주지 않으면 [로그아웃]이 '연결 전' 표시와 함께 누를 수 없는 상태(`aria-disabled`)로 보인다.
 - **닫기 조작:** #51·#55의 미결을 [#171 A 담당 검토](https://github.com/JminAILab/CatchU/pull/171#pullrequestreview-5349302819)(9/29)로 정했다. 어느 방법으로 닫아도 창·메뉴만 닫고 현재 페이지·입력·필터·상세 상태는 그대로 둔다.
 
 | 대상 | 닫는 방법 | 초점 | 닫히지 않는 경우 |
@@ -126,7 +133,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | 주소 | 화면 | 담당 | 로그인 | 구분 | 비고 |
 |---|---|---|---|---|---|
 | `/` | 서비스 소개 | D | 불필요 | 제안 | 로그아웃 성공 후 비로그인 홈 이동은 확정(#55) |
-| `/login` | 로그인 진입 | A / 틀 D | 불필요 | 제안 | 회원 경로 가드의 이동 목적지(PR②) |
+| `/login` | 로그인 진입 | A / 틀 D | 불필요 | 제안 | 회원 경로 가드의 이동 목적지. Google 로그인은 연결 전(A), 개발용 로그인은 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`일 때만 |
 | `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 Catch 탭 저장소 연결 관리로 이동(확정) |
 | `/profile/setup` | 최초 프로필 입력 (W02) | A | 필요 | 제안 | 저장 성공 후 회원 정보를 다시 불러온 뒤 `/home` |
 | `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지 |
@@ -139,7 +146,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/s/[token]` | 수신자 링크 | C | 불필요 | 제안 | 수신자 전용 헤더 |
 | `/s/[token]/catches/[catchId]` | 수신자 Catch 상세 | C | 불필요 | 제안 | 직접 진입해도 접근 판정·비밀번호 확인 후 표시 |
 
-**주소 원칙(제안, PR②에서 적용):**
+**주소 원칙(제안):** 로그인 진입·`next` 복귀·토큰 없는 접근 차단은 적용했다. 이름 미저장 규칙(둘째·넷째 항목의 이름 판정)은 판정 함수(`decideMemberEntry`·`afterLoginPath`)와 테스트만 있고, `GET /v1/me`([#135](https://github.com/JminAILab/CatchU/issues/135))가 병합되면 가드와 로그인 진입에 연결한다. 그전에는 로그인 후 `next` 또는 `/home`으로 간다.
 - 토큰 없이 회원 경로에 들어오거나 회원 API가 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 `/login`으로 보낸다. 수신자 비밀번호 401은 수신자 화면에서 처리한다.
 - `GET /v1/me` 성공 시 `profile.displayName`이 빈 문자열이면 `/profile/setup`으로 보낸다. 조회 중에는 판단을 미루고, 조회 실패는 다시 불러오기로 처리한다. 이미 `/profile/setup`이면 다시 보내지 않는다.
 - 복귀 주소는 `/login?next=<인코딩한 경로>`로 넘기고 서비스 안 회원 경로만 허용한다. 토큰·grant는 주소에 넣지 않는다.
@@ -162,9 +169,41 @@ const result = await readApiResponse(fetch(url, options));
 
 정본은 [API 명세 v1](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)과 공통 Error 스키마다. 추가 필드는 무시하며 알려진 details만 전달한다. 새로운 업무 code도 문자열 그대로 보존하고, 화면에서 모르는 코드는 일반 오류 안내로 처리한다. 오류 응답의 필수 형식 위반·JSON 해석 실패·네트워크 실패는 `LOOKUP_FAILED`다. HTTP 응답을 받았다면 상태를 보존하고, 네트워크 실패는 `status: null`이다.
 
-정상 JSON은 그대로 반환하며 `EMPTY`·`PARTIAL_FAILED`·`FAILED` 같은 분석 결과를 HTTP 오류로 바꾸지 않는다. 204는 성공 데이터 null이다. 함수는 기능별 성공 스키마를 검증하지 않으므로 화면에서 확인해야 한다. 401도 회원 인증과 링크 비밀번호 오류를 code로 구분하며 자동 로그인 이동·토큰 처리·재시도는 하지 않는다. 해당 API 클라이언트 연결은 #106 범위다. 함수는 요청/응답이나 예외를 로그에 출력하지 않는다.
+정상 JSON은 그대로 반환하며 `EMPTY`·`PARTIAL_FAILED`·`FAILED` 같은 분석 결과를 HTTP 오류로 바꾸지 않는다. 204는 성공 데이터 null이다. 함수는 기능별 성공 스키마를 검증하지 않으므로 화면에서 확인해야 한다. 401도 회원 인증과 링크 비밀번호 오류를 code로 구분하며 자동 로그인 이동·토큰 처리·재시도는 하지 않는다. 회원 인증 401 처리는 아래 「API 호출」의 호출 함수가 맡는다. 함수는 요청/응답이나 예외를 로그에 출력하지 않는다.
 
 테스트는 새 의존성 없이 Node.js 24의 TypeScript 타입 제거와 `node --test`를 사용한다. 현재 package의 모듈 형식 미지정으로 `.ts`를 ES module로 재해석한다는 Node 경고가 나올 수 있으며, 테스트 실패는 아니다.
+
+## API 호출 (#106 PR②)
+
+화면은 `fetch`를 직접 쓰지 않고 `src/lib/api.ts`의 `api`를 쓴다. 결과는 「공통 응답 해석」과 같은 `ApiResult`다.
+
+```typescript
+import { api } from '@/lib/api';
+import { createIdempotencyKeyHolder, isSettledResult } from '@/lib/idempotency';
+
+// 회원 API: 토큰이 있으면 Authorization: Bearer를 붙인다. 경로는 /v1 뒤부터 적는다.
+const me = await api.member('/me');
+
+// 생성 POST: 같은 요청을 다시 보낼 때 같은 키를 쓴다.
+const key = createIdempotencyKeyHolder();            // 화면(폼)마다 하나
+const created = await api.member('/share-links', { method: 'POST', body, idempotencyKey: key.current() });
+if (isSettledResult(created)) key.reset();          // 성공·4xx 업무 거부(401 제외)일 때만 새 키로
+
+// 수신자 API: 회원 토큰을 붙이지 않는다. 비밀번호 링크는 grant를 X-Link-Grant로 보낸다.
+const page = await api.recipient(`/public/links/${encodeURIComponent(token)}`, { linkGrant });
+
+// 비밀번호 시도 제한(429 LINK_UNLOCK_LIMITED)이면 남은 초가 retryAfterSeconds로 온다.
+const unlock = await api.recipient(`/public/links/${encodeURIComponent(token)}/unlock`, { method: 'POST', body: { password } });
+if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLimited(unlock.retryAfterSeconds);
+```
+
+- 요청은 `cache: 'no-store'`로 보내고 쿠키를 싣지 않는다(`credentials: 'omit'`).
+- 회원 API가 401 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 그 토큰을 지운다. 회원 경로 가드가 `/login?next=<현재 경로>`로 보낸다. 수신자 401(`LINK_PASSWORD_*`)은 지우지 않고 수신자 화면이 처리한다.
+- 자동 재시도하지 않는다. 서버가 저장했는지 알 수 없는 결과(조회 실패·5xx)면 키를 유지하고, 사용자가 다시 누르면 같은 키로 보낸다. 401도 앞선 같은 키 요청의 저장 여부를 알려 주지 않으므로 키를 유지한다. 성공과 401을 뺀 4xx 업무 거부만 확정으로 본다(`isSettledResult`).
+- 로그인 복귀 후 키 보존은 아직 구현하지 않았다. 지금은 401이면 로그인 화면으로 이동하면서 화면이 다시 만들어져 키도 새로 생긴다. 후속 구현 조건: 로그인 뒤 키를 이어 쓰려면 실제 생성 화면에서 **같은 회원·같은 생성 요청일 때만** 이어 쓰고, 다른 계정으로 로그인했으면 키를 버린다. 로그인 뒤 이전 요청을 자동으로 다시 보내지 않는다.
+- 오류 응답에 `Retry-After`가 1 이상의 정수 초로 오면 `retryAfterSeconds`로 전달한다. 헤더가 없거나 다른 형식이면 붙이지 않으며, 남은 시간을 추정하지 않는다.
+- 토큰은 탭의 메모리(`src/lib/access-token.ts`)에만 둔다. localStorage·sessionStorage·쿠키·URL·로그에 쓰지 않으며, 새로고침하면 사라져 다시 로그인한다. 실제 유지 방식은 OQ-A1에서 정한다.
+- 개발용 로그인은 `api.devLogin(memberId, { signal })`다. `memberId`에는 개발용 식별 문자열을 넣으며, api가 해당 회원을 찾거나 만들어 그 회원의 토큰을 준다. 성공하면 토큰을 메모리에 넣고, 결과에는 토큰을 담지 않는다. 가장 늦게 시작한 로그인만 반영하며, 먼저 보낸 로그인이 늦게 오거나 로그인 화면을 떠나 취소되면 토큰을 바꾸지 않는다.
 
 ## 작업 규칙
 

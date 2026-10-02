@@ -86,6 +86,7 @@ npm ci
 | 구분 | 이름   | 기본값 | 의미                             |
 | ---- | ------ | ------ | -------------------------------- |
 | 선택 | `PORT` | `3001` | HTTP 포트. 정수 `1~65535`만 허용 |
+| 선택 | `CORS_ALLOWED_ORIGINS` | 없음(CORS 꺼짐) | 교차 출처 호출을 허용할 web 출처. 쉼표로 구분하고 `http://localhost:3000`처럼 출처와 정확히 같아야 한다(`*`·경로·끝 슬래시 불가, 잘못되면 기동 실패). 허용 요청 헤더는 `Authorization`·`Content-Type`·`Idempotency-Key`·`X-Link-Grant`, 노출 응답 헤더는 `Retry-After`, 쿠키(credentials)는 허용하지 않는다. 운영 값은 OQ-A1에서 정한다(#106) |
 | 선택 | `BIND_HOST` | `127.0.0.1` | HTTP 바인딩 주소. IP 주소만 허용하고 `localhost` 같은 이름은 기동 실패. `0.0.0.0`은 같은 네트워크의 다른 기기에서도 접속되므로 컨테이너 등 필요할 때만 쓴다 |
 | 필수 | `AUTH_JWT_SECRET` | 없음 | 안전한 난수 32바이트를 64자리 hex로 표현한 서명 키. 환경별로 별도 준비 |
 | 필수 | `AUTH_ACCESS_TOKEN_TTL_SECONDS` | 없음 | Access JWT 수명(초). 양의 안전한 정수이며 현재 시각과 합산 가능해야 함 |
@@ -205,6 +206,7 @@ DB를 쓰는 테스트를 추가할 때:
 | `package.json` / `package-lock.json`    | 실행·검사 명령, 도구 버전, 재현 가능한 의존성 설치 |
 | `src/main.ts`                           | 환경변수 검사, HTTP 서버 시작, 종료 훅             |
 | `src/app.module.ts`                     | 최상위 Nest 모듈과 기능 모듈 연결                  |
+| `src/cors.ts`                           | 개발용 CORS. `CORS_ALLOWED_ORIGINS`가 있을 때만 켜고 `Retry-After`를 노출(#106) |
 | `src/health/health.controller.ts`       | `GET /health` 응답                                 |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
 | `src/auth/access-token.guard.ts`       | Bearer 토큰 검증 후 요청에 인증 회원 정보 저장 |
