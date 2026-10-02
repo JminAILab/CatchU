@@ -189,6 +189,34 @@ test("같은 조회 중 D 갱신 요청이 반복되어도 후속 조회 하나�
   assert.deepEqual(store.getSnapshot().items.map((v) => v.catchId), ["new"]);
 });
 
+for (const saved of [true, false]) {
+  test(`D 갱신 예약 직전의 목록과 저장 ${saved ? "성공" : "실패"} 응답이 겹쳐도 새 Catch를 읽는다`, async () => {
+    const old = deferred(); const writeResponse = deferred(); let lists = 0; let writes = 0;
+    const current = { ...item("existing"), mismatch: saved };
+    const store = createAssetsStore(createCatchApi(async (url, options) => {
+      if (options.method === "PUT") { writes++; return writeResponse.promise; }
+      if (url.startsWith("/catches?")) return ++lists === 1 ? old.promise : page([current, item("new")]);
+      return success(item("existing"));
+    }));
+    await store.openDetail("existing");
+    const initial = store.refresh("repo-a");
+    const write = store.update({ kind: "mismatch", mismatch: true });
+    store.setManagementOpen(true);
+    store.setManagementOpen(false);
+    const closed = store.invalidateList("repo-a");
+    // 같은 턴에 목록을 먼저 완료해 ready 상태와 아직 실행 전인 갱신 예약이 겹치게 한다.
+    old.resolve(page([item("existing")]));
+    writeResponse.resolve(saved ? success(current) : fail);
+    await Promise.all([initial, write, closed]);
+    await store.selectRepository("repo-a");
+    assert.equal(lists, 2);
+    assert.equal(writes, 1);
+    assert.deepEqual(store.getSnapshot().items.map((entry) => entry.catchId), ["existing", "new"]);
+    assert.equal(store.getSnapshot().items[0].mismatch, saved);
+    assert.equal(store.getSnapshot().mutation.status, saved ? "success" : "error");
+  });
+}
+
 test("필터가 바뀌면 이전 저장소에 예약된 D 갱신을 버린다", async () => {
   const old = deferred(); const paths = [];
   const store = createAssetsStore(createCatchApi(async (path) => {
@@ -282,5 +310,133 @@ test("D 모달 열기는 Catch 상세를 닫고 dispose는 늦은 결과를 버�
   assert.equal(store.getSnapshot().detail, undefined);
   store.setManagementOpen(false);
   assert.equal(store.getSnapshot().managementOpen, false);
+});
+
+
+test("저장 API는 각 계약의 body만 보내며 확인만으로 공개를 보내지 않는다", async () => {
+  const calls = [];
+  const confirmed = { ...item("c"), confirmation: { workFactsConfirmed: true, contributionConfirmed: true } };
+  const api = createCatchApi(async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith("/confirmation")) return success(confirmed);
+    if (url.endsWith("/mismatch")) return success({ ...confirmed, mismatch: true });
+    return success({ ...confirmed, visibility: "PUBLIC" });
+  });
+  await api.update("c", { kind: "confirmation" });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "/catches/c/confirmation");
+  assert.deepEqual(calls[0].options.body, { workFactsConfirmed: true, contributionConfirmed: true });
+  await api.update("c", { kind: "mismatch", mismatch: true });
+  assert.deepEqual(calls[1].options.body, { mismatch: true });
+  await api.update("c", { kind: "visibility", visibility: "PUBLIC" });
+  assert.deepEqual(calls[2].options.body, { visibility: "PUBLIC" });
+  assert.ok(calls.every(({ options }) => options.method === "PUT" && options.cache === "no-store"));
+});
+
+test("서버가 다른 ID/요청과 다른 저장 상태를 200으로 보내도 성공하지 않는다", async () => {
+  const api = createCatchApi(async () => success(item("c")));
+  assert.equal((await api.update("c", { kind: "confirmation" })).kind, "lookup-failed");
+  assert.equal((await api.update("c", { kind: "visibility", visibility: "PUBLIC" })).kind, "lookup-failed");
+  assert.equal((await api.update("other", { kind: "mismatch", mismatch: false })).kind, "lookup-failed");
+});
+
+test("저장 응답 전에는 공개로 바꾸지 않으며 연속 조작은 PUT 하나만 보낸다", async () => {
+  const pending = deferred(); let writes = 0;
+  const store = createAssetsStore(createCatchApi(async (url, options) => {
+    if (options.method === "PUT") { writes++; return pending.promise; }
+    return url.startsWith("/catches?") ? page([item("c")]) : success(item("c"));
+  }));
+  await store.refresh("repo-a"); await store.openDetail("c");
+  const first = store.update({ kind: "visibility", visibility: "PUBLIC" });
+  const second = store.update({ kind: "visibility", visibility: "PUBLIC" });
+  assert.equal(first, second); assert.equal(writes, 1);
+  assert.equal(store.getSnapshot().detail.visibility, "PRIVATE");
+  pending.resolve(success({ ...item("c"), visibility: "PUBLIC" })); await first;
+  assert.equal(store.getSnapshot().detail.visibility, "PUBLIC");
+  assert.equal(store.getSnapshot().items[0].visibility, "PUBLIC");
+  assert.equal(store.getSnapshot().mutation.status, "success");
+});
+
+test("공개 거부/저장 결과 불명은 이전 상태를 보존하고 재조회 전 PUT을 막는다", async () => {
+  for (const error of [fail, { kind: "api-error", status: 409, code: "SOURCE_RESTRICTED", message: "보호" }]) {
+    let writes = 0;
+    const store = createAssetsStore(createCatchApi(async (_url, options) => {
+      if (options.method === "PUT") { writes++; return error; }
+      return success(item("c"));
+    }));
+    await store.openDetail("c");
+    await store.update({ kind: "visibility", visibility: "PUBLIC" });
+    assert.equal(store.getSnapshot().detail.visibility, "PRIVATE");
+    assert.equal(store.getSnapshot().mutation.status, "error");
+    await store.update({ kind: "visibility", visibility: "PUBLIC" }); assert.equal(writes, 1);
+    await store.openDetail("c", true);
+    assert.equal(store.getSnapshot().mutation, null);
+    await store.update({ kind: "visibility", visibility: "PUBLIC" }); assert.equal(writes, 2);
+  }
+});
+
+test("불일치 표시 결과는 서버의 확인·공개 값을 보존한다", async () => {
+  const original = { ...item("c"), visibility: "PUBLIC", confirmation: { workFactsConfirmed: true, contributionConfirmed: true } };
+  const store = createAssetsStore(createCatchApi(async (_url, options) => success({ ...original, mismatch: options.method === "PUT" })));
+  await store.openDetail("c");
+  await store.update({ kind: "mismatch", mismatch: true });
+  assert.equal(store.getSnapshot().detail.mismatch, true);
+  assert.equal(store.getSnapshot().detail.visibility, "PUBLIC");
+  assert.deepEqual(store.getSnapshot().detail.confirmation, original.confirmation);
+});
+
+test("저장 중 다른 Catch를 열면 이전 저장 응답을 새 상세에 적용하지 않는다", async () => {
+  const pending = deferred();
+  const store = createAssetsStore(createCatchApi(async (url, options) => options.method === "PUT" ? pending.promise
+    : success(item(url.endsWith("/b") ? "b" : "a"))));
+  await store.openDetail("a");
+  const write = store.update({ kind: "mismatch", mismatch: true });
+  await store.openDetail("b");
+  pending.resolve(success({ ...item("a"), mismatch: true })); await write;
+  assert.equal(store.getSnapshot().detail.catchId, "b");
+  assert.equal(store.getSnapshot().detail.mismatch, false);
+});
+
+test("저장 중 닫고 같은 Catch를 다시 열어도 추가 PUT·낡은 GET이 생기지 않는다", async () => {
+  const pending = deferred(); let reads = 0;
+  const store = createAssetsStore(createCatchApi(async (_url, options) => {
+    if (options.method === "PUT") return pending.promise;
+    reads++; return success(item("a"));
+  }));
+  await store.openDetail("a");
+  const write = store.update({ kind: "mismatch", mismatch: true });
+  await store.openDetail(null);
+  const reopened = store.openDetail("a");
+  assert.equal(reads, 1);
+  pending.resolve(success({ ...item("a"), mismatch: true }));
+  await Promise.all([write, reopened]);
+  assert.equal(store.getSnapshot().detail.mismatch, true);
+  assert.equal(store.getSnapshot().detailState, "ready");
+});
+
+test("저장 전 시작한 페이지 응답은 저장 완료 값을 덮어쓰지 않고 이후 페이지는 조회된다", async () => {
+  const late = deferred(); let pages = 0;
+  const store = createAssetsStore(createCatchApi(async (url, options) => {
+    if (options.method === "PUT") return success({ ...item("a"), mismatch: true });
+    if (url.includes("cursor=")) { pages++; return pages === 1 ? late.promise : options.signal.aborted ? fail : page([item("b")]); }
+    return url.startsWith("/catches?") ? page([item("a")], "next") : success(item("a"));
+  }));
+  await store.refresh("repo-a"); await store.openDetail("a");
+  const more = store.loadMore();
+  await store.update({ kind: "mismatch", mismatch: true });
+  late.resolve(page([item("a")])); await more;
+  assert.equal(store.getSnapshot().items[0].mismatch, true);
+  await store.loadMore();
+  assert.deepEqual(store.getSnapshot().items.map((v) => v.catchId), ["a", "b"]);
+});
+
+test("화면을 해제한 뒤 도착한 저장 응답은 상태를 복구하지 않는다", async () => {
+  const pending = deferred();
+  const store = createAssetsStore(createCatchApi(async (_url, options) => options.method === "PUT" ? pending.promise : success(item("c"))));
+  await store.openDetail("c");
+  const write = store.update({ kind: "mismatch", mismatch: true });
+  store.dispose();
+  pending.resolve(success({ ...item("c"), mismatch: true })); await write;
+  assert.equal(store.getSnapshot().detail, undefined);
 });
 

@@ -142,6 +142,7 @@ test('서버 저장 여부가 불명확한 결과(조회 실패·5xx)에서는 �
 
   assert.equal(isSettledResult({ kind: 'success', status: 204, data: null }), true);
   assert.equal(isSettledResult({ kind: 'api-error', status: 400, code: 'VALIDATION_FAILED', message: 'x' }), true);
+  assert.equal(isSettledResult({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'x' }), false, '401은 앞선 요청의 저장 여부를 알려 주지 않는다');
   assert.equal(isSettledResult({ kind: 'api-error', status: 503, code: 'INTERNAL_ERROR', message: 'x' }), false);
   assert.equal(isSettledResult({ kind: 'lookup-failed', status: 502, code: 'LOOKUP_FAILED' }), false);
   assert.equal(isSettledResult({ kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' }), false);
@@ -209,5 +210,53 @@ test('개발용 로그인 실패·이상한 성공 응답은 토큰을 바꾸지
   const results = [];
   for (let i = 0; i < 4; i += 1) results.push(await client.devLogin('m'));
   assert.deepEqual(results.map((r) => [r.kind, r.status]), [['api-error', 403], ['api-error', 400], ['lookup-failed', 200], ['lookup-failed', 200]]);
+  assert.deepEqual(tokens.get(), { token: null, ended: null });
+});
+
+test('인증 만료 401을 받으면 키를 유지하고, 다시 로그인한 뒤 같은 키로 보낸다', async () => {
+  const { client, calls, tokens } = setup({ responses: [
+    new TypeError('network'), authError('AUTH_INVALID'), Response.json({ linkId: 'l1' }, { status: 201 }),
+  ] });
+  tokens.set('expiring-token');
+  let generated = 0;
+  const holder = createIdempotencyKeyHolder(() => `key-${generated += 1}`);
+  const send = async () => {
+    const result = await client.member('/share-links', { method: 'POST', body: { title: 'a' }, idempotencyKey: holder.current() });
+    if (isSettledResult(result)) holder.reset();
+    return result;
+  };
+  assert.equal((await send()).kind, 'lookup-failed');
+  assert.equal((await send()).status, 401);
+  assert.equal(tokens.get().token, null);
+  tokens.set('new-token');
+  assert.equal((await send()).kind, 'success');
+  assert.deepEqual(calls.map((call) => call.headers['Idempotency-Key']), ['key-1', 'key-1', 'key-1']);
+});
+
+test('먼저 보낸 개발용 로그인이 늦게 도착해도 나중에 성공한 로그인의 토큰을 유지한다', async () => {
+  const releases = {};
+  const tokens = createAccessTokenStore();
+  const client = createApiClient({ baseUrl: BASE, tokens, fetch: (url, init) => new Promise((resolve) => {
+    releases[JSON.parse(init.body).memberId] = resolve;
+  }) });
+  const loginA = client.devLogin('member-a');
+  const loginB = client.devLogin('member-b');
+  releases['member-b'](Response.json({ accessToken: 'token-b', tokenType: 'Bearer', expiresIn: 3600 }));
+  assert.equal((await loginB).kind, 'success');
+  releases['member-a'](Response.json({ accessToken: 'token-a', tokenType: 'Bearer', expiresIn: 3600 }));
+  assert.equal((await loginA).kind, 'lookup-failed', '반영하지 않은 응답은 성공으로 돌려주지 않는다');
+  assert.equal(tokens.get().token, 'token-b');
+});
+
+test('로그인 화면을 떠나 취소된 개발용 로그인은 늦게 성공해도 토큰을 바꾸지 않는다', async () => {
+  let release;
+  const tokens = createAccessTokenStore();
+  // 실제 fetch는 취소되면 거부하지만, 응답 처리 도중 취소된 경우도 막는지 보려고 신호를 무시하는 가짜를 쓴다.
+  const client = createApiClient({ baseUrl: BASE, tokens, fetch: () => new Promise((resolve) => { release = resolve; }) });
+  const abort = new AbortController();
+  const login = client.devLogin('member-a', { signal: abort.signal });
+  abort.abort();
+  release(Response.json({ accessToken: 'token-a', tokenType: 'Bearer', expiresIn: 3600 }));
+  assert.equal((await login).kind, 'lookup-failed');
   assert.deepEqual(tokens.get(), { token: null, ended: null });
 });

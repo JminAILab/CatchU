@@ -3,18 +3,19 @@ import { Public } from './auth.decorators';
 import { AccessTokenService } from './access-token.service';
 import { DevLoginDto } from './dev-login.dto';
 import { DevLoginGuard } from './dev-login.guard';
+import { DevMemberService } from '../member-analysis/dev-member.service';
 
 @Controller('auth/dev-login')
 export class DevLoginController {
-  constructor(private readonly tokens: AccessTokenService) {}
+  constructor(private readonly tokens: AccessTokenService, private readonly members: DevMemberService) {}
 
   @Public()
   @UseGuards(DevLoginGuard)
   @Post()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
-  login(@Body() body: DevLoginDto) {
-    // #104에서 회원 행과 연결한다. 지금은 DB 존재 여부를 보장하지 않는다.
-    return this.tokens.issue(body.memberId);
+  async login(@Body() body: DevLoginDto) {
+    const memberId = await this.members.resolveMember(body.memberId);
+    return this.tokens.issue(memberId);
   }
 }
