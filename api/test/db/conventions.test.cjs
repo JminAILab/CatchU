@@ -6,7 +6,7 @@ const { inValues, lengthBetween } = require('../../dist/database/checks');
 const { SnakeNamingStrategy } = require('../../dist/database/snake-naming.strategy');
 const { openTestDataSource } = require('../support/test-database.cjs');
 
-// README 「DB 물리 규약」대로 쓴 검증용 엔티티. 제품 src/에 두지 않고, 테이블을 만들지 않고 생성될 SQL만 본다.
+// CONVENTIONS.md 「DB 물리 규약」대로 쓴 검증용 엔티티. 제품 src/에 두지 않고, 테이블을 만들지 않고 생성될 SQL만 본다.
 class ProbeOwner {}
 Entity()(ProbeOwner);
 PrimaryColumn({ type: 'uuid' })(ProbeOwner.prototype, 'probeOwnerId');

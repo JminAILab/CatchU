@@ -72,7 +72,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:3001/v1/auth/d
 - 첫 줄: `HTTP/1.1 200 OK`와 `{"status":"ok"}`. 이 응답은 DB 상태를 보지 않는다. DB가 꺼져 있으면 api가 아예 켜지지 않는다.
 - 둘째 줄: `200`. 개발용 로그인이 켜져 있다는 뜻이다. 토큰은 출력하지 않는다. `403`이면 `.env`의 `DEV_LOGIN_ENABLED`와 `NODE_ENV`를 본다.
 
-**보호 경로 호출(선택).** 지금 dev의 api에는 로그인이 필요한 제품 경로가 아직 없다. 받은 토큰으로 보호 경로를 불러 보려면 [api README 「검토자 재현」](../api/README.md#검토자-재현--readme만-보고-보호-api-추가호출)의 확인용 컨트롤러를 잠시 추가하고, 확인이 끝나면 지운다. 토큰은 변수에만 담는다.
+**보호 경로 호출(선택).** 지금 dev의 api에는 로그인이 필요한 제품 경로가 아직 없다. 받은 토큰으로 보호 경로를 불러 보려면 [api 「검토자 재현」](../api/docs/auth-review.md)의 확인용 컨트롤러를 잠시 추가하고, 확인이 끝나면 지운다. 토큰은 변수에만 담는다.
 
 ```sh
 TOKEN=$(curl -s -X POST http://127.0.0.1:3001/v1/auth/dev-login -H 'Content-Type: application/json' -d '{"memberId":"local-member-1"}' | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s).accessToken))")
