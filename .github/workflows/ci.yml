@@ -138,7 +138,7 @@ jobs:
         working-directory: worker
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0 # 이 action은 주 판본 태그(v10)를 내지 않는다.
         with:
           version: '0.12.18' # worker README 「도구와 버전」의 기준. 저장소 설정에는 uv 판본 고정이 없다.
           working-directory: worker
