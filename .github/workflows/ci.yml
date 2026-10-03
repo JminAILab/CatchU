@@ -47,8 +47,8 @@ jobs:
               case "$file" in web/*) web=true ;; esac
               # api 테스트는 worker 합성 자료와 계약 YAML도 읽는다.
               case "$file" in api/* | worker/fixtures/* | "$contract"*) api=true ;; esac
-              # worker 메시지 검사는 계약 YAML을 읽는다.
-              case "$file" in worker/* | "$contract"*) worker=true ;; esac
+              # worker 메시지 검사는 계약 YAML을 읽고, ruff는 루트 .gitignore에 적힌 파일을 검사에서 뺀다.
+              case "$file" in worker/* | "$contract"* | .gitignore) worker=true ;; esac
             done <<< "$files"
           fi
           printf 'web=%s\napi=%s\nworker=%s\n' "$web" "$api" "$worker" | tee -a "$GITHUB_OUTPUT"
