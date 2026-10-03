@@ -149,7 +149,7 @@ docker stop catchu-db
 | CORS 허용 주소 | `CORS_ALLOWED_ORIGINS` | api | web 주소(`http://localhost:3000`) | 아님 | web을 여는 주소 |
 | worker 주소 | 환경변수 없음. 실행 명령의 `--host`·`--port` | worker | `127.0.0.1` · `8000` | 아님 | api→worker 연결 설정은 큐 작업([#77][i77])에서 정한다 |
 | web 포트 | 환경변수 없음. 실행 인자 `-p` | web | `3000` | 아님 | CORS 허용 주소. `.env`의 `PORT`는 적용되지 않는다 |
-| 공유 링크 기준 주소 | 아직 없음 | 정하지 않음 | 없음 | 아님 | 공유 링크 발급 작업에서 정한다 |
+| 공유 링크 기준 주소 | `SHARE_LINK_WEB_BASE_URL`([#147][i147]) | api | 비우면 `http://localhost:3000` | 아님 | web을 여는 주소. 배포(`NODE_ENV=production`)에서 없으면 api 기동 실패 |
 
 `BIND_HOST`는 IP 주소만 받는다. `0.0.0.0`으로 바꾸면 같은 네트워크의 다른 기기에서도 api에 접속되므로 컨테이너처럼 다른 주소에서 들어와야 할 때만 쓴다.
 
@@ -172,5 +172,6 @@ Dockerfile·Compose, NCP 배포·복구([#24][i24]), 실제 큐 연결([#77][i77
 [i24]: https://github.com/JminAILab/CatchU/issues/24
 [i77]: https://github.com/JminAILab/CatchU/issues/77
 [i106]: https://github.com/JminAILab/CatchU/issues/106
+[i147]: https://github.com/JminAILab/CatchU/issues/147
 [i107]: https://github.com/JminAILab/CatchU/issues/107
 [r174]: https://github.com/JminAILab/CatchU/pull/174#pullrequestreview-5349715690

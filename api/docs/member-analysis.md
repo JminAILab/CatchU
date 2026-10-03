@@ -78,7 +78,7 @@ C의 기존 회원 단위 발급 잠금은 create 안에서 획득한다. 호출
 
 B는 `member_account.member_id`, `analysis_request.request_id/member_id/repository_id/current_attempt_id`, `analysis_attempt.attempt_id/request_id/source_mode`를 참조할 수 있다. B의 외부 FK 엔티티 메타데이터 연결과 전체 적용 순서는 해당 연결 PR에서 다시 검사한다. ResultApplicationRecord·ReceiverStore·B 호출·보호 관찰 공급이 없으므로 이번 선행 테이블만으로 #143/#157 전체 연결 완료가 아니다.
 
-ShareLink 생성 마이그레이션과 `idempotency_record.link_id → share_link.link_id` FK·엔티티 메타데이터 추가는 **C 담당**이다. 공통 함수의 link 소유자 조회는 실제 C 테이블이 준비된 뒤 사용한다. 되돌릴 때는 B/C·수신 기록의 종속 FK/테이블을 먼저 되돌린다. #104 down은 자기 일곱 테이블·트리거만 제거하며 CASCADE로 후속 테이블을 지우지 않는다.
+ShareLink 생성 마이그레이션과 `idempotency_record.link_id → share_link.link_id` FK·엔티티 메타데이터는 C 담당으로 #147에서 추가했다([share-links.md](share-links.md), 복합 FK `(link_id, member_id)`). 되돌릴 때는 B/C·수신 기록의 종속 FK/테이블을 먼저 되돌린다. #104 down은 자기 일곱 테이블·트리거만 제거하며 CASCADE로 후속 테이블을 지우지 않는다.
 
 ## 검사와 검토
 

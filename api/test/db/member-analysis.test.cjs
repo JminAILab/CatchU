@@ -307,37 +307,38 @@ test('트랜잭션 없음·더 높은 격리 수준은 생성 전에 거부', as
 });
 
 test('C 링크 연결: 같은 지문·다른 비밀번호 판정은 409, 같은 manager로 만든 링크만 재생', async()=>{
-  // 제품 C 테이블을 구현하지 않는다. 실제 공통 멱등 처리를 검증하기 위한 최소 SQL 대역.
-  await db.query('CREATE TABLE share_link (link_id uuid PRIMARY KEY, owner_id uuid NOT NULL REFERENCES member_account(member_id), verifier text NOT NULL)');
-  try {
-    const id=await dev().resolveMember('link');
-    const k=key(id,{operation:'createShareLink'});
-    let comparisons=0;
-    const cb=(password)=>({
-      async create(m){
-        const linkId=randomUUID();
-        await m.query('INSERT INTO share_link VALUES ($1,$2,$3)',[linkId,id,fingerprint(password)]);
-        return {requestId:null,linkId,responseReference:linkId};
-      },
-      async isSame(m,r){
-        comparisons++;
-        const [link]=await m.query('SELECT * FROM share_link WHERE link_id=$1',[r.linkId]);
-        return link.verifier===fingerprint(password); // 합성 비교 대역. 실제 C는 scrypt isSameShareCreate.
-      },
-      async readResponse(m,r){
-        const [link]=await m.query('SELECT link_id FROM share_link WHERE link_id=$1',[r.linkId]);
-        return link;
-      }
-    });
-    const first=await transaction(m=>runIdempotentCreation(m,k,cb('first')));
-    assert.deepEqual((await transaction(m=>runIdempotentCreation(m,k,cb('first')))).response,first.response);
-    await assert.rejects(transaction(m=>runIdempotentCreation(m,k,cb('different'))),e=>e.code==='IDEMPOTENCY_CONFLICT');
-    assert.equal(comparisons,2);
-    assert.equal((await db.query('SELECT count(*)::int AS n FROM share_link'))[0].n,1);
-    // DB나 기록 오류를 비밀번호 불일치로 바꾸지 않는다.
-    await db.query('DELETE FROM share_link');
-    await assert.rejects(transaction(m=>runIdempotentCreation(m,k,cb('first'))),/owner reference/);
-  } finally { await db.query('DROP TABLE share_link'); }
+  // 실제 C 테이블(share_link, #147 마이그레이션)에 합성 비교값을 넣어 공통 멱등 처리만 검증한다.
+  // 실제 C 발급·scrypt 비교는 test/db/share-links-api.test.cjs가 검증한다.
+  const id=await dev().resolveMember('link');
+  const k=key(id,{operation:'createShareLink'});
+  let comparisons=0;
+  const cb=(password)=>({
+    async create(m){
+      const linkId=randomUUID();
+      await m.query(`INSERT INTO share_link (link_id, owner_id, title, link_token_reference, password_protection_reference, issued_at, expires_at)
+        VALUES ($1,$2,'합성 링크',$3,$4,now(),now()+interval '720 hours')`,[linkId,id,randomUUID(),fingerprint(password)]);
+      return {requestId:null,linkId,responseReference:linkId};
+    },
+    async isSame(m,r){
+      comparisons++;
+      const [link]=await m.query('SELECT password_protection_reference AS verifier FROM share_link WHERE link_id=$1',[r.linkId]);
+      return link.verifier===fingerprint(password); // 합성 비교 대역. 실제 C는 scrypt isSameShareCreate.
+    },
+    async readResponse(m,r){
+      const [link]=await m.query('SELECT link_id FROM share_link WHERE link_id=$1',[r.linkId]);
+      return link;
+    }
+  });
+  const first=await transaction(m=>runIdempotentCreation(m,k,cb('first')));
+  assert.deepEqual((await transaction(m=>runIdempotentCreation(m,k,cb('first')))).response,first.response);
+  await assert.rejects(transaction(m=>runIdempotentCreation(m,k,cb('different'))),e=>e.code==='IDEMPOTENCY_CONFLICT');
+  assert.equal(comparisons,2);
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM share_link'))[0].n,1);
+  // 비교 중 기록 불일치·DB 오류는 409로 감싸지 않고 그대로 서버 오류로 전달한다.
+  await assert.rejects(transaction(m=>runIdempotentCreation(m,k,{...cb('first'),async isSame(){throw new Error('synthetic record inconsistency');}})),
+    e=>e.message==='synthetic record inconsistency'&&e.code!=='IDEMPOTENCY_CONFLICT');
+  // 기록이 가리키는 링크는 DB 외래 키 때문에 지울 수 없다(없는 링크를 가리키는 기록이 생기지 않음).
+  await assert.rejects(db.query('DELETE FROM share_link'),/fk_idempotency_record_link_id_member_id/);
 });
 
 test('개발 로그인 HTTP 토큰의 UUID로 실제 분석 FK를 저장하며 반복 발급도 같은 회원', async (t)=>{
@@ -388,9 +389,11 @@ test('일곱 테이블은 빈 스키마에 up/down/re-up 가능하고 엔티티�
   try {
     await isolated.runMigrations();
     const tables=await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema]);
-    assert.equal(tables.length,8,'일곱 테이블 + migrations');
+    assert.equal(tables.length,9,'일곱 테이블 + C share_link(#147) + migrations');
     const diff=await isolated.driver.createSchemaBuilder().log();
     assert.deepEqual(diff.upQueries.map(q=>q.query),[]);
+    await isolated.undoLastMigration(); // #147 share_link
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).length,8);
     await isolated.undoLastMigration();
     assert.deepEqual((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).map(x=>x.tablename),['migrations']);
     await isolated.runMigrations();

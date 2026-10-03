@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Check, Column, Entity, ForeignKey, Index, PrimaryColumn, Unique } from 'typeorm';
 import { inValues, lengthBetween } from '../database/checks';
+import { ShareLink } from '../share-links/share-link.entity';
 
 const deferred = { deferrable: 'INITIALLY DEFERRED' as const };
 
@@ -126,6 +127,8 @@ export type CreationOperation = 'createAnalysisRequest' | 'createShareLink';
 @Unique(['memberId', 'operation', 'key'])
 @ForeignKey(() => MemberAccount, ['memberId'], ['memberId'])
 @ForeignKey(() => AnalysisRequest, ['requestId', 'memberId'], ['requestId', 'memberId'], deferred)
+// 링크가 있고 그 소유자가 이 기록의 회원임을 DB에서도 보장한다(#147).
+@ForeignKey(() => ShareLink, ['linkId', 'memberId'], ['linkId', 'ownerId'])
 @Check(inValues('operation', ['createAnalysisRequest', 'createShareLink']))
 @Check(lengthBetween('key', 1, 128))
 @Check(`"request_fingerprint" ~ '^[0-9a-f]{64}$'`)
@@ -139,7 +142,6 @@ export class IdempotencyRecord {
   @Column({ type: 'text' }) key!: string;
   @Column({ type: 'text' }) requestFingerprint!: string;
   @Column({ type: 'uuid', nullable: true }) requestId: string | null = null;
-  // ShareLink의 FK는 C의 마이그레이션·엔티티 연결에서 추가한다.
   @Column({ type: 'uuid', nullable: true }) linkId: string | null = null;
   @Column({ type: 'text' }) responseReference!: string;
 }

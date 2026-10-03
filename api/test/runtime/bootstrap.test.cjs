@@ -125,7 +125,8 @@ for (const source of [false, true]) {
 }
 
 test('main: 터미널 production 설정이 env 파일보다 우선하여 개발 로그인을 거부한다', { timeout: 15000 }, async (t) => {
-  const server = await launch(t, { environment: { NODE_ENV: 'production' } });
+  // production은 공유 URL 주소가 필수(#147)라 합성 주소를 함께 준다.
+  const server = await launch(t, { environment: { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example' } });
   await server.ready();
   const response = await server.request('/v1/auth/dev-login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
