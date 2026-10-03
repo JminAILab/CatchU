@@ -1,6 +1,6 @@
 # CatchU 로컬 통합 실행 안내
 
-> **지위: 안내** · 한 컴퓨터에서 PostgreSQL·api·worker·web을 함께 띄우는 로컬 개발용 순서다. 작성자가 macOS에서, 작성자 외 1명이 Windows의 새 작업 폴더에서 1~4단계와 끄는 순서를 따라 해 확인했다([PR #174 리뷰][r174]). web 화면을 거친 로그인 확인은 남아 있다([#107][i107]). 각 서비스의 설치·검사 상세는 서비스 README가 정본이다.
+> **지위: 안내** · 한 컴퓨터에서 PostgreSQL·api·worker·web을 함께 띄우는 로컬 개발용 순서다. 작성자가 macOS에서, 작성자 외 1명이 Windows의 새 작업 폴더에서 1~4단계와 끄는 순서를 따라 해 확인했다([PR #174 리뷰][r174]). 5단계(web 화면 로그인 → 보호 경로 호출)는 작성자 외 1명이 Linux 브라우저에서 확인했다([PR #185][p185] 「확인」, [#107][i107]). 각 서비스의 설치·검사 상세는 서비스 README가 정본이다.
 
 ## 한눈에 보기
 
@@ -72,7 +72,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:3001/v1/auth/d
 - 첫 줄: `HTTP/1.1 200 OK`와 `{"status":"ok"}`. 이 응답은 DB 상태를 보지 않는다. DB가 꺼져 있으면 api가 아예 켜지지 않는다.
 - 둘째 줄: `200`. 개발용 로그인이 켜져 있다는 뜻이다. 토큰은 출력하지 않는다. `403`이면 `.env`의 `DEV_LOGIN_ENABLED`와 `NODE_ENV`를 본다.
 
-**보호 경로 호출(선택).** 지금 dev의 api에는 로그인이 필요한 제품 경로가 아직 없다. 받은 토큰으로 보호 경로를 불러 보려면 [api 「검토자 재현」](../api/docs/auth-review.md)의 확인용 컨트롤러를 잠시 추가하고, 확인이 끝나면 지운다. 토큰은 변수에만 담는다.
+**보호 경로 호출(선택).** 로그인이 필요한 제품 경로는 지금 공유 링크 발급(`POST /v1/share-links`) 하나다. 이 경로는 요청 본문을 갖춰 보내야 성공하므로(빈 본문은 `400`), 받은 토큰이 통하는지만 보려면 [api 「검토자 재현」](../api/docs/auth-review.md)의 확인용 컨트롤러를 잠시 추가하고, 확인이 끝나면 지운다. 토큰은 변수에만 담는다.
 
 ```sh
 TOKEN=$(curl -s -X POST http://127.0.0.1:3001/v1/auth/dev-login -H 'Content-Type: application/json' -d '{"memberId":"local-member-1"}' | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s).accessToken))")
@@ -81,7 +81,7 @@ printf 'Authorization: Bearer %s\n' "$TOKEN" | curl -s -w ' %{http_code}\n' -H @
 unset TOKEN
 ```
 
-토큰 없이는 `AUTH_REQUIRED` 본문과 `401`, 토큰을 붙이면 `{"memberId":"local-member-1"} 200`이 나온다. 로그인이 필요한 기능 API가 dev에 들어오면 확인용 컨트롤러 대신 그 경로로 확인해도 된다.
+토큰 없이는 `AUTH_REQUIRED` 본문과 `401`, 토큰을 붙이면 `{"memberId":"<회원 UUID>"}`와 `200`이 나온다. 개발용 로그인은 입력한 문자열로 회원을 찾거나 만들어 그 회원의 UUID를 토큰에 넣으므로, 같은 문자열로 다시 로그인하면 같은 UUID가 나온다. 확인용 컨트롤러 없이도 토큰 없이 `POST /v1/share-links`를 부르면 같은 `401`이 나온다.
 
 ### 3. worker
 
@@ -175,3 +175,4 @@ Dockerfile·Compose, NCP 배포·복구([#24][i24]), 실제 큐 연결([#77][i77
 [i147]: https://github.com/JminAILab/CatchU/issues/147
 [i107]: https://github.com/JminAILab/CatchU/issues/107
 [r174]: https://github.com/JminAILab/CatchU/pull/174#pullrequestreview-5349715690
+[p185]: https://github.com/JminAILab/CatchU/pull/185
