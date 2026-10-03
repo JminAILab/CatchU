@@ -221,13 +221,13 @@ chore: worker 의존성에 httpx 추가
 | 리뷰 대화 해소 후 머지 (Require conversation resolution before merging) | ✅ | ✅ |
 | 강제 푸시 차단 (Block force pushes) | ✅ | ✅ |
 | 삭제 차단 (Restrict deletions) | ✅ | ✅ |
-| 필수 상태 검사 (Require status checks to pass) | ⬜ 배포 PR을 시작할 때 정함 | ✅ `changes`·`docs-size`·`web`·`api`·`worker` (`dev-ci`) |
+| 필수 상태 검사 (Require status checks to pass) | ⬜ 배포 PR을 시작할 때 정함 | ✅ `changes`·`docs-size`·`web`·`api`·`worker` (`dev-ci`, PR #208 머지 직후 적용) |
 
 켜지 않기로 한 항목은 이 표에 없다 — 그 목록과 사유는 §6에 있다.
 
 `main`·`dev` ruleset은 내용이 같아도 **분리해서 유지한다.** 브랜치마다 필수 상태 검사를 따로 정할 수 있게 하기 위해서다. 필수 상태 검사의 이름은 [CI](../.github/workflows/ci.yml)의 job 이름이므로, job 이름을 바꾸면 `dev-ci`도 함께 고친다.
 
-**우회 권한(bypass)**: 조직 역할이 Organization admin인 사람(현재 이재민 1인)에 한해 **"pull request에 한해서만"**. PR을 여는 것 자체는 면제되지 않고 승인 대기만 면제된다. 전면 우회를 주지 않은 이유는 §3에 있다 — PR 없이 머지하면 머지 커밋이 생기지 않아 "이 커밋들이 한 작업이었다"는 기록이 남지 않는다. 우회 권한은 그 ruleset의 규칙에만 적용되며, `dev-ci`에는 우회 권한을 두지 않았다. 그래서 승인 대기를 건너뛰는 우회 병합도 CI는 통과해야 한다. CI 고장으로 아무도 머지하지 못하면 Organization admin이 `dev-ci`를 잠시 끄고, 끈 사실과 이유를 관련 이슈에 남긴다.
+**우회 권한(bypass)**: 조직 역할이 Organization admin인 사람(현재 이재민 1인)에 한해 **"pull request에 한해서만"**. PR을 여는 것 자체는 면제되지 않고 승인 대기만 면제된다. 전면 우회를 주지 않은 이유는 §3에 있다 — PR 없이 머지하면 머지 커밋이 생기지 않아 "이 커밋들이 한 작업이었다"는 기록이 남지 않는다. 우회 권한은 그 ruleset의 규칙에만 적용되며, `dev-ci`에는 우회 권한을 두지 않는다. 그래서 승인 대기를 건너뛰는 우회 병합도 CI는 통과해야 한다. CI 고장으로 아무도 머지하지 못하면 Organization admin이 `dev-ci`를 잠시 끄고, 끈 사실과 이유를 관련 이슈에 남긴다.
 
 ### 팀원의 레포 접근 권한 등급
 
@@ -275,4 +275,4 @@ chore: worker 의존성에 httpx 추가
 - **2026-09-21** — PR #16에서 동의한 AI-DLC intent 브랜치 예외의 상세를 §2.1에 연결했다(PR #74 검토 대상). 이번 web 모의 시연의 목적·PR 대상·종료·최신화와 Unit/Bolt를 생성하지 않는 관계를 명시한다. 브랜치 생성·보호 설정·코드 병합을 완료한 기록은 아니다.
 - **2026-09-23** — 팀장 결정([작업관리 코딩 운영](CatchU_작업관리.md#코딩-운영))에 따라 10월 MVP 코딩은 `dev` PR로 진행하고 AI-DLC Construction의 intent 통합 브랜치·Bolt 경계 rebase를 적용하지 않는다고 §2에 적었다. 머지 전 CI는 CI 도입 전까지 머지 조건이 아니다.
 - **2026-09-24** — 팀장 결정으로 AI-DLC intent `260920-catchu-web-mock`(9/30 web 모의 시연)을 더 진행하지 않아 §2.1의 적용 안내를 중단 기록으로 표시했다. 안내 내용은 소급 수정하지 않았고, §2.1 첫 문단의 PR #16 예외 설명은 바꾸지 않았다.
-- **2026-10-03** — dev 대상 PR의 CI를 도입하고 dev에 필수 상태 검사를 걸었다([#201](https://github.com/JminAILab/CatchU/issues/201), 팀장 결정). 검사는 각 서비스 README의 기존 명령과 AI가 읽는 문서의 크기 상한이다. 관련 경로가 바뀌지 않은 서비스의 검사는 건너뛰어 Actions 사용 시간을 줄인다. 경로 조건을 워크플로 전체에 걸면 필수 검사가 대기 상태로 남으므로 job 단위로 건너뛴다. 필수 상태 검사는 우회 권한이 없는 별도 ruleset `dev-ci`에 두었다. 문서 크기 검사 대상이 주로 팀장이 우회 병합하는 문서라, 우회 병합도 CI는 통과하게 하기 위해서다. main의 필수 상태 검사는 배포 PR을 시작할 때 정한다. §2 「dev의 검증」과 §7을 고쳤다.
+- **2026-10-03** — dev 대상 PR의 CI를 도입하고 dev에 필수 상태 검사를 걸기로 했다([#201](https://github.com/JminAILab/CatchU/issues/201), 팀장 결정). 검사는 각 서비스 README의 기존 명령과 AI가 읽는 문서의 크기 상한이다. 관련 경로가 바뀌지 않은 서비스의 검사는 건너뛰어 Actions 사용 시간을 줄인다. 경로 조건을 워크플로 전체에 걸면 필수 검사가 대기 상태로 남으므로 job 단위로 건너뛴다. 필수 상태 검사는 우회 권한이 없는 별도 ruleset `dev-ci`에 둔다. 적용은 CI가 dev에 들어간 PR #208의 머지 직후이며, 적용과 확인 결과는 #201에 남긴다. 문서 크기 검사 대상이 주로 팀장이 우회 병합하는 문서라, 우회 병합도 CI는 통과하게 하기 위해서다. main의 필수 상태 검사는 배포 PR을 시작할 때 정한다. §2 「dev의 검증」과 §7을 고쳤다.
