@@ -29,7 +29,7 @@ function constraintName(prefix: string, parts: string[]): string {
 
 /**
  * 테이블·칼럼은 snake_case, 제약·인덱스는 접두사가 붙은 결정적 이름으로 만든다.
- * 이름은 규칙이 만들므로 엔티티에서 제약·인덱스 이름을 직접 쓰지 않는다(api/README.md 「DB 물리 규약」).
+ * 이름은 규칙이 만들므로 엔티티에서 제약·인덱스 이름을 직접 쓰지 않는다(api/CONVENTIONS.md 「DB 물리 규약」).
  */
 export class SnakeNamingStrategy extends DefaultNamingStrategy implements NamingStrategyInterface {
   override tableName(targetName: string, userSpecifiedName: string | undefined): string {

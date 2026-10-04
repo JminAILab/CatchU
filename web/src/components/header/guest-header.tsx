@@ -14,7 +14,7 @@ export function GuestHeader() {
         <Link href={routes.landing} className={styles.brand}>
           CatchU
         </Link>
-        {/* 실제 로그인 화면은 A 담당, 진입 주소는 #106 PR②에서 연결한다. */}
+        {/* 로그인 진입(/login). 실제 Google 로그인 연결은 A 담당(OQ-A1)이다. */}
         <Link href={routes.login} className={styles.startButton}>
           Google로 시작하기
         </Link>

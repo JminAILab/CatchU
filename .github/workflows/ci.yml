@@ -1,0 +1,151 @@
+# dev 대상 PR의 최소 CI(#201). 각 서비스 README의 기존 검사 명령을 그대로 실행한다.
+# 서비스 job은 관련 경로가 바뀐 경우에만 돌고, 아니면 건너뛴다. 건너뛴 job은 필수 상태 검사에서 통과로 취급된다.
+# 필수 상태 검사로 거는 job 이름(changes·docs-size·web·api·worker)을 바꾸면 dev ruleset도 함께 고친다.
+name: CI
+
+on:
+  pull_request:
+    branches: [dev]
+  push:
+    branches: [dev]
+  workflow_dispatch: # 수동 실행은 경로와 관계없이 모든 서비스를 검사한다.
+
+permissions:
+  contents: read
+
+# 같은 PR에 새 push가 오면 이전 실행을 취소한다. dev push와 수동 실행은 커밋마다 따로 돈다.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.detect.outputs.web }}
+      api: ${{ steps.detect.outputs.api }}
+      worker: ${{ steps.detect.outputs.worker }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - id: detect
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          # PR은 GitHub이 만든 시험 병합 커밋, dev push는 PR의 merge commit이라 첫 부모와 비교하면 그 PR의 변경 전체가 나온다.
+          contract=aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/
+          web=false api=false worker=false
+          if [ "$EVENT" = workflow_dispatch ] || ! git rev-parse -q --verify HEAD^1 >/dev/null; then
+            web=true api=true worker=true
+          else
+            files=$(git -c core.quotePath=false diff --name-only --no-renames HEAD^1 HEAD)
+            while IFS= read -r file; do
+              case "$file" in .github/workflows/ci.yml) web=true api=true worker=true ;; esac
+              case "$file" in web/*) web=true ;; esac
+              # api 테스트는 worker 합성 자료와 계약 YAML도 읽는다.
+              case "$file" in api/* | worker/fixtures/* | "$contract"*) api=true ;; esac
+              # worker 메시지 검사는 계약 YAML을 읽고, ruff는 루트 .gitignore에 적힌 파일을 검사에서 뺀다.
+              case "$file" in worker/* | "$contract"* | .gitignore) worker=true ;; esac
+            done <<< "$files"
+          fi
+          printf 'web=%s\napi=%s\nworker=%s\n' "$web" "$api" "$worker" | tee -a "$GITHUB_OUTPUT"
+          printf '### 실행할 서비스 검사\n\n| web | api | worker |\n|---|---|---|\n| %s | %s | %s |\n' \
+            "$web" "$api" "$worker" >> "$GITHUB_STEP_SUMMARY"
+
+  docs-size:
+    name: docs-size
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash .github/scripts/check-doc-sizes.sh
+
+  web:
+    name: web
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.node-version
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      # lint → typecheck → test → build → check:run(next start로 GET / 확인)
+      - run: npm run check
+
+  api:
+    name: api
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: api
+    env:
+      # 러너 기본값 UTC에서는 timestamptz 테스트의 '현지 시각 ≠ UTC' 경우가 빠지므로 팀 로컬과 같은 시간대로 둔다.
+      TZ: Asia/Seoul
+    services:
+      # api README 「DB 테스트」의 docker run과 같은 값이다. 테스트 실행기의 기본 TEST_DB_*와 맞으므로 따로 넘기지 않는다.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: catchu
+          POSTGRES_PASSWORD: catchu_local
+          POSTGRES_DB: catchu_test
+        ports:
+          - 5433:5432
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd "pg_isready -U catchu -d catchu_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: api/package.json
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      # npm test와 test:analysis-fixtures는 각자 빌드부터 한다.
+      - run: npm test
+      - run: npm run test:analysis-fixtures
+
+  worker:
+    name: worker
+    needs: changes
+    if: needs.changes.outputs.worker == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0 # 이 action은 주 판본 태그(v10)를 내지 않는다.
+        with:
+          version: '0.12.18' # worker README 「도구와 버전」의 기준. 저장소 설정에는 uv 판본 고정이 없다.
+          working-directory: worker
+          cache-dependency-glob: uv.lock
+      - run: uv python install # .python-version(3.12.10)
+      - run: uv sync --locked
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+      - run: uv run --locked mypy
+      - run: uv run --locked pytest

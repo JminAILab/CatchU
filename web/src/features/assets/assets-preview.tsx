@@ -30,7 +30,7 @@ export function AssetsPreview() {
   }
 
   return (
-    <div className={styles.preview}>
+    <div className={`${styles.preview} ${styles.standalonePreview}`}>
       <aside className={styles.previewToolbar} aria-label="개발용 미리보기 도구">
         <div><strong>CatchU · 내 자산 미리보기</strong><p>모두 임시 데이터입니다. 실제 로그인·분석·저장·공개는 실행하지 않습니다.</p></div>
         <div className={styles.previewControls}>

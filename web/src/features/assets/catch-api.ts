@@ -33,10 +33,12 @@ export function isCatch(value: unknown): value is CatchAsset {
     && ["NONE", "SOURCE_PRIVATE"].includes(value.restriction as string) && ["MOCK", "LIVE"].includes(value.sourceMode as string);
 }
 
-export function catchErrorText(error: CatchFailure | null): string {
+export function catchErrorText(error: CatchFailure | null, context: "catch" | "list" = "catch"): string {
   if (error?.kind === "api-error") {
     if (error.status === 401) return "로그인이 필요합니다. 다시 로그인한 뒤 확인해 주세요.";
-    if (error.code === "RESOURCE_UNAVAILABLE") return "이 Catch를 열 수 없습니다. 목록으로 돌아가 주세요.";
+    if (error.code === "RESOURCE_UNAVAILABLE") return context === "list"
+      ? "목록을 불러올 수 없습니다. 다시 불러와 주세요."
+      : "이 Catch를 열 수 없습니다. 목록으로 돌아가 주세요.";
     if (error.code === "CONFIRMATION_REQUIRED") return "작업 사실과 나의 기여를 먼저 확인해 주세요.";
     if (error.code === "SOURCE_RESTRICTED") return "원본 저장소가 보호되어 지금은 공개할 수 없습니다.";
   }
@@ -65,11 +67,24 @@ export function createCatchApi(transport: MemberTransport) {
           && v.items.every((item) => !repositoryId || item.repositoryId === repositoryId)
           && record(v.page) && (v.page.nextCursor === null || nonempty(v.page.nextCursor)));
     },
+    update(catchId: string, change: CatchChange) {
+      const body = change.kind === "confirmation" ? { workFactsConfirmed: true, contributionConfirmed: true }
+        : change.kind === "mismatch" ? { mismatch: change.mismatch } : { visibility: change.visibility };
+      return request(`/catches/${encodeURIComponent(catchId)}/${change.kind}`, { method: "PUT", cache: "no-store", body },
+        (v): v is CatchAsset => isCatch(v) && v.catchId === catchId
+          && (change.kind === "confirmation" ? v.confirmation.workFactsConfirmed && v.confirmation.contributionConfirmed
+            : change.kind === "mismatch" ? v.mismatch === change.mismatch : v.visibility === change.visibility));
+    },
     detail(catchId: string, signal?: AbortSignal) {
       return request(`/catches/${encodeURIComponent(catchId)}`, { method: "GET", cache: "no-store", signal },
         (v): v is CatchAsset => isCatch(v) && v.catchId === catchId);
     },
   };
 }
+export type CatchChange =
+  | { kind: "confirmation" }
+  | { kind: "mismatch"; mismatch: boolean }
+  | { kind: "visibility"; visibility: "PRIVATE" | "PUBLIC" };
+
 export type CatchApi = ReturnType<typeof createCatchApi>;
 
