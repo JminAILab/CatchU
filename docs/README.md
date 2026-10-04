@@ -34,7 +34,7 @@
 **처음 읽는다면**: 승인된 요구사항(아래 「AI-DLC 산출물과의 관계」) → 카드생성논리 → 페르소나 P1~P4.
 페르소나는 본문을 먼저 읽고, 그 판단의 근거·검증 상태가 궁금할 때 같은 번호의 설계 노트를 편다.
 **화면을 만든다면**: 승인된 요구사항과 범위 문서(`aidlc/`)를 기준으로 한다. 이전 화면목록·설계원칙은 2026-09-11에 삭제했다(아래 「정리 기록」).
-**작업을 시작한다면**: 그라운드룰 + 레포 컨벤션 + [작업관리](CatchU_작업관리.md). 코딩할 때는 [코딩 절차](CatchU_coding_procedures.md)·[보안 점검](CatchU_security_checks.md)과 해당 작업의 이슈·계약과 필요한 서비스의 [web](../web/README.md)·[api](../api/README.md)·[worker](../worker/README.md) README를 함께 확인한다.
+**작업을 시작한다면**: 그라운드룰 + 레포 컨벤션 + [작업관리](CatchU_작업관리.md). 코딩할 때는 [코딩 절차](CatchU_coding_procedures.md)와 해당 작업의 이슈·계약과 필요한 서비스의 [web](../web/README.md)·[api](../api/README.md)·[worker](../worker/README.md) README를 함께 확인하고, 권한·입력·출력·인증·설정·외부 호출·의존성·LLM을 바꾸면 [보안 점검](CatchU_security_checks.md)도 읽는다.
 
 ## 문서의 무게
 
