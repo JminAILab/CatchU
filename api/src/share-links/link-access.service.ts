@@ -53,7 +53,7 @@ export class LinkAccessService {
 
   /**
    * 비밀번호 확인(POST /v1/public/links/{token}/unlock). 성공하면 이 링크 한정 grant를 준다.
-   * `clientAddress`는 시도 제한을 세는 접속지다(현재 직접 연결 주소, 신뢰 프록시는 배포에서 정함).
+   * `clientAddress`는 시도 제한을 세는 주소 단위다(client-address.ts의 `clientAddressKey`, IPv4 또는 IPv6 /64).
    */
   async unlock(token: string, body: unknown, clientAddress: string): Promise<{ grant: string }> {
     const now = this.clock();

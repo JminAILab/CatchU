@@ -90,6 +90,7 @@ npm ci
 | ---- | ------ | ------ | -------------------------------- |
 | 선택 | `PORT` | `3001` | HTTP 포트. 정수 `1~65535`만 허용 |
 | 선택 | `CORS_ALLOWED_ORIGINS` | 없음(CORS 꺼짐) | 교차 출처 호출을 허용할 web 출처. 쉼표로 구분하고 `http://localhost:3000`처럼 출처와 정확히 같아야 한다(`*`·경로·끝 슬래시 불가, 잘못되면 기동 실패). 허용 요청 헤더는 `Authorization`·`Content-Type`·`Idempotency-Key`·`X-Link-Grant`, 노출 응답 헤더는 `Retry-After`, 쿠키(credentials)는 허용하지 않는다. 운영 값은 OQ-A1에서 정한다(#106) |
+| 선택 | `TRUST_PROXY_CIDRS` | 없음(프록시 신뢰 안 함) | 신뢰할 프록시(부하분산기)의 IP 또는 CIDR, 쉼표로 구분. 이 프록시가 붙인 `X-Forwarded-For`로만 요청 주소(`request.ip`)를 정하고, 없으면 직접 연결 주소를 쓴다. 이름·`true`·홉 수·전체 대역(`/0`)·잘못된 값은 기동 실패. 수신자 비밀번호 시도 제한이 이 주소로 세므로 배포에서는 부하분산기 대역만 넣는다(넓게 열면 주소를 꾸며 제한을 피할 수 있다). Express에서 `request.hostname`·`request.protocol` 해석에도 쓰인다([docs/share-links.md](docs/share-links.md)) |
 | 선택 | `BIND_HOST` | `127.0.0.1` | HTTP 바인딩 주소. IP 주소만 허용하고 `localhost` 같은 이름은 기동 실패. `0.0.0.0`은 같은 네트워크의 다른 기기에서도 접속되므로 컨테이너 등 필요할 때만 쓴다 |
 | 필수 | `AUTH_JWT_SECRET` | 없음 | 안전한 난수 32바이트를 64자리 hex로 표현한 서명 키. 환경별로 별도 준비 |
 | 필수 | `AUTH_ACCESS_TOKEN_TTL_SECONDS` | 없음 | Access JWT 수명(초). 양의 안전한 정수이며 현재 시각과 합산 가능해야 함 |
