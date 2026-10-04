@@ -35,7 +35,7 @@ export class ShareLink {
   title!: string;
 
   /**
-   * 수신자 URL의 토큰(ERD `secret-lookup-key`). 토큰 자체를 저장한다(제안, PR #162 리뷰에서 A·E 확인 대기).
+   * 수신자 URL의 토큰(ERD `secret-lookup-key`). 이번 MVP는 토큰 자체를 저장한다(PR #162 검토 합의, api/docs/share-links.md 「토큰 저장」).
    * 목록·발급·같은 키 재요청 응답이 모두 `url`을 다시 만들어야 해서, 되돌릴 수 없는 해시로는 저장하지 않는다.
    * 암호화 보관은 키 관리 방식이 정해지지 않아 쓰지 않는다. 대신 `url` 밖(별도 응답 필드·로그·오류)에는 내보내지 않는다.
    */
