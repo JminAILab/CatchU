@@ -56,21 +56,20 @@ test('해시 작업이 예외로 끝나도 차례를 넘겨 다음 작업이 실
   assert.deepEqual(hashes.stats, { active: 0, running: 0, waiting: 0 });
 });
 
-test('운영 정책: 링크 전체 실패 상한이 미정(null)이면 만들지 않고, 시험에서 명시한 경우만 제한 없이 만든다', () => {
-  assert.equal(PRODUCT_UNLOCK_POLICY.link.maxFailures, null);
+test('운영 정책: 링크 전체 실패 상한은 30이고, 정책값이 1 이상의 정수가 아니면 만들지 않는다', () => {
+  assert.equal(PRODUCT_UNLOCK_POLICY.link.maxFailures, 30);
   assert.deepEqual(PRODUCT_UNLOCK_POLICY.hash, { maxRunning: 2, maxWaiting: 20 });
-  assert.throws(() => createUnlockControls(PRODUCT_UNLOCK_POLICY), /링크 전체 실패 상한/);
-  assert.throws(() => createUnlockControls(PRODUCT_UNLOCK_POLICY, { allowUnlimitedLink: false }), /링크 전체 실패 상한/);
-  assert.doesNotThrow(() => createUnlockControls(PRODUCT_UNLOCK_POLICY, { allowUnlimitedLink: true }));
-  for (const maxFailures of [20, 30, 50]) {
+  assert.doesNotThrow(() => createUnlockControls(PRODUCT_UNLOCK_POLICY));
+  for (const maxFailures of [20, 50]) {
     assert.doesNotThrow(() => createUnlockControls({ ...PRODUCT_UNLOCK_POLICY, link: { ...PRODUCT_UNLOCK_POLICY.link, maxFailures } }));
   }
   for (const broken of [
+    { link: { ...PRODUCT_UNLOCK_POLICY.link, maxFailures: null } },
     { link: { ...PRODUCT_UNLOCK_POLICY.link, maxFailures: 0 } },
     { link: { ...PRODUCT_UNLOCK_POLICY.link, maxFailures: 2.5 } },
-    { link: { ...PRODUCT_UNLOCK_POLICY.link, maxFailures: 20, maxInFlight: 0 } },
-    { link: { ...PRODUCT_UNLOCK_POLICY.link, maxFailures: 20 }, hash: { maxRunning: 0, maxWaiting: 20 } },
+    { link: { ...PRODUCT_UNLOCK_POLICY.link, maxInFlight: 0 } },
+    { hash: { maxRunning: 0, maxWaiting: 20 } },
   ]) {
-    assert.throws(() => createUnlockControls({ ...PRODUCT_UNLOCK_POLICY, ...broken }, { allowUnlimitedLink: true }), /정책값/);
+    assert.throws(() => createUnlockControls({ ...PRODUCT_UNLOCK_POLICY, ...broken }), /정책값/);
   }
 });

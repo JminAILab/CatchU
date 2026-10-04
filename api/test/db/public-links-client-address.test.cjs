@@ -5,6 +5,8 @@ const { after, before, beforeEach, test } = require('node:test');
 const { NestFactory } = require('@nestjs/core');
 const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
+const { LinkAccessService } = require('../../dist/share-links/link-access.service');
+const { PRODUCT_UNLOCK_POLICY } = require('../../dist/share-links/unlock-policy');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
 // #150 10/4 보안 의견: unlock 시도 제한이 어느 주소로 세는지를 실제 앱·테스트 DB로 검증한다.
@@ -60,6 +62,15 @@ async function start(t, trust) {
     assert.equal(response.status, 201);
     return (await response.json()).url.split('/s/')[1];
   }
+  /** unlock을 부르고 상태·Retry-After·본문을 돌려준다. */
+  async function unlockFull(token, password, forwardedFor) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (forwardedFor !== undefined) headers['X-Forwarded-For'] = forwardedFor;
+    const response = await fetch(`${url}/v1/public/links/${token}/unlock`, {
+      method: 'POST', headers, body: JSON.stringify({ password }), signal: AbortSignal.timeout(10000),
+    });
+    return { status: response.status, retryAfter: response.headers.get('retry-after'), body: await response.json() };
+  }
   /** X-Forwarded-For를 붙여(없으면 생략) unlock을 부르고 상태 코드를 돌려준다. */
   async function unlock(token, password, forwardedFor) {
     const headers = { 'Content-Type': 'application/json' };
@@ -74,7 +85,7 @@ async function start(t, trust) {
   async function failFrom(token, addresses) {
     for (const address of addresses) assert.equal(await unlock(token, 'wrong-password', address), 401, String(address));
   }
-  return { link, unlock, failFrom };
+  return { link, unlock, unlockFull, failFrom, access: app.get(LinkAccessService, { strict: false }) };
 }
 
 const range = (count, make) => Array.from({ length: count }, (_, index) => make(index + 1));
@@ -141,4 +152,25 @@ test('신뢰 프록시 설정값이 잘못되면 앱을 시작하지 않는다',
     }
   }
   delete process.env.TRUST_PROXY_CIDRS;
+});
+
+test('운영 정책 그대로(N=30): 여러 주소의 실패가 링크 전체로 30회 쌓이면 새 unlock을 15분 막고, 중간 성공은 누적을 지우지 않으며, 받아 둔 grant로는 계속 열람한다', async (t) => {
+  assert.equal(PRODUCT_UNLOCK_POLICY.link.maxFailures, 30);
+  const { link, unlock, unlockFull, failFrom, access } = await start(t, '127.0.0.1');
+  const token = await link();
+  const other = await link();
+  const before = await unlockFull(token, PASSWORD, '192.0.2.250');
+  assert.equal(before.status, 200);
+  const { grant } = before.body;
+
+  await failFrom(token, range(29, (n) => `198.51.100.${n}`)); // 주소마다 1회라 주소별 한도(10)에는 닿지 않는다
+  assert.equal(await unlock(token, PASSWORD, '192.0.2.251'), 200, '29회까지는 차단 전, 성공해도 링크 누적은 남는다');
+  assert.equal(await unlock(token, 'wrong-password', '198.51.100.30'), 401, '30번째 실패');
+
+  const blocked = await unlockFull(token, PASSWORD, '203.0.113.200');
+  assert.equal(blocked.status, 429, '새 주소의 맞는 비밀번호도 거부');
+  assert.equal(blocked.body.code, 'LINK_UNLOCK_LIMITED');
+  assert.ok(Number(blocked.retryAfter) >= 899 && Number(blocked.retryAfter) <= 900, blocked.retryAfter);
+  await assert.doesNotReject(access.assertReadable(token, grant), '받아 둔 grant로는 계속 열람');
+  assert.equal(await unlock(other, PASSWORD, '203.0.113.200'), 200, '다른 링크는 막지 않음');
 });

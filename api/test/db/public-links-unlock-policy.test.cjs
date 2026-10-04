@@ -13,7 +13,7 @@ const { createUnlockControls, PRODUCT_UNLOCK_POLICY, UNLOCK_CONTROLS } = require
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
 // #150 10/4 보안 의견 2·3: 링크 전체 제한·동시 요청·해시 직전 재확인·자원 해제를 실제 DB와 실제 해시로 검증한다.
-// 링크 전체 상한 N은 미정이라 후보 20·30·50을 주입한 서비스를 직접 만들어 쓴다(운영 정책값은 바꾸지 않는다).
+// 링크 전체 상한은 운영값 30과 후보 20·50을 주입한 서비스를 직접 만들어 쓴다(운영 정책값은 바꾸지 않는다).
 // 주소 인자는 client-address.ts가 만든 주소 단위 문자열을 흉내 낸 합성 값이다.
 
 const PASSWORD = 'synthetic-recipient-password';

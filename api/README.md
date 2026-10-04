@@ -197,7 +197,6 @@ docker run -d --name catchu-db-test -p 127.0.0.1:5433:5432 -e POSTGRES_USER=catc
 - DB 이름이 `_test`로 끝나지 않으면 실행기와 초기화 함수가 거부한다.
 - 포트·이름을 바꾸려면 `docker run`의 `-p`·`--name`과 `TEST_DB_PORT`를 함께 바꾼다. 여러 작업 폴더에서 동시에 테스트하면 폴더마다 다른 컨테이너·포트를 쓴다.
 - 파일 하나만 실행: `npm test -- test/db/timestamptz.test.cjs`. `node --test`로 직접 실행하면 `DB_*`가 없어 실패한다.
-- 실행기는 `NODE_OPTIONS`로 `test/support/allow-unlimited-unlock-link.cjs`를 미리 불러온다. unlock 링크 전체 실패 상한이 정해지기 전에도 시험이 앱을 띄울 수 있게 하는 시험 전용 허용이며, 운영 실행에는 쓰지 않는다([docs/share-links.md](docs/share-links.md)).
 - 테스트 DB를 새로 만들려면 `docker rm -f catchu-db-test` 뒤 다시 `docker run`한다. 다음 `npm test`가 마이그레이션을 처음부터 적용한다.
 
 DB를 쓰는 테스트를 추가할 때:

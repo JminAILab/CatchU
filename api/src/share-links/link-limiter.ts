@@ -2,8 +2,7 @@
  * 링크 전체 비밀번호 시도 제한(#150 10/4 보안 의견 2). 주소를 바꿔 가며 시도해도 한 링크에서 검사하는 횟수를 묶는다.
  *
  * - **누적 차단:** 한 링크에서 집계 기간(15분) 안에 주소와 상관없이 `maxFailures`번 틀리면 그 시각부터 `blockMs`(15분) 동안
- *   그 링크의 새 unlock을 막는다. 차단 중 요청은 세지 않아 종료 시각이 늘지 않고, 풀리면 처음부터 센다.
- *   `maxFailures`가 null이면 누적 차단을 하지 않는다(값 미정 동안의 운영 정책, unlock-policy.ts).
+ *   그 링크의 새 unlock을 막는다. 차단 중 요청은 세지 않아 종료 시각이 늘지 않고, 풀리면 처음부터 센다(값은 unlock-policy.ts).
  * - **검사 중 포화:** 검사 전에 자리를 예약한다. 한 링크의 검사 중(차례 대기 포함) 요청이 `maxInFlight`개이거나,
  *   (집계 기간 안 실패 + 검사 중)이 `maxFailures`에 닿으면 검사 없이 거절한다. 실패로 세지 않는다.
  *   그래서 집계 기간 안의 검사가 모두 실패하면 차단 전 검사는 정확히 `maxFailures`번이다(중간에 성공이 섞이면 그보다 많을 수 있다).
@@ -14,8 +13,8 @@
  */
 
 export interface LinkLimitOptions {
-  /** 링크 전체 실패 상한. null이면 누적 차단 없음. */
-  maxFailures: number | null;
+  /** 링크 전체 실패 상한. */
+  maxFailures: number;
   windowMs: number;
   blockMs: number;
   maxInFlight: number;
@@ -60,8 +59,7 @@ export class LinkLimiter {
       }
       this.prune(entry, at);
       if (entry.inFlight >= this.options.maxInFlight) return { ok: false, reason: 'busy', retryAfterSeconds: 1 };
-      const { maxFailures } = this.options;
-      if (maxFailures !== null && entry.failures.length + entry.inFlight >= maxFailures) {
+      if (entry.failures.length + entry.inFlight >= this.options.maxFailures) {
         return { ok: false, reason: 'busy', retryAfterSeconds: 1 };
       }
     } else {
@@ -81,12 +79,11 @@ export class LinkLimiter {
     const entry = this.settle(linkId);
     if (!entry) return;
     const at = now.getTime();
-    const { maxFailures } = this.options;
-    if (maxFailures !== null && !(entry.blockedUntil !== null && entry.blockedUntil > at)) {
+    if (!(entry.blockedUntil !== null && entry.blockedUntil > at)) {
       entry.blockedUntil = null;
       this.prune(entry, at);
       entry.failures.push(at);
-      if (entry.failures.length >= maxFailures) {
+      if (entry.failures.length >= this.options.maxFailures) {
         entry.failures = [];
         entry.blockedUntil = at + this.options.blockMs;
       }

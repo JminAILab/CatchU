@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { LinkLimiter } = require('../dist/share-links/link-limiter.js');
 
-// #150 10/4 보안 의견 2·3: 링크 전체 제한. 상한 N은 미정이라 후보 20·30·50을 주입해 같은 규칙을 검사한다(가짜 시계).
+// #150 10/4 보안 의견 2·3: 링크 전체 제한. 운영값 30과 후보 20·50을 주입해 같은 규칙을 검사한다(가짜 시계).
 
 const MIN = 60 * 1000;
 const at = (ms) => new Date(Date.UTC(2026, 9, 1) + ms);
@@ -90,7 +90,7 @@ for (const N of CANDIDATES) {
 }
 
 test('동시 검사 상한: 한 링크의 검사 중은 3개까지이고, 넘치면 실패로 세지 않고 1초로 거절한다(N과 별개)', () => {
-  for (const N of [...CANDIDATES, null]) {
+  for (const N of CANDIDATES) {
     const limiter = new LinkLimiter(options(N));
     for (let i = 0; i < 3; i++) assert.equal(limiter.reserve('L', at(0)).ok, true);
     assert.deepEqual(limiter.reserve('L', at(0)), { ok: false, reason: 'busy', retryAfterSeconds: 1 });
@@ -103,13 +103,6 @@ test('동시 검사 상한: 한 링크의 검사 중은 3개까지이고, 넘치
     assert.equal(limiter.inFlight, 0);
     assert.equal(limiter.size, 0, '실패가 없는 빈 기록은 지운다');
   }
-});
-
-test('N이 null이면 누적 차단을 하지 않지만 동시 검사 상한은 적용한다', () => {
-  const limiter = new LinkLimiter(options(null));
-  for (let i = 0; i < 500; i++) assert.equal(fail(limiter, 'L', at(i)).ok, true);
-  assert.equal(limiter.blockedFor('L', at(500)), null);
-  assert.equal(limiter.size, 0, '실패를 쌓지 않는다');
 });
 
 test('기록 상한: 실패 누적이 남은 링크 기록은 밀어내지 않고, 집계가 끝난 기록만 정리한다', () => {
