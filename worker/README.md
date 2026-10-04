@@ -2,7 +2,7 @@
 
 > 기능별 동작·연결 안내는 이 README에 덧붙이지 않고 `worker/docs/<기능>.md`로 쓴다.
 
-FastAPI 기반 worker의 최소 실행 골격이다. HTTP 경로는 `GET /health`뿐이며 HTTP `200`과 `{"status":"ok"}`를 반환한다. 분석 요청 검사와 합성(MOCK) 결과 생성([요청 검사와 합성 결과 생성](#요청-검사와-합성-결과-생성)), 허용 GitHub 자료 수집([허용 GitHub 자료 수집과 근거 정규화](#허용-github-자료-수집과-근거-정규화))은 내부 함수로만 있다. 수집은 합성 응답으로만 검사했고 실제 GitHub 연결은 검증 전이다. 후보·생성 처리, DB·큐·LLM 연결, Docker·CI·NCP 배포는 후속 작업이다.
+FastAPI 기반 worker의 최소 실행 골격이다. HTTP 경로는 `GET /health`뿐이며 HTTP `200`과 `{"status":"ok"}`를 반환한다. 분석 요청 검사와 합성(MOCK) 결과 생성([요청 검사와 합성 결과 생성](#요청-검사와-합성-결과-생성)), 허용 GitHub 자료 수집([허용 GitHub 자료 수집과 근거 정규화](#허용-github-자료-수집과-근거-정규화))은 내부 함수로만 있다. 수집은 합성 응답으로만 검사했고 실제 GitHub 연결은 검증 전이다. 후보·생성 처리, DB·큐·LLM 연결, Docker·NCP 배포는 후속 작업이다. worker 관련 파일(worker 폴더, 계약 폴더, 루트 `.gitignore`, CI 파일)이 바뀐 PR에서는 「변경 후 검사」의 명령을 CI가 실행한다.
 
 작업 범위는 [#84](https://github.com/JminAILab/CatchU/issues/84), 공통 착수·브랜치·검사·PR 기준은 [코딩 운영](../docs/CatchU_작업관리.md#코딩-운영)을 따른다. worker 초기화 담당이 이후 분석 기능과 공통 환경까지 자동으로 맡는 것은 아니다.
 
