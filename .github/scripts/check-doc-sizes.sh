@@ -27,6 +27,7 @@ TARGETS='
 36000 docs/CatchU_work_identity_*.md
 36000 docs/CatchU_collection_control_*.md
 36000 docs/CatchU_integration_rows_*.md
+36000 docs/CatchU_security_checks.md
 '
 # Codex는 루트부터 작업 폴더까지의 AGENTS.md를 이어 붙여 읽고 그 합이 32 KiB를 넘으면 뒤를 버린다.
 AGENTS_LIMIT=32768
