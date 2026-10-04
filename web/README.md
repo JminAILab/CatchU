@@ -56,7 +56,7 @@ npm ci
 | `npm run lint` | ESLint (`eslint-config-next` core-web-vitals + typescript) | 조건문 안의 React Hook 호출 |
 | `npm run typecheck` | `tsc --noEmit`. 생성 파일(`next-env.d.ts`, `.next/types`) 없이도 통과해야 함 | `const n: number = "x"` |
 | `npm run build` | 프로덕션 빌드 | 빌드 중 타입·import 오류 |
-| `npm run check:run` | `scripts/smoke.mjs`: 포트가 비어 있는지 확인한 뒤 빌드 결과를 `next start`로 띄우고, Ready 출력 후 `GET /`가 200이고 본문에 "CatchU web"이 있는지 확인하고 종료(전체 30초 제한). **`npm run build` 이후에만, 개발 서버를 끈 상태에서 실행** | 포트 사용 중, 서버 미기동, 200 아님, 본문 불일치, 30초 초과 |
+| `npm run check:run` | `scripts/smoke.mjs`: 포트가 비어 있는지 확인한 뒤 빌드 결과를 `next start`로 띄우고, Ready 출력 후 `GET /`가 200이고 본문에 "CatchU web"이 있는지, 보안 헤더(아래 「보안 응답 헤더」)가 붙고 `X-Powered-By`가 없는지 확인하고 종료(전체 30초 제한). **`npm run build` 이후에만, 개발 서버를 끈 상태에서 실행** | 포트 사용 중, 서버 미기동, 200 아님, 본문 불일치, 보안 헤더 누락, 30초 초과 |
 | `npm test` | Node 기본 테스트 도구로 공통 응답 해석 검사 | 오류를 빈 목록으로 처리, HTTP 상태·code 소실 |
 | `npm run check` | lint → typecheck → test → build → check:run | 하나라도 실패하면 중단 |
 
@@ -68,7 +68,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 
 | 구분 | 이름 | 예시 값 | 의미 |
 |---|---|---|---|
-| API 호출 시 필수 | `NEXT_PUBLIC_API_BASE_URL` | `http://127.0.0.1:3001` | api 기준 주소. `/v1`은 넣지 않는다(호출 함수가 붙인다). 없거나 잘못되면 호출하지 않고 조회 실패로 돌려준다. `npm run build`로 만든 운영 빌드처럼 `NODE_ENV`가 `development`·`test`가 아니면 https 주소나 로컬 주소(`localhost`·`127.0.0.1`·`[::1]`)의 http만 받고, 그 밖의 http 주소도 잘못된 주소로 본다(#218) |
+| API 호출 시 필수 | `NEXT_PUBLIC_API_BASE_URL` | `http://127.0.0.1:3001` | api 기준 주소. `/v1`은 넣지 않는다(호출 함수가 붙인다). 없거나 잘못되면 호출하지 않고 조회 실패로 돌려준다. `npm run build`로 만든 운영 빌드처럼 `NODE_ENV`가 `development`·`test`가 아니면 https 주소나 로컬 주소(`localhost`·`127.0.0.1`·`[::1]`)의 http만 받고, 그 밖의 http 주소도 잘못된 주소로 본다(#218). 이 주소의 출처를 CSP 연결 허용에도 넣는다(「보안 응답 헤더」) |
 | 선택 | `NEXT_PUBLIC_DEV_LOGIN_ENABLED` | `false` | 기본 비활성. 정확히 `true`일 때만 `/login`에 개발용 로그인을 보인다. api도 `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development` 또는 `test`가 함께 지정돼야 허용하며, 그 밖에는 403이다 |
 
 - 이름이 `NEXT_PUBLIC_`으로 시작하는 변수만 브라우저에 노출된다. 비밀값·토큰은 이 이름으로 두지 않는다.
@@ -95,7 +95,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `.node-version` | Node.js 버전(버전 관리 도구용) |
 | `.env.example` | 환경변수 목록 예시(포트는 여기서 못 바꿈) |
 | `.npmrc` | `engine-strict=true` — Node 버전 강제 |
-| `next.config.ts` | Next.js 설정. `agentRules: false`로 `npm run dev`가 `web/`에 `AGENTS.md`·`CLAUDE.md`를 자동으로 만들지 않게 한다 |
+| `next.config.ts` | Next.js 설정. `agentRules: false`로 `npm run dev`가 `web/`에 `AGENTS.md`·`CLAUDE.md`를 자동으로 만들지 않게 한다. 보안 응답 헤더와 `X-Powered-By` 끄기도 여기에 둔다 |
 | `tsconfig.json`, `eslint.config.mjs` | TypeScript·ESLint 설정(create-next-app 기본값) |
 | `.gitignore` | `node_modules/`, `.next/`, `next-env.d.ts` 등 생성물 제외 |
 
@@ -207,6 +207,21 @@ if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLi
 - 오류 응답에 `Retry-After`가 1 이상의 정수 초로 오면 `retryAfterSeconds`로 전달한다. 헤더가 없거나 다른 형식이면 붙이지 않으며, 남은 시간을 추정하지 않는다.
 - 토큰은 탭의 메모리(`src/lib/access-token.ts`)에만 둔다. localStorage·sessionStorage·쿠키·URL·로그에 쓰지 않으며, 새로고침하면 사라져 다시 로그인한다. 실제 유지 방식은 OQ-A1에서 정한다.
 - 개발용 로그인은 `api.devLogin(memberId, { signal })`다. `memberId`에는 개발용 식별 문자열을 넣으며, api가 해당 회원을 찾거나 만들어 그 회원의 토큰을 준다. 성공하면 토큰을 메모리에 넣고, 결과에는 토큰을 담지 않는다. 가장 늦게 시작한 로그인만 반영하며, 먼저 보낸 로그인이 늦게 오거나 로그인 화면을 떠나 취소되면 토큰을 바꾸지 않는다.
+
+## 보안 응답 헤더 (#217)
+
+`next.config.ts`가 모든 응답에 아래 헤더를 붙이고 `X-Powered-By`를 끈다. 값은 `npm run dev`·`npm run build`를 시작할 때 정해지므로, `NEXT_PUBLIC_API_BASE_URL`을 바꾸면 다시 시작하거나 다시 빌드한다.
+
+| 헤더 | 값 | 하는 일 |
+|---|---|---|
+| `Content-Security-Policy` | 같은 출처의 자원만 허용, 연결은 같은 출처와 API 기준 주소의 출처만, `frame-ancestors 'none'` | 허용하지 않은 곳에서 스크립트·자원을 불러오거나 연결하지 못하게 하고, 다른 사이트가 화면을 끼워 넣지 못하게 한다 |
+| `X-Content-Type-Options` | `nosniff` | 브라우저가 응답 형식을 짐작하지 않게 한다 |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | 다른 출처로는 출처만 보내 공유 링크 주소(`/s/<토큰>`)가 넘어가지 않게 한다 |
+| `Strict-Transport-Security` | `max-age=31536000` | 배포용 빌드에서만. 브라우저가 1년 동안 https로만 접속하게 한다 |
+
+- 스크립트는 인라인을 허용한다(`'unsafe-inline'`). Next.js가 페이지에 인라인 스크립트를 넣는데, 요청마다 일회용 값(nonce)을 주려면 모든 페이지를 요청 때마다 새로 그려야 해서다. 그래서 화면 출력은 [보안 점검](../docs/CatchU_security_checks.md) 「화면 출력」대로 React 텍스트로만 그린다.
+- 개발 서버에서만 `'unsafe-eval'`을 더한다(React 개발용 오류 표시).
+- 외부 스크립트·이미지·글꼴·연결(예: Google 로그인 스크립트, 외부 이미지)을 새로 쓰면 CSP의 해당 항목에 그 출처를 더하고, 브라우저 콘솔에 CSP 위반 오류가 없는지 확인한다. 화면을 다른 페이지 안에 띄워야 하면 이슈로 먼저 정한다.
 
 ## 작업 규칙
 
