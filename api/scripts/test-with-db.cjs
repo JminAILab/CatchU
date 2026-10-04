@@ -54,9 +54,14 @@ async function main() {
 
   // DB를 함께 쓰므로 파일을 병렬로 돌리지 않는다. 인자를 주면 그 파일만 실행한다(npm test -- test/db/x.test.cjs).
   const targets = process.argv.slice(2);
+  // 링크 전체 실패 상한이 정해지기 전에도 앱을 띄워 검사할 수 있게, 시험에서만 제한 없는 링크 정책을 명시적으로 허용한다.
+  // 자식 프로세스(dist/main.js를 띄우는 검사 포함)까지 이어지도록 NODE_OPTIONS로 미리 불러온다.
+  // 경로는 큰따옴표로 감싸고 역슬래시를 이스케이프한다(공백이 있는 Windows 경로).
+  const preload = `--require=${JSON.stringify(resolve(apiDir, 'test/support/allow-unlimited-unlock-link.cjs'))}`;
+  const env = { ...process.env, NODE_OPTIONS: [process.env.NODE_OPTIONS, preload].filter(Boolean).join(' ') };
   const result = spawnSync(process.execPath, [
     '--test', '--test-concurrency=1', ...(targets.length > 0 ? targets : ['test/**/*.test.cjs']),
-  ], { cwd: apiDir, env: process.env, stdio: 'inherit', windowsHide: true });
+  ], { cwd: apiDir, env, stdio: 'inherit', windowsHide: true });
   return result.status ?? 1;
 }
 

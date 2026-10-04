@@ -8,6 +8,7 @@ const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
 const { LinkAccessService } = require('../../dist/share-links/link-access.service');
 const { LINK_GRANT_KEY } = require('../../dist/share-links/link-grant');
+const passwordModule = require('../../dist/share-links/link-password');
 const { createUnlockControls, PRODUCT_UNLOCK_POLICY, UNLOCK_CONTROLS } = require('../../dist/share-links/unlock-policy');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
@@ -233,22 +234,76 @@ test('전체 자원 포화는 링크 구분 없이 걸려 다른 링크의 unloc
   idle(controls);
 });
 
-test('HTTP 요청을 해시 차례 대기 중에 취소해도 자원을 돌려주고, 이후 요청을 정상 처리한다', async () => {
-  const link = await issue('취소');
+/** 비밀번호 검사(해시)를 감싸 실제 동시 실행 수를 재고, gate가 열릴 때까지 실행 중 상태로 붙잡는다. */
+function instrumentHash(t) {
+  const original = passwordModule.verifyLinkPassword;
+  let open;
+  const gate = new Promise((resolve) => { open = resolve; });
+  const probe = { calls: 0, active: 0, peak: 0, open: () => open() };
+  passwordModule.verifyLinkPassword = async (...args) => {
+    probe.calls += 1;
+    probe.active += 1;
+    probe.peak = Math.max(probe.peak, probe.active);
+    try {
+      await gate;
+      return await original(...args);
+    } finally {
+      probe.active -= 1;
+    }
+  };
+  t.after(() => { open(); passwordModule.verifyLinkPassword = original; });
+  return probe;
+}
+function unlockOverHttp(token, password, signal) {
+  return fetch(`${url}/v1/public/links/${token}/unlock`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }), signal,
+  }).then(async (response) => { await response.arrayBuffer(); return response.status; }, (error) => error.name);
+}
+
+test('HTTP 요청을 해시 차례 대기 중에 취소하면, 서버는 차례가 왔을 때 그대로 검사·기록하고 자리를 돌려준다', async (t) => {
+  const probe = instrumentHash(t);
+  probe.open(); // 이 시험은 해시를 붙잡지 않는다
+  const link = await issue('대기 중 취소');
   const held = holdHashSlots(appControls, 2);
   const controller = new AbortController();
-  const request = fetch(`${url}/v1/public/links/${link.token}/unlock`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'wrong' }), signal: controller.signal,
-  }).catch((error) => error.name);
+  const request = unlockOverHttp(link.token, 'wrong', controller.signal);
   await waitFor(() => appControls.hashes.stats.waiting === 1);
   controller.abort();
   assert.equal(await request, 'AbortError');
+  assert.equal(probe.calls, 0, '취소한 시점에는 아직 해시를 시작하지 않았다');
   await held.release();
   await waitFor(() => appControls.hashes.stats.active === 0);
+  assert.equal(probe.calls, 1, '연결이 끊겨도 차례가 오면 서버는 검사한다(틀린 비밀번호는 실패로 센다)');
   idle(appControls);
-  const response = await fetch(`${url}/v1/public/links/${link.token}/unlock`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: PASSWORD }),
-  });
-  assert.equal(response.status, 200);
+  assert.equal(await unlockOverHttp(link.token, PASSWORD), 200);
+  idle(appControls);
+});
+
+test('HTTP 요청을 해시 실행 중에 취소해도 해시가 끝나기 전에는 실행 자리를 돌려주지 않고, 새 요청이 와도 실제 동시 해시는 2개를 넘지 않는다', async (t) => {
+  const probe = instrumentHash(t);
+  const first = await issue('실행 중 취소 1');
+  const second = await issue('실행 중 취소 2');
+  const third = await issue('실행 중 취소 3');
+  const controller = new AbortController();
+  const canceled = unlockOverHttp(first.token, 'wrong', controller.signal);
+  const running = unlockOverHttp(second.token, 'wrong');
+  await waitFor(() => probe.active === 2 && appControls.hashes.stats.running === 2);
+
+  controller.abort();
+  assert.equal(await canceled, 'AbortError');
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(probe.active, 2, '취소한 요청의 해시가 아직 실행 중이다');
+  assert.equal(appControls.hashes.stats.running, 2, '해시가 끝나기 전에는 실행 자리를 돌려주지 않는다');
+
+  const late = unlockOverHttp(third.token, 'wrong');
+  await waitFor(() => appControls.hashes.stats.waiting === 1);
+  assert.equal(probe.active, 2, '새 요청은 해시를 시작하지 않고 기다린다');
+
+  probe.open();
+  assert.equal(await running, 401);
+  assert.equal(await late, 401);
+  await waitFor(() => appControls.hashes.stats.active === 0);
+  assert.equal(probe.calls, 3);
+  assert.equal(probe.peak, 2, '실제 동시 해시는 2개를 넘지 않았다');
   idle(appControls);
 });

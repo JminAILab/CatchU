@@ -107,6 +107,13 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
   };
 }
 
+test('빌드 main: unlock 링크 전체 실패 상한이 정해지지 않으면(null) 시험 허용 없이 기동하지 않는다', { timeout: 15000 }, async (t) => {
+  // 시험 실행기가 NODE_OPTIONS로 넣는 시험 허용(test/support/allow-unlimited-unlock-link.cjs)을 빼고 운영 실행과 같게 띄운다.
+  const server = await launch(t, { environment: { NODE_OPTIONS: '' } });
+  assert.equal(await server.closed, 1, '기동 실패로 종료');
+  assert.match(server.logs(), /링크 전체 실패 상한/);
+});
+
 for (const source of [false, true]) {
   test(`${source ? '개발 소스' : '빌드'} main: env 파일의 인증 설정으로 기동·발급·종료`, { timeout: 15000 }, async (t) => {
     const server = await launch(t, { source });
