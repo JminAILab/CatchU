@@ -1,6 +1,7 @@
 # dev 대상 PR의 최소 CI(#201). 각 서비스 README의 기존 검사 명령을 그대로 실행한다.
 # 서비스 job은 관련 경로가 바뀐 경우에만 돌고, 아니면 건너뛴다. 건너뛴 job은 필수 상태 검사에서 통과로 취급된다.
 # 필수 상태 검사로 거는 job 이름(changes·docs-size·web·api·worker)을 바꾸면 dev ruleset도 함께 고친다.
+# 외부 action은 전체 커밋 SHA로 고정하고 판본을 주석으로 남긴다(#215). 갱신 PR은 Dependabot이 주 1회 올린다(.github/dependabot.yml).
 name: CI
 
 on:
@@ -28,7 +29,7 @@ jobs:
       api: ${{ steps.detect.outputs.api }}
       worker: ${{ steps.detect.outputs.worker }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
       - id: detect
@@ -60,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: bash .github/scripts/check-doc-sizes.sh
 
   web:
@@ -75,8 +76,8 @@ jobs:
     env:
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: web/.node-version
           cache: npm
@@ -114,8 +115,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: api/package.json
           cache: npm
@@ -137,8 +138,8 @@ jobs:
       run:
         working-directory: worker
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0 # 이 action은 주 판본 태그(v10)를 내지 않는다.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: '0.12.18' # worker README 「도구와 버전」의 기준. 저장소 설정에는 uv 판본 고정이 없다.
           working-directory: worker
