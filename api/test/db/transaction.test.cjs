@@ -3,7 +3,7 @@ const { randomUUID } = require('node:crypto');
 const { after, before, beforeEach, test } = require('node:test');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
-// README 「트랜잭션 규약」 확인용. 테이블은 이 파일에서만 만들고 지운다.
+// CONVENTIONS.md 「트랜잭션 규약」 확인용. 테이블은 이 파일에서만 만들고 지운다.
 let dataSource;
 before(async () => {
   dataSource = await openTestDataSource();

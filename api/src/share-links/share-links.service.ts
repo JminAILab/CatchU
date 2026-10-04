@@ -31,7 +31,7 @@ export class ShareLinksService {
 
   /**
    * 링크 발급(POST /v1/share-links). 멱등 키 예약 → 발급 판정·저장 → 멱등 기록 → 응답 구성을 한 READ COMMITTED 트랜잭션에서 한다.
-   * 잠금 순서는 공통 멱등 키 잠금 → 회원 단위 발급 잠금이다(api README 「멱등 생성 호출」).
+   * 잠금 순서는 공통 멱등 키 잠금 → 회원 단위 발급 잠금이다(api/docs/member-analysis.md 「멱등 생성 호출」).
    */
   async create(memberId: string, idempotencyKey: string | undefined, body: unknown): Promise<CreateShareLinkResult> {
     const { webBaseUrl } = this.config;
