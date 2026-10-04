@@ -222,7 +222,7 @@ chore: worker 의존성에 httpx 추가
 | 리뷰 대화 해소 후 머지 (Require conversation resolution before merging) | ✅ | ✅ |
 | 강제 푸시 차단 (Block force pushes) | ✅ | ✅ |
 | 삭제 차단 (Restrict deletions) | ✅ | ✅ |
-| 필수 상태 검사 (Require status checks to pass) | ⬜ 배포 PR을 시작할 때 정함 | ✅ `changes`·`docs-size`·`web`·`api`·`worker` (`dev-ci`, PR #208 머지 직후 적용) |
+| 필수 상태 검사 (Require status checks to pass) | ⬜ 배포 PR을 시작할 때 정함 | ✅ `changes`·`docs-size`·`web`·`api`·`worker`·`deps-audit` (`dev-ci`, PR #208 머지 직후 적용, `deps-audit`는 #215 반영 PR 머지 직후 추가) |
 
 켜지 않기로 한 항목은 이 표에 없다 — 그 목록과 사유는 §6에 있다.
 
@@ -278,3 +278,4 @@ chore: worker 의존성에 httpx 추가
 - **2026-09-24** — 팀장 결정으로 AI-DLC intent `260920-catchu-web-mock`(9/30 web 모의 시연)을 더 진행하지 않아 §2.1의 적용 안내를 중단 기록으로 표시했다. 안내 내용은 소급 수정하지 않았고, §2.1 첫 문단의 PR #16 예외 설명은 바꾸지 않았다.
 - **2026-10-03** — dev 대상 PR의 CI를 도입하고 dev에 필수 상태 검사를 걸기로 했다([#201](https://github.com/JminAILab/CatchU/issues/201), 팀장 결정). 검사는 각 서비스 README의 기존 명령과 AI가 읽는 문서의 크기 상한이다. 관련 경로가 바뀌지 않은 서비스의 검사는 건너뛰어 Actions 사용 시간을 줄인다. 경로 조건을 워크플로 전체에 걸면 필수 검사가 대기 상태로 남으므로 job 단위로 건너뛴다. 필수 상태 검사는 우회 권한이 없는 별도 ruleset `dev-ci`에 둔다. 적용은 CI가 dev에 들어간 PR #208의 머지 직후이며, 적용과 확인 결과는 #201에 남긴다. 문서 크기 검사 대상이 주로 팀장이 우회 병합하는 문서라, 우회 병합도 CI는 통과하게 하기 위해서다. main의 필수 상태 검사는 배포 PR을 시작할 때 정한다. §2 「dev의 검증」과 §7을 고쳤다.
 - **2026-10-05** — PR 자동 리뷰로 Codex 보안 리뷰·코드 리뷰를 쓰기로 했다([#69](https://github.com/JminAILab/CatchU/issues/69), 팀장 결정). §6에 11행을 더했다. 9번에서 Copilot을 쓰지 않은 이유(작성자 라이선스에 따라 다르게 작동)는 저장소 단위 '모든 PR' 설정이라 생기지 않는다. 보안 기준은 Codex 설정 화면에서 위협 모델 파일로 지정해 AGENTS.md는 고치지 않았다. Copilot·Claude 등 다른 후보와 비교한 내용은 #69 댓글에 있다.
+- **2026-10-05** — dev 대상 PR에 의존성 취약점 검사 `deps-audit`를 더하고 `dev-ci` 필수 상태 검사에 넣기로 했다([#215](https://github.com/JminAILab/CatchU/issues/215), 팀장 결정). Dependabot은 취약점을 알리지만 취약한 의존성을 새로 들이는 PR을 막지 않기 때문이다. 검사는 의존성 목록·잠금 파일이 바뀐 서비스만 한다. 기존 의존성에 새로 공개된 취약점은 지금처럼 Dependabot 알림·보안 업데이트가 맡고, 관계없는 PR이 그날부터 막히지 않게 한다. web·api는 high 이상에서 실패하고, worker는 검사 도구가 심각도를 구분하지 않아 알려진 취약점이 하나라도 있으면 실패한다. 고친 판본이 없는 취약점은 예외 목록에 두되 고친 판본이 나오면 다시 실패한다. 같은 작업에서 CI의 외부 action을 전체 커밋 SHA로 고정하고, Dependabot이 주 1회 묶음 PR로 갱신하게 했다. §7을 고쳤다.
