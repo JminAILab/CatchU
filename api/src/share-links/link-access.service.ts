@@ -7,10 +7,10 @@ import { isLinkTokenFormat } from './link-token';
 import { Clock } from './share-link-issuance';
 import { ShareLink } from './share-link.entity';
 import { isShareLinkValidAt } from './share-link-state';
-import { UnlockBusyError, UnlockLimiter } from './unlock-limiter';
+import { HashTicket, UnlockSaturatedError } from './hash-gate';
+import { UnlockBusyError } from './unlock-limiter';
+import { UNLOCK_CONTROLS, UnlockControls } from './unlock-policy';
 import { SHARE_LINKS_CLOCK } from './share-links.service';
-
-export const UNLOCK_LIMITER = Symbol('UNLOCK_LIMITER');
 
 function unavailable(): ApiError {
   // 없는 URL·중단·만료를 구분하지 않는다. 문구는 명세 고정값, details 없음.
@@ -26,7 +26,7 @@ export class LinkAccessService {
   constructor(
     private readonly dataSource: DataSource,
     @Inject(LINK_GRANT_KEY) private readonly grantKey: Buffer,
-    @Inject(UNLOCK_LIMITER) private readonly limiter: UnlockLimiter,
+    @Inject(UNLOCK_CONTROLS) private readonly controls: UnlockControls,
     @Inject(SHARE_LINKS_CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -54,50 +54,97 @@ export class LinkAccessService {
   /**
    * 비밀번호 확인(POST /v1/public/links/{token}/unlock). 성공하면 이 링크 한정 grant를 준다.
    * `clientAddress`는 시도 제한을 세는 주소 단위다(client-address.ts의 `clientAddressKey`, IPv4 또는 IPv6 /64).
+   *
+   * 판정 순서: 링크(404) → 비밀번호 없는 링크(400) → 본문(400) → 주소·링크 차단(429, 남은 초) →
+   * 진행 중 상한·같은 주소 대기 상한(429, 1초) → 차례가 오면 주소·링크 자리 예약 → 해시 차례 대기 →
+   * 해시 직전 재확인(중단·만료 404, 차단 429) → 비밀번호(401·200). 어떤 결과로 끝나도 잡은 자리는 모두 돌려준다.
    */
   async unlock(token: string, body: unknown, clientAddress: string): Promise<{ grant: string }> {
     const now = this.clock();
     const link = await this.usableLink(token, now);
-    if (link.passwordProtectionReference === null) throw new ApiError('INVALID_REQUEST');
-    const password = readPassword(body);
-    const key = `${link.linkId}|${clientAddress}`;
     const verifier = link.passwordProtectionReference;
-    // 이미 차단된 키는 대기열과 무관하게 실제 남은 시간으로 먼저 거절한다(대기 초과의 Retry-After: 1로 덮어쓰지 않음).
-    const blockedFor = this.limiter.blockedFor(key, this.clock());
-    if (blockedFor !== null) throw new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds: blockedFor });
+    if (verifier === null) throw new ApiError('INVALID_REQUEST');
+    const password = readPassword(body);
+    const addressKey = `${link.linkId}|${clientAddress}`;
+    // 이미 차단된 주소·링크는 대기열과 무관하게 실제 남은 시간으로 먼저 거절한다(대기 초과의 Retry-After: 1로 덮어쓰지 않음).
+    this.assertNotBlocked(addressKey, link.linkId, now);
+    let ticket;
     try {
-      // 같은 링크·접속지는 한 번에 하나씩 "차단 확인 → 비밀번호 검사 → 기록"을 해, 동시 요청으로 한도를 넘겨 검사하지 않는다.
-      return await this.limiter.runExclusive(key, async () => {
-        const limit = this.limiter.check(key, this.clock());
-        // 차단 중(또는 기록 자리가 없음)에는 맞는 비밀번호도 거부하고 해시를 계산하지 않는다.
-        if (limit.blocked) throw new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds: limit.retryAfterSeconds });
-        let matched: boolean;
-        try {
-          matched = await verifyLinkPassword(password, verifier);
-        } catch (error) {
-          this.limiter.release(key);
-          throw error;
-        }
-        const at = this.clock();
+      ticket = this.controls.hashes.enter();
+    } catch (error) {
+      if (error instanceof UnlockSaturatedError) throw limited(1);
+      throw error;
+    }
+    try {
+      // 같은 링크·주소는 한 번에 하나씩 "예약 → 해시 → 기록"을 해, 동시 요청으로 주소별 한도를 넘겨 검사하지 않는다.
+      return await this.controls.addresses.runExclusive(addressKey, () =>
+        this.attempt(token, link.linkId, addressKey, verifier, password, ticket));
+    } catch (error) {
+      // 같은 링크·주소에 이미 3개(실행 중 포함)가 걸려 있으면 검사하지 않고 거절한다.
+      if (error instanceof UnlockBusyError) throw limited(1);
+      throw error;
+    } finally {
+      ticket.leave();
+    }
+  }
+
+  /** 차례가 온 요청 하나의 검사. 주소·링크 자리를 예약하고, 기록하지 못한 예약은 finally에서 푼다. */
+  private async attempt(
+    token: string, linkId: string, addressKey: string, verifier: string, password: string, ticket: HashTicket,
+  ): Promise<{ grant: string }> {
+    const { addresses, links } = this.controls;
+    const at = this.clock();
+    const address = addresses.check(addressKey, at);
+    if (address.blocked) {
+      if (address.reason === 'limit') this.assertNotBlocked(addressKey, linkId, at);
+      throw limited(address.retryAfterSeconds);
+    }
+    const reservation = links.reserve(linkId, at);
+    if (!reservation.ok) {
+      addresses.release(addressKey);
+      if (reservation.reason === 'limit') this.assertNotBlocked(addressKey, linkId, at);
+      throw limited(reservation.retryAfterSeconds);
+    }
+    let settled = false;
+    try {
+      return await ticket.runHash(async () => {
+        // 해시 직전 재확인: 기다리는 동안 링크가 중단·만료되거나 주소·링크가 차단됐으면 해시를 계산하지 않는다.
+        const before = this.clock();
+        const current = await this.usableLink(token, before);
+        this.assertNotBlocked(addressKey, linkId, before);
+        const matched = await verifyLinkPassword(password, verifier);
+        const done = this.clock();
         if (!matched) {
-          this.limiter.recordFailure(key, at);
+          addresses.recordFailure(addressKey, done);
+          links.recordFailure(linkId, done);
+          settled = true;
           throw new ApiError('LINK_PASSWORD_INVALID');
         }
         // 방어적 재확인: 검사하는 사이 차단이 걸려 있으면 늦은 성공도 429로 끝내고 grant를 주지 않는다.
-        const late = this.limiter.blockedFor(key, at);
-        if (late !== null) {
-          this.limiter.release(key);
-          throw new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds: late });
-        }
-        this.limiter.recordSuccess(key, at);
-        return { grant: issueLinkGrant(this.grantKey, link.linkId, link.expiresAt, at) };
+        this.assertNotBlocked(addressKey, linkId, done);
+        addresses.recordSuccess(addressKey, done);
+        links.recordSuccess(linkId);
+        settled = true;
+        return { grant: issueLinkGrant(this.grantKey, linkId, current.expiresAt, done) };
       });
-    } catch (error) {
-      // 같은 링크·접속지에 이미 3개(실행 중 포함)가 걸려 있으면 검사하지 않고 거절한다.
-      if (error instanceof UnlockBusyError) throw new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds: 1 });
-      throw error;
+    } finally {
+      if (!settled) {
+        addresses.release(addressKey);
+        links.release(linkId);
+      }
     }
   }
+
+  /** 주소·링크 중 하나라도 차단 중이면 429. 둘 다면 늦게 끝나는 쪽의 남은 초를 준다(그 전에 다시 와도 막히므로). */
+  private assertNotBlocked(addressKey: string, linkId: string, now: Date): void {
+    const address = this.controls.addresses.blockedFor(addressKey, now);
+    const link = this.controls.links.blockedFor(linkId, now);
+    if (address !== null || link !== null) throw limited(Math.max(address ?? 0, link ?? 0));
+  }
+}
+
+function limited(retryAfterSeconds: number): ApiError {
+  return new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds });
 }
 
 /** unlock 본문: `{ password: 비어 있지 않은 문자열 }`만 받는다. 비밀번호는 trim하지 않으며, 오류에 입력값을 담지 않는다. */

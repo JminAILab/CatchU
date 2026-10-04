@@ -5,7 +5,8 @@ const { after, before, beforeEach, test } = require('node:test');
 const { NestFactory } = require('@nestjs/core');
 const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
-const { LinkAccessService, UNLOCK_LIMITER } = require('../../dist/share-links/link-access.service');
+const { LinkAccessService } = require('../../dist/share-links/link-access.service');
+const { UNLOCK_CONTROLS } = require('../../dist/share-links/unlock-policy');
 const { generateLinkToken } = require('../../dist/share-links/link-token');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
@@ -38,7 +39,7 @@ before(async () => {
   await app.listen(0, '127.0.0.1');
   url = await app.getUrl();
   access = app.get(LinkAccessService, { strict: false });
-  limiter = app.get(UNLOCK_LIMITER, { strict: false });
+  limiter = app.get(UNLOCK_CONTROLS, { strict: false }).addresses;
   db = await openTestDataSource();
 });
 after(async () => {

@@ -1,16 +1,16 @@
 /**
- * unlock 비밀번호 시도 제한(#150 9/29 결정): 같은 링크·같은 접속지에서 15분 안에 10번 틀리면 15분 차단.
+ * 주소 단위 비밀번호 시도 제한(#150 9/29 결정): 같은 링크·같은 주소 단위에서 15분 안에 10번 틀리면 15분 차단.
+ * 주소 단위는 client-address.ts, 링크 전체 집계는 link-limiter.ts, 전체 해시 자원은 hash-gate.ts가 맡는다.
  *
- * - **직렬화:** 같은 링크·접속지의 요청은 `runExclusive`로 한 번에 하나씩 "차단 확인 → 비밀번호 검사 → 기록"을 한다.
+ * - **직렬화:** 같은 링크·주소의 요청은 `runExclusive`로 한 번에 하나씩 "차단 확인 → 비밀번호 검사 → 기록"을 한다.
  *   동시에 몰아 보내도 한도(10번)를 넘겨 검사하지 않는다. 같은 키에 걸려 있는 요청은 실행 중 1개를 포함해
  *   최대 `maxPendingPerKey`(3)개이며, 넘치면 검사 없이 거절한다(`UnlockBusyError`). 이미 차단된 키는 이보다 먼저 차단으로 판정한다.
  * - **차단 중:** 요청을 세지 않아 차단 종료 시각이 늘어나지 않고, 해시도 계산하지 않는다.
- * - **성공:** 그 링크·접속지의 실패 기록을 지운다. 차단 중이면 지우지 않는다.
- * - **메모리 상한(`maxEntries`):** 새 키는 검사 전에 자리를 예약한다. 자리가 없으면 만료된 기록만 정리하고,
- *   그래도 없으면 새 키는 검사 없이 429로 거절한다(가장 이른 기록 만료까지 남은 초). 창 안의 실패 기록과 유효한 차단은
- *   지우지 않으므로 누적 제한이 약해지지 않고, 항목 수는 상한을 넘지 않는다. 대신 상한이 찬 동안에는 새 링크·접속지가 막힌다.
- * - 링크 전체가 아니라 링크·접속지 단위로만 막는다. 프로세스 메모리(단일 인스턴스·단일 프로세스 MVP)라 재시작하면 초기화되고,
- *   여러 프로세스면 차단이 헐거워진다.
+ * - **성공:** 그 링크·주소의 실패 기록을 지운다. 차단 중이면 지우지 않는다.
+ * - **기록 상한(`maxEntries`):** 새 키는 검사 전에 자리를 예약한다. 자리가 없으면 만료된 기록을 정리하고, 그래도 없으면
+ *   차단 중도 검사 중도 아닌 기록 가운데 가장 오래 쓰지 않은 것 하나를 밀어낸다(10/4 보안 의견 3). 밀려난 주소의 실패 누적은
+ *   초기화되지만, 그 링크의 링크 전체 누적은 남는다. 밀어낼 기록도 없으면(모두 차단·검사 중) 새 키만 검사 없이 거절한다.
+ * - 프로세스 메모리(단일 인스턴스·단일 프로세스 MVP)라 재시작하면 초기화되고, 여러 프로세스면 차단이 헐거워진다.
  */
 
 export interface UnlockLimitOptions {
@@ -84,6 +84,7 @@ export class UnlockLimiter {
     const at = now.getTime();
     const entry = this.entries.get(key);
     if (entry) {
+      this.touch(key, entry);
       if (entry.blockedUntil !== null && entry.blockedUntil > at) {
         return { blocked: true, reason: 'limit', retryAfterSeconds: seconds(entry.blockedUntil - at) };
       }
@@ -95,8 +96,8 @@ export class UnlockLimiter {
       return { blocked: false };
     }
     if (this.entries.size >= this.options.maxEntries) this.pruneExpired(at);
-    if (this.entries.size >= this.options.maxEntries) {
-      return { blocked: true, reason: 'capacity', retryAfterSeconds: seconds(this.earliestExpiry(at) - at) };
+    if (this.entries.size >= this.options.maxEntries && !this.evictOldest(at)) {
+      return { blocked: true, reason: 'capacity', retryAfterSeconds: this.capacityRetrySeconds(at) };
     }
     this.entries.set(key, { failures: [], blockedUntil: null, reserved: true });
     return { blocked: false };
@@ -108,6 +109,7 @@ export class UnlockLimiter {
     const entry = this.entries.get(key);
     if (!entry) return; // check로 자리를 잡지 않은 기록은 받지 않는다
     entry.reserved = false;
+    this.touch(key, entry);
     if (entry.blockedUntil !== null && entry.blockedUntil > at) return; // 차단 중에는 세지 않는다
     entry.blockedUntil = null;
     entry.failures = entry.failures.filter((time) => at - time < this.options.windowMs);
@@ -159,12 +161,31 @@ export class UnlockLimiter {
     }
   }
 
-  private earliestExpiry(at: number): number {
+  /** 가장 오래 쓰지 않은 기록부터 보고, 차단 중도 검사 중도 아닌 첫 기록을 밀어낸다. 밀어냈으면 true. */
+  private evictOldest(at: number): boolean {
+    for (const [key, entry] of this.entries) {
+      const blocked = entry.blockedUntil !== null && entry.blockedUntil > at;
+      if (!entry.reserved && !blocked) {
+        this.entries.delete(key);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** 밀어낼 기록이 없을 때 새 키에 줄 남은 초: 검사 중인 자리가 있으면 곧 풀리므로 1초, 아니면 가장 빨리 끝나는 차단까지. */
+  private capacityRetrySeconds(at: number): number {
     let earliest = Number.POSITIVE_INFINITY;
     for (const entry of this.entries.values()) {
-      const expiry = entry.reserved ? at + 1000 : this.expiry(entry);
-      if (expiry < earliest) earliest = expiry;
+      if (entry.reserved) return 1;
+      if (entry.blockedUntil !== null && entry.blockedUntil < earliest) earliest = entry.blockedUntil;
     }
-    return Number.isFinite(earliest) ? earliest : at + 1000;
+    return Number.isFinite(earliest) ? seconds(earliest - at) : 1;
+  }
+
+  /** Map 순서를 마지막 사용 순서로 유지한다(맨 앞이 가장 오래 쓰지 않은 기록). */
+  private touch(key: string, entry: Entry): void {
+    this.entries.delete(key);
+    this.entries.set(key, entry);
   }
 }
