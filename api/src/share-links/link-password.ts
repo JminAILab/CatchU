@@ -12,8 +12,9 @@ import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 const FORMAT_PREFIX = 'scrypt';
 const FORMAT_VERSION = '1';
 
-// N=2^15, r=8이면 한 번 계산에 약 32MiB를 쓴다. unlock 시도 제한(#150)과 함께 쓰는 링크 비밀번호 기준이다.
-export const PASSWORD_HASH_PARAMS = { N: 32768, r: 8, p: 1 } as const;
+// OWASP 비밀번호 저장 권고 조합 N=2^15, r=8, p=3(#219). 한 번 계산에 약 32MiB를 쓰고, p는 메모리를 늘리지 않고
+// 같은 계산을 차례로 3번 한다. 이전 값(p=1)으로 저장된 검증값도 아래 허용 범위 안이라 그대로 검증된다.
+export const PASSWORD_HASH_PARAMS = { N: 32768, r: 8, p: 3 } as const;
 const SALT_BYTES = 16;
 const HASH_BYTES = 32;
 

@@ -9,7 +9,7 @@
 | `share-links.config.ts` | `SHARE_LINK_WEB_BASE_URL`([api README 「설치와 환경변수」](../README.md#설치와-환경변수)) |
 | `share-link-response.ts` | 응답 구성. 상태는 응답 시각으로 구하고, 토큰은 `url` 안에만 넣는다 |
 | `share-create.ts` | `ShareCreate` 입력 검증(제목만 trim), 발급 시각부터 정확히 30×24시간 만료 |
-| `link-password.ts` | 비밀번호 검증값. Node 내장 `scrypt`(N=2^15, r=8, p=1), 16바이트 salt, 상수 시간 비교. 비밀번호는 trim·정규화하지 않는다. 깨진 저장값은 서버 오류 |
+| `link-password.ts` | 비밀번호 검증값. Node 내장 `scrypt`(N=2^15, r=8, p=3 — OWASP 권고 조합, #219), 16바이트 salt, 상수 시간 비교. 매개변수를 값에 함께 저장해 이전 값(p=1)도 검증한다. 비밀번호는 trim·정규화하지 않는다. 깨진 저장값은 서버 오류 |
 | `link-token.ts` | 256비트 난수 토큰(base64url 43자)과 수신자 URL(`/s/<token>`) 조립 |
 | `share-create-fingerprint.ts` | 멱등 지문(제목 + 비밀번호 **설정 여부**)과 같은 키 재요청 비교 |
 | `share-link.entity.ts` | ShareLink 엔티티. 상태 칼럼 없음 |
@@ -117,3 +117,4 @@ grant 형식·수명·보관·시도 제한은 [#150 9/29 결정](https://github
 - `test/db/public-links-unlock.test.cjs`: unlock HTTP(200·401·404 동일 본문·400 두 종류·발급 길이 기준 미적용(8자 미만 저장 비밀번호 200, 길이 밖 틀린 입력 401)·429와 `Retry-After`·차단 중 400/429 구분·다른 링크 비차단·동시 15회)와 늦은 성공 429와 수신 조회 판정(grant 필요·다른 링크 grant 무효·중단·만료 우회 불가), 비밀번호·grant·토큰 로그 비노출. 단위: `test/link-grant.test.cjs`, `test/unlock-limiter.test.cjs`.
 - `test/db/public-links-unlock-policy.test.cjs`: 링크 전체 상한 운영값 30과 후보 20·50을 주입해 여러 주소 순차·동시 실패 시 차단(모두 실패하면 차단 전 검사 정확히 N번), 받아 둔 grant·다른 링크 영향 없음, 링크별 동시 검사 3개, 해시 대기 중 중단·만료(404)와 차단(429), 겹친 차단의 `Retry-After`, 검사 중 예외 뒤 자원 반환, HTTP 요청 취소(대기 중·해시 실행 중 구분, 실행 중 취소 뒤에도 실제 동시 해시 2개 이하), 전체 자원 포화의 다른 링크 영향. 단위: `test/link-limiter.test.cjs`(집계 경계·기록 상한 포함), `test/hash-gate.test.cjs`.
 - `test/db/public-links-client-address.test.cjs`: 신뢰 프록시 미설정·연결 주소 불일치 때 꾸민 `X-Forwarded-For` 무시, 설정 때 주소별 집계, 수신자가 앞에 넣은 주소 무시, IPv6 같은 /64·다른 /64, IPv4 매핑 IPv6 동등성, 잘못된 설정의 기동 거부, 운영 정책(N=30) 그대로 링크 전체 30회 실패 뒤 차단·성공해도 누적 유지·받아 둔 grant 열람 유지. 단위: `test/client-address.test.cjs`, `test/trust-proxy.test.cjs`.
+- 해시 비용 측정(#219): `npm run build` 뒤 `node scripts/measure-link-password.cjs`. 1회 저장·확인 시간과 동시 계산 때 메모리 증가를 출력한다. 검사가 아니라 측정이며, 배포 서버와 같은 사양에서 실행해 결과를 PR·이슈에 남긴다.
