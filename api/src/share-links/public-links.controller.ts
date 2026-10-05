@@ -8,13 +8,13 @@ interface ClientRequest {
   ip?: string;
 }
 
-/** 비로그인 수신자 경로(수신자 API). 회원 인증 Guard를 거치지 않는다. */
-@Public()
+/** 비로그인 수신자 경로(수신자 API). 공개할 메서드마다 회원 인증 예외를 지정한다. */
 @Controller('public/links')
 export class PublicLinksController {
   constructor(private readonly access: LinkAccessService) {}
 
   /** 비밀번호 확인(unlockLink). 성공 200 `{ grant }`. */
+  @Public()
   @Post(':token/unlock')
   @HttpCode(200)
   unlock(@Param('token') token: string, @Body() body: unknown, @Req() request: ClientRequest): Promise<{ grant: string }> {
