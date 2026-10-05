@@ -216,7 +216,7 @@ components:
       type: "object"
       additionalProperties: false
       required: ["title"]
-      properties: {"title":{"type":"string","minLength":1,"description":"trim 후 1~50자. 글자 수는 유니코드 코드 포인트(한글·이모지 모두 1자)"},"password":{"type":"string","minLength":8,"maxLength":64,"description":"trim·정규화 없이 입력 그대로 8~64자. 글자 수는 유니코드 코드 포인트(한글·이모지 모두 1자)"}}
+      properties: {"title":{"type":"string","minLength":1,"description":"trim 후 1~50자. 글자 수는 유니코드 코드 포인트(DB char_length 기준)"},"password":{"type":"string","minLength":8,"maxLength":64,"description":"trim·정규화 없이 입력 그대로 8~64자. 글자 수는 유니코드 코드 포인트(DB char_length 기준)"}}
     PageInfo: {"type":"object","additionalProperties":false,"required":["nextCursor"],"properties":{"nextCursor":{"type":"string","nullable":true}}}
     PublicProfile:
       type: "object"
