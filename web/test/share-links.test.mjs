@@ -5,6 +5,7 @@ import { createShareLinkApi, isShareLink } from "../src/features/share-links/sha
 import { alsoExpired, formatKst, remainingText } from "../src/features/share-links/share-link-format.ts";
 import { createShareLinksStore, violationText } from "../src/features/share-links/share-links-store.ts";
 import { copyText } from "../src/features/share-links/copy-text.ts";
+import { createMemberSessionScope } from "../src/features/share-links/member-session-scope.ts";
 
 const link = (id, patch = {}) => ({
   linkId: id,
@@ -288,19 +289,74 @@ test("401은 처리되지 않은 요청이다. 처음 요청이면 새 키로, �
   assert.deepEqual(keys, ["key-1", "key-2", "key-2"]);
 });
 
-test("불명 상태에서 [목록에서 확인]으로 닫으면 키를 버리고 목록을 다시 확인한다", async () => {
-  const { store, queue, snap } = setup();
+test("불명 상태에서 [목록에서 확인] 뒤 목록 조회까지 실패해도 키·본문을 잃지 않고, 다시 열면 같은 키·본문으로만 보낸다", async () => {
+  const { store, queue, calls, snap } = setup();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  store.setUsePassword(true);
+  store.setPassword("pass-1234");
+  queue.push(lookupFailed);
+  await store.submit();
+  queue.push(lookupFailed);
+  store.closeForm();
+  await setImmediate();
+  assert.equal(snap().form.open, false);
+  assert.equal(snap().list.stale, true, "목록 재조회도 실패");
+  assert.deepEqual(snap().pendingIssue, { title: "A사 지원" }, "확인하지 못한 요청을 남겨 둔다");
+  store.openForm();
+  assert.equal(snap().form.phase, "unknown", "다시 열면 불명 상태로 이어진다");
+  assert.equal(snap().form.title, "A사 지원");
+  store.setTitle("다른 제목");
+  assert.equal(snap().form.title, "A사 지원");
+  queue.push(ok(link("n", { title: "A사 지원", passwordRequired: true }), 200));
+  await store.resend();
+  const posts = calls.filter((call) => call.request?.method === "POST");
+  assert.deepEqual(posts.map((call) => call.request.idempotencyKey), ["key-1", "key-1"], "새 키로 같은 요청을 보내지 않는다");
+  for (const call of posts) assert.deepEqual(call.request.body, { title: "A사 지원", password: "pass-1234" });
+  assert.equal(snap().form.phase, "issued");
+  assert.equal(snap().pendingIssue, null);
+});
+
+test("목록에서 같은 제목의 유효 링크가 확인될 때만 붙잡은 요청을 놓는다", async () => {
+  const { store, queue, calls, snap } = setup();
   await store.load();
   store.openForm();
   store.setTitle("A사 지원");
   queue.push(lookupFailed);
   await store.submit();
-  queue.push(page([link("n"), link("a")]));
+  queue.push(page([link("x", { title: "다른 링크" }), link("y", { title: "A사 지원", state: "STOPPED" })]));
   store.closeForm();
   await setImmediate();
-  assert.equal(snap().form.open, false);
-  assert.match(snap().notice.text, /목록에서 제목과 상태로 확인/);
-  assert.equal(snap().list.items[0].linkId, "n");
+  assert.deepEqual(snap().pendingIssue, { title: "A사 지원" }, "중단된 같은 제목이나 다른 제목만 있으면 계속 붙잡는다");
+  queue.push(page([link("n", { title: "A사 지원" })]));
+  await store.load();
+  assert.equal(snap().pendingIssue, null);
+  assert.match(snap().notice.text, /유효 링크가 목록에 있습니다/);
+  store.openForm();
+  assert.equal(snap().form.phase, "editing");
+  store.setTitle("B사 지원");
+  queue.push(ok(link("m", { title: "B사 지원" }), 201));
+  await store.submit();
+  assert.deepEqual(calls.filter((call) => call.request?.method === "POST").map((call) => call.request.idempotencyKey), ["key-1", "key-2"]);
+});
+
+test("[새로 작성]을 고를 때만 붙잡은 키를 버리고 입력을 고칠 수 있다", async () => {
+  const { store, queue, calls, snap } = setup();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  queue.push(lookupFailed);
+  await store.submit();
+  store.discardPending();
+  assert.equal(snap().form.phase, "editing");
+  assert.equal(snap().pendingIssue, null);
+  store.setTitle("A사 최종 지원");
+  queue.push(ok(link("n", { title: "A사 최종 지원" }), 201));
+  await store.submit();
+  const posts = calls.filter((call) => call.request?.method === "POST");
+  assert.deepEqual(posts.map((call) => call.request.idempotencyKey), ["key-1", "key-2"]);
+  assert.deepEqual(posts[1].request.body, { title: "A사 최종 지원" });
 });
 
 // ── 중단 ─────────────────────────────────────────────────
@@ -393,6 +449,79 @@ test("화면을 떠나면 늦은 발급 응답을 버리고 처음 상태로 돌
   queue.push(page([link("n")]));
   await store.load();
   assert.equal(snap().list.items[0].linkId, "n");
+});
+
+test("화면을 떠난 뒤 도착한 중단·다음 페이지 응답은 반영하지 않는다", async () => {
+  const stopCase = setup();
+  await stopCase.store.load();
+  stopCase.store.openStop("a");
+  const stopPending = deferred();
+  stopCase.queue.push(() => stopPending.promise);
+  const stopTask = stopCase.store.confirmStop();
+  stopCase.store.dispose();
+  stopPending.resolve(ok(link("a", { state: "STOPPED" })));
+  await stopTask;
+  assert.equal(stopCase.snap().stop, null);
+  assert.equal(stopCase.snap().notice, null);
+  assert.deepEqual(stopCase.snap().list.items, []);
+
+  const moreCase = setup(page([link("a")], "c1"));
+  await moreCase.store.load();
+  const morePending = deferred();
+  moreCase.queue.push(() => morePending.promise);
+  const moreTask = moreCase.store.loadMore();
+  moreCase.store.dispose();
+  morePending.resolve(page([link("b")]));
+  await moreTask;
+  assert.deepEqual(moreCase.snap().list.items, []);
+  assert.equal(moreCase.snap().list.status, "loading");
+});
+
+test("화면을 떠나면 확인하지 못한 발급 요청과 비밀번호도 버리고, 다시 들어오면 새 키로 시작한다", async () => {
+  const { store, queue, calls, snap } = setup();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  store.setUsePassword(true);
+  store.setPassword("pass-1234");
+  queue.push(lookupFailed);
+  await store.submit();
+  store.dispose();
+  assert.equal(snap().pendingIssue, null);
+  assert.equal(snap().form.password, "");
+  queue.push(page([]));
+  await store.load();
+  store.openForm();
+  assert.equal(snap().form.phase, "editing", "이전 요청을 불명 상태로 되살리지 않는다");
+  assert.equal(snap().form.title, "");
+  store.setTitle("B사 지원");
+  queue.push(ok(link("n", { title: "B사 지원" }), 201));
+  await store.submit();
+  assert.deepEqual(calls.filter((call) => call.request?.method === "POST").map((call) => call.request.idempotencyKey), ["key-1", "key-2"]);
+});
+
+test("회원이 바뀌면(로그아웃 후 다른 계정·토큰 직접 교체) 새 세대로 화면을 새로 만든다", () => {
+  let token = "token-a";
+  const listeners = new Set();
+  const source = {
+    get: () => ({ token }),
+    subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+  };
+  const change = (next) => { token = next; listeners.forEach((listener) => listener()); };
+  const scope = createMemberSessionScope(source);
+  const seen = [];
+  scope.subscribe(() => seen.push(scope.getSnapshot()));
+  const first = scope.getSnapshot();
+  assert.equal(typeof first, "number");
+  assert.equal(scope.getSnapshot(), first, "같은 회원이면 같은 세대");
+  change(null);
+  change("token-b");
+  const second = scope.getSnapshot();
+  assert.ok(seen.includes(null), "401·로그아웃으로 토큰이 사라지면 화면을 내린다");
+  assert.notEqual(second, first);
+  change("token-c");
+  assert.notEqual(scope.getSnapshot(), second, "빈 상태를 거치지 않고 바뀌어도 새 세대");
+  assert.equal(JSON.stringify(seen).includes("token"), false, "토큰 값은 세대에 섞지 않는다");
 });
 
 // ── 표시 ─────────────────────────────────────────────────

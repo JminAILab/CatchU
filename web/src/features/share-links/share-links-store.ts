@@ -51,6 +51,11 @@ export type ShareLinksSnapshot = {
   stop: StopSnapshot;
   /** 응답이 불명이었던 중단 대상. 목록을 다시 확인하기 전에는 같은 링크의 중단을 다시 보내지 않는다. */
   unresolvedStops: readonly string[];
+  /**
+   * 결과를 확인하지 못한 발급 요청. 발행 화면을 닫아도 같은 키·본문을 붙잡아 두며, 다시 열면 불명 상태로 이어진다.
+   * 목록에서 같은 제목의 유효 링크가 확인되거나, 다시 보낸 요청이 확정되거나, 사용자가 [새로 작성]을 고를 때만 풀린다.
+   */
+  pendingIssue: { title: string } | null;
   notice: Notice | null;
 };
 
@@ -63,12 +68,14 @@ const INITIAL: ShareLinksSnapshot = {
   form: EMPTY_FORM,
   stop: null,
   unresolvedStops: [],
+  pendingIssue: null,
   notice: null,
 };
 
 const TITLE_REQUIRED = "링크 제목을 입력해 주세요.";
 const PASSWORD_REQUIRED = "비밀번호를 입력하거나 비밀번호 사용을 해제해 주세요.";
 const AUTH_TEXT = "로그인이 필요합니다. 다시 로그인한 뒤 확인해 주세요.";
+const UNKNOWN_TEXT = "발행 여부를 확인하지 못했습니다. 같은 내용으로 다시 발행하거나, 공유 링크 목록에서 확인해 주세요.";
 
 /** 서버가 판정한 입력 오류(400 VALIDATION_FAILED)를 필드별 안내로 바꾼다. 입력값은 담지 않는다. */
 export function violationText(field: string, reason: string): { field: "title" | "password" | null; text: string } {
@@ -130,6 +137,14 @@ export function createShareLinksStore(api: ShareLinkApi, options: ShareLinksStor
       setList({ status: "ready", items: result.data.items, nextCursor: result.data.nextCursor, refreshing: false, stale: false, more: "idle" });
       // 목록을 다시 확인했으므로 응답 불명이었던 중단의 재요청 차단을 푼다. 현재 상태는 목록이 보여 준다.
       emit({ unresolvedStops: [] });
+      // 결과를 모르던 발급과 같은 제목의 유효 링크가 있으면, 같은 본문을 다시 보내도 기존 결과나 제목 중복뿐이므로 붙잡은 키를 놓는다.
+      // 목록에 없으면 그대로 붙잡아 둔다(앞선 요청이 아직 처리 중일 수 있고, 새 키로 같은 요청을 보내지 않기 위해).
+      const pending = pendingBody;
+      if (pending && !state.form.open && result.data.items.some((item) => item.state === "ACTIVE" && item.title === pending.title)) {
+        keys.reset();
+        pendingBody = null;
+        emit({ pendingIssue: null, notice: { tone: "info", text: `‘${pending.title}’ 제목의 유효 링크가 목록에 있습니다. 확인하지 못했던 발급 요청을 정리했습니다.` } });
+      }
       return;
     }
     if (hasList) setList({ refreshing: false, stale: true });
@@ -162,21 +177,39 @@ export function createShareLinksStore(api: ShareLinkApi, options: ShareLinksStor
 
   function openForm() {
     if (state.form.open) return;
+    const pending = pendingBody;
+    if (pending) {
+      // 결과를 모르는 요청이 남아 있으면 같은 키·본문의 불명 상태로 다시 연다. 새 키로 같은 요청을 보내지 않는다.
+      emit({
+        form: {
+          ...EMPTY_FORM, open: true, phase: "unknown", title: pending.title,
+          usePassword: pending.password !== undefined, password: pending.password ?? "",
+          message: { tone: "error", text: UNKNOWN_TEXT },
+        },
+        notice: null,
+      });
+      return;
+    }
     keys.reset();
-    pendingBody = null;
     emit({ form: { ...EMPTY_FORM, open: true }, notice: null });
   }
 
   /** 발행 화면을 닫고 목록을 다시 확인한다. 요청 중에는 닫지 않는다. 응답 불명이었으면 그 요청은 목록에서 확인한다. */
   function closeForm() {
     if (!state.form.open || state.form.phase === "submitting") return;
-    const wasUnknown = state.form.phase === "unknown";
+    const wasUnknown = state.form.phase === "unknown" && pendingBody !== null;
     const issued = state.form.phase === "issued";
-    keys.reset();
-    pendingBody = null;
+    // 결과를 모르는 요청은 닫아도 키·본문을 버리지 않는다(목록 조회가 실패해도 같은 키로만 다시 보낼 수 있게).
+    if (!wasUnknown) {
+      keys.reset();
+      pendingBody = null;
+    }
     emit({
       form: EMPTY_FORM,
-      notice: wasUnknown ? { tone: "info", text: "직전 발행 요청의 결과는 아래 목록에서 제목과 상태로 확인해 주세요." } : null,
+      pendingIssue: wasUnknown && pendingBody ? { title: pendingBody.title } : null,
+      notice: wasUnknown
+        ? { tone: "info", text: "직전 발행 요청의 결과는 아래 목록에서 제목과 상태로 확인해 주세요. 목록에 없으면 [새 링크 발행]에서 같은 요청을 다시 보낼 수 있습니다." }
+        : null,
     });
     if (wasUnknown || issued || state.list.status !== "ready") void load();
   }
@@ -204,25 +237,28 @@ export function createShareLinksStore(api: ShareLinkApi, options: ShareLinksStor
     if (result.kind === "success") {
       keys.reset();
       pendingBody = null;
+      emit({ pendingIssue: null });
       setForm({ phase: "issued", issued: result.data, password: "", message: null });
       return;
     }
     if (isSettledResult(result)) {
       keys.reset();
       pendingBody = null;
+      emit({ pendingIssue: null });
     }
     if (isUnknown(result)) {
-      setForm({
-        phase: "unknown",
-        message: { tone: "error", text: "발행 여부를 확인하지 못했습니다. 같은 내용으로 다시 발행하거나, 공유 링크 목록에서 확인해 주세요." },
-      });
+      emit({ pendingIssue: { title: body.title } });
+      setForm({ phase: "unknown", message: { tone: "error", text: UNKNOWN_TEXT } });
       return;
     }
     // 여기부터는 서버가 판정한 거부(4xx)다.
     if (result.kind === "api-error" && result.status === 401) {
       // 인증 단계에서 거부돼 이 요청은 처리되지 않았다. 다시 보내던 요청이면 앞선 요청의 결과는 여전히 모른다.
       setForm({ phase: resend ? "unknown" : "editing", message: { tone: "error", text: AUTH_TEXT } });
-      if (!resend) keys.reset();
+      if (!resend) {
+        keys.reset();
+        pendingBody = null;
+      }
       return;
     }
     const code = result.kind === "api-error" ? result.code : "";
@@ -271,6 +307,18 @@ export function createShareLinksStore(api: ShareLinkApi, options: ShareLinksStor
   async function resend(): Promise<void> {
     if (!state.form.open || state.form.phase !== "unknown" || pendingBody === null) return;
     await send(pendingBody, true);
+  }
+
+  /**
+   * 불명 상태의 [새로 작성]: 사용자가 고를 때만 붙잡은 키를 버리고 새 요청으로 고칠 수 있게 한다.
+   * 앞선 요청이 처리됐다면 같은 제목은 서버가 제목 중복으로 거부하므로 같은 링크가 두 번 생기지 않는다.
+   */
+  function discardPending() {
+    if (!state.form.open || state.form.phase !== "unknown") return;
+    keys.reset();
+    pendingBody = null;
+    emit({ pendingIssue: null });
+    setForm({ phase: "editing", message: { tone: "info", text: "새 요청으로 작성합니다. 앞선 요청이 처리됐다면 같은 제목은 ‘이미 있음’으로 안내됩니다." } });
   }
 
   function canStop(link: ShareLink): boolean {
@@ -343,7 +391,7 @@ export function createShareLinksStore(api: ShareLinkApi, options: ShareLinksStor
       return () => { listeners.delete(listener); };
     },
     load, loadMore, activeCount, canStop,
-    openForm, closeForm, setTitle, setUsePassword, setPassword, submit, resend,
+    openForm, closeForm, setTitle, setUsePassword, setPassword, submit, resend, discardPending,
     openStop, cancelStop, confirmStop, recheckStop, dismissNotice,
     now: options.now ?? (() => Date.now()),
     /** 화면을 떠날 때: 진행 중 조회를 취소하고 늦은 응답을 버리며 처음 상태로 돌린다. 비밀번호 입력도 지운다. */

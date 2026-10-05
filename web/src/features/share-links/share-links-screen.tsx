@@ -1,21 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type SyntheticEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type SyntheticEvent } from "react";
 import { EmptyState, LoadingState, LookupFailedState } from "@/components/status/status";
+import { accessTokenStore } from "@/lib/access-token";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { copyText } from "./copy-text";
 import { createShareLinkApi, type ShareLink } from "./share-link-api";
 import { alsoExpired, formatKst, remainingText, STATE_LABELS } from "./share-link-format";
+import { createMemberSessionScope } from "./member-session-scope";
 import { ACTIVE_LINK_LIMIT, createShareLinksStore, type ShareLinksStore } from "./share-links-store";
 import styles from "./share-links.module.css";
+
+const serverSnapshot = () => null;
+
+/**
+ * 회원이 바뀔 때마다(토큰 변경) 화면과 상태를 새로 만든다. 이전 회원의 목록·발급 요청·비밀번호 입력과
+ * 늦게 도착한 응답이 다음 회원 화면에 이어지지 않게 한다. 토큰은 React key나 DOM에 넣지 않는다.
+ */
+export function ShareLinksPage() {
+  const scope = useMemo(() => createMemberSessionScope(accessTokenStore), []);
+  const generation = useSyncExternalStore(scope.subscribe, scope.getSnapshot, serverSnapshot);
+  if (generation === null) return null;
+  return <Fragment key={generation}><ShareLinksScreen /></Fragment>;
+}
 
 /**
  * W6 공유 링크(#149): L03 관리 목록 → [새 링크 발행] L01 → 발행 완료 L02 → [URL 복사]·[링크 중단].
  * 근거: 공유링크 흐름 초안 §4.1~§4.3·§4.8, API 명세 v1 share-links·stop.
  */
-export function ShareLinksScreen() {
+function ShareLinksScreen() {
   const store = useMemo(() => createShareLinksStore(createShareLinkApi(api.member)), []);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
 
@@ -153,6 +168,7 @@ function IssuePanel({ store }: { store: ShareLinksStore }) {
           {form.phase === "unknown" ? (
             <>
               <button type="button" className={styles.secondary} onClick={store.closeForm}>목록에서 확인</button>
+              <button type="button" className={styles.secondary} onClick={store.discardPending}>새로 작성</button>
               <button type="button" className={styles.primary} onClick={() => void store.resend()}>다시 발행</button>
             </>
           ) : (
@@ -194,25 +210,40 @@ function IssuedPanel({ store, link }: { store: ShareLinksStore; link: ShareLink 
 
 /** L03 목록. 조회 중·조회 실패·정상 0건을 서로 바꿔 쓰지 않는다. */
 function LinkList({ store }: { store: ShareLinksStore }) {
-  const { list } = useSnapshot(store);
+  const { list, pendingIssue, form } = useSnapshot(store);
   const now = store.now();
+  const pending = pendingIssue && !form.open && (
+    <div className={styles.noticeError} role="status">
+      <span>확인하지 못한 발급 요청이 있습니다: ‘{pendingIssue.title}’. 목록에 없으면 같은 요청으로 다시 보낼 수 있습니다.</span>
+      <button type="button" className={styles.linkButton} onClick={store.openForm}>요청 다시 보기</button>
+    </div>
+  );
 
-  if (list.status === "loading") return <LoadingState>공유 링크 목록을 불러오는 중입니다.</LoadingState>;
+  if (list.status === "loading") return <>{pending}<LoadingState>공유 링크 목록을 불러오는 중입니다.</LoadingState></>;
   if (list.status === "error") {
-    return <LookupFailedState title="공유 링크 목록을 불러오지 못했습니다." onRetry={() => void store.load()}>잠시 후 다시 불러와 주세요.</LookupFailedState>;
+    return (
+      <>
+        {pending}
+        <LookupFailedState title="공유 링크 목록을 불러오지 못했습니다." onRetry={() => void store.load()}>잠시 후 다시 불러와 주세요.</LookupFailedState>
+      </>
+    );
   }
   if (list.items.length === 0 && !list.stale) {
     return (
-      <EmptyState
-        title="발행한 링크가 없습니다."
-        action={<button type="button" className={styles.primary} onClick={store.openForm}>새 링크 발행</button>}
-      />
+      <>
+        {pending}
+        <EmptyState
+          title="발행한 링크가 없습니다."
+          action={<button type="button" className={styles.primary} onClick={store.openForm}>새 링크 발행</button>}
+        />
+      </>
     );
   }
   const activeCount = store.activeCount();
   return (
     <section aria-labelledby="links-heading">
       <h2 id="links-heading" className="visually-hidden">공유 링크 목록</h2>
+      {pending}
       <p className={styles.muted}>
         발행 시각 최신순{activeCount !== null && ` · 현재 유효 링크 ${activeCount}/${ACTIVE_LINK_LIMIT}개`}
       </p>
