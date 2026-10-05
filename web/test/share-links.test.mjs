@@ -413,6 +413,25 @@ test("[새로 작성]은 이전 요청이 발급됐을 수 있다는 안내를 �
   assert.deepEqual(posts[1].request.body, { title: "A사 최종 지원" });
 });
 
+test("제목 중복·한도 안내에서 [공유 링크로]를 누르면 목록을 다시 받아 앞선 요청이 만든 링크를 보여 준다", async () => {
+  const { store, queue, calls, snap } = setup(page([]));
+  await store.load();
+  store.openForm();
+  store.setTitle("S사 지원");
+  queue.push(lookupFailed);
+  await store.submit();
+  store.askDiscard();
+  store.discardPending();
+  queue.push(apiError(409, "LINK_TITLE_CONFLICT"));
+  await store.submit();
+  assert.equal(snap().form.message.action, "to-list");
+  queue.push(page([link("s", { title: "S사 지원" })]));
+  store.closeForm();
+  await setImmediate();
+  assert.equal(calls.filter((call) => call.request?.method !== "POST").length, 2, "닫을 때 목록을 다시 조회한다");
+  assert.deepEqual(snap().list.items.map((item) => item.title), ["S사 지원"]);
+});
+
 test("안내 단계에서 [목록에서 확인]으로 닫으면 요청을 계속 붙잡는다", async () => {
   const { store, queue, calls, snap } = setup();
   await store.load();

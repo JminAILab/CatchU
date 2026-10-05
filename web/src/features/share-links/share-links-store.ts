@@ -207,6 +207,8 @@ export function createShareLinksStore(api: ShareLinkApi, options: ShareLinksStor
     if (!state.form.open || state.form.phase === "submitting") return;
     const wasUnknown = state.form.phase === "unknown" && pendingBody !== null;
     const issued = state.form.phase === "issued";
+    // 제목 중복·한도·멱등 충돌 안내는 목록 확인을 권하므로 목록을 다시 받는다(앞선 불명 요청이 만든 링크가 아직 목록에 없을 수 있다).
+    const toList = state.form.message?.action === "to-list";
     // 결과를 모르는 요청은 닫아도 키·본문을 버리지 않는다(목록 조회가 실패해도 같은 키로만 다시 보낼 수 있게).
     if (!wasUnknown) {
       keys.reset();
@@ -218,7 +220,7 @@ export function createShareLinksStore(api: ShareLinkApi, options: ShareLinksStor
       // 불명 요청의 안내는 목록 위 배너가 맡는다(후보 행 수와 [요청 다시 보기]).
       notice: null,
     });
-    if (wasUnknown || issued || state.list.status !== "ready") void load();
+    if (wasUnknown || issued || toList || state.list.status !== "ready") void load();
   }
 
   function editable() {
