@@ -23,6 +23,7 @@ import {
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import { AbstractHttpAdapter, HttpAdapterHost } from '@nestjs/core';
+import { requestIdOf } from '../http/request-id';
 import { ApiError, ErrorBody, ErrorDetails } from './api-error';
 import { DEFAULT_ERROR_MESSAGES, ErrorCode } from './error-codes';
 import { collectedFrames } from './stack-frames';
@@ -58,6 +59,16 @@ export class ApiExceptionFilter implements ExceptionFilter {
 const logger = new Logger('ApiExceptionFilter');
 
 /**
+ * 업무 거부 중 보안 사건으로 한 줄씩 남기는 코드(#222, [10/4 팀장 결정](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5975854431)).
+ * 정상적인 업무 거부는 지금처럼 기록하지 않는다. 토큰 없이 온 요청(AUTH_REQUIRED)과 비밀번호를 아직 넣지 않은
+ * 요청(LINK_PASSWORD_REQUIRED)은 로그인 전 접속·링크 첫 열람에서도 생기므로 넣지 않는다.
+ * 링크 비밀번호 틀림·시도 제한은 #150의 unlock 경로가 dev에 들어온 뒤 테스트와 함께 추가한다.
+ */
+export const SECURITY_EVENT_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>(['AUTH_INVALID']);
+
+const securityLogger = new Logger('SecurityEvent');
+
+/**
  * 예외 하나를 명세 형식으로 응답하고 로그를 남긴다.
  * Nest 필터와, Nest 밖에서 끝나는 요청(전역 접두사 밖의 없는 경로 등)의 대비 처리가 함께 쓴다.
  */
@@ -65,6 +76,11 @@ export function writeErrorResponse(adapter: AbstractHttpAdapter, request: Reques
   const { status, body, log } = resolve(exception);
   const name = errorKind(exception);
   const where = `${request.method ?? '?'} ${safePath(request)}`;
+
+  if (SECURITY_EVENT_CODES.has(body.code)) {
+    // 분류 코드·등록된 경로 틀(메서드 포함)·시각·요청 식별자만 남긴다. 토큰·비밀번호·요청 원문·실제 URL은 넣지 않는다.
+    securityLogger.warn(`${body.code} ${where} requestId=${requestIdOf(request)} at=${new Date().toISOString()}`);
+  }
 
   if (log === 'error') {
     const frames = exception instanceof Error ? collectedFrames(exception) : undefined;
