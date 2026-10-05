@@ -11,6 +11,8 @@ const { ResultApplicationService, ApplicationFailureRecordingError } = require('
 const { registerCandidates, CatchRegistrationContextError } = require('../../dist/catches/registration-service');
 const { CatchRegistrationInputError } = require('../../dist/catches/registration-input-error');
 const { prepare: prepareReceipt } = require('../support/result-application-fixture.cjs');
+const { ShareLink } = require('../../dist/share-links/share-link.entity');
+const { CreateShareLink1790745895865 } = require('../../dist/database/migrations/1790745895865-CreateShareLink');
 const fixtureDir = resolve(__dirname, '../../../worker/fixtures/m1-synthetic');
 const read = path => JSON.parse(readFileSync(join(fixtureDir,path),'utf8'));
 let db;
@@ -182,10 +184,12 @@ test('E 수신 기록의 시도 유일성·복합 FK·지문 형식·엔티티 �
   const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
   const { CreateResultApplicationRecord1790550000000 } = require('../../dist/database/migrations/1790550000000-CreateResultApplicationRecord');
   const isolated = await openTestDataSource({ schema, extra: { options: '-c search_path=' + schema },
-    entities: [...Object.values(foundation).filter(v => typeof v === 'function'), ResultApplicationRecord],
-    migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000] });
+    entities: [...Object.values(foundation).filter(v => typeof v === 'function'), ResultApplicationRecord, ShareLink],
+    migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000, CreateShareLink1790745895865] });
   try {
-    await isolated.runMigrations();
+    assert.deepEqual((await isolated.runMigrations()).map(m => m.name),
+      ['CreateMemberAnalysisFoundation1790500000000', 'CreateResultApplicationRecord1790550000000', 'CreateShareLink1790745895865']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 10);
     const diff = await isolated.driver.createSchemaBuilder().log();
     assert.deepEqual(diff.upQueries.map(q => q.query), []);
   } finally { await isolated.destroy(); await db.query('DROP SCHEMA "' + schema + '" CASCADE'); }
@@ -240,14 +244,25 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
   try {
     const migrations = await isolated.runMigrations();
     assert.deepEqual(migrations.map(m => m.name), ['CreateMemberAnalysisFoundation1790500000000',
-      'CreateResultApplicationRecord1790550000000', 'CreateCatchAssets1790600000000', 'CreateRepositoryProtection1790601000000']);
+      'CreateResultApplicationRecord1790550000000', 'CreateCatchAssets1790600000000', 'CreateRepositoryProtection1790601000000', 'CreateShareLink1790745895865']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 14);
+    // B 고정 판본은 E 참조 FK를 엔티티 대신 실제 마이그레이션에 둔다.
+    // 이 한 차이만 허용하며, 아래에서 실제 FK 대상도 대조한다.
+    const expectedDdlDifference = ['ALTER TABLE "candidate_registration" DROP CONSTRAINT "fk_candidate_registration_application_record_id"'];
+    assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), expectedDdlDifference);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
-    await isolated.undoLastMigration(); await isolated.undoLastMigration();
+    await isolated.undoLastMigration(); // C 공유 링크 및 멱등 FK
+    assert.equal((await isolated.query("SELECT to_regclass('share_link') AS name"))[0].name,null);
+    await isolated.undoLastMigration(); await isolated.undoLastMigration(); // B 보호 판단·등록 테이블
     assert.equal((await isolated.query("SELECT to_regclass('result_application_record') AS table_name"))[0].table_name, 'result_application_record');
     await isolated.undoLastMigration();
     assert.equal(await isolated.manager.count(MemberAccount), 1);
+    assert.equal((await isolated.query("SELECT to_regclass('result_application_record') AS name"))[0].name,null);
+    await isolated.undoLastMigration(); // 회원·분석 기반
+    assert.deepEqual((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).map(r=>r.tablename),['migrations']);
     await isolated.runMigrations();
+    assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), expectedDdlDifference);
     const fk = await isolated.query(`SELECT confrelid::regclass::text AS target FROM pg_constraint
       WHERE conrelid='candidate_registration'::regclass AND conname='fk_candidate_registration_application_record_id'`);
     assert.equal(fk[0].target, 'result_application_record');

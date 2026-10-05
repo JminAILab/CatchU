@@ -10,8 +10,11 @@ const { ResultApplicationService, ResultApplicationContextError, ApplicationFail
 const foundation = require('../../dist/member-analysis/member-analysis.entity');
 const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
 const { CreateResultApplicationRecord1790550000000 } = require('../../dist/database/migrations/1790550000000-CreateResultApplicationRecord');
-const entities = [...Object.values(foundation).filter(v => typeof v === 'function'),ResultApplicationRecord];
-const migrations = [CreateMemberAnalysisFoundation1790500000000,CreateResultApplicationRecord1790550000000];
+const { ShareLink } = require('../../dist/share-links/share-link.entity');
+const { CreateShareLink1790745895865 } = require('../../dist/database/migrations/1790745895865-CreateShareLink');
+// ShareLink는 회원 멱등 기록의 실제 FK 참조이며 B 등록 대역과는 별개다.
+const entities = [...Object.values(foundation).filter(v => typeof v === 'function'),ResultApplicationRecord,ShareLink];
+const migrations = [CreateMemberAnalysisFoundation1790500000000,CreateResultApplicationRecord1790550000000,CreateShareLink1790745895865];
 const selfSchema = 'e_self_' + randomUUID().replaceAll('-','');
 let db, schemaOwner;
 before(async () => {
@@ -201,12 +204,19 @@ test('E 수신 제약·물리 매핑 및 실제 기반→E 적용·역순 되돌
   const isolated = await openTestDataSource({schema,entities,migrations,extra:{options:'-c search_path='+schema+' -c TimeZone=UTC'}});
   try {
     assert.deepEqual((await isolated.runMigrations()).map(m => m.name),
-      ['CreateMemberAnalysisFoundation1790500000000','CreateResultApplicationRecord1790550000000']);
+      ['CreateMemberAnalysisFoundation1790500000000','CreateResultApplicationRecord1790550000000','CreateShareLink1790745895865']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).length,10);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries,[]);
     await isolated.manager.insert(MemberAccount,{memberId:randomUUID(),identityReference:'preserve',accountState:'ACTIVE'});
-    await isolated.undoLastMigration();
+    await isolated.undoLastMigration(); // C 공유 링크 및 멱등 FK
+    assert.equal((await isolated.query("SELECT to_regclass('share_link') AS name"))[0].name,null);
+    assert.equal((await isolated.query("SELECT to_regclass('result_application_record') AS name"))[0].name,'result_application_record');
+    await isolated.undoLastMigration(); // E 수신 기록
     assert.equal(await isolated.manager.count(MemberAccount),1);
     assert.equal((await isolated.query("SELECT to_regclass('result_application_record') AS name"))[0].name,null);
+    await isolated.undoLastMigration(); // 회원·분석 기반
+    assert.deepEqual((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).map(r=>r.tablename),['migrations']);
     await isolated.runMigrations();
+    assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries,[]);
   } finally { await isolated.destroy(); await db.query('DROP SCHEMA "'+schema+'" CASCADE'); }
 });
