@@ -318,45 +318,119 @@ test("불명 상태에서 [목록에서 확인] 뒤 목록 조회까지 실패�
   assert.equal(snap().pendingIssue, null);
 });
 
-test("목록에서 같은 제목의 유효 링크가 확인될 때만 붙잡은 요청을 놓는다", async () => {
+test("목록에 같은 제목의 유효 링크가 있어도 요청을 놓지 않고 후보로만 보여 준다", async () => {
   const { store, queue, calls, snap } = setup();
   await store.load();
   store.openForm();
   store.setTitle("A사 지원");
   queue.push(lookupFailed);
   await store.submit();
-  queue.push(page([link("x", { title: "다른 링크" }), link("y", { title: "A사 지원", state: "STOPPED" })]));
+  // 같은 제목의 유효 링크: 이번 요청의 결과일 수도, 기존 링크·다른 탭의 발급일 수도 있다.
+  queue.push(page([link("old", { title: "A사 지원" }), link("x", { title: "다른 링크" })]));
   store.closeForm();
   await setImmediate();
-  assert.deepEqual(snap().pendingIssue, { title: "A사 지원" }, "중단된 같은 제목이나 다른 제목만 있으면 계속 붙잡는다");
-  queue.push(page([link("n", { title: "A사 지원" })]));
+  assert.deepEqual(snap().pendingIssue, { title: "A사 지원" }, "제목이 같다는 것만으로 결과를 확정하지 않는다");
+  assert.deepEqual(store.issueCandidates(), ["old"], "같은 제목 행은 후보로만 표시한다");
+  assert.equal(snap().notice, null);
+  queue.push(page([link("old", { title: "A사 지원" })]));
   await store.load();
-  assert.equal(snap().pendingIssue, null);
-  assert.match(snap().notice.text, /유효 링크가 목록에 있습니다/);
+  assert.deepEqual(snap().pendingIssue, { title: "A사 지원" }, "다시 조회해도 그대로 붙잡는다");
   store.openForm();
-  assert.equal(snap().form.phase, "editing");
-  store.setTitle("B사 지원");
-  queue.push(ok(link("m", { title: "B사 지원" }), 201));
-  await store.submit();
-  assert.deepEqual(calls.filter((call) => call.request?.method === "POST").map((call) => call.request.idempotencyKey), ["key-1", "key-2"]);
+  assert.equal(snap().form.phase, "unknown", "다시 열면 같은 요청의 불명 상태");
+  assert.equal(calls.filter((call) => call.request?.method === "POST").length, 1, "목록 확인만으로 자동 재전송하지 않는다");
 });
 
-test("[새로 작성]을 고를 때만 붙잡은 키를 버리고 입력을 고칠 수 있다", async () => {
+test("불명 요청의 결과는 같은 키·본문으로 다시 보낸 응답으로 확정한다", async () => {
+  // (1) 앞선 요청이 처리됐다: 같은 키 재요청은 그 링크를 200으로 돌려준다.
+  {
+    const { store, queue, calls, snap } = setup();
+    await store.load();
+    store.openForm();
+    store.setTitle("A사 지원");
+    queue.push(lookupFailed, page([link("n", { title: "A사 지원" })]));
+    await store.submit();
+    store.closeForm();
+    await setImmediate();
+    store.openForm();
+    queue.push(ok(link("n", { title: "A사 지원" }), 200));
+    await store.resend();
+    assert.equal(snap().form.phase, "issued");
+    assert.equal(snap().form.issued.linkId, "n");
+    assert.equal(snap().pendingIssue, null);
+    assert.deepEqual(store.issueCandidates(), []);
+    assert.deepEqual(calls.filter((call) => call.request?.method === "POST").map((call) => call.request.idempotencyKey), ["key-1", "key-1"]);
+  }
+  // (2) 앞선 요청은 처리되지 않았고 같은 제목의 기존 링크가 있다: 같은 키 재요청이 제목 중복으로 확정된다.
+  {
+    const { store, queue, calls, snap } = setup();
+    await store.load();
+    store.openForm();
+    store.setTitle("A사 지원");
+    queue.push(lookupFailed);
+    await store.submit();
+    queue.push(apiError(409, "LINK_TITLE_CONFLICT"));
+    await store.resend();
+    assert.equal(snap().form.phase, "editing");
+    assert.equal(snap().pendingIssue, null, "서버가 판정한 거부로 확정됐으므로 놓는다");
+    assert.match(snap().form.message.text, /같은 제목의 유효한 링크가 이미 있습니다/);
+    store.setTitle("A사 지원 2");
+    queue.push(ok(link("m", { title: "A사 지원 2" }), 201));
+    await store.submit();
+    assert.deepEqual(calls.filter((call) => call.request?.method === "POST").map((call) => call.request.idempotencyKey), ["key-1", "key-1", "key-2"]);
+  }
+});
+
+test("[새로 작성]은 이전 요청이 발급됐을 수 있다는 안내를 먼저 보이고, 계속할 때만 키를 버린다", async () => {
   const { store, queue, calls, snap } = setup();
   await store.load();
   store.openForm();
   store.setTitle("A사 지원");
   queue.push(lookupFailed);
   await store.submit();
+  // 키를 바로 버리는 우회 호출은 받지 않는다.
+  store.discardPending();
+  assert.equal(snap().form.phase, "unknown");
+  assert.deepEqual(snap().pendingIssue, { title: "A사 지원" });
+
+  store.askDiscard();
+  assert.equal(snap().form.discardAsked, true);
+  assert.match(snap().form.message.text, /이전 요청은 이미 발급됐을 수 있습니다\. 목록을 확인한 뒤 새로 작성해 주세요\./);
+  assert.match(snap().form.message.text, /새 요청으로 보내며, 이전 요청은 자동으로 다시 보내지 않습니다/);
+  store.cancelDiscard();
+  assert.equal(snap().form.discardAsked, false);
+  assert.deepEqual(snap().pendingIssue, { title: "A사 지원" }, "[취소]는 같은 요청을 그대로 붙잡는다");
+
+  store.askDiscard();
   store.discardPending();
   assert.equal(snap().form.phase, "editing");
   assert.equal(snap().pendingIssue, null);
+  assert.equal(calls.filter((call) => call.request?.method === "POST").length, 1, "이전 요청을 자동으로 다시 보내지 않는다");
   store.setTitle("A사 최종 지원");
   queue.push(ok(link("n", { title: "A사 최종 지원" }), 201));
   await store.submit();
   const posts = calls.filter((call) => call.request?.method === "POST");
-  assert.deepEqual(posts.map((call) => call.request.idempotencyKey), ["key-1", "key-2"]);
+  assert.deepEqual(posts.map((call) => call.request.idempotencyKey), ["key-1", "key-2"], "새로 작성한 요청은 새 키");
   assert.deepEqual(posts[1].request.body, { title: "A사 최종 지원" });
+});
+
+test("안내 단계에서 [목록에서 확인]으로 닫으면 요청을 계속 붙잡는다", async () => {
+  const { store, queue, calls, snap } = setup();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  queue.push(lookupFailed);
+  await store.submit();
+  store.askDiscard();
+  queue.push(page([link("a")]));
+  store.closeForm();
+  await setImmediate();
+  assert.deepEqual(snap().pendingIssue, { title: "A사 지원" });
+  store.openForm();
+  assert.equal(snap().form.phase, "unknown");
+  assert.equal(snap().form.discardAsked, false);
+  queue.push(ok(link("n", { title: "A사 지원" }), 201));
+  await store.resend();
+  assert.deepEqual(calls.filter((call) => call.request?.method === "POST").map((call) => call.request.idempotencyKey), ["key-1", "key-1"]);
 });
 
 // ── 중단 ─────────────────────────────────────────────────

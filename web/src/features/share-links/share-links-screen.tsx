@@ -165,10 +165,16 @@ function IssuePanel({ store }: { store: ShareLinksStore }) {
         )}
 
         <div className={styles.actions}>
-          {form.phase === "unknown" ? (
+          {form.phase === "unknown" && form.discardAsked ? (
             <>
               <button type="button" className={styles.secondary} onClick={store.closeForm}>목록에서 확인</button>
-              <button type="button" className={styles.secondary} onClick={store.discardPending}>새로 작성</button>
+              <button type="button" className={styles.secondary} onClick={store.cancelDiscard}>취소</button>
+              <button type="button" className={styles.primary} onClick={store.discardPending}>새로 작성 계속</button>
+            </>
+          ) : form.phase === "unknown" ? (
+            <>
+              <button type="button" className={styles.secondary} onClick={store.closeForm}>목록에서 확인</button>
+              <button type="button" className={styles.secondary} onClick={store.askDiscard}>새로 작성</button>
               <button type="button" className={styles.primary} onClick={() => void store.resend()}>다시 발행</button>
             </>
           ) : (
@@ -193,14 +199,21 @@ function IssuedPanel({ store, link }: { store: ShareLinksStore; link: ShareLink 
       <h2 id="issued-title" className={styles.panelTitle}>링크가 발행되었습니다.</h2>
       <dl className={styles.details}>
         <dt>제목</dt><dd>{link.title} <span className={styles.muted}>— 나에게만 표시</span></dd>
-        <dt>URL</dt><dd><span className={styles.url}>{link.url}</span> <CopyButton url={link.url} disabled={false} /></dd>
+        <dt>URL</dt><dd><span className={styles.url}>{link.url}</span> <CopyButton url={link.url} disabled={link.state !== "ACTIVE"} /></dd>
         <dt>발행 시각</dt><dd>{formatKst(link.createdAt)}</dd>
         <dt>만료 시각</dt><dd>{formatKst(link.expiresAt)}</dd>
         <dt>비밀번호</dt><dd>{link.passwordRequired ? "설정됨" : "없음"}</dd>
       </dl>
-      <p className={styles.help}>
-        URL을 수신자에게 전달하세요.{link.passwordRequired && " 비밀번호를 설정했으므로 비밀번호도 따로 전달해야 합니다."}
-      </p>
+      {link.state !== "ACTIVE" ? (
+        // 같은 요청을 다시 보내면 서버는 그 링크를 현재 상태로 돌려준다. 그사이 중단·만료됐으면 그대로 알린다.
+        <p className={styles.messageError} role="alert">
+          이 요청으로 발행된 링크이지만 현재 상태는 ‘{STATE_LABELS[link.state]}’입니다. 이 URL로는 열람할 수 없습니다.
+        </p>
+      ) : (
+        <p className={styles.help}>
+          URL을 수신자에게 전달하세요.{link.passwordRequired && " 비밀번호를 설정했으므로 비밀번호도 따로 전달해야 합니다."}
+        </p>
+      )}
       <div className={styles.actions}>
         <button type="button" className={styles.primary} onClick={store.closeForm}>공유 링크로</button>
       </div>
@@ -212,9 +225,14 @@ function IssuedPanel({ store, link }: { store: ShareLinksStore; link: ShareLink 
 function LinkList({ store }: { store: ShareLinksStore }) {
   const { list, pendingIssue, form } = useSnapshot(store);
   const now = store.now();
+  const candidates = store.issueCandidates();
   const pending = pendingIssue && !form.open && (
     <div className={styles.noticeError} role="status">
-      <span>확인하지 못한 발급 요청이 있습니다: ‘{pendingIssue.title}’. 목록에 없으면 같은 요청으로 다시 보낼 수 있습니다.</span>
+      <span>
+        확인하지 못한 발급 요청이 있습니다: ‘{pendingIssue.title}’.{" "}
+        {list.status === "ready" && candidates.length > 0 && `목록에 같은 제목의 링크가 ${candidates.length}개 있지만, 이번 요청의 결과인지는 아직 알 수 없습니다. `}
+        [요청 다시 보기]에서 같은 요청을 다시 보내면 결과를 확인할 수 있습니다. 이미 처리된 요청이면 새 링크를 만들지 않고 그 결과를 돌려받습니다.
+      </span>
       <button type="button" className={styles.linkButton} onClick={store.openForm}>요청 다시 보기</button>
     </div>
   );
@@ -255,7 +273,9 @@ function LinkList({ store }: { store: ShareLinksStore }) {
         </div>
       )}
       <ul className={styles.list}>
-        {list.items.map((link) => <LinkRow key={link.linkId} store={store} link={link} now={now} />)}
+        {list.items.map((link) => (
+          <LinkRow key={link.linkId} store={store} link={link} now={now} candidate={candidates.includes(link.linkId)} />
+        ))}
       </ul>
       {list.nextCursor !== null && (
         <div className={styles.more}>
@@ -269,7 +289,7 @@ function LinkList({ store }: { store: ShareLinksStore }) {
   );
 }
 
-function LinkRow({ store, link, now }: { store: ShareLinksStore; link: ShareLink; now: number }) {
+function LinkRow({ store, link, now, candidate }: { store: ShareLinksStore; link: ShareLink; now: number; candidate: boolean }) {
   const snapshot = useSnapshot(store);
   const actionable = snapshot.list.status === "ready" && !snapshot.list.refreshing && !snapshot.list.stale;
   const remaining = remainingText(link, now);
@@ -281,6 +301,7 @@ function LinkRow({ store, link, now }: { store: ShareLinksStore; link: ShareLink
         <span className={styles[`state${link.state}`]}>{STATE_LABELS[link.state]}</span>
       </div>
       <p className={styles.url}>{link.url}</p>
+      {candidate && <p className={styles.muted}>확인하지 못한 발급 요청과 제목이 같습니다. 이 요청의 결과인지는 아직 알 수 없습니다.</p>}
       <p className={styles.meta}>
         비밀번호: {link.passwordRequired ? "설정됨" : "없음"} · 발행: {formatKst(link.createdAt)} · 만료: {formatKst(link.expiresAt)}
         {remaining && ` · 남은 기간: ${remaining}`}
