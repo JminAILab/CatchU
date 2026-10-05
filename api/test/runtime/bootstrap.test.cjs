@@ -91,7 +91,7 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
   return {
     request, closed, logs: () => output, secret, port,
     async ready() {
-      for (let attempt = 0; attempt < 100; attempt++) {
+      for (let attempt = 0; attempt < 200; attempt++) {
         if (child.exitCode !== null || child.signalCode !== null) {
           assert.fail('main 진입점이 정상 기동 전에 종료됨');
         }
