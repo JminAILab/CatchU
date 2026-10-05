@@ -9,6 +9,9 @@ const MEMBER_AUTH_FAILURES = new Set(["AUTH_REQUIRED", "AUTH_INVALID"]);
 
 const LOOKUP_FAILED: ApiResult = { kind: "lookup-failed", status: null, code: "LOOKUP_FAILED" };
 
+/** 이 컴퓨터 안의 주소. 운영 빌드에서도 http로 부를 수 있다(빌드 결과를 로컬 api와 띄워 볼 때). */
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
 /**
  * 호출 결과. #88의 ApiResult에 차단 응답의 남은 시간을 더한다.
  * `retryAfterSeconds`는 오류 응답에 `Retry-After`가 1 이상의 정수 초로 왔을 때만 있다(#150 비밀번호 시도 제한, #173 계약).
@@ -47,6 +50,8 @@ export type RecipientRequest = {
 export type ApiClientOptions = {
   /** NEXT_PUBLIC_API_BASE_URL. `/v1`은 넣지 않는다. */
   baseUrl: string | undefined;
+  /** process.env.NODE_ENV. development·test가 아니면 로컬 주소가 아닌 http 기준 주소로 요청하지 않는다(#218). */
+  nodeEnv?: string;
   tokens: AccessTokenStore;
   fetch?: typeof fetch;
 };
@@ -63,11 +68,17 @@ export type ApiClient = {
   devLogin(memberId: string, request?: DevLoginRequest): Promise<ClientResult>;
 };
 
-/** http(s) 주소만 받고 끝 슬래시를 뗀다. 쿼리·해시·계정 정보가 있거나 `/v1`로 끝나면 설정 오류(null)다. */
-export function normalizeApiBaseUrl(value: string | undefined): string | null {
+/**
+ * http(s) 주소만 받고 끝 슬래시를 뗀다. 쿼리·해시·계정 정보가 있거나 `/v1`로 끝나면 설정 오류(null)다.
+ * `nodeEnv`가 development·test가 아니면(운영 빌드·미지정 포함) 로컬 주소가 아닌 http 주소도 설정 오류다.
+ * 회원 토큰과 링크 비밀번호가 암호화 없이 오가지 않게 한다(#218).
+ */
+export function normalizeApiBaseUrl(value: string | undefined, nodeEnv?: string): string | null {
   if (typeof value !== "string" || !URL.canParse(value.trim())) return null;
   const url = new URL(value.trim());
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  if (url.protocol === "http:" && !LOCAL_HOSTNAMES.has(url.hostname)
+    && nodeEnv !== "development" && nodeEnv !== "test") return null;
   if (url.search || url.hash || url.username || url.password) return null;
   const path = url.pathname.replace(/\/+$/, "");
   if (path.endsWith(API_VERSION_PATH)) return null;
@@ -79,7 +90,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function createApiClient(options: ApiClientOptions): ApiClient {
-  const baseUrl = normalizeApiBaseUrl(options.baseUrl);
+  const baseUrl = normalizeApiBaseUrl(options.baseUrl, options.nodeEnv);
   const fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
   let latestLogin = 0;
 
