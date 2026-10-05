@@ -157,7 +157,8 @@ test('Nest 조립 시 주입 설정 없음이면 인증해도 거부한다', asy
 });
 
 test('Nest 조립 시 production + 주입 설정 true라도 인증된 주입을 거부한다', async (t) => {
-  const app = await server(t, { NODE_ENV: 'production' });
+  // production은 공유 URL 주소가 필수(#147)라 합성 주소를 함께 준다.
+  const app = await server(t, { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example' });
   assert.equal((await app.post('/v1/__test/analysis/test-request/message',
     { kind: 'Result', template: template(), caseId: 'case' }, await app.issueTestToken())).status, 403);
   assert.equal(app.store.commits, 0);

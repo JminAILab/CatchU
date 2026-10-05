@@ -5,9 +5,10 @@ import { NoStoreInterceptor } from './common/http/no-store.interceptor';
 import { HealthController } from './health/health.controller';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
+import { ShareLinksModule } from './share-links/share-links.module';
 
 @Module({
-  imports: [ErrorsModule, AuthModule, DatabaseModule],
+  imports: [ErrorsModule, AuthModule, DatabaseModule, ShareLinksModule],
   controllers: [HealthController],
   providers: [{ provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor }],
 })
