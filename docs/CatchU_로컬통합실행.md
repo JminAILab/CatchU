@@ -72,16 +72,16 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:3001/v1/auth/d
 - 첫 줄: `HTTP/1.1 200 OK`와 `{"status":"ok"}`. 이 응답은 DB 상태를 보지 않는다. DB가 꺼져 있으면 api가 아예 켜지지 않는다.
 - 둘째 줄: `200`. 개발용 로그인이 켜져 있다는 뜻이다. 토큰은 출력하지 않는다. `403`이면 `.env`의 `DEV_LOGIN_ENABLED`와 `NODE_ENV`를 본다.
 
-**보호 경로 호출(선택).** 로그인이 필요한 제품 경로는 지금 공유 링크 발급(`POST /v1/share-links`) 하나다. 이 경로는 요청 본문과 `Idempotency-Key` 헤더를 갖춰야 성공하므로, 받은 토큰이 통하는지만 보려면 [api 「검토자 재현」](../api/docs/auth-review.md)의 확인용 컨트롤러를 잠시 추가하고, 확인이 끝나면 지운다. 토큰은 변수에만 담는다.
+**보호 경로 호출(선택).** 로그인이 필요한 제품 경로는 지금 공유 링크의 목록·발급·중단이다. 받은 토큰이 통하는지는 요청 내용이 필요 없는 내 링크 목록(`GET /v1/share-links`)으로 본다. 토큰은 변수에만 담는다.
 
 ```sh
 TOKEN=$(curl -s -X POST http://127.0.0.1:3001/v1/auth/dev-login -H 'Content-Type: application/json' -d '{"memberId":"local-member-1"}' | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s).accessToken))")
-curl -s -w ' %{http_code}\n' http://127.0.0.1:3001/v1/auth-check
-printf 'Authorization: Bearer %s\n' "$TOKEN" | curl -s -w ' %{http_code}\n' -H @- http://127.0.0.1:3001/v1/auth-check
+curl -s -w ' %{http_code}\n' http://127.0.0.1:3001/v1/share-links
+printf 'Authorization: Bearer %s\n' "$TOKEN" | curl -s -w ' %{http_code}\n' -H @- http://127.0.0.1:3001/v1/share-links
 unset TOKEN
 ```
 
-토큰 없이는 `AUTH_REQUIRED` 본문과 `401`, 토큰을 붙이면 `{"memberId":"<회원 UUID>"}`와 `200`이 나온다. 개발용 로그인은 입력한 문자열로 회원을 찾거나 만들어 그 회원의 UUID를 토큰에 넣으므로, 같은 문자열로 다시 로그인하면 같은 UUID가 나온다. 확인용 컨트롤러 없이도 토큰 없이 `POST /v1/share-links`를 부르면 같은 `401`이 나온다.
+토큰 없이는 `AUTH_REQUIRED` 본문과 `401`, 토큰을 붙이면 내 링크 목록과 `200`이 나온다(링크가 없으면 `{"items":[],"page":{"nextCursor":null}}`). 개발용 로그인은 입력한 문자열로 회원을 찾거나 만들어 그 회원의 UUID를 토큰에 넣으므로, 같은 문자열로 다시 로그인하면 같은 회원으로 들어간다. 토큰에 담긴 회원 UUID를 직접 보려면 [api 「검토자 재현」](../api/docs/auth-review.md)의 확인용 컨트롤러를 잠시 붙였다가 지운다.
 
 ### 3. worker
 
@@ -120,7 +120,7 @@ curl -s http://localhost:3000/ | grep -o 'CatchU web'
 3. `http://localhost:3000/login`에서 개발용 식별 문자열을 입력한다. api가 해당 회원을 찾거나 만들어 로그인하며, 요청 필드 이름은 `memberId`다. 성공하면 `/home`으로, 회원 경로에서 왔다면 검증된 `next`로 돌아간다.
 4. 새로고침하면 메모리 토큰이 사라져 다시 로그인한다. 로그아웃하면 `/`로 이동한다. 이름 미저장 회원의 최초 입력 이동은 `GET /v1/me`(#135) 연결 뒤 확인한다.
 
-기능 화면은 [web README 「API 호출」](../web/README.md#api-호출-106-pr②)의 `api.member`·`api.recipient`를 사용한다. 회원 호출만 Bearer 토큰을 첨부하고, 수신자 비밀번호 차단의 `Retry-After`는 `retryAfterSeconds`로 전달한다. 제품 API의 필수 입력과 무관하게 토큰 전달만 확인할 때는 2단계의 임시 확인용 경로를 사용하며, 이것을 제품 기능 연결 완료로 세지 않는다. 토큰 값을 화면·로그·공유 자료에 남기지 않는다.
+기능 화면은 [web README 「API 호출」](../web/README.md#api-호출-106-pr②)의 `api.member`·`api.recipient`를 사용한다. 회원 호출만 Bearer 토큰을 첨부하고, 수신자 비밀번호 차단의 `Retry-After`는 `retryAfterSeconds`로 전달한다. 토큰 전달만 확인할 때는 2단계의 내 링크 목록 호출을 쓰며, 이것을 web 화면의 기능 연결 완료로 세지 않는다. 토큰 값을 화면·로그·공유 자료에 남기지 않는다.
 
 ## 끄는 순서
 
