@@ -331,13 +331,7 @@ async save(manager: EntityManager, input: Input): Promise<void> {
 
 ### B Catch 등록 저장 — #105
 
-[`registerCandidates(manager, input)`](src/catches/registration-service.ts)는 E가 연 활성 TypeORM 트랜잭션에서 B의 Catch·근거·후보 연결을 함께 저장한다. 전체 후보를 먼저 검사하고, 동일 작업·수신 재전달 시 기존 Catch와 최초 등록 판정을 보존한다. 실패는 E로 전달해 전체를 롤백하며 E가 바깥에서 APPLY_FAILED를 기록한다. 준비 함수·엔티티·B 마이그레이션과 내부 오류/연결 경계는 [등록 연결 설명](docs/catch-registration-proposal.md)에 있다.
-
-등록·재호출 전에 Catch의 원 요청 저장소·동일 소유자의 명시적 보호 판단(`NONE`/`SOURCE_PRIVATE`)이 필요하며, 없으면 `CATCH_NOT_READY`로 거부한다. 보호 테이블 마이그레이션은 포함하지만 최초 판단 공급은 별도 연결하며 기본 `NONE`을 생성하지 않는다.
-
-같은 작업 식별값이어도 기존 Catch의 원 저장소·MOCK/LIVE가 새 요청·시도와 다르면 `CONTEXT_MISMATCH`로 전체 반영을 거부한다. 이미 저장된 후보 연결을 재반영할 때도 대조하며 기존 Catch·수신 기록은 보존한다. E의 실제 실패 기록과 복구 연결은 별도다.
-
-실제 B PostgreSQL 검사는 `TEST_DB_HOST/PORT/USER/PASSWORD/NAME`을 지정하고 `npm run test:catches:db`로 실행한다. 이름이 `_test`로 끝나는 DB의 임의 스키마에 #104의 실제 회원·분석 기반 마이그레이션과 B 마이그레이션을 적용한다. 입력 자료·보호 관찰과 E 수신 기록·완료 호출은 검사 대역이며, 전체 분석 연결을 대신하지 않는다. 실제 동의·요청·시도의 순환 FK와 회원당 활성 요청 하나 제약을 유지한다. 일반 `npm test`에서도 B DB 검사를 생략하지 않으며 공통 실행기의 테스트 DB 설정을 사용한다. 전체 검사 재현은 [등록 연결 설명의 검사 실행](docs/catch-registration-proposal.md#6-검사-실행)을 따른다. 제품 마이그레이션은 E 수신 테이블이 없으면 실패하며 대역을 자동 생성하지 않는다.
+[Catch 등록 안내](docs/catch-registration-proposal.md)에서 저장 규칙, E 연결 조건, DB 적용·검사 방법을 확인한다.
 
 ## 인증 기반 사용과 후속 경계 — #87
 
