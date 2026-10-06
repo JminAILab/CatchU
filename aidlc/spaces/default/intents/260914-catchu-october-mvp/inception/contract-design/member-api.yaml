@@ -315,6 +315,7 @@ paths:
         "403": {"$ref":"./common.yaml#/components/responses/Error403"}
         "404": {"$ref":"./common.yaml#/components/responses/Error404"}
         "409": {"$ref":"./common.yaml#/components/responses/Error409"}
+        "429": {"$ref":"./common.yaml#/components/responses/Error429"}
         "500": {"$ref":"./common.yaml#/components/responses/Error500"}
   "/share-links/{linkId}/stop":
     parameters: [{"name":"linkId","in":"path","required":true,"schema":{"type":"string","minLength":1}}]
