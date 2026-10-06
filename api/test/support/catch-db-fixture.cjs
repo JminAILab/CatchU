@@ -1,4 +1,4 @@
-const { randomUUID } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 
 const TEST_KEYS = ['TEST_DB_HOST', 'TEST_DB_PORT', 'TEST_DB_USER', 'TEST_DB_PASSWORD', 'TEST_DB_NAME'];
 
@@ -42,17 +42,18 @@ function candidate(candidateId = 'synthetic-candidate-1', workIdentity = 'synthe
   };
 }
 
-/** 실제 회원·분석·공유 링크 기반을 적용한다. E 수신 기록만 명시적 SQL 시험 대역이다. */
+/** 실제 회원·분석·E 수신 기록·공유 링크 마이그레이션을 적용한다. */
 async function createUpstreamTables(dataSource) {
   const { assertTestDatabaseName } = require('./test-database.cjs');
   const { DataSource } = require('typeorm');
   const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
+  const { CreateResultApplicationRecord1790550000000 } = require('../../dist/database/migrations/1790550000000-CreateResultApplicationRecord');
   const { CreateShareLink1790745895865 } = require('../../dist/database/migrations/1790745895865-CreateShareLink');
   assertTestDatabaseName(dataSource.options.database);
   // 공통 npm test가 이어서 runMigrations해도 기반을 중복 생성하지 않도록 이력도 남긴다.
   const foundation = new DataSource({
     ...dataSource.options,
-    migrations: [CreateMemberAnalysisFoundation1790500000000, CreateShareLink1790745895865],
+    migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000, CreateShareLink1790745895865],
   });
   try {
     await foundation.initialize();
@@ -60,13 +61,6 @@ async function createUpstreamTables(dataSource) {
   } finally {
     if (foundation.isInitialized) await foundation.destroy();
   }
-  await dataSource.query(`CREATE TABLE result_application_record (
-    application_record_id uuid PRIMARY KEY,
-    request_id uuid NOT NULL REFERENCES analysis_request(request_id),
-    attempt_id uuid NOT NULL UNIQUE REFERENCES analysis_attempt(attempt_id),
-    result_id text NOT NULL, payload_fingerprint text NOT NULL,
-    received_at timestamptz NOT NULL DEFAULT now(), UNIQUE(request_id, attempt_id, result_id)
-  )`);
 }
 
 async function createCatchDbFixture(config) {
@@ -101,11 +95,12 @@ async function createCatchDbFixture(config) {
     const { MemberAccount, MemberProfile, GitHubConnection, AnalysisRequest, AnalysisConsent,
       AnalysisAttempt, IdempotencyRecord } = require('../../dist/member-analysis/member-analysis.entity');
     const { ShareLink } = require('../../dist/share-links/share-link.entity');
+    const { ResultApplicationRecord } = require('../../dist/result-application/result-application.entity');
     const { SnakeNamingStrategy } = require('../../dist/database/snake-naming.strategy');
     dataSource = new DataSource({
       ...config, schema, namingStrategy: new SnakeNamingStrategy(),
       entities: [MemberAccount, MemberProfile, GitHubConnection, AnalysisRequest, AnalysisConsent,
-        AnalysisAttempt, IdempotencyRecord, ShareLink, CatchAssetEntity, CatchEvidenceEntity,
+        AnalysisAttempt, IdempotencyRecord, ShareLink, ResultApplicationRecord, CatchAssetEntity, CatchEvidenceEntity,
         CandidateRegistrationEntity, RepositoryProtectionEntity],
       // 되돌리기 검사는 B 마이그레이션만 취소하여 실제 선행 테이블의 보존을 확인한다.
       migrations: [CreateCatchAssets1790600000000, CreateRepositoryProtection1790601000000],
@@ -147,9 +142,13 @@ async function createCatchDbFixture(config) {
             attemptId: input.attemptId, requestId: input.requestId, sourceMode: input.sourceMode,
             processing: 'SUCCEEDED', application: 'PENDING', eligibleCandidateCount: input.candidates.length,
           });
-          await manager.query(`INSERT INTO result_application_record
-            (application_record_id, request_id, attempt_id, result_id, payload_fingerprint) VALUES ($1,$2,$3,$4,$5)`,
-          [input.applicationRecordId, input.requestId, input.attemptId, input.resultId, 'synthetic-fingerprint']);
+          // B 입력으로 만든 합성 수신 준비물이다. 실제 E의 worker 결과 지문 대조는 결합 검사에서 확인한다.
+          await manager.insert(ResultApplicationRecord, {
+            applicationRecordId: input.applicationRecordId, requestId: input.requestId,
+            attemptId: input.attemptId, resultId: input.resultId,
+            payloadFingerprint: createHash('sha256').update(JSON.stringify(input)).digest('hex'),
+            receivedAt: now,
+          });
           // 정상 시험을 위한 명시적인 합성 관측이다. 제품이 누락된 판단을 NONE으로 채우는 동작이 아니다.
           // 보호 부재 시험은 protection: null로 이 준비 자체를 생략한다.
           if (protection !== null) {

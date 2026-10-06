@@ -25,8 +25,8 @@ function fillWorkerTemplate(template, values) {
   });
 }
 
-// 실제 회원·분석 기반과 PostgreSQL에서 B 저장·제약·트랜잭션을 검증한다.
-// E 수신 기록·완료 처리·보호 관측은 명시적인 SQL 시험 대역이며 실제 E 연결을 증명하지 않는다.
+// 실제 회원·분석·E 수신 기록 기반과 PostgreSQL에서 B 저장·제약·트랜잭션을 검증한다.
+// 수신 자료·E 완료 처리·보호 관측은 시험 준비물이며 실제 수신 경로 연결을 증명하지 않는다.
 describe('Catch 등록 PostgreSQL', {
   concurrency: false, timeout: 60000,
 }, () => {

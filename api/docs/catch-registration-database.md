@@ -26,9 +26,8 @@ down은 보호 판단→후보 연결→근거→Catch 순서이며 A/E 테이�
 
 Catch 소유자·원 요청, 보호 판단 소유자는 #104의 실제 MemberAccount·AnalysisRequest
 엔티티에 외래 키 메타데이터로 연결하며 기존 마이그레이션의 제약 이름·동작을 유지한다.
-CandidateRegistration의 E 수신 기록 참조는 실제 ResultApplicationRecord 엔티티를 결합할 때 연결한다.
-이 참조의 DB 외래 키는 기존 마이그레이션에서 보장하므로
-`migration:generate`가 삭제를 제안해도 채택하지 않는다.
+CandidateRegistration의 E 수신 기록 참조도 실제 ResultApplicationRecord 엔티티에 연결한다.
+기존 DB 외래 키의 이름·대상·기본 동작을 유지하며, 전체 엔티티와 실제 마이그레이션의 차이가 없는지 검사한다.
 B→B 관계는 엔티티에도 있다. synchronize로 스키마를 바꾸지 않는다.
 
 ## 검사 실행
@@ -42,25 +41,22 @@ B 저장 검사만 실행할 때는 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USE
 설정 누락이나 잘못된 DB 이름은 실패한다.
 전체 제품 마이그레이션에는 #104·E 선행 테이블이 필요하며, 제품 코드가 합성 테이블을 만들지 않는다.
 
-전체 검사를 재현할 때는 **새로 만든 폐기 가능한 전용 테스트 DB**에 한해
-아래 검사 전용 helper로 #104와 공유 링크 참조의 실제 마이그레이션(적용 기록 포함)을 적용하고,
-E 수신 테이블 대역을 먼저 준비한다.
-`DB_*`와 전체 검사에 쓰는 `TEST_DB_*`를 같은 전용 `_test` DB로 지정한다.
-기존 제품/개발 DB에는 실행하지 않는다. 대역 테이블이 이미 있으면 덮어쓰지 않고 실패한다.
+전체 검사는 **폐기 가능한 전용 테스트 DB**에 실제 마이그레이션을 자동 적용한다.
+E 수신 테이블을 별도 helper나 SQL 대역으로 미리 만들지 않는다.
+`TEST_DB_*` 설정과 실행 환경은 [api README의 DB 테스트](../README.md#db-테스트)를 따른다.
 
 ```powershell
-# api에서 npm run build 후, 위 전용 테스트 DB 설정으로 한 번만 실행
-node -e "const {openTestDataSource}=require('./test/support/test-database.cjs'); const {createUpstreamTables}=require('./test/support/catch-db-fixture.cjs'); (async()=>{const db=await openTestDataSource(); try{await createUpstreamTables(db);}finally{await db.destroy();}})().catch(e=>{console.error(e);process.exitCode=1;});"
+# api에서 전용 TEST_DB_* 설정 후 실행
 npm test
+# 실제 E 반영 서비스와 B 등록의 결합 검사만 실행
+npm test -- test/integration/result-application-b.test.cjs
 ```
 
-실제 E 수신 마이그레이션을 결합할 때 이 대역을 교체한다.
-공통 실행기나 제품 마이그레이션에 대역 자동 준비를 넣지 않는다.
+결합 검사도 기본 `npm test` 탐색에 포함되므로 같은 명령을 쓰는 CI에서 실행된다.
 
 ## 검사가 보장하는 범위
 
-fixture는 임의 이름의 격리 스키마에 실제 회원·분석·공유 링크 기반→E 수신 테이블 대역→B 마이그레이션
-순서로 적용한다. [PR #184](https://github.com/JminAILab/CatchU/pull/184)의 실제 기반이므로
+B fixture는 임의 이름의 격리 스키마에 실제 회원·분석/E 수신/공유 링크 기반과 B 마이그레이션을 적용한다. [PR #184](https://github.com/JminAILab/CatchU/pull/184)의 실제 기반이므로
 동의·요청·시도의 필수 값과 순환 FK, 회원당 활성 요청 하나 제약을 유지한다.
 같은 회원의 후속 요청 사례는 이전 요청 종료를 테스트에 명시하며 fixture가 자동 종료하지 않는다.
 정상 등록 자료에는 합성 관측의 보호 판단을 명시적으로 준비한다.
@@ -74,6 +70,7 @@ fixture는 임의 이름의 격리 스키마에 실제 회원·분석·공유 �
 - 같은 수신 기록의 동시 재전달과 종료된 요청의 재전달·후속 요청 경합.
   한 회원의 두 활성 분석을 허용한다는 뜻이 아니다.
 
-입력 자료·보호 관찰과 E 수신 테이블·완료/실패 호출은 검사 대역이다.
-실제 E 수신부·worker 통합 성공은 별도 연결 검증이 필요하다.
+B 단독 검사의 E 완료 호출은 대역이며, 결합 검사는 실제 E 반영 서비스와 B 등록 함수를 사용한다.
+두 검사 모두 입력 자료·최초 수신 기록·보호 판단은 합성 준비물로 공급한다.
+실제 수신 저장 어댑터·보호 판단 공급·worker까지의 전체 서비스 연결은 별도 검증이 필요하다.
 판본별 실행 명령·결과는 PR에 기록하며 여기에서 실행 상태를 복제하지 않는다.

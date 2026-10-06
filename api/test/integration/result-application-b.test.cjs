@@ -246,10 +246,7 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
     assert.deepEqual(migrations.map(m => m.name), ['CreateMemberAnalysisFoundation1790500000000',
       'CreateResultApplicationRecord1790550000000', 'CreateCatchAssets1790600000000', 'CreateRepositoryProtection1790601000000', 'CreateShareLink1790745895865']);
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 14);
-    // B 고정 판본은 E 참조 FK를 엔티티 대신 실제 마이그레이션에 둔다.
-    // 이 한 차이만 허용하며, 아래에서 실제 FK 대상도 대조한다.
-    const expectedDdlDifference = ['ALTER TABLE "candidate_registration" DROP CONSTRAINT "fk_candidate_registration_application_record_id"'];
-    assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), expectedDdlDifference);
+    assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
     await isolated.undoLastMigration(); // C 공유 링크 및 멱등 FK
@@ -262,7 +259,7 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
     await isolated.undoLastMigration(); // 회원·분석 기반
     assert.deepEqual((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).map(r=>r.tablename),['migrations']);
     await isolated.runMigrations();
-    assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), expectedDdlDifference);
+    assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const fk = await isolated.query(`SELECT confrelid::regclass::text AS target FROM pg_constraint
       WHERE conrelid='candidate_registration'::regclass AND conname='fk_candidate_registration_application_record_id'`);
     assert.equal(fk[0].target, 'result_application_record');

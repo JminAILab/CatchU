@@ -15,7 +15,8 @@ ResultApplicationRecord 엔티티·마이그레이션, 외부 등록 함수 port
 B 등록 함수는 A/E의 회원·요청·시도·수신 테이블 관리,
 원문 fingerprint·동의·범위 검증, 반영 상태 처리와 반복 실패 복구를 대신하지 않는다.
 MemberAccount·AnalysisRequest·AnalysisAttempt는 [PR #184](https://github.com/JminAILab/CatchU/pull/184)의
-실제 기반을 참조한다. B 검사에서 대역인 E 수신·완료 호출과 보호 관찰 공급을 실제 경로로 결합해야 한다.
+실제 기반을 참조한다. 결합 검사는 실제 E 수신 테이블·반영 서비스와 B 등록 함수를 사용한다.
+수신 저장 어댑터·보호 판단 공급·서비스 호출 조립은 실제 경로로 연결해야 한다.
 
 ## 수신 저장과 반영 트랜잭션
 
@@ -32,8 +33,8 @@ MemberAccount·AnalysisRequest·AnalysisAttempt는 [PR #184](https://github.com/
 내부 입력·맥락·DB 오류의 분류와 안전한 기록은 E 호출부에서 연결한다.
 오류 원문을 외부 응답·로그에 싣지 않는 기준은 [저장 규칙](catch-registration-rules.md#오류와-롤백)을 따른다.
 
-실제 ResultApplicationRecord의 엔티티·마이그레이션과 B 참조를 결합하고
-[DB 적용 순서](catch-registration-database.md#테이블과-적용-순서)를 확인한다.
+실제 ResultApplicationRecord 엔티티·마이그레이션과 B 참조를 사용하며,
+[DB 적용 순서](catch-registration-database.md#테이블과-적용-순서)와 역순 되돌리기를 결합 검사에서 확인한다.
 E 수신 테이블이 없으면 제품 마이그레이션은 실패하며 테스트 대역을 자동 생성하지 않는다.
 
 ## 보호 판단과 LIVE 출처

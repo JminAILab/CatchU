@@ -4,9 +4,9 @@
 
 ## 독립 구성과 B 연결
 
-E는 B 제품 모듈을 import하지 않는다. `RegistrationPort`는 [PR #143](https://github.com/JminAILab/CatchU/pull/143)의 기존 내부 입출력을 받는 조립 경계이며 새 HTTP/API 계약이 아니다. B가 제공된 연결부에서 실제 등록 함수와 실제 오류 타입의 분류를 **필수로 공급**한다. 기본 가짜 등록 함수·자동 활성화는 없다. B 코드·테이블이 없는 dev에서는 E 테이블/마이그레이션과 자체 검사를 독립 제공하지만 실제 Catch 등록 서비스를 호출할 수 없다.
+E는 B 제품 모듈을 import하지 않는다. `RegistrationPort`는 [PR #143](https://github.com/JminAILab/CatchU/pull/143)의 기존 내부 입출력을 받는 조립 경계이며 새 HTTP/API 계약이 아니다. B가 제공된 연결부에서 실제 등록 함수와 실제 오류 타입의 분류를 **필수로 공급**한다. 기본 가짜 등록 함수·자동 활성화는 없다. E 자체 검사는 등록 대역으로 독립 실행할 수 있고, 실제 결합 검사는 같은 저장소의 B 등록 함수를 전달한다.
 
-B 제공 후의 조립 예시(현재 E 브랜치에는 아래 B 모듈이 없으므로 그대로 실행하지 않는다):
+조립 예시(호출부에서 연결된 `dataSource`와 먼저 저장·커밋한 `accepted`를 공급해야 한다):
 
 ```ts
 import { ResultApplicationService } from './result-application/result-application.service';
@@ -34,7 +34,7 @@ const applied = await new ResultApplicationService(dataSource, registration).app
 
 현재 PR #205의 `ResultApplicationRecord`는 UUID 수신 ID·요청/시도 ID, 외부 결과 ID(text), SHA-256 지문·수신 시각만 저장한다. 이 구현에는 결과 원문·후보·비밀값을 저장하는 칼럼이 없다. 시도당 하나 및 요청/시도/결과 유일성, 시도/요청 복합 FK와 지문 형식 제약을 적용한다. 이 메타데이터만으로 결과 본문을 복원할 수 없으며, #234의 결과 본문 보관은 별도 변경이다.
 
-적용 순서는 [회원·분석 기반 #104](https://github.com/JminAILab/CatchU/issues/104)(`1790500000000`) → E 수신 기록(`1790550000000`) → B Catch·근거·후보 연결(`1790600000000`) → B 보호 판단(`1790601000000`)이며 되돌리기는 역순이다. 이번 E 변경에는 E 엔티티·마이그레이션만 추가하며 B 테이블을 만들지 않는다. [#105의 연결 순서](https://github.com/JminAILab/CatchU/issues/105)에 따라 E 제공분 검토 → 실제 E 테이블 적용·되돌리기와 B 외래 키 연결 확인 → B 재검증으로 진행한다. #105 전체 완료나 #234 복구 완료를 E 제공분의 선행 조건으로 두지 않는다.
+적용 순서는 [회원·분석 기반 #104](https://github.com/JminAILab/CatchU/issues/104)(`1790500000000`) → E 수신 기록(`1790550000000`) → B Catch·근거·후보 연결(`1790600000000`) → B 보호 판단(`1790601000000`)이며 되돌리기는 역순이다. E 마이그레이션은 E 테이블만, B 마이그레이션은 B 테이블만 관리한다. [#105의 연결 순서](https://github.com/JminAILab/CatchU/issues/105)에 따라 E 제공분 검토 → 실제 E 테이블 적용·되돌리기와 B 외래 키 연결 확인 → B 재검증으로 진행한다. #105 전체 완료나 #234 복구 완료를 E 제공분의 선행 조건으로 두지 않는다.
 
 E는 READ COMMITTED 트랜잭션에서 요청 → 현재 시도 → 수신 기록을 잠그고 기존 `resultFingerprint`를 재사용해 지문·동의·범위·회원·저장소·시도·자료 모드·종결 상태를 대조한다. 입력은 첫 await 전에 복제한다. 같은 manager로 B를 호출하고, 반환한 모든 후보와 실제 `candidate_registration` 저장 연결의 ID·처리 결과·준비 여부를 대조한 뒤 APPLIED/CLOSED를 함께 저장한다. `registrations`와 DB 저장에는 미준비 후보를 포함한 전체 등록을 유지한다. 결과 진입에 사용하는 `registeredCatchIds`는 B가 `ownerViewReady === true`로 반환·저장한 등록의 Catch ID만 중복 제거해 담고, 이 배열이 비어 있지 않을 때만 `ownerResultsReady`가 true다([결과 진입 계약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#분석-접수상태재요청)). 전부 미준비이면 false·빈 ID 배열, 혼합이면 준비된 ID만 반환하며 같은 결과 재반영에도 이 기준을 적용한다. 정상 0건/실패 결과의 APPLIED는 열람 준비 true가 아니며 부분 실패의 failures·처리 종결값도 유지한다. 이 SQL 대조는 B의 기존 물리 칼럼을 사용하며 B 판정·저장 함수를 재구현하지 않는다.
 
@@ -45,7 +45,7 @@ E는 READ COMMITTED 트랜잭션에서 요청 → 현재 시도 → 수신 기�
 ## 검사 구분과 후속 연결
 
 - E 자체: `npm test` 또는 `npm test -- test/db/result-application.test.cjs`. 실제 #104/E 마이그레이션·전용 `_test` DB를 사용한다. 격리된 시험 스키마의 `registration_probe`와 후보 연결은 **명시적 저장 대역**이며 실제 B 등록·적합성/보호·작업 동일성 검증을 뜻하지 않는다. 수신 정본은 `test/support/result-application-fixture.cjs`에서 #103 공용 결과로 먼저 커밋한다.
-- 실제 E·B 결합: 별도 검토 공간에 [B 고정 판본 16302527450a43bf9e6a24b7cad69dd6c199d696](https://github.com/JminAILab/CatchU/commit/16302527450a43bf9e6a24b7cad69dd6c199d696)의 실제 등록 코드·테이블/마이그레이션과 현재 E 파일을 배치한다. 별도 테스트 DB를 설정하고 `npm test -- test/integration/result-application-b.check.cjs`를 실행한다. 이 파일은 기본 테스트 glob에 들어가지 않는 명시적 결합 검사이며 B가 없으면 실행할 수 없다. 전체 결합 검사에는 `npm test -- "test/**/*.test.cjs" test/integration/result-application-b.check.cjs`를 쓴다. 이 검사는 B 파일을 E 제출 브랜치에 추가하거나 merge/cherry-pick하는 절차가 아니다.
+- 실제 E·B 결합: 현재 저장소의 실제 E 반영 서비스와 B 등록 코드·마이그레이션을 함께 사용한다. `npm test`에 기본 포함되며, 별도 테스트 DB에서 `npm test -- test/integration/result-application-b.test.cjs`로 이 검사만 실행할 수도 있다.
 - 결합 검사에서는 실제 B 함수·마이그레이션으로 신규 PRIVATE 저장, 같은 작업·결과의 Catch ID 유지와 기존 본문/공개 상태 보존, 전체 롤백·수신 보존·별도 실패 기록·커밋 오류·실패 기록 오류·동시 반영을 대조한다. 보호 관찰과 수신 기록은 시험 준비물이다. 기존 B 시험의 E 상태 대역과 신규 실제 E 호출 검사는 구분한다.
 
 ## 후속 작업의 범위
