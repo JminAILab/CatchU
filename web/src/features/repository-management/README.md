@@ -13,7 +13,7 @@
 
 ## 조립
 
-B의 `AssetsConnected`가 주는 `repositoryManagement` 자리에 넣는다. 호출 함수는 #106의 `api.member`를 그대로 쓴다. 실제 `/assets` 제품 페이지는 아직 없으며, B와 담당을 정해 조립한다.
+B의 `AssetsConnected`가 주는 `repositoryManagement` 자리에 넣는다. 호출 함수는 #106의 `api.member`를 그대로 쓴다. 제품 `/assets`의 조립과 회원 변경 시 초기화는 [내 자산의 제품 페이지 연결](../assets/README.md#제품-페이지-연결-168169)을 따른다.
 
 ```tsx
 const repositoryApi = createRepositoryApi(api.member); // 모듈 단위로 한 번 만든다
