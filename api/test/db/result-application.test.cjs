@@ -82,13 +82,63 @@ test('같은 결과 동시 E 반영은 하나의 저장 묶음으로 수렴', as
   assert.equal(await count('registration_probe'),1);
 });
 
-test('등록 반환값과 저장 연결의 열람 준비 false를 유지', async () => {
+test('열람 미준비 등록은 보존하지만 결과 진입 ID를 반환하지 않으며 재반영도 동일', async () => {
   const input = await prepare(db);
-  const result = await service((m,i) => storeProbe(m,i,false)).apply(input);
+  const application = service((m,i) => storeProbe(m,i,false));
+  const result = await application.apply(input);
   assert.equal(result.ownerResultsReady,false);
   assert.equal((await state(input)).ownerResultsReady,false);
-  assert.equal(result.registeredCatchIds.length,1);
+  assert.deepEqual(result.registeredCatchIds,[]);
+  assert.equal(result.registrations.length,1);
+  assert.equal(result.registrations[0].ownerViewReady,false);
+  assert.equal(await count('registration_probe'),1);
+  assert.deepEqual(await readStored(db.manager,input.metadata.applicationRecordId),result.registrations);
+  assert.deepEqual(await application.apply(input),result);
+  assert.equal(await count('registration_probe'),1);
 });
+
+for (const [label, readiness, expectedIdIndexes] of [
+  ['전부 미준비',[false,false,false],[]],
+  ['준비·미준비 혼합',[false,true,true],[1]],
+  ['모두 준비',[true,true,true],[0,1]],
+]) {
+  test(`결과 진입 ${label}: 준비된 ID만 중복 제거하고 전체 등록·재반영 ID를 보존`, async () => {
+    const input = await prepare(db,undefined,{change: result => {
+      const candidate = result.candidates[0];
+      result.candidates = readiness.map((_,index) => ({
+        ...structuredClone(candidate), candidateId: candidate.candidateId + '-' + index,
+      }));
+    }});
+    // 명시적 B 저장 대역: 뒤의 두 후보가 같은 Catch를 참조하는 반환 경계만 검사한다.
+    const catchIds = [randomUUID(),randomUUID()];
+    const application = service(async (manager,value) => {
+      const saved = await readStored(manager,value.applicationRecordId);
+      if (saved.length > 0) return value.candidates.map(c => saved.find(r => r.candidateId === c.candidateId));
+      const registrations = [];
+      for (const [index,candidate] of value.candidates.entries()) {
+        const catchId = catchIds[index === 0 ? 0 : 1];
+        await manager.query('INSERT INTO registration_probe VALUES($1,$2) ON CONFLICT DO NOTHING',[catchId,candidate.title]);
+        await manager.query('INSERT INTO candidate_registration VALUES($1,$2,$3,$4,$5)',
+          [value.applicationRecordId,candidate.candidateId,catchId,'CREATED',readiness[index]]);
+        registrations.push({candidateId:candidate.candidateId,catchId,disposition:'CREATED',ownerViewReady:readiness[index]});
+      }
+      return registrations;
+    });
+    const first = await application.apply(input);
+    assert.deepEqual(first.registeredCatchIds,expectedIdIndexes.map(index => catchIds[index]));
+    assert.equal(first.ownerResultsReady,expectedIdIndexes.length > 0);
+    assert.equal((await state(input)).ownerResultsReady,first.ownerResultsReady);
+    assert.equal((await state(input)).application,'APPLIED');
+    assert.equal(first.registrations.length,3);
+    assert.deepEqual(first.registrations.map(r => r.ownerViewReady),readiness);
+    assert.deepEqual(await readStored(db.manager,input.metadata.applicationRecordId),first.registrations);
+    assert.equal(await count('registration_probe'),2);
+    assert.equal(await count('candidate_registration'),3);
+    assert.deepEqual(await application.apply(input),first);
+    assert.equal(await count('registration_probe'),2);
+    assert.equal(await count('candidate_registration'),3);
+  });
+}
 
 test('등록 저장 중 실패는 대역·E 완료 전체 롤백, 수신 보존 후 별도 실패 기록', async () => {
   const input = await prepare(db);

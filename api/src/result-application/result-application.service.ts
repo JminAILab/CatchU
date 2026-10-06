@@ -73,8 +73,9 @@ export class ResultApplicationService {
             s.candidateId === r.candidateId && s.catchId === r.catchId && s.disposition === r.disposition && s.ownerViewReady === r.ownerViewReady))) {
           throw new ResultApplicationContextError('REGISTRATION_MISMATCH');
         }
-        const registeredCatchIds = [...new Set(registrations.map(r => r.catchId))];
-        const ownerResultsReady = registrations.some(r => r.ownerViewReady);
+        const registeredCatchIds = [...new Set(registrations
+          .filter(r => r.ownerViewReady === true).map(r => r.catchId))];
+        const ownerResultsReady = registeredCatchIds.length > 0;
         await manager.update(AnalysisAttempt, { attemptId: result.attemptId }, {
           application: 'APPLIED', ownerResultsReady, failures: result.failures,
         });
