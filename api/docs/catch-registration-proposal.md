@@ -21,7 +21,7 @@ B 저장 검증을 실제 E 수신부·worker 통합 검증으로 해석하지 �
 
 [PR #143](https://github.com/JminAILab/CatchU/pull/143)의 B 저장 제공 범위와
 [PR #205](https://github.com/JminAILab/CatchU/pull/205)의 E 제공분을 실제로 결합하는 일은 구분한다.
-실제 연결과 실행 상태는 [#105](https://github.com/JminAILab/CatchU/issues/105)에서 추적한다.
+실제 E/B 연결은 [#105](https://github.com/JminAILab/CatchU/issues/105), 장애·반복 실패 복구는 [#234](https://github.com/JminAILab/CatchU/issues/234)에서 추적한다.
 이 문서 분리는 #105의 완료 기준을 줄이거나 연결 완료를 선언하는 변경이 아니다.
 
 ## 근거
@@ -45,7 +45,7 @@ B 저장 검증을 실제 E 수신부·worker 통합 검증으로 해석하지 �
 ## 변경 이력
 
 - v0.10 (2026-10-06): 시작 안내·저장 규칙·DB 검사·E 연결 조건으로 나눴다.
-  실제 회원·분석 기반과 E 검사 대역을 구분하고, #105의 후속 연결 조건을 명시했다.
+  실제 회원·분석 기반과 E 검사 대역을 구분하고, #105 연결 조건과 #234 복구 분담을 명시했다.
   저장 동작·테스트 소스·완료 기준은 바꾸지 않았다.
 - [v0.4~v0.9 변경 이력](https://github.com/JminAILab/CatchU/blob/16302527450a43bf9e6a24b7cad69dd6c199d696/api/docs/catch-registration-proposal.md#7-근거와-변경-이력)은
   분리 전 판본에 보존한다.
