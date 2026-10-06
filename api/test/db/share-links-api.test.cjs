@@ -193,6 +193,12 @@ test('인증·멱등 키·입력 오류는 링크를 만들지 않는다', async
     [{ title: ' \t ' }, [{ field: 'title', reason: 'isNotEmpty' }]],
     [{}, [{ field: 'title', reason: 'isString' }]],
     [{ title: 'x', password: '' }, [{ field: 'password', reason: 'isNotEmpty' }]],
+    // #221: 제목은 trim 뒤 50자, 비밀번호는 입력 그대로 8~64자(코드 포인트).
+    [{ title: 'x'.repeat(51) }, [{ field: 'title', reason: 'maxLength' }]],
+    [{ title: '😀'.repeat(51) }, [{ field: 'title', reason: 'maxLength' }]],
+    [{ title: 'x', password: 'p'.repeat(7) }, [{ field: 'password', reason: 'minLength' }]],
+    [{ title: 'x', password: '😀'.repeat(7) }, [{ field: 'password', reason: 'minLength' }]],
+    [{ title: 'x', password: 'p'.repeat(65) }, [{ field: 'password', reason: 'maxLength' }]],
     [{ title: 'x', ownerId: 'someone-else' }, [{ field: 'body', reason: 'whitelistValidation' }]],
     [[], [{ field: 'body', reason: 'isObject' }]],
   ]) {
@@ -203,6 +209,20 @@ test('인증·멱등 키·입력 오류는 링크를 만들지 않는다', async
   expectError(await create(token, 'key-invalid', '{"title":'), 400, 'INVALID_REQUEST');
   assert.equal(await count('share_link'), 0);
   assert.equal(await count('idempotency_record'), 0);
+});
+
+test('제목 50자와 비밀번호 8자·64자 경계는 발급되고, 저장된 제목 길이는 DB char_length와 같다', async () => {
+  const token = await login();
+  for (const [key, body, codePoints] of [
+    ['key-len-1', { title: ` ${'가'.repeat(50)} `, password: 'p'.repeat(8) }, 50],
+    ['key-len-2', { title: '😀'.repeat(50), password: 'p'.repeat(64) }, 50],
+    ['key-len-3', { title: '🇰🇷'.repeat(25), password: '😀'.repeat(8) }, 50],
+  ]) {
+    const result = await create(token, key, body);
+    assert.equal(result.status, 201, JSON.stringify(result.body));
+    const [row] = await db.query('SELECT char_length(title) AS n FROM share_link WHERE link_id = $1', [result.body.linkId]);
+    assert.equal(Number(row.n), codePoints, key);
+  }
 });
 
 test('로그에 비밀번호 원문과 링크 토큰을 남기지 않는다', async () => {

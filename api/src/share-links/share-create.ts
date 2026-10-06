@@ -6,7 +6,20 @@ export interface ShareCreateInput {
 export interface ShareCreateViolation {
   field: string;
   /** 위반한 규칙 이름. 공통 ValidationPipe와 같은 방식이며 입력값을 담지 않는다. */
-  reason: 'isObject' | 'whitelistValidation' | 'isString' | 'isNotEmpty';
+  reason: 'isObject' | 'whitelistValidation' | 'isString' | 'isNotEmpty' | 'minLength' | 'maxLength';
+}
+
+/** 발급 본문 길이(#223 계약). 제목은 trim 뒤, 비밀번호는 입력 그대로 센다. 단위는 유니코드 코드 포인트(DB char_length와 같음). */
+export const SHARE_TITLE_MAX_LENGTH = 50;
+export const SHARE_PASSWORD_MIN_LENGTH = 8;
+export const SHARE_PASSWORD_MAX_LENGTH = 64;
+
+/**
+ * 유니코드 코드 포인트 수. JavaScript `string.length`는 UTF-16 단위라 😀 같은 글자를 2로 세므로 쓰지 않는다.
+ * 결합 이모지·국기처럼 화면에서 한 글자로 보여도 코드 포인트 여러 개면 그만큼 센다(계약과 같음).
+ */
+export function codePointLength(value: string): number {
+  return [...value].length;
 }
 
 export type ShareCreateValidation =
@@ -29,12 +42,19 @@ export function validateShareCreate(body: unknown): ShareCreateValidation {
     violations.push({ field: 'title', reason: 'isString' });
   } else if (input.title.trim().length === 0) {
     violations.push({ field: 'title', reason: 'isNotEmpty' });
+  } else if (codePointLength(input.title.trim()) > SHARE_TITLE_MAX_LENGTH) {
+    violations.push({ field: 'title', reason: 'maxLength' });
   }
   const hasPassword = Object.hasOwn(input, 'password');
   if (hasPassword && typeof input.password !== 'string') {
     violations.push({ field: 'password', reason: 'isString' });
   } else if (hasPassword && input.password === '') {
     violations.push({ field: 'password', reason: 'isNotEmpty' });
+  } else if (hasPassword) {
+    // 비밀번호는 trim·정규화하지 않고 입력 그대로 센다. 수신자 unlock에는 이 길이 검사를 쓰지 않는다(#223).
+    const length = codePointLength(input.password as string);
+    if (length < SHARE_PASSWORD_MIN_LENGTH) violations.push({ field: 'password', reason: 'minLength' });
+    else if (length > SHARE_PASSWORD_MAX_LENGTH) violations.push({ field: 'password', reason: 'maxLength' });
   }
   if (violations.length > 0) {
     return { valid: false, violations };
