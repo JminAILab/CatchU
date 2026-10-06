@@ -69,13 +69,30 @@ test('개발 연동은 지정 repository 표본과 일치하며 자격정보 원
   assert.deepEqual((await dev().readConnection(id)).repositories,[]);
 });
 
-test('기본 비활성·production은 로그인 회원 생성과 개발 연결 조회를 모두 거부', async () => {
-  for(const settings of [{}, {DEV_LOGIN_ENABLED:'true',NODE_ENV:'production'}]) {
+test('기본 비활성·허용되지 않은 환경은 로그인 회원 생성과 개발 연결 조회를 모두 거부', async () => {
+  for(const settings of [
+    {NODE_ENV:'test'},
+    {DEV_LOGIN_ENABLED:'false',NODE_ENV:'development'},
+    ...[undefined,'','production','staging','preview','Development','test ']
+      .map(NODE_ENV=>({DEV_LOGIN_ENABLED:'true',NODE_ENV})),
+  ]) {
     const config=readAuthConfig({AUTH_JWT_SECRET:'ab'.repeat(32),AUTH_ACCESS_TOKEN_TTL_SECONDS:'60',...settings});
     await assert.rejects(dev(config).resolveMember('blocked'), e=>e.getStatus()===403);
     await assert.rejects(dev(config).readConnection(randomUUID()),e=>e.getStatus()===403);
   }
   assert.equal(await db.getRepository(MemberAccount).count(),0);
+  assert.equal(await db.getRepository(MemberProfile).count(),0);
+  assert.equal(await db.getRepository(GitHubConnection).count(),0);
+});
+
+test('development·test의 명시적 활성화는 회원 준비와 합성 연결 조회를 허용', async () => {
+  for(const NODE_ENV of ['development','test']) {
+    const config=readAuthConfig({AUTH_JWT_SECRET:'ab'.repeat(32),AUTH_ACCESS_TOKEN_TTL_SECONDS:'60',
+      DEV_LOGIN_ENABLED:'true',NODE_ENV});
+    const memberId=await dev(config).resolveMember(`allowed-${NODE_ENV}`);
+    assert.equal((await dev(config).readConnection(memberId)).sourceMode,'MOCK');
+  }
+  assert.equal(await db.getRepository(MemberAccount).count(),2);
 });
 
 test('기존 회원 누락 프로필·실제 연동을 합성 자료로 보정하지 않으며 DB 오류는 실패', async () => {
