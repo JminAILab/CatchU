@@ -3884,3 +3884,268 @@
 **Summary Authorization Id**: 593bf18999f8995eb3304c8bb35ddcb17dbdf0dc72ade6440e17f8d38255ee73
 
 ---
+
+## Session End
+**Timestamp**: 2026-10-06T08:01:43Z
+**Event**: SESSION_ENDED
+**Reason**: inferred — Codex has no SessionEnd event (D-4); reconciled at next SessionStart. Prior session 01a10fe3-6dfd-72f2-8c5f-aa0d2d81711d last seen 2026-10-06T06:25:51.830Z.
+
+---
+
+## Session Start
+**Timestamp**: 2026-10-06T08:01:43Z
+**Event**: SESSION_STARTED
+**Source**: startup
+**Session**: 01a1103b-4a3b-7bf2-a3e6-c240dd015e42
+
+---
+
+## Human Turn
+**Timestamp**: 2026-10-06T08:01:44Z
+**Event**: HUMAN_TURN
+**Session**: 01a1103b-4a3b-7bf2-a3e6-c240dd015e42
+
+---
+
+## Guardrail Loaded
+**Timestamp**: 2026-10-06T08:03:36Z
+**Event**: GUARDRAIL_LOADED
+**Scope**: all
+**Path**: .codex/aidlc-rules/
+**Rule count**: 7
+
+---
+
+## Health Check
+**Timestamp**: 2026-10-06T08:03:36Z
+**Event**: HEALTH_CHECKED
+**Request**: /aidlc --doctor
+**Details**: 60 passed, 1 failed
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-10-06T08:07:12Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-06-r2-questions.md
+**Context**: inception > contract-design > single-2026-10-06-r2-questions.md
+**Summary Authorization Id**: 2c27e7fb92ad2512b2385a877ed5ec2d1da187def3e15c60bb833bc0c7017d3d
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-10-06T08:07:13Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-06-r2-verification.md
+**Context**: inception > contract-design > single-2026-10-06-r2-verification.md
+**Summary Authorization Id**: 2c27e7fb92ad2512b2385a877ed5ec2d1da187def3e15c60bb833bc0c7017d3d
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-10-06T08:07:13Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-06-r2-tools.json
+**Context**: inception > contract-design > single-2026-10-06-r2-tools.json
+**Summary Authorization Id**: 2c27e7fb92ad2512b2385a877ed5ec2d1da187def3e15c60bb833bc0c7017d3d
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-10-06T08:08:07Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-06-r2-verification.md
+**Context**: inception > contract-design > single-2026-10-06-r2-verification.md
+**Summary Authorization Id**: 2c27e7fb92ad2512b2385a877ed5ec2d1da187def3e15c60bb833bc0c7017d3d
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-10-06T08:08:07Z
+**Event**: DECISION_RECORDED
+**Stage**: contract-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-06-r2-questions.md
+**Workflow**: single-stage:contract-design
+
+---
+
+## Human Turn
+**Timestamp**: 2026-10-06T08:14:09Z
+**Event**: HUMAN_TURN
+**Session**: 01a1103b-4a3b-7bf2-a3e6-c240dd015e42
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-10-06T08:14:35Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-06-r2-questions.md
+**Context**: inception > contract-design > single-2026-10-06-r2-questions.md
+**Summary Authorization Id**: 2c27e7fb92ad2512b2385a877ed5ec2d1da187def3e15c60bb833bc0c7017d3d
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-10-06T08:14:35Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: contract-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-06-r2-questions.md
+**Questions SHA-256**: 9028d6655738af54c9f726e7577f75d228f09d3925d4c63c89ba5b7f2e80faf6
+**Hash Scope**: confirmed-content-v1
+**Workflow**: single-stage:contract-design
+**Summary Authorization Id**: 98fd1a17ea92b38c27cbbe47ceb458f7f240db86c6cf80df2c99d596dfe22ef9
+
+---
+
+## Error Logged
+**Timestamp**: 2026-10-06T08:14:42Z
+**Event**: ERROR_LOGGED
+**Tool**: aidlc-log
+**Command**: aidlc-log engine log review --stage contract-design --single --reviewer aidlc-architecture-reviewer-agent --iteration 1
+**Error**: Cannot start review for "contract-design": no fresh human-backed consolidated summary confirmation is recorded. Present the summary, then run `aidlc-log.ts answer --checkpoint summary-confirmation --stage contract-design --single --details "Looks correct" after the human responds.\n{"kind":"ask","ask_type":"guard-recovery","response_route":"execute-remedy","question":"The next action for \"contract-design\" would be refused. Choose one authority-preserving recovery action.","stage":"contract-design","reason_codes":["SUMMARY_RECEIPT_MISSING"],"remedies":[{"op":"restore-or-jump","action":"This stage is already approved; restore the reviewed source state, or jump back with /aidlc --stage contract-design to redo it.","operation":{"kind":"restart-stage","stage":"contract-design"},"command":"aidlc engine orchestrate next --stage contract-design","requiresHuman":true,"executableNow":true,"interaction":"command"}]}
+
+---
+
+## Stage Start
+**Timestamp**: 2026-10-06T08:15:30Z
+**Event**: STAGE_STARTED
+**Stage**: functional-design
+**Agent**: aidlc-architect-agent
+**Workflow**: single-stage:functional-design
+**Scope**: feature
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-10-06T08:18:33Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/single-2026-10-06-r2-questions.md
+**Context**: construction > u1-web > functional-design > single-2026-10-06-r2-questions.md
+**Summary Authorization Id**: 593bf18999f8995eb3304c8bb35ddcb17dbdf0dc72ade6440e17f8d38255ee73
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-10-06T08:18:33Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/single-2026-10-06-r2-verification.md
+**Context**: construction > u1-web > functional-design > single-2026-10-06-r2-verification.md
+**Summary Authorization Id**: 593bf18999f8995eb3304c8bb35ddcb17dbdf0dc72ade6440e17f8d38255ee73
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-10-06T08:19:16Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/single-2026-10-06-r2-questions.md
+**Workflow**: single-stage:functional-design
+
+---
+
+## Human Turn
+**Timestamp**: 2026-10-06T08:25:06Z
+**Event**: HUMAN_TURN
+**Session**: 01a1103b-4a3b-7bf2-a3e6-c240dd015e42
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-10-06T08:25:17Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/single-2026-10-06-r2-questions.md
+**Context**: construction > u1-web > functional-design > single-2026-10-06-r2-questions.md
+**Summary Authorization Id**: 593bf18999f8995eb3304c8bb35ddcb17dbdf0dc72ade6440e17f8d38255ee73
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-10-06T08:25:17Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: functional-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/single-2026-10-06-r2-questions.md
+**Questions SHA-256**: 1d70dcd0b9f3b947b594953e67b1e9cb340173953359126a440a207e08465f4f
+**Hash Scope**: confirmed-content-v1
+**Workflow**: single-stage:functional-design
+**Summary Authorization Id**: a8d5bcd9546170049c75991dc968fe0e86220c55053b258d84ff752739822971
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-10-06T08:25:24Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: functional-design
+**Checkpoint**: summary-confirmation
+**Changed**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md
+**Recorded**: a8d5bcd9546170049c75991dc968fe0e86220c55053b258d84ff752739822971
+**Current**: b89cc5f02df0a9508bb4f3904ff7fbb3892ae8708633e11e6a481c672ea7af00
+**Details**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md was saved without the current summary confirmation. Continuing (Guard Policy: relaxed or off).
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-10-06T08:25:24Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: functional-design
+**Checkpoint**: summary-confirmation
+**Changed**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/traceability.json
+**Recorded**: a8d5bcd9546170049c75991dc968fe0e86220c55053b258d84ff752739822971
+**Current**: b89cc5f02df0a9508bb4f3904ff7fbb3892ae8708633e11e6a481c672ea7af00
+**Details**: aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/traceability.json was saved without the current summary confirmation. Continuing (Guard Policy: relaxed or off).
+
+---
+
+## Review Requested
+**Timestamp**: 2026-10-06T08:25:24Z
+**Event**: REVIEW_REQUESTED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Workflow**: single-stage:functional-design
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:41c9db22b48ac99f7e1118bb84d6a59d46518e60f61c68009d43ad0794b7a436
+**Request Id**: review:90cb68ce7322d5326af9c7db128d9d08
+
+---
+
+## Review Completed
+**Timestamp**: 2026-10-06T08:29:27Z
+**Event**: REVIEW_COMPLETED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Workflow**: single-stage:functional-design
+**Iteration**: 1
+**Verdict**: READY
+**Request Fingerprint**: sha256:41c9db22b48ac99f7e1118bb84d6a59d46518e60f61c68009d43ad0794b7a436
+**Artifact Fingerprint**: sha256:41c9db22b48ac99f7e1118bb84d6a59d46518e60f61c68009d43ad0794b7a436
+**Request Id**: review:90cb68ce7322d5326af9c7db128d9d08
+**Review Record**: .aidlc-engine/reviews/functional-design/stage/33621a1dc69c904a/1.json
+**Review Record Digest**: sha256:058c62c407da65e1f7cdbf007862c409b0daed52edfdab20233f5595dc3f3679
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-10-06T08:29:32Z
+**Event**: STAGE_COMPLETED
+**Stage**: functional-design
+**Details**: Single-stage run of functional-design completed
+**Workflow**: single-stage:functional-design
+
+---
