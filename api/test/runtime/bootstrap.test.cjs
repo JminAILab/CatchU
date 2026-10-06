@@ -91,9 +91,7 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
   return {
     request, closed, logs: () => output, secret, port,
     async ready() {
-      // 소스 실행은 ts-node가 DB 엔티티와 기능 모듈까지 컴파일한다. 제품 기동 SLA 검사가 아니다.
-      const deadline = Date.now() + (source ? 10000 : 5000);
-      while (Date.now() < deadline) {
+      for (let attempt = 0; attempt < 200; attempt++) {
         if (child.exitCode !== null || child.signalCode !== null) {
           assert.fail('main 진입점이 정상 기동 전에 종료됨');
         }
@@ -127,8 +125,8 @@ for (const source of [false, true]) {
 }
 
 test('main: 터미널 production 설정이 env 파일보다 우선하여 개발 로그인을 거부한다', { timeout: 15000 }, async (t) => {
-  // production은 공유 URL 주소가 필수(#147)라 합성 주소를 함께 준다.
-  const server = await launch(t, { environment: { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example' } });
+  // production은 공유 URL 주소(#147)와 grant 서명 키(#150)가 필수라 합성 값을 함께 준다.
+  const server = await launch(t, { environment: { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' } });
   await server.ready();
   const response = await server.request('/v1/auth/dev-login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

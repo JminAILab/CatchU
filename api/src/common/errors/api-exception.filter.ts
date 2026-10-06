@@ -74,6 +74,9 @@ export function writeErrorResponse(adapter: AbstractHttpAdapter, request: Reques
   }
 
   adapter.setHeader(response, 'Cache-Control', 'no-store');
+  if (exception instanceof ApiError && exception.retryAfterSeconds !== undefined) {
+    adapter.setHeader(response, 'Retry-After', String(exception.retryAfterSeconds));
+  }
   adapter.reply(response, body, status);
 }
 
