@@ -65,13 +65,13 @@ audit_npm() { # 서비스
     if [[ "$NPM_BLOCKING" != *" $severity "* ]]; then
       report '참고' "$service" "$severity" "$name" "$id" "$title"
     elif ! grep -qxF "$id" <<< "$ignored"; then
-      fail "$lock" "$name $id($severity): 고친 판본으로 의존성을 올린다. 고친 판본이 없으면 이유와 함께 $EXCEPTIONS에 적는다." \
+      fail "$lock" "$name $id($severity): 고친 판본으로 의존성을 올린다. 고친 판본이 없으면 이유와 함께 ${EXCEPTIONS}에 적는다." \
         "$service" "$severity" "$name" "$id" "$title"
     elif ! n=$(patched_count "$id" npm "$name") || ! [[ "$n" =~ ^[0-9]+$ ]]; then
       fail "$lock" "$name $id: 예외 목록의 취약점에 고친 판본이 있는지 확인하지 못했다. gh 로그인과 GitHub API 응답을 확인한다." \
         "$service" "$severity" "$name" "$id" '고친 판본 확인 실패'
     elif [ "$n" -gt 0 ]; then
-      fail "$lock" "$name $id: 예외 목록의 취약점에 고친 판본이 나왔다. 의존성을 올리고 $EXCEPTIONS에서 이 줄을 지운다." \
+      fail "$lock" "$name $id: 예외 목록의 취약점에 고친 판본이 나왔다. 의존성을 올리고 ${EXCEPTIONS}에서 이 줄을 지운다." \
         "$service" "$severity" "$name" "$id" '고친 판본이 나옴'
     else
       report '예외' "$service" "$severity" "$name" "$id" "고친 판본 없음. $title"
@@ -87,7 +87,7 @@ audit_uv() { # 서비스
   if (cd "$service" && uv audit --frozen --preview-features audit-command ${args[@]+"${args[@]}"}); then
     report '통과' "$service" '-' '-' '-' "알려진 취약점 없음${ignored:+ (고친 판본이 없을 때만 넘기는 예외: ${ignored//$'\n'/, })}"
   else
-    fail "$lock" "알려진 취약점이 있거나 검사가 실패했다(로그 참고). 고친 판본으로 의존성을 올린다. 고친 판본이 없으면 이유와 함께 $EXCEPTIONS에 적는다." \
+    fail "$lock" "알려진 취약점이 있거나 검사가 실패했다(로그 참고). 고친 판본으로 의존성을 올린다. 고친 판본이 없으면 이유와 함께 ${EXCEPTIONS}에 적는다." \
       "$service" '-' '-' '-' 'uv audit 실패(로그 참고)'
   fi
 }
@@ -100,7 +100,7 @@ for service in "$@"; do
   elif [ -f "$service/uv.lock" ]; then
     audit_uv "$service"
   else
-    fail "$service" "$service에 package-lock.json이나 uv.lock이 없다." "$service" '-' '-' '-' '잠금 파일 없음'
+    fail "$service" "${service}에 package-lock.json이나 uv.lock이 없다." "$service" '-' '-' '-' '잠금 파일 없음'
   fi
 done
 
