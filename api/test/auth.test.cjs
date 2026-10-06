@@ -24,7 +24,7 @@ class ProbeModule {}
 Module({ imports: [AppModule], controllers: [ProbeController] })(ProbeModule);
 
 async function start(t, overrides = {}) {
-  const envKeys = ['AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'SHARE_LINK_WEB_BASE_URL'];
+  const envKeys = ['AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'SHARE_LINK_WEB_BASE_URL', 'LINK_GRANT_SECRET'];
   const before = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
   const secret = randomBytes(32).toString('hex');
   const settings = {
@@ -185,8 +185,8 @@ for (const [label, overrides] of [
   ['그 밖의 환경', { NODE_ENV: 'preview' }],
   ['대소문자가 다른 환경', { NODE_ENV: 'Development' }],
   ['공백이 포함된 환경', { NODE_ENV: 'test ' }],
-  // production은 공유 URL 주소가 필수(#147)라 합성 주소를 함께 준다.
-  ['운영 환경에서 활성화 요청', { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example' }],
+  // production은 공유 URL 주소(#147)와 grant 서명 키(#150)가 필수라 합성 값을 함께 준다.
+  ['운영 환경에서 활성화 요청', { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' }],
 ]) {
   test(`개발 로그인 거부: ${label}`, async (t) => {
     const server = await start(t, overrides);
