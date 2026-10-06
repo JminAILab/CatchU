@@ -4,10 +4,10 @@
 
 ## 저장소 지도
 
-- `web/` `api/` `worker/`: 배포 단위(현재 자리표시자). 스택은 2026-09-13 확정 — Next.js·NestJS·FastAPI, 배포는 네이버 클라우드 플랫폼(NCP). 근거는 `docs/ai-dlc-input-mvp/CatchU_mvp_input.md`.
+- `web/` `api/` `worker/`: Next.js·NestJS·FastAPI 배포 단위. 배포 대상은 네이버 클라우드 플랫폼(NCP). 설치·실행·검사 방법과 현재 구현 범위는 각 서비스의 `README.md`에서 확인한다.
 - `docs/`: 팀 문서 정본 안내. 문서 목록·지위·우선순위는 `docs/README.md`. 삭제된 옛 문서는 git 이력에서 찾지 않는 한 존재하지 않는 것으로 취급한다.
 - `docs/ai-dlc-input/`: AI-DLC 시작 시점(2026-09-09) 입력 스냅샷이며 **현행 기준이 아니다**. 승인된 산출물이 출처로 인용하므로 남겨 두지만, 새 작업의 근거로 읽지 않고 내용을 수정하지 않는다. `docs/ai-dlc-input-mvp/`: 두 번째 intent(10월 MVP)의 입력. 팀장 결정과 제안을 담으며 승인 기록이 아니다. `docs/ai-dlc/`: AI-DLC 설치·운영 안내.
-- `aidlc/`: AI-DLC 워크플로우 기록. 승인된 요구사항은 `aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md`. 과거 승인 기록은 소급 수정하지 않는다.
+- `aidlc/`: AI-DLC 요구사항·설계·승인 기록. 이번 작업에 적용할 10월·12월 기준은 `docs/README.md`의 `AI-DLC 산출물과의 관계`에서 찾는다. 과거 승인 기록은 소급 수정하지 않는다.
 - `.codex/` `.agents/`: AI-DLC 하네스. 변경은 필요한 범위로 제한하고 이유·검증·refresh 후 재적용 방법을 커밋 메시지에 남긴다.
 
 ## 규칙
@@ -19,10 +19,22 @@
 
 ## AI의 작업 관리
 
-- 작업 착수·검토 요청·종료 시 `docs/CatchU_작업관리.md`를 읽고 적용한다. Codex와 Claude Code의 상세 작업관리 규칙은 이 문서 한 곳에서 관리한다. 코딩은 그 문서의 `코딩 운영`을 따르며, 담당자가 요청할 때만 AI-DLC로 코딩한다.
+- 상세 절차의 정본은 `docs/CatchU_작업관리.md`이고, 코드 수정·검사·자료·PR 절차는 `docs/CatchU_coding_procedures.md`(코딩 절차)다. 작업 착수·검토 요청·종료 시 아래 표에서 해당하는 절을 읽고 적용한다. 한 요청에 여러 작업이 있으면 각 행을 함께 적용하며, 같은 세션에서 이미 읽은 기준은 변경되거나 필요한 범위가 달라질 때 다시 확인한다. 코딩에는 담당자가 요청할 때만 AI-DLC를 쓴다.
 - 사용자가 “홈 만들려고”, “B 파트 이슈로 나눠줘”처럼 작업 의도를 말하면 Projects 언급을 기다리지 않는다. AI가 기존 작업을 먼저 조회하고, 연결할 작업·범위·완료 기준이 불명확하면 구체적인 질문 1~2개로 먼저 안내한다. 상세 질문 기준은 공통 문서를 따른다.
 - 사용자가 맡긴 실행 작업의 이슈·Projects 갱신은 AI가 함께 처리한다. 단순 논의 또는 원격 등록 없이 초안·로컬 작업만 하라는 요청이면 등록하지 않는다. 와이어프레임·설계 초안 작성도 실행 작업이 될 수 있다. 최초 Project 연결·권한 설정은 별도이며, 미연결 상태를 등록 성공으로 보고하지 않는다.
 - 이슈·PR은 CLI/API로 쓸 때도 `.github/ISSUE_TEMPLATE/`·`.github/pull_request_template.md`의 항목을 채운다. Projects 완료와 AI-DLC 승인은 Project 필드와 `aidlc/` 기록으로 구분한다.
+
+아래 표에서 절 이름만 쓴 것은 `docs/CatchU_작업관리.md`의 절이다. 표에서 가리킨 문서는 실제로 열어 확인한다. 큰 문서는 도구 호출 한 번에 하나만 열고, 잘림 표시가 나오면 절 목록을 찾아 잘린 절을 줄 범위로 다시 읽는다. GitHub의 이슈·PR·Project를 만들거나 갱신할 때는 해당 작업 행과 `GitHub 원격 반영` 행을 함께 적용한다.
+
+| 작업 | 행동 전에 읽을 곳 |
+|---|---|
+| 새 작업 착수·이슈 등록·분할 | `AI가 먼저 시작하는 착수 안내`·`착수`·`이슈 본문`. 분할·선행 조율은 `진행·검토`, 새 이슈는 `우선순위 확인`과 해당 이슈 양식 |
+| 코드 수정 | 코딩 절차 전체, 이슈 완료 기준·관련 명세·해당 서비스 README. 권한·입력·화면 출력·인증·설정·외부 호출·의존성·LLM을 건드리면 `docs/CatchU_security_checks.md`(보안 점검) |
+| 문서 수정 | `docs/README.md`의 `문서의 무게`·`규칙`·`문서 작성 규칙`, 수정 대상의 직접 근거. 계약 문서 수정은 코딩 절차의 `코딩 운영`, 검사 보고는 코딩 절차의 `검사 선택과 결과 보고` |
+| PR 작성·리뷰 | 코딩 절차의 `PR 작성·리뷰 요청·잘못 올린 PR 처리`·`PR 본문`·`검사 선택과 결과 보고`, `.github/pull_request_template.md`와 이슈 완료 기준 |
+| 완료·중단 보고 | `종료와 실패 복구`, 이슈 완료 기준과 산출물·검증·PR 반영 증거 |
+| GitHub 원격 반영 | `2. 최초 연결과 적용 범위`. 기존 이슈·PR 갱신은 `진행·검토`, 본문 변경은 각각 `이슈 본문`·코딩 절차의 `PR 본문`도 확인. Project 연결·상태 변경은 `3. 최소 Project 구성`, 양식·자동 편입은 `5. 양식과 자동화의 역할` |
+| 실제 자료·실행 로그를 다루는 작업 | 코딩 절차의 `자료와 실행 로그` — 열람·첨부·외부 전송에도 적용 |
 
 <!-- BEGIN AI-DLC:agents -->
 This project uses AI-DLC (AI-Driven Development Life Cycle) for structured development. Harness-specific setup, commands, and prerequisites live in each harness's own onboarding file (see Harness onboarding below).

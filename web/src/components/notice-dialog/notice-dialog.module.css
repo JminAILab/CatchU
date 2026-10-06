@@ -1,0 +1,62 @@
+.dialog {
+  width: min(320px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: 0 12px 32px rgba(32, 43, 56, 0.18);
+}
+
+.dialog::backdrop {
+  background: rgba(32, 43, 56, 0.28);
+}
+
+/* 여백을 패널에 두어, dialog 자체를 누른 경우를 배경 클릭으로만 판별한다. */
+.panel {
+  position: relative;
+  padding: 24px;
+}
+
+.close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--color-line);
+  color: var(--color-ink);
+}
+
+.message {
+  margin: 0 0 20px;
+  padding-right: 24px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.confirm {
+  min-width: 72px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: #ffffff;
+  cursor: pointer;
+}

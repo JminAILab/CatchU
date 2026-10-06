@@ -16,6 +16,7 @@ export const assetTabs: { id: AssetTab; label: string }[] = [
 type AssetsViewProps = {
   dataMode?: "preview" | "api";
   detailItem?: CatchAsset;
+  detailActions?: ReactNode;
   listMessage?: string;
   detailMessage?: string;
   hasMore?: boolean;
@@ -171,15 +172,16 @@ export function AssetsView(props: AssetsViewProps) {
       {selectedId && tab === "catch" && (
         <CatchDetail key={selectedId} item={selected} state={detailState}
           repositoryName={repositories.find((repo) => repo.repositoryId === selected?.repositoryId)?.name}
-          onClose={props.onClose} onRetry={props.onRetryDetail} dataMode={props.dataMode} errorMessage={props.detailMessage} />
+          onClose={props.onClose} onRetry={props.onRetryDetail} dataMode={props.dataMode} errorMessage={props.detailMessage} actions={props.detailActions} />
       )}
     </main>
   );
 }
 
-function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage }: {
+function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage, actions }: {
   dataMode?: "preview" | "api";
   errorMessage?: string;
+  actions?: ReactNode;
   item?: CatchAsset;
   state: LoadState;
   repositoryName?: string;
@@ -244,6 +246,7 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
             <p className={styles.small}>내용 확인과 공개 선택은 별도입니다. 팝업을 열어도 확인 완료로 바뀌지 않습니다.</p>
           </section>
         </>}
+      {state === "ready" && item && actions}
       <div className={styles.dialogFooter}><button className={styles.primaryButton} onClick={onClose}>목록으로 돌아가기</button></div>
     </dialog>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { AssetsView, assetTabs, type AssetTab } from "./assets-view";
+import { CatchActions } from "./catch-actions";
 import { createAssetsStore } from "./assets-store";
 import { catchErrorText, type CatchApi } from "./catch-api";
 import type { RepositoryOption } from "./types";
@@ -17,7 +18,7 @@ export type RepositoryManagementBindings = {
 };
 
 type Props = {
-  /** 인증된 회원이 바뀌면 부모는 이 컴포넌트도 새 key로 마운트한다. */
+  /** AssetsMemberBoundary 안에 조립해 회원 전환 때 이 컴포넌트도 새로 마운트한다. */
   api: CatchApi;
   repositories: readonly RepositoryOption[];
   repositoryManagement: (bindings: RepositoryManagementBindings) => ReactNode;
@@ -36,6 +37,8 @@ export function AssetsConnected({ api, repositories, repositoryManagement }: Pro
   useEffect(() => () => store.dispose(), [store]);
   useEffect(() => { void store.selectRepository(repositoryId); }, [repositoryId, store]);
   useEffect(() => {
+    // 탭/뒤로 가기로 D 슬롯이 해제되면 열림 상태만 정리한다. 일반 닫기 재조회와 구분한다.
+    if (tab !== "catch" && snapshot.managementOpen) store.setManagementOpen(false);
     void store.openDetail(tab === "catch" && !snapshot.managementOpen ? catchId : null);
   }, [catchId, tab, snapshot.managementOpen, store]);
 
@@ -65,10 +68,14 @@ export function AssetsConnected({ api, repositories, repositoryManagement }: Pro
       <AssetsView dataMode="api" items={listMatches ? snapshot.items : []}
         repositories={repositories} repositoryId={repositoryId} tab={tab}
         listState={listMatches ? snapshot.listState : "loading"}
-        listMessage={catchErrorText(snapshot.listError)}
+        listMessage={catchErrorText(snapshot.listError, "list")}
         detailState={detailMatches ? snapshot.detailState : "loading"}
         detailMessage={catchErrorText(snapshot.detailError)}
         detailItem={detailMatches ? snapshot.detail : undefined}
+        detailActions={detailMatches && snapshot.detail ? <CatchActions key={snapshot.detail.catchId}
+          item={snapshot.detail} mutation={snapshot.mutation}
+          onChange={(change) => { void store.update(change); }}
+          onReload={() => { if (catchId) void store.openDetail(catchId, true); }} /> : null}
         selectedId={visibleCatchId}
         hasMore={listMatches && snapshot.nextCursor !== null} moreState={snapshot.moreState}
         onLoadMore={() => { void store.loadMore(); }}
