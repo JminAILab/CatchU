@@ -1,6 +1,6 @@
 # E 수신 기록과 Catch 반영 연결 — #105
 
-`src/result-application/`은 검증된 결과 수신 이후 B 등록과 E 완료 상태를 함께 저장하는 내부 서비스다. 실제 수신 DB 어댑터(#139), 진행 이벤트 연결, 자동 복구·재시도 스케줄러는 포함하지 않는다. [등록·반영 흐름](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)과 [수신·후보 연결 모델](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)이 기준이다.
+`src/result-application/`은 검증된 결과 수신 이후 B의 Catch 등록과 E의 반영 완료 상태를 함께 저장하는 내부 서비스다. [PR #205](https://github.com/JminAILab/CatchU/pull/205)는 E 수신 기록 테이블·마이그레이션과 이 반영 서비스를 제공한다. 수신 기록을 실제 수신 경로에서 저장하고 서비스를 호출하는 조립은 [E↔B 전체 연결 #105](https://github.com/JminAILab/CatchU/issues/105), 결과 본문 보관과 장애·반복 실패 복구는 [복구 작업 #234](https://github.com/JminAILab/CatchU/issues/234)에서 다룬다. [등록·반영 흐름](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)과 [수신·후보 연결 모델](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)이 구현 기준이며, 결과 본문 보관에 필요한 계약 수정은 아래 후속 범위에서 구분한다.
 
 ## 독립 구성과 B 연결
 
@@ -21,7 +21,8 @@ const registration: RegistrationPort = {
     return undefined;
   },
 };
-// #139에서 수신 정본·종결 상태를 먼저 저장·커밋한 이후 전달할 accepted 값.
+// #105에서 #139의 실제 수신 경로를 연결할 때,
+// 수신 정본·종결 상태를 먼저 저장·커밋한 이후 전달할 accepted 값.
 const applied = await new ResultApplicationService(dataSource, registration).apply(accepted);
 // 이 Promise는 B 등록/E 완료 기록의 최종 커밋 이후에만 성공한다.
 // applied.registeredCatchIds / ownerResultsReady / registrations는 내부 연결 결과다.
@@ -31,9 +32,9 @@ const applied = await new ResultApplicationService(dataSource, registration).app
 
 ## 테이블·원자성·재반영
 
-`ResultApplicationRecord`는 UUID 수신 ID·요청/시도 ID, 외부 결과 ID(text), SHA-256 지문·수신 시각만 저장한다. 결과 원문·후보·비밀값은 복제하지 않는다. 시도당 하나 및 요청/시도/결과 유일성, 시도/요청 복합 FK와 지문 형식 제약을 적용한다.
+현재 PR #205의 `ResultApplicationRecord`는 UUID 수신 ID·요청/시도 ID, 외부 결과 ID(text), SHA-256 지문·수신 시각만 저장한다. 이 구현에는 결과 원문·후보·비밀값을 저장하는 칼럼이 없다. 시도당 하나 및 요청/시도/결과 유일성, 시도/요청 복합 FK와 지문 형식 제약을 적용한다. 이 메타데이터만으로 결과 본문을 복원할 수 없으며, #234의 결과 본문 보관은 별도 변경이다.
 
-적용 순서는 #104 회원·분석 기반(`1790500000000`) → E 수신 기록(`1790550000000`) → B Catch·근거·후보 연결(`1790600000000`) → B 보호 판단(`1790601000000`)이며 되돌리기는 역순이다. 이번 E 변경에는 E 엔티티·마이그레이션만 추가하며 B 테이블을 만들지 않는다. 마이그레이션 적용 순서와 E/B PR 분리·병합 순서 합의는 구분한다.
+적용 순서는 [회원·분석 기반 #104](https://github.com/JminAILab/CatchU/issues/104)(`1790500000000`) → E 수신 기록(`1790550000000`) → B Catch·근거·후보 연결(`1790600000000`) → B 보호 판단(`1790601000000`)이며 되돌리기는 역순이다. 이번 E 변경에는 E 엔티티·마이그레이션만 추가하며 B 테이블을 만들지 않는다. [#105의 연결 순서](https://github.com/JminAILab/CatchU/issues/105)에 따라 E 제공분 검토 → 실제 E 테이블 적용·되돌리기와 B 외래 키 연결 확인 → B 재검증으로 진행한다. #105 전체 완료나 #234 복구 완료를 E 제공분의 선행 조건으로 두지 않는다.
 
 E는 READ COMMITTED 트랜잭션에서 요청 → 현재 시도 → 수신 기록을 잠그고 기존 `resultFingerprint`를 재사용해 지문·동의·범위·회원·저장소·시도·자료 모드·종결 상태를 대조한다. 입력은 첫 await 전에 복제한다. 같은 manager로 B를 호출하고, 반환한 모든 후보와 실제 `candidate_registration` 저장 연결의 ID·처리 결과·준비 여부를 대조한 뒤 APPLIED/CLOSED를 함께 저장한다. 등록 ID는 서로 다른 Catch ID에서 유도하고 열람 준비는 B가 준비됐다고 반환·저장한 등록이 있을 때만 true다. 정상 0건/실패 결과의 APPLIED는 열람 준비 true가 아니며 부분 실패의 failures·처리 종결값도 유지한다. 이 SQL 대조는 B의 기존 물리 칼럼을 사용하며 B 판정·저장 함수를 재구현하지 않는다.
 
@@ -47,4 +48,10 @@ E는 READ COMMITTED 트랜잭션에서 요청 → 현재 시도 → 수신 기�
 - 실제 E·B 결합: 별도 검토 공간에 [B 고정 판본 16302527450a43bf9e6a24b7cad69dd6c199d696](https://github.com/JminAILab/CatchU/commit/16302527450a43bf9e6a24b7cad69dd6c199d696)의 실제 등록 코드·테이블/마이그레이션과 현재 E 파일을 배치한다. 별도 테스트 DB를 설정하고 `npm test -- test/integration/result-application-b.check.cjs`를 실행한다. 이 파일은 기본 테스트 glob에 들어가지 않는 명시적 결합 검사이며 B가 없으면 실행할 수 없다. 전체 결합 검사에는 `npm test -- "test/**/*.test.cjs" test/integration/result-application-b.check.cjs`를 쓴다. 이 검사는 B 파일을 E 제출 브랜치에 추가하거나 merge/cherry-pick하는 절차가 아니다.
 - 결합 검사에서는 실제 B 함수·마이그레이션으로 신규 PRIVATE 저장, 같은 작업·결과의 Catch ID 유지와 기존 본문/공개 상태 보존, 전체 롤백·수신 보존·별도 실패 기록·커밋 오류·실패 기록 오류·동시 반영을 대조한다. 보호 관찰과 수신 기록은 시험 준비물이다. 기존 B 시험의 E 상태 대역과 신규 실제 E 호출 검사는 구분한다.
 
-#139는 수신 메타데이터와 PENDING 종결 상태를 별도 커밋하는 ReceiverStore DB 어댑터, Receipt 이후 실제 E apply 연결을 맡는다. 결과 원문은 accepted 또는 합의된 보존 공급자에서 받아야 하며 E 메타데이터만으로 복원할 수 없다. 보호 판단 최초 공급·결과 보존/재전달·반복 반영 실패의 복구 정책과 E/B 실제 조립·병합 순서는 후속 연결 사항이다. 이번 검사로 실제 수신부터 등록까지의 전체 흐름이나 자동 복구를 완료했다고 기록하지 않는다.
+## 후속 작업의 범위
+
+- **실제 수신·등록 연결 — [#105](https://github.com/JminAILab/CatchU/issues/105):** [메시지 수신 #139](https://github.com/JminAILab/CatchU/issues/139)의 경로에 `ReceiverStore` DB 어댑터를 연결해 수신 메타데이터와 처리 종결값·반영 대기 상태(`PENDING`)를 먼저 커밋하고, 수신 확인(`Receipt`) 이후 실제 B 등록 함수와 E의 `apply`를 호출하도록 조립한다. 최초 저장소 보호 판단도 공급해야 하며, 판단이 없으면 열람 준비로 처리하지 않는다. [10/4 팀장 조건](https://github.com/JminAILab/CatchU/issues/105#issuecomment-5975854918)에 따른 실제 자료(`LIVE`)의 근거 주소와 연결된 GitHub 저장소 대조도 실제 분석 연결에서 갖춘다. 합성 자료(`MOCK`)는 이 주소 대조에서 제외한다. 공급 주체·조립 책임과 실행 방법은 #105에서 확인한다.
+- **결과 본문 보관·장애 복구 — [#234](https://github.com/JminAILab/CatchU/issues/234):** 10/6 팀장 결정은 결과 본문을 수신 기록과 같은 트랜잭션으로 api DB에 보관하고, 재시작·주기적 조회로 미반영 결과를 찾아 #105의 반영 경로를 다시 호출하는 방식이다. 반영 완료 시 본문을 삭제하고, 미반영 본문은 수신 시각부터 14일 뒤 삭제한다. 재시도 한도를 넘으면 자동 복구를 멈추고 반영 실패(`APPLY_FAILED`)로 둔다. 한도·간격과 보관 테이블 구성은 #234에서 정한다. 이 결정은 현재 #205의 구현이나 검증 결과가 아니며, 원문 보관을 금지한 승인 설계·계약을 고치는 팀장 PR이 선행돼야 한다. 복구 중단·보관 만료 뒤 진행 중 요청을 종료하는 방법도 #234에 연결된 계약 결정 사항이다.
+- **큐와 worker 보존:** [큐 연결 #233](https://github.com/JminAILab/CatchU/issues/233)과 [worker 결과 보존 #121](https://github.com/JminAILab/CatchU/issues/121)은 각 작업에서 다룬다.
+
+이번 자체·결합 검사는 수신 기록과 보호 판단을 시험 준비물로 공급한다. 실제 수신부터 Catch 등록까지의 전체 연결 검증은 #105에서, 본문 보관·자동 복구 검증은 #234에서 각각 확인한다.
