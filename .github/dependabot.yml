@@ -1,0 +1,22 @@
+# CI가 쓰는 외부 action의 고정 커밋(SHA)과 판본 주석을 갱신하는 PR을 주 1회 올린다(#215). 처리 규칙은 레포 컨벤션 §6에 있다.
+# npm·uv 의존성의 판본 갱신은 여기서 켜지 않는다. 그 의존성은 저장소 설정의 Dependabot 보안 업데이트만 받는다.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Asia/Seoul
+    # 갓 나온 판본이 검토 전에 PR CI에서 돌지 않도록 공개 7일 뒤부터 제안한다(태그 바꿔치기 사고 노출 기간이 최장 약 6일).
+    cooldown:
+      default-days: 7
+    # 작은 갱신만 한 PR로 묶는다. 호환이 깨질 수 있는 큰 판본 변경은 action마다 따로 PR이 열려 묶음을 막지 않는다.
+    groups:
+      actions:
+        patterns: ['*']
+        update-types: [minor, patch]
+    commit-message:
+      prefix: chore # 레포 컨벤션의 커밋 접두사
+    labels: [] # 기본 라벨(dependencies)을 새로 만들지 않는다.
