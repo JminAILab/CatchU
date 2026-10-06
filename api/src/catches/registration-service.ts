@@ -68,8 +68,12 @@ async function assertReady(
   }
   // 기존 Catch를 참조해도 새 요청이 아닌 원 요청 저장소의 보호 판단을 확인한다.
   // 본인 열람은 NONE/SOURCE_PRIVATE 모두 허용하며 판단 부재를 NONE으로 채우지 않는다.
-  const readiness: { member_id: string; applied_restriction: string }[] = await manager.query(`
-    SELECT request.member_id, protection.applied_restriction
+  const readiness: {
+    member_id: string; applied_restriction: string;
+    confirmed_source_state: unknown; observation_provenance: unknown; observed_at: Date | null;
+  }[] = await manager.query(`
+    SELECT request.member_id, protection.applied_restriction,
+           protection.confirmed_source_state, protection.observation_provenance, protection.observed_at
       FROM analysis_request request
       JOIN repository_protection protection
         ON protection.owner_id = request.member_id AND protection.repository_id = request.repository_id
@@ -77,7 +81,10 @@ async function assertReady(
        FOR SHARE OF protection
   `, [asset.sourceRequestId]);
   if (readiness.length !== 1 || readiness[0].member_id !== asset.ownerId
-    || !['NONE', 'SOURCE_PRIVATE'].includes(readiness[0].applied_restriction)) {
+    || !['NONE', 'SOURCE_PRIVATE'].includes(readiness[0].applied_restriction)
+    // JSON null도 누락이다. 최근 조회 실패만으로 이전의 유효한 관측을 무효화하지 않는다.
+    || [readiness[0].confirmed_source_state, readiness[0].observation_provenance, readiness[0].observed_at]
+      .some((value) => value === null || value === undefined)) {
     throw new CatchRegistrationContextError('CATCH_NOT_READY');
   }
   const evidenceCount = await manager.getRepository(CatchEvidenceEntity).countBy({ catchId: asset.catchId });

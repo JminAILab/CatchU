@@ -33,12 +33,16 @@ await dataSource.transaction(async (manager) => {
 원 요청 소유자·근거와 원 요청 저장소에 대응하는 동일 소유자의 명시적인
 `RepositoryProtection` 판단을 확인한다. `NONE`과 `SOURCE_PRIVATE` 모두 본인 열람이 가능하다.
 행이 없거나 판단 값이 유효하지 않으면 `CATCH_NOT_READY`로 거부해 트랜잭션을 롤백한다.
+확인한 상태·확인 출처·확인 시각이 모두 있어야 유효한 판단으로 인정한다.
+조회 실패만 기록된 행이나 이 세 값 중 하나라도 없는 행(JSON `null` 포함)은 준비 완료로 보지 않는다.
+이전의 유효한 관측과 판단이 남아 있다면, 최근 조회 실패 기록만으로 본인 열람 준비를 거부하거나 보호 상태를 바꾸지 않는다.
 B가 기본 `NONE` 행을 만들지 않으며, 최초 판단은 [E 연결 조건](catch-registration-e-integration.md#보호-판단과-live-출처)대로 공급한다.
 
 ## 저장·중복·보존
 
 1. [`prepareRegistrationBatch`](../src/catches/registration-batch.ts)로 모든 후보를 검사한다.
    한 후보라도 조건을 충족하지 못하면 조용히 빼지 않고 전체 호출을 거부한다.
+   worker 메시지의 전달 형식보다 엄격하게 빈 필수 내용을 거부하는 이유는, Catch 저장에 적용되는 ERD의 필수 내용·근거 조건을 지켜야 하기 때문이다.
 2. 수신 기록과 요청·시도·소유자 맥락을 대조한다.
    E가 먼저 검증했다는 이유로 B 대조를 생략하지 않는다.
 3. 같은 owner/workIdentity의 잠금을 작업 키 순으로 잡는다.

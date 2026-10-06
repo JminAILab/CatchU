@@ -159,6 +159,94 @@ describe('Catch 등록 PostgreSQL', {
     assert.equal((await db.query('SELECT count(*)::int AS n FROM result_application_record'))[0].n, 1);
   });
 
+  for (const { label, protection, missing } of [
+    { label: '최초 조회 실패만 남음', protection: 'NONE', missing: {
+      confirmedSourceState: null, observationProvenance: null, observedAt: null,
+      observationFailure: { synthetic: true, code: 'OBSERVATION_FAILED' },
+    } },
+    { label: '최초 조회 실패만 남음', protection: 'SOURCE_PRIVATE', missing: {
+      confirmedSourceState: null, observationProvenance: null, observedAt: null,
+      observationFailure: { synthetic: true, code: 'OBSERVATION_FAILED' },
+    } },
+    { label: '확인 상태 SQL NULL', protection: 'NONE', missing: { confirmedSourceState: null } },
+    { label: '확인 상태 JSON null', protection: 'SOURCE_PRIVATE', missing: { confirmedSourceState: 'null' } },
+    { label: '확인 출처 SQL NULL', protection: 'NONE', missing: { observationProvenance: null } },
+    { label: '확인 출처 JSON null', protection: 'SOURCE_PRIVATE', missing: { observationProvenance: 'null' } },
+    { label: '확인 시각 SQL NULL', protection: 'NONE', missing: { observedAt: null } },
+  ]) {
+    test(`${protection}: ${label}이면 신규 등록 전체를 롤백하고 수신·보호 기록을 보존한다`, async () => {
+      const input = await fixture.receipt({
+        candidates: [candidate(), candidate('synthetic-candidate-2', 'synthetic-work-2')],
+      }, { protection });
+      const observation = {
+        confirmedSourceState: JSON.stringify({ synthetic: true, visibility: protection === 'SOURCE_PRIVATE' ? 'PRIVATE' : 'PUBLIC' }),
+        observationProvenance: JSON.stringify({ fixture: 'catch-db-fixture', synthetic: true }),
+        observedAt: '2026-10-01T00:00:00Z', observationFailure: null, ...missing,
+      };
+      await db.query(`UPDATE repository_protection
+        SET confirmed_source_state = $1::jsonb, observation_provenance = $2::jsonb,
+            observed_at = $3, observation_failure = $4::jsonb WHERE owner_id = $5`,
+      [observation.confirmedSourceState, observation.observationProvenance, observation.observedAt,
+        JSON.stringify(observation.observationFailure), input.ownerId]);
+      const before = await storedState();
+      const protectionBefore = await db.query('SELECT * FROM repository_protection');
+
+      await assert.rejects(apply(input), contextError('CATCH_NOT_READY'));
+
+      await empty();
+      assert.deepEqual(await storedState(), before, '실패한 등록은 수신 기록과 요청·시도의 대기 상태를 바꾸지 않는다');
+      assert.deepEqual(await db.query('SELECT * FROM repository_protection'), protectionBefore,
+        '누락된 관측을 채우거나 보호 판단을 바꾸지 않는다');
+    });
+  }
+
+  for (const protection of ['NONE', 'SOURCE_PRIVATE']) {
+    test(`${protection}: 유효 관측이 빠지면 기존 등록 재전달과 새 요청의 기존 Catch 참조를 거부한다`, async () => {
+      const original = await fixture.receipt({}, { protection });
+      const [created] = await apply(original);
+      await completeApplication(original);
+      await db.query('UPDATE repository_protection SET observation_provenance = $1::jsonb WHERE owner_id = $2',
+        ['null', original.ownerId]);
+      const next = await fixture.receipt({
+        ownerId: original.ownerId, candidates: [candidate('synthetic-next-candidate')],
+      }, { protection: null });
+      const before = await storedState();
+      const protectionBefore = await db.query('SELECT * FROM repository_protection');
+
+      await assert.rejects(apply(original), contextError('CATCH_NOT_READY'));
+      assert.deepEqual(await storedState(), before, '재전달 거부는 기존 Catch·완료 상태·두 수신 기록을 보존한다');
+      await assert.rejects(apply(next), contextError('CATCH_NOT_READY'));
+      assert.deepEqual(await storedState(), before, '새 요청 거부는 기존 Catch와 등록 연결을 덮어쓰지 않는다');
+      assert.deepEqual(await db.query('SELECT * FROM repository_protection'), protectionBefore);
+      assert.deepEqual(await db.query('SELECT catch_id FROM candidate_registration'), [{ catch_id: created.catchId }]);
+      assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 1 });
+    });
+
+    test(`${protection}: 이전 유효 관측과 최근 조회 실패가 함께 있으면 열람 준비와 보호 자료를 유지한다`, async () => {
+      const input = await fixture.receipt({}, { protection });
+      await db.query('UPDATE repository_protection SET observation_failure = $1::jsonb WHERE owner_id = $2',
+        [JSON.stringify({ synthetic: true, code: 'OBSERVATION_FAILED', failedAt: '2026-10-02T00:00:00Z' }), input.ownerId]);
+      const protectionBefore = await db.query('SELECT * FROM repository_protection');
+
+      const [first] = await apply(input);
+      assert.equal(first.ownerViewReady, true);
+      assert.equal(first.disposition, 'CREATED');
+      assert.deepEqual(await apply(input), [first]);
+      await completeApplication(input);
+      const next = await fixture.receipt({
+        ownerId: input.ownerId, candidates: [candidate('synthetic-next-candidate')],
+      }, { protection: null });
+      const [existing] = await apply(next);
+      assert.deepEqual(existing, {
+        candidateId: next.candidates[0].candidateId, catchId: first.catchId,
+        disposition: 'EXISTING', ownerViewReady: true,
+      });
+      assert.deepEqual(await db.query('SELECT * FROM repository_protection'), protectionBefore,
+        '최근 조회 실패는 이전 관측·판단을 덮어쓰거나 해제하지 않는다');
+      assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 2 });
+    });
+  }
+
   test('SOURCE_PRIVATE 보호가 있어도 본인 열람 준비는 허용하며 보호 판단을 바꾸지 않는다', async () => {
     const input = await fixture.receipt({}, { protection: 'SOURCE_PRIVATE' });
     const protectionBefore = await db.query('SELECT * FROM repository_protection');

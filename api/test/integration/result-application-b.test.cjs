@@ -125,6 +125,33 @@ test('B 입력 거부·맥락 거부와 DB 실패를 기존 오류 타입으로 
   assert.equal((await counts()).catches, 0);
 });
 
+test('최초 보호 조회 실패만 있는 경우 실제 B 전체 롤백·수신 보존 후 E가 APPLY_FAILED를 기록한다', async () => {
+  const input = await prepare(undefined, { protection: null });
+  await db.query(`INSERT INTO repository_protection
+    (protection_id, owner_id, repository_id, applied_restriction, observation_failure)
+    VALUES ($1,$2,$3,'NONE',$4::jsonb)`,
+  [randomUUID(), input.result.memberId, input.result.repositoryId,
+    JSON.stringify({ synthetic: true, code: 'OBSERVATION_FAILED' })]);
+  const receipt = await db.manager.findOneByOrFail(ResultApplicationRecord, {
+    applicationRecordId: input.metadata.applicationRecordId,
+  });
+  const protectionBefore = await db.query('SELECT * FROM repository_protection');
+
+  await assert.rejects(apply(input), e => e instanceof CatchRegistrationContextError && e.reason === 'CATCH_NOT_READY');
+
+  assert.deepEqual(await counts(), { catches: 0, evidence: 0, registrations: 0, receipts: 1 });
+  const failed = await state(input);
+  assert.equal(failed.application, 'APPLY_FAILED');
+  assert.equal(failed.ownerResultsReady, false);
+  assert.equal(failed.processing, input.result.outcome);
+  assert.equal(failed.failures.at(-1).code, 'CATCH_NOT_READY');
+  assert.equal((await db.manager.findOneByOrFail(AnalysisRequest, { requestId: input.result.requestId })).lifecycle, 'ACTIVE');
+  assert.deepEqual(await db.manager.findOneByOrFail(ResultApplicationRecord, {
+    applicationRecordId: receipt.applicationRecordId,
+  }), receipt);
+  assert.deepEqual(await db.query('SELECT * FROM repository_protection'), protectionBefore);
+});
+
 test('일부 후보만 반환하면 전체 완료로 처리하지 않음', async () => {
   const input = await prepare();
   const service = combinedService(db, async (m, value) => { await registerCandidates(m, value); return []; });
