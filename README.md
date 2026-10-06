@@ -18,7 +18,7 @@
 | `.codex/` `.agents/` | AI-DLC 하네스(Codex hook·도구·스킬·규칙). `aidlc config`로 관리하며 팀 수정분은 커밋 이력에 기록 | — |
 
 최상위 디렉터리는 **배포 단위**와 1:1로 대응한다.
-스택 열의 Next.js·NestJS·FastAPI는 2026-09-13 확정했고 배포 대상은 네이버 클라우드 플랫폼(NCP)이다(레포 컨벤션 §1 결정 이력 참조). `aidlc/`·`.codex/`·`.agents/`는 배포 단위가 아니라 AI-DLC 작업 기록과 도구다.
+스택 열의 Next.js·NestJS·FastAPI는 2026-09-13 확정했다. 배포 대상은 AWS다(2026-10-06 NCP에서 변경, 레포 컨벤션 §1 결정 이력 참조). `aidlc/`·`.codex/`·`.agents/`는 배포 단위가 아니라 AI-DLC 작업 기록과 도구다.
 
 ## 문서
 

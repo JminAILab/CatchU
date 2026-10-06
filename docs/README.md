@@ -61,7 +61,7 @@ PR 본문에, 판본은 git 이력에 남는다.
 - 12월 확장 기준: [12월 요구사항](../aidlc/spaces/default/intents/260925-intent-12/inception/requirements-analysis/requirements.md)과 [사용자 스토리](../aidlc/spaces/default/intents/260925-intent-12/inception/user-stories/stories.md)는 2026-09-28 승인됐다. 읽기 순서·마감 구분·적용 경계는 [12월 승인 문서 안내](CatchU_12월_승인문서_안내.md)를 따른다. 12월의 명시적 정정은 그 범위에 적용하며, 이번 공유만으로 10월 구현 계약을 변경하지 않는다.
 - 10월 MVP에 적용하는 범위·순서·착수 조건은 후속 intent의 [scope-document.md](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)·[intent-backlog.md](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/intent-backlog.md)와 연결된 후속 결정을 확인한다. 산출물에 남은 작성 당시 지위와 현재 승인 여부를 구분하고, 승인 여부는 해당 intent의 `aidlc-state.md`·`audit/` 기록에서 확인한다.
 - 승인된 AI-DLC 산출물이 `docs/`의 기존 기준을 대체하는 경우, 대체 대상·범위·적용 시점·승인 근거를 해당 `docs/` 문서의 본문이나 「결정 이력」에 명시한다. 명시되지 않은 충돌에는 자동 우선순위를 적용하지 않고 미결로 표시해 Slack에 올린다.
-- 현재 명시된 항목: 레포 컨벤션 §1의 Next.js·NestJS·FastAPI와 배포 대상 NCP는 2026-09-13 확정이다(해당 문서 결정 이력 및 [MVP 입력](ai-dlc-input-mvp/CatchU_mvp_input.md) 참조). KPI v4.1의 초안 지위는 그대로다. AI-DLC의 후속 intent에서 검토 자료로 쓰려면 입력 문서에 필요한 내용·지위·출처·기준 커밋을 옮겨 적는다. 링크만으로는 AI-DLC가 원문을 읽지 않는다.
+- 현재 명시된 항목: 레포 컨벤션 §1의 Next.js·NestJS·FastAPI는 2026-09-13 확정이고, 배포 대상은 2026-10-06 NCP에서 AWS로 바꿨다(해당 문서 결정 이력 및 [MVP 입력](ai-dlc-input-mvp/CatchU_mvp_input.md) 참조). 승인된 AI-DLC 기록에 남은 배포 대상 NCP는 이 결정이 대체하며, 기록은 소급 수정하지 않는다. KPI v4.1의 초안 지위는 그대로다. AI-DLC의 후속 intent에서 검토 자료로 쓰려면 입력 문서에 필요한 내용·지위·출처·기준 커밋을 옮겨 적는다. 링크만으로는 AI-DLC가 원문을 읽지 않는다.
 
 ## 정리 기록
 
