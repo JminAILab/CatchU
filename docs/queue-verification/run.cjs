@@ -56,10 +56,19 @@ function docker(args) {
   return execFileSync('docker', args, { encoding: 'utf8' }).trim();
 }
 
+// 키트가 띄운 컨테이너에만 붙이는 표식. 지울 때는 이 표식이 있는 컨테이너만 지우고, 같은 이름의 다른 컨테이너는 건드리지 않는다.
+const KIT_CONTAINER_LABEL = 'catchu-q77-kit=1';
+
+function removeKitContainer(name) {
+  const own = docker(['ps', '-a', '--filter', `label=${KIT_CONTAINER_LABEL}`, '--format', '{{.Names}}']).split('\n');
+  if (own.includes(name)) docker(['rm', '-f', '-v', name]); // -v: 이미지가 만든 익명 볼륨도 지운다
+}
+
 async function startContainer(name, port, serverArgs) {
   const engine = ENGINES[ENGINE];
-  docker(['rm', '-f', '-v', name]); // -v: 이미지가 만든 익명 볼륨도 지운다
-  docker(['run', '-d', '--name', name, '-p', `127.0.0.1:${port}:6379`, engine.image, engine.server, ...serverArgs]);
+  // 지난 실행이 남긴 키트 컨테이너만 지운다. 같은 이름의 다른 컨테이너가 있으면 아래 run이 이름 충돌로 멈춘다.
+  removeKitContainer(name);
+  docker(['run', '-d', '--name', name, '--label', KIT_CONTAINER_LABEL, '-p', `127.0.0.1:${port}:6379`, engine.image, engine.server, ...serverArgs]);
   const url = `redis://127.0.0.1:${port}`;
   await waitForPing(url);
   return url;
@@ -667,7 +676,7 @@ function auxScenario(serverArgs, body) {
       return await body(run, AUX.name);
     } finally {
       await run.close();
-      docker(['rm', '-f', '-v', AUX.name]);
+      removeKitContainer(AUX.name);
     }
   };
 }
@@ -1036,7 +1045,7 @@ async function main() {
       console.log(`${row.status.padEnd(7)} ${row.id} (${row.seconds}s) calls=${row.observed.calls ?? '-'} ${JSON.stringify(row.observed).slice(0, 300)}`);
     }
   } finally {
-    if (ENGINE) docker(['rm', '-f', '-v', 'catchu-q77-main']);
+    if (ENGINE) removeKitContainer('catchu-q77-main');
   }
   const out = join(ensureDir(join(RUNS_DIR, LABEL)), FILTERS.length ? `summary-${FILTERS.join('_')}.json` : 'summary.json');
   writeFileSync(out, JSON.stringify({ environment, results }, null, 1));
