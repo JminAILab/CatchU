@@ -6,6 +6,7 @@ const { NestFactory } = require('@nestjs/core');
 const { SignJWT } = require('jose');
 const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
+const { hashLinkPassword } = require('../../dist/share-links/link-password');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
 // #147: POST /v1/share-links를 실제 앱·테스트 DB·개발 로그인 회원으로 검증한다.
@@ -223,6 +224,32 @@ test('제목 50자와 비밀번호 8자·64자 경계는 발급되고, 저장된
     const [row] = await db.query('SELECT char_length(title) AS n FROM share_link WHERE link_id = $1', [result.body.linkId]);
     assert.equal(Number(row.n), codePoints, key);
   }
+});
+
+test('#221 전에 짧은 비밀번호로 발급한 요청을 같은 키로 다시 보내면 400이고, 기존 링크·멱등 기록은 그대로이며 unlock은 된다', async () => {
+  // #221 전 발급을 재현한다. 발급 API는 이제 짧은 비밀번호를 받지 않으므로, 같은 제목·비밀번호 설정 여부(멱등 지문)로
+  // 발급한 뒤 저장된 검증값만 짧은 비밀번호의 것으로 바꾼다.
+  const token = await login();
+  const legacy = { title: '이전 짧은 비밀번호', password: 'a' };
+  const issued = await create(token, 'key-legacy', { title: legacy.title, password: PASSWORD });
+  assert.equal(issued.status, 201);
+  await db.query('UPDATE share_link SET password_protection_reference = $2 WHERE link_id = $1',
+    [issued.body.linkId, await hashLinkPassword(legacy.password)]);
+  const before = await db.query('SELECT link_id, password_protection_reference, stopped_at FROM share_link');
+
+  // 본문 검사가 멱등 처리보다 먼저라, 예전 응답(201·200)이 아니라 입력 오류다(검사 순서는 바꾸지 않음).
+  const replay = await create(token, 'key-legacy', legacy);
+  expectError(replay, 400, 'VALIDATION_FAILED');
+  assert.deepEqual(replay.body.details.violations, [{ field: 'password', reason: 'minLength' }]);
+  assert.deepEqual(await db.query('SELECT link_id, password_protection_reference, stopped_at FROM share_link'), before);
+  assert.equal(await count('idempotency_record'), 1);
+
+  // 수신자 unlock은 길이를 검사하지 않으므로 기존 링크는 짧은 비밀번호로 계속 열린다.
+  const linkToken = issued.body.url.split('/s/')[1];
+  const unlock = await fetch(`${url}/v1/public/links/${encodeURIComponent(linkToken)}/unlock`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: legacy.password }),
+  });
+  assert.equal(unlock.status, 200);
 });
 
 test('로그에 비밀번호 원문과 링크 토큰을 남기지 않는다', async () => {
