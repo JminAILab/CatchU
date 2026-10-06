@@ -8,6 +8,7 @@ const { configureApp } = require('../../dist/app.setup');
 const { LinkAccessService } = require('../../dist/share-links/link-access.service');
 const { UNLOCK_CONTROLS } = require('../../dist/share-links/unlock-policy');
 const { generateLinkToken } = require('../../dist/share-links/link-token');
+const { hashLinkPassword } = require('../../dist/share-links/link-password');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
 // #150: 비밀번호 확인(unlock)과 수신 조회용 공통 접근 판정을 실제 앱·테스트 DB로 검증한다.
@@ -135,6 +136,20 @@ test('비밀번호 없는 링크의 unlock은 400 INVALID_REQUEST, 본문 형식
     expectError(result, 400, 'VALIDATION_FAILED');
     assert.deepEqual(result.body.details.violations, [violation]);
   }
+});
+
+test('unlock은 발급 길이 기준(8~64자, #223)을 적용하지 않고 저장된 검증값과 비교한다', async () => {
+  // #221 이전에 발급된 짧은 비밀번호 링크를 흉내 낸다. 발급 API의 길이 검사와 무관하게 검증값을 DB에 직접 둔다.
+  const link = await issue('짧은 비밀번호 링크', PASSWORD);
+  for (const short of ['a', '1234567']) {
+    await db.query('UPDATE share_link SET password_protection_reference = $2 WHERE link_id = $1',
+      [link.linkId, await hashLinkPassword(short)]);
+    const ok = await unlock(link.token, { password: short });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal((await access.assertReadable(link.token, ok.body.grant)).linkId, link.linkId);
+  }
+  // 길이를 벗어난 틀린 입력도 400이 아니라 비교 결과(401)다.
+  for (const wrong of ['b', 'x'.repeat(65)]) expectError(await unlock(link.token, { password: wrong }), 401, 'LINK_PASSWORD_INVALID');
 });
 
 test('10번 틀리면 맞는 비밀번호도 429 LINK_UNLOCK_LIMITED이고, Retry-After는 올림한 남은 초이며 차단 중 요청으로 늘어나지 않는다', async () => {
