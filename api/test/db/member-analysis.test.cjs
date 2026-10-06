@@ -69,13 +69,30 @@ test('개발 연동은 지정 repository 표본과 일치하며 자격정보 원
   assert.deepEqual((await dev().readConnection(id)).repositories,[]);
 });
 
-test('기본 비활성·production은 로그인 회원 생성과 개발 연결 조회를 모두 거부', async () => {
-  for(const settings of [{}, {DEV_LOGIN_ENABLED:'true',NODE_ENV:'production'}]) {
+test('기본 비활성·허용되지 않은 환경은 로그인 회원 생성과 개발 연결 조회를 모두 거부', async () => {
+  for(const settings of [
+    {NODE_ENV:'test'},
+    {DEV_LOGIN_ENABLED:'false',NODE_ENV:'development'},
+    ...[undefined,'','production','staging','preview','Development','test ']
+      .map(NODE_ENV=>({DEV_LOGIN_ENABLED:'true',NODE_ENV})),
+  ]) {
     const config=readAuthConfig({AUTH_JWT_SECRET:'ab'.repeat(32),AUTH_ACCESS_TOKEN_TTL_SECONDS:'60',...settings});
     await assert.rejects(dev(config).resolveMember('blocked'), e=>e.getStatus()===403);
     await assert.rejects(dev(config).readConnection(randomUUID()),e=>e.getStatus()===403);
   }
   assert.equal(await db.getRepository(MemberAccount).count(),0);
+  assert.equal(await db.getRepository(MemberProfile).count(),0);
+  assert.equal(await db.getRepository(GitHubConnection).count(),0);
+});
+
+test('development·test의 명시적 활성화는 회원 준비와 합성 연결 조회를 허용', async () => {
+  for(const NODE_ENV of ['development','test']) {
+    const config=readAuthConfig({AUTH_JWT_SECRET:'ab'.repeat(32),AUTH_ACCESS_TOKEN_TTL_SECONDS:'60',
+      DEV_LOGIN_ENABLED:'true',NODE_ENV});
+    const memberId=await dev(config).resolveMember(`allowed-${NODE_ENV}`);
+    assert.equal((await dev(config).readConnection(memberId)).sourceMode,'MOCK');
+  }
+  assert.equal(await db.getRepository(MemberAccount).count(),2);
 });
 
 test('기존 회원 누락 프로필·실제 연동을 합성 자료로 보정하지 않으며 DB 오류는 실패', async () => {
@@ -385,9 +402,16 @@ test('접수한 동의 변경과 재요청 선행 참조의 역방향 변경을 
 test('일곱 테이블은 빈 스키마에 up/down/re-up 가능하고 엔티티와 생성 DDL이 일치',async()=>{
   const schema='test_104_'+randomUUID().replaceAll('-','');
   await db.query('CREATE SCHEMA "'+schema+'"');
-  const isolated=await openTestDataSource({schema,extra:{options:'-c search_path='+schema+' -c TimeZone=UTC'}});
+  // #104와 멱등 기록이 참조하는 실제 C 엔티티를 대조한다. 후속 E/B는 각 기능 검사에서 확인한다.
+  const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
+  const { ShareLink } = require('../../dist/share-links/share-link.entity');
+  const { CreateShareLink1790745895865 } = require('../../dist/database/migrations/1790745895865-CreateShareLink');
+  const isolated=await openTestDataSource({schema,extra:{options:'-c search_path='+schema+' -c TimeZone=UTC'},
+    entities:[MemberAccount,MemberProfile,GitHubConnection,AnalysisRequest,AnalysisConsent,AnalysisAttempt,IdempotencyRecord,ShareLink],
+    migrations:[CreateMemberAnalysisFoundation1790500000000,CreateShareLink1790745895865]});
   try {
-    await isolated.runMigrations();
+    assert.deepEqual((await isolated.runMigrations()).map(m=>m.name),
+      ['CreateMemberAnalysisFoundation1790500000000','CreateShareLink1790745895865']);
     const tables=await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema]);
     assert.equal(tables.length,9,'일곱 테이블 + C share_link(#147) + migrations');
     const diff=await isolated.driver.createSchemaBuilder().log();
