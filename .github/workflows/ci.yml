@@ -2,6 +2,7 @@
 # 서비스 job은 관련 경로가 바뀐 경우에만 돌고, 아니면 건너뛴다. 건너뛴 job은 필수 상태 검사에서 통과로 취급된다.
 # 필수 상태 검사로 거는 job 이름(changes·docs-size·web·api·worker·deps-audit)을 바꾸면 dev ruleset도 함께 고친다.
 # 외부 action은 전체 커밋 SHA로 고정하고 판본을 주석으로 남긴다(#215). 갱신 PR은 Dependabot이 주 1회 올린다(.github/dependabot.yml).
+# checkout 뒤에 git 인증을 쓰는 job이 없으므로, 토큰을 작업 폴더(.git/config)에 남기지 않는다(persist-credentials: false).
 name: CI
 
 on:
@@ -32,6 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 2
       - id: detect
         env:
@@ -69,6 +71,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: bash .github/scripts/check-doc-sizes.sh
 
   web:
@@ -84,6 +88,8 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: web/.node-version
@@ -123,6 +129,8 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: api/package.json
@@ -146,9 +154,12 @@ jobs:
         working-directory: worker
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: '0.12.18' # worker README 「도구와 버전」의 기준. 저장소 설정에는 uv 판본 고정이 없다.
+          checksum: '89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16' # uv 0.12.18 x86_64-unknown-linux-gnu. version을 바꾸면 변경 불가 릴리스 자산의 sha256으로 함께 바꾼다.
           working-directory: worker
           cache-dependency-glob: uv.lock
       - run: uv python install # .python-version(3.12.10)
@@ -166,6 +177,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       # 잠금 파일만 읽으므로 의존성은 설치하지 않는다. web·api의 Node 판본이 같아 web 기준 하나만 설치한다.
       - if: contains(needs.changes.outputs.deps, 'web') || contains(needs.changes.outputs.deps, 'api')
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -175,6 +188,7 @@ jobs:
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version: '0.12.18' # worker job과 같은 판본
+          checksum: '89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16' # worker job과 같은 값
           enable-cache: false
       - env:
           SERVICES: ${{ needs.changes.outputs.deps }}
