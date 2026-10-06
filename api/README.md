@@ -230,6 +230,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 [docs/member-analysis.md](docs/member-analysis.md)에 있다.
 
+## E 수신 기록과 Catch 반영 연결 — #105
+
+[docs/result-application.md](docs/result-application.md)에 있다.
+
 ## 분석 메시지 수신과 개발용 주입 — #139
 
 [docs/analysis-receiver.md](docs/analysis-receiver.md)에 있다.
