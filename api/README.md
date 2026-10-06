@@ -94,9 +94,9 @@ npm ci
 | 선택 | `BIND_HOST` | `127.0.0.1` | HTTP 바인딩 주소. IP 주소만 허용하고 `localhost` 같은 이름은 기동 실패. `0.0.0.0`은 같은 네트워크의 다른 기기에서도 접속되므로 컨테이너 등 필요할 때만 쓴다 |
 | 필수 | `AUTH_JWT_SECRET` | 없음 | 안전한 난수 32바이트를 64자리 hex로 표현한 서명 키. 환경별로 별도 준비 |
 | 필수 | `AUTH_ACCESS_TOKEN_TTL_SECONDS` | 없음 | Access JWT 수명(초). 양의 안전한 정수이며 현재 시각과 합산 가능해야 함 |
-| 선택 | `DEV_LOGIN_ENABLED` | 비활성 | 정확히 `true`일 때만 개발 로그인 활성화 요청 |
+| 선택 | `DEV_LOGIN_ENABLED` | 비활성 | 정확히 `true`이고 `NODE_ENV`가 `development` 또는 `test`일 때만 개발 로그인 허용 |
 | 선택 | `DEV_ANALYSIS_INJECTION_ENABLED` | 비활성 | 분석 주입 모듈을 조립한 경우에만 사용. 정확히 `true`이고 `NODE_ENV`가 `development` 또는 `test`여야 허용. 이 설정만으로 HTTP 경로가 생기지 않음 |
-| 선택 | `NODE_ENV` | 미지정 | 운영 배포에서는 반드시 `production`. 개발 로그인 플래그보다 우선하여 거부 |
+| 선택 | `NODE_ENV` | 미지정 | 개발 로그인은 정확히 `development` 또는 `test`에서만 허용. 미지정·공란·그 밖의 값은 플래그가 켜져 있어도 거부. 운영 배포에서는 반드시 `production` |
 | 운영 필수 | `LINK_GRANT_SECRET` | 개발·테스트는 실행마다 임시 키 | 비밀번호 링크 열람 증표(grant) 서명 키. 32바이트 무작위 값의 64자리 hex이며 `AUTH_JWT_SECRET`과 달라야 한다. `production`에서 없거나 형식이 틀리면 기동 실패 |
 | 운영 필수 | `SHARE_LINK_WEB_BASE_URL` | 개발·테스트 `http://localhost:3000` | 공유 링크 `url`(`<이 값>/s/<token>`)을 만들 web 주소. `production`에서 없거나, http(s)가 아니거나 쿼리·조각·계정 정보가 있으면 기동 실패. CORS 허용 출처와 따로 둔다 |
 | 필수 | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 없음 | 개발 DB 접속. 로컬 값은 「로컬 DB 준비」의 `docker run`과 `.env.example`이 같다. `DB_PORT`는 정수 `1~65535` |
@@ -233,6 +233,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 [docs/member-analysis.md](docs/member-analysis.md)에 있다.
 
+## E 수신 기록과 Catch 반영 연결 — #105
+
+[docs/result-application.md](docs/result-application.md)에 있다.
+
 ## 분석 메시지 수신과 개발용 주입 — #139
 
 [docs/analysis-receiver.md](docs/analysis-receiver.md)에 있다.
@@ -242,7 +246,7 @@ DB를 쓰는 테스트를 추가할 때:
 - `EADDRINUSE`: 지정 포트가 사용 중인지 확인하고 자신이 실행한 이전 서버를 종료하거나 선택 포트를 바꾼다. 다른 사람의 프로세스를 임의 종료하지 않는다.
 - `PORT` 오류: `.env`와 현재 터미널 환경의 값을 확인한다.
 - `BIND_HOST는 IP 주소여야 합니다`: `localhost` 같은 이름 대신 `127.0.0.1`·`::1`·`0.0.0.0`처럼 IP로 적는다. 빈 값도 실패한다.
-- 인증 설정 오류: 오류에 나온 변수 이름을 기준으로 누락·형식을 확인한다. 키·토큰 값은 출력하거나 공유하지 않는다. 개발 로그인 403은 플래그와 운영 환경 차단 조건을 확인한다.
+- 인증 설정 오류: 오류에 나온 변수 이름을 기준으로 누락·형식을 확인한다. 키·토큰 값은 출력하거나 공유하지 않는다. 개발 로그인 403은 `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development` 또는 `test`가 함께 지정됐는지 확인한다.
 - `DB 설정이 없습니다: DB_...`: `.env`나 터미널 환경에 `DB_*`가 있는지 확인한다(`.env.example` 참고).
 - `DB에 접속하지 못했습니다(...)`: `docker ps`로 DB 컨테이너가 실행 중인지 보고, 멈춰 있으면 `docker start catchu-db`. `ECONNREFUSED`면 주소·포트를, `password authentication failed`면 `DB_USER`·`DB_PASSWORD`가 볼륨을 처음 만들 때의 값과 같은지 확인한다.
 - `docker run`의 `port is already allocated`: 5432(테스트는 5433)를 다른 PostgreSQL이 쓰고 있다. 자신이 띄운 컨테이너면 그것을 쓰고, 아니면 「로컬 DB 준비」대로 포트를 바꾼다.

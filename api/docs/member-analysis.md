@@ -26,7 +26,7 @@
 
 `DevMemberService`는 `AuthModule`에서 export한다. `readConnection(인증된 memberId)`은 개발 회원의 현재 합성 연결과 선정 저장소, sourceMode=MOCK을 반환한다. [지정 표본](../../worker/fixtures/m1-synthetic/context.sample.json)의 repositoryId=`synthetic-repo-0001`, allowedScopeRevision=`00000000-0000-4000-8000-000000000201`을 사용하며 테스트가 표본 일치를 검사한다. 요청·동의·시도 ID를 표본에서 복사하지 않는다. 현재 대역은 GitHub 네트워크 호출·실제 접근권한·분석 동의를 제공하지 않는다. #136과 E 접수에서 이 내부 공급자를 연결한다.
 
-회원·기본 프로필·최초 합성 CONNECTED 행은 한 트랜잭션이다. `DEV_LOGIN_ENABLED=true` 설정을 공유하며, 기본 비활성·production에서는 회원 준비와 대역 조회 모두 거부한다. 기존 실제 연동을 합성 연결로 덮어쓰지 않는다. 토큰 검증 Guard는 매 요청 DB 조회를 추가하지 않았으므로, 기존 문자열 토큰은 다시 개발 로그인하여 UUID 토큰으로 바꿔야 한다. 기능은 여전히 `@CurrentMemberId()`만 사용하고 자원 존재·소유권을 별도로 확인한다.
+회원·기본 프로필·최초 합성 CONNECTED 행은 한 트랜잭션이다. 인증의 공통 설정을 공유하며, `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development` 또는 `test`가 함께 지정된 경우만 회원 준비와 대역 조회를 허용한다. 기본 비활성·환경 미지정·production·그 밖의 환경에서는 모두 거부한다. 기존 실제 연동을 합성 연결로 덮어쓰지 않는다. 토큰 검증 Guard는 매 요청 DB 조회를 추가하지 않았으므로, 기존 문자열 토큰은 다시 개발 로그인하여 UUID 토큰으로 바꿔야 한다. 기능은 여전히 `@CurrentMemberId()`만 사용하고 자원 존재·소유권을 별도로 확인한다.
 
 ## 멱등 생성 호출
 

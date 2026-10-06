@@ -164,10 +164,27 @@ test('변조·만료·필수 값 오류 토큰은 AUTH_INVALID이며 토큰·JWT
     'JWT 라이브러리의 내부 오류를 로그로 전달하지 않는다');
 });
 
+for (const environment of ['development', 'test']) {
+  test(`명시적으로 켠 개발 로그인은 ${environment}에서 허용`, async (t) => {
+    const server = await start(t, { NODE_ENV: environment });
+    const response = await server.login();
+    assert.equal(response.status, 200);
+    const { accessToken } = await response.json();
+    assert.equal((await server.protectedRequest(accessToken)).status, 200);
+    assert.equal(server.logs.join('\n').includes(accessToken), false);
+  });
+}
+
 for (const [label, overrides] of [
   ['설정 없음', { DEV_LOGIN_ENABLED: undefined }],
   ['명시적 비활성', { DEV_LOGIN_ENABLED: 'false' }],
   ['정확한 true가 아닌 값', { DEV_LOGIN_ENABLED: '1' }],
+  ['NODE_ENV 미지정', { NODE_ENV: undefined }],
+  ['NODE_ENV 공란', { NODE_ENV: '' }],
+  ['staging 환경', { NODE_ENV: 'staging' }],
+  ['그 밖의 환경', { NODE_ENV: 'preview' }],
+  ['대소문자가 다른 환경', { NODE_ENV: 'Development' }],
+  ['공백이 포함된 환경', { NODE_ENV: 'test ' }],
   // production은 공유 URL 주소(#147)와 grant 서명 키(#150)가 필수라 합성 값을 함께 준다.
   ['운영 환경에서 활성화 요청', { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' }],
 ]) {
@@ -178,7 +195,7 @@ for (const [label, overrides] of [
       { memberId: 'valid-member', constructor: 'extra' },
     ]) {
       const response = await server.login(body);
-      assert.equal(response.status, 403, '비활성·운영 차단은 DTO 검증보다 먼저 적용한다');
+      assert.equal(response.status, 403, '플래그·허용 환경 검사는 DTO 검증보다 먼저 적용한다');
       assert.equal(response.headers.get('cache-control'), 'no-store');
       const denied = await response.json();
       assert.equal(denied.code, 'INTERNAL_ERROR', '전용 거부 코드 미결: 기존 #88 처리를 유지한다');
