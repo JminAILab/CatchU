@@ -96,7 +96,7 @@ npm ci
 | 필수 | `AUTH_ACCESS_TOKEN_TTL_SECONDS` | 없음 | Access JWT 수명(초). 양의 안전한 정수이며 현재 시각과 합산 가능해야 함 |
 | 선택 | `DEV_LOGIN_ENABLED` | 비활성 | 정확히 `true`이고 `NODE_ENV`가 `development` 또는 `test`일 때만 개발 로그인 허용 |
 | 선택 | `DEV_ANALYSIS_INJECTION_ENABLED` | 비활성 | 분석 주입 모듈을 조립한 경우에만 사용. 정확히 `true`이고 `NODE_ENV`가 `development` 또는 `test`여야 허용. 이 설정만으로 HTTP 경로가 생기지 않음 |
-| 선택 | `NODE_ENV` | 미지정 | 개발 로그인은 정확히 `development` 또는 `test`에서만 허용. 미지정·공란·그 밖의 값은 플래그가 켜져 있어도 거부. 운영 배포에서는 반드시 `production` |
+| 선택 | `NODE_ENV` | 미지정 | 개발 로그인은 정확히 `development` 또는 `test`에서만 허용. 미지정·공란·그 밖의 값은 플래그가 켜져 있어도 거부. 같은 기준으로 http 주소도 `development`·`test`에서만 받으므로, 그 밖(미지정 포함)에서는 `SHARE_LINK_WEB_BASE_URL`에 https 주소가 필요하고 `CORS_ALLOWED_ORIGINS`에 http 출처가 있으면 기동 실패(#218). 운영 배포에서는 반드시 `production`, 로컬 개발은 `.env.example`처럼 `development`로 둔다 |
 | 운영 필수 | `LINK_GRANT_SECRET` | 개발·테스트는 실행마다 임시 키 | 비밀번호 링크 열람 증표(grant) 서명 키. 32바이트 무작위 값의 64자리 hex이며 `AUTH_JWT_SECRET`과 달라야 한다. `production`에서 없거나 형식이 틀리면 기동 실패 |
 | 운영 필수 | `SHARE_LINK_WEB_BASE_URL` | `NODE_ENV`가 `development`·`test`일 때만 `http://localhost:3000` | 공유 링크 `url`(`<이 값>/s/<token>`)을 만들 web 주소. http 주소는 `NODE_ENV`가 `development`·`test`일 때만 받고, 그 밖(`production`·미지정 포함)에서 없거나 http이면 기동 실패(#218). http(s)가 아니거나 쿼리·조각·계정 정보가 있어도 기동 실패. CORS 허용 출처와 따로 둔다 |
 | 필수 | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 없음 | 개발 DB 접속. 로컬 값은 「로컬 DB 준비」의 `docker run`과 `.env.example`이 같다. `DB_PORT`는 정수 `1~65535` |
