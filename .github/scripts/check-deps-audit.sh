@@ -47,7 +47,8 @@ audit_npm() { # 서비스
   local service=$1 lock="$1/package-lock.json" ignored json advisories id severity name title n
   ignored=$(exceptions "$service")
   # 취약점이 있으면 종료 코드가 0이 아니므로 종료 코드 대신 결과 JSON으로 판정한다.
-  json=$(cd "$service" && npm audit --package-lock-only --json) || true
+  # NODE_ENV=production이나 npm 설정 omit=dev가 있어도 개발 의존성을 빼지 않도록 --include=dev를 준다.
+  json=$(cd "$service" && npm audit --package-lock-only --include=dev --json) || true
   if ! jq -e '.metadata.vulnerabilities' > /dev/null 2>&1 <<< "$json"; then
     fail "$lock" 'npm audit 결과를 받지 못했다. 다시 실행하고, 계속되면 로그의 npm 오류를 확인한다.' \
       "$service" '-' '-' '-' 'npm audit 결과 없음'
