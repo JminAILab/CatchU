@@ -18,6 +18,7 @@ NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 
 | 없음·열람 불가 | 404 | RESOURCE_UNAVAILABLE, LINK_UNAVAILABLE |
 | 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED |
 | 수신자 비밀번호 시도 제한 | 429 | LINK_UNLOCK_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds })`) |
+| 회원 링크 발급 빈도 제한 | 429 | RATE_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('RATE_LIMITED', { retryAfterSeconds })`) |
 | 서버 오류 | 500 | INTERNAL_ERROR |
 
 기능에서는 `src/common/errors`의 `ApiError`를 던진다. HTTP 상태는 코드에 따라 정해진다.

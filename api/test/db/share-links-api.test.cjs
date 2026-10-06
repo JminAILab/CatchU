@@ -1,6 +1,7 @@
 require('reflect-metadata');
 const assert = require('node:assert/strict');
-const { randomBytes } = require('node:crypto');
+const crypto = require('node:crypto');
+const { randomBytes } = crypto;
 const { after, before, beforeEach, test } = require('node:test');
 const { NestFactory } = require('@nestjs/core');
 const { SignJWT } = require('jose');
@@ -59,7 +60,10 @@ async function create(token, key, body) {
   const response = await fetch(`${url}/v1/share-links`, {
     method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body), signal: AbortSignal.timeout(10000),
   });
-  return { status: response.status, cacheControl: response.headers.get('cache-control'), body: await response.json() };
+  return {
+    status: response.status, cacheControl: response.headers.get('cache-control'), retryAfter: response.headers.get('retry-after'),
+    body: await response.json(),
+  };
 }
 const count = async (table) => Number((await db.query(`SELECT count(*) AS n FROM ${table}`))[0].n);
 const expectError = (result, status, code) => {
@@ -234,4 +238,54 @@ test('같은 키 재요청에서 기록과 링크가 어긋나면 409가 아니�
   await db.query('UPDATE share_link SET password_protection_reference = NULL');
   expectError(await create(token, 'key-broken', { title: '어긋난 기록', password: PASSWORD }), 500, 'INTERNAL_ERROR');
   assert.equal(await count('share_link'), 1);
+});
+
+/** 링크 비밀번호 해시(scrypt) 호출 수를 센다. 빌드된 link-password.js는 호출할 때마다 crypto.scrypt를 찾는다. */
+async function countHashes(t, work) {
+  const original = crypto.scrypt;
+  let calls = 0;
+  crypto.scrypt = (...args) => { calls += 1; return original(...args); };
+  t.after(() => { crypto.scrypt = original; });
+  try {
+    await work();
+  } finally {
+    crypto.scrypt = original;
+  }
+  return calls;
+}
+
+test('같은 회원의 발급 요청이 1분에 10번을 넘으면 해시 전에 429 RATE_LIMITED와 Retry-After로 거부하고 아무것도 저장하지 않는다(#219)', async (t) => {
+  const token = await login();
+  // 한도(5개)를 넘는 6~10번째도 한도 판정 전에 해시를 계산하므로 빈도로 센다.
+  const hashedBefore = await countHashes(t, async () => {
+    for (let i = 1; i <= 10; i++) {
+      const result = await create(token, `rate-${i}`, { title: `빈도 ${i}`, password: PASSWORD });
+      assert.equal(result.status, i <= 5 ? 201 : 409, JSON.stringify(result.body));
+    }
+  });
+  assert.equal(hashedBefore, 10, '상한 안의 요청은 요청마다 해시를 계산한다');
+  const links = await count('share_link');
+  const records = await count('idempotency_record');
+
+  let limited;
+  let replayed;
+  const hashedAfter = await countHashes(t, async () => {
+    limited = await create(token, 'rate-11', { title: '빈도 11', password: PASSWORD });
+    replayed = await create(token, 'rate-1', { title: '빈도 1', password: PASSWORD });
+  });
+  for (const result of [limited, replayed]) {
+    expectError(result, 429, 'RATE_LIMITED');
+    assert.equal(result.body.message, '요청이 많아 잠시 뒤에 다시 시도할 수 있습니다.');
+    assert.equal(result.body.details, undefined);
+    const retryAfter = Number(result.retryAfter);
+    assert.ok(Number.isInteger(retryAfter) && retryAfter >= 1 && retryAfter <= 60, `Retry-After ${result.retryAfter}`);
+  }
+  assert.equal(hashedAfter, 0, '거부한 요청은 비밀번호 해시를 계산하지 않는다');
+  assert.equal(await count('share_link'), links);
+  assert.equal(await count('idempotency_record'), records, '거부한 요청은 멱등 기록을 남기지 않아 같은 키로 다시 보낼 수 있다');
+  assert.equal(Number((await db.query("SELECT count(*) AS n FROM idempotency_record WHERE key = 'rate-11'"))[0].n), 0);
+
+  // 다른 회원은 따로 센다.
+  const other = await create(await login('share-link-member-b'), 'rate-other', { title: '다른 회원', password: PASSWORD });
+  assert.equal(other.status, 201, JSON.stringify(other.body));
 });
