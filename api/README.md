@@ -218,7 +218,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 [api 코딩 규약](CONVENTIONS.md#트랜잭션-규약)에 있다.
 
-### B Catch 등록 저장 — #105
+## B Catch 등록 저장 — #105
 
 [Catch 등록 안내](docs/catch-registration-proposal.md)에서 저장 규칙, E 연결 조건, DB 적용·검사 방법을 확인한다.
 

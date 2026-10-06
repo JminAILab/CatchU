@@ -45,7 +45,7 @@ E 수신 테이블이 없으면 제품 마이그레이션은 실패하며 테스
 판단이 없거나 유효하지 않으면 `CATCH_NOT_READY`로 전체 반영을 거부한다.
 
 [10/4 팀장 조건](https://github.com/JminAILab/CatchU/issues/105#issuecomment-5975854918)에 따라
-**실제 LIVE 연결 때 근거 URL을 연결된 GitHub 저장소와 대조한다.**
+**실제 LIVE 연결 때 근거 URL을 연결된 GitHub 저장소와 대조하고, 다른 출처는 거부한다.**
 MOCK는 이 대조 대상에서 제외한다.
 현재 B 준비 함수의 URL 형식 검사만으로 실제 출처 일치가 확인됐다고 판단하지 않는다.
 
