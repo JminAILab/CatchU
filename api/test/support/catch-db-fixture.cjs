@@ -42,14 +42,18 @@ function candidate(candidateId = 'synthetic-candidate-1', workIdentity = 'synthe
   };
 }
 
-/** 실제 회원·분석 기반을 적용한다. E 수신 기록만 아직 구현되지 않은 명시적 SQL 시험 대역이다. */
+/** 실제 회원·분석·공유 링크 기반을 적용한다. E 수신 기록만 명시적 SQL 시험 대역이다. */
 async function createUpstreamTables(dataSource) {
   const { assertTestDatabaseName } = require('./test-database.cjs');
   const { DataSource } = require('typeorm');
   const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
+  const { CreateShareLink1790745895865 } = require('../../dist/database/migrations/1790745895865-CreateShareLink');
   assertTestDatabaseName(dataSource.options.database);
   // 공통 npm test가 이어서 runMigrations해도 기반을 중복 생성하지 않도록 이력도 남긴다.
-  const foundation = new DataSource({ ...dataSource.options, migrations: [CreateMemberAnalysisFoundation1790500000000] });
+  const foundation = new DataSource({
+    ...dataSource.options,
+    migrations: [CreateMemberAnalysisFoundation1790500000000, CreateShareLink1790745895865],
+  });
   try {
     await foundation.initialize();
     await foundation.runMigrations();
@@ -96,11 +100,12 @@ async function createCatchDbFixture(config) {
     const { RepositoryProtectionEntity } = require('../../dist/catches/entities/repository-protection.entity');
     const { MemberAccount, MemberProfile, GitHubConnection, AnalysisRequest, AnalysisConsent,
       AnalysisAttempt, IdempotencyRecord } = require('../../dist/member-analysis/member-analysis.entity');
+    const { ShareLink } = require('../../dist/share-links/share-link.entity');
     const { SnakeNamingStrategy } = require('../../dist/database/snake-naming.strategy');
     dataSource = new DataSource({
       ...config, schema, namingStrategy: new SnakeNamingStrategy(),
       entities: [MemberAccount, MemberProfile, GitHubConnection, AnalysisRequest, AnalysisConsent,
-        AnalysisAttempt, IdempotencyRecord, CatchAssetEntity, CatchEvidenceEntity,
+        AnalysisAttempt, IdempotencyRecord, ShareLink, CatchAssetEntity, CatchEvidenceEntity,
         CandidateRegistrationEntity, RepositoryProtectionEntity],
       // 되돌리기 검사는 B 마이그레이션만 취소하여 실제 선행 테이블의 보존을 확인한다.
       migrations: [CreateCatchAssets1790600000000, CreateRepositoryProtection1790601000000],
