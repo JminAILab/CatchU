@@ -65,20 +65,29 @@ test('정상 0건은 빈 배열 성공이고, 계약과 다른 항목·같은 �
   assert.equal((await endless.api.repositories()).kind, 'lookup-failed');
   assert.equal(endless.calls.length, MAX_PAGES);
 
+  // MAX_PAGES번째 페이지에서 끝나면 정상이다(넘을 때만 조회 실패).
+  let m = 0;
+  const lastAllowed = fakeTransport({ '/me/repositories': () => ok({ items: [], page: { nextCursor: (m += 1) < MAX_PAGES ? `p${m}` : null } }) });
+  assert.equal((await lastAllowed.api.repositories()).kind, 'success');
+  assert.equal(lastAllowed.calls.length, MAX_PAGES);
+
   const thrown = createRepositoryApi(async () => { throw new TypeError('network'); });
   assert.deepEqual(await thrown.analyses(), { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' });
 });
 
-test('저장소별 최신 요청은 submittedAt이 늦은 것, 같으면 updatedAt이 늦은 것이다', () => {
+test('저장소별 최신 요청은 submittedAt이 늦은 것, 같으면 updatedAt이 늦은 것, 둘 다 같으면 먼저 받은 것이다', () => {
   const items = [
     summary({ requestId: 'old', submittedAt: '2026-09-29T00:00:00Z' }),
     summary({ requestId: 'new', submittedAt: '2026-09-30T00:00:00Z', updatedAt: '2026-09-30T00:00:00Z' }),
     summary({ requestId: 'new-updated', submittedAt: '2026-09-30T00:00:00Z', updatedAt: '2026-09-30T02:00:00Z' }),
     summary({ requestId: 'other', repositoryId: 'repo-2' }),
+    summary({ requestId: 'tie-first', repositoryId: 'repo-3', submittedAt: '2026-09-30T00:00:00Z', updatedAt: '2026-09-30T01:00:00Z' }),
+    summary({ requestId: 'tie-second', repositoryId: 'repo-3', submittedAt: '2026-09-30T00:00:00Z', updatedAt: '2026-09-30T01:00:00Z' }),
   ];
   const latest = latestByRepository(items);
   assert.equal(latest.get('repo-1').requestId, 'new-updated');
   assert.equal(latest.get('repo-2').requestId, 'other');
+  assert.equal(latest.get('repo-3').requestId, 'tie-first');
 });
 
 test('연결된 저장소는 분석 이력이 있는 저장소이며, 이름은 선정 목록과 식별자로 합치고 없으면 null이다', () => {

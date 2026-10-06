@@ -24,8 +24,8 @@ export type ConnectedRepository = {
 const time = (value: string) => Date.parse(value);
 
 /**
- * 저장소별 최신 요청 하나를 고른다. [제안] submittedAt이 가장 늦은 요청, 같으면 updatedAt이 늦은 요청.
- * 정렬 기준은 E 담당 확인 대기(#153 확인 요청 3).
+ * 저장소별 최신 요청 하나를 고른다. submittedAt이 가장 늦은 요청, 같으면 updatedAt이 늦은 요청, 둘 다 같으면 먼저 받은 요청을 유지한다.
+ * 기준은 E 담당 확인(#187 리뷰, 2026-10-06).
  */
 export function latestByRepository(analyses: readonly AnalysisSummary[]): Map<string, AnalysisSummary> {
   const latest = new Map<string, AnalysisSummary>();
