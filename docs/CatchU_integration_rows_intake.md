@@ -20,7 +20,7 @@
 | IV-07 | 실패와 사용자 재요청 · [`failed`][k68] | 쓸 수 있는 후보 없이 실패한 결과 → 실패로 끝나고, 서버가 허용할 때만 사용자가 다시 요청할 수 있다. 다시 요청하면 새 동의로 새 요청을 만들고 기존 자료·링크는 그대로다. 허용되지 않는 재요청은 원래 요청 번호를 빼고 보내도 거절된다 | [FR1.4][r57] · [명세 L74-75][c74] · [api F8][f43] | E(팀원 2) / F(팀원 1)·D(팀원 3) | [#103][i103] · [#138][i138] · [#139][i139] · [#140][i140] | M1-API · 합성 | 미실행 |
 | IV-08 | 식별 불가 · [`unidentifiable`][k87] | 결과·요청·시도 번호 중 하나라도 없거나 비어 있는 결과 → 수신 확인 없이 거절만 기록한다. 번호를 추정해 채우지 않고 기존 요청은 그대로다 | [명세 L161][c161] · [api F3][f37] · [worker 연결 확인][wk] | E(팀원 2) / F(팀원 1) | [#103][i103] · [#139][i139] | M1-API · 합성 | 미실행 |
 | IV-09 | 형식·맥락·시도 불일치 | 번호는 있지만 형식이 틀렸거나, 다른 회원·저장소·동의의 결과이거나, 이미 끝난 시도의 결과 → 거절하고 기존 자료를 지킨다. 입력은 #103 세트에 파일이 없어 [#103 안내][k74]대로 만든다 | [명세 L90][c90] · [명세 L161][c161] · [Receipt 스키마][wm142] | E(팀원 2) / F(팀원 1) | [#103][i103] · [#139][i139] | M1-API · 합성 | 미실행 |
-| IV-10 | 진행 알림 · [`progress-events`][k187] | '실행 중'·'실행 여부 모름' 알림 → 진행 상태만 바뀐다. '실행 여부 모름'은 시간이 지나도 저절로 실패가 되지 않고, 끝난 것으로 처리되지도 않는다 | [FR1.4][r57] · [명세 L60][c60] · [명세 L68][c68] · [api F3-P][f38] · [api 상태 전이][f52] · [api 종료 조건][f57] | E(팀원 2) / F(팀원 1) | [#103][i103] · [#139][i139] | M1-API · 합성. 진행·실패 알림을 보내는 방식과 실행 여부를 모를 때의 판단은 [#77][i77] 뒤 결정([#23 기록][i23c0928]) | 미실행 |
+| IV-10 | 진행 알림과 처리 시한 · [`progress-events`][k187] | '실행 중'·'실행 여부 모름' 알림 → 진행 상태만 바뀌고, 끝난 것으로 처리되지 않는다. 이미 '실행 중'이면 '실행 여부 모름'이 와도 '실행 중'으로 남는다. 접수 후 처리 시한(60분)이 지나도 끝나지 않으면 서버가 실패로 닫고, 사용자는 다시 요청할 수 있다(계약 PR 병합 뒤 적용, [#237][i237]) | [FR1.4][r57] · [명세 L60][c60] · [명세 L68][c68] · [api F3-P][f38] · [api 상태 전이][f52] · [api 종료 조건][f57] · [#23 결정][i23c1006] | E(팀원 2) / F(팀원 1) | [#103][i103] · [#139][i139] · [#237][i237] | M1-API · 합성, 시한 닫기는 시각 제어. 지금 계약(명세 L60·L68)은 시간 경과로 실패를 확정하지 않아 계약 PR이 먼저다 | 미실행 |
 | IV-11 | 늦은 진행 이벤트 | 결과가 끝난 뒤에 '실행 중' 알림이 늦게 도착 → 끝난 상태가 되돌아가지 않는다. 결과가 알림보다 먼저 와도 받는다. 입력은 #103 세트에 파일이 없어 [#103 안내][k74]대로 만든다 | [NFR4][r119] · [명세 L156][c156] · [api 상태 전이][f52] | E(팀원 2) / F(팀원 1) | [#103][i103] · [#139][i139] | M1-API · 합성 | 미실행 |
 | IV-12 | 같은 결과 재전달 · [`redelivery`][k106] | 같은 결과가 한 번 더 도착 → '이미 받음'으로 답하고 Catch가 늘거나 바뀌지 않는다 | [FR1.4][r57] · [NFR4][r119] · [명세 L86][c86] · [api 동시성][f73] | E(팀원 2)·B(팀원 4) / F(팀원 1) | [#103][i103] · [#139][i139] · [#105][i105] | M1-API · 합성 | 미실행 |
 | IV-13 | 같은 ID의 다른 내용 · [`same-id-different-content`][k137] | 같은 번호인데 내용이 다른 결과 → 거절하고 기존 결과·Catch를 지킨다 | [NFR4][r119] · [명세 L86][c86] · [명세 L90][c90] · [ERD 수신 기록][e194] | E(팀원 2) / F(팀원 1)·B(팀원 4) | [#103][i103] · [#139][i139] | M1-API · 합성 | 미실행 |
@@ -32,8 +32,8 @@
 | IV-14 | 정상 등록과 반영 완료 | IV-04의 결과 → 비공개 Catch·근거 등록과 '반영 완료·본인 열람 준비' 기록이 한꺼번에 저장되고, 본인이 조회할 수 있다 | [FR2.1][r66] · [FR2.2][r67] · [FR3.5][r76] · [명세 E↔B][c82] · [api F4][f39] | B(팀원 4)·E(팀원 2) / F(팀원 1) | [#86][i86] · [#103][i103] · [#104][i104] · [#105][i105] · [#130][i130] · [#139][i139] | M1-API · 합성, 테스트 DB 실제 저장 | 미실행 |
 | IV-15 | 두 후보가 같은 작업 · [`two-candidates-same-work`][k168] | 같은 작업으로 판정된 두 후보 → Catch는 하나만 생기고 두 후보가 모두 그 Catch를 가리킨다. 기존 Catch 내용·공개 여부는 바뀌지 않는다. 초안이 없는 후보도 그 이유로 빠지지 않는다 | [NFR4][r119] · [명세 L72][c72] · [명세 L86][c86] · [명세 L92][c92] · [api 동시성][f74] · [api 등록 목록][f61] · [ERD 유일성][e119] | B(팀원 4) / E(팀원 2)·F(팀원 1) | [#103][i103] · [#105][i105] | M1-API · 알려진 합성 작업 식별값으로 대신함. 실제 판별은 [#111][i111]·[#118][i118] | 미실행 |
 | IV-16 | 다른 작업의 근거 일부 중첩 | 근거 일부가 겹치지만 다른 작업인 두 후보 → Catch가 따로 둘 생긴다 | [명세 L92][c92] · [api 동시성][f74] · [ERD 근거][e138] | B(팀원 4) / F(팀원 1) | [#105][i105] · [PR #143][p143] | M1-API · B 자체 테스트 값(#103 공용 세트 밖, [PR #143 검사][p143test]) | 미실행 |
-| IV-17 | 반영 실패 | 등록 저장 중 실패 → Catch·근거가 일부만 남지 않고 '반영 실패'로 기록되며, 받은 결과 기록은 남는다. 새 분석은 돌지 않는다. 후보 하나라도 저장할 수 없으면 전체를 저장하지 않는다 | [NFR4][r119] · [명세 L69][c69] · [api F4][f39] · [api 동시성][f75] · [PR #143 팀장 댓글][p143c] | B(팀원 4)·E(팀원 2) / F(팀원 1) | [#105][i105] · [#139][i139] · [PR #143][p143] | M1-API · 합성, 실패는 테스트에서 강제 | 미실행 |
-| IV-18 | 반영 복구 | 같은 결과로 반영을 다시 시도 → Catch 중복 없이 반영이 끝나고 분석을 다시 돌리지 않는다. 다시 해도 계속 실패하는 경우는 미결 9 | [NFR4][r119] · [명세 L69][c69] · [api 상태 전이][f56] · [api 동시성][f75] | E(팀원 2)·B(팀원 4) / F(팀원 1) | [#105][i105] · [#139][i139] | M1-API · 합성, 실제 결과 보존·재전달(미결 4)은 확인 안 함 | 미실행 |
+| IV-17 | 반영 실패 | 등록 저장 중 실패 → Catch·근거가 일부만 남지 않고 '반영 실패'로 기록되며, 받은 결과 기록은 남는다. 새 분석은 돌지 않는다. 후보 하나라도 저장할 수 없으면 전체를 저장하지 않는다. 반영에 실패한 요청은 처리 시한을 기다리지 않고 닫힌다(계약 PR 병합 뒤 적용, [#237][i237]). 닫힌 뒤 재요청은 IV-18 | [NFR4][r119] · [명세 L69][c69] · [api F4][f39] · [api 동시성][f75] · [PR #143 팀장 댓글][p143c] · [#23 결정][i23c1006] | B(팀원 4)·E(팀원 2) / F(팀원 1) | [#105][i105] · [#139][i139] · [PR #143][p143] · [#237][i237] | M1-API · 합성, 실패는 테스트에서 강제 | 미실행 |
+| IV-18 | 반영 실패로 닫힌 뒤 재요청 | 반영 실패로 닫혀 등록된 Catch가 0건인 요청에서 다시 요청 → 새 동의·새 요청으로 접수되고, 기존 자료·링크는 그대로다. 같은 결과로 반영을 다시 시도하는 복구는 없다(미결 9, 계약 PR 병합 뒤 적용, [#237][i237]) | [FR1.4][r57] · [명세 L74-75][c74] · [api F8][f43] · [#23 결정][i23c1006] | E(팀원 2) / B(팀원 4) | [#105][i105] · [#138][i138] · [#140][i140] · [#237][i237] | M1-API · 합성, 반영 실패는 테스트에서 강제. 지금 계약(명세 L74-75)은 이 재요청을 막아 계약 PR이 먼저다 | 미실행 |
 | IV-19 | 커밋 뒤 응답·확인 유실 | 등록은 저장됐는데 응답을 잃어 다시 시도 → 새로 만들지 않고 같은 Catch를 돌려준다 | [api F4][f39] · [api 동시성][f76] · [ERD 등록 연결][e205] | B(팀원 4)·E(팀원 2) / F(팀원 1) | [#105][i105] · [#139][i139] | M1-API · 합성 | 미실행 |
 
 ### 라. 상태와 본인 조회
@@ -46,8 +46,7 @@
 | IV-23 | 타인·없는 자원과 인증 오류 | 다른 사람 것이나 없는 것을 보거나 바꾸려 함 → 둘 다 똑같이 '볼 수 없음'으로 답해 있는지조차 숨기고, 아무것도 바꾸지 않는다. 로그인이 없거나 만료되면 로그인 오류로 답한다 | [FR3.5][r76] · [NFR1][r116] · [명세 L48][c48] · [명세 인증 오류][c124] · [명세 오류 표][c127] | E(팀원 2)·B(팀원 4) / C·D(팀원 3) | [#87][i87] · [#88][i88] · [#130][i130] · [#131][i131] · [#140][i140] · [#165][i165] | M1-API·M1-화면 · 합성 | 미실행 |
 | IV-24 | 본인 결과 진입 화면 | 분석 상태 화면 → 등록된 Catch가 준비됐을 때만 결과로 들어간다. 분석이 끝났다는 것만으로 결과 버튼을 열지 않고, 반영 실패를 분석 실패로 안내하지 않으며, 서버가 허용할 때만 재요청 버튼을 보인다 | [FR1.4][r57] · [명세 L63-64][c63] · [web W3][w13] · [web 상태 전이][w57] | D(팀원 3)·B(팀원 4) / E(팀원 2) | [#106][i106] · [#140][i140] · [#153][i153] · [#154][i154] · 미등록 2 | M1-화면 · 합성, 초기 준비는 API 응답 대역 가능 | 미실행 |
 
-[i23c0928]: https://github.com/JminAILab/CatchU/issues/23#issuecomment-5869226609
-[i77]: https://github.com/JminAILab/CatchU/issues/77
+[i23c1006]: https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296
 [i86]: https://github.com/JminAILab/CatchU/issues/86
 [i87]: https://github.com/JminAILab/CatchU/issues/87
 [i88]: https://github.com/JminAILab/CatchU/issues/88
@@ -66,6 +65,7 @@
 [i153]: https://github.com/JminAILab/CatchU/issues/153
 [i154]: https://github.com/JminAILab/CatchU/issues/154
 [i165]: https://github.com/JminAILab/CatchU/issues/165
+[i237]: https://github.com/JminAILab/CatchU/issues/237
 [p143]: https://github.com/JminAILab/CatchU/pull/143
 [p143c]: https://github.com/JminAILab/CatchU/pull/143#issuecomment-5865277945
 [p143test]: https://github.com/JminAILab/CatchU/blob/a56bf14181fd812d686cbc2d7ce6b0ee6ccb46db/api/test/catches/registration-batch.test.cjs#L65
@@ -116,7 +116,6 @@
 [f39]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#L39
 [f43]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#L43
 [f52]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#L52-L54
-[f56]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#L56-L57
 [f61]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#L61-L63
 [f71]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#L71-L72
 [f73]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#L73

@@ -100,6 +100,8 @@ Windows PowerShell에서는 `curl.exe -i http://127.0.0.1:8000/health`를 사용
 3. **생성**: 생성기를 한 번 부른다. 생성기가 실행 여부를 확인하지 못했거나(상태 조회 오류) 시간이 초과되면 `UNCERTAIN`만 알리고 결과를 만들지 않는다. 실패로 확정하지 않고 다시 생성하지도 않는다. 이 `UNCERTAIN`은 항상 `RUNNING` 뒤에 가고, E의 [상태 전이 정본](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본)에는 `RUNNING`에서 `UNCERTAIN`으로 가는 전이가 없으므로 E의 처리 상태는 `RUNNING`으로 남는다.
 4. **결과 조합**: 요청의 식별자·맥락을 그대로 옮긴다. 종결값은 후보와 실패의 수로 정한다(후보만 있으면 SUCCEEDED, 둘 다 없으면 EMPTY, 둘 다 있으면 PARTIAL_FAILED, 실패만 있으면 FAILED). 근거 부족·기준 미달은 `notProvided`, 수집·생성 오류는 `failures`에 넣는다. 초안·질문을 만들지 못해도 후보는 남기고 초안 본문은 `null`, 실패는 `failures`에 넣는다. 제목을 만들지 못하면 `workFacts` 첫 항목을 제목으로 쓴다.
 
+1번 거부나 3번 실행 불명으로 E에 남은 요청은 E의 처리 시한(접수 후 60분)이 지나면 처리 `FAILED`로 닫힌다. worker는 이 요청을 다시 처리하지 않는다. 이 닫기는 처리 시한 계약 PR이 병합된 뒤 적용되며, 구현은 [#237](https://github.com/JminAILab/CatchU/issues/237)이다([10/6 팀장 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)).
+
 `credentialContextReference`는 형식만 확인해 넘긴다. 이 값이 있다고 요청을 받아들이지 않으며, 해석과 대조는 수집 모듈이 첫 GitHub 호출 전에 한다([허용 GitHub 자료 수집과 근거 정규화](#허용-github-자료-수집과-근거-정규화)).
 
 ### 개발용 실행
@@ -134,7 +136,7 @@ uv run --locked python -m app.processing succeeded-one-candidate
 | 허용 GitHub 자료 수집의 실제 연결(A 자격정보 제공·실제 환경 통제 검사). 수집 모듈은 합성 검사까지 | [#117](https://github.com/JminAILab/CatchU/issues/117) · [#133](https://github.com/JminAILab/CatchU/issues/133) · [#37](https://github.com/JminAILab/CatchU/issues/37) |
 | 후보 묶음·본인 기여 확인·작업 동일성 판별 | [#111](https://github.com/JminAILab/CatchU/issues/111) · [#118](https://github.com/JminAILab/CatchU/issues/118) |
 | 초안·질문 생성과 서비스 LLM | [#119](https://github.com/JminAILab/CatchU/issues/119) · [#120](https://github.com/JminAILab/CatchU/issues/120) |
-| 요청 수신·진행 알림 전달·결과 보존과 재전달, 실제 전송 | [#121](https://github.com/JminAILab/CatchU/issues/121) · [#77](https://github.com/JminAILab/CatchU/issues/77) |
+| 요청 수신, 진행 알림과 결과의 실제 전송 | [#121](https://github.com/JminAILab/CatchU/issues/121) · [#233](https://github.com/JminAILab/CatchU/issues/233)(api 쪽) · [#77](https://github.com/JminAILab/CatchU/issues/77) |
 | E 수신·개발용 주입, B 등록 | [#139](https://github.com/JminAILab/CatchU/issues/139) · [#105](https://github.com/JminAILab/CatchU/issues/105) |
 
 ## 허용 GitHub 자료 수집과 근거 정규화
@@ -223,4 +225,4 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `.python-version` | 로컬에서 사용할 Python 버전 |
 | `.env.example` | 필요한 환경변수 안내. 현재는 없음 |
 
-앱 코드는 `app/`, 그 동작을 확인하는 테스트는 `tests/`에 추가한다. API 경로나 처리 로직이 늘어나면 관련 모듈로 나누고 `app/main.py`에서 연결한다. 큐 작업 수신·결과 전달은 [#77](https://github.com/JminAILab/CatchU/issues/77) 검증과 관련 계약을 확인한 후 구현한다. `.venv/`와 검사 캐시는 커밋하지 않는다.
+앱 코드는 `app/`, 그 동작을 확인하는 테스트는 `tests/`에 추가한다. API 경로나 처리 로직이 늘어나면 관련 모듈로 나누고 `app/main.py`에서 연결한다. 큐 작업 수신·결과 전달은 [#77](https://github.com/JminAILab/CatchU/issues/77) 판정과 관련 계약에 따라 [#121](https://github.com/JminAILab/CatchU/issues/121)에서 구현한다. `.venv/`와 검사 캐시는 커밋하지 않는다.
