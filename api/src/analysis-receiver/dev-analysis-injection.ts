@@ -27,7 +27,7 @@ function fill(value: unknown, context: Record<string, string>): unknown {
 export class DevAnalysisInjection {
   constructor(
     private readonly store: ReceiverStore,
-    private readonly receiver: AnalysisReceiver,
+    private readonly receiver: Pick<AnalysisReceiver, 'receiveResult' | 'receiveProgress'>,
     private readonly config: DevInjectionConfig,
   ) {}
 
