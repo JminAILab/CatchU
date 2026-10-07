@@ -7,9 +7,17 @@ import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { ShareLinksModule } from './share-links/share-links.module';
 import { CatchesModule } from './catches/catches.module';
+import { MemberRepositoriesModule } from './member-repositories/member-repositories.module';
 
 @Module({
-  imports: [ErrorsModule, AuthModule, DatabaseModule, ShareLinksModule, CatchesModule],
+  imports: [
+    ErrorsModule,
+    AuthModule,
+    DatabaseModule,
+    ShareLinksModule,
+    CatchesModule,
+    MemberRepositoriesModule,
+  ],
   controllers: [HealthController],
   providers: [{ provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor }],
 })
