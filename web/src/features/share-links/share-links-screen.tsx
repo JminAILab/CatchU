@@ -81,12 +81,25 @@ function IssuePanel({ store }: { store: ShareLinksStore }) {
   const [showPassword, setShowPassword] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const activeCount = store.activeCount();
+  // 빈도 제한의 남은 초를 보여 주고, 시간이 지나면 [다시 발행]·[링크 발행]을 풀기 위해 1초마다 다시 그린다.
+  // 자동으로 다시 보내지는 않는다. 남은 시간이 0이 되면 다시 그리기를 멈춘다.
+  // 대기는 limited뿐 아니라 닫았다 연 새 작성·[새로 작성 계속] 화면에도 이어진다.
+  const [, setTick] = useState(0);
+  const waitSeconds = form.retryAt !== null ? store.retryWaitSeconds() : 0;
+  const limitedWaiting = waitSeconds > 0;
 
   useEffect(() => { titleRef.current?.focus(); }, []);
+  useEffect(() => {
+    if (!limitedWaiting) return;
+    const timer = setInterval(() => setTick((tick) => tick + 1), 1000);
+    return () => clearInterval(timer);
+  }, [limitedWaiting, form.retryAt]);
 
   if (form.phase === "issued" && form.issued) return <IssuedPanel store={store} link={form.issued} />;
 
   const locked = form.phase !== "editing";
+  // 결과를 모르는 요청을 붙잡은 상태: 응답 불명이거나, 결과를 모르는 시도가 있었던 빈도 제한. [새로 작성]은 안내를 거친다.
+  const holdingUnknown = form.phase === "unknown" || (form.phase === "limited" && form.uncertain);
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     void store.submit();
@@ -155,6 +168,11 @@ function IssuePanel({ store }: { store: ShareLinksStore }) {
         <p className={styles.help}>비밀번호는 발행 후 변경·해제할 수 없습니다. 유효기간은 발행 시점부터 30일로 고정입니다.</p>
 
         {form.phase === "submitting" && <p className={styles.progress} role="status">링크를 발행하는 중입니다.</p>}
+        {limitedWaiting && (
+          <p className={styles.help}>
+            {waitSeconds}초 뒤에 {form.phase === "limited" ? "[다시 발행]" : "[링크 발행]"}을 누를 수 있습니다.
+          </p>
+        )}
         {form.message && (
           <div className={form.message.tone === "error" ? styles.messageError : styles.message} role="alert">
             <span>{form.message.text}</span>
@@ -165,24 +183,29 @@ function IssuePanel({ store }: { store: ShareLinksStore }) {
         )}
 
         <div className={styles.actions}>
-          {form.phase === "unknown" && form.discardAsked ? (
+          {holdingUnknown && form.discardAsked ? (
             <>
               <button type="button" className={styles.secondary} onClick={store.closeForm}>목록에서 확인</button>
               <button type="button" className={styles.secondary} onClick={store.cancelDiscard}>취소</button>
               <button type="button" className={styles.primary} onClick={store.discardPending}>새로 작성 계속</button>
             </>
-          ) : form.phase === "unknown" ? (
+          ) : holdingUnknown ? (
             <>
               <button type="button" className={styles.secondary} onClick={store.closeForm}>목록에서 확인</button>
               <button type="button" className={styles.secondary} onClick={store.askDiscard}>새로 작성</button>
-              <button type="button" className={styles.primary} onClick={() => void store.resend()}>다시 발행</button>
+              <button type="button" className={styles.primary} onClick={() => void store.resend()} disabled={!store.canResend()}>다시 발행</button>
+            </>
+          ) : form.phase === "limited" ? (
+            <>
+              <button type="button" className={styles.secondary} onClick={store.closeForm}>돌아가기</button>
+              <button type="button" className={styles.primary} onClick={() => void store.resend()} disabled={!store.canResend()}>다시 발행</button>
             </>
           ) : (
             <>
               <button type="button" className={styles.secondary} onClick={store.closeForm} disabled={form.phase === "submitting"}>
                 돌아가기
               </button>
-              <button type="submit" className={styles.primary} disabled={form.phase === "submitting"}>
+              <button type="submit" className={styles.primary} disabled={form.phase === "submitting" || !store.canSubmit()}>
                 링크 발행
               </button>
             </>

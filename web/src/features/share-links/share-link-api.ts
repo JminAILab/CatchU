@@ -1,3 +1,4 @@
+import type { ClientApiFailure } from "../../lib/api-client.ts";
 import type { ApiResult } from "../../lib/api-response.ts";
 
 /**
@@ -29,9 +30,10 @@ export type MemberCall = (path: string, request?: {
   body?: unknown;
   idempotencyKey?: string;
   signal?: AbortSignal;
-}) => Promise<ApiResult>;
+}) => Promise<ApiResult | ClientApiFailure>;
 
-export type ShareLinkFailure = Exclude<ApiResult, { kind: "success" }>;
+/** 실패 결과. 429면 `Retry-After`의 남은 초가 `retryAfterSeconds`로 붙는다(공통 호출 함수, #235 계약). */
+export type ShareLinkFailure = Exclude<ApiResult, { kind: "success" }> | ClientApiFailure;
 export type ShareLinkResult<T> = { kind: "success"; status: number; data: T } | ShareLinkFailure;
 
 /** 목록 한 번에 받을 개수. 계약 기본값과 같다. */
@@ -74,7 +76,7 @@ export function createShareLinkApi(member: MemberCall) {
     statuses: readonly number[],
     read: (data: unknown) => T | null,
   ): Promise<ShareLinkResult<T>> {
-    let result: ApiResult;
+    let result: ApiResult | ClientApiFailure;
     try {
       result = await member(path, request);
     } catch {
