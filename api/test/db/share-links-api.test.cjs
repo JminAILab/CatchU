@@ -352,3 +352,20 @@ test('같은 회원의 발급 요청이 1분에 10번을 넘으면 해시 전에
   const other = await create(await login('share-link-member-b'), 'rate-other', { title: '다른 회원', password: PASSWORD });
   assert.equal(other.status, 201, JSON.stringify(other.body));
 });
+
+test('입력 오류(400)도 발급 빈도로 센다: 같은 회원이 잘못된 본문을 10번 보낸 뒤에는 맞는 요청도 해시 전에 429다(#219)', async (t) => {
+  // 빈도 판정은 입력 검사보다 먼저다(계약 #235). 그래서 입력 오류도 한 번으로 센다.
+  const token = await login();
+  for (let i = 1; i <= 10; i++) {
+    const result = await create(token, `invalid-rate-${i}`, { title: ' ' });
+    expectError(result, 400, 'VALIDATION_FAILED');
+  }
+  let limited;
+  const hashed = await countHashes(t, async () => {
+    limited = await create(token, 'valid-after-invalid', { title: '입력 오류 뒤', password: PASSWORD });
+  });
+  expectError(limited, 429, 'RATE_LIMITED');
+  assert.equal(hashed, 0, '빈도 상한으로 거부한 요청은 해시를 계산하지 않는다');
+  assert.equal(await count('share_link'), 0);
+  assert.equal(await count('idempotency_record'), 0);
+});
