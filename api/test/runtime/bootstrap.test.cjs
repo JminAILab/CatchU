@@ -143,8 +143,9 @@ for (const [label, file, expected] of [
   ['DB 비밀번호 누락', { DB_PASSWORD: undefined }, 'DB_PASSWORD'],
   ['바인딩 주소 형식 오류', { BIND_HOST: 'localhost' }, 'BIND_HOST'],
   // http 주소와 공유 URL 기본값(http)은 development·test에서만 받는다(#218).
-  ['production에서 공유 URL 주소가 http', { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'http://catchu.example' },
-    'SHARE_LINK_WEB_BASE_URL'],
+  // grant 서명 키(#150)는 합성 값을 줘서 공유 URL 주소만 실패 원인이 되게 한다.
+  ['production에서 공유 URL 주소가 http', { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'http://catchu.example',
+    LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' }, 'SHARE_LINK_WEB_BASE_URL'],
   ['NODE_ENV 미지정에 공유 URL 주소 없음', { NODE_ENV: undefined, SHARE_LINK_WEB_BASE_URL: undefined }, 'SHARE_LINK_WEB_BASE_URL'],
 ]) {
   test(`main: ${label}이면 기동하지 않고 실패 종료한다`, { timeout: 15000 }, async (t) => {
