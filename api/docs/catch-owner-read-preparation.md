@@ -20,7 +20,7 @@ AppModule에 CatchesModule을 등록했다. /v1, 공통 오류 응답, 성공/�
 - Catch의 repositoryId는 원 AnalysisRequest에서 읽는다. CatchAsset에 저장소 칼럼을 추가하지 않는다.
 - 커서는 catchId UUID 오름차순의 다음 위치다. 내부 ownerId와 필터 문맥의 해시를 포함하고 매 요청 같은 범위를 확인한다. 커서를 권한 증명으로 쓰지 않으며 SQL은 항상 본인으로 다시 제한한다. limit 변경은 허용한다.
 - 다른 회원의 Catch·없는 Catch는 똑같은 `404 RESOURCE_UNAVAILABLE`다. 계약상 ID는 비어 있지 않은 문자열이므로 저장 UUID에 해당하지 않는 Catch ID도 같은 404이며 SQL cast 오류로 노출하지 않는다.
-- 잘못된 커서·중복/추가 쿼리·허용 범위 밖 limit·잘못된 PUT 본문은 400이다. 인증이 없거나 잘못되면 공통 Guard가 401로 거부한다.
+- 잘못된 커서·중복/추가 쿼리·허용 범위 밖 limit·잘못된 PUT 본문은 400이다. 인증이 없거나 서명이 잘못되면 공통 Guard가 401로 거부한다. 서명이 유효해도 회원 ID가 UUID가 아니거나 같은 트랜잭션에서 회원 행을 찾지 못하면 `401 AUTH_INVALID`다. 회원 조회 자체의 DB 오류는 500으로 구분하며 빈 목록·자원 404로 바꾸지 않는다.
 - 본인 응답은 제목·사실·기여·근거·최소 질문과 원 결과/후보·생성 상태·MOCK/LIVE를 보존한다. 내부 ownerId·작업 키·등록 판단은 응답하지 않는다.
 - SOURCE_PRIVATE여도 본인은 응답을 받는다. 수신자 공개나 PUBLIC 설정을 바꾸는 기능은 아니다.
 - 조회·응답 매핑은 REPEATABLE READ 트랜잭션 안에서 수행한다. 연결 누락·DB 오류를 정상 빈 결과로 변환하지 않는다.

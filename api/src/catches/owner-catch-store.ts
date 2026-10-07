@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { ApiError } from '../common/errors';
 import { catchIdInput, confirmationInput, isUuid, mismatchInput, nextOwnerCatchCursor, ownerCatchQuery, visibilityInput } from './owner-catch-input';
 import { CatchReadIntegrityError, OwnerCatchResponse, toOwnerCatchPage, toOwnerCatchResponse } from './owner-catch-response';
-import { ApiError } from '../common/errors';
 import { READ_COLUMNS, READ_FROM, ReadRow, readCatchSources } from './catch-reader';
 
 @Injectable()
@@ -11,12 +11,14 @@ export class OwnerCatchStore {
 
   async list(memberId: string, input: unknown) {
     memberId = memberId.toLowerCase();
+    if (!isUuid(memberId)) throw new ApiError('AUTH_INVALID');
     const query = ownerCatchQuery(memberId, input);
-    // 공개 계약의 ID는 비어 있지 않은 문자열이다. UUID로 저장될 수 없는 ID는 일치 자료가 없다.
-    if (!isUuid(memberId) || (query.sourceRequestId !== undefined && !isUuid(query.sourceRequestId))) {
-      return { items: [], page: { nextCursor: null } };
-    }
     return this.dataSource.transaction('REPEATABLE READ', async (manager) => {
+      await this.assertMemberExists(manager, memberId);
+      // 공개 계약의 ID는 비어 있지 않은 문자열이다. UUID로 저장될 수 없는 ID는 일치 자료가 없다.
+      if (query.sourceRequestId !== undefined && !isUuid(query.sourceRequestId)) {
+        return { items: [], page: { nextCursor: null } };
+      }
       const values: unknown[] = [memberId];
       const conditions = ['c.owner_id = $1'];
       if (query.repositoryId !== undefined) {
@@ -44,9 +46,13 @@ export class OwnerCatchStore {
 
   async get(memberId: string, input: unknown): Promise<OwnerCatchResponse> {
     memberId = memberId.toLowerCase();
+    if (!isUuid(memberId)) throw new ApiError('AUTH_INVALID');
     const catchId = catchIdInput(input);
-    if (!isUuid(memberId) || !isUuid(catchId)) throw new NotFoundException();
-    return this.dataSource.transaction('REPEATABLE READ', (manager) => this.read(manager, memberId, catchId));
+    return this.dataSource.transaction('REPEATABLE READ', async (manager) => {
+      await this.assertMemberExists(manager, memberId);
+      if (!isUuid(catchId)) throw new NotFoundException();
+      return this.read(manager, memberId, catchId);
+    });
   }
 
   async confirm(memberId: string, input: unknown, body: unknown): Promise<OwnerCatchResponse> {
@@ -62,10 +68,12 @@ export class OwnerCatchStore {
   async setVisibility(memberId: string, input: unknown, body: unknown): Promise<OwnerCatchResponse> {
     const visibility = visibilityInput(body);
     memberId = memberId.toLowerCase();
+    if (!isUuid(memberId)) throw new ApiError('AUTH_INVALID');
     const catchId = catchIdInput(input);
-    if (!isUuid(memberId) || !isUuid(catchId)) throw new NotFoundException();
     // READ COMMITTED: 잠금 대기 중 확정된 보호 상태를 읽고 검사·저장까지 잠금을 유지한다.
     return this.dataSource.transaction('READ COMMITTED', async (manager) => {
+      await this.assertMemberExists(manager, memberId);
+      if (!isUuid(catchId)) throw new NotFoundException();
       const owned: { workFactsConfirmed: boolean; contributionConfirmed: boolean;
         requestMemberId: string | null; repositoryId: string | null }[] = await manager.query(`
         SELECT c.work_facts_confirmed AS "workFactsConfirmed", c.contribution_confirmed AS "contributionConfirmed",
@@ -100,8 +108,10 @@ export class OwnerCatchStore {
 
   private async update(memberId: string, catchId: string, assignment: string, values: unknown[]): Promise<OwnerCatchResponse> {
     memberId = memberId.toLowerCase();
-    if (!isUuid(memberId) || !isUuid(catchId)) throw new NotFoundException();
+    if (!isUuid(memberId)) throw new ApiError('AUTH_INVALID');
     return this.dataSource.transaction('REPEATABLE READ', async (manager) => {
+      await this.assertMemberExists(manager, memberId);
+      if (!isUuid(catchId)) throw new NotFoundException();
       const owned: { catch_id: string }[] = await manager.query(
         'SELECT catch_id FROM catch_asset WHERE owner_id = $1 AND catch_id = $2 FOR UPDATE', [memberId, catchId],
       );
@@ -111,6 +121,12 @@ export class OwnerCatchStore {
       // 근거·원 요청·보호 판단 조회/매핑 실패도 저장을 롤백한다.
       return this.read(manager, memberId, catchId);
     });
+  }
+
+  private async assertMemberExists(manager: EntityManager, memberId: string): Promise<void> {
+    // 조회·수정이 끝날 때까지 회원 삭제를 막고, 다른 DB 오류는 그대로 서버 오류로 둔다.
+    const member = await manager.query('SELECT 1 FROM member_account WHERE member_id = $1 FOR KEY SHARE', [memberId]);
+    if (member.length === 0) throw new ApiError('AUTH_INVALID');
   }
 
   private async read(manager: EntityManager, memberId: string, catchId: string): Promise<OwnerCatchResponse> {

@@ -343,6 +343,63 @@ describe('본인 Catch HTTP·PostgreSQL', {
     failure(await request(own.ownerId, '/catches'), 404, 'RESOURCE_UNAVAILABLE');
   });
 
+  for (const kind of ['legacy-sub', 'missing-member', 'deleted-member']) {
+    test('유효한 서명이어도 ' + kind + ' 토큰은 Catch 조회·변경을 401로 거부한다', async () => {
+      const own = await seed();
+      let memberId = kind === 'legacy-sub' ? 'synthetic-legacy-subject' : randomUUID();
+      if (kind === 'deleted-member') {
+        const login = success(await request(undefined, '/v1/auth/dev-login', {
+          method: 'POST', body: { memberId: 'synthetic-deleted-member' },
+        }));
+        memberId = await tokens.verify(login.accessToken);
+        issuedTokens.set(memberId, login.accessToken);
+        // 토큰 발급 뒤 회원을 실제로 삭제한다. 이 합성 회원에는 분석·Catch가 없다.
+        await db.transaction(async (manager) => {
+          await manager.query('DELETE FROM github_connection WHERE member_id = $1', [memberId]);
+          await manager.query('DELETE FROM member_profile WHERE member_id = $1', [memberId]);
+          await manager.query('DELETE FROM member_account WHERE member_id = $1', [memberId]);
+        });
+      }
+      const beforeState = await snapshot();
+      const calls = [
+        ['/v1/catches', {}],
+        [queryPath({ sourceRequestId: 'synthetic-unknown-request' }), {}],
+        ...[own.catchId, 'synthetic-not-a-uuid'].flatMap((catchId) => [
+          [detailPath(catchId), {}],
+          [confirmPath(catchId), { method: 'PUT', body: CONFIRMED }],
+          [mismatchPath(catchId), { method: 'PUT', body: { mismatch: true } }],
+          [visibilityPath(catchId), { method: 'PUT', body: { visibility: 'PUBLIC' } }],
+          [visibilityPath(catchId), { method: 'PUT', body: { visibility: 'PRIVATE' } }],
+        ]),
+      ];
+      for (const [path, options] of calls) {
+        const response = await request(memberId, path, options);
+        failure(response, 401, 'AUTH_INVALID');
+        assert.ok(!response.text.includes(memberId));
+        assert.ok(!response.text.includes(issuedTokens.get(memberId)));
+      }
+      assert.deepEqual(await snapshot(), beforeState);
+    });
+  }
+
+  test('회원 조회 DB 오류는 인증 거부나 빈 목록이 아닌 안전한 500으로 처리한다', async () => {
+    const own = await seed();
+    const beforeState = await snapshot();
+    await db.query('ALTER TABLE member_account RENAME TO member_account_unavailable');
+    try {
+      for (const [path, options] of [
+        ['/v1/catches', {}], [detailPath(own.catchId), {}],
+        [confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }],
+        [mismatchPath(own.catchId), { method: 'PUT', body: { mismatch: true } }],
+        [visibilityPath(own.catchId), { method: 'PUT', body: { visibility: 'PUBLIC' } }],
+        [visibilityPath(own.catchId), { method: 'PUT', body: { visibility: 'PRIVATE' } }],
+      ]) failure(await request(own.ownerId, path, options), 500, 'INTERNAL_ERROR');
+    } finally {
+      await db.query('ALTER TABLE member_account_unavailable RENAME TO member_account');
+    }
+    assert.deepEqual(await snapshot(), beforeState);
+  });
+
   test('타인·없는·UUID가 아닌 Catch는 같은 404이며 다른 회원 입력으로 우회하지 못한다', async () => {
     const own = await seed();
     const foreign = await seed();

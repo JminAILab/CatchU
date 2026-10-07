@@ -6,7 +6,7 @@
 
 `PUT /v1/catches/{catchId}/visibility`에 `{ "visibility": "PUBLIC" }` 또는 `{ "visibility": "PRIVATE" }`만 보낸다. 응답은 현재 본인용 Catch다. 회원 ID는 공통 인증 Guard가 공급하며 body/query로 받지 않는다.
 
-- 타인·없는 Catch는 공통 `404 RESOURCE_UNAVAILABLE`, 잘못된 본문·추가 키·쿼리는 `400 INVALID_REQUEST`다.
+- 서명된 토큰이라도 회원 ID가 UUID가 아니거나 회원이 없으면 `401 AUTH_INVALID`다. 같은 트랜잭션에서 회원을 먼저 조회·잠금하며, 회원 조회 DB 오류는 공통 500으로 전달한다. 정상 회원의 타인·없는 Catch는 공통 `404 RESOURCE_UNAVAILABLE`, 잘못된 본문·추가 키·쿼리는 `400 INVALID_REQUEST`다.
 - PUBLIC은 Catch 행을 잠그고 두 확인 항목이 true인지 검사한다. 미확인은 `409 CONFIRMATION_REQUIRED`다.
 - 같은 원 요청 저장소·소유자의 RepositoryProtection을 공유 잠금으로 읽는다. SOURCE_PRIVATE는 `409 SOURCE_RESTRICTED`, 보호 자료와 확인 상태·출처·시각 누락(SQL/JSON null 포함)·무결성 실패는 공통 500이다. 행 부재를 NONE으로 만들지 않는다. 이전 유효 관측에 최근 조회 실패만 추가된 경우는 기존 판단을 유지한다.
 - 보호 판단 잠금은 공개 저장과 응답 검사가 끝날 때까지 유지한다. READ COMMITTED로 잠금 대기 중 커밋된 보호 변경을 확인한다. 다른 트랜잭션의 원본 보호 갱신은 같은 행의 DB 잠금과 직렬화된다.
