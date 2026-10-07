@@ -8,7 +8,7 @@
 | `share-link-list.ts` | 목록 쿼리(`cursor`·`limit`) 검사와 소유자에 묶인 cursor |
 | `share-links.config.ts` | `SHARE_LINK_WEB_BASE_URL`([api README 「설치와 환경변수」](../README.md#설치와-환경변수)) |
 | `share-link-response.ts` | 응답 구성. 상태는 응답 시각으로 구하고, 토큰은 `url` 안에만 넣는다 |
-| `share-create.ts` | `ShareCreate` 입력 검증(제목만 trim), 발급 시각부터 정확히 30×24시간 만료 |
+| `share-create.ts` | `ShareCreate` 입력 검증(제목만 trim, 제목 1~50자·비밀번호 8~64자를 코드 포인트로 셈), 발급 시각부터 정확히 30×24시간 만료 |
 | `link-password.ts` | 비밀번호 검증값. Node 내장 `scrypt`(N=2^15, r=8, p=1), 16바이트 salt, 상수 시간 비교. 비밀번호는 trim·정규화하지 않는다. 깨진 저장값은 서버 오류 |
 | `link-token.ts` | 256비트 난수 토큰(base64url 43자)과 수신자 URL(`/s/<token>`) 조립 |
 | `share-create-fingerprint.ts` | 멱등 지문(제목 + 비밀번호 **설정 여부**)과 같은 키 재요청 비교 |
@@ -18,7 +18,7 @@
 
 ## 발급 처리 순서
 
-1. 토큰의 회원 ID가 UUID가 아니면(#104 이전 개발 토큰) `401 AUTH_INVALID`. `Idempotency-Key`가 없거나 1~128자가 아니면 `400 INVALID_REQUEST`, 본문이 계약과 다르면 `400 VALIDATION_FAILED`(`details.violations`의 reason은 `isObject`·`whitelistValidation`·`isString`·`isNotEmpty`). 알 수 없는 필드 이름은 응답에 반사하지 않고 `body` 한 건으로 알린다.
+1. 토큰의 회원 ID가 UUID가 아니면(#104 이전 개발 토큰) `401 AUTH_INVALID`. `Idempotency-Key`가 없거나 1~128자가 아니면 `400 INVALID_REQUEST`, 본문이 계약과 다르면 `400 VALIDATION_FAILED`(`details.violations`의 reason은 `isObject`·`whitelistValidation`·`isString`·`isNotEmpty`·`minLength`·`maxLength`). 길이는 아래 「비밀번호 길이」의 기준이며, trim 뒤 51자 이상 제목은 `title`의 `maxLength`, 8자 미만·64자 초과 비밀번호는 `password`의 `minLength`·`maxLength`다(#221). 빈 비밀번호는 지금처럼 `isNotEmpty`다. 알 수 없는 필드 이름은 응답에 반사하지 않고 `body` 한 건으로 알린다.
 2. 비밀번호 해시와 토큰은 잠금 시간을 줄이려고 트랜잭션 밖에서 미리 만든다.
 3. 한 READ COMMITTED 트랜잭션에서 회원 행을 `FOR KEY SHARE`로 확인하고(없으면 `401 AUTH_INVALID`, 다른 DB 오류는 500 그대로) #104의 `runIdempotentCreation`을 부른다. 잠금 순서는 **멱등 키 잠금 → 회원 단위 발급 잠금**이다.
    - 새 키: `issueShareLink`가 회원 단위 advisory lock을 잡고, 잠금을 얻은 **뒤의** 시각으로 유효 링크(중단 안 됨, 만료 전)를 모아 제목 중복(`LINK_TITLE_CONFLICT`)을 한도(`LINK_LIMIT_REACHED`, 5개)보다 먼저 판정한 뒤 저장한다(#23 9/28 결정).
@@ -47,7 +47,7 @@
 
 마이그레이션 `1790745895865-CreateShareLink`가 `share_link`와 두 외래 키를 만든다. #104(`1790500000000`) 뒤, B(`1790600000000`)와는 서로 참조하지 않는다.
 
-- `share_link`: 제목 1자 이상, `expires_at = issued_at + 720시간`, 중단 시각 ≥ 발급 시각, 토큰 유일, `owner_id` 인덱스.
+- `share_link`: 제목 1자 이상(50자 상한은 API 입력 검사에만 적용한다. DB 상한 제약·마이그레이션은 추가하지 않으므로 DB 직접 쓰기는 이 상한을 보장하지 않는다), `expires_at = issued_at + 720시간`, 중단 시각 ≥ 발급 시각, 토큰 유일, `owner_id` 인덱스.
 - `owner_id → member_account.member_id`.
 - `unique(link_id, owner_id)`와 `idempotency_record (link_id, member_id) → share_link (link_id, owner_id)`: 멱등 기록이 있는 링크를, 그리고 기록한 회원이 소유한 링크만 가리킨다. 분석 요청 기록은 `link_id`가 null이라 검사 대상이 아니다.
 - 기록이 가리키는 링크는 지울 수 없다. 되돌릴 때는 이 마이그레이션을 #104보다 먼저 되돌린다.
@@ -99,7 +99,7 @@ grant 형식·수명·보관·시도 제한은 [#150 9/29 결정](https://github
   - 성공은 링크 전체 실패 기록을 지우지 않는다. 한 수신자의 성공이 다른 주소에서 쌓인 실패를 지우지 않게 하기 위해서다.
   - 영향: URL을 가진 한 사람이 여러 주소로 N번 틀리면, 정상 수신자도 15분 동안 그 링크의 새 비밀번호 확인(unlock)이 차단될 수 있다. 이미 발급된 유효한 grant의 열람은 유지된다. 9/28 제안에서 링크 전체 차단을 피했던 이유이며, 10/4 보안 의견에 따라 이 위험을 받아들인다. 정상 수신자끼리의 실패로도 걸릴 수 있다(예: 구직자가 비밀번호를 잘못 전달해 여러 수신자가 반복해 틀린 경우, 올바른 비밀번호를 다시 받아도 차단이 끝날 때까지 비밀번호 확인을 할 수 없다). 정상 수신자 수와 실패 횟수에 대한 실측 자료는 없다. 발행자는 링크를 중단하고 새 URL을 발행할 수 있다.
   - 추측 횟수(전제에 따른 추정치, 보장 상한 아님): api 프로세스 1개·재시작 없음·링크 실패 기록 유지 조건에서, 실패 N번과 15분 차단을 쉬지 않고 반복하면 한 링크에 하루 약 96×N번, N=30이면 약 2,880번 시도할 수 있다. 재시작으로 기록이 초기화되거나 프로세스가 늘면 더 늘어난다. 짧은 비밀번호는 이 범위 안에서 맞혀질 수 있어, 추측 저항은 시도 제한보다 아래 「비밀번호 길이」의 발급 최소 길이에 기댄다.
-- **비밀번호 길이:** 계약([#223](https://github.com/JminAILab/CatchU/pull/223), 2026-10-06 병합)은 발급 본문의 선택 비밀번호를 trim·정규화 없이 입력 그대로 8~64자, 제목을 trim 후 1~50자로 정한다. 글자 수는 유니코드 코드 포인트(DB `char_length`와 같음)로 센다. 발급 API의 길이 검사 구현은 #221에서 하며, 그 전까지 이 판본의 발급 API는 비어 있지 않은 비밀번호를 모두 받는다. unlock은 길이를 검사하지 않고(빈 값만 400) 저장된 검증값과 비교하므로, #221 이전에 8자 미만으로 발급된 링크도 맞는 비밀번호로 열린다.
+- **비밀번호 길이:** 계약([#223](https://github.com/JminAILab/CatchU/pull/223), 2026-10-06 병합)은 발급 본문의 선택 비밀번호를 trim·정규화 없이 입력 그대로 8~64자, 제목을 trim 후 1~50자로 정한다. 글자 수는 유니코드 코드 포인트(DB `char_length`와 같음)로 센다. 결합 이모지·국기처럼 화면에서 한 글자로 보여도 코드 포인트 수만큼 센다. 발급 API는 이 기준으로 검사한다(#221, 위 「발급 처리 순서」 1). unlock은 길이를 검사하지 않고(빈 값만 400) 저장된 검증값과 비교하므로, #221 이전에 8자 미만으로 발급된 링크도 맞는 비밀번호로 열린다. 다만 본문 검사가 멱등 처리보다 먼저라, #221 이전에 허용됐던 제목 51자 이상 또는 비밀번호 8자 미만·65자 이상 요청을 같은 `Idempotency-Key`로 다시 보내면 기존 응답 대신 `400 VALIDATION_FAILED`다. 위반 이유는 각각 `title.maxLength`, `password.minLength`, `password.maxLength`다. 기존 링크와 멱등 기록은 바뀌지 않으며, 기존 비밀번호로 unlock할 수 있다.
 - **링크별 독립과 전체 자원:** 링크별 차단은 서로 독립이다. 다만 아래 전체 해시 자원 상한은 링크 구분 없이 걸려, 한 링크에 몰린 요청이 다른 링크의 unlock도 잠시 포화(429, `Retry-After: 1`)로 만들 수 있다.
 - **전체 해시 자원(`hash-gate.ts`):** unlock 경로에서 동시에 계산하는 scrypt는 2개(scrypt는 libuv 스레드 풀 기본 4개에서 돌고 1회 약 32 MiB를 쓴다. 같은 풀을 쓰는 파일·DNS 작업을 막지 않도록 일부만 쓴다), 처리 중이지만 해시를 계산하지 않는 요청은 20개까지다. 발급 API의 해시는 세지 않는다. 처리 시간은 해시 시간에 따른 추정이다(2026-09-30 로컬 측정에서 해시 1회 약 90ms).
 - **기록 상한:** 주소 기록과 링크 기록은 각 1만 개다. 프로세스 메모리라 재시작하면 초기화되고, 서버·프로세스가 늘면 제한이 헐거워진다(api는 프로세스 1개로 띄운다, #24 배포 설정 목록).
