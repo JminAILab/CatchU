@@ -1,6 +1,19 @@
-# 내 자산 목록·상세 미리보기
+# 내 자산 목록·상세와 회원 페이지
 
-B 담당의 화면을 서버 연결 전에 검토하는 개발용 미리보기다. 모든 Catch·저장소·근거는 합성 자료이며 분석 결과가 아니다. 중단된 `web-mock-demo` 작업을 재개하는 것이 아니라 #129의 목록·상세 구현을 준비하는 독립 작업이다.
+B 담당의 제품 `/assets`와 개발용 미리보기를 관리한다. 제품 페이지는 공통 회원 가드·API 클라이언트를 사용하며 합성 자료로 조회 실패를 대체하지 않는다. `/preview/assets`·`/preview/assets-connected`의 자료만 합성이다.
+
+## 제품 페이지 연결 (#168·#169)
+
+`src/app/(member)/assets/page.tsx`가 `AssetsMemberPage`를 연다. `(member)`의 `MemberShell`이 로그인·헤더를 담당하고 `AssetsMemberBoundary`가 회원 변경 시 저장소 이름·Catch 목록/상세·D 모달을 함께 초기화한다. 별도 로그인·토큰 저장소를 만들지 않는다.
+
+- `web/.env.example`에 따라 `NEXT_PUBLIC_API_BASE_URL`을 API 주소(`/v1` 제외)로 설정한다. 개발용 로그인은 web과 api 양쪽에서 허용할 때만 사용한다. 실행 안내는 [공통 web README](../../../README.md)를 따른다.
+- `/assets`에 들어가면 미인증 상태는 `/login?next=…`로 이동한다. 로그인 후 저장소 필터와 Catch 상세 주소로 돌아간다. 현재 메모리 토큰은 새로고침 시 다시 로그인이 필요하며 실제 Google OAuth 연결을 의미하지 않는다.
+- B 조회·저장은 `createCatchApi(api.member)`, D 모달은 `createRepositoryApi(api.member)`를 사용한다. 두 인스턴스와 `accessTokenStore`는 모듈 수준의 안정적인 객체다.
+- 저장소 이름은 별도로 조회한다. 로딩·실패는 필터 아래에 표시하며 Catch 목록·상세를 숨기지 않는다. 정상 0건과 실패를 구분하고, 이름을 몰라도 URL 필터와 조회된 Catch를 유지한다. 이름 다시 불러오기는 Catch의 필터·페이지·저장 결과를 초기화하지 않는다.
+- D 일반 닫기는 B 목록을 갱신하고 저장소 이름도 다시 조회한다. [이 저장소 Catch 보기]는 선택한 저장소의 목록과 이름을 갱신하며 일반 닫기 콜백을 추가 호출하지 않는다.
+- 새 저장소 선택·동의·분석 요청은 [#154](https://github.com/JminAILab/CatchU/issues/154)의 `connectSection`, GitHub 연동·복귀는 회원 담당 화면에서 연결한다. 제품 조립만으로 이 기능들이 구현된 것은 아니다.
+
+연결 기반은 [#185 공통 인증](https://github.com/JminAILab/CatchU/pull/185)·[#187 저장소 관리](https://github.com/JminAILab/CatchU/pull/187)다. 실제 API에는 `/me`, `/me/repositories`, `/analysis-requests`와 B Catch 조회·저장 경로가 필요하다. 없는 API를 모의 성공 응답으로 바꾸지 않는다. 검증 시 실제 서버·DB와 합성 HTTP 대역을 구분한다.
 
 ## 실행
 
@@ -24,11 +37,11 @@ B 담당의 화면을 서버 연결 전에 검토하는 개발용 미리보기�
 
 | 연결 | 이번 구현·제안 |
 |---|---|
-| 실제 페이지 주소 | `/assets`를 연결 후보로 제안한다. 이번 PR에서 제품 경로를 만들거나 확정하지 않는다. |
+| 실제 페이지 주소 | 제품 `/assets`를 위 「제품 페이지 연결」 구성으로 조립한다. |
 | 저장소 필터 | B의 제안은 `repositoryId`. 비어 있으면 전체, 값은 저장소 식별자다. 미리보기에서 이 이름으로 구현한다. |
 | 상세 팝업 | B의 제안은 `catchId`. 닫으면 해당 파라미터만 제거하며 필터를 유지한다. |
 | 자료 탭 | `tab` 생략 시 Catch. 준비 중 탭도 미리보기에서만 주소에 기록한다. |
-| 저장소 연결 관리 | `AssetsView.repositoryManagement` 삽입 자리에 [#153](https://github.com/JminAILab/CatchU/issues/153)의 D 영역을 받는다. 미리보기에서는 자리 안내만 보인다. 실제 모달·닫기 후 재조회 콜백 연결은 후속이다. |
+| 저장소 연결 관리 | 제품 페이지는 `AssetsConnected.repositoryManagement`에 [#153](https://github.com/JminAILab/CatchU/issues/153)의 D 모달을 넣는다. 독립 미리보기의 자리 안내와 구분한다. |
 | 목록·상세 데이터 | `AssetsView`가 받은 자료와 상태를 표시한다. [#130](https://github.com/JminAILab/CatchU/issues/130)의 본인 조회 API와 #106 인증을 연결하기 전에는 권한·실제 재조회·페이지네이션 검증 완료로 보지 않는다. |
 
 `scenario`, `detailScenario`는 개발용 예외 상태 선택기다. 제품 주소 규약에 포함하지 않는다. URL에는 합성 저장소·Catch 식별자와 예시 상태만 두며 토큰이나 본문을 넣지 않는다. API 연결 시 합성 자료로 오류를 대체하지 않고, 별도 조회 상태를 그대로 전달해야 한다.
@@ -71,13 +84,13 @@ CatchActions는 작업 사실·기여를 각각 체크한 뒤 confirmation을 �
 
 배포용 미리보기 차단은 빌드 후 `node scripts/catches-preview-smoke.mjs`로 재현한다(PORT 기본 3119). 전용 서버를 띄워 두 미리보기 경로의 404를 확인하고 검사 프로세스만 종료한다.
 
-실제 회원 페이지 조립·공통 조회 컴포넌트 적용·준비 중 탭의 제품 URL 반영은 #106과 검토한다.
+제품 조립은 위 구성을 사용하고, 준비 중 탭의 `tab` 주소와 기존 조회 표시를 유지한다. 공통 인증·D 연결은 #106·#153 담당과 검토한다.
 
 ## 회원 전환 경계 (#169)
 
 `AssetsMemberBoundary`는 #106 회원 가드 안에서 B 화면을 감싸는 연결 부품이다. 공통 토큰 저장소의 `get()`·`subscribe()`를 받아 토큰이 없으면 자식을 표시하지 않고, 토큰이 바뀌면 하위 화면을 새로 마운트한다. 토큰은 React key·DOM·URL·영구 저장소에 넣지 않고 메모리에서 변경 여부만 비교한다. 같은 토큰의 중복 설정은 화면을 초기화하지 않는다. 토큰 갱신도 안전하게 새 세션으로 취급한다.
 
-아래는 공통 인증 PR #185의 `accessTokenStore`·`api.member`를 사용하는 **클라이언트 컴포넌트의 조립 예시**다. 이 PR에서 로그인 코드나 제품 `/assets` 경로를 추가하지 않는다.
+아래는 공통 인증 PR #185의 `accessTokenStore`·`api.member`를 사용하는 **클라이언트 컴포넌트의 조립 구조**다. 실제 제품 경로는 `assets-member-page.tsx`를 사용한다. `tokens`에 매 렌더 새 래퍼 객체를 넘기면 세대 추적이 끊기므로 `accessTokenStore` 자체를 넘긴다.
 
 ```tsx
 const catches = createCatchApi(api.member); // 모듈 수준의 안정적인 인스턴스

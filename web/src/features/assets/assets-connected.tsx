@@ -21,11 +21,13 @@ type Props = {
   /** AssetsMemberBoundary 안에 조립해 회원 전환 때 이 컴포넌트도 새로 마운트한다. */
   api: CatchApi;
   repositories: readonly RepositoryOption[];
+  /** 저장소 이름 조회는 Catch 목록·상세 조회를 막지 않는다. */
+  repositoryNotice?: ReactNode;
   repositoryManagement: (bindings: RepositoryManagementBindings) => ReactNode;
 };
 
 /** #106의 인증 가드 안에 조립하는 B 화면. 제품 경로나 토큰 저장소를 소유하지 않는다. */
-export function AssetsConnected({ api, repositories, repositoryManagement }: Props) {
+export function AssetsConnected({ api, repositories, repositoryNotice, repositoryManagement }: Props) {
   const store = useMemo(() => createAssetsStore(api), [api]);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const params = useSearchParams();
@@ -66,7 +68,7 @@ export function AssetsConnected({ api, repositories, repositoryManagement }: Pro
   return (
     <div className={styles.preview}>
       <AssetsView dataMode="api" items={listMatches ? snapshot.items : []}
-        repositories={repositories} repositoryId={repositoryId} tab={tab}
+        repositories={repositories} repositoryNotice={repositoryNotice} repositoryId={repositoryId} tab={tab}
         listState={listMatches ? snapshot.listState : "loading"}
         listMessage={catchErrorText(snapshot.listError, "list")}
         detailState={detailMatches ? snapshot.detailState : "loading"}
