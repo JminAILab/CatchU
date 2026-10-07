@@ -143,6 +143,7 @@ test('서버 저장 여부가 불명확한 결과(조회 실패·5xx)에서는 �
   assert.equal(isSettledResult({ kind: 'success', status: 204, data: null }), true);
   assert.equal(isSettledResult({ kind: 'api-error', status: 400, code: 'VALIDATION_FAILED', message: 'x' }), true);
   assert.equal(isSettledResult({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'x' }), false, '401은 앞선 요청의 저장 여부를 알려 주지 않는다');
+  assert.equal(isSettledResult({ kind: 'api-error', status: 429, code: 'RATE_LIMITED', message: 'x', retryAfterSeconds: 30 }), false, '429는 처리하지 않은 요청이라 앞선 요청의 결과를 알려 주지 않는다(#235)');
   assert.equal(isSettledResult({ kind: 'api-error', status: 503, code: 'INTERNAL_ERROR', message: 'x' }), false);
   assert.equal(isSettledResult({ kind: 'lookup-failed', status: 502, code: 'LOOKUP_FAILED' }), false);
   assert.equal(isSettledResult({ kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' }), false);
