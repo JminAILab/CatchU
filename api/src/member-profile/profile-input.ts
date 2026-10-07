@@ -1,5 +1,8 @@
 import { ApiError } from '../common/errors';
 
+// u 모드는 올바른 서로게이트 쌍을 하나의 코드 포인트로 읽으므로 고립된 코드 단위만 잡는다.
+const LONE_SURROGATE = /[\uD800-\uDFFF]/u;
+
 /** #135에서 2026-10-06 확인한 서비스 입력 제한. 길이는 유니코드 코드 포인트 기준이다. */
 export const PROFILE_LIMITS = Object.freeze({ displayName: 50, introduction: 200, desiredRole: 100, skills: 20, skill: 50 });
 
@@ -28,6 +31,7 @@ export function validateProfileInput(body: unknown): ProfileInput {
       continue;
     }
     if (value.includes('\u0000')) violations.push({ field, reason: 'noNul' });
+    if (LONE_SURROGATE.test(value)) violations.push({ field, reason: 'isWellFormed' });
     const checked = field === 'displayName' ? value.trim() : value;
     if (field === 'displayName' && checked.length === 0) violations.push({ field, reason: 'isNotEmpty' });
     if (Array.from(checked).length > PROFILE_LIMITS[field]) violations.push({ field, reason: 'maxLength' });
@@ -40,6 +44,7 @@ export function validateProfileInput(body: unknown): ProfileInput {
       if (typeof skill !== 'string') violations.push({ field: `skills.${index}`, reason: 'isString' });
       else {
         if (skill.includes('\u0000')) violations.push({ field: `skills.${index}`, reason: 'noNul' });
+        if (LONE_SURROGATE.test(skill)) violations.push({ field: `skills.${index}`, reason: 'isWellFormed' });
         if (Array.from(skill).length > PROFILE_LIMITS.skill) violations.push({ field: `skills.${index}`, reason: 'maxLength' });
       }
     }

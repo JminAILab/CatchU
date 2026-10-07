@@ -32,6 +32,31 @@ for (const field of ['displayName', 'introduction', 'desiredRole', 'skills']) {
     }
   });
 }
+for (const field of ['displayName', 'introduction', 'desiredRole', 'skills']) {
+  test(`${field}의 고립 상위·하위 서로게이트와 잘못된 조합을 보정 없이 거부`, () => {
+    const invalidSequences = ['\ud800', '\udbff', '\udc00', '\udfff', '\ud800\ud800',
+      '\udc00\udc00', '\udc00\ud800', '\ud800가\udc00', '\ud800\ud83d\ude00', '\ud83d\ude00\udc00'];
+    for (const sequence of invalidSequences) {
+      for (const value of [sequence + '검토용', '검토' + sequence + '용', '검토용' + sequence]) {
+        const body = { ...base(), [field]: field === 'skills' ? ['정상', value] : value };
+        const original = structuredClone(body);
+        assert.throws(() => validateProfileInput(body), error => {
+          assert.equal(error.getStatus(), 400);
+          assert.equal(error.code, 'VALIDATION_FAILED');
+          assert.deepEqual(error.details.violations, [{ field: field === 'skills' ? 'skills.1' : field, reason: 'isWellFormed' }]);
+          assert.ok(!JSON.stringify(error.details).includes('검토'));
+          return true;
+        });
+        assert.deepEqual(body, original);
+      }
+    }
+  });
+}
+test('한글·이모지·서로게이트 쌍 경계·대체 문자 자체는 변환 없이 허용', () => {
+  const value = '한글😀\ud800\udc00\udbff\udfff\ufffd';
+  const body = { displayName: ` ${value} `, introduction: value, desiredRole: value, skills: [value, ''] };
+  assert.deepEqual(validateProfileInput(body), { ...body, displayName: value });
+});
 test('NUL 이외의 제어문자를 금지하지 않고 한글·이모지와 내부 공백을 보존', () => {
   const body = { displayName: '  한글😀\u0001이름\t끝  ', introduction: '\t소개\n\u0001',
     desiredRole: '직무\r\n\u0002', skills: ['React😀\t\n\u0003', ''] };

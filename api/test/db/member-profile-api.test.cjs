@@ -185,6 +185,37 @@ for (const field of ['displayName', 'introduction', 'desiredRole', 'skills']) {
     }
   });
 }
+for (const field of ['displayName', 'introduction', 'desiredRole', 'skills']) {
+  test(`${field}의 고립 서로게이트는 실제 API에서 400이며 DB 프로필과 원문 비노출을 유지`, async () => {
+    const a = await login(); await replace(a.token, profile('기존 한글😀'));
+    const before = await stored(a.memberId);
+    const marker = `surrogate-private-${field}`;
+    const invalidSequences = ['\ud800', '\udbff', '\udc00', '\udfff', '\ud800\ud800',
+      '\udc00\udc00', '\udc00\ud800', '\ud800가\udc00', '\ud800\ud83d\ude00', '\ud83d\ude00\udc00'];
+    for (const sequence of invalidSequences) {
+      for (const value of [sequence + marker, marker + sequence + '가', marker + sequence]) {
+        const body = { ...profile(), [field]: field === 'skills' ? ['정상', value] : value };
+        const result = await replace(a.token, body);
+        error(result, 400, 'VALIDATION_FAILED');
+        assert.deepEqual(result.body.details.violations, [{ field: field === 'skills' ? 'skills.1' : field, reason: 'isWellFormed' }]);
+        assert.ok(!JSON.stringify(result.body).includes(marker));
+        assert.ok(!logs.join('\n').includes(marker));
+        assert.deepEqual(await stored(a.memberId), before);
+        assert.deepEqual((await read(a.token)).body.profile, profile('기존 한글😀'));
+      }
+    }
+  });
+}
+test('정상 한글·이모지·올바른 서로게이트 쌍 저장은 PUT과 직후 GET 및 DB 값이 같다', async () => {
+  const a = await login();
+  const value = '한글😀\ud800\udc00\udbff\udfff\ufffd';
+  const body = { displayName: ` ${value} `, introduction: value, desiredRole: value, skills: [value, ''] };
+  const expected = { ...body, displayName: value };
+  assert.deepEqual(await replace(a.token, body), { status: 200, body: expected });
+  assert.deepEqual((await read(a.token)).body.profile, expected);
+  const row = await stored(a.memberId);
+  for (const field of ['displayName', 'introduction', 'desiredRole', 'skills']) assert.deepEqual(row[field], expected[field]);
+});
 test('NUL 이외의 제어문자를 추가 거부하지 않고 한글·이모지·빈 선택 입력을 저장', async () => {
   const a = await login();
   const body = { displayName: '  한글😀\u0001이름\t끝  ', introduction: '\t소개\n\u0001',
