@@ -99,8 +99,8 @@ rules:
     category: constraint
     applies_to: ["ShareLink"]
     trigger: "링크 POST·중단 PUT"
-    logic: "발급 본문은 trim 제목 1~50자, 선택 비밀번호는 입력 그대로 8~64자(유니코드 코드 포인트로 셈); IF stoppedAt=null AND t<expiresAt인 본인 링크가 5개 미만이고 trim 제목이 유일하면 원자 발급; 만료는 발급+30*24시간; 중단 PUT은 소유를 상태보다 먼저 검사해 본인 링크면 첫 중단·반복 중단·만료 링크 모두 200으로 현재 ShareLink 반환(중단은 만료 뒤에도 STOPPED, 만료 링크는 EXPIRED 유지); 중단은 자산 상태를 바꾸지 않음"
-    violation: "길이 위반 400 VALIDATION_FAILED; 409 LINK_LIMIT_REACHED/LINK_TITLE_CONFLICT; 중단/만료된 링크는 검사 집합에서 제외; 중단 PUT의 타인·없는 링크는 404 RESOURCE_UNAVAILABLE이고 403·409를 쓰지 않음"
+    logic: "같은 회원의 발급 요청이 빈도 상한을 넘으면 입력 검사·비밀번호 해시·저장 없이 거부; 발급 본문은 trim 제목 1~50자, 선택 비밀번호는 입력 그대로 8~64자(유니코드 코드 포인트로 셈); IF stoppedAt=null AND t<expiresAt인 본인 링크가 5개 미만이고 trim 제목이 유일하면 원자 발급; 만료는 발급+30*24시간; 중단 PUT은 소유를 상태보다 먼저 검사해 본인 링크면 첫 중단·반복 중단·만료 링크 모두 200으로 현재 ShareLink 반환(중단은 만료 뒤에도 STOPPED, 만료 링크는 EXPIRED 유지); 중단은 자산 상태를 바꾸지 않음"
+    violation: "빈도 상한 초과 429 RATE_LIMITED(남은 초는 Retry-After 헤더); 길이 위반 400 VALIDATION_FAILED; 409 LINK_LIMIT_REACHED/LINK_TITLE_CONFLICT; 중단/만료된 링크는 검사 집합에서 제외; 중단 PUT의 타인·없는 링크는 404 RESOURCE_UNAVAILABLE이고 403·409를 쓰지 않음"
     source: ["FR4.3","FR4.4"]
   - id: BR2.13
     statement: "없는 링크·중단·만료는 공통 안내하고 비밀번호 분기와 시도 제한을 유지한다"
