@@ -62,7 +62,7 @@ entities:
     constraints:
       - "사용자당 ACTIVE 최대 1개"
       - "동의와 현재 시도는 같은 requestId; 동의 memberId/repositoryId와 일치"
-      - "retryOfRequestId는 본인·같은 저장소의 확정 실패만; 자기 참조/순환 금지"
+      - "retryOfRequestId는 본인·같은 저장소의, 등록 Catch 없이 실패 확정·반영 실패로 닫힌 요청만(BR2.4); 자기 참조/순환 금지"
       - "동의 범위는 AnalysisConsent 정본을 참조; analysisScope 중복 저장하지 않음"
   - name: AnalysisConsent
     owner: E
@@ -90,7 +90,7 @@ entities:
       - {name: eligibleCandidateCount, type: integer, required: true, min: 0, default: 0}
       - {name: ownerResultsReady, type: boolean, required: true, default: false}
       - {name: failures, type: "list<Failure>", required: true, default: [], constraints: "공통 계약 stage/code/message/candidateId만; 원문/비밀값 제외"}
-      - {name: failureConfirmationReference, type: operational-reference, required: false, constraints: "확정 실패 판단의 비원문 근거; timeout/조회 오류만으로 채우지 않음"}
+      - {name: failureConfirmationReference, type: operational-reference, required: false, constraints: "확정 실패 판단의 비원문 근거(F 실패 결과 또는 E 처리 시한 판정, 시한 판정은 code PROCESSING_DEADLINE_EXCEEDED); HTTP·조회 timeout/조회 오류만으로 채우지 않음"}
     constraints: ["등록 Catch 목록은 CandidateRegistration에서 유도; 별도 배열 정본 없음", "현재 MVP는 새 요청에 새 시도; 자동 새 시도/재분석 기능을 추가하지 않음"]
   - name: CatchAsset
     owner: B
@@ -125,7 +125,7 @@ entities:
       - "repositoryId는 sourceRequest에서 유도해 회원 Catch 응답 필드와 목록의 repositoryId 필터에 사용; CatchAsset에 repositoryId 칼럼을 추가하지 않음. restriction은 해당 RepositoryProtection으로 현재 계산"
   - name: CatchEvidence
     owner: B
-    description: "등록 Catch의 근거 사본 정본; F 임시 저장의 영구 접근에 의존하지 않음"
+    description: "등록 Catch의 근거 사본 정본; F 자료에 의존하지 않음(F는 결과를 보존하지 않음)"
     attributes:
       - {name: catchEvidenceId, type: id, required: true, unique: true, primary: true}
       - {name: catchId, type: id, required: true, references: CatchAsset.catchId}
@@ -194,7 +194,7 @@ technical_records:
     constraints: ["unique(requestId, attemptId, resultId); 현재 시도당 검증된 종결 결과 하나", "시도/요청/본인/저장소/동의/범위/sourceMode 일치 후만 생성", "다른 payload/늦은 시도는 기존 기록을 덮어쓰지 않음"]
   - name: CandidateRegistration
     owner: "B 판정 정본, E 결과 연결"
-    description: "후보별 등록 또는 기존 동일 작업 참조; 재전달·반영 복구 때의 재진입 키"
+    description: "후보별 등록 또는 기존 동일 작업 참조; 커밋 뒤 같은 결과를 다시 받을 때의 재진입 키(같은 catchId)"
     attributes:
       - {name: registrationId, type: id, required: true, unique: true, primary: true}
       - {name: applicationRecordId, type: id, required: true, references: ResultApplicationRecord.applicationRecordId}
@@ -234,7 +234,7 @@ relationships:
 
 MemberProfile의 desiredRole/skills는 기존 jobRole/technologyTags의 API 명칭 매핑이다. 공개 프로필·Catch restriction·링크 state·registeredCatchIds는 정본에서 유도하므로 중복 열이 아니다. Account/GitHub 인증 세부 상태를 새 제품 정책으로 확대하지 않는다.
 
-F의 AnalysisResult·WorkCandidate·AnalysisEvidence·DraftOutcome는 이 모델에 **없다**. B가 등록한 자료만 CatchAsset/CatchEvidence에 보유하며 미등록 F 결과의 위치·수명은 Open question이다. RepositoryProtection과 CatchAsset의 연결은 sourceRequest의 소유자·저장소 일치 조회이며 링크–자산 연결이 아니다.
+F의 AnalysisResult·WorkCandidate·AnalysisEvidence·DraftOutcome는 이 모델에 **없다**. B가 등록한 자료만 CatchAsset/CatchEvidence에 보유하며 미등록 F 결과는 보존·재전달하지 않는다(2026-10-06 결정, [#23](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)). RepositoryProtection과 CatchAsset의 연결은 sourceRequest의 소유자·저장소 일치 조회이며 링크–자산 연결이 아니다.
 
 ## 담당자 확인 요청
 

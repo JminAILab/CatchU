@@ -31,12 +31,12 @@ rules:
     violation: "409 ANALYSIS_IN_PROGRESS; 자동 대기열/새 시도/동의 재사용 없음"
     source: ["FR1.1","FR1.4"]
   - id: BR2.4
-    statement: "유효 결과 없는 확정 실패만 새 동의 재요청을 허용한다"
+    statement: "등록 Catch 없이 실패 확정·반영 실패로 닫힌 요청만 새 동의 재요청을 허용한다"
     category: policy
     applies_to: ["AnalysisRequest","AnalysisAttempt"]
     trigger: "새 분석 POST의 retry 판정"
-    logic: "IF FAILED/APPLIED/CLOSED이고 적합 후보0·등록0·진행/복구없음·실패확정근거가 모두 있으면 본인/저장소 이력에 새 ID와 retryOfRequestId 연결"
-    violation: "409 RETRY_NOT_ALLOWED/REANALYSIS_DEFERRED; 요청 ID 생략 우회 금지, timeout/조회 실패는 근거 아님"
+    logic: "IF (FAILED/APPLIED/CLOSED이고 적합 후보0·등록0·실패확정근거(F 실패 결과 또는 E 처리 시한 판정)) 또는 (APPLY_FAILED/CLOSED이고 등록0, 처리 결과·적합 후보 수 무관)이면 retry.allowed=true·reason FAILURE_WITHOUT_RESULTS; 본인/저장소 이력에 새 동의·요청·시도 ID와 retryOfRequestId 연결"
+    violation: "409 RETRY_NOT_ALLOWED/REANALYSIS_DEFERRED; 요청 ID 생략 우회 금지, HTTP·조회 timeout/조회 실패는 근거 아님(E의 처리 시한 초과 판정은 근거)"
     source: ["FR1.4"]
   - id: BR2.5
     statement: "Result 수신 식별·맥락·중복 검사와 반영 완료를 분리한다"
@@ -50,9 +50,9 @@ rules:
     statement: "처리·반영·열람 준비와 조회 실패를 구분한다"
     category: constraint
     applies_to: ["AnalysisAttempt","CandidateRegistration"]
-    trigger: "상태 조회·결과 반영"
-    logic: "IF 결과가 검증되면 적합 후보수/실패로 SUCCEEDED·EMPTY·PARTIAL_FAILED·FAILED를 정하고 반영 상태는 별도; B 준비 확인만 ownerResultsReady"
-    violation: "조회 오류 500/클라이언트 LOOKUP_FAILED; APPLY_FAILED/RECOVERING은 ACTIVE, EMPTY/확정 실패로 치환 금지"
+    trigger: "상태 조회·결과 반영·E 주기 판정"
+    logic: "IF 결과가 검증되면 적합 후보수/실패로 SUCCEEDED·EMPTY·PARTIAL_FAILED·FAILED를 정하고 반영 상태는 별도; B 준비 확인만 ownerResultsReady; E 주기 판정이 접수(submittedAt) 후 처리 시한(값은 계약)을 넘긴 ACTIVE를 실행 멈춤 증거 없이 닫음: 처리 중(QUEUED·RUNNING·UNCERTAIN)은 FAILED/APPLIED/CLOSED와 실패 stage DISPATCH, 반영 대기(PENDING)는 APPLY_FAILED/CLOSED와 stage APPLICATION, code는 둘 다 PROCESSING_DEADLINE_EXCEEDED; APPLY_FAILED는 시한을 기다리지 않고 다음 판정에서 CLOSED"
+    violation: "조회 오류 500/클라이언트 LOOKUP_FAILED; 반영 실패·조회 오류를 처리 결과 EMPTY/FAILED로 치환 금지(반영 대기에서 닫혀도 처리 결과는 유지); 시한 전 처리 중·반영 대기는 시간 경과/조회 실패로 FAILED/CLOSED 안 함; RECOVERING·반영 복구 없음"
     source: ["FR1.4"]
   - id: BR2.7
     statement: "적합 후보를 B 정본으로 중복 없이 등록한다"
