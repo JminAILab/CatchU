@@ -42,9 +42,16 @@ test('API 기준 주소가 없거나 http(s)가 아니면 다른 출처로 연�
   }
 });
 
-test('모든 경로에 헤더를 붙이고 X-Powered-By를 끈다', async () => {
+test('API 기준 주소가 IPv6 주소면 CSP에 적을 수 없으므로 시작할 때 멈춘다', () => {
+  for (const value of ['http://[::1]:3001', 'https://[2001:db8::1]']) {
+    assert.throws(() => securityHeaders({ NODE_ENV: 'development', NEXT_PUBLIC_API_BASE_URL: value }), /IPv6/, value);
+  }
+});
+
+test('모든 경로에 헤더 생성 함수의 헤더를 붙이고 X-Powered-By를 끈다', async () => {
   assert.equal(nextConfig.poweredByHeader, false);
   const rules = await nextConfig.headers();
   assert.equal(rules.length, 1);
   assert.equal(rules[0].source, '/:path*');
+  assert.deepEqual(rules[0].headers, securityHeaders(process.env));
 });
