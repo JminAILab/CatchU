@@ -168,6 +168,34 @@ test('빈·공백 이름, 필수 누락·타입·추가 필드 오류는 violati
   error(await replace(a.token, null), 400, 'INVALID_REQUEST');
   assert.deepEqual((await read(a.token)).body.profile, profile());
 });
+for (const field of ['displayName', 'introduction', 'desiredRole', 'skills']) {
+  test(`${field}의 NUL은 API에서 400으로 거부하며 DB 프로필·입력 원문 비노출을 유지`, async () => {
+    const a = await login(); await replace(a.token, profile());
+    const before = await stored(a.memberId);
+    const marker = `nul-private-${field}`;
+    for (const value of [`\u0000${marker}`, `${marker}\u0000한글😀`, `${marker}\u0000`]) {
+      const body = { ...profile(), [field]: field === 'skills' ? ['정상', value] : value };
+      const result = await replace(a.token, body);
+      error(result, 400, 'VALIDATION_FAILED');
+      assert.deepEqual(result.body.details.violations, [{ field: field === 'skills' ? 'skills.1' : field, reason: 'noNul' }]);
+      assert.ok(!JSON.stringify(result.body).includes(marker));
+      assert.ok(!logs.join('\n').includes(marker));
+      assert.deepEqual(await stored(a.memberId), before);
+      assert.deepEqual((await read(a.token)).body.profile, profile());
+    }
+  });
+}
+test('NUL 이외의 제어문자를 추가 거부하지 않고 한글·이모지·빈 선택 입력을 저장', async () => {
+  const a = await login();
+  const body = { displayName: '  한글😀\u0001이름\t끝  ', introduction: '\t소개\n\u0001',
+    desiredRole: '직무\r\n\u0002', skills: ['React😀\t\n\u0003', ''] };
+  const expected = { ...body, displayName: body.displayName.trim() };
+  assert.deepEqual(await replace(a.token, body), { status: 200, body: expected });
+  assert.deepEqual((await read(a.token)).body.profile, expected);
+  assert.deepEqual(await replace(a.token, profile('한글😀')), { status: 200, body: profile('한글😀') });
+  assert.deepEqual((await read(a.token)).body.profile, profile('한글😀'));
+});
+
 test('실제 조회 SQL 실패는 500이고 복구 후 저장값을 다시 조회할 수 있다', async () => {
   const a = await login(); await replace(a.token, profile());
   await db.query('ALTER TABLE member_profile RENAME TO profile_read_failure_probe');

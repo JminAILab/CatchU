@@ -26,6 +26,8 @@
 
 모든 필드를 반드시 보낸다. 표시 이름의 내부 공백·대소문자·유니코드 조합은 변경하지 않는다. 선택 문자열과 기술 항목은 보정·중복 제거하지 않으며, 초과 입력을 잘라 저장하지 않는다. 타입·필수 필드·추가 필드·길이 오류는 `400 VALIDATION_FAILED`와 `details.violations: [{field, reason}]`으로 반환한다. 잘못된 JSON이나 최상위 `null` 등 공통 요청 해석 단계의 오류는 기존 `400 INVALID_REQUEST`다.
 
+[PR #238 NUL 입력 리뷰](https://github.com/JminAILab/CatchU/pull/238#discussion_r4193329628)에 따라 네 항목의 각 문자열에 NUL(`U+0000`)이 있으면 저장 전에 `400 VALIDATION_FAILED`로 거부한다. 위반 항목은 `displayName`·`introduction`·`desiredRole` 또는 `skills.<배열 인덱스>`, 규칙 이름은 `noNul`로 반환하며 입력 원문은 응답·로그에 넣지 않는다. NUL을 제거해 저장하지 않으며 다른 제어문자를 일괄 금지하지 않는다. 기존 표시 이름 trim·코드 포인트 길이 제한·선택 항목의 빈 값 허용은 유지한다.
+
 길이는 JavaScript의 `Array.from(value).length`와 같은 **유니코드 코드 포인트**로 센다. 이모지·결합 문자에서 화면에 보이는 글자 수와 다를 수 있다. [#137 프로필 화면 연결](https://github.com/JminAILab/CatchU/issues/137)과 [#106 web 공통 기반](https://github.com/JminAILab/CatchU/issues/106)의 후속 화면 검증도 같은 기준과 표시 이름의 trim 순서를 사용해야 한다. HTML `maxlength`나 문자열의 UTF-16 `length`만으로 서버 제한을 대체하지 않는다.
 
 이름 저장 여부는 **조회 성공 시 저장된 `profile.displayName === ""`인지**로 판단한다. 빈 문자열은 #104가 생성한 최초 기본값이며, `PUT`으로 빈 이름을 다시 저장할 수는 없다. 빈 값이면 최초 프로필 입력, 저장된 이름이 있으면 홈 진입에 사용하는 방향은 [#106 연결 제안](https://github.com/JminAILab/CatchU/issues/106#issuecomment-5865929993)을 따른다. 로딩 중에는 판정을 기다리고 조회 실패는 재시도 가능한 오류로 처리해야 한다. 조회 실패·필수 프로필 행 누락을 빈 기본 프로필로 바꾸지 않으며, 판단용 새 응답 필드를 추가하지 않았다. 실제 web 연결 검증은 후속 작업이다.

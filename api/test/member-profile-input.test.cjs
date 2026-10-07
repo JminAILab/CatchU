@@ -19,6 +19,24 @@ test('빈 이름·공백 이름은 거부하지만 선택 문자열 빈 값·빈
   assert.deepEqual(validateProfileInput(base()), base());
   for (const displayName of ['', ' ', '\t\n', '\u00a0\u3000']) invalid({ ...base(), displayName }, 'displayName', 'isNotEmpty');
 });
+for (const field of ['displayName', 'introduction', 'desiredRole', 'skills']) {
+  test(`${field}의 NUL은 위치와 관계없이 거부하고 원본을 변경하지 않는다`, () => {
+    for (const value of ['\u0000검토용', '검토\u0000용', '검토용\u0000']) {
+      const body = { ...base(), [field]: field === 'skills' ? ['정상', value] : value };
+      const original = structuredClone(body);
+      invalid(body, field === 'skills' ? 'skills.1' : field, 'noNul');
+      assert.deepEqual(body, original);
+      try { validateProfileInput(body); } catch (error) {
+        assert.ok(!JSON.stringify(error.details).includes('검토'));
+      }
+    }
+  });
+}
+test('NUL 이외의 제어문자를 금지하지 않고 한글·이모지와 내부 공백을 보존', () => {
+  const body = { displayName: '  한글😀\u0001이름\t끝  ', introduction: '\t소개\n\u0001',
+    desiredRole: '직무\r\n\u0002', skills: ['React😀\t\n\u0003', ''] };
+  assert.deepEqual(validateProfileInput(body), { ...body, displayName: body.displayName.trim() });
+});
 for (const [field, limit] of [['displayName', 50], ['introduction', 200], ['desiredRole', 100]]) {
   test(`${field} 코드 포인트 ${limit} 경계는 보존하고 ${limit + 1}은 거부`, () => {
     const value = '😀'.repeat(limit);

@@ -27,6 +27,7 @@ export function validateProfileInput(body: unknown): ProfileInput {
       violations.push({ field, reason: 'isString' });
       continue;
     }
+    if (value.includes('\u0000')) violations.push({ field, reason: 'noNul' });
     const checked = field === 'displayName' ? value.trim() : value;
     if (field === 'displayName' && checked.length === 0) violations.push({ field, reason: 'isNotEmpty' });
     if (Array.from(checked).length > PROFILE_LIMITS[field]) violations.push({ field, reason: 'maxLength' });
@@ -37,7 +38,10 @@ export function validateProfileInput(body: unknown): ProfileInput {
     if (input.skills.length > PROFILE_LIMITS.skills) violations.push({ field: 'skills', reason: 'arrayMaxSize' });
     for (const [index, skill] of input.skills.entries()) {
       if (typeof skill !== 'string') violations.push({ field: `skills.${index}`, reason: 'isString' });
-      else if (Array.from(skill).length > PROFILE_LIMITS.skill) violations.push({ field: `skills.${index}`, reason: 'maxLength' });
+      else {
+        if (skill.includes('\u0000')) violations.push({ field: `skills.${index}`, reason: 'noNul' });
+        if (Array.from(skill).length > PROFILE_LIMITS.skill) violations.push({ field: `skills.${index}`, reason: 'maxLength' });
+      }
     }
   }
   if (violations.length > 0) throw new ApiError('VALIDATION_FAILED', { details: { violations } });
