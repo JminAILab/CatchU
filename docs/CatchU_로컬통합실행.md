@@ -168,7 +168,7 @@ docker stop catchu-db
 
 ## 다루지 않는 것
 
-Dockerfile·Compose, NCP 배포·복구([#24][i24]), 실제 큐 연결([#77][i77]), CI는 이 안내의 범위가 아니다. 로컬에서 네 구성요소가 켜지는 것은 배포 검증이나 서비스 간 기능 연결 확인을 뜻하지 않는다.
+Dockerfile·Compose, AWS 배포·복구([#24][i24]), 실제 큐 연결([#77][i77]), CI는 이 안내의 범위가 아니다. 로컬에서 네 구성요소가 켜지는 것은 배포 검증이나 서비스 간 기능 연결 확인을 뜻하지 않는다.
 
 [i24]: https://github.com/JminAILab/CatchU/issues/24
 [i77]: https://github.com/JminAILab/CatchU/issues/77

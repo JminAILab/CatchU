@@ -24,6 +24,7 @@ type AssetsViewProps = {
   onLoadMore?: () => void;
   items: readonly CatchAsset[];
   repositories: readonly RepositoryOption[];
+  repositoryNotice?: ReactNode;
   repositoryId: string;
   tab: AssetTab;
   listState: LoadState;
@@ -128,6 +129,7 @@ export function AssetsView(props: AssetsViewProps) {
               </label>
             </div>
 
+            {props.repositoryNotice}
             {listState === "loading" ? (
               <StateMessage title="Catch를 불러오고 있습니다">목록을 확인하고 있어요. 잠시만 기다려 주세요.</StateMessage>
             ) : listState === "error" ? (

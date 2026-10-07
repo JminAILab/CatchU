@@ -19,7 +19,8 @@
     "build": "node scripts/clean-dist.cjs && tsc -p tsconfig.build.json",
     "migration:generate": "node --env-file-if-exists=.env ./node_modules/typeorm/cli-ts-node-commonjs.js migration:generate -d src/database/data-source.ts",
     "migration:run": "node --env-file-if-exists=.env ./node_modules/typeorm/cli-ts-node-commonjs.js migration:run -d src/database/data-source.ts",
-    "migration:revert": "node --env-file-if-exists=.env ./node_modules/typeorm/cli-ts-node-commonjs.js migration:revert -d src/database/data-source.ts"
+    "migration:revert": "node --env-file-if-exists=.env ./node_modules/typeorm/cli-ts-node-commonjs.js migration:revert -d src/database/data-source.ts",
+    "test:catches:db": "npm run build && node scripts/test-catches-db.cjs"
   },
   "dependencies": {
     "@nestjs/common": "12.0.4",

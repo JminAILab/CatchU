@@ -85,6 +85,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/(guest)/`, `(member)/`, `s/` | 화면 묶음별 레이아웃(헤더). 아래 「공통 레이아웃」 참조 |
 | `src/app/(guest)/page.tsx` | `/` 기본 화면. 서비스 소개는 #155에서 채운다 |
 | `src/app/preview/common/` | 헤더·상태 표시 개발용 미리보기(`npm run dev`에서만) |
+| `src/app/(member)/assets/` | 회원 가드 안의 실제 내 자산 페이지. B 목록·상세와 D 저장소 모달을 조립한다([기능 안내](src/features/assets/README.md)) |
 | `src/components/header/` | 로그인·비로그인·수신자 헤더와 프로필 메뉴 |
 | `src/components/notice-dialog/` | 채용공고·알림 안내창 |
 | `src/components/status/` | 불러오는 중·조회 실패·정상 0건 공통 표시 |
@@ -213,4 +214,4 @@ if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLi
 - Next.js 16은 이전 판과 API·파일 규칙이 달라진 부분이 있다. 사람이든 AI든 Next.js 코드를 쓰기 전에 설치된 판본의 문서 `node_modules/next/dist/docs/`를 확인한다.
 - 화면 문구·상태는 각 흐름 초안(`docs/ai-dlc-input-mvp/`)과 승인 요구사항을 근거로 하고, 요청 중·저장 중을 성공으로, 조회 실패를 데이터 없음으로 표시하지 않는다.
 - 브라우저 로그에는 민감정보를 출력하지 않는다.
-- 로컬 실행 확인과 NCP 배포 검증은 각각 기록한다.
+- 로컬 실행 확인과 AWS 배포 검증은 각각 기록한다.
