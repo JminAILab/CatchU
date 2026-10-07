@@ -695,6 +695,54 @@ describe('본인 Catch HTTP·PostgreSQL', {
     } finally { await db.query('ALTER TABLE public_test_unavailable_asset RENAME TO catch_asset'); }
   });
 
+  for (const [missing, assignment] of [
+    ['상태 SQL null', 'confirmed_source_state = NULL'],
+    ['상태 JSON null', "confirmed_source_state = 'null'::jsonb"],
+    ['출처 SQL null', 'observation_provenance = NULL'],
+    ['출처 JSON null', "observation_provenance = 'null'::jsonb"],
+    ['시각 SQL null', 'observed_at = NULL'],
+  ]) {
+    test('보호 관측 ' + missing + '이면 공개 변경을 롤백하고 수신자 조회도 실패한다', async () => {
+      const own = await seed({ count: 2 });
+      const alreadyPublic = { ...own, catchId: own.catchIds[1] };
+      await publish(alreadyPublic);
+      success(await request(own.ownerId, confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }));
+      // 두 Catch가 같은 보호 행을 사용한다. assignment는 위 고정 시험 사례다.
+      await db.query('UPDATE repository_protection SET ' + assignment + ' WHERE owner_id = $1 AND repository_id = $2',
+        [own.ownerId, own.repositoryId]);
+      const beforeState = await snapshot();
+      failure(await changeVisibility(own, 'PUBLIC'), 500, 'INTERNAL_ERROR');
+      assert.equal((await asset(own.catchId)).visibility, 'PRIVATE');
+      await assert.rejects(publicCatches.list(own.ownerId, {}), { name: 'CatchReadIntegrityError' });
+      await assert.rejects(publicCatches.get(own.ownerId, alreadyPublic.catchId), { name: 'CatchReadIntegrityError' });
+      assert.deepEqual(await snapshot(), beforeState);
+
+      // 불완전한 관측은 SOURCE_PRIVATE여도 확인된 원본 제한(409)으로 판정하지 않는다.
+      await db.query("UPDATE repository_protection SET applied_restriction = 'SOURCE_PRIVATE' WHERE owner_id = $1 AND repository_id = $2",
+        [own.ownerId, own.repositoryId]);
+      const restrictedState = await snapshot();
+      failure(await changeVisibility(own, 'PUBLIC'), 500, 'INTERNAL_ERROR');
+      assert.deepEqual(await snapshot(), restrictedState);
+    });
+  }
+
+  test('이전 유효 관측에 최근 조회 실패가 추가되어도 공개와 수신자 조회를 허용한다', async () => {
+    const own = await seed();
+    success(await request(own.ownerId, confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }));
+    await db.query('UPDATE repository_protection SET observation_failure = $3::jsonb WHERE owner_id = $1 AND repository_id = $2',
+      [own.ownerId, own.repositoryId, JSON.stringify({ synthetic: true, reason: 'TIMEOUT' })]);
+    const beforeState = await snapshot();
+    const published = success(await changeVisibility(own, 'PUBLIC'));
+    assert.equal(published.visibility, 'PUBLIC');
+    assert.equal(published.restriction, 'NONE');
+    const detail = await publicCatches.get(own.ownerId, own.catchId);
+    assert.equal(detail.catchId, own.catchId);
+    assert.deepEqual(await publicCatches.list(own.ownerId, {}), { catches: [detail], page: { nextCursor: null } });
+    assert.deepEqual(await snapshot(), {
+      ...beforeState, assets: [{ ...beforeState.assets[0], visibility: 'PUBLIC' }],
+    });
+  });
+
   test('공개 저장·응답 매핑에 실패하면 PUBLIC 변경을 롤백한다', async () => {
     const own = await seed();
     success(await request(own.ownerId, confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }));

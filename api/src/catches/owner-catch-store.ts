@@ -77,10 +77,16 @@ export class OwnerCatchStore {
       if (visibility === 'PUBLIC') {
         if (current.requestMemberId !== memberId || !current.repositoryId) throw new CatchReadIntegrityError('sourceRequest');
         if (!current.workFactsConfirmed || !current.contributionConfirmed) throw new ApiError('CONFIRMATION_REQUIRED');
-        const protection: { restriction: string }[] = await manager.query(`
-          SELECT applied_restriction AS restriction FROM repository_protection
+        const protection: { restriction: string; confirmedSourceState: unknown;
+          observationProvenance: unknown; observedAt: Date | null }[] = await manager.query(`
+          SELECT applied_restriction AS restriction, confirmed_source_state AS "confirmedSourceState",
+            observation_provenance AS "observationProvenance", observed_at AS "observedAt"
+          FROM repository_protection
           WHERE owner_id = $1 AND repository_id = $2 FOR SHARE`, [memberId, current.repositoryId]);
-        if (protection.length !== 1 || !['NONE', 'SOURCE_PRIVATE'].includes(protection[0].restriction)) {
+        if (protection.length !== 1 || !['NONE', 'SOURCE_PRIVATE'].includes(protection[0].restriction)
+          // 등록·조회와 같은 관측 완전성을 잠금 안에서 확인한다. 최근 실패는 이전 유효 관측을 무효화하지 않는다.
+          || [protection[0].confirmedSourceState, protection[0].observationProvenance, protection[0].observedAt]
+            .some((value) => value === null || value === undefined)) {
           throw new CatchReadIntegrityError('protection');
         }
         if (protection[0].restriction === 'SOURCE_PRIVATE') throw new ApiError('SOURCE_RESTRICTED');
