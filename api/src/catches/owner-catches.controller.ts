@@ -30,4 +30,10 @@ export class OwnerCatchesController {
     emptyCatchQuery(query);
     return this.catches.setMismatch(memberId, catchId, body);
   }
+
+  @Put(':catchId/visibility')
+  visibility(@CurrentMemberId() memberId: string, @Param('catchId') catchId: string, @Body() body: unknown, @Query() query: unknown) {
+    emptyCatchQuery(query);
+    return this.catches.setVisibility(memberId, catchId, body);
+  }
 }

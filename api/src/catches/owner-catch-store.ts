@@ -1,39 +1,9 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { ApiError } from '../common/errors';
-import { catchIdInput, confirmationInput, isUuid, mismatchInput, nextOwnerCatchCursor, ownerCatchQuery } from './owner-catch-input';
-import { CatchReadIntegrityError, OwnerCatchReadSource, OwnerCatchResponse, toOwnerCatchPage, toOwnerCatchResponse } from './owner-catch-response';
-
-type ReadRow = OwnerCatchReadSource['asset'] & {
-  requestId: string | null;
-  requestMemberId: string | null;
-  repositoryId: string | null;
-  protectionOwnerId: string | null;
-  protectionRepositoryId: string | null;
-  appliedRestriction: 'NONE' | 'SOURCE_PRIVATE' | null;
-  confirmedSourceState: unknown;
-  observationProvenance: unknown;
-  observedAt: Date | null;
-};
-
-const READ_COLUMNS = `
-  c.catch_id AS "catchId", c.owner_id AS "ownerId", c.title,
-  c.source_request_id AS "sourceRequestId", c.source_result_id AS "sourceResultId",
-  c.source_candidate_id AS "sourceCandidateId", c.work_facts AS "workFacts",
-  c.subject_contribution AS "subjectContribution", c.draft_status AS "draftStatus",
-  c.draft_content AS "draftContent", c.reflection_status AS "reflectionStatus",
-  c.reflection_questions AS "reflectionQuestions", c.work_facts_confirmed AS "workFactsConfirmed",
-  c.contribution_confirmed AS "contributionConfirmed", c.mismatch, c.visibility,
-  c.source_mode AS "sourceMode", r.request_id AS "requestId", r.member_id AS "requestMemberId",
-  r.repository_id AS "repositoryId", p.owner_id AS "protectionOwnerId",
-  p.repository_id AS "protectionRepositoryId", p.applied_restriction AS "appliedRestriction",
-  p.confirmed_source_state AS "confirmedSourceState", p.observation_provenance AS "observationProvenance",
-  p.observed_at AS "observedAt"`;
-
-// LEFT JOIN으로 연결 누락을 숨기지 않고 응답 매핑의 무결성 검사에 전달한다.
-const READ_FROM = `FROM catch_asset c
-  LEFT JOIN analysis_request r ON r.request_id = c.source_request_id
-  LEFT JOIN repository_protection p ON p.owner_id = c.owner_id AND p.repository_id = r.repository_id`;
+import { catchIdInput, confirmationInput, isUuid, mismatchInput, nextOwnerCatchCursor, ownerCatchQuery, visibilityInput } from './owner-catch-input';
+import { CatchReadIntegrityError, OwnerCatchResponse, toOwnerCatchPage, toOwnerCatchResponse } from './owner-catch-response';
+import { READ_COLUMNS, READ_FROM, ReadRow, readCatchSources } from './catch-reader';
 
 @Injectable()
 export class OwnerCatchStore {
@@ -67,7 +37,7 @@ export class OwnerCatchStore {
       const rows: ReadRow[] = await manager.query(`SELECT ${READ_COLUMNS} ${READ_FROM}
         WHERE ${conditions.join(' AND ')} ORDER BY c.catch_id ASC LIMIT $${values.length}`, values);
       const pageRows = rows.slice(0, query.limit);
-      const sources = await this.sources(manager, memberId, pageRows);
+      const sources = await readCatchSources(manager, memberId, pageRows);
       const nextCursor = rows.length > query.limit
         ? nextOwnerCatchCursor(memberId, query, pageRows[pageRows.length - 1].catchId) : null;
       return toOwnerCatchPage(memberId, sources, nextCursor);
@@ -93,6 +63,47 @@ export class OwnerCatchStore {
   async setMismatch(memberId: string, input: unknown, body: unknown): Promise<OwnerCatchResponse> {
     const mismatch = mismatchInput(body);
     return this.update(memberId, catchIdInput(input), 'mismatch = $3', [mismatch]);
+  }
+
+  async setVisibility(memberId: string, input: unknown, body: unknown): Promise<OwnerCatchResponse> {
+    const visibility = visibilityInput(body);
+    memberId = memberId.toLowerCase();
+    if (!isUuid(memberId)) throw new ApiError('AUTH_INVALID');
+    const catchId = catchIdInput(input);
+    // READ COMMITTED: 잠금 대기 중 확정된 보호 상태를 읽고 검사·저장까지 잠금을 유지한다.
+    return this.dataSource.transaction('READ COMMITTED', async (manager) => {
+      await this.assertMemberExists(manager, memberId);
+      if (!isUuid(catchId)) throw new NotFoundException();
+      const owned: { workFactsConfirmed: boolean; contributionConfirmed: boolean;
+        requestMemberId: string | null; repositoryId: string | null }[] = await manager.query(`
+        SELECT c.work_facts_confirmed AS "workFactsConfirmed", c.contribution_confirmed AS "contributionConfirmed",
+          r.member_id AS "requestMemberId", r.repository_id AS "repositoryId"
+        FROM catch_asset c LEFT JOIN analysis_request r ON r.request_id = c.source_request_id
+        WHERE c.owner_id = $1 AND c.catch_id = $2 FOR UPDATE OF c`, [memberId, catchId]);
+      if (owned.length === 0) throw new NotFoundException();
+      const current = owned[0];
+      if (visibility === 'PUBLIC') {
+        if (current.requestMemberId !== memberId || !current.repositoryId) throw new CatchReadIntegrityError('sourceRequest');
+        if (!current.workFactsConfirmed || !current.contributionConfirmed) throw new ApiError('CONFIRMATION_REQUIRED');
+        const protection: { restriction: string; confirmedSourceState: unknown;
+          observationProvenance: unknown; observedAt: Date | null }[] = await manager.query(`
+          SELECT applied_restriction AS restriction, confirmed_source_state AS "confirmedSourceState",
+            observation_provenance AS "observationProvenance", observed_at AS "observedAt"
+          FROM repository_protection
+          WHERE owner_id = $1 AND repository_id = $2 FOR SHARE`, [memberId, current.repositoryId]);
+        if (protection.length !== 1 || !['NONE', 'SOURCE_PRIVATE'].includes(protection[0].restriction)
+          // 등록·조회와 같은 관측 완전성을 잠금 안에서 확인한다. 최근 실패는 이전 유효 관측을 무효화하지 않는다.
+          || [protection[0].confirmedSourceState, protection[0].observationProvenance, protection[0].observedAt]
+            .some((value) => value === null || value === undefined)) {
+          throw new CatchReadIntegrityError('protection');
+        }
+        if (protection[0].restriction === 'SOURCE_PRIVATE') throw new ApiError('SOURCE_RESTRICTED');
+      }
+      await manager.query('UPDATE catch_asset SET visibility = $3 WHERE owner_id = $1 AND catch_id = $2',
+        [memberId, catchId, visibility]);
+      // 응답 무결성 검사 실패도 저장을 롤백한다. PRIVATE에는 공개 자격 조건을 적용하지 않는다.
+      return this.read(manager, memberId, catchId);
+    });
   }
 
   private async update(memberId: string, catchId: string, assignment: string, values: unknown[]): Promise<OwnerCatchResponse> {
@@ -123,32 +134,9 @@ export class OwnerCatchStore {
       WHERE c.owner_id = $1 AND c.catch_id = $2`, [memberId, catchId]);
     if (rows.length === 0) throw new NotFoundException();
     if (rows.length !== 1) throw new CatchReadIntegrityError('catch.duplicate');
-    const [source] = await this.sources(manager, memberId, rows);
+    const [source] = await readCatchSources(manager, memberId, rows);
     const response = toOwnerCatchResponse(memberId, source);
     if (response === null) throw new CatchReadIntegrityError('catch.ownerId');
     return response;
-  }
-
-  private async sources(manager: EntityManager, memberId: string, rows: ReadRow[]): Promise<OwnerCatchReadSource[]> {
-    if (rows.length === 0) return [];
-    const evidence: OwnerCatchReadSource['evidence'][number][] = await manager.query(`SELECT
-      e.catch_evidence_id AS "catchEvidenceId", e.catch_id AS "catchId", e.source_evidence_id AS "sourceEvidenceId",
-      e.source_url AS "sourceUrl", e.source_revision AS "sourceRevision", e.represented_facts AS "representedFacts",
-      e.contribution_scope AS "contributionScope", e.coverage_limits AS "coverageLimits"
-      FROM catch_evidence e JOIN catch_asset c ON c.catch_id = e.catch_id
-      WHERE c.owner_id = $1 AND e.catch_id = ANY($2::uuid[]) ORDER BY e.catch_evidence_id ASC`,
-    [memberId, rows.map((row) => row.catchId)]);
-    return rows.map((row) => ({
-      asset: row,
-      sourceRequest: row.requestId === null ? null : {
-        requestId: row.requestId, memberId: row.requestMemberId!, repositoryId: row.repositoryId!,
-      },
-      evidence: evidence.filter((item) => item.catchId === row.catchId),
-      protection: row.protectionOwnerId === null ? null : {
-        ownerId: row.protectionOwnerId, repositoryId: row.protectionRepositoryId!, appliedRestriction: row.appliedRestriction!,
-        confirmedSourceState: row.confirmedSourceState, observationProvenance: row.observationProvenance,
-        observedAt: row.observedAt,
-      },
-    }));
   }
 }

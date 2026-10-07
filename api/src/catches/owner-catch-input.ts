@@ -76,3 +76,9 @@ export function mismatchInput(input: unknown): boolean {
 export function emptyCatchQuery(input: unknown): void {
   object(input, []);
 }
+
+export function visibilityInput(input: unknown): 'PRIVATE' | 'PUBLIC' {
+  const value = object(input, ['visibility']);
+  if (value.visibility !== 'PRIVATE' && value.visibility !== 'PUBLIC') throw new BadRequestException();
+  return value.visibility;
+}
