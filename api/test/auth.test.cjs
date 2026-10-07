@@ -259,3 +259,65 @@ test('비밀값 기본값이 없고 수명·서명 키 설정 오류에 실제 �
     (error) => error.message.includes('AUTH_JWT_SECRET') && !error.message.includes(invalidSecret),
   );
 });
+
+// #222 보안 사건 기록. 회원 토큰 변조·만료·형식 오류(AUTH_INVALID)만 SecurityEvent 경고 한 줄로 남긴다.
+const SECURITY_EVENT = /^AUTH_INVALID GET \/v1\/__test\/member requestId=([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}) at=(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)$/;
+const securityEvents = (logs) => logs
+  .filter((line) => line.endsWith(' SecurityEvent'))
+  .map((line) => line.slice(0, -' SecurityEvent'.length));
+
+test('회원 토큰 변조·만료·형식 오류는 보안 사건 한 줄씩, 분류 코드·경로 틀·시각·요청 식별자만 남긴다', async (t) => {
+  const server = await start(t);
+  const { accessToken } = await (await server.login()).json();
+  const pieces = accessToken.split('.');
+  pieces[2] = (pieces[2][0] === 'A' ? 'B' : 'A') + pieces[2].slice(1);
+  const tampered = pieces.join('.');
+  const expired = await server.sign({ iat: 1, exp: 2 });
+  const marker = 'synthetic-header-value-222';
+  const startedAt = Date.now();
+  const responses = [
+    await server.protectedRequest(tampered),
+    await server.protectedRequest(expired),
+    await server.request('/v1/__test/member', { headers: { Authorization: `Bearer ${marker} extra` } }),
+  ];
+  const finishedAt = Date.now();
+  for (const response of responses) await assertAuthError(response, 'AUTH_INVALID');
+
+  const events = securityEvents(server.logs);
+  assert.equal(events.length, 3, '거부 한 건마다 보안 사건이 한 줄씩 남는다');
+  const ids = events.map((line) => {
+    const match = SECURITY_EVENT.exec(line);
+    assert.ok(match, `정해진 필드만 담는다: ${line.replace(/requestId=\S+/, 'requestId=…')}`);
+    const at = Date.parse(match[2]);
+    assert.ok(at >= startedAt - 1000 && at <= finishedAt + 1000, '기록 시각은 요청을 처리한 시각이다');
+    return match[1];
+  });
+  assert.equal(new Set(ids).size, 3, '요청 식별자는 요청마다 다르다');
+
+  const logText = server.logs.join('\n');
+  for (const sensitive of [accessToken, tampered, expired, marker, server.secret]) {
+    assert.equal(logText.includes(sensitive), false, '보안 사건에 토큰·키·헤더 원문을 넣지 않는다');
+  }
+  for (const response of responses) {
+    const headerValues = [...response.headers.values()].join('\n');
+    for (const id of ids) assert.equal(headerValues.includes(id), false, '요청 식별자를 응답으로 내보내지 않는다');
+  }
+});
+
+test('토큰 없는 요청·정상 요청·다른 업무 거부는 보안 사건으로 남기지 않는다', async (t) => {
+  const server = await start(t);
+  const { accessToken } = await (await server.login()).json();
+  await assertAuthError(await server.protectedRequest(), 'AUTH_REQUIRED');
+  assert.equal((await server.protectedRequest(accessToken)).status, 200);
+  assert.equal((await server.login({ memberId: '' })).status, 400);
+  assert.equal((await server.request('/v1/__test/missing')).status, 404);
+  assert.deepEqual(securityEvents(server.logs), [], 'AUTH_REQUIRED·성공·입력 오류·없는 경로는 보안 사건이 아니다');
+});
+
+test('요청 식별자는 같은 요청에 같은 값, 다른 요청에 다른 값이다', () => {
+  const { requestIdOf } = require('../dist/common/http/request-id');
+  const first = {};
+  const second = {};
+  assert.equal(requestIdOf(first), requestIdOf(first));
+  assert.notEqual(requestIdOf(first), requestIdOf(second));
+});

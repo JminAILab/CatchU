@@ -238,7 +238,7 @@ components:
         representedFacts: {"type":"array","items":{"type":"string"}}
         contributionScope: {"type":"string"}
         coverageLimits: {"type":"array","items":{"type":"string"}}
-  headers: {"NoStore":{"description":"회원·수신자 응답에 Cache-Control: no-store","schema":{"type":"string","enum":["no-store"]}},"RetryAfter":{"description":"차단 해제까지 남은 초","schema":{"type":"integer","minimum":1}}}
+  headers: {"NoStore":{"description":"회원·수신자 응답에 Cache-Control: no-store","schema":{"type":"string","enum":["no-store"]}},"RetryAfter":{"description":"다시 보낼 수 있을 때까지 남은 초(비밀번호 시도 차단·발급 빈도 제한)","schema":{"type":"integer","minimum":1}}}
   responses:
     Error400:
       description: "오류 코드 표 및 경계 규칙 참조"

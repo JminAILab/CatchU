@@ -1,0 +1,301 @@
+{
+  "task": "#219 링크 발급 빈도 제한 계약 AI-DLC 사후 기록",
+  "project_dir": "/Users/ljm/Desktop/github/CatchU",
+  "intent": "260914-catchu-october-mvp",
+  "baseline_commit": "37b50f055847f27d549f53e89029486dabd529c1",
+  "validation": {
+    "yaml_files": 4,
+    "summary_yaml_blocks": 3,
+    "resolved_refs": 203,
+    "operations": {
+      "createShareLink": {
+        "method": "post",
+        "path": "/share-links",
+        "responses": [
+          "200",
+          "201",
+          "400",
+          "401",
+          "403",
+          "404",
+          "409",
+          "429",
+          "500"
+        ]
+      },
+      "unlockLink": {
+        "method": "post",
+        "path": "/public/links/{token}/unlock",
+        "responses": [
+          "200",
+          "400",
+          "401",
+          "404",
+          "429",
+          "500"
+        ]
+      },
+      "getPublicCollection": {
+        "method": "get",
+        "path": "/public/links/{token}",
+        "responses": [
+          "200",
+          "400",
+          "401",
+          "404",
+          "500"
+        ]
+      },
+      "getPublicCatch": {
+        "method": "get",
+        "path": "/public/links/{token}/catches/{catchId}",
+        "responses": [
+          "200",
+          "400",
+          "401",
+          "404",
+          "500"
+        ]
+      }
+    },
+    "create_429_ref": "./common.yaml#/components/responses/Error429",
+    "retry_after_schema": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "rules_blocks": 1,
+    "rule_count": 15,
+    "BR2.12": {
+      "id": "BR2.12",
+      "statement": "발급 입력의 길이를 확인하고 유효 링크의 개수·제목을 원자적으로 제한하며 중단 응답을 정한다",
+      "category": "constraint",
+      "applies_to": [
+        "ShareLink"
+      ],
+      "trigger": "링크 POST·중단 PUT",
+      "logic": "같은 회원의 발급 요청이 빈도 상한을 넘으면 입력 검사·비밀번호 해시·저장 없이 거부; 발급 본문은 trim 제목 1~50자, 선택 비밀번호는 입력 그대로 8~64자(유니코드 코드 포인트로 셈); IF stoppedAt=null AND t<expiresAt인 본인 링크가 5개 미만이고 trim 제목이 유일하면 원자 발급; 만료는 발급+30*24시간; 중단 PUT은 소유를 상태보다 먼저 검사해 본인 링크면 첫 중단·반복 중단·만료 링크 모두 200으로 현재 ShareLink 반환(중단은 만료 뒤에도 STOPPED, 만료 링크는 EXPIRED 유지); 중단은 자산 상태를 바꾸지 않음",
+      "violation": "빈도 상한 초과 429 RATE_LIMITED(남은 초는 Retry-After 헤더); 길이 위반 400 VALIDATION_FAILED; 409 LINK_LIMIT_REACHED/LINK_TITLE_CONFLICT; 중단/만료된 링크는 검사 집합에서 제외; 중단 PUT의 타인·없는 링크는 404 RESOURCE_UNAVAILABLE이고 403·409를 쓰지 않음",
+      "source": [
+        "FR4.3",
+        "FR4.4"
+      ]
+    },
+    "trace_rows": [
+      {
+        "id": "FR4.3",
+        "status": "OK",
+        "target": "BR2.12 BR2.14"
+      },
+      {
+        "id": "FR4.4",
+        "status": "OK",
+        "target": "BR2.12 BR2.13"
+      }
+    ],
+    "status": "PASS"
+  },
+  "preservation": {
+    "artifacts": 15,
+    "historical_records": 33,
+    "mismatches": [],
+    "changed_existing_tracked_files": [
+      "aidlc/spaces/default/intents/260914-catchu-october-mvp/audit/macui-macbookpro-local-3cf6d8f9dcd7.md"
+    ],
+    "audit_initial_prefix_preserved": true,
+    "audit_committed_prefix_preserved": true,
+    "uncommitted_start_audit_bytes": 2740,
+    "contract_single_lifecycle": [
+      {
+        "file": "aidlc/spaces/default/intents/260914-catchu-october-mvp/audit/macui-macbookpro-local-de1289503add.md",
+        "event": "STAGE_STARTED",
+        "timestamp": "2026-09-23T07:02:00Z"
+      }
+    ]
+  },
+  "sensors": [
+    {
+      "name": "contract-required-sections",
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "1e6363",
+        "wall_time_seconds": 0.041571584,
+        "exit_code": 0,
+        "original_token_count": 98,
+        "output": "{\"pass\":true,\"h2_count\":11,\"headings\":[\"## 계약의 지위와 경계\",\"## M — 회원 API\",\"## 분석 접수·상태·재요청\",\"## B 등록·공개 및 E/F 반영 경계\",\"## P — 수신자 API\",\"## 공통 오류·요청 안전성\",\"## W — worker 메시지 계약\",\"## Contract ownership rules\",\"## Open questions\",\"## 담당자 확인 요청\",\"## 추적 정보\"],\"findings_count\":0}\n"
+      },
+      "command": "aidlc engine sensor-required-sections --output-path aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md --stage contract-design"
+    },
+    {
+      "name": "contract-upstream-coverage",
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "7541dd",
+        "wall_time_seconds": 0.019598917,
+        "exit_code": 0,
+        "original_token_count": 72,
+        "output": "{\"pass\":true,\"consumes\":[\"unit-of-work\",\"unit-of-work-dependency\",\"components\",\"requirements\"],\"unreferenced\":[],\"scanned_files\":[\"/Users/ljm/Desktop/github/CatchU/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md\"],\"findings_count\":0}\n"
+      },
+      "command": "aidlc engine sensor-upstream-coverage --output-path aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md --stage contract-design --consumes unit-of-work,unit-of-work-dependency,components,requirements --deliverables contract-summary"
+    },
+    {
+      "name": "u2-entities-required-sections",
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "65f659",
+        "wall_time_seconds": 0.000027333,
+        "exit_code": 0,
+        "original_token_count": 41,
+        "output": "{\"pass\":true,\"h2_count\":4,\"headings\":[\"## 모델 정본\",\"## 물리 스키마 전환 제약\",\"## 담당자 확인 요청\",\"## 추적 정보\"],\"findings_count\":0}\n"
+      },
+      "command": "aidlc engine sensor-required-sections --output-path aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md --stage functional-design"
+    },
+    {
+      "name": "u2-rules-required-sections",
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "92f182",
+        "wall_time_seconds": 0.000004334,
+        "exit_code": 0,
+        "original_token_count": 29,
+        "output": "{\"pass\":true,\"h2_count\":3,\"headings\":[\"## 규칙 정본\",\"## 규칙 요약\",\"## 추적 정보\"],\"findings_count\":0}\n"
+      },
+      "command": "aidlc engine sensor-required-sections --output-path aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md --stage functional-design"
+    },
+    {
+      "name": "u2-functional-spec-required-sections",
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "1ce0f9",
+        "wall_time_seconds": 0.002479792,
+        "exit_code": 0,
+        "original_token_count": 85,
+        "output": "{\"pass\":true,\"h2_count\":10,\"headings\":[\"## 적용 범위\",\"## ERD — 파생 뷰\",\"## 업무 흐름\",\"## 상태 전이 정본\",\"## 동시성과 일관성\",\"## DTO와 저장 모델 연결\",\"## 규칙 요약 — 파생 뷰\",\"## Open questions · 개발 이슈로 보완\",\"## 담당자 확인 요청\",\"## 추적 정보\"],\"findings_count\":0}\n"
+      },
+      "command": "aidlc engine sensor-required-sections --output-path aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md --stage functional-design"
+    },
+    {
+      "name": "u2-upstream-coverage",
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "b64738",
+        "wall_time_seconds": 0.040946292,
+        "exit_code": 0,
+        "original_token_count": 149,
+        "output": "{\"pass\":true,\"consumes\":[\"unit-of-work\",\"unit-of-work-story-map\",\"requirements\",\"components\",\"contract-summary\"],\"unreferenced\":[],\"scanned_files\":[\"/Users/ljm/Desktop/github/CatchU/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md\",\"/Users/ljm/Desktop/github/CatchU/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md\",\"/Users/ljm/Desktop/github/CatchU/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md\"],\"findings_count\":0}\n"
+      },
+      "command": "aidlc engine sensor-upstream-coverage --output-path aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md --stage functional-design --consumes unit-of-work,unit-of-work-story-map,requirements,components,contract-summary --deliverables entities,rules,functional-spec"
+    },
+    {
+      "name": "u2-traceability",
+      "status": "fulfilled",
+      "value": {
+        "chunk_id": "37ef43",
+        "wall_time_seconds": 0.053272291,
+        "exit_code": 0,
+        "original_token_count": 85,
+        "output": "{\"pass\":false,\"gaps\":[],\"orphans\":[],\"missing_from_table\":[],\"missing_from_upstream_ids\":[\"FR1.2\",\"FR1.3\",\"FR10\",\"FR10.1\",\"FR10.4\",\"FR10.5\",\"FR10.6\",\"FR2\",\"FR2.1\",\"FR2.2\",\"FR3.3\",\"FR3.6\",\"FR5\",\"FR5.1\",\"FR5.5\",\"FR6.1\",\"FR6.6\",\"FR7.1\",\"FR7.4\",\"FR8.1\",\"FR8.4\",\"FR9.1\",\"FR9.2\"],\"invalid_entries\":[],\"invalid_targets\":[],\"findings_count\":23}\n"
+      },
+      "command": "aidlc engine sensor-traceability --output-path aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/traceability.json --stage functional-design"
+    }
+  ],
+  "validator_setup_error": {
+    "message": "BR2.12 limit missing (RuntimeError)",
+    "cause": "검사 스크립트가 rules.md 자체에 회원 인증 문구와 429가 함께 있다고 잘못 가정했다. 회원 인증 순서는 계약 요약에서, rules logic의 입력 검사·해시·저장 전 거부와 violation의 429는 각 필드에서 검사하도록 임시 스크립트만 수정했다. 산출물은 수정하지 않았다."
+  },
+  "review_requests": [
+    {
+      "stage": "contract-design",
+      "command": "aidlc engine log review --stage contract-design --single --reviewer aidlc-architecture-reviewer-agent --iteration 1",
+      "chunk_id": "2027df",
+      "wall_time_seconds": 0.0000075,
+      "exit_code": 1,
+      "original_token_count": 250,
+      "output": "{\"error\":\"Cannot start review for \\\"contract-design\\\": no fresh human-backed consolidated summary confirmation is recorded. Present the summary, then run `aidlc-log.ts answer --checkpoint summary-confirmation --stage contract-design --single --details \\\"Looks correct\\\" after the human responds.\\n{\\\"kind\\\":\\\"ask\\\",\\\"ask_type\\\":\\\"guard-recovery\\\",\\\"response_route\\\":\\\"execute-remedy\\\",\\\"question\\\":\\\"The next action for \\\\\\\"contract-design\\\\\\\" would be refused. Choose one authority-preserving recovery action.\\\",\\\"stage\\\":\\\"contract-design\\\",\\\"reason_codes\\\":[\\\"SUMMARY_RECEIPT_MISSING\\\"],\\\"remedies\\\":[{\\\"op\\\":\\\"restore-or-jump\\\",\\\"action\\\":\\\"This stage is already approved; restore the reviewed source state, or jump back with /aidlc --stage contract-design to redo it.\\\",\\\"operation\\\":{\\\"kind\\\":\\\"restart-stage\\\",\\\"stage\\\":\\\"contract-design\\\"},\\\"command\\\":\\\"aidlc engine orchestrate next --stage contract-design\\\",\\\"requiresHuman\\\":true,\\\"executableNow\\\":true,\\\"interaction\\\":\\\"command\\\"}]}\"}\n"
+    },
+    {
+      "stage": "functional-design",
+      "command": "aidlc engine log review --stage functional-design --single --reviewer aidlc-architecture-reviewer-agent --iteration 1",
+      "chunk_id": "418816",
+      "wall_time_seconds": 0.000010625,
+      "exit_code": 0,
+      "original_token_count": 327,
+      "output": "{\"emitted\":\"REVIEW_REQUESTED\",\"stage\":\"functional-design\",\"requestId\":\"review:2d9870963d4b38d4edc5ca5dcacc5792\",\"reviewFile\":\"aidlc/spaces/default/intents/260914-catchu-october-mvp/.aidlc-engine/reviews/functional-design/stage/e4799f6afb2b8f27/1.review.md\",\"recordVerdict\":\"aidlc engine log review --stage functional-design --reviewer aidlc-architecture-reviewer-agent --single --iteration 1 --verdict '<READY|NOT-READY>' --project-dir /Users/ljm/Desktop/github/CatchU\",\"change_notices\":[\"aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md was saved without the current summary confirmation. Continuing (Guard Policy: relaxed or off).\",\"aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md was saved without the current summary confirmation. Continuing (Guard Policy: relaxed or off).\",\"aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md was saved without the current summary confirmation. Continuing (Guard Policy: relaxed or off).\",\"aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/traceability.json was saved without the current summary confirmation. Continuing (Guard Policy: relaxed or off).\"]}\n"
+    }
+  ],
+  "completion_reports": [
+    {
+      "stage": "contract-design",
+      "command": "aidlc engine orchestrate report --single --stage contract-design --result completed",
+      "chunk_id": "f190a4",
+      "wall_time_seconds": 0.000009166,
+      "exit_code": 0,
+      "original_token_count": 78,
+      "output": "{\"kind\":\"error\",\"message\":\"Refusing to complete \\\"contract-design\\\": no fresh human-backed consolidated summary confirmation is recorded. Present the summary, then run `aidlc-log.ts answer --checkpoint summary-confirmation --stage contract-design --single --details \\\"Looks correct\\\" after the human responds.\"}\n"
+    },
+    {
+      "stage": "functional-design",
+      "command": "aidlc engine orchestrate report --single --stage functional-design --result completed",
+      "chunk_id": "f04076",
+      "wall_time_seconds": 0.000010666,
+      "exit_code": 0,
+      "original_token_count": 47,
+      "output": "{\"kind\":\"done\",\"reason\":\"Single-stage run of \\\"functional-design\\\" committed under synthetic workflow \\\"single-stage:functional-design\\\". The main workflow's Current Stage is untouched.\"}\n"
+    }
+  ],
+  "summary_confirmations": [
+    {
+      "stage": "contract-design",
+      "command": "aidlc engine log answer --stage contract-design --single --checkpoint summary-confirmation --questions-file aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-06-questions.md --details 'Looks correct'",
+      "chunk_id": "795386",
+      "wall_time_seconds": 0.00001125,
+      "exit_code": 0,
+      "original_token_count": 50,
+      "output": "{\"emitted\":\"SUMMARY_CONFIRMATION_RECORDED\",\"checkpoint\":\"summary-confirmation\",\"stage\":\"contract-design\",\"summary_authorization_id\":\"2c27e7fb92ad2512b2385a877ed5ec2d1da187def3e15c60bb833bc0c7017d3d\"}\n"
+    },
+    {
+      "stage": "functional-design",
+      "command": "aidlc engine log answer --stage functional-design --single --checkpoint summary-confirmation --questions-file aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/single-2026-10-06-questions.md --details 'Looks correct'",
+      "chunk_id": "03f701",
+      "wall_time_seconds": 0.000010584,
+      "exit_code": 0,
+      "original_token_count": 51,
+      "output": "{\"emitted\":\"SUMMARY_CONFIRMATION_RECORDED\",\"checkpoint\":\"summary-confirmation\",\"stage\":\"functional-design\",\"summary_authorization_id\":\"593bf18999f8995eb3304c8bb35ddcb17dbdf0dc72ade6440e17f8d38255ee73\"}\n"
+    }
+  ],
+  "summary_brief_setup_error": {
+    "command": "aidlc engine review-brief summary --stage contract-design --single --questions-file aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-06-questions.md",
+    "output": "{\"error\":\"Expected --flag value, got \\\"aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-06-questions.md\\\".\"}",
+    "resolution": "읽기 안내의 정식 인자에 따라 --single을 제외한 호출이 성공했다. 검토 요청·report의 재시도가 아니며 산출물 변경도 없다."
+  },
+  "validation_command": "ruby /private/tmp/catchu-219-validate.rb",
+  "validation_script": "require 'yaml'\nrequire 'json'\nrequire 'date'\nrequire 'uri'\n\nroot = File.expand_path('aidlc/spaces/default/intents/260914-catchu-october-mvp')\ncontract = File.join(root, 'inception/contract-design')\ncache = {}\nload_yaml = ->(text) { YAML.safe_load(text, permitted_classes: [Date, Time], aliases: true) }\nDir.glob(File.join(contract, '*.yaml')).sort.each { |p| cache[p] = load_yaml.call(File.read(p)) }\nsummary_path = File.join(contract, 'contract-summary.md')\nsummary = File.read(summary_path)\nblocks = summary.scan(/```yaml[^\\n]*\\n(.*?)\\n```/m).flatten.map { |b| load_yaml.call(b) }\nrefs = []\nwalk = nil\nwalk = ->(node, source, current_doc) do\n  case node\n  when Hash\n    if node.key?('$ref')\n      ref = node['$ref']\n      path, fragment = ref.split('#', 2)\n      raise \"External ref: #{ref}\" if path.match?(/\\A[a-z]+:/i)\n      target_path = path.empty? ? source : File.expand_path(path, File.dirname(source))\n      target = path.empty? ? current_doc : cache.fetch(target_path) { cache[target_path] = load_yaml.call(File.read(target_path)) }\n      pointer = fragment ? URI::DEFAULT_PARSER.unescape(fragment) : ''\n      unless pointer.empty?\n        raise \"Bad pointer #{ref}\" unless pointer.start_with?('/')\n        pointer[1..].split('/').each do |raw|\n          key = raw.gsub('~1', '/').gsub('~0', '~')\n          target = target.is_a?(Array) ? target.fetch(Integer(key)) : target.fetch(key)\n        end\n      end\n      refs << ref\n    end\n    node.each_value { |v| walk.call(v, source, current_doc) }\n  when Array\n    node.each { |v| walk.call(v, source, current_doc) }\n  end\nend\ncache.to_a.each { |p, doc| walk.call(doc, p, doc) }\nblocks.each { |doc| walk.call(doc, summary_path, doc) }\noperations = {}\n%w[member-api.yaml recipient-api.yaml].each do |name|\n  cache.fetch(File.join(contract, name)).fetch('paths').each do |path, item|\n    item.each do |method, op|\n      next unless op.is_a?(Hash) && op['operationId']\n      operations[op['operationId']] = {'method'=>method, 'path'=>path, 'responses'=>op.fetch('responses').keys.map(&:to_s).sort, 'document'=>op}\n    end\n  end\nend\nexpected = {\n  'createShareLink'=>%w[200 201 400 401 403 404 409 429 500],\n  'unlockLink'=>%w[200 400 401 404 429 500],\n  'getPublicCollection'=>%w[200 400 401 404 500],\n  'getPublicCatch'=>%w[200 400 401 404 500]\n}\nexpected.each { |id, codes| raise \"Response mismatch #{id}\" unless operations.fetch(id).fetch('responses') == codes }\ncommon = cache.fetch(File.join(contract, 'common.yaml')).fetch('components')\nerror429 = operations.fetch('createShareLink').fetch('document').fetch('responses').fetch('429').fetch('$ref')\nraise 'Error429 mismatch' unless error429 == './common.yaml#/components/responses/Error429'\nretry_header = common.fetch('responses').fetch('Error429').fetch('headers').fetch('Retry-After').fetch('$ref')\nraise 'Retry-After ref mismatch' unless retry_header == '#/components/headers/RetryAfter'\nretry_schema = common.fetch('headers').fetch('RetryAfter').fetch('schema')\nraise 'RetryAfter seconds schema mismatch' unless retry_schema == {'type'=>'integer','minimum'=>1}\n%w[429/RATE_LIMITED Retry-After].each { |s| raise \"Summary missing #{s}\" unless summary.include?(s) }\nraise 'authentication ordering missing' unless summary.include?('회원 인증 다음, 입력 검사·비밀번호 해시·저장보다 먼저')\nraise 'No-record contract missing' unless summary.include?('거부한 요청은 링크·멱등 기록을 남기지 않아 같은 키로 다시 보낼 수 있다')\nraise 'Recipient OQ boundary missing' unless summary.include?('수신자 경로의 429는 unlock 시도 제한에만')\nraise '429 table missing' unless summary.include?('| 429 | LINK_UNLOCK_LIMITED, RATE_LIMITED |')\nraise 'Api design boundary missing' unless summary.include?('상한 값은 api 설계가 정하며')\nraise 'Tentative limit entered contract' if (summary + File.read(File.join(contract, 'common.yaml')) + File.read(File.join(contract, 'member-api.yaml'))).match?(/1분\\s*10회|2\\^15/)\nrules_path = File.join(root, 'construction/u2-api/functional-design/rules.md')\nrules_blocks = File.read(rules_path).scan(/```yaml[^\\n]*\\n(.*?)\\n```/m).flatten.map { |b| load_yaml.call(b) }\nrules = rules_blocks.first.fetch('rules')\nrule = rules.find { |r| r['id'] == 'BR2.12' }\nraise 'BR2.12 source mismatch' unless rule.fetch('source') == %w[FR4.3 FR4.4]\nraise 'BR2.12 limit missing' unless rule.fetch('logic').start_with?('같은 회원의 발급 요청이 빈도 상한을 넘으면 입력 검사·비밀번호 해시·저장 없이 거부')\nraise 'BR2.12 violation missing' unless rule.fetch('violation').start_with?('빈도 상한 초과 429 RATE_LIMITED')\nspec = File.read(File.join(root, 'construction/u2-api/functional-design/functional-spec.md'))\nraise 'F6 step zero missing' unless spec.include?('| F6 링크 발급/중단 | 0 회원 발급 빈도 상한 확인(넘으면 해시·저장 없이 429 RATE_LIMITED와 Retry-After)')\ntrace = JSON.parse(File.read(File.join(root, 'construction/u2-api/functional-design/traceability.json')))\n%w[FR4.3 FR4.4].each do |id|\n  row = trace.fetch('coverage').find { |r| r['id'] == id }\n  raise \"trace mismatch #{id}\" unless row && row['status']=='OK' && row['target'].include?('BR2.12')\nend\nresult = {'yaml_files'=>cache.size,'summary_yaml_blocks'=>blocks.size,'resolved_refs'=>refs.size,'operations'=>expected.to_h { |id,_| [id,operations.fetch(id).reject { |k,_| k=='document' }] },'create_429_ref'=>error429,'retry_after_schema'=>retry_schema,'rules_blocks'=>rules_blocks.size,'rule_count'=>rules.size,'BR2.12'=>rule,'trace_rows'=>trace.fetch('coverage').select { |r| %w[FR4.3 FR4.4].include?(r['id']) },'status'=>'PASS'}\nputs JSON.pretty_generate(result)\n",
+  "review_terminal": {
+    "stage": "functional-design",
+    "command": "aidlc engine log review --stage functional-design --reviewer aidlc-architecture-reviewer-agent --single --iteration 1 --verdict READY --project-dir /Users/ljm/Desktop/github/CatchU",
+    "chunk_id": "47af10",
+    "wall_time_seconds": 0.000008917,
+    "exit_code": 0,
+    "original_token_count": 56,
+    "output": "{\"emitted\":\"REVIEW_COMPLETED\",\"stage\":\"functional-design\",\"reviewRecord\":\".aidlc-engine/reviews/functional-design/stage/e4799f6afb2b8f27/1.json\",\"reviewMarkdown\":\"construction/u1-web/functional-design/reviews/review-04.md\"}\n"
+  },
+  "review_result": {
+    "verdict": "READY",
+    "findings": [],
+    "official_record": ".aidlc-engine/reviews/functional-design/stage/e4799f6afb2b8f27/1.json",
+    "readable_copy": "construction/u1-web/functional-design/reviews/review-04.md",
+    "review_scope": "u2-api. u1-web 폴더의 파일은 도구가 저장한 읽기용 사본이며 u1-web 검토·산출물 변경으로 세지 않는다."
+  },
+  "final_preservation": {
+    "artifacts": 15,
+    "historical_records": 33,
+    "mismatches": [],
+    "changed_existing_tracked_files": [
+      "aidlc/spaces/default/intents/260914-catchu-october-mvp/audit/macui-macbookpro-local-3cf6d8f9dcd7.md"
+    ],
+    "audit_initial_prefix_preserved": true,
+    "review_copy_matches_official_body": true,
+    "state_unchanged": true,
+    "protected_december_and_old_review_files": 39,
+    "protected_mismatches": []
+  }
+}

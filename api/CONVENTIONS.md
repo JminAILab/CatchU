@@ -12,6 +12,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/main.ts`                           | 환경변수 검사, HTTP 서버 시작, 종료 훅             |
 | `src/app.module.ts`                     | 최상위 Nest 모듈과 기능 모듈 연결                  |
 | `src/cors.ts`                           | 개발용 CORS. `CORS_ALLOWED_ORIGINS`가 있을 때만 켜고 `Retry-After`를 노출(#106) |
+| `src/common/http/request-id.ts`         | 요청별 서버 내부 식별자(#222). 응답·web으로 내보내지 않음 |
 | `src/health/health.controller.ts`       | `GET /health` 응답                                 |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
 | `src/auth/access-token.guard.ts`       | Bearer 토큰 검증 후 요청에 인증 회원 정보 저장 |
@@ -27,7 +28,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/analysis-receiver/analysis-receiver.module.ts` | 저장소와 계약 경로를 명시해 수신 모듈 조립. 기본 앱에는 미등록 |
 | `test/analysis/` / `test/helpers/receiver-harness.cjs` | 수신·인증 연결·주입 검사와 테스트 전용 메모리 저장소. 실제 DB 구현 아님 |
 | `test/health.test.cjs`                  | 빌드된 앱의 최소 HTTP 실행 검사                    |
-| `test/auth.test.cjs`                    | 테스트 안에만 보호 컨트롤러 구성, 인증 정상·거부 및 로그 비노출 검사 |
+| `test/auth.test.cjs`                    | 테스트 안에만 보호 컨트롤러 구성, 인증 정상·거부·보안 사건 기록 및 로그 비노출 검사 |
 | `test/runtime/bootstrap.test.cjs`       | 소스/빌드 main의 실제 설정 로딩·기동·실패 종료 검사 |
 | `src/database/database.config.ts`       | DB 환경설정 검증과 앱·마이그레이션 명령이 함께 쓰는 접속·매핑 설정(엔티티·마이그레이션 위치, `synchronize` 끔, 세션 UTC) |
 | `src/database/database.module.ts`       | 앱의 DB 연결. 접속 실패 시 짧게 재시도한 뒤 기동 중단 |

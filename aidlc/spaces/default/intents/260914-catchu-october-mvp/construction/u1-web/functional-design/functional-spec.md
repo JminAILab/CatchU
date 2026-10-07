@@ -71,7 +71,7 @@ Catch 탭 아래쪽에는 **저장소 필터가 있는 Catch 목록**을 두고,
 |---|---|
 | 목록 형식 | 회원은 items/page, 수신자는 profile/catches/page. opaque cursor를 해당 조회에만 사용; 다음 페이지도 새 권한 판정 결과를 표시 |
 | 오류 | code/message/details를 소비하되 message 문자열 비교로 분기하지 않음. 알 수 없는 응답은 오류로 표시하고 성공/빈 자료로 추정하지 않음. #88 공통 해석 적용 |
-| 재전송 | 생성 POST의 Idempotency-Key는 같은 사용자·operation·본문 요청에 유지. 응답 불명에 새 키로 자동 재요청하지 않음; 서버의 기존 자원 응답을 사용 |
+| 재전송 | 생성 POST의 Idempotency-Key는 같은 사용자·operation·본문 요청에 유지. 응답 불명에 새 키로 자동 재요청하지 않음; 서버의 기존 자원 응답을 사용. 429 RATE_LIMITED는 처리하지 않은 요청이라 확정 결과로 보지 않고 키를 유지하며, Retry-After 뒤 같은 키로 다시 보낸다 |
 | 공개 자료 | PublicCatch에 있는 title·근거·기여·draft만 표시. reflection·본인 확인/불일치·내부 ID·링크 제목을 수신자 화면에서 재구성하지 않음 |
 | 초안/질문 | GENERATED와 실패/미생성을 구분. draft.content=null을 생성된 설명으로 표시하지 않음. 최소 질문의 상세 표시는 B 개발 이슈, 수신자 공개/답변 저장 없음 |
 | 상태 정본 | 권한·등록·공개·링크 유효성·재요청 가능성은 api가 판정. worker와 직접 통신하거나 ProcessingEvent/ResultReceipt를 web에서 해석하지 않음 |
