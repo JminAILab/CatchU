@@ -4,7 +4,7 @@
 
 NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준을 확인한다.
 
-현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 저장소 연결 전 독립 로직으로 제공하며 `AppModule`에는 등록하지 않는다. [#104 회원·분석 선행 테이블](https://github.com/JminAILab/CatchU/issues/104)과 개발 회원·합성 연동·공통 멱등 처리를 제공한다. 기능 API는 [#147 공유 링크 발급](https://github.com/JminAILab/CatchU/issues/147)(`POST /v1/share-links`)과 [#148 목록·중단](https://github.com/JminAILab/CatchU/issues/148)(`GET /v1/share-links`, `PUT /v1/share-links/{linkId}/stop`)이 있다([docs/share-links.md](docs/share-links.md)). 실제 로그인·나머지 기능 API·worker 연결은 후속 작업이다.
+현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 저장소 연결 전 독립 로직으로 제공하며 `AppModule`에는 등록하지 않는다. [#104 회원·분석 선행 테이블](https://github.com/JminAILab/CatchU/issues/104)과 개발 회원·합성 연동·공통 멱등 처리를 제공한다. 기능 API는 [#147 공유 링크 발급](https://github.com/JminAILab/CatchU/issues/147)(`POST /v1/share-links`)과 [#148 목록·중단](https://github.com/JminAILab/CatchU/issues/148)(`GET /v1/share-links`, `PUT /v1/share-links/{linkId}/stop`)이 있다([docs/share-links.md](docs/share-links.md)). 본인 Catch 조회·확인·불일치 API는 [docs/catch-owner-read-preparation.md](docs/catch-owner-read-preparation.md)를 따른다. 실제 로그인·나머지 기능 API·worker 연결은 후속 작업이다.
 
 ## 공통 오류 처리 — API 명세 v1
 
@@ -42,10 +42,6 @@ throw new ApiError('ANALYSIS_IN_PROGRESS', { details: { existingRequestId: reque
 - 예상 밖 예외는 `500 INTERNAL_ERROR`와 일반 안내다. 5xx 로그는 `ApiError`를 포함해 예외 분류명과 코드 위치(`파일:줄:칸`)만 남긴다. 분류명은 `error.name` 원문이 아니라 `instanceof` 기반으로 고른 허용 목록의 고정 분류명(`ApiError`·`ForbiddenException`·`TypeError`·`Error` 등)이며, 목록 밖의 하위 클래스는 가장 가까운 상위 분류로 기록한다. 코드 위치는 stack 문자열이 아니라 V8의 구조화된 호출 위치에서 따로 수집하므로 원문 메시지가 섞이지 않으며, 함수 이름은 기록하지 않는다. 수집 기록이 없으면 위치를 생략한다(`src/common/errors/stack-frames.ts`). 요청 주소는 토큰이 들어가는 실제 경로 대신 등록된 경로 틀만 기록하고, 없으면 `[unmatched]`로 표시한다.
 
 전역 설정은 `configureApp`에 모았다. 기능 경로는 `/v1` 아래, `GET /health`는 접두사 없이 유지하며 성공·오류 응답에 `Cache-Control: no-store`를 붙인다. `npm test`는 실제 로컬 HTTP 서버에서 위 상태/본문/헤더/로그, ValidationPipe, 인증 Guard를 검증한다. 오류 재현 전용 경로는 `test/errors.test.cjs`에만 있고 제품 앱에 추가하지 않는다.
-
-## B 본인 Catch 조회 준비 — #130
-
-[`src/catches/owner-catch-response.ts`](src/catches/owner-catch-response.ts)는 Catch·원 요청·근거·보호 판단을 본인용 응답으로 매핑하는 순수 함수다. [사용 범위와 실제 조회 연결 순서](docs/catch-owner-read-preparation.md)에 응답 출처·소유권 대조·오류 구분과 남은 검사를 정리했다. 현재 `/v1/catches` 경로·DB 조회·인증 연결은 구현하지 않았으며 실제 조회 API의 완성을 뜻하지 않는다.
 
 ## 작업 시작
 

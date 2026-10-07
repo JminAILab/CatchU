@@ -47,6 +47,9 @@ function fixture() {
       ownerId: 'member-owner',
       repositoryId: 'repository-1',
       appliedRestriction: 'SOURCE_PRIVATE',
+      confirmedSourceState: { synthetic: true, visibility: 'PRIVATE' },
+      observationProvenance: { synthetic: true, fixture: 'owner-catch-response' },
+      observedAt: new Date('2026-10-01T00:00:00Z'),
     },
   };
 }
@@ -151,7 +154,22 @@ test('보호 자료 누락 또는 회원·저장소 불일치를 NONE으로 보�
   }
 });
 
-test('관측 실패 정보가 있어도 이미 적용된 보호 상태를 설정하거나 해제하지 않는다', () => {
+test('관측 상태·출처·시각의 null·누락은 상세와 전체 페이지를 실패시킨다', () => {
+  for (const restriction of ['NONE', 'SOURCE_PRIVATE']) {
+    for (const field of ['confirmedSourceState', 'observationProvenance', 'observedAt']) {
+      for (const value of [null, undefined]) {
+        const source = fixture();
+        source.protection.appliedRestriction = restriction;
+        source.protection[field] = value;
+        source.protection.observationFailure = { synthetic: true, reason: 'TIMEOUT' };
+        assertIntegrityError(() => project(source));
+        assertIntegrityError(() => toOwnerCatchPage('member-owner', [fixture(), source], null));
+      }
+    }
+  }
+});
+
+test('이전 유효 관측이 있으면 최근 실패 정보가 있어도 적용된 보호 상태를 보존한다', () => {
   for (const restriction of ['NONE', 'SOURCE_PRIVATE']) {
     const source = fixture();
     source.protection.appliedRestriction = restriction;

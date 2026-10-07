@@ -8,9 +8,9 @@ const config = readCatchTestDatabase();
 const CONFIRMED = { workFactsConfirmed: true, contributionConfirmed: true };
 
 // 실제 Nest HTTP·PostgreSQL·회원/분석 기반·B 코드를 연결한다.
-// E 수신 기록·완료 처리·보호 관측은 SQL 시험 대역이며 실제 분석 수신이나 Google 로그인을 검증하지 않는다.
+// E 수신 기록은 실제 엔티티를 쓰되 입력·완료 상태·보호 관측은 합성 자료로 직접 준비한다.
+// 실제 E 수신·완료 호출이나 Google 로그인을 검증하지 않는다.
 describe('본인 Catch HTTP·PostgreSQL', {
-  skip: config ? false : 'TEST_DB_* 미설정: 실제 DB 검사는 명시 DB 검사에서 실행',
   concurrency: false, timeout: 120000,
 }, () => {
   let fixture;
@@ -32,7 +32,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
 
     fixture = await createCatchDbFixture(config);
     db = fixture.dataSource;
-    // 실제 회원·분석 기반과 B 마이그레이션을 적용하며 E 수신 기록만 시험 대역이다.
+    // 실제 회원·분석·E 수신 기록·B 엔티티와 마이그레이션을 적용한다.
 
     const { Global, Module } = require('@nestjs/common');
     const { APP_INTERCEPTOR, NestFactory } = require('@nestjs/core');
@@ -408,6 +408,58 @@ describe('본인 Catch HTTP·PostgreSQL', {
     failure(await request(own.ownerId), 500, 'INTERNAL_ERROR');
     assert.equal(success(await request(own.ownerId, detailPath(healthy.catchId))).restriction, 'NONE');
     assert.deepEqual(await snapshot(), beforeState);
+  });
+
+  for (const [missing, assignment] of [
+    ['상태 SQL null', 'confirmed_source_state = NULL'],
+    ['상태 JSON null', "confirmed_source_state = 'null'::jsonb"],
+    ['출처 SQL null', 'observation_provenance = NULL'],
+    ['출처 JSON null', "observation_provenance = 'null'::jsonb"],
+    ['시각 SQL null', 'observed_at = NULL'],
+    ['조회 실패만 존재', 'confirmed_source_state = NULL, observation_provenance = NULL, observed_at = NULL'],
+  ]) {
+    test('보호 관측 ' + missing + '은 조회 500과 확인·불일치 저장 롤백으로 처리한다', async () => {
+      const own = await seed();
+      const healthy = await seed({ ownerId: own.ownerId, repositoryId: 'synthetic-healthy-repository' });
+      // assignment는 위 고정 시험 사례다. SQL null과 JSON null을 따로 저장해 조회 매핑도 확인한다.
+      await db.query(
+        'UPDATE repository_protection SET ' + assignment + ', observation_failure = $3::jsonb WHERE owner_id = $1 AND repository_id = $2',
+        [own.ownerId, own.repositoryId, JSON.stringify({ synthetic: true, reason: 'TIMEOUT' })],
+      );
+      const beforeState = await snapshot();
+      failure(await request(own.ownerId, detailPath(own.catchId)), 500, 'INTERNAL_ERROR');
+      failure(await request(own.ownerId), 500, 'INTERNAL_ERROR');
+      assert.equal(success(await request(own.ownerId, detailPath(healthy.catchId))).restriction, 'NONE');
+      assert.deepEqual(await snapshot(), beforeState);
+      for (const [path, body] of [
+        [confirmPath(own.catchId), CONFIRMED], [mismatchPath(own.catchId), { mismatch: true }],
+      ]) {
+        failure(await request(own.ownerId, path, { method: 'PUT', body }), 500, 'INTERNAL_ERROR');
+        assert.deepEqual(await snapshot(), beforeState);
+      }
+    });
+  }
+
+  test('유효 관측 뒤 최근 조회 실패가 있어도 본인 조회·확인·불일치를 허용한다', async () => {
+    for (const restriction of ['NONE', 'SOURCE_PRIVATE']) {
+      const own = await seed({ restriction });
+      await db.query('UPDATE repository_protection SET observation_failure = $3::jsonb WHERE owner_id = $1 AND repository_id = $2',
+        [own.ownerId, own.repositoryId, JSON.stringify({ synthetic: true, reason: 'TIMEOUT' })]);
+      const beforeState = await snapshot();
+      const detail = success(await request(own.ownerId, detailPath(own.catchId)));
+      assert.equal(detail.restriction, restriction);
+      assert.deepEqual(success(await request(own.ownerId)), { items: [detail], page: { nextCursor: null } });
+      assert.deepEqual(await snapshot(), beforeState);
+      const confirmed = success(await request(own.ownerId, confirmPath(own.catchId), { method: 'PUT', body: CONFIRMED }));
+      assert.deepEqual(confirmed, { ...detail, confirmation: CONFIRMED });
+      const mismatched = success(await request(own.ownerId, mismatchPath(own.catchId), { method: 'PUT', body: { mismatch: true } }));
+      assert.deepEqual(mismatched, { ...confirmed, mismatch: true });
+      assert.deepEqual(await snapshot(), {
+        ...beforeState,
+        assets: beforeState.assets.map((row) => row.catch_id === own.catchId
+          ? { ...row, work_facts_confirmed: true, contribution_confirmed: true, mismatch: true } : row),
+      });
+    }
   });
 
   test('실제 DB 조회 오류는 상세·목록의 500이며 SQL이나 빈 자료를 응답하지 않는다', async () => {

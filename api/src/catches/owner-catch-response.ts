@@ -43,6 +43,9 @@ export interface OwnerCatchReadSource {
     readonly ownerId: string;
     readonly repositoryId: string;
     readonly appliedRestriction: Restriction;
+    readonly confirmedSourceState: unknown;
+    readonly observationProvenance: unknown;
+    readonly observedAt: Date | null;
   } | null;
 }
 
@@ -130,10 +133,16 @@ export function toOwnerCatchResponse(
     throw new CatchReadIntegrityError('sourceRequest');
   }
   const repositoryId = text(sourceRequest.repositoryId, 'sourceRequest.repositoryId');
-  // 보호 행이 없는 경우의 정책은 미정이므로 NONE을 추정하지 않는다.
+  // 명시적인 보호 판단과 관측이 없으면 NONE을 추정하지 않는다.
   if (!protection || protection.ownerId !== authenticatedMemberId
     || protection.repositoryId !== repositoryId) {
     throw new CatchReadIntegrityError('protection');
+  }
+  // 등록의 본인 열람 준비와 같은 기준이다. 최근 조회 실패는 이전 유효 관측을 무효화하지 않는다.
+  for (const field of ['confirmedSourceState', 'observationProvenance', 'observedAt'] as const) {
+    if (protection[field] === null || protection[field] === undefined) {
+      throw new CatchReadIntegrityError('protection.' + field);
+    }
   }
   if (!Array.isArray(source.evidence) || source.evidence.length === 0) {
     throw new CatchReadIntegrityError('evidence');

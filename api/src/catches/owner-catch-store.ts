@@ -10,6 +10,9 @@ type ReadRow = OwnerCatchReadSource['asset'] & {
   protectionOwnerId: string | null;
   protectionRepositoryId: string | null;
   appliedRestriction: 'NONE' | 'SOURCE_PRIVATE' | null;
+  confirmedSourceState: unknown;
+  observationProvenance: unknown;
+  observedAt: Date | null;
 };
 
 const READ_COLUMNS = `
@@ -22,7 +25,9 @@ const READ_COLUMNS = `
   c.contribution_confirmed AS "contributionConfirmed", c.mismatch, c.visibility,
   c.source_mode AS "sourceMode", r.request_id AS "requestId", r.member_id AS "requestMemberId",
   r.repository_id AS "repositoryId", p.owner_id AS "protectionOwnerId",
-  p.repository_id AS "protectionRepositoryId", p.applied_restriction AS "appliedRestriction"`;
+  p.repository_id AS "protectionRepositoryId", p.applied_restriction AS "appliedRestriction",
+  p.confirmed_source_state AS "confirmedSourceState", p.observation_provenance AS "observationProvenance",
+  p.observed_at AS "observedAt"`;
 
 // LEFT JOIN으로 연결 누락을 숨기지 않고 응답 매핑의 무결성 검사에 전달한다.
 const READ_FROM = `FROM catch_asset c
@@ -126,6 +131,8 @@ export class OwnerCatchStore {
       evidence: evidence.filter((item) => item.catchId === row.catchId),
       protection: row.protectionOwnerId === null ? null : {
         ownerId: row.protectionOwnerId, repositoryId: row.protectionRepositoryId!, appliedRestriction: row.appliedRestriction!,
+        confirmedSourceState: row.confirmedSourceState, observationProvenance: row.observationProvenance,
+        observedAt: row.observedAt,
       },
     }));
   }
