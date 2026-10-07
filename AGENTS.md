@@ -4,7 +4,7 @@
 
 ## 저장소 지도
 
-- `web/` `api/` `worker/`: Next.js·NestJS·FastAPI 배포 단위. 배포 대상은 네이버 클라우드 플랫폼(NCP). 설치·실행·검사 방법과 현재 구현 범위는 각 서비스의 `README.md`에서 확인한다.
+- `web/` `api/` `worker/`: Next.js·NestJS·FastAPI 배포 단위. 배포 대상은 AWS(2026-10-06 NCP에서 변경). 설치·실행·검사 방법과 현재 구현 범위는 각 서비스의 `README.md`에서 확인한다.
 - `docs/`: 팀 문서 정본 안내. 문서 목록·지위·우선순위는 `docs/README.md`. 삭제된 옛 문서는 git 이력에서 찾지 않는 한 존재하지 않는 것으로 취급한다.
 - `docs/ai-dlc-input/`: AI-DLC 시작 시점(2026-09-09) 입력 스냅샷이며 **현행 기준이 아니다**. 승인된 산출물이 출처로 인용하므로 남겨 두지만, 새 작업의 근거로 읽지 않고 내용을 수정하지 않는다. `docs/ai-dlc-input-mvp/`: 두 번째 intent(10월 MVP)의 입력. 팀장 결정과 제안을 담으며 승인 기록이 아니다. `docs/ai-dlc/`: AI-DLC 설치·운영 안내.
 - `aidlc/`: AI-DLC 요구사항·설계·승인 기록. 이번 작업에 적용할 10월·12월 기준은 `docs/README.md`의 `AI-DLC 산출물과의 관계`에서 찾는다. 과거 승인 기록은 소급 수정하지 않는다.
