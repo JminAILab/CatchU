@@ -62,7 +62,7 @@ const logger = new Logger('ApiExceptionFilter');
  * 업무 거부 중 보안 사건으로 한 줄씩 남기는 코드(#222, [10/4 팀장 결정](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5975854431)).
  * 정상적인 업무 거부는 지금처럼 기록하지 않는다. 토큰 없이 온 요청(AUTH_REQUIRED)과 비밀번호를 아직 넣지 않은
  * 요청(LINK_PASSWORD_REQUIRED)은 로그인 전 접속·링크 첫 열람에서도 생기므로 넣지 않는다.
- * 링크 비밀번호 틀림·시도 제한은 #150의 unlock 경로가 dev에 들어온 뒤 테스트와 함께 추가한다.
+ * 링크 비밀번호 틀림·시도 제한은 #222 후속 PR에서 #150의 unlock 경로 테스트와 함께 추가한다.
  */
 export const SECURITY_EVENT_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>(['AUTH_INVALID']);
 
