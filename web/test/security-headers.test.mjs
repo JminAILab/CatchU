@@ -14,7 +14,7 @@ test('배포용 빌드: 개발용 eval 없이 HSTS를 붙이고 API 기준 주�
   assert.equal(directive(csp, 'object-src'), "object-src 'none'");
   assert.equal(headers['X-Content-Type-Options'], 'nosniff');
   assert.equal(headers['Referrer-Policy'], 'strict-origin-when-cross-origin');
-  assert.equal(headers['Strict-Transport-Security'], 'max-age=31536000');
+  assert.equal(headers['Strict-Transport-Security'], 'max-age=300');
 });
 
 test('개발 서버: React 개발용 eval만 더하고 HSTS는 붙이지 않는다', () => {
@@ -24,6 +24,15 @@ test('개발 서버: React 개발용 eval만 더하고 HSTS는 붙이지 않는�
   assert.equal(directive(csp, 'connect-src'), "connect-src 'self' http://127.0.0.1:3001");
   assert.equal(directive(csp, 'frame-ancestors'), "frame-ancestors 'none'");
   assert.equal(headers['Strict-Transport-Security'], undefined);
+});
+
+test('HSTS는 development·test가 아니면 붙인다(값이 없거나 다른 값 포함)', () => {
+  for (const env of [{ NODE_ENV: 'production' }, {}, { NODE_ENV: 'staging' }]) {
+    assert.equal(asMap(securityHeaders(env))['Strict-Transport-Security'], 'max-age=300', JSON.stringify(env));
+  }
+  for (const env of [{ NODE_ENV: 'development' }, { NODE_ENV: 'test' }]) {
+    assert.equal(asMap(securityHeaders(env))['Strict-Transport-Security'], undefined, JSON.stringify(env));
+  }
 });
 
 test('API 기준 주소가 없거나 http(s)가 아니면 다른 출처로 연결을 열지 않는다', () => {

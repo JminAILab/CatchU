@@ -15,7 +15,7 @@ const EXPECTED = {
 };
 
 async function start(t, env) {
-  const keys = ['AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'CORS_ALLOWED_ORIGINS', 'SHARE_LINK_WEB_BASE_URL'];
+  const keys = ['AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'CORS_ALLOWED_ORIGINS', 'SHARE_LINK_WEB_BASE_URL', 'LINK_GRANT_SECRET'];
   const before = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   for (const key of keys) delete process.env[key];
   Object.assign(process.env, { AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '60' }, env);
@@ -64,12 +64,28 @@ test('성공·오류·CORS 사전 요청과 Nest 밖 오류 응답 모두 보안
   }
 });
 
-test('HSTS는 NODE_ENV=production에서만 붙는다', { timeout: 15000 }, async (t) => {
-  const request = await start(t, { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example' });
+// 운영처럼 다루는 환경은 운영 필수 설정을 함께 준다. NODE_ENV가 없는 경우는 키 자체를 넣지 않는다(process.env에 undefined를 넣으면 문자열이 된다).
+const PRODUCTION_LIKE = { SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex') };
+
+for (const [label, env] of [
+  ['production', { NODE_ENV: 'production', ...PRODUCTION_LIKE }],
+  ['값 없음', { ...PRODUCTION_LIKE }],
+  ['다른 값(staging)', { NODE_ENV: 'staging', ...PRODUCTION_LIKE }],
+]) {
+  test(`HSTS는 development·test가 아니면 붙는다: ${label}`, { timeout: 15000 }, async (t) => {
+    const request = await start(t, env);
+    const health = await request('/health');
+    assert.equal(health.status, 200);
+    assertSecurityHeaders(health, 'GET /health', 'max-age=300');
+    const missing = await request('/nope');
+    assert.equal(missing.status, 404);
+    assertSecurityHeaders(missing, '/v1 밖 없는 경로(Nest 밖)', 'max-age=300');
+  });
+}
+
+test('HSTS는 development에서 붙지 않는다', { timeout: 15000 }, async (t) => {
+  const request = await start(t, { NODE_ENV: 'development' });
   const health = await request('/health');
   assert.equal(health.status, 200);
-  assertSecurityHeaders(health, 'GET /health', 'max-age=31536000');
-  const missing = await request('/nope');
-  assert.equal(missing.status, 404);
-  assertSecurityHeaders(missing, '/v1 밖 없는 경로(Nest 밖)', 'max-age=31536000');
+  assertSecurityHeaders(health, 'GET /health');
 });

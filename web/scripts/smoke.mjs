@@ -55,7 +55,7 @@ function checkHeaders(headers) {
   if (!headers.get("content-security-policy")?.includes("frame-ancestors 'none'")) errors.push("CSP에 frame-ancestors 'none'이 없습니다");
   if (headers.get("x-content-type-options") !== "nosniff") errors.push("X-Content-Type-Options가 nosniff가 아닙니다");
   if (headers.get("referrer-policy") !== "strict-origin-when-cross-origin") errors.push("Referrer-Policy가 strict-origin-when-cross-origin이 아닙니다");
-  if (headers.get("strict-transport-security") !== "max-age=31536000") errors.push("Strict-Transport-Security가 max-age=31536000이 아닙니다");
+  if (headers.get("strict-transport-security") !== "max-age=300") errors.push("Strict-Transport-Security가 max-age=300이 아닙니다");
   if (headers.has("x-powered-by")) errors.push("X-Powered-By가 있습니다");
   return errors;
 }

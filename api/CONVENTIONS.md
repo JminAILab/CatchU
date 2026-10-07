@@ -13,7 +13,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/app.module.ts`                     | 최상위 Nest 모듈과 기능 모듈 연결                  |
 | `src/cors.ts`                           | 개발용 CORS. `CORS_ALLOWED_ORIGINS`가 있을 때만 켜고 `Retry-After`를 노출(#106) |
 | `src/common/http/request-id.ts`         | 요청별 서버 내부 식별자(#222). 응답·web으로 내보내지 않음 |
-| `src/common/http/security-headers.ts`   | 모든 응답의 보안 헤더와 `X-Powered-By` 끄기. HSTS는 `NODE_ENV=production`에서만(#217) |
+| `src/common/http/security-headers.ts`   | 모든 응답의 보안 헤더와 `X-Powered-By` 끄기. HSTS는 `NODE_ENV`가 development·test가 아닐 때만(#217) |
 | `src/health/health.controller.ts`       | `GET /health` 응답                                 |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
 | `src/auth/access-token.guard.ts`       | Bearer 토큰 검증 후 요청에 인증 회원 정보 저장 |

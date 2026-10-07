@@ -7,7 +7,7 @@ import type { NextConfig } from "next";
  *   (docs/CatchU_security_checks.md 「화면 출력」).
  * - connect-src에 API 기준 주소의 출처를 더한다. web과 api의 출처가 달라서다. 주소가 없거나 http(s)가 아니면
  *   API 호출 함수도 요청하지 않으므로 더하지 않는다(src/lib/api-client.ts).
- * - 'unsafe-eval'은 `next dev`에서만 더한다(React 개발용 오류 표시). HSTS는 배포용 빌드에서만 붙인다.
+ * - 'unsafe-eval'은 `next dev`(development)에서만 더한다(React 개발용 오류 표시). HSTS는 development·test가 아닐 때(배포용 빌드) 붙인다.
  * - 외부 스크립트·이미지·글꼴·연결을 새로 쓰면 해당 항목에 출처를 더한다.
  */
 export function securityHeaders(env: NodeJS.ProcessEnv): { key: string; value: string }[] {
@@ -31,8 +31,9 @@ export function securityHeaders(env: NodeJS.ProcessEnv): { key: string; value: s
     // 공유 링크 주소(/s/<토큰>)가 다른 사이트로 넘어가지 않게 다른 출처에는 출처만 보낸다.
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   ];
-  // TLS는 앞단(부하분산기)에서 끝나지만 브라우저는 앞단이 https로 전달한 응답의 값을 따른다. 도메인 미정이라 하위 도메인·preload는 넣지 않는다.
-  if (env.NODE_ENV === "production") headers.push({ key: "Strict-Transport-Security", value: "max-age=31536000" });
+  // `next build`는 NODE_ENV가 비어 있을 때만 production으로 채우므로, 값이 없거나 다른 값이어도 운영과 같이 붙인다(docs/CatchU_security_checks.md 「설정·개발용 기능」).
+  // TLS는 앞단에서 끝나지만 브라우저는 앞단이 https로 전달한 응답의 값을 따른다. 5분으로 시작해 도메인·인증서가 정해지면 늘리고, 하위 도메인·preload는 넣지 않는다(#217).
+  if (env.NODE_ENV !== "development" && env.NODE_ENV !== "test") headers.push({ key: "Strict-Transport-Security", value: "max-age=300" });
   return headers;
 }
 

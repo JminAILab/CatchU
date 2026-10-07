@@ -11,10 +11,11 @@ export const SECURITY_HEADERS = {
 } as const;
 
 /**
- * 운영(`NODE_ENV=production`)에서만 붙인다. TLS는 앞단(부하분산기)에서 끝나지만, 브라우저는 앞단이 https로 전달한 응답의 값을 따른다.
- * 도메인이 정해지지 않아 하위 도메인 포함(includeSubDomains)·preload는 넣지 않는다.
+ * `NODE_ENV`가 development·test가 아니면(값이 없거나 다른 값 포함) 붙인다. 판정할 수 없으면 운영과 같이 다루는 팀 기준이다
+ * (docs/CatchU_security_checks.md 「설정·개발용 기능」). TLS는 앞단에서 끝나지만 브라우저는 앞단이 https로 전달한 응답의 값을 따른다.
+ * 기간은 5분으로 시작해 도메인·인증서가 정해지면 늘리고, 도메인이 정해지지 않아 하위 도메인 포함(includeSubDomains)·preload는 넣지 않는다(#217).
  */
-export const HSTS_HEADER_VALUE = 'max-age=31536000';
+export const HSTS_HEADER_VALUE = 'max-age=300';
 
 type HeaderResponse = { setHeader(name: string, value: string): void };
 
@@ -25,9 +26,10 @@ type HeaderResponse = { setHeader(name: string, value: string): void };
 export function applySecurityHeaders(app: INestApplication, nodeEnv: string | undefined): void {
   const server: { disable(setting: string): void } = app.getHttpAdapter().getInstance();
   server.disable('x-powered-by');
-  const headers: Record<string, string> = nodeEnv === 'production'
-    ? { ...SECURITY_HEADERS, 'Strict-Transport-Security': HSTS_HEADER_VALUE }
-    : { ...SECURITY_HEADERS };
+  const isDevelopmentOrTest = nodeEnv === 'development' || nodeEnv === 'test';
+  const headers: Record<string, string> = isDevelopmentOrTest
+    ? { ...SECURITY_HEADERS }
+    : { ...SECURITY_HEADERS, 'Strict-Transport-Security': HSTS_HEADER_VALUE };
   app.use((_request: unknown, response: HeaderResponse, next: () => void) => {
     for (const [name, value] of Object.entries(headers)) response.setHeader(name, value);
     next();

@@ -217,7 +217,7 @@ if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLi
 | `Content-Security-Policy` | 같은 출처의 자원만 허용, 연결은 같은 출처와 API 기준 주소의 출처만, `frame-ancestors 'none'` | 허용하지 않은 곳에서 스크립트·자원을 불러오거나 연결하지 못하게 하고, 다른 사이트가 화면을 끼워 넣지 못하게 한다 |
 | `X-Content-Type-Options` | `nosniff` | 브라우저가 응답 형식을 짐작하지 않게 한다 |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | 다른 출처로는 출처만 보내 공유 링크 주소(`/s/<토큰>`)가 넘어가지 않게 한다 |
-| `Strict-Transport-Security` | `max-age=31536000` | 배포용 빌드에서만. 브라우저가 1년 동안 https로만 접속하게 한다 |
+| `Strict-Transport-Security` | `max-age=300` | `NODE_ENV`가 development·test가 아닐 때(배포용 빌드). 브라우저가 https로 받은 뒤 5분 동안 https로만 접속하게 한다. 도메인·인증서가 정해지면 기간을 늘린다 |
 
 - 스크립트는 인라인을 허용한다(`'unsafe-inline'`). Next.js가 페이지에 인라인 스크립트를 넣는데, 요청마다 일회용 값(nonce)을 주려면 모든 페이지를 요청 때마다 새로 그려야 해서다. 그래서 화면 출력은 [보안 점검](../docs/CatchU_security_checks.md) 「화면 출력」대로 React 텍스트로만 그린다.
 - 개발 서버에서만 `'unsafe-eval'`을 더한다(React 개발용 오류 표시).
