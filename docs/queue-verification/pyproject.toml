@@ -1,0 +1,17 @@
+[project]
+name = "catchu-queue-verification"
+version = "0.0.0"
+description = "#77 BullMQ 기술 검증 재현 키트. 제품 코드가 아니다."
+requires-python = "==3.12.10"
+dependencies = [
+    "bullmq==3.3.0",
+    # worker 계약 검사·합성 처리(app.contract·app.processing)를 그대로 불러 쓰기 위한 worker 의존성. 판본은 worker/pyproject.toml과 같다.
+    "jsonschema==4.26.0",
+    "pyyaml==6.0.3",
+    "referencing==0.37.0",
+    "rfc3339-validator==0.1.4",
+    "rfc3986-validator==0.1.1",
+]
+
+[tool.uv]
+package = false

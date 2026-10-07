@@ -1,0 +1,2394 @@
+{
+ "environment": {
+  "label": "valkey-7.2.11-ncp-like",
+  "engine": "valkey-7.2.11",
+  "image": "valkey/valkey:7.2.11-alpine",
+  "serverArgs": [
+   "--appendonly",
+   "no",
+   "--save",
+   "",
+   "--maxmemory-policy",
+   "noeviction",
+   "--rename-command",
+   "BGREWRITEAOF",
+   "",
+   "--rename-command",
+   "BGSAVE",
+   "",
+   "--rename-command",
+   "SAVE",
+   "",
+   "--rename-command",
+   "SLAVEOF",
+   "",
+   "--rename-command",
+   "FLUSHALL",
+   "",
+   "--rename-command",
+   "FLUSHDB",
+   "",
+   "--rename-command",
+   "CONFIG",
+   "",
+   "--rename-command",
+   "KEYS",
+   "",
+   "--rename-command",
+   "MIGRATE",
+   "",
+   "--rename-command",
+   "SHUTDOWN",
+   ""
+  ],
+  "redisVersion": "7.2.4",
+  "valkeyVersion": "7.2.11",
+  "maxmemoryPolicy": "noeviction",
+  "aofEnabled": "0",
+  "configCommand": "거부됨: ERR unknown command 'config', with args beginning with: 'GET' 'maxmemory-policy' ",
+  "node": "v24.21.0",
+  "bullmqNode": "6.3.11",
+  "ioredis": "6.0.0",
+  "python": "3.12.10 bullmq 3.3.0 redis-py 7.4.1",
+  "fastTimings": {
+   "lock": 2000,
+   "stalled": 1000
+  },
+  "startedAt": "2026-10-02T01:00:10.985Z"
+ },
+ "results": [
+  {
+   "id": "A1-echo",
+   "variant": "연결",
+   "title": "Node→Python→Node 왕복과 Python 생산자→Node 소비자",
+   "seconds": 3.4,
+   "requirement": "왕복 값이 그대로이고 Request는 worker 계약 검사 VALID",
+   "observed": {
+    "rows": [
+     {
+      "case": "synthetic-request",
+      "schema": "Request",
+      "pythonVerdict": "VALID",
+      "nodeToPythonToReturnValueEqual": true,
+      "pythonProducerToNodeEqual": true
+     },
+     {
+      "case": "edge-request",
+      "schema": "Request",
+      "pythonVerdict": "VALID",
+      "nodeToPythonToReturnValueEqual": true,
+      "pythonProducerToNodeEqual": true
+     },
+     {
+      "case": "result-template",
+      "schema": null,
+      "pythonVerdict": null,
+      "nodeToPythonToReturnValueEqual": true,
+      "pythonProducerToNodeEqual": true
+     },
+     {
+      "case": "type-probe",
+      "schema": null,
+      "pythonVerdict": null,
+      "nodeToPythonToReturnValueEqual": true,
+      "pythonProducerToNodeEqual": true,
+      "pythonTypes": {
+       "zero": "int",
+       "negative": "int",
+       "maxSafe": "int",
+       "fraction": "float",
+       "yes": "bool",
+       "no": "bool",
+       "nothing": "NoneType",
+       "emptyList": [],
+       "emptyObject": {},
+       "nested": {
+        "list": [
+         "int",
+         "str",
+         "NoneType",
+         [],
+         {}
+        ]
+       },
+       "korean": "str",
+       "emoji": "str",
+       "empty": "str"
+      }
+     }
+    ]
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "A2-1-succeeded-one-candidate",
+   "variant": "연결",
+   "title": "요청→F 처리(succeeded-one-candidate)→E 수신",
+   "seconds": 3,
+   "requirement": "분석 1회, 종결값 SUCCEEDED·실패 단계 [], E ACCEPTED, 큐를 거친 결과가 F 보존본과 같음, Python이 수신 확인을 읽음",
+   "observed": {
+    "expectedOutcome": "SUCCEEDED",
+    "expectedFailureStages": [],
+    "calls": 1,
+    "requestJob": "completed",
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fOutcome": "SUCCEEDED",
+    "fFailureStages": [],
+    "receiptReadByPython": "ACCEPTED/OK"
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "A2-2-empty",
+   "variant": "연결",
+   "title": "요청→F 처리(empty)→E 수신",
+   "seconds": 3.2,
+   "requirement": "분석 1회, 종결값 EMPTY·실패 단계 [], E ACCEPTED, 큐를 거친 결과가 F 보존본과 같음, Python이 수신 확인을 읽음",
+   "observed": {
+    "expectedOutcome": "EMPTY",
+    "expectedFailureStages": [],
+    "calls": 1,
+    "requestJob": "completed",
+    "eProcessing": "EMPTY",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fOutcome": "EMPTY",
+    "fFailureStages": [],
+    "receiptReadByPython": "ACCEPTED/OK"
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "A2-3-partial-failed",
+   "variant": "연결",
+   "title": "요청→F 처리(partial-failed)→E 수신",
+   "seconds": 3.3,
+   "requirement": "분석 1회, 종결값 PARTIAL_FAILED·실패 단계 [COLLECTION], E ACCEPTED, 큐를 거친 결과가 F 보존본과 같음, Python이 수신 확인을 읽음",
+   "observed": {
+    "expectedOutcome": "PARTIAL_FAILED",
+    "expectedFailureStages": [
+     "COLLECTION"
+    ],
+    "calls": 1,
+    "requestJob": "completed",
+    "eProcessing": "PARTIAL_FAILED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fOutcome": "PARTIAL_FAILED",
+    "fFailureStages": [
+     "COLLECTION"
+    ],
+    "receiptReadByPython": "ACCEPTED/OK"
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "A2-4-failed",
+   "variant": "연결",
+   "title": "요청→F 처리(failed)→E 수신",
+   "seconds": 3.2,
+   "requirement": "분석 1회, 종결값 FAILED·실패 단계 [COLLECTION], E ACCEPTED, 큐를 거친 결과가 F 보존본과 같음, Python이 수신 확인을 읽음",
+   "observed": {
+    "expectedOutcome": "FAILED",
+    "expectedFailureStages": [
+     "COLLECTION"
+    ],
+    "calls": 1,
+    "requestJob": "completed",
+    "eProcessing": "FAILED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fOutcome": "FAILED",
+    "fFailureStages": [
+     "COLLECTION"
+    ],
+    "receiptReadByPython": "ACCEPTED/OK"
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "A2-5-draft-failed",
+   "variant": "연결",
+   "title": "요청→F 처리(draft-failed)→E 수신",
+   "seconds": 3.6,
+   "requirement": "분석 1회, 종결값 PARTIAL_FAILED·실패 단계 [DRAFT], E ACCEPTED, 큐를 거친 결과가 F 보존본과 같음, Python이 수신 확인을 읽음",
+   "observed": {
+    "expectedOutcome": "PARTIAL_FAILED",
+    "expectedFailureStages": [
+     "DRAFT"
+    ],
+    "calls": 1,
+    "requestJob": "completed",
+    "eProcessing": "PARTIAL_FAILED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fOutcome": "PARTIAL_FAILED",
+    "fFailureStages": [
+     "DRAFT"
+    ],
+    "receiptReadByPython": "ACCEPTED/OK"
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "A2-6-reflection-failed",
+   "variant": "연결",
+   "title": "요청→F 처리(reflection-failed)→E 수신",
+   "seconds": 3.4,
+   "requirement": "분석 1회, 종결값 PARTIAL_FAILED·실패 단계 [REFLECTION], E ACCEPTED, 큐를 거친 결과가 F 보존본과 같음, Python이 수신 확인을 읽음",
+   "observed": {
+    "expectedOutcome": "PARTIAL_FAILED",
+    "expectedFailureStages": [
+     "REFLECTION"
+    ],
+    "calls": 1,
+    "requestJob": "completed",
+    "eProcessing": "PARTIAL_FAILED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fOutcome": "PARTIAL_FAILED",
+    "fFailureStages": [
+     "REFLECTION"
+    ],
+    "receiptReadByPython": "ACCEPTED/OK"
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "A2-7-execution-unknown",
+   "variant": "연결",
+   "title": "요청→F 처리(execution-unknown)→E 수신",
+   "seconds": 2.7,
+   "requirement": "분석 1회, 결과 없음, E가 RECEIVED·RUNNING·UNCERTAIN을 받음",
+   "observed": {
+    "expectedOutcome": null,
+    "calls": 1,
+    "requestJob": "completed",
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fOutcome": null,
+    "fFailureStages": null,
+    "receiptReadByPython": null
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "B1-same-jobid-kept",
+   "variant": "큐만",
+   "title": "같은 jobId 재추가(완료 작업 보존) · 일반 F",
+   "seconds": 3.3,
+   "requirement": "같은 요청이 두 번 전달돼도 분석 1회",
+   "observed": {
+    "firstAdd": "00000000-0000-4000-8000-000000000102",
+    "secondAdd": "00000000-0000-4000-8000-000000000102",
+    "secondStateRightAfterAdd": "completed",
+    "secondJobStarts": 1,
+    "secondAction": "finished",
+    "requestJobsInRedis": [
+     "00000000-0000-4000-8000-000000000102"
+    ],
+    "calls": 1,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [],
+    "fJobResults": [
+     "finished"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "B2-same-jobid-removed-naive",
+   "variant": "큐만",
+   "title": "같은 jobId 재추가(완료 작업 삭제) · 일반 F",
+   "seconds": 3.4,
+   "requirement": "같은 요청이 두 번 전달돼도 분석 1회",
+   "observed": {
+    "firstAdd": "00000000-0000-4000-8000-000000000102",
+    "secondAdd": "00000000-0000-4000-8000-000000000102",
+    "secondStateRightAfterAdd": "active",
+    "secondJobStarts": 2,
+    "secondAction": "finished",
+    "requestJobsInRedis": [],
+    "calls": 2,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK",
+     "REJECTED/PAYLOAD_CONFLICT"
+    ],
+    "bodyReturnedByReceiver": [
+     true,
+     false
+    ],
+    "sameAsStored": [
+     true,
+     true
+    ],
+    "fActions": [],
+    "fJobResults": [
+     "finished",
+     "finished"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result",
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": false,
+   "status": "MISSES"
+  },
+  {
+   "id": "B3-same-jobid-removed-guarded",
+   "variant": "앱 보호",
+   "title": "같은 jobId 재추가(완료 작업 삭제) · 보호 F",
+   "seconds": 2.9,
+   "requirement": "같은 요청이 두 번 전달돼도 분석 1회, 두 번째는 보존 결과 분기로 가고 이미 수락된 결과는 다시 보내지 않음",
+   "observed": {
+    "firstAdd": "00000000-0000-4000-8000-000000000102",
+    "secondAdd": "00000000-0000-4000-8000-000000000102",
+    "secondStateRightAfterAdd": "active",
+    "secondJobStarts": 2,
+    "secondAction": "result-already-stored",
+    "requestJobsInRedis": [],
+    "calls": 1,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "delivery-check(redelivered-job):delivered",
+     "skip:result-stored:delivered"
+    ],
+    "fJobResults": [
+     "finished",
+     "result-already-stored"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "B4-new-jobid-naive",
+   "variant": "큐만",
+   "title": "다른 jobId로 같은 요청 재발행 · 일반 F",
+   "seconds": 3.1,
+   "requirement": "같은 요청이 두 번 전달돼도 분석 1회",
+   "observed": {
+    "firstAdd": "00000000-0000-4000-8000-000000000102",
+    "secondAdd": "00000000-0000-4000-8000-000000000102-republish",
+    "secondStateRightAfterAdd": "waiting",
+    "secondJobStarts": 1,
+    "secondAction": "finished",
+    "requestJobsInRedis": [
+     "00000000-0000-4000-8000-000000000102",
+     "00000000-0000-4000-8000-000000000102-republish"
+    ],
+    "calls": 2,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK",
+     "DUPLICATE/ALREADY_RECEIVED"
+    ],
+    "bodyReturnedByReceiver": [
+     true,
+     false
+    ],
+    "sameAsStored": [
+     true,
+     true
+    ],
+    "fActions": [],
+    "fJobResults": [
+     "finished",
+     "finished"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result",
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": false,
+   "status": "MISSES"
+  },
+  {
+   "id": "B5-new-jobid-guarded",
+   "variant": "앱 보호",
+   "title": "다른 jobId로 같은 요청 재발행 · 보호 F",
+   "seconds": 3.6,
+   "requirement": "같은 요청이 두 번 전달돼도 분석 1회, 두 번째는 보존 결과 분기로 가고 이미 수락된 결과는 다시 보내지 않음",
+   "observed": {
+    "firstAdd": "00000000-0000-4000-8000-000000000102",
+    "secondAdd": "00000000-0000-4000-8000-000000000102-republish",
+    "secondStateRightAfterAdd": "active",
+    "secondJobStarts": 1,
+    "secondAction": "result-already-stored",
+    "requestJobsInRedis": [
+     "00000000-0000-4000-8000-000000000102",
+     "00000000-0000-4000-8000-000000000102-republish"
+    ],
+    "calls": 1,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "delivery-check(redelivered-job):delivered",
+     "skip:result-stored:delivered"
+    ],
+    "fJobResults": [
+     "finished",
+     "result-already-stored"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "B6-dedup-option",
+   "variant": "큐 옵션",
+   "title": "BullMQ deduplication 옵션의 적용 구간 · 보호 F",
+   "seconds": 4.7,
+   "requirement": "대기 중 두 번째 추가는 무시되고, 완료 뒤 추가는 새 작업이 되며(큐 중복 방지 해제), 보호 F는 보존 결과 분기로 분석 1회",
+   "observed": {
+    "firstAdd": "1",
+    "secondAddWhileWaiting": "1",
+    "jobsWhileWaiting": [
+     "1"
+    ],
+    "deduplicatedEvents": 0,
+    "thirdAddAfterCompletion": "3",
+    "thirdAction": "result-already-stored",
+    "requestJobsInRedis": [
+     "1",
+     "3"
+    ],
+    "calls": 1,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "delivery-check(redelivered-job):delivered",
+     "skip:result-stored:delivered"
+    ],
+    "fJobResults": [
+     "finished",
+     "result-already-stored"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ]
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "B7-same-attempt-changed",
+   "variant": "앱 보호",
+   "title": "같은 시도 ID·다른 내용(requestedAt)의 요청 · 보호 F",
+   "seconds": 3.1,
+   "requirement": "같은 시도 ID·다른 내용의 요청은 분석·재전송 없이 멈춤(사람 확인)",
+   "observed": {
+    "secondAction": "request-mismatch",
+    "calls": 1,
+    "sentCount": 1,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "skip:request-mismatch"
+    ],
+    "fJobResults": [
+     "finished",
+     "request-mismatch"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ]
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "C-naive-stall1-before-call",
+   "variant": "큐만",
+   "title": "일반 F · maxStalledCount=1 · before-call에서 강제 종료 후 재기동",
+   "seconds": 11.9,
+   "requirement": "분석 전 중단 → 다시 실행해 분석 1회·정상 종결·E 수락",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "before-call",
+    "callsByCrashedProcess": 0,
+    "filesAtCrash": {
+     "request": false,
+     "started": false,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "terminal",
+    "calls": 1,
+    "requestJob": "completed",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": false,
+     "started": false,
+     "result": true,
+     "sent": 1,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "stalled",
+     "worker-error:Exception('could not renew lock for job 00000000-0000-4000-8000-000000000102')"
+    ],
+    "fJobResults": [
+     "finished"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "C-naive-stall1-during-call",
+   "variant": "큐만",
+   "title": "일반 F · maxStalledCount=1 · during-call에서 강제 종료 후 재기동",
+   "seconds": 11.1,
+   "requirement": "분석 재실행 없음(호출 1회), 결과 없음, E가 UNCERTAIN을 받음",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "during-call",
+    "callsByCrashedProcess": 1,
+    "filesAtCrash": {
+     "request": false,
+     "started": false,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "uncertain",
+    "calls": 2,
+    "requestJob": "completed",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": false,
+     "started": false,
+     "result": true,
+     "sent": 1,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "stalled"
+    ],
+    "fJobResults": [
+     "finished"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": false,
+   "status": "MISSES"
+  },
+  {
+   "id": "C-naive-stall1-after-store",
+   "variant": "큐만",
+   "title": "일반 F · maxStalledCount=1 · after-store에서 강제 종료 후 재기동",
+   "seconds": 10.7,
+   "requirement": "분석 재실행 없음(호출 1회), 보존 결과를 보내 E 수락",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "after-store",
+    "callsByCrashedProcess": 1,
+    "filesAtCrash": {
+     "request": false,
+     "started": false,
+     "result": true,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "stored-accepted",
+    "calls": 2,
+    "requestJob": "completed",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": false,
+     "started": false,
+     "result": true,
+     "sent": 1,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "stalled"
+    ],
+    "fJobResults": [
+     "finished"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": false,
+   "status": "MISSES"
+  },
+  {
+   "id": "C-naive-stall0-before-call",
+   "variant": "큐만",
+   "title": "일반 F · maxStalledCount=0 · before-call에서 강제 종료 후 재기동",
+   "seconds": 10.2,
+   "requirement": "분석 전 중단 → 다시 실행해 분석 1회·정상 종결·E 수락",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "before-call",
+    "callsByCrashedProcess": 0,
+    "filesAtCrash": {
+     "request": false,
+     "started": false,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "terminal",
+    "calls": 0,
+    "requestJob": "failed",
+    "failedReason": "job stalled more than allowable limit",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": false,
+     "started": false,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fActions": [
+     "stalled",
+     "job-failed:job stalled more than allowable limit"
+    ],
+    "fJobResults": [],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "valid": true
+   },
+   "meets": false,
+   "status": "MISSES"
+  },
+  {
+   "id": "C-naive-stall0-during-call",
+   "variant": "큐만",
+   "title": "일반 F · maxStalledCount=0 · during-call에서 강제 종료 후 재기동",
+   "seconds": 9.7,
+   "requirement": "분석 재실행 없음(호출 1회), 결과 없음, E가 UNCERTAIN을 받음",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "during-call",
+    "callsByCrashedProcess": 1,
+    "filesAtCrash": {
+     "request": false,
+     "started": false,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "uncertain",
+    "calls": 1,
+    "requestJob": "failed",
+    "failedReason": "job stalled more than allowable limit",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": false,
+     "started": false,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fActions": [
+     "stalled",
+     "job-failed:job stalled more than allowable limit"
+    ],
+    "fJobResults": [],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "valid": true
+   },
+   "meets": false,
+   "status": "MISSES"
+  },
+  {
+   "id": "C-naive-stall0-after-store",
+   "variant": "큐만",
+   "title": "일반 F · maxStalledCount=0 · after-store에서 강제 종료 후 재기동",
+   "seconds": 10,
+   "requirement": "분석 재실행 없음(호출 1회), 보존 결과를 보내 E 수락",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "after-store",
+    "callsByCrashedProcess": 1,
+    "filesAtCrash": {
+     "request": false,
+     "started": false,
+     "result": true,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "stored-accepted",
+    "calls": 1,
+    "requestJob": "failed",
+    "failedReason": "job stalled more than allowable limit",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": false,
+     "started": false,
+     "result": true,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fActions": [
+     "stalled",
+     "job-failed:job stalled more than allowable limit"
+    ],
+    "fJobResults": [],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "valid": true
+   },
+   "meets": false,
+   "status": "MISSES"
+  },
+  {
+   "id": "C-guarded-stall1-before-call",
+   "variant": "앱 보호",
+   "title": "보호 F · maxStalledCount=1 · before-call에서 강제 종료 후 재기동",
+   "seconds": 10.2,
+   "requirement": "분석 전 중단 → 다시 실행해 분석 1회·정상 종결·E 수락",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "before-call",
+    "callsByCrashedProcess": 0,
+    "filesAtCrash": {
+     "request": true,
+     "started": false,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "terminal",
+    "calls": 1,
+    "requestJob": "completed",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": true,
+     "started": true,
+     "result": true,
+     "sent": 1,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "stalled"
+    ],
+    "fJobResults": [
+     "finished"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "C-guarded-stall1-after-marker",
+   "variant": "앱 보호",
+   "title": "보호 F · maxStalledCount=1 · after-marker에서 강제 종료 후 재기동",
+   "seconds": 10.5,
+   "requirement": "분석 재실행 없음(호출 0회), 결과 없음, E가 UNCERTAIN을 받음",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "after-marker",
+    "callsByCrashedProcess": 0,
+    "filesAtCrash": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "uncertain",
+    "calls": 0,
+    "requestJob": "completed",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 2,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fActions": [
+     "stalled",
+     "skip:started-without-result"
+    ],
+    "fJobResults": [
+     "uncertain-no-rerun"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN",
+     "UNCERTAIN"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "C-guarded-stall1-during-call",
+   "variant": "앱 보호",
+   "title": "보호 F · maxStalledCount=1 · during-call에서 강제 종료 후 재기동",
+   "seconds": 10.4,
+   "requirement": "분석 재실행 없음(호출 1회), 결과 없음, E가 UNCERTAIN을 받음",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "during-call",
+    "callsByCrashedProcess": 1,
+    "filesAtCrash": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "uncertain",
+    "calls": 1,
+    "requestJob": "completed",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 2,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fActions": [
+     "stalled",
+     "skip:started-without-result"
+    ],
+    "fJobResults": [
+     "uncertain-no-rerun"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN",
+     "UNCERTAIN"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "C-guarded-stall1-before-store",
+   "variant": "앱 보호",
+   "title": "보호 F · maxStalledCount=1 · before-store에서 강제 종료 후 재기동",
+   "seconds": 10,
+   "requirement": "분석 재실행 없음(호출 1회), 결과 없음, E가 UNCERTAIN을 받음",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "before-store",
+    "callsByCrashedProcess": 1,
+    "filesAtCrash": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "uncertain",
+    "calls": 1,
+    "requestJob": "completed",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 2,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fActions": [
+     "stalled",
+     "skip:started-without-result"
+    ],
+    "fJobResults": [
+     "uncertain-no-rerun"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN",
+     "UNCERTAIN"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "C-guarded-stall1-after-store",
+   "variant": "앱 보호",
+   "title": "보호 F · maxStalledCount=1 · after-store에서 강제 종료 후 재기동",
+   "seconds": 9.8,
+   "requirement": "분석 재실행 없음(호출 1회), 보존 결과를 보내 E 수락",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "after-store",
+    "callsByCrashedProcess": 1,
+    "filesAtCrash": {
+     "request": true,
+     "started": true,
+     "result": true,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "stored-accepted",
+    "calls": 1,
+    "requestJob": "completed",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": true,
+     "started": true,
+     "result": true,
+     "sent": 1,
+     "uncertainSent": 0,
+     "delivered": true,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "delivery-check(startup-scan):missing",
+     "stalled",
+     "delivery-check(redelivered-job):delivered",
+     "skip:result-stored:delivered"
+    ],
+    "fJobResults": [
+     "result-already-stored"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "C-guarded-stall0-before-call",
+   "variant": "앱 보호",
+   "title": "보호 F · maxStalledCount=0 · before-call에서 강제 종료 후 재기동",
+   "seconds": 9.8,
+   "requirement": "분석 전 중단 → 다시 실행해 분석 1회·정상 종결·E 수락",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "before-call",
+    "callsByCrashedProcess": 0,
+    "filesAtCrash": {
+     "request": true,
+     "started": false,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "terminal",
+    "calls": 0,
+    "requestJob": "failed",
+    "failedReason": "job stalled more than allowable limit",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": true,
+     "started": false,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fActions": [
+     "stalled",
+     "job-failed:job stalled more than allowable limit"
+    ],
+    "fJobResults": [],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "valid": true
+   },
+   "meets": false,
+   "status": "MISSES"
+  },
+  {
+   "id": "C-guarded-stall0-after-marker",
+   "variant": "앱 보호",
+   "title": "보호 F · maxStalledCount=0 · after-marker에서 강제 종료 후 재기동",
+   "seconds": 10.1,
+   "requirement": "분석 재실행 없음(호출 0회), 결과 없음, E가 UNCERTAIN을 받음",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "after-marker",
+    "callsByCrashedProcess": 0,
+    "filesAtCrash": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "uncertain",
+    "calls": 0,
+    "requestJob": "failed",
+    "failedReason": "job stalled more than allowable limit",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 1,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fActions": [
+     "stalled",
+     "job-failed:job stalled more than allowable limit"
+    ],
+    "fJobResults": [],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "C-guarded-stall0-during-call",
+   "variant": "앱 보호",
+   "title": "보호 F · maxStalledCount=0 · during-call에서 강제 종료 후 재기동",
+   "seconds": 10.1,
+   "requirement": "분석 재실행 없음(호출 1회), 결과 없음, E가 UNCERTAIN을 받음",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "during-call",
+    "callsByCrashedProcess": 1,
+    "filesAtCrash": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "uncertain",
+    "calls": 1,
+    "requestJob": "failed",
+    "failedReason": "job stalled more than allowable limit",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 1,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fActions": [
+     "stalled",
+     "job-failed:job stalled more than allowable limit"
+    ],
+    "fJobResults": [],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "C-guarded-stall0-before-store",
+   "variant": "앱 보호",
+   "title": "보호 F · maxStalledCount=0 · before-store에서 강제 종료 후 재기동",
+   "seconds": 9.8,
+   "requirement": "분석 재실행 없음(호출 1회), 결과 없음, E가 UNCERTAIN을 받음",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "before-store",
+    "callsByCrashedProcess": 1,
+    "filesAtCrash": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "uncertain",
+    "calls": 1,
+    "requestJob": "failed",
+    "failedReason": "job stalled more than allowable limit",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 1,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fActions": [
+     "stalled",
+     "job-failed:job stalled more than allowable limit"
+    ],
+    "fJobResults": [],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "C-guarded-stall0-after-store",
+   "variant": "앱 보호",
+   "title": "보호 F · maxStalledCount=0 · after-store에서 강제 종료 후 재기동",
+   "seconds": 9.7,
+   "requirement": "분석 재실행 없음(호출 1회), 보존 결과를 보내 E 수락",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "crashLogPoint": "after-store",
+    "callsByCrashedProcess": 1,
+    "filesAtCrash": {
+     "request": true,
+     "started": true,
+     "result": true,
+     "sent": 0,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "stateAtCrash": "active",
+    "expected": "stored-accepted",
+    "calls": 1,
+    "requestJob": "failed",
+    "failedReason": "job stalled more than allowable limit",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "filesAfter": {
+     "request": true,
+     "started": true,
+     "result": true,
+     "sent": 1,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "delivery-check(startup-scan):missing",
+     "stalled",
+     "job-failed:job stalled more than allowable limit"
+    ],
+    "fJobResults": [],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "D1-resend",
+   "variant": "앱 보호",
+   "title": "보존 결과 재전달",
+   "seconds": 3.7,
+   "requirement": "보존 결과 재전달은 분석 없이 같은 결과로, E는 DUPLICATE",
+   "observed": {
+    "calls": 1,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK",
+     "DUPLICATE/ALREADY_RECEIVED"
+    ],
+    "bodyReturnedByReceiver": [
+     true,
+     false
+    ],
+    "sameAsStored": [
+     true,
+     true
+    ],
+    "resentMessageId": "message-succeeded-one-candidate-00000000-0000-4000-8000-000000000102-result-resend-7086cc7af580",
+    "receiptReadByPython": "DUPLICATE/ALREADY_RECEIVED"
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "D2-e-crash-after-commit",
+   "variant": "큐만",
+   "title": "E 수신 기록 커밋 뒤·큐 완료 전 E 중단",
+   "seconds": 5.4,
+   "requirement": "수신 확인 반환 전 E가 죽으면 큐가 결과를 다시 주고, E는 DUPLICATE로 수렴, 분석 1회(등록 중복은 시험 안 함)",
+   "observed": {
+    "crashExit": "SIGKILL",
+    "eApplicationAfterCrash": "PENDING",
+    "calls": 1,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK",
+     "DUPLICATE/ALREADY_RECEIVED"
+    ],
+    "bodyReturnedByReceiver": [
+     true,
+     false
+    ],
+    "sameAsStored": [
+     true,
+     true
+    ],
+    "resultJobState": "completed",
+    "resultJobStalledCounter": 1,
+    "finalReturnValue": "DUPLICATE/ALREADY_RECEIVED",
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "D3-e-down",
+   "variant": "큐만",
+   "title": "E가 꺼진 동안 결과 전달(지연)",
+   "seconds": 10.2,
+   "requirement": "E가 꺼진 동안 결과는 큐에서 기다리고(수신 확인 없음 = 실패 아님), E 기동 뒤 ACCEPTED, 분석 1회",
+   "observed": {
+    "calls": 1,
+    "receiptBeforeE": "waiting/null",
+    "receiptAfterE": "completed/ACCEPTED",
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ]
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "D4-late-event",
+   "variant": "E 수신",
+   "title": "종결 뒤 늦게 도착한 RUNNING",
+   "seconds": 2.9,
+   "requirement": "종결 뒤 늦은 RUNNING은 상태를 되돌리지 않음",
+   "observed": {
+    "lateEventDecision": "TERMINAL_UNCHANGED",
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ]
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "G1-request-too-old",
+   "variant": "앱 보호",
+   "title": "기록 없이 기록 수명(60초)보다 오래된 요청 · 보호 F",
+   "seconds": 2.1,
+   "requirement": "시도 기록이 없고 접수 시각이 기록 수명보다 오래된 요청은 분석하지 않고 UNCERTAIN",
+   "observed": {
+    "requestedAt": "2026-10-01T23:04:08Z",
+    "maxAgeSeconds": 60,
+    "action": "too-old",
+    "calls": 0,
+    "files": {
+     "request": false,
+     "started": false,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 1,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "UNCERTAIN",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "UNCERTAIN"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": []
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "L1-loop-naive",
+   "variant": "큐만",
+   "title": "분석이 이벤트 루프를 막음 · 일반 F",
+   "seconds": 20.8,
+   "requirement": "분석(6초)이 잠금 시간(2초)보다 길어 잠금을 잃어도 분석 1회, 요청 작업 완료, E 수락 1회",
+   "observed": {
+    "calls": 2,
+    "requestJob": "failed",
+    "failedReason": "job stalled more than allowable limit",
+    "attemptsStarted": 3,
+    "stalledCounter": 2,
+    "stalledEvents": 2,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK",
+     "REJECTED/PAYLOAD_CONFLICT"
+    ],
+    "bodyReturnedByReceiver": [
+     true,
+     false
+    ],
+    "sameAsStored": [
+     true,
+     true
+    ],
+    "fActions": [
+     "worker-error:Exception('could not renew lock for job 00000000-0000-4000-8000-000000000102')",
+     "worker-error:TypeError('Missing lock for job 00000000-0000-4000-8000-000000000102. moveToFini",
+     "stalled",
+     "worker-error:Exception('could not renew lock for job 00000000-0000-4000-8000-000000000102')",
+     "worker-error:TypeError('Missing lock for job 00000000-0000-4000-8000-000000000102. moveToFini",
+     "stalled",
+     "job-failed:job stalled more than allowable limit"
+    ],
+    "fJobResults": [],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result",
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": false,
+   "status": "MISSES"
+  },
+  {
+   "id": "L2-loop-guarded",
+   "variant": "앱 보호",
+   "title": "분석이 이벤트 루프를 막음 · 보호 F",
+   "seconds": 14,
+   "requirement": "분석(6초)이 잠금 시간(2초)보다 길어 잠금을 잃어도 분석 1회, 요청 작업 완료, E 수락 1회",
+   "observed": {
+    "calls": 1,
+    "requestJob": "completed",
+    "attemptsStarted": 2,
+    "stalledCounter": 1,
+    "stalledEvents": 1,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "worker-error:TypeError('Missing lock for job 00000000-0000-4000-8000-000000000102. moveToFini",
+     "worker-error:Exception('could not renew lock for job 00000000-0000-4000-8000-000000000102')",
+     "stalled",
+     "delivery-check(redelivered-job):delivered",
+     "skip:result-stored:delivered"
+    ],
+    "fJobResults": [
+     "result-already-stored"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "L3-thread-naive",
+   "variant": "큐만",
+   "title": "분석을 별도 스레드에서 실행 · 일반 F",
+   "seconds": 13,
+   "requirement": "분석(6초)을 별도 스레드에서 돌리면 잠금을 잃지 않고 분석 1회, 요청 작업 완료, E 수락",
+   "observed": {
+    "calls": 1,
+    "requestJob": "completed",
+    "attemptsStarted": 1,
+    "stalledCounter": 0,
+    "stalledEvents": 0,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "worker-error:Exception('could not renew lock for job 00000000-0000-4000-8000-000000000102')"
+    ],
+    "fJobResults": [
+     "finished"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "P1-restart-no-persistence",
+   "variant": "저장소",
+   "title": "NCP와 비슷한 조건(상시 영속성 없음)에서 Redis 재시작 → 대기 요청 유실, 실행기가 같은 요청을 다시 넣음",
+   "seconds": 7.6,
+   "requirement": "큐에서 요청이 사라져도 E 접수 기록(QUEUED)으로 다시 넣을 수 있고, 다시 넣어도 분석 1회",
+   "observed": {
+    "stateBeforeRestart": "waiting",
+    "stateAfterRestart": "unknown",
+    "eProcessingAfterLoss": "QUEUED",
+    "calls": 1,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "P2-restart-aof",
+   "variant": "저장소",
+   "title": "로컬 비교: AOF(everysec)를 켠 Redis 재시작 → 대기 요청 유지",
+   "seconds": 7.1,
+   "requirement": "(로컬 비교) 영속성이 있으면 재시작 뒤에도 요청이 남아 처리됨",
+   "observed": {
+    "stateBeforeRestart": "waiting",
+    "stateAfterRestart": "waiting",
+    "calls": 1,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ]
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "P3-outage-midrun",
+   "variant": "저장소",
+   "title": "NCP와 비슷한 조건에서 분석 중 Redis가 12초 멈췄다 빈 상태로 복귀",
+   "seconds": 21.2,
+   "requirement": "큐 장애 중에도 분석을 다시 하지 않고, 서버 복귀 뒤 프로세스 재기동 없이 결과가 E에 닿음",
+   "observed": {
+    "calls": 1,
+    "acceptedBeforeRestart": true,
+    "filesBeforeRestart": {
+     "request": true,
+     "started": true,
+     "result": true,
+     "sent": 1,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eBeforeFRestart": {
+     "eProcessing": "SUCCEEDED",
+     "eApplication": "PENDING",
+     "eObserved": [
+      "RECEIVED",
+      "RUNNING"
+     ],
+     "resultReceipts": [
+      "ACCEPTED/OK"
+     ],
+     "bodyReturnedByReceiver": [
+      true
+     ],
+     "sameAsStored": [
+      true
+     ]
+    },
+    "processesAliveAfterOutage": 2,
+    "requestJobAfterOutage": "unknown",
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "worker-error:Exception('could not renew lock for job 00000000-0000-4000-8000-000000000102')",
+     "worker-error:TypeError('Missing key for job 00000000-0000-4000-8000-000000000102. moveToFinis",
+     "delivery-check(startup-scan):delivered"
+    ],
+    "fJobResults": [],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ]
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "P5-result-lost-then-republish",
+   "variant": "저장소",
+   "title": "NCP와 비슷한 조건에서 F가 결과를 보낸 뒤 E가 받기 전에 큐 자료가 사라짐 → 실행기가 같은 요청을 다시 넣음",
+   "seconds": 7.6,
+   "requirement": "F가 결과를 보낸 뒤 큐 자료가 사라져도, 같은 요청을 다시 넣으면 분석 없이 보존 결과가 새 메시지 ID로 다시 가서 E가 받음",
+   "observed": {
+    "calls": 1,
+    "sentBeforeRestart": 1,
+    "waitingBeforeRestart": "waiting",
+    "workerMessagesAfterRestart": 0,
+    "eProcessingBeforeRepublish": "QUEUED",
+    "sentAfter": 2,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "delivery-check(redelivered-job):missing",
+     "skip:result-stored:missing"
+    ],
+    "fJobResults": [
+     "finished",
+     "result-already-stored"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "P6-uncertain-lost-then-republish",
+   "variant": "저장소",
+   "title": "NCP와 비슷한 조건에서 UNCERTAIN 알림이 E에 닿기 전에 큐 자료가 사라짐 → 실행기가 같은 요청을 다시 넣음",
+   "seconds": 8.4,
+   "requirement": "실행 불명 알림이 큐에서 사라져도, 같은 요청을 다시 넣으면 분석 없이 UNCERTAIN을 다시 보내 E가 받음",
+   "observed": {
+    "calls": 1,
+    "uncertainWaitingBeforeRestart": 1,
+    "workerMessagesAfterRestart": 0,
+    "eProcessingBeforeRepublish": "QUEUED",
+    "secondAction": "uncertain-no-rerun",
+    "files": {
+     "request": true,
+     "started": true,
+     "result": false,
+     "sent": 0,
+     "uncertainSent": 1,
+     "delivered": false,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "eProcessing": "UNCERTAIN",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "UNCERTAIN"
+    ],
+    "resultReceipts": [],
+    "bodyReturnedByReceiver": [],
+    "sameAsStored": [],
+    "fActions": [
+     "skip:started-without-result"
+    ],
+    "fJobResults": [
+     "uncertain",
+     "uncertain-no-rerun"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "UNCERTAIN",
+     "UNCERTAIN"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "P7-periodic-recheck-resend",
+   "variant": "저장소",
+   "title": "NCP와 비슷한 조건에서 결과가 E에 닿기 전에 큐 자료가 사라짐 → 재발행 없이 F 주기 점검(2초)이 다시 보냄",
+   "seconds": 7.7,
+   "requirement": "큐가 결과를 잃어도 요청 재발행 없이 F 주기 점검이 보존 결과를 다시 보내 E가 받고, 받은 뒤 전달 표식을 남김",
+   "observed": {
+    "calls": 1,
+    "sentBeforeRestart": 1,
+    "waitingBeforeRestart": "waiting",
+    "workerMessagesAfterRestart": 0,
+    "deliveredMarker": true,
+    "files": {
+     "request": true,
+     "started": true,
+     "result": true,
+     "sent": 2,
+     "uncertainSent": 0,
+     "delivered": true,
+     "rejected": false,
+     "needsHuman": false
+    },
+    "requestJobs": 1,
+    "eProcessing": "SUCCEEDED",
+    "eApplication": "PENDING",
+    "eObserved": [],
+    "resultReceipts": [
+     "ACCEPTED/OK"
+    ],
+    "bodyReturnedByReceiver": [
+     true
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "delivery-check(periodic):missing",
+     "delivery-check(periodic):delivered"
+    ],
+    "fJobResults": [
+     "finished"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "P8-rejected-not-resent",
+   "variant": "저장소",
+   "title": "NCP와 비슷한 조건에서 E가 결과를 거부(REJECTED)한 뒤 큐 자료가 사라짐 → F 주기 점검이 다시 보내지 않음",
+   "seconds": 9.7,
+   "requirement": "E가 거부한 결과는 큐 자료가 사라진 뒤에도 다시 보내지 않음(거부 표식을 큐 밖에 보존)",
+   "observed": {
+    "firstReceipt": "REJECTED/CONTEXT_MISMATCH",
+    "rejectedMarker": true,
+    "workerMessagesAfterRestart": 0,
+    "checksAfterRestart": [
+     "rejected",
+     "rejected",
+     "rejected"
+    ],
+    "calls": 1,
+    "files": {
+     "request": true,
+     "started": true,
+     "result": true,
+     "sent": 1,
+     "uncertainSent": 0,
+     "delivered": false,
+     "rejected": true,
+     "needsHuman": false
+    },
+    "eProcessing": "RUNNING",
+    "eApplication": "NOT_READY",
+    "eObserved": [
+     "RECEIVED",
+     "RUNNING"
+    ],
+    "resultReceipts": [
+     "REJECTED/CONTEXT_MISMATCH"
+    ],
+    "bodyReturnedByReceiver": [
+     false
+    ],
+    "sameAsStored": [
+     true
+    ],
+    "fActions": [
+     "delivery-check(periodic):rejected",
+     "delivery-check(periodic):rejected",
+     "delivery-check(periodic):rejected",
+     "delivery-check(periodic):rejected"
+    ],
+    "fJobResults": [
+     "finished"
+    ],
+    "fSent": [
+     "RECEIVED",
+     "RUNNING",
+     "Result"
+    ],
+    "valid": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  },
+  {
+   "id": "P4-eviction-policy-warning",
+   "variant": "저장소",
+   "title": "maxmemory-policy가 noeviction이 아닐 때 Node·Python BullMQ의 반응",
+   "seconds": 2.3,
+   "requirement": "정책이 잘못돼도 연결은 막히지 않으므로, Node·Python 모두 경고를 내는지 확인(관찰)",
+   "observed": {
+    "nodeWarnings": [
+     "IMPORTANT! Eviction policy is allkeys-lru. It should be \"noeviction\""
+    ],
+    "nodeWarningCount": 3,
+    "pythonWarnings": {
+     "afterAdd": [],
+     "afterGetJobState": [
+      "IMPORTANT! Eviction policy is allkeys-lru. It should be \"noeviction\""
+     ]
+    },
+    "pythonWarned": true,
+    "addStillWorked": true
+   },
+   "meets": true,
+   "status": "MEETS"
+  }
+ ]
+}

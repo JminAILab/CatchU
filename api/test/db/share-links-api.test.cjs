@@ -7,6 +7,8 @@ const { NestFactory } = require('@nestjs/core');
 const { SignJWT } = require('jose');
 const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
+const { hashLinkPassword } = require('../../dist/share-links/link-password');
+const { shareCreateFingerprint, isSameShareCreate } = require('../../dist/share-links/share-create-fingerprint');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
 // #147: POST /v1/share-links를 실제 앱·테스트 DB·개발 로그인 회원으로 검증한다.
@@ -193,14 +195,22 @@ test('인증·멱등 키·입력 오류는 링크를 만들지 않는다', async
   expectError(await create(token, undefined, { title: 'x' }), 400, 'INVALID_REQUEST');
   expectError(await create(token, '', { title: 'x' }), 400, 'INVALID_REQUEST');
   expectError(await create(token, 'k'.repeat(129), { title: 'x' }), 400, 'INVALID_REQUEST');
+  // 본문 사례마다 다른 회원으로 보낸다. 회원별 발급 빈도(1분 10회, #219)가 입력 검사보다 먼저라, 한 회원으로 보내면 11번째부터 400이 아니라 429다.
+  let member = 0;
   for (const [body, violations] of [
     [{ title: ' \t ' }, [{ field: 'title', reason: 'isNotEmpty' }]],
     [{}, [{ field: 'title', reason: 'isString' }]],
     [{ title: 'x', password: '' }, [{ field: 'password', reason: 'isNotEmpty' }]],
+    // #221: 제목은 trim 뒤 50자, 비밀번호는 입력 그대로 8~64자(코드 포인트).
+    [{ title: 'x'.repeat(51) }, [{ field: 'title', reason: 'maxLength' }]],
+    [{ title: '😀'.repeat(51) }, [{ field: 'title', reason: 'maxLength' }]],
+    [{ title: 'x', password: 'p'.repeat(7) }, [{ field: 'password', reason: 'minLength' }]],
+    [{ title: 'x', password: '😀'.repeat(7) }, [{ field: 'password', reason: 'minLength' }]],
+    [{ title: 'x', password: 'p'.repeat(65) }, [{ field: 'password', reason: 'maxLength' }]],
     [{ title: 'x', ownerId: 'someone-else' }, [{ field: 'body', reason: 'whitelistValidation' }]],
     [[], [{ field: 'body', reason: 'isObject' }]],
   ]) {
-    const result = await create(token, 'key-invalid', body);
+    const result = await create(await login(`share-link-invalid-${member += 1}`), 'key-invalid', body);
     expectError(result, 400, 'VALIDATION_FAILED');
     assert.deepEqual(result.body.details.violations, violations);
   }
@@ -208,6 +218,59 @@ test('인증·멱등 키·입력 오류는 링크를 만들지 않는다', async
   assert.equal(await count('share_link'), 0);
   assert.equal(await count('idempotency_record'), 0);
 });
+
+test('제목 50자와 비밀번호 8자·64자 경계는 발급되고, 저장된 제목 길이는 DB char_length와 같다', async () => {
+  const token = await login();
+  for (const [key, body, codePoints] of [
+    ['key-len-1', { title: ` ${'가'.repeat(50)} `, password: 'p'.repeat(8) }, 50],
+    ['key-len-2', { title: '😀'.repeat(50), password: 'p'.repeat(64) }, 50],
+    ['key-len-3', { title: '🇰🇷'.repeat(25), password: '😀'.repeat(8) }, 50],
+  ]) {
+    const result = await create(token, key, body);
+    assert.equal(result.status, 201, JSON.stringify(result.body));
+    const [row] = await db.query('SELECT char_length(title) AS n FROM share_link WHERE link_id = $1', [result.body.linkId]);
+    assert.equal(Number(row.n), codePoints, key);
+  }
+});
+
+for (const scenario of [
+  { name: '짧은 비밀번호', title: '이전 짧은 비밀번호', password: 'a', field: 'password', reason: 'minLength' },
+  { name: '긴 제목', title: '가'.repeat(51), password: PASSWORD, field: 'title', reason: 'maxLength' },
+  { name: '긴 비밀번호', title: '이전 긴 비밀번호', password: 'p'.repeat(65), field: 'password', reason: 'maxLength' },
+]) {
+  test(`#221 이전 ${scenario.name} 요청 재전송은 400이며 기존 링크·멱등 기록과 unlock은 유지된다`, async () => {
+    // 이전 판본을 실행한 결과가 아니라, 과거 허용 범위의 저장 자료를 구성한 HTTP·DB 검사다.
+    const token = await login();
+    const legacy = { title: scenario.title, password: scenario.password };
+    const issued = await create(token, 'key-legacy', { title: '이전 발급 준비', password: PASSWORD });
+    assert.equal(issued.status, 201);
+    const verifier = await hashLinkPassword(legacy.password);
+    const fingerprint = shareCreateFingerprint(legacy);
+    await db.query('UPDATE share_link SET title = $2, password_protection_reference = $3 WHERE link_id = $1',
+      [issued.body.linkId, legacy.title, verifier]);
+    await db.query('UPDATE idempotency_record SET request_fingerprint = $2 WHERE link_id = $1',
+      [issued.body.linkId, fingerprint]);
+    const linksBefore = await db.query('SELECT * FROM share_link ORDER BY link_id');
+    const recordsBefore = await db.query('SELECT * FROM idempotency_record ORDER BY idempotency_id');
+    assert.equal(await isSameShareCreate(legacy, {
+      requestFingerprint: recordsBefore[0].request_fingerprint,
+      passwordVerifier: linksBefore[0].password_protection_reference,
+    }), true);
+
+    // 입력 검사가 멱등 처리보다 먼저라 같은 요청이어도 기존 응답 대신 입력 오류다.
+    const replay = await create(token, 'key-legacy', legacy);
+    expectError(replay, 400, 'VALIDATION_FAILED');
+    assert.deepEqual(replay.body.details.violations, [{ field: scenario.field, reason: scenario.reason }]);
+    assert.deepEqual(await db.query('SELECT * FROM share_link ORDER BY link_id'), linksBefore);
+    assert.deepEqual(await db.query('SELECT * FROM idempotency_record ORDER BY idempotency_id'), recordsBefore);
+
+    const linkToken = issued.body.url.split('/s/')[1];
+    const unlock = await fetch(`${url}/v1/public/links/${encodeURIComponent(linkToken)}/unlock`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: legacy.password }),
+    });
+    assert.equal(unlock.status, 200);
+  });
+}
 
 test('로그에 비밀번호 원문과 링크 토큰을 남기지 않는다', async () => {
   const token = await login();
