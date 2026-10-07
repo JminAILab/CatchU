@@ -8,7 +8,7 @@
 |---|---|
 | E 역할(Node) | Node 24.21.0, `bullmq` 6.3.11, `ioredis` 6.0.0. dev의 실제 E 수신 처리([`AnalysisReceiver`](../api/src/analysis-receiver/analysis-receiver.service.ts))를 빌드해 그대로 썼다. 저장은 파일 대역이며 B 등록·DB 반영은 하지 않았다 |
 | F 역할(Python) | Python 3.12.10, `bullmq` 3.3.0(redis-py 7.4.1 고정 의존). dev worker의 요청 검사·처리 함수([`process_request`](../worker/app/processing/pipeline.py))와 가짜 생성기를 그대로 썼다 |
-| 큐 서버 | Docker의 Redis 7.2.11, Valkey 7.2.11, Valkey 8.1.6. NCP가 막은 명령 10개를 끄고, 상시 영속성을 끄고, 축출 정책을 `noeviction`으로 띄웠다(「[NCP 적용 조건](CatchU_queue_requirements.md#ncp-적용-조건)」). 비교용 AOF 시나리오만 AOF를 켜고 명령을 막지 않았고, 축출 정책 시나리오는 정책만 `allkeys-lru`로 바꿨다 |
+| 큐 서버 | Docker의 Redis 7.2.11, Valkey 7.2.11, Valkey 8.1.6. NCP가 막은 명령 10개를 끄고, 상시 영속성을 끄고, 축출 정책을 `noeviction`으로 띄웠다(「[배포 서버 적용 조건](CatchU_queue_requirements.md#배포-서버-적용-조건)」). 비교용 AOF 시나리오만 AOF를 켜고 명령을 막지 않았고, 축출 정책 시나리오는 정책만 `allkeys-lru`로 바꿨다 |
 | 모의 분석 함수 | 불릴 때마다 디스크에 한 줄을 먼저 쓴다. 그 줄 수를 분석 호출 횟수로 셌다 |
 | 시간 설정 | 중단 복구를 빨리 보려고 잠금 2초·정체 검사 1초로 줄였다(기본값 각 30초). 제품 설정 제안이 아니다 |
 | 재현 | [재현 키트](queue-verification/README.md)의 `node run.cjs --engine <엔진>`. 엔진별 요약은 [results/](queue-verification/results/) |
