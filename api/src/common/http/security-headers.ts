@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { isDevelopmentOrTest } from '../node-env';
 
 /**
  * 모든 응답에 붙이는 보안 헤더(#217). api는 JSON만 내보내므로 브라우저가 응답으로 아무것도 불러오지 않고,
@@ -23,11 +24,10 @@ type HeaderResponse = { setHeader(name: string, value: string): void };
  * app.init() 전, CORS보다 먼저 부른다. 라우터·본문 해석·CORS 사전 요청보다 앞에서 헤더를 붙여야
  * /v1 기능 경로뿐 아니라 /health, CORS 사전 요청, Nest 밖에서 끝나는 오류 응답에도 같은 헤더가 남는다.
  */
-export function applySecurityHeaders(app: INestApplication, nodeEnv: string | undefined): void {
+export function applySecurityHeaders(app: INestApplication, env: NodeJS.ProcessEnv): void {
   const server: { disable(setting: string): void } = app.getHttpAdapter().getInstance();
   server.disable('x-powered-by');
-  const isDevelopmentOrTest = nodeEnv === 'development' || nodeEnv === 'test';
-  const headers: Record<string, string> = isDevelopmentOrTest
+  const headers: Record<string, string> = isDevelopmentOrTest(env)
     ? { ...SECURITY_HEADERS }
     : { ...SECURITY_HEADERS, 'Strict-Transport-Security': HSTS_HEADER_VALUE };
   app.use((_request: unknown, response: HeaderResponse, next: () => void) => {

@@ -25,7 +25,7 @@ type Next = (error?: unknown) => void;
  */
 export async function configureApp(app: INestApplication): Promise<INestApplication> {
   installStackFrameCollector();
-  applySecurityHeaders(app, process.env.NODE_ENV);
+  applySecurityHeaders(app, process.env);
   applyCors(app, process.env);
   applyTrustProxy(app, process.env.TRUST_PROXY_CIDRS);
   app.setGlobalPrefix(API_PREFIX, { exclude: [{ path: 'health', method: RequestMethod.GET }] });
