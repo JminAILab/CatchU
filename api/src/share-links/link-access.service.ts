@@ -69,7 +69,7 @@ export class LinkAccessService {
     // 이미 차단된 주소·링크는 대기열과 무관하게 실제 남은 시간으로 먼저 거절한다(대기 초과의 Retry-After: 1로 덮어쓰지 않음).
     this.assertNotBlocked(addressKey, link.linkId, now);
     // 같은 링크·주소의 요청 빈도(#219). 실패 기록은 성공하면 지워지므로, 맞는 비밀번호를 되풀이해 해시 자원을 차지하지 못하게
-    // 해시 차례를 잡기 전에 센다. 거부한 요청은 세지 않는다.
+    // 해시 차례를 잡기 전에 센다. 여기서 거부한 요청은 세지 않고, 통과한 뒤 포화·차단·중단으로 거절된 요청은 이미 센 것이다.
     const rate = this.controls.rates.take(addressKey, now);
     if (!rate.allowed) throw limited(rate.retryAfterSeconds);
     let ticket;
