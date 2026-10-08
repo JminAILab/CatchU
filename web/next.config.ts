@@ -2,13 +2,15 @@ import type { NextConfig } from "next";
 
 /**
  * 응답에 붙이는 보안 헤더(#217). 값은 `next dev`·`next build`를 시작할 때 정해진다(NEXT_PUBLIC_ 값과 같다).
- * 끝 슬래시를 떼는 이동 응답(308)에는 Next가 헤더 설정을 적용하지 않아 빠진다(본문 없는 이동 응답).
+ * 경로를 정리하는 자동 이동(308: 끝 슬래시, 중복 슬래시·역슬래시)에는 Next가 헤더 설정을 적용하지 않아 빠진다.
+ * 이 응답은 이동할 주소만 담고 화면을 그리지 않는다.
  * - 스크립트는 인라인을 허용한다('unsafe-inline'). Next가 페이지에 인라인 스크립트를 넣는데, 요청마다 일회용 값(nonce)을
  *   주려면 모든 페이지를 요청 때마다 새로 그려야 해서다. 화면 출력은 React 텍스트로만 그려 스크립트 삽입을 막는다
  *   (docs/CatchU_security_checks.md 「화면 출력」).
  * - connect-src에 API 기준 주소의 출처를 더한다. web과 api의 출처가 달라서다. 주소가 없거나 http(s)가 아니면
  *   API 호출 함수도 요청하지 않으므로 더하지 않는다(src/lib/api-client.ts). IPv6 주소(`[::1]` 등)는 CSP 출처 문법에
- *   적을 수 없어 브라우저가 API 요청을 모두 막으므로, 조용히 막히지 않게 시작할 때 오류로 멈춘다.
+ *   적을 수 없어 쓸 수 없으므로, 형식과 관계없이 `next dev`·`next build`에서 오류로 멈춘다(요청이 조용히 막히지 않게).
+ *   `next start`는 빌드 때 정해진 헤더를 쓰므로 API 주소를 바꾸려면 다시 빌드한다.
  * - 'unsafe-eval'은 `next dev`(development)에서만 더한다(React 개발용 오류 표시). HSTS는 development·test가 아닐 때(배포용 빌드) 붙인다.
  * - 외부 스크립트·이미지·글꼴·연결을 새로 쓰면 해당 항목에 출처를 더한다.
  */
@@ -44,7 +46,7 @@ function readHttpOrigin(value: string | undefined): string | null {
   const url = new URL(value.trim());
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
   if (url.hostname.startsWith("[")) {
-    throw new Error("NEXT_PUBLIC_API_BASE_URL에는 IPv6 주소를 쓸 수 없습니다. CSP가 막으므로 127.0.0.1이나 localhost로 적으세요.");
+    throw new Error("NEXT_PUBLIC_API_BASE_URL에는 IPv6 주소를 쓸 수 없습니다. CSP 허용 목록에 적을 수 없으므로 127.0.0.1이나 localhost로 적으세요.");
   }
   return url.origin;
 }

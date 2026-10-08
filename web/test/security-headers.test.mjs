@@ -49,9 +49,20 @@ test('API 기준 주소가 IPv6 주소면 CSP에 적을 수 없으므로 시작�
 });
 
 test('모든 경로에 헤더 생성 함수의 헤더를 붙이고 X-Powered-By를 끈다', async () => {
-  assert.equal(nextConfig.poweredByHeader, false);
-  const rules = await nextConfig.headers();
-  assert.equal(rules.length, 1);
-  assert.equal(rules[0].source, '/:path*');
-  assert.deepEqual(rules[0].headers, securityHeaders(process.env));
+  // headers()는 process.env를 읽으므로, 실행하는 셸의 값과 관계없이 합성 값으로 확인하고 되돌린다.
+  const env = { NODE_ENV: 'production', NEXT_PUBLIC_API_BASE_URL: 'https://api.catchu.example' };
+  const before = Object.fromEntries(Object.keys(env).map((key) => [key, process.env[key]]));
+  Object.assign(process.env, env);
+  try {
+    assert.equal(nextConfig.poweredByHeader, false);
+    const rules = await nextConfig.headers();
+    assert.equal(rules.length, 1);
+    assert.equal(rules[0].source, '/:path*');
+    assert.deepEqual(rules[0].headers, securityHeaders(env));
+  } finally {
+    for (const [key, value] of Object.entries(before)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 });
