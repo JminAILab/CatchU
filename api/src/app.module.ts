@@ -9,6 +9,7 @@ import { ShareLinksModule } from './share-links/share-links.module';
 import { MemberProfileModule } from './member-profile/member-profile.module';
 import { CatchesModule } from './catches/catches.module';
 import { MemberRepositoriesModule } from './member-repositories/member-repositories.module';
+import { GoogleLoginModule } from './google-login/google-login.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { MemberRepositoriesModule } from './member-repositories/member-repositor
     CatchesModule,
     MemberRepositoriesModule,
     MemberProfileModule,
+    GoogleLoginModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor }],
