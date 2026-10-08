@@ -16,6 +16,7 @@ const { AnalysisRegistrationService, AnalysisRegistrationError, AnalysisReceiptD
 const { AnalysisReceiverModule } = require('../../dist/analysis-receiver/analysis-receiver.module');
 const { DevAnalysisInjection } = require('../../dist/analysis-receiver/dev-analysis-injection');
 const { AppModule } = require('../../dist/app.module');
+const { OwnerCatchStore } = require('../../dist/catches/owner-catch-store');
 const { configureApp } = require('../../dist/app.setup');
 const { CurrentMemberId } = require('../../dist/auth/auth.decorators');
 const { AccessTokenService } = require('../../dist/auth/access-token.service');
@@ -254,6 +255,120 @@ test('LIVE 연결된 저장소 주소의 근거 허용, MOCK example.invalid 허
   await receive(pipeline().service, await prepare(undefined, { sourceMode: 'LIVE' }));
   await receive(pipeline().service, await prepare());
   assert.equal((await counts()).catches, 2);
+});
+
+
+function gate() {
+  let release;
+  const promise = new Promise(resolve => { release = resolve; });
+  return { promise, release };
+}
+async function within(promise, label) {
+  let timer;
+  try {
+    return await Promise.race([promise, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('잠금 단계 시간 초과: ' + label)), 8000);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+// 실제 트랜잭션/SQL은 그대로 실행하고, 잠금 획득 직후의 진행 시점만 제어한다.
+function lockObservedSource(onQuery, errors) {
+  const source = Object.create(db);
+  source.transaction = (...args) => {
+    const work = args.pop();
+    return db.transaction(...args, async manager => {
+      const runner = manager.queryRunner;
+      const originalQuery = runner.query;
+      const query = originalQuery.bind(runner);
+      const [{ pid }] = await query('SELECT pg_backend_pid() AS pid');
+      await query("SET LOCAL statement_timeout = '10000ms'");
+      runner.query = async (...queryArgs) => {
+        try {
+          const value = await query(...queryArgs);
+          await onQuery(queryArgs[0], pid);
+          return value;
+        } catch (error) {
+          if (error.driverError?.code) errors.push(error.driverError.code);
+          throw error;
+        }
+      };
+      try { return await work(manager); }
+      finally { runner.query = originalQuery; }
+    });
+  };
+  return source;
+}
+async function waitForBlock(waitingPid, blockingPid) {
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    const [{ blocked }] = await db.query('SELECT $2::int = ANY(pg_blocking_pids($1::int)) AS blocked',
+      [waitingPid, blockingPid]);
+    if (blocked) return;
+    await new Promise(resolve => setTimeout(resolve, 20));
+  }
+  assert.fail('공개 경로가 반영 트랜잭션의 보호 잠금을 실제로 기다리지 않았습니다.');
+}
+
+test('기존 Catch 공개와 동일 작업 새 결과 반영은 잠금 경쟁에도 둘 다 커밋한다', async () => {
+  const original = await prepare();
+  const first = await receive(pipeline().service, original);
+  const [catchId] = first.application.registeredCatchIds;
+  await new OwnerCatchStore(db).confirm(original.memberId, catchId,
+    { workFactsConfirmed: true, contributionConfirmed: true });
+  const [beforeCatch] = await db.query('SELECT * FROM catch_asset WHERE catch_id=$1', [catchId]);
+  const beforeEvidence = await db.query('SELECT * FROM catch_evidence WHERE catch_id=$1 ORDER BY catch_evidence_id', [catchId]);
+  const next = await prepare(undefined, { memberId: original.memberId });
+  next.candidates[0].workIdentity = original.candidates[0].workIdentity;
+  next.candidates[0].title = '기존 본문을 바꾸지 않는 새 합성 후보';
+  const catchLocked = gate(); const protectionLocked = gate(); const resumeApplication = gate();
+  const errors = [];
+  const visibilitySource = lockObservedSource(async (sql, pid) => {
+    if (/FOR (?:NO KEY )?UPDATE OF c\b/.test(sql)) {
+      catchLocked.release(pid);
+      await within(protectionLocked.promise, '반영의 보호 잠금');
+    }
+  }, errors);
+  const applicationSource = lockObservedSource(async (sql, pid) => {
+    if (/repository_protection/.test(sql) && /FOR UPDATE/.test(sql)) {
+      protectionLocked.release(pid);
+      await within(resumeApplication.promise, '공개의 실제 보호 잠금 대기');
+    }
+  }, errors);
+  const pending = [];
+  try {
+    const visibility = new OwnerCatchStore(visibilitySource).setVisibility(original.memberId, catchId, { visibility: 'PUBLIC' });
+    pending.push(visibility);
+    // 거부가 발생해도 finally에서 수집할 때까지 unhandled rejection을 만들지 않는다.
+    visibility.catch(() => {});
+    const visibilityPid = await within(catchLocked.promise, '공개의 Catch 잠금');
+    const application = receive(pipeline(async context => observation(context), applicationSource).service, next);
+    pending.push(application); application.catch(() => {});
+    const applicationPid = await within(protectionLocked.promise, '반영의 보호 잠금');
+    await waitForBlock(visibilityPid, applicationPid);
+    resumeApplication.release();
+    const outcomes = await within(Promise.allSettled(pending), '두 호출의 최종 커밋');
+    assert.deepEqual(errors, [], '실제 SQL에서 교착/잠금 시간 초과가 없어야 한다');
+    assert.deepEqual(outcomes.map(value => value.status), ['fulfilled', 'fulfilled']);
+    const applied = outcomes[1].value.application;
+    assert.deepEqual(applied.registeredCatchIds, [catchId]);
+    assert.equal(applied.registrations[0].disposition, 'EXISTING');
+    assert.equal(applied.ownerResultsReady, true);
+    assert.equal((await state(next)).application, 'APPLIED');
+    assert.equal((await db.manager.findOneByOrFail(AnalysisRequest, { requestId: next.requestId })).lifecycle, 'CLOSED');
+    assert.deepEqual(await counts(), { catches: 1, evidence: beforeEvidence.length, registrations: 2, receipts: 2 });
+    assert.deepEqual((await db.query('SELECT * FROM catch_asset WHERE catch_id=$1', [catchId]))[0],
+      { ...beforeCatch, visibility: 'PUBLIC' });
+    assert.deepEqual(await db.query('SELECT * FROM catch_evidence WHERE catch_id=$1 ORDER BY catch_evidence_id', [catchId]), beforeEvidence);
+    const [protection] = await db.query('SELECT applied_restriction, confirmed_source_state FROM repository_protection WHERE owner_id=$1 AND repository_id=$2',
+      [next.memberId, next.repositoryId]);
+    assert.equal(protection.applied_restriction, 'NONE');
+    assert.deepEqual(protection.confirmed_source_state, observation(next).confirmedSourceState);
+    assert.equal((await receive(pipeline().service, next)).receipt.disposition, 'DUPLICATE');
+    assert.equal((await counts()).catches, 1);
+  } finally {
+    protectionLocked.release(); resumeApplication.release();
+    await Promise.allSettled(pending);
+  }
 });
 
 // 네트워크 재현 전용 컨트롤러. 운영 worker/회원 API를 추가하지 않는다.

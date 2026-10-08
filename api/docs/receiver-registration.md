@@ -28,6 +28,9 @@ const outcome = await service.receiveResult(message, async receipt => {
 
 중간 저장·최종 커밋 실패는 이번 보호 관측·Catch·근거·후보 연결·E 완료 변경을 모두 롤백한다. 먼저 커밋한 수신 기록과 기존 Catch는 보존한다. 기존 E 서비스가 별도 트랜잭션으로 현재 시도의 `APPLY_FAILED`를 기록하고, 뒤늦은 실패로 다른 성공·시도를 덮어쓰지 않는다. 실패 기록까지 실패하면 호출은 실패하며 `FAILURE_RECORDING_FAILED`를 안전한 로그에 남긴다. 수신 저장 실패는 기존 `ReceiverStorageError`, Receipt 전달 실패는 `AnalysisReceiptDeliveryError`, 반영 호출 실패는 `AnalysisRegistrationError`다. DB 오류·후보 원문·서명 키·토큰·공급자/전송 오류 원문을 응답/로그로 전달하지 않는다.
 
+
+[동시 공개·반영 교착 리뷰](https://github.com/JminAILab/CatchU/pull/244#discussion_r4203953397)를 반영해 B `OwnerCatchStore.setVisibility`의 Catch 잠금은 `FOR NO KEY UPDATE OF c`다. 공개·숨김은 키를 변경하지 않으므로, 같은 Catch를 참조하는 새 후보 연결의 외래 키 검사(`KEY SHARE`)와 공존한다([PostgreSQL 16 행 잠금](https://www.postgresql.org/docs/16/explicit-locking.html#LOCKING-ROWS)). 공개의 확인 항목·보호 제한 검사와 보호 행의 `FOR SHARE`는 유지하며, 동시 공개 변경끼리는 계속 직렬화된다. 보호 관측을 별도 선커밋하지 않고 기존 보호·B 등록·E 완료의 동일 트랜잭션과 전체 롤백을 유지한다.
+
 ## 보호 관측과 LIVE 근거 주소
 
 `RepositoryObservationSource.observe(context)`는 검증된 요청·시도·회원·저장소·동의·범위·자료 방식으로 신뢰 경로를 조회한다. 반환값에는 다음이 필요하다. 토큰은 반환하지 않는다.
@@ -52,5 +55,7 @@ const outcome = await service.receiveResult(message, async receipt => {
 ## 검사와 한계
 
 `api/`에서 전용 `_test` DB를 지정한 뒤 `npm test -- test/integration/receiver-registration.test.cjs` 또는 `npm test`를 실행한다. 실제 #104/E/B 마이그레이션·수신 어댑터·B 등록·E 완료/실패 서비스를 사용한다. 정상 등록·0건·부분 실패·실패, 동일 결과 재전달·동시 수신, 동일 작업 두 후보, 수신/반영 커밋 실패·전체 롤백·수신 보존·실패 기록 오류·LIVE 주소 대조를 검사한다.
+
+추가 동시성 검사는 실제 공개 서비스와 수신·반영 서비스를 호출하고, Catch 잠금 → 보호 관측 잠금 → 공개의 보호 잠금 대기를 `pg_blocking_pids`로 확인한 뒤 반영을 진행한다. 동일 작업의 기존 Catch 재사용과 PUBLIC 전환이 모두 커밋되고 같은 Catch ID·기존 본문·근거를 유지하며 새 시도는 APPLIED/CLOSED인지 검사한다. 기존 공개/숨김·보호 변경 경쟁·저장 실패·전체 롤백 검사는 전체 API 검사에 포함된다.
 
 실제 HTTP 검사는 파일 안의 전용 컨트롤러에서 기존 Auth/CurrentMemberId·개발 주입과 DB 모듈을 조립해 정상·중복·권한 경계·저장 실패를 확인한다. 접수한 요청·동의·시도는 시험 준비 단계에서 넣으며 #138 접수 API를 실행한 것이 아니다. **보호 공급은 명시적 합성 관측 대역**이다. 실제 OAuth·GitHub 관측·큐/worker 전송·#237 종료를 검증하지 않았으며 #105 전체 완료를 뜻하지 않는다.

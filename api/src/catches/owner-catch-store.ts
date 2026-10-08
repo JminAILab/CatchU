@@ -74,12 +74,14 @@ export class OwnerCatchStore {
     return this.dataSource.transaction('READ COMMITTED', async (manager) => {
       await this.assertMemberExists(manager, memberId);
       if (!isUuid(catchId)) throw new NotFoundException();
+      // visibility만 갱신하므로 키를 보호하는 외래 키의 KEY SHARE와 공존한다.
+      // 보호 행의 FOR SHARE는 유지해 공개 조건 검사와 저장을 직렬화한다.
       const owned: { workFactsConfirmed: boolean; contributionConfirmed: boolean;
         requestMemberId: string | null; repositoryId: string | null }[] = await manager.query(`
         SELECT c.work_facts_confirmed AS "workFactsConfirmed", c.contribution_confirmed AS "contributionConfirmed",
           r.member_id AS "requestMemberId", r.repository_id AS "repositoryId"
         FROM catch_asset c LEFT JOIN analysis_request r ON r.request_id = c.source_request_id
-        WHERE c.owner_id = $1 AND c.catch_id = $2 FOR UPDATE OF c`, [memberId, catchId]);
+        WHERE c.owner_id = $1 AND c.catch_id = $2 FOR NO KEY UPDATE OF c`, [memberId, catchId]);
       if (owned.length === 0) throw new NotFoundException();
       const current = owned[0];
       if (visibility === 'PUBLIC') {
