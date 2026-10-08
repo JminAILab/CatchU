@@ -6,6 +6,7 @@ import { HealthController } from './health/health.controller';
 import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { ShareLinksModule } from './share-links/share-links.module';
+import { MemberProfileModule } from './member-profile/member-profile.module';
 import { CatchesModule } from './catches/catches.module';
 import { MemberRepositoriesModule } from './member-repositories/member-repositories.module';
 
@@ -17,6 +18,7 @@ import { MemberRepositoriesModule } from './member-repositories/member-repositor
     ShareLinksModule,
     CatchesModule,
     MemberRepositoriesModule,
+    MemberProfileModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor }],
