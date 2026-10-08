@@ -265,7 +265,8 @@ test('수신 조회 판정: 비밀번호 링크는 이 링크의 grant가 있어
   await rejectsCode(access.assertReadable(link.token, otherGrant), 'LINK_PASSWORD_REQUIRED');
   await rejectsCode(access.assertReadable(link.token, `${grant.slice(0, -2)}AA`), 'LINK_PASSWORD_REQUIRED');
 
-  await db.query('UPDATE share_link SET stopped_at = now() WHERE link_id = $1', [link.linkId]);
+  // 발급 시각은 Node 시계로 정한다. DB 시계가 조금 늦어도 중단 시각 ≥ 발급 시각 제약을 지키게 한다.
+  await db.query('UPDATE share_link SET stopped_at = GREATEST(now(), issued_at) WHERE link_id = $1', [link.linkId]);
   await rejectsCode(access.assertReadable(link.token, grant), 'LINK_UNAVAILABLE');
   await moveIssuedAt(otherLink.linkId, new Date(Date.now() - 721 * HOUR));
   await rejectsCode(access.assertReadable(otherLink.token, otherGrant), 'LINK_UNAVAILABLE');
