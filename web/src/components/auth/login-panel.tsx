@@ -5,6 +5,8 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { ApiResult } from "@/lib/api-response";
 import { api, devLoginEnabled } from "@/lib/api";
 import { afterLoginPath } from "@/lib/member-navigation";
+import { useMemberLookup } from "./use-member-lookup";
+import { LookupFailedState } from "@/components/status/status";
 import styles from "./auth.module.css";
 
 function devLoginErrorMessage(result: Exclude<ApiResult, { kind: "success" }>): string {
@@ -22,6 +24,12 @@ function devLoginErrorMessage(result: Exclude<ApiResult, { kind: "success" }>): 
  */
 export function LoginPanel() {
   const router = useRouter();
+  const { session, me, retry } = useMemberLookup("login");
+  useEffect(() => {
+    if (session.token && me.state === "loaded") {
+      router.replace(afterLoginPath(me.displayName, new URLSearchParams(window.location.search).get("next")));
+    }
+  }, [session, me, router]);
   const inputId = useId();
   const [memberId, setMemberId] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -41,9 +49,7 @@ export function LoginPanel() {
     const result = await api.devLogin(memberId, { signal: abort.signal });
     if (abort.signal.aborted) return;
     if (result.kind === "success") {
-      // 이름 저장 여부는 GET /v1/me(#135) 연결 전이라 알 수 없다(null).
-      const next = new URLSearchParams(window.location.search).get("next");
-      router.replace(afterLoginPath(null, next));
+      setSubmitting(false);
       return;
     }
     setError(devLoginErrorMessage(result));
@@ -59,7 +65,8 @@ export function LoginPanel() {
           Google로 로그인 <span className={styles.pendingTag}>연결 전</span>
         </button>
 
-        {devLoginEnabled && (
+        {session.token && (me.state === "failed" ? <LookupFailedState title="회원 정보를 불러오지 못했습니다" onRetry={retry} /> : <p role="status">회원 정보를 확인하고 있습니다.</p>)}
+        {devLoginEnabled && !session.token && (
           <section className={styles.devSection} aria-labelledby={`${inputId}-title`}>
             <h2 id={`${inputId}-title`} className={styles.devTitle}>개발용 로그인</h2>
             <p className={styles.devNotice}>개발 환경에서만 보입니다. 개발용 식별 문자열을 입력하면 해당 회원을 찾거나 만들어 로그인합니다.</p>

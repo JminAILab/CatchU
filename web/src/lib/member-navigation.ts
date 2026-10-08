@@ -47,7 +47,7 @@ export type MemberEntryDecision =
  * 조회 중에는 판단을 미루고, 실패는 다시 불러오기, 이름이 빈 문자열이면 최초 입력으로 보낸다.
  * 이미 최초 입력 화면이면 다시 보내지 않는다.
  *
- * 아직 회원 경로 가드에 연결하지 않았다. `GET /v1/me`(#135)가 병합되면 연결한다.
+ * 회원 경로 가드가 GET /v1/me 성공 결과로 호출한다.
  */
 export function decideMemberEntry(me: MeLookup, pathname: string): MemberEntryDecision {
   if (me.state === "loading") return { action: "wait" };
