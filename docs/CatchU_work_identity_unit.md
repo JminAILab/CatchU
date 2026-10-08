@@ -28,6 +28,7 @@
   - 부분끼리 변경이 겹치지 않는다.
   - 단위에 배정된 모든 변경(다른 단위에 배정된 변경은 빼고)이 어느 한 부분에 속한다.
   - 하나라도 못 채우면 나누지 않는다. 속할 곳을 보일 수 없는 변경을 임의로 한 부분에 붙이거나 따로 후보로 내지 않는다.
+  - 이슈 조회가 허용되지 않은 요청(10월)에서는 본인 커밋 메시지가 PR 번호가 아닌 서로 다른 번호를 둘 이상 가리켜도 나누지 않는다. 작성자가 한 PR·병합으로 묶은 경계를 따르고, 그 사실을 groupingLimitations에 남긴다(2026-10-08 팀장 결정, [결정 기록](CatchU_work_identity_records.md#결정)).
 - **부분은 PR·병합 단위를 커밋으로 나누거나, 한 커밋 안을 파일 경로로 나눌 때만 쓴다.** F가 묶은 커밋 묶음은 커밋 경계로 나누지 않고 별도 커밋 묶음 단위로 만든다.
 - 어떤 커밋을 어느 커밋 묶음으로 묶는지(방법 B의 기준)와 본인 기여를 어떻게 가리는지는 #118의 범위다. 이 문서는 묶은 결과에서 값을 만드는 방법과, 묶을 때 지킬 조건만 정한다.
 
@@ -37,7 +38,7 @@
 
 | 근거 | 쓰는 방법 |
 |---|---|
-| PR 커밋 목록 | PR에 담긴 커밋 SHA 목록. [PR 커밋 목록 API][gh-prc]는 최대 250개까지만 돌려주므로, 넘으면 [커밋 목록 API][gh-lc]로 전체를 받는다. 병합되지 않고 닫힌 PR의 커밋은 이 목록으로만 알 수 있다 |
+| PR 커밋 목록 | PR에 담긴 커밋 SHA 목록. [PR 커밋 목록 API][gh-prc]는 최대 250개까지만 돌려준다. 넘으면 [PR API][gh-pr]의 전체 커밋 수와 [비교 API][gh-cmp](PR이 갈라져 나온 기준 커밋부터 PR 머리 커밋까지)로 나머지를 받는다. [커밋 목록 API][gh-lc]는 PR이 어디서 시작하는지 알려 주지 않아 쓰지 않는다. 전체로 보는 조건과 어긋날 때의 처리는 [결정 기록](CatchU_work_identity_records.md#결정)에 있다(2026-10-08 팀장 결정). 병합되지 않고 닫힌 PR의 커밋은 이 목록으로만 알 수 있다 |
 | 병합된 PR의 `merge_commit_sha` | [PR API][gh-pr]가 주는 값이다. squash로 합쳤으면 대상 브랜치(PR을 병합한 브랜치)의 squash 커밋, rebase로 합쳤으면 대상 브랜치가 옮겨 간 커밋, 병합 커밋으로 합쳤으면 그 병합 커밋이다. 병합 전에는 시험용 병합 커밋이라 쓰지 않는다 |
 | 커밋과 연결된 PR | [연결 PR API][gh-cpr]. 기본 브랜치에 있는 커밋이면 그 커밋을 들여온 병합 PR을 돌려준다. 기본 브랜치에 없으면 병합됐거나 열린 PR을 돌려주고, 병합되지 않고 닫힌 PR은 돌려주지 않는다 |
 | 병합 커밋의 부모 | PR 없는 병합이 어느 커밋을 들였는지 정한다 |
@@ -129,6 +130,7 @@
 [gh-pr]: https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request
 [gh-prc]: https://docs.github.com/en/rest/pulls/pulls#list-commits-on-a-pull-request
 [gh-lc]: https://docs.github.com/en/rest/commits/commits#list-commits
+[gh-cmp]: https://docs.github.com/en/rest/commits/commits#compare-two-commits
 [gh-cpr]: https://docs.github.com/en/rest/commits/commits#list-pull-requests-associated-with-a-commit
 <!-- 코드·합성 자료 -->
 [x-blookup]: https://github.com/JminAILab/CatchU/blob/e2acdfe5adf0e21ad70b18ea2a4ae52ed1b64964/api/src/catches/registration-service.ts#L135-L140
