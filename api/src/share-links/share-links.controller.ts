@@ -1,8 +1,11 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Post, Put, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post, Put, Query, Req, Res } from '@nestjs/common';
 import { CurrentMemberId } from '../auth/auth.decorators';
 import { ApiError } from '../common/errors';
+import { SHARE_LINK_ISSUE_LIMITER } from './issue-rate-limit';
+import { RequestRateLimiter } from './request-rate-limiter';
+import { Clock } from './share-link-issuance';
 import { ShareLinkResponse } from './share-link-response';
-import { ShareLinkPage, ShareLinksService } from './share-links.service';
+import { SHARE_LINKS_CLOCK, ShareLinkPage, ShareLinksService } from './share-links.service';
 
 interface RawRequest {
   headers: Record<string, string | string[] | undefined>;
@@ -22,7 +25,11 @@ function assertNoBodyOrQuery(request: RawRequest): void {
 
 @Controller('share-links')
 export class ShareLinksController {
-  constructor(private readonly shareLinks: ShareLinksService) {}
+  constructor(
+    private readonly shareLinks: ShareLinksService,
+    @Inject(SHARE_LINK_ISSUE_LIMITER) private readonly issueLimiter: RequestRateLimiter,
+    @Inject(SHARE_LINKS_CLOCK) private readonly clock: Clock,
+  ) {}
 
   /** 내 링크 목록(회원 API listShareLinks). 쿼리는 `cursor`·`limit`만 받는다. */
   @Get()
@@ -39,6 +46,9 @@ export class ShareLinksController {
     @Body() body: unknown,
     @Res({ passthrough: true }) response: { status(code: number): unknown },
   ): Promise<ShareLinkResponse> {
+    // 회원별 발급 빈도(#219)는 입력 검사·비밀번호 해시·저장보다 먼저 센다. 거부한 요청은 세지 않고 아무것도 저장하지 않는다.
+    const rate = this.issueLimiter.take(memberId, this.clock());
+    if (!rate.allowed) throw new ApiError('RATE_LIMITED', { retryAfterSeconds: rate.retryAfterSeconds });
     const result = await this.shareLinks.create(memberId, idempotencyKey, body);
     response.status(result.replayed ? 200 : 201);
     return result.link;

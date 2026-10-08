@@ -1,10 +1,31 @@
 const assert = require('node:assert/strict');
+const { randomBytes, scryptSync } = require('node:crypto');
 const { test } = require('node:test');
 const {
   hashLinkPassword, verifyLinkPassword, PasswordVerifierFormatError, PASSWORD_HASH_PARAMS,
 } = require('../dist/share-links/link-password.js');
 
 const PASSWORD = 'synthetic-only-password';
+
+// 모듈을 거치지 않고 저장 형식대로 검증값을 만든다. 이전 매개변수로 저장된 값을 흉내 낸다.
+function verifierWith(password, params) {
+  const salt = randomBytes(16);
+  const hash = scryptSync(password, salt, 32, { ...params, maxmem: 128 * params.N * params.r * 2 });
+  return ['scrypt', '1', params.N, params.r, params.p, salt.toString('base64url'), hash.toString('base64url')].join('$');
+}
+
+test('새 검증값은 OWASP 권고 조합 N=2^15·r=8·p=3으로 저장된다(#219)', async () => {
+  assert.deepEqual({ ...PASSWORD_HASH_PARAMS }, { N: 2 ** 15, r: 8, p: 3 });
+  const stored = await hashLinkPassword(PASSWORD);
+  assert.deepEqual(stored.split('$').slice(2, 5), ['32768', '8', '3']);
+  assert.equal(await verifyLinkPassword(PASSWORD, stored), true);
+});
+
+test('이전 매개변수 N=2^15·r=8·p=1로 저장된 값도 계속 검증된다(#219)', async () => {
+  const legacy = verifierWith(PASSWORD, { N: 2 ** 15, r: 8, p: 1 });
+  assert.equal(await verifyLinkPassword(PASSWORD, legacy), true);
+  assert.equal(await verifyLinkPassword(`${PASSWORD}x`, legacy), false);
+});
 
 test('검증값은 원문을 포함하지 않고 형식·매개변수를 기록한다', async () => {
   const stored = await hashLinkPassword(PASSWORD);

@@ -24,6 +24,7 @@ export const ERROR_STATUS = {
   LINK_TITLE_CONFLICT: 409,
   LINK_LIMIT_REACHED: 409,
   LINK_UNLOCK_LIMITED: 429,
+  RATE_LIMITED: 429,
   INTERNAL_ERROR: 500,
 } as const;
 
@@ -55,5 +56,6 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   LINK_TITLE_CONFLICT: '같은 제목의 유효한 링크가 있습니다.',
   LINK_LIMIT_REACHED: '유효한 링크는 최대 5개까지 만들 수 있습니다.',
   LINK_UNLOCK_LIMITED: '비밀번호 시도가 많아 잠시 뒤에 다시 시도할 수 있습니다.',
+  RATE_LIMITED: '요청이 많아 잠시 뒤에 다시 시도할 수 있습니다.',
   INTERNAL_ERROR: '처리 중 오류가 발생했습니다.',
 };
