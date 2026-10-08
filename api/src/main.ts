@@ -18,9 +18,18 @@ async function bootstrap(): Promise<void> {
     throw new Error('BIND_HOST는 IP 주소여야 합니다(예: 127.0.0.1, 0.0.0.0).');
   }
 
-  const app = await configureApp(await NestFactory.create(AppModule));
-  app.enableShutdownHooks();
-  await app.listen(port, host);
+  const app = await NestFactory.create(AppModule);
+  try {
+    await configureApp(app);
+    app.enableShutdownHooks();
+    await app.listen(port, host);
+  } catch (error) {
+    // 이미 열린 DB 연결 풀을 닫는다. 닫지 않으면 유휴 연결이 시한(10초)까지 프로세스를 붙잡아 종료가 늦어진다.
+    await app.close().catch((closeError: unknown) => {
+      Logger.error(closeError instanceof Error ? closeError.message : 'API 종료 실패', undefined, 'Bootstrap');
+    });
+    throw error;
+  }
   Logger.log(`API 실행: http://${family === 6 ? `[${host}]` : host}:${port}/health`, 'Bootstrap');
 }
 

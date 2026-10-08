@@ -156,6 +156,39 @@ for (const [label, file, expected] of [
   });
 }
 
+async function holdPort(t) {
+  const holder = createServer();
+  await new Promise((resolve, reject) => {
+    holder.once('error', reject);
+    holder.listen(0, '127.0.0.1', resolve);
+  });
+  t.after(() => new Promise((resolve) => holder.close(resolve)));
+  return holder.address().port;
+}
+
+// 앱을 만든 뒤(DB 연결 풀이 열린 뒤) 설정·포트 오류로 멈출 때도 앱을 닫고 바로 끝나야 한다.
+// 닫지 않으면 DB 유휴 연결이 시한(10초)까지 프로세스를 붙잡는다(#230 리뷰).
+for (const [label, settings, expected] of [
+  ['production에서 CORS 허용 출처가 http', async () => ({ NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example',
+    LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111',
+    CORS_ALLOWED_ORIGINS: 'http://web.catchu.example' }), 'CORS_ALLOWED_ORIGINS'],
+  ['포트가 이미 사용 중', async (t) => ({ PORT: String(await holdPort(t)) }), 'EADDRINUSE'],
+]) {
+  test(`main: 앱 생성 뒤 ${label}이면 DB 연결을 닫고 바로 실패 종료한다`, { timeout: 15000 }, async (t) => {
+    const file = await settings(t);
+    const started = performance.now();
+    const server = await launch(t, { file });
+    assert.equal(await server.closed, 1);
+    const elapsed = performance.now() - started;
+    assert.ok(elapsed < 5000, `종료까지 ${Math.round(elapsed)}ms 걸림: DB 유휴 연결 시한을 기다리지 않아야 한다`);
+    assert.ok(server.logs().includes(expected), '실패 원인을 안내한다');
+    if (file.CORS_ALLOWED_ORIGINS) {
+      assert.equal(server.logs().includes(file.CORS_ALLOWED_ORIGINS), false, '허용 출처 값은 로그에 넣지 않는다');
+    }
+    assert.equal(server.logs().includes(server.secret), false);
+  });
+}
+
 test('main: DB에 접속할 수 없으면 기동하지 않고 DB 안내와 함께 실패 종료한다', { timeout: 15000 }, async (t) => {
   const server = await launch(t, { file: { DB_PORT: String(await unusedPort()) } });
   assert.equal(await server.closed, 1);
