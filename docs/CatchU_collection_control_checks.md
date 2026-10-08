@@ -97,6 +97,7 @@
 | 임시 자료 위치·수명([4](CatchU_collection_control_temp_data.md#4-임시-자료의-위치수명삭제)) | **아니다** | 같은 OQ-F1의 "F 임시 결과 보존 위치/수명"이다. 10/6 결정으로 결과를 보존하지 않으므로 이 미결의 보존 부분은 처리 시한 계약 PR에서 함께 고친다 |
 | F의 "요청 거부" 알림 메시지([2.4](CatchU_collection_control_scope.md#24-상한을-넘거나-실패했을-때)) | **그렇다** | 새 메시지가 필요하다. **이번에 제안하지 않는다.** 거부된 요청은 처리 시한에 닫는다(아래 행) |
 | 처리 시한이 지난 요청의 실패 확정, 반영 실패 요청 닫기, 닫힌 요청의 재요청([5.3](CatchU_collection_control_temp_data.md#53-수신-후-반영-전-장애--지금-막히는-곳)) | **그렇다** | 지금 계약은 시간 경과로 실패를 확정하는 것, 반영 실패 요청을 닫는 것, 그 뒤의 재요청을 막는다. 10/6 [결정][d23]을 팀장 계약 PR로 반영한 뒤 [#237][i237]에서 구현한다 |
+| 한 분석 안의 제목 고쳐 쓰기 재호출([2.3](CatchU_collection_control_scope.md#23-자원시간-상한)) | **그렇다** | 계약 요약의 재호출 금지 문장에 예외를 둔다. 문안은 [팀장 확인](ai-dlc-input-mvp/2026-10-08_catch-decisions.md#ai-dlc로-반영할-것)의 「AI-DLC로 반영할 것」(2026-10-09) |
 
 [i37]: https://github.com/JminAILab/CatchU/issues/37
 [i77]: https://github.com/JminAILab/CatchU/issues/77
