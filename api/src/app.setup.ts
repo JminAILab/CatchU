@@ -23,7 +23,7 @@ type Next = (error?: unknown) => void;
  */
 export async function configureApp(app: INestApplication): Promise<INestApplication> {
   installStackFrameCollector();
-  applyCors(app, process.env.CORS_ALLOWED_ORIGINS);
+  applyCors(app, process.env);
   applyTrustProxy(app, process.env.TRUST_PROXY_CIDRS);
   app.setGlobalPrefix(API_PREFIX, { exclude: [{ path: 'health', method: RequestMethod.GET }] });
   await app.init();

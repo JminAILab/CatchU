@@ -12,6 +12,8 @@ const { Public } = require('../dist/auth/auth.decorators');
 
 process.env.AUTH_JWT_SECRET = randomBytes(32).toString('hex');
 process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = '60';
+// 공유 URL 기본값(http)은 development·test에서만 쓴다(#218).
+process.env.NODE_ENV = 'test';
 delete process.env.DEV_LOGIN_ENABLED;
 
 // 검증 대상 DTO와 경로는 테스트 안에만 둔다.
