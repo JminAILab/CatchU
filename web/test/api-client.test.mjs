@@ -39,7 +39,7 @@ const LOCAL_HTTP = ['http://localhost:3001', 'http://127.0.0.1:3001', 'http://[:
 test('development·test가 아니면 로컬 주소(localhost·127.0.0.1·[::1])가 아닌 http 기준 주소는 설정 오류다', () => {
   for (const nodeEnv of STRICT_ENVS) {
     for (const value of ['http://api.example', 'http://api.example/catchu', 'http://10.0.0.5:3001', 'http://localhost.example:3001',
-      'http://127.0.0.2:3001', 'HTTP://API.EXAMPLE']) {
+      'http://api.localhost:3001', 'http://127.0.0.2:3001', 'HTTP://API.EXAMPLE']) {
       assert.equal(normalizeApiBaseUrl(value, nodeEnv), null, `${nodeEnv} ${value}`);
     }
     for (const value of LOCAL_HTTP) assert.equal(normalizeApiBaseUrl(`${value}/`, nodeEnv), value, `${nodeEnv} ${value}`);
