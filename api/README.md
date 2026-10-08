@@ -238,6 +238,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 [docs/member-analysis.md](docs/member-analysis.md)에 있다.
 
+## 선정 지원 저장소 조회 — #136
+
+[docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다.
+
 ## E 수신 기록과 Catch 반영 연결 — #105
 
 [docs/result-application.md](docs/result-application.md)에 있다.
