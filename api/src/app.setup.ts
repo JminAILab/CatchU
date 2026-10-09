@@ -2,6 +2,7 @@ import { INestApplication, NotFoundException, RequestMethod } from '@nestjs/comm
 import { AbstractHttpAdapter, HttpAdapterHost } from '@nestjs/core';
 import { writeErrorResponse } from './common/errors/api-exception.filter';
 import { installStackFrameCollector } from './common/errors/stack-frames';
+import { applySecurityHeaders } from './common/http/security-headers';
 import { applyCors } from './cors';
 import { applyTrustProxy } from './trust-proxy';
 
@@ -15,6 +16,7 @@ type Next = (error?: unknown) => void;
  * (오류 필터·입력 검증·no-store는 ErrorsModule·AppModule에 등록돼 AppModule만 불러도 적용된다.)
  *
  * - 500 오류 로그의 코드 위치 수집 훅을 설치한다(여러 번 불러도 한 번만 설치).
+ * - 모든 응답에 보안 헤더를 붙이고 X-Powered-By를 끈다(security-headers.ts). HSTS는 `NODE_ENV`가 development·test가 아닐 때만.
  * - `CORS_ALLOWED_ORIGINS`가 있으면 개발용 CORS를 켠다(cors.ts). 없으면 교차 출처 요청을 허용하지 않는다.
  * - `TRUST_PROXY_CIDRS`에 적은 프록시만 신뢰해 `request.ip`를 정한다(trust-proxy.ts). 없으면 직접 연결 주소다.
  * - 기능 경로는 /v1 아래. GET /health는 배포 점검용이라 접두사 없이 둔다(#81).
@@ -23,6 +25,7 @@ type Next = (error?: unknown) => void;
  */
 export async function configureApp(app: INestApplication): Promise<INestApplication> {
   installStackFrameCollector();
+  applySecurityHeaders(app, process.env);
   applyCors(app, process.env);
   applyTrustProxy(app, process.env.TRUST_PROXY_CIDRS);
   app.setGlobalPrefix(API_PREFIX, { exclude: [{ path: 'health', method: RequestMethod.GET }] });
