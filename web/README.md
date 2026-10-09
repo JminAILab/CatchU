@@ -13,7 +13,7 @@ Next.js로 만드는 10월 MVP의 사용자 화면이다. 로그인·프로필·
 | Node.js | 24.21.0 고정. `package.json` `engines` + `.npmrc`의 `engine-strict=true`로 다른 버전에서는 `npm ci`가 실패한다 | 9/23 회의 공통 결정 |
 | npm | 11 이상. 잠금 파일은 `package-lock.json` | [#81](https://github.com/JminAILab/CatchU/issues/81) 공통 설정 |
 | 포트 | 3000 (api 3001, worker 8000) | [#81](https://github.com/JminAILab/CatchU/issues/81) 공통 설정 |
-| Next.js / React | 16.3.6 / 19.2.8 | `package.json` |
+| Next.js / React | 16.3.8 / 19.2.8 | `package.json` |
 
 모든 명령은 `web/` 디렉터리에서 실행한다. 저장소 루트에는 `package.json`이 없다(워크스페이스 미사용).
 
