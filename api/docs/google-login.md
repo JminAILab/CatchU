@@ -14,6 +14,16 @@
 
 Google 기준은 [서버 인증 코드 흐름](https://developers.google.com/identity/protocols/oauth2/web-server)과 [OpenID Connect 검증·sub 기준](https://developers.google.com/identity/openid-connect/openid-connect)을 따른다. Google 공개키로 RS256 서명을 검증하고 issuer·audience·nonce·sub·iat·exp 및 존재하는 azp를 확인한다. 발급 시각(iat)에만 서버 시각보다 최대 5초 미래를 허용한다. 초 단위 계산과 작은 시계 차이로 정상 토큰이 거부되지 않도록 선택한 짧은 허용값이며, 6초 이상 미래는 거부한다. 만료(exp)·서명·issuer·audience·nonce 및 다른 검증에는 이 오차를 적용하지 않는다. 외부 전송 대상은 Google 토큰·공개키 HTTPS 주소로 고정하고 리다이렉트하지 않는다. 요청은 10초, 응답 본문은 64 KiB로 제한한다.
 
+### 화면 연결 기준
+
+[화면 담당자의 연결 접점 리뷰](https://github.com/JminAILab/CatchU/pull/257#issuecomment-6097352980)를 반영한 기준이며, 실제 화면 구현은 [#251](https://github.com/JminAILab/CatchU/issues/251)에서 연결한다.
+
+- 최초 프로필 입력 여부는 로그인 성공 후 `GET /v1/me`의 `profile.displayName === ""`로 판단한다. `suggestedDisplayName`의 null은 이름이 이미 저장됐거나 Google 이름이 없는 경우 모두 가능하므로 화면 이동 기준으로 사용하지 않는다. 이름 제안은 최초 입력에 전달하는 값으로만 사용한다.
+- Google 로그인 완료 API의 `401 AUTH_INVALID`는 로그인 시도·인증 코드·Google 토큰 검증 실패일 수 있으며, 기존 CatchU 회원 세션 만료로 일괄 처리하지 않는다. 현재 web의 `api.member`는 `AUTH_REQUIRED`·`AUTH_INVALID` 응답을 받으면 보관 중인 회원 토큰을 정리한다. #251에서는 로그인 시작·완료 호출을 이 회원 인증 오류 처리 경로와 구분해야 한다. 요청에서 회원 토큰을 생략하는 것만으로 응답의 오류 처리까지 분리되지는 않는다.
+- 완료 API에 전달할 취소 오류는 `access_denied`만 지원한다. 다른 Google 오류는 화면에서 실패로 안내하고, 사용자가 다시 시도하기를 선택하면 새 인증을 시작한다. 지원하지 않는 오류를 완료 API로 보내면 `400 VALIDATION_FAILED`와 `details.violations`를 반환한다. 컨트롤러의 입력 검증이 인증 시도 소비 전에 실행되므로 이 단계에서는 시도를 소비하지 않는다. 입력 검증 통과 후의 취소·외부 교환·DB 실패는 아래 일회용 처리 기준을 따른다.
+
+시작자 확인값·복귀 경로의 `sessionStorage` 보관은 후속 제안이며 확정된 정책이 아니다. 세션 유지·갱신·로그아웃은 [#250](https://github.com/JminAILab/CatchU/issues/250), 이름 저장 회원의 프로필 설정 화면 접근·복귀·저장 후 재진입 처리는 [PR #261](https://github.com/JminAILab/CatchU/pull/261) 범위로 구분한다.
+
 ## API 연결안
 
 두 경로는 로그인 시작을 위해 메서드 단위로 인증 제외한다. 성공·오류에 기존 `Cache-Control: no-store`를 적용한다. 추가 본문·query 필드는 기존 공통 입력 오류로 거부한다.
@@ -26,11 +36,11 @@ Google 기준은 [서버 인증 코드 흐름](https://developers.google.com/ide
 
 `authorizationUrl`에는 `openid profile`만 요청한다. 이메일을 회원 연결 기준으로 사용하지 않아 email scope는 요청하지 않는다. `loginAttemptToken`은 인증을 시작한 브라우저가 보관했다가 완료 요청에 보내는 별도 비밀 확인값이며 Google URL·콜백 query에 넣지 않는다. 시작 응답·콜백 URL·code·state·확인값·토큰은 로그나 대화에 공유하지 않는다.
 
-state의 보관 시간 600초는 **인증 요청의 시간 제한**이며 CatchU 로그인·세션 수명이 아니다. 서버 메모리에 최대 1,000건을 보관하며 만료된 항목은 회수한다. 요청은 교환 전에 소비하고 취소·교환 실패·DB 실패 뒤에도 재사용할 수 없다. API 재시작·다른 인스턴스·만료·성공 뒤 재전달은 새 인증을 시작해야 한다. 다중 인스턴스의 공유 보관소·시작 경로의 배포 단계 남용 제어는 후속 연결 검토 대상이다. 시작자 확인값은 state와 별도로 저장하며 비교 실패만으로 정상 요청을 소비하지 않는다.
+state의 보관 시간 600초는 **인증 요청의 시간 제한**이며 CatchU 로그인·세션 수명이 아니다. 서버 메모리에 최대 1,000건을 보관하며 만료된 항목은 회수한다. 입력 검증을 통과하고 시작자 확인값이 일치하는 요청은 교환 전에 소비하고 취소·교환 실패·DB 실패 뒤에도 재사용할 수 없다. API 재시작·다른 인스턴스·만료·성공 뒤 재전달은 새 인증을 시작해야 한다. 다중 인스턴스의 공유 보관소·시작 경로의 배포 단계 남용 제어는 후속 연결 검토 대상이다. 시작자 확인값은 state와 별도로 저장하며 비교 실패만으로 정상 요청을 소비하지 않는다.
 
 | 오류 | 처리 |
 |---|---|
-| 형식 오류·추가 필드·code와 취소 동시 지정 | `400 VALIDATION_FAILED`, `details.violations` |
+| 형식 오류·추가 필드·code와 취소 동시 지정·지원하지 않는 error | `400 VALIDATION_FAILED`, `details.violations` |
 | 없는·만료·소비한 state, 시작자 불일치, 잘못된 코드·서명·claim | `401 AUTH_INVALID` |
 | Google 로그인 비활성 | `404 RESOURCE_UNAVAILABLE` |
 | 외부 통신·공개키 조회·설정 문제·DB·커밋·서명 발급 실패 | `500 INTERNAL_ERROR` |
@@ -75,9 +85,13 @@ $localAddress = [uri]([Net.NetworkCredential]::new('', $callbackInput).Password)
 Add-Type -AssemblyName System.Web
 $callbackQuery = [System.Web.HttpUtility]::ParseQueryString($localAddress.Query)
 $completion = @{ state = $callbackQuery['state']; loginAttemptToken = $started.loginAttemptToken }
-if ($callbackQuery['error']) { $completion.error = $callbackQuery['error'] }
-else { $completion.code = $callbackQuery['code'] }
 try {
+  if ($callbackQuery['error']) {
+    if ($callbackQuery['error'] -ne 'access_denied') {
+      throw 'Google 승인 실패: 완료 API로 보내지 않고 사용자가 선택하면 새 인증을 시작한다.'
+    }
+    $completion.error = 'access_denied'
+  } else { $completion.code = $callbackQuery['code'] }
   $login = Invoke-RestMethod -Method Post -Uri "$apiBase/v1/auth/google/login" -ContentType 'application/json' -Body ($completion | ConvertTo-Json -Compress)
   if ($login.cancelled) { [pscustomobject]@{ Cancelled = $true } }
   else {
