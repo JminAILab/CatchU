@@ -13,6 +13,10 @@ api가 읽는 환경변수 목록이다. 설치, `.env` 준비, 값의 우선순
 | 필수 | `AUTH_JWT_SECRET` | 없음 | 안전한 난수 32바이트를 64자리 hex로 표현한 서명 키. 환경별로 별도 준비 |
 | 필수 | `AUTH_ACCESS_TOKEN_TTL_SECONDS` | 없음 | Access JWT 수명(초). 양의 안전한 정수이며 현재 시각과 합산 가능해야 함 |
 | 선택 | `DEV_LOGIN_ENABLED` | 비활성 | 정확히 `true`이고 `NODE_ENV`가 `development` 또는 `test`일 때만 개발 로그인 허용 |
+| 선택 | `GOOGLE_LOGIN_ENABLED` | 비활성 | 정확히 `true`일 때 Google 로그인 활성화. 미지정·공란·`false`는 비활성이며 다른 값은 기동 실패. 아래 세 설정은 활성화할 때 필수([Google 로그인 안내](google-login.md)) |
+| 활성화 시 필수 | `GOOGLE_CLIENT_ID` | 없음 | 등록한 웹 OAuth 클라이언트 ID. `.apps.googleusercontent.com` 형식을 검사하며 누락·잘못된 값이면 기동 실패 |
+| 활성화 시 필수 | `GOOGLE_CLIENT_SECRET` | 없음 | 같은 클라이언트의 비밀값. 비어 있거나 공백·제어문자가 있으면 기동 실패. 환경별로 안전하게 보관하고 Git·로그·PR에 기록하지 않음 |
+| 활성화 시 필수 | `GOOGLE_REDIRECT_URI` | 없음 | Google에 등록한 콜백과 정확히 같은 절대 URL. HTTPS가 필요하며 `NODE_ENV=development` 또는 `test`에서는 loopback HTTP도 허용. 계정 정보·query·fragment 또는 정규화 시 달라지는 값은 거부. [앱 등록·로컬 설정](google-login.md#개발용-앱-등록과-설정) 참조 |
 | 선택 | `DEV_ANALYSIS_INJECTION_ENABLED` | 비활성 | 분석 주입 모듈을 조립한 경우에만 사용. 정확히 `true`이고 `NODE_ENV`가 `development` 또는 `test`여야 허용. 이 설정만으로 HTTP 경로가 생기지 않음 |
 | 선택 | `NODE_ENV` | 미지정 | 개발 로그인은 정확히 `development` 또는 `test`에서만 허용. 미지정·공란·그 밖의 값은 플래그가 켜져 있어도 거부. 같은 기준으로 http 주소도 `development`·`test`에서만 받으므로, 그 밖(미지정 포함)에서는 `SHARE_LINK_WEB_BASE_URL`에 https 주소가 필요하고 `CORS_ALLOWED_ORIGINS`에 http 출처가 있으면 기동 실패(#218). 운영 배포에서는 반드시 `production`, 로컬 개발은 `.env.example`처럼 `development`로 둔다. HSTS 헤더도 같은 기준으로 `development`·`test`가 아니면 붙는다 |
 | 운영 필수 | `LINK_GRANT_SECRET` | 개발·테스트는 실행마다 임시 키 | 비밀번호 링크 열람 증표(grant) 서명 키. 32바이트 무작위 값의 64자리 hex이며 `AUTH_JWT_SECRET`과 달라야 한다. `production`에서 없거나 형식이 틀리면 기동 실패 |
