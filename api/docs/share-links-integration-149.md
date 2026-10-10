@@ -28,7 +28,7 @@ Docker Desktop을 시작한 뒤 전용 테스트 DB를 준비한다. 자동 검�
 docker run --name catchu-149-db -e POSTGRES_USER=catchu -e POSTGRES_PASSWORD=catchu_local -e POSTGRES_DB=catchu_149_test -p 127.0.0.1:5433:5432 -d postgres:16
 docker exec catchu-149-db pg_isready -U catchu -d catchu_149_test
 
-cd C:\Users\aica_\Desktop\CatchU\api
+Set-Location api # 저장소 루트 기준
 npm.cmd ci
 $env:TEST_DB_HOST='127.0.0.1'
 $env:TEST_DB_PORT='5433'
@@ -45,15 +45,15 @@ npm.cmd test -- test/db/share-links-web-integration.test.cjs
 자동 검사 종료 후 다음을 각각 별도 PowerShell 창에서 실행한다. 도구는 전용 로컬 `catchu_149_test`만 사용하며 테이블을 지우지 않는다. 포트는 중계 3431, web 3000이다. 기존 서버가 사용 중이면 먼저 본인이 띄운 서버를 종료한다.
 
 ```powershell
-# 창 1
-cd C:\Users\aica_\Desktop\CatchU\api
+# 창 1: 저장소 루트에서
+Set-Location api
 npm.cmd run build
 node scripts/verify-share-links-browser.cjs
 ```
 
 ```powershell
-# 창 2
-cd C:\Users\aica_\Desktop\CatchU\web
+# 창 2: 저장소 루트에서
+Set-Location web
 npm.cmd ci
 $env:NEXT_PUBLIC_API_BASE_URL='http://127.0.0.1:3431'
 $env:NEXT_PUBLIC_DEV_LOGIN_ENABLED='true'
@@ -137,3 +137,12 @@ docker exec catchu-149-db psql -U catchu -d catchu_149_test -c "SELECT count(*) 
 검증용 API·web 서버는 종료했다. 전용 Docker DB와 합성 검증 자료는 사용자의 재실행을 위해 남겼다.
 
 사용자 실행 기록에는 날짜·`git rev-parse HEAD`·미커밋 변경 포함 여부·테스트별 통과/실패·안전한 JSON 로그·DB 전후 건수·브라우저 상태를 함께 남긴다. DevTools 요청 본문/Authorization/발급 URL을 그대로 공유하지 않는다.
+
+### PR 준비 재검사 — 2026-10-10
+
+- 최신 원격 dev `5c2728c5ef192935ce70448f67d5b537012c55b7`가 작업 브랜치에 포함됨을 확인했다. 검사 판본은 `91b5edb07aeee5205b35dd9a822805a4e7be6d10` + 실행 안내의 저장소 기준 경로 수정이다. 검증 코드 자체는 이 커밋과 같다.
+- API `npm.cmd run lint`, `npm.cmd run typecheck` 통과. `npm.cmd test -- test/db/share-links-web-integration.test.cjs test/db/share-links-api.test.cjs`는 빌드 포함 23/23 통과(약 150초, 실패·건너뜀 0).
+- 기존 전용 컨테이너 `catchu-149-db`를 다시 시작하고 TEST_DB_*로 `127.0.0.1:5433/catchu_149_test`를 지정했다. 이 테스트 DB의 자료만 검사 과정에서 초기화했다.
+- web `node --test test/share-links.test.mjs test/api-client.test.mjs` 56/56 통과.
+- `git diff --check`와 저장소 문서 크기 검사 통과. Windows CRLF로 스크립트 직접 실행이 실패해 실행 스트림만 LF로 변환했다. 스크립트 파일은 바꾸지 않았다.
+- 최신 판본의 실제 브라우저 검사는 이번에 반복하지 않았다. 위 10월 9일 브라우저 관측과 이번 실제 HTTP·DB 검증의 판본을 구분한다. 제품 코드에서 새 결함은 발견되지 않았다.
