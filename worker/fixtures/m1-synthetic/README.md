@@ -82,6 +82,7 @@ api와 worker는 같은 메시지에 같은 판정을 내야 한다(`cases.json`
 
 - 모든 값은 합성 값이다. URL은 예약 도메인 `example.invalid`만 쓰고, 실제 저장소 자료·과거 실험 자료를 쓰지 않는다([#37](https://github.com/JminAILab/CatchU/issues/37)).
 - `sourceMode`는 항상 `MOCK`이다. 합성 연결의 통과는 실제 분석 성공, 실제 자료 검증, Catch 저장·열람 준비 완료를 뜻하지 않는다.
+- 제목·기여 문구는 2026-10-08 팀장 결정([결정 문서](../../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md))의 모양을 따른 합성 값이다. 제목은 대상·종류·동작 조각으로 만든 모양(예: `loginErrorMessage 코드 수정`)이고 정확한 글자 모양은 [#120](https://github.com/JminAILab/CatchU/issues/120)에서 정한다. 계약이 제목 null을 받기 전이라 값을 둔다. 나의 기여와 커밋 근거의 귀속 범위는 '작성자로 기록된 커밋', PR 근거는 'PR을 연 계정(본인 기여는 이 PR의 본인 커밋에 한정)'으로 적고 센 숫자를 쓰지 않는다.
 
 ## 검사
 

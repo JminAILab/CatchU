@@ -13,12 +13,12 @@
   "candidates": [
     {
       "candidateId": "candidate-{{caseId}}-{{attemptId}}-1",
-      "title": "합성 작업 C: 알림 목록 페이지 나누기",
+      "title": "paginateNotifications 코드 추가",
       "workIdentity": "synthetic-work-{{caseId}}-c",
       "workFacts": [
-        "합성 PR 1건이 알림 목록에 페이지 나누기를 추가했다"
+        "합성 PR이 알림 목록에 페이지 나누기를 추가했다"
       ],
-      "subjectContribution": "합성 회원이 PR을 작성했다",
+      "subjectContribution": "합성 회원 계정이 작성자로 기록된 커밋",
       "groupingBasis": "합성 PR 단위",
       "groupingLimitations": [
         "합성 자료라 실제 저장소 기록과 대조하지 않았다"
@@ -36,7 +36,7 @@
           "representedFacts": [
             "합성 PR 1건이 페이지 나누기를 추가했다"
           ],
-          "contributionScope": "PR 작성",
+          "contributionScope": "합성 회원 계정이 연 PR(본인 기여는 이 PR의 본인 커밋에 한정)",
           "coverageLimits": [
             "리뷰 댓글은 포함하지 않았다"
           ]
@@ -55,12 +55,12 @@
     },
     {
       "candidateId": "candidate-{{caseId}}-{{attemptId}}-2",
-      "title": "합성 작업 C: 알림 목록 페이지 크기 조정",
+      "title": "notificationPageSize 코드 수정",
       "workIdentity": "synthetic-work-{{caseId}}-c",
       "workFacts": [
-        "합성 커밋 1건이 알림 목록 페이지 크기를 조정했다"
+        "합성 커밋이 알림 목록 페이지 크기를 조정했다"
       ],
-      "subjectContribution": "합성 회원이 커밋 1건을 작성했다",
+      "subjectContribution": "합성 회원 계정이 작성자로 기록된 커밋",
       "groupingBasis": "합성 커밋 단위",
       "groupingLimitations": [
         "합성 자료라 실제 저장소 기록과 대조하지 않았다"
@@ -78,7 +78,7 @@
           "representedFacts": [
             "합성 커밋 1건이 페이지 크기를 조정했다"
           ],
-          "contributionScope": "커밋 1건",
+          "contributionScope": "합성 회원 계정이 작성자로 기록된 커밋",
           "coverageLimits": [
             "PR 연결은 확인하지 않았다"
           ]

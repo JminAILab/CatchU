@@ -13,12 +13,12 @@
   "candidates": [
     {
       "candidateId": "candidate-{{caseId}}-{{attemptId}}-1",
-      "title": "합성 작업 B: 회원 설정 화면 입력 검사 추가",
+      "title": "validateProfileInput 코드 추가",
       "workIdentity": "synthetic-work-{{caseId}}-b",
       "workFacts": [
-        "합성 커밋 1건이 회원 설정 입력 검사를 추가했다"
+        "합성 커밋이 회원 설정 입력 검사를 추가했다"
       ],
-      "subjectContribution": "합성 회원이 커밋 1건을 작성했다",
+      "subjectContribution": "합성 회원 계정이 작성자로 기록된 커밋",
       "groupingBasis": "같은 합성 커밋",
       "groupingLimitations": [
         "합성 자료라 실제 저장소 기록과 대조하지 않았다"
@@ -36,7 +36,7 @@
           "representedFacts": [
             "합성 커밋 1건이 입력 검사를 추가했다"
           ],
-          "contributionScope": "커밋 1건",
+          "contributionScope": "합성 회원 계정이 작성자로 기록된 커밋",
           "coverageLimits": [
             "합성 이슈 목록 수집이 실패해 이슈 연결은 확인하지 못했다"
           ]
