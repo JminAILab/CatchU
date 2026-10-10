@@ -2,7 +2,7 @@
 
 ## 범위와 결정 근거
 
-[#249 실제 Google 로그인 API](https://github.com/JminAILab/CatchU/issues/249)와 [이번 구현에서 사용자가 수용한 연결안](https://github.com/JminAILab/CatchU/issues/249#issuecomment-6053701691)을 반영한다. API 경로·응답은 이번 구현의 **연결 검토안**이며 공식 API 계약 승인이나 실제 연결 검증 완료를 뜻하지 않는다.
+[#249 실제 Google 로그인 API](https://github.com/JminAILab/CatchU/issues/249)와 [이번 구현에서 사용자가 수용한 연결안](https://github.com/JminAILab/CatchU/issues/249#issuecomment-6053701691)을 반영한다. API 경로·응답은 이번 구현의 **연결 검토안**이며 공식 API 계약 승인을 뜻하지 않는다. 실제 연결의 확인 범위와 미검증 항목은 아래 「실제 연결 재현 현황」에서 구분한다.
 
 - 서버가 Google 인증 코드를 교환한다. 일회용 state·nonce·PKCE와 요청 시작자 확인값을 검증한다.
 - 검증된 Google `sub`를 내부 `catchu:google:<sub>` 식별자로 사용한다. Google의 두 허용 issuer 표기는 같은 Google 식별 영역이다. 이메일·개발 회원·다른 인증 수단과 자동 연결하거나 병합하지 않는다.
@@ -12,7 +12,7 @@
 - [#250 로그인 유지·재발급·로그아웃](https://github.com/JminAILab/CatchU/issues/250)의 세션 저장·Refresh Token·쿠키·토큰 보관 위치·갱신·로그아웃 무효화는 이번 범위에 없다. 현재 JWT가 없는 요청과 유효하지 않은 JWT는 기존 인증 Guard가 처리한다.
 - 최초 프로필 화면 자체는 [#137 프로필 화면 API 연결](https://github.com/JminAILab/CatchU/issues/137), 실제 로그인 화면 연결은 [#251 실제 인증 화면 연결](https://github.com/JminAILab/CatchU/issues/251)에서 다룬다.
 
-Google 기준은 [서버 인증 코드 흐름](https://developers.google.com/identity/protocols/oauth2/web-server)과 [OpenID Connect 검증·sub 기준](https://developers.google.com/identity/openid-connect/openid-connect)을 따른다. Google 공개키로 RS256 서명을 검증하고 issuer·audience·nonce·sub·iat·exp 및 존재하는 azp를 확인한다. 외부 전송 대상은 Google 토큰·공개키 HTTPS 주소로 고정하고 리다이렉트하지 않는다. 요청은 10초, 응답 본문은 64 KiB로 제한한다.
+Google 기준은 [서버 인증 코드 흐름](https://developers.google.com/identity/protocols/oauth2/web-server)과 [OpenID Connect 검증·sub 기준](https://developers.google.com/identity/openid-connect/openid-connect)을 따른다. Google 공개키로 RS256 서명을 검증하고 issuer·audience·nonce·sub·iat·exp 및 존재하는 azp를 확인한다. 발급 시각(iat)에만 서버 시각보다 최대 5초 미래를 허용한다. 초 단위 계산과 작은 시계 차이로 정상 토큰이 거부되지 않도록 선택한 짧은 허용값이며, 6초 이상 미래는 거부한다. 만료(exp)·서명·issuer·audience·nonce 및 다른 검증에는 이 오차를 적용하지 않는다. 외부 전송 대상은 Google 토큰·공개키 HTTPS 주소로 고정하고 리다이렉트하지 않는다. 요청은 10초, 응답 본문은 64 KiB로 제한한다.
 
 ## API 연결안
 
@@ -37,7 +37,7 @@ state의 보관 시간 600초는 **인증 요청의 시간 제한**이며 CatchU
 
 오류에는 코드·nonce·토큰·외부 응답·SQL·원문 예외를 넣지 않는다. 기존 공통 필터의 안전한 오류 분류 로그를 재사용한다. 보호 API는 검증된 CatchU Access JWT의 회원 UUID를 사용하며 Google sub나 입력 memberId로 대체하지 않는다.
 
-## 설정과 사용자가 준비할 첫 단계
+## 개발용 앱 등록과 설정
 
 기존 [API 환경변수·DB 준비](../README.md)를 먼저 따른다. `GOOGLE_LOGIN_ENABLED` 미지정 또는 false이면 Google 비밀 설정 없이 기동한다. true일 때 다음 세 값이 필수다. 실제 값을 예시 파일·Git·PR·대화에 넣지 않는다.
 
@@ -47,12 +47,12 @@ state의 보관 시간 600초는 **인증 요청의 시간 제한**이며 CatchU
 | `GOOGLE_CLIENT_SECRET` | 같은 클라이언트의 비밀값. 로컬 무시된 `.env`에만 보관 |
 | `GOOGLE_REDIRECT_URI` | Google에 등록한 콜백과 정확히 같은 주소. 운영은 HTTPS, development/test만 loopback HTTP |
 
-현재 실제 앱 등록·로컬 비밀 설정은 준비 전이며 **실제 Google 연결 검증은 미수행**이다. 우선 다음 등록 단계만 사용자가 수행한다.
+2026-10-08 사용자 검증 환경에서는 앱 등록·로컬 설정과 실제 로그인 재현을 마쳤다. 아래는 다른 개발자가 자신의 환경을 준비하는 절차이며, 기존 검증 환경의 비밀값을 재사용하거나 공유하지 않는다.
 
 1. Google Cloud Console에서 개발용 프로젝트를 선택하거나 만든 뒤 **Google Auth platform**을 연다.
 2. 첫 설정이 필요하면 **Branding**에서 앱 이름(예: CatchU 로컬 개발)과 본인의 지원·연락 이메일을 입력한다. **Audience**는 해당 계정에서 선택 가능한 개발 대상에 맞춰 설정하고, 테스트 사용자 목록을 사용하는 경우 자신의 검증 계정을 추가한다. 조직 전용 범위나 공개 배포를 임의로 선택하지 않는다.
 3. **Clients → Create client → Web application**을 선택한다. 이름은 예를 들어 CatchU 로컬 Google 로그인이다. 승인된 리디렉션 URI에 `http://localhost:3000/google/callback`을 등록한다. 현재 검토용 로컬 주소이며 `.env`에도 정확히 같은 값을 사용한다. 이 서버 교환 흐름에는 브라우저 Google SDK를 사용하지 않아 JavaScript origin을 추가할 필요가 없다.
-4. Client ID·secret은 본인 로컬에서만 보관하고, 완료 여부만 알려 준다. 다음 단계에서 `.env`를 추적·노출하지 않는 방법으로 안내받는다. 다운로드 파일도 Git 작업 폴더에 저장하지 않는다.
+4. Client ID·secret은 본인 로컬에서만 보관하고 아래 「앱 등록 이후의 로컬 설정·실재현」에 따라 Git에서 무시되는 `api/.env`에 설정한다. 다운로드 파일도 Git 작업 폴더에 저장하지 않는다.
 
 이는 콜백 **화면 구현**이 아니다. 현재 콜백 페이지가 없다면 브라우저에 연결 실패·없는 페이지가 표시될 수 있다. 이후 검증 단계에서 콜백 query를 로컬에서만 읽어 시작자 확인값과 함께 완료 API로 전달한다. 채팅·이슈·PR에는 URL query나 코드를 붙이지 않는다. 노출되었으면 새 state·PKCE로 시작한다. 실제 화면 연결은 #251 범위다.
 
@@ -60,7 +60,7 @@ state의 보관 시간 600초는 **인증 요청의 시간 제한**이며 CatchU
 
 ### 앱 등록 이후의 로컬 설정·실재현
 
-등록 완료 후 이 작업의 `api/.env`만 준비한다. `git ls-files -- .env`의 결과가 없어야 하고 `git check-ignore .env`가 무시됨을 확인해야 한다. 기존 설정이 있으면 값을 보존하고 필요한 Google 세 항목과 `GOOGLE_LOGIN_ENABLED=true`만 본인이 추가한다. `NODE_ENV=development`, 기존 인증 키·수명·DB 설정도 유지한다. 설정 전체나 비밀값을 출력하지 않는다. 실제 `.env`는 이번 구현에서 생성하지 않았다.
+등록 완료 후 이 작업의 `api/.env`만 준비한다. `git ls-files -- .env`의 결과가 없어야 하고 `git check-ignore .env`가 무시됨을 확인해야 한다. 기존 설정이 있으면 값을 보존하고 필요한 Google 세 항목과 `GOOGLE_LOGIN_ENABLED=true`만 본인이 추가한다. `NODE_ENV=development`, 기존 인증 키·수명·DB 설정도 유지한다. 설정 전체나 비밀값을 출력하지 않는다. 로컬 설정은 소스·자동 검사와 별도로 관리하며 Git에 포함하지 않는다.
 
 README대로 DB 마이그레이션을 적용하고 API를 실행한다. 다른 작업 서버·포트를 재사용하거나 종료하지 않는다. 아래는 **사용자가 자신의 로컬 터미널에서 수행하는 절차**이며 이번 자동 검사의 수행 기록이 아니다. Google에 등록한 콜백과 설정의 주소가 같아야 한다. API 주소는 본인이 실행한 포트로 맞춘다.
 
@@ -99,7 +99,18 @@ finally { $completion = $null; $callbackQuery = $null; $localAddress = $null; $c
 - `google-provider.ts`: 고정 외부 교환·공개키 검증과 안전한 오류 분류.
 - `google-login.service.ts`: 검증된 Google 주체의 회원·프로필 조회/생성과 기존 Access JWT 발급.
 - `google-login.module.ts`: 설정·제공자 의존성 연결. `AuthModule`의 기존 발급기를 공유한다.
-- `test/google-login.test.cjs`: 합성 서명된 Google ID token으로 설정·claim·요청·외부 오류 검사.
+- `test/google-login.test.cjs`: 합성 서명된 Google ID token으로 설정·claim·요청·외부 오류 검사. 고정 시각에서 iat +1초·+5초 허용, +6초·+300초 거부와 만료 시각의 엄격한 거부를 확인한다. +300초 사례는 exp를 iat 이후로 설정해 미래 발급 시각 검사를 분리한다.
 - `test/db/google-login-api.test.cjs`: 실제 로컬 API·전용 PostgreSQL에서 중복·경쟁·실패·최종 커밋 롤백·프로필 보존·비밀 비노출 검사. 외부 Google HTTP와 공개키만 대역이며 실제 Google 연결 완료로 세지 않는다.
 
-API 폴더에서 `npm run lint`, `npm run typecheck`, `npm run build` 후 README대로 전용 `TEST_DB_*`를 지정해 `npm test -- test/google-login.test.cjs test/db/google-login-api.test.cjs`, 전체는 `npm test`를 실행한다. 기존 DB를 초기화하지 않는다. 검토자는 최초·반복 로그인과 이름 저장 여부·다른 계정 분리·취소·무효 state·설정 실패를 확인한다. 실제 Google 앱 설정·승인·콜백 완료·직후 본인 회원 조회는 별도 실재현으로 남아 있다.
+API 폴더에서 `npm run lint`, `npm run typecheck`, `npm run build` 후 README대로 전용 `TEST_DB_*`를 지정해 `npm test -- test/google-login.test.cjs test/db/google-login-api.test.cjs`, 전체는 `npm test`를 실행한다. 기존 DB를 초기화하지 않는다. 자동 검사와 실제 Google 재현은 별도 근거이며, 관련 검사는 전체 검사의 일부이므로 건수를 합산하지 않는다.
+
+### 실제 연결 재현 현황
+
+[2026-10-08 사용자 직접 재현 기록](https://github.com/JminAILab/CatchU/issues/249#issuecomment-6053701691)과 [PR #257 검증 기록](https://github.com/JminAILab/CatchU/pull/257)을 근거로 다음 범위를 확인했다. 사용자가 로컬 명령을 실행하고 성공 여부를 제공한 결과이며 CLI 자동 검사를 다시 수행한 기록이 아니다.
+
+- 최초 실제 Google 로그인에서 Access JWT 발급과 보호된 `GET /v1/me` 호출이 성공했다. 최초 입력용 `suggestedDisplayName`은 제공되고 표시 이름은 자동 저장되지 않았다.
+- 같은 Google 계정의 반복 로그인은 동일 회원으로 연결되며 표시 이름 미저장 상태를 유지했다.
+- 검증용 표시 이름 저장 응답과 직후 회원 조회가 일치했다. 저장 후 재로그인에서도 동일 회원과 검사 당시 프로필 값이 유지됐으며, `suggestedDisplayName` 필드는 존재하고 null이었다.
+- 소개·희망 직무·기술 목록은 당시 값의 보존을 비교했다. 각 항목에 비어 있지 않은 새 값을 입력해 실제 Google 흐름에서 검사한 것은 아니다.
+
+실제 Google 승인 취소·외부 오류·다른 실제 계정 간 분리·동시 최초 로그인은 이 수동 재현에 포함하지 않았다. 해당 분기는 합성 제공자 응답과 실제 로컬 API·전용 DB의 자동 검사로 확인하며, 실제 Google 환경 검사와 구분한다. 세션 유지·갱신·로그아웃은 [#250 세션 기능](https://github.com/JminAILab/CatchU/issues/250), 실제 화면 연결은 [#251 인증 화면 연결](https://github.com/JminAILab/CatchU/issues/251)의 별도 범위다.

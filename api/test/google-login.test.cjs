@@ -98,13 +98,30 @@ test('실제 서명 검증과 고정 전송 대상·최소 권한·보정 없는
 });
 for (const overrides of [{ iss: 'https://evil.invalid' }, { aud: 'other-client' }, { azp: 'other-client' },
   { sub: '' }, { sub: ' '.repeat(2) }, { sub: 'a'.repeat(256) }, { nonce: 'wrong-nonce' },
-  { exp: 1 }, { iat: Math.floor(Date.now() / 1000) + 300 }, { exp: null }, { iat: null }, { nonce: null },
+  { exp: 1 }, { exp: null }, { iat: null }, { nonce: null },
   { aud: [config.clientId, 'other-client'] }]) {
   test('서명된 인증 claim의 잘못된 발급자·대상·식별자·nonce·만료 거부', async () => {
     const { client } = await providerFixture(overrides);
     await assert.rejects(client.exchange('code', 'verifier', 'synthetic-nonce'), isCode('AUTH_INVALID'));
   });
 }
+for (const [offset, accepted] of [[1, true], [5, true], [6, false], [300, false]]) {
+  test(`고정 시각에서 iat ${offset}초 미래: ${accepted ? '허용' : '거부'}`, async t => {
+    const now = 1800000000;
+    t.mock.timers.enable({ apis: ['Date'], now: now * 1000 });
+    // exp는 iat 이후로 두어 미래 발급 시각 검사만의 경계를 확인한다.
+    const { client } = await providerFixture({ iat: now + offset, exp: now + offset + 300 });
+    const result = client.exchange('code', 'verifier', 'synthetic-nonce');
+    if (accepted) assert.deepEqual(await result, { subject: 'synthetic-sub', name: '한글😀' });
+    else await assert.rejects(result, isCode('AUTH_INVALID'));
+  });
+}
+test('iat 오차 허용은 만료 검증을 완화하지 않는다', async t => {
+  const now = 1800000000;
+  t.mock.timers.enable({ apis: ['Date'], now: now * 1000 });
+  const { client } = await providerFixture({ iat: now - 60, exp: now });
+  await assert.rejects(client.exchange('code', 'verifier', 'synthetic-nonce'), isCode('AUTH_INVALID'));
+});
 test('잘못된 서명 거부 및 선택 이름 누락 허용', async () => {
   const bad = await providerFixture({}, { wrongKey: true });
   await assert.rejects(bad.client.exchange('code', 'verifier', 'synthetic-nonce'), isCode('AUTH_INVALID'));

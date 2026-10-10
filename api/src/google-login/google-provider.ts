@@ -12,6 +12,8 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const KEYS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 const MAX_RESPONSE_BYTES = 65536;
 const DEADLINE_MS = 10000;
+// 초 단위 반올림·작은 시계 차이만 수용한다. exp 등 다른 claim에는 적용하지 않는다.
+const IAT_CLOCK_SKEW_SECONDS = 5;
 
 /** 고정 전송 대상과 시간·본문 상한. 외부 오류 원문은 전달하지 않는다. */
 async function boundedJson(fetcher: typeof fetch, url: string, init: RequestInit) {
@@ -73,7 +75,7 @@ export class HttpGoogleProvider implements GoogleProvider {
       });
       if (typeof payload.sub !== 'string' || !/^[\x21-\x7e]{1,255}$/.test(payload.sub) ||
           payload.nonce !== nonce || !Number.isSafeInteger(payload.iat) || !Number.isSafeInteger(payload.exp) ||
-          payload.iat! > Math.floor(Date.now() / 1000) || payload.exp! <= payload.iat! ||
+          payload.iat! > Math.floor(Date.now() / 1000) + IAT_CLOCK_SKEW_SECONDS || payload.exp! <= payload.iat! ||
           (payload.azp !== undefined && payload.azp !== this.config.clientId) ||
           (Array.isArray(payload.aud) && payload.aud.length !== 1)) {
         throw new ApiError('AUTH_INVALID');
