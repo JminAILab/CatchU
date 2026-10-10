@@ -406,9 +406,10 @@ def test_full_count_range_with_own_records_fits_the_default_call_limit() -> None
     pulls = [p.commits_status for p in outcome.pull_requests]
     assert pulls == [DetailStatus.FETCHED] * 30 + [DetailStatus.BEYOND_RANGE] * 70
     limits = {(limit.resource_type, limit.message) for limit in outcome.coverage_limits}
+    # 2026-10-08 팀장 결정(본인 기여의 뜻): '작성한'이 아니라 '작성자로 기록된'. 상한 값은 그대로다.
     assert (
         "COMMIT",
-        "연동 계정이 작성한 최근 커밋 200건 밖은 변경 내용을 조회하지 않았다",
+        "연동 계정이 작성자로 기록된 최근 커밋 200건 밖은 변경 내용을 조회하지 않았다",
     ) in limits
     assert (
         "PULL_REQUEST",
