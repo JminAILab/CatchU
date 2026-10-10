@@ -6,8 +6,9 @@
 import itertools
 import logging
 import re
+import tracemalloc
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import replace
 from datetime import timedelta
 from typing import Any
@@ -2013,6 +2014,162 @@ def test_stop_before_mode_checks_marks_the_received_side_unreached() -> None:
     assert transport.paths[MODE_CALLS_BEFORE_DETAILS:] == MODE_DETAILS[:3]
     assert _commit_status(outcome, 8) is DetailStatus.NOT_REACHED
     assert _mode_checks(outcome) == [(sha(21), DetailStatus.NOT_REACHED, False)]
+
+
+def resubmission_mode_routes(
+    old: Mapping[int, str], new: Mapping[int, str]
+) -> dict[str, Reply]:
+    """병합된 #32가 닫힌 #30을 다시 올렸다. 커밋 번호마다 app.py의 patch를 정한다(목록 순서)."""
+    routes: dict[str, Reply] = {
+        BASE: respond(relation_repository_json()),
+        LISTED_COMMITS: respond([graph_commit_json(2, OTHER, parents=(999,))]),
+        LISTED_PULLS: respond(
+            [
+                relation_pull_json(
+                    32,
+                    MEMBER,
+                    created=40,
+                    merged_minute=41,
+                    body="#30을 다시 올립니다",
+                    head=[*new][-1],
+                ),
+                relation_pull_json(
+                    30, MEMBER, state="closed", created=30, head=[*old][-1]
+                ),
+            ]
+        ),
+        LISTED_ISSUES: respond([]),
+    }
+    for number, commits in ((32, new), (30, old)):
+        routes[pull_commits_path(number)] = respond(
+            [graph_commit_json(n, MEMBER, parents=(2,)) for n in commits]
+        )
+    for number, patch in (*old.items(), *new.items()):
+        detail = _detail_with(number, patch)
+        routes[detail_path(number)] = respond(detail)
+        routes[detail_diff_path(number)] = diff_reply(diff_text(detail["files"]))
+    return routes
+
+
+# 목록 4 + PR 커밋 목록 2.
+RESUBMISSION_CALLS_BEFORE_DETAILS = 4 + 2
+OTHER_PATCH = "@@ -1 +1 @@\n-old\n+other"
+THIRD_PATCH = "@@ -1 +1 @@\n-old\n+third"
+
+
+def test_mode_checks_follow_each_earlier_commit_and_then_its_pairs() -> None:
+    """재제출 양쪽에 커밋이 여럿이면 앞쪽 커밋 순이고, 그 바로 뒤에 값이 같은 뒤쪽 커밋을 둔다."""
+    routes = resubmission_mode_routes(
+        {41: SAME_PATCH, 42: OTHER_PATCH}, {43: OTHER_PATCH, 44: SAME_PATCH}
+    )
+
+    outcome, transport = _run(routes)
+
+    assert outcome.completed
+    order = (41, 44, 42, 43)
+    assert transport.paths[RESUBMISSION_CALLS_BEFORE_DETAILS:] == [
+        *(detail_path(n) for n in (41, 42, 43, 44)),
+        *(detail_diff_path(n) for n in order),
+    ]
+    assert _mode_checks(outcome) == [
+        (sha(n), DetailStatus.FETCHED, True) for n in order
+    ]
+
+
+def test_stop_before_mode_checks_keeps_the_order_of_earlier_commits() -> None:
+    """필수 상세 도중에 멈추면, 받은 앞쪽 커밋마다 그 커밋과 값이 같은 뒤쪽 커밋을 바로 뒤에 둔다.
+
+    55의 변경 내용을 받지 못해 52는 값이 같은 상대가 없어도 넣는다. 54는 값이 같은 앞쪽 커밋도,
+    받지 못한 앞쪽 커밋도 없어 넣지 않는다.
+    """
+    routes = resubmission_mode_routes(
+        {51: SAME_PATCH, 52: THIRD_PATCH},
+        {53: SAME_PATCH, 54: OTHER_PATCH, 55: OTHER_PATCH},
+    )
+    limits = replace(PROPOSED_LIMITS, max_calls=RESUBMISSION_CALLS_BEFORE_DETAILS + 4)
+
+    outcome, transport = _run(routes, limits=limits)
+
+    assert _codes(outcome) == [FailureCode.BUDGET_EXCEEDED]
+    assert transport.paths[RESUBMISSION_CALLS_BEFORE_DETAILS:] == [
+        detail_path(n) for n in (51, 52, 53, 54)
+    ]
+    assert _commit_status(outcome, 55) is DetailStatus.NOT_REACHED
+    assert _mode_checks(outcome) == [
+        (sha(n), DetailStatus.NOT_REACHED, False) for n in (51, 53, 52)
+    ]
+
+
+def test_stop_among_many_resubmissions_does_not_pair_every_commit() -> None:
+    """닫힌 PR 10개를 병합된 PR 10개가 모두 다시 올렸다고 적었다(PR마다 커밋 200개).
+
+    필수 상세 첫 조회 뒤 호출 상한에 걸려 멈춘다. 두 PR의 커밋 쌍을 모두 만들면 400만 쌍(약
+    250 MiB)이라, 상한 실패 대신 작업 프로세스가 메모리 부족으로 끝날 수 있었다. 쌍을 만들지 않고
+    받은 커밋 하나만 모드 확인 대상으로 남긴다.
+    """
+    closed, merged = range(1, 11), range(11, 21)
+    commits = {
+        number: [number * 1000 + i for i in range(200)] for number in (*closed, *merged)
+    }
+    references = " ".join(f"#{number}" for number in closed)
+    routes: dict[str, Reply] = {
+        BASE: respond(relation_repository_json()),
+        LISTED_COMMITS: respond([graph_commit_json(2, OTHER, parents=(999,))]),
+        LISTED_PULLS: respond(
+            [
+                *(
+                    relation_pull_json(
+                        number,
+                        MEMBER,
+                        created=100 + number,
+                        merged_minute=200 + number,
+                        body=f"다시 올립니다: {references}",
+                        head=commits[number][-1],
+                    )
+                    for number in merged
+                ),
+                *(
+                    relation_pull_json(
+                        number,
+                        MEMBER,
+                        state="closed",
+                        created=number,
+                        head=commits[number][-1],
+                    )
+                    for number in closed
+                ),
+            ]
+        ),
+        LISTED_ISSUES: respond([]),
+    }
+    for number, numbers in commits.items():
+        for page in (1, 2):
+            routes[pull_commits_path(number, page)] = respond(
+                [
+                    graph_commit_json(n, MEMBER, parents=(2,))
+                    for n in numbers[(page - 1) * 100 : page * 100]
+                ],
+                next_page=page == 1,
+            )
+    first = commits[1][0]
+    routes[detail_path(first)] = respond(_detail_with(first, SAME_PATCH))
+    # 목록 4 + PR 20개의 커밋 목록 두 쪽씩 + 필수 상세 하나.
+    limits = replace(PROPOSED_LIMITS, max_calls=4 + 20 * 2 + 1)
+
+    if tracemalloc.is_tracing():
+        pytest.skip("이미 메모리를 추적 중이면 최고값에 앞선 할당이 섞인다")
+    tracemalloc.start()
+    try:
+        outcome, transport = _run(routes, limits=limits)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert _codes(outcome) == [FailureCode.BUDGET_EXCEEDED]
+    assert _relations(outcome).stopped_during == "DETAILS"
+    assert transport.paths[-1] == detail_path(first)
+    assert _mode_checks(outcome) == [(sha(first), DetailStatus.NOT_REACHED, False)]
+    assert peak < 64 * 2**20
 
 
 @pytest.mark.parametrize(

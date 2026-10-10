@@ -56,7 +56,7 @@ PR 소속은 PR 응답의 `merge_commit_sha`에 기댄다. GitHub REST API 판�
 """
 
 import re
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import partial
@@ -1293,20 +1293,22 @@ class RelationCollector:
             )
         return units
 
-    def _relation_pairs(
+    def _relation_sides(
         self, data: CollectedData, index: Mapping[str, CommitRecord]
-    ) -> list[tuple[str, str]]:
-        """관계 근거가 있는 병합 아닌 커밋 쌍(앞쪽, 뒤쪽): 재제출한 두 PR의 커밋, cherry-pick 표시.
+    ) -> Iterator[tuple[tuple[str, ...], tuple[str, ...]]]:
+        """관계 근거마다 양쪽의 병합 아닌 커밋(앞쪽, 뒤쪽): 재제출한 두 PR의 커밋, cherry-pick 표시.
 
-        후보 처리의 관계 근거와 같은 정의다. 재제출은 커밋 목록을 받은 PR끼리만 본다.
+        후보 처리의 관계 근거와 같은 정의다. 재제출은 커밋 목록을 받은 PR끼리만 본다. 양쪽 커밋의
+        쌍은 만들지 않는다. PR이 많으면 수천만 쌍이 되어 메모리를 다 쓸 수 있다.
         """
-        pairs: list[tuple[str, str]] = []
 
-        def changes(shas: Iterable[str]) -> list[str]:
-            return [sha for sha in shas if sha in index and not is_merge(index[sha])]
+        def changes(shas: Iterable[str]) -> tuple[str, ...]:
+            return tuple(
+                sha for sha in shas if sha in index and not is_merge(index[sha])
+            )
 
         lists = {
-            number: entry.commits
+            number: changes(entry.commits)
             for number, entry in self._pull_commits.items()
             if entry.status is DetailStatus.FETCHED
         }
@@ -1318,25 +1320,22 @@ class RelationCollector:
         for old in pulls:
             for new in pulls:
                 if old.number != new.number and self._is_resubmission(old, new):
-                    later = changes(lists[new.number])
-                    pairs.extend(
-                        (each, other)
-                        for each in changes(lists[old.number])
-                        for other in later
-                    )
+                    yield lists[old.number], lists[new.number]
         for record in index.values():
             if is_merge(record):
                 continue
             for source in sorted(_cherry_pick_sources(record.message)):
                 if source != record.sha and changes((source,)):
-                    pairs.append((source, record.sha))
-        return pairs
+                    yield (source,), (record.sha,)
 
     def _mode_targets(self, data: CollectedData, *, stopped: bool) -> tuple[str, ...]:
         """파일 모드를 확인할 커밋: 관계 근거가 있고 모드 없이 만든 diff 값이 같은 쌍의 양쪽.
 
         stopped면 필수 상세를 다 받기 전에 수집이 멈춘 때다. 이때는 상대 커밋의 변경 내용을 받지
         못한 쌍도, 받은 쪽은 끝까지 수집했다면 확인했을 수 있으므로 넣는다(부르지 않는다).
+        순서는 관계마다 앞쪽 커밋 순이고, 앞쪽 커밋 바로 뒤에 그와 쌍인 뒤쪽 커밋을 뒤쪽 순으로
+        둔다. 변경 내용을 받지 못한 앞쪽 커밋은 넣지 않고 그 자리에 쌍인 뒤쪽 커밋만 둔다. 쌍을 하나씩
+        보지 않고 관계마다 diff 값으로 쌍을 찾아 양쪽 커밋 수에 비례해 끝낸다.
         """
         index = self._commit_index(data)
         values: dict[str, str | None] = {}
@@ -1353,17 +1352,33 @@ class RelationCollector:
                 DetailStatus.NOT_REQUESTED,
             )
 
+        # 받지 못한 커밋은 값이 없으므로, 값이 같은 쌍과 받지 못한 쪽이 낀 쌍은 겹치지 않는다.
         targets: dict[str, None] = {}
-        for earlier, later in self._relation_pairs(data, index):
-            first, second = value(earlier), value(later)
-            if first is not None and first == second:
-                targets.setdefault(earlier)
-                targets.setdefault(later)
-            elif stopped:
-                if first is not None and unreached(later):
-                    targets.setdefault(earlier)
-                if second is not None and unreached(earlier):
-                    targets.setdefault(later)
+        for earlier, later in self._relation_sides(data, index):
+            by_value: dict[str, list[str]] = {}
+            for sha in later:
+                found = value(sha)
+                if found is not None:
+                    by_value.setdefault(found, []).append(sha)
+            valued = [sha for sha in later if value(sha) is not None]
+            later_unreached = stopped and any(unreached(sha) for sha in later)
+            for sha in earlier:
+                found = value(sha)
+                if found is None:
+                    if stopped and unreached(sha):
+                        # 값이 있는 뒤쪽 커밋 모두와 쌍이다. 한 번 넣으면 다시 넣을 것이 없다.
+                        for other in valued:
+                            targets.setdefault(other)
+                        valued = []
+                    continue
+                matches = by_value.get(found)
+                if matches is not None or later_unreached:
+                    targets.setdefault(sha)
+                if matches:
+                    for other in matches:
+                        targets.setdefault(other)
+                    # 이미 넣었다. 열쇠는 남겨 같은 값의 다음 앞쪽 커밋도 쌍이 있다고 본다.
+                    by_value[found] = []
         return tuple(targets)
 
     def _fetch_modes(

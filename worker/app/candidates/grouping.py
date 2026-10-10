@@ -57,7 +57,7 @@
 """
 
 from collections import Counter
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import Literal
@@ -460,8 +460,8 @@ def group(outcome: CollectionOutcome) -> Grouping:
     patch_ids = _PatchIds(ctx)
     _union_same_changes(same_change, relations, patch_ids)
     notes = _unconfirmed_notes(same_change, relations)
-    pairs = _uncompared_pairs(ctx, same_change, relations, patch_ids)
-    _hold_uncertain(ctx, states, same_change, pairs)
+    uncompared = _uncompared(ctx, same_change, relations, patch_ids)
+    _hold_uncertain(ctx, states, same_change, uncompared)
     # 4. 배정
     assignment = _assign(ctx, states, same_change)
     inner_placed = _inner_placed(merges, states, assignment)
@@ -477,7 +477,7 @@ def group(outcome: CollectionOutcome) -> Grouping:
         same_change,
         notes,
         inner_placed,
-        frozenset(sha for pair in pairs for sha in pair),
+        uncompared.commits,
         {merge.sha: merge for merge in merges},
     )
     return Grouping(
@@ -1102,27 +1102,101 @@ def _unconfirmed_notes(
     return {root: frozenset(found) for root, found in notes.items()}
 
 
-def _uncompared_pairs(
+@dataclass(frozen=True)
+class _Uncompared:
+    """관계 근거가 있는데 수집이 멈춰 비교하지 못했고, 끝까지 받았다면 같을 수 있었던 쌍.
+
+    변경 내용이나 파일 모드 확인에 닿지 못한 커밋이 낀 쌍이다. 쌍 자체는 두지 않는다.
+    """
+
+    # 그런 쌍에 든 커밋.
+    commits: frozenset[str]
+    # 그런 쌍으로 서로 이어지는 같은 변경 묶음(대표 SHA)들. 묶음은 여러 무리에 들 수 있다.
+    links: tuple[tuple[str, ...], ...]
+
+
+@dataclass
+class _Side:
+    """관계 한쪽의 커밋을 비교하지 못한 쌍이 될 수 있는 경우로 나눈 것.
+
+    변경 내용을 받지 못한 커밋(changes_cut)은 어떤 변경이든 될 수 있다. 변경 내용을 받은 커밋은
+    비교할 수 있어야 한다. comparable은 이 둘을 모두 담는다. 받은 커밋 가운데 모드 확인에 닿지 못한
+    커밋은 모드 없이 만든 값이 있어야 하고(modes), 나머지는 모드를 반영한 값이 있어야 한다(full).
+    modes·full은 모드 없이 만든 값마다 모은다.
+    """
+
+    comparable: list[str] = field(default_factory=list)
+    changes_cut: list[str] = field(default_factory=list)
+    modes: dict[str, list[str]] = field(default_factory=dict)
+    full: dict[str, list[str]] = field(default_factory=dict)
+
+
+def _side(ctx: _Context, patch_id: _PatchIds, shas: Iterable[str]) -> _Side:
+    side = _Side()
+    for sha in shas:
+        if _changes_cut(ctx, sha):
+            side.changes_cut.append(sha)
+            side.comparable.append(sha)
+            continue
+        modes_unreached = sha in ctx.modes_unreached
+        if (patch_id.content(sha) if modes_unreached else patch_id(sha)) is None:
+            continue
+        side.comparable.append(sha)
+        content = patch_id.content(sha)
+        if content is not None:
+            found = side.modes if modes_unreached else side.full
+            found.setdefault(content, []).append(sha)
+    return side
+
+
+def _uncompared(
     ctx: _Context,
     same_change: _UnionFind,
     relations: list[_Relation],
     patch_id: _PatchIds,
-) -> list[tuple[str, str]]:
-    """관계 근거가 있는데 수집이 멈춰 비교하지 못했고, 끝까지 받았다면 같을 수 있었던 쌍.
+) -> _Uncompared:
+    """비교하지 못했고 같을 수 있었던 쌍(_Uncompared)을 관계마다 양쪽 커밋 수에 비례해 찾는다.
 
-    변경 내용이나 파일 모드 확인에 닿지 못한 커밋이 낀 쌍이다.
+    앞쪽·뒤쪽의 모든 쌍을 만들지 않는다. PR이 많으면 수천만 쌍이 되어 메모리를 다 쓸 수 있다.
+    쌍이 되는 경우는 한쪽 변경 내용을 받지 못했거나, 두 쪽 모두 받았고 한쪽 이상이 모드 확인에
+    닿지 못했으며 모드 없이 만든 값이 같은 것이다. 같은 변경 묶음끼리는 쌍으로 보지 않는다.
     """
-    pairs: list[tuple[str, str]] = []
+    commits: set[str] = set()
+    links: list[tuple[str, ...]] = []
+
+    def connect(left: Sequence[str], right: Sequence[str]) -> None:
+        """left와 right의 모든 쌍을 반영한다.
+
+        이 쌍들이 잇는 묶음은 모두 서로 이어진다. 두 쌍 (a, b)·(c, d)는 a와 d의 묶음이 다르면
+        (a, d)도 쌍이고, 같으면 a에서 만난다. 그래서 묶음 목록 하나로 남긴다.
+        """
+        if not left or not right:
+            return
+        left_roots = {same_change.find(sha) for sha in left}
+        right_roots = {same_change.find(sha) for sha in right}
+        roots: set[str] = set()
+        for shas, others in ((left, right_roots), (right, left_roots)):
+            for sha in shas:
+                root = same_change.find(sha)
+                # 상대 쪽에 다른 묶음의 커밋이 있어야 쌍이 있다.
+                if len(others) > 1 or root not in others:
+                    commits.add(sha)
+                    roots.add(root)
+        if roots:
+            links.append(tuple(sorted(roots)))
+
     for relation in relations:
         if not any(_cut(ctx, sha) for sha in (*relation.earlier, *relation.later)):
             continue
-        for earlier in relation.earlier:
-            for later in relation.later:
-                if same_change.find(earlier) != same_change.find(
-                    later
-                ) and _may_be_same(ctx, patch_id, earlier, later):
-                    pairs.append((earlier, later))
-    return pairs
+        earlier = _side(ctx, patch_id, relation.earlier)
+        later = _side(ctx, patch_id, relation.later)
+        connect(earlier.changes_cut, later.comparable)
+        connect(earlier.comparable, later.changes_cut)
+        for value, shas in earlier.modes.items():
+            connect(shas, [*later.modes.get(value, ()), *later.full.get(value, ())])
+        for value, shas in earlier.full.items():
+            connect(shas, later.modes.get(value, []))
+    return _Uncompared(frozenset(commits), tuple(links))
 
 
 def _cut(ctx: _Context, sha: str) -> bool:
@@ -1145,31 +1219,11 @@ def _changes_cut(ctx: _Context, sha: str) -> bool:
     )
 
 
-def _may_be_same(ctx: _Context, patch_id: _PatchIds, left: str, right: str) -> bool:
-    """관계 근거가 있는 두 커밋을 수집이 멈춰 비교하지 못했고, 끝까지 받았다면 같을 수 있었다.
-
-    변경 내용을 받지 못한 쪽은 어떤 변경이든 될 수 있다. 변경 내용을 받은 쪽은 비교할 수 있어야
-    한다. 모드 확인에 닿지 못한 쪽은 모드 없이 만든 값이 있어야 하고, 나머지는 모드를 반영한 값이
-    있어야 한다. 두 쪽 모두 변경 내용을 받았으면 모드 없이 만든 값이 같아야 한다.
-    """
-    if not (_cut(ctx, left) or _cut(ctx, right)):
-        return False
-    for sha in (left, right):
-        if _changes_cut(ctx, sha):
-            continue
-        value = patch_id.content(sha) if sha in ctx.modes_unreached else patch_id(sha)
-        if value is None:
-            return False
-    if _changes_cut(ctx, left) or _changes_cut(ctx, right):
-        return True
-    return patch_id.content(left) == patch_id.content(right)
-
-
 def _hold_uncertain(
     ctx: _Context,
     states: States,
     same_change: _UnionFind,
-    pairs: list[tuple[str, str]],
+    uncompared: _Uncompared,
 ) -> None:
     """비교하지 못한 쌍으로 이어진 같은 변경 묶음 가운데 배정이 비교 결과에 달린 것을 보류한다.
 
@@ -1177,11 +1231,12 @@ def _hold_uncertain(
     _roots_to_hold가 정한다. 수집을 끝까지 마친 결과에는 이런 쌍이 없다(_context가 멈춘 흔적이
     있는 완료 결과를 결함으로 막는다).
     """
-    if not pairs:
+    if not uncompared.commits:
         return
-    links = _UnionFind(same_change.find(sha) for pair in pairs for sha in pair)
-    for left, right in pairs:
-        links.union(same_change.find(left), same_change.find(right))
+    links = _UnionFind(same_change.find(sha) for sha in uncompared.commits)
+    for first, *rest in uncompared.links:
+        for root in rest:
+            links.union(first, root)
     members: dict[str, list[str]] = {}
     for sha in states:
         root = same_change.find(sha)

@@ -10,6 +10,7 @@ import json
 import logging
 import random
 import re
+import tracemalloc
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -2064,6 +2065,60 @@ def test_uncompared_pairs_outside_confirmed_units_keep_the_hold_rules(
     assert observations[moved].membership is Membership.STOPPED
     held_after_stop = 1 if case == "one-already-held" else 2
     assert f"heldAfterStop={held_after_stop}" in caplog.records[-1].getMessage()
+
+
+def test_uncompared_resubmissions_with_many_commits_are_held_without_pairing() -> None:
+    """닫힌 PR 10개를 병합된 PR 10개가 모두 다시 올렸다고 적었다(PR마다 커밋 200개).
+
+    수집이 멈춰 어느 커밋의 변경 내용도 받지 못했다. 쌍을 모두 만들면 400만 쌍(약 250 MiB)이다.
+    쌍을 만들지 않고도 비교하지 못한 쌍으로 모두 이어지므로, 가장 앞선 단위인 먼저 병합된 #11의
+    커밋만 두고 나머지를 확인 중단으로 보류한다.
+    """
+    closed, merged = range(1, 11), range(11, 21)
+    commits = {
+        number: [number * 1000 + i for i in range(200)] for number in (*closed, *merged)
+    }
+    references = " ".join(f"#{number}" for number in closed)
+    data = outcome(
+        extra=[
+            commit(n, status=DetailStatus.NOT_REACHED)
+            for numbers in commits.values()
+            for n in numbers
+        ],
+        pulls=[
+            *(pull(number, commits[number], created=number) for number in closed),
+            *(
+                pull(
+                    number,
+                    commits[number],
+                    created=100 + number,
+                    merged=200 + number,
+                    body=f"다시 올립니다: {references}",
+                )
+                for number in merged
+            ),
+        ],
+        failures=[failure()],
+    )
+
+    if tracemalloc.is_tracing():
+        pytest.skip("이미 메모리를 추적 중이면 최고값에 앞선 할당이 섞인다")
+    tracemalloc.start()
+    try:
+        grouping = group(data)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert [unit.unit for unit in grouping.units] == [PullRequestUnit(11)]
+    kept = {
+        observation.sha
+        for observation in grouping.observations.values()
+        if observation.membership is not Membership.STOPPED
+    }
+    assert kept == {sha(n) for n in commits[11]}
+    assert len(grouping.observations) == 20 * 200
+    assert peak < 64 * 2**20
 
 
 @pytest.mark.parametrize(
