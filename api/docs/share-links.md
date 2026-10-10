@@ -1,5 +1,7 @@
 # 공유 링크 발급(#147)·목록·중단(#148)·수신자 비밀번호 확인(#150)
 
+발급 UI의 병합 후 검증은 [#149 통합 검증](share-links-integration-149.md)을 따른다(실행 명령·응답 유실 재현·관측 결과와 미실행 범위).
+
 `POST /v1/share-links`(회원 API `createShareLink`), `GET /v1/share-links`(`listShareLinks`), `PUT /v1/share-links/{linkId}/stop`(`stopShareLink`), `POST /v1/public/links/{token}/unlock`(수신자 API `unlockLink`)과 ShareLink 테이블이다. 코드는 `src/share-links/`에 있다.
 
 | 파일 | 내용 |

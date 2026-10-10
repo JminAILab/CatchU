@@ -49,6 +49,8 @@
 
 ## 근거
 
+- [병합 후 통합 검증 실행 방법·결과](../../../../api/docs/share-links-integration-149.md): 실제 web 상태→HTTP→DB 자동 검사와 수동 브라우저 응답 유실 재현. 실제 실행 결과와 미실행 범위를 구분한다.
+
 - [공유링크 흐름·와이어프레임 초안](../../../../docs/ai-dlc-input-mvp/CatchU_공유링크_흐름_와이어프레임_초안.md) §4.1 L01·§4.2 L02·§4.3 L03·§4.8 예외 동작
 - [web 기능 설계](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md) W6, 재전송·상태 정본 규칙(429는 처리하지 않은 요청이라 키를 유지하고 `Retry-After` 뒤 같은 키로 다시 보낸다, #235)
 - [API 명세 v1](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml) `listShareLinks`·`createShareLink`·`stopShareLink`, [공통 스키마](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml) `ShareLink`·`ShareCreate`
