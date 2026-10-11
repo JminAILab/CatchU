@@ -215,7 +215,7 @@ class AssignedChange:
     # 원래 커밋만 근거가 되고, squash·rebase로 새로 생긴 커밋은 배정만 받는다.
     contributing: bool
     # 연동 계정이 작성자로 기록된 기여 근거 커밋. 이 단위의 커밋이 우선이고, 없으면 같은 변경의
-    # 다른 단위 커밋이다(어느 PR의 squash 후보 커밋도 아닌 것만).
+    # 다른 단위 커밋이다(어느 PR에서든 그 PR 목록에서 확인하지 못한 squash 후보 커밋은 뺀다).
     own_commits: tuple[str, ...]
 
 
@@ -1381,7 +1381,9 @@ def _change(
         for sha in members
         if sha not in commits
         and states[sha].own
-        and not any(ctx.squash_candidate(number, sha) for number in states[sha].pulls)
+        and not any(
+            _unlisted_squash(ctx, states, number, sha) for number in states[sha].pulls
+        )
     )
     return AssignedChange(
         commits=commits,
@@ -1416,6 +1418,16 @@ def _contribution_basis(
     return not ctx.squash_candidate(number, sha)
 
 
+def _unlisted_squash(
+    ctx: _Context, states: Mapping[str, _CommitState], number: int, sha: str
+) -> bool:
+    """그 PR 목록에서 원래 커밋으로 확인하지 못한 squash 후보 커밋. 기여 근거로 쓰지 않는다.
+
+    목록에 있으면 merge_commit_sha여도(fast-forward로 합친 PR의 마지막 커밋) 원래 커밋이다.
+    """
+    return not states[sha].pulls[number] & _LISTED and ctx.squash_candidate(number, sha)
+
+
 def _squash_unconfirmed(
     ctx: _Context,
     states: Mapping[str, _CommitState],
@@ -1434,9 +1446,7 @@ def _squash_unconfirmed(
     ):
         return False
     return any(
-        states[sha].own
-        and not states[sha].pulls[number] & _LISTED
-        and ctx.squash_candidate(number, sha)
+        states[sha].own and _unlisted_squash(ctx, states, number, sha)
         for change in changes
         for sha in change.commits
     )

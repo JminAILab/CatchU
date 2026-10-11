@@ -2779,6 +2779,102 @@ def test_squash_commit_of_cherry_picked_pull_request_is_not_contribution(
     assert counts(output) == []
 
 
+@pytest.mark.parametrize("on_default_branch", [True, False])
+@pytest.mark.parametrize("complete", [True, False], ids=["whole", "incomplete"])
+def test_listed_own_commit_that_is_merge_commit_sha_counts_where_its_change_goes(
+    on_default_branch: bool, complete: bool
+) -> None:
+    """회원이 다른 계정 커밋 301을 cherry-pick한 311을 #31로 내고 fast-forward로 합쳐, 311이 #31의
+    merge_commit_sha(부모 하나)이기도 하다. 311은 #31 목록에서 확인한 원래 커밋이므로 같은 변경으로
+    먼저 병합된 #30에 가도 본인 기여다(2026-10-08 팀장 결정 「본인 기여의 뜻」). 목록을 다 받지
+    못했어도 목록에 있으면 같고, 311이 관측하지 않은 기본 브랜치 창 밖에 있어도 같다."""
+    own = commit(311, [1], message=picked(301))
+    data = outcome(
+        window=[own, ROOT] if on_default_branch else [],
+        extra=[commit(301, [1], author=OTHER), *([] if on_default_branch else [own])],
+        pulls=[
+            pull(30, [301], merged=10, author=OTHER),
+            pull(31, [311], merged=20, merge_commit=311, complete=complete),
+        ],
+    )
+
+    output = build_candidates(REQ, data)
+
+    assert identities(output) == [identity(PullRequestUnit(30))]
+    assert counts(output) == []
+    assert [item.source_revision for item in output.candidates[0].evidence[1:]] == [
+        sha(311)
+    ]
+
+
+@pytest.mark.parametrize(
+    "list_state", ["whole", "incomplete", "oversized", "unreached"]
+)
+def test_own_squash_commit_is_not_contribution_where_its_change_goes(
+    list_state: str,
+) -> None:
+    """#31을 squash로 합쳐 기본 브랜치에는 본인 squash 커밋 50만 있다. 50 메시지에 옮긴 cherry-pick
+    표시가 남아 다른 계정 커밋 301과 같은 변경으로 먼저 병합된 #30에 간다. 50은 #31 목록에서 확인한
+    원래 커밋이 아니므로 #30의 본인 기여가 아니다(2026-10-08 팀장 결정 「본인 기여의 뜻」). 목록을 다
+    받지 못했거나 수집이 멈춰 받지 못해도 #30은 후보가 아니다."""
+    extra = [commit(301, [1], author=OTHER)]
+    failures: list[CollectionFailure] = []
+    if list_state in ("whole", "incomplete"):
+        complete = list_state == "whole"
+        listed = pull(31, [41], merged=20, merge_commit=50, complete=complete)
+        extra.append(commit(41, [1], author=OTHER, paths=("z.py",)))
+    elif list_state == "oversized":
+        listed = pull(31, merged=20, merge_commit=50, status=DetailStatus.OVERSIZED)
+    else:
+        listed = pull(31, merged=20, merge_commit=50, status=DetailStatus.NOT_REACHED)
+        failures.append(failure())
+    data = outcome(
+        window=[commit(50, [1], message=f"합침(#31)\n\n{picked(301)}"), ROOT],
+        extra=extra,
+        pulls=[pull(30, [301], merged=10, author=OTHER), listed],
+        failures=failures,
+    )
+
+    output = build_candidates(REQ, data)
+    composed = result(output)
+
+    assert output.candidates == ()
+    if list_state == "unreached":
+        assert output.not_provided == ()
+        assert composed["outcome"] == "FAILED"
+    else:
+        assert composed["failures"] == []
+        assert composed["outcome"] == "EMPTY"
+    # 목록을 다 받지 못했을 때의 근거 부족 집계는 고정하지 않는다. 변경이 #30으로 가면 세지 않는
+    # 알려진 한계다(candidate-checks.md 「다른 PR로 간 squash 후보 커밋」).
+    if list_state == "whole":
+        assert counts(output) == []
+
+
+def test_squash_commit_listed_in_another_pull_request_is_not_contribution() -> None:
+    """본인 커밋 311은 #32를 squash로 합친 커밋(#32 목록에 없음)이고, release로 가는 #31 목록에도
+    있다. 다른 PR 목록에 실렸어도 GitHub가 squash로 새로 만든 커밋이라, 같은 변경으로 먼저 병합된
+    #30에 가도 #30의 본인 기여가 아니다(2026-10-08 팀장 결정 「본인 기여의 뜻」)."""
+    output = build_candidates(
+        REQ,
+        outcome(
+            window=[commit(311, [1], message=picked(301)), ROOT],
+            extra=[
+                commit(301, [1], author=OTHER),
+                commit(321, [1], author=OTHER, paths=("q.py",)),
+            ],
+            pulls=[
+                pull(30, [301], merged=10, author=OTHER),
+                pull(32, [321], merged=15, author=OTHER, merge_commit=311),
+                pull(31, [311], merged=20, base_ref="release"),
+            ],
+        ),
+    )
+
+    assert output.candidates == ()
+    assert output.not_provided == ()
+
+
 @pytest.mark.parametrize("opener", [MEMBER, OTHER], ids=["member-pr", "other-pr"])
 @pytest.mark.parametrize("list_state", ["incomplete", "oversized"])
 def test_own_squash_commit_without_the_whole_list_is_insufficient_evidence(

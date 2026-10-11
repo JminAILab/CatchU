@@ -77,6 +77,7 @@ PR을 연 것만으로는 기여로 보지 않는다. [수집 통제 문서의 �
 - PR 커밋 목록을 끝까지 받았으면 목록의 원래 커밋만 기여 근거다. squash·rebase로 새로 생긴 커밋은 PR에 배정만 된다.
 - 목록을 다 받지 못했으면(크기 상한, 판본 불일치, 250건에서 다 읽지 못함, 목록 밖에서 연결 PR 조회로만 앎) 연결 PR 조회·`merge_commit_sha`로 배정한 커밋도 근거로 쓴다. 다만 그 PR의 `merge_commit_sha`이면서 부모가 하나인 커밋은 squash 커밋일 수 있어 근거에서 뺀다. 그 커밋 말고 본인 기여 커밋이 없으면 PR을 연 계정과 무관하게 그 PR 하나에 근거 부족 1로 센다. 이 PR의 기여를 바꿀 수 있는 확인이 수집 중단으로 끝나지 않았을 때만 센다(아래 「수집이 멈췄을 때」).
 - 목록을 조회 오류나 수집 상한으로 받지 못했으면 그 PR의 변경은 확인 중단으로 보류하고 세지 않는다. 수집 실패는 수집이 남긴 것을 그대로 옮긴다.
+- 같은 변경을 따라 다른 단위로 간 본인 커밋도 같다. 그 커밋이 든 PR 목록에서 확인한 원래 커밋이면 그 PR의 `merge_commit_sha`여도(fast-forward로 합친 PR의 마지막 커밋) 기여 근거다. 그 커밋이 든 PR 가운데 하나라도 목록에서 확인하지 못한 squash 후보 커밋이면 근거가 아니다.
 
 ## 소속 판정
 
@@ -142,7 +143,7 @@ SHA가 다른 두 커밋은 관계 근거와 공백을 무시한 같은 diff가 
 - **squash 커밋과 원래 커밋**: 둘을 같은 변경으로 잇지 않는다. squash 커밋은 `merge_commit_sha`로 PR에 배정되지만 기여 근거인지는 「본인 기여」대로 정한다. 그래서 기준 문서 「한계와 실제 구현에서 검증할 것」의 squash 항목처럼 원래 커밋 목록을 받은 PR에서는 squash 커밋이 두 번째 후보를 만들지 않는다.
   - C8의 통합 PR #12를 squash로 합치면: 원래 커밋은 먼저 병합된 #10·#11에 가고, #12에는 squash 커밋만 남는다. #12는 후보가 아니고, 연동 계정이 연 PR이어도 건수에 세지 않는다.
   - C20·C25에서 옮긴 PR을 squash로 합치면: squash 커밋이 release 같은 다른 브랜치에 있으면 관측하지 않으므로 Catch는 하나다. 기본 브랜치에 있으면 그 PR에 배정되지만 기여 근거가 아니라 Catch는 하나이고 건수도 없다.
-  - 시험: `test_squash_merged_integration_pull_request_is_not_a_second_candidate`, `test_squash_commit_of_cherry_picked_pull_request_is_not_contribution`, `test_own_squash_commit_without_the_whole_list_is_insufficient_evidence`.
+  - 시험: `test_squash_merged_integration_pull_request_is_not_a_second_candidate`, `test_squash_commit_of_cherry_picked_pull_request_is_not_contribution`, `test_own_squash_commit_without_the_whole_list_is_insufficient_evidence`, `test_listed_own_commit_that_is_merge_commit_sha_counts_where_its_change_goes`, `test_own_squash_commit_is_not_contribution_where_its_change_goes`, `test_squash_commit_listed_in_another_pull_request_is_not_contribution`.
 
 ## 커밋 묶음(방법 B)
 
