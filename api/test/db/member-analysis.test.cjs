@@ -76,7 +76,7 @@ test('기본 비활성·허용되지 않은 환경은 로그인 회원 생성과
     ...[undefined,'','production','staging','preview','Development','test ']
       .map(NODE_ENV=>({DEV_LOGIN_ENABLED:'true',NODE_ENV})),
   ]) {
-    const config=readAuthConfig({AUTH_JWT_SECRET:'ab'.repeat(32),AUTH_ACCESS_TOKEN_TTL_SECONDS:'60',...settings});
+    const config=readAuthConfig({AUTH_JWT_SECRET:'ab'.repeat(32),AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',...settings});
     await assert.rejects(dev(config).resolveMember('blocked'), e=>e.getStatus()===403);
     await assert.rejects(dev(config).readConnection(randomUUID()),e=>e.getStatus()===403);
   }
@@ -87,7 +87,7 @@ test('기본 비활성·허용되지 않은 환경은 로그인 회원 생성과
 
 test('development·test의 명시적 활성화는 회원 준비와 합성 연결 조회를 허용', async () => {
   for(const NODE_ENV of ['development','test']) {
-    const config=readAuthConfig({AUTH_JWT_SECRET:'ab'.repeat(32),AUTH_ACCESS_TOKEN_TTL_SECONDS:'60',
+    const config=readAuthConfig({AUTH_JWT_SECRET:'ab'.repeat(32),AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
       DEV_LOGIN_ENABLED:'true',NODE_ENV});
     const memberId=await dev(config).resolveMember(`allowed-${NODE_ENV}`);
     assert.equal((await dev(config).readConnection(memberId)).sourceMode,'MOCK');
@@ -364,7 +364,7 @@ test('개발 로그인 HTTP 토큰의 UUID로 실제 분석 FK를 저장하며 �
   const {NestFactory}=require('@nestjs/core');
   const {AppModule}=require('../../dist/app.module');
   const {configureApp}=require('../../dist/app.setup');
-  const settings={AUTH_JWT_SECRET:randomBytes(32).toString('hex'),AUTH_ACCESS_TOKEN_TTL_SECONDS:'60',DEV_LOGIN_ENABLED:'true',NODE_ENV:'test'};
+  const settings={AUTH_JWT_SECRET:randomBytes(32).toString('hex'),AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',DEV_LOGIN_ENABLED:'true',NODE_ENV:'test'};
   const previous=Object.fromEntries(Object.keys(settings).map(k=>[k,process.env[k]]));
   Object.assign(process.env,settings);
   let app;

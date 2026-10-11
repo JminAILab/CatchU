@@ -62,7 +62,7 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
   });
   const settings = {
     AUTH_JWT_SECRET: secret,
-    AUTH_ACCESS_TOKEN_TTL_SECONDS: '60',
+    AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
     DEV_LOGIN_ENABLED: 'true',
     NODE_ENV: 'development',
     PORT: String(port),
@@ -118,7 +118,7 @@ for (const source of [false, true]) {
     });
     assert.equal(response.status, 200);
     const token = await response.json();
-    assert.equal(token.expiresIn, 60);
+    assert.equal(token.expiresIn, 900);
     assert.equal(typeof token.accessToken, 'string');
     assert.equal(server.logs().includes(token.accessToken), false);
     assert.equal(server.logs().includes(server.secret), false);

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { AccessTokenService } from '../auth/access-token.service';
+import { SessionService } from '../auth/session.service';
 import { ApiError } from '../common/errors';
 import { MemberAccount, MemberProfile } from '../member-analysis/member-analysis.entity';
 import { GOOGLE_CONFIG, GoogleConfig } from './google.config';
@@ -18,7 +18,7 @@ export class GoogleLoginService {
     @Inject(GOOGLE_CONFIG) private readonly config: GoogleConfig,
     @Inject(GOOGLE_PROVIDER) private readonly provider: GoogleProvider,
     private readonly dataSource: DataSource,
-    private readonly tokens: AccessTokenService,
+    private readonly sessions: SessionService,
   ) {}
 
   private assertEnabled() {
@@ -58,8 +58,7 @@ export class GoogleLoginService {
         if (!stored) throw new ApiError('INTERNAL_ERROR');
         profile = stored;
       }
-      // 기존 #87 발급만 재사용. #250 세션 저장·갱신·폐기는 별도 접점이다.
-      const issued = await this.tokens.issue(account.memberId);
+      const issued = await this.sessions.create(manager, account.memberId);
       return { ...issued, suggestedDisplayName: profile.displayName === '' ? identity.name : null };
     }); // 최종 커밋 성공 이후에만 호출자에게 토큰을 반환한다.
   }

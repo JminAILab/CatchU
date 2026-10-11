@@ -271,12 +271,17 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
   try {
     const migrations = await isolated.runMigrations();
     assert.deepEqual(migrations.map(m => m.name), ['CreateMemberAnalysisFoundation1790500000000',
-      'CreateResultApplicationRecord1790550000000', 'CreateCatchAssets1790600000000', 'CreateRepositoryProtection1790601000000', 'CreateShareLink1790745895865', 'AllowNullCatchTitle1791784385918']);
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 14);
+      'CreateResultApplicationRecord1790550000000', 'CreateCatchAssets1790600000000', 'CreateRepositoryProtection1790601000000', 'CreateShareLink1790745895865',
+      'CreateAuthSessions1791648335731', 'AllowNullCatchTitle1791784385918']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 16);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
     await isolated.undoLastMigration(); // B 제목 null 허용
+    await isolated.undoLastMigration(); // A 회원 세션·Refresh 기록
+    assert.equal((await isolated.query("SELECT to_regclass('auth_session') AS name"))[0].name, null);
+    assert.equal((await isolated.query("SELECT to_regclass('session_refresh_token') AS name"))[0].name, null);
+    assert.equal(await isolated.manager.count(MemberAccount), 1);
     await isolated.undoLastMigration(); // C 공유 링크 및 멱등 FK
     assert.equal((await isolated.query("SELECT to_regclass('share_link') AS name"))[0].name,null);
     await isolated.undoLastMigration(); await isolated.undoLastMigration(); // B 보호 판단·등록 테이블

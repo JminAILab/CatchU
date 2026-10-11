@@ -15,10 +15,10 @@ const EXPECTED = {
 };
 
 async function start(t, env) {
-  const keys = ['AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'CORS_ALLOWED_ORIGINS', 'SHARE_LINK_WEB_BASE_URL', 'LINK_GRANT_SECRET'];
+  const keys = ['AUTH_WEB_ORIGIN', 'AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'CORS_ALLOWED_ORIGINS', 'SHARE_LINK_WEB_BASE_URL', 'LINK_GRANT_SECRET'];
   const before = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   for (const key of keys) delete process.env[key];
-  Object.assign(process.env, { AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '60' }, env);
+  Object.assign(process.env, { AUTH_WEB_ORIGIN: 'https://catchu.example', AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900' }, env);
   let app;
   t.after(async () => {
     try { if (app) await app.close(); }

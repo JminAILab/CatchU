@@ -13,14 +13,15 @@ const WEB = 'http://localhost:3000';
 const PRODUCTION = { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' };
 
 async function start(t, corsValue, environment = {}) {
-  const keys = ['AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'SHARE_LINK_WEB_BASE_URL',
+  const keys = ['AUTH_WEB_ORIGIN', 'AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'SHARE_LINK_WEB_BASE_URL',
     'LINK_GRANT_SECRET', 'CORS_ALLOWED_ORIGINS'];
   const before = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   delete process.env.SHARE_LINK_WEB_BASE_URL;
   delete process.env.LINK_GRANT_SECRET;
   Object.assign(process.env, {
+    AUTH_WEB_ORIGIN: 'https://catchu.example',
     AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
-    AUTH_ACCESS_TOKEN_TTL_SECONDS: '60',
+    AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
     DEV_LOGIN_ENABLED: 'true',
     NODE_ENV: 'test',
     ...environment,
@@ -74,11 +75,10 @@ test('http 출처는 development·test에서만 받고 production·미지정 등
     assert.deepEqual(origins(`${WEB},http://192.168.0.10:3000`, { NODE_ENV }), [WEB, 'http://192.168.0.10:3000']);
   }
   for (const NODE_ENV of ['production', undefined, 'staging']) {
-    assert.deepEqual(origins('https://catchu.example, https://www.catchu.example', { NODE_ENV }),
-      ['https://catchu.example', 'https://www.catchu.example']);
+    assert.throws(() => origins('https://catchu.example, https://www.catchu.example', { NODE_ENV }), /동일 출처/);
     for (const value of [WEB, 'http://catchu.example', 'https://catchu.example,http://catchu.example']) {
       assert.throws(() => origins(value, { NODE_ENV }), (error) => {
-        assert.match(error.message, /CORS_ALLOWED_ORIGINS는 NODE_ENV가 development·test가 아니면 https 출처만 받습니다/);
+        assert.match(error.message, /CORS_ALLOWED_ORIGINS는 운영의 동일 출처 구성에서 비워야 합니다/);
         assert.equal(error.message.includes('catchu.example'), false, '값은 오류에 넣지 않는다');
         return true;
       }, `${NODE_ENV} ${value}`);
@@ -94,7 +94,7 @@ test('허용한 web 출처는 CORS 헤더를 받고 Retry-After를 읽을 수 �
   assert.equal(options.headers.get('access-control-allow-origin'), WEB);
   const allowed = options.headers.get('access-control-allow-headers').toLowerCase().split(',');
   for (const header of ['authorization', 'content-type', 'idempotency-key', 'x-link-grant']) assert.ok(allowed.includes(header), header);
-  assert.equal(options.headers.get('access-control-allow-credentials'), null, '쿠키를 쓰지 않으므로 credentials를 허용하지 않는다');
+  assert.equal(options.headers.get('access-control-allow-credentials'), 'true', '#250 개발 허용 출처는 Refresh 쿠키를 전달한다');
 
   const login = await request('/v1/auth/dev-login', {
     method: 'POST', headers: { Origin: WEB, 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId: 'cors-member' }),
@@ -132,16 +132,11 @@ test('잘못된 CORS 설정이면 앱을 시작하지 않는다', async (t) => {
 
 for (const value of [WEB, 'https://catchu.example,http://catchu.example']) {
   test(`production에서 CORS 허용 출처에 http 주소가 있으면 앱을 시작하지 않는다: ${value}`, async (t) => {
-    await assert.rejects(start(t, value, PRODUCTION), /CORS_ALLOWED_ORIGINS는 NODE_ENV가 development·test가 아니면 https 출처만/);
+    await assert.rejects(start(t, value, PRODUCTION), /CORS_ALLOWED_ORIGINS는 운영의 동일 출처 구성에서 비워야/);
   });
 }
 
-test('production에서 https 출처만 두면 앱이 시작되고 그 출처만 CORS 헤더를 받는다', async (t) => {
+test('production에서는 https 출처라도 CORS를 켜면 기동을 거부한다', async (t) => {
   const origin = 'https://catchu.example';
-  const request = await start(t, origin, PRODUCTION);
-  const options = await preflight(request, origin);
-  assert.equal(options.status, 204);
-  assert.equal(options.headers.get('access-control-allow-origin'), origin);
-  const insecure = await preflight(request, 'http://catchu.example');
-  assert.equal(insecure.headers.get('access-control-allow-origin'), null);
+  await assert.rejects(start(t, origin, PRODUCTION), /동일 출처/);
 });
