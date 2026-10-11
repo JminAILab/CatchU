@@ -1654,6 +1654,46 @@ def test_boundary_compare_that_does_not_prove_the_range_is_not_complete(
     assert not boundary.complete and not boundary.usable
 
 
+def _run_boundary(compared: Reply) -> tuple[CollectionOutcome, list[str]]:
+    routes = _merge_routes()
+    routes[compare_path(51, 50, 1)] = compared
+    outcome, transport = _run(routes, request_with("COMMIT", "PULL_REQUEST"))
+    return outcome, transport.paths
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        respond(
+            {
+                key: value
+                for key, value in compare_json(3, 51, M50_BOUNDARY).items()
+                if key != "merge_base_commit"
+            }
+        ),
+        respond(
+            {**compare_json(3, 51, M50_BOUNDARY), "merge_base_commit": {"sha": "zz"}}
+        ),
+    ],
+    ids=["base-missing", "base-malformed"],
+)
+def test_boundary_compare_without_a_start_commit_is_like_another_start(
+    reply: Reply,
+) -> None:
+    """수가 맞고 병합 커밋이 있어도 시작 커밋이 없거나 형식이 틀리면 다른 시작 커밋과 같이 본다."""
+    outcome, paths = _run_boundary(reply)
+    other, other_paths = _run_boundary(respond(compare_json(3, 54, M50_BOUNDARY)))
+
+    assert outcome.completed and other.completed
+    assert _relations(outcome).merge_boundaries == (
+        MergeBoundary(
+            sha(50), tuple(sha(n) for n in (53, 52, 50)), False, DetailStatus.FETCHED
+        ),
+    )
+    assert _relations(outcome) == _relations(other)
+    assert paths == other_paths
+
+
 def _window(*entries: tuple[int, tuple[int, ...]]) -> list[CommitRecord]:
     return [
         normalize.commit(

@@ -192,8 +192,9 @@ class MergeBoundary:
     merge: str
     # 비교 범위의 커밋 SHA(API 순서). 병합 커밋 자신도 든다.
     commits: tuple[str, ...]
-    # 비교 범위의 전체 수만큼 다 받았고, 병합 커밋이 들어 있고, 응답이 준 시작 커밋이 첫 부모와 다르지
-    # 않았다. 쪽수·응답 크기 상한에 걸렸거나, 쪽끼리 전체 수가 다르거나, 전체 수 전에 끝났으면 거짓이다.
+    # 비교 범위의 전체 수만큼 다 받았고, 병합 커밋이 들어 있고, 응답이 준 시작 커밋이 첫 부모였다. 시작
+    # 커밋이 없거나 형식이 틀렸거나, 쪽수·응답 크기 상한에 걸렸거나, 쪽끼리 전체 수가 다르거나, 전체 수
+    # 전에 끝났으면 거짓이다.
     complete: bool
     # FETCHED(불렀다), OVERSIZED(응답이 크기 상한을 넘었다), NOT_REACHED(수집이 멈춰 부르지 못했다).
     status: DetailStatus
@@ -1027,7 +1028,7 @@ class RelationCollector:
             collected.update(dict.fromkeys(shas))
             if (
                 compared.total_commits != total
-                or compared.merge_base not in (None, first)
+                or compared.merge_base != first
                 or len(collected) > total
             ):
                 return unfinished()
