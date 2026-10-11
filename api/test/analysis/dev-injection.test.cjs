@@ -96,6 +96,7 @@ Body()(InjectionProbeController.prototype, 'inject', 2);
 
 async function server(t, overrides) {
   const settings = { AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
+    AUTH_WEB_ORIGIN: 'https://catchu.example', CORS_ALLOWED_ORIGINS: undefined,
     DEV_LOGIN_ENABLED: 'true', NODE_ENV: 'test', DEV_ANALYSIS_INJECTION_ENABLED: 'true', ...overrides };
   const before = Object.fromEntries(Object.keys(settings).map((key) => [key, process.env[key]]));
   for (const [key, value] of Object.entries(settings)) {

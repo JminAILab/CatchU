@@ -63,6 +63,9 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
   const settings = {
     AUTH_JWT_SECRET: secret,
     AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
+    // 다른 설정의 실패를 검사할 때도 세션의 운영용 Origin 조건은 충족한다.
+    AUTH_WEB_ORIGIN: 'https://catchu.example',
+    CORS_ALLOWED_ORIGINS: undefined,
     DEV_LOGIN_ENABLED: 'true',
     NODE_ENV: 'development',
     PORT: String(port),
