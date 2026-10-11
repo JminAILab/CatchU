@@ -40,14 +40,23 @@ test('고치거나 형식이 틀린 grant는 예외 없이 무효다', () => {
   }
 });
 
-test('서명 키는 production에서 필수·형식 검사·회원 JWT 키와 분리, 개발·테스트는 없으면 무작위', () => {
+test('서명 키는 development·test 밖에서 필수·형식 검사·회원 JWT 키와 분리, development·test는 없으면 무작위', () => {
   const secret = randomBytes(32).toString('hex');
-  assert.throws(() => readLinkGrantKey({ NODE_ENV: 'production' }), /LINK_GRANT_SECRET is required in production/);
+  // 판정할 수 없는 환경(미지정·빈 값·staging 같은 다른 값)도 production과 같이 키가 없으면 기동을 멈춘다(#242).
+  for (const NODE_ENV of ['production', undefined, '', 'staging']) {
+    for (const LINK_GRANT_SECRET of [undefined, '']) {
+      assert.throws(() => readLinkGrantKey({ NODE_ENV, LINK_GRANT_SECRET }),
+        /LINK_GRANT_SECRET is required unless NODE_ENV is development or test/,
+        `NODE_ENV ${JSON.stringify(NODE_ENV) ?? '미지정'}, 키 ${JSON.stringify(LINK_GRANT_SECRET) ?? '미지정'}`);
+    }
+  }
   assert.throws(() => readLinkGrantKey({ LINK_GRANT_SECRET: 'short' }), (error) => {
     assert.match(error.message, /64 hex characters/);
     assert.equal(error.message.includes('short'), false);
     return true;
   });
+  // 공백뿐인 키는 누락으로 보지 않는다. 임시 키를 만드는 development에서도 형식 오류다.
+  assert.throws(() => readLinkGrantKey({ NODE_ENV: 'development', LINK_GRANT_SECRET: '   ' }), /64 hex characters/);
   assert.throws(() => readLinkGrantKey({ LINK_GRANT_SECRET: secret, AUTH_JWT_SECRET: secret.toUpperCase() }), /must differ/);
   assert.deepEqual(readLinkGrantKey({ NODE_ENV: 'production', LINK_GRANT_SECRET: secret }), Buffer.from(secret, 'hex'));
   const a = readLinkGrantKey({ NODE_ENV: 'development' });

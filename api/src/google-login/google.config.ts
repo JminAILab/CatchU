@@ -1,3 +1,5 @@
+import { isDevelopmentOrTest } from '../common/node-env';
+
 export interface GoogleConfig {
   enabled: boolean;
   clientId: string;
@@ -26,7 +28,7 @@ export function readGoogleConfig(env: NodeJS.ProcessEnv = process.env): GoogleCo
   let redirect: URL;
   try { redirect = new URL(env.GOOGLE_REDIRECT_URI ?? ''); }
   catch { throw new Error('GOOGLE_REDIRECT_URI must be an absolute callback URL'); }
-  const localHttp = ['development', 'test'].includes(env.NODE_ENV ?? '') &&
+  const localHttp = isDevelopmentOrTest(env) &&
     redirect.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(redirect.hostname);
   if ((!localHttp && redirect.protocol !== 'https:') || redirect.username || redirect.password ||
       redirect.search || redirect.hash || redirect.href !== env.GOOGLE_REDIRECT_URI) {
