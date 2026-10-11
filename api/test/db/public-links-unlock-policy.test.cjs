@@ -171,7 +171,8 @@ test('해시 차례를 기다리는 동안 링크가 중단·만료되면 해시
     const held = holdHashSlots(controls, 2);
     const pending = attempt(access, link.token, 'wrong', '4:198.51.100.1');
     await waitFor(() => controls.hashes.stats.waiting === 1);
-    if (change === 'stop') await db.query('UPDATE share_link SET stopped_at = now() WHERE link_id = $1', [link.linkId]);
+    // 발급 시각은 Node 시계로 정한다. DB 시계가 조금 늦어도 중단 시각 ≥ 발급 시각 제약을 지키게 한다.
+    if (change === 'stop') await db.query('UPDATE share_link SET stopped_at = GREATEST(now(), issued_at) WHERE link_id = $1', [link.linkId]);
     else await db.query("UPDATE share_link SET issued_at = now() - interval '721 hours', expires_at = now() - interval '1 hour' WHERE link_id = $1", [link.linkId]);
     await held.release();
     assert.deepEqual(await pending, { code: 'LINK_UNAVAILABLE' }, change);

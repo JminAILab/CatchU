@@ -146,7 +146,8 @@ test('유효 링크 5개면 LINK_LIMIT_REACHED, 중단한 링크의 제목은 �
   const token = await login();
   for (let i = 1; i <= 5; i++) assert.equal((await create(token, `key-limit-${i}`, { title: `링크 ${i}` })).status, 201);
   expectError(await create(token, 'key-limit-6', { title: '여섯 번째' }), 409, 'LINK_LIMIT_REACHED');
-  await db.query("UPDATE share_link SET stopped_at = now() WHERE title = '링크 1'");
+  // 발급 시각은 Node 시계로 정한다. DB 시계가 조금 늦어도 중단 시각 ≥ 발급 시각 제약을 지키게 한다.
+  await db.query("UPDATE share_link SET stopped_at = GREATEST(now(), issued_at) WHERE title = '링크 1'");
   assert.equal((await create(token, 'key-limit-7', { title: '링크 1' })).status, 201);
   assert.equal(await count('share_link'), 6);
 });
