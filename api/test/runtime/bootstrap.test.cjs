@@ -67,6 +67,7 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
     NODE_ENV: 'development',
     PORT: String(port),
     BIND_HOST: undefined, // 터미널의 값이 섞이지 않게 기본은 두지 않는다
+    LINK_GRANT_SECRET: undefined, // 같은 이유로 두지 않는다. development에서는 임시 키로 기동한다
     ...file,
   };
   await writeFile(envPath, Object.entries(settings)
@@ -146,7 +147,10 @@ for (const [label, file, expected] of [
   // grant 서명 키(#150)는 합성 값을 줘서 공유 URL 주소만 실패 원인이 되게 한다.
   ['production에서 공유 URL 주소가 http', { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'http://catchu.example',
     LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' }, 'SHARE_LINK_WEB_BASE_URL'],
-  ['NODE_ENV 미지정에 공유 URL 주소 없음', { NODE_ENV: undefined, SHARE_LINK_WEB_BASE_URL: undefined }, 'SHARE_LINK_WEB_BASE_URL'],
+  ['NODE_ENV 미지정에 공유 URL 주소 없음', { NODE_ENV: undefined, SHARE_LINK_WEB_BASE_URL: undefined,
+    LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' }, 'SHARE_LINK_WEB_BASE_URL'],
+  // grant 서명 키 임시 생성도 development·test에서만 한다(#242). 공유 URL 주소는 https로 줘서 키만 실패 원인이 되게 한다.
+  ['NODE_ENV 미지정에 grant 서명 키 없음', { NODE_ENV: undefined, SHARE_LINK_WEB_BASE_URL: 'https://catchu.example' }, 'LINK_GRANT_SECRET'],
 ]) {
   test(`main: ${label}이면 기동하지 않고 실패 종료한다`, { timeout: 15000 }, async (t) => {
     const server = await launch(t, { file });

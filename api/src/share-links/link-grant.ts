@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { isDevelopmentOrTest } from '../common/node-env';
 
 /**
  * 비밀번호 링크의 열람 증표(grant, #150 9/29 결정).
@@ -16,14 +17,17 @@ const MAX_GRANT_LENGTH = 512;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
- * 서명 키. production에서는 64자리 hex(32바이트) `LINK_GRANT_SECRET`이 없으면 기동을 멈춘다.
- * 개발·테스트에서 없으면 프로세스마다 무작위 키를 만든다(재시작하면 이전 grant는 무효, 다시 비밀번호 입력).
+ * 서명 키. 64자리 hex(32바이트) `LINK_GRANT_SECRET`을 쓴다.
+ * - 값이 없거나 빈 문자열이면 NODE_ENV가 development·test일 때만 프로세스마다 무작위 키를 만든다
+ *   (재시작하면 이전 grant는 무효, 다시 비밀번호 입력).
+ * - 그 밖(production·미지정·다른 값)에서는 기동을 멈춘다(#242). 재시작이나 여러 대 실행에서 grant가 통하지 않는
+ *   설정 누락을 배포 때 바로 알게 한다.
  * 오류 메시지에 키 값을 넣지 않는다.
  */
 export function readLinkGrantKey(env: NodeJS.ProcessEnv = process.env): Buffer {
   const secret = env.LINK_GRANT_SECRET;
   if (secret === undefined || secret === '') {
-    if (env.NODE_ENV === 'production') throw new Error('LINK_GRANT_SECRET is required in production');
+    if (!isDevelopmentOrTest(env)) throw new Error('LINK_GRANT_SECRET is required unless NODE_ENV is development or test');
     return randomBytes(32);
   }
   if (!/^[a-fA-F0-9]{64}$/.test(secret)) throw new Error('LINK_GRANT_SECRET must be a random 32-byte key encoded as 64 hex characters');

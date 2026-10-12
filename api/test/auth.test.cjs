@@ -185,12 +185,14 @@ for (const [label, overrides] of [
   ['그 밖의 환경', { NODE_ENV: 'preview' }],
   ['대소문자가 다른 환경', { NODE_ENV: 'Development' }],
   ['공백이 포함된 환경', { NODE_ENV: 'test ' }],
-  // production은 grant 서명 키(#150)도 필수라 합성 값을 함께 준다(공유 URL 주소는 아래 반복문이 준다).
-  ['운영 환경에서 활성화 요청', { NODE_ENV: 'production', LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' }],
+  ['운영 환경에서 활성화 요청', { NODE_ENV: 'production' }],
 ]) {
   test(`개발 로그인 거부: ${label}`, async (t) => {
-    // development·test가 아니면 공유 URL 주소가 https로 필수(#147·#218)라 합성 주소를 함께 준다.
-    const server = await start(t, { SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', ...overrides });
+    // development·test가 아니면 https 공유 URL 주소(#147·#218)와 grant 서명 키(#150·#242)가 필수라 합성 값을 함께 준다.
+    // 키가 없어 기동이 실패하면 아래 403 확인이 grant 설정 오류에 가려진다.
+    const server = await start(t, {
+      SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex'), ...overrides,
+    });
     for (const body of [
       { memberId: 'test-member-87' }, {}, { memberId: ' id ', admin: true }, [],
       { memberId: 'valid-member', constructor: 'extra' },
