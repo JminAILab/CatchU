@@ -17,15 +17,25 @@ RESOURCE_TYPES: tuple[ResourceType, ...] = ("COMMIT", "PULL_REQUEST", "ISSUE")
 
 
 class DetailStatus(StrEnum):
-    """목록 뒤에 따로 조회하는 상세(커밋 변경 내용, PR 커밋 목록)의 상태."""
+    """목록 뒤에 따로 조회하는 상세(커밋 변경 내용, PR 커밋 목록)의 상태.
+
+    관계 조회(#118)에서는 뜻이 조금 넓다. 연동 계정 커밋이라도 병합 커밋과 커밋 조회가 허용되지
+    않은 요청의 커밋은 NOT_REQUESTED로 둔다. 선택 조회를 상세 조회 개수나 남은 호출·시간·총량
+    여유 때문에 건너뛴 커밋, 최근 PR 목록 밖에서 연결 PR로만 안 PR의 커밋 목록은 BEYOND_RANGE다.
+    병합 경계 비교와 파일 모드 확인(relations.MergeBoundary·ModeCheck)도 FETCHED·OVERSIZED·
+    NOT_REACHED를 같은 뜻으로 쓴다.
+    """
 
     FETCHED = "FETCHED"
-    # 연동 계정이 작성하지 않은 기록이라 상세를 조회하지 않았다.
+    # 연동 계정이 작성자로 기록되지 않은(PR은 연동 계정이 열지 않은) 기록이라 상세를 조회하지 않았다.
     NOT_REQUESTED = "NOT_REQUESTED"
     # 연동 계정 기록이지만 상세 조회 개수 범위 밖이라 조회하지 않았다.
     BEYOND_RANGE = "BEYOND_RANGE"
-    # 단일 응답 크기 상한을 넘어 버렸다.
+    # 단일 응답 크기 상한을 넘어 버렸다. PR 커밋 목록은 일부 쪽만 받았어도 모두 버린다.
     OVERSIZED = "OVERSIZED"
+    # PR 커밋 목록만 쓴다. 조회하는 동안 PR이 바뀌어 커밋 목록을 관측한 판본(PR 머리 커밋)과 맞출
+    # 수 없었다. 받은 목록은 버리고 다시 부르지 않는다.
+    REVISION_MISMATCH = "REVISION_MISMATCH"
     # 수집이 상한·오류로 멈춰 조회하지 못했다(확인 중단).
     NOT_REACHED = "NOT_REACHED"
 
@@ -39,6 +49,10 @@ class ChangedFile:
     previous_path: str | None
     # None이면 GitHub 응답에 변경 내용이 없다(큰 파일·이진 파일 등).
     patch: str | None
+    # git diff 머리글의 파일 모드 줄(`new file mode 100755` 등, git 순서). 커밋 상세(JSON)에는 모드가
+    # 없어 같은 변경을 비교할 커밋만 diff 형식으로 따로 받아 채운다. None이면 관측하지 않았고, 빈
+    # 값이면 모드 바꿈이 없음을 확인했다.
+    mode_lines: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -92,10 +106,14 @@ class PullRequestRecord:
     commits_status: DetailStatus
     # PR 커밋 목록 API가 돌려주는 최대 개수에 닿아 나머지를 확인하지 못했을 수 있다.
     commits_truncated: bool
+    # 관측한 시점의 기준 브랜치 커밋(`base.sha`). 없거나 형식이 다르면 None.
+    base_sha: str | None = None
 
     def __post_init__(self) -> None:
         require_number(self.number)
         normalize_sha(self.head_sha)
+        if self.base_sha is not None:
+            normalize_sha(self.base_sha)
         if self.merge_commit_sha is not None:
             normalize_sha(self.merge_commit_sha)
             if self.merged_at is None:

@@ -12,6 +12,8 @@ const { ApiError, ERROR_STATUS } = require('../dist/common/errors');
 // AppModule의 인증 설정(#87)이 요구하는 값. 테스트마다 무작위 키를 쓰고 개발 로그인은 끈다.
 process.env.AUTH_JWT_SECRET = randomBytes(32).toString('hex');
 process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = '60';
+// 공유 URL 기본값(http)은 development·test에서만 쓴다(#218).
+process.env.NODE_ENV = 'test';
 delete process.env.DEV_LOGIN_ENABLED;
 
 // 오류를 일부러 내는 검증용 경로는 테스트 안에만 두고 제품 src/에 등록하지 않는다.

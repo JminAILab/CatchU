@@ -76,6 +76,7 @@ function service(overrides = {}, clock = () => new Date()) {
     address: { ...PRODUCT_UNLOCK_POLICY.address, ...overrides.address },
     link: { ...PRODUCT_UNLOCK_POLICY.link, ...overrides.link },
     hash: { ...PRODUCT_UNLOCK_POLICY.hash, ...overrides.hash },
+    rate: { ...PRODUCT_UNLOCK_POLICY.rate, ...overrides.rate },
   };
   const controls = createUnlockControls(policy);
   const access = new LinkAccessService(app.get(DataSource), app.get(LINK_GRANT_KEY, { strict: false }), controls, clock);
@@ -170,7 +171,8 @@ test('해시 차례를 기다리는 동안 링크가 중단·만료되면 해시
     const held = holdHashSlots(controls, 2);
     const pending = attempt(access, link.token, 'wrong', '4:198.51.100.1');
     await waitFor(() => controls.hashes.stats.waiting === 1);
-    if (change === 'stop') await db.query('UPDATE share_link SET stopped_at = now() WHERE link_id = $1', [link.linkId]);
+    // 발급 시각은 Node 시계로 정한다. DB 시계가 조금 늦어도 중단 시각 ≥ 발급 시각 제약을 지키게 한다.
+    if (change === 'stop') await db.query('UPDATE share_link SET stopped_at = GREATEST(now(), issued_at) WHERE link_id = $1', [link.linkId]);
     else await db.query("UPDATE share_link SET issued_at = now() - interval '721 hours', expires_at = now() - interval '1 hour' WHERE link_id = $1", [link.linkId]);
     await held.release();
     assert.deepEqual(await pending, { code: 'LINK_UNAVAILABLE' }, change);
@@ -193,6 +195,35 @@ test('해시 차례를 기다리는 동안 차단되면 맞는 비밀번호도 �
   const result = await pending;
   assert.ok(result.limited >= 899, JSON.stringify(result));
   assert.notEqual(controls.addresses.blockedFor(key, new Date()), null, '차단이 남아 있다');
+  idle(controls);
+});
+
+test('같은 링크·주소의 요청 빈도 상한(#219)을 넘으면 맞는 비밀번호도 해시 없이 429이고, 다른 주소·다른 링크는 따로 세며 창이 지나면 다시 받는다', async (t) => {
+  let now = Date.now();
+  const { access, controls } = service({ rate: { maxRequests: 3 } }, () => new Date(now));
+  const link = await issue('빈도 링크');
+  const other = await issue('빈도 다른 링크');
+  const address = '4:198.51.100.20';
+  const original = passwordModule.verifyLinkPassword;
+  let hashed = 0;
+  passwordModule.verifyLinkPassword = async (...args) => { hashed += 1; return original(...args); };
+  t.after(() => { passwordModule.verifyLinkPassword = original; });
+
+  // 실패 기록은 성공하면 지워지므로, 맞는 비밀번호를 되풀이하는 것은 빈도 상한만 막는다.
+  for (let i = 0; i < 3; i++) {
+    assert.equal(await attempt(access, link.token, PASSWORD, address), 'ok');
+    now += 1000;
+  }
+  assert.equal(hashed, 3);
+  assert.deepEqual(await attempt(access, link.token, PASSWORD, address), { limited: 57 }, '첫 요청이 창(1분)을 벗어날 때까지');
+  assert.deepEqual(await attempt(access, link.token, 'wrong', address), { limited: 57 }, '틀린 비밀번호도 같고, 실패로 세지 않는다');
+  assert.equal(hashed, 3, '빈도 상한으로 거부한 요청은 해시를 계산하지 않는다');
+  assert.equal(await attempt(access, link.token, PASSWORD, '4:198.51.100.21'), 'ok', '다른 주소는 따로 센다');
+  assert.equal(await attempt(access, other.token, PASSWORD, address), 'ok', '같은 주소라도 다른 링크는 따로 센다');
+  assert.equal(controls.links.blockedFor(link.linkId, new Date(now)), null);
+
+  now += 57 * 1000;
+  assert.equal(await attempt(access, link.token, PASSWORD, address), 'ok', '창이 지나면 다시 받는다');
   idle(controls);
 });
 

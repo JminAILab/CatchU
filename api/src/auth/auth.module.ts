@@ -16,6 +16,6 @@ import { DevMemberService } from '../member-analysis/dev-member.service';
     DevMemberService,
     { provide: APP_GUARD, useClass: AccessTokenGuard },
   ],
-  exports: [DevMemberService],
+  exports: [DevMemberService, AccessTokenService],
 })
 export class AuthModule {}

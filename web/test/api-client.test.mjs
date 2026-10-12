@@ -18,7 +18,7 @@ function setup(options = {}) {
     if (next instanceof Error) throw next;
     return next;
   };
-  return { calls, tokens, client: createApiClient({ baseUrl, tokens, fetch: fakeFetch }) };
+  return { calls, tokens, client: createApiClient({ baseUrl, nodeEnv: options.nodeEnv, tokens, fetch: fakeFetch }) };
 }
 
 const authError = (code) => Response.json({ code, message: '안내' }, { status: 401 });
@@ -30,6 +30,48 @@ test('기준 주소는 http(s)만 받고 끝 슬래시를 떼며 /v1·쿼리·�
   for (const value of [undefined, '', 'localhost:3001', 'ftp://host', `${BASE}/v1`, `${BASE}/v1/`, `${BASE}?a=1`, `${BASE}#x`, 'http://u:p@host']) {
     assert.equal(normalizeApiBaseUrl(value), null, String(value));
   }
+});
+
+// development·test가 아니면(production 빌드·미지정·다른 값) 운영과 같이 다룬다.
+const STRICT_ENVS = ['production', undefined, 'staging'];
+const LOCAL_HTTP = ['http://localhost:3001', 'http://127.0.0.1:3001', 'http://[::1]:3001'];
+
+test('development·test가 아니면 로컬 주소(localhost·127.0.0.1·[::1])가 아닌 http 기준 주소는 설정 오류다', () => {
+  for (const nodeEnv of STRICT_ENVS) {
+    for (const value of ['http://api.example', 'http://api.example/catchu', 'http://10.0.0.5:3001', 'http://localhost.example:3001',
+      'http://api.localhost:3001', 'http://127.0.0.2:3001', 'HTTP://API.EXAMPLE']) {
+      assert.equal(normalizeApiBaseUrl(value, nodeEnv), null, `${nodeEnv} ${value}`);
+    }
+    for (const value of LOCAL_HTTP) assert.equal(normalizeApiBaseUrl(`${value}/`, nodeEnv), value, `${nodeEnv} ${value}`);
+    assert.equal(normalizeApiBaseUrl('https://api.example/catchu/', nodeEnv), 'https://api.example/catchu');
+  }
+  for (const nodeEnv of ['development', 'test']) {
+    assert.equal(normalizeApiBaseUrl('http://api.example/', nodeEnv), 'http://api.example');
+    assert.equal(normalizeApiBaseUrl('http://10.0.0.5:3001', nodeEnv), 'http://10.0.0.5:3001');
+  }
+});
+
+test('production 빌드는 로컬 주소가 아닌 http 기준 주소로 회원 토큰·비밀번호·로그인 요청을 보내지 않는다', async () => {
+  const { client, calls, tokens } = setup({ baseUrl: 'http://api.example', nodeEnv: 'production' });
+  tokens.set('access-token-1');
+  const failed = { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' };
+  assert.deepEqual(await client.member('/me'), failed);
+  assert.deepEqual(await client.recipient('/public/links/t/unlock', { method: 'POST', body: { password: 'x' } }), failed);
+  assert.deepEqual(await client.devLogin('member-a'), failed);
+  assert.equal(calls.length, 0, '요청 자체를 보내지 않는다');
+  assert.equal(tokens.get().token, 'access-token-1', '설정 오류로 토큰을 지우지 않는다');
+
+  for (const baseUrl of [...LOCAL_HTTP, 'https://api.example']) {
+    const local = setup({ baseUrl, nodeEnv: 'production' });
+    local.tokens.set('access-token-1');
+    assert.equal((await local.client.member('/me')).kind, 'success', baseUrl);
+    assert.equal(local.calls[0].url, `${baseUrl}/v1/me`);
+    assert.equal(local.calls[0].headers.Authorization, 'Bearer access-token-1');
+  }
+
+  const dev = setup({ baseUrl: 'http://api.example', nodeEnv: 'development' });
+  assert.equal((await dev.client.member('/me')).kind, 'success', '개발 서버는 지금처럼 http를 받는다');
+  assert.equal(dev.calls[0].url, 'http://api.example/v1/me');
 });
 
 test('주소 설정이 없으면 요청하지 않고 조회 실패로 돌려준다', async () => {
@@ -143,6 +185,7 @@ test('서버 저장 여부가 불명확한 결과(조회 실패·5xx)에서는 �
   assert.equal(isSettledResult({ kind: 'success', status: 204, data: null }), true);
   assert.equal(isSettledResult({ kind: 'api-error', status: 400, code: 'VALIDATION_FAILED', message: 'x' }), true);
   assert.equal(isSettledResult({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'x' }), false, '401은 앞선 요청의 저장 여부를 알려 주지 않는다');
+  assert.equal(isSettledResult({ kind: 'api-error', status: 429, code: 'RATE_LIMITED', message: 'x', retryAfterSeconds: 30 }), false, '429는 처리하지 않은 요청이라 앞선 요청의 결과를 알려 주지 않는다(#235)');
   assert.equal(isSettledResult({ kind: 'api-error', status: 503, code: 'INTERNAL_ERROR', message: 'x' }), false);
   assert.equal(isSettledResult({ kind: 'lookup-failed', status: 502, code: 'LOOKUP_FAILED' }), false);
   assert.equal(isSettledResult({ kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' }), false);

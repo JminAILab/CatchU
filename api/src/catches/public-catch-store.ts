@@ -32,8 +32,13 @@ function publicResponse(ownerId: string, source: OwnerCatchReadSource): PublicCa
   };
 }
 
-// 누락된 보호 관찰을 공개 가능/정상 0건으로 보정하지 않고 매핑 무결성 오류로 보낸다.
-const PUBLIC_CONDITIONS = "c.owner_id = $1 AND c.visibility = 'PUBLIC' AND p.applied_restriction IS DISTINCT FROM 'SOURCE_PRIVATE'";
+// 관측이 완전한 SOURCE_PRIVATE만 제외한다. SQL/JSON null 관측은 정상 0건 대신 매핑 무결성 오류로 보낸다.
+const PUBLIC_CONDITIONS = `c.owner_id = $1 AND c.visibility = 'PUBLIC' AND (
+  p.applied_restriction IS DISTINCT FROM 'SOURCE_PRIVATE'
+  OR p.confirmed_source_state IS NULL OR p.confirmed_source_state = 'null'::jsonb
+  OR p.observation_provenance IS NULL OR p.observation_provenance = 'null'::jsonb
+  OR p.observed_at IS NULL
+)`;
 
 /**
  * C가 링크 유효성·비밀번호를 검증한 뒤 링크 소유자 ID로 호출하는 내부 서비스다.

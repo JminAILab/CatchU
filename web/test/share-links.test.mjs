@@ -289,6 +289,234 @@ test("401은 처리되지 않은 요청이다. 처음 요청이면 새 키로, �
   assert.deepEqual(keys, ["key-1", "key-2", "key-2"]);
 });
 
+// ── 빈도 제한(429 RATE_LIMITED, #235) ───────────────────
+
+const rateLimited = (retryAfterSeconds) => ({
+  ...apiError(429, "RATE_LIMITED"), ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
+});
+
+/** 시계를 움직일 수 있는 setup. 빈도 제한의 남은 시간 판정에 쓴다. */
+function setupWithClock(listResponse = page([link("a")])) {
+  const fake = fakeMember();
+  if (listResponse) fake.queue.push(listResponse);
+  const clock = { now: Date.parse("2026-10-07T06:00:00Z") };
+  const store = createShareLinksStore(createShareLinkApi(fake.member), { keys: keyHolder(), now: () => clock.now });
+  const posts = () => fake.calls.filter((call) => call.request?.method === "POST");
+  return { ...fake, store, clock, posts, snap: () => store.getSnapshot() };
+}
+
+test("발급 API는 429의 남은 초(retryAfterSeconds)를 화면 상태까지 그대로 넘긴다", async () => {
+  const fake = fakeMember();
+  fake.queue.push(rateLimited(30));
+  const result = await createShareLinkApi(fake.member).create({ title: "A사 지원" }, "key-1");
+  assert.equal(result.status, 429);
+  assert.equal(result.code, "RATE_LIMITED");
+  assert.equal(result.retryAfterSeconds, 30);
+});
+
+test("429는 확정으로 보지 않는다. 키·본문을 유지하고 남은 시간 동안은 다시 보내지 않으며, 지난 뒤 누르면 같은 키·본문으로 보낸다", async () => {
+  const { store, queue, clock, posts, snap } = setupWithClock();
+  await store.load();
+  store.openForm();
+  store.setTitle(" A사 지원 ");
+  store.setUsePassword(true);
+  store.setPassword(" pass 1234 ");
+  queue.push(rateLimited(30));
+  await store.submit();
+  assert.equal(snap().form.phase, "limited");
+  assert.equal(snap().form.uncertain, false);
+  assert.equal(snap().form.retryAt, clock.now + 30_000);
+  assert.match(snap().form.message.text, /요청이 많아 지금은 발행하지 못했습니다/);
+  assert.doesNotMatch(snap().form.message.text, /비밀번호|pass/, "안내에 입력값을 담지 않는다");
+  store.setTitle("다른 제목");
+  assert.equal(snap().form.title, " A사 지원 ", "대기 중에는 본문을 바꾸지 않는다");
+
+  // 남은 시간 동안은 [다시 발행]을 강제로 눌러도 보내지 않는다. 자동으로 다시 보내지도 않는다.
+  assert.equal(store.canResend(), false);
+  assert.equal(store.retryWaitSeconds(), 30);
+  await store.resend();
+  clock.now += 29_001;
+  assert.equal(store.retryWaitSeconds(), 1, "남은 초는 올림한다");
+  await store.resend();
+  assert.equal(posts().length, 1, "대기 중 재전송 없음");
+
+  clock.now += 999;
+  assert.equal(store.canResend(), true);
+  assert.equal(store.retryWaitSeconds(), 0);
+  queue.push(ok(link("n", { title: "A사 지원", passwordRequired: true }), 201));
+  await store.resend();
+  assert.deepEqual(posts().map((call) => call.request.idempotencyKey), ["key-1", "key-1"], "새 키를 만들지 않는다");
+  for (const call of posts()) assert.deepEqual(call.request.body, { title: "A사 지원", password: " pass 1234 " }, "같은 본문, 비밀번호는 그대로");
+  assert.equal(snap().form.phase, "issued");
+});
+
+test("다시 보낸 요청이 또 429면 새 남은 시간으로 다시 기다리고, 기존 발급 결과(200)를 받으면 그 링크로 확정한다", async () => {
+  const { store, queue, clock, posts, snap } = setupWithClock();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  queue.push(lookupFailed);
+  await store.submit();
+  assert.equal(snap().form.phase, "unknown");
+  queue.push(rateLimited(10));
+  await store.resend();
+  assert.equal(snap().form.phase, "limited");
+  assert.equal(snap().form.uncertain, true, "앞선 시도의 결과를 아직 모른다");
+  assert.match(snap().form.message.text, /앞선 요청의 발행 여부는 아직 모릅니다/);
+  assert.deepEqual(snap().pendingIssue, { title: "A사 지원" }, "429로 불명 요청을 놓지 않는다");
+
+  clock.now += 10_000;
+  queue.push(rateLimited(20));
+  await store.resend();
+  assert.equal(snap().form.retryAt, clock.now + 20_000, "새 Retry-After로 다시 기다린다");
+  await store.resend();
+  assert.equal(posts().length, 3);
+
+  clock.now += 20_000;
+  const earlier = link("n", { title: "A사 지원" });
+  queue.push(ok(earlier, 200));
+  await store.resend();
+  assert.deepEqual(new Set(posts().map((call) => call.request.idempotencyKey)), new Set(["key-1"]));
+  assert.equal(posts().length, 4, "중복 발급 요청을 새 키로 만들지 않는다");
+  assert.equal(snap().form.phase, "issued");
+  assert.equal(snap().form.issued.linkId, "n", "같은 키의 기존 결과로 확정한다");
+  assert.equal(snap().pendingIssue, null);
+});
+
+test("Retry-After가 없거나 형식이 맞지 않으면 남은 시간을 추정하지 않고, 사용자가 누를 때 같은 키·본문으로 보낸다", async () => {
+  const { store, queue, posts, snap } = setupWithClock();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  queue.push(rateLimited(undefined));
+  await store.submit();
+  assert.equal(snap().form.phase, "limited");
+  assert.equal(snap().form.retryAt, null);
+  assert.equal(store.retryWaitSeconds(), 0);
+  assert.equal(store.canResend(), true);
+  assert.equal(posts().length, 1, "자동으로 다시 보내지 않는다");
+  queue.push(ok(link("n", { title: "A사 지원" }), 201));
+  await store.resend();
+  assert.deepEqual(posts().map((call) => call.request.idempotencyKey), ["key-1", "key-1"]);
+});
+
+test("결과를 모르는 요청은 빈도 제한 대기 중 닫았다 열어도 붙잡고, 대기를 건너뛰지 않는다", async () => {
+  // 결과를 모르는 시도가 있었던 경우: 닫아도 붙잡고, 다시 열면 남은 시간이 그대로다.
+  const held = setupWithClock();
+  await held.store.load();
+  held.store.openForm();
+  held.store.setTitle("A사 지원");
+  held.queue.push(lookupFailed, rateLimited(30));
+  await held.store.submit();
+  await held.store.resend();
+  held.queue.push(page([link("a")]));
+  held.store.closeForm();
+  await setImmediate();
+  assert.deepEqual(held.snap().pendingIssue, { title: "A사 지원" });
+  held.clock.now += 5_000;
+  held.store.openForm();
+  assert.equal(held.snap().form.phase, "limited");
+  assert.equal(held.store.retryWaitSeconds(), 25);
+  await held.store.resend();
+  assert.equal(held.posts().length, 2, "다시 열어도 대기 중에는 보내지 않는다");
+  held.queue.push(page([link("a")]));
+  held.store.closeForm();
+  await setImmediate();
+  held.clock.now += 25_000;
+  held.store.openForm();
+  assert.equal(held.snap().form.phase, "unknown", "대기가 끝나면 불명 상태로 열어 같은 키로 결과를 확인한다");
+  held.queue.push(ok(link("n", { title: "A사 지원" }), 200));
+  await held.store.resend();
+  assert.deepEqual(held.posts().map((call) => call.request.idempotencyKey), ["key-1", "key-1", "key-1"]);
+});
+
+test("처음 요청이 429면 [돌아가기]로 요청은 놓지만, 다시 열어 새로 작성해도 대기 시간 전에는 보내지 않는다", async () => {
+  // 경로 ①: 처음 요청 429 → 돌아가기 → 다시 열어 작성. 처리된 요청이 없으므로 요청(키·본문)은 놓고, 대기는 이어진다.
+  const { store, queue, clock, posts, snap } = setupWithClock();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  queue.push(rateLimited(30));
+  await store.submit();
+  store.askDiscard();
+  assert.equal(snap().form.discardAsked, false, "결과를 모르는 요청이 없으면 ‘이미 발급됐을 수 있음’ 안내를 띄우지 않는다");
+  store.closeForm();
+  assert.equal(snap().pendingIssue, null);
+
+  clock.now += 5_000;
+  store.openForm();
+  assert.equal(snap().form.phase, "editing");
+  assert.equal(snap().form.retryAt, clock.now + 25_000, "닫았다 열어도 대기 시각은 그대로다");
+  assert.equal(store.retryWaitSeconds(), 25);
+  assert.equal(store.canSubmit(), false);
+  store.setTitle("B사 지원");
+  await store.submit();
+  assert.equal(posts().length, 1, "대기 시간 전에는 새 요청도 보내지 않는다");
+  assert.match(snap().form.message.text, /잠시 뒤에 발행할 수 있습니다/);
+  assert.equal(snap().form.title, "B사 지원", "입력은 그대로 둔다");
+
+  clock.now += 25_000;
+  assert.equal(posts().length, 1, "대기 시간이 지나도 자동으로 보내지 않는다");
+  assert.equal(store.canSubmit(), true);
+  queue.push(ok(link("n", { title: "B사 지원" }), 201));
+  await store.submit();
+  assert.deepEqual(posts().map((call) => call.request.idempotencyKey), ["key-1", "key-2"], "새로 작성한 요청은 새 키로 보낸다");
+  assert.deepEqual(posts()[1].request.body, { title: "B사 지원" });
+  assert.equal(snap().form.phase, "issued");
+});
+
+test("빈도 제한 뒤 401은 처리되지 않은 요청이다. 결과를 모르는 시도가 있었으면 불명 상태와 키를 유지한다", async () => {
+  const { store, queue, clock, posts, snap } = setupWithClock();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  queue.push(rateLimited(1), apiError(401, "AUTH_INVALID"));
+  await store.submit();
+  clock.now += 1_000;
+  await store.resend();
+  assert.equal(snap().form.phase, "editing", "처음 요청부터 처리되지 않았으면 새 요청으로 작성한다");
+
+  queue.push(lookupFailed, rateLimited(1), apiError(401, "AUTH_INVALID"));
+  await store.submit();
+  await store.resend();
+  clock.now += 1_000;
+  await store.resend();
+  assert.equal(snap().form.phase, "unknown");
+  assert.deepEqual(posts().map((call) => call.request.idempotencyKey), ["key-1", "key-1", "key-2", "key-2", "key-2"]);
+});
+
+test("결과를 모르는 요청의 빈도 제한 중 [새로 작성]은 안내를 거치고, [새로 작성 계속] 뒤에도 대기 시간 전에는 보내지 않으며 이후 새 키로 보낸다", async () => {
+  // 경로 ②: 응답 불명 → 429 → [새로 작성] → [새로 작성 계속].
+  const { store, queue, clock, posts, snap } = setupWithClock();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  queue.push(lookupFailed, rateLimited(30));
+  await store.submit();
+  await store.resend();
+  store.askDiscard();
+  assert.match(snap().form.message.text, /이전 요청은 이미 발급됐을 수 있습니다/);
+  store.cancelDiscard();
+  assert.equal(snap().form.phase, "limited");
+  assert.match(snap().form.message.text, /요청이 많아/);
+  store.askDiscard();
+  store.discardPending();
+  assert.equal(snap().form.phase, "editing");
+  assert.equal(snap().form.retryAt, clock.now + 30_000, "이전 요청은 놓아도 대기는 이어진다");
+  assert.equal(snap().pendingIssue, null);
+  assert.equal(store.canSubmit(), false);
+  store.setTitle("B사 지원");
+  await store.submit();
+  assert.equal(posts().length, 2, "대기 시간 전에는 새 요청도, 이전 요청도 보내지 않는다");
+
+  clock.now += 30_000;
+  assert.equal(posts().length, 2, "대기 시간이 지나도 자동으로 보내지 않는다");
+  queue.push(ok(link("n", { title: "B사 지원" }), 201));
+  await store.submit();
+  assert.deepEqual(posts().map((call) => call.request.idempotencyKey), ["key-1", "key-1", "key-2"], "명시적으로 새로 작성한 요청은 새 키로 보낸다");
+  assert.deepEqual(posts()[2].request.body, { title: "B사 지원" });
+});
+
 test("불명 상태에서 [목록에서 확인] 뒤 목록 조회까지 실패해도 키·본문을 잃지 않고, 다시 열면 같은 키·본문으로만 보낸다", async () => {
   const { store, queue, calls, snap } = setup();
   await store.load();

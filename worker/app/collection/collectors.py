@@ -1,9 +1,11 @@
 """허용된 자료 종류별 수집 단계.
 
 모든 호출은 게이트웨이를 거친다. 목록은 조회 개수 범위까지만 보고, 범위 밖이 남았거나
-단일 응답 크기 상한으로 버린 부분은 한계(coverage limit)로 남긴다. 상세는 연동 계정이 작성한
-최근 기록을 상세 조회 개수만큼만 조회한다. 받은 쪽은 곧바로 `CollectedData`에 넣으므로
-수집이 멈춰도(CollectionStopped) 그때까지 모은 것은 남는다.
+단일 응답 크기 상한으로 버린 부분은 한계(coverage limit)로 남긴다. 관계 조회를 요청하지 않은
+기본 경로(#117)에서는 연동 계정이 작성자로 기록된(PR은 연동 계정이 연) 최근 기록의 상세를 상세
+조회 개수만큼만 조회한다. 관계 조회를 요청하면 이 상세 단계 대신 relations.py가 목록 뒤의 조회를
+한다. 받은 쪽은 곧바로 `CollectedData`에 넣으므로 수집이 멈춰도(CollectionStopped) 그때까지 모은
+것은 남는다.
 """
 
 from collections.abc import Callable, Iterator
@@ -68,7 +70,7 @@ def _malformed() -> CollectionStopped:
 
 
 @contextmanager
-def _reading() -> Iterator[None]:
+def reading() -> Iterator[None]:
     """응답 모양이 어긋나면 수집 실패로 멈춘다."""
     try:
         yield
@@ -100,7 +102,7 @@ def list_pages(
         if isinstance(fetched, Oversized):
             return ListingEnd(more_beyond_range=False, oversized=True)
         room = max_items - seen
-        with _reading():
+        with reading():
             batch = normalize.as_list(fetched.data)
             take(batch[:room])
         seen += min(len(batch), room)
@@ -111,22 +113,31 @@ def list_pages(
         page += 1
 
 
-def verify_repository(gateway: GitHubGateway, paths: RepositoryPaths) -> None:
-    """대상 저장소에 접근되고, 응답이 요청한 공개 저장소인지 확인한다."""
+def verify_repository(
+    gateway: GitHubGateway,
+    paths: RepositoryPaths,
+    *,
+    read_default_branch: bool = False,
+) -> str | None:
+    """대상 저장소에 접근되고, 응답이 요청한 공개 저장소인지 확인한다.
+
+    read_default_branch면 기존 확인을 모두 통과한 뒤 기본 브랜치 이름을 읽어 돌려준다(관계
+    조회만 쓴다). 아니면 그 값을 읽지 않아 그 값 때문에 멈추는 일이 없다.
+    """
     fetched = gateway.get(paths.metadata())
     if isinstance(fetched, Oversized):
         raise stop(
             FailureCode.COLLECTION_FETCH_FAILED,
             "저장소 확인 응답이 크기 상한을 넘어 수집을 멈췄다",
         )
-    with _reading():
+    with reading():
         full_name = normalize.repository_full_name(fetched.data)
     if not paths.repository.same_as(full_name):
         raise stop(
             FailureCode.SCOPE_INCONSISTENT,
             "GitHub가 요청한 저장소가 아닌 저장소를 돌려줘 수집을 멈췄다",
         )
-    with _reading():
+    with reading():
         public = normalize.repository_is_public(fetched.data)
     if not public:
         # 수집 대상은 공개 저장소뿐이다. 토큰으로 접근된다고 비공개 자료를 모으지 않는다.
@@ -135,6 +146,11 @@ def verify_repository(gateway: GitHubGateway, paths: RepositoryPaths) -> None:
             FailureCode.REPOSITORY_UNREACHABLE,
             "공개 저장소가 아니어서 자료를 조회하지 않고 수집을 멈췄다",
         )
+    if not read_default_branch:
+        return None
+    with reading():
+        default_branch = normalize.repository_default_branch(fetched.data)
+    return default_branch
 
 
 class Collector(Protocol):
@@ -149,14 +165,19 @@ class Collector(Protocol):
 
 
 class _DetailRange:
-    """연동 계정 기록 가운데 상세를 조회할 최근 기록 수를 센다(목록은 최근 것부터 온다)."""
+    """연동 계정 기록 가운데 상세를 조회할 최근 기록 수를 센다(목록은 최근 것부터 온다).
 
-    def __init__(self, limit: int) -> None:
+    mark_details가 거짓이면 모든 기록을 NOT_REQUESTED로 두고 범위를 세지 않는다. 그때는
+    관계 조회(`relations.py`)가 어떤 상세를 조회할지 정한다.
+    """
+
+    def __init__(self, limit: int, *, mark_details: bool = True) -> None:
         self._left = limit
+        self._mark = mark_details
         self.exceeded = False
 
     def status_for(self, own: bool) -> DetailStatus:
-        if not own:
+        if not own or not self._mark:
             return DetailStatus.NOT_REQUESTED
         if self._left == 0:
             self.exceeded = True
@@ -167,19 +188,27 @@ class _DetailRange:
 
 
 class CommitCollector:
-    """기본 브랜치의 최근 커밋과, 연동 계정이 작성한 최근 커밋의 변경 내용."""
+    """기본 브랜치의 최근 커밋과, 연동 계정이 작성자로 기록된 최근 커밋의 변경 내용."""
 
     resource_type: ResourceType = "COMMIT"
 
     def __init__(
-        self, paths: RepositoryPaths, account: GitHubAccount, limits: CollectionLimits
+        self,
+        paths: RepositoryPaths,
+        account: GitHubAccount,
+        limits: CollectionLimits,
+        *,
+        mark_details: bool = True,
     ) -> None:
         self._paths = paths
         self._account = account
         self._limits = limits
+        self._mark_details = mark_details
 
     def collect_list(self, gateway: GitHubGateway, data: CollectedData) -> None:
-        details = _DetailRange(self._limits.max_commit_details)
+        details = _DetailRange(
+            self._limits.max_commit_details, mark_details=self._mark_details
+        )
 
         def take(items: list[object]) -> None:
             for item in items:
@@ -208,8 +237,8 @@ class CommitCollector:
         if details.exceeded:
             data.limit(
                 "COMMIT",
-                f"연동 계정이 작성한 최근 커밋 {self._limits.max_commit_details}건 밖은 "
-                "변경 내용을 조회하지 않았다",
+                f"연동 계정이 작성자로 기록된 최근 커밋 {self._limits.max_commit_details}건 "
+                "밖은 변경 내용을 조회하지 않았다",
             )
 
     def collect_details(self, gateway: GitHubGateway, data: CollectedData) -> None:
@@ -222,7 +251,7 @@ class CommitCollector:
                     record, changes_status=DetailStatus.OVERSIZED
                 )
                 continue
-            with _reading():
+            with reading():
                 changes = normalize.commit_changes(
                     fetched.data, record.sha, files_truncated=fetched.has_next_page
                 )
@@ -237,14 +266,23 @@ class PullRequestCollector:
     resource_type: ResourceType = "PULL_REQUEST"
 
     def __init__(
-        self, paths: RepositoryPaths, account: GitHubAccount, limits: CollectionLimits
+        self,
+        paths: RepositoryPaths,
+        account: GitHubAccount,
+        limits: CollectionLimits,
+        *,
+        mark_details: bool = True,
     ) -> None:
         self._paths = paths
         self._account = account
         self._limits = limits
+        self._mark_details = mark_details
 
     def collect_list(self, gateway: GitHubGateway, data: CollectedData) -> None:
-        details = _DetailRange(self._limits.max_pull_request_commit_lists)
+        details = _DetailRange(
+            self._limits.max_pull_request_commit_lists,
+            mark_details=self._mark_details,
+        )
 
         def take(items: list[object]) -> None:
             for item in items:

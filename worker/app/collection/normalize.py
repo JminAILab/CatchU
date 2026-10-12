@@ -1,10 +1,13 @@
 """GitHub REST 응답(JSON)을 정규화된 기록으로 바꾼다.
 
 필요한 필드만 읽고 모양을 검사한다. 응답의 `url`·`html_url` 같은 주소는 읽지 않는다.
-본문·메시지의 글자는 해석하지 않고 그대로 자료로 옮긴다.
+본문·메시지의 글자는 해석하지 않고 그대로 자료로 옮긴다. diff 형식 커밋 응답은 파일 머리글의
+경로와 모드 줄만 읽는다.
 """
 
+import re
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, cast
 
@@ -115,6 +118,14 @@ def repository_full_name(data: object) -> str:
     return _text(_object(data), "full_name")
 
 
+def repository_default_branch(data: object) -> str:
+    """저장소 응답의 기본 브랜치 이름. 비었거나 문자열이 아니면 모양 오류다."""
+    name = _text(_object(data), "default_branch")
+    if not name:
+        raise MalformedResponse("default_branch: 비었다")
+    return name
+
+
 def repository_is_public(data: object) -> bool:
     """저장소 응답이 공개 저장소라고 하는가.
 
@@ -177,6 +188,116 @@ def commit_changes(
     )
 
 
+# diff 형식 커밋 응답(`application/vnd.github.diff`)의 파일 머리글.
+_DIFF_GIT = b"diff --git "
+_MODE_LINE = re.compile(
+    rb"(?:old mode|new mode|new file mode|deleted file mode) [0-7]{6}"
+)
+_MODE_PREFIXES = (b"old mode ", b"new mode ", b"new file mode ", b"deleted file mode ")
+# git의 C 문자열 따옴표 규칙에서 `\` 뒤 글자가 나타내는 바이트.
+_UNESCAPED = {
+    ord("a"): 0x07,
+    ord("b"): 0x08,
+    ord("t"): 0x09,
+    ord("n"): 0x0A,
+    ord("v"): 0x0B,
+    ord("f"): 0x0C,
+    ord("r"): 0x0D,
+    ord('"'): 0x22,
+    ord("\\"): 0x5C,
+}
+_OCTAL = frozenset(b"01234567")
+
+
+def diff_file_modes(body: bytes) -> dict[str, tuple[str, ...]] | None:
+    """diff 형식 커밋 응답에서 파일마다 모드 줄(git 순서). 맞춰 읽을 수 없으면 None.
+
+    `diff --git` 줄부터 그 파일의 `---` 줄(없으면 다음 `diff --git` 줄) 전까지를 머리글로 보고,
+    그 안의 `old mode`·`new mode`·`new file mode`·`deleted file mode` 줄만 남긴다. `index` 줄은
+    건너뛴다. hunk 줄은 읽지 않는다. 경로는 git 따옴표 규칙(`"...\\t..."`, `\\ooo`)을 풀어
+    UTF-8로 읽는다. 다음이면 None이다: 첫 줄이 `diff --git`이 아니다, 두 경로가 다르다(이름 바꿈
+    등), 경로를 읽을 수 없다, 같은 경로가 두 번 나온다, 머리글에 그 밖의 줄(유사도·이름 바꿈·
+    이진 표시 등)이나 모양이 다른 모드 줄이 있다. 셸이나 git을 부르지 않는다.
+    """
+    lines = body.split(b"\n")
+    if lines and lines[-1] == b"":
+        lines.pop()
+    modes: dict[str, list[str]] = {}
+    current: list[str] | None = None
+    in_header = False
+    for line in lines:
+        if line.startswith(_DIFF_GIT):
+            path = _diff_path(line[len(_DIFF_GIT) :])
+            if path is None or path in modes:
+                return None
+            current = modes[path] = []
+            in_header = True
+            continue
+        if current is None:
+            return None
+        if not in_header:
+            continue
+        if line.startswith(b"--- "):
+            in_header = False
+        elif line.startswith(_MODE_PREFIXES):
+            if _MODE_LINE.fullmatch(line) is None:
+                return None
+            current.append(line.decode("ascii"))
+        elif not line.startswith(b"index "):
+            return None
+    return {path: tuple(found) for path, found in modes.items()}
+
+
+def _diff_path(names: bytes) -> str | None:
+    """`diff --git` 줄의 두 이름(`a/경로 b/경로`)이 같은 경로를 가리킬 때 그 경로."""
+    if names.startswith(b'"'):
+        first = _unquoted(names)
+        if first is None or not first[1].startswith(b' "'):
+            return None
+        second = _unquoted(first[1][1:])
+        if second is None or second[1]:
+            return None
+        old, new = first[0], second[0]
+    else:
+        # 따옴표가 없으면 경로에 공백이 있을 수 있으므로 같은 경로라고 보고 길이로 가른다.
+        half = (len(names) - 1) // 2
+        if len(names) % 2 == 0 or names[half : half + 1] != b" ":
+            return None
+        old, new = names[:half], names[half + 1 :]
+    if not (old.startswith(b"a/") and new.startswith(b"b/")) or old[2:] != new[2:]:
+        return None
+    try:
+        path = old[2:].decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    return path or None
+
+
+def _unquoted(text: bytes) -> tuple[bytes, bytes] | None:
+    """`"`로 시작하는 git 따옴표 이름의 (푼 바이트, 닫는 따옴표 뒤). 모양이 다르면 None."""
+    raw = bytearray()
+    index = 1
+    while index < len(text):
+        byte = text[index]
+        if byte == 0x22:
+            return bytes(raw), text[index + 1 :]
+        if byte != 0x5C:
+            raw.append(byte)
+            index += 1
+            continue
+        escaped = text[index + 1 : index + 2]
+        if escaped and escaped[0] in _UNESCAPED:
+            raw.append(_UNESCAPED[escaped[0]])
+            index += 2
+            continue
+        digits = text[index + 1 : index + 4]
+        if len(digits) != 3 or not set(digits) <= _OCTAL or digits[0] > ord("3"):
+            return None
+        raw.append(int(digits, 8))
+        index += 4
+    return None
+
+
 def pull_request(
     item: object, repository: RepositoryCoordinates, status: DetailStatus
 ) -> PullRequestRecord:
@@ -187,6 +308,11 @@ def pull_request(
     head_repository = head.get("repo")
     merged_at = _optional_time(data, "merged_at")
     merge_commit = data.get("merge_commit_sha")
+    try:
+        # 비교 API의 기준으로만 쓰는 선택 값이다. 없다고 PR 기록을 버리지 않는다.
+        base_sha: str | None = normalize_sha(base.get("sha"))
+    except ValueError:
+        base_sha = None
     return PullRequestRecord(
         number=_number(data.get("number")),
         title=_text(data, "title"),
@@ -208,6 +334,92 @@ def pull_request(
         commits=None,
         commits_status=status,
         commits_truncated=False,
+        base_sha=base_sha,
+    )
+
+
+@dataclass(frozen=True)
+class AssociatedPullRequests:
+    """연결 PR API 응답 한 쪽을 기준 저장소로 가른 결과."""
+
+    # 이 저장소를 기준으로 연 PR(응답 순서).
+    records: tuple[PullRequestRecord, ...]
+    # 기준 저장소가 다른 저장소로 확인돼 버린 PR 수.
+    foreign: int
+    # 기준 저장소를 알 수 없어(`base.repo`가 없거나 null) 버린 PR 수. 이 저장소 PR일 수도 있다.
+    unknown_base: int
+
+
+def associated_pull_requests(
+    items: Iterable[object], repository: RepositoryCoordinates
+) -> AssociatedPullRequests:
+    """연결 PR API 응답에서 이 저장소를 기준으로 연 PR만 남긴다."""
+    records: list[PullRequestRecord] = []
+    foreign = 0
+    unknown_base = 0
+    for item in items:
+        base_repository = _object(_object(item).get("base")).get("repo")
+        if base_repository is None:
+            unknown_base += 1
+            continue
+        if not repository.same_as(repository_full_name(base_repository)):
+            foreign += 1
+            continue
+        records.append(pull_request(item, repository, DetailStatus.NOT_REQUESTED))
+    return AssociatedPullRequests(tuple(records), foreign, unknown_base)
+
+
+@dataclass(frozen=True)
+class PullRequestDetail:
+    """PR API(PR 하나) 응답에서 PR 커밋 목록 250건 밖을 확인할 때 쓰는 값."""
+
+    # PR의 전체 커밋 수(`commits`).
+    total_commits: int
+    # 이 응답을 받은 때의 PR 머리 커밋(`head.sha`). 이 PR을 관측한 판본과 대조한다.
+    head_sha: str
+    # 이 응답의 기준 브랜치 커밋(`base.sha`). 없거나 형식이 다르면 None.
+    base_sha: str | None
+
+
+def pull_request_detail(data: object, number: int) -> PullRequestDetail:
+    """PR API 응답의 전체 커밋 수와 머리·기준 커밋. 요청한 PR이 아니면 모양 오류다."""
+    pull = _object(data)
+    if _number(pull.get("number")) != number:
+        raise MalformedResponse("요청한 PR이 아니다")
+    try:
+        base_sha: str | None = normalize_sha(_object(pull.get("base")).get("sha"))
+    except (ValueError, MalformedResponse):
+        base_sha = None
+    return PullRequestDetail(
+        total_commits=_count(pull, "commits"),
+        head_sha=_sha(_object(pull.get("head")).get("sha")),
+        base_sha=base_sha,
+    )
+
+
+@dataclass(frozen=True)
+class Comparison:
+    """비교 API(base...head) 응답 한 쪽. commits는 커밋 목록 항목 모양 그대로다."""
+
+    total_commits: int
+    commits: tuple[object, ...]
+    # 비교의 시작 커밋(`merge_base_commit`). 경계를 남기는 선택 값이라 없거나 형식이 다르면 None.
+    merge_base: str | None = None
+
+
+def comparison(data: object) -> Comparison:
+    compared = _object(data)
+    base = compared.get("merge_base_commit")
+    try:
+        merge_base: str | None = (
+            normalize_sha(base.get("sha")) if isinstance(base, dict) else None
+        )
+    except ValueError:
+        merge_base = None
+    return Comparison(
+        total_commits=_count(compared, "total_commits"),
+        commits=tuple(as_list(compared.get("commits"))),
+        merge_base=merge_base,
     )
 
 

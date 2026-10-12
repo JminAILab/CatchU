@@ -169,7 +169,7 @@ components:
         - "sourceMode"
       properties:
         catchId: {"type":"string","minLength":1}
-        title: {"type":"string","minLength":1}
+        title: {"type":"string","minLength":1,"nullable":true}
         repositoryId: {"type":"string","minLength":1}
         sourceRequestId: {"type":"string","minLength":1}
         sourceResultId: {"type":"string","minLength":1}
@@ -194,7 +194,7 @@ components:
       required: ["catchId","title","workFacts","subjectContribution","evidence","draft"]
       properties:
         catchId: {"type":"string","minLength":1}
-        title: {"type":"string","minLength":1}
+        title: {"type":"string","minLength":1,"nullable":true}
         workFacts: {"type":"array","items":{"type":"string"}}
         subjectContribution: {"type":"string"}
         evidence: {"type":"array","items":{"$ref":"#/components/schemas/PublicEvidence"}}

@@ -68,7 +68,7 @@ export class AnalysisReceiver {
           return { receipt: { ...ids, schemaVersion: '1', messageId: randomUUID(), disposition: 'DUPLICATE', code: 'ALREADY_RECEIVED' } };
         }
         // 종결 기록 없이 이미 반영 단계인 모순된 저장 상태를 덮어쓰지 않는다.
-        if (TERMINAL.has(state.processing) || state.application !== 'NOT_READY') {
+        if (state.lifecycle === 'CLOSED' || TERMINAL.has(state.processing) || state.application !== 'NOT_READY') {
           return this.reject(ids, 'PAYLOAD_CONFLICT');
         }
         const metadata = {
@@ -77,6 +77,7 @@ export class AnalysisReceiver {
         };
         await tx.saveResult(metadata, {
           processing: result.outcome, application: 'PENDING', eligibleCandidateCount: result.candidates.length,
+          failures: result.failures,
         });
         return {
           receipt: { ...ids, schemaVersion: '1', messageId: randomUUID(), disposition: 'ACCEPTED', code: 'OK' },
@@ -98,7 +99,7 @@ export class AnalysisReceiver {
         const state = tx.snapshot;
         if (!state || state.context.requestId !== event.requestId) return this.rejectProgress('CONTEXT_MISMATCH');
         if (state.context.attemptId !== event.attemptId) return this.rejectProgress('STALE_ATTEMPT');
-        if (TERMINAL.has(state.processing)) return 'TERMINAL_UNCHANGED';
+        if (state.lifecycle === 'CLOSED' || TERMINAL.has(state.processing)) return 'TERMINAL_UNCHANGED';
         // 확정 전이는 QUEUED → RUNNING/UNCERTAIN뿐이다. 이후 관측은 상태를 추측하지 않는다.
         const next = state.processing === 'QUEUED' && event.state !== 'RECEIVED' ? event.state : state.processing;
         await tx.saveObservation(event, next);

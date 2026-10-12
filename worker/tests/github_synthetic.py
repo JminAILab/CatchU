@@ -6,7 +6,7 @@
 """
 
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -76,6 +76,14 @@ class FakeClock:
 # 응답: 고정 응답, 전송 예외, 또는 호출 때 만드는 함수.
 Reply = HttpResponse | Exception | Callable[[], HttpResponse]
 
+# diff 형식 조회의 Accept 값(게이트웨이와 같은 값을 따로 적는다).
+DIFF_ACCEPT = "application/vnd.github.diff"
+
+
+def diff_route(path: str) -> str:
+    """diff 형식 조회의 응답 열쇠. 실제 경로에는 공백이 없어 JSON 조회 경로와 겹치지 않는다."""
+    return f"diff {path}"
+
 
 @dataclass
 class Call:
@@ -90,6 +98,7 @@ class Call:
 class FakeTransport:
     """경로별로 정한 응답을 돌려주고 호출을 기록한다. 정하지 않은 경로는 시험 실패다.
 
+    Accept가 diff 형식이면 `diff_route(경로)` 열쇠의 응답을 찾고, paths에도 그 열쇠로 적는다.
     시계를 주면 호출마다 seconds_per_call만큼 흐른다. 실제 전송처럼 받은 대기 시간을 넘기지
     않으며, 넘을 호출은 대기 시간만큼 흐른 뒤 TransportTimeout으로 끝난다.
     """
@@ -119,9 +128,10 @@ class FakeTransport:
                 self.clock.advance(read_timeout)
                 raise TransportTimeout("합성: 응답 대기 시간 초과")
             self.clock.advance(self.seconds_per_call)
-        if path not in self.routes:
-            raise AssertionError(f"계획에 없는 호출: {path}")
-        reply = self.routes[path]
+        key = diff_route(path) if headers.get("Accept") == DIFF_ACCEPT else path
+        if key not in self.routes:
+            raise AssertionError(f"계획에 없는 호출: {key}")
+        reply = self.routes[key]
         if isinstance(reply, Exception):
             raise reply
         if callable(reply):
@@ -133,7 +143,13 @@ class FakeTransport:
 
     @property
     def paths(self) -> list[str]:
-        return [call.path for call in self.calls]
+        """호출한 경로. diff 형식 조회는 diff_route(경로)로 적는다."""
+        return [
+            diff_route(call.path)
+            if call.headers.get("Accept") == DIFF_ACCEPT
+            else call.path
+            for call in self.calls
+        ]
 
 
 def respond(
@@ -234,23 +250,42 @@ def commit_json(
 def commit_detail_json(
     number: int, author: GitHubAccount | None, files: list[dict[str, Any]]
 ) -> dict[str, Any]:
+    return with_files(commit_json(number, author), files)
+
+
+def with_files(item: dict[str, Any], files: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """커밋 목록 항목에 파일과 합계를 더한 커밋 상세 응답."""
     return {
-        **commit_json(number, author),
+        **item,
         "stats": {
             "additions": sum(f["additions"] for f in files),
             "deletions": sum(f["deletions"] for f in files),
             "total": sum(f["additions"] + f["deletions"] for f in files),
         },
-        "files": files,
+        "files": list(files),
     }
 
 
+def line_counts(patch: str | None) -> tuple[int, int]:
+    """patch의 (더한 줄 수, 뺀 줄 수). hunk 머리글(`@@`)과 `\\ `로 시작하는 표시 줄은 세지 않는다."""
+    lines = (patch or "").split("\n")
+    return (
+        sum(1 for line in lines if line.startswith("+")),
+        sum(1 for line in lines if line.startswith("-")),
+    )
+
+
 def file_json(
-    path: str, additions: int, deletions: int, patch: str | None = "@@ -1 +1 @@"
+    path: str,
+    additions: int,
+    deletions: int,
+    patch: str | None = "@@ -1 +1 @@",
+    *,
+    status: str = "modified",
 ) -> dict[str, Any]:
     entry: dict[str, Any] = {
         "filename": path,
-        "status": "modified",
+        "status": status,
         "additions": additions,
         "deletions": deletions,
         "changes": additions + deletions,
@@ -407,3 +442,191 @@ class StaticSelections:
         if self.fail:
             raise SelectionLookupError("합성: 선택 범위 조회 실패")
         return self.selected if reference == REQUEST.selection_reference else None
+
+
+# 관계 조회(#118) 합성 응답. 위 도우미의 모양은 바꾸지 않고 필요한 필드만 덧붙인다. SHA를 받는
+# 도우미는 번호(sha(번호)로 바꾼다)와 전체 SHA 문자열(실제 git 커밋 등)을 모두 받는다.
+
+
+def sha_of(commit: int | str) -> str:
+    return commit if isinstance(commit, str) else sha(commit)
+
+
+DEFAULT_BRANCH = "main"
+LISTED_COMMITS = f"{BASE}/commits?per_page=100&page=1"
+LISTED_PULLS = f"{BASE}/pulls?state=all&sort=created&direction=desc&per_page=100&page=1"
+LISTED_ISSUES = (
+    f"{BASE}/issues?state=all&sort=created&direction=desc&per_page=100&page=1"
+)
+
+
+def relation_repository_json(**changes: Any) -> dict[str, Any]:
+    """기본 브랜치 이름이 있는 저장소 응답. repository_json에는 이 필드가 없다."""
+    return repository_json(default_branch=DEFAULT_BRANCH, **changes)
+
+
+def graph_commit_json(
+    number: int,
+    author: GitHubAccount | None,
+    *,
+    parents: tuple[int, ...] = (),
+    message: str = "합성 커밋",
+) -> dict[str, Any]:
+    """부모를 정한 커밋 항목. 커밋 목록·PR 커밋 목록·비교 API가 같은 모양을 준다."""
+    item = commit_json(number, author, message=message)
+    item["parents"] = [{"sha": sha(parent), "url": f"{EVIL}/p"} for parent in parents]
+    return item
+
+
+def relation_pull_json(
+    number: int,
+    author: GitHubAccount | None,
+    *,
+    state: str = "merged",
+    created: int | None = None,
+    merged_minute: int | None = None,
+    merge_commit: int | str | None = None,
+    base_commit: int | str | None = 9999,
+    head: int | str | None = None,
+    base_ref: str = DEFAULT_BRANCH,
+    fork: bool = False,
+    title: str | None = None,
+    body: str | None = "합성 PR 본문",
+    base_repository: str | None = f"{OWNER}/{NAME}",
+) -> dict[str, Any]:
+    """`base.sha`·`base.repo`와 상태·시각을 정한 PR 응답(PR 목록·연결 PR API 모양).
+
+    state는 merged·open·closed(병합 없이 닫힘) 가운데 하나다. merged_minute는 병합(병합 없이
+    닫혔으면 닫은) 시각이다. 병합되지 않은 PR의 merge_commit_sha는 시험용 병합 커밋이라 쓰면 안
+    되는 값을 일부러 둔다.
+    """
+    merged = state == "merged"
+    item = pull_json(number, author, merged=merged, fork=fork, body=body)
+    closed_at = stamp(number + 5 if merged_minute is None else merged_minute)
+    if merge_commit is not None:
+        merge_sha = sha_of(merge_commit)
+    else:
+        merge_sha = sha(number + 5000 if merged else number + 70000)
+    item.update(
+        state="open" if state == "open" else "closed",
+        created_at=stamp(number if created is None else created),
+        closed_at=None if state == "open" else closed_at,
+        merged_at=closed_at if merged else None,
+        merge_commit_sha=merge_sha,
+        base={
+            "ref": base_ref,
+            "sha": None if base_commit is None else sha_of(base_commit),
+            "repo": None if base_repository is None else {"full_name": base_repository},
+        },
+    )
+    if head is not None:
+        item["head"] = {**item["head"], "sha": sha_of(head)}
+    if title is not None:
+        item["title"] = title
+    return item
+
+
+def compare_json(
+    total: int, merge_base: int | str, commits: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """비교 API(base...head) 응답 한 쪽. merge_base는 번호나 SHA 문자열(실제 git 커밋)이다."""
+    base = (
+        commit_json(merge_base, None)
+        if isinstance(merge_base, int)
+        else {"sha": merge_base}
+    )
+    return {
+        "url": f"{EVIL}/api/compare",
+        "html_url": f"{EVIL}/compare",
+        "status": "ahead",
+        "ahead_by": total,
+        "behind_by": 0,
+        "total_commits": total,
+        "merge_base_commit": {**base, "url": f"{EVIL}/m"},
+        "commits": commits,
+        "files": [],
+    }
+
+
+def pull_path(number: int) -> str:
+    return f"{BASE}/pulls/{number}"
+
+
+def pull_detail_json(item: dict[str, Any], commits: int) -> dict[str, Any]:
+    """PR API(PR 하나) 응답: PR 목록 항목 모양(`head.sha`·`base.sha` 포함)에 전체 커밋 수를 더한다.
+
+    관계 조회는 이 응답의 머리 커밋을 PR 목록에서 본 머리 커밋과 대조한다. PR이 바뀐 경우는
+    item의 head를 바꿔 넘긴다.
+    """
+    return {**item, "commits": commits}
+
+
+def pull_commits_path(number: int, page: int = 1) -> str:
+    return f"{BASE}/pulls/{number}/commits?per_page=100&page={page}"
+
+
+def commit_pulls_path(commit: int | str) -> str:
+    """연결 PR API 경로(첫 쪽)."""
+    return f"{BASE}/commits/{sha_of(commit)}/pulls?per_page=100&page=1"
+
+
+def compare_path(base: int | str, head: int | str, page: int) -> str:
+    return f"{BASE}/compare/{sha_of(base)}...{sha_of(head)}?per_page=100&page={page}"
+
+
+def detail_path(commit: int | str) -> str:
+    return f"{BASE}/commits/{sha_of(commit)}"
+
+
+def branch_commits_path(quoted_ref: str, page: int = 1, per_page: int = 100) -> str:
+    """추가 기준 브랜치 커밋 목록 경로. 한 쪽 개수는 기준 브랜치 커밋 상한(100건 미만이면 그 값)이다."""
+    return f"{BASE}/commits?sha={quoted_ref}&per_page={per_page}&page={page}"
+
+
+def detail_diff_path(commit: int | str) -> str:
+    """커밋 경로를 diff 형식으로 부를 때의 응답 열쇠."""
+    return diff_route(detail_path(commit))
+
+
+# 파일 모드를 정하지 않았을 때 상태마다 두는 모드 줄(일반 파일, 모드 바꿈 없음).
+_PLAIN_MODES = {
+    "added": ("new file mode 100644",),
+    "removed": ("deleted file mode 100644",),
+}
+
+
+def diff_text(
+    files: Sequence[Mapping[str, Any]],
+    modes: Mapping[str, tuple[str, ...]] | None = None,
+) -> bytes:
+    """커밋 상세의 files로 만든 diff 형식 응답 본문(git diff 모양). 경로는 따옴표 없이 쓴다.
+
+    modes는 경로마다 모드 줄이다. 없는 경로는 새 파일·지운 파일이면 100644, 수정이면 모드 바꿈
+    없음으로 둔다. hunk는 files의 patch를 그대로 쓴다(없으면 머리글만).
+    """
+    lines: list[str] = []
+    for entry in files:
+        path, status = entry["filename"], entry["status"]
+        lines.append(f"diff --git a/{path} b/{path}")
+        lines.extend((modes or {}).get(path, _PLAIN_MODES.get(status, ())))
+        lines.append("index 1111111..2222222")
+        patch = entry.get("patch")
+        if patch is None:
+            continue
+        lines.append("--- /dev/null" if status == "added" else f"--- a/{path}")
+        lines.append("+++ /dev/null" if status == "removed" else f"+++ b/{path}")
+        lines.extend(patch.split("\n"))
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def diff_reply(body: bytes) -> HttpResponse:
+    """diff 형식 응답. 본문은 JSON이 아니다."""
+    return HttpResponse(
+        200, {"content-type": "text/plain; charset=utf-8"}, body, len(body)
+    )
+
+
+def detail_reply(number: int, author: GitHubAccount | None) -> HttpResponse:
+    return respond(
+        commit_detail_json(number, author, [file_json(f"src/{number}.py", 1, 0)])
+    )

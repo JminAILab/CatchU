@@ -36,7 +36,9 @@ def _candidate(
 ) -> dict[str, Any]:
     title = candidate.title
     if title is None or not title.strip():
-        # 제목 생성 실패: 확인된 작업 사실의 첫 항목으로 채운다(BR3.2).
+        # #118은 제목을 만들지 않아 title이 None이다. 지금 계약과 B·C·E는 빈 제목을 받지 않으므로
+        # workFacts 첫 항목을 넣는다. 계약 정정과 B·C·E 수정이 병합되기 전까지의 임시 동작이며, 그
+        # 뒤 뺀다(2026-10-08 결정 문서 「담당과 순서」 ③).
         title = candidate.work_facts[0]
     return {
         "candidateId": candidate_id,

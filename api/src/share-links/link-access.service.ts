@@ -56,7 +56,7 @@ export class LinkAccessService {
    * `clientAddress`는 시도 제한을 세는 주소 단위다(client-address.ts의 `clientAddressKey`, IPv4 또는 IPv6 /64).
    *
    * 판정 순서: 링크(404) → 비밀번호 없는 링크(400) → 본문(400) → 주소·링크 차단(429, 남은 초) →
-   * 진행 중 상한·같은 주소 대기 상한(429, 1초) → 차례가 오면 주소·링크 자리 예약 → 해시 차례 대기 →
+   * 같은 링크·주소 요청 빈도(429, 창이 빌 때까지) → 진행 중 상한·같은 주소 대기 상한(429, 1초) → 차례가 오면 주소·링크 자리 예약 → 해시 차례 대기 →
    * 해시 직전 재확인(중단·만료 404, 차단 429) → 비밀번호(401·200). 어떤 결과로 끝나도 잡은 자리는 모두 돌려준다.
    */
   async unlock(token: string, body: unknown, clientAddress: string): Promise<{ grant: string }> {
@@ -68,6 +68,10 @@ export class LinkAccessService {
     const addressKey = `${link.linkId}|${clientAddress}`;
     // 이미 차단된 주소·링크는 대기열과 무관하게 실제 남은 시간으로 먼저 거절한다(대기 초과의 Retry-After: 1로 덮어쓰지 않음).
     this.assertNotBlocked(addressKey, link.linkId, now);
+    // 같은 링크·주소의 요청 빈도(#219). 실패 기록은 성공하면 지워지므로, 맞는 비밀번호를 되풀이해 해시 자원을 차지하지 못하게
+    // 해시 차례를 잡기 전에 센다. 여기서 거부한 요청은 세지 않고, 통과한 뒤 포화·차단·중단으로 거절된 요청은 이미 센 것이다.
+    const rate = this.controls.rates.take(addressKey, now);
+    if (!rate.allowed) throw limited(rate.retryAfterSeconds);
     let ticket;
     try {
       ticket = this.controls.hashes.enter();

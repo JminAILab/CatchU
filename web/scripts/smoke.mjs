@@ -1,4 +1,4 @@
-// 최소 실행 검사: 빌드 결과로 서버를 띄우고 기본 화면이 200으로 응답하는지 확인한다.
+// 최소 실행 검사: 빌드 결과로 서버를 띄우고 기본 화면이 200으로 응답하는지, 보안 헤더(#217)가 붙는지 확인한다.
 // 실행 전 `npm run build`가 끝나 있어야 한다. 외부 서비스(API·DB)를 호출하지 않는다.
 // 포트는 셸 환경변수 PORT로만 바꾼다(.env 파일의 PORT는 next가 읽기 전에 포트를 정하므로 적용되지 않음).
 import { spawn, execSync } from "node:child_process";
@@ -49,6 +49,17 @@ function stop() {
   }
 }
 
+// 배포용 빌드의 응답에 있어야 할 보안 헤더. 값의 근거는 next.config.ts.
+function checkHeaders(headers) {
+  const errors = [];
+  if (!headers.get("content-security-policy")?.includes("frame-ancestors 'none'")) errors.push("CSP에 frame-ancestors 'none'이 없습니다");
+  if (headers.get("x-content-type-options") !== "nosniff") errors.push("X-Content-Type-Options가 nosniff가 아닙니다");
+  if (headers.get("referrer-policy") !== "strict-origin-when-cross-origin") errors.push("Referrer-Policy가 strict-origin-when-cross-origin이 아닙니다");
+  if (headers.get("strict-transport-security") !== "max-age=300") errors.push("Strict-Transport-Security가 max-age=300이 아닙니다");
+  if (headers.has("x-powered-by")) errors.push("X-Powered-By가 있습니다");
+  return errors;
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const deadline = Date.now() + TOTAL_MS;
 let result = null;
@@ -64,7 +75,7 @@ try {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(remaining) });
       const body = await res.text();
-      result = { status: res.status, ok: res.status === 200 && body.includes("CatchU web") };
+      result = { status: res.status, ok: res.status === 200 && body.includes("CatchU web"), headerErrors: checkHeaders(res.headers) };
       break;
     } catch (e) {
       if (e?.name === "TimeoutError") break;
@@ -78,4 +89,5 @@ try {
 if (error) fail(`${error}\n${serverLog}`);
 if (!result) fail(`${TOTAL_MS / 1000}초 안에 ${url} 응답을 받지 못했습니다.\n${serverLog}`);
 if (!result.ok) fail(`실패: status=${result.status}, 본문에 'CatchU web'이 없습니다.\n${serverLog}`);
-console.log(`[smoke] 통과: GET ${url} -> ${result.status}, 기본 화면 확인`);
+if (result.headerErrors.length > 0) fail(`보안 헤더 실패: ${result.headerErrors.join(", ")}`);
+console.log(`[smoke] 통과: GET ${url} -> ${result.status}, 기본 화면·보안 헤더 확인`);

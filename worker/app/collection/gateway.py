@@ -1,7 +1,10 @@
 """GitHub API 호출이 지나는 유일한 곳.
 
 호출마다 자격정보 만료·호출 수·수집 시간을 확인하고, 받은 크기를 총량에 더한 뒤 응답
-상태를 해석한다. 429·5xx·시간 초과·연결 오류·우회 이동은 다시 부르지 않고 수집을 멈춘다.
+상태를 해석한다. 200이 아닌 응답(빈 Git 저장소의 커밋 목록 409는 빼고)·시간 초과·연결 오류·
+우회 이동은 다시 부르지 않고 수집을 멈춘다. 관계 조회의 404·409·422도 다른 호출과 같다.
+응답은 JSON으로 받는다(`get`). 커밋의 파일 모드를 볼 때만 같은 경로를 diff 형식으로 받아
+본문을 해석하지 않은 바이트로 넘긴다(`get_diff`). 두 호출의 상한·상태 해석은 같다.
 """
 
 import json
@@ -32,6 +35,8 @@ _FIXED_HEADERS = {
     "X-GitHub-Api-Version": "2022-11-28",
     "User-Agent": "CatchU-worker",
 }
+# 커밋 경로를 git diff 모양의 글로 받는 형식. 커밋 상세(JSON)에 없는 파일 모드 줄이 있다.
+DIFF_MEDIA_TYPE = "application/vnd.github.diff"
 
 
 @dataclass(frozen=True)
@@ -139,6 +144,39 @@ class GitHubGateway:
         self, path: ApiPath, *, allow_empty_repository: bool = False
     ) -> Fetched | Oversized:
         """allow_empty_repository면 빈 Git 저장소 응답을 실패가 아닌 빈 목록으로 돌려준다."""
+        response = self._send(path, _FIXED_HEADERS["Accept"])
+        if allow_empty_repository and is_empty_repository(response):
+            return Fetched([], has_next_page=False)
+        failure = failure_for(response)
+        if failure is not None:
+            raise CollectionStopped(failure)
+        if response.body is None:
+            return OVERSIZED
+        try:
+            data = json.loads(response.body)
+        except (ValueError, RecursionError):
+            raise stop(
+                FailureCode.COLLECTION_FETCH_FAILED,
+                "GitHub 응답을 해석하지 못해 수집을 멈췄다",
+            ) from None
+        return Fetched(data, has_next_page(response.headers.get("link")))
+
+    def get_diff(self, path: ApiPath) -> bytes | Oversized:
+        """같은 경로를 diff 형식으로 받은 본문(바이트). 크기 상한을 넘으면 OVERSIZED.
+
+        호출 수·시간·크기 상한과 응답 상태 해석은 get과 같다. 200이 아니면 다시 부르지 않고
+        멈춘다. 본문은 여기서 해석하지 않는다.
+        """
+        response = self._send(path, DIFF_MEDIA_TYPE)
+        failure = failure_for(response)
+        if failure is not None:
+            raise CollectionStopped(failure)
+        if response.body is None:
+            return OVERSIZED
+        return response.body
+
+    def _send(self, path: ApiPath, accept: str) -> HttpResponse:
+        """호출 하나. 자격정보 만료·호출 수·시간을 확인하고 받은 크기를 총량에 더한다."""
         if self._token is None:
             raise RuntimeError("닫힌 수집 연결")
         if self._clock() >= self._expires_at:
@@ -152,6 +190,7 @@ class GitHubGateway:
                 path,
                 headers={
                     **_FIXED_HEADERS,
+                    "Accept": accept,
                     "Authorization": f"Bearer {self._token.reveal()}",
                 },
                 connect_timeout=min(self._limits.connect_timeout, remaining),
@@ -176,21 +215,28 @@ class GitHubGateway:
             ) from None
         self._budget.add_received(response.received_bytes)
         self._budget.raise_if_past_deadline()
-        if allow_empty_repository and is_empty_repository(response):
-            return Fetched([], has_next_page=False)
-        failure = failure_for(response)
-        if failure is not None:
-            raise CollectionStopped(failure)
-        if response.body is None:
-            return OVERSIZED
-        try:
-            data = json.loads(response.body)
-        except (ValueError, RecursionError):
+        return response
+
+    def raise_if_time_exhausted(self) -> None:
+        """수집 시간 마감에 이미 닿았으면 시간 상한 실패로 멈춘다. 호출로 세지 않는다.
+
+        부르지 않고 건너뛰는 선택 조회가 이미 지난 마감을 자료 범위 한계로 숨기지 않게 한다.
+        """
+        if self._budget.time_exhausted():
             raise stop(
-                FailureCode.COLLECTION_FETCH_FAILED,
-                "GitHub 응답을 해석하지 못해 수집을 멈췄다",
-            ) from None
-        return Fetched(data, has_next_page(response.headers.get("link")))
+                FailureCode.TIME_LIMIT_EXCEEDED,
+                "수집 시간 상한에 걸려 수집을 멈췄다",
+            )
+
+    def remaining_calls(self) -> int:
+        """남은 호출 수. 선택적 조회를 상한 전에 멈출 때 본다(호출로 세지 않는다)."""
+        return self._budget.remaining_calls()
+
+    def remaining_seconds(self) -> float:
+        return self._budget.remaining_seconds()
+
+    def remaining_bytes(self) -> int:
+        return self._budget.remaining_bytes()
 
     def close(self) -> None:
         """자격정보를 놓고 연결을 닫는다. 성공·실패·중단 모두 부른다."""

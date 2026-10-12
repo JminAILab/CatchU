@@ -308,7 +308,8 @@ def test_evidence_uses_urls_and_revisions_built_by_f() -> None:
 
     other = outcome.evidence_for(outcome.commits[1])
     assert not other.contribution.linked_account_is_author
-    assert "연동 계정이 작성한 커밋이 아니라 변경 내용을 조회하지 않았다" in (
+    # 2026-10-08 팀장 결정(본인 기여의 뜻): '작성한'이 아니라 '작성자로 기록된'으로 쓴다.
+    assert "연동 계정이 작성자로 기록된 커밋이 아니라 변경 내용을 조회하지 않았다" in (
         other.coverage_limits
     )
 

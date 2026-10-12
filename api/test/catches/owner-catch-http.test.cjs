@@ -779,6 +779,8 @@ describe('본인 Catch HTTP·PostgreSQL', {
         [own.ownerId, own.repositoryId]);
       const restrictedState = await snapshot();
       failure(await changeVisibility(own, 'PUBLIC'), 500, 'INTERNAL_ERROR');
+      await assert.rejects(publicCatches.list(own.ownerId, {}), { name: 'CatchReadIntegrityError' });
+      await assert.rejects(publicCatches.get(own.ownerId, alreadyPublic.catchId), { name: 'CatchReadIntegrityError' });
       assert.deepEqual(await snapshot(), restrictedState);
     });
   }

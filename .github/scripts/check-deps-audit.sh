@@ -39,7 +39,8 @@ exceptions() { # 서비스 → 그 서비스의 예외 ID(한 줄에 하나)
 }
 
 patched_count() { # 취약점ID 생태계 패키지 → GitHub 취약점 DB에 있는 고친 판본 수
-  gh api "/advisories/$1" --jq "[.vulnerabilities[] | select(.package.ecosystem == \"$2\" and .package.name == \"$3\")
+  # 경로 앞에 /를 붙이지 않는다. Windows Git Bash가 /로 시작하는 인자를 파일 경로로 바꾼다.
+  gh api "advisories/$1" --jq "[.vulnerabilities[] | select(.package.ecosystem == \"$2\" and .package.name == \"$3\")
     | .first_patched_version | select(. != null)] | length" < /dev/null
 }
 

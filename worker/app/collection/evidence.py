@@ -65,17 +65,51 @@ class EvidenceBasis:
 
 
 _COMMIT_CHANGES_LIMIT = {
-    DetailStatus.NOT_REQUESTED: "연동 계정이 작성한 커밋이 아니라 변경 내용을 조회하지 않았다",
+    DetailStatus.NOT_REQUESTED: (
+        "연동 계정이 작성자로 기록된 커밋이 아니라 변경 내용을 조회하지 않았다"
+    ),
     DetailStatus.BEYOND_RANGE: "상세 조회 개수 범위 밖이라 변경 내용을 조회하지 않았다",
     DetailStatus.OVERSIZED: "변경 내용 응답이 크기 상한을 넘어 변경 파일을 확인하지 못했다",
     DetailStatus.NOT_REACHED: "수집이 멈춰 변경 내용을 확인하지 못했다",
 }
+# 관계 조회(#118)는 연동 계정 커밋이라도 병합 커밋과, 커밋 조회가 허용되지 않은 요청에서 PR 커밋
+# 목록으로만 본 커밋의 변경 내용은 부르지 않는다. 그 기록에 "작성자로 기록된 커밋이 아니라"를 쓰지
+# 않는다.
+_OWN_MERGE_NOT_REQUESTED = "병합 커밋이라 변경 내용을 조회하지 않았다"
+_OWN_COMMIT_NOT_ALLOWED = (
+    "커밋 조회가 허용되지 않은 요청이라 변경 내용을 조회하지 않았다"
+)
+# 두 수집 경로 모두 본인의 병합 아닌 커밋은 받았거나 범위 밖·수집 중단으로 표시하므로 지금은 나오지
+# 않는다. 표시가 빠진 기록이 생겨도 "작성자로 기록된 커밋이 아니라"라고 잘못 적지 않으려고 둔다.
+_OWN_NOT_PLANNED = "변경 내용 조회 대상으로 정하지 않아 변경 내용을 조회하지 않았다"
 _PULL_REQUEST_COMMITS_LIMIT = {
     DetailStatus.NOT_REQUESTED: "연동 계정이 연 PR이 아니라 커밋 목록을 조회하지 않았다",
     DetailStatus.BEYOND_RANGE: "상세 조회 개수 범위 밖이라 커밋 목록을 조회하지 않았다",
     DetailStatus.OVERSIZED: "커밋 목록 응답이 크기 상한을 넘어 커밋 목록을 확인하지 못했다",
+    # 관계 조회(#118)만 쓴다. 판본을 맞출 수 없는 목록은 버렸다.
+    DetailStatus.REVISION_MISMATCH: (
+        "조회하는 동안 PR이 바뀌어 커밋 목록을 관측한 판본과 맞출 수 없었다"
+    ),
     DetailStatus.NOT_REACHED: "수집이 멈춰 커밋 목록을 확인하지 못했다",
 }
+# 관계 조회(#118)가 최근 PR 목록 밖에서 커밋에 연결된 PR로만 알게 된 PR. 그 PR의 커밋 목록은
+# 부르지 않는다. 상세 조회 개수와는 관계없다.
+_LOOKUP_ONLY_COMMITS = (
+    "최근 PR 목록 밖의 PR이라 이 PR에 담긴 커밋 전체는 확인하지 않았다"
+)
+
+
+def _changes_limit(
+    record: CommitRecord, linked_account: GitHubAccount, details_allowed: bool
+) -> str:
+    status = record.changes_status
+    if status is DetailStatus.NOT_REQUESTED and linked_account.same_account(
+        record.author
+    ):
+        if len(record.parents) > 1:
+            return _OWN_MERGE_NOT_REQUESTED
+        return _OWN_NOT_PLANNED if details_allowed else _OWN_COMMIT_NOT_ALLOWED
+    return _COMMIT_CHANGES_LIMIT[status]
 
 
 def commit_evidence(
@@ -84,13 +118,15 @@ def commit_evidence(
     repository: RepositoryCoordinates,
     linked_account: GitHubAccount,
     shared_limits: tuple[str, ...],
+    details_allowed: bool = True,
 ) -> EvidenceBasis:
+    """details_allowed는 요청이 커밋 조회(COMMIT)를 허용했는지다. 한계 문구에만 쓴다."""
     facts = [f"커밋 {record.sha[:12]}, 작성 시각 {rfc3339(record.authored_at)}"]
     if len(record.parents) > 1:
         facts.append(f"병합 커밋(부모 {len(record.parents)}개)")
     limits = [_UNKNOWN_AUTHOR] if record.author is None else []
     if record.changes is None:
-        limits.append(_COMMIT_CHANGES_LIMIT[record.changes_status])
+        limits.append(_changes_limit(record, linked_account, details_allowed))
     else:
         changes = record.changes
         facts.append(
@@ -124,7 +160,9 @@ def pull_request_evidence(
     repository: RepositoryCoordinates,
     linked_account: GitHubAccount,
     shared_limits: tuple[str, ...],
+    lookup_only: bool = False,
 ) -> EvidenceBasis:
+    """lookup_only는 관계 조회가 PR 목록 밖에서 연결 PR 조회로만 안 PR인지다. 한계 문구에만 쓴다."""
     state = (
         "병합됨"
         if record.merged_at is not None
@@ -135,12 +173,21 @@ def pull_request_evidence(
         facts.append("다른 저장소(포크)의 브랜치에서 연 PR")
     limits = [_UNKNOWN_AUTHOR] if record.author is None else []
     if record.commits is None:
-        limits.append(_PULL_REQUEST_COMMITS_LIMIT[record.commits_status])
+        limits.append(
+            _LOOKUP_ONLY_COMMITS
+            if lookup_only
+            else _PULL_REQUEST_COMMITS_LIMIT[record.commits_status]
+        )
     else:
         facts.append(f"PR 커밋 {len(record.commits)}건")
         if record.commits_truncated:
+            # 관계 조회(#118)는 250건 밖을 비교 API로 일부 더 읽을 수 있다. 그때 250건이라 적으면
+            # 위 사실과 어긋난다. 기본 경로의 목록은 250건을 넘지 않아 문구가 그대로다.
             limits.append(
                 f"PR 커밋 목록 API가 돌려주는 {PULL_REQUEST_COMMITS_API_CAP}건까지만 확인했다"
+                if len(record.commits) <= PULL_REQUEST_COMMITS_API_CAP
+                else f"PR 커밋이 많아 {len(record.commits)}건까지만 확인했고 나머지는 "
+                "확인하지 못했다"
             )
     return EvidenceBasis(
         resource_type="PULL_REQUEST",
