@@ -58,7 +58,8 @@ export const previewCatches: readonly CatchAsset[] = [
   },
   {
     catchId: "synthetic-catch-api-pagination",
-    title: "[합성] 목록 조회의 다음 페이지 처리",
+    // 제목 유무는 설명·질문의 생성 상태와 별개다.
+    title: null,
     repositoryId: "demo-api",
     sourceRequestId: "synthetic-request-api",
     sourceResultId: "synthetic-result-api",

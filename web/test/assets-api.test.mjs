@@ -24,6 +24,59 @@ test("필터·opaque cursor를 인코딩하고 회원 경로와 no-store를 전�
   assert.equal(calls[1][0], "/catches?limit=20");
 });
 
+test("제목이 null인 Catch와 문자열인 Catch를 함께 조회하고 null 상세를 유지한다", async () => {
+  const untitled = { ...item("untitled"), title: null };
+  const titled = { ...item("titled"), title: "[합성] 제목 있는 Catch" };
+  const store = createAssetsStore(createCatchApi(async (url) => url.startsWith("/catches?")
+    ? page([untitled, titled]) : success(untitled)));
+  await store.refresh("repo-a");
+  assert.equal(store.getSnapshot().listState, "ready");
+  assert.equal(store.getSnapshot().listError, null);
+  assert.deepEqual(store.getSnapshot().items, [untitled, titled]);
+  await store.openDetail("untitled");
+  assert.equal(store.getSnapshot().detailState, "ready");
+  assert.equal(store.getSnapshot().detailError, null);
+  assert.deepEqual(store.getSnapshot().detail, untitled);
+  assert.deepEqual(store.getSnapshot().items, [untitled, titled]);
+});
+
+for (const [name, fields] of [
+  ["누락", {}], ["undefined", { title: undefined }], ["빈 문자열", { title: "" }],
+  ["숫자", { title: 0 }], ["boolean", { title: false }], ["배열", { title: [] }], ["객체", { title: {} }],
+]) {
+  test(`title ${name}: null로 간주하지 않고 목록·상세·저장 조회 실패로 유지한다`, async () => {
+    const invalid = item("c");
+    delete invalid.title;
+    Object.assign(invalid, fields);
+    const expected = { kind: "lookup-failed", status: 200, code: "LOOKUP_FAILED" };
+    assert.deepEqual(await createCatchApi(async () => page([invalid])).list("repo-a", null), expected);
+    const api = createCatchApi(async () => success(invalid));
+    assert.deepEqual(await api.detail("c"), expected);
+    assert.deepEqual(await api.update("c", { kind: "mismatch", mismatch: invalid.mismatch }), expected);
+  });
+}
+
+for (const [change, savedFields] of [
+  [{ kind: "confirmation" }, { confirmation: { workFactsConfirmed: true, contributionConfirmed: true } }],
+  [{ kind: "mismatch", mismatch: true }, { mismatch: true }],
+  [{ kind: "visibility", visibility: "PUBLIC" }, { visibility: "PUBLIC" }],
+]) {
+  test(`${change.kind} 저장 성공 응답의 null 제목을 상세와 목록에 보존한다`, async () => {
+    const original = { ...item("untitled"), title: null };
+    const saved = { ...original, ...savedFields };
+    const store = createAssetsStore(createCatchApi(async (url, options) => {
+      if (options.method === "PUT") return success(saved);
+      return url.startsWith("/catches?") ? page([original]) : success(original);
+    }));
+    await store.refresh("repo-a");
+    await store.openDetail("untitled");
+    await store.update(change);
+    assert.equal(store.getSnapshot().mutation.status, "success");
+    assert.deepEqual(store.getSnapshot().detail, saved);
+    assert.deepEqual(store.getSnapshot().items, [saved]);
+  });
+}
+
 test("손상된 성공·필터 불일치·다른 상세 ID는 성공이나 0건으로 바꾸지 않는다", async () => {
   for (const data of [{}, { items: [], page: {} }, { items: [null], page: { nextCursor: null } },
     { items: [item("c", "other")], page: { nextCursor: null } },
