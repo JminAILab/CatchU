@@ -1,6 +1,6 @@
 # api — API 서버
 
-공유 링크의 수동 검증 명령 `node scripts/verify-share-links-browser.cjs`와 자동 통합 검사는 [#149 실행 안내](docs/share-links-integration-149.md)를 따른다. 수동 도구의 실제 브라우저·DB 실행 확인은 해당 기록에서 구분한다.
+공유 링크 발급의 자동 통합 검사(`test/db/share-links-web-integration.test.cjs`)와 수동 재현 도구 `node scripts/verify-share-links-browser.cjs`의 실행 방법·판정 기준은 [#149 실행 안내](docs/share-links-integration-149.md)를 따른다. 실행 결과는 검증한 PR에 기록한다(첫 기록: [PR #266](https://github.com/JminAILab/CatchU/pull/266)).
 
 > 코드를 고치기 전에 [api 코딩 규약](CONVENTIONS.md), 이 문서, 맡은 기능의 `api/docs/<기능>.md`를 한 파일씩 따로 열어 읽는다(여러 파일을 한 번에 출력하면 가운데가 잘릴 수 있다). 기능별 안내는 이 README에 덧붙이지 않고 `api/docs/<기능>.md`로 쓴다.
 
