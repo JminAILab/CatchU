@@ -90,6 +90,7 @@ export type ProgressDecision = 'OBSERVED' | 'TERMINAL_UNCHANGED' | RejectionCode
 
 export interface AttemptSnapshot {
   context: RequestContext;
+  lifecycle?: 'ACTIVE' | 'CLOSED';
   processing: ProcessingState;
   application: ApplicationState;
   received: ResultMetadata | null;
@@ -102,6 +103,7 @@ export interface ReceiverTransaction {
     processing: Outcome;
     application: 'PENDING';
     eligibleCandidateCount: number;
+    failures: Result['failures'];
   }): Promise<void>;
 }
 
