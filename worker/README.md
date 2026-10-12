@@ -141,7 +141,7 @@ uv run --locked python -m app.processing succeeded-one-candidate
 
 ## 허용 GitHub 자료 수집과 근거 정규화
 
-[docs/github-collection.md](docs/github-collection.md)에 있다. #118이 더한 관계 조회는 [docs/relation-collection.md](docs/relation-collection.md)에 있다.
+[docs/github-collection.md](docs/github-collection.md)에 있다. #118이 더한 관계 조회는 [docs/relation-collection.md](docs/relation-collection.md), 그 가운데 연결 PR 묶음 조회(#267, GraphQL)와 요청당 호출 수의 근거는 [docs/associated-pr-lookup.md](docs/associated-pr-lookup.md)에 있다.
 
 ## 후보 묶음과 작업 동일성
 
@@ -158,7 +158,7 @@ uv run --locked mypy
 uv run --locked pytest
 ```
 
-Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 요청 검사와 합성 결과 생성은 거부 조건, 시나리오별 결과, 실행 불명 처리를 확인하며, 네트워크 연결을 막은 상태에서도 모든 시나리오가 끝나는지 본다. 수집 검사는 합성 GitHub 응답으로 사전 거부·호출 통제·상한·실패 보존·정규화·근거·결과 조합 연결·정리와 비밀값 누출을 확인하고, 관계 조회의 단계·조회 대상·멈춤 처리를 확인한다. 후보 판별 검사는 작업 동일성 값([wi1 규칙](docs/candidate-decision.md)), 실제 git과 대조한 공백을 무시한 diff 값, 배정·보류·같은 변경·커밋 묶음·나누기·집계, 판별 기준 문서의 합성 사례를 수집부터 결과 조합까지 확인한다. 실제 git으로 만드는 시험은 git이 없으면 건너뛴다. 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
+Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 요청 검사와 합성 결과 생성은 거부 조건, 시나리오별 결과, 실행 불명 처리를 확인하며, 네트워크 연결을 막은 상태에서도 모든 시나리오가 끝나는지 본다. 수집 검사는 합성 GitHub 응답으로 사전 거부·호출 통제·상한·실패 보존·정규화·근거·결과 조합 연결·정리와 비밀값 누출을 확인하고, 관계 조회의 단계·조회 대상·멈춤 처리와 연결 PR 묶음 조회(GraphQL)의 요청 본문·응답 대응·실패 분류·묶음 경계·호출 수를 확인한다. 후보 판별 검사는 작업 동일성 값([wi1 규칙](docs/candidate-decision.md)), 실제 git과 대조한 공백을 무시한 diff 값, 배정·보류·같은 변경·커밋 묶음·나누기·집계, 판별 기준 문서의 합성 사례를 수집부터 결과 조합까지 확인한다. 실제 git으로 만드는 시험은 git이 없으면 건너뛴다. 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
 
 검사 결과·실행 환경·기준 커밋·작성자 외 재현 여부는 초기화 이슈·PR에 남긴다. 이 README의 명령과 기대 결과 자체가 검사 통과 기록은 아니다. 로컬 확인과 AWS 배포 검증은 각각 기록한다.
 
@@ -175,11 +175,12 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `app/processing/` | 요청 검사(`request_check.py`), 제공자 비종속 생성 인터페이스(`generation.py`), 결과 조합(`result.py`), 처리 순서(`pipeline.py`), 가짜 생성기와 합성 요청(`fake_generator.py`·`synthetic.py`), 개발용 실행(`__main__.py`) |
 | `tests/test_request_check.py` | 요청 형식·접수 맥락 불일치·지난 시도의 거부 검사 |
 | `tests/test_processing.py` | 종결값·미제공과 실패 구분·초안/질문/제목 실패·진행 알림과 실행 불명·외부 호출 없음 검사 |
-| `app/collection/` | 허용 GitHub 자료 수집. 순서 조립(`collect.py`), 자격정보 대조(`credentials.py`), 선택 범위(`selection.py`), 상한(`limits.py`·`budget.py`), 호출 통제(`gateway.py`), HTTPS 전송(`transport.py`), 경로 틀(`api_paths.py`), 식별 값 검사(`identifiers.py`), 종류별 수집(`collectors.py`), 관계 조회(`relations.py`), 기본 브랜치 커밋의 병합 계산(`graph.py`), 응답 정규화(`normalize.py`·`records.py`), 근거 재료(`evidence.py`), 실패 코드(`failures.py`) |
-| `tests/github_synthetic.py` | 수집·후보 판별 검사용 합성 GitHub 응답(경로·PR·커밋·파일 항목)·자격정보와 선택 범위 대역·가짜 시계. M1 합성 결과 세트와 따로 둔다 |
+| `app/collection/` | 허용 GitHub 자료 수집. 순서 조립(`collect.py`), 자격정보 대조(`credentials.py`), 선택 범위(`selection.py`), 상한(`limits.py`·`budget.py`), 호출 통제(`gateway.py`), HTTPS 전송(`transport.py`), 경로 틀(`api_paths.py`), 연결 PR 묶음 조회의 GraphQL 쿼리 틀(`graphql.py`), 식별 값 검사(`identifiers.py`), 종류별 수집(`collectors.py`), 관계 조회(`relations.py`), 기본 브랜치 커밋의 병합 계산(`graph.py`), 응답 정규화(`normalize.py`·`records.py`), 근거 재료(`evidence.py`), 실패 코드(`failures.py`) |
+| `tests/github_synthetic.py` | 수집·후보 판별 검사용 합성 GitHub 응답(경로·PR·커밋·파일 항목, 연결 PR 묶음 조회의 GraphQL 요청 검사와 응답)·자격정보와 선택 범위 대역·가짜 시계. M1 합성 결과 세트와 따로 둔다. 연결 PR은 SHA마다 `associated_key`로 정하고, 정하지 않은 SHA를 물으면 시험 실패다 |
 | `tests/git_synthetic.py` | 실제 git으로 만든 합성 저장소와, 그 커밋을 GitHub 커밋 응답 모양으로 옮기는 시험 도구, 사례용 파일 내용·두 갈래 브랜치 도우미. 같은 변경 확인 시험과 후보 판별 사례 시험이 실제 git 결과와 대조할 때 쓰며, git이 없으면 그 시험을 건너뛴다 |
 | `tests/conftest.py` | 여러 시험 파일이 함께 쓰는 고정값(시험마다 새로 만드는 합성 git 저장소 `repo`) |
-| `tests/test_collection_*.py` | 첫 호출 전 거부(`boundary`), 호출 통제·상한·실패 응답(`controls`), 정상 수집·정규화·근거·결과 연결·정리(`flow`), 관계 조회(`relations`), HTTPS 전송(`transport`) |
+| `tests/test_collection_*.py` | 첫 호출 전 거부(`boundary`), 호출 통제·상한·실패 응답(`controls`), 정상 수집·정규화·근거·결과 연결·정리(`flow`), 관계 조회(`relations`), 연결 PR 묶음 조회의 쿼리·응답 대응·실패 분류·점수(`graphql`)와 묶음 경계·순서(`lookup_batches`), HTTPS 전송(`transport`) |
+| `tests/call_budget_shapes.py`·`tests/test_lookup_call_budget.py` | 요청당 호출 수를 비교할 합성 저장소 모양과, 운영 제안 상한으로 후보 판정까지 가는지·종류별 호출 수 시험. 같은 모양을 기준 판본에서 돌려 REST와 비교할 수 있다 |
 | `app/candidates/` | 후보 묶음·본인 기여 확인·작업 동일성(#118). wi1 값(`identity.py`), 같은 변경의 재료(`same_change.py`), 소속·배정·커밋 묶음·나누기(`grouping.py`), 후보 자격·집계·문장·근거(`build.py`) |
 | `tests/candidate_scenarios.py` | 후보 판별 사례 시험용 선언형 합성 저장소와, 수집부터 결과 조합까지 돌리는 실행 도구 |
 | `tests/test_candidate_*.py` | wi1 값(`identity`), 공백을 무시한 diff 값·관계 근거(`same_change`), 수집 관측을 직접 만든 묶음·집계·근거(`grouping`), 판별 기준 문서의 합성 사례(`cases`), 수집·판별·결과 조합 연결(`flow`) |
