@@ -2,7 +2,8 @@
 
 경로는 검사를 통과한 저장소 좌표·SHA·번호·기준 브랜치 이름과 F가 올리는 쪽 번호로만
 만든다. 브랜치 이름은 경로 문자로 해석되지 않게 모두 인코딩한다. 응답의
-`url`·Link 헤더의 next 주소는 쓰지 않는다. 경로를 만드는 곳은 이 모듈뿐이다.
+`url`·Link 헤더의 next 주소는 쓰지 않는다. REST 경로를 만드는 곳은 이 모듈뿐이다. 연결 PR
+조회는 REST 대신 GraphQL 묶음 조회(graphql.py, #267)로 한다.
 """
 
 from dataclasses import dataclass
@@ -59,13 +60,6 @@ class RepositoryPaths:
         number = require_number(number)
         return ApiPath(
             f"{self._base}/pulls/{number}/commits?{_page_query(page, per_page)}"
-        )
-
-    def commit_pulls(self, sha: str, page: int, per_page: int) -> ApiPath:
-        """커밋과 연결된 PR(연결 PR API)."""
-        return ApiPath(
-            f"{self._base}/commits/{normalize_sha(sha)}/pulls?"
-            f"{_page_query(page, per_page)}"
         )
 
     def branch_commits(self, ref: str, page: int, per_page: int) -> ApiPath:

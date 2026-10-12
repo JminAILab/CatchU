@@ -52,20 +52,24 @@ from candidate_scenarios import (
 from git_synthetic import GitRepo, python_module, requires_git, two_branches
 from github_synthetic import (
     BASE,
+    EVIL,
     LISTED_COMMITS,
     LISTED_ISSUES,
     LISTED_PULLS,
     MEMBER,
+    MISSING_COMMIT,
     OTHER,
+    REPOSITORY,
     REQUEST,
     FakeClock,
     Reply,
     branch_commits_path,
-    commit_pulls_path,
     compare_json,
     compare_path,
     detail_diff_path,
     detail_path,
+    graphql_reply,
+    graphql_route,
     oversized,
     pull_commits_path,
     pull_detail_json,
@@ -83,6 +87,7 @@ from app.collection import (
     PROPOSED_LIMITS,
     CollectionLimits,
     GitHubAccount,
+    Lookup,
     RelationOptions,
 )
 
@@ -1130,12 +1135,18 @@ def test_c17_short_sha_cannot_become_an_identity(unit: Callable[[], object]) -> 
 def test_range_limited_membership_is_undetermined(
     lookup: Reply, with_pull: bool
 ) -> None:
-    """자료 범위 한계 사례는 연결 PR 응답 크기 초과·PR 100건과 다음 쪽으로 만든다."""
+    """자료 범위 한계 사례는 연결 PR 묶음 응답 크기 초과·PR 100건과 다음 쪽으로 만든다.
+
+    크기 초과는 묶음 전체의 응답이다. 여기서는 묶음에 ffff 하나만 실리므로 ffff만 한계다(여러
+    커밋이 실린 묶음은 아래 test_oversized_lookup_batch_holds_every_commit_in_it).
+    """
     # 연결 PR 응답이 크기 상한을 넘었거나 한 쪽을 넘어(자료 범위 한계) 소속을 확정하지 못했다.
     # 전체 SHA라 근거 요건은 채웠고(C17이 아니다) 정한 범위대로 조회도 마쳤으므로 단위
     # 미확정이다(2026-09-30 집계 결정). 실패는 없다.
     run = run_case(open_pull_with_direct_commit(lookup=lookup, with_pull=with_pull))
 
+    # 나눠 다시 부르거나 다음 쪽을 부르지 않는다.
+    assert run.transport.batches == [(F,)]
     assert identities(run.result) == ([pull_identity(3)] if with_pull else [])
     for entry in run.result["candidates"]:
         assert commit_url(F) not in evidence_urls(entry)
@@ -1144,8 +1155,64 @@ def test_range_limited_membership_is_undetermined(
     assert run.result["outcome"] == ("SUCCEEDED" if with_pull else "EMPTY")
 
 
+def two_direct_commits() -> tuple[Commit, Commit]:
+    """서로 다른 파일을 고친 PR 밖 본인 커밋 둘(older ← newer). 조회가 빈 목록이면 각자 커밋 묶음이다."""
+    older = commit(
+        sha(1401), MEMBER, parents=(B0,), minute=2, files=[change("app/older.py")]
+    )
+    newer = commit(
+        sha(1402),
+        MEMBER,
+        parents=(older.sha,),
+        minute=3,
+        files=[change("app/newer.py")],
+    )
+    return older, newer
+
+
+@pytest.mark.parametrize("batch", [100, 1], ids=["one-batch", "batch-of-one"])
+def test_oversized_lookup_batch_holds_every_commit_in_it(batch: int) -> None:
+    """#267: 연결 PR 묶음 조회 응답이 크기 상한을 넘으면 그 묶음에 실린 커밋이 모두 자료 범위 한계다.
+
+    PR 밖 본인 커밋 둘을 한 묶음으로 물으면 둘 다 단위 미확정이다. 묶음 크기를 1로 줄이면 크기를
+    넘은 첫 묶음(newer)만 보류하고, 나눠 다시 부르지 않고 다음 묶음(older)으로 넘어가 older는 커밋
+    묶음 후보가 된다. 어느 쪽이든 크기 초과는 실패가 아니다.
+    """
+    older, newer = two_direct_commits()
+    branch = (newer, older, root_commit())
+    if batch == 1:
+        scenario = Scenario(
+            default_branch=branch,
+            lookups={older.sha: ()},
+            overrides={graphql_route(newer.sha): oversized()},
+        )
+    else:
+        scenario = Scenario(
+            default_branch=branch,
+            overrides={graphql_route(newer.sha, older.sha): oversized()},
+        )
+
+    run = run_case(scenario, limits=replace(PROPOSED_LIMITS, max_lookup_batch=batch))
+
+    assert run.outcome.relations is not None
+    statuses = {each.sha: each.status for each in run.outcome.relations.associated}
+    if batch == 1:
+        assert run.transport.batches == [(newer.sha,), (older.sha,)]
+        assert statuses == {newer.sha: Lookup.LIMITED, older.sha: Lookup.EMPTY}
+        assert identities(run.result) == [bundle_identity(older.sha)]
+        assert not_provided(run.result) == {"UNDETERMINED": 1}
+        assert run.result["outcome"] == "SUCCEEDED"
+    else:
+        assert run.transport.batches == [(newer.sha, older.sha)]
+        assert statuses == {newer.sha: Lookup.LIMITED, older.sha: Lookup.LIMITED}
+        assert run.result["candidates"] == []
+        assert not_provided(run.result) == {"UNDETERMINED": 2}
+        assert run.result["outcome"] == "EMPTY"
+    assert run.result["failures"] == []
+
+
 def test_lookup_with_unknown_base_repository_is_undetermined() -> None:
-    """기준 저장소를 알 수 없는 연결 PR은 이 저장소 PR일 수 있다."""
+    """기준 저장소를 알 수 없는 연결 PR(baseRepository가 null)은 이 저장소 PR일 수 있다."""
     run = run_case(
         open_pull_with_direct_commit(
             lookup=respond([relation_pull_json(44, OTHER, base_repository=None)]),
@@ -1159,21 +1226,68 @@ def test_lookup_with_unknown_base_repository_is_undetermined() -> None:
     assert run.result["outcome"] == "EMPTY"
 
 
-@pytest.mark.parametrize("status", [409, 422])
+def _empty_commit_node(sha_value: str) -> dict[str, Any]:
+    """연결 PR이 없는 커밋 하나의 묶음 응답 값(GraphQL 모양)."""
+    return {
+        "__typename": "Commit",
+        "oid": sha_value,
+        "associatedPullRequests": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+    }
+
+
+# C17: 연결 PR 묶음 조회의 거절. ffff 하나만 실린 묶음의 응답이다.
+LOOKUP_REFUSALS: dict[str, Reply] = {
+    # GitHub가 그 SHA의 커밋을 찾지 못해 별칭 값이 null이다.
+    "null-commit": MISSING_COMMIT,
+    # HTTP 200이지만 한도와 무관한 errors가 있다. 함께 온 data가 정상 모양이어도 쓰지 않는다.
+    "errors-with-data": graphql_reply(
+        {
+            "repository": {
+                "nameWithOwner": REPOSITORY.full_name,
+                "c0": _empty_commit_node(F),
+            }
+        },
+        errors=[{"message": "Something went wrong while executing your query."}],
+    ),
+    # 저장소를 찾지 못했다는 errors(type NOT_FOUND)와 repository null.
+    "repository-not-found": graphql_reply(
+        {"repository": None},
+        errors=[
+            {
+                "type": "NOT_FOUND",
+                "path": ["repository"],
+                "message": "Could not resolve to a Repository with the name "
+                f"'{REPOSITORY.full_name}'.",
+            }
+        ],
+    ),
+}
+
+
+@pytest.mark.parametrize("refusal", list(LOOKUP_REFUSALS))
 @pytest.mark.parametrize("with_pull", [True, False], ids=["with-pr3", "alone"])
 def test_c17_lookup_refusal_is_a_collection_failure(
-    status: int, with_pull: bool
+    refusal: str, with_pull: bool
 ) -> None:
-    """조회 오류는 수집 실패(작업 동일성 기준 2026-09-30): 연결 PR 조회 409·422는 수집 실패다. 그 변경은 보류하고 세지 않는다.
+    """조회 오류는 수집 실패(작업 동일성 기준 2026-09-30): 연결 PR 묶음 조회가 커밋을 null로
+    돌려주거나 한도와 무관한 errors로 답하면 수집 실패다. 그 변경은 보류하고 세지 않는다.
+
+    REST 연결 PR API의 409·422 거절 대신 GraphQL은 null 커밋이나 HTTP 200의 errors로 답한다. 다시
+    부르지 않고(POST 1회) 같은 응답에 함께 온 data도 쓰지 않는다. 저장소를 찾지 못한 errors
+    (NOT_FOUND)도 COLLECTION_FETCH_FAILED다. REST 연결 PR API의 404는 REPOSITORY_UNREACHABLE이었으므로
+    이 경우는 실패 코드가 REST와 다르다. 이 차이는 2026-10-12 팀장 결정으로 받아들였다.
 
     지금 수집은 연결 PR 조회 뒤에 변경 내용을 받으므로 여기서 멈추면 PR #3 커밋의
     변경 내용도 받지 못한다. 빈 커밋인지 모르는 PR #3도 후보로 내지 않고 세지 않는다.
     """
     run = run_case(
-        open_pull_with_direct_commit(lookup=status_only(status), with_pull=with_pull)
+        open_pull_with_direct_commit(
+            lookup=LOOKUP_REFUSALS[refusal], with_pull=with_pull
+        )
     )
 
-    assert run.transport.paths.count(commit_pulls_path(F)) == 1
+    assert run.transport.batches == [(F,)]
+    assert run.outcome.graphql.calls == 1
     assert run.result["candidates"] == []
     assert run.result["notProvided"] == []
     assert failure_codes(run.result) == [("COLLECTION", "COLLECTION_FETCH_FAILED")]
@@ -1286,6 +1400,9 @@ def test_commits_that_may_belong_to_a_closed_unread_pull_request_are_held(
     run = run_case(scenario)
 
     assert run.outcome.completed
+    # 250건 밖 본인 커밋은 한 묶음으로 묻고, PR 없는 병합 후보는 그 결과를 본 뒤 다음 묶음으로 묻는다.
+    assert [len(each) for each in run.transport.batches] == [LONG_PULL_COUNT - 250, 1]
+    assert run.transport.batches[1] == (joined,)
     assert identities(run.result) == [pull_identity(5)]
     unit = run.result["candidates"][0]["evidence"][0]
     assert unit["sourceUrl"] == pull_url(5)
@@ -1413,19 +1530,61 @@ def test_c27_budget_stop_during_lookup_holds_change_and_the_unchecked_pull_reque
     수집은 연결 PR 조회 뒤에 변경 내용을 받는다. 그래서 연결 PR 조회에서 멈추면
     PR #3 커밋의 변경 내용도 받지 못해, 빈 커밋인지 모르는 PR #3도 후보로 내지 않는다(세지 않음).
     결과는 Catch 0개·FAILED이고 회원은 다시 요청할 수 있다(사례 문서 C27, 2026-10-09 팀장 결정).
-    변경 내용을 받은 뒤 멈춰 PARTIAL_FAILED가 되는 모양은 아래 C29 시험의 after_details와
+    변경 내용을 받은 뒤 멈춰 PARTIAL_FAILED가 되는 모양은 아래
+    test_c29_rate_limit_after_details_keeps_the_other_candidate와
     test_candidate_grouping의 test_stopped_lookup_holds_change_without_counting이 본다.
     """
-    # 저장소 확인·목록 셋·PR #3 커밋 목록까지 5회. ffff의 연결 PR 조회가 6번째 호출이다.
+    # 저장소 확인·목록 셋·PR #3 커밋 목록까지 5회. ffff를 묻는 연결 PR 묶음 조회 POST가 6번째
+    # 호출이다. 보내기 전에 호출 수 상한에 걸려 ffff는 어느 POST에도 실리지 않는다.
     run = run_case(
         open_pull_with_direct_commit(lookup=()), limits=CollectionLimits(max_calls=5)
     )
 
-    assert commit_pulls_path(F) not in run.transport.paths
+    assert F not in run.transport.looked_up
+    assert run.transport.batches == []
+    assert len(run.transport.paths) == 5
     assert run.outcome.relations is not None
     assert run.outcome.relations.stopped_during == "LOOKUPS"
     assert run.result["candidates"] == []
     # 판단한 것이 아니므로 notProvided에 세지 않고, 수집 실패를 기록한다.
+    assert run.result["notProvided"] == []
+    assert failure_codes(run.result) == [("COLLECTION", "BUDGET_EXCEEDED")]
+    assert run.result["outcome"] == "FAILED"
+
+
+def test_lookup_stop_between_batches_keeps_the_earlier_batch() -> None:
+    """#267: 묶음 사이에서 호출 수 상한에 걸리면 앞서 받은 묶음의 결과는 남고, 보내지 못한 묶음과 그
+    뒤에 계획한 커밋은 조회하지 못한 것(NOT_REACHED)이다. 묶음 크기 1로 묶음 경계를 만든다.
+
+    첫 묶음의 newer는 연결 PR 조회로만 안 병합 PR #40에 배정한 결과가 남고, older는 확인 중단이다.
+    변경 내용을 받기 전에 멈췄으므로 후보는 없고 세지도 않으며 결과는 FAILED다(C27과 같은 이유).
+    """
+    older, newer = two_direct_commits()
+    scenario = Scenario(
+        default_branch=(newer, older, root_commit()),
+        lookups={newer.sha: (40,), older.sha: ()},
+        lookup_pulls=(Pull(40, MEMBER, created=1, merged=4, merge_commit=sha(1499)),),
+    )
+    one = replace(PROPOSED_LIMITS, max_lookup_batch=1)
+    full = run_case(scenario, limits=one)
+    assert full.transport.batches == [(newer.sha,), (older.sha,)]
+    # 둘째 묶음 POST를 보낼 호출 수가 남지 않게 한다.
+    limits = replace(
+        one, max_calls=full.transport.paths.index(graphql_route(older.sha))
+    )
+
+    run = run_case(scenario, limits=limits)
+
+    assert run.transport.batches == [(newer.sha,)]
+    assert older.sha not in run.transport.looked_up
+    assert run.outcome.relations is not None
+    assert run.outcome.relations.stopped_during == "LOOKUPS"
+    statuses = {each.sha: each.status for each in run.outcome.relations.associated}
+    assert statuses == {newer.sha: Lookup.FOUND, older.sha: Lookup.NOT_REACHED}
+    observations = group_outcome(run.outcome).observations
+    assert observations[newer.sha].membership is Membership.ASSIGNED
+    assert observations[older.sha].membership is Membership.STOPPED
+    assert run.result["candidates"] == []
     assert run.result["notProvided"] == []
     assert failure_codes(run.result) == [("COLLECTION", "BUDGET_EXCEEDED")]
     assert run.result["outcome"] == "FAILED"
@@ -1473,7 +1632,8 @@ def test_c28_time_stop_without_other_candidate_fails() -> None:
 
 def test_time_stop_after_finished_lookups_keeps_the_undetermined_change() -> None:
     """조회를 마쳐 정한 단위 미확정은 뒤의 시간 실패와 함께 남는다."""
-    # 호출마다 10초. 저장소 확인·목록 셋·PR #3 커밋 목록·ffff 연결 PR 조회(60초)를 마친 때가 마감이다.
+    # 호출마다 10초. 저장소 확인·목록 셋·PR #3 커밋 목록·ffff 연결 PR 묶음 조회 POST(60초)를 마친 때가
+    # 마감이다.
     # ffff는 C16처럼 근거끼리 어긋나 단위 미확정이다. 변경 내용을 받으려는 때 마감이 이미 지나
     # 범위 한계로 건너뛰지 않고 시간 상한 실패로 멈춘다.
     run = run_case(
@@ -1483,7 +1643,7 @@ def test_time_stop_after_finished_lookups_keeps_the_undetermined_change() -> Non
         seconds_per_call=10.0,
     )
 
-    assert run.transport.paths[-1] == commit_pulls_path(F)
+    assert run.transport.paths[-1] == graphql_route(F)
     assert len(run.transport.paths) == 6
     assert run.outcome.relations is not None
     assert run.outcome.relations.stopped_during == "DETAILS"
@@ -1493,27 +1653,54 @@ def test_time_stop_after_finished_lookups_keeps_the_undetermined_change() -> Non
     assert run.result["outcome"] == "FAILED"
 
 
-def test_c29_rate_limited_lookup_is_not_retried_and_holds_change() -> None:
-    """C29: 연결 PR 조회 429는 다시 부르지 않고 보류한다(세지 않음, 실패 기록).
+# C29: 연결 PR 묶음 조회의 호출 한도 응답. ffff 하나만 실린 묶음의 응답이다.
+LOOKUP_RATE_LIMITS: dict[str, Reply] = {
+    "http-429": status_only(429),
+    # HTTP 200이고 errors의 message에만 한도 문구가 있다(type·한도 머리글 없음).
+    "graphql-200-message": graphql_reply(
+        errors=[{"message": "API rate limit exceeded for user ID 1001."}]
+    ),
+    # 보조 호출 한도: HTTP 403과 안내 문구만 있고 한도 머리글은 없다.
+    "http-403-secondary": respond(
+        {
+            "message": "You have exceeded a secondary rate limit. Please wait a few "
+            "minutes before you try again.",
+            "documentation_url": f"{EVIL}/docs",
+        },
+        status=403,
+    ),
+}
+
+
+@pytest.mark.parametrize("reply", list(LOOKUP_RATE_LIMITS))
+def test_c29_rate_limited_lookup_is_not_retried_and_holds_change(reply: str) -> None:
+    """C29: 연결 PR 묶음 조회의 호출 한도 응답(HTTP 429, HTTP 200의 한도 errors, 보조 한도 문구의
+    HTTP 403)은 다시 부르지 않고 보류한다(세지 않음, 실패 기록).
 
     이 조회에서 멈추면 PR #3 커밋의 변경 내용도 받지 못해 PR #3도 후보가 아니고
     결과는 FAILED다(C27과 같은 이유, 사례 문서 C29). 다른 적합 후보가 있는 PARTIAL_FAILED는 변경
-    내용을 받은 뒤 멈춘 경우다(after_details).
+    내용을 받은 뒤 멈춘 경우다(아래 test_c29_rate_limit_after_details_keeps_the_other_candidate).
     """
-    run = run_case(open_pull_with_direct_commit(lookup=status_only(429)))
+    run = run_case(open_pull_with_direct_commit(lookup=LOOKUP_RATE_LIMITS[reply]))
 
-    assert run.transport.paths.count(commit_pulls_path(F)) == 1
+    assert run.transport.batches == [(F,)]
+    assert run.outcome.graphql.calls == 1
     assert run.result["candidates"] == []
     assert run.result["notProvided"] == []
     assert failure_codes(run.result) == [("COLLECTION", "RATE_LIMITED")]
     assert run.result["outcome"] == "FAILED"
 
+
+def test_c29_rate_limit_after_details_keeps_the_other_candidate() -> None:
+    """C29에서 연결 PR 조회는 빈 목록으로 마치고 ffff의 변경 내용 조회가 429다. PR #3은 후보이고
+    ffff는 보류해 세지 않으며 결과는 PARTIAL_FAILED다."""
     after_details = run_case(
         replace(
             open_pull_with_direct_commit(lookup=()),
             overrides={detail_path(F): status_only(429)},
         )
     )
+    assert after_details.transport.batches == [(F,)]
     assert identities(after_details.result) == [pull_identity(3)]
     assert after_details.result["notProvided"] == []
     assert failure_codes(after_details.result) == [("COLLECTION", "RATE_LIMITED")]
@@ -1644,7 +1831,7 @@ def test_member_pull_request_without_own_commit_with_an_unrelated_lookup_stop(
     merged: bool,
 ) -> None:
     """다른 계정 커밋만 담은 본인 PR #12는 세지 않는다(2026-10-09 팀장 결정). PR 밖 본인 커밋
-    ffff의 연결 PR 조회가 429로 멈췄어도, #12가 열렸든 병합됐든 건수는 없고 실패만 남는다.
+    ffff를 묻는 연결 PR 묶음 조회가 429로 멈췄어도, #12가 열렸든 병합됐든 건수는 없고 실패만 남는다.
     """
     first = commit(sha(411), OTHER, parents=(B0,), minute=2)
     second = commit(sha(412), OTHER, parents=(first.sha,), minute=3)
@@ -1663,12 +1850,16 @@ def test_member_pull_request_without_own_commit_with_an_unrelated_lookup_stop(
         )
         branch = (direct, root_commit())
         pull = Pull(12, MEMBER, (first, second), state="open", created=2)
+    # 429는 묶음 전체의 응답이다. 그 묶음에는 ffff만 실린다.
     scenario = Scenario(
-        default_branch=branch, pulls=(pull,), lookups={F: status_only(429)}
+        default_branch=branch,
+        pulls=(pull,),
+        overrides={graphql_route(F): status_only(429)},
     )
 
     run = run_case(scenario)
 
+    assert run.transport.batches == [(F,)]
     assert run.result["candidates"] == []
     assert not_provided(run.result) == {}
     assert failure_codes(run.result) == [("COLLECTION", "RATE_LIMITED")]
@@ -1692,7 +1883,9 @@ def test_commit_without_linked_author_is_never_own() -> None:
     assert run.result["candidates"] == []
     # 회원이 연 PR #13도, 작성자 없는 직접 커밋도 어디에도 세지 않는다.
     assert not_provided(run.result) == {}
-    assert commit_pulls_path(direct.sha) not in run.transport.paths
+    # 본인 커밋이 아니므로 연결 PR을 묻지 않는다.
+    assert direct.sha not in run.transport.looked_up
+    assert unknown.sha not in run.transport.looked_up
     assert run.result["outcome"] == "EMPTY"
 
 
@@ -1754,8 +1947,9 @@ def test_without_pull_request_permission_units_are_merges_and_bundles() -> None:
 
     run = run_case(scenario, request=live_request("COMMIT", "ISSUE"))
 
-    # PR API(목록·커밋 목록·연결 PR)와 비교 API를 부르지 않는다.
+    # PR API(목록·커밋 목록), 연결 PR 묶음 조회(GraphQL), 비교 API를 부르지 않는다.
     assert not any("/pulls" in path for path in run.transport.paths)
+    assert run.transport.batches == []
     assert not any("/compare/" in path for path in run.transport.paths)
     assert sorted(identities(run.result)) == sorted(
         [merge_identity(merged.sha), bundle_identity(second.sha, third.sha)]
@@ -1772,9 +1966,10 @@ def test_without_pull_request_permission_units_are_merges_and_bundles() -> None:
 def test_without_commit_permission_pull_request_lists_still_give_candidates() -> None:
     run = run_case(c6_scenario(), request=live_request("PULL_REQUEST"))
 
-    # 커밋 API(기본 브랜치 목록·상세·연결 PR)는 부르지 않고 PR 커밋 목록만 본다.
+    # 커밋 API(기본 브랜치 목록·상세)와 연결 PR 묶음 조회는 부르지 않고 PR 커밋 목록만 본다.
     assert LISTED_COMMITS not in run.transport.paths
     assert not any("/commits/" in path for path in run.transport.paths)
+    assert run.transport.batches == []
     assert sorted(identities(run.result)) == sorted(
         [pull_identity(7), pull_identity(9)]
     )
@@ -1906,6 +2101,8 @@ def test_commits_brought_by_merge_without_pull_request_form_a_merge_unit() -> No
 
     run = run_case(scenario)
 
+    # 커밋 묶음을 받은 뒤 그 결과로 고른 병합 후보를 따로 묻는다(두 단계를 한 POST로 합치지 않는다).
+    assert run.transport.batches == [(second.sha, first.sha), (merged.sha,)]
     assert identities(run.result) == [merge_identity(merged.sha)]
     urls = evidence_urls(run.result["candidates"][0])
     assert {
@@ -1931,6 +2128,7 @@ def test_merge_that_took_in_the_base_branch_is_not_a_unit() -> None:
 
     run = run_case(scenario)
 
+    assert absorbed.sha not in run.transport.looked_up
     assert identities(run.result) == [merge_identity(merged.sha)]
     assert merge_identity(absorbed.sha) not in identities(run.result)
     assert bundle_identity(first.sha) not in identities(run.result)
@@ -2010,6 +2208,8 @@ def test_commits_an_absorption_merge_took_in_stay_in_their_own_unit() -> None:
     """
     run = run_case(release_scenario(), options=RELEASE)
 
+    # 흡수 병합으로 확인한 A4는 연결 PR을 묻지 않는다.
+    assert ABSORB_A4 not in run.transport.looked_up
     assert sorted(identities(run.result)) == sorted(
         [merge_identity(MERGE_M6), bundle_identity(RELEASE_C2)]
     )
@@ -2111,14 +2311,14 @@ def test_rebase_merged_commit_found_by_lookup_belongs_to_the_pull_request() -> N
 
     run = run_case(scenario)
 
-    # 연결 PR API가 병합된 PR을 가리키는 커밋이 PR 커밋 목록에 없는 것은 정상이다.
+    # 연결 PR 조회가 병합된 PR을 가리키는 커밋이 PR 커밋 목록에 없는 것은 정상이다.
     assert identities(run.result) == [pull_identity(4)]
     assert bundle_identity(first.sha) not in identities(run.result)
     assert_succeeded_without_holds(run)
 
 
 def test_pull_request_known_only_from_lookup_is_the_unit() -> None:
-    """최근 PR 목록 밖의 병합된 PR #40이 이 커밋을 들였다. 연결 PR API가 가리키는 병합 PR에 배정한다.
+    """최근 PR 목록 밖의 병합된 PR #40이 이 커밋을 들였다. 연결 PR 조회가 가리키는 병합 PR에 배정한다.
 
     2026-10-08 팀장 결정 「본인 기여의 뜻」: 이 커밋은 #40의 merge_commit_sha이고 부모가 하나라
     squash 커밋일 수 있다. 원래 커밋 목록을 받지 않았으므로 그 작성자를 명의로 보지 않는다. PR

@@ -6,6 +6,7 @@
 """
 
 import json
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
@@ -92,6 +93,11 @@ class Call:
     connect_timeout: float
     read_timeout: float
     max_bytes: int
+    method: str = "GET"
+    # POST 본문(GraphQL). GET은 None.
+    body: bytes | None = None
+    # 연결 PR 묶음 조회 POST가 물은 SHA(요청 순서). 그 밖의 호출은 빈 값.
+    shas: tuple[str, ...] = ()
 
 
 @dataclass
@@ -99,6 +105,9 @@ class FakeTransport:
     """경로별로 정한 응답을 돌려주고 호출을 기록한다. 정하지 않은 경로는 시험 실패다.
 
     Accept가 diff 형식이면 `diff_route(경로)` 열쇠의 응답을 찾고, paths에도 그 열쇠로 적는다.
+    연결 PR 묶음 조회(POST /graphql)는 본문을 따로 검사해(`graphql_lookup`) 물은 SHA를 얻고,
+    `graphql_route(SHA…)`에 정한 응답이 있으면 그것을, 없으면 SHA마다 `associated_key(SHA)`에
+    정한 연결 PR로 GraphQL 응답을 만든다. 정하지 않은 SHA는 빈 목록이 아니라 시험 실패다.
     시계를 주면 호출마다 seconds_per_call만큼 흐른다. 실제 전송처럼 받은 대기 시간을 넘기지
     않으며, 넘을 호출은 대기 시간만큼 흐른 뒤 TransportTimeout으로 끝난다.
     """
@@ -109,6 +118,14 @@ class FakeTransport:
     seconds_per_call: float = 0.0
     calls: list[Call] = field(default_factory=list)
     closed: bool = False
+    # 묶음 조회 응답의 rateLimit: POST 순번(0부터)을 받아 값을 준다. OMIT이면 필드를 빼고 보낸다.
+    rate_limit: Callable[[int], Any] = field(
+        default=lambda index: standard_rate_limit()
+    )
+    # 참이면 응답의 별칭을 요청과 반대 순서로 둔다(필드 순서로 맞추지 않는지 본다).
+    reverse_aliases: bool = False
+    # 묶음 조회 변수로 와야 할 저장소 좌표.
+    repository: RepositoryCoordinates = REPOSITORY
 
     def get(
         self,
@@ -123,12 +140,51 @@ class FakeTransport:
         self.calls.append(
             Call(path, dict(headers), connect_timeout, read_timeout, max_bytes)
         )
+        self._wait(read_timeout)
+        key = diff_route(path) if headers.get("Accept") == DIFF_ACCEPT else path
+        return self._reply(key)
+
+    def post(
+        self,
+        path: str,
+        *,
+        body: bytes,
+        headers: Mapping[str, str],
+        connect_timeout: float,
+        read_timeout: float,
+        max_bytes: int,
+    ) -> HttpResponse:
+        assert not self.closed, "닫힌 연결로 호출함"
+        assert path == GRAPHQL_PATH, f"GraphQL 밖의 POST: {path}"
+        lookup = graphql_lookup(body, self.repository)
+        shas = tuple(sha_value for _, sha_value in lookup)
+        index = sum(1 for call in self.calls if call.method == "POST")
+        self.calls.append(
+            Call(
+                path,
+                dict(headers),
+                connect_timeout,
+                read_timeout,
+                max_bytes,
+                method="POST",
+                body=body,
+                shas=shas,
+            )
+        )
+        self._wait(read_timeout)
+        key = graphql_route(*shas)
+        if key in self.routes:
+            return self._reply(key)
+        return self._synthesized(lookup, index)
+
+    def _wait(self, read_timeout: float) -> None:
         if self.clock is not None:
             if self.seconds_per_call > read_timeout:
                 self.clock.advance(read_timeout)
                 raise TransportTimeout("합성: 응답 대기 시간 초과")
             self.clock.advance(self.seconds_per_call)
-        key = diff_route(path) if headers.get("Accept") == DIFF_ACCEPT else path
+
+    def _reply(self, key: str) -> HttpResponse:
         if key not in self.routes:
             raise AssertionError(f"계획에 없는 호출: {key}")
         reply = self.routes[key]
@@ -138,18 +194,222 @@ class FakeTransport:
             return reply()
         return reply
 
+    def _synthesized(
+        self, lookup: Sequence[tuple[str, str]], index: int
+    ) -> HttpResponse:
+        """SHA마다 정한 연결 PR로 만든 오류 없는 묶음 응답(HTTP 200)."""
+        commits: list[tuple[str, Any]] = []
+        for alias_name, sha_value in lookup:
+            key = associated_key(sha_value)
+            if key not in self.routes:
+                raise AssertionError(f"계획에 없는 연결 PR 조회: {sha_value}")
+            commits.append((alias_name, _graphql_commit(sha_value, self.routes[key])))
+        if self.reverse_aliases:
+            commits.reverse()
+        data: dict[str, Any] = {}
+        rate = self.rate_limit(index)
+        if rate is not OMIT:
+            data["rateLimit"] = rate
+        data["repository"] = {
+            "nameWithOwner": self.repository.full_name,
+            **dict(commits),
+        }
+        return respond({"data": data})
+
     def close(self) -> None:
         self.closed = True
 
     @property
     def paths(self) -> list[str]:
-        """호출한 경로. diff 형식 조회는 diff_route(경로)로 적는다."""
-        return [
-            diff_route(call.path)
-            if call.headers.get("Accept") == DIFF_ACCEPT
-            else call.path
-            for call in self.calls
-        ]
+        """호출 하나에 하나씩 적은 호출 열쇠. diff 형식 조회는 diff_route(경로)로,
+        연결 PR 묶음 조회는 graphql_route(물은 SHA…)로 적는다."""
+        return [_call_key(call) for call in self.calls]
+
+    @property
+    def looked_up(self) -> list[str]:
+        """연결 PR 묶음 조회로 물은 SHA(호출 순서, 묶음 안은 요청 순서). 같은 SHA를 두 번 물었으면
+        두 번 나온다."""
+        return [sha_value for call in self.calls for sha_value in call.shas]
+
+    @property
+    def batches(self) -> list[tuple[str, ...]]:
+        """연결 PR 묶음 조회 POST마다 물은 SHA."""
+        return [call.shas for call in self.calls if call.method == "POST"]
+
+
+def _call_key(call: Call) -> str:
+    if call.method == "POST":
+        return graphql_route(*call.shas)
+    if call.headers.get("Accept") == DIFF_ACCEPT:
+        return diff_route(call.path)
+    return call.path
+
+
+# 연결 PR 묶음 조회(#267) 합성. 실제 GitHub GraphQL 응답의 모양 가운데 수집이 읽는 필드만 둔다.
+
+GRAPHQL_PATH = "/graphql"
+# 묶음 조회 응답에서 필드를 뺄 때 쓰는 표시.
+OMIT = object()
+
+
+def standard_rate_limit(
+    *, cost: int = 1, remaining: int = 4999, reset_minutes: int = 60
+) -> dict[str, Any]:
+    reset = START + timedelta(minutes=reset_minutes)
+    return {
+        "cost": cost,
+        "remaining": remaining,
+        "resetAt": reset.isoformat().replace("+00:00", "Z"),
+    }
+
+
+def associated_key(commit: int | str) -> str:
+    """커밋 하나의 연결 PR 첫 쪽을 정하는 열쇠(경로가 아니다). 값은 respond([PR 응답…])이고
+    next_page=True면 다음 쪽이 있다는 표시다. MISSING_COMMIT이면 그 커밋은 null로 온다.
+
+    오류 상태·크기 초과·전송 오류는 묶음 전체의 응답이라 여기 두지 않고 graphql_route로 정한다."""
+    return f"associated {sha_of(commit)}"
+
+
+GRAPHQL_ROUTE_PREFIX = "POST /graphql "
+
+
+def graphql_route(*commits: int | str) -> str:
+    """연결 PR 묶음 조회 POST 하나의 호출 열쇠·응답 열쇠: 물은 SHA를 요청 순서로."""
+    return GRAPHQL_ROUTE_PREFIX + ",".join(sha_of(commit) for commit in commits)
+
+
+# GitHub가 없는 SHA에 주는 결과(null). associated_key의 값으로 둔다.
+MISSING_COMMIT = HttpResponse(200, {"x-synthetic": "missing-commit"}, b"null", 4)
+
+_BINDING = re.compile(r"(\w+): object\(oid: \$(\w+)\)")
+
+
+def graphql_lookup(
+    body: bytes, repository: RepositoryCoordinates = REPOSITORY
+) -> list[tuple[str, str]]:
+    """묶음 조회 POST 본문을 검사하고 (응답 별칭, SHA)를 쿼리 순서로 돌려준다.
+
+    수집 코드와 따로 확인한다: 본문은 query·variables뿐이고, 변수는 저장소 좌표와 별칭마다 하나인
+    전체 SHA뿐이며, 쿼리 문에는 좌표·SHA가 글자로 들어 있지 않다. 쿼리는 이름 바뀐 저장소를 따라가지
+    않고, 연결 PR은 첫 100개만 묻고 다음 쪽 cursor를 쓰지 않으며, 쓰기(mutation)가 없다.
+    """
+    request = json.loads(body)
+    assert set(request) == {"query", "variables"}, "묶음 조회 본문의 필드가 다르다"
+    query, variables = request["query"], request["variables"]
+    assert isinstance(query, str) and isinstance(variables, dict)
+    assert variables.get("owner") == repository.owner
+    assert variables.get("name") == repository.name
+    assert "mutation" not in query
+    assert "followRenames: false" in query
+    assert query.count("associatedPullRequests(") == 1
+    assert "associatedPullRequests(first: 100)" in query
+    for argument in ("after:", "before:", "last:"):
+        assert argument not in query, f"쿼리에 {argument}가 있다"
+    for value in variables.values():
+        assert isinstance(value, str) and value not in query, (
+            "쿼리에 변수 값이 글자로 있다"
+        )
+    bindings = _BINDING.findall(query)
+    shas = {
+        name: value
+        for name, value in variables.items()
+        if name not in ("owner", "name")
+    }
+    assert sorted(name for _, name in bindings) == sorted(shas), (
+        "별칭과 SHA 변수가 맞지 않는다"
+    )
+    assert len({alias_name for alias_name, _ in bindings}) == len(bindings)
+    for value in shas.values():
+        assert re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", value), (
+            "SHA 변수가 전체 SHA가 아니다"
+        )
+    return [(alias_name, shas[name]) for alias_name, name in bindings]
+
+
+def _graphql_commit(sha_value: str, reply: Reply) -> Any:
+    """associated_key에 정한 응답(REST 연결 PR API 모양)을 GraphQL 커밋 결과로 바꾼다."""
+    if reply is MISSING_COMMIT:
+        return None
+    assert isinstance(reply, HttpResponse), "묶음 단위 응답은 graphql_route로 정한다"
+    assert reply.status == 200 and reply.body is not None, (
+        "오류·크기 초과는 묶음 전체의 응답이라 graphql_route로 정한다"
+    )
+    items = json.loads(reply.body)
+    assert isinstance(items, list)
+    return {
+        "__typename": "Commit",
+        "oid": sha_value,
+        "associatedPullRequests": {
+            "pageInfo": {"hasNextPage": 'rel="next"' in reply.headers.get("link", "")},
+            "nodes": [graphql_pull_node(item) for item in items],
+        },
+    }
+
+
+def graphql_pull_node(item: Mapping[str, Any]) -> dict[str, Any]:
+    """REST 연결 PR API의 PR 항목과 같은 PR을 GraphQL PullRequest 필드로 적는다.
+
+    병합되지 않은 PR의 REST merge_commit_sha(시험용 병합 커밋)는 GraphQL mergeCommit에 없다.
+    """
+    merged = item.get("merged_at") is not None
+    head, base = item["head"], item["base"]
+    head_repository = head.get("repo")
+    base_repository = base.get("repo")
+    user = item.get("user")
+    return {
+        "number": item["number"],
+        "title": item["title"],
+        "body": item.get("body") or "",
+        "state": "MERGED" if merged else item["state"].upper(),
+        "createdAt": item["created_at"],
+        "closedAt": item.get("closed_at"),
+        "mergedAt": item.get("merged_at"),
+        "mergeCommit": (
+            {"oid": item["merge_commit_sha"]}
+            if merged and item.get("merge_commit_sha")
+            else None
+        ),
+        "headRefOid": head["sha"],
+        "headRefName": head["ref"],
+        "baseRefName": base["ref"],
+        "baseRefOid": base.get("sha"),
+        "headRepository": (
+            None
+            if head_repository is None
+            else {"nameWithOwner": head_repository["full_name"]}
+        ),
+        "baseRepository": (
+            None
+            if base_repository is None
+            else {"nameWithOwner": base_repository["full_name"]}
+        ),
+        "author": (
+            None
+            if user is None
+            else {
+                "__typename": "User",
+                "login": user["login"],
+                "databaseId": user["id"],
+            }
+        ),
+    }
+
+
+def graphql_reply(
+    data: Any = None,
+    *,
+    errors: Sequence[Mapping[str, Any]] | None = None,
+    status: int = 200,
+    headers: Mapping[str, str] | None = None,
+) -> HttpResponse:
+    """묶음 조회 응답을 직접 정할 때: data와 최상위 errors."""
+    body: dict[str, Any] = {}
+    if errors is not None:
+        body["errors"] = list(errors)
+    if data is not None:
+        body["data"] = data
+    return respond(body, status=status, headers=headers)
 
 
 def respond(
@@ -563,11 +823,6 @@ def pull_detail_json(item: dict[str, Any], commits: int) -> dict[str, Any]:
 
 def pull_commits_path(number: int, page: int = 1) -> str:
     return f"{BASE}/pulls/{number}/commits?per_page=100&page={page}"
-
-
-def commit_pulls_path(commit: int | str) -> str:
-    """연결 PR API 경로(첫 쪽)."""
-    return f"{BASE}/commits/{sha_of(commit)}/pulls?per_page=100&page=1"
 
 
 def compare_path(base: int | str, head: int | str, page: int) -> str:

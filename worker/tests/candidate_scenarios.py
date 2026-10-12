@@ -3,8 +3,9 @@
 기본 브랜치 커밋(부모·작성자·메시지·변경 파일), PR(상태·시각·병합 커밋·제목·본문·포크·커밋 목록),
 연결 PR 조회 응답, 이슈를 적으면 합성 GitHub 경로별 응답을 만든다. 그다음 관계 조회를 포함한
 수집 → 후보 판정 → 결과 조합을 한 번에 돌리고 결과가 메시지 계약 v1을 통과하는지 확인한다.
-계획에 없는 호출은 FakeTransport가 시험 실패로 만든다. 수집을 마쳤으면 사례가 둔 PR 커밋
-목록·연결 PR 조회 응답을 모두 실제로 불렀는지도 본다.
+계획에 없는 호출과 정하지 않은 SHA의 연결 PR 조회는 FakeTransport가 시험 실패로 만든다. 수집을
+마쳤으면 사례가 둔 PR 커밋 목록을 모두 불렀는지, 연결 PR을 정한 SHA를 모두 묶음 조회로 물었는지도
+본다.
 
 기대값은 작업 동일성 판별 기준 문서와 #118 명세에서 정한다. 후보 판정 코드를 읽어 맞추지 않는다.
 workIdentity 기대값은 wi1 함수로 따로 계산한다.
@@ -21,10 +22,12 @@ from github_synthetic import (
     BASE,
     DEFAULT_BRANCH,
     EVIL,
+    GRAPHQL_ROUTE_PREFIX,
     LISTED_COMMITS,
     LISTED_ISSUES,
     LISTED_PULLS,
     MEMBER,
+    MISSING_COMMIT,
     NAME,
     OTHER,
     OWNER,
@@ -35,13 +38,14 @@ from github_synthetic import (
     StaticCredentials,
     StaticSelections,
     account_json,
-    commit_pulls_path,
+    associated_key,
     credential_context,
     detail_diff_path,
     detail_path,
     diff_reply,
     diff_text,
     file_json,
+    graphql_route,
     issue_json,
     issue_listing_pull_json,
     line_counts,
@@ -72,6 +76,7 @@ from app.collection import (
     SelectedRange,
     collect,
 )
+from app.collection.transport import HttpResponse
 from app.contract import Verdict, check_message
 from app.processing import CheckedRequest, GenerationOutput, compose_result
 
@@ -307,14 +312,15 @@ class Scenario:
     default_branch: tuple[Commit, ...] = ()
     # 목록에 나오는 PR. 응답은 만든 순서의 최근 것부터 정렬한다.
     pulls: tuple[Pull, ...] = ()
-    # 연결 PR 조회: SHA → 돌려줄 PR 번호(빈 튜플은 빈 목록) 또는 정한 응답.
+    # 연결 PR 조회: SHA → 돌려줄 PR 번호(빈 튜플은 빈 목록) 또는 그 커밋의 정한 결과(다음 쪽 표시,
+    # MISSING_COMMIT). 오류 상태·크기 초과는 묶음 전체의 응답이라 overrides에 graphql_route로 둔다.
     lookups: Mapping[str, tuple[int, ...] | Reply] = field(default_factory=dict)
     # PR 목록 밖에서 연결 PR 조회로만 나오는 PR.
     lookup_pulls: tuple[Pull, ...] = ()
     # 다른 계정이 연 이슈 번호와, 이슈 목록 API가 섞어 주는 PR 항목 번호.
     issues: tuple[int, ...] = ()
     issue_pull_items: tuple[int, ...] = ()
-    # 위에서 만든 경로 응답을 바꾸거나 더한다(목록의 다음 쪽·오류 응답 등).
+    # 위에서 만든 경로 응답을 바꾸거나 더한다(목록의 다음 쪽·오류 응답, 연결 PR 묶음 응답 등).
     overrides: Mapping[str, Reply] = field(default_factory=dict)
 
     def pull(self, number: int) -> Pull:
@@ -353,7 +359,7 @@ class Scenario:
         for sha_value, reply in self.lookups.items():
             if isinstance(reply, tuple):
                 reply = respond([self.pull(number).item() for number in reply])
-            routes[commit_pulls_path(sha_value)] = reply
+            routes[associated_key(sha_value)] = reply
         for each in self.all_commits().values():
             if each.detail is not None:
                 routes[detail_path(each.sha)] = respond(each.detail)
@@ -375,7 +381,10 @@ def open_pull_with_direct_commit(
     """열린 PR #3(커밋 하나)과, PR #3의 전체 커밋 목록에 없는 기본 브랜치의 본인 커밋 ffff.
 
     C16·C17·C27~C29의 모양이다. 판정은 기본 브랜치의 본인 커밋만 연결 PR을 조회하므로 ffff를
-    기본 브랜치 목록에 둔다. 사례표의 강제 푸시 같은 어긋남은 연결 PR API 응답(lookup)으로 만든다.
+    기본 브랜치 목록에 둔다. 사례표의 강제 푸시 같은 어긋남은 연결 PR 조회 응답(lookup)으로 만든다.
+    연결 PR 묶음 조회는 ffff 하나만 묻는다. 그래서 lookup이 PR 번호, 그 커밋의 PR 목록 응답(다음 쪽
+    표시 포함), MISSING_COMMIT이면 ffff의 결과로 두고, 그 밖의 응답(오류 상태·크기 초과·전송
+    오류)은 그 POST 전체의 응답(graphql_route(ffff))으로 둔다.
     """
     own = commit(
         sha(31), pull_author, parents=(ROOT,), minute=3, files=[change("app/page.py")]
@@ -386,24 +395,49 @@ def open_pull_with_direct_commit(
     pulls = (
         (Pull(3, pull_author, (own,), state="open", created=2),) if with_pull else ()
     )
+    if isinstance(lookup, tuple) or _commit_result(lookup):
+        return Scenario(
+            default_branch=(direct, root_commit()),
+            pulls=pulls,
+            lookups={direct.sha: lookup},
+        )
     return Scenario(
         default_branch=(direct, root_commit()),
         pulls=pulls,
-        lookups={direct.sha: lookup},
+        overrides={graphql_route(direct.sha): lookup},
     )
 
 
-def _relation_routes(scenario: Scenario, request: CheckedRequest) -> set[str]:
-    """허용 종류로 부를 수 있는, 사례가 둔 관계 조회 경로."""
+def _commit_result(lookup: Reply) -> bool:
+    """커밋 하나의 결과로 둘 응답인가(묶음 전체의 응답이 아닌가)."""
+    return lookup is MISSING_COMMIT or (
+        isinstance(lookup, HttpResponse)
+        and lookup.status == 200
+        and lookup.body is not None
+        and lookup.body.startswith(b"[")
+    )
+
+
+def _relation_routes(
+    scenario: Scenario, request: CheckedRequest
+) -> tuple[set[str], set[str]]:
+    """허용 종류로 부를 수 있는, 사례가 둔 관계 조회: (호출 열쇠, 연결 PR을 정한 SHA).
+
+    호출 열쇠는 PR 커밋 목록 경로와, 직접 정한 연결 PR 묶음 조회 POST(graphql_route)다.
+    """
     allowed = request.allowed_resource_types
-    routes: set[str] = set()
+    paths: set[str] = set()
+    shas: set[str] = set()
     if "PULL_REQUEST" in allowed:
-        routes.update(pull_commits_path(pull.number) for pull in scenario.pulls)
+        paths.update(pull_commits_path(pull.number) for pull in scenario.pulls)
         if "COMMIT" in allowed:
-            routes.update(
-                commit_pulls_path(sha_value) for sha_value in scenario.lookups
+            shas.update(scenario.lookups)
+            paths.update(
+                key
+                for key in scenario.overrides
+                if key.startswith(GRAPHQL_ROUTE_PREFIX)
             )
-    return routes
+    return paths, shas
 
 
 @dataclass(frozen=True)
@@ -476,9 +510,13 @@ def run_case(
     )
     if outcome.completed:
         # 사례가 둔 관계 응답(PR 커밋 목록·연결 PR 조회)을 수집이 실제로 불렀어야 한다. 응답만 두고
-        # 부르지 않았는데 기대 판정이 우연히 맞는 시험을 막는다.
-        missing = _relation_routes(scenario, request) - set(transport.paths)
-        assert not missing, f"부르지 않은 관계 조회: {sorted(missing)}"
+        # 부르지 않았는데 기대 판정이 우연히 맞는 시험을 막는다. 연결 PR은 묶음 조회 POST의 SHA로
+        # 본다(REST 경로가 없다는 것만으로 부르지 않았다고 보지 않는다).
+        paths, shas = _relation_routes(scenario, request)
+        missing = sorted(paths - set(transport.paths)) + sorted(
+            associated_key(sha_value) for sha_value in shas - set(transport.looked_up)
+        )
+        assert not missing, f"부르지 않은 관계 조회: {missing}"
     output = candidates.build_candidates(request, outcome)
     result = compose_result(request, output, finished_at=FINISHED_AT, id_label="case")
     assert_member_text(output, result)
