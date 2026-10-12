@@ -905,6 +905,52 @@ def test_limit_words_in_pull_request_text_are_only_data() -> None:
     assert (record.title, record.body) == ("API rate limit exceeded", SECONDARY)
 
 
+_LIMIT_MESSAGE = "You have exceeded a secondary rate limit."
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param({"message": _LIMIT_MESSAGE}, id="message-only"),
+        pytest.param(
+            {"message": _LIMIT_MESSAGE, "data": _data(_VALID, _commit(1))},
+            id="message-with-data",
+        ),
+    ],
+)
+def test_200_with_only_a_top_level_limit_message_is_rate_limited(
+    body: dict[str, Any], caplog: pytest.LogCaptureFixture
+) -> None:
+    """HTTP 200·errors 없음·최상위 message의 2차 한도 문구만으로도 한도 실패다.
+
+    응답을 직접 정해 대역이 errors 모양으로 바꾸지 않게 한다. 함께 온 정상 모양의 data(PR #41 포함)도
+    쓰지 않는다. 그 묶음을 한 번만 보내고 재시도·재분할·REST 대체·변경 내용 조회가 없다.
+    """
+    routes = _routes(2, 1, overrides={graphql_route(2, 1): respond(body)})
+    with caplog.at_level(logging.DEBUG, logger="app.collection"):
+        outcome, transport = _run(routes)
+
+    _assert_batch_unused(outcome, transport, FailureCode.RATE_LIMITED, [2, 1])
+    assert transport.batches == [(sha(2), sha(1))]
+    assert outcome.graphql == GraphQLUsage(calls=1, observed_cost=0, unobserved_calls=1)
+    for text in (repr(outcome), caplog.text):
+        assert TOKEN not in text
+        assert _LIMIT_MESSAGE not in text
+
+
+def test_200_with_an_unrelated_top_level_message_is_still_a_result() -> None:
+    """errors 없는 HTTP 200에 한도와 무관한 최상위 message가 있어도 정상 결과를 쓴다."""
+    body = {"message": "Notice: unrelated", "data": _data(_VALID, _commit(1))}
+    routes = _routes(2, 1, overrides={graphql_route(2, 1): respond(body)})
+    outcome, transport = _run(routes)
+
+    assert outcome.completed
+    assert _statuses(outcome) == [(sha(2), Lookup.FOUND), (sha(1), Lookup.EMPTY)]
+    assert _lookup_numbers(outcome) == [41]
+    assert transport.paths[: len(LISTS) + 1] == [*LISTS, graphql_route(2, 1)]
+    assert detail_path(1) in transport.paths
+
+
 def test_403_reads_only_top_level_errors() -> None:
     body = {
         "data": {"repository": {"c0": {"title": "API rate limit exceeded"}}},

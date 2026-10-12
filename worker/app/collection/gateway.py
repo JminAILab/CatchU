@@ -207,8 +207,9 @@ def graphql_outcome(
     """GraphQL 응답의 실패, 크기 초과, 또는 오류 없는 최상위 객체.
 
     자격정보·전송·HTTP 오류는 REST와 같은 코드다(401·한도와 무관한 403/404·429·3xx·5xx). 403과
-    errors가 있는 200은 머리글과 최상위 message·errors로 한도 오류를 가린다. errors가 없는 200은
-    남은 점수가 0이어도 정상이다. 200이라도 errors가 있으면(부분 data가
+    errors가 있는 200은 머리글과 최상위 message·errors로 한도 오류를 가린다. errors가 없는 200도
+    최상위 message가 한도를 알리면 한도 오류다. 그 밖의 errors 없는 200은 남은 점수가 0이어도
+    정상이다. 200이라도 errors가 있으면(부분 data가
     함께 와도) 실패이고, 한도 오류가 섞였으면 한도 오류로 둔다.
     """
     status, headers = response.status, response.headers
@@ -239,6 +240,12 @@ def graphql_outcome(
         return CollectionFailure(
             FailureCode.COLLECTION_FETCH_FAILED,
             "GitHub 응답을 해석하지 못해 수집을 멈췄다",
+        )
+    if _mentions_limit(top.get("message")):
+        # errors 없이 최상위 message로만 한도를 알린 응답(2차 한도는 200으로도 온다). data는 보지 않는다.
+        return CollectionFailure(
+            FailureCode.RATE_LIMITED,
+            "GitHub GraphQL 호출 한도 오류를 받아 다시 부르지 않고 수집을 멈췄다",
         )
     if "errors" in top:
         if _limit_errors(top) or _limit_headers(headers):
