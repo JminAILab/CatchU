@@ -1272,8 +1272,7 @@ def test_cherry_pick_with_oversized_details_keeps_both_with_limitation() -> None
         identity(PullRequestUnit(31)),
     ]
     for candidate in output.candidates:
-        (limitation,) = candidate.grouping_limitations
-        assert limitation.startswith(CHERRY_PICK_NOTE)
+        assert_same_work_warning(candidate, CHERRY_PICK_NOTE)
     composed = result(output)
     assert composed["failures"] == [] and composed["outcome"] == "SUCCEEDED"
 
@@ -1295,9 +1294,37 @@ def test_cherry_pick_with_different_diff_keeps_both_with_limitation() -> None:
         identity(PullRequestUnit(31)),
     ]
     for candidate in output.candidates:
-        assert candidate.grouping_limitations[0].startswith(
-            "cherry-pick으로 옮긴 같은 변경일 수"
-        )
+        assert_same_work_warning(candidate, CHERRY_PICK_NOTE)
+
+
+@pytest.mark.parametrize("via_merge", [False, True], ids=["direct", "pr-less-merge"])
+def test_same_work_warning_outside_pull_requests_goes_on_the_first_evidence(
+    via_merge: bool,
+) -> None:
+    """PR 밖으로 옮긴 커밋도 diff가 다르면 두 후보와 양쪽 한계다. 커밋 묶음은 단위 근거가 없어
+    맨 앞 본인 커밋 근거에, PR 없는 병합은 병합 커밋 근거에 같은 작업 경고를 적는다."""
+    window = [commit(311, [1], message=picked(301), content=" 문맥"), ROOT]
+    lookups = empty(311)
+    if via_merge:
+        window = [commit(320, [1, 311], author=OTHER), *window]
+        lookups = empty(311, 320)
+    output = build_candidates(
+        REQ,
+        outcome(
+            window=window,
+            extra=[commit(301)],
+            pulls=[pull(30, [301], merged=10)],
+            lookups=lookups,
+        ),
+    )
+
+    unit = MergeUnit(sha(320)) if via_merge else CommitsUnit((sha(311),))
+    assert identities(output) == [identity(PullRequestUnit(30)), identity(unit)]
+    for candidate in output.candidates:
+        assert_same_work_warning(candidate, CHERRY_PICK_NOTE)
+    outside = output.candidates[1].evidence[0]
+    assert outside.source_revision == sha(320 if via_merge else 311)
+    assert output.not_provided == ()
 
 
 @pytest.mark.parametrize(
@@ -1357,8 +1384,7 @@ def test_resubmission_with_a_cut_patch_keeps_both_with_limitation() -> None:
 
     assert identities(output) == [identity(PullRequestUnit(n)) for n in (11, 12)]
     for candidate in output.candidates:
-        (limitation,) = candidate.grouping_limitations
-        assert limitation.startswith(RESUBMISSION_NOTE)
+        assert_same_work_warning(candidate, RESUBMISSION_NOTE)
     assert output.not_provided == ()
 
 
@@ -1413,8 +1439,7 @@ def test_related_changes_without_matching_modes_keep_both_with_limitation(
     note = RESUBMISSION_NOTE if kind == "resubmission" else CHERRY_PICK_NOTE
     assert identities(output) == [identity(PullRequestUnit(n)) for n in numbers]
     for candidate in output.candidates:
-        (limitation,) = candidate.grouping_limitations
-        assert limitation.startswith(note)
+        assert_same_work_warning(candidate, note)
     assert output.not_provided == ()
 
 
@@ -1452,8 +1477,7 @@ def test_mode_check_stopped_by_budget_keeps_both_pull_requests_with_limitation(
         identity(PullRequestUnit(31)),
     ]
     for candidate in output.candidates:
-        (limitation,) = candidate.grouping_limitations
-        assert limitation.startswith(CHERRY_PICK_NOTE)
+        assert_same_work_warning(candidate, CHERRY_PICK_NOTE)
     assert output.not_provided == ()
     assert "heldAfterStop=0" in caplog.records[-1].getMessage()
     composed = result(output)
@@ -1522,6 +1546,18 @@ CHERRY_PICK_NOTE = "cherry-pick으로 옮긴 같은 변경일 수 있다"
 RESUBMISSION_NOTE = "같은 작업을 다시 낸 것일 수 있다(PR #11·#12"
 
 
+def assert_same_work_warning(
+    candidate: EligibleCandidate, note: str | tuple[str, ...]
+) -> None:
+    """같은 변경 미확정 경고는 groupingLimitations에 두고, 회원·수신자 응답에 담기는 첫 근거의
+    한계에도 같은 문장으로 적는다(2026-10-12 팀장 결정). 다른 근거에는 적지 않는다."""
+    (limitation,) = candidate.grouping_limitations
+    assert limitation.startswith(note)
+    first, *rest = candidate.evidence
+    assert limitation in first.coverage_limits
+    assert all(limitation not in item.coverage_limits for item in rest)
+
+
 @pytest.mark.parametrize(
     ("extra", "pulls", "expected", "note"),
     [
@@ -1569,8 +1605,7 @@ def test_unconfirmed_limitation_follows_each_change_to_its_candidate(
 
     assert identities(output) == [identity(PullRequestUnit(n)) for n in expected]
     for candidate in output.candidates:
-        (limitation,) = candidate.grouping_limitations
-        assert limitation.startswith(note)
+        assert_same_work_warning(candidate, note)
 
 
 def test_integration_pull_request_with_only_moved_changes_is_not_a_candidate() -> None:
@@ -1838,8 +1873,7 @@ def test_unreached_details_of_relation_hold_only_the_later_side(
     numbers = [30, 31] if with_other else [30]
     assert identities(output) == [identity(PullRequestUnit(n)) for n in numbers]
     for candidate in output.candidates:
-        (limitation,) = candidate.grouping_limitations
-        assert limitation.startswith(CHERRY_PICK_NOTE)
+        assert_same_work_warning(candidate, CHERRY_PICK_NOTE)
     assert output.not_provided == ()
     assert f"heldAfterStop={int(not with_other)}" in caplog.records[-1].getMessage()
     assert [each["code"] for each in composed["failures"]] == ["RATE_LIMITED"]
@@ -1905,9 +1939,8 @@ def test_stop_between_confirmed_pull_requests_keeps_them_with_limitation(
 
     assert identities(output) == [identity(PullRequestUnit(n)) for n in expected]
     for candidate in output.candidates:
-        (limitation,) = candidate.grouping_limitations
-        assert limitation.startswith(
-            ("cherry-pick으로 옮긴 같은 변경일 수", "같은 작업을 다시 낸 것일 수")
+        assert_same_work_warning(
+            candidate, (CHERRY_PICK_NOTE, "같은 작업을 다시 낸 것일 수 있다")
         )
     assert output.not_provided == ()
 
@@ -2198,8 +2231,9 @@ def test_member_pull_request_is_not_counted_when_its_contribution_check_stopped(
         assert identities(output) == [identity(PullRequestUnit(2))]
     elif stop == "details":
         assert identities(output) == [identity(PullRequestUnit(1))]
-        (limitation,) = output.candidates[0].grouping_limitations
-        assert limitation.startswith("같은 작업을 다시 낸 것일 수 있다(PR #1·#2")
+        assert_same_work_warning(
+            output.candidates[0], "같은 작업을 다시 낸 것일 수 있다(PR #1·#2"
+        )
     else:
         assert output.candidates == ()
     assert output.not_provided == ()

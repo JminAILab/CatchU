@@ -149,6 +149,11 @@ _EVIDENCE_NOTES = {
     NoteKind.PULL_REQUEST_LISTS_INCOMPLETE: _LISTS_INCOMPLETE,
     NoteKind.EARLIER_PULL_REQUEST_LIST_INCOMPLETE: _EARLIER_LIST_INCOMPLETE,
 }
+# 후보 문장(groupingLimitations)에 두고 첫 근거의 한계에도 같은 문장을 적는 같은 작업 경고. B는
+# groupingLimitations를 화면에 내지 않고, 근거의 한계는 회원·수신자 응답에 담긴다(2026-10-12 팀장 결정).
+_SHOWN_NOTES = frozenset(
+    {NoteKind.RESUBMISSION_UNCONFIRMED, NoteKind.CHERRY_PICK_UNCONFIRMED}
+)
 _SPLIT_REASONS = {
     NoteKind.NOT_SPLIT_STOPPED: "수집이 멈춰 나눌 근거를 끝까지 확인하지 못해",
     NoteKind.NOT_SPLIT_MEMBERSHIP: "PR 커밋 목록을 모두 확인하지 못해",
@@ -356,8 +361,10 @@ def _text(
 ) -> _Text:
     evidence_limits = tuple(
         _EVIDENCE_NOTES[note.kind]
-        for note in unit.notes
         if note.kind in _EVIDENCE_NOTES
+        else _limitation(note, unit.unit)
+        for note in unit.notes
+        if note.kind in _EVIDENCE_NOTES or note.kind in _SHOWN_NOTES
     )
     if MembershipSource.LOOKUP in unit.sources and not isinstance(
         unit.unit, PullRequestUnit
