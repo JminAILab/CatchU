@@ -5,6 +5,9 @@
 자료와 실패 하나를 함께 돌려준다. 성공·실패·예외 모두 연결을 닫고 자격정보를 놓는다.
 원문은 메모리에만 두며 디스크에 쓰지 않는다.
 
+relations를 주면 목록 뒤에 같은 연결로 관계 조회(`relations.py`)를 하고, 그때는 목록 단계가
+상세를 정하지 않는다. 주지 않으면 #117의 순서·호출·한계를 그대로 지킨다.
+
 후보·Catch를 만들지 않는다. 결과 조합에는 `stage_failures()`를 `GenerationOutput.failures`에
 더해 넘기며, 그러면 수집 실패가 있는 결과는 EMPTY가 되지 않는다.
 """
@@ -42,9 +45,16 @@ from app.collection.records import (
     RESOURCE_TYPES,
     CommitRecord,
     CoverageLimit,
+    DetailStatus,
     IssueRecord,
     PullRequestRecord,
     ResourceType,
+)
+from app.collection.relations import (
+    Lookup,
+    RelationCollector,
+    RelationObservations,
+    RelationOptions,
 )
 from app.collection.selection import SelectionResolver, check_selection
 from app.collection.transport import Transport
@@ -74,6 +84,8 @@ class CollectionOutcome:
     failures: tuple[CollectionFailure, ...] = ()
     calls: int = 0
     received_bytes: int = 0
+    # 관계 조회를 요청했고 첫 호출 전에 멈추지 않았을 때만 있다.
+    relations: RelationObservations | None = None
 
     @property
     def completed(self) -> bool:
@@ -102,6 +114,7 @@ class CollectionOutcome:
                 repository=repository,
                 linked_account=account,
                 shared_limits=self.shared_limits("COMMIT"),
+                details_allowed="COMMIT" in self.allowed_resource_types,
             )
         if isinstance(record, PullRequestRecord):
             return evidence.pull_request_evidence(
@@ -109,6 +122,11 @@ class CollectionOutcome:
                 repository=repository,
                 linked_account=account,
                 shared_limits=self.shared_limits("PULL_REQUEST"),
+                lookup_only=self.relations is not None
+                and any(
+                    pull.number == record.number
+                    for pull in self.relations.pull_requests_from_lookups
+                ),
             )
         return evidence.issue_evidence(
             record,
@@ -123,11 +141,15 @@ def _collectors(
     paths: RepositoryPaths,
     account: GitHubAccount,
     limits: CollectionLimits,
+    *,
+    mark_details: bool = True,
 ) -> list[Collector]:
     # 허용 목록에 있는 종류만 만든다. 없는 종류의 API는 부를 수단이 없다.
     available: dict[ResourceType, Collector] = {
-        "COMMIT": CommitCollector(paths, account, limits),
-        "PULL_REQUEST": PullRequestCollector(paths, account, limits),
+        "COMMIT": CommitCollector(paths, account, limits, mark_details=mark_details),
+        "PULL_REQUEST": PullRequestCollector(
+            paths, account, limits, mark_details=mark_details
+        ),
         "ISSUE": IssueCollector(paths, limits),
     }
     return [available[kind] for kind in RESOURCE_TYPES if kind in allowed]
@@ -162,17 +184,28 @@ def _run(
     gateway: GitHubGateway,
     paths: RepositoryPaths,
     data: CollectedData,
+    relations: RelationCollector | None = None,
 ) -> CollectionFailure | None:
-    """저장소 확인 → 목록 → 상세. 멈추면 실패와, 확인하지 못한 종류의 한계를 남긴다."""
+    """저장소 확인 → 목록 → 상세(관계 조회면 관계 조회). 멈추면 실패와, 확인하지 못한 종류의
+    한계를 남긴다."""
     listed: set[ResourceType] = set()
     try:
-        verify_repository(gateway, paths)
+        default_branch = verify_repository(
+            gateway, paths, read_default_branch=relations is not None
+        )
+        if relations is not None:
+            relations.default_branch = default_branch
         for collector in collectors:
             collector.collect_list(gateway, data)
             listed.add(collector.resource_type)
-        for collector in collectors:
-            collector.collect_details(gateway, data)
+        if relations is None:
+            for collector in collectors:
+                collector.collect_details(gateway, data)
+        else:
+            relations.run(gateway, data)
     except CollectionStopped as stopped:
+        if relations is not None:
+            relations.stopped(data)
         for collector in collectors:
             kind = collector.resource_type
             if kind in listed:
@@ -197,11 +230,13 @@ def collect(
     clock: Clock,
     limits: CollectionLimits = PROPOSED_LIMITS,
     started_at: datetime | None = None,
+    relations: RelationOptions | None = None,
 ) -> CollectionOutcome:
     """요청 하나의 허용 범위 안에서 GitHub 자료를 모은다.
 
     started_at은 수집 시간 상한의 기준 시각이다(기본: 지금). 연결은 모든 사전 검사를
     통과한 뒤에만 open_transport로 연다. 예상하지 못한 예외는 결과로 바꾸지 않고 올린다.
+    relations를 주면 같은 연결로 관계 조회까지 하고 결과의 relations에 담는다.
     """
     started = clock() if started_at is None else started_at
     allowed = _allowed_types(request)
@@ -222,7 +257,14 @@ def collect(
         return _refuse(request, allowed, selected)
 
     return _collect_with(
-        request, allowed, context, open_transport, clock, limits, started
+        request,
+        allowed,
+        context,
+        open_transport,
+        clock,
+        limits,
+        started,
+        relations,
     )
 
 
@@ -234,10 +276,18 @@ def _collect_with(
     clock: Clock,
     limits: CollectionLimits,
     started: datetime,
+    relations: RelationOptions | None,
 ) -> CollectionOutcome:
     paths = RepositoryPaths(context.repository)
     budget = CollectionBudget(limits, clock=clock, started_at=started)
     data = CollectedData()
+    relation = (
+        None
+        if relations is None
+        else RelationCollector(
+            relations, paths, context.linked_account, limits, allowed
+        )
+    )
     logger.info(
         "수집 시작: requestId=%s attemptId=%s types=%s",
         request.request_id,
@@ -256,10 +306,17 @@ def _collect_with(
             limits=limits,
         )
         failure = _run(
-            _collectors(allowed, paths, context.linked_account, limits),
+            _collectors(
+                allowed,
+                paths,
+                context.linked_account,
+                limits,
+                mark_details=relation is None,
+            ),
             gateway,
             paths,
             data,
+            relation,
         )
     finally:
         # 성공·실패·예외 모두 자격정보를 놓고 연결을 닫는다.
@@ -281,6 +338,9 @@ def _collect_with(
         len(data.pull_requests),
         len(data.issues),
     )
+    observations = None if relation is None else relation.observations(data)
+    if observations is not None:
+        _log_relations(request, observations, data)
     return CollectionOutcome(
         allowed_resource_types=allowed,
         selection_reference=request.selection_reference,
@@ -293,4 +353,39 @@ def _collect_with(
         failures=(failure,) if failure else (),
         calls=budget.calls,
         received_bytes=budget.received_bytes,
+        relations=observations,
+    )
+
+
+def _log_relations(
+    request: CheckedRequest, observations: RelationObservations, data: CollectedData
+) -> None:
+    """관계 조회 개수만 남긴다. SHA·브랜치 이름·제목·본문은 남기지 않는다."""
+    lookups = [entry.status for entry in observations.associated]
+    statuses = [
+        record.changes_status for record in (*data.commits, *observations.commits)
+    ]
+    logger.info(
+        "관계 조회 종료: requestId=%s attemptId=%s stoppedDuring=%s "
+        "pullRequestLists=%d lookups=%d found=%d empty=%d limited=%d notReached=%d "
+        "foreignBaseIgnored=%d lookupOnlyPullRequests=%d relationCommits=%d details=%d "
+        "beyondRange=%d",
+        request.request_id,
+        request.attempt_id,
+        observations.stopped_during or "-",
+        sum(
+            1
+            for entry in observations.pull_request_commits
+            if entry.status is DetailStatus.FETCHED
+        ),
+        len(lookups),
+        lookups.count(Lookup.FOUND),
+        lookups.count(Lookup.EMPTY),
+        lookups.count(Lookup.LIMITED),
+        lookups.count(Lookup.NOT_REACHED),
+        sum(entry.foreign_ignored for entry in observations.associated),
+        len(observations.pull_requests_from_lookups),
+        len(observations.commits),
+        statuses.count(DetailStatus.FETCHED),
+        statuses.count(DetailStatus.BEYOND_RANGE),
     )

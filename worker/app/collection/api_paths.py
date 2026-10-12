@@ -1,11 +1,13 @@
 """대상 저장소 하나의 GitHub REST API 경로 틀.
 
-경로는 검사를 통과한 저장소 좌표·SHA·번호와 F가 올리는 쪽 번호로만 만든다. 응답의
+경로는 검사를 통과한 저장소 좌표·SHA·번호·기준 브랜치 이름과 F가 올리는 쪽 번호로만
+만든다. 브랜치 이름은 경로 문자로 해석되지 않게 모두 인코딩한다. 응답의
 `url`·Link 헤더의 next 주소는 쓰지 않는다. 경로를 만드는 곳은 이 모듈뿐이다.
 """
 
 from dataclasses import dataclass
 from typing import NewType
+from urllib.parse import quote
 
 from app.collection.identifiers import (
     RepositoryCoordinates,
@@ -49,10 +51,39 @@ class RepositoryPaths:
         query = f"state=all&sort=created&direction=desc&{_page_query(page, per_page)}"
         return ApiPath(f"{self._base}/pulls?{query}")
 
+    def pull_request(self, number: int) -> ApiPath:
+        """PR 하나(PR API). 관계 조회가 PR의 전체 커밋 수(`commits`)를 볼 때만 쓴다."""
+        return ApiPath(f"{self._base}/pulls/{require_number(number)}")
+
     def pull_request_commits(self, number: int, page: int, per_page: int) -> ApiPath:
         number = require_number(number)
         return ApiPath(
             f"{self._base}/pulls/{number}/commits?{_page_query(page, per_page)}"
+        )
+
+    def commit_pulls(self, sha: str, page: int, per_page: int) -> ApiPath:
+        """커밋과 연결된 PR(연결 PR API)."""
+        return ApiPath(
+            f"{self._base}/commits/{normalize_sha(sha)}/pulls?"
+            f"{_page_query(page, per_page)}"
+        )
+
+    def branch_commits(self, ref: str, page: int, per_page: int) -> ApiPath:
+        """지정한 브랜치의 커밋, 최근 것부터. ref는 호출하는 쪽이 이름 규칙으로 검사한 값이다."""
+        if not ref:
+            raise ValueError("브랜치 이름이 비었다")
+        return ApiPath(
+            f"{self._base}/commits?sha={quote(ref, safe='')}&"
+            f"{_page_query(page, per_page)}"
+        )
+
+    def compare(
+        self, base_sha: str, head_sha: str, page: int, per_page: int
+    ) -> ApiPath:
+        """두 커밋의 비교(base...head). 병합 기준 커밋과 전체 커밋 수를 준다."""
+        return ApiPath(
+            f"{self._base}/compare/{normalize_sha(base_sha)}...{normalize_sha(head_sha)}?"
+            f"{_page_query(page, per_page)}"
         )
 
     def issues(self, page: int, per_page: int) -> ApiPath:

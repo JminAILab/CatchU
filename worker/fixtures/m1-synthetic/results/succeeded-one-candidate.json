@@ -13,13 +13,13 @@
   "candidates": [
     {
       "candidateId": "candidate-{{caseId}}-{{attemptId}}-1",
-      "title": "합성 작업 A: 로그인 실패 안내 문구 정리",
+      "title": "loginErrorMessage 코드 수정",
       "workIdentity": "synthetic-work-{{caseId}}-a",
       "workFacts": [
-        "합성 커밋 2건이 로그인 실패 안내 문구를 바꿨다",
-        "합성 PR 1건이 두 커밋을 묶어 병합됐다"
+        "합성 커밋이 로그인 실패 안내 문구를 바꿨다",
+        "합성 PR이 커밋들을 묶어 병합됐다"
       ],
-      "subjectContribution": "합성 회원이 PR과 커밋 2건을 작성했다",
+      "subjectContribution": "합성 회원 계정이 작성자로 기록된 커밋",
       "groupingBasis": "같은 합성 PR에 속한 커밋",
       "groupingLimitations": [
         "합성 자료라 실제 저장소 기록과 대조하지 않았다"
@@ -37,7 +37,7 @@
           "representedFacts": [
             "합성 PR 1건에 커밋 2건이 포함됐다"
           ],
-          "contributionScope": "PR 작성과 커밋 2건",
+          "contributionScope": "합성 회원 계정이 연 PR(본인 기여는 이 PR의 본인 커밋에 한정)",
           "coverageLimits": [
             "리뷰 댓글은 포함하지 않았다"
           ]

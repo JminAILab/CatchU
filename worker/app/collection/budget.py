@@ -49,6 +49,18 @@ class CollectionBudget:
         self._calls += 1
         return remaining
 
+    def remaining_calls(self) -> int:
+        """호출 수 상한까지 남은 호출. 호출로 세지 않는다."""
+        return max(0, self._limits.max_calls - self._calls)
+
+    def remaining_seconds(self) -> float:
+        """수집 시간 상한까지 남은 초. 호출로 세지 않는다."""
+        return max(0.0, (self._deadline - self._clock()).total_seconds())
+
+    def remaining_bytes(self) -> int:
+        """수집 총량 상한까지 남은 바이트. 호출로 세지 않는다."""
+        return max(0, self._limits.max_total_bytes - self._received_bytes)
+
     def time_exhausted(self) -> bool:
         return self._clock() >= self._deadline
 
