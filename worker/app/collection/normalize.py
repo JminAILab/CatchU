@@ -545,7 +545,9 @@ def _graphql_pull_request(
 def _graphql_author(pull: Json) -> GitHubAccount | None:
     """작성자. 명시적 null만 작성자 없음이다. 있는 작성자의 숫자 ID를 얻지 못하면 모양 오류다.
 
-    숫자 ID(`databaseId`)는 REST의 `user.id`와 같은 계정을 가리킨다고 보고 같은 칸에 넣는다.
+    숫자 ID(`databaseId`)는 REST의 `user.id`와 같은 계정을 가리킨다고 보고 같은 칸에 넣는다. GitHub
+    Enterprise 계정(EnterpriseUserAccount)은 숫자 ID가 없어 그 계정의 GitHub 사용자(`user`)를 작성자로 쓴다.
+    `user`가 없거나 null이어도 작성자 없음으로 바꾸지 않고 모양 오류로 둔다.
     """
     if "author" not in pull:
         raise MalformedResponse("author: 없다")
@@ -553,6 +555,8 @@ def _graphql_author(pull: Json) -> GitHubAccount | None:
     if value is None:
         return None
     author = _object(value)
+    if author.get("__typename") == "EnterpriseUserAccount":
+        author = _object(author.get("user"))
     try:
         return GitHubAccount(
             _text(author, "login"), require_number(author.get("databaseId"))

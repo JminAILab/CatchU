@@ -258,6 +258,8 @@ def test_request_uses_one_fixed_template_with_values_only_in_variables(
     for argument in ("after:", "before:", "last:"):
         assert argument not in query
     assert "mutation" not in query
+    # 로그인은 유형마다 묻는다. GitHub Enterprise 계정의 login(이메일일 수 있음)은 묻지 않는다.
+    assert "author { __typename ... on User" in query
     # 응답 해석이 읽는 필드를 모두 묻는다. 대역은 쿼리와 무관하게 채워 답하므로 여기서 고정한다.
     for selection in (
         "rateLimit { cost remaining resetAt }",
@@ -267,8 +269,9 @@ def test_request_uses_one_fixed_template_with_values_only_in_variables(
         "number title body state createdAt closedAt mergedAt mergeCommit { oid }",
         "headRefOid headRefName baseRefName baseRefOid",
         "headRepository { nameWithOwner } baseRepository { nameWithOwner }",
-        "... on User { databaseId }",
-        "... on Bot { databaseId }",
+        "... on User { login databaseId }",
+        "... on Bot { login databaseId }",
+        "... on EnterpriseUserAccount { user { login databaseId } }",
     ):
         assert selection in query, selection
     assert re.findall(r"(\w+): object\(oid: \$(\w+)\)", query) == [
@@ -466,6 +469,17 @@ def test_unmerged_pull_request_has_no_merge_commit(state: str, closed: bool) -> 
             GitHubAccount("imported-user", 77),
             id="mannequin",
         ),
+        # GitHub Enterprise 계정은 그 계정의 GitHub 사용자를 작성자로 쓴다. 그 계정의 login(이메일일 수
+        # 있음)은 묻지도 쓰지도 않는다.
+        pytest.param(
+            {
+                "__typename": "EnterpriseUserAccount",
+                "login": "someone@example.invalid",
+                "user": {"login": MEMBER.login, "databaseId": 1001},
+            },
+            MEMBER,
+            id="enterprise-user-account",
+        ),
     ],
 )
 def test_author_uses_login_and_database_id(
@@ -643,7 +657,30 @@ _MALFORMED: list[Any] = [
                 ),
             ),
         ),
-        id="author-without-number",
+        id="enterprise-account-without-user",
+    ),
+    *(
+        pytest.param(
+            _data(
+                _VALID,
+                _commit(
+                    1,
+                    _node(
+                        40,
+                        author={
+                            "__typename": "EnterpriseUserAccount",
+                            "login": "enterprise-user",
+                            "user": user,
+                        },
+                    ),
+                ),
+            ),
+            id=f"enterprise-account-user-{name}",
+        )
+        for name, user in (
+            ("null", None),
+            ("without-number", {"login": "enterprise-user"}),
+        )
     ),
     *(
         pytest.param(

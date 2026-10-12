@@ -43,9 +43,9 @@
 | `head_sha`·`head_ref`·`base_ref`·`base_sha` | `headRefOid`·`headRefName`·`baseRefName`·`baseRefOid` | `head.sha`·`head.ref`·`base.ref`·`base.sha` |
 | `from_fork` | `headRepository`가 null이거나 다른 저장소 | `head.repo`가 null이거나 다른 저장소 |
 | 기준 저장소 | `baseRepository.nameWithOwner`. null이면 기준 저장소 불명 | `base.repo.full_name`. 없거나 null이면 불명 |
-| `author` | `author`의 `login`과 숫자 ID(`databaseId`, 사용자·봇·Mannequin·조직 유형) | `user.login`·`user.id` |
+| `author` | `author`의 `login`과 숫자 ID(`databaseId`, 사용자·봇·Mannequin·조직 유형). GitHub Enterprise 계정(`EnterpriseUserAccount`)은 숫자 ID가 없어 그 계정의 GitHub 사용자 `user`의 `login`·`databaseId` | `user.login`·`user.id` |
 
-작성자 숫자 ID는 REST `user.id`와 같은 계정을 가리킨다고 보고 같은 칸에 넣는다. 같은 계정인지는 이 숫자로만 본다. `author`가 명시적으로 null이면 작성자 없음이다. 작성자가 있는데 숫자 ID를 얻지 못하면(숫자 ID가 없는 유형 포함) 작성자 없음으로 바꾸지 않고 모양 오류로 멈춘다. 필드가 응답에 없으면(값이 null인 것과 달리) 모양 오류다. 봇의 로그인은 GraphQL이 `[bot]` 없이 준다(아래 실측). 로그인은 지금 판정·결과 문장에 쓰지 않아 영향이 없다. 삭제된 계정이 연 PR은 REST가 ghost 계정을, GraphQL이 `author` null을 줄 수 있다(미실측). 그러면 연결 PR 조회로만 안 그 PR은 「다른 계정이 연 PR」 대신 작성자를 확인하지 못한 PR(한계 문구 포함)이 된다.
+작성자 숫자 ID는 REST `user.id`와 같은 계정을 가리킨다고 보고 같은 칸에 넣는다. 같은 계정인지는 이 숫자로만 본다. `author`가 명시적으로 null이면 작성자 없음이다. 작성자가 있는데 숫자 ID를 얻지 못하면(GitHub Enterprise 계정의 `user`가 없거나 null인 경우 포함) 작성자 없음으로 바꾸지 않고 모양 오류로 멈춘다. 로그인은 유형마다 묻고, 이메일일 수 있는 GitHub Enterprise 계정의 `login`은 묻지 않는다. 필드가 응답에 없으면(값이 null인 것과 달리) 모양 오류다. 봇의 로그인은 GraphQL이 `[bot]` 없이 준다(아래 실측). 로그인은 지금 판정·결과 문장에 쓰지 않아 영향이 없다. 삭제된 계정이 연 PR은 REST가 ghost 계정을, GraphQL이 `author` null을 줄 수 있다(미실측). 그러면 연결 PR 조회로만 안 그 PR은 「다른 계정이 연 PR」 대신 작성자를 확인하지 못한 PR(한계 문구 포함)이 된다.
 
 ## 결과와 실패
 
@@ -81,7 +81,7 @@ HTTP 200도 `errors`가 있으면 성공이 아니다. `errors`와 일부 `data`
 
 | 상한 | 제안값 | 고른 이유 |
 |---|---|---|
-| 묶음 크기 `max_lookup_batch` | 100(최대 100) | 아래 실측에서 100개 묶음이 1점이었다. 50개도 1점이라 줄이면 요청 수만 늘고 점수는 줄지 않는다. 100개 묶음은 1.4~2.1초에 끝나 GitHub의 처리 시간 한도(10초)보다 짧다 |
+| 묶음 크기 `max_lookup_batch` | 100(최대 100) | 아래 실측에서 100개 묶음이 1점이었다. 50개도 1점이라 줄이면 요청 수만 늘고 점수는 줄지 않는다. 100개 묶음은 1.4~3.4초에 끝나 GitHub의 처리 시간 한도(10초)보다 짧다 |
 | 요청당 호출 수 `max_calls` | 300회 유지 | 아래 비교에서 본인 커밋 500건·PR 0건 저장소가 216회로 수집을 마치고 후보 판정까지 간다(전에는 300회에서 수집 실패). 관계 조회를 하지 않는 기본 경로의 최악 298회도 그대로 들어간다. 판정에 꼭 필요한 호출은 비교한 모양 모두 114회 이하이고, 남는 호출은 선택 변경 내용이 쓴다 |
 
 **같은 합성 저장소의 호출 수 비교.** 같은 사례(`tests/call_budget_shapes.py`)를 기준 판본 `e09a633`(커밋마다 REST)과 이번 판본(묶음 조회)에서 운영 제안 상한으로 돌렸다. 개수는 #267 「왜」 표의 공개 저장소 모양을 본떴고, 실제 저장소를 부르지 않았다. 변경 내용은 커밋마다 파일 하나를 고친 응답이다. 칸은 목록·PR 커밋 목록·연결 PR 조회·경계 비교·변경 내용 순이다. 파일 모드 확인(diff 형식 조회)은 관계 근거(재제출·cherry-pick 표시)가 있고 모드를 뺀 변경이 같은 쌍에만 생기는데, 여섯 모양에는 그런 쌍이 없어 두 판본 모두 0회라 칸에서 뺐다. 그런 쌍이 있으면 그 커밋마다 REST 1회가 더 든다(두 판본 같음).
@@ -97,7 +97,7 @@ HTTP 200도 `errors`가 있으면 성공이 아니다. `errors`와 일부 `data`
 
 호출 상한이 충분하면(5,000회로 비교할 때만) 기준 판본은 710·710·300·220·302·331회, 이번 판본은 216·217·156·116·137·314회를 쓰고 여섯 모양 모두 결과 메시지가 같았다. 상한 300회에서는 이번 판본이 아낀 호출만큼 변경 내용을 더 받아, TheMe 모양처럼 결과가 기준 판본과 다를 수 있다. 이 차이는 확인 범위가 넓어진 것이다.
 
-**실측(2026-10-12).** #267이 허용한 범위(이슈 「왜」 표의 공개 저장소, 담당자 본인 토큰, 읽기 쿼리)에서 이번 구현의 쿼리 틀·전송·응답 검사를 그대로 써서 GraphQL 6회·REST 5회를 불렀다. 쿼리 판본은 측정 때의 `app/collection/graphql.py`(git blob `c30156735d1d`)이고, 100개 묶음의 요청 본문은 12,061 B다. 이 틀이 바뀌면 다시 재거나 차이를 여기에 적는다. 토큰은 GitHub CLI의 OAuth 토큰이고 권한 범위는 `gist`·`project`·`read:org`·`repo`·`workflow`다(값은 남기지 않음). 시간은 이 프로그램 안에서 잰 요청 왕복(연결·TLS 포함, 프로그램 기동 제외)이다.
+**실측(2026-10-12).** #267이 허용한 범위(이슈 「왜」 표의 공개 저장소, 담당자 본인 토큰, 읽기 쿼리)에서 이번 구현의 쿼리 틀·전송·응답 검사를 그대로 써서 GraphQL 6회·REST 5회를 불렀다. 쿼리 판본은 측정 때의 `app/collection/graphql.py`(git blob `c30156735d1d`)이고, 100개 묶음의 요청 본문은 12,061 B다. 그 뒤 작성자 필드를 고친 틀(GitHub Enterprise 계정 작성자를 더하고 로그인을 유형마다 묻게 함)을 같은 날 두 번 다시 불러, 쿼리가 실행되고 응답 검사를 통과하는지 확인했다(표의 「다시 확인」 두 줄, 각 GraphQL 2회·REST 5회). 지금 코드의 틀은 두 번째 것(blob `1353446483fd`, 100개 묶음 요청 본문 12,138 B)이다. 이 틀이 바뀌면 다시 재거나 차이를 여기에 적는다. 토큰은 GitHub CLI의 OAuth 토큰이고 권한 범위는 `gist`·`project`·`read:org`·`repo`·`workflow`다(값은 남기지 않음). 시간은 이 프로그램 안에서 잰 요청 왕복(연결·TLS 포함, 프로그램 기동 제외)이다.
 
 | 대상과 판본 | 묶음 | 점수 | 시간 | 응답 크기 | 응답 검사 |
 |---|---|---|---|---|---|
@@ -105,6 +105,8 @@ HTTP 200도 `errors`가 있으면 성공이 아니다. `errors`와 일부 `data`
 | 같은 저장소 | 50 | 1 | 0.76초 | 7,627 B | 통과 |
 | 같은 저장소, 실제 커밋 1개와 없는 SHA 1개 | 2 | 1 | 0.43초 | 296 B | 없는 SHA가 오류 없이 null → 모양 오류로 멈춤(`COLLECTION_FETCH_FAILED`) |
 | `ljm0850/TheMe` PR 커밋 포함 100건(머리 `694b343`) | 100 | 1 | 1.93초 | 28,387 B | 통과, PR 2건 |
+| 다시 확인 1(중간 틀 blob `178fc0e2bcc9`): algo-problem 100건, TheMe PR 커밋 포함 100건 | 100·100 | 1·1 | 1.56·3.41초 | 15,127·28,387 B | 통과, 봇 작성자 숫자 ID가 REST와 같음 |
+| 다시 확인 2(지금 틀 blob `1353446483fd`): 같은 두 묶음 | 100·100 | 1·1 | 2.15·2.22초 | 15,127·28,387 B | 통과, 봇 작성자 숫자 ID가 REST와 같음 |
 
 **PR이 많은 묶음의 크기.** PR 한 건의 응답은 본문 없이 약 0.7 KB이고 본문만큼 커진다(TheMe의 PR 2건은 합쳐 약 13 KB). 커밋 100개가 PR을 하나씩 가지면 본문 2,000자일 때 약 0.3 MB(한글이면 0.7 MB), 10,000자 한글이면 약 3 MB로 10 MB 안이다. GitHub 본문 최대 길이(65,536자)의 한글 본문 PR이 한 묶음에 53건쯤 모이면 10 MB를 넘어 그 묶음 전체가 `LIMITED`가 된다. 이 크기는 합성 계산이고, PR이 많은 묶음의 처리 시간 여유는 실측하지 않았다(미검증).
 
@@ -124,7 +126,7 @@ HTTP 200도 `errors`가 있으면 성공이 아니다. `errors`와 일부 `data`
 실측으로 확인한 것과 아직 아닌 것:
 
 - **확인함(2026-10-12, TheMe PR 2건)**: 같은 PR을 REST PR 목록(`GET /repos/{owner}/{repo}/pulls`, 연결 PR API와 같은 PR 요약 모양)과 대조했다. 봇 작성자의 숫자 ID가 REST `user.id`와 같다. 머리·기준 커밋, 두 브랜치 이름, 열린 상태(`OPEN`→open), 만든 시각, 제목, 본문, 포크 여부가 같다. 두 PR 모두 열려 있어 닫은·병합 시각은 둘 다 null인 것만 확인했다. 로그인은 GraphQL `dependabot`, REST `dependabot[bot]`으로 다르다. 100개 묶음이 1점이고 없는 SHA는 null로 온다.
-- **확인하지 못함**: 사용자·Mannequin·조직 작성자의 숫자 ID(두 PR 모두 봇), 삭제된 계정 작성자(REST ghost, GraphQL null), 닫히거나 병합된 PR의 상태(`CLOSED`·`MERGED`→closed)와 `closedAt`·`mergedAt` 값, 병합된 PR의 `mergeCommit.oid`와 `merge_commit_sha`, 저장소 접근이 막혔을 때의 응답 모양, PR이 많은 묶음의 처리 시간.
+- **확인하지 못함**: 사용자·Mannequin·조직·GitHub Enterprise 계정 작성자의 숫자 ID(두 PR 모두 봇. GitHub Enterprise 계정이 공개 저장소 PR의 작성자로 오는 조건은 문서에 없다), 삭제된 계정 작성자(REST ghost, GraphQL null), 닫히거나 병합된 PR의 상태(`CLOSED`·`MERGED`→closed)와 `closedAt`·`mergedAt` 값, 병합된 PR의 `mergeCommit.oid`와 `merge_commit_sha`, 저장소 접근이 막혔을 때의 응답 모양, PR이 많은 묶음의 처리 시간.
 - **[#121](https://github.com/JminAILab/CatchU/issues/121) 실제 연결에서 함께 대조할 것(제안)**: A가 줄 토큰으로 이 쿼리가 실행되는지와 그 한도, PR 번호와 함께 작성자 숫자 ID·병합 커밋 SHA·병합 시각이 REST와 같은지, 요청 하나의 실제 호출 수·점수·시간. #121의 완료 기준을 이 문서가 바꾸지는 않는다.
 
 기준 판본 `e09a633`의 REST 연결 PR 조회 코드는 이번 판본에서 지웠고, 비교용 REST 경로를 운영 코드에 남기지 않았다. 다시 대조하려면 `e09a633`을 꺼낸 작업 폴더의 `worker/tests/`에 이 판본의 `tests/call_budget_shapes.py`를 복사하고, 모양마다 `build(shape).scenario`를 `run_case(..., limits=PROPOSED_LIMITS)`로 돌려 호출 경로를 종류별로 센다. 그 판본의 연결 PR 조회는 REST 경로 `/commits/{sha}/pulls?`이다.

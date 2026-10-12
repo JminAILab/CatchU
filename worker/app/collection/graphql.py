@@ -23,13 +23,16 @@ MAX_BATCH = 100
 PULLS_PER_COMMIT = MAX_PER_PAGE
 
 # 연결 PR 한 건에서 읽는 필드. REST 연결 PR API에서 읽던 값과 같은 뜻의 필드만 둔다. 작성자 숫자 ID는
-# Actor 인터페이스에 없어 숫자 ID가 있는 유형마다 받는다.
+# Actor 인터페이스에 없어 유형마다 로그인과 함께 받는다. GitHub Enterprise 계정(EnterpriseUserAccount)은
+# 숫자 ID가 없고 login이 이메일일 수 있어, 그 login은 묻지 않고 그 계정의 GitHub 사용자(user)의
+# 로그인·숫자 ID를 받는다.
 _PULL_FIELDS = (
     "number title body state createdAt closedAt mergedAt mergeCommit { oid } "
     "headRefOid headRefName baseRefName baseRefOid "
     "headRepository { nameWithOwner } baseRepository { nameWithOwner } "
-    "author { __typename login ... on User { databaseId } ... on Bot { databaseId } "
-    "... on Mannequin { databaseId } ... on Organization { databaseId } }"
+    "author { __typename ... on User { login databaseId } ... on Bot { login databaseId } "
+    "... on Mannequin { login databaseId } ... on Organization { login databaseId } "
+    "... on EnterpriseUserAccount { user { login databaseId } } }"
 )
 _COMMIT_FRAGMENT = (
     "fragment AssociatedPulls on Commit { __typename oid "
