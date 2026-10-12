@@ -22,10 +22,12 @@
    표시가 없는 것은 끝의 증거로 쓰지 않는다.
 3. 로컬 계산(호출 없음): PR 커밋 목록·merge_commit_sha로 설명되지 않은 본인 커밋을 고른다.
 4. LOOKUPS(커밋·PR 허용 때): 고른 커밋을 모두 먼저 계획해 두고 최근 것부터 연결 PR을 조회한다.
+   묶음(최대 max_lookup_batch개)마다 GraphQL POST 한 번으로 차례로 묻는다(#267, graphql.py).
    커밋 조회를 마친 뒤(멈췄으면 멈춘 때) 그 결과로 PR 없는 병합 후보를 고른다. 들인 커밋(흡수
    병합이 기준 브랜치에서 들인 커밋은 뺀다)에 PR 밖으로 확인된(빈 목록이거나 멈춰 조회하지 못한)
-   본인 커밋이 있는 병합만 이어서 조회한다. 응답 크기 상한, 다음 쪽, 기준 저장소를 알 수 없는 PR은
-   그 커밋의 자료 범위 한계(LIMITED)다. 그다음 이 병합 가운데 첫 부모 쪽 조상이 창 밖으로 열린
+   본인 커밋이 있는 병합만 다음 묶음으로 조회한다(멈췄으면 계획만 한다). 다음 쪽이나 기준 저장소를
+   알 수 없는 PR은 그 커밋의, 응답 크기 상한을 넘은 묶음은 그 묶음 커밋 모두의 자료 범위
+   한계(LIMITED)다. 그다음 이 병합 가운데 첫 부모 쪽 조상이 창 밖으로 열린
    병합만 경계 비교(비교 API, 첫 부모...병합)를 비교 쪽수 상한까지 부른다. 창만으로는 첫 부모가 이미
    담은 커밋을 다 빼지 못하기 때문이다. 창이 저장소의 모든 이력을 담았으면 부르지 않는다. 결과는
    MergeBoundary로 남기고, 쪽수·응답 크기 상한이나 수가 맞지 않으면 다 읽지 못한 것(complete 거짓),
@@ -46,8 +48,9 @@
    시간 상한에 걸릴 수 있다.
 
 어느 단계든 200이 아닌 응답(빈 Git 저장소의 커밋 목록 409는 빼고: #117)·오류·상한이면 다른
-호출처럼 수집을 멈춘다. 비교 API(250건 경로와 경계 비교)·연결 PR 조회·추가 기준 브랜치의
-404·409·422와 diff 형식 조회의 오류 응답도 같다. 멈추면 그 단계를 남기고, 계획했으나 닿지 못한
+호출처럼 수집을 멈춘다. 비교 API(250건 경로와 경계 비교)·추가 기준 브랜치의 404·409·422와 diff
+형식 조회의 오류 응답도 같다. 연결 PR 묶음 조회는 HTTP 200이라도 errors·null 커밋·모양 오류가 있으면
+그 묶음 결과를 하나도 쓰지 않고 멈춘다. 멈추면 그 단계를 남기고, 계획했으나 닿지 못한
 조회는 NOT_REACHED로 둔다. 다시 부르지 않는다. 소속 확정·같은 변경·후보 판정은 하지 않는다. 그
 판정은 app/candidates가 이 관측으로 한다.
 
@@ -72,8 +75,10 @@ from app.collection.collectors import (
     list_pages,
     reading,
 )
+from app.collection.failures import FailureCode, stop
 from app.collection.gateway import GitHubGateway, Oversized
 from app.collection.graph import BroughtIn, WindowGraph, base_line, is_merge
+from app.collection.graphql import associated_pulls_request
 from app.collection.identifiers import GitHubAccount, RepositoryCoordinates
 from app.collection.limits import CollectionLimits
 from app.collection.records import (
@@ -120,15 +125,16 @@ class RelationOptions:
 
 
 class Lookup(StrEnum):
-    """커밋 하나의 연결 PR 조회 상태. 조회 오류(404·409·422 포함)는 상태가 아니라 수집 실패다."""
+    """커밋 하나의 연결 PR 조회 상태. 조회 오류(오류 응답·null 커밋·모양 오류)는 상태가 아니라
+    수집 실패다."""
 
     # 다음 쪽 없이 이 저장소의 PR을 돌려줬다.
     FOUND = "FOUND"
     # 다음 쪽 없이 이 저장소의 PR이 0건이었다(정상 부재). 다른 저장소 기준으로 확인된 PR만 있었던
     # 경우도 여기다.
     EMPTY = "EMPTY"
-    # 응답 크기 상한을 넘었거나, 연결 PR이 한 쪽보다 많거나(다음 쪽이 있다. 첫 쪽이 다른 저장소
-    # PR로만 찼어도 같다), 기준 저장소를 알 수 없는 PR이 있었다(자료 범위 한계).
+    # 묶음 응답이 크기 상한을 넘었거나, 연결 PR이 100개보다 많거나(다음 쪽이 있다. 첫 100개가 다른
+    # 저장소 PR로만 찼어도 같다), 기준 저장소를 알 수 없는 PR이 있었다(자료 범위 한계).
     LIMITED = "LIMITED"
     # 수집이 멈춰 조회하지 못했다(확인 중단).
     NOT_REACHED = "NOT_REACHED"
@@ -170,7 +176,7 @@ class AssociatedPulls:
     pull_requests: tuple[int, ...] = ()
     # 기준 저장소가 다른 저장소로 확인돼 버린 PR 수.
     foreign_ignored: int = 0
-    # 기준 저장소를 알 수 없어(base.repo가 없거나 null) 버린 PR 수. 1 이상이면 LIMITED다.
+    # 기준 저장소를 알 수 없어(baseRepository가 null) 버린 PR 수. 1 이상이면 LIMITED다.
     unknown_base: int = 0
 
 
@@ -953,11 +959,11 @@ class RelationCollector:
         )
         # 전체를 먼저 계획해 둔다. 멈추면 닿지 못한 대상을 NOT_REACHED로 남긴다.
         self._planned_lookups.extend(targets)
-        for sha in targets:
-            self._look_up(gateway, sha, data)
+        self._look_up(gateway, targets, data)
+        # 병합 후보는 커밋 조회 결과(새로 안 PR의 병합 커밋 포함)로 고르므로 커밋 묶음을 모두 받은
+        # 뒤에 다음 묶음으로 조회한다. 두 단계를 한 묶음으로 합치지 않는다.
         self._plan_merge_lookups(data)
-        for sha in self._planned_lookups[len(targets) :]:
-            self._look_up(gateway, sha, data)
+        self._look_up(gateway, self._planned_lookups[len(targets) :], data)
         first_parents = {
             record.sha: record.parents[0] for record in data.commits if record.parents
         }
@@ -1041,20 +1047,48 @@ class RelationCollector:
                 return unfinished()
         return unfinished()
 
-    def _look_up(self, gateway: GitHubGateway, sha: str, data: CollectedData) -> None:
-        """커밋 하나의 연결 PR을 한 쪽만 조회한다. 조회 오류(409·422 포함)는 수집을 멈춘다."""
-        items: list[object] = []
-        end = list_pages(
-            gateway,
-            partial(self._paths.commit_pulls, sha),
-            MAX_PER_PAGE,
-            items.extend,
-        )
-        if end.oversized:
-            self._associated[sha] = AssociatedPulls(sha, Lookup.LIMITED)
-            return
-        with reading():
-            found = normalize.associated_pull_requests(items, self._paths.repository)
+    def _look_up(
+        self, gateway: GitHubGateway, shas: Sequence[str], data: CollectedData
+    ) -> None:
+        """커밋들의 연결 PR을 계획 순서대로 묶음(최대 max_lookup_batch개)마다 POST 한 번으로 조회한다.
+
+        묶음은 차례로 하나씩 부르고 다시 부르지 않는다. 응답이 크기 상한을 넘은 묶음은 그 커밋이
+        모두 LIMITED이고 다음 묶음으로 넘어간다(나눠 다시 부르지 않는다). 오류 응답·null 커밋·모양
+        오류는 그 묶음 결과를 하나도 쓰지 않고 수집을 멈춘다. 그 묶음과 뒤의 계획 대상은 조회하지
+        못한 것(NOT_REACHED)으로 남고, 앞서 받은 묶음의 결과는 그대로 둔다.
+        """
+        size = self._limits.max_lookup_batch
+        for start in range(0, len(shas), size):
+            request = associated_pulls_request(
+                self._paths.repository, shas[start : start + size]
+            )
+            fetched = gateway.post_graphql(request)
+            if isinstance(fetched, Oversized):
+                for sha in request.shas:
+                    self._associated[sha] = AssociatedPulls(sha, Lookup.LIMITED)
+                continue
+            with reading():
+                try:
+                    found = normalize.associated_pulls_batch(
+                        fetched.data, request, self._paths.repository
+                    )
+                except normalize.MissingCommit:
+                    raise stop(
+                        FailureCode.COLLECTION_FETCH_FAILED,
+                        "연결 PR 묶음 조회에서 GitHub가 커밋을 찾지 못해(null) 다시 부르지 "
+                        "않고 수집을 멈췄다",
+                    ) from None
+                except normalize.RepositoryMismatch:
+                    raise stop(
+                        FailureCode.SCOPE_INCONSISTENT,
+                        "GitHub가 요청한 저장소가 아닌 저장소를 돌려줘 수집을 멈췄다",
+                    ) from None
+            for result in found:
+                self._take_lookup(result, data)
+
+    def _take_lookup(self, result: normalize.CommitPulls, data: CollectedData) -> None:
+        """커밋 하나의 연결 PR 첫 쪽을 관측으로 남긴다."""
+        found = result.found
         records = found.records
         listed = {record.number for record in data.pull_requests}
         for record in records:
@@ -1063,13 +1097,13 @@ class RelationCollector:
                     record.number,
                     replace(record, commits_status=DetailStatus.BEYOND_RANGE),
                 )
-        if end.more_beyond_range or found.unknown_base:
+        if result.has_next_page or found.unknown_base:
             # 다음 쪽이나 기준 저장소를 알 수 없는 PR에 이 저장소 PR이 있을 수 있다.
             status = Lookup.LIMITED
         else:
             status = Lookup.FOUND if records else Lookup.EMPTY
-        self._associated[sha] = AssociatedPulls(
-            sha,
+        self._associated[result.sha] = AssociatedPulls(
+            result.sha,
             status,
             _unique(record.number for record in records),
             found.foreign,

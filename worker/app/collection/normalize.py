@@ -1,4 +1,4 @@
-"""GitHub REST 응답(JSON)을 정규화된 기록으로 바꾼다.
+"""GitHub REST 응답(JSON)과 연결 PR 묶음 조회의 GraphQL 응답을 정규화된 기록으로 바꾼다.
 
 필요한 필드만 읽고 모양을 검사한다. 응답의 `url`·`html_url` 같은 주소는 읽지 않는다.
 본문·메시지의 글자는 해석하지 않고 그대로 자료로 옮긴다. diff 형식 커밋 응답은 파일 머리글의
@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, cast
 
+from app.collection.graphql import PULLS_PER_COMMIT, GraphQLRequest, alias
 from app.collection.identifiers import (
     GitHubAccount,
     RepositoryCoordinates,
@@ -340,7 +341,7 @@ def pull_request(
 
 @dataclass(frozen=True)
 class AssociatedPullRequests:
-    """연결 PR API 응답 한 쪽을 기준 저장소로 가른 결과."""
+    """커밋 하나의 연결 PR 한 쪽을 기준 저장소로 가른 결과."""
 
     # 이 저장소를 기준으로 연 PR(응답 순서).
     records: tuple[PullRequestRecord, ...]
@@ -348,25 +349,6 @@ class AssociatedPullRequests:
     foreign: int
     # 기준 저장소를 알 수 없어(`base.repo`가 없거나 null) 버린 PR 수. 이 저장소 PR일 수도 있다.
     unknown_base: int
-
-
-def associated_pull_requests(
-    items: Iterable[object], repository: RepositoryCoordinates
-) -> AssociatedPullRequests:
-    """연결 PR API 응답에서 이 저장소를 기준으로 연 PR만 남긴다."""
-    records: list[PullRequestRecord] = []
-    foreign = 0
-    unknown_base = 0
-    for item in items:
-        base_repository = _object(_object(item).get("base")).get("repo")
-        if base_repository is None:
-            unknown_base += 1
-            continue
-        if not repository.same_as(repository_full_name(base_repository)):
-            foreign += 1
-            continue
-        records.append(pull_request(item, repository, DetailStatus.NOT_REQUESTED))
-    return AssociatedPullRequests(tuple(records), foreign, unknown_base)
 
 
 @dataclass(frozen=True)
@@ -421,6 +403,192 @@ def comparison(data: object) -> Comparison:
         commits=tuple(as_list(compared.get("commits"))),
         merge_base=merge_base,
     )
+
+
+# 연결 PR 묶음 조회(#267, GraphQL). 쿼리 틀은 graphql.py에 있다.
+
+
+class MissingCommit(MalformedResponse):
+    """묶음 응답에서 요청한 커밋이 null이다(GitHub가 그 SHA의 커밋을 찾지 못했다)."""
+
+
+class RepositoryMismatch(MalformedResponse):
+    """요청한 저장소가 아닌 저장소로 답했다."""
+
+
+@dataclass(frozen=True)
+class CommitPulls:
+    """커밋 하나의 연결 PR 첫 쪽을 기준 저장소로 가른 결과."""
+
+    sha: str
+    found: AssociatedPullRequests
+    # 첫 100개 뒤에 연결 PR이 더 있다.
+    has_next_page: bool
+
+
+def associated_pulls_batch(
+    data: object, request: GraphQLRequest, repository: RepositoryCoordinates
+) -> tuple[CommitPulls, ...]:
+    """묶음 응답의 `data`를 요청 순서의 커밋별 결과로 바꾼다. 하나라도 어긋나면 예외를 올린다.
+
+    별칭은 요청 때 정한 것과 정확히 같아야 하고, 커밋은 그 별칭에 묶은 SHA여야 한다. 응답의 필드
+    순서는 쓰지 않는다. 결과를 모두 만든 뒤에만 돌려주므로 예외가 나면 그 묶음의 관계 상태도 PR
+    기록도 남지 않는다. `rateLimit`은 기록용이라 여기서 보지 않는다(`graphql_rate_limit`).
+    """
+    top = _object(data)
+    if not set(top) <= {"rateLimit", "repository"}:
+        raise MalformedResponse("요청하지 않은 최상위 필드가 있다")
+    found = _object(top.get("repository"))
+    if not repository.same_as(_text(found, "nameWithOwner")):
+        raise RepositoryMismatch("요청한 저장소가 아니다")
+    aliases = [alias(index) for index in range(len(request.shas))]
+    if set(found) != {"nameWithOwner", *aliases}:
+        raise MalformedResponse("요청한 별칭과 응답의 별칭이 맞지 않는다")
+    return tuple(
+        _commit_pulls(found[name], sha, repository)
+        for name, sha in zip(aliases, request.shas, strict=True)
+    )
+
+
+def _commit_pulls(
+    value: object, sha: str, repository: RepositoryCoordinates
+) -> CommitPulls:
+    if value is None:
+        raise MissingCommit("커밋이 null이다")
+    commit = _object(value)
+    if commit.get("__typename") != "Commit":
+        raise MalformedResponse("커밋이 아니다")
+    if _sha(commit.get("oid")) != sha:
+        raise MalformedResponse("요청한 커밋이 아니다")
+    connection = _object(commit.get("associatedPullRequests"))
+    next_page = _object(connection.get("pageInfo")).get("hasNextPage")
+    if not isinstance(next_page, bool):
+        raise MalformedResponse("hasNextPage: 참·거짓이 아니다")
+    nodes = as_list(connection.get("nodes"))
+    if len(nodes) > PULLS_PER_COMMIT:
+        raise MalformedResponse("연결 PR이 요청한 수보다 많다")
+    records: list[PullRequestRecord] = []
+    foreign = 0
+    unknown_base = 0
+    for node in nodes:
+        pull = _object(node)
+        if "baseRepository" not in pull:
+            raise MalformedResponse("baseRepository: 없다")
+        base_repository = pull["baseRepository"]
+        if base_repository is None:
+            # 기준 저장소를 알 수 없다. 이 저장소 PR일 수도 있다.
+            unknown_base += 1
+            continue
+        if not repository.same_as(_text(_object(base_repository), "nameWithOwner")):
+            foreign += 1
+            continue
+        records.append(_graphql_pull_request(pull, repository))
+    return CommitPulls(
+        sha, AssociatedPullRequests(tuple(records), foreign, unknown_base), next_page
+    )
+
+
+_GRAPHQL_STATES: dict[str, Literal["open", "closed"]] = {
+    "OPEN": "open",
+    "CLOSED": "closed",
+    # REST는 병합된 PR의 state를 closed로 준다.
+    "MERGED": "closed",
+}
+
+
+def _graphql_pull_request(
+    pull: Json, repository: RepositoryCoordinates
+) -> PullRequestRecord:
+    """연결 PR 한 건. REST 연결 PR API의 같은 PR을 정규화한 기록(`pull_request`)과 같은 뜻이다."""
+    state = pull.get("state")
+    if not isinstance(state, str) or state not in _GRAPHQL_STATES:
+        raise MalformedResponse("state: OPEN·CLOSED·MERGED가 아니다")
+    merged_at = _optional_time(pull, "mergedAt")
+    if (state == "MERGED") != (merged_at is not None):
+        raise MalformedResponse("병합 상태와 병합 시각이 맞지 않는다")
+    merge_commit = pull.get("mergeCommit")
+    if merge_commit is not None:
+        merge_commit = _object(merge_commit).get("oid")
+    if "headRepository" not in pull:
+        raise MalformedResponse("headRepository: 없다")
+    head_repository = pull["headRepository"]
+    try:
+        # 비교 API의 기준으로만 쓰는 선택 값이다(REST의 base.sha). 없다고 PR 기록을 버리지 않는다.
+        base_sha: str | None = normalize_sha(pull.get("baseRefOid"))
+    except ValueError:
+        base_sha = None
+    return PullRequestRecord(
+        number=_number(pull.get("number")),
+        title=_text(pull, "title"),
+        body=_optional_text(pull, "body") or "",
+        state=_GRAPHQL_STATES[state],
+        created_at=_time(pull.get("createdAt"), "createdAt"),
+        closed_at=_optional_time(pull, "closedAt"),
+        merged_at=merged_at,
+        merge_commit_sha=(
+            _sha(merge_commit) if merged_at is not None and merge_commit else None
+        ),
+        head_sha=_sha(pull.get("headRefOid")),
+        base_ref=_text(pull, "baseRefName"),
+        head_ref=_text(pull, "headRefName"),
+        # 포크가 지워졌으면 headRepository가 null이다. 이것도 이 저장소 밖에서 연 PR이다.
+        from_fork=head_repository is None
+        or not repository.same_as(_text(_object(head_repository), "nameWithOwner")),
+        author=_graphql_author(pull),
+        commits=None,
+        commits_status=DetailStatus.NOT_REQUESTED,
+        commits_truncated=False,
+        base_sha=base_sha,
+    )
+
+
+def _graphql_author(pull: Json) -> GitHubAccount | None:
+    """작성자. 명시적 null만 작성자 없음이다. 있는 작성자의 숫자 ID를 얻지 못하면 모양 오류다.
+
+    숫자 ID(`databaseId`)는 REST의 `user.id`와 같은 계정을 가리킨다고 보고 같은 칸에 넣는다.
+    """
+    if "author" not in pull:
+        raise MalformedResponse("author: 없다")
+    value = pull["author"]
+    if value is None:
+        return None
+    author = _object(value)
+    try:
+        return GitHubAccount(
+            _text(author, "login"), require_number(author.get("databaseId"))
+        )
+    except ValueError:
+        raise MalformedResponse("계정 형식이 아니다") from None
+
+
+@dataclass(frozen=True)
+class RateLimitObservation:
+    """GraphQL 응답이 함께 준 점수. 기록용이며 관계 판정에 쓰지 않는다."""
+
+    cost: int
+    remaining: int
+    reset_at: datetime
+
+
+def graphql_rate_limit(data: object) -> RateLimitObservation | None:
+    """정상 응답 `data`의 `rateLimit`. 없거나 null이거나 모양이 다르면 관측하지 못한 것(None)이다.
+
+    점수는 기록일 뿐이라 이 값 때문에 관계 자료를 버리지 않는다.
+    """
+    if not isinstance(data, Mapping):
+        return None
+    value = cast(Json, data).get("rateLimit")
+    if not isinstance(value, Mapping):
+        return None
+    found = cast(Json, value)
+    try:
+        return RateLimitObservation(
+            _count(found, "cost"),
+            _count(found, "remaining"),
+            _time(found.get("resetAt"), "resetAt"),
+        )
+    except MalformedResponse:
+        return None
 
 
 def commit_shas(items: Iterable[object]) -> tuple[str, ...]:

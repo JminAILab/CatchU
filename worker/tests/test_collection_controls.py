@@ -12,6 +12,7 @@ from github_synthetic import (
     EVIL,
     MEMBER,
     REFERENCE,
+    REPOSITORY,
     REQUEST,
     STANDARD_ORDER,
     START,
@@ -21,13 +22,20 @@ from github_synthetic import (
     Reply,
     StaticCredentials,
     StaticSelections,
+    associated_key,
     commit_detail_json,
     commit_json,
     credential_context,
+    detail_path,
+    detail_reply,
     empty_repository,
     file_json,
+    graph_commit_json,
+    graphql_route,
     issue_json,
+    oversized,
     pull_json,
+    relation_repository_json,
     repository_json,
     respond,
     sha,
@@ -42,12 +50,16 @@ from app.collection import (
     CollectionOutcome,
     DetailStatus,
     FailureCode,
+    Lookup,
+    RelationObservations,
+    RelationOptions,
     collect,
 )
 from app.collection.api_paths import ApiPath
 from app.collection.budget import CollectionBudget
 from app.collection.failures import CollectionStopped
-from app.collection.gateway import GitHubGateway, has_next_page
+from app.collection.gateway import GitHubGateway, GraphQLUsage, has_next_page
+from app.collection.graphql import associated_pulls_request
 from app.collection.transport import HttpResponse, TransportError, TransportTimeout
 
 COMMITS = f"{BASE}/commits?per_page=100&page=1"
@@ -61,6 +73,7 @@ def _run(
     limits: CollectionLimits = PROPOSED_LIMITS,
     clock: FakeClock | None = None,
     seconds_per_call: float = 0.0,
+    relations: RelationOptions | None = None,
 ) -> tuple[CollectionOutcome, FakeTransport]:
     clock = clock or FakeClock()
     transport = FakeTransport(routes, clock=clock, seconds_per_call=seconds_per_call)
@@ -71,12 +84,58 @@ def _run(
         open_transport=lambda: transport,
         clock=clock,
         limits=limits,
+        relations=relations,
     )
     return outcome, transport
 
 
 def _codes(outcome: CollectionOutcome) -> list[FailureCode]:
     return [failure.code for failure in outcome.failures]
+
+
+# 관계 조회(#118·#267) 합성: 회원 커밋 c3·c2·c1(직선, c1이 뿌리), PR·이슈 없음. 회원 커밋은 모두
+# PR로 설명되지 않아 연결 PR 묶음 조회(POST /graphql) 대상이다.
+OWN = (3, 2, 1)
+# 묶음 조회 전 REST 호출: 저장소·커밋·PR·이슈 목록.
+BEFORE_LOOKUPS = [BASE, COMMITS, PULLS, ISSUES]
+
+
+def _relation_routes() -> dict[str, Reply]:
+    routes: dict[str, Reply] = {
+        BASE: respond(relation_repository_json()),
+        COMMITS: respond(
+            [
+                graph_commit_json(n, MEMBER, parents=(n - 1,) if n > 1 else ())
+                for n in OWN
+            ]
+        ),
+        PULLS: respond([]),
+        ISSUES: respond([]),
+    }
+    for number in OWN:
+        routes[associated_key(number)] = respond([])
+        routes[detail_path(number)] = detail_reply(number, MEMBER)
+    return routes
+
+
+def _run_relations(
+    routes: dict[str, Reply], *, limits: CollectionLimits = PROPOSED_LIMITS
+) -> tuple[CollectionOutcome, FakeTransport, RelationObservations]:
+    outcome, transport = _run(routes, limits=limits, relations=RelationOptions())
+    assert outcome.relations is not None
+    return outcome, transport, outcome.relations
+
+
+def _lookups(relations: RelationObservations) -> list[tuple[str, Lookup]]:
+    return [(entry.sha, entry.status) for entry in relations.associated]
+
+
+def _received_before_lookups(routes: dict[str, Reply]) -> int:
+    return sum(
+        reply.received_bytes
+        for path in BEFORE_LOOKUPS
+        if isinstance(reply := routes[path], HttpResponse)
+    )
 
 
 # 주소·권한
@@ -502,11 +561,111 @@ def test_credential_expiring_during_collection_stops_without_refresh() -> None:
     assert len(transport.calls) == 1
 
 
+def test_credential_expiring_before_the_first_lookup_post_sends_nothing() -> None:
+    """연결 PR 묶음 조회(POST)도 보내기 전에 만료를 확인한다. 만료면 보내지 않고 호출로 세지 않는다."""
+    clock = FakeClock()
+    transport = FakeTransport(standard_routes())
+    budget = CollectionBudget(PROPOSED_LIMITS, clock=clock, started_at=START)
+    gateway = GitHubGateway(
+        transport,
+        token=AccessToken(TOKEN),
+        expires_at=START + timedelta(minutes=1),
+        budget=budget,
+        clock=clock,
+        limits=PROPOSED_LIMITS,
+    )
+    gateway.get(ApiPath(BASE))
+    clock.advance(60)
+
+    with pytest.raises(CollectionStopped) as stopped:
+        gateway.post_graphql(associated_pulls_request(REPOSITORY, [sha(1)]))
+
+    assert stopped.value.failure.code is FailureCode.CREDENTIAL_EXPIRED
+    assert transport.paths == [BASE]
+    assert transport.batches == []
+    assert budget.calls == 1
+    assert gateway.graphql_usage == GraphQLUsage()
+
+
+# 연결 PR 묶음 조회(#267)도 같은 요청 상한 안에서 부른다
+
+
+def test_call_limit_right_before_the_lookup_post_leaves_lookups_not_reached() -> None:
+    """목록 호출로 호출 수 상한에 닿으면 묶음 조회 POST를 보내지 않는다. 계획한 조회는 확인 중단이다."""
+    limits = replace(PROPOSED_LIMITS, max_calls=len(BEFORE_LOOKUPS))
+
+    outcome, transport, relations = _run_relations(_relation_routes(), limits=limits)
+
+    assert _codes(outcome) == [FailureCode.BUDGET_EXCEEDED]
+    assert transport.paths == BEFORE_LOOKUPS
+    assert transport.batches == []
+    assert outcome.calls == len(BEFORE_LOOKUPS)
+    assert outcome.graphql == GraphQLUsage()
+    assert relations.stopped_during == "LOOKUPS"
+    assert _lookups(relations) == [(sha(n), Lookup.NOT_REACHED) for n in OWN]
+    assert {c.changes_status for c in outcome.commits} == {DetailStatus.NOT_REACHED}
+
+
+def test_oversized_lookup_reply_past_the_total_size_is_a_failure_not_a_limit() -> None:
+    """묶음 응답이 단일 응답 상한을 넘었어도, 받은 크기로 수집 총량을 넘었으면 한계(LIMITED)가
+    아니라 총량 상한 실패다. 그 묶음은 확인 중단으로 남는다."""
+    routes = _relation_routes()
+    # 전송은 단일 응답 상한을 1바이트 넘겨 받은 뒤 읽기를 멈춘다.
+    received = PROPOSED_LIMITS.max_response_bytes + 1
+    routes[graphql_route(*OWN)] = oversized(received)
+    limits = replace(
+        PROPOSED_LIMITS,
+        max_total_bytes=_received_before_lookups(routes) + received - 1,
+    )
+
+    outcome, transport, relations = _run_relations(routes, limits=limits)
+
+    assert _codes(outcome) == [FailureCode.BUDGET_EXCEEDED]
+    assert transport.paths == [*BEFORE_LOOKUPS, graphql_route(*OWN)]
+    assert outcome.received_bytes > limits.max_total_bytes
+    # 보낸 POST는 호출로 세고, 점수는 알 수 없는 호출로 센다.
+    assert outcome.graphql == GraphQLUsage(calls=1, unobserved_calls=1)
+    assert _lookups(relations) == [(sha(n), Lookup.NOT_REACHED) for n in OWN]
+    assert {c.changes_status for c in outcome.commits} == {DetailStatus.NOT_REACHED}
+
+
+def test_oversized_lookup_reply_within_the_total_size_limits_only_its_batch() -> None:
+    """총량 안에서 단일 응답 상한을 넘은 묶음은 그 커밋 모두 LIMITED이고, 다음 묶음은 그대로 보낸다."""
+    routes = _relation_routes()
+    routes[graphql_route(3, 2)] = oversized(PROPOSED_LIMITS.max_response_bytes + 1)
+    limits = replace(PROPOSED_LIMITS, max_lookup_batch=2)
+
+    outcome, transport, relations = _run_relations(routes, limits=limits)
+
+    assert outcome.completed
+    assert transport.batches == [(sha(3), sha(2)), (sha(1),)]
+    # 넘은 묶음을 나눠 다시 묻지 않는다.
+    assert transport.looked_up == [sha(n) for n in OWN]
+    assert _lookups(relations) == [
+        (sha(3), Lookup.LIMITED),
+        (sha(2), Lookup.LIMITED),
+        (sha(1), Lookup.EMPTY),
+    ]
+    assert outcome.graphql == GraphQLUsage(calls=2, observed_cost=1, unobserved_calls=1)
+    assert outcome.calls == len(transport.calls)
+    # 묶음 조회 뒤 변경 내용(REST)도 부른다.
+    assert {detail_path(n) for n in OWN} <= set(transport.paths)
+
+
 # 자격정보는 호출 머리글에만
 
 
-def test_token_is_sent_only_as_authorization_and_reference_never_leaves() -> None:
-    _, transport = _run(standard_routes())
+@pytest.mark.parametrize("relation", [False, True], ids=["lists", "relations"])
+def test_token_is_sent_only_as_authorization_and_reference_never_leaves(
+    relation: bool,
+) -> None:
+    if relation:
+        # 관계 조회에는 연결 PR 묶음 조회 POST가 있다. 토큰은 그 본문에도 싣지 않는다.
+        outcome, transport, _ = _run_relations(_relation_routes())
+        assert outcome.completed
+        assert transport.batches == [tuple(sha(n) for n in OWN)]
+    else:
+        _, transport = _run(standard_routes())
 
     for call in transport.calls:
         assert call.headers["Authorization"] == f"Bearer {TOKEN}"
@@ -515,6 +674,12 @@ def test_token_is_sent_only_as_authorization_and_reference_never_leaves() -> Non
         assert not any(REFERENCE in value for value in call.headers.values())
         others = {k: v for k, v in call.headers.items() if k != "Authorization"}
         assert not any(TOKEN in value for value in others.values())
+        if call.method == "POST":
+            assert call.body is not None
+            assert TOKEN.encode() not in call.body
+            assert REFERENCE.encode() not in call.body
+        else:
+            assert call.body is None
 
 
 def test_context_repr_hides_token() -> None:
