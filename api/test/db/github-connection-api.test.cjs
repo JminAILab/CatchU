@@ -4,14 +4,14 @@ const { randomBytes, randomUUID } = require('node:crypto');
 const { mkdtemp, readdir, readFile, rm } = require('node:fs/promises');
 const { join } = require('node:path');
 const { tmpdir } = require('node:os');
-const { before, after, beforeEach, test } = require('node:test');
+const { before, after, beforeEach, test, mock } = require('node:test');
 const { NestFactory } = require('@nestjs/core');
 const { decodeJwt, SignJWT } = require('jose');
 const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
 const { GitHubConnectionService } = require('../../dist/github-connection/github-connection.service');
 const { GitHubClient, GitHubAccessToken, GitHubProviderError } = require('../../dist/github-connection/github.client');
-const { CredentialVault } = require('../../dist/github-connection/credential-vault');
+const { CredentialVault, CredentialUnavailableError } = require('../../dist/github-connection/credential-vault');
 const { GITHUB_CONFIG } = require('../../dist/github-connection/github.config');
 const { GitHubConnection } = require('../../dist/member-analysis/member-analysis.entity');
 const { ApiError } = require('../../dist/common/errors');
@@ -118,7 +118,7 @@ test('연결 해제·반복 해제는 DISCONNECTED와 자격정보 없음', asyn
   const a = await login(); await connect(a); const reference = (await row(a.memberId)).credentialReference;
   for (let i = 0; i < 2; i++) assert.deepEqual((await call(a.token, 'DELETE', '/me/github/connection')).body, { state: 'DISCONNECTED', accountLogin: null });
   assert.equal(await service.resolveCredential(a.memberId), null);
-  await assert.rejects(vault.read(reference, a.memberId), ApiError);
+  await assert.rejects(vault.read(reference, a.memberId), CredentialUnavailableError);
 });
 test('만료 확인 GET /me는 REAUTH_REQUIRED로 전환하며 CatchU JWT는 유효', async () => {
   const a = await login(); await connect(a); const c = await row(a.memberId);
@@ -160,17 +160,108 @@ test('연결 없음·개발 대역·해제·재인증이면 실제 자격정보 
   await db.manager.delete(GitHubConnection, { memberId: a.memberId });
   assert.equal(await service.resolveCredential(a.memberId), null);
 });
-test('타인 소유의 보관 참조·암호문 변조·키 변경은 인계하지 않음', async () => {
+test('타인 소유의 보관 참조는 오류로 거부하고 연결 상태를 임의 변경하지 않음', async () => {
   const a = await login(), b = await login('github-b'); await connect(a);
   const c = await row(a.memberId);
   await assert.rejects(vault.read(c.credentialReference, b.memberId), ApiError);
-  const { writeFile } = require('node:fs/promises');
-  const path = join(directory, c.credentialReference.slice(10) + '.enc'), original = await readFile(path);
-  const changed = Buffer.from(original); changed[28] ^= 1; await writeFile(path, changed);
-  await assert.rejects(service.resolveCredential(a.memberId), ApiError); await writeFile(path, original);
-  const config = app.get(GITHUB_CONFIG), oldKey = config.encryptionKey;
-  config.encryptionKey = randomBytes(32);
-  try { await assert.rejects(service.resolveCredential(a.memberId), ApiError); } finally { config.encryptionKey = oldKey; }
+  assert.deepEqual(await row(a.memberId), c);
+});
+
+for (const entry of ['회원 조회', '자격정보 제공']) {
+  for (const fault of ['파일 누락', '키 불일치', '암호문 변조']) {
+    test(`${entry}에서 ${fault} 확인 시 회원 조회 유지·REAUTH_REQUIRED·반복 미제공`, async () => {
+      const a = await login(), b = await login('unaffected-member'); await connect(a); await connect(b);
+      const current = await row(a.memberId), other = await row(b.memberId);
+      const filename = join(directory, current.credentialReference.slice(10) + '.enc');
+      const config = app.get(GITHUB_CONFIG), originalKey = config.encryptionKey;
+      const { unlink, writeFile } = require('node:fs/promises');
+      if (fault === '파일 누락') await unlink(filename);
+      if (fault === '키 불일치') config.encryptionKey = randomBytes(32);
+      if (fault === '암호문 변조') { const data = await readFile(filename); data[28] ^= 1; await writeFile(filename, data); }
+      let identityCalls = 0;
+      client.identity = async () => { identityCalls++; return { accountLogin: 'real-test-user', externalAccountReference: '12345' }; };
+      try {
+        if (entry === '회원 조회') {
+          const result = await call(a.token, 'GET', '/me');
+          assert.equal(result.status, 200); assert.equal(result.body.memberId, a.memberId);
+        } else assert.equal(await service.resolveCredential(a.memberId), null);
+        const read = await call(a.token, 'GET', '/me');
+        assert.equal(read.status, 200); assert.equal(read.body.memberId, a.memberId);
+        assert.deepEqual(read.body.github, { state: 'REAUTH_REQUIRED', accountLogin: 'real-test-user' });
+        assert.equal((await row(a.memberId)).credentialReference, null);
+        assert.equal(await service.resolveCredential(a.memberId), null);
+        assert.equal(await service.resolveCredential(a.memberId), null);
+        assert.equal(identityCalls, 0, '사용 불가 자격정보로 GitHub를 호출하지 않는다');
+        await assert.rejects(readFile(filename), error => error.code === 'ENOENT');
+      } finally { config.encryptionKey = originalKey; }
+      assert.deepEqual(await row(b.memberId), other, '다른 회원의 연결은 유지한다');
+      assert.equal((await call(b.token, 'GET', '/me')).body.github.state, 'CONNECTED');
+      assert.equal((await service.resolveCredential(b.memberId)).token.reveal(), FAKE_TOKEN);
+    });
+  }
+}
+
+for (const code of ['EACCES', 'EIO', undefined]) {
+  test(`파일 읽기 장애 ${code ?? '알 수 없는 오류'}는 500·CONNECTED 보존`, async () => {
+    const a = await login(); await connect(a); const original = await row(a.memberId);
+    const reading = mock.method(require('node:fs/promises'), 'lstat', async () => {
+      throw Object.assign(new Error('private-vault-read-marker'), { code });
+    });
+    try {
+      const result = await call(a.token, 'GET', '/me');
+      assert.equal(result.status, 500); assert.equal(result.body.code, 'INTERNAL_ERROR');
+      await assert.rejects(service.resolveCredential(a.memberId), error => error.code === 'INTERNAL_ERROR');
+      assert.deepEqual(await row(a.memberId), original);
+      assert(!logs.join(' ').includes('private-vault-read-marker'));
+    } finally { reading.mock.restore(); }
+    assert.equal((await call(a.token, 'GET', '/me')).body.github.state, 'CONNECTED');
+  });
+}
+
+test('사용 불가 연결의 DB 상태 전환 실패는 500이며 CONNECTED를 임의로 바꾸지 않음', async () => {
+  const a = await login(); await connect(a); const original = await row(a.memberId);
+  await vault.remove(original.credentialReference);
+  await db.query(`CREATE FUNCTION github_read_fail() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'private-invalidation-marker'; END; $$ LANGUAGE plpgsql`);
+  await db.query('CREATE TRIGGER github_read_fail BEFORE UPDATE ON github_connection FOR EACH ROW EXECUTE FUNCTION github_read_fail()');
+  try {
+    const result = await call(a.token, 'GET', '/me');
+    assert.equal(result.status, 500); assert.equal(result.body.code, 'INTERNAL_ERROR');
+    await assert.rejects(service.resolveCredential(a.memberId));
+    assert.deepEqual(await row(a.memberId), original);
+    assert(!logs.join(' ').includes('private-invalidation-marker'));
+  } finally { await db.query('DROP TRIGGER github_read_fail ON github_connection'); await db.query('DROP FUNCTION github_read_fail()'); }
+  assert.equal((await call(a.token, 'GET', '/me')).body.github.state, 'REAUTH_REQUIRED');
+});
+
+for (const entry of ['회원 조회', '자격정보 제공']) {
+  test(`${entry}의 늦은 파일 누락 판단이 재연결한 새 자격정보를 폐기하지 않음`, async () => {
+    const a = await login(); await connect(a); const old = await row(a.memberId);
+    const originalRead = vault.read;
+    let entered, release;
+    const started = new Promise(resolve => { entered = resolve; });
+    vault.read = async (reference, memberId) => {
+      if (reference !== old.credentialReference) return originalRead.call(vault, reference, memberId);
+      entered(); await new Promise(resolve => { release = resolve; });
+      throw new CredentialUnavailableError();
+    };
+    try {
+      const pending = entry === '회원 조회' ? call(a.token, 'GET', '/me') : service.resolveCredential(a.memberId);
+      await started; await connect(a); release();
+      if (entry === '회원 조회') assert.equal((await pending).status, 200);
+      else assert.equal(await pending, null);
+      const current = await row(a.memberId);
+      assert.equal(current.connectionState, 'CONNECTED'); assert.notEqual(current.credentialReference, old.credentialReference);
+      assert.equal((await service.resolveCredential(a.memberId)).token.reveal(), FAKE_TOKEN);
+    } finally { vault.read = originalRead; }
+  });
+}
+
+test('사용 불가 연결도 유효하지 않은 CatchU 토큰의 회원 조회를 허용하지 않음', async () => {
+  const a = await login(); await connect(a); const original = await row(a.memberId);
+  await vault.remove(original.credentialReference);
+  assert.equal((await call(null, 'GET', '/me')).status, 401);
+  assert.equal((await call('invalid-token', 'GET', '/me')).status, 401);
+  assert.deepEqual(await row(a.memberId), original);
 });
 test('외부 교환 실패·유효 만료 없는 응답은 기존 연결 보존', async () => {
   const a = await login(); await connect(a); const original = await row(a.memberId);

@@ -4,7 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import { ApiError } from '../common/errors';
 import { GitHubConnection, MemberAccount } from '../member-analysis/member-analysis.entity';
-import { CredentialVault, StoredCredential } from './credential-vault';
+import { CredentialUnavailableError, CredentialVault, StoredCredential } from './credential-vault';
 import { GITHUB_CONFIG, GitHubConfig } from './github.config';
 import { GitHubClient, GitHubProviderError } from './github.client';
 
@@ -118,13 +118,22 @@ export class GitHubConnectionService {
     });
     if (changed) await this.vault.remove(reference);
   }
-  /** GET /me의 상태 투영: 실제 보관 참조의 만료만 확인한다. 개발 대역은 건드리지 않는다. */
+  private async readCredential(memberId: string, reference: string): Promise<StoredCredential | null> {
+    try { return await this.vault.read(reference, memberId); }
+    catch (error) {
+      if (!(error instanceof CredentialUnavailableError)) throw error;
+      await this.invalidate(memberId, reference);
+      return null;
+    }
+  }
+  /** GET /me의 상태 투영: 실제 보관 참조의 만료·이용 불가를 확인한다. 개발 대역은 건드리지 않는다. */
   async refreshStatus(memberId: string): Promise<void> {
     if (!this.config.enabled || !isUUID(memberId)) return;
     await this.requireMember(this.dataSource.manager, memberId, false);
     const connection = await this.dataSource.manager.findOneBy(GitHubConnection, { memberId });
     if (connection?.connectionState !== 'CONNECTED' || !isCredentialReference(connection.credentialReference)) return;
-    const value = await this.vault.read(connection.credentialReference, memberId);
+    const value = await this.readCredential(memberId, connection.credentialReference);
+    if (!value) return;
     if (value.expiresAt.getTime() <= Date.now()) await this.invalidate(memberId, connection.credentialReference);
   }
   /** #232가 사용할 유일한 자격정보 인계 지점. 일반 회원 HTTP 응답에는 사용하지 않는다. */
@@ -134,7 +143,8 @@ export class GitHubConnectionService {
     const connection = await this.dataSource.manager.findOneBy(GitHubConnection, { memberId });
     if (connection?.connectionState !== 'CONNECTED' || !isCredentialReference(connection.credentialReference)) return null;
     const reference = connection.credentialReference;
-    const value = await this.vault.read(reference, memberId);
+    const value = await this.readCredential(memberId, reference);
+    if (!value) return null;
     if (value.accountLogin !== connection.accountLogin || value.externalAccountReference !== connection.externalAccountReference) throw new ApiError('INTERNAL_ERROR');
     if (value.expiresAt.getTime() <= Date.now()) { await this.invalidate(memberId, reference); return null; }
     try {

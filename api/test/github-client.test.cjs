@@ -76,7 +76,7 @@ test('유효 시각 계산은 임의 고정 수명·슬라이딩 연장 없음',
 });
 test('설정 기본 비활성 및 필수·운영 콜백·별도 암호화 키 검증', () => {
   assert.deepEqual(readGitHubConfig({}), { enabled: false });
-  const env = { GITHUB_CONNECTION_ENABLED: 'true', GITHUB_OAUTH_CLIENT_ID: 'fake-client',
+  const env = { NODE_ENV: 'test', GITHUB_CONNECTION_ENABLED: 'true', GITHUB_OAUTH_CLIENT_ID: 'fake-client',
     GITHUB_OAUTH_CLIENT_SECRET: 'FAKE_SECRET', GITHUB_OAUTH_CALLBACK_URL: 'http://localhost:3000/callback',
     GITHUB_CREDENTIAL_DIRECTORY: resolve('fake-vault'), GITHUB_CREDENTIAL_ENCRYPTION_KEY: randomBytes(32).toString('hex') };
   assert(readGitHubConfig(env).enabled);
@@ -88,4 +88,19 @@ test('설정 기본 비활성 및 필수·운영 콜백·별도 암호화 키 �
   assert.throws(() => readGitHubConfig({ ...env, AUTH_JWT_SECRET: env.GITHUB_CREDENTIAL_ENCRYPTION_KEY }));
   assert.throws(() => readGitHubConfig({ ...env, GITHUB_CREDENTIAL_DIRECTORY: 'relative' }));
   assert.throws(() => readGitHubConfig({ GITHUB_CONNECTION_ENABLED: 'yes' }));
+});
+
+test('HTTP 콜백은 development·test의 허용 루프백만, 미지정·기타 환경은 HTTPS만 허용', () => {
+  const env = { GITHUB_CONNECTION_ENABLED: 'true', GITHUB_OAUTH_CLIENT_ID: 'fake-client',
+    GITHUB_OAUTH_CLIENT_SECRET: 'FAKE_SECRET', GITHUB_CREDENTIAL_DIRECTORY: resolve('fake-vault'),
+    GITHUB_CREDENTIAL_ENCRYPTION_KEY: randomBytes(32).toString('hex') };
+  for (const nodeEnv of ['development', 'test', 'production', undefined, '', 'staging', 'Development']) {
+    for (const host of ['localhost', '127.0.0.1', '[::1]', '192.168.0.1', 'localhost.evil.example']) {
+      const settings = { ...env, NODE_ENV: nodeEnv, GITHUB_OAUTH_CALLBACK_URL: `http://${host}:3000/callback` };
+      const allowed = ['development', 'test'].includes(nodeEnv) && ['localhost', '127.0.0.1', '[::1]'].includes(host);
+      if (allowed) assert.equal(readGitHubConfig(settings).enabled, true);
+      else assert.throws(() => readGitHubConfig(settings));
+    }
+    assert.equal(readGitHubConfig({ ...env, NODE_ENV: nodeEnv, GITHUB_OAUTH_CALLBACK_URL: 'https://catchu.example/github/callback' }).enabled, true);
+  }
 });

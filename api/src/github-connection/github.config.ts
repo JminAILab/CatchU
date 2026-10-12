@@ -1,4 +1,5 @@
 import { isAbsolute, resolve, parse } from 'node:path';
+import { isDevelopmentOrTest } from '../common/node-env';
 
 export const GITHUB_CONFIG = Symbol('GITHUB_CONFIG');
 export type GitHubConfig = { enabled: false } | {
@@ -26,8 +27,8 @@ export function readGitHubConfig(env: NodeJS.ProcessEnv = process.env): GitHubCo
   try { callback = new URL(env.GITHUB_OAUTH_CALLBACK_URL!); } catch { throw new Error('GitHub 콜백 설정 형식이 잘못되었습니다.'); }
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(callback.hostname);
   if (callback.username || callback.password || callback.search || callback.hash
-      || !(callback.protocol === 'https:' || (env.NODE_ENV !== 'production' && callback.protocol === 'http:' && loopback))) {
-    throw new Error('GitHub 콜백 주소는 HTTPS여야 합니다(개발 시 loopback HTTP만 허용).');
+      || !(callback.protocol === 'https:' || (isDevelopmentOrTest(env) && callback.protocol === 'http:' && loopback))) {
+    throw new Error('GitHub 콜백 주소는 HTTPS여야 합니다(development·test에서만 loopback HTTP 허용).');
   }
   const directory = env.GITHUB_CREDENTIAL_DIRECTORY!;
   if (!isAbsolute(directory) || resolve(directory) === parse(resolve(directory)).root) {
