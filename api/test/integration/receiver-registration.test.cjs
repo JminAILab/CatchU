@@ -98,6 +98,35 @@ for (const [file, expected] of [['succeeded-one-candidate',1], ['empty',0], ['pa
   });
 }
 
+test('제목 없는 GENERATED 후보도 실제 수신·B 등록 후 APPLIED/CLOSED이며 재전달에서 보존한다', async () => {
+  const result = await prepare('succeeded-one-candidate');
+  result.candidates[0].title = null;
+  assert.equal(result.candidates[0].draft.status, 'GENERATED');
+  const { service } = pipeline();
+  const output = await receive(service, result);
+  assert.equal(output.receipt.disposition, 'ACCEPTED');
+  assert.equal(output.application.registeredCatchIds.length, 1);
+  assert.equal(output.application.ownerResultsReady, true);
+  const attempt = await state(result);
+  assert.equal(attempt.application, 'APPLIED');
+  assert.equal(attempt.ownerResultsReady, true);
+  assert.equal((await db.manager.findOneByOrFail(AnalysisRequest, { requestId: result.requestId })).lifecycle, 'CLOSED');
+  const [asset] = await db.query('SELECT * FROM catch_asset');
+  assert.equal(asset.title, null);
+  assert.equal(asset.draft_status, 'GENERATED');
+  assert.equal(asset.draft_content, result.candidates[0].draft.content);
+  assert.equal(asset.visibility, 'PRIVATE');
+  const ownerCatches = new OwnerCatchStore(db);
+  assert.equal((await ownerCatches.get(result.memberId, asset.catch_id)).title, null);
+  assert.equal((await ownerCatches.list(result.memberId, {})).items[0].title, null);
+  const beforeReplay = await counts();
+  const replay = await receive(service, { ...result, messageId: randomUUID() });
+  assert.equal(replay.receipt.disposition, 'DUPLICATE');
+  assert.equal(replay.application, undefined);
+  assert.deepEqual(await counts(), beforeReplay);
+  assert.deepEqual(await db.query('SELECT * FROM catch_asset'), [asset]);
+});
+
 test('동시 수신 5회에서 수신/등록 하나, 동일 작업 두 후보는 Catch 하나', async () => {
   const result = await prepare('succeeded-one-candidate');
   result.candidates.push({ ...structuredClone(result.candidates[0]), candidateId: 'second-candidate' });

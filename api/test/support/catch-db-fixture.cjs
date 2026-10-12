@@ -88,6 +88,7 @@ async function createCatchDbFixture(config) {
     created = true;
     const { CreateCatchAssets1790600000000 } = require('../../dist/database/migrations/1790600000000-CreateCatchAssets');
     const { CreateRepositoryProtection1790601000000 } = require('../../dist/database/migrations/1790601000000-CreateRepositoryProtection');
+    const { AllowNullCatchTitle1791784385918 } = require('../../dist/database/migrations/1791784385918-AllowNullCatchTitle');
     const { CatchAssetEntity } = require('../../dist/catches/entities/catch-asset.entity');
     const { CatchEvidenceEntity } = require('../../dist/catches/entities/catch-evidence.entity');
     const { CandidateRegistrationEntity } = require('../../dist/catches/entities/candidate-registration.entity');
@@ -103,7 +104,7 @@ async function createCatchDbFixture(config) {
         AnalysisAttempt, IdempotencyRecord, ShareLink, ResultApplicationRecord, CatchAssetEntity, CatchEvidenceEntity,
         CandidateRegistrationEntity, RepositoryProtectionEntity],
       // 되돌리기 검사는 B 마이그레이션만 취소하여 실제 선행 테이블의 보존을 확인한다.
-      migrations: [CreateCatchAssets1790600000000, CreateRepositoryProtection1790601000000],
+      migrations: [CreateCatchAssets1790600000000, CreateRepositoryProtection1790601000000, AllowNullCatchTitle1791784385918],
       extra: { options: `-c TimeZone=UTC -c search_path=${schema}` },
     });
     await dataSource.initialize();

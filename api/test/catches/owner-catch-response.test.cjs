@@ -112,6 +112,21 @@ test('본인 응답은 common.yaml의 필드만 내보내고 저장소는 원 �
   });
 });
 
+test('null 제목은 초안 생성 상태와 독립적이며 상세·혼합 목록에서 필드를 보존한다', () => {
+  for (const status of ['GENERATED', 'FAILED', 'NOT_GENERATED']) {
+    const source = fixture();
+    source.asset.title = null;
+    source.asset.draftStatus = status;
+    source.asset.draftContent = status === 'GENERATED' ? '제목 없이 생성된 합성 초안' : null;
+    const response = project(source);
+    assert.equal(response.title, null);
+    assert.deepEqual(response.draft, { status, content: source.asset.draftContent });
+    const page = toOwnerCatchPage('member-owner', [source, fixture()], null);
+    assert.equal(page.items[0].title, null);
+    assert.equal(page.items[1].title, fixture().asset.title);
+  }
+});
+
 test('타인 자료는 PUBLIC이어도 존재하지 않는 자료와 같은 null을 반환한다', () => {
   assert.equal(project(null), null);
   for (const visibility of ['PRIVATE', 'PUBLIC']) {
@@ -290,7 +305,8 @@ test('근거 출처는 URI여야 하며 잘못된 값이 내부 오류 메시지
 test('필수 식별자·열거형·불리언 오류를 기본값으로 숨기지 않는다', () => {
   const malformed = [
     (source) => { source.asset.catchId = ''; },
-    (source) => { source.asset.title = ''; },
+    (source) => { delete source.asset.title; },
+    ...[undefined, '', 123, false, [], {}].map((title) => (source) => { source.asset.title = title; }),
     (source) => { source.sourceRequest.repositoryId = ''; },
     (source) => { source.asset.sourceResultId = ''; },
     (source) => { source.asset.sourceCandidateId = ''; },
