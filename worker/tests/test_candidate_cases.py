@@ -11,7 +11,7 @@
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import Any
@@ -96,6 +96,20 @@ def assert_succeeded_without_holds(run: CaseRun) -> None:
     assert run.result["outcome"] == "SUCCEEDED"
     assert run.result["notProvided"] == []
     assert run.result["failures"] == []
+
+
+RESUBMISSION_NOTE = "같은 작업을 다시 낸 것일 수 있다(PR #11·#12, "
+CHERRY_PICK_NOTE = "cherry-pick으로 옮긴 같은 변경일 수 있다"
+
+
+def assert_same_work_warning(entry: Mapping[str, Any], note: str) -> None:
+    """같은 변경 미확정 경고는 groupingLimitations에 두고, 회원·수신자 응답에 담기는 첫 근거의
+    한계(coverageLimits)에도 같은 문장으로 적는다(2026-10-12 팀장 결정)."""
+    (limitation,) = entry["groupingLimitations"]
+    assert limitation.startswith(note)
+    first, *rest = entry["evidence"]
+    assert limitation in first["coverageLimits"]
+    assert all(limitation not in item["coverageLimits"] for item in rest)
 
 
 # C6 · C7 · C8 · 쌓아 올린 PR: 저자가 연 단위와 배정
@@ -577,7 +591,7 @@ def test_c26_relation_with_changed_context_keeps_both_with_limitation(
     )
     for entry in run.result["candidates"]:
         # 같은 작업을 다시 낸 것일 수 있다는 점을 두 후보 모두에 적는다.
-        assert entry["groupingLimitations"]
+        assert_same_work_warning(entry, RESUBMISSION_NOTE)
     assert_succeeded_without_holds(run)
 
 
@@ -593,7 +607,7 @@ def test_c26_relation_without_patch_keeps_both_with_limitation(repo: GitRepo) ->
         [pull_identity(11), pull_identity(12)]
     )
     for entry in run.result["candidates"]:
-        assert entry["groupingLimitations"]
+        assert_same_work_warning(entry, RESUBMISSION_NOTE)
     assert_succeeded_without_holds(run)
 
 
@@ -743,8 +757,7 @@ def test_cherry_pick_amended_to_change_only_the_file_mode_keeps_both_with_limita
         [pull_identity(30), pull_identity(31)]
     )
     for entry in run.result["candidates"]:
-        (limitation,) = entry["groupingLimitations"]
-        assert limitation.startswith("cherry-pick으로 옮긴 같은 변경일 수 있다")
+        assert_same_work_warning(entry, CHERRY_PICK_NOTE)
     assert_succeeded_without_holds(run)
 
 
@@ -782,8 +795,7 @@ def test_cherry_pick_whose_mode_diff_is_oversized_keeps_both_with_limitation() -
         [pull_identity(30), pull_identity(31)]
     )
     for entry in run.result["candidates"]:
-        (limitation,) = entry["groupingLimitations"]
-        assert limitation.startswith("cherry-pick으로 옮긴 같은 변경일 수 있다")
+        assert_same_work_warning(entry, CHERRY_PICK_NOTE)
     assert_succeeded_without_holds(run)
 
 
@@ -813,8 +825,7 @@ def test_stop_before_the_mode_check_keeps_confirmed_pull_requests_with_limitatio
     numbers = [30, 31] if refused == detail_diff_path(sha(311)) else [30]
     assert sorted(identities(run.result)) == sorted(pull_identity(n) for n in numbers)
     for entry in run.result["candidates"]:
-        (limitation,) = entry["groupingLimitations"]
-        assert limitation.startswith("cherry-pick으로 옮긴 같은 변경일 수 있다")
+        assert_same_work_warning(entry, CHERRY_PICK_NOTE)
     assert run.result["notProvided"] == []
     assert failure_codes(run.result) == [("COLLECTION", "BUDGET_EXCEEDED")]
     assert run.result["outcome"] == "PARTIAL_FAILED"

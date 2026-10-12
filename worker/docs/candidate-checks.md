@@ -28,8 +28,8 @@
 |---|---|
 | `tests/test_candidate_identity.py` | wi1 값, 정규화, C1–C5·C9–C13의 불변·민감성, 입력 검사 |
 | `tests/test_candidate_same_change.py` | 공백을 무시한 diff 값(파일 모드 포함)을 실제 `git patch-id --stable`과 대조, 잘린 `patch`, cherry-pick 표시·번호 읽기 |
-| `tests/test_candidate_grouping.py` | 수집 관측을 직접 만들어 배정·보류·같은 변경·커밋 묶음·나누기·집계·근거를 본다. squash로 합친 PR, 목록을 다 받지 못한 PR의 보류, 먼저 병합된 PR의 목록 한계, 연동 계정이 연 PR을 세지 않음, 단위별 확인 중단, 다른 계정 커밋 섞임 문장, 근거 순서, 입력 순서를 바꾼 배정·나누기, 수집 결과끼리 맞지 않는 입력의 `ValueError`도 본다 |
-| `tests/test_candidate_cases.py` | 기준 문서의 합성 사례(C1·C3·C6–C8·C10–C17·C20–C30)와 결정 사례(목록을 다 받지 못한 PR과 L13, 먼저 병합된 PR의 목록 한계, 이슈 조회가 없는 요청의 작성자 경계)를 합성 GitHub 응답으로 수집부터 결과 조합까지 돌린다 |
+| `tests/test_candidate_grouping.py` | 수집 관측을 직접 만들어 배정·보류·같은 변경·커밋 묶음·나누기·집계·근거를 본다. squash로 합친 PR, 목록을 다 받지 못한 PR의 보류, 먼저 병합된 PR의 목록 한계, 같은 변경 미확정 경고가 묶음 한계와 첫 근거의 한계 두 곳에 같은 문장으로 있음, 연동 계정이 연 PR을 세지 않음, 단위별 확인 중단, 다른 계정 커밋 섞임 문장, 근거 순서, 입력 순서를 바꾼 배정·나누기, 수집 결과끼리 맞지 않는 입력의 `ValueError`도 본다 |
+| `tests/test_candidate_cases.py` | 기준 문서의 합성 사례(C1·C3·C6–C8·C10–C17·C20–C30)와 결정 사례(목록을 다 받지 못한 PR과 L13, 먼저 병합된 PR의 목록 한계, 이슈 조회가 없는 요청의 작성자 경계)를 합성 GitHub 응답으로 수집부터 결과 조합까지 돌린다. C26과 cherry-pick 미확정 사례는 같은 작업 경고가 묶음 한계와 첫 근거의 한계에 모두 있는지 본다 |
 | `tests/test_candidate_flow.py` | 수집 → 후보 판정 → 결과 조합의 연결, 계약 v1 통과, 네 종결값에서 비밀값·저장소 글자 누출 없음 |
 | `tests/candidate_scenarios.py` | 사례 시험용 선언형 합성 저장소와 실행 도구. 실행할 때마다 후보 제목이 비었고 조합 결과의 제목이 첫 작업 사실인지, 제목·작업 사실·나의 기여에 센 숫자가 없는지, 후보 문장에 조회 방식의 말이, 후보 문장과 근거에 '작성한'이 없는지 본다 |
 | `tests/git_synthetic.py`·`tests/conftest.py` | 실제 git 합성 저장소(시험마다 새로 만드는 `repo` 고정값). git이 없으면 그 시험을 건너뛴다 |
