@@ -97,7 +97,7 @@ entities:
     description: "등록된 작업·기여·초안·최소 질문의 서비스 정본"
     attributes:
       - {name: catchId, type: id, required: true, unique: true, primary: true}
-      - {name: title, type: string, required: true, min_length: 1, constraints: "F가 생성한 값을 저장하며 구직자는 수정할 수 없음"}
+      - {name: title, type: string, required: false, min_length: 1, constraints: "F가 생성한 값을 저장하며 구직자는 수정할 수 없음. 없으면 null이며 값이 있으면 1자 이상(빈 문자열 금지)"}
       - {name: ownerId, type: id, required: true, references: MemberAccount.memberId}
       - {name: sourceRequestId, type: id, required: true, references: AnalysisRequest.requestId}
       - {name: sourceResultId, type: external-id, required: true}
@@ -135,6 +135,7 @@ entities:
       - {name: representedFacts, type: "list<string>", required: true, min_items: 1}
       - {name: contributionScope, type: string, required: true}
       - {name: coverageLimits, type: "list<string>", required: true}
+      - {name: position, type: integer, required: true, min: 1, constraints: "받은 evidence 목록에서의 위치(1부터). 근거 목록 순서가 표시 순서이며 회원·수신자 응답은 이 순서로 근거를 돌려줌"}
     constraints: ["unique(catchId, sourceEvidenceId); 다른 Catch의 근거 일부 중첩 허용", "근거 출처는 Catch의 원 요청/범위와 일치"]
   - name: RepositoryProtection
     owner: B

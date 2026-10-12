@@ -82,7 +82,7 @@ components:
         - "reflection"
       properties:
         candidateId: {"type":"string","minLength":1}
-        title: {"type":"string","minLength":1}
+        title: {"type":"string","minLength":1,"nullable":true}
         workIdentity: {"type":"string","minLength":1}
         workFacts: {"type":"array","items":{"type":"string"}}
         subjectContribution: {"type":"string"}

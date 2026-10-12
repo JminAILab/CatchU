@@ -66,7 +66,7 @@ components:
 **전이·불변 조건**
 
 - 접수는 QUEUED/NOT_READY/ACTIVE. F 진행은 RUNNING, 실행이 확인되지 않으면 UNCERTAIN을 유지한다. #77 이전에 큐 시간 초과로 실패 확정하는 규칙은 만들지 않는다.
-- 검증된 종결 결과 수신 뒤 PENDING → APPLYING → APPLIED. 반영 오류는 APPLY_FAILED, 복구 작업이 실제 진행할 때만 RECOVERING이다. 둘 다 ACTIVE로 잠그며 새 분석을 실행하지 않는다. 저장 결과 재전달·반영 복구와 분석/LLM 재호출은 별개이고 이번 계약은 자동 분석 재시도를 허용하지 않는다.
+- 검증된 종결 결과 수신 뒤 PENDING → APPLYING → APPLIED. 반영 오류는 APPLY_FAILED, 복구 작업이 실제 진행할 때만 RECOVERING이다. 둘 다 ACTIVE로 잠그며 새 분석을 실행하지 않는다. 저장 결과 재전달·반영 복구와 분석/LLM 재호출은 별개이고 이번 계약은 자동 분석 재시도를 허용하지 않는다. 한 분석 안의 제목 고쳐 쓰기는 분석 재시도가 아니다.
 - APPLIED는 결과/실패 의미의 반영도 포함한다. EMPTY도 결과 0건이라는 사실을 저장한 뒤 APPLIED/CLOSED이며 정상 완료다. FAILED는 실패가 확정되고 반영할 유효 결과가 없다는 사실이 저장된 뒤 APPLIED/CLOSED가 될 수 있다.
 - SUCCEEDED는 후보 1개 이상이고 실패 0건, EMPTY는 후보 0개·실패 0건이다. PARTIAL_FAILED는 실패와 분리된 적합 후보 1개 이상과 실패 1건 이상, FAILED는 후보 0개·실패 1건 이상이다. 근거 부족·등록 기준 미달은 notProvided로 구분하며 그 자체를 시스템 오류로 만들지 않는다.
 - 초안 실패라도 근거·기여/등록 조건을 충족한 후보를 제공한다. 초안/질문 실패는 해당 결과와 failures에 분리해 담는다. 본문은 GENERATED일 때만 문자열, 나머지는 null이다. 초안이 없다고 후보 없음/등록 불가로 바꾸지 않는다. 질문 실패의 보완 경로는 OQ-B2에 남긴다.
@@ -90,6 +90,8 @@ components:
 B의 판정 결과·등록과 E 반영 확인은 재진입 가능해야 한다. E 기록 전에 B 저장이 끝나도 다시 처리해 Catch가 중복 생성되지 않아야 한다. 원자성·영속 키는 api ERD/기능 설계에서 구현 제약으로 연결한다. 이미 적용된 결과를 덮어쓰거나 종료된 attempt의 늦은 결과를 자동 반영하지 않는다. 불일치는 409 의미의 PAYLOAD_CONFLICT/STALE_ATTEMPT로 격리해 담당 확인하며 기존 결과를 보존한다.
 
 workIdentity 생성은 F가 제안하고 B/E가 검토한다(OQ-F2). 같은 근거 일부를 공유해도 다른 작업임을 확인하면 별도 Catch, 같은 작업의 표현만 바꾸면 중복이다. 이 계약이 커밋마다 Catch를 만드는 규칙은 아니다.
+
+Catch 제목(Candidate·Catch·PublicCatch의 `title`)은 필수 칸이되 값 없음을 허용한다(null 허용, 값이 있으면 1자 이상). 제목이 없으면 null이며 생성된 제목처럼 꾸미지 않는다. 근거 목록 순서가 표시 순서다. B는 받은 evidence 순서를 저장하고 회원·수신자 응답의 evidence를 같은 순서로 돌려준다.
 
 ## P — 수신자 API
 
@@ -135,7 +137,7 @@ components:
 
 생성 POST는 Idempotency-Key를 사용자·operation에 묶는다. 동일 키/정규화된 동일 본문은 기존 응답·자원 참조를 반환하고 다른 본문은 409다. 저장 전/응답 유실이 불명확하면 새 키로 자동 재전송하지 않는다. 요청/발급 기록이 존재하는 동안 중복 방지 연결을 유지하며 기록 삭제 후 키 재사용 규칙은 보관 정책 결정 없이 추정하지 않는다. Catch 확인/공개/표시와 링크 중단은 PUT 상태 지정으로 반복 적용해도 추가 생성이 없다.
 
-HTTP timeout은 실패 확정 증거가 아니다. web은 재조회·사용자 재요청을 구분한다. 정량 timeout/처리 상한은 기술 검증 후 이슈로 보완하며 자동 외부 재시도·추가 호출을 허용하지 않는다.
+HTTP timeout은 실패 확정 증거가 아니다. web은 재조회·사용자 재요청을 구분한다. 정량 timeout/처리 상한은 기술 검증 후 이슈로 보완하며 자동 외부 재시도·추가 호출을 허용하지 않는다. worker는 한 분석 안에서 Catch 제목이 형식을 어겼을 때만 제목을 고쳐 쓰려고 LLM을 다시 부를 수 있다. 제목당 최대 3회이고, 요청당 고쳐 쓰기 호출 상한(이슈에서 정함)과 요청당 총 처리 시간 상한 안이며 생성 호출 상한에는 세지 않는다. 요청당 상한에 이르면 그 뒤 제목은 null로 둔다. 생성 호출이나 고쳐 쓰기 호출이 실패하면(시간 초과·서버 오류 포함) 다시 부르지 않는다.
 
 ## W — worker 메시지 계약
 
@@ -155,7 +157,7 @@ components:
 |---|---|
 | Request | E가 영속 요청/새 동의에 연결한 requestId·attemptId·memberId·repositoryId·consentId와 허용 scope를 제공. scope의 허용 자료 종류는 요청마다 한정하며 전체 종류 열거가 수집 허가가 아님 |
 | ProcessingEvent | RECEIVED/RUNNING은 F 관측, UNCERTAIN은 실행 불명. 순서 역전으로 종결 상태를 되돌리지 않음. 전달 방식·실행 불명 해소는 #77 |
-| Result | 후보는 근거/기여와 실패 분리 확인을 충족한 것만. notProvided의 근거 부족/기준 미달과 failures의 수집/생성 오류를 구분. schemaVersion=1 |
+| Result | 후보는 근거/기여와 실패 분리 확인을 충족한 것만. notProvided의 근거 부족/기준 미달과 failures의 수집/생성 오류를 구분. 초안이 나왔는데 제목만 null인 경우는 failures가 아니다. schemaVersion=1 |
 | ResultReceipt | resultId·requestId·attemptId를 모두 식별할 수 있는 메시지에만 전송. E의 형식·맥락 검사 후 ACCEPTED/DUPLICATE/REJECTED. ACCEPTED는 DB/Catch 등록 완료가 아니며 E application이 별도로 표시 |
 | mock 연결 | 같은 Request/Result를 합성 fixture·가짜 생성기로 연결. sourceMode=MOCK를 유지하고 실제 분석 성공으로 표시하지 않음. 제공자명·모델명·SDK·API 키 의존 필드 없음 |
 
