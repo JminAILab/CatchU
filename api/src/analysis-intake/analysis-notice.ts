@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { isDevelopmentOrTest } from '../common/node-env';
 import { ApiError } from '../common/errors';
 import { SYNTHETIC_REPOSITORY } from '../member-analysis/dev-member.service';
@@ -15,7 +15,7 @@ export const SYNTHETIC_NOTICE = Object.freeze({
 export class AnalysisNoticeService {
   private readonly enabled = isDevelopmentOrTest(process.env) && process.env.DEV_LOGIN_ENABLED === 'true';
   current() {
-    if (!this.enabled) throw new ApiError('CONSENT_REQUIRED');
+    if (!this.enabled) throw new ForbiddenException();
     return { noticeRevision: SYNTHETIC_NOTICE.noticeRevision, text: SYNTHETIC_NOTICE.text };
   }
   scope(repositoryId: string, revision: string, sourceMode: string) {

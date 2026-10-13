@@ -82,7 +82,7 @@ export class AnalysisIntakeService {
         },
         isSame: async (same, record) => {
           await this.lockMember(same, memberId);
-          await this.context(same, memberId, input);
+          // 이미 접수된 키는 현재 연결·선정·판본의 신규 접수 조건을 다시 검사하지 않는다.
           // 지문은 전체 입력이다. ACTIVE 200은 다른 동의에 대한 응답일 수 있어 원 동의를 변경하지 않는다.
           const request = await same.findOneBy(AnalysisRequest, { requestId: record.requestId!, memberId });
           if (!request || record.responseReference !== request.requestId) throw new Error('Analysis idempotency reference is inconsistent');

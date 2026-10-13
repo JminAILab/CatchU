@@ -68,7 +68,9 @@ export class DevMemberService {
       }
       const connection = await manager.findOne(GitHubConnection, { where: { memberId },
         ...(transactionManager ? { lock: { mode: 'pessimistic_read' as const } } : {}) });
-      if (connection && connection.externalAccountReference !== CONNECTION_NAMESPACE + memberId) {
+      const clearedDisconnect = connection?.connectionState === 'DISCONNECTED' &&
+        connection.externalAccountReference === null;
+      if (connection && !clearedDisconnect && connection.externalAccountReference !== CONNECTION_NAMESPACE + memberId) {
         throw new Error('Development connection is not a synthetic connection');
       }
       return {

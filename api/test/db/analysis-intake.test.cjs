@@ -131,6 +131,45 @@ test('같은 키·변경 본문은 모든 동의/대상/retry 필드에서 충�
   }
   assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 1 });
 });
+for (const changed of ['DISCONNECTED', 'REAUTH_REQUIRED', 'notice', 'selection', 'scope']) {
+  test('접수 뒤 조건 변경은 같은 키 재응답을 막지 않고 새 접수·실패 재요청에는 적용: ' + changed, async t => {
+    const s = await start(t); const u = await s.login(); const key = randomUUID(); const body = command();
+    const firstResponse = await s.post(u, key, body); assert.equal(firstResponse.status, 202);
+    const first = await firstResponse.json();
+    let code = 'CONSENT_REQUIRED';
+    if (changed === 'DISCONNECTED' || changed === 'REAUTH_REQUIRED') {
+      await db.query('UPDATE github_connection SET connection_state=$1, external_account_reference=$2, account_login=$3 WHERE member_id=$4',
+        [changed, changed === 'DISCONNECTED' ? null : 'catchu:mock-github:' + u.memberId,
+          changed === 'DISCONNECTED' ? null : SYNTHETIC_REPOSITORY.ownerLogin, u.memberId]);
+      code = 'GITHUB_CONNECTION_REQUIRED';
+    } else if (changed === 'notice') {
+      s.notices.current = () => ({ noticeRevision: 'catchu-synthetic-analysis-notice-v2', text: '변경된 합성 고지' });
+    } else {
+      const original = s.provider.readConnection.bind(s.provider);
+      s.provider.readConnection = async (member, manager) => ({ ...await original(member, manager),
+        repositories: changed === 'selection' ? [] : [{ ...SYNTHETIC_REPOSITORY, allowedScopeRevision: randomUUID() }] });
+      if (changed === 'selection') code = 'REPOSITORY_NOT_ALLOWED';
+    }
+    const before = await counts();
+    const replay = await s.post(u, key, body); assert.equal(replay.status, 200);
+    assert.deepEqual(await replay.json(), first); assert.deepEqual(await counts(), before);
+    await error(await s.post(u, randomUUID(), body), 403, code);
+    await terminal(first.requestId);
+    await error(await s.post(u, randomUUID(), command({ retryOfRequestId: first.requestId })), 403, code);
+    const closedReplay = await s.post(u, key, body); assert.equal(closedReplay.status, 200);
+    assert.equal((await closedReplay.json()).requestId, first.requestId);
+    assert.deepEqual(await counts(), before);
+  });
+}
+test('멱등 재응답도 잘못된 응답 참조를 500으로 거부하고 새 행을 만들지 않는다', async t => {
+  const s = await start(t); const u = await s.login(); const key = randomUUID();
+  assert.equal((await s.post(u, key)).status, 202);
+  const before = await counts();
+  await db.query('UPDATE idempotency_record SET response_reference=$1 WHERE member_id=$2 AND key=$3',
+    [randomUUID(), u.memberId, key]);
+  await error(await s.post(u, key), 500, 'INTERNAL_ERROR');
+  assert.deepEqual(await counts(), before);
+});
 test('동시 같은 키·다른 키에도 한 회원 ACTIVE는 하나이고 회원 간 키는 분리된다', async t => {
   const s = await start(t); const u = await s.login(); const key = randomUUID();
   const rs = await Promise.all(Array.from({ length: 8 }, () => s.post(u, key)));
@@ -174,8 +213,12 @@ for (const state of ['DISCONNECTED','REAUTH_REQUIRED','missing']) {
   test('현재 연결을 재확인: ' + state, async t => {
     const s=await start(t); const u=await s.login();
     if(state==='missing') await db.query('DELETE FROM github_connection WHERE member_id=$1',[u.memberId]);
+    else if(state==='DISCONNECTED') await db.query('UPDATE github_connection SET connection_state=$1, external_account_reference=NULL, account_login=NULL, credential_reference=NULL WHERE member_id=$2',[state,u.memberId]);
     else await db.query('UPDATE github_connection SET connection_state=$1 WHERE member_id=$2',[state,u.memberId]);
     await error(await s.post(u),403,'GITHUB_CONNECTION_REQUIRED');
+    const notice = await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}});
+    assert.equal(notice.status,200);
+    assert.deepEqual(await notice.json(),{noticeRevision:SYNTHETIC_NOTICE.noticeRevision,text:SYNTHETIC_NOTICE.text});
     assert.equal((await counts()).requests,0);
   });
 }
@@ -184,10 +227,21 @@ test('공급자/DB 조회 실패와 잘못된 공급 자료는 빈 목록·접�
   s.provider.readConnection=async()=>{ throw Error('synthetic-secret-provider'); };
   const body=await error(await s.post(u),500,'INTERNAL_ERROR');
   assert(!JSON.stringify(body).includes('synthetic-secret-provider'));
+  await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}}),500,'INTERNAL_ERROR');
   s.provider.readConnection=async()=>({connectionState:'CONNECTED',sourceMode:'MOCK',repositories:[{}]});
   await error(await s.post(u),500,'INTERNAL_ERROR');
   assert.equal((await counts()).requests,0);
 });
+for (const [state, reference] of [['CONNECTED', null], ['DISCONNECTED', 'not-synthetic'], ['REAUTH_REQUIRED', null]]) {
+  test('합성 연결의 잘못된 상태·참조 조합은 미연결로 숨기지 않는다: ' + state, async t => {
+    const s = await start(t); const u = await s.login();
+    await db.query('UPDATE github_connection SET connection_state=$1, external_account_reference=$2 WHERE member_id=$3',
+      [state, reference, u.memberId]);
+    await error(await s.post(u),500,'INTERNAL_ERROR');
+    await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}}),500,'INTERNAL_ERROR');
+    assert.equal((await counts()).requests,0);
+  });
+}
 test('실제 자료용 설정 부재·LIVE 공급에 합성 고지를 대신 쓰지 않는다',async t=>{
   const s=await start(t); const u=await s.login();
   const original=s.provider.readConnection.bind(s.provider);
@@ -207,7 +261,9 @@ for(const overrides of [{DEV_LOGIN_ENABLED:'false'},{NODE_ENV:'production'},{NOD
   test('합성 고지 기본 비활성/운영 차단: '+JSON.stringify(overrides),async t=>{
     const s=await start(t,overrides);
     const token=await s.app.get(require('../../dist/auth/access-token.service').AccessTokenService).issue(randomUUID());
-    await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+token.accessToken}}),403,'CONSENT_REQUIRED');
+    await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+token.accessToken}}),403,'INTERNAL_ERROR');
+    await error(await s.post({token:token.accessToken}),403,'INTERNAL_ERROR');
+    assert.deepEqual(await counts(),{requests:0,consents:0,attempts:0,keys:0});
   });
 }
 test('저장 실패와 지연 커밋 실패는 네 자원 모두 롤백·동일 키 재접수 가능',async t=>{
