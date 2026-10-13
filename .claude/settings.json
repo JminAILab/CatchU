@@ -49,6 +49,17 @@
       "Bash(aidlc config flags --clear-bypass AIDLC_DISABLE_SENSORS --yes)",
       "Bash(aidlc config flags --clear-bypass AIDLC_DISABLE_LEARNINGS --yes)",
       "Bash(aidlc config flags --clear-bypass AIDLC_DISABLE_SUMMARY_CONFIRMATION --yes)"
+    ],
+    "deny": [
+      "PowerShell"
+    ],
+    "ask": [
+      "Bash(aidlc engine sensor *)",
+      "Bash(aidlc engine sensor-linter *)",
+      "Bash(aidlc engine hook run-sensors*)",
+      "Bash(aidlc engine __sensor-script *)",
+      "Bash(aidlc engine __sensor-script-file *)",
+      "Bash(aidlc engine adapter *)"
     ]
   },
   "statusLine": {
@@ -56,7 +67,8 @@
     "command": "aidlc engine statusline"
   },
   "env": {
-    "AWS_AIDLC_DEFAULT_SCOPE": "classic"
+    "AWS_AIDLC_DEFAULT_SCOPE": "classic",
+    "CLAUDE_CODE_USE_POWERSHELL_TOOL": "0"
   },
   "hooks": {
     "PreToolUse": [
@@ -155,11 +167,6 @@
             "type": "command",
             "command": "aidlc engine hook write-audit-log",
             "timeout": 1800
-          },
-          {
-            "type": "command",
-            "command": "aidlc engine hook run-sensors",
-            "timeout": 3600
           }
         ]
       },
