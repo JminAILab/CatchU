@@ -279,3 +279,28 @@ test('로그에 비밀번호·grant·링크 토큰을 남기지 않는다', asyn
   const text = logs.join('\n');
   for (const secret of [PASSWORD, 'wrong-password-for-log', grant, link.token]) assert.equal(text.includes(secret), false);
 });
+
+test('#222 실제 HTTP·DB: 비밀번호 실패·차단을 한 줄씩 기록하고 민감정보는 제외한다', async () => {
+  const link = await issue('보안 사건 검증', PASSWORD);
+  const startIndex = logs.length;
+  const wrong = 'synthetic-wrong-password-222';
+  for (let i = 0; i < 10; i++) expectError(await unlock(link.token, { password: wrong }), 401, 'LINK_PASSWORD_INVALID');
+  const limited = await unlock(link.token, { password: PASSWORD });
+  expectError(limited, 429, 'LINK_UNLOCK_LIMITED');
+  assert.ok(Number(limited.retryAfter) > 0);
+  const captured = logs.slice(startIndex);
+  const events = captured.filter(line => line.endsWith(' SecurityEvent'));
+  assert.equal(events.length, 11);
+  assert.equal(events.filter(line => line.startsWith('LINK_PASSWORD_INVALID ')).length, 10);
+  assert.equal(events.filter(line => line.startsWith('LINK_UNLOCK_LIMITED ')).length, 1);
+  const ids = [];
+  for (const line of events) {
+    const match = /^(?:LINK_PASSWORD_INVALID|LINK_UNLOCK_LIMITED) POST \/v1\/public\/links\/:token\/unlock requestId=([0-9a-f-]{36}) at=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z SecurityEvent$/.exec(line);
+    assert.ok(match, '등록 경로와 허용 필드만 기록한다');
+    ids.push(match[1]);
+  }
+  assert.equal(new Set(ids).size, 11);
+  for (const secret of [link.token, link.url, PASSWORD, wrong, ownerToken, ...Object.values(ENV).filter(value => value.length === 64)]) {
+    assert.equal(captured.join('\n').includes(secret), false, '합성 비밀값은 로그에 남지 않는다');
+  }
+});

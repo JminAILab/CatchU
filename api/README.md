@@ -1,5 +1,7 @@
 # api — API 서버
 
+공유 링크 발급의 자동 통합 검사(`test/db/share-links-web-integration.test.cjs`)와 수동 재현 도구 `node scripts/verify-share-links-browser.cjs`의 실행 방법·판정 기준은 [#149 실행 안내](docs/share-links-integration-149.md)를 따른다. 실행 결과는 검증한 PR에 기록한다(첫 기록: [PR #266](https://github.com/JminAILab/CatchU/pull/266)).
+
 > 코드를 고치기 전에 [api 코딩 규약](CONVENTIONS.md), 이 문서, 맡은 기능의 `api/docs/<기능>.md`를 한 파일씩 따로 열어 읽는다(여러 파일을 한 번에 출력하면 가운데가 잘릴 수 있다). 기능별 안내는 이 README에 덧붙이지 않고 `api/docs/<기능>.md`로 쓴다.
 
 NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준을 확인한다.
@@ -43,7 +45,7 @@ throw new ApiError('ANALYSIS_IN_PROGRESS', { details: { existingRequestId: reque
 - 본문 크기 초과(413 예외 포함)는 `400 INVALID_REQUEST`, 안내는 `요청 본문이 너무 큽니다.`다.
 - 없는 경로는 `404 RESOURCE_UNAVAILABLE`이다. `/v1` 밖에서도 HTML 대신 같은 형식으로 응답한다.
 - 예상 밖 예외는 `500 INTERNAL_ERROR`와 일반 안내다. 5xx 로그는 `ApiError`를 포함해 예외 분류명과 코드 위치(`파일:줄:칸`)만 남긴다. 분류명은 `error.name` 원문이 아니라 `instanceof` 기반으로 고른 허용 목록의 고정 분류명(`ApiError`·`ForbiddenException`·`TypeError`·`Error` 등)이며, 목록 밖의 하위 클래스는 가장 가까운 상위 분류로 기록한다. 코드 위치는 stack 문자열이 아니라 V8의 구조화된 호출 위치에서 따로 수집하므로 원문 메시지가 섞이지 않으며, 함수 이름은 기록하지 않는다. 수집 기록이 없으면 위치를 생략한다(`src/common/errors/stack-frames.ts`). 요청 주소는 토큰이 들어가는 실제 경로 대신 등록된 경로 틀만 기록하고, 없으면 `[unmatched]`로 표시한다.
-- 업무 코드가 있는 4xx 거부는 기록하지 않는다. 예외로 회원 토큰 변조·만료·형식 오류(`401 AUTH_INVALID`)는 보안 사건으로 `SecurityEvent` 경고 한 줄을 남긴다([#222](https://github.com/JminAILab/CatchU/issues/222), [10/4 팀장 결정](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5975854431)). 형식은 `<분류 코드> <메서드> <등록된 경로 틀> requestId=<UUID> at=<ISO 시각>`이며 토큰·비밀번호·요청 원문은 넣지 않는다. 요청 식별자는 요청마다 서버 안에서 만든 값으로 응답에 내보내지 않는다(`src/common/http/request-id.ts`). 토큰 없이 온 요청(`AUTH_REQUIRED`)은 기록하지 않는다. 링크 비밀번호 틀림·시도 제한은 #222 후속 PR에서 unlock 경로 테스트와 함께 추가한다(`SECURITY_EVENT_CODES`).
+- 업무 코드가 있는 4xx 거부는 기본적으로 기록하지 않는다. 보안 사건 세 코드의 예외·기록 형식·검사는 [보안 사건 기록](docs/security-events.md)을 따른다.
 
 전역 설정은 `configureApp`에 모았다. 기능 경로는 `/v1` 아래, `GET /health`는 접두사 없이 유지하며 성공·오류 응답에 `Cache-Control: no-store`를 붙인다. `/v1` 밖 오류와 CORS 사전 요청을 포함한 모든 응답에 보안 헤더 `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`·`X-Content-Type-Options: nosniff`·`Referrer-Policy: no-referrer`를 붙이고 `X-Powered-By`를 끈다. `Strict-Transport-Security: max-age=300`은 `NODE_ENV`가 development·test가 아닐 때(값이 없거나 다른 값 포함) 붙인다. 기간은 5분으로 시작해 도메인·인증서가 정해지면 늘린다(`src/common/http/security-headers.ts`, #217). `npm test`는 실제 로컬 HTTP 서버에서 위 상태/본문/헤더/로그, ValidationPipe, 인증 Guard를 검증한다. 오류 재현 전용 경로는 `test/errors.test.cjs`에만 있고 제품 앱에 추가하지 않는다.
 

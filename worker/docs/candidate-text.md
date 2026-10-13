@@ -20,13 +20,13 @@
 
 ## 제목
 
-#118은 제목을 만들지 않는다(후보의 `title`은 `None`). 제목은 [#120](https://github.com/JminAILab/CatchU/issues/120)이 설명 초안과 같은 생성에서 확인할 수 있는 조각(대상·종류·동작)으로만 만들고, 만들 수 없으면 null이다([결정 문서 「Catch 제목」](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#catch-제목)).
+#118은 제목을 만들지 않는다(후보의 `title`은 `None`). 제목은 [#120](https://github.com/JminAILab/CatchU/issues/120)이 설명 초안과 같은 생성에서 확인할 수 있는 조각(대상·종류·동작)으로만 만들고, 만들 수 없으면 null이다([결정 문서 「Catch 제목」](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#catch-제목)). 만드는 규칙은 [생성](generation.md#제목)에 있다.
 
-지금 계약과 B·C·E는 빈 제목을 받지 않는다. 그래서 결과 조합(`app/processing/result.py`)이 제목이 없는 후보에 작업 사실 첫 항목을 넣는다. 이것은 계약 정정과 B·C·E 수정이 병합된 뒤 빼는 임시 동작이다(결정 문서 「[담당과 순서](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#담당과-순서)」 ③).
+계약은 [PR #262](https://github.com/JminAILab/CatchU/pull/262)로 제목 null을 받는다. B 회원 화면([#274](https://github.com/JminAILab/CatchU/pull/274))과 B 서버·E([#272](https://github.com/JminAILab/CatchU/pull/272))의 null 수용은 dev에 병합됐지만 C 수신자 화면([#152](https://github.com/JminAILab/CatchU/issues/152))이 남았다. 그래서 결과 조합(`app/processing/result.py`)이 제목이 없는 후보에 작업 사실 첫 항목을 넣는다. 이것은 B·C·E 수용 뒤 빼는 임시 동작이다(결정 문서 「[담당과 순서](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#담당과-순서)」 ③).
 
 ## 생성 단계(#120)가 이어 붙일 곳
 
-- 바꿀 칸: 각 `EligibleCandidate`의 `draft`(지금 `DraftOutcome.not_generated()`), `reflection`(지금 `ReflectionOutcome.not_generated()`), `title`(지금 `None`). `work_identity`·`work_facts`·`subject_contribution`·`grouping_basis`·`grouping_limitations`·`evidence`와 후보 순서는 바꾸지 않는다.
+- 바꿀 칸: 각 `EligibleCandidate`의 `draft`(#118 출력은 `DraftOutcome.not_generated()`), `reflection`(`ReflectionOutcome.not_generated()`), `title`(`None`). `work_identity`·`work_facts`·`subject_contribution`·`grouping_basis`·`grouping_limitations`·`evidence`와 후보 순서는 바꾸지 않는다. 예외는 하나다: #120은 본인 커밋 근거의 `coverageLimits` 끝에 생성 입력 크기 상한으로 뺀 자료와 온전하지 않은 patch로 뺀 파일의 고정 문구만 더한다([2026-10-12 결정 5·6·13](https://github.com/JminAILab/CatchU/issues/120#issuecomment-6125259129), 문구와 조건은 [생성 「coverageLimits」](generation.md#coveragelimits)). 그 근거의 주소·판본·관측 사실·귀속 범위·기존 한계와 항목 순서는 그대로이고, 후보 판정이나 기존 근거 내용을 바꾸는 예외로 넓히지 않는다.
 - 대조 기준: 제목과 설명 초안은 근거가 가리키는 연동 계정 커밋의 추가·삭제 줄과 변경 파일(경로·상태)로만 확인한다. 바뀌지 않은 문맥 줄, 다른 계정 커밋, PR 본문, 커밋 메시지는 쓰지 않는다. 변경 내용(`patch`)이 없거나 잘렸으면 제목은 null이다(결정 문서 「Catch 제목」의 확인 기준).
 - 실패: 초안·질문 실패는 후보를 두고 `DraftOutcome.failed`·`ReflectionOutcome.failed`로 적는다. 결과 조합이 `failures`에 더한다. 초안이 나왔는데 제목만 null이면 실패가 아니다(결정 문서).
-- 재료를 얻는 길(지금 제안): 후보에는 커밋 메시지·PR 제목·본문·변경 내용을 넣지 않았다. 같은 수집 결과로 `group(outcome)`을 다시 불러 `Grouping.units`·`commits`를 얻는다. 단위와 후보는 `work_identity(request.source_mode, request.repository_id, unit.unit, unit.parts)` 값으로 맞춘다(후보가 되지 않은 단위가 있어 순서로는 맞추지 않는다). 근거가 가리키는 본인 커밋은 근거의 판본(`source_revision`, 커밋은 SHA)으로 찾고, 그 커밋 기록의 `changes.files`에 경로·상태·`patch`가 있다. 후보에 내부 값을 더할지는 #120에서 정한다. 원문은 신뢰할 수 없는 자료로 다룬다([보안 점검](../../docs/CatchU_security_checks.md)).
+- 재료를 얻는 길(#120 구현, [생성 「재료 찾기」](generation.md#재료-찾기)): 후보에는 커밋 메시지·PR 제목·본문·변경 내용을 넣지 않았고 #120도 후보에 내부 값을 더하지 않는다. 같은 수집 결과로 `group(outcome)`을 다시 불러 `Grouping.units`·`commits`를 얻는다. 단위와 후보는 `work_identity(request.source_mode, request.repository_id, unit.unit, unit.parts)` 값으로 맞춘다(후보가 되지 않은 단위가 있어 순서로는 맞추지 않는다). 근거가 가리키는 본인 커밋은 근거 주소 전체가 그 판본(`source_revision`)의 커밋 주소이고 그 판본이 단위의 본인 기여 근거 커밋인 것으로 찾는다(PR 근거의 판본은 머리 커밋이라 본인 커밋 SHA와 같을 수 있다). 그 커밋 기록의 `changes.files`에 경로·상태·`patch`가 있다. 원문은 신뢰할 수 없는 자료로 다룬다([보안 점검](../../docs/CatchU_security_checks.md)).
