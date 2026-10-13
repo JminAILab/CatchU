@@ -74,7 +74,7 @@ Claude Code도 프로젝트의 [`.claude/settings.json`](../../.claude/settings.
 
 또한 hooks가 세션 이벤트에 따라 실행되고, statusLine은 `aidlc engine statusline`을 호출해 AI-DLC 상태를 표시한다. 이 설정은 `/aidlc`를 시작하지 않은 일반 Claude 대화에도 로드된다. 두 하네스는 같은 `aidlc/` 기록을 참조하므로 같은 intent를 서로 다른 세션에서 동시에 진행하지 않는다.
 
-Windows에서 Claude Code로 AI-DLC를 쓰려면 Git Bash를 설치하고, 개인 설정 `.claude/settings.local.json`의 `env`에 `"CLAUDE_CODE_USE_POWERSHELL_TOOL": "0"`을 넣는다. AI-DLC의 Claude hook은 Bash 도구 호출에만 걸려 있는데, Windows의 Claude Code는 기본으로 [PowerShell 도구](https://code.claude.com/docs/en/tools-reference#powershell-tool)로 명령을 실행해 상태·승인 확인을 거치지 않기 때문이다.
+Windows에서 Claude Code로 AI-DLC를 쓰려면 Git Bash를 설치하고, 개인 설정 `.claude/settings.local.json`의 `env`에 `"CLAUDE_CODE_USE_POWERSHELL_TOOL": "0"`을 넣는다. AI-DLC의 Claude hook은 셸 명령 중 Bash 도구에만 걸리는데, Windows의 Claude Code는 claude.ai 계정이면 [PowerShell 도구](https://code.claude.com/docs/en/tools-reference#powershell-tool)를 기본으로 써서 그 명령이 상태·승인 확인을 거치지 않기 때문이다.
 
 새 세션에서 위 `--doctor`를 실행하고 Runtime hook PATH·버전·신뢰 진단을 확인한다. 세션의 자동 hook 실행 기록도 확인해 2.11.0 런타임이 실제 호출됐는지 구분한다. 설정 파일 존재나 hook 스크립트의 수동 실행만으로 자동 hook 정상 동작을 판정하지 않는다. 진단이 남기는 감사 기록은 기존 승인과 별개이며, 실패·경고를 임의로 지워 통과시키지 않는다.
 
