@@ -25,11 +25,14 @@ try {
   const before = await readProfile(api);
   assert.equal(before.displayName,'');
   assert.deepEqual(decideMemberEntry(await lookupMember(api),'/home'),{action:'redirect',to:'/profile/setup'});
+  assert.deepEqual(decideMemberEntry(await lookupMember(api),'/profile/setup'),{action:'allow'});
   const profile = {displayName:' 검증😀 ',introduction:' 소개 ',desiredRole:'개발',skills:['TypeScript','😀']};
   assert.equal(await completeProfileSetup(api,profile,{alreadySaved:false,onSaved:()=>{},isCurrent:()=>true}),'ready');
   assert.deepEqual(await readProfile(api),{...profile,displayName:'검증😀'});
   assert.deepEqual(decideMemberEntry(await lookupMember(api),'/home'),{action:'allow'});
+  // 이름이 저장된 뒤에는 최초 입력 화면을 다시 열지 않는다(#261 리뷰).
+  assert.deepEqual(decideMemberEntry(await lookupMember(api),'/profile/setup'),{action:'redirect',to:'/home'});
   assert.equal(await saveProfile(api,{...profile,displayName:' '}),false);
   assert.deepEqual(await readProfile(api),{...profile,displayName:'검증😀'});
-  console.log('PASS: 실제 web API 함수 → HTTP → PostgreSQL: 초기 진입, 4필드 저장, 재조회, 홈 허용, 빈 이름 거부·기존 값 보존');
+  console.log('PASS: 실제 web API 함수 → HTTP → PostgreSQL: 초기 진입, 4필드 저장, 재조회, 홈 허용, 저장 후 조회한 회원 정보로 최초 입력 재진입 시 리디렉션 판정, 빈 이름 거부·기존 값 보존');
 } finally { await app?.close(); if(db.isInitialized) await db.destroy(); }

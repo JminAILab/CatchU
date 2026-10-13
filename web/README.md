@@ -151,7 +151,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 
 **주소 원칙(제안):** 이름 조회·회원 가드·로그인 이동을 연결했다. 현재 범위와 최초 프로필 저장 연결은 [회원 진입 연결](src/features/member-entry/README.md)을 따른다.
 - 토큰 없이 회원 경로에 들어오거나 회원 API가 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 `/login`으로 보낸다. 수신자 비밀번호 401은 수신자 화면에서 처리한다.
-- `GET /v1/me` 성공 시 `profile.displayName`이 빈 문자열이면 `/profile/setup`으로 보낸다. 조회 중에는 판단을 미루고, 조회 실패는 다시 불러오기로 처리한다. 이미 `/profile/setup`이면 다시 보내지 않는다.
+- `GET /v1/me` 성공 시 `profile.displayName`이 빈 문자열이면 `/profile/setup`으로 보낸다. 조회 중에는 판단을 미루고, 조회 실패는 다시 불러오기로 처리한다. 이미 `/profile/setup`이면 다시 보내지 않는다. 이름이 저장된 회원이 `/profile/setup`에 들어오면 `/home`으로 보낸다(기존 프로필 수정은 `/profile/edit` 범위).
 - 복귀 주소는 `/login?next=<인코딩한 경로>`로 넘기고 서비스 안 회원 경로만 허용한다. 토큰·grant는 주소에 넣지 않는다.
 - 이름이 저장된 회원만 로그인 후 `next`로 복귀한다. 유효하지 않은 `next`는 `/home`으로 보내며, 최초 프로필 입력(`/profile/setup`)을 거친 경우에도 `/home`으로 이동한다.
 - 최초 프로필 입력은 저장에 성공하면 회원 정보(`GET /v1/me`)를 다시 불러온 뒤 `/home`으로 이동한다. 저장 전의 빈 이름 응답 때문에 `/profile/setup`으로 되돌아가지 않게 하기 위해서다([#171 A 담당 검토](https://github.com/JminAILab/CatchU/pull/171#pullrequestreview-5349302819)).

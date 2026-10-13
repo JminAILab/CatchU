@@ -46,13 +46,18 @@ export type MemberEntryDecision =
  * 토큰이 있는 회원이 회원 경로에 들어올 때의 판정.
  * 조회 중에는 판단을 미루고, 실패는 다시 불러오기, 이름이 빈 문자열이면 최초 입력으로 보낸다.
  * 이미 최초 입력 화면이면 다시 보내지 않는다.
+ * 최초 입력 화면은 이름이 빈 회원만 연다. 이름이 있으면 최초 입력을 거친 뒤와 같은 `/home`으로 보낸다
+ * (기존 프로필 수정은 별도 화면 범위).
  *
  * 회원 경로 가드가 GET /v1/me 성공 결과로 호출한다.
  */
 export function decideMemberEntry(me: MeLookup, pathname: string): MemberEntryDecision {
   if (me.state === "loading") return { action: "wait" };
   if (me.state === "failed") return { action: "retry" };
-  if (me.displayName === "" && pathname !== routes.profileSetup) return { action: "redirect", to: routes.profileSetup };
+  if (me.displayName === "") {
+    return pathname === routes.profileSetup ? { action: "allow" } : { action: "redirect", to: routes.profileSetup };
+  }
+  if (pathname === routes.profileSetup) return { action: "redirect", to: routes.home };
   return { action: "allow" };
 }
 
