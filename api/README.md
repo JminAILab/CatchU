@@ -235,6 +235,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 `GET /v1/me`, `PUT /v1/me/profile`의 입력 제한·이름 저장 판정·호출 예시·공개 경계는 [docs/member-profile.md](docs/member-profile.md)에 있다.
 
+## 실제 GitHub 계정 연결 — #231
+
+추가 scope 없는 OAuth App 연결·해제, 발급 응답의 실제 만료 시각, 암호화 보관 설정과 #232의 단일 자격정보 제공 함수는 [docs/github-connection.md](docs/github-connection.md)를 따른다. 기능은 기본 비활성이며 실제 앱 설정·토큰 검증과 API·DB 대역 검사 범위를 구분한다.
+
 ## E 수신 기록과 Catch 반영 연결 — #105
 
 [반영 서비스](docs/result-application.md)와 [실제 수신 DB·E/B 조립](docs/receiver-registration.md)에 있다.

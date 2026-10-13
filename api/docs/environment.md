@@ -17,6 +17,12 @@ api가 읽는 환경변수 목록이다. 설치, `.env` 준비, 값의 우선순
 | 활성화 시 필수 | `GOOGLE_CLIENT_ID` | 없음 | 등록한 웹 OAuth 클라이언트 ID. `.apps.googleusercontent.com` 형식을 검사하며 누락·잘못된 값이면 기동 실패 |
 | 활성화 시 필수 | `GOOGLE_CLIENT_SECRET` | 없음 | 같은 클라이언트의 비밀값. 비어 있거나 공백·제어문자가 있으면 기동 실패. 환경별로 안전하게 보관하고 Git·로그·PR에 기록하지 않음 |
 | 활성화 시 필수 | `GOOGLE_REDIRECT_URI` | 없음 | Google에 등록한 콜백과 정확히 같은 절대 URL. HTTPS가 필요하며 `NODE_ENV=development` 또는 `test`에서는 loopback HTTP도 허용. 계정 정보·query·fragment 또는 정규화 시 달라지는 값은 거부. [앱 등록·로컬 설정](google-login.md#개발용-앱-등록과-설정) 참조 |
+| 선택 | `GITHUB_CONNECTION_ENABLED` | 비활성 | 정확히 `true`일 때 실제 GitHub 연결 활성화. 미지정·공란·`false`는 비활성이며 다른 값은 기동 실패. 아래 다섯 설정은 활성화할 때 필수([GitHub 연결 안내](github-connection.md)) |
+| 활성화 시 필수 | `GITHUB_OAUTH_CLIENT_ID` | 없음 | 등록한 GitHub OAuth App Client ID. 영문·숫자·밑줄·하이픈 1~128자이며 누락·형식 오류는 기동 실패 |
+| 활성화 시 필수 | `GITHUB_OAUTH_CLIENT_SECRET` | 없음 | 같은 앱의 Client secret. 공백·제어문자 없는 ASCII 1~512자. 로컬 .env 또는 배포 비밀 관리 수단에만 보관하고 Git·로그·PR에 기록하지 않음 |
+| 활성화 시 필수 | `GITHUB_OAUTH_CALLBACK_URL` | 없음 | GitHub 앱에 등록한 콜백 URL. HTTPS가 필요하며 공통 `isDevelopmentOrTest`에 따라 정확히 `development`·`test`일 때만 localhost·127.0.0.1·::1의 HTTP 허용. 미지정·공란·다른 환경은 HTTP 거부. 계정 정보·query·fragment도 거부 |
+| 활성화 시 필수 | `GITHUB_CREDENTIAL_DIRECTORY` | 없음 | 루트가 아닌 절대 경로의 전용 영속 보관 디렉터리. 토큰 암호문만 보관하며 Git 추적 밖에 두고 서비스 계정의 읽기·쓰기 권한과 운영 보관 준비를 확인 |
+| 활성화 시 필수 | `GITHUB_CREDENTIAL_ENCRYPTION_KEY` | 없음 | 별도 난수 32바이트를 64자리 hex로 표현한 AES-256-GCM 키. `AUTH_JWT_SECRET`·`LINK_GRANT_SECRET`과 같으면 기동 실패. 기존 암호문을 쓸 때 같은 키를 유지하며 키 불일치가 확인된 연결은 재연결 필요로 전환 |
 | 선택 | `DEV_ANALYSIS_INJECTION_ENABLED` | 비활성 | 분석 주입 모듈을 조립한 경우에만 사용. 정확히 `true`이고 `NODE_ENV`가 `development` 또는 `test`여야 허용. 이 설정만으로 HTTP 경로가 생기지 않음 |
 | 선택 | `NODE_ENV` | 미지정 | 개발 로그인은 정확히 `development` 또는 `test`에서만 허용. 미지정·공란·그 밖의 값은 플래그가 켜져 있어도 거부. 같은 기준으로 http 주소도 `development`·`test`에서만 받으므로, 그 밖(미지정 포함)에서는 `SHARE_LINK_WEB_BASE_URL`에 https 주소가 필요하고 `CORS_ALLOWED_ORIGINS`에 http 출처가 있으면 기동 실패(#218). `LINK_GRANT_SECRET`의 임시 키도 `development`·`test`에서만 만들므로, 그 밖(미지정 포함)에서는 키가 없으면 기동 실패(#242). 운영 배포에서는 반드시 `production`, 로컬 개발은 `.env.example`처럼 `development`로 둔다. HSTS 헤더도 같은 기준으로 `development`·`test`가 아니면 붙는다 |
 | 운영 필수 | `LINK_GRANT_SECRET` | `NODE_ENV`가 `development`·`test`일 때만 실행마다 임시 키 | 비밀번호 링크 열람 증표(grant) 서명 키. 32바이트 무작위 값의 64자리 hex이며 `AUTH_JWT_SECRET`과 달라야 한다. 없거나 빈 값이면 `development`·`test`에서만 임시 키를 만들고(재시작하면 수신자가 비밀번호를 다시 입력), 그 밖(`production`·미지정 포함)에서는 기동 실패(#242). 형식이 틀리면 환경과 관계없이 기동 실패 |

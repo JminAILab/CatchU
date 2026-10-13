@@ -4,6 +4,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { ApiError } from '../common/errors';
 import { GitHubConnection, MemberAccount, MemberProfile } from '../member-analysis/member-analysis.entity';
 import { ProfileInput, validateProfileInput } from './profile-input';
+import { GitHubConnectionService } from '../github-connection/github-connection.service';
 
 function profileResponse(profile: MemberProfile): ProfileInput {
   return { displayName: profile.displayName, introduction: profile.introduction,
@@ -12,7 +13,7 @@ function profileResponse(profile: MemberProfile): ProfileInput {
 
 @Injectable()
 export class MemberProfileService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(private readonly dataSource: DataSource, private readonly github: GitHubConnectionService) {}
 
   private async requireMember(manager: EntityManager, memberId: string, lock = false): Promise<void> {
     if (!isUUID(memberId)) throw new ApiError('RESOURCE_UNAVAILABLE');
@@ -22,6 +23,7 @@ export class MemberProfileService {
   }
 
   async read(memberId: string) {
+    await this.github.refreshStatus(memberId);
     return this.dataSource.transaction('REPEATABLE READ', async manager => {
       await this.requireMember(manager, memberId);
       const profile = await manager.findOneBy(MemberProfile, { memberId });
