@@ -47,6 +47,8 @@ npm ci
 | 배포용 빌드 | `npm run build` | `.next/` 생성, 오류 없이 종료 |
 | 빌드 결과 실행 | `npm run start` | `npm run build` 뒤에만 가능. 주소는 개발 서버와 같음 |
 
+운영 이미지는 빌드 때 `CATCHU_STANDALONE_BUILD=1`로 standalone 출력(`node server.js`로 실행)을 만든다. 위 명령의 빌드·실행은 바뀌지 않는다. 운영 이미지 빌드·실행은 [배포 안내](../deploy/README.md)를 따른다.
+
 종료는 서버를 띄운 터미널에서 `Ctrl+C`. 포트 3000이 이미 사용 중이면 `npm run dev -- -p 3001`처럼 실행 인자로 임시로 바꾸되(Windows·macOS 공통), 팀 공통 포트는 3000이다. `.env`·`.env.local`의 `PORT`는 적용되지 않는다.
 
 ## 검사

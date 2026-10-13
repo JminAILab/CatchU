@@ -1,0 +1,32 @@
+# 운영 이미지 검사(#275, deploy/scripts/check-images.mjs). dev 대상 PR의 CI(ci.yml)에는 넣지 않는다.
+# main으로 가는 배포 PR과 수동 실행(Actions 화면의 Run workflow, 브랜치 선택)에서만 돈다. 이미지 관련 dev 변경은 필요할 때 수동으로 돌린다.
+# main에서 필수 상태 검사로 걸지는 #277의 main 배포 PR 검사 기준에서 정한다.
+# 러너 아키텍처(x86_64)로 빌드하므로 운영 노드 아키텍처의 최종 이미지 확인(#276)을 대신하지 않는다. 레지스트리에 올리지 않는다.
+# 외부 action은 ci.yml과 같은 전체 커밋 SHA로 고정한다(#215). checkout 뒤 git 인증을 쓰지 않으므로 토큰을 남기지 않는다.
+name: images
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: images-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  images:
+    name: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: web/.node-version
+      - run: node deploy/scripts/check-images.mjs
