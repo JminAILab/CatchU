@@ -52,12 +52,15 @@ aidlc config --harness codex --dry-run --json
 Claude Code를 쓴다면:
 
 ```sh
+node .github/scripts/apply-claude-aidlc-policy.mjs --prepare-refresh
 aidlc config --harness claude --mcp none --dry-run --json
 ```
 
+Claude의 첫 명령은 CatchU가 고친 안내 문구 세 줄만 공식 문구로 되돌리고 manifest의 baseline 해시와 대조한다. 다른 편집이 있으면 덮어쓰지 않고 중단한다. `.claude/CLAUDE.md`가 파일 단위로 관리되어 생기는 refresh 충돌을 피하기 위한 준비이며, 실행 제한 설정은 유지한다. 갱신을 취소하거나 변경이 없어도 아래 재적용을 완료한 뒤 Claude 세션을 연다.
+
 변경이 필요하면 미리보기의 경로·충돌·`data.notes`를 검토하고, 같은 옵션으로 `--dry-run`을 `--plan-token '<검토한 data.planToken 값>'`으로 바꿔 적용한다. 미리보기 뒤 파일·옵션이 바뀌면 다시 미리보기를 만든다. 충돌을 `--force`로 덮어쓰지 않는다. `--mcp none`은 이번 저장소의 선택 MCP를 추가하지 않는 구성이다. 이후 MCP를 따로 설정한 팀원은 이 옵션을 재사용하기 전에 기존 서버와 변경 예고를 확인한다.
 
-**Claude 설정을 갱신했다면 새 Claude 세션을 열기 전에** CatchU의 실행 제한을 다시 적용한다. 공식 `config`가 파일 편집 후 자동 센서를 다시 추가하기 때문이다. 프로젝트의 다른 설정을 보존하며, Node.js가 필요하다.
+**Claude 설정을 검토·갱신한 뒤 새 Claude 세션을 열기 전에** CatchU의 실행 제한과 안내 문구를 다시 적용한다. 공식 `config`가 파일 편집 후 자동 센서를 다시 추가하기 때문이다. 정책 대상인 상태 표시줄·권한·안내 문구 외의 프로젝트 설정을 보존하며, Node.js가 필요하다.
 
 ```sh
 node .github/scripts/apply-claude-aidlc-policy.mjs
@@ -81,7 +84,9 @@ Codex의 프로젝트·hook 신뢰는 각 사용자의 컴퓨터와 프로젝트
 
 Claude Code도 프로젝트의 [`.claude/settings.json`](../../.claude/settings.json)을 확인하고 도구가 요구하는 프로젝트 신뢰 절차를 따른다. `permissions.allow`에는 프로젝트 안의 파일 생성·편집을 허용하는 `Edit(/**)`, 하위 에이전트 호출 `Task`, 웹 검색 `WebSearch`, `Bash(aidlc engine *)`와 AI-DLC 진단·조회 명령이 추가된다. 이 설정의 선행 `/`는 프로젝트 루트를 가리키며, 프로젝트 밖 쓰기나 `aidlc update`·`use` 등 기계 설치 변경을 일괄 허용하지 않는다.
 
-또한 hooks가 세션 이벤트에 따라 실행되고, statusLine은 `aidlc engine statusline`을 호출해 AI-DLC 상태를 표시한다. 이 설정은 `/aidlc`를 시작하지 않은 일반 Claude 대화에도 로드된다. 두 하네스는 같은 `aidlc/` 기록을 참조하므로 같은 intent를 서로 다른 세션에서 동시에 진행하지 않는다.
+또한 hooks가 세션 이벤트에 따라 실행된다. 이 설정은 `/aidlc`를 시작하지 않은 일반 Claude 대화에도 로드된다. 두 하네스는 같은 `aidlc/` 기록을 참조하므로 같은 intent를 서로 다른 세션에서 동시에 진행하지 않는다.
+
+상태 표시줄은 셸 builtin `printf`가 `AI-DLC status: /aidlc --status`라는 고정 안내만 출력한다. 공식 2.11.0의 `aidlc engine statusline`은 저장소의 `.claude/hooks/aidlc-statusline.ts`를 우선 불러오므로 자동 호출에서 제외했다. 현재 단계·진행률을 자동 표시하는 기능은 꺼졌으며, 실제 상태는 `/aidlc --status`로 조회한다. 동적 statusline의 직접 호출도 승인 대상이며, 안내의 상태 조회 명령과 구분한다. 개인 설정으로 프로젝트 스크립트 실행을 다시 연결하지 않는다.
 
 AI-DLC 2.11.0의 Claude 가드는 `Bash` 도구에 연결돼 있어 네이티브 `PowerShell` 도구를 지원 경로로 사용하지 않는다. 이를 위한 CatchU 프로젝트 정책으로 `env.CLAUDE_CODE_USE_POWERSHELL_TOOL`을 `"0"`으로 설정하고 `permissions.deny`에 `"PowerShell"`을 추가했다. 전자는 자동 활성화를 끄고 후자는 해당 도구 전체를 거부한다. 다른 설정에서 도구를 켜더라도 이 거부 규칙을 제거해 진행하지 않는다. 근거는 Claude Code의 [환경 변수](https://code.claude.com/docs/en/env-vars)와 [PowerShell 권한 규칙](https://code.claude.com/docs/en/permissions#powershell)이다.
 
@@ -89,9 +94,9 @@ AI-DLC 2.11.0의 Claude 가드는 `Bash` 도구에 연결돼 있어 네이티브
 
 Claude의 파일 편집 후 자동 센서(`PostToolUse`의 `run-sensors`)는 제거했다. 해당 단계의 린터가 저장소의 실행 가능한 ESLint 설정을 개발자 권한·환경에서 불러오기 때문이다. 쓰기 감사와 상태·승인 가드는 유지하고, 단계 완료 시의 문서 센서는 유지한다. 파일 편집 직후의 자동 린터·타입 검사·문서 센서는 실행하지 않으므로 그 결과를 통과로 간주하지 않는다. 기존 intent의 센서 정책이나 과거 승인 원본은 바꾸지 않는다.
 
-명시적인 센서·내부 센서·어댑터 명령에는 `permissions.ask`를 추가했다. 저장소 설정과 의존성을 검토하고 실행 승인을 받은 뒤, 개인 인증·비밀값이 없는 별도 환경에서 서비스 README의 검사를 수행한다. 이 승인 규칙은 Claude가 직접 호출하는 명령에 적용되며 자식 프로세스를 격리하는 기능은 아니다. 기존 Codex의 자동 센서 동작은 이번 Claude 정책의 적용 대상이 아니므로 신뢰하지 않은 브랜치에서 실행하지 않는다.
+명시적인 센서·내부 센서·어댑터·동적 statusline 명령에는 `permissions.ask`를 추가했다. 저장소 설정과 의존성을 검토하고 실행 승인을 받은 뒤, 개인 인증·비밀값이 없는 별도 환경에서 서비스 README의 검사를 수행한다. 이 승인 규칙은 Claude가 직접 호출하는 명령에 적용되며 자식 프로세스를 격리하는 기능은 아니다. 기존 Codex의 자동 센서 동작은 이번 Claude 정책의 적용 대상이 아니므로 신뢰하지 않은 브랜치에서 실행하지 않는다.
 
-이 제한 때문에 Claude `--doctor`는 `aidlc-run-sensors.ts shipped but not wired` **1건을 의도된 실패**로 보고하고, 공식 hook 구성과의 차이도 경고한다. 이를 없애려고 센서를 복원하거나 manifest를 수정하지 않는다. 다른 실패는 별도 문제로 처리한다. 공식 런타임에 안전한 자동 린터 실행 경계가 제공되면 이 정책을 재검토한다.
+이 제한 때문에 Claude `--doctor`는 `aidlc-run-sensors.ts shipped but not wired` **1건을 의도된 실패**로 보고하고, 공식 hook 구성과의 차이도 경고한다. 실제 정책을 반영한 `.claude/CLAUDE.md` 세 줄은 `Instruction file: hand-modified - conflict` 경고로 표시된다. 갱신할 때는 위 `--prepare-refresh`의 해시 검증을 거쳐 처리한다. 진단을 없애려고 센서를 복원하거나 manifest를 수정하지 않는다. 다른 실패는 별도 문제로 처리한다. 공식 런타임에 안전한 자동 린터 실행 경계가 제공되면 이 정책을 재검토한다.
 
 새 세션에서 위 `--doctor`를 실행하고 Runtime hook PATH·버전·신뢰 진단을 확인한다. 세션의 자동 hook 실행 기록도 확인해 2.11.0 런타임이 실제 호출됐는지 구분한다. 설정 파일 존재나 hook 스크립트의 수동 실행만으로 자동 hook 정상 동작을 판정하지 않는다. 진단이 남기는 감사 기록은 기존 승인과 별개이며, 실패·경고를 임의로 지워 통과시키지 않는다.
 

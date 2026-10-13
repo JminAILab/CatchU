@@ -59,12 +59,14 @@
       "Bash(aidlc engine hook run-sensors*)",
       "Bash(aidlc engine __sensor-script *)",
       "Bash(aidlc engine __sensor-script-file *)",
-      "Bash(aidlc engine adapter *)"
+      "Bash(aidlc engine adapter *)",
+      "Bash(aidlc engine statusline*)",
+      "Bash(aidlc engine hook statusline*)"
     ]
   },
   "statusLine": {
     "type": "command",
-    "command": "aidlc engine statusline"
+    "command": "printf '%s' 'AI-DLC status: /aidlc --status'"
   },
   "env": {
     "AWS_AIDLC_DEFAULT_SCOPE": "classic",
