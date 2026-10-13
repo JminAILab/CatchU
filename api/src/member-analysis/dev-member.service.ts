@@ -57,14 +57,17 @@ export class DevMemberService {
   }
 
   /** #136/E 접수에서 재사용할 내부 개발 대역. 제품 HTTP 연동 API는 추가하지 않는다. */
-  async readConnection(memberId: string) {
+  async readConnection(memberId: string, transactionManager?: EntityManager) {
     this.assertEnabled();
-    return this.dataSource.transaction('REPEATABLE READ', async (manager) => {
-      const account = await manager.findOneBy(MemberAccount, { memberId });
+    if (transactionManager && !transactionManager.queryRunner?.isTransactionActive) throw new Error('Connection lookup requires a transaction');
+    const read = async (manager: EntityManager) => {
+      const account = await manager.findOne(MemberAccount, { where: { memberId },
+        ...(transactionManager ? { lock: { mode: 'pessimistic_read' as const } } : {}) });
       if (!account || account.accountState !== 'ACTIVE' || !account.identityReference.startsWith(IDENTITY_NAMESPACE)) {
         throw new ForbiddenException();
       }
-      const connection = await manager.findOneBy(GitHubConnection, { memberId });
+      const connection = await manager.findOne(GitHubConnection, { where: { memberId },
+        ...(transactionManager ? { lock: { mode: 'pessimistic_read' as const } } : {}) });
       if (connection && connection.externalAccountReference !== CONNECTION_NAMESPACE + memberId) {
         throw new Error('Development connection is not a synthetic connection');
       }
@@ -73,6 +76,7 @@ export class DevMemberService {
         repositories: connection?.connectionState === 'CONNECTED' ? [{ ...SYNTHETIC_REPOSITORY }] : [],
         sourceMode: 'MOCK' as const,
       };
-    });
+    };
+    return transactionManager ? read(transactionManager) : this.dataSource.transaction('REPEATABLE READ', read);
   }
 }
