@@ -49,8 +49,8 @@ jobs:
             while IFS= read -r file; do
               case "$file" in .github/workflows/ci.yml) web=true api=true worker=true ;; esac
               case "$file" in web/*) web=true ;; esac
-              # api 테스트는 worker 합성 자료와 계약 YAML도 읽는다.
-              case "$file" in api/* | worker/fixtures/* | "$contract"*) api=true ;; esac
+              # api 테스트는 worker 합성 자료와 계약 YAML도 읽고, 공유 링크 web 통합 시험은 web의 share-links·lib 코드를 직접 불러온다.
+              case "$file" in api/* | worker/fixtures/* | "$contract"* | web/src/features/share-links/* | web/src/lib/*) api=true ;; esac
               # worker 메시지 검사는 계약 YAML을 읽고, ruff는 루트 .gitignore에 적힌 파일을 검사에서 뺀다.
               case "$file" in worker/* | "$contract"* | .gitignore) worker=true ;; esac
             done <<< "$files"
