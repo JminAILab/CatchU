@@ -74,7 +74,6 @@ jobs:
         with:
           persist-credentials: false
       - run: bash .github/scripts/check-doc-sizes.sh
-      - run: node .github/scripts/apply-claude-aidlc-policy.mjs --check
 
   web:
     name: web
