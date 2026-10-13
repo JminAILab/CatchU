@@ -40,7 +40,7 @@
 
 ## 자격정보·선택 범위 제공자
 
-A의 실제 조회 지점은 아직 없다([#133](https://github.com/JminAILab/CatchU/issues/133) 후속). 수집 모듈은 `CredentialResolver`·`SelectionResolver` 인터페이스만 두고, 검사는 `tests/github_synthetic.py`의 대역으로 한다. 맥락의 항목(회원·저장소·저장소 좌표·허용 범위 판본·연동 계정·자격정보·만료)은 수집 통제 문서 「인계 내용 — A가 주는 것」의 제안이다.
+`CredentialResolver`·`SelectionResolver`의 내부 api HTTP 구현과 요청 단위 조립은 [내부 API 자격정보·선택 범위 조회](request-context.md)에 있다(#232). 기존 `check_credential`·`check_selection` 대조는 그대로 유지한다. 기존 수집 검사는 `tests/github_synthetic.py`의 대역을 사용하며, 새 조회 경계는 합성 HTTP 응답으로 별도 검사한다.
 
 ## 합성 검사와 실제 연결
 

@@ -60,7 +60,7 @@ class CredentialLookupError(Exception):
 
 
 class CredentialResolver(Protocol):
-    """A의 자격정보 맥락 조회. 실제 조회 지점은 #133 후속에서 A가 제공한다."""
+    """A의 자격정보 맥락 조회. 내부 HTTP 구현은 app.request_context에 있다."""
 
     def resolve(self, reference: str) -> CredentialContext | None:
         """모르는 참조면 None, 조회 자체가 실패하면 CredentialLookupError."""
