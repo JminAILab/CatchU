@@ -2,7 +2,7 @@
 # 단일 호스트 계획 교체·처음 설치(#275). 사람이 실행하는 수동 절차이며 자동 배포가 아니다. 절차 설명은 deploy/README.md.
 #   1) 대상 이미지가 이 호스트에 있는지 확인(합성 DB 이미지는 없으면 받는다)
 #   2) 유입 차단: web·api를 멈추고, worker를 멈춘다
-#   3) 종료 확인: 같은 이름·같은 프로젝트의 web·api·worker가 하나라도 실행 중이면 멈춘다.
+#   3) 종료 확인: 같은 이름·같은 프로젝트의 web·api·worker가 하나라도 실행 중이거나 상태를 확인할 수 없으면 멈춘다.
 #      대기 상한을 넘어 강제 종료(137)됐거나, 이전 migration 실행 컨테이너(실패·불명)가 남아 있어도 새 실행을 시작하지 않는다
 #   4) (--migrate) migration을 이미지마다 정해진 이름으로 한 번 실행한다. 실패·결과 불명이면 새 실행을 시작하지 않고 멈춘다
 #   5) api → worker → web 순서로 시작하고 각각 정상 확인(health)을 기다린다. 하나라도 실패하면 세 서비스를 다시 멈추고 끝낸다
@@ -86,13 +86,17 @@ done
 # 2) 유입 차단과 중지. compose 밖에서 같은 라벨로 띄운 실행이 남으면 3)에서 멈춘다.
 stop_started=$(date +%s)
 log "web·api 중지(유입 차단), 이어서 worker 중지. 대기 상한 ${stop_timeout}초(넘으면 Docker가 강제 종료한다)"
-"${compose[@]}" stop -t "${stop_timeout}" web
-"${compose[@]}" stop -t "${stop_timeout}" api
-"${compose[@]}" stop -t "${stop_timeout}" worker
+# 하나의 중지 명령이 실패해도(Docker 오류 등) 나머지 서비스도 멈추도록 모두 시도하고, 실제 상태는 3)에서 확인한다.
+stop_failed=""
+for service in web api worker; do
+  "${compose[@]}" stop -t "${stop_timeout}" "${service}" || stop_failed="${stop_failed} ${service}"
+done
+if [ -n "${stop_failed}" ]; then log "중지 명령이 실패했습니다:${stop_failed}. 종료 확인으로 실제 상태를 봅니다."; fi
 
 # 3) 종료 확인
 for service in web api worker; do
-  ids=$(running_ids "${service}")
+  ids=$(running_ids "${service}") \
+    || fail 3 "Docker에서 ${service} 실행 상태를 확인하지 못했습니다. 종료를 확인하기 전에는 새 실행을 시작하지 않습니다."
   if [ -n "${ids}" ]; then
     fail 3 "${service} 실행이 남아 있습니다(${ids//$'\n'/ }). 종료를 확인하기 전에는 새 실행을 시작하지 않습니다."
   fi
@@ -107,7 +111,8 @@ for service in ${was_running}; do
   fi
 done
 # 성공한 migration 실행은 4)에서 지우므로, 남은 실행 컨테이너는 실패했거나 결과가 불분명한 실행이다(되돌리기 경로도 막는다).
-leftover=$(docker ps -a --filter "label=com.docker.compose.project=${project}" --filter "label=com.docker.compose.service=migration" --format '{{.Names}} {{.Status}}')
+leftover=$(docker ps -a --filter "label=com.docker.compose.project=${project}" --filter "label=com.docker.compose.service=migration" --format '{{.Names}} {{.Status}}') \
+  || fail 3 "Docker에서 이전 migration 실행 상태를 확인하지 못했습니다."
 if [ -n "${leftover}" ]; then
   fail 5 "이전 migration 실행이 남아 있습니다(${leftover//$'\n'/, }). 로그와 DB 적용 이력을 확인하고 직접 지운 뒤 다시 실행합니다."
 fi

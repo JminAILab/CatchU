@@ -9,7 +9,7 @@
 //   --report  결과(통과·실패, 이미지 ID·플랫폼)를 JSON으로 쓴다. 비밀값·환경변수 원문은 쓰지 않는다
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -525,6 +525,27 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
   const restored = replace();
   await check("교체", "원래 이미지로 다시 시작", () => {
     expect(restored.code === 0, `replace code=${restored.code}`);
+  });
+  // web 중지 명령만 실패하는 가짜 docker로 교체한다. 나머지(api·worker)도 멈추고, 종료 확인에서 종료 코드 3으로 끝나야 한다.
+  const realDocker = must("sh", ["-c", "command -v docker"]).stdout.trim();
+  const shimDir = path.join(work, "docker-shim");
+  mkdirSync(shimDir);
+  writeFileSync(path.join(shimDir, "docker"), `#!/usr/bin/env bash
+if [ "$1" = compose ] && [[ " $* " == *" stop "* ]] && [ "\${@: -1}" = web ]; then echo "검사용 가짜 Docker 오류" >&2; exit 1; fi
+exec "${realDocker}" "$@"
+`, { mode: 0o755 });
+  const stopFail = run("bash", [path.join(DEPLOY, "scripts/replace-single.sh"), "--env-file", composeEnv, "--local-db"],
+    { timeoutMs: 900_000, env: { PATH: `${shimDir}:${process.env.PATH}` } });
+  await check("교체", "중지 명령 하나가 실패해도 나머지를 멈추고 종료 확인에서 멈춘다", () => {
+    expect(stopFail.code === 3, `replace code=${stopFail.code}`);
+    expect(/중지 명령이 실패했습니다: web/.test(stopFail.text), "실패 기록 없음");
+    const running = ["api", "worker", "web"].filter((service) => docker(["inspect", "-f", "{{.State.Running}}", name(service)]).stdout.trim() === "true");
+    expect(running.length === 1 && running[0] === "web", `실행 중 ${running.join(",")}`);
+    return "web만 남고 api·worker 멈춤, 종료 코드 3";
+  });
+  const afterStopFail = replace();
+  await check("교체", "원인 해결 뒤 다시 실행하면 이어서 시작", () => {
+    expect(afterStopFail.code === 0, `replace code=${afterStopFail.code}`);
   });
 
   // ---------- 7. 종료 신호와 비밀값 ----------
