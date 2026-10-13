@@ -49,6 +49,24 @@ test('적합 후보의 저장값은 미공개·미확인이며 저장 완료 정
   assert.equal('ownerViewReady' in prepared, false);
 });
 
+test('제목은 null 또는 비어 있지 않은 문자열 그대로 보존하고 누락·잘못된 형식은 거부한다', () => {
+  for (const title of [null, '[합성] 기존 제목', ' ']) {
+    const input = { ...candidate(), title };
+    const prepared = prepareRegistrationBatch([input], 'MOCK')[0].candidates[0];
+    assert.equal(prepared.content.asset.title, title);
+    assert.equal(prepared.content.asset.draftStatus, 'GENERATED');
+    assert.equal(prepared.content.asset.draftContent, input.draft.content);
+  }
+  const missingTitle = candidate();
+  delete missingTitle.title;
+  for (const input of [
+    missingTitle,
+    ...[undefined, '', 123, false, [], {}].map((title) => ({ ...candidate(), title })),
+  ]) {
+    assert.throws(() => prepareRegistrationBatch([input], 'MOCK'), inputError('INVALID_INPUT', 'title'));
+  }
+});
+
 test('같은 작업은 제목이 달라도 한 묶음이며 두 후보의 내용을 각각 보존한다', () => {
   const first = candidate();
   const second = candidate('candidate-2');

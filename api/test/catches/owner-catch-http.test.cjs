@@ -172,7 +172,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
   const visibilityPath = (catchId) => detailPath(catchId) + '/visibility';
   const ids = (items) => items.map((item) => item.catchId).sort();
 
-  test('개발 로그인 회원이 조회·확인·공개·숨김하고 타인 변경은 거부하며 수신자 조회에 반영한다', async () => {
+  test('개발 로그인 회원의 null 제목이 조회·확인·공개·숨김에서 보존되고 타인 변경은 거부된다', async () => {
     // 실제 개발 로그인 경로를 사용한다. Google 인증과 E 분석 수신은 이 시험의 범위가 아니다.
     const login = async (identifier) => {
       const body = success(await request(undefined, '/v1/auth/dev-login', {
@@ -189,10 +189,13 @@ describe('본인 Catch HTTP·PostgreSQL', {
     const owner = await login('synthetic-owner-http-login');
     const other = await login('synthetic-other-http-login');
     assert.notEqual(owner.memberId, other.memberId);
-    const own = await seed({ ownerId: owner.memberId });
+    const own = await seed({ ownerId: owner.memberId, source: { ...candidate(), title: null } });
     const beforeRead = await snapshot();
+    assert.equal(beforeRead.assets[0].title, null);
     const detail = success(await request(undefined, detailPath(own.catchId), { headers: owner.headers }));
     assert.equal(detail.catchId, own.catchId);
+    assert.equal(detail.title, null);
+    assert.equal(detail.draft.status, 'GENERATED');
     assert.deepEqual(success(await request(undefined, '/v1/catches', { headers: owner.headers })), {
       items: [detail], page: { nextCursor: null },
     });
@@ -208,6 +211,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
     }));
     assert.deepEqual(confirmed.confirmation, CONFIRMED);
     assert.equal(confirmed.visibility, 'PRIVATE');
+    assert.equal(confirmed.title, null);
     assert.deepEqual(await asset(own.catchId), {
       ...beforeRead.assets[0], work_facts_confirmed: true, contribution_confirmed: true,
     });
@@ -217,9 +221,14 @@ describe('본인 Catch HTTP·PostgreSQL', {
     }));
     assert.equal(published.visibility, 'PUBLIC');
     assert.deepEqual(published.confirmation, CONFIRMED);
+    assert.equal(published.title, null);
     // C의 링크 인증 경로는 대체하지 않는다. 허용된 링크 소유자 ID로 호출하는 내부 조회만 검사한다.
-    assert.deepEqual(ids((await publicCatches.list(owner.memberId, {})).catches), [own.catchId]);
-    assert.equal((await publicCatches.get(owner.memberId, own.catchId)).catchId, own.catchId);
+    const publicDetail = await publicCatches.get(owner.memberId, own.catchId);
+    assert.equal(publicDetail.catchId, own.catchId);
+    assert.equal(publicDetail.title, null);
+    assert.deepEqual(await publicCatches.list(owner.memberId, {}), {
+      catches: [publicDetail], page: { nextCursor: null },
+    });
     const beforeForeign = await snapshot();
     assert.deepEqual(success(await request(undefined, '/v1/catches', { headers: other.headers })), {
       items: [], page: { nextCursor: null },
@@ -237,6 +246,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
     }));
     assert.equal(hidden.visibility, 'PRIVATE');
     assert.deepEqual(hidden.confirmation, CONFIRMED);
+    assert.equal(hidden.title, null);
     assert.deepEqual(await publicCatches.list(owner.memberId, {}), emptyPublic);
     await assert.rejects(publicCatches.get(owner.memberId, own.catchId), { status: 404 });
     assert.deepEqual(await snapshot(), {
@@ -678,8 +688,8 @@ describe('본인 Catch HTTP·PostgreSQL', {
     }
   });
 
-  test('현재 원본 보호가 제한되면 공개는 409, 수신자는 제외, 본인 조회·숨김은 가능하다', async () => {
-    const own = await seed();
+  test('null 제목도 현재 원본 보호가 제한되면 공개는 409, 수신자는 제외, 본인 조회·숨김은 가능하다', async () => {
+    const own = await seed({ source: { ...candidate(), title: null } });
     await publish(own);
     await db.query("UPDATE repository_protection SET applied_restriction = 'SOURCE_PRIVATE' WHERE owner_id = $1", [own.ownerId]);
     const beforeState = await snapshot();

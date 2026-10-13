@@ -46,7 +46,7 @@ function validateCandidate(candidate: RegistrationCandidate): void {
     throw new CatchRegistrationInputError('INVALID_INPUT', 'candidate');
   }
   assertString(candidate.candidateId, 'candidateId', true);
-  assertString(candidate.title, 'title', true);
+  if (candidate.title !== null) assertString(candidate.title, 'title', true);
   assertString(candidate.workIdentity, 'workIdentity', true);
   assertStrings(candidate.workFacts, 'workFacts', true);
   assertString(candidate.subjectContribution, 'subjectContribution', true);

@@ -22,6 +22,7 @@ AppModule에 CatchesModule을 등록했다. /v1, 공통 오류 응답, 성공/�
 - 다른 회원의 Catch·없는 Catch는 똑같은 `404 RESOURCE_UNAVAILABLE`다. 계약상 ID는 비어 있지 않은 문자열이므로 저장 UUID에 해당하지 않는 Catch ID도 같은 404이며 SQL cast 오류로 노출하지 않는다.
 - 잘못된 커서·중복/추가 쿼리·허용 범위 밖 limit·잘못된 PUT 본문은 400이다. 인증이 없거나 서명이 잘못되면 공통 Guard가 401로 거부한다. 서명이 유효해도 회원 ID가 UUID가 아니거나 같은 트랜잭션에서 회원 행을 찾지 못하면 `401 AUTH_INVALID`다. 회원 조회 자체의 DB 오류는 500으로 구분하며 빈 목록·자원 404로 바꾸지 않는다.
 - 본인 응답은 제목·사실·기여·근거·최소 질문과 원 결과/후보·생성 상태·MOCK/LIVE를 보존한다. 내부 ownerId·작업 키·등록 판단은 응답하지 않는다.
+- [PR #262](https://github.com/JminAILab/CatchU/pull/262)에 따라 `title:null`도 정상 응답이며 필드를 생략하거나 대체 제목으로 채우지 않는다. 같은 매퍼를 사용하는 수신자용 PublicCatch에도 적용한다. 본인 권한·공개/숨김·원본 보호 판단은 그대로 검사한다.
 - SOURCE_PRIVATE여도 본인은 응답을 받는다. 수신자 공개나 PUBLIC 설정을 바꾸는 기능은 아니다.
 - 조회·응답 매핑은 REPEATABLE READ 트랜잭션 안에서 수행한다. 연결 누락·DB 오류를 정상 빈 결과로 변환하지 않는다.
 

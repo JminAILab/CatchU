@@ -38,8 +38,8 @@ export class CatchAssetEntity {
   @PrimaryColumn({ name: 'catch_id', type: 'uuid' })
   catchId: string = randomUUID();
 
-  @Column({ name: 'title', type: 'text' })
-  title!: string;
+  @Column({ name: 'title', type: 'text', nullable: true })
+  title!: string | null;
 
   @Column({ name: 'owner_id', type: 'uuid' })
   ownerId!: string;

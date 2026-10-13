@@ -8,7 +8,7 @@ export interface OwnerCatchReadSource {
   readonly asset: {
     readonly catchId: string;
     readonly ownerId: string;
-    readonly title: string;
+    readonly title: string | null;
     readonly sourceRequestId: string;
     readonly sourceResultId: string;
     readonly sourceCandidateId: string;
@@ -52,7 +52,7 @@ export interface OwnerCatchReadSource {
 /** common.yaml의 본인용 Catch 응답. 수신자용 PublicCatch와 구분한다. */
 export interface OwnerCatchResponse {
   catchId: string;
-  title: string;
+  title: string | null;
   repositoryId: string;
   sourceRequestId: string;
   sourceResultId: string;
@@ -177,7 +177,7 @@ export function toOwnerCatchResponse(
 
   return {
     catchId,
-    title: text(asset.title, 'asset.title'),
+    title: asset.title === null ? null : text(asset.title, 'asset.title'),
     repositoryId,
     sourceRequestId: text(asset.sourceRequestId, 'asset.sourceRequestId'),
     sourceResultId: text(asset.sourceResultId, 'asset.sourceResultId'),
