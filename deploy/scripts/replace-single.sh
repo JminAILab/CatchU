@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
 # 단일 호스트 계획 교체·처음 설치(#275). 사람이 실행하는 수동 절차이며 자동 배포가 아니다. 절차 설명은 deploy/README.md.
-#   1) 대상 이미지가 이 호스트에 있는지 확인(합성 DB 이미지는 없으면 받는다)
+#   1) 대상 이미지가 이 호스트에 있는지 확인(합성 DB 이미지는 없으면 받는다)하고, 교체 전에 실행 중인 서비스를 기록한다.
+#      실행 상태를 조회하지 못하면 아무것도 멈추지 않고 끝낸다. 컨테이너가 아직 없으면(처음 설치) 실행 중이 아닌 것으로 본다
 #   2) 유입 차단: web·api를 멈추고, worker를 멈춘다
-#   3) 종료 확인: 같은 이름·같은 프로젝트의 web·api·worker가 하나라도 실행 중이거나 상태를 확인할 수 없으면 멈춘다.
-#      대기 상한을 넘어 강제 종료(137)됐거나, 이전 migration 실행 컨테이너(실패·불명)가 남아 있어도 새 실행을 시작하지 않는다
-#   4) (--migrate) migration을 이미지마다 정해진 이름으로 한 번 실행한다. 실패·결과 불명이면 새 실행을 시작하지 않고 멈춘다
+#   3) 종료 확인: 같은 이름·같은 프로젝트의 web·api·worker가 하나라도 실행 중이거나 상태·종료 코드를 확인할 수 없으면 멈춘다.
+#      대기 상한을 넘어 강제 종료(137)됐거나, 이전 migration 실행 컨테이너가 남아 있어도 새 실행을 시작하지 않는다.
+#      세 서비스를 모두 확인한 뒤 판단하고, 3으로 멈출 때도 확인한 강제 종료와 교체 전에 실행 중이던 서비스를 함께 적는다
+#   4) (--migrate) migration을 이미지마다 정해진 이름으로 한 번 실행한다. 실패·결과 불명이면 새 실행을 시작하지 않고 멈춘다.
+#      성공을 확인한 뒤 실행 컨테이너를 지우지 못해도 새 실행을 시작하지 않고 멈춘다(적용은 확인됨, 컨테이너는 직접 지운다)
 #   5) api → worker → web 순서로 시작하고 각각 정상 확인(health)을 기다린다. 하나라도 실패하면 세 서비스를 다시 멈추고
 #      종료를 확인한다. 다시 멈추지 못했거나 상태를 확인할 수 없으면 종료 확인 실패(3)로 끝낸다
 # 자동 재시도·자동 되돌리기·DB 복원은 하지 않는다. 진행 중이던 요청·분석은 끝까지 마친다고 보장하지 않는다.
 #
 # 사용: deploy/scripts/replace-single.sh --env-file <compose.env> [--local-db] [--migrate] [--stop-timeout 초]
-# 종료 코드: 0 성공, 2 사용법·사전 확인 실패, 3 종료 확인 실패(새 실행 실패 뒤 다시 멈출 때 포함), 4 migration 실패,
-#           5 migration 결과 불명·남은 실행, 6 새 실행 확인 실패(세 서비스 종료까지 확인함),
-#           7 대기 상한을 넘어 강제 종료됨(원인 확인 뒤 다시 실행하면 이어서 진행)
+# 종료 코드: 0 성공, 2 사용법·사전 확인 실패, 3 종료 확인 실패(교체 전 상태 조회 실패, 새 실행 실패 뒤 다시 멈출 때 포함),
+#           4 migration 실패, 5 migration 결과 불명·남은 실행, 6 새 실행 확인 실패(세 서비스 종료까지 확인함),
+#           7 대기 상한을 넘어 강제 종료됨(원인 확인 뒤 다시 실행하면 이어서 진행),
+#           8 migration 성공 뒤 실행 컨테이너 정리 실패(직접 지운 뒤 compose.env를 바꾸지 않고 --migrate 없이 다시 실행하면 이어서 진행)
 set -euo pipefail
 
-usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; }
+# 머리말 주석(둘째 줄부터 첫 코드 줄 전까지)을 그대로 보여 준다. 머리말 줄 수가 바뀌어도 범위를 고치지 않아도 된다.
+usage() { awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; }
 env_file="" local_db=false migrate=false stop_timeout=30
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -60,7 +65,17 @@ project=$("${compose[@]}" config | sed -n 's/^name: //p' | head -n 1)
 running_ids() { # 서비스 이름 → 같은 프로젝트에서 실행 중인 컨테이너 ID(이름을 바꾼 수동 실행도 라벨로 잡는다)
   docker ps -q --filter "label=com.docker.compose.project=${project}" --filter "label=com.docker.compose.service=$1"
 }
-# 기록용. inspect는 컨테이너가 없을 때와 Docker 조회 실패를 같은 코드로 끝내므로 둘을 가르지 않는다(판정에는 쓰지 않는다).
+# 판정용. 컨테이너 이름 → "absent"(없음) 또는 "<실행 중 true|false> <종료 코드>". Docker 조회가 실패하거나 답이 형식에
+# 맞지 않으면 실패로 끝나므로, 부르는 쪽은 상태 불명으로 멈춘다. inspect는 없는 컨테이너와 조회 실패를 같은 코드로 끝내므로
+# 있는지는 목록 조회(없으면 빈 출력으로 성공)로 먼저 가른다.
+container_status() {
+  local names status
+  names=$(docker ps -a --filter "name=$1" --format '{{.Names}}') || return 1
+  case $'\n'"${names}"$'\n' in *$'\n'"$1"$'\n'*) ;; *) echo absent; return 0 ;; esac
+  status=$(docker inspect --type container -f '{{.State.Running}} {{.State.ExitCode}}' "$1") || return 1
+  case "${status}" in true\ [0-9]*|false\ [0-9]*) echo "${status}" ;; *) return 1 ;; esac
+}
+# 기록용. inspect는 컨테이너가 없을 때와 Docker 조회 실패를 같은 코드로 끝내므로 둘을 가르지 않는다(판정에는 container_status를 쓴다).
 state() { docker inspect -f '{{.Id}} {{.State.Status}} exit={{.State.ExitCode}} started={{.State.StartedAt}} finished={{.State.FinishedAt}} image={{.Image}}' "$1" 2>/dev/null || echo "확인 못 함(없거나 조회 실패)"; }
 
 # 1) 사전 확인. 앱 이미지는 미리 빌드하거나 받아 둔다. 합성 DB 이미지(digest 고정)는 없으면 받는다.
@@ -78,12 +93,18 @@ for image in ${images}; do
 done
 log "대상 이미지:"
 for image in ${images}; do log "  ${image} -> $(docker image inspect -f '{{.Id}}' "${image}")"; done
+# 교체 전에 실행 중인 서비스는 3)에서 강제 종료 여부를 본다. 실행 중이었는지 조회하지 못하면 그 판정을 할 수 없으므로
+# 아무것도 멈추지 않고 끝낸다(기존 실행은 그대로 둔다).
 was_running=""
 for service in web api worker; do
-  log "교체 전 ${service}: $(state "${project}-${service}")"
-  if [ "$(docker inspect -f '{{.State.Running}}' "${project}-${service}" 2>/dev/null || echo false)" = true ]; then
-    was_running="${was_running} ${service}"
+  status=$(container_status "${project}-${service}") \
+    || fail 3 "Docker에서 교체 전 ${service} 실행 상태를 확인하지 못했습니다. 강제 종료 여부를 판정할 수 없으므로 아무것도 멈추지 않고 끝냅니다."
+  if [ "${status}" = absent ]; then
+    log "교체 전 ${service}: 컨테이너 없음"
+    continue
   fi
+  log "교체 전 ${service}: $(state "${project}-${service}")"
+  case "${status}" in true\ *) was_running="${was_running} ${service}" ;; esac
 done
 
 # 2) 유입 차단과 중지. compose 밖에서 같은 라벨로 띄운 실행이 남으면 3)에서 멈춘다.
@@ -96,28 +117,54 @@ for service in web api worker; do
 done
 if [ -n "${stop_failed}" ]; then log "중지 명령이 실패했습니다:${stop_failed}. 종료 확인으로 실제 상태를 봅니다."; fi
 
-# 3) 종료 확인
+# 3) 종료 확인. 세 서비스를 모두 확인한 뒤 판단한다. 실행이 남았거나 상태·종료 코드를 조회하지 못하면 멈춘다(3).
+# 교체 전에 실행 중이던 서비스가 강제 종료(137)됐으면 정상 교체로 보지 않는다(7). 3으로 멈출 때도 이미 확인한 강제 종료와
+# 교체 전에 실행 중이던 서비스를 함께 적는다. 다시 실행하면 멈춘 서비스는 강제 종료 판정에서 빠지므로 운영자가 확인할 대상이다.
+# 컨테이너가 없는 서비스(처음 설치)는 멈춘 것으로 본다.
+forced="" absent_now="" left="" unknown="" vanished=""
 for service in web api worker; do
-  ids=$(running_ids "${service}") \
-    || fail 3 "Docker에서 ${service} 실행 상태를 확인하지 못했습니다. 종료를 확인하기 전에는 새 실행을 시작하지 않습니다."
+  if ! ids=$(running_ids "${service}"); then
+    unknown="${unknown} ${service}"
+    continue
+  fi
   if [ -n "${ids}" ]; then
-    fail 3 "${service} 실행이 남아 있습니다(${ids//$'\n'/ }). 종료를 확인하기 전에는 새 실행을 시작하지 않습니다."
+    left="${left} ${service}(${ids//$'\n'/ })"
+    continue
   fi
-  if [ "$(docker inspect -f '{{.State.Running}}' "${project}-${service}" 2>/dev/null || echo false)" = true ]; then
-    fail 3 "${project}-${service}가 아직 실행 중입니다."
+  if ! status=$(container_status "${project}-${service}"); then
+    unknown="${unknown} ${service}"
+    continue
   fi
+  case "${status}" in
+    true\ *) left="${left} ${service}(${project}-${service})"; continue ;;
+    absent) absent_now="${absent_now} ${service}" ;;
+  esac
+  case " ${was_running} " in
+    *" ${service} "*)
+      case "${status}" in
+        "false 137") forced="${forced} ${service}" ;;
+        absent) vanished="${vanished} ${service}" ;;
+      esac ;;
+  esac
 done
-for service in web api worker; do log "종료 확인 ${service}: $(state "${project}-${service}")"; done
-for service in ${was_running}; do
-  if [ "$(docker inspect -f '{{.State.ExitCode}}' "${project}-${service}" 2>/dev/null)" = 137 ]; then
-    fail 7 "${service}가 대기 상한 안에 끝나지 않아 강제 종료됐습니다. 정상 교체로 보지 않습니다. 로그로 원인을 확인한 뒤 다시 실행합니다."
-  fi
+for service in web api worker; do
+  case " ${absent_now} " in
+    *" ${service} "*) log "종료 확인 ${service}: 컨테이너 없음" ;;
+    *) log "종료 확인 ${service}: $(state "${project}-${service}")" ;;
+  esac
 done
-# 성공한 migration 실행은 4)에서 지우므로, 남은 실행 컨테이너는 실패했거나 결과가 불분명한 실행이다(되돌리기 경로도 막는다).
+if [ -n "${left}${unknown}${vanished}" ]; then
+  fail 3 "종료를 확인하지 못해 새 실행을 시작하지 않습니다.${left:+ 실행이 남아 있습니다:${left}.}${unknown:+ Docker에서 실행 상태·종료 코드를 확인하지 못했습니다:${unknown}.}${vanished:+ 교체 전에 실행 중이던 컨테이너가 없어져 종료 코드를 확인하지 못했습니다:${vanished}.}${forced:+ 대기 상한을 넘어 강제 종료(137)된 서비스도 있습니다:${forced}.} 교체 전 실행 중:${was_running:- 없음}."
+fi
+if [ -n "${forced}" ]; then
+  fail 7 "${forced# }가 대기 상한 안에 끝나지 않아 강제 종료됐습니다. 정상 교체로 보지 않습니다. 로그로 원인을 확인한 뒤 다시 실행합니다."
+fi
+# 성공한 migration 실행은 4)에서 지우므로, 남은 실행 컨테이너는 실패·결과 불명이거나 성공했지만 지우지 못한(8) 실행이다.
+# 어느 쪽인지 여기서 다시 판정하지 않고 멈춘다(되돌리기 경로도 막는다).
 leftover=$(docker ps -a --filter "label=com.docker.compose.project=${project}" --filter "label=com.docker.compose.service=migration" --format '{{.Names}} {{.Status}}') \
   || fail 3 "Docker에서 이전 migration 실행 상태를 확인하지 못했습니다."
 if [ -n "${leftover}" ]; then
-  fail 5 "이전 migration 실행이 남아 있습니다(${leftover//$'\n'/, }). 로그와 DB 적용 이력을 확인하고 직접 지운 뒤 다시 실행합니다."
+  fail 5 "이전 migration 실행이 남아 있습니다(${leftover//$'\n'/, }). 앞선 교체가 8(migration 성공·정리 실패)로 끝났고 그 기록의 실행 이름·종료 코드 0과 같으며 compose.env를 바꾸지 않았다면, 직접 지운 뒤 --migrate 없이 다시 실행합니다. 그 밖에는 로그와 DB 적용 이력을 확인하고 직접 지운 뒤 다시 실행합니다."
 fi
 
 # 4) migration: 이미지마다 정해진 이름으로 한 번만 실행한다.
@@ -140,8 +187,11 @@ if [ "${migrate}" = true ]; then
   log "migration 기록: $(state "${run_name}")"
   if [ "${recorded}" = "exited 0" ] && [ "${run_code}" -eq 0 ]; then
     # 성공을 확인하고 기록을 남긴 뒤에만 지운다. 실패·불명이면 확인용으로 남긴다.
-    docker rm "${run_name}" >/dev/null
-    log "migration 성공. 실행 컨테이너를 지웠습니다: ${run_name}"
+    log "migration 성공: ${run_name}"
+    # 지우지 못해도 적용은 확인된 상태다. 실패(4)·결과 불명(5)과 나눠 8로 멈추고, 다시 실행하거나 강제로 지우지 않는다.
+    docker rm "${run_name}" >/dev/null \
+      || fail 8 "migration은 성공했지만 실행 컨테이너(${run_name})를 지우지 못했습니다. web·api·worker는 멈춘 상태입니다. 이 컨테이너가 exited 0인지 확인하고 직접 지운 뒤, compose.env를 바꾸지 않고 --migrate 없이 다시 실행합니다. 지우지 않고 다시 실행하면 남은 실행으로 보고 5로 멈춥니다."
+    log "실행 컨테이너를 지웠습니다: ${run_name}"
   elif [ "${recorded#exited }" != "${recorded}" ] && [ "${recorded}" != "exited 0" ]; then
     fail 4 "migration 실패(${recorded}). 컨테이너 ${run_name}과 DB 적용 이력을 확인하기 전에는 다시 실행하거나 새 실행을 시작하지 않습니다."
   else

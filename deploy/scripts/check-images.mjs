@@ -299,6 +299,9 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
   const first = replace(["--migrate"]);
   await check("설치", "처음 설치: migration → api → worker → web", () => {
     expect(first.code === 0, `replace code=${first.code}\n${first.text.slice(-800)}`);
+    // 컨테이너가 아직 없는 상태를 조회 실패가 아니라 "없음"으로 판정하고 진행했는지 본다.
+    const absent = ["web", "api", "worker"].filter((service) => !first.text.includes(`교체 전 ${service}: 컨테이너 없음`));
+    expect(absent.length === 0, `컨테이너 없음 기록이 없는 서비스 ${absent.join(",")}`);
     const pulled = /합성 DB 이미지를 받았습니다/.test(first.text) ? "합성 DB 이미지를 받음, " : "합성 DB 이미지는 이미 있음, ";
     return pulled + (/중지 시작부터 web 정상 확인까지 \d+초/.exec(first.text) ?? [""])[0];
   });
@@ -514,14 +517,17 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
   });
   // 가짜 docker: PATH 앞에 두어 정해진 호출만 실패시키고 나머지는 실제 docker로 넘긴다. 실제 데몬은 멈추지 않는다.
   // 모드마다 폴더를 따로 둔다(replace-single.sh는 CATCHU_*를 지우고 BASE_ENV는 COMPOSE_·CATCHU_를 빼므로 환경변수로 넘기지 않는다).
-  // marker는 5단계 시작(api를 띄우는 up) 뒤에만 오류를 넣을 때 쓴다. 2·3단계와 합성 DB의 up(마지막 인자 db)은 실제 docker로 지나간다.
+  // marker는 5단계 시작(api를 띄우는 up) 뒤에만, stopped는 2단계 중지 명령 뒤에만 오류를 넣을 때 쓴다.
+  // 규칙에 맞지 않는 호출(2·3단계, 합성 DB의 up 등)은 실제 docker로 지나간다.
   const realDocker = must("sh", ["-c", "command -v docker"]).stdout.trim();
   const dockerShim = (mode, rule) => {
     const dir = path.join(work, `docker-shim-${mode}`);
     mkdirSync(dir);
     writeFileSync(path.join(dir, "docker"), `#!/usr/bin/env bash
 marker="${dir}/started"
+stopped="${dir}/stopped"
 if [ "$1" = compose ] && [[ " $* " == *" up "* ]] && [ "\${@: -1}" = api ]; then : > "$marker"; fi
+if [ "$1" = compose ] && [[ " $* " == *" stop "* ]]; then : > "$stopped"; fi
 ${rule}
 exec "${realDocker}" "$@"
 `, { mode: 0o755 });
@@ -583,6 +589,75 @@ exec "${realDocker}" "$@"
   const afterStopFail = replace();
   await check("교체", "원인 해결 뒤 다시 실행하면 이어서 시작", () => {
     expect(afterStopFail.code === 0, `replace code=${afterStopFail.code}`);
+  });
+  // web을 SIGSTOP으로 멈춰 대기 상한(2초) 뒤 강제 종료(137)되게 하고, 중지 뒤 api의 상태·종료 코드 inspect만 실패시킨다.
+  // 조회하지 못한 api 때문에 3으로 멈추되, 이미 확인한 web 137과 교체 전에 실행 중이던 서비스를 함께 적어야 한다
+  // (다시 실행하면 멈춘 web은 강제 종료 판정에서 빠지므로 운영자가 확인할 대상이다).
+  mustDocker(["kill", "--signal", "SIGSTOP", name("web")]);
+  const forcedUnknown = replace(["--stop-timeout", "2", "--migrate"], dockerShim("forced-unknown",
+    `if [ -e "$stopped" ] && [ "$1" = inspect ] && [[ " $* " == *"{{.State.Running}} {{.State.ExitCode}}"* ]] && [ "\${@: -1}" = "${name("api")}" ]; then echo "검사용 가짜 Docker 오류: api 종료 코드 조회" >&2; exit 1; fi`));
+  await check("교체", "강제 종료(137)와 다른 서비스의 조회 실패가 겹치면 3으로 멈추고 137을 함께 적는다", () => {
+    expect(forcedUnknown.code === 3, `replace code=${forcedUnknown.code}`);
+    expect(/확인하지 못했습니다: api\./.test(forcedUnknown.text) && /강제 종료\(137\)된 서비스도 있습니다: web\./.test(forcedUnknown.text), "조회 실패·137 기록 없음");
+    expect(/교체 전 실행 중: web api worker\./.test(forcedUnknown.text), "교체 전 실행 중 기록 없음");
+    expect(![/migration 실행:/, /api 시작/].some((step) => step.test(forcedUnknown.text)), "migration·새 실행을 시도함");
+    const running = runningNow();
+    expect(running.length === 0, `실행 중 ${running.join(",")}`);
+    return "종료 코드 3, 출력에 api 조회 실패·web 137·교체 전 실행 중 서비스";
+  });
+  const afterForcedUnknown = replace();
+  await check("교체", "종료 코드를 확인한 뒤 다시 실행하면 이어서 시작", () => {
+    expect(afterForcedUnknown.code === 0, `replace code=${afterForcedUnknown.code}`);
+  });
+  // 교체를 시작할 때의 실행 상태 조회(이름으로 찾는 docker ps)만 실패시킨다. 실행 중이었는지 모르면 강제 종료를 가릴 수 없으므로
+  // 아무것도 멈추지 않고 3이어야 한다. --migrate를 주어 migration도 시작하지 않는지 본다.
+  const preUnknown = replace(["--migrate"], dockerShim("pre-unknown",
+    `if [ ! -e "$stopped" ] && [ "$1" = ps ] && [[ " $* " == *" name="* ]]; then echo "검사용 가짜 Docker 오류: 교체 전 조회" >&2; exit 1; fi`));
+  await check("교체", "교체를 시작할 때 상태 조회가 실패하면 아무것도 멈추지 않고 종료 코드 3", () => {
+    expect(preUnknown.code === 3, `replace code=${preUnknown.code}`);
+    expect(/교체 전 web 실행 상태를 확인하지 못했습니다/.test(preUnknown.text), "조회 실패 기록 없음");
+    expect(![/web·api 중지/, /migration 실행:/, /api 시작/].some((step) => step.test(preUnknown.text)), "중지·migration·새 실행을 시도함");
+    const running = runningNow();
+    expect(running.length === 3, `실행 중 ${running.join(",")}`);
+    return "종료 코드 3, 세 서비스는 그대로 실행 중, 중지·migration·새 실행 없음";
+  });
+  // 중지 뒤 실행 상태·종료 코드를 읽는 inspect만 실패시킨다. 강제 종료(137) 여부를 모르므로 migration·새 실행 없이 3이어야 한다.
+  const exitUnknown = replace(["--migrate"], dockerShim("exit-unknown",
+    `if [ -e "$stopped" ] && [ "$1" = inspect ] && [[ " $* " == *"{{.State.Running}} {{.State.ExitCode}}"* ]]; then echo "검사용 가짜 Docker 오류: 종료 코드 조회" >&2; exit 1; fi`));
+  await check("교체", "중지 뒤 종료 코드 조회가 실패하면 migration·새 실행 없이 종료 코드 3", () => {
+    expect(exitUnknown.code === 3, `replace code=${exitUnknown.code}`);
+    expect(/실행 상태·종료 코드를 확인하지 못했습니다/.test(exitUnknown.text), "조회 실패 기록 없음");
+    expect(![/migration 실행:/, /api 시작/].some((step) => step.test(exitUnknown.text)), "migration·새 실행을 시도함");
+    const running = runningNow();
+    expect(running.length === 0, `실행 중 ${running.join(",")}`);
+    return "종료 코드 3, 세 서비스 멈춤, migration·새 실행 없음";
+  });
+  // migration 성공을 확인한 뒤의 실행 컨테이너 삭제(docker rm)만 실패시킨다. 실패·불명으로 안내하지 않고 성공 기록과 컨테이너를
+  // 남긴 채 8로 멈춰야 한다. 이어서 정리 없이 다시 실행하면 5, 운영자가 지운 뒤 다시 실행하면 이어서 시작한다.
+  const cleanupFail = replace(["--migrate"], dockerShim("rm-fail",
+    `if [ "$1" = rm ]; then echo "검사용 가짜 Docker 오류: 삭제" >&2; exit 1; fi`));
+  const keptRun = /실행 컨테이너\((\S+)\)를 지우지 못했습니다/.exec(cleanupFail.text)?.[1];
+  await check("교체", "migration 성공 뒤 실행 컨테이너를 지우지 못하면 성공 기록과 컨테이너를 남기고 종료 코드 8", () => {
+    expect(cleanupFail.code === 8, `replace code=${cleanupFail.code}`);
+    expect(keptRun && cleanupFail.text.includes(`migration 성공: ${keptRun}`), "성공·실행 이름 기록 없음");
+    expect(![/migration 실패/, /결과가 불분명/, /api 시작/].some((step) => step.test(cleanupFail.text)), "실패·불명으로 안내했거나 새 실행을 시작함");
+    const kept = docker(["inspect", "-f", "{{.State.Status}} {{.State.ExitCode}}", keptRun]).stdout.trim();
+    expect(kept === "exited 0", `남긴 실행 ${kept}`);
+    const running = runningNow();
+    expect(running.length === 0, `실행 중 ${running.join(",")}`);
+    return `종료 코드 8, ${keptRun} exited 0 보존, 세 서비스 멈춤`;
+  });
+  const afterCleanupFail = replace();
+  await check("교체", "남긴 실행을 지우지 않고 다시 실행하면 남은 실행으로 보고 종료 코드 5", () => {
+    expect(afterCleanupFail.code === 5, `replace code=${afterCleanupFail.code}`);
+    expect(keptRun && afterCleanupFail.text.includes(keptRun) && /8\(migration 성공·정리 실패\)/.test(afterCleanupFail.text), "남은 실행·8 안내 없음");
+    expect(runningNow().length === 0, "새 실행을 시작함");
+  });
+  // 운영자가 exited 0을 확인하고 직접 지운 상황
+  if (keptRun) docker(["rm", keptRun]);
+  const afterManualCleanup = replace();
+  await check("교체", "남긴 실행을 지운 뒤 --migrate 없이 다시 실행하면 이어서 시작", () => {
+    expect(afterManualCleanup.code === 0, `replace code=${afterManualCleanup.code}`);
   });
 
   // ---------- 7. 종료 신호와 비밀값 ----------
