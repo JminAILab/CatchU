@@ -5,8 +5,9 @@
 // 확인 항목·결과 해석은 deploy/README.md 「검사」.
 //
 // 사용(저장소 루트): node deploy/scripts/check-images.mjs [--keep] [--report <저장소 밖 JSON 경로>]
-//   --keep    검사 이미지를 지우지 않는다(합성 환경·컨테이너·DB 볼륨은 항상 지운다)
-//   --report  결과(통과·실패, 이미지 ID·플랫폼)를 JSON으로 쓴다. 비밀값·환경변수 원문은 쓰지 않는다
+//   --keep    검사 이미지를 지우지 않는다(합성 환경·임시 폴더·컨테이너·망·DB 볼륨은 항상 지운다)
+//   --report  결과(통과·실패, 이미지 ID·플랫폼, 정리 조회 결과)를 JSON으로 쓴다. 비밀값·환경변수 원문은 쓰지 않는다
+// 끝에 남은 자원을 조회한다. 자원이 남았거나 조회가 실패해 확인하지 못하면 정리 실패로 기록하고 종료 코드 1로 끝낸다.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -29,6 +30,9 @@ const CONTEXT_ALLOWED = [
   "aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml",
   "aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml",
 ];
+// 맥락 검사 미끼 파일. 허용한 폴더 안(.env·키)과 서비스 폴더의 허용하지 않은 자료를 함께 둔다. 모두 .gitignore 대상 이름이다.
+const DECOYS = ["web/.env.catchu-check", "web/src/.env.catchu-check", "api/src/catchu-check.pem", "worker/app/.env.catchu-check",
+  "worker/catchu-check-userdata.local"];
 const args = process.argv.slice(2);
 const keepImages = args.includes("--keep");
 const reportArg = args.includes("--report") ? args[args.indexOf("--report") + 1] : undefined;
@@ -103,7 +107,7 @@ const envDir = path.join(work, "env");
 const composeEnv = path.join(envDir, "compose.env");
 const compose = (extra) => ["compose", "-p", PROJECT, "--env-file", composeEnv, "-f", path.join(DEPLOY, "compose.single.yaml"),
   "-f", path.join(DEPLOY, "compose.local-db.yaml"), ...extra];
-const replace = (extra = []) => run("bash", [path.join(DEPLOY, "scripts/replace-single.sh"), "--env-file", composeEnv, "--local-db", ...extra], { timeoutMs: 900_000 });
+const replace = (extra = [], env) => run("bash", [path.join(DEPLOY, "scripts/replace-single.sh"), "--env-file", composeEnv, "--local-db", ...extra], { timeoutMs: 900_000, env });
 const name = (service) => `${PROJECT}-${service}`;
 
 async function main() {
@@ -124,9 +128,7 @@ async function main() {
   // ---------- 1. 빌드 맥락 ----------
   // 잘못 들어가면 안 되는 미끼 파일을 새 이름으로만 만든다(기존 파일은 건드리지 않음). .gitignore 대상이라 커밋되지 않는다.
   const canary = randomBytes(16).toString("hex");
-  // 허용한 폴더 안(.env·키)과 서비스 폴더의 허용하지 않은 자료를 함께 둔다. 모두 .gitignore 대상 이름이다.
-  const decoys = ["web/.env.catchu-check", "web/src/.env.catchu-check", "api/src/catchu-check.pem", "worker/app/.env.catchu-check",
-    "worker/catchu-check-userdata.local"];
+  const decoys = DECOYS;
   for (const decoy of decoys) {
     const file = path.join(ROOT, decoy);
     expect(!existsSync(file), `미끼 파일 이름이 이미 있습니다: ${decoy} (이전 검사가 중단됐다면 이 파일을 지웁니다)`);
@@ -510,32 +512,67 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
   await check("교체", "원인 확인 뒤 다시 실행하면 이어서 시작", () => {
     expect(resumed.code === 0, `replace code=${resumed.code}`);
   });
+  // 가짜 docker: PATH 앞에 두어 정해진 호출만 실패시키고 나머지는 실제 docker로 넘긴다. 실제 데몬은 멈추지 않는다.
+  // 모드마다 폴더를 따로 둔다(replace-single.sh는 CATCHU_*를 지우고 BASE_ENV는 COMPOSE_·CATCHU_를 빼므로 환경변수로 넘기지 않는다).
+  // marker는 5단계 시작(api를 띄우는 up) 뒤에만 오류를 넣을 때 쓴다. 2·3단계와 합성 DB의 up(마지막 인자 db)은 실제 docker로 지나간다.
+  const realDocker = must("sh", ["-c", "command -v docker"]).stdout.trim();
+  const dockerShim = (mode, rule) => {
+    const dir = path.join(work, `docker-shim-${mode}`);
+    mkdirSync(dir);
+    writeFileSync(path.join(dir, "docker"), `#!/usr/bin/env bash
+marker="${dir}/started"
+if [ "$1" = compose ] && [[ " $* " == *" up "* ]] && [ "\${@: -1}" = api ]; then : > "$marker"; fi
+${rule}
+exec "${realDocker}" "$@"
+`, { mode: 0o755 });
+    return { PATH: `${dir}:${process.env.PATH}` };
+  };
+  const runningNow = () => ["api", "worker", "web"].filter((service) => docker(["inspect", "-f", "{{.State.Running}}", name(service)]).stdout.trim() === "true");
   // worker 자리에 기동하지 못하는 이미지(migration 이미지: DB 설정이 없어 바로 끝난다)를 넣어 api가 뜬 뒤 실패하게 한다.
   const composeNow = readFileSync(composeEnv, "utf8");
-  writeFileSync(composeEnv, composeNow.replace(`CATCHU_WORKER_IMAGE=${image.worker}`, `CATCHU_WORKER_IMAGE=${image.migration}`));
-  const healthFail = replace();
-  writeFileSync(composeEnv, composeNow);
-  await check("교체", "새 실행이 정상 확인에 실패하면 먼저 시작한 서비스도 다시 멈춘다", () => {
-    expect(healthFail.code === 6, `replace code=${healthFail.code}`);
-    expect(/api 시작/.test(healthFail.text) && /새 실행 실패: worker/.test(healthFail.text), "api 시작 뒤 worker 실패 기록 없음");
-    const running = ["api", "worker", "web"].filter((service) => docker(["inspect", "-f", "{{.State.Running}}", name(service)]).stdout.trim() === "true");
-    expect(running.length === 0, `실행 중 ${running.join(",")}`);
-    return "종료 코드 6, api·worker·web 모두 멈춤";
-  });
+  try {
+    writeFileSync(composeEnv, composeNow.replace(`CATCHU_WORKER_IMAGE=${image.worker}`, `CATCHU_WORKER_IMAGE=${image.migration}`));
+    const healthFail = replace();
+    await check("교체", "새 실행이 정상 확인에 실패하면 먼저 시작한 서비스도 다시 멈추고 종료를 확인한다", () => {
+      expect(healthFail.code === 6, `replace code=${healthFail.code}`);
+      expect(/api 시작/.test(healthFail.text) && /새 실행 실패: worker/.test(healthFail.text), "api 시작 뒤 worker 실패 기록 없음");
+      expect(/세 서비스의 종료를 확인했습니다/.test(healthFail.text), "종료 확인 기록 없음");
+      const running = runningNow();
+      expect(running.length === 0, `실행 중 ${running.join(",")}`);
+      return "종료 코드 6, api·worker·web 모두 멈춤";
+    });
+    // 다시 멈춘 뒤 상태 조회(docker ps)만 실패시킨다. 중지는 실제로 일어나지만 확인할 수 없으므로 6이 아니라 3이어야 한다.
+    const healthFailUnknown = replace([], dockerShim("ps-unknown",
+      `if [ -e "$marker" ] && [ "$1" = ps ]; then echo "검사용 가짜 Docker 오류: 상태 조회" >&2; exit 1; fi`));
+    await check("교체", "새 실행 실패 뒤 상태 조회가 실패하면 멈췄다고 보지 않는다", () => {
+      expect(healthFailUnknown.code === 3, `replace code=${healthFailUnknown.code}`);
+      expect(/실행 상태를 확인하지 못했습니다\. 멈췄다고 보지 않습니다/.test(healthFailUnknown.text), "조회 실패 기록 없음");
+      expect(!/종료를 확인했습니다/.test(healthFailUnknown.text), "조회하지 못했는데 종료 확인을 기록함");
+      const running = runningNow();
+      expect(running.length === 0, `실행 중 ${running.join(",")}`);
+      return "종료 코드 3, 종료 확인 기록 없음(실제로는 세 서비스 멈춤)";
+    });
+    // 다시 멈출 때 api 중지만 실패시킨다. 서비스별로 중지하므로 web·worker는 멈추고, api가 남아 3이어야 한다.
+    // 서비스 인자를 지우는 방식은 쓰지 않는다(인자 없는 compose stop은 합성 DB까지 멈춘다).
+    const healthFailLeft = replace([], dockerShim("api-left",
+      `if [ -e "$marker" ] && [ "$1" = compose ] && [[ " $* " == *" stop "* ]] && [ "\${@: -1}" = api ]; then echo "검사용 가짜 Docker 오류: 중지" >&2; exit 1; fi`));
+    await check("교체", "새 실행 실패 뒤 다시 멈추지 못한 서비스가 남으면 종료 코드 3", () => {
+      expect(healthFailLeft.code === 3, `replace code=${healthFailLeft.code}`);
+      expect(/중지 명령이 실패했습니다: api/.test(healthFailLeft.text) && /api 실행이 남아 있습니다/.test(healthFailLeft.text), "중지 실패·남은 실행 기록 없음");
+      const running = runningNow();
+      expect(running.length === 1 && running[0] === "api", `실행 중 ${running.join(",")}`);
+      return "종료 코드 3, api만 남음";
+    });
+  } finally {
+    writeFileSync(composeEnv, composeNow);
+  }
   const restored = replace();
   await check("교체", "원래 이미지로 다시 시작", () => {
     expect(restored.code === 0, `replace code=${restored.code}`);
   });
   // web 중지 명령만 실패하는 가짜 docker로 교체한다. 나머지(api·worker)도 멈추고, 종료 확인에서 종료 코드 3으로 끝나야 한다.
-  const realDocker = must("sh", ["-c", "command -v docker"]).stdout.trim();
-  const shimDir = path.join(work, "docker-shim");
-  mkdirSync(shimDir);
-  writeFileSync(path.join(shimDir, "docker"), `#!/usr/bin/env bash
-if [ "$1" = compose ] && [[ " $* " == *" stop "* ]] && [ "\${@: -1}" = web ]; then echo "검사용 가짜 Docker 오류" >&2; exit 1; fi
-exec "${realDocker}" "$@"
-`, { mode: 0o755 });
-  const stopFail = run("bash", [path.join(DEPLOY, "scripts/replace-single.sh"), "--env-file", composeEnv, "--local-db"],
-    { timeoutMs: 900_000, env: { PATH: `${shimDir}:${process.env.PATH}` } });
+  const stopFail = replace([], dockerShim("web-stop",
+    `if [ "$1" = compose ] && [[ " $* " == *" stop "* ]] && [ "\${@: -1}" = web ]; then echo "검사용 가짜 Docker 오류" >&2; exit 1; fi`));
   await check("교체", "중지 명령 하나가 실패해도 나머지를 멈추고 종료 확인에서 멈춘다", () => {
     expect(stopFail.code === 3, `replace code=${stopFail.code}`);
     expect(/중지 명령이 실패했습니다: web/.test(stopFail.text), "실패 기록 없음");
@@ -572,37 +609,107 @@ exec "${realDocker}" "$@"
     expect(secrets.length === 5 && found.length === 0, `발견 ${found.length}개`);
     return `비밀값 ${secrets.length}개 × 출력 ${captured.length}건`;
   });
+
+  // ---------- 8. 정리 확인 판정 ----------
+  // 이 실행의 컨테이너·볼륨·망이 아직 있는 시점이다. 조회 실패는 "남은 자원 없음"으로 답하는 가짜 docker에서 한 조회만 실패시켜 넣는다
+  // (실제 데몬은 멈추지 않는다). 실제로 남은 자원은 실제 docker 조회로 본다. 맨 끝 정리 기록이 "조회 정상·남은 자원 없음" 사례다.
+  const fakeDocker = (mode, rule) => {
+    const dir = path.join(work, `docker-fake-${mode}`);
+    mkdirSync(dir);
+    writeFileSync(path.join(dir, "docker"), `#!/usr/bin/env bash\n${rule}\nexit 0\n`, { mode: 0o755 });
+    return { PATH: `${dir}:${process.env.PATH}` };
+  };
+  await check("정리", "자원 조회가 실패하면(조회별·docker 없음·시간 초과) 정리 통과로 보지 않고 전체 종료 코드를 1로 한다", () => {
+    const down = 'echo "Cannot connect to the Docker daemon (검사용 가짜)" >&2; exit 1';
+    const absent = path.join(work, "docker-absent");
+    mkdirSync(absent);
+    const cases = [
+      ["컨테이너(이름)", { env: fakeDocker("name", `if [ "$1" = ps ] && [[ " $* " == *" name=^"* ]]; then ${down}; fi`) }, ["컨테이너(이름)"]],
+      ["컨테이너(라벨)", { env: fakeDocker("label", `if [ "$1" = ps ] && [[ " $* " == *" label="* ]]; then ${down}; fi`) }, ["컨테이너(라벨)"]],
+      ["볼륨", { env: fakeDocker("volume", `if [ "$1" = volume ]; then ${down}; fi`) }, ["볼륨"]],
+      ["망", { env: fakeDocker("network", `if [ "$1" = network ]; then ${down}; fi`) }, ["망"]],
+      ["docker 없음", { env: { PATH: absent } }, LEFTOVER_QUERIES.map(([scope]) => scope)],
+      ["시간 초과", { env: fakeDocker("slow", "exec sleep 5"), timeoutMs: 300 }, LEFTOVER_QUERIES.map(([scope]) => scope)],
+    ];
+    const wrong = [];
+    for (const [label, options, scopes] of cases) {
+      const state = { ...inspectLeftovers(options), files: [] };
+      const verdict = cleanupVerdict(state);
+      const failedScopes = state.failedQueries.map((query) => query.scope).join(",");
+      const ok = !verdict.ok && state.found.length === 0 && failedScopes === scopes.join(",") && verdict.detail.includes(PROJECT)
+        && (label !== "시간 초과" || state.failedQueries.every((query) => query.timedOut))
+        && exitCodeFor([{ status: "pass" }, { status: verdict.ok ? "pass" : "fail" }]) === 1;
+      if (!ok) wrong.push(`${label}: 통과=${verdict.ok} 실패 조회=${failedScopes}`);
+    }
+    const quiet = cleanupVerdict({ ...inspectLeftovers({ env: fakeDocker("empty", "") }), files: [] });
+    expect(quiet.ok && exitCodeFor([{ status: "pass" }]) === 0, "조회 정상·자원 없음이 통과가 아님");
+    expect(wrong.length === 0, wrong.join("; "));
+    return `실패 사례 ${cases.length}개 모두 정리 실패·종료 코드 1, 조회 정상·자원 없음은 통과`;
+  });
+  await check("정리", "실제로 남은 컨테이너·볼륨·망을 이름과 함께 정리 실패로 기록한다", () => {
+    const state = { ...inspectLeftovers(), files: [] };
+    const verdict = cleanupVerdict(state);
+    const expected = [`container ${name("api")}`, `volume ${PROJECT}_db-data`, `network ${PROJECT}_db`];
+    const missing = expected.filter((item) => !state.found.includes(item) || !verdict.detail.includes(item));
+    expect(state.failedQueries.length === 0, `조회 실패 ${state.failedQueries.map((query) => query.scope).join(",")}`);
+    expect(!verdict.ok && missing.length === 0, `빠진 항목 ${missing.join(", ")}`);
+    return `남은 자원 ${state.found.length}개 감지`;
+  });
 }
 
-let cleaned = false;
-function leftovers() {
-  const list = (args) => docker(args, { capture: false }).stdout.split("\n").filter(Boolean);
-  const label = `label=com.docker.compose.project=${PROJECT}`;
-  return [...new Set([
-    ...list(["ps", "-a", "--filter", `name=^${PROJECT}-`, "--format", "container {{.Names}}"]),
-    ...list(["ps", "-a", "--filter", label, "--format", "container {{.Names}}"]),
-    ...list(["volume", "ls", "--filter", label, "--format", "volume {{.Name}}"]),
-    ...list(["network", "ls", "--filter", label, "--format", "network {{.Name}}"]),
-  ])];
+// 이 실행이 만든 자원 조회. 조회마다 종료 코드 0일 때만 성공으로 본다. 조회 실패·docker 없음·시간 초과를 "남은 자원 없음"으로 읽지 않는다.
+const LABEL_FILTER = `label=com.docker.compose.project=${PROJECT}`;
+const LEFTOVER_QUERIES = [
+  ["컨테이너(이름)", ["ps", "-a", "--filter", `name=^${PROJECT}-`, "--format", "container {{.Names}}"]],
+  ["컨테이너(라벨)", ["ps", "-a", "--filter", LABEL_FILTER, "--format", "container {{.Names}}"]],
+  ["볼륨", ["volume", "ls", "--filter", LABEL_FILTER, "--format", "volume {{.Name}}"]],
+  ["망", ["network", "ls", "--filter", LABEL_FILTER, "--format", "network {{.Name}}"]],
+];
+function inspectLeftovers({ env, timeoutMs = 60_000 } = {}) {
+  const found = new Set();
+  const failedQueries = [];
+  for (const [scope, queryArgs] of LEFTOVER_QUERIES) {
+    const out = docker(queryArgs, { capture: false, env, timeoutMs });
+    if (out.code !== 0) {
+      failedQueries.push({ scope, code: out.code, timedOut: out.timedOut });
+      continue;
+    }
+    for (const line of out.stdout.split("\n").filter(Boolean)) found.add(line);
+  }
+  return { found: [...found], failedQueries };
 }
+// 정리 판정. 조회가 모두 성공하고 남은 자원·미끼 파일이 없을 때만 통과다. 프로젝트 이름과 확인 명령을 남기고, Docker 오류 원문은 넣지 않는다.
+function cleanupVerdict({ found, failedQueries, files }) {
+  const ok = found.length === 0 && files.length === 0 && failedQueries.length === 0;
+  if (ok) return { ok, detail: `프로젝트 ${PROJECT}, 조회 ${LEFTOVER_QUERIES.length}건 모두 성공` };
+  const parts = [`프로젝트 ${PROJECT}`];
+  if (found.length + files.length > 0) parts.push(`남은 자원: ${[...found, ...files].join(", ")}`);
+  if (failedQueries.length > 0) {
+    const why = (query) => (query.timedOut ? "시간 초과" : query.code === null ? "실행하지 못함" : `code=${query.code}`);
+    parts.push(`확인하지 못한 조회(자원이 남았을 수 있음): ${failedQueries.map((query) => `${query.scope} ${why(query)}`).join(", ")}`);
+  }
+  parts.push(`직접 확인: docker ps -a --filter name=^${PROJECT}- 와 docker ps -a·volume ls·network ls --filter ${LABEL_FILTER}`);
+  return { ok, detail: parts.join(". ") };
+}
+const exitCodeFor = (list) => (list.some((result) => result.status === "fail") ? 1 : 0);
+
+let cleanupState = null;
 function cleanupAll() {
-  if (cleaned) return [];
-  cleaned = true;
+  if (cleanupState) return cleanupState;
   for (const cleanup of cleanups.reverse()) {
     try { cleanup(); } catch { /* 남은 자원은 아래에서 따로 확인한다 */ }
   }
+  // 임시 폴더에는 합성 비밀값·TLS 키가 있어 정리 결과와 관계없이 지운다. 남은 자원은 프로젝트 이름(라벨·이름 접두사)만으로 확인·정리할 수 있다.
   rmSync(work, { recursive: true, force: true });
-  const left = leftovers();
-  for (const decoy of ["web/.env.catchu-check", "web/src/.env.catchu-check", "api/src/catchu-check.pem", "worker/app/.env.catchu-check", "worker/catchu-check-userdata.local"]) {
-    if (existsSync(path.join(ROOT, decoy))) left.push(`file ${decoy}`);
-  }
-  return left;
+  const files = DECOYS.filter((decoy) => existsSync(path.join(ROOT, decoy))).map((decoy) => `file ${decoy}`);
+  cleanupState = { ...inspectLeftovers(), files };
+  return cleanupState;
 }
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.once(signal, () => {
     console.error(`[check-images] ${signal}: 만든 컨테이너·망·볼륨·임시 폴더·미끼 파일을 지우고 끝냅니다`);
-    const left = cleanupAll();
-    if (left.length > 0) console.error(`[check-images] 남은 자원: ${left.join(", ")}`);
+    const verdict = cleanupVerdict(cleanupAll());
+    if (!verdict.ok) console.error(`[check-images] 정리를 끝내지 못했거나 확인하지 못했습니다. ${verdict.detail}`);
     process.exit(130);
   });
 }
@@ -613,14 +720,16 @@ try {
 } catch (error) {
   record("준비", "검사 진행", false, error instanceof Error ? error.message.split("\n")[0] : String(error));
 } finally {
-  const left = cleanupAll();
-  record("정리", "이 검사가 만든 컨테이너·볼륨·망·미끼 파일이 남지 않았다", left.length === 0,
-    left.length === 0 ? `프로젝트 ${PROJECT}` : `남은 자원(직접 지웁니다): ${left.join(", ")}`);
+  const cleanup = cleanupAll();
+  const verdict = cleanupVerdict(cleanup);
+  record("정리", "이 검사가 만든 컨테이너·볼륨·망·미끼 파일이 남지 않았다(확인하지 못해도 실패)", verdict.ok,
+    verdict.ok ? verdict.detail : `${verdict.detail}. 확인 뒤 직접 지웁니다`);
   const failed = results.filter((result) => result.status === "fail");
-  exitCode = failed.length === 0 ? 0 : 1;
+  exitCode = exitCodeFor(results);
   const images = Object.fromEntries(Object.entries(image).map(([key, ref]) => [key, { ref, id: imageInfo[key] ?? "빌드 안 됨", kept: keepImages }]));
   if (reportPath) {
-    writeFileSync(reportPath, `${JSON.stringify({ revision, project: PROJECT, images, results }, null, 2)}\n`);
+    const cleanupReport = { project: PROJECT, found: [...cleanup.found, ...cleanup.files], failedQueries: cleanup.failedQueries };
+    writeFileSync(reportPath, `${JSON.stringify({ revision, project: PROJECT, images, cleanup: cleanupReport, results }, null, 2)}\n`);
   }
   console.log(`[check-images] ${results.length - failed.length}/${results.length} 통과${failed.length ? `, 실패 ${failed.length}` : ""}`);
 }

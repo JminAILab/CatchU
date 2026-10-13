@@ -5,12 +5,14 @@
 #   3) 종료 확인: 같은 이름·같은 프로젝트의 web·api·worker가 하나라도 실행 중이거나 상태를 확인할 수 없으면 멈춘다.
 #      대기 상한을 넘어 강제 종료(137)됐거나, 이전 migration 실행 컨테이너(실패·불명)가 남아 있어도 새 실행을 시작하지 않는다
 #   4) (--migrate) migration을 이미지마다 정해진 이름으로 한 번 실행한다. 실패·결과 불명이면 새 실행을 시작하지 않고 멈춘다
-#   5) api → worker → web 순서로 시작하고 각각 정상 확인(health)을 기다린다. 하나라도 실패하면 세 서비스를 다시 멈추고 끝낸다
+#   5) api → worker → web 순서로 시작하고 각각 정상 확인(health)을 기다린다. 하나라도 실패하면 세 서비스를 다시 멈추고
+#      종료를 확인한다. 다시 멈추지 못했거나 상태를 확인할 수 없으면 종료 확인 실패(3)로 끝낸다
 # 자동 재시도·자동 되돌리기·DB 복원은 하지 않는다. 진행 중이던 요청·분석은 끝까지 마친다고 보장하지 않는다.
 #
 # 사용: deploy/scripts/replace-single.sh --env-file <compose.env> [--local-db] [--migrate] [--stop-timeout 초]
-# 종료 코드: 0 성공, 2 사용법·사전 확인 실패, 3 종료 확인 실패, 4 migration 실패, 5 migration 결과 불명·남은 실행,
-#           6 새 실행 정상 확인 실패(세 서비스를 멈춘 상태로 끝냄), 7 대기 상한을 넘어 강제 종료됨(원인 확인 뒤 다시 실행하면 이어서 진행)
+# 종료 코드: 0 성공, 2 사용법·사전 확인 실패, 3 종료 확인 실패(새 실행 실패 뒤 다시 멈출 때 포함), 4 migration 실패,
+#           5 migration 결과 불명·남은 실행, 6 새 실행 확인 실패(세 서비스 종료까지 확인함),
+#           7 대기 상한을 넘어 강제 종료됨(원인 확인 뒤 다시 실행하면 이어서 진행)
 set -euo pipefail
 
 usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; }
@@ -58,7 +60,8 @@ project=$("${compose[@]}" config | sed -n 's/^name: //p' | head -n 1)
 running_ids() { # 서비스 이름 → 같은 프로젝트에서 실행 중인 컨테이너 ID(이름을 바꾼 수동 실행도 라벨로 잡는다)
   docker ps -q --filter "label=com.docker.compose.project=${project}" --filter "label=com.docker.compose.service=$1"
 }
-state() { docker inspect -f '{{.Id}} {{.State.Status}} exit={{.State.ExitCode}} started={{.State.StartedAt}} finished={{.State.FinishedAt}} image={{.Image}}' "$1" 2>/dev/null || echo "없음"; }
+# 기록용. inspect는 컨테이너가 없을 때와 Docker 조회 실패를 같은 코드로 끝내므로 둘을 가르지 않는다(판정에는 쓰지 않는다).
+state() { docker inspect -f '{{.Id}} {{.State.Status}} exit={{.State.ExitCode}} started={{.State.StartedAt}} finished={{.State.FinishedAt}} image={{.Image}}' "$1" 2>/dev/null || echo "확인 못 함(없거나 조회 실패)"; }
 
 # 1) 사전 확인. 앱 이미지는 미리 빌드하거나 받아 둔다. 합성 DB 이미지(digest 고정)는 없으면 받는다.
 db_image=""
@@ -148,15 +151,26 @@ fi
 
 # 5) 새 실행: api → worker → web. 이미지가 바뀐 서비스는 기존(멈춘) 컨테이너를 지우고 새로 만든다.
 # 하나라도 정상 확인에 실패하면 이미 시작한 서비스까지 다시 멈춰, 반쯤 열린 상태로 두지 않는다.
+# 세 서비스의 종료를 조회로 확인한 경우에만 6으로 끝낸다. 실행이 남았거나 조회가 실패하면 멈췄다고 보지 않고 3으로 끝낸다.
 fail_started() {
-  local message=$1
+  # `||`의 마지막 명령으로 불리므로 이 안에서도 set -e가 켜져 있다. 실패할 수 있는 명령은 모두 `||`나 if로 받아
+  # 3·6 판정까지 가게 한다(받지 않으면 정의되지 않은 코드 1로 끝난다).
+  local message=$1 service ids unknown="" left=""
   log "새 실행 실패: ${message} 세 서비스를 다시 멈춥니다."
-  "${compose[@]}" stop -t "${stop_timeout}" web api worker || true
+  for service in web api worker; do
+    "${compose[@]}" stop -t "${stop_timeout}" "${service}" || log "중지 명령이 실패했습니다: ${service}"
+  done
   for service in web api worker; do log "멈춘 뒤 ${service}: $(state "${project}-${service}")"; done
   for service in web api worker; do
-    if [ -n "$(running_ids "${service}")" ]; then fail 3 "${message} ${service}가 멈추지 않았습니다. 직접 확인합니다."; fi
+    if ! ids=$(running_ids "${service}"); then
+      unknown="${unknown} ${service}"
+    elif [ -n "${ids}" ]; then
+      left="${left} ${service}"
+    fi
   done
-  fail 6 "${message} 원인 확인: docker logs <컨테이너 이름>"
+  # 조회 실패와 남은 실행이 함께 있으면 둘 다 적는다.
+  [ -z "${unknown}${left}" ] || fail 3 "${message}${unknown:+ Docker에서${unknown} 실행 상태를 확인하지 못했습니다. 멈췄다고 보지 않습니다.}${left:+${left} 실행이 남아 있습니다.} 직접 확인합니다."
+  fail 6 "${message} 세 서비스의 종료를 확인했습니다. 원인 확인: docker logs <컨테이너 이름>"
 }
 for service in api worker web; do
   log "${service} 시작"
@@ -165,7 +179,8 @@ for service in api worker web; do
 done
 stop_ended=$(date +%s)
 for service in api worker web; do
-  count=$(running_ids "${service}" | grep -c . || true)
+  ids=$(running_ids "${service}") || fail_started "Docker에서 ${service} 실행 상태를 확인하지 못했습니다."
+  count=$(printf '%s\n' "${ids}" | grep -c . || true)
   [ "${count}" = 1 ] || fail_started "${service} 실행 수가 1이 아닙니다(${count})."
   log "교체 후 ${service}: $(state "${project}-${service}")"
 done
