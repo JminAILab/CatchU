@@ -17,6 +17,8 @@
 
 ## API와 입력
 
+#104 이전의 UUID가 아닌 회원 토큰은 고지 조회·접수 모두 DB 조회 전에 401 AUTH_INVALID로 거부한다.
+
 모든 경로는 기존 전역 회원 Guard와 `@CurrentMemberId()`를 사용한다. 성공·오류 모두 `Cache-Control: no-store`다. 새 응답 필드·오류 코드·환경변수는 추가하지 않는다.
 
 | 경로 | 입력 | 성공 |

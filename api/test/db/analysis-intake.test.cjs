@@ -92,6 +92,13 @@ test('현재 합성 고지는 인증·no-store와 계약 두 필드만 제공한
   assert.deepEqual(await r.json(), { noticeRevision: SYNTHETIC_NOTICE.noticeRevision, text: SYNTHETIC_NOTICE.text });
   await error(await s.call('/v1/analysis-notice?memberId=other', { headers: { Authorization: 'Bearer ' + u.token } }), 400, 'VALIDATION_FAILED');
 });
+test('#104 이전 문자열 회원 토큰은 고지·접수 모두 DB 조회 전 401로 거부한다',async t=>{
+  const s=await start(t);
+  const {accessToken}=await s.app.get(require('../../dist/auth/access-token.service').AccessTokenService).issue('legacy-member-138');
+  await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+accessToken}}),401,'AUTH_INVALID');
+  await error(await s.post({token:accessToken}),401,'AUTH_INVALID');
+  assert.equal((await counts()).requests,0);
+});
 test('원자 접수·현재 상태 재응답·새 키 ACTIVE 200은 새 동의를 만들지 않는다', async t => {
   const s = await start(t); const u = await s.login(); const body = command(); const key = randomUUID();
   const r = await s.post(u, key, body); assert.equal(r.status, 202); const first = await r.json();

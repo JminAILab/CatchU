@@ -18,6 +18,7 @@ export class AnalysisIntakeService {
     private readonly notices: AnalysisNoticeService) {}
 
   async notice(memberId: string) {
+    if (!UUID.test(memberId)) throw new ApiError('AUTH_INVALID');
     const notice = this.notices.current();
     const connection = await this.connections.readConnection(memberId);
     if (connection.sourceMode !== 'MOCK') throw new ApiError('CONSENT_REQUIRED');
