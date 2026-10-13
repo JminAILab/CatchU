@@ -3,7 +3,7 @@
 연결은 만들 때 정한 호스트 하나에만 간다. 요청은 경로만 받으므로 다른 호스트·프로토콜로
 보낼 방법이 없다. `http.client`는 우회 이동(redirect)을 따라가지 않으므로 3xx도 그대로
 돌려준다. 응답 본문은 정한 크기까지만 읽는다. 호출마다 연결을 열고 닫아 호출 사이에 남는
-연결이 없다.
+연결이 없다. GET(REST)과 본문을 싣는 POST(GraphQL, #267)는 이 통제를 함께 쓴다.
 """
 
 import http.client
@@ -65,6 +65,17 @@ class Transport(Protocol):
         max_bytes: int,
     ) -> HttpResponse: ...
 
+    def post(
+        self,
+        path: str,
+        *,
+        body: bytes,
+        headers: Mapping[str, str],
+        connect_timeout: float,
+        read_timeout: float,
+        max_bytes: int,
+    ) -> HttpResponse: ...
+
     def close(self) -> None: ...
 
 
@@ -73,7 +84,9 @@ class _Connection(Protocol):
 
     def connect(self) -> None: ...
 
-    def request(self, method: str, url: str, *, headers: Mapping[str, str]) -> None: ...
+    def request(
+        self, method: str, url: str, *, body: bytes | None, headers: Mapping[str, str]
+    ) -> None: ...
 
     def getresponse(self) -> http.client.HTTPResponse: ...
 
@@ -91,7 +104,7 @@ def _https_connection(host: str, timeout: float) -> _Connection:
 
 
 class HttpsTransport:
-    """정한 호스트 하나로만 GET을 보낸다. 실제 GitHub 연결은 아직 검증하지 않았다.
+    """정한 호스트 하나로만 GET·POST를 보낸다. 실제 GitHub 연결은 아직 검증하지 않았다.
 
     소켓 대기는 받기 한 번마다 걸리므로, 조금씩 오래 보내는 응답을 막으려고 연결 뒤
     read_timeout이 지나면 감시 타이머가 소켓을 끊는다. 머리글·본문 모두 이 시간 안에 받아야 한다.
@@ -119,6 +132,35 @@ class HttpsTransport:
         read_timeout: float,
         max_bytes: int,
     ) -> HttpResponse:
+        return self._exchange(
+            "GET", path, None, headers, connect_timeout, read_timeout, max_bytes
+        )
+
+    def post(
+        self,
+        path: str,
+        *,
+        body: bytes,
+        headers: Mapping[str, str],
+        connect_timeout: float,
+        read_timeout: float,
+        max_bytes: int,
+    ) -> HttpResponse:
+        """본문을 싣는 POST. 주소·우회 이동·크기·대기 통제는 GET과 같다."""
+        return self._exchange(
+            "POST", path, body, headers, connect_timeout, read_timeout, max_bytes
+        )
+
+    def _exchange(
+        self,
+        method: str,
+        path: str,
+        body: bytes | None,
+        headers: Mapping[str, str],
+        connect_timeout: float,
+        read_timeout: float,
+        max_bytes: int,
+    ) -> HttpResponse:
         if not _is_path(path):
             raise ValueError("요청 경로는 '/'로 시작하는 경로·쿼리여야 한다")
         connection = self._connect(self._host, connect_timeout)
@@ -135,7 +177,7 @@ class HttpsTransport:
             watchdog = threading.Timer(read_timeout, _cut, (sock, expired))
             watchdog.daemon = True
             watchdog.start()
-            connection.request("GET", path, headers=headers)
+            connection.request(method, path, body=body, headers=headers)
             response = _read(connection.getresponse(), max_bytes)
             if not expired.is_set():
                 return response

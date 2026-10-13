@@ -108,8 +108,8 @@ describe('Catch 등록 PostgreSQL', {
     assert.deepEqual(await db.query("SELECT request_id FROM analysis_request WHERE lifecycle = 'ACTIVE'"), [{ request_id: next.requestId }]);
   });
 
-  test('새 후보는 PRIVATE Catch·근거·후보 연결을 함께 저장한다', async () => {
-    const input = await fixture.receipt();
+  test('제목 없는 새 후보도 PRIVATE Catch·근거·후보 연결을 함께 저장하고 재호출에서 보존한다', async () => {
+    const input = await fixture.receipt({ candidates: [{ ...candidate(), title: null }] });
     const result = await apply(input);
     assert.equal(result.length, 1);
     assert.deepEqual(result[0], {
@@ -143,6 +143,9 @@ describe('Catch 등록 PostgreSQL', {
     assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 1 });
     const [attempt] = await db.query('SELECT application, owner_results_ready FROM analysis_attempt');
     assert.deepEqual(attempt, { application: 'PENDING', owner_results_ready: false }, 'B는 E 완료 상태를 쓰지 않는다');
+    const beforeReplay = await storedState();
+    assert.deepEqual(await apply(input), result);
+    assert.deepEqual(await storedState(), beforeReplay);
   });
 
   test('원 요청 저장소의 보호 판단이 없으면 이번 등록 전체를 롤백하고 준비됐다고 기록하지 않는다', async () => {
@@ -356,30 +359,35 @@ describe('Catch 등록 PostgreSQL', {
     assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 1 });
   });
 
-  test('같은 sourceMode·저장소의 다른 요청과 재반영은 기존 본문·출처·공개·확인·근거를 보존한다', async () => {
-    const original = await fixture.receipt();
-    const [first] = await apply(original);
-    await completeApplication(original);
-    await db.query(`UPDATE catch_asset SET visibility = 'PUBLIC', work_facts_confirmed = true,
-      contribution_confirmed = true, mismatch = true WHERE catch_id = $1`, [first.catchId]);
-    const beforeAsset = await db.query('SELECT * FROM catch_asset');
-    const beforeEvidence = await db.query('SELECT * FROM catch_evidence');
-    const source = candidate('synthetic-other-candidate');
-    source.title = '[합성] 후속 제목';
-    source.draft.content = '[합성] 후속 초안';
-    source.evidence[0].sourceRevision = 'synthetic-new-revision';
-    const other = await fixture.receipt({ ownerId: original.ownerId, candidates: [source] });
-    const [existing] = await apply(other);
-    assert.equal(existing.catchId, first.catchId);
-    assert.equal(existing.disposition, 'EXISTING');
-    assert.deepEqual(await db.query('SELECT * FROM catch_asset'), beforeAsset);
-    assert.deepEqual(await db.query('SELECT * FROM catch_evidence'), beforeEvidence);
-    assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 2 });
-    const beforeReplay = await storedState();
-    assert.deepEqual(await apply(original), [first]);
-    assert.deepEqual(await apply(other), [existing]);
-    assert.deepEqual(await storedState(), beforeReplay);
-  });
+  for (const [originalTitle, nextTitle] of [
+    [null, '[합성] 후속 제목'],
+    ['[합성] 기존 제목', null],
+  ]) {
+    test(originalTitle === null ? '기존 null 제목은 후속 문자열 제목과 재반영에서도 보존한다' : '기존 문자열 제목은 후속 null 제목과 재반영에서도 보존한다', async () => {
+      const original = await fixture.receipt({ candidates: [{ ...candidate(), title: originalTitle }] });
+      const [first] = await apply(original);
+      await completeApplication(original);
+      await db.query(`UPDATE catch_asset SET visibility = 'PUBLIC', work_facts_confirmed = true,
+        contribution_confirmed = true, mismatch = true WHERE catch_id = $1`, [first.catchId]);
+      const beforeAsset = await db.query('SELECT * FROM catch_asset');
+      const beforeEvidence = await db.query('SELECT * FROM catch_evidence');
+      const source = candidate('synthetic-other-candidate');
+      source.title = nextTitle;
+      source.draft.content = '[합성] 후속 초안';
+      source.evidence[0].sourceRevision = 'synthetic-new-revision';
+      const other = await fixture.receipt({ ownerId: original.ownerId, candidates: [source] });
+      const [existing] = await apply(other);
+      assert.equal(existing.catchId, first.catchId);
+      assert.equal(existing.disposition, 'EXISTING');
+      assert.deepEqual(await db.query('SELECT * FROM catch_asset'), beforeAsset);
+      assert.deepEqual(await db.query('SELECT * FROM catch_evidence'), beforeEvidence);
+      assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 2 });
+      const beforeReplay = await storedState();
+      assert.deepEqual(await apply(original), [first]);
+      assert.deepEqual(await apply(other), [existing]);
+      assert.deepEqual(await storedState(), beforeReplay);
+    });
+  }
 
   for (const { label, sourceMode, repositoryId } of [
     { label: 'sourceMode', sourceMode: 'LIVE', repositoryId: 'synthetic-repository' },
@@ -668,8 +676,9 @@ describe('Catch 등록 PostgreSQL', {
   test('B 마이그레이션 되돌리기는 선행 A/E 테이블·행을 보존하고 다시 적용된다', async () => {
     const input = await fixture.receipt();
     await apply(input);
-    await db.undoLastMigration();
+    await db.undoLastMigration(); // title NOT NULL 복원
     try {
+      await db.undoLastMigration(); // 보호 판단 테이블
       assert.equal((await db.query('SELECT to_regclass($1)::text AS relation', [`${fixture.schema}.repository_protection`]))[0].relation, null);
       assert.deepEqual(await bCounts(), { assets: 1, evidence: 1, registrations: 1 }, '보호 마이그레이션의 down은 등록 자료를 지우지 않는다');
       await db.undoLastMigration();

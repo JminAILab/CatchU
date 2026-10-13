@@ -2,7 +2,7 @@
 
 > 기능별 동작·연결 안내는 이 README에 덧붙이지 않고 `worker/docs/<기능>.md`로 쓴다.
 
-FastAPI 기반 worker의 최소 실행 골격이다. HTTP 경로는 `GET /health`뿐이며 HTTP `200`과 `{"status":"ok"}`를 반환한다. 분석 요청 검사와 합성(MOCK) 결과 생성([요청 검사와 합성 결과 생성](#요청-검사와-합성-결과-생성)), 허용 GitHub 자료 수집([허용 GitHub 자료 수집과 근거 정규화](docs/github-collection.md))과 후보 묶음·작업 동일성 판별([후보 묶음과 작업 동일성](docs/candidate-decision.md))은 내부 함수로만 있다. 둘 다 합성 자료로만 검사했고 실제 GitHub 연결은 검증 전이며, 후보 판별은 아직 처리 순서에 연결하지 않았다. 초안·질문 생성, 처리 순서에 실제 수집·후보 판별 연결, DB·큐·LLM 연결, Docker·AWS 배포는 후속 작업이다. worker 관련 파일(worker 폴더, 계약 폴더, 루트 `.gitignore`, CI 파일)이 바뀐 PR에서는 「변경 후 검사」의 명령을 CI가 실행한다.
+FastAPI 기반 worker의 최소 실행 골격이다. HTTP 경로는 `GET /health`뿐이며 HTTP `200`과 `{"status":"ok"}`를 반환한다. 분석 요청 검사와 합성(MOCK) 결과 생성([요청 검사와 합성 결과 생성](#요청-검사와-합성-결과-생성)), 허용 GitHub 자료 수집([허용 GitHub 자료 수집과 근거 정규화](docs/github-collection.md)), 후보 묶음·작업 동일성 판별([후보 묶음과 작업 동일성](docs/candidate-decision.md)), 설명 초안·질문·제목 생성([설명 초안·생각해볼 질문·Catch 제목 생성](docs/generation.md))은 내부 함수로만 있다. 셋 다 합성 자료(생성은 합성 제공자)로만 검사했고 실제 GitHub·LLM 연결은 검증 전이며, 아직 처리 순서에 연결하지 않았다. 처리 순서에 실제 수집·후보 판별·생성 연결, 실제 LLM 제공자·DB·큐 연결, Docker·AWS 배포는 후속 작업이다. worker 관련 파일(worker 폴더, 계약 폴더, 루트 `.gitignore`, CI 파일)이 바뀐 PR에서는 「변경 후 검사」의 명령을 CI가 실행한다.
 
 작업 범위는 [#84](https://github.com/JminAILab/CatchU/issues/84), 공통 착수·브랜치·검사·PR 기준은 [코딩 운영](../docs/CatchU_작업관리.md#코딩-운영)을 따른다. worker 초기화 담당이 이후 분석 기능과 공통 환경까지 자동으로 맡는 것은 아니다.
 
@@ -98,7 +98,7 @@ Windows PowerShell에서는 `curl.exe -i http://127.0.0.1:8000/health`를 사용
 1. **요청 검사**: 스키마 v1을 검사한 뒤 E가 접수한 기록(요청·현재 시도·회원·저장소·동의·허용 범위·`sourceMode`)과 필드마다 대조한다. 하나라도 다르면 생성기를 부르지 않고 거부한다. 거부는 사유와 어긋난 위치만 호출한 쪽에 돌려주며, 계약에 요청 거부 메시지가 없으므로 E에 보내는 메시지는 없다. 따라서 E의 요청은 접수 상태(`QUEUED`)로 남는다.
 2. **진행 알림**: 검사를 통과하면 `RECEIVED`, 생성 직전에 `RUNNING`을 알린다.
 3. **생성**: 생성기를 한 번 부른다. 생성기가 실행 여부를 확인하지 못했거나(상태 조회 오류) 시간이 초과되면 `UNCERTAIN`만 알리고 결과를 만들지 않는다. 실패로 확정하지 않고 다시 생성하지도 않는다. 이 `UNCERTAIN`은 항상 `RUNNING` 뒤에 가고, E의 [상태 전이 정본](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본)에는 `RUNNING`에서 `UNCERTAIN`으로 가는 전이가 없으므로 E의 처리 상태는 `RUNNING`으로 남는다.
-4. **결과 조합**: 요청의 식별자·맥락을 그대로 옮긴다. 종결값은 후보와 실패의 수로 정한다(후보만 있으면 SUCCEEDED, 둘 다 없으면 EMPTY, 둘 다 있으면 PARTIAL_FAILED, 실패만 있으면 FAILED). 근거 부족·기준 미달은 `notProvided`, 수집·생성 오류는 `failures`에 넣는다. 초안·질문을 만들지 못해도 후보는 남기고 초안 본문은 `null`, 실패는 `failures`에 넣는다. 후보에 제목이 없으면 `workFacts` 첫 항목을 제목에 넣는다. 지금 계약과 B·C·E가 빈 제목을 받지 않아 두는 임시 동작이며, 계약 정정과 B·C·E 수정 뒤 뺀다([결정 문서 「담당과 순서」](../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#담당과-순서) ③). 제목은 #118이 만들지 않고 [#120](https://github.com/JminAILab/CatchU/issues/120)이 만든다.
+4. **결과 조합**: 요청의 식별자·맥락을 그대로 옮긴다. 종결값은 후보와 실패의 수로 정한다(후보만 있으면 SUCCEEDED, 둘 다 없으면 EMPTY, 둘 다 있으면 PARTIAL_FAILED, 실패만 있으면 FAILED). 근거 부족·기준 미달은 `notProvided`, 수집·생성 오류는 `failures`에 넣는다. 생성이 실패해 초안·질문을 만들지 못해도 후보는 남기고 초안 본문은 `null`, 그 실패는 `failures`에 넣는다. 재료가 없어 만들지 않은 것(`NOT_GENERATED`)은 실패가 아니다([생성 「상태와 실패」](docs/generation.md#상태와-실패)). 후보에 제목이 없으면 `workFacts` 첫 항목을 제목에 넣는다. 계약은 [PR #262](https://github.com/JminAILab/CatchU/pull/262)로 제목 null을 받지만 C 수신자 화면([#152](https://github.com/JminAILab/CatchU/issues/152))의 null 수용 전이라 두는 임시 동작이며(B·E는 [#274](https://github.com/JminAILab/CatchU/pull/274)·[#272](https://github.com/JminAILab/CatchU/pull/272)로 수용), B·C·E 수용 뒤 뺀다([결정 문서 「담당과 순서」](../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#담당과-순서) ③). 제목은 #118이 만들지 않고 [#120](https://github.com/JminAILab/CatchU/issues/120) 생성 모듈이 만든다([생성 「제목」](docs/generation.md#제목)).
 
 1번 거부나 3번 실행 불명으로 E에 남은 요청은 E의 처리 시한(접수 후 60분)이 지나면 처리 `FAILED`로 닫힌다. worker는 이 요청을 다시 처리하지 않는다. 이 닫기는 처리 시한 계약 PR이 병합된 뒤 적용되며, 구현은 [#237](https://github.com/JminAILab/CatchU/issues/237)이다([10/6 팀장 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)).
 
@@ -135,17 +135,21 @@ uv run --locked python -m app.processing succeeded-one-candidate
 |---|---|
 | 허용 GitHub 자료 수집의 실제 연결(A 자격정보 제공·실제 환경 통제 검사). 수집 모듈은 합성 검사까지 | [#117](https://github.com/JminAILab/CatchU/issues/117) · [#133](https://github.com/JminAILab/CatchU/issues/133) · [#37](https://github.com/JminAILab/CatchU/issues/37) |
 | 후보 묶음·본인 기여 확인·작업 동일성 판별의 처리 순서 연결과 실제 자료 검수. 판별 모듈(`app/candidates/`)은 합성 검사까지 | [#118](https://github.com/JminAILab/CatchU/issues/118) · [#121](https://github.com/JminAILab/CatchU/issues/121) · [#122](https://github.com/JminAILab/CatchU/issues/122) |
-| 초안·질문 생성과 서비스 LLM | [#119](https://github.com/JminAILab/CatchU/issues/119) · [#120](https://github.com/JminAILab/CatchU/issues/120) |
+| 초안·질문·제목 생성의 실제 LLM 제공자 연결과 품질 확인. 생성 모듈(`app/generation/`)은 합성 제공자 검사까지 | [#119](https://github.com/JminAILab/CatchU/issues/119) · [#120](https://github.com/JminAILab/CatchU/issues/120) |
 | 요청 수신, 진행 알림과 결과의 실제 전송 | [#121](https://github.com/JminAILab/CatchU/issues/121) · [#233](https://github.com/JminAILab/CatchU/issues/233)(api 쪽) · [#77](https://github.com/JminAILab/CatchU/issues/77) |
 | E 수신·개발용 주입, B 등록 | [#139](https://github.com/JminAILab/CatchU/issues/139) · [#105](https://github.com/JminAILab/CatchU/issues/105) |
 
 ## 허용 GitHub 자료 수집과 근거 정규화
 
-[docs/github-collection.md](docs/github-collection.md)에 있다. #118이 더한 관계 조회는 [docs/relation-collection.md](docs/relation-collection.md)에 있다.
+[docs/github-collection.md](docs/github-collection.md)에 있다. #118이 더한 관계 조회는 [docs/relation-collection.md](docs/relation-collection.md), 그 가운데 연결 PR 묶음 조회(#267, GraphQL)와 요청당 호출 수의 근거는 [docs/associated-pr-lookup.md](docs/associated-pr-lookup.md)에 있다.
 
 ## 후보 묶음과 작업 동일성
 
 [docs/candidate-decision.md](docs/candidate-decision.md)에 있다. 후보 문장·근거·제목은 [docs/candidate-text.md](docs/candidate-text.md), 알려진 한계와 검사는 [docs/candidate-checks.md](docs/candidate-checks.md)에 있다.
+
+## 설명 초안·질문·제목 생성
+
+[docs/generation.md](docs/generation.md)에 있다.
 
 ## 변경 후 검사
 
@@ -158,7 +162,7 @@ uv run --locked mypy
 uv run --locked pytest
 ```
 
-Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 요청 검사와 합성 결과 생성은 거부 조건, 시나리오별 결과, 실행 불명 처리를 확인하며, 네트워크 연결을 막은 상태에서도 모든 시나리오가 끝나는지 본다. 수집 검사는 합성 GitHub 응답으로 사전 거부·호출 통제·상한·실패 보존·정규화·근거·결과 조합 연결·정리와 비밀값 누출을 확인하고, 관계 조회의 단계·조회 대상·멈춤 처리를 확인한다. 후보 판별 검사는 작업 동일성 값([wi1 규칙](docs/candidate-decision.md)), 실제 git과 대조한 공백을 무시한 diff 값, 배정·보류·같은 변경·커밋 묶음·나누기·집계, 판별 기준 문서의 합성 사례를 수집부터 결과 조합까지 확인한다. 실제 git으로 만드는 시험은 git이 없으면 건너뛴다. 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
+Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 요청 검사와 합성 결과 생성은 거부 조건, 시나리오별 결과, 실행 불명 처리를 확인하며, 네트워크 연결을 막은 상태에서도 모든 시나리오가 끝나는지 본다. 수집 검사는 합성 GitHub 응답으로 사전 거부·호출 통제·상한·실패 보존·정규화·근거·결과 조합 연결·정리와 비밀값 누출을 확인하고, 관계 조회의 단계·조회 대상·멈춤 처리와 연결 PR 묶음 조회(GraphQL)의 요청 본문·응답 대응·실패 분류·묶음 경계·호출 수를 확인한다. 후보 판별 검사는 작업 동일성 값([wi1 규칙](docs/candidate-decision.md)), 실제 git과 대조한 공백을 무시한 diff 값, 배정·보류·같은 변경·커밋 묶음·나누기·집계, 판별 기준 문서의 합성 사례를 수집부터 결과 조합까지 확인한다. 생성 검사는 합성 제공자로 재료 고르기·patch 확인·가리기·크기 선별·응답 판정·문장 틀·제목·상태와 실패·호출 한도와 시간·제목 고쳐 쓰기·근거 한계 문구를 수집부터 결과 조합까지 확인하고, 제공자 입력·결과·로그에 가린 값이 남지 않는지 본다. 실제 git으로 만드는 시험은 git이 없으면 건너뛴다. 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
 
 검사 결과·실행 환경·기준 커밋·작성자 외 재현 여부는 초기화 이슈·PR에 남긴다. 이 README의 명령과 기대 결과 자체가 검사 통과 기록은 아니다. 로컬 확인과 AWS 배포 검증은 각각 기록한다.
 
@@ -175,14 +179,18 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `app/processing/` | 요청 검사(`request_check.py`), 제공자 비종속 생성 인터페이스(`generation.py`), 결과 조합(`result.py`), 처리 순서(`pipeline.py`), 가짜 생성기와 합성 요청(`fake_generator.py`·`synthetic.py`), 개발용 실행(`__main__.py`) |
 | `tests/test_request_check.py` | 요청 형식·접수 맥락 불일치·지난 시도의 거부 검사 |
 | `tests/test_processing.py` | 종결값·미제공과 실패 구분·초안/질문/제목 실패·진행 알림과 실행 불명·외부 호출 없음 검사 |
-| `app/collection/` | 허용 GitHub 자료 수집. 순서 조립(`collect.py`), 자격정보 대조(`credentials.py`), 선택 범위(`selection.py`), 상한(`limits.py`·`budget.py`), 호출 통제(`gateway.py`), HTTPS 전송(`transport.py`), 경로 틀(`api_paths.py`), 식별 값 검사(`identifiers.py`), 종류별 수집(`collectors.py`), 관계 조회(`relations.py`), 기본 브랜치 커밋의 병합 계산(`graph.py`), 응답 정규화(`normalize.py`·`records.py`), 근거 재료(`evidence.py`), 실패 코드(`failures.py`) |
-| `tests/github_synthetic.py` | 수집·후보 판별 검사용 합성 GitHub 응답(경로·PR·커밋·파일 항목)·자격정보와 선택 범위 대역·가짜 시계. M1 합성 결과 세트와 따로 둔다 |
+| `app/collection/` | 허용 GitHub 자료 수집. 순서 조립(`collect.py`), 자격정보 대조(`credentials.py`), 선택 범위(`selection.py`), 상한(`limits.py`·`budget.py`), 호출 통제(`gateway.py`), HTTPS 전송(`transport.py`), 경로 틀(`api_paths.py`), 연결 PR 묶음 조회의 GraphQL 쿼리 틀(`graphql.py`), 식별 값 검사(`identifiers.py`), 종류별 수집(`collectors.py`), 관계 조회(`relations.py`), 기본 브랜치 커밋의 병합 계산(`graph.py`), 응답 정규화(`normalize.py`·`records.py`), 근거 재료(`evidence.py`), 실패 코드(`failures.py`) |
+| `tests/github_synthetic.py` | 수집·후보 판별 검사용 합성 GitHub 응답(경로·PR·커밋·파일 항목, 연결 PR 묶음 조회의 GraphQL 요청 검사와 응답)·자격정보와 선택 범위 대역·가짜 시계. M1 합성 결과 세트와 따로 둔다. 연결 PR은 SHA마다 `associated_key`로 정하고, 정하지 않은 SHA를 물으면 시험 실패다 |
 | `tests/git_synthetic.py` | 실제 git으로 만든 합성 저장소와, 그 커밋을 GitHub 커밋 응답 모양으로 옮기는 시험 도구, 사례용 파일 내용·두 갈래 브랜치 도우미. 같은 변경 확인 시험과 후보 판별 사례 시험이 실제 git 결과와 대조할 때 쓰며, git이 없으면 그 시험을 건너뛴다 |
 | `tests/conftest.py` | 여러 시험 파일이 함께 쓰는 고정값(시험마다 새로 만드는 합성 git 저장소 `repo`) |
-| `tests/test_collection_*.py` | 첫 호출 전 거부(`boundary`), 호출 통제·상한·실패 응답(`controls`), 정상 수집·정규화·근거·결과 연결·정리(`flow`), 관계 조회(`relations`), HTTPS 전송(`transport`) |
+| `tests/test_collection_*.py` | 첫 호출 전 거부(`boundary`), 호출 통제·상한·실패 응답(`controls`), 정상 수집·정규화·근거·결과 연결·정리(`flow`), 관계 조회(`relations`), 연결 PR 묶음 조회의 쿼리·응답 대응·실패 분류·점수(`graphql`)와 묶음 경계·순서(`lookup_batches`), HTTPS 전송(`transport`) |
+| `tests/call_budget_shapes.py`·`tests/test_lookup_call_budget.py` | 요청당 호출 수를 비교할 합성 저장소 모양과, 운영 제안 상한으로 후보 판정까지 가는지·종류별 호출 수 시험. 같은 모양을 기준 판본에서 돌려 REST와 비교할 수 있다 |
 | `app/candidates/` | 후보 묶음·본인 기여 확인·작업 동일성(#118). wi1 값(`identity.py`), 같은 변경의 재료(`same_change.py`), 소속·배정·커밋 묶음·나누기(`grouping.py`), 후보 자격·집계·문장·근거(`build.py`) |
 | `tests/candidate_scenarios.py` | 후보 판별 사례 시험용 선언형 합성 저장소와, 수집부터 결과 조합까지 돌리는 실행 도구 |
 | `tests/test_candidate_*.py` | wi1 값(`identity`), 공백을 무시한 diff 값·관계 근거(`same_change`), 수집 관측을 직접 만든 묶음·집계·근거(`grouping`), 판별 기준 문서의 합성 사례(`cases`), 수집·판별·결과 조합 연결(`flow`) |
+| `app/generation/` | 설명 초안·질문·제목 생성(#120). 입구(`flow.py`), 재료 찾기(`material.py`), patch 확인(`patch.py`), 가리기(`redact.py`), 입력 만들기·크기 선별(`request.py`), 응답 판정(`response.py`), 문장 틀(`render.py`), 제목(`title.py`), 실패 코드·한계 문구(`outcome.py`), 상한(`limits.py`), 제공자 경계(`provider.py`) |
+| `tests/generation_scenarios.py` | 생성 시험용 합성 제공자(받은 요청 기록, 정해 둔 응답·예외·늦은 응답)와, 수집부터 생성·결과 조합까지 돌리고 후보 보존을 확인하는 실행 도구 |
+| `tests/test_generation_*.py` | patch 확인(`patch`), 가리기(`redact`), 재료 찾기(`material`), 응답 판정·문장 틀(`response`), 제목(`title`), 상태·실패·호출 한도(`flow`), 고쳐 쓰기·근거 한계·가리기 끝까지(`rewrite_coverage`) |
 | `pyproject.toml` | 프로젝트 의존성·개발 도구·검사 설정 |
 | `uv.lock` | 실행·개발 의존성의 잠금 파일. 저장소에 함께 커밋 |
 | `.python-version` | 로컬에서 사용할 Python 버전 |

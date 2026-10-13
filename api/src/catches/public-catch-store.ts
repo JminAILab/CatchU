@@ -7,7 +7,7 @@ import { READ_COLUMNS, READ_FROM, ReadRow, readCatchSources } from './catch-read
 /** common.yaml PublicCatch/PublicEvidence 허용 필드만 전달한다. */
 export interface PublicCatchResponse {
   catchId: string;
-  title: string;
+  title: string | null;
   workFacts: string[];
   subjectContribution: string;
   evidence: Pick<OwnerCatchResponse['evidence'][number],

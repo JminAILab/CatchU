@@ -14,7 +14,7 @@ interface CandidateEvidence {
 
 // B 내부의 본문 변환용 입력이다. E↔B 호출 계약이나 공개 API DTO가 아니다.
 export interface CatchContentSource {
-  readonly title: string;
+  readonly title: string | null;
   readonly workIdentity: string;
   readonly workFacts: readonly string[];
   readonly subjectContribution: string;
@@ -31,7 +31,7 @@ export interface CatchContentSource {
 
 export interface NewCatchContent {
   asset: {
-    title: string;
+    title: string | null;
     workIdentity: string;
     workFacts: string[];
     subjectContribution: string;

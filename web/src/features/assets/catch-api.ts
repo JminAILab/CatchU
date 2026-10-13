@@ -21,7 +21,8 @@ const generation = (v: unknown) => ["GENERATED", "FAILED", "NOT_GENERATED"].incl
 /** 손상된 200 응답을 0건이나 확인/공개 성공으로 표시하지 않는다. */
 export function isCatch(value: unknown): value is CatchAsset {
   if (!record(value)) return false;
-  return ["catchId", "title", "repositoryId", "sourceRequestId", "sourceResultId", "sourceCandidateId"].every((key) => nonempty(value[key]))
+  return ["catchId", "repositoryId", "sourceRequestId", "sourceResultId", "sourceCandidateId"].every((key) => nonempty(value[key]))
+    && (value.title === null || nonempty(value.title))
     && strings(value.workFacts) && typeof value.subjectContribution === "string"
     && Array.isArray(value.evidence) && value.evidence.every((e) => record(e)
       && ["catchEvidenceId", "sourceEvidenceId", "sourceUrl", "sourceRevision", "contributionScope"].every((key) => typeof e[key] === "string")

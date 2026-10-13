@@ -149,13 +149,18 @@ export function AssetsView(props: AssetsViewProps) {
                   {visibleItems.map((item) => (
                     <li key={item.catchId} className={styles.card}>
                       <p className={styles.repository}>{repositories.find((repo) => repo.repositoryId === item.repositoryId)?.name ?? "저장소 정보 없음"}</p>
-                      <h3><button className={styles.cardTitle} onClick={(event) => {
+                      {item.title !== null && <h3><button className={styles.cardTitle} onClick={(event) => {
                         returnFocusRef.current = event.currentTarget;
                         props.onOpen(item.catchId);
-                      }}>{item.title}</button></h3>
+                      }}>{item.title}</button></h3>}
                       <StatusBadges item={item} />
                       <p className={styles.summary}>{item.workFacts[0] || "상세에서 근거를 확인해 주세요."}</p>
-                      <div className={styles.cardFooter}><span>근거 {item.evidence.length}개</span><span>상세 보기 ↗</span></div>
+                      <div className={styles.cardFooter}><span>근거 {item.evidence.length}개</span>
+                        {item.title === null ? <button className={styles.cardDetails} onClick={(event) => {
+                          returnFocusRef.current = event.currentTarget;
+                          props.onOpen(item.catchId);
+                        }}>상세 보기 ↗</button> : <span>상세 보기 ↗</span>}
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -210,7 +215,7 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
         : !item ? <StateMessage title="이 Catch를 열 수 없습니다">목록으로 돌아가 확인할 Catch를 다시 선택해 주세요.</StateMessage>
         : <>
           <p className={styles.repository}>{repositoryName ?? "저장소 정보 없음"}</p>
-          <h3 className={styles.detailTitle}>{item.title}</h3>
+          {item.title !== null && <h3 className={styles.detailTitle}>{item.title}</h3>}
           <StatusBadges item={item} />
           <p className={styles.readOnlyNotice}>{dataMode === "preview" ? "예시 자료입니다. 확인·불일치·공개 설정은 바뀌지 않습니다." : item.sourceMode === "MOCK" ? "합성 자료로 생성된 Catch입니다. 실제 분석 결과와 구분해 확인해 주세요." : "확인과 공개 선택은 별도입니다."}</p>
           <section className={styles.detailSection}><h3>작업에서 확인된 사실</h3>

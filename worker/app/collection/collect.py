@@ -38,7 +38,7 @@ from app.collection.failures import (
     CollectionStopped,
     FailureCode,
 )
-from app.collection.gateway import GitHubGateway
+from app.collection.gateway import GitHubGateway, GraphQLUsage
 from app.collection.identifiers import GitHubAccount, RepositoryCoordinates
 from app.collection.limits import PROPOSED_LIMITS, CollectionLimits
 from app.collection.records import (
@@ -82,8 +82,11 @@ class CollectionOutcome:
     issues: tuple[IssueRecord, ...] = ()
     coverage_limits: tuple[CoverageLimit, ...] = ()
     failures: tuple[CollectionFailure, ...] = ()
+    # 실제 HTTP 요청 수(REST 호출과 GraphQL POST를 1회씩 합한 값). 호출 수 상한과 같은 셈이다.
     calls: int = 0
     received_bytes: int = 0
+    # 그 가운데 연결 PR 묶음 조회(GraphQL)의 호출 수와 점수. 점수는 호출 수에 더하지 않는다.
+    graphql: GraphQLUsage = GraphQLUsage()
     # 관계 조회를 요청했고 첫 호출 전에 멈추지 않았을 때만 있다.
     relations: RelationObservations | None = None
 
@@ -296,6 +299,7 @@ def _collect_with(
     )
     transport = open_transport()
     gateway: GitHubGateway | None = None
+    graphql = GraphQLUsage()
     try:
         gateway = GitHubGateway(
             transport,
@@ -321,12 +325,14 @@ def _collect_with(
     finally:
         # 성공·실패·예외 모두 자격정보를 놓고 연결을 닫는다.
         if gateway is not None:
+            graphql = gateway.graphql_usage
             gateway.close()
         else:
             transport.close()
     logger.log(
         logging.WARNING if failure else logging.INFO,
         "수집 종료: requestId=%s attemptId=%s completed=%s code=%s calls=%d bytes=%d "
+        "graphqlCalls=%d graphqlCost=%d graphqlCostUnobserved=%d "
         "commits=%d pullRequests=%d issues=%d",
         request.request_id,
         request.attempt_id,
@@ -334,6 +340,9 @@ def _collect_with(
         failure.code if failure else "-",
         budget.calls,
         budget.received_bytes,
+        graphql.calls,
+        graphql.observed_cost,
+        graphql.unobserved_calls,
         len(data.commits),
         len(data.pull_requests),
         len(data.issues),
@@ -353,6 +362,7 @@ def _collect_with(
         failures=(failure,) if failure else (),
         calls=budget.calls,
         received_bytes=budget.received_bytes,
+        graphql=graphql,
         relations=observations,
     )
 

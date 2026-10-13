@@ -1,6 +1,7 @@
 """관계 조회(#118): 같은 수집 연결로 PR 커밋 목록·연결 PR·비교·변경 내용을 모은다.
 
-모두 합성 GitHub 응답으로 확인한다. 실제 GitHub 연결·호출 순서는 검증하지 않았다.
+연결 PR은 커밋마다 부르지 않고 GraphQL 묶음 조회(POST /graphql, #267)로 묻는다. 모두 합성
+GitHub 응답으로 확인한다. 실제 GitHub 연결·호출 순서·GraphQL 응답 모양은 검증하지 않았다.
 """
 
 import itertools
@@ -21,7 +22,10 @@ from github_synthetic import (
     LISTED_ISSUES,
     LISTED_PULLS,
     MEMBER,
+    MISSING_COMMIT,
+    NAME,
     OTHER,
+    OWNER,
     REFERENCE,
     REPOSITORY,
     REQUEST,
@@ -32,9 +36,9 @@ from github_synthetic import (
     Reply,
     StaticCredentials,
     StaticSelections,
+    associated_key,
     branch_commits_path,
     commit_detail_json,
-    commit_pulls_path,
     compare_json,
     compare_path,
     detail_diff_path,
@@ -44,6 +48,9 @@ from github_synthetic import (
     diff_text,
     file_json,
     graph_commit_json,
+    graphql_pull_node,
+    graphql_reply,
+    graphql_route,
     issue_json,
     issue_listing_pull_json,
     oversized,
@@ -56,6 +63,7 @@ from github_synthetic import (
     request_with,
     respond,
     sha,
+    standard_rate_limit,
     standard_routes,
     status_only,
 )
@@ -77,6 +85,7 @@ from app.collection import (
     collect,
     normalize,
 )
+from app.collection.gateway import GraphQLUsage
 from app.collection.graph import BroughtIn, WindowGraph
 from app.collection.relations import (
     BaseChain,
@@ -160,7 +169,7 @@ def _plain(limits: Iterable[str]) -> bool:
 # PR마다 PR 목록에서 본 머리 커밋은 그 PR 커밋 목록의 끝 커밋이다(판본이 맞는다).
 
 PRECEDENCE = [12, 10, 11, 13]
-# 연결 PR 조회는 기본 브랜치 목록 순서(최근 것부터)로 부른다.
+# 연결 PR 조회 대상. 기본 브랜치 목록 순서(최근 것부터)로 묶음에 싣는다.
 LOOKED_UP = [7, 5, 4]
 # 변경 내용: 단위마다 첫 기여 커밋(목록 #13·#12·#11·#10의 c22·c21·c6·c1, 연결 PR #40의 c5)을 최근
 # 것부터, 그다음 PR 밖 본인 커밋(c7·c4), 나머지 본인 커밋(c3)이다.
@@ -202,14 +211,14 @@ def relation_routes() -> dict[str, Reply]:
             ]
         ),
         pull_commits_path(13): respond([graph_commit_json(22, MEMBER, parents=(7,))]),
-        commit_pulls_path(4): respond([]),
-        commit_pulls_path(5): respond(
+        associated_key(4): respond([]),
+        associated_key(5): respond(
             [
                 relation_pull_json(40, MEMBER, merge_commit=5),
                 relation_pull_json(41, OTHER, base_repository="someone-else/fork"),
             ]
         ),
-        commit_pulls_path(7): respond(
+        associated_key(7): respond(
             [relation_pull_json(42, OTHER, base_repository="someone-else/other")]
         ),
     }
@@ -218,15 +227,72 @@ def relation_routes() -> dict[str, Reply]:
     return routes
 
 
+# 연결 PR 조회 대상 셋을 한 번에 묻는 묶음 조회 POST(기본 묶음 크기 100).
+LOOKUP_BATCH = graphql_route(*LOOKED_UP)
+LOOKED_UP_SHAS = [sha(number) for number in LOOKED_UP]
+
 RELATION_ORDER = [
     BASE,
     LISTED_COMMITS,
     LISTED_PULLS,
     LISTED_ISSUES,
     *(pull_commits_path(number) for number in PRECEDENCE),
-    *(commit_pulls_path(number) for number in LOOKED_UP),
+    LOOKUP_BATCH,
     *(detail_path(number) for number in DETAILS),
 ]
+# 연결 PR 조회 전의 호출: 목록 4 + PR 커밋 목록 4.
+CALLS_BEFORE_LOOKUPS = 4 + len(PRECEDENCE)
+
+
+def _batch_limits(size: int, **changes: Any) -> CollectionLimits:
+    """묶음 경계를 보려고 연결 PR 묶음 크기만 줄인 상한(다른 상한은 제안값이거나 changes)."""
+    return replace(PROPOSED_LIMITS, max_lookup_batch=size, **changes)
+
+
+# 연결 PR 묶음 응답을 직접 정할 때 쓴다. 커밋의 연결 PR은 REST 연결 PR 항목 모양으로 적고
+# graphql_pull_node로 바꾼다.
+
+
+def _commit_node(
+    number: int, items: Iterable[dict[str, Any]] = (), *, next_page: bool = False
+) -> dict[str, Any]:
+    """묶음 응답의 커밋 하나(연결 PR 첫 쪽)."""
+    return {
+        "__typename": "Commit",
+        "oid": sha(number),
+        "associatedPullRequests": {
+            "pageInfo": {"hasNextPage": next_page},
+            "nodes": [graphql_pull_node(item) for item in items],
+        },
+    }
+
+
+def _batch_data(*commits: dict[str, Any] | None) -> dict[str, Any]:
+    """묶음 응답의 data. 요청 순서의 커밋 결과를 c0, c1, …에 둔다."""
+    return {
+        "rateLimit": standard_rate_limit(),
+        "repository": {
+            "nameWithOwner": f"{OWNER}/{NAME}",
+            **{f"c{index}": commit for index, commit in enumerate(commits)},
+        },
+    }
+
+
+def _base_case_batch() -> dict[str, Any]:
+    """기본 사례의 c7·c5·c4 묶음 응답 data(relation_routes의 연결 PR과 같다)."""
+    return _batch_data(
+        _commit_node(
+            7, [relation_pull_json(42, OTHER, base_repository="someone-else/other")]
+        ),
+        _commit_node(
+            5,
+            [
+                relation_pull_json(40, MEMBER, merge_commit=5),
+                relation_pull_json(41, OTHER, base_repository="someone-else/fork"),
+            ],
+        ),
+        _commit_node(4),
+    )
 
 
 # 1. 관계 조회를 요청하지 않으면 #117 동작 그대로다
@@ -249,6 +315,10 @@ def test_default_path_never_calls_relation_endpoints() -> None:
         assert "/compare/" not in path
         assert "?sha=" not in path
         assert not re.search(r"/commits/[0-9a-f]{40}/pulls", path)
+    # 연결 PR 묶음 조회(POST /graphql)도 하지 않는다.
+    assert all(call.method == "GET" for call in transport.calls)
+    assert transport.batches == []
+    assert outcome.graphql == GraphQLUsage()
 
 
 def test_default_path_does_not_read_the_default_branch() -> None:
@@ -277,15 +347,32 @@ def test_relation_phase_reuses_the_connection_in_planned_order() -> None:
 
     assert outcome.completed
     assert transport.paths == RELATION_ORDER
-    # 같은 경로를 두 번 부르지 않는다(상세도 다시 받지 않는다).
+    # 같은 경로를 두 번 부르지 않는다(상세도 다시 받지 않는다). 연결 PR은 POST 하나로 묻고, 같은
+    # 커밋을 두 번 묻지 않는다.
     assert set(Counter(transport.paths).values()) == {1}
+    assert transport.batches == [tuple(LOOKED_UP_SHAS)]
+    assert transport.looked_up == LOOKED_UP_SHAS
+    # POST 하나가 호출 1회다. 점수는 호출 수에 더하지 않고 따로 센다.
+    assert outcome.calls == len(RELATION_ORDER)
+    assert outcome.graphql == GraphQLUsage(calls=1, observed_cost=1)
     # 모든 호출이 같은 토큰을 머리글로만 실은 같은 연결을 지났다.
     assert {call.headers["Authorization"] for call in transport.calls} == {
         f"Bearer {TOKEN}"
     }
-    # 소속 판정이 쓰는 merge_commit_sha는 API 판본 2026-03-10에서 빠졌다. 판본을 고정한다.
-    assert {call.headers["X-GitHub-Api-Version"] for call in transport.calls} == {
-        "2022-11-28"
+    for call in transport.calls:
+        others = {k: v for k, v in call.headers.items() if k != "Authorization"}
+        assert TOKEN not in repr(others) and TOKEN not in call.path
+        assert call.body is None or TOKEN.encode() not in call.body
+    rest = [call for call in transport.calls if call.method == "GET"]
+    (post,) = (call for call in transport.calls if call.method == "POST")
+    # 소속 판정이 쓰는 merge_commit_sha는 API 판본 2026-03-10에서 빠졌다. REST 판본을 고정한다.
+    assert {call.headers["X-GitHub-Api-Version"] for call in rest} == {"2022-11-28"}
+    # GraphQL POST는 REST 판본 머리글 없이 JSON 본문을 보낸다.
+    assert post.headers == {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "CatchU-worker",
+        "Authorization": f"Bearer {TOKEN}",
     }
     assert transport.closed
     assert relations.default_branch == DEFAULT_BRANCH
@@ -354,15 +441,11 @@ def test_only_unexplained_own_default_branch_commits_are_looked_up() -> None:
     outcome, transport = _run(relation_routes())
     relations = _relations(outcome)
 
-    looked_up = [
-        path
-        for path in transport.paths
-        if path.endswith("/pulls?per_page=100&page=1") and "/commits/" in path
-    ]
-    assert looked_up == [commit_pulls_path(number) for number in LOOKED_UP]
+    # 묶음 POST가 물은 SHA로 본다(경로가 아니다).
+    assert transport.looked_up == LOOKED_UP_SHAS
     # PR 커밋 목록(c1·c6), merge_commit_sha(c3), 다른 계정(c2)은 조회하지 않는다.
     for number in (1, 2, 3, 6):
-        assert commit_pulls_path(number) not in transport.paths
+        assert sha(number) not in transport.looked_up
     assert relations.associated == (
         AssociatedPulls(sha(7), Lookup.EMPTY, (), 1),
         AssociatedPulls(sha(5), Lookup.FOUND, (40,), 1),
@@ -391,39 +474,74 @@ def test_lookup_only_pull_request_is_kept_and_foreign_base_is_ignored() -> None:
     assert not numbers & {41, 42}
 
 
-@pytest.mark.parametrize("status", [409, 422])
-def test_lookup_refusal_stops_collection_without_retry(status: int) -> None:
-    """조회 오류는 수집 실패(작업 동일성 기준 2026-09-30): 연결 PR 조회 409·422는 자료 범위 한계가 아니라 수집 실패다."""
+# 연결 PR 조회 오류는 묶음 전체의 응답이다. 그 묶음의 결과는 하나도 쓰지 않는다(#267).
+_ALL_STOPPED = [(sha(n), Lookup.NOT_REACHED) for n in LOOKED_UP]
+
+
+@pytest.mark.parametrize(
+    ("key", "reply"),
+    [
+        # GitHub가 그 SHA의 커밋을 찾지 못하면 그 커밋의 별칭이 null이다.
+        (associated_key(5), MISSING_COMMIT),
+        # HTTP 200에 한도와 무관한 오류. 부분 data가 함께 와도 쓰지 않는다.
+        (
+            LOOKUP_BATCH,
+            graphql_reply(
+                _base_case_batch(),
+                errors=[
+                    {
+                        "path": ["repository", "c1"],
+                        "message": "Something went wrong while executing your query.",
+                    }
+                ],
+            ),
+        ),
+        # POST 자체의 409·422. 합성 상태 분류일 뿐 REST 응답과 같은 뜻이라는 근거는 아니다.
+        (LOOKUP_BATCH, status_only(409)),
+        (LOOKUP_BATCH, status_only(422)),
+    ],
+    ids=["missing-commit", "query-errors", "http-409", "http-422"],
+)
+def test_lookup_refusal_stops_collection_without_retry(key: str, reply: Reply) -> None:
+    """조회 오류는 수집 실패(작업 동일성 기준 2026-09-30): 자료 범위 한계가 아니다.
+
+    REST 연결 PR 조회의 409·422는 커밋 하나의 응답이라 앞서 받은 c7은 EMPTY로 남았다. 묶음 조회(#267)
+    에서는 null 커밋·오류 응답이 묶음 전체를 실패로 만들어 같은 묶음의 c7도 NOT_REACHED다.
+    """
     routes = relation_routes()
-    routes[commit_pulls_path(5)] = status_only(status)
+    routes[key] = reply
 
     outcome, transport = _run(routes)
     relations = _relations(outcome)
 
     assert _codes(outcome) == [FailureCode.COLLECTION_FETCH_FAILED]
     assert relations.stopped_during == "LOOKUPS"
-    assert transport.paths[-1] == commit_pulls_path(5)
+    assert transport.paths[-1] == LOOKUP_BATCH
     assert set(Counter(transport.paths).values()) == {1}
-    assert [(a.sha, a.status) for a in relations.associated] == [
-        (sha(7), Lookup.EMPTY),
-        (sha(5), Lookup.NOT_REACHED),
-        (sha(4), Lookup.NOT_REACHED),
-    ]
+    assert transport.looked_up == LOOKED_UP_SHAS
+    assert [(a.sha, a.status) for a in relations.associated] == _ALL_STOPPED
+    # 부분 data에 있던 PR #40도 남기지 않는다.
     assert relations.pull_requests_from_lookups == ()
+    # 오류 없이 받은 응답(null 커밋)의 점수는 묶음을 쓰지 않아도 센다. 오류 응답은 알 수 없는 점수다.
+    assert outcome.graphql == (
+        GraphQLUsage(calls=1, observed_cost=1)
+        if reply is MISSING_COMMIT
+        else GraphQLUsage(calls=1, unobserved_calls=1)
+    )
 
 
 def test_lookup_with_unknown_base_repository_is_limited() -> None:
-    """기준 저장소를 알 수 없는 연결 PR은 이 저장소 PR일 수 있어 LIMITED다."""
+    """기준 저장소를 알 수 없는(baseRepository null) 연결 PR은 이 저장소 PR일 수 있어 LIMITED다."""
     routes = relation_routes()
-    routes[commit_pulls_path(7)] = respond(
+    routes[associated_key(7)] = respond(
         [
             relation_pull_json(42, OTHER, base_repository=None),
             relation_pull_json(43, OTHER, base_repository="someone-else/other"),
         ]
     )
-    no_repo = relation_pull_json(44, OTHER)
-    del no_repo["base"]["repo"]
-    routes[commit_pulls_path(4)] = respond([no_repo])
+    routes[associated_key(4)] = respond(
+        [relation_pull_json(44, OTHER, base_repository=None)]
+    )
 
     outcome, _ = _run(routes)
     relations = _relations(outcome)
@@ -431,6 +549,8 @@ def test_lookup_with_unknown_base_repository_is_limited() -> None:
     assert outcome.completed
     assert _lookup(relations, 7) == AssociatedPulls(sha(7), Lookup.LIMITED, (), 1, 1)
     assert _lookup(relations, 4) == AssociatedPulls(sha(4), Lookup.LIMITED, (), 0, 1)
+    # 같은 묶음의 c5는 그대로 FOUND다.
+    assert _lookup(relations, 5) == AssociatedPulls(sha(5), Lookup.FOUND, (40,), 1)
     # 다른 저장소 기준으로 확인된 PR만 있으면 정상 부재다(기본 사례의 c7).
     outcome, _ = _run(relation_routes())
     assert _lookup(_relations(outcome), 7) == AssociatedPulls(
@@ -438,10 +558,35 @@ def test_lookup_with_unknown_base_repository_is_limited() -> None:
     )
 
 
+def test_lookup_pull_request_without_the_base_repository_field_fails_the_batch() -> (
+    None
+):
+    """연결 PR에 baseRepository 필드가 아예 없으면 모양 오류다(null과 다르다).
+
+    REST는 base.repo가 없어도 기준 저장소 모름(LIMITED)으로 봤다. 묶음 조회(#267)에서는 물은 필드가
+    빠진 응답이라 그 묶음을 하나도 쓰지 않고 수집 실패로 멈춘다.
+    """
+    data = _base_case_batch()
+    node = _commit_node(4, [relation_pull_json(44, OTHER)])
+    del node["associatedPullRequests"]["nodes"][0]["baseRepository"]
+    data["repository"]["c2"] = node
+    routes = relation_routes()
+    routes[LOOKUP_BATCH] = graphql_reply(data)
+
+    outcome, transport = _run(routes)
+    relations = _relations(outcome)
+
+    assert _codes(outcome) == [FailureCode.COLLECTION_FETCH_FAILED]
+    assert relations.stopped_during == "LOOKUPS"
+    assert transport.batches == [tuple(LOOKED_UP_SHAS)]
+    assert [(a.sha, a.status) for a in relations.associated] == _ALL_STOPPED
+    assert relations.pull_requests_from_lookups == ()
+
+
 def test_full_first_lookup_page_of_foreign_pull_requests_is_limited() -> None:
     """첫 쪽이 다른 저장소 PR로만 차도 다음 쪽이 있으면 이 저장소 PR이 남았을 수 있다."""
     routes = relation_routes()
-    routes[commit_pulls_path(7)] = respond(
+    routes[associated_key(7)] = respond(
         [
             relation_pull_json(100 + n, OTHER, base_repository="someone-else/other")
             for n in range(100)
@@ -453,29 +598,108 @@ def test_full_first_lookup_page_of_foreign_pull_requests_is_limited() -> None:
     relations = _relations(outcome)
 
     assert outcome.completed
-    assert not any(
-        path.endswith("/pulls?per_page=100&page=2") for path in transport.paths
-    )
+    # 다음 쪽을 묻는 POST가 없고, 다음 쪽 cursor를 묻지도 않는다.
+    assert transport.batches == [tuple(LOOKED_UP_SHAS)]
+    assert all(b"endCursor" not in (call.body or b"") for call in transport.calls)
     assert _lookup(relations, 7) == AssociatedPulls(sha(7), Lookup.LIMITED, (), 100)
     assert relations.pull_requests_from_lookups[0].number == 40
 
 
-def test_lookup_not_found_still_stops_collection() -> None:
+@pytest.mark.parametrize(
+    ("reply", "code"),
+    [
+        # POST 자체의 HTTP 404. 합성 상태 분류일 뿐 REST 404와 같은 뜻이라는 근거는 아니다.
+        (status_only(404), FailureCode.REPOSITORY_UNREACHABLE),
+        # 실제에 가까운 응답: GitHub GraphQL은 저장소를 찾지 못하면 HTTP 200에 NOT_FOUND 오류와
+        # repository null을 준다.
+        (
+            graphql_reply(
+                {"rateLimit": standard_rate_limit(), "repository": None},
+                errors=[
+                    {
+                        "type": "NOT_FOUND",
+                        "path": ["repository"],
+                        "message": "Could not resolve to a Repository with the name "
+                        f"'{OWNER}/{NAME}'.",
+                    }
+                ],
+            ),
+            FailureCode.COLLECTION_FETCH_FAILED,
+        ),
+    ],
+    ids=["http-404", "graphql-not-found"],
+)
+def test_lookup_not_found_still_stops_collection(
+    reply: Reply, code: FailureCode
+) -> None:
+    """연결 PR 조회가 저장소를 찾지 못하면 수집을 멈추고 묶음 전체가 NOT_REACHED다.
+
+    REST 연결 PR 조회의 404는 REPOSITORY_UNREACHABLE이었다. 실제에 가까운 GraphQL 응답(HTTP 200,
+    NOT_FOUND 오류)은 COLLECTION_FETCH_FAILED다. 이 차이는 2026-10-12 팀장 결정으로 받아들였다(#267).
+    같은 묶음의 c7도 NOT_REACHED다.
+    """
     routes = relation_routes()
-    routes[commit_pulls_path(5)] = status_only(404)
+    routes[LOOKUP_BATCH] = reply
 
-    outcome, _ = _run(routes)
+    outcome, transport = _run(routes)
+    relations = _relations(outcome)
 
-    assert _codes(outcome) == [FailureCode.REPOSITORY_UNREACHABLE]
-    assert _lookup(_relations(outcome), 5) == AssociatedPulls(
-        sha(5), Lookup.NOT_REACHED
+    assert _codes(outcome) == [code]
+    assert relations.stopped_during == "LOOKUPS"
+    assert transport.paths[-1] == LOOKUP_BATCH
+    assert [(a.sha, a.status) for a in relations.associated] == _ALL_STOPPED
+    # GitHub 오류 문구를 결과로 옮기지 않는다.
+    assert "Could not resolve" not in repr(outcome)
+
+
+@pytest.mark.parametrize(
+    ("size", "statuses", "outside"),
+    [
+        # 기본 묶음 크기: c7·c5·c4를 한 POST로 물어 셋 다 LIMITED다.
+        (100, [Lookup.LIMITED] * 3, ()),
+        # 묶음 크기 2: 첫 묶음(c7·c5)만 넘었고 다음 묶음(c4)은 그대로 묻는다.
+        (2, [Lookup.LIMITED, Lookup.LIMITED, Lookup.EMPTY], (sha(4),)),
+    ],
+    ids=["one-batch", "next-batch-continues"],
+)
+def test_oversized_lookup_batch_is_a_range_limit_for_every_commit_in_it(
+    size: int, statuses: list[Lookup], outside: tuple[str, ...]
+) -> None:
+    """응답 크기 상한을 넘은 묶음은 실패가 아니라 그 묶음 커밋 모두의 자료 범위 한계다.
+
+    나눠 다시 묻지 않고 다음 묶음으로 넘어간다. REST에서는 크기를 넘은 커밋(c7)만 LIMITED였고 같은
+    묶음이 된 c4는 EMPTY였다(#267).
+    """
+    routes = relation_routes()
+    routes[graphql_route(*LOOKED_UP[:size])] = oversized()
+
+    outcome, transport = _run(routes, limits=_batch_limits(size))
+    relations = _relations(outcome)
+
+    assert outcome.completed and outcome.failures == ()
+    # 크기를 넘은 묶음을 쪼개 다시 묻지 않는다.
+    assert transport.batches == [
+        tuple(LOOKED_UP_SHAS[start : start + size])
+        for start in range(0, len(LOOKED_UP), size)
+    ]
+    assert transport.looked_up == LOOKED_UP_SHAS
+    assert [(a.sha, a.status) for a in relations.associated] == list(
+        zip(LOOKED_UP_SHAS, statuses, strict=True)
     )
+    # PR 밖으로 확인되지 않은 커밋은 선택 1이 아니라 선택 2로 상세를 받는다.
+    assert relations.detail_tiers.outside_pull_requests == outside
+    # 크기를 넘은 묶음의 점수는 알 수 없는 것으로 센다(0점이 아니다).
+    assert outcome.graphql.calls == len(transport.batches)
+    assert outcome.graphql.unobserved_calls == 1
 
 
-def test_oversized_or_multi_page_lookup_is_a_range_limit() -> None:
+def test_lookup_with_more_than_a_page_is_a_range_limit_for_that_commit() -> None:
+    """연결 PR이 첫 100개보다 많은(다음 쪽이 있는) 커밋만 LIMITED다. 같은 묶음의 다른 커밋은 그대로다.
+
+    다음 쪽은 묻지 않는다. 받은 첫 쪽의 이 저장소 PR은 연결 PR 조회로만 안 PR로 남긴다.
+    """
     routes = relation_routes()
-    routes[commit_pulls_path(7)] = oversized()
-    routes[commit_pulls_path(5)] = respond(
+    routes[associated_key(5)] = respond(
         [relation_pull_json(100 + n, OTHER) for n in range(100)], next_page=True
     )
 
@@ -483,18 +707,19 @@ def test_oversized_or_multi_page_lookup_is_a_range_limit() -> None:
     relations = _relations(outcome)
 
     assert outcome.completed
-    # 둘째 쪽은 부르지 않는다.
-    assert not any(
-        path.endswith("/pulls?per_page=100&page=2") for path in transport.paths
+    assert transport.batches == [tuple(LOOKED_UP_SHAS)]
+    assert _lookup(relations, 5) == AssociatedPulls(
+        sha(5), Lookup.LIMITED, tuple(range(100, 200))
     )
-    statuses = {entry.sha: entry.status for entry in relations.associated}
-    assert statuses == {
-        sha(7): Lookup.LIMITED,
-        sha(5): Lookup.LIMITED,
-        sha(4): Lookup.EMPTY,
-    }
-    # PR 밖으로 확인되지 않았으므로 선택 1이 아니라 선택 2로 상세를 받는다.
-    assert relations.detail_tiers.outside_pull_requests == (sha(4),)
+    assert [(a.sha, a.status) for a in relations.associated] == [
+        (sha(7), Lookup.EMPTY),
+        (sha(5), Lookup.LIMITED),
+        (sha(4), Lookup.EMPTY),
+    ]
+    assert {pull.number for pull in relations.pull_requests_from_lookups} == set(
+        range(100, 200)
+    )
+    assert relations.detail_tiers.outside_pull_requests == (sha(7), sha(4))
 
 
 def test_detail_tiers_fetch_unit_first_then_outside_then_evidence_commits() -> None:
@@ -1138,11 +1363,36 @@ def test_oversized_compare_or_list_is_a_limit_not_a_failure() -> None:
 # 4. 멈춤: 계획한 조회는 NOT_REACHED, 실패는 하나, 연결은 닫힌다
 
 
+@pytest.mark.parametrize(
+    ("size", "max_calls", "sent", "statuses", "foreign"),
+    [
+        # 묶음 크기 1: 앞 묶음(c7)은 받은 대로 두고, 멈춘 묶음(c5)과 뒤 계획(c4)은 NOT_REACHED다.
+        (
+            1,
+            CALLS_BEFORE_LOOKUPS + 1,
+            [(7,)],
+            [Lookup.EMPTY, Lookup.NOT_REACHED, Lookup.NOT_REACHED],
+            1,
+        ),
+        # 기본 묶음 크기: 첫 POST 전에 멈추면 그 묶음 전체가 NOT_REACHED다.
+        (100, CALLS_BEFORE_LOOKUPS, [], [Lookup.NOT_REACHED] * 3, 0),
+    ],
+    ids=["after-first-batch", "before-the-batch"],
+)
 def test_call_limit_during_lookups_keeps_planned_targets_as_not_reached(
     caplog: pytest.LogCaptureFixture,
+    size: int,
+    max_calls: int,
+    sent: list[tuple[int, ...]],
+    statuses: list[Lookup],
+    foreign: int,
 ) -> None:
-    calls_before_lookups = 4 + len(PRECEDENCE)
-    limits = replace(PROPOSED_LIMITS, max_calls=calls_before_lookups + 1)
+    """연결 PR 조회 중 호출 상한에 걸리면 앞 묶음은 남기고 멈춘 묶음과 뒤 계획은 NOT_REACHED다.
+
+    REST는 커밋마다 호출 1회라 상한(목록 8 + 1)이 c7 조회 뒤에 걸렸다. 묶음 조회(#267)에서는 같은
+    상한이면 POST 하나로 조회가 끝나 멈추지 않으므로, 묶음 크기를 1로 줄여 같은 경계를 본다.
+    """
+    limits = _batch_limits(size, max_calls=max_calls)
 
     with caplog.at_level(logging.DEBUG, logger="app.collection"):
         outcome, transport = _run(relation_routes(), limits=limits)
@@ -1150,13 +1400,14 @@ def test_call_limit_during_lookups_keeps_planned_targets_as_not_reached(
 
     assert _codes(outcome) == [FailureCode.BUDGET_EXCEEDED]
     assert relations.stopped_during == "LOOKUPS"
-    assert transport.paths == RELATION_ORDER[: calls_before_lookups + 1]
-    assert transport.closed
-    assert [(a.sha, a.status) for a in relations.associated] == [
-        (sha(7), Lookup.EMPTY),
-        (sha(5), Lookup.NOT_REACHED),
-        (sha(4), Lookup.NOT_REACHED),
+    assert transport.paths == [
+        *RELATION_ORDER[:CALLS_BEFORE_LOOKUPS],
+        *(graphql_route(*batch) for batch in sent),
     ]
+    assert transport.closed
+    assert [(a.sha, a.status) for a in relations.associated] == list(
+        zip(LOOKED_UP_SHAS, statuses, strict=True)
+    )
     # 본인 커밋 상세는 확인 중단, 다른 계정 커밋은 원래 조회하지 않는다.
     for number in DETAILS:
         assert _commit_status(outcome, number) is DetailStatus.NOT_REACHED
@@ -1169,48 +1420,113 @@ def test_call_limit_during_lookups_keeps_planned_targets_as_not_reached(
     assert TOKEN not in repr(outcome)
     assert TOKEN not in caplog.text and REFERENCE not in caplog.text
     assert BASE not in caplog.text and sha(7) not in caplog.text
+    # 묶음 조회의 쿼리 문도 로그에 남기지 않는다.
+    assert "AssociatedPulls" not in caplog.text
     assert "관계 조회 종료" in caplog.text
-    # 다른 저장소를 기준으로 연 PR은 버리고 수만 남긴다(c7의 조회가 하나를 돌려줬다).
-    assert "foreignBaseIgnored=1" in caplog.text
+    # 다른 저장소를 기준으로 연 PR은 버리고 수만 남긴다(받은 c7의 결과가 하나를 돌려줬다).
+    assert f"foreignBaseIgnored={foreign}" in caplog.text
+    assert f"graphqlCalls={len(sent)}" in caplog.text
 
 
-def test_time_limit_during_lookups_is_a_failure() -> None:
-    calls_before_lookups = 4 + len(PRECEDENCE)
-    limits = replace(
-        PROPOSED_LIMITS,
-        max_collection_time=timedelta(seconds=(calls_before_lookups + 2) * 10),
-    )
+@pytest.mark.parametrize(
+    ("size", "calls", "statuses"),
+    [
+        # 묶음 크기 1: 둘째 묶음(c5)까지 받고 셋째 묶음(c4)을 보내기 전에 마감이다.
+        (
+            1,
+            CALLS_BEFORE_LOOKUPS + 2,
+            [Lookup.EMPTY, Lookup.FOUND, Lookup.NOT_REACHED],
+        ),
+        # 기본 묶음 크기: PR 커밋 목록을 다 받은 때 마감이라 POST를 보내지 않는다.
+        (100, CALLS_BEFORE_LOOKUPS, [Lookup.NOT_REACHED] * 3),
+    ],
+    ids=["after-second-batch", "before-the-batch"],
+)
+def test_time_limit_during_lookups_is_a_failure(
+    size: int, calls: int, statuses: list[Lookup]
+) -> None:
+    """REST는 커밋마다 호출해 c5 조회 뒤에 마감이 왔다. 묶음 조회(#267)는 같은 시간이면 POST 하나로
+    조회를 마치므로 묶음 크기를 1로 줄여 같은 경계를 본다(앞 묶음은 남고 뒤 계획은 NOT_REACHED)."""
+    limits = _batch_limits(size, max_collection_time=timedelta(seconds=calls * 10))
 
     outcome, transport = _run(relation_routes(), limits=limits, seconds_per_call=10)
     relations = _relations(outcome)
 
     assert _codes(outcome) == [FailureCode.TIME_LIMIT_EXCEEDED]
     assert relations.stopped_during == "LOOKUPS"
-    assert len(transport.calls) == calls_before_lookups + 2
-    assert [a.status for a in relations.associated] == [
-        Lookup.EMPTY,
-        Lookup.FOUND,
-        Lookup.NOT_REACHED,
-    ]
+    assert len(transport.calls) == calls
+    assert [a.status for a in relations.associated] == statuses
+    assert sha(4) not in transport.looked_up
 
 
-def test_rate_limit_on_a_lookup_stops_without_retry() -> None:
+@pytest.mark.parametrize(
+    ("size", "stopped", "reply", "statuses"),
+    [
+        (
+            100,
+            LOOKED_UP,
+            status_only(429, {"retry-after": "60"}),
+            [Lookup.NOT_REACHED] * 3,
+        ),
+        # GraphQL 1차 한도: HTTP 200에 RATE_LIMITED 오류.
+        (
+            100,
+            LOOKED_UP,
+            graphql_reply(
+                errors=[
+                    {
+                        "type": "RATE_LIMITED",
+                        "message": "API rate limit exceeded for user ID 1001.",
+                    }
+                ],
+            ),
+            [Lookup.NOT_REACHED] * 3,
+        ),
+        # 2차 한도: 한도 머리글 없이 403과 안내 문구만 온다.
+        (
+            100,
+            LOOKED_UP,
+            respond(
+                {
+                    "message": "You have exceeded a secondary rate limit. "
+                    "Please wait a few minutes before you try again."
+                },
+                status=403,
+            ),
+            [Lookup.NOT_REACHED] * 3,
+        ),
+        # 묶음 크기 1: 앞 묶음(c7)의 결과는 남는다.
+        (
+            1,
+            [5],
+            status_only(429, {"retry-after": "60"}),
+            [Lookup.EMPTY, Lookup.NOT_REACHED, Lookup.NOT_REACHED],
+        ),
+    ],
+    ids=["http-429", "graphql-rate-limited", "secondary-403", "second-batch-429"],
+)
+def test_rate_limit_on_a_lookup_stops_without_retry(
+    size: int, stopped: list[int], reply: Reply, statuses: list[Lookup]
+) -> None:
+    """한도 응답은 다시 묻지 않고 멈춘다. 묶음 조회(#267)에서는 그 묶음 전체가 NOT_REACHED다.
+
+    REST에서는 c5의 429 앞에 받은 c7이 EMPTY로 남았다. 같은 묶음이면 c7도 NOT_REACHED이고, 앞
+    묶음에서 받은 결과만 남는다.
+    """
     routes = relation_routes()
-    routes[commit_pulls_path(5)] = status_only(429, {"retry-after": "60"})
+    routes[graphql_route(*stopped)] = reply
 
-    outcome, transport = _run(routes)
+    outcome, transport = _run(routes, limits=_batch_limits(size))
     relations = _relations(outcome)
 
     assert _codes(outcome) == [FailureCode.RATE_LIMITED]
     assert relations.stopped_during == "LOOKUPS"
-    assert transport.paths[-1] == commit_pulls_path(5)
+    assert transport.paths[-1] == graphql_route(*stopped)
     assert set(Counter(transport.paths).values()) == {1}
+    # 멈춘 묶음까지만 묻고, 같은 커밋을 다시 묻지 않는다.
+    assert transport.looked_up == LOOKED_UP_SHAS[: LOOKED_UP.index(stopped[-1]) + 1]
     assert transport.closed
-    assert [a.status for a in relations.associated] == [
-        Lookup.EMPTY,
-        Lookup.NOT_REACHED,
-        Lookup.NOT_REACHED,
-    ]
+    assert [a.status for a in relations.associated] == statuses
 
 
 def test_stop_during_pull_request_lists_marks_unreached_lists() -> None:
@@ -1263,6 +1579,8 @@ def test_without_pull_request_permission_no_pull_request_calls_are_made() -> Non
 
     assert outcome.completed
     assert not any("/pulls" in path or "/compare/" in path for path in transport.paths)
+    # 연결 PR 묶음 조회(POST)도 PR 자료라 하지 않는다.
+    assert transport.batches == []
     assert transport.paths == [
         BASE,
         LISTED_COMMITS,
@@ -1288,6 +1606,8 @@ def test_without_commit_permission_pull_request_lists_are_still_read() -> None:
         LISTED_ISSUES,
         *(pull_commits_path(number) for number in PRECEDENCE),
     ]
+    # 커밋 조회가 허용되지 않으면 연결 PR 묶음 조회도 하지 않는다.
+    assert transport.batches == []
     assert outcome.commits == ()
     assert [r.sha for r in relations.commits] == [
         sha(21),
@@ -1492,8 +1812,8 @@ def _merge_routes(*, rooted: bool = False) -> dict[str, Reply]:
             ]
         ),
         LISTED_PULLS: respond([]),
-        commit_pulls_path(53): respond([]),
-        commit_pulls_path(50): respond([]),
+        associated_key(53): respond([]),
+        associated_key(50): respond([]),
         compare_path(51, 50, 1): respond(compare_json(3, 51, M50_BOUNDARY)),
         detail_path(53): detail_reply(53, MEMBER),
     }
@@ -1509,11 +1829,13 @@ def test_pr_less_merge_that_brought_outside_commits_is_looked_up() -> None:
         BASE,
         LISTED_COMMITS,
         LISTED_PULLS,
-        commit_pulls_path(53),
-        commit_pulls_path(50),
+        graphql_route(53),
+        graphql_route(50),
         compare_path(51, 50, 1),
         detail_path(53),
     ]
+    # 병합 후보(m50)는 커밋 묶음(c53)의 결과로 고르므로 두 단계를 한 묶음으로 합치지 않는다.
+    assert transport.batches == [(sha(53),), (sha(50),)]
     assert [(a.sha, a.status) for a in relations.associated] == [
         (sha(53), Lookup.EMPTY),
         (sha(50), Lookup.EMPTY),
@@ -1542,17 +1864,40 @@ def test_window_with_the_whole_history_needs_no_boundary_compare() -> None:
 def test_stop_before_merge_lookups_records_planned_merges() -> None:
     limits = replace(PROPOSED_LIMITS, max_calls=3)
 
-    outcome, _ = _run(
+    outcome, transport = _run(
         _merge_routes(), request_with("COMMIT", "PULL_REQUEST"), limits=limits
     )
     relations = _relations(outcome)
 
     assert _codes(outcome) == [FailureCode.BUDGET_EXCEEDED]
+    assert transport.batches == []
     assert [(a.sha, a.status) for a in relations.associated] == [
         (sha(53), Lookup.NOT_REACHED),
         (sha(50), Lookup.NOT_REACHED),
     ]
     # 계획한 경계 비교도 닿지 못한 것으로 남는다.
+    assert relations.merge_boundaries == (
+        MergeBoundary(sha(50), (), False, DetailStatus.NOT_REACHED),
+    )
+
+
+def test_stop_between_lookup_stages_keeps_the_first_stage() -> None:
+    """커밋 묶음(1단계)을 받은 뒤 병합 묶음(2단계) 전에 멈추면 1단계 결과는 남고 2단계는 NOT_REACHED다."""
+    limits = replace(PROPOSED_LIMITS, max_calls=4)
+
+    outcome, transport = _run(
+        _merge_routes(), request_with("COMMIT", "PULL_REQUEST"), limits=limits
+    )
+    relations = _relations(outcome)
+
+    assert _codes(outcome) == [FailureCode.BUDGET_EXCEEDED]
+    assert relations.stopped_during == "LOOKUPS"
+    assert transport.paths[-1] == graphql_route(53)
+    assert transport.batches == [(sha(53),)]
+    assert [(a.sha, a.status) for a in relations.associated] == [
+        (sha(53), Lookup.EMPTY),
+        (sha(50), Lookup.NOT_REACHED),
+    ]
     assert relations.merge_boundaries == (
         MergeBoundary(sha(50), (), False, DetailStatus.NOT_REACHED),
     )
@@ -1569,7 +1914,7 @@ def test_boundary_compare_counts_toward_the_call_limit() -> None:
 
     assert _codes(outcome) == [FailureCode.BUDGET_EXCEEDED]
     assert relations.stopped_during == "LOOKUPS"
-    assert transport.paths[-1] == commit_pulls_path(50)
+    assert transport.paths[-1] == graphql_route(50)
     assert compare_path(51, 50, 1) not in transport.paths
     assert relations.merge_boundaries == (
         MergeBoundary(sha(50), (), False, DetailStatus.NOT_REACHED),
@@ -1882,13 +2227,14 @@ def needed_routes() -> dict[str, Reply]:
         pull_commits_path(12): respond([graph_commit_json(21, MEMBER, parents=(2,))]),
         pull_commits_path(32): respond([graph_commit_json(33, MEMBER, parents=(2,))]),
         pull_commits_path(30): respond([graph_commit_json(31, OTHER, parents=(2,))]),
-        commit_pulls_path(8): respond([]),
+        associated_key(8): respond([]),
     }
     for number in NEEDED:
         routes[detail_path(number)] = detail_reply(number, MEMBER)
     return routes
 
 
+# 목록 4 + PR 커밋 목록 4 + 연결 PR 묶음 조회 POST 1(c8).
 NEEDED_CALLS_BEFORE_DETAILS = 4 + 4 + 1
 
 
@@ -1970,7 +2316,7 @@ def mode_routes() -> dict[str, Reply]:
         pull_commits_path(32): respond([graph_commit_json(33, MEMBER, parents=(2,))]),
         pull_commits_path(30): respond([graph_commit_json(31, OTHER, parents=(2,))]),
         pull_commits_path(12): respond([graph_commit_json(21, MEMBER, parents=(2,))]),
-        commit_pulls_path(8): respond([]),
+        associated_key(8): respond([]),
         detail_path(31): respond(_detail_with(31, "@@ -1 +1 @@\n-a\n+b", "b.py")),
         detail_path(33): respond(_detail_with(33, "@@ -1 +1 @@\n-a\n+c", "b.py")),
     }
@@ -1981,7 +2327,7 @@ def mode_routes() -> dict[str, Reply]:
     return routes
 
 
-# 목록 4 + PR 커밋 목록 3 + 연결 PR 조회 1(c8).
+# 목록 4 + PR 커밋 목록 3 + 연결 PR 묶음 조회 POST 1(c8).
 MODE_CALLS_BEFORE_DETAILS = 4 + 3 + 1
 MODE_DETAILS = [detail_path(n) for n in (31, 33, 21, 8)]
 
@@ -2016,7 +2362,15 @@ def test_mode_check_goes_only_to_related_pairs_with_the_same_content() -> None:
     ]
     accepts = [call.headers["Accept"] for call in transport.calls]
     assert accepts[-2:] == ["application/vnd.github.diff"] * 2
-    assert set(accepts[:-2]) == {"application/vnd.github+json"}
+    # 연결 PR 묶음 조회(POST)는 GraphQL JSON을 받고, 그 밖의 REST 조회는 JSON 형식이다.
+    assert {
+        accept
+        for call, accept in zip(transport.calls[:-2], accepts[:-2], strict=True)
+        if call.method == "GET"
+    } == {"application/vnd.github+json"}
+    assert [
+        call.headers["Accept"] for call in transport.calls if call.method == "POST"
+    ] == ["application/json"]
     assert _mode_checks(outcome) == [
         (sha(21), DetailStatus.FETCHED, True),
         (sha(8), DetailStatus.FETCHED, True),

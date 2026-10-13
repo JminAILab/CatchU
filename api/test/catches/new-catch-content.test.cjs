@@ -47,23 +47,27 @@ test('새 Catch는 입력에 공개·확인 값을 주입해도 미공개·미�
   assert.equal('catchId' in asset, false);
 });
 
-test('후보의 제목·설명·작업 키와 근거의 출처·한계를 변조하지 않는다', () => {
-  const input = candidate();
-  const result = prepareNewCatchContent(input, 'MOCK');
-  assert.equal(result.asset.title, input.title);
-  assert.equal(result.asset.draftContent, input.draft.content);
-  assert.equal(result.asset.workIdentity, input.workIdentity);
-  assert.equal(result.evidence[0].sourceEvidenceId, input.evidence[0].evidenceId);
-  assert.equal(result.evidence[0].sourceRevision, input.evidence[0].sourceRevision);
-  assert.deepEqual(result.evidence[0].coverageLimits, input.evidence[0].coverageLimits);
+test('후보의 null·문자열 제목과 설명·작업 키·근거의 출처·한계를 변조하지 않는다', () => {
+  for (const title of [null, candidate().title]) {
+    const input = { ...candidate(), title };
+    const result = prepareNewCatchContent(input, 'MOCK');
+    assert.equal(result.asset.title, title);
+    assert.equal(result.asset.draftStatus, 'GENERATED');
+    assert.equal(result.asset.draftContent, input.draft.content);
+    assert.equal(result.asset.workIdentity, input.workIdentity);
+    assert.equal(result.evidence[0].sourceEvidenceId, input.evidence[0].evidenceId);
+    assert.equal(result.evidence[0].sourceRevision, input.evidence[0].sourceRevision);
+    assert.deepEqual(result.evidence[0].coverageLimits, input.evidence[0].coverageLimits);
+  }
 });
 
 for (const status of ['FAILED', 'NOT_GENERATED']) {
   test(`초안·질문이 ${status}여도 내용을 꾸며 넣거나 근거를 버리지 않는다`, () => {
-    const input = candidate();
+    const input = { ...candidate(), title: null };
     input.draft = { status, content: null };
     input.reflection = { status, questions: [] };
     const { asset, evidence } = prepareNewCatchContent(input, 'MOCK');
+    assert.equal(asset.title, null);
     assert.equal(asset.draftStatus, status);
     assert.equal(asset.draftContent, null);
     assert.equal(asset.reflectionStatus, status);

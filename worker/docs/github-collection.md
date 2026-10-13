@@ -2,7 +2,7 @@
 
 > [worker README](../README.md)의 같은 이름 절을 #118에서 옮겼다. 옮기며 제목과 상대 링크를 고치고, 본인 커밋을 가리키는 '작성한'을 '작성자로 기록된'으로 바꿨다([결정 문서 「본인 기여의 뜻」](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#본인-기여의-뜻)). 끝에는 관계 조회 문서로 가는 절을 더했다. 이 문서는 #117의 수집이며, 관계 조회를 요청하지 않은 기본 경로의 동작이다. #118이 더한 관계 조회는 [관계 조회](relation-collection.md)에 있다.
 
-[#117](https://github.com/JminAILab/CatchU/issues/117)의 범위다. 검사를 통과한 요청(`CheckedRequest`) 하나의 허용 범위 안에서 GitHub 자료를 REST API로 모으고, 출처 주소·판본·관측 사실·기여 관측·한계를 가진 기록으로 정리해 후보 처리([#118](https://github.com/JminAILab/CatchU/issues/118))에 넘긴다. 저장소 복제·체크아웃·수집 자료 실행은 하지 않는다. 통제의 근거는 [수집 통제 문서](../../docs/CatchU_수집통제_임시자료.md)다.
+[#117](https://github.com/JminAILab/CatchU/issues/117)의 범위다. 검사를 통과한 요청(`CheckedRequest`) 하나의 허용 범위 안에서 GitHub 자료를 REST API로 모으고(관계 조회의 연결 PR 조회만 GraphQL 묶음 조회, [#267](https://github.com/JminAILab/CatchU/issues/267)), 출처 주소·판본·관측 사실·기여 관측·한계를 가진 기록으로 정리해 후보 처리([#118](https://github.com/JminAILab/CatchU/issues/118))에 넘긴다. 저장소 복제·체크아웃·수집 자료 실행은 하지 않는다. 통제의 근거는 [수집 통제 문서](../../docs/CatchU_수집통제_임시자료.md)다.
 
 후보·Catch·종결값은 만들지 않는다. 공개 HTTP 경로나 개발용 실행 명령 없이 `app.collection.collect` 함수로 부르며, 요청 수신부터 결과 전달까지의 LIVE 조립은 [#121](https://github.com/JminAILab/CatchU/issues/121)에서 한다.
 
@@ -13,7 +13,7 @@
 | 통제 | 동작 |
 |---|---|
 | 호스트·프로토콜 | 연결은 `https://api.github.com` 하나로만 연다. 요청은 경로만 받아 다른 호스트로 보낼 수 없다 |
-| 주소 | 검사한 저장소 좌표·SHA·번호와 경로 틀로 F가 만든다. 응답의 `url`·Link 헤더의 next 주소·본문 속 주소는 부르지 않고, 쪽 번호만 F가 올린다 |
+| 주소 | 검사한 저장소 좌표·SHA·번호와 경로 틀로 F가 만든다. 응답의 `url`·Link 헤더의 next 주소·본문 속 주소는 부르지 않고, 쪽 번호만 F가 올린다. 관계 조회의 연결 PR 조회는 고정 주소 `POST /graphql`에 F의 쿼리 틀을 쓰고 검사한 좌표·SHA는 변수로만 넘긴다([연결 PR 묶음 조회](associated-pr-lookup.md)) |
 | 우회 이동 | 따라가지 않고 수집 실패로 멈춘다 |
 | 다른 저장소 | 포크 원본·다른 저장소 참조를 따라가지 않는다. 응답이 요청한 저장소가 아니면 멈춘다 |
 | 공개 저장소 | 저장소 확인 응답의 `private`(GitHub 응답의 필수 항목)가 false이고, `visibility`가 있으면 그것도 public일 때만 목록을 부른다. 토큰으로 접근되더라도 비공개면 실패 `REPOSITORY_UNREACHABLE`, 공개 여부를 읽을 수 없으면 실패 `COLLECTION_FETCH_FAILED`로 멈춘다. 수집 시작 때 한 번 확인하며, 수집 중 공개 여부 변경은 감시하지 않는다 |
@@ -28,7 +28,7 @@
 
 | 상한 | 제안값 | 넘으면 |
 |---|---|---|
-| 요청당 GitHub 호출 | 300회 | 실패 `BUDGET_EXCEEDED` |
+| 요청당 GitHub 호출 | 300회. 실제 HTTP 요청 수로 센다(REST 1회, GraphQL 묶음 요청 1회. GraphQL 점수는 더하지 않고 따로 기록) | 실패 `BUDGET_EXCEEDED` |
 | 요청당 수집 총량 | 50MB | 실패 `BUDGET_EXCEEDED` |
 | 수집 시간(시작 시각 하나 기준) | 10분 | 실패 `TIME_LIMIT_EXCEEDED` |
 | 단일 호출 대기 | 연결 5초·응답 15초. 응답은 연결 뒤 이 시간 안에 머리글·본문을 다 받아야 한다. 연결·응답 대기를 각각 남은 수집 시간보다 길게 잡지 않고, 수집 마감 뒤에 끝난 호출의 응답은 쓰지 않는다 | 실패 `COLLECTION_FETCH_FAILED`(수집 마감에 걸렸으면 `TIME_LIMIT_EXCEEDED`) |
@@ -47,7 +47,7 @@ A의 실제 조회 지점은 아직 없다([#133](https://github.com/JminAILab/C
 `tests/test_collection_*.py`는 합성 GitHub 응답(`tests/github_synthetic.py`)·자격정보 대역·가짜 시계로 네트워크 없이 돈다. 전송 코드는 가짜 연결과 이 컴퓨터 안(127.0.0.1)의 시험 서버로만 확인했다. **실제 GitHub·A 연결, TLS, 실제 환경의 나가는 방향 제한은 검증하지 않았다.** 실제 연결에서 확인할 것:
 
 - A 자격정보 인계로 실제 요청 하나를 끝까지 수집하고, 대상 저장소 밖 호출이 거부되는지([#37](https://github.com/JminAILab/CatchU/issues/37) C05, 실제 환경)
-- 호출 한도 수치와 429·403 응답 머리글(머리글 없는 보조 한도 403은 본문의 "rate limit" 문구로 판별한다), 큰 커밋의 파일 목록 나눔·변경 내용 생략 조건, 빈 저장소의 커밋 목록 응답 문구(합성 응답은 [Octokit 안내서](https://github.com/octokit/handbook#some-list-endpoint-respond-with-204-or-409-if-the-repository-is-empty)의 409 예시를 따랐다), 저장소 응답의 `private`·`visibility` 값
+- 호출 한도 수치와 429·403 응답 머리글(머리글 없는 보조 한도 403은 본문의 "rate limit" 문구로 판별한다. GraphQL의 200·403 한도 오류 판별은 [연결 PR 묶음 조회](associated-pr-lookup.md#결과와-실패)), 큰 커밋의 파일 목록 나눔·변경 내용 생략 조건, 빈 저장소의 커밋 목록 응답 문구(합성 응답은 [Octokit 안내서](https://github.com/octokit/handbook#some-list-endpoint-respond-with-204-or-409-if-the-repository-is-empty)의 409 예시를 따랐다), 저장소 응답의 `private`·`visibility` 값
 - 제안 상한값의 실측(호출 수·시간·총량·조회 개수·상세 조회 개수)
 
 ## 관계 조회(#118)

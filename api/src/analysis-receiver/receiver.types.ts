@@ -26,7 +26,7 @@ export interface ProcessingEvent {
 
 export interface Candidate {
   candidateId: string;
-  title: string;
+  title: string | null;
   workIdentity: string;
   workFacts: string[];
   subjectContribution: string;

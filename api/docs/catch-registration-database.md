@@ -19,6 +19,8 @@ B 엔티티는 [`src/catches/entities`](../src/catches/entities), 마이그레�
 단수 snake_case 테이블/컬럼, 앱 발급 UUID, 외부 ID text, 배열 text[], 판단 jsonb,
 enum varchar+CHECK를 사용한다. 공통 DB 규약과 동일한 TypeORM 1.1.1·pg 8.23.0을 고정했다.
 
+제목 `null` 허용은 [`AllowNullCatchTitle1791784385918`](../src/database/migrations/1791784385918-AllowNullCatchTitle.ts)을 추가 적용한다. 기존 제목과 빈 문자열 거부 CHECK는 보존한다. `down`은 NOT NULL을 복원하므로 `null` 행이 있으면 실패하며, 제목을 임의로 채우거나 자료를 지우지 않는다. 해당 자료의 처리 방침을 정하기 전에는 되돌리지 않는다.
+
 B 마이그레이션은 E 수신 테이블을 포함한 선행 테이블이 없으면 실패한다.
 가짜 제품 테이블을 만들거나 FK를 생략하지 않는다.
 down은 보호 판단→후보 연결→근거→Catch 순서이며 A/E 테이블을 지우지 않는다.

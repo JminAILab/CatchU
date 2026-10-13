@@ -1,3 +1,5 @@
+import { isDevelopmentOrTest } from '../common/node-env';
+
 export interface AuthConfig {
   signingKey: Uint8Array;
   accessTokenTtlSeconds: number;
@@ -23,7 +25,6 @@ export function readAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig
   return {
     signingKey: Buffer.from(secret, 'hex'),
     accessTokenTtlSeconds: seconds,
-    devLoginEnabled: env.DEV_LOGIN_ENABLED === 'true' &&
-      (env.NODE_ENV === 'development' || env.NODE_ENV === 'test'),
+    devLoginEnabled: env.DEV_LOGIN_ENABLED === 'true' && isDevelopmentOrTest(env),
   };
 }

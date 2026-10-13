@@ -24,7 +24,7 @@ export interface Reflection {
 
 export interface CatchAsset {
   readonly catchId: string;
-  readonly title: string;
+  readonly title: string | null;
   readonly repositoryId: string;
   readonly sourceRequestId: string;
   readonly sourceResultId: string;

@@ -1,4 +1,5 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { isDevelopmentOrTest } from '../common/node-env';
 import { AnalysisReceiver, ReceiverStorageError } from './analysis-receiver.service';
 import { ReceiverStore, RequestContext } from './receiver.types';
 
@@ -6,8 +7,7 @@ export interface DevInjectionConfig { enabled: boolean }
 
 export function readDevInjectionConfig(env: NodeJS.ProcessEnv = process.env): DevInjectionConfig {
   return {
-    enabled: env.DEV_ANALYSIS_INJECTION_ENABLED === 'true' &&
-      (env.NODE_ENV === 'development' || env.NODE_ENV === 'test'),
+    enabled: env.DEV_ANALYSIS_INJECTION_ENABLED === 'true' && isDevelopmentOrTest(env),
   };
 }
 

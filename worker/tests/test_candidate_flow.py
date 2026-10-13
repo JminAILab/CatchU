@@ -146,6 +146,7 @@ def run_outcome(kind: str) -> CaseRun:
             )
         )
     assert kind == "FAILED"
+    # 호출마다 10초. 목록 넷(40초)을 받은 뒤 ffff를 묻는 연결 PR 묶음 조회 POST 전에 시간 상한에 닿는다.
     return run_case(
         open_pull_with_direct_commit(lookup=(), with_pull=False),
         limits=CollectionLimits(max_collection_time=timedelta(seconds=40)),
@@ -366,6 +367,15 @@ def test_token_and_repository_text_stay_out_of_result_and_logs(
         assert marker not in text
         assert marker not in caplog.text
     assert TOKEN not in caplog.text
+    # 토큰은 Authorization 머리글에만 싣는다. 경로·다른 머리글·연결 PR 묶음 조회 본문에는 없다.
+    posted = [call for call in run.transport.calls if call.method == "POST"]
+    assert bool(posted) == (kind in ("SUCCEEDED", "PARTIAL_FAILED"))
+    for call in run.transport.calls:
+        assert TOKEN not in call.path
+        assert call.headers["Authorization"] == f"Bearer {TOKEN}"
+        others = [v for k, v in call.headers.items() if k != "Authorization"]
+        assert all(TOKEN not in value for value in others)
+        assert call.body is None or TOKEN.encode() not in call.body
 
 
 def _decision_log(caplog: pytest.LogCaptureFixture) -> str:
@@ -398,6 +408,8 @@ def test_hold_log_has_counts_only(
             limits=CollectionLimits(max_calls=5),
         )
 
+    # C16은 ffff 하나를 연결 PR 묶음 조회로 묻는다. C27은 그 POST를 보내기 전에 호출 수 상한에 걸린다.
+    assert run.transport.batches == ([(named("f"),)] if kind == "C16" else [])
     line = _decision_log(caplog)
     # 조회 완료 뒤 보류(C16)와 확인 중단 보류(C27~C29)를 나눠 건수만 남긴다.
     assert f"requestId={LIVE.request_id}" in line
