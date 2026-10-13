@@ -23,7 +23,7 @@ const issued = (overrides = {}) => ({ accountLogin: 'real-test-user', externalAc
   token: new GitHubAccessToken(FAKE_TOKEN), expiresAt: new Date(Date.now() + 1800000), ...overrides });
 before(async () => {
   directory = await mkdtemp(join(tmpdir(), 'catchu-231-vault-test-'));
-  settings = { AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '300',
+  settings = { AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
     DEV_LOGIN_ENABLED: 'true', NODE_ENV: 'test', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
     GITHUB_CONNECTION_ENABLED: 'true', GITHUB_OAUTH_CLIENT_ID: 'fake-client', GITHUB_OAUTH_CLIENT_SECRET: 'FAKE_SECRET',
     GITHUB_OAUTH_CALLBACK_URL: 'http://localhost:3000/github/callback',
@@ -382,12 +382,15 @@ test('입력 추가 필드·다른 회원 입력·잘못된 code/state·쿼리�
     assert.equal((await call(a.token, method, path, body)).body.code, 'VALIDATION_FAILED');
   }
 });
-test('없는·비활성 회원은 기존 404로 거부', async () => {
+test('없는·비활성 회원은 공통 세션 Guard에서 401, GitHub 서비스에서 404로 거부', async () => {
   const { MemberAccount } = require('../../dist/member-analysis/member-analysis.entity');
   const a = await login(); await db.manager.update(MemberAccount, { memberId: a.memberId }, { accountState: 'INACTIVE' });
-  assert.equal((await authorize(a.token)).status, 404);
+  assert.equal((await authorize(a.token)).status, 401);
+  await assert.rejects(service.authorize(a.memberId), { code: 'RESOURCE_UNAVAILABLE' });
   const now = Math.floor(Date.now() / 1000);
-  const token = await new SignJWT({ sub: randomUUID(), iss: 'catchu-api', aud: 'catchu-member-api', iat: now, exp: now + 300 })
+  const missingMemberId = randomUUID();
+  const token = await new SignJWT({ sub: missingMemberId, iss: 'catchu-api', aud: 'catchu-member-api', iat: now, exp: now + 900 })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' }).sign(Buffer.from(settings.AUTH_JWT_SECRET, 'hex'));
-  assert.equal((await authorize(token)).status, 404);
+  assert.equal((await authorize(token)).status, 401);
+  await assert.rejects(service.authorize(missingMemberId), { code: 'RESOURCE_UNAVAILABLE' });
 });
