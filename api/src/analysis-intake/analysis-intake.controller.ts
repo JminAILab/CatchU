@@ -2,15 +2,14 @@ import { Body, Controller, Get, Headers, Post, Query, Res } from '@nestjs/common
 import { CurrentMemberId } from '../auth/auth.decorators';
 import { ApiError } from '../common/errors';
 import { AnalysisIntakeService } from './analysis-intake.service';
-import { AnalysisNoticeService } from './analysis-notice';
 
 @Controller()
 export class AnalysisIntakeController {
-  constructor(private readonly intake: AnalysisIntakeService, private readonly notices: AnalysisNoticeService) {}
+  constructor(private readonly intake: AnalysisIntakeService) {}
   @Get('analysis-notice')
-  notice(@Query() query: Record<string, unknown>) {
+  notice(@CurrentMemberId() memberId: string, @Query() query: Record<string, unknown>) {
     if (Object.keys(query).length) throw new ApiError('VALIDATION_FAILED');
-    return this.notices.current();
+    return this.intake.notice(memberId);
   }
   @Post('analysis-requests')
   async create(@CurrentMemberId() memberId: string, @Headers('idempotency-key') key: string | undefined,

@@ -33,7 +33,15 @@ export async function readAnalysisStatus(manager: EntityManager, memberId: strin
   const receipt = await manager.findOneBy(ResultApplicationRecord, { requestId, attemptId: attempt.attemptId });
   // 기존 E가 검증·저장한 Result와 FAILED 정본도 확정 근거다. 수신 ACK만으로는 허용하지 않고 APPLIED/CLOSED를 요구한다.
   const confirmation = attempt.failureConfirmationReference || (receipt ? 'received-result:' + receipt.resultId : null);
-  const retry = retryDecision(request, attempt, Math.max(registrations.length, count), confirmation);
+  let retry = retryDecision(request, attempt, Math.max(registrations.length, count), confirmation);
+  if (retry.allowed) {
+    const active = await manager.findOneBy(AnalysisRequest, { memberId, lifecycle: 'ACTIVE' });
+    const latest = await manager.findOne(AnalysisRequest, { where: { memberId, repositoryId: request.repositoryId },
+      order: { submittedAt: 'DESC', requestId: 'DESC' } });
+    // 이전 실패 키의 재응답도 현재 접수 판정과 같아야 한다. 이미 새 요청을 만든 실패를 다시 허용하지 않는다.
+    if (active) retry = { allowed: false, reason: 'IN_PROGRESS' };
+    else if (latest?.requestId !== requestId) retry = { allowed: false, reason: 'REANALYSIS_DEFERRED' };
+  }
   const status = {
     requestId: request.requestId, repositoryId: request.repositoryId, consentId: request.consentId,
     attemptId: attempt.attemptId, submittedAt: request.submittedAt.toISOString(), updatedAt: request.updatedAt.toISOString(),

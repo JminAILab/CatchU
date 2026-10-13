@@ -17,6 +17,13 @@ export class AnalysisIntakeService {
   constructor(private readonly database: DataSource, private readonly connections: DevMemberService,
     private readonly notices: AnalysisNoticeService) {}
 
+  async notice(memberId: string) {
+    const notice = this.notices.current();
+    const connection = await this.connections.readConnection(memberId);
+    if (connection.sourceMode !== 'MOCK') throw new ApiError('CONSENT_REQUIRED');
+    return notice;
+  }
+
   private async context(manager: EntityManager, memberId: string, input: AnalysisInput) {
     const connection = await this.connections.readConnection(memberId, manager);
     if (connection.connectionState === 'DISCONNECTED' || connection.connectionState === 'REAUTH_REQUIRED') throw new ApiError('GITHUB_CONNECTION_REQUIRED');

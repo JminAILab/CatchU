@@ -185,7 +185,15 @@ test('실제 자료용 설정 부재·LIVE 공급에 합성 고지를 대신 쓰
   const s=await start(t); const u=await s.login();
   const original=s.provider.readConnection.bind(s.provider);
   s.provider.readConnection=async(member,manager)=>({...await original(member,manager),sourceMode:'LIVE'});
+  await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}}),403,'CONSENT_REQUIRED');
   await error(await s.post(u),403,'CONSENT_REQUIRED');
+  assert.equal((await counts()).requests,0);
+});
+test('개발 플래그가 켜져도 일반 회원에게 합성 고지를 대신 제공하지 않는다',async t=>{
+  const s=await start(t);const u=await s.login();
+  await db.query('UPDATE member_account SET identity_reference=$1 WHERE member_id=$2',['catchu:google:synthetic-test',u.memberId]);
+  await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}}),403,'INTERNAL_ERROR');
+  await error(await s.post(u),403,'INTERNAL_ERROR');
   assert.equal((await counts()).requests,0);
 });
 for(const overrides of [{DEV_LOGIN_ENABLED:'false'},{NODE_ENV:'production'},{NODE_ENV:undefined},{NODE_ENV:'preview'}]){
@@ -221,7 +229,11 @@ test('확정 실패만 새 동의·ID로 재요청하고 같은 키는 현재 �
   assert.equal((await db.manager.findOneByOrFail(AnalysisRequest,{requestId:next.requestId})).retryOfRequestId,first.requestId);
   assert.equal((await db.manager.findOneByOrFail(AnalysisConsent,{consentId:first.consentId})).requestId,first.requestId);
   const replay=await s.post(u,key,body);assert.equal(replay.status,200);assert.equal((await replay.json()).requestId,next.requestId);
-  const old=await s.post(u,originalKey);assert.equal(old.status,200);assert.equal((await old.json()).retry.allowed,true);
+  const old=await s.post(u,originalKey);assert.equal(old.status,200);
+  assert.deepEqual((await old.json()).retry,{allowed:false,reason:'IN_PROGRESS'});
+  await terminal(next.requestId,'EMPTY');
+  const outdated=await s.post(u,originalKey);assert.equal(outdated.status,200);
+  assert.deepEqual((await outdated.json()).retry,{allowed:false,reason:'REANALYSIS_DEFERRED'});
 });
 for(const processing of ['EMPTY','SUCCEEDED','PARTIAL_FAILED']){
   test('정상·정상 0건·부분 결과의 재분석 및 참조 생략 우회 거부: '+processing,async t=>{
