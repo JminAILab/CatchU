@@ -21,7 +21,7 @@ This project uses AI-DLC (AI-Driven Development Life Cycle) for structured devel
 - **Locking**: Audit log file locking is handled portably using mkdir-based locking in the system temp directory (no external dependencies).
 - **Hook permissions**: Framework hooks run through the self-contained `aidlc` binary. No separate script runtime or executable bits are required.
 After copying the project shell, approve its hooks when Claude Code prompts or through `/hooks`, then fully restart Claude Code; `/clear` is not enough. Organization-managed policy can block project hooks, and `/aidlc --doctor` detects the supported managed-policy restriction.
-- **Settings**: CatchU는 프로젝트 편집과 AI-DLC 조회·엔진 명령을 기본 허용하지만, `.claude/settings.json`의 `deny`·`ask`가 우선합니다. PowerShell 도구는 거부하고 센서·어댑터·동적 statusline의 직접 호출은 승인을 요구합니다. 자동 린터가 실행됐다고 가정하지 말고 실제 검사 결과를 확인합니다.
+- **Settings**: CatchU는 프로젝트 편집과 AI-DLC 조회·엔진 명령을 기본 허용하지만, `.claude/settings.json`의 `deny`·`ask`가 우선합니다. PowerShell 도구는 거부하고 센서·어댑터·동적 statusline·bolt·swarm 호출은 승인을 요구합니다. 자동 린터가 실행됐다고 가정하지 말고 실제 검사 결과를 확인합니다.
 - **Personal overrides**: Copy `.claude/settings.local.json.example` to `.claude/settings.local.json` (gitignored) to override the model or set environment variables without affecting shared settings.
 
 ## AI-DLC Structure

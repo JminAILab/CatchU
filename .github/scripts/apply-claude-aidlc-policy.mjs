@@ -11,7 +11,7 @@ if (args.length > 1 || args.some((arg) => !['--check', '--prepare-refresh'].incl
 const onboardingPatches = [
   {
     "before": "- **Settings**: `.claude/settings.json` pre-approves the framework's own work (file edits inside the project, Task, WebSearch, and the bun .claude/tools/ engine commands) so workflows run without per-call permission prompts; a project's own build or test commands prompt once.",
-    "after": "- **Settings**: CatchU는 프로젝트 편집과 AI-DLC 조회·엔진 명령을 기본 허용하지만, `.claude/settings.json`의 `deny`·`ask`가 우선합니다. PowerShell 도구는 거부하고 센서·어댑터·동적 statusline의 직접 호출은 승인을 요구합니다. 자동 린터가 실행됐다고 가정하지 말고 실제 검사 결과를 확인합니다."
+    "after": "- **Settings**: CatchU는 프로젝트 편집과 AI-DLC 조회·엔진 명령을 기본 허용하지만, `.claude/settings.json`의 `deny`·`ask`가 우선합니다. PowerShell 도구는 거부하고 센서·어댑터·동적 statusline·bolt·swarm 호출은 승인을 요구합니다. 자동 린터가 실행됐다고 가정하지 말고 실제 검사 결과를 확인합니다."
   },
   {
     "before": "- **Sensors**: `.claude/sensors/`: automatic checks that run on matching writes or once per existing deliverable at the approval gate. Gate-fired sensors may be advisory or blocking; blocking failures require an explicit audited override before the gate opens. Ships with framework defaults (`aidlc-claim-sources.md`, `aidlc-required-sections.md`, `aidlc-upstream-coverage.md`, `aidlc-traceability.md`, `aidlc-linter.md`, `aidlc-type-check.md`); forks may add custom `aidlc-<id>.md` manifests. Stages declare which sensors fire via the frontmatter `sensors: [<id>]` list — a pull import resolved at compile time.",
@@ -64,6 +64,8 @@ append('ask', [
   'Bash(aidlc engine adapter *)',
   'Bash(aidlc engine statusline*)',
   'Bash(aidlc engine hook statusline*)',
+  'Bash(aidlc engine bolt *)',
+  'Bash(aidlc engine swarm *)',
 ]);
 // 셸 builtin의 고정 문자열만 출력한다. 저장소 소유 statusline 모듈을 실행하지 않는다.
 settings.statusLine = { ...settings.statusLine, type: 'command', command: "printf '%s' 'AI-DLC status: /aidlc --status'" };

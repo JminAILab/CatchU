@@ -61,7 +61,9 @@
       "Bash(aidlc engine __sensor-script-file *)",
       "Bash(aidlc engine adapter *)",
       "Bash(aidlc engine statusline*)",
-      "Bash(aidlc engine hook statusline*)"
+      "Bash(aidlc engine hook statusline*)",
+      "Bash(aidlc engine bolt *)",
+      "Bash(aidlc engine swarm *)"
     ]
   },
   "statusLine": {
