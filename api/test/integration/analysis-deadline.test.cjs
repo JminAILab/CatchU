@@ -84,26 +84,19 @@ async function waitUntilBlocked(holders, except = []) {
   }
   assert.fail(`${holders.join(',')}에 막힌 연결이 생기지 않았다`);
 }
-// 다른 연결이 요청 행을 잠근 동안 first가 먼저 줄을 선 것을 확인하고 second를 세운 뒤 풀어 준다.
-// PostgreSQL은 같은 행을 기다린 순서대로 넘겨주므로 겹친 상태에서 순서를 정해 시험할 수 있다.
-async function contend(requestId, first, second) {
+// 다른 연결이 행 하나를 잠가 둔다. 시도 행을 잡아 두면 요청을 먼저 잠근 작업이 그 시도에서 기다리므로,
+// 누가 요청을 먼저 잡았는지 정한 채 두 작업을 겹치게 할 수 있다.
+async function hold(table, column, id) {
   const runner = db.createQueryRunner();
   await runner.connect();
   await runner.startTransaction();
-  try {
-    const [{ pid: holder }] = await runner.query('SELECT pg_backend_pid() AS pid');
-    await runner.query('SELECT 1 FROM analysis_request WHERE request_id = $1 FOR UPDATE', [requestId]);
-    const firstDone = first().then(value => ({ status: 'fulfilled', value }), reason => ({ status: 'rejected', reason }));
-    const firstPid = await waitUntilBlocked([holder]);
-    const secondDone = second().then(value => ({ status: 'fulfilled', value }), reason => ({ status: 'rejected', reason }));
-    await waitUntilBlocked([holder, firstPid], [firstPid]);
-    await runner.commitTransaction();
-    return await Promise.all([firstDone, secondDone]);
-  } finally {
-    if (runner.isTransactionActive) await runner.rollbackTransaction();
-    await runner.release();
-  }
+  const [{ pid }] = await runner.query('SELECT pg_backend_pid() AS pid');
+  await runner.query(`SELECT 1 FROM ${table} WHERE ${column} = $1 FOR UPDATE`, [id]);
+  return { pid, release: async () => { try { await runner.commitTransaction(); } finally { await runner.release(); } } };
 }
+const settle = promise => promise.then(value => ({ status: 'fulfilled', value }), reason => ({ status: 'rejected', reason }));
+// 잠금을 기다리지 않고 끝나는지 본다.
+const within = (promise, ms) => Promise.race([promise, sleep(ms).then(() => { throw new Error(`${ms}ms 안에 끝나지 않았다`); })]);
 
 test('시한을 넘긴 대기·실행 중·실행 불명 요청은 실패로 닫히고 재요청 조건을 갖춘다', async () => {
   for (const processing of ['QUEUED', 'RUNNING', 'UNCERTAIN']) {
@@ -207,82 +200,134 @@ test('반영이 먼저 끝나 닫힌 요청은 시한 판정이 바꾸지 않는
   assert.equal((await counts()).catches, applied.registeredCatchIds.length);
 });
 
-test('닫기와 반영이 겹치면 먼저 잠근 쪽 하나만 남는다', async () => {
-  for (const closeFirst of [true, false]) {
-    const result = await prepare();
-    const received = await pipeline().receiver.receiveResult(result);
-    const close = () => deadline().service.closeOverdue();
-    const apply = () => applier(result).apply(received.accepted);
-    const settled = await contend(result.requestId, ...(closeFirst ? [close, apply] : [apply, close]));
-    const [closing, applying] = closeFirst ? settled : settled.reverse();
-    assert.equal(closing.status, 'fulfilled');
-    const { request, attempt } = await stored(result);
-    const { catches, registrations } = await counts();
-    assert.equal(request.lifecycle, 'CLOSED');
-    if (closeFirst) {
-      // 닫기가 먼저: 반영 대기 결과는 반영하지 않고 반영 실패로 닫힌다.
-      assert.equal(applying.status, 'rejected');
-      assert.ok(applying.reason instanceof ResultApplicationContextError);
-      assert.deepEqual(closing.value, { closed: 1, failed: 0 });
-      assert.equal(attempt.application, 'APPLY_FAILED');
-      assert.deepEqual(attempt.failures, [...result.failures, APPLICATION]);
-      assert.deepEqual({ catches, registrations }, { catches: 0, registrations: 0 });
-    } else {
-      // 반영이 먼저: 닫기는 잠근 뒤 CLOSED를 보고 바꾸지 않는다.
-      assert.equal(applying.status, 'fulfilled');
-      assert.deepEqual(closing.value, { closed: 0, failed: 0 });
-      assert.equal(attempt.application, 'APPLIED');
-      assert.deepEqual(attempt.failures, result.failures);
-      assert.ok(catches > 0);
-      assert.equal(catches, applying.value.registeredCatchIds.length);
-    }
-    await resetTestDatabase(db);
+test('다른 작업이 오래 잠근 요청은 건너뛰고 나머지를 닫으며, 풀린 뒤 다음 판정에서 닫는다', async () => {
+  const locked = await prepare({ processing: 'RUNNING' });
+  const others = [await prepare(), await prepare({ processing: 'UNCERTAIN' })];
+  const lock = await hold('analysis_request', 'request_id', locked.requestId);
+  try {
+    assert.deepEqual(await within(deadline().service.closeOverdue(), 2000), { closed: 2, failed: 0 });
+    assert.equal((await stored(locked)).request.lifecycle, 'ACTIVE');
+    for (const other of others) assert.equal((await stored(other)).request.lifecycle, 'CLOSED');
+  } finally {
+    await lock.release();
   }
+  assert.deepEqual(await deadline().service.closeOverdue(), { closed: 1, failed: 0 });
+  assert.deepEqual((await stored(locked)).attempt.failures, [DISPATCH]);
 });
 
-test('닫기와 결과 수신이 겹치면 한쪽 결과만 남고, 닫기가 먼저면 결과는 PAYLOAD_CONFLICT다', async () => {
-  for (const closeFirst of [true, false]) {
-    const result = await prepare();
-    const close = () => deadline().service.closeOverdue();
-    const receive = () => pipeline().receiver.receiveResult(result);
-    const settled = await contend(result.requestId, ...(closeFirst ? [close, receive] : [receive, close]));
-    const [closing, receiving] = closeFirst ? settled : settled.reverse();
-    assert.equal(closing.status, 'fulfilled');
-    assert.equal(receiving.status, 'fulfilled');
-    assert.deepEqual(closing.value, { closed: 1, failed: 0 });
-    const { request, attempt } = await stored(result);
-    assert.equal(request.lifecycle, 'CLOSED');
-    if (closeFirst) {
-      assert.equal(receiving.value.receipt.code, 'PAYLOAD_CONFLICT');
-      assert.equal(attempt.processing, 'FAILED');
-      assert.equal(attempt.application, 'APPLIED');
-      assert.deepEqual(attempt.failures, [DISPATCH]);
-      assert.equal((await counts()).receipts, 0);
-    } else {
-      // 수신이 먼저: 받은 결과는 반영 대기이므로 처리 결과를 유지한 채 반영 실패로 닫힌다.
-      assert.equal(receiving.value.receipt.disposition, 'ACCEPTED');
-      assert.equal(attempt.processing, result.outcome);
-      assert.equal(attempt.application, 'APPLY_FAILED');
-      assert.deepEqual(attempt.failures, [...result.failures, APPLICATION]);
-      assert.equal((await counts()).receipts, 1);
-    }
-    assert.equal((await counts()).catches, 0);
-    await resetTestDatabase(db);
+test('닫기가 요청을 먼저 잡으면 겹친 반영은 거부되고 반영 실패로 닫힌다', async () => {
+  const result = await prepare();
+  const received = await pipeline().receiver.receiveResult(result);
+  const lock = await hold('analysis_attempt', 'attempt_id', result.attemptId);
+  let closing;
+  let applying;
+  try {
+    closing = settle(deadline().service.closeOverdue());
+    const closer = await waitUntilBlocked([lock.pid]);
+    applying = settle(applier(result).apply(received.accepted));
+    await waitUntilBlocked([lock.pid, closer], [closer]);
+  } finally {
+    await lock.release();
   }
+  const [closed, applied] = await Promise.all([closing, applying]);
+  assert.deepEqual(closed.value, { closed: 1, failed: 0 });
+  assert.equal(applied.status, 'rejected');
+  assert.ok(applied.reason instanceof ResultApplicationContextError);
+  const { request, attempt } = await stored(result);
+  assert.equal(request.lifecycle, 'CLOSED');
+  assert.equal(attempt.application, 'APPLY_FAILED');
+  assert.deepEqual(attempt.failures, [...result.failures, APPLICATION]);
+  const { catches, registrations } = await counts();
+  assert.deepEqual({ catches, registrations }, { catches: 0, registrations: 0 });
+});
+
+test('반영이 요청을 먼저 잡으면 닫기는 기다리지 않고 건너뛰며, 반영 결과가 남는다', async () => {
+  const result = await prepare();
+  const received = await pipeline().receiver.receiveResult(result);
+  const lock = await hold('analysis_attempt', 'attempt_id', result.attemptId);
+  let applying;
+  try {
+    applying = settle(applier(result).apply(received.accepted));
+    await waitUntilBlocked([lock.pid]);
+    assert.deepEqual(await within(deadline().service.closeOverdue(), 2000), { closed: 0, failed: 0 });
+  } finally {
+    await lock.release();
+  }
+  const applied = await applying;
+  assert.equal(applied.status, 'fulfilled');
+  const { request, attempt } = await stored(result);
+  assert.equal(request.lifecycle, 'CLOSED');
+  assert.equal(attempt.application, 'APPLIED');
+  assert.deepEqual(attempt.failures, result.failures);
+  const { catches } = await counts();
+  assert.ok(catches > 0);
+  assert.equal(catches, applied.value.registeredCatchIds.length);
+  assert.deepEqual(await deadline().service.closeOverdue(), { closed: 0, failed: 0 });
+});
+
+test('닫기가 요청을 먼저 잡으면 겹친 결과 수신은 PAYLOAD_CONFLICT다', async () => {
+  const result = await prepare();
+  const lock = await hold('analysis_attempt', 'attempt_id', result.attemptId);
+  let closing;
+  let receiving;
+  try {
+    closing = settle(deadline().service.closeOverdue());
+    const closer = await waitUntilBlocked([lock.pid]);
+    receiving = settle(pipeline().receiver.receiveResult(result));
+    await waitUntilBlocked([lock.pid, closer], [closer]);
+  } finally {
+    await lock.release();
+  }
+  const [closed, received] = await Promise.all([closing, receiving]);
+  assert.deepEqual(closed.value, { closed: 1, failed: 0 });
+  assert.equal(received.value.receipt.code, 'PAYLOAD_CONFLICT');
+  const { request, attempt } = await stored(result);
+  assert.equal(request.lifecycle, 'CLOSED');
+  assert.equal(attempt.processing, 'FAILED');
+  assert.equal(attempt.application, 'APPLIED');
+  assert.deepEqual(attempt.failures, [DISPATCH]);
+  assert.deepEqual(await counts(), { catches: 0, registrations: 0, receipts: 0 });
+});
+
+test('결과 수신이 요청을 먼저 잡으면 닫기는 건너뛰고, 다음 판정에서 반영 대기를 반영 실패로 닫는다', async () => {
+  const result = await prepare();
+  const lock = await hold('analysis_attempt', 'attempt_id', result.attemptId);
+  let receiving;
+  try {
+    receiving = settle(pipeline().receiver.receiveResult(result));
+    await waitUntilBlocked([lock.pid]);
+    assert.deepEqual(await within(deadline().service.closeOverdue(), 2000), { closed: 0, failed: 0 });
+  } finally {
+    await lock.release();
+  }
+  assert.equal((await receiving).value.receipt.disposition, 'ACCEPTED');
+  assert.equal((await stored(result)).attempt.application, 'PENDING');
+  assert.deepEqual(await deadline().service.closeOverdue(), { closed: 1, failed: 0 });
+  const { request, attempt } = await stored(result);
+  assert.equal(request.lifecycle, 'CLOSED');
+  assert.equal(attempt.processing, result.outcome);
+  assert.equal(attempt.application, 'APPLY_FAILED');
+  assert.deepEqual(attempt.failures, [...result.failures, APPLICATION]);
+  assert.deepEqual(await counts(), { catches: 0, registrations: 0, receipts: 1 });
 });
 
 test('여러 api가 같은 후보를 함께 골라도 요청마다 한 번만 닫는다', async () => {
   const results = [];
   for (let i = 0; i < 6; i += 1) results.push(await prepare({ processing: i % 2 ? 'RUNNING' : 'QUEUED' }));
-  // 첫 후보를 가장 이른 접수로 두고 잠가, 두 판정이 같은 후보 목록을 고른 뒤 그 요청에서 함께 기다리게 한다.
+  // 첫 후보를 가장 이른 접수로 두고 그 시도를 잠가, 첫 판정이 후보 목록을 고른 뒤 첫 요청을 쥔 채 기다리게 한다.
   await db.query('UPDATE analysis_request SET submitted_at = $1 WHERE request_id = $2',
     [new Date(SUBMITTED.getTime() - 1000), results[0].requestId]);
-  const [first, second] = await contend(results[0].requestId,
-    () => deadline().service.closeOverdue(), () => deadline().service.closeOverdue());
-  assert.equal(first.status, 'fulfilled');
-  assert.equal(second.status, 'fulfilled');
-  assert.equal(first.value.closed + second.value.closed, results.length);
-  assert.equal(first.value.failed + second.value.failed, 0);
+  const lock = await hold('analysis_attempt', 'attempt_id', results[0].attemptId);
+  let first;
+  try {
+    first = settle(deadline().service.closeOverdue());
+    await waitUntilBlocked([lock.pid]);
+    // 두 번째 판정은 같은 후보를 고르고, 첫 판정이 쥔 요청만 건너뛴다.
+    assert.deepEqual(await within(deadline().service.closeOverdue(), 2000), { closed: 5, failed: 0 });
+  } finally {
+    await lock.release();
+  }
+  assert.deepEqual((await first).value, { closed: 1, failed: 0 });
   for (const result of results) assert.deepEqual((await stored(result)).attempt.failures, [DISPATCH]);
 });
 

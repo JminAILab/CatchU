@@ -53,6 +53,7 @@ interface CloseOutcome {
  * 처리 시한을 넘긴 ACTIVE 요청과 반영 실패 요청을 닫는다(#237, 2026-10-06 #23 결정).
  * 실행이 멈췄다는 증거는 요구하지 않는다. 요청 하나마다 한 트랜잭션에서 E 공통 순서(요청 → 시도)로
  * 잠그고 상태를 다시 확인한 뒤 바꾸므로, 결과 수신·반영과 겹쳐도 먼저 잠근 쪽 하나만 남는다.
+ * 다른 작업이 잠근 요청은 기다리지 않고 건너뛰어, 한 요청 때문에 판정 전체와 서버 종료가 멈추지 않게 한다.
  */
 export class AnalysisDeadlineService {
   constructor(private readonly dataSource: DataSource, private readonly log: AnalysisDeadlineLog,
@@ -99,8 +100,12 @@ export class AnalysisDeadlineService {
   private closeOne(requestId: string, now: Date): Promise<CloseOutcome | null> {
     return this.dataSource.transaction('READ COMMITTED', async manager => {
       // 멱등 소유 확인의 KEY SHARE와는 겹치지 않고 수신·반영의 잠금과는 직렬화되는 잠금이다.
-      const request = await manager.findOne(AnalysisRequest, { where: { requestId }, lock: { mode: 'for_no_key_update' } });
+      // 수신·반영이 잡고 있는 요청은 건너뛰고(결과 null) 다음 판정에서 바뀐 상태로 다시 본다.
+      const request = await manager.findOne(AnalysisRequest, {
+        where: { requestId }, lock: { mode: 'for_no_key_update', onLocked: 'skip_locked' },
+      });
       if (!request || request.lifecycle !== 'ACTIVE') return null;
+      // 시도를 잠그는 모든 경로는 요청을 먼저 잠그므로, 요청을 잡은 뒤의 시도 잠금은 기다려도 된다.
       const attempt = await manager.findOne(AnalysisAttempt, {
         where: { attemptId: request.currentAttemptId, requestId }, lock: { mode: 'for_no_key_update' },
       });
