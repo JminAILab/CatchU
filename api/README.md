@@ -249,6 +249,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 [docs/analysis-receiver.md](docs/analysis-receiver.md)에 있다.
 
+## 분석 처리 시한 닫기 — #237
+
+접수 후 60분(처리 시한) 안에 끝나지 않은 분석 요청과 반영 실패 요청을 api가 1분마다 판정해 실패로 닫는다. 주기 작업은 `src/common/periodic-task.ts`의 `PeriodicTask`로 돌리며 실제 서버 진입점(`main.ts`)에서만 시작한다. 닫는 규칙·경합·로그와 주기 작업 추가 방법은 [docs/analysis-deadline.md](docs/analysis-deadline.md)에 있다.
+
 ## 실행 실패 시 확인
 
 - `EADDRINUSE`: 지정 포트가 사용 중인지 확인하고 자신이 실행한 이전 서버를 종료하거나 선택 포트를 바꾼다. 다른 사람의 프로세스를 임의 종료하지 않는다.

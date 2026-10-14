@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { AnalysisDeadlineScheduler } from './analysis-deadline/analysis-deadline.module';
 import { configureApp } from './app.setup';
 
 async function bootstrap(): Promise<void> {
@@ -23,6 +24,8 @@ async function bootstrap(): Promise<void> {
     await configureApp(app);
     app.enableShutdownHooks();
     await app.listen(port, host);
+    // 주기 작업은 실제 서버에서만 돈다. AppModule을 띄우는 테스트는 시작하지 않는다.
+    app.get(AnalysisDeadlineScheduler).start();
   } catch (error) {
     // 이미 열린 DB 연결 풀을 닫는다. 닫지 않으면 유휴 연결이 시한(10초)까지 프로세스를 붙잡아 종료가 늦어진다.
     await app.close().catch((closeError: unknown) => {
