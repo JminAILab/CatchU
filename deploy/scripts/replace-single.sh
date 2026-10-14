@@ -8,8 +8,9 @@
 #      세 서비스를 모두 확인한 뒤 판단하고, 3으로 멈출 때도 확인한 강제 종료와 교체 전에 실행 중이던 서비스를 함께 적는다
 #   4) (--migrate) migration을 이미지마다 정해진 이름으로 한 번 실행한다. 실패·결과 불명이면 새 실행을 시작하지 않고 멈춘다.
 #      성공을 확인한 뒤 실행 컨테이너를 지우지 못해도 새 실행을 시작하지 않고 멈춘다(적용은 확인됨, 컨테이너는 직접 지운다)
-#   5) api → worker → web 순서로 시작하고 각각 정상 확인(health)을 기다린다. 하나라도 실패하면 세 서비스를 다시 멈추고
-#      종료를 확인한다. 다시 멈추지 못했거나 상태를 확인할 수 없으면 종료 확인 실패(3)로 끝낸다
+#   5) api → worker → web 순서로 시작하고 각각 정상 확인(health)을 기다린다. 모두 띄운 뒤 세 서비스가 지금도 healthy인지
+#      다시 확인한다. 하나라도 실패하면 세 서비스를 다시 멈추고 종료를 확인한다. 다시 멈추지 못했거나 상태를 확인할 수
+#      없으면 종료 확인 실패(3)로 끝낸다
 # 자동 재시도·자동 되돌리기·DB 복원은 하지 않는다. 진행 중이던 요청·분석은 끝까지 마친다고 보장하지 않는다.
 #
 # 사용: deploy/scripts/replace-single.sh --env-file <compose.env> [--local-db] [--migrate] [--stop-timeout 초]
@@ -228,10 +229,21 @@ for service in api worker web; do
     || fail_started "${service}가 정상 확인에 실패했습니다."
 done
 stop_ended=$(date +%s)
+# 완료 전에 세 서비스를 다시 본다. 앞 서비스는 각자 정상 확인을 통과했어도 뒤 서비스를 띄우는 동안 다시 시작되는 중이거나
+# (restart: unless-stopped) 비정상일 수 있으므로, 실행 수와 함께 지금의 health가 healthy인지 세 서비스 모두 본 뒤 판단한다.
+# 지금 시점의 health만 보므로, 그 사이 다시 시작됐다가 이미 healthy로 돌아온 경우는 잡지 못한다.
+not_healthy="" health_unknown=""
 for service in api worker web; do
   ids=$(running_ids "${service}") || fail_started "Docker에서 ${service} 실행 상태를 확인하지 못했습니다."
   count=$(printf '%s\n' "${ids}" | grep -c . || true)
   [ "${count}" = 1 ] || fail_started "${service} 실행 수가 1이 아닙니다(${count})."
+  if ! health=$(docker inspect --type container -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${ids}"); then
+    health_unknown="${health_unknown} ${service}"
+  elif [ "${health}" != healthy ]; then
+    not_healthy="${not_healthy} ${service}(${health})"
+  fi
   log "교체 후 ${service}: $(state "${project}-${service}")"
 done
+[ -z "${not_healthy}${health_unknown}" ] \
+  || fail_started "완료 확인 실패.${not_healthy:+ 정상(healthy)이 아닌 서비스:${not_healthy}.}${health_unknown:+ Docker에서 health를 확인하지 못한 서비스:${health_unknown}.}"
 log "완료. 중지 시작부터 web 정상 확인까지 $((stop_ended - stop_started))초"

@@ -515,7 +515,8 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
   await check("교체", "원인 확인 뒤 다시 실행하면 이어서 시작", () => {
     expect(resumed.code === 0, `replace code=${resumed.code}`);
   });
-  // 가짜 docker: PATH 앞에 두어 정해진 호출만 실패시키고 나머지는 실제 docker로 넘긴다. 실제 데몬은 멈추지 않는다.
+  // 가짜 docker: PATH 앞에 두어 정해진 호출만 실패시키거나 그 호출 뒤에 상태를 바꾸고(예: api 다시 시작), 나머지는 실제 docker로
+  // 넘긴다. 실제 데몬은 멈추지 않는다.
   // 모드마다 폴더를 따로 둔다(replace-single.sh는 CATCHU_*를 지우고 BASE_ENV는 COMPOSE_·CATCHU_를 빼므로 환경변수로 넘기지 않는다).
   // marker는 5단계 시작(api를 띄우는 up) 뒤에만, stopped는 2단계 중지 명령 뒤에만 오류를 넣을 때 쓴다.
   // 규칙에 맞지 않는 호출(2·3단계, 합성 DB의 up 등)은 실제 docker로 지나간다.
@@ -658,6 +659,26 @@ exec "${realDocker}" "$@"
   const afterManualCleanup = replace();
   await check("교체", "남긴 실행을 지운 뒤 --migrate 없이 다시 실행하면 이어서 시작", () => {
     expect(afterManualCleanup.code === 0, `replace code=${afterManualCleanup.code}`);
+  });
+  // web까지 띄운 직후 api를 다시 시작시키고(뒤 서비스를 띄우는 동안 다시 시작된 상황) 곧바로 SIGSTOP으로 멈춰 healthy가 되지
+  // 못하게 한다(health는 starting, 실행 수는 1). 실행 수만 세면 완료로 끝나므로, 완료 전 health 재확인으로 6이어야 한다.
+  const healthRegressed = replace(["--stop-timeout", "2"], dockerShim("health-regressed",
+    `if [ "$1" = compose ] && [[ " $* " == *" up "* ]] && [ "\${@: -1}" = web ]; then
+  "${realDocker}" "$@"; code=$?
+  if [ "$code" = 0 ]; then "${realDocker}" restart -t 0 "${name("api")}" >/dev/null && "${realDocker}" kill --signal SIGSTOP "${name("api")}" >/dev/null; fi
+  exit "$code"
+fi`));
+  await check("교체", "세 서비스를 띄운 직후 api가 다시 시작돼 healthy가 아니면 완료로 보지 않고 다시 멈춘다", () => {
+    expect(healthRegressed.code === 6, `replace code=${healthRegressed.code}`);
+    expect(/완료 확인 실패\. 정상\(healthy\)이 아닌 서비스: api\(starting\)\./.test(healthRegressed.text), "health 재확인 기록 없음");
+    expect(/세 서비스의 종료를 확인했습니다/.test(healthRegressed.text) && !/완료\. 중지 시작부터/.test(healthRegressed.text), "완료로 끝났거나 종료 확인 기록 없음");
+    const running = runningNow();
+    expect(running.length === 0, `실행 중 ${running.join(",")}`);
+    return "종료 코드 6, api health=starting(실행 수 1), 세 서비스 멈춤";
+  });
+  const afterHealthRegressed = replace();
+  await check("교체", "원인 확인 뒤 다시 실행하면 이어서 시작(health 재확인 통과)", () => {
+    expect(afterHealthRegressed.code === 0, `replace code=${afterHealthRegressed.code}`);
   });
 
   // ---------- 7. 종료 신호와 비밀값 ----------
