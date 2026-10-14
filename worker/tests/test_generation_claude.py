@@ -1,0 +1,536 @@
+"""Anthropic Claude API 생성 제공자(#120·#119 결정) 시험.
+
+SDK는 진짜를 쓰고 HTTP 전송만 가짜(httpx2.MockTransport)로 바꾼다. 그래서 재시도·시간 제한·접속 주소·
+redirect·요청 본문을 SDK가 실제로 만드는 HTTP 요청에서 확인한다. 네트워크 연결은 막는다. 응답은 공식 문서의
+모양을 본뜬 합성 값이고, 실제 API의 응답 시간·토큰 수·결과 품질은 이 시험으로 알 수 없다.
+"""
+
+import json
+import logging
+import socket
+from collections.abc import Callable, Iterator
+from typing import Any
+
+import httpx2
+import pytest
+from candidate_scenarios import (
+    ROOT,
+    Pull,
+    Scenario,
+    change,
+    commit,
+    root_commit,
+)
+from generation_scenarios import ScriptedProvider, generation_case, naive
+from github_synthetic import MEMBER, sha
+
+from app.collection.credentials import AccessToken
+from app.generation import ProviderError, ProviderRequest, UnusableResponse
+from app.generation.claude import ClaudeModels, ClaudeProvider
+from app.generation.provider import Purpose
+
+KEY = "".join(("synthetic-", "claude-key-", "0" * 16))
+INSTRUCTIONS = "합성 지시문 INSTRUCTION-MARK-51"
+DATA = '{"commits":[{"id":"c1","note":"DATA-MARK-73"}]}'
+ANSWER = '{"title":{"target":"FILE","file":"c1f1"},"note":"ANSWER-MARK-29"}'
+ERROR_TEXT = "upstream detail ERROR-MARK-88"
+REFUSAL_TEXT = "refusal explanation REFUSAL-MARK-64"
+LEAKS = (KEY, "INSTRUCTION-MARK-51", "DATA-MARK-73", "ANSWER-MARK-29", "ERROR-MARK-88")
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise AssertionError("외부 연결 시도")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket.socket, "connect_ex", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    monkeypatch.setattr(socket, "getaddrinfo", refuse)
+
+
+@pytest.fixture(autouse=True)
+def sdk_log_level() -> Iterator[None]:
+    """제공자가 SDK 로거 수준을 고정하므로 시험마다 원래대로 돌린다."""
+    sdk = logging.getLogger("anthropic")
+    level = sdk.level
+    yield
+    sdk.setLevel(level)
+
+
+# 가짜 Messages API
+
+
+Reply = Callable[[httpx2.Request], httpx2.Response]
+
+
+class FakeApi:
+    """받은 HTTP 요청을 기록하고 정해 둔 응답을 돌려준다."""
+
+    def __init__(self, reply: Reply) -> None:
+        self._reply = reply
+        self.requests: list[httpx2.Request] = []
+
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        self.requests.append(request)
+        return self._reply(request)
+
+    def provider(self, models: ClaudeModels | None = None) -> ClaudeProvider:
+        return ClaudeProvider(
+            AccessToken(KEY), models, transport=httpx2.MockTransport(self)
+        )
+
+    def body(self, index: int = 0) -> dict[str, Any]:
+        value = json.loads(self.requests[index].content)
+        assert isinstance(value, dict)
+        return value
+
+
+def message(
+    text: str = ANSWER,
+    *,
+    stop_reason: str = "end_turn",
+    model: str = "claude-haiku-5-5",
+    stop_details: dict[str, Any] | None = None,
+) -> Reply:
+    body = {
+        "id": "msg_synthetic",
+        "type": "message",
+        "role": "assistant",
+        "model": model,
+        "content": [{"type": "text", "text": text}],
+        "stop_reason": stop_reason,
+        "stop_details": stop_details,
+        "stop_sequence": None,
+        "usage": {"input_tokens": 1234, "output_tokens": 56, "inference_geo": "us"},
+    }
+    return lambda request: httpx2.Response(
+        200, json=body, headers={"request-id": "req_synthetic_ok"}
+    )
+
+
+def api_error(
+    status: int,
+    error_type: str,
+    text: str = ERROR_TEXT,
+    *,
+    details: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
+) -> Reply:
+    error: dict[str, Any] = {"type": error_type, "message": text}
+    if details is not None:
+        error["details"] = details
+    body = {"type": "error", "error": error, "request_id": "req_synthetic_err"}
+    return lambda request: httpx2.Response(
+        status,
+        json=body,
+        headers={"request-id": "req_synthetic_err", **(headers or {})},
+    )
+
+
+def call(purpose: Purpose = "GENERATE", timeout: float = 45.0) -> ProviderRequest:
+    return ProviderRequest(
+        purpose=purpose,
+        instructions=INSTRUCTIONS,
+        data=DATA,
+        timeout_seconds=timeout,
+        max_output_bytes=4_000,
+    )
+
+
+def assert_no_leak(text: str) -> None:
+    for leaked in LEAKS:
+        assert leaked not in text
+
+
+# 정상 응답과 요청 설정
+
+
+def test_normal_response_returns_text_with_fixed_settings(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """정상 응답의 글만 돌려준다. 요청은 고정 주소·지시문과 자료 분리·Haiku 5.5·생각 끔·미국 처리·
+    최대 출력 4,000 토큰·호출 시간 제한 45초로 한 번 나간다. 운영 로그에는 모델 ID·토큰 사용량만 남는다."""
+    api = FakeApi(message())
+
+    with caplog.at_level(logging.INFO, logger="app.generation.claude"):
+        text = api.provider().complete(call())
+
+    assert text == ANSWER
+    assert len(api.requests) == 1
+    sent = api.requests[0]
+    assert str(sent.url) == "https://api.anthropic.com/v1/messages"
+    assert sent.headers["x-api-key"] == KEY
+    assert "authorization" not in sent.headers
+    assert api.body() == {
+        "model": "claude-haiku-5-5",
+        "max_tokens": 4_000,
+        "system": INSTRUCTIONS,
+        "messages": [{"role": "user", "content": DATA}],
+        "thinking": {"type": "disabled"},
+        "inference_geo": "us",
+    }
+    assert sent.extensions["timeout"] == {
+        "connect": 45.0,
+        "read": 45.0,
+        "write": 45.0,
+        "pool": 45.0,
+    }
+    assert "model=claude-haiku-5-5" in caplog.text
+    assert "stopReason=end_turn" in caplog.text
+    assert "inputTokens=1234 outputTokens=56 inferenceGeo=us" in caplog.text
+    assert "requestId=req_synthetic_ok" in caplog.text
+    assert_no_leak(caplog.text)
+
+
+def test_models_are_fixed_per_call_kind() -> None:
+    """생성 호출과 제목 고쳐 쓰기 호출의 모델을 따로 정한다. 고쳐 쓰기는 자기 시간 제한(20초)을 쓴다.
+    Sonnet 5.5는 `disabled`를 받지 않아 `between_tools`로 생각을 끈다."""
+    api = FakeApi(message())
+    provider = api.provider(ClaudeModels(generate="claude-sonnet-5-5"))
+
+    provider.complete(call("GENERATE"))
+    provider.complete(call("REWRITE_TITLE", timeout=20.0))
+
+    assert api.body(0)["model"] == "claude-sonnet-5-5"
+    assert api.body(0)["thinking"] == {"type": "between_tools"}
+    assert api.body(1)["model"] == "claude-haiku-5-5"
+    assert api.body(1)["thinking"] == {"type": "disabled"}
+    assert api.requests[1].extensions["timeout"]["read"] == 20.0
+
+
+def test_unknown_model_is_rejected_without_echoing_it() -> None:
+    """표에 없는 모델(30일 보관이 필수인 모델 포함)은 받지 않는다. 예외에 설정 값을 싣지 않는다."""
+    for model in (
+        "claude-fable-5-1",
+        "claude-opus-5-5",
+        "synthetic-value-in-wrong-field",
+    ):
+        with pytest.raises(ValueError) as raised:
+            ClaudeModels(rewrite_title=model)
+        assert model not in str(raised.value)
+
+
+def test_environment_cannot_change_address_or_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ANTHROPIC_BASE_URL·키 환경변수가 있어도 고정 주소와 넘긴 키로만 보낸다."""
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://collector.example.test")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "env-key-should-not-be-used")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "env-token-should-not-be-used")
+    api = FakeApi(message())
+
+    api.provider().complete(call())
+
+    sent = api.requests[0]
+    assert sent.url.host == "api.anthropic.com"
+    assert sent.url.scheme == "https"
+    assert sent.headers["x-api-key"] == KEY
+    assert "authorization" not in sent.headers
+
+
+def test_redirect_is_not_followed() -> None:
+    """다른 주소로 보내는 redirect를 따라가지 않고 그 호출의 실패로 끝낸다."""
+    api = FakeApi(
+        lambda request: httpx2.Response(
+            307, headers={"location": "https://collector.example.test/v1/messages"}
+        )
+    )
+
+    with pytest.raises(ProviderError):
+        api.provider().complete(call())
+
+    assert [each.url.host for each in api.requests] == ["api.anthropic.com"]
+
+
+def test_sdk_debug_log_does_not_record_request_data(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """SDK는 DEBUG에서 요청 본문을 로그에 남긴다. 루트·SDK 로거가 DEBUG여도 자료·지시문이 남지 않는다."""
+    logging.getLogger("anthropic").setLevel(logging.DEBUG)
+    api = FakeApi(message())
+
+    with caplog.at_level(logging.DEBUG):
+        api.provider().complete(call())
+
+    assert caplog.records
+    assert_no_leak(caplog.text)
+
+
+# 재시도와 시간 초과
+
+
+RETRIED_BY_DEFAULT = {
+    "409": api_error(409, "conflict_error"),
+    "429": api_error(429, "rate_limit_error"),
+    "500": api_error(500, "api_error"),
+    "504": api_error(504, "timeout_error"),
+    "529": api_error(529, "overloaded_error"),
+}
+
+
+@pytest.mark.parametrize("status", list(RETRIED_BY_DEFAULT))
+def test_sdk_retries_are_off(status: str) -> None:
+    """SDK가 기본으로 다시 보내는 상태 코드(재시도를 권하는 머리글 포함)에도 요청은 한 번이다."""
+    reply = RETRIED_BY_DEFAULT[status]
+
+    def answer(request: httpx2.Request) -> httpx2.Response:
+        response = reply(request)
+        response.headers["x-should-retry"] = "true"
+        response.headers["retry-after"] = "0"
+        return response
+
+    api = FakeApi(answer)
+
+    with pytest.raises(ProviderError):
+        api.provider().complete(call())
+
+    assert len(api.requests) == 1
+
+
+def raises(error: type[httpx2.TransportError]) -> Reply:
+    def reply(request: httpx2.Request) -> httpx2.Response:
+        raise error("synthetic transport failure", request=request)
+
+    return reply
+
+
+@pytest.mark.parametrize("error", [httpx2.ReadTimeout, httpx2.ConnectTimeout])
+def test_timeout_becomes_timeout_error_without_retry(
+    error: type[httpx2.TransportError], caplog: pytest.LogCaptureFixture
+) -> None:
+    """SDK 시간 초과는 TimeoutError로 바뀌고 다시 보내지 않는다. 원인 예외를 잇지 않는다."""
+    api = FakeApi(raises(error))
+
+    with (
+        caplog.at_level(logging.INFO, logger="app.generation.claude"),
+        pytest.raises(TimeoutError) as raised,
+    ):
+        api.provider().complete(call())
+
+    assert len(api.requests) == 1
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__
+    assert "cause=TIMEOUT" in caplog.text
+
+
+def test_connection_failure_becomes_provider_error_without_retry(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    api = FakeApi(raises(httpx2.ConnectError))
+
+    with (
+        caplog.at_level(logging.INFO, logger="app.generation.claude"),
+        pytest.raises(ProviderError) as raised,
+    ):
+        api.provider().complete(call())
+
+    assert not isinstance(raised.value, UnusableResponse)
+    assert len(api.requests) == 1
+    assert "cause=CONNECTION" in caplog.text
+
+
+# 오류 응답
+
+
+STATUS_ERRORS: dict[str, tuple[Reply, str]] = {
+    "400": (api_error(400, "invalid_request_error"), "BAD_REQUEST"),
+    "400-spend-limit": (
+        api_error(
+            400,
+            "invalid_request_error",
+            "You have reached your specified API usage limits. " + ERROR_TEXT,
+        ),
+        "SPEND_LIMIT",
+    ),
+    "400-workspace-spend-limit": (
+        api_error(
+            400,
+            "invalid_request_error",
+            "You have reached your specified workspace API usage limits. " + ERROR_TEXT,
+        ),
+        "SPEND_LIMIT",
+    ),
+    "400-credit": (
+        api_error(
+            400,
+            "invalid_request_error",
+            "Your credit balance is too low to access the Anthropic API. " + ERROR_TEXT,
+        ),
+        "CREDIT_EXHAUSTED",
+    ),
+    "401": (api_error(401, "authentication_error"), "AUTHENTICATION"),
+    "402": (api_error(402, "billing_error"), "BILLING"),
+    "403": (api_error(403, "permission_error"), "PERMISSION"),
+    "404": (api_error(404, "not_found_error"), "NOT_FOUND"),
+    "409": (api_error(409, "conflict_error"), "CONFLICT"),
+    "413": (api_error(413, "request_too_large"), "REQUEST_TOO_LARGE"),
+    "429": (
+        api_error(429, "rate_limit_error", headers={"retry-after": "7"}),
+        "RATE_LIMIT",
+    ),
+    "429-spend-cap": (
+        api_error(
+            429,
+            "rate_limit_error",
+            details={"error_code": "enforced_spend_limit_reached"},
+        ),
+        "SPEND_CAP",
+    ),
+    "500": (api_error(500, "api_error"), "SERVER_ERROR"),
+    "504": (api_error(504, "timeout_error"), "SERVER_TIMEOUT"),
+    "529": (api_error(529, "overloaded_error"), "OVERLOADED"),
+}
+
+
+@pytest.mark.parametrize("case", list(STATUS_ERRORS))
+def test_error_status_becomes_provider_error_with_cause(
+    case: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """오류 응답은 다시 보내지 않고 ProviderError가 된다. 운영 로그에는 원인 이름·상태 코드·오류 종류·요청
+    ID만 남고 오류 원문·자료·키는 남지 않는다. 예외에도 원문이 없고 SDK 예외를 잇지 않는다."""
+    reply, cause = STATUS_ERRORS[case]
+    status = case.split("-")[0]
+    api = FakeApi(reply)
+
+    with (
+        caplog.at_level(logging.INFO, logger="app.generation.claude"),
+        pytest.raises(ProviderError) as raised,
+    ):
+        api.provider().complete(call())
+
+    assert not isinstance(raised.value, UnusableResponse)
+    assert len(api.requests) == 1
+    assert f"cause={cause} status={status}" in caplog.text
+    assert "requestId=req_synthetic_err" in caplog.text
+    assert_no_leak(caplog.text)
+    assert_no_leak(str(raised.value))
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__
+
+
+# 정상 HTTP 응답이지만 쓸 수 없는 응답
+
+
+UNUSABLE = {
+    "refusal": (
+        "UNREADABLE",
+        {"type": "refusal", "category": "cyber", "explanation": REFUSAL_TEXT},
+    ),
+    "max_tokens": ("TOO_LARGE", None),
+    "pause_turn": ("UNREADABLE", None),
+}
+
+
+@pytest.mark.parametrize("stop_reason", list(UNUSABLE))
+def test_refusal_and_cut_responses_are_unusable(
+    stop_reason: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """거절·최대 출력에서 잘림·그 밖의 멈춤은 응답 글을 돌려주지 않는다. 사용량과 멈춘 이유는 남기고 거절
+    설명 글은 남기지 않는다."""
+    reason, details = UNUSABLE[stop_reason]
+    api = FakeApi(message(stop_reason=stop_reason, stop_details=details))
+
+    with (
+        caplog.at_level(logging.INFO, logger="app.generation.claude"),
+        pytest.raises(UnusableResponse) as raised,
+    ):
+        api.provider().complete(call())
+
+    assert raised.value.reason == reason
+    assert len(api.requests) == 1
+    assert f"stopReason={stop_reason}" in caplog.text
+    assert "inputTokens=1234 outputTokens=56" in caplog.text
+    if stop_reason == "refusal":
+        assert "refusalCategory=cyber" in caplog.text
+    assert "REFUSAL-MARK-64" not in caplog.text
+    assert_no_leak(caplog.text)
+
+
+# 생성 흐름과 이어서
+
+
+ALPHA_PULL = Scenario(
+    default_branch=(root_commit(),),
+    pulls=(
+        Pull(
+            3,
+            MEMBER,
+            (
+                commit(
+                    sha(31),
+                    MEMBER,
+                    parents=(ROOT,),
+                    minute=3,
+                    files=(
+                        change(
+                            "app/alpha.py", patch="@@ -1 +1 @@\n-alpha = 1\n+alpha = 2"
+                        ),
+                    ),
+                ),
+            ),
+            state="open",
+            created=2,
+        ),
+    ),
+)
+
+
+def as_provider_request(sent: httpx2.Request) -> ProviderRequest:
+    """가짜 API가 받은 HTTP 본문을 합성 모델(naive)이 읽는 요청으로 되돌린다."""
+    body = json.loads(sent.content)
+    return ProviderRequest(
+        purpose="GENERATE",
+        instructions=body["system"],
+        data=body["messages"][0]["content"],
+        timeout_seconds=sent.extensions["timeout"]["read"],
+        max_output_bytes=body["max_tokens"],
+    )
+
+
+def test_generation_flow_runs_through_the_claude_provider() -> None:
+    """생성 흐름 → 어댑터 → SDK → 가짜 API → 생성 흐름. 흐름이 만든 지시문·자료가 그대로 나가고, 합성 모델의
+    정상 응답으로 설명·질문·제목이 생성된다."""
+    api = FakeApi(lambda request: message(naive(as_provider_request(request)))(request))
+    scripted = ScriptedProvider(api.provider().complete)
+
+    case = generation_case(ALPHA_PULL, scripted)
+
+    assert len(api.requests) == 1
+    assert api.body()["system"] == scripted.requests[0].instructions
+    assert api.body()["messages"][0]["content"] == scripted.requests[0].data
+    (candidate,) = case.output.candidates
+    assert candidate.draft.status == "GENERATED"
+    assert candidate.reflection.status == "GENERATED"
+    assert candidate.title is not None
+
+
+FLOW_FAILURES = {
+    "refusal": (
+        message(
+            stop_reason="refusal", stop_details={"type": "refusal", "category": None}
+        ),
+        "GENERATION_RESPONSE_UNREADABLE",
+    ),
+    "max_tokens": (message(stop_reason="max_tokens"), "GENERATION_RESPONSE_TOO_LARGE"),
+    "529": (api_error(529, "overloaded_error"), "GENERATION_CALL_FAILED"),
+    "timeout": (raises(httpx2.ReadTimeout), "GENERATION_TIMEOUT"),
+}
+
+
+@pytest.mark.parametrize("kind", list(FLOW_FAILURES))
+def test_generation_flow_turns_provider_failures_into_whole_call_failures(
+    kind: str,
+) -> None:
+    """어댑터의 실패가 생성 흐름에서 원인별 전체 호출 실패가 되고, 다시 부르지 않는다."""
+    reply, code = FLOW_FAILURES[kind]
+    api = FakeApi(reply)
+
+    case = generation_case(ALPHA_PULL, ScriptedProvider(api.provider().complete))
+
+    assert len(api.requests) == 1
+    (candidate,) = case.output.candidates
+    assert candidate.draft.status == "FAILED"
+    assert candidate.reflection.status == "FAILED"
+    assert candidate.title is None
+    assert {each["code"] for each in case.result["failures"]} == {code}

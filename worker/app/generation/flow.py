@@ -41,7 +41,12 @@ from app.generation.outcome import (
     failed_draft,
     failed_reflection,
 )
-from app.generation.provider import GenerationProvider, ProviderError, ProviderRequest
+from app.generation.provider import (
+    GenerationProvider,
+    ProviderError,
+    ProviderRequest,
+    UnusableResponse,
+)
 from app.generation.request import (
     GENERATE_INSTRUCTIONS,
     REWRITE_INSTRUCTIONS,
@@ -283,6 +288,10 @@ def _call(
         raw = provider.complete(call)
     except TimeoutError:
         return GenerationFailureCode.TIMEOUT, None
+    except UnusableResponse as error:
+        if error.reason == "TOO_LARGE":
+            return GenerationFailureCode.RESPONSE_TOO_LARGE, None
+        return GenerationFailureCode.RESPONSE_UNREADABLE, None
     except ProviderError:
         return GenerationFailureCode.CALL_FAILED, None
     if clock() - started > timedelta(seconds=call.timeout_seconds):

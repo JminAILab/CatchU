@@ -1,8 +1,8 @@
 """후보별 생성 제공자의 경계(#120). 제공자 이름·모델·API 키에 해당하는 값은 두지 않는다.
 
 `app.processing.Generator`는 요청 하나의 수집·후보·생성 전체를 감싸는 경계이고, 이 Protocol은 후보 하나의
-생성 호출(또는 제목 형식 고쳐 쓰기 호출) 한 번이다. 실제 제공자 어댑터는 #119·C06과 #37의 자료 처리
-조건을 갖춘 뒤 이 Protocol로 붙인다. 그 전에는 시험의 합성 제공자만 쓴다.
+생성 호출(또는 제목 형식 고쳐 쓰기 호출) 한 번이다. 실제 제공자 어댑터는 `app.generation.claude`(#119 결정)다.
+실제 회원 자료를 보내는 것은 #37의 자료 처리 조건과 실제 자료용 고지(#138) 뒤다.
 """
 
 from dataclasses import dataclass
@@ -33,10 +33,23 @@ class ProviderError(Exception):
     """
 
 
+class UnusableResponse(ProviderError):
+    """호출은 성공했지만 응답 전체를 쓸 수 없다. reason은 응답 판정(`response.Unreadable`)과 같은 뜻이다.
+
+    - TOO_LARGE: 최대 출력에서 잘렸다(최대 출력을 넘은 응답).
+    - UNREADABLE: 제공자가 생성을 거절했거나 그 밖의 이유로 응답이 끝나지 않았다.
+    """
+
+    def __init__(self, reason: Literal["TOO_LARGE", "UNREADABLE"]) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
 class GenerationProvider(Protocol):
     """생성 호출 한 번을 하고 응답 글을 돌려준다.
 
-    - timeout_seconds 안에 끝내지 못하면 TimeoutError를 낸다. 다른 실패는 ProviderError로 낸다.
+    - timeout_seconds 안에 끝내지 못하면 TimeoutError를 낸다. 다른 실패는 ProviderError로 낸다(응답 전체를
+      쓸 수 없으면 그 하위의 UnusableResponse).
     - 스스로 다시 시도하지 않는다. 실제 SDK를 쓰면 기본 재시도를 끈다.
     - 응답이 max_output_bytes를 넘을 수 있으면 그만큼만 생성하도록 제공자에 넘긴다. 넘는 응답은 생성
       모듈이 읽지 않고 버린다.
