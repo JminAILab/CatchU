@@ -1,0 +1,117 @@
+{
+  "date": "2026-10-13",
+  "stage": "contract-design",
+  "intent": "260914-catchu-october-mvp",
+  "events": [
+  {
+    "id": "contract-summary-decision",
+    "cmd": "aidlc engine log decision --stage contract-design --single --checkpoint summary-confirmation --questions-file aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-13-processing-deadline-questions.md --decision 'Does this all look correct before I generate the artifact?' --options 'Looks correct,Request changes'",
+    "chunk_id": "0509a7",
+    "wall_time_seconds": 0.000012458,
+    "exit_code": 0,
+    "original_token_count": 15,
+    "output": "{\"emitted\":\"DECISION_RECORDED\",\"stage\":\"contract-design\"}\n"
+  },
+  {
+    "id": "contract-summary-answer",
+    "cmd": "aidlc engine log answer --stage contract-design --single --checkpoint summary-confirmation --questions-file aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/single-2026-10-13-processing-deadline-questions.md --details 'Looks correct'",
+    "chunk_id": "a55021",
+    "wall_time_seconds": 0.032563791,
+    "exit_code": 0,
+    "original_token_count": 57,
+    "output": "{\"emitted\":\"SUMMARY_CONFIRMATION_RECORDED\",\"checkpoint\":\"summary-confirmation\",\"stage\":\"contract-design\",\"choice\":\"Looks correct\",\"summary_authorization_id\":\"3c322bd2550c51eb6497065c3fdf0b336cb9d34195f0cf7e0a8b12480227d31b\"}\n"
+  },
+  {
+    "id": "contract-review-request",
+    "cmd": "aidlc engine log review --stage contract-design --single --reviewer aidlc-architecture-reviewer-agent --iteration 1",
+    "chunk_id": "76c176",
+    "wall_time_seconds": 0.038449625,
+    "exit_code": 1,
+    "original_token_count": 416,
+    "output": "{\"error\":\"Cannot start review for \\\"contract-design\\\": no fresh human-backed consolidated summary confirmation is recorded. Present the summary and record it with `aidlc engine log decision --checkpoint summary-confirmation --stage contract-design --single --questions-file aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md --decision 'Does this all look correct?' --options 'Looks correct,Request changes'`, end the turn, then after the human responds run `aidlc engine log answer --checkpoint summary-confirmation --stage contract-design --single --questions-file aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md --details 'Looks correct'`.\\n{\\\"kind\\\":\\\"ask\\\",\\\"ask_type\\\":\\\"guard-recovery\\\",\\\"response_route\\\":\\\"execute-remedy\\\",\\\"question\\\":\\\"Contract Design can't go ahead as things stand: which way would you like to go on?\\\",\\\"stage\\\":\\\"contract-design\\\",\\\"reason_codes\\\":[\\\"SUMMARY_RECEIPT_MISSING\\\"],\\\"remedies\\\":[{\\\"op\\\":\\\"restore-or-jump\\\",\\\"label\\\":\\\"Reopen the approved stage\\\",\\\"description\\\":\\\"Contract Design is already approved. I'll reopen it and redo it from the top. To keep the approval instead, put the files back the way they were when it was reviewed.\\\",\\\"action\\\":\\\"This stage is already approved; restore the reviewed source state, or jump back with $aidlc --stage contract-design to redo it.\\\",\\\"operation\\\":{\\\"kind\\\":\\\"restart-stage\\\",\\\"stage\\\":\\\"contract-design\\\"},\\\"command\\\":\\\"aidlc engine orchestrate next --stage contract-design\\\",\\\"requiresHuman\\\":true,\\\"executableNow\\\":true,\\\"interaction\\\":\\\"command\\\"}]}\"}\n"
+  },
+  {
+    "id": "contract-report",
+    "cmd": "aidlc engine orchestrate report --single --stage contract-design --result completed",
+    "chunk_id": "2ed3f1",
+    "wall_time_seconds": 0.000013,
+    "exit_code": 0,
+    "original_token_count": 195,
+    "output": "{\"kind\":\"error\",\"message\":\"Refusing to complete \\\"contract-design\\\": no fresh human-backed consolidated summary confirmation is recorded. Present the summary and record it with `aidlc engine log decision --checkpoint summary-confirmation --stage contract-design --single --questions-file aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md --decision 'Does this all look correct?' --options 'Looks correct,Request changes'`, end the turn, then after the human responds run `aidlc engine log answer --checkpoint summary-confirmation --stage contract-design --single --questions-file aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-design-questions.md --details 'Looks correct'`.\"}\n"
+  }
+],
+  "checks": [
+    {
+      "id": "contract-required-sections",
+      "cmd": "aidlc engine sensor-required-sections --output-path aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md --stage contract-design",
+      "chunk_id": "4bbaa1",
+      "wall_time_seconds": 0.000009292,
+      "exit_code": 0,
+      "original_token_count": 98,
+      "output": "{\"pass\":true,\"h2_count\":11,\"headings\":[\"## 계약의 지위와 경계\",\"## M — 회원 API\",\"## 분석 접수·상태·재요청\",\"## B 등록·공개 및 E/F 반영 경계\",\"## P — 수신자 API\",\"## 공통 오류·요청 안전성\",\"## W — worker 메시지 계약\",\"## Contract ownership rules\",\"## Open questions\",\"## 담당자 확인 요청\",\"## 추적 정보\"],\"findings_count\":0}\n"
+    },
+    {
+      "id": "contract-upstream-coverage",
+      "cmd": "aidlc engine sensor-upstream-coverage --output-path aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md --stage contract-design --consumes unit-of-work,unit-of-work-dependency,components,requirements --deliverables contract-summary",
+      "chunk_id": "8a9381",
+      "wall_time_seconds": 0.000008,
+      "exit_code": 0,
+      "original_token_count": 72,
+      "output": "{\"pass\":true,\"consumes\":[\"unit-of-work\",\"unit-of-work-dependency\",\"components\",\"requirements\"],\"unreferenced\":[],\"scanned_files\":[\"/Users/ljm/Desktop/github/CatchU/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md\"],\"findings_count\":0}\n"
+    },
+    {
+      "id": "yaml-validation",
+      "cmd": "python3 - <<'PY'\nimport pathlib,re,json,yaml\nbase=pathlib.Path('aidlc/spaces/default/intents/260914-catchu-october-mvp')\nc=base/'inception/contract-design'\nparsed=[]\nfor name in ['common.yaml','member-api.yaml','recipient-api.yaml','worker-messages.yaml']:\n yaml.safe_load((c/name).read_text()); parsed.append(str(c/name))\nfor rel in ['inception/contract-design/contract-summary.md','construction/u2-api/functional-design/rules.md','construction/u2-api/functional-design/entities.md']:\n p=base/rel\n blocks=re.findall(r'```yaml\\s*\\n(.*?)\\n```',p.read_text(),re.S)\n for i,b in enumerate(blocks,1): yaml.safe_load(b); parsed.append(str(p)+'#yaml-'+str(i))\nprint(json.dumps({'pass':True,'parsed':parsed,'count':len(parsed)},ensure_ascii=False,indent=2))\nPY",
+      "chunk_id": "45d5f2",
+      "wall_time_seconds": 0.000009417,
+      "exit_code": 1,
+      "original_token_count": 30,
+      "output": "Traceback (most recent call last):\n  File \"<stdin>\", line 1, in <module>\nModuleNotFoundError: No module named 'yaml'\n"
+    },
+    {
+      "id": "yaml-validation-node",
+      "cmd": "node <<'JS'\nconst fs=require('fs'),path=require('path');\nconst yaml=require(require.resolve('yaml',{paths:[path.join(process.cwd(),'api')]}));\nconst base='aidlc/spaces/default/intents/260914-catchu-october-mvp/',c=base+'inception/contract-design/';\nconst parsed=[];\nfor(const n of ['common.yaml','member-api.yaml','recipient-api.yaml','worker-messages.yaml']){const d=yaml.parseDocument(fs.readFileSync(c+n,'utf8'));if(d.errors.length)throw d.errors[0];parsed.push(c+n)}\nfor(const rel of ['inception/contract-design/contract-summary.md','construction/u2-api/functional-design/rules.md','construction/u2-api/functional-design/entities.md']){\n let i=0;for(const m of fs.readFileSync(base+rel,'utf8').matchAll(/```yaml\\s*\\n([\\s\\S]*?)\\n```/g)){const d=yaml.parseDocument(m[1]);if(d.errors.length)throw d.errors[0];parsed.push(base+rel+'#yaml-'+(++i))}\n if(!i)throw new Error('No YAML blocks: '+rel);\n}\nconsole.log(JSON.stringify({pass:true,parser:'api/node_modules/yaml',parsed,count:parsed.length},null,2));\nJS",
+      "chunk_id": "7e6a3e",
+      "wall_time_seconds": 0.089227417,
+      "exit_code": 0,
+      "original_token_count": 272,
+      "output": "{\n  \"pass\": true,\n  \"parser\": \"api/node_modules/yaml\",\n  \"parsed\": [\n    \"aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml\",\n    \"aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml\",\n    \"aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/recipient-api.yaml\",\n    \"aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml\",\n    \"aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#yaml-1\",\n    \"aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#yaml-2\",\n    \"aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#yaml-3\",\n    \"aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md#yaml-1\",\n    \"aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md#yaml-1\"\n  ],\n  \"count\": 9\n}\n"
+    },
+    {
+      "id": "branch-provenance",
+      "cmd": "git log -5 --format='%h %s'",
+      "chunk_id": "2aa644",
+      "wall_time_seconds": 0.000011875,
+      "exit_code": 0,
+      "original_token_count": 110,
+      "output": "7e3b92b2 chore: AI-DLC 2.11.0 반영 뒤의 dev를 처리 시한 계약 브랜치에 병합\n0bfe9bfe Merge pull request #290 from JminAILab/chore/aidlc-211-claude\n9941430c docs: Windows 안내의 hook 적용 범위 설명을 바로잡는다\n6eafa486 docs: Windows Claude Code에서 AI-DLC 확인이 동작하는 개인 설정을 안내한다\n613287b8 chore: Claude AI-DLC 실행 제한을 되돌려 공식 2.11.0 설정을 그대로 쓴다\n"
+    },
+    {
+      "id": "changed-artifacts",
+      "cmd": "git diff --numstat 0bfe9bf 7e3b92b -- aidlc/spaces/default/intents/260914-catchu-october-mvp",
+      "chunk_id": "e6cd38",
+      "wall_time_seconds": 0.000008083,
+      "exit_code": 0,
+      "original_token_count": 139,
+      "output": "5\t5\taidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md\n5\t5\taidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md\n13\t13\taidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md\n6\t6\taidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md\n13\t13\taidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md\n"
+    },
+    {
+      "id": "merge-preservation",
+      "cmd": "git diff --name-only e9b3455 7e3b92b -- aidlc/spaces/default/intents/260914-catchu-october-mvp",
+      "chunk_id": "c6253f",
+      "wall_time_seconds": 0.000006,
+      "exit_code": 0,
+      "original_token_count": 0,
+      "output": ""
+    },
+    {
+      "id": "contract-detail-count",
+      "cmd": "python3 - <<'PY'\nimport pathlib,json\np=pathlib.Path('aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md');s=p.read_text();print(json.dumps({'60분_occurrences':s.count('60분'),'deadline_error_code_occurrences':s.count('PROCESSING_DEADLINE_EXCEEDED'),'title_rewrite_retained':'한 분석 안의 제목 고쳐 쓰기는 분석 재시도가 아니다.' in s,'null_title_retained':'제목이 없으면 null' in s},ensure_ascii=False))\nPY",
+      "chunk_id": "640b88",
+      "wall_time_seconds": 0.000007958,
+      "exit_code": 0,
+      "original_token_count": 31,
+      "output": "{\"60분_occurrences\": 1, \"deadline_error_code_occurrences\": 1, \"title_rewrite_retained\": true, \"null_title_retained\": true}\n"
+    }
+  ]
+}
