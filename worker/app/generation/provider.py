@@ -36,8 +36,10 @@ class ProviderError(Exception):
 class UnusableResponse(ProviderError):
     """호출은 성공했지만 응답 전체를 쓸 수 없다. reason은 응답 판정(`response.Unreadable`)과 같은 뜻이다.
 
-    - TOO_LARGE: 최대 출력에서 잘렸다(최대 출력을 넘은 응답).
+    - TOO_LARGE: 최대 출력에서 잘렸거나 응답 본문이 받는 상한을 넘었다(최대 출력을 넘은 응답).
     - UNREADABLE: 제공자가 생성을 거절했거나 그 밖의 이유로 응답이 끝나지 않았다.
+
+    시간 제한을 넘겨 돌아왔으면 생성 흐름은 시간 초과로 다룬다.
     """
 
     def __init__(self, reason: Literal["TOO_LARGE", "UNREADABLE"]) -> None:

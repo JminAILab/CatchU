@@ -3,28 +3,33 @@
 `GenerationProvider`를 구현한다. 생성 호출 한 번은 Messages API 요청 한 번이고, 실패해도 다시 보내지 않는다.
 
 - 접속 주소는 코드에 고정하고 API 키와 함께 SDK 클라이언트에 직접 넘긴다. 그래서 `ANTHROPIC_BASE_URL`·
-  `ANTHROPIC_API_KEY`·`ANTHROPIC_AUTH_TOKEN` 환경변수가 주소·자격정보를 바꾸지 못한다. redirect는 따라가지
-  않는다.
+  `ANTHROPIC_API_KEY`·`ANTHROPIC_AUTH_TOKEN` 환경변수가 주소·자격정보를 바꾸지 못한다. 머리글을 덧붙이는
+  `ANTHROPIC_CUSTOM_HEADERS`가 있으면 만들지 않는다. HTTP 전송은 프록시 환경변수를 읽지 않고, redirect를
+  따라가지 않으며, 응답 본문을 `MAX_RESPONSE_BYTES`까지만 받는다.
 - SDK 기본 재시도(2회, 시간 초과 포함)를 끈다(`max_retries=0`).
 - 요청의 timeout_seconds를 호출마다 넘긴다. 생성 흐름은 남은 시간이 그만큼 있을 때만 호출을 시작하므로 이
-  값은 남은 시간 이하다. SDK 시간 제한이 연결·읽기 단계마다 걸리는지 전체 경과에 걸리는지는 문서에 없어,
-  시간 제한을 넘겨 돌아온 응답은 생성 흐름(`flow._call`)이 따로 버린다.
+  값은 남은 시간 이하다. SDK 시간 제한은 연결·읽기·쓰기 단계마다 걸려 전체 경과를 막지 않으므로, 시간 제한을
+  넘겨 돌아온 응답은 생성 흐름(`flow._call`)이 따로 버린다.
 - 추론 위치는 미국으로 고정하고(`inference_geo="us"`), 모델의 생각(thinking)은 끈다.
 - 지시문은 system 칸에, 신뢰할 수 없는 자료는 user 칸에 따로 둔다.
 
 운영 로그에는 호출마다 호출 종류·모델 ID·토큰 사용량·멈춘 이유·실패 원인 구분·Anthropic 요청 ID·걸린
-시간만 남긴다. 지시문·자료·응답 글·오류 원문·거절 설명·API 키는 남기지 않는다.
+시간만 남긴다. 지시문·자료·응답 글·오류 원문·거절 설명·API 키는 남기지 않는다. 응답에서 온 값은 정해 둔
+목록·모양에 맞을 때만 그대로 쓴다.
 """
 
+import json
 import logging
+import os
+import re
 import time
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import Final
 
 import anthropic
 import httpx2
-from anthropic import Anthropic, DefaultHttpxClient
+from anthropic import DEFAULT_CONNECTION_LIMITS, Anthropic, DefaultHttpxClient
 from anthropic.types import Message, ThinkingConfigParam
 
 from app.collection.credentials import AccessToken
@@ -40,9 +45,11 @@ logger = logging.getLogger(__name__)
 BASE_URL: Final = "https://api.anthropic.com"
 INFERENCE_GEO: Final = "us"
 DEFAULT_MODEL: Final = "claude-haiku-5-5"
-# 응답 최대 출력(바이트)보다 적게 잡지 않는다. 출력 토큰 하나는 1바이트 이상이므로, 최대 출력 안의 응답은
-# 이 토큰 수 안에서 끝난다. 생각을 끄므로 모두 응답 글에 쓰인다.
+# 최대 출력 바이트(4,000)보다 적게 잡지 않는다. 토큰 수와 응답 글 길이는 일대일이 아니어서 이 값으로 최대 출력
+# 안의 응답이 잘리지 않는다고 보장하지는 못한다. 잘리면 `max_tokens` 멈춤으로 와 전체 응답을 쓰지 않는다.
 MIN_MAX_TOKENS: Final = 4_000
+# 받는 HTTP 응답 본문 상한(바이트, 압축하지 않은 크기). 최대 출력 4,000 B 응답의 JSON 본문보다 넉넉히 크다.
+MAX_RESPONSE_BYTES: Final = 256 * 1024
 
 # 받는 모델과 그 모델에서 생각을 끄는 설정. 표에 없는 모델은 받지 않는다(30일 보관이 필수인 모델이나 단가가
 # 큰 모델을 설정 실수로 쓰지 않게 한다). Haiku 5.5는 `disabled`로 끄고(노력 수준 high 이하, 기본 medium),
@@ -78,6 +85,38 @@ _STATUS_CAUSES: Final[Mapping[int, str]] = {
     529: "OVERLOADED",
 }
 
+# 응답에서 와 운영 로그에 쓰는 값의 허용 목록·모양. 맞지 않으면 OTHER·INVALID로 적는다(원문·줄바꿈 차단).
+_STOP_REASONS: Final = frozenset(
+    {
+        "end_turn",
+        "max_tokens",
+        "stop_sequence",
+        "tool_use",
+        "pause_turn",
+        "refusal",
+        "model_context_window_exceeded",
+    }
+)
+_REFUSAL_CATEGORIES: Final = frozenset(
+    {"cyber", "bio", "frontier_llm", "reasoning_extraction", "general_harms"}
+)
+_ERROR_TYPES: Final = frozenset(
+    {
+        "invalid_request_error",
+        "authentication_error",
+        "billing_error",
+        "permission_error",
+        "not_found_error",
+        "conflict_error",
+        "request_too_large",
+        "rate_limit_error",
+        "api_error",
+        "timeout_error",
+        "overloaded_error",
+    }
+)
+_SAFE_ID: Final = re.compile(r"[A-Za-z0-9._:-]{1,128}")
+
 
 @dataclass(frozen=True)
 class ClaudeModels:
@@ -108,19 +147,39 @@ class ClaudeProvider:
         *,
         transport: httpx2.BaseTransport | None = None,
     ) -> None:
-        """transport는 시험이 네트워크 없이 SDK 전체를 돌릴 때만 넘긴다. 운영은 기본 transport다."""
-        _quiet_sdk_debug_log()
+        """transport는 시험이 네트워크 없이 SDK 전체를 돌릴 때만 넘긴다. 운영은 환경변수를 읽지 않는 기본
+        HTTP 전송이다. 어느 쪽이든 응답 본문 상한을 씌운다."""
+        if "ANTHROPIC_CUSTOM_HEADERS" in os.environ:
+            # SDK는 이 값을 머리글로 붙이고, 그 머리글이 x-api-key·Host까지 덮어쓴다. 값은 예외에 싣지 않는다.
+            raise ValueError(
+                "ANTHROPIC_CUSTOM_HEADERS 환경변수가 있으면 생성 제공자를 만들지 않는다"
+            )
+        _drop_sdk_debug_records()
         self._models = models if models is not None else ClaudeModels()
+        inner = (
+            transport
+            if transport is not None
+            else httpx2.HTTPTransport(trust_env=False, limits=DEFAULT_CONNECTION_LIMITS)
+        )
         self._client = Anthropic(
             api_key=api_key.reveal(),
             base_url=BASE_URL,
             max_retries=0,
-            http_client=DefaultHttpxClient(transport=transport, follow_redirects=False),
+            # 압축된 응답은 풀린 크기를 미리 셀 수 없어 압축하지 않은 응답만 받는다.
+            default_headers={"Accept-Encoding": "identity"},
+            http_client=DefaultHttpxClient(
+                transport=_CappedTransport(inner),
+                follow_redirects=False,
+                trust_env=False,
+            ),
         )
 
     def complete(self, request: ProviderRequest) -> str:
         model = self._models.for_purpose(request.purpose)
         started = time.monotonic()
+        # 실패 예외는 except 밖에서 낸다. SDK 예외는 응답 원문·요청 본문·키 머리글을 담고 있어, 새 예외의
+        # 원인(__cause__)으로도 문맥(__context__)으로도 이어지지 않게 한다.
+        failure: _Failure
         try:
             message = self._client.messages.create(
                 model=model,
@@ -131,58 +190,124 @@ class ClaudeProvider:
                 inference_geo=INFERENCE_GEO,
                 timeout=request.timeout_seconds,
             )
-        # 원인 예외를 잇지 않는다(from None). SDK 예외에는 응답 원문이 들어 있다.
         except anthropic.APITimeoutError:
-            _log_failure(request.purpose, model, "TIMEOUT", started)
-            raise TimeoutError("생성 제공자 호출 시간 초과") from None
-        except anthropic.APIConnectionError:
-            _log_failure(request.purpose, model, "CONNECTION", started)
-            raise ProviderError("생성 제공자 연결 실패") from None
+            failure = _Failure("TIMEOUT")
+        except anthropic.APIConnectionError as error:
+            failure = _connection_failure(error)
         except anthropic.APIStatusError as error:
-            cause = _status_cause(error)
-            _log_failure(
-                request.purpose,
-                model,
-                cause,
-                started,
+            failure = _Failure(
+                _status_cause(error),
                 status=error.status_code,
-                error_type=error.type,
-                request_id=error.request_id,
+                error_type=_listed(error.type, _ERROR_TYPES),
+                request_id=_safe_id(error.request_id),
             )
-            raise ProviderError(f"생성 제공자 호출 실패: {cause}") from None
-        except anthropic.APIError:
-            # 응답 모양 검사 실패 등 상태 코드 밖의 SDK 오류.
-            _log_failure(request.purpose, model, "INVALID_RESPONSE", started)
-            raise ProviderError("생성 제공자 응답 오류") from None
-        return _text(request.purpose, message, started)
+        except (anthropic.APIError, json.JSONDecodeError):
+            # 상태 코드 밖의 응답 오류(JSON이 아닌 본문, SDK 응답 검사 실패).
+            failure = _Failure("INVALID_RESPONSE")
+        else:
+            return _text(request.purpose, model, message, started)
+        _log_failure(request.purpose, model, failure, started)
+        raise failure.exception()
 
 
-def _text(purpose: Purpose, message: Message, started: float) -> str:
+@dataclass(frozen=True)
+class _Failure:
+    """실패 원인과 로그에 남길 안전한 값. SDK 예외 객체는 담지 않는다."""
+
+    cause: str
+    status: int | None = None
+    error_type: str | None = None
+    request_id: str | None = None
+
+    def exception(self) -> Exception:
+        if self.cause == "TIMEOUT":
+            return TimeoutError("생성 제공자 호출 시간 초과")
+        if self.cause == "RESPONSE_TOO_LARGE":
+            return UnusableResponse("TOO_LARGE")
+        return ProviderError(f"생성 제공자 호출 실패: {self.cause}")
+
+
+@dataclass(frozen=True)
+class _Reply:
+    text: str
+    stop: str | None
+    category: str | None
+    model: str
+    input_tokens: int
+    output_tokens: int
+    inference_geo: str | None
+    request_id: str | None
+
+
+def _text(purpose: Purpose, model: str, message: object, started: float) -> str:
     """정상으로 끝난 응답의 글만 돌려준다. 거절·출력 상한·그 밖의 멈춤은 응답 전체를 쓰지 않는다."""
-    stop = message.stop_reason
-    category = None
-    if stop == "refusal" and message.stop_details is not None:
-        category = message.stop_details.category
-    usage = message.usage
+    reply = _read(message)
+    if reply is None:
+        _log_failure(purpose, model, _Failure("INVALID_RESPONSE"), started)
+        raise ProviderError("생성 제공자 호출 실패: INVALID_RESPONSE")
     logger.log(
-        logging.INFO if stop == "end_turn" else logging.WARNING,
+        logging.INFO if reply.stop == "end_turn" else logging.WARNING,
         "생성 제공자 응답: purpose=%s model=%s stopReason=%s refusalCategory=%s "
         "inputTokens=%d outputTokens=%d inferenceGeo=%s elapsedMs=%d requestId=%s",
         purpose,
-        message.model,
-        stop,
-        category,
-        usage.input_tokens,
-        usage.output_tokens,
-        usage.inference_geo,
+        _safe_id(reply.model),
+        _listed(reply.stop, _STOP_REASONS),
+        _listed(reply.category, _REFUSAL_CATEGORIES),
+        reply.input_tokens,
+        reply.output_tokens,
+        _safe_id(reply.inference_geo),
         _elapsed_ms(started),
-        message._request_id,
+        _safe_id(reply.request_id),
     )
-    if stop == "max_tokens":
+    if reply.stop == "max_tokens":
         raise UnusableResponse("TOO_LARGE")
-    if stop != "end_turn":
+    if reply.stop != "end_turn":
         raise UnusableResponse("UNREADABLE")
-    return "".join(block.text for block in message.content if block.type == "text")
+    return reply.text
+
+
+def _read(message: object) -> _Reply | None:
+    """쓰기 전에 필요한 칸의 모양을 확인한다. SDK는 응답을 엄격히 검사하지 않아 칸이 빠지거나 자료형이 달라도
+    객체를 만든다. 맞지 않으면 None."""
+    if not isinstance(message, Message):
+        return None
+    usage = getattr(message, "usage", None)
+    content = getattr(message, "content", None)
+    stop = getattr(message, "stop_reason", None)
+    model = getattr(message, "model", None)
+    if usage is None or not isinstance(content, list) or not isinstance(model, str):
+        return None
+    if stop is not None and not isinstance(stop, str):
+        return None
+    tokens = (
+        getattr(usage, "input_tokens", None),
+        getattr(usage, "output_tokens", None),
+    )
+    if type(tokens[0]) is not int or type(tokens[1]) is not int:
+        return None
+    texts: list[str] = []
+    for block in content:
+        if getattr(block, "type", None) != "text":
+            continue
+        text = getattr(block, "text", None)
+        if not isinstance(text, str):
+            return None
+        texts.append(text)
+    category = None
+    if stop == "refusal":
+        category = getattr(getattr(message, "stop_details", None), "category", None)
+    geo = getattr(usage, "inference_geo", None)
+    request_id = getattr(message, "_request_id", None)
+    return _Reply(
+        text="".join(texts),
+        stop=stop,
+        category=category if isinstance(category, str) else None,
+        model=model,
+        input_tokens=tokens[0],
+        output_tokens=tokens[1],
+        inference_geo=geo if isinstance(geo, str) else None,
+        request_id=request_id if isinstance(request_id, str) else None,
+    )
 
 
 def _status_cause(error: anthropic.APIStatusError) -> str:
@@ -205,39 +330,122 @@ def _status_cause(error: anthropic.APIStatusError) -> str:
     return "SERVER_ERROR" if error.status_code >= 500 else "HTTP_ERROR"
 
 
+def _connection_failure(error: anthropic.APIConnectionError) -> _Failure:
+    """SDK는 응답을 받는 중에 난 예외를 연결 오류로 감싼다. 응답 상한·압축 거부는 따로 가른다."""
+    cause = error.__cause__
+    if isinstance(cause, _ResponseTooLarge):
+        return _Failure("RESPONSE_TOO_LARGE", status=cause.status)
+    if isinstance(cause, _UnexpectedEncoding):
+        return _Failure("INVALID_RESPONSE", status=cause.status)
+    return _Failure("CONNECTION")
+
+
 def _log_failure(
-    purpose: Purpose,
-    model: str,
-    cause: str,
-    started: float,
-    *,
-    status: int | None = None,
-    error_type: str | None = None,
-    request_id: str | None = None,
+    purpose: Purpose, model: str, failure: _Failure, started: float
 ) -> None:
     logger.warning(
         "생성 제공자 실패: purpose=%s model=%s cause=%s status=%s errorType=%s "
         "elapsedMs=%d requestId=%s",
         purpose,
         model,
-        cause,
-        status,
-        error_type,
+        failure.cause,
+        failure.status,
+        failure.error_type,
         _elapsed_ms(started),
-        request_id,
+        failure.request_id,
     )
+
+
+def _listed(value: object, allowed: frozenset[str]) -> str | None:
+    if value is None:
+        return None
+    return value if isinstance(value, str) and value in allowed else "OTHER"
+
+
+def _safe_id(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str) and _SAFE_ID.fullmatch(value):
+        return value
+    return "INVALID"
 
 
 def _elapsed_ms(started: float) -> int:
     return round((time.monotonic() - started) * 1000)
 
 
-def _quiet_sdk_debug_log() -> None:
-    """SDK는 DEBUG 수준에서 요청 본문 전체(보낸 변경 줄)를 로그에 남긴다(`Request options`).
+class _ResponseTooLarge(Exception):
+    def __init__(self, status: int) -> None:
+        super().__init__("응답 본문 상한 초과")
+        self.status = status
 
-    회원 자료가 운영 로그에 남지 않게 SDK 로거를 INFO 아래로 내리지 않는다. `ANTHROPIC_LOG=debug`나 루트
-    로거의 DEBUG 설정도 이것으로 막는다. 이미 INFO보다 높게 둔 설정은 그대로 둔다.
+
+class _UnexpectedEncoding(Exception):
+    def __init__(self, status: int) -> None:
+        super().__init__("압축된 응답")
+        self.status = status
+
+
+class _CappedStream(httpx2.SyncByteStream):
+    def __init__(self, stream: httpx2.SyncByteStream, status: int) -> None:
+        self._stream = stream
+        self._status = status
+
+    def __iter__(self) -> Iterator[bytes]:
+        received = 0
+        for chunk in self._stream:
+            received += len(chunk)
+            if received > MAX_RESPONSE_BYTES:
+                raise _ResponseTooLarge(self._status)
+            yield chunk
+
+    def close(self) -> None:
+        self._stream.close()
+
+
+class _CappedTransport(httpx2.BaseTransport):
+    """응답 본문을 MAX_RESPONSE_BYTES까지만 받는다. SDK는 본문을 끝까지 읽은 뒤에 해석하므로 그 전에 끊는다.
+    압축된 응답(Content-Encoding이 identity가 아님)은 풀린 크기를 셀 수 없어 받지 않는다."""
+
+    def __init__(self, inner: httpx2.BaseTransport) -> None:
+        self._inner = inner
+
+    def handle_request(self, request: httpx2.Request) -> httpx2.Response:
+        response = self._inner.handle_request(request)
+        encoding = response.headers.get("content-encoding", "identity").strip().lower()
+        if encoding not in ("", "identity") or not isinstance(
+            response.stream, httpx2.SyncByteStream
+        ):
+            response.close()
+            raise _UnexpectedEncoding(response.status_code)
+        return httpx2.Response(
+            response.status_code,
+            headers=response.headers,
+            stream=_CappedStream(response.stream, response.status_code),
+            extensions=response.extensions,
+        )
+
+    def close(self) -> None:
+        self._inner.close()
+
+
+class _DropBelowInfo(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.levelno >= logging.INFO
+
+
+_SDK_DEBUG_FILTER: Final = _DropBelowInfo()
+
+
+def _drop_sdk_debug_records() -> None:
+    """SDK는 DEBUG에서 요청 본문 전체(보낸 변경 줄)를 남긴다(`anthropic._base_client`의 `Request options`).
+
+    상위 로거의 수준으로는 하위 로거가 만든 기록을 막지 못한다(하위 로거에 수준·핸들러를 직접 달면 그대로
+    나간다). 로거 필터는 그 로거가 만든 기록을 수준·핸들러·전파 설정과 관계없이 거르므로, 지금 있는 SDK
+    로거 모두에 INFO 아래 기록을 버리는 필터를 단다. SDK 모듈은 불러올 때 로거를 만든다.
     """
-    sdk = logging.getLogger("anthropic")
-    if sdk.level < logging.INFO:
-        sdk.setLevel(logging.INFO)
+    for name in list(logging.Logger.manager.loggerDict):
+        if name == "anthropic" or name.startswith("anthropic."):
+            sdk = logging.getLogger(name)
+            if _SDK_DEBUG_FILTER not in sdk.filters:
+                sdk.addFilter(_SDK_DEBUG_FILTER)
