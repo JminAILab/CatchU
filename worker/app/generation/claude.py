@@ -7,11 +7,11 @@
   `ANTHROPIC_CUSTOM_HEADERS`가 있으면 만들지 않는다. HTTP 전송은 프록시 환경변수를 읽지 않고, redirect를
   따라가지 않으며, 응답 본문을 `MAX_RESPONSE_BYTES`까지만 받는다.
 - SDK 기본 재시도(2회, 시간 초과 포함)를 끈다(`max_retries=0`).
-- 요청의 timeout_seconds를 호출마다 넘긴다. 생성 흐름은 남은 시간이 그만큼 있을 때만 호출을 시작하므로 이
-  값은 남은 시간 이하다. SDK 시간 제한은 연결·읽기 등 단계마다 걸려 전체 경과를 막지 않으므로, HTTP 전송이
-  머리글을 받은 직후와 본문 조각마다 호출 시작부터 지난 시간을 보고 넘으면 시간 초과로 끊는다. 막혀 있는 읽기
-  한 번은 그 읽기의 시간 제한까지 더 걸릴 수 있어 최악은 시간 제한의 2배다. 시간 제한을 넘겨 돌아온 응답은
-  생성 흐름(`flow._call`)도 따로 버린다.
+- 요청의 timeout_seconds를 호출마다 넘기고, 같은 값을 호출 전체의 마감으로 쓴다. 생성 흐름은 남은 시간이
+  그만큼 있을 때만 호출을 시작하므로 이 값은 남은 시간 이하다. SDK 시간 제한은 연결·읽기 등 네트워크 대기
+  한 번마다 걸려 전체 경과를 막지 않으므로, 네트워크 연결·쓰기·읽기마다 그 대기 시간을 마감까지 남은 시간
+  이하로 줄이고 마감이 지났으면 바로 시간 초과로 끊는다(`_DeadlineBackend`). 이름 조회(DNS)는 이 마감 밖이다.
+  시간 제한을 넘겨 끝난 호출은 생성 흐름(`flow._call`)도 시간 초과로 본다.
 - 추론 위치는 미국으로 고정하고(`inference_geo="us"`), 모델의 생각(thinking)은 끈다.
 - 지시문은 system 칸에, 신뢰할 수 없는 자료는 user 칸에 따로 둔다.
 
@@ -20,16 +20,18 @@
 목록·모양에 맞을 때만 그대로 쓴다.
 """
 
-import json
 import logging
 import os
 import re
+import ssl
 import time
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
 import anthropic
+import httpcore2
 import httpx2
 from anthropic import DEFAULT_CONNECTION_LIMITS, Anthropic, DefaultHttpxClient
 from anthropic.types import Message, ThinkingConfigParam
@@ -152,20 +154,16 @@ class ClaudeProvider:
         *,
         transport: httpx2.BaseTransport | None = None,
     ) -> None:
-        """transport는 시험이 네트워크 없이 SDK 전체를 돌릴 때만 넘긴다. 운영은 환경변수를 읽지 않는 기본
-        HTTP 전송이다. 어느 쪽이든 응답 본문 상한을 씌운다."""
+        """transport는 시험이 네트워크 없이 SDK 전체를 돌릴 때만 넘긴다. 운영은 `_http_transport()`다. 어느
+        쪽이든 응답 본문 상한과 호출 마감 확인을 씌운다."""
         if "ANTHROPIC_CUSTOM_HEADERS" in os.environ:
             # SDK는 이 값을 머리글로 붙이고, 그 머리글이 x-api-key·Host까지 덮어쓴다. 값은 예외에 싣지 않는다.
             raise ValueError(
                 "ANTHROPIC_CUSTOM_HEADERS 환경변수가 있으면 생성 제공자를 만들지 않는다"
             )
-        _drop_sdk_debug_records()
+        _quiet_library_logs()
         self._models = models if models is not None else ClaudeModels()
-        inner = (
-            transport
-            if transport is not None
-            else httpx2.HTTPTransport(trust_env=False, limits=DEFAULT_CONNECTION_LIMITS)
-        )
+        inner = transport if transport is not None else _http_transport()
         self._client = Anthropic(
             api_key=api_key.reveal(),
             base_url=BASE_URL,
@@ -206,8 +204,10 @@ class ClaudeProvider:
                 error_type=_listed(error.type, _ERROR_TYPES),
                 request_id=_safe_id(error.request_id),
             )
-        except (anthropic.APIError, json.JSONDecodeError):
-            # 상태 코드 밖의 응답 오류(JSON이 아닌 본문, SDK 응답 검사 실패).
+        except (anthropic.APIError, ValueError, RecursionError):
+            # 상태 코드 밖의 응답 오류. SDK는 본문 해석 오류를 감싸지 않아 JSON이 아닌 본문·잘못된 UTF-8
+            # (ValueError 하위), 자릿수 상한을 넘는 정수(ValueError), 너무 깊은 중첩(RecursionError)이 그대로
+            # 온다. 이 try에는 SDK 호출만 있다.
             failure = _Failure("INVALID_RESPONSE")
         else:
             return _text(request.purpose, model, message, started)
@@ -406,13 +406,24 @@ class _CappedStream(httpx2.SyncByteStream):
 
     def __iter__(self) -> Iterator[bytes]:
         received = 0
-        for chunk in self._stream:
+        chunks = iter(self._stream)
+        while True:
+            # 본문 읽기(네트워크 대기)도 이 호출의 마감 안에서 하게 한다.
+            token = _DEADLINE.set(self._deadline)
+            try:
+                chunk = next(chunks, None)
+            finally:
+                _DEADLINE.reset(token)
+            if chunk is None:
+                break
             received += len(chunk)
             if received > MAX_RESPONSE_BYTES:
                 raise _ResponseTooLarge(self._status)
             if _past(self._deadline):
                 raise _timed_out(self._request)
             yield chunk
+        if _past(self._deadline):
+            raise _timed_out(self._request)
 
     def close(self) -> None:
         self._stream.close()
@@ -422,9 +433,10 @@ class _CappedTransport(httpx2.BaseTransport):
     """응답을 호출 마감과 MAX_RESPONSE_BYTES 안에서만 받는다. SDK는 본문을 끝까지 읽은 뒤에 해석하므로 그 전에
     끊는다. 압축된 응답(Content-Encoding이 identity가 아님)은 풀린 크기를 셀 수 없어 받지 않는다.
 
-    SDK 시간 제한은 연결·읽기 등 단계마다 걸려, 서버가 그보다 짧은 간격으로 조각을 계속 보내면 호출이 끝나지
-    않는다. 그래서 그 시간 제한을 호출 전체의 상한으로도 쓴다. 머리글을 받은 직후와 본문 조각마다 지난 시간을
-    보며, 막혀 있는 읽기 한 번은 그 읽기의 시간 제한까지 더 걸릴 수 있다."""
+    호출 마감은 SDK가 요청에 실은 시간 제한(호출마다 넘긴 값)이다. 연결·요청 쓰기·머리글 읽기와 본문 읽기
+    동안 마감을 `_DEADLINE`에 두어 네트워크 대기마다 남은 시간 이하로 줄이게 하고(`_DeadlineBackend`), 머리글
+    직후·본문 조각마다·본문 끝에서도 지난 시간을 다시 본다. 뒤의 확인은 네트워크 아래를 바꾸지 않은 전송
+    (시험의 가짜 전송)에서도 같은 마감을 지키게 한다."""
 
     def __init__(self, inner: httpx2.BaseTransport) -> None:
         self._inner = inner
@@ -432,7 +444,11 @@ class _CappedTransport(httpx2.BaseTransport):
     def handle_request(self, request: httpx2.Request) -> httpx2.Response:
         limit = _call_limit(request)
         deadline = None if limit is None else _monotonic() + limit
-        response = self._inner.handle_request(request)
+        token = _DEADLINE.set(deadline)
+        try:
+            response = self._inner.handle_request(request)
+        finally:
+            _DEADLINE.reset(token)
         if _past(deadline):
             response.close()
             raise _timed_out(request)
@@ -477,23 +493,145 @@ def _timed_out(request: httpx2.Request) -> httpx2.ReadTimeout:
     return httpx2.ReadTimeout("호출 시간 제한 초과", request=request)
 
 
-class _DropBelowInfo(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        return record.levelno >= logging.INFO
+# 지금 진행 중인 호출의 마감(`_monotonic` 기준). 호출 밖이면 None이고, 그때는 네트워크 대기를 줄이지 않는다.
+_DEADLINE: ContextVar[float | None] = ContextVar("claude_call_deadline", default=None)
 
 
-_SDK_DEBUG_FILTER: Final = _DropBelowInfo()
+def _within_deadline(timeout: float | None, timed_out: type[Exception]) -> float | None:
+    """네트워크 대기 한 번의 시간 제한을 호출 마감까지 남은 시간 이하로 줄인다. 이미 지났으면 바로 시간 초과."""
+    deadline = _DEADLINE.get()
+    if deadline is None:
+        return timeout
+    remaining = deadline - _monotonic()
+    if remaining <= 0:
+        raise timed_out("호출 시간 제한 초과")
+    return remaining if timeout is None else min(timeout, remaining)
 
 
-def _drop_sdk_debug_records() -> None:
-    """SDK는 DEBUG에서 요청 본문 전체(보낸 변경 줄)를 남긴다(`anthropic._base_client`의 `Request options`).
+class _DeadlineStream(httpcore2.NetworkStream):
+    def __init__(self, inner: httpcore2.NetworkStream) -> None:
+        self._inner = inner
 
-    상위 로거의 수준으로는 하위 로거가 만든 기록을 막지 못한다(하위 로거에 수준·핸들러를 직접 달면 그대로
-    나간다). 로거 필터는 그 로거가 만든 기록을 수준·핸들러·전파 설정과 관계없이 거르므로, 지금 있는 SDK
-    로거 모두에 INFO 아래 기록을 버리는 필터를 단다. SDK 모듈은 불러올 때 로거를 만든다.
+    def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
+        return self._inner.read(
+            max_bytes, _within_deadline(timeout, httpcore2.ReadTimeout)
+        )
+
+    def write(self, buffer: bytes, timeout: float | None = None) -> None:
+        self._inner.write(buffer, _within_deadline(timeout, httpcore2.WriteTimeout))
+
+    def close(self) -> None:
+        self._inner.close()
+
+    def start_tls(
+        self,
+        ssl_context: ssl.SSLContext,
+        server_hostname: str | None = None,
+        timeout: float | None = None,
+    ) -> httpcore2.NetworkStream:
+        return _DeadlineStream(
+            self._inner.start_tls(
+                ssl_context,
+                server_hostname,
+                _within_deadline(timeout, httpcore2.ConnectTimeout),
+            )
+        )
+
+    def get_extra_info(self, info: str) -> Any:
+        return self._inner.get_extra_info(info)
+
+
+class _DeadlineBackend(httpcore2.NetworkBackend):
+    """HTTPCore2 네트워크 백엔드를 감싸 연결·TLS·쓰기·읽기 대기마다 호출 마감까지 남은 시간만 기다리게 한다.
+
+    HTTPCore2는 머리글이나 청크 구분 정보가 다 올 때까지 소켓을 여러 번 읽고, 읽기마다 같은 시간 제한을 새로
+    건다. 그래서 그 위(머리글을 다 받은 뒤, 본문 조각을 받은 뒤)에서만 지난 시간을 보면 조금씩 계속 오는 응답을
+    끊지 못한다."""
+
+    def __init__(self, inner: httpcore2.NetworkBackend) -> None:
+        self._inner = inner
+
+    def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: Iterable[Any] | None = None,
+    ) -> httpcore2.NetworkStream:
+        return _DeadlineStream(
+            self._inner.connect_tcp(
+                host,
+                port,
+                _within_deadline(timeout, httpcore2.ConnectTimeout),
+                local_address,
+                socket_options,
+            )
+        )
+
+    def connect_unix_socket(
+        self,
+        path: str,
+        timeout: float | None = None,
+        socket_options: Iterable[Any] | None = None,
+    ) -> httpcore2.NetworkStream:
+        return _DeadlineStream(
+            self._inner.connect_unix_socket(
+                path,
+                _within_deadline(timeout, httpcore2.ConnectTimeout),
+                socket_options,
+            )
+        )
+
+    def sleep(self, seconds: float) -> None:
+        self._inner.sleep(seconds)
+
+
+def _http_transport(
+    backend: httpcore2.NetworkBackend | None = None,
+) -> httpx2.HTTPTransport:
+    """운영 HTTP 전송. 환경변수(프록시·인증서 파일 지정)를 읽지 않고, 네트워크 대기마다 호출 마감을 지킨다.
+
+    HTTPX2 전송은 네트워크 백엔드를 받는 인자가 없어, 만든 뒤 연결 풀의 백엔드를 감싼다. 판본은 잠금 파일로
+    고정했고, 구조가 달라지면 여기서 멈추고 시험이 실패한다. backend는 시험이 가짜 네트워크를 넣을 때만 넘긴다.
     """
+    transport = httpx2.HTTPTransport(trust_env=False, limits=DEFAULT_CONNECTION_LIMITS)
+    pool = transport._pool
+    if not isinstance(pool, httpcore2.ConnectionPool):
+        raise TypeError("HTTPX2 전송의 연결 풀 구조가 예상과 다르다")
+    pool._network_backend = _DeadlineBackend(
+        backend if backend is not None else pool._network_backend
+    )
+    return transport
+
+
+class _DropBelow(logging.Filter):
+    def __init__(self, level: int) -> None:
+        super().__init__()
+        self._level = level
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.levelno >= self._level
+
+
+# 로거 이름(과 그 하위)마다 버릴 기록 수준. 로거 수준으로는 하위 로거가 만든 기록을 막지 못하지만(하위 로거에
+# 수준·핸들러를 직접 달면 그대로 나간다), 로거 필터는 그 로거가 만든 기록을 수준·핸들러·전파 설정과 관계없이
+# 거른다.
+# - anthropic: DEBUG에 요청 본문 전체(보낸 변경 줄)를 남긴다(`anthropic._base_client`의 `Request options`).
+# - httpx2: INFO에 서버가 보낸 상태 설명을 그대로 남긴다.
+# - httpcore2: DEBUG에 응답 머리글과, 프로토콜 오류의 원문(받은 바이트)을 남긴다.
+_LOG_FLOORS: Final = (
+    ("anthropic", _DropBelow(logging.INFO)),
+    ("httpx2", _DropBelow(logging.WARNING)),
+    ("httpcore2", _DropBelow(logging.WARNING)),
+)
+
+
+def _quiet_library_logs() -> None:
+    """지금 있는 SDK·HTTP 라이브러리 로거 모두에 필터를 단다. 이 모듈들은 불러올 때 로거를 만든다."""
     for name in list(logging.Logger.manager.loggerDict):
-        if name == "anthropic" or name.startswith("anthropic."):
-            sdk = logging.getLogger(name)
-            if _SDK_DEBUG_FILTER not in sdk.filters:
-                sdk.addFilter(_SDK_DEBUG_FILTER)
+        for prefix, floor in _LOG_FLOORS:
+            if name == prefix or name.startswith(prefix + "."):
+                each = logging.getLogger(name)
+                if floor not in each.filters:
+                    each.addFilter(floor)

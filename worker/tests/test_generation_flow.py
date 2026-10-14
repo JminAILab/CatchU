@@ -492,8 +492,10 @@ WHOLE_FAILURES: dict[str, str] = {
     # 제공자가 정상 응답 안에서 생성을 거절함·최대 출력에서 잘림(실제 제공자 어댑터가 알려 준다).
     "refused": UNREADABLE,
     "cut-at-max-output": TOO_LARGE,
-    # 거절이어도 시간 제한을 넘겨 돌아왔으면 시간 초과다.
+    # 거절·잘림·호출 오류여도 시간 제한을 넘겨 끝났으면 시간 초과다.
     "late-refusal": TIMEOUT,
+    "late-cut": TIMEOUT,
+    "late-call-error": TIMEOUT,
 }
 
 
@@ -513,6 +515,13 @@ def failing_reply(kind: str) -> Reply | Late:
         return UnusableResponse("TOO_LARGE")
     if kind == "late-refusal":
         return Late(UnusableResponse("UNREADABLE"), GENERATION_TIMEOUT_SECONDS + 1)
+    if kind == "late-cut":
+        return Late(UnusableResponse("TOO_LARGE"), GENERATION_TIMEOUT_SECONDS + 1)
+    if kind == "late-call-error":
+        return Late(
+            ProviderError(f"제공자 내부 오류 {INTERNAL} {SECRET}"),
+            GENERATION_TIMEOUT_SECONDS + 1,
+        )
     assert kind == "too-large"
     return padded(MAX_OUTPUT_BYTES)
 

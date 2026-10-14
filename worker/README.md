@@ -14,8 +14,8 @@ FastAPI 기반 worker의 최소 실행 골격이다. HTTP 경로는 `GET /health
 | 가상환경·의존성 관리 | `uv` (`0.12.18` 기준) |
 | 웹 앱·서버 | FastAPI `0.141.1`, Uvicorn `0.53.0` |
 | 정적·서식·타입 검사 | Ruff `0.16.8`, mypy `2.3.1` |
-| 테스트 | pytest `9.1.1`, HTTPX2 `2.13.0` |
-| 생성 LLM 제공자 SDK | anthropic `1.13.0`(HTTP는 위 HTTPX2를 쓴다, [생성의 실제 제공자](docs/generation-provider.md)) |
+| 테스트 | pytest `9.1.1` |
+| 생성 LLM 제공자 SDK | anthropic `1.13.0`, HTTP는 HTTPX2 `2.13.0`·HTTPCore2 `2.13.0`(FastAPI 시험 클라이언트도 HTTPX2를 쓴다, [생성의 실제 제공자](docs/generation-provider.md)) |
 | 메시지 스키마 검사 | jsonschema `4.26.0`, referencing `0.37.0`, PyYAML `6.0.3`, 형식 검사 rfc3339-validator `0.1.4`·rfc3986-validator `0.1.1` |
 
 직접 의존성과 검사 설정은 `pyproject.toml`, 전체 의존성의 해석 결과는 `uv.lock`에 둔다. `--locked`는 두 파일이 맞지 않으면 실행을 중단하여 의존성이 조용히 바뀌지 않게 한다. 패키지 배포를 하지 않는 앱(`package = false`)이므로 별도 빌드 명령은 없다.

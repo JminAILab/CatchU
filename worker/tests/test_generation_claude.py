@@ -1,7 +1,8 @@
 """Anthropic Claude API 생성 제공자(#120·#119 결정) 시험.
 
 SDK는 진짜를 쓰고 HTTP 전송만 가짜(httpx2.MockTransport)로 바꾼다. 그래서 재시도·시간 제한·접속 주소·
-redirect·응답 상한·요청 본문을 SDK가 실제로 만드는 HTTP 요청·응답에서 확인한다. 네트워크 연결은 막는다.
+redirect·응답 상한·요청 본문을 SDK가 실제로 만드는 HTTP 요청·응답에서 확인한다. 호출 마감과 HTTP 라이브러리
+로그는 그보다 아래(HTTPCore2의 네트워크 백엔드)를 가짜로 바꿔 실제 HTTP 해석을 거치게 한다. 네트워크 연결은 막는다.
 응답은 공식 문서의 모양을 본뜬 합성 값이고, 실제 API의 응답 시간·토큰 수·결과 품질은 이 시험으로 알 수 없다.
 """
 
@@ -10,10 +11,12 @@ import io
 import json
 import logging
 import socket
-from collections.abc import Callable, Iterator
+import ssl
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 import anthropic
+import httpcore2
 import httpx2
 import pytest
 from candidate_scenarios import (
@@ -41,6 +44,7 @@ ERROR_TEXT = "upstream detail ERROR-MARK-88"
 REFUSAL_TEXT = "refusal explanation REFUSAL-MARK-64"
 LEAKS = (KEY, "INSTRUCTION-MARK-51", "DATA-MARK-73", "ANSWER-MARK-29", "ERROR-MARK-88")
 SDK_LOGGERS = ("anthropic", "anthropic._base_client")
+LIBRARY_PREFIXES = ("anthropic", "httpx2", "httpcore2")
 
 
 @pytest.fixture(autouse=True)
@@ -55,17 +59,37 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def sdk_loggers() -> Iterator[None]:
-    """시험이 바꾼 SDK 로거의 수준·전파·핸들러를 원래대로 돌린다."""
+def no_custom_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """밖에서 물려받은 머리글 환경변수가 다른 시험을 깨뜨리지 않게 지운다(그 변수 전용 시험은 직접 둔다)."""
+    monkeypatch.delenv("ANTHROPIC_CUSTOM_HEADERS", raising=False)
+
+
+def library_loggers() -> list[logging.Logger]:
+    names = list(logging.Logger.manager.loggerDict)
+    return [
+        logging.getLogger(name)
+        for name in names
+        if any(name == each or name.startswith(each + ".") for each in LIBRARY_PREFIXES)
+    ]
+
+
+@pytest.fixture(autouse=True)
+def fresh_library_logs() -> Iterator[None]:
+    """시험마다 SDK·HTTP 라이브러리 로거에서 어댑터의 필터를 떼고 시작해, 제공자를 만들 때 다시 다는지
+    보게 한다. 끝나면 수준·전파·핸들러·필터를 원래대로 돌린다."""
+    floors = [floor for _, floor in claude_module._LOG_FLOORS]
     saved = []
-    for name in SDK_LOGGERS:
-        each = logging.getLogger(name)
-        saved.append((each, each.level, each.propagate, list(each.handlers)))
+    for each in library_loggers():
+        saved.append(
+            (each, each.level, each.propagate, list(each.handlers), list(each.filters))
+        )
+        each.filters[:] = [kept for kept in each.filters if kept not in floors]
     yield
-    for each, level, propagate, handlers in saved:
+    for each, level, propagate, handlers, filters in saved:
         each.setLevel(level)
         each.propagate = propagate
         each.handlers[:] = handlers
+        each.filters[:] = filters
 
 
 # 가짜 Messages API
@@ -339,29 +363,27 @@ def test_custom_headers_environment_is_refused(
     assert "collector" not in str(raised.value)
 
 
-def test_default_transport_ignores_proxy_environment(
+def test_default_transport_ignores_environment_and_bounds_network_waits(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """운영 기본 전송은 환경변수를 읽지 않게 만들고, 프록시 환경변수가 있어도 프록시 경로를 두지 않는다."""
+    """운영 기본 전송은 환경변수(프록시·인증서 파일)를 읽지 않아 프록시 경로를 두지 않고, 연결 풀의 네트워크
+    백엔드를 호출 마감으로 감싼다."""
     for name in ("HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY"):
         monkeypatch.setenv(name, "http://proxy.example.test:3128")
-    api = FakeApi(message())
-    made: list[dict[str, object]] = []
+    # 환경변수를 읽는 전송이면 이 없는 파일을 인증서로 열다가 만들지 못한다.
+    monkeypatch.setenv("SSL_CERT_FILE", "/nonexistent/synthetic-ca.pem")
 
-    class Recording(httpx2.MockTransport):
-        def __init__(self, **kwargs: object) -> None:
-            made.append(kwargs)
-            super().__init__(api)
-
-    monkeypatch.setattr(httpx2, "HTTPTransport", Recording)
     provider = ClaudeProvider(AccessToken(KEY))
-    provider.complete(call())
 
-    assert made == [{"trust_env": False, "limits": anthropic.DEFAULT_CONNECTION_LIMITS}]
-    assert len(api.requests) == 1
     http = provider._client._client
     assert http.trust_env is False
     assert http._mounts == {}
+    capped = http._transport
+    assert isinstance(capped, claude_module._CappedTransport)
+    inner = capped._inner
+    assert isinstance(inner, httpx2.HTTPTransport)
+    assert isinstance(inner._pool, httpcore2.ConnectionPool)
+    assert isinstance(inner._pool._network_backend, claude_module._DeadlineBackend)
 
 
 def test_redirect_is_not_followed() -> None:
@@ -467,6 +489,33 @@ def test_sdk_retries_are_off(status: str) -> None:
     assert len(api.requests) == 1
 
 
+@pytest.mark.parametrize(
+    ("purpose", "models", "model"),
+    [
+        ("GENERATE", ClaudeModels(generate="claude-sonnet-5-5"), "claude-sonnet-5-5"),
+        ("REWRITE_TITLE", ClaudeModels(), "claude-haiku-5-5"),
+        (
+            "REWRITE_TITLE",
+            ClaudeModels(rewrite_title="claude-sonnet-5-5"),
+            "claude-sonnet-5-5",
+        ),
+    ],
+)
+def test_failed_call_is_not_sent_again_or_to_another_model(
+    purpose: Purpose, models: ClaudeModels, model: str
+) -> None:
+    """두 번째 요청이면 성공하는 API에서도, 호출 종류·모델과 관계없이 정해진 모델로 한 번만 보내고 실패로
+    끝낸다(재시도·모델 대체 없음)."""
+    replies = iter([api_error(529, "overloaded_error"), message()])
+    api = FakeApi(lambda request: next(replies)(request))
+
+    with pytest.raises(ProviderError):
+        api.provider(models).complete(call(purpose))
+
+    assert len(api.requests) == 1
+    assert api.body()["model"] == model
+
+
 def raises(error: type[httpx2.TransportError]) -> Reply:
     def reply(request: httpx2.Request) -> httpx2.Response:
         raise error("synthetic transport failure", request=request)
@@ -537,25 +586,35 @@ class DripStream(httpx2.SyncByteStream):
     짧아, 그 시간 제한만으로는 끊기지 않는 서버를 흉내 낸다."""
 
     def __init__(
-        self, body: bytes, pieces: int, seconds: float, clock: SyntheticClock
+        self,
+        body: bytes,
+        pieces: int,
+        seconds: float,
+        clock: SyntheticClock,
+        tail: float = 0.0,
     ) -> None:
         self._body = body
         self._size = -(-len(body) // pieces)
         self._seconds = seconds
         self._clock = clock
+        self._tail = tail
 
     def __iter__(self) -> Iterator[bytes]:
         for start in range(0, len(self._body), self._size):
             self._clock.advance(self._seconds)
             yield self._body[start : start + self._size]
+        # 마지막 조각 뒤 본문 끝을 알리기까지 걸리는 시간.
+        self._clock.advance(self._tail)
 
 
-def dripping(pieces: int, seconds: float, clock: SyntheticClock) -> Reply:
+def dripping(
+    pieces: int, seconds: float, clock: SyntheticClock, tail: float = 0.0
+) -> Reply:
     body = json.dumps(message_body()).encode()
     return lambda request: httpx2.Response(
         200,
         headers={"content-type": "application/json"},
-        stream=DripStream(body, pieces, seconds, clock),
+        stream=DripStream(body, pieces, seconds, clock, tail),
     )
 
 
@@ -626,6 +685,216 @@ def test_headers_after_the_call_limit_time_out(clock: SyntheticClock) -> None:
     assert len(api.requests) == 1
     assert not body.read
     assert_detached(raised.value)
+
+
+def test_stream_ending_after_the_call_limit_times_out(clock: SyntheticClock) -> None:
+    """본문 조각은 마감 안에 다 왔어도 본문 끝이 마감 뒤에 오면 시간 초과다."""
+    api = FakeApi(dripping(2, 10.0, clock, tail=30.0))
+
+    with pytest.raises(TimeoutError):
+        api.provider().complete(call())
+
+
+# 실제 HTTP 해석을 거치는 가짜 네트워크
+
+
+class _SyntheticTls:
+    def selected_alpn_protocol(self) -> str:
+        return "http/1.1"
+
+
+class ScriptedNetwork(httpcore2.NetworkBackend):
+    """HTTPCore2 아래의 가짜 네트워크. 받은 요청 바이트를 기록하고, 정해 둔 (기다릴 초, 바이트) 조각을 차례로
+    돌려주며 합성 시계를 움직인다. 기다릴 시간이 그 읽기의 시간 제한보다 길면 진짜 소켓처럼 시간 제한만큼
+    기다린 뒤 시간 초과를 낸다."""
+
+    def __init__(
+        self, clock: SyntheticClock, pieces: Iterable[tuple[float, bytes]]
+    ) -> None:
+        self.clock = clock
+        self.pieces = list(pieces)
+        self.connected: list[tuple[str, int]] = []
+        self.read_timeouts: list[float | None] = []
+        self.sent = bytearray()
+
+    def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: Iterable[Any] | None = None,
+    ) -> httpcore2.NetworkStream:
+        self.connected.append((host, port))
+        return ScriptedStream(self)
+
+    def connect_unix_socket(
+        self,
+        path: str,
+        timeout: float | None = None,
+        socket_options: Iterable[Any] | None = None,
+    ) -> httpcore2.NetworkStream:
+        raise AssertionError("unix 소켓 연결 시도")
+
+    def sleep(self, seconds: float) -> None:
+        self.clock.advance(seconds)
+
+
+class ScriptedStream(httpcore2.NetworkStream):
+    def __init__(self, network: ScriptedNetwork) -> None:
+        self._network = network
+
+    def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
+        network = self._network
+        network.read_timeouts.append(timeout)
+        if not network.pieces:
+            return b""
+        wait, data = network.pieces[0]
+        if timeout is not None and wait > timeout:
+            network.clock.advance(timeout)
+            network.pieces[0] = (wait - timeout, data)
+            raise httpcore2.ReadTimeout("합성 소켓 시간 초과")
+        network.pieces.pop(0)
+        network.clock.advance(wait)
+        return data
+
+    def write(self, buffer: bytes, timeout: float | None = None) -> None:
+        self._network.sent += buffer
+
+    def close(self) -> None:
+        pass
+
+    def start_tls(
+        self,
+        ssl_context: ssl.SSLContext,
+        server_hostname: str | None = None,
+        timeout: float | None = None,
+    ) -> httpcore2.NetworkStream:
+        return self
+
+    def get_extra_info(self, info: str) -> Any:
+        return _SyntheticTls() if info == "ssl_object" else None
+
+
+def http_bytes(
+    body: bytes, *, status: bytes = b"200 OK", chunked: bool = False
+) -> bytes:
+    head = (
+        b"HTTP/1.1 " + status + b"\r\ncontent-type: application/json\r\n"
+        b"request-id: req_synthetic_net\r\n"
+    )
+    if chunked:
+        size = f"{len(body):x}\r\n".encode()
+        return (
+            head
+            + b"transfer-encoding: chunked\r\n\r\n"
+            + size
+            + body
+            + b"\r\n0\r\n\r\n"
+        )
+    return head + f"content-length: {len(body)}\r\n\r\n".encode() + body
+
+
+def trickle(data: bytes, size: int, wait: float) -> list[tuple[float, bytes]]:
+    return [(wait, data[start : start + size]) for start in range(0, len(data), size)]
+
+
+def network_provider(network: ScriptedNetwork) -> ClaudeProvider:
+    return ClaudeProvider(
+        AccessToken(KEY), transport=claude_module._http_transport(network)
+    )
+
+
+NET_BODY = json.dumps(message_body()).encode()
+NET_CHUNKED = http_bytes(NET_BODY, chunked=True)
+NET_HEAD_END = NET_CHUNKED.index(b"\r\n\r\n") + 4
+NET_ERROR = json.dumps(
+    {"type": "error", "error": {"type": "api_error", "message": ERROR_TEXT}}
+).encode()
+
+
+def test_real_http_path_reads_a_normal_response(
+    clock: SyntheticClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """실제 HTTP 해석을 거쳐도 정상 응답을 읽는다. 프록시 환경변수가 있어도 api.anthropic.com:443에 바로
+    연결하고, 네트워크 대기마다 호출 시간 제한(45초) 이하만 기다린다."""
+    for name in ("HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY"):
+        monkeypatch.setenv(name, "http://proxy.example.test:3128")
+    network = ScriptedNetwork(clock, [(1.0, http_bytes(NET_BODY))])
+
+    assert network_provider(network).complete(call()) == ANSWER
+    assert network.connected == [("api.anthropic.com", 443)]
+    assert network.sent.startswith(b"POST /v1/messages HTTP/1.1\r\n")
+    assert network.read_timeouts
+    assert all(each is not None and each <= 45.0 for each in network.read_timeouts)
+
+
+NET_TRICKLES: dict[str, list[tuple[float, bytes]]] = {
+    # 머리글을 8바이트씩 10초마다 보낸다. 읽기마다 시간 제한이 새로 걸리면 끝나지 않는다.
+    "headers": trickle(http_bytes(NET_BODY), 8, 10.0),
+    # 머리글은 바로, 청크 구분 정보와 본문을 1바이트씩 10초마다 보낸다.
+    "chunk-framing": [(0.0, NET_CHUNKED[:NET_HEAD_END])]
+    + trickle(NET_CHUNKED[NET_HEAD_END:], 1, 10.0),
+    # 본문은 바로 오고 끝을 알리는 마지막 청크만 50초 뒤에 온다.
+    "late-terminator": [(1.0, NET_CHUNKED[: -len(b"0\r\n\r\n")]), (50.0, b"0\r\n\r\n")],
+    # 오류 응답도 끝이 마감 뒤에 오면 시간 초과다.
+    "late-terminator-500": [
+        (
+            1.0,
+            http_bytes(NET_ERROR, status=b"500 Internal Server Error", chunked=True)[
+                : -len(b"0\r\n\r\n")
+            ],
+        ),
+        (50.0, b"0\r\n\r\n"),
+    ],
+}
+
+
+@pytest.mark.parametrize("case", list(NET_TRICKLES))
+def test_network_waits_stop_at_the_call_limit(
+    case: str, clock: SyntheticClock, caplog: pytest.LogCaptureFixture
+) -> None:
+    """머리글·청크 구분 정보·마지막 청크를 조금씩 늦게 보내도, 네트워크 대기마다 마감까지 남은 시간만 기다려
+    호출 시작부터 정확히 시간 제한(45초)에서 시간 초과로 끊는다. 다시 연결하지 않는다."""
+    network = ScriptedNetwork(clock, NET_TRICKLES[case])
+
+    with (
+        caplog.at_level(logging.INFO, logger="app.generation.claude"),
+        pytest.raises(TimeoutError) as raised,
+    ):
+        network_provider(network).complete(call())
+
+    assert clock.now - 1_000.0 == pytest.approx(45.0)
+    assert network.connected == [("api.anthropic.com", 443)]
+    assert_detached(raised.value)
+    assert "cause=TIMEOUT" in caplog.text
+
+
+def test_http_library_logs_do_not_record_response_text(
+    clock: SyntheticClock, caplog: pytest.LogCaptureFixture
+) -> None:
+    """HTTP 라이브러리는 INFO에 서버가 보낸 상태 설명을, DEBUG에 프로토콜 오류의 원문을 남긴다. 루트 로거가
+    DEBUG여도 운영 로그에 남지 않는다."""
+    odd_reason = ScriptedNetwork(
+        clock, [(1.0, http_bytes(NET_BODY, status=b"200 REASON-MARK-31"))]
+    )
+    bad_chunk = ScriptedNetwork(
+        clock,
+        [
+            (
+                1.0,
+                NET_CHUNKED[:NET_HEAD_END] + b"ANSWER-MARK-29 not a chunk size\r\n",
+            )
+        ],
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        assert network_provider(odd_reason).complete(call()) == ANSWER
+        with pytest.raises(ProviderError):
+            network_provider(bad_chunk).complete(call())
+
+    assert "REASON-MARK-31" not in caplog.text
+    assert_no_leak(caplog.text)
 
 
 # 오류 응답
@@ -832,6 +1101,36 @@ def test_response_body_over_the_limit_is_not_read(
     assert f"cause=RESPONSE_TOO_LARGE status={status}" in caplog.text
 
 
+class CountingStream(httpx2.SyncByteStream):
+    """조각을 몇 개 꺼내 갔는지 센다."""
+
+    def __init__(self, chunks: list[bytes]) -> None:
+        self._chunks = chunks
+        self.pulled = 0
+
+    def __iter__(self) -> Iterator[bytes]:
+        for chunk in self._chunks:
+            self.pulled += 1
+            yield chunk
+
+
+def test_response_limit_counts_the_sum_of_chunks() -> None:
+    """조각 하나하나는 상한보다 작아도 합이 상한을 넘으면, 넘긴 조각에서 멈추고 나머지는 읽지 않는다."""
+    piece = 16 * 1024
+    stream = CountingStream([b" " * piece] * 20)
+    api = FakeApi(
+        lambda request: httpx2.Response(
+            200, headers={"content-type": "application/json"}, stream=stream
+        )
+    )
+
+    with pytest.raises(UnusableResponse) as raised:
+        api.provider().complete(call())
+
+    assert raised.value.reason == "TOO_LARGE"
+    assert stream.pulled == MAX_RESPONSE_BYTES // piece + 1
+
+
 def test_response_body_at_the_limit_is_read() -> None:
     body = json.dumps(message_body()).encode()
     padded = body + b" " * (MAX_RESPONSE_BYTES - len(body))
@@ -877,6 +1176,10 @@ MALFORMED = {
     "content-null": with_fields(content=None),
     "text-not-string": with_fields(content=[{"type": "text", "text": 123}]),
     "tokens-not-int": with_fields(usage={"input_tokens": "12", "output_tokens": 3}),
+    # SDK가 감싸지 않는 본문 해석 오류: 잘못된 UTF-8, 자릿수 상한을 넘는 정수, 너무 깊은 중첩.
+    "bad-utf8": b'{"note": "ANSWER-MARK-29 \xff"}',
+    "huge-int": b"9" * 5_000,
+    "deep-nesting": b"[" * 100_000 + b"]" * 100_000,
 }
 
 
@@ -991,6 +1294,7 @@ FLOW_FAILURES = {
     "malformed": (raw(200, b"{}"), "GENERATION_CALL_FAILED"),
     "529": (api_error(529, "overloaded_error"), "GENERATION_CALL_FAILED"),
     "timeout": (raises(httpx2.ReadTimeout), "GENERATION_TIMEOUT"),
+    "bad-utf8": (raw(200, b'{"note": "\xff"}'), "GENERATION_CALL_FAILED"),
 }
 
 
