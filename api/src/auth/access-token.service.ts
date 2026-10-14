@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { jwtVerify, SignJWT } from 'jose';
+import { isUUID } from 'class-validator';
 import { ApiError } from '../common/errors';
 import { AUTH_CONFIG, AuthConfig } from './auth.config';
 
@@ -15,10 +16,10 @@ export function isMemberId(value: unknown): value is string {
 export class AccessTokenService {
   constructor(@Inject(AUTH_CONFIG) private readonly config: AuthConfig) {}
 
-  async issue(memberId: string) {
-    if (!isMemberId(memberId)) throw new ApiError('AUTH_INVALID');
+  async issue(memberId: string, sessionId: string) {
+    if (!isSessionId(memberId) || !isSessionId(sessionId)) throw new ApiError('AUTH_INVALID');
     const issuedAt = Math.floor(Date.now() / 1000);
-    const accessToken = await new SignJWT({})
+    const accessToken = await new SignJWT({ sid: sessionId })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setSubject(memberId)
       .setIssuer(ISSUER)
@@ -29,24 +30,28 @@ export class AccessTokenService {
     return { accessToken, tokenType: 'Bearer', expiresIn: this.config.accessTokenTtlSeconds };
   }
 
-  async verify(token: string): Promise<string> {
+  async verify(token: string): Promise<{ memberId: string; sessionId: string }> {
     try {
       const { payload } = await jwtVerify(token, this.config.signingKey, {
         algorithms: ['HS256'],
         issuer: ISSUER,
         audience: AUDIENCE,
         typ: 'JWT',
-        requiredClaims: ['sub', 'exp', 'iat'],
+        requiredClaims: ['sub', 'sid', 'exp', 'iat'],
       });
-      if (!isMemberId(payload.sub) || !Number.isSafeInteger(payload.iat) ||
+      if (!isSessionId(payload.sub) || !isSessionId(payload.sid) || !Number.isSafeInteger(payload.iat) ||
           !Number.isSafeInteger(payload.exp) || payload.iat! > Math.floor(Date.now() / 1000) ||
           payload.exp! <= payload.iat!) {
         throw new ApiError('AUTH_INVALID');
       }
-      return payload.sub;
+      return { memberId: payload.sub, sessionId: payload.sid };
     } catch {
       // 라이브러리 오류, 헤더, 토큰을 응답이나 로그에 전달하지 않는다.
       throw new ApiError('AUTH_INVALID');
     }
   }
+}
+
+export function isSessionId(value: unknown): value is string {
+  return typeof value === 'string' && isUUID(value);
 }

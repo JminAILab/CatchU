@@ -8,7 +8,8 @@ const { SignJWT, decodeJwt } = require('jose');
 const { AppModule } = require('../dist/app.module');
 const { configureApp } = require('../dist/app.setup');
 const { DevMemberService, SYNTHETIC_REPOSITORY } = require('../dist/member-analysis/dev-member.service');
-const { GitHubConnection } = require('../dist/member-analysis/member-analysis.entity');
+const { GitHubConnection, MemberAccount } = require('../dist/member-analysis/member-analysis.entity');
+const { SessionService } = require('../dist/auth/session.service');
 const { parseRepositoryQuery, repositoryPage } = require('../dist/member-repositories/repository-page');
 const { openTestDataSource, resetTestDatabase } = require('./support/test-database.cjs');
 const context = require('../../worker/fixtures/m1-synthetic/context.sample.json');
@@ -28,6 +29,7 @@ function assertInvalid(run, field) {
 
 async function start(t, overrides = {}) {
   const settings = {
+    AUTH_WEB_ORIGIN: 'https://catchu.example',
     AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
     SHARE_LINK_WEB_BASE_URL: 'https://example.invalid', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
     NODE_ENV: 'test', DEV_LOGIN_ENABLED: 'true', ...overrides,
@@ -238,6 +240,11 @@ for (const overrides of [{ DEV_LOGIN_ENABLED: undefined }, { NODE_ENV: 'producti
   test(`기존 #104 개발 대역 제한 유지: ${JSON.stringify(overrides)}`, async (t) => {
     const server = await start(t, overrides);
     // 개발 대역 자체의 기본 비활성/운영 차단을 같은 설정으로 재사용한다.
-    await errorBody(await server.list(await server.sign(randomUUID())), 403, 'INTERNAL_ERROR');
+    const memberId = randomUUID();
+    const token = await server.app.get(DataSource).transaction(async manager => {
+      await manager.insert(MemberAccount, { memberId, identityReference: 'repository-block-' + memberId, accountState: 'ACTIVE' });
+      return (await server.app.get(SessionService).create(manager, memberId)).access.accessToken;
+    });
+    await errorBody(await server.list(token), 403, 'INTERNAL_ERROR');
   });
 }

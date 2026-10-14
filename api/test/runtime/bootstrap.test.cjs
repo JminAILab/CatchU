@@ -62,7 +62,10 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
   });
   const settings = {
     AUTH_JWT_SECRET: secret,
-    AUTH_ACCESS_TOKEN_TTL_SECONDS: '60',
+    AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
+    // 다른 설정의 실패를 검사할 때도 세션의 운영용 Origin 조건은 충족한다.
+    AUTH_WEB_ORIGIN: 'https://catchu.example',
+    CORS_ALLOWED_ORIGINS: undefined,
     DEV_LOGIN_ENABLED: 'true',
     NODE_ENV: 'development',
     PORT: String(port),
@@ -118,7 +121,7 @@ for (const source of [false, true]) {
     });
     assert.equal(response.status, 200);
     const token = await response.json();
-    assert.equal(token.expiresIn, 60);
+    assert.equal(token.expiresIn, 900);
     assert.equal(typeof token.accessToken, 'string');
     assert.equal(server.logs().includes(token.accessToken), false);
     assert.equal(server.logs().includes(server.secret), false);

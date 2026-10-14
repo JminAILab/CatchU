@@ -3,10 +3,12 @@ import { Reflector } from '@nestjs/core';
 import { ApiError } from '../common/errors';
 import { AccessTokenService } from './access-token.service';
 import { AUTHENTICATED_MEMBER, AuthenticatedRequest, PUBLIC_ROUTE } from './auth.decorators';
+import { SessionService } from './session.service';
 
 @Injectable()
 export class AccessTokenGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector, private readonly tokens: AccessTokenService) {}
+  constructor(private readonly reflector: Reflector, private readonly tokens: AccessTokenService,
+    private readonly sessions: SessionService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     if (this.reflector.getAllAndOverride<boolean>(PUBLIC_ROUTE, [context.getHandler(), context.getClass()])) {
@@ -19,7 +21,8 @@ export class AccessTokenGuard implements CanActivate {
     const match = typeof authorization === 'string' ? /^Bearer ([^\s,]+)$/i.exec(authorization) : null;
     if (!match) throw new ApiError('AUTH_INVALID');
 
-    const memberId = await this.tokens.verify(match[1]);
+    const { memberId, sessionId } = await this.tokens.verify(match[1]);
+    await this.sessions.assertAccess(memberId, sessionId);
     request[AUTHENTICATED_MEMBER] = { memberId };
     return true;
   }

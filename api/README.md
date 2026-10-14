@@ -6,9 +6,9 @@
 
 NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준을 확인한다.
 
-현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 독립 수신 로직과 필수 공급자를 받는 실제 DB/E·B 조립을 제공하며 `AppModule`에는 자동 등록하지 않는다. [#104 회원·분석 선행 테이블](https://github.com/JminAILab/CatchU/issues/104)과 개발 회원·합성 연동·공통 멱등 처리를 제공한다. 기능 API는 [#135 본인 회원 조회·프로필 저장](docs/member-profile.md)(`GET /v1/me`, `PUT /v1/me/profile`), [#147 공유 링크 발급](https://github.com/JminAILab/CatchU/issues/147)(`POST /v1/share-links`)과 [#148 목록·중단](https://github.com/JminAILab/CatchU/issues/148)(`GET /v1/share-links`, `PUT /v1/share-links/{linkId}/stop`)이 있다([docs/share-links.md](docs/share-links.md)). 본인 Catch 조회·확인·불일치 API는 [docs/catch-owner-read-preparation.md](docs/catch-owner-read-preparation.md), 공개·숨김은 [docs/catch-visibility.md](docs/catch-visibility.md)를 따른다. 실제 로그인 화면·세션 기능·나머지 기능 API·worker 연결은 후속 작업이다.
+현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 독립 수신 로직과 필수 공급자를 받는 실제 DB/E·B 조립을 제공하며 `AppModule`에는 자동 등록하지 않는다. [#104 회원·분석 선행 테이블](https://github.com/JminAILab/CatchU/issues/104)과 개발 회원·합성 연동·공통 멱등 처리를 제공한다. 기능 API는 [#135 본인 회원 조회·프로필 저장](docs/member-profile.md)(`GET /v1/me`, `PUT /v1/me/profile`), [#147 공유 링크 발급](https://github.com/JminAILab/CatchU/issues/147)(`POST /v1/share-links`)과 [#148 목록·중단](https://github.com/JminAILab/CatchU/issues/148)(`GET /v1/share-links`, `PUT /v1/share-links/{linkId}/stop`)이 있다([docs/share-links.md](docs/share-links.md)). 본인 Catch 조회·확인·불일치 API는 [docs/catch-owner-read-preparation.md](docs/catch-owner-read-preparation.md), 공개·숨김은 [docs/catch-visibility.md](docs/catch-visibility.md)를 따른다. 세션 유지·갱신·로그아웃은 [세션 안내 — #250](docs/auth-sessions.md)를 따른다. 실제 로그인 화면·나머지 기능 API·worker 연결은 후속 작업이다.
 
-Google 인증 코드 교환·회원 연결 API와 앱 등록·검사 절차는 [실제 Google 로그인 — #249](docs/google-login.md)를 따른다. 2026-10-08 사용자 직접 재현으로 실제 로그인·보호 API 호출·반복 로그인·저장된 프로필 보존을 확인했다. 수동 미검증 항목과 자동 검사, 세션·실제 화면 연결의 후속 범위는 기능 문서에서 구분한다.
+Google 인증 코드 교환·회원 연결 API와 앱 등록·검사 절차는 [실제 Google 로그인 — #249](docs/google-login.md)를 따른다. 2026-10-08 사용자 직접 재현으로 실제 로그인·보호 API 호출·반복 로그인·저장된 프로필 보존을 확인했다. 수동 미검증 항목과 자동 검사와 실제 화면 연결의 후속 범위는 기능 문서에서 구분한다. #250의 세션·쿠키 연결 판본에서 실제 Google/브라우저 재현은 별도로 남아 있다.
 
 ## 공통 오류 처리 — API 명세 v1
 
@@ -18,7 +18,7 @@ Google 인증 코드 교환·회원 연결 API와 앱 등록·검사 절차는 [
 |---|---|---|
 | 입력 | 400 | INVALID_REQUEST, VALIDATION_FAILED |
 | 미인증·수신자 비밀번호 | 401 | AUTH_REQUIRED, AUTH_INVALID, LINK_PASSWORD_REQUIRED, LINK_PASSWORD_INVALID |
-| 권한·선행 조건 | 403 | GITHUB_CONNECTION_REQUIRED, REPOSITORY_NOT_ALLOWED, CONSENT_REQUIRED |
+| 권한·선행 조건·요청 출처 | 403 | GITHUB_CONNECTION_REQUIRED, REPOSITORY_NOT_ALLOWED, CONSENT_REQUIRED, AUTH_ORIGIN_FORBIDDEN |
 | 없음·열람 불가 | 404 | RESOURCE_UNAVAILABLE, LINK_UNAVAILABLE |
 | 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED |
 | 수신자 비밀번호 시도 제한 | 429 | LINK_UNLOCK_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds })`) |
@@ -35,7 +35,7 @@ throw new ApiError('CONSENT_REQUIRED');
 throw new ApiError('ANALYSIS_IN_PROGRESS', { details: { existingRequestId: requestId } });
 ```
 
-새 오류 코드는 계약 변경 이슈로 상태·의미·문구를 합의한 뒤 `error-codes.ts`의 상태/기본 문구, 이 표, 기능 테스트를 함께 추가한다. 과거 승인 문서를 소급 수정하지 않는다. 기존 코드의 사용자 문구를 지정할 때도 내부 예외의 message를 그대로 전달하지 않는다.
+새 오류 코드는 계약 변경 이슈로 상태·의미·문구를 합의한 뒤 `error-codes.ts`의 상태/기본 문구, 이 표, 기능 테스트를 함께 추가한다. #250의 `403 AUTH_ORIGIN_FORBIDDEN`은 팀장이 담당자에게 맡긴 Origin 거부 코드의 연결 검토안이며 [세션 안내](docs/auth-sessions.md)를 따른다. 과거 승인 문서를 소급 수정하지 않는다. 기존 코드의 사용자 문구를 지정할 때도 내부 예외의 message를 그대로 전달하지 않는다.
 
 전역 ValidationPipe는 class-validator 데코레이터가 있는 DTO 클래스의 검증 실패·추가 필드를 `400 VALIDATION_FAILED`와 필드/규칙 이름으로 응답한다. `unknown`·인터페이스·직접 수동 검증은 DTO 검증 대상이 아니다.
 
@@ -96,7 +96,7 @@ npm ci
 
 실행 명령과 마이그레이션 명령이 `.env`를 읽으며, 이미 터미널 환경에 지정된 값이 우선한다. DB 값은 `.env.example`의 `DB_*` 줄을 `.env`에 옮기면 된다. 큐·worker 설정은 필요하지 않다. `.env`·의존성·빌드 결과를 제외하는 기존 `.gitignore`를 유지한다. 키를 바꾸면 이전 키로 발급한 토큰은 사용할 수 없다.
 
-PowerShell에서 로컬 검토용 설정을 준비하는 예시다. 생성한 키는 변수에만 받아 화면에 출력하지 않는다. `900`초는 이 재현의 예시이며 제품의 최종 수명 정책이 아니다.
+PowerShell에서 로컬 검토용 설정을 준비하는 예시다. 생성한 키는 변수에만 받아 화면에 출력하지 않는다. `900`초는 #250 팀장 결정의 Access 수명 15분이며 다른 값이면 기동을 거부한다. 정확한 web 출처·쿠키 조건은 [세션 안내](docs/auth-sessions.md)를 따른다.
 
 ```powershell
 $env:AUTH_JWT_SECRET = node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))"

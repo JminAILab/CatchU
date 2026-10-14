@@ -14,7 +14,7 @@ const { openTestDataSource, resetTestDatabase } = require('../support/test-datab
 const HOUR = 60 * 60 * 1000;
 const ENV = {
   AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
-  AUTH_ACCESS_TOKEN_TTL_SECONDS: '300',
+  AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
   DEV_LOGIN_ENABLED: 'true',
   NODE_ENV: 'test',
   SHARE_LINK_WEB_BASE_URL: 'https://catchu.example',

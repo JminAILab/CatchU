@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { AUTH_CONFIG, AuthConfig } from '../auth/auth.config';
 import { isMemberId } from '../auth/access-token.service';
 import { GitHubConnection, MemberAccount, MemberProfile } from './member-analysis.entity';
@@ -26,11 +26,11 @@ export class DevMemberService {
     if (!this.config.devLoginEnabled) throw new ForbiddenException();
   }
 
-  async resolveMember(identifier: string): Promise<string> {
+  async resolveMember(identifier: string, transactionManager?: EntityManager): Promise<string> {
     this.assertEnabled();
     if (!isMemberId(identifier)) throw new TypeError('Invalid development identity');
     const identityReference = IDENTITY_NAMESPACE + identifier;
-    return this.dataSource.transaction('READ COMMITTED', async (manager) => {
+    const resolve = async (manager: EntityManager) => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [identityReference]);
       let account = await manager.findOneBy(MemberAccount, { identityReference });
       if (!account) {
@@ -52,7 +52,8 @@ export class DevMemberService {
       }
       // 기존 연결 상태·자격정보는 반복 로그인으로 덮어쓰지 않는다.
       return account.memberId;
-    });
+    };
+    return transactionManager ? resolve(transactionManager) : this.dataSource.transaction('READ COMMITTED', resolve);
   }
 
   /** #136/E 접수에서 재사용할 내부 개발 대역. 제품 HTTP 연동 API는 추가하지 않는다. */

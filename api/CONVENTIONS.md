@@ -11,7 +11,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `package.json` / `package-lock.json`    | 실행·검사 명령, 도구 버전, 재현 가능한 의존성 설치 |
 | `src/main.ts`                           | 환경변수 검사, HTTP 서버 시작, 종료 훅             |
 | `src/app.module.ts`                     | 최상위 Nest 모듈과 기능 모듈 연결                  |
-| `src/cors.ts`                           | 개발용 CORS. `CORS_ALLOWED_ORIGINS`가 있을 때만 켜고 `Retry-After`를 노출(#106) |
+| `src/cors.ts`                           | 개발용 CORS. 개발/test에서만 정확한 허용 출처·쿠키를 지원하고 운영은 동일 출처(#250) |
 | `src/common/http/request-id.ts`         | 요청별 서버 내부 식별자(#222). 응답·web으로 내보내지 않음 |
 | `src/common/http/security-headers.ts`   | 모든 응답의 보안 헤더와 `X-Powered-By` 끄기. HSTS는 `NODE_ENV`가 development·test가 아닐 때만(#217) |
 | `src/health/health.controller.ts`       | `GET /health` 응답                                 |
@@ -153,7 +153,7 @@ async save(manager: EntityManager, input: Input): Promise<void> {
 
 인증 오류의 응답·로그에 토큰이나 JWT 라이브러리의 원문 오류를 전달하지 않는다. 헤더 형식 오류의 세부 코드는 기존 명세에 없었던 경계로, 이번 후속 작업에서 사용자 확인을 받아 위처럼 구현했으며 PR의 연결 검토 대상이다. 개발 로그인 입력 검증은 기존 전역 ValidationPipe를 재사용한다. `memberId` 조건 위반의 reason은 `isMemberId`, 추가 필드는 `whitelistValidation`이며 입력값을 담지 않는다. 아래 날짜별 과거 검증 기록은 당시 상태를 나타낸다.
 
-기능 컨트롤러에는 Guard를 다시 붙일 필요가 없다. `@CurrentMemberId()`만 사용하며 JWT claim, 개발 로그인 플래그, 요청 body/query의 회원 ID에 의존하지 않는다. 이 인증 통과는 회원 행의 존재, GitHub 연동, 분석 동의, 자원 소유권을 보장하지 않는다. 각 후속 기능에서 해당 계약에 따른 검사가 필요하다.
+기능 컨트롤러에는 Guard를 다시 붙일 필요가 없다. `@CurrentMemberId()`만 사용하며 JWT claim, 개발 로그인 플래그, 요청 body/query의 회원 ID에 의존하지 않는다. #250 후속 Guard는 DB의 세션 유효성·ACTIVE 회원을 확인한다([세션 안내](docs/auth-sessions.md)). GitHub 연동·분석 동의·자원 소유권은 각 기능에서 따로 검사한다. 각 후속 기능에서 해당 계약에 따른 검사가 필요하다.
 
 인증 없이 허용할 메서드에만 다음처럼 표시한다. 컨트롤러 클래스에 붙이면 그 클래스 전체가 공개되므로 범위를 신중히 선택한다. `/health`는 메서드에 명시되어 있다.
 
@@ -175,6 +175,6 @@ export class ExamplePublicController {
 
 개발 로그인 Guard는 실행 제한 확인 후, DTO 변환기가 제거하는 `constructor`·`__proto__` 입력도 추가 필드 오류로 거부한다. 그 밖의 필드 검증은 기존 전역 ValidationPipe가 담당한다.
 
-현재 내부 토큰 구현은 HS256, 발급자 `catchu-api`, 대상 `catchu-member-api`, `sub` 회원 ID와 `iat`·`exp`를 서명·검증한다. 서명 알고리즘을 제한하고 비어 있는/공백 회원 ID, 누락된 만료·발급 시각, 잘못된 대상·발급자도 거부한다. 이는 #87 개발 기반의 내부 형식이며 기능 코드의 의존 대상이나 실제 OAuth 발급 계약이 아니다. 토큰 원문과 검증 라이브러리의 상세 오류는 로그·오류 응답에 포함하지 않는다.
+현재 내부 토큰 구현은 HS256, 발급자 `catchu-api`, 대상 `catchu-member-api`, `sub` 회원 UUID·`sid` 세션 UUID와 `iat`·`exp`를 서명·검증한다. 서명 알고리즘을 제한하고 비어 있는/공백 회원 ID, 누락된 만료·발급 시각, 잘못된 대상·발급자도 거부한다. 이는 #87 개발 기반의 내부 형식이며 기능 코드의 의존 대상이나 실제 OAuth 발급 계약이 아니다. 토큰 원문과 검증 라이브러리의 상세 오류는 로그·오류 응답에 포함하지 않는다.
 
-[#104](https://github.com/JminAILab/CatchU/issues/104)의 개발 회원 공급자가 받은 문자열을 개발 전용 identityReference에 연결하고 회원·기본 프로필·최초 합성 연동을 준비한다. 토큰에는 실제 회원 UUID를 사용하며 기능 코드의 `@CurrentMemberId()` 사용 방식은 유지한다. 상세는 「회원·분석 선행 테이블과 멱등 처리 — #104」를 따른다. 실제 Google/GitHub 로그인, Refresh Token·재발급·로그아웃, 소유권 검사, 쿠키·CORS·CSRF와 실제 발급 정책은 이번 범위 밖이다.
+[#104](https://github.com/JminAILab/CatchU/issues/104)의 개발 회원 공급자가 받은 문자열을 개발 전용 identityReference에 연결하고 회원·기본 프로필·최초 합성 연동을 준비한다. 토큰에는 실제 회원 UUID를 사용하며 기능 코드의 `@CurrentMemberId()` 사용 방식은 유지한다. 상세는 「회원·분석 선행 테이블과 멱등 처리 — #104」를 따른다. 이는 #104 당시 경계다. 현재 Google 발급은 [Google 안내](docs/google-login.md), 세션·재발급·로그아웃·쿠키·Origin 검사는 [#250 세션 안내](docs/auth-sessions.md)를 따른다. GitHub·자원 소유권은 별도 기능의 기준을 적용한다.

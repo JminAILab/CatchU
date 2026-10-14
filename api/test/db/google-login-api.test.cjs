@@ -10,9 +10,10 @@ const { GoogleLoginService } = require('../../dist/google-login/google-login.ser
 const { HttpGoogleProvider } = require('../../dist/google-login/google-provider');
 const { GOOGLE_CONFIG } = require('../../dist/google-login/google.config');
 const { MemberAccount, MemberProfile, GitHubConnection } = require('../../dist/member-analysis/member-analysis.entity');
+const { AuthSession, SessionRefreshToken } = require('../../dist/auth/session.entity');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const settings = { NODE_ENV: 'test', DEV_LOGIN_ENABLED: 'true', AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
-  AUTH_ACCESS_TOKEN_TTL_SECONDS: '300', LINK_GRANT_SECRET: randomBytes(32).toString('hex'), GOOGLE_LOGIN_ENABLED: 'true',
+  AUTH_ACCESS_TOKEN_TTL_SECONDS: '900', LINK_GRANT_SECRET: randomBytes(32).toString('hex'), GOOGLE_LOGIN_ENABLED: 'true',
   GOOGLE_CLIENT_ID: 'synthetic.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'google-secret-marker',
   GOOGLE_REDIRECT_URI: 'http://localhost:3000/google/callback' };
 const saved = {}, logs = [], exchanges = new Map();
@@ -68,10 +69,33 @@ async function attempt(sub = 'google-owner', extra = {}) {
 const finish = input => call('/v1/auth/google/login', input);
 const member = token => call('/v1/me', undefined, token, 'GET');
 function error(response, status, code) { assert.equal(response.status, status); assert.equal(response.body.code, code); assert.ok(!response.body.accessToken); }
-async function empty() { assert.equal(await db.getRepository(MemberAccount).count(), 0); assert.equal(await db.getRepository(MemberProfile).count(), 0); }
+async function empty() {
+  for (const entity of [MemberAccount, MemberProfile, AuthSession, SessionRefreshToken]) {
+    assert.equal(await db.getRepository(entity).count(), 0);
+  }
+}
+
+test('Google 로그인 성공은 같은 회원 세션·Refresh 쿠키를 커밋하고 갱신에 연결', async () => {
+  const response = await fetch(url + '/v1/auth/google/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(await attempt()), signal: AbortSignal.timeout(10000) });
+  assert.equal(response.status, 200);
+  const issued = await response.json(), claims = decodeJwt(issued.accessToken);
+  const cookie = response.headers.get('set-cookie');
+  assert.match(cookie, /Path=\/v1\/auth; HttpOnly; SameSite=Strict/);
+  assert.equal((await db.manager.findOneByOrFail(AuthSession, { sessionId: claims.sid })).memberId, claims.sub);
+  assert.equal(await db.manager.countBy(SessionRefreshToken, { sessionId: claims.sid }), 1);
+  const renewed = await fetch(url + '/v1/auth/refresh', { method: 'POST', headers: {
+    Origin: process.env.AUTH_WEB_ORIGIN ?? 'http://localhost:3000', Cookie: cookie.split(';')[0],
+  }, signal: AbortSignal.timeout(10000) });
+  assert.equal(renewed.status, 200);
+  const result = await renewed.json();
+  assert.equal(decodeJwt(result.accessToken).sub, claims.sub);
+  assert.equal(decodeJwt(result.accessToken).sid, claims.sid);
+  assert.equal((await member(result.accessToken)).status, 200);
+});
 test('실제 API·DB 최초 로그인과 회원 조회: Google 이름은 제안만, GitHub 연결은 생성하지 않음', async () => {
   const input = await attempt(); const result = await finish(input); assert.equal(result.status, 200);
-  assert.equal(result.body.suggestedDisplayName, '이름😀'); assert.equal(result.body.expiresIn, 300);
+  assert.equal(result.body.suggestedDisplayName, '이름😀'); assert.equal(result.body.expiresIn, 900);
   const id = decodeJwt(result.body.accessToken).sub; assert.match(id, /^[0-9a-f-]{36}$/);
   const me = await member(result.body.accessToken); assert.equal(me.status, 200); assert.equal(me.body.memberId, id);
   assert.equal(me.body.profile.displayName, ''); assert.deepEqual(me.body.github, { state: 'DISCONNECTED', accountLogin: null });
@@ -134,9 +158,9 @@ test('최종 커밋 실패는 토큰 응답 없이 회원·프로필 전체 롤�
   finally { await db.query('DROP TRIGGER google_test_commit_fail ON member_profile'); await db.query('DROP FUNCTION google_test_commit_fail()'); }
 });
 test('서명 발급 실패는 최초 회원 생성도 롤백', async () => {
-  const original = service.tokens.issue; service.tokens.issue = async () => { throw new Error('private-sign-marker'); };
+  const original = service.sessions.tokens.issue; service.sessions.tokens.issue = async () => { throw new Error('private-sign-marker'); };
   try { error(await finish(await attempt()), 500, 'INTERNAL_ERROR'); await empty(); }
-  finally { service.tokens.issue = original; }
+  finally { service.sessions.tokens.issue = original; }
   assert.ok(!logs.join('\n').includes('private-sign-marker'));
 });
 test('기존 비활성 회원·누락 프로필은 토큰 발급이나 자동 복원 없음', async () => {

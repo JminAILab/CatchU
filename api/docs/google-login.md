@@ -8,8 +8,8 @@
 - 검증된 Google `sub`를 내부 `catchu:google:<sub>` 식별자로 사용한다. Google의 두 허용 issuer 표기는 같은 Google 식별 영역이다. 이메일·개발 회원·다른 인증 수단과 자동 연결하거나 병합하지 않는다.
 - 최초 로그인은 기존 회원·빈 기본 프로필을 같은 DB 트랜잭션으로 만든다. 같은 sub의 동시 요청은 잠금·기존 유일성 제약으로 같은 회원을 사용한다. 기존 회원이 비활성이면 인증을 거부하며, 프로필 누락을 빈 프로필로 복구하지 않는다.
 - Google 이름은 이름 미저장 회원의 `suggestedDisplayName`으로만 반환하며 저장하지 않는다. 이미 저장한 표시 이름·소개·희망 직무·기술 목록·GitHub 연결은 덮어쓰지 않는다. 이름 제안은 선택적 외부 값이며 [프로필 저장 입력 제한](member-profile.md)을 통과한 저장본이 아니다. 화면에서 확인·수정한 후 기존 프로필 API로 저장해야 한다.
-- 기존 Access JWT 발급기·설정된 수명을 재사용하고, 회원 생성부터 서명 발급까지 성공하더라도 최종 DB 커밋 전에는 성공 응답을 반환하지 않는다. Google access/refresh token은 저장·전달하지 않는다.
-- [#250 로그인 유지·재발급·로그아웃](https://github.com/JminAILab/CatchU/issues/250)의 세션 저장·Refresh Token·쿠키·토큰 보관 위치·갱신·로그아웃 무효화는 이번 범위에 없다. 현재 JWT가 없는 요청과 유효하지 않은 JWT는 기존 인증 Guard가 처리한다.
+- #250에서 회원 연결과 같은 트랜잭션으로 세션·Refresh를 저장하고 기존 Access 발급기로 15분 토큰을 발급한다. 최종 DB 커밋 전에는 성공 응답이나 쿠키를 반환하지 않는다. Google access/refresh token은 저장·전달하지 않는다.
+- [#250 세션 후속 연결](auth-sessions.md)은 세션 저장·Refresh 쿠키·갱신·로그아웃과 공통 Guard의 DB 유효성 확인을 추가한다. 이 문서의 #249 외부 인증 검증과 구분한다.
 - 최초 프로필 화면 자체는 [#137 프로필 화면 API 연결](https://github.com/JminAILab/CatchU/issues/137), 실제 로그인 화면 연결은 [#251 실제 인증 화면 연결](https://github.com/JminAILab/CatchU/issues/251)에서 다룬다.
 
 Google 기준은 [서버 인증 코드 흐름](https://developers.google.com/identity/protocols/oauth2/web-server)과 [OpenID Connect 검증·sub 기준](https://developers.google.com/identity/openid-connect/openid-connect)을 따른다. Google 공개키로 RS256 서명을 검증하고 issuer·audience·nonce·sub·iat·exp 및 존재하는 azp를 확인한다. 발급 시각(iat)에만 서버 시각보다 최대 5초 미래를 허용한다. 초 단위 계산과 작은 시계 차이로 정상 토큰이 거부되지 않도록 선택한 짧은 허용값이며, 6초 이상 미래는 거부한다. 만료(exp)·서명·issuer·audience·nonce 및 다른 검증에는 이 오차를 적용하지 않는다. 외부 전송 대상은 Google 토큰·공개키 HTTPS 주소로 고정하고 리다이렉트하지 않는다. 요청은 10초, 응답 본문은 64 KiB로 제한한다.
@@ -22,7 +22,7 @@ Google 기준은 [서버 인증 코드 흐름](https://developers.google.com/ide
 - Google 로그인 완료 API의 `401 AUTH_INVALID`는 로그인 시도·인증 코드·Google 토큰 검증 실패일 수 있으며, 기존 CatchU 회원 세션 만료로 일괄 처리하지 않는다. 현재 web의 `api.member`는 `AUTH_REQUIRED`·`AUTH_INVALID` 응답을 받으면 보관 중인 회원 토큰을 정리한다. #251에서는 로그인 시작·완료 호출을 이 회원 인증 오류 처리 경로와 구분해야 한다. 요청에서 회원 토큰을 생략하는 것만으로 응답의 오류 처리까지 분리되지는 않는다.
 - 완료 API에 전달할 취소 오류는 `access_denied`만 지원한다. 다른 Google 오류는 화면에서 실패로 안내하고, 사용자가 다시 시도하기를 선택하면 새 인증을 시작한다. 지원하지 않는 오류를 완료 API로 보내면 `400 VALIDATION_FAILED`와 `details.violations`를 반환한다. 컨트롤러의 입력 검증이 인증 시도 소비 전에 실행되므로 이 단계에서는 시도를 소비하지 않는다. 입력 검증 통과 후의 취소·외부 교환·DB 실패는 아래 일회용 처리 기준을 따른다.
 
-시작자 확인값·복귀 경로의 `sessionStorage` 보관은 후속 제안이며 확정된 정책이 아니다. 세션 유지·갱신·로그아웃은 [#250](https://github.com/JminAILab/CatchU/issues/250), 이름 저장 회원의 프로필 설정 화면 접근·복귀·저장 후 재진입 처리는 [PR #261](https://github.com/JminAILab/CatchU/pull/261) 범위로 구분한다.
+시작자 확인값·복귀 경로의 `sessionStorage` 보관은 후속 제안이며 확정된 정책이 아니다. 세션 유지·갱신·로그아웃은 [#250 후속 안내](auth-sessions.md), 이름 저장 회원의 프로필 설정 화면 접근·복귀·저장 후 재진입 처리는 [PR #261](https://github.com/JminAILab/CatchU/pull/261) 범위로 구분한다.
 
 ## API 연결안
 
@@ -31,7 +31,7 @@ Google 기준은 [서버 인증 코드 흐름](https://developers.google.com/ide
 | 동작 | 요청 | 응답 |
 |---|---|---|
 | 시작 | `POST /v1/auth/google/authorization`, 빈 객체 `{}` | `{authorizationUrl, loginAttemptToken, expiresIn: 600}` |
-| 완료 | `POST /v1/auth/google/login`, `{state, loginAttemptToken, code}` | 기존 `{accessToken, tokenType, expiresIn}` + `suggestedDisplayName: string 또는 null` |
+| 완료 | `POST /v1/auth/google/login`, `{state, loginAttemptToken, code}` | `{accessToken, tokenType, expiresIn: 900}` + `suggestedDisplayName: string 또는 null`, #250 Refresh 쿠키 |
 | Google 승인 취소 | 완료 경로에 `{state, loginAttemptToken, error: "access_denied"}` (code와 동시 지정 불가) | `{cancelled: true}`, 회원·토큰 생성 없음 |
 
 `authorizationUrl`에는 `openid profile`만 요청한다. 이메일을 회원 연결 기준으로 사용하지 않아 email scope는 요청하지 않는다. `loginAttemptToken`은 인증을 시작한 브라우저가 보관했다가 완료 요청에 보내는 별도 비밀 확인값이며 Google URL·콜백 query에 넣지 않는다. 시작 응답·콜백 URL·code·state·확인값·토큰은 로그나 대화에 공유하지 않는다.

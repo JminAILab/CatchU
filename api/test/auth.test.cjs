@@ -24,12 +24,13 @@ class ProbeModule {}
 Module({ imports: [AppModule], controllers: [ProbeController] })(ProbeModule);
 
 async function start(t, overrides = {}) {
-  const envKeys = ['AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'SHARE_LINK_WEB_BASE_URL', 'LINK_GRANT_SECRET'];
+  const envKeys = ['AUTH_WEB_ORIGIN', 'AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'SHARE_LINK_WEB_BASE_URL', 'LINK_GRANT_SECRET'];
   const before = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
   const secret = randomBytes(32).toString('hex');
   const settings = {
+    AUTH_WEB_ORIGIN: 'https://catchu.example',
     AUTH_JWT_SECRET: secret,
-    AUTH_ACCESS_TOKEN_TTL_SECONDS: '60',
+    AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
     DEV_LOGIN_ENABLED: 'true',
     NODE_ENV: 'test',
     ...overrides,
@@ -119,7 +120,7 @@ test('개발 로그인 토큰의 회원 ID를 읽으며 요청 입력으로 대�
   assert.equal(response.headers.get('cache-control'), 'no-store');
   const { accessToken, tokenType, expiresIn } = await response.json();
   assert.equal(tokenType, 'Bearer');
-  assert.equal(expiresIn, 60);
+  assert.equal(expiresIn, 900);
   const member = await server.protectedRequest(accessToken, '/v1/__test/member?memberId=someone-else');
   assert.equal(member.status, 200);
   assert.equal(member.headers.get('cache-control'), 'no-store');
@@ -258,7 +259,7 @@ test('비밀값 기본값이 없고 수명·서명 키 설정 오류에 실제 �
   }
   const invalidSecret = randomBytes(16).toString('hex');
   assert.throws(
-    () => readAuthConfig({ AUTH_JWT_SECRET: invalidSecret, AUTH_ACCESS_TOKEN_TTL_SECONDS: '60' }),
+    () => readAuthConfig({ AUTH_JWT_SECRET: invalidSecret, AUTH_ACCESS_TOKEN_TTL_SECONDS: '900' }),
     (error) => error.message.includes('AUTH_JWT_SECRET') && !error.message.includes(invalidSecret),
   );
 });

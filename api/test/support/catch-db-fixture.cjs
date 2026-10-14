@@ -49,11 +49,12 @@ async function createUpstreamTables(dataSource) {
   const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
   const { CreateResultApplicationRecord1790550000000 } = require('../../dist/database/migrations/1790550000000-CreateResultApplicationRecord');
   const { CreateShareLink1790745895865 } = require('../../dist/database/migrations/1790745895865-CreateShareLink');
+  const { CreateAuthSessions1791648335731 } = require('../../dist/database/migrations/1791648335731-CreateAuthSessions');
   assertTestDatabaseName(dataSource.options.database);
   // 공통 npm test가 이어서 runMigrations해도 기반을 중복 생성하지 않도록 이력도 남긴다.
   const foundation = new DataSource({
     ...dataSource.options,
-    migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000, CreateShareLink1790745895865],
+    migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000, CreateShareLink1790745895865, CreateAuthSessions1791648335731],
   });
   try {
     await foundation.initialize();
@@ -98,11 +99,12 @@ async function createCatchDbFixture(config) {
     const { ShareLink } = require('../../dist/share-links/share-link.entity');
     const { ResultApplicationRecord } = require('../../dist/result-application/result-application.entity');
     const { SnakeNamingStrategy } = require('../../dist/database/snake-naming.strategy');
+    const { AuthSession, SessionRefreshToken } = require('../../dist/auth/session.entity');
     dataSource = new DataSource({
       ...config, schema, namingStrategy: new SnakeNamingStrategy(),
       entities: [MemberAccount, MemberProfile, GitHubConnection, AnalysisRequest, AnalysisConsent,
         AnalysisAttempt, IdempotencyRecord, ShareLink, ResultApplicationRecord, CatchAssetEntity, CatchEvidenceEntity,
-        CandidateRegistrationEntity, RepositoryProtectionEntity],
+        CandidateRegistrationEntity, RepositoryProtectionEntity, AuthSession, SessionRefreshToken],
       // 되돌리기 검사는 B 마이그레이션만 취소하여 실제 선행 테이블의 보존을 확인한다.
       migrations: [CreateCatchAssets1790600000000, CreateRepositoryProtection1790601000000, AllowNullCatchTitle1791784385918],
       extra: { options: `-c TimeZone=UTC -c search_path=${schema}` },

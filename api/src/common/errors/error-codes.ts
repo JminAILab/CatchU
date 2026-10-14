@@ -8,6 +8,8 @@ export const ERROR_STATUS = {
   VALIDATION_FAILED: 400,
   AUTH_REQUIRED: 401,
   AUTH_INVALID: 401,
+  // #250 팀장 결정에 따라 담당자가 선정한 전용 Origin 거부 코드. 공식 명세 반영은 별도다.
+  AUTH_ORIGIN_FORBIDDEN: 403,
   LINK_PASSWORD_REQUIRED: 401,
   LINK_PASSWORD_INVALID: 401,
   GITHUB_CONNECTION_REQUIRED: 403,
@@ -40,6 +42,7 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   VALIDATION_FAILED: '입력값을 확인해 주세요.',
   AUTH_REQUIRED: '로그인이 필요합니다.',
   AUTH_INVALID: '로그인 정보가 유효하지 않습니다. 다시 로그인해 주세요.',
+  AUTH_ORIGIN_FORBIDDEN: '허용된 화면에서 다시 요청해 주세요.',
   LINK_PASSWORD_REQUIRED: '비밀번호를 입력해 주세요.',
   LINK_PASSWORD_INVALID: '비밀번호가 올바르지 않습니다.',
   GITHUB_CONNECTION_REQUIRED: 'GitHub 연결이 필요합니다.',

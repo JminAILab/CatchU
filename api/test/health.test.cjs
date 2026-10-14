@@ -7,7 +7,7 @@ const { configureApp } = require('../dist/app.setup');
 const { randomBytes } = require('node:crypto');
 
 process.env.AUTH_JWT_SECRET = randomBytes(32).toString('hex');
-process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = '60';
+process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = '900';
 // 공유 URL 기본값(http)은 development·test에서만 쓴다(#218).
 process.env.NODE_ENV = 'test';
 delete process.env.DEV_LOGIN_ENABLED;

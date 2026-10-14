@@ -1,4 +1,5 @@
 import { isDevelopmentOrTest } from '../common/node-env';
+import { ACCESS_SECONDS } from './session.config';
 
 export interface AuthConfig {
   signingKey: Uint8Array;
@@ -17,9 +18,8 @@ export function readAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig
 
   const ttl = env.AUTH_ACCESS_TOKEN_TTL_SECONDS;
   const seconds = Number(ttl);
-  if (!ttl || !/^[1-9]\d*$/.test(ttl) || !Number.isSafeInteger(seconds) ||
-      !Number.isSafeInteger(Math.floor(Date.now() / 1000) + seconds)) {
-    throw new Error('AUTH_ACCESS_TOKEN_TTL_SECONDS must be a positive safe integer');
+  if (ttl !== String(ACCESS_SECONDS)) {
+    throw new Error('AUTH_ACCESS_TOKEN_TTL_SECONDS must be 900 (#250: Access 15 minutes)');
   }
 
   return {
