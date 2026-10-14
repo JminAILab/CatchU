@@ -32,10 +32,17 @@ paths:
   "/catches/{catchId}/mismatch": {$ref: "./member-api.yaml#/paths/~1catches~1{catchId}~1mismatch"}
   "/share-links": {$ref: "./member-api.yaml#/paths/~1share-links"}
   "/share-links/{linkId}/stop": {$ref: "./member-api.yaml#/paths/~1share-links~1{linkId}~1stop"}
+  "/auth/google/authorization": {$ref: "./member-api.yaml#/paths/~1auth~1google~1authorization"}
+  "/auth/google/login": {$ref: "./member-api.yaml#/paths/~1auth~1google~1login"}
+  "/auth/refresh": {$ref: "./member-api.yaml#/paths/~1auth~1refresh"}
+  "/auth/logout": {$ref: "./member-api.yaml#/paths/~1auth~1logout"}
+  "/me/github/authorization": {$ref: "./member-api.yaml#/paths/~1me~1github~1authorization"}
+  "/me/github/connection": {$ref: "./member-api.yaml#/paths/~1me~1github~1connection"}
 security: [{AccessJWT: []}]
 components:
   securitySchemes:
     AccessJWT: {type: http, scheme: bearer, bearerFormat: JWT}
+    RefreshCookie: {type: apiKey, in: cookie, name: catchu_refresh}
 ```
 
 | 경로 묶음 | 의미·소유 | FR |
@@ -44,9 +51,17 @@ components:
 | analysis-notice, analysis-requests | 현재 고지·새 동의 접수·이력/개별 상태·실패 후 명시 재요청 | FR1.1, FR1.4 |
 | catches 및 confirmation/visibility/mismatch | 목록/상세·명시 확인·개별 공개/숨김·불일치 표시; 목록은 선택 repositoryId로 저장소 필터링하며 sourceRequestId와 함께 주면 둘 다 만족하는 Catch만 반환; 직접 편집/재생성 없음 | FR2.1~2.2, FR3.5, FR4.1 |
 | share-links 및 stop | 대표 없이 발급·현재 상태 관리·중단; 제목 변경/복구/기간 연장 없음 | FR3.1~3.2, FR4.2~4.5 |
+| auth/google/authorization, auth/google/login | Google 로그인 시작·완료·취소. 첫 로그인은 회원·빈 프로필 생성 | FR11.1 |
+| auth/refresh, auth/logout | Access 재발급·현재 브라우저 세션 종료. Refresh 쿠키·Origin으로 보호 | FR11.1 |
+| me/github/authorization, me/github/connection | GitHub 계정 연결 시작·완료·해제. 상태 조회는 me | FR11.2, FR1.1 |
 
-- 회원 경로는 `Authorization: Bearer <CatchU Access JWT>`가 필요하다. `memberId`는 검증한 토큰에서 얻으며 본문에서 지정하지 않는다. Guard 통과 뒤 기능 담당이 자원 소유·연동·동의를 검사한다. 다른 회원의 자원과 없는 자원은 동일 404/RESOURCE_UNAVAILABLE이다.
-- Google 실제 로그인/GitHub OAuth·refresh·로그아웃의 제공자/쿠키 경로는 OQ-A1이다. 이 문서는 Access JWT 소비 계약을 고정하며 미합의 OAuth callback 등을 작동하는 계약으로 꾸미지 않는다. #87 개발용 로그인은 명시 설정에서만 켜고 production에서는 거부한다. 운영 OpenAPI에 개발 로그인 경로를 추가하지 않는다.
+- auth 경로 4개를 뺀 회원 경로는 `Authorization: Bearer <CatchU Access JWT>`가 필요하다. Guard는 서명·만료와 함께 세션·회원이 유효한지 확인한다(끝난 세션의 Access는 401/AUTH_INVALID). `memberId`는 검증한 토큰에서 얻으며 본문에서 지정하지 않는다. Guard 통과 뒤 기능 담당이 자원 소유·연동·동의를 검사한다. 다른 회원의 자원과 없는 자원은 동일 404/RESOURCE_UNAVAILABLE이다.
+- 인증 경로의 요청·응답·거부는 [member-api.yaml](member-api.yaml)을 따르며 Idempotency-Key를 쓰지 않는다(로그인 시도·state는 한 번만 쓰임). #87 개발용 로그인은 명시 설정에서만 켜고 production에서는 거부한다. 운영 OpenAPI에 개발 로그인 경로를 추가하지 않는다.
+- Google: 검증된 `sub`로만 회원을 찾고(`catchu:google:<sub>`) 이메일·다른 로그인 수단과 자동 연결하지 않는다.
+- 세션: Access 15분, 로그인 세션은 생성부터 최대 7일이며 마지막 정상 갱신 뒤 24시간이 지나면 끝난다(갱신으로 7일을 늘리지 않음). 갱신마다 Refresh를 교체하고 이미 쓴 Refresh가 다시 오면 그 세션을 끝내므로, 갱신 응답을 잃고 이전 쿠키로 다시 보내도 재로그인이 필요하다. 로그아웃은 현재 브라우저 세션만 끝낸다.
+- 쿠키: `catchu_refresh`, Path `/v1/auth`, HttpOnly, SameSite=Strict, Domain 없음, https 출처에서 Secure(개발·test의 loopback http만 생략). 만료는 common.yaml SetRefreshCookie.
+- 출처: 갱신·로그아웃은 `Origin`이 설정한 web 출처와 정확히 같을 때만 받는다(CSRF 방어). 운영은 web과 API를 같은 출처에 두고(앞단이 `/v1`만 API로 보냄) CORS를 켜지 않는다.
+- GitHub: 추가 권한(scope) 없는 OAuth App으로 만료형 토큰을 받고 자동 갱신하지 않는다. 만료·폐기·보관 자료 손상을 확인하면(`GET /me` 포함) REAUTH_REQUIRED로 바꾸며(최근 계정명 유지) 다시 연결해야 한다.
 - 프로필은 displayName·introduction·desiredRole·skills를 자가 입력으로 취급한다. 값이 없는 문자열은 빈 문자열, 기술은 빈 배열이다. 서비스 기본값/길이 제한은 A의 기능 설계로 보완하며 공개 투영은 OQ-A2의 A/C 확인 대상이다.
 - 회원 목록은 `items`와 `page.nextCursor`(마지막은 null)를 반환한다. 이 `items`·`page` 규칙은 회원 목록에만 적용되며 수신자 목록 응답은 `profile`·`catches`·`page`다. opaque cursor는 소유자/필터 경계에 묶이며 현재 권한을 다시 검사한다. cursor는 공개 상태 스냅샷이나 영구 접근권이 아니다. 기본 20·최대 100개는 v1 페이지 규격이다.
 
@@ -122,11 +137,12 @@ components:
 
 | HTTP | code | 적용 |
 |---|---|---|
-| 400 | INVALID_REQUEST, VALIDATION_FAILED | 형태/입력 오류. details.violations=[{field,reason}] |
-| 401 | AUTH_REQUIRED, AUTH_INVALID | 회원 토큰 없음/변조·만료. 내부 원인·토큰 없음 |
+| 400 | INVALID_REQUEST, VALIDATION_FAILED | 형태/입력 오류. details.violations=[{field,reason}]. GitHub 연결 완료의 state·권한 불일치도 INVALID_REQUEST |
+| 401 | AUTH_REQUIRED, AUTH_INVALID | 회원 토큰 없음/변조·만료·끝난 세션. Google 로그인 검증 실패·Refresh 거부도 AUTH_INVALID. 내부 원인·토큰 없음 |
 | 401 | LINK_PASSWORD_REQUIRED, LINK_PASSWORD_INVALID | 수신자 비밀번호 분기만. 로그인 유도와 구분 |
-| 403 | GITHUB_CONNECTION_REQUIRED, REPOSITORY_NOT_ALLOWED, CONSENT_REQUIRED | 접수의 연동/대상/동의 조건 미충족 |
-| 404 | RESOURCE_UNAVAILABLE, LINK_UNAVAILABLE | 존재/권한 은닉 규칙은 각 경계 표 적용 |
+| 403 | GITHUB_CONNECTION_REQUIRED, REPOSITORY_NOT_ALLOWED, CONSENT_REQUIRED | 접수의 연동/대상/동의 조건 미충족. GitHub 연결 기능이 꺼지면 연결 경로 3개도 GITHUB_CONNECTION_REQUIRED |
+| 403 | AUTH_ORIGIN_FORBIDDEN | 갱신·로그아웃의 Origin 불일치·누락. 쿠키·세션 변경 없음 |
+| 404 | RESOURCE_UNAVAILABLE, LINK_UNAVAILABLE | 존재/권한 은닉 규칙은 각 경계 표 적용. Google 로그인이 꺼지면 Google 경로 2개도 RESOURCE_UNAVAILABLE |
 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED | 접수 충돌/보류. 기존 작업 ID는 본인에게만 |
 | 409 | IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED | 키 재사용 본문 충돌·공개 조건 실패 |
 | 409 | LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED | trim 제목 중복·유효 링크 5개 한도 |
@@ -180,7 +196,7 @@ credentialContextReference는 A/F 계약에서 해석할 작업 맥락의 식별
 
 | Contract | Question / 담당·시점 | Blocks |
 |---|---|---|
-| OQ-A1 M | 실제 Google/GitHub OAuth 경로·GitHub 앱 종류·refresh/logout·쿠키/CORS/CSRF·수명: A/2, 관련 실제 인증 연결 전 | 실제 로그인/재인증/연동. #87의 JWT 소비·개발용 로그인과 모의 API 개발은 가능 |
+| OQ-A1 M (결정) | 2026-10-14 반영: 인증 경로·GitHub 앱 종류·쿠키·CORS·CSRF·수명은 「M — 회원 API」, 세션 기준은 [#250 팀장 결정](https://github.com/JminAILab/CatchU/issues/250#issuecomment-6097542703). 남은 것: 운영 도메인·AWS 앞단은 [#212 배포 조건](https://github.com/JminAILab/CatchU/issues/212#issuecomment-6097540881). 로그인 시도·GitHub state를 API 메모리에 두므로 API를 여러 대로 늘리려면 공유 저장소가 먼저 필요 | 운영 배포의 인증 연결. 로컬 연결과 화면 연결(#251)은 가능 |
 | OQ-A2 M/P | 프로필 4항목의 자가 입력/공개 투영과 GitHub 공개 정보 추가 여부: A/2·C/3, PR 영역 리뷰. 미확인 GitHub 항목은 현재 응답에 넣지 않음 | 실제 공개 프로필 제공 전 확인; 새로운 공개 항목은 계약 수정 |
 | OQ-F1 W (보존·전송 결정) | 2026-10-06 팀장 결정([#23](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)): F 결과는 E에 보낸 뒤 보존·재전달하지 않으며 전송은 #77 판정을 따른다. 남은 것은 A/F 자격정보 제공의 상세: F/H/1·A/E/2, 실제 worker 연결 전 | 실제 수집. 메시지/가짜 생성기에는 영향 없음 |
 | OQ-F2 W/B | workIdentity·묶음 동일성 판별의 함수/충돌 검증: F/1 제안, B/4·E/2 리뷰, 실제 등록 연결 전 | 동일 작업 중복 방지의 실제 판정; v1 식별 필드/동작 규칙 유지 |

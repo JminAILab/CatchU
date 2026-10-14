@@ -333,4 +333,147 @@ paths:
         "404": {"$ref":"./common.yaml#/components/responses/Error404"}
         "409": {"$ref":"./common.yaml#/components/responses/Error409"}
         "500": {"$ref":"./common.yaml#/components/responses/Error500"}
-components: {"securitySchemes":{"AccessJWT":{"type":"http","scheme":"bearer","bearerFormat":"JWT"}}}
+  "/auth/google/authorization":
+    post:
+      operationId: "startGoogleLogin"
+      summary: "Google 로그인 시작. 회원 Access 없이 호출한다"
+      description: "인증 주소는 openid profile만 요청한다. loginAttemptToken은 시작한 브라우저가 보관했다가 완료 요청에 보내는 확인값이며 Google 주소·콜백에 넣지 않는다. expiresIn은 이 로그인 시도의 수명(현재 600초)이며 로그인 세션 수명이 아니다. Google 로그인이 꺼진 환경은 404/RESOURCE_UNAVAILABLE, 추가 본문·query는 400/VALIDATION_FAILED다"
+      security: []
+      requestBody: {"required":false,"content":{"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/EmptyRequest"}}}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                additionalProperties: false
+                required: ["authorizationUrl","loginAttemptToken","expiresIn"]
+                properties: {"authorizationUrl":{"type":"string","format":"uri"},"loginAttemptToken":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},"expiresIn":{"type":"integer","minimum":1}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/auth/google/login":
+    post:
+      operationId: "completeGoogleLogin"
+      summary: "Google 로그인 완료 또는 취소. 회원 Access 없이 호출한다"
+      description: "입력 형식을 통과하고 시작 브라우저 확인값이 맞으면 로그인 시도를 Google 교환 전에 소비하며, 취소·교환 실패·DB 실패 뒤에도 다시 쓸 수 없다(새로 시작). 시도 없음·만료·이미 사용, 확인값 불일치, Google 코드·서명·claim 검증 실패, 비활성 회원은 401/AUTH_INVALID이며 CatchU 회원 세션 만료와 다른 뜻이다. 형식 오류·추가 필드·code와 error 동시 지정·access_denied 밖의 error는 400/VALIDATION_FAILED이고 시도를 소비하지 않는다. Google 로그인이 꺼진 환경은 404/RESOURCE_UNAVAILABLE, Google 통신·DB·커밋·서명 실패는 500이며 이때 성공 응답·쿠키를 보내지 않는다"
+      security: []
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              oneOf:
+                - {"type":"object","additionalProperties":false,"required":["state","loginAttemptToken","code"],"properties":{"state":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},"loginAttemptToken":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},"code":{"type":"string","minLength":1,"maxLength":4096,"description":"공백·제어 문자 없음"}}}
+                - {"type":"object","additionalProperties":false,"required":["state","loginAttemptToken","error"],"properties":{"state":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},"loginAttemptToken":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},"error":{"type":"string","enum":["access_denied"]}}}
+      responses:
+        "200":
+          description: "로그인 성공이면 GoogleLoginResult와 Set-Cookie의 Refresh. Google 승인 취소면 {cancelled: true}이며 회원·세션·쿠키를 만들지 않는다"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"},"Set-Cookie":{"$ref":"./common.yaml#/components/headers/SetRefreshCookie"}}
+          content:
+            "application/json":
+              schema:
+                oneOf:
+                  - {"$ref":"./common.yaml#/components/schemas/GoogleLoginResult"}
+                  - {"type":"object","additionalProperties":false,"required":["cancelled"],"properties":{"cancelled":{"type":"boolean","enum":[true]}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/auth/refresh":
+    post:
+      operationId: "refreshSession"
+      summary: "Refresh 쿠키로 Access를 다시 받고 Refresh를 교체한다. 회원 Access 대신 Refresh 쿠키와 Origin으로 보호한다"
+      description: "Origin을 먼저 검사한다. 다르거나 없으면 403/AUTH_ORIGIN_FORBIDDEN이며 쿠키·세션을 바꾸지 않는다. 추가 본문·query는 400/VALIDATION_FAILED이고 Refresh를 쓰지 않는다. 쿠키 없음·형식 오류·같은 이름 쿠키 여러 개·알 수 없는 값·끝난 세션·이미 사용한 Refresh는 401/AUTH_INVALID와 쿠키 제거이며, 이미 사용한 Refresh가 다시 오면 그 세션 전체를 끝낸다. DB·서명·커밋 실패는 500이며 새 쿠키도 제거 쿠키도 보내지 않는다"
+      security: [{"RefreshCookie":[]}]
+      parameters: [{"$ref":"#/components/parameters/Origin"}]
+      requestBody: {"required":false,"content":{"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/EmptyRequest"}}}}
+      responses:
+        "200":
+          description: "새 Access와 교체한 Refresh 쿠키"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"},"Set-Cookie":{"$ref":"./common.yaml#/components/headers/SetRefreshCookie"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/AccessToken"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401ClearRefresh"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/auth/logout":
+    post:
+      operationId: "logout"
+      summary: "현재 브라우저의 Refresh 쿠키가 가리키는 로그인 세션만 끝낸다. 다른 기기의 세션은 유지한다"
+      description: "Origin을 먼저 검사한다. 통과하면 현재 Refresh와 이미 사용한 Refresh 모두 같은 세션을 끝내고, 쿠키가 없거나 알 수 없는 값·이미 끝난 세션이어도 같은 204와 쿠키 제거로 답한다. 쿠키 없는 204는 따로 가진 Access의 세션을 끝냈다는 뜻이 아니다. Origin이 다르거나 없으면 403/AUTH_ORIGIN_FORBIDDEN, 추가 본문·query는 400/VALIDATION_FAILED, DB 실패는 500이며 셋 모두 쿠키를 바꾸지 않는다"
+      security: [{"RefreshCookie":[]},{}]
+      parameters: [{"$ref":"#/components/parameters/Origin"}]
+      requestBody: {"required":false,"content":{"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/EmptyRequest"}}}}
+      responses:
+        "204":
+          description: "종료 또는 끝낼 세션 없음. 빈 본문"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"},"Set-Cookie":{"$ref":"./common.yaml#/components/headers/ClearRefreshCookie"}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/me/github/authorization":
+    post:
+      operationId: "startGitHubConnection"
+      summary: "GitHub 계정 연결 시작. 추가 권한(scope) 없는 OAuth App의 인증 주소와 이 절차의 state를 준다"
+      description: "state는 회원마다 하나이며 10분 동안 한 번만 쓸 수 있고, 새로 시작하면 이전 state를 대체한다. expiresAt은 이 state의 만료 시각이며 GitHub 토큰 수명이 아니다. GitHub 연결 기능이 꺼진 환경은 403/GITHUB_CONNECTION_REQUIRED, 추가 본문·query는 400/VALIDATION_FAILED다"
+      requestBody: {"required":false,"content":{"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/EmptyRequest"}}}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                additionalProperties: false
+                required: ["authorizationUrl","state","expiresAt"]
+                properties: {"authorizationUrl":{"type":"string","format":"uri"},"state":{"type":"string","pattern":"^[a-f0-9]{64}$"},"expiresAt":{"type":"string","format":"date-time"}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/me/github/connection":
+    post:
+      operationId: "completeGitHubConnection"
+      summary: "GitHub 승인 뒤 콜백으로 받은 code·state로 연결을 완료한다. 성공은 state CONNECTED와 accountLogin"
+      description: "state가 없거나 만료·이미 사용·대체됐거나, 돌아온 권한이 추가 권한 없음과 다르거나, 발급 응답이 맞지 않으면 400/INVALID_REQUEST이며 새로 시작해야 한다. 형식 오류·추가 필드는 400/VALIDATION_FAILED다. 사용자가 GitHub에서 취소하면 이 경로를 부르지 않으며 기존 연결을 유지한다. 새 시작·해제와 겹친 늦은 완료는 현재 연결을 덮어쓰지 않는다. GitHub 연결 기능이 꺼진 환경은 403/GITHUB_CONNECTION_REQUIRED, GitHub 통신 장애·자격정보 보관·DB 실패는 500이다"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              additionalProperties: false
+              required: ["code","state"]
+              properties: {"code":{"type":"string","pattern":"^[!-~]{1,512}$"},"state":{"type":"string","pattern":"^[a-f0-9]{64}$"}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/GitHubConnection"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+    delete:
+      operationId: "disconnectGitHub"
+      summary: "CatchU에 저장한 GitHub 연결과 자격정보를 지운다. 성공은 state DISCONNECTED와 accountLogin null"
+      description: "본문은 없거나 {}만 받고 다른 필드·query는 400/VALIDATION_FAILED다. 연결이 없어도 같은 200이다. GitHub에 남은 앱 승인 자체를 취소하지는 않는다. GitHub 연결 기능이 꺼진 환경은 403/GITHUB_CONNECTION_REQUIRED, DB·보관 정리 실패는 500이다"
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/GitHubConnection"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "403": {"$ref":"./common.yaml#/components/responses/Error403"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+components:
+  securitySchemes: {"AccessJWT":{"type":"http","scheme":"bearer","bearerFormat":"JWT"},"RefreshCookie":{"type":"apiKey","in":"cookie","name":"catchu_refresh"}}
+  parameters: {"Origin":{"name":"Origin","in":"header","required":true,"schema":{"type":"string"},"description":"web 출처(AUTH_WEB_ORIGIN)와 정확히 같아야 한다. 브라우저가 보낸다"}}
