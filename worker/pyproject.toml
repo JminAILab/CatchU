@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "CatchU 수집·분석 worker 실행 기반"
 requires-python = "==3.12.10"
 dependencies = [
+    "anthropic==1.13.0",
     "fastapi==0.141.1",
+    "httpcore2==2.13.0",
+    "httpx2==2.13.0",
     "jsonschema==4.26.0",
     "pyyaml==6.0.3",
     "referencing==0.37.0",
@@ -15,7 +18,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "httpx2==2.13.0",
     "mypy==2.3.1",
     "pytest==9.1.1",
     "ruff==0.16.8",

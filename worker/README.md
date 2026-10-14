@@ -14,7 +14,8 @@ FastAPI 기반 worker의 최소 실행 골격이다. HTTP 경로는 `GET /health
 | 가상환경·의존성 관리 | `uv` (`0.12.18` 기준) |
 | 웹 앱·서버 | FastAPI `0.141.1`, Uvicorn `0.53.0` |
 | 정적·서식·타입 검사 | Ruff `0.16.8`, mypy `2.3.1` |
-| 테스트 | pytest `9.1.1`, HTTPX2 `2.13.0` |
+| 테스트 | pytest `9.1.1` |
+| 생성 LLM 제공자 SDK | anthropic `1.13.0`, HTTP는 HTTPX2 `2.13.0`·HTTPCore2 `2.13.0`(FastAPI 시험 클라이언트도 HTTPX2를 쓴다, [생성의 실제 제공자](docs/generation-provider.md)) |
 | 메시지 스키마 검사 | jsonschema `4.26.0`, referencing `0.37.0`, PyYAML `6.0.3`, 형식 검사 rfc3339-validator `0.1.4`·rfc3986-validator `0.1.1` |
 
 직접 의존성과 검사 설정은 `pyproject.toml`, 전체 의존성의 해석 결과는 `uv.lock`에 둔다. `--locked`는 두 파일이 맞지 않으면 실행을 중단하여 의존성이 조용히 바뀌지 않게 한다. 패키지 배포를 하지 않는 앱(`package = false`)이므로 별도 빌드 명령은 없다.
@@ -149,7 +150,7 @@ uv run --locked python -m app.processing succeeded-one-candidate
 
 ## 설명 초안·질문·제목 생성
 
-[docs/generation.md](docs/generation.md)에 있다.
+[docs/generation.md](docs/generation.md)에 있다. 실제 제공자 어댑터(Anthropic Claude API)는 [docs/generation-provider.md](docs/generation-provider.md)에 있다.
 
 ## 변경 후 검사
 
@@ -162,7 +163,7 @@ uv run --locked mypy
 uv run --locked pytest
 ```
 
-Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 요청 검사와 합성 결과 생성은 거부 조건, 시나리오별 결과, 실행 불명 처리를 확인하며, 네트워크 연결을 막은 상태에서도 모든 시나리오가 끝나는지 본다. 수집 검사는 합성 GitHub 응답으로 사전 거부·호출 통제·상한·실패 보존·정규화·근거·결과 조합 연결·정리와 비밀값 누출을 확인하고, 관계 조회의 단계·조회 대상·멈춤 처리와 연결 PR 묶음 조회(GraphQL)의 요청 본문·응답 대응·실패 분류·묶음 경계·호출 수를 확인한다. 후보 판별 검사는 작업 동일성 값([wi1 규칙](docs/candidate-decision.md)), 실제 git과 대조한 공백을 무시한 diff 값, 배정·보류·같은 변경·커밋 묶음·나누기·집계, 판별 기준 문서의 합성 사례를 수집부터 결과 조합까지 확인한다. 생성 검사는 합성 제공자로 재료 고르기·patch 확인·가리기·크기 선별·응답 판정·문장 틀·제목·상태와 실패·호출 한도와 시간·제목 고쳐 쓰기·근거 한계 문구를 수집부터 결과 조합까지 확인하고, 제공자 입력·결과·로그에 가린 값이 남지 않는지 본다. 실제 git으로 만드는 시험은 git이 없으면 건너뛴다. 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
+Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 요청 검사와 합성 결과 생성은 거부 조건, 시나리오별 결과, 실행 불명 처리를 확인하며, 네트워크 연결을 막은 상태에서도 모든 시나리오가 끝나는지 본다. 수집 검사는 합성 GitHub 응답으로 사전 거부·호출 통제·상한·실패 보존·정규화·근거·결과 조합 연결·정리와 비밀값 누출을 확인하고, 관계 조회의 단계·조회 대상·멈춤 처리와 연결 PR 묶음 조회(GraphQL)의 요청 본문·응답 대응·실패 분류·묶음 경계·호출 수를 확인한다. 후보 판별 검사는 작업 동일성 값([wi1 규칙](docs/candidate-decision.md)), 실제 git과 대조한 공백을 무시한 diff 값, 배정·보류·같은 변경·커밋 묶음·나누기·집계, 판별 기준 문서의 합성 사례를 수집부터 결과 조합까지 확인한다. 생성 검사는 합성 제공자로 재료 고르기·patch 확인·가리기·크기 선별·응답 판정·문장 틀·제목·상태와 실패·호출 한도와 시간·제목 고쳐 쓰기·근거 한계 문구를 수집부터 결과 조합까지 확인하고, 제공자 입력·결과·로그에 가린 값이 남지 않는지 본다. 실제 제공자 어댑터는 진짜 SDK에 가짜 HTTP 전송을 붙여 요청 설정·재시도 끔·오류 변환을 확인한다. 실제 git으로 만드는 시험은 git이 없으면 건너뛴다. 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
 
 검사 결과·실행 환경·기준 커밋·작성자 외 재현 여부는 초기화 이슈·PR에 남긴다. 이 README의 명령과 기대 결과 자체가 검사 통과 기록은 아니다. 로컬 확인과 AWS 배포 검증은 각각 기록한다.
 
@@ -188,9 +189,9 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `app/candidates/` | 후보 묶음·본인 기여 확인·작업 동일성(#118). wi1 값(`identity.py`), 같은 변경의 재료(`same_change.py`), 소속·배정·커밋 묶음·나누기(`grouping.py`), 후보 자격·집계·문장·근거(`build.py`) |
 | `tests/candidate_scenarios.py` | 후보 판별 사례 시험용 선언형 합성 저장소와, 수집부터 결과 조합까지 돌리는 실행 도구 |
 | `tests/test_candidate_*.py` | wi1 값(`identity`), 공백을 무시한 diff 값·관계 근거(`same_change`), 수집 관측을 직접 만든 묶음·집계·근거(`grouping`), 판별 기준 문서의 합성 사례(`cases`), 수집·판별·결과 조합 연결(`flow`) |
-| `app/generation/` | 설명 초안·질문·제목 생성(#120). 입구(`flow.py`), 재료 찾기(`material.py`), patch 확인(`patch.py`), 가리기(`redact.py`), 입력 만들기·크기 선별(`request.py`), 응답 판정(`response.py`), 문장 틀(`render.py`), 제목(`title.py`), 실패 코드·한계 문구(`outcome.py`), 상한(`limits.py`), 제공자 경계(`provider.py`) |
+| `app/generation/` | 설명 초안·질문·제목 생성(#120). 입구(`flow.py`), 재료 찾기(`material.py`), patch 확인(`patch.py`), 가리기(`redact.py`), 입력 만들기·크기 선별(`request.py`), 응답 판정(`response.py`), 문장 틀(`render.py`), 제목(`title.py`), 실패 코드·한계 문구(`outcome.py`), 상한(`limits.py`), 제공자 경계(`provider.py`), 실제 제공자 어댑터(`claude.py`) |
 | `tests/generation_scenarios.py` | 생성 시험용 합성 제공자(받은 요청 기록, 정해 둔 응답·예외·늦은 응답)와, 수집부터 생성·결과 조합까지 돌리고 후보 보존을 확인하는 실행 도구 |
-| `tests/test_generation_*.py` | patch 확인(`patch`), 가리기(`redact`), 재료 찾기(`material`), 응답 판정·문장 틀(`response`), 제목(`title`), 상태·실패·호출 한도(`flow`), 고쳐 쓰기·근거 한계·가리기 끝까지(`rewrite_coverage`) |
+| `tests/test_generation_*.py` | patch 확인(`patch`), 가리기(`redact`), 재료 찾기(`material`), 응답 판정·문장 틀(`response`), 제목(`title`), 상태·실패·호출 한도(`flow`), 고쳐 쓰기·근거 한계·가리기 끝까지(`rewrite_coverage`), 실제 제공자 어댑터(`claude`) |
 | `pyproject.toml` | 프로젝트 의존성·개발 도구·검사 설정 |
 | `uv.lock` | 실행·개발 의존성의 잠금 파일. 저장소에 함께 커밋 |
 | `.python-version` | 로컬에서 사용할 Python 버전 |

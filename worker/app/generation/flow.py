@@ -41,7 +41,12 @@ from app.generation.outcome import (
     failed_draft,
     failed_reflection,
 )
-from app.generation.provider import GenerationProvider, ProviderError, ProviderRequest
+from app.generation.provider import (
+    GenerationProvider,
+    ProviderError,
+    ProviderRequest,
+    UnusableResponse,
+)
 from app.generation.request import (
     GENERATE_INSTRUCTIONS,
     REWRITE_INSTRUCTIONS,
@@ -277,16 +282,27 @@ def _call_and_read(
 def _call(
     provider: GenerationProvider, call: ProviderRequest, clock: Clock
 ) -> tuple[GenerationFailureCode | None, str | None]:
-    """제공자를 한 번 부른다. 다시 부르지 않는다. 시간 제한을 넘겨 돌아온 응답은 버린다."""
+    """제공자를 한 번 부른다. 다시 부르지 않는다. 시간 제한을 넘겨 끝난 호출은 쓸 수 없는 응답·호출 오류로
+    끝났어도 시간 초과로 본다(제공자 경계: 시간 제한 안에 끝내지 못하면 시간 초과)."""
     started = clock()
+    failed: GenerationFailureCode | None = None
+    raw: str | None = None
     try:
         raw = provider.complete(call)
     except TimeoutError:
         return GenerationFailureCode.TIMEOUT, None
+    except UnusableResponse as error:
+        failed = (
+            GenerationFailureCode.RESPONSE_TOO_LARGE
+            if error.reason == "TOO_LARGE"
+            else GenerationFailureCode.RESPONSE_UNREADABLE
+        )
     except ProviderError:
-        return GenerationFailureCode.CALL_FAILED, None
+        failed = GenerationFailureCode.CALL_FAILED
     if clock() - started > timedelta(seconds=call.timeout_seconds):
         return GenerationFailureCode.TIMEOUT, None
+    if failed is not None:
+        return failed, None
     return None, raw
 
 
