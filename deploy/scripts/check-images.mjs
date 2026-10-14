@@ -248,7 +248,7 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
     return "ARG·ENV 이름 검사(값은 실행할 때 주입)";
   });
   await check("worker", "Python 판본·운영 의존성·개발 도구 부재", () => {
-    const out = inImage(image.worker, ".venv/bin/python -c \"import sys,importlib.util as u;assert sys.version.split()[0]=='3.12.10',sys.version;missing=[m for m in ['fastapi','uvicorn','jsonschema','yaml','referencing','rfc3339_validator','rfc3986_validator'] if not u.find_spec(m)];dev=[m for m in ['pytest','mypy','ruff','httpx2'] if u.find_spec(m)];assert not missing and not dev,(missing,dev);import ssl;print('ok', ssl.OPENSSL_VERSION)\" && test -f /app/worker/fixtures/m1-synthetic/context.sample.json && test -f " + CONTRACT + "/worker-messages.yaml && echo layout");
+    const out = inImage(image.worker, ".venv/bin/python -c \"import sys,importlib.util as u;assert sys.version.split()[0]=='3.12.10',sys.version;missing=[m for m in ['fastapi','uvicorn','jsonschema','yaml','referencing','rfc3339_validator','rfc3986_validator','anthropic','httpx2','httpcore2'] if not u.find_spec(m)];dev=[m for m in ['pytest','mypy','ruff'] if u.find_spec(m)];assert not missing and not dev,(missing,dev);import ssl;print('ok', ssl.OPENSSL_VERSION)\" && test -f /app/worker/fixtures/m1-synthetic/context.sample.json && test -f " + CONTRACT + "/worker-messages.yaml && echo layout");
     expect(out.code === 0 && /ok/.test(out.stdout) && /layout/.test(out.stdout), out.text.slice(0, 300));
     return `3.12.10, 개발 그룹 없음, 계약 YAML·합성 자료 배치, Python 내장 ${(/OpenSSL [\d.]+/.exec(out.stdout) ?? ["OpenSSL ?"])[0]}`;
   });
