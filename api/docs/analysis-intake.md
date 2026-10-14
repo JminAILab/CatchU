@@ -58,20 +58,25 @@
 
 ## 선행 이력과 실패 재요청
 
-같은 회원·저장소의 선행 이력을 검사한다. 다른 저장소의 종료 이력에 실패 재요청 기준을 확대하지 않는다. 같은 저장소에 정상 완료·EMPTY·유효 부분 결과나 후보/등록 Catch가 있으면 요청 참조를 빼더라도 409 REANALYSIS_DEFERRED다.
+같은 회원·저장소의 선행 이력을 검사한다. 다른 저장소의 종료 이력에 실패 재요청 기준을 확대하지 않는다. 같은 저장소에 정상 완료·EMPTY·유효 부분 결과나 후보/등록 Catch가 있으면 요청 참조를 빼더라도 409 REANALYSIS_DEFERRED다. 반영 실패로 닫혔고 등록 Catch가 없는 요청(아래 ②)은 정상 완료가 아니므로 이 검사에서 제외하고, 가장 최근 요청의 재요청 판정으로 넘긴다.
 
-실패 재요청은 가장 최근 실패 요청을 명시하고 다음을 모두 만족해야 한다.
+실패 재요청은 가장 최근 요청을 `retryOfRequestId`로 명시하고, 그 요청이 CLOSED이며 등록 Catch가 없는 아래 두 경우 중 하나여야 한다([처리 시한 계약 PR #292](https://github.com/JminAILab/CatchU/pull/292)). 두 경우 모두 `retry.allowed=true`, `reason=FAILURE_WITHOUT_RESULTS`다.
 
-1. FAILED/APPLIED/CLOSED이며 진행·반영·복구가 남지 않았다.
+**① 실패 확정.** FAILED/APPLIED/CLOSED이고 다음을 모두 만족한다.
+
+1. 진행·반영·복구가 남지 않았다.
 2. 적합 후보·등록 연결·원 요청의 Catch 본체가 없고 ownerResultsReady=false다.
 3. 실패 배열이 있고 서버의 실패 확정 참조 또는 기존 E가 검증·저장한 현재 시도의 ResultApplicationRecord가 있다. HTTP 시간 초과·조회 실패·수신 ACK만으로 확정하지 않는다.
-4. 현재 연결·선정 대상·고지/범위와 새 동의가 유효하다.
 
-참조 생략·오래된 실패 선택·실행 불명·반영 실패/복구·확정 근거 부족은 409 RETRY_NOT_ALLOWED다. 허용하면 새 requestId/consentId/attemptId를 만들고 원 실패를 retryOfRequestId로 연결한다. 원 요청/동의·Catch·링크는 변경하지 않는다. 실패 확정 참조의 실제 전송/처리 시한 공급은 기존 후속 작업 범위이며 여기서 시간을 근거로 만들지 않는다.
+**② 반영 실패로 닫힘.** APPLY_FAILED/CLOSED이고 등록 연결·Catch 본체가 없으며 ownerResultsReady=false다. 처리 결과(processing)·적합 후보 수·실패 배열·실패 확정 참조는 보지 않는다. 닫히지 않은(ACTIVE) 반영 실패는 대상이 아니다.
+
+두 경우 모두 현재 연결·선정 대상·고지/범위와 새 동의가 유효해야 하며, 이 검사는 선행 이력 검사보다 먼저 한다.
+
+참조 생략·오래된 요청 선택·실행 불명·닫히지 않은 반영 대기/실패/복구·확정 근거 부족은 409 RETRY_NOT_ALLOWED다. 등록 Catch나 유효 결과가 있으면 409 REANALYSIS_DEFERRED다. 허용하면 새 requestId/consentId/attemptId를 만들고 원 요청을 retryOfRequestId로 연결한다. 원 요청/동의·Catch·링크는 변경하지 않는다. 실패 확정 참조와 처리 시한 닫기의 실제 공급은 [#237](https://github.com/JminAILab/CatchU/issues/237) 범위이며 여기서 시간을 근거로 만들지 않는다.
 
 상태 응답은 같은 트랜잭션의 요청/시도 잠금 안에서 읽는다. 등록 Catch ID는 현재 시도의 B 등록 연결에서 본인 열람 준비가 확인된 것만 반환한다. 실패 확정 참조·수신 지문·자격정보는 응답에 포함하지 않는다.
 
-이전 실패 키를 다시 조회해도 현재 다른 ACTIVE가 있으면 retry.allowed=false/IN_PROGRESS다. 이미 후속 요청을 만든 오래된 실패는 후속 작업이 끝나도 재요청 대상으로 표시하지 않는다. 같은 키 재응답의 현재 판정과 새 POST의 선행 이력 판정이 엇갈리지 않게 한다.
+이전 실패 키를 다시 조회해도 현재 다른 ACTIVE가 있으면 retry.allowed=false/IN_PROGRESS다. 이미 후속 요청을 만든 오래된 실패는 후속 작업이 끝나도 재요청 대상으로 표시하지 않는다. 같은 키 재응답의 현재 판정과 새 POST의 선행 이력 판정이 엇갈리지 않게 한다. 두 판정은 `analysis-status.ts`의 `retryDecision`·`blocksReanalysis` 한 곳에서 계산한다.
 
 ## 실행 요청 맥락의 준비와 경계
 
@@ -93,5 +98,7 @@ npm run build
 `analysis-intake.test.cjs`는 실제 HTTP·전용 PostgreSQL의 새 접수·현재 상태 재응답·다중 키 경쟁·회원 경계·현재 연결/고지/범위·저장/지연 커밋 실패·확정 실패/정상/부분/불명/복구 판정을 검사한다. [PR #284 리뷰 F1~F3](https://github.com/JminAILab/CatchU/pull/284#pullrequestreview-5498953523) 회귀로 접수 뒤 연결·선정·판본 변경의 200/동일 ID/행 불변과 새 키·실패 재요청 거부, 고지/접수 비활성 403 구분, 정상 해제의 고지 200·접수 403을 확인한다. 공유 공급자의 저장소 조회 회귀는 정상 해제 403과 잘못된 참조·DB 실패 500을 구분한다. 해제 상태는 DB에 정상 API와 같은 null 참조 형태로 구성하며 이번에 실제 GitHub 승인·해제 API를 시험한 것은 아니다. 여러 저장소는 시험 공급 대역, 종결 실패는 합성 상태 또는 기존 E에 합성 Result를 수신·반영한 준비물이다. worker Request 스키마 대조는 전송 시험이 아니다.
 
 [교착 리뷰](https://github.com/JminAILab/CatchU/pull/284#pullrequestreview-5500599838)의 회귀는 확정 실패 준비 후 별도 DB 연결로 회원 접수 잠금을 잡고 새 키 실패 재요청→이전 키 재전송 순서로 대기시킨다. `pg_locks`에서 두 대기를 확인한 뒤 풀며 3개의 독립 시험에서 각각 202·200, 이전 실패의 현재 상태, 새 요청의 ACTIVE 하나, 요청·동의·시도·멱등 기록 각각 총 2개와 원 기록 불변을 확인한다. 새 키를 다시 전송해도 200·추가 행 없음이어야 한다. 수정 전 잠금으로는 이 시험 3건이 교착에 따른 500을 검출한다. 검토 사본의 결과와 최종 구현 판본에서 직접 수행한 결과는 PR 검사 기록에서 구분한다.
+
+②의 시험은 처리 시한 닫기([#237](https://github.com/JminAILab/CatchU/issues/237))가 병합되기 전이므로 APPLY_FAILED/CLOSED를 시험 DB에 직접 구성한다. 처리 결과 4종(FAILED·EMPTY·SUCCEEDED·PARTIAL_FAILED)과 후보 수에서 허용·새 ID·이력 연결·원 기록 불변·응답과 POST 판정 일치를 확인하고, 등록 연결(열람 준비 true/false)·Catch 본체만 있는 경우와 닫히지 않은 ACTIVE에서는 거부(ACTIVE는 같은 저장소 200·다른 저장소 409)를 확인한다. 이 시험은 닫는 주기·실제 반영 흐름을 대신하지 않는다.
 
 자동 검사 결과와 실제 명령·작업 위치·판본·미검증은 #138 구현 PR에서 관리한다. 실제 GitHub·worker·화면 전체 연결, 실제 고지/자료 처리 동의 승인과 작성자 외 재현은 이 합성 API 검사와 구분한다.
