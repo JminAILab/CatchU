@@ -4,11 +4,13 @@ const { randomBytes, randomUUID } = require('node:crypto');
 const { before, after, beforeEach, test } = require('node:test');
 const { setTimeout: delay } = require('node:timers/promises');
 const { NestFactory } = require('@nestjs/core');
-const { decodeJwt } = require('jose');
+const { decodeJwt, SignJWT } = require('jose');
 const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
 const { DevMemberService, SYNTHETIC_REPOSITORY } = require('../../dist/member-analysis/dev-member.service');
-const { AnalysisRequest, AnalysisConsent, AnalysisAttempt } = require('../../dist/member-analysis/member-analysis.entity');
+const { AnalysisRequest, AnalysisConsent, AnalysisAttempt, MemberAccount } = require('../../dist/member-analysis/member-analysis.entity');
+const { AUTH_CONFIG } = require('../../dist/auth/auth.config');
+const { SessionService } = require('../../dist/auth/session.service');
 const { AnalysisIntakeService } = require('../../dist/analysis-intake/analysis-intake.service');
 const { AnalysisNoticeService, SYNTHETIC_NOTICE } = require('../../dist/analysis-intake/analysis-notice');
 const { parseAnalysisInput, analysisFingerprint } = require('../../dist/analysis-intake/analysis-input');
@@ -107,7 +109,11 @@ test('현재 합성 고지는 인증·no-store와 계약 두 필드만 제공한
 });
 test('#104 이전 문자열 회원 토큰은 고지·접수 모두 DB 조회 전 401로 거부한다',async t=>{
   const s=await start(t);
-  const {accessToken}=await s.app.get(require('../../dist/auth/access-token.service').AccessTokenService).issue('legacy-member-138');
+  const now = Math.floor(Date.now() / 1000);
+  // 제품 발급 함수는 비 UUID를 거부하므로 검증용 과거 토큰을 직접 서명한다.
+  const accessToken = await new SignJWT({ sub: 'legacy-member-138', sid: randomUUID(),
+    iss: 'catchu-api', aud: 'catchu-member-api', iat: now, exp: now + 900 })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' }).sign(s.app.get(AUTH_CONFIG).signingKey);
   await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+accessToken}}),401,'AUTH_INVALID');
   await error(await s.post({token:accessToken}),401,'AUTH_INVALID');
   assert.equal((await counts()).requests,0);
@@ -273,9 +279,14 @@ test('개발 플래그가 켜져도 일반 회원에게 합성 고지를 대신 
 for(const overrides of [{DEV_LOGIN_ENABLED:'false'},{NODE_ENV:'production'},{NODE_ENV:undefined},{NODE_ENV:'preview'}]){
   test('합성 고지 기본 비활성/운영 차단: '+JSON.stringify(overrides),async t=>{
     const s=await start(t,overrides);
-    const token=await s.app.get(require('../../dist/auth/access-token.service').AccessTokenService).issue(randomUUID());
-    await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+token.accessToken}}),403,'INTERNAL_ERROR');
-    await error(await s.post({token:token.accessToken}),403,'INTERNAL_ERROR');
+    // 개발 로그인이 차단된 환경에서도 유효한 회원·세션으로 인증 뒤의 기능 차단을 검사한다.
+    const member = Object.assign(new MemberAccount(), { identityReference: 'catchu:dev-login:blocked-' + randomUUID(), accountState: 'ACTIVE' });
+    const issued = await db.transaction(async manager => {
+      await manager.insert(MemberAccount, member);
+      return s.app.get(SessionService).create(manager, member.memberId);
+    });
+    await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+issued.access.accessToken}}),403,'INTERNAL_ERROR');
+    await error(await s.post({token:issued.access.accessToken}),403,'INTERNAL_ERROR');
     assert.deepEqual(await counts(),{requests:0,consents:0,attempts:0,keys:0});
   });
 }
