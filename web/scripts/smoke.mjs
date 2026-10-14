@@ -27,7 +27,8 @@ const portInUse = await new Promise((resolve) => {
 });
 if (portInUse) fail(`포트 ${port}가 이미 사용 중입니다. 켜 둔 개발 서버를 끄거나 PORT를 바꿔 다시 실행하세요.`);
 
-const server = spawn(process.execPath, [nextBin, "start", "-p", port], {
+// 호스트에서 직접 띄우는 검사이므로 이 컴퓨터 안(127.0.0.1)에만 연다.
+const server = spawn(process.execPath, [nextBin, "start", "-p", port, "-H", "127.0.0.1"], {
   stdio: ["ignore", "pipe", "pipe"],
   env: { ...process.env, PORT: port },
 });

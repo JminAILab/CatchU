@@ -123,6 +123,8 @@ docker run -d --name catchu-db -p 127.0.0.1:5432:5432 -e POSTGRES_USER=catchu -e
 2. `npm run migration:run`: 아직 적용하지 않은 마이그레이션을 개발 DB에 적용한다. 앱 기동은 스키마를 바꾸지 않는다(`synchronize` 꺼짐).
 3. `npm run start:dev`, 또는 `npm run build` 뒤 `npm start`
 
+운영 이미지와 별도 migration 이미지의 빌드·실행·교체는 [배포 안내](../deploy/README.md)를 따른다.
+
 테이블 확인: `docker exec catchu-db psql -U catchu -d catchu -c '\dt'`
 
 DB를 멈추거나 자료를 지우는 명령의 영향:
@@ -232,6 +234,10 @@ DB를 쓰는 테스트를 추가할 때:
 ## 선정 지원 저장소 조회 — #136
 
 [docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다.
+
+## 분석 고지·접수·실패 재요청 — #138
+
+[docs/analysis-intake.md](docs/analysis-intake.md)에서 개발용 합성 고지·원자 접수·동시 요청·멱등 처리·확정 실패 재요청과 실제 자료용 고지의 미결을 확인한다. 실제 worker 전송은 포함하지 않는다.
 
 ## 본인 회원·프로필 조회와 전체 저장 — #135
 

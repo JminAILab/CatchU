@@ -9,6 +9,7 @@ export interface InitialAnalysisInput {
   scopeRevision: string;
   consentedScope: Record<string, unknown>;
   sourceMode: 'MOCK' | 'LIVE';
+  retryOfRequestId?: string | null;
 }
 
 /**
@@ -23,7 +24,8 @@ export async function insertInitialAnalysis(manager: EntityManager, input: Initi
   const attempt = new AnalysisAttempt();
   const now = new Date();
   Object.assign(request, { memberId: input.memberId, repositoryId: input.repositoryId,
-    consentId: consent.consentId, currentAttemptId: attempt.attemptId, submittedAt: now, updatedAt: now });
+    consentId: consent.consentId, currentAttemptId: attempt.attemptId, submittedAt: now, updatedAt: now,
+    retryOfRequestId: input.retryOfRequestId ?? null });
   Object.assign(consent, { requestId: request.requestId, memberId: input.memberId, repositoryId: input.repositoryId,
     accepted: true, noticeRevision: input.noticeRevision, scopeRevision: input.scopeRevision,
     consentedScope: input.consentedScope, consentedAt: now });

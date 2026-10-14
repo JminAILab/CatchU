@@ -160,7 +160,8 @@ for (const state of ['DISCONNECTED', 'REAUTH_REQUIRED', 'missing']) {
     const first = await server.login('member-a-136');
     const second = await server.login('member-b-136');
     if (state === 'missing') await database.manager.delete(GitHubConnection, { memberId: first.memberId });
-    else await database.manager.update(GitHubConnection, { memberId: first.memberId }, { connectionState: state });
+    else await database.manager.update(GitHubConnection, { memberId: first.memberId }, { connectionState: state,
+      ...(state === 'DISCONNECTED' ? { externalAccountReference: null, accountLogin: null, credentialReference: null } : {}) });
     await errorBody(await server.list(first.token), 403, 'GITHUB_CONNECTION_REQUIRED');
     assert.equal((await server.list(second.token)).status, 200);
   });
@@ -235,6 +236,14 @@ test('다른 회원의 합성 연결 참조를 본인 행에 넣어도 조회 �
   assert.equal((JSON.stringify(body) + server.logs.join('\n')).includes('synthetic-secret-136'), false);
   assert.equal((await server.list(b.token)).status, 200);
 });
+for (const [state, reference] of [['CONNECTED', null], ['DISCONNECTED', 'not-synthetic'], ['REAUTH_REQUIRED', null]]) {
+  test('정상 해제 외의 잘못된 합성 참조는 저장소 조회에서도 500: ' + state, async t => {
+    const server = await start(t); const a = await server.login();
+    await database.manager.update(GitHubConnection, { memberId: a.memberId },
+      { connectionState: state, externalAccountReference: reference });
+    await errorBody(await server.list(a.token), 500, 'INTERNAL_ERROR');
+  });
+}
 
 for (const overrides of [{ DEV_LOGIN_ENABLED: undefined }, { NODE_ENV: 'production' }]) {
   test(`기존 #104 개발 대역 제한 유지: ${JSON.stringify(overrides)}`, async (t) => {
