@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
-const { before, after, beforeEach, test } = require('node:test');
+const { before, after, beforeEach, afterEach, test } = require('node:test');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { CONTRACT_DIR, event } = require('../helpers/receiver-harness.cjs');
 const { AnalysisRequest, AnalysisConsent, AnalysisAttempt } = require('../../dist/member-analysis/member-analysis.entity');
@@ -86,17 +86,32 @@ async function waitUntilBlocked(holders, except = []) {
 }
 // 다른 연결이 행 하나를 잠가 둔다. 시도 행을 잡아 두면 요청을 먼저 잠근 작업이 그 시도에서 기다리므로,
 // 누가 요청을 먼저 잡았는지 정한 채 두 작업을 겹치게 할 수 있다.
-async function hold(table, column, id) {
+async function hold(table, column, ids) {
   const runner = db.createQueryRunner();
   await runner.connect();
-  await runner.startTransaction();
-  const [{ pid }] = await runner.query('SELECT pg_backend_pid() AS pid');
-  await runner.query(`SELECT 1 FROM ${table} WHERE ${column} = $1 FOR UPDATE`, [id]);
-  return { pid, release: async () => { try { await runner.commitTransaction(); } finally { await runner.release(); } } };
+  try {
+    await runner.startTransaction();
+    const [{ pid }] = await runner.query('SELECT pg_backend_pid() AS pid');
+    await runner.query(`SELECT 1 FROM ${table} WHERE ${column} = ANY($1::uuid[]) FOR UPDATE`, [[].concat(ids)]);
+    return { pid, release: async () => { try { await runner.commitTransaction(); } finally { await runner.release(); } } };
+  } catch (error) {
+    if (runner.isTransactionActive) await runner.rollbackTransaction();
+    await runner.release();
+    throw error;
+  }
 }
-const settle = promise => promise.then(value => ({ status: 'fulfilled', value }), reason => ({ status: 'rejected', reason }));
+// 시험 안에서 시작한 작업. 시험이 중간에 실패해도 잠금이 풀린 뒤 끝까지 기다려, 다음 시험의 자료를 건드리지 않게 한다.
+const inflight = [];
+afterEach(async () => { await Promise.allSettled(inflight.splice(0)); });
+const settle = promise => {
+  inflight.push(promise);
+  return promise.then(value => ({ status: 'fulfilled', value }), reason => ({ status: 'rejected', reason }));
+};
 // 잠금을 기다리지 않고 끝나는지 본다.
-const within = (promise, ms) => Promise.race([promise, sleep(ms).then(() => { throw new Error(`${ms}ms 안에 끝나지 않았다`); })]);
+const within = (promise, ms) => {
+  inflight.push(promise);
+  return Promise.race([promise, sleep(ms).then(() => { throw new Error(`${ms}ms 안에 끝나지 않았다`); })]);
+};
 
 test('시한을 넘긴 대기·실행 중·실행 불명 요청은 실패로 닫히고 재요청 조건을 갖춘다', async () => {
   for (const processing of ['QUEUED', 'RUNNING', 'UNCERTAIN']) {
@@ -213,6 +228,23 @@ test('다른 작업이 오래 잠근 요청은 건너뛰고 나머지를 닫으�
   }
   assert.deepEqual(await deadline().service.closeOverdue(), { closed: 1, failed: 0 });
   assert.deepEqual((await stored(locked)).attempt.failures, [DISPATCH]);
+});
+
+test('잠긴 후보가 100건 넘게 있어도 잠기지 않은 뒤쪽 요청을 닫는다', async () => {
+  const locked = [];
+  for (let i = 0; i < 100; i += 1) locked.push(await prepare({ processing: 'RUNNING' }));
+  await db.query('UPDATE analysis_request SET submitted_at = $1 WHERE request_id = ANY($2::uuid[])',
+    [new Date(SUBMITTED.getTime() - 60 * 1000), locked.map(result => result.requestId)]);
+  const later = await prepare();
+  const lock = await hold('analysis_request', 'request_id', locked.map(result => result.requestId));
+  try {
+    assert.deepEqual(await within(deadline().service.closeOverdue(), 2000), { closed: 1, failed: 0 });
+    assert.equal((await stored(later)).request.lifecycle, 'CLOSED');
+    assert.equal((await stored(locked[0])).request.lifecycle, 'ACTIVE');
+  } finally {
+    await lock.release();
+  }
+  assert.deepEqual(await deadline().service.closeOverdue(), { closed: 100, failed: 0 });
 });
 
 test('닫기가 요청을 먼저 잡으면 겹친 반영은 거부되고 반영 실패로 닫힌다', async () => {

@@ -63,7 +63,8 @@ export class AnalysisDeadlineService {
   async closeOverdue(): Promise<{ closed: number; failed: number }> {
     const now = this.clock();
     const cutoff = new Date(now.getTime() - ANALYSIS_PROCESSING_DEADLINE_MS);
-    // 잠그지 않고 닫을 수 있는 상태의 후보만 고른다. 닫을 수 없는 행이 쌓여도 다른 요청이 밀리지 않는다.
+    // 닫을 수 있는 상태의 후보만 고르고, 지금 다른 작업이 잡고 있는 요청은 빼고 센다(SKIP LOCKED).
+    // 닫을 수 없는 행이나 잠긴 행이 쌓여도 뒤쪽 요청이 밀리지 않는다. 트랜잭션 밖 조회라 잠금은 조회가 끝나면 풀린다.
     // 실제 판단은 closeOne이 잠근 뒤 decideDeadline으로 다시 한다.
     const candidates: { requestId: string }[] = await this.dataSource.query(`
       SELECT r.request_id AS "requestId"
@@ -74,7 +75,8 @@ export class AnalysisDeadlineService {
            OR (r.submitted_at <= $1
              AND (a.application = 'PENDING' OR (a.application = 'NOT_READY' AND a.processing = ANY($2)))))
        ORDER BY r.submitted_at, r.request_id
-       LIMIT $3`, [cutoff, [...IN_PROGRESS], BATCH_SIZE]);
+       LIMIT $3
+         FOR NO KEY UPDATE OF r SKIP LOCKED`, [cutoff, [...IN_PROGRESS], BATCH_SIZE]);
     let closed = 0;
     let failed = 0;
     for (const { requestId } of candidates) {
