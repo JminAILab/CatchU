@@ -29,6 +29,7 @@ from github_synthetic import MEMBER, sha
 
 from app.collection.credentials import AccessToken
 from app.generation import ProviderError, ProviderRequest, UnusableResponse
+from app.generation import claude as claude_module
 from app.generation.claude import MAX_RESPONSE_BYTES, ClaudeModels, ClaudeProvider
 from app.generation.provider import Purpose
 
@@ -508,6 +509,125 @@ def test_connection_failure_becomes_provider_error_without_retry(
     assert "cause=CONNECTION" in caplog.text
 
 
+# 호출 전체의 마감
+
+
+class SyntheticClock:
+    """어댑터의 시계를 바꿔, 실제로 기다리지 않고 시간을 움직인다."""
+
+    def __init__(self) -> None:
+        self.now = 1_000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
+@pytest.fixture
+def clock(monkeypatch: pytest.MonkeyPatch) -> SyntheticClock:
+    fake = SyntheticClock()
+    monkeypatch.setattr(claude_module, "_monotonic", fake)
+    return fake
+
+
+class DripStream(httpx2.SyncByteStream):
+    """본문을 조각으로 나눠 조각마다 시계를 움직이며 보낸다. 조각 사이 간격은 SDK의 단계별 시간 제한보다
+    짧아, 그 시간 제한만으로는 끊기지 않는 서버를 흉내 낸다."""
+
+    def __init__(
+        self, body: bytes, pieces: int, seconds: float, clock: SyntheticClock
+    ) -> None:
+        self._body = body
+        self._size = -(-len(body) // pieces)
+        self._seconds = seconds
+        self._clock = clock
+
+    def __iter__(self) -> Iterator[bytes]:
+        for start in range(0, len(self._body), self._size):
+            self._clock.advance(self._seconds)
+            yield self._body[start : start + self._size]
+
+
+def dripping(pieces: int, seconds: float, clock: SyntheticClock) -> Reply:
+    body = json.dumps(message_body()).encode()
+    return lambda request: httpx2.Response(
+        200,
+        headers={"content-type": "application/json"},
+        stream=DripStream(body, pieces, seconds, clock),
+    )
+
+
+@pytest.mark.parametrize(
+    ("purpose", "timeout", "pieces", "seconds"),
+    [("GENERATE", 45.0, 6, 10.0), ("REWRITE_TITLE", 20.0, 3, 8.0)],
+)
+def test_slow_drip_past_the_call_limit_times_out(
+    purpose: Purpose,
+    timeout: float,
+    pieces: int,
+    seconds: float,
+    clock: SyntheticClock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """조각 사이 간격이 단계별 시간 제한보다 짧아도, 호출 시작부터 그 호출의 시간 제한(생성 45초·고쳐 쓰기
+    20초)을 넘기면 끝까지 읽지 않고 시간 초과로 끊는다. 다시 보내지 않는다."""
+    api = FakeApi(dripping(pieces, seconds, clock))
+
+    with (
+        caplog.at_level(logging.INFO, logger="app.generation.claude"),
+        pytest.raises(TimeoutError) as raised,
+    ):
+        api.provider().complete(call(purpose, timeout=timeout))
+
+    assert len(api.requests) == 1
+    assert_detached(raised.value)
+    assert "cause=TIMEOUT" in caplog.text
+    # 마감을 넘긴 첫 조각에서 끊는다(나머지 조각은 읽지 않는다).
+    assert clock.now - 1_000.0 <= timeout + seconds
+
+
+def test_slow_drip_within_the_call_limit_is_read(clock: SyntheticClock) -> None:
+    """천천히 와도 호출 시간 제한 안에 다 오면 정상 응답이다."""
+    api = FakeApi(dripping(4, 10.0, clock))
+
+    assert api.provider().complete(call()) == ANSWER
+    assert clock.now - 1_000.0 == 40.0
+
+
+class TrackingStream(httpx2.SyncByteStream):
+    """본문을 읽었는지 기록한다."""
+
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+        self.read = False
+
+    def __iter__(self) -> Iterator[bytes]:
+        self.read = True
+        yield self._body
+
+
+def test_headers_after_the_call_limit_time_out(clock: SyntheticClock) -> None:
+    """머리글이 호출 시간 제한을 넘겨 오면 본문을 읽지 않고 시간 초과로 끊는다."""
+    body = TrackingStream(json.dumps(message_body()).encode())
+
+    def late(request: httpx2.Request) -> httpx2.Response:
+        clock.advance(46.0)
+        return httpx2.Response(
+            200, headers={"content-type": "application/json"}, stream=body
+        )
+
+    api = FakeApi(late)
+
+    with pytest.raises(TimeoutError) as raised:
+        api.provider().complete(call())
+
+    assert len(api.requests) == 1
+    assert not body.read
+    assert_detached(raised.value)
+
+
 # 오류 응답
 
 
@@ -890,3 +1010,17 @@ def test_generation_flow_turns_provider_failures_into_whole_call_failures(
     assert candidate.reflection.status == "FAILED"
     assert candidate.title is None
     assert {each["code"] for each in case.result["failures"]} == {code}
+
+
+def test_generation_flow_turns_a_slow_drip_into_a_timeout(
+    clock: SyntheticClock,
+) -> None:
+    """호출 시간 제한을 넘겨 조각을 계속 보내는 응답은 생성 흐름에서 시간 초과 실패가 된다."""
+    api = FakeApi(dripping(6, 10.0, clock))
+
+    case = generation_case(ALPHA_PULL, ScriptedProvider(api.provider().complete))
+
+    assert len(api.requests) == 1
+    (candidate,) = case.output.candidates
+    assert candidate.draft.status == "FAILED"
+    assert {each["code"] for each in case.result["failures"]} == {"GENERATION_TIMEOUT"}

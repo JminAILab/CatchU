@@ -8,8 +8,10 @@
   따라가지 않으며, 응답 본문을 `MAX_RESPONSE_BYTES`까지만 받는다.
 - SDK 기본 재시도(2회, 시간 초과 포함)를 끈다(`max_retries=0`).
 - 요청의 timeout_seconds를 호출마다 넘긴다. 생성 흐름은 남은 시간이 그만큼 있을 때만 호출을 시작하므로 이
-  값은 남은 시간 이하다. SDK 시간 제한은 연결·읽기·쓰기 단계마다 걸려 전체 경과를 막지 않으므로, 시간 제한을
-  넘겨 돌아온 응답은 생성 흐름(`flow._call`)이 따로 버린다.
+  값은 남은 시간 이하다. SDK 시간 제한은 연결·읽기 등 단계마다 걸려 전체 경과를 막지 않으므로, HTTP 전송이
+  머리글을 받은 직후와 본문 조각마다 호출 시작부터 지난 시간을 보고 넘으면 시간 초과로 끊는다. 막혀 있는 읽기
+  한 번은 그 읽기의 시간 제한까지 더 걸릴 수 있어 최악은 시간 제한의 2배다. 시간 제한을 넘겨 돌아온 응답은
+  생성 흐름(`flow._call`)도 따로 버린다.
 - 추론 위치는 미국으로 고정하고(`inference_geo="us"`), 모델의 생각(thinking)은 끈다.
 - 지시문은 system 칸에, 신뢰할 수 없는 자료는 user 칸에 따로 둔다.
 
@@ -23,7 +25,7 @@ import logging
 import os
 import re
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from typing import Final
 
@@ -117,6 +119,9 @@ _ERROR_TYPES: Final = frozenset(
 )
 _SAFE_ID: Final = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 
+# 걸린 시간과 호출 마감을 재는 시계(초). 시험이 실제로 기다리지 않고 시간을 움직일 때만 바꾼다.
+_monotonic: Callable[[], float] = time.monotonic
+
 
 @dataclass(frozen=True)
 class ClaudeModels:
@@ -176,7 +181,7 @@ class ClaudeProvider:
 
     def complete(self, request: ProviderRequest) -> str:
         model = self._models.for_purpose(request.purpose)
-        started = time.monotonic()
+        started = _monotonic()
         # 실패 예외는 except 밖에서 낸다. SDK 예외는 응답 원문·요청 본문·키 머리글을 담고 있어, 새 예외의
         # 원인(__cause__)으로도 문맥(__context__)으로도 이어지지 않게 한다.
         failure: _Failure
@@ -371,7 +376,7 @@ def _safe_id(value: object) -> str | None:
 
 
 def _elapsed_ms(started: float) -> int:
-    return round((time.monotonic() - started) * 1000)
+    return round((_monotonic() - started) * 1000)
 
 
 class _ResponseTooLarge(Exception):
@@ -387,9 +392,17 @@ class _UnexpectedEncoding(Exception):
 
 
 class _CappedStream(httpx2.SyncByteStream):
-    def __init__(self, stream: httpx2.SyncByteStream, status: int) -> None:
+    def __init__(
+        self,
+        stream: httpx2.SyncByteStream,
+        status: int,
+        deadline: float | None,
+        request: httpx2.Request,
+    ) -> None:
         self._stream = stream
         self._status = status
+        self._deadline = deadline
+        self._request = request
 
     def __iter__(self) -> Iterator[bytes]:
         received = 0
@@ -397,6 +410,8 @@ class _CappedStream(httpx2.SyncByteStream):
             received += len(chunk)
             if received > MAX_RESPONSE_BYTES:
                 raise _ResponseTooLarge(self._status)
+            if _past(self._deadline):
+                raise _timed_out(self._request)
             yield chunk
 
     def close(self) -> None:
@@ -404,14 +419,23 @@ class _CappedStream(httpx2.SyncByteStream):
 
 
 class _CappedTransport(httpx2.BaseTransport):
-    """응답 본문을 MAX_RESPONSE_BYTES까지만 받는다. SDK는 본문을 끝까지 읽은 뒤에 해석하므로 그 전에 끊는다.
-    압축된 응답(Content-Encoding이 identity가 아님)은 풀린 크기를 셀 수 없어 받지 않는다."""
+    """응답을 호출 마감과 MAX_RESPONSE_BYTES 안에서만 받는다. SDK는 본문을 끝까지 읽은 뒤에 해석하므로 그 전에
+    끊는다. 압축된 응답(Content-Encoding이 identity가 아님)은 풀린 크기를 셀 수 없어 받지 않는다.
+
+    SDK 시간 제한은 연결·읽기 등 단계마다 걸려, 서버가 그보다 짧은 간격으로 조각을 계속 보내면 호출이 끝나지
+    않는다. 그래서 그 시간 제한을 호출 전체의 상한으로도 쓴다. 머리글을 받은 직후와 본문 조각마다 지난 시간을
+    보며, 막혀 있는 읽기 한 번은 그 읽기의 시간 제한까지 더 걸릴 수 있다."""
 
     def __init__(self, inner: httpx2.BaseTransport) -> None:
         self._inner = inner
 
     def handle_request(self, request: httpx2.Request) -> httpx2.Response:
+        limit = _call_limit(request)
+        deadline = None if limit is None else _monotonic() + limit
         response = self._inner.handle_request(request)
+        if _past(deadline):
+            response.close()
+            raise _timed_out(request)
         encoding = response.headers.get("content-encoding", "identity").strip().lower()
         if encoding not in ("", "identity") or not isinstance(
             response.stream, httpx2.SyncByteStream
@@ -421,12 +445,36 @@ class _CappedTransport(httpx2.BaseTransport):
         return httpx2.Response(
             response.status_code,
             headers=response.headers,
-            stream=_CappedStream(response.stream, response.status_code),
+            stream=_CappedStream(
+                response.stream, response.status_code, deadline, request
+            ),
             extensions=response.extensions,
         )
 
     def close(self) -> None:
         self._inner.close()
+
+
+def _call_limit(request: httpx2.Request) -> float | None:
+    """SDK가 요청에 실은 단계별 시간 제한(호출마다 넘긴 값) 가운데 가장 큰 값. 없으면 None."""
+    timeouts = request.extensions.get("timeout")
+    if not isinstance(timeouts, dict):
+        return None
+    values = [
+        value
+        for value in timeouts.values()
+        if isinstance(value, int | float) and not isinstance(value, bool)
+    ]
+    return float(max(values)) if values else None
+
+
+def _past(deadline: float | None) -> bool:
+    return deadline is not None and _monotonic() > deadline
+
+
+def _timed_out(request: httpx2.Request) -> httpx2.ReadTimeout:
+    """SDK는 HTTP 전송의 시간 초과를 APITimeoutError로 바꾸고, 어댑터는 그것을 TimeoutError로 바꾼다."""
+    return httpx2.ReadTimeout("호출 시간 제한 초과", request=request)
 
 
 class _DropBelowInfo(logging.Filter):
