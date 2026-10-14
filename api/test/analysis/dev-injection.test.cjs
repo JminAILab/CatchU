@@ -4,7 +4,7 @@ const { randomBytes } = require('node:crypto');
 const { test } = require('node:test');
 const { Body, Controller, Module, Param, Post, Inject } = require('@nestjs/common');
 const { NestFactory } = require('@nestjs/core');
-const { SignJWT, decodeJwt } = require('jose');
+const { decodeJwt } = require('jose');
 const { DevAnalysisInjection, readDevInjectionConfig } = require('../../dist/analysis-receiver/dev-analysis-injection');
 const { AnalysisReceiverModule } = require('../../dist/analysis-receiver/analysis-receiver.module');
 const { AppModule } = require('../../dist/app.module');
@@ -95,7 +95,8 @@ Param('requestId')(InjectionProbeController.prototype, 'inject', 1);
 Body()(InjectionProbeController.prototype, 'inject', 2);
 
 async function server(t, overrides) {
-  const settings = { AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '60',
+  const settings = { AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
+    AUTH_WEB_ORIGIN: 'https://catchu.example', CORS_ALLOWED_ORIGINS: undefined,
     DEV_LOGIN_ENABLED: 'true', NODE_ENV: 'test', DEV_ANALYSIS_INJECTION_ENABLED: 'true', ...overrides };
   const before = Object.fromEntries(Object.keys(settings).map((key) => [key, process.env[key]]));
   for (const [key, value] of Object.entries(settings)) {
@@ -123,9 +124,17 @@ async function server(t, overrides) {
   const post = (path, body, token) => fetch(`${url}${path}`, { method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(body), signal: AbortSignal.timeout(3000) });
-  const issueTestToken = () => new SignJWT({ sub: 'test-member', iss: 'catchu-api', aud: 'catchu-member-api',
-    iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 60 })
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' }).sign(Buffer.from(settings.AUTH_JWT_SECRET, 'hex'));
+  const issueTestToken = async () => {
+    const { DataSource } = require('typeorm');
+    const { SessionService } = require('../../dist/auth/session.service');
+    const { MemberAccount } = require('../../dist/member-analysis/member-analysis.entity');
+    const account = Object.assign(new MemberAccount(), { identityReference: 'test:production-injection:' + randomBytes(16).toString('hex'), accountState: 'ACTIVE' });
+    const issued = await app.get(DataSource).transaction(async manager => {
+      await manager.insert(MemberAccount, account);
+      return app.get(SessionService).create(manager, account.memberId);
+    });
+    return issued.access.accessToken;
+  };
   return { ...setup, logs, post, issueTestToken };
 }
 

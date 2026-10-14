@@ -8,7 +8,7 @@ const { Body, Controller, Inject, Module, Param, Post } = require('@nestjs/commo
 const { NestFactory } = require('@nestjs/core');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { CONTRACT_DIR, event } = require('../helpers/receiver-harness.cjs');
-const { AnalysisRequest, AnalysisConsent, AnalysisAttempt } = require('../../dist/member-analysis/member-analysis.entity');
+const { AnalysisRequest, AnalysisConsent, AnalysisAttempt, MemberAccount } = require('../../dist/member-analysis/member-analysis.entity');
 const { DatabaseReceiverStore } = require('../../dist/analysis-receiver/database-receiver.store');
 const { AnalysisReceiver, ReceiverStorageError } = require('../../dist/analysis-receiver/analysis-receiver.service');
 const { WorkerMessageValidator } = require('../../dist/analysis-receiver/worker-message.validator');
@@ -19,7 +19,7 @@ const { AppModule } = require('../../dist/app.module');
 const { OwnerCatchStore } = require('../../dist/catches/owner-catch-store');
 const { configureApp } = require('../../dist/app.setup');
 const { CurrentMemberId } = require('../../dist/auth/auth.decorators');
-const { AccessTokenService } = require('../../dist/auth/access-token.service');
+const { SessionService } = require('../../dist/auth/session.service');
 let db;
 before(async () => { db = await openTestDataSource(); });
 after(async () => { await db?.destroy(); });
@@ -414,7 +414,8 @@ Body()(InjectionProbe.prototype, 'inject', 2);
 
 test('실제 HTTP/Auth/DB/E/B 조립: 인증·소유권, 정상·중복·저장 실패와 입력/토큰 비노출', async t => {
   const settings = { NODE_ENV: 'test', DEV_ANALYSIS_INJECTION_ENABLED: 'true', AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
-    AUTH_ACCESS_TOKEN_TTL_SECONDS: '60', LINK_GRANT_SECRET: randomBytes(32).toString('hex'), SHARE_LINK_WEB_BASE_URL: 'https://catchu.example' };
+    AUTH_ACCESS_TOKEN_TTL_SECONDS: '900', AUTH_WEB_ORIGIN: 'https://catchu.example',
+    LINK_GRANT_SECRET: randomBytes(32).toString('hex'), SHARE_LINK_WEB_BASE_URL: 'https://catchu.example' };
   const previous = Object.fromEntries(Object.keys(settings).map(k => [k, process.env[k]]));
   Object.assign(process.env, settings);
   let app;
@@ -432,8 +433,17 @@ test('실제 HTTP/Auth/DB/E/B 조립: 인증·소유권, 정상·중복·저장 
   await app.listen(0,'127.0.0.1');
   const url = await app.getUrl();
   const result = await prepare();
-  const token = (await app.get(AccessTokenService).issue(result.memberId)).accessToken;
-  const other = (await app.get(AccessTokenService).issue(randomUUID())).accessToken;
+  // #250의 DB Guard를 통과한 뒤 수신 소유권을 검사하도록 실제 회원·세션을 준비한다.
+  const { token, other } = await db.transaction(async manager => {
+    const otherMemberId = randomUUID();
+    await manager.insert(MemberAccount, { memberId: otherMemberId,
+      identityReference: 'receiver-other:' + otherMemberId, accountState: 'ACTIVE' });
+    const sessions = app.get(SessionService);
+    return {
+      token: (await sessions.create(manager, result.memberId)).access.accessToken,
+      other: (await sessions.create(manager, otherMemberId)).access.accessToken,
+    };
+  });
   const post = (r, auth) => fetch(`${url}/v1/__test/receiver-db/${r.requestId}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}) },
     body: JSON.stringify({ kind: 'Result', template: r, caseId: 'http-test' }), signal: AbortSignal.timeout(5000),

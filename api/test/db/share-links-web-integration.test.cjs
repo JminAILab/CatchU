@@ -14,7 +14,7 @@ let app, db, url, createStore, createApi, createClient, createTokens;
 const saved = {};
 before(async () => {
   const env = { NODE_ENV: 'test', DEV_LOGIN_ENABLED: 'true',
-    AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '300',
+    AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
     SHARE_LINK_WEB_BASE_URL: 'http://127.0.0.1:3000' };
   for (const [key, value] of Object.entries(env)) { saved[key] = process.env[key]; process.env[key] = value; }
   db = await openTestDataSource();

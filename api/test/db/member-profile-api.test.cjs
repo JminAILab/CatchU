@@ -11,7 +11,7 @@ const { MemberAccount, MemberProfile, GitHubConnection } = require('../../dist/m
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 let app, db, url;
 const logs = [];
-const settings = { AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '300',
+const settings = { AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
   DEV_LOGIN_ENABLED: 'true', NODE_ENV: 'test', LINK_GRANT_SECRET: randomBytes(32).toString('hex') };
 const saved = {};
 before(async () => {
@@ -50,9 +50,9 @@ function error(response, status, code) {
   assert.equal(response.body.code, code);
 }
 const stored = memberId => db.manager.findOneByOrFail(MemberProfile, { memberId });
-async function sign(memberId, expired = false) {
+async function sign(memberId, expired = false, sessionId = randomUUID()) {
   const now = Math.floor(Date.now() / 1000);
-  return new SignJWT({ sub: memberId, iss: 'catchu-api', aud: 'catchu-member-api',
+  return new SignJWT({ sub: memberId, sid: sessionId, iss: 'catchu-api', aud: 'catchu-member-api',
     iat: now - 20, exp: expired ? now - 1 : now + 300 }).setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .sign(Buffer.from(settings.AUTH_JWT_SECRET, 'hex'));
 }
@@ -110,17 +110,17 @@ test('회원 API는 개발 로그인 플래그에 의존하지 않고 인증된 
 });
 test('토큰 없음·변조·만료는 조회와 저장에서 모두 401이며 원문을 노출하지 않는다', async () => {
   const a = await login();
-  for (const [token, code] of [[undefined, 'AUTH_REQUIRED'], ['synthetic-invalid-token', 'AUTH_INVALID'], [await sign(a.memberId, true), 'AUTH_INVALID']]) {
+  for (const [token, code] of [[undefined, 'AUTH_REQUIRED'], ['synthetic-invalid-token', 'AUTH_INVALID'], [await sign(a.memberId, true, decodeJwt(a.token).sid), 'AUTH_INVALID']]) {
     error(await read(token), 401, code); error(await replace(token, profile()), 401, code);
   }
   assert.ok(!logs.join('\n').includes(a.token));
   assert.ok(!logs.join('\n').includes('synthetic-invalid-token'));
 });
-test('없는·비활성·UUID 아닌 인증 주체는 같은 404이며 프로필을 생성하지 않는다', async () => {
+test('#250 Guard는 없는·비활성·UUID 아닌 인증 주체를 401로 거부하고 프로필을 생성하지 않는다', async () => {
   const a = await login(); await db.manager.update(MemberAccount, { memberId: a.memberId }, { accountState: 'INACTIVE' });
   for (const id of [a.memberId, randomUUID(), 'legacy-member']) {
-    const token = await sign(id);
-    error(await read(token), 404, 'RESOURCE_UNAVAILABLE'); error(await replace(token, profile()), 404, 'RESOURCE_UNAVAILABLE');
+    const token = await sign(id, false, decodeJwt(a.token).sid);
+    error(await read(token), 401, 'AUTH_INVALID'); error(await replace(token, profile()), 401, 'AUTH_INVALID');
   }
   assert.equal(await db.getRepository(MemberProfile).count(), 1);
 });

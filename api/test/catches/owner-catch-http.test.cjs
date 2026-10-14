@@ -27,7 +27,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
   before(async () => {
     previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
     process.env.AUTH_JWT_SECRET = randomBytes(32).toString('hex');
-    process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = '600';
+    process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = '900';
     process.env.NODE_ENV = 'test';
     process.env.DEV_LOGIN_ENABLED = 'true';
 
@@ -91,7 +91,11 @@ describe('본인 Catch HTTP·PostgreSQL', {
     const { body, rawBody, ...fetchOptions } = options;
     const headers = { ...fetchOptions.headers };
     if (ownerId !== undefined) {
-      if (!issuedTokens.has(ownerId)) issuedTokens.set(ownerId, (await tokens.issue(ownerId)).accessToken);
+      if (!issuedTokens.has(ownerId)) {
+        const { SessionService } = require('../../dist/auth/session.service');
+        const issued = await db.transaction(manager => app.get(SessionService).create(manager, ownerId));
+        issuedTokens.set(ownerId, issued.access.accessToken);
+      }
       headers.Authorization = 'Bearer ' + issuedTokens.get(ownerId);
     }
     if (body !== undefined || rawBody !== undefined) headers['Content-Type'] = 'application/json';
@@ -179,7 +183,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
         method: 'POST', body: { memberId: identifier },
       }));
       assert.equal(body.tokenType, 'Bearer');
-      const memberId = await tokens.verify(body.accessToken);
+      const { memberId } = await tokens.verify(body.accessToken);
       assert.match(memberId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
       assert.notEqual(memberId, identifier);
       assert.deepEqual(await db.query('SELECT identity_reference FROM member_account WHERE member_id = $1', [memberId]),
@@ -361,14 +365,23 @@ describe('본인 Catch HTTP·PostgreSQL', {
         const login = success(await request(undefined, '/v1/auth/dev-login', {
           method: 'POST', body: { memberId: 'synthetic-deleted-member' },
         }));
-        memberId = await tokens.verify(login.accessToken);
+        ({ memberId } = await tokens.verify(login.accessToken));
         issuedTokens.set(memberId, login.accessToken);
         // 토큰 발급 뒤 회원을 실제로 삭제한다. 이 합성 회원에는 분석·Catch가 없다.
         await db.transaction(async (manager) => {
           await manager.query('DELETE FROM github_connection WHERE member_id = $1', [memberId]);
           await manager.query('DELETE FROM member_profile WHERE member_id = $1', [memberId]);
+          await manager.query('DELETE FROM session_refresh_token WHERE session_id IN (SELECT session_id FROM auth_session WHERE member_id = $1)', [memberId]);
+          await manager.query('DELETE FROM auth_session WHERE member_id = $1', [memberId]);
           await manager.query('DELETE FROM member_account WHERE member_id = $1', [memberId]);
         });
+      }
+      if (kind !== 'deleted-member') {
+        const { SignJWT } = require('jose');
+        const now = Math.floor(Date.now() / 1000);
+        const invalid = await new SignJWT({ sub: memberId, sid: randomUUID(), iss: 'catchu-api', aud: 'catchu-member-api', iat: now, exp: now + 900 })
+          .setProtectedHeader({ alg: 'HS256', typ: 'JWT' }).sign(Buffer.from(process.env.AUTH_JWT_SECRET, 'hex'));
+        issuedTokens.set(memberId, invalid);
       }
       const beforeState = await snapshot();
       const calls = [
@@ -394,6 +407,8 @@ describe('본인 Catch HTTP·PostgreSQL', {
 
   test('회원 조회 DB 오류는 인증 거부나 빈 목록이 아닌 안전한 500으로 처리한다', async () => {
     const own = await seed();
+    // 정상 세션을 먼저 발급한 뒤 조회 오류를 주입한다. 준비 단계의 회원 조회 실패와 구분한다.
+    success(await request(own.ownerId));
     const beforeState = await snapshot();
     await db.query('ALTER TABLE member_account RENAME TO member_account_unavailable');
     try {

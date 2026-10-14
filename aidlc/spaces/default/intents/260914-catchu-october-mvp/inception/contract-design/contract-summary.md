@@ -56,23 +56,23 @@ components:
 |---|---|---|
 | 접수 결과 | 신규 202 / 기존 작업 200 | 요청 수락이며 처리·반영 완료 아님. 저장·동의 연결에 실패하면 접수 성공을 반환하지 않음 |
 | requestState | ACCEPTED | 영속 접수된 요청만 조회. 거절은 HTTP 오류이며 분석 요청을 만들지 않음 |
-| lifecycle | ACTIVE / CLOSED | ACTIVE는 사용자당 1개 제한에 포함. CLOSED는 더 진행 중인 처리/반영/복구가 없다는 E 확인 |
-| processing | QUEUED / RUNNING / UNCERTAIN | 대기·실행 중·실행 여부 불명. 시간 경과/조회 실패만으로 FAILED로 바꾸지 않음 |
+| lifecycle | ACTIVE / CLOSED | ACTIVE는 사용자당 1개 제한에 포함. CLOSED는 E가 이 요청을 더 처리/반영하지 않는다는 표시. 반영 완료·반영 실패·처리 시한 초과로 닫힌 경우를 포함하며 닫힌 뒤 온 결과는 반영하지 않음 |
+| processing | QUEUED / RUNNING / UNCERTAIN | 대기·실행 중·실행 여부 불명. 처리 시한 전에는 시간 경과/조회 실패만으로 FAILED로 바꾸지 않음. 처리 시한을 넘기면 E가 실행이 멈췄다는 증거 없이 FAILED로 확정 |
 | processing | SUCCEEDED / EMPTY / PARTIAL_FAILED / FAILED | 오류 없는 후보 존재 / 오류 없는 등록 적합 후보 0 / 실패와 분리된 적합 후보 존재 / 제공 가능한 유효 결과 없는 실패 |
-| application | NOT_READY / PENDING / APPLYING / RECOVERING / APPLIED / APPLY_FAILED | 결과 전 / 전달받아 대기 / 반영 중 / 반영 복구 중 / 결과 의미·등록 처리 반영 완료 / 반영 실패 |
+| application | NOT_READY / PENDING / APPLYING / RECOVERING / APPLIED / APPLY_FAILED | 결과 전 / 전달받아 대기 / 반영 중 / 쓰지 않음(값만 유지, 반영 복구 없음) / 결과 의미·등록 처리 반영 완료 / 반영 실패(처리 시한을 기다리지 않고 E의 다음 주기 판정에서 CLOSED) |
 | 결과 진입 | ownerResultsReady + registeredCatchIds | B가 등록·본인 열람 준비를 확인한 Catch만 E가 전달. 후보 존재·F 종료만으로 true 불가 |
 | 재요청 | retry.allowed + reason | E의 현재 서버 판정. 결과 열람 가능 여부와 별개 |
 
 **전이·불변 조건**
 
-- 접수는 QUEUED/NOT_READY/ACTIVE. F 진행은 RUNNING, 실행이 확인되지 않으면 UNCERTAIN을 유지한다. #77 이전에 큐 시간 초과로 실패 확정하는 규칙은 만들지 않는다.
-- 검증된 종결 결과 수신 뒤 PENDING → APPLYING → APPLIED. 반영 오류는 APPLY_FAILED, 복구 작업이 실제 진행할 때만 RECOVERING이다. 둘 다 ACTIVE로 잠그며 새 분석을 실행하지 않는다. 저장 결과 재전달·반영 복구와 분석/LLM 재호출은 별개이고 이번 계약은 자동 분석 재시도를 허용하지 않는다. 한 분석 안의 제목 고쳐 쓰기는 분석 재시도가 아니다.
+- 접수는 QUEUED/NOT_READY/ACTIVE. F 진행은 RUNNING, 실행이 확인되지 않으면 UNCERTAIN을 유지한다. RUNNING → UNCERTAIN 전이는 두지 않으며 RUNNING 뒤의 실행 불명 알림은 상태를 바꾸지 않는다. 접수(submittedAt) 후 처리 시한(값은 아래 「공통 오류·요청 안전성」) 안에 끝나지 않은 ACTIVE 요청은 E(api)가 주기 판정으로 닫으며 실행이 멈췄다는 증거는 요구하지 않는다. 처리 중(QUEUED/RUNNING/UNCERTAIN)이면 FAILED/APPLIED/CLOSED이고 failures에 stage DISPATCH 항목을 더하며, 서버의 실패 확정 증거도 같은 code로 남긴다. 결과를 받고 반영 대기(PENDING)면 처리 결과는 그대로 두고 APPLY_FAILED/CLOSED이며 failures에 stage APPLICATION 항목을 더한다. 두 항목의 code는 PROCESSING_DEADLINE_EXCEEDED, message는 처리 중 “정해진 시간 안에 분석을 마치지 못했습니다.”, 반영 대기 “정해진 시간 안에 결과를 반영하지 못했습니다.”다. stage DISPATCH는 요청 전달·실행 확인 단계이며 처리 시한 초과를 포함한다(처리 시한 도입 때 처음 정의).
+- 검증된 종결 결과 수신 뒤 PENDING → APPLYING → APPLIED. 반영 오류(B의 입력·맥락 거부 같은 업무 거부 포함)는 APPLY_FAILED로 기록하고 처리 시한을 기다리지 않고 E의 다음 주기 판정에서 CLOSED로 닫으며 새 분석을 실행하지 않는다. 서버·worker·큐·DB 장애는 앱에서 복구하지 않는다. 결과 보존·저장 결과 재전달·같은 결과의 반영 복구(RECOVERING은 쓰지 않음)와 큐에서 사라진 작업을 찾아 다시 넣기를 두지 않으며, 대기(QUEUED) 시도는 큐 작업 ID를 attemptId로 해 넣는다(같은 시도를 다시 넣어도 큐 작업은 하나). 이번 계약은 자동 분석 재시도를 허용하지 않는다. 한 분석 안의 제목 고쳐 쓰기는 분석 재시도가 아니다. 받아들인 위험은 두 가지다. 큐 자료 유실로 같은 시도가 드물게 한 번 더 실행되거나, 처리 시한으로 닫힌 뒤 앞 시도가 아직 도는 중에 재요청이 들어올 수 있다. 이때도 한 시도에는 먼저 받은 결과 하나만 수락하고 닫힌 시도의 결과는 거부해 Catch가 늘지 않는다.
 - APPLIED는 결과/실패 의미의 반영도 포함한다. EMPTY도 결과 0건이라는 사실을 저장한 뒤 APPLIED/CLOSED이며 정상 완료다. FAILED는 실패가 확정되고 반영할 유효 결과가 없다는 사실이 저장된 뒤 APPLIED/CLOSED가 될 수 있다.
 - SUCCEEDED는 후보 1개 이상이고 실패 0건, EMPTY는 후보 0개·실패 0건이다. PARTIAL_FAILED는 실패와 분리된 적합 후보 1개 이상과 실패 1건 이상, FAILED는 후보 0개·실패 1건 이상이다. 근거 부족·등록 기준 미달은 notProvided로 구분하며 그 자체를 시스템 오류로 만들지 않는다.
 - 초안 실패라도 근거·기여/등록 조건을 충족한 후보를 제공한다. 초안/질문 실패는 해당 결과와 failures에 분리해 담는다. 본문은 GENERATED일 때만 문자열, 나머지는 null이다. 초안이 없다고 후보 없음/등록 불가로 바꾸지 않는다. 질문 실패의 보완 경로는 OQ-B2에 남긴다.
 - 같은 사용자·저장소의 ACTIVE 요청에는 기존 작업을 200으로 반환한다. 다른 저장소 ACTIVE 요청은 409/ANALYSIS_IN_PROGRESS와 details.existingRequestId를 반환한다. 이 판정과 새 요청 생성은 사용자 단위로 원자적이다. 비동기 실행 개수와 별개이며 자동 대기열 접수를 만들지 않는다.
-- 재요청은 FAILED/APPLIED/CLOSED, eligibleCandidateCount=0, registeredCatchIds=[], 진행/복구 없음, 서버의 실패 확정 증거가 있을 때만 허용한다. 새 consentId·requestId·attemptId를 만들고 retryOfRequestId로 실패 이력만 연결한다. 새 동의의 대상·범위·고지 판본을 다시 검사한다. 기존 자료/링크를 수정하지 않는다.
-- 정상 완료(EMPTY 포함)의 재분석, 유효 결과가 있는 부분 실패의 추가 생성·초안 보완은 허용 API가 아니다. 단지 요청 ID를 빼고 POST하는 것으로 이를 우회하지 못한다. 서버가 본인·저장소의 선행 이력과 retryOfRequestId를 검사하고 409/REANALYSIS_DEFERRED 또는 RETRY_NOT_ALLOWED로 거부한다.
+- 재요청은 CLOSED이고 registeredCatchIds=[]인 두 경우에만 허용한다. ① 실패 확정: FAILED/APPLIED/CLOSED, eligibleCandidateCount=0, 서버의 실패 확정 증거(F의 실패 결과 또는 E의 처리 시한 판정)가 있을 때. ② 반영 실패로 닫힘: APPLY_FAILED/CLOSED일 때이며 처리 결과·eligibleCandidateCount는 보지 않는다. 두 경우 모두 retry.allowed=true, reason=FAILURE_WITHOUT_RESULTS다. 새 consentId·requestId·attemptId를 만들고 retryOfRequestId로 실패 이력만 연결한다. 새 동의의 대상·범위·고지 판본을 다시 검사한다. 기존 자료/링크를 수정하지 않는다.
+- APPLIED/CLOSED로 끝난 정상 완료(EMPTY 포함)의 재분석, 유효 결과가 반영된 부분 실패의 추가 생성·초안 보완은 허용 API가 아니다. 반영 실패로 닫힌 요청(위 ②)은 정상 완료가 아니다. 단지 요청 ID를 빼고 POST하는 것으로 이를 우회하지 못한다. 서버가 본인·저장소의 선행 이력과 retryOfRequestId를 검사하고 409/REANALYSIS_DEFERRED 또는 RETRY_NOT_ALLOWED로 거부한다.
 - 조회 불능은 HTTP 오류 또는 클라이언트 LOOKUP_FAILED다. processing에 LOOKUP_FAILED/EMPTY를 저장하거나 신규 POST를 자동 호출하지 않는다. 상태 응답은 한 판본으로 읽으며 updatedAt은 서버 관측 시각이다.
 
 ## B 등록·공개 및 E/F 반영 경계
@@ -87,7 +87,7 @@ components:
 | 공개 | 최초 PRIVATE. confirmation은 근거·본인 기여 확인만, PUBLIC은 별도 PUT에서 현재 확인·보호 조건 검사. PRIVATE은 기존 링크에도 즉시 다음 조회부터 적용 |
 | 원본 보호 | 확인된 SOURCE_PRIVATE는 관련 Catch 수신 접근을 막음. 일시 원본 조회 실패는 비공개 확정이 아님. 관측 제공자·주기·실패 시 판단은 OQ-B3 |
 
-B의 판정 결과·등록과 E 반영 확인은 재진입 가능해야 한다. E 기록 전에 B 저장이 끝나도 다시 처리해 Catch가 중복 생성되지 않아야 한다. 원자성·영속 키는 api ERD/기능 설계에서 구현 제약으로 연결한다. 이미 적용된 결과를 덮어쓰거나 종료된 attempt의 늦은 결과를 자동 반영하지 않는다. 불일치는 409 의미의 PAYLOAD_CONFLICT/STALE_ATTEMPT로 격리해 담당 확인하며 기존 결과를 보존한다.
+B의 판정 결과·등록과 E 반영 확인은 재진입 가능해야 한다. 같은 결과가 다시 들어와도 Catch가 중복 생성되지 않아야 한다. 원자성·영속 키는 api ERD/기능 설계에서 구현 제약으로 연결한다. 이미 적용된 결과를 덮어쓰거나 종료된 attempt의 늦은 결과를 자동 반영하지 않는다. 불일치는 409 의미의 PAYLOAD_CONFLICT/STALE_ATTEMPT로 격리해 담당 확인하며 기존 결과를 보존한다.
 
 workIdentity 생성은 F가 제안하고 B/E가 검토한다(OQ-F2). 같은 근거 일부를 공유해도 다른 작업임을 확인하면 별도 Catch, 같은 작업의 표현만 바꾸면 중복이다. 이 계약이 커밋마다 Catch를 만드는 규칙은 아니다.
 
@@ -137,7 +137,7 @@ components:
 
 생성 POST는 Idempotency-Key를 사용자·operation에 묶는다. 동일 키/정규화된 동일 본문은 기존 응답·자원 참조를 반환하고 다른 본문은 409다. 저장 전/응답 유실이 불명확하면 새 키로 자동 재전송하지 않는다. 요청/발급 기록이 존재하는 동안 중복 방지 연결을 유지하며 기록 삭제 후 키 재사용 규칙은 보관 정책 결정 없이 추정하지 않는다. Catch 확인/공개/표시와 링크 중단은 PUT 상태 지정으로 반복 적용해도 추가 생성이 없다.
 
-HTTP timeout은 실패 확정 증거가 아니다. web은 재조회·사용자 재요청을 구분한다. 정량 timeout/처리 상한은 기술 검증 후 이슈로 보완하며 자동 외부 재시도·추가 호출을 허용하지 않는다. worker는 한 분석 안에서 Catch 제목이 형식을 어겼을 때만 제목을 고쳐 쓰려고 LLM을 다시 부를 수 있다. 제목당 최대 3회이고, 요청당 고쳐 쓰기 호출 상한(이슈에서 정함)과 요청당 총 처리 시간 상한 안이며 생성 호출 상한에는 세지 않는다. 요청당 상한에 이르면 그 뒤 제목은 null로 둔다. 생성 호출이나 고쳐 쓰기 호출이 실패하면(시간 초과·서버 오류 포함) 다시 부르지 않는다.
+HTTP timeout은 실패 확정 증거가 아니다. web은 재조회·사용자 재요청을 구분한다. 분석 요청의 처리 시한은 접수(submittedAt) 후 60분이다. 시간 경과로 실패를 확정하는 근거는 E의 처리 시한 판정뿐이며 F가 보낸 실패 결과는 그대로 근거다. F의 요청당 총 처리 상한은 이 시한보다 충분히 짧게 둔다(값은 #121). 그 밖의 정량 timeout은 기술 검증 후 이슈로 보완하며 자동 외부 재시도·추가 호출을 허용하지 않는다. worker는 한 분석 안에서 Catch 제목이 형식을 어겼을 때만 제목을 고쳐 쓰려고 LLM을 다시 부를 수 있다. 제목당 최대 3회이고, 요청당 고쳐 쓰기 호출 상한(이슈에서 정함)과 요청당 총 처리 시간 상한 안이며 생성 호출 상한에는 세지 않는다. 요청당 상한에 이르면 그 뒤 제목은 null로 둔다. 생성 호출이나 고쳐 쓰기 호출이 실패하면(시간 초과·서버 오류 포함) 다시 부르지 않는다.
 
 ## W — worker 메시지 계약
 
@@ -156,7 +156,7 @@ components:
 | 메시지 | 조건 |
 |---|---|
 | Request | E가 영속 요청/새 동의에 연결한 requestId·attemptId·memberId·repositoryId·consentId와 허용 scope를 제공. scope의 허용 자료 종류는 요청마다 한정하며 전체 종류 열거가 수집 허가가 아님 |
-| ProcessingEvent | RECEIVED/RUNNING은 F 관측, UNCERTAIN은 실행 불명. 순서 역전으로 종결 상태를 되돌리지 않음. 전달 방식·실행 불명 해소는 #77 |
+| ProcessingEvent | RECEIVED/RUNNING은 F 관측, UNCERTAIN은 실행 불명. 순서 역전으로 종결 상태를 되돌리지 않음. 전달 방식은 #77. 실행 불명을 따로 해소하는 절차는 두지 않고 E의 처리 시한 판정으로 닫으며, 닫힌 뒤 온 진행 알림은 상태를 바꾸지 않음 |
 | Result | 후보는 근거/기여와 실패 분리 확인을 충족한 것만. notProvided의 근거 부족/기준 미달과 failures의 수집/생성 오류를 구분. 초안이 나왔는데 제목만 null인 경우는 failures가 아니다. schemaVersion=1 |
 | ResultReceipt | resultId·requestId·attemptId를 모두 식별할 수 있는 메시지에만 전송. E의 형식·맥락 검사 후 ACCEPTED/DUPLICATE/REJECTED. ACCEPTED는 DB/Catch 등록 완료가 아니며 E application이 별도로 표시 |
 | mock 연결 | 같은 Request/Result를 합성 fixture·가짜 생성기로 연결. sourceMode=MOCK를 유지하고 실제 분석 성공으로 표시하지 않음. 제공자명·모델명·SDK·API 키 의존 필드 없음 |
@@ -165,7 +165,7 @@ ResultReceipt의 식별 가능 조건은 resultId·requestId·attemptId 세 필�
 
 credentialContextReference는 A/F 계약에서 해석할 작업 맥락의 식별자이며 토큰/권한 자체가 아니다. 메시지에 GitHub/LLM 비밀값을 넣지 않는다. 외부 입력의 memberId·consentId는 신뢰하지 않고 E의 접수 정본과 일치할 때만 처리/반영한다. F는 지정 scope 밖으로 확장하지 않는다. 수신 schema 검사·맥락 대조·중복 판정은 외부 실행을 일으키지 않는다.
 
-후보 evidence는 비어 있지 않고 안정 sourceRevision과 관측 사실/귀속 범위·한계를 연결한다. 등록되지 않은 F Result·Candidate·Evidence·Draft의 저장 위치/수명은 OQ-F1이며 서비스 DB의 F 테이블로 옮기지 않는다. 등록 후 필요한 근거/초안/질문은 B 정본으로 복사하고 F 임시 저장소의 영구 접근에 의존하지 않는다.
+후보 evidence는 비어 있지 않고 안정 sourceRevision과 관측 사실/귀속 범위·한계를 연결한다. 등록되지 않은 F Result·Candidate·Evidence·Draft는 E에 보낸 뒤 F가 보존·재전달하지 않으며(2026-10-06 결정, OQ-F1) 서비스 DB의 F 테이블로 옮기지 않는다. 등록 후 필요한 근거/초안/질문은 B 정본으로 복사하고 F 자료에 의존하지 않는다.
 
 ## Contract ownership rules
 
@@ -182,7 +182,7 @@ credentialContextReference는 A/F 계약에서 해석할 작업 맥락의 식별
 |---|---|---|
 | OQ-A1 M | 실제 Google/GitHub OAuth 경로·GitHub 앱 종류·refresh/logout·쿠키/CORS/CSRF·수명: A/2, 관련 실제 인증 연결 전 | 실제 로그인/재인증/연동. #87의 JWT 소비·개발용 로그인과 모의 API 개발은 가능 |
 | OQ-A2 M/P | 프로필 4항목의 자가 입력/공개 투영과 GitHub 공개 정보 추가 여부: A/2·C/3, PR 영역 리뷰. 미확인 GitHub 항목은 현재 응답에 넣지 않음 | 실제 공개 프로필 제공 전 확인; 새로운 공개 항목은 계약 수정 |
-| OQ-F1 W | A/F 자격정보 제공의 상세·F 임시 결과 보존 위치/수명·전송: F/H/1·A/E/2, #77 이후 실제 worker 연결 전 | 실제 수집/결과 보존·전송. 메시지/가짜 생성기에는 영향 없음 |
+| OQ-F1 W (보존·전송 결정) | 2026-10-06 팀장 결정([#23](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)): F 결과는 E에 보낸 뒤 보존·재전달하지 않으며 전송은 #77 판정을 따른다. 남은 것은 A/F 자격정보 제공의 상세: F/H/1·A/E/2, 실제 worker 연결 전 | 실제 수집. 메시지/가짜 생성기에는 영향 없음 |
 | OQ-F2 W/B | workIdentity·묶음 동일성 판별의 함수/충돌 검증: F/1 제안, B/4·E/2 리뷰, 실제 등록 연결 전 | 동일 작업 중복 방지의 실제 판정; v1 식별 필드/동작 규칙 유지 |
 | OQ-B1 M/W (결정) | 2026-09-24 팀장 결정: B 등록(Catch·근거·등록 연결)과 E 반영 완료 기록을 한 트랜잭션으로 저장한다. 수신 기록은 그 전에 E가 저장한다. 등록 함수의 입출력과 테이블 생성 순서는 E↔B 등록 개발 이슈에서 정한다. | 트랜잭션 경계 확정. 실제 등록 연결의 함수 입출력·테이블 생성 순서는 개발 이슈에서 보완; 계약·ERD 관계와 유일성 유지 |
 | OQ-B2 W/B | 실패 후 초안/최소 질문 보완·동의 재사용·재분석·기존 Catch/링크 변경: 팀장 + B/E/F/C, 해당 기능 추가 전 | 보완/재분석 endpoint를 제공하지 않음. Q1 허용 실패 재요청과 기존 공개는 별개 |
@@ -200,6 +200,6 @@ credentialContextReference는 A/F 계약에서 해석할 작업 맥락의 식별
 
 [확인한 작성 요약](contract-design-questions.md) · [unit-of-work](../units-generation/unit-of-work.md) · [unit-of-work-dependency](../units-generation/unit-of-work-dependency.md) · [components](../domain-design/components.md) · [requirements](../requirements-analysis/requirements.md) · [E의 #23 Q4~Q6](https://github.com/JminAILab/CatchU/issues/23#issuecomment-5787076387) · [코딩 운영 PR #72](https://github.com/JminAILab/CatchU/pull/72).
 
-상류 문구 차이 목록(수정/재개 안 함): Requirements의 CI/커버리지·LLM 결정 시점, ‘복구 중 기존 작업 반환 미결’, 발행 후 공개 자산 변화 문구는 9/23 사용자 결정/PR #72 및 이번 Q1/Q2와 함께 적용한다. 기존 내용 변경/재분석은 여전히 보류다.
+상류 문구 차이 목록(수정/재개 안 함): Requirements의 CI/커버리지·LLM 결정 시점, ‘복구 중 기존 작업 반환 미결’, 발행 후 공개 자산 변화 문구는 9/23 사용자 결정/PR #72 및 이번 Q1/Q2와 함께 적용한다. 기존 내용 변경/재분석은 여전히 보류다. 2026-10-06 팀장 결정([#23](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296))에 따라 Requirements·Domain·Units의 ‘저장된 결과의 재전달/반영 복구’, ‘F 임시 보존 위치·수명’ 문구와, 앞 목록의 ‘복구 중 기존 작업 반환 미결’은 이제 ‘앱은 서버·worker·큐·DB 장애를 복구하지 않고(결과 보존·재전달·반영 복구 없음) 처리 시한·반영 실패로 닫은 뒤 사용자가 재요청’으로 적용한다. 10월 M05의 ‘자료 손실 없음’과 FR1.4의 ‘기존 자료/링크 보존’은 이미 저장된 Catch·공개·링크를 뜻하며, 반영 전 결과는 처리 시한 초과 실패 뒤 재요청으로 다룬다. M07·NFR4의 ‘합의한 복구 시나리오’는 재시작·재배포 뒤 DB 자료와 공개·숨김·링크 상태 유지, 관리형 DB 자동 백업 켜짐과 보관 기간 확인이며([#24](https://github.com/JminAILab/CatchU/issues/24#issuecomment-6012203241) 10/6, 배포 대상은 PR #241의 AWS), 복원 시험은 12월이다. NFR7에 따라 드문 중복·남은 자료를 운영자가 정리할 때는 식별자·상태·시각만 본다.
 
 자료 사용·잔여 조건: [#37](https://github.com/JminAILab/CatchU/issues/37).
