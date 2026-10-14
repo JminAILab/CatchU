@@ -10,6 +10,7 @@ import { MemberProfileModule } from './member-profile/member-profile.module';
 import { CatchesModule } from './catches/catches.module';
 import { MemberRepositoriesModule } from './member-repositories/member-repositories.module';
 import { GoogleLoginModule } from './google-login/google-login.module';
+import { AnalysisIntakeModule } from './analysis-intake/analysis-intake.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { GoogleLoginModule } from './google-login/google-login.module';
     MemberRepositoriesModule,
     MemberProfileModule,
     GoogleLoginModule,
+    AnalysisIntakeModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor }],

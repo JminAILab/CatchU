@@ -235,6 +235,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 [docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다.
 
+## 분석 고지·접수·실패 재요청 — #138
+
+[docs/analysis-intake.md](docs/analysis-intake.md)에서 개발용 합성 고지·원자 접수·동시 요청·멱등 처리·확정 실패 재요청과 실제 자료용 고지의 미결을 확인한다. 실제 worker 전송은 포함하지 않는다.
+
 ## 본인 회원·프로필 조회와 전체 저장 — #135
 
 `GET /v1/me`, `PUT /v1/me/profile`의 입력 제한·이름 저장 판정·호출 예시·공개 경계는 [docs/member-profile.md](docs/member-profile.md)에 있다.
