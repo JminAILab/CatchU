@@ -7,8 +7,8 @@
 | 값 | 기준 | 위치 |
 |---|---|---|
 | 처리 시한 | 접수 시각(`submittedAt`) 후 60분. 60분이 되는 순간부터 닫는다 | `ANALYSIS_PROCESSING_DEADLINE_MS`(계약 값) |
-| 판정 주기 | 1분. 반영 실패는 시한을 기다리지 않고 다음 판정에서 닫히므로 길어도 약 1분 뒤 닫힌다 | `ANALYSIS_DEADLINE_CHECK_INTERVAL_MS` |
-| 한 번에 다루는 요청 | 100개(접수 시각 순). 남은 요청은 다음 판정에서 닫는다 | `analysis-deadline.service.ts` |
+| 판정 주기 | 한 번의 판정이 끝나고 1분 뒤에 다음 판정을 한다. 반영 실패는 시한을 기다리지 않고 다음 판정에서 닫힌다. 닫을 요청이 100개를 넘거나 수신·반영의 잠금을 기다리면 그만큼 늦어진다 | `ANALYSIS_DEADLINE_CHECK_INTERVAL_MS` |
+| 한 번에 다루는 요청 | 아래 표에서 닫을 수 있는 상태인 요청 100개(접수 시각 순). 남은 요청은 다음 판정에서 닫는다 | `analysis-deadline.service.ts` |
 
 환경변수는 없다. 시간 판단에는 api 서버 시계를 쓰며 worker가 보낸 관측 시각은 쓰지 않는다.
 
@@ -21,7 +21,7 @@
 | 처리 중(`QUEUED`·`RUNNING`·`UNCERTAIN`, 반영 `NOT_READY`) | 시한 지남 | `FAILED`/`APPLIED`/`CLOSED`. `failures`에 `{stage: DISPATCH, code: PROCESSING_DEADLINE_EXCEEDED, message: "정해진 시간 안에 분석을 마치지 못했습니다."}`를 더하고 `failureConfirmationReference`에 같은 code |
 | 결과를 받고 반영 대기(`PENDING`) | 시한 지남 | 처리 결과·적합 후보 수는 그대로, `APPLY_FAILED`/`CLOSED`. `failures`에 `{stage: APPLICATION, code: PROCESSING_DEADLINE_EXCEEDED, message: "정해진 시간 안에 결과를 반영하지 못했습니다."}` |
 | 반영 실패(`APPLY_FAILED`, B의 입력·맥락 거부 포함) | 시한과 무관 | `CLOSED`만. 반영 실패 기록은 그대로 |
-| 그 밖의 조합(예: `APPLIED`인데 `ACTIVE`) | 시한 지남 | 바꾸지 않고 경고 로그만 남긴다. 지금 코드로는 생기지 않는 저장 상태다 |
+| 그 밖의 조합(예: `APPLIED`인데 `ACTIVE`) | 시한 지남 | 판정 대상으로 고르지 않으므로 이런 행이 쌓여도 다른 요청이 밀리지 않는다. 잠근 뒤 다시 읽었을 때 이런 조합이면 바꾸지 않고 경고 로그만 남긴다. 지금 코드로는 생기지 않는 저장 상태다 |
 
 닫힌 뒤에는 기존 수신 코드가 늦은 결과를 `PAYLOAD_CONFLICT`로 거부하고 진행 알림은 상태를 바꾸지 않는다(`TERMINAL_UNCHANGED`). 반영 대기에서 닫힌 결과를 다시 보내면 `ALREADY_RECEIVED`이며 반영하지 않는다. 처리 시한으로 닫힌 요청은 계약의 재요청 ①(실패 확정), 반영 실패로 닫힌 요청은 재요청 ②의 저장 조건을 갖춘다. 재요청 허용 판정과 접수 API는 E 영역([PR #284](https://github.com/JminAILab/CatchU/pull/284))이다.
 
@@ -35,7 +35,7 @@
 
 ## 주기 실행 장치
 
-`src/common/periodic-task.ts`의 `PeriodicTask`가 api 안의 주기 작업을 돌린다. 한 번이 끝난 뒤 다음 실행을 예약하므로 실행이 겹치지 않고, 실행이 예외로 끝나도 오류 이름만 기록하고 다음 주기를 계속한다. `stop()`은 진행 중인 실행이 끝날 때까지 기다린다. 첫 실행은 시작 후 한 주기 뒤다.
+`src/common/periodic-task.ts`의 `PeriodicTask`가 api 안의 주기 작업을 돌린다. 한 번이 끝난 뒤 다음 실행을 예약하므로 실행이 겹치지 않고, 실행이 예외로 끝나도 오류 이름만 기록하고 다음 주기를 계속한다. 기록 함수까지 실패하면 표준 오류에 한 줄만 남기고 계속한다. `stop()`은 진행 중인 실행이 끝날 때까지 기다리며, 멈추는 중에 다시 시작해도 실행이 겹치지 않는다. 첫 실행은 시작 후 한 주기 뒤다.
 
 - 시작은 실제 서버 진입점(`src/main.ts`)이 `listen` 뒤에 한다. `AppModule`을 띄우는 테스트는 시작하지 않으므로 주기 작업이 테스트 자료를 바꾸지 않는다.
 - 앱이 종료되면 `onModuleDestroy`에서 멈춰, DB 연결이 닫히기 전에 진행 중인 판정을 끝낸다.
@@ -58,15 +58,15 @@ await task.stop();  // 종료 훅에서
 | event | 수준 | 내용 |
 |---|---|---|
 | `ANALYSIS_REQUEST_CLOSED` | log | 커밋 뒤. `requestId`·`attemptId`·`decision`(`PROCESSING_DEADLINE`·`APPLICATION_DEADLINE`·`APPLICATION_FAILED`) |
-| `ANALYSIS_DEADLINE_UNEXPECTED_STATE` | warn | 위 표의 그 밖의 조합. `requestId`·`processing`·`application` |
+| `ANALYSIS_DEADLINE_UNEXPECTED_STATE` | warn | 잠근 뒤 다시 읽은 상태가 위 표의 그 밖의 조합일 때. `requestId`·`processing`·`application` |
 | `ANALYSIS_DEADLINE_CLOSE_FAILED` | error | 요청 하나의 닫기 실패. `requestId`·오류 이름(DB 오류는 `QueryFailedError:<SQLSTATE>`). 다음 요청과 다음 판정은 계속한다 |
 | `PERIODIC_TASK_FAILED` | error | 판정 한 번 전체의 실패(예: 후보 조회 DB 오류). 작업 이름·오류 이름 |
 
 ## 검사
 
 - `test/analysis/deadline-decision.test.cjs`: 시한 경계(60분 직전·정각)와 상태 조합별 판단. DB 없음.
-- `test/periodic-task.test.cjs`: 실행이 겹치지 않음, 실패 뒤 계속, `stop()` 대기. DB 없음.
-- `test/integration/analysis-deadline.test.cjs`: 실제 테스트 DB와 실제 수신·B 등록·반영 코드로 닫기 규칙, 늦은 결과·진행 알림, 닫기와 수신·반영 경합(두 순서를 각각 강제), 여러 api 동시 판정, 닫힌 뒤 같은 회원의 새 요청 저장을 확인한다. GitHub 관측은 시험 대역이다.
+- `test/periodic-task.test.cjs`: 실행이 겹치지 않음, 실패 뒤 계속(기록 함수 실패 포함), `stop()` 대기, 멈추는 중 재시작. DB 없음.
+- `test/integration/analysis-deadline.test.cjs`: 실제 테스트 DB와 실제 수신·B 등록·반영 코드로 닫기 규칙, 늦은 결과·진행 알림, 닫기와 수신·반영 경합(잠근 연결에 막힌 작업을 확인해 두 순서를 각각 강제), 같은 후보를 고른 두 판정, 닫을 수 없는 행 100건 적체, 요청 하나의 닫기 실패와 되돌림, 닫힌 뒤 같은 회원의 새 요청 저장을 확인한다. GitHub 관측은 시험 대역이다.
 
 ## 하지 않는 것
 

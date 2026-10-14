@@ -21,7 +21,8 @@ const IN_PROGRESS: ReadonlySet<AnalysisAttempt['processing']> = new Set(['QUEUED
  * PROCESSING_DEADLINE: 처리 중 시한 초과 → FAILED/APPLIED/CLOSED.
  * APPLICATION_DEADLINE: 반영 대기 중 시한 초과 → 처리 결과 유지, APPLY_FAILED/CLOSED.
  * APPLICATION_FAILED: 반영 실패 → 시한과 관계없이 CLOSED.
- * UNEXPECTED: 시한을 넘겼지만 계약 전이에 없는 조합. 바꾸지 않고 기록만 한다.
+ * UNEXPECTED: 시한을 넘겼지만 계약 전이에 없는 조합. 후보 조회에서 빠지며, 잠근 뒤 다시 읽었을 때
+ * 이 조합이면 바꾸지 않고 기록만 한다.
  */
 export type DeadlineDecision = 'NONE' | 'PROCESSING_DEADLINE' | 'APPLICATION_DEADLINE' | 'APPLICATION_FAILED' | 'UNEXPECTED';
 
@@ -61,14 +62,18 @@ export class AnalysisDeadlineService {
   async closeOverdue(): Promise<{ closed: number; failed: number }> {
     const now = this.clock();
     const cutoff = new Date(now.getTime() - ANALYSIS_PROCESSING_DEADLINE_MS);
-    // 잠그지 않고 후보만 고른다. 실제 판단은 closeOne이 잠근 뒤 다시 한다.
+    // 잠그지 않고 닫을 수 있는 상태의 후보만 고른다. 닫을 수 없는 행이 쌓여도 다른 요청이 밀리지 않는다.
+    // 실제 판단은 closeOne이 잠근 뒤 decideDeadline으로 다시 한다.
     const candidates: { requestId: string }[] = await this.dataSource.query(`
       SELECT r.request_id AS "requestId"
         FROM analysis_request r
         JOIN analysis_attempt a ON a.attempt_id = r.current_attempt_id AND a.request_id = r.request_id
-       WHERE r.lifecycle = 'ACTIVE' AND (r.submitted_at <= $1 OR a.application = 'APPLY_FAILED')
+       WHERE r.lifecycle = 'ACTIVE'
+         AND (a.application = 'APPLY_FAILED'
+           OR (r.submitted_at <= $1
+             AND (a.application = 'PENDING' OR (a.application = 'NOT_READY' AND a.processing = ANY($2)))))
        ORDER BY r.submitted_at, r.request_id
-       LIMIT $2`, [cutoff, BATCH_SIZE]);
+       LIMIT $3`, [cutoff, [...IN_PROGRESS], BATCH_SIZE]);
     let closed = 0;
     let failed = 0;
     for (const { requestId } of candidates) {

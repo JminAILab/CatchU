@@ -73,14 +73,16 @@ async function stored(result) {
 const counts = async () => (await db.query(`SELECT (SELECT count(*)::int FROM catch_asset) AS catches,
   (SELECT count(*)::int FROM candidate_registration) AS registrations,
   (SELECT count(*)::int FROM result_application_record) AS receipts`))[0];
-const lockWaiters = async () => (await db.query(`SELECT count(*)::int AS n FROM pg_stat_activity
-  WHERE datname = current_database() AND wait_event_type = 'Lock'`))[0].n;
-async function waitForLockWaiters(n) {
+const sleep = ms => new Promise(done => setTimeout(done, ms));
+// holders 중 하나에게 막혀 기다리는 연결을 찾는다. 다른 연결의 대기(advisory·다른 행)는 세지 않는다.
+async function waitUntilBlocked(holders, except = []) {
   for (let i = 0; i < 400; i += 1) {
-    if (await lockWaiters() >= n) return;
-    await new Promise(done => setTimeout(done, 5));
+    const rows = await db.query('SELECT pid FROM pg_stat_activity WHERE pg_blocking_pids(pid) && $1::int[]', [holders]);
+    const found = rows.map(row => row.pid).filter(pid => !except.includes(pid));
+    if (found.length > 0) return found[0];
+    await sleep(5);
   }
-  assert.fail(`잠금 대기 ${n}개가 생기지 않았다`);
+  assert.fail(`${holders.join(',')}에 막힌 연결이 생기지 않았다`);
 }
 // 다른 연결이 요청 행을 잠근 동안 first가 먼저 줄을 선 것을 확인하고 second를 세운 뒤 풀어 준다.
 // PostgreSQL은 같은 행을 기다린 순서대로 넘겨주므로 겹친 상태에서 순서를 정해 시험할 수 있다.
@@ -89,11 +91,12 @@ async function contend(requestId, first, second) {
   await runner.connect();
   await runner.startTransaction();
   try {
+    const [{ pid: holder }] = await runner.query('SELECT pg_backend_pid() AS pid');
     await runner.query('SELECT 1 FROM analysis_request WHERE request_id = $1 FOR UPDATE', [requestId]);
     const firstDone = first().then(value => ({ status: 'fulfilled', value }), reason => ({ status: 'rejected', reason }));
-    await waitForLockWaiters(1);
+    const firstPid = await waitUntilBlocked([holder]);
     const secondDone = second().then(value => ({ status: 'fulfilled', value }), reason => ({ status: 'rejected', reason }));
-    await waitForLockWaiters(2);
+    await waitUntilBlocked([holder, firstPid], [firstPid]);
     await runner.commitTransaction();
     return await Promise.all([firstDone, secondDone]);
   } finally {
@@ -268,22 +271,58 @@ test('닫기와 결과 수신이 겹치면 한쪽 결과만 남고, 닫기가 �
   }
 });
 
-test('여러 api가 같은 시각에 판정해도 요청마다 한 번만 닫는다', async () => {
+test('여러 api가 같은 후보를 함께 골라도 요청마다 한 번만 닫는다', async () => {
   const results = [];
   for (let i = 0; i < 6; i += 1) results.push(await prepare({ processing: i % 2 ? 'RUNNING' : 'QUEUED' }));
-  const outcomes = await Promise.all([deadline().service.closeOverdue(), deadline().service.closeOverdue()]);
-  assert.equal(outcomes[0].closed + outcomes[1].closed, results.length);
-  assert.equal(outcomes[0].failed + outcomes[1].failed, 0);
+  // 첫 후보를 가장 이른 접수로 두고 잠가, 두 판정이 같은 후보 목록을 고른 뒤 그 요청에서 함께 기다리게 한다.
+  await db.query('UPDATE analysis_request SET submitted_at = $1 WHERE request_id = $2',
+    [new Date(SUBMITTED.getTime() - 1000), results[0].requestId]);
+  const [first, second] = await contend(results[0].requestId,
+    () => deadline().service.closeOverdue(), () => deadline().service.closeOverdue());
+  assert.equal(first.status, 'fulfilled');
+  assert.equal(second.status, 'fulfilled');
+  assert.equal(first.value.closed + second.value.closed, results.length);
+  assert.equal(first.value.failed + second.value.failed, 0);
   for (const result of results) assert.deepEqual((await stored(result)).attempt.failures, [DISPATCH]);
 });
 
-test('계약 전이에 없는 조합은 시한을 넘겨도 바꾸지 않고 기록만 남긴다', async () => {
-  const result = await prepare({ processing: 'SUCCEEDED', application: 'APPLIED' });
-  const before = await stored(result);
+test('계약 전이에 없는 조합은 판정 대상이 아니며, 100건이 쌓여도 다른 요청이 밀리지 않는다', async () => {
+  const stuck = [];
+  for (let i = 0; i < 100; i += 1) stuck.push(await prepare({ processing: 'SUCCEEDED', application: 'APPLIED' }));
+  await db.query('UPDATE analysis_request SET submitted_at = $1 WHERE request_id = ANY($2::uuid[])',
+    [new Date(SUBMITTED.getTime() - 60 * 1000), stuck.map(result => result.requestId)]);
+  const before = await stored(stuck[0]);
+  const overdue = await prepare({ processing: 'RUNNING' });
   const { service, logs } = deadline();
-  assert.deepEqual(await service.closeOverdue(), { closed: 0, failed: 0 });
-  assert.deepEqual(logs, [{ unexpected: 'SUCCEEDED/APPLIED', requestId: result.requestId }]);
-  assert.deepEqual(await stored(result), before);
+  assert.deepEqual(await service.closeOverdue(), { closed: 1, failed: 0 });
+  assert.deepEqual(logs, [{ closed: 'PROCESSING_DEADLINE', requestId: overdue.requestId }]);
+  assert.deepEqual(await stored(stuck[0]), before);
+  const [{ n }] = await db.query("SELECT count(*)::int AS n FROM analysis_request WHERE lifecycle = 'ACTIVE'");
+  assert.equal(n, 100);
+});
+
+test('요청 하나의 닫기가 실패하면 그 요청만 되돌리고 나머지는 닫으며, 다음 판정에서 다시 닫는다', async () => {
+  const failing = await prepare({ processing: 'RUNNING' });
+  const other = await prepare();
+  // 이 요청을 닫는 UPDATE만 거부하는 시험용 제약. 시도 변경이 함께 되돌려지는지 본다.
+  await db.query(`ALTER TABLE analysis_request ADD CONSTRAINT test_deadline_close_failure
+    CHECK (request_id <> '${failing.requestId}'::uuid OR lifecycle = 'ACTIVE') NOT VALID`);
+  try {
+    const { service, logs } = deadline();
+    assert.deepEqual(await service.closeOverdue(), { closed: 1, failed: 1 });
+    assert.deepEqual(logs.filter(log => log.failed), [{ failed: 'QueryFailedError:23514', requestId: failing.requestId }]);
+    const kept = await stored(failing);
+    assert.equal(kept.request.lifecycle, 'ACTIVE');
+    assert.equal(kept.attempt.processing, 'RUNNING');
+    assert.equal(kept.attempt.application, 'NOT_READY');
+    assert.deepEqual(kept.attempt.failures, []);
+    assert.equal(kept.attempt.failureConfirmationReference, null);
+    assert.equal((await stored(other)).request.lifecycle, 'CLOSED');
+  } finally {
+    await db.query('ALTER TABLE analysis_request DROP CONSTRAINT test_deadline_close_failure');
+  }
+  assert.deepEqual(await deadline().service.closeOverdue(), { closed: 1, failed: 0 });
+  assert.deepEqual((await stored(failing)).attempt.failures, [DISPATCH]);
 });
 
 test('닫힌 요청의 회원은 같은 저장소에 새 동의·요청·시도를 만들 수 있다', async () => {

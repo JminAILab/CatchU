@@ -26,7 +26,8 @@ export class PeriodicTask {
   start(): void {
     if (!this.stopped) return;
     this.stopped = false;
-    this.schedule();
+    // 멈추는 중에 다시 시작하면 진행 중인 실행이 끝난 뒤 그 실행이 다음 주기를 예약한다.
+    if (!this.running) this.schedule();
   }
 
   async stop(): Promise<void> {
@@ -53,7 +54,13 @@ export class PeriodicTask {
     try {
       await this.options.run();
     } catch (error) {
-      this.options.failed(this.options.name, error instanceof Error ? error.name : 'UnknownError');
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      try {
+        this.options.failed(this.options.name, errorName);
+      } catch {
+        // 기록 함수까지 실패하면 표준 오류에만 남긴다. 처리되지 않은 거부로 서버가 멈추지 않게 한다.
+        process.stderr.write(`[PeriodicTask] ${this.options.name} failed: ${errorName}\n`);
+      }
     }
   }
 }
