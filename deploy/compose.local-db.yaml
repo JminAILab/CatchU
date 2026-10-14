@@ -1,0 +1,47 @@
+# 로컬 합성 DB 겹침 파일(#275). 검증·재현 전용이며 운영 DB 대신 쓰지 않는다. 사용법은 deploy/README.md.
+# 운영과 같은 방식(TLS verify-full, 앱·migration 계정 분리)을 합성 값으로 재현한다. 평문 연결은 받지 않는다.
+# DB는 내부 망(db)에만 두고 api·migration만 연결한다. worker는 이 망에 없어 DB에 닿지 않는다.
+services:
+  db:
+    image: postgres:16@sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d
+    container_name: ${CATCHU_SINGLE_NAME:-catchu-single}-db
+    env_file:
+      - path: ${CATCHU_ENV_DIR:?저장소 밖 환경 폴더(CATCHU_ENV_DIR)가 필요합니다}/db.env
+        required: true
+    entrypoint: ["/catchu/start-tls.sh"]
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./local-db:/catchu:ro
+      - ./local-db/init-roles.sh:/docker-entrypoint-initdb.d/10-catchu-roles.sh:ro
+      - type: bind
+        source: ${CATCHU_ENV_DIR}/tls
+        target: /run/catchu/tls
+        read_only: true
+        bind:
+          create_host_path: false
+    networks:
+      - db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "/var/run/postgresql", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+      start_interval: 1s
+
+  api:
+    networks:
+      - default
+      - db
+
+  migration:
+    networks:
+      - db
+
+networks:
+  db:
+    internal: true
+
+volumes:
+  db-data:
