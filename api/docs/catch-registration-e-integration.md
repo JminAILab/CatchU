@@ -53,7 +53,7 @@ MOCK는 이 대조 대상에서 제외한다.
 ## 실패 요청 닫기
 
 [10/6 팀장 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)과
-[처리 시한 계약 PR #292](https://github.com/JminAILab/CatchU/pull/292)이
+[처리 시한 계약 PR #292](https://github.com/JminAILab/CatchU/pull/292)가
 10/4 조건 중 실패·재시작 후 재반영 조건과 [#234 복구 계획](https://github.com/JminAILab/CatchU/issues/234#issuecomment-6028927385)을 대체한다.
 
 - 반영 실패(`APPLY_FAILED`)는 처리 시한을 기다리지 않고 E의 다음 주기 판정에서 닫는다.
