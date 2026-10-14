@@ -44,7 +44,7 @@ entities:
       - {name: accountLogin, type: string, required: false}
       - {name: credentialReference, type: secret-reference, required: false}
       - {name: connectionState, type: enum, required: true, allowed: [CONNECTED, DISCONNECTED, REAUTH_REQUIRED]}
-    constraints: ["행 없음은 DISCONNECTED로 투영", "CONNECTED의 실제 접근 가능 여부는 A가 확인; 상세 보관/갱신은 OQ-A1/F1"]
+    constraints: ["행 없음은 DISCONNECTED로 투영", "CONNECTED의 실제 접근 가능 여부는 A가 확인; 토큰 자동 갱신 없음, 만료·폐기·보관 자료 손상 확인 시 REAUTH_REQUIRED로 바꾸고 credentialReference 제거; A/F 제공 상세는 OQ-F1"]
   - name: AnalysisRequest
     owner: E
     description: "새 동의로 접수된 요청; 현재 시도와 진행 잠금의 정본"
