@@ -7,7 +7,8 @@
 // 사용(저장소 루트): node deploy/scripts/check-images.mjs [--keep] [--report <저장소 밖 JSON 경로>]
 //   --keep    검사 이미지를 지우지 않는다(합성 환경·임시 폴더·컨테이너·망·DB 볼륨은 항상 지운다)
 //   --report  결과(통과·실패, 이미지 ID·플랫폼, 정리 조회 결과)를 JSON으로 쓴다. 비밀값·환경변수 원문은 쓰지 않는다
-// 끝에 남은 자원을 조회한다. 자원이 남았거나 조회가 실패해 확인하지 못하면 정리 실패로 기록하고 종료 코드 1로 끝낸다.
+// 끝에 남은 자원(컨테이너·볼륨·망, --keep이 아니면 검사 이미지까지)을 조회한다. 자원이 남았거나 조회가 실패해 확인하지
+// 못하면 정리 실패로 기록하고 종료 코드 1로 끝낸다.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -65,6 +66,12 @@ function must(cmd, cmdArgs, options) {
 }
 const docker = (cmdArgs, options) => run("docker", cmdArgs, options);
 const mustDocker = (cmdArgs, options) => must("docker", cmdArgs, options);
+// 비밀값 검사에 쓸 로그·이미지 기록을 모은다(출력은 run이 captured에 넣는다). 조회가 실패하면 빈 출력으로 통과시키지 않도록 따로 적는다.
+const collectFailed = [];
+const collect = (label, cmdArgs) => {
+  const out = docker(cmdArgs);
+  if (out.code !== 0) collectFailed.push(`${label} code=${out.code}`);
+};
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function record(group, name, ok, detail = "") {
@@ -113,13 +120,10 @@ const name = (service) => `${PROJECT}-${service}`;
 async function main() {
   console.log(`[check-images] 판본 ${revision}, 임시 폴더 ${work}`);
   mustDocker(["version", "--format", "{{.Server.Os}}/{{.Server.Arch}}"]);
-  // 다른 검사가 남긴 자원이 있으면 건드리지 않고 멈춘다(포트·이름이 겹칠 수 있다).
-  const others = [
-    ...docker(["ps", "-a", "--filter", "name=^catchu-check-", "--format", "container {{.Names}}"], { capture: false }).stdout.split("\n"),
-    ...docker(["volume", "ls", "--filter", "name=catchu-check-", "--format", "volume {{.Name}}"], { capture: false }).stdout.split("\n"),
-    ...docker(["network", "ls", "--filter", "name=catchu-check-", "--format", "network {{.Name}}"], { capture: false }).stdout.split("\n"),
-  ].filter(Boolean);
-  expect(others.length === 0, `다른 검사가 남긴 자원이 있습니다(직접 확인 뒤 지웁니다): ${others.slice(0, 5).join(", ")}`);
+  // 다른 검사가 남긴 자원이 있으면 건드리지 않고 멈춘다(포트·이름이 겹칠 수 있다). 조회가 실패하면 없다고 보지 않고 멈춘다.
+  const others = runQueries(OTHER_CHECK_QUERIES);
+  expect(others.failedQueries.length === 0, `다른 검사가 남긴 자원을 확인하지 못했습니다: ${others.failedQueries.map(describeFailure).join(", ")}`);
+  expect(others.found.length === 0, `다른 검사가 남긴 자원이 있습니다(직접 확인 뒤 지웁니다): ${others.found.slice(0, 5).join(", ")}`);
   for (const [service, port] of Object.entries(PORTS)) {
     const busy = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1000) }).then(() => true, () => false);
     expect(!busy, `${service} 검사 포트 ${port}가 이미 사용 중입니다`);
@@ -140,8 +144,12 @@ async function main() {
     mustDocker(["build", "--load", "-q", "-t", ctxTag, "-f", "-", "."], {
       input: `FROM ${nodeImage}\nCOPY . /ctx\nRUN cd /ctx && find . -type f | sort > /ctx-files && ! grep -rq ${canary} /ctx\n`,
     });
-    const files = mustDocker(["run", "--rm", "--network", "none", ctxTag, "cat", "/ctx-files"]).stdout.trim().split("\n");
-    docker(["image", "rm", "-f", ctxTag]);
+    let files;
+    try {
+      files = mustDocker(["run", "--rm", "--network", "none", ctxTag, "cat", "/ctx-files"]).stdout.trim().split("\n");
+    } finally {
+      docker(["image", "rm", "-f", ctxTag]); // 지우지 못하면 마지막 정리 조회(이미지)가 잡는다
+    }
     const outside = files.filter((file) => !CONTEXT_ALLOWED.some((allowed) => file.slice(2) === allowed || (allowed.endsWith("/") && file.slice(2).startsWith(allowed))));
     expect(outside.length === 0, `허용 목록 밖 ${outside.slice(0, 5).join(", ")}`);
     const missing = ["api/src/main.ts", "web/src/lib/api-client.ts", "worker/app/main.py", "worker/fixtures/m1-synthetic/context.sample.json",
@@ -436,7 +444,7 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
       }
       expect(status === "403", `status=${status}`);
     } finally {
-      captured.push(docker(["logs", devName]).text);
+      collect("개발 로그인 시험 api 로그", ["logs", devName]);
       docker(["rm", "-f", devName]);
     }
   });
@@ -450,6 +458,12 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
   // ---------- 6. 계획 교체 ----------
   // 컨테이너 inspect에는 주입한 환경변수가 들어 있으므로 비밀값 검사용 출력에 넣지 않는다.
   const inspect = (container) => JSON.parse(mustDocker(["inspect", container], { capture: false }).stdout)[0];
+  // 세 서비스 중 지금 실행 중인 것. 조회가 실패하면 "멈춤"으로 읽지 않고 그 시험을 실패시킨다.
+  const runningNow = () => ["api", "worker", "web"].filter((service) => {
+    const out = docker(["inspect", "-f", "{{.State.Running}}", name(service)]);
+    if (out.code !== 0) throw new Error(`${service} 실행 상태를 조회하지 못함(code=${out.code})`);
+    return out.stdout.trim() === "true";
+  });
   const oldApi = inspect(name("api"));
   const composeText = readFileSync(composeEnv, "utf8");
   writeFileSync(composeEnv, composeText.replace(`CATCHU_API_IMAGE=${image.api}`, `CATCHU_API_IMAGE=${image.apiNext}`));
@@ -472,7 +486,7 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
   const blocked = replace();
   await check("교체", "같은 라벨의 api가 남아 있으면 새 실행을 시작하지 않는다", () => {
     expect(blocked.code === 3, `replace code=${blocked.code}`);
-    const running = ["api", "worker", "web"].filter((service) => docker(["inspect", "-f", "{{.State.Running}}", name(service)]).stdout.trim() === "true");
+    const running = runningNow();
     expect(running.length === 0, `실행 중 ${running.join(",")}`);
     return "종료 코드 3, web·api·worker 모두 멈춘 상태 유지";
   });
@@ -482,7 +496,7 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
   psql("alter role catchu_migrator login");
   await check("교체", "migration이 실패하면 새 실행을 시작하지 않는다", () => {
     expect(migrationFail.code === 4, `replace code=${migrationFail.code}`);
-    const running = ["api", "worker", "web"].filter((service) => docker(["inspect", "-f", "{{.State.Running}}", name(service)]).stdout.trim() === "true");
+    const running = runningNow();
     expect(running.length === 0, `실행 중 ${running.join(",")}`);
     const kept = docker(["ps", "-a", "--filter", `name=^${PROJECT}-migration-`, "--format", "{{.Names}} {{.Status}}"]).stdout.trim();
     expect(/Exited \((?!0\))\d+\)/.test(kept), `남긴 실행 ${kept}`);
@@ -491,7 +505,7 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
   const leftoverBlocked = replace();
   await check("교체", "실패한 migration 실행이 남아 있으면 되돌리기·재시작도 멈춘다", () => {
     expect(leftoverBlocked.code === 5, `replace code=${leftoverBlocked.code}`);
-    const running = ["api", "worker", "web"].filter((service) => docker(["inspect", "-f", "{{.State.Running}}", name(service)]).stdout.trim() === "true");
+    const running = runningNow();
     expect(running.length === 0, `실행 중 ${running.join(",")}`);
     return "종료 코드 5";
   });
@@ -506,7 +520,7 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
   const forced = replace(["--stop-timeout", "2"]);
   await check("교체", "대기 상한을 넘어 강제 종료되면 새 실행을 시작하지 않는다", () => {
     expect(forced.code === 7, `replace code=${forced.code}`);
-    const running = ["api", "worker", "web"].filter((service) => docker(["inspect", "-f", "{{.State.Running}}", name(service)]).stdout.trim() === "true");
+    const running = runningNow();
     expect(running.length === 0, `실행 중 ${running.join(",")}`);
     expect(/web: \w+ exited exit=137/.test(forced.text), "web 강제 종료(137) 기록 없음");
     return "web 137, 종료 코드 7";
@@ -534,7 +548,6 @@ exec "${realDocker}" "$@"
 `, { mode: 0o755 });
     return { PATH: `${dir}:${process.env.PATH}` };
   };
-  const runningNow = () => ["api", "worker", "web"].filter((service) => docker(["inspect", "-f", "{{.State.Running}}", name(service)]).stdout.trim() === "true");
   // worker 자리에 기동하지 못하는 이미지(migration 이미지: DB 설정이 없어 바로 끝난다)를 넣어 api가 뜬 뒤 실패하게 한다.
   const composeNow = readFileSync(composeEnv, "utf8");
   try {
@@ -583,7 +596,7 @@ exec "${realDocker}" "$@"
   await check("교체", "중지 명령 하나가 실패해도 나머지를 멈추고 종료 확인에서 멈춘다", () => {
     expect(stopFail.code === 3, `replace code=${stopFail.code}`);
     expect(/중지 명령이 실패했습니다: web/.test(stopFail.text), "실패 기록 없음");
-    const running = ["api", "worker", "web"].filter((service) => docker(["inspect", "-f", "{{.State.Running}}", name(service)]).stdout.trim() === "true");
+    const running = runningNow();
     expect(running.length === 1 && running[0] === "web", `실행 중 ${running.join(",")}`);
     return "web만 남고 api·worker 멈춤, 종료 코드 3";
   });
@@ -680,50 +693,70 @@ fi`));
   await check("교체", "원인 확인 뒤 다시 실행하면 이어서 시작(health 재확인 통과)", () => {
     expect(afterHealthRegressed.code === 0, `replace code=${afterHealthRegressed.code}`);
   });
+  // 세 서비스를 멈춘 뒤 migration 이미지 ID 조회(image inspect -f)만 실패시킨다. 문서에 없는 코드로 끝나지 않고, migration을
+  // 시작하지 않은 채 2로 멈춰야 한다. 중지 전의 같은 조회(대상 이미지 기록)는 실제 docker로 지나간다.
+  const migrationPrepFail = replace(["--migrate"], dockerShim("migration-prep",
+    `if [ -e "$stopped" ] && [ "$1" = image ] && [ "$2" = inspect ] && [ "$3" = -f ]; then echo "검사용 가짜 Docker 오류: 이미지 조회" >&2; exit 1; fi`));
+  await check("교체", "세 서비스를 멈춘 뒤 migration 이미지를 확인하지 못하면 migration을 시작하지 않고 종료 코드 2", () => {
+    expect(migrationPrepFail.code === 2, `replace code=${migrationPrepFail.code}`);
+    expect(/migration 이미지\(\S+\)를 확인하지 못했습니다\. web·api·worker는 멈춘 상태이고 migration은 시작하지 않았습니다\./.test(migrationPrepFail.text), "준비 조회 실패 기록 없음");
+    expect(![/migration 실행:/, /api 시작/].some((step) => step.test(migrationPrepFail.text)), "migration·새 실행을 시도함");
+    const running = runningNow();
+    expect(running.length === 0, `실행 중 ${running.join(",")}`);
+    return "종료 코드 2, 세 서비스 멈춤, migration·새 실행 없음";
+  });
+  const afterMigrationPrepFail = replace(["--migrate"]);
+  await check("교체", "Docker가 응답한 뒤 --migrate로 다시 실행하면 이어서 시작", () => {
+    expect(afterMigrationPrepFail.code === 0 && /No migrations are pending/.test(afterMigrationPrepFail.text), `replace code=${afterMigrationPrepFail.code}`);
+  });
 
   // ---------- 7. 종료 신호와 비밀값 ----------
   for (const service of ["web", "worker", "api"]) {
     await check("종료", `${service} SIGTERM 종료`, () => {
-      const started = Date.now();
-      mustDocker(["stop", "-t", "30", name(service)]);
-      const seconds = (Date.now() - started) / 1000;
-      const state = inspect(name(service)).State;
-      captured.push(docker(["logs", name(service)]).text);
-      expect(!state.Running && [0, 143].includes(state.ExitCode) && seconds < 30, `exit=${state.ExitCode} ${seconds.toFixed(1)}초`);
-      return `exit=${state.ExitCode}, ${seconds.toFixed(1)}초`;
+      try {
+        const started = Date.now();
+        mustDocker(["stop", "-t", "30", name(service)]);
+        const seconds = (Date.now() - started) / 1000;
+        const state = inspect(name(service)).State;
+        expect(!state.Running && [0, 143].includes(state.ExitCode) && seconds < 30, `exit=${state.ExitCode} ${seconds.toFixed(1)}초`);
+        return `exit=${state.ExitCode}, ${seconds.toFixed(1)}초`;
+      } finally {
+        // 중지·조회가 실패해도 로그는 모은다. 모으지 못하면 비밀값 검사가 그 로그 없이 통과하지 않는다.
+        collect(`${service} 로그`, ["logs", name(service)]);
+      }
     });
   }
-  captured.push(docker(["logs", name("db")]).text);
+  collect("db 로그", ["logs", name("db")]);
   // 합성 비밀값은 이미지를 만든 뒤에 생기므로 이 검사의 의미는 실행 로그·출력이다. 이미지 쪽은 맥락 미끼·Dockerfile 이름 검사가 맡는다.
   await check("비밀값·설정", "합성 비밀값이 실행 로그·출력(이미지 설정·기록 포함)에 없다", () => {
     for (const img of Object.values(image)) {
-      captured.push(docker(["image", "inspect", img]).text);
-      captured.push(docker(["history", "--no-trunc", "--format", "{{.CreatedBy}}", img]).text);
+      collect(`${img} 설정`, ["image", "inspect", img]);
+      collect(`${img} 기록`, ["history", "--no-trunc", "--format", "{{.CreatedBy}}", img]);
     }
-    const haystack = captured.join("\n").toLowerCase();
-    const found = secrets.filter((secret) => haystack.includes(secret.toLowerCase()));
-    expect(secrets.length === 5 && found.length === 0, `발견 ${found.length}개`);
-    return `비밀값 ${secrets.length}개 × 출력 ${captured.length}건`;
+    const verdict = secretVerdict(secrets, captured, collectFailed);
+    expect(secrets.length === 5 && verdict.ok, verdict.detail);
+    return verdict.detail;
   });
 
   // ---------- 8. 정리 확인 판정 ----------
-  // 이 실행의 컨테이너·볼륨·망이 아직 있는 시점이다. 조회 실패는 "남은 자원 없음"으로 답하는 가짜 docker에서 한 조회만 실패시켜 넣는다
-  // (실제 데몬은 멈추지 않는다). 실제로 남은 자원은 실제 docker 조회로 본다. 맨 끝 정리 기록이 "조회 정상·남은 자원 없음" 사례다.
+  // 이 실행의 컨테이너·볼륨·망·검사 이미지가 아직 있는 시점이다. 조회 실패는 "남은 자원 없음"으로 답하는 가짜 docker에서 한 조회만
+  // 실패시켜 넣는다(실제 데몬은 멈추지 않는다). 실제로 남은 자원은 실제 docker 조회로 본다. 맨 끝 정리 기록이 "조회 정상·남은 자원 없음" 사례다.
   const fakeDocker = (mode, rule) => {
     const dir = path.join(work, `docker-fake-${mode}`);
     mkdirSync(dir);
     writeFileSync(path.join(dir, "docker"), `#!/usr/bin/env bash\n${rule}\nexit 0\n`, { mode: 0o755 });
     return { PATH: `${dir}:${process.env.PATH}` };
   };
+  const down = 'echo "Cannot connect to the Docker daemon (검사용 가짜)" >&2; exit 1';
+  const absent = path.join(work, "docker-absent");
+  mkdirSync(absent);
   await check("정리", "자원 조회가 실패하면(조회별·docker 없음·시간 초과) 정리 통과로 보지 않고 전체 종료 코드를 1로 한다", () => {
-    const down = 'echo "Cannot connect to the Docker daemon (검사용 가짜)" >&2; exit 1';
-    const absent = path.join(work, "docker-absent");
-    mkdirSync(absent);
     const cases = [
       ["컨테이너(이름)", { env: fakeDocker("name", `if [ "$1" = ps ] && [[ " $* " == *" name=^"* ]]; then ${down}; fi`) }, ["컨테이너(이름)"]],
       ["컨테이너(라벨)", { env: fakeDocker("label", `if [ "$1" = ps ] && [[ " $* " == *" label="* ]]; then ${down}; fi`) }, ["컨테이너(라벨)"]],
       ["볼륨", { env: fakeDocker("volume", `if [ "$1" = volume ]; then ${down}; fi`) }, ["볼륨"]],
       ["망", { env: fakeDocker("network", `if [ "$1" = network ]; then ${down}; fi`) }, ["망"]],
+      ["이미지", { env: fakeDocker("image", `if [ "$1" = image ]; then ${down}; fi`) }, ["이미지"]],
       ["docker 없음", { env: { PATH: absent } }, LEFTOVER_QUERIES.map(([scope]) => scope)],
       ["시간 초과", { env: fakeDocker("slow", "exec sleep 5"), timeoutMs: 300 }, LEFTOVER_QUERIES.map(([scope]) => scope)],
     ];
@@ -742,29 +775,45 @@ fi`));
     expect(wrong.length === 0, wrong.join("; "));
     return `실패 사례 ${cases.length}개 모두 정리 실패·종료 코드 1, 조회 정상·자원 없음은 통과`;
   });
-  await check("정리", "실제로 남은 컨테이너·볼륨·망을 이름과 함께 정리 실패로 기록한다", () => {
+  // --keep이면 검사 이미지는 남은 자원으로 세지 않으므로 이미지 항목은 지우는 실행에서만 기대한다.
+  await check("정리", "실제로 남은 컨테이너·볼륨·망·검사 이미지를 이름과 함께 정리 실패로 기록한다", () => {
     const state = { ...inspectLeftovers(), files: [] };
     const verdict = cleanupVerdict(state);
-    const expected = [`container ${name("api")}`, `volume ${PROJECT}_db-data`, `network ${PROJECT}_db`];
+    const expected = [`container ${name("api")}`, `volume ${PROJECT}_db-data`, `network ${PROJECT}_db`, ...(keepImages ? [] : [`image ${image.web}`])];
     const missing = expected.filter((item) => !state.found.includes(item) || !verdict.detail.includes(item));
     expect(state.failedQueries.length === 0, `조회 실패 ${state.failedQueries.map((query) => query.scope).join(",")}`);
     expect(!verdict.ok && missing.length === 0, `빠진 항목 ${missing.join(", ")}`);
-    return `남은 자원 ${state.found.length}개 감지`;
+    return `남은 자원 ${state.found.length}개 감지${keepImages ? "(--keep: 검사 이미지 제외)" : ""}`;
+  });
+  // 시작 전 확인(main 맨 앞)이 쓰는 조회도 같은 방식으로 실패를 가르는지 본다. 이 시점에는 이 실행의 자원이 있으므로 가짜 docker로만 본다.
+  await check("정리", "시작 전 다른 검사 자원 확인도 조회 실패를 자원 없음으로 보지 않는다", () => {
+    const wrong = [];
+    for (const [label, env, scopes] of [
+      ["볼륨", fakeDocker("before-volume", `if [ "$1" = volume ]; then ${down}; fi`), ["볼륨"]],
+      ["docker 없음", { PATH: absent }, OTHER_CHECK_QUERIES.map(([scope]) => scope)],
+    ]) {
+      const failedScopes = runQueries(OTHER_CHECK_QUERIES, { env }).failedQueries.map((query) => query.scope).join(",");
+      if (failedScopes !== scopes.join(",")) wrong.push(`${label}: 실패 조회=${failedScopes}`);
+    }
+    expect(runQueries(OTHER_CHECK_QUERIES, { env: fakeDocker("before-empty", "") }).failedQueries.length === 0, "조회 정상인데 실패로 봄");
+    expect(wrong.length === 0, wrong.join("; "));
+    return "조회 실패·docker 없음은 실패로 가르고, 조회 정상은 통과";
+  });
+  await check("비밀값·설정", "로그·이미지 기록을 모으지 못하면 비밀값 검사를 통과로 보지 않는다", () => {
+    const sample = [randomBytes(32).toString("hex")];
+    const failed = secretVerdict(sample, ["정상 출력"], ["web 로그 code=1"]);
+    const leaked = secretVerdict(sample, [`출력 ${sample[0].toUpperCase()}`], []);
+    const clean = secretVerdict(sample, ["정상 출력"], []);
+    expect(!failed.ok && !leaked.ok && clean.ok, `수집 실패 ${failed.ok}, 노출 ${leaked.ok}, 정상 ${clean.ok}`);
+    return "수집 실패·비밀값 노출은 실패, 정상 출력은 통과";
   });
 }
 
-// 이 실행이 만든 자원 조회. 조회마다 종료 코드 0일 때만 성공으로 본다. 조회 실패·docker 없음·시간 초과를 "남은 자원 없음"으로 읽지 않는다.
-const LABEL_FILTER = `label=com.docker.compose.project=${PROJECT}`;
-const LEFTOVER_QUERIES = [
-  ["컨테이너(이름)", ["ps", "-a", "--filter", `name=^${PROJECT}-`, "--format", "container {{.Names}}"]],
-  ["컨테이너(라벨)", ["ps", "-a", "--filter", LABEL_FILTER, "--format", "container {{.Names}}"]],
-  ["볼륨", ["volume", "ls", "--filter", LABEL_FILTER, "--format", "volume {{.Name}}"]],
-  ["망", ["network", "ls", "--filter", LABEL_FILTER, "--format", "network {{.Name}}"]],
-];
-function inspectLeftovers({ env, timeoutMs = 60_000 } = {}) {
+// 조회 묶음 실행. 조회마다 종료 코드 0일 때만 성공으로 본다. 조회 실패·docker 없음·시간 초과를 "자원 없음"으로 읽지 않는다.
+function runQueries(queries, { env, timeoutMs = 60_000 } = {}) {
   const found = new Set();
   const failedQueries = [];
-  for (const [scope, queryArgs] of LEFTOVER_QUERIES) {
+  for (const [scope, queryArgs] of queries) {
     const out = docker(queryArgs, { capture: false, env, timeoutMs });
     if (out.code !== 0) {
       failedQueries.push({ scope, code: out.code, timedOut: out.timedOut });
@@ -774,6 +823,29 @@ function inspectLeftovers({ env, timeoutMs = 60_000 } = {}) {
   }
   return { found: [...found], failedQueries };
 }
+const describeFailure = (query) => `${query.scope} ${query.timedOut ? "시간 초과" : query.code === null ? "실행하지 못함" : `code=${query.code}`}`;
+// 시작 전 확인: 다른 검사(다른 작업 폴더 포함)가 남긴 catchu-check-* 자원.
+const OTHER_CHECK_QUERIES = [
+  ["컨테이너", ["ps", "-a", "--filter", "name=^catchu-check-", "--format", "container {{.Names}}"]],
+  ["볼륨", ["volume", "ls", "--filter", "name=catchu-check-", "--format", "volume {{.Name}}"]],
+  ["망", ["network", "ls", "--filter", "name=catchu-check-", "--format", "network {{.Name}}"]],
+];
+// 이 실행이 만든 자원. 검사 이미지는 이 실행의 태그로 찾는다(맥락 검사 이미지 포함).
+const LABEL_FILTER = `label=com.docker.compose.project=${PROJECT}`;
+const IMAGE_FILTER = `reference=catchu-check-*:${tag}*`;
+const LEFTOVER_QUERIES = [
+  ["컨테이너(이름)", ["ps", "-a", "--filter", `name=^${PROJECT}-`, "--format", "container {{.Names}}"]],
+  ["컨테이너(라벨)", ["ps", "-a", "--filter", LABEL_FILTER, "--format", "container {{.Names}}"]],
+  ["볼륨", ["volume", "ls", "--filter", LABEL_FILTER, "--format", "volume {{.Name}}"]],
+  ["망", ["network", "ls", "--filter", LABEL_FILTER, "--format", "network {{.Name}}"]],
+  ["이미지", ["image", "ls", "--filter", IMAGE_FILTER, "--format", "image {{.Repository}}:{{.Tag}}"]],
+];
+// --keep으로 일부러 남긴 검사 이미지는 남은 자원으로 보지 않는다(맥락 검사 이미지처럼 남길 이유가 없는 이미지는 그대로 센다).
+function inspectLeftovers(options = {}) {
+  const state = runQueries(LEFTOVER_QUERIES, options);
+  const kept = new Set(keepImages ? Object.values(image).map((ref) => `image ${ref}`) : []);
+  return { ...state, found: state.found.filter((item) => !kept.has(item)) };
+}
 // 정리 판정. 조회가 모두 성공하고 남은 자원·미끼 파일이 없을 때만 통과다. 프로젝트 이름과 확인 명령을 남기고, Docker 오류 원문은 넣지 않는다.
 function cleanupVerdict({ found, failedQueries, files }) {
   const ok = found.length === 0 && files.length === 0 && failedQueries.length === 0;
@@ -781,11 +853,17 @@ function cleanupVerdict({ found, failedQueries, files }) {
   const parts = [`프로젝트 ${PROJECT}`];
   if (found.length + files.length > 0) parts.push(`남은 자원: ${[...found, ...files].join(", ")}`);
   if (failedQueries.length > 0) {
-    const why = (query) => (query.timedOut ? "시간 초과" : query.code === null ? "실행하지 못함" : `code=${query.code}`);
-    parts.push(`확인하지 못한 조회(자원이 남았을 수 있음): ${failedQueries.map((query) => `${query.scope} ${why(query)}`).join(", ")}`);
+    parts.push(`확인하지 못한 조회(자원이 남았을 수 있음): ${failedQueries.map(describeFailure).join(", ")}`);
   }
-  parts.push(`직접 확인: docker ps -a --filter name=^${PROJECT}- 와 docker ps -a·volume ls·network ls --filter ${LABEL_FILTER}`);
+  parts.push(`직접 확인: docker ps -a --filter name=^${PROJECT}- 와 docker ps -a·volume ls·network ls --filter ${LABEL_FILTER}, docker image ls --filter '${IMAGE_FILTER}'`);
   return { ok, detail: parts.join(". ") };
+}
+// 비밀값 노출 판정. 출력을 모으지 못한 곳이 있으면 빈 출력으로 통과시키지 않는다.
+function secretVerdict(secretList, texts, failures) {
+  if (failures.length > 0) return { ok: false, detail: `출력을 모으지 못한 곳 ${failures.length}개: ${failures.slice(0, 5).join(", ")}` };
+  const haystack = texts.join("\n").toLowerCase();
+  const found = secretList.filter((secret) => haystack.includes(secret.toLowerCase()));
+  return { ok: found.length === 0, detail: `비밀값 ${secretList.length}개 × 출력 ${texts.length}건${found.length ? `, 발견 ${found.length}개` : ""}` };
 }
 const exitCodeFor = (list) => (list.some((result) => result.status === "fail") ? 1 : 0);
 
@@ -803,7 +881,7 @@ function cleanupAll() {
 }
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.once(signal, () => {
-    console.error(`[check-images] ${signal}: 만든 컨테이너·망·볼륨·임시 폴더·미끼 파일을 지우고 끝냅니다`);
+    console.error(`[check-images] ${signal}: 만든 컨테이너·망·볼륨·검사 이미지(--keep 제외)·임시 폴더·미끼 파일을 지우고 끝냅니다`);
     const verdict = cleanupVerdict(cleanupAll());
     if (!verdict.ok) console.error(`[check-images] 정리를 끝내지 못했거나 확인하지 못했습니다. ${verdict.detail}`);
     process.exit(130);
@@ -818,7 +896,7 @@ try {
 } finally {
   const cleanup = cleanupAll();
   const verdict = cleanupVerdict(cleanup);
-  record("정리", "이 검사가 만든 컨테이너·볼륨·망·미끼 파일이 남지 않았다(확인하지 못해도 실패)", verdict.ok,
+  record("정리", "이 검사가 만든 컨테이너·볼륨·망·검사 이미지(--keep 제외)·미끼 파일이 남지 않았다(확인하지 못해도 실패)", verdict.ok,
     verdict.ok ? verdict.detail : `${verdict.detail}. 확인 뒤 직접 지웁니다`);
   const failed = results.filter((result) => result.status === "fail");
   exitCode = exitCodeFor(results);

@@ -14,7 +14,8 @@
 # 자동 재시도·자동 되돌리기·DB 복원은 하지 않는다. 진행 중이던 요청·분석은 끝까지 마친다고 보장하지 않는다.
 #
 # 사용: deploy/scripts/replace-single.sh --env-file <compose.env> [--local-db] [--migrate] [--stop-timeout 초]
-# 종료 코드: 0 성공, 2 사용법·사전 확인 실패, 3 종료 확인 실패(교체 전 상태 조회 실패, 새 실행 실패 뒤 다시 멈출 때 포함),
+# 종료 코드: 0 성공, 2 사용법·사전 확인 실패(설정·이미지 조회 실패, 멈춘 뒤 합성 DB 기동·migration 준비 조회 실패 포함),
+#           3 종료 확인 실패(교체 전 상태 조회 실패, 새 실행 실패 뒤 다시 멈출 때 포함),
 #           4 migration 실패, 5 migration 결과 불명·남은 실행, 6 새 실행 확인 실패(세 서비스 종료까지 확인함),
 #           7 대기 상한을 넘어 강제 종료됨(원인 확인 뒤 다시 실행하면 이어서 진행),
 #           8 migration 성공 뒤 실행 컨테이너 정리 실패(직접 지운 뒤 compose.env를 바꾸지 않고 --migrate 없이 다시 실행하면 이어서 진행)
@@ -60,7 +61,7 @@ log() { printf '[replace %s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 fail() { local code=$1; shift; log "중단: $*"; exit "${code}"; }
 
 "${compose[@]}" --profile migration config --quiet || fail 2 "compose 설정을 읽지 못했습니다."
-project=$("${compose[@]}" config | sed -n 's/^name: //p' | head -n 1)
+project=$("${compose[@]}" config | sed -n 's/^name: //p' | head -n 1) || fail 2 "compose 설정에서 프로젝트 이름을 읽지 못했습니다."
 [ -n "${project}" ] || fail 2 "compose 프로젝트 이름을 읽지 못했습니다."
 
 running_ids() { # 서비스 이름 → 같은 프로젝트에서 실행 중인 컨테이너 ID(이름을 바꾼 수동 실행도 라벨로 잡는다)
@@ -81,19 +82,26 @@ state() { docker inspect -f '{{.Id}} {{.State.Status}} exit={{.State.ExitCode}} 
 
 # 1) 사전 확인. 앱 이미지는 미리 빌드하거나 받아 둔다. 합성 DB 이미지(digest 고정)는 없으면 받는다.
 db_image=""
-if [ "${local_db}" = true ]; then db_image=$("${compose[@]}" config --images db); fi
-images=$("${compose[@]}" --profile migration config --images)
+if [ "${local_db}" = true ]; then
+  db_image=$("${compose[@]}" config --images db) || fail 2 "compose 설정에서 합성 DB 이미지를 읽지 못했습니다."
+fi
+images=$("${compose[@]}" --profile migration config --images) || fail 2 "compose 설정에서 이미지 목록을 읽지 못했습니다."
 for image in ${images}; do
+  # inspect는 이미지가 없을 때와 Docker 조회 실패를 같은 코드로 끝낸다. 어느 쪽이든 아무것도 멈추기 전에 2로 끝낸다.
   docker image inspect "${image}" >/dev/null 2>&1 && continue
   if [ -n "${db_image}" ] && [ "${image}" = "${db_image}" ]; then
     docker pull -q "${image}" >/dev/null || fail 2 "합성 DB 이미지를 받지 못했습니다: ${image}"
     log "합성 DB 이미지를 받았습니다: ${image}"
   else
-    fail 2 "이 호스트에 이미지가 없습니다: ${image} (먼저 빌드하거나 받아 둡니다)"
+    fail 2 "이 호스트에 이미지가 없거나 Docker에서 확인하지 못했습니다: ${image} (먼저 빌드하거나 받아 두고, Docker가 응답하는지 확인합니다)"
   fi
 done
 log "대상 이미지:"
-for image in ${images}; do log "  ${image} -> $(docker image inspect -f '{{.Id}}' "${image}")"; done
+for image in ${images}; do
+  # 이미지 ID는 교체 기록에 남기는 값이므로, 조회하지 못하면 빈 값으로 적고 넘어가지 않고 아무것도 멈추기 전에 끝낸다.
+  image_id=$(docker image inspect -f '{{.Id}}' "${image}") || fail 2 "Docker에서 이미지 ID를 확인하지 못했습니다: ${image}"
+  log "  ${image} -> ${image_id}"
+done
 # 교체 전에 실행 중인 서비스는 3)에서 강제 종료 여부를 본다. 실행 중이었는지 조회하지 못하면 그 판정을 할 수 없으므로
 # 아무것도 멈추지 않고 끝낸다(기존 실행은 그대로 둔다).
 was_running=""
@@ -169,15 +177,21 @@ if [ -n "${leftover}" ]; then
 fi
 
 # 4) migration: 이미지마다 정해진 이름으로 한 번만 실행한다.
+# 실행 전 준비 조회(이미지 이름·ID, 같은 이름 실행)가 실패하면 서비스는 멈춘 채 migration을 시작하지 않고 2로 끝낸다.
 if [ "${local_db}" = true ]; then
-  "${compose[@]}" up -d --wait --wait-timeout 120 db || fail 2 "합성 DB가 정상 확인에 실패했습니다."
+  "${compose[@]}" up -d --wait --wait-timeout 120 db || fail 2 "합성 DB가 정상 확인에 실패했습니다. web·api·worker는 멈춘 상태이고 migration·새 실행은 시작하지 않았습니다."
 fi
 if [ "${migrate}" = true ]; then
-  migration_image=$("${compose[@]}" --profile migration config --images migration)
-  migration_id=$(docker image inspect -f '{{.Id}}' "${migration_image}")
+  not_started="web·api·worker는 멈춘 상태이고 migration은 시작하지 않았습니다."
+  migration_image=$("${compose[@]}" --profile migration config --images migration) \
+    || fail 2 "compose 설정에서 migration 이미지를 읽지 못했습니다. ${not_started}"
+  migration_id=$(docker image inspect -f '{{.Id}}' "${migration_image}") \
+    || fail 2 "Docker에서 migration 이미지(${migration_image})를 확인하지 못했습니다. ${not_started}"
   migration_id=${migration_id#sha256:}
   run_name="${project}-migration-${migration_id:0:12}"
-  if docker inspect "${run_name}" >/dev/null 2>&1; then fail 5 "같은 이름의 migration 실행(${run_name})이 이미 있습니다."; fi
+  status=$(container_status "${run_name}") \
+    || fail 2 "Docker에서 같은 이름의 migration 실행(${run_name})이 있는지 확인하지 못했습니다. ${not_started}"
+  [ "${status}" = absent ] || fail 5 "같은 이름의 migration 실행(${run_name})이 이미 있습니다."
   log "migration 실행: ${run_name}"
   set +e
   "${compose[@]}" --profile migration run -T --no-deps --name "${run_name}" migration
