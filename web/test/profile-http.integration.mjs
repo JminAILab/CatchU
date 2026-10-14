@@ -9,7 +9,7 @@ import { lookupMember } from '../src/lib/member-lookup.ts';
 import { decideMemberEntry } from '../src/lib/member-navigation.ts';
 const require = createRequire(new URL('../../api/package.json', import.meta.url));
 require('reflect-metadata');
-Object.assign(process.env, { NODE_ENV:'test', DEV_LOGIN_ENABLED:'true', AUTH_JWT_SECRET:randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS:'300', LINK_GRANT_SECRET:randomBytes(32).toString('hex'), SHARE_LINK_WEB_BASE_URL:'https://catchu.example', DB_HOST:'127.0.0.1', DB_PORT:process.env.TEST_DB_PORT || '55137', DB_USER:'catchu', DB_PASSWORD:'catchu_local', DB_NAME:'catchu_issue137_test' });
+Object.assign(process.env, { NODE_ENV:'test', DEV_LOGIN_ENABLED:'true', AUTH_JWT_SECRET:randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS:'900', LINK_GRANT_SECRET:randomBytes(32).toString('hex'), SHARE_LINK_WEB_BASE_URL:'https://catchu.example', DB_HOST:'127.0.0.1', DB_PORT:process.env.TEST_DB_PORT || '55137', DB_USER:'catchu', DB_PASSWORD:'catchu_local', DB_NAME:'catchu_issue137_test' });
 const db = require('./dist/database/data-source').default;
 let app;
 try {
