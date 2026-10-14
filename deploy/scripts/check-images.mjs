@@ -422,6 +422,8 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
     ["AUTH_JWT_SECRET 없음", ["-e", "AUTH_JWT_SECRET="], /AUTH_JWT_SECRET/],
     ["http CORS 출처", ["-e", "CORS_ALLOWED_ORIGINS=http://localhost:3000"], /CORS_ALLOWED_ORIGINS/],
     ["http 공유 링크 주소", ["-e", "SHARE_LINK_WEB_BASE_URL=http://catchu.invalid"], /SHARE_LINK_WEB_BASE_URL/],
+    ["AUTH_WEB_ORIGIN 없음", ["-e", "AUTH_WEB_ORIGIN="], /AUTH_WEB_ORIGIN/],
+    ["http AUTH_WEB_ORIGIN", ["-e", "AUTH_WEB_ORIGIN=http://catchu-single.invalid"], /AUTH_WEB_ORIGIN/],
   ];
   for (const [label, extra, pattern] of configCases) {
     await check("비밀값·설정", `api 기동 거부: ${label}`, () => {

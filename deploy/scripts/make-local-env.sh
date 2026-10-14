@@ -69,8 +69,9 @@ cat > "${dir}/api.env" <<EOF
 AUTH_JWT_SECRET=$(hex32)
 LINK_GRANT_SECRET=$(hex32)
 AUTH_ACCESS_TOKEN_TTL_SECONDS=900
-# production은 https만 받는다. 로컬 검증용 합성 주소다(이 주소로 공유 링크를 열 수 없다).
+# production은 https만 받는다. 로컬 검증용 합성 주소다(이 주소로 공유 링크를 열거나 로그인 유지를 확인할 수 없다).
 SHARE_LINK_WEB_BASE_URL=https://catchu-single.invalid
+AUTH_WEB_ORIGIN=https://catchu-single.invalid
 CORS_ALLOWED_ORIGINS=
 TRUST_PROXY_CIDRS=
 DB_HOST=db

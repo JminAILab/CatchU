@@ -65,7 +65,7 @@ docker build -f worker/Dockerfile --build-arg SOURCE_REVISION=$(git rev-parse HE
 | `migration.env` | migration 전용 DB 계정 |
 | `db.env`, `tls/` | 로컬 합성 DB 전용(`make-local-env.sh`가 만든다) |
 
-- **운영 값의 기준**은 [api 환경변수](../api/docs/environment.md)와 같다. `AUTH_JWT_SECRET`·`LINK_GRANT_SECRET`은 64자리 hex로 서로 달라야 하고, 환경마다 한 번 만들어 고정한다. 재배포 때 새로 만들면 로그인과 비밀번호 링크 열람이 끊긴다. `AUTH_ACCESS_TOKEN_TTL_SECONDS=900`, `CORS_ALLOWED_ORIGINS`는 비운다(web·api 같은 출처).
+- **운영 값의 기준**은 [api 환경변수](../api/docs/environment.md)와 같다. `AUTH_JWT_SECRET`·`LINK_GRANT_SECRET`은 64자리 hex로 서로 달라야 하고, 환경마다 한 번 만들어 고정한다. 재배포 때 새로 만들면 로그인과 비밀번호 링크 열람이 끊긴다. `AUTH_ACCESS_TOKEN_TTL_SECONDS=900`, `CORS_ALLOWED_ORIGINS`는 비운다(web·api 같은 출처). `AUTH_WEB_ORIGIN`에는 그 공개 https 출처를 끝 슬래시 없이 넣는다. 이 세 값 중 하나라도 어긋나면 api가 기동하지 않는다.
 - `compose.single.yaml`이 `NODE_ENV=production`, `BIND_HOST=0.0.0.0`, `PORT`, `PGSSLMODE=verify-full`, `NODE_EXTRA_CA_CERTS`, `NODE_TLS_REJECT_UNAUTHORIZED=1`을 고정한다. env 파일에 같은 이름을 넣어도 이 값이 쓰인다. `NODE_OPTIONS` 같은 실행 옵션은 env 파일에 넣지 않는다.
 - api·migration 이미지의 기본값도 `PGSSLMODE=verify-full`이다. 값을 빠뜨려도 평문으로 붙지 않고 인증서를 검증한다.
 - DB TLS: pg는 `PGSSLROOTCERT`를 읽지 않으므로 DB 서버 인증서를 발급한 CA 파일을 읽기 전용으로 넣고 `NODE_EXTRA_CA_CERTS`로 알려 준다. `DB_HOST`는 인증서의 이름과 같아야 하며 IP로 접속하면 거부된다. CA 파일 경로가 틀려도 Node는 경고만 내고 진행할 수 있으므로, 접속 성공 여부로 확인한다.
@@ -103,7 +103,7 @@ docker compose --env-file ~/catchu-local-env/compose.env -f deploy/compose.singl
 - web `/`는 200과 `CatchU web` 화면, api·worker `/health`는 200과 `{"status":"ok"}`다. health는 프로세스가 응답한다는 뜻이다. api health는 기동할 때 DB 접속에 성공했다는 데까지만 말하고, 큐·분석 연결 성공을 뜻하지 않는다.
 - 마지막 명령(`down -v`)은 이 구성의 컨테이너·망·합성 DB 볼륨만 지운다. 합성 환경 폴더는 직접 지운다.
 - 합성 CA·DB 서버 인증서는 만든 날부터 30일 뒤 만료된다. 만료되면 api가 DB에 접속하지 못해 교체가 종료 코드 6으로 멈춘다. 이어서 쓰려면 위 `down -v`, 환경 폴더 삭제, `make-local-env.sh`부터 다시 한다(합성 DB 자료도 새로 만든다).
-- 로컬 구성에는 web과 api를 같은 출처로 묶는 앞단이 없다. production 모드 api는 교차 출처 호출을 받지 않으므로, 브라우저 화면에서 api를 부르는 흐름은 같은 출처 경로 분배가 있는 AWS 환경(#276·#277)에서 확인한다. 합성 공유 링크 주소(`https://catchu-single.invalid`)로는 링크를 열 수 없다.
+- 로컬 구성에는 web과 api를 같은 출처로 묶는 앞단이 없다. production 모드 api는 교차 출처 호출을 받지 않으므로, 브라우저 화면에서 api를 부르는 흐름은 같은 출처 경로 분배가 있는 AWS 환경(#276·#277)에서 확인한다. 합성 공유 링크 주소·로그인 출처(`https://catchu-single.invalid`)로는 링크를 열거나 로그인 유지(갱신·로그아웃)를 확인할 수 없다.
 - 합성 DB는 TLS 연결만 받고(평문 거부), migration 계정이 스키마를 소유하며 앱 계정은 자료 읽기·쓰기만 한다([`local-db/init-roles.sh`](local-db/init-roles.sh)). 운영 DB의 계정·권한(동의 기록 직접 삭제 불가, 시간 상한 포함)은 #276에서 정한다. worker는 DB 망에 연결하지 않는다.
 
 ## migration
@@ -166,7 +166,7 @@ node deploy/scripts/check-images.mjs [--keep] [--report <저장소 밖 JSON 경�
 - 빌드 맥락: 허용 목록 밖 파일이 하나도 없는지, 허용한 폴더 안의 `.env*`·키 미끼와 서비스 폴더의 다른 자료 미끼가 빠지는지
 - 이미지: UID 1000, `/app`·`/opt`·`/usr/local`에 쓰기 가능한 파일 없음과 넣은 경로(`/app`, worker `/opt/uv-python`)의 root 소유(세 이미지), web 정적 자산·환경 파일 없음, api 개발 도구 부재와 운영 모듈, 실제 검증기의 계약 YAML 읽기, worker Python 3.12.10·개발 그룹 부재·`WEB_CONCURRENCY`와 관계없이 프로세스 1개·MOCK 시나리오 9개, web 빌드 입력 거부(외부 http·`/v1`·경로·빈 값·개발 로그인), Dockerfile에 비밀값 이름의 빌드 입력·환경변수 없음
 - 실행: 처음 설치 순서(컨테이너가 없는 상태를 조회 실패와 구분해 진행), web 화면·JS·CSS·보안 헤더, api health와 앱 계정의 TLS DB 조회, worker health, 서비스별 프로세스 1개, migration 이력·소유자·앱 계정 권한, 순차 재실행
-- 거부: DB TLS(틀린 CA, 인증서에 없는 호스트, 평문, `PGSSLMODE`를 빠뜨린 실행)를 api·migration 각각, env 파일로 인증서 검증 끄기, 운영 키 누락·형식 오류·두 키 같음, http CORS·공유 링크 주소, production 개발 로그인, worker의 DB 접근
+- 거부: DB TLS(틀린 CA, 인증서에 없는 호스트, 평문, `PGSSLMODE`를 빠뜨린 실행)를 api·migration 각각, env 파일로 인증서 검증 끄기, 운영 키 누락·형식 오류·두 키 같음, http CORS·공유 링크 주소, 로그인 출처(`AUTH_WEB_ORIGIN`) 누락·http, production 개발 로그인, worker의 DB 접근
 - 교체: 새 api 판본 교체에서 이전 종료 뒤 새 시작, 멈춤 조건 다섯 가지(같은 표식의 실행이 남음 3, migration 실패 4, 실패한 migration 실행이 남음 5, 새 실행 health 실패 6, 대기 상한 초과 강제 종료 7)와 각각 서비스가 멈춘 상태로 남는지, SIGTERM 종료 코드·시간. 가짜 docker로 해당 호출만 실패시켜 다음도 본다: web 중지 명령만 실패하면 api·worker는 멈추고 web만 남은 채 3, 새 실행 실패 뒤 상태 조회가 실패하면 3(종료 확인 기록 없음), 새 실행 실패 뒤 api 중지만 실패하면 api만 남은 채 3, 교체를 시작할 때 상태 조회가 실패하면 아무것도 멈추지 않은 채 3, 중지 뒤 종료 코드 조회가 실패하면 migration·새 실행 없이 3, web 강제 종료(137)와 api 조회 실패가 겹치면 3이고 출력에 web 137과 교체 전 실행 중 서비스가 함께 적히는지, migration 성공 뒤 실행 컨테이너 삭제가 실패하면 성공 기록과 컨테이너를 남긴 채 8이고 그대로 다시 실행하면 5, 지운 뒤 다시 실행하면 이어서 시작, 세 서비스를 멈춘 뒤 migration 이미지 조회가 실패하면 migration을 시작하지 않고 2. 또 web을 띄운 직후 api를 실제로 다시 시작시켜(health starting) 완료로 보지 않고 세 서비스를 다시 멈춘 채 6인지 본다
 - 정리: 자원 조회가 실패하거나(조회별·docker 없음·시간 초과) 실제로 자원(`--keep`이 아니면 검사 이미지 포함)이 남으면 정리 통과로 보지 않는지, 시작 전 다른 검사 자원 확인도 조회 실패를 자원 없음으로 보지 않는지
 - 비밀값: 합성 비밀값이 실행 로그·출력에 없는지, 로그·이미지 기록을 모으지 못하면 통과로 보지 않는지. 합성 비밀값은 이미지를 만든 뒤에 생기므로 이미지 쪽 확인은 맥락 미끼와 Dockerfile 이름 검사가 맡는다
@@ -183,7 +183,7 @@ GitHub Actions의 `images` 워크플로가 같은 명령을 x86_64 러너에서 
 |---|---|
 | 노드 CPU 아키텍처·OS, EKS 판본, cluster·namespace, 리소스 범위 | 최종 이미지 빌드 플랫폼, EKS 실행 파일 |
 | 레지스트리 경로·push/pull 권한 | 이미지 게시(#275는 게시하지 않는다) |
-| 실제 공개 https 출처, `/v1` 경로 보존 분배 | 운영 web 빌드, `SHARE_LINK_WEB_BASE_URL` |
+| 실제 공개 https 출처, `/v1` 경로 보존 분배 | 운영 web 빌드, `SHARE_LINK_WEB_BASE_URL`·`AUTH_WEB_ORIGIN` |
 | 앞단 대상 유형·`X-Forwarded-For` 처리·유휴 시간, 유입 차단·노드 종료 확인 경로 | `TRUST_PROXY_CIDRS`, 연결 유지 시간(web `KEEP_ALIVE_TIMEOUT`은 ms. api에는 연결 유지 시간 설정이 없어 앞단 유휴 시간과 어긋나면 간헐 502가 날 수 있으므로 배포 전에 api 담당과 조율한다), 교체 절차 2·3단계 |
 | worker→DB 차단과 나가는 연결 제한의 집행 수단(NetworkPolicy·보안 그룹·egress 규칙) | EKS 실행 파일, 운영 Compose 호스트의 망 구성. 공유 노드 보안 그룹이나 같은 호스트 IP만으로 분리됐다고 보지 않는다 |
 | DB 주소·판본, 앱·migration 계정과 비밀값 참조, CA 파일과 주입 방식 | `api.env`·`migration.env`·CA 파일 |
@@ -192,4 +192,4 @@ GitHub Actions의 `images` 워크플로가 같은 명령을 x86_64 러너에서 
 
 EKS 실행 파일을 쓸 때 지킬 조건: api·worker `replicas: 1`과 업데이트 방식 `Recreate`, 자동 확장(HPA) 없음, `runAsNonRoot`·`runAsUser: 1000`·`readOnlyRootFilesystem`과 `/tmp` 빈 볼륨, api·migration의 `PGSSLMODE=verify-full`·DB CA 파일 읽기 전용 mount·`NODE_EXTRA_CA_CERTS`, web의 `HOSTNAME=0.0.0.0` 명시, worker에서 DB로의 접근 차단, api·worker·DB·큐를 외부에 여는 Service 없음, worker health는 내부용, migration은 위 일회 Pod. `Recreate`는 업데이트 순서일 뿐 장애 때 대체 실행과의 중복을 막지 않는다. Google 로그인은 시작 경로의 앞단 보호를 #277에서 확인하기 전에는 켜지 않는다.
 
-제공 판본이 나오면 실행 값·종료 방법을 다시 확인할 기능: 로그인 유지(#250·#251, `AUTH_WEB_ORIGIN`·쿠키), GitHub 연결 켜기와 내부 자격정보 조회(#231·#232), 결과 수신 공급(#105), 큐와 worker 소비(#233·#121), 처리 시한 정리(#237).
+제공 판본이 나오면 실행 값·종료 방법을 다시 확인할 기능: 로그인 유지의 화면 연결(#251. api 쪽 #250은 `AUTH_WEB_ORIGIN`까지 반영), GitHub 연결 켜기와 내부 자격정보 조회(#231·#232), 결과 수신 공급(#105), 큐와 worker 소비(#233·#121), 처리 시한 정리(#237).
