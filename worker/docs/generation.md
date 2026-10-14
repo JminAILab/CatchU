@@ -1,6 +1,6 @@
 # 설명 초안·생각해볼 질문·Catch 제목 생성 — #120
 
-> [#120](https://github.com/JminAILab/CatchU/issues/120)의 첫 범위(후보 입력 어댑터와 제공자 비종속 생성 모듈)를 합성 제공자로 구현한 내용이다. 실제 LLM 제공자 연결과 품질 확인, 처리 순서에 잇는 전체 조립, 결과의 제목 null 전달은 아직 아니다(맨 아래 「남은 연결」). 후보 문장·근거의 규칙은 [후보 문장과 근거](candidate-text.md)를 따른다.
+> [#120](https://github.com/JminAILab/CatchU/issues/120)의 첫 범위(후보 입력 어댑터와 제공자 비종속 생성 모듈)를 합성 제공자로 구현한 내용이다. 실제 제공자 어댑터는 [생성의 실제 제공자](generation-provider.md)에 있다. 실제 호출 확인과 품질 확인, 처리 순서에 잇는 전체 조립, 결과의 제목 null 전달은 아직 아니다(맨 아래 「남은 연결」). 후보 문장·근거의 규칙은 [후보 문장과 근거](candidate-text.md)를 따른다.
 
 후보 판정(#118)이 만든 후보마다, 그 후보 근거가 가리키는 본인 커밋의 바뀐 줄로 짧은 설명 초안·본인용 질문·Catch 제목을 만든다. 모델은 근거 조각과 질문 종류, 제목 대상을 **고르기만** 하고, 문장과 제목 글자는 코드가 확인한 경로·이름·파일 상태만 넣어 만든다. 바뀐 줄에 이름이 있다는 것만으로 자유 문장 전체가 사실이라고 볼 수 없기 때문이다. 코드는 `app/generation/`에 있다.
 
@@ -20,7 +20,7 @@
 
 - 입구는 `run_generation(request, outcome, built, *, provider, clock, deadline, limits)`다. `built`는 같은 요청·수집 결과로 만든 `build_candidates(request, outcome)`의 결과다. 돌려주는 값은 생성 칸을 채운 `GenerationOutput`과 운영 로그 건수다.
 - 바꾸는 것은 후보의 `title`·`draft`·`reflection`과, 본인 커밋 근거의 `coverageLimits` 끝 고정 문구(아래 「coverageLimits」)뿐이다. 후보 순서·작업 사실·기여·묶음 설명·근거와 그 순서·미제공 집계·기존 실패는 그대로다. 실패는 요청 단위 `ANALYSIS` 1건이 끝에 더해질 수 있다.
-- 제공자는 `GenerationProvider` Protocol 하나다(`complete(ProviderRequest) -> str`). 요청에는 지시문·자료·시간 제한·최대 출력이 따로 들어간다. 제공자는 시간 제한 안에 끝내지 못하면 `TimeoutError`, 다른 실패는 `ProviderError`를 내고 스스로 다시 시도하지 않는다. 실제 SDK를 붙일 때 기본 재시도를 끈다. 지금은 시험의 합성 제공자만 있고 SDK·API 키·네트워크 호출이 없다.
+- 제공자는 `GenerationProvider` Protocol 하나다(`complete(ProviderRequest) -> str`). 요청에는 지시문·자료·시간 제한·최대 출력이 따로 들어간다. 제공자는 시간 제한 안에 끝내지 못하면 `TimeoutError`, 다른 실패는 `ProviderError`를 내고 스스로 다시 시도하지 않는다. 호출은 됐지만 거절·출력 상한으로 응답 전체를 쓸 수 없으면 하위 예외 `UnusableResponse`를 내고, 생성 흐름은 이를 읽을 수 없는 응답·크기 초과 응답으로 다룬다. 실제 제공자는 SDK 기본 재시도를 끈 Anthropic Claude API 어댑터(`claude.py`)이고, 시험은 합성 제공자로 한다.
 - 처리 순서(`app/processing/pipeline.py`)에 잇는 것, 요청 전체 마감을 정하는 것, 큐·E 전달은 [#121](https://github.com/JminAILab/CatchU/issues/121)이다. `deadline`은 #121이 요청 전체 마감에서 결과 조합·전송 여유를 빼 넘길 생성 몫의 마감 시각이다.
 
 ## 재료 찾기
@@ -175,6 +175,7 @@
 | `tests/test_generation_title.py` | 위치 분류, 동작, 시작 전·끝 비교, 제목 null |
 | `tests/test_generation_flow.py` | 상태·실패 변환, 호출 한도·시간, 생성 순서, 예외 |
 | `tests/test_generation_rewrite_coverage.py` | 제목 고쳐 쓰기, coverageLimits, 가리기 끝까지, 운영 로그 |
+| `tests/test_generation_claude.py` | 실제 제공자 어댑터([생성의 실제 제공자](generation-provider.md#시험)) |
 
 ## 알려진 한계
 
@@ -190,7 +191,7 @@
 
 | 남은 일 | 시작 조건 |
 |---|---|
-| 실제 제공자 어댑터와 개발용 모델 품질 시험 | 팀장의 모델·자료 범위·비용 결정, 서비스 LLM 선정과 이용 조건 확인(C06, [#119](https://github.com/JminAILab/CatchU/issues/119)), [#37](https://github.com/JminAILab/CatchU/issues/37)의 자료·전송·실행 조건. SDK 기본 재시도 끄기·호스트 고정·의존성 검사 |
+| 실제 API 호출 확인(응답 시간·토큰·실제 결과 기록)과 개발용 모델 품질 시험. 어댑터 쪽 남은 일은 [생성의 실제 제공자 「남은 확인」](generation-provider.md#남은-확인) | 팀장의 호출 허가(자료 범위·비용 한도). 실제 회원 자료는 [#138](https://github.com/JminAILab/CatchU/issues/138) 고지와 [#37](https://github.com/JminAILab/CatchU/issues/37) 조건 뒤 |
 | 처리 순서에 수집·후보·생성·큐·E 전달 연결, 요청 전체 마감 | [#121](https://github.com/JminAILab/CatchU/issues/121)(선행 #117·#233) |
 | 결과에 제목 null 그대로 보내기(결과 조합의 임시 대체값 제거) | B·C·E의 null 수용([결정 문서 「담당과 순서」](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#담당과-순서) ③). B 회원 화면([#274](https://github.com/JminAILab/CatchU/pull/274))·B 서버와 E([#272](https://github.com/JminAILab/CatchU/pull/272))는 dev에 병합됐고 C 수신자 화면([#152](https://github.com/JminAILab/CatchU/issues/152))이 남았다 |
 | 실제 결과의 품질 판정 | 허용 자료·모델의 실제 결과로 C01 영향을 평가하고 [#122](https://github.com/JminAILab/CatchU/issues/122) 검수와 연결 |
