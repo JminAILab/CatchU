@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "CatchU 수집·분석 worker 실행 기반"
 requires-python = "==3.12.10"
 dependencies = [
+    "anthropic==1.13.0",
     "fastapi==0.141.1",
     "jsonschema==4.26.0",
     "pyyaml==6.0.3",
