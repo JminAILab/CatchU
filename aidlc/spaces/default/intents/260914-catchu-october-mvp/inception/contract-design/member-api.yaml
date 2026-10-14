@@ -366,7 +366,7 @@ paths:
           "application/json":
             schema:
               oneOf:
-                - {"type":"object","additionalProperties":false,"required":["state","loginAttemptToken","code"],"properties":{"state":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},"loginAttemptToken":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},"code":{"type":"string","minLength":1,"maxLength":4096,"description":"공백·제어 문자 없음"}}}
+                - {"type":"object","additionalProperties":false,"required":["state","loginAttemptToken","code"],"properties":{"state":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},"loginAttemptToken":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},"code":{"type":"string","minLength":1,"maxLength":4096,"pattern":"^[^\\s\\x00-\\x1F\\x7F]+$","description":"공백·제어 문자 없음"}}}
                 - {"type":"object","additionalProperties":false,"required":["state","loginAttemptToken","error"],"properties":{"state":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},"loginAttemptToken":{"type":"string","pattern":"^[A-Za-z0-9_-]{43}$"},"error":{"type":"string","enum":["access_denied"]}}}
       responses:
         "200":
@@ -464,6 +464,7 @@ paths:
       operationId: "disconnectGitHub"
       summary: "CatchU에 저장한 GitHub 연결과 자격정보를 지운다. 성공은 state DISCONNECTED와 accountLogin null"
       description: "본문은 없거나 {}만 받고 다른 필드·query는 400/VALIDATION_FAILED다. 연결이 없어도 같은 200이다. GitHub에 남은 앱 승인 자체를 취소하지는 않는다. GitHub 연결 기능이 꺼진 환경은 403/GITHUB_CONNECTION_REQUIRED, DB·보관 정리 실패는 500이다"
+      requestBody: {"required":false,"content":{"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/EmptyRequest"}}}}
       responses:
         "200":
           description: "성공"
