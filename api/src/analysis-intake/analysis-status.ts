@@ -17,13 +17,13 @@ export function retryDecision(request: AnalysisRequest, attempt: AnalysisAttempt
   else reason = 'FAILURE_WITHOUT_RESULTS';
   return { allowed: reason === 'FAILURE_WITHOUT_RESULTS', reason };
 }
-/** 같은 트랜잭션·요청→시도 잠금 순서로 상태를 한 판본으로 읽는다. #140 GET은 추가하지 않는다. */
+/** 상태 변경을 막되 멱등 소유 확인의 KEY SHARE와 경합하지 않는 요청→시도 잠금으로 읽는다. */
 export async function readAnalysisStatus(manager: EntityManager, memberId: string, requestId: string) {
   const request = await manager.findOne(AnalysisRequest, { where: { requestId, memberId },
-    lock: { mode: 'pessimistic_write' } });
+    lock: { mode: 'for_no_key_update' } });
   if (!request) throw new Error('Analysis reference is missing');
   const attempt = await manager.findOne(AnalysisAttempt, { where: { attemptId: request.currentAttemptId, requestId },
-    lock: { mode: 'pessimistic_write' } });
+    lock: { mode: 'for_no_key_update' } });
   if (!attempt) throw new Error('Analysis attempt is missing');
   const registrations: { catchId: string; ready: boolean }[] = await manager.query(
     'SELECT cr.catch_id AS "catchId", cr.owner_view_ready AS ready FROM candidate_registration cr JOIN result_application_record r ON r.application_record_id = cr.application_record_id WHERE r.request_id = $1 AND r.attempt_id = $2',

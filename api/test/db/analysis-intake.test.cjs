@@ -2,6 +2,7 @@ require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { randomBytes, randomUUID } = require('node:crypto');
 const { before, after, beforeEach, test } = require('node:test');
+const { setTimeout: delay } = require('node:timers/promises');
 const { NestFactory } = require('@nestjs/core');
 const { decodeJwt } = require('jose');
 const { AppModule } = require('../../dist/app.module');
@@ -74,6 +75,18 @@ async function terminal(requestId, processing = 'FAILED', changes = {}) {
     failureConfirmationReference: processing === 'FAILED' ? 'synthetic-confirmed:' + requestId : null, ...changes,
   });
   await db.manager.update(AnalysisRequest, { requestId }, { lifecycle: 'CLOSED' });
+}
+async function waitForMemberWaiters(blockerPid, expected) {
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    const rows = await db.query(`SELECT waiting.pid FROM pg_locks waiting JOIN pg_locks held
+      ON waiting.locktype = held.locktype AND waiting.database = held.database
+      AND waiting.classid = held.classid AND waiting.objid = held.objid AND waiting.objsubid = held.objsubid
+      WHERE held.pid = $1 AND held.locktype = 'advisory' AND held.granted AND NOT waiting.granted`, [blockerPid]);
+    if (rows.length === expected) return rows.map(row => row.pid);
+    await delay(20);
+  }
+  assert.fail('회원 접수 잠금의 대기 요청 수가 ' + expected + '가 되지 않았다');
 }
 function otherRepository(server) {
   const second = { ...SYNTHETIC_REPOSITORY, repositoryId: 'synthetic-second' };
@@ -298,6 +311,64 @@ test('확정 실패만 새 동의·ID로 재요청하고 같은 키는 현재 �
   const outdated=await s.post(u,originalKey);assert.equal(outdated.status,200);
   assert.deepEqual((await outdated.json()).retry,{allowed:false,reason:'REANALYSIS_DEFERRED'});
 });
+for (let run = 1; run <= 3; run++) {
+  test('이전 실패 키 재전송·새 실패 재요청의 잠금 경합은 200·202와 중복 없는 저장: ' + run, async t => {
+    const s = await start(t); const u = await s.login(); const oldKey = randomUUID(); const newKey = randomUUID();
+    const firstResponse = await s.post(u, oldKey); assert.equal(firstResponse.status, 202);
+    const first = await firstResponse.json(); await terminal(first.requestId);
+    const original = await db.query(`SELECT to_jsonb(r) AS request, to_jsonb(c) AS consent,
+      to_jsonb(a) AS attempt, to_jsonb(i) AS key FROM analysis_request r
+      JOIN analysis_consent c ON c.consent_id = r.consent_id
+      JOIN analysis_attempt a ON a.attempt_id = r.current_attempt_id
+      JOIN idempotency_record i ON i.request_id = r.request_id WHERE r.request_id = $1`, [first.requestId]);
+    const blocker = db.createQueryRunner(); const pending = [];
+    let responses;
+    await blocker.connect();
+    try {
+      await blocker.startTransaction();
+      const [{ pid }] = await blocker.query('SELECT pg_backend_pid() AS pid');
+      await blocker.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [JSON.stringify(['catchu:analysis-intake', u.memberId])]);
+      // 새 키를 먼저 대기시킨다. 이전 키는 assertOwner의 KEY SHARE 뒤 같은 회원 잠금에서 대기한다.
+      pending.push(s.post(u, newKey, command({ retryOfRequestId: first.requestId })));
+      const [retryPid] = await waitForMemberWaiters(pid, 1);
+      pending.push(s.post(u, oldKey));
+      const waiters = await waitForMemberWaiters(pid, 2);
+      assert(waiters.includes(retryPid)); assert.equal(new Set(waiters).size, 2);
+      await blocker.commitTransaction();
+      responses = await Promise.all(pending);
+    } finally {
+      if (blocker.isTransactionActive) await blocker.rollbackTransaction();
+      await Promise.allSettled(pending);
+      await blocker.release();
+    }
+    const [retry, replay] = responses;
+    assert.equal(retry.status, 202); assert.equal(replay.status, 200);
+    const next = await retry.json(); const old = await replay.json();
+    assert.equal(old.requestId, first.requestId); assert.equal(old.lifecycle, 'CLOSED');
+    assert.equal(old.processing, 'FAILED'); assert.equal(old.application, 'APPLIED');
+    assert.deepEqual(old.retry, { allowed: false, reason: 'IN_PROGRESS' });
+    for (const field of ['requestId', 'consentId', 'attemptId']) assert.notEqual(next[field], first[field]);
+    assert.equal(next.lifecycle, 'ACTIVE'); assert.equal(next.processing, 'QUEUED');
+    assert.equal(next.application, 'NOT_READY');
+    assert.deepEqual(await counts(), { requests: 2, consents: 2, attempts: 2, keys: 2 });
+    assert.equal(await db.manager.countBy(AnalysisRequest, { memberId: u.memberId, lifecycle: 'ACTIVE' }), 1);
+    assert.equal((await db.manager.findOneByOrFail(AnalysisRequest, { requestId: next.requestId })).retryOfRequestId, first.requestId);
+    assert.equal((await db.manager.findOneByOrFail(AnalysisConsent, { consentId: next.consentId })).requestId, next.requestId);
+    assert.equal((await db.manager.findOneByOrFail(AnalysisAttempt, { attemptId: next.attemptId })).requestId, next.requestId);
+    const keys = await db.query('SELECT key, request_id, response_reference FROM idempotency_record WHERE member_id=$1', [u.memberId]);
+    for (const [key, id] of [[oldKey, first.requestId], [newKey, next.requestId]]) {
+      assert.deepEqual(keys.find(row => row.key === key), { key, request_id: id, response_reference: id });
+    }
+    assert.deepEqual(await db.query(`SELECT to_jsonb(r) AS request, to_jsonb(c) AS consent,
+      to_jsonb(a) AS attempt, to_jsonb(i) AS key FROM analysis_request r
+      JOIN analysis_consent c ON c.consent_id = r.consent_id
+      JOIN analysis_attempt a ON a.attempt_id = r.current_attempt_id
+      JOIN idempotency_record i ON i.request_id = r.request_id WHERE r.request_id = $1`, [first.requestId]), original);
+    assert.equal((await s.post(u, newKey, command({ retryOfRequestId: first.requestId }))).status, 200);
+    assert.deepEqual(await counts(), { requests: 2, consents: 2, attempts: 2, keys: 2 });
+  });
+}
 for(const processing of ['EMPTY','SUCCEEDED','PARTIAL_FAILED']){
   test('정상·정상 0건·부분 결과의 재분석 및 참조 생략 우회 거부: '+processing,async t=>{
     const s=await start(t);const u=await s.login();const first=await(await s.post(u)).json();await terminal(first.requestId,processing);
