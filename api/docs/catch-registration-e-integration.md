@@ -7,13 +7,13 @@
 [PR #143](https://github.com/JminAILab/CatchU/pull/143)은 B의 저장·중복·롤백 검증을 제공한다.
 E의 [PR #205](https://github.com/JminAILab/CatchU/pull/205)는
 ResultApplicationRecord 엔티티·마이그레이션, 외부 등록 함수 port, 반영 서비스를 제공하는 연결 입력이다.
-실제 수신 경로·보호 판단 공급·서비스 조립·자동 복구는 이 제공분에 포함되지 않는다.
+실제 수신 경로·보호 판단 공급·서비스 조립은 이 제공분에 포함되지 않는다.
 제공분을 갖춘 것만으로 실제 수신·반영 연결이 완료됐다고 판단하지 않는다.
 제공 내용과 검토 상태는 각 PR에서, 실제 결합과 남은 실행 작업은
-기존 [#105](https://github.com/JminAILab/CatchU/issues/105)에서 확인한다. 장애·반복 실패 복구는 [#234](https://github.com/JminAILab/CatchU/issues/234)로 연결한다.
+기존 [#105](https://github.com/JminAILab/CatchU/issues/105)에서 확인한다. 실패 요청 닫기는 [#237](https://github.com/JminAILab/CatchU/issues/237)에서 구현한다.
 
 B 등록 함수는 A/E의 회원·요청·시도·수신 테이블 관리,
-원문 fingerprint·동의·범위 검증, 반영 상태 처리와 반복 실패 복구를 대신하지 않는다.
+원문 fingerprint·동의·범위 검증, 반영 상태 처리와 요청 닫기를 대신하지 않는다.
 MemberAccount·AnalysisRequest·AnalysisAttempt는 [PR #184](https://github.com/JminAILab/CatchU/pull/184)의
 실제 기반을 참조한다. 결합 검사는 실제 E 수신 테이블·반영 서비스와 B 등록 함수를 사용한다.
 수신 저장 어댑터·보호 판단 공급·서비스 호출 조립은 실제 경로로 연결해야 한다.
@@ -27,7 +27,7 @@ MemberAccount·AnalysisRequest·AnalysisAttempt는 [PR #184](https://github.com/
 3. B 반환값은 커밋 전 내부 결과다. 성공 응답·열람 준비는 커밋 뒤에만 외부에 알린다.
 4. B 또는 E 완료 기록이 실패하면 전체 반영을 롤백하고,
    E가 트랜잭션 밖에서 `APPLY_FAILED`를 기록한다.
-   기존 Catch와 먼저 저장한 수신 결과는 보존한다.
+   기존 Catch와 먼저 저장한 수신 기록(식별자·지문·시각)은 보존한다. 복구용 결과 본문은 저장하지 않는다.
 
 빈 후보 배열의 반환은 E의 정상 0건·전체 실패·최종 상태를 결정하지 않는다.
 내부 입력·맥락·DB 오류의 분류와 안전한 기록은 E 호출부에서 연결한다.
@@ -50,18 +50,19 @@ E 수신 테이블이 없으면 제품 마이그레이션은 실패하며 테스
 MOCK는 이 대조 대상에서 제외한다.
 현재 B 준비 함수의 URL 형식 검사만으로 실제 출처 일치가 확인됐다고 판단하지 않는다.
 
-## 실패와 재시작 후 재반영
+## 실패 요청 닫기
 
-같은 [10/4 팀장 조건](https://github.com/JminAILab/CatchU/issues/105#issuecomment-5975854918)에 따라
-실제 연결에서 아래 두 경로와 반복 실패 복구를 확인한다.
+[10/6 팀장 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)과
+[처리 시한 계약 PR #292](https://github.com/JminAILab/CatchU/pull/292)가
+10/4 조건 중 실패·재시작 후 재반영 조건과 [#234 복구 계획](https://github.com/JminAILab/CatchU/issues/234#issuecomment-6028927385)을 대체한다.
 
-- 반영 실패로 `APPLY_FAILED`가 남은 경우.
-- 수신 저장 후 재시작해 `PENDING`이 남은 경우.
+- 반영 실패(`APPLY_FAILED`)는 처리 시한을 기다리지 않고 E의 다음 주기 판정에서 닫는다.
+- 수신 후 반영 대기(`PENDING`)는 처리 시한을 넘기면 반영 실패로 닫는다.
 
-10/6 팀장 결정으로 복구 구현은 [#234](https://github.com/JminAILab/CatchU/issues/234)가 맡는다. 결과 본문을 수신 기록과 함께 보관하고 재기동·주기적 재반영에 사용하는 방향이며, 해당 계약 수정과 구현은 그 이슈에서 확인한다. #234는 #105의 수신 테이블·등록 함수를 사용하는 후속 작업이다. 이번 B 저장 제공 범위나 현재 배포 전체의
-새 차단 조건으로 확대하지 않는다.
-반복 실패를 후보 삭제·원문 수정·자동 재분석으로 해결하지 않는다.
-현재 B의 재호출·전체 롤백 검사만으로 실제 E의 재반영 호출과 운영 복구가 검증됐다고 보지 않는다.
+상세 전이·재요청 조건은 [계약 요약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)을 따르고,
+닫기 구현·검사는 [#237](https://github.com/JminAILab/CatchU/issues/237)에서 확인한다.
+복구용 결과 본문 보존·재기동/주기적 재반영·자동 재분석은 두지 않는다.
+닫힌 시도의 늦은 결과는 거부한다. 현재 B의 재호출·전체 롤백 검사만으로 실제 E의 요청 닫기가 검증됐다고 보지 않는다.
 
 E가 현재 시도/생성 방식 값을 변경하는 경로를 만들면
 B의 receipt 잠금과 공유 잠금 순서·불변성을 맞춘다.
