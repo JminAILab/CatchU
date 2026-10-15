@@ -13,6 +13,7 @@ const { SYNTHETIC_REPOSITORY } = require('../../dist/member-analysis/dev-member.
 const { WorkerMessageValidator } = require('../../dist/analysis-receiver/worker-message.validator');
 const { AnalysisRequestDispatcher } = require('../../dist/analysis-queue/analysis-request.dispatcher');
 const { ANALYSIS_PROCESSING_DEADLINE_MS } = require('../../dist/analysis-deadline/analysis-deadline.service');
+const { checkMessage } = require('../helpers/worker-messages.cjs');
 
 const validator = new WorkerMessageValidator(CONTRACT_DIR);
 let db;
@@ -73,6 +74,8 @@ test('실제 접수 API가 저장한 대기 시도를 접수 기록 그대로(�
   });
   assert.equal(Object.keys(job.data).length, 13);
   assert.ok(validator.request(job.data));
+  // worker와 같은 규칙의 시험용 검사기로도 계약 v1 Request다.
+  assert.equal(checkMessage('Request', job.data).verdict, 'VALID');
   assert.deepEqual(log.entries, [{ event: 'ENQUEUED', requestId: request.request_id, attemptId: attempt.attempt_id }]);
   // DB에 쓰지 않는다. 저장된 동의 범위(합성 선정 참조)도 그대로다.
   assert.deepEqual(await tables(), before);

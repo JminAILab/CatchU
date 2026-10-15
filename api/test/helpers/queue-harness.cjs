@@ -1,7 +1,11 @@
 // 큐 연결(#233) 시험 도우미. 테스트 전용이며 운영 코드에서 쓰지 않는다.
 // 접수 기록은 처음부터 원하는 값으로 직접 넣는다(동의 행은 마이그레이션 트리거로 고칠 수 없다).
 const { randomBytes, randomUUID } = require('node:crypto');
+const { readFileSync } = require('node:fs');
+const { resolve } = require('node:path');
 const { CONTRACT_DIR } = require('./receiver-harness.cjs');
+
+const FIXTURES = resolve(__dirname, '../../../worker/fixtures/m1-synthetic');
 
 const RESOURCE_TYPES = ['COMMIT', 'PULL_REQUEST', 'ISSUE'];
 const REPOSITORY_ID = 'synthetic-repo-0001';
@@ -31,6 +35,27 @@ async function insertAttempt(db, overrides = {}) {
       VALUES ($1,$2,$3,$4,$5)`, [row.attemptId, row.requestId, row.processing, row.application, row.sourceMode]);
   });
   return row;
+}
+
+function fill(value, context) {
+  if (Array.isArray(value)) return value.map(entry => fill(entry, context));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, fill(entry, context)]));
+  return typeof value === 'string' ? value.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    if (!Object.hasOwn(context, key)) throw new Error('Unknown fixture placeholder');
+    return context[key];
+  }) : value;
+}
+
+/** worker가 보내는 형식의 결과(#103 합성 세트). 메시지 ID message-mock-<시도>-result, 결과 ID result-mock-<시도>. */
+function workerResult(row, file = 'succeeded-one-candidate') {
+  const template = JSON.parse(readFileSync(resolve(FIXTURES, `results/${file}.json`), 'utf8'));
+  return fill(template, { ...row, caseId: row.sourceMode === 'LIVE' ? 'live' : 'mock' });
+}
+
+/** worker가 보내는 형식의 진행 알림. 메시지 ID event-mock-<시도>-<상태>. */
+function workerEvent(row, state) {
+  return { schemaVersion: '1', messageId: `event-${row.sourceMode === 'LIVE' ? 'live' : 'mock'}-${row.attemptId}-${state.toLowerCase()}`,
+    requestId: row.requestId, attemptId: row.attemptId, state, observedAt: new Date().toISOString() };
 }
 
 /** 필수 공급 경계의 시험 대역. 실제 GitHub 관측·#105 정책 공급자가 아니다. */
@@ -115,6 +140,6 @@ async function waitFor(check, label, timeoutMs = 10_000) {
 }
 
 module.exports = {
-  CONTRACT_DIR, REPOSITORY_ID, RESOURCE_TYPES, SCOPE_REVISION, MemoryRequestQueue, captureLogger, dispatchLog,
-  insertAttempt, observation, useAppSettings, waitFor,
+  CONTRACT_DIR, FIXTURES, REPOSITORY_ID, RESOURCE_TYPES, SCOPE_REVISION, MemoryRequestQueue, captureLogger, dispatchLog,
+  insertAttempt, observation, useAppSettings, waitFor, workerEvent, workerResult,
 };
