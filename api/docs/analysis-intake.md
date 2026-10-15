@@ -76,6 +76,8 @@
 
 상태 응답은 같은 트랜잭션의 요청/시도 잠금 안에서 읽는다. 등록 Catch ID는 현재 시도의 B 등록 연결에서 본인 열람 준비가 확인된 것만 반환한다. 실패 확정 참조·수신 지문·자격정보는 응답에 포함하지 않는다.
 
+`retry.reason`은 재요청 판정의 사유이며 결과 유무나 실패 원인을 뜻하지 않는다. `RESULTS_EXIST`는 등록 연결(본인 열람 준비 전 포함)이나 원 요청의 Catch 본체가 있으면 내려가고, 반영 실패로 닫히지 않은 요청에 적합 후보가 있을 때도 내려가므로 열람 가능한 Catch가 없어도 나올 수 있다. `registeredCatchIds`에는 위처럼 본인 열람 준비가 확인된 Catch만 담긴다. 화면 안내는 `reason`이 아니라 `lifecycle`·`application`·`registeredCatchIds`로 만든다.
+
 이전 실패 키를 다시 조회해도 현재 다른 ACTIVE가 있으면 retry.allowed=false/IN_PROGRESS다. 이미 후속 요청을 만든 오래된 실패는 후속 작업이 끝나도 재요청 대상으로 표시하지 않는다. 같은 키 재응답의 현재 판정과 새 POST의 선행 이력 판정이 엇갈리지 않게 한다. 두 판정은 `analysis-status.ts`의 `retryDecision`·`blocksReanalysis` 한 곳에서 계산한다.
 
 ## 실행 요청 맥락의 준비와 경계
