@@ -10,13 +10,19 @@ export const WORKER_JOB_NAMES: readonly string[] = ['ProcessingEvent', 'Result']
 /** 요청 작업 보관(초). 처리 시한 60분보다 길어, 그동안 같은 시도를 다시 넣어도 같은 작업 ID라 무시된다. */
 export const REQUEST_JOB_RETENTION_SECONDS = 2 * 60 * 60;
 
-/** 요청 작업 옵션. 재시도·backoff 없음(#77 「결론」 조건 2, 10/6 결정: 재전달로 복구하지 않음). 작업 ID는 넣을 때 시도 ID로 준다. */
-export const REQUEST_JOB_OPTIONS = Object.freeze({
-  attempts: 1,
-  removeOnComplete: Object.freeze({ age: REQUEST_JOB_RETENTION_SECONDS }),
-  removeOnFail: Object.freeze({ age: REQUEST_JOB_RETENTION_SECONDS }),
-  stackTraceLimit: 0,
-});
+/**
+ * 요청 작업 옵션. 작업 ID = 시도 ID, 재시도·backoff 없음(#77 「결론」 조건 2, 10/6 결정: 재전달로 복구하지 않음).
+ * BullMQ에 넘긴 객체를 다시 쓰지 않게 부를 때마다 새로 만든다.
+ */
+export function requestJobOptions(attemptId: string) {
+  return {
+    jobId: attemptId,
+    attempts: 1,
+    removeOnComplete: { age: REQUEST_JOB_RETENTION_SECONDS },
+    removeOnFail: { age: REQUEST_JOB_RETENTION_SECONDS },
+    stackTraceLimit: 0,
+  };
+}
 
 /**
  * 진행 알림·결과 소비자 설정. 동시 1, 정체 복구 0회(잠금을 잃은 작업을 다시 처리하지 않는다).
