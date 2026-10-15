@@ -75,7 +75,8 @@ export function SessionLoginPanel() {
           Google로 로그인 <span className={styles.pendingTag}>연결 전</span>
         </button>
 
-        {signedIn && (me.state === "failed" ? <LookupFailedState title="회원 정보를 불러오지 못했습니다" onRetry={retry} /> : <p role="status">회원 정보를 확인하고 있습니다.</p>)}
+        {signedIn && me.state === "failed" && <LookupFailedState title="회원 정보를 불러오지 못했습니다" onRetry={retry} />}
+        {signedIn && me.state === "loading" && <p role="status">회원 정보를 확인하고 있습니다.</p>}
         {!signedIn && !canLogin && <p role="status">로그인 상태를 확인하고 있습니다.</p>}
         {devLoginEnabled && canLogin && (
           <section className={styles.devSection} aria-labelledby={`${inputId}-title`}>
