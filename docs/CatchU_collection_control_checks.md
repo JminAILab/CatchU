@@ -38,7 +38,7 @@
 |---|---|---|
 | 수집 방식마다 주소/권한·외부 실행/네트워크·자원/시간·실패 정리 통제와 검증 방법 | [1](CatchU_collection_control_scope.md#1-무엇을-어떻게-가져오는가)·[2](CatchU_collection_control_scope.md#2-수집할-때-막는-것)·[6](#6-검증-사례) | **충족** |
 | 수집 구현 전 통제 설계와 실행/검토 책임 | [2](CatchU_collection_control_scope.md#2-수집할-때-막는-것)·[7](#7-누가-구현검사하는가)·[7.1](#71-검토자가-없을-때) | **충족**. 실행 담당은 팀원 1로 **확정**(2026-09-29)했고, 작성자 외 검토자가 없다는 사실과 대체 수단을 명시해 [8](CatchU_수집통제_임시자료.md#8-37-조건-대조--적용충족미확인)에 미충족으로 남겼다 |
-| 자격정보가 잘못·만료·범위 불일치일 때의 인계와 거부 경계를 A/E가 검토 | [3](CatchU_collection_control_scope.md#3-af-자격정보-인계) | **충족**. A/E가 검토했다([A/E 리뷰][rv166]) — 회원·저장소·허용 범위 판본·만료 대조와 불일치 시 수집하지 않는 방향에 동의. 제공 구현은 [#133][i133] 후속 |
+| 자격정보가 잘못·만료·범위 불일치일 때의 인계와 거부 경계를 A/E가 검토 | [3](CatchU_collection_control_scope.md#3-af-자격정보-인계) | **충족**. A/E가 검토했다([A/E 리뷰][rv166]) — 회원·저장소·허용 범위 판본·만료 대조와 불일치 시 수집하지 않는 방향에 동의. 제공 구현은 토큰 꺼내기 [#231][i231], worker 내부 조회 연결 [#232][i232] |
 | 임시 입력/결과의 생성·보존·전달·정리 조건과 검증 책임 | [4](CatchU_collection_control_temp_data.md#4-임시-자료의-위치수명삭제)·[6](#6-검증-사례) | **충족**. 결과는 보존하지 않는다(2026-10-06 [결정][d23]이 09-29의 14일 보존을 대체). 자원·시간 상한만 제안이다 |
 | 수신 확인과 등록 완료를 구분하고 반영 전 장애의 손실 위험 대조 | [5](CatchU_collection_control_temp_data.md#5-전달과-수신등록의-구분) | **충족**. 반영 전 장애는 앱에서 복구하지 않고 처리 시한으로 닫는다(2026-10-06 [결정][d23], 계약 PR 뒤 [#237][i237]) |
 | #37 조건의 적용·충족·미확인 구분 | [8](CatchU_수집통제_임시자료.md#8-37-조건-대조--적용충족미확인) | **충족** |
@@ -111,7 +111,6 @@
 [i233]: https://github.com/JminAILab/CatchU/issues/233
 [i237]: https://github.com/JminAILab/CatchU/issues/237
 [d23]: https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296
-[i133]: https://github.com/JminAILab/CatchU/issues/133
 [i139]: https://github.com/JminAILab/CatchU/issues/139
 [p164]: https://github.com/JminAILab/CatchU/pull/164
 [c93]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L86
