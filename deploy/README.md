@@ -50,7 +50,7 @@ docker build -f worker/Dockerfile --build-arg SOURCE_REVISION=$(git rev-parse HE
 
 **api 운영 이미지에는 운영 의존성만 있다.** `npm ci --omit=dev --omit=optional`로 설치한다. ts-node·typescript는 잠금 파일에서 TypeORM의 선택 의존성으로도 잡혀 있어 `--omit=dev`만으로는 남기 때문이다. 이 조합은 api 전용이며, web은 SWC·sharp가 선택 의존성이라 쓰지 않는다. 결과 수신 검증기가 읽을 계약 YAML은 `/app/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/`에 둔다. 수신 모듈은 아직 앱에 연결돼 있지 않으므로 api가 떠도 YAML을 읽지는 않는다(연결은 #105·#233 범위).
 
-**worker 이미지는 `/app/worker`에서 실행한다.** 계약 YAML(위와 같은 경로)과 합성 자료(`/app/worker/fixtures/m1-synthetic`)를 저장소와 같은 상대 위치에 둔다. 개발 그룹(ruff·mypy·pytest 등)은 넣지 않는다. 기본 명령은 분석 요청 큐 소비자(`python -m app.consumer`, [#121](https://github.com/JminAILab/CatchU/issues/121))다. 운영 모드에서 큐 설정이 없거나 틀리면 기동하지 않는다(종료 코드 2). SIGTERM을 받으면 새 작업을 멈추고 분석 중인 작업을 실패로 남긴 뒤 25초 안에 끝난다([worker 큐 소비자](../worker/docs/queue-consumer.md)). 합성 처리는 `docker run --rm <worker 이미지> .venv/bin/python -m app.processing <시나리오>`로 실행한다.
+**worker 이미지는 `/app/worker`에서 실행한다.** 계약 YAML(위와 같은 경로)과 합성 자료(`/app/worker/fixtures/m1-synthetic`)를 저장소와 같은 상대 위치에 둔다. 개발 그룹(ruff·mypy·pytest 등)은 넣지 않는다. 기본 명령은 분석 요청 큐 소비자(`python -m app.consumer`, [#121](https://github.com/JminAILab/CatchU/issues/121))다. 운영 모드에서 큐 설정이 없거나 틀리면 기동하지 않는다(종료 코드 2). SIGTERM을 받으면 새 작업을 멈추고 분석 중인 작업을 실패로 남긴 뒤 끝난다. 25초를 넘기면 스스로 강제 종료하며 종료 코드가 137이라 교체 절차는 7로 멈춘다([worker 큐 소비자](../worker/docs/queue-consumer.md)). 합성 처리는 `docker run --rm <worker 이미지> .venv/bin/python -m app.processing <시나리오>`로 실행한다.
 
 세 이미지 모두 숫자 UID 1000으로 실행하고 앱 파일은 쓰기 권한이 없다. 읽기 전용 루트 파일시스템과 권한 제거(`cap_drop: ALL`)에서 동작하며, 쓰기 경로는 `/tmp`뿐이다.
 
