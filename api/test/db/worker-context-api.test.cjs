@@ -12,6 +12,9 @@ const { NestFactory } = require('@nestjs/core');
 const { decodeJwt } = require('jose');
 const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
+const { AccessTokenService } = require('../../dist/auth/access-token.service');
+const { AuthSession, SessionRefreshToken } = require('../../dist/auth/session.entity');
+const { SESSION_IDLE_MS, SESSION_MAX_MS } = require('../../dist/auth/session.config');
 const { WorkerContextModule } = require('../../dist/worker-context/worker-context.module');
 const { GitHubConnectionService } = require('../../dist/github-connection/github-connection.service');
 const { GitHubClient, GitHubAccessToken, GitHubProviderError } = require('../../dist/github-connection/github.client');
@@ -30,8 +33,8 @@ Module({ imports: [AppModule, WorkerContextModule.register({ selectionSource })]
 
 before(async () => {
   directory = await mkdtemp(join(tmpdir(), 'catchu-232-vault-test-'));
-  Object.assign(settings, { AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '300',
-    DEV_LOGIN_ENABLED: 'true', NODE_ENV: 'test', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
+  Object.assign(settings, { AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
+    DEV_LOGIN_ENABLED: 'true', NODE_ENV: 'test', AUTH_WEB_ORIGIN: 'http://localhost:3000', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
     WORKER_CONTEXT_ENABLED: 'true', WORKER_CONTEXT_API_KEY: randomBytes(32).toString('hex'),
     GITHUB_CONNECTION_ENABLED: 'true', GITHUB_OAUTH_CLIENT_ID: 'fake-client', GITHUB_OAUTH_CLIENT_SECRET: 'FAKE_SECRET',
     GITHUB_OAUTH_CALLBACK_URL: 'http://localhost:3000/github/callback',
@@ -84,7 +87,11 @@ async function call(path, { method = 'GET', headers = {}, body, allowToken = fal
 async function member(name = randomUUID()) {
   const result = await call('/auth/dev-login', { method: 'POST', body: { memberId: name } });
   assert.equal(result.status, 200);
-  return { memberId: decodeJwt(result.body.accessToken).sub, token: result.body.accessToken };
+  assert.equal(result.body.expiresIn, 900);
+  const claims = decodeJwt(result.body.accessToken);
+  const session = await db.manager.findOneByOrFail(AuthSession, { sessionId: claims.sid, memberId: claims.sub });
+  assert.equal(session.revokedAt, null);
+  return { memberId: claims.sub, sessionId: claims.sid, token: result.body.accessToken };
 }
 async function connect(user, token = FAKE_TOKEN) {
   client.exchange = async () => ({ accountLogin: 'context-user', externalAccountReference: '9007199254740993',
@@ -138,6 +145,44 @@ test('키 누락/오류와 회원 두 명의 Bearer 접근은 거부하고 일�
   assert.equal((await call('/me', { headers: { Authorization: 'Bearer ' + b.token } })).status, 200);
   assert.equal((await call('/me', { headers: { 'x-worker-key': settings.WORKER_CONTEXT_API_KEY } })).status, 401);
 });
+
+for (const state of ['폐기', '삭제', '24시간 만료', '7일 만료']) {
+  test(`유효 JWT의 DB 세션이 ${state}되면 회원 API는 거부하고 worker 키는 독립적으로 허용한다`, async () => {
+    const user = await member(); await connect(user); const r = await analysis(user);
+    const headers = { Authorization: 'Bearer ' + user.token };
+    assert.equal((await call('/me', { headers })).status, 200);
+    assert.equal((await context(r.currentAttemptId)).status, 200);
+
+    const now = Date.now();
+    if (state === '폐기') {
+      await db.manager.update(AuthSession, { sessionId: user.sessionId }, { revokedAt: new Date(now) });
+    } else if (state === '삭제') {
+      await db.transaction(async manager => {
+        await manager.delete(SessionRefreshToken, { sessionId: user.sessionId });
+        await manager.delete(AuthSession, { sessionId: user.sessionId });
+      });
+    } else {
+      const elapsed = state === '24시간 만료' ? SESSION_IDLE_MS : SESSION_MAX_MS;
+      const createdAt = new Date(now - elapsed - 1000);
+      await db.manager.update(AuthSession, { sessionId: user.sessionId }, {
+        createdAt, expiresAt: new Date(createdAt.getTime() + SESSION_MAX_MS),
+        lastRefreshedAt: state === '24시간 만료' ? createdAt : new Date(now - 2000),
+      });
+    }
+
+    // JWT 자체가 아직 유효해도 전역 Guard가 DB 세션을 확인해야 한다.
+    assert.deepEqual(await app.get(AccessTokenService).verify(user.token), {
+      memberId: user.memberId, sessionId: user.sessionId,
+    });
+    const denied = await call('/me', { headers });
+    assert.equal(denied.status, 401); assert.equal(denied.body.code, 'AUTH_INVALID');
+    assert.equal((await context(r.currentAttemptId)).status, 200);
+    const mixed = await context(r.currentAttemptId, {
+      headers: { ...headers, 'x-worker-key': settings.WORKER_CONTEXT_API_KEY },
+    });
+    assert.equal(mixed.status, 401); assert.equal(mixed.body.code, 'AUTH_INVALID');
+  });
+}
 
 test('없는·잘못된 ID·닫힌 요청·지난 시도·종결/UNCERTAIN은 모두 같은 404다', async () => {
   const user = await member(); await connect(user); const r = await analysis(user); identityCalls = 0;

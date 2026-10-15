@@ -14,7 +14,7 @@ worker가 분석 `attemptId`로 접수 회원·동의·선정 범위와 GitHub �
 
 제공받은 `EntityManager`로 조회하고 외부 통신을 하지 않는다. 자격정보 조회 전후 두 번 호출하며, 최종 호출은 분석·회원·동의의 짧은 읽기 잠금 안에서 수행한다. 조회 장애는 예외로 전달해 `500 INTERNAL_ERROR`로 남긴다. 서비스는 공급자 반환 식별자와 좌표 형식도 검사한다. 실제 공급자는 이 인터페이스의 새 구현으로 #252의 저장소 선정 근거에 연결해야 하며 테스트 공급자를 앱에 등록해서는 안 된다.
 
-후속 실제 공급자를 마련한 뒤 실행 모듈을 조립하는 형태다. `selectedRepositories`는 실제 공급자를 준비해 전달하는 값이며 이 문서가 구현을 제공하지 않는다.
+#252가 실제 선정 공급자를 제공한 뒤, #232의 후속 PR에서 그 공급자를 전달해 앱 등록과 worker 연결을 검증한다. 이 PR의 병합만으로 기본 앱의 내부 경로가 활성화되지는 않는다. `selectedRepositories`는 실제 공급자를 준비해 전달하는 값이며 이 문서가 구현을 제공하지 않는다.
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -34,7 +34,7 @@ export function workerContextApplication(selectedRepositories: WorkerRepositoryS
 
 ## HTTP 입력과 응답
 
-`GET /v1/internal/analysis-attempts/{attemptId}/context`에 `X-Worker-Key`를 보낸다. 경로의 attemptId만 받고 query와 GET body는 거부한다. 전역 AccessTokenGuard의 **메서드 전용 서비스 인증 분기**가 키를 상수 시간 비교한다. `@Public()`을 쓰지 않으며 회원 Bearer는 본인·타인 모두 거부하고 키와 혼용해도 거부한다. 일반 회원 API에는 기존 JWT 인증을 유지한다.
+`GET /v1/internal/analysis-attempts/{attemptId}/context`에 `X-Worker-Key`를 보낸다. 경로의 attemptId만 받고 query와 GET body는 거부한다. 전역 AccessTokenGuard의 **메서드 전용 서비스 인증 분기**가 키를 상수 시간 비교한다. `@Public()`을 쓰지 않으며 회원 Bearer는 본인·타인 모두 거부하고 키와 혼용해도 거부한다. 일반 회원 API에는 #269의 JWT 검증과 DB 세션·회원 활성 상태 확인을 함께 유지한다. 회원 Access 유효 시간은 900초이며, worker 전용 키가 일반 회원 API의 세션 검사를 대신하지 않는다.
 
 성공은 200이며 다음 모양이다. 모든 응답은 `Cache-Control: no-store`다.
 
@@ -84,4 +84,4 @@ npm run typecheck
 npm test -- test/worker-context-auth.test.cjs test/db/worker-context-api.test.cjs
 ```
 
-시험은 실제 Nest HTTP·PostgreSQL·암호문 보관과 기존 자격정보 함수를 사용한다. GitHub 응답과 선정 공급자만 합성 대역이다. 활성 시도·키/JWT 거부·회원 두 명·동의/선정 불일치·지난/종결 시도·만료/해제/재연결·외부 확인 중 종결 경쟁·자격정보 조회가 끝난 뒤 최종 선정 확인 대기 중 해제/동일 계정 재연결 경쟁·오류/로그 비노출을 검사한다. 실제 GitHub 승인·실제 #252 선정 공급·운영 내부 네트워크 검증을 대신하지 않는다. `npm test`가 두 파일을 자동 탐색한다.
+시험은 실제 Nest HTTP·PostgreSQL·암호문 보관과 기존 자격정보 함수를 사용한다. GitHub 응답과 선정 공급자만 합성 대역이다. 활성 시도·키/JWT 거부·일반 회원의 유효/폐기/만료 세션·회원 두 명·동의/선정 불일치·지난/종결 시도·만료/해제/재연결·외부 확인 중 종결 경쟁·자격정보 조회가 끝난 뒤 최종 선정 확인 대기 중 해제/동일 계정 재연결 경쟁·오류/로그 비노출을 검사한다. 실제 GitHub 승인·실제 #252 선정 공급·운영 내부 네트워크 검증을 대신하지 않는다. `npm test`가 두 파일을 자동 탐색한다.
