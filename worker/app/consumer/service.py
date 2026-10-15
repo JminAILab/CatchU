@@ -149,6 +149,17 @@ class ConsumerService:
         self.worker.on("error", _log_worker_error)
         self.worker.on("failed", _log_job_failed)
         self._run_task = asyncio.create_task(self.worker.run(), name="request-worker")
+        self._run_task.add_done_callback(self._run_finished)
+
+    def _run_finished(self, task: "asyncio.Task[Any]") -> None:
+        if self._stopping:
+            return
+        # 예상 밖 종료. 상태 확인이 503이 되고, 다시 띄우는 것은 실행 환경의 몫이다.
+        error = None if task.cancelled() else task.exception()
+        logger.error(
+            "소비 실행 작업이 예상 밖으로 끝남: %s",
+            "cancelled" if error is None else type(error).__name__,
+        )
 
     async def run(self) -> int:
         loop = asyncio.get_running_loop()
