@@ -196,6 +196,7 @@ class RequestProcessor:
             self._runs.pop(attempt_id, None)
             if run is not None:
                 run.kill_now()
+                run.release()
 
     async def _next(
         self, run: ChildRun, stop: asyncio.Event, timeout: float

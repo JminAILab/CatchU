@@ -47,6 +47,7 @@ class ChildRun:
         self._loop = loop
         self._max_bytes = max_bytes
         self.items: asyncio.Queue[Item] = asyncio.Queue()
+        self._released_exitcode: int | None = None
         self._thread = threading.Thread(
             target=self._read, name="child-frames", daemon=True
         )
@@ -102,11 +103,15 @@ class ChildRun:
             self._reader.close()
 
     def is_alive(self) -> bool:
+        if self._released_exitcode is not None:
+            return False
         alive: bool = self.process.is_alive()
         return alive
 
     @property
     def exitcode(self) -> int | None:
+        if self._released_exitcode is not None:
+            return self._released_exitcode
         code: int | None = self.process.exitcode
         return code
 
@@ -131,3 +136,10 @@ class ChildRun:
         if self.is_alive():
             self.process.kill()
             self.process.join(wait)
+
+    def release(self) -> None:
+        """회수한 자식의 프로세스 자원(파일 기술자)을 바로 놓는다. 아직 살아 있으면 둔다."""
+        code = self.exitcode
+        if code is not None and self._released_exitcode is None:
+            self._released_exitcode = code
+            self.process.close()
