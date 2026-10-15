@@ -21,6 +21,8 @@ enum varchar+CHECK를 사용한다. 공통 DB 규약과 동일한 TypeORM 1.1.1�
 
 제목 `null` 허용은 [`AllowNullCatchTitle1791784385918`](../src/database/migrations/1791784385918-AllowNullCatchTitle.ts)을 추가 적용한다. 기존 제목과 빈 문자열 거부 CHECK는 보존한다. `down`은 NOT NULL을 복원하므로 `null` 행이 있으면 실패하며, 제목을 임의로 채우거나 자료를 지우지 않는다. 해당 자료의 처리 방침을 정하기 전에는 되돌리지 않는다.
 
+근거 표시 순서는 [`AddCatchEvidencePosition1792029036359`](../src/database/migrations/1792029036359-AddCatchEvidencePosition.ts)으로 저장한다. 기존 근거는 Catch마다 종전 UUID 오름차순으로 1부터 채워 ID·본문과 당시 표시 순서를 보존한다. `down`은 위치 칼럼만 제거하므로 이후 새로 저장한 입력 순서는 잃으며, 재적용 때는 UUID 순서로 다시 채운다.
+
 B 마이그레이션은 E 수신 테이블을 포함한 선행 테이블이 없으면 실패한다.
 가짜 제품 테이블을 만들거나 FK를 생략하지 않는다.
 down은 보호 판단→후보 연결→근거→Catch 순서이며 A/E 테이블을 지우지 않는다.

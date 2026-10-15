@@ -37,7 +37,7 @@ export async function readCatchSources(manager: EntityManager, memberId: string,
     e.source_url AS "sourceUrl", e.source_revision AS "sourceRevision", e.represented_facts AS "representedFacts",
     e.contribution_scope AS "contributionScope", e.coverage_limits AS "coverageLimits"
     FROM catch_evidence e JOIN catch_asset c ON c.catch_id = e.catch_id
-    WHERE c.owner_id = $1 AND e.catch_id = ANY($2::uuid[]) ORDER BY e.catch_evidence_id ASC`,
+    WHERE c.owner_id = $1 AND e.catch_id = ANY($2::uuid[]) ORDER BY e.catch_id ASC, e.position ASC, e.catch_evidence_id ASC`,
   [memberId, rows.map((row) => row.catchId)]);
   return rows.map((row) => ({
     asset: row,

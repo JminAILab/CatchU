@@ -4,6 +4,7 @@ import { CatchAssetEntity } from './catch-asset.entity';
 
 @Entity('catch_evidence')
 @Unique(['catchId', 'sourceEvidenceId'])
+@Check('"position" >= 1')
 @Check('char_length("source_evidence_id") >= 1')
 @Check('char_length("source_url") >= 1')
 @Check('char_length("source_revision") >= 1')
@@ -20,6 +21,9 @@ export class CatchEvidenceEntity {
   @ManyToOne(() => CatchAssetEntity, { nullable: false })
   @JoinColumn({ name: 'catch_id', referencedColumnName: 'catchId' })
   catchAsset!: CatchAssetEntity;
+
+  @Column({ type: 'integer' })
+  position!: number;
 
   @Column({ name: 'source_evidence_id', type: 'text' })
   sourceEvidenceId!: string;
