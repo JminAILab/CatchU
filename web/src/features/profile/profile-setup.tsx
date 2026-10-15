@@ -6,6 +6,8 @@ import { accessTokenStore } from "@/lib/access-token";
 import { routes } from "@/lib/routes";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { readProfile, completeProfileSetup, profileErrors, type Profile } from "./profile-api";
+import { ProfileFields } from "./profile-fields";
+import { useUnsavedGuard } from "./use-unsaved-guard";
 import styles from "@/components/auth/auth.module.css";
 
 export function ProfileSetup() {
@@ -30,19 +32,7 @@ export function ProfileSetup() {
     return () => abort.abort();
   }, [attempt]);
   useEffect(() => () => pending.current?.abort(), []);
-  useEffect(() => {
-    if (!dirty) return;
-    const unload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
-    const click = (event: MouseEvent) => {
-      const anchor = event.target instanceof Element ? event.target.closest("a[href]") : null;
-      if (anchor && !window.confirm("저장하지 않은 입력이 있습니다. 이동하시겠습니까?")) {
-        event.preventDefault(); event.stopPropagation();
-      }
-    };
-    window.addEventListener("beforeunload", unload);
-    document.addEventListener("click", click, true);
-    return () => { window.removeEventListener("beforeunload", unload); document.removeEventListener("click", click, true); };
-  }, [dirty]);
+  useUnsavedGuard(dirty);
 
   async function submit() {
     if (!profile || busy) return;
@@ -70,22 +60,11 @@ export function ProfileSetup() {
   }
   if (failed && !profile) return <main className={styles.page}><LookupFailedState title="프로필을 불러오지 못했습니다" onRetry={() => { setFailed(false); setAttempt(n => n + 1); }} /></main>;
   if (!profile) return <main className={styles.page}><LoadingState /></main>;
-  const edit = <K extends keyof Profile>(key: K, value: Profile[K]) => setProfile({ ...profile, [key]: value });
   return <main className={styles.page}><div className={styles.panel}>
     <h1 className={styles.title}>최초 프로필 입력</h1>
     <p className={styles.lead}>표시 이름을 입력해 주세요. 나머지 항목은 선택 사항입니다.</p>
     <form onSubmit={event => { event.preventDefault(); void submit(); }} noValidate>
-      <fieldset disabled={busy || saved} style={{ border: 0, padding: 0, margin: 0 }}>
-        <label className={styles.field}>표시 이름 (필수, 최대 50자)<input className={styles.input} value={profile.displayName} onChange={e => edit("displayName", e.target.value)} autoComplete="nickname" /></label>
-        <label className={styles.field}>한 줄 소개 (최대 200자)<input className={styles.input} value={profile.introduction} onChange={e => edit("introduction", e.target.value)} /></label>
-        <label className={styles.field}>희망 직무 (최대 100자)<input className={styles.input} value={profile.desiredRole} onChange={e => edit("desiredRole", e.target.value)} /></label>
-        <p>기술 (최대 20개, 각 50자)</p>
-        {profile.skills.map((skill, index) => <div key={index}>
-          <label className={styles.field}>기술 {index + 1}<input className={styles.input} value={skill} onChange={e => edit("skills", profile.skills.map((s, i) => i === index ? e.target.value : s))} /></label>
-          <button type="button" onClick={() => edit("skills", profile.skills.filter((_, i) => i !== index))}>기술 {index + 1} 삭제</button>
-        </div>)}
-        <button type="button" disabled={profile.skills.length >= 20} onClick={() => edit("skills", [...profile.skills, ""])}>기술 추가</button>
-      </fieldset>
+      <ProfileFields profile={profile} disabled={busy || saved} onChange={setProfile} />
       {errors.length > 0 && <div className={styles.error} role="alert">{errors.map(message => <p key={message}>{message}</p>)}</div>}
       <button className={styles.submit} type="submit" disabled={busy}>{busy ? "처리 중" : saved ? "회원 정보 다시 확인" : "저장하고 시작하기"}</button>
     </form>

@@ -57,3 +57,27 @@ export async function completeProfileSetup(
     return saved ? 'refresh-failed' : 'save-failed';
   }
 }
+
+export function sameProfile(a: Profile, b: Profile): boolean {
+  return a.displayName === b.displayName && a.introduction === b.introduction && a.desiredRole === b.desiredRole
+    && a.skills.length === b.skills.length && a.skills.every((skill, index) => skill === b.skills[index]);
+}
+
+/**
+ * 기존 프로필 수정 저장. PUT 성공만 'saved'다. 실패·응답 유실·성공 형식 오류는 입력을 유지하는 'save-failed'이며,
+ * 세션이 바뀌었거나 취소됐으면 'cancelled'라서 화면은 이동·안내를 하지 않는다. 자동 재전송은 하지 않는다.
+ */
+export async function updateProfile(
+  api: Pick<ApiClient, 'member'>, profile: Profile,
+  options: { isCurrent: () => boolean; signal?: AbortSignal },
+): Promise<'saved' | 'save-failed' | 'cancelled'> {
+  const current = () => !options.signal?.aborted && options.isCurrent();
+  if (!current()) return 'cancelled';
+  try {
+    const ok = await saveProfile(api, profile, options.signal);
+    if (!current()) return 'cancelled';
+    return ok ? 'saved' : 'save-failed';
+  } catch {
+    return current() ? 'save-failed' : 'cancelled';
+  }
+}
