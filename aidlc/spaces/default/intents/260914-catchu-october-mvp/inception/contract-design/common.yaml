@@ -238,7 +238,27 @@ components:
         representedFacts: {"type":"array","items":{"type":"string"}}
         contributionScope: {"type":"string"}
         coverageLimits: {"type":"array","items":{"type":"string"}}
-  headers: {"NoStore":{"description":"회원·수신자 응답에 Cache-Control: no-store","schema":{"type":"string","enum":["no-store"]}},"RetryAfter":{"description":"다시 보낼 수 있을 때까지 남은 초(비밀번호 시도 차단·발급 빈도 제한)","schema":{"type":"integer","minimum":1}}}
+    AccessToken:
+      type: "object"
+      additionalProperties: false
+      required: ["accessToken","tokenType","expiresIn"]
+      description: "Google 로그인 성공과 Refresh 갱신이 주는 Access 응답(개발 로그인도 같은 형식). Refresh 값은 본문에 넣지 않고 Set-Cookie로만 보낸다"
+      properties:
+        accessToken: {"type":"string","minLength":1}
+        tokenType: {"type":"string","enum":["Bearer"]}
+        expiresIn: {"type":"integer","minimum":1,"description":"Access 수명(초). 10월 기준 900(15분)"}
+    GoogleLoginResult:
+      type: "object"
+      additionalProperties: false
+      required: ["accessToken","tokenType","expiresIn","suggestedDisplayName"]
+      description: "AccessToken의 세 필드와 이름 제안"
+      properties:
+        accessToken: {"type":"string","minLength":1}
+        tokenType: {"type":"string","enum":["Bearer"]}
+        expiresIn: {"type":"integer","minimum":1,"description":"AccessToken.expiresIn과 같다"}
+        suggestedDisplayName: {"type":"string","nullable":true,"description":"표시 이름이 빈 회원에게만 주는 Google 이름. 저장하지 않으며 프로필 입력 제한을 거친 값이 아니다. 이름이 이미 저장됐거나 Google 이름이 없으면 null"}
+    EmptyRequest: {"type":"object","additionalProperties":false,"maxProperties":0,"description":"본문 없음 또는 {}. 다른 필드는 400/VALIDATION_FAILED"}
+  headers: {"NoStore":{"description":"회원·수신자 응답에 Cache-Control: no-store","schema":{"type":"string","enum":["no-store"]}},"RetryAfter":{"description":"다시 보낼 수 있을 때까지 남은 초(비밀번호 시도 차단·발급 빈도 제한)","schema":{"type":"integer","minimum":1}},"SetRefreshCookie":{"description":"Refresh 쿠키 설정·교체. catchu_refresh=<값>; Path=/v1/auth; HttpOnly; SameSite=Strict; Expires=min(세션 절대 만료, 마지막 정상 갱신+24시간). Domain 없음, https 출처에서 Secure","schema":{"type":"string"}},"ClearRefreshCookie":{"description":"Refresh 쿠키 제거. 같은 이름·Path·속성에 Max-Age=0과 과거 Expires","schema":{"type":"string"}}}
   responses:
     Error400:
       description: "오류 코드 표 및 경계 규칙 참조"
@@ -267,4 +287,8 @@ components:
     Error500:
       description: "오류 코드 표 및 경계 규칙 참조"
       headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"}}
+      content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}
+    Error401ClearRefresh:
+      description: "Refresh 거부(AUTH_INVALID). Refresh 쿠키를 제거한다"
+      headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"},"Set-Cookie":{"$ref":"#/components/headers/ClearRefreshCookie"}}
       content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}

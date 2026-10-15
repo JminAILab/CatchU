@@ -24,15 +24,17 @@ erDiagram
   AnalysisAttempt ||--o| ResultApplicationRecord : received_result
   ResultApplicationRecord ||--o{ CandidateRegistration : decisions
   CatchAsset ||--|{ CandidateRegistration : registration
+  MemberAccount ||--o{ AuthSession : sessions
+  AuthSession ||--|{ SessionRefreshToken : refresh_tokens
 ```
 
-텍스트 대체: A 회원은 프로필/현재 연동을 최대 하나씩, 요청·Catch·보호·링크를 여러 개 갖는다. 요청은 새 동의 하나와 현재 시도를 갖고, 시도는 검증된 결과 메타데이터를 최대 하나 갖는다. B Catch는 근거 1개 이상과 등록 연결 1개 이상을 갖는다. 결과별 여러 후보 등록 연결이 새 Catch 또는 기존 같은 작업을 가리킨다. IdempotencyRecord는 operation에 맞는 요청 또는 링크 하나만 참조한다. 그림의 다중 시도 관계는 이력 모델이며 현재 MVP의 자동 재시도 허가가 아니다.
+텍스트 대체: A 회원은 프로필/현재 연동을 최대 하나씩, 요청·Catch·보호·링크·로그인 세션을 여러 개 갖는다. 로그인 세션은 교체된 Refresh 기록을 1개 이상 갖는다. 요청은 새 동의 하나와 현재 시도를 갖고, 시도는 검증된 결과 메타데이터를 최대 하나 갖는다. B Catch는 근거 1개 이상과 등록 연결 1개 이상을 갖는다. 결과별 여러 후보 등록 연결이 새 Catch 또는 기존 같은 작업을 가리킨다. IdempotencyRecord는 operation에 맞는 요청 또는 링크 하나만 참조한다. 그림의 다중 시도 관계는 이력 모델이며 현재 MVP의 자동 재시도 허가가 아니다.
 
 ## 업무 흐름
 
 | 흐름 | 순서·원자성 | 실패/경계 |
 |---|---|---|
-| F1 회원/연동 | 1 JWT 주체 확인 → 2 A 계정/프로필·현재 연동 조회 → 3 허용 필드 응답/자가 입력 저장 | 타인 자원 은닉; 실제 OAuth/자격정보 수명 OQ-A1. 개발용 로그인 #87과 실제 제공자 연결 구분 |
+| F1 회원/연동 | 1 JWT 주체와 로그인 세션 유효성 확인 → 2 A 계정/프로필·현재 연동 조회 → 3 허용 필드 응답/자가 입력 저장 | 타인 자원 은닉; Google 로그인·세션 갱신·GitHub 연결의 경로·수명은 [계약 요약](../../../inception/contract-design/contract-summary.md)의 회원 API. 개발용 로그인 #87과 실제 제공자 연결 구분 |
 | F2 새 요청 | 1 인증/형식·멱등 키 검사 → 2 현재 연동·저장소/고지/범위 확인 → 3 회원 단위 ACTIVE·선행 이력 판정 → 4 요청·새 동의·첫 시도·멱등 연결 한 번에 저장 → 5 202 → 6 허용된 전송 연결로 요청 전달 | 동일 키 충돌 409. 동일 저장소 ACTIVE는 새 행 없이 기존 작업 200; 다른 저장소는 409. 영속 접수 실패는 202 불가. 전송 불확실은 새 요청·새 시도가 아님(대기 시도는 같은 attemptId로 큐에 넣음); 처리 시한까지 끝나지 않은 요청은 E가 실패로 닫음 |
 | F3 Result 수신 | 1 식별 가능성 검사 → 2 스키마/맥락 대조 → 3 수신/반영 키·동일 payload 판정 → 4 E 메타데이터 저장 → 5 Receipt → 6 B 전달 | 세 ID 중 하나라도 식별 불가면 Receipt 없음. 맥락 오류/다른 payload/늦은 시도는 기존 값 보존. Receipt ACCEPTED는 B 반영 완료 아님 |
 | F3-P ProcessingEvent 수신 | 1 자체 스키마 검사 → 2 requestId/attemptId의 요청·현재 시도 맥락 확인 → 3 F 진행 관측 반영 | BR2.15 적용. resultId/ResultReceipt를 요구하거나 생성하지 않으며, 늦은 진행 이벤트로 종결 상태를 되돌리지 않음 |
@@ -103,7 +105,7 @@ retry.allowed는 [계약](../../../inception/contract-design/contract-summary.md
 
 | 항목 | 담당 / 막는 부분 |
 |---|---|
-| OQ-A1/A2 | 2 A·3 C: 실제 OAuth/자격정보 수명·프로필 투영 확인. 실제 인증/공개 연결 전; #87 개발용 로그인은 별도 |
+| OQ-A1 (결정)/A2 | OQ-A1은 2026-10-14 계약에 반영(남은 운영 도메인·AWS 앞단은 #212). OQ-A2는 2 A·3 C: 프로필 투영 확인, 실제 공개 연결 전 |
 | OQ-F1/L | 1 F/H·2 A/E: A/F 자격정보 상세, 전송은 #77 판정. F 결과 보존·재전달은 두지 않음(2026-10-06 결정). 제공자는 팀장이 실제 연결 전 선정. F 서비스 DB 제외 유지 |
 | OQ-F2 | 1 F 제안·4 B/2 E 검토: workIdentity의 네임스페이스/범위·충돌 판별. 실제 중복 등록 판정 전 |
 | OQ-B1 (결정) | 2026-09-24 팀장 결정: B 등록(Catch·근거·등록 연결)과 E 반영 완료 기록을 한 트랜잭션으로 저장한다. 수신 기록은 그 전에 E가 저장한다. 등록 함수의 입출력과 테이블 생성 순서는 E↔B 등록 개발 이슈에서 정한다. |

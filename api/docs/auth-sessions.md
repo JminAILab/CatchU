@@ -6,7 +6,7 @@
 
 로그아웃은 현재 브라우저가 쿠키로 공유하는 세션만 종료한다. 다른 기기의 세션은 유지한다. 동일 브라우저 탭들은 같은 쿠키를 사용한다. Google·개발 로그인 모두 세션을 저장한 후 Access JWT와 Refresh 쿠키를 발급한다. JWT에는 회원 UUID와 세션 UUID가 들어가며, 공통 Guard는 서명·만료 검증 후 DB의 해당 세션·회원 ACTIVE 상태를 확인한다. 세션 ID 없는 기존 토큰은 재로그인이 필요하다. 인증 통과가 GitHub 연결·분석 동의·자원 소유권을 보장하지는 않는다.
 
-API 경로·응답·새 오류 코드와 저장 모델은 팀장이 담당자에게 맡긴 설계를 구현한 **연결 검토안**이다. 공식 API 명세 승인이나 실제 화면 연결 완료가 아니다. 승인 문서는 수정하지 않는다. 화면 연결은 [#251](https://github.com/JminAILab/CatchU/issues/251), 기존 호출 기반은 [#106](https://github.com/JminAILab/CatchU/issues/106)과 맞춘다.
+API 경로·응답·새 오류 코드는 [API 명세의 회원 API](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api), 저장 모델은 [api ERD](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)에 반영했으며 그쪽이 정본이다. 실제 화면 연결 완료를 뜻하지는 않는다. 화면 연결은 [#251](https://github.com/JminAILab/CatchU/issues/251), 기존 호출 기반은 [#106](https://github.com/JminAILab/CatchU/issues/106)과 맞춘다.
 
 서버 구현의 기존 검토 근거는 [PR #269의 제품 판본](https://github.com/JminAILab/CatchU/commit/a7e9e58d11c1617625d50a5a5809996bf72c3fab)이다. 최신 dev 통합 판본·직접 회귀 검사·CI는 [PR #269 검사 기록](https://github.com/JminAILab/CatchU/pull/269)에서 구분한다. 아래 연결 합의 정리는 서버 정책·응답 계약을 변경하지 않는다.
 
@@ -33,7 +33,7 @@ API 경로·응답·새 오류 코드와 저장 모델은 팀장이 담당자에
 
 ## 교체·동시 갱신·응답 유실
 
-성공한 갱신마다 Refresh를 교체한다. 사용한 Refresh가 다시 도착하면 세션 전체를 폐기한다. 난수 원문을 복구하거나 이전 토큰으로 새 토큰을 재전달하는 유예 방식은 두지 않는다. [Refresh 재사용 탐지 원칙](https://datatracker.ietf.org/doc/html/rfc9700#section-4.14.2)을 참고한 선택이며 CatchU의 교체·엄격 거부 규칙은 이번 연결 검토안이다.
+성공한 갱신마다 Refresh를 교체한다. 사용한 Refresh가 다시 도착하면 세션 전체를 폐기한다. 난수 원문을 복구하거나 이전 토큰으로 새 토큰을 재전달하는 유예 방식은 두지 않는다. [Refresh 재사용 탐지 원칙](https://datatracker.ietf.org/doc/html/rfc9700#section-4.14.2)을 참고한 선택이며 CatchU의 교체·엄격 거부 규칙은 API 명세의 세션 규칙이다.
 
 같은 토큰의 동시 갱신은 잠금 순서상 첫 요청만 발급에 성공할 수 있고, 두 번째 요청은 재사용으로 세션을 폐기한다. 첫 200 응답의 Access도 이후 사용할 수 없다. 갱신 응답을 잃고 이전 쿠키로 재요청해도 재인증이 필요하다. 이 제약을 감추기 위해 재사용 검사를 생략하지 않는다.
 

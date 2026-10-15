@@ -2,7 +2,7 @@
 
 ## 범위와 결정 근거
 
-[#249 실제 Google 로그인 API](https://github.com/JminAILab/CatchU/issues/249)와 [이번 구현에서 사용자가 수용한 연결안](https://github.com/JminAILab/CatchU/issues/249#issuecomment-6053701691)을 반영한다. API 경로·응답은 이번 구현의 **연결 검토안**이며 공식 API 계약 승인을 뜻하지 않는다. 실제 연결의 확인 범위와 미검증 항목은 아래 「실제 연결 재현 현황」에서 구분한다.
+[#249 실제 Google 로그인 API](https://github.com/JminAILab/CatchU/issues/249)와 [이번 구현에서 사용자가 수용한 연결안](https://github.com/JminAILab/CatchU/issues/249#issuecomment-6053701691)을 반영한다. API 경로·응답은 [API 명세의 회원 API](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api)에 반영했으며 명세가 정본이다. 아래 「API 연결안」은 구현 설명이다. 실제 연결의 확인 범위와 미검증 항목은 아래 「실제 연결 재현 현황」에서 구분한다.
 
 - 서버가 Google 인증 코드를 교환한다. 일회용 state·nonce·PKCE와 요청 시작자 확인값을 검증한다.
 - 검증된 Google `sub`를 내부 `catchu:google:<sub>` 식별자로 사용한다. Google의 두 허용 issuer 표기는 같은 Google 식별 영역이다. 이메일·개발 회원·다른 인증 수단과 자동 연결하거나 병합하지 않는다.

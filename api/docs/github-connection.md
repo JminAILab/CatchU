@@ -12,7 +12,7 @@
 
 ## 인증된 회원의 API
 
-아래 경로는 이번 대화에서 수용한 연결안이며 PR의 담당자 검토 대상이다. 사용자 입력 memberId를 받지 않고 Guard가 확인한 현재 회원 UUID만 사용한다.
+아래 경로는 [API 명세의 회원 API](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api)에 반영했으며 명세가 정본이다. 사용자 입력 memberId를 받지 않고 Guard가 확인한 현재 회원 UUID만 사용한다.
 
 | 경로 | 입력 / 성공 200 | 거부 |
 |---|---|---|

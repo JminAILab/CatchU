@@ -2,7 +2,7 @@
 
 ## 모델 정본
 
-개발 기준 ERD v1의 승인 검토본. 업무 엔티티 10개와 멱등·반영 연결용 기술 기록 3개를 구분한다. YAML이 논리 모델 정본이며 관계도는 [functional-spec](functional-spec.md)의 파생 뷰다. 확정된 저장 기술로 옮길 때 아래 제약을 유지한다. 코드·DDL은 개발 이슈에서 작성한다.
+개발 기준 ERD v1의 승인 검토본. 업무 엔티티 10개와 멱등·반영 연결·로그인 세션용 기술 기록 5개를 구분한다. YAML이 논리 모델 정본이며 관계도는 [functional-spec](functional-spec.md)의 파생 뷰다. 확정된 저장 기술로 옮길 때 아래 제약을 유지한다. 코드·DDL은 개발 이슈에서 작성한다.
 
 ```yaml
 model: api-erd-v1
@@ -44,7 +44,7 @@ entities:
       - {name: accountLogin, type: string, required: false}
       - {name: credentialReference, type: secret-reference, required: false}
       - {name: connectionState, type: enum, required: true, allowed: [CONNECTED, DISCONNECTED, REAUTH_REQUIRED]}
-    constraints: ["행 없음은 DISCONNECTED로 투영", "CONNECTED의 실제 접근 가능 여부는 A가 확인; 상세 보관/갱신은 OQ-A1/F1"]
+    constraints: ["행 없음은 DISCONNECTED로 투영", "CONNECTED의 실제 접근 가능 여부는 A가 확인; 토큰 자동 갱신 없음, 만료·폐기·보관 자료 손상 확인 시 REAUTH_REQUIRED로 바꾸고 credentialReference 제거; A/F 제공 상세는 OQ-F1"]
   - name: AnalysisRequest
     owner: E
     description: "새 동의로 접수된 요청; 현재 시도와 진행 잠금의 정본"
@@ -204,6 +204,27 @@ technical_records:
       - {name: disposition, type: enum, required: true, allowed: [CREATED, EXISTING]}
       - {name: ownerViewReady, type: boolean, required: true}
     constraints: ["unique(applicationRecordId, candidateId); 하나의 후보는 하나의 Catch", "같은 owner와 검증한 동일 작업만 EXISTING; 기존 Catch 본문/출처/공개 상태 변경 없음", "Catch·근거·등록 연결이 함께 커밋; E는 이 연결에서 등록 목록/준비 여부 복원"]
+  - name: AuthSession
+    owner: A
+    description: "브라우저 로그인 세션; Access JWT가 이 세션을 가리키며 Guard가 요청마다 유효성을 확인"
+    attributes:
+      - {name: sessionId, type: id, required: true, unique: true, primary: true}
+      - {name: memberId, type: id, required: true, references: MemberAccount.memberId}
+      - {name: createdAt, type: instant, required: true}
+      - {name: expiresAt, type: instant, required: true, constraints: "createdAt+7일 절대 만료; 갱신으로 늘리지 않음"}
+      - {name: lastRefreshedAt, type: instant, required: true, constraints: "처음은 createdAt; 정상 갱신 때만 바꿈"}
+      - {name: revokedAt, type: instant, required: false, constraints: "로그아웃·Refresh 재사용 탐지로 끝낸 시각"}
+    constraints: ["유효 = revokedAt 없음 AND 현재 < expiresAt AND 현재 < lastRefreshedAt+24시간", "createdAt < expiresAt, createdAt <= lastRefreshedAt < expiresAt", "로그아웃은 해당 세션만 끝냄; 같은 회원의 다른 세션 유지"]
+  - name: SessionRefreshToken
+    owner: A
+    description: "세션별 Refresh 교체 기록; Refresh 원문은 저장하지 않음"
+    attributes:
+      - {name: refreshId, type: id, required: true, unique: true, primary: true}
+      - {name: sessionId, type: id, required: true, references: AuthSession.sessionId}
+      - {name: tokenHash, type: secret-lookup-key, required: true, unique: true, constraints: "Refresh 원문의 SHA-256 hex"}
+      - {name: createdAt, type: instant, required: true}
+      - {name: usedAt, type: instant, required: false, constraints: "갱신에 쓴 시각; 재사용 탐지·로그아웃을 위해 사용한 행도 남김"}
+    constraints: ["세션마다 usedAt 없는 행 최대 1개(부분 유일)", "사용한 토큰이 다시 오면 그 세션을 끝냄", "갱신은 이전 토큰 사용 표시·새 토큰 저장·lastRefreshedAt 변경을 한 트랜잭션으로"]
 relationships:
   - {from: MemberAccount, to: MemberProfile, cardinality: "1 : 0..1", via: memberId}
   - {from: MemberAccount, to: GitHubConnection, cardinality: "1 : 0..1", via: memberId}
@@ -221,6 +242,8 @@ relationships:
   - {from: AnalysisAttempt, to: ResultApplicationRecord, cardinality: "1 : 0..1", via: attemptId}
   - {from: ResultApplicationRecord, to: CandidateRegistration, cardinality: "1 : 0..N", via: applicationRecordId}
   - {from: CatchAsset, to: CandidateRegistration, cardinality: "1 : 1..N", via: catchId}
+  - {from: MemberAccount, to: AuthSession, cardinality: "1 : 0..N", via: memberId}
+  - {from: AuthSession, to: SessionRefreshToken, cardinality: "1 : 1..N", via: sessionId}
 ```
 
 ## 물리 스키마 전환 제약
