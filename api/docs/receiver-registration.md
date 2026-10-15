@@ -50,7 +50,7 @@ const outcome = await service.receiveResult(message, async receipt => {
 
 따라서 연결된 저장소 ID와 실제 좌표의 대조, 공개/비공개 상태를 언제 누가 관측하는지, 관측 근거·시각을 E 인터페이스로 전달할 구현·책임은 #105의 남은 연결 검토 사항이다. 이를 #231/#232의 추가 구현 책임으로 자동 배정하지 않는다. 실제 제공자가 확인되면 이 필수 경계를 연결하고 실제 관측을 사용한 재현을 별도로 수행해야 한다.
 
-[10/6 최신 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)과 [#234 철회 기록](https://github.com/JminAILab/CatchU/issues/234#issuecomment-6028927385)에 따라 결과 원문 보관·자동 재반영·worker 결과 14일 보관을 구현하지 않는다. 수신 커밋 후 중단·Receipt 전달 실패·공급 실패는 각각 `PENDING`/`APPLY_FAILED`에 남을 수 있다. [#237 처리 시한·실패 종료](https://github.com/JminAILab/CatchU/issues/237)는 계약 변경 후 별도로 요청을 닫는 작업이며 이번 서비스가 시간만으로 종료·재요청을 허용하지 않는다. 잠금 순서는 요청 → 현재 시도로 맞춘다.
+[10/6 최신 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)과 [#234 철회 기록](https://github.com/JminAILab/CatchU/issues/234#issuecomment-6028927385)에 따라 결과 원문 보관·자동 재반영·worker 결과 14일 보관을 구현하지 않는다. 수신 커밋 후 중단·Receipt 전달 실패·공급 실패는 각각 `PENDING`/`APPLY_FAILED`에 남을 수 있다. [#237 처리 시한·실패 종료](https://github.com/JminAILab/CatchU/issues/237)는 [PR #295](https://github.com/JminAILab/CatchU/pull/295)로 구현돼 주기 작업이 시한을 넘긴 요청을 닫는다([규칙](analysis-deadline.md)). 이 수신·반영 서비스 자체는 시간만으로 요청을 닫거나 재요청을 허용하지 않는다. 잠금 순서는 요청 → 현재 시도로 맞춘다.
 
 ## 검사와 한계
 
@@ -58,4 +58,4 @@ const outcome = await service.receiveResult(message, async receipt => {
 
 추가 동시성 검사는 실제 공개 서비스와 수신·반영 서비스를 호출하고, Catch 잠금 → 보호 관측 잠금 → 공개의 보호 잠금 대기를 `pg_blocking_pids`로 확인한 뒤 반영을 진행한다. 동일 작업의 기존 Catch 재사용과 PUBLIC 전환이 모두 커밋되고 같은 Catch ID·기존 본문·근거를 유지하며 새 시도는 APPLIED/CLOSED인지 검사한다. 기존 공개/숨김·보호 변경 경쟁·저장 실패·전체 롤백 검사는 전체 API 검사에 포함된다.
 
-실제 HTTP 검사는 파일 안의 전용 컨트롤러에서 기존 Auth/CurrentMemberId·개발 주입과 DB 모듈을 조립해 정상·중복·권한 경계·저장 실패를 확인한다. 접수한 요청·동의·시도는 시험 준비 단계에서 넣으며 #138 접수 API를 실행한 것이 아니다. **보호 공급은 명시적 합성 관측 대역**이다. 실제 OAuth·GitHub 관측·큐/worker 전송·#237 종료를 검증하지 않았으며 #105 전체 완료를 뜻하지 않는다.
+실제 HTTP 검사는 파일 안의 전용 컨트롤러에서 기존 Auth/CurrentMemberId·개발 주입과 DB 모듈을 조립해 정상·중복·권한 경계·저장 실패를 확인한다. 접수한 요청·동의·시도는 시험 준비 단계에서 넣으며 #138 접수 API를 실행한 것이 아니다(접수 API가 저장한 맥락의 연결 검증은 [분석 메시지 수신 「실제 접수 연결 검증」](analysis-receiver.md#실제-접수-연결-검증)). **보호 공급은 명시적 합성 관측 대역**이다. 실제 OAuth·GitHub 관측·큐/worker 전송·#237 종료를 검증하지 않았으며 #105 전체 완료를 뜻하지 않는다.
