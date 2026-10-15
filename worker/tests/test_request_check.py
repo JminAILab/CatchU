@@ -12,7 +12,6 @@ from app.processing import (
     synthetic_accepted_context,
     synthetic_request,
 )
-from app.processing.synthetic import CREDENTIAL_CONTEXT_REFERENCE
 
 ACCEPTED = synthetic_accepted_context()
 OTHER_ID = "00000000-0000-4000-8000-000000000999"
@@ -56,7 +55,7 @@ def test_synthetic_request_matches_accepted_context() -> None:
         allowed_resource_types=ACCEPTED.allowed_resource_types,
         selection_reference=ACCEPTED.selection_reference,
         source_mode="MOCK",
-        credential_context_reference=CREDENTIAL_CONTEXT_REFERENCE,
+        credential_context_reference=ACCEPTED.attempt_id,
     )
 
 
@@ -170,7 +169,7 @@ def test_context_mismatch_is_reported_before_stale_attempt() -> None:
 
 def test_credential_reference_does_not_admit_mismatched_request() -> None:
     request = _with("/memberId", OTHER_ID)
-    assert request["credentialContextReference"] == CREDENTIAL_CONTEXT_REFERENCE
+    assert request["credentialContextReference"] == ACCEPTED.attempt_id
 
     rejected = check_request(request, ACCEPTED)
 

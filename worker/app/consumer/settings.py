@@ -1,0 +1,204 @@
+"""분석 소비자 기동 설정: 환경변수 읽기와 검사, 비밀값 숨김, 시간 상한.
+
+큐 주소에는 비밀번호가 들어가므로 주소 전체를 비밀값으로 다룬다. 검사에 실패하면 입력 값을
+오류 문구에 싣지 않는다. 시간 상한은 환경변수로 열지 않고 코드 상수로 둔다(시험은 생성자 인자로
+바꾼다).
+"""
+
+import os
+import re
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from typing import Final, Literal, NoReturn
+from urllib.parse import urlsplit
+
+Environment = Literal["production", "development", "test"]
+
+DEFAULT_PREFIX: Final = "catchu"
+DEFAULT_CONCURRENCY: Final = 1
+MAX_CONCURRENCY: Final = 4
+DEFAULT_MOCK_SCENARIO: Final = "succeeded-one-candidate"
+
+_HOST = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?")
+_PREFIX = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
+
+
+class SettingsError(ValueError):
+    """기동 설정이 없거나 틀렸다. 문구에는 설정 이름만 담고 값은 담지 않는다."""
+
+
+class QueueUrl:
+    """큐 서버 주소. 비밀번호가 들어 있으므로 문자열 변환·repr에 드러내지 않는다."""
+
+    __slots__ = ("_value",)
+
+    def __init__(self, value: str) -> None:
+        self._value = value
+
+    def reveal(self) -> str:
+        return self._value
+
+    def __repr__(self) -> str:
+        return "QueueUrl(***)"
+
+    __str__ = __repr__
+
+    def __reduce__(self) -> NoReturn:
+        # 자식 프로세스로 넘기지 않는다(자식은 큐에 붙지 않는다).
+        raise TypeError("큐 주소는 다른 프로세스로 넘기지 않는다")
+
+
+@dataclass(frozen=True)
+class Limits:
+    """대기·처리 상한(초). 계획 「부모의 전송·조회 대기 상한」과 「총 마감의 범위」의 값이다."""
+
+    total: float = 20 * 60  # 꺼낸 시각부터 종결 프레임까지
+    child_grace: float = 30  # 자식은 total + child_grace에 스스로 끝낸다
+    parent_watch_interval: float = 1  # 자식이 부모 PID를 확인하는 간격
+    event_send: float = 5
+    result_send: float = 10
+    receipt_poll_once: float = 3
+    receipt_interval: float = 5
+    receipt_window: float = 5 * 60
+    receipt_remove: float = 3
+    child_exit_wait: float = 5  # 종결 프레임 뒤 자식이 스스로 끝나기를 기다림
+    terminate_wait: float = 5  # SIGTERM 뒤
+    kill_wait: float = 5  # SIGKILL 뒤 회수
+    pause: float = 2
+    shutdown: float = 25
+    frame_max_bytes: int = 16 * 1024 * 1024
+    lock_duration_ms: int = 30_000
+    stalled_interval_ms: int = 30_000
+
+
+@dataclass(frozen=True)
+class ChildSettings:
+    """자식에 넘기는 설정. 비밀값과 큐 접속 정보는 담지 않는다."""
+
+    environment: Environment
+    mock_enabled: bool
+    mock_scenario: str
+    limits: Limits
+
+
+@dataclass(frozen=True)
+class ConsumerSettings:
+    environment: Environment
+    queue_url: QueueUrl | None = field(repr=False)
+    prefix: str
+    concurrency: int
+    mock_enabled: bool
+    mock_scenario: str = DEFAULT_MOCK_SCENARIO
+    limits: Limits = field(default_factory=Limits)
+
+    @property
+    def consumer_enabled(self) -> bool:
+        return self.queue_url is not None
+
+    def for_child(self) -> ChildSettings:
+        return ChildSettings(
+            environment=self.environment,
+            mock_enabled=self.mock_enabled,
+            mock_scenario=self.mock_scenario,
+            limits=self.limits,
+        )
+
+    @classmethod
+    def from_environment(
+        cls,
+        environment: Mapping[str, str] | None = None,
+        *,
+        limits: Limits | None = None,
+        mock_scenario: str = DEFAULT_MOCK_SCENARIO,
+    ) -> "ConsumerSettings":
+        values = os.environ if environment is None else environment
+        env = _environment(values.get("NODE_ENV"))
+        development = env in ("development", "test")
+        return cls(
+            environment=env,
+            queue_url=_queue_url(values.get("CATCHU_QUEUE_REDIS_URL"), development),
+            prefix=_prefix(values.get("CATCHU_QUEUE_PREFIX")),
+            concurrency=_concurrency(values.get("CATCHU_WORKER_CONCURRENCY")),
+            mock_enabled=_mock(values.get("CATCHU_WORKER_MOCK"), development),
+            mock_scenario=mock_scenario,
+            limits=limits or Limits(),
+        )
+
+
+def _environment(value: str | None) -> Environment:
+    # 개발 동작은 development·test에서만 연다. 그 밖의 값은 모두 운영으로 본다.
+    if value == "development":
+        return "development"
+    if value == "test":
+        return "test"
+    return "production"
+
+
+def _printable(value: str) -> bool:
+    return all(0x21 <= ord(c) <= 0x7E for c in value)
+
+
+def _queue_url(value: str | None, development: bool) -> QueueUrl | None:
+    if value is None or value == "":
+        if development:
+            return None
+        raise SettingsError("운영 설정에는 CATCHU_QUEUE_REDIS_URL이 필요하다")
+    valid = False
+    try:
+        if not _printable(value):
+            raise ValueError
+        parsed = urlsplit(value)
+        host = parsed.hostname
+        port = parsed.port  # 범위 밖이면 ValueError
+        allowed = ("rediss", "redis") if development else ("rediss",)
+        # 질의 문자열은 redis-py 연결 옵션(예: TLS 인증서 검증 끄기)이 되므로 받지 않는다.
+        valid = (
+            parsed.scheme in allowed
+            and host is not None
+            and _HOST.fullmatch(host) is not None
+            and (port is None or port >= 1)
+            and re.fullmatch(r"(/[0-9]{1,2})?", parsed.path) is not None
+            and not parsed.query
+            and not parsed.fragment
+            and "?" not in value
+            and "#" not in value
+        )
+    except ValueError:
+        valid = False
+    if not valid:
+        raise SettingsError(
+            "CATCHU_QUEUE_REDIS_URL이 유효하지 않다"
+            " (운영은 rediss://만, 개발·시험은 redis://도 받는다. 질의 문자열은 받지 않는다)"
+        )
+    return QueueUrl(value)
+
+
+def _prefix(value: str | None) -> str:
+    if value is None or value == "":
+        return DEFAULT_PREFIX
+    if _PREFIX.fullmatch(value) is None:
+        raise SettingsError("CATCHU_QUEUE_PREFIX는 영문·숫자·_·-로 64자 이하여야 한다")
+    return value
+
+
+def _concurrency(value: str | None) -> int:
+    if value is None or value == "":
+        return DEFAULT_CONCURRENCY
+    if re.fullmatch(r"[0-9]{1,2}", value) is None or not (
+        1 <= int(value) <= MAX_CONCURRENCY
+    ):
+        raise SettingsError(
+            f"CATCHU_WORKER_CONCURRENCY는 1~{MAX_CONCURRENCY}의 정수여야 한다"
+        )
+    return int(value)
+
+
+def _mock(value: str | None, development: bool) -> bool:
+    if value is None or value == "":
+        return development
+    if value not in ("true", "false"):
+        raise SettingsError("CATCHU_WORKER_MOCK은 true 또는 false여야 한다")
+    if value == "true" and not development:
+        # MOCK 처리는 개발·시험에서만 연다(10/15 결정). 운영에서 켜려 하면 기동하지 않는다.
+        raise SettingsError("운영 설정에서는 CATCHU_WORKER_MOCK을 켤 수 없다")
+    return value == "true"
