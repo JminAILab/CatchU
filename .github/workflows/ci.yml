@@ -52,7 +52,8 @@ jobs:
               # api 테스트는 worker 합성 자료와 계약 YAML도 읽고, 공유 링크 web 통합 시험은 web의 share-links·lib 코드를 직접 불러온다.
               case "$file" in api/* | worker/fixtures/* | "$contract"* | web/src/features/share-links/* | web/src/lib/*) api=true ;; esac
               # worker 메시지 검사는 계약 YAML을 읽고, ruff는 루트 .gitignore에 적힌 파일을 검사에서 뺀다.
-              case "$file" in worker/* | "$contract"* | .gitignore) worker=true ;; esac
+              # 큐 소비자 시험은 큐 검증 키트의 판본(BullMQ·redis)과 같은지 보고 키트의 Node BullMQ로 요청을 넣는다.
+              case "$file" in worker/* | "$contract"* | .gitignore | docs/queue-verification/pyproject.toml | docs/queue-verification/uv.lock | docs/queue-verification/package.json | docs/queue-verification/package-lock.json) worker=true ;; esac
             done <<< "$files"
             # 의존성 취약점 검사는 의존성 목록·잠금 파일이 바뀐 서비스만 한다. 검사 방법(CI·스크립트·예외 목록)이 바뀌면 전부 한다.
             for s in web api worker; do
@@ -148,10 +149,25 @@ jobs:
     needs: changes
     if: needs.changes.outputs.worker == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: worker
+    env:
+      # 이 값이 있으면 큐 소비자의 실제 Redis 시험이 건너뛰지 않고 반드시 돈다(worker/docs/queue-consumer.md).
+      CATCHU_TEST_REDIS_URL: redis://127.0.0.1:6379
+      CATCHU_TEST_REQUIRE_NODE: '1'
+    services:
+      # 운영 큐(ElastiCache Valkey 8.1)와 같은 계열이자 큐 검증 키트가 돌린 Valkey 8.1.6. digest로 고정한다.
+      valkey:
+        image: valkey/valkey:8.1.6-alpine@sha256:1cb6b20b70d927560cc4cc5397b5f045e74aa603ff7696274778880bb6fadc75
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -164,6 +180,14 @@ jobs:
           cache-dependency-glob: uv.lock
       - run: uv python install # .python-version(3.12.10)
       - run: uv sync --locked
+      # 큐 소비자 시험 14는 api(#233)가 쓸 Node BullMQ로 요청을 넣는다. 판본은 큐 검증 키트에 고정한 것을 쓴다.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: docs/queue-verification/package.json
+          cache: npm
+          cache-dependency-path: docs/queue-verification/package-lock.json
+      - run: npm ci
+        working-directory: docs/queue-verification
       - run: uv run --locked ruff check .
       - run: uv run --locked ruff format --check .
       - run: uv run --locked mypy

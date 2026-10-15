@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 단일 호스트 계획 교체·처음 설치(#275). 사람이 실행하는 수동 절차이며 자동 배포가 아니다. 절차 설명은 deploy/README.md.
-#   1) 대상 이미지가 이 호스트에 있는지 확인(합성 DB 이미지는 없으면 받는다)하고, 교체 전에 실행 중인 서비스를 기록한다.
+#   1) 대상 이미지가 이 호스트에 있는지 확인(합성 DB·큐 이미지는 없으면 받는다)하고, 교체 전에 실행 중인 서비스를 기록한다.
 #      실행 상태를 조회하지 못하면 아무것도 멈추지 않고 끝낸다. 컨테이너가 아직 없으면(처음 설치) 실행 중이 아닌 것으로 본다
 #   2) 유입 차단: web·api를 멈추고, worker를 멈춘다
 #   3) 종료 확인: 같은 이름·같은 프로젝트의 web·api·worker가 하나라도 실행 중이거나 상태·종료 코드를 확인할 수 없으면 멈춘다.
@@ -14,7 +14,7 @@
 # 자동 재시도·자동 되돌리기·DB 복원은 하지 않는다. 진행 중이던 요청·분석은 끝까지 마친다고 보장하지 않는다.
 #
 # 사용: deploy/scripts/replace-single.sh --env-file <compose.env> [--local-db] [--migrate] [--stop-timeout 초]
-# 종료 코드: 0 성공, 2 사용법·사전 확인 실패(설정·이미지 조회 실패, 멈춘 뒤 합성 DB 기동·migration 준비 조회 실패 포함),
+# 종료 코드: 0 성공, 2 사용법·사전 확인 실패(설정·이미지 조회 실패, 멈춘 뒤 합성 DB·큐 기동·migration 준비 조회 실패 포함),
 #           3 종료 확인 실패(교체 전 상태 조회 실패, 새 실행 실패 뒤 다시 멈출 때 포함),
 #           4 migration 실패, 5 migration 결과 불명·남은 실행, 6 새 실행 확인 실패(세 서비스 종료까지 확인함),
 #           7 대기 상한을 넘어 강제 종료됨(원인 확인 뒤 다시 실행하면 이어서 진행),
@@ -80,10 +80,11 @@ container_status() {
 # 기록용. inspect는 컨테이너가 없을 때와 Docker 조회 실패를 같은 코드로 끝내므로 둘을 가르지 않는다(판정에는 container_status를 쓴다).
 state() { docker inspect -f '{{.Id}} {{.State.Status}} exit={{.State.ExitCode}} started={{.State.StartedAt}} finished={{.State.FinishedAt}} image={{.Image}}' "$1" 2>/dev/null || echo "확인 못 함(없거나 조회 실패)"; }
 
-# 1) 사전 확인. 앱 이미지는 미리 빌드하거나 받아 둔다. 합성 DB 이미지(digest 고정)는 없으면 받는다.
-db_image=""
+# 1) 사전 확인. 앱 이미지는 미리 빌드하거나 받아 둔다. 합성 DB·큐 이미지(digest 고정)는 없으면 받는다.
+db_image="" queue_image=""
 if [ "${local_db}" = true ]; then
   db_image=$("${compose[@]}" config --images db) || fail 2 "compose 설정에서 합성 DB 이미지를 읽지 못했습니다."
+  queue_image=$("${compose[@]}" config --images queue) || fail 2 "compose 설정에서 합성 큐 이미지를 읽지 못했습니다."
 fi
 images=$("${compose[@]}" --profile migration config --images) || fail 2 "compose 설정에서 이미지 목록을 읽지 못했습니다."
 for image in ${images}; do
@@ -92,6 +93,9 @@ for image in ${images}; do
   if [ -n "${db_image}" ] && [ "${image}" = "${db_image}" ]; then
     docker pull -q "${image}" >/dev/null || fail 2 "합성 DB 이미지를 받지 못했습니다: ${image}"
     log "합성 DB 이미지를 받았습니다: ${image}"
+  elif [ -n "${queue_image}" ] && [ "${image}" = "${queue_image}" ]; then
+    docker pull -q "${image}" >/dev/null || fail 2 "합성 큐 이미지를 받지 못했습니다: ${image}"
+    log "합성 큐 이미지를 받았습니다: ${image}"
   else
     fail 2 "이 호스트에 이미지가 없거나 Docker에서 확인하지 못했습니다: ${image} (먼저 빌드하거나 받아 두고, Docker가 응답하는지 확인합니다)"
   fi
@@ -179,7 +183,7 @@ fi
 # 4) migration: 이미지마다 정해진 이름으로 한 번만 실행한다.
 # 실행 전 준비 조회(이미지 이름·ID, 같은 이름 실행)가 실패하면 서비스는 멈춘 채 migration을 시작하지 않고 2로 끝낸다.
 if [ "${local_db}" = true ]; then
-  "${compose[@]}" up -d --wait --wait-timeout 120 db || fail 2 "합성 DB가 정상 확인에 실패했습니다. web·api·worker는 멈춘 상태이고 migration·새 실행은 시작하지 않았습니다."
+  "${compose[@]}" up -d --wait --wait-timeout 120 db queue || fail 2 "합성 DB·큐가 정상 확인에 실패했습니다. web·api·worker는 멈춘 상태이고 migration·새 실행은 시작하지 않았습니다."
 fi
 if [ "${migrate}" = true ]; then
   not_started="web·api·worker는 멈춘 상태이고 migration은 시작하지 않았습니다."
