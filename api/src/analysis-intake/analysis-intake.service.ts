@@ -9,7 +9,7 @@ import { runIdempotentCreation } from '../member-analysis/idempotent-creation';
 import { repositoryPage } from '../member-repositories/repository-page';
 import { AnalysisInput, analysisFingerprint, parseAnalysisInput } from './analysis-input';
 import { AnalysisNoticeService } from './analysis-notice';
-import { readAnalysisStatus } from './analysis-status';
+import { blocksReanalysis, readAnalysisStatus } from './analysis-status';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 @Injectable()
@@ -64,11 +64,11 @@ export class AnalysisIntakeService {
           }
           const previous = await same.find(AnalysisRequest, { where: { memberId, repositoryId: input.repositoryId },
             order: { submittedAt: 'DESC', requestId: 'DESC' } });
-          // 같은 저장소의 과거 정상·부분 결과를 새 ID로 우회하지 않는다.
+          // 같은 저장소의 과거 정상·부분 결과를 새 ID로 우회하지 않는다. 반영 실패로 닫혀 등록이 없는 요청은
+          // 정상 완료가 아니므로 막지 않고 아래의 가장 최근 요청 재요청 판정으로 넘긴다.
           for (const request of previous) {
             const { status } = await readAnalysisStatus(same, memberId, request.requestId);
-            if (['SUCCEEDED', 'EMPTY', 'PARTIAL_FAILED'].includes(status.processing) ||
-                status.retry.reason === 'RESULTS_EXIST') throw new ApiError('REANALYSIS_DEFERRED');
+            if (blocksReanalysis(status)) throw new ApiError('REANALYSIS_DEFERRED');
           }
           if (previous.length > 0) {
             const latest = previous[0];

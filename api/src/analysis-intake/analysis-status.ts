@@ -4,10 +4,16 @@ import { ResultApplicationRecord } from '../result-application/result-applicatio
 
 export type RetryReason = 'FAILURE_WITHOUT_RESULTS' | 'IN_PROGRESS' | 'RESULTS_EXIST' | 'NOT_FAILED' |
   'EXECUTION_UNCERTAIN' | 'APPLICATION_UNRESOLVED' | 'REANALYSIS_DEFERRED';
+/** 반영 실패로 닫힌 요청이다. 처리 결과와 적합 후보 수는 재요청 판정에서 보지 않는다. */
+const closedApplyFailure = (request: AnalysisRequest, attempt: AnalysisAttempt) =>
+  request.lifecycle === 'CLOSED' && attempt.application === 'APPLY_FAILED';
 export function retryDecision(request: AnalysisRequest, attempt: AnalysisAttempt, registrationCount: number,
   confirmedFailure = attempt.failureConfirmationReference) {
+  const closedApply = closedApplyFailure(request, attempt);
   let reason: RetryReason;
-  if (attempt.eligibleCandidateCount > 0 || registrationCount > 0 || attempt.ownerResultsReady) reason = 'RESULTS_EXIST';
+  // 등록 Catch가 하나라도 있으면 어느 경우에도 재요청하지 않는다(기존 Catch·공개·링크 불변).
+  if (registrationCount > 0 || attempt.ownerResultsReady || (!closedApply && attempt.eligibleCandidateCount > 0)) reason = 'RESULTS_EXIST';
+  else if (closedApply) reason = 'FAILURE_WITHOUT_RESULTS';
   else if (attempt.processing === 'UNCERTAIN') reason = 'EXECUTION_UNCERTAIN';
   else if (['PENDING', 'APPLYING', 'RECOVERING', 'APPLY_FAILED'].includes(attempt.application)) reason = 'APPLICATION_UNRESOLVED';
   else if (request.lifecycle === 'ACTIVE' || ['QUEUED', 'RUNNING'].includes(attempt.processing)) reason = 'IN_PROGRESS';
@@ -16,6 +22,16 @@ export function retryDecision(request: AnalysisRequest, attempt: AnalysisAttempt
       !confirmedFailure?.trim()) reason = 'NOT_FAILED';
   else reason = 'FAILURE_WITHOUT_RESULTS';
   return { allowed: reason === 'FAILURE_WITHOUT_RESULTS', reason };
+}
+/**
+ * 같은 저장소의 새 분석을 막는 과거 결과인지 판정한다. 정상 완료·정상 0건·유효 결과가 반영된 부분 실패와
+ * 등록 Catch가 있는 요청은 막는다. 반영 실패로 닫혀 등록이 없는 요청은 정상 완료가 아니므로 막지 않는다.
+ */
+export function blocksReanalysis(status: { processing: string; lifecycle: string; application: string;
+  retry: { reason: RetryReason } }) {
+  if (status.retry.reason === 'RESULTS_EXIST') return true;
+  if (status.lifecycle === 'CLOSED' && status.application === 'APPLY_FAILED') return false;
+  return ['SUCCEEDED', 'EMPTY', 'PARTIAL_FAILED'].includes(status.processing);
 }
 /** 상태 변경을 막되 멱등 소유 확인의 KEY SHARE와 경합하지 않는 요청→시도 잠금으로 읽는다. */
 export async function readAnalysisStatus(manager: EntityManager, memberId: string, requestId: string) {

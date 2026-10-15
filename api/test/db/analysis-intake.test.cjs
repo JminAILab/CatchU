@@ -78,6 +78,42 @@ async function terminal(requestId, processing = 'FAILED', changes = {}) {
   });
   await db.manager.update(AnalysisRequest, { requestId }, { lifecycle: 'CLOSED' });
 }
+async function applyFailed(requestId, changes = {}) {
+  const request = await db.manager.findOneByOrFail(AnalysisRequest, { requestId });
+  await db.manager.update(AnalysisAttempt, { attemptId: request.currentAttemptId }, {
+    processing: 'FAILED', application: 'APPLY_FAILED', eligibleCandidateCount: 0, ownerResultsReady: false,
+    failures: [{ stage: 'APPLICATION', code: 'PROCESSING_DEADLINE_EXCEEDED', message: '정해진 시간 안에 결과를 반영하지 못했습니다.' }],
+    failureConfirmationReference: null, ...changes,
+  });
+  await db.manager.update(AnalysisRequest, { requestId }, { lifecycle: 'CLOSED' });
+}
+/** 시험용 등록 Catch를 만든다. link=false는 등록 연결 없이 Catch 본체만 남긴 경우다. */
+async function registerCatch(requestId, { ready = true, link = true } = {}) {
+  const request = await db.manager.findOneByOrFail(AnalysisRequest, { requestId });
+  const catchId = randomUUID();
+  await db.query(`INSERT INTO catch_asset (catch_id, title, owner_id, source_request_id, source_result_id,
+    source_candidate_id, work_identity, work_facts, subject_contribution, draft_status, reflection_status,
+    reflection_questions, registration_assessment, source_mode)
+    VALUES ($1, '합성 Catch', $2, $3, $4, 'candidate-1', $5, ARRAY['합성 사실'], '합성 기여', 'NOT_GENERATED',
+    'NOT_GENERATED', ARRAY[]::text[], '{}'::jsonb, 'MOCK')`,
+  [catchId, request.memberId, requestId, 'result-' + catchId, 'identity-' + catchId]);
+  if (link) {
+    const recordId = randomUUID();
+    await db.query('INSERT INTO result_application_record VALUES ($1, $2, $3, $4, $5, now())',
+      [recordId, requestId, request.currentAttemptId, 'result-' + catchId, 'a'.repeat(64)]);
+    await db.query('INSERT INTO candidate_registration VALUES ($1, $2, $3, $4, $5, $6)',
+      [randomUUID(), recordId, 'candidate-1', catchId, 'CREATED', ready]);
+  }
+  return catchId;
+}
+/** 기존 요청의 요청·동의·시도·멱등 키·Catch 행을 비교용으로 읽는다. */
+async function snapshot(requestId) {
+  return db.query(`SELECT to_jsonb(r) AS request, to_jsonb(c) AS consent, to_jsonb(a) AS attempt,
+    (SELECT coalesce(jsonb_agg(to_jsonb(k) ORDER BY k.key), '[]') FROM idempotency_record k WHERE k.request_id = r.request_id) AS keys,
+    (SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.catch_id), '[]') FROM catch_asset x WHERE x.source_request_id = r.request_id) AS catches
+    FROM analysis_request r JOIN analysis_consent c ON c.consent_id = r.consent_id
+    JOIN analysis_attempt a ON a.attempt_id = r.current_attempt_id WHERE r.request_id = $1`, [requestId]);
+}
 async function waitForMemberWaiters(blockerPid, expected) {
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
@@ -387,7 +423,7 @@ for(const processing of ['EMPTY','SUCCEEDED','PARTIAL_FAILED']){
     assert.equal((await counts()).requests,1);
   });
 }
-for(const changes of [{failureConfirmationReference:null},{failures:[]},{processing:'UNCERTAIN'},{application:'RECOVERING'},{application:'APPLY_FAILED'},{eligibleCandidateCount:1},{ownerResultsReady:true}]){
+for(const changes of [{failureConfirmationReference:null},{failures:[]},{processing:'UNCERTAIN'},{application:'RECOVERING'},{eligibleCandidateCount:1},{ownerResultsReady:true}]){
   test('실행 불명·반영 미해결·근거 부족·유효 결과 재요청 거부: '+JSON.stringify(changes),async t=>{
     const s=await start(t);const u=await s.login();const first=await(await s.post(u)).json();await terminal(first.requestId,'FAILED',changes);
     await error(await s.post(u,randomUUID(),command({retryOfRequestId:first.requestId})),409,
@@ -426,4 +462,111 @@ test('기존 E의 검증된 실패 Result·반영 완료를 확정 근거로 쓰
   await application.apply(received.accepted);
   const state=await(await s.post(u,key)).json();assert.equal(state.retry.allowed,true);assert.equal(state.lifecycle,'CLOSED');
   assert.equal((await s.post(u,randomUUID(),command({retryOfRequestId:first.requestId}))).status,202);
+});
+
+// #237 처리 시한 계약(PR #292): 반영 실패로 닫혀 등록 Catch가 없는 요청도 재요청한다. 닫는 주기 구현이
+// 병합되지 않았으므로 닫힌 상태는 시험 DB에 직접 구성한다.
+const closedApplyCases = [
+  { processing: 'FAILED', eligibleCandidateCount: 0 },
+  { processing: 'EMPTY', eligibleCandidateCount: 0 },
+  { processing: 'SUCCEEDED', eligibleCandidateCount: 2 },
+  { processing: 'PARTIAL_FAILED', eligibleCandidateCount: 1 },
+];
+for (const changes of closedApplyCases) {
+  test('반영 실패로 닫히고 등록이 없으면 처리 결과·후보 수와 무관하게 새 동의로 재요청한다: ' + JSON.stringify(changes), async t => {
+    const s = await start(t); const u = await s.login(); const originalKey = randomUUID();
+    const first = await (await s.post(u, originalKey)).json(); await applyFailed(first.requestId, changes);
+    const original = await snapshot(first.requestId);
+    // 응답의 retry 정보가 실제 POST 판정과 같다.
+    const state = await s.post(u, originalKey); assert.equal(state.status, 200);
+    const shown = await state.json();
+    assert.deepEqual(shown.retry, { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' });
+    assert.equal(shown.lifecycle, 'CLOSED'); assert.equal(shown.application, 'APPLY_FAILED');
+    assert.deepEqual(shown.registeredCatchIds, []); assert.equal(shown.ownerResultsReady, false);
+    // 참조를 생략해 우회하지 못하고, 새 동의의 판본·대상은 다시 검사한다.
+    await error(await s.post(u, randomUUID(), command()), 409, 'RETRY_NOT_ALLOWED');
+    const retry = { retryOfRequestId: first.requestId };
+    await error(await s.post(u, randomUUID(), command({ ...retry,
+      consent: { ...command().consent, noticeRevision: 'old-notice' } })), 403, 'CONSENT_REQUIRED');
+    await error(await s.post(u, randomUUID(), command({ ...retry,
+      consent: { ...command().consent, scopeRevision: randomUUID() } })), 403, 'CONSENT_REQUIRED');
+    await error(await s.post(u, randomUUID(), command({ ...retry, repositoryId: 'synthetic-not-selected' })),
+      403, 'REPOSITORY_NOT_ALLOWED');
+    assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 1 });
+    const key = randomUUID(); const body = command(retry);
+    const response = await s.post(u, key, body); assert.equal(response.status, 202);
+    const next = await response.json();
+    for (const field of ['requestId', 'consentId', 'attemptId']) assert.notEqual(next[field], first[field]);
+    assert.equal(next.lifecycle, 'ACTIVE'); assert.equal(next.processing, 'QUEUED'); assert.equal(next.application, 'NOT_READY');
+    assert.equal((await db.manager.findOneByOrFail(AnalysisRequest, { requestId: next.requestId })).retryOfRequestId, first.requestId);
+    assert.equal((await db.manager.findOneByOrFail(AnalysisConsent, { consentId: next.consentId })).requestId, next.requestId);
+    assert.deepEqual(await counts(), { requests: 2, consents: 2, attempts: 2, keys: 2 });
+    assert.deepEqual(await snapshot(first.requestId), original);
+    // 같은 키 재전송은 새 행을 만들지 않고, 이전 키는 현재 진행 중임을 보여 준다.
+    const replay = await s.post(u, key, body); assert.equal(replay.status, 200);
+    assert.equal((await replay.json()).requestId, next.requestId);
+    assert.deepEqual((await (await s.post(u, originalKey)).json()).retry, { allowed: false, reason: 'IN_PROGRESS' });
+    assert.deepEqual(await counts(), { requests: 2, consents: 2, attempts: 2, keys: 2 });
+  });
+}
+for (const registration of [{ ready: true }, { ready: false }, { link: false }]) {
+  test('반영 실패로 닫혔어도 등록 Catch가 있으면 재요청·참조 생략 모두 거부한다: ' + JSON.stringify(registration), async t => {
+    const s = await start(t); const u = await s.login(); const key = randomUUID();
+    const first = await (await s.post(u, key)).json();
+    await applyFailed(first.requestId, { processing: 'SUCCEEDED', eligibleCandidateCount: 1 });
+    await registerCatch(first.requestId, registration);
+    const original = await snapshot(first.requestId);
+    const shown = await (await s.post(u, key)).json();
+    assert.deepEqual(shown.retry, { allowed: false, reason: 'RESULTS_EXIST' });
+    for (const body of [command(), command({ retryOfRequestId: first.requestId })]) {
+      await error(await s.post(u, randomUUID(), body), 409, 'REANALYSIS_DEFERRED');
+    }
+    assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 1 });
+    assert.deepEqual(await snapshot(first.requestId), original);
+  });
+}
+test('반영 실패라도 닫히기 전 ACTIVE 요청은 재요청하지 않고 같은 저장소 200·다른 저장소 409로 처리한다', async t => {
+  const s = await start(t); const u = await s.login(); const second = otherRepository(s); const key = randomUUID();
+  const first = await (await s.post(u, key)).json();
+  await applyFailed(first.requestId, { processing: 'SUCCEEDED', eligibleCandidateCount: 1 });
+  await db.manager.update(AnalysisRequest, { requestId: first.requestId }, { lifecycle: 'ACTIVE' });
+  const shown = await (await s.post(u, key)).json();
+  assert.equal(shown.lifecycle, 'ACTIVE'); assert.equal(shown.retry.allowed, false);
+  const same = await s.post(u, randomUUID(), command({ retryOfRequestId: first.requestId }));
+  assert.equal(same.status, 200); assert.equal((await same.json()).requestId, first.requestId);
+  const other = await error(await s.post(u, randomUUID(), command({ repositoryId: second.repositoryId })), 409, 'ANALYSIS_IN_PROGRESS');
+  assert.equal(other.details.existingRequestId, first.requestId);
+  assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 2 });
+});
+test('반영 실패 재요청 뒤에는 최신 요청만 판정하고 정상 완료 뒤에는 다시 분석하지 못한다', async t => {
+  const s = await start(t); const u = await s.login(); const key = randomUUID();
+  const first = await (await s.post(u, key)).json();
+  await applyFailed(first.requestId, { processing: 'SUCCEEDED', eligibleCandidateCount: 3 });
+  const second = await (await s.post(u, randomUUID(), command({ retryOfRequestId: first.requestId }))).json();
+  // 이미 후속 요청이 있는 오래된 반영 실패는 재요청 대상으로 표시하지 않는다.
+  await applyFailed(second.requestId, { processing: 'EMPTY' });
+  assert.deepEqual((await (await s.post(u, key)).json()).retry, { allowed: false, reason: 'REANALYSIS_DEFERRED' });
+  await error(await s.post(u, randomUUID(), command({ retryOfRequestId: first.requestId })), 409, 'RETRY_NOT_ALLOWED');
+  const thirdResponse = await s.post(u, randomUUID(), command({ retryOfRequestId: second.requestId }));
+  assert.equal(thirdResponse.status, 202);
+  const third = await thirdResponse.json();
+  await terminal(third.requestId, 'EMPTY');
+  for (const retryOfRequestId of [undefined, first.requestId, second.requestId, third.requestId]) {
+    await error(await s.post(u, randomUUID(), command(retryOfRequestId ? { retryOfRequestId } : {})), 409, 'REANALYSIS_DEFERRED');
+  }
+  assert.deepEqual(await counts(), { requests: 3, consents: 3, attempts: 3, keys: 3 });
+});
+test('retryDecision은 닫힌 반영 실패를 등록 Catch가 없을 때만 허용한다', () => {
+  const make = (lifecycle, changes) => [Object.assign(new AnalysisRequest(), { lifecycle }),
+    Object.assign(new AnalysisAttempt(), { processing: 'SUCCEEDED', application: 'APPLY_FAILED', eligibleCandidateCount: 3,
+      ownerResultsReady: false, failures: [], failureConfirmationReference: null, ...changes })];
+  const allowed = { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' };
+  assert.deepEqual(retryDecision(...make('CLOSED', {}), 0), allowed);
+  assert.deepEqual(retryDecision(...make('CLOSED', { processing: 'UNCERTAIN' }), 0), allowed);
+  assert.deepEqual(retryDecision(...make('CLOSED', {}), 1), { allowed: false, reason: 'RESULTS_EXIST' });
+  assert.deepEqual(retryDecision(...make('CLOSED', { ownerResultsReady: true }), 0), { allowed: false, reason: 'RESULTS_EXIST' });
+  assert.deepEqual(retryDecision(...make('ACTIVE', {}), 0), { allowed: false, reason: 'RESULTS_EXIST' });
+  assert.deepEqual(retryDecision(...make('ACTIVE', { eligibleCandidateCount: 0 }), 0), { allowed: false, reason: 'APPLICATION_UNRESOLVED' });
+  assert.deepEqual(retryDecision(...make('CLOSED', { application: 'RECOVERING', eligibleCandidateCount: 0 }), 0),
+    { allowed: false, reason: 'APPLICATION_UNRESOLVED' });
 });
