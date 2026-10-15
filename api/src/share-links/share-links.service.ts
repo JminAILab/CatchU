@@ -56,6 +56,7 @@ export class ShareLinksService {
   /**
    * 링크 발급(POST /v1/share-links). 멱등 키 예약 → 발급 판정·저장 → 멱등 기록 → 응답 구성을 한 READ COMMITTED 트랜잭션에서 한다.
    * 잠금 순서는 공통 멱등 키 잠금 → 회원 단위 발급 잠금이다(api/docs/member-analysis.md 「멱등 생성 호출」).
+   * 비밀번호가 있는 같은 키 재요청만 예외로, 비밀번호 비교를 트랜잭션 밖에서 한 뒤 링크를 다시 읽어 응답 상태를 구성한다.
    */
   async create(memberId: string, idempotencyKey: string | undefined, body: unknown): Promise<CreateShareLinkResult> {
     const { webBaseUrl } = this.config;
@@ -100,9 +101,17 @@ export class ShareLinksService {
         },
       });
     });
-    // 재요청이면 키 잠금·DB 연결을 놓은 뒤 비밀번호를 비교한다. 다르면 이미 읽어 둔 응답을 돌려주지 않고 409로 거절한다.
+    // 비밀번호 비교가 필요한 재요청은 키 잠금·DB 연결을 놓은 뒤 비교한다. 다르면 이미 구성한 응답을 돌려주지 않고 추가 조회 없이 409로 거절한다.
     // 이 비교는 쓰기 없이 읽은 저장값을 대상으로 하므로 롤백할 것이 없고, 같은 키는 다시 보낼 수 있다.
-    if (replayed && !await verifyPendingPassword(pendingPassword)) throw new ApiError('IDEMPOTENCY_CONFLICT');
+    if (replayed && pendingPassword !== null) {
+      if (!await verifyPendingPassword(pendingPassword)) throw new ApiError('IDEMPOTENCY_CONFLICT');
+      // 비교하는 동안 링크가 중단·만료됐을 수 있어, 트랜잭션 안에서 만든 응답 대신 지금의 링크로 상태를 다시 구성한다.
+      // 재요청의 응답은 "현재 상태"여야 하기 때문이다. 링크가 없으면 낡은 성공 응답을 돌려주지 않고 서버 오류로 처리한다.
+      const current = await this.dataSource.getRepository(ShareLink).findOneBy({ linkId: response.linkId, ownerId: memberId });
+      if (!current) throw new ApiError('INTERNAL_ERROR');
+      return { replayed, link: toShareLinkResponse(current, webBaseUrl, this.clock()) };
+    }
+    // 비밀번호 없는 재요청은 비교 대기가 없어, 트랜잭션 안에서 구성한 응답을 그대로 돌려준다(커밋 직후, 목록·단건 조회와 같은 수준).
     return { replayed, link: response };
   }
 

@@ -72,8 +72,11 @@ async function create(token, key, body) {
 }
 const count = async (table) => Number((await db.query(`SELECT count(*) AS n FROM ${table}`))[0].n);
 
-/** 비밀번호 비교를 감싸 호출 수·동시 실행 수·그 순간 서버에 남은 잠금과 열린 트랜잭션을 잰다. */
-function instrumentVerify(t, delayMs = 0) {
+/**
+ * 비밀번호 비교를 감싸 호출 수·동시 실행 수·그 순간 서버에 남은 잠금과 열린 트랜잭션을 잰다.
+ * `during`은 비교가 진행되는 동안(키 잠금·연결을 놓은 뒤) 실행할 동작이다.
+ */
+function instrumentVerify(t, delayMs = 0, during = null) {
   const passwordModule = require('../../dist/share-links/link-password');
   const original = passwordModule.verifyLinkPassword;
   const probe = { calls: 0, active: 0, peak: 0, locksHeld: [], openTransactions: [] };
@@ -89,6 +92,7 @@ function instrumentVerify(t, delayMs = 0) {
       probe.locksHeld.push(locks);
       probe.openTransactions.push(open);
       if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      if (during) await during();
       return await original(...args);
     } finally {
       probe.active -= 1;
@@ -250,4 +254,83 @@ test('키 잠금을 상한 안에 얻지 못하면 최초·재요청 모두 500 
   const wrong = await create(token, 'key-lock', { title: '키 대기', password: 'synthetic-wrong-password' });
   assert.equal(wrong.status, 409);
   assert.equal(wrong.body.code, 'IDEMPOTENCY_CONFLICT');
+});
+
+// 비밀번호 비교가 끝난 뒤의 응답은 비교 전에 만든 응답이 아니라 그 시점의 링크 상태여야 한다(PR #302 Codex P2).
+
+async function stopLink(token, linkId) {
+  const response = await fetch(`${url}/v1/share-links/${linkId}/stop`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000),
+  });
+  return { status: response.status, body: await response.json() };
+}
+
+test('비교하는 동안 링크가 중단되면 같은 키 재요청은 STOPPED를 돌려준다', async (t) => {
+  const { token } = await login();
+  const first = await create(token, 'stop-key', { title: '중단될 링크', password: PASSWORD });
+  assert.equal(first.status, 201);
+  assert.equal(first.body.state, 'ACTIVE');
+  let stopped;
+  const probe = instrumentVerify(t, 0, async () => {
+    // 비교 중에는 키 잠금·연결을 놓고 있으므로 실제 중단 API가 끝까지 완료된다.
+    stopped = await stopLink(token, first.body.linkId);
+  });
+  const replay = await create(token, 'stop-key', { title: '중단될 링크', password: PASSWORD });
+  assert.equal(probe.calls, 1);
+  assert.equal(stopped.status, 200, JSON.stringify(stopped.body));
+  assert.equal(stopped.body.state, 'STOPPED');
+  assert.equal(replay.status, 200, JSON.stringify(replay.body));
+  assert.equal(replay.body.linkId, first.body.linkId);
+  assert.equal(replay.body.state, 'STOPPED');
+  assert.equal(replay.body.stoppedAt, stopped.body.stoppedAt);
+  assert.equal(await count('share_link'), 1);
+  assert.equal(await count('idempotency_record'), 1);
+});
+
+test('비교하는 동안 만료 시각을 지나면 같은 키 재요청은 EXPIRED를 돌려준다', async (t) => {
+  const { token } = await login();
+  const first = await create(token, 'expire-key', { title: '만료될 링크', password: PASSWORD });
+  assert.equal(first.status, 201);
+  const { ShareLinksService } = require('../../dist/share-links/share-links.service');
+  const service = app.get(ShareLinksService);
+  const realClock = service.clock;
+  t.after(() => { service.clock = realClock; });
+  const expiresAt = new Date(first.body.expiresAt).getTime();
+  instrumentVerify(t, 0, async () => {
+    // 비교가 시작된 뒤 주입한 시계가 만료 시각을 넘긴다. 비교 전에 만든 응답은 ACTIVE였다.
+    service.clock = () => new Date(expiresAt + 1000);
+  });
+  const replay = await create(token, 'expire-key', { title: '만료될 링크', password: PASSWORD });
+  assert.equal(replay.status, 200, JSON.stringify(replay.body));
+  assert.equal(replay.body.linkId, first.body.linkId);
+  assert.equal(replay.body.state, 'EXPIRED');
+  assert.equal(replay.body.stoppedAt, null);
+});
+
+test('비교 뒤 링크를 다시 읽지 못하면 낡은 성공 응답 대신 500 INTERNAL_ERROR다', async (t) => {
+  const { token } = await login();
+  const first = await create(token, 'gone-key', { title: '사라질 링크', password: PASSWORD });
+  assert.equal(first.status, 201);
+  instrumentVerify(t, 0, async () => {
+    await db.query('DELETE FROM idempotency_record');
+    await db.query('DELETE FROM share_link');
+  });
+  const replay = await create(token, 'gone-key', { title: '사라질 링크', password: PASSWORD });
+  assert.equal(replay.status, 500, JSON.stringify(replay.body));
+  assert.equal(replay.body.code, 'INTERNAL_ERROR');
+  assert.equal(replay.cacheControl, 'no-store');
+});
+
+test('비밀번호가 다르면 링크를 다시 읽지 않고 기존 409를 유지한다', async (t) => {
+  const { token } = await login();
+  const first = await create(token, 'wrong-key', { title: '다른 비밀번호', password: PASSWORD });
+  assert.equal(first.status, 201);
+  // 다시 읽었다면 링크가 없어 500이 된다. 409이면 추가 조회를 하지 않은 것이다.
+  instrumentVerify(t, 0, async () => {
+    await db.query('DELETE FROM idempotency_record');
+    await db.query('DELETE FROM share_link');
+  });
+  const replay = await create(token, 'wrong-key', { title: '다른 비밀번호', password: `${PASSWORD}-x` });
+  assert.equal(replay.status, 409, JSON.stringify(replay.body));
+  assert.equal(replay.body.code, 'IDEMPOTENCY_CONFLICT');
 });
