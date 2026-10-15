@@ -36,8 +36,9 @@ export class WorkerContextService {
     return await query.getRawOne<AcceptedWorkerContext>() ?? unavailable();
   }
 
-  private async selected(manager: EntityManager, context: AcceptedWorkerContext): Promise<WorkerRepositorySelection> {
-    const selection = await this.selections.resolve(manager, context);
+  private async selected(manager: EntityManager, context: AcceptedWorkerContext,
+    lock: 'pessimistic_read' | null): Promise<WorkerRepositorySelection> {
+    const selection = await this.selections.resolve(manager, context, { lock });
     if (!selection || selection.attemptId !== context.attemptId || selection.requestId !== context.requestId ||
         selection.memberId !== context.memberId || selection.repositoryId !== context.repositoryId ||
         selection.scopeRevision !== context.scopeRevision || selection.wholeRepository !== true) return unavailable();
@@ -53,7 +54,7 @@ export class WorkerContextService {
   async read(attemptId: string) {
     if (!isUUID(attemptId)) return unavailable();
     const accepted = await this.accepted(this.dataSource.manager, attemptId);
-    const selected = await this.selected(this.dataSource.manager, accepted);
+    const selected = await this.selected(this.dataSource.manager, accepted, null);
     // 연결 참조는 불투명 비교값으로만 읽는다. 자격정보 원문/보관 참조 해석은 기존 함수의 책임이다.
     const connection = await this.dataSource.manager.findOneBy(GitHubConnection, { memberId: accepted.memberId });
     if (connection?.connectionState !== 'CONNECTED' || connection.credentialReference === null) return unavailable();
@@ -65,7 +66,7 @@ export class WorkerContextService {
       const current = await this.accepted(manager, attemptId, true);
       if (current.requestId !== accepted.requestId || current.memberId !== accepted.memberId ||
           current.repositoryId !== accepted.repositoryId || current.scopeRevision !== accepted.scopeRevision) return unavailable();
-      const selection = await this.selected(manager, current);
+      const selection = await this.selected(manager, current, 'pessimistic_read');
       // resolveCredential이 끝난 뒤 선정 확인을 기다리는 동안 해제/같은 계정 재연결도 일어날 수 있다.
       // 이 행 잠금부터 응답 객체 구성까지 연결 교체가 끼어들지 못하게 하고 이전 참조를 거부한다.
       const currentConnection = await manager.findOne(GitHubConnection, {
