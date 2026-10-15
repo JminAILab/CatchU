@@ -77,7 +77,7 @@ class ConsumerService:
         child_target: ChildTarget = child_main,
         output_wrapper: Callable[[OutputQueue], OutputQueue] = lambda output: output,
         install_signals: bool = True,
-        hard_exit: Callable[[int], NoReturn] = os._exit,
+        hard_exit: Callable[[int], NoReturn] | None = None,
         worker_options: Mapping[str, Any] | None = None,
     ) -> None:
         self._settings = settings
@@ -87,7 +87,7 @@ class ConsumerService:
         self._child_target = child_target
         self._output_wrapper = output_wrapper
         self._install_signals = install_signals
-        self._hard_exit = hard_exit
+        self._hard_exit = hard_exit or _kill_self
         # 시험에서만 쓴다(예: 재연결 대기를 줄임). 운영 값은 아래 Worker 옵션이다.
         self._worker_options = dict(worker_options or {})
         self._stop_requested = asyncio.Event()
@@ -215,6 +215,10 @@ class ConsumerService:
             processor.abort_active()
             if not await _until(lambda: processor.active == 0, remaining()):
                 return self._hard_stop()
+            # close()는 부른 순간의 처리 작업만 기다린다. 멈추기 직전에 꺼낸 작업의 처리와 실패 기록
+            # (WORKER_STOPPING)이 끝나기 전에 연결을 닫지 않도록, BullMQ의 진행 작업이 비기를 먼저 기다린다.
+            if not await _until(lambda: _bullmq_idle(worker), remaining()):
+                return self._hard_stop()
             if self.receipts is not None:
                 await self.receipts.cancel_all()
             close = asyncio.create_task(worker.close())
@@ -245,6 +249,15 @@ class ConsumerService:
         self._hard_exit(1)
 
 
+def _bullmq_idle(worker: Worker) -> bool:
+    """처리 중인 작업(완료·실패 기록 포함)이 없고, 가져오기 작업도 모두 끝났다.
+
+    BullMQ Worker의 `jobs`는 processJob이 끝날 때(기록 뒤) 비고, `processing`은 가져오기·처리
+    작업 묶음이다. 동시 수가 1이면 멈춘 뒤 새 작업이 들어오지 않는다.
+    """
+    return not worker.jobs and all(task.done() for task in worker.processing)
+
+
 async def _bounded(awaitable: Awaitable[Any], timeout: float) -> None:
     try:
         await asyncio.wait_for(awaitable, timeout)
@@ -259,6 +272,13 @@ async def _until(condition: Callable[[], bool], timeout: float) -> bool:
             return False
         await asyncio.sleep(0.05)
     return True
+
+
+def _kill_self(code: int) -> NoReturn:
+    """종료 상한을 넘기면 스스로 SIGKILL로 끝낸다. 컨테이너 종료 코드가 정지 유예 초과 강제 종료와
+    같은 137이 되어, 교체 절차(replace-single.sh)가 정상 종료로 보지 않고 멈춘다."""
+    os.kill(os.getpid(), signal.SIGKILL)
+    os._exit(code)  # SIGKILL이 막힌 환경에서만 닿는다
 
 
 def _log_worker_error(error: BaseException, *_: Any) -> None:

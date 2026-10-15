@@ -129,6 +129,7 @@ class ReceiptWatcher:
         message_id = sent["messageId"]
         end = self._clock() + self._limits.receipt_window
         last_seen = "missing"
+        observed = False
         try:
             while True:
                 await self._sleep(self._limits.receipt_interval)
@@ -136,6 +137,7 @@ class ReceiptWatcher:
                 if isinstance(view, ResultJobView) and view.finished:
                     record = classify(view, sent)
                     self._log(sent, record)
+                    observed = True
                     await self._remove(message_id)
                     return record
                 last_seen = (
@@ -144,8 +146,16 @@ class ReceiptWatcher:
                 if self._clock() >= end:
                     break
         except asyncio.CancelledError:
-            record = ReceiptRecord(ReceiptKind.UNOBSERVED, last_seen="cancelled")
-            self._log(sent, record)
+            if observed:
+                # 이미 기록한 수신 확인을 미관측으로 다시 적지 않는다. 지우기만 끝나지 않았다.
+                logger.warning(
+                    "결과 작업을 지우는 중 종료(큐 보관 정리에 맡김): messageId=%s",
+                    message_id,
+                )
+            else:
+                self._log(
+                    sent, ReceiptRecord(ReceiptKind.UNOBSERVED, last_seen="cancelled")
+                )
             raise
         record = ReceiptRecord(ReceiptKind.UNOBSERVED, last_seen=last_seen)
         self._log(sent, record)

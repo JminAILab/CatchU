@@ -157,6 +157,33 @@ def test_cancel_records_unobserved(caplog: pytest.LogCaptureFixture) -> None:
     assert "last=cancelled" in caplog.text
 
 
+class _SlowRemove(FakeResultJobs):
+    async def remove(self, job_id: str) -> None:
+        await asyncio.sleep(3600)
+
+
+def test_cancel_while_removing_does_not_record_unobserved(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO)
+
+    async def go() -> None:
+        watcher = ReceiptWatcher(
+            _SlowRemove([done(receipt("ACCEPTED", "OK"))]),
+            replace(LIMITS, receipt_remove=3600),
+        )
+        task = watcher.watch(SENT)
+        while "수신 확인:" not in caplog.text:
+            await asyncio.sleep(0.01)
+        await watcher.cancel_all()
+        assert task.cancelled()
+
+    asyncio.run(go())
+    assert "disposition=ACCEPTED" in caplog.text
+    assert "미관측" not in caplog.text
+    assert "지우는 중 종료" in caplog.text
+
+
 def test_rejected_receipt_does_not_resend_or_rerun_analysis() -> None:
     output = FakeOutput()
     job = request_job()

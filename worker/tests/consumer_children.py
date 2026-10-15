@@ -39,9 +39,14 @@ def hang_when_dead(conn: Connection, child_input: ChildInput) -> None:
 
 
 def hang_ignoring_sigterm(conn: Connection, child_input: ChildInput) -> None:
+    """SIGTERM을 무시하고 멈춘다. 무시를 건 뒤 CONSUMER_TEST_READY_DIR에 준비 파일을 만든다."""
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
     start_watchdog(child_input)
+    ready_dir = os.environ.get("CONSUMER_TEST_READY_DIR")
+    if ready_dir:
+        with open(os.path.join(ready_dir, child_input.job_id), "w", encoding="utf-8"):
+            pass
     while True:
         time.sleep(1)
 

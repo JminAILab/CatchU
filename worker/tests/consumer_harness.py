@@ -45,21 +45,25 @@ async def orphan() -> None:
         settings=settings,
         parent_pid=os.getpid(),
     )
-    run = await ChildRun.start(
-        consumer_children.hang, child_input, FAST.frame_max_bytes
-    )
+    run = ChildRun.create(consumer_children.hang, child_input, FAST.frame_max_bytes)
+    await run.launch()
     tracker = getattr(resource_tracker._resource_tracker, "_pid", None) or 0
     print(run.pid, tracker, flush=True)
     await asyncio.sleep(3600)
 
 
 class _DelayedOutput:
-    def __init__(self, inner: OutputQueue, delay: float) -> None:
+    """결과를 넣기 직전에 표식(sending)을 남기고 delay만큼 기다린다."""
+
+    def __init__(self, inner: OutputQueue, delay: float, marker: Path) -> None:
         self._inner = inner
         self._delay = delay
+        self._marker = marker
 
     async def add(self, name: str, data: dict[str, Any], opts: dict[str, Any]) -> Any:
         if name == "Result":
+            with self._marker.open("a", encoding="utf-8") as stream:
+                stream.write(f"sending {data['attemptId']}\n")
             await asyncio.sleep(self._delay)
         return await self._inner.add(name, data, opts)
 
@@ -100,7 +104,7 @@ async def service() -> int:
         host="127.0.0.1",
         port=int(os.environ["HARNESS_PORT"]),
         child_target=consumer_children.marked,
-        output_wrapper=(lambda inner: _DelayedOutput(inner, delay))
+        output_wrapper=(lambda inner: _DelayedOutput(inner, delay, marker))
         if delay
         else (lambda o: o),
     ).run()

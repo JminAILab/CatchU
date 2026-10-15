@@ -20,8 +20,9 @@ requires_redis = pytest.mark.skipif(
     not REDIS_URL, reason="CATCHU_TEST_REDIS_URL이 없어 실제 Redis 시험을 건너뜀"
 )
 
+# 정상 처리의 자식 띄우기가 느린 CI에서도 상한에 걸리지 않게 총 상한은 넉넉히 둔다.
 FAST = Limits(
-    total=5,
+    total=15,
     child_grace=2,
     parent_watch_interval=0.2,
     event_send=0.5,

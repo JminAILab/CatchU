@@ -4,17 +4,16 @@
 const { join } = require('node:path');
 const kit = join(__dirname, '../../docs/queue-verification');
 const { Queue } = require(require.resolve('bullmq', { paths: [kit] }));
+const IORedis = require(require.resolve('ioredis', { paths: [kit] }));
 
 async function main() {
   const [url, prefix] = process.argv.slice(2);
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
   const request = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  const parsed = new URL(url);
-  const queue = new Queue('analysis-requests', {
-    prefix,
-    connection: { host: parsed.hostname, port: Number(parsed.port || 6379), maxRetriesPerRequest: null },
-  });
+  // 주소의 계정·비밀번호·TLS(rediss)·DB 번호를 Python 쪽(redis-py)과 같게 쓰도록 ioredis가 주소를 해석한다.
+  const connection = new IORedis(url, { maxRetriesPerRequest: null });
+  const queue = new Queue('analysis-requests', { prefix, connection });
   // 계획 「큐 규격」의 요청 작업 옵션(#233이 넣는 값).
   await queue.add('Request', request, {
     jobId: request.attemptId,
@@ -24,6 +23,7 @@ async function main() {
     stackTraceLimit: 0,
   });
   await queue.close();
+  await connection.quit();
 }
 
 main().catch((error) => {

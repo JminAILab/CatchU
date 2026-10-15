@@ -5,6 +5,7 @@ import logging
 import pickle
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -250,6 +251,8 @@ def test_time_limit_kills_child_sends_nothing_and_next_job_runs() -> None:
         except ProcessingAborted as error:
             first = error
         sent_before = list(output.attempts)
+        # 다음 정상 작업에는 자식 띄우기가 느린 CI에서도 넉넉한 별도 예산을 준다.
+        processor._limits = replace(processor._limits, total=30)
         second = await processor(following, "token")
         await watcher.cancel_all()
         return first, (sent_before, second), processor, output
@@ -262,30 +265,126 @@ def test_time_limit_kills_child_sends_nothing_and_next_job_runs() -> None:
     assert processor.spawned == 2
 
 
-def test_child_ignoring_sigterm_is_killed_and_reaped(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def _record_runs(monkeypatch: pytest.MonkeyPatch) -> list[ChildRun]:
     seen: list[ChildRun] = []
-    original = ChildRun.start.__func__  # type: ignore[attr-defined]
+    original = ChildRun.create.__func__  # type: ignore[attr-defined]
 
-    async def start(
-        cls: Any, target: Any, child_input: ChildInput, max_bytes: int
-    ) -> Any:
-        child = await original(cls, target, child_input, max_bytes)
+    def create(cls: Any, *args: Any) -> Any:
+        child = original(cls, *args)
         seen.append(child)
         return child
 
-    monkeypatch.setattr(ChildRun, "start", classmethod(start))
-    run = run_job(
-        request_job(),
-        settings=_short(1.5),
-        target=consumer_children.hang_ignoring_sigterm,
-    )
+    monkeypatch.setattr(ChildRun, "create", classmethod(create))
+    return seen
 
-    assert aborted(run) == "TIME_LIMIT_EXCEEDED"
+
+def test_child_ignoring_sigterm_is_killed_and_reaped(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen = _record_runs(monkeypatch)
+    monkeypatch.setenv("CONSUMER_TEST_READY_DIR", str(tmp_path))
+    settings = child_settings(limits=replace(FAST, total=60))
+    job = request_job()
+
+    async def go() -> Any:
+        watcher = ReceiptWatcher(FakeResultJobs(), settings.limits)
+        processor = RequestProcessor(
+            settings,
+            FakeOutput(),
+            watcher,
+            child_target=consumer_children.hang_ignoring_sigterm,
+        )
+        task = asyncio.ensure_future(processor(job, "token"))
+        # 자식이 SIGTERM 무시를 건 뒤에 종료 신호를 준다.
+        ready = tmp_path / job.id
+        for _ in range(600):
+            if ready.exists():
+                break
+            await asyncio.sleep(0.05)
+        assert ready.exists()
+        processor.begin_stop()
+        processor.abort_active()
+        try:
+            return await task
+        except ProcessingAborted as error:
+            return error
+
+    value = asyncio.run(go())
+
+    assert isinstance(value, ProcessingAborted) and value.code == "WORKER_STOPPING"
     assert len(seen) == 1
     assert not seen[0].is_alive()
     assert seen[0].exitcode == -9  # SIGTERM을 무시해 SIGKILL로 끝났다
+
+
+def _slow_start(monkeypatch: pytest.MonkeyPatch, seconds: float) -> None:
+    import multiprocessing.process
+
+    original = multiprocessing.process.BaseProcess.start
+
+    def start(self: Any) -> None:
+        original(self)
+        time.sleep(seconds)  # 자식은 떴지만 부모 쪽 시작 호출이 늦게 돌아온다
+
+    monkeypatch.setattr(multiprocessing.process.BaseProcess, "start", start)
+
+
+def test_time_limit_covers_child_launch_and_late_child_is_reaped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen = _record_runs(monkeypatch)
+    _slow_start(monkeypatch, 1.5)
+    settings = child_settings(limits=replace(FAST, total=0.3))
+    output = FakeOutput()
+
+    async def go() -> tuple[Any, float, RequestProcessor]:
+        watcher = ReceiptWatcher(FakeResultJobs(), settings.limits)
+        processor = RequestProcessor(
+            settings, output, watcher, child_target=consumer_children.hang
+        )
+        started = time.monotonic()
+        try:
+            value: Any = await processor(request_job(), "token")
+        except ProcessingAborted as error:
+            value = error
+        return value, time.monotonic() - started, processor
+
+    value, elapsed, processor = asyncio.run(go())
+
+    assert isinstance(value, ProcessingAborted) and value.code == "TIME_LIMIT_EXCEEDED"
+    assert elapsed < 1.0  # 띄우기가 끝나기를 기다리지 않는다
+    assert processor.spawned == 0 and output.attempts == []
+    process = seen[0].process
+    assert wait_until(lambda: process.exitcode is not None, 10)
+    assert process.exitcode == -9  # 늦게 뜬 자식도 끝내고 회수한다
+
+
+def test_stop_signal_during_child_launch(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen = _record_runs(monkeypatch)
+    _slow_start(monkeypatch, 1.5)
+    settings = child_settings()
+
+    async def go() -> Any:
+        watcher = ReceiptWatcher(FakeResultJobs(), settings.limits)
+        processor = RequestProcessor(
+            settings, FakeOutput(), watcher, child_target=consumer_children.hang
+        )
+        task = asyncio.ensure_future(processor(request_job(), "token"))
+        while not seen:
+            await asyncio.sleep(0.01)
+        await asyncio.sleep(0.1)
+        processor.begin_stop()
+        processor.abort_active()
+        try:
+            return await task
+        except ProcessingAborted as error:
+            return error
+
+    value = asyncio.run(go())
+
+    assert isinstance(value, ProcessingAborted) and value.code == "WORKER_STOPPING"
+    process = seen[0].process
+    assert wait_until(lambda: process.exitcode is not None, 10)
 
 
 def test_child_exits_by_itself_when_parent_is_killed() -> None:
@@ -357,34 +456,30 @@ def test_exception_in_child_is_defect_without_result() -> None:
 # 9. 결과와 상한·종료의 경쟁 -----------------------------------------------------------------
 
 
-class _RacingOutput(FakeOutput):
-    """결과를 넣는 순간 상한 시각을 지나게 하고 종료 신호도 보낸다."""
-
-    def __init__(self, clock: list[float]) -> None:
-        super().__init__()
-        self.clock = clock
-        self.processor: RequestProcessor | None = None
-
-    async def add(self, name: str, data: dict[str, Any], opts: dict[str, Any]) -> Any:
-        if name == "Result":
-            self.clock[0] += 10_000
-            assert self.processor is not None
-            self.processor.begin_stop()
-            self.processor.abort_active()
-        return await super().add(name, data, opts)
-
-
-def test_limit_or_stop_after_terminal_frame_does_not_drop_result() -> None:
+def test_limit_or_stop_right_after_terminal_frame_does_not_drop_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     clock = [0.0]
-    output = _RacingOutput(clock)
+    output = FakeOutput()
     settings = child_settings()
+    holder: list[RequestProcessor] = []
+    original = ChildRun.wait_exit
+
+    async def wait_exit(self: ChildRun, timeout: float) -> int | None:
+        # 종결 프레임을 받은 직후(자식 종료를 기다리기 전)에 상한 시각을 넘기고 종료 신호를 준다.
+        clock[0] += 10_000
+        holder[0].begin_stop()
+        holder[0].abort_active()
+        return await original(self, timeout)
+
+    monkeypatch.setattr(ChildRun, "wait_exit", wait_exit)
 
     async def go() -> Any:
         watcher = ReceiptWatcher(FakeResultJobs(), settings.limits)
         processor = RequestProcessor(
             settings, output, watcher, monotonic=lambda: clock[0]
         )
-        output.processor = processor
+        holder.append(processor)
         value = await processor(request_job(), "token")
         await watcher.cancel_all()
         return value, processor
@@ -404,6 +499,19 @@ def test_result_send_timeout_is_not_retried() -> None:
     assert output.attempts.count("Result") == 1
     assert run.processor.spawned == 1
     assert run.receipts_watched == 1  # 보냈는지 몰라도 수신 확인 조회는 한다
+
+
+def test_event_send_waits_no_longer_than_remaining_time() -> None:
+    output = FakeOutput(hang_on="ProcessingEvent")
+    settings = child_settings(limits=replace(FAST, total=3, event_send=30))
+    started = time.monotonic()
+    run = run_job(request_job(), settings=settings, output=output)
+
+    assert aborted(run) == "TIME_LIMIT_EXCEEDED"
+    assert (
+        time.monotonic() - started < 3 + 3
+    )  # 진행 알림 상한(30초)까지 기다리지 않는다
+    assert "Result" not in output.attempts
 
 
 def test_event_send_timeout_continues_analysis_once() -> None:
@@ -481,3 +589,62 @@ def test_logs_carry_ids_and_codes_but_no_message_body(
     ]
     for value in forbidden:
         assert value not in text, value
+
+
+# 실패 사유 고정: BullMQ 완료 기록이 실패해도 원문이 실패 사유가 되지 않는다 ------------------
+
+
+class _CompletionFails:
+    """완료 기록에서 연결 오류를 내고, 실패 기록은 받은 값을 남기는 BullMQ 저장소 대역."""
+
+    def __init__(self) -> None:
+        self.failed: list[tuple[str, dict[str, str]]] = []
+
+    async def moveToCompleted(self, *args: Any, **kwargs: Any) -> Any:
+        raise ConnectionError("Error 61 connecting to 10.0.0.5:6379. secret-host")
+
+    async def moveToFailed(
+        self,
+        job: Any,
+        message: str,
+        remove: Any,
+        token: str,
+        fetch: bool,
+        fields: dict[str, str],
+    ) -> dict[str, Any]:
+        self.failed.append((message, fields))
+        return {"result": None, "finishedOn": 1}
+
+
+def test_completion_record_failure_is_saved_as_fixed_code() -> None:
+    from types import SimpleNamespace
+
+    from bullmq import Job, Worker
+
+    backend = _CompletionFails()
+    message = mock_request(new_attempt())
+    settings = child_settings()
+
+    async def go() -> None:
+        watcher = ReceiptWatcher(FakeResultJobs(), settings.limits)
+        processor = RequestProcessor(settings, FakeOutput(), watcher)
+        worker = Worker(
+            "analysis-requests",
+            processor,
+            {"connection": "redis://127.0.0.1:1", "autorun": False},
+        )
+        worker.backend = backend
+        queue = SimpleNamespace(backend=backend, qualifiedName="test", opts={})
+        job = Job(
+            queue, "Request", message, {"jobId": message["attemptId"], "attempts": 1}
+        )
+        await worker.processJob(job, "token")
+        await watcher.cancel_all()
+
+    asyncio.run(go())
+
+    assert len(backend.failed) == 1
+    reason, fields = backend.failed[0]
+    assert reason == "COMPLETION_RECORD_FAILED"
+    assert fields["failedReason"] == "COMPLETION_RECORD_FAILED"
+    assert fields["stacktrace"] == "[]"

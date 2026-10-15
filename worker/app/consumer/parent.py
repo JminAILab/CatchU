@@ -32,6 +32,7 @@ AbortCode = Literal[
     "CHILD_EXITED",
     "WORKER_STOPPING",
     "RESULT_DISPATCH_UNKNOWN",
+    "COMPLETION_RECORD_FAILED",
 ]
 
 
@@ -114,12 +115,16 @@ class RequestProcessor:
 
     def kill_all(self) -> None:
         for run in list(self._runs.values()):
-            run.kill_now()
+            if run.launched:
+                run.kill_now()
+            else:
+                run.abandon(self._limits.kill_wait)
 
     async def __call__(self, job: RequestJob, token: str) -> dict[str, str]:
         if isinstance(job.opts, dict):
             # 요청 작업 옵션(#233)이 빠져도 실패 때 stacktrace를 저장하지 않게 한다.
             job.opts["stackTraceLimit"] = 0
+        _fixed_failure_reason(job)
         outcome = await self._handle(job)
         if isinstance(outcome, str):
             raise ProcessingAborted(outcome)
@@ -158,13 +163,19 @@ class RequestProcessor:
         )
         stop = asyncio.Event()
         self._stop_events[attempt_id] = stop
-        run: ChildRun | None = None
+        run = ChildRun.create(self._target, child_input, self._limits.frame_max_bytes)
+        self._runs[attempt_id] = run
         try:
-            run = await ChildRun.start(
-                self._target, child_input, self._limits.frame_max_bytes
-            )
+            # 자식 띄우기도 20분 안에 든다. 기다리기를 그만두면 늦게 뜬 자식은 abandon이 회수한다.
+            launch_failed = await self._launch(run, stop, deadline)
+            if launch_failed is not None:
+                logger.warning(
+                    "자식을 띄우는 중 중단: attemptId=%s code=%s",
+                    attempt_id,
+                    launch_failed,
+                )
+                return launch_failed
             self.spawned += 1
-            self._runs[attempt_id] = run
             logger.info("분석 시작: attemptId=%s pid=%s", attempt_id, run.pid)
             terminal = await self._watch(run, stop, deadline, data, attempt_id)
             if not isinstance(terminal, Frame):
@@ -194,9 +205,30 @@ class RequestProcessor:
         finally:
             self._stop_events.pop(attempt_id, None)
             self._runs.pop(attempt_id, None)
-            if run is not None:
+            if run.launched:
                 run.kill_now()
                 run.release()
+            else:
+                run.abandon(self._limits.kill_wait)
+
+    async def _launch(
+        self, run: ChildRun, stop: asyncio.Event, deadline: float
+    ) -> AbortCode | None:
+        started = run.launch()
+        stopped = asyncio.ensure_future(stop.wait())
+        waiters: set[asyncio.Future[Any]] = {started, stopped}
+        try:
+            done, _ = await asyncio.wait(
+                waiters,
+                timeout=max(0.0, deadline - self._monotonic()),
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+        finally:
+            stopped.cancel()
+        if started in done:
+            started.result()  # 띄우기 실패는 예외로 올라가 결함(WORKER_DEFECT)이 된다
+            return None
+        return "WORKER_STOPPING" if stopped in done else "TIME_LIMIT_EXCEEDED"
 
     async def _next(
         self, run: ChildRun, stop: asyncio.Event, timeout: float
@@ -248,7 +280,13 @@ class RequestProcessor:
             ):
                 return "WORKER_DEFECT"
             # 앞 알림을 다 넣은 뒤 다음 프레임을 본다(진행 알림은 결과보다 먼저 들어간다).
-            await self._send_event(item.message, attempt_id)
+            # 알림 전송도 20분 안에 든다. 남은 시간이 전송 상한보다 짧으면 남은 시간만 기다린다.
+            remaining = deadline - self._monotonic()
+            if remaining <= 0:
+                return "TIME_LIMIT_EXCEEDED"
+            await self._send_event(
+                item.message, attempt_id, min(self._limits.event_send, remaining)
+            )
 
     async def _valid_event(
         self, event: Mapping[str, Any], data: Mapping[str, Any], attempt_id: str
@@ -269,13 +307,14 @@ class RequestProcessor:
             and event["requestId"] == data.get("requestId")
         )
 
-    async def _send_event(self, event: Mapping[str, Any], attempt_id: str) -> None:
+    async def _send_event(
+        self, event: Mapping[str, Any], attempt_id: str, timeout: float
+    ) -> None:
         message_id = event["messageId"]
         opts = {**queues.EVENT_JOB_OPTIONS, "jobId": message_id}
         try:
             await asyncio.wait_for(
-                self._output.add(queues.EVENT_JOB, dict(event), opts),
-                self._limits.event_send,
+                self._output.add(queues.EVENT_JOB, dict(event), opts), timeout
             )
         except Exception as error:
             # 보냈는지 모른다. 다시 넣지 않고 분석을 계속한다.
@@ -354,6 +393,33 @@ class RequestProcessor:
             return False
         logger.info("결과 전송: attemptId=%s outcome=%s", attempt_id, result["outcome"])
         return True
+
+
+def _fixed_failure_reason(job: RequestJob) -> None:
+    """BullMQ가 이 작업을 실패로 기록할 때 고정 코드만 실패 사유가 되게 한다.
+
+    처리 함수가 정상 반환한 뒤 완료 기록(moveToCompleted)이 실패하면 BullMQ는 그 예외를 그대로
+    moveToFailed에 넘겨 str(err)를 실패 사유로 저장한다(worker.py processJob). 그 예외 원문(큐 서버
+    주소 등) 대신 COMPLETION_RECORD_FAILED를 남긴다.
+    """
+    original = getattr(job, "moveToFailed", None)
+    if not callable(original):
+        return
+    job_id = _safe_id(job.id)
+
+    async def move_to_failed(
+        err: BaseException, token: str, fetchNext: bool = False
+    ) -> Any:
+        if not isinstance(err, ProcessingAborted):
+            logger.error(
+                "요청 작업 완료 기록 실패: jobId=%s error=%s",
+                job_id,
+                type(err).__name__,
+            )
+            err = ProcessingAborted("COMPLETION_RECORD_FAILED")
+        return await original(err, token, fetchNext)
+
+    job.moveToFailed = move_to_failed  # type: ignore[attr-defined]
 
 
 def _safe_id(value: object) -> str:

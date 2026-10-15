@@ -229,8 +229,8 @@ def test_stop_signal_at_each_moment(
     if moment == "analyzing":
         assert wait_until(lambda: harness.lines("child") == [attempt], 10)
     if moment == "sending":
-        running = queues.event_message_id("MOCK", attempt, "RUNNING")
-        assert wait_until(lambda: _output_has(prefix, running), 10)
+        # 결과를 넣기 시작한 뒤(넣기 직전 표식)에 종료 신호를 준다.
+        assert wait_until(lambda: harness.lines("sending") == [attempt], 15)
     if moment == "receipts":
         assert wait_until(lambda: state_of(prefix, attempt) == "completed", 10)
 
@@ -243,6 +243,7 @@ def test_stop_signal_at_each_moment(
         return
     state, job = asyncio.run(load(prefix, attempt))
     if moment == "fetching":
+        # 작업을 넣자마자 종료 신호를 준다. 꺼내는 시점과의 경쟁이라 둘 중 어느 쪽이든 맞다:
         # 꺼내기 전에 멈췄으면 대기로 남고, 꺼낸 뒤라면 새 분석 없이 실패로 기록된다.
         assert state in ("waiting", "failed"), state
         if state == "failed":
@@ -260,6 +261,27 @@ def test_stop_signal_at_each_moment(
     else:
         assert "last=cancelled" in harness.log()
     assert len(harness.lines("child")) <= 1
+
+
+def test_shutdown_over_budget_kills_itself_with_137(
+    prefix: str, tmp_path: Path, harnesses: list[Harness]
+) -> None:
+    # 결과를 넣다가 종료 예산(시험값 8초)보다 오래 멈추면 스스로 SIGKILL로 끝난다.
+    # 컨테이너 종료 코드 137이 되어 교체 절차가 정상 종료로 보지 않는다.
+    harness = Harness(
+        tmp_path, prefix, HARNESS_RESULT_DELAY="60", HARNESS_RESULT_SEND="120"
+    )
+    harnesses.append(harness)
+    harness.wait_running()
+    message = mock_request(new_attempt())
+    asyncio.run(add_request(prefix, message))
+    assert wait_until(lambda: harness.lines("sending") == [message["attemptId"]], 15)
+
+    code, elapsed = harness.terminate()
+
+    assert code == -signal.SIGKILL, harness.log()
+    assert FAST.shutdown - 1 < elapsed < FAST.shutdown + 5
+    assert "종료 상한" in harness.log()
 
 
 # 12. 정체 복구 0회 --------------------------------------------------------------------------
@@ -354,7 +376,7 @@ def test_node_request_options_read_by_python_and_failure_not_retried(
     assert job.opts["removeOnFail"] == {"age": 7200}
     assert job.opts["stackTraceLimit"] == 0
 
-    harness = Harness(tmp_path, prefix, HARNESS_TARGET="hang", HARNESS_TOTAL="1.5")
+    harness = Harness(tmp_path, prefix, HARNESS_TARGET="hang", HARNESS_TOTAL="4")
     harnesses.append(harness)
     assert wait_until(lambda: state_of(prefix, attempt) == "failed", 20), harness.log()
     time.sleep(2)
