@@ -72,7 +72,8 @@ def test_invalid_queue_url_is_rejected(url: str) -> None:
     assert url.strip() not in str(raised.value)
 
 
-@pytest.mark.parametrize("value", ["0", "5", "-1", "abc", "1.5", "01x"])
+# 지금은 1만 받는다(2 이상은 종료 직전 작업의 기록 틈 때문에 막음, 10/15 결정).
+@pytest.mark.parametrize("value", ["0", "2", "4", "-1", "abc", "1.5", "01x"])
 def test_invalid_concurrency_is_rejected(value: str) -> None:
     with pytest.raises(SettingsError):
         load(NODE_ENV="test", CATCHU_WORKER_CONCURRENCY=value)
@@ -81,13 +82,13 @@ def test_invalid_concurrency_is_rejected(value: str) -> None:
 def test_concurrency_prefix_and_mock_values() -> None:
     settings = load(
         NODE_ENV="test",
-        CATCHU_WORKER_CONCURRENCY="2",
+        CATCHU_WORKER_CONCURRENCY="1",
         CATCHU_QUEUE_PREFIX="catchu-test_1",
         CATCHU_WORKER_MOCK="false",
     )
 
     assert (settings.concurrency, settings.prefix, settings.mock_enabled) == (
-        2,
+        1,
         "catchu-test_1",
         False,
     )

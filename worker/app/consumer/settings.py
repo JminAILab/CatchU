@@ -16,7 +16,9 @@ Environment = Literal["production", "development", "test"]
 
 DEFAULT_PREFIX: Final = "catchu"
 DEFAULT_CONCURRENCY: Final = 1
-MAX_CONCURRENCY: Final = 4
+# 10월 운영값. 2 이상은 종료 직전에 꺼낸 작업의 실패 기록 틈(worker/docs/queue-consumer.md)을
+# 고치기 전까지 받지 않는다(10/15 팀장 결정).
+MAX_CONCURRENCY: Final = 1
 DEFAULT_MOCK_SCENARIO: Final = "succeeded-one-candidate"
 # 부모만 쓰는 비밀값. spawn 자식은 부모의 환경변수를 물려받으므로 부모가 읽은 뒤 환경에서 지운다.
 PARENT_ONLY_ENV: Final = ("CATCHU_QUEUE_REDIS_URL",)
@@ -190,7 +192,7 @@ def _concurrency(value: str | None) -> int:
         1 <= int(value) <= MAX_CONCURRENCY
     ):
         raise SettingsError(
-            f"CATCHU_WORKER_CONCURRENCY는 1~{MAX_CONCURRENCY}의 정수여야 한다"
+            f"CATCHU_WORKER_CONCURRENCY는 지금 {MAX_CONCURRENCY}만 받는다"
         )
     return int(value)
 

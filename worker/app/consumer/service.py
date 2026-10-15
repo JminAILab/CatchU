@@ -92,6 +92,7 @@ class ConsumerService:
         self._worker_options = dict(worker_options or {})
         self._stop_requested = asyncio.Event()
         self._stopping = False
+        self._consumer_failed = False
         self.worker: Worker | None = None
         self.processor: RequestProcessor | None = None
         self.receipts: ReceiptWatcher | None = None
@@ -154,12 +155,16 @@ class ConsumerService:
     def _run_finished(self, task: "asyncio.Task[Any]") -> None:
         if self._stopping:
             return
-        # 예상 밖 종료. 상태 확인이 503이 되고, 다시 띄우는 것은 실행 환경의 몫이다.
-        error = None if task.cancelled() else task.exception()
-        logger.error(
-            "소비 실행 작업이 예상 밖으로 끝남: %s",
-            "cancelled" if error is None else type(error).__name__,
-        )
+        # 예상 밖 종료. 소비가 멈춘 채 상태 확인만 503으로 살아 있으면 compose(restart:
+        # unless-stopped)는 컨테이너를 다시 띄우지 않으므로, 정리 순서를 밟아 종료 코드 1로 끝낸다.
+        if task.cancelled():
+            cause = "cancelled"
+        else:
+            error = task.exception()
+            cause = "returned" if error is None else type(error).__name__
+        logger.error("소비 실행 작업이 예상 밖으로 끝나 프로세스를 끝냄: %s", cause)
+        self._consumer_failed = True
+        self.request_stop()
 
     async def run(self) -> int:
         loop = asyncio.get_running_loop()
@@ -189,7 +194,7 @@ class ConsumerService:
         done, _ = await asyncio.wait(
             {server_task, stop_wait}, return_when=asyncio.FIRST_COMPLETED
         )
-        exit_code = 0
+        exit_code = 1 if self._consumer_failed else 0
         if server_task in done and not self._stop_requested.is_set():
             logger.error("상태 확인 서버가 먼저 끝남")
             exit_code = 1

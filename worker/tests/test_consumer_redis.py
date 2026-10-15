@@ -590,14 +590,10 @@ def test_health_states(prefix: str) -> None:
             {"status": "unavailable", "consumer": "starting"},
         )
         assert starting._run_task is not None
-        starting._run_task.cancel()  # 실행 작업이 끝난 상태를 만든다
-        await asyncio.sleep(0.1)
-        assert await _get(starting.port) == (
-            503,
-            {"status": "unavailable", "consumer": "stopped"},
-        )
-        starting.request_stop()
-        await task
+        # 소비 실행 작업이 예상 밖으로 끝나면 정리 순서를 밟아 종료 코드 1로 끝난다
+        # (상태 확인만 살아 있으면 compose가 컨테이너를 다시 띄우지 않는다).
+        starting._run_task.cancel()
+        assert await asyncio.wait_for(task, 10) == 1
 
         proxy = _Proxy(target.hostname or "127.0.0.1", target.port or 6379)
         proxy_port = await proxy.start()
