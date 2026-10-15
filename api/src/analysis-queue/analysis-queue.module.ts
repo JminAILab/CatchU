@@ -76,9 +76,9 @@ export class AnalysisQueueRunner implements OnModuleDestroy {
     this.state = 'running';
     const { redisUrl, prefix } = this.options.config;
     // 끊긴 동안 명령을 쌓지 않고 바로 실패시킨다. 보내기는 연결이 준비됐을 때만 명령을 보낸다.
-    this.requestConnection = this.watch(new IORedis(redisUrl, { enableOfflineQueue: false }), 'REQUEST_CONNECTION');
+    this.requestConnection = this.watch(new IORedis(redisUrl, { enableOfflineQueue: false }), 'REQUEST_CONNECTION', 'REQUEST_QUEUE');
     // BullMQ Worker가 요구하는 설정(명령 재시도 제한 없음).
-    this.consumerConnection = this.watch(new IORedis(redisUrl, { maxRetriesPerRequest: null }), 'CONSUMER_CONNECTION');
+    this.consumerConnection = this.watch(new IORedis(redisUrl, { maxRetriesPerRequest: null }), 'CONSUMER_CONNECTION', 'CONSUMER');
 
     const queue = new Queue(ANALYSIS_REQUEST_QUEUE, { connection: this.requestConnection, prefix });
     queue.on('error', error => this.recordError('REQUEST_QUEUE', error));
@@ -184,11 +184,14 @@ export class AnalysisQueueRunner implements OnModuleDestroy {
     if (!closed) connection.disconnect();
   }
 
-  private watch(connection: IORedis, source: string): IORedis {
+  /** user는 이 연결을 쓰는 Queue·Worker의 출처다. 다시 붙으면 둘의 기록 상태를 함께 비워 다음 오류를 다시 남긴다. */
+  private watch(connection: IORedis, source: string, user: string): IORedis {
     // error 수신기가 없으면 ioredis가 원문 오류와 스택을 표준 오류로 낸다.
     connection.on('error', error => this.recordError(source, error));
     connection.on('ready', () => {
-      if (this.lastErrors.delete(source)) this.logger.log({ event: 'ANALYSIS_QUEUE_CONNECTED', source });
+      const recovered = this.lastErrors.delete(source);
+      this.lastErrors.delete(user);
+      if (recovered) this.logger.log({ event: 'ANALYSIS_QUEUE_CONNECTED', source });
     });
     return connection;
   }

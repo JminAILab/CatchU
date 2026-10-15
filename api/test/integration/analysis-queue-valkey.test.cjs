@@ -335,3 +335,26 @@ test('큐 서버에 닿지 않으면 보내기는 명령 없이 건너뛰고, �
   assert.ok(lines.some(line => line.includes('"event":"ANALYSIS_QUEUE_ERROR"') && line.includes('ECONNREFUSED')));
   assert.equal(lines.some(line => line.includes('127.0.0.1:1')), false, '오류 기록에 주소를 싣지 않는다');
 });
+
+test('같은 출처의 같은 오류는 한 번만 남기고, 그 연결이 다시 붙으면 연결과 그 연결을 쓰는 큐의 기록 상태를 함께 비운다', async t => {
+  const lines = [];
+  const logger = Object.fromEntries(['log', 'warn', 'error'].map(level => [level, value => lines.push(value)]));
+  const runner = new AnalysisQueueRunner({ config: { redisUrl: 'redis://127.0.0.1:1', prefix: 'catchu-test' }, dataSource: db,
+    registration: { receiveResult: async () => assert.fail(), receiveProgress: async () => assert.fail() },
+    validator: new WorkerMessageValidator(CONTRACT_DIR), logger, limits: { connectionQuitTimeoutMs: 300 } });
+  t.after(() => runner.stop());
+  runner.start();
+  // 실제 연결 대신 합성 사건을 보낸다(내부 객체 접근은 이 시험에서만).
+  const synthetic = () => Object.assign(new Error('synthetic detail'), { name: 'SyntheticError' });
+  const queueErrors = () => lines.filter(entry => entry.event === 'ANALYSIS_QUEUE_ERROR' && entry.source === 'REQUEST_QUEUE' &&
+    entry.error === 'SyntheticError').length;
+  runner.queue.emit('error', synthetic());
+  runner.queue.emit('error', synthetic());
+  assert.equal(queueErrors(), 1);
+  runner.requestConnection.emit('error', synthetic());
+  runner.requestConnection.emit('ready');
+  runner.queue.emit('error', synthetic());
+  assert.equal(queueErrors(), 2, '다시 붙은 뒤의 같은 오류는 다시 남긴다');
+  assert.ok(lines.some(entry => entry.event === 'ANALYSIS_QUEUE_CONNECTED' && entry.source === 'REQUEST_CONNECTION'));
+  assert.equal(JSON.stringify(lines).includes('synthetic detail'), false);
+});
