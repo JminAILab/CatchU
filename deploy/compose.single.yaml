@@ -62,10 +62,17 @@ services:
     <<: *hardening
     image: ${CATCHU_WORKER_IMAGE:?worker 이미지(CATCHU_WORKER_IMAGE)가 필요합니다}
     container_name: ${CATCHU_SINGLE_NAME:-catchu-single}-worker
-    # 현재 worker는 환경변수를 읽지 않는다. 큐·자격정보 설정은 #121·#232 제공 판본에서 더한다.
+    # 분석 소비자(#121) 설정. 큐 주소에 비밀번호가 들어가므로 저장소 밖 환경 폴더의 파일로만 넣는다.
+    env_file:
+      - path: ${CATCHU_ENV_DIR:?저장소 밖 환경 폴더(CATCHU_ENV_DIR)가 필요합니다}/worker.env
+        required: true
+    # env 파일로 개발 동작(MOCK 처리·평문 큐 주소)을 켤 수 없게 운영 모드를 고정한다.
+    environment:
+      NODE_ENV: production
     ports:
       - "127.0.0.1:${CATCHU_WORKER_PORT:-8000}:8000"
     restart: unless-stopped
+    # 앱은 SIGTERM을 받고 25초 안에 분석 중인 자식을 끝내고 큐에 실패를 남긴 뒤 끝난다.
     stop_grace_period: 30s
     healthcheck:
       test: ["CMD", "/app/worker/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]

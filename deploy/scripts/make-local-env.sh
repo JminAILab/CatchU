@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 로컬 검증·재현용 합성 환경 폴더를 만든다(#275). 저장소 밖 빈 폴더에만 쓰고, 기존 파일은 덮어쓰지 않는다.
-# 만드는 것: 합성 비밀값(무작위)·DB 계정·시험용 사설 CA와 DB 서버 인증서, compose 실행 묶음(compose.env).
+# 만드는 것: 합성 비밀값(무작위)·DB 계정·시험용 사설 CA와 DB 서버 인증서, worker 큐 설정(합성 큐), compose 실행 묶음(compose.env).
 # 운영 비밀값·운영 CA를 만들지 않는다. 운영 값은 배포 환경의 비밀 관리에서 주입한다(deploy/README.md).
 #
 # 사용: deploy/scripts/make-local-env.sh <저장소 밖 새 폴더>
@@ -79,6 +79,14 @@ DB_PORT=5432
 DB_NAME=catchu
 DB_USER=catchu_app
 DB_PASSWORD=${app_password}
+EOF
+
+cat > "${dir}/worker.env" <<EOF
+# 로컬 합성 큐(compose.local-db.yaml의 queue)에 붙는다. 그 겹침 파일이 worker를 시험 모드로 띄우므로 평문 주소를 받는다.
+# 운영은 rediss://(TLS)만 받고 주소에 비밀번호가 들어간다(deploy/env/worker.env.example).
+CATCHU_QUEUE_REDIS_URL=redis://queue:6379
+CATCHU_QUEUE_PREFIX=catchu
+CATCHU_WORKER_CONCURRENCY=1
 EOF
 
 cat > "${dir}/compose.env" <<EOF

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 운영 이미지 검사(#275). 이 컴퓨터의 아키텍처로 web·api·worker 이미지와 api migration 이미지를 빌드하고,
-// 저장소 밖 임시 폴더의 합성 환경(합성 비밀값·합성 DB·시험용 사설 CA)에서 실행 조건을 확인한다.
+// 저장소 밖 임시 폴더의 합성 환경(합성 비밀값·합성 DB·합성 큐·시험용 사설 CA)에서 실행 조건을 확인한다.
 // 실제 GitHub·LLM·AWS·운영 DB에 연결하지 않는다. health 응답은 기동 확인일 뿐 분석 연결 성공이 아니다.
 // 확인 항목·결과 해석은 deploy/README.md 「검사」.
 //
@@ -248,26 +248,44 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
     return "ARG·ENV 이름 검사(값은 실행할 때 주입)";
   });
   await check("worker", "Python 판본·운영 의존성·개발 도구 부재", () => {
-    const out = inImage(image.worker, ".venv/bin/python -c \"import sys,importlib.util as u;assert sys.version.split()[0]=='3.12.10',sys.version;missing=[m for m in ['fastapi','uvicorn','jsonschema','yaml','referencing','rfc3339_validator','rfc3986_validator','anthropic','httpx2','httpcore2'] if not u.find_spec(m)];dev=[m for m in ['pytest','mypy','ruff'] if u.find_spec(m)];assert not missing and not dev,(missing,dev);import ssl;print('ok', ssl.OPENSSL_VERSION)\" && test -f /app/worker/fixtures/m1-synthetic/context.sample.json && test -f " + CONTRACT + "/worker-messages.yaml && echo layout");
+    const out = inImage(image.worker, ".venv/bin/python -c \"import sys,importlib.util as u;assert sys.version.split()[0]=='3.12.10',sys.version;missing=[m for m in ['fastapi','uvicorn','jsonschema','yaml','referencing','rfc3339_validator','rfc3986_validator','anthropic','httpx2','httpcore2','bullmq','redis'] if not u.find_spec(m)];dev=[m for m in ['pytest','mypy','ruff'] if u.find_spec(m)];assert not missing and not dev,(missing,dev);import ssl,os,glob;d=ssl.get_default_verify_paths().capath;ca=len(glob.glob(os.path.join(d or '/nonexistent','*.0')));assert ca>0,ca;print('ok', ssl.OPENSSL_VERSION, 'ca', ca)\" && test -f /app/worker/fixtures/m1-synthetic/context.sample.json && test -f " + CONTRACT + "/worker-messages.yaml && echo layout");
     expect(out.code === 0 && /ok/.test(out.stdout) && /layout/.test(out.stdout), out.text.slice(0, 300));
-    return `3.12.10, 개발 그룹 없음, 계약 YAML·합성 자료 배치, Python 내장 ${(/OpenSSL [\d.]+/.exec(out.stdout) ?? ["OpenSSL ?"])[0]}`;
+    // 운영 큐(rediss://)는 redis-py 기본 TLS 문맥으로 검증한다. 그 문맥이 보는 CA 디렉터리(해시 링크)에 시스템 CA가 있어야 한다.
+    return `3.12.10, 개발 그룹 없음, 계약 YAML·합성 자료 배치, Python 내장 ${(/OpenSSL [\d.]+/.exec(out.stdout) ?? ["OpenSSL ?"])[0]}, 기본 TLS 문맥의 CA 디렉터리 인증서 ${(/ca (\d+)/.exec(out.stdout) ?? ["", "?"])[1]}개`;
   });
   const scenarios = {
     "succeeded-one-candidate": ["SUCCEEDED", 1], empty: ["EMPTY", 0], "partial-failed": ["PARTIAL_FAILED", 1], failed: ["FAILED", 0],
     "two-candidates-same-work": ["SUCCEEDED", 2], "draft-failed": ["PARTIAL_FAILED", null], "reflection-failed": ["PARTIAL_FAILED", null],
     "title-failed": ["SUCCEEDED", null], "execution-unknown": [null, null],
   };
-  await check("worker", "WEB_CONCURRENCY=4에서도 프로세스 1개", async () => {
+  await check("worker", "WEB_CONCURRENCY=4에서도 프로세스 1개(분석 소비자, 큐 설정 없는 시험 모드)", async () => {
     const probe = `${PROJECT}-concurrency`;
-    mustDocker(["run", "-d", "--name", probe, "--network", "none", "--read-only", "--tmpfs", "/tmp", "--cap-drop", "ALL", "-e", "WEB_CONCURRENCY=4", image.worker]);
+    mustDocker(["run", "-d", "--name", probe, "--network", "none", "--read-only", "--tmpfs", "/tmp", "--cap-drop", "ALL", "-e", "WEB_CONCURRENCY=4", "-e", "NODE_ENV=test", image.worker]);
     try {
       await sleep(3000);
       const lines = mustDocker(["top", probe, "-o", "pid,args"]).stdout.trim().split("\n").slice(1);
-      expect(lines.length === 1 && /--workers 1/.test(lines[0]), `프로세스 ${lines.length}개`);
+      expect(lines.length === 1 && /-m app\.consumer/.test(lines[0]), `프로세스 ${lines.length}개`);
+      const health = mustDocker(["exec", probe, "/app/worker/.venv/bin/python", "-c", "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read().decode())"]).stdout.trim();
+      expect(health === '{"status":"ok","consumer":"disabled"}', `health ${health}`);
+      return `health ${health}`;
     } finally {
       docker(["rm", "-f", probe]);
     }
   });
+  const queueSecret = randomBytes(16).toString("hex");
+  const workerRefusals = [
+    ["큐 주소 없음", []],
+    ["평문 큐 주소(redis://)", ["-e", `CATCHU_QUEUE_REDIS_URL=redis://:${queueSecret}@queue:6379`]],
+    ["질의 문자열이 붙은 주소", ["-e", `CATCHU_QUEUE_REDIS_URL=rediss://:${queueSecret}@queue:6379?ssl_cert_reqs=none`]],
+    ["MOCK 켜기", ["-e", `CATCHU_QUEUE_REDIS_URL=rediss://:${queueSecret}@queue:6379`, "-e", "CATCHU_WORKER_MOCK=true"]],
+  ];
+  for (const [label, extra] of workerRefusals) {
+    await check("비밀값·설정", `worker 기동 거부(운영 모드): ${label}`, () => {
+      const out = docker(["run", "--rm", "--network", "none", "--read-only", "--tmpfs", "/tmp", "--cap-drop", "ALL", ...extra, image.worker], { timeoutMs: 60_000 });
+      expect(out.code === 2 && /기동 설정 오류/.test(out.text) && !out.text.includes(queueSecret), `code=${out.code}`);
+      return "종료 코드 2, 큐 비밀번호가 출력에 없음";
+    });
+  }
   await check("worker", "MOCK 시나리오 9개(읽기 전용·망 없음)", () => {
     const failed = [];
     for (const [scenario, [outcome, candidates]] of Object.entries(scenarios)) {
@@ -294,7 +312,7 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
     },
   });
   // 정리는 등록 역순으로 돈다: compose 밖에서 망에 붙인 컨테이너를 먼저 지우고 → compose down → 남은 망을 지운다.
-  cleanups.push(() => docker(["network", "rm", `${PROJECT}_db`, `${PROJECT}_default`]));
+  cleanups.push(() => docker(["network", "rm", `${PROJECT}_db`, `${PROJECT}_queue`, `${PROJECT}_default`]));
   cleanups.push(() => docker([...compose(["--profile", "migration", "down", "-v", "--remove-orphans", "-t", "30"])]));
   cleanups.push(() => docker(["rm", "-f", ...docker(["ps", "-aq", "--filter", `name=^${PROJECT}-`]).stdout.split("\n").filter(Boolean)]));
   const envValues = (file) => Object.fromEntries(readFileSync(path.join(envDir, file), "utf8").split("\n").filter((line) => /^[A-Z_]+=/.test(line)).map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]));
@@ -310,7 +328,7 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
     // 컨테이너가 아직 없는 상태를 조회 실패가 아니라 "없음"으로 판정하고 진행했는지 본다.
     const absent = ["web", "api", "worker"].filter((service) => !first.text.includes(`교체 전 ${service}: 컨테이너 없음`));
     expect(absent.length === 0, `컨테이너 없음 기록이 없는 서비스 ${absent.join(",")}`);
-    const pulled = /합성 DB 이미지를 받았습니다/.test(first.text) ? "합성 DB 이미지를 받음, " : "합성 DB 이미지는 이미 있음, ";
+    const pulled = ["DB", "큐"].map((what) => (new RegExp(`합성 ${what} 이미지를 받았습니다`).test(first.text) ? `합성 ${what} 이미지를 받음, ` : `합성 ${what} 이미지는 이미 있음, `)).join("");
     return pulled + (/중지 시작부터 web 정상 확인까지 \d+초/.exec(first.text) ?? [""])[0];
   });
   const psql = (sql) => mustDocker(["exec", name("db"), "psql", "-U", "postgres", "-d", "catchu", "-Atc", sql]).stdout.trim();
@@ -346,9 +364,10 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
     expect(/^catchu_app:(t|true):TLSv1\.[23]$/.test(ssl), `pg_stat_ssl ${ssl}`);
     return `공개 링크 조회 404(LINK_UNAVAILABLE), DB 세션 ${ssl}`;
   });
-  await check("worker", "health", async () => {
+  await check("worker", "health(합성 큐에 붙은 소비자 실행 중)", async () => {
     const res = await fetch(`http://127.0.0.1:${PORTS.worker}/health`);
-    expect(res.status === 200 && (await res.json()).status === "ok", `status=${res.status}`);
+    const body = await res.json();
+    expect(res.status === 200 && body.status === "ok" && body.consumer === "running", `status=${res.status} ${JSON.stringify(body)}`);
   });
   await check("단일 실행", "서비스마다 프로세스 1개", () => {
     const counts = ["api", "worker", "web"].map((service) => {
@@ -358,6 +377,34 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
     });
     expect(counts.every(([, count]) => count === 1), JSON.stringify(counts));
     return counts.map(([service, count]) => `${service}=${count}`).join(" ");
+  });
+  await check("worker", "합성 큐의 MOCK 요청 1건을 자식 프로세스로 처리(읽기 전용·권한 제거)", () => {
+    // api(#233) 대신 컨테이너 안에서 합성 요청을 넣는다. 처리 뒤에는 spawn 자원 추적기가 남아 worker 프로세스가 2개가 된다.
+    const script = [
+      "import asyncio, json",
+      "from bullmq import Job, Queue",
+      "from app.processing import synthetic_accepted_context, synthetic_request",
+      "async def main():",
+      "    c = {'connection': 'redis://queue:6379', 'prefix': 'catchu'}",
+      "    q, o = Queue('analysis-requests', c), Queue('worker-messages', c)",
+      "    m = synthetic_request(synthetic_accepted_context())",
+      "    await q.add('Request', m, {'jobId': m['attemptId'], 'attempts': 1, 'removeOnComplete': {'age': 7200}, 'removeOnFail': {'age': 7200}, 'stackTraceLimit': 0})",
+      "    state = None",
+      "    for _ in range(120):",
+      "        state = await q.getJobState(m['attemptId'])",
+      "        if state in ('completed', 'failed'): break",
+      "        await asyncio.sleep(0.5)",
+      "    job = await Job.fromId(q, m['attemptId'])",
+      "    out = sorted(j.name + ':' + str(j.data.get('state') or j.data.get('outcome')) for j in await o.getJobs(['waiting']))",
+      "    print(json.dumps({'state': state, 'ret': job.returnvalue, 'out': out}))",
+      "    await q.close(); await o.close()",
+      "asyncio.run(main())",
+    ].join("\n");
+    const out = mustDocker(["exec", name("worker"), "/app/worker/.venv/bin/python", "-c", script], { timeoutMs: 120_000 });
+    const parsed = JSON.parse(out.stdout.trim().split("\n").at(-1));
+    expect(parsed.state === "completed" && parsed.ret?.handled === "RESULT_SENT" && parsed.ret?.outcome === "SUCCEEDED", out.stdout.slice(0, 300));
+    expect(JSON.stringify(parsed.out) === JSON.stringify(["ProcessingEvent:RECEIVED", "ProcessingEvent:RUNNING", "Result:SUCCEEDED"]), JSON.stringify(parsed.out));
+    return `요청 작업 ${parsed.state}, 큐에 ${parsed.out.join(", ")}`;
   });
   await check("migration", "적용 이력·소유자·앱 계정 권한", () => {
     const count = Number(psql("select count(*) from migrations"));

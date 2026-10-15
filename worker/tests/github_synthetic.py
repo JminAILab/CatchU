@@ -44,7 +44,11 @@ START = datetime(2026, 10, 1, 0, 0, tzinfo=UTC)
 ACCEPTED = synthetic_accepted_context()
 _checked = check_request(synthetic_request(ACCEPTED), ACCEPTED)
 assert isinstance(_checked, CheckedRequest)
-REQUEST: CheckedRequest = _checked
+# 합성 요청의 자격정보 참조는 시도 ID와 같다(#121 조회 전 자체 검사). 수집 시험은 참조 값이 로그·결과에
+# 남지 않는지 보므로, 어디에나 실리는 시도 ID와 구별되는 값을 둔다.
+REQUEST: CheckedRequest = replace(
+    _checked, credential_context_reference="synthetic-credential-context-0001"
+)
 
 
 def request_with(*types: str) -> CheckedRequest:

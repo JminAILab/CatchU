@@ -46,5 +46,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app/worker
 USER 1000:1000
 EXPOSE 8000
-# 현재 실행은 health 서버뿐이다. 실제 큐 소비 명령·종료 방법은 #121 제공 판본에서 받는다. --workers 1이 WEB_CONCURRENCY보다 우선한다.
-CMD ["/app/worker/.venv/bin/python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# 분석 소비자(#121). 큐 설정은 실행할 때 주입한다(worker/docs/queue-consumer.md). 같은 포트로 /health만 연다.
+# 이 프로세스(컨테이너 PID 1)가 작업마다 띄운 자식을 직접 회수하고, SIGTERM을 받으면 25초 안에 끝낸다.
+CMD ["/app/worker/.venv/bin/python", "-m", "app.consumer"]
