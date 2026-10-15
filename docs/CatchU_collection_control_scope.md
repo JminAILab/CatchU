@@ -173,7 +173,7 @@
 | 만료 시각 | 수집 도중 만료를 피하려고 |
 
 - **전달 경로 제안**: F가 api의 내부 조회 지점에 worker 전용 인증키로 접속해 참조를 제시하고 맥락을 받는다. 검토초안이 "worker DB 차단, 전용 인증키" 방향을 이미 적었다([검토초안 §10][arch10]). 회원용 공개 API에 이 지점을 만들지 않는다.
-- **권한은 최소로.** 대상은 **공개 저장소뿐**이므로([요구사항 FR1.1][r56]) 토큰은 비공개 자료 접근이 아니라 **호출 한도와 본인 확인**을 위한 것이다. 따라서 비공개 저장소 읽기 권한을 포함하지 않는 자격정보를 제안한다. 실제로 어떤 종류의 GitHub 연동을 쓰는지는 [명세 OQ-A1][c180]의 미결이며 A가 정한다.
+- **권한은 최소로.** 대상은 **공개 저장소뿐**이므로([요구사항 FR1.1][r56]) 토큰은 비공개 자료 접근이 아니라 **호출 한도와 본인 확인**을 위한 것이다. 따라서 비공개 저장소 읽기 권한을 포함하지 않는 자격정보를 제안한다. 실제 GitHub 연동은 추가 권한(scope)을 요청하지 않는 OAuth App과 만료형 토큰으로 2026-10-14 명세에 정해졌다([명세 GitHub 연동 규칙][c1014gh]).
 - **수명은 짧게.** 한 번의 수집에 필요한 만큼만. 수집 시간 상한([2.3](#23-자원시간-상한))보다 넉넉해야 한다.
 - **F는 참조도 자격정보도 저장하지 않는다.** 처리 중 메모리에만 두고, 로그·오류 메시지·결과 메시지·근거 어디에도 남기지 않는다.
 
@@ -221,7 +221,7 @@
 [c137]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L137
 [r119]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md#L119
 [c162]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L161-L165
-[c180]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L180
+[c1014gh]: https://github.com/JminAILab/CatchU/blob/c0104009af94c554a013b814746c239c8fc04d9d/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L64
 [yw]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml
 [yc]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml
 [wr]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u3-worker/functional-design/rules.md

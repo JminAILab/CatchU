@@ -35,7 +35,7 @@ throw new ApiError('CONSENT_REQUIRED');
 throw new ApiError('ANALYSIS_IN_PROGRESS', { details: { existingRequestId: requestId } });
 ```
 
-새 오류 코드는 계약 변경 이슈로 상태·의미·문구를 합의한 뒤 `error-codes.ts`의 상태/기본 문구, 이 표, 기능 테스트를 함께 추가한다. #250의 `403 AUTH_ORIGIN_FORBIDDEN`은 팀장이 담당자에게 맡긴 Origin 거부 코드의 연결 검토안이며 [세션 안내](docs/auth-sessions.md)를 따른다. 과거 승인 문서를 소급 수정하지 않는다. 기존 코드의 사용자 문구를 지정할 때도 내부 예외의 message를 그대로 전달하지 않는다.
+새 오류 코드는 계약 변경 이슈로 상태·의미·문구를 합의한 뒤 `error-codes.ts`의 상태/기본 문구, 이 표, 기능 테스트를 함께 추가한다. #250의 `403 AUTH_ORIGIN_FORBIDDEN`(갱신·로그아웃 요청의 출처 거부)은 2026-10-14 API 명세에 반영됐다. 상태·의미는 위 공통 오류·요청 안전성 표와 [M — 회원 API](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api)가 정본이고, 구현 동작은 [세션 안내](docs/auth-sessions.md)에 있다. 과거 승인 문서를 소급 수정하지 않는다. 기존 코드의 사용자 문구를 지정할 때도 내부 예외의 message를 그대로 전달하지 않는다.
 
 전역 ValidationPipe는 class-validator 데코레이터가 있는 DTO 클래스의 검증 실패·추가 필드를 `400 VALIDATION_FAILED`와 필드/규칙 이름으로 응답한다. `unknown`·인터페이스·직접 수동 검증은 DTO 검증 대상이 아니다.
 
