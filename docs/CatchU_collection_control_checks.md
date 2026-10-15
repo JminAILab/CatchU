@@ -55,7 +55,7 @@
 | 나가는 방향 제한(코드) | [#117][i117] F | 같은 PR | — |
 | 나가는 방향 제한(환경) | H(팀원 1) | 자동 검사 + 실제 환경 확인. **작성자 외 검토자 없음**([7.1](#71-검토자가-없을-때)) | [#37][i37] C05 |
 | 자원·시간 상한 | [#117][i117] F | 같은 PR | 실측은 실제 연결 때 |
-| 자격정보 참조 발급·수명·권한 최소화 | A(팀원 2), [#133][i133]의 실제 GitHub 연동 후속 | A의 PR | GitHub 토큰의 권한·수명은 2026-10-14 명세에 정해졌다(추가 권한 없는 OAuth App·만료형 토큰, [명세 GitHub 연동 규칙][c1014gh]). 실제 확인은 구현 칸의 후속 뒤 |
+| 자격정보 참조 발급·수명·권한 최소화 | 권한 최소화는 [#231][i231], 참조 발급·수명은 worker용 내부 조회 [#232][i232](10/6 팀장 배치) | 각 PR | 추가 권한 없음과 만료형 토큰은 2026-10-14 명세에 정해졌고([명세 GitHub 연동 규칙][c1014gh]), #231 작성자 환경의 실제 연결 기록이 있다([GitHub 연결 기능 문서][gc]). 참조 발급·수명은 #232 연결 뒤 |
 | 자격정보 맥락 검사·거부 | [#117][i117] F | 같은 PR | — |
 | 임시 입력 정리 | [#117][i117]·[#121][i121] F | 같은 PR | — |
 | 결과 전달(한 번 보냄, 거부된 결과는 기록만) | [#121][i121] F | 같은 PR | — |
@@ -106,6 +106,8 @@
 [i117]: https://github.com/JminAILab/CatchU/issues/117
 [i120]: https://github.com/JminAILab/CatchU/issues/120
 [i121]: https://github.com/JminAILab/CatchU/issues/121
+[i231]: https://github.com/JminAILab/CatchU/issues/231
+[i232]: https://github.com/JminAILab/CatchU/issues/232
 [i233]: https://github.com/JminAILab/CatchU/issues/233
 [i237]: https://github.com/JminAILab/CatchU/issues/237
 [d23]: https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296
@@ -117,6 +119,7 @@
 [c150]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L153-L159
 [c137]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L137
 [c162]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L161-L165
+[gc]: https://github.com/JminAILab/CatchU/blob/c0104009af94c554a013b814746c239c8fc04d9d/api/docs/github-connection.md#검사와-한계
 [c1014gh]: https://github.com/JminAILab/CatchU/blob/c0104009af94c554a013b814746c239c8fc04d9d/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L64
 [c182]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L182
 [yw]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml
