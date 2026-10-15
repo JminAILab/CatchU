@@ -82,7 +82,7 @@
 
 ## 실행 요청 맥락의 준비와 경계
 
-`AnalysisIntakeService.prepareExecutionRequest`는 저장한 요청·시도·동의·허용 scope를 현재 worker Request 스키마에 맞춰 준비하는 **내부 함수**다. 자격정보 참조도 mock 전용이며 실제 토큰을 제공하지 않는다. HTTP 경로·큐 등록·worker 호출·자동 재시도·처리 시한은 없다. 메시지 준비가 실행 증거가 아니며 요청은 QUEUED로 남는다. #139를 자동 AppModule에 등록하지 않는다.
+`AnalysisIntakeService.prepareExecutionRequest`는 저장한 요청·시도·동의·허용 scope를 현재 worker Request 스키마에 맞춰 준비하는 **내부 함수**다. 자격정보 참조도 mock 전용이며 실제 토큰을 제공하지 않는다. HTTP 경로·큐 등록·worker 호출·자동 재시도·처리 시한은 없다. 메시지 준비가 실행 증거가 아니며 요청은 QUEUED로 남는다. #139를 자동 AppModule에 등록하지 않는다. 이 접수 API가 저장한 요청·동의·시도를 개발용 주입과 DB 수신 처리에 연결한 검증은 [분석 메시지 수신 「실제 접수 연결 검증」](analysis-receiver.md#실제-접수-연결-검증)에 있다.
 
 ## 개발 재현과 검사
 
