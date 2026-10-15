@@ -18,7 +18,10 @@ export interface CreationReference {
 }
 export interface CreationCallbacks<T> {
   create(manager: EntityManager): Promise<CreationReference>;
-  /** 지문이 같아도 반드시 실행. C는 링크를 읽어 isSameShareCreate를 호출한다. */
+  /**
+   * 지문이 같아도 반드시 실행. 키 잠금과 DB 연결을 쥔 채 실행되므로 해시 계산 같은 무거운 연산은 하지 않는다.
+   * C는 링크를 읽어 matchStoredShareCreate로 본문·설정 여부를 확정하고 비밀번호 해시 비교는 트랜잭션 밖에서 한다.
+   */
   isSame(manager: EntityManager, record: Readonly<IdempotencyRecord>): Promise<boolean>;
   /** 신규·재요청 모두 같은 트랜잭션에서 응답 구성. 조회 실패도 전체 롤백한다. */
   readResponse(manager: EntityManager, record: Readonly<IdempotencyRecord>): Promise<T>;

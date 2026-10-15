@@ -37,12 +37,13 @@
 - 형식 오류는 값의 출처에 따라 구분한다. 사용자 입력인 `Idempotency-Key`는 `400 INVALID_REQUEST`, 서버가 정하는 operation·생성하는 requestFingerprint는 `500 INTERNAL_ERROR`다. 오류 응답에 내부 값이나 지문을 포함하지 않는다. 정상 형식의 지문이 기존 요청과 다르거나 `isSame`의 비동기 비교 결과가 false이면 기존 `409 IDEMPOTENCY_CONFLICT`를 유지한다.
 - request_id/link_id: operation에 맞는 하나만 저장한다. 공통 함수가 연결 자원의 회원도 대조한다. request_id의 회원 일치는 DB 복합 FK로도 보장한다.
 - response_reference: 안전한 응답 재구성 참조(text). 예를 들어 자원 UUID를 저장하고 readResponse에서 원본 자원을 다시 읽는다. 요청/응답 원문, 비밀번호·토큰을 이 열에 직렬화하지 않는다.
-- isSame: 지문이 같은 재요청에서도 **항상 await하는 필수 비교 함수**다. C는 같은 manager로 기존 링크를 조회한 뒤 `isSameShareCreate`로 비밀번호까지 비교한다. false만 `409 IDEMPOTENCY_CONFLICT`이며 DB 오류·기록 불일치는 서버 오류로 전달한다.
+- isSame: 지문이 같은 재요청에서도 **항상 await하는 필수 비교 함수**다. 키 잠금과 DB 연결을 쥔 채 실행되므로 해시 계산 같은 무거운 연산은 하지 않는다. C는 같은 manager로 기존 링크를 조회해 `matchStoredShareCreate`로 본문·설정 여부를 확정하고, 읽은 저장 검증값을 트랜잭션 밖으로 넘겨 커밋 뒤 `verifyPendingPassword`로 비밀번호를 비교한다(#220). 비밀번호가 다르면 `replayed`여도 응답을 돌려주지 않고 `409 IDEMPOTENCY_CONFLICT`다. false만 `409 IDEMPOTENCY_CONFLICT`이며 DB 오류·기록 불일치는 서버 오류로 전달한다. 분석 접수(E)의 `isSame`에는 해시가 없어 이 구분이 필요하지 않다.
 - create/readResponse: 모두 받은 manager를 사용한다. readResponse 실패도 신규 자원·멱등 기록을 함께 롤백한다. 예외를 트랜잭션 내부에서 삼키지 않는다.
 
 다음은 기능 담당자가 채울 콜백의 호출 형태다(제품 API 추가 예시가 아님).
 
 ```typescript
+let pendingPassword: PendingPasswordCheck | null = null;
 const result = await dataSource.transaction('READ COMMITTED', (manager) =>
   runIdempotentCreation(manager, {
     memberId, operation: 'createShareLink', key, requestFingerprint,
@@ -53,15 +54,19 @@ const result = await dataSource.transaction('READ COMMITTED', (manager) =>
     },
     isSame: async (sameManager, record) => {
       const link = await sameManager.findOneByOrFail(ShareLink, { linkId: record.linkId! });
-      return isSameShareCreate(input, {
+      const match = matchStoredShareCreate(input, {
         requestFingerprint: record.requestFingerprint,
         passwordVerifier: link.passwordProtectionReference,
       });
+      if (!match.same) return false;
+      pendingPassword = match.passwordCheck; // 해시 비교는 트랜잭션 밖에서 한다
+      return true;
     },
     readResponse: async (sameManager, record) =>
       buildOwnerLinkResponse(sameManager, record.responseReference),
   }),
 );
+// 재요청이면 잠금·연결을 놓은 뒤: if (result.replayed && !await verifyPendingPassword(pendingPassword)) → 409 IDEMPOTENCY_CONFLICT.
 // 여기까지 성공한 뒤 응답: result.replayed와 operation 계약에 맞는 HTTP 상태 사용.
 ```
 

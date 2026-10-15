@@ -5,7 +5,9 @@ import { runIdempotentCreation } from '../member-analysis/idempotent-creation';
 import { hashLinkPassword } from './link-password';
 import { generateLinkToken } from './link-token';
 import { validateShareCreate } from './share-create';
-import { isSameShareCreate, shareCreateFingerprint } from './share-create-fingerprint';
+import {
+  matchStoredShareCreate, shareCreateFingerprint, verifyPendingPassword, type PendingPasswordCheck,
+} from './share-create-fingerprint';
 import { Clock, issueShareLink } from './share-link-issuance';
 import { ShareLink } from './share-link.entity';
 import { encodeShareLinkCursor, parseShareLinkListQuery } from './share-link-list';
@@ -68,6 +70,8 @@ export class ShareLinksService {
     const passwordVerifier = input.password === undefined ? null : await hashLinkPassword(input.password);
     const linkToken = generateLinkToken();
 
+    // 같은 키 재요청의 비밀번호 비교 대상. 잠금 안에서는 해시를 계산하지 않고, 읽은 저장값만 남겨 잠금과 연결을 놓은 뒤 비교한다.
+    let pendingPassword: PendingPasswordCheck | null = null;
     const { replayed, response } = await this.dataSource.transaction('READ COMMITTED', async (manager) => {
       await assertMemberExists(manager, memberId);
       return runIdempotentCreation(manager, {
@@ -81,10 +85,14 @@ export class ShareLinksService {
         },
         isSame: async (sameManager, record) => {
           const link = await sameManager.findOneByOrFail(ShareLink, { linkId: record.linkId as string });
-          return isSameShareCreate(input, {
+          const match = matchStoredShareCreate(input, {
             requestFingerprint: record.requestFingerprint,
             passwordVerifier: link.passwordProtectionReference,
           });
+          if (!match.same) return false;
+          // 지문과 설정 여부까지만 여기서 확정한다. 비밀번호 비교는 아래 트랜잭션 밖에서 반드시 한다.
+          pendingPassword = match.passwordCheck;
+          return true;
         },
         readResponse: async (sameManager, record) => {
           const link = await sameManager.findOneByOrFail(ShareLink, { linkId: record.responseReference });
@@ -92,6 +100,9 @@ export class ShareLinksService {
         },
       });
     });
+    // 재요청이면 키 잠금·DB 연결을 놓은 뒤 비밀번호를 비교한다. 다르면 이미 읽어 둔 응답을 돌려주지 않고 409로 거절한다.
+    // 이 비교는 쓰기 없이 읽은 저장값을 대상으로 하므로 롤백할 것이 없고, 같은 키는 다시 보낼 수 있다.
+    if (replayed && !await verifyPendingPassword(pendingPassword)) throw new ApiError('IDEMPOTENCY_CONFLICT');
     return { replayed, link: response };
   }
 

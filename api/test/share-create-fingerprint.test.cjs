@@ -2,7 +2,9 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { validateShareCreate } = require('../dist/share-links/share-create.js');
 const { hashLinkPassword } = require('../dist/share-links/link-password.js');
-const { shareCreateFingerprint, isSameShareCreate } = require('../dist/share-links/share-create-fingerprint.js');
+const {
+  shareCreateFingerprint, isSameShareCreate, matchStoredShareCreate, verifyPendingPassword,
+} = require('../dist/share-links/share-create-fingerprint.js');
 
 const valid = (body) => {
   const result = validateShareCreate(body);
@@ -64,4 +66,39 @@ test('기록과 링크의 비밀번호 설정 여부가 어긋나면 409가 아�
   const without = valid({ title: 'Catch' });
   await assert.rejects(isSameShareCreate(without,
     { requestFingerprint: shareCreateFingerprint(without), passwordVerifier: await hashLinkPassword('synthetic') }));
+});
+
+test('잠금 안에서 쓰는 판정은 해시를 계산하지 않고 비교 대상만 돌려준다(#220)', async () => {
+  const link = require('../dist/share-links/link-password.js');
+  const original = link.verifyLinkPassword;
+  let calls = 0;
+  link.verifyLinkPassword = async (...args) => { calls += 1; return original(...args); };
+  try {
+    const first = valid({ title: 'Catch', password: 'synthetic-a' });
+    const verifier = await hashLinkPassword('synthetic-a');
+    const stored = { requestFingerprint: shareCreateFingerprint(first), passwordVerifier: verifier };
+
+    const same = matchStoredShareCreate(valid({ title: ' Catch ', password: 'synthetic-a' }), stored);
+    assert.deepEqual(same, { same: true, passwordCheck: { password: 'synthetic-a', verifier } });
+    // 비밀번호만 다른 요청도 여기서는 같은 본문이다. 비교 대상을 반드시 비교해야 한다.
+    const other = matchStoredShareCreate(valid({ title: 'Catch', password: 'synthetic-b' }), stored);
+    assert.deepEqual(other, { same: true, passwordCheck: { password: 'synthetic-b', verifier } });
+    assert.deepEqual(matchStoredShareCreate(valid({ title: 'Other', password: 'synthetic-a' }), stored), { same: false });
+    assert.deepEqual(matchStoredShareCreate(valid({ title: 'Catch' }), stored), { same: false });
+    assert.equal(calls, 0, '판정만으로는 해시를 계산하지 않는다');
+
+    assert.equal(await verifyPendingPassword(same.passwordCheck), true);
+    assert.equal(await verifyPendingPassword(other.passwordCheck), false);
+    assert.equal(await verifyPendingPassword(null), true, '비교 대상이 없으면(비밀번호 없는 링크) 통과');
+    assert.equal(calls, 2);
+
+    const plain = { requestFingerprint: shareCreateFingerprint(valid({ title: 'Catch' })), passwordVerifier: null };
+    assert.deepEqual(matchStoredShareCreate(valid({ title: ' Catch' }), plain), { same: true, passwordCheck: null });
+    assert.deepEqual(matchStoredShareCreate(valid({ title: 'Catch', password: 'synthetic' }), plain), { same: false });
+    const withPassword = valid({ title: 'Catch', password: 'synthetic' });
+    assert.throws(() => matchStoredShareCreate(withPassword,
+      { requestFingerprint: shareCreateFingerprint(withPassword), passwordVerifier: null }), /inconsistent/);
+  } finally {
+    link.verifyLinkPassword = original;
+  }
 });
