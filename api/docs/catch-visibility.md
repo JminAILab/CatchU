@@ -27,6 +27,7 @@ const catchDetail = await publicCatches.get(link.ownerId, catchId);
 - `list(ownerId, query)`: query는 HTTP 문자열 `limit?`·`cursor?`만 받는다. limit은 기본 20, 최대 100. 반환은 `{ catches: PublicCatchResponse[], page: { nextCursor: string | null } }`다. C가 별도로 A의 공개 프로필과 결합한다.
 - `get(ownerId, catchId)`: PublicCatchResponse 하나를 반환한다. 숨김·다른 소유자·없는 자료·원본 제한은 모두 같은 NotFoundException이며 공통 필터가 `404 RESOURCE_UNAVAILABLE`로 변환한다.
 - 매 호출의 DB 트랜잭션에서 현재 PUBLIC이고 보호 제한이 NONE인 자료만 반환한다. 링크별 Catch 스냅샷이나 캐시를 만들지 않는다. 숨김·보호 변경 커밋 후 시작한 다음 조회부터 제외된다.
+- 근거 배열은 등록 때 받은 순서(`CatchEvidence.position`)대로 본인·수신자 목록과 상세에 반환한다. 위치는 내부 정렬값이며 응답 필드를 추가하지 않는다.
 - 목록·근거는 같은 REPEATABLE READ 스냅샷에서 읽는다. 커서는 Catch UUID 오름차순의 위치이며 권한 증명이 아니다. 다음 페이지도 현재 공개 조건을 다시 검사한다. 본인용 커서·다른 소유자의 커서는 거절한다.
 - 정상 빈 목록은 200에 사용할 빈 catches 배열이다. 보호 판단 누락·DB 조회·응답 자료 오류는 예외로 전달하며 빈 목록으로 바꾸지 않는다.
 - 허용 필드만 새 객체로 만든다: catchId, title, workFacts, subjectContribution, evidence, draft. 근거에서는 sourceUrl, sourceRevision, representedFacts, contributionScope, coverageLimits만 전달한다. 본인 질문·확인·불일치·내부 등록/근거 식별자·sourceMode를 제외한다. 생성되지 않은 초안 content는 null이다.

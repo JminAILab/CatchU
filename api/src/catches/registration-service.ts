@@ -172,8 +172,8 @@ export async function registerCandidates(
       }).orIgnore().returning(['catchId']).execute();
       // ON CONFLICT는 PostgreSQL 트랜잭션을 오류 상태로 만들지 않는다.
       if (insertion.raw.length > 0) {
-        await evidence.insert(first.content.evidence.map((item) => ({
-          catchEvidenceId: randomUUID(), catchId, ...item,
+        await evidence.insert(first.content.evidence.map((item, index) => ({
+          catchEvidenceId: randomUUID(), catchId, ...item, position: index + 1,
         })));
         createdCandidateId = first.candidateId;
       }

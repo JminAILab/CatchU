@@ -287,6 +287,63 @@ describe('본인 Catch HTTP·PostgreSQL', {
     assert.deepEqual(await snapshot(), beforeState);
   });
 
+  test('근거 3개의 입력 순서는 UUID 순서와 달라도 본인·수신자 조회와 재등록에서 유지된다', async () => {
+    const source = candidate();
+    source.evidence = ['z', 'a', 'm'].map((suffix) => ({
+      ...source.evidence[0], evidenceId: 'synthetic-evidence-' + suffix,
+      sourceUrl: 'https://example.invalid/pull/' + suffix,
+      representedFacts: ['[합성] 근거 ' + suffix],
+    }));
+    const own = await seed({ source });
+    const readStored = () => db.query('SELECT * FROM catch_evidence WHERE catch_id = $1 ORDER BY position', [own.catchId]);
+    const initial = await readStored();
+    assert.deepEqual(initial.map(item => item.position), [1, 2, 3]);
+    assert.deepEqual(initial.map(item => item.source_evidence_id), source.evidence.map(item => item.evidenceId));
+    // 난수 운에 기대지 않고, 저장 UUID 오름차순이 입력 순서와 다르게 만든다.
+    const knownIds = ['ffffffff-ffff-4fff-8fff-ffffffffffff',
+      '11111111-1111-4111-8111-111111111111', '88888888-8888-4888-8888-888888888888'];
+    for (let index = 0; index < initial.length; index++) {
+      await db.query('UPDATE catch_evidence SET catch_evidence_id = $1 WHERE catch_evidence_id = $2',
+        [knownIds[index], initial[index].catch_evidence_id]);
+    }
+    const stored = await readStored();
+    assert.notDeepEqual(knownIds, [...knownIds].sort());
+    const expectedOwnerEvidence = source.evidence.map((item, index) => ({
+      catchEvidenceId: knownIds[index], sourceEvidenceId: item.evidenceId,
+      sourceUrl: item.sourceUrl, sourceRevision: item.sourceRevision,
+      representedFacts: item.representedFacts, contributionScope: item.contributionScope,
+      coverageLimits: item.coverageLimits,
+    }));
+    const expectedPublicEvidence = expectedOwnerEvidence.map(({ sourceUrl, sourceRevision,
+      representedFacts, contributionScope, coverageLimits }) =>
+      ({ sourceUrl, sourceRevision, representedFacts, contributionScope, coverageLimits }));
+    const checkReadOrder = async () => {
+      assert.deepEqual(success(await request(own.ownerId, detailPath(own.catchId))).evidence, expectedOwnerEvidence);
+      assert.deepEqual(success(await request(own.ownerId)).items[0].evidence, expectedOwnerEvidence);
+      assert.deepEqual((await publicCatches.get(own.ownerId, own.catchId)).evidence, expectedPublicEvidence);
+      assert.deepEqual((await publicCatches.list(own.ownerId, {})).catches[0].evidence, expectedPublicEvidence);
+    };
+    assert.deepEqual(success(await request(own.ownerId, confirmPath(own.catchId), {
+      method: 'PUT', body: CONFIRMED,
+    })).evidence, expectedOwnerEvidence);
+    assert.deepEqual(success(await request(own.ownerId, visibilityPath(own.catchId), {
+      method: 'PUT', body: { visibility: 'PUBLIC' },
+    })).evidence, expectedOwnerEvidence);
+    await checkReadOrder();
+    const [repeated] = await db.transaction(manager => registerCandidates(manager, own));
+    assert.equal(repeated.catchId, own.catchId);
+    assert.deepEqual(await readStored(), stored);
+    // 같은 작업을 후속 결과가 역순으로 보내도 최초 근거와 ID·position을 덮어쓰지 않는다.
+    const next = await fixture.receipt({ ownerId: own.ownerId,
+      candidates: [{ ...source, candidateId: 'synthetic-next-candidate', evidence: [...source.evidence].reverse() }],
+    }, { repositoryId: own.repositoryId });
+    const [existing] = await db.transaction(manager => registerCandidates(manager, next));
+    assert.equal(existing.catchId, own.catchId);
+    assert.equal(existing.disposition, 'EXISTING');
+    assert.deepEqual(await readStored(), stored);
+    await checkReadOrder();
+  });
+
   test('repositoryId와 sourceRequestId는 본인 범위 안에서 AND로 적용한다', async () => {
     const ownerId = randomUUID();
     const first = await seed({ ownerId, repositoryId: 'synthetic-repo-a', count: 2 });

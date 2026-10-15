@@ -676,6 +676,7 @@ describe('Catch 등록 PostgreSQL', {
   test('B 마이그레이션 되돌리기는 선행 A/E 테이블·행을 보존하고 다시 적용된다', async () => {
     const input = await fixture.receipt();
     await apply(input);
+    await db.undoLastMigration(); // 근거 position
     await db.undoLastMigration(); // title NOT NULL 복원
     try {
       await db.undoLastMigration(); // 보호 판단 테이블
