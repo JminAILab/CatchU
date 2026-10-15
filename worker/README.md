@@ -2,7 +2,7 @@
 
 > 기능별 동작·연결 안내는 이 README에 덧붙이지 않고 `worker/docs/<기능>.md`로 쓴다.
 
-FastAPI 기반 worker의 최소 실행 골격이다. HTTP 경로는 `GET /health`뿐이며 HTTP `200`과 `{"status":"ok"}`를 반환한다. 분석 요청 검사와 합성(MOCK) 결과 생성([요청 검사와 합성 결과 생성](#요청-검사와-합성-결과-생성)), 허용 GitHub 자료 수집([허용 GitHub 자료 수집과 근거 정규화](docs/github-collection.md)), 후보 묶음·작업 동일성 판별([후보 묶음과 작업 동일성](docs/candidate-decision.md)), 설명 초안·질문·제목 생성([설명 초안·생각해볼 질문·Catch 제목 생성](docs/generation.md))은 내부 함수로만 있다. 셋 다 합성 자료(생성은 합성 제공자)로만 검사했고 실제 GitHub·LLM 연결은 검증 전이며, 아직 처리 순서에 연결하지 않았다. 처리 순서에 실제 수집·후보 판별·생성 연결, 실제 LLM 제공자·DB·큐 연결과 AWS 배포는 후속 작업이다. 운영 이미지와 한 호스트 실행은 [배포 안내](../deploy/README.md)에 있다. worker 관련 파일(worker 폴더, 계약 폴더, 루트 `.gitignore`, CI 파일)이 바뀐 PR에서는 「변경 후 검사」의 명령을 CI가 실행한다.
+분석 요청을 큐에서 받아 처리하는 worker다. 운영 실행은 분석 요청 큐 소비자(`python -m app.consumer`, [분석 요청 큐 소비자](#분석-요청-큐-소비자))이며, 같은 포트로 상태 확인 `GET /health`만 연다. 지금은 개발·시험 설정의 MOCK 요청만 가짜 생성기로 처리하고 LIVE 요청은 처리 전에 거부한다. FastAPI 앱(`app.main`)은 HTTP 경로가 `GET /health`뿐이며 HTTP `200`과 `{"status":"ok"}`를 반환한다. 분석 요청 검사와 합성(MOCK) 결과 생성([요청 검사와 합성 결과 생성](#요청-검사와-합성-결과-생성)), 허용 GitHub 자료 수집([허용 GitHub 자료 수집과 근거 정규화](docs/github-collection.md)), 후보 묶음·작업 동일성 판별([후보 묶음과 작업 동일성](docs/candidate-decision.md)), 설명 초안·질문·제목 생성([설명 초안·생각해볼 질문·Catch 제목 생성](docs/generation.md))은 내부 함수로만 있다. 셋 다 합성 자료(생성은 합성 제공자)로만 검사했고 실제 GitHub·LLM 연결은 검증 전이며, 아직 처리 순서에 연결하지 않았다. 처리 순서에 실제 수집·후보 판별·생성 연결(LIVE 처리), 실제 LLM 제공자 연결과 AWS 배포는 후속 작업이다. 운영 이미지와 한 호스트 실행은 [배포 안내](../deploy/README.md)에 있다. worker 관련 파일(worker 폴더, 계약 폴더, 루트 `.gitignore`, CI 파일)이 바뀐 PR에서는 「변경 후 검사」의 명령을 CI가 실행한다.
 
 작업 범위는 [#84](https://github.com/JminAILab/CatchU/issues/84), 공통 착수·브랜치·검사·PR 기준은 [코딩 운영](../docs/CatchU_작업관리.md#코딩-운영)을 따른다. worker 초기화 담당이 이후 분석 기능과 공통 환경까지 자동으로 맡는 것은 아니다.
 
@@ -17,6 +17,7 @@ FastAPI 기반 worker의 최소 실행 골격이다. HTTP 경로는 `GET /health
 | 테스트 | pytest `9.1.1` |
 | 생성 LLM 제공자 SDK | anthropic `1.13.0`, HTTP는 HTTPX2 `2.13.0`·HTTPCore2 `2.13.0`(FastAPI 시험 클라이언트도 HTTPX2를 쓴다, [생성의 실제 제공자](docs/generation-provider.md)) |
 | 메시지 스키마 검사 | jsonschema `4.26.0`, referencing `0.37.0`, PyYAML `6.0.3`, 형식 검사 rfc3339-validator `0.1.4`·rfc3986-validator `0.1.1` |
+| 큐 | bullmq `3.3.0`, redis(redis-py) `7.4.1`. 큐 검증 키트와 같은 판본이어야 한다([분석 요청 큐 소비자](docs/queue-consumer.md#큐-규격-233과-공동)) |
 
 직접 의존성과 검사 설정은 `pyproject.toml`, 전체 의존성의 해석 결과는 `uv.lock`에 둔다. `--locked`는 두 파일이 맞지 않으면 실행을 중단하여 의존성이 조용히 바뀌지 않게 한다. 패키지 배포를 하지 않는 앱(`package = false`)이므로 별도 빌드 명령은 없다.
 
@@ -59,11 +60,11 @@ uv sync --locked
 
 직접 가상환경을 활성화하고 싶다면 macOS·Linux에서는 `source .venv/bin/activate`, Windows PowerShell에서는 `.venv\Scripts\Activate.ps1`을 사용한다. 작업 후 `deactivate`로 활성화만 해제한다. PowerShell 실행 정책 때문에 활성화가 막히면 활성화 없이 `uv run`을 사용해도 된다.
 
-현재 필수·선택 환경변수는 모두 없다. `.env.example`에는 이 사실만 주석으로 적었으며, `.env`로 복사할 필요가 없다. GitHub 토큰·LLM 키·큐 접속 정보는 실제 연결을 구현하는 후속 작업에서 정의한다.
+분석 요청 큐 소비자의 환경변수(큐 주소·접두사·동시 수·MOCK)는 [분석 요청 큐 소비자 「설정」](docs/queue-consumer.md#설정)에 있다. 운영에서는 큐 주소가 필수이고, 개발·시험(`NODE_ENV=development`·`test`)에서는 없으면 소비자를 끈 채 상태 확인만 띄운다. `.env.example`에 이름을 적었으며 `.env`를 자동으로 읽지 않는다. GitHub 토큰·LLM 키·요청 정보 조회 설정은 LIVE 처리를 붙이는 후속 작업에서 정의한다.
 
 ## 실행·확인·종료
 
-`worker/`에서 개발 서버를 시작한다.
+분석 요청 큐 소비자의 실행·종료는 [분석 요청 큐 소비자 「실행」](docs/queue-consumer.md#실행)에 있다. 아래는 FastAPI 앱(`app.main`)의 개발 서버다. `worker/`에서 시작한다.
 
 ```sh
 uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
@@ -137,7 +138,7 @@ uv run --locked python -m app.processing succeeded-one-candidate
 | 허용 GitHub 자료 수집의 실제 연결(A 자격정보 제공·실제 환경 통제 검사). 수집 모듈은 합성 검사까지 | [#117](https://github.com/JminAILab/CatchU/issues/117) · [#133](https://github.com/JminAILab/CatchU/issues/133) · [#37](https://github.com/JminAILab/CatchU/issues/37) |
 | 후보 묶음·본인 기여 확인·작업 동일성 판별의 처리 순서 연결과 실제 자료 검수. 판별 모듈(`app/candidates/`)은 합성 검사까지 | [#118](https://github.com/JminAILab/CatchU/issues/118) · [#121](https://github.com/JminAILab/CatchU/issues/121) · [#122](https://github.com/JminAILab/CatchU/issues/122) |
 | 초안·질문·제목 생성의 실제 LLM 제공자 연결과 품질 확인. 생성 모듈(`app/generation/`)은 합성 제공자 검사까지 | [#119](https://github.com/JminAILab/CatchU/issues/119) · [#120](https://github.com/JminAILab/CatchU/issues/120) |
-| 요청 수신, 진행 알림과 결과의 실제 전송 | [#121](https://github.com/JminAILab/CatchU/issues/121) · [#233](https://github.com/JminAILab/CatchU/issues/233)(api 쪽) · [#77](https://github.com/JminAILab/CatchU/issues/77) |
+| 큐 연결 기본 틀은 있음([분석 요청 큐 소비자](docs/queue-consumer.md), MOCK만). LIVE 처리 조립과 실제 E 수신 연결 확인 | [#121](https://github.com/JminAILab/CatchU/issues/121) · [#233](https://github.com/JminAILab/CatchU/issues/233)(api 쪽) · [#77](https://github.com/JminAILab/CatchU/issues/77) |
 | E 수신·개발용 주입, B 등록 | [#139](https://github.com/JminAILab/CatchU/issues/139) · [#105](https://github.com/JminAILab/CatchU/issues/105) |
 
 ## 허용 GitHub 자료 수집과 근거 정규화
@@ -152,6 +153,21 @@ uv run --locked python -m app.processing succeeded-one-candidate
 
 [docs/generation.md](docs/generation.md)에 있다. 실제 제공자 어댑터(Anthropic Claude API)는 [docs/generation-provider.md](docs/generation-provider.md)에 있다.
 
+## 분석 요청 큐 소비자
+
+[docs/queue-consumer.md](docs/queue-consumer.md)에 있다(구조·실행·설정·상태 확인·큐 규격·처리 결과와 큐 완료/실패·시간 상한·종료 순서·수신 확인).
+
+### 보장하지 않는 범위
+
+[10/6 팀장 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)에 따라 서버·worker·큐가 끊기는 장애는 앱에서 복구하지 않는다. 끝나지 않은 요청은 E가 접수 후 60분에 실패로 닫고([#237](https://github.com/JminAILab/CatchU/issues/237)) 회원이 다시 요청한다. 그래서 worker는 다음을 보장하지 않는다.
+
+- **큐 자료가 사라지면 같은 시도가 한 번 더 실행될 수 있다.** 큐 서버가 자료 없이 다시 뜨면 api가 대기 시도를 다시 넣고, worker는 그것을 새 작업으로 받는다. 분석 비용이 한 번 더 든다.
+- **큐 서버 장애 중에는** 20분 상한의 실패 기록, 25초 안의 정상 종료(실패 기록 포함), 진행 알림·결과 전송을 보장하지 못한다. 상한·종료 자체는 지키지만(자식을 끝내고 프로세스를 끝낸다) 그 사실이 큐에 남지 않을 수 있다. 장애 중 잠금이 끝나면 큐는 그 작업을 실패로 보지만, 자식은 끝까지 돌아 결과를 보낼 수 있다.
+- **부모 프로세스가 죽은 작업**(강제 종료·노드 장애)은 소비자가 다시 떠서 정체 검사를 돌아야 큐에 실패로 남는다. 다시 실행하지는 않는다(정체 복구 0회). 그 사이 E의 요청은 대기·실행 중으로 보이다 처리 시한에 닫힌다.
+- **소비자 둘이 겹치면 동시 1건이 깨진다.** 교체 중 새 worker가 뜨기 전에 옛 worker가 내려가야 한다(실행 설정은 [#275](https://github.com/JminAILab/CatchU/issues/275)). worker가 상한을 넘겨 멈춘 사이 재요청이 오면 분석이 두 번 돌 수 있다.
+- **자식을 강제로 끝내도 이미 보낸 LLM 요청은 취소되지 않는다.** 비용이 중복될 수 있다.
+- **결과를 보낸 뒤의 수신·반영.** 결과는 한 번 보내면 끝이고 보존하지 않는다. 수신 확인을 못 봤거나 E가 거부(`REJECTED`)해도 다시 보내거나 분석을 다시 하지 않고 기록만 한다. 수신 확인 `ACCEPTED`는 E가 받았다는 뜻이지 회원 화면 반영 완료가 아니다.
+
 ## 변경 후 검사
 
 다음 명령을 `worker/`에서 실행한다.
@@ -163,7 +179,7 @@ uv run --locked mypy
 uv run --locked pytest
 ```
 
-Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 요청 검사와 합성 결과 생성은 거부 조건, 시나리오별 결과, 실행 불명 처리를 확인하며, 네트워크 연결을 막은 상태에서도 모든 시나리오가 끝나는지 본다. 수집 검사는 합성 GitHub 응답으로 사전 거부·호출 통제·상한·실패 보존·정규화·근거·결과 조합 연결·정리와 비밀값 누출을 확인하고, 관계 조회의 단계·조회 대상·멈춤 처리와 연결 PR 묶음 조회(GraphQL)의 요청 본문·응답 대응·실패 분류·묶음 경계·호출 수를 확인한다. 후보 판별 검사는 작업 동일성 값([wi1 규칙](docs/candidate-decision.md)), 실제 git과 대조한 공백을 무시한 diff 값, 배정·보류·같은 변경·커밋 묶음·나누기·집계, 판별 기준 문서의 합성 사례를 수집부터 결과 조합까지 확인한다. 생성 검사는 합성 제공자로 재료 고르기·patch 확인·가리기·크기 선별·응답 판정·문장 틀·제목·상태와 실패·호출 한도와 시간·제목 고쳐 쓰기·근거 한계 문구를 수집부터 결과 조합까지 확인하고, 제공자 입력·결과·로그에 가린 값이 남지 않는지 본다. 실제 제공자 어댑터는 진짜 SDK에 가짜 HTTP 전송을 붙여 요청 설정·재시도 끔·오류 변환을 확인한다. 실제 git으로 만드는 시험은 git이 없으면 건너뛴다. 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
+Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 요청 검사와 합성 결과 생성은 거부 조건, 시나리오별 결과, 실행 불명 처리를 확인하며, 네트워크 연결을 막은 상태에서도 모든 시나리오가 끝나는지 본다. 수집 검사는 합성 GitHub 응답으로 사전 거부·호출 통제·상한·실패 보존·정규화·근거·결과 조합 연결·정리와 비밀값 누출을 확인하고, 관계 조회의 단계·조회 대상·멈춤 처리와 연결 PR 묶음 조회(GraphQL)의 요청 본문·응답 대응·실패 분류·묶음 경계·호출 수를 확인한다. 후보 판별 검사는 작업 동일성 값([wi1 규칙](docs/candidate-decision.md)), 실제 git과 대조한 공백을 무시한 diff 값, 배정·보류·같은 변경·커밋 묶음·나누기·집계, 판별 기준 문서의 합성 사례를 수집부터 결과 조합까지 확인한다. 생성 검사는 합성 제공자로 재료 고르기·patch 확인·가리기·크기 선별·응답 판정·문장 틀·제목·상태와 실패·호출 한도와 시간·제목 고쳐 쓰기·근거 한계 문구를 수집부터 결과 조합까지 확인하고, 제공자 입력·결과·로그에 가린 값이 남지 않는지 본다. 실제 제공자 어댑터는 진짜 SDK에 가짜 HTTP 전송을 붙여 요청 설정·재시도 끔·오류 변환을 확인한다. 실제 git으로 만드는 시험은 git이 없으면 건너뛴다. 큐 소비자 검사는 가짜 큐와 실제 자식 프로세스로 작업 봉투·자체 검사·MOCK 종결·실행 불명·상한 초과·자식 회수·통신 경계·결과 전송 상한·수신 확인·설정·로그를 확인하고, `CATCHU_TEST_REDIS_URL`이 있으면 실제 Redis로 종료 신호 경쟁·정체 0회·잠금 갱신·Node가 넣은 요청 옵션·보관 정리·상태 확인·실패 사유를 확인한다(CI는 Valkey 8.1.6으로 늘 돈다, [검사](docs/queue-consumer.md#검사)). 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
 
 검사 결과·실행 환경·기준 커밋·작성자 외 재현 여부는 초기화 이슈·PR에 남긴다. 이 README의 명령과 기대 결과 자체가 검사 통과 기록은 아니다. 로컬 확인과 AWS 배포 검증은 각각 기록한다.
 
@@ -177,7 +193,9 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `app/contract/` | api–worker 메시지 스키마 v1 검사(계약 YAML을 원본 경로에서 읽음), 세 ID 식별 판정, 합성 템플릿 채우기 |
 | `fixtures/m1-synthetic/` | E·B 시험이 함께 쓰는 M1 합성 결과 세트와 사례별 기대 결과([안내](fixtures/m1-synthetic/README.md)) |
 | `tests/test_worker_messages.py` | 합성 사례·음성 대조의 스키마 판정 검사 |
-| `app/processing/` | 요청 검사(`request_check.py`), 제공자 비종속 생성 인터페이스(`generation.py`), 결과 조합(`result.py`), 처리 순서(`pipeline.py`), 가짜 생성기와 합성 요청(`fake_generator.py`·`synthetic.py`), 개발용 실행(`__main__.py`) |
+| `app/processing/` | 요청 검사(`request_check.py`), 제공자 비종속 생성 인터페이스(`generation.py`), 결과 조합(`result.py`), 처리 순서(`pipeline.py`), 큐 소비자 자식이 부르는 요청 처리(`runner.py`), 가짜 생성기와 합성 요청(`fake_generator.py`·`synthetic.py`), 개발용 실행(`__main__.py`) |
+| `app/consumer/` | 분석 요청 큐 소비자. 실행(`__main__.py`), 설정(`settings.py`), 큐 규격(`queues.py`), 서비스·종료 순서(`service.py`), 처리 함수(`parent.py`), 자식 관리(`children.py`), 자식 진입점(`child.py`), 부모·자식 프레임(`frames.py`), 수신 확인 조회(`receipts.py`), 상태 확인(`health.py`) |
+| `tests/test_consumer_*.py`, `tests/consumer_*.py`, `tests/node_add_request.cjs` | 큐 소비자 검사(가짜 큐 `processor`·`receipts`·`settings`, 실제 Redis `redis`)와 시험 도구(가짜 큐·짧은 상한, 시험용 자식, 별도 프로세스 실행, Node로 요청 넣기) |
 | `tests/test_request_check.py` | 요청 형식·접수 맥락 불일치·지난 시도의 거부 검사 |
 | `tests/test_processing.py` | 종결값·미제공과 실패 구분·초안/질문/제목 실패·진행 알림과 실행 불명·외부 호출 없음 검사 |
 | `app/collection/` | 허용 GitHub 자료 수집. 순서 조립(`collect.py`), 자격정보 대조(`credentials.py`), 선택 범위(`selection.py`), 상한(`limits.py`·`budget.py`), 호출 통제(`gateway.py`), HTTPS 전송(`transport.py`), 경로 틀(`api_paths.py`), 연결 PR 묶음 조회의 GraphQL 쿼리 틀(`graphql.py`), 식별 값 검사(`identifiers.py`), 종류별 수집(`collectors.py`), 관계 조회(`relations.py`), 기본 브랜치 커밋의 병합 계산(`graph.py`), 응답 정규화(`normalize.py`·`records.py`), 근거 재료(`evidence.py`), 실패 코드(`failures.py`) |
@@ -195,6 +213,6 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `pyproject.toml` | 프로젝트 의존성·개발 도구·검사 설정 |
 | `uv.lock` | 실행·개발 의존성의 잠금 파일. 저장소에 함께 커밋 |
 | `.python-version` | 로컬에서 사용할 Python 버전 |
-| `.env.example` | 필요한 환경변수 안내. 현재는 없음 |
+| `.env.example` | 큐 소비자 환경변수 안내 |
 
-앱 코드는 `app/`, 그 동작을 확인하는 테스트는 `tests/`에 추가한다. API 경로나 처리 로직이 늘어나면 관련 모듈로 나누고 `app/main.py`에서 연결한다. 큐 작업 수신·결과 전달은 [#77](https://github.com/JminAILab/CatchU/issues/77) 판정과 관련 계약에 따라 [#121](https://github.com/JminAILab/CatchU/issues/121)에서 구현한다. `.venv/`와 검사 캐시는 커밋하지 않는다.
+앱 코드는 `app/`, 그 동작을 확인하는 테스트는 `tests/`에 추가한다. API 경로나 처리 로직이 늘어나면 관련 모듈로 나누고 `app/main.py`에서 연결한다. 큐 작업 수신·결과 전달은 `app/consumer/`에 있다([#121](https://github.com/JminAILab/CatchU/issues/121), [#77](https://github.com/JminAILab/CatchU/issues/77) 판정). `.venv/`와 검사 캐시는 커밋하지 않는다.

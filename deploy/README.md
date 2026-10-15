@@ -10,10 +10,10 @@ web·api·worker 운영 이미지를 만들고, 한 호스트에서 API 한 프�
 |---|---|
 | [`web/Dockerfile`](../web/Dockerfile) | web 이미지. Next standalone 서버(`node server.js`), 포트 3000 |
 | [`api/Dockerfile`](../api/Dockerfile) | api 이미지(기본 단계, `node dist/main.js`, 포트 3001)와 migration 이미지(`--target migration`) |
-| [`worker/Dockerfile`](../worker/Dockerfile) | worker 이미지. 지금은 health 서버(포트 8000)와 합성(MOCK) 처리 명령뿐이다 |
+| [`worker/Dockerfile`](../worker/Dockerfile) | worker 이미지. 분석 요청 큐 소비자(`/health` 포트 8000)와 합성(MOCK) 처리 명령 |
 | [`.dockerignore`](../.dockerignore) | 빌드 맥락에 Dockerfile이 복사하는 경로(잠금 파일·설정·`src`·`app`·합성 자료·계약 YAML 두 개)만 넣는다 |
 | [`compose.single.yaml`](compose.single.yaml) | 한 호스트 실행. api·worker·web 각 1개, migration은 따로 실행 |
-| [`compose.local-db.yaml`](compose.local-db.yaml), [`local-db/`](local-db) | 로컬 합성 DB(검증·재현 전용). TLS와 앱·migration 계정 분리를 운영과 같은 방식으로 재현한다 |
+| [`compose.local-db.yaml`](compose.local-db.yaml), [`local-db/`](local-db) | 로컬 합성 DB·큐(검증·재현 전용). DB는 TLS와 앱·migration 계정 분리를 운영과 같은 방식으로 재현한다. 큐는 내부 망의 평문 Valkey 8.1.6이고 worker를 시험 모드로 띄운다(운영 큐의 TLS·비밀번호는 재현하지 않는다) |
 | [`env/`](env) | 실행 값 예시(이름만). 실제 파일은 저장소 밖에 둔다 |
 | [`scripts/make-local-env.sh`](scripts/make-local-env.sh) | 저장소 밖에 합성 환경 폴더(합성 비밀값·시험용 CA)를 만든다 |
 | [`scripts/replace-single.sh`](scripts/replace-single.sh) | 처음 설치와 계획 교체 절차를 차례로 실행한다 |
@@ -50,7 +50,7 @@ docker build -f worker/Dockerfile --build-arg SOURCE_REVISION=$(git rev-parse HE
 
 **api 운영 이미지에는 운영 의존성만 있다.** `npm ci --omit=dev --omit=optional`로 설치한다. ts-node·typescript는 잠금 파일에서 TypeORM의 선택 의존성으로도 잡혀 있어 `--omit=dev`만으로는 남기 때문이다. 이 조합은 api 전용이며, web은 SWC·sharp가 선택 의존성이라 쓰지 않는다. 결과 수신 검증기가 읽을 계약 YAML은 `/app/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/`에 둔다. 수신 모듈은 아직 앱에 연결돼 있지 않으므로 api가 떠도 YAML을 읽지는 않는다(연결은 #105·#233 범위).
 
-**worker 이미지는 `/app/worker`에서 실행한다.** 계약 YAML(위와 같은 경로)과 합성 자료(`/app/worker/fixtures/m1-synthetic`)를 저장소와 같은 상대 위치에 둔다. 개발 그룹(ruff·mypy·pytest 등)은 넣지 않는다. 기본 명령은 `uvicorn ... --workers 1`(health 서버)이고, 합성 처리는 `docker run --rm <worker 이미지> .venv/bin/python -m app.processing <시나리오>`로 실행한다. 실제 큐 소비 명령·종료 방법은 [#121](https://github.com/JminAILab/CatchU/issues/121) 제공 판본에서 받는다.
+**worker 이미지는 `/app/worker`에서 실행한다.** 계약 YAML(위와 같은 경로)과 합성 자료(`/app/worker/fixtures/m1-synthetic`)를 저장소와 같은 상대 위치에 둔다. 개발 그룹(ruff·mypy·pytest 등)은 넣지 않는다. 기본 명령은 분석 요청 큐 소비자(`python -m app.consumer`, [#121](https://github.com/JminAILab/CatchU/issues/121))다. 운영 모드에서 큐 설정이 없거나 틀리면 기동하지 않는다(종료 코드 2). SIGTERM을 받으면 새 작업을 멈추고 분석 중인 작업을 실패로 남긴 뒤 25초 안에 끝난다([worker 큐 소비자](../worker/docs/queue-consumer.md)). 합성 처리는 `docker run --rm <worker 이미지> .venv/bin/python -m app.processing <시나리오>`로 실행한다.
 
 세 이미지 모두 숫자 UID 1000으로 실행하고 앱 파일은 쓰기 권한이 없다. 읽기 전용 루트 파일시스템과 권한 제거(`cap_drop: ALL`)에서 동작하며, 쓰기 경로는 `/tmp`뿐이다.
 
@@ -63,10 +63,11 @@ docker build -f worker/Dockerfile --build-arg SOURCE_REVISION=$(git rev-parse HE
 | `compose.env` | 실행 묶음. 네 이미지, 환경 폴더, DB CA 파일, 포트. 비밀값 없음. `docker compose --env-file`로 읽는다 |
 | `api.env` | api 값. 인증·grant 키, DB 앱 계정, 공개 주소 등 |
 | `migration.env` | migration 전용 DB 계정 |
+| `worker.env` | worker 큐 설정. 큐 주소(비밀번호 포함, 운영은 `rediss://`)·접두사·동시 수 |
 | `db.env`, `tls/` | 로컬 합성 DB 전용(`make-local-env.sh`가 만든다) |
 
 - **운영 값의 기준**은 [api 환경변수](../api/docs/environment.md)와 같다. `AUTH_JWT_SECRET`·`LINK_GRANT_SECRET`은 64자리 hex로 서로 달라야 하고, 환경마다 한 번 만들어 고정한다. 재배포 때 새로 만들면 로그인과 비밀번호 링크 열람이 끊긴다. `AUTH_ACCESS_TOKEN_TTL_SECONDS=900`, `CORS_ALLOWED_ORIGINS`는 비운다(web·api 같은 출처). `AUTH_WEB_ORIGIN`에는 그 공개 https 출처를 끝 슬래시 없이 넣는다. 이 세 값 중 하나라도 어긋나면 api가 기동하지 않는다.
-- `compose.single.yaml`이 `NODE_ENV=production`, `BIND_HOST=0.0.0.0`, `PORT`, `PGSSLMODE=verify-full`, `NODE_EXTRA_CA_CERTS`, `NODE_TLS_REJECT_UNAUTHORIZED=1`을 고정한다. env 파일에 같은 이름을 넣어도 이 값이 쓰인다. `NODE_OPTIONS` 같은 실행 옵션은 env 파일에 넣지 않는다.
+- `compose.single.yaml`이 `NODE_ENV=production`, `BIND_HOST=0.0.0.0`, `PORT`, `PGSSLMODE=verify-full`, `NODE_EXTRA_CA_CERTS`, `NODE_TLS_REJECT_UNAUTHORIZED=1`을 고정한다(worker는 `NODE_ENV=production`만. 합성 겹침 파일만 worker를 `test`로 바꾼다). env 파일에 같은 이름을 넣어도 이 값이 쓰인다. `NODE_OPTIONS` 같은 실행 옵션은 env 파일에 넣지 않는다.
 - api·migration 이미지의 기본값도 `PGSSLMODE=verify-full`이다. 값을 빠뜨려도 평문으로 붙지 않고 인증서를 검증한다.
 - DB TLS: pg는 `PGSSLROOTCERT`를 읽지 않으므로 DB 서버 인증서를 발급한 CA 파일을 읽기 전용으로 넣고 `NODE_EXTRA_CA_CERTS`로 알려 준다. `DB_HOST`는 인증서의 이름과 같아야 하며 IP로 접속하면 거부된다. CA 파일 경로가 틀려도 Node는 경고만 내고 진행할 수 있으므로, 접속 성공 여부로 확인한다.
 - 비밀값은 Git·이미지·예시·빌드 입력·로그·PR에 넣지 않는다. 환경변수로 주입하므로 이 호스트에서 `docker inspect` 권한이 있는 사람은 값을 볼 수 있다. Docker 사용 권한은 운영 담당으로 제한한다.
@@ -100,7 +101,7 @@ docker compose --env-file ~/catchu-local-env/compose.env -f deploy/compose.singl
 docker compose --env-file ~/catchu-local-env/compose.env -f deploy/compose.single.yaml -f deploy/compose.local-db.yaml --profile migration down -v
 ```
 
-- web `/`는 200과 `CatchU web` 화면, api·worker `/health`는 200과 `{"status":"ok"}`다. health는 프로세스가 응답한다는 뜻이다. api health는 기동할 때 DB 접속에 성공했다는 데까지만 말하고, 큐·분석 연결 성공을 뜻하지 않는다.
+- web `/`는 200과 `CatchU web` 화면, api `/health`는 200과 `{"status":"ok"}`, worker `/health`는 200과 `{"status":"ok","consumer":"running"}`(합성 큐에 붙어 기다리는 중)다. api health는 기동할 때 DB 접속에 성공했다는 데까지만 말하고, 큐·분석 연결 성공을 뜻하지 않는다. worker health도 분석 성공을 뜻하지 않는다.
 - 마지막 명령(`down -v`)은 이 구성의 컨테이너·망·합성 DB 볼륨만 지운다. 합성 환경 폴더는 직접 지운다.
 - 합성 CA·DB 서버 인증서는 만든 날부터 30일 뒤 만료된다. 만료되면 api가 DB에 접속하지 못해 교체가 종료 코드 6으로 멈춘다. 이어서 쓰려면 위 `down -v`, 환경 폴더 삭제, `make-local-env.sh`부터 다시 한다(합성 DB 자료도 새로 만든다).
 - 로컬 구성에는 web과 api를 같은 출처로 묶는 앞단이 없다. production 모드 api는 교차 출처 호출을 받지 않으므로, 브라우저 화면에서 api를 부르는 흐름은 같은 출처 경로 분배가 있는 AWS 환경(#276·#277)에서 확인한다. 합성 공유 링크 주소·로그인 출처(`https://catchu-single.invalid`)로는 링크를 열거나 로그인 유지(갱신·로그아웃)를 확인할 수 없다.
@@ -132,7 +133,7 @@ migration은 별도 이미지로 **한 번 실행하고 끝난다.** 앱은 기�
 deploy/scripts/replace-single.sh --env-file <환경 폴더>/compose.env [--local-db] [--migrate]
 ```
 
-- 진행 중이던 요청·분석이 끝까지 처리된다고 보장하지 않는다. 신규 소비만 멈추고 남은 일을 마치는 방식(drain)은 큐 연결(#121·#233)에 아직 없다. health·순간적인 큐 0건은 그 근거가 아니다.
+- 진행 중이던 요청·분석이 끝까지 처리된다고 보장하지 않는다. worker는 SIGTERM을 받으면 새 작업을 멈추고 분석 중인 작업을 끝내 큐에 실패로 남긴다(남은 일을 마치는 방식은 없다). 그 요청은 처리 시한에 닫히고 회원이 다시 요청한다. health·순간적인 큐 0건은 그 근거가 아니다.
 - api 재기동으로 메모리에 있던 요청 빈도 제한 기록과 진행 중인 Google 로그인 시도가 사라진다. DB에 있는 자료·공개 상태·링크는 남는다.
 - 중단된 분석을 처리 시한(접수 후 60분) 뒤 닫는 정책은 [계약](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md) 「공통 오류·요청 안전성」에 정해졌고, 실제 적용은 [#237](https://github.com/JminAILab/CatchU/issues/237) 구현 뒤다. 지금 코드가 바로 실패로 닫는다고 보지 않는다. 컨테이너 재시작은 운영 복구로 허용하지만 중단된 분석을 다시 실행해도 된다는 뜻은 아니다.
 - 같은 호스트의 중복은 고정 컨테이너 이름과 위 3의 확인으로 막는다. 다른 호스트·다른 구성(EKS 포함)이 같은 DB·큐에 붙어 있는 것은 이 스크립트가 알 수 없다. **같은 운영 DB·큐에 Compose 실행과 EKS 실행을 동시에 연결하지 않는다.** 장애 때 자동으로 생기는 대체 실행(노드 장애 등)은 이 수동 규칙으로 막지 못하며 #276에서 구성·대체 정책을 정한다.
@@ -164,16 +165,16 @@ node deploy/scripts/check-images.mjs [--keep] [--report <저장소 밖 JSON 경�
 이 컴퓨터의 아키텍처로 네 이미지를 만들고, 저장소 밖 임시 폴더의 합성 환경(합성 비밀값·합성 DB·시험용 사설 CA)에서 확인한다. 실제 GitHub·LLM·AWS·운영 DB에는 연결하지 않는다. 포트 23000·23001·28000을 쓰고, 실행마다 다른 이름(`catchu-check-<무작위>`)으로 컨테이너·망·볼륨·이미지 태그를 만든다. 셸에 남은 `COMPOSE_*`·`CATCHU_*` 값은 넘기지 않는다. 다른 검사가 남긴 `catchu-check-*` 자원이 있거나 그 조회가 실패하면 건드리지 않고 멈춘다. 끝나면 만든 컨테이너·망·DB 볼륨·임시 폴더·미끼 파일과(`--keep`이 아니면) 검사 이미지를 지우고 남은 것이 없는지 조회한다. 자원이 남았거나 Docker 조회가 실패해 확인하지 못하면 실패로 끝내고, 프로젝트 이름·남은 이름·확인하지 못한 조회와 직접 확인할 명령을 알려 준다. 임시 폴더는 합성 비밀값이 있어 이때도 지운다(남은 자원은 프로젝트 이름만으로 찾을 수 있다). `--keep`이면 검사 이미지만 남긴다.
 
 - 빌드 맥락: 허용 목록 밖 파일이 하나도 없는지, 허용한 폴더 안의 `.env*`·키 미끼와 서비스 폴더의 다른 자료 미끼가 빠지는지
-- 이미지: UID 1000, `/app`·`/opt`·`/usr/local`에 쓰기 가능한 파일 없음과 넣은 경로(`/app`, worker `/opt/uv-python`)의 root 소유(세 이미지), web 정적 자산·환경 파일 없음, api 개발 도구 부재와 운영 모듈, 실제 검증기의 계약 YAML 읽기, worker Python 3.12.10·개발 그룹 부재·`WEB_CONCURRENCY`와 관계없이 프로세스 1개·MOCK 시나리오 9개, web 빌드 입력 거부(외부 http·`/v1`·경로·빈 값·개발 로그인), Dockerfile에 비밀값 이름의 빌드 입력·환경변수 없음
-- 실행: 처음 설치 순서(컨테이너가 없는 상태를 조회 실패와 구분해 진행), web 화면·JS·CSS·보안 헤더, api health와 앱 계정의 TLS DB 조회, worker health, 서비스별 프로세스 1개, migration 이력·소유자·앱 계정 권한, 순차 재실행
-- 거부: DB TLS(틀린 CA, 인증서에 없는 호스트, 평문, `PGSSLMODE`를 빠뜨린 실행)를 api·migration 각각, env 파일로 인증서 검증 끄기, 운영 키 누락·형식 오류·두 키 같음, http CORS·공유 링크 주소, 로그인 출처(`AUTH_WEB_ORIGIN`) 누락·http, production 개발 로그인, worker의 DB 접근
+- 이미지: UID 1000, `/app`·`/opt`·`/usr/local`에 쓰기 가능한 파일 없음과 넣은 경로(`/app`, worker `/opt/uv-python`)의 root 소유(세 이미지), web 정적 자산·환경 파일 없음, api 개발 도구 부재와 운영 모듈, 실제 검증기의 계약 YAML 읽기, worker Python 3.12.10·개발 그룹 부재·운영 의존성(BullMQ·redis 포함)·기본 TLS 문맥의 시스템 CA 디렉터리·`WEB_CONCURRENCY`와 관계없이 프로세스 1개·MOCK 시나리오 9개, web 빌드 입력 거부(외부 http·`/v1`·경로·빈 값·개발 로그인), Dockerfile에 비밀값 이름의 빌드 입력·환경변수 없음
+- 실행: 처음 설치 순서(컨테이너가 없는 상태를 조회 실패와 구분해 진행), web 화면·JS·CSS·보안 헤더, api health와 앱 계정의 TLS DB 조회, worker health(합성 큐에 붙은 소비자), 서비스별 프로세스 1개, 합성 큐의 MOCK 요청 1건을 자식 프로세스로 처리(읽기 전용·권한 제거 상태), migration 이력·소유자·앱 계정 권한, 순차 재실행
+- 거부: DB TLS(틀린 CA, 인증서에 없는 호스트, 평문, `PGSSLMODE`를 빠뜨린 실행)를 api·migration 각각, env 파일로 인증서 검증 끄기, 운영 키 누락·형식 오류·두 키 같음, http CORS·공유 링크 주소, 로그인 출처(`AUTH_WEB_ORIGIN`) 누락·http, production 개발 로그인, worker의 DB 접근, 운영 모드 worker의 큐 설정 오류(주소 없음·평문 주소·질의 문자열·MOCK 켜기, 출력에 큐 비밀번호 없음)
 - 교체: 새 api 판본 교체에서 이전 종료 뒤 새 시작, 멈춤 조건 다섯 가지(같은 표식의 실행이 남음 3, migration 실패 4, 실패한 migration 실행이 남음 5, 새 실행 health 실패 6, 대기 상한 초과 강제 종료 7)와 각각 서비스가 멈춘 상태로 남는지, SIGTERM 종료 코드·시간. 가짜 docker로 해당 호출만 실패시켜 다음도 본다: web 중지 명령만 실패하면 api·worker는 멈추고 web만 남은 채 3, 새 실행 실패 뒤 상태 조회가 실패하면 3(종료 확인 기록 없음), 새 실행 실패 뒤 api 중지만 실패하면 api만 남은 채 3, 교체를 시작할 때 상태 조회가 실패하면 아무것도 멈추지 않은 채 3, 중지 뒤 종료 코드 조회가 실패하면 migration·새 실행 없이 3, web 강제 종료(137)와 api 조회 실패가 겹치면 3이고 출력에 web 137과 교체 전 실행 중 서비스가 함께 적히는지, migration 성공 뒤 실행 컨테이너 삭제가 실패하면 성공 기록과 컨테이너를 남긴 채 8이고 그대로 다시 실행하면 5, 지운 뒤 다시 실행하면 이어서 시작, 세 서비스를 멈춘 뒤 migration 이미지 조회가 실패하면 migration을 시작하지 않고 2. 또 web을 띄운 직후 api를 실제로 다시 시작시켜(health starting) 완료로 보지 않고 세 서비스를 다시 멈춘 채 6인지 본다
 - 정리: 자원 조회가 실패하거나(조회별·docker 없음·시간 초과) 실제로 자원(`--keep`이 아니면 검사 이미지 포함)이 남으면 정리 통과로 보지 않는지, 시작 전 다른 검사 자원 확인도 조회 실패를 자원 없음으로 보지 않는지
 - 비밀값: 합성 비밀값이 실행 로그·출력에 없는지, 로그·이미지 기록을 모으지 못하면 통과로 보지 않는지. 합성 비밀값은 이미지를 만든 뒤에 생기므로 이미지 쪽 확인은 맥락 미끼와 Dockerfile 이름 검사가 맡는다
 
 GitHub Actions의 `images` 워크플로가 같은 명령을 x86_64 러너에서 실행한다. **main으로 가는 배포 PR**과 **수동 실행**(Actions 화면의 Run workflow에서 브랜치를 골라 실행)에서만 돌고, dev 대상 PR의 CI(`ci.yml`)에는 들어 있지 않다. 이미지 관련 파일(Dockerfile·`.dockerignore`·`deploy/`·잠금 파일·DB 구조·실행 진입점·계약 YAML·합성 자료)을 바꾼 dev PR은 병합 전에 그 브랜치로 수동 실행해 확인한다. main에서 이 검사를 필수로 할지는 [#277](https://github.com/JminAILab/CatchU/issues/277)의 main 배포 PR 검사 기준에서 정한다.
 
-이 검사가 대신하지 않는 것: 운영 노드 아키텍처의 최종 이미지 기동, 운영 DB의 역할별 TLS·평문 거부, 실제 앞단의 같은 출처 경로·신뢰 프록시·연결 유지 시간, 실제 큐 처리와 분석, 작성자 외 재현.
+이 검사가 대신하지 않는 것: 운영 노드 아키텍처의 최종 이미지 기동, 운영 DB의 역할별 TLS·평문 거부, 실제 앞단의 같은 출처 경로·신뢰 프록시·연결 유지 시간, 운영 큐(TLS·비밀번호)와 api의 실제 큐 연결(#233)·실제 분석, 작성자 외 재현.
 
 ## #276에서 받을 값과 남은 일
 
@@ -187,9 +188,9 @@ GitHub Actions의 `images` 워크플로가 같은 명령을 x86_64 러너에서 
 | 앞단 대상 유형·`X-Forwarded-For` 처리·유휴 시간, 유입 차단·노드 종료 확인 경로 | `TRUST_PROXY_CIDRS`, 연결 유지 시간(web `KEEP_ALIVE_TIMEOUT`은 ms. api에는 연결 유지 시간 설정이 없어 앞단 유휴 시간과 어긋나면 간헐 502가 날 수 있으므로 배포 전에 api 담당과 조율한다), 교체 절차 2·3단계 |
 | worker→DB 차단과 나가는 연결 제한의 집행 수단(NetworkPolicy·보안 그룹·egress 규칙) | EKS 실행 파일, 운영 Compose 호스트의 망 구성. 공유 노드 보안 그룹이나 같은 호스트 IP만으로 분리됐다고 보지 않는다 |
 | DB 주소·판본, 앱·migration 계정과 비밀값 참조, CA 파일과 주입 방식 | `api.env`·`migration.env`·CA 파일 |
-| 큐 제품·주소·TLS·인증 | #121·#233 제공 뒤 worker·api 실행 값 |
+| 큐 주소·비밀번호 참조(ElastiCache Valkey 8.1, TLS) | `worker.env`의 `CATCHU_QUEUE_REDIS_URL`(`rediss://`), api 실행 값(#233) |
 | GitHub 연결의 자격정보 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)용 지속 volume·UID/GID·권한, 암호화 키·OAuth 값 참조, #232 내부 자격정보 경로·인증키 참조 | GitHub 연결 코드(PR #254)는 dev에 있고 기본은 꺼짐이다(`GITHUB_CONNECTION_ENABLED`, 값은 [api 환경변수](../api/docs/environment.md)). 켜려면 api에 쓰기 가능한 지속 volume을 더해야 한다(지금 구성은 읽기 전용 루트라 `/tmp` 말고 쓸 곳이 없고, `/tmp`는 재시작하면 지워진다). #232 내부 경로는 공개 `/v1/*` 분배에서 제외한다 |
 
-EKS 실행 파일을 쓸 때 지킬 조건: api·worker `replicas: 1`과 업데이트 방식 `Recreate`, 자동 확장(HPA) 없음, `runAsNonRoot`·`runAsUser: 1000`·`readOnlyRootFilesystem`과 `/tmp` 빈 볼륨, api·migration의 `PGSSLMODE=verify-full`·DB CA 파일 읽기 전용 mount·`NODE_EXTRA_CA_CERTS`, web의 `HOSTNAME=0.0.0.0` 명시, worker에서 DB로의 접근 차단, api·worker·DB·큐를 외부에 여는 Service 없음, worker health는 내부용, migration은 위 일회 Pod. `Recreate`는 업데이트 순서일 뿐 장애 때 대체 실행과의 중복을 막지 않는다. Google 로그인은 시작 경로의 앞단 보호를 #277에서 확인하기 전에는 켜지 않는다.
+EKS 실행 파일을 쓸 때 지킬 조건: api·worker `replicas: 1`과 업데이트 방식 `Recreate`, 자동 확장(HPA) 없음, `runAsNonRoot`·`runAsUser: 1000`·`readOnlyRootFilesystem`과 `/tmp` 빈 볼륨, api·migration의 `PGSSLMODE=verify-full`·DB CA 파일 읽기 전용 mount·`NODE_EXTRA_CA_CERTS`, web의 `HOSTNAME=0.0.0.0` 명시, worker에서 DB로의 접근 차단, api·worker·DB·큐를 외부에 여는 Service 없음, worker health는 내부용(큐에 처음 붙기 전에는 503이므로 시작 확인 시간을 넉넉히 둔다), worker 종료 유예는 30초 이상(앱 안 종료 예산 25초), migration은 위 일회 Pod. `Recreate`는 업데이트 순서일 뿐 장애 때 대체 실행과의 중복을 막지 않는다. Google 로그인은 시작 경로의 앞단 보호를 #277에서 확인하기 전에는 켜지 않는다.
 
-제공 판본이 나오면 실행 값·종료 방법을 다시 확인할 기능: 로그인 유지의 화면 연결(#251. api 쪽 #250은 `AUTH_WEB_ORIGIN`까지 반영), GitHub 연결 켜기와 내부 자격정보 조회(#231·#232), 결과 수신 공급(#105), 큐와 worker 소비(#233·#121), 처리 시한 정리(#237).
+제공 판본이 나오면 실행 값·종료 방법을 다시 확인할 기능: 로그인 유지의 화면 연결(#251. api 쪽 #250은 `AUTH_WEB_ORIGIN`까지 반영), GitHub 연결 켜기와 내부 자격정보 조회(#231·#232), 결과 수신 공급(#105), api 쪽 큐 연결(#233)과 worker의 LIVE 처리(#121), 처리 시한 정리(#237).
