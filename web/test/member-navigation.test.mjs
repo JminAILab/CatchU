@@ -33,6 +33,17 @@ test('이름 규칙: 조회 중 대기, 실패는 다시 불러오기, 빈 이�
   assert.deepEqual(decideMemberEntry({ state: 'loaded', displayName: '수영' }, '/assets'), { action: 'allow' });
 });
 
+test('최초 입력 화면은 이름이 빈 회원만 열고, 이름이 있으면 홈으로 보낸다(#261 리뷰)', () => {
+  const setup = '/profile/setup';
+  assert.deepEqual(decideMemberEntry({ state: 'loaded', displayName: '수영' }, setup), { action: 'redirect', to: '/home' });
+  assert.deepEqual(decideMemberEntry({ state: 'loaded', displayName: '' }, setup), { action: 'allow' }, '이름이 빈 회원의 최초 입력은 유지');
+  // 조회 중·실패는 이름 미저장으로 보지 않는다. 폼을 열지도, 다른 곳으로 보내지도 않는다.
+  assert.deepEqual(decideMemberEntry({ state: 'loading' }, setup), { action: 'wait' });
+  assert.deepEqual(decideMemberEntry({ state: 'failed' }, setup), { action: 'retry' });
+  // 다른 회원 경로는 영향을 받지 않는다.
+  assert.deepEqual(decideMemberEntry({ state: 'loaded', displayName: '수영' }, '/home'), { action: 'allow' });
+});
+
 test('로그인 후 목적지: 이름이 있으면 검증된 next, 없으면 최초 입력, 모르면 next 또는 홈', () => {
   assert.equal(afterLoginPath('수영', '/links'), '/links');
   assert.equal(afterLoginPath('수영', '//evil.example'), '/home');
