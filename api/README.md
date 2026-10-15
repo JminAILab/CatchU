@@ -255,6 +255,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 [docs/analysis-receiver.md](docs/analysis-receiver.md)에 있다.
 
+## 분석 처리 시한 닫기 — #237
+
+처리 시한(접수 후 60분)·판정 주기(1분)·닫는 규칙과 주기 실행 장치(`PeriodicTask`) 사용법은 [docs/analysis-deadline.md](docs/analysis-deadline.md)에 있다.
+
 ## 실행 실패 시 확인
 
 - `EADDRINUSE`: 지정 포트가 사용 중인지 확인하고 자신이 실행한 이전 서버를 종료하거나 선택 포트를 바꾼다. 다른 사람의 프로세스를 임의 종료하지 않는다.
