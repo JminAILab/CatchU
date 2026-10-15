@@ -17,6 +17,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/health/health.controller.ts`       | `GET /health` 응답                                 |
 | `src/common/periodic-task.ts`           | api 안의 주기 실행 장치. 겹치지 않게 다음 실행 예약, 실패 뒤 계속, 종료 때 진행 중 실행 대기(#237) |
 | `src/analysis-deadline/`                | 처리 시한을 넘긴 분석 요청과 반영 실패 요청을 닫는 판정과 그 주기 작업([docs/analysis-deadline.md](docs/analysis-deadline.md)) |
+| `src/analysis-queue/`                   | 대기 시도를 요청 큐로 보내고 worker의 진행 알림·결과를 받아 E 수신 경로로 넘기는 큐 연결과 그 연결·주기·종료(#233, [docs/analysis-queue.md](docs/analysis-queue.md)). 큐 규격 값은 `queue-spec.ts` 한곳. 기본 앱에는 미등록 |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
 | `src/auth/access-token.guard.ts`       | Bearer 토큰 검증 후 요청에 인증 회원 정보 저장 |
 | `src/auth/dev-login.guard.ts` / `dev-login.dto.ts` | 개발 로그인 실행 제한을 먼저 검사하고 기존 회원 ID 조건·추가 필드를 공통 입력 검증에 연결 |
@@ -44,6 +45,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `test/support/test-database.cjs`        | 테스트 DB 접속, `_test` 이름 확인, 테스트 사이 자료 초기화 |
 | `test/db/*.test.cjs`                    | DB 규약으로 생성되는 SQL, 시각 왕복, 테스트 DB 격리, 트랜잭션 전달, 재빌드 뒤 지운 마이그레이션 미탐색 검사 |
 | `test/worker-messages.test.cjs`         | M1 합성 결과 세트의 worker 메시지 스키마 v1 판정 검사 |
+| `test/helpers/queue-harness.cjs` / `scripts/verify-analysis-queue.cjs` | 큐 연결 시험의 접수 기록 픽스처·메모리 요청 큐·worker 형식 메시지 / 큐 검증 키트·실제 worker와 한 번 왕복하는 수동 검증(CI 미실행). 운영 코드에서 쓰지 않음 |
 | `test/helpers/worker-messages.cjs`      | 테스트 전용 메시지 검사 도우미. 계약 YAML·합성 세트를 원본 경로에서 읽음. 운영 코드에서 쓰지 않음 |
 | `tsconfig.json` / `tsconfig.build.json` | 엄격한 타입 검사, 데코레이터, 빌드 설정            |
 | `eslint.config.mjs`                     | TypeScript·JavaScript 정적 검사                    |

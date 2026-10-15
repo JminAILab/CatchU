@@ -71,9 +71,11 @@ throw new ApiError('ANALYSIS_IN_PROGRESS', { details: { existingRequestId: reque
 | jose (Access JWT 서명·검증)            | `6.2.12`                       |
 | ajv / ajv-formats / yaml (분석 메시지 계약 검사) | `8.20.0` / `3.0.1` / `2.9.1` |
 | TypeORM / @nestjs/typeorm / pg          | `1.1.1` / `12.0.1` / `8.23.0`   |
+| BullMQ / ioredis (분석 큐 연결, 큐 검증 키트와 같은 판본) | `6.3.11` / `6.0.0` |
 | PostgreSQL (로컬·테스트 Docker 이미지)  | `postgres:16`                   |
+| Valkey (큐 시험 Docker 이미지)          | `valkey/valkey:8.1.6-alpine`    |
 
-직접 의존성은 `package.json`, 전이 의존성을 포함한 설치본은 `package-lock.json`으로 고정한다. 전역 Nest CLI나 루트 workspace는 필요하지 않다.
+직접 의존성은 `package.json`, 전이 의존성을 포함한 설치본은 `package-lock.json`으로 고정한다. 전역 Nest CLI나 루트 workspace는 필요하지 않다. typeorm 1.1.1의 선택 peer(ioredis 5)가 ioredis 6과 충돌하므로 `overrides`로 typeorm도 같은 ioredis를 쓰게 했다(api는 TypeORM 캐시를 쓰지 않는다).
 
 초기 NestJS 11 의존성에서 보고된 multer 취약점을 해소하기 위해 NestJS 12로 갱신했다. 현재 잠금 파일의 multer는 `2.4.0`이다. ESLint도 10으로 갱신하고 기존 flat config를 유지했다. Node.js 24.21.0과 TypeScript 5.9.3·typescript-eslint 8.70.1의 호환 범위를 확인했으며 실제 검사·실행 결과는 아래에 기록한다. `--force`·`--legacy-peer-deps`는 사용하지 않았다.
 
@@ -192,6 +194,7 @@ docker run -d --name catchu-db-test -p 127.0.0.1:5433:5432 -e POSTGRES_USER=catc
 - 포트·이름을 바꾸려면 `docker run`의 `-p`·`--name`과 `TEST_DB_PORT`를 함께 바꾼다. 여러 작업 폴더에서 동시에 테스트하면 폴더마다 다른 컨테이너·포트를 쓴다.
 - 파일 하나만 실행: `npm test -- test/db/timestamptz.test.cjs`. `node --test`로 직접 실행하면 `DB_*`가 없어 실패한다.
 - 테스트 DB를 새로 만들려면 `docker rm -f catchu-db-test` 뒤 다시 `docker run`한다. 다음 `npm test`가 마이그레이션을 처음부터 적용한다.
+- 큐 연결(#233)의 실제 Valkey 시험은 `CATCHU_TEST_REDIS_URL`을 **셸 환경변수**로 줄 때만 돌고(`.env`로는 넘어가지 않는다), 없으면 건너뛴다. 준비 명령은 [docs/analysis-queue.md 「시험」](docs/analysis-queue.md#시험).
 
 DB를 쓰는 테스트를 추가할 때:
 
@@ -259,6 +262,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 처리 시한(접수 후 60분)·판정 주기(1분)·닫는 규칙과 주기 실행 장치(`PeriodicTask`) 사용법은 [docs/analysis-deadline.md](docs/analysis-deadline.md)에 있다.
 
+## 분석 요청 보내기와 알림·결과 받기(큐 연결) — #233
+
+큐 설정은 `CATCHU_QUEUE_REDIS_URL`(큐 서버 주소, 없으면 모듈을 조립하지 않음)과 `CATCHU_QUEUE_PREFIX`(기본 `catchu`, worker와 같아야 함)다. 보내기 주기: 이전 보내기가 끝나고 5초 뒤 다음 보내기를 하며, 한 번에 대기 시도 100건을 읽는다. 큐 이름·작업 옵션·받기 규칙·수동 검증은 [docs/analysis-queue.md](docs/analysis-queue.md)에 있다. 모듈은 아직 `AppModule`에 등록하지 않았다(켜는 조건도 같은 문서).
+
 ## 실행 실패 시 확인
 
 - `EADDRINUSE`: 지정 포트가 사용 중인지 확인하고 자신이 실행한 이전 서버를 종료하거나 선택 포트를 바꾼다. 다른 사람의 프로세스를 임의 종료하지 않는다.
@@ -281,7 +288,7 @@ API↔worker의 메시지 형식은 [메시지 스키마 v1](../aidlc/spaces/def
 | 필요한 입력                                               | 결정할 곳                                                                                        | 결정 전 가능한 작업                                                            |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | 배포 DB의 PostgreSQL 주 버전, SSL 등 관리형 DB 접속 옵션  | AWS 배포 작업 재개 때([#24](https://github.com/JminAILab/CatchU/issues/24))                      | 로컬·테스트는 `postgres:16`을 유지한다(「로컬 DB 준비」) |
-| 큐 선정·버전과 실제 전달 방식 | [#77 큐 기술 검증](https://github.com/JminAILab/CatchU/issues/77): Node·Python 호환성, 중복 전달·worker 중단 시 분석 재실행 방지, 배포 서버 제약과 실행 불명 처리 확인 후 결정 | 기존 메시지 계약으로 수신 처리·가짜 생성기·합성 자료 검사를 진행하고 실제 전송 연결은 보류 |
+| 큐 선정·버전과 실제 전달 방식 | [#77 큐 기술 검증](https://github.com/JminAILab/CatchU/issues/77): Node·Python 호환성, 중복 전달·worker 중단 시 분석 재실행 방지, 배포 서버 제약과 실행 불명 처리 확인 후 결정 | BullMQ로 정했다. 큐 송수신 모듈(#233)은 있고 `AppModule` 등록은 보호 관측 공급자(#105) 뒤 |
 | 현행 E·B·F 계약으로 해결되지 않는 연결 쟁점 | 기존 계약·기능 설계를 먼저 확인하고 실제 기능 담당자 사이에서 남은 쟁점을 조율 | 합의된 책임·반영 기준으로 독립 구현을 진행하고, 미결의 영향 범위만 보류. api 초기화 담당에게 자동 배정하지 않음 |
 | 인증·외부 서비스·큐의 개발·테스트 환경                    | 관련 계약과 공통 환경 준비 작업                                                                  | 필요한 설정·계정·실제 연결 검증 범위 정리                                      |
 
