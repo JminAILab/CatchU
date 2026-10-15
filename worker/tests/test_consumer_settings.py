@@ -9,7 +9,12 @@ from consumer_support import env
 
 from app.consumer import queues
 from app.consumer.__main__ import main
-from app.consumer.settings import DEFAULT_PREFIX, ConsumerSettings, SettingsError
+from app.consumer.settings import (
+    DEFAULT_PREFIX,
+    ConsumerSettings,
+    QueueUrl,
+    SettingsError,
+)
 
 SECRET = "s3cr3t-queue-password"
 WORKER_DIR = Path(__file__).resolve().parents[1]
@@ -123,6 +128,45 @@ def test_queue_url_secret_stays_out_of_repr_and_logs(
         assert main([]) == 2  # 운영에서 redis://는 기동하지 않는다
     assert "CATCHU_QUEUE_REDIS_URL" in caplog.text
     assert SECRET not in caplog.text
+
+
+def test_queue_url_is_dropped_before_children_can_inherit_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import subprocess
+    import sys
+
+    import app.consumer.service as service_module
+
+    url = f"redis://user:{SECRET}@127.0.0.1:6379"
+    seen: dict[str, object] = {}
+
+    class FakeService:
+        def __init__(self, settings: ConsumerSettings, **_: object) -> None:
+            seen["settings_url"] = settings.queue_url
+
+        async def run(self) -> int:
+            # 서비스가 뜬 뒤 띄우는 자식 프로세스는 부모의 환경변수를 물려받는다.
+            seen["child_env"] = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "import os; print(os.environ.get('CATCHU_QUEUE_REDIS_URL', 'absent'))",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            return 0
+
+    monkeypatch.setattr(service_module, "ConsumerService", FakeService)
+    monkeypatch.setenv("NODE_ENV", "test")
+    monkeypatch.setenv("CATCHU_QUEUE_REDIS_URL", url)
+
+    assert main([]) == 0
+    queue_url = seen["settings_url"]
+    assert isinstance(queue_url, QueueUrl) and queue_url.reveal() == url
+    assert seen["child_env"] == "absent"
 
 
 # 큐 규격 ---------------------------------------------------------------------------------

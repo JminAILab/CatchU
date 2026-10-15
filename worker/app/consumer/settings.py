@@ -7,7 +7,7 @@
 
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import Final, Literal, NoReturn
 from urllib.parse import urlsplit
@@ -18,6 +18,8 @@ DEFAULT_PREFIX: Final = "catchu"
 DEFAULT_CONCURRENCY: Final = 1
 MAX_CONCURRENCY: Final = 4
 DEFAULT_MOCK_SCENARIO: Final = "succeeded-one-candidate"
+# 부모만 쓰는 비밀값. spawn 자식은 부모의 환경변수를 물려받으므로 부모가 읽은 뒤 환경에서 지운다.
+PARENT_ONLY_ENV: Final = ("CATCHU_QUEUE_REDIS_URL",)
 
 _HOST = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?")
 _PREFIX = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
@@ -202,3 +204,10 @@ def _mock(value: str | None, development: bool) -> bool:
         # MOCK 처리는 개발·시험에서만 연다(10/15 결정). 운영에서 켜려 하면 기동하지 않는다.
         raise SettingsError("운영 설정에서는 CATCHU_WORKER_MOCK을 켤 수 없다")
     return value == "true"
+
+
+def drop_parent_only_env(environment: MutableMapping[str, str] | None = None) -> None:
+    """설정을 읽은 뒤 부르면, 그 뒤에 띄우는 자식은 큐 주소(비밀번호 포함)를 물려받지 않는다."""
+    values = os.environ if environment is None else environment
+    for name in PARENT_ONLY_ENV:
+        values.pop(name, None)

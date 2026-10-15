@@ -252,7 +252,10 @@ def test_time_limit_kills_child_sends_nothing_and_next_job_runs() -> None:
             first = error
         sent_before = list(output.attempts)
         # 다음 정상 작업에는 자식 띄우기가 느린 CI에서도 넉넉한 별도 예산을 준다.
-        processor._limits = replace(processor._limits, total=30)
+        # 자식의 자기 마감도 같은 설정에서 오므로 부모·자식 상한을 함께 바꾼다.
+        longer = replace(processor._limits, total=30)
+        processor._limits = longer
+        processor._settings = replace(processor._settings, limits=longer)
         second = await processor(following, "token")
         await watcher.cancel_all()
         return first, (sent_before, second), processor, output
