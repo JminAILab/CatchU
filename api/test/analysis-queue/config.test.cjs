@@ -91,3 +91,18 @@ test('받은 주소를 ioredis가 같은 뜻으로 읽는다: rediss://만 TLS, 
     } finally { client.disconnect(); }
   }
 });
+
+test('큐 모듈은 큐 설정·보호 관측 공급자·계약 경로가 모두 있을 때만 조립하고 수신·등록 조립은 한 번만 불러온다', () => {
+  require('reflect-metadata');
+  const { AnalysisQueueModule } = require('../../dist/analysis-queue/analysis-queue.module');
+  const { AnalysisReceiverModule } = require('../../dist/analysis-receiver/analysis-receiver.module');
+  const { CONTRACT_DIR } = require('../helpers/receiver-harness.cjs');
+  const full = { queue: dev('redis://127.0.0.1:6379'), observations: { observe: async () => null }, contractDirectory: CONTRACT_DIR };
+  // 가짜 공급자를 기본으로 채우지 않는다.
+  for (const missing of ['queue', 'observations', 'contractDirectory']) {
+    assert.throws(() => AnalysisQueueModule.register({ ...full, [missing]: undefined }), /큐 설정·보호 관측 공급자·계약 경로/);
+  }
+  assert.throws(() => AnalysisQueueModule.register(undefined), /큐 설정·보호 관측 공급자·계약 경로/);
+  const assembled = AnalysisQueueModule.register(full);
+  assert.equal(assembled.imports.filter(entry => entry.module === AnalysisReceiverModule).length, 1);
+});

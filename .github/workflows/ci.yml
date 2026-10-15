@@ -113,7 +113,19 @@ jobs:
     env:
       # 러너 기본값 UTC에서는 timestamptz 테스트의 '현지 시각 ≠ UTC' 경우가 빠지므로 팀 로컬과 같은 시간대로 둔다.
       TZ: Asia/Seoul
+      # 이 값이 있으면 큐 연결(#233)의 실제 Valkey 시험이 건너뛰지 않고 반드시 돈다(api/docs/analysis-queue.md 「시험」).
+      CATCHU_TEST_REDIS_URL: redis://127.0.0.1:6379
     services:
+      # worker job과 같은 Valkey 8.1.6(큐 검증 키트가 돌린 판본). digest로 고정한다.
+      valkey:
+        image: valkey/valkey:8.1.6-alpine@sha256:1cb6b20b70d927560cc4cc5397b5f045e74aa603ff7696274778880bb6fadc75
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
       # api README 「DB 테스트」의 docker run과 같은 값이다. 테스트 실행기의 기본 TEST_DB_*와 맞으므로 따로 넘기지 않는다.
       postgres:
         image: postgres:16
