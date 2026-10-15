@@ -173,8 +173,8 @@
 | 만료 시각 | 수집 도중 만료를 피하려고 |
 
 - **전달 경로 제안**: F가 api의 내부 조회 지점에 worker 전용 인증키로 접속해 참조를 제시하고 맥락을 받는다. 검토초안이 "worker DB 차단, 전용 인증키" 방향을 이미 적었다([검토초안 §10][arch10]). 회원용 공개 API에 이 지점을 만들지 않는다.
-- **권한은 최소로.** 대상은 **공개 저장소뿐**이므로([요구사항 FR1.1][r56]) 토큰은 비공개 자료 접근이 아니라 **호출 한도와 본인 확인**을 위한 것이다. 따라서 비공개 저장소 읽기 권한을 포함하지 않는 자격정보를 제안한다. 실제로 어떤 종류의 GitHub 연동을 쓰는지는 [명세 OQ-A1][c180]의 미결이며 A가 정한다.
-- **수명은 짧게.** 한 번의 수집에 필요한 만큼만. 수집 시간 상한([2.3](#23-자원시간-상한))보다 넉넉해야 한다.
+- **권한은 최소로.** 대상은 **공개 저장소뿐**이므로([요구사항 FR1.1][r56]) 토큰은 비공개 자료 접근이 아니라 **호출 한도와 본인 확인**을 위한 것이다. 따라서 비공개 저장소 읽기 권한을 포함하지 않는 자격정보를 제안한다. 실제 GitHub 연동은 추가 권한(scope)을 요청하지 않는 OAuth App과 만료형 토큰으로 2026-10-14 명세에 정해졌다([명세 GitHub 연동 규칙][c1014gh]).
+- **수명은 GitHub가 정한 그대로.** A는 GitHub가 발급한 토큰의 만료 시각을 줄이거나 늘리지 않고 넘긴다([GitHub 연결 기능 문서][gc]). F는 그 시각이 지금부터 수집 시간 상한([2.3](#23-자원시간-상한))보다 늦을 때만 쓴다(3.3의 5번).
 - **F는 참조도 자격정보도 저장하지 않는다.** 처리 중 메모리에만 두고, 로그·오류 메시지·결과 메시지·근거 어디에도 남기지 않는다.
 
 ### 3.3 F의 검사 순서와 거부
@@ -197,13 +197,14 @@
 
 | 책임 | 누가 |
 |---|---|
-| 참조 발급·수명 관리·폐기, 자격정보의 권한 최소화 | A(팀원 2) |
-| 참조로 맥락을 돌려주는 내부 조회 지점과 그 인증 | A(팀원 2) |
+| 참조 발급·수명 관리·폐기 | worker용 내부 조회 [#232][i232](10/6 팀장 배치) |
+| 자격정보의 권한 최소화 | 실제 GitHub 연동 [#231][i231] |
+| 참조로 맥락을 돌려주는 내부 조회 지점과 그 인증 | [#232][i232] |
 | 맥락이 요청과 맞는지 다시 검사, 어긋나면 거부 | F(팀원 1) |
 | 참조·자격정보를 저장·기록하지 않기 | F(팀원 1) |
 | 나가는 방향 제한, 비밀값 주입 방법 | H(팀원 1), [#24][i24] |
 
-**A가 보증하고 F가 확인할 수 없는 것**: 자격정보의 실제 권한 범위가 최소인지. F는 받은 값으로 호출할 뿐 그 권한을 조회할 수 없다. 따라서 이 부분은 A의 인계 책임으로 남기고, [#117][i117]의 실제 연결 검사에서 "대상 저장소 밖 호출이 거부되는지"를 실제 환경에서 확인해 간접으로 확인한다([#37][i37] C05).
+**A가 보증하고 F가 확인할 수 없는 것**: 자격정보의 실제 권한 범위가 최소인지. F는 받은 값으로 호출할 뿐 그 권한을 조회할 수 없다. 따라서 이 부분은 A의 인계 책임으로 남긴다. A([#231][i231])는 연결할 때 받은 권한이 비었는지 확인한다([GitHub 연결 기능 문서][gc]). [#117][i117]의 실제 연결 검사에서 확인하는 "대상 저장소 밖 호출이 거부되는지"([#37][i37] C05)는 F의 별도 통제이며, 권한이 최소라는 증거로 쓰지 않는다.
 
 [i24]: https://github.com/JminAILab/CatchU/issues/24
 [i37]: https://github.com/JminAILab/CatchU/issues/37
@@ -212,6 +213,8 @@
 [i119]: https://github.com/JminAILab/CatchU/issues/119
 [i120]: https://github.com/JminAILab/CatchU/issues/120
 [i121]: https://github.com/JminAILab/CatchU/issues/121
+[i231]: https://github.com/JminAILab/CatchU/issues/231
+[i232]: https://github.com/JminAILab/CatchU/issues/232
 [i233]: https://github.com/JminAILab/CatchU/issues/233
 [i237]: https://github.com/JminAILab/CatchU/issues/237
 [d23]: https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296
@@ -221,7 +224,8 @@
 [c137]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L137
 [r119]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md#L119
 [c162]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L161-L165
-[c180]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L180
+[gc]: https://github.com/JminAILab/CatchU/blob/c0104009af94c554a013b814746c239c8fc04d9d/api/docs/github-connection.md#선택한-방식과-이번-수명-결정
+[c1014gh]: https://github.com/JminAILab/CatchU/blob/c0104009af94c554a013b814746c239c8fc04d9d/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L64
 [yw]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml
 [yc]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml
 [wr]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u3-worker/functional-design/rules.md

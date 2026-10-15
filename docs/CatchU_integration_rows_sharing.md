@@ -29,7 +29,7 @@
 |---|---|---|---|---|---|---|---|
 | IV-35 | 원본 보호(합성 상태) | 원본 저장소의 비공개 전환이 확인된 상태(합성) → 관련 Catch는 수신자에게 안 보이고 공개도 거절되며, 본인 화면에는 보호 중으로 보인다. 일시적인 조회 실패는 비공개로 치지 않고, 상관없는 Catch·링크는 멈추지 않는다. 소유자에게 보일 안내 문구·방식은 이 문서에서 정하지 않는다 | [FR1.5][r58] · [명세 L88][c88] · [명세 오류 표][c129] · [Catch 보호 필드][yc189] · [ERD 보호][e151] | B(팀원 4) / C(팀원 3)·F(팀원 1) | [#151][i151] · [#165][i165] | 전체 MVP · 규칙은 계약대로 유지하지만 10월에는 이 상태를 만드는 경로가 없어 미실행으로 남는다(팀장 결정 9/28, [#23 기록][i23c0928]) | 미실행 |
 | IV-36 | 원본 상태 실제 관측 | 실제 저장소의 비공개 전환·일시 장애 → 확인된 전환만 보호로 반영한다. 10월에는 관측을 실행하지 않으며, 누가 어떻게 관측할지는 12월 범위나 배포 재개 때 정한다(미결 1) | [FR1.5][r58] · [명세 OQ-B3][c186] · [#23 기록][i23c0928] | 미배정(계약상 A/B/F/H) / 팀장 | 미등록 3 · 미등록 8 | 전체 MVP · 10월 실행 없음 | 미실행 |
-| IV-37 | 실제 로그인·GitHub 연동 | 실제 Google 로그인·GitHub 연동으로 IV-01을 다시 → 로그인·연동 방식이 정해진 뒤 채운다(미결 7) | [FR11.1~11.3][r108] · [명세 OQ-A1][c180] | A(팀원 2) / C·D(팀원 3) | 미등록 6 | 전체 MVP · 미결 7 | 미실행 |
+| IV-37 | 실제 로그인·GitHub 연동 | 실제 Google 로그인과 실제 GitHub 연결로 IV-01을 다시 → IV-01과 같은 결과가 나온다. 처음 로그인하면 회원과 빈 프로필이 생기고, GitHub를 연결하면 연동 상태가 연결됨으로 바뀐다. 사용 중에는 세션 갱신으로 로그인이 이어지며(Access 15분, 세션은 최대 7일·마지막 갱신 뒤 24시간), 로그아웃은 그 브라우저의 세션만 끝낸다. 허용한 web 출처가 아닌 곳에서 온 갱신·로그아웃은 거부되고 쿠키·세션은 그대로다. API가 GitHub 토큰의 만료·폐기를 확인하면 다시 연결해야 하는 상태로 바뀐다 | [FR11.1~11.3][r108] · [명세 OQ-A1][c180] · [명세 인증 규칙][c1014auth] · [명세 출처 거부][c1014err] | A(팀원 2) / C·D(팀원 3) | [#249][i249] · [#231][i231] · [#250][i250] · [#251][i251] · [#252][i252] · 미등록 9 | 전체 MVP · 실제 계정. 운영 배포에서의 확인은 운영 도메인·AWS 앞단 설정([#212][i212]) 뒤 | 미실행 |
 | IV-38 | 실제 분석 전체 흐름 | 실제 저장소 분석 결과 → 등록 → 본인 확인 → 공개 → 로그인 없는 열람까지, 실패·보호·결함 재시험 포함 | [주요 시나리오][r127] · [첫 연결 순서][b13] | 각 영역 담당 / 팀원 1(I 취합) | [#124][i124] · [#77][i77] · 미등록 4 · [#233][i233] | 전체 MVP · 실제 자료, 미결 4·5·6 | 미실행 |
 | IV-39 | 배포 환경 자료 유지·백업 설정 | 실제 주소에서 서버를 재시작·재배포 → DB 자료와 공개·숨김·링크 상태가 그대로다. 관리형 DB 자동 백업이 켜져 있는지와 보관 기간을 설정 화면으로 확인해 증거로 남긴다. 백업에서 복원하는 시험은 12월로 넘긴다. H 재개 때 확인한다 | [NFR4][r119] · [NFR8][r123] · [주요 시나리오(작성 당시 NCP)][r138] · [#24 결정][i24c1006] | H(팀원 1) / 각 영역 담당 | 미등록 7 | 전체 MVP · 배포 환경. 서버는 컨테이너 재시작 설정으로 다시 띄우고, 서버·큐 장애를 앱 안에서 복구하는 동작은 없어 확인하지 않는다([#23 결정][i23c1006]) | 미실행 |
 
@@ -51,7 +51,13 @@
 [i151]: https://github.com/JminAILab/CatchU/issues/151
 [i152]: https://github.com/JminAILab/CatchU/issues/152
 [i165]: https://github.com/JminAILab/CatchU/issues/165
+[i212]: https://github.com/JminAILab/CatchU/issues/212
+[i231]: https://github.com/JminAILab/CatchU/issues/231
 [i233]: https://github.com/JminAILab/CatchU/issues/233
+[i249]: https://github.com/JminAILab/CatchU/issues/249
+[i250]: https://github.com/JminAILab/CatchU/issues/250
+[i251]: https://github.com/JminAILab/CatchU/issues/251
+[i252]: https://github.com/JminAILab/CatchU/issues/252
 [c48]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L48
 [c51]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L51
 [c87]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L87
@@ -67,6 +73,8 @@
 [c130]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L130
 [c135]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L135
 [c180]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L180
+[c1014auth]: https://github.com/JminAILab/CatchU/blob/c0104009af94c554a013b814746c239c8fc04d9d/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L54-L64
+[c1014err]: https://github.com/JminAILab/CatchU/blob/c0104009af94c554a013b814746c239c8fc04d9d/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L144
 [c186]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L186
 [c125]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L125
 [ym306]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml#L306

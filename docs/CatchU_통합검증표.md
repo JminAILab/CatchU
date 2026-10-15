@@ -102,16 +102,16 @@
 
 ## 미등록 선행
 
-이슈가 없는 기능 선행이다(2026-09-29 확인). [#24][i24] 「남은 외부 선행과 완료 판정」은 이 표를 가리키며, C·D 기능은 [#145][i145]·[#146][i146] 하위 이슈로 등록돼 이 표에 없다. 이 문서는 담당을 새로 배정하지 않으며 I에 자동 배정하지 않는다. 담당이 이슈를 만들면 해당 행의 선행 칸을 이슈 링크로 바꾸고 이 표에서 뺀다. 빠진 번호는 다시 매기지 않는다. 2026-09-29: 미등록 1(Catch 공개·숨김과 C에 제공할 현재 공개 자료)이 [#165][i165]([PR #167][p167])로 등록돼 IV-23·IV-27·IV-28·IV-31·IV-35의 선행 칸을 바꿨다. 2026-10-06: 미등록 5(E의 실제 전송 연결)는 api 쪽 큐 연결 [#233][i233]으로 등록돼 뺐다.
+이슈가 없는 기능 선행이다(2026-09-29 확인). [#24][i24] 「남은 외부 선행과 완료 판정」은 이 표를 가리키며, C·D 기능은 [#145][i145]·[#146][i146] 하위 이슈로 등록돼 이 표에 없다. 이 문서는 담당을 새로 배정하지 않으며 I에 자동 배정하지 않는다. 담당이 이슈를 만들면 해당 행의 선행 칸을 이슈 링크로 바꾸고 이 표에서 뺀다. 빠진 번호는 다시 매기지 않는다. 2026-09-29: 미등록 1(Catch 공개·숨김과 C에 제공할 현재 공개 자료)이 [#165][i165]([PR #167][p167])로 등록돼 IV-23·IV-27·IV-28·IV-31·IV-35의 선행 칸을 바꿨다. 2026-10-06: 미등록 5(E의 실제 전송 연결)는 api 쪽 큐 연결 [#233][i233]으로 등록돼 뺐다. 2026-10-15: 미등록 6(실제 Google 로그인·GitHub 연동)은 [#249][i249]·[#231][i231]·[#250][i250]으로 등록돼 IV-37의 선행 칸을 바꾸고 뺐다. 같은 날 IV-37에 필요한 실제 자료용 고지 반영과 실제 회원 요청을 받는 접수 연결은 이슈가 없어 미등록 9로 더했다.
 
 | 번호 | 필요한 기능 | 영역 | 쓰는 행 | 현재 기록 |
 |---|---|---|---|---|
 | 미등록 2 | 내 자산 Catch 목록·필터 화면, Catch 상세·확인·공개 화면 | B(팀원 4) | IV-24~IV-28 | [#129][i129] 계획표 B05·B06 '등록 전' |
 | 미등록 3 | 원본 보호 상태 입력 연결 | B(팀원 4), 관측 제공은 미배정 | IV-36 | [#129][i129] 계획표 B08 '등록 전' |
 | 미등록 4 | 실제 작업 식별 기준과 B 등록 연결 | B(팀원 4) | IV-38 | [#129][i129] 계획표 B07 '등록 전' |
-| 미등록 6 | 실제 Google 로그인·GitHub 연동 | A(팀원 2) | IV-37 | [#133][i133] 하위 [#135][i135]~[#137][i137]에 없음 |
 | 미등록 7 | 배포 환경 배포, 컨테이너 재시작 설정, 재시작·재배포 뒤 DB 자료 유지와 자동 백업 설정 확인 | H(팀원 1) | IV-39 | H 재개 때 등록([#24][i24]). 백업 복원 시험은 12월([#24 결정][i24c1006]) |
 | 미등록 8 | 원본 상태 관측의 실행 책임 | 미배정(계약상 A/B/F/H) | IV-36 | 12월 범위나 배포 재개 때 정한다([#23 기록][i23c0928]), 그때까지 [#24][i24]의 미배정 책임 |
+| 미등록 9 | 실제 자료용 분석 고지 반영과 실제 회원 요청을 받는 분석 접수 연결 | E(팀원 2), 고지 문구는 팀장 | IV-37 | 문구는 팀장이 쓰고 승인하며, 반영 이슈는 문구가 정해지면 등록한다([#138 결정][i138c1014]) |
 
 ## 미결
 
@@ -125,7 +125,7 @@
 | 미결 4 | F 임시 결과 보존 위치·수명과 손실 없는 전달(OQ-F1) | [명세 OQ-F1][c182] | IV-38 | 팀장 결정(10/6): 앱에서 다루지 않는다. worker는 결과를 보내면 끝이고 보존·재전달을 두지 않으며, 9/29 결과 보존 14일 결정은 철회했다. 전달되지 않은 요청은 처리 시한이 닫는다(계약 PR 병합 뒤 적용, [#237][i237]). 계약 OQ-F1의 보존·전송 부분은 계약 PR에서 고친다([#23 결정][i23c1006]) |
 | 미결 5 | 작업 동일성 판별 함수와 충돌 검증(OQ-F2) | [명세 OQ-F2][c183] | IV-15, IV-38 | [#111][i111] · [#118][i118] |
 | 미결 6 | 서비스 LLM 제공자·모델·조건(OQ-L) | [명세 OQ-L][c188] | IV-38 | [#119][i119] |
-| 미결 7 | 실제 로그인·연동 경로와 수명(OQ-A1) | [명세 OQ-A1][c180] | IV-37 | 미등록 6 |
+| 미결 7 | 실제 로그인·연동 경로와 수명(OQ-A1) | [명세 OQ-A1][c180] | IV-37 | 2026-10-14 명세에 반영해 정했다([PR #297][p297] · [명세 OQ-A1 결정][c1014oq]). 로그인·GitHub 연결·세션 갱신·로그아웃의 경로, 쿠키·요청 출처 검사, 세션 수명은 [명세 「M — 회원 API」의 인증 규칙][c1014auth]을 따른다. 운영 도메인·AWS 앞단 설정만 [#212][i212]에 남았다 |
 | 미결 8 | 수신자에게 보일 공개 프로필 항목(OQ-A2) | [명세 OQ-A2][c181] | IV-31 | [#151][i151] |
 | 미결 9 | 같은 결과로 다시 반영해도 계속 실패하는 경우의 처리. 계약상 반영 실패 동안 그 요청은 진행 중으로 남으므로([명세 L69][c69]), 해결 전에는 그 회원이 다른 저장소 분석을 요청하면 거절된다([명세 L73][c73]) | [PR #143 팀장 댓글][p143c] | IV-17, IV-18 | 팀장 결정(10/6): 반영을 다시 시도하는 복구는 두지 않는다. 반영에 실패한 요청은 처리 시한을 기다리지 않고 닫히고, 등록된 Catch가 0건이면 새 동의·새 요청으로 다시 요청할 수 있다. 계약 PR 병합 뒤 적용하며 구현은 [#237][i237]이다([#23 결정][i23c1006]) |
 | 미결 10 | 링크 중단 요청의 답. 회원 경로의 공통 '볼 수 없음'과 수신자 공통 안내 규칙(BR2.13)이 중단 요청에 함께 걸려 문서끼리 갈리고, 본인 만료 링크의 중단은 계약에 없다 | [명세 L48][c48] · [api 규칙 BR2.13][br105] | IV-40 | 팀장 결정(9/29): 위 「기준 판본」의 결정대로 답하고, 계약 세 파일 수정은 팀장이 별도 PR로 한다([#148 기록][i148c0929]) |
@@ -166,11 +166,9 @@
 [i129]: https://github.com/JminAILab/CatchU/issues/129
 [i130]: https://github.com/JminAILab/CatchU/issues/130
 [i131]: https://github.com/JminAILab/CatchU/issues/131
-[i133]: https://github.com/JminAILab/CatchU/issues/133
-[i135]: https://github.com/JminAILab/CatchU/issues/135
 [i136]: https://github.com/JminAILab/CatchU/issues/136
-[i137]: https://github.com/JminAILab/CatchU/issues/137
 [i138]: https://github.com/JminAILab/CatchU/issues/138
+[i138c1014]: https://github.com/JminAILab/CatchU/issues/138#issuecomment-6159562994
 [i140]: https://github.com/JminAILab/CatchU/issues/140
 [i145]: https://github.com/JminAILab/CatchU/issues/145
 [i146]: https://github.com/JminAILab/CatchU/issues/146
@@ -178,11 +176,16 @@
 [i150]: https://github.com/JminAILab/CatchU/issues/150
 [i151]: https://github.com/JminAILab/CatchU/issues/151
 [i165]: https://github.com/JminAILab/CatchU/issues/165
+[i212]: https://github.com/JminAILab/CatchU/issues/212
+[i231]: https://github.com/JminAILab/CatchU/issues/231
 [i233]: https://github.com/JminAILab/CatchU/issues/233
 [i237]: https://github.com/JminAILab/CatchU/issues/237
+[i249]: https://github.com/JminAILab/CatchU/issues/249
+[i250]: https://github.com/JminAILab/CatchU/issues/250
 [p143c]: https://github.com/JminAILab/CatchU/pull/143#issuecomment-5865277945
 [p158]: https://github.com/JminAILab/CatchU/pull/158
 [p167]: https://github.com/JminAILab/CatchU/pull/167
+[p297]: https://github.com/JminAILab/CatchU/pull/297
 [rv3]: https://github.com/JminAILab/CatchU/pull/160#pullrequestreview-5347129835
 [p143doc]: https://github.com/JminAILab/CatchU/blob/a56bf14181fd812d686cbc2d7ce6b0ee6ccb46db/api/docs/catch-registration-proposal.md#L151
 [p143test]: https://github.com/JminAILab/CatchU/blob/a56bf14181fd812d686cbc2d7ce6b0ee6ccb46db/api/test/catches/registration-batch.test.cjs#L65
@@ -204,6 +207,8 @@
 [c186]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L186
 [c187]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L187
 [c188]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L188
+[c1014auth]: https://github.com/JminAILab/CatchU/blob/c0104009af94c554a013b814746c239c8fc04d9d/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L54-L64
+[c1014oq]: https://github.com/JminAILab/CatchU/blob/c0104009af94c554a013b814746c239c8fc04d9d/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#L199
 [fs]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md
 [en]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md
 [br105]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md#L105-L112

@@ -17,7 +17,7 @@
 | 환경 통제의 실행 담당 — 팀원 1 | **결정**(2026-09-29) |
 | 작성자 외 검토자 | **없음**. 대체 수단은 [7.1](CatchU_collection_control_checks.md#71-검토자가-없을-때), [#37][i37] C04 ②에 미충족으로 남김 |
 | 자원·시간 상한 수치 | **제안**. [#117][i117]·[#121][i121] 실측 뒤 확정. 호출 수를 세는 법(실제 HTTP 요청 수)은 **결정**(2026-10-12), 호출 수 제안값은 [#267](https://github.com/JminAILab/CatchU/issues/267)에서 다시 냈다 |
-| 자격정보 인계 방향 | **A 동의**([A/E 리뷰][rv166]). 제공 구현은 [#133][i133]의 실제 GitHub 연동 후속이며 아직 제공되지 않았다 |
+| 자격정보 인계 방향 | **A 동의**([A/E 리뷰][rv166]). 토큰 꺼내기는 [#231][i231]에서 구현됐고, worker에 넘기는 내부 조회는 [#232][i232]라 아직 제공되지 않는다 |
 | 반영 전 장애 복구 | **두지 않는다** — 2026-10-06 결정([#23][d23]). 결과를 받은 뒤 반영 전에 멈춘 요청은 접수 후 60분이 지나면 실패로 닫히고 회원이 다시 요청한다(처리 시한 계약 PR 병합 뒤 적용, 구현 [#237][i237]) |
 
 결정된 항목은 다시 승인받을 항목이 아니다. 실행 담당 확정과 검토자 부재는 서로 다른 것이므로 묶어 읽지 않는다.
@@ -131,7 +131,7 @@
 
 | # | 미결 | 확인 상대 | 막는 범위 |
 |---|---|---|---|
-| Q1 | 자격정보 인계의 내용·전달 경로([3.2](CatchU_collection_control_scope.md#32-인계-내용--a가-주는-것)). **저장소 좌표와 연동 계정 GitHub 로그인·식별자 포함에 A 동의**([A/E 리뷰][rv166]). 제공은 [#133][i133]의 실제 GitHub 연동 후속에서 구현하며 **아직 제공되지 않았다** | A yeongyeon1802 | [#117][i117] 실제 연결 |
+| Q1 | 자격정보 인계의 내용·전달 경로([3.2](CatchU_collection_control_scope.md#32-인계-내용--a가-주는-것)). **저장소 좌표와 연동 계정 GitHub 로그인·식별자 포함에 A 동의**([A/E 리뷰][rv166]). 토큰 꺼내기는 [#231][i231]에서 구현됐고, worker에 넘기는 내부 조회는 [#232][i232]라 **아직 제공되지 않는다** | A yeongyeon1802 | [#117][i117] 실제 연결 |
 | Q2 | 반영 전 장애 복구 — **결정으로 닫힘**. 두지 않는다(2026-10-06 [#23 결정][d23]). 결과를 받은 뒤 반영 전에 멈춘 요청은 접수 후 60분이 지나면 실패로 닫히고 회원이 다시 요청한다(처리 시한 계약 PR 병합 뒤 적용, 구현 [#237][i237]). 안 1(1-가·1-나)은 쓰지 않는다([5.3](CatchU_collection_control_temp_data.md#53-수신-후-반영-전-장애--지금-막히는-곳)) | E yeongyeon1802 | 막지 않음 |
 | Q3 | E의 반영 복구 기간 — **결정으로 닫힘**. F가 결과를 보존하지 않고 E도 반영을 복구하지 않으므로 맞출 기간이 없다(2026-10-06 [#23 결정][d23]) | E yeongyeon1802 | 막지 않음 |
 | Q4 | 재전달 시 `messageId`를 새로 발급하는 것 — **확인 완료**([A/E 리뷰][rv166]). 2026-10-06 결정으로 재전달을 두지 않아 지금은 적용할 곳이 없다 | E yeongyeon1802 | 막지 않음. 번호는 외부 댓글과 맞추려고 유지 |
@@ -171,6 +171,8 @@
 [i119]: https://github.com/JminAILab/CatchU/issues/119
 [i121]: https://github.com/JminAILab/CatchU/issues/121
 [i133]: https://github.com/JminAILab/CatchU/issues/133
+[i231]: https://github.com/JminAILab/CatchU/issues/231
+[i232]: https://github.com/JminAILab/CatchU/issues/232
 [i233]: https://github.com/JminAILab/CatchU/issues/233
 [i237]: https://github.com/JminAILab/CatchU/issues/237
 [명세]: https://github.com/JminAILab/CatchU/blob/9093d2e452dbcdcd746265758abc9e7f41ff9527/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md
