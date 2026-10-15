@@ -1,0 +1,708 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { createAuthStore } from '../src/lib/auth-state.ts';
+import { createAuthSession, createSessionLock } from '../src/lib/auth-session.ts';
+import { createLoginMarker, LOGIN_MARKER_KEY } from '../src/lib/auth-login-marker.ts';
+import { createFetchRefreshTransport } from '../src/lib/auth-refresh.ts';
+import { createFetchLogoutTransport } from '../src/lib/auth-logout.ts';
+import { createAuthApi, memberCallBlock } from '../src/lib/auth-api.ts';
+
+const BASE = 'http://127.0.0.1:3001';
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((r) => { resolve = r; });
+  return { promise, resolve };
+}
+
+/** `localStorage` 대역. 여러 탭이 한 인스턴스를 쓰면 같은 출처의 저장소를 공유한다. 쓰기 실패를 켤 수 있다. */
+function fakeStorage() {
+  const map = new Map();
+  const storage = {
+    map, failWrite: false,
+    getItem: (key) => (map.has(key) ? map.get(key) : null),
+    setItem: (key, value) => { if (storage.failWrite) throw new Error('quota'); map.set(key, String(value)); },
+  };
+  return storage;
+}
+
+/** Web Locks 대역(4-1 시험과 같은 규칙). 실제 브라우저 Web Locks 검증이 아니다. */
+function fakeLockManager() {
+  const queues = new Map();
+  return {
+    request(name, options, callback) {
+      return new Promise((resolve, reject) => {
+        const queue = queues.get(name) ?? [];
+        queues.set(name, queue);
+        const grant = () => queueMicrotask(async () => {
+          try { resolve(await callback({ name, mode: options.mode })); } catch (error) { reject(error); } finally {
+            queue.shift();
+            if (queue.length) queue[0]();
+          }
+        });
+        queue.push(grant);
+        if (queue.length === 1) grant();
+      });
+    },
+  };
+}
+
+/**
+ * 서버·쿠키 대역. 실제 `Response`를 돌려주는 fetch 하나로 개발 로그인·갱신·로그아웃·보호 API를 흉내 낸다.
+ * Refresh 쿠키는 `credentials: "include"`일 때만 보내고 받는다. 실제 서버·브라우저 검증이 아니다.
+ */
+function fakeServer() {
+  let serial = 0;
+  const refreshTokens = new Map();
+  const accessTokens = new Map();
+  const sessions = new Map();
+  const holds = new Map();
+  const failures = new Set();
+  const state = { jar: null, log: [], devLogin: 'ok', mutations: 0 };
+  const open = (member) => { const sid = 'S' + (sessions.size + 1); sessions.set(sid, { member, revoked: false }); return sid; };
+  const mintRefresh = (sid) => { const t = 'R' + ++serial; refreshTokens.set(t, { sid, used: false }); return t; };
+  const mintAccess = (sid) => { const t = `A${++serial}-${sessions.get(sid).member}`; accessTokens.set(t, { sid, expired: false }); return t; };
+  const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const invalid = () => json(401, { code: 'AUTH_INVALID', message: '인증이 유효하지 않습니다.' });
+  const memberOf = (init) => {
+    const header = init.headers?.Authorization;
+    const record = typeof header === 'string' && header.startsWith('Bearer ') ? accessTokens.get(header.slice(7)) : undefined;
+    return record && !record.expired && !sessions.get(record.sid).revoked ? sessions.get(record.sid).member : null;
+  };
+
+  async function handle(entry, init, include) {
+    const cookie = include ? state.jar : null;
+    if (entry === 'POST /auth/dev-login') {
+      // 실제 API: 가드의 코드 없는 403은 예외 필터가 403 INTERNAL_ERROR로 응답한다(api-exception.filter.ts). 처리 전 거부.
+      if (state.devLogin === 'forbidden') return { response: json(403, { code: 'INTERNAL_ERROR', message: '서버 오류' }) };
+      if (state.devLogin === 'invalid') return { response: json(400, { code: 'VALIDATION_FAILED', message: '검증 실패' }) };
+      // 처리 중 오류(쿠키 없음). 화면은 처리 여부를 알 수 없다.
+      if (state.devLogin === 'server-error') return { response: json(500, { code: 'INTERNAL_ERROR', message: '서버 오류' }) };
+      const { memberId } = JSON.parse(init.body);
+      const sid = open(memberId);
+      const refresh = mintRefresh(sid);
+      const body = state.devLogin === 'malformed'
+        ? new Response('{', { status: 200, headers: { 'Content-Type': 'application/json' } })
+        : json(200, { accessToken: mintAccess(sid), tokenType: 'Bearer', expiresIn: 900 });
+      return { response: body, setCookie: refresh };
+    }
+    if (entry === 'POST /auth/refresh') {
+      const record = cookie ? refreshTokens.get(cookie) : undefined;
+      if (record && !record.used && !sessions.get(record.sid).revoked) {
+        record.used = true;
+        return { response: json(200, { accessToken: mintAccess(record.sid), tokenType: 'Bearer', expiresIn: 900 }), setCookie: mintRefresh(record.sid) };
+      }
+      if (record?.used) sessions.get(record.sid).revoked = true; // 재사용: 그 세션만 폐기
+      return { response: invalid(), setCookie: null };
+    }
+    if (entry === 'POST /auth/logout') {
+      const record = cookie ? refreshTokens.get(cookie) : undefined;
+      if (record) sessions.get(record.sid).revoked = true;
+      return { response: new Response(null, { status: 204 }), setCookie: null };
+    }
+    const member = memberOf(init);
+    if (!member) return { response: invalid() };
+    if (entry === 'GET /me') return { response: json(200, { profile: { displayName: member } }) };
+    if (entry === 'POST /catches') { state.mutations += 1; return { response: json(201, { id: 'c' + state.mutations, member }) }; }
+    return { response: json(404, { code: 'NOT_FOUND', message: '없음' }) };
+  }
+
+  return {
+    state,
+    /** 다음 한 번의 이 요청은 서버 처리 뒤 응답을 돌려주기 전에 기다린다. */
+    hold(entry) { const gate = deferred(); holds.set(entry, gate); return gate; },
+    /** 다음 한 번의 이 요청은 응답 없이 끊긴다(서버 처리 없음). */
+    fail(entry) { failures.add(entry); },
+    expire(token) { accessTokens.get(token).expired = true; },
+    expireAll() { for (const record of accessTokens.values()) record.expired = true; },
+    revokeAll() { for (const s of sessions.values()) s.revoked = true; },
+    jarMember() { return state.jar ? sessions.get(refreshTokens.get(state.jar).sid).member : null; },
+    count(entry) { return state.log.filter((l) => l.entry === entry).length; },
+    requests(entry) { return state.log.filter((l) => l.entry === entry); },
+    async fetch(url, init) {
+      const entry = `${init.method} ${new URL(url).pathname.replace(/^\/v1/, '')}`;
+      const include = init.credentials === 'include';
+      state.log.push({ entry, auth: init.headers?.Authorization ?? null, credentials: init.credentials, jar: include ? state.jar : null });
+      await tick();
+      if (failures.has(entry)) { failures.delete(entry); throw new TypeError('network'); }
+      const { response, setCookie } = await handle(entry, init, include);
+      // 서버가 처리하고 쿠키가 바뀐 뒤 응답을 읽지 못함(연결 끊김 대역). 실제 브라우저에서 같은 순서가 나는지는 확인하지 않았다.
+      if (entry === 'POST /auth/dev-login' && state.devLogin === 'drop-after-cookie') {
+        if (include) state.jar = setCookie;
+        state.log.push({ entry: `dropped ${entry}` });
+        throw new TypeError('network');
+      }
+      const gate = holds.get(entry);
+      if (gate) { holds.delete(entry); await gate.promise; }
+      state.log.push({ entry: `done ${entry}` });
+      if (include && setCookie !== undefined) state.jar = setCookie; // 응답이 도착할 때 쿠키가 바뀐다(null은 삭제).
+      return response;
+    },
+  };
+}
+
+/** 한 탭: 저장소·표식·잠금·세션·공통 호출. */
+function tab(server, { locks = null, storage = fakeStorage(), baseUrl = BASE } = {}) {
+  const fetch = (url, init) => server.fetch(url, init);
+  const store = createAuthStore();
+  const marker = createLoginMarker({ storage });
+  const session = createAuthSession({ store, marker, lock: createSessionLock({ locks }),
+    refreshTransport: createFetchRefreshTransport({ baseUrl, nodeEnv: 'test', fetch }),
+    logoutTransport: createFetchLogoutTransport({ baseUrl, nodeEnv: 'test', fetch }) });
+  const api = createAuthApi({ baseUrl, nodeEnv: 'test', store, session, fetch });
+  return { store, marker, session, api, storage };
+}
+
+/** 개발 로그인으로 시작한 탭. */
+async function signedInTab(server, member = 'X', options) {
+  const t = tab(server, options);
+  assert.deepEqual(await t.api.devLogin(member), { kind: 'success', status: 200, data: null });
+  return t;
+}
+
+const meOf = (result) => result.data.profile.displayName;
+
+// ---- 보호 API 보내기 전 조건 ----
+
+test('보호 API 조건은 status만 보지 않는다: 감지·보류·재인증·로그인 상태·토큰을 함께 확인하고, 막히면 요청을 보내지 않는다', async () => {
+  const server = fakeServer();
+  const t = tab(server);
+  assert.equal(memberCallBlock(t.store), 'not-signed-in'); // 복원 중
+  assert.deepEqual(await t.api.member('/me'), { kind: 'not-sent', reason: 'not-signed-in' });
+  assert.equal(server.count('GET /me'), 0);
+
+  assert.equal((await t.api.devLogin('X')).kind, 'success');
+  assert.equal(memberCallBlock(t.store), null);
+
+  const ticket = t.store.logoutStarted(); // 로그아웃 확인 중
+  assert.equal(memberCallBlock(t.store), 'logout-hold');
+  t.store.logoutSettled('unknown', ticket); // 결과 불명 보류
+  assert.equal(t.store.getSnapshot().status, 'signed-in');
+  assert.notEqual(t.store.accessToken(), null);
+  assert.deepEqual(await t.api.member('/me'), { kind: 'not-sent', reason: 'logout-hold' }); // status는 signed-in이고 토큰도 있음
+  assert.equal(server.count('GET /me'), 0);
+});
+
+test('로그인 변경을 감지하면 status가 signed-in이어도 보내지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  t.store.invalidateByLoginMarker();
+  assert.equal(t.store.getSnapshot().status, 'signed-in');
+  assert.deepEqual(await t.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
+  assert.equal(server.count('GET /me'), 0);
+});
+
+test('재인증 필요 상태에서는 보내지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  server.revokeAll();
+  await t.session.refresh(); // 401 → 로그인 중 실패는 재인증 필요
+  assert.equal(t.store.getSnapshot().status, 'reauth-required');
+  assert.deepEqual(await t.api.member('/me'), { kind: 'not-sent', reason: 'reauth-required' });
+  assert.equal(server.count('GET /me'), 0);
+});
+
+// ---- 정상 호출과 401 뒤 갱신 ----
+
+test('정상 조회: 현재 Access를 Bearer로 붙이고 쿠키는 보내지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  const result = await t.api.member('/me');
+  assert.equal(result.kind, 'success');
+  assert.equal(meOf(result), 'X');
+  const [request] = server.requests('GET /me');
+  assert.equal(request.auth, `Bearer ${t.store.accessToken()}`);
+  assert.equal(request.credentials, 'omit');
+  assert.equal(server.count('POST /auth/refresh'), 0);
+});
+
+test('조회 401: 한 번 갱신하고 새 토큰으로 조회만 한 번 다시 보낸다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  const before = t.store.accessToken();
+  const generation = t.store.getSnapshot().generation;
+  server.expire(before);
+  const result = await t.api.member('/me');
+  assert.equal(result.kind, 'success');
+  assert.equal(meOf(result), 'X');
+  assert.deepEqual([server.count('GET /me'), server.count('POST /auth/refresh')], [2, 1]);
+  const [first, second] = server.requests('GET /me');
+  assert.equal(first.auth, `Bearer ${before}`);
+  assert.equal(second.auth, `Bearer ${t.store.accessToken()}`);
+  assert.notEqual(t.store.accessToken(), before);
+  assert.equal(t.store.getSnapshot().generation, generation); // 같은 세션 갱신은 세대 유지
+});
+
+test('변경 요청 401: 갱신은 하지만 다시 보내지 않고 결과에 갱신 여부만 붙인다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  server.expire(t.store.accessToken());
+  const result = await t.api.member('/catches', { method: 'POST', body: { title: 't' } });
+  assert.equal(result.kind, 'api-error');
+  assert.equal(result.status, 401);
+  assert.equal(result.authRenewal, 'renewed');
+  assert.deepEqual([server.count('POST /catches'), server.count('POST /auth/refresh'), server.state.mutations], [1, 1, 0]);
+  assert.equal(t.store.getSnapshot().status, 'signed-in');
+});
+
+test('401 뒤 갱신이 실패하면 재인증 필요가 되고, 조회·변경 모두 다시 보내지 않으며 이후 호출도 보내지 않는다', async () => {
+  for (const request of [{}, { method: 'POST', body: {} }]) {
+    const server = fakeServer();
+    const t = await signedInTab(server);
+    server.revokeAll();
+    const path = request.method === 'POST' ? '/catches' : '/me';
+    const entry = request.method === 'POST' ? 'POST /catches' : 'GET /me';
+    const result = await t.api.member(path, request);
+    assert.equal(result.status, 401);
+    assert.equal(result.authRenewal, 'not-renewed');
+    assert.equal(t.store.getSnapshot().status, 'reauth-required');
+    assert.deepEqual([server.count(entry), server.count('POST /auth/refresh')], [1, 1]);
+    assert.deepEqual(await t.api.member(path, request), { kind: 'not-sent', reason: 'reauth-required' });
+    assert.deepEqual([server.count(entry), server.count('POST /auth/refresh')], [1, 1]);
+  }
+});
+
+test('다시 보낸 조회도 401이면 더 갱신하지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  server.expire(t.store.accessToken());
+  const gate = server.hold('POST /auth/refresh');
+  const pending = t.api.member('/me');
+  await tick(); await tick(); await tick(); await tick();
+  gate.resolve();
+  // 갱신 응답이 오자마자 새 토큰도 무효로 만든다(이상 상황).
+  const origin = server.fetch;
+  let expired = false;
+  server.fetch = async (url, init) => {
+    if (!expired && init.method === 'GET') { expired = true; server.expireAll(); }
+    return origin(url, init);
+  };
+  const result = await pending;
+  assert.equal(result.status, 401);
+  assert.equal(result.authRenewal, 'not-renewed');
+  assert.deepEqual([server.count('GET /me'), server.count('POST /auth/refresh')], [2, 1]);
+});
+
+test('동시에 401을 받은 두 조회는 갱신 하나를 함께 쓰고 각자 한 번만 다시 보낸다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  server.expire(t.store.accessToken());
+  const [a, b] = await Promise.all([t.api.member('/me'), t.api.member('/me')]);
+  assert.deepEqual([a.kind, b.kind], ['success', 'success']);
+  assert.deepEqual([server.count('GET /me'), server.count('POST /auth/refresh')], [4, 1]);
+});
+
+test('다른 호출이 먼저 갱신해 토큰이 바뀌었으면 갱신하지 않고 새 토큰으로 조회만 다시 보낸다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  const old = t.store.accessToken();
+  server.expire(old);
+  const gate = server.hold('GET /me');
+  const pending = t.api.member('/me');
+  await tick(); await tick();
+  assert.deepEqual(await t.session.refresh(), { kind: 'signed-in' }); // 다른 호출이 먼저 갱신
+  gate.resolve();
+  const result = await pending;
+  assert.equal(result.kind, 'success');
+  assert.deepEqual([server.count('GET /me'), server.count('POST /auth/refresh')], [2, 1]);
+  assert.equal(server.requests('GET /me')[1].auth, `Bearer ${t.store.accessToken()}`);
+});
+
+test('로그아웃 결과 불명 보류 중 받은 401은 갱신하지 않고 다시 보내지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  server.expire(t.store.accessToken());
+  const gate = server.hold('GET /me');
+  const pending = t.api.member('/me');
+  await tick(); await tick();
+  server.fail('POST /auth/logout');
+  assert.deepEqual(await t.session.logout(), { kind: 'settled', result: 'unknown' });
+  gate.resolve();
+  const result = await pending; // 같은 세대(결과 불명은 세대를 바꾸지 않음)라 401은 돌려주되 갱신하지 않음
+  assert.equal(result.status, 401);
+  assert.equal(result.authRenewal, 'not-renewed');
+  assert.deepEqual([server.count('GET /me'), server.count('POST /auth/refresh')], [1, 0]);
+  assert.equal(t.store.getSnapshot().sessionHold, 'logout-unknown');
+});
+
+// ---- 이전 응답 무시와 표식 비교 ----
+
+test('응답을 기다리는 사이 이 탭에서 다른 회원으로 로그인하면 이전 응답을 돌려주지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server, 'X');
+  const gate = server.hold('GET /me');
+  const pending = t.api.member('/me');
+  await tick(); await tick();
+  assert.equal((await t.api.devLogin('Y')).kind, 'success');
+  gate.resolve();
+  assert.deepEqual(await pending, { kind: 'discarded', sent: true });
+  const now = await t.api.member('/me');
+  assert.equal(meOf(now), 'Y');
+});
+
+test('응답을 기다리는 사이 로그아웃이 끝나면 이전 응답을 돌려주지 않고 401이어도 갱신하지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  server.expire(t.store.accessToken());
+  const gate = server.hold('GET /me');
+  const pending = t.api.member('/me');
+  await tick(); await tick();
+  assert.deepEqual(await t.session.logout(), { kind: 'settled', result: 'done' });
+  gate.resolve();
+  assert.deepEqual(await pending, { kind: 'discarded', sent: true });
+  assert.equal(server.count('POST /auth/refresh'), 0);
+});
+
+test('표식 비교: 다른 탭 로그인을 요청 전에 감지하면 보내지 않고, 응답 반영 전에 감지하면 응답을 버리며 갱신하지 않는다', async () => {
+  const server = fakeServer();
+  const locks = fakeLockManager();
+  const storage = fakeStorage();
+  const a = await signedInTab(server, 'X', { locks, storage });
+  const b = tab(server, { locks, storage });
+
+  // 응답 반영 전 감지
+  server.expire(a.store.accessToken());
+  const gate = server.hold('GET /me');
+  const pending = a.api.member('/me');
+  await tick(); await tick();
+  assert.equal((await b.api.devLogin('Y')).kind, 'success');
+  gate.resolve();
+  assert.deepEqual(await pending, { kind: 'discarded', sent: true }); // 401이었지만 갱신하지 않음
+  assert.equal(server.count('POST /auth/refresh'), 0);
+  assert.equal(a.store.loginChangeDetected(), true);
+
+  // 이후 요청 전 감지 상태 유지: 보내지 않음
+  assert.deepEqual(await a.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
+  assert.equal(server.count('GET /me'), 1);
+  assert.equal(server.jarMember(), 'Y'); // 쿠키는 B의 로그인 것. A가 갱신하면 Y의 토큰을 받게 된다.
+});
+
+test('표식 비교: 요청 전 감지(다른 탭 로그인이 이미 끝남)면 보호 API를 보내지 않는다', async () => {
+  const server = fakeServer();
+  const locks = fakeLockManager();
+  const storage = fakeStorage();
+  const a = await signedInTab(server, 'X', { locks, storage });
+  const b = tab(server, { locks, storage });
+  assert.equal((await b.api.devLogin('Y')).kind, 'success');
+  assert.deepEqual(await a.api.member('/catches', { method: 'POST', body: {} }), { kind: 'not-sent', reason: 'login-changed' });
+  assert.deepEqual([server.count('POST /catches'), server.state.mutations], [0, 0]);
+  assert.equal(meOf(await b.api.member('/me')), 'Y');
+});
+
+// ---- 개발 로그인 ----
+
+test('개발 로그인: 시도 시작 → 잠금 안 전송(쿠키 포함) → 성공 반영·표식 기록, 결과에는 토큰이 없다', async () => {
+  const server = fakeServer();
+  const storage = fakeStorage();
+  const t = tab(server, { storage });
+  const generation = t.store.getSnapshot().generation;
+  const result = await t.api.devLogin('X');
+  assert.deepEqual(result, { kind: 'success', status: 200, data: null });
+  assert.equal(JSON.stringify(result).includes('A'), false);
+  const [request] = server.requests('POST /auth/dev-login');
+  assert.equal(request.credentials, 'include');
+  assert.equal(request.auth, null);
+  assert.equal(t.store.getSnapshot().status, 'signed-in');
+  assert.equal(t.store.getSnapshot().generation, generation + 1);
+  assert.equal(server.jarMember(), 'X');
+  assert.match(storage.map.get(LOGIN_MARKER_KEY), /^[0-9a-f]{32}$/);
+  assert.equal(t.marker.compare(), 'same');
+  assert.deepEqual(await t.session.refresh(), { kind: 'signed-in' }); // 받은 쿠키로 갱신 가능
+});
+
+test('개발 로그인은 진행 중인 갱신과 같은 잠금을 쓴다: 갱신 응답 뒤에 보내 마지막 쿠키가 새 로그인 것이다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server, 'X');
+  const gate = server.hold('POST /auth/refresh');
+  const refreshing = t.session.refresh();
+  await tick(); await tick();
+  const login = t.api.devLogin('Y');
+  await tick(); await tick(); await tick();
+  assert.equal(server.count('POST /auth/dev-login'), 1); // 처음 X 로그인뿐, Y는 잠금 대기
+  gate.resolve();
+  assert.deepEqual(await refreshing, { kind: 'discarded', sent: true }); // 새 로그인 시작으로 결과 미반영
+  assert.equal((await login).kind, 'success');
+  const order = server.state.log.map((l) => l.entry).filter((e) => e.includes('refresh') || e.includes('dev-login'));
+  assert.deepEqual(order.slice(-4), ['POST /auth/refresh', 'done POST /auth/refresh', 'POST /auth/dev-login', 'done POST /auth/dev-login']);
+  assert.equal(server.jarMember(), 'Y');
+  assert.equal(meOf(await t.api.member('/me')), 'Y');
+});
+
+test('잠금을 기다리는 동안 화면이 취소하면 보내지 않고 시도를 끝내 이전 세션 갱신이 다시 가능하다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server, 'X');
+  const gate = server.hold('POST /auth/refresh');
+  const refreshing = t.session.refresh();
+  await tick(); await tick();
+  const abort = new AbortController();
+  const login = t.api.devLogin('Y', { signal: abort.signal });
+  abort.abort();
+  gate.resolve();
+  await refreshing;
+  assert.deepEqual(await login, { kind: 'discarded', sent: false });
+  assert.equal(server.count('POST /auth/dev-login'), 1); // 처음 X 로그인뿐
+  assert.equal(t.store.loginChangeDetected(), false);
+  assert.deepEqual(await t.session.refresh(), { kind: 'signed-in' });
+  assert.equal(meOf(await t.api.member('/me')), 'X');
+});
+
+test('이미 취소된 신호로 부르면 시도를 시작하지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server, 'X');
+  const abort = new AbortController();
+  abort.abort();
+  assert.deepEqual(await t.api.devLogin('Y', { signal: abort.signal }), { kind: 'discarded', sent: false });
+  assert.equal(server.count('POST /auth/dev-login'), 1);
+  assert.deepEqual(await t.session.refresh(), { kind: 'signed-in' });
+});
+
+test('[결정 대기] 보낸 뒤 취소된 로그인이 성공하면 반영하지 않고, 쿠키가 바뀌었으므로 이 탭·다른 탭이 이전 세션으로 갱신하지 않는다', async () => {
+  const server = fakeServer();
+  const locks = fakeLockManager();
+  const storage = fakeStorage();
+  const a = await signedInTab(server, 'X', { locks, storage });
+  const b = await (async () => { const t = tab(server, { locks, storage }); await t.session.refresh(); return t; })(); // B는 X를 복원
+  assert.equal(b.store.getSnapshot().status, 'signed-in');
+  const gate = server.hold('POST /auth/dev-login');
+  const abort = new AbortController();
+  const login = a.api.devLogin('Y', { signal: abort.signal });
+  await tick(); await tick();
+  abort.abort(); // 이미 보냄
+  gate.resolve();
+  assert.deepEqual(await login, { kind: 'discarded', sent: true });
+  assert.equal(server.jarMember(), 'Y'); // 서버는 로그인을 처리해 쿠키를 바꿨다
+  const refreshes = server.count('POST /auth/refresh');
+  // A: 감지·무효화(정책 미지정 정지). 이전 세션으로 갱신해 Y의 토큰을 받지 않는다.
+  assert.equal(a.store.loginChangeDetected(), true);
+  assert.equal(a.store.accessToken(), null);
+  assert.deepEqual(await a.session.refresh(), { kind: 'not-started' });
+  // B: 새 표식으로 알아차려 갱신·보호 API를 보내지 않는다.
+  assert.deepEqual(await b.session.refresh(), { kind: 'not-started' });
+  assert.deepEqual(await b.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
+  assert.equal(server.count('POST /auth/refresh'), refreshes);
+});
+
+test('이전 시도의 성공은 반영하지 않고, 뒤의 시도가 잠금 뒤에 보내져 최종 쿠키와 상태가 같은 회원이다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server, 'X');
+  const gate = server.hold('POST /auth/dev-login');
+  const first = t.api.devLogin('Y');
+  await tick(); await tick();
+  const second = t.api.devLogin('Z'); // Y 요청이 진행 중일 때 새 시도
+  gate.resolve();
+  assert.deepEqual(await first, { kind: 'discarded', sent: true });
+  assert.equal((await second).kind, 'success');
+  assert.equal(server.count('POST /auth/dev-login'), 3); // 처음 X + Y + Z
+  assert.equal(server.jarMember(), 'Z');
+  assert.equal(t.store.loginChangeDetected(), false); // 이 탭 로그인 성공으로 풀림
+  assert.equal(meOf(await t.api.member('/me')), 'Z');
+  assert.deepEqual(await t.session.refresh(), { kind: 'signed-in' });
+});
+
+test('잠금을 기다리는 동안 이 탭에서 다른 로그인을 시작했으면 이전 시도는 보내지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server, 'X');
+  const gate = server.hold('POST /auth/refresh');
+  const refreshing = t.session.refresh();
+  await tick(); await tick();
+  const first = t.api.devLogin('Y');
+  const second = t.api.devLogin('Z');
+  gate.resolve();
+  await refreshing;
+  assert.deepEqual(await first, { kind: 'discarded', sent: false });
+  assert.equal((await second).kind, 'success');
+  assert.equal(server.count('POST /auth/dev-login'), 2); // 처음 X 로그인 + Z
+  assert.equal(server.jarMember(), 'Z');
+});
+
+test('미전송이 확실한 경우(주소 설정 오류)는 요청 없이 시도만 끝내고 이전 세션을 그대로 쓴다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server, 'X');
+  const token = t.store.accessToken();
+  const generation = t.store.getSnapshot().generation;
+  const requests = server.state.log.length;
+  // 같은 탭(저장소·세션)이지만 주소 설정이 잘못된 호출 함수
+  const bad = createAuthApi({ baseUrl: 'ftp://bad', nodeEnv: 'test', store: t.store, session: t.session, fetch: (u, i) => server.fetch(u, i) });
+  assert.deepEqual(await bad.devLogin('Y'), { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' });
+  assert.equal(server.state.log.length, requests); // 요청 0건
+  assert.deepEqual([t.store.accessToken(), t.store.getSnapshot().generation, t.store.loginChangeDetected()], [token, generation, false]);
+  assert.deepEqual(await t.session.refresh(), { kind: 'signed-in' }); // 시도가 끝나 이전 세션 갱신 가능
+  assert.equal(meOf(await t.api.member('/me')), 'X');
+});
+
+test('계약상 쿠키를 바꾸지 않는 거부(403 가드·400 검증)는 시도만 끝내고 이전 세션을 그대로 쓴다', async () => {
+  const cases = [
+    ['forbidden', { kind: 'api-error', status: 403, code: 'INTERNAL_ERROR', message: '서버 오류' }],
+    ['invalid', { kind: 'api-error', status: 400, code: 'VALIDATION_FAILED', message: '검증 실패' }],
+  ];
+  for (const [mode, expected] of cases) {
+    const server = fakeServer();
+    const storage = fakeStorage();
+    const t = await signedInTab(server, 'X', { storage });
+    const token = t.store.accessToken();
+    const generation = t.store.getSnapshot().generation;
+    const marker = storage.map.get(LOGIN_MARKER_KEY);
+    server.state.devLogin = mode;
+    assert.deepEqual(await t.api.devLogin('Y'), expected, mode);
+    assert.equal(server.count('POST /auth/dev-login'), 2, mode); // 처음 X + 이번 1건(다시 보내지 않음)
+    assert.equal(server.jarMember(), 'X', mode);
+    assert.equal(storage.map.get(LOGIN_MARKER_KEY), marker, mode); // 표식을 바꾸지 않음
+    assert.deepEqual([t.store.accessToken(), t.store.getSnapshot().generation, t.store.loginChangeDetected()],
+      [token, generation, false], mode);
+    assert.deepEqual(await t.session.refresh(), { kind: 'signed-in' }, mode);
+    assert.equal(meOf(await t.api.member('/me')), 'X', mode);
+  }
+});
+
+/** 결과 불명 확인: 이전 회원 상태(signed-in)는 두되 토큰을 버리고, 새 회원 토큰을 받지 않으며, 두 탭 모두 쿠키 요청·보호 API를 보내지 않는다. */
+async function assertUnknownBlocksBothTabs({ server, a, b, generation, refreshes }) {
+  assert.equal(a.store.getSnapshot().status, 'signed-in'); // 상태 전환 없음(감지 뒤 정책 미지정)
+  assert.equal(a.store.accessToken(), null); // 이전 토큰도 새 토큰도 쓰지 않음
+  assert.equal(a.store.getSnapshot().generation, generation + 1);
+  assert.equal(a.store.loginChangeDetected(), true);
+  assert.deepEqual(await a.session.refresh(), { kind: 'not-started' }); // 이전 세션으로 갱신해 새 쿠키의 토큰을 받지 않음
+  assert.deepEqual(await a.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
+  assert.deepEqual(await b.session.refresh(), { kind: 'not-started' }); // 다른 탭도 바뀐 표식으로 감지
+  assert.deepEqual(await b.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
+  assert.equal(b.store.loginChangeDetected(), true);
+  assert.equal(server.count('POST /auth/refresh'), refreshes);
+  assert.equal(server.count('GET /me'), 0);
+  assert.equal(server.count('POST /auth/dev-login'), 2); // 처음 X + 이번 1건. 자동 재전송 없음
+}
+
+/** 같은 출처 두 탭. A는 X로 로그인, B는 같은 쿠키로 X를 복원. */
+async function twoSignedInTabs(options = {}) {
+  const server = fakeServer();
+  const locks = fakeLockManager();
+  const storage = fakeStorage();
+  const a = await signedInTab(server, 'X', { locks, storage });
+  const b = tab(server, { locks, storage });
+  assert.deepEqual(await b.session.refresh(), { kind: 'signed-in' });
+  Object.assign(server.state, options);
+  return { server, storage, a, b };
+}
+
+test('결과 불명: 서버가 처리하고 쿠키를 바꾼 뒤 응답을 읽지 못하면 새 회원 토큰을 받지 않고, 이 탭·다른 탭 모두 이전 세션 요청을 막는다', async () => {
+  const { server, a, b } = await twoSignedInTabs();
+  const generation = a.store.getSnapshot().generation;
+  const refreshes = server.count('POST /auth/refresh');
+  server.state.devLogin = 'drop-after-cookie';
+  assert.deepEqual(await a.api.devLogin('Y'), { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' });
+  assert.equal(server.jarMember(), 'Y'); // 쿠키는 이미 Y의 것
+  await assertUnknownBlocksBothTabs({ server, a, b, generation, refreshes });
+});
+
+test('결과 불명: 응답이 없으면(처리 여부를 알 수 없음) 처리 전 끊김이어도 같은 감지·차단을 적용한다', async () => {
+  const { server, a, b } = await twoSignedInTabs();
+  const generation = a.store.getSnapshot().generation;
+  const refreshes = server.count('POST /auth/refresh');
+  server.fail('POST /auth/dev-login');
+  assert.deepEqual(await a.api.devLogin('Y'), { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' });
+  assert.equal(server.jarMember(), 'X'); // 이 대역에서는 실제로 바뀌지 않았지만 화면은 구분할 수 없다
+  await assertUnknownBlocksBothTabs({ server, a, b, generation, refreshes });
+});
+
+test('결과 불명: 계약상 거부가 아닌 오류 응답(500)도 같은 감지·차단을 적용한다', async () => {
+  const { server, a, b } = await twoSignedInTabs();
+  const generation = a.store.getSnapshot().generation;
+  const refreshes = server.count('POST /auth/refresh');
+  server.state.devLogin = 'server-error';
+  const result = await a.api.devLogin('Y');
+  assert.deepEqual([result.kind, result.status, result.code], ['api-error', 500, 'INTERNAL_ERROR']);
+  await assertUnknownBlocksBothTabs({ server, a, b, generation, refreshes });
+});
+
+test('[한계] 결과 불명 때 표식을 쓰지 못하면 이 탭은 막히지만, 다른 탭은 알아차리지 못해 바뀐 쿠키로 갱신하고 새 회원 토큰을 받는다', async () => {
+  const { server, storage, a, b } = await twoSignedInTabs();
+  server.state.devLogin = 'drop-after-cookie';
+  storage.failWrite = true;
+  assert.deepEqual(await a.api.devLogin('Y'), { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' });
+  // 이 탭: 표식 쓰기 실패와 관계없이 감지·무효화
+  assert.equal(a.store.loginChangeDetected(), true);
+  assert.equal(a.store.accessToken(), null);
+  assert.deepEqual(await a.session.refresh(), { kind: 'not-started' });
+  // 다른 탭: 표식이 그대로라 감지하지 못한다(4-2 쓰기 실패 한계와 같은 원인)
+  assert.equal(b.session.checkLoginMarker(), 'same');
+  assert.deepEqual(await b.session.refresh(), { kind: 'signed-in' });
+  assert.equal(meOf(await b.api.member('/me')), 'Y'); // 같은 탭 화면이 X인 채 Y의 자료를 받는다
+});
+
+test('개발 로그인 200이지만 본문을 읽지 못하면 반영하지 않고, 쿠키가 바뀌었으므로 감지·무효화한다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server, 'X');
+  server.state.devLogin = 'malformed';
+  assert.deepEqual(await t.api.devLogin('Y'), { kind: 'lookup-failed', status: 200, code: 'LOOKUP_FAILED' });
+  assert.equal(server.jarMember(), 'Y');
+  assert.equal(t.store.loginChangeDetected(), true);
+  assert.deepEqual(await t.session.refresh(), { kind: 'not-started' });
+  assert.deepEqual(await t.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
+});
+
+test('감지 상태에서도 이 탭의 개발 로그인 성공은 기존 규칙대로 상태를 초기화한다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server, 'X');
+  t.store.invalidateByLoginMarker();
+  assert.equal((await t.api.devLogin('Y')).kind, 'success');
+  assert.equal(t.store.loginChangeDetected(), false);
+  assert.equal(meOf(await t.api.member('/me')), 'Y');
+});
+
+test('loginAttemptCurrent: 가장 최근에 시작해 아직 성공·종료되지 않은 시도만 true이며 상태를 바꾸지 않는다', () => {
+  const store = createAuthStore();
+  const first = store.loginStarted();
+  assert.equal(store.loginAttemptCurrent(first), true);
+  const second = store.loginStarted();
+  assert.deepEqual([store.loginAttemptCurrent(first), store.loginAttemptCurrent(second)], [false, true]);
+  const snapshot = store.getSnapshot();
+  store.loginAttemptCurrent(second);
+  assert.equal(store.getSnapshot(), snapshot);
+  store.signedIn('t', second);
+  assert.equal(store.loginAttemptCurrent(second), false);
+  const third = store.loginStarted();
+  store.loginAttemptEnded(third);
+  assert.equal(store.loginAttemptCurrent(third), false);
+  assert.throws(() => store.loginAttemptCurrent({}), TypeError);
+});
+
+test('[회귀] 갱신으로 받은 Access가 이전과 같은 문자열이어도(같은 초 재발급) 갱신 성공으로 보고 조회를 한 번만 다시 보낸다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  const token = t.store.accessToken();
+  const origin = server.fetch;
+  let gets = 0;
+  server.fetch = async (url, init) => {
+    if (init.method === 'GET') {
+      gets += 1;
+      if (gets === 1) return new Response(JSON.stringify({ code: 'AUTH_INVALID', message: 'm' }), { status: 401 });
+    }
+    const response = await origin(url, init);
+    if (url.endsWith('/auth/refresh') && response.status === 200) {
+      return new Response(JSON.stringify({ accessToken: token, tokenType: 'Bearer', expiresIn: 900 }), { status: 200 });
+    }
+    return response;
+  };
+  const result = await t.api.member('/me');
+  assert.equal(result.kind, 'success');
+  assert.equal(meOf(result), 'X');
+  assert.deepEqual([gets, server.count('POST /auth/refresh')], [2, 1]);
+  assert.equal(t.store.accessToken(), token);
+
+  // 변경 요청은 같은 경우에도 다시 보내지 않고 renewed로 알린다.
+  gets = 0;
+  let posts = 0;
+  server.fetch = async (url, init) => {
+    if (init.method === 'POST' && url.endsWith('/catches')) {
+      posts += 1;
+      return new Response(JSON.stringify({ code: 'AUTH_INVALID', message: 'm' }), { status: 401 });
+    }
+    const response = await origin(url, init);
+    if (url.endsWith('/auth/refresh') && response.status === 200) {
+      return new Response(JSON.stringify({ accessToken: token, tokenType: 'Bearer', expiresIn: 900 }), { status: 200 });
+    }
+    return response;
+  };
+  const post = await t.api.member('/catches', { method: 'POST', body: {} });
+  assert.equal(post.authRenewal, 'renewed');
+  assert.deepEqual([posts, server.count('POST /auth/refresh')], [1, 2]);
+});

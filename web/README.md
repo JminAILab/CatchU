@@ -72,6 +72,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 |---|---|---|---|
 | API 호출 시 필수 | `NEXT_PUBLIC_API_BASE_URL` | `http://127.0.0.1:3001` | api 기준 주소. `/v1`은 넣지 않는다(호출 함수가 붙인다). 없거나 잘못되면 호출하지 않고 조회 실패로 돌려준다. `npm run build`로 만든 운영 빌드처럼 `NODE_ENV`가 `development`·`test`가 아니면 https 주소나 로컬 주소(`localhost`·`127.0.0.1`)의 http만 받고, 그 밖의 http 주소도 잘못된 주소로 본다(#218). 이 주소의 출처를 CSP 연결 허용에도 넣는다(「보안 응답 헤더」). IPv6 주소(`[::1]` 등)는 CSP에 적을 수 없어 형식과 관계없이 `npm run dev`·`npm run build`가 오류로 멈추므로 `127.0.0.1`이나 `localhost`를 쓴다 |
 | 선택 | `NEXT_PUBLIC_DEV_LOGIN_ENABLED` | `false` | 기본 비활성. 정확히 `true`일 때만 `/login`에 개발용 로그인을 보인다. api도 `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development` 또는 `test`가 함께 지정돼야 허용하며, 그 밖에는 403이다 |
+| 선택 | `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION` | `false` | 공통 인증(#286) 화면 연결의 통합 시험 전환. 정확히 `true`일 때만 켠다. 미결 정책 결정 전에는 제품에서 켜지 않는다(아래 「공통 인증」) |
 
 - 이름이 `NEXT_PUBLIC_`으로 시작하는 변수만 브라우저에 노출된다. 비밀값·토큰은 이 이름으로 두지 않는다.
 - `NEXT_PUBLIC_` 값은 `npm run dev`·`npm run build`를 시작할 때 읽힌다. 바꾸면 다시 시작한다.
@@ -207,8 +208,33 @@ if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLi
 - 자동 재시도하지 않는다. 서버가 저장했는지 알 수 없는 결과(조회 실패·5xx)면 키를 유지하고, 사용자가 다시 누르면 같은 키로 보낸다. 401도 앞선 같은 키 요청의 저장 여부를 알려 주지 않으므로 키를 유지한다. 429(빈도 제한)도 요청을 처리하지 않은 것이라 키를 유지하고, `Retry-After`가 지난 뒤 사용자가 다시 누르면 같은 키·본문으로 보낸다(#235 계약). 성공과 401·429를 뺀 4xx 업무 거부만 확정으로 본다(`isSettledResult`).
 - 로그인 복귀 후 키 보존은 아직 구현하지 않았다. 지금은 401이면 로그인 화면으로 이동하면서 화면이 다시 만들어져 키도 새로 생긴다. 후속 구현 조건: 로그인 뒤 키를 이어 쓰려면 실제 생성 화면에서 **같은 회원·같은 생성 요청일 때만** 이어 쓰고, 다른 계정으로 로그인했으면 키를 버린다. 로그인 뒤 이전 요청을 자동으로 다시 보내지 않는다.
 - 오류 응답에 `Retry-After`가 1 이상의 정수 초로 오면 `retryAfterSeconds`로 전달한다. 헤더가 없거나 다른 형식이면 붙이지 않으며, 남은 시간을 추정하지 않는다.
-- 토큰은 탭의 메모리(`src/lib/access-token.ts`)에만 둔다. localStorage·sessionStorage·쿠키·URL·로그에 쓰지 않으며, 새로고침하면 사라져 다시 로그인한다. 실제 유지 방식은 OQ-A1에서 정한다.
+- 토큰은 탭의 메모리(`src/lib/access-token.ts`)에만 둔다. localStorage·sessionStorage·쿠키·URL·로그에 쓰지 않으며, 새로고침하면 사라져 다시 로그인한다. 실제 유지 방식은 OQ-A1에서 정한다. 예외는 Google 로그인 시도 값 하나뿐이다([팀장 T1 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6182257830), 아래 「공통 인증」).
 - 개발용 로그인은 `api.devLogin(memberId, { signal })`다. `memberId`에는 개발용 식별 문자열을 넣으며, api가 해당 회원을 찾거나 만들어 그 회원의 토큰을 준다. 성공하면 토큰을 메모리에 넣고, 결과에는 토큰을 담지 않는다. 가장 늦게 시작한 로그인만 반영하며, 먼저 보낸 로그인이 늦게 오거나 로그인 화면을 떠나 취소되면 토큰을 바꾸지 않는다.
+
+## 공통 인증 (#286)
+
+회원 인증 상태·세션 갱신·로그아웃·로그인 완료를 한 곳(`src/lib/auth-*.ts`)에서 다룬다. 합의 원문은 [#251](https://github.com/JminAILab/CatchU/issues/251)의 설계 접점 댓글과 [#286](https://github.com/JminAILab/CatchU/issues/286)이다.
+
+**제품 경로 연결은 보류 중이다.** 공통 인증으로 화면을 움직이면 미결 정책(보내지 않은 요청의 화면 결과, 로그인 표식 감지 뒤 화면, 재로드 A/B)에 기대는 동작이 함께 들어오므로, 화면 연결은 통합 시험 전환 `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`일 때만 쓴다(`src/lib/auth-integration.ts`). 기본(꺼짐)은 위 「API 호출」의 기존 동작이다. 켜면 회원 셸·가드·로그인 화면·`api.member`·`api.devLogin`이 `src/lib/auth-runtime.ts`의 탭별 인스턴스와 `src/components/auth/use-auth.ts`의 훅을 쓴다. 아래 설명은 켰을 때의 동작이다.
+
+| 파일 | 맡는 일 |
+|---|---|
+| `auth-state.ts` | 상태 4종(`restoring`·`signed-in`·`signed-out`·`reauth-required`), 인증 세대, 로그아웃 진행·결과, 로그인 시도 식별자 |
+| `auth-refresh.ts` | 세션 갱신(탭 안 중복 방지, 500만 잠금 안에서 1회 재시도, 응답 유실 뒤 재전송 없음) |
+| `auth-logout.ts` | 로그아웃(`done`·`failed`·`unknown`) |
+| `auth-session.ts` | 탭 사이 잠금(Web Locks), 로그인 표식 비교, 다른 탭 로그아웃 완료 알림 |
+| `auth-login-marker.ts` | 로그인 표식(`localStorage`, 무작위 값. 토큰·회원 정보 아님) |
+| `auth-api.ts` | 보호 API 호출 조건·401 뒤 갱신·이전 응답 무시, 개발용 로그인 |
+| `auth-google.ts` | Google 시작·시도 보관·콜백 해석·완료(버튼·콜백 화면·안내는 #287) |
+| `auth-gate.ts`·`auth-scope.ts` | 회원 경로 가드 판정, 회원 화면 범위 번호 |
+
+- **보호 API 조건:** `status`만 보지 않는다. 로그인 변경 감지 없음·로그아웃 보류 없음·`signed-in`·토큰 있음을 모두 확인하고, 요청 전과 응답 반영 전에 로그인 표식을 비교한다. 그사이 로그인이 바뀌었으면 응답을 쓰지 않는다.
+- **새로고침:** 회원 경로 가드와 로그인 화면이 열릴 때 Refresh 쿠키로 세션을 복원한다(#251 필수 검사 「로그인 유지」의 "새로고침 후 세션 확인"). 확인이 끝나기 전에는 로그인 화면으로 보내지 않는다. 확인하지 못하면 Refresh를 쓰지 않았음이 확인된 경우만 [다시 확인]을, 결과를 모르면 [다시 로그인]만 보인다. 이 복원은 저장 표식이 없는 기본 복원이며, 갱신 중 새로고침의 재전송 문제에 대한 재로드 A/B(B안의 표식 포함)를 충족한 것이 아니다.
+- **화면 유지:** 회원 화면은 회원 화면 범위 번호(`auth-scope.ts`)를 기준으로 새로 만든다. 같은 세션의 Access 갱신·재인증 필요·로그아웃 확인 중에는 바뀌지 않고, 새 로그인·회원 전환 때만 바뀐다. 기존 `accessTokenStore`는 이 번호로 만든 표시값을 담는 호환 신호이며 실제 토큰이 아니다.
+- **다중 탭:** 다중 탭 로그인 유지는 Web Locks를 지원하는 최근 Chrome·Edge·Firefox·Safari에서만 보장한다([팀장 T4 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6182257830)). Web Locks는 HTTPS나 localhost에서만 동작한다. 지원하지 않는 환경에서는 탭 사이 요청 순서를 보장하지 않으며, 갱신이 실패하면 입력을 보존하고 재인증을 안내한다. `localStorage`를 쓸 수 없는 환경도 다중 탭 보장 범위 밖이다(T3).
+- **다른 탭 로그아웃:** 같은 로그인을 쓰는 다른 탭의 로그아웃이 `done`이면(같은 표식, `BroadcastChannel` 알림) 이 탭도 비로그인으로 확정하고 회원 경로 가드가 비로그인 홈으로 보낸다. `failed`·`unknown`·새 로그인 시작 뒤의 결과는 반영하지 않는다(#251 접점 4).
+- **Google 로그인 시도 보관:** `loginAttemptToken`·`state`·`next`·`expiresAt`을 `sessionStorage`의 키 하나(`catchu.auth.google-attempt`)에 둔다. 완료 요청 직전 `sent`를 표시하고, 완료 응답을 받으면 지우며, 시한이 지나면 지운다. 저장에 실패하면 Google로 이동하지 않는다. `next`는 저장·복귀 때 모두 회원 경로인지 검사한다. 값은 로그·화면에 출력하지 않는다.
+- **미결(임의로 정하지 않음, 제품 경로 보류 사유):** 로그인 표식 불일치 감지 뒤의 상태·화면·출구, 재로드 A/B, 같은 페이지 [다시 확인] 허용 범위, Web Lock 실패·대기 시간 제한, 탭 종료 뒤 재전송(W4), 보낸 뒤 취소된 개발 로그인의 반영(P1). 감지 뒤에는 요청을 보내지 않는 임시 처리이며 최종 정책이 아니다.
 
 ## 보안 응답 헤더 (#217)
 
