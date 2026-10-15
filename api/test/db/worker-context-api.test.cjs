@@ -99,11 +99,11 @@ async function connect(user, token = FAKE_TOKEN) {
   const authorization = await github.authorize(user.memberId);
   await github.connect(user.memberId, 'SYNTHETIC_CODE', authorization.state);
 }
-async function analysis(user, consent = undefined) {
+async function analysis(user, consent = undefined, sourceMode = 'LIVE') {
   const repositoryId = 'synthetic-context-repository', scopeRevision = randomUUID();
   const scope = consent ?? { wholeRepository: true, repositoryId, scopeRevision, fixture: true };
   const request = await db.transaction(manager => insertInitialAnalysis(manager, { memberId: user.memberId,
-    repositoryId, scopeRevision, noticeRevision: 'synthetic-notice', consentedScope: scope, sourceMode: 'LIVE' }));
+    repositoryId, scopeRevision, noticeRevision: 'synthetic-notice', consentedScope: scope, sourceMode }));
   fixtures.set(request.currentAttemptId, { requestId: request.requestId, memberId: user.memberId, repositoryId,
     scopeRevision, consent: scope });
   return request;
@@ -129,6 +129,38 @@ test('활성 분석의 서비스 인증 HTTP는 실제 DB 동의와 #254 자격�
     assert(result.body.credential.expiresAt.endsWith('Z'));
   }
   assert.equal(identityCalls, 2, '컨텍스트 조회당 기존 자격정보 함수 한 번만 호출');
+});
+
+for (const processing of ['QUEUED', 'RUNNING']) {
+  test(`MOCK ${processing} 시도는 선정·자격정보 조회 전에 거부한다`, async t => {
+    const user = await member(); await connect(user); const r = await analysis(user, undefined, 'MOCK');
+    await db.manager.update(AnalysisAttempt, { attemptId: r.currentAttemptId }, { processing });
+    identityCalls = 0;
+    const selected = t.mock.method(selectionSource, 'resolve');
+    const credential = t.mock.method(github, 'resolveCredential');
+    const result = await context(r.currentAttemptId);
+    unavailable(result); assertNoLeaks(result);
+    assert.equal(selected.mock.callCount(), 0);
+    assert.equal(credential.mock.callCount(), 0);
+    assert.equal(identityCalls, 0);
+  });
+}
+
+test('LIVE 자격정보 확인 중 MOCK으로 바뀐 시도는 최종 조회에서 토큰 없이 거부한다', async t => {
+  const user = await member(); await connect(user); const r = await analysis(user);
+  identityCalls = 0;
+  const selected = t.mock.method(selectionSource, 'resolve');
+  const credential = t.mock.method(github, 'resolveCredential');
+  const original = client.identity;
+  client.identity = async token => {
+    await db.manager.update(AnalysisAttempt, { attemptId: r.currentAttemptId }, { sourceMode: 'MOCK' });
+    return original(token);
+  };
+  const result = await context(r.currentAttemptId);
+  unavailable(result); assertNoLeaks(result);
+  assert.equal(identityCalls, 1);
+  assert.equal(credential.mock.callCount(), 1);
+  assert.equal(selected.mock.callCount(), 1, '최종 LIVE 검사에서 거부해 두 번째 선정 조회를 하지 않음');
 });
 
 test('키 누락/오류와 회원 두 명의 Bearer 접근은 거부하고 일반 회원 인증은 유지한다', async () => {

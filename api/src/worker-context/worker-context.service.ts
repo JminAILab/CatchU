@@ -28,6 +28,7 @@ export class WorkerContextService {
       .andWhere('request.lifecycle = :lifecycle', { lifecycle: 'ACTIVE' })
       .andWhere('request.request_state = :requestState', { requestState: 'ACCEPTED' })
       .andWhere('attempt.processing IN (:...processing)', { processing: ['QUEUED', 'RUNNING'] })
+      .andWhere('attempt.source_mode = :sourceMode', { sourceMode: 'LIVE' })
       .andWhere('member.account_state = :accountState', { accountState: 'ACTIVE' })
       .andWhere('consent.accepted = true');
     // GitHub 호출 후 짧은 최종 확인 중 종결/회원 비활성화가 끼어들지 않게 한다.

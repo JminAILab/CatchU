@@ -62,7 +62,7 @@ externalAccountId는 정밀도 손실 없는 양의 십진 문자열이다. expi
 | 키 없음 | 401 AUTH_REQUIRED |
 | 틀린 키·형식 오류·회원 Authorization 포함 | 401 AUTH_INVALID |
 | 추가 query/body | 400 INVALID_REQUEST |
-| 잘못된/없는 attemptId, 지난 시도, 닫힌 요청, QUEUED/RUNNING이 아닌 상태 | 404 RESOURCE_UNAVAILABLE |
+| 잘못된/없는 attemptId, 지난 시도, 닫힌 요청, MOCK 시도, QUEUED/RUNNING이 아닌 상태 | 404 RESOURCE_UNAVAILABLE |
 | 비활성 회원, 불일치/미확인 동의·선정, 사용 불가 GitHub 자격정보 | 404 RESOURCE_UNAVAILABLE |
 | DB·선정 공급자·GitHub 일시 장애 | 500 INTERNAL_ERROR |
 
@@ -70,7 +70,7 @@ externalAccountId는 정밀도 손실 없는 양의 십진 문자열이다. expi
 
 ## 유효성 재확인
 
-현재 요청의 ACTIVE·ACCEPTED, 현재 시도의 QUEUED/RUNNING, 활성 회원, accepted 동의의 requestId·memberId·repositoryId 일치를 하나의 DB 조회에서 확인한다. 처리 시한으로 FAILED가 된 시도와 UNCERTAIN은 인계하지 않는다. 이 경로가 자체 처리 시한이나 상태 전이를 새로 정의하지는 않는다.
+현재 요청의 ACTIVE·ACCEPTED, 현재 시도의 LIVE·QUEUED/RUNNING, 활성 회원, accepted 동의의 requestId·memberId·repositoryId 일치를 하나의 DB 조회에서 확인한다. MOCK은 선정·자격정보 공급자를 호출하기 전에 거부하며, 외부 확인 뒤의 최종 잠금 조회에서도 LIVE를 다시 확인해 조회 중 MOCK으로 바뀐 시도에 토큰을 인계하지 않는다. 처리 시한으로 FAILED가 된 시도와 UNCERTAIN은 인계하지 않는다. 이 경로가 자체 처리 시한이나 상태 전이를 새로 정의하지는 않는다.
 
 선정을 확인한 뒤 **GitHubConnectionService.resolveCredential(memberId)만 한 번 호출**한다. 이 함수가 실제 보관·만료·GitHub 신원/권한·해제·재연결을 확인한다. 외부 확인이 끝나면 API가 분석·회원·동의·선정을 다시 확인해 도중 종결·비활성화·선정 변경의 인계를 막는다. 이 함수 직전의 연결 참조는 불투명한 비교값으로만 보관하고, 두 번째 선정 확인이 끝난 뒤 같은 트랜잭션에서 GitHub 연결 행을 읽기 잠금으로 확인한다. 연결 상태·참조·계정이 달라졌으면 같은 GitHub 계정으로 재연결했더라도 이전 토큰을 반환하지 않는다. 연결 참조로 토큰을 직접 읽거나 해석하지 않는다. 이미 worker에 인계한 토큰을 이후 로컬 해제만으로 회수하지는 못하며 이 경계는 기존 GitHub 연결 기능과 같다.
 
@@ -84,4 +84,4 @@ npm run typecheck
 npm test -- test/worker-context-auth.test.cjs test/db/worker-context-api.test.cjs
 ```
 
-시험은 실제 Nest HTTP·PostgreSQL·암호문 보관과 기존 자격정보 함수를 사용한다. GitHub 응답과 선정 공급자만 합성 대역이다. 활성 시도·키/JWT 거부·일반 회원의 유효/폐기/만료 세션·회원 두 명·동의/선정 불일치·지난/종결 시도·만료/해제/재연결·외부 확인 중 종결 경쟁·자격정보 조회가 끝난 뒤 최종 선정 확인 대기 중 해제/동일 계정 재연결 경쟁·오류/로그 비노출을 검사한다. 실제 GitHub 승인·실제 #252 선정 공급·운영 내부 네트워크 검증을 대신하지 않는다. `npm test`가 두 파일을 자동 탐색한다.
+시험은 실제 Nest HTTP·PostgreSQL·암호문 보관과 기존 자격정보 함수를 사용한다. GitHub 응답과 선정 공급자만 합성 대역이다. LIVE 활성 시도·MOCK의 선정/자격정보 조회 전 거부·조회 중 LIVE→MOCK 전환·키/JWT 거부·일반 회원의 유효/폐기/만료 세션·회원 두 명·동의/선정 불일치·지난/종결 시도·만료/해제/재연결·외부 확인 중 종결 경쟁·자격정보 조회가 끝난 뒤 최종 선정 확인 대기 중 해제/동일 계정 재연결 경쟁·오류/로그 비노출을 검사한다. 실제 GitHub 승인·실제 #252 선정 공급·운영 내부 네트워크 검증을 대신하지 않는다. `npm test`가 두 파일을 자동 탐색한다.
