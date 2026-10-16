@@ -328,7 +328,7 @@ for (const [label, change] of [
   ['저장소 ID가 요청과 다름', scope => ({ ...scope, repositoryId: 'other-repository' })],
   ['자료 종류가 목록이 아님', scope => ({ ...scope, allowedResourceTypes: 'COMMIT' })],
   ['계약에 없는 자료 종류', scope => ({ ...scope, allowedResourceTypes: ['COMMIT', 'WIKI'] })],
-  ['판본 칸 없음', ({ revision, ...scope }) => scope],
+  ['판본 칸 없음', scope => Object.fromEntries(Object.entries(scope).filter(([key]) => key !== 'revision'))],
 ]) {
   test(`동의 범위 JSON의 ${label}이면 SCOPE_UNVERIFIED로 조회 전에 거부한다`, async t => {
     const user = await member(); await connect(user); const r = await analysis(user, change); identityCalls = 0;
