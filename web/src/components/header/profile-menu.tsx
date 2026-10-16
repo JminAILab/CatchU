@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
+import { authScreenMessages } from "@/lib/auth-screen-messages";
 import { routes } from "@/lib/routes";
 import styles from "./header.module.css";
 
@@ -11,6 +12,8 @@ type ProfileMenuProps = {
    * 없으면 '연결 전'으로 표시하고 아무 동작도 하지 않는다(초점은 받아 보조기기가 읽을 수 있다).
    */
   onLogout?: () => void;
+  /** 로그아웃 진행 중이면 [로그아웃]을 막고 진행을 표시한다(#287). 주지 않으면 기존과 같다. */
+  logoutPending?: boolean;
 };
 
 /**
@@ -20,7 +23,7 @@ type ProfileMenuProps = {
  * - Esc로 닫으면 [프로필] 버튼으로 초점을 돌린다.
  * - 바깥 클릭은 메뉴만 닫는다. 누른 요소의 동작과 초점은 막거나 옮기지 않는다.
  */
-export function ProfileMenu({ onLogout }: ProfileMenuProps) {
+export function ProfileMenu({ onLogout, logoutPending = false }: ProfileMenuProps) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -67,8 +70,8 @@ export function ProfileMenu({ onLogout }: ProfileMenuProps) {
             프로필 보기
           </Link>
           {onLogout ? (
-            <button type="button" className={styles.profileMenuItem} onClick={onLogout}>
-              로그아웃
+            <button type="button" className={styles.profileMenuItem} onClick={onLogout} disabled={logoutPending} aria-busy={logoutPending}>
+              {logoutPending ? authScreenMessages.logoutPending : "로그아웃"}
             </button>
           ) : (
             <button type="button" className={styles.profileMenuItemPending} aria-disabled="true">

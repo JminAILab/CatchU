@@ -10,6 +10,8 @@ import styles from "./header.module.css";
 
 type MemberHeaderProps = {
   onLogout?: () => void;
+  /** 로그아웃 진행 중 표시(#287). 프로필 메뉴의 [로그아웃]을 막는다. */
+  logoutPending?: boolean;
 };
 
 const navItems = [
@@ -23,7 +25,7 @@ const navItems = [
  * 오른쪽: 알림(비활성, 클릭 시 안내창) · 프로필
  * 대표 구성 진입점은 10월에 두지 않는다.
  */
-export function MemberHeader({ onLogout }: MemberHeaderProps) {
+export function MemberHeader({ onLogout, logoutPending }: MemberHeaderProps) {
   const pathname = usePathname();
   const [noticeOpen, setNoticeOpen] = useState(false);
 
@@ -54,7 +56,7 @@ export function MemberHeader({ onLogout }: MemberHeaderProps) {
           <button type="button" className={styles.inactiveItem} aria-haspopup="dialog" onClick={() => setNoticeOpen(true)}>
             알림<span className="visually-hidden"> (개발 중)</span>
           </button>
-          <ProfileMenu onLogout={onLogout} />
+          <ProfileMenu onLogout={onLogout} logoutPending={logoutPending} />
         </div>
       </div>
       <NoticeDialog open={noticeOpen} onClose={() => setNoticeOpen(false)} />
