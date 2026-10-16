@@ -13,7 +13,8 @@ import type { ShareCreateInput } from './share-create';
  *   원문을 알아낼 수 있어서다. 같은 키로 다시 보낸 비밀번호는 저장된 검증값(scrypt)으로 비교한다.
  *
  * 주의: 비밀번호만 다른 요청도 지문은 같다. 지문 일치만 보고 기존 응답을 돌려주면 안 된다.
- * 같은 키 재요청은 반드시 "기존 멱등 기록과 연결된 링크 조회 → isSameShareCreate() → 같으면 기존 응답, 다르면 409" 순서로 처리한다.
+ * 같은 키 재요청은 반드시 "기존 멱등 기록과 연결된 링크 조회 → isSameShareCreate()(또는 matchStoredShareCreate()와
+ * 잠금 밖의 verifyPendingPassword()) → 같으면 기존 응답, 다르면 409" 순서로 처리한다.
  */
 
 const FINGERPRINT_VERSION = 1;
@@ -35,18 +36,44 @@ export interface StoredShareCreate {
   passwordVerifier: string | null;
 }
 
+/** 비밀번호까지 같은지 확인하려고 남긴 비교 대상. 잠금을 놓은 뒤 `verifyLinkPassword`로 비교한다. */
+export interface PendingPasswordCheck {
+  password: string;
+  verifier: string;
+}
+
+export type StoredShareCreateMatch =
+  | { same: false }
+  | { same: true; passwordCheck: PendingPasswordCheck | null };
+
 /**
- * 같은 키로 다시 온 요청이 처음 요청과 같은 본문인지 판정한다.
- * true면 기존 링크를 200으로 돌려주고, false면 409로 거절한다.
+ * 본문 지문과 비밀번호 설정 여부까지만 판정한다. 해시를 계산하지 않으므로 키 잠금 안에서 불러도 CPU·메모리를 오래 쓰지 않는다.
+ * `same: true`이고 `passwordCheck`가 있으면 호출한 쪽이 반드시 그 값을 비교해야 같은 본문으로 볼 수 있다.
+ * 비교 대상은 이 호출이 읽은 저장값이므로, 비교를 잠금 밖으로 옮겨도 판정 대상이 바뀌지 않는다.
  */
-export async function isSameShareCreate(input: ShareCreateInput, stored: StoredShareCreate): Promise<boolean> {
-  if (shareCreateFingerprint(input) !== stored.requestFingerprint) return false;
+export function matchStoredShareCreate(input: ShareCreateInput, stored: StoredShareCreate): StoredShareCreateMatch {
+  if (shareCreateFingerprint(input) !== stored.requestFingerprint) return { same: false };
   const passwordSet = typeof input.password === 'string';
   // 지문에 비밀번호 설정 여부가 들어 있으므로, 여기서 설정 여부가 어긋나면 기록과 링크가 맞지 않는 서버 자료 오류다.
   // 사용자에게 409로 알리지 않고 서버 오류(500)로 올린다.
   if (passwordSet !== (stored.passwordVerifier !== null)) {
     throw new Error('idempotency record and share link are inconsistent');
   }
-  if (!passwordSet) return true;
-  return verifyLinkPassword(input.password as string, stored.passwordVerifier as string);
+  if (!passwordSet) return { same: true, passwordCheck: null };
+  return { same: true, passwordCheck: { password: input.password as string, verifier: stored.passwordVerifier as string } };
+}
+
+/** 비교 대상이 있으면 비밀번호가 같을 때만 true다. 대상이 없으면(비밀번호 없는 링크) true다. */
+export async function verifyPendingPassword(check: PendingPasswordCheck | null): Promise<boolean> {
+  return check === null ? true : verifyLinkPassword(check.password, check.verifier);
+}
+
+/**
+ * 같은 키로 다시 온 요청이 처음 요청과 같은 본문인지 판정한다.
+ * true면 기존 링크를 200으로 돌려주고, false면 409로 거절한다.
+ * 비밀번호 해시 비교를 이 함수 안에서 한다. 키 잠금 안에서는 `matchStoredShareCreate`를 쓰고 비교는 잠금 밖에서 한다.
+ */
+export async function isSameShareCreate(input: ShareCreateInput, stored: StoredShareCreate): Promise<boolean> {
+  const match = matchStoredShareCreate(input, stored);
+  return match.same && verifyPendingPassword(match.passwordCheck);
 }
