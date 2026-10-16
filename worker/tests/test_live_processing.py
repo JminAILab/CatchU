@@ -8,7 +8,7 @@ import gc
 import json
 import logging
 import weakref
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -23,12 +23,17 @@ from live_synthetic import (
     Parts,
     live_message,
     live_payload,
+    live_settings,
     no_github_assembly,
 )
 
 from app.collection.credentials import CredentialLookupError
+from app.collection.transport import HttpsTransport
+from app.consumer import child
+from app.consumer.settings import ChildSettings, Limits
 from app.contract import Verdict, check_message
 from app.generation import run_generation
+from app.generation.claude import ClaudeProvider
 from app.processing import ExecutionUnknown, Finished, Uncertain
 from app.processing import live as live_module
 from app.processing.live import LiveAssembly
@@ -44,6 +49,27 @@ __all__ = ["context_api"]
 
 # 결과가 요청에서 그대로 옮기는 맥락(E가 접수 기록과 대조하는 일곱 개).
 CONTEXT_KEYS = ("requestId", "attemptId", "memberId", "repositoryId", "consentId")
+# 10/15 팀장이 확정한 이유 코드별 회원 문구(계획 3.7, 질문 3). 구현 사전과 따로 둔 기대값이다.
+EXPECTED_MESSAGES = {
+    "ATTEMPT_NOT_ACTIVE": (
+        "이 분석 요청은 이미 끝났거나 새 요청으로 바뀌어 처리하지 않았습니다."
+    ),
+    "MEMBER_INACTIVE": "회원 상태를 확인할 수 없어 분석하지 않았습니다.",
+    "SCOPE_UNVERIFIED": (
+        "동의한 저장소 범위를 확인하지 못해 분석하지 않았습니다. 다시 동의한 뒤 요청해 주세요."
+    ),
+    "GITHUB_NOT_CONNECTED": (
+        "GitHub 연결이 없어 분석하지 않았습니다. GitHub를 연결한 뒤 다시 요청해 주세요."
+    ),
+    "GITHUB_REAUTH_REQUIRED": (
+        "GitHub 연결을 다시 확인해야 해서 분석하지 않았습니다."
+        " GitHub를 다시 연결한 뒤 요청해 주세요."
+    ),
+    "REQUEST_CONTEXT_UNRESOLVED": "분석 요청 정보를 확인하지 못해 분석하지 않았습니다.",
+    "REQUEST_CONTEXT_UNAVAILABLE": (
+        "분석 요청 정보를 잠시 확인하지 못해 분석하지 않았습니다. 잠시 후 다시 요청해 주세요."
+    ),
+}
 
 
 @dataclass
@@ -163,7 +189,7 @@ def assert_unresolved(
         {
             "stage": "COLLECTION",
             "code": reason.value,
-            "message": FAILURE_MESSAGES[reason],
+            "message": EXPECTED_MESSAGES[reason.value],
         }
     ]
     # 진행 알림 없이 결과 하나. 수집·생성은 일어나지 않는다(부품이 막는다).
@@ -197,18 +223,12 @@ def test_not_found_reason_sends_one_failed_result_without_events(
     assert context_api.requests == 1
 
 
-def test_member_text_is_polite_and_says_what_to_do() -> None:
-    """회원 화면에 그대로 나가는 문구다(10/15 결정 질문 3: 회원용 존댓말, 다음 행동)."""
-    assert len(FAILURE_MESSAGES) == len(UnresolvedReason)
-    for reason, text in FAILURE_MESSAGES.items():
-        assert "분석하지 않았습니다." in text or "처리하지 않았습니다." in text, reason
-    for reason in (
-        UnresolvedReason.SCOPE_UNVERIFIED,
-        UnresolvedReason.GITHUB_NOT_CONNECTED,
-        UnresolvedReason.GITHUB_REAUTH_REQUIRED,
-        UnresolvedReason.REQUEST_CONTEXT_UNAVAILABLE,
-    ):
-        assert "요청해 주세요" in FAILURE_MESSAGES[reason], reason
+def test_member_text_is_exactly_the_decided_wording() -> None:
+    """회원 화면에 그대로 나가는 문구다. 이유 코드 일곱 개와 문구가 확정본과 글자 단위로 같다."""
+    assert {reason.value: text for reason, text in FAILURE_MESSAGES.items()} == (
+        EXPECTED_MESSAGES
+    )
+    assert {reason.value for reason in UnresolvedReason} == set(EXPECTED_MESSAGES)
 
 
 def _closed_port() -> int:
@@ -386,3 +406,74 @@ def test_live_without_settings_is_refused_before_lookup(context_api: ApiReply) -
 
     assert ran.outcome == Refused(RefusalReason.LIVE_NOT_CONFIGURED, ("/sourceMode",))
     assert ran.events == [] and context_api.requests == 0
+
+
+# 운영 조립: 자식이 기동 설정으로 만드는 부품 ----------------------------------------------------
+
+
+def _child_settings(base_url: str, limits: Limits) -> ChildSettings:
+    return ChildSettings(
+        environment="test",
+        mock_enabled=False,
+        mock_scenario="succeeded-one-candidate",
+        limits=limits,
+        live=live_settings(base_url),
+    )
+
+
+def test_child_assembly_uses_total_limit_minus_margin_as_generation_deadline(
+    context_api: ApiReply, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """운영 조립(`child.live_assembly`)이 생성 마감을 총 상한 − 여유로 넘긴다(계획 3.2).
+
+    두 값을 기본값과 다르게 두어 여유를 빼지 않는 회귀를 잡는다.
+    """
+    default = child.live_assembly(_child_settings(context_api.base_url, Limits()))
+    assert default is not None
+    assert default.generation_budget == timedelta(minutes=20) - timedelta(seconds=60)
+
+    built = child.live_assembly(
+        _child_settings(
+            context_api.base_url, replace(Limits(), total=1000, generation_margin=37)
+        )
+    )
+    assert built is not None
+    assert built.open_transport is HttpsTransport
+    context_api.payload = live_payload()
+    deadlines: list[datetime] = []
+    original = run_generation
+
+    def recording(*args: Any, **kwargs: Any) -> Any:
+        deadlines.append(kwargs["deadline"])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(live_module, "run_generation", recording)
+    parts = Parts(ONE_PULL)
+    # 조회 클라이언트와 마감은 운영 조립 그대로, GitHub·제공자만 합성으로 바꾼다.
+    live = replace(
+        built,
+        open_transport=parts.open_transport,
+        provider_factory=parts.make_provider,
+    )
+
+    ran = run_live(live_message(), live, clock=parts.clock)
+
+    assert result_of(ran)["outcome"] == "SUCCEEDED"
+    assert deadlines == [START + timedelta(seconds=963)]
+    assert context_api.requests == 1
+
+
+def test_child_assembly_makes_the_claude_provider_only_when_asked(
+    context_api: ApiReply,
+) -> None:
+    built = child.live_assembly(_child_settings(context_api.base_url, Limits()))
+    assert built is not None
+    # 부품을 만드는 것만으로는 제공자를 만들지 않는다(후보가 있을 때 생성 흐름이 부른다).
+    provider = built.provider_factory()
+    assert isinstance(provider, ClaudeProvider)
+    assert (
+        child.live_assembly(
+            replace(_child_settings(context_api.base_url, Limits()), live=None)
+        )
+        is None
+    )
