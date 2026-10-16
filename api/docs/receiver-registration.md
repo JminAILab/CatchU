@@ -40,7 +40,7 @@ const outcome = await service.receiveResult(message, async receipt => {
 - 명시적인 `confirmedSourceState`·`observationProvenance` 객체와 유효한 `observedAt`
 - 확인된 `appliedRestriction` (`NONE` 또는 `SOURCE_PRIVATE`)
 
-공급자 조회는 반영 트랜잭션 밖에서 수행한다. 공급 부재·조회 실패·맥락 불일치·관측 근거 부재는 `NONE`이나 열람 준비 완료로 보정하지 않는다. 후보가 있는 결과는 기존 B의 `CATCH_NOT_READY` 분류로 반영 실패 처리한다. 이전 유효 관측은 실패로 덮어쓰지 않는다. 명시적 새 공개 관측도 기존 `SOURCE_PRIVATE` 제한을 자동 해제하지 않는다([보호 업무 규칙](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md)).
+공급자 조회는 반영 트랜잭션 밖에서 수행한다. 공급 부재·조회 실패·맥락 불일치·관측 근거 부재는 `NONE`이나 열람 준비 완료로 보정하지 않는다. 후보가 있는 결과는 기존 B의 `CATCH_NOT_READY` 분류로 반영 실패 처리한다. 이전 유효 관측은 실패로 덮어쓰지 않는다. 명시적 새 공개 관측도 기존 `SOURCE_PRIVATE` 제한을 자동 해제하지 않는다([보호 업무 규칙](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md)). [10/15 요청](https://github.com/JminAILab/CatchU/issues/105#issuecomment-6189230335)에 따라 기존 `SOURCE_PRIVATE` 기록은 제한뿐 아니라 확인 상태·출처·시각도 새 공급값(10월 ‘관측 안 함’ `NONE` 포함)으로 바꾸지 않는다. 기록이 없으면 공급값으로 새로 만들고, 기존 `NONE` 기록은 공급값으로 갱신한다. 어느 경우든 보호 행을 잠근 뒤 B 등록·E 완료와 같은 트랜잭션에서 처리한다.
 
 [10/4 팀장 조건](https://github.com/JminAILab/CatchU/issues/105#issuecomment-5975854918)에 따라 LIVE 후보의 모든 근거 주소는 공급자가 확인한 `https://github.com/<owner>/<repo>/`로 시작해야 한다. 파싱된 origin·정규화된 경로도 대조해 위장 호스트·다른 저장소·상위 경로 이동을 거부한다. 주소를 조회하거나 redirect를 따르지 않는다. 주소 불일치는 기존 B의 `INVALID_INPUT / evidence.sourceUrl` 분류다. MOCK의 `example.invalid` 합성 주소에는 이 대조를 적용하지 않는다.
 
@@ -54,7 +54,7 @@ const outcome = await service.receiveResult(message, async receipt => {
 
 ## 검사와 한계
 
-`api/`에서 전용 `_test` DB를 지정한 뒤 `npm test -- test/integration/receiver-registration.test.cjs` 또는 `npm test`를 실행한다. 실제 #104/E/B 마이그레이션·수신 어댑터·B 등록·E 완료/실패 서비스를 사용한다. 정상 등록·0건·부분 실패·실패, 동일 결과 재전달·동시 수신, 동일 작업 두 후보, 수신/반영 커밋 실패·전체 롤백·수신 보존·실패 기록 오류·LIVE 주소 대조를 검사한다.
+`api/`에서 전용 `_test` DB를 지정한 뒤 `npm test -- test/integration/receiver-registration.test.cjs` 또는 `npm test`를 실행한다. 실제 #104/E/B 마이그레이션·수신 어댑터·B 등록·E 완료/실패 서비스를 사용한다. 정상 등록·0건·부분 실패·실패, 동일 결과 재전달·동시 수신, 동일 작업 두 후보, 수신/반영 커밋 실패·전체 롤백·수신 보존·실패 기록 오류·LIVE 주소 대조를 검사한다. ‘관측 안 함’ `NONE`과 같은 모양의 합성 공급으로 기존 `SOURCE_PRIVATE`의 제한·근거 보존, 신규 `NONE` 기록 생성, 근거 저장 실패 시 보호 기록(신규·기존 `NONE`·기존 `SOURCE_PRIVATE`)·Catch·완료의 전체 롤백도 검사한다.
 
 추가 동시성 검사는 실제 공개 서비스와 수신·반영 서비스를 호출하고, Catch 잠금 → 보호 관측 잠금 → 공개의 보호 잠금 대기를 `pg_blocking_pids`로 확인한 뒤 반영을 진행한다. 동일 작업의 기존 Catch 재사용과 PUBLIC 전환이 모두 커밋되고 같은 Catch ID·기존 본문·근거를 유지하며 새 시도는 APPLIED/CLOSED인지 검사한다. 기존 공개/숨김·보호 변경 경쟁·저장 실패·전체 롤백 검사는 전체 API 검사에 포함된다.
 

@@ -36,13 +36,16 @@ export class RepositoryRegistrationPort implements RegistrationPort {
         confirmedSourceState: observation.confirmedSourceState,
         observationProvenance: observation.observationProvenance,
         observedAt: observation.observedAt, observationFailure: () => 'NULL',
-        // 원본 재공개 후 자동 보호 해제는 보류다. 새 관측으로 기존 제한을 풀지 않는다.
-        appliedRestriction: previous?.appliedRestriction === 'SOURCE_PRIVATE' ? 'SOURCE_PRIVATE' as const : observation.appliedRestriction,
+        appliedRestriction: observation.appliedRestriction,
       };
-      if (previous) await manager.update(RepositoryProtectionEntity, { protectionId: previous.protectionId }, values);
-      else await manager.insert(RepositoryProtectionEntity, {
+      if (!previous) await manager.insert(RepositoryProtectionEntity, {
         protectionId: randomUUID(), ownerId: input.ownerId, repositoryId: this.repositoryId, ...values,
       });
+      // 기존 SOURCE_PRIVATE는 제한과 그 근거(상태·출처·시각)를 그대로 둔다. 10월 '관측 안 함' NONE이나
+      // 원본 재공개 관측으로 덮지 않으며, 자동 보호 해제·재관측 갱신은 보류다. 행 잠금은 위에서 이미 잡았다.
+      else if (previous.appliedRestriction !== 'SOURCE_PRIVATE') {
+        await manager.update(RepositoryProtectionEntity, { protectionId: previous.protectionId }, values);
+      }
     }
     return registerCandidates(manager, input);
   }
