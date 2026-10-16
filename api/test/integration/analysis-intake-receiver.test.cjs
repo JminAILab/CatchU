@@ -1,8 +1,8 @@
 require('reflect-metadata');
 // #139: #138의 실제 접수 API가 DB에 저장한 요청·동의·시도를 개발용 주입(DevAnalysisInjection)과 수신 처리에 연결한다.
 // 요청·동의·시도는 직접 넣지 않고 실제 HTTP 접수(POST /v1/analysis-requests)로 만든다. #103 공용 합성 세트
-// (worker/fixtures/m1-synthetic)의 사례 목록을 그대로 따른다. worker·큐·GitHub는 연결하지 않으며 보호 관측은
-// 명시적 합성 대역이다. 시험용 조립(주입 컨트롤러·관측 대역)은 이 파일 안에서만 만들고 제품 AppModule에 등록하지 않는다.
+// (worker/fixtures/m1-synthetic)의 사례 목록을 그대로 따른다. worker·큐·GitHub는 연결하지 않는다.
+// 보호 기록에는 실제 10월 정책 공급자를 쓰고 좌표는 합성 저장소 어댑터로 공급한다. 제품 앱에는 이 시험 조립을 등록하지 않는다.
 const assert = require('node:assert/strict');
 const { randomBytes, randomUUID } = require('node:crypto');
 const { readFileSync } = require('node:fs');
@@ -18,6 +18,9 @@ const { configureApp } = require('../../dist/app.setup');
 const { CurrentMemberId } = require('../../dist/auth/auth.decorators');
 const { AnalysisReceiverModule } = require('../../dist/analysis-receiver/analysis-receiver.module');
 const { DevAnalysisInjection } = require('../../dist/analysis-receiver/dev-analysis-injection');
+const { DatabaseReceiverStore } = require('../../dist/analysis-receiver/database-receiver.store');
+const { OctoberRepositoryObservationSource } = require('../../dist/analysis-receiver/october-repository-observation.source');
+const { PublicCatchStore } = require('../../dist/catches/public-catch-store');
 const { SYNTHETIC_REPOSITORY } = require('../../dist/member-analysis/dev-member.service');
 
 const FIXTURES = resolve(__dirname, '../../../worker/fixtures/m1-synthetic');
@@ -36,20 +39,23 @@ CurrentMemberId()(InjectionProbe.prototype, 'inject', 0);
 Param('requestId')(InjectionProbe.prototype, 'inject', 1);
 Body()(InjectionProbe.prototype, 'inject', 2);
 
-// 보호 관측은 실제 GitHub 조회가 아니라 접수 맥락에서 만든 합성 대역이다.
-const observations = { observe: async context => ({
-  ownerId: context.memberId, repositoryId: context.repositoryId,
-  githubRepository: { owner: 'synthetic-owner', name: 'synthetic-repo' },
-  confirmedSourceState: { synthetic: true, visibility: 'PUBLIC' },
-  observationProvenance: { synthetic: true, provider: 'test' },
-  observedAt: new Date(), appliedRestriction: 'NONE' }) };
+// 시험용 좌표 어댑터: 접수 정본을 DB에서 읽고 #104 합성 저장소만 매핑한다.
+// LIVE 좌표를 임의로 만들거나 #252의 실제 제공자 구현으로 취급하지 않는다.
+const observations = new OctoberRepositoryObservationSource({
+  findForRegistration: context => new DatabaseReceiverStore(db).withRequest(context.requestId, async tx => {
+    const stored = tx.snapshot?.context;
+    if (!stored || stored.sourceMode !== 'MOCK' || stored.repositoryId !== SYNTHETIC_REPOSITORY.repositoryId ||
+      stored.scopeRevision !== SYNTHETIC_REPOSITORY.allowedScopeRevision) return null;
+    return { ...stored, githubRepository: { owner: SYNTHETIC_REPOSITORY.ownerLogin, name: SYNTHETIC_REPOSITORY.name } };
+  }),
+});
 
 let db;
 before(async () => { db = await openTestDataSource(); });
 after(async () => { await db?.destroy(); });
 beforeEach(async () => { await resetTestDatabase(db); });
 
-async function start(t, { injection = true } = {}) {
+async function start(t, { injection = true, protection = observations } = {}) {
   const settings = { NODE_ENV: 'test', DEV_LOGIN_ENABLED: 'true',
     DEV_ANALYSIS_INJECTION_ENABLED: injection ? 'true' : undefined,
     AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
@@ -71,7 +77,7 @@ async function start(t, { injection = true } = {}) {
     }
   });
   class TestModule {}
-  Module({ imports: [AppModule, AnalysisReceiverModule.registerDatabase({ contractDirectory: CONTRACT_DIR, observations })],
+  Module({ imports: [AppModule, AnalysisReceiverModule.registerDatabase({ contractDirectory: CONTRACT_DIR, observations: protection })],
     controllers: [InjectionProbe] })(TestModule);
   app = await configureApp(await NestFactory.create(TestModule, { logger, abortOnError: false }));
   await app.listen(0, '127.0.0.1');
@@ -379,4 +385,80 @@ test('개발 주입을 켜지 않으면 접수한 요청에도 주입하지 못�
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: '{}' });
     assert.equal(response.status, 404, path);
   }
+});
+
+test('10월 정책으로 실제 접수·Catch 저장·본인 조회·확인·공개·숨김을 연결한다', async t => {
+  const s = await start(t);
+  const { user, requestId, intake } = await accepted(s, 'october-policy');
+  const result = await s.inject(user, requestId, 'Result', read('results/succeeded-one-candidate.json'), 'october-policy');
+  assert.equal(result.status, 201, result.text);
+  assert.equal(result.body.receipt.disposition, 'ACCEPTED');
+  const [catchId] = result.body.application.registeredCatchIds;
+  const [protection] = await db.query('SELECT * FROM repository_protection');
+  assert.equal(protection.applied_restriction, 'NONE');
+  assert.deepEqual(protection.confirmed_source_state, { observation: 'NOT_OBSERVED', sourceMode: 'MOCK' });
+  assert.equal(protection.observation_provenance.description, '10월 관측 안 함(9/28 결정)');
+  assert.equal(protection.observation_provenance.requestId, requestId);
+  assert.ok(Number.isFinite(protection.observed_at.getTime()));
+  const auth = { Authorization: 'Bearer ' + user.token };
+  const detailPath = '/v1/catches/' + catchId;
+  const detail = await s.call(detailPath, { headers: auth });
+  assert.equal(detail.status, 200);
+  assert.equal((await detail.json()).visibility, 'PRIVATE');
+  const list = await s.call('/v1/catches?repositoryId=' + encodeURIComponent(SYNTHETIC_REPOSITORY.repositoryId), { headers: auth });
+  assert.deepEqual((await list.json()).items.map(item => item.catchId), [catchId]);
+  const other = await s.login('october-other');
+  assert.equal((await s.call(detailPath, { headers: { Authorization: 'Bearer ' + other.token } })).status, 404);
+  const publicCatches = new PublicCatchStore(db);
+  assert.deepEqual((await publicCatches.list(user.memberId, {})).catches, []);
+  const put = (suffix, body) => s.call(detailPath + suffix, { method: 'PUT',
+    headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await put('/visibility', { visibility: 'PUBLIC' })).status, 409);
+  const confirmed = await put('/confirmation', { workFactsConfirmed: true, contributionConfirmed: true });
+  assert.equal(confirmed.status, 200);
+  assert.equal((await confirmed.json()).visibility, 'PRIVATE');
+  assert.deepEqual((await publicCatches.list(user.memberId, {})).catches, []);
+  assert.equal((await put('/visibility', { visibility: 'PUBLIC' })).status, 200);
+  assert.equal((await publicCatches.get(user.memberId, catchId)).catchId, catchId);
+  assert.equal((await put('/visibility', { visibility: 'PRIVATE' })).status, 200);
+  assert.deepEqual((await publicCatches.list(user.memberId, {})).catches, []);
+  assert.equal((await s.status(user, intake)).application, 'APPLIED');
+  const repeated = await s.inject(user, requestId, 'Result', read('results/succeeded-one-candidate.json'), 'october-policy');
+  assert.equal(repeated.body.receipt.disposition, 'DUPLICATE');
+  assert.equal((await counts()).catches, 1);
+  assert.deepEqual(await db.query('SELECT * FROM repository_protection'), [protection]);
+});
+
+for (const [label, findForRegistration] of [
+  ['좌표 없음', async () => null],
+  ['다른 시도', async context => ({ ...context, attemptId: randomUUID(), githubRepository: { owner: 'synthetic', name: 'repo' } })],
+  ['조회 실패', async () => { throw Error('synthetic-secret-coordinate-error'); }],
+]) {
+  test(`10월 공급자 ${label}: 실제 수신은 남기고 Catch·보호 기록 없이 반영 실패`, async t => {
+    const s = await start(t, { protection: new OctoberRepositoryObservationSource({ findForRegistration }) });
+    const { user, requestId, intake } = await accepted(s, label);
+    const response = await s.inject(user, requestId, 'Result', read('results/succeeded-one-candidate.json'), label);
+    assert.equal(response.status, 500, response.text);
+    assert.equal(response.body.code, 'INTERNAL_ERROR');
+    assert.equal((await s.status(user, intake)).application, 'APPLY_FAILED');
+    assert.equal((await counts()).receipts, 1);
+    assert.equal((await counts()).catches, 0);
+    assert.deepEqual(await db.query('SELECT * FROM repository_protection'), []);
+    assert.equal((response.text + s.logs.join('\n')).includes('synthetic-secret-coordinate-error'), false);
+  });
+}
+
+test('10월 정책 저장 후 Catch 근거 저장이 실패하면 같은 반영 트랜잭션을 모두 되돌린다', async t => {
+  const s = await start(t);
+  const { user, requestId, intake } = await accepted(s, 'october-rollback');
+  await db.query('ALTER TABLE catch_evidence ADD CONSTRAINT test_october_fail CHECK (false) NOT VALID');
+  let response;
+  try { response = await s.inject(user, requestId, 'Result', read('results/succeeded-one-candidate.json'), 'october-rollback'); }
+  finally { await db.query('ALTER TABLE catch_evidence DROP CONSTRAINT test_october_fail'); }
+  assert.equal(response.status, 500, response.text);
+  assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, receipts: 1, catches: 0, registrations: 0 });
+  assert.deepEqual(await db.query('SELECT * FROM repository_protection'), []);
+  const status = await s.status(user, intake);
+  assert.equal(status.application, 'APPLY_FAILED');
+  assert.equal(status.ownerResultsReady, false);
 });

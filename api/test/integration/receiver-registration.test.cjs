@@ -470,3 +470,28 @@ test('실제 HTTP/Auth/DB/E/B 조립: 인증·소유권, 정상·중복·저장 
     assert.equal((logs.join('\n') + body).includes(value), false);
   }
 });
+
+test('LIVE 처리 종결 뒤 같은 시도의 합성 좌표로 10월 정책을 공급해 실제 Catch를 저장한다', async () => {
+  const { OctoberRepositoryObservationSource } = require('../../dist/analysis-receiver/october-repository-observation.source');
+  const result = await prepare(undefined, { sourceMode: 'LIVE' });
+  const lookups = [];
+  const observations = new OctoberRepositoryObservationSource({
+    // #252의 실제 저장 자료 대신 DB 접수 맥락과 명시적인 합성 좌표를 제공하는 시험 어댑터.
+    findForRegistration: context => new DatabaseReceiverStore(db).withRequest(context.requestId, async tx => {
+      assert.ok(tx.snapshot);
+      lookups.push(tx.snapshot.processing);
+      return { ...tx.snapshot.context, githubRepository: { owner: 'synthetic-owner', name: 'synthetic-repo' } };
+    }),
+  });
+  const output = await receive(pipeline(context => observations.observe(context)).service, result);
+  assert.deepEqual(lookups, ['SUCCEEDED'], '실행 중 전용 조회로는 수신 후 좌표를 공급할 수 없다');
+  assert.equal(output.application.ownerResultsReady, true);
+  assert.equal((await state(result)).application, 'APPLIED');
+  const [asset] = await db.query('SELECT * FROM catch_asset');
+  assert.equal(asset.source_mode, 'LIVE');
+  assert.equal(asset.visibility, 'PRIVATE');
+  const [protection] = await db.query('SELECT * FROM repository_protection');
+  assert.deepEqual(protection.confirmed_source_state, { observation: 'NOT_OBSERVED', sourceMode: 'LIVE' });
+  assert.equal(protection.applied_restriction, 'NONE');
+  assert.equal((await new OwnerCatchStore(db).get(result.memberId, asset.catch_id)).catchId, asset.catch_id);
+});

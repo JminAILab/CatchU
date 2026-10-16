@@ -44,6 +44,8 @@ const outcome = await service.receiveResult(message, async receipt => {
 
 [10/4 팀장 조건](https://github.com/JminAILab/CatchU/issues/105#issuecomment-5975854918)에 따라 LIVE 후보의 모든 근거 주소는 공급자가 확인한 `https://github.com/<owner>/<repo>/`로 시작해야 한다. 파싱된 origin·정규화된 경로도 대조해 위장 호스트·다른 저장소·상위 경로 이동을 거부한다. 주소를 조회하거나 redirect를 따르지 않는다. 주소 불일치는 기존 B의 `INVALID_INPUT / evidence.sourceUrl` 분류다. MOCK의 `example.invalid` 합성 주소에는 이 대조를 적용하지 않는다.
 
+10월에는 [10월 정책 공급자](october-registration-policy.md)를 명시적으로 연결할 수 있다. 이 공급자는 GitHub를 조회하지 않고 ‘관측 안 함’ 출처와 NONE을 반환한다. 공급 실패를 NONE으로 보정하는 것이 아니며, 최초 PRIVATE와 별도 공개 선택은 그대로다. 실제 좌표 제공·기존 비공개 근거 보존·LIVE 주소 대조·앱 활성화의 남은 조건은 해당 문서에서 확인한다.
+
 ## 실제 공급과 후속 경계
 
 [#231 실제 GitHub 연동](https://github.com/JminAILab/CatchU/issues/231)은 회원 ID로 계정·토큰·만료 시각을 공급할 접점, [#232 worker 요청 정보 조회](https://github.com/JminAILab/CatchU/issues/232)는 저장소 좌표·동의 범위를 조회할 접점을 정의한다. 현재 dev에는 이 실제 공급 코드가 없다. worker의 `CredentialResolver`·`SelectionResolver`는 확인 로직과 인터페이스이며 API의 보호 관측 공급자가 아니다. #104 개발 연동도 합성 계정만 제공한다.
