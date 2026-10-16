@@ -1,5 +1,6 @@
 # 개발 서버 자동 배포(#313). main에 반영된 판본을 arm64로 빌드·검사해 ECR에 올리고 개발 서버(#304)에서 교체한다.
 # 수동 실행(Run workflow)은 main에서만 되고, 커밋을 넣으면 그 main 커밋을 다시 배포한다(되돌리기). 이미 올린 판본이면 빌드·검사를 건너뛴다.
+# 배포 도구(deploy/dev-server/cd/)는 늘 지금 main 판본을 쓰고, 이미지·compose·교체 스크립트만 배포할 커밋에서 가져온다.
 # AWS 권한은 OIDC로 받는다. 역할은 environment dev-server(배포 브랜치 main만)에서 돈 실행만 믿으며, 저장소에 AWS 키를 두지 않는다.
 # 배포는 한 번에 하나만 돈다. 진행 중에 main push가 여러 번 오면 기다리는 실행은 가장 나중 것 하나만 남는다.
 # 절차·끄는 법·되돌리기는 deploy/dev-server/README.md 「자동 배포」, 단계별 스크립트는 deploy/dev-server/cd/.
@@ -56,17 +57,26 @@ jobs:
           printf 'commit=%s\ntag=main-%s\n' "$commit" "${commit:0:12}" >> "$GITHUB_OUTPUT"
           printf '### 배포 대상\n\n- 커밋: `%s`\n- 이미지 태그: `main-%s`\n' "$commit" "${commit:0:12}" >> "$GITHUB_STEP_SUMMARY"
 
+      # 작업 폴더는 이 실행의 main 판본(배포 도구). 배포할 커밋은 아래에서 따로 꺼낸다.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
-          ref: ${{ steps.target.outputs.commit }}
 
-      - name: main 이력의 커밋인지 확인
+      - name: 배포할 커밋 꺼내기
+        id: src
         env:
           COMMIT: ${{ steps.target.outputs.commit }}
         run: |
           git merge-base --is-ancestor "$COMMIT" origin/main || { echo "::error::${COMMIT}는 main 이력에 없다"; exit 1; }
+          if [ "$(git rev-parse HEAD)" = "$COMMIT" ]; then
+            dir=$GITHUB_WORKSPACE
+          else
+            dir=$RUNNER_TEMP/src
+            git worktree add --detach "$dir" "$COMMIT"
+          fi
+          printf 'dir=%s\ntools=%s\n' "$dir" "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          printf -- '- 배포 도구 판본: `%s`\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: AWS 권한 받기(올린 판본 조회)
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
@@ -80,16 +90,21 @@ jobs:
         id: plan
         env:
           TAG: ${{ steps.target.outputs.tag }}
+          TOOLS_COMMIT: ${{ steps.src.outputs.tools }}
         run: bash deploy/dev-server/cd/ci-images.sh plan
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        if: steps.plan.outputs.build == 'true'
+        if: steps.plan.outputs.build_apps == 'true'
         with:
           node-version-file: web/.node-version
 
+      # 검사는 배포할 커밋의 검사 스크립트로 그 커밋의 소스를 본다.
       - name: 이미지 검사(arm64)
-        if: steps.plan.outputs.build == 'true'
-        run: node deploy/scripts/check-images.mjs
+        if: steps.plan.outputs.build_apps == 'true'
+        working-directory: ${{ steps.src.outputs.dir }}
+        run: |
+          [ -f deploy/scripts/check-images.mjs ] || { echo "::error::이 커밋에는 이미지 검사가 없어 배포할 수 없다"; exit 1; }
+          node deploy/scripts/check-images.mjs
 
       # 검사가 길어 처음 받은 권한(1시간)이 끝날 수 있으므로 올리기 전에 다시 받는다.
       - name: AWS 권한 다시 받기(올리기·배포)
@@ -105,6 +120,8 @@ jobs:
         env:
           TAG: ${{ steps.target.outputs.tag }}
           COMMIT: ${{ steps.target.outputs.commit }}
+          TOOLS_COMMIT: ${{ steps.src.outputs.tools }}
+          SRC_DIR: ${{ steps.src.outputs.dir }}
         run: bash deploy/dev-server/cd/ci-images.sh push
 
       - name: 개발 서버 교체

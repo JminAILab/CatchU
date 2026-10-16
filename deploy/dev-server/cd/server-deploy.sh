@@ -4,11 +4,12 @@
 #   1) 네 이미지를 digest로 받고 arm64인지, web 공개 주소 표식이 이 서버 도메인인지 확인한다
 #   2) 배포 파일 폴더를 새 묶음으로 바꾸고(이전 것은 deploy-src.prev-<시각>), compose.env의 이미지 값을 바꾼다(이전 파일은 env-backup)
 #   3) replace-single.sh --local-db --migrate 로 교체한다. 자동 재시도·자동 되돌리기는 하지 않는다
-#   4) Caddy를 새 폴더의 Caddyfile로 다시 띄운다(인증서는 보관 볼륨에서 다시 쓴다)
+#   4) Caddy를 새 폴더의 Caddyfile로 다시 띄우고, 새로 만들어져 돌고 있는지 본다(인증서는 보관 볼륨에서 다시 쓴다)
 #   5) 서버 안 확인: 실행 이미지가 compose.env와 같음, health, 앞단 첫 화면, 프록시 주소, 앱 계정 잠금 대기 상한
 #   6) /opt/catchu/deploy-history.log에 한 줄 남긴다
 # 1에서 멈추면 서버의 실행 중 판본은 바뀌지 않는다. 출력은 환경 폴더의 비밀값을 가린다(redact.py).
-# 종료 코드: 0 완료, 2 입력·준비 실패(바꾼 것 없음), 3 교체 실패(replace-single.sh의 종료 코드를 출력에 적는다), 4 교체 뒤 확인 실패
+# 종료 코드: 0 완료, 2 입력·준비 실패(바꾼 것 없음), 3 교체 실패(replace-single.sh의 종료 코드를 출력에 적는다),
+#           4 교체 뒤 확인 실패(Caddy를 새로 띄우지 못함 포함)
 set -uo pipefail
 
 BASE=/opt/catchu
@@ -64,7 +65,8 @@ main() {
   [ "$base" = "https://${domain}" ] || { echo "멈춤: web 공개 주소 표식이 ${base}다(기대 https://${domain})"; return 2; }
 
   echo "== 2. 배포 파일·compose.env 바꾸기"
-  local stamp prev
+  local stamp prev started
+  started=$(date -u +%s)
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
   prev=$SRC.prev-$stamp
   mv "$SRC" "$prev" || { echo "멈춤: 배포 파일 폴더를 옮기지 못했다"; return 2; }
@@ -93,7 +95,19 @@ main() {
 
   echo "== 4. 앞단 다시 띄우기"
   # 폴더를 바꿨으므로 이미 뜬 Caddy는 옛 폴더의 Caddyfile을 붙들고 있다. 앱 교체 결과와 상관없이 새 폴더로 다시 붙인다.
-  docker compose --env-file "$envf" -f deploy/dev-server/compose.caddy.yaml up -d --force-recreate 2>&1 | tail -1
+  local cout crc caddy_ok=true running created
+  cout=$(docker compose --env-file "$envf" -f deploy/dev-server/compose.caddy.yaml up -d --force-recreate 2>&1)
+  crc=$?
+  tail -3 <<< "$cout"
+  # 명령이 실패해도 옛 Caddy가 그대로 돌면 바깥 확인은 통과할 수 있으므로, 이번 배포 중에 새로 만들어져 돌고 있는지 본다.
+  read -r running created <<< "$(docker inspect catchu-dev-caddy --format '{{.State.Running}} {{.Created}}' 2>/dev/null)"
+  if [ "$crc" -ne 0 ]; then
+    echo "실패 Caddy 다시 띄우기 종료 코드 ${crc}"; caddy_ok=false
+  elif [ "$running" != true ] || [ "$(date -u -d "$created" +%s 2>/dev/null || echo 0)" -lt "$started" ]; then
+    echo "실패 Caddy가 새로 만들어져 돌고 있지 않다(실행 ${running:-?}, 생성 ${created:-?})"; caddy_ok=false
+  else
+    echo "통과 Caddy 새 설정으로 다시 띄움"
+  fi
   # 이전 폴더는 방금 것 하나만 남긴다(되돌리기는 이전 커밋 재배포로 하므로 폴더는 확인용이다).
   ls -d "$SRC".prev-* 2>/dev/null | sort | head -n -1 | xargs -r rm -rf
 
@@ -101,6 +115,7 @@ main() {
   if [ "$rc" -ne 0 ]; then
     result=3
   else
+    [ "$caddy_ok" = true ] || result=4
     echo "== 5. 서버 안 확인"
     local c want got code gw cidr lock
     for c in api:CATCHU_API_IMAGE worker:CATCHU_WORKER_IMAGE web:CATCHU_WEB_IMAGE; do
