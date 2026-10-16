@@ -1,6 +1,6 @@
 # 개발 서버(서버 한 대)
 
-12월 전 개발 단계에 AWS 서버 한 대로 web·api·worker와 DB를 띄워, 실제 https 주소에서 화면과 api를 시험하는 방법이다. 로그인·GitHub·LLM 같은 실제 연결은 켜는 데 필요한 것이 남아 있다(아래 「개발 단계라 받아들이는 한계」). 2026-10-15 팀장 결정으로 지금은 이 구성으로 운영하고, 11월 중순~말에 EKS로 옮긴다([#276](https://github.com/JminAILab/CatchU/issues/276)). 사람이 실행하는 수동 절차이며 자동 배포가 아니다.
+12월 전 개발 단계에 AWS 서버 한 대로 web·api·worker와 DB를 띄워, 실제 https 주소에서 화면과 api를 시험하는 방법이다. 로그인·GitHub·LLM 같은 실제 연결은 켜는 데 필요한 것이 남아 있다(아래 「개발 단계라 받아들이는 한계」). 2026-10-15 팀장 결정으로 지금은 이 구성으로 운영하고, 11월 중순~말에 EKS로 옮긴다([#276](https://github.com/JminAILab/CatchU/issues/276)). 이 문서는 사람이 실행하는 수동 절차다. `main` 반영 때 같은 절차를 자동으로 하는 방법은 [cd/README.md](cd/README.md)에 있다.
 
 앱 실행·교체·migration·검사는 [deploy/README.md](../README.md)의 한 호스트 실행을 그대로 쓴다. 이 문서는 그 위에 더하는 것만 적는다.
 
