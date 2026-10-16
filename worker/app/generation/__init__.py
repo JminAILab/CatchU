@@ -2,8 +2,8 @@
 
 후보 판정(#118) 결과와 같은 수집 결과를 받아 후보마다 제공자 비종속 생성 호출로 설명 초안·질문·제목을
 채운다. 제공자는 `GenerationProvider` Protocol로 주입한다. 실제 제공자 어댑터(`app.generation.claude`)는
-SDK를 불러오므로 여기서 다시 내보내지 않고, 만드는 쪽에서 직접 불러온다. 처리 순서
-(`app.processing.pipeline`)와 큐·E 전달 연결은 #121이다. 규칙과 상한은 `worker/docs/generation.md`에 있다.
+SDK를 불러오므로 여기서 다시 내보내지 않고, 만드는 쪽(큐 소비자 자식, `app.consumer.child`)에서 직접 불러온다.
+처리 순서 연결은 #121의 `app.processing.live`다. 규칙과 상한은 `worker/docs/generation.md`에 있다.
 """
 
 from app.generation.flow import GenerationReport, GenerationRun, run_generation
