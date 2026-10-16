@@ -12,7 +12,7 @@ api가 대기 중인 분석 시도를 큐(BullMQ)로 worker에 보내고, worker
 
 모듈은 안에서 실제 수신·등록 조립(`AnalysisReceiverModule.registerDatabase`)을 한 번 불러온다. 같은 앱에서 그 조립을 따로 또 부르지 않는다.
 
-**`AppModule`에는 등록하지 않았다.** 받기는 보호 관측 공급자가 있어야 도는데, 실제 공급자는 [#105](https://github.com/JminAILab/CatchU/issues/105)(E/B)가 맡는다. 10월에는 실제 관측 대신 "10월 관측 안 함(정책 NONE)"을 명시하는 공급자로 풀기로 했다(10/15 보호 결정). 그 공급자가 준비되면 별도 작업에서 다음을 한다: `AppModule`에 이 모듈 등록, `main.ts`에서 `listen` 뒤 `app.get(AnalysisQueueRunner).start()` 호출, 배포 설정에 큐 주소 추가. 그때 `registerDatabase`가 개발 주입(`DevAnalysisInjection`)도 함께 들여오므로 "제품 AppModule에 주입 제공자 없음"을 보는 기존 시험과 맞춰야 한다.
+**`AppModule`에는 등록하지 않았다.** 받기는 보호 관측 공급자가 있어야 도는데, 실제 공급자는 [#105](https://github.com/JminAILab/CatchU/issues/105)(E/B)가 맡는다. 10월에는 실제 관측 대신 "10월 관측 안 함(정책 NONE)"을 명시하는 공급자로 풀기로 했다(10/15 보호 결정). 그 공급자가 준비되면 별도 작업에서 다음을 한다: `AppModule`에 이 모듈 등록, `main.ts`에서 `listen` 뒤 `app.get(AnalysisQueueRunner).start(onFailure)` 호출(`onFailure`는 받기가 멈췄을 때 앱을 닫고 종료 코드 1로 끝낸다. 아래 「수명주기」), 배포 설정에 큐 주소 추가. 그때 `registerDatabase`가 개발 주입(`DevAnalysisInjection`)도 함께 들여오므로 "제품 AppModule에 주입 제공자 없음"을 보는 기존 시험과 맞춰야 한다.
 
 연결은 `start()`에서 연다. 조립과 Nest 초기화만으로는 큐 서버에 붙지 않는다.
 
@@ -75,6 +75,7 @@ MOCK·LIVE를 거르지 않는다. 받을지는 worker가 정한다(지금 worke
 - 받기를 시작하지 않았으면(처리 중 작업이 없음) 또는 받기 연결이 끊겨 다시 붙는 중이면(완료 기록을 남길 수 없음) 기다리지 않고 닫는다. 끊긴 연결에서 BullMQ의 일반 닫기는 끝나지 않기 때문이다.
 - 상한은 기다리기를 그만둘 뿐 진행 중인 DB 조회나 처리 함수(보호 관측 조회 등)를 취소하지 않는다. 실제 서버는 종료 훅이 끝나면 Nest가 프로세스를 끝내고, 그때 처리 중이던 결과 작업은 정체 처리로 실패하며 요청은 처리 시한으로 닫힌다(10/6 결정 범위).
 - 큐 서버가 끊기면 ioredis가 다시 붙는다. 다시 붙는 동안 보내기는 회차를 건너뛰고, 받기는 다시 붙은 뒤 이어서 소비한다.
+- 멈추는 중이 아닌데 받기가 멈추면(첫 준비 실패, 받기 실행이 끝나거나 실패함) 받기를 다시 시작하지 않는다. `ANALYSIS_QUEUE_CONSUMER_STOPPED`를 남기고 위 멈춤 순서로 보내기까지 멈춘 뒤 `start(onFailure)`의 `onFailure`를 부른다. 받기 없이 보내기만 돌면 결과를 받지 못한 요청이 처리 시한으로 닫히기 때문이다. 상태 확인(`/health`)은 이 실행기를 보지 않으므로, 켤 때 진입점이 `onFailure`에서 앱을 닫고 종료 코드 1로 끝내 실행 환경이 다시 띄우게 한다(worker 소비자와 같은 방식, [worker 큐 소비자](../../worker/docs/queue-consumer.md)). 큐 서버에 처음 붙지 못하는 동안은 준비를 기다릴 뿐 실패로 보지 않는다.
 
 ## 설정
 
@@ -99,7 +100,7 @@ MOCK·LIVE를 거르지 않는다. 받을지는 worker가 정한다(지금 worke
 | `RESULT_APPLICATION_FAILED` | warn | `jobId`. 수신은 됐고 반영이 실패함 |
 | `WORKER_MESSAGE_FAILED` | error | `jobName`·`jobId`·`code`. 작업을 실패로 끝냄 |
 | `ANALYSIS_QUEUE_ERROR` / `ANALYSIS_QUEUE_CONNECTED` | warn / log | 출처(`REQUEST_CONNECTION`·`CONSUMER_CONNECTION`·`REQUEST_QUEUE`·`CONSUMER`)·오류 이름. 같은 출처에서 같은 오류가 연달아 나면 한 번만 남긴다(다른 오류가 끼면 다시 남긴다). 원본 연결이 다시 붙으면 그 연결과 그 연결을 쓰는 큐·받기의 기록 상태를 비우고, 오류 뒤였으면 `CONNECTED`를 남긴다. 받기 내부 대기용 연결만 다시 붙을 때는 비우지 않는다 |
-| `ANALYSIS_QUEUE_SHUTDOWN_TIMEOUT` / `ANALYSIS_QUEUE_CONSUMER_STOPPED` / `PERIODIC_TASK_FAILED` | error | 종료 단계 상한 초과 / 받기 실행이 예상 밖으로 끝남 / 보내기 한 번 전체의 실패(예: 조회 DB 오류) |
+| `ANALYSIS_QUEUE_SHUTDOWN_TIMEOUT` / `ANALYSIS_QUEUE_CONSUMER_STOPPED` / `PERIODIC_TASK_FAILED` | error | 종료 단계 상한 초과 / 받기가 예상 밖으로 멈춤(`error`: 오류 이름, 오류 없이 끝나면 `RUN_ENDED`). 이어서 실행기 전체를 멈춘다 / 보내기 한 번 전체의 실패(예: 조회 DB 오류) |
 
 ## 시험
 
@@ -116,7 +117,7 @@ CATCHU_TEST_REDIS_URL=redis://127.0.0.1:6380 npm test
 | `test/analysis-queue/versions.test.cjs` | api `package.json`·잠금 파일·설치본, 키트 `package.json`·잠금 파일, bullmq가 불러오는 ioredis까지 같은 판본 |
 | `test/integration/analysis-queue-dispatch.test.cjs` | 실제 DB와 메모리 큐: 실제 접수 API 행과 보낸 메시지 대조·DB 불변, 넣기 전 검사, 보내지 않는 상태, 60분 경계, 101번째 시도, 연결 준비 전·명령 상한·실패, 겹침·멈춤, 멈춤 뒤 넣기 없음 |
 | `test/integration/analysis-queue-consumer.test.cjs` | 실제 DB와 처리 함수: 받음·실행 중·실행 불명, 결과·수신 확인 스키마, 중복, 작업 ID 불일치, 알림 없는 실패 결과, 닫힌 요청, 반영 실패·실패 기록 실패·커밋 실패, 식별 불가, 비밀 표지 비노출 |
-| `test/integration/analysis-queue-valkey.test.cjs` | 실제 Valkey: 같은 시도의 작업 하나(대기·완료·실패 보관), Redis에서 다시 읽은 옵션, 보관 정리(점수를 90분·130분 전으로 옮김), worker 형식 알림·결과 왕복과 반환값, 처리 중 종료와 종료 상한, 시작 전에 쌓인 결과를 처리하는 중의 종료, TCP 중계를 끊어 만든 재접속 중 종료, 요청 테이블 잠금으로 멎은 보내기 조회 중 종료, AppModule에 실행기 없음, 큐 서버 없음, 오류 기록 억제(내부 객체에 합성 사건을 보내는 배선 시험이며 실제 재접속 검증이 아님) |
+| `test/integration/analysis-queue-valkey.test.cjs` | 실제 Valkey: 같은 시도의 작업 하나(대기·완료·실패 보관), Redis에서 다시 읽은 옵션, 보관 정리(점수를 90분·130분 전으로 옮김), worker 형식 알림·결과 왕복과 반환값, 처리 중 종료와 종료 상한, 시작 전에 쌓인 결과를 처리하는 중의 종료, TCP 중계를 끊어 만든 재접속 중 종료, 요청 테이블 잠금으로 멎은 보내기 조회 중 종료, 받기 실행이 예상 밖으로 끝나면 보내기까지 멈추고 `onFailure` 호출, AppModule에 실행기 없음, 큐 서버 없음, 오류 기록 억제(내부 객체에 합성 사건을 보내는 배선 시험이며 실제 재접속 검증이 아님) |
 
 worker 쪽은 시험 대역이다(요청 작업은 시험용 BullMQ Worker가 끝내고 알림·결과는 worker와 같은 이름·ID·옵션으로 직접 넣는다). 보호 관측은 합성 대역이다.
 

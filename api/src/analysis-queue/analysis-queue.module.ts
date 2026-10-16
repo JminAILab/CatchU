@@ -72,8 +72,11 @@ export class AnalysisQueueRunner implements OnModuleDestroy {
     this.logger = options.logger ?? new Logger('AnalysisQueue');
   }
 
-  /** 연결을 열고 받기와 5초 주기 보내기를 시작한다. 실제 서버 진입점에서만 부른다. 두 번째 호출은 아무것도 하지 않는다. */
-  start(): void {
+  /**
+   * 연결을 열고 받기와 5초 주기 보내기를 시작한다. 실제 서버 진입점에서만 부른다. 두 번째 호출은 아무것도 하지 않는다.
+   * 받기가 예상 밖으로 멈추면 다시 시작하지 않고 실행기 전체를 멈춘 뒤 onFailure를 부른다(진입점이 앱을 닫고 실패 종료하는 데 쓴다).
+   */
+  start(onFailure?: () => void): void {
     if (this.state !== 'idle') return;
     this.state = 'running';
     const { redisUrl, prefix } = this.options.config;
@@ -104,14 +107,18 @@ export class AnalysisQueueRunner implements OnModuleDestroy {
     this.worker = worker;
     // 받기는 주 연결과 대기용 연결이 모두 준비된 뒤 시작한다. BullMQ는 준비 사건 전에도 주 연결로 작업을 가져올 수 있어,
     // 먼저 시작하면 "시작 전에는 처리 중 작업이 없다"는 종료 판단이 틀린다. 받기 실행은 멈출 때까지 끝나지 않으므로 기다리지 않는다.
-    const stopped = (error: unknown) => {
-      if (this.state === 'running') this.logger.error({ event: 'ANALYSIS_QUEUE_CONSUMER_STOPPED', error: errorName(error) });
+    // 멈추는 중이 아닌데 준비가 실패하거나 받기 실행이 끝나면, 받기 없이 보내기만 돌아 결과를 못 받은 요청이 처리 시한으로 닫히므로
+    // 보내기까지 멈춘다. 다시 띄우는 것은 실행 환경의 몫이다(worker 소비자와 같음).
+    const stopped = (reason: string) => {
+      if (this.state !== 'running') return;
+      this.logger.error({ event: 'ANALYSIS_QUEUE_CONSUMER_STOPPED', error: reason });
+      void this.stop().then(onFailure);
     };
     worker.waitUntilReady().then(() => {
       if (this.state !== 'running') return;
       this.consumerStarted = true;
-      worker.run().catch(stopped);
-    }, stopped);
+      worker.run().then(() => stopped('RUN_ENDED'), error => stopped(errorName(error)));
+    }, error => stopped(errorName(error)));
 
     this.task = new PeriodicTask({
       name: 'analysis-dispatch',

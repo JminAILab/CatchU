@@ -445,6 +445,25 @@ test('큐 서버가 끊겨 다시 붙으려는 중에 멈추면 받기를 기다
   assert.deepEqual(shutdownTimeouts(lines, 'CONSUMER'), [], 'BullMQ 일반 닫기에 매달리지 않는다');
 });
 
+test('받기 실행이 예상 밖으로 끝나면 다시 시작하지 않고 보내기까지 멈춘 뒤 onFailure를 한 번 부른다', { skip }, async t => {
+  const { runner, lines, requests } = directRunner(t);
+  let failures = 0;
+  runner.start(() => { failures += 1; });
+  await within(runner.waitUntilReady(), '큐 연결 준비');
+  await waitFor(() => runner.worker.isRunning(), '받기 시작');
+  // 받기 실행이 끝나는 경우를 만든다(시험에서만 내부 객체를 닫는다).
+  await within(runner.worker.close(), '받기 닫기');
+  await waitFor(() => failures === 1, 'onFailure 호출');
+  assert.deepEqual(lines.filter(line => line.event === 'ANALYSIS_QUEUE_CONSUMER_STOPPED').map(line => line.error), ['RUN_ENDED']);
+  assert.equal(runner.worker.isRunning(), false);
+  // 멈춘 뒤에는 보낼 대기 시도가 있어도 넣지 않는다.
+  const row = await insertAttempt(db);
+  assert.equal((await runner.dispatchOnce()).enqueued, 0);
+  assert.equal(await requests.getJob(row.attemptId), undefined);
+  await runner.stop();
+  assert.equal(failures, 1);
+});
+
 test('보내기의 DB 조회가 멎어도 종료는 보내기 상한까지만 기다리고 다음 단계로 간다', { skip }, async t => {
   const { runner, lines } = directRunner(t, { limits: { dispatchStopTimeoutMs: 500 } });
   const holder = db.createQueryRunner();
