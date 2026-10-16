@@ -62,6 +62,22 @@ function StatusBadges({ item }: { item: CatchAsset }) {
   );
 }
 
+function hasGeneratedDraft(item: CatchAsset) {
+  return item.draft.status === "GENERATED" && item.draft.content !== null && item.draft.content.trim().length > 0;
+}
+
+function GeneratedContentNotice({ item }: { item?: CatchAsset }) {
+  const hasTitle = !item || item.title !== null;
+  const hasDraft = !item || hasGeneratedDraft(item);
+  const subject = hasTitle ? (hasDraft ? "제목과 설명" : "제목") : hasDraft ? "설명" : null;
+  return (
+    <p className={styles.readOnlyNotice}>
+      {subject && <>{subject}은 CatchU가 GitHub 기록에서 자동으로 만들었습니다<br /></>}
+      사실과 다르면 불일치를 표시하거나 공개하지 마세요.
+    </p>
+  );
+}
+
 function StateMessage({ title, children, retry }: {
   title: string;
   children: ReactNode;
@@ -129,6 +145,7 @@ export function AssetsView(props: AssetsViewProps) {
               </label>
             </div>
 
+            <GeneratedContentNotice />
             {props.repositoryNotice}
             {listState === "loading" ? (
               <StateMessage title="Catch를 불러오고 있습니다">목록을 확인하고 있어요. 잠시만 기다려 주세요.</StateMessage>
@@ -217,6 +234,7 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
           <p className={styles.repository}>{repositoryName ?? "저장소 정보 없음"}</p>
           {item.title !== null && <h3 className={styles.detailTitle}>{item.title}</h3>}
           <StatusBadges item={item} />
+          <GeneratedContentNotice item={item} />
           <p className={styles.readOnlyNotice}>{dataMode === "preview" ? "예시 자료입니다. 확인·불일치·공개 설정은 바뀌지 않습니다." : item.sourceMode === "MOCK" ? "합성 자료로 생성된 Catch입니다. 실제 분석 결과와 구분해 확인해 주세요." : "확인과 공개 선택은 별도입니다."}</p>
           <section className={styles.detailSection}><h3>작업에서 확인된 사실</h3>
             {item.workFacts.length ? <ul>{item.workFacts.map((fact, index) => <li key={index}>{fact}</li>)}</ul> : <p>제공된 작업 사실이 없습니다.</p>}
@@ -236,7 +254,7 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
             ))}
           </section>
           <section className={styles.detailSection}><h3>Catch 설명 초안</h3>
-            {item.draft.status === "GENERATED" && item.draft.content !== null ? <p className={styles.draft}>{item.draft.content}</p>
+            {hasGeneratedDraft(item) ? <p className={styles.draft}>{item.draft.content}</p>
               : <p>{item.draft.status === "FAILED" ? "설명 초안을 생성하지 못했습니다. 위의 사실과 근거는 확인할 수 있습니다." : "생성된 설명 초안이 없습니다."}</p>}
           </section>
           <section className={styles.detailSection}><h3>생각해 볼 질문 <span className={styles.small}>본인만 확인</span></h3>

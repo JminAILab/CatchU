@@ -20,7 +20,7 @@ export const previewCatches: readonly CatchAsset[] = [
       "입력값 오류와 처리 중 오류를 서로 다른 응답으로 구분했다.",
       "두 오류 응답의 코드와 메시지를 확인하는 검사를 추가했다.",
     ],
-    subjectContribution: "오류 응답 분기와 해당 분기를 확인하는 검사 코드를 작성했다.",
+    subjectContribution: "연동 계정이 작성자로 기록된 변경에는 오류 응답 분기와 해당 분기를 확인하는 검사 코드가 포함됩니다.",
     evidence: [
       {
         catchEvidenceId: "synthetic-evidence-api-errors",
@@ -65,7 +65,7 @@ export const previewCatches: readonly CatchAsset[] = [
     sourceResultId: "synthetic-result-api",
     sourceCandidateId: "synthetic-candidate-api-pagination",
     workFacts: ["목록 응답에 다음 페이지 식별자를 포함했다.", "마지막 페이지에서 다음 식별자가 없는 경우를 검사했다."],
-    subjectContribution: "다음 페이지 식별자를 만드는 로직과 마지막 페이지 검사를 작성했다.",
+    subjectContribution: "연동 계정이 작성자로 기록된 변경에는 다음 페이지 식별자를 만드는 로직과 마지막 페이지 검사가 포함됩니다.",
     evidence: [
       {
         catchEvidenceId: "synthetic-evidence-api-pagination",
@@ -98,7 +98,7 @@ export const previewCatches: readonly CatchAsset[] = [
     sourceResultId: "synthetic-result-web",
     sourceCandidateId: "synthetic-candidate-web-loading",
     workFacts: ["조회 대기 중에는 로딩 안내를 표시했다.", "조회 성공 후 결과가 없을 때만 빈 목록 안내를 표시했다."],
-    subjectContribution: "조회 상태별 표시 조건과 로딩·빈 목록 안내 컴포넌트를 작성했다.",
+    subjectContribution: "연동 계정이 작성자로 기록된 변경에는 조회 상태별 표시 조건과 로딩·빈 목록 안내 컴포넌트가 포함됩니다.",
     evidence: [
       {
         catchEvidenceId: "synthetic-evidence-web-loading",
@@ -130,7 +130,7 @@ export const previewCatches: readonly CatchAsset[] = [
     sourceResultId: "synthetic-result-web",
     sourceCandidateId: "synthetic-candidate-web-form",
     workFacts: ["입력 오류를 해당 항목 아래에 표시했다.", "오류가 나도 이미 입력한 값을 화면에 유지했다."],
-    subjectContribution: "입력 항목별 오류 메시지와 입력값 유지 처리를 작성했다.",
+    subjectContribution: "연동 계정이 작성자로 기록된 변경에는 입력 항목별 오류 메시지와 입력값 유지 처리가 포함됩니다.",
     evidence: [
       {
         catchEvidenceId: "synthetic-evidence-web-form",
