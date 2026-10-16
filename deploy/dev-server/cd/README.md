@@ -78,6 +78,20 @@ Actions 화면에서 `deploy-dev-server`를 `main`으로 Run workflow하고, 되
 | 바깥 확인 | 새 판본이 떠 있음 | 앞단·DNS·인증서를 본다 |
 | 기다리는 시간 초과 | 서버에서 계속 돌 수 있음 | 서버의 `deploy-history.log`와 컨테이너 상태를 본 뒤 다시 실행한다 |
 
+## 검사
+
+`ci-images.sh`(이미지 단계)를 바꾸면 회귀 시험을 돌린다.
+
+```bash
+bash deploy/dev-server/cd/ci-images.test.sh
+```
+
+- aws·docker를 합성 응답으로 바꾸고, 합성 git 저장소에서 plan·push를 실제로 실행한다. 확인하는 것은 판본 조회, 이미 올린 태그 다시 쓰기와 새로 빌드해 올리기, manifest 판정, 묶음의 판본 나누기다.
+  - manifest 판정: 실행 이미지는 받고, in-toto 증명 문서·층이 모자란 것·이미지 설정이 아닌 문서는 거부한다. 최소 층 수는 앱 2, 묶음 1이다.
+- 실제 ECR·SSM·서버·Docker에는 닿지 않는다. 그래서 OIDC 권한 받기, arm64 빌드, 실제 manifest 응답, 서버 교체는 확인하지 못한다. 이것들은 첫 실제 배포에서 확인한다.
+- GitHub Actions `images` 워크플로의 `cd-scripts` job이 같은 명령을 쓴다. `main`으로 가는 배포 PR과 수동 실행에서 돈다. `deploy/`를 바꾼 dev PR은 병합 전에 그 브랜치로 수동 실행한다([배포 안내 「검사」](../../README.md#검사)).
+- 셸 정적 검사(`bash -n`·shellcheck)는 셸 안의 Python 코드를 검사하지 못한다. 그래서 이 시험이 판정 코드를 실제로 실행한다.
+
 ## 끄는 법과 수동 절차와의 관계
 
 - 끄기: Actions 화면에서 `deploy-dev-server` 워크플로를 Disable한다(`gh workflow disable deploy-dev-server`). 다시 켜면 그다음 `main` push부터 돈다.

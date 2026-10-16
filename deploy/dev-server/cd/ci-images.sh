@@ -67,7 +67,8 @@ config = m["config"]["mediaType"]
 layers = m["layers"]
 in_toto = any("in-toto" in layer["mediaType"] for layer in layers)
 ok = ("image.config" in config or "container.image" in config) and not in_toto and len(layers) >= min_layers
-print(f"{name}: 층 {len(layers)}개 -> {\"실행 이미지\" if ok else \"이상\"}")
+verdict = "실행 이미지" if ok else "이상"
+print(f"{name}: 층 {len(layers)}개 -> {verdict}")
 sys.exit(0 if ok else 1)
 ' "$repo" "$min_layers"
 }
