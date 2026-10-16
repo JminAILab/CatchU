@@ -12,6 +12,7 @@ import { authRuntime } from "./auth-runtime";
  *
  * 공통 인증(#286) 통합 시험 전환(`auth-integration.ts`)이 켜졌을 때만 회원 API·개발 로그인을 공통 인증으로 보낸다.
  * 이때 보내지 않은 요청·이전 세션 응답을 조회 실패로 바꾸는 변환(`toClientResult`)은 각 기능 화면 담당 확인(P2·P5) 전이라 통합 시험에만 쓴다.
+ * 변경 요청 결과의 원래 구분은 `memberMutationOutcome()`(auth-api.ts)으로 읽는다. 전환을 끈 기존 호출에서는 언제나 `other`다.
  */
 const legacyApi = createApiClient({
   baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL,

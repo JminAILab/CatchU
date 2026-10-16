@@ -5,7 +5,8 @@ import { createAuthSession, createSessionLock } from '../src/lib/auth-session.ts
 import { createLoginMarker, LOGIN_MARKER_KEY } from '../src/lib/auth-login-marker.ts';
 import { createFetchRefreshTransport } from '../src/lib/auth-refresh.ts';
 import { createFetchLogoutTransport } from '../src/lib/auth-logout.ts';
-import { createAuthApi, memberCallBlock } from '../src/lib/auth-api.ts';
+import { createAuthApi, memberCallBlock, memberMutationOutcome, toClientResult } from '../src/lib/auth-api.ts';
+import { readProfile, saveProfileDetailed } from '../src/features/profile/profile-api.ts';
 
 const BASE = 'http://127.0.0.1:3001';
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -107,6 +108,7 @@ function fakeServer() {
     if (!member) return { response: invalid() };
     if (entry === 'GET /me') return { response: json(200, { profile: { displayName: member } }) };
     if (entry === 'POST /catches') { state.mutations += 1; return { response: json(201, { id: 'c' + state.mutations, member }) }; }
+    if (entry === 'PUT /me/profile') { state.mutations += 1; return { response: json(200, JSON.parse(init.body)) }; }
     return { response: json(404, { code: 'NOT_FOUND', message: '없음' }) };
   }
 
@@ -729,4 +731,63 @@ test('[회귀] 갱신으로 받은 Access가 이전과 같은 문자열이어도
   const post = await t.api.member('/catches', { method: 'POST', body: {} });
   assert.equal(post.authRenewal, 'renewed');
   assert.deepEqual([posts, server.count('POST /auth/refresh')], [1, 2]);
+});
+
+// ---- 변경 요청 결과 구분(#286 후속, 담당 합의 6209853081) ----
+// 기능 화면이 쓰는 경로(공통 호출 → 호환 변환 `toClientResult` → 기능 함수)를 대역 서버로 확인한다. 실제 브라우저·서버 검증이 아니다.
+
+const profile = { displayName: 'X', introduction: '', desiredRole: '', skills: [] };
+/** 통합 시험 전환을 켠 `api.member`(api.ts의 sessionApi)와 같은 변환. */
+const featureApi = (t) => ({ member: async (path, request) => toClientResult(await t.api.member(path, request)) });
+
+test('변경 요청 결과 구분: Access 갱신 성공 뒤 401 거부는 renewed-rejected이고 저장을 자동으로 다시 보내지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  server.expire(t.store.accessToken());
+  assert.equal(await saveProfileDetailed(featureApi(t), profile), 'renewed-rejected');
+  assert.deepEqual([server.count('PUT /me/profile'), server.count('POST /auth/refresh'), server.state.mutations], [1, 1, 0]);
+  assert.equal(t.store.getSnapshot().status, 'signed-in');
+  assert.equal(await saveProfileDetailed(featureApi(t), profile), 'saved', '사용자가 다시 누르면 새 Access로 보낸다');
+  assert.deepEqual([server.count('PUT /me/profile'), server.state.mutations], [2, 1]);
+});
+
+test('변경 요청 결과 구분: 갱신하지 못한 401은 기존 처리(save-failed)이고, 그 뒤 재인증 필요 상태의 요청은 not-sent다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  server.revokeAll();
+  assert.equal(await saveProfileDetailed(featureApi(t), profile), 'save-failed');
+  assert.equal(t.store.getSnapshot().status, 'reauth-required');
+  assert.equal(await saveProfileDetailed(featureApi(t), profile), 'not-sent');
+  assert.deepEqual([server.count('PUT /me/profile'), server.count('POST /auth/refresh')], [1, 1], '보내지 않은 요청은 서버에 가지 않는다');
+  assert.equal(await readProfile(featureApi(t)), null, '조회는 기존대로 조회 실패로 받는다');
+});
+
+test('변경 요청 결과 구분: 저장 응답을 기다리는 사이 다른 회원으로 로그인하면 discarded(성공·실패로 확정하지 않음)다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server, 'X');
+  const gate = server.hold('PUT /me/profile');
+  const pending = saveProfileDetailed(featureApi(t), profile);
+  await tick(); await tick();
+  assert.equal((await t.api.devLogin('Y')).kind, 'success');
+  gate.resolve();
+  assert.equal(await pending, 'discarded');
+  assert.equal(server.state.mutations, 1, '서버에는 반영됐을 수 있다');
+});
+
+test('변경 요청 결과 구분: 표시는 결과 모양을 바꾸지 않고, 전환을 끈 결과·복사된 결과·성공은 other다', () => {
+  const failed = { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' };
+  const notSent = toClientResult({ kind: 'not-sent', reason: 'reauth-required' });
+  const dropped = toClientResult({ kind: 'discarded', sent: true });
+  assert.deepEqual(notSent, failed);
+  assert.deepEqual(dropped, failed);
+  assert.notEqual(notSent, toClientResult({ kind: 'not-sent', reason: 'reauth-required' }), '결과마다 새 객체');
+  assert.equal(memberMutationOutcome(notSent), 'not-sent');
+  assert.equal(memberMutationOutcome(dropped), 'discarded');
+  assert.equal(memberMutationOutcome({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm', authRenewal: 'renewed' }), 'renewed-rejected');
+  assert.equal(memberMutationOutcome({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm', authRenewal: 'not-renewed' }), 'other');
+  assert.equal(memberMutationOutcome({ kind: 'api-error', status: 401, code: 'LINK_PASSWORD_INVALID', message: 'm', authRenewal: 'renewed' }), 'other');
+  assert.equal(memberMutationOutcome({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm' }), 'other');
+  assert.equal(memberMutationOutcome({ ...failed }), 'other');
+  assert.equal(memberMutationOutcome({ ...notSent }), 'other', '복사하면 표시가 없어져 기존 처리로 돌아간다');
+  assert.equal(memberMutationOutcome({ kind: 'success', status: 200, data: null }), 'other');
 });

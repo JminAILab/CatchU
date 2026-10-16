@@ -33,6 +33,7 @@
  * - 화면에 연결하지 않았다. `api.ts`의 전역 인스턴스 교체와 `useAuth`·`MemberGuard`·`useMemberLookup`·기능별 API 연결은 6단계다.
  *   기존 `api-client.ts`(메모리 토큰·쿠키 미사용 개발 로그인)는 그때까지 그대로 둔다.
  * - 결과에 `not-sent`·`discarded`가 더해져 기존 `ClientResult`와 다르다. 화면별 표시는 6단계에서 정하며 조회 실패로 바꾸지 않는다.
+ *   기능별 API 호환 변환(`toClientResult`) 뒤에도 변경 요청 화면은 `memberMutationOutcome()`으로 연장 뒤 거부·보내지 않음·반영하지 않음을 나눈다.
  * - Access 토큰과 응답 원문은 결과·오류·로그에 남기지 않는다.
  */
 import type { AccessTokenState, AccessTokenStore } from "./access-token.ts";
@@ -94,11 +95,40 @@ const MEMBER_AUTH_FAILURES = new Set(["AUTH_REQUIRED", "AUTH_INVALID"]);
 const LOOKUP_FAILED = { kind: "lookup-failed", status: null, code: "LOOKUP_FAILED" } as const;
 
 /**
+ * `toClientResult`가 조회 실패로 바꾼 결과의 원래 구분. 결과 객체의 모양은 바꾸지 않고 이 표에만 남긴다.
+ * 그래서 기존 호출부의 조회 처리는 그대로이고, 변경 요청 결과를 나눠야 하는 화면만 `memberMutationOutcome()`으로 읽는다.
+ * 중간에서 결과를 복사하면 표시가 없어져 기존 처리(결과 불명)로 돌아간다(안전한 쪽).
+ */
+const convertedResults = new WeakMap<object, "not-sent" | "discarded">();
+
+/**
  * 기존 `ClientResult`만 아는 호출부(기능별 API 함수)에 넘기는 변환(6단계 호환). 보내지 않음·이전 세션 응답은 조회 실패로 돌려준다.
  * 이때 화면 상태는 회원 가드가 공통 인증 상태(재인증 필요·로그아웃 보류 등)로 따로 보여 준다. 회원 조회는 이 변환을 쓰지 않는다.
+ * 원래 구분은 `memberMutationOutcome()`으로 읽을 수 있게 결과마다 새 객체로 돌려준다.
  */
 export function toClientResult(result: MemberCallResult): ClientResult {
-  return result.kind === "not-sent" || result.kind === "discarded" ? LOOKUP_FAILED : result;
+  if (result.kind !== "not-sent" && result.kind !== "discarded") return result;
+  const failed: ClientResult = { ...LOOKUP_FAILED };
+  convertedResults.set(failed, result.kind);
+  return failed;
+}
+
+/**
+ * 변경 요청(저장·발행·중단 등) 결과 중 화면이 따로 안내할 것(#286 후속, [담당 합의](https://github.com/JminAILab/CatchU/issues/286#issuecomment-6209853081)).
+ * - `renewed-rejected`: Access 갱신에 성공했지만 이 요청은 401로 거부됐다. 서버가 처리하지 않았고 자동으로 다시 보내지 않았다. 입력을 두고 다시 누르게 한다.
+ * - `not-sent`: 요청을 보내지 않았다(재인증 필요·로그아웃 처리 중 등). 결과 불명이 아니다. 다시 눌렀을 때 보낼지는 그때의 인증 상태가 정한다.
+ * - `discarded`: 보낸 뒤 로그인이 바뀌어 응답을 반영하지 않았다. 서버에 반영됐을 수 있어 성공·실패로 확정하지 않는다(결과 불명).
+ * - `other`: 그 밖. 성공·업무 거부·결과 불명(응답 유실·5xx)·갱신하지 못한 401은 화면의 기존 처리를 따른다.
+ * 통합 시험 전환을 끈 기존 호출(`api-client.ts`)의 결과는 언제나 `other`다.
+ */
+export type MemberMutationOutcome = "renewed-rejected" | "not-sent" | "discarded" | "other";
+
+export function memberMutationOutcome(result: ClientResult): MemberMutationOutcome {
+  const converted = convertedResults.get(result);
+  if (converted) return converted;
+  if (result.kind === "api-error" && result.status === 401 && MEMBER_AUTH_FAILURES.has(result.code)
+    && "authRenewal" in result && result.authRenewal === "renewed") return "renewed-rejected";
+  return "other";
 }
 
 /** 보호 API를 지금 보낼 수 없는 이유. 보낼 수 있으면 null. `status`만으로 판단하지 않는다. */

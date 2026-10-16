@@ -1,4 +1,5 @@
 import type { ApiClient } from '../../lib/api-client.ts';
+import { memberMutationOutcome } from '../../lib/auth-api.ts';
 
 export type Profile = { displayName: string; introduction: string; desiredRole: string; skills: string[] };
 export function isProfile(value: unknown): value is Profile {
@@ -26,26 +27,46 @@ export async function readProfile(api: Pick<ApiClient, 'member'>, signal?: Abort
   if (result.kind !== 'success' || !result.data || typeof result.data !== 'object' || !('profile' in result.data)) return null;
   return isProfile(result.data.profile) ? result.data.profile : null;
 }
-export async function saveProfile(api: Pick<ApiClient, 'member'>, profile: Profile, signal?: AbortSignal): Promise<boolean> {
+/**
+ * 프로필 저장 결과를 자세히 돌려준다(#286 후속, 담당 합의). 자동으로 다시 보내지 않는다.
+ * - `saved`: 저장 성공(기존 `saveProfile`의 true와 같은 기준).
+ * - `renewed-rejected`: 로그인 연장 뒤 이 저장은 거부됐다(처리되지 않음). 입력을 두고 다시 누르게 한다.
+ * - `not-sent`: 저장 요청을 보내지 않았다. 결과 불명이 아니다.
+ * - `discarded`: 보낸 뒤 로그인이 바뀌어 응답을 반영하지 않았다. 반영됐을 수 있어 성공·실패로 확정하지 않는다.
+ * - `save-failed`: 그 밖(업무 거부·응답 유실·5xx·성공 형식 오류). 기존 처리와 같다.
+ */
+export type ProfileSaveOutcome = 'saved' | 'renewed-rejected' | 'not-sent' | 'discarded' | 'save-failed';
+export async function saveProfileDetailed(api: Pick<ApiClient, 'member'>, profile: Profile, signal?: AbortSignal): Promise<ProfileSaveOutcome> {
   const body = { displayName: profile.displayName.trim(), introduction: profile.introduction,
     desiredRole: profile.desiredRole, skills: [...profile.skills] };
   const result = await api.member('/me/profile', { method: 'PUT', body, signal });
-  return result.kind === 'success' && isProfile(result.data) && result.data.displayName !== '';
+  if (result.kind === 'success' && isProfile(result.data) && result.data.displayName !== '') return 'saved';
+  const outcome = memberMutationOutcome(result);
+  return outcome === 'other' ? 'save-failed' : outcome;
+}
+/** 기존 호출 계약(성공 여부만). 자세한 결과가 필요하면 `saveProfileDetailed`를 쓴다. */
+export async function saveProfile(api: Pick<ApiClient, 'member'>, profile: Profile, signal?: AbortSignal): Promise<boolean> {
+  return (await saveProfileDetailed(api, profile, signal)) === 'saved';
 }
 
-/** PUT 성공 뒤에는 GET만 재시도한다. 세션이 바뀌면 후속 요청·이동을 중단한다. */
+/**
+ * PUT 성공 뒤에는 GET만 재시도한다. 세션이 바뀌면 후속 요청·이동을 중단한다.
+ * 로그인 연장 뒤 거부(`renewed-rejected`)·보내지 않음(`not-sent`)은 저장되지 않은 것이라 그대로 돌려준다(자동 재전송 없음).
+ * 반영하지 않은 응답(`discarded`)은 세션이 바뀐 것이라 보통 `cancelled`이며, 아니면 결과 불명인 `save-failed`로 본다.
+ */
 export async function completeProfileSetup(
   api: Pick<ApiClient, 'member'>, profile: Profile,
   options: { alreadySaved: boolean; onSaved: () => void; isCurrent: () => boolean; signal?: AbortSignal },
-): Promise<'ready' | 'save-failed' | 'refresh-failed' | 'cancelled'> {
+): Promise<'ready' | 'save-failed' | 'renewed-rejected' | 'not-sent' | 'refresh-failed' | 'cancelled'> {
   let saved = options.alreadySaved;
   const current = () => !options.signal?.aborted && options.isCurrent();
   if (!current()) return 'cancelled';
   try {
     if (!saved) {
-      const ok = await saveProfile(api, profile, options.signal);
+      const outcome = await saveProfileDetailed(api, profile, options.signal);
       if (!current()) return 'cancelled';
-      if (!ok) return 'save-failed';
+      if (outcome === 'renewed-rejected' || outcome === 'not-sent') return outcome;
+      if (outcome !== 'saved') return 'save-failed';
       saved = true;
       options.onSaved();
     }
