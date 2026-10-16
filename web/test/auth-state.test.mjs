@@ -23,7 +23,7 @@ test('처음에는 세션 복원 확인 중이며 토큰이 없고, 바뀐 것�
   assert.equal(store.accessToken(), null);
   assert.equal(store.getSnapshot(), store.getSnapshot());
   assert.deepEqual(SERVER_AUTH_SNAPSHOT, { status: 'restoring', generation: 0, logout: { phase: 'idle' },
-    sessionHold: null, restoreUnconfirmed: false, canRetryRestore: false, canRetryLogout: false, canCleanUpAfterLogout: false });
+    sessionHold: null, restoreUnconfirmed: false, canRetryRestore: false, canRetryLogout: false, canCleanUpAfterLogout: false, reloginOnly: false });
 });
 
 test('로그인 성공은 세대를 올리고 토큰을 메모리에 두며, 스냅샷에는 토큰이 없다', () => {

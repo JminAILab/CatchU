@@ -25,7 +25,7 @@ function devLoginErrorMessage(result: Exclude<ApiResult, { kind: "success" }>): 
  * 개발용 로그인(#87)은 NEXT_PUBLIC_DEV_LOGIN_ENABLED=true일 때만 보이며, Google 로그인처럼 보이지 않게 따로 둔다.
  */
 export function LoginPanel() {
-  // 공통 인증(#286) 연결은 통합 시험 전환이 켜졌을 때만 쓴다(미결 정책 결정 전 제품 경로 보류).
+  // 공통 인증(#286) 연결은 통합 시험 전환이 켜졌을 때만 쓴다(각 화면 담당 확인·#287 연결·통합 검증 전 제품 경로 보류).
   return authSessionIntegrationEnabled ? <SessionLoginPanel /> : <LegacyLoginPanel />;
 }
 

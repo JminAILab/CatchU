@@ -72,7 +72,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 |---|---|---|---|
 | API 호출 시 필수 | `NEXT_PUBLIC_API_BASE_URL` | `http://127.0.0.1:3001` | api 기준 주소. `/v1`은 넣지 않는다(호출 함수가 붙인다). 없거나 잘못되면 호출하지 않고 조회 실패로 돌려준다. `npm run build`로 만든 운영 빌드처럼 `NODE_ENV`가 `development`·`test`가 아니면 https 주소나 로컬 주소(`localhost`·`127.0.0.1`)의 http만 받고, 그 밖의 http 주소도 잘못된 주소로 본다(#218). 이 주소의 출처를 CSP 연결 허용에도 넣는다(「보안 응답 헤더」). IPv6 주소(`[::1]` 등)는 CSP에 적을 수 없어 형식과 관계없이 `npm run dev`·`npm run build`가 오류로 멈추므로 `127.0.0.1`이나 `localhost`를 쓴다 |
 | 선택 | `NEXT_PUBLIC_DEV_LOGIN_ENABLED` | `false` | 기본 비활성. 정확히 `true`일 때만 `/login`에 개발용 로그인을 보인다. api도 `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development` 또는 `test`가 함께 지정돼야 허용하며, 그 밖에는 403이다 |
-| 선택 | `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION` | `false` | 공통 인증(#286) 화면 연결의 통합 시험 전환. 정확히 `true`일 때만 켠다. 미결 정책 결정 전에는 제품에서 켜지 않는다(아래 「공통 인증」) |
+| 선택 | `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION` | `false` | 공통 인증(#286) 화면 연결의 통합 시험 전환. 정확히 `true`일 때만 켠다. 각 화면 담당 확인·#287 연결·통합 검증 전에는 제품에서 켜지 않는다(아래 「공통 인증」) |
 
 - 이름이 `NEXT_PUBLIC_`으로 시작하는 변수만 브라우저에 노출된다. 비밀값·토큰은 이 이름으로 두지 않는다.
 - `NEXT_PUBLIC_` 값은 `npm run dev`·`npm run build`를 시작할 때 읽힌다. 바꾸면 다시 시작한다.
@@ -215,7 +215,7 @@ if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLi
 
 회원 인증 상태·세션 갱신·로그아웃·로그인 완료를 한 곳(`src/lib/auth-*.ts`)에서 다룬다. 합의 원문은 [#251](https://github.com/JminAILab/CatchU/issues/251)의 설계 접점 댓글과 [#286](https://github.com/JminAILab/CatchU/issues/286)이다.
 
-**제품 경로 연결은 보류 중이다.** 공통 인증으로 화면을 움직이면 미결 정책(기능 화면이 받는 보내지 않은 요청의 결과, 로그인 표식 감지 뒤 화면, 재로드 A/B)에 기대는 동작이 함께 들어오므로, 화면 연결은 통합 시험 전환 `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`일 때만 쓴다(`src/lib/auth-integration.ts`). 기본(꺼짐)은 위 「API 호출」의 기존 동작이다. 켜면 회원 셸·가드·로그인 화면·`api.member`·`api.devLogin`이 `src/lib/auth-runtime.ts`의 탭별 인스턴스와 `src/components/auth/use-auth.ts`의 훅을 쓴다. 아래 설명은 켰을 때의 동작이다.
+**제품 경로 연결은 보류 중이다.** 공통 인증으로 화면을 움직이면 아직 확인하지 않은 동작(기능 화면이 받는 보내지 않은 요청의 결과, #287 화면 연결)이 함께 들어오므로, 화면 연결은 통합 시험 전환 `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`일 때만 쓴다(`src/lib/auth-integration.ts`). 기본(꺼짐)은 위 「API 호출」의 기존 동작이다. 켜면 회원 셸·가드·로그인 화면·`api.member`·`api.devLogin`이 `src/lib/auth-runtime.ts`의 탭별 인스턴스와 `src/components/auth/use-auth.ts`의 훅을 쓴다. 아래 설명은 켰을 때의 동작이다.
 
 | 파일 | 맡는 일 |
 |---|---|
@@ -229,13 +229,15 @@ if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLi
 | `auth-gate.ts`·`auth-scope.ts` | 회원 경로 가드 판정, 회원 화면 범위 번호 |
 
 - **보호 API 조건:** `status`만 보지 않는다. 로그인 변경 감지 없음·로그아웃 보류 없음·`signed-in`·토큰 있음을 모두 확인하고, 요청 전과 응답 반영 전에 로그인 표식을 비교한다. 그사이 로그인이 바뀌었으면 응답을 쓰지 않는다.
-- **새로고침:** 회원 경로 가드와 로그인 화면이 열릴 때 Refresh 쿠키로 세션을 복원한다(#251 필수 검사 「로그인 유지」의 "새로고침 후 세션 확인"). 확인이 끝나기 전에는 로그인 화면으로 보내지 않는다. 확인하지 못하면 Refresh를 쓰지 않았음이 확인된 경우만 [다시 확인]을, 결과를 모르면 [다시 로그인]만 보인다. 이 복원은 저장 표식이 없는 기본 복원이며, 갱신 중 새로고침의 재전송 문제에 대한 재로드 A/B(B안의 표식 포함)를 충족한 것이 아니다.
-- **화면 유지:** 회원 화면은 회원 화면 범위 번호(`auth-scope.ts`)를 기준으로 새로 만든다. 같은 세션의 Access 갱신·재인증 필요·로그아웃 확인 중에는 바뀌지 않고, 새 로그인·회원 전환 때만 바뀐다. 기존 `accessTokenStore`는 이 번호로 만든 표시값을 담는 호환 신호이며 실제 토큰이 아니다.
+- **새로고침:** 회원 경로 가드와 로그인 화면이 열릴 때 Refresh 쿠키로 세션을 복원한다(#251 필수 검사 「로그인 유지」의 "새로고침 후 세션 확인"). 확인이 끝나기 전에는 로그인 화면으로 보내지 않는다. 확인하지 못하면 Refresh를 쓰지 않았음이 확인된 경우만 [다시 확인]을, 결과를 모르면 [다시 로그인]만 보인다(같은 화면 [다시 확인]은 10월에 두지 않는다, [팀장 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443) 3). 복원은 별도 저장 표식 없이 Refresh 쿠키로 한다([팀장 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443) 1, A안). **한계:** 갱신·복원 응답을 기다리는 중의 새로고침·탭 종료로 서버가 이미 교체를 마쳤다면 그 세션은 다시 쓸 수 없어 재인증이 필요하다. 페이지를 열 때의 복원 중 새로고침(빠른 연속 새로고침 등)도 포함하며, [세션 안내](../api/docs/auth-sessions.md)의 "갱신 응답 유실 후 재인증" 한계에 든다.
+- **화면 유지:** 회원 화면은 회원 화면 범위 번호(`auth-scope.ts`)를 기준으로 새로 만든다. 같은 세션의 Access 갱신·재인증 필요·로그아웃 확인 중에는 바뀌지 않고(화면·입력 유지), 새 로그인·회원 전환·다른 탭의 새 로그인 감지 때만 바뀐다. 기존 `accessTokenStore`는 이 번호로 만든 표시값을 담는 호환 신호이며 실제 토큰이 아니다.
 - **다중 탭:** 다중 탭 로그인 유지는 Web Locks를 지원하는 최근 Chrome·Edge·Firefox·Safari에서만 보장한다([팀장 T4 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6182257830)). Web Locks는 HTTPS나 localhost에서만 동작한다. 지원하지 않는 환경에서는 탭 사이 요청 순서를 보장하지 않으며, 갱신이 실패하면 입력을 보존하고 재인증을 안내한다. `localStorage`를 쓸 수 없는 환경도 다중 탭 보장 범위 밖이다(T3).
 - **보내지 않은 조회:** 공통 화면(회원 경로 가드·로그인 화면)은 보내지 않은 조회(`not-sent`)·이전 세션 응답(`discarded`)을 조회 실패로도 성공으로도 보이지 않고, 그 조회의 진행 표시만 지운다. 이전에 받은 결과가 있으면 그대로 두고, 없으면 재인증 안내 등 인증 상태 표시만 둔다([A 동의](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6187946262), `viewSessionLookup`). `api.member`를 쓰는 기능 화면은 각 화면 담당 확인 전까지 조회 실패로 받는다.
+- **다른 탭 로그인 감지:** 로그인 표식이 바뀌었거나 읽을 수 없으면 이 탭의 이전 세대 토큰·요청 결과를 버리고 화면·입력을 정리한다([팀장 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443) 2). 재전송 차단·로그아웃 보류가 없는 탭은 확인 중 표시를 거쳐 지금 쿠키로 한 번만 복원하고, 성공하면 새 화면을 연다. 재전송 차단·로그아웃 보류가 있는 탭과 한 번 복원한 뒤에도 표식 오류가 이어지는 탭은 재인증 안내와 같은 문구에 [다시 로그인]만 둔다(`variant: "login-changed"`). 이때 로그아웃·갱신 요청은 보내지 않고 자동 복원을 반복하지 않으며, 재전송 차단도 풀지 않는다. 보내지 않은 변경 요청은 복원 뒤에도 자동으로 다시 보내지 않는다. 비로그인·복원 중인 탭은 감지 사실만 기록하고 새 로그인을 받는다. **한계:** 같은 회원이 다른 탭에서 다시 로그인해도 이 탭의 작성 중 입력은 사라진다(T3에서 입력을 잃는 쪽을 택한 결과).
+- **이 탭이 반영하지 않은 로그인:** 보낸 로그인의 결과를 반영하지 않았는데 쿠키가 바뀌었을 수 있으면(응답 없음·반영하지 않은 200 등, `loginNotAdopted`) 새 표식을 써 다른 탭이 알아차리게 하고, 이 탭은 자동 복원 없이 [다시 로그인]만 둔다. Google 완료는 기존 [A 합의](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6183158107) 1(세션 확인 결과로 이번 로그인의 성공을 판정하지 않음)을 적용한 것이다. 개발 로그인(개발 환경 전용)은 같은 안전 기준을 적용해 구현했다. 다른 탭은 위 「다른 탭 로그인 감지」대로 처리한다.
 - **다른 탭 로그아웃:** 같은 로그인을 쓰는 다른 탭의 로그아웃이 `done`이면(같은 표식, `BroadcastChannel` 알림) 이 탭도 비로그인으로 확정하고 회원 경로 가드가 비로그인 홈으로 보낸다. `failed`·`unknown`·새 로그인 시작 뒤의 결과는 반영하지 않는다(#251 접점 4).
 - **Google 로그인 시도 보관:** `loginAttemptToken`·`state`·`next`·`expiresAt`을 `sessionStorage`의 키 하나(`catchu.auth.google-attempt`)에 둔다. 완료 요청 직전 `sent`를 표시하고, 완료 응답을 받으면 지우며, 시한이 지나면 지운다. 저장에 실패하면 Google로 이동하지 않는다. `next`는 저장·복귀 때 모두 회원 경로인지 검사한다. 값은 로그·화면에 출력하지 않는다.
-- **미결(임의로 정하지 않음, 제품 경로 보류 사유):** 로그인 표식 불일치 감지 뒤의 상태·화면·출구, 재로드 A/B, 같은 페이지 [다시 확인] 허용 범위, Web Lock 실패·대기 시간 제한, 탭 종료 뒤 재전송(W4), 보낸 뒤 취소된 개발 로그인의 반영(P1). 감지 뒤에는 요청을 보내지 않는 임시 처리이며 최종 정책이 아니다.
+- **미결(임의로 정하지 않음):** Web Lock 실패·대기 시간 제한, 보낸 뒤 취소된 개발 로그인의 반영(P1). 표식 감지 뒤 복구·새로고침 복원·[다시 확인]은 위 팀장 결정대로 반영했다.
 
 ## 보안 응답 헤더 (#217)
 

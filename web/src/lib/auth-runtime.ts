@@ -7,8 +7,10 @@
  *   화면 훅은 서버 스냅샷(`SERVER_AUTH_SNAPSHOT`)을 쓰므로 서버 쪽 인스턴스는 상태가 바뀌지 않는다.
  * - 세션 복원(7단계)은 회원 가드·로그인 화면이 `ensureRestored()`로 한 번 시작한다. Google 콜백 화면은 부르지 않는다
  *   (복원 결과로 이번 로그인 성공을 판정하지 않기 위해, #251 접점 1).
- * - 새로고침 뒤 복원은 저장 표식 없이 브라우저 쿠키로 보내는 기본 복원이다. 갱신 진행 중 새로고침의 재전송 문제(재로드 A/B)는 미결이며,
- *   B안의 표식을 넣지 않았으므로 재로드 A/B를 충족한 것이 아니다.
+ * - 새로고침 뒤 복원은 저장 표식 없이 브라우저 쿠키로 보낸다([팀장 결정 1](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443), A안).
+ *   갱신·복원 응답을 기다리는 중의 새로고침·탭 종료(페이지를 열 때의 복원 중 새로고침, 빠른 연속 새로고침 포함)로 서버가 이미 교체를
+ *   마쳤다면 그 세션은 다시 쓸 수 없어 재인증이 필요하다. 이는 "갱신 응답 유실 뒤 재인증" 한계에 든다.
+ * - 다른 탭의 새 로그인 감지 뒤 한 번 복원은 `auth-session.ts`가 직접 보낸다(`ensureRestored`의 한 번 제한과 별개).
  */
 import { accessTokenStore } from "./access-token.ts";
 import { createAuthApi, type AuthApi } from "./auth-api.ts";

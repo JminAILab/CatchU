@@ -308,7 +308,7 @@ test('완료 오류 응답(400·404·500): 이유별 실패, 보관값 삭제, �
   }
 });
 
-test('완료 응답 없음: 다시 보내지 않고 network, 보관값은 sent로 남아 다시 열린 콜백은 already-sent, 쿠키가 바뀌었을 수 있어 감지·무효화', async () => {
+test('완료 응답 없음: 다시 보내지 않고 network, 보관값은 sent로 남아 다시 열린 콜백은 already-sent, 쿠키가 바뀌었을 수 있어 이 탭은 [다시 로그인]만, 다른 탭은 한 번 복원', async () => {
   for (const mode of ['before-processing', 'drop-after-cookie']) {
     const server = fakeServer();
     server.seed('X');
@@ -325,9 +325,15 @@ test('완료 응답 없음: 다시 보내지 않고 network, 보관값은 sent�
     const state = parsed.input.state;
     assert.deepEqual(t.google.readGoogleCallback(query(`state=${state}&code=c1`)), { kind: 'already-sent' }, mode);
     assert.equal(t.store.loginChangeDetected(), true, mode);
+    assert.equal(t.store.getSnapshot().reloginOnly, true, mode); // A 합의 1: 세션 확인으로 이번 로그인 성공을 판정하지 않으므로 자동 복원 없음
     assert.deepEqual(await t.session.refresh(), { kind: 'not-started' }, mode); // 이전 세션 갱신으로 새 쿠키의 토큰을 받지 않음
-    assert.deepEqual(await other.session.refresh(), { kind: 'not-started' }, mode); // 다른 탭도 감지
+    assert.deepEqual(await t.session.logout(), { kind: 'not-started' }, mode);
     assert.equal(server.count('POST /auth/refresh'), 2, mode); // 처음 두 복원뿐
+    assert.deepEqual(await other.session.refresh(), { kind: 'signed-in' }, mode); // 다른 탭: 바뀐 표식을 감지해 지금 쿠키로 한 번 복원(팀장 결정 2)
+    for (let i = 0; i < 20; i += 1) await tick();
+    assert.equal(server.count('POST /auth/refresh'), 3, mode);
+    assert.equal(other.store.loginChangeDetected(), false, mode);
+    assert.equal(server.count('POST /auth/google/login'), 1, mode); // 로그인 완료 요청은 다시 보내지 않음
   }
 });
 

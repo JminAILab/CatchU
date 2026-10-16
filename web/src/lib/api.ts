@@ -11,7 +11,7 @@ import { authRuntime } from "./auth-runtime";
  * 회원 자료는 메모리 토큰을 쓰므로 브라우저에서 호출한다.
  *
  * 공통 인증(#286) 통합 시험 전환(`auth-integration.ts`)이 켜졌을 때만 회원 API·개발 로그인을 공통 인증으로 보낸다.
- * 이때 보내지 않은 요청·이전 세션 응답을 조회 실패로 바꾸는 변환(`toClientResult`)은 미결 정책(P2·P5)이라 통합 시험에만 쓴다.
+ * 이때 보내지 않은 요청·이전 세션 응답을 조회 실패로 바꾸는 변환(`toClientResult`)은 각 기능 화면 담당 확인(P2·P5) 전이라 통합 시험에만 쓴다.
  */
 const legacyApi = createApiClient({
   baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL,

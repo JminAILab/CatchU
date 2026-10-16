@@ -12,8 +12,9 @@
  * - 이 탭이 세션을 확인할 때(복원 성공) 표식을 읽지 못했거나, 로그인 성공 뒤 표식을 쓰지 못하면 기준값이 없다.
  *   이후 비교는 `unconfirmed`(같은 로그인인지 확인할 수 없음 → 새 로그인으로 처리)이다. 기준값은 다음 세션 확인(복원 성공·이 탭 로그인)에서만 다시 잡는다.
  * - 기준값은 불일치를 감지해도 지우지 않는다. 그래서 감지 뒤에도 비교 결과(`same`·`changed`)를 계속 알 수 있다.
- * - 표식 불일치는 감지 기록과 이전 세대 무효화일 뿐이다. 새 세션 확인·재전송 허용·상태 전환은 하지 않는다(auth-state.ts `invalidateByLoginMarker`).
- * - 이 표식은 다른 탭의 로그인을 알아차리는 수단일 뿐이다. 쿠키 경쟁·탭 종료 뒤 재전송(W4)은 이 표식으로 해결되지 않는다.
+ * - 표식 불일치 뒤의 처리(복원 한 번 또는 [다시 로그인]만)는 auth-state.ts `invalidateByLoginMarker`와 auth-session.ts가 정한다.
+ *   감지 뒤 복원할 때는 기준값을 비우고(`reset`), 복원이 성공하면 그때 읽은 값을 새 기준값으로 삼는다(`adopt`).
+ * - 이 표식은 다른 탭의 로그인을 알아차리는 수단일 뿐이다. 쿠키 경쟁·탭 종료 뒤 재전송은 이 표식으로 해결되지 않는다(팀장 결정 1: "갱신 응답 유실 후 재인증" 한계).
  */
 
 /** 같은 출처의 모든 탭이 함께 쓰는 `localStorage` 키. 값은 무작위 32자리 16진수다. */
@@ -47,6 +48,8 @@ export type LoginMarker = {
   adopt(reading: MarkerReading): void;
   /** 비교한다. 상태는 바꾸지 않는다. 기준값이 있으면 매번 저장소를 다시 읽는다. */
   compare(): MarkerComparison;
+  /** 기준값을 비운다(`no-session`). 감지 뒤 복원을 시작할 때만 쓴다. 복원이 성공하면 `adopt`로 다시 잡는다. */
+  reset(): void;
   /** 이 탭이 아는 표식 값. 기준값이 없거나 값이 없으면 null. 다른 탭 로그아웃이 같은 로그인인지 확인할 때만 쓴다(5단계). */
   known(): string | null;
 };
@@ -115,6 +118,9 @@ export function createLoginMarker(options: LoginMarkerOptions = {}): LoginMarker
       if (!now.ok) return "unreadable";
       if (known.kind === "unconfirmed") return "unconfirmed";
       return now.value === known.value ? "same" : "changed";
+    },
+    reset() {
+      known = { kind: "none" };
     },
     known: () => (known.kind === "value" ? known.value : null),
   };

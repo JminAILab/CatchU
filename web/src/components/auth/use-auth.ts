@@ -21,7 +21,7 @@ export function useLastScopeGeneration(): number | null {
   return useSyncExternalStore(scope.subscribe, scope.lastGeneration, () => null);
 }
 
-/** 로그인 표식 불일치를 감지해 감지 뒤 정책을 기다리는 중인지(4-2). 화면 표시는 미결이며, 이 탭의 새 로그인만 받는다. */
+/** 로그인 표식 변경을 감지해 이 탭의 새 로그인만 받는 중인지(팀장 결정 2의 [다시 로그인]만 상태와 비로그인 탭의 감지 기록). */
 export function useLoginChangeDetected(): boolean {
   const { store } = authRuntime();
   return useSyncExternalStore(store.subscribe, store.loginChangeDetected, () => false);

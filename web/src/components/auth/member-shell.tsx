@@ -12,7 +12,7 @@ import { SessionMemberShell } from "./session-member-shell";
  * 로그아웃은 서버 세션이 없으므로(OQ-A1) 메모리 토큰을 지우고 비로그인 홈으로 간다.
  */
 export function MemberShell({ children }: { children: ReactNode }) {
-  // 공통 인증(#286) 연결은 통합 시험 전환이 켜졌을 때만 쓴다(미결 정책 결정 전 제품 경로 보류).
+  // 공통 인증(#286) 연결은 통합 시험 전환이 켜졌을 때만 쓴다(각 화면 담당 확인·#287 연결·통합 검증 전 제품 경로 보류).
   if (authSessionIntegrationEnabled) return <SessionMemberShell>{children}</SessionMemberShell>;
   return (
     <MemberGuard>

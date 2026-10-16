@@ -11,7 +11,9 @@
  * - 갱신 응답 유실 시 이전 Refresh를 다시 보내지 않는다(#251 「재인증」). 갱신 500은 탭 간 잠금 안에서 한 번만 다시 보낸다(T2).
  *   그래서 서버가 Refresh를 쓰지 않았음이 확인된 실패만 다시 확인할 수 있고, 결과를 알 수 없는 실패 뒤에는 이 페이지에서 갱신·복원을
  *   다시 보내지 않는다. 낡은 표라 결과를 반영하지 않은 경우에도 같은 세션이면 이 차단은 남긴다. 새 로그인 성공으로만 풀린다.
- *   새로고침 뒤 복원을 어떻게 할지는 미결이다(#286 2단계 검토본 §3). 이 파일은 페이지 메모리 범위만 다룬다.
+ *   새로고침 뒤에는 저장 표식 없이 Refresh 쿠키로 복원한다([팀장 결정 1](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443)).
+ *   갱신·복원 응답을 기다리는 중의 새로고침·탭 종료로 세션을 다시 쓸 수 없게 되는 경우는 "갱신 응답 유실 뒤 재인증" 한계에 든다.
+ *   이 파일은 페이지 메모리 범위만 다룬다.
  *
  * 새 로그인 시작
  * - `loginStarted()`부터 `signedIn()` 또는 그 시도의 `loginAttemptEnded()`까지는 새 로그인 시도 중이다. 이 동안 갱신·복원을 새로 시작하지 않고,
@@ -94,7 +96,17 @@ export type AuthSnapshot = {
    * `done`이고 그사이 새 로그인이 시작되지 않았을 때만 true다. 화면은 자기가 열릴 때의 세대가 `logout.fromGeneration`과 같은지도 확인한다.
    */
   canCleanUpAfterLogout: boolean;
+  /**
+   * 로그인 표식 변경을 감지했지만 이 탭에서 복원할 수 없어 새 로그인만 받는지([팀장 결정 2](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443)).
+   * 응답 유실 뒤 재전송 차단·로그아웃 보류가 있거나, 감지 뒤 한 번 복원한 다음에도 표식 오류가 이어질 때 true다.
+   * 이때 회원 화면·입력을 정리하고 재인증 안내와 같은 문구에 [다시 로그인]만 둔다. 로그아웃·갱신 요청과 자동 복원은 하지 않는다.
+   * 이 탭의 로그인 성공으로만 풀린다.
+   */
+  reloginOnly: boolean;
 };
+
+/** 로그인 표식 변경 감지의 처리 결과(`invalidateByLoginMarker`). `null`은 이미 처리돼 바꾼 것이 없음. */
+export type LoginChangeHandling = "restore" | "relogin-only" | "recorded" | null;
 
 /** 요청을 시작할 때 받는 표. 결과를 반영할 때 그대로 돌려준다. */
 export type RequestTicket = { readonly generation: AuthGeneration; readonly sequence: number };
@@ -156,19 +168,23 @@ export type AuthStore = {
    */
   logoutStarted(): RequestTicket | null;
   /**
-   * 로그인 표식이 다르거나 사라졌거나 읽을 수 없음(T3: 새 로그인으로 처리). 합의된 부분만 한다.
-   * - 감지 기록: `loginChangeDetected()`가 true가 된다. 이미 기록돼 있으면 아무것도 바꾸지 않고 false다(한 번만 무효화).
-   * - 이전 세대 무효화(로그인·재인증 필요 상태): 세대를 올리고 토큰을 버린다. 진행 중이던 갱신·로그아웃의 결과와 보내지 않은 갱신·로그아웃은
-   *   이전 세대 것이 되어 반영·전송되지 않는다. 상태(`status`)는 바꾸지 않는다.
-   * - 보호 상태 유지: 응답 유실 뒤 재전송 차단은 그대로 두고, 로그아웃 확인 중·결과 불명 보류는 새 세대로 넘긴다(결과 불명 보류).
-   * - 감지 뒤 정책 미지정: 이 탭에서 Refresh 쿠키를 쓰는 요청(갱신·복원·로그아웃)은 시작하지 않고, 토큰이 없어 보호 API도 보내지 않는다.
-   *   상태 전환·복원·로그아웃 허용 같은 감지 뒤 정책은 합의 전이라 구현하지 않았다. 기존 규칙대로 이 탭의 로그인 성공(`signedIn`)만
-   *   이전 상태를 초기화하며 기록도 지운다.
-   * - 복원 중·비로그인: 무효화할 세션 상태가 없으므로 기록만 한다.
-   * - 이 탭의 로그인 시도(`loginStarted()`)는 그대로 둔다.
+   * 로그인 표식이 다르거나 사라졌거나 읽을 수 없음(T3: 새 로그인으로 처리). [팀장 결정 2](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443)를 따른다.
+   * 로그인·재인증 필요 상태면 먼저 이전 세대를 끊는다(세대 증가, 토큰·진행 중인 갱신·로그아웃 결과 폐기). 그다음 둘 중 하나다.
+   * - `restore`: 재전송 차단·로그아웃 보류·진행 중인 이 탭의 로그인 시도가 없고, 감지 뒤 복원을 아직 쓰지 않았으면 복원 중으로 바꾼다.
+   *   회원 화면·입력은 정리되고(범위 번호 없음), 호출한 쪽이 지금 쿠키로 복원을 한 번 보낸다. 복원이 성공하고 표식이 같다고
+   *   다시 확인되면(`loginMarkerConfirmed`) 다음 감지에서 다시 복원할 수 있다.
+   * - `relogin-only`: 위 조건이 아니면(재전송 차단·로그아웃 보류가 있거나, 감지 뒤 복원 다음에도 표식 오류가 이어짐) `reloginOnly`를 켠다.
+   *   회원 화면·입력은 정리되고 [다시 로그인]만 남는다. 재전송 차단은 해제하지 않고 로그아웃 보류는 새 세대로 넘긴다.
+   *   이 탭에서는 갱신·복원·로그아웃을 시작하지 않고 토큰이 없어 보호 API도 보내지 않는다. 이 탭의 로그인 성공(`signedIn`)으로만 풀린다.
+   * - `recorded`: 복원 중·비로그인은 무효화할 세션이 없어 기록만 한다(비로그인 탭의 반응은 정하지 않았다).
+   * - `null`: 이미 `relogin-only`·`recorded`로 기록돼 있으면 아무것도 바꾸지 않는다(한 번만 처리).
+   * `allowRestore: false`면 복원 조건이어도 `relogin-only`로 처리한다(이 탭이 반영하지 않은 로그인으로 쿠키가 바뀐 경우, `loginNotAdopted`).
+   * 이 탭의 로그인 시도(`loginStarted()`)는 그대로 둔다.
    */
-  invalidateByLoginMarker(): boolean;
-  /** 로그인 표식 불일치를 감지해 감지 뒤 정책을 기다리는 중인지. 이 동안 갱신·복원·로그아웃을 시작하지 않는다. */
+  invalidateByLoginMarker(options?: { allowRestore?: boolean }): LoginChangeHandling;
+  /** 감지 뒤 복원 다음에 표식이 이 탭의 것과 같다고 확인됨. 다음 감지에서 다시 한 번 복원할 수 있게 한다. */
+  loginMarkerConfirmed(): void;
+  /** 로그인 표식 변경을 감지해 새 로그인만 받는 중인지(`relogin-only`·`recorded`). 이 동안 갱신·복원·로그아웃을 시작하지 않는다. */
   loginChangeDetected(): boolean;
   /**
    * 이 표의 로그아웃을 지금 보내도 되는지(진행 중인 바로 그 로그아웃이고 같은 세대). 공통 요청 함수가 잠금을 얻은 뒤 보내기 직전에 확인한다.
@@ -200,7 +216,7 @@ const IDLE: LogoutState = { phase: "idle" };
 /** 서버 렌더링 스냅샷. 서버에서는 세션을 알 수 없으므로 복원 확인 중으로 둔다. */
 export const SERVER_AUTH_SNAPSHOT: AuthSnapshot = {
   status: "restoring", generation: 0, logout: IDLE, sessionHold: null, restoreUnconfirmed: false, canRetryRestore: false,
-  canRetryLogout: false, canCleanUpAfterLogout: false,
+  canRetryLogout: false, canCleanUpAfterLogout: false, reloginOnly: false,
 };
 
 /** 이 세대의 실패·결과 불명 로그아웃을 다시 보낼 수 있는지. 새 로그인이 시작됐으면 이전 세션의 로그아웃을 다시 보내지 않는다. */
@@ -219,7 +235,7 @@ function nonEmpty(token: string) {
   if (typeof token !== "string" || token.length === 0) throw new TypeError("token must be a non-empty string");
 }
 
-type CoreState = Pick<AuthSnapshot, "status" | "generation" | "logout" | "restoreUnconfirmed" | "canRetryRestore">;
+type CoreState = Pick<AuthSnapshot, "status" | "generation" | "logout" | "restoreUnconfirmed" | "canRetryRestore" | "reloginOnly">;
 
 export function createAuthStore(initialStatus: AuthStatus = "restoring"): AuthStore {
   let token: string | null = null;
@@ -234,8 +250,10 @@ export function createAuthStore(initialStatus: AuthStatus = "restoring"): AuthSt
   let loginSequence = 0;
   /** 표식 불일치로 세대를 바꿀 때 넘겨받은 로그아웃 보류. 이 탭의 새 로그인 성공으로만 풀린다. */
   let carriedHold: SessionHold = null;
-  /** 로그인 표식 불일치를 감지했는지. 감지 뒤 정책이 정해지기 전까지 세션 쿠키를 쓰는 요청을 시작하지 않는다. */
+  /** 로그인 표식 변경을 감지해 새 로그인만 받는 중인지(`relogin-only`·`recorded`). 이 동안 세션 쿠키를 쓰는 요청을 시작하지 않는다. */
   let loginChanged = false;
+  /** 감지 뒤 복원을 이미 썼는지. 복원 뒤 표식이 같다고 확인되거나 이 탭의 로그인이 성공하면 풀린다(팀장 결정 2: 한 번만 복원). */
+  let markerRestoreUsed = false;
   const isAttempt = (value: unknown): value is LoginAttempt =>
     typeof value === "object" && value !== null && Number.isSafeInteger((value as LoginAttempt).loginAttempt);
   const listeners = new Set<() => void>();
@@ -248,6 +266,7 @@ export function createAuthStore(initialStatus: AuthStatus = "restoring"): AuthSt
       logout: change.logout ?? snapshot.logout,
       restoreUnconfirmed: change.restoreUnconfirmed ?? snapshot.restoreUnconfirmed,
       canRetryRestore: change.canRetryRestore ?? snapshot.canRetryRestore,
+      reloginOnly: change.reloginOnly ?? snapshot.reloginOnly,
     };
     // 복원 확인 실패 표시는 복원 중에만 의미가 있다.
     if (core.status !== "restoring") {
@@ -255,7 +274,8 @@ export function createAuthStore(initialStatus: AuthStatus = "restoring"): AuthSt
       core.canRetryRestore = false;
     }
     if (core.status === snapshot.status && core.generation === snapshot.generation && core.logout === snapshot.logout
-      && core.restoreUnconfirmed === snapshot.restoreUnconfirmed && core.canRetryRestore === snapshot.canRetryRestore) return;
+      && core.restoreUnconfirmed === snapshot.restoreUnconfirmed && core.canRetryRestore === snapshot.canRetryRestore
+      && core.reloginOnly === snapshot.reloginOnly) return;
     snapshot = {
       ...core,
       sessionHold: holdOf(core.logout, core.generation) ?? carriedHold,
@@ -294,27 +314,43 @@ export function createAuthStore(initialStatus: AuthStatus = "restoring"): AuthSt
       refreshBlocked = false;
       carriedHold = null;
       loginChanged = false;
+      markerRestoreUsed = false;
       currentLogin = 0;
       // 진행 중이던 로그아웃은 새 세션의 보류 사유가 아니므로 비운다. 끝난 로그아웃에는 새 로그인이 시작됐음을 남긴다.
       const { logout } = snapshot;
-      publish({ status: "signed-in", generation: snapshot.generation + 1,
+      publish({ status: "signed-in", generation: snapshot.generation + 1, reloginOnly: false,
         logout: logout.phase === "pending" ? IDLE : markLoginStarted(logout) });
       return snapshot.generation;
     },
 
-    invalidateByLoginMarker() {
-      if (loginChanged) return false;
-      loginChanged = true;
-      if (snapshot.status === "signed-in" || snapshot.status === "reauth-required") {
-        // 무효화: 이전 세대의 토큰·요청 표·로그아웃 결과 반영을 끊는다. 상태는 바꾸지 않는다.
-        token = null;
-        latestRefresh = 0;
-        pendingLogout = 0;
-        // 보호 유지: 재전송 차단(refreshBlocked)은 건드리지 않고, 로그아웃 보류는 새 세대로 넘긴다.
-        if (snapshot.sessionHold !== null) carriedHold = "logout-unknown";
-        publish({ generation: snapshot.generation + 1, logout: IDLE });
+    invalidateByLoginMarker(options = {}) {
+      if (loginChanged) return null;
+      if (snapshot.status !== "signed-in" && snapshot.status !== "reauth-required") {
+        loginChanged = true; // 복원 중·비로그인: 기록만 한다.
+        return "recorded";
       }
-      return true;
+      // 무효화: 이전 세대의 토큰·요청 표·로그아웃 결과 반영을 끊는다.
+      token = null;
+      latestRefresh = 0;
+      pendingLogout = 0;
+      const canRestore = options.allowRestore !== false && !refreshBlocked && snapshot.sessionHold === null
+        && currentLogin === 0 && !markerRestoreUsed;
+      if (canRestore) {
+        // 차단·보류가 없는 탭: 화면·입력을 정리하고(복원 중은 범위 번호가 없다) 지금 쿠키로 한 번만 복원한다.
+        markerRestoreUsed = true;
+        publish({ status: "restoring", generation: snapshot.generation + 1, logout: IDLE });
+        return "restore";
+      }
+      // 차단·보류가 있거나 복원 뒤에도 표식 오류가 이어짐: 화면·입력을 정리하고 [다시 로그인]만 둔다.
+      // 재전송 차단(refreshBlocked)은 해제하지 않고, 로그아웃 보류는 새 세대로 넘긴다. 로그아웃·갱신은 보내지 않는다.
+      loginChanged = true;
+      if (snapshot.sessionHold !== null) carriedHold = "logout-unknown";
+      publish({ generation: snapshot.generation + 1, logout: IDLE, reloginOnly: true });
+      return "relogin-only";
+    },
+
+    loginMarkerConfirmed() {
+      if (!loginChanged && snapshot.status === "signed-in") markerRestoreUsed = false;
     },
 
     loginChangeDetected: () => loginChanged,
@@ -344,7 +380,7 @@ export function createAuthStore(initialStatus: AuthStatus = "restoring"): AuthSt
       if (snapshot.sessionHold !== null) return null;
       if (snapshot.status !== "restoring" && snapshot.status !== "signed-in") return null;
       if (currentLogin !== 0) return null; // 새 로그인 시도 중에는 이전 세션의 갱신을 새로 보내지 않는다.
-      if (loginChanged) return null; // 표식 불일치 감지 뒤 정책 미지정: 복원·갱신을 시작하지 않는다.
+      if (loginChanged) return null; // 표식 변경 감지 뒤 [다시 로그인]만 받는 탭: 복원·갱신을 시작하지 않는다(팀장 결정 2).
       if (refreshBlocked) return null; // 응답 유실·재시도 소진 뒤 이 페이지에서 이전 Refresh 재전송 금지
       const t = ticket();
       latestRefresh = t.sequence;
@@ -387,7 +423,8 @@ export function createAuthStore(initialStatus: AuthStatus = "restoring"): AuthSt
 
     logoutStarted() {
       if (snapshot.status !== "signed-in" && snapshot.status !== "reauth-required") return null;
-      if (loginChanged) return null; // 표식 불일치 감지 뒤 정책 미지정: 쿠키 주인이 불확실한 로그아웃을 보내지 않는다.
+      // 표식 변경 감지 뒤에는 쿠키가 다른 탭의 새 로그인 것일 수 있어 로그아웃을 보내지 않는다(팀장 결정 2).
+      if (loginChanged) return null;
       const { logout } = snapshot;
       if (logout.phase === "pending") return null;
       // 이 세대에 끝난 로그아웃이 있으면 그것을 다시 보내는 것이므로 재시도 조건을 그대로 적용한다.

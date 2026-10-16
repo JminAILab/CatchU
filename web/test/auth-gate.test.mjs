@@ -99,16 +99,48 @@ test('범위: 재인증 필요에도 유지되고, 새 로그인·회원 전환�
   assert.equal(scope.lastGeneration(), generation);
 });
 
-test('범위: 로그인 표식 불일치 감지(세대 증가)에는 화면 범위를 바꾸지 않는다(감지 뒤 정책 미지정)', () => {
+test('범위(팀장 결정 2): 같은 세션 갱신은 범위를 유지하고, 다른 탭 로그인 감지는 범위를 닫았다가(화면·입력 정리) 한 번 복원에 성공하면 새 번호를 연다', () => {
   const store = signedInStore();
   const scope = createSessionScope(store);
   const opened = scope.getSnapshot();
-  const generation = store.getSnapshot().generation;
-  store.invalidateByLoginMarker();
-  assert.equal(store.getSnapshot().generation, generation + 1);
+  store.refreshSucceeded('t1b', store.refreshStarted()); // 같은 세션의 Access 갱신
   assert.equal(scope.getSnapshot(), opened);
-  store.signedIn('t2', store.loginStarted()); // 이 탭의 새 로그인
+  assert.equal(store.invalidateByLoginMarker(), 'restore');
+  assert.equal(scope.getSnapshot(), null);
+  assert.deepEqual(decideAuthGate(store.getSnapshot(), opened), { action: 'restoring' });
+  store.refreshSucceeded('t2', store.refreshStarted());
+  const restored = scope.getSnapshot();
+  assert.notEqual(restored, null);
+  assert.notEqual(restored, opened); // 이전 화면 상태를 이어 쓰지 않음
+});
+
+test('범위·가드(팀장 결정 2): 복원할 수 없는 탭은 범위를 닫고 [다시 로그인]만 보이며, 이 탭의 새 로그인에만 새 번호를 연다', () => {
+  const store = signedInStore();
+  const scope = createSessionScope(store);
+  const opened = scope.getSnapshot();
+  store.refreshFailed(store.refreshStarted(), 'outcome-unknown'); // 재전송 차단
+  assert.deepEqual(decideAuthGate(store.getSnapshot(), opened), { action: 'show', reauth: true }); // 일반 재인증 필요는 화면 유지
+  assert.equal(scope.getSnapshot(), opened);
+  assert.equal(store.invalidateByLoginMarker(), 'relogin-only');
+  assert.equal(scope.getSnapshot(), null);
+  assert.deepEqual(decideAuthGate(store.getSnapshot(), opened), { action: 'relogin-only' });
+  store.signedIn('t2', store.loginStarted());
+  assert.notEqual(scope.getSnapshot(), null);
   assert.notEqual(scope.getSnapshot(), opened);
+  assert.deepEqual(decideAuthGate(store.getSnapshot(), store.getSnapshot().generation), { action: 'show', reauth: false });
+});
+
+test('기존 토큰 신호 호환: 다른 탭 로그인 감지는 표시값을 비워(auth-failed) 기존 화면을 새로 만들게 하고, 복원 뒤 새 표시값을 넣는다', () => {
+  const store = signedInStore();
+  const scope = createSessionScope(store);
+  const tokens = createAccessTokenStore();
+  bindLegacyTokenSignal(store, scope, tokens);
+  const before = tokens.get().token;
+  store.invalidateByLoginMarker();
+  assert.deepEqual(tokens.get(), { token: null, ended: 'auth-failed' });
+  store.refreshSucceeded('t2', store.refreshStarted());
+  assert.match(tokens.get().token, /^member-scope-\d+$/);
+  assert.notEqual(tokens.get().token, before);
 });
 
 test('기존 토큰 신호 호환: 실제 토큰 대신 범위 표시값을 넣어 같은 세션 갱신에는 바뀌지 않고, 로그아웃 완료면 logout으로 비운다', () => {

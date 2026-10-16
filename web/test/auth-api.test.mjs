@@ -9,6 +9,8 @@ import { createAuthApi, memberCallBlock } from '../src/lib/auth-api.ts';
 
 const BASE = 'http://127.0.0.1:3001';
 const tick = () => new Promise((resolve) => setImmediate(resolve));
+/** 감지 뒤 예약된 복원(잠금·대역 응답)이 끝날 때까지 기다린다. */
+const settle = async () => { for (let i = 0; i < 20; i += 1) await tick(); };
 
 function deferred() {
   let resolve;
@@ -184,12 +186,18 @@ test('보호 API 조건은 status만 보지 않는다: 감지·보류·재인증
   assert.equal(server.count('GET /me'), 0);
 });
 
-test('로그인 변경을 감지하면 status가 signed-in이어도 보내지 않는다', async () => {
+test('로그인 변경을 감지하면 보내지 않는다: 복원하는 탭은 복원 중, [다시 로그인]만 남는 탭은 status가 signed-in이어도(팀장 결정 2)', async () => {
   const server = fakeServer();
   const t = await signedInTab(server);
-  t.store.invalidateByLoginMarker();
-  assert.equal(t.store.getSnapshot().status, 'signed-in');
-  assert.deepEqual(await t.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
+  assert.equal(t.store.invalidateByLoginMarker(), 'restore');
+  assert.equal(t.store.getSnapshot().status, 'restoring');
+  assert.deepEqual(await t.api.member('/me'), { kind: 'not-sent', reason: 'not-signed-in' });
+
+  const u = await signedInTab(server);
+  assert.equal(u.store.invalidateByLoginMarker({ allowRestore: false }), 'relogin-only');
+  assert.equal(u.store.getSnapshot().status, 'signed-in');
+  assert.equal(u.store.getSnapshot().reloginOnly, true);
+  assert.deepEqual(await u.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
   assert.equal(server.count('GET /me'), 0);
 });
 
@@ -367,26 +375,33 @@ test('표식 비교: 다른 탭 로그인을 요청 전에 감지하면 보내�
   const pending = a.api.member('/me');
   await tick(); await tick();
   assert.equal((await b.api.devLogin('Y')).kind, 'success');
+  const generation = a.store.getSnapshot().generation;
   gate.resolve();
-  assert.deepEqual(await pending, { kind: 'discarded', sent: true }); // 401이었지만 갱신하지 않음
+  assert.deepEqual(await pending, { kind: 'discarded', sent: true }); // 401이었지만 이전 세션으로 갱신하지 않음
   assert.equal(server.count('POST /auth/refresh'), 0);
-  assert.equal(a.store.loginChangeDetected(), true);
 
-  // 이후 요청 전 감지 상태 유지: 보내지 않음
-  assert.deepEqual(await a.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
-  assert.equal(server.count('GET /me'), 1);
-  assert.equal(server.jarMember(), 'Y'); // 쿠키는 B의 로그인 것. A가 갱신하면 Y의 토큰을 받게 된다.
+  // 팀장 결정 2: 차단·보류 없는 탭은 이전 화면을 정리하고(복원 중) 지금 쿠키로 한 번만 복원한다. 쿠키는 B의 로그인 것이다.
+  assert.equal(a.store.getSnapshot().status, 'restoring');
+  await settle();
+  assert.equal(server.count('POST /auth/refresh'), 1);
+  assert.equal(a.store.getSnapshot().status, 'signed-in');
+  assert.equal(a.store.getSnapshot().generation, generation + 2); // 이전 세대 끊기 + 복원 성공
+  assert.equal(a.store.loginChangeDetected(), false);
+  assert.equal(meOf(await a.api.member('/me')), 'Y'); // 새 화면은 지금 로그인(Y)의 자료다
+  assert.equal(server.count('POST /auth/refresh'), 1); // 복원은 한 번
 });
 
-test('표식 비교: 요청 전 감지(다른 탭 로그인이 이미 끝남)면 보호 API를 보내지 않는다', async () => {
+test('표식 비교: 요청 전 감지(다른 탭 로그인이 이미 끝남)면 보호 API를 보내지 않고, 복원 뒤에도 변경 요청을 다시 보내지 않는다', async () => {
   const server = fakeServer();
   const locks = fakeLockManager();
   const storage = fakeStorage();
   const a = await signedInTab(server, 'X', { locks, storage });
   const b = tab(server, { locks, storage });
   assert.equal((await b.api.devLogin('Y')).kind, 'success');
-  assert.deepEqual(await a.api.member('/catches', { method: 'POST', body: {} }), { kind: 'not-sent', reason: 'login-changed' });
-  assert.deepEqual([server.count('POST /catches'), server.state.mutations], [0, 0]);
+  assert.deepEqual(await a.api.member('/catches', { method: 'POST', body: {} }), { kind: 'not-sent', reason: 'not-signed-in' });
+  await settle();
+  assert.equal(a.store.getSnapshot().status, 'signed-in'); // 한 번 복원
+  assert.deepEqual([server.count('POST /catches'), server.state.mutations], [0, 0]); // 보내지 않은 변경 요청은 자동으로 보내지 않음
   assert.equal(meOf(await b.api.member('/me')), 'Y');
 });
 
@@ -457,7 +472,7 @@ test('이미 취소된 신호로 부르면 시도를 시작하지 않는다', as
   assert.deepEqual(await t.session.refresh(), { kind: 'signed-in' });
 });
 
-test('[결정 대기] 보낸 뒤 취소된 로그인이 성공하면 반영하지 않고, 쿠키가 바뀌었으므로 이 탭·다른 탭이 이전 세션으로 갱신하지 않는다', async () => {
+test('[결정 대기] 보낸 뒤 취소된 로그인이 성공하면 반영하지 않고, 이 탭은 [다시 로그인]만, 다른 탭은 이전 세션 대신 지금 쿠키로 한 번 복원한다', async () => {
   const server = fakeServer();
   const locks = fakeLockManager();
   const storage = fakeStorage();
@@ -473,14 +488,17 @@ test('[결정 대기] 보낸 뒤 취소된 로그인이 성공하면 반영하�
   assert.deepEqual(await login, { kind: 'discarded', sent: true });
   assert.equal(server.jarMember(), 'Y'); // 서버는 로그인을 처리해 쿠키를 바꿨다
   const refreshes = server.count('POST /auth/refresh');
-  // A: 감지·무효화(정책 미지정 정지). 이전 세션으로 갱신해 Y의 토큰을 받지 않는다.
+  // A: 이 탭이 반영하지 않은 로그인이다. 자동 복원 없이 화면을 정리하고 [다시 로그인]만 둔다(Google 완료의 A 합의 1과 같은 안전 기준: 세션 확인으로 이번 로그인 성공을 판정하지 않음).
   assert.equal(a.store.loginChangeDetected(), true);
+  assert.equal(a.store.getSnapshot().reloginOnly, true);
   assert.equal(a.store.accessToken(), null);
   assert.deepEqual(await a.session.refresh(), { kind: 'not-started' });
-  // B: 새 표식으로 알아차려 갱신·보호 API를 보내지 않는다.
-  assert.deepEqual(await b.session.refresh(), { kind: 'not-started' });
-  assert.deepEqual(await b.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
-  assert.equal(server.count('POST /auth/refresh'), refreshes);
+  assert.deepEqual(await a.session.logout(), { kind: 'not-started' });
+  // B: 새 표식으로 알아차리고, 차단·보류가 없으므로 이전 세션(X) 갱신 대신 지금 쿠키로 한 번 복원한다(팀장 결정 2).
+  assert.deepEqual(await b.session.refresh(), { kind: 'signed-in' });
+  await settle();
+  assert.equal(server.count('POST /auth/refresh'), refreshes + 1);
+  assert.equal(meOf(await b.api.member('/me')), 'Y');
 });
 
 test('이전 시도의 성공은 반영하지 않고, 뒤의 시도가 잠금 뒤에 보내져 최종 쿠키와 상태가 같은 회원이다', async () => {
@@ -555,19 +573,25 @@ test('계약상 쿠키를 바꾸지 않는 거부(403 가드·400 검증)는 시
   }
 });
 
-/** 결과 불명 확인: 이전 회원 상태(signed-in)는 두되 토큰을 버리고, 새 회원 토큰을 받지 않으며, 두 탭 모두 쿠키 요청·보호 API를 보내지 않는다. */
-async function assertUnknownBlocksBothTabs({ server, a, b, generation, refreshes }) {
-  assert.equal(a.store.getSnapshot().status, 'signed-in'); // 상태 전환 없음(감지 뒤 정책 미지정)
+/**
+ * 결과 불명 확인. 이 탭(A): 토큰을 버리고 새 회원 토큰을 받지 않으며, 자동 복원 없이 [다시 로그인]만 남긴다.
+ * 다른 탭(B): 바뀐 표식으로 알아차리고 이전 세션 대신 지금 쿠키로 한 번 복원한다(팀장 결정 2). 로그인은 다시 보내지 않는다.
+ */
+async function assertUnknownLoginHandled({ server, a, b, generation, refreshes }) {
+  assert.equal(a.store.getSnapshot().status, 'signed-in');
+  assert.equal(a.store.getSnapshot().reloginOnly, true); // 화면·입력 정리, [다시 로그인]만
   assert.equal(a.store.accessToken(), null); // 이전 토큰도 새 토큰도 쓰지 않음
   assert.equal(a.store.getSnapshot().generation, generation + 1);
   assert.equal(a.store.loginChangeDetected(), true);
-  assert.deepEqual(await a.session.refresh(), { kind: 'not-started' }); // 이전 세션으로 갱신해 새 쿠키의 토큰을 받지 않음
+  assert.deepEqual(await a.session.refresh(), { kind: 'not-started' }); // 자동 복원·갱신 없음
+  assert.deepEqual(await a.session.logout(), { kind: 'not-started' }); // 쿠키 주인이 불확실한 로그아웃 없음
   assert.deepEqual(await a.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
-  assert.deepEqual(await b.session.refresh(), { kind: 'not-started' }); // 다른 탭도 바뀐 표식으로 감지
-  assert.deepEqual(await b.api.member('/me'), { kind: 'not-sent', reason: 'login-changed' });
-  assert.equal(b.store.loginChangeDetected(), true);
   assert.equal(server.count('POST /auth/refresh'), refreshes);
-  assert.equal(server.count('GET /me'), 0);
+  assert.deepEqual(await b.session.refresh(), { kind: 'signed-in' }); // 다른 탭: 지금 쿠키로 한 번 복원
+  await settle();
+  assert.equal(server.count('POST /auth/refresh'), refreshes + 1);
+  assert.equal(b.store.loginChangeDetected(), false);
+  assert.equal(meOf(await b.api.member('/me')), server.jarMember()); // 복원한 것은 지금 쿠키의 회원
   assert.equal(server.count('POST /auth/dev-login'), 2); // 처음 X + 이번 1건. 자동 재전송 없음
 }
 
@@ -590,7 +614,7 @@ test('결과 불명: 서버가 처리하고 쿠키를 바꾼 뒤 응답을 읽�
   server.state.devLogin = 'drop-after-cookie';
   assert.deepEqual(await a.api.devLogin('Y'), { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' });
   assert.equal(server.jarMember(), 'Y'); // 쿠키는 이미 Y의 것
-  await assertUnknownBlocksBothTabs({ server, a, b, generation, refreshes });
+  await assertUnknownLoginHandled({ server, a, b, generation, refreshes });
 });
 
 test('결과 불명: 응답이 없으면(처리 여부를 알 수 없음) 처리 전 끊김이어도 같은 감지·차단을 적용한다', async () => {
@@ -600,7 +624,7 @@ test('결과 불명: 응답이 없으면(처리 여부를 알 수 없음) 처리
   server.fail('POST /auth/dev-login');
   assert.deepEqual(await a.api.devLogin('Y'), { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' });
   assert.equal(server.jarMember(), 'X'); // 이 대역에서는 실제로 바뀌지 않았지만 화면은 구분할 수 없다
-  await assertUnknownBlocksBothTabs({ server, a, b, generation, refreshes });
+  await assertUnknownLoginHandled({ server, a, b, generation, refreshes });
 });
 
 test('결과 불명: 계약상 거부가 아닌 오류 응답(500)도 같은 감지·차단을 적용한다', async () => {
@@ -610,7 +634,7 @@ test('결과 불명: 계약상 거부가 아닌 오류 응답(500)도 같은 감
   server.state.devLogin = 'server-error';
   const result = await a.api.devLogin('Y');
   assert.deepEqual([result.kind, result.status, result.code], ['api-error', 500, 'INTERNAL_ERROR']);
-  await assertUnknownBlocksBothTabs({ server, a, b, generation, refreshes });
+  await assertUnknownLoginHandled({ server, a, b, generation, refreshes });
 });
 
 test('[한계] 결과 불명 때 표식을 쓰지 못하면 이 탭은 막히지만, 다른 탭은 알아차리지 못해 바뀐 쿠키로 갱신하고 새 회원 토큰을 받는다', async () => {

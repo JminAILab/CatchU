@@ -20,9 +20,12 @@
  *
  * 로그인 표식 비교(4-2, T3)
  * - `marker`를 넘기면 다음 시점에 표식을 비교한다. 표식이 다르거나 사라졌거나 읽을 수 없거나 확인할 수 없으면
- *   `store.invalidateByLoginMarker()`로 감지를 기록하고 이전 세대를 끊는다. 응답 유실 뒤 재전송 차단과 로그아웃 보류는 그대로 남는다.
- * - 감지 뒤 정책(상태 전환·복원·로그아웃 허용·저장소 오류 지속 처리·비로그인 탭 반응)은 합의 전이라 넣지 않았다.
- *   정책이 정해지기 전에는 감지한 탭이 세션 쿠키를 쓰는 요청을 보내지 않는다. 이 상태로는 화면에 연결할 수 없다(검토본 「연결 불가 범위」).
+ *   `store.invalidateByLoginMarker()`로 이전 세대를 끊고, [팀장 결정 2](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443)대로 처리한다.
+ *   - 차단·보류가 없는 탭(`restore`): 기준값을 비우고 지금 쿠키로 복원을 한 번 보낸다. 잠금 안에서 감지해도 기다리지 않고 예약만 하므로
+ *     잠금이 풀린 뒤 보낸다. 같은 세대의 복원은 하나로 합쳐진다. 복원이 성공하면 그때 읽은 표식을 기준값으로 삼는다.
+ *   - 재전송 차단·로그아웃 보류가 있거나 복원 뒤에도 표식 오류가 이어지는 탭(`relogin-only`): 요청을 보내지 않고 [다시 로그인]만 남긴다.
+ *   - 표식이 같다고 확인되면(`same`) 감지 뒤 복원 사용 기록을 푼다(`loginMarkerConfirmed`).
+ *   - 비로그인 탭이 다른 탭 로그인을 감지했을 때의 반응은 정하지 않았다(기록만 한다).
  *   - 갱신·로그아웃을 부를 때(요청 전)
  *   - 잠금을 얻은 직후 보내기 전, 작업이 끝난 직후 결과를 반영하기 전(잠금 안)
  *   - 탭이 다시 보일 때(`watchVisibility`), 회원 조회 전·반영 전(`checkLoginMarker`, 연결은 5단계)
@@ -30,8 +33,8 @@
  *   표식을 잠금 안에서 써야 잠금을 기다리던 다른 탭이 새 쿠키로 보내기 전에 바뀐 표식을 본다.
  * - 서버가 로그인을 처리해 쿠키가 바뀌었는데 이 탭이 반영하지 않은 경우는 `loginNotAdopted()`로 알린다(5단계).
  * - 복원 성공 때는 잠금 안에서 읽어 둔 표식을 이 탭의 표식으로 삼는다. 표식만으로 인증 성공을 확정하지 않는다.
- * - 로그아웃 완료 뒤에도 기준값을 지우지 않는다. 비로그인 탭이 다른 탭 로그인에 어떻게 반응할지는 정하지 않았고, 감지 기록만 남는다.
- * - 표식 비교는 다른 탭의 로그인을 알아차리는 수단이다. 쿠키 경쟁·탭 종료 뒤 재전송(W4)을 해결하지 않는다.
+ * - 로그아웃 완료 뒤에도 기준값을 지우지 않는다. 비로그인 탭은 정리할 회원 화면이 없어 감지 기록만 남기고 새 로그인을 받는다.
+ * - 표식 비교는 다른 탭의 로그인을 알아차리는 수단이다. 쿠키 경쟁·탭 종료 뒤 재전송을 해결하지 않는다(팀장 결정 1: "갱신 응답 유실 후 재인증" 한계).
  * - `marker`를 넘기지 않으면 비교하지 않는다(4-1과 같음). 앱 연결(5단계)에서는 반드시 넘긴다.
  *
  * 한계
@@ -164,8 +167,10 @@ export type AuthSession = {
    * 예: 이전·종료된 시도의 성공(`loginSucceeded`가 null), 보낸 뒤 취소된 시도의 성공, 본문을 읽지 못한 200.
    * 반드시 그 로그인 요청을 보낸 `withSessionLock` 작업 안에서 부른다.
    * - 새 표식을 써서 같은 브라우저의 다른 탭이 다음 비교에서 새 로그인으로 알아차리게 한다(T3).
-   * - 이 탭은 `invalidateByLoginMarker()`로 감지 기록과 이전 세대 무효화만 한다. 쿠키가 바뀌었으므로 이 탭의 이전 세션으로
-   *   갱신하면 다른 로그인의 토큰을 받게 되기 때문이다. 감지 뒤 상태·화면·출구는 4-2와 같이 미지정이며, 이 탭의 로그인 성공으로만 풀린다.
+   * - 이 탭은 이전 세대를 끊고 자동 복원 없이 [다시 로그인]만 남긴다(`allowRestore: false`). 쿠키가 이 탭이 반영하지 않은
+   *   로그인 것이므로, 그 쿠키로 복원하면 사용자가 취소한 로그인을 이어받게 되기 때문이다. 이 탭의 로그인 성공으로만 풀린다.
+   *   Google 완료는 A 합의 1(세션 확인 결과로 이번 로그인의 성공을 판정하지 않음)을 적용한 것이고, 개발 로그인은 같은 안전 기준을 적용했다.
+   *   취소된 개발 로그인 성공의 반영(P1)은 별도 미결이다.
    */
   loginNotAdopted(): void;
   /** 지금 표식을 비교하고, 다르거나 읽을 수 없으면 이전 세대를 끊는다. 회원 조회 전·반영 전에 쓴다. `marker`가 없으면 null. */
@@ -181,12 +186,21 @@ export function createAuthSession(options: AuthSessionOptions): AuthSession {
   const lock = options.lock ?? createSessionLock();
   /** 마지막으로 잠금 안에서 읽은 표식. 복원 성공 때 이 탭의 표식으로 삼는다. */
   let lastReading: MarkerReading | null = null;
+  /** 감지 뒤 복원을 보낸다. 아래 반환 객체가 만들어진 뒤에 채운다. */
+  let startRecovery: () => void = () => {};
 
   const checkLoginMarker = (): MarkerComparison | null => {
     if (!marker) return null;
     const result = marker.compare();
-    // 감지 기록과 이전 세대 무효화만 한다(한 번만). 감지 뒤 정책은 실행하지 않는다.
-    if (result === "changed" || result === "unreadable" || result === "unconfirmed") store.invalidateByLoginMarker();
+    if (result === "same") store.loginMarkerConfirmed();
+    if (result === "changed" || result === "unreadable" || result === "unconfirmed") {
+      if (store.invalidateByLoginMarker() === "restore") {
+        // 복원하는 동안 같은 변경을 다시 감지하지 않도록 기준값을 비운다. 성공하면 refresh()가 그때 읽은 값을 기준값으로 삼는다.
+        marker.reset();
+        // 잠금 안에서 불릴 수 있으므로 기다리지 않고 예약만 한다(잠금이 풀린 뒤 차례로 보낸다).
+        queueMicrotask(startRecovery);
+      }
+    }
     return result;
   };
 
@@ -215,7 +229,7 @@ export function createAuthSession(options: AuthSessionOptions): AuthSession {
   const refreshClient = createRefreshClient({ store, transport: options.refreshTransport, lock: markedLock });
   const logoutClient = createLogoutClient({ store, transport: options.logoutTransport, session: refreshClient });
 
-  return {
+  const session: AuthSession = {
     async refresh() {
       checkLoginMarker();
       const restoring = store.getSnapshot().status === "restoring";
@@ -246,7 +260,7 @@ export function createAuthSession(options: AuthSessionOptions): AuthSession {
     },
     loginNotAdopted() {
       if (marker) marker.issue();
-      store.invalidateByLoginMarker();
+      store.invalidateByLoginMarker({ allowRestore: false });
     },
     checkLoginMarker,
     watchVisibility(target) {
@@ -258,4 +272,9 @@ export function createAuthSession(options: AuthSessionOptions): AuthSession {
     },
     lock,
   };
+  // 감지 뒤 복원은 일반 복원과 같은 경로(표식 비교·잠금·500 1회 재시도·응답 유실 뒤 차단)를 쓴다. 결과는 저장소 상태로 화면에 전해진다.
+  startRecovery = () => {
+    void session.refresh().catch(() => undefined);
+  };
+  return session;
 }

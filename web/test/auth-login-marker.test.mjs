@@ -126,13 +126,24 @@ async function twoTabs() {
   return { browser, locks, storage, a, b };
 }
 
-/** 감지 뒤 정책 미지정 상태 확인: 상태 그대로, 토큰 없음, 감지 기록, 갱신·로그아웃을 시작하지 않음. */
-function assertDetectedWithoutPolicy(store, status) {
+/** 감지 뒤 예약된 복원(잠금·대역 응답)이 끝날 때까지 기다린다. */
+const settle = async () => { for (let i = 0; i < 20; i += 1) await tick(); };
+
+/** 팀장 결정 2의 [다시 로그인]만 상태: 상태 값은 그대로, 화면 정리 표시, 토큰 없음, 감지 기록, 복원·갱신·로그아웃을 시작하지 않음. */
+function assertReloginOnly(store, status) {
   assert.equal(store.loginChangeDetected(), true);
+  assert.equal(store.getSnapshot().reloginOnly, true);
   assert.equal(store.getSnapshot().status, status);
   assert.equal(store.accessToken(), null);
   assert.equal(store.refreshStarted(), null);
   assert.equal(store.logoutStarted(), null);
+}
+
+/** 팀장 결정 2의 한 번 복원이 끝난 상태: 로그인, 감지 기록 없음, [다시 로그인]만 아님. */
+function assertRestoredOnce(store) {
+  assert.equal(store.getSnapshot().status, 'signed-in');
+  assert.equal(store.getSnapshot().reloginOnly, false);
+  assert.equal(store.loginChangeDetected(), false);
 }
 
 // ---- 표식 자체 ----
@@ -205,69 +216,107 @@ test('브라우저 저장소: 접근 자체가 예외면 null, getItem·setItem�
   }
 });
 
-// ---- 상태 저장소: 감지·무효화·보호 유지(정책 없음) ----
+// ---- 상태 저장소: 감지 뒤 처리([팀장 결정 2](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443)) ----
 
-test('invalidateByLoginMarker: 상태는 그대로 두고 세대·토큰·이전 요청 표만 끊으며, 한 번만 처리한다', () => {
+test('invalidateByLoginMarker(차단·보류 없음): 이전 세대·토큰·요청 표를 끊고 복원 중으로 바꿔 한 번만 복원하며, 표식이 같다고 확인되기 전 다시 감지되면 [다시 로그인]만 둔다', () => {
   const store = createAuthStore(); store.signedIn('access-1');
   const old = store.refreshStarted();
-  assert.equal(store.invalidateByLoginMarker(), true);
-  assert.equal(store.getSnapshot().generation, 2);
-  assertDetectedWithoutPolicy(store, 'signed-in');
+  assert.equal(store.invalidateByLoginMarker(), 'restore');
+  const s = store.getSnapshot();
+  assert.deepEqual([s.status, s.generation, s.reloginOnly], ['restoring', 2, false]); // 복원 중: 화면 범위가 없어 이전 화면·입력이 정리된다
+  assert.equal(store.accessToken(), null);
+  assert.equal(store.loginChangeDetected(), false);
   assert.equal(store.refreshSucceeded('access-late', old), false); // 이전 세대 결과 무시
+  const restore = store.refreshStarted();
+  assert.notEqual(restore, null);
+  assert.equal(store.refreshSucceeded('access-2', restore), true);
+  assertRestoredOnce(store);
+  // 복원 뒤 표식이 같다고 확인되기 전에 또 감지(표식 오류 지속): 다시 복원하지 않는다.
+  assert.equal(store.invalidateByLoginMarker(), 'relogin-only');
+  assertReloginOnly(store, 'signed-in');
   const settled = store.getSnapshot();
-  assert.equal(store.invalidateByLoginMarker(), false); // 다시 감지해도 바뀌지 않음
+  assert.equal(store.invalidateByLoginMarker(), null); // 다시 감지해도 바뀌지 않음
   assert.equal(store.getSnapshot(), settled);
 });
 
-test('invalidateByLoginMarker: 응답 유실 뒤 재전송 차단과 재인증 필요 상태를 그대로 둔다', () => {
+test('invalidateByLoginMarker: 복원 뒤 표식이 같다고 확인되면 다음 로그인 변경도 한 번 복원할 수 있다', () => {
   const store = createAuthStore(); store.signedIn('access-1');
-  store.refreshFailed(store.refreshStarted(), 'outcome-unknown');
-  assert.equal(store.invalidateByLoginMarker(), true);
-  assertDetectedWithoutPolicy(store, 'reauth-required');
-  store.signedIn('access-own'); // 기존 규칙: 이 탭의 로그인 성공은 이전 상태를 초기화한다
-  assert.equal(store.loginChangeDetected(), false);
-  assert.notEqual(store.refreshStarted(), null);
+  assert.equal(store.invalidateByLoginMarker(), 'restore');
+  store.refreshSucceeded('access-2', store.refreshStarted());
+  store.loginMarkerConfirmed();
+  assert.equal(store.invalidateByLoginMarker(), 'restore');
 });
 
-test('invalidateByLoginMarker: 로그아웃 결과 불명·진행 중 보류를 새 세대로 넘기고 이전 결과는 반영하지 않는다', () => {
+test('invalidateByLoginMarker: 응답 유실 뒤 재전송 차단이 있으면 복원하지 않고 [다시 로그인]만 두며 차단을 풀지 않는다. 차단 없는 재인증 필요 상태는 한 번 복원한다', () => {
+  const store = createAuthStore(); store.signedIn('access-1');
+  store.refreshFailed(store.refreshStarted(), 'outcome-unknown');
+  assert.equal(store.invalidateByLoginMarker(), 'relogin-only');
+  assertReloginOnly(store, 'reauth-required');
+  store.signedIn('access-own'); // 기존 규칙: 이 탭의 로그인 성공은 이전 상태를 초기화한다
+  assert.equal(store.loginChangeDetected(), false);
+  assert.equal(store.getSnapshot().reloginOnly, false);
+  assert.notEqual(store.refreshStarted(), null);
+
+  const plain = createAuthStore(); plain.signedIn('access-1');
+  plain.refreshFailed(plain.refreshStarted(), 'not-consumed');
+  assert.equal(plain.getSnapshot().status, 'reauth-required');
+  assert.equal(plain.invalidateByLoginMarker(), 'restore');
+  assert.equal(plain.getSnapshot().status, 'restoring');
+});
+
+test('invalidateByLoginMarker: 로그아웃 결과 불명·진행 중 보류가 있으면 [다시 로그인]만 두고, 보류를 새 세대로 넘기며 이전 결과는 반영하지 않는다', () => {
   for (const kind of ['unknown', 'pending']) {
     const store = createAuthStore(); store.signedIn('access-1');
     const logout = store.logoutStarted();
     if (kind === 'unknown') store.logoutSettled('unknown', logout);
-    assert.equal(store.invalidateByLoginMarker(), true);
-    assertDetectedWithoutPolicy(store, 'signed-in');
+    assert.equal(store.invalidateByLoginMarker(), 'relogin-only', kind);
+    assertReloginOnly(store, 'signed-in');
     assert.equal(store.getSnapshot().sessionHold, 'logout-unknown', kind);
     assert.equal(store.logoutSettled('done', logout), false);
     assert.equal(store.getSnapshot().sessionHold, 'logout-unknown');
   }
 });
 
-test('invalidateByLoginMarker: 복원 중·비로그인은 기록만 하고 상태를 바꾸지 않으며, 이 탭의 로그인 시도는 그대로 둔다', () => {
+test('invalidateByLoginMarker: 복원 중·비로그인은 기록만 하고 상태를 바꾸지 않는다. 이 탭의 로그인 시도 중이면 복원하지 않되 시도는 그대로 둔다', () => {
   for (const store of [createAuthStore(), createAuthStore('signed-out')]) {
     const before = store.getSnapshot();
-    assert.equal(store.invalidateByLoginMarker(), true);
+    assert.equal(store.invalidateByLoginMarker(), 'recorded');
     assert.equal(store.getSnapshot(), before);
     assert.equal(store.loginChangeDetected(), true);
   }
   const store = createAuthStore(); store.signedIn('access-1');
   const attempt = store.loginStarted();
-  store.invalidateByLoginMarker();
+  assert.equal(store.invalidateByLoginMarker(), 'relogin-only');
   assert.equal(store.signedIn('access-2', attempt), 3); // 시도는 살아 있다
   assert.equal(store.loginChangeDetected(), false);
+  assert.equal(store.getSnapshot().reloginOnly, false);
 });
 
-// ---- 다른 탭 로그인 감지(정책 미지정) ----
+test('invalidateByLoginMarker({ allowRestore: false }): 차단이 없어도 복원하지 않고 [다시 로그인]만 둔다(이 탭이 반영하지 않은 로그인)', () => {
+  const store = createAuthStore(); store.signedIn('access-1');
+  assert.equal(store.invalidateByLoginMarker({ allowRestore: false }), 'relogin-only');
+  assertReloginOnly(store, 'signed-in');
+});
 
-test('[대역] 다른 탭 로그인을 다음 갱신 전에 감지하면 이전 세대를 끊고, 정책이 없으므로 복원·상태 전환을 하지 않는다', async () => {
+// ---- 다른 탭 로그인 감지(대역) ----
+
+test('[대역] 다른 탭 로그인을 다음 갱신 전에 감지하면 이전 세대를 끊고 복원 중(화면 정리)을 거쳐 지금 쿠키로 한 번 복원한다', async () => {
   const { browser, a, b } = await twoTabs();
   const g = a.store.getSnapshot().generation;
   assert.equal(await loginIn(b, browser, 'Y'), 1);
   const requests = browser.count('refresh');
-  assert.deepEqual(await a.session.refresh(), { kind: 'not-started' });
-  assert.equal(browser.count('refresh'), requests); // 자동 복원 없음
-  assert.equal(a.store.getSnapshot().generation, g + 1);
-  assertDetectedWithoutPolicy(a.store, 'signed-in');
-  assert.equal(browser.memberOfJar(), 'Y');
+  const statuses = [];
+  a.store.subscribe(() => statuses.push(a.store.getSnapshot().status));
+  assert.deepEqual(await a.session.refresh(), { kind: 'signed-in' });
+  await settle();
+  assert.deepEqual(statuses, ['restoring', 'signed-in']);
+  assert.equal(browser.count('refresh'), requests + 1); // 복원 1건
+  assert.equal(a.store.getSnapshot().generation, g + 2);
+  assertRestoredOnce(a.store);
+  assert.match(a.store.accessToken(), /^access-Y-/); // 지금 쿠키(B의 로그인)
+  assert.equal(a.session.checkLoginMarker(), 'same'); // 복원 때 읽은 표식을 기준값으로 삼음
+  assert.deepEqual(await a.session.refresh(), { kind: 'signed-in' }); // 이후 같은 세션 갱신
+  assert.equal(browser.count('refresh'), requests + 2);
 });
 
 test('[대역] 같은 세션의 단순 갱신은 표식이 같아 세대·스냅샷을 바꾸지 않는다', async () => {
@@ -279,7 +328,7 @@ test('[대역] 같은 세션의 단순 갱신은 표식이 같아 세대·스냅
   assert.equal(a.store.loginChangeDetected(), false);
 });
 
-test('[대역] 잠금을 기다리는 동안 다른 탭이 로그인하면, 잠금을 얻은 뒤 이전 세션 갱신을 보내지 않는다', async () => {
+test('[대역] 잠금을 기다리는 동안 다른 탭이 로그인하면, 잠금을 얻은 뒤 이전 세션 갱신을 보내지 않고 지금 쿠키로 한 번 복원한다', async () => {
   const { browser, a, b } = await twoTabs();
   const hold = deferred();
   const bLogin = loginIn(b, browser, 'Y', { hold: hold.promise });
@@ -288,8 +337,11 @@ test('[대역] 잠금을 기다리는 동안 다른 탭이 로그인하면, 잠�
   hold.resolve();
   await bLogin;
   assert.deepEqual(await pending, { kind: 'discarded', sent: false });
-  assert.deepEqual(browser.state.log, ['refresh C1→200', 'login Y']);
-  assertDetectedWithoutPolicy(a.store, 'signed-in');
+  assert.deepEqual(browser.state.log.slice(0, 2), ['refresh C1→200', 'login Y']);
+  await settle();
+  assert.equal(browser.count('refresh'), 2); // 처음 복원 + 감지 뒤 복원. 이전 세션(C2) 갱신은 없음
+  assertRestoredOnce(a.store);
+  assert.match(a.store.accessToken(), /^access-Y-/);
 });
 
 test('[대역] 잠금을 기다리는 동안 다른 탭이 로그인하면, 이전 세션 로그아웃을 보내지 않아 새 로그인 세션을 끊지 않는다', async () => {
@@ -301,11 +353,13 @@ test('[대역] 잠금을 기다리는 동안 다른 탭이 로그인하면, 이�
   hold.resolve();
   await bLogin;
   assert.deepEqual(await pending, { kind: 'discarded', sent: false });
-  assert.deepEqual(browser.state.log, ['refresh C1→200', 'login Y']);
+  await settle();
+  assert.deepEqual(browser.state.log, ['refresh C1→200', 'login Y']); // 로그아웃 보류 중 감지: 복원·갱신·로그아웃 없음
+  assertReloginOnly(a.store, 'signed-in');
   assert.equal(browser.memberOfJar(), 'Y');
 });
 
-test('[대역] 응답 반영 전 비교: 갱신 응답을 기다리는 사이 표식이 바뀌면(잠금 밖에서 쓰인 경우) 그 결과를 반영하지 않는다', async () => {
+test('[대역] 응답 반영 전 비교: 갱신 응답을 기다리는 사이 표식이 바뀌면(잠금 밖에서 쓰인 경우) 그 결과를 반영하지 않고, 한 번 복원한 결과만 쓴다', async () => {
   const hold = deferred();
   const { a, b } = await twoTabs();
   // A의 저장소·표식에 응답을 늦추는 갱신 대역을 붙인 세션을 만들고, 응답을 기다리는 사이 다른 탭이 표식만 바꾼다.
@@ -317,10 +371,14 @@ test('[대역] 응답 반영 전 비교: 갱신 응답을 기다리는 사이 �
   b.marker.issue(); // 잠금을 쓰지 않는 환경의 다른 탭 로그인(표식만 바뀜)
   hold.resolve();
   assert.deepEqual(await pending, { kind: 'discarded', sent: true });
-  assertDetectedWithoutPolicy(a.store, 'signed-in');
+  assert.equal(a.store.getSnapshot().status, 'restoring'); // 늦은 응답(C2)으로 로그인 상태를 되살리지 않음
+  await settle();
+  assertRestoredOnce(a.store);
+  assert.equal(a.store.accessToken(), 'access-X-C3'); // 복원 응답의 토큰. 늦은 응답의 토큰(access-X-C2)이 아님
+  assert.equal(browser.count('refresh'), 2);
 });
 
-test('[대역] 탭이 다시 보일 때 표식을 비교하고, 숨겨질 때는 비교하지 않는다', async () => {
+test('[대역] 탭이 다시 보일 때 표식을 비교하고(감지하면 한 번 복원), 숨겨질 때는 비교하지 않는다', async () => {
   const { browser, a, b } = await twoTabs();
   const listeners = new Set();
   const doc = { visibilityState: 'hidden', addEventListener: (_, fn) => listeners.add(fn), removeEventListener: (_, fn) => listeners.delete(fn) };
@@ -333,12 +391,15 @@ test('[대역] 탭이 다시 보일 때 표식을 비교하고, 숨겨질 때는
   doc.visibilityState = 'visible';
   fire();
   assert.equal(a.store.getSnapshot().generation, before.generation + 1);
-  assertDetectedWithoutPolicy(a.store, 'signed-in');
+  assert.equal(a.store.getSnapshot().status, 'restoring');
+  await settle();
+  assertRestoredOnce(a.store);
+  assert.match(a.store.accessToken(), /^access-Y-/);
   stop();
   assert.equal(listeners.size, 0);
 });
 
-test('[대역] 알고 있던 표식이 사라지면 새 로그인으로 처리해 감지·무효화한다', async () => {
+test('[대역] 알고 있던 표식이 사라지면 새 로그인으로 처리해 감지하고 한 번 복원한다', async () => {
   const { storage, a } = await twoTabs();
   storage.map.set(LOGIN_MARKER_KEY, 'a'.repeat(32));
   storage.map.delete(LOGIN_MARKER_KEY); // A의 기준값(null)과 같아짐
@@ -349,15 +410,20 @@ test('[대역] 알고 있던 표식이 사라지면 새 로그인으로 처리�
   a.marker.adopt(a.marker.read()); // A가 지금 값을 기준값으로
   storage.map.delete(LOGIN_MARKER_KEY);
   assert.equal(a.session.checkLoginMarker(), 'changed');
-  assertDetectedWithoutPolicy(a.store, 'signed-in');
+  assert.equal(a.store.getSnapshot().status, 'restoring');
+  await settle();
+  assertRestoredOnce(a.store);
 });
 
-test('[대역·한계] 로그인 뒤 표식을 쓰지 못하면 그 탭은 곧바로 감지 상태가 되고, 다른 탭은 알아차리지 못해 새 세션을 같은 세션으로 갱신한다', async () => {
+test('[대역·한계] 로그인 뒤 표식을 쓰지 못하면 그 탭은 곧바로 감지해 지금 쿠키(자기 로그인)로 한 번 복원하고, 다른 탭은 알아차리지 못해 새 세션을 같은 세션으로 갱신한다', async () => {
   const { storage, browser, a, b } = await twoTabs();
   storage.failWrite = true;
   assert.equal(await loginIn(b, browser, 'Y'), 1); // 로그인 자체는 반영됨
-  assert.equal(b.store.getSnapshot().generation, 2); // 잠금 안 사후 비교에서 unconfirmed → 감지·무효화
-  assertDetectedWithoutPolicy(b.store, 'signed-in');
+  assert.equal(b.store.getSnapshot().generation, 2); // 잠금 안 사후 비교에서 unconfirmed → 감지
+  assert.equal(b.store.getSnapshot().status, 'restoring');
+  await settle();
+  assertRestoredOnce(b.store);
+  assert.match(b.store.accessToken(), /^access-Y-/);
   const before = a.store.getSnapshot();
   assert.deepEqual(await a.session.refresh(), { kind: 'signed-in' });
   assert.equal(a.store.getSnapshot(), before); // A는 바뀜을 모른 채
@@ -373,7 +439,7 @@ test('진행 중인 시도가 아닌 로그인 성공은 무시하고 표식도 
   assert.equal(storage.map.size, 0);
 });
 
-test('(정책 미지정) 로그아웃한 탭은 기준값을 지우지 않고, 다른 탭 로그인을 감지해도 기록만 하고 상태·요청은 바꾸지 않는다', async () => {
+test('(비로그인 탭) 로그아웃한 탭은 기준값을 지우지 않고, 다른 탭 로그인을 감지해도 기록만 하고 상태·요청은 바꾸지 않는다', async () => {
   const { browser, a, b } = await twoTabs();
   assert.deepEqual(await a.session.logout(), { kind: 'settled', result: 'done' });
   await loginIn(b, browser, 'Y');
@@ -425,7 +491,7 @@ for (const [name, apply] of Object.entries(breakMarker)) {
     assert.notEqual(session.checkLoginMarker(), 'same');
     assert.equal(calls.refresh, 2); // 유실된 요청 뒤로 한 건도 더 나가지 않음
     assert.equal(store.getSnapshot().generation, g + 1);
-    assertDetectedWithoutPolicy(store, 'reauth-required');
+    assertReloginOnly(store, 'reauth-required');
   });
 
   test(`[회귀] 로그아웃 결과 불명 중 표식 ${name}이 생겨도 보호 호출·갱신 보류가 유지된다`, async () => {
@@ -440,7 +506,7 @@ for (const [name, apply] of Object.entries(breakMarker)) {
     assert.deepEqual([calls.refresh, calls.logout], [1, 1]); // 복원 1건·로그아웃 1건 뒤로 추가 전송 없음
     assert.equal(s.sessionHold, 'logout-unknown');
     assert.equal(store.accessToken(), null); // 보호 API에 쓸 토큰 없음(보호 호출 조건: sessionHold null·signed-in·토큰)
-    assertDetectedWithoutPolicy(store, 'signed-in');
+    assertReloginOnly(store, 'signed-in');
   });
 }
 
@@ -460,49 +526,60 @@ test('[회귀] 로그아웃 진행 중 다른 탭 로그인이 감지되면 늦�
   assert.equal(store.getSnapshot().sessionHold, 'logout-unknown');
   assert.deepEqual(await delayed.refresh(), { kind: 'not-started' });
   assert.deepEqual([calls.refresh, calls.logout], [1, 1]);
-  assertDetectedWithoutPolicy(store, 'signed-in');
+  assertReloginOnly(store, 'signed-in');
 });
 
-test('[회귀] 일시적인 저장소 오류가 복구되면 표식 비교가 재개되고 다른 탭의 로그인 변경을 감지한다(요청은 보내지 않음)', async () => {
+test('[회귀] 일시적인 저장소 오류는 한 번 복원으로 끝나고, 복구 뒤 표식이 같다고 확인되면 다음 로그인 변경도 한 번 복원한다', async () => {
   const { browser, storage, a, b } = await twoTabs();
-  const requests = browser.state.log.length;
+  const refreshes = browser.count('refresh');
   storage.failRead = true;
-  assert.equal(a.session.checkLoginMarker(), 'unreadable'); // 합의: 새 로그인으로 처리(감지·무효화)
-  assertDetectedWithoutPolicy(a.store, 'signed-in');
-  storage.failRead = false; // 저장소 복구
-  assert.equal(a.session.checkLoginMarker(), 'same'); // 다시 읽어 비교 재개(감지 기록은 정책 없이 풀지 않음)
+  assert.equal(a.session.checkLoginMarker(), 'unreadable'); // 합의: 새 로그인으로 처리
+  assert.equal(a.store.getSnapshot().status, 'restoring');
+  storage.failRead = false; // 복원을 보내기 전에 저장소 복구
+  await settle();
+  assertRestoredOnce(a.store);
+  assert.equal(browser.count('refresh'), refreshes + 1);
+  assert.equal(a.session.checkLoginMarker(), 'same'); // 다시 읽어 비교 재개
   await loginIn(b, browser, 'Y');
   assert.equal(a.session.checkLoginMarker(), 'changed'); // 다른 탭 로그인 변경 감지
-  assert.equal(browser.state.log.length, requests + 1); // B의 로그인 1건뿐, A는 요청하지 않음
+  await settle();
+  assertRestoredOnce(a.store);
+  assert.equal(browser.count('refresh'), refreshes + 2);
+  assert.match(a.store.accessToken(), /^access-Y-/);
 });
 
-test('[회귀] 정책 미지정 상태에서는 감지 뒤 상태 전환·자동 복원·반복 요청이 일어나지 않는다', async () => {
+test('[회귀] 표식 오류가 이어지면 한 번 복원한 뒤 [다시 로그인]만 남기고, 복원·갱신·로그아웃을 반복하지 않는다', async () => {
   const { browser, storage, a } = await twoTabs();
   const listeners = new Set();
   const doc = { visibilityState: 'visible', addEventListener: (_, fn) => listeners.add(fn), removeEventListener: (_, fn) => listeners.delete(fn) };
   a.session.watchVisibility(doc);
   const g = a.store.getSnapshot().generation;
-  const requests = browser.state.log.length;
+  const refreshes = browser.count('refresh');
   storage.failRead = true; // 저장소 오류가 계속됨
   for (let i = 0; i < 5; i += 1) {
-    assert.deepEqual(await a.session.refresh(), { kind: 'not-started' });
-    assert.deepEqual(await a.session.logout(), { kind: 'not-started' });
+    await a.session.refresh();
+    await a.session.logout();
     a.session.checkLoginMarker();
     for (const fn of listeners) fn();
+    await settle();
   }
-  assert.equal(browser.state.log.length, requests); // 요청 0건
-  assert.equal(a.store.getSnapshot().generation, g + 1); // 무효화는 한 번
-  assertDetectedWithoutPolicy(a.store, 'signed-in');
+  assert.equal(browser.count('refresh'), refreshes + 1); // 감지 뒤 복원 1건뿐
+  assert.equal(browser.count('logout'), 0);
+  assert.equal(a.store.getSnapshot().generation, g + 3); // 무효화·복원 성공·[다시 로그인]만 전환 각 한 번
+  assertReloginOnly(a.store, 'signed-in');
 });
 
-test('[회귀] 합의된 정상 경로: 이 탭의 로그인 성공은 기존 규칙대로 이전 상태를 초기화하고 표식을 새로 써 다시 갱신할 수 있다', async () => {
+test('[회귀] [다시 로그인]만 남은 탭도 이 탭의 로그인 성공은 기존 규칙대로 이전 상태를 초기화하고 표식을 새로 써 다시 갱신할 수 있다', async () => {
   const { browser, storage, a } = await twoTabs();
   storage.failRead = true;
   a.session.checkLoginMarker();
-  assertDetectedWithoutPolicy(a.store, 'signed-in');
+  await settle(); // 한 번 복원(표식을 읽지 못해 기준값 미확인)
+  a.session.checkLoginMarker(); // 오류 지속 → [다시 로그인]만
+  assertReloginOnly(a.store, 'signed-in');
   storage.failRead = false;
   assert.equal(await loginIn(a, browser, 'Z'), a.store.getSnapshot().generation);
   assert.equal(a.store.loginChangeDetected(), false);
+  assert.equal(a.store.getSnapshot().reloginOnly, false);
   assert.equal(a.marker.compare(), 'same');
   assert.deepEqual(await a.session.refresh(), { kind: 'signed-in' });
   assert.match(a.store.accessToken(), /^access-Z-/);

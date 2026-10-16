@@ -9,7 +9,9 @@
  * - 로그인 성공·복원 성공으로 인증 세대가 바뀌어 `signed-in`이 될 때 새 번호.
  * - 비로그인·복원 중이면 null.
  * - Access 갱신·재인증 필요·로그아웃 진행/실패/불명은 세대를 바꾸지 않으므로 그대로다.
- * - 로그인 표식 불일치 감지(4-2)는 세대를 올리지만 감지 뒤 화면 정책이 미결이라 번호를 바꾸지 않는다(임시 처리).
+ * - 다른 탭의 새 로그인 감지(로그인 표식 변경)는 기존 자료·입력을 정리한다([팀장 결정 2](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443)).
+ *   차단 없는 탭은 복원 중이 되어 null, 복원이 성공하면 새 번호다. 차단·보류·지속 오류 탭은 `reloginOnly`라 null이다.
+ *   같은 회원이 다른 탭에서 다시 로그인해도 이 탭의 작성 중 입력은 사라진다(T3에서 입력을 잃는 쪽을 택한 한계).
  *
  * 다른 화면 호환(통합 시험 전환이 켜졌을 때만 `auth-runtime.ts`가 연결한다)
  * - 내 자산·공유 링크의 회원 범위(`assets-session-scope`·`member-session-scope`)는 `accessTokenStore`의 값이 바뀔 때 화면을 새로 만든다.
@@ -30,18 +32,15 @@ let nextScope = 0;
 
 export function createSessionScope(store: AuthStore): SessionScope {
   let seen: AuthSnapshot | null = null;
-  let seenDetected = false;
   let scope: number | null = null;
   let generation: number | null = null;
 
   const update = () => {
     const snapshot = store.getSnapshot();
-    const detected = store.loginChangeDetected();
-    if (snapshot === seen && detected === seenDetected) return;
+    if (snapshot === seen) return;
     seen = snapshot;
-    seenDetected = detected;
-    if (detected) return; // 감지 뒤 정책 미지정: 화면 범위를 그대로 둔다.
-    if (snapshot.status === "signed-in" || snapshot.status === "reauth-required") {
+    // 표식 변경 감지 뒤 [다시 로그인]만 받는 탭은 화면·입력을 정리한다(팀장 결정 2). 복원하는 탭은 복원 중이라 아래에서 null이 된다.
+    if ((snapshot.status === "signed-in" || snapshot.status === "reauth-required") && !snapshot.reloginOnly) {
       if (scope === null || snapshot.generation !== generation) {
         scope = ++nextScope;
         generation = snapshot.generation;

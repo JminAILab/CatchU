@@ -33,7 +33,7 @@ export function SessionLoginPanel() {
   const { sessionScope, me, retry } = useSessionMemberLookup("login");
   const signedIn = auth.status === "signed-in" && sessionScope !== null && !detected;
   // 복원 확인 중(확인 실패 표시 전)에는 로그인 입력을 보이지 않는다. 그 밖의 비로그인·재인증 필요·확인 실패와
-  // 로그인 변경 감지 뒤(이 탭의 새 로그인만 받는다, 4-2)에는 새 로그인을 받는다.
+  // 로그인 변경 감지 뒤 [다시 로그인]만 받는 탭(팀장 결정 2)에는 새 로그인을 받는다.
   const canLogin = !signedIn && !(auth.status === "restoring" && !auth.restoreUnconfirmed);
   useEffect(() => {
     if (signedIn && me.state === "loaded") {
