@@ -70,6 +70,22 @@ test('대문자 접두사·질의 문자열·#·깨진 퍼센트 인코딩·DB �
   }
 });
 
+test('URL이 DB 번호로 정규화하는 경로(.. · . · %2e)도 원문으로 보고 어느 환경에서나 거부한다(worker와 같은 판정)', () => {
+  const paths = ['/1/../0', '/%2e/0', '/%2E/0', '/./0', '/1/%2e%2e/0', '/x/../15'];
+  for (const path of paths) {
+    // 전제: URL은 이 경로를 DB 번호 하나로 바꾼다(원문을 보지 않으면 통과한다).
+    assert.match(new URL(`redis://127.0.0.1:6379${path}`).pathname, /^\/[0-9]{1,2}$/, path);
+    rejects(() => dev(`redis://127.0.0.1:6379${path}`), 'CATCHU_QUEUE_REDIS_URL');
+    rejects(() => dev(`rediss://:${SECRET}@queue.example.internal:6379${path}`), 'CATCHU_QUEUE_REDIS_URL');
+    rejects(() => prod(`rediss://:${SECRET}@queue.example.internal:6379${path}`), 'CATCHU_QUEUE_REDIS_URL');
+  }
+  // 정상 경로는 그대로 받는다.
+  for (const path of ['', '/0', '/15', '/99']) {
+    assert.ok(dev(`redis://127.0.0.1:6379${path}`), path);
+    assert.ok(prod(`rediss://:${SECRET}@queue.example.internal:6379${path}`), path);
+  }
+});
+
 test('접두사는 영문·숫자·_·- 64자 이하(첫 글자 영문·숫자)만 받고 오류에 값을 싣지 않는다', () => {
   assert.equal(dev('redis://127.0.0.1', { CATCHU_QUEUE_PREFIX: 'a'.repeat(64) }).prefix, 'a'.repeat(64));
   for (const prefix of ['a'.repeat(65), `-${SECRET}`, `_${SECRET}`, `${SECRET}:x`, `${SECRET} x`, `${SECRET}{x}`, '큐']) {

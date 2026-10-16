@@ -51,7 +51,12 @@ function validRedisUrl(value: string, development: boolean): boolean {
   } catch {
     return false;
   }
-  if (!HOST.test(url.hostname) || !DATABASE_PATH.test(url.pathname)) return false;
+  // 경로는 URL이 정규화하기 전의 원문으로 본다. URL은 `/1/../0`·`/%2e/0`을 `/0`으로 바꾸지만 worker(urlsplit)는 원문을 거부한다.
+  // 질의 문자열·#은 위에서 거부했으므로 주소 부분 뒤 첫 `/`부터 끝까지가 경로다.
+  const afterScheme = value.slice(value.indexOf('://') + 3);
+  const slash = afterScheme.indexOf('/');
+  const rawPath = slash === -1 ? '' : afterScheme.slice(slash);
+  if (!HOST.test(url.hostname) || !DATABASE_PATH.test(rawPath)) return false;
   if (url.port !== '' && (Number(url.port) < 1 || Number(url.port) > 65535)) return false;
   let password: string;
   try {
