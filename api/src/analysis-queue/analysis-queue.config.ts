@@ -8,10 +8,12 @@ export interface AnalysisQueueConfig {
 
 export const DEFAULT_QUEUE_PREFIX = 'catchu';
 
-// worker(app/consumer/settings.py)와 같은 판정이다. 큐 주소·접두사는 worker와 같은 설정 이름을 쓴다.
+// 큐 주소·접두사는 worker와 같은 설정 이름을 쓰고, 호스트·포트·DB 번호 경로·질의 문자열은 worker(app/consumer/settings.py)와 같이 판정한다.
+// 운영 비밀번호 필수, 대문자 접두사·풀리지 않는 퍼센트 인코딩 거부는 api가 더 엄격하다.
 const HOST = /^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/;
 const PREFIX = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
-const DATABASE_PATH = /^(?:\/(?:[0-9]{1,2})?)?$/;
+// 경로는 없거나 /0~/99. 끝 슬래시만 있는 주소(…:6379/)는 worker가 거부하므로 api도 거부한다(한쪽만 기동하지 않게).
+const DATABASE_PATH = /^(?:\/[0-9]{1,2})?$/;
 
 class AnalysisQueueConfigError extends Error {
   constructor(message: string) { super(message); this.name = 'AnalysisQueueConfigError'; }

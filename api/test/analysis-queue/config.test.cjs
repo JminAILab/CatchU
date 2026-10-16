@@ -35,7 +35,7 @@ test('개발·시험은 redis://·rediss://를 받고 접두사 기본값은 cat
   }
   assert.equal(dev('rediss://queue.example.internal:6380').redisUrl, 'rediss://queue.example.internal:6380');
   assert.equal(dev('redis://localhost').prefix, 'catchu');
-  for (const path of ['/', '/0', '/15', '/99']) assert.ok(dev(`redis://127.0.0.1:6379${path}`), path);
+  for (const path of ['', '/0', '/15', '/99']) assert.ok(dev(`redis://127.0.0.1:6379${path}`), path);
   assert.equal(dev('redis://127.0.0.1:6379', { CATCHU_QUEUE_PREFIX: 'catchu-test_1' }).prefix, 'catchu-test_1');
 });
 
@@ -58,6 +58,8 @@ test('대문자 접두사·질의 문자열·#·깨진 퍼센트 인코딩·DB �
     `rediss://:${SECRET}@queue.example.internal:6379#${SECRET}`, `rediss://:${SECRET}%zz@queue.example.internal:6379`,
     `rediss://:${SECRET}%E0%A4%A@queue.example.internal:6379`, `rediss://%zz:${SECRET}@queue.example.internal:6379`,
     `rediss://:${SECRET}@queue.example.internal:6379/100`, `rediss://:${SECRET}@queue.example.internal:6379/a`,
+    // worker는 끝 슬래시만 있는 경로를 거부한다. 한쪽만 기동하지 않게 api도 거부한다.
+    `rediss://:${SECRET}@queue.example.internal:6379/`, 'redis://127.0.0.1:6379/',
     `rediss://:${SECRET}@queue.example.internal:6379/0/x`, `rediss://:${SECRET}@:6379`, `rediss://:${SECRET}@queue.example.internal:0`,
     `rediss://:${SECRET}@queue.example.internal:65536`, `rediss://:${SECRET}@-queue.example.internal`, `rediss://:${SECRET}@[::1]:6379`,
     `rediss://:${SECRET}@queue.example.internal:6379 `, `rediss://:${SECRET}@queue.example.internal\n`, `rediss://:${SECRET}@큐.example.internal`,
@@ -78,7 +80,7 @@ test('접두사는 영문·숫자·_·- 64자 이하(첫 글자 영문·숫자)�
 test('받은 주소를 ioredis가 같은 뜻으로 읽는다: rediss://만 TLS, DB 번호·비밀번호', async () => {
   const cases = [
     [prod(`rediss://:${SECRET}@queue.example.internal:6380/3`), { tls: true, db: 3, port: 6380, password: SECRET }],
-    [dev('redis://127.0.0.1:6379/'), { tls: undefined, db: 0, port: 6379, password: null }],
+    [dev('redis://127.0.0.1:6379/0'), { tls: undefined, db: 0, port: 6379, password: null }],
     [dev('redis://127.0.0.1'), { tls: undefined, db: 0, port: 6379, password: null }],
   ];
   for (const [config, expected] of cases) {
