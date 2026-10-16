@@ -1,0 +1,47 @@
+schemaVersion: '2.2'
+description: CatchU dev server deploy (#313). Pulls the deploy-files bundle by digest and runs its server-deploy.sh. Inputs are a commit and five image digests only.
+# 개발 서버 자동 배포(#313)의 SSM 문서 catchu-dev-deploy. 배포 역할은 이 문서만 이 서버에 보낼 수 있다.
+# 입력은 형식을 검사한 커밋 하나와 digest 다섯 개다. 묶음 이미지에서 꺼낸 server-deploy.sh가 나머지를 한다.
+# 이 파일을 바꾸면 AWS의 문서도 갱신한다(deploy/dev-server/README.md 「자동 배포」 「처음 준비」). 설명 문장은 AWS가 영문만 받아 영문으로 둔다.
+parameters:
+  Commit:
+    type: String
+    allowedPattern: '^[0-9a-f]{40}$'
+  WebDigest:
+    type: String
+    allowedPattern: '^sha256:[0-9a-f]{64}$'
+  ApiDigest:
+    type: String
+    allowedPattern: '^sha256:[0-9a-f]{64}$'
+  MigrationDigest:
+    type: String
+    allowedPattern: '^sha256:[0-9a-f]{64}$'
+  WorkerDigest:
+    type: String
+    allowedPattern: '^sha256:[0-9a-f]{64}$'
+  FilesDigest:
+    type: String
+    allowedPattern: '^sha256:[0-9a-f]{64}$'
+mainSteps:
+  - action: aws:runShellScript
+    name: deploy
+    inputs:
+      timeoutSeconds: '1200'
+      runCommand:
+        - '#!/bin/bash'
+        - set -euo pipefail
+        - umask 022
+        # 두 배포가 겹치지 않게 서버에서도 잠근다(GitHub 쪽 동시 실행 막기와 별개).
+        - exec 9>/opt/catchu/deploy.lock
+        - 'flock -n 9 || { echo "멈춤: 다른 배포가 진행 중이다"; exit 10; }'
+        - REG="$(aws sts get-caller-identity --query Account --output text).dkr.ecr.ap-northeast-2.amazonaws.com"
+        - aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin "$REG" >/dev/null
+        - trap 'docker logout "$REG" >/dev/null 2>&1 || true' EXIT
+        - FILES="$REG/catchu-deploy-files@{{ FilesDigest }}"
+        - docker pull -q "$FILES" >/dev/null
+        - NEW=/opt/catchu/deploy-src.new
+        - rm -rf "$NEW" && mkdir -p "$NEW"
+        - CID=$(docker create "$FILES" /none)
+        - 'docker cp "$CID:/deploy-src/." "$NEW/" >/dev/null || { docker rm "$CID" >/dev/null; echo "멈춤: 배포 파일 묶음을 꺼내지 못했다"; exit 11; }'
+        - docker rm "$CID" >/dev/null
+        - bash "$NEW/deploy/dev-server/cd/server-deploy.sh" --registry "$REG" --commit '{{ Commit }}' --web '{{ WebDigest }}' --api '{{ ApiDigest }}' --migration '{{ MigrationDigest }}' --worker '{{ WorkerDigest }}' --files '{{ FilesDigest }}'
