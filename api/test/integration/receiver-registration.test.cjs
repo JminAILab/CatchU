@@ -214,8 +214,65 @@ test('공급 실패 시 이전 유효 관측 보존, 원본 재공개 관측으�
   await db.query(`INSERT INTO repository_protection (protection_id,owner_id,repository_id,applied_restriction,
     confirmed_source_state,observation_provenance,observed_at) VALUES ($1,$2,$3,'SOURCE_PRIVATE',$4,$5,$6)`,
     [randomUUID(),next.memberId,next.repositoryId,existing.confirmedSourceState,existing.observationProvenance,existing.observedAt]);
+  const kept = await db.query('SELECT * FROM repository_protection WHERE owner_id=$1', [next.memberId]);
   await receive(pipeline().service, next);
-  assert.equal((await db.query('SELECT applied_restriction FROM repository_protection WHERE owner_id=$1', [next.memberId]))[0].applied_restriction, 'SOURCE_PRIVATE');
+  assert.deepEqual(await db.query('SELECT * FROM repository_protection WHERE owner_id=$1', [next.memberId]), kept);
+});
+
+// #314 10월 정책 공급자가 돌려주는 '관측 안 함' NONE과 같은 모양의 합성 값. 이 브랜치에는 그 공급자가 없다.
+function notObserved(context) {
+  return { ownerId: context.memberId, repositoryId: context.repositoryId,
+    githubRepository: { owner: 'synthetic-owner', name: 'synthetic-repo' },
+    confirmedSourceState: { observation: 'NOT_OBSERVED', sourceMode: context.sourceMode },
+    observationProvenance: { policy: 'OCTOBER_2026_NOT_OBSERVED', description: '10월 관측 안 함(9/28 결정)' },
+    observedAt: new Date(), appliedRestriction: 'NONE' };
+}
+// 앞선 등록이 남긴 보호 기록. 근거·시각을 정책값과 다르게 둬 덮어쓰기를 구분한다.
+async function insertProtection(result, restriction) {
+  await db.query(`INSERT INTO repository_protection (protection_id,owner_id,repository_id,applied_restriction,
+    confirmed_source_state,observation_provenance,observed_at) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [randomUUID(), result.memberId, result.repositoryId, restriction, { synthetic: true, visibility: 'PRIVATE' },
+      { synthetic: true, provider: 'earlier' }, new Date('2026-10-01T00:00:00Z')]);
+  return db.query('SELECT * FROM repository_protection');
+}
+
+for (const sourceMode of ['MOCK', 'LIVE']) test(`기존 SOURCE_PRIVATE에 '관측 안 함' NONE 공급: 제한·확인 상태·출처·시각을 보존하고 Catch는 PRIVATE 등록(${sourceMode})`, async () => {
+  const result = await prepare(undefined, { sourceMode });
+  const before = await insertProtection(result, 'SOURCE_PRIVATE');
+  const output = await receive(pipeline(async context => notObserved(context)).service, result);
+  assert.equal(output.application.registeredCatchIds.length, 1);
+  assert.equal(output.application.ownerResultsReady, true);
+  assert.equal((await state(result)).application, 'APPLIED');
+  assert.deepEqual(await db.query('SELECT * FROM repository_protection'), before);
+  const [asset] = await db.query('SELECT catch_id, visibility FROM catch_asset');
+  assert.equal(asset.visibility, 'PRIVATE');
+  assert.equal((await new OwnerCatchStore(db).get(result.memberId, asset.catch_id)).catchId, asset.catch_id);
+});
+
+test("보호 기록이 없으면 '관측 안 함' NONE 기록을 Catch 등록과 함께 만든다", async () => {
+  const result = await prepare();
+  const supplied = notObserved(result);
+  await receive(pipeline(async () => supplied).service, result);
+  assert.deepEqual(await db.query(`SELECT owner_id, repository_id, applied_restriction, confirmed_source_state,
+    observation_provenance, observed_at, observation_failure FROM repository_protection`), [{
+    owner_id: result.memberId, repository_id: result.repositoryId, applied_restriction: 'NONE',
+    confirmed_source_state: supplied.confirmedSourceState, observation_provenance: supplied.observationProvenance,
+    observed_at: supplied.observedAt, observation_failure: null }]);
+  assert.equal((await counts()).catches, 1);
+  assert.equal((await state(result)).application, 'APPLIED');
+});
+
+for (const previous of [null, 'NONE', 'SOURCE_PRIVATE']) test(`'관측 안 함' 공급 뒤 근거 저장 실패: 보호 기록(${previous ?? '신규'})·Catch·완료를 함께 롤백하고 수신 보존`, async () => {
+  const result = await prepare();
+  const before = previous ? await insertProtection(result, previous) : [];
+  await db.query('ALTER TABLE catch_evidence ADD CONSTRAINT test_reject_evidence CHECK (false) NOT VALID');
+  const { service, logs } = pipeline(async context => notObserved(context));
+  try { await assert.rejects(receive(service, result), AnalysisRegistrationError); }
+  finally { await db.query('ALTER TABLE catch_evidence DROP CONSTRAINT test_reject_evidence'); }
+  assert.deepEqual(await db.query('SELECT * FROM repository_protection'), before);
+  assert.deepEqual(await counts(), { catches: 0, evidence: 0, registrations: 0, receipts: 1 });
+  assert.equal((await state(result)).application, 'APPLY_FAILED');
+  assert.ok(logs.some(l => l.code === 'STORAGE_UNAVAILABLE'));
 });
 
 test('수신 저장 실패/커밋 실패에서는 Receipt·후보·종결 상태를 만들지 않음', async () => {
