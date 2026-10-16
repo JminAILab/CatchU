@@ -1,3 +1,4 @@
+import { WORKER_CONTEXT_AUTH_CONFIG, readWorkerContextAuthConfig } from './worker-context-auth';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AccessTokenGuard } from './access-token.guard';
@@ -17,6 +18,7 @@ import { readSessionConfig, SESSION_CLOCK, SESSION_CONFIG } from './session.conf
     { provide: SESSION_CONFIG, useFactory: () => readSessionConfig() },
     { provide: SESSION_CLOCK, useValue: () => Date.now() },
     SessionService,
+    { provide: WORKER_CONTEXT_AUTH_CONFIG, useFactory: () => readWorkerContextAuthConfig() },
     AccessTokenService,
     DevLoginGuard,
     DevMemberService,

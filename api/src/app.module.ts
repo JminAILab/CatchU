@@ -25,6 +25,8 @@ import { AnalysisIntakeModule } from './analysis-intake/analysis-intake.module';
     MemberProfileModule,
     GoogleLoginModule,
     AnalysisIntakeModule,
+    // #232는 #252의 실제 선정 공급자를 받는 WorkerContextModule.register로 별도 조립한다.
+    // 기본 앱에 가짜 선정/동의 해석을 등록하지 않는다(docs/worker-context.md).
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor }],

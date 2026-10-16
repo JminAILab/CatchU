@@ -250,6 +250,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 추가 scope 없는 OAuth App 연결·해제, 발급 응답의 실제 만료 시각, 암호화 보관 설정과 #232의 단일 자격정보 제공 함수는 [docs/github-connection.md](docs/github-connection.md)를 따른다. 기능은 기본 비활성이며 실제 앱 설정·토큰 검증과 API·DB 대역 검사 범위를 구분한다.
 
+## Worker 내부 분석 컨텍스트 — #232
+
+서비스 인증·실제 DB 조회·필수 선정 공급자 조립과 후속 경계는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 AppModule에는 자동 등록하지 않으며, 실제 선정 공급자와 명시적 활성화가 모두 필요하다.
+
 ## E 수신 기록과 Catch 반영 연결 — #105
 
 [반영 서비스](docs/result-application.md)와 [실제 수신 DB·E/B 조립](docs/receiver-registration.md)에 있다.

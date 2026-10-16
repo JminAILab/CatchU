@@ -60,7 +60,9 @@ uv sync --locked
 
 직접 가상환경을 활성화하고 싶다면 macOS·Linux에서는 `source .venv/bin/activate`, Windows PowerShell에서는 `.venv\Scripts\Activate.ps1`을 사용한다. 작업 후 `deactivate`로 활성화만 해제한다. PowerShell 실행 정책 때문에 활성화가 막히면 활성화 없이 `uv run`을 사용해도 된다.
 
-분석 요청 큐 소비자의 환경변수(큐 주소·접두사·동시 수·MOCK)는 [분석 요청 큐 소비자 「설정」](docs/queue-consumer.md#설정)에 있다. 운영에서는 큐 주소가 필수이고, 개발·시험(`NODE_ENV=development`·`test`)에서는 없으면 소비자를 끈 채 상태 확인만 띄운다. `.env.example`에 이름을 적었으며 `.env`를 자동으로 읽지 않는다. GitHub 토큰·LLM 키·요청 정보 조회 설정은 LIVE 처리를 붙이는 후속 작업에서 정의한다.
+분석 요청 큐 소비자의 환경변수(큐 주소·접두사·동시 수·MOCK)는 [분석 요청 큐 소비자 「설정」](docs/queue-consumer.md#설정)에 있다. 운영에서는 큐 주소가 필수이고, 개발·시험(`NODE_ENV=development`·`test`)에서는 없으면 소비자를 끈 채 상태 확인만 띄운다. `.env.example`에 이름을 적었으며 `.env`를 자동으로 읽지 않는다. 큐의 LIVE 처리 연결은 후속 작업이다.
+
+내부 api의 자격정보·선택 범위 조회를 조립할 때는 `.env.example`의 `WORKER_CONTEXT_API_URL`·`WORKER_CONTEXT_API_KEY`를 실행 환경에 주입한다. 설정·수명·연결 방법은 [내부 API 자격정보·선택 범위 조회](docs/request-context.md)에 있다. `.env` 파일을 자동으로 읽지 않는다.
 
 ## 실행·확인·종료
 
@@ -145,6 +147,10 @@ uv run --locked python -m app.processing succeeded-one-candidate
 
 [docs/github-collection.md](docs/github-collection.md)에 있다. #118이 더한 관계 조회는 [docs/relation-collection.md](docs/relation-collection.md), 그 가운데 연결 PR 묶음 조회(#267, GraphQL)와 요청당 호출 수의 근거는 [docs/associated-pr-lookup.md](docs/associated-pr-lookup.md)에 있다.
 
+## 내부 API 자격정보·선택 범위 조회
+
+[docs/request-context.md](docs/request-context.md)에 있다. 요청마다 한 번 조회한 맥락을 기존 수집 검사에 넘기며, 전체 처리 순서·큐 연결은 후속 작업이다.
+
 ## 후보 묶음과 작업 동일성
 
 [docs/candidate-decision.md](docs/candidate-decision.md)에 있다. 후보 문장·근거·제목은 [docs/candidate-text.md](docs/candidate-text.md), 알려진 한계와 검사는 [docs/candidate-checks.md](docs/candidate-checks.md)에 있다.
@@ -205,6 +211,7 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `tests/conftest.py` | 여러 시험 파일이 함께 쓰는 고정값(시험마다 새로 만드는 합성 git 저장소 `repo`) |
 | `tests/test_collection_*.py` | 첫 호출 전 거부(`boundary`), 호출 통제·상한·실패 응답(`controls`), 정상 수집·정규화·근거·결과 연결·정리(`flow`), 관계 조회(`relations`), 연결 PR 묶음 조회의 쿼리·응답 대응·실패 분류·점수(`graphql`)와 묶음 경계·순서(`lookup_batches`), HTTPS 전송(`transport`) |
 | `tests/call_budget_shapes.py`·`tests/test_lookup_call_budget.py` | 요청당 호출 수를 비교할 합성 저장소 모양과, 운영 제안 상한으로 후보 판정까지 가는지·종류별 호출 수 시험. 같은 모양을 기준 판본에서 돌려 REST와 비교할 수 있다 |
+| `app/request_context/`·`tests/test_request_context*.py` | 요청 단위 내부 api HTTP 조회·기존 resolver 제공·수집 조립과 합성 HTTP 경계 검사([연결 안내](docs/request-context.md)) |
 | `app/candidates/` | 후보 묶음·본인 기여 확인·작업 동일성(#118). wi1 값(`identity.py`), 같은 변경의 재료(`same_change.py`), 소속·배정·커밋 묶음·나누기(`grouping.py`), 후보 자격·집계·문장·근거(`build.py`) |
 | `tests/candidate_scenarios.py` | 후보 판별 사례 시험용 선언형 합성 저장소와, 수집부터 결과 조합까지 돌리는 실행 도구 |
 | `tests/test_candidate_*.py` | wi1 값(`identity`), 공백을 무시한 diff 값·관계 근거(`same_change`), 수집 관측을 직접 만든 묶음·집계·근거(`grouping`), 판별 기준 문서의 합성 사례(`cases`), 수집·판별·결과 조합 연결(`flow`) |
@@ -214,6 +221,6 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `pyproject.toml` | 프로젝트 의존성·개발 도구·검사 설정 |
 | `uv.lock` | 실행·개발 의존성의 잠금 파일. 저장소에 함께 커밋 |
 | `.python-version` | 로컬에서 사용할 Python 버전 |
-| `.env.example` | 큐 소비자 환경변수 안내 |
+| `.env.example` | 큐 소비자와 내부 api 맥락 조회를 조립할 때 주입할 환경변수 안내 |
 
 앱 코드는 `app/`, 그 동작을 확인하는 테스트는 `tests/`에 추가한다. API 경로나 처리 로직이 늘어나면 관련 모듈로 나누고 `app/main.py`에서 연결한다. 큐 작업 수신·결과 전달은 `app/consumer/`에 있다([#121](https://github.com/JminAILab/CatchU/issues/121), [#77](https://github.com/JminAILab/CatchU/issues/77) 판정). `.venv/`와 검사 캐시는 커밋하지 않는다.
