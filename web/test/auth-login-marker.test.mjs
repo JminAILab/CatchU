@@ -277,13 +277,17 @@ test('invalidateByLoginMarker: 로그아웃 결과 불명·진행 중 보류가 
   }
 });
 
-test('invalidateByLoginMarker: 복원 중·비로그인은 기록만 하고 상태를 바꾸지 않는다. 이 탭의 로그인 시도 중이면 복원하지 않되 시도는 그대로 둔다', () => {
-  for (const store of [createAuthStore(), createAuthStore('signed-out')]) {
-    const before = store.getSnapshot();
-    assert.equal(store.invalidateByLoginMarker(), 'recorded');
-    assert.equal(store.getSnapshot(), before);
-    assert.equal(store.loginChangeDetected(), true);
-  }
+test('invalidateByLoginMarker: 비로그인은 기록만 하고 상태를 바꾸지 않는다. 복원 중은 기록하고 「확인하지 못함」으로 둔다. 이 탭의 로그인 시도 중이면 복원하지 않되 시도는 그대로 둔다', () => {
+  const signedOut = createAuthStore('signed-out');
+  const before = signedOut.getSnapshot();
+  assert.equal(signedOut.invalidateByLoginMarker(), 'recorded');
+  assert.equal(signedOut.getSnapshot(), before);
+  assert.equal(signedOut.loginChangeDetected(), true);
+  const restoring = createAuthStore();
+  assert.equal(restoring.invalidateByLoginMarker(), 'recorded');
+  const r = restoring.getSnapshot();
+  assert.deepEqual([r.status, r.generation, r.restoreUnconfirmed, r.canRetryRestore], ['restoring', 0, true, false]);
+  assert.equal(restoring.loginChangeDetected(), true);
   const store = createAuthStore(); store.signedIn('access-1');
   const attempt = store.loginStarted();
   assert.equal(store.invalidateByLoginMarker(), 'relogin-only');
@@ -583,4 +587,19 @@ test('[회귀] [다시 로그인]만 남은 탭도 이 탭의 로그인 성공�
   assert.equal(a.marker.compare(), 'same');
   assert.deepEqual(await a.session.refresh(), { kind: 'signed-in' });
   assert.match(a.store.accessToken(), /^access-Z-/);
+});
+
+test('[회귀] 복원 중 탭이 반영하지 않은 로그인을 기록하면 「확인하지 못함」(다시 확인 없음)이 되고, 늦은 이전 복원 결과는 새 로그인을 덮지 않는다', () => {
+  const store = createAuthStore();
+  const old = store.refreshStarted(); // 복원 요청이 이미 나가 있던 경우
+  assert.equal(store.invalidateByLoginMarker({ allowRestore: false }), 'recorded');
+  const s = store.getSnapshot();
+  assert.deepEqual([s.status, s.restoreUnconfirmed, s.canRetryRestore, s.reloginOnly], ['restoring', true, false, false]);
+  assert.equal(store.refreshStarted(), null); // 복원·다시 확인을 시작하지 않는다
+  assert.equal(store.refreshSucceeded('access-old', old), false); // 늦은 이전 복원 결과는 반영하지 않는다
+  const generation = store.signedIn('access-new', store.loginStarted()); // 새 로그인
+  assert.equal(store.refreshSucceeded('access-old', old), false);
+  assert.equal(store.accessToken(), 'access-new');
+  assert.equal(store.getSnapshot().generation, generation);
+  assert.deepEqual([store.getSnapshot().restoreUnconfirmed, store.loginChangeDetected()], [false, false]);
 });

@@ -472,3 +472,36 @@ test('[회귀] 시작 실패는 시작한 로그인 시도를 끝내 복원·갱
   assert.deepEqual(await t.google.startGoogleLogin('/home'), { kind: 'failed', reason: 'server' });
   assert.notEqual(t.store.refreshStarted(), null);
 });
+
+// ---- 복원 전 콜백 탭의 완료 실패(#308 후속: /login 「확인 중」 고정 회귀) ----
+
+test('[회귀] 복원 전 콜백 탭: 완료 응답이 없거나 반영하지 않은 응답이면 복원 대기에 머물지 않고 로그인 진입을 연다(쿠키 복원·완료 재전송 없음)', async () => {
+  for (const mode of ['before-processing', 'drop-after-cookie', 'malformed']) {
+    const server = fakeServer();
+    server.seed('X'); // 다른 회원의 Refresh 쿠키가 남아 있다. 복원하면 X로 로그인돼 버린다.
+    const markers = fakeStorage();
+    const login = tab(server, { markers }); // 로그인 화면에서 시작
+    const parsed = await readyCallback(server, login);
+    const t = tab(server, { attempts: login.attempts, markers }); // Google에서 돌아온 콜백 화면(새 페이지, 복원하지 않음)
+    assert.deepEqual(t.google.readGoogleCallback(query(`state=${parsed.input.state}&code=c1`)).kind, 'complete', mode);
+    if (mode === 'before-processing') server.fail('POST /auth/google/login'); else server.state.complete = mode;
+    const result = await t.google.completeGoogleLogin(parsed.input);
+    assert.equal(result.kind, 'failed', mode);
+    const s = t.store.getSnapshot();
+    // 이 탭은 결과를 모르는 로그인을 복원으로 성공 처리하지 않는다. 대신 「확인하지 못함」으로 두어 로그인 진입을 연다.
+    assert.deepEqual([s.status, s.restoreUnconfirmed, s.canRetryRestore], ['restoring', true, false], mode);
+    assert.equal(t.store.accessToken(), null, mode);
+    assert.deepEqual(await t.session.refresh(), { kind: 'not-started' }, mode); // 로그인 화면의 복원 시작(ensureRestored)도 보내지 않음
+    assert.equal(server.count('POST /auth/refresh'), 0, mode);
+    // 같은 탭(화면 안 이동한 /login)에서 새 로그인을 시도하면 반영된다. 첫 완료 요청은 다시 보내지 않는다.
+    server.state.complete = 'ok';
+    const again = await readyCallback(server, t, { code: 'c2' });
+    assert.deepEqual(await t.google.completeGoogleLogin(again.input), { kind: 'signed-in', suggestedDisplayName: '구글이름' }, mode);
+    assert.equal(t.store.getSnapshot().status, 'signed-in', mode);
+    assert.equal(t.store.accessToken(), 'A-G-c2', mode);
+    assert.equal(t.store.getSnapshot().restoreUnconfirmed, false, mode);
+    assert.equal(t.store.loginChangeDetected(), false, mode);
+    assert.equal(server.count('POST /auth/google/login'), 2, mode); // 시도마다 한 번
+    assert.equal(server.count('POST /auth/refresh'), 0, mode);
+  }
+});

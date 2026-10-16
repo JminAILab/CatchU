@@ -176,7 +176,9 @@ export type AuthStore = {
    * - `relogin-only`: 위 조건이 아니면(재전송 차단·로그아웃 보류가 있거나, 감지 뒤 복원 다음에도 표식 오류가 이어짐) `reloginOnly`를 켠다.
    *   회원 화면·입력은 정리되고 [다시 로그인]만 남는다. 재전송 차단은 해제하지 않고 로그아웃 보류는 새 세대로 넘긴다.
    *   이 탭에서는 갱신·복원·로그아웃을 시작하지 않고 토큰이 없어 보호 API도 보내지 않는다. 이 탭의 로그인 성공(`signedIn`)으로만 풀린다.
-   * - `recorded`: 복원 중·비로그인은 무효화할 세션이 없어 기록만 한다(비로그인 탭의 반응은 정하지 않았다).
+   * - `recorded`: 복원 중·비로그인은 무효화할 세션이 없어 기록만 한다. 복원 중이면 이 탭은 이제 복원을 시작할 수 없으므로
+   *   「확인하지 못함」(`restoreUnconfirmed`, 다시 확인 없음)으로 바꿔 로그인 진입을 연다. 결과를 모르는 로그인을 지금 쿠키의
+   *   복원으로 성공 처리하지 않기 위해서다(#251 A 합의 1, 결정 3: 결과를 모르면 [다시 확인] 없이 [다시 로그인]만).
    * - `null`: 이미 `relogin-only`·`recorded`로 기록돼 있으면 아무것도 바꾸지 않는다(한 번만 처리).
    * `allowRestore: false`면 복원 조건이어도 `relogin-only`로 처리한다(이 탭이 반영하지 않은 로그인으로 쿠키가 바뀐 경우, `loginNotAdopted`).
    * 이 탭의 로그인 시도(`loginStarted()`)는 그대로 둔다.
@@ -327,6 +329,8 @@ export function createAuthStore(initialStatus: AuthStatus = "restoring"): AuthSt
       if (loginChanged) return null;
       if (snapshot.status !== "signed-in" && snapshot.status !== "reauth-required") {
         loginChanged = true; // 복원 중·비로그인: 기록만 한다.
+        // 복원 중인 탭은 이 기록 뒤로 복원을 시작하지 않는다(refreshStarted). 복원 대기로 남기지 않고 「확인하지 못함」으로 둔다.
+        if (snapshot.status === "restoring") publish({ restoreUnconfirmed: true, canRetryRestore: false });
         return "recorded";
       }
       // 무효화: 이전 세대의 토큰·요청 표·로그아웃 결과 반영을 끊는다.
