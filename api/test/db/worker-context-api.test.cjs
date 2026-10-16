@@ -65,7 +65,7 @@ beforeEach(async () => {
     const fixture = fixtures.get(context.attemptId);
     if (!fixture || !isDeepStrictEqual(context.consentedScope, fixture.consent) ||
         context.consentedScope.wholeRepository !== true || context.consentedScope.repositoryId !== context.repositoryId ||
-        context.consentedScope.scopeRevision !== context.scopeRevision || context.consentedScope.fixture !== true) return null;
+        context.consentedScope.revision !== context.scopeRevision || context.consentedScope.fixture !== true) return null;
     return { attemptId: context.attemptId, requestId: fixture.requestId, memberId: fixture.memberId,
       repositoryId: fixture.repositoryId, scopeRevision: fixture.scopeRevision,
       repository: { owner: 'synthetic-owner', name: 'selected-repository' }, wholeRepository: true };
@@ -100,9 +100,14 @@ async function connect(user, token = FAKE_TOKEN) {
   const authorization = await github.authorize(user.memberId);
   await github.connect(user.memberId, 'SYNTHETIC_CODE', authorization.state);
 }
+// #138 접수의 동의 범위 모양(판본·저장소·자료 종류·선정 참조)에 시험 공급자 표식을 더한다.
+const RESOURCE_TYPES = ['COMMIT', 'PULL_REQUEST', 'ISSUE'];
+const fixtureScope = (repositoryId, scopeRevision) => ({ revision: scopeRevision, repositoryId,
+  allowedResourceTypes: [...RESOURCE_TYPES], selectionReference: 'synthetic-selection', wholeRepository: true, fixture: true });
 async function analysis(user, consent = undefined, sourceMode = 'LIVE') {
   const repositoryId = 'synthetic-context-repository', scopeRevision = randomUUID();
-  const scope = consent ?? { wholeRepository: true, repositoryId, scopeRevision, fixture: true };
+  const scope = typeof consent === 'function' ? consent(fixtureScope(repositoryId, scopeRevision))
+    : consent ?? fixtureScope(repositoryId, scopeRevision);
   const request = await db.transaction(manager => insertInitialAnalysis(manager, { memberId: user.memberId,
     repositoryId, scopeRevision, noticeRevision: 'synthetic-notice', consentedScope: scope, sourceMode }));
   fixtures.set(request.currentAttemptId, { requestId: request.requestId, memberId: user.memberId, repositoryId,
@@ -139,7 +144,7 @@ async function storedSelection(t, request) {
         !isDeepStrictEqual(row.consented_scope, accepted.consentedScope) ||
         accepted.consentedScope.wholeRepository !== true ||
         accepted.consentedScope.repositoryId !== accepted.repositoryId ||
-        accepted.consentedScope.scopeRevision !== accepted.scopeRevision ||
+        accepted.consentedScope.revision !== accepted.scopeRevision ||
         accepted.consentedScope.fixture !== true) return null;
     return { attemptId: row.attempt_id, requestId: row.request_id, memberId: row.member_id,
       repositoryId: row.repository_id, scopeRevision: row.scope_revision,
@@ -174,7 +179,12 @@ async function assertSelectionWriterBlocked(writerPid, selectionPid, writerState
 
 const contextPath = id => '/internal/analysis-attempts/' + id + '/context';
 const context = (id, options = {}) => call(contextPath(id), { headers: { 'x-worker-key': settings.WORKER_CONTEXT_API_KEY }, allowToken: true, ...options });
-const unavailable = result => { assert.equal(result.status, 404); assert.equal(result.body.code, 'RESOURCE_UNAVAILABLE'); };
+// 404마다 worker가 실패 문구를 고를 이유 코드 하나를 details.violations에 싣는다(#121).
+const unavailable = (result, reason) => {
+  assert.equal(result.status, 404); assert.equal(result.body.code, 'RESOURCE_UNAVAILABLE');
+  assert.equal(result.body.message, '현재 열람할 수 없는 자료입니다.');
+  assert.deepEqual(result.body.details, { violations: [{ field: 'attemptId', reason }] });
+};
 
 test('활성 분석의 서비스 인증 HTTP는 실제 DB 동의와 #254 자격정보를 결합한다', async () => {
   const user = await member(); await connect(user); const r = await analysis(user); identityCalls = 0;
@@ -182,8 +192,12 @@ test('활성 분석의 서비스 인증 HTTP는 실제 DB 동의와 #254 자격�
     await db.manager.update(AnalysisAttempt, { attemptId: r.currentAttemptId }, { processing });
     const result = await context(r.currentAttemptId);
     assert.equal(result.status, 200, JSON.stringify(result.body));
-    assert.deepEqual(Object.keys(result.body).sort(), ['attemptId', 'credential', 'requestId', 'selection']);
+    assert.deepEqual(Object.keys(result.body).sort(), ['allowedResourceTypes', 'attemptId', 'consentId', 'credential',
+      'noticeRevision', 'requestId', 'selection', 'sourceMode']);
     assert.equal(result.body.attemptId, r.currentAttemptId); assert.equal(result.body.requestId, r.requestId);
+    // 요청 메시지와 대조할 접수 기록: 동의 행·동의 범위 JSON·시도 행의 값.
+    assert.equal(result.body.consentId, r.consentId); assert.equal(result.body.noticeRevision, 'synthetic-notice');
+    assert.deepEqual(result.body.allowedResourceTypes, RESOURCE_TYPES); assert.equal(result.body.sourceMode, 'LIVE');
     assert.deepEqual(result.body.selection, { repositoryId: r.repositoryId, wholeRepository: true });
     assert.deepEqual(result.body.credential, { memberId: user.memberId, repositoryId: r.repositoryId,
       scopeRevision: fixtures.get(r.currentAttemptId).scopeRevision,
@@ -203,7 +217,7 @@ for (const processing of ['QUEUED', 'RUNNING']) {
     const selected = t.mock.method(selectionSource, 'resolve');
     const credential = t.mock.method(github, 'resolveCredential');
     const result = await context(r.currentAttemptId);
-    unavailable(result); assertNoLeaks(result);
+    unavailable(result, 'ATTEMPT_NOT_ACTIVE'); assertNoLeaks(result);
     assert.equal(selected.mock.callCount(), 0);
     assert.equal(credential.mock.callCount(), 0);
     assert.equal(identityCalls, 0);
@@ -221,7 +235,7 @@ test('LIVE 자격정보 확인 중 MOCK으로 바뀐 시도는 최종 조회에�
     return original(token);
   };
   const result = await context(r.currentAttemptId);
-  unavailable(result); assertNoLeaks(result);
+  unavailable(result, 'ATTEMPT_NOT_ACTIVE'); assertNoLeaks(result);
   assert.equal(identityCalls, 1);
   assert.equal(credential.mock.callCount(), 1);
   assert.equal(selected.mock.callCount(), 1, '최종 LIVE 검사에서 거부해 두 번째 선정 조회를 하지 않음');
@@ -282,29 +296,55 @@ for (const state of ['폐기', '삭제', '24시간 만료', '7일 만료']) {
 
 test('없는·잘못된 ID·닫힌 요청·지난 시도·종결/UNCERTAIN은 모두 같은 404다', async () => {
   const user = await member(); await connect(user); const r = await analysis(user); identityCalls = 0;
-  unavailable(await context(randomUUID())); unavailable(await context('not-a-uuid'));
+  const ended = 'ATTEMPT_NOT_ACTIVE';
+  unavailable(await context(randomUUID()), ended); unavailable(await context('not-a-uuid'), ended);
   for (const processing of ['SUCCEEDED', 'EMPTY', 'PARTIAL_FAILED', 'FAILED', 'UNCERTAIN']) {
     await db.manager.update(AnalysisAttempt, { attemptId: r.currentAttemptId }, { processing,
       failureConfirmationReference: processing === 'FAILED' ? 'PROCESSING_DEADLINE' : null });
-    unavailable(await context(r.currentAttemptId));
+    unavailable(await context(r.currentAttemptId), ended);
   }
   await db.manager.update(AnalysisAttempt, { attemptId: r.currentAttemptId }, { processing: 'QUEUED' });
   await db.manager.update(AnalysisRequest, { requestId: r.requestId }, { lifecycle: 'CLOSED' });
-  unavailable(await context(r.currentAttemptId));
+  unavailable(await context(r.currentAttemptId), ended);
   await db.manager.update(AnalysisRequest, { requestId: r.requestId }, { lifecycle: 'ACTIVE' });
   await db.transaction(async manager => {
     const replacement = manager.create(AnalysisAttempt, { requestId: r.requestId, sourceMode: 'LIVE' });
     await manager.save(replacement);
     await manager.update(AnalysisRequest, { requestId: r.requestId }, { currentAttemptId: replacement.attemptId });
   });
-  unavailable(await context(r.currentAttemptId)); assert.equal(identityCalls, 0);
+  unavailable(await context(r.currentAttemptId), ended); assert.equal(identityCalls, 0);
 });
 
 test('비활성 회원과 알 수 없는 동의 범위는 GitHub 조회 전 거부한다', async () => {
   const user = await member(); await connect(user); const r = await analysis(user, { synthetic: true }); identityCalls = 0;
-  unavailable(await context(r.currentAttemptId));
+  unavailable(await context(r.currentAttemptId), 'SCOPE_UNVERIFIED');
   await db.manager.update(MemberAccount, { memberId: user.memberId }, { accountState: 'DISABLED' });
-  unavailable(await context(r.currentAttemptId)); assert.equal(identityCalls, 0);
+  unavailable(await context(r.currentAttemptId), 'MEMBER_INACTIVE'); assert.equal(identityCalls, 0);
+});
+
+// 동의 범위 JSON은 동의 행·요청과 이중 저장이다(#121 계획). 어긋나면 선정 공급자·GitHub 확인 전에 거부한다.
+for (const [label, change] of [
+  ['판본이 동의 행과 다름', scope => ({ ...scope, revision: randomUUID() })],
+  ['저장소 ID가 요청과 다름', scope => ({ ...scope, repositoryId: 'other-repository' })],
+  ['자료 종류가 목록이 아님', scope => ({ ...scope, allowedResourceTypes: 'COMMIT' })],
+  ['계약에 없는 자료 종류', scope => ({ ...scope, allowedResourceTypes: ['COMMIT', 'WIKI'] })],
+  ['판본 칸 없음', ({ revision, ...scope }) => scope],
+]) {
+  test(`동의 범위 JSON의 ${label}이면 SCOPE_UNVERIFIED로 조회 전에 거부한다`, async t => {
+    const user = await member(); await connect(user); const r = await analysis(user, change); identityCalls = 0;
+    const selected = t.mock.method(selectionSource, 'resolve');
+    const result = await context(r.currentAttemptId);
+    unavailable(result, 'SCOPE_UNVERIFIED'); assertNoLeaks(result);
+    assert.equal(selected.mock.callCount(), 0); assert.equal(identityCalls, 0);
+  });
+}
+
+test('동의 범위의 자료 종류는 동의 행에 저장된 목록을 그대로 돌려준다', async () => {
+  const user = await member(); await connect(user);
+  const r = await analysis(user, scope => ({ ...scope, allowedResourceTypes: ['COMMIT'] }));
+  const result = await context(r.currentAttemptId);
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.deepEqual(result.body.allowedResourceTypes, ['COMMIT']);
 });
 
 for (const field of ['attemptId', 'requestId', 'memberId', 'repositoryId', 'scopeRevision', 'wholeRepository']) {
@@ -313,7 +353,7 @@ for (const field of ['attemptId', 'requestId', 'memberId', 'repositoryId', 'scop
     const original = selectionResolver;
     selectionResolver = async (manager, ctx, options) => ({ ...await original(manager, ctx, options),
       [field]: field === 'wholeRepository' ? false : field === 'memberId' ? b.memberId : 'mismatched' });
-    unavailable(await context(r.currentAttemptId)); assert.equal(identityCalls, 0);
+    unavailable(await context(r.currentAttemptId), 'SCOPE_UNVERIFIED'); assert.equal(identityCalls, 0);
   });
 }
 
@@ -337,19 +377,24 @@ test('추가 query와 GET body는 받지 않고 no-store 오류를 반환한다'
 
 test('미연결·만료·해제와 재연결 후 새 자격정보를 제공한다', async () => {
   const user = await member(); const r = await analysis(user);
-  unavailable(await context(r.currentAttemptId)); await connect(user);
+  unavailable(await context(r.currentAttemptId), 'GITHUB_NOT_CONNECTED'); await connect(user);
   const current = await db.manager.findOneByOrFail(GitHubConnection, { memberId: user.memberId });
   const reference = await vault.save({ memberId: user.memberId, accountLogin: current.accountLogin,
     externalAccountReference: current.externalAccountReference, token: new GitHubAccessToken(FAKE_TOKEN), expiresAt: new Date(Date.now() - 1) });
   await db.manager.update(GitHubConnection, { memberId: user.memberId }, { credentialReference: reference });
-  unavailable(await context(r.currentAttemptId));
+  unavailable(await context(r.currentAttemptId), 'GITHUB_REAUTH_REQUIRED');
   assert.equal((await db.manager.findOneByOrFail(GitHubConnection, { memberId: user.memberId })).connectionState, 'REAUTH_REQUIRED');
+  unavailable(await context(r.currentAttemptId), 'GITHUB_REAUTH_REQUIRED');
   await connect(user); assert.equal((await context(r.currentAttemptId)).status, 200);
-  await github.disconnect(user.memberId); unavailable(await context(r.currentAttemptId));
+  await github.disconnect(user.memberId); unavailable(await context(r.currentAttemptId), 'GITHUB_NOT_CONNECTED');
   await connect(user); assert.equal((await context(r.currentAttemptId)).status, 200);
 });
 
-for (const state of ['closed', 'failed', 'member-disabled', 'attempt-replaced', 'selection-removed', 'disconnected', 'reconnected']) {
+const changedDuringGitHub = { closed: 'ATTEMPT_NOT_ACTIVE', failed: 'ATTEMPT_NOT_ACTIVE', 'member-disabled': 'MEMBER_INACTIVE',
+  'attempt-replaced': 'ATTEMPT_NOT_ACTIVE', 'selection-removed': 'SCOPE_UNVERIFIED',
+  // 조회 중 연결이 바뀌면 기존 함수가 null을 돌려준다(다시 연결 안내).
+  disconnected: 'GITHUB_REAUTH_REQUIRED', reconnected: 'GITHUB_REAUTH_REQUIRED' };
+for (const [state, reason] of Object.entries(changedDuringGitHub)) {
   test(`GitHub 확인 중 ${state} 변경은 이전 토큰을 인계하지 않는다`, async () => {
     const user = await member(); await connect(user); const r = await analysis(user);
     const original = client.identity;
@@ -368,7 +413,7 @@ for (const state of ['closed', 'failed', 'member-disabled', 'attempt-replaced', 
       if (state === 'reconnected') await connect(user);
       return original(token);
     };
-    unavailable(await context(r.currentAttemptId));
+    unavailable(await context(r.currentAttemptId), reason);
   });
 }
 
@@ -407,7 +452,7 @@ for (const change of ['disconnected', 'same-account-reconnected']) {
       }
     } finally { release(); }
     const result = await pending;
-    unavailable(result); assertNoLeaks(result);
+    unavailable(result, 'GITHUB_REAUTH_REQUIRED'); assertNoLeaks(result);
   });
 }
 
@@ -433,7 +478,7 @@ for (const change of ['removed', 'coordinates']) {
       await db.transaction(manager => changeStoredSelection(manager, r.currentAttemptId, change));
       resumeSelection.resolve();
       const result = await pending;
-      unavailable(result); assertNoLeaks(result);
+      unavailable(result, 'SCOPE_UNVERIFIED'); assertNoLeaks(result);
       assert.deepEqual(lockOptions, [null, 'pessimistic_read']);
     } finally {
       resumeSelection.resolve();
@@ -496,7 +541,7 @@ for (const change of ['removed', 'coordinates-and-revision']) {
         assert.deepEqual(result.body.credential.repository, { owner: 'synthetic-owner', name: 'selected-repository' });
         assert.deepEqual(lockOptions, [null, 'pessimistic_read']);
         await within(writing, '선정 변경 커밋');
-        unavailable(await context(r.currentAttemptId));
+        unavailable(await context(r.currentAttemptId), 'SCOPE_UNVERIFIED');
       } finally {
         resumeSelection.resolve(); resumeCommit.resolve();
         await Promise.allSettled([pendingSettled, writingSettled]);
@@ -570,7 +615,7 @@ for (const processing of ['RUNNING', 'EMPTY']) {
           assert.equal(result.body.attemptId, r.currentAttemptId);
           assert.equal(result.body.credential.accessToken, FAKE_TOKEN);
         } else {
-          unavailable(result); assertNoLeaks(result);
+          unavailable(result, 'ATTEMPT_NOT_ACTIVE'); assertNoLeaks(result);
         }
         assert.equal((await db.manager.findOneByOrFail(AnalysisAttempt,
           { attemptId: r.currentAttemptId })).processing, processing);
