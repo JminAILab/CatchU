@@ -8,13 +8,13 @@
 		protocols h1 h2
 	}
 	# 접근 로그는 쓰지 않지만, 앱이 멈췄을 때(502 등) 남는 오류 로그에는 요청 주소와 헤더가 들어간다.
-	# 공유 링크 토큰 자리와 쿼리 전체(로그인 콜백의 code·state 등)를 가리고,
-	# 헤더(이전 페이지 주소 Referer에 토큰이 담길 수 있음)는 남기지 않는다.
+	# 요청 주소는 통째로 지운다. 공유 링크 토큰·로그인 콜백의 code·state 자리만 가리면, 주소를 조금 바꾼 형태(//, %73 등)가
+	# 가리는 규칙을 빠져나간다. 헤더(이전 페이지 주소 Referer에 토큰이 담길 수 있음)도 남기지 않는다.
 	log default {
 		format filter {
 			wrap json
 			fields {
-				request>uri regexp "(^/(?:s|v1/public/links)/)[^/?]+|([?]).*$" "${1}${2}REDACTED"
+				request>uri delete
 				request>headers delete
 			}
 		}

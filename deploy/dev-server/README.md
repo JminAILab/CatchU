@@ -8,7 +8,7 @@
 
 | 위치 | 내용 |
 |---|---|
-| AWS | EC2 `t4g.large`(arm64, Amazon Linux 2023) 한 대, 탄력적 IP, 보안 그룹(들어옴 80·443만, SSH 없음), 서버 역할 `catchu-dev-server`(Session Manager·ECR 읽기·`/catchu/prod/*` 파라미터 읽기), ECR 저장소 4개, Route 53의 도메인 A 기록 |
+| AWS | EC2 `t4g.large`(arm64, Amazon Linux 2023) 한 대, 탄력적 IP, 보안 그룹(들어옴 80·443만, SSH 없음), 서버 역할 `catchu-dev-server`(Session Manager·ECR 읽기. `/catchu/*` 파라미터 읽기는 거부 규칙 `catchu-dev-deny-parameter-read`로 막음), ECR 저장소 4개, Route 53의 도메인 A 기록 |
 | 앱·DB·큐 | [`compose.single.yaml`](../compose.single.yaml) + [`compose.local-db.yaml`](../compose.local-db.yaml). Compose 이름 `catchu-dev`. DB는 내부 망에만 있고 worker는 그 망에 없다. 큐(Valkey 8.1.6)는 worker만 붙는 내부 망에 평문으로 연다. 이 겹침 파일 때문에 worker는 시험 모드(`NODE_ENV=test`)로 뜬다 |
 | 앞단 | [`compose.caddy.yaml`](compose.caddy.yaml) + [`Caddyfile`](Caddyfile). Compose 이름 `catchu-dev-edge`. 서버 망(host)에서 80·443을 받는다 |
 
@@ -16,7 +16,7 @@ Caddy가 하는 일:
 - 인증서를 Let's Encrypt에서 자동으로 받고 갱신하며, http를 https로 돌려보낸다.
 - `/v1/internal`·`/v1/internal/*`는 404, `/v1/*`는 api(127.0.0.1:3001), 나머지는 web(127.0.0.1:3000)으로 보낸다. web과 api가 같은 출처가 된다([#250](https://github.com/JminAILab/CatchU/issues/250) 조건).
 - HSTS를 `max-age=300`으로 붙인다. 앱이 보낸 같은 헤더는 이 값 하나로 바뀐다.
-- 접근 로그를 쓰지 않는다(공유 링크 토큰이 든 주소가 남지 않게). 앱이 멈췄을 때(502 등) 남는 오류 로그에는 요청 주소와 헤더가 들어가므로, 주소의 공유 링크 토큰 자리(`/s/…`, `/v1/public/links/…`)와 쿼리 전체(로그인 콜백의 code·state 등)는 `REDACTED`로 가리고 헤더는 남기지 않는다.
+- 접근 로그를 쓰지 않는다(공유 링크 토큰이 든 주소가 남지 않게). 앱이 멈췄을 때(502 등) 남는 오류 로그에는 요청 주소와 헤더가 들어가므로, 주소는 통째로 지우고 헤더도 남기지 않는다. 공유 링크 토큰·로그인 콜백의 code·state 자리만 가리면, 주소를 조금 바꾼 형태(`//`, `%73` 등)가 가리는 규칙을 빠져나간다.
 
 앱과 다른 Compose 묶음이라 `replace-single.sh`로 앱을 교체해도 Caddy는 그대로 돈다. 교체하는 동안 사용자는 502를 받는다.
 
@@ -25,6 +25,7 @@ Caddy가 하는 일:
 `/opt/catchu/env`(root만 읽기). 배치는 [`make-local-env.sh`](../scripts/make-local-env.sh)와 같고 다음이 다르다.
 
 - 서명 키(`AUTH_JWT_SECRET`·`LINK_GRANT_SECRET`)와 DB 앱·migration 계정 비밀번호는 SSM `/catchu/prod/*` 값을 서버 안에서 읽어 쓴다. 11월 EKS에서도 같은 값을 써서 로그인과 링크 증표가 이어진다. 값은 출력하지 않는다.
+  - 다 쓴 뒤에는 서버 역할의 거부 규칙(`catchu-dev-deny-parameter-read`, `/catchu/*` 읽기 거부)으로 서버가 이 값을 다시 읽지 못하게 한다. 환경 파일을 다시 만들 때만 이 규칙을 잠시 지웠다가 다시 건다. 서버 망을 쓰는 Caddy는 서버의 AWS 권한에 닿을 수 있기 때문이다(아래 「개발 단계라 받아들이는 한계」).
 - Postgres 관리자 비밀번호는 서버에서 만들어 `db.env`에만 둔다. DB용 사설 CA·서버 인증서(이름 `db`)는 120일짜리다.
 - `worker.env`: `CATCHU_QUEUE_REDIS_URL=redis://queue:6379`, `CATCHU_QUEUE_PREFIX=catchu`, `CATCHU_WORKER_CONCURRENCY=1`, **`CATCHU_WORKER_MOCK=false`**. 시험 모드에서는 이 값을 빼면 합성(MOCK) 처리가 켜지므로 꼭 적는다([worker 설정](../../worker/docs/queue-consumer.md)).
 - `compose.env`: `CATCHU_SINGLE_NAME=catchu-dev`, 이미지 네 개는 ECR digest(`…@sha256:…`), `CATCHU_DOMAIN=<도메인>`(Caddy용).
@@ -56,4 +57,5 @@ Caddy가 하는 일:
 - worker의 바깥 연결 제한은 코드 쪽 통제([#117](https://github.com/JminAILab/CatchU/issues/117))뿐이다. 네트워크 차단은 11월 EKS의 NetworkPolicy에서 한다. worker의 DB 차단은 Docker 내부 망으로 된다.
 - 로그인(Google·GitHub)·GitHub 연결·LLM은 아직 켜지 않았다. GitHub 연결을 켜려면 OAuth 앱 등록·암호화 키와 함께 api가 쓸 수 있는 지속 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)가 필요하다. 이 구성의 api는 읽기 전용 루트와 임시 `/tmp`만 있어 그 폴더가 없으므로, 켤 때 함께 만든다([배포 안내 「#276에서 받을 값과 남은 일」](../README.md#276에서-받을-값과-남은-일)).
 - 요청 빈도 제한이 없다. Google 로그인을 켜기 전에 시작 경로 보호를 [#277](https://github.com/JminAILab/CatchU/issues/277)에서 정한다.
+- Caddy는 서버 망(host)에서 돌아 서버의 AWS 권한(인스턴스 메타데이터)에 닿는다. 다른 컨테이너는 hop 제한으로 막힌다. Caddy가 뚫려도 비밀값 파라미터는 읽지 못하게 서버 역할에 거부 규칙을 둔다(위 「환경 폴더」). 11월 EKS에서는 ALB가 앞단을 맡아 이 예외가 없어진다.
 - 서버 접속은 SSH가 아니라 AWS Session Manager다. 비밀값은 환경변수로 들어가므로 서버에서 `docker inspect`를 쓸 수 있는 사람은 값을 볼 수 있다.
