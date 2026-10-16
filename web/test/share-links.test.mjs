@@ -6,6 +6,7 @@ import { alsoExpired, formatKst, remainingText } from "../src/features/share-lin
 import { createShareLinksStore, violationText } from "../src/features/share-links/share-links-store.ts";
 import { copyText } from "../src/features/share-links/copy-text.ts";
 import { createMemberSessionScope } from "../src/features/share-links/member-session-scope.ts";
+import { toClientResult } from "../src/lib/auth-api.ts";
 
 const link = (id, patch = {}) => ({
   linkId: id,
@@ -865,4 +866,136 @@ test("클립보드 쓰기에 실제로 성공했을 때만 복사 완료로 본�
   assert.deepEqual(written, ["http://x/s/t"]);
   assert.equal(await copyText({ writeText: async () => { throw new Error("denied"); } }, "u"), false);
   assert.equal(await copyText(undefined, "u"), false);
+});
+
+// ── 로그인 연장 뒤 거부·보내지 않음(#286 후속, 통합 시험 전환을 켰을 때) ──
+// 공통 인증 결과를 기능 API 호환 변환(`toClientResult`)으로 바꾼 값을 그대로 넣는다. 실제 브라우저·서버 검증이 아니다.
+
+const notSent = () => toClientResult({ kind: "not-sent", reason: "reauth-required" });
+const discarded = () => toClientResult({ kind: "discarded", sent: true });
+const renewed401 = () => ({ ...apiError(401, "AUTH_INVALID"), authRenewal: "renewed" });
+const RENEWED = /^로그인이 연장되었습니다\. 다시 눌러 주세요\./;
+const NOT_SENT = /^지금은 요청을 보내지 않았습니다\. 입력은 그대로 두었습니다\./;
+const posts = (calls) => calls.filter((call) => call.request?.method === "POST");
+
+test("발행: 연장 뒤 거부·보내지 않음은 결과 불명으로 보이지 않고 입력을 둔 채 진행 표시만 푼다(자동 재전송 없음)", async () => {
+  const { store, queue, calls, snap } = setup();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  queue.push(renewed401());
+  await store.submit();
+  assert.equal(snap().form.phase, "editing");
+  assert.match(snap().form.message.text, RENEWED);
+  assert.equal(snap().form.title, "A사 지원", "입력을 유지한다");
+  assert.equal(snap().pendingIssue, null, "결과 불명으로 붙잡지 않는다");
+  assert.equal(posts(calls).length, 1, "연장 뒤 자동으로 다시 보내지 않는다");
+  queue.push(notSent());
+  await store.submit();
+  assert.equal(snap().form.phase, "editing");
+  assert.match(snap().form.message.text, NOT_SENT);
+  assert.doesNotMatch(snap().form.message.text, /확인하지 못했습니다|아직 모릅니다/);
+  assert.equal(store.canSubmit(), true, "다시 누를 수 있다. 실제 전송 여부는 그때의 인증 상태가 정한다");
+  queue.push(ok(link("n"), 201));
+  await store.submit();
+  assert.equal(snap().form.phase, "issued");
+  assert.deepEqual(posts(calls).map((call) => call.request.idempotencyKey), ["key-1", "key-2", "key-3"], "처리되지 않은 처음 요청이라 다음은 새 키");
+});
+
+test("발행: 앞선 결과 불명 뒤의 보내지 않음·연장 뒤 거부는 불명 안내와 같은 키·본문을 지우지 않는다", async () => {
+  const { store, queue, calls, snap } = setup();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  queue.push(lookupFailed);
+  await store.submit();
+  assert.equal(snap().form.phase, "unknown");
+  for (const [result, text] of [[notSent(), NOT_SENT], [renewed401(), RENEWED]]) {
+    queue.push(result);
+    await store.resend();
+    assert.equal(snap().form.phase, "unknown", "앞선 요청의 불명 상태를 지우지 않는다");
+    assert.equal(snap().form.uncertain, true);
+    assert.match(snap().form.message.text, text);
+    assert.match(snap().form.message.text, /앞선 요청의 발행 여부는 아직 모릅니다/);
+    assert.deepEqual(snap().pendingIssue, { title: "A사 지원" });
+    assert.equal(store.canResend(), true);
+  }
+  queue.push(ok(link("n"), 200));
+  await store.resend();
+  assert.equal(snap().form.phase, "issued");
+  assert.deepEqual(new Set(posts(calls).map((call) => call.request.idempotencyKey)), new Set(["key-1"]), "같은 키 수동 재시도 계약 유지");
+  for (const call of posts(calls)) assert.deepEqual(call.request.body, { title: "A사 지원" });
+});
+
+test("발행: 보낸 뒤 로그인이 바뀌어 반영하지 않은 응답은 성공·실패로 확정하지 않고, 화면을 떠난 뒤 도착한 결과는 반영하지 않는다", async () => {
+  const { store, queue, snap } = setup();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  queue.push(discarded());
+  await store.submit();
+  assert.equal(snap().form.phase, "unknown", "반영됐을 수 있어 결과 불명으로 둔다");
+  assert.equal(snap().form.issued, null);
+
+  const late = setup();
+  await late.store.load();
+  late.store.openForm();
+  late.store.setTitle("B사 지원");
+  const pending = deferred();
+  late.queue.push(() => pending.promise);
+  const task = late.store.submit();
+  late.store.dispose(); // 회원 범위가 바뀌어 화면을 새로 만든다
+  pending.resolve(notSent());
+  await task;
+  assert.equal(late.snap().form.open, false, "이전 화면의 결과를 새 화면 상태에 쓰지 않는다");
+  assert.equal(late.snap().form.message, null);
+});
+
+test("발행: 표시 없는 조회 실패(전환을 끈 기존 호출·복사된 결과)는 기존대로 결과 불명이다", async () => {
+  const { store, queue, snap } = setup();
+  await store.load();
+  store.openForm();
+  store.setTitle("A사 지원");
+  queue.push({ ...notSent() });
+  await store.submit();
+  assert.equal(snap().form.phase, "unknown", "표시를 잃으면 안전한 쪽(결과 불명)으로 처리한다");
+});
+
+test("중단: 연장 뒤 거부·보내지 않음은 확인 상자로 돌아가 다시 누를 수 있고, 불명으로 막지 않는다", async () => {
+  const { store, queue, calls, snap } = setup();
+  await store.load();
+  store.openStop("a");
+  queue.push(notSent());
+  await store.confirmStop();
+  assert.equal(snap().stop.phase, "confirm");
+  assert.equal(snap().stop.message, "지금은 요청을 보내지 않았습니다.", "확인 상자에는 입력이 없어 입력 안내를 붙이지 않는다");
+  assert.deepEqual(snap().unresolvedStops, []);
+  queue.push(renewed401());
+  await store.confirmStop();
+  assert.equal(snap().stop.phase, "confirm");
+  assert.match(snap().stop.message, RENEWED);
+  queue.push(ok(link("a", { state: "STOPPED", stoppedAt: "2026-10-05T02:00:00Z" })));
+  await store.confirmStop();
+  assert.equal(snap().stop, null);
+  assert.equal(snap().list.items[0].state, "STOPPED");
+  assert.equal(calls.filter((call) => call.request?.method === "PUT").length, 3, "사용자가 누른 만큼만 보낸다");
+});
+
+test("중단: 갱신하지 못한 401·반영하지 않은 응답은 기존 처리(실패 확정·결과 불명)를 따른다", async () => {
+  const { store, queue, snap } = setup();
+  await store.load();
+  store.openStop("a");
+  queue.push({ ...apiError(401, "AUTH_INVALID"), authRenewal: "not-renewed" });
+  await store.confirmStop();
+  assert.equal(snap().stop.phase, "failed");
+  assert.match(snap().stop.message, /로그인이 필요합니다/);
+  queue.push(page([link("a")]));
+  store.recheckStop();
+  await setImmediate();
+  store.openStop("a");
+  assert.equal(snap().stop.phase, "confirm");
+  queue.push(discarded());
+  await store.confirmStop();
+  assert.equal(snap().stop.phase, "unknown");
+  assert.deepEqual(snap().unresolvedStops, ["a"]);
 });

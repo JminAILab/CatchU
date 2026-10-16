@@ -1,3 +1,4 @@
+import { memberMutationOutcome } from "../../lib/auth-api.ts";
 import { createIdempotencyKeyHolder, isSettledResult, type IdempotencyKeyHolder } from "../../lib/idempotency.ts";
 import type { ShareCreateBody, ShareLink, ShareLinkApi, ShareLinkFailure, ShareLinkResult } from "./share-link-api.ts";
 
@@ -54,6 +55,7 @@ export type StopSnapshot = {
   url: string;
   /** confirm: 확인 상자 / requesting: 요청 중 / failed: 실패 확정 / unknown: 응답 불명 */
   phase: "confirm" | "requesting" | "failed" | "unknown";
+  /** confirm에서는 처리되지 않은 앞선 시도의 안내(로그인 연장 뒤 거부·보내지 않음)만 담는다. */
   message: string | null;
 } | null;
 
@@ -93,6 +95,13 @@ const UNKNOWN_TEXT = "발행 여부를 확인하지 못했습니다. [다시 발
 const LIMITED_TEXT = "요청이 많아 지금은 발행하지 못했습니다. 잠시 뒤 [다시 발행]을 누르면 같은 요청을 다시 보냅니다.";
 const WAIT_TEXT = "요청이 많아 잠시 뒤에 발행할 수 있습니다. 남은 시간이 지난 뒤 [링크 발행]을 눌러 주세요.";
 const LIMITED_UNCERTAIN_TEXT = "요청이 많아 지금은 결과를 확인하지 못했습니다. 앞선 요청의 발행 여부는 아직 모릅니다. 잠시 뒤 [다시 발행]을 누르면 같은 요청을 다시 보내 결과를 확인합니다.";
+/** 로그인 연장 뒤 거부·보내지 않음(#286 후속, 담당 합의). 이번 요청은 처리되지 않았다. 자동으로 다시 보내지 않는다. */
+const RENEWED_TEXT = "로그인이 연장되었습니다. 다시 눌러 주세요.";
+const NOT_SENT_TEXT = "지금은 요청을 보내지 않았습니다. 입력은 그대로 두었습니다.";
+/** 중단 확인 상자에는 입력이 없어 앞 문장만 쓴다. */
+const STOP_NOT_SENT_TEXT = "지금은 요청을 보내지 않았습니다.";
+/** 위 안내에 덧붙인다. 앞선 같은 키 요청의 결과는 여전히 모른다. */
+const PRIOR_UNKNOWN_TEXT = "앞선 요청의 발행 여부는 아직 모릅니다. [다시 발행]은 같은 요청을 다시 보내 결과를 확인합니다.";
 export const DISCARD_WARNING = "이전 요청은 이미 발급됐을 수 있습니다. 목록을 확인한 뒤 새로 작성해 주세요. 새로 작성하면 새 요청으로 보내며, 이전 요청은 자동으로 다시 보내지 않습니다.";
 
 /** 서버가 판정한 입력 오류(400 VALIDATION_FAILED)를 필드별 안내로 바꾼다. 입력값은 담지 않는다. */
@@ -288,10 +297,19 @@ export function createShareLinksStore(api: ShareLinkApi, options: ShareLinksStor
       setForm({ phase: "issued", issued: result.data, password: "", uncertain: false, message: null });
       return;
     }
+    const outcome = memberMutationOutcome(result);
+    if (outcome === "renewed-rejected" || outcome === "not-sent") {
+      // 이번 요청은 서버가 처리하지 않았다. 401과 같이 앞선 시도의 결과를 모르면 불명 상태와 같은 키·본문을 그대로 둔다.
+      const text = outcome === "renewed-rejected" ? RENEWED_TEXT : NOT_SENT_TEXT;
+      setForm({ phase: uncertain ? "unknown" : "editing", message: { tone: "error", text: uncertain ? `${text} ${PRIOR_UNKNOWN_TEXT}` : text } });
+      if (!uncertain) releasePending();
+      return;
+    }
     if (isSettledResult(result)) {
       releasePending();
       emit({ pendingIssue: null });
     }
+    // 보낸 뒤 로그인이 바뀌어 반영하지 않은 응답(discarded)도 조회 실패라 여기서 결과 불명으로 남는다. 회원 범위가 바뀌어 이 화면은 새로 만들어진다.
     if (isUnknown(result)) {
       uncertain = true;
       emit({ pendingIssue: { title: body.title } });
@@ -444,6 +462,12 @@ export function createShareLinksStore(api: ShareLinkApi, options: ShareLinksStor
     const gen = generation;
     const result = await safely(() => api.stop(target.linkId));
     if (gen !== generation) return;
+    const outcome = memberMutationOutcome(result);
+    if (outcome === "renewed-rejected" || outcome === "not-sent") {
+      // 중단 요청이 처리되지 않았다. 확인 상자로 돌아가 다시 누를 수 있게 한다(자동으로 다시 보내지 않음).
+      emit({ stop: { ...target, phase: "confirm", message: outcome === "renewed-rejected" ? RENEWED_TEXT : STOP_NOT_SENT_TEXT } });
+      return;
+    }
     if (result.kind === "success" && result.data.state !== "ACTIVE") {
       const items = state.list.items.map((item) => (item.linkId === target.linkId ? result.data : item));
       setList({ items });
