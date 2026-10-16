@@ -1,0 +1,37 @@
+# 개발 서버 앞단(#304). 12월 전 개발 단계 전용이며, 11월 EKS 전환 뒤에는 ALB가 같은 일을 맡는다.
+# 사용법은 deploy/dev-server/README.md. 공개 주소는 compose.env의 CATCHU_DOMAIN에서 받는다.
+{
+	# 설정을 바꾸는 관리 API를 끈다. 설정은 이 파일을 고쳐 컨테이너를 다시 띄워서만 바꾼다.
+	admin off
+	# 보안 그룹이 TCP 443만 연다. UDP를 쓰는 HTTP/3는 끈다.
+	servers {
+		protocols h1 h2
+	}
+	# 접근 로그는 쓰지 않지만, 앱이 멈췄을 때(502 등) 남는 오류 로그에는 요청 주소와 헤더가 들어간다.
+	# 요청 주소는 통째로 지운다. 공유 링크 토큰·로그인 콜백의 code·state 자리만 가리면, 주소를 조금 바꾼 형태(//, %73 등)가
+	# 가리는 규칙을 빠져나간다. 헤더(이전 페이지 주소 Referer에 토큰이 담길 수 있음)도 남기지 않는다.
+	log default {
+		format filter {
+			wrap json
+			fields {
+				request>uri delete
+				request>headers delete
+			}
+		}
+	}
+}
+
+{$CATCHU_DOMAIN} {
+	# 앞단 HSTS(2026-10-07 결정: 5분부터 단계적으로). 앱이 붙인 같은 헤더를 응답 직전에 이 값 하나로 바꾼다.
+	header >Strict-Transport-Security "max-age=300"
+
+	# 위에서부터 차례로 맞춘다. 접근 로그는 쓰지 않는다(공유 링크 토큰이 든 주소가 남지 않게, Caddy 기본값).
+	route {
+		# worker 전용 내부 경로(/v1/internal/…)는 밖에서 쓰지 못하게 막는다. worker는 서버 안에서 api를 직접 부른다.
+		respond /v1/internal 404
+		respond /v1/internal/* 404
+		# web과 api를 같은 출처로 묶는다(#250). api·web은 compose.single.yaml이 127.0.0.1에만 연 포트다.
+		reverse_proxy /v1/* 127.0.0.1:3001
+		reverse_proxy 127.0.0.1:3000
+	}
+}

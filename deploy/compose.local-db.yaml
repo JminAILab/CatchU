@@ -1,4 +1,5 @@
-# 로컬 합성 DB·큐 겹침 파일(#275·#121). 검증·재현 전용이며 운영 DB·큐 대신 쓰지 않는다. 사용법은 deploy/README.md.
+# 로컬 합성 DB·큐 겹침 파일(#275·#121). 로컬 검증·재현과 개발 서버(#304, 12월 전 개발 단계, 합성·시험 자료) 전용이며
+# 운영 DB·큐(11월 EKS 전환 뒤 RDS·ElastiCache, #276) 대신 쓰지 않는다. 사용법은 deploy/README.md, 개발 서버는 deploy/dev-server/README.md.
 # DB는 운영과 같은 방식(TLS verify-full, 앱·migration 계정 분리)을 합성 값으로 재현한다. 평문 연결은 받지 않는다.
 # DB는 내부 망(db)에만 두고 api·migration만 연결한다. worker는 이 망에 없어 DB에 닿지 않는다.
 # 합성 큐는 운영(TLS·비밀번호)과 달리 내부 망(queue)에서 평문으로만 열고, worker만 연결해 시험 모드로 띄운다.
