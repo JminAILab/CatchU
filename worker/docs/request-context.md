@@ -61,7 +61,13 @@ LIVE 요청마다 `attemptId`로 내부 api에 한 번 묻는다. 응답의 접�
 | `WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP` | 선택(`true`·`false`, 기본 꺼짐). 켜면 클러스터 안 서비스 이름 `<서비스>.<네임스페이스>.svc.cluster.local`에 한해 운영에서도 `http://`를 받는다. 그 밖의 http 주소는 켜도 기동 때 거부한다 |
 | `NODE_ENV` | 기본은 `production`. `development`·`test`에서만 숫자 loopback(`127.0.0.1`·`[::1]` 등)의 HTTP를 허용한다. `localhost` 같은 DNS 이름에는 HTTP 예외가 없다 |
 
-**운영 http의 한계(10/15 팀장 결정 질문 4).** api는 평문 HTTP로 듣고 TLS는 바깥 ALB에서 끝난다. 그래서 운영에서 worker는 클러스터 안 주소로 api를 부르고, 응답의 GitHub 토큰이 클러스터 안 Pod 사이 망을 평문으로 지난다. 이 결정에는 조건이 셋 붙었다: NetworkPolicy가 실제로 동작해 api 3001에는 ALB·worker만 닿는다(#276), Pod를 특권 없이 띄운다(#275), http 허용은 위 설정과 클러스터 안 서비스 이름일 때만이다(이 설정). 노드·망을 엿볼 수 있는 쪽에는 토큰이 보인다. 노드를 다른 서비스와 같이 쓰게 되거나 구간이 VPC 밖으로 나가거나 외부 점검이 내부 암호화를 요구하면 다시 본다.
+**운영 http의 한계(10/15 팀장 결정 질문 4).** api는 평문 HTTP로 듣고 TLS는 바깥 ALB에서 끝난다. 그래서 운영에서 worker는 클러스터 안 주소로 api를 부르고, 응답의 GitHub 토큰이 클러스터 안 Pod 사이 망을 평문으로 지난다. 이 결정에는 조건이 셋 붙었다.
+
+1. NetworkPolicy가 실제로 동작한다: 기본 차단, api 3001은 ALB·worker에서만, worker의 나가는 연결은 api·큐·GitHub·Anthropic 대역만([#276](https://github.com/JminAILab/CatchU/issues/276), 시험 Pod로 확인).
+2. Pod를 특권 없이 띄운다: 호스트 망 금지, 권한 전부 제거, root 아님, 네임스페이스에 Pod Security `restricted`([#275](https://github.com/JminAILab/CatchU/issues/275) EKS 실행 파일).
+3. http 허용을 좁힌다: 위 설정을 켰고 주소가 클러스터 안 서비스 이름일 때만. 그 밖의 http 주소는 기동 때 거부한다(이 설정).
+
+노드·망을 엿볼 수 있는 쪽에는 토큰이 보인다. 노드를 다른 서비스와 같이 쓰게 되거나 구간이 VPC 밖으로 나가거나 외부 점검이 내부 암호화를 요구하면 다시 본다.
 
 클라이언트 기본 상한은 연결 5초, 응답 전체 5초, 응답 본문 64 KiB다. 조금씩 계속 오는 응답도 응답 마감으로 끊고, Content-Length 유무와 관계없이 크기 상한을 적용한다. HTTPS 인증서·호스트 검사를 끄지 않는다. 연결마다 소켓을 닫는다. 이 값은 GitHub 수집 상한과 별개다. api 안의 GitHub 확인 시간이 이 안에 드는지는 실제 연결 확인에서 잰다.
 

@@ -30,7 +30,7 @@ export function workerContextApplication(selectedRepositories: WorkerRepositoryS
 // NestFactory.create(workerContextApplication(실제공급자)) 후 기존 configureApp(app), listen을 사용한다.
 ```
 
-이 조립과 `WORKER_CONTEXT_ENABLED=true`, 별도 `WORKER_CONTEXT_API_KEY`가 모두 필요하다. 키는 안전한 난수 32바이트의 64자리 hex이며 기본값이 없다. AUTH JWT·링크 grant·GitHub 보관 암호화 키와 같으면 기동을 거부한다. 잘못된 활성화 값·키는 development/test/staging/production을 포함해 어느 환경에서도 기동을 거부한다. 기능 자체는 운영용 내부 조회이므로 개발 환경으로 제한하지 않는다. api는 평문 HTTP로 듣고 TLS는 바깥 ALB에서 끝나므로, 배포에서 worker는 클러스터 안 서비스 주소로 이 경로를 http로 부른다(10/15 팀장 결정). 조건은 NetworkPolicy로 api 3001에 ALB·worker만 닿게 하는 것([#276](https://github.com/JminAILab/CatchU/issues/276)), Pod를 특권 없이 띄우는 것([#275](https://github.com/JminAILab/CatchU/issues/275)), worker가 명시 설정과 `*.svc.cluster.local` 주소에만 http를 허용하는 것이다. 응답의 GitHub 토큰은 Pod 사이 망을 평문으로 지나 노드·망을 엿볼 수 있는 쪽에는 보인다. 비밀 주입은 별도로 준비한다. 자세한 목록은 [환경변수 표](environment.md)에 있다.
+이 조립과 `WORKER_CONTEXT_ENABLED=true`, 별도 `WORKER_CONTEXT_API_KEY`가 모두 필요하다. 키는 안전한 난수 32바이트의 64자리 hex이며 기본값이 없다. AUTH JWT·링크 grant·GitHub 보관 암호화 키와 같으면 기동을 거부한다. 잘못된 활성화 값·키는 development/test/staging/production을 포함해 어느 환경에서도 기동을 거부한다. 기능 자체는 운영용 내부 조회이므로 개발 환경으로 제한하지 않는다. api는 평문 HTTP로 듣고 TLS는 바깥 ALB에서 끝나므로, 배포에서 worker는 클러스터 안 서비스 주소로 이 경로를 http로 부른다(10/15 팀장 결정). 조건은 셋이다: NetworkPolicy(기본 차단, api 3001은 ALB·worker에서만, worker의 나가는 연결 제한, [#276](https://github.com/JminAILab/CatchU/issues/276)), 특권 없는 Pod(호스트 망 금지, 권한 전부 제거, root 아님, Pod Security `restricted`, [#275](https://github.com/JminAILab/CatchU/issues/275)), worker가 명시 설정과 `*.svc.cluster.local` 주소에만 http를 허용하는 것. 세부는 [worker 요청 정보 조회 「설정」](../../worker/docs/request-context.md#설정)에 있다. 응답의 GitHub 토큰은 Pod 사이 망을 평문으로 지나 노드·망을 엿볼 수 있는 쪽에는 보인다. 비밀 주입은 별도로 준비한다. 자세한 목록은 [환경변수 표](environment.md)에 있다.
 
 ## HTTP 입력과 응답
 
