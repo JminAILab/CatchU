@@ -24,8 +24,8 @@ PUT /v1/me/profile 성공 후 GET /v1/me를 다시 조회하고 이름이 저장
 조회 중에는 불러오는 중, 실패·응답 형식 오류에는 '다시 불러오기'를 보이고 빈 프로필이나 이름 미저장으로 바꾸지 않는다.
 
 - [프로필 수정] → /profile/edit.
-- [GitHub 연결 상태] → /profile/github 링크만 둔다. 연동 화면과 연결 상태 표시는 [#253](https://github.com/JminAILab/CatchU/issues/253) 범위이며 이 PR에는 없다.
-  #253 전에는 이 주소가 비어 있다.
+- [GitHub 연결 상태]는 '연결 전'으로 표시하고 누를 수 없게 둔다(프로필 메뉴의 [로그아웃] 표시와 같다). 연동 화면(/profile/github)과 연결 상태 표시는 [#253](https://github.com/JminAILab/CatchU/issues/253) 범위이며 이 PR에는 없다.
+  #253 전에는 이 주소가 없어, 이동하면 문서가 새로 열려 메모리의 로그인 정보가 사라지고 404가 된다([#300 리뷰](https://github.com/JminAILab/CatchU/pull/300#pullrequestreview-5541683061)). #253에서 실제 화면과 함께 이동을 연결한다.
 
 ## 프로필 수정 — /profile/edit
 
