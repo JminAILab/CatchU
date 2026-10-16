@@ -21,9 +21,9 @@
 3. **검사·빌드·올리기(arm64 러너):** `check` job에서 [이미지 검사](../../README.md#검사)를 통과한 뒤, `deploy` job에서 네 이미지를 만든다. web은 `https://<도메인>`으로 만든다. 배포할 커밋의 배포 파일(compose 두 개·`local-db/`·`replace-single.sh`·`dev-server/`)에서 `cd/`만 지금 판본으로 덮어 묶음 이미지 `catchu-deploy-files`로 만들어 함께 올린다. 이미지 검사는 배포할 커밋의 검사 스크립트로 그 커밋의 소스를 본다. 출처 증명은 붙이지 않고, 올린 태그가 실행 이미지인지 확인한다([`ci-images.sh`](ci-images.sh)).
 4. **서버 교체:** SSM 문서 `catchu-dev-deploy`([`ssm-document.yaml`](ssm-document.yaml))에 커밋과 digest 다섯 개만 넘긴다([`ci-deploy.sh`](ci-deploy.sh)). 문서는 서버에서 잠금을 잡고 묶음을 꺼낸 뒤, 묶음 안의 [`server-deploy.sh`](server-deploy.sh)를 실행한다. 이 스크립트는 다음 순서로 일한다.
    - 이미지를 digest로 받아 arm64인지, web 공개 주소가 서버 도메인인지 확인한다. 여기서 멈추면 실행 중 판본은 바뀌지 않는다.
-   - 배포 파일 폴더와 `compose.env`를 바꾼다. 이전 폴더는 `deploy-src.prev-<시각>`에, 이전 파일은 `env-backup/`에 둔다.
+   - 배포 파일 폴더와 `compose.env`를 바꾼다. 이전 폴더는 `deploy-src.prev-<시각>`에, 이전 파일은 `env-backup/`에 둔다. `compose.env`는 임시 파일에서 먼저 바꿔 네 값이 전달받은 digest와 정확히 같은지 확인한 뒤 한 번에 옮긴다. 쓰기 실패나 같은 이름이 여러 줄인 경우 여기서 멈추며, 이때도 아무것도 바뀌지 않는다.
    - `replace-single.sh --local-db --migrate`로 교체하고 Caddy를 다시 띄운다. Caddy 명령이 실패하거나, 이번 배포 중에 새로 만들어진 Caddy가 돌고 있지 않으면 실패(4)로 끝낸다. 옛 Caddy가 남아 돌면 바깥 확인은 통과할 수 있어서다.
-   - 서버 안에서 확인한다: 실행 이미지, health, 앞단 첫 화면, `TRUST_PROXY_CIDRS`, 앱 계정 잠금 대기 상한.
+   - 서버 안에서 확인한다: 실행 이미지(전달받은 digest와 대조), health, 앞단 첫 화면, `TRUST_PROXY_CIDRS`, 앱 계정 잠금 대기 상한.
    - `/opt/catchu/deploy-history.log`에 커밋·digest·결과를 한 줄 남긴다.
 5. **바깥 확인:** 첫 화면 200, http→https 308, `/v1/me` 401, `/v1/internal/…` 404, HSTS `max-age=300` 한 줄([`ci-check.sh`](ci-check.sh)).
 
