@@ -4,13 +4,21 @@
 
 ## 흐름
 
-워크플로는 [`.github/workflows/deploy-dev-server.yml`](../../../.github/workflows/deploy-dev-server.yml)이고 job 하나(`deploy`)로 돈다.
+워크플로는 [`.github/workflows/deploy-dev-server.yml`](../../../.github/workflows/deploy-dev-server.yml)이고 job 셋으로 돈다.
+
+| job | 하는 일 | AWS 권한 |
+|---|---|---|
+| `plan` | 배포할 커밋 확인, 이미 올린 판본인지 조회 | 있음(environment `dev-server`) |
+| `check` | 배포할 커밋의 이미지 검사. 이미 올린 판본이면 건너뜀 | 없음. OIDC 토큰도 요청할 수 없는 별도 러너 |
+| `deploy` | 빌드·ECR 올리기, 서버 교체, 바깥 확인 | 있음(environment `dev-server`) |
+
+이미지 검사는 배포할 커밋의 스크립트를 러너에서 그대로 실행한다. 그래서 AWS 권한을 받는 job과 러너를 나눴다. 권한이 있는 job은 배포할 커밋의 코드를 러너에서 실행하지 않는다. 이미지 빌드는 Docker 안에서만 돌아 러너의 권한에 닿지 않는다.
 
 **판본은 둘로 나뉜다.** 배포 도구(이 폴더 `cd/`)는 언제나 그 실행의 `main` 판본을 쓴다. 이미지·compose·교체 스크립트·Caddy 설정은 배포할 커밋에서 가져온다. 그래서 지난 커밋으로 되돌릴 때도 도구는 지금 판본으로 돈다.
 
-1. **시작:** `main`에 push될 때(dev→main PR 병합)와, `main`에서 수동 실행할 때. 수동 실행에 커밋을 넣으면 그 `main` 커밋을 배포한다(되돌리기). 다른 브랜치에서는 돌지 않는다.
+1. **시작:** `main`에 push될 때(dev→main PR 병합)와, `main`에서 수동 실행할 때. 수동 실행에 커밋을 넣으면 그 `main` 커밋을 배포한다(되돌리기). 다른 브랜치에서는 돌지 않는다. 배포할 커밋과 도구 커밋은 모두 `main`의 first-parent 커밋, 곧 `main`에 반영된 판본이어야 한다([`ci-source.sh`](ci-source.sh)).
 2. **판본 확인:** 앱 이미지 네 개의 태그는 `main-<배포할 커밋 12자>`, 배포 파일 묶음의 태그는 `main-<배포할 커밋 12자>-tools-<도구 커밋 12자>`다. 앱 이미지가 모두 있으면 이미지 검사·빌드를 건너뛴다. 묶음만 없으면 묶음만 새로 만든다. 되돌리기는 보통 여기서 바로 교체로 간다.
-3. **검사·빌드·올리기(arm64 러너):** [이미지 검사](../../README.md#검사)를 통과한 뒤 네 이미지를 만든다. web은 `https://<도메인>`으로 만든다. 배포할 커밋의 배포 파일(compose 두 개·`local-db/`·`replace-single.sh`·`dev-server/`)에서 `cd/`만 지금 판본으로 덮어 묶음 이미지 `catchu-deploy-files`로 만들어 함께 올린다. 이미지 검사는 배포할 커밋의 검사 스크립트로 그 커밋의 소스를 본다. 출처 증명은 붙이지 않고, 올린 태그가 실행 이미지인지 확인한다([`ci-images.sh`](ci-images.sh)).
+3. **검사·빌드·올리기(arm64 러너):** `check` job에서 [이미지 검사](../../README.md#검사)를 통과한 뒤, `deploy` job에서 네 이미지를 만든다. web은 `https://<도메인>`으로 만든다. 배포할 커밋의 배포 파일(compose 두 개·`local-db/`·`replace-single.sh`·`dev-server/`)에서 `cd/`만 지금 판본으로 덮어 묶음 이미지 `catchu-deploy-files`로 만들어 함께 올린다. 이미지 검사는 배포할 커밋의 검사 스크립트로 그 커밋의 소스를 본다. 출처 증명은 붙이지 않고, 올린 태그가 실행 이미지인지 확인한다([`ci-images.sh`](ci-images.sh)).
 4. **서버 교체:** SSM 문서 `catchu-dev-deploy`([`ssm-document.yaml`](ssm-document.yaml))에 커밋과 digest 다섯 개만 넘긴다([`ci-deploy.sh`](ci-deploy.sh)). 문서는 서버에서 잠금을 잡고 묶음을 꺼낸 뒤, 묶음 안의 [`server-deploy.sh`](server-deploy.sh)를 실행한다. 이 스크립트는 다음 순서로 일한다.
    - 이미지를 digest로 받아 arm64인지, web 공개 주소가 서버 도메인인지 확인한다. 여기서 멈추면 실행 중 판본은 바뀌지 않는다.
    - 배포 파일 폴더와 `compose.env`를 바꾼다. 이전 폴더는 `deploy-src.prev-<시각>`에, 이전 파일은 `env-backup/`에 둔다.
@@ -53,6 +61,7 @@
 
 Actions 화면에서 `deploy-dev-server`를 `main`으로 Run workflow하고, 되돌릴 `main` 커밋(40자리)을 넣는다. 배포 기록은 서버의 `deploy-history.log`나 지난 실행의 요약에 있다.
 
+- 넣을 수 있는 커밋은 `main`에 반영된 판본(`git log --first-parent origin/main`에 나오는 커밋)뿐이다. merge commit으로 반영된 PR 안의 중간 커밋은 `main`의 조상이어도 승인된 최종 판본이 아니므로 받지 않는다. 그 안에 뒤 커밋에서 되돌린 코드가 들어 있을 수 있어서다.
 - 수동 되돌리기와 같은 조건이 붙는다. **이전 이미지가 지금 DB 스키마와 호환될 때만** 한다. migration은 되돌리지 않으며, `--migrate`를 붙여도 이미 적용된 것은 다시 실행하지 않는다. 호환이 불분명하면 실행하지 않고 담당자 판단을 받는다([배포 안내 「실패 시 정지와 되돌리기」](../../README.md#실패-시-정지와-되돌리기)).
 - ECR은 저장소마다 최근 10개만 남긴다. 그보다 오래된 판본은 태그가 지워졌으므로 다시 빌드·검사한다.
 - 이미지 검사(`check-images.mjs`)나 교체 스크립트(`replace-single.sh`)가 없는 커밋(#275 이전)은 배포하지 않고 멈춘다.
