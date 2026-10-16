@@ -252,7 +252,7 @@ export interface AnalysisQueueModuleOptions {
 /**
  * 큐 연결 모듈. 큐 설정과 보호 관측 공급자가 모두 있을 때만 조립한다(10/15 팀장 결정). 가짜 공급자를 기본으로 넣지 않는다.
  * 실제 수신·등록 조립(AnalysisReceiverModule.registerDatabase)을 여기서 한 번 불러온다. 같은 앱에서 따로 또 부르지 않는다.
- * AppModule에는 아직 등록하지 않는다. 켜는 일은 #105의 정책 공급자가 준비된 뒤다(api/docs/analysis-queue.md).
+ * AppModule에는 아직 등록하지 않는다. 켜는 일은 #252 좌표 제공자와 #105 근거 보존 수정이 들어온 뒤다(api/docs/analysis-queue.md).
  */
 @Module({})
 export class AnalysisQueueModule {

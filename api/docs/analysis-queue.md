@@ -7,12 +7,12 @@ api가 대기 중인 분석 시도를 큐(BullMQ)로 worker에 보내고, worker
 `AnalysisQueueModule.register({ queue, observations, contractDirectory })`로 조립한다. 셋 중 하나라도 없으면 조립하지 않고 오류를 낸다. 보호 관측 공급자(`observations`)의 가짜 기본값은 없다(2026-10-15 팀장 결정).
 
 - `queue`: `readAnalysisQueueConfig()`가 읽은 큐 설정(아래 「설정」). 큐 주소가 없으면 `null`이므로 조립하지 않는다.
-- `observations`: 수신 뒤 반영이 쓰는 보호 관측 공급자(`RepositoryObservationSource`, [수신 연결 안내](receiver-registration.md)).
+- `observations`: 수신 뒤 반영이 쓰는 보호 관측 공급자(`RepositoryObservationSource`, [수신 연결 안내](receiver-registration.md)). 10월에는 [#314](https://github.com/JminAILab/CatchU/pull/314)의 `OctoberRepositoryObservationSource`를 여기에 넘긴다. 그 안내의 `registerDatabase` 직접 호출 예시는 큐 없이 조립할 때의 방법이며, 큐를 쓸 때는 이 모듈에만 넘긴다.
 - `contractDirectory`: `worker-messages.yaml`·`common.yaml`이 있는 절대 경로.
 
 모듈은 안에서 실제 수신·등록 조립(`AnalysisReceiverModule.registerDatabase`)을 한 번 불러온다. 같은 앱에서 그 조립을 따로 또 부르지 않는다.
 
-**`AppModule`에는 등록하지 않았다.** 받기는 보호 관측 공급자가 있어야 도는데, 실제 공급자는 [#105](https://github.com/JminAILab/CatchU/issues/105)(E/B)가 맡는다. 10월에는 실제 관측 대신 "10월 관측 안 함(정책 NONE)"을 명시하는 공급자로 풀기로 했다(10/15 보호 결정). 그 공급자가 준비되면 별도 작업에서 다음을 한다: `AppModule`에 이 모듈 등록, `main.ts`에서 `listen` 뒤 `app.get(AnalysisQueueRunner).start(onFailure)` 호출(`onFailure`는 받기가 멈췄을 때 앱을 닫고 종료 코드 1로 끝낸다. 아래 「수명주기」), 배포 설정에 큐 주소 추가. 그때 `registerDatabase`가 개발 주입(`DevAnalysisInjection`)도 함께 들여오므로 "제품 AppModule에 주입 제공자 없음"을 보는 기존 시험과 맞춰야 한다.
+**`AppModule`에는 등록하지 않았다.** 받기는 보호 관측 공급자가 있어야 돈다. 10월에는 실제 관측 대신 "10월 관측 안 함(정책 NONE)"을 명시하는 공급자를 쓰기로 했고(10/15 보호 결정), 그 공급자는 [#314](https://github.com/JminAILab/CatchU/pull/314)가 더한다. 다만 이 공급자는 시도마다 저장소 좌표를 받아야 돌고, 기존 비공개 근거를 덮지 않게 하는 E 쪽 수정 전에는 켜지 않는다. 그래서 [#252](https://github.com/JminAILab/CatchU/issues/252)의 좌표 제공자와 [#105](https://github.com/JminAILab/CatchU/issues/105)의 근거 보존·주소 대소문자 대조 수정이 들어온 뒤 별도 작업에서 다음을 한다: `AppModule`에 이 모듈 등록, `main.ts`에서 `listen` 뒤 `app.get(AnalysisQueueRunner).start(onFailure)` 호출(`onFailure`는 받기가 멈췄을 때 앱을 닫고 종료 코드 1로 끝낸다. 아래 「수명주기」), 배포 설정에 큐 주소 추가. 그때 `registerDatabase`가 개발 주입(`DevAnalysisInjection`)도 함께 들여오므로 "제품 AppModule에 주입 제공자 없음"을 보는 기존 시험과 맞춰야 한다.
 
 연결은 `start()`에서 연다. 조립과 Nest 초기화만으로는 큐 서버에 붙지 않는다.
 
