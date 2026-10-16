@@ -337,7 +337,7 @@ test('큐 서버에 닿지 않으면 보내기는 명령 없이 건너뛰고, �
   assert.equal(lines.some(line => line.includes('127.0.0.1:1')), false, '오류 기록에 주소를 싣지 않는다');
 });
 
-test('같은 출처의 같은 오류는 한 번만 남기고, 그 연결이 다시 붙으면 연결과 그 연결을 쓰는 큐의 기록 상태를 함께 비운다', async t => {
+test('같은 출처에서 연달아 나는 같은 오류는 한 번만 남기고, 원본 연결이 다시 붙으면 그 연결을 쓰는 큐의 기록 상태도 비운다(합성 사건 배선 시험)', async t => {
   const lines = [];
   const logger = Object.fromEntries(['log', 'warn', 'error'].map(level => [level, value => lines.push(value)]));
   const runner = new AnalysisQueueRunner({ config: { redisUrl: 'redis://127.0.0.1:1', prefix: 'catchu-test' }, dataSource: db,
