@@ -42,7 +42,10 @@ export const DISPATCH_BATCH_SIZE = 100;
 
 /** 큐 명령 하나를 기다리는 상한. 넘으면 명령을 취소하지 않고 결과를 모르는 것으로 다룬다. */
 export const QUEUE_COMMAND_TIMEOUT_MS = 5_000;
-/** 멈출 때 처리 중인 알림·결과 작업을 기다리는 상한. */
-export const CONSUMER_CLOSE_TIMEOUT_MS = 20_000;
-/** 멈출 때 연결 하나를 정상 종료(QUIT)로 닫기를 기다리는 상한. 넘으면 끊는다. */
+// 멈출 때의 대기 상한. 보내기 6초 + 받기 15초 + 요청 큐·연결 닫기 각 2초로 정지 유예 30초 안에 든다.
+/** 진행 중인 보내기를 기다리는 상한. 멈춤 표시 뒤에는 새 명령을 보내지 않으므로 명령 하나(5초)와 여유다. DB 조회가 멎어도 이만큼만 기다린다. */
+export const DISPATCH_STOP_TIMEOUT_MS = QUEUE_COMMAND_TIMEOUT_MS + 1_000;
+/** 처리 중인 알림·결과 작업을 기다리는 상한. 기다리기를 그만둘 뿐 처리를 취소하지는 않는다. */
+export const CONSUMER_CLOSE_TIMEOUT_MS = 15_000;
+/** 요청 큐 닫기와 연결 하나를 정상 종료(QUIT)로 닫기를 기다리는 상한. 넘으면 끊는다. */
 export const CONNECTION_QUIT_TIMEOUT_MS = 2_000;

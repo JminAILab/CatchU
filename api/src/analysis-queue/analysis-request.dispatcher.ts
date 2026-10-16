@@ -169,16 +169,17 @@ export class AnalysisRequestDispatcher {
         summary.skipped += 1;
         this.recordSkip(row, built.skip);
       } else {
-        let added: boolean;
+        let outcome: 'ENQUEUED' | 'EXISTING' | 'STOPPED';
         try {
-          added = await this.enqueue(row.attemptId, built.message);
+          outcome = await this.enqueue(row.attemptId, built.message);
         } catch (error) {
           // 커서를 이 시도 앞에 두어 다음 회차가 여기서 다시 시작한다.
           return error instanceof QueueCommandTimeout
             ? this.pause(summary, 'QUEUE_COMMAND_TIMEOUT')
             : this.pause(summary, 'QUEUE_COMMAND_FAILED', errorName(error));
         }
-        if (added) {
+        if (outcome === 'STOPPED') return summary;
+        if (outcome === 'ENQUEUED') {
           summary.enqueued += 1;
           this.log.enqueued(row.requestId, row.attemptId);
         } else summary.existing += 1;
@@ -213,13 +214,14 @@ export class AnalysisRequestDispatcher {
        LIMIT $3`, [cutoff, this.cursor, DISPATCH_BATCH_SIZE]);
   }
 
-  /** 넣었으면 true, 이미 큐에 있으면 false. */
-  private async enqueue(attemptId: string, message: AnalysisRequestMessage): Promise<boolean> {
+  private async enqueue(attemptId: string, message: AnalysisRequestMessage): Promise<'ENQUEUED' | 'EXISTING' | 'STOPPED'> {
     // 대기·처리 중이거나 완료·실패로 보관 중이면 넣지 않는다. 같은 시도의 넣음 기록이 5초마다 쌓이지 않게 한다.
-    if (await this.command(() => this.queue.getJob(attemptId))) return false;
+    if (await this.command(() => this.queue.getJob(attemptId))) return 'EXISTING';
+    // 멈춤 표시 뒤에는 새 명령을 보내지 않는다. 진행 중인 보내기가 명령 하나의 상한 안에 끝나게 한다.
+    if (this.stopping) return 'STOPPED';
     // 확인과 넣기 사이에 같은 시도가 들어갔으면 BullMQ가 같은 작업 ID를 무시한다(그때 넣음 기록이 두 번 남을 수 있다).
     await this.command(() => this.queue.add(REQUEST_JOB_NAME, message, requestJobOptions(attemptId)));
-    return true;
+    return 'ENQUEUED';
   }
 
   /** 명령 하나를 상한까지만 기다린다. 넘으면 명령은 취소되지 않으므로 실행됐는지 모르는 것으로 다룬다. */

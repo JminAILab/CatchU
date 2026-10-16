@@ -236,3 +236,17 @@ test('보내기는 겹치지 않고, 멈춤 표시 뒤에는 진행 중인 회�
   assert.deepEqual(await d.dispatchOnce(), { read: 0, enqueued: 0, existing: 0, skipped: 0, paused: null });
   assert.equal(queue.calls.length, 1);
 });
+
+test('멈춤 표시 뒤에는 큐에 이미 있는지 확인한 시도라도 넣지 않는다', async () => {
+  const row = await insertAttempt(db);
+  const { dispatcher: d, queue, log } = dispatcher({ commandTimeoutMs: 1000 });
+  queue.next = { hang: true };
+  const running = d.dispatchOnce();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  const stopped = d.stop();
+  queue.release();
+  assert.deepEqual(await running, { read: 1, enqueued: 0, existing: 0, skipped: 0, paused: null });
+  await stopped;
+  assert.deepEqual(queue.calls, [['getJob', row.attemptId]], 'getJob 뒤 add를 보내지 않는다');
+  assert.deepEqual(log.entries, []);
+});

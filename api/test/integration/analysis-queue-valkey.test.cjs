@@ -6,6 +6,7 @@ require('reflect-metadata');
 // 보호 관측은 합성 대역이다(실제 GitHub 관측·#105 정책 공급자가 아님).
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
+const net = require('node:net');
 const { after, before, beforeEach, test } = require('node:test');
 const { setTimeout: sleep } = require('node:timers/promises');
 const { Module } = require('@nestjs/common');
@@ -357,4 +358,118 @@ test('같은 출처의 같은 오류는 한 번만 남기고, 그 연결이 다�
   assert.equal(queueErrors(), 2, '다시 붙은 뒤의 같은 오류는 다시 남긴다');
   assert.ok(lines.some(entry => entry.event === 'ANALYSIS_QUEUE_CONNECTED' && entry.source === 'REQUEST_CONNECTION'));
   assert.equal(JSON.stringify(lines).includes('synthetic detail'), false);
+});
+
+/** 모듈 없이 실행기를 직접 만든다(종료 상한을 짧게 바꾸는 시험용). 보호 관측은 observe가 정한다. */
+function directRunner(t, { redisUrl = REDIS_URL, observe = async context => observation(context), limits = {} } = {}) {
+  const prefix = `catchu-test-${randomUUID().slice(0, 8)}`;
+  const receiver = new AnalysisReceiver(new DatabaseReceiverStore(db), new WorkerMessageValidator(CONTRACT_DIR), { record: () => undefined });
+  const registration = new AnalysisRegistrationService(receiver, db, { observe }, { failed: () => undefined });
+  const lines = [];
+  const logger = Object.fromEntries(['log', 'warn', 'error'].map(level => [level, value => lines.push(value)]));
+  const runner = new AnalysisQueueRunner({ config: { redisUrl, prefix }, dataSource: db, registration,
+    validator: new WorkerMessageValidator(CONTRACT_DIR), logger, limits });
+  const connection = new IORedis(REDIS_URL, { maxRetriesPerRequest: null });
+  const requests = new Queue('analysis-requests', { connection, prefix });
+  const messages = new Queue('worker-messages', { connection, prefix });
+  t.after(async () => {
+    await runner.stop();
+    for (const queue of [requests, messages]) {
+      await queue.obliterate({ force: true });
+      await queue.close();
+    }
+    await connection.quit();
+  });
+  return { runner, lines, requests, messages, prefix };
+}
+const shutdownTimeouts = (lines, stage) => lines.filter(line => line.event === 'ANALYSIS_QUEUE_SHUTDOWN_TIMEOUT' && line.stage === stage);
+
+test('받기는 두 연결이 준비된 뒤에만 시작하고, 시작 전에 쌓여 있던 결과를 처리하는 중이면 종료가 그 작업을 기다린다', { skip }, async t => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let entered;
+  const inSupplier = new Promise(resolve => { entered = resolve; });
+  const { runner, messages, lines } = directRunner(t, {
+    observe: async context => { entered(); await gate; return observation(context); },
+    limits: { consumerCloseTimeoutMs: 5000 } });
+  t.after(() => release());
+  const row = await insertAttempt(db);
+  const result = workerResult(row);
+  await messages.add('Result', result, resultOptions(result.messageId));
+  runner.start();
+  // 준비를 기다리는 동안에는 소비를 시작하지 않는다(시험에서만 내부 객체를 본다).
+  assert.equal(runner.worker.isRunning(), false);
+  await within(inSupplier, '쌓여 있던 결과 처리 시작');
+  let stopped = false;
+  const stopping = runner.stop().then(() => { stopped = true; });
+  await sleep(300);
+  assert.equal(stopped, false, '처리 중 작업이 있으면 강제로 닫지 않고 기다린다');
+  release();
+  await within(stopping, '처리가 끝난 뒤 종료', 8000);
+  assert.equal(await stateOf(messages, result.messageId), 'completed');
+  assert.equal((await Job.fromId(messages, result.messageId)).returnvalue.disposition, 'ACCEPTED');
+  assert.deepEqual(shutdownTimeouts(lines, 'CONSUMER'), []);
+});
+
+/** 시험용 TCP 중계. cut()은 듣기를 멈추고 열린 연결을 끊어, 붙어 있던 클라이언트가 재접속을 되풀이하게 한다. */
+async function relay(target) {
+  const sockets = new Set();
+  const server = net.createServer(client => {
+    const upstream = net.connect(Number(target.port || 6379), target.hostname);
+    for (const socket of [client, upstream]) {
+      sockets.add(socket);
+      socket.on('error', () => undefined);
+      socket.on('close', () => { client.destroy(); upstream.destroy(); });
+    }
+    client.pipe(upstream).pipe(client);
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  return {
+    url: `redis://127.0.0.1:${server.address().port}`,
+    cut: () => new Promise(resolve => { server.close(() => resolve()); for (const socket of sockets) socket.destroy(); }),
+  };
+}
+
+test('큐 서버가 끊겨 다시 붙으려는 중에 멈추면 받기를 기다리지 않고 닫아 상한 안에 끝난다', { skip }, async t => {
+  const link = await relay(new URL(REDIS_URL));
+  const { runner, lines } = directRunner(t, { redisUrl: link.url, limits: { consumerCloseTimeoutMs: 3000, connectionQuitTimeoutMs: 300 } });
+  t.after(() => link.cut());
+  runner.start();
+  await within(runner.waitUntilReady(), '큐 연결 준비');
+  await waitFor(() => runner.worker.isRunning(), '받기 시작');
+  await link.cut();
+  await waitFor(() => runner.consumerConnection.status === 'reconnecting', '받기 연결 재접속 중');
+  const started = Date.now();
+  await within(runner.stop(), '재접속 중 종료', 6000);
+  assert.ok(Date.now() - started < 1500, `종료에 ${Date.now() - started}ms`);
+  assert.deepEqual(shutdownTimeouts(lines, 'CONSUMER'), [], 'BullMQ 일반 닫기에 매달리지 않는다');
+});
+
+test('보내기의 DB 조회가 멎어도 종료는 보내기 상한까지만 기다리고 다음 단계로 간다', { skip }, async t => {
+  const { runner, lines } = directRunner(t, { limits: { dispatchStopTimeoutMs: 500 } });
+  const holder = db.createQueryRunner();
+  await holder.connect();
+  t.after(async () => {
+    if (holder.isTransactionActive) await holder.rollbackTransaction();
+    await holder.release();
+  });
+  runner.start();
+  await within(runner.waitUntilReady(), '큐 연결 준비');
+  // 대상 조회가 기다리게 요청 테이블을 잠근다.
+  await holder.startTransaction();
+  await holder.query('LOCK TABLE analysis_request IN ACCESS EXCLUSIVE MODE');
+  const dispatching = runner.dispatchOnce();
+  dispatching.catch(() => undefined);
+  try {
+    await sleep(200);
+    const started = Date.now();
+    await within(runner.stop(), 'DB 조회가 멎은 동안 종료', 5000);
+    assert.ok(Date.now() - started < 2500, `종료에 ${Date.now() - started}ms`);
+    assert.equal(shutdownTimeouts(lines, 'DISPATCH').length, 1);
+  } finally {
+    // 실패해도 잠금을 먼저 풀어 정리 단계가 멈추지 않게 한다.
+    await holder.rollbackTransaction();
+  }
+  // 잠금이 풀리면 멈춘 보내기는 아무것도 넣지 않고 끝난다.
+  assert.equal((await within(dispatching, '멈춘 보내기 끝남')).enqueued, 0);
 });

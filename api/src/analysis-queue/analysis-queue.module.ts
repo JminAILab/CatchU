@@ -12,13 +12,14 @@ import { AnalysisQueueConfig } from './analysis-queue.config';
 import { AnalysisRequestDispatcher, DispatchLog, DispatchSummary, errorName } from './analysis-request.dispatcher';
 import {
   ANALYSIS_REQUEST_QUEUE, CONNECTION_QUIT_TIMEOUT_MS, CONSUMER_CLOSE_TIMEOUT_MS, CONSUMER_OPTIONS, DISPATCH_INTERVAL_MS,
-  QUEUE_COMMAND_TIMEOUT_MS, WORKER_MESSAGE_QUEUE,
+  DISPATCH_STOP_TIMEOUT_MS, QUEUE_COMMAND_TIMEOUT_MS, WORKER_MESSAGE_QUEUE,
 } from './queue-spec';
 import { AnalysisQueueError, ConsumerLog, WorkerMessageConsumer, loggableJobId, loggableJobName } from './worker-message.consumer';
 
 export interface AnalysisQueueLimits {
   dispatchIntervalMs: number;
   commandTimeoutMs: number;
+  dispatchStopTimeoutMs: number;
   consumerCloseTimeoutMs: number;
   connectionQuitTimeoutMs: number;
 }
@@ -26,6 +27,7 @@ export interface AnalysisQueueLimits {
 const DEFAULT_LIMITS: AnalysisQueueLimits = {
   dispatchIntervalMs: DISPATCH_INTERVAL_MS,
   commandTimeoutMs: QUEUE_COMMAND_TIMEOUT_MS,
+  dispatchStopTimeoutMs: DISPATCH_STOP_TIMEOUT_MS,
   consumerCloseTimeoutMs: CONSUMER_CLOSE_TIMEOUT_MS,
   connectionQuitTimeoutMs: CONNECTION_QUIT_TIMEOUT_MS,
 };
@@ -58,8 +60,8 @@ export class AnalysisQueueRunner implements OnModuleDestroy {
   private dispatcher: AnalysisRequestDispatcher | null = null;
   private task: PeriodicTask | null = null;
   private stopping: Promise<void> | null = null;
-  /** 받기(BullMQ Worker)가 큐 서버에 한 번이라도 붙었는지. */
-  private consumerReady = false;
+  /** 받기 소비를 시작했는지. 두 연결이 준비된 뒤에만 시작하므로, 거짓이면 처리 중 작업이 있을 수 없다. */
+  private consumerStarted = false;
   /** 같은 출처의 같은 오류는 다시 붙기 전까지 한 번만 남긴다(재접속마다 쌓이지 않게). */
   private readonly lastErrors = new Map<string, string>();
   private readonly limits: AnalysisQueueLimits;
@@ -95,16 +97,21 @@ export class AnalysisQueueRunner implements OnModuleDestroy {
       connection: this.consumerConnection, prefix, autorun: false, ...CONSUMER_OPTIONS,
     });
     worker.on('error', error => this.recordError('CONSUMER', error));
-    worker.on('ready', () => { this.consumerReady = true; });
     worker.on('failed', (job: Job | undefined, error: Error) => this.logger.error({
       event: 'WORKER_MESSAGE_FAILED', jobName: loggableJobName(job?.name), jobId: loggableJobId(job?.id),
       code: error instanceof AnalysisQueueError ? error.code : errorName(error),
     }));
     this.worker = worker;
-    // 받기 실행은 멈출 때까지 끝나지 않으므로 기다리지 않는다. 예상 밖으로 끝나면 남긴다.
-    worker.run().catch(error => {
+    // 받기는 주 연결과 대기용 연결이 모두 준비된 뒤 시작한다. BullMQ는 준비 사건 전에도 주 연결로 작업을 가져올 수 있어,
+    // 먼저 시작하면 "시작 전에는 처리 중 작업이 없다"는 종료 판단이 틀린다. 받기 실행은 멈출 때까지 끝나지 않으므로 기다리지 않는다.
+    const stopped = (error: unknown) => {
       if (this.state === 'running') this.logger.error({ event: 'ANALYSIS_QUEUE_CONSUMER_STOPPED', error: errorName(error) });
-    });
+    };
+    worker.waitUntilReady().then(() => {
+      if (this.state !== 'running') return;
+      this.consumerStarted = true;
+      worker.run().catch(stopped);
+    }, stopped);
 
     this.task = new PeriodicTask({
       name: 'analysis-dispatch',
@@ -136,8 +143,9 @@ export class AnalysisQueueRunner implements OnModuleDestroy {
   }
 
   /**
-   * 멈춤 표시 → 주기 멈춤(진행 중 보내기 대기, 명령 하나는 5초 상한) → 받기 닫기(처리 중 작업 대기, 상한) → 요청 큐 닫기 →
-   * 두 연결 닫기. 상한을 넘기면 기록하고 다음 단계로 간다. 연결은 앞 단계가 실패해도 닫는다.
+   * 멈춤 표시 → 주기·보내기 멈춤(상한) → 받기 닫기(처리 중 작업 대기, 상한) → 요청 큐 닫기 → 두 연결 닫기.
+   * 상한을 넘기면 기록하고 다음 단계로 간다. 상한은 기다리기를 그만둘 뿐 진행 중인 DB 조회·처리 함수를 취소하지 않는다
+   * (실제 서버는 종료 훅이 끝나면 프로세스가 끝나고, 남은 작업은 정체 처리와 처리 시한 닫기가 정리한다). 연결은 앞 단계가 실패해도 닫는다.
    */
   private async close(): Promise<void> {
     if (this.state !== 'running') {
@@ -145,14 +153,15 @@ export class AnalysisQueueRunner implements OnModuleDestroy {
       return;
     }
     this.state = 'stopped';
-    const dispatchStopped = this.dispatcher?.stop();
+    // 보내기 멈춤 표시를 먼저 한다. 보내기의 DB 조회는 큐 명령 상한 밖이라 DB가 멎으면 끝나지 않을 수 있다.
+    const dispatchStopped = Promise.all([this.dispatcher?.stop(), this.task?.stop()]);
     try {
-      await this.task?.stop();
-      await dispatchStopped;
-      // 한 번도 붙지 못했으면 처리 중 작업이 있을 수 없다. 이때 BullMQ의 일반 닫기는 연결을 기다리며 끝나지 않고
-      // 내부 대기용 연결이 재접속을 계속하므로 강제 닫기로 끊는다.
+      await this.within(dispatchStopped, this.limits.dispatchStopTimeoutMs, 'DISPATCH');
       if (this.worker) {
-        await this.within(this.worker.close(!this.consumerReady), this.limits.consumerCloseTimeoutMs, 'CONSUMER');
+        // 소비를 시작하지 않았으면 처리 중 작업이 없고, 받기 연결이 끊긴 동안은 완료 기록을 남길 수 없으므로 기다리지 않고 닫는다.
+        // BullMQ의 일반 닫기는 재접속 중인 대기용 연결의 종료 사건을 기다리며 끝나지 않는다(ioredis는 재접속 중 끊으면 그 사건을 내지 않음).
+        const force = !this.consumerStarted || this.consumerConnection?.status !== 'ready';
+        await this.within(this.worker.close(force), this.limits.consumerCloseTimeoutMs, 'CONSUMER');
       }
       if (this.queue) await this.within(this.queue.close(), this.limits.connectionQuitTimeoutMs, 'REQUEST_QUEUE');
     } finally {
@@ -173,6 +182,11 @@ export class AnalysisQueueRunner implements OnModuleDestroy {
 
   private async quit(connection: IORedis): Promise<void> {
     if (connection.status === 'end') return;
+    // 붙어 있지 않으면 QUIT이 다시 붙기를 기다리므로 바로 끊는다(재접속 타이머도 지운다).
+    if (connection.status !== 'ready') {
+      connection.disconnect();
+      return;
+    }
     const quitting = connection.quit();
     quitting.catch(() => undefined);
     let timer: NodeJS.Timeout | undefined;
