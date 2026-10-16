@@ -14,7 +14,19 @@ export class WorkerContextService {
   constructor(private readonly dataSource: DataSource, private readonly github: GitHubConnectionService,
     @Inject(WORKER_REPOSITORY_SELECTION_SOURCE) private readonly selections: WorkerRepositorySelectionSource) {}
 
-  private async accepted(manager: EntityManager, attemptId: string, lock = false): Promise<AcceptedWorkerContext> {
+  private async accepted(manager: EntityManager, attemptId: string, requestId?: string): Promise<AcceptedWorkerContext> {
+    if (requestId !== undefined) {
+      // JOIN의 FOR SHARE OF 나열은 잠금 획득 순서를 보장하지 않는다.
+      // 수신·결과 반영과 같이 요청 → 시도를 별도 SQL로 잠근 뒤 최신 조건을 다시 검사한다.
+      const request = await manager.findOne(AnalysisRequest, {
+        where: { requestId }, lock: { mode: 'pessimistic_read' },
+      });
+      if (!request || request.currentAttemptId !== attemptId) return unavailable();
+      const attempt = await manager.findOne(AnalysisAttempt, {
+        where: { attemptId, requestId }, lock: { mode: 'pessimistic_read' },
+      });
+      if (!attempt) return unavailable();
+    }
     // 한 SQL에서 현재 시도·소유회원·동의 관계를 대조한다. UNCERTAIN도 실행 허가가 아니다.
     const query = manager.createQueryBuilder(AnalysisAttempt, 'attempt')
       .innerJoin(AnalysisRequest, 'request', 'request.request_id = attempt.request_id AND request.current_attempt_id = attempt.attempt_id')
@@ -32,7 +44,10 @@ export class WorkerContextService {
       .andWhere('member.account_state = :accountState', { accountState: 'ACTIVE' })
       .andWhere('consent.accepted = true');
     // GitHub 호출 후 짧은 최종 확인 중 종결/회원 비활성화가 끼어들지 않게 한다.
-    if (lock) query.setLock('pessimistic_read', undefined, ['attempt', 'request', 'member', 'consent']);
+    if (requestId !== undefined) {
+      query.andWhere('request.request_id = :requestId', { requestId })
+        .setLock('pessimistic_read', undefined, ['member', 'consent']);
+    }
     return await query.getRawOne<AcceptedWorkerContext>() ?? unavailable();
   }
 
@@ -63,7 +78,7 @@ export class WorkerContextService {
     const credential = await this.github.resolveCredential(accepted.memberId);
     if (!credential) return unavailable();
     return this.dataSource.transaction('READ COMMITTED', async manager => {
-      const current = await this.accepted(manager, attemptId, true);
+      const current = await this.accepted(manager, attemptId, accepted.requestId);
       if (current.requestId !== accepted.requestId || current.memberId !== accepted.memberId ||
           current.repositoryId !== accepted.repositoryId || current.scopeRevision !== accepted.scopeRevision) return unavailable();
       const selection = await this.selected(manager, current, 'pessimistic_read');

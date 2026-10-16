@@ -349,7 +349,7 @@ test('미연결·만료·해제와 재연결 후 새 자격정보를 제공한�
   await connect(user); assert.equal((await context(r.currentAttemptId)).status, 200);
 });
 
-for (const state of ['closed', 'failed', 'member-disabled', 'selection-removed', 'disconnected', 'reconnected']) {
+for (const state of ['closed', 'failed', 'member-disabled', 'attempt-replaced', 'selection-removed', 'disconnected', 'reconnected']) {
   test(`GitHub 확인 중 ${state} 변경은 이전 토큰을 인계하지 않는다`, async () => {
     const user = await member(); await connect(user); const r = await analysis(user);
     const original = client.identity;
@@ -358,6 +358,11 @@ for (const state of ['closed', 'failed', 'member-disabled', 'selection-removed',
       if (state === 'closed') await db.manager.update(AnalysisRequest, { requestId: r.requestId }, { lifecycle: 'CLOSED' });
       if (state === 'failed') await db.manager.update(AnalysisAttempt, { attemptId: r.currentAttemptId }, { processing: 'FAILED', failureConfirmationReference: 'PROCESSING_DEADLINE' });
       if (state === 'member-disabled') await db.manager.update(MemberAccount, { memberId: user.memberId }, { accountState: 'DISABLED' });
+      if (state === 'attempt-replaced') await db.transaction(async manager => {
+        const replacement = manager.create(AnalysisAttempt, { requestId: r.requestId, sourceMode: 'LIVE' });
+        await manager.save(replacement);
+        await manager.update(AnalysisRequest, { requestId: r.requestId }, { currentAttemptId: replacement.attemptId });
+      });
       if (state === 'selection-removed') fixtures.delete(r.currentAttemptId);
       if (state === 'disconnected') await github.disconnect(user.memberId);
       if (state === 'reconnected') await connect(user);
@@ -497,6 +502,81 @@ for (const change of ['removed', 'coordinates-and-revision']) {
         await Promise.allSettled([pendingSettled, writingSettled]);
         try { if (writer.isTransactionActive) await writer.rollbackTransaction(); }
         finally { await writer.release(); }
+      }
+    });
+}
+
+async function contextBlockedBy(writerPid) {
+  const deadline = Date.now() + 3000;
+  do {
+    const rows = await db.query('SELECT pid FROM pg_stat_activity WHERE datname = current_database()' +
+      ' AND $1::integer = ANY(pg_blocking_pids(pid))', [writerPid]);
+    if (rows.length) return rows[0].pid;
+    await delay(10);
+  } while (Date.now() < deadline);
+  assert.fail('최종 컨텍스트 조회가 수신 트랜잭션의 요청 잠금을 기다리지 않았다');
+}
+
+for (const processing of ['RUNNING', 'EMPTY']) {
+  test(`수신 요청 잠금과 최종 컨텍스트 조회가 겹쳐도 ${processing} 저장은 교착 없이 끝난다`,
+    { timeout: 20000 }, async t => {
+      const user = await member(); await connect(user); const r = await analysis(user);
+      const { DatabaseReceiverStore } = require('../../dist/analysis-receiver/database-receiver.store');
+      const receiver = new DatabaseReceiverStore(db);
+      const requestLocked = Promise.withResolvers(), resumeReceiver = Promise.withResolvers();
+      const createRunner = db.createQueryRunner.bind(db);
+      // 실제 수신 저장소가 요청을 잠근 직후에만 멈춘다. 잠금 SQL/순서 자체는 대역으로 바꾸지 않는다.
+      t.mock.method(db, 'createQueryRunner', (...args) => {
+        const runner = createRunner(...args), findOne = runner.manager.findOne.bind(runner.manager);
+        t.mock.method(runner.manager, 'findOne', async (entity, options) => {
+          const row = await findOne(entity, options);
+          if (entity === AnalysisRequest && options.where.requestId === r.requestId &&
+              options.lock?.mode === 'pessimistic_write') {
+            await runner.query("SET LOCAL statement_timeout = '8000ms'");
+            const [{ pid }] = await runner.query('SELECT pg_backend_pid() AS pid');
+            requestLocked.resolve(pid);
+            await within(resumeReceiver.promise, '수신 시도 잠금 재개');
+          }
+          return row;
+        });
+        return runner;
+      });
+      const writing = receiver.withRequest(r.requestId, async tx => {
+        assert.equal(tx.snapshot.context.attemptId, r.currentAttemptId);
+        if (processing === 'RUNNING') {
+          await tx.saveObservation({ schemaVersion: '1', messageId: randomUUID(), requestId: r.requestId,
+            attemptId: r.currentAttemptId, state: 'RUNNING', observedAt: new Date().toISOString() }, 'RUNNING');
+        } else {
+          await tx.saveResult({ applicationRecordId: randomUUID(), resultId: randomUUID(),
+            requestId: r.requestId, attemptId: r.currentAttemptId, payloadFingerprint: 'a'.repeat(64),
+            receivedAt: new Date().toISOString() },
+          { processing: 'EMPTY', application: 'PENDING', eligibleCandidateCount: 0, failures: [] });
+        }
+      });
+      const writerSettled = Promise.allSettled([writing]);
+      let pending, readerSettled;
+      try {
+        const writerPid = await within(requestLocked.promise, '수신 요청 잠금');
+        pending = context(r.currentAttemptId);
+        readerSettled = Promise.allSettled([pending]);
+        const readerPid = await contextBlockedBy(writerPid);
+        assert.notEqual(readerPid, writerPid);
+        // 이전 JOIN 잠금에서는 이 시점에 reader가 attempt를 잡고 request를 기다려 순환 대기가 생긴다.
+        resumeReceiver.resolve();
+        await within(writing, '수신 커밋');
+        const result = await within(pending, '최종 컨텍스트 응답');
+        if (processing === 'RUNNING') {
+          assert.equal(result.status, 200, JSON.stringify(result.body));
+          assert.equal(result.body.attemptId, r.currentAttemptId);
+          assert.equal(result.body.credential.accessToken, FAKE_TOKEN);
+        } else {
+          unavailable(result); assertNoLeaks(result);
+        }
+        assert.equal((await db.manager.findOneByOrFail(AnalysisAttempt,
+          { attemptId: r.currentAttemptId })).processing, processing);
+      } finally {
+        resumeReceiver.resolve();
+        await Promise.allSettled([writerSettled, readerSettled]);
       }
     });
 }
