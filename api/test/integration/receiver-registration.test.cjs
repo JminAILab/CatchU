@@ -269,6 +269,10 @@ test('실패 기록 자체의 실패도 숨기지 않고 수신 PENDING 보존',
 
 for (const address of ['https://github.com/synthetic-owner/other/commit/x',
   'https://github.com/synthetic-owner/synthetic-repo-other/commit/x',
+  'https://github.com/OTHER-OWNER/SYNTHETIC-REPO/commit/x',
+  'http://github.com/SYNTHETIC-OWNER/SYNTHETIC-REPO/commit/x',
+  'https://github.com@evil.invalid/SYNTHETIC-OWNER/SYNTHETIC-REPO/commit/x',
+  'https://github.com/SYNTHETIC-OWNER/SYNTHETIC-REPO/%2e%2e/other/commit/x',
   'https://github.com.evil.invalid/synthetic-owner/synthetic-repo/commit/x',
   'https://github.com/synthetic-owner/synthetic-repo/../other/commit/x',
   'https://github.com/synthetic-owner/synthetic-repo/%2e%2e/other/commit/x']) {
@@ -280,6 +284,25 @@ for (const address of ['https://github.com/synthetic-owner/other/commit/x',
     assert.equal((await state(result)).failures.at(-1).code, 'INVALID_INPUT');
   });
 }
+for (const [label, coordinates, path] of [
+  ['URL 소유자 대문자', { owner: 'synthetic-owner', name: 'synthetic-repo' }, 'SYNTHETIC-OWNER/synthetic-repo'],
+  ['URL 저장소 대문자', { owner: 'synthetic-owner', name: 'synthetic-repo' }, 'synthetic-owner/SYNTHETIC-REPO'],
+  ['공급 좌표 대문자', { owner: 'SYNTHETIC-OWNER', name: 'SYNTHETIC-REPO' }, 'synthetic-owner/synthetic-repo'],
+  ['양쪽 혼합', { owner: 'Synthetic-Owner', name: 'Synthetic-Repo' }, 'sYNTHETIC-oWNER/sYNTHETIC-rEPO'],
+]) test('LIVE 같은 저장소의 대소문자 차이 허용과 근거 원문 보존: ' + label, async () => {
+  const result = await prepare(undefined, { sourceMode: 'LIVE' });
+  const address = 'https://github.com/' + path + '/commit/MixedCaseSha';
+  result.candidates[0].evidence[0].sourceUrl = address;
+  const { service } = pipeline(async context => ({ ...observation(context), githubRepository: coordinates }));
+  const output = await receive(service, result);
+  assert.equal(output.receipt.disposition, 'ACCEPTED');
+  assert.equal(output.application.registeredCatchIds.length, 1);
+  assert.equal((await state(result)).application, 'APPLIED');
+  assert.equal((await db.manager.findOneByOrFail(AnalysisRequest, { requestId: result.requestId })).lifecycle, 'CLOSED');
+  assert.equal((await db.query('SELECT visibility FROM catch_asset'))[0].visibility, 'PRIVATE');
+  assert.deepEqual(await db.query('SELECT source_url FROM catch_evidence'), [{ source_url: address }]);
+});
+
 test('LIVE 연결된 저장소 주소의 근거 허용, MOCK example.invalid 허용', async () => {
   await receive(pipeline().service, await prepare(undefined, { sourceMode: 'LIVE' }));
   await receive(pipeline().service, await prepare());

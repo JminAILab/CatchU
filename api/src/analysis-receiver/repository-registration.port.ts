@@ -59,11 +59,13 @@ export class RepositoryRegistrationPort implements RegistrationPort {
       !/^[A-Za-z0-9_.-]+$/.test(coordinates.name) || ['.', '..'].includes(coordinates.name)) {
       throw new CatchRegistrationContextError('CONTEXT_MISMATCH');
     }
-    const prefix = `https://github.com/${coordinates.owner}/${coordinates.name}/`;
+    // 같은 저장소 좌표의 대소문자만 정규화해 대조하고 근거 URL 원문은 보존한다.
+    const repositoryPath = `/${coordinates.owner}/${coordinates.name}/`.toLowerCase();
+    const prefix = `https://github.com${repositoryPath}`;
     for (const candidate of input.candidates) for (const evidence of candidate.evidence) {
       const url = URL.canParse(evidence.sourceUrl) ? new URL(evidence.sourceUrl) : null;
-      if (!evidence.sourceUrl.startsWith(prefix) || !url || url.origin !== 'https://github.com' ||
-        url.username || url.password || !url.pathname.startsWith(`/${coordinates.owner}/${coordinates.name}/`)) {
+      if (!evidence.sourceUrl.toLowerCase().startsWith(prefix) || !url || url.origin !== 'https://github.com' ||
+        url.username || url.password || !url.pathname.toLowerCase().startsWith(repositoryPath)) {
         throw new CatchRegistrationInputError('INVALID_INPUT', 'evidence.sourceUrl');
       }
     }

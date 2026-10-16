@@ -42,7 +42,7 @@ const outcome = await service.receiveResult(message, async receipt => {
 
 공급자 조회는 반영 트랜잭션 밖에서 수행한다. 공급 부재·조회 실패·맥락 불일치·관측 근거 부재는 `NONE`이나 열람 준비 완료로 보정하지 않는다. 후보가 있는 결과는 기존 B의 `CATCH_NOT_READY` 분류로 반영 실패 처리한다. 이전 유효 관측은 실패로 덮어쓰지 않는다. 명시적 새 공개 관측도 기존 `SOURCE_PRIVATE` 제한을 자동 해제하지 않는다([보호 업무 규칙](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md)).
 
-[10/4 팀장 조건](https://github.com/JminAILab/CatchU/issues/105#issuecomment-5975854918)에 따라 LIVE 후보의 모든 근거 주소는 공급자가 확인한 `https://github.com/<owner>/<repo>/`로 시작해야 한다. 파싱된 origin·정규화된 경로도 대조해 위장 호스트·다른 저장소·상위 경로 이동을 거부한다. 주소를 조회하거나 redirect를 따르지 않는다. 주소 불일치는 기존 B의 `INVALID_INPUT / evidence.sourceUrl` 분류다. MOCK의 `example.invalid` 합성 주소에는 이 대조를 적용하지 않는다.
+[10/4 팀장 조건](https://github.com/JminAILab/CatchU/issues/105#issuecomment-5975854918)에 따라 LIVE 후보의 모든 근거 주소는 공급자가 확인한 `https://github.com/<owner>/<repo>/`로 시작해야 한다. 파싱된 origin·정규화된 경로도 대조해 위장 호스트·다른 저장소·상위 경로 이동을 거부한다. [10/15 후속 결정](https://github.com/JminAILab/CatchU/issues/105#issuecomment-6189230335)에 따라 소유자·저장소 이름은 대소문자를 구분하지 않고 대조하며, 저장하는 근거 주소는 원문을 유지한다. 주소를 조회하거나 redirect를 따르지 않는다. 주소 불일치는 기존 B의 `INVALID_INPUT / evidence.sourceUrl` 분류다. MOCK의 `example.invalid` 합성 주소에는 이 대조를 적용하지 않는다.
 
 10월에는 [10월 정책 공급자](october-registration-policy.md)를 명시적으로 연결할 수 있다. 이 공급자는 GitHub를 조회하지 않고 ‘관측 안 함’ 출처와 NONE을 반환한다. 공급 실패를 NONE으로 보정하는 것이 아니며, 최초 PRIVATE와 별도 공개 선택은 그대로다. 실제 좌표 제공·기존 비공개 근거 보존·LIVE 주소 대조·앱 활성화의 남은 조건은 해당 문서에서 확인한다.
 
