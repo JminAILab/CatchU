@@ -68,6 +68,8 @@ main   배포 브랜치
 
 **dev의 검증**: dev 대상 PR마다 [CI](../.github/workflows/ci.yml)가 web·api·worker README의 검사 명령, AI가 읽는 문서의 크기 검사, 의존성 취약점 검사를 실행하고, 이를 통과해야 머지할 수 있다(필수 상태 검사, §7). 관련 경로가 바뀌지 않은 서비스의 검사는 건너뛰며, 건너뛴 검사는 통과로 친다. 어떤 경로가 어느 검사를 돌리는지는 CI 파일에 있다. CI 통과가 사람 리뷰를 대신하지 않는다. PR과 승인 1건이 필요하며(§7), 검토자는 무엇을 확인했는지 설명할 수 있어야 한다([작업관리](CatchU_작업관리.md)). dev를 코드가 쌓이기 전에 둔 이유는 나중에 브랜치 정책을 바꾸는 비용이 더 크기 때문이다.
 
+**main의 검증**: main 대상 PR(dev→main 배포 PR)마다 [images 워크플로](../.github/workflows/images.yml)가 운영 이미지 검사(`images`)와 개발 서버 자동 배포 스크립트의 회귀 시험(`cd-scripts`)을 실행하고, 이를 통과해야 머지할 수 있다(필수 상태 검사, §7). dev의 CI는 main 대상 PR에서 돌지 않고, dev push 때는 마지막으로 병합된 PR이 바꾼 서비스만 검사한다. 그래서 배포 PR을 올리기 전에 dev 최신으로 CI를 수동 실행해 모든 서비스를 검사하고 결과를 PR에 남긴다. main 병합은 개발 서버 자동 배포를 시작한다([자동 배포 안내](../deploy/dev-server/cd/README.md)).
+
 ### 임시 통합 브랜치 운영안
 
 > 지위: 2026-09-20 논의 방향을 반영한 검토안. 저장소 설정이나 AI-DLC 규칙의 적용 완료를 뜻하지 않는다.
@@ -214,7 +216,7 @@ chore: worker 의존성에 httpx 추가
 
 ### 브랜치 보호 (브랜치별 ruleset)
 
-`main`과 `dev`에 각각 ruleset 1벌씩 두고, dev에는 필수 상태 검사만 담은 `dev-ci`를 하나 더 둔다. 대상 브랜치는 이름으로 정확히 지정한다(넓은 패턴을 쓰지 않는 이유는 §6 #8).
+`main`과 `dev`에 각각 ruleset 1벌씩 두고, 필수 상태 검사만 담은 `main-ci`·`dev-ci`를 하나씩 더 둔다. 대상 브랜치는 이름으로 정확히 지정한다(넓은 패턴을 쓰지 않는 이유는 §6 #8).
 
 | 규칙 | `main` | `dev` |
 |---|---|---|
@@ -223,13 +225,13 @@ chore: worker 의존성에 httpx 추가
 | 리뷰 대화 해소 후 머지 (Require conversation resolution before merging) | ✅ | ✅ |
 | 강제 푸시 차단 (Block force pushes) | ✅ | ✅ |
 | 삭제 차단 (Restrict deletions) | ✅ | ✅ |
-| 필수 상태 검사 (Require status checks to pass) | ⬜ 배포 PR을 시작할 때 정함 | ✅ `changes`·`docs-size`·`web`·`api`·`worker`·`deps-audit` (`dev-ci`, PR #208 머지 직후 적용, `deps-audit`는 #215 반영 PR 머지 직후 추가) |
+| 필수 상태 검사 (Require status checks to pass) | ✅ `images`·`cd-scripts` (`main-ci`, 2026-10-16 첫 배포 PR 전에 적용) | ✅ `changes`·`docs-size`·`web`·`api`·`worker`·`deps-audit` (`dev-ci`, PR #208 머지 직후 적용, `deps-audit`는 #215 반영 PR 머지 직후 추가) |
 
 켜지 않기로 한 항목은 이 표에 없다 — 그 목록과 사유는 §6에 있다.
 
-`main`·`dev` ruleset은 내용이 같아도 **분리해서 유지한다.** 브랜치마다 필수 상태 검사를 따로 정할 수 있게 하기 위해서다. 필수 상태 검사의 이름은 [CI](../.github/workflows/ci.yml)의 job 이름이므로, job 이름을 바꾸면 `dev-ci`도 함께 고친다.
+`main`·`dev` ruleset은 내용이 같아도 **분리해서 유지한다.** 브랜치마다 필수 상태 검사를 따로 정할 수 있게 하기 위해서다. 필수 상태 검사의 이름은 워크플로의 job 이름이므로, job 이름을 바꾸면 해당 ruleset도 함께 고친다([CI](../.github/workflows/ci.yml)는 `dev-ci`, [images](../.github/workflows/images.yml)는 `main-ci`).
 
-**우회 권한(bypass)**: 조직 역할이 Organization admin인 사람(현재 이재민 1인)에 한해 **"pull request에 한해서만"**. PR을 여는 것 자체는 면제되지 않고 승인 대기만 면제된다. 전면 우회를 주지 않은 이유는 §3에 있다 — PR 없이 머지하면 머지 커밋이 생기지 않아 "이 커밋들이 한 작업이었다"는 기록이 남지 않는다. 우회 권한은 그 ruleset의 규칙에만 적용되며, `dev-ci`에는 우회 권한을 두지 않는다. 그래서 승인 대기를 건너뛰는 우회 병합도 CI는 통과해야 한다. CI 고장으로 아무도 머지하지 못하면 Organization admin이 `dev-ci`를 잠시 끄고, 끈 사실과 이유를 관련 이슈에 남긴다.
+**우회 권한(bypass)**: 조직 역할이 Organization admin인 사람(현재 이재민 1인)에 한해 **"pull request에 한해서만"**. PR을 여는 것 자체는 면제되지 않고 승인 대기만 면제된다. 전면 우회를 주지 않은 이유는 §3에 있다 — PR 없이 머지하면 머지 커밋이 생기지 않아 "이 커밋들이 한 작업이었다"는 기록이 남지 않는다. 우회 권한은 그 ruleset의 규칙에만 적용되며, `dev-ci`·`main-ci`에는 우회 권한을 두지 않는다. 그래서 승인 대기를 건너뛰는 우회 병합도 필수 검사는 통과해야 한다. 검사 고장으로 아무도 머지하지 못하면 Organization admin이 해당 ruleset을 잠시 끄고, 끈 사실과 이유를 관련 이슈에 남긴다.
 
 ### 팀원의 레포 접근 권한 등급
 
@@ -282,3 +284,4 @@ chore: worker 의존성에 httpx 추가
 - **2026-10-05** — dev 대상 PR에 의존성 취약점 검사 `deps-audit`를 더하고 `dev-ci` 필수 상태 검사에 넣기로 했다([#215](https://github.com/JminAILab/CatchU/issues/215), 팀장 결정). Dependabot은 취약점을 알리지만 취약한 의존성을 새로 들이는 PR을 막지 않기 때문이다. 검사는 의존성 목록·잠금 파일이 바뀐 서비스만 한다. 기존 의존성에 새로 공개된 취약점은 지금처럼 Dependabot 알림·보안 업데이트가 맡고, 관계없는 PR이 그날부터 막히지 않게 한다. web·api는 high 이상에서 실패하고, worker는 검사 도구가 심각도를 구분하지 않아 알려진 취약점이 하나라도 있으면 실패한다. 고친 판본이 없는 취약점은 예외 목록에 두되 고친 판본이 나오면 다시 실패한다. 같은 작업에서 CI의 외부 action을 전체 커밋 SHA로 고정하고, Dependabot이 주 1회 묶음 PR로 갱신하게 했다. §2 「dev의 검증」과 §7을 고쳤다.
 - **2026-10-06** — Dependabot의 action 갱신 PR을 팀장이 2근무일 안에 처리하기로 하고 §6에 12행을 더했다([#215](https://github.com/JminAILab/CatchU/issues/215), 팀장 결정). 커밋으로 고정한 action은 주 판본 태그(`@v7`)처럼 수정판을 저절로 받지 못하고, 이 action들은 보안 수정을 취약점 등록 없이 내기도 해서 갱신 PR이 수정을 받는 유일한 길이기 때문이다. 같은 작업에서 갓 나온 판본이 검토 전에 PR CI에서 도는 위험을 줄이려고 대기를 3일에서 7일로 늘렸다(2025~2026년 태그 바꿔치기 사고 4건의 노출 기간이 최장 약 6일). 큰 판본 변경 하나가 묶음 PR 전체를 막지 않게 따로 받게 했고, CI의 checkout이 토큰을 작업 폴더에 남기지 않게 하고 uv 내려받기 파일의 체크섬을 고정했다.
 - **2026-10-06** — §1 배포 대상을 NCP에서 AWS로 바꿨다(팀장 결정). 2026-09-13에 NCP를 고른 이유는 소속 기관의 지원이었는데, 기관이 AWS도 지원하도록 정책을 바꿨다. 지원 조건이 같아진 상태에서, AWS는 쓸 수 있는 서비스와 자료가 더 잘 갖춰져 있고 실제 기업에서도 많이 쓰여 AWS로 정했다. AWS에서 쓸 서비스(큐 서버 등)는 정하지 않았다. README·AGENTS.md·docs/README의 배포 대상 문장을 함께 고쳤다. 지난 AI-DLC 기록과 입력 문서(`docs/ai-dlc-input-mvp/`)의 NCP 서술은 소급 수정하지 않는다.
+- **2026-10-16** — main 배포 PR의 필수 상태 검사를 정했다([#277](https://github.com/JminAILab/CatchU/issues/277), 팀장 결정). images 워크플로의 운영 이미지 검사(`images`)와 자동 배포 스크립트 회귀 시험(`cd-scripts`)이며, `dev-ci`처럼 우회 권한이 없는 별도 ruleset `main-ci`에 두고 첫 배포 PR 전에 적용했다. dev의 CI(web·api·worker 등)는 main 필수 검사로 걸지 않았다. dev push 때는 마지막으로 병합된 PR이 바꾼 서비스만 검사하므로, 걸어도 대부분 건너뜀(통과)으로 남기 때문이다. 대신 배포 PR을 올리기 전에 dev 최신으로 CI를 수동 실행해 모든 서비스를 검사하고 결과를 PR에 남긴다. §2에 「main의 검증」을 더하고 §7을 고쳤다.
