@@ -255,7 +255,8 @@ export type AnalysisQueueModuleOptions = {
 @Module({})
 export class AnalysisQueueModule {
   static register(options: AnalysisQueueModuleOptions): DynamicModule {
-    if (!options?.queue || !options.contractDirectory) {
+    if (!options?.queue || !options.contractDirectory
+      || ((options.observations === undefined) === (options.observationsFactory === undefined))) {
       throw new Error('AnalysisQueueModule에는 큐 설정·보호 관측 공급자·계약 경로가 모두 필요합니다.');
     }
     return {
