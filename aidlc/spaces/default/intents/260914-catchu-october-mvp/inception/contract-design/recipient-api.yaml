@@ -1,0 +1,70 @@
+openapi: "3.0.3"
+info: {"title":"CatchU 비로그인 수신자 API v1","version":"1.0.0"}
+servers: [{"url":"/v1"}]
+security: []
+paths:
+  "/public/links/{token}/unlock":
+    parameters: [{"name":"token","in":"path","required":true,"schema":{"type":"string","minLength":1}}]
+    post:
+      operationId: "unlockLink"
+      security: [{},{"LinkGrant":[]}]
+      requestBody:
+        required: true
+        content:
+          "application/json": {"schema":{"type":"object","additionalProperties":false,"required":["password"],"properties":{"password":{"type":"string","minLength":1}}}}
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content:
+            "application/json": {"schema":{"type":"object","additionalProperties":false,"required":["grant"],"properties":{"grant":{"type":"string","minLength":1}}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "429": {"$ref":"./common.yaml#/components/responses/Error429"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/public/links/{token}":
+    parameters: [{"name":"token","in":"path","required":true,"schema":{"type":"string","minLength":1}}]
+    get:
+      operationId: "getPublicCollection"
+      security: [{},{"LinkGrant":[]}]
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                additionalProperties: false
+                required: ["profile","catches","page"]
+                properties:
+                  profile: {"$ref":"./common.yaml#/components/schemas/PublicProfile"}
+                  catches: {"type":"array","items":{"$ref":"./common.yaml#/components/schemas/PublicCatch"}}
+                  page: {"$ref":"./common.yaml#/components/schemas/PageInfo"}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+      parameters:
+        - {"name":"cursor","in":"query","schema":{"type":"string"}}
+        - {"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":100,"default":20}}
+  "/public/links/{token}/catches/{catchId}":
+    parameters:
+      - {"name":"token","in":"path","required":true,"schema":{"type":"string","minLength":1}}
+      - {"name":"catchId","in":"path","required":true,"schema":{"type":"string","minLength":1}}
+    get:
+      operationId: "getPublicCatch"
+      security: [{},{"LinkGrant":[]}]
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content: {"application/json":{"schema":{"$ref":"./common.yaml#/components/schemas/PublicCatch"}}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "404": {"$ref":"./common.yaml#/components/responses/Error404"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+components:
+  securitySchemes:
+    LinkGrant: {"type":"apiKey","in":"header","name":"X-Link-Grant","description":"비밀번호 확인 뒤 발급한 링크 한정 opaque proof. 회원 JWT가 아니며 현재 권한 검사를 대체하지 않음."}

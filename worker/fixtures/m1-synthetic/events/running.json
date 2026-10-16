@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1",
+  "messageId": "event-{{caseId}}-{{attemptId}}-running",
+  "requestId": "{{requestId}}",
+  "attemptId": "{{attemptId}}",
+  "state": "RUNNING",
+  "observedAt": "2026-10-01T00:10:00Z"
+}

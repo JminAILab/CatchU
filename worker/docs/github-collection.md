@@ -1,0 +1,55 @@
+# 허용 GitHub 자료 수집과 근거 정규화 — #117·#118
+
+> [worker README](../README.md)의 같은 이름 절을 #118에서 옮겼다. 옮기며 제목과 상대 링크를 고치고, 본인 커밋을 가리키는 '작성한'을 '작성자로 기록된'으로 바꿨다([결정 문서 「본인 기여의 뜻」](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#본인-기여의-뜻)). 끝에는 관계 조회 문서로 가는 절을 더했다. 이 문서는 #117의 수집이며, 관계 조회를 요청하지 않은 기본 경로의 동작이다. #118이 더한 관계 조회는 [관계 조회](relation-collection.md)에 있다.
+
+[#117](https://github.com/JminAILab/CatchU/issues/117)의 범위다. 검사를 통과한 요청(`CheckedRequest`) 하나의 허용 범위 안에서 GitHub 자료를 REST API로 모으고(관계 조회의 연결 PR 조회만 GraphQL 묶음 조회, [#267](https://github.com/JminAILab/CatchU/issues/267)), 출처 주소·판본·관측 사실·기여 관측·한계를 가진 기록으로 정리해 후보 처리([#118](https://github.com/JminAILab/CatchU/issues/118))에 넘긴다. 저장소 복제·체크아웃·수집 자료 실행은 하지 않는다. 통제의 근거는 [수집 통제 문서](../../docs/CatchU_수집통제_임시자료.md)다.
+
+후보·Catch·종결값은 만들지 않는다. 공개 HTTP 경로나 개발용 실행 명령 없이 `app.collection.collect` 함수로 부르며, 요청 수신부터 결과 전달까지의 LIVE 조립은 [#121](https://github.com/JminAILab/CatchU/issues/121)에서 한다.
+
+1. **첫 호출 전 검사**: 허용 자료 종류가 비어 있으면 멈춘다. 요청의 자격정보 참조로 A에 작업 맥락을 물어, 회원·저장소·허용 범위 판본이 요청과 모두 같고 만료가 수집 시간 상한 뒤일 때만 통과한다. 선택 범위 참조는 제공자가 저장소 단위 선택이라고 밝힌 경우만 통과하며, 알 수 없는 범위를 저장소 전체로 넓히지 않는다. 하나라도 어긋나면 연결을 열지 않고(호출 0회) 실패 하나로 끝나며, 조회를 다시 시도하지 않는다.
+2. **수집**: 저장소 확인(요청한 저장소이고 공개 저장소인지) → 허용된 종류의 목록(기본 브랜치 최근 커밋, 최근 PR, 최근 이슈) → 상세(연동 계정이 작성자로 기록된 최근 커밋의 변경 내용, 연동 계정이 연 최근 PR의 커밋 목록) 순으로 부른다. 받은 쪽은 곧바로 보존하므로 중간에 멈춰도 그때까지 받은 기록이 남는다. 상세를 연동 계정의 기록으로 좁힌 것은 호출 수를 아끼려는 수집 순서이며, 본인 기여의 최종 판정은 #118이 한다.
+3. **넘기는 것**: `CollectionOutcome`에 기록·한계(`coverage_limits`)·수집 실패(0 또는 1건)가 들어 있다. 후보 처리는 `stage_failures()`를 `GenerationOutput.failures`에 더해 결과 조합에 넘긴다. 그러면 수집이 멈춘 결과는 적합 후보가 있으면 PARTIAL_FAILED, 없으면 FAILED이고 EMPTY가 되지 않는다. `completed`가 False이면 확인이 중단된 것이다. `evidence_for(기록)`은 근거 재료(F가 만든 GitHub 화면 주소, 판본, 관측 사실, API 작성자와 연동 계정의 관계, 한계)를 주며 `to_evidence_item(기여 범위 문구)`로 결과의 근거가 된다.
+
+| 통제 | 동작 |
+|---|---|
+| 호스트·프로토콜 | 연결은 `https://api.github.com` 하나로만 연다. 요청은 경로만 받아 다른 호스트로 보낼 수 없다 |
+| 주소 | 검사한 저장소 좌표·SHA·번호와 경로 틀로 F가 만든다. 응답의 `url`·Link 헤더의 next 주소·본문 속 주소는 부르지 않고, 쪽 번호만 F가 올린다. 관계 조회의 연결 PR 조회는 고정 주소 `POST /graphql`에 F의 쿼리 틀을 쓰고 검사한 좌표·SHA는 변수로만 넘긴다([연결 PR 묶음 조회](associated-pr-lookup.md)) |
+| 우회 이동 | 따라가지 않고 수집 실패로 멈춘다 |
+| 다른 저장소 | 포크 원본·다른 저장소 참조를 따라가지 않는다. 응답이 요청한 저장소가 아니면 멈춘다 |
+| 공개 저장소 | 저장소 확인 응답의 `private`(GitHub 응답의 필수 항목)가 false이고, `visibility`가 있으면 그것도 public일 때만 목록을 부른다. 토큰으로 접근되더라도 비공개면 실패 `REPOSITORY_UNREACHABLE`, 공개 여부를 읽을 수 없으면 실패 `COLLECTION_FETCH_FAILED`로 멈춘다. 수집 시작 때 한 번 확인하며, 수집 중 공개 여부 변경은 감시하지 않는다 |
+| 빈 Git 저장소 | 커밋 목록 첫 쪽이 409와 `Git Repository is empty.` 문구로 오면 커밋 0건으로 받고 PR·이슈 목록을 계속 부른다. 문구가 다르거나 다른 목록·둘째 쪽 이후의 409는 수집 실패다 |
+| 자료 안의 글 | 제목·본문·커밋 메시지·변경 내용은 자료로만 옮기고 해석·실행하지 않는다. 관측 사실에는 글자를 넣지 않는다 |
+| 재시도 | 429·5xx·시간 초과·연결 오류를 다시 부르지 않는다. 자격정보를 스스로 갱신하지 않는다 |
+| 상한 | 호출 수·수집 시간·수집 총량을 넘으면 수집 실패다. 조회 개수·상세 조회 개수 범위 밖과 단일 응답 크기 초과로 버린 부분은 실패가 아니라 한계로 남긴다 |
+| 비밀값 | 토큰은 `Authorization` 머리글에만 쓰고 로그·오류·결과·근거에 남기지 않는다. 자격정보 참조는 GitHub에 보내지 않는다 |
+| 임시 자료 | 응답은 메모리에서 필요한 값만 남기고 디스크에 쓰지 않는다. 성공·실패·예외 모두 연결을 닫고 자격정보를 놓는다 |
+
+상한 기본값(`CollectionLimits`)은 모두 **제안값**이며 실측 전이다. 상세 조회 개수 두 값은 수집 통제 문서의 조회 개수가 호출 수 상한 안에서 끝나도록 이 모듈에서 더한 제안값이다. 기본값으로 조회 개수를 다 채우고 모든 기록이 연동 계정 것이어도 최악 298회(목록 8 + 커밋 상세 200 + PR 커밋 목록 30건 × 3쪽)로 300회 안에 든다.
+
+| 상한 | 제안값 | 넘으면 |
+|---|---|---|
+| 요청당 GitHub 호출 | 300회. 실제 HTTP 요청 수로 센다(REST 1회, GraphQL 묶음 요청 1회. GraphQL 점수는 더하지 않고 따로 기록) | 실패 `BUDGET_EXCEEDED` |
+| 요청당 수집 총량 | 50MB | 실패 `BUDGET_EXCEEDED` |
+| 수집 시간(시작 시각 하나 기준) | 10분 | 실패 `TIME_LIMIT_EXCEEDED` |
+| 단일 호출 대기 | 연결 5초·응답 15초. 응답은 연결 뒤 이 시간 안에 머리글·본문을 다 받아야 한다. 연결·응답 대기를 각각 남은 수집 시간보다 길게 잡지 않고, 수집 마감 뒤에 끝난 호출의 응답은 쓰지 않는다 | 실패 `COLLECTION_FETCH_FAILED`(수집 마감에 걸렸으면 `TIME_LIMIT_EXCEEDED`) |
+| 조회 개수 | 최근 커밋 500·PR 100·이슈 목록 항목 100(이 API는 PR도 섞어 주므로 PR 포함) | 한계 |
+| 상세 조회 개수 | 연동 계정이 작성자로 기록된 최근 커밋 200건의 변경 내용, 연동 계정이 연 최근 PR 30건의 커밋 목록 | 한계 |
+| 단일 응답 크기 | 10MB | 상세 응답은 그 기록만, 목록 응답은 그 쪽부터 뒤를 확인하지 못한 한계. 저장소 확인 응답이면 실패 `COLLECTION_FETCH_FAILED` |
+
+수집 실패 코드는 결과의 `Failure.code`(stage `COLLECTION`)에 담긴다. 이름은 수집 통제 문서의 제안을 따르고, 원인이 달라 나눈 `SELECTION_UNRESOLVED`·`SELECTION_UNSUPPORTED`·`CREDENTIAL_REJECTED`를 더했다. 전체 목록은 `app/collection/failures.py`에 있다.
+
+## 자격정보·선택 범위 제공자
+
+`CredentialResolver`·`SelectionResolver`의 내부 api HTTP 구현과 요청 단위 조립은 [내부 API 자격정보·선택 범위 조회](request-context.md)에 있다(#232). 기존 `check_credential`·`check_selection` 대조는 그대로 유지한다. 기존 수집 검사는 `tests/github_synthetic.py`의 대역을 사용하며, 새 조회 경계는 합성 HTTP 응답으로 별도 검사한다.
+
+## 합성 검사와 실제 연결
+
+`tests/test_collection_*.py`는 합성 GitHub 응답(`tests/github_synthetic.py`)·자격정보 대역·가짜 시계로 네트워크 없이 돈다. 전송 코드는 가짜 연결과 이 컴퓨터 안(127.0.0.1)의 시험 서버로만 확인했다. **실제 GitHub·A 연결, TLS, 실제 환경의 나가는 방향 제한은 검증하지 않았다.** 실제 연결에서 확인할 것:
+
+- A 자격정보 인계로 실제 요청 하나를 끝까지 수집하고, 대상 저장소 밖 호출이 거부되는지([#37](https://github.com/JminAILab/CatchU/issues/37) C05, 실제 환경)
+- 호출 한도 수치와 429·403 응답 머리글(머리글 없는 보조 한도 403은 본문의 "rate limit" 문구로 판별한다. GraphQL의 200·403 한도 오류 판별은 [연결 PR 묶음 조회](associated-pr-lookup.md#결과와-실패)), 큰 커밋의 파일 목록 나눔·변경 내용 생략 조건, 빈 저장소의 커밋 목록 응답 문구(합성 응답은 [Octokit 안내서](https://github.com/octokit/handbook#some-list-endpoint-respond-with-204-or-409-if-the-repository-is-empty)의 409 예시를 따랐다), 저장소 응답의 `private`·`visibility` 값
+- 제안 상한값의 실측(호출 수·시간·총량·조회 개수·상세 조회 개수)
+
+## 관계 조회(#118)
+
+[relation-collection.md](relation-collection.md)에 있다.

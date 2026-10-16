@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "01a0ae71-98c0-76f5-b986-0f79ed587540",
+  "source": {
+    "kind": "managed",
+    "path": "documents/CatchU_C02_C01_재검증_2026-09-17.md"
+  },
+  "sha256": "552474d9a39c491c780002fb3dbcc9a8d63823fa392b1676c5f26af9aa422edc",
+  "bytes": 27960,
+  "indexed_at": "2026-09-17T08:17:55.384Z",
+  "extraction": {
+    "state": "extracted",
+    "extractor": {
+      "name": "builtin-text",
+      "version": "1"
+    },
+    "chars": 15967,
+    "truncated": false,
+    "source_revision": "552474d9a39c491c780002fb3dbcc9a8d63823fa392b1676c5f26af9aa422edc"
+  },
+  "summary": {
+    "state": "absent"
+  },
+  "content": "documentkb/01a0ae71-98c0-76f5-b986-0f79ed587540/content.md",
+  "content_sha256": "552474d9a39c491c780002fb3dbcc9a8d63823fa392b1676c5f26af9aa422edc",
+  "related_intent_ids": [
+    "01a09dc4-cc12-774d-8813-47bcf51644de"
+  ],
+  "content_trust": "untrusted",
+  "content_handling": "data-not-instructions"
+}

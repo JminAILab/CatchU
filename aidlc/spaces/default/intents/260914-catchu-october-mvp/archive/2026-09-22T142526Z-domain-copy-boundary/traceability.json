@@ -1,0 +1,414 @@
+{
+  "stage": "domain-design",
+  "upstream_artifact": "../requirements-analysis/requirements.md",
+  "upstream_ids": [
+    "FR1",
+    "FR2",
+    "FR3",
+    "FR4",
+    "FR5",
+    "FR6",
+    "FR7",
+    "FR8",
+    "FR9",
+    "FR10",
+    "FR11",
+    "FR1.1",
+    "FR1.2",
+    "FR1.3",
+    "FR1.4",
+    "FR1.5",
+    "FR2.1",
+    "FR2.2",
+    "FR3.1",
+    "FR3.2",
+    "FR3.3",
+    "FR3.4",
+    "FR3.5",
+    "FR3.6",
+    "FR4.1",
+    "FR4.2",
+    "FR4.3",
+    "FR4.4",
+    "FR4.5",
+    "FR5.1",
+    "FR5.2",
+    "FR5.3",
+    "FR5.4",
+    "FR5.5",
+    "FR6.1",
+    "FR6.2",
+    "FR6.3",
+    "FR6.4",
+    "FR6.5",
+    "FR6.6",
+    "FR7.1",
+    "FR7.2",
+    "FR7.3",
+    "FR7.4",
+    "FR8.1",
+    "FR8.2",
+    "FR8.3",
+    "FR8.4",
+    "FR9.1",
+    "FR9.2",
+    "FR10.1",
+    "FR10.2",
+    "FR10.3",
+    "FR10.4",
+    "FR10.5",
+    "FR10.6",
+    "FR11.1",
+    "FR11.2",
+    "FR11.3"
+  ],
+  "coverage": [
+    {
+      "id": "FR1",
+      "status": "OK",
+      "target": "AnalysisCoordinator",
+      "note": "상위 묶음의 첫 MVP 적용 부분만 연결. 개별 FR 행의 Deferred/N/A 및 부분 적용을 함께 따른다."
+    },
+    {
+      "id": "FR2",
+      "status": "OK",
+      "target": "EvidenceAnalysis",
+      "note": "상위 묶음의 첫 MVP 적용 부분만 연결. 개별 FR 행의 Deferred/N/A 및 부분 적용을 함께 따른다."
+    },
+    {
+      "id": "FR3",
+      "status": "OK",
+      "target": "CatchRegistry",
+      "note": "상위 묶음의 첫 MVP 적용 부분만 연결. 개별 FR 행의 Deferred/N/A 및 부분 적용을 함께 따른다."
+    },
+    {
+      "id": "FR4",
+      "status": "OK",
+      "target": "ShareAccess",
+      "note": "상위 묶음의 첫 MVP 적용 부분만 연결. 개별 FR 행의 Deferred/N/A 및 부분 적용을 함께 따른다."
+    },
+    {
+      "id": "FR5",
+      "status": "Deferred",
+      "target": "첫 MVP 제외/별도 검토 — 개별 FR 하위 행 참조",
+      "justification": "후속 기능 묶음. 현재 도메인 카탈로그에 구현 구성요소를 추가하지 않는다."
+    },
+    {
+      "id": "FR6",
+      "status": "Deferred",
+      "target": "첫 MVP 제외/별도 검토 — 개별 FR 하위 행 참조",
+      "justification": "후속 기능 묶음. 현재 도메인 카탈로그에 구현 구성요소를 추가하지 않는다."
+    },
+    {
+      "id": "FR7",
+      "status": "Deferred",
+      "target": "첫 MVP 제외/별도 검토 — 개별 FR 하위 행 참조",
+      "justification": "후속 기능 묶음. 현재 도메인 카탈로그에 구현 구성요소를 추가하지 않는다."
+    },
+    {
+      "id": "FR8",
+      "status": "Deferred",
+      "target": "첫 MVP 제외/별도 검토 — 개별 FR 하위 행 참조",
+      "justification": "후속 기능 묶음. 현재 도메인 카탈로그에 구현 구성요소를 추가하지 않는다."
+    },
+    {
+      "id": "FR9",
+      "status": "Deferred",
+      "target": "첫 MVP 제외/별도 검토 — 개별 FR 하위 행 참조",
+      "justification": "후속 기능 묶음. 현재 도메인 카탈로그에 구현 구성요소를 추가하지 않는다."
+    },
+    {
+      "id": "FR10",
+      "status": "Deferred",
+      "target": "첫 MVP 제외/별도 검토 — 개별 FR 하위 행 참조",
+      "justification": "FR10.1~FR10.4는 10월 미제공, FR10.5는 후속 재검토, FR10.6은 별도 조사 계획. 개별 행을 따른다."
+    },
+    {
+      "id": "FR11",
+      "status": "OK",
+      "target": "IdentityProfile",
+      "note": "상위 묶음의 첫 MVP 적용 부분만 연결. 개별 FR 행의 Deferred/N/A 및 부분 적용을 함께 따른다."
+    },
+    {
+      "id": "FR1.1",
+      "status": "OK",
+      "target": "AnalysisCoordinator"
+    },
+    {
+      "id": "FR1.2",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR1.3",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR1.4",
+      "status": "OK",
+      "target": "AnalysisCoordinator"
+    },
+    {
+      "id": "FR1.5",
+      "status": "OK",
+      "target": "RepositoryProtection"
+    },
+    {
+      "id": "FR2.1",
+      "status": "OK",
+      "target": "EvidenceAnalysis",
+      "note": "후보·근거·최소 생각해볼 질문: EvidenceAnalysis가 WorkCandidate.reflectionQuestions를 생성·제공하고 AnalysisCoordinator가 해당 요청의 결과와 함께 CatchRegistry로 전달한다. CatchRegistry는 CatchAsset.reflectionQuestions의 서비스 자료 관리·본인 화면 제공을, MemberExperience의 B 담당 화면은 표시를 맡는다. components.md의 FR2.1 제공 경계를 따른다. 생성 방법·API·보관·표시 상세는 후속 설계이며 수신자 공개·답변 저장은 포함하지 않는다."
+    },
+    {
+      "id": "FR2.2",
+      "status": "OK",
+      "target": "DraftOutcome"
+    },
+    {
+      "id": "FR3.1",
+      "status": "OK",
+      "target": "ShareAccess",
+      "note": "첫 MVP 적용은 대표 없는 발급 경로만. 대표 작성/구성은 첫 MVP 이후."
+    },
+    {
+      "id": "FR3.2",
+      "status": "OK",
+      "target": "ShareAccess"
+    },
+    {
+      "id": "FR3.3",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR3.4",
+      "status": "OK",
+      "target": "CatchRegistry",
+      "note": "첫 MVP 적용은 현재 숨김/권한 보호. 발행 시 대표 구성 보존은 후속이며 본문/구성 변화의 기존 링크 영향은 보류."
+    },
+    {
+      "id": "FR3.5",
+      "status": "OK",
+      "target": "CatchRegistry"
+    },
+    {
+      "id": "FR3.6",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR4.1",
+      "status": "OK",
+      "target": "CatchRegistry"
+    },
+    {
+      "id": "FR4.2",
+      "status": "OK",
+      "target": "ShareAccess"
+    },
+    {
+      "id": "FR4.3",
+      "status": "OK",
+      "target": "ShareLink"
+    },
+    {
+      "id": "FR4.4",
+      "status": "OK",
+      "target": "ShareLink"
+    },
+    {
+      "id": "FR4.5",
+      "status": "OK",
+      "target": "ShareLink"
+    },
+    {
+      "id": "FR5.1",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR5.2",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR5.3",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR5.4",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR5.5",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR6.1",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR6.2",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR6.3",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR6.4",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR6.5",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR6.6",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR7.1",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR7.2",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR7.3",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR7.4",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR8.1",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR8.2",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR8.3",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR8.4",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR9.1",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR9.2",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "현재 첫 MVP 범위 밖. 원 FR ID·후속 계획/미결을 보존하며 가짜 구현 대상을 만들지 않는다."
+    },
+    {
+      "id": "FR10.1",
+      "status": "N/A",
+      "target": "첫 MVP 미제공 — requirements.md의 FR10.1~FR10.4 적용 변경",
+      "justification": "G 품질 신호·선택 공유·운영 조회·전체 중단/재개는 10월 제외. H/I 또는 B 불일치 표시로 대체 충족하지 않는다."
+    },
+    {
+      "id": "FR10.2",
+      "status": "N/A",
+      "target": "첫 MVP 미제공 — requirements.md의 FR10.1~FR10.4 적용 변경",
+      "justification": "G 품질 신호·선택 공유·운영 조회·전체 중단/재개는 10월 제외. H/I 또는 B 불일치 표시로 대체 충족하지 않는다."
+    },
+    {
+      "id": "FR10.3",
+      "status": "N/A",
+      "target": "첫 MVP 미제공 — requirements.md의 FR10.1~FR10.4 적용 변경",
+      "justification": "G 품질 신호·선택 공유·운영 조회·전체 중단/재개는 10월 제외. H/I 또는 B 불일치 표시로 대체 충족하지 않는다."
+    },
+    {
+      "id": "FR10.4",
+      "status": "N/A",
+      "target": "첫 MVP 미제공 — requirements.md의 FR10.1~FR10.4 적용 변경",
+      "justification": "G 품질 신호·선택 공유·운영 조회·전체 중단/재개는 10월 제외. H/I 또는 B 불일치 표시로 대체 충족하지 않는다."
+    },
+    {
+      "id": "FR10.5",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "운영 경고는 후속 재검토; 날짜/담당/구현 미정."
+    },
+    {
+      "id": "FR10.6",
+      "status": "Deferred",
+      "target": "첫 MVP 이후/별도 검토 — requirements.md의 해당 FR 적용표",
+      "justification": "조사 구상과 OQ15 보존. 현재 도메인 설계가 조사 수행·참여자 확보를 완료하지 않으며 업무 코드 구성요소를 임의 추가하지 않는다."
+    },
+    {
+      "id": "FR11.1",
+      "status": "OK",
+      "target": "IdentityProfile"
+    },
+    {
+      "id": "FR11.2",
+      "status": "OK",
+      "target": "GitHubConnection"
+    },
+    {
+      "id": "FR11.3",
+      "status": "OK",
+      "target": "MemberProfile"
+    }
+  ],
+  "notes": [
+    "stories.md는 이 intent에서 생성하지 않았으므로 requirements.md의 FR 하위 ID를 사용한다. 범위 표의 FRn.a~FRn.b는 기존 ID를 모두 펼친다.",
+    "OK는 현재 첫 MVP 적용 부분의 도메인 책임 추적이며 실제 구현/시험 통과나 FR 전체 범위 제공을 뜻하지 않는다.",
+    "OK target은 components.md의 구성요소/엔티티만 사용한다. Deferred/N/A target은 미제공 사유이며 설계된 구현 식별자가 아니다.",
+    "Q1~Q8과 작성 전 사용자 명확화는 components.md·decisions.md에 반영한다. 보류 정책과 C01~C12 조건은 닫지 않는다.",
+    "FR1~FR11 상위 묶음 11개와 하위 48개를 함께 추적한다. 묶음 행을 추가 요구사항 또는 구현 완료 건수로 세지 않는다."
+  ]
+}

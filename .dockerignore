@@ -1,0 +1,52 @@
+# 이미지 빌드 맥락(#275). 세 Dockerfile은 저장소 루트를 맥락으로 쓰므로 전부 제외한 뒤 Dockerfile이 복사하는 경로만 연다.
+# 서비스 폴더 안의 다른 자료(테스트·문서·중첩 작업 폴더·사용자 자료)와 하네스·.git·로컬 인계·AI-DLC 기록은 들어가지 않는다.
+# Dockerfile에서 새 경로를 복사하면 여기에도 연다(deploy/scripts/check-images.mjs의 허용 목록도 함께 고친다).
+*
+!web/package.json
+!web/package-lock.json
+!web/.npmrc
+!web/next.config.ts
+!web/tsconfig.json
+!web/src/
+!web/scripts/check-image-build-env.mjs
+!api/package.json
+!api/package-lock.json
+!api/tsconfig.json
+!api/tsconfig.build.json
+!api/scripts/clean-dist.cjs
+!api/src/
+!worker/.python-version
+!worker/pyproject.toml
+!worker/uv.lock
+!worker/app/
+!worker/fixtures/m1-synthetic/
+# 두 서비스가 읽는 계약 YAML 두 개(worker_messages.py·worker-message.validator.ts)
+!aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml
+!aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml
+
+# 연 경로 안에서도 다시 뺀다: 실값 환경 파일(Next는 빌드 때 .env*를 자동으로 읽는다)·키·인증서·자격정보·캐시
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.crt
+**/*.p12
+**/*.pfx
+**/credentials.json
+**/*-service-account.json
+**/.aws
+**/.git
+**/node_modules
+**/.next
+**/dist
+**/.venv
+**/__pycache__
+**/*.pyc
+**/*.tsbuildinfo
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.cache
+**/coverage
+**/*.log
+**/.DS_Store

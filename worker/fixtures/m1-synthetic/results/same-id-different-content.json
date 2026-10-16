@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "1",
+  "messageId": "message-{{caseId}}-{{attemptId}}-result-changed",
+  "resultId": "result-{{caseId}}-{{attemptId}}",
+  "requestId": "{{requestId}}",
+  "attemptId": "{{attemptId}}",
+  "memberId": "{{memberId}}",
+  "repositoryId": "{{repositoryId}}",
+  "consentId": "{{consentId}}",
+  "scopeRevision": "{{scopeRevision}}",
+  "sourceMode": "MOCK",
+  "outcome": "SUCCEEDED",
+  "candidates": [
+    {
+      "candidateId": "candidate-{{caseId}}-{{attemptId}}-1",
+      "title": "loginRetryButton 코드 추가",
+      "workIdentity": "synthetic-work-{{caseId}}-a",
+      "workFacts": [
+        "합성 커밋이 로그인 실패 안내 문구와 재시도 버튼을 바꿨다",
+        "합성 PR이 커밋들을 묶어 병합됐다"
+      ],
+      "subjectContribution": "합성 회원 계정이 작성자로 기록된 커밋",
+      "groupingBasis": "같은 합성 PR에 속한 커밋",
+      "groupingLimitations": [
+        "합성 자료라 실제 저장소 기록과 대조하지 않았다"
+      ],
+      "eligibility": {
+        "workFactsVerified": true,
+        "contributionVerified": true,
+        "independentOfFailures": true
+      },
+      "evidence": [
+        {
+          "evidenceId": "evidence-{{caseId}}-{{attemptId}}-1-1",
+          "sourceUrl": "https://example.invalid/catchu-synthetic-owner/catchu-synthetic-repo/pull/1",
+          "sourceRevision": "synthetic-revision-11",
+          "representedFacts": [
+            "합성 PR 1건에 커밋 2건이 포함됐다"
+          ],
+          "contributionScope": "합성 회원 계정이 연 PR(본인 기여는 이 PR의 본인 커밋에 한정)",
+          "coverageLimits": [
+            "리뷰 댓글은 포함하지 않았다"
+          ]
+        }
+      ],
+      "draft": {
+        "status": "GENERATED",
+        "content": "합성 설명 초안: 로그인 실패 안내 문구를 사용자가 원인을 알 수 있게 정리했다."
+      },
+      "reflection": {
+        "status": "GENERATED",
+        "questions": [
+          "합성 질문: 문구를 바꾸게 된 계기는 무엇이었나요?"
+        ]
+      }
+    }
+  ],
+  "notProvided": [],
+  "failures": [],
+  "finishedAt": "2026-10-01T00:30:00Z"
+}

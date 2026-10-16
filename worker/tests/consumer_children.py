@@ -1,0 +1,134 @@
+"""큐 소비자 시험용 자식 대상 함수. spawn 자식이 이 모듈을 이름으로 불러온다.
+
+정상 자식은 `app.consumer.child.child_main`이다. 여기 함수들은 멈추거나, 종료 신호를 무시하거나,
+통신을 깨는 자식을 흉내 낸다.
+"""
+
+import os
+import signal
+import struct
+import time
+from multiprocessing.connection import Connection
+
+from app.consumer.child import ChildInput, child_main, start_watchdog
+from app.consumer.frames import Frame, encode
+
+
+def marked(conn: Connection, child_input: ChildInput) -> None:
+    """HARNESS_MARKER에 자식 시작을 적고 HARNESS_TARGET 함수로 처리한다(하네스 전용)."""
+    with open(os.environ["HARNESS_MARKER"], "a", encoding="utf-8") as stream:
+        stream.write(f"child {child_input.job_id}\n")
+    name = os.environ.get("HARNESS_TARGET", "child_main")
+    target = child_main if name == "child_main" else globals()[name]
+    target(conn, child_input)
+
+
+def hang(conn: Connection, child_input: ChildInput) -> None:
+    """종결 프레임 없이 멈춘다(자기 마감·부모 감시는 그대로 돈다)."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    start_watchdog(child_input)
+    while True:
+        time.sleep(1)
+
+
+def hang_when_dead(conn: Connection, child_input: ChildInput) -> None:
+    """시도 ID가 dead로 끝나면 멈추고, 아니면 정상 처리한다(같은 부모의 다음 작업 확인)."""
+    if child_input.job_id.endswith("dead"):
+        hang(conn, child_input)
+    child_main(conn, child_input)
+
+
+def hang_ignoring_sigterm(conn: Connection, child_input: ChildInput) -> None:
+    """SIGTERM을 무시하고 멈춘다. 무시를 건 뒤 CONSUMER_TEST_READY_DIR에 준비 파일을 만든다."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    start_watchdog(child_input)
+    ready_dir = os.environ.get("CONSUMER_TEST_READY_DIR")
+    if ready_dir:
+        with open(os.path.join(ready_dir, child_input.job_id), "w", encoding="utf-8"):
+            pass
+    while True:
+        time.sleep(1)
+
+
+def work_for_seconds(conn: Connection, child_input: ChildInput) -> None:
+    """정상 처리 전에 SLOW_CHILD_SECONDS(기본 6초)만큼 일하는 척한다(잠금 갱신 시험)."""
+    time.sleep(float(os.environ.get("SLOW_CHILD_SECONDS", "6")))
+    child_main(conn, child_input)
+
+
+def large_result(conn: Connection, child_input: ChildInput) -> None:
+    """정상 결과에 수 MB 근거 한계 문구를 덧붙여 보낸다(결과 자체는 스키마를 지킨다)."""
+    from app.processing import runner
+
+    original = getattr(runner, "process_request")  # noqa: B009
+
+    def bigger(*args: object, **kwargs: object) -> object:
+        outcome = original(*args, **kwargs)
+        result = getattr(outcome, "result", None)
+        if isinstance(result, dict):
+            limits = result["candidates"][0]["groupingLimitations"]
+            limits.append("가" * (3 * 1024 * 1024))
+        return outcome
+
+    setattr(runner, "process_request", bigger)  # noqa: B010
+    child_main(conn, child_input)
+
+
+def oversized_frame(conn: Connection, child_input: ChildInput) -> None:
+    """프레임 상한보다 큰 프레임을 보낸다."""
+    size = child_input.settings.limits.frame_max_bytes + 1
+    conn.send_bytes(b" " * size)
+    time.sleep(30)
+
+
+def partial_frame_then_die(conn: Connection, child_input: ChildInput) -> None:
+    """진행 알림 한 건은 온전히 보내고, 다음 프레임은 길이 머리만 보낸 채 죽는다."""
+    import json
+    from datetime import UTC, datetime
+
+    from app.processing.pipeline import _event
+    from app.processing.request_check import CheckedRequest, check_request
+    from app.processing.runner import _mock_context
+
+    message = json.loads(child_input.job_data)
+    checked = check_request(message, _mock_context(message))
+    assert isinstance(checked, CheckedRequest)
+    event = _event(checked, "RECEIVED", datetime.now(UTC), "mock")
+    conn.send_bytes(encode(Frame("event", message=event)))
+    os.write(conn.fileno(), struct.pack("!i", 4096) + b'{"kind":')
+    os._exit(9)
+
+
+def exit_without_terminal(conn: Connection, child_input: ChildInput) -> None:
+    os._exit(3)
+
+
+def exit_badly_after_terminal(conn: Connection, child_input: ChildInput) -> None:
+    child_main(conn, child_input)
+    os._exit(5)
+
+
+def raise_in_child(conn: Connection, child_input: ChildInput) -> None:
+    """처리 중 예외(결함). 정상 자식과 같이 결함 프레임을 보내는지 본다."""
+    from app.processing import runner
+
+    def broken(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("비밀 원문 sk-test-should-not-leak")
+
+    setattr(runner, "process_request", broken)  # noqa: B010
+    child_main(conn, child_input)
+
+
+def report_modules(conn: Connection, child_input: ChildInput) -> None:
+    """자식에 불러온 모듈 중 BullMQ·Redis·FastAPI가 있는지 결함 프레임 이름으로 알린다."""
+    import sys
+
+    child_main_modules = {"bullmq", "redis", "fastapi", "uvicorn"} & {
+        name.split(".")[0] for name in sys.modules
+    }
+    conn.send_bytes(
+        encode(
+            Frame("defect", error_type=",".join(sorted(child_main_modules)) or "none")
+        )
+    )

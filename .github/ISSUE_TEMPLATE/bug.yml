@@ -1,0 +1,52 @@
+name: "버그 보고"
+description: "10월 MVP 버그의 재현 조건과 기대·실제 동작, 영향과 해결 확인 기준을 남깁니다."
+labels: ["mvp-october"]
+body:
+  - type: markdown
+    attributes:
+      value: "판단 기준은 [공통 작업관리 §4 이슈 본문](https://github.com/JminAILab/CatchU/blob/dev/docs/CatchU_작업관리.md#이슈-본문)을 따릅니다. 30분 이상 해결하지 못한 버그는 기존 이슈를 확인해 작성·갱신하고 Slack으로 도움을 요청합니다. 비밀번호·토큰·개인 자료 원문은 첨부하지 않습니다. 담당·일정은 합의 전 확정하지 않으며, [조건부] 칸은 해당 없으면 비워서 지웁니다."
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 재현 절차와 환경
+      description: "버전·환경·조건·단계. 재현되지 않으면 관찰한 사실과 미확인 부분을 구분합니다."
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 기대 동작과 실제 동작
+      description: "어떤 동작을 기대했으며 실제로 무엇이 발생했는가? 기대 동작의 근거가 되는 이슈 완료 기준·승인된 제품 행동·합의된 계약을 관련 근거 칸에 연결합니다. 미확정이면 그대로 표시합니다."
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 영향과 시도한 해결
+      description: "영향받는 흐름, 자료·권한 영향, 확인한 증거와 시도 결과."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 해결 완료 기준
+      description: "재현 사례와 필요한 회귀 검증 조건을 적습니다."
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: 관련 작업과 근거
+      description: "관련 이슈·PR·요구사항·설계 링크. 미확정이면 그대로 표시합니다."
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 선행 조건과 미결
+      description: "[조건부] 확인은 항상 수행합니다. 없음을 확인했으면 이 칸을 비워 지웁니다. 확인하지 못했으면 없음으로 적지 말고 미확인으로 표시합니다. 실제 선행 이슈는 본문과 별도로 blocked by 관계도 설정합니다."
+  - type: textarea
+    id: ownership
+    attributes:
+      label: 담당과 분류 제안
+      description: "[조건부] 담당·분류 결정이 필요할 때만 씁니다. 확정되면 Project 필드에 반영하고 제안 문구는 지웁니다. 필드로 표현할 수 없는 협업·검토 역할은 남깁니다."

@@ -1,0 +1,18 @@
+{
+  "description": "합성 접수 맥락 표본. 개발용 주입에서는 E가 실제로 접수한 요청의 값으로 채우고, 이 값은 api 연결 없이 도는 테스트와 개발 연동 대역의 합성 저장소 값 기준으로 쓴다.",
+  "values": {
+    "requestId": "00000000-0000-4000-8000-000000000101",
+    "attemptId": "00000000-0000-4000-8000-000000000102",
+    "memberId": "00000000-0000-4000-8000-000000000001",
+    "repositoryId": "synthetic-repo-0001",
+    "consentId": "00000000-0000-4000-8000-000000000103",
+    "scopeRevision": "00000000-0000-4000-8000-000000000201"
+  },
+  "repository": {
+    "repositoryId": "synthetic-repo-0001",
+    "name": "catchu-synthetic-repo",
+    "ownerLogin": "catchu-synthetic-owner",
+    "url": "https://example.invalid/catchu-synthetic-owner/catchu-synthetic-repo",
+    "allowedScopeRevision": "00000000-0000-4000-8000-000000000201"
+  }
+}

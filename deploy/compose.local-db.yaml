@@ -1,0 +1,75 @@
+# 로컬 합성 DB·큐 겹침 파일(#275·#121). 로컬 검증·재현과 개발 서버(#304, 12월 전 개발 단계, 합성·시험 자료) 전용이며
+# 운영 DB·큐(11월 EKS 전환 뒤 RDS·ElastiCache, #276) 대신 쓰지 않는다. 사용법은 deploy/README.md, 개발 서버는 deploy/dev-server/README.md.
+# DB는 운영과 같은 방식(TLS verify-full, 앱·migration 계정 분리)을 합성 값으로 재현한다. 평문 연결은 받지 않는다.
+# DB는 내부 망(db)에만 두고 api·migration만 연결한다. worker는 이 망에 없어 DB에 닿지 않는다.
+# 합성 큐는 운영(TLS·비밀번호)과 달리 내부 망(queue)에서 평문으로만 열고, worker만 연결해 시험 모드로 띄운다.
+services:
+  db:
+    image: postgres:16@sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d
+    container_name: ${CATCHU_SINGLE_NAME:-catchu-single}-db
+    env_file:
+      - path: ${CATCHU_ENV_DIR:?저장소 밖 환경 폴더(CATCHU_ENV_DIR)가 필요합니다}/db.env
+        required: true
+    entrypoint: ["/catchu/start-tls.sh"]
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./local-db:/catchu:ro
+      - ./local-db/init-roles.sh:/docker-entrypoint-initdb.d/10-catchu-roles.sh:ro
+      - type: bind
+        source: ${CATCHU_ENV_DIR}/tls
+        target: /run/catchu/tls
+        read_only: true
+        bind:
+          create_host_path: false
+    networks:
+      - db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "/var/run/postgresql", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+      start_interval: 1s
+
+  queue:
+    image: valkey/valkey:8.1.6-alpine@sha256:1cb6b20b70d927560cc4cc5397b5f045e74aa603ff7696274778880bb6fadc75
+    container_name: ${CATCHU_SINGLE_NAME:-catchu-single}-queue
+    # 큐 검증 키트와 같은 엔진·판본. 영속성 없이 메모리만 쓰고 축출하지 않는다(BullMQ 요구).
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory-policy", "noeviction"]
+    networks:
+      - queue
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+      start_interval: 1s
+
+  api:
+    networks:
+      - default
+      - db
+
+  # 운영 compose는 worker를 운영 모드로 고정한다. 이 겹침 파일만 합성 큐의 평문 주소를 받도록 시험 모드로 바꾼다.
+  worker:
+    environment:
+      NODE_ENV: test
+    networks:
+      - default
+      - queue
+
+  migration:
+    networks:
+      - db
+
+networks:
+  db:
+    internal: true
+  queue:
+    internal: true
+
+volumes:
+  db-data:

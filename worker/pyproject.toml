@@ -1,0 +1,51 @@
+[project]
+name = "catchu-worker"
+version = "0.1.0"
+description = "CatchU 수집·분석 worker 실행 기반"
+requires-python = "==3.12.10"
+dependencies = [
+    "anthropic==1.13.0",
+    "bullmq==3.3.0",
+    "fastapi==0.141.1",
+    "httpcore2==2.13.0",
+    "httpx2==2.13.0",
+    "jsonschema==4.26.0",
+    "pyyaml==6.0.3",
+    "redis==7.4.1",
+    "referencing==0.37.0",
+    "rfc3339-validator==0.1.4",
+    "rfc3986-validator==0.1.1",
+    "uvicorn==0.53.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy==2.3.1",
+    "pytest==9.1.1",
+    "ruff==0.16.8",
+    "types-jsonschema==4.26.0.20260518",
+    "types-pyyaml==6.0.12.20260906",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app", "tests"]
+strict = true
+
+# bullmq(Python)는 형식 정보(py.typed)를 싣지 않는다. 소비자 서비스(app/consumer/service.py)만 쓴다.
+[[tool.mypy.overrides]]
+module = ["bullmq", "bullmq.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,15 @@
+{
+  "name": "@catchu/queue-verification",
+  "version": "0.0.0",
+  "private": true,
+  "description": "#77 BullMQ 기술 검증 재현 키트. 제품 코드가 아니다.",
+  "type": "commonjs",
+  "engines": {
+    "node": "24.21.0",
+    "npm": "11.19.0"
+  },
+  "dependencies": {
+    "bullmq": "6.3.11",
+    "ioredis": "6.0.0"
+  }
+}
