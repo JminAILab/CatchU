@@ -7,7 +7,9 @@
 #   3) replace-single.sh --local-db --migrate 로 교체한다. 자동 재시도·자동 되돌리기는 하지 않는다
 #   4) Caddy를 새 폴더의 Caddyfile로 다시 띄우고, 새로 만들어져 돌고 있는지 본다(인증서는 보관 볼륨에서 다시 쓴다)
 #   5) 서버 안 확인: 실행 이미지가 compose.env와 같음, health, 앞단 첫 화면, 프록시 주소, 앱 계정 잠금 대기 상한
-#   6) /opt/catchu/deploy-history.log에 한 줄 남긴다
+#   6) 모두 통과했으면 서버의 catchu 이미지(앱 네 개와 배포 파일 묶음) 중 지금 판본과 직전 판본만 남기고 지운다.
+#      직전 판본은 교체 전 compose.env(앱)와 배포 기록의 마지막 성공 줄(묶음)로 정한다. 다른 이미지(DB·큐·Caddy)는 건드리지 않는다
+#   7) /opt/catchu/deploy-history.log에 한 줄 남긴다
 # 1·2에서 멈추면 서버의 실행 중 판본은 바뀌지 않는다. 출력은 환경 폴더의 비밀값을 가린다(redact.py).
 # 종료 코드: 0 완료, 2 입력·준비 실패(바꾼 것 없음), 3 교체 실패(replace-single.sh의 종료 코드를 출력에 적는다),
 #           4 교체 뒤 확인 실패(Caddy를 새로 띄우지 못함 포함)
@@ -32,6 +34,28 @@ while [ $# -gt 0 ]; do
     *) echo "알 수 없는 인자: $1"; exit 2 ;;
   esac
 done
+
+# 서버 디스크가 배포마다 쌓이는 이미지로 차지 않게, 지금 판본(keep_now)과 직전 판본(keep_prev)만 남긴다.
+# 지우기 실패(컨테이너가 쓰는 중 등)는 알리기만 하고 배포 결과는 바꾸지 않는다. 지운 판본도 ECR에서 다시 받을 수 있다.
+prune_images() {
+  local registry=$1 keep=$2 repo digest removed=0 kept=0 failed=0
+  while read -r repo digest; do
+    case "$repo" in
+      "$registry"/catchu-web | "$registry"/catchu-api | "$registry"/catchu-api-migration | "$registry"/catchu-worker | "$registry"/catchu-deploy-files) ;;
+      *) continue ;;
+    esac
+    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || continue
+    if grep -qxF "${repo}@${digest}" <<< "$keep"; then
+      kept=$((kept + 1))
+    elif docker image rm "${repo}@${digest}" > /dev/null 2>&1; then
+      removed=$((removed + 1))
+    else
+      failed=$((failed + 1))
+    fi
+  done < <(docker images --digests --format '{{.Repository}} {{.Digest}}' | sort -u)
+  echo "이미지 정리: 남김 ${kept}, 지움 ${removed}, 지우지 못함 ${failed}"
+  [ "$failed" = 0 ] || echo "주의: 지우지 못한 이미지는 다음 배포 때 다시 정리한다"
+}
 
 main() {
   local d
@@ -156,6 +180,18 @@ main() {
     if [ -n "$gw" ] && [ "$cidr" = "${gw}/32" ]; then echo "통과 신뢰 프록시 주소"; else echo "실패 TRUST_PROXY_CIDRS(${cidr})가 앱 망 게이트웨이(${gw}/32)와 다르다"; result=4; fi
     lock=$(docker exec catchu-dev-db psql -U catchu_app -d catchu -tAc 'show lock_timeout' 2>&1)
     if [ "$lock" = 3s ]; then echo "통과 앱 계정 잠금 대기 상한 3s"; else echo "실패 앱 계정 잠금 대기 상한 ${lock}"; result=4; fi
+  fi
+
+  if [ "$result" = 0 ]; then
+    echo "== 6. 이전 이미지 정리"
+    local keep prev_files
+    keep=$(printf '%s\n' "${registry}/catchu-web@${web}" "${registry}/catchu-api@${api}" "${registry}/catchu-api-migration@${migration}" \
+      "${registry}/catchu-worker@${worker}" "${registry}/catchu-deploy-files@${files}")
+    # 직전 판본: 교체 전 compose.env의 앱 이미지 네 개와, 배포 기록의 마지막 성공 줄의 묶음
+    keep+=$'\n'$(grep -E '^CATCHU_(WEB|API|MIGRATION|WORKER)_IMAGE=' "$BASE/env-backup/compose.env.$stamp" | cut -d= -f2-)
+    prev_files=$(grep ' result=0$' "$BASE/deploy-history.log" 2>/dev/null | tail -1 | sed -n 's/.* files=\(sha256:[0-9a-f]*\) .*/\1/p')
+    [ -n "$prev_files" ] && keep+=$'\n'"${registry}/catchu-deploy-files@${prev_files}"
+    prune_images "$registry" "$keep"
   fi
 
   echo "$(date -u +%FT%TZ) commit=${commit} web=${web} api=${api} migration=${migration} worker=${worker} files=${files} replace=${rc} result=${result}" >> "$BASE/deploy-history.log"
