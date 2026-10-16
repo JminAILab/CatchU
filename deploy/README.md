@@ -174,7 +174,7 @@ node deploy/scripts/check-images.mjs [--keep] [--report <저장소 밖 JSON 경�
 - 정리: 자원 조회가 실패하거나(조회별·docker 없음·시간 초과) 실제로 자원(`--keep`이 아니면 검사 이미지 포함)이 남으면 정리 통과로 보지 않는지, 시작 전 다른 검사 자원 확인도 조회 실패를 자원 없음으로 보지 않는지
 - 비밀값: 합성 비밀값이 실행 로그·출력에 없는지, 로그·이미지 기록을 모으지 못하면 통과로 보지 않는지. 합성 비밀값은 이미지를 만든 뒤에 생기므로 이미지 쪽 확인은 맥락 미끼와 Dockerfile 이름 검사가 맡는다
 
-GitHub Actions의 `images` 워크플로가 같은 명령을 x86_64 러너에서 실행한다. **main으로 가는 배포 PR**과 **수동 실행**(Actions 화면의 Run workflow에서 브랜치를 골라 실행)에서만 돌고, dev 대상 PR의 CI(`ci.yml`)에는 들어 있지 않다. 이미지 관련 파일(Dockerfile·`.dockerignore`·`deploy/`·잠금 파일·DB 구조·실행 진입점·계약 YAML·합성 자료)을 바꾼 dev PR은 병합 전에 그 브랜치로 수동 실행해 확인한다. main에서 이 검사를 필수로 할지는 [#277](https://github.com/JminAILab/CatchU/issues/277)의 main 배포 PR 검사 기준에서 정한다.
+GitHub Actions의 `images` 워크플로가 같은 명령을 x86_64 러너에서 실행한다. **main으로 가는 배포 PR**과 **수동 실행**(Actions 화면의 Run workflow에서 브랜치를 골라 실행)에서만 돌고, dev 대상 PR의 CI(`ci.yml`)에는 들어 있지 않다. 이미지 관련 파일(Dockerfile·`.dockerignore`·`deploy/`·잠금 파일·DB 구조·실행 진입점·계약 YAML·합성 자료)을 바꾼 dev PR은 병합 전에 그 브랜치로 수동 실행해 확인한다. main 대상 PR에서는 이 검사(`images`)와 자동 배포 스크립트 회귀 시험(`cd-scripts`)이 필수 상태 검사다([레포 컨벤션 「main의 검증」](../docs/CatchU_레포_컨벤션.md#2-브랜치), 2026-10-16 [#277](https://github.com/JminAILab/CatchU/issues/277) 결정).
 
 이 검사가 대신하지 않는 것: 운영 노드 아키텍처의 최종 이미지 기동, 운영 DB의 역할별 TLS·평문 거부, 실제 앞단의 같은 출처 경로·신뢰 프록시·연결 유지 시간, 운영 큐(TLS·비밀번호)와 api의 실제 큐 연결(#233)·실제 분석, 작성자 외 재현.
 
