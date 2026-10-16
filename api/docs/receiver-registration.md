@@ -44,13 +44,17 @@ const outcome = await service.receiveResult(message, async receipt => {
 
 [10/4 팀장 조건](https://github.com/JminAILab/CatchU/issues/105#issuecomment-5975854918)에 따라 LIVE 후보의 모든 근거 주소는 공급자가 확인한 `https://github.com/<owner>/<repo>/`로 시작해야 한다. 파싱된 origin·정규화된 경로도 대조해 위장 호스트·다른 저장소·상위 경로 이동을 거부한다. [10/15 후속 결정](https://github.com/JminAILab/CatchU/issues/105#issuecomment-6189230335)에 따라 소유자·저장소 이름은 대소문자를 구분하지 않고 대조하며, 저장하는 근거 주소는 원문을 유지한다. 주소를 조회하거나 redirect를 따르지 않는다. 주소 불일치는 기존 B의 `INVALID_INPUT / evidence.sourceUrl` 분류다. MOCK의 `example.invalid` 합성 주소에는 이 대조를 적용하지 않는다.
 
-10월에는 [10월 정책 공급자](october-registration-policy.md)를 명시적으로 연결할 수 있다. 이 공급자는 GitHub를 조회하지 않고 ‘관측 안 함’ 출처와 NONE을 반환한다. 공급 실패를 NONE으로 보정하는 것이 아니며, 최초 PRIVATE와 별도 공개 선택은 그대로다. 실제 좌표 제공·기존 비공개 근거 보존·LIVE 주소 대조·앱 활성화의 남은 조건은 해당 문서에서 확인한다.
+10월에는 [10월 정책 공급자](october-registration-policy.md)를 명시적으로 연결할 수 있다. 이 공급자는 GitHub를 조회하지 않고 ‘관측 안 함’ 출처와 NONE을 반환한다. 공급 실패를 NONE으로 보정하는 것이 아니며, 최초 PRIVATE와 별도 공개 선택은 그대로다. 실제 좌표 제공·앱 활성화의 남은 조건은 해당 문서에서 확인한다. 기존 비공개 근거 보존과 LIVE 주소 대조는 등록부에 반영돼 있다.
 
 ## 실제 공급과 후속 경계
 
-[#231 실제 GitHub 연동](https://github.com/JminAILab/CatchU/issues/231)은 회원 ID로 계정·토큰·만료 시각을 공급할 접점, [#232 worker 요청 정보 조회](https://github.com/JminAILab/CatchU/issues/232)는 저장소 좌표·동의 범위를 조회할 접점을 정의한다. 현재 dev에는 이 실제 공급 코드가 없다. worker의 `CredentialResolver`·`SelectionResolver`는 확인 로직과 인터페이스이며 API의 보호 관측 공급자가 아니다. #104 개발 연동도 합성 계정만 제공한다.
+[선정 저장소 좌표 연결](selected-repository-coordinates.md)은 기존 동의의 선정 참조와 보관 판본으로 당시 좌표를 읽는다.
+DB를 사용하는 공급자는 `registerDatabase({ contractDirectory, observationsFactory: db => ... })`로 연결할 수 있다.
+기존 `observations` 객체와 공급 함수 중 하나를 명시해야 한다.
 
-따라서 연결된 저장소 ID와 실제 좌표의 대조, 공개/비공개 상태를 언제 누가 관측하는지, 관측 근거·시각을 E 인터페이스로 전달할 구현·책임은 #105의 남은 연결 검토 사항이다. 이를 #231/#232의 추가 구현 책임으로 자동 배정하지 않는다. 실제 제공자가 확인되면 이 필수 경계를 연결하고 실제 관측을 사용한 재현을 별도로 수행해야 한다.
+#231의 GitHub 자격정보 및 #232의 실행 허가 조회는 종결 결과의 등록 조회와 다르다.
+목록·접수 측에서 같은 선정 참조를 저장하고 실제 동의 범위를 확정하는 연결(#252·#138), 앱·큐 활성화와 실제 왕복(#233)은 남아 있다.
+10월의 공개 관측 생략은 위 정책을 따르며, 이 좌표 제공자가 GitHub 공개 여부를 확인했다고 표시하지 않는다.
 
 [10/6 최신 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)과 [#234 철회 기록](https://github.com/JminAILab/CatchU/issues/234#issuecomment-6028927385)에 따라 결과 원문 보관·자동 재반영·worker 결과 14일 보관을 구현하지 않는다. 수신 커밋 후 중단·Receipt 전달 실패·공급 실패는 각각 `PENDING`/`APPLY_FAILED`에 남을 수 있다. [#237 처리 시한·실패 종료](https://github.com/JminAILab/CatchU/issues/237)는 [PR #295](https://github.com/JminAILab/CatchU/pull/295)로 구현돼 주기 작업이 시한을 넘긴 요청을 닫는다([규칙](analysis-deadline.md)). 이 수신·반영 서비스 자체는 시간만으로 요청을 닫거나 재요청을 허용하지 않는다. 잠금 순서는 요청 → 현재 시도로 맞춘다.
 

@@ -24,7 +24,7 @@ AnalysisReceiverModule.registerDatabase({ contractDirectory, observations });
 - `githubRepository: { owner, name }`: 허용된 GitHub 좌표 형식이어야 한다.
 - 해당 자료가 없으면 `null`, 조회에 실패하면 예외를 전달한다. 결과 메시지의 URL에서 좌표를 만들지 않는다.
 
-실제 좌표는 [#252](https://github.com/JminAILab/CatchU/issues/252)의 저장 자료를 사용한다.
+실제 좌표 조회 구현과 접수 측에 남은 연결은 [선정 저장소 좌표 연결](selected-repository-coordinates.md)을 따른다.
 **결과 수신 뒤에는 분석 처리가 종결된 상태이므로, 종결 뒤에도 같은 시도의 좌표를 읽을 수 있어야 한다.**
 진행 중에만 답하는 #232의 worker 요청 정보 API를 호출하거나 현재 저장소 이름으로 과거 좌표를 바꾸지 않는다.
 MOCK은 명시적인 합성 좌표 제공자를 연결하고, LIVE 조회 실패를 MOCK으로 대체하지 않는다.
@@ -54,13 +54,11 @@ MOCK은 명시적인 합성 좌표 제공자를 연결하고, LIVE 조회 실패
 
 이 파일은 정책 공급자의 구현 안내다. 다음 연결을 대체하지 않는다.
 
-- #252의 실제 좌표 제공자를 위 내부 인터페이스에 연결하고 종료된 시도의 좌표를 검증한다.
-- #105의 E 등록부에서 기존 SOURCE_PRIVATE의 상태·출처·시각을 보존하고, LIVE 근거 주소의 저장소 좌표를 대소문자 구분 없이 대조한다. [요청](https://github.com/JminAILab/CatchU/issues/105#issuecomment-6189230335)과 [E 담당의 근거 보존 분담](https://github.com/JminAILab/CatchU/pull/309#pullrequestreview-5542057916)을 따른다.
-- #233의 큐 및 앱 조립에서 이 공급자를 명시적으로 전달하고 실제 왕복 검사를 한다.
+- #252의 실제 선정·접수에서 [보관 좌표 판본](selected-repository-coordinates.md)의 참조를 저장하고 실제 동의 범위를 확정한다.
+- #233의 큐 및 앱 조립에서 공급자를 명시적으로 전달하고 실제 왕복 검사를 한다.
 
-기존 등록부는 SOURCE_PRIVATE 제한만 유지하고 상태·출처·시각을 새 정책값으로 덮을 수 있으므로,
-**근거 보존 수정 전에는 이 공급자를 제품 앱에 활성화하지 않는다.** 조회 단계에서 과거 보호 행을 읽어
-정책값에 복사하는 방법으로 우회하지 않으며, 저장 트랜잭션 안에서 보존해야 한다.
+기존 SOURCE_PRIVATE의 상태·출처·시각 보존과 LIVE 주소의 대소문자 구분 없는 대조는 [PR #317](https://github.com/JminAILab/CatchU/pull/317)로 반영됐다.
+보호 행을 잠근 저장 트랜잭션 안에서 보존하며, 조회 단계에서 과거 값을 복사해 우회하지 않는다.
 
 ## 검사
 
@@ -74,4 +72,4 @@ npm test -- test/analysis/october-repository-observation.test.cjs test/integrati
 - 실제 API·DB: 접수 → 합성 결과 주입 → 정책 공급 → Catch 저장 → 본인 목록·상세 → 확인 → 공개·숨김.
   타인 조회 거부, 중복 결과 보존, 공급 실패, Catch 저장 실패의 전체 롤백도 검사한다.
 - 분석 결과와 좌표는 합성 자료다. 실제 Google/GitHub·LLM·큐 전송·C의 링크 HTTP 전체 흐름이나
-  기존 SOURCE_PRIVATE 근거 보존 수정까지 검증했다는 뜻은 아니다.
+  운영 환경의 전체 연결을 검증했다는 뜻은 아니다.
