@@ -11,7 +11,7 @@ export interface RepositoryObservation {
   appliedRestriction: 'NONE' | 'SOURCE_PRIVATE';
 }
 
-/** #231의 자격정보/#232의 저장소 조회와 연결할 내부 공급 경계. 토큰은 이 반환값에 포함하지 않는다. */
+/** #105 등록용 내부 공급 경계. 실제 좌표는 #252의 동일 시도 기록을 사용하며 토큰은 반환하지 않는다. */
 export interface RepositoryObservationSource {
   observe(context: Readonly<RequestContext>): Promise<RepositoryObservation | null>;
 }
