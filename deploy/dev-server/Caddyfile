@@ -1,4 +1,4 @@
-# 개발 서버 앞단(#276). 12월 전 개발 단계 전용이며, 11월 EKS 전환 뒤에는 ALB가 같은 일을 맡는다.
+# 개발 서버 앞단(#304). 12월 전 개발 단계 전용이며, 11월 EKS 전환 뒤에는 ALB가 같은 일을 맡는다.
 # 사용법은 deploy/dev-server/README.md. 공개 주소는 compose.env의 CATCHU_DOMAIN에서 받는다.
 {
 	# 설정을 바꾸는 관리 API를 끈다. 설정은 이 파일을 고쳐 컨테이너를 다시 띄워서만 바꾼다.
@@ -8,12 +8,13 @@
 		protocols h1 h2
 	}
 	# 접근 로그는 쓰지 않지만, 앱이 멈췄을 때(502 등) 남는 오류 로그에는 요청 주소와 헤더가 들어간다.
-	# 공유 링크 토큰 자리를 가리고, 헤더(이전 페이지 주소 Referer에 토큰이 담길 수 있음)는 남기지 않는다.
+	# 공유 링크 토큰 자리와 쿼리 전체(로그인 콜백의 code·state 등)를 가리고,
+	# 헤더(이전 페이지 주소 Referer에 토큰이 담길 수 있음)는 남기지 않는다.
 	log default {
 		format filter {
 			wrap json
 			fields {
-				request>uri regexp "^/(s|v1/public/links)/[^/?]+" "/$1/REDACTED"
+				request>uri regexp "(^/(?:s|v1/public/links)/)[^/?]+|([?]).*$" "${1}${2}REDACTED"
 				request>headers delete
 			}
 		}

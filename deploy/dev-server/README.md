@@ -1,6 +1,6 @@
 # 개발 서버(서버 한 대)
 
-12월 전 개발 단계에 AWS 서버 한 대로 web·api·worker와 DB를 띄워, 실제 https 주소에서 화면과 실제 연결(GitHub·LLM·로그인)을 시험하는 방법이다. 2026-10-15 팀장 결정으로 지금은 이 구성으로 운영하고, 11월 중순~말에 EKS로 옮긴다([#276](https://github.com/JminAILab/CatchU/issues/276)). 사람이 실행하는 수동 절차이며 자동 배포가 아니다.
+12월 전 개발 단계에 AWS 서버 한 대로 web·api·worker와 DB를 띄워, 실제 https 주소에서 화면과 api를 시험하는 방법이다. 로그인·GitHub·LLM 같은 실제 연결은 켜는 데 필요한 것이 남아 있다(아래 「개발 단계라 받아들이는 한계」). 2026-10-15 팀장 결정으로 지금은 이 구성으로 운영하고, 11월 중순~말에 EKS로 옮긴다([#276](https://github.com/JminAILab/CatchU/issues/276)). 사람이 실행하는 수동 절차이며 자동 배포가 아니다.
 
 앱 실행·교체·migration·검사는 [deploy/README.md](../README.md)의 한 호스트 실행을 그대로 쓴다. 이 문서는 그 위에 더하는 것만 적는다.
 
@@ -16,7 +16,7 @@ Caddy가 하는 일:
 - 인증서를 Let's Encrypt에서 자동으로 받고 갱신하며, http를 https로 돌려보낸다.
 - `/v1/internal`·`/v1/internal/*`는 404, `/v1/*`는 api(127.0.0.1:3001), 나머지는 web(127.0.0.1:3000)으로 보낸다. web과 api가 같은 출처가 된다([#250](https://github.com/JminAILab/CatchU/issues/250) 조건).
 - HSTS를 `max-age=300`으로 붙인다. 앱이 보낸 같은 헤더는 이 값 하나로 바뀐다.
-- 접근 로그를 쓰지 않는다(공유 링크 토큰이 든 주소가 남지 않게). 앱이 멈췄을 때(502 등) 남는 오류 로그에는 요청 주소와 헤더가 들어가므로, 주소의 공유 링크 토큰 자리(`/s/…`, `/v1/public/links/…`)는 `REDACTED`로 가리고 헤더는 남기지 않는다.
+- 접근 로그를 쓰지 않는다(공유 링크 토큰이 든 주소가 남지 않게). 앱이 멈췄을 때(502 등) 남는 오류 로그에는 요청 주소와 헤더가 들어가므로, 주소의 공유 링크 토큰 자리(`/s/…`, `/v1/public/links/…`)와 쿼리 전체(로그인 콜백의 code·state 등)는 `REDACTED`로 가리고 헤더는 남기지 않는다.
 
 앱과 다른 Compose 묶음이라 `replace-single.sh`로 앱을 교체해도 Caddy는 그대로 돈다. 교체하는 동안 사용자는 502를 받는다.
 
@@ -54,5 +54,6 @@ Caddy가 하는 일:
 - 큐는 합성 큐(평문, 영속성 없음)이고 worker는 시험 모드다. 운영 큐(TLS·비밀번호)와 운영 모드 worker는 11월 EKS에서 쓴다. 운영 모드에서만 도는 worker 설정 검사도 그때 처음 확인된다.
 - worker는 합성 처리를 끄므로, 실제 처리(LIVE)가 조립되기 전([#121](https://github.com/JminAILab/CatchU/issues/121))에는 분석 요청을 처리 전에 거부한다.
 - worker의 바깥 연결 제한은 코드 쪽 통제([#117](https://github.com/JminAILab/CatchU/issues/117))뿐이다. 네트워크 차단은 11월 EKS의 NetworkPolicy에서 한다. worker의 DB 차단은 Docker 내부 망으로 된다.
+- 로그인(Google·GitHub)·GitHub 연결·LLM은 아직 켜지 않았다. GitHub 연결을 켜려면 OAuth 앱 등록·암호화 키와 함께 api가 쓸 수 있는 지속 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)가 필요하다. 이 구성의 api는 읽기 전용 루트와 임시 `/tmp`만 있어 그 폴더가 없으므로, 켤 때 함께 만든다([배포 안내 「#276에서 받을 값과 남은 일」](../README.md#276에서-받을-값과-남은-일)).
 - 요청 빈도 제한이 없다. Google 로그인을 켜기 전에 시작 경로 보호를 [#277](https://github.com/JminAILab/CatchU/issues/277)에서 정한다.
 - 서버 접속은 SSH가 아니라 AWS Session Manager다. 비밀값은 환경변수로 들어가므로 서버에서 `docker inspect`를 쓸 수 있는 사람은 값을 볼 수 있다.
