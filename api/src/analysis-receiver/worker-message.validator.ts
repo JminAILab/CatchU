@@ -11,6 +11,7 @@ const BASE_URI = 'https://contract.catchu.invalid/contract-design/';
 export class WorkerMessageValidator {
   private readonly resultValidator: ValidateFunction<Result>;
   private readonly progressValidator: ValidateFunction<ProcessingEvent>;
+  private readonly requestValidator: ValidateFunction;
 
   constructor(contractDirectory: string) {
     const ajv = new Ajv({ allErrors: false });
@@ -29,6 +30,7 @@ export class WorkerMessageValidator {
     }
     this.resultValidator = ajv.compile<Result>({ $ref: `${BASE_URI}worker-messages.yaml#/components/schemas/Result` });
     this.progressValidator = ajv.compile<ProcessingEvent>({ $ref: `${BASE_URI}worker-messages.yaml#/components/schemas/ProcessingEvent` });
+    this.requestValidator = ajv.compile({ $ref: `${BASE_URI}worker-messages.yaml#/components/schemas/Request` });
   }
 
   result(value: unknown): value is Result {
@@ -37,6 +39,11 @@ export class WorkerMessageValidator {
 
   progress(value: unknown): value is ProcessingEvent {
     return this.progressValidator(value);
+  }
+
+  /** api가 큐로 보내는 요청 메시지(#233)를 같은 계약·같은 Ajv 설정으로 검사한다. */
+  request(value: unknown): boolean {
+    return this.requestValidator(value);
   }
 }
 

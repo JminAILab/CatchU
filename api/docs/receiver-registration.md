@@ -4,7 +4,7 @@
 
 [#139 메시지 수신](https://github.com/JminAILab/CatchU/issues/139)의 `AnalysisReceiver` 검사·지문·중복 판정, [#205 E 반영](https://github.com/JminAILab/CatchU/pull/205)의 트랜잭션·실패 기록, [#143 B 등록](https://github.com/JminAILab/CatchU/pull/143)의 `registerCandidates`를 재사용한다. [수신 계약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#w--worker-메시지-계약)·[트랜잭션 규약](../CONVENTIONS.md#트랜잭션-규약)이 기준이다. 신규 엔티티·마이그레이션·HTTP 경로는 추가하지 않는다.
 
-`AnalysisReceiverModule.registerDatabase({ contractDirectory, observations })`는 실제 `DatabaseModule`을 사용해 `DatabaseReceiverStore`, `AnalysisReceiver`, `AnalysisRegistrationService`, `DevAnalysisInjection`을 제공한다. `contractDirectory`는 `worker-messages.yaml`·`common.yaml`이 있는 절대 경로이며, `observations`는 아래 필수 공급 인터페이스다. 기본 가짜 공급자는 없다. 실제 공급·전송 호출자가 없는 `AppModule`에는 이 모듈을 자동 활성화하지 않는다.
+`AnalysisReceiverModule.registerDatabase({ contractDirectory, observations })`는 실제 `DatabaseModule`을 사용해 `DatabaseReceiverStore`, `AnalysisReceiver`, `AnalysisRegistrationService`, `DevAnalysisInjection`을 제공한다. `contractDirectory`는 `worker-messages.yaml`·`common.yaml`이 있는 절대 경로이며, `observations`는 아래 필수 공급 인터페이스다. 기본 가짜 공급자는 없다. 실제 공급자가 없는 `AppModule`에는 이 모듈을 자동 활성화하지 않는다. 큐 연결 모듈(#233)이 이 조립을 안에서 한 번 불러오며 같은 이유로 `AppModule`에 등록하지 않았다.
 
 ```ts
 // 내부 worker 전송 연결부에서 Nest가 제공한 service를 사용한다.
@@ -16,7 +16,7 @@ const outcome = await service.receiveResult(message, async receipt => {
 // 진행 이벤트에는 Receipt가 없고, 같은 서비스의 receiveProgress(message)를 사용한다.
 ```
 
-이 예시의 `transport`는 구현된 큐나 새 외부 API 계약을 의미하지 않는다. [#233 큐 연결](https://github.com/JminAILab/CatchU/issues/233)에서 인증된 실제 호출자를 연결해야 한다. `receiveResult`는 수신 DB 커밋 → Receipt 알림 callback → 새 수락 결과만 보호 조회·반영 순서다. callback 실패 시 수신 기록은 남고 반영은 호출하지 않는다. 같은 결과 재전달은 `DUPLICATE`로 끝내며 자동 재반영하지 않는다. Receipt 수락은 Catch 등록 완료를 뜻하지 않는다.
+이 예시의 `transport`는 새 외부 API 계약을 의미하지 않는다. 실제 호출자는 [#233 큐 연결](analysis-queue.md#받기)의 결과 작업 소비자이며, 받은 Receipt를 변수에 담아 결과 작업의 반환값으로 돌려준다(큐 접근 통제가 전달 경로의 경계다). 그 모듈은 `AppModule`에 아직 등록하지 않았다. `receiveResult`는 수신 DB 커밋 → Receipt 알림 callback → 새 수락 결과만 보호 조회·반영 순서다. callback 실패 시 수신 기록은 남고 반영은 호출하지 않는다. 같은 결과 재전달은 `DUPLICATE`로 끝내며 자동 재반영하지 않는다. Receipt 수락은 Catch 등록 완료를 뜻하지 않는다.
 
 개발 주입은 기존 `DevAnalysisInjection.inject`의 본인·MOCK·환경 제한을 유지한다. 위 DB 모듈에 등록된 주입은 실제 수신 저장과 E/B 반영을 호출한다. 결과는 `{ receipt, application? }`이며 원문 `accepted`를 외부에 반환하지 않는다. 이는 내부 반환값이고 새 공개 API 계약이 아니다. 개발 주입에서는 별도 전송이 없어 Receipt callback은 아무 동작도 하지 않는다. 운영 공개 주입 라우트는 만들지 않는다.
 

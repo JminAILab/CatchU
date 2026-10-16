@@ -39,7 +39,7 @@
 
 - 시작은 실제 서버 진입점(`src/main.ts`)이 `listen` 뒤에 한다. `AppModule`을 띄우는 테스트는 시작하지 않으므로 주기 작업이 테스트 자료를 바꾸지 않는다.
 - 앱이 종료되면 `onModuleDestroy`에서 멈춰, DB 연결이 닫히기 전에 진행 중인 판정을 끝낸다.
-- 새 주기 작업(예: #233의 대기 시도 보내기)은 기능 모듈에 `PeriodicTask`를 감싼 스케줄러를 두고 `main.ts`에서 `start()`를 부른다. 예시는 `src/analysis-deadline/analysis-deadline.module.ts`의 `AnalysisDeadlineScheduler`다.
+- 새 주기 작업은 기능 모듈에 `PeriodicTask`를 감싼 스케줄러를 두고 `main.ts`에서 `start()`를 부른다. 예시는 `src/analysis-deadline/analysis-deadline.module.ts`의 `AnalysisDeadlineScheduler`다. #233의 대기 시도 보내기는 큐 연결 실행기(`AnalysisQueueRunner`)가 같은 장치로 5초마다 돌리며, 큐 모듈을 `AppModule`에 켤 때 `main.ts`에서 그 `start()`를 부른다([큐 연결](analysis-queue.md)). 보내기는 DB를 잠그지 않고, 읽은 직후 이 닫기와 겹치면 늦은 알림·결과를 수신 코드가 거부한다.
 
 ```typescript
 const task = new PeriodicTask({

@@ -50,7 +50,8 @@ jobs:
               case "$file" in .github/workflows/ci.yml) web=true api=true worker=true ;; esac
               case "$file" in web/*) web=true ;; esac
               # api 테스트는 worker 합성 자료와 계약 YAML도 읽고, 공유 링크 web 통합 시험은 web의 share-links·lib 코드를 직접 불러온다.
-              case "$file" in api/* | worker/fixtures/* | "$contract"* | web/src/features/share-links/* | web/src/lib/*) api=true ;; esac
+              # 큐 판본 시험은 api의 BullMQ·ioredis가 큐 검증 키트에 고정한 판본과 같은지 본다.
+              case "$file" in api/* | worker/fixtures/* | "$contract"* | web/src/features/share-links/* | web/src/lib/* | docs/queue-verification/package.json | docs/queue-verification/package-lock.json) api=true ;; esac
               # worker 메시지 검사는 계약 YAML을 읽고, ruff는 루트 .gitignore에 적힌 파일을 검사에서 뺀다.
               # 큐 소비자 시험은 큐 검증 키트의 판본(BullMQ·redis)과 같은지 보고 키트의 Node BullMQ로 요청을 넣는다.
               case "$file" in worker/* | "$contract"* | .gitignore | docs/queue-verification/pyproject.toml | docs/queue-verification/uv.lock | docs/queue-verification/package.json | docs/queue-verification/package-lock.json) worker=true ;; esac
@@ -112,7 +113,19 @@ jobs:
     env:
       # 러너 기본값 UTC에서는 timestamptz 테스트의 '현지 시각 ≠ UTC' 경우가 빠지므로 팀 로컬과 같은 시간대로 둔다.
       TZ: Asia/Seoul
+      # 이 값이 있으면 큐 연결(#233)의 실제 Valkey 시험이 건너뛰지 않고 반드시 돈다(api/docs/analysis-queue.md 「시험」).
+      CATCHU_TEST_REDIS_URL: redis://127.0.0.1:6379
     services:
+      # worker job과 같은 Valkey 8.1.6(큐 검증 키트가 돌린 판본). digest로 고정한다.
+      valkey:
+        image: valkey/valkey:8.1.6-alpine@sha256:1cb6b20b70d927560cc4cc5397b5f045e74aa603ff7696274778880bb6fadc75
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
       # api README 「DB 테스트」의 docker run과 같은 값이다. 테스트 실행기의 기본 TEST_DB_*와 맞으므로 따로 넘기지 않는다.
       postgres:
         image: postgres:16

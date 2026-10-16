@@ -69,8 +69,8 @@ try {
 | 연결 | 필요한 결과 |
 | --- | --- |
 | [#104 요청·시도 모델](https://github.com/JminAILab/CatchU/issues/104) + [#105 수신 기록 테이블](https://github.com/JminAILab/CatchU/issues/105) | [DB 수신 어댑터](receiver-registration.md)에서 기존 실제 테이블과 요청 → 시도 → 수신 기록 잠금을 사용. 커밋 실패·동시 수신을 전용 DB로 검사 |
-| [#138 분석 접수 API](https://github.com/JminAILab/CatchU/issues/138) | 위 「실제 접수 연결 검증」으로 재현했다. 남은 일은 인증된 전송 호출자(#233)가 같은 맥락을 쓰는 연결이다 |
+| [#138 분석 접수 API](https://github.com/JminAILab/CatchU/issues/138) | 위 「실제 접수 연결 검증」으로 재현했다. 접수 API가 저장한 행을 큐 보내기(#233)가 같은 맥락으로 보내는지도 [큐 연결 시험](analysis-queue.md#시험)이 확인한다 |
 | [#105 등록·반영](https://github.com/JminAILab/CatchU/issues/105) | 수신 커밋 후 실제 B/E 반영 조립은 제공됐다. 실제 보호 관측·저장소 주소의 공급 주체와 조립 책임은 #105에서 확인하며 #231·#232의 책임으로 배정하지 않는다. ACCEPTED는 APPLIED가 아님 |
-| [#233 전송 연결](https://github.com/JminAILab/CatchU/issues/233) | 큐 송수신과 인증된 내부 전송 호출자의 연결(미구현). 결과 원문 보관·자동 재반영은 추가하지 않음 |
+| [#233 전송 연결](https://github.com/JminAILab/CatchU/issues/233) | 큐 송수신 모듈이 있다([큐 연결](analysis-queue.md)). 결과 작업을 받아 `AnalysisRegistrationService`에 넘기고 수신 확인을 작업 반환값으로 돌려준다. 모듈은 `AppModule`에 아직 등록하지 않았고, 켜는 일은 #252 좌표 제공자와 #105 근거 보존 수정 뒤다(10월 정책 공급자는 #314). 결과 원문 보관·자동 재반영은 추가하지 않음 |
 
 이미 구현된 것: [#237 처리 시한·실패 종료](https://github.com/JminAILab/CatchU/issues/237)는 [PR #295](https://github.com/JminAILab/CatchU/pull/295)로 dev에 있다. 10/4 교차 검토 의견([#139 댓글](https://github.com/JminAILab/CatchU/issues/139#issuecomment-5975854779))의 "실행 중에 멈춘 요청" 항목은 이 구현이 닫는다. 같은 의견의 보낸 쪽 확인·거부 기록의 요청 식별자·예상 밖 오류 분류는 코드에 반영되지 않았고 담당 작업이 정해지지 않았다.
