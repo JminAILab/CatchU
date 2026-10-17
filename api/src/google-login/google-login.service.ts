@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { SessionService } from '../auth/session.service';
 import { ApiError } from '../common/errors';
 import { MemberAccount, MemberProfile } from '../member-analysis/member-analysis.entity';
+import { GOOGLE_IDENTITY_PREFIX } from '../member-analysis/member-kind';
 import { GOOGLE_CONFIG, GoogleConfig } from './google.config';
 import { GOOGLE_PROVIDER, GoogleProvider } from './google-provider';
 import { LoginAttempts } from './login-attempts';
@@ -42,7 +43,7 @@ export class GoogleLoginService {
     if (input.error === 'access_denied') return { cancelled: true as const };
     const identity = await this.provider.exchange(input.code!, attempt.verifier, attempt.nonce);
     // 제공자가 검증한 sub만 사용한다. 이메일·개발 회원과 자동 연결하지 않는다.
-    const identityReference = 'catchu:google:' + identity.subject;
+    const identityReference = GOOGLE_IDENTITY_PREFIX + identity.subject;
     return this.dataSource.transaction('READ COMMITTED', async manager => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [identityReference]);
       let account = await manager.findOneBy(MemberAccount, { identityReference });

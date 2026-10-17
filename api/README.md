@@ -232,7 +232,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 회원·분석 선행 테이블과 멱등 처리 — #104
 
-[docs/member-analysis.md](docs/member-analysis.md)에 있다.
+[docs/member-analysis.md](docs/member-analysis.md)에 있다. #252·#323이 함께 쓰는 실제·개발 회원 구분(#322)도 이 문서에 있다.
 
 ## 선정 지원 저장소 조회 — #136
 
@@ -240,7 +240,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 분석 고지·접수·실패 재요청 — #138
 
-[docs/analysis-intake.md](docs/analysis-intake.md)에서 개발용 합성 고지·원자 접수·동시 요청·멱등 처리·확정 실패 재요청과 실제 자료용 고지의 미결을 확인한다. 실제 worker 전송은 포함하지 않는다.
+[docs/analysis-intake.md](docs/analysis-intake.md)에서 개발용 합성 고지·실제 회원의 실제 자료용 고지(#322)·원자 접수·동시 요청·멱등 처리·확정 실패 재요청을 확인한다. 실제 회원의 접수(#323)와 worker 전송은 포함하지 않는다.
 
 ## 본인 회원·프로필 조회와 전체 저장 — #135
 

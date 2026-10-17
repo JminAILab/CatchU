@@ -3,6 +3,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { AUTH_CONFIG, AuthConfig } from '../auth/auth.config';
 import { isMemberId } from '../auth/access-token.service';
 import { GitHubConnection, MemberAccount, MemberProfile } from './member-analysis.entity';
+import { DEV_LOGIN_IDENTITY_PREFIX, memberKindOf } from './member-kind';
 
 /** #104 지정 context.sample.json(d50c1bc)의 repository. 실제 GitHub 접근 권한이 아니다. */
 export const SYNTHETIC_REPOSITORY = Object.freeze({
@@ -12,7 +13,6 @@ export const SYNTHETIC_REPOSITORY = Object.freeze({
   url: 'https://example.invalid/catchu-synthetic-owner/catchu-synthetic-repo',
   allowedScopeRevision: '00000000-0000-4000-8000-000000000201',
 });
-const IDENTITY_NAMESPACE = 'catchu:dev-login:';
 const CONNECTION_NAMESPACE = 'catchu:mock-github:';
 
 @Injectable()
@@ -29,7 +29,7 @@ export class DevMemberService {
   async resolveMember(identifier: string, transactionManager?: EntityManager): Promise<string> {
     this.assertEnabled();
     if (!isMemberId(identifier)) throw new TypeError('Invalid development identity');
-    const identityReference = IDENTITY_NAMESPACE + identifier;
+    const identityReference = DEV_LOGIN_IDENTITY_PREFIX + identifier;
     const resolve = async (manager: EntityManager) => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [identityReference]);
       let account = await manager.findOneBy(MemberAccount, { identityReference });
@@ -63,7 +63,7 @@ export class DevMemberService {
     const read = async (manager: EntityManager) => {
       const account = await manager.findOne(MemberAccount, { where: { memberId },
         ...(transactionManager ? { lock: { mode: 'pessimistic_read' as const } } : {}) });
-      if (!account || account.accountState !== 'ACTIVE' || !account.identityReference.startsWith(IDENTITY_NAMESPACE)) {
+      if (!account || account.accountState !== 'ACTIVE' || memberKindOf(account.identityReference) !== 'DEVELOPMENT') {
         throw new ForbiddenException();
       }
       const connection = await manager.findOne(GitHubConnection, { where: { memberId },
