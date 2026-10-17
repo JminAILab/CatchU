@@ -144,7 +144,7 @@ const closedApplyFailed = (overrides = {}) => summary({
   retry: { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' }, ...overrides,
 });
 
-test('응답의 lifecycle과 실패 항목의 stage·code를 읽고, 없거나 계약과 다르면 빈 목록이 아니라 조회 실패다', async () => {
+test('응답의 lifecycle과 실패 항목의 stage·code를 읽고, lifecycle 값이 허용 목록 밖이거나 실패 항목의 필수 필드(stage·code·message)가 없거나 문자열이 아니면 빈 목록이 아니라 조회 실패다', async () => {
   assert.equal(summary({ lifecycle: 'CLOSED' }).lifecycle, 'CLOSED');
   assert.deepEqual(summary({ failures: [APPLICATION_DEADLINE] }).failures, [APPLICATION_DEADLINE]);
   for (const broken of [{ lifecycle: undefined }, { lifecycle: 'DONE' }, { lifecycle: null },
