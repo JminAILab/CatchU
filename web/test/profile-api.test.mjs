@@ -79,3 +79,48 @@ test('저장 뒤 빈 이름·조회 예외는 홈 이동 가능한 결과가 아
     assert.equal(await completeProfileSetup({member},empty,{alreadySaved:true,onSaved:()=>{},isCurrent:()=>true}),'refresh-failed');
   }
 });
+
+// 기존 프로필 수정(#137): 상세 → 수정 화면이 쓰는 저장 함수를 직접 검사한다.
+const { updateProfile, sameProfile } = await import('../src/features/profile/profile-api.ts');
+const edited = { displayName: ' 수정 ', introduction: '새 소개', desiredRole: '백엔드', skills: ['a', 'a', ''] };
+test('수정 저장은 PUT 한 번으로 네 필드를 보내고 입력을 바꾸지 않는다', async () => {
+  const input = structuredClone(edited); const calls = [];
+  const api = { member: async (path, options) => {
+    calls.push([path, options.method]);
+    return { kind: 'success', status: 200, data: options.body };
+  } };
+  assert.equal(await updateProfile(api, input, { isCurrent: () => true }), 'saved');
+  assert.deepEqual(calls, [['/me/profile', 'PUT']]);
+  assert.deepEqual(input, edited);
+});
+test('수정 저장 실패·잘못된 성공 응답·예외는 save-failed이며 재전송하지 않는다', async () => {
+  for (const member of [
+    async () => ({ kind: 'api-error', status: 500, code: 'INTERNAL_ERROR' }),
+    async () => ({ kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' }),
+    async () => ({ kind: 'success', status: 200, data: {} }),
+    async () => { throw new Error('offline'); },
+  ]) {
+    let count = 0;
+    const result = await updateProfile({ member: async (...args) => { count++; return member(...args); } }, edited, { isCurrent: () => true });
+    assert.equal(result, 'save-failed'); assert.equal(count, 1);
+  }
+});
+test('수정 저장 중 세션이 바뀌거나 취소되면 cancelled이고 요청 전 취소는 보내지 않는다', async () => {
+  let current = true; let count = 0;
+  const result = await updateProfile({ member: async (_p, o) => { count++; current = false; return { kind: 'success', data: o.body }; } },
+    edited, { isCurrent: () => current });
+  assert.equal(result, 'cancelled'); assert.equal(count, 1);
+  const before = await updateProfile({ member: async () => { count++; return { kind: 'success', data: empty }; } },
+    edited, { isCurrent: () => false });
+  assert.equal(before, 'cancelled'); assert.equal(count, 1);
+  const abort = new AbortController(); abort.abort();
+  assert.equal(await updateProfile({ member: async () => { throw new Error('aborted'); } }, edited, { isCurrent: () => true, signal: abort.signal }), 'cancelled');
+});
+test('미저장 판정은 네 필드와 기술 순서·빈 항목까지 비교한다', () => {
+  const base = { displayName: '회원', introduction: '', desiredRole: '', skills: ['a', ''] };
+  assert.equal(sameProfile(base, structuredClone(base)), true);
+  for (const next of [
+    { ...base, displayName: '회원 ' }, { ...base, introduction: 'x' }, { ...base, desiredRole: 'x' },
+    { ...base, skills: ['', 'a'] }, { ...base, skills: ['a'] }, { ...base, skills: ['a', '', ''] },
+  ]) assert.equal(sameProfile(base, next), false);
+});

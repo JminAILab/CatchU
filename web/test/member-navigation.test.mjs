@@ -71,3 +71,12 @@ test('토큰 저장소는 바뀔 때만 알리고 끝난 이유를 남긴다', (
   assert.equal(notified, 3);
   assert.throws(() => store.set(''), TypeError);
 });
+
+test('상세·수정 화면은 이름이 저장된 회원만 열고, 이름이 비면 최초 입력으로 보낸다(#137)', () => {
+  for (const path of ['/profile', '/profile/edit']) {
+    assert.deepEqual(decideMemberEntry({ state: 'loaded', displayName: '수영' }, path), { action: 'allow' }, path);
+    assert.deepEqual(decideMemberEntry({ state: 'loaded', displayName: '' }, path), { action: 'redirect', to: '/profile/setup' }, path);
+    assert.deepEqual(decideMemberEntry({ state: 'failed' }, path), { action: 'retry' }, path);
+    assert.deepEqual(decideMemberEntry({ state: 'loading' }, path), { action: 'wait' }, path);
+  }
+});

@@ -1,0 +1,107 @@
+.detail {
+  display: grid;
+  gap: 16px;
+  margin: 0 0 24px;
+}
+
+.detail dt {
+  margin: 0 0 4px;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.detail dd {
+  margin: 0;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  color: var(--color-muted);
+}
+
+.skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skills li {
+  padding: 4px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-size: 14px;
+}
+
+.note {
+  margin: 0 0 24px;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.primaryLink,
+.secondaryLink,
+.secondaryButton {
+  display: inline-block;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 15px;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.primaryLink {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.secondaryLink,
+.secondaryButton {
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.secondaryButton:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* 아직 연결되지 않은 항목: 누를 수 없음을 글자색·표시·커서로 함께 알린다(프로필 메뉴의 [로그아웃]과 같은 표시). */
+.pendingAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: 15px;
+  cursor: not-allowed;
+}
+
+.formActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.formActions > * {
+  flex: 1;
+}
+
+.backRow {
+  margin-top: 16px;
+}
