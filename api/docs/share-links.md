@@ -68,12 +68,12 @@
 
 ## 수신자 비밀번호 확인·접근 판정 — #150
 
-grant 형식·수명·보관·시도 제한은 [#150 9/29 결정](https://github.com/JminAILab/CatchU/issues/150#issuecomment-5883572995), 차단 응답은 #173 계약을 따른다. 회원 JWT를 쓰지 않는다. 인증 예외 `@Public()`은 클래스가 아니라 `unlock` 메서드에만 붙이며, 이 컨트롤러에 경로를 더할 때(#151)도 경로마다 붙인다([보안 점검](../../docs/CatchU_security_checks.md)). `test/public-links-auth-boundary.test.cjs`가 실제 Guard로 `unlock`의 비로그인 허용과 같은 컨트롤러의 미지정 경로 인증 요구를 검사한다.
+grant 형식·수명·보관·시도 제한은 [#150 9/29 결정](https://github.com/JminAILab/CatchU/issues/150#issuecomment-5883572995), 차단 응답은 #173 계약을 따른다. 회원 JWT를 쓰지 않는다. 인증 예외 `@Public()`은 클래스가 아니라 `unlock` 메서드에만 붙이며, 수신자 조회 경로(#151, 별도 `RecipientController`)도 경로마다 붙인다([보안 점검](../../docs/CatchU_security_checks.md), [수신자 조회](recipient-read.md)). `test/public-links-auth-boundary.test.cjs`가 실제 Guard로 `unlock`의 비로그인 허용과 같은 컨트롤러의 미지정 경로 인증 요구를 검사한다.
 
 | 파일 | 내용 |
 |---|---|
 | `public-links.controller.ts` | `POST /v1/public/links/{token}/unlock` |
-| `link-access.service.ts` | 링크 판정·unlock·수신 조회용 `assertReadable(token, grant)`(#151이 쓴다) |
+| `link-access.service.ts` | 링크 판정·unlock·수신 조회용 `assertReadable(token, grant)`([#151 수신자 조회](recipient-read.md)가 쓴다) |
 | `link-grant.ts` | grant 서명·검증(HMAC-SHA256, `LINK_GRANT_SECRET`). 링크 ID·만료만 담고 서버에 저장하지 않는다 |
 | `unlock-limiter.ts` | 링크·주소 단위 시도 제한과 직렬화(프로세스 메모리) |
 | `link-limiter.ts` | 링크 전체 시도 제한과 링크별 검사 중 상한 |
