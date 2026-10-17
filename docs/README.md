@@ -16,6 +16,7 @@
 | [`CatchU_security_checks.md`](CatchU_security_checks.md) | 권한·입력·출력·인증·설정·외부 호출·의존성·LLM 코드를 고칠 때 지킬 보안 기준(OWASP 웹·LLM Top 10 중 CatchU 해당분) | **적용** (10-03 팀장 결정) · 코딩 절차의 보충, 계약·서비스 README와 어긋나면 그쪽이 이김 |
 | [`CatchU_work_management_history.md`](CatchU_work_management_history.md) | 작업관리·코딩 절차의 결정 이력 | 기록 · 2026-10-01 분리 |
 | [AI 공통 지침 개편 검증 기록](ai-guidance/2026-09-30-validation.md) | 일반 지침·양식 정리와 같은 요청의 수정 전·후 비교 | **기록** (09-30) · Codex 10회(요청 설정 고정·적용값 미확인), Claude 예비 관찰 10회(effort 미통제) · 제품 품질·실제 운영 검증을 뜻하지 않음 |
+| [개발 마일스톤 해석 새 세션 검증](ai-guidance/2026-10-17-milestone-review.md) | 공통 지침 수정 후 같은 이슈 질문의 문서 도달·핵심 판단 확인 | **기록** (10-17) · Codex·Claude 각 새 세션 1회, 모델·effort 통제 없는 제한된 관찰 |
 | [`CatchU_로컬통합실행.md`](CatchU_로컬통합실행.md) | 한 컴퓨터에서 PostgreSQL·api·worker·web을 함께 띄우는 순서, 정상 확인·끄는 방법, 서비스끼리 맞출 설정값 | **안내** (09-29) · 1~4단계는 macOS(작성자)·Windows(작성자 외 1명)에서 재현, 5단계 web 로그인은 PR #185 검증과 작성자 재현(10-05) · 배포 검증을 뜻하지 않음 |
 | [`CatchU_통합검증표.md`](CatchU_통합검증표.md) | 첫 연결과 전체 MVP의 연결별 시나리오·기대 결과·담당·선행·실행 증거 칸과 담당별 확인 기록. 통합 검증 행은 [가~라](CatchU_integration_rows_intake.md) · [마~사](CatchU_integration_rows_sharing.md)로 나눴다 | **초안** (09-28) · 승인된 API 명세 v1(9093d2e)의 파생 검증 기준, 계약과 어긋나면 계약이 이김 · 실행 결과는 미실행이며 통합 통과·M1 승인·MVP 완료를 뜻하지 않음 |
 | [`CatchU_작업동일성_판별기준.md`](CatchU_작업동일성_판별기준.md) | 같은 작업이 Catch로 두 번 만들어지거나 다른 작업이 하나로 합쳐지지 않게 하는 workIdentity 판별 기준과 합성 사례별 기대 판정. 나눈 파일: [작업 단위와 판정 입력](CatchU_work_identity_unit.md) · [판정 규칙과 값 만드는 법](CatchU_work_identity_rules.md) · [합성 사례·시험·한계](CatchU_work_identity_cases.md) · [결정과 검토 기록](CatchU_work_identity_records.md) | **채택** (09-30 팀장) · #118 구현 기준, B/E 검토 반영(E 승인·B 수용) · 10-08 팀장 정정(커밋 250개 넘는 PR 확인 경로, 10월 C7 범위) · 10-09 목록을 다 받지 못한 PR과 겹칠 수 있는 커밋의 PR 밖 확정 보류 · API 명세 v1과 어긋나면 계약이 이김 |
@@ -54,10 +55,22 @@
 폐기된 문서는 지운다. 기각 사유는 각 문서의 「결정 이력」 절과
 PR 본문에, 판본은 git 이력에 남는다.
 
+## 개발 목표와 마일스톤
+
+2026-10-17 팀장 결정. CatchU는 **12월 공개를 목표로 하나의 제품을 개발**한다. 10월 목표는 프로젝트 내부의 중간 마일스톤이며, 그 단계의 제품을 실제 소비자에게 별도 제공하는 출시판으로 운영하지 않는다.
+
+- 현재 작업은 해당 이슈의 완료 기준과 승인된 요구사항·설계·계약, 그 대상과 적용 시점을 명시한 후속 결정을 함께 따른다. 중간 마일스톤에 필요한 연결과 최종 제품에 남길 결과를 기준으로 필요성과 범위를 판단한다.
+- 최종 제품의 문구·설계·기반을 먼저 반영하기로 명시한 결정은 해당 산출물에 적용한다. 문구가 설명하는 기능이 현재 미구현이라는 이유만으로 별도 10월용 문구나 구현을 요구하지 않는다. 선반영이 관련 기능 전체의 즉시 구현·제공·완료를 뜻하지는 않는다.
+- 검토할 때는 현재 작업에서 고쳐야 할 결함, 계획된 후속 구현, 실제로 합의가 필요한 연결 조건을 구분한다. 확정된 선반영을 날짜 차이만으로 다시 결정하게 하거나 같은 결과물을 두 번 만들도록 요구하지 않는다.
+- 선반영만으로 현재 실행에 쓰는 API·권한·접수·상태 전이 계약을 일괄 변경하지 않는다. 변경은 명시된 대상과 적용 시점에 한정하며, 실제 자료 처리와 공개 제공에는 그 시점의 허용 조건·검증 기준을 적용한다. 과거 승인 원본은 보존한다.
+
+구체적인 선반영의 예는 [#322 실제 자료용 고지](https://github.com/JminAILab/CatchU/issues/322)의 12월 확정 문구다. 이 문구를 지금 API에 싣는 결정은 [#323 실제 회원 접수](https://github.com/JminAILab/CatchU/issues/323)에서 모든 12월 기능을 함께 구현하라는 뜻이 아니다.
+
 ## AI-DLC 산출물과의 관계
 
 - `docs/`는 팀의 현행 기준과 문서 안내를 관리한다. AI-DLC 산출물의 원본과 승인 이력은 `aidlc/`에서 관리한다(`aidlc/spaces/default/intents/<intent>/`의 단계별 폴더와 `audit/`). 원본을 두 곳에 복제해 수정하지 않는다.
 - 초기 제품 정의의 승인 요구사항: [첫 intent 요구사항](../aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md) (2026-09-11 승인). 이후 10월 MVP와 12월 범위의 적용 기준은 각각의 후속 승인 문서에서 확인한다. 과거 승인 원본은 보존한다.
+- 아래 10월·12월 산출물의 적용 관계는 위 「개발 목표와 마일스톤」을 전제로 읽는다.
 - 10월 MVP 구현 기준: [10월 요구사항](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md)와 해당 intent의 승인된 설계·계약 및 후속 결정을 사용한다.
 - 12월 확장 기준: [12월 요구사항](../aidlc/spaces/default/intents/260925-intent-12/inception/requirements-analysis/requirements.md)과 [사용자 스토리](../aidlc/spaces/default/intents/260925-intent-12/inception/user-stories/stories.md)는 2026-09-28 승인됐다. 읽기 순서·마감 구분·적용 경계는 [12월 승인 문서 안내](CatchU_12월_승인문서_안내.md)를 따른다. 12월의 명시적 정정은 그 범위에 적용하며, 이번 공유만으로 10월 구현 계약을 변경하지 않는다.
 - 10월 MVP에 적용하는 범위·순서·착수 조건은 후속 intent의 [scope-document.md](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)·[intent-backlog.md](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/intent-backlog.md)와 연결된 후속 결정을 확인한다. 산출물에 남은 작성 당시 지위와 현재 승인 여부를 구분하고, 승인 여부는 해당 intent의 `aidlc-state.md`·`audit/` 기록에서 확인한다.
@@ -73,6 +86,8 @@ PR 본문에, 판본은 git 이력에 남는다.
   - `JD적합도_기능_벤치마킹_보고서.md`, `ATS_경쟁사_분석_보고서_2026-08.docx`, `링크드인과_경력_개발자_채용.docx`: 개편 전 포지션(채용플랫폼·JD 적합도)의 조사 자료.
   - `CatchU_실험기록_주장회상_2026-08-30.md`: n=1 실측 기록. 필요하면 git 이력에서 읽는다.
 - 유지하되 다음 intent의 입력으로 옮긴 뒤 정리할 문서: `카드생성논리_상세설명.md`, `증거카드_이상형과_추출방법.md`, `CatchU_KPI_성공기준_v4_1.md`. 페르소나 P1~P4와 설계노트는 팀이 판단한다.
+
+- **2026-10-17** — 팀장 설명에 따라 10월 내부 중간 마일스톤과 12월 공개 목표의 관계, 확정 산출물의 선반영 및 현재 실행 계약의 적용 경계를 명시했다. 승인 기록·제품 계약·이슈 완료 기준은 소급 변경하지 않는다.
 
 ## 규칙
 
