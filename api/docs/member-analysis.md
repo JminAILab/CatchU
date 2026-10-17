@@ -28,6 +28,23 @@
 
 회원·기본 프로필·최초 합성 CONNECTED 행은 한 트랜잭션이다. 인증의 공통 설정을 공유하며, `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development` 또는 `test`가 함께 지정된 경우만 회원 준비와 대역 조회를 허용한다. 기본 비활성·환경 미지정·production·그 밖의 환경에서는 모두 거부한다. 기존 실제 연동을 합성 연결로 덮어쓰지 않는다. 토큰 검증 Guard는 매 요청 DB 조회를 추가하지 않았으므로, 기존 문자열 토큰은 다시 개발 로그인하여 UUID 토큰으로 바꿔야 한다. 기능은 여전히 `@CurrentMemberId()`만 사용하고 자원 존재·소유권을 별도로 확인한다.
 
+## 실제·개발 회원 구분 — #322
+
+실제 회원과 개발 회원은 회원을 만든 로그인 경로, 곧 identityReference의 접두사로만 가른다. [`member-kind.ts`](../src/member-analysis/member-kind.ts)가 이 구분의 한 곳이며 Google 로그인·개발 로그인의 회원 생성도 같은 접두사 상수를 쓴다. [#322](https://github.com/JminAILab/CatchU/issues/322) 고지 선택이 먼저 쓰고 [#252](https://github.com/JminAILab/CatchU/issues/252) 선정 공급과 [#323](https://github.com/JminAILab/CatchU/issues/323) 접수 전환이 같은 접점을 재사용한다.
+
+| identityReference | 만든 곳 | 구분 |
+| --- | --- | --- |
+| `catchu:google:<sub>` | Google 로그인(`GoogleLoginService`) | `REAL` |
+| `catchu:dev-login:<개발 식별 문자열>` | 개발 로그인(`DevMemberService`) | `DEVELOPMENT` |
+| 그 밖의 값, 대소문자가 다른 값, 접두사뿐인 값 | — | `null`(미지원) |
+
+GitHub 연결 상태(실제·합성·없음·해제·재인증 필요), 이메일, `DEV_LOGIN_ENABLED`·`NODE_ENV`는 구분을 바꾸지 않는다. 개발 회원이 실제 GitHub 계정을 연결해도 개발 회원이다.
+
+- `memberKindOf(identityReference)`: 문자열만 보는 순수 함수다. 이미 읽은 회원 행에 쓴다.
+- `MemberKindService.read(memberId, manager?)`: `AuthModule`이 export한다. 회원이 없거나 ACTIVE가 아니거나 출처가 미지원이면 `null`이다. DB 조회 오류는 삼키지 않고 그대로 던진다(공통 필터에서 500). 트랜잭션 manager를 넘기면 회원 행을 읽기 잠금(`FOR SHARE`)해 커밋 전에 판정이 바뀌지 않게 하며, 활성 트랜잭션이 아닌 manager는 오류로 거부한다.
+
+호출하는 기능은 `REAL`이면 실제 경로, `DEVELOPMENT`면 기존 개발 경로로 보내고 `null`은 실제 회원으로 추정하지 않고 거부한다. 개발 경로의 환경·활성화 조건(위 절)은 구분과 별개로 각 기능이 그대로 검사한다. `DevMemberService.readConnection`도 이 함수로 개발 회원을 확인한다. 새 로그인 경로를 더하면 이 파일에 접두사를 더하기 전까지 그 회원은 `null`이다. 고지 선택 결과는 [실제 자료용 고지와 고지 선택](analysis-intake.md#실제-자료용-고지와-고지-선택--322)에 있다.
+
 ## 멱등 생성 호출
 
 [`runIdempotentCreation`](../src/member-analysis/idempotent-creation.ts)은 활성 **READ COMMITTED** 트랜잭션의 manager를 받는다. (회원, operation, key)의 트랜잭션 잠금으로 키를 예약한 후 자원 생성·멱등 기록·응답 구성을 함께 처리한다. 유일 인덱스가 최종 중복 방어다. 예약 중간 행을 커밋하지 않으며, 실패 후 동일 키로 다시 요청할 수 있다.

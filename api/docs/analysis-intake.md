@@ -4,17 +4,42 @@
 
 [회원 API](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml)와 [접수·재요청 계약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#분석-접수상태재요청), [업무 규칙](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md)의 현재 판본을 따른다. 이슈에 연결된 9093d2e 판본 이후 제목 null·제목 고쳐 쓰기 등 변경을 확인했다. 제목만 없다고 실패 재요청을 허용하지 않으며 접수·동시성·실패 재요청 기준을 바꾸지 않는다.
 
-첫 연결은 [#104 개발 회원·합성 GitHub 연결](member-analysis.md)과 [#136 선정 저장소 공급](member-repositories.md)을 사용한다. 실제 Nest HTTP·PostgreSQL로 접수와 롤백을 검사하지만 GitHub 자료·worker·LLM을 호출하지 않는다. 기존 Google·GitHub·세션 기능을 대체하지 않는다. #139 수신/개발 주입·#140 이력/개별 상태 GET은 새로 구현하지 않는다.
+첫 연결은 [#104 개발 회원·합성 GitHub 연결](member-analysis.md)과 [#136 선정 저장소 공급](member-repositories.md)을 사용한다. 실제 Nest HTTP·PostgreSQL로 접수와 롤백을 검사하지만 GitHub 자료·worker·LLM을 호출하지 않는다. 기존 Google·GitHub·세션 기능을 대체하지 않는다. #139 수신/개발 주입·#140 이력/개별 상태 GET은 새로 구현하지 않는다. 실제 회원의 고지 조회는 [#322](https://github.com/JminAILab/CatchU/issues/322)에서 더했고(아래 「실제 자료용 고지와 고지 선택」), 실제 회원의 접수는 [#323](https://github.com/JminAILab/CatchU/issues/323) 범위다.
 
 ## 합성 고지의 정본·활성화
 
 `src/analysis-intake/analysis-notice.ts`의 `SYNTHETIC_NOTICE`에서 본문·판본·범위를 함께 버전 관리한다. 고지 판본은 `catchu-synthetic-analysis-notice-v1`, 허용 범위 판본은 [공용 합성 표본](../../worker/fixtures/m1-synthetic/context.sample.json) 및 #104의 `00000000-0000-4000-8000-000000000201`이다. 합성 COMMIT/PULL_REQUEST/ISSUE와 선정 참조를 묶는다. 본문/범위를 바꾸면 판본도 함께 변경해 오래된 동의를 현재 동의로 받지 않는다. 접수한 동의는 DB에서 불변으로 보존한다.
 
-- `NODE_ENV=development` 또는 `test`와 `DEV_LOGIN_ENABLED=true`일 때만 합성 고지를 제공한다.
-- 실제 회원·LIVE 공급이나 실제 자료용 설정 부재를 합성 고지/동의로 보정하지 않는다. 현재 접수 공급자는 #136과 같은 DevMemberService이며 개발 회원·합성 연결 이외는 거부한다. LIVE는 `403 CONSENT_REQUIRED`로 접수하지 않는다.
-- 실제 자료용 고지는 팀장이 문구를 쓰고 승인하며, 담당(E)이 그 문구를 실제 자료용 판본으로 API에 싣는다([2026-10-14 결정](https://github.com/JminAILab/CatchU/issues/138#issuecomment-6159562994)). 문구와 실제 공급자·허용 범위가 정해져 반영되기 전에는 이 합성 판본을 실제 자료 처리 동의로 사용할 수 없다. 실제 worker 전달도 없다.
-- 운영이나 개발 기능이 비활성이면 고지 조회와 신규 접수 모두 기존 #136 개발 공급자의 `403 INTERNAL_ERROR`로 거부한다. 개발 회원 경계 거부도 같은 기준을 유지한다. 동의 누락·고지/범위 판본 불일치는 `403 CONSENT_REQUIRED`로 구분하며 공통 필터·오류 코드는 바꾸지 않는다. 조회 실패·자료 불일치는 `500 INTERNAL_ERROR`이며 정상 빈 목록이나 권한 없음으로 바꾸지 않는다.
-- 정상 해제로 `DISCONNECTED`의 외부 계정 참조가 null이 된 개발 회원은 고지 조회를 할 수 있지만 신규 접수·저장소 조회는 `403 GITHUB_CONNECTION_REQUIRED`다. 연결 행 부재도 고지 제공을 막지 않는다. CONNECTED의 합성 참조 검사와 개발 회원 경계를 유지하며, 정상 해제 외 잘못된 참조·실제 자료를 합성 연결로 보정하지 않는다.
+- 개발 회원에게 `NODE_ENV=development` 또는 `test`와 `DEV_LOGIN_ENABLED=true`일 때만 합성 고지를 제공한다.
+- 실제 회원이나 실제 판본 부재를 합성 고지로 대신하지 않고, 실제 회원·LIVE 공급을 합성 동의로 받지 않는다. 현재 접수 공급자는 #136과 같은 DevMemberService이며 개발 회원·합성 연결 이외는 거부한다. LIVE는 `403 CONSENT_REQUIRED`로 접수하지 않는다.
+- 합성 판본은 실제 자료 처리 동의로 쓸 수 없다. 실제 자료용 고지는 #322에서 따로 실었고(아래 절), 그 판본에 동의한 접수는 #323 전까지 받지 않는다. 실제 worker 전달도 없다.
+- 운영이나 개발 기능이 비활성이면 개발 회원의 고지 조회와 모든 신규 접수를 기존 #136 개발 공급자와 같은 `403 INTERNAL_ERROR`로 거부한다. 개발 회원 경계 거부도 같은 기준을 유지한다. 동의 누락·고지/범위 판본 불일치는 `403 CONSENT_REQUIRED`로 구분하며 공통 필터·오류 코드는 바꾸지 않는다. 조회 실패·자료 불일치는 `500 INTERNAL_ERROR`이며 정상 빈 목록이나 권한 없음으로 바꾸지 않는다.
+- 고지 조회는 GitHub 연결과 공급 방식을 읽지 않는다(#322). 개발 회원은 연결 행 부재·정상 해제·재인증 필요·잘못된 참조·실제 GitHub 연결·연결 공급 장애·LIVE 공급에서도 합성 고지를 받는다. 신규 접수·저장소 조회는 기존대로 연결 행 부재·정상 해제(외부 계정 참조 null)·재인증 필요를 `403 GITHUB_CONNECTION_REQUIRED`로 거부하고, 합성 참조 검사와 개발 회원 경계를 유지하며, 정상 해제 외 잘못된 참조·실제 연결을 합성 연결로 보정하지 않는다(`500 INTERNAL_ERROR`).
+
+## 실제 자료용 고지와 고지 선택 — #322
+
+[#322](https://github.com/JminAILab/CatchU/issues/322)의 2026-10-17 팀장 확정 문구를 `src/analysis-intake/analysis-notice.ts`의 `REAL_NOTICE`에 판본 `catchu-real-analysis-notice-v1`로 싣는다. 합성 판본 `catchu-synthetic-analysis-notice-v1`과 다른 값이다. 문구는 12월 공개판 기준이며 설명하는 기능의 현재 구현 여부에 맞춰 고치지 않는다. 배열 한 원소가 한 줄, 빈 원소가 문단 사이 빈 줄이고 응답 `text`는 이를 LF(`\n`)로 이은 일반 텍스트다(HTML·마크다운 아님). 화면 표시는 [#154](https://github.com/JminAILab/CatchU/issues/154)가 맡아 이 문단·줄바꿈에 맞춘다.
+
+`GET /v1/analysis-notice`는 [공통 회원 구분](member-analysis.md#실제개발-회원-구분--322)으로 고지를 고르며 GitHub 연결 상태·공급 방식은 보지 않는다. 응답 두 필드·no-store·인증 조건은 그대로다.
+
+| 회원 | 응답 |
+|---|---|
+| 실제 회원(Google 로그인으로 생성) | 개발 로그인 설정과 GitHub 연결 상태에 관계없이 실제 고지. 실제 판본이 없으면 합성 고지로 대신하지 않고 `403 CONSENT_REQUIRED` |
+| 개발 회원(개발 로그인으로 생성) | 위 절의 활성화 조건에서 합성 고지, 아니면 `403 INTERNAL_ERROR`. 실제 GitHub 연결이 있어도 합성 고지 |
+| 미지원 출처·비활성·없는 회원 | 실제 회원으로 보지 않고 `403 INTERNAL_ERROR` |
+| 회원 자료 조회 장애 | 고지나 403으로 대신하지 않고 `500 INTERNAL_ERROR` |
+
+접수(`POST /v1/analysis-requests`)는 바꾸지 않았다. 실제 판본에 동의한 요청은 실제 회원이면 기존 개발 공급 경계에서 `403 INTERNAL_ERROR`, 개발 기능이 켜진 환경의 개발 회원이면 현재 판본 불일치로 `403 CONSENT_REQUIRED`다. 실제 회원 접수와 실제 판본 동의 대조는 #323이 맡는다.
+
+고지 문구를 바꿀 때:
+
+1. 팀장이 문구를 쓰고 확정해 해당 이슈 본문에 남긴다([2026-10-14 결정](https://github.com/JminAILab/CatchU/issues/138#issuecomment-6159562994)).
+2. 담당(E)이 `REAL_NOTICE`의 `text`와 `noticeRevision`을 함께 바꾼다(예: `-v1` → `-v2`). 글자 하나가 바뀌어도 판본을 올리고, 같은 판본에 다른 문구를 싣지 않는다.
+3. `test/db/analysis-notice.test.cjs`의 확정 문구 지문(SHA-256)과 판본 기대값을 새 값으로 바꾼다. 문구만 바뀌고 지문이 그대로면 시험이 실패한다.
+4. 반영 PR에서 팀장 승인을 받는다. 이 승인이 실제 고지의 승인 기록이다.
+5. 외부 AI 제공자나 고지에 적은 보내는 자료·처리 위치·보관 조건이 바뀌면 문구와 판본을 함께 갱신한다([#119 결정](https://github.com/JminAILab/CatchU/issues/119#issuecomment-6159097353)).
+
+이미 받은 동의의 판본은 DB에 그대로 남는다. 판본이 바뀐 뒤 이전 판본 동의를 현재 동의로 받지 않는 대조는 실제 접수(#323)에서 한다.
 
 ## API와 입력
 
@@ -26,7 +51,7 @@
 
 | 경로 | 입력 | 성공 |
 |---|---|---|
-| `GET /v1/analysis-notice` | Bearer 회원 인증, 쿼리 없음 | 200 `{noticeRevision,text}`, 본문에 합성 시험임을 표시 |
+| `GET /v1/analysis-notice` | Bearer 회원 인증, 쿼리 없음 | 200 `{noticeRevision,text}`. 실제 회원은 실제 고지, 개발 회원은 합성 시험임을 표시한 합성 고지 |
 | `POST /v1/analysis-requests` | Bearer, 필수 `Idempotency-Key` 1~128자, 아래 JSON, 쿼리 없음 | 새 요청 202, 같은 저장소 ACTIVE/같은 키 재응답 200, 모두 계약의 AnalysisStatus |
 
 ```json
@@ -91,7 +116,7 @@
 ```powershell
 npm run lint
 npm run typecheck
-npm test -- test/db/analysis-intake.test.cjs test/member-repositories.test.cjs test/db/member-analysis.test.cjs
+npm test -- test/db/analysis-intake.test.cjs test/db/analysis-notice.test.cjs test/member-repositories.test.cjs test/db/member-analysis.test.cjs
 npm test
 npm run test:analysis-fixtures
 npm run build
@@ -101,6 +126,8 @@ npm run build
 
 [교착 리뷰](https://github.com/JminAILab/CatchU/pull/284#pullrequestreview-5500599838)의 회귀는 확정 실패 준비 후 별도 DB 연결로 회원 접수 잠금을 잡고 새 키 실패 재요청→이전 키 재전송 순서로 대기시킨다. `pg_locks`에서 두 대기를 확인한 뒤 풀며 3개의 독립 시험에서 각각 202·200, 이전 실패의 현재 상태, 새 요청의 ACTIVE 하나, 요청·동의·시도·멱등 기록 각각 총 2개와 원 기록 불변을 확인한다. 새 키를 다시 전송해도 200·추가 행 없음이어야 한다. 수정 전 잠금으로는 이 시험 3건이 교착에 따른 500을 검출한다. 검토 사본의 결과와 최종 구현 판본에서 직접 수행한 결과는 PR 검사 기록에서 구분한다.
 
+`analysis-notice.test.cjs`(#322)는 확정 문구 지문과 판본 구분, 회원 구분 함수, Google 로그인으로 만든 실제 회원의 연결 상태별 실제 고지, 개발 로그인 설정 다섯 가지(켬·false·production·미지정·preview)에서의 실제 고지와 개발 회원·미지원 출처 차단, 개발 회원의 연결 상태별 합성 고지, 실제 판본 부재 403, 회원 조회 장애 500, 접수 불변(실제 판본 동의 거부·실제 연결이 섞인 개발 접수 거부·합성 접수 MOCK), 트랜잭션 안 회원 행 읽기 잠금을 검사한다. Google 제공자는 시험 대역이고 GitHub 연결은 #231의 행 모양을 DB에 직접 만들었으며 실제 Google·GitHub를 호출하지 않는다.
+
 ②의 시험은 처리 시한 닫기([#237](https://github.com/JminAILab/CatchU/issues/237))가 병합되기 전이므로 APPLY_FAILED/CLOSED를 시험 DB에 직접 구성한다. 처리 결과 4종(FAILED·EMPTY·SUCCEEDED·PARTIAL_FAILED)과 후보 수에서 허용·새 ID·이력 연결·원 기록 불변·응답과 POST 판정 일치를 확인하고, 등록 연결(열람 준비 true/false)·Catch 본체만 있는 경우와 닫히지 않은 ACTIVE에서는 거부(ACTIVE는 같은 저장소 200·다른 저장소 409)를 확인한다. 이 시험은 닫는 주기·실제 반영 흐름을 대신하지 않는다.
 
-자동 검사 결과와 실제 명령·작업 위치·판본·미검증은 #138 구현 PR에서 관리한다. 실제 GitHub·worker·화면 전체 연결, 실제 고지/자료 처리 동의 승인과 작성자 외 재현은 이 합성 API 검사와 구분한다.
+자동 검사 결과와 실제 명령·작업 위치·판본·미검증은 #138·#322 구현 PR에서 관리한다. 실제 GitHub·worker·화면 전체 연결, 실제 자료 처리 동의의 접수와 작성자 외 재현은 이 API 검사와 구분한다. 실제 고지 문구의 승인은 #322 반영 PR의 팀장 승인이다.

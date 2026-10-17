@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { ApiError } from '../common/errors';
 import { DevMemberService } from '../member-analysis/dev-member.service';
 import { AnalysisConsent, AnalysisRequest } from '../member-analysis/member-analysis.entity';
+import { MemberKindService } from '../member-analysis/member-kind';
 import { insertInitialAnalysis } from '../member-analysis/initial-analysis';
 import { runIdempotentCreation } from '../member-analysis/idempotent-creation';
 import { repositoryPage } from '../member-repositories/repository-page';
@@ -15,14 +16,16 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 @Injectable()
 export class AnalysisIntakeService {
   constructor(private readonly database: DataSource, private readonly connections: DevMemberService,
-    private readonly notices: AnalysisNoticeService) {}
+    private readonly notices: AnalysisNoticeService, private readonly members: MemberKindService) {}
 
   async notice(memberId: string) {
     if (!UUID.test(memberId)) throw new ApiError('AUTH_INVALID');
-    const notice = this.notices.current();
-    const connection = await this.connections.readConnection(memberId);
-    if (connection.sourceMode !== 'MOCK') throw new ApiError('CONSENT_REQUIRED');
-    return notice;
+    // 고지는 회원 생성 출처로만 고른다. GitHub 연결 상태·공급 방식은 보지 않고, 조회 오류는 그대로 500이다.
+    const kind = await this.members.read(memberId);
+    if (kind === 'REAL') return this.notices.real();
+    // 미지원 출처는 실제 회원으로 보지 않고 기존 개발 회원 경계처럼 거부한다.
+    if (kind !== 'DEVELOPMENT') throw new ForbiddenException();
+    return this.notices.current();
   }
 
   private async context(manager: EntityManager, memberId: string, input: AnalysisInput) {
