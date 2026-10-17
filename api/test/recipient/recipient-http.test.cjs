@@ -269,11 +269,24 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
       catches: [], page: { nextCursor: null },
     });
 
-    const [nullable] = await publish(owner, { source: { ...candidate(), title: null, draft: { status: 'FAILED', content: null } } });
-    const listed = ok(await recipient(collectionPath(link.token)));
+    const source = candidate();
+    source.evidence[0].coverageLimits = ['[합성] 리뷰 대화는 포함하지 않음'];
+    const [nullable] = await publish(owner, { source: { ...source, title: null, draft: { status: 'FAILED', content: null } } });
+    const listedResponse = await recipient(collectionPath(link.token));
+    const listed = { ...ok(listedResponse), text: listedResponse.text };
     assert.equal(listed.catches.length, 1);
     assert.equal(listed.catches[0].title, null);
     assert.deepEqual(listed.catches[0].draft, { status: 'FAILED', content: null });
+    // 근거의 기여 범위·한계를 보존하고, 내부 근거 ID·본인용 질문·확인·불일치·공개 상태는 넣지 않는다.
+    assert.deepEqual(listed.catches[0].evidence, [{
+      sourceUrl: 'https://example.invalid/pull/1', sourceRevision: 'synthetic-revision-1', representedFacts: ['[합성] 응답 변경'],
+      contributionScope: '[합성] 응답 구현', coverageLimits: ['[합성] 리뷰 대화는 포함하지 않음'],
+    }]);
+    assert.deepEqual(listed.catches[0].workFacts, ['[합성] 오류 응답을 구분했다.']);
+    assert.equal(listed.catches[0].subjectContribution, '[합성] 응답 분기를 구현했다.');
+    for (const ownerOnly of ['synthetic-evidence-1', '[합성] 무엇을 확인했나요?', 'reflection', 'confirmation', 'mismatch', 'visibility', 'restriction', 'sourceMode']) {
+      assert.ok(!listed.text.includes(ownerOnly), ownerOnly);
+    }
     assert.deepEqual(ok(await recipient(catchPath(link.token, nullable))), listed.catches[0]);
   });
 
@@ -314,6 +327,29 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     // 비밀번호 없는 링크에 다른 링크의 grant를 붙여도 판정에 영향이 없다.
     const open = await issue(owner);
     assert.deepEqual(ok(await recipient(collectionPath(open.token), { grant })), body);
+  });
+
+  test('비밀번호 시도 제한으로 unlock이 막힌 동안에도 받아 둔 유효한 grant로 열람된다', async () => {
+    const owner = randomUUID();
+    profileStub.values.set(owner, profileOf('소유자'));
+    const [visible] = await publish(owner);
+    const link = await issue(owner, PASSWORD);
+    const grant = await unlock(link.token);
+    const attempt = async (password) => {
+      const response = await fetch(`${origin}/v1/public/links/${link.token}/unlock`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }), signal: AbortSignal.timeout(10000),
+      });
+      return { status: response.status, body: await response.json() };
+    };
+    // 같은 주소에서 15분 안에 10번 틀리면 차단된다(#150). 차단 뒤에는 올바른 비밀번호도 429다.
+    for (let index = 0; index < 10; index += 1) assert.equal((await attempt(`${PASSWORD}-wrong-${index}`)).status, 401);
+    const blocked = await attempt(PASSWORD);
+    assert.equal(blocked.status, 429, JSON.stringify(blocked.body));
+    assert.equal(blocked.body.code, 'LINK_UNLOCK_LIMITED');
+    // 조회 GET에는 시도 제한을 두지 않는다. 받아 둔 grant로는 계속 열리고, grant가 없으면 여전히 401이다.
+    assert.equal(ok(await recipient(collectionPath(link.token), { grant })).catches.length, 1);
+    ok(await recipient(catchPath(link.token, visible), { grant }));
+    fails(await recipient(collectionPath(link.token)), 401, 'LINK_PASSWORD_REQUIRED');
   });
 
   test('유효한 grant가 있어도 중단·만료·없는 링크는 같은 404 LINK_UNAVAILABLE이다', async () => {
