@@ -3,7 +3,7 @@ import { emptyCatchQuery } from '../catches/owner-catch-input';
 import { PublicCatchResponse, PublicCatchStore } from '../catches/public-catch-store';
 import { LinkAccessService } from '../share-links/link-access.service';
 import { PUBLIC_PROFILE_SOURCE, PublicProfileSource } from './public-profile-source';
-import { PublicProfileResponse, toPublicProfile } from './public-profile-response';
+import { PublicProfileResponse, PublicProfileSourceError, toPublicProfile } from './public-profile-response';
 
 export interface PublicCollectionResponse {
   profile: PublicProfileResponse;
@@ -32,8 +32,20 @@ export class RecipientService {
     const link = await this.access.assertReadable(token, grant);
     // 쿼리(cursor·limit)는 링크·비밀번호 판정 뒤에 검사한다. 정상 0건은 빈 배열이고, 조회 실패는 그대로 오류다.
     const page = await this.catches.list(link.ownerId, query);
-    const profile = toPublicProfile(await this.profiles.read(link.ownerId));
+    const profile = toPublicProfile(await this.readProfile(link.ownerId));
     return { profile, catches: page.catches, page: page.page };
+  }
+
+  /**
+   * 프로필 공급자 호출만 감싼다. 링크·grant(404·401)와 Catch 조회(400·404·500)의 오류는 감싸지 않아 기존 계약 응답을 유지한다.
+   * 공급자 오류는 종류와 관계없이 500이다(비활성 소유자의 최종 응답은 A와 합의 전).
+   */
+  private async readProfile(ownerId: string): Promise<unknown> {
+    try {
+      return await this.profiles.read(ownerId);
+    } catch (error) {
+      throw new PublicProfileSourceError(error);
+    }
   }
 
   async catch(token: string, grant: string | undefined, catchId: string, query: unknown): Promise<PublicCatchResponse> {

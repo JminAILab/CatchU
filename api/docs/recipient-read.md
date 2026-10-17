@@ -4,7 +4,7 @@
 
 ## 현재 상태
 
-- **기본 앱(`AppModule`)에는 등록하지 않는다.** 공개 프로필을 줄 A의 공급자가 아직 정해지지 않았다([10/13 확인 요청](https://github.com/JminAILab/CatchU/issues/151#issuecomment-6137981301)). 수신자 모듈은 공급자를 받아야만 조립되므로(`RecipientModule.register({ profileSource })`), 공급자가 없으면 제품 앱에서 두 경로가 열리지 않는다(없는 경로 404).
+- **기본 앱(`AppModule`)에는 등록하지 않는다.** 공개 프로필을 줄 A의 공급자가 아직 정해지지 않았다([10/13 확인 요청](https://github.com/JminAILab/CatchU/issues/151#issuecomment-6137981301)). 수신자 모듈은 공급자를 받아야만 조립되므로(`RecipientModule.register({ profileSource })`), 공급자가 없으면 제품 앱에 두 경로가 조립되지 않는다. 이는 모듈 메타데이터 구조 검사로 확인했고, 제품 앱의 해당 경로 HTTP 응답은 검증하지 않았다.
 - 시험은 공급자 자리에 **대역**을 넣는다. 대역으로 통과한 결과를 A 프로필 연동 검증으로 보지 않는다. 대역을 켜는 환경변수나 설정은 없다.
 - 실제 공급자가 정해지면 `AppModule`에 `RecipientModule.register({ profileSource })`를 더하고, 이 문서와 [api README](../README.md)의 상태를 고친다.
 
@@ -26,13 +26,12 @@
 
 ## 공개 프로필 공급자 — A와 합의 전
 
-`public-profile-source.ts`의 `PublicProfileSource.read(ownerId)`는 링크 판정을 통과한 링크의 소유자 ID로만 부른다. 돌려받은 값에서 `displayName`·`introduction`·`desiredRole`·`skills`만 복사하고 `fieldSource: 'SELF_REPORTED'`를 붙인다. 다른 필드가 섞여 와도 응답에 넣지 않는다. 값이 이 모양이 아니거나 공급자가 오류를 던지면 기본값으로 채우지 않고 `500 INTERNAL_ERROR`다.
+`public-profile-source.ts`의 `PublicProfileSource.read(ownerId)`는 링크 판정을 통과한 링크의 소유자 ID로만 부른다. 돌려받은 값에서 `displayName`·`introduction`·`desiredRole`·`skills`만 복사하고 `fieldSource: 'SELF_REPORTED'`를 붙인다. 다른 필드가 섞여 와도 응답에 넣지 않는다. 값이 이 모양이 아니면 기본값으로 채우지 않고 `500 INTERNAL_ERROR`다. 공급자가 던진 예외도 종류(업무 오류 `ApiError`·HTTP 예외 포함)와 관계없이 프로필 호출 지점에서 500으로 바꾼다. 공급자가 수신자 응답 코드를 정하지 않게 막는 합의 전 임시 처리이며, 링크·grant·Catch 조회 오류는 감싸지 않아 기존 401·404·400 응답을 유지한다.
 
-아래는 이 작업에서 정하지 않았다. A의 답변과 계약 수정으로 정한다.
+아래는 이 작업에서 정하지 않았다. A의 답변과 계약 수정 PR로 정한다.
 
-- 프로필 4항목의 공개 투영과 GitHub 공개 정보 추가 여부([계약 요약 OQ-A2](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)). 지금은 현재 계약 `PublicProfile`의 모양만 따르며 GitHub 필드는 넣지 않는다.
-- GitHub 미연동·재인증 필요 상태의 수신자 표현.
-- 비활성·탈퇴 소유자 링크의 수신 응답, 프로필 행 누락의 처리. 지금은 공급자가 던진 오류를 그대로 500으로 보낸다.
+- GitHub 계정 공개 필드의 계약 반영. 공개 항목에 GitHub 계정을 넣는 방향은 [9/20 결정](../../docs/ai-dlc-input-mvp/2026-09-14_followup.md)으로 정해졌고, 필드명·상태별 값(미연동·재인증 필요 표현)·제공 함수·반영 순서가 [OQ-A2](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)로 남아 있다. 계약 PR 전까지 현재 `PublicProfile` 모양만 따른다.
+- 비활성·탈퇴 소유자 링크의 수신 응답. 지금은 위 임시 처리로 500이며 최종 정책이 아니다.
 
 ## 파일
 
@@ -46,6 +45,6 @@
 
 ## 검사
 
-- `test/recipient/recipient-http.test.cjs`: 실제 Nest HTTP·테스트 DB(격리 스키마)·#150 판정·B 공개 조회와 프로필 대역으로 위 판정 순서, 회원 토큰 없는 열람, grant 경계(다른 링크·위조·만료·쿼리 전달), unlock 시도 제한 차단 중 받아 둔 grant 열람, 중단·만료 우회 불가, 다음 페이지 재판정, 사본 없음, 읽기 실패 500, 근거의 기여 범위·한계 보존, 응답 필드 누출(본인용 질문·확인·불일치·내부 ID·링크 제목), `no-store`, 서버 로그의 토큰·grant·비밀번호 비노출을 검사한다.
-- `test/recipient-module-boundary.test.cjs`: 실제 Guard로 두 메서드의 비로그인 허용과 미지정 경로의 인증 요구, 공급자 없는 조립 거부, 제품 앱에 수신자 모듈·경로가 없음을 검사한다.
-- 원본 비공개 제한은 합성 보호 관측 행으로 만든다. 실제 GitHub 원본 상태 관측과 A 프로필 연동, web 수신자 화면 연결은 검증하지 않았다.
+- `test/recipient/recipient-http.test.cjs`: 실제 Nest HTTP·테스트 DB(격리 스키마)·#150 판정·B 공개 조회와 프로필 대역으로 위 판정 순서, 회원 토큰 없는 열람, grant 경계(다른 링크·위조·만료·쿼리 전달), unlock 시도 제한 차단 중 받아 둔 grant 열람, 중단·만료 우회 불가, 다음 페이지 재판정, 링크 사이 같은 현재 자료·변경 즉시 반영·조회 전후 Catch 행 수 유지, 읽기 실패와 공급자 업무 오류·HTTP 예외 500, 근거의 기여 범위·한계 보존, 응답 필드 누출(본인용 질문·확인·불일치·내부 ID·링크 제목), `no-store`, 서버 로그의 토큰·grant·비밀번호 비노출을 검사한다.
+- `test/recipient-module-boundary.test.cjs`: 실제 Guard로 두 메서드의 비로그인 허용과 미지정 경로의 인증 요구, 공급자 없는 조립 거부, AppModule의 모듈·컨트롤러 메타데이터에 수신자 모듈·컨트롤러가 없음(구조 검사)을 확인한다.
+- 원본 비공개 제한은 합성 보호 관측 행으로 만든다. 실제 원본 상태 관측(OQ-B3)은 #151의 미결로 A/B/F/H와 확인할 사항이며, 이 구현에서 검증하지 않았다. A 프로필 연동, 제품 앱의 해당 경로 HTTP 응답, web 수신자 화면 연결도 검증하지 않았다.

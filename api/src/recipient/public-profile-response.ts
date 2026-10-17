@@ -16,6 +16,18 @@ export class PublicProfileIntegrityError extends Error {
 }
 
 /**
+ * 공급자 호출이 실패했다. 공급자가 던진 예외의 종류(ApiError·HttpException 포함)와 관계없이 500으로 보낸다.
+ * 비활성 소유자 등 공급자 사유별 수신 응답은 A와 합의 전이라, 공급자가 수신자 응답 코드를 정하지 않게 막는 임시 처리다.
+ * 원래 예외는 `cause`로만 두고 메시지에 넣지 않는다.
+ */
+export class PublicProfileSourceError extends Error {
+  constructor(cause: unknown) {
+    super('public profile source failed', { cause });
+    this.name = 'PublicProfileSourceError';
+  }
+}
+
+/**
  * 공급자 값에서 허용 필드만 골라 응답을 만든다. 다른 필드(회원 ID·연동 상태 등)가 섞여 와도 복사하지 않는다.
  * 문자열이 비어 있는 것은 계약상 정상이다(값이 없는 문자열은 빈 문자열).
  */

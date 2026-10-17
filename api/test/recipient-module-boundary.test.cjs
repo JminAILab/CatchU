@@ -11,6 +11,7 @@ const { RecipientModule } = require('../dist/recipient/recipient.module');
 const { PUBLIC_PROFILE_SOURCE } = require('../dist/recipient/public-profile-source');
 
 // #151 수신자 조회의 회원 인증 예외 범위와 제품 앱 조립 경계를 DB 없이 확인한다.
+// 제품 앱 경계는 모듈 메타데이터를 순회하는 구조 검사다. 제품 앱을 띄워 해당 경로의 HTTP 응답을 확인하지는 않는다.
 const guard = new AccessTokenGuard(new Reflector(), {
   verify() { assert.fail('회원 토큰 없는 요청에서 토큰 검증을 호출하면 안 된다'); },
 });
@@ -38,7 +39,7 @@ test('수신자 모듈은 공개 프로필 공급자 없이 조립되지 않는�
   assert.equal(registered.providers.find((provider) => provider.provide === PUBLIC_PROFILE_SOURCE).useValue, source);
 });
 
-test('A의 공급자가 정해지기 전까지 제품 앱(AppModule)에는 수신자 모듈·경로가 없다', () => {
+test('구조 검사: A의 공급자가 정해지기 전까지 AppModule의 모듈·컨트롤러 메타데이터에 수신자 모듈·컨트롤러가 없다', () => {
   const seen = new Set();
   const controllers = [];
   const visit = (entry) => {

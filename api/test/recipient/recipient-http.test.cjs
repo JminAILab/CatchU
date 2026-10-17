@@ -447,7 +447,7 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
       assert.deepEqual(ids(now.catches), [second]);
       fails(await recipient(catchPath(token, first), { grant }), 404, 'RESOURCE_UNAVAILABLE');
     }
-    // 수신 조회는 쓰기를 하지 않는다.
+    // 조회 전후 Catch 행 수가 같다(링크마다 Catch 사본을 만들지 않는다). 모든 쓰기가 없다는 증거는 아니다.
     assert.deepEqual(await db.query('SELECT count(*)::int AS n FROM catch_asset'), before);
   });
 
@@ -455,6 +455,14 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     const owner = randomUUID();
     const [visible] = await publish(owner);
     const link = await issue(owner);
+    const { ApiError } = require('../../dist/common/errors');
+    const { ForbiddenException, NotFoundException, UnauthorizedException } = require('@nestjs/common');
+    // 공급자가 업무 오류·HTTP 예외를 던져도 수신자 응답 코드를 정하지 못하고 500이다(비활성 소유자 정책은 A와 합의 전).
+    for (const error of [new ApiError('RESOURCE_UNAVAILABLE'), new ApiError('AUTH_REQUIRED'), new ApiError('LINK_UNAVAILABLE'),
+      new ApiError('INTERNAL_ERROR'), new NotFoundException(), new UnauthorizedException(), new ForbiddenException()]) {
+      profileStub.values.set(owner, error);
+      fails(await recipient(collectionPath(link.token)), 500, 'INTERNAL_ERROR');
+    }
     // 공급자 오류와 계약 모양이 아닌 값은 기본값으로 채우지 않는다.
     for (const value of [new Error('synthetic profile source failure'), undefined, null, [], 'text',
       { displayName: '[합성]', introduction: '', desiredRole: '' },
