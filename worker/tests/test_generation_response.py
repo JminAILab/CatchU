@@ -12,6 +12,7 @@
 import json
 import logging
 import re
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -48,7 +49,7 @@ from generation_scenarios import (
 from github_synthetic import EVIL, INJECTION, MEMBER, OTHER, sha
 
 from app.generation import ProviderRequest
-from app.generation.response import name_in
+from app.generation.response import name_in, name_match
 from app.processing import CheckedRequest, EligibleCandidate
 
 # 커밋 묶음 후보(PR 조회 없이 본인 커밋 하나가 한 작업)로 돌린다. PR이 필요한 사례만 LIVE 기본값을 쓴다.
@@ -285,6 +286,18 @@ def check(
     assert case.provider.rewrite_requests() == []
 
 
+def reasons(
+    case: GenerationCase,
+) -> tuple[Counter[str], Counter[str], Counter[str]]:
+    """운영 로그의 실패 원인별 건수(전체 호출, 설명, 질문). generation-limits.md 「운영 로그」."""
+    report = case.run.report
+    return report.whole_reasons, report.draft_reasons, report.reflection_reasons
+
+
+def one(reason: str) -> Counter[str]:
+    return Counter({reason: 1})
+
+
 def _failure(stage: str, code: str, entry: dict[str, Any]) -> dict[str, str]:
     return {
         "stage": stage,
@@ -413,6 +426,7 @@ def test_unsupported_file_status_fails_whole_description(status: str) -> None:
     )
 
     check(case, draft=Failed(UNVERIFIED), questions=(QUESTION,), title=TITLE)
+    assert reasons(case) == (Counter(), one("NO_TEMPLATE"), Counter())
 
 
 def test_same_sentence_is_written_once() -> None:
@@ -580,6 +594,23 @@ KIND_MISMATCH_REFS = [
     ("added-kind-on-removed-line", _added_kind_on_removed, True),
     ("removed-kind-on-added-line", _removed_kind_on_added, True),
 ]
+# 사례마다 운영 로그에 남는 실패 원인(generation-limits.md 「운영 로그」). 실패 코드·문구는 모두 같다.
+UNVERIFIED_REASONS = {
+    "unsent-line": "UNKNOWN_LINE",
+    "context-line": "UNKNOWN_LINE",
+    "hunk-header": "UNKNOWN_LINE",
+    "missing-file": "UNKNOWN_FILE",
+    "path-instead-of-id": "UNKNOWN_FILE",
+    "name-not-on-line": "NAME_MISSING",
+    # 대소문자가 다르면 그 글자열이 줄에 없다.
+    "name-other-case": "NAME_MISSING",
+    # 소문자 limit은 loginRateLimit 줄에 글자열로도 없다(대문자 Limit만 있다).
+    "name-inside-longer-name": "NAME_MISSING",
+    "name-part-of-longer-name": "NAME_JOINED_ASCII",
+    "name-prefix-of-name": "NAME_JOINED_ASCII",
+    "added-kind-on-removed-line": "KIND_MISMATCH",
+    "removed-kind-on-added-line": "KIND_MISMATCH",
+}
 
 
 def _assert_cited(request: ProviderRequest, cited: dict[str, str], sent: bool) -> None:
@@ -597,12 +628,14 @@ def _assert_cited(request: ProviderRequest, cited: dict[str, str], sent: bool) -
         for label, make, sent in UNVERIFIED_REFS + KIND_MISMATCH_REFS
     ],
 )
-def test_unverified_fragment_fails_whole_description(make: Part, sent: bool) -> None:
+def test_unverified_fragment_fails_whole_description(
+    make: Part, sent: bool, request: pytest.FixtureRequest
+) -> None:
     """보낸 자료로 확인되지 않는 조각이 하나라도 있으면 설명 전체가 실패한다(05·12).
 
     보내지 않은 줄, 문맥 줄·머리글의 patch 줄 순서로 만든 id, 없는 파일 id, 이름이 그 줄에 식별자 경계로
     없음(limit·loginRateLimit, func_1·func_10), 조각 종류와 줄 종류 불일치. 확인된 앞 조각만 남겨 쓰지
-    않는다.
+    않는다. 운영 로그에는 설명 실패 원인이 하나 남는다.
     """
     case = run(
         reply_with(
@@ -612,6 +645,8 @@ def test_unverified_fragment_fails_whole_description(make: Part, sent: bool) -> 
 
     _assert_cited(first_request(case), make(first_request(case)), sent)
     check(case, draft=Failed(UNVERIFIED), questions=(QUESTION,), title=TITLE)
+    expected = UNVERIFIED_REASONS[request.node.callspec.id]
+    assert reasons(case) == (Counter(), one(expected), Counter())
 
 
 def _as_question(fragment: dict[str, str]) -> dict[str, str]:
@@ -624,7 +659,9 @@ def _as_question(fragment: dict[str, str]) -> dict[str, str]:
     ("make", "sent"),
     [pytest.param(make, sent, id=label) for label, make, sent in UNVERIFIED_REFS],
 )
-def test_unverified_question_fails_whole_questions(make: Part, sent: bool) -> None:
+def test_unverified_question_fails_whole_questions(
+    make: Part, sent: bool, request: pytest.FixtureRequest
+) -> None:
     """질문도 확인한 근거만 가리킨다. 확인되지 않는 질문이 하나라도 있으면 질문 전체가 실패한다(07·12)."""
     case = run(
         reply_with(
@@ -637,6 +674,8 @@ def test_unverified_question_fails_whole_questions(make: Part, sent: bool) -> No
 
     _assert_cited(first_request(case), make(first_request(case)), sent)
     check(case, draft=SENTENCE, questions=Failed(UNVERIFIED), title=TITLE)
+    expected = UNVERIFIED_REASONS[request.node.callspec.id]
+    assert reasons(case) == (Counter(), Counter(), one(expected))
 
 
 def two_candidates() -> Scenario:
@@ -897,6 +936,7 @@ def test_unsupported_file_status_question_fails_questions() -> None:
     code = made.reflection.failure.code
     assert code in (UNVERIFIED, RULE)
     check(case, draft=SENTENCE, questions=Failed(code), title=TITLE)
+    assert reasons(case) == (Counter(), Counter(), one("NO_TEMPLATE"))
 
 
 # 길이 150자: 경로 대신 파일 이름, 그래도 넘으면 형식 위반(impl.md 상한)
@@ -960,6 +1000,7 @@ def test_question_still_too_long_with_file_name_fails_questions() -> None:
         questions=Failed(RULE),
         title=TITLE,
     )
+    assert reasons(case) == (Counter(), Counter(), one("TOO_LONG"))
 
 
 # 질문에 자유 문장이 들어갈 길이 없다: 동기·성과·타인 기여·개발 범위 전제 거부(07)
@@ -1092,7 +1133,7 @@ def _four_fragments(r: ProviderRequest) -> list[dict[str, str]]:
     ],
 )
 def test_fragment_count_or_shape_violation_fails_description_only(
-    fragments: Part,
+    fragments: Part, request: pytest.FixtureRequest
 ) -> None:
     """설명 조각이 0개·4개이거나 칸·종류·모양을 어기면 설명만 형식 위반이다(12·11).
 
@@ -1101,6 +1142,23 @@ def test_fragment_count_or_shape_violation_fails_description_only(
     case = run(reply_with(fragments=fragments))
 
     check(case, draft=Failed(RULE), questions=(QUESTION,), title=TITLE)
+    expected = FRAGMENT_SHAPE_REASONS[request.node.callspec.id]
+    assert reasons(case) == (Counter(), one(expected), Counter())
+
+
+FRAGMENT_SHAPE_REASONS = {
+    "none": "COUNT",
+    "four": "COUNT",
+    "missing-key": "COUNT",
+    "not-a-list": "COUNT",
+    "null": "COUNT",
+    "unknown-kind": "ITEM_SHAPE",
+    "unknown-item-key": "ITEM_SHAPE",
+    "missing-name": "ITEM_SHAPE",
+    "line-not-text": "ITEM_SHAPE",
+    "name-over-64-chars": "NAME_SHAPE",
+    "item-not-object": "ITEM_SHAPE",
+}
 
 
 def _four_questions(r: ProviderRequest) -> list[dict[str, str]]:
@@ -1146,7 +1204,7 @@ def _four_questions(r: ProviderRequest) -> list[dict[str, str]]:
     ],
 )
 def test_question_count_or_type_violation_fails_questions_only(
-    questions: Part,
+    questions: Part, request: pytest.FixtureRequest
 ) -> None:
     """질문이 0개·4개이거나 같은 종류가 둘이거나 칸을 어기면 질문만 형식 위반이다(12·11).
 
@@ -1155,6 +1213,20 @@ def test_question_count_or_type_violation_fails_questions_only(
     case = run(reply_with(questions=questions))
 
     check(case, draft=SENTENCE, questions=Failed(RULE), title=TITLE)
+    expected = QUESTION_SHAPE_REASONS[request.node.callspec.id]
+    assert reasons(case) == (Counter(), Counter(), one(expected))
+
+
+QUESTION_SHAPE_REASONS = {
+    "none": "COUNT",
+    "four": "COUNT",
+    "same-type-twice": "DUPLICATE_TYPE",
+    "missing-key": "COUNT",
+    "null": "COUNT",
+    "not-a-list": "COUNT",
+    "unknown-item-key": "ITEM_SHAPE",
+    "line-and-file": "ITEM_SHAPE",
+}
 
 
 def test_both_parts_violating_counts_stay_partial_failures() -> None:
@@ -1252,6 +1324,8 @@ def test_unreadable_response_fails_description_and_questions(
         title=None,
     )
     assert "성능" not in result_text(case)
+    # 전체 호출 실패는 실패 코드로 한 번만 세고, 설명·질문 원인으로 다시 세지 않는다.
+    assert reasons(case) == (one(UNREADABLE), Counter(), Counter())
 
 
 def _duplicate_in_fragment(r: ProviderRequest) -> str:
@@ -1582,6 +1656,12 @@ def test_masked_line_cannot_be_cited(
     assert "sessionKey" in hidden.text
     check(case, draft=draft, questions=questions, title=title)
     assert_nowhere(secret, provider=case.provider, result=case.result)
+    masked = one("MASKED_LINE")
+    assert reasons(case) == (
+        Counter(),
+        masked if isinstance(draft, Failed) else Counter(),
+        masked if isinstance(questions, Failed) else Counter(),
+    )
 
 
 def test_title_name_also_inside_masked_line_is_null() -> None:
@@ -1713,6 +1793,31 @@ def test_name_joined_to_other_identifier_characters_is_not_found(text: str) -> N
     assert not name_in("limit", text)
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("limit = 5", "FOUND"),
+        # 붙은 곳이 있어도 경계로 일치하는 곳이 하나 있으면 확인된다.
+        ("xlimit = limit", "FOUND"),
+        ("한글limit = 5", "JOINED_NON_ASCII"),
+        ("# limit을 늘렸다", "JOINED_NON_ASCII"),
+        ("limit́ = 5", "JOINED_NON_ASCII"),
+        ("limit_v2 = 5", "JOINED_ASCII"),
+        ("$limit = 5", "JOINED_ASCII"),
+        ("loginRateLimit = rate_limit", "JOINED_ASCII"),
+        # 붙은 곳 가운데 ASCII 밖 글자가 하나라도 있으면 그쪽으로 센다.
+        ("rate_limit 한글limit", "JOINED_NON_ASCII"),
+        ("loginRateLimit = 5", "MISSING"),
+    ],
+)
+def test_name_match_tells_why_a_name_is_not_on_the_line(
+    text: str, expected: str
+) -> None:
+    """운영 로그의 원인 건수용 분류: 확인됨, 영문·숫자·밑줄·$에 붙음, ASCII 밖 글자에 붙음, 없음."""
+    assert name_match("limit", text) == expected
+    assert name_in("limit", text) is (expected == "FOUND")
+
+
 def test_citing_part_of_a_unicode_identifier_is_rejected() -> None:
     """`한글limit`의 `limit`처럼 다른 식별자의 일부를 지목하면 설명·질문은 확인 실패, 제목은 null이다(05)."""
     work = commit(
@@ -1744,3 +1849,5 @@ def test_citing_part_of_a_unicode_identifier_is_rejected() -> None:
     assert generated.draft.status == "FAILED"
     assert generated.reflection.status == "FAILED"
     assert generated.title is None
+    joined = one("NAME_JOINED_NON_ASCII")
+    assert reasons(case) == (Counter(), joined, joined)

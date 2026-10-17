@@ -19,6 +19,7 @@ ExecutionUnknown)는 그대로 올린다.
 """
 
 import logging
+from collections import Counter
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Literal
@@ -61,6 +62,7 @@ from app.generation.request import (
 )
 from app.generation.response import (
     TOP_LEVEL_KEYS,
+    PartReason,
     Sent,
     TitleProblem,
     Unreadable,
@@ -87,6 +89,8 @@ _PART_CODES = {
     "RULE_VIOLATION": GenerationFailureCode.RULE_VIOLATION,
     "UNVERIFIED": GenerationFailureCode.UNVERIFIED,
 }
+_NO_TEMPLATE: PartReason = "NO_TEMPLATE"
+_TOO_LONG: PartReason = "TOO_LONG"
 
 
 @dataclass
@@ -112,6 +116,11 @@ class GenerationReport:
     size_limited_commits: int = 0
     truncated_commits: int = 0
     unknown_response_keys: int = 0
+    # 실패 원인별 건수(원인 코드 → 건수). 전체 호출 실패는 실패 코드, 설명·질문 실패는 부분이 실패한 첫
+    # 원인(response.PartReason)으로 센다. 설명 실패 수 = 전체 호출 실패 수 + 설명 원인 건수의 합이다.
+    whole_reasons: Counter[str] = field(default_factory=Counter)
+    draft_reasons: Counter[str] = field(default_factory=Counter)
+    reflection_reasons: Counter[str] = field(default_factory=Counter)
 
 
 @dataclass(frozen=True)
@@ -238,6 +247,7 @@ def _generate_one(
     if response is None:
         assert code is not None
         report.whole_failures += 1
+        report.whole_reasons[code.value] += 1
         return _Result(
             draft=failed_draft(code),
             reflection=failed_reflection(code),
@@ -247,8 +257,8 @@ def _generate_one(
     report.unknown_response_keys += unknown_keys(response, TOP_LEVEL_KEYS)
     sent = Sent(selection.lines, selection.files)
     result = _Result(selection=selection, called=True)
-    result.draft = _draft(response, sent, limits)
-    result.reflection = _reflection(response, sent, limits)
+    result.draft = _draft(response, sent, limits, report.draft_reasons)
+    result.reflection = _reflection(response, sent, limits, report.reflection_reasons)
     choice = title_choice(response.get("title"), sent, max_name=limits.max_name_chars)
     if choice.problem is not None:
         result.title_problem = choice.problem
@@ -307,7 +317,10 @@ def _call(
 
 
 def _draft(
-    response: dict[str, object], sent: Sent, limits: GenerationLimits
+    response: dict[str, object],
+    sent: Sent,
+    limits: GenerationLimits,
+    reasons: Counter[str],
 ) -> DraftOutcome:
     verdict = fragments(
         response,
@@ -317,15 +330,21 @@ def _draft(
         max_name=limits.max_name_chars,
     )
     if verdict.problem is not None:
+        assert verdict.reason is not None
+        reasons[verdict.reason] += 1
         return failed_draft(_PART_CODES[verdict.problem])
     text = render.description(verdict.items)
     if text is None:
+        reasons[_NO_TEMPLATE] += 1
         return failed_draft(GenerationFailureCode.UNVERIFIED)
     return DraftOutcome.generated(text)
 
 
 def _reflection(
-    response: dict[str, object], sent: Sent, limits: GenerationLimits
+    response: dict[str, object],
+    sent: Sent,
+    limits: GenerationLimits,
+    reasons: Counter[str],
 ) -> ReflectionOutcome:
     verdict = questions(
         response,
@@ -335,13 +354,17 @@ def _reflection(
         max_name=limits.max_name_chars,
     )
     if verdict.problem is not None:
+        assert verdict.reason is not None
+        reasons[verdict.reason] += 1
         return failed_reflection(_PART_CODES[verdict.problem])
     texts: list[str] = []
     for item in verdict.items:
         text = render.question(item, limits.max_question_chars)
         if text == "UNSUPPORTED":
+            reasons[_NO_TEMPLATE] += 1
             return failed_reflection(GenerationFailureCode.UNVERIFIED)
         if text == "TOO_LONG":
+            reasons[_TOO_LONG] += 1
             return failed_reflection(GenerationFailureCode.RULE_VIOLATION)
         texts.append(text)
     return ReflectionOutcome.generated(tuple(texts))
@@ -435,6 +458,11 @@ def _apply(
     )
 
 
+def _reasons(counts: Counter[str]) -> str:
+    """원인 코드:건수를 코드순으로 쉼표로 잇는다. 없으면 '-'. 코드는 고정 값이라 자료가 들어가지 않는다."""
+    return ",".join(f"{code}:{count}" for code, count in sorted(counts.items())) or "-"
+
+
 def _log(request: CheckedRequest, report: GenerationReport) -> None:
     """건수만 남긴다. SHA·경로·이름·제목·본문·응답 원문·가린 값은 남기지 않는다."""
     logger.log(
@@ -443,7 +471,8 @@ def _log(request: CheckedRequest, report: GenerationReport) -> None:
         "rewriteCalls=%d noMaterial=%d budgetSkipped=%d wholeFailures=%d "
         "draftGenerated=%d draftFailed=%d reflectionFailed=%d titleOnlyNull=%d "
         "titlesRewritten=%d maskedValues=%d secretFiles=%d maskedToEmpty=%d "
-        "sizeLimitedCommits=%d truncatedCommits=%d unknownResponseKeys=%d",
+        "sizeLimitedCommits=%d truncatedCommits=%d unknownResponseKeys=%d "
+        "wholeReasons=%s draftReasons=%s reflectionReasons=%s",
         request.request_id,
         request.attempt_id,
         report.candidates,
@@ -463,4 +492,7 @@ def _log(request: CheckedRequest, report: GenerationReport) -> None:
         report.size_limited_commits,
         report.truncated_commits,
         report.unknown_response_keys,
+        _reasons(report.whole_reasons),
+        _reasons(report.draft_reasons),
+        _reasons(report.reflection_reasons),
     )
