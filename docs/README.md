@@ -54,10 +54,22 @@
 폐기된 문서는 지운다. 기각 사유는 각 문서의 「결정 이력」 절과
 PR 본문에, 판본은 git 이력에 남는다.
 
+## 개발 목표와 마일스톤
+
+2026-10-17 팀장 결정. CatchU는 **12월 공개를 목표로 하나의 제품을 개발**한다. 10월 목표는 프로젝트 내부의 중간 마일스톤이며, 그 단계의 제품을 실제 소비자에게 별도 제공하는 출시판으로 운영하지 않는다.
+
+- 현재 작업은 해당 이슈의 완료 기준과 승인된 요구사항·설계·계약, 그 대상과 적용 시점을 명시한 후속 결정을 함께 따른다. 중간 마일스톤에 필요한 연결과 최종 제품에 남길 결과를 기준으로 필요성과 범위를 판단한다.
+- 최종 제품의 문구·설계·기반을 먼저 반영하기로 명시한 결정은 해당 산출물에 적용한다. 문구가 설명하는 기능이 현재 미구현이라는 이유만으로 별도 10월용 문구나 구현을 요구하지 않는다. 선반영이 관련 기능 전체의 즉시 구현·제공·완료를 뜻하지는 않는다.
+- 검토할 때는 현재 작업에서 고쳐야 할 결함, 계획된 후속 구현, 실제로 합의가 필요한 연결 조건을 구분한다. 확정된 선반영을 날짜 차이만으로 다시 결정하게 하거나 같은 결과물을 두 번 만들도록 요구하지 않는다.
+- 선반영만으로 현재 실행에 쓰는 API·권한·접수·상태 전이 계약을 일괄 변경하지 않는다. 변경은 명시된 대상과 적용 시점에 한정하며, 실제 자료 처리와 공개 제공에는 그 시점의 허용 조건·검증 기준을 적용한다. 과거 승인 원본은 보존한다.
+
+구체적인 선반영의 예는 [#322 실제 자료용 고지](https://github.com/JminAILab/CatchU/issues/322)의 12월 확정 문구다. 이 문구를 지금 API에 싣는 결정은 [#323 실제 회원 접수](https://github.com/JminAILab/CatchU/issues/323)에서 모든 12월 기능을 함께 구현하라는 뜻이 아니다.
+
 ## AI-DLC 산출물과의 관계
 
 - `docs/`는 팀의 현행 기준과 문서 안내를 관리한다. AI-DLC 산출물의 원본과 승인 이력은 `aidlc/`에서 관리한다(`aidlc/spaces/default/intents/<intent>/`의 단계별 폴더와 `audit/`). 원본을 두 곳에 복제해 수정하지 않는다.
 - 초기 제품 정의의 승인 요구사항: [첫 intent 요구사항](../aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md) (2026-09-11 승인). 이후 10월 MVP와 12월 범위의 적용 기준은 각각의 후속 승인 문서에서 확인한다. 과거 승인 원본은 보존한다.
+- 아래 10월·12월 산출물의 적용 관계는 위 「개발 목표와 마일스톤」을 전제로 읽는다.
 - 10월 MVP 구현 기준: [10월 요구사항](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md)와 해당 intent의 승인된 설계·계약 및 후속 결정을 사용한다.
 - 12월 확장 기준: [12월 요구사항](../aidlc/spaces/default/intents/260925-intent-12/inception/requirements-analysis/requirements.md)과 [사용자 스토리](../aidlc/spaces/default/intents/260925-intent-12/inception/user-stories/stories.md)는 2026-09-28 승인됐다. 읽기 순서·마감 구분·적용 경계는 [12월 승인 문서 안내](CatchU_12월_승인문서_안내.md)를 따른다. 12월의 명시적 정정은 그 범위에 적용하며, 이번 공유만으로 10월 구현 계약을 변경하지 않는다.
 - 10월 MVP에 적용하는 범위·순서·착수 조건은 후속 intent의 [scope-document.md](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)·[intent-backlog.md](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/intent-backlog.md)와 연결된 후속 결정을 확인한다. 산출물에 남은 작성 당시 지위와 현재 승인 여부를 구분하고, 승인 여부는 해당 intent의 `aidlc-state.md`·`audit/` 기록에서 확인한다.
@@ -73,6 +85,8 @@ PR 본문에, 판본은 git 이력에 남는다.
   - `JD적합도_기능_벤치마킹_보고서.md`, `ATS_경쟁사_분석_보고서_2026-08.docx`, `링크드인과_경력_개발자_채용.docx`: 개편 전 포지션(채용플랫폼·JD 적합도)의 조사 자료.
   - `CatchU_실험기록_주장회상_2026-08-30.md`: n=1 실측 기록. 필요하면 git 이력에서 읽는다.
 - 유지하되 다음 intent의 입력으로 옮긴 뒤 정리할 문서: `카드생성논리_상세설명.md`, `증거카드_이상형과_추출방법.md`, `CatchU_KPI_성공기준_v4_1.md`. 페르소나 P1~P4와 설계노트는 팀이 판단한다.
+
+- **2026-10-17** — 팀장 설명에 따라 10월 내부 중간 마일스톤과 12월 공개 목표의 관계, 확정 산출물의 선반영 및 현재 실행 계약의 적용 경계를 명시했다. 승인 기록·제품 계약·이슈 완료 기준은 소급 변경하지 않는다.
 
 ## 규칙
 
