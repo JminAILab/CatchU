@@ -28,7 +28,7 @@ const repositoryApi = createRepositoryApi(api.member); // 모듈 단위로 한 �
 | 닫기·X·Esc·바깥 클릭 | `onClosed()` → 현재 필터로 목록 다시 불러오기 |
 | [이 저장소 Catch 보기] | `onShowRepository(repositoryId)`만 부른다(`onClosed` 중복 없음) |
 
-모달 아래쪽 「연결할 수 있는 저장소」는 `connectSection`으로 #154가 채운다. 넘기지 않으면 준비 중 안내만 보인다.
+모달 아래쪽 「연결할 수 있는 저장소」는 #154의 [저장소 선택·동의·첫 분석 요청](../analysis-request/README.md)이 채운다. `requestApi`를 생략하면 `api.member`로 만든 제품 호출을 쓰고, `connectSection`을 넘기면 그 내용을 대신 그린다.
 
 ## 표시 규칙
 

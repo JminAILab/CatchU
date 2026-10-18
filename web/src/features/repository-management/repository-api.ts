@@ -12,6 +12,8 @@ export type Lookup<T> = { kind: "success"; data: T } | LookupFailure;
 
 export type GitHubState = "CONNECTED" | "DISCONNECTED" | "REAUTH_REQUIRED";
 export type EligibleRepository = { repositoryId: string; name: string; ownerLogin: string; url: string };
+/** 분석 요청(#154)이 쓰는 선정 저장소. 동의 본문에 실을 현재 허용 범위 판본(allowedScopeRevision)을 보존한다. */
+export type AnalyzableRepository = EligibleRepository & { allowedScopeRevision: string };
 
 export const PROCESSING = ["QUEUED", "RUNNING", "UNCERTAIN", "SUCCEEDED", "EMPTY", "PARTIAL_FAILED", "FAILED"] as const;
 export const APPLICATION = ["NOT_READY", "PENDING", "APPLYING", "RECOVERING", "APPLIED", "APPLY_FAILED"] as const;
@@ -77,6 +79,16 @@ export function readAnalysis(value: unknown): AnalysisSummary | null {
   };
 }
 
+/**
+ * 계약 Repository의 필수 필드를 모두 확인한다. allowedScopeRevision이 없거나 빈 값·문자열이 아니면 null이다.
+ * 기존 readRepository(이름 결합용)는 바꾸지 않고, 분석 요청 경로만 이 함수로 판본까지 검증한다.
+ */
+export function readAnalyzableRepository(value: unknown): AnalyzableRepository | null {
+  const repository = readRepository(value);
+  if (repository === null || !isRecord(value) || !isId(value.allowedScopeRevision)) return null;
+  return { ...repository, allowedScopeRevision: value.allowedScopeRevision };
+}
+
 export function createRepositoryApi(transport: RepositoryTransport) {
   async function get(path: string, signal?: AbortSignal): Promise<Lookup<unknown>> {
     try {
@@ -122,6 +134,8 @@ export function createRepositoryApi(transport: RepositoryTransport) {
       return state === null ? LOOKUP_FAILED : { kind: "success", data: state };
     },
     repositories: (signal?: AbortSignal) => readAllPages("/me/repositories", readRepository, signal),
+    /** 같은 선정 목록을 판본까지 검증해 읽는다(#154). 항목 하나라도 판본이 없거나 잘못되면 전체를 조회 실패로 본다. */
+    analyzableRepositories: (signal?: AbortSignal) => readAllPages("/me/repositories", readAnalyzableRepository, signal),
     analyses: (signal?: AbortSignal) => readAllPages("/analysis-requests", readAnalysis, signal),
   };
 }
