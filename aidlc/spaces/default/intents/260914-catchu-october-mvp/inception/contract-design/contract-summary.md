@@ -62,7 +62,7 @@ components:
 - 쿠키: `catchu_refresh`, Path `/v1/auth`, HttpOnly, SameSite=Strict, Domain 없음, https 출처에서 Secure(개발·test의 loopback http만 생략). 만료는 common.yaml SetRefreshCookie.
 - 출처: 갱신·로그아웃은 `Origin`이 설정한 web 출처와 정확히 같을 때만 받는다(CSRF 방어). 운영은 web과 API를 같은 출처에 두고(앞단이 `/v1`만 API로 보냄) CORS를 켜지 않는다.
 - GitHub: 추가 권한(scope) 없는 OAuth App으로 만료형 토큰을 받고 자동 갱신하지 않는다. 만료·폐기·보관 자료 손상을 확인하면(`GET /me` 포함) REAUTH_REQUIRED로 바꾸며(최근 계정명 유지) 다시 연결해야 한다.
-- 프로필은 displayName·introduction·desiredRole·skills를 자가 입력으로 취급한다. 값이 없는 문자열은 빈 문자열, 기술은 빈 배열이다. 서비스 기본값/길이 제한은 A의 기능 설계로 보완하며 공개 투영은 OQ-A2의 A/C 확인 대상이다.
+- 프로필은 displayName·introduction·desiredRole·skills를 자가 입력으로 취급한다. 값이 없는 문자열은 빈 문자열, 기술은 빈 배열이다. 서비스 기본값/길이 제한은 A의 기능 설계로 보완한다. 공개 투영(PublicProfile)은 이 네 항목과 fieldSource, githubAccountLogin이며 규칙은 「P — 수신자 API」를 따른다(OQ-A2).
 - 회원 목록은 `items`와 `page.nextCursor`(마지막은 null)를 반환한다. 이 `items`·`page` 규칙은 회원 목록에만 적용되며 수신자 목록 응답은 `profile`·`catches`·`page`다. opaque cursor는 소유자/필터 경계에 묶이며 현재 권한을 다시 검사한다. cursor는 공개 상태 스냅샷이나 영구 접근권이 아니다. 기본 20·최대 100개는 v1 페이지 규격이다.
 
 ## 분석 접수·상태·재요청
@@ -130,6 +130,7 @@ components:
 - 정상 목록은 **링크 소유자의 현재 공개 Catch 전체**를 페이지로 제공한다. 링크–자산 join/snapshot/선택 목록을 만들지 않는다. 현재 허용 자료 0개는 200+빈 배열, 자료 조회 실패는 500이며 빈 자료로 대체하지 않는다.
 - 직접 Catch 조회는 같은 링크 소유자의 현재 PUBLIC·보호 제한 없음만 허용한다. 숨김·타인 소유·없음은 동일 404/RESOURCE_UNAVAILABLE “현재 열람할 수 없는 자료입니다.”이다. 비밀번호 미확인이면 Catch 존재를 검사해 알리지 않고 먼저 비밀번호 분기를 적용한다.
 - PublicCatch는 title·근거·기여·초안 상태/본문만 제공한다. reflection·본인 확인/불일치·요청/결과/후보 ID·링크 제목을 내보내지 않는다. 없는 초안은 null로 표현하고 생성된 설명으로 표시하지 않는다.
+- PublicProfile.githubAccountLogin은 링크 소유자의 GitHub 연결이 CONNECTED일 때만 마지막 연결 때 확인해 저장한 계정명이고, REAUTH_REQUIRED·DISCONNECTED·연결 기록 없음은 null이다. 연결 상태값은 내보내지 않으며 null을 미연동으로 표시하지 않는다. 수신자 조회는 연결 상태를 바꾸거나 GitHub·자격정보 보관소를 호출하지 않으므로, 승인 철회나 계정명 변경이 반영되기 전의 저장값일 수 있다. fieldSource(SELF_REPORTED)는 자가 입력 네 항목에만 적용되며 GitHub 계정명은 자가 입력이 아니다.
 - 모든 회원/수신자 응답에 Cache-Control: no-store를 적용한다. web도 응답/본문을 영속 캐시하지 않는다. 열린 화면을 실시간 회수하는 약속은 없으며 목록/상세/새로고침/unlock 등 다음 요청에 현재 권한을 적용한다.
 - 제목은 trim 후 사용자별 ‘stoppedAt 없음 AND 현재 시각 < expiresAt’인 링크 사이에서 유일하고 유효 링크는 최대 5개다. 발급 본문의 제목은 trim 후 1~50자, 선택 비밀번호는 trim·정규화 없이 8~64자이며 글자 수는 유니코드 코드 포인트(DB char_length와 같음)로 센다. 결합 이모지·국기처럼 화면에서 한 글자로 보여도 여러 개로 셀 수 있다. 벗어나면 400/VALIDATION_FAILED다. 같은 회원의 발급 요청이 빈도 상한을 넘으면 회원 인증 다음, 입력 검사·비밀번호 해시·저장보다 먼저 429/RATE_LIMITED로 거부하고 다시 보낼 수 있을 때까지 남은 초를 Retry-After 헤더로 보낸다. 상한 값은 api 설계가 정하며, 거부한 요청은 링크·멱등 기록을 남기지 않아 같은 키로 다시 보낼 수 있다. 429는 요청을 처리하지 않은 것이라 앞선 같은 키 요청의 결과를 알려 주지 않으므로, 응답을 모르던 요청이면 키를 유지하고 Retry-After 뒤 같은 키·같은 본문으로 다시 보낸다. 수신자 unlock의 비밀번호는 길이를 검사하지 않는다(빈 값만 400). 사용자 단위 원자적 판정·생성, 발행 후 30×24시간 고정 만료이며 대표·공개 Catch 수와 무관하게 발급 가능하다. 중단은 자산 상태를 바꾸지 않는다. 중단 PUT의 업무 판정은 200과 404만 쓰고 403·409는 쓰지 않는다(인증 실패 401·서버 오류 500은 회원 경로 공통). 소유 확인을 상태 확인보다 먼저 하며 본인 링크는 첫 중단도 반복 중단도 200으로 현재 ShareLink를 돌려주고(중단은 만료 시각 뒤에도 STOPPED 유지, 만료 링크는 중단 처리 없이 EXPIRED 유지), 타인·없는 링크는 회원 경로 공통 404/RESOURCE_UNAVAILABLE이다.
 
@@ -197,7 +198,7 @@ credentialContextReference는 A/F 계약에서 해석할 작업 맥락의 식별
 | Contract | Question / 담당·시점 | Blocks |
 |---|---|---|
 | OQ-A1 M (결정) | 2026-10-14 반영: 인증 경로·GitHub 앱 종류·쿠키·CORS·CSRF·수명은 「M — 회원 API」, 세션 기준은 [#250 팀장 결정](https://github.com/JminAILab/CatchU/issues/250#issuecomment-6097542703). 남은 것: 운영 도메인·AWS 앞단은 [#212 배포 조건](https://github.com/JminAILab/CatchU/issues/212#issuecomment-6097540881). 로그인 시도·GitHub state를 API 메모리에 두므로 API를 여러 대로 늘리려면 공유 저장소가 먼저 필요 | 운영 배포의 인증 연결. 로컬 연결과 화면 연결(#251)은 가능 |
-| OQ-A2 M/P | 프로필 4항목의 자가 입력/공개 투영과 GitHub 공개 정보 추가 여부: A/2·C/3, PR 영역 리뷰. 미확인 GitHub 항목은 현재 응답에 넣지 않음 | 실제 공개 프로필 제공 전 확인; 새로운 공개 항목은 계약 수정 |
+| OQ-A2 M/P (검토 중) | 프로필 4항목의 자가 입력/공개 투영과 GitHub 공개 정보: A/2·C/3, PR 영역 리뷰. GitHub 계정 공개 필드는 A 제안인 `githubAccountLogin`과 상태별 값·출처 설명으로 계약 수정안(#151)을 검토 중이며, 계약 결정은 그 수정안의 리뷰로 정한다. 공급자 필드 반영·수신 응답 연결·제품 경로 검증은 계약 결정과 별도로 남는다. 소유 회원 비활성·없음의 수신 응답은 이 항목에 포함하지 않는다 | 실제 공개 프로필 제공 전 확인; 새로운 공개 항목은 계약 수정 |
 | OQ-F1 W (보존·전송 결정) | 2026-10-06 팀장 결정([#23](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)): F 결과는 E에 보낸 뒤 보존·재전달하지 않으며 전송은 #77 판정을 따른다. 남은 것은 A/F 자격정보 제공의 상세: F/H/1·A/E/2, 실제 worker 연결 전 | 실제 수집. 메시지/가짜 생성기에는 영향 없음 |
 | OQ-F2 W/B | workIdentity·묶음 동일성 판별의 함수/충돌 검증: F/1 제안, B/4·E/2 리뷰, 실제 등록 연결 전 | 동일 작업 중복 방지의 실제 판정; v1 식별 필드/동작 규칙 유지 |
 | OQ-B1 M/W (결정) | 2026-09-24 팀장 결정: B 등록(Catch·근거·등록 연결)과 E 반영 완료 기록을 한 트랜잭션으로 저장한다. 수신 기록은 그 전에 E가 저장한다. 등록 함수의 입출력과 테이블 생성 순서는 E↔B 등록 개발 이슈에서 정한다. | 트랜잭션 경계 확정. 실제 등록 연결의 함수 입출력·테이블 생성 순서는 개발 이슈에서 보완; 계약·ERD 관계와 유일성 유지 |
