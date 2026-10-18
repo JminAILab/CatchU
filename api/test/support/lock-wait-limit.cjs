@@ -12,8 +12,12 @@ const APP_LOCK_TIMEOUT_MS = 3000;
 const LOCK_NOT_AVAILABLE = '55P03';
 const ROLE_PREFIX = 'catchu_t220_';
 const NO_ROLE_PRIVILEGE = '테스트 DB 계정에 역할 생성 권한이 없어 시험 전용 앱 계정을 만들지 못했다';
-// 잠금을 쥐는 시험 연결은 상한 없이 기다리는 쪽이다. 다만 시험이 멈추지 않도록 그 트랜잭션에만 넉넉한 상한을 둔다.
+// 잠금을 쥐는 시험 연결(테스트 DB 계정)에는 계정 상한이 없다. 그 연결이 잠금을 얻으려고 기다릴 때 멈추지 않도록 그 트랜잭션에만
+// 넉넉한 상한을 둔다. 이 상한은 이미 얻은 잠금을 풀지 않으며, 쥔 잠금은 release()나 cleanUpLocks()가 푼다.
 const HOLDER_LOCK_TIMEOUT = '20s';
+// cleanUpLocks()가 시험이 시작한 작업을 기다리는 한도. 앱 계정의 잠금 대기(3초)·시험 HTTP 요청 한도(15~20초)·
+// 잠금을 얻으려는 시험 연결의 상한(20초)보다 길다.
+const CLEANUP_WAIT_MS = 30000;
 
 const quote = name => `"${name.replaceAll('"', '""')}"`;
 const sleep = ms => new Promise(done => setTimeout(done, ms));
@@ -93,31 +97,75 @@ async function withAppAccount(roles, create) {
   }
 }
 
+// 시험이 쥔 잠금 연결과 아직 끝나지 않은 작업(hold()·timed()). 대기 확인이나 검사가 실패해 시험이 release() 전에 끝나도
+// 각 시험 파일의 afterEach가 cleanUpLocks()로 잠금을 풀고 작업이 끝나기를 기다려, 다음 시험의 자료 정리(TRUNCATE)와
+// 연결 종료(db.destroy())가 남은 잠금에 막히지 않는다.
+const holders = new Set();
+const pending = new Set();
+function follow(promise) {
+  pending.add(promise);
+  const forget = () => { pending.delete(promise); };
+  promise.then(forget, forget);
+  return promise;
+}
+
 /** 다른 연결이 잠금을 쥐고 있게 한다. sql은 그 트랜잭션 안에서 실행할 잠금 SQL이다. release()로 끝내고 보유 시간(ms)을 받는다. */
-async function hold(db, sql, params = []) {
-  const runner = db.createQueryRunner();
-  await runner.connect();
-  try {
-    await runner.startTransaction('READ COMMITTED');
-    await runner.query(`SET LOCAL lock_timeout = '${HOLDER_LOCK_TIMEOUT}'`);
-    const [{ pid }] = await runner.query('SELECT pg_backend_pid() AS pid');
-    await runner.query(sql, params);
+function hold(db, sql, params = []) {
+  return follow((async () => {
+    const runner = db.createQueryRunner();
+    await runner.connect();
+    let pid;
+    try {
+      await runner.startTransaction('READ COMMITTED');
+      await runner.query(`SET LOCAL lock_timeout = '${HOLDER_LOCK_TIMEOUT}'`);
+      pid = (await runner.query('SELECT pg_backend_pid() AS pid'))[0].pid;
+      await runner.query(sql, params);
+    } catch (error) {
+      try { if (runner.isTransactionActive) await runner.rollbackTransaction(); } finally { await runner.release(); }
+      throw error;
+    }
     const acquiredAt = Date.now();
-    let released = false;
-    return {
+    let released;
+    const held = {
       pid, acquiredAt,
-      async release() {
-        if (released) return Date.now() - acquiredAt;
-        released = true;
-        try { await runner.rollbackTransaction(); } finally { await runner.release(); }
-        return Date.now() - acquiredAt;
+      /** 롤백하고 연결을 돌려준다. 여러 번 불러도 한 번만 풀고 같은 보유 시간을 준다. */
+      release() {
+        released ??= (async () => {
+          try { await runner.rollbackTransaction(); } finally {
+            holders.delete(held);
+            await runner.release();
+          }
+          return Date.now() - acquiredAt;
+        })();
+        return released;
       },
     };
-  } catch (error) {
-    if (runner.isTransactionActive) await runner.rollbackTransaction();
-    await runner.release();
-    throw error;
-  }
+    holders.add(held);
+    return held;
+  })());
+}
+
+/**
+ * 각 시험 파일의 afterEach에서 부른다. 남은 잠금 연결을 롤백·반납하고, 시작한 작업(그 잠금을 기다리던 요청, 아직 잠금을
+ * 얻는 중인 hold())이 끝나기를 기다린 뒤 그 사이 얻은 잠금도 푼다. 작업이 한도 안에 끝나지 않거나 반납이 실패하면 던진다.
+ */
+async function cleanUpLocks() {
+  const failures = [];
+  const releaseAll = async () => {
+    for (const outcome of await Promise.allSettled([...holders].map(held => held.release()))) {
+      if (outcome.status === 'rejected') failures.push(outcome.reason);
+    }
+  };
+  await releaseAll();
+  let timer;
+  const settled = await Promise.race([
+    Promise.allSettled([...pending]).then(() => true),
+    new Promise(done => { timer = setTimeout(done, CLEANUP_WAIT_MS, false); }),
+  ]);
+  clearTimeout(timer);
+  await releaseAll();
+  if (!settled) failures.push(new Error(`시험이 시작한 작업 ${pending.size}건이 ${CLEANUP_WAIT_MS}ms 안에 끝나지 않았다`));
+  if (failures.length > 0) throw new AggregateError(failures, '시험이 쥔 잠금이나 시작한 작업을 정리하지 못했다');
 }
 const holdAdvisory = (db, text) => hold(db, 'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [text]);
 const holdRow = (db, table, column, value) =>
@@ -147,15 +195,17 @@ async function waitUntilWaiting(db, count, except = [], label = '잠금 대기',
   return assert.fail(`${label}: 잠금을 기다리는 연결이 ${timeoutMs}ms 안에 ${count}개가 되지 않았다`);
 }
 
-/** 성공·실패와 걸린 시간을 함께 돌려준다. 실패를 삼키지 않고 값으로 넘겨 시험에서 판정한다. */
-async function timed(work) {
-  const started = Date.now();
-  try {
-    const value = await work();
-    return { ok: true, value, ms: Date.now() - started };
-  } catch (error) {
-    return { ok: false, error, ms: Date.now() - started };
-  }
+/** 성공·실패와 걸린 시간을 함께 돌려준다. 실패를 삼키지 않고 값으로 넘겨 시험에서 판정한다. 끝나기 전에는 정리 대상이다. */
+function timed(work) {
+  return follow((async () => {
+    const started = Date.now();
+    try {
+      const value = await work();
+      return { ok: true, value, ms: Date.now() - started };
+    } catch (error) {
+      return { ok: false, error, ms: Date.now() - started };
+    }
+  })());
 }
 
 const driverCode = error => error?.driverError?.code ?? error?.code;
@@ -184,6 +234,6 @@ function summarize(values) {
 
 module.exports = {
   APP_LOCK_TIMEOUT, APP_LOCK_TIMEOUT_MS, LOCK_NOT_AVAILABLE, NO_ROLE_PRIVILEGE, ROLE_PREFIX,
-  assertCapWait, assertQueuedCapWait, canCreateRoles, createLockWaitRoles, driverCode, hold, holdAdvisory, holdRow,
+  assertCapWait, assertQueuedCapWait, canCreateRoles, cleanUpLocks, createLockWaitRoles, driverCode, hold, holdAdvisory, holdRow,
   sleep, summarize, timed, waitUntilBlocked, waitUntilWaiting, withAppAccount,
 };

@@ -1,7 +1,7 @@
 require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { randomBytes, randomUUID } = require('node:crypto');
-const { after, before, beforeEach, test } = require('node:test');
+const { after, afterEach, before, beforeEach, test } = require('node:test');
 const { NestFactory } = require('@nestjs/core');
 const { DataSource } = require('typeorm');
 const { decodeJwt } = require('jose');
@@ -12,7 +12,7 @@ const { GoogleLoginService } = require('../../dist/google-login/google-login.ser
 const { DEV_LOGIN_IDENTITY_PREFIX, GOOGLE_IDENTITY_PREFIX } = require('../../dist/member-analysis/member-kind');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
-  APP_LOCK_TIMEOUT, APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, createLockWaitRoles,
+  APP_LOCK_TIMEOUT, APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, cleanUpLocks, createLockWaitRoles,
   holdAdvisory, holdRow, sleep, summarize, timed, waitUntilBlocked, withAppAccount,
 } = require('../support/lock-wait-limit.cjs');
 const { defineShareLinkLockCases } = require('../support/share-link-lock-cases.cjs');
@@ -56,6 +56,8 @@ after(async () => {
   }
 });
 beforeEach(async () => { await resetTestDatabase(db); logs.length = 0; });
+// 대기 확인이나 검사가 실패해 시험이 잠금을 풀기 전에 끝나도, 다음 시험 전에 잠금을 풀고 시작한 요청이 끝나기를 기다린다.
+afterEach(() => cleanUpLocks());
 
 /** 계정 생성 권한이 없는 환경에서는 이유를 남기고 건너뛴다(CI에서는 createLockWaitRoles가 실패시킨다). */
 function ready(t) {

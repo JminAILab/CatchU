@@ -4,7 +4,7 @@ const { randomBytes, randomUUID } = require('node:crypto');
 const { mkdtemp, rm } = require('node:fs/promises');
 const { join } = require('node:path');
 const { tmpdir } = require('node:os');
-const { after, before, beforeEach, test } = require('node:test');
+const { after, afterEach, before, beforeEach, test } = require('node:test');
 const { Module } = require('@nestjs/common');
 const { NestFactory } = require('@nestjs/core');
 const { decodeJwt } = require('jose');
@@ -16,7 +16,7 @@ const { GitHubClient, GitHubAccessToken } = require('../../dist/github-connectio
 const { insertInitialAnalysis } = require('../../dist/member-analysis/initial-analysis');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
-  APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, createLockWaitRoles, holdRow,
+  APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, cleanUpLocks, createLockWaitRoles, holdRow,
   sleep, summarize, timed, waitUntilBlocked, withAppAccount,
 } = require('../support/lock-wait-limit.cjs');
 
@@ -80,6 +80,8 @@ beforeEach(async () => {
     token: new GitHubAccessToken(FAKE_TOKEN), expiresAt: new Date(Date.now() + 1800000) });
   client.identity = async () => ({ accountLogin: 'context-user', externalAccountReference: '9007199254740993' });
 });
+// 대기 확인이나 검사가 실패해 시험이 잠금을 풀기 전에 끝나도, 다음 시험 전에 잠금을 풀고 시작한 요청이 끝나기를 기다린다.
+afterEach(() => cleanUpLocks());
 
 function ready(t) {
   if (roles) return true;

@@ -21,8 +21,8 @@ const { ResultApplicationService } = require('../../dist/result-application/resu
 const { ANALYSIS_PROCESSING_DEADLINE_MS, AnalysisDeadlineService } = require('../../dist/analysis-deadline/analysis-deadline.service');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
-  APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, assertQueuedCapWait, createLockWaitRoles, hold, holdAdvisory, holdRow,
-  sleep, timed, waitUntilBlocked, waitUntilWaiting, withAppAccount,
+  APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, assertQueuedCapWait, cleanUpLocks, createLockWaitRoles, hold, holdAdvisory,
+  holdRow, sleep, timed, waitUntilBlocked, waitUntilWaiting, withAppAccount,
 } = require('../support/lock-wait-limit.cjs');
 
 // #220: 결과 수신·반영과, 반영 중인 요청에 겹치는 접수 재응답·결과 재전달·진행 알림·시한 닫기의 잠금 대기를
@@ -32,6 +32,7 @@ const {
 // 운영의 받기 소비자는 동시 1이라 한 api 안에서는 결과·진행 알림 수신이 반영과 겹치지 않는다. 반영 중 수신 경쟁은
 // api가 여럿일 때의 경우이고, 접수 재응답(HTTP)과 시한 닫기는 한 api에서도 겹친다.
 // 후보가 많은 합성 결과(40·100·300·500건)의 반영 시간은 이 환경에서 한 번 잰 값이며, 모든 부하에서 3초가 적정하다는 근거가 아니다.
+// 반영과 겹친 경쟁 요청이 모두 성공하는 경우와 상한에서 실패하는 경우는 후보 수별 측정과 따로 조건을 만들어 확인한다.
 
 const SUBMITTED = new Date('2026-10-14T00:00:00.000Z');
 const DEADLINE = new Date(SUBMITTED.getTime() + ANALYSIS_PROCESSING_DEADLINE_MS);
@@ -70,15 +71,8 @@ after(async () => {
   }
 });
 beforeEach(async () => { await resetTestDatabase(db); });
-// 시험 안에서 쥔 잠금과 시작한 작업. 시험이 중간에 실패해도 잠금을 풀고 작업이 끝난 뒤 다음 시험의 자료 정리로 넘어간다.
-const holders = [], inflight = [];
-afterEach(async () => {
-  await Promise.allSettled(holders.splice(0).map(held => held.release()));
-  await Promise.allSettled(inflight.splice(0));
-  await Promise.allSettled(holders.splice(0).map(held => held.release()));
-});
-const track = held => { holders.push(held); return held; };
-const start = promise => { inflight.push(promise); return promise; };
+// 대기 확인이나 검사가 실패해 시험이 잠금을 풀기 전에 끝나도, 다음 시험 전에 잠금을 풀고 시작한 작업이 끝나기를 기다린다.
+afterEach(() => cleanUpLocks());
 
 function ready(t) {
   if (roles) return true;
@@ -186,7 +180,8 @@ const counts = async () => (await db.query(`SELECT (SELECT count(*)::int FROM re
   (SELECT count(*)::int FROM catch_evidence) AS evidence, (SELECT count(*)::int FROM candidate_registration) AS registrations`))[0];
 const NOTHING_REGISTERED = { receipts: 1, protections: 0, catches: 0, evidence: 0, registrations: 0 };
 /** 후보 등록은 작업 정체 순서로 회원·작업 잠금을 잡는다. 마지막 작업의 잠금을 쥐면 앞의 후보를 모두 넣은 뒤 기다린다. */
-const lastWorkLock = result => JSON.stringify([result.memberId, result.candidates.map(c => c.workIdentity).sort().at(-1)]);
+const workLocks = result => result.candidates.map(c => c.workIdentity).sort().map(work => JSON.stringify([result.memberId, work]));
+const lastWorkLock = result => workLocks(result).at(-1);
 /** 기존 계약의 후속: 같은 결과의 재전달은 수신 확인만 하고 자동 재반영하지 않는다. */
 async function assertNoReapply(result) {
   const before = await stored(result);
@@ -208,7 +203,7 @@ test('결과 수신: 요청 행을 3초 넘게 쥔 작업이 있으면 결과·�
   const before = await stored(result);
   const { registration, rejections } = pipeline();
   const receipts = [];
-  const held = track(await holdRow(db, 'analysis_request', 'request_id', result.requestId));
+  const held = await holdRow(db, 'analysis_request', 'request_id', result.requestId);
   let delivered, observed;
   try {
     [delivered, observed] = await Promise.all([
@@ -241,7 +236,7 @@ test('결과 반영 ① 초기 잠금 실패: 반영이 요청 행을 3초 안�
   // 수신이 커밋되고 Receipt를 알린 뒤, 반영 트랜잭션이 요청 행을 잠그기 전에 다른 연결이 그 행을 쥔다.
   const outcome = await timed(() => registration.receiveResult(result, async receipt => {
     assert.equal(receipt.disposition, 'ACCEPTED');
-    held = track(await holdRow(db, 'analysis_request', 'request_id', result.requestId));
+    held = await holdRow(db, 'analysis_request', 'request_id', result.requestId);
   }));
   await held?.release();
   assert.equal(outcome.ok, false);
@@ -274,9 +269,9 @@ test('결과 반영 ② 반영 중 실패: 후보 등록 잠금을 3초 안에 �
   const candidates = 40;
   const result = await prepare(candidates);
   // 같은 회원의 같은 작업을 다른 반영이 등록 중인 상황을 만든다.
-  const held = track(await holdAdvisory(db, lastWorkLock(result)));
+  const held = await holdAdvisory(db, lastWorkLock(result));
   const { registration, failures } = pipeline();
-  const receiving = start(timed(() => registration.receiveResult(result, async () => {})));
+  const receiving = timed(() => registration.receiveResult(result, async () => {}));
   const applyPid = await waitUntilBlocked(db, held.pid, '후보 등록 잠금');
   const [{ granted }] = await db.query(
     "SELECT count(*)::int AS granted FROM pg_locks WHERE pid = $1 AND locktype = 'advisory' AND granted", [applyPid]);
@@ -308,12 +303,12 @@ test('결과 반영 ② 반영 중 실패: 후보 등록 잠금을 3초 안에 �
 test('결과 반영 ③ 실패 기록 중 잠금 실패: 반영 실패 뒤 실패 기록도 요청 행을 3초 안에 얻지 못하면 시도는 PENDING으로 남고, 재반영 없이 시한 판정에서 닫힌다', async t => {
   if (!ready(t)) return;
   const result = await prepare(40);
-  const blocker = track(await holdAdvisory(db, lastWorkLock(result)));
+  const blocker = await holdAdvisory(db, lastWorkLock(result));
   const { registration, failures } = pipeline();
-  const receiving = start(timed(() => registration.receiveResult(result, async () => {})));
+  const receiving = timed(() => registration.receiveResult(result, async () => {}));
   const applyPid = await waitUntilBlocked(db, blocker.pid, '후보 등록 잠금');
   // 반영 트랜잭션이 롤백되면 요청 행을 바로 이어받아, 뒤따르는 실패 기록보다 먼저 쥐는 연결.
-  const takeover = start(hold(db, 'SELECT 1 FROM analysis_request WHERE request_id = $1 FOR UPDATE', [result.requestId]).then(track));
+  const takeover = hold(db, 'SELECT 1 FROM analysis_request WHERE request_id = $1 FOR UPDATE', [result.requestId]);
   await waitUntilBlocked(db, applyPid, '요청 행 이어받기');
   const outcome = await receiving;
   await (await takeover).release();
@@ -342,79 +337,160 @@ test('결과 반영 ③ 실패 기록 중 잠금 실패: 반영 실패 뒤 실�
 
 const REPLAYS = 3;
 const outcomeOf = r => `${r.ok ? '성공' : '실패'} ${r.ms}ms`;
-for (const candidates of [40, 100, 300, 500]) {
-  test(`후보 ${candidates}건 결과 반영: 반영이 요청·시도를 쥔 동안 접수 재응답·결과 재전달·진행 알림은 기다리고 시한 닫기는 건너뛰며, 반영 결과는 그대로다`, async t => {
-    if (!ready(t)) return;
-    const user = await login(`apply-${candidates}`);
-    const body = await consentBody(user);
-    const created = await submit(user, 'apply-key', body);
-    assert.equal(created.status, 202, JSON.stringify(created.body));
-    const result = await resultFor(created.body.requestId, candidates);
-    const received = await pipeline().receiver.receiveResult(result);
-    assert.equal(received.receipt.disposition, 'ACCEPTED');
+/** 접수 API로 요청을 만들고, 후보 count건의 합성 결과를 수신·저장한다(반영 전). */
+async function receivedResult(identity, count) {
+  const user = await login(identity);
+  const body = await consentBody(user);
+  const created = await submit(user, 'apply-key', body);
+  assert.equal(created.status, 202, JSON.stringify(created.body));
+  const result = await resultFor(created.body.requestId, count);
+  const received = await pipeline().receiver.receiveResult(result);
+  assert.equal(received.receipt.disposition, 'ACCEPTED');
+  return { user, body, result, accepted: received.accepted };
+}
+/**
+ * 반영은 요청 → 시도 순서로 잠근다. 시도 행(gate)을 쥐어 반영이 요청 행을 잡고 기다리게 한 뒤, 같은 요청의 접수 재응답
+ * REPLAYS건·결과 재전달·진행 알림을 보내 모두 잠금을 기다리는 것까지 본다. 첫 재응답·재전달·진행 알림은 반영이 쥔
+ * 요청 행에서, 나머지 재응답은 같은 키 잠금에서 기다린다. at.startedAt은 반영이 시도 행에 막힌 것을 보고 경쟁 요청을
+ * 보내기 직전, at.observedAt은 경쟁 요청이 모두 기다리는 것을 본 때, at.appliedAt은 반영이 끝난 때다.
+ */
+async function contend({ user, body, result, accepted }) {
+  const gate = await holdRow(db, 'analysis_attempt', 'attempt_id', result.attemptId);
+  const at = {};
+  const applying = timed(() => applier(result).apply(accepted).finally(() => { at.appliedAt = Date.now(); }));
+  const applyPid = await waitUntilBlocked(db, gate.pid, '반영 시작');
+  const competitors = pipeline();
+  at.startedAt = Date.now();
+  const replays = Array.from({ length: REPLAYS }, () => timed(() => submit(user, 'apply-key', body)));
+  const resend = timed(() => competitors.receiver.receiveResult(result));
+  const progress = timed(() => competitors.receiver.receiveProgress(
+    event({ requestId: result.requestId, attemptId: result.attemptId, state: 'RUNNING' })));
+  await waitUntilWaiting(db, REPLAYS + 2, [applyPid], '반영과 겹친 요청');
+  at.observedAt = Date.now();
+  return { gate, applying, at, competing: { replays, resend, progress } };
+}
+/**
+ * 경쟁 요청마다 결과가 계약에 맞는지 본다. 성공은 반영이 끝난 뒤의 기존 응답이고, 실패는 잠금 하나를 상한만큼 기다린 뒤의
+ * 500(접수 재응답)이나 저장 실패(재전달·진행 알림)다. 시간은 요청 전체 시간이라 잠금 한 번의 대기와 같지 않다
+ * (줄 선 요청은 상한보다 오래 기다린 뒤 성공할 수 있다).
+ */
+async function settle({ replays, resend, progress }, result) {
+  const replayed = await Promise.all(replays);
+  for (const replay of replayed) {
+    replay.ok = replay.value.status === 200;
+    if (replay.ok) assert.equal(replay.value.body.requestId, result.requestId);
+    else {
+      assertInternalError(replay.value, '접수 재응답');
+      assert.ok(replay.ms >= APP_LOCK_TIMEOUT_MS - 100, `접수 재응답 ${replay.ms}ms`);
+    }
+  }
+  const resent = await resend;
+  if (resent.ok) assert.equal(resent.value.receipt.code, 'ALREADY_RECEIVED');
+  else assert.ok(resent.error instanceof ReceiverStorageError && resent.ms >= APP_LOCK_TIMEOUT_MS - 100, `재전달 ${resent.ms}ms`);
+  const observed = await progress;
+  if (observed.ok) assert.equal(observed.value, 'TERMINAL_UNCHANGED');
+  else assert.ok(observed.error instanceof ReceiverStorageError && observed.ms >= APP_LOCK_TIMEOUT_MS - 100, `진행 알림 ${observed.ms}ms`);
+  return { replayed, resent, observed, all: [...replayed, resent, observed] };
+}
+/** 반영 결과는 경쟁과 관계없이 그대로고, 실패한 경쟁 요청은 수신 기록·보호 기록·Catch·근거·등록을 더 남기지 않는다. */
+async function assertApplied(result, candidates) {
+  const { request, attempt } = await stored(result);
+  assert.equal(request.lifecycle, 'CLOSED');
+  assert.equal(attempt.application, 'APPLIED');
+  assert.deepEqual(await counts(), { receipts: 1, protections: 1, catches: candidates, evidence: candidates, registrations: candidates });
+}
 
-    // 반영은 요청 → 시도 순서로 잠근다. 시도 행을 잠깐 쥐어, 반영이 요청 행을 잡은 상태에서 경쟁 요청을 보낸다.
-    const gate = track(await holdRow(db, 'analysis_attempt', 'attempt_id', result.attemptId));
-    let appliedAt;
-    const applying = start(timed(() => applier(result).apply(received.accepted).finally(() => { appliedAt = Date.now(); })));
-    const applyPid = await waitUntilBlocked(db, gate.pid, '반영 시작');
-    const competitors = pipeline();
-    const replays = Array.from({ length: REPLAYS }, () => start(timed(() => submit(user, 'apply-key', body))));
-    const resend = start(timed(() => competitors.receiver.receiveResult(result)));
-    const progress = start(timed(() => competitors.receiver.receiveProgress(
-      event({ requestId: result.requestId, attemptId: result.attemptId, state: 'RUNNING' }))));
-    // 첫 재응답·재전달·진행 알림은 반영이 쥔 요청 행에서, 나머지 재응답은 같은 키 잠금에서 기다린다.
-    await waitUntilWaiting(db, REPLAYS + 2, [applyPid], '반영과 겹친 요청');
+// 후보 수별 측정. 경쟁 요청의 잠금 대기는 보낸 뒤부터 반영이 끝날 때까지 이어질 수 있고, 시도 행을 풀기 전의 사전 조율
+// (대기 확인·시한 닫기)도 그 안에 든다. 그래서 반영 보유만으로는 성공·실패를 가를 수 없어 여기서는 결과마다 계약에 맞는지만 보고,
+// 모두 성공하는 경우와 상한에서 실패하는 경우는 아래 두 시험이 조건을 만들어 확인한다.
+for (const candidates of [40, 100, 300, 500]) {
+  test(`후보 ${candidates}건 결과 반영(측정): 반영이 요청·시도를 쥔 동안 접수 재응답·결과 재전달·진행 알림은 기다리고 시한 닫기는 건너뛰며, 반영 결과는 그대로다`, async t => {
+    if (!ready(t)) return;
+    const prepared = await receivedResult(`apply-${candidates}`, candidates);
+    const { result } = prepared;
+    const { gate, applying, at, competing } = await contend(prepared);
     const closing = await timed(() => deadline(new Date(Date.now() + ANALYSIS_PROCESSING_DEADLINE_MS + 60 * 1000)).service.closeOverdue());
     const releasedAt = Date.now();
     await gate.release();
     const applied = await applying;
-    const holdMs = appliedAt - releasedAt;
+    const holdMs = at.appliedAt - releasedAt;
 
-    assert.equal(applied.ok, true, String(applied.error));
+    // 반영도 사전 조율 동안 시도 행을 기다린다. 그 대기가 상한을 넘으면 반영이 실패하므로 함께 남긴다.
+    assert.equal(applied.ok, true, `반영의 시도 행 대기 ${releasedAt - at.startedAt}ms: ${applied.error}`);
     assert.equal(applied.value.registeredCatchIds.length, candidates);
     assert.deepEqual(closing.value, { closed: 0, failed: 0 });
     assert.ok(closing.ms < 2000, `시한 닫기는 반영을 기다리지 않고 건너뛴다(${closing.ms}ms)`);
-    const replayed = await Promise.all(replays);
-    const resent = await resend;
-    const observed = await progress;
-    // 경쟁 요청은 반영이 끝난 뒤 기존 응답을 받거나, 잠금 하나를 상한만큼 기다린 뒤 실패한다.
-    for (const replay of replayed) {
-      if (replay.value.status === 200) assert.equal(replay.value.body.requestId, result.requestId);
-      else {
-        assertInternalError(replay.value, '접수 재응답');
-        assert.ok(replay.ms >= APP_LOCK_TIMEOUT_MS - 100, `접수 재응답 ${replay.ms}ms`);
-      }
-      replay.ok = replay.value.status === 200;
-    }
-    if (resent.ok) assert.equal(resent.value.receipt.code, 'ALREADY_RECEIVED');
-    else assert.ok(resent.error instanceof ReceiverStorageError && resent.ms >= APP_LOCK_TIMEOUT_MS - 100, `재전달 ${resent.ms}ms`);
-    if (observed.ok) assert.equal(observed.value, 'TERMINAL_UNCHANGED');
-    else assert.ok(observed.error instanceof ReceiverStorageError && observed.ms >= APP_LOCK_TIMEOUT_MS - 100, `진행 알림 ${observed.ms}ms`);
-    // 반영 보유가 상한보다 확실히 짧으면 모두 성공한다. 확실히 길면 반영이 쥔 행을 맨 앞에서 기다린 요청은 실패한다.
-    // 뒤에 줄 선 요청은 앞 요청이 포기한 뒤 다시 기다려(잠금 획득마다 상한) 반영이 끝나면 3초를 넘겨 성공할 수도 있다.
-    if (holdMs < APP_LOCK_TIMEOUT_MS - 500) {
-      assert.ok([...replayed, resent, observed].every(r => r.ok), `보유 ${holdMs}ms인데 실패한 경쟁 요청이 있다`);
-    } else if (holdMs > APP_LOCK_TIMEOUT_MS + 500) {
-      assert.ok([...replayed, resent, observed].some(r => !r.ok), `보유 ${holdMs}ms인데 상한 초과 실패가 없다`);
-    }
-    // 반영 결과는 경쟁과 관계없이 그대로다.
-    const { request, attempt } = await stored(result);
-    assert.equal(request.lifecycle, 'CLOSED');
-    assert.equal(attempt.application, 'APPLIED');
-    assert.deepEqual(await counts(), { receipts: 1, protections: 1, catches: candidates, evidence: candidates, registrations: candidates });
-    t.diagnostic(`후보 ${candidates}건: 반영 보유 ${holdMs}ms, 동시 경쟁 ${REPLAYS + 3}건(접수 재응답 ${REPLAYS}·재전달 1·진행 알림 1·시한 닫기 1)`);
-    t.diagnostic(`  접수 재응답 [${replayed.map(r => `${r.value.status} ${r.ms}ms`).join(', ')}], 재전달 ${outcomeOf(resent)}, ` +
+    const { replayed, resent, observed } = await settle(competing, result);
+    await assertApplied(result, candidates);
+    t.diagnostic(`후보 ${candidates}건: 반영 보유 ${holdMs}ms, 경쟁 요청을 보낸 뒤 반영이 끝나기까지 ${at.appliedAt - at.startedAt}ms, ` +
+      `동시 경쟁 ${REPLAYS + 3}건(접수 재응답 ${REPLAYS}·재전달 1·진행 알림 1·시한 닫기 1)`);
+    t.diagnostic(`  요청 전체 시간: 접수 재응답 [${replayed.map(r => `${r.value.status} ${r.ms}ms`).join(', ')}], 재전달 ${outcomeOf(resent)}, ` +
       `진행 알림 ${outcomeOf(observed)}, 시한 닫기 ${closing.ms}ms에 건너뜀`);
   });
 }
+
+test('결과 반영과 겹친 짧은 대기: 경쟁 요청을 보낸 뒤 반영이 끝나기까지가 상한보다 짧으면 접수 재응답·결과 재전달·진행 알림은 모두 기다린 뒤 성공한다', async t => {
+  if (!ready(t)) return;
+  const prepared = await receivedResult('apply-short', 1);
+  const { result } = prepared;
+  const { gate, applying, at, competing } = await contend(prepared);
+  // 경쟁 요청을 보내고 약 1초 뒤 시도 행을 푼다. 사전 조율이 그보다 길었으면 바로 푼다.
+  await sleep(Math.max(0, at.startedAt + 1000 - Date.now()));
+  await gate.release();
+  const applied = await applying;
+  // 경쟁 요청의 잠금 대기는 보낸 뒤 시작하고, 반영이 끝나면 앞 요청의 짧은 처리만 더 기다린다. 이 구간이 상한보다
+  // 500ms 넘게 짧으면 어느 대기도 상한에 닿지 않는다.
+  const windowMs = at.appliedAt - at.startedAt;
+  assert.ok(windowMs < APP_LOCK_TIMEOUT_MS - 500, `전제: 경쟁 요청을 보낸 뒤 반영이 끝나기까지 ${windowMs}ms가 상한보다 500ms 넘게 짧아야 한다`);
+  assert.equal(applied.ok, true, String(applied.error));
+  const { all } = await settle(competing, result);
+  assert.ok(all.every(r => r.ok), `경쟁 요청을 보낸 뒤 반영이 끝나기까지 ${windowMs}ms인데 실패한 경쟁 요청이 있다`);
+  await assertApplied(result, 1);
+  t.diagnostic(`짧은 대기: 경쟁 요청을 보낸 뒤 반영이 끝나기까지 ${windowMs}ms, 요청 전체 시간 [${all.map(outcomeOf).join(', ')}]`);
+});
+
+test('결과 반영과 겹친 상한 초과: 반영이 잠금마다 상한보다 짧게 기다리며 요청 행을 상한보다 오래 쥐면 맨 앞에서 기다린 경쟁 요청은 상한에서 실패하고, 반영은 성공하며 실패한 요청은 기록을 남기지 않는다', async t => {
+  if (!ready(t)) return;
+  const prepared = await receivedResult('apply-cap', 2);
+  const { result } = prepared;
+  // 반영은 요청 행을 쥔 채 시도 행 → 첫 작업 → 마지막 작업 잠금을 차례로 기다린다. 두 작업 잠금은 미리 쥐어 둔다.
+  const [firstWork, lastWork] = await Promise.all(workLocks(result).map(text => holdAdvisory(db, text)));
+  const { gate, applying, at, competing } = await contend(prepared);
+  const gateMs = Date.now() - at.startedAt;
+  await gate.release();
+  // 작업 잠금은 반영이 막힌 것을 본 뒤 2초씩 쥐고 푼다. 반영의 대기는 매번 상한보다 짧고, 요청 행 보유는 그 합만큼 길어진다.
+  const workMs = [];
+  for (const [held, label] of [[firstWork, '첫 작업 잠금'], [lastWork, '마지막 작업 잠금']]) {
+    await waitUntilBlocked(db, held.pid, label);
+    const blockedAt = Date.now();
+    await sleep(2000);
+    workMs.push(Date.now() - blockedAt);
+    await held.release();
+  }
+  const applied = await applying;
+  // 반영의 잠금 대기는 매번 상한보다 짧아 반영은 성공한다(시도 행 대기는 사전 조율 시간이라 함께 남긴다).
+  assert.equal(applied.ok, true, `반영의 잠금 대기 시도 행 ${gateMs}ms·작업 ${workMs.join('ms·')}ms: ${applied.error}`);
+  assert.equal(applied.value.registeredCatchIds.length, 2);
+  // 맨 앞에서 기다린 경쟁 요청은 모두 기다리는 것을 보기 전에 반영을 기다리기 시작했고 반영이 끝나야 행을 얻으므로,
+  // 그 잠금 대기는 이 구간보다 길다. 이 구간이 상한보다 500ms 넘게 길면 그 요청은 상한에 닿는다.
+  const headWaitMs = at.appliedAt - at.observedAt;
+  assert.ok(headWaitMs > APP_LOCK_TIMEOUT_MS + 500, `전제: 경쟁 요청이 모두 기다리는 것을 본 뒤 반영이 끝나기까지 ${headWaitMs}ms가 상한보다 500ms 넘게 길어야 한다`);
+  const { all } = await settle(competing, result);
+  assert.ok(all.some(r => !r.ok), `맨 앞의 잠금 대기가 ${headWaitMs}ms보다 긴데 상한 초과 실패가 없다`);
+  await assertApplied(result, 2);
+  const [{ requests, records }] = await db.query(`SELECT (SELECT count(*)::int FROM analysis_request) AS requests,
+    (SELECT count(*)::int FROM idempotency_record) AS records`);
+  assert.deepEqual({ requests, records }, { requests: 1, records: 1 }, '실패한 접수 재응답은 요청·멱등 기록을 더 남기지 않는다');
+  t.diagnostic(`상한 초과: 반영의 잠금 대기 시도 행 ${gateMs}ms·작업 ${workMs.join('ms·')}ms, 경쟁 요청이 모두 기다리는 것을 본 뒤 ` +
+    `반영이 끝나기까지 ${headWaitMs}ms, 요청 전체 시간 [${all.map(outcomeOf).join(', ')}]`);
+});
 
 test('시한 닫기: 요청을 잡은 뒤 시도 행을 기다리며, 짧은 보유는 기다려 닫고 3초를 넘기면 그 요청만 실패로 세고 다음 판정에서 닫는다', async t => {
   if (!ready(t)) return;
   // 제품 경로는 시도보다 요청을 먼저 잠그므로 시도 행만 쥔 연결은 이 시험에서만 만든다. 닫기가 기다리는 곳은 여기뿐이다.
   const waiting = await prepare();
-  let held = track(await holdRow(db, 'analysis_attempt', 'attempt_id', waiting.attemptId));
-  const pending = start(timed(() => deadline(DEADLINE).service.closeOverdue()));
+  let held = await holdRow(db, 'analysis_attempt', 'attempt_id', waiting.attemptId);
+  const pending = timed(() => deadline(DEADLINE).service.closeOverdue());
   await waitUntilBlocked(db, held.pid, '시한 닫기');
   await sleep(1000);
   const heldMs = await held.release();
@@ -423,7 +499,7 @@ test('시한 닫기: 요청을 잡은 뒤 시도 행을 기다리며, 짧은 보
   assert.ok(closed.ms >= 900 && closed.ms < APP_LOCK_TIMEOUT_MS, `보유 ${heldMs}ms 뒤 닫았다(${closed.ms}ms)`);
 
   const forced = await prepare();
-  held = track(await holdRow(db, 'analysis_attempt', 'attempt_id', forced.attemptId));
+  held = await holdRow(db, 'analysis_attempt', 'attempt_id', forced.attemptId);
   const { service, logs } = deadline(DEADLINE);
   let failed;
   try { failed = await timed(() => service.closeOverdue()); } finally { await held.release(); }
