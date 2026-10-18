@@ -46,7 +46,7 @@
 
 ```json
 {"commits":[{"id":"c1","files":[{"id":"c1f1","path":"src/auth.ts","status":"modified",
-  "lines":[{"id":"c1f1:L4","change":"added","text":"const loginRateLimit = 5;"},
+  "lines":[{"id":"c1f1:L4","change":"added","text":"const loginRateLimit = 5;","names":["const","loginRateLimit"]},
            {"id":"c1f1:L6","change":"added","text":"API_KEY = [MASKED]","selectable":false}]}]}]}
 ```
 
@@ -60,6 +60,7 @@
 
 - 설명 조각은 1~3개다. `ADDED_LINE_WITH`(추가 줄)·`REMOVED_LINE_WITH`(삭제 줄)는 줄과 그 줄의 코드 이름을, `FILE_STATUS`는 파일을 가리킨다. 질문은 1~3개이고 종류(`BACKGROUND`·`ALTERNATIVES`·`VERIFICATION`)가 서로 달라야 하며, 줄+이름 또는 파일을 가리킨다. 질문이 조각 번호가 아니라 줄을 직접 가리키므로 설명 실패와 질문 실패는 서로를 지우지 않는다.
 - 코드 이름은 영문자·숫자·밑줄·`$`로 된 식별자 하나(영문자 하나 이상, 64자 이하)이고, 지목한 줄에 **식별자 경계로** 있어야 한다. 부분 문자열로 보면 `limit`이 `loginRateLimit`에, `func_1`이 `func_10`에 묻어 확인된다. 경계는 유니코드로 본다. 이름 바로 앞뒤에 한글 등 다른 글자·숫자·밑줄·`$`·결합 문자가 붙어 있으면 다른 식별자의 일부일 수 있어 확인하지 않는다(`한글limit`의 `limit`, 한글 조사가 바로 붙은 「limit을」). 이 제한은 공백·백틱·주소·명령문이 이름으로 새는 통로를 막지만, 모든 프롬프트 주입을 막는다는 뜻은 아니다.
+- 고를 수 있는 줄에는 이 규칙으로 확인되는 이름을 나온 순서대로 최대 12개 `names`에 실어 보내고, 지시문은 그 가운데서 고르게 한다(2026-10-18 팀장 결정: 로컬 실제 연결의 검증 실패 대부분이 '이름이 그 줄에 없음'·'이름 모양 위반'이었다, [생성 호출 한도와 운영 로그 「모델」](generation-limits.md#모델)). 이름이 없는 줄에는 칸을 두지 않는다. 목록은 안내일 뿐 판정은 위 규칙 그대로다(`app/generation/names.py`).
 - 지목은 그 호출에서 **보낸** 줄·파일만 받는다. 문맥 줄, 보내지 않은 줄, 다른 후보·다른 계정 커밋·커밋 메시지·PR 글은 보낸 자료에 없으므로 지목할 수 없다.
 
 | 응답 문제 | 처리 |
@@ -166,7 +167,7 @@
 
 ## 알려진 한계
 
-- 합성 제공자로만 확인했다. 실제 모델이 고르는 조각·질문의 품질, 생성 품질 제약 C01(문맥 줄을 이번 변경으로 잘못 귀속한 결함)에 대한 영향, 실제 제공자의 시간 제한·출력 상한 강제는 확인하지 않았다(#120 품질 확인 단계).
+- 실제 모델 결과는 2026-10-16~18 로컬 시험대에서 팀장 저장소 3개로만 봤다([생성 호출 한도와 운영 로그 「모델」](generation-limits.md#모델)). 생성 품질 제약 C01(문맥 줄을 이번 변경으로 잘못 귀속한 결함)에 대한 영향과 실제 서비스 결과의 품질 판정은 [#122](https://github.com/JminAILab/CatchU/issues/122)다.
 - 문장 틀은 이름이 줄에 있다는 것만 말한다. 이름이 주석 안에 있어도 "포함된 줄"은 사실이지만, 그 줄이 무엇을 하는지는 말하지 않는다.
 - 코드 이름은 ASCII 식별자만 받는다. 한글 변수 이름 등은 이름으로 고를 수 없어 파일 조각을 고르거나 실패한다. 한글 조사가 바로 붙은 이름(「limit을」)이 든 주석·문서 줄에서도 그 이름을 고를 수 없다.
 - 가리기는 정규식이다. 따옴표 없는 소문자 대입(`password = hunter2`, YAML `password: …`·`secret_key_base: …`), 점 이름 설정(`spring.datasource.password=…`), `curl -u 사용자:비밀번호`, 띄어 쓰거나 국제 표기한 전화번호·하이픈 없는 주민번호는 놓친다. 같은 값을 다른 줄에서 가리는 것도 한 줄에서 꼴로 알아본 값에만 적용된다. `git@github.com`·`logo@2x.png`·`tokenizer = "bert"`·`MAX_TOKENS = 4096`·인증서·공개 키 내용 줄은 잘못 가린다. 잘못 가린 줄은 고를 수 없어 재료가 줄어들 뿐 값이 새지는 않는다. 알려진 경우는 시험으로 고정했다.
@@ -178,7 +179,7 @@
 
 | 남은 일 | 시작 조건 |
 |---|---|
-| 실제 API 호출 확인(응답 시간·토큰·실제 결과 기록)과 개발용 모델 품질 시험. 어댑터 쪽 남은 일은 [생성의 실제 제공자 「남은 확인」](generation-provider.md#남은-확인) | 팀장의 호출 허가(자료 범위·비용 한도). 실제 회원 자료는 [#138](https://github.com/JminAILab/CatchU/issues/138) 고지와 [#37](https://github.com/JminAILab/CatchU/issues/37) 조건 뒤 |
+| 어댑터 쪽 남은 일([생성의 실제 제공자 「남은 확인」](generation-provider.md#남은-확인)). 실제 API 호출 확인과 모델 비교는 2026-10-16~18 로컬 시험대에서 했다 | 실제 회원 자료는 [#138](https://github.com/JminAILab/CatchU/issues/138) 고지와 [#37](https://github.com/JminAILab/CatchU/issues/37) 조건 뒤 |
 | 처리 순서에 수집·후보·생성·큐·E 전달 연결, 요청 전체 마감 | [#121](https://github.com/JminAILab/CatchU/issues/121)(선행 #117·#233) |
 | 결과에 제목 null 그대로 보내기(결과 조합의 임시 대체값 제거) | B·C·E의 null 수용([결정 문서 「담당과 순서」](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#담당과-순서) ③). B 회원 화면([#274](https://github.com/JminAILab/CatchU/pull/274))·B 서버와 E([#272](https://github.com/JminAILab/CatchU/pull/272))는 dev에 병합됐고 C 수신자 화면([#152](https://github.com/JminAILab/CatchU/issues/152))이 남았다 |
 | 실제 결과의 품질 판정 | 허용 자료·모델의 실제 결과로 C01 영향을 평가하고 [#122](https://github.com/JminAILab/CatchU/issues/122) 검수와 연결 |

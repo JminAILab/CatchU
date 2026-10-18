@@ -12,12 +12,11 @@
 """
 
 import json
-import re
-import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from app.generation.names import NameMatch, name_match, valid_name
 from app.generation.request import PreparedFile, PreparedLine
 
 FragmentKind = Literal["ADDED_LINE_WITH", "REMOVED_LINE_WITH", "FILE_STATUS"]
@@ -33,7 +32,6 @@ _QUESTION_TYPES: tuple[QuestionType, ...] = (
     "VERIFICATION",
 )
 TOP_LEVEL_KEYS = frozenset({"fragments", "title", "questions"})
-_NAME = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
 
 
 class Unreadable(Exception):
@@ -77,52 +75,6 @@ def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
             return _Duplicated(pairs)
         found[key] = value
     return found
-
-
-def valid_name(name: object, max_chars: int) -> bool:
-    """코드 이름 모양: 식별자 글자만, 영문자 하나 이상, 길이 상한 안. 공백·백틱·주소·명령문은 거부."""
-    return (
-        isinstance(name, str)
-        and len(name) <= max_chars
-        and _NAME.fullmatch(name) is not None
-        and any(char.isalpha() for char in name)
-    )
-
-
-def _joins(char: str) -> bool:
-    """이름에 이어 붙어 한 식별자가 되는 글자: 유니코드 글자·숫자, 밑줄, $, 결합 문자."""
-    return char.isalnum() or char in "_$" or unicodedata.category(char).startswith("M")
-
-
-NameMatch = Literal["FOUND", "JOINED_ASCII", "JOINED_NON_ASCII", "MISSING"]
-
-
-def name_match(name: str, text: str) -> NameMatch:
-    """식별자 경계로 일치하는가. `limit`이 `loginRateLimit`에, `func_1`이 `func_10`에, `한글limit`에 묻어
-    확인되지 않는다. 한글 조사가 바로 붙은 이름(「limit을」)도 한 덩어리라 확인하지 않는다.
-
-    경계로 일치하는 곳이 없을 때 붙어서만 나오면, 붙은 글자에 ASCII 밖 글자(한글 등)가 하나라도 있으면
-    JOINED_NON_ASCII, 아니면 JOINED_ASCII다(실패 원인 건수용, 판정은 같다)."""
-    found_joined = False
-    non_ascii = False
-    start = text.find(name)
-    while start >= 0:
-        end = start + len(name)
-        before = text[start - 1] if start > 0 else ""
-        after = text[end] if end < len(text) else ""
-        joined = [char for char in (before, after) if char and _joins(char)]
-        if not joined:
-            return "FOUND"
-        found_joined = True
-        non_ascii = non_ascii or any(not char.isascii() for char in joined)
-        start = text.find(name, start + 1)
-    if not found_joined:
-        return "MISSING"
-    return "JOINED_NON_ASCII" if non_ascii else "JOINED_ASCII"
-
-
-def name_in(name: str, text: str) -> bool:
-    return name_match(name, text) == "FOUND"
 
 
 # 부분 판정 결과

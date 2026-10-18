@@ -49,7 +49,7 @@ from generation_scenarios import (
 from github_synthetic import EVIL, INJECTION, MEMBER, OTHER, sha
 
 from app.generation import ProviderRequest
-from app.generation.response import name_in, name_match
+from app.generation.names import line_names, name_in, name_match
 from app.processing import CheckedRequest, EligibleCandidate
 
 # 커밋 묶음 후보(PR 조회 없이 본인 커밋 하나가 한 작업)로 돌린다. PR이 필요한 사례만 LIVE 기본값을 쓴다.
@@ -1851,3 +1851,62 @@ def test_citing_part_of_a_unicode_identifier_is_rejected() -> None:
     assert generated.title is None
     joined = one("NAME_JOINED_NON_ASCII")
     assert reasons(case) == (Counter(), joined, joined)
+
+
+# 줄마다 고를 수 있는 이름 목록(2026-10-18 팀장 결정, generation.md 「응답과 판정」)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("const loginRateLimit = 5;", ("const", "loginRateLimit")),
+        ("self.count += dp[i]", ("self", "count", "dp", "i")),
+        ("$limit = rate_limit", ("$limit", "rate_limit")),
+        # 다른 글자와 붙은 덩어리·숫자로 시작하는 것은 담지 않는다.
+        ("한글limit = 5px", ()),
+        ("# limit을 늘렸다", ()),
+        ("limit́ = 5", ()),
+        # 겹치면 처음 나온 하나만.
+        ("a = a + b", ("a", "b")),
+    ],
+)
+def test_line_names_lists_only_names_that_pass_the_line_check(
+    text: str, expected: tuple[str, ...]
+) -> None:
+    """목록의 이름은 모두 그 줄에서 식별자 경계로 확인된다. 그래서 모델이 목록에서 고르면 이름 확인을 통과한다."""
+    names = line_names(text, max_chars=64, limit=12)
+
+    assert names == expected
+    assert all(name_in(name, text) for name in names)
+
+
+def test_line_names_keeps_the_first_names_up_to_the_limit() -> None:
+    text = " ".join(f"name{index:02d}" for index in range(15))
+
+    assert line_names(text, max_chars=64, limit=12) == tuple(
+        f"name{index:02d}" for index in range(12)
+    )
+    # 상한을 넘는 긴 이름은 모양 위반이라 담지 않는다.
+    assert line_names("x" * 65 + " ok", max_chars=64, limit=12) == ("ok",)
+
+
+def test_selectable_lines_carry_their_names_and_masked_lines_do_not() -> None:
+    """보내는 자료의 고를 수 있는 줄에는 `names`가 붙고, 가린 줄에는 붙지 않는다. 지시문은 그 목록에서 고르게 한다."""
+    secret = fake_token()
+    case = run(_client_reply(), masked_scenario(secret))
+
+    request = first_request(case)
+    raw = {
+        line["id"]: line
+        for commit in json.loads(request.data)["commits"]
+        for file in commit["files"]
+        for line in file["lines"]
+    }
+    hidden = raw[masked_line(request).id]
+    assert "names" not in hidden
+    assert hidden["selectable"] is False
+    shown = raw[client(request).id]
+    assert "clientName" in shown["names"]
+    assert all(name_in(name, shown["text"]) for name in shown["names"])
+    assert "names 가운데 하나를 글자 그대로" in request.instructions
+    assert_nowhere(secret, provider=case.provider, result=case.result)

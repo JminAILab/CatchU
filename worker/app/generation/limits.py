@@ -37,6 +37,8 @@ class GenerationLimits:
     max_title_chars: int = 40
     max_question_chars: int = 150
     max_name_chars: int = 64
+    # 줄마다 싣는 고를 수 있는 이름 수(나온 순서대로). 실측 전 제안값이다.
+    max_names_per_line: int = 12
 
     def __post_init__(self) -> None:
         counts = (
@@ -50,6 +52,7 @@ class GenerationLimits:
             self.max_title_chars,
             self.max_question_chars,
             self.max_name_chars,
+            self.max_names_per_line,
         )
         if any(value < 0 for value in counts):
             raise ValueError("상한은 0 이상이어야 한다")

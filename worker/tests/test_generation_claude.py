@@ -210,10 +210,10 @@ def assert_detached(error: BaseException) -> None:
 def test_normal_response_returns_text_with_fixed_settings(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """정상 응답의 글만 돌려준다. 요청은 고정 주소·지시문과 자료 분리·Haiku 5.5·생각 끔·미국 처리·
-    최대 출력 4,000 토큰·압축하지 않은 응답·호출 시간 제한 45초로 한 번 나간다. 운영 로그에는 모델 ID·토큰
-    사용량만 남는다."""
-    api = FakeApi(message())
+    """정상 응답의 글만 돌려준다. 요청은 고정 주소·지시문과 자료 분리·생성 호출 기본 모델 Sonnet 5.5(2026-10-18
+    팀장 결정)·생각 끔(`between_tools`)·미국 처리·최대 출력 4,000 토큰·압축하지 않은 응답·호출 시간 제한
+    45초로 한 번 나간다. 운영 로그에는 모델 ID·토큰 사용량만 남는다."""
+    api = FakeApi(message(model="claude-sonnet-5-5"))
 
     with caplog.at_level(logging.INFO, logger="app.generation.claude"):
         text = api.provider().complete(call())
@@ -226,11 +226,11 @@ def test_normal_response_returns_text_with_fixed_settings(
     assert "authorization" not in sent.headers
     assert sent.headers["accept-encoding"] == "identity"
     assert api.body() == {
-        "model": "claude-haiku-5-5",
+        "model": "claude-sonnet-5-5",
         "max_tokens": 4_000,
         "system": INSTRUCTIONS,
         "messages": [{"role": "user", "content": DATA}],
-        "thinking": {"type": "disabled"},
+        "thinking": {"type": "between_tools"},
         "inference_geo": "us",
     }
     assert sent.extensions["timeout"] == {
@@ -239,7 +239,7 @@ def test_normal_response_returns_text_with_fixed_settings(
         "write": 45.0,
         "pool": 45.0,
     }
-    assert "model=claude-haiku-5-5" in caplog.text
+    assert "model=claude-sonnet-5-5" in caplog.text
     assert "stopReason=end_turn" in caplog.text
     assert "inputTokens=1234 outputTokens=56 inferenceGeo=us" in caplog.text
     assert "requestId=req_synthetic_ok" in caplog.text
@@ -279,14 +279,16 @@ def test_max_tokens_is_at_least_4000(max_output: int, max_tokens: int) -> None:
 @pytest.mark.parametrize(
     ("models", "generate", "rewrite"),
     [
+        # 기본: 생성 호출 Sonnet 5.5(2026-10-18 팀장 결정), 제목 고쳐 쓰기 Haiku 5.5(#119 결정).
+        (ClaudeModels(), "claude-sonnet-5-5", "claude-haiku-5-5"),
         (
-            ClaudeModels(generate="claude-sonnet-5-5"),
-            "claude-sonnet-5-5",
+            ClaudeModels(generate="claude-haiku-5-5"),
+            "claude-haiku-5-5",
             "claude-haiku-5-5",
         ),
         (
             ClaudeModels(rewrite_title="claude-sonnet-5-5"),
-            "claude-haiku-5-5",
+            "claude-sonnet-5-5",
             "claude-sonnet-5-5",
         ),
     ],
