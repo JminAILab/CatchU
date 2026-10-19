@@ -40,12 +40,20 @@ show_evidence() {
 catchu_require_tools aws jq
 catchu_guard_aws
 
+# 큐 비밀번호 원본. 큐가 이미 있어도 api·worker 접속 값을 만들려면 있어야 하므로 먼저 본다.
+n=$(catchu_count "SSM ${token_parameter}" ssm describe-parameters --parameter-filters "Key=Name,Values=${token_parameter}" --query 'length(Parameters)')
+[ "$n" = 1 ] || catchu_die "SSM ${token_parameter}가 없다"
+
 existing=$(catchu_count "복제 그룹 ${group}" elasticache describe-replication-groups \
   --query "length(ReplicationGroups[?ReplicationGroupId=='${group}'])")
 if [ "$existing" != 0 ]; then
   # 앞선 실행이 만드는 중에 끊겼을 수 있으므로 쓸 수 있게 될 때까지 기다린다.
   catchu_info "${group}가 이미 있다. 다시 만들지 않고 쓸 수 있게 될 때까지 기다린 뒤 확인 값을 찍는다."
   aws_catchu elasticache wait replication-group-available --replication-group-id "$group"
+  # 메모리가 차도 지우지 않는 설정이 그대로인지 본다. 다르면 고치지 않고 멈춘다.
+  policy=$(aws_catchu elasticache describe-cache-parameters --cache-parameter-group-name "$parameter_group" \
+    --query "Parameters[?ParameterName=='maxmemory-policy'] | [0].ParameterValue" --output text)
+  [ "$policy" = noeviction ] || catchu_die "${parameter_group}의 maxmemory-policy가 noeviction이 아니다(${policy})"
   show_evidence
   exit 0
 fi
@@ -54,8 +62,6 @@ vpc=$(catchu_vpc_id)
 subnets=$(catchu_private_subnets)
 read -r subnet_a subnet_c <<< "$subnets"
 node_sg=$(catchu_node_sg)
-n=$(catchu_count "SSM ${token_parameter}" ssm describe-parameters --parameter-filters "Key=Name,Values=${token_parameter}" --query 'length(Parameters)')
-[ "$n" = 1 ] || catchu_die "SSM ${token_parameter}가 없다"
 topic=$(aws_catchu sns list-topics --query "Topics[?ends_with(TopicArn, ':${alert_topic}')] | [0].TopicArn" --output text)
 [ "$topic" = None ] && topic=''
 catchu_info "VPC ${vpc}, 프라이빗 서브넷 ${subnet_a}(2a)·${subnet_c}(2c), 노드 보안 그룹 ${node_sg}, 큐 비밀번호 SSM 있음"

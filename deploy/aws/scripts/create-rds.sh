@@ -48,6 +48,15 @@ show_evidence() {
     --query 'Parameters[].[ParameterName, ParameterValue]' --output text
 }
 
+# 파라미터 그룹의 사용자 지정 값이 위 목록과 정확히 같은지 본다. 다르면 고치지 않고 멈춘다(운영 중인 값을 몰래 바꾸지 않는다).
+check_parameters() {
+  local want have
+  want=$(printf '%s\n' "${parameters[@]}" | sort)
+  have=$(aws_catchu rds describe-db-parameters --db-parameter-group-name "$parameter_group" --source user \
+    --query 'Parameters[].[ParameterName, ParameterValue]' --output text | awk -F'\t' '{ print $1 "=" $2 }' | sort)
+  [ "$have" = "$want" ] || catchu_die "파라미터 그룹 ${parameter_group}의 값이 기대와 다르다. describe-db-parameters --source user로 확인한다"
+}
+
 catchu_require_tools aws jq
 catchu_guard_aws
 
@@ -56,6 +65,9 @@ if [ "$existing" != 0 ]; then
   # 앞선 실행이 만드는 중에 끊겼을 수 있으므로 쓸 수 있게 될 때까지 기다린다. 실패 상태면 기다리기가 실패하며 멈춘다.
   catchu_info "${db}가 이미 있다. 다시 만들지 않고 쓸 수 있게 될 때까지 기다린 뒤 확인 값을 찍는다."
   aws_catchu rds wait db-instance-available --db-instance-identifier "$db"
+  attached=$(aws_catchu rds describe-db-instances --db-instance-identifier "$db" --query 'DBInstances[0].DBParameterGroups[0].DBParameterGroupName' --output text)
+  [ "$attached" = "$parameter_group" ] || catchu_die "${db}가 파라미터 그룹 ${parameter_group}가 아니라 ${attached}를 쓴다"
+  check_parameters
   show_evidence
   exit 0
 fi
@@ -86,10 +98,7 @@ aws_catchu rds modify-db-parameter-group --db-parameter-group-name "$parameter_g
 # AWS 안내: 파라미터 그룹을 고친 뒤 그 그룹으로 첫 DB를 만들기 전에 5분 이상 기다린다. 기다린 뒤 값이 들어갔는지 본다.
 catchu_info "파라미터 그룹 반영을 5분 기다린다."
 sleep 300
-want=$(printf '%s\n' "${parameters[@]}" | sort)
-have=$(aws_catchu rds describe-db-parameters --db-parameter-group-name "$parameter_group" --source user \
-  --query 'Parameters[].[ParameterName, ParameterValue]' --output text | awk -F'\t' '{ print $1 "=" $2 }' | sort)
-[ "$have" = "$want" ] || catchu_die "파라미터 그룹 ${parameter_group}의 값이 기대와 다르다. describe-db-parameters --source user로 확인한다"
+check_parameters
 
 n=$(catchu_count "서브넷 그룹 ${subnet_group}" rds describe-db-subnet-groups \
   --query "length(DBSubnetGroups[?DBSubnetGroupName=='${subnet_group}'])")

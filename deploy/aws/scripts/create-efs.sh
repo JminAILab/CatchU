@@ -97,15 +97,20 @@ if [ "$n" = 0 ]; then
     --tags "${tags[@]}" --query AccessPointId --output text
 fi
 
-# 마운트 지점을 거친 접속만 붙이고 쓰게 하고(루트 권한 없음), TLS가 아닌 접속은 모두 거부한다.
+# 마운트 지점과 위 접근점을 거친 접속만 붙이고 쓰게 하고(루트 권한 없음), TLS가 아닌 접속은 모두 거부한다.
+# 접근점 조건이 없으면 노드에서 닿는 클라이언트가 접근점 없이 파일 시스템 맨 위를 마운트할 수 있다.
 # 거부만 두면 기본 허용 정책이 꺼져 마운트가 모두 막히므로 허용 문장을 함께 둔다.
+# IAM 없이(익명으로) 마운트할 때도 접근점 조건이 적용되는지는 문서로 확인하지 못했다. GitHub 연결을 켤 때 마운트 시험으로 본다(README.md).
+n=$(catchu_count '접근점' efs describe-access-points --file-system-id "$fs" --query 'length(AccessPoints)')
+[ "$n" = 1 ] || catchu_die "파일 시스템 ${fs}의 접근점이 하나가 아니다(${n}개)"
+access_point=$(aws_catchu efs describe-access-points --file-system-id "$fs" --query 'AccessPoints[0].AccessPointArn' --output text)
 arn=$(aws_catchu efs describe-file-systems --file-system-id "$fs" --query 'FileSystems[0].FileSystemArn' --output text)
-policy=$(jq -cn --arg arn "$arn" '{
+policy=$(jq -cn --arg arn "$arn" --arg ap "$access_point" '{
   Version: "2012-10-17",
   Statement: [
     {Sid: "AllowMountViaMountTarget", Effect: "Allow", Principal: {AWS: "*"},
      Action: ["elasticfilesystem:ClientMount", "elasticfilesystem:ClientWrite"], Resource: $arn,
-     Condition: {Bool: {"elasticfilesystem:AccessedViaMountTarget": "true"}}},
+     Condition: {Bool: {"elasticfilesystem:AccessedViaMountTarget": "true"}, StringEquals: {"elasticfilesystem:AccessPointArn": $ap}}},
     {Sid: "DenyInsecureTransport", Effect: "Deny", Principal: {AWS: "*"}, Action: "*", Resource: $arn,
      Condition: {Bool: {"aws:SecureTransport": "false"}}}
   ]}')

@@ -82,7 +82,12 @@ case "$svc $op" in
   "ec2 create-security-group") echo sg-0fedcba9876543210 ;;
   "ec2 describe-security-group-rules") case "$all" in *'!('*) echo "${STUB_OTHER_RULES:-0}" ;; *) echo 0 ;; esac ;;
   "ec2 authorize-security-group-ingress") echo sgr-0123456789abcdef0 ;;
-  "rds describe-db-instances") case "$all" in *--filters*) echo "${STUB_DB_COUNT:-0}" ;; *) echo '{"multiAZ": true}' ;; esac ;;
+  "rds describe-db-instances")
+    case "$all" in
+      *--filters*) echo "${STUB_DB_COUNT:-0}" ;;
+      *"{"*) echo '{"multiAZ": true}' ;;
+      *DBParameterGroupName*) echo "${STUB_DB_PG:-catchu-pg16}" ;;
+    esac ;;
   "rds describe-db-parameter-groups" | "rds describe-db-subnet-groups") echo 0 ;;
   "rds describe-db-parameters")
     printf 'log_error_verbosity\t%s\n' "${STUB_VERBOSITY:-terse}"
@@ -91,7 +96,11 @@ case "$svc $op" in
   "rds wait" | "elasticache wait") printf 'wait %s\n' "$all" >> "$S/waits" ;;
   "elasticache describe-replication-groups") case "$all" in *length*) echo "${STUB_QUEUE_COUNT:-0}" ;; *) echo '{"multiAZ": "enabled"}' ;; esac ;;
   "elasticache describe-cache-parameter-groups" | "elasticache describe-cache-subnet-groups") echo 0 ;;
-  "elasticache describe-cache-parameters") printf 'maxmemory-policy\tnoeviction\n' ;;
+  "elasticache describe-cache-parameters")
+    case "$all" in
+      *"=='maxmemory-policy'"*) echo "${STUB_MAXMEMORY:-noeviction}" ;;
+      *) printf 'maxmemory-policy\tnoeviction\n' ;;
+    esac ;;
   "ssm describe-parameters") case "$all" in *auth-token*) echo "${STUB_TOKEN_COUNT:-1}" ;; *) echo "${STUB_KEY_COUNT:-0}" ;; esac ;;
   "ssm get-parameter") echo "${STUB_TOKEN:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}" ;;
   "sns list-topics") echo "${STUB_TOPIC:-None}" ;;
@@ -104,7 +113,12 @@ case "$svc $op" in
     esac ;;
   "efs create-file-system") echo fs-0123456789abcdef0 ;;
   "efs describe-mount-targets") case "$all" in *"LifeCycleState=="*) echo 2 ;; *length*) echo 0 ;; *) printf 'ap-northeast-2a\tsubnet-0aaaaaaaaaaaaaaaa\tavailable\n' ;; esac ;;
-  "efs describe-access-points") case "$all" in *length*) echo 0 ;; *) printf 'fsap-0123456789abcdef0\t1000\t1000\t/github-credentials\t0700\n' ;; esac ;;
+  "efs describe-access-points")
+    case "$all" in
+      *length*) if [ -n "${STUB_AP_COUNT:-}" ]; then echo "$STUB_AP_COUNT"; elif grep -q '^efs create-access-point' "$S/calls"; then echo 1; else echo 0; fi ;;
+      *AccessPointArn*) echo arn:aws:elasticfilesystem:ap-northeast-2:123456789012:access-point/fsap-0123456789abcdef0 ;;
+      *) printf 'fsap-0123456789abcdef0\t1000\t1000\t/github-credentials\t0700\n' ;;
+    esac ;;
   "efs describe-backup-policy") echo DISABLED ;;
   "efs describe-file-system-policy") echo '{"Statement":[{"Sid":"AllowMountViaMountTarget","Effect":"Allow","Action":["elasticfilesystem:ClientMount"]}]}' ;;
   "backup list-recovery-points-by-resource") echo 0 ;;
@@ -200,8 +214,9 @@ check "EFS 만들기: 종료 0, 순서대로 8건" "$(ok test "$rc" = 0 -a "$(op
 want='Path=/github-credentials,CreationInfo={OwnerUid=1000,OwnerGid=1000,Permissions=0700}'
 check "EFS 만들기: 암호화·백업 끔, 접근점 UID 1000·0700" "$( { has_all "$(call_of 'efs create-file-system')" --encrypted --no-backup && has_all "$(call_of 'efs create-access-point')" Uid=1000,Gid=1000 "$want"; } > /dev/null 2>&1; echo $?)"
 policy=$(call_of 'efs put-file-system-policy' | sed 's/.*--policy //; s/ --query.*//')
-check "EFS 만들기: 정책은 마운트 지점 경유 마운트·쓰기만 허용(루트 권한 없음), TLS 아닌 접속 거부" \
-  "$(ok test "$(printf '%s' "$policy" | jq -c '[.Statement[] | [.Effect, .Action, .Condition]]')" = '[["Allow",["elasticfilesystem:ClientMount","elasticfilesystem:ClientWrite"],{"Bool":{"elasticfilesystem:AccessedViaMountTarget":"true"}}],["Deny","*",{"Bool":{"aws:SecureTransport":"false"}}]]')"
+want='[["Allow",["elasticfilesystem:ClientMount","elasticfilesystem:ClientWrite"],{"Bool":{"elasticfilesystem:AccessedViaMountTarget":"true"},"StringEquals":{"elasticfilesystem:AccessPointArn":"arn:aws:elasticfilesystem:ap-northeast-2:123456789012:access-point/fsap-0123456789abcdef0"}}],["Deny","*",{"Bool":{"aws:SecureTransport":"false"}}]]'
+check "EFS 만들기: 정책은 마운트 지점과 만든 접근점을 거친 마운트·쓰기만 허용(루트 권한 없음), TLS 아닌 접속 거부" \
+  "$(ok test "$(printf '%s' "$policy" | jq -c '[.Statement[] | [.Effect, .Action, .Condition]]')" = "$want")"
 check "EFS 만들기: 키는 파일로만 넘기고(--value 없음) CLI 인자 검사 8건 통과, 키 출력 0, 임시 파일 0" \
   "$( { has_all "$(call_of 'ssm put-parameter')" --cli-input-json && has_none "$(call_of 'ssm put-parameter')" --value && test "$(wc -l < "$S/valid" | tr -d ' ')" = 8 -a -s "$S/secrets" && clean; } > /dev/null 2>&1; echo $?)"
 
@@ -264,6 +279,16 @@ run_sut env STUB_DB_COUNT=1 bash "$P/create-rds.sh" --apply
 check "DB가 이미 있으면 만들지 않고 준비를 기다린 뒤 확인 값" "$(ok test "$rc" = 0 -a -z "$(ops)" -a -s "$S/waits")"
 run_sut env STUB_QUEUE_COUNT=1 bash "$P/create-queue.sh" --apply
 check "큐가 이미 있으면 만들지 않고 준비를 기다림" "$(ok test "$rc" = 0 -a -z "$(ops)" -a -s "$S/waits")"
+run_sut env STUB_QUEUE_COUNT=1 STUB_TOKEN_COUNT=0 bash "$P/create-queue.sh" --apply
+check "큐가 이미 있어도 비밀번호 SSM이 없으면 성공으로 끝내지 않음" "$(ok test "$rc" = 1)"
+run_sut env STUB_QUEUE_COUNT=1 STUB_MAXMEMORY=volatile-lru bash "$P/create-queue.sh" --apply
+check "큐가 이미 있고 noeviction이 아니면 고치지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_DB_COUNT=1 STUB_VERBOSITY=default bash "$P/create-rds.sh" --apply
+check "DB가 이미 있고 파라미터 값이 다르면 고치지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_DB_COUNT=1 STUB_DB_PG=default.postgres16 bash "$P/create-rds.sh" --apply
+check "DB가 이미 있고 다른 파라미터 그룹을 쓰면 멈춤" "$(ok test "$rc" = 1)"
+run_sut env STUB_AP_COUNT=2 bash "$P/create-efs.sh" --apply
+check "EFS 접근점이 둘이면 어느 것으로 제한할지 고르지 않고 정책을 넣기 전에 멈춤" "$(ok test "$rc" = 1 -a -z "$(call_of 'efs put-file-system-policy')")"
 run_sut env STUB_KEY_COUNT=1 bash "$P/create-efs.sh" --apply
 check "EFS 암호화 키가 이미 있으면 덮어쓰지 않음" "$(ok test "$rc" = 0 -a -z "$(call_of 'ssm put-parameter')")"
 run_sut env STUB_ACL=abc123 bash "$P/create-waf.sh" --apply
