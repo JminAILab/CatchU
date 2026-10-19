@@ -6,6 +6,7 @@ import type { ApiResult } from "@/lib/api-response";
 import { devLoginEnabled } from "@/lib/api";
 import { authRuntime } from "@/lib/auth-runtime";
 import { afterLoginPath } from "@/lib/member-navigation";
+import { GoogleLoginButton } from "./google-login-button";
 import { useAuth, useEnsureRestored, useLoginChangeDetected } from "./use-auth";
 import { useSessionMemberLookup } from "./use-session-member-lookup";
 import { LookupFailedState } from "@/components/status/status";
@@ -21,7 +22,8 @@ function devLoginErrorMessage(result: Exclude<ApiResult, { kind: "success" }>): 
 }
 
 /**
- * 공통 인증으로 움직이는 로그인 진입(`/login`, 통합 시험 전환이 켜졌을 때만 쓴다). 화면 틀은 D가 맡고, Google 버튼·이동은 #287이 연결하므로(#251 접점 7) '연결 전'으로 둔다.
+ * 공통 인증으로 움직이는 로그인 진입(`/login`, 통합 시험 전환이 켜졌을 때만 쓴다). 화면 틀은 D가 맡는다.
+ * Google 버튼(#287, #251 접점 7)은 새 로그인을 받을 때만 보이며 `startGoogleLogin(next)`를 부른다. `next`는 `/login?next=` 값이다.
  * 개발용 로그인(#87)은 NEXT_PUBLIC_DEV_LOGIN_ENABLED=true일 때만 보이며, Google 로그인처럼 보이지 않게 따로 둔다.
  * 인증 상태는 공통 인증(#286)을 따른다. 들어오면 세션 복원을 한 번 시작하고, 로그인 상태가 확인되면 #261 흐름대로 이동한다.
  */
@@ -71,9 +73,7 @@ export function SessionLoginPanel() {
       <div className={styles.panel}>
         <h1 className={styles.title}>CatchU 시작하기</h1>
         <p className={styles.lead}>로그인하면 내 GitHub 기록으로 Catch를 만들 수 있습니다.</p>
-        <button type="button" className={styles.googleButton} aria-disabled="true">
-          Google로 로그인 <span className={styles.pendingTag}>연결 전</span>
-        </button>
+        {canLogin && <GoogleLoginButton startGoogleLogin={(next) => authRuntime().google.startGoogleLogin(next)} />}
 
         {signedIn && me.state === "failed" && <LookupFailedState title="회원 정보를 불러오지 못했습니다" onRetry={retry} />}
         {signedIn && me.state === "loading" && <p role="status">회원 정보를 확인하고 있습니다.</p>}

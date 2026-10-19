@@ -3,11 +3,11 @@
 Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 로그아웃 진행·실패·불명 표시를 다룬다.
 상위 작업은 [#251](https://github.com/JminAILab/CatchU/issues/251)이고, 공통 인증은 [#286](https://github.com/JminAILab/CatchU/issues/286)이 맡는다.
 
-## 현재 상태: 화면 준비, 제품 경로 미연결
+## 현재 상태: 통합 시험 전환 아래 연결, 제품 기본 꺼짐
 
-- 공통 인증(#286, [PR #308](https://github.com/JminAILab/CatchU/pull/308))이 아직 `dev`에 없다. 그래서 화면은 #286의 함수를 props로 받는 컴포넌트와 화면 제어 로직까지만 있고, 어느 페이지에서도 쓰지 않는다.
-- `/google/callback` 페이지와 로그인 화면의 Google 버튼은 아직 없다. 제품의 로그인·로그아웃은 기존 #106 동작 그대로다.
-- 이 상태의 검사는 함수 대역 시험이다. 실제 Google·API·쿠키·브라우저·다중 탭 검증은 하지 않았다.
+- 공통 인증(#286)의 통합 시험 전환 `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`일 때만 화면이 연결된다(`src/lib/auth-integration.ts`, 아래 「연결」).
+- 기본(꺼짐)에서는 로그인·로그아웃이 기존 #106 동작 그대로이고, 로그인 화면의 Google 버튼은 '연결 전' 표시이며 `/google/callback`은 404다.
+- 실제 Google·쿠키·다중 탭을 합친 통합 브라우저 검증은 #286이 맡아 #251에 기록한다. 제품 전환은 그 검증 뒤 별도 승인으로 정한다.
 
 ## 담당 경계
 
@@ -67,7 +67,7 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 
 ## 안내 문구
 
-[합의]는 #251에서 양쪽이 확인한 문구, [제안]은 연결 전에 #251에서 정할 문구다. 안내의 종류는 합의됐다.
+[합의]는 #251에서 양쪽이 확인한 문구, [제안]은 #251에서 아직 확정하지 않은 문구다. 통합 시험 전환 아래에서는 [제안] 문구로 연결해 두고, 제품 전환 전에 #251에서 정한다. 안내의 종류는 합의됐다.
 
 | 상황 | 문구 | 구분 |
 |---|---|---|
@@ -88,18 +88,27 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 
 12번·11번 초안: [#251 착수 전 접점](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6162564432).
 
-## 남은 연결 작업(#286 병합 뒤)
+## 연결(통합 시험 전환을 켰을 때)
 
-1. 통합 시험 전환(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`) 아래에서만 연결한다. 전환을 끈 기본 빌드는 기존 동작 그대로여야 한다.
-   - 공통 인증판 로그인 화면에 `GoogleLoginButton`(`authRuntime().google.startGoogleLogin`).
-   - `/google/callback` 페이지에 `GoogleCallbackScreen`(`readGoogleCallback`·`completeGoogleLogin`·공통 인증판 회원 조회). 전환을 끄면 이 주소는 열지 않는다.
-   - 공통 인증판 가드의 `renderReauthNotice`에 `ReauthNotice`. 가드가 넘기는 `returnTo`·`variant`를 그대로 넘긴다(`relogin-only`에서 `login-changed`).
-   - 공통 인증판 셸에 `useMemberLogout`(`useAuth()`·`session.logout()`)·`LogoutStatus`와 헤더 `logoutPending`.
-2. 각 화면 담당이 작성 중 입력을 `useUnsavedChanges`로 알린다. 등록한 화면이 없으면 미저장 확인은 묻지 않는다.
-3. [제안] 문구를 #251에서 정한다.
-4. 실제 Google 승인·콜백·쿠키·다중 탭 검증은 #286이 수행해 #251에 기록하고, 그 결과에서 나온 화면 보완은 #287에서 한다.
+전환을 끈 기본 빌드는 아래 연결을 쓰지 않고 기존 동작 그대로다.
+
+| 자리 | 연결 |
+|---|---|
+| `/login`(`session-login-panel.tsx`) | 새 로그인을 받을 때만(복원 확인 중·로그인 확인 뒤가 아닐 때) `GoogleLoginButton`에 `authRuntime().google.startGoogleLogin`을 넘긴다 |
+| `/google/callback`(`src/app/(guest)/google/callback/page.tsx`) | `session-google-callback.tsx`가 `GoogleCallbackScreen`에 `readGoogleCallback`·`completeGoogleLogin`·`lookupMemberWithAuth(api.member)`를 넘긴다. 전환을 끄면 `notFound()`(404) |
+| 회원 셸(`session-member-shell.tsx`) | `useMemberLogout`(`useAuth()`·`session.logout()`)과 헤더 `logoutPending`, 헤더 아래 `LogoutStatus`, 가드의 `renderReauthNotice`에 `ReauthNotice` |
+| 미저장 확인 | 로그아웃·재인증 [다시 로그인]은 `useUnsavedChanges` 등록을 읽는다. 최초 입력·프로필 수정은 #286에서 기존 `dirty`를 함께 등록했다. 등록한 화면이 없으면 묻지 않는다 |
+
+- 미저장 등록은 `useUnsavedChanges` 하나를 공통 수단으로 쓰고 새로 만들지 않는다. 화면 안의 링크 이동·새로고침·창 닫기 확인(`useUnsavedGuard`, [PR #300](https://github.com/JminAILab/CatchU/pull/300))은 역할이 달라 그대로 둔다.
+
+## 남은 일
+
+1. [제안] 문구를 #251에서 정한다.
+2. 실제 Google 승인·콜백·쿠키·다중 탭 검증은 #286이 수행해 #251에 기록하고, 그 결과에서 나온 화면 보완은 #287에서 한다.
+3. 제품 전환은 각 화면 담당 확인·통합 검증 뒤 별도 승인으로 정한다(#286).
 
 ## 검사
 
-`npm test`의 `test/auth-screens-google.test.mjs`·`test/auth-screens-session.test.mjs`가 위 동작을 함수 대역으로 확인한다.
-#286 함수·응답 대역과 합친 검사는 연결 단계에서 추가한다. React 렌더링과 실제 브라우저 조작은 이 시험에 들지 않는다.
+- `test/auth-screens-google.test.mjs`·`test/auth-screens-session.test.mjs`: 화면 제어를 함수 대역으로 확인한다.
+- `test/auth-screens-connected.test.mjs`: 화면 제어에 #286 공통 함수(시도 보관·콜백 해석·완료, 세션·보호 API, 가드 판정)를 연결 코드와 같은 방식으로 붙이고, 서버와 `sessionStorage`·`localStorage`만 대역으로 바꿔 확인한다.
+- React 렌더링과 실제 브라우저 조작은 이 시험에 들지 않는다.
