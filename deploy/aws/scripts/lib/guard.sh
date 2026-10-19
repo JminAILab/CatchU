@@ -37,6 +37,16 @@ aws_catchu() {
   command aws --profile "$CATCHU_PROFILE" --region "$CATCHU_REGION" "$@"
 }
 
+# 개수를 세는 조회(--query '... length(...)'). 조회가 실패하거나 숫자가 아니면 멈춘다. 실패를 '없음'이나 '있음'으로 보지 않기 위해서다.
+# 명령 치환 안에서는 set -e가 이어지지 않으므로(bash 3.2) 부르는 쪽은 n=$(catchu_count …) 꼴로 따로 대입한다.
+catchu_count() {
+  local what=$1 n
+  shift
+  n=$(aws_catchu "$@" --output text) || catchu_die "${what} 조회에 실패했다"
+  [[ $n =~ ^[0-9]+$ ]] || catchu_die "${what} 조회 결과가 개수가 아니다(${n})"
+  printf '%s\n' "$n"
+}
+
 catchu_tool_version() {
   case $1 in
     aws) command aws --version 2>&1 | sed -E 's#^aws-cli/([0-9.]+).*#\1#' ;;

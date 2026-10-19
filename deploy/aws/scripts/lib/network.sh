@@ -33,20 +33,23 @@ catchu_private_subnets() {
 }
 
 # app 노드 그룹 노드에 실제로 붙은 보안 그룹. Pod 연결도 이 보안 그룹으로 판정된다(t 계열은 Pod 보안 그룹을 쓸 수 없다).
-# 둘 이상이면 고르지 않고 멈춘다. 그때는 README.md 「1단계 만드는 순서」대로 하나를 정해 CATCHU_NODE_SG로 넘긴다.
+# 하나면 그것을 쓴다. 둘 이상이면 고르지 않고 멈춘다. 그때는 README.md 「1단계 만드는 순서」대로 하나를 정해 CATCHU_NODE_SG로 넘기며,
+# 넘긴 값도 실제 노드에 붙은 것 가운데 하나여야 한다(다른 그룹에 DB·큐·EFS를 열지 않기 위해서다).
 catchu_node_sg() {
   local sgs n
-  if [ -n "${CATCHU_NODE_SG:-}" ]; then
-    [[ $CATCHU_NODE_SG =~ ^sg-[0-9a-f]+$ ]] || catchu_die "CATCHU_NODE_SG 형식이 틀렸다(${CATCHU_NODE_SG})"
-    printf '%s\n' "$CATCHU_NODE_SG"
-    return
-  fi
   sgs=$(aws_catchu ec2 describe-instances \
     --filters "Name=tag:eks:cluster-name,Values=${CATCHU_CLUSTER}" "Name=tag:eks:nodegroup-name,Values=app" "Name=instance-state-name,Values=running" \
     --query 'Reservations[].Instances[].NetworkInterfaces[].Groups[].GroupId' --output text) ||
     catchu_die "노드를 조회하지 못했다"
   sgs=$(printf '%s\n' "$sgs" | tr '\t ' '\n\n' | awk 'NF' | sort -u)
   n=$(catchu_count_lines "$sgs")
+  [ "$n" -gt 0 ] || catchu_die "실행 중인 app 노드가 없다"
+  if [ -n "${CATCHU_NODE_SG:-}" ]; then
+    printf '%s\n' "$sgs" | grep -qx -- "$CATCHU_NODE_SG" ||
+      catchu_die "CATCHU_NODE_SG(${CATCHU_NODE_SG})가 app 노드에 붙은 보안 그룹이 아니다($(printf '%s' "$sgs" | tr '\n' ' '))"
+    printf '%s\n' "$CATCHU_NODE_SG"
+    return
+  fi
   if [ "$n" -ne 1 ]; then
     catchu_die "노드에 붙은 보안 그룹이 하나가 아니다(${n}개: $(printf '%s' "$sgs" | tr '\n' ' ')). 쓸 것을 정해 CATCHU_NODE_SG로 넘긴다"
   fi
@@ -65,7 +68,7 @@ catchu_sg_id() {
 
 # 노드 보안 그룹에서 오는 TCP <포트>만 받는 보안 그룹을 만든다. 이미 있으면 그 규칙이 있는지 보고 없으면 더한다.
 catchu_ensure_sg() {
-  local name=$1 description=$2 port=$3 vpc=$4 node_sg=$5 id rule
+  local name=$1 description=$2 port=$3 vpc=$4 node_sg=$5 id rule others
   # 명령 치환 안에서는 set -e가 이어지지 않으므로(bash 3.2) 실패를 직접 넘긴다.
   id=$(catchu_sg_id "$name" "$vpc") || exit 1
   if [ -z "$id" ]; then
@@ -76,10 +79,16 @@ catchu_ensure_sg() {
   else
     catchu_info "보안 그룹 ${name}: 이미 있음(${id})"
   fi
-  rule=$(aws_catchu ec2 describe-security-group-rules \
+  rule=$(catchu_count "보안 그룹 ${name}의 규칙" ec2 describe-security-group-rules \
     --filters "Name=group-id,Values=${id}" \
-    --query "SecurityGroupRules[?IsEgress==\`false\` && IpProtocol=='tcp' && FromPort==\`${port}\` && ToPort==\`${port}\` && ReferencedGroupInfo.GroupId=='${node_sg}'] | length(@)" \
-    --output text) || catchu_die "보안 그룹 ${name}의 규칙을 조회하지 못했다"
+    --query "SecurityGroupRules[?IsEgress==\`false\` && IpProtocol=='tcp' && FromPort==\`${port}\` && ToPort==\`${port}\` && ReferencedGroupInfo.GroupId=='${node_sg}'] | length(@)") ||
+    exit 1
+  # 이 스크립트가 넣는 규칙 말고 들어오는 규칙이 더 있으면 누군가 넓게 연 것이다. 그대로 쓰지 않고 멈춘다.
+  others=$(catchu_count "보안 그룹 ${name}의 다른 규칙" ec2 describe-security-group-rules \
+    --filters "Name=group-id,Values=${id}" \
+    --query "SecurityGroupRules[?IsEgress==\`false\` && !(IpProtocol=='tcp' && FromPort==\`${port}\` && ToPort==\`${port}\` && ReferencedGroupInfo.GroupId=='${node_sg}')] | length(@)") ||
+    exit 1
+  [ "$others" = 0 ] || catchu_die "보안 그룹 ${name}(${id})에 노드 ${port} 말고 들어오는 규칙이 ${others}개 있다. 확인한 뒤 다시 실행한다"
   if [ "$rule" = 0 ]; then
     aws_catchu ec2 authorize-security-group-ingress --group-id "$id" \
       --ip-permissions "IpProtocol=tcp,FromPort=${port},ToPort=${port},UserIdGroupPairs=[{GroupId=${node_sg},Description=catchu-nodes}]" \

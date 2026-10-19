@@ -26,12 +26,13 @@ file_system_id() {
   aws_catchu efs describe-file-systems --creation-token "$name" --query 'FileSystems[0].FileSystemId' --output text
 }
 
-key_exists() {
-  aws_catchu ssm describe-parameters --parameter-filters "Key=Name,Values=${key_parameter}" --query 'length(Parameters)' --output text
+# 0 또는 1. 조회가 실패하면 멈춘다(실패를 '이미 있음'으로 보면 키 없이 끝난다).
+key_count() {
+  catchu_count "SSM ${key_parameter}" ssm describe-parameters --parameter-filters "Key=Name,Values=${key_parameter}" --query 'length(Parameters)'
 }
 
 show_evidence() {
-  local fs=$1 arn
+  local fs=$1 arn points keys
   aws_catchu efs describe-file-systems --file-system-id "$fs" --query 'FileSystems[0].{
     id: FileSystemId, state: LifeCycleState, encrypted: Encrypted, performance: PerformanceMode, throughput: ThroughputMode,
     zone: AvailabilityZoneName}' --output json
@@ -42,9 +43,9 @@ show_evidence() {
     --query 'AccessPoints[].[AccessPointId, PosixUser.Uid, PosixUser.Gid, RootDirectory.Path, RootDirectory.CreationInfo.Permissions]' --output text
   aws_catchu efs describe-file-system-policy --file-system-id "$fs" --query Policy --output text | jq -c '[.Statement[] | {Sid, Effect, Action}]'
   arn=$(aws_catchu efs describe-file-systems --file-system-id "$fs" --query 'FileSystems[0].FileSystemArn' --output text)
-  printf 'AWS Backup 복구 지점: %s개\n' \
-    "$(aws_catchu backup list-recovery-points-by-resource --resource-arn "$arn" --query 'length(RecoveryPoints)' --output text)"
-  printf '암호화 키 SSM: %s개\n' "$(key_exists)"
+  points=$(catchu_count 'AWS Backup 복구 지점' backup list-recovery-points-by-resource --resource-arn "$arn" --query 'length(RecoveryPoints)')
+  keys=$(key_count)
+  printf 'AWS Backup 복구 지점: %s개\n암호화 키 SSM: %s개\n' "$points" "$keys"
 }
 
 catchu_require_tools aws jq openssl
@@ -56,8 +57,9 @@ vpc=$(catchu_vpc_id)
 subnets=$(catchu_private_subnets)
 read -r subnet_a subnet_c <<< "$subnets"
 node_sg=$(catchu_node_sg)
+keys=$(key_count)
 catchu_info "VPC ${vpc}, 프라이빗 서브넷 ${subnet_a}(2a)·${subnet_c}(2c), 노드 보안 그룹 ${node_sg}"
-catchu_info "파일 시스템 ${name}: ${fs:-없음}, 암호화 키 SSM: $(key_exists)개"
+catchu_info "파일 시스템 ${name}: ${fs:-없음}, 암호화 키 SSM: ${keys}개"
 catchu_info "만들 것(없는 것만): 보안 그룹 ${sg_name}(노드에서 2049만), 파일 시스템(암호화·백업 끔·Elastic), 마운트 지점 2a·2c, 접근점(UID 1000·0700), TLS 강제 정책, 암호화 키"
 if [ "$apply" != 1 ]; then
   catchu_info "확인만 했다. 만들려면 팀장 승인 뒤 --apply로 다시 실행한다."
@@ -80,13 +82,15 @@ done
 [ "$state" = available ] || catchu_die "파일 시스템 ${fs}가 5분 안에 available이 되지 않았다(${state})"
 
 for subnet in "$subnet_a" "$subnet_c"; do
-  if [ "$(aws_catchu efs describe-mount-targets --file-system-id "$fs" --query "length(MountTargets[?SubnetId=='${subnet}'])" --output text)" = 0 ]; then
+  n=$(catchu_count "마운트 지점(${subnet})" efs describe-mount-targets --file-system-id "$fs" --query "length(MountTargets[?SubnetId=='${subnet}'])")
+  if [ "$n" = 0 ]; then
     aws_catchu efs create-mount-target --file-system-id "$fs" --subnet-id "$subnet" --security-groups "$sg" \
       --query '[MountTargetId, AvailabilityZoneName]' --output text
   fi
 done
 
-if [ "$(aws_catchu efs describe-access-points --file-system-id "$fs" --query 'length(AccessPoints)' --output text)" = 0 ]; then
+n=$(catchu_count '접근점' efs describe-access-points --file-system-id "$fs" --query 'length(AccessPoints)')
+if [ "$n" = 0 ]; then
   aws_catchu efs create-access-point --file-system-id "$fs" --client-token "$name" \
     --posix-user Uid=1000,Gid=1000 \
     --root-directory 'Path=/github-credentials,CreationInfo={OwnerUid=1000,OwnerGid=1000,Permissions=0700}' \
@@ -107,7 +111,8 @@ policy=$(jq -cn --arg arn "$arn" '{
   ]}')
 aws_catchu efs put-file-system-policy --file-system-id "$fs" --policy "$policy" --query FileSystemId --output text
 
-if [ "$(key_exists)" = 0 ]; then
+keys=$(key_count)
+if [ "$keys" = 0 ]; then
   umask 077
   key_file=$(mktemp)
   trap 'rm -f "$key_file"' EXIT
@@ -122,5 +127,13 @@ if [ "$(key_exists)" = 0 ]; then
 else
   catchu_info "암호화 키: 이미 있음(덮어쓰지 않음)"
 fi
+
+# 마운트 지점은 만든 뒤 몇 분 걸려 available이 된다. 두 곳 모두 준비될 때까지 기다린다.
+for _ in $(seq 60); do
+  n=$(catchu_count '준비된 마운트 지점' efs describe-mount-targets --file-system-id "$fs" --query "length(MountTargets[?LifeCycleState=='available'])")
+  [ "$n" = 2 ] && break
+  sleep 5
+done
+[ "$n" = 2 ] || catchu_die "마운트 지점 두 곳이 5분 안에 available이 되지 않았다(${n}곳)"
 
 show_evidence "$fs"

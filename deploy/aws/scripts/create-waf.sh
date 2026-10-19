@@ -26,17 +26,20 @@ acl_id() {
 }
 
 show_evidence() {
-  local id=$1 arn
+  local id=$1 arn err
   aws_catchu wafv2 get-web-acl --scope REGIONAL --name "$acl" --id "$id" --output json | jq '.WebACL | {
     name: .Name, capacity: .Capacity, defaultAction: (.DefaultAction | keys),
     sampledRequests: .VisibilityConfig.SampledRequestsEnabled,
     rules: [.Rules[] | {name: .Name, priority: .Priority, sampledRequests: .VisibilityConfig.SampledRequestsEnabled,
       response: .Action.Block.CustomResponse.ResponseCode}]}'
   arn=$(aws_catchu wafv2 list-web-acls --scope REGIONAL --query "WebACLs[?Name=='${acl}'] | [0].ARN" --output text)
-  if aws_catchu wafv2 get-logging-configuration --resource-arn "$arn" > /dev/null 2>&1; then
+  # 로그 설정이 없다는 응답(WAFNonexistentItemException)만 '없음'으로 본다. 권한·일시 오류는 확인 실패로 멈춘다.
+  if err=$(aws_catchu wafv2 get-logging-configuration --resource-arn "$arn" 2>&1 > /dev/null); then
     catchu_info "경고: WAF 로그 설정이 있다. 끄기로 했으므로 확인한다"
-  else
+  elif printf '%s' "$err" | grep -q WAFNonexistentItemException; then
     catchu_info "WAF 로그 설정: 없음"
+  else
+    catchu_die "WAF 로그 설정을 조회하지 못했다"
   fi
 }
 

@@ -51,9 +51,11 @@ show_evidence() {
 catchu_require_tools aws jq
 catchu_guard_aws
 
-existing=$(aws_catchu rds describe-db-instances --filters "Name=db-instance-id,Values=${db}" --query 'length(DBInstances)' --output text)
+existing=$(catchu_count "DB ${db}" rds describe-db-instances --filters "Name=db-instance-id,Values=${db}" --query 'length(DBInstances)')
 if [ "$existing" != 0 ]; then
-  catchu_info "${db}가 이미 있다. 다시 만들지 않는다. 확인 값:"
+  # 앞선 실행이 만드는 중에 끊겼을 수 있으므로 쓸 수 있게 될 때까지 기다린다. 실패 상태면 기다리기가 실패하며 멈춘다.
+  catchu_info "${db}가 이미 있다. 다시 만들지 않고 쓸 수 있게 될 때까지 기다린 뒤 확인 값을 찍는다."
+  aws_catchu rds wait db-instance-available --db-instance-identifier "$db"
   show_evidence
   exit 0
 fi
@@ -69,7 +71,9 @@ if [ "$apply" != 1 ]; then
   exit 0
 fi
 
-if [ "$(aws_catchu rds describe-db-parameter-groups --query "length(DBParameterGroups[?DBParameterGroupName=='${parameter_group}'])" --output text)" = 0 ]; then
+n=$(catchu_count "파라미터 그룹 ${parameter_group}" rds describe-db-parameter-groups \
+  --query "length(DBParameterGroups[?DBParameterGroupName=='${parameter_group}'])")
+if [ "$n" = 0 ]; then
   aws_catchu rds create-db-parameter-group --db-parameter-group-name "$parameter_group" --db-parameter-group-family postgres16 \
     --description 'catchu PostgreSQL 16: no values in error logs' --tags "${tags[@]}" \
     --query 'DBParameterGroup.DBParameterGroupName' --output text
@@ -79,8 +83,17 @@ for pair in "${parameters[@]}"; do
   parameter_args+=("ParameterName=${pair%%=*},ParameterValue=${pair#*=},ApplyMethod=immediate")
 done
 aws_catchu rds modify-db-parameter-group --db-parameter-group-name "$parameter_group" --parameters "${parameter_args[@]}" --output text
+# AWS 안내: 파라미터 그룹을 고친 뒤 그 그룹으로 첫 DB를 만들기 전에 5분 이상 기다린다. 기다린 뒤 값이 들어갔는지 본다.
+catchu_info "파라미터 그룹 반영을 5분 기다린다."
+sleep 300
+want=$(printf '%s\n' "${parameters[@]}" | sort)
+have=$(aws_catchu rds describe-db-parameters --db-parameter-group-name "$parameter_group" --source user \
+  --query 'Parameters[].[ParameterName, ParameterValue]' --output text | awk -F'\t' '{ print $1 "=" $2 }' | sort)
+[ "$have" = "$want" ] || catchu_die "파라미터 그룹 ${parameter_group}의 값이 기대와 다르다. describe-db-parameters --source user로 확인한다"
 
-if [ "$(aws_catchu rds describe-db-subnet-groups --query "length(DBSubnetGroups[?DBSubnetGroupName=='${subnet_group}'])" --output text)" = 0 ]; then
+n=$(catchu_count "서브넷 그룹 ${subnet_group}" rds describe-db-subnet-groups \
+  --query "length(DBSubnetGroups[?DBSubnetGroupName=='${subnet_group}'])")
+if [ "$n" = 0 ]; then
   aws_catchu rds create-db-subnet-group --db-subnet-group-name "$subnet_group" \
     --db-subnet-group-description 'catchu private subnets 2a 2c' --subnet-ids "$subnet_a" "$subnet_c" --tags "${tags[@]}" \
     --query 'DBSubnetGroup.DBSubnetGroupName' --output text

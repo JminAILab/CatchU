@@ -40,9 +40,12 @@ show_evidence() {
 catchu_require_tools aws jq
 catchu_guard_aws
 
-existing=$(aws_catchu elasticache describe-replication-groups --query "length(ReplicationGroups[?ReplicationGroupId=='${group}'])" --output text)
+existing=$(catchu_count "복제 그룹 ${group}" elasticache describe-replication-groups \
+  --query "length(ReplicationGroups[?ReplicationGroupId=='${group}'])")
 if [ "$existing" != 0 ]; then
-  catchu_info "${group}가 이미 있다. 다시 만들지 않는다. 확인 값:"
+  # 앞선 실행이 만드는 중에 끊겼을 수 있으므로 쓸 수 있게 될 때까지 기다린다.
+  catchu_info "${group}가 이미 있다. 다시 만들지 않고 쓸 수 있게 될 때까지 기다린 뒤 확인 값을 찍는다."
+  aws_catchu elasticache wait replication-group-available --replication-group-id "$group"
   show_evidence
   exit 0
 fi
@@ -51,8 +54,8 @@ vpc=$(catchu_vpc_id)
 subnets=$(catchu_private_subnets)
 read -r subnet_a subnet_c <<< "$subnets"
 node_sg=$(catchu_node_sg)
-[ "$(aws_catchu ssm describe-parameters --parameter-filters "Key=Name,Values=${token_parameter}" --query 'length(Parameters)' --output text)" = 1 ] ||
-  catchu_die "SSM ${token_parameter}가 없다"
+n=$(catchu_count "SSM ${token_parameter}" ssm describe-parameters --parameter-filters "Key=Name,Values=${token_parameter}" --query 'length(Parameters)')
+[ "$n" = 1 ] || catchu_die "SSM ${token_parameter}가 없다"
 topic=$(aws_catchu sns list-topics --query "Topics[?ends_with(TopicArn, ':${alert_topic}')] | [0].TopicArn" --output text)
 [ "$topic" = None ] && topic=''
 catchu_info "VPC ${vpc}, 프라이빗 서브넷 ${subnet_a}(2a)·${subnet_c}(2c), 노드 보안 그룹 ${node_sg}, 큐 비밀번호 SSM 있음"
@@ -67,7 +70,9 @@ if [ "$apply" != 1 ]; then
   exit 0
 fi
 
-if [ "$(aws_catchu elasticache describe-cache-parameter-groups --query "length(CacheParameterGroups[?CacheParameterGroupName=='${parameter_group}'])" --output text)" = 0 ]; then
+n=$(catchu_count "파라미터 그룹 ${parameter_group}" elasticache describe-cache-parameter-groups \
+  --query "length(CacheParameterGroups[?CacheParameterGroupName=='${parameter_group}'])")
+if [ "$n" = 0 ]; then
   aws_catchu elasticache create-cache-parameter-group --cache-parameter-group-name "$parameter_group" \
     --cache-parameter-group-family valkey8 --description 'catchu queue: noeviction' --tags "${tags[@]}" \
     --query 'CacheParameterGroup.CacheParameterGroupName' --output text
@@ -75,7 +80,9 @@ fi
 aws_catchu elasticache modify-cache-parameter-group --cache-parameter-group-name "$parameter_group" \
   --parameter-name-values ParameterName=maxmemory-policy,ParameterValue=noeviction --output text
 
-if [ "$(aws_catchu elasticache describe-cache-subnet-groups --query "length(CacheSubnetGroups[?CacheSubnetGroupName=='${subnet_group}'])" --output text)" = 0 ]; then
+n=$(catchu_count "서브넷 그룹 ${subnet_group}" elasticache describe-cache-subnet-groups \
+  --query "length(CacheSubnetGroups[?CacheSubnetGroupName=='${subnet_group}'])")
+if [ "$n" = 0 ]; then
   aws_catchu elasticache create-cache-subnet-group --cache-subnet-group-name "$subnet_group" \
     --cache-subnet-group-description 'catchu private subnets 2a 2c' --subnet-ids "$subnet_a" "$subnet_c" --tags "${tags[@]}" \
     --query 'CacheSubnetGroup.CacheSubnetGroupName' --output text
