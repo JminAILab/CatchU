@@ -17,7 +17,7 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 | #287 이 화면 | Google 버튼·이동, 콜백 화면(해석 결과 보존·query 제거 포함)과 안내, 재인증 안내 컴포넌트, 로그아웃의 미저장 확인·진행·실패·불명 표시, 화면 대역 시험 |
 | 각 화면 담당 | 내 자산·공유 링크·최초 입력에서 어떤 입력을 미저장으로 볼지와 공통 인증 결과를 받는 방식 |
 
-근거: [#287 연결 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6187890290), [1~9번 답변](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6139957700), [A 답변](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6187946262), [팀장 답변](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443).
+근거: [#287 연결 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6187890290), [재인증 안내 `variant` 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6207895905), [1~9번 답변](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6139957700), [A 답변](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6187946262), [팀장 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443).
 
 ## 파일
 
@@ -51,10 +51,10 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 - 취소·실패·응답 유실·다시 열린 콜백은 재전송 없이 안내하고 [다시 로그인](로그인 화면, 새 시작)을 둔다. 로그인 실패 안내는 회원 인증 만료 안내와 다르다.
 
 **재인증 안내**
-- 가드가 회원 화면 위에 그린다. 안내 중에도 아래 화면·입력은 유지된다.
-- [다시 로그인]은 로그아웃·갱신 요청 없이 `/login?next=<현재 경로>`로 간다.
-- 일반 재인증: 미저장 입력이 있으면 로그아웃과 같은 확인을 거친다. 머무르면 아무것도 하지 않는다.
-- 로그인 표식 변경 뒤 #286이 화면·입력을 이미 정리한 탭(`inputCleared`): 같은 문구에 [다시 로그인]만 두고 묻지 않는다. 자동 복원·로그아웃 재전송은 하지 않는다(팀장 답변 2). 정리 여부는 #286이 정해 넘긴다.
+- 가드가 `renderReauthNotice({ returnTo, variant })`로 그린다. `variant`는 #286 `auth-gate.ts`의 `ReauthNoticeProps`다([#287 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6207895905)).
+- 두 경우 모두 [다시 로그인]은 로그아웃·갱신 요청 없이 `/login?next=<현재 경로>`로 간다.
+- `variant` 생략·`reauth`: 회원 화면 위의 안내이며 아래 화면·입력은 유지된다. 미저장 입력이 있으면 로그아웃과 같은 확인을 거치고, 머무르면 아무것도 하지 않는다.
+- `login-changed`: 다른 탭의 새 로그인을 감지했지만 이 탭에서 복원할 수 없어 가드가 화면·입력을 이미 정리한 탭이다(가드의 `relogin-only`). 같은 문구에 [다시 로그인]만 두고 미저장 확인 없이 간다. 자동 이동·복원·로그아웃은 하지 않는다(팀장 결정 2).
 
 **로그아웃**
 - 미저장 확인 → `logout()`. 머무르면 요청·이동이 없다.
@@ -92,7 +92,7 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 1. 통합 시험 전환(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`) 아래에서만 연결한다. 전환을 끈 기본 빌드는 기존 동작 그대로여야 한다.
    - 공통 인증판 로그인 화면에 `GoogleLoginButton`(`authRuntime().google.startGoogleLogin`).
    - `/google/callback` 페이지에 `GoogleCallbackScreen`(`readGoogleCallback`·`completeGoogleLogin`·공통 인증판 회원 조회). 전환을 끄면 이 주소는 열지 않는다.
-   - 공통 인증판 가드의 `renderReauthNotice`에 `ReauthNotice`. 표식 변경 뒤 정리된 탭의 표시와 `inputCleared` 전달은 #286이 팀장 답변 2를 반영할 때 정한다.
+   - 공통 인증판 가드의 `renderReauthNotice`에 `ReauthNotice`. 가드가 넘기는 `returnTo`·`variant`를 그대로 넘긴다(`relogin-only`에서 `login-changed`).
    - 공통 인증판 셸에 `useMemberLogout`(`useAuth()`·`session.logout()`)·`LogoutStatus`와 헤더 `logoutPending`.
 2. 각 화면 담당이 작성 중 입력을 `useUnsavedChanges`로 알린다. 등록한 화면이 없으면 미저장 확인은 묻지 않는다.
 3. [제안] 문구를 #251에서 정한다.

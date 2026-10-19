@@ -2,6 +2,7 @@
  * 회원 화면 묶음의 로그아웃·재인증 안내(#287). React와 분리해 시험한다.
  * 인증 상태 판단·입력 정리·복원·로그아웃 뒤 이동은 공통 인증(#286)과 그 가드가 맡는다. 여기서는 미저장 확인·요청·진행·실패·불명 표시만 정한다.
  */
+import type { ReauthNoticeProps } from "./auth-gate.ts";
 import type { LogoutOutcome } from "./auth-logout.ts";
 import type { AuthSnapshot, LogoutResult } from "./auth-state.ts";
 import { authScreenMessages, logoutNotice } from "./auth-screen-messages.ts";
@@ -103,15 +104,15 @@ export function confirmLogout(registry: Pick<UnsavedRegistry, "hasUnsaved">, con
 /* ---------- 재인증 안내 ---------- */
 
 /**
- * 재인증 안내의 [다시 로그인]을 눌렀을 때 로그인 화면으로 갈지. 로그아웃·갱신 요청은 보내지 않는다(#251 A 답변 3, 팀장 답변 2).
- * - 일반 재인증(`inputCleared` false): 화면·입력을 유지하고 있으므로 로그아웃과 같은 미저장 확인을 거친다. 머무르면 false.
- * - 로그인 표식 변경 뒤 공통 인증이 이미 화면·입력을 정리한 탭(`inputCleared` true): 잃을 입력이 없으므로 묻지 않는다.
- *   정리 여부는 #286이 정해 넘긴다.
+ * 재인증 안내의 [다시 로그인]을 눌렀을 때 로그인 화면으로 갈지. 로그아웃·갱신 요청은 보내지 않는다(#251 A 답변 3, 팀장 결정 2).
+ * - `variant` 생략·`reauth`: 화면·입력을 유지하고 있으므로 로그아웃과 같은 미저장 확인을 거친다. 머무르면 false.
+ * - `login-changed`: 다른 탭의 새 로그인 감지로 가드가 화면·입력을 이미 정리한 탭이다. 잃을 입력이 없으므로 묻지 않는다.
+ *   이 값은 #286 가드가 정해 넘긴다(`relogin-only` 판정).
  */
 export function confirmReauthLeave(
-  inputCleared: boolean,
+  variant: ReauthNoticeProps["variant"],
   registry: Pick<UnsavedRegistry, "hasUnsaved">,
   confirm: ConfirmDialog,
 ): boolean {
-  return inputCleared || confirmDiscardUnsaved(registry, confirm, authScreenMessages.reauthUnsavedConfirm);
+  return variant === "login-changed" || confirmDiscardUnsaved(registry, confirm, authScreenMessages.reauthUnsavedConfirm);
 }
