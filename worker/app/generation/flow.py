@@ -1,8 +1,8 @@
 """생성 흐름(#120): 후보 판정 결과(#118)의 후보마다 설명 초안·생각해볼 질문·제목을 채운다.
 
 입구는 `run_generation`이다. 후보 순서·근거·미제공 집계·기존 실패는 그대로 두고, 후보의 생성 칸(draft·
-reflection·title)과 본인 커밋 근거의 한계 끝 문구(결정 5·6)만 바꾼다. 처리 순서에 실제 수집·후보·큐·E
-전달을 잇는 것은 #121이다.
+reflection·title)과 본인 커밋 근거의 한계 끝 문구(결정 5·6)만 바꾼다. 처리 순서에 잇는 것은 #121의 LIVE
+조립(`app.processing.live`)이다.
 
 후보 하나의 처리(2026-10-12 결정 4·7·8·9·13 및 #120 본문 「응답과 실패 판정」):
 1. 재료 준비: 재료 커밋의 파일마다 patch 온전성 확인과 가리기(request.prepare).
@@ -155,7 +155,8 @@ def run_generation(
 ) -> GenerationRun:
     """built는 같은 요청·수집 결과로 만든 `build_candidates(request, outcome)`의 결과다.
 
-    deadline은 생성 몫이 끝나야 할 시각이다(요청 전체 마감에서 결과 조합·전송 여유를 뺀 값, #121이 정한다).
+    deadline은 생성 몫이 끝나야 할 시각이다(요청 전체 마감에서 결과 조합·전송 여유를 뺀 값). 큐 소비자는
+    꺼낸 시각 + 20분 − 60초를 넘긴다(#121).
     """
     report = GenerationReport()
     materials = gather(request, outcome, built)

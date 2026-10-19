@@ -1,6 +1,6 @@
 # 생성의 실제 제공자 — Anthropic Claude API (#120)
 
-> [설명 초안·생각해볼 질문·Catch 제목 생성](generation.md)의 제공자 경계(`GenerationProvider`)에 붙이는 실제 제공자 어댑터다. 제공자·시작 모델·처리 위치는 [#119 결정](https://github.com/JminAILab/CatchU/issues/119#issuecomment-6159097353)(2026-10-14)을 따른다. 코드는 `app/generation/claude.py`다. 실제 API는 2026-10-16~18 로컬 시험대에서 팀장 저장소 자료로만 불렀고(팀장 허가 범위, 결과는 [생성 호출 한도와 운영 로그 「모델」](generation-limits.md#모델)), 처리 순서 연결은 [#121](https://github.com/JminAILab/CatchU/issues/121)이다. 실제 회원 자료는 실제 자료용 고지([#138](https://github.com/JminAILab/CatchU/issues/138))와 [#37](https://github.com/JminAILab/CatchU/issues/37)의 조건을 갖춘 뒤에 보낸다.
+> [설명 초안·생각해볼 질문·Catch 제목 생성](generation.md)의 제공자 경계(`GenerationProvider`)에 붙이는 실제 제공자 어댑터다. 제공자·시작 모델·처리 위치는 [#119 결정](https://github.com/JminAILab/CatchU/issues/119#issuecomment-6159097353)(2026-10-14)을 따른다. 코드는 `app/generation/claude.py`다. 큐 소비자의 LIVE 처리가 후보가 있을 때 자식 프로세스 안에서 한 번 만든다([#121](https://github.com/JminAILab/CatchU/issues/121), [큐 소비자 「구조」](queue-consumer.md#구조)). 실제 API는 2026-10-16~18 로컬 시험대에서 팀장 저장소 자료로만 불렀다(팀장 허가 범위, 결과는 [생성 호출 한도와 운영 로그 「모델」](generation-limits.md#모델)). 실제 회원 자료는 실제 자료용 고지([#138](https://github.com/JminAILab/CatchU/issues/138))와 [#37](https://github.com/JminAILab/CatchU/issues/37)의 조건을 갖춘 뒤에 보낸다.
 
 ## 요청 설정
 
@@ -47,11 +47,11 @@
   - `SPEND_LIMIT`: 400이고 메시지가 「You have reached your specified (workspace) API usage limits」로 시작한다. 직접 정한 지출 상한이다.
 - 응답에서 온 멈춘 이유·거절 분류·오류 종류는 공식 값 목록에 있을 때만, 모델 ID·추론 위치·요청 ID는 영문·숫자·`._:-`로 된 128자 이하일 때만 그대로 적고, 아니면 `OTHER`·`INVALID`로 적는다. 원문이나 줄바꿈이 로그에 들어가지 않게 하기 위해서다.
 - 지시문·자료·응답 글·오류 메시지 원문·거절 설명·API 키는 남기지 않는다. SDK는 DEBUG 수준에서 요청 본문 전체를 로그에 남긴다. 상위 로거 수준으로는 하위 로거가 만든 기록을 막지 못하므로, 어댑터를 만들 때 SDK 로거(`anthropic`과 그 하위) 모두에 INFO 아래 기록을 버리는 필터를 단다. 하위 로거에 DEBUG 수준·핸들러를 직접 달거나 `ANTHROPIC_LOG=debug`를 켜도 남지 않는다. HTTP 라이브러리도 HTTPX2는 INFO에 서버가 보낸 상태 설명을, HTTPCore2는 DEBUG에 응답 머리글과 프로토콜 오류의 원문(받은 바이트)을 남겨, 두 라이브러리 로거에는 WARNING 아래 기록을 버리는 필터를 단다. worker 코드에서 HTTPX2를 쓰는 곳은 이 SDK뿐이다(GitHub 수집은 표준 라이브러리 HTTP를 쓴다).
-- 호출별 줄에는 CatchU 요청 ID가 없어 요청 단위 「생성 종료」 줄과 시각으로 잇는다. 여러 요청을 동시에 처리하게 되면 #121에서 호출별 줄에 요청 ID를 넣는다.
+- 호출별 줄 자체에는 CatchU 요청 ID가 없다. 큐 소비자는 요청 하나를 자식 프로세스 하나가 맡고 그 자식의 모든 로그 줄 앞에 `attemptId=`를 붙이므로([큐 소비자 「로그」](queue-consumer.md#로그)), 동시 처리를 늘려도 호출별 줄을 요청과 이을 수 있다.
 
 ## 만들 때 넘길 것
 
-`ClaudeProvider(api_key, models)`. `api_key`는 값을 문자열·repr에 드러내지 않는 `AccessToken`이다. 키를 어디에 두고 어떤 환경변수로 읽을지는 처리 순서 연결(#121)과 운영 설정([#276](https://github.com/JminAILab/CatchU/issues/276))에서 정한다. 운영 환경에 `ANTHROPIC_CUSTOM_HEADERS`를 두면 어댑터를 만들 때 실패한다. 프록시를 거쳐야 하는 운영 환경이면 이 어댑터와 GitHub 수집 전송 모두 바꿔야 한다.
+`ClaudeProvider(api_key, models)`. `api_key`는 값을 문자열·repr에 드러내지 않는 `AccessToken`이다. 큐 소비자는 키를 `CATCHU_GENERATION_API_KEY`에서 읽는다(운영 필수, SDK 환경변수 이름 `ANTHROPIC_API_KEY`를 피한다). 기동 때 검사한 뒤 환경변수에서 지우고 자식에 설정 객체로 넘긴다([큐 소비자 「설정」](queue-consumer.md#설정)). 운영 비밀 주입은 [#276](https://github.com/JminAILab/CatchU/issues/276)이다. 운영 환경에 `ANTHROPIC_CUSTOM_HEADERS`를 두면 어댑터를 만들 때 실패한다(그 요청은 결함으로 끝난다). 프록시를 거쳐야 하는 운영 환경이면 이 어댑터와 GitHub 수집 전송 모두 바꿔야 한다.
 
 ## 의존성
 
@@ -80,6 +80,6 @@
 | 남은 일 | 시작 조건 |
 |---|---|
 | 어댑터를 거친 실제 오류 응답(지출 상한·크레딧 소진·과부하)의 모양 확인. 응답 시간·토큰·설정 수용은 2026-10-16~18 로컬 실제 호출로 확인했다 | 팀장의 호출 허가(자료 범위·비용 한도) |
-| 처리 순서에 잇기, 키 읽기, 요청 전체 마감 | #121, #276 |
+| 운영 키 주입 | #276 |
 | 실제 회원 자료 전송 | #138 고지, #37 조건 |
 | Console 조직·작업 공간(미국 고정·지출 상한)·등급 확인 | 팀장(#119의 남은 조치) |

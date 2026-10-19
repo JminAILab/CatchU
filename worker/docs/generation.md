@@ -21,7 +21,7 @@
 - 입구는 `run_generation(request, outcome, built, *, provider, clock, deadline, limits)`다. `built`는 같은 요청·수집 결과로 만든 `build_candidates(request, outcome)`의 결과다. 돌려주는 값은 생성 칸을 채운 `GenerationOutput`과 운영 로그 건수다.
 - 바꾸는 것은 후보의 `title`·`draft`·`reflection`과, 본인 커밋 근거의 `coverageLimits` 끝 고정 문구(아래 「coverageLimits」)뿐이다. 후보 순서·작업 사실·기여·묶음 설명·근거와 그 순서·미제공 집계·기존 실패는 그대로다. 실패는 요청 단위 `ANALYSIS` 1건이 끝에 더해질 수 있다.
 - 제공자는 `GenerationProvider` Protocol 하나다(`complete(ProviderRequest) -> str`). 요청에는 지시문·자료·시간 제한·최대 출력이 따로 들어간다. 제공자는 시간 제한 안에 끝내지 못하면 `TimeoutError`, 다른 실패는 `ProviderError`를 내고 스스로 다시 시도하지 않는다. 호출은 됐지만 거절·출력 상한으로 응답 전체를 쓸 수 없으면 하위 예외 `UnusableResponse`를 내고, 생성 흐름은 이를 읽을 수 없는 응답·크기 초과 응답으로 다룬다. 실제 제공자는 SDK 기본 재시도를 끈 Anthropic Claude API 어댑터(`claude.py`)이고, 시험은 합성 제공자로 한다.
-- 처리 순서(`app/processing/pipeline.py`)에 잇는 것, 요청 전체 마감을 정하는 것, 큐·E 전달은 [#121](https://github.com/JminAILab/CatchU/issues/121)이다. `deadline`은 #121이 요청 전체 마감에서 결과 조합·전송 여유를 빼 넘길 생성 몫의 마감 시각이다.
+- 처리 순서에 잇기와 큐·E 전달은 [#121](https://github.com/JminAILab/CatchU/issues/121)의 LIVE 조립(`app/processing/live.py`)이다. `deadline`은 생성 몫의 마감 시각으로, 큐 소비자는 꺼낸 시각 + 20분 − 60초(결과 조합·전송 여유)를 넘긴다.
 
 ## 재료 찾기
 
@@ -180,6 +180,6 @@
 | 남은 일 | 시작 조건 |
 |---|---|
 | 어댑터 쪽 남은 일([생성의 실제 제공자 「남은 확인」](generation-provider.md#남은-확인)). 실제 API 호출 확인과 모델 비교는 2026-10-16~18 로컬 시험대에서 했다 | 실제 회원 자료는 [#138](https://github.com/JminAILab/CatchU/issues/138) 고지와 [#37](https://github.com/JminAILab/CatchU/issues/37) 조건 뒤 |
-| 처리 순서에 수집·후보·생성·큐·E 전달 연결, 요청 전체 마감 | [#121](https://github.com/JminAILab/CatchU/issues/121)(선행 #117·#233) |
+| 실제 api 조회·GitHub·Claude·E와 이은 처리 순서 확인(조립은 합성 검사까지) | [#121](https://github.com/JminAILab/CatchU/issues/121)(선행 #233·#252) |
 | 결과에 제목 null 그대로 보내기(결과 조합의 임시 대체값 제거) | B·C·E의 null 수용([결정 문서 「담당과 순서」](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#담당과-순서) ③). B 회원 화면([#274](https://github.com/JminAILab/CatchU/pull/274))·B 서버와 E([#272](https://github.com/JminAILab/CatchU/pull/272))는 dev에 병합됐고 C 수신자 화면([#152](https://github.com/JminAILab/CatchU/issues/152))이 남았다 |
 | 실제 결과의 품질 판정 | 허용 자료·모델의 실제 결과로 C01 영향을 평가하고 [#122](https://github.com/JminAILab/CatchU/issues/122) 검수와 연결 |
