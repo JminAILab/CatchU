@@ -140,20 +140,22 @@ test('로그아웃: 예상 밖 예외는 삼키지 않고 진행 표시를 지�
   assert.deepEqual(control.getLocal(), { inFlight: false, last: null });
 });
 
-test('재인증 [다시 로그인]: 입력을 유지한 일반 재인증은 미저장 확인을 거치고, 머무르면 이동하지 않는다', () => {
-  const registry = createUnsavedRegistry();
-  registry.register(() => true);
-  const asked = [];
-  assert.equal(confirmReauthLeave(false, registry, (m) => { asked.push(m); return false; }), false);
-  assert.equal(confirmReauthLeave(false, registry, (m) => { asked.push(m); return true; }), true);
-  assert.deepEqual(asked, [M.reauthUnsavedConfirm, M.reauthUnsavedConfirm]);
-  assert.equal(confirmReauthLeave(false, createUnsavedRegistry(), () => assert.fail('입력이 없으면 묻지 않는다')), true);
+test('재인증 [다시 로그인]: variant 생략·reauth(입력 유지)는 미저장 확인을 거치고, 머무르면 이동하지 않는다', () => {
+  for (const variant of [undefined, 'reauth']) {
+    const registry = createUnsavedRegistry();
+    registry.register(() => true);
+    const asked = [];
+    assert.equal(confirmReauthLeave(variant, registry, (m) => { asked.push(m); return false; }), false, String(variant));
+    assert.equal(confirmReauthLeave(variant, registry, (m) => { asked.push(m); return true; }), true, String(variant));
+    assert.deepEqual(asked, [M.reauthUnsavedConfirm, M.reauthUnsavedConfirm], String(variant));
+    assert.equal(confirmReauthLeave(variant, createUnsavedRegistry(), () => assert.fail('입력이 없으면 묻지 않는다')), true);
+  }
 });
 
-test('재인증 [다시 로그인]: 표식 변경 뒤 입력이 이미 정리된 탭은 묻지 않고 로그인 화면으로 간다', () => {
+test('재인증 [다시 로그인]: login-changed(가드가 화면·입력을 정리한 탭)는 미저장 입력이 남아 있어도 묻지 않고 로그인 화면으로 간다', () => {
   const registry = createUnsavedRegistry();
   registry.register(() => true);
-  assert.equal(confirmReauthLeave(true, registry, () => assert.fail('정리된 탭은 묻지 않는다')), true);
+  assert.equal(confirmReauthLeave('login-changed', registry, () => assert.fail('login-changed는 묻지 않는다')), true);
 });
 
 test('안내 문구: 합의 문구를 그대로 쓰고 code·state·토큰 같은 값을 담지 않는다', () => {
