@@ -34,7 +34,7 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 | `src/components/auth/reauth-notice.tsx` | 재인증 안내(가드의 `renderReauthNotice` 자리) |
 | `src/components/auth/member-logout.tsx` | 셸의 `useMemberLogout`·`LogoutStatus` |
 | `src/components/auth/use-unsaved-changes.ts` | 화면이 미저장 입력을 알리는 hook |
-| `src/components/header/` | `logoutPending`을 주면 [로그아웃]을 막고 "로그아웃하는 중"을 보인다. 주지 않으면 기존과 같다 |
+| `src/components/header/` | `logoutPending`을 주면 [로그아웃]을 막고 "로그아웃하는 중"을 보인다. 주지 않으면 기존과 같다. [로그아웃]을 누르면 프로필 메뉴를 닫고 초점을 [프로필]로 돌린다 |
 
 ## 동작
 
@@ -57,6 +57,7 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 - `login-changed`: 다른 탭의 새 로그인을 감지했지만 이 탭에서 복원할 수 없어 가드가 화면·입력을 이미 정리한 탭이다(가드의 `relogin-only`). 같은 문구에 [다시 로그인]만 두고 미저장 확인 없이 간다. 자동 이동·복원·로그아웃은 하지 않는다(팀장 결정 2).
 
 **로그아웃**
+- [로그아웃]을 누르면 프로필 메뉴를 먼저 닫는다. 열린 메뉴가 실패·불명 안내의 [다시 시도]를 가리지 않게 하기 위해서다([#311 리뷰](https://github.com/JminAILab/CatchU/pull/311#pullrequestreview-5543242144)).
 - 미저장 확인 → `logout()`. 머무르면 요청·이동이 없다.
 - 이 화면의 요청이나 공통 상태가 진행 중이면 다시 묻거나 보내지 않는다.
 - `done`이어도 셸은 이동하지 않는다. 현재 유효한 완료일 때 입력 정리·비로그인 홈 이동은 가드가 한다. 다른 탭의 유효한 완료도 가드가 처리한다.
