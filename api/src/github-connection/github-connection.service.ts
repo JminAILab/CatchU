@@ -11,7 +11,8 @@ import { GitHubClient, GitHubProviderError } from './github.client';
 interface Authorization { memberId: string; state: string; verifier: string; expiresAt: number; claimed: boolean }
 const STATE_LIFETIME_MS = 10 * 60 * 1000;
 const MAX_AUTHORIZATIONS = 1000;
-const isCredentialReference = (value: string | null): value is string => !!value?.startsWith('github-v1:');
+// 이 서비스가 보관한 실제 자격정보 참조인가. #252 선정 공급도 같은 기준으로 실제 연결을 가른다.
+export const isCredentialReference = (value: string | null): value is string => !!value?.startsWith('github-v1:');
 
 @Injectable()
 export class GitHubConnectionService {
