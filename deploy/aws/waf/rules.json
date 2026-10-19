@@ -1,0 +1,104 @@
+[
+  {
+    "Name": "block-internal-path",
+    "Priority": 0,
+    "Statement": {
+      "ByteMatchStatement": {
+        "SearchString": "/v1/internal",
+        "FieldToMatch": {
+          "UriPath": {}
+        },
+        "TextTransformations": [
+          {
+            "Priority": 0,
+            "Type": "URL_DECODE"
+          },
+          {
+            "Priority": 1,
+            "Type": "NORMALIZE_PATH"
+          },
+          {
+            "Priority": 2,
+            "Type": "LOWERCASE"
+          }
+        ],
+        "PositionalConstraint": "STARTS_WITH"
+      }
+    },
+    "Action": {
+      "Block": {
+        "CustomResponse": {
+          "ResponseCode": 404,
+          "ResponseHeaders": [
+            {
+              "Name": "Cache-Control",
+              "Value": "no-store"
+            }
+          ]
+        }
+      }
+    },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": false,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "block-internal-path"
+    }
+  },
+  {
+    "Name": "google-start-per-ip",
+    "Priority": 1,
+    "Statement": {
+      "RateBasedStatement": {
+        "Limit": 20,
+        "EvaluationWindowSec": 300,
+        "AggregateKeyType": "IP",
+        "ScopeDownStatement": {
+          "ByteMatchStatement": {
+            "SearchString": "/v1/auth/google/authorization",
+            "FieldToMatch": {
+              "UriPath": {}
+            },
+            "TextTransformations": [
+              {
+                "Priority": 0,
+                "Type": "URL_DECODE"
+              },
+              {
+                "Priority": 1,
+                "Type": "NORMALIZE_PATH"
+              },
+              {
+                "Priority": 2,
+                "Type": "LOWERCASE"
+              }
+            ],
+            "PositionalConstraint": "STARTS_WITH"
+          }
+        }
+      }
+    },
+    "Action": {
+      "Block": {
+        "CustomResponse": {
+          "ResponseCode": 429,
+          "CustomResponseBodyKey": "rate-limited",
+          "ResponseHeaders": [
+            {
+              "Name": "Cache-Control",
+              "Value": "no-store"
+            },
+            {
+              "Name": "Retry-After",
+              "Value": "300"
+            }
+          ]
+        }
+      }
+    },
+    "VisibilityConfig": {
+      "SampledRequestsEnabled": false,
+      "CloudWatchMetricsEnabled": true,
+      "MetricName": "google-start-per-ip"
+    }
+  }
+]
