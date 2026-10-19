@@ -18,7 +18,7 @@
 | [`scripts/create-scripts.test.sh`](scripts/create-scripts.test.sh) | 위 스크립트들의 회귀 시험(AWS에 닿지 않음, 「시험」) |
 | [`scripts/create-waf.sh`](scripts/create-waf.sh), [`waf/`](waf) | ALB 앞 WAF. `/v1/internal`로 시작하는 주소(대소문자·인코딩 변형 포함)는 404, Google 로그인 시작은 주소당 5분 20회를 넘으면 429 |
 
-생성 스크립트는 인자 없이 실행하면 **확인만 하고 아무것도 만들지 않는다**(무엇을 만들지와 이미 있는 것을 보여 준다). `--apply`를 줄 때만 만든다. 이미 있는 자원은 다시 만들지 않는다. 이미 있는 DB·큐는 파라미터 값(로그 설정·`noeviction`)이 기대와 다르면 고치지 않고 멈춘다. EFS 파일 시스템 정책은 다시 실행할 때마다 같은 내용으로 다시 넣는다. 조회가 실패하면 '있음'이나 '없음'으로 넘기지 않고 멈춘다. 모두 저장소 루트에서 실행하고, [`scripts/create-scripts.test.sh`](scripts/create-scripts.test.sh)로 AWS에 닿지 않고 시험한다(「시험」).
+생성 스크립트는 **깨끗할 때 한 번 만드는 용도**다. 인자 없이 실행하면 확인만 하고 아무것도 만들지 않으며(무엇을 만들지 보여 준다), `--apply`를 줄 때만 만든다. 그 스크립트가 만들 자원(이름은 각 파일 머리말) 가운데 하나라도 이미 있으면, 확인 모드에서도 `--apply`에서도 아무것도 만들지 않고 그 목록을 보여 준 뒤 멈춘다(「생성이 중간에 멈췄을 때」). 이미 있는 자원의 상태를 맞추거나 점검하지는 않는다. 조회가 실패해도 '있음'이나 '없음'으로 넘기지 않고 멈춘다. 모두 저장소 루트에서 실행하고, [`scripts/create-scripts.test.sh`](scripts/create-scripts.test.sh)로 AWS에 닿지 않고 시험한다(「시험」).
 
 다음 PR로 남긴 것: 쿠버네티스 실행 파일(namespace·NetworkPolicy·Deployment·Service·Ingress·migration 일회 Pod), 교체 스크립트 `deploy.sh`, 서비스별 Secret 생성, DB 계정 SQL, 로그 수집(관측 애드온·로그 그룹 미리 만들기·토큰 줄 버림), 경보, ACM 인증서·Route 53, Load Balancer Controller 설치, 노드 패치 절차, 전환 절차.
 
@@ -106,13 +106,24 @@
 5. **DB·큐·EFS·WAF:** 각각 확인 모드로 먼저 돌려 찾은 VPC·서브넷·노드 보안 그룹을 보고, 그다음 `--apply`로 만든다. 끝에 찍히는 확인 값을 증거로 남긴다.
    ```bash
    bash deploy/aws/scripts/create-rds.sh            # 확인만
-   bash deploy/aws/scripts/create-rds.sh --apply    # 만듦(15~30분)
+   bash deploy/aws/scripts/create-rds.sh --apply    # 만듦(파라미터 반영 5분, DB는 최대 60분 기다림)
    bash deploy/aws/scripts/create-queue.sh --apply  # 큐 비밀번호는 SSM /catchu/prod/queue/auth-token(개발 서버와 같은 값)
-   bash deploy/aws/scripts/create-efs.sh --apply    # 암호화 키 SSM이 없을 때만 한 번 만든다
+   bash deploy/aws/scripts/create-efs.sh --apply    # 암호화 키 SSM은 있으면 그대로 쓰고, 없으면 만든다
    bash deploy/aws/scripts/create-waf.sh --apply    # ALB에는 Ingress 주석으로 붙인다(다음 PR)
    ```
    큐는 SNS 주제 `catchu-alerts`가 있으면 장애 조치 같은 이벤트를 그 주제로 보낸다. 없으면 알림 없이 만들고 나중에 붙인다.
 6. **다음 PR에서 이어서:** ACM 인증서·Route 53, Load Balancer Controller(Helm 차트 3.6.0), 경보, 서비스별 Secret, DB 계정 SQL(앱 계정 `lock_timeout` 3초, `idle_in_transaction_session_timeout`은 #220에서 정할 값), 앱 실행 파일.
+
+## 생성이 중간에 멈췄을 때
+
+생성 스크립트는 만들 자원이 하나라도 이미 있으면 멈추므로, 중간에 멈춘 뒤에는 그냥 다시 실행해도 진행되지 않는다. 멈춘 곳에 따라 아래처럼 한다. 명령의 `…`는 `--profile catchu --region ap-northeast-2`를 줄인 것이다.
+
+- **DB·큐·파일 시스템을 만들기 전에 멈춤:** 앞서 만든 파라미터 그룹·서브넷 그룹·보안 그룹만 남는다. 요금이 없는 자원이다. 다시 실행하면 남은 것을 보여 주니, 그것을 지운 뒤 다시 실행한다.
+  - RDS: `aws rds delete-db-subnet-group --db-subnet-group-name catchu-db …`, `aws rds delete-db-parameter-group --db-parameter-group-name catchu-pg16 …`, `aws ec2 delete-security-group --group-id <보안 그룹 ID> …`
+  - 큐: `aws elasticache delete-cache-subnet-group --cache-subnet-group-name catchu-queue …`, `aws elasticache delete-cache-parameter-group --cache-parameter-group-name catchu-valkey8-noeviction …`, 보안 그룹은 위와 같다.
+  - EFS: 보안 그룹만 남았으면 그것을 지운다. 파일 시스템까지 만들었으면 「삭제 순서」 B의 5번(마운트 지점 → 접근점 → 파일 시스템)대로 지운 뒤 보안 그룹을 지운다.
+- **만든 뒤 기다리다 멈춤(DB 60분, 큐 40분, EFS 파일 시스템·마운트 지점 각 5분):** AWS에서는 계속 만들고 있을 수 있다. 다시 실행하지 말고 상태를 본다(`aws rds describe-db-instances --db-instance-identifier catchu-db --query 'DBInstances[0].DBInstanceStatus' …`, `aws elasticache describe-replication-groups --replication-group-id catchu-queue --query 'ReplicationGroups[0].Status' …`, `aws efs describe-mount-targets --file-system-id <fs> …`). available이 되면 그대로 쓰고, 확인 값은 그 스크립트 안 `show_evidence`의 조회를 그대로 실행해 남긴다. failed처럼 실패한 상태면 「삭제 순서」 B의 그 자원 줄(RDS는 6·8번, 큐는 7·8번, EFS는 5·8번)대로 지운 뒤 다시 실행한다.
+- WAF는 웹 ACL 하나를 한 번에 만들므로 중간 상태가 없다.
 
 ## 노드 작업
 
@@ -147,8 +158,8 @@
 3. `kubectl --kubeconfig ~/.kube/catchu -n catchu delete ingress --all` → `aws elbv2 describe-load-balancers …`·`describe-target-groups …`에서 `k8s-` 항목과 컨트롤러가 만든 보안 그룹이 0이 될 때까지 기다린다.
 4. WAF 웹 ACL `catchu-edge`(ALB에 붙어 있는 동안은 지워지지 않는다) → ACM 인증서 → Route 53의 ALB 별칭·인증서 검증 기록(호스팅 영역은 남김).
 5. EFS: 마운트 지점 2개를 지우고 `aws efs describe-mount-targets --file-system-id <fs> …`가 빈 목록이 될 때까지 기다린다 → 접근점 → 파일 시스템.
-6. RDS: `aws rds modify-db-instance --db-instance-identifier catchu-db --no-deletion-protection --apply-immediately …` → `aws rds delete-db-instance --db-instance-identifier catchu-db --skip-final-snapshot --delete-automated-backups …` → **`aws rds wait db-instance-deleted --db-instance-identifier catchu-db …`** → 서브넷 그룹 `catchu-db`·파라미터 그룹 `catchu-pg16`. 마지막 스냅샷을 남길지는 그때 팀장이 정한다(남기면 그만큼 요금이 계속 나간다). RDS가 관리하는 관리자 비밀번호는 인스턴스와 함께 지워진다.
-7. 큐: `aws elasticache delete-replication-group --replication-group-id catchu-queue …`(마지막 스냅샷 없이) → **`aws elasticache wait replication-group-deleted --replication-group-id catchu-queue …`** → 서브넷 그룹 `catchu-queue`·파라미터 그룹 `catchu-valkey8-noeviction`.
+6. RDS: `aws rds modify-db-instance --db-instance-identifier catchu-db --no-deletion-protection --apply-immediately …` → `aws rds delete-db-instance --db-instance-identifier catchu-db --skip-final-snapshot --delete-automated-backups …` → **`aws rds wait db-instance-deleted --db-instance-identifier catchu-db …`**(30분까지만 기다리므로, 시간이 다 됐다고 나오면 같은 명령을 다시 실행한다) → 서브넷 그룹 `catchu-db`·파라미터 그룹 `catchu-pg16`. 마지막 스냅샷을 남길지는 그때 팀장이 정한다(남기면 그만큼 요금이 계속 나간다). RDS가 관리하는 관리자 비밀번호는 인스턴스와 함께 지워진다.
+7. 큐: `aws elasticache delete-replication-group --replication-group-id catchu-queue …`(마지막 스냅샷 없이) → **`aws elasticache wait replication-group-deleted --replication-group-id catchu-queue …`**(10분까지만 기다리므로, 시간이 다 됐다고 나오면 같은 명령을 다시 실행한다) → 서브넷 그룹 `catchu-queue`·파라미터 그룹 `catchu-valkey8-noeviction`.
 8. 직접 만든 보안 그룹 `catchu-db`·`catchu-queue`·`catchu-efs`.
 9. `helm uninstall aws-load-balancer-controller -n kube-system --kubeconfig ~/.kube/catchu`
 10. `eksctl delete cluster -f deploy/aws/cluster.yaml --wait --profile catchu`(노드 그룹·애드온·Pod Identity 역할·NAT와 그 공인 IP·VPC).
@@ -187,7 +198,7 @@ bash deploy/aws/scripts/create-scripts.test.sh
 
 bash·jq·aws CLI v2가 필요하고 30초쯤 걸린다. aws·kubectl·sleep을 합성 명령으로 바꿔 네 생성 스크립트와 공통 확인을 실제로 실행한다.
 
-- 확인하는 것: 인자 없이 실행하면 만드는 호출이 없음, `--apply`의 호출 순서와 필수 옵션(RDS Multi-AZ·저장 암호화·삭제 보호·백업 7일, 큐 복제본·TLS 필수·스냅샷 0, EFS 암호화·백업 끔·TLS 강제 정책, WAF 요청 표본 끔), 계정·리전·키 환경변수·kubeconfig가 다르면 멈춤, 노드 보안 그룹 검증, 조회 실패 때 멈춤, 이미 있는 자원을 다시 만들지 않음, 비밀값이 출력과 임시 파일에 남지 않음.
+- 확인하는 것: 인자 없이 실행하면 만드는 호출이 없음, `--apply`의 호출 순서와 필수 옵션(RDS Multi-AZ·저장 암호화·삭제 보호·백업 7일, 큐 복제본·TLS 필수·스냅샷 0, EFS 암호화·백업 끔·만든 접근점과 TLS만 허용하는 정책, WAF 요청 표본 끔), 계정·리전·키 환경변수·kubeconfig가 다르면 멈춤, 노드 보안 그룹 검증, 조회 실패 때 멈춤, 만들 자원이 하나라도 이미 있으면(일부만 남은 경우 포함) 아무것도 만들지 않고 멈춤, 기다리기가 한도에 닿으면 정한 횟수만큼 이어서 기다리고 그래도 안 되면 멈춤, 비밀값이 출력과 임시 파일에 남지 않음.
 - 만들기 시험에서는 진짜 AWS CLI를 합성 키와 닫힌 로컬 주소(`127.0.0.1:9`)로 실행해, 옵션 이름·값 형식·입력 파일을 CLI가 받아들이는지도 본다.
 - 확인하지 못하는 것: AWS 서버 쪽 검사(함께 쓸 수 없는 옵션, 이름 규칙, 권한, 할당량)와 실제로 만들어진 자원의 설정. 이것은 1단계에서 각 스크립트가 끝에 찍는 확인 값으로 본다.
 - CI에는 아직 넣지 않았다. 이 폴더를 바꾸면 손으로 돌린다.

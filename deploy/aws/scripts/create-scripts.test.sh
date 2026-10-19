@@ -42,8 +42,8 @@ while [ "$i" -lt "${#args[@]}" ]; do
 done
 all="${rest[*]}"
 printf '%s %s\n' "$svc" "$op" >> "$S/seen"
-# STUB_FAIL에 적은 호출을 실패시킨다. STUB_FAIL_NTH가 있으면 그 호출의 N번째만 실패시킨다.
-if [ "$svc $op" = "${STUB_FAIL:-}" ] && { [ -z "${STUB_FAIL_NTH:-}" ] || [ "$(grep -cx "$svc $op" "$S/seen")" = "$STUB_FAIL_NTH" ]; }; then
+# STUB_FAIL에 적은 호출을 실패시킨다.
+if [ "$svc $op" = "${STUB_FAIL:-}" ]; then
   echo "An error occurred (AccessDenied) when calling the operation: synthetic" >&2
   exit 254
 fi
@@ -80,57 +80,45 @@ case "$svc $op" in
   "ec2 describe-instances") echo "${STUB_NODE_SGS:-sg-0123456789abcdef0${tab}sg-0123456789abcdef0}" ;;
   "ec2 describe-security-groups") echo "${STUB_SG_ID:-None}" ;;
   "ec2 create-security-group") echo sg-0fedcba9876543210 ;;
-  "ec2 describe-security-group-rules") case "$all" in *'!('*) echo "${STUB_OTHER_RULES:-0}" ;; *) echo 0 ;; esac ;;
   "ec2 authorize-security-group-ingress") echo sgr-0123456789abcdef0 ;;
-  "rds describe-db-instances")
-    case "$all" in
-      *--filters*) echo "${STUB_DB_COUNT:-0}" ;;
-      *"{"*) echo '{"multiAZ": true}' ;;
-      *DBParameterGroupName*) echo "${STUB_DB_PG:-catchu-pg16}" ;;
-    esac ;;
-  "rds describe-db-parameter-groups" | "rds describe-db-subnet-groups") echo 0 ;;
+  "rds describe-db-instances") case "$all" in *--filters*) echo "${STUB_DB_COUNT:-0}" ;; *) echo '{"multiAZ": true}' ;; esac ;;
+  "rds describe-db-parameter-groups") echo "${STUB_RDS_PG_COUNT:-0}" ;;
+  "rds describe-db-subnet-groups") echo 0 ;;
   "rds describe-db-parameters")
     printf 'log_error_verbosity\t%s\n' "${STUB_VERBOSITY:-terse}"
     printf '%s\n' log_min_error_statement=panic log_parameter_max_length_on_error=0 log_statement=none log_min_duration_statement=-1 \
       log_connections=0 rds.force_ssl=1 ssl_min_protocol_version=TLSv1.2 rds.log_retention_period=1440 | tr '=' '\t' ;;
-  "rds wait" | "elasticache wait") printf 'wait %s\n' "$all" >> "$S/waits" ;;
+  "rds wait" | "elasticache wait")
+    # STUB_WAIT_FAILS번째까지의 대기는 시간이 다 된 것처럼 실패시킨다.
+    printf 'wait %s\n' "$all" >> "$S/waits"
+    if [ "$(wc -l < "$S/waits" | tr -d ' ')" -le "${STUB_WAIT_FAILS:-0}" ]; then
+      echo "Waiter failed: Max attempts exceeded (synthetic)" >&2
+      exit 255
+    fi ;;
   "elasticache describe-replication-groups") case "$all" in *length*) echo "${STUB_QUEUE_COUNT:-0}" ;; *) echo '{"multiAZ": "enabled"}' ;; esac ;;
   "elasticache describe-cache-parameter-groups" | "elasticache describe-cache-subnet-groups") echo 0 ;;
-  "elasticache describe-cache-clusters") echo "${STUB_QUEUE_PGS:-catchu-valkey8-noeviction${tab}catchu-valkey8-noeviction}" ;;
-  "elasticache describe-cache-parameters")
-    case "$all" in
-      *"=='maxmemory-policy'"*) echo "${STUB_MAXMEMORY:-noeviction}" ;;
-      *) printf 'maxmemory-policy\tnoeviction\n' ;;
-    esac ;;
+  "elasticache describe-cache-parameters") printf 'maxmemory-policy\tnoeviction\n' ;;
   "ssm describe-parameters") case "$all" in *auth-token*) echo "${STUB_TOKEN_COUNT:-1}" ;; *) echo "${STUB_KEY_COUNT:-0}" ;; esac ;;
   "ssm get-parameter") echo "${STUB_TOKEN:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}" ;;
   "sns list-topics") echo "${STUB_TOPIC:-None}" ;;
   "efs describe-file-systems")
     case "$all" in
-      *--creation-token*) echo None ;;
+      *--creation-token*) echo "${STUB_FS:-None}" ;;
       *"{"*) echo '{"encrypted": true}' ;;
       *FileSystemArn*) echo arn:aws:elasticfilesystem:ap-northeast-2:123456789012:file-system/fs-0123456789abcdef0 ;;
       *LifeCycleState*) echo available ;;
     esac ;;
   "efs create-file-system") echo fs-0123456789abcdef0 ;;
-  "efs describe-mount-targets") case "$all" in *"LifeCycleState=="*) echo 2 ;; *length*) echo 0 ;; *) printf 'ap-northeast-2a\tsubnet-0aaaaaaaaaaaaaaaa\tavailable\n' ;; esac ;;
-  "efs describe-access-points")
-    case "$all" in
-      *length*) if [ -n "${STUB_AP_COUNT:-}" ]; then echo "$STUB_AP_COUNT"; elif grep -q '^efs create-access-point' "$S/calls"; then echo 1; else echo 0; fi ;;
-      *AccessPointArn*) echo arn:aws:elasticfilesystem:ap-northeast-2:123456789012:access-point/fsap-0123456789abcdef0 ;;
-      *) printf 'fsap-0123456789abcdef0\t1000\t1000\t/github-credentials\t0700\n' ;;
-    esac ;;
+  "efs create-access-point") echo arn:aws:elasticfilesystem:ap-northeast-2:123456789012:access-point/fsap-0123456789abcdef0 ;;
+  "efs describe-mount-targets") case "$all" in *"LifeCycleState=="*) echo 2 ;; *) printf 'ap-northeast-2a\tsubnet-0aaaaaaaaaaaaaaaa\tavailable\n' ;; esac ;;
+  "efs describe-access-points") printf 'fsap-0123456789abcdef0\t1000\t1000\t/github-credentials\t0700\n' ;;
   "efs describe-backup-policy") echo DISABLED ;;
   "efs describe-file-system-policy") echo '{"Statement":[{"Sid":"AllowMountViaMountTarget","Effect":"Allow","Action":["elasticfilesystem:ClientMount"]}]}' ;;
   "backup list-recovery-points-by-resource") echo 0 ;;
   "wafv2 check-capacity") echo 36 ;;
-  "wafv2 list-web-acls") case "$all" in *.ARN*) echo arn:aws:wafv2:ap-northeast-2:123456789012:regional/webacl/catchu-edge/abc ;; *) echo "${STUB_ACL:-None}" ;; esac ;;
+  "wafv2 list-web-acls") echo "${STUB_ACL:-None}" ;;
+  "wafv2 create-web-acl") echo 0123abcd-0123-abcd-0123-0123456789ab ;;
   "wafv2 get-web-acl") echo '{"WebACL":{"Name":"catchu-edge","Capacity":36,"DefaultAction":{"Allow":{}},"VisibilityConfig":{"SampledRequestsEnabled":false},"Rules":[]}}' ;;
-  "wafv2 get-logging-configuration")
-    case "${STUB_LOGGING:-none}" in
-      none) echo "An error occurred (WAFNonexistentItemException) when calling the GetLoggingConfiguration operation: synthetic" >&2; exit 254 ;;
-      error) echo "An error occurred (AccessDeniedException) when calling the GetLoggingConfiguration operation: synthetic" >&2; exit 254 ;;
-    esac ;;
   *create-* | *modify-* | *put-* | *authorize-*) echo ok ;;
   *) echo "합성 aws: 정해 두지 않은 호출 $svc $op" >&2; printf '%s %s\n' "$svc" "$op" >> "$S/unknown"; exit 253 ;;
 esac
@@ -260,44 +248,47 @@ want=$(rule_of 5432 sg-0bbbbbbbbbbbbbbbb)
 check "CATCHU_NODE_SG가 노드에 붙은 것이면 그 그룹으로 허용" "$( { test "$rc" = 0 && has_all "$(call_of 'ec2 authorize-security-group-ingress')" "$want"; } > /dev/null 2>&1; echo $?)"
 run_sut env CATCHU_NODE_SG=sg-0ccccccccccccccccc bash "$P/create-rds.sh" --apply
 check "CATCHU_NODE_SG가 노드에 붙지 않은 것이면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
-run_sut env STUB_SG_ID=sg-0fedcba9876543210 STUB_OTHER_RULES=1 bash "$P/create-efs.sh" --apply
-check "이미 있는 보안 그룹에 다른 들어오는 규칙이 있으면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
 
 # ---------- 조회 실패를 '있음'·'없음'으로 보지 않음 ----------
 run_sut env STUB_FAIL='rds describe-db-instances' bash "$P/create-rds.sh" --apply
 check "DB 조회 실패면 만들지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
 run_sut env STUB_FAIL='ssm describe-parameters' bash "$P/create-efs.sh" --apply
-check "EFS 키 조회 실패면 '이미 있음'으로 넘기지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
-run_sut env STUB_FAIL='ssm describe-parameters' STUB_FAIL_NTH=2 bash "$P/create-efs.sh" --apply
-check "EFS 키를 만들기 직전 조회가 실패하면 '이미 있음'으로 넘기지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(call_of 'ssm put-parameter')" -a "$(grep -c '이미 있음' "$OUT")" = 0)"
-run_sut env STUB_FAIL='ec2 describe-security-group-rules' bash "$P/create-queue.sh" --apply
-check "보안 그룹 규칙 조회 실패면 큐를 만들지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(call_of 'elasticache create-replication-group')")"
+check "EFS 키 조회 실패면 '있음'·'없음'으로 넘기지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_FAIL='ec2 describe-security-groups' bash "$P/create-queue.sh" --apply
+check "보안 그룹 조회 실패면 큐를 만들지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
 run_sut env STUB_VERBOSITY=default bash "$P/create-rds.sh" --apply
 check "파라미터 값이 기대와 다르면 DB를 만들지 않음" "$(ok test "$rc" = 1 -a -z "$(call_of 'rds create-db-instance')")"
 
-# ---------- 이미 있는 자원 ----------
+# ---------- 만들 자원이 하나라도 이미 있으면 아무것도 만들지 않고 멈춤 ----------
+stopped() { # 이미 있는 것으로 찍힐 이름
+  test "$rc" = 1 -a -z "$(ops)" && grep -qF -- "- $1" "$OUT" && grep -q '생성이 중간에 멈췄을 때' "$OUT"
+}
 run_sut env STUB_DB_COUNT=1 bash "$P/create-rds.sh" --apply
-check "DB가 이미 있으면 만들지 않고 준비를 기다린 뒤 확인 값" "$(ok test "$rc" = 0 -a -z "$(ops)" -a -s "$S/waits")"
+check "DB가 이미 있으면 멈춤" "$(ok stopped 'DB catchu-db')"
+run_sut env STUB_DB_COUNT=1 bash "$P/create-rds.sh"
+check "DB가 이미 있으면 확인 모드에서도 멈춤" "$(ok stopped 'DB catchu-db')"
+run_sut env STUB_RDS_PG_COUNT=1 bash "$P/create-rds.sh" --apply
+check "만들다 멈춰 파라미터 그룹만 남았어도 멈추고 그것을 알려 줌" "$(ok stopped '파라미터 그룹 catchu-pg16')"
 run_sut env STUB_QUEUE_COUNT=1 bash "$P/create-queue.sh" --apply
-check "큐가 이미 있으면 만들지 않고 준비를 기다림" "$(ok test "$rc" = 0 -a -z "$(ops)" -a -s "$S/waits")"
-run_sut env STUB_QUEUE_COUNT=1 STUB_TOKEN_COUNT=0 bash "$P/create-queue.sh" --apply
-check "큐가 이미 있어도 비밀번호 SSM이 없으면 성공으로 끝내지 않음" "$(ok test "$rc" = 1)"
-run_sut env STUB_QUEUE_COUNT=1 STUB_QUEUE_PGS="default.valkey8$(printf '\t')catchu-valkey8-noeviction" bash "$P/create-queue.sh" --apply
-check "큐가 이미 있고 노드 하나라도 다른 파라미터 그룹을 쓰면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
-run_sut env STUB_QUEUE_COUNT=1 STUB_MAXMEMORY=volatile-lru bash "$P/create-queue.sh" --apply
-check "큐가 이미 있고 noeviction이 아니면 고치지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
-run_sut env STUB_DB_COUNT=1 STUB_VERBOSITY=default bash "$P/create-rds.sh" --apply
-check "DB가 이미 있고 파라미터 값이 다르면 고치지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
-run_sut env STUB_DB_COUNT=1 STUB_DB_PG=default.postgres16 bash "$P/create-rds.sh" --apply
-check "DB가 이미 있고 다른 파라미터 그룹을 쓰면 멈춤" "$(ok test "$rc" = 1)"
-run_sut env STUB_AP_COUNT=2 bash "$P/create-efs.sh" --apply
-check "EFS 접근점이 둘이면 어느 것으로 제한할지 고르지 않고 정책을 넣기 전에 멈춤" "$(ok test "$rc" = 1 -a -z "$(call_of 'efs put-file-system-policy')")"
+check "큐가 이미 있으면 멈춤" "$(ok stopped '복제 그룹 catchu-queue')"
+run_sut env STUB_SG_ID=sg-0fedcba9876543210 bash "$P/create-queue.sh" --apply
+check "보안 그룹만 남았어도 멈추고 그것을 알려 줌" "$(ok stopped '보안 그룹 catchu-queue(sg-0fedcba9876543210)')"
+run_sut env STUB_FS=fs-0123456789abcdef0 bash "$P/create-efs.sh" --apply
+check "EFS 파일 시스템이 이미 있으면 멈춤(키도 만들지 않음)" "$(ok stopped '파일 시스템 catchu-github-credentials(fs-0123456789abcdef0)')"
+run_sut env STUB_ACL=abc123 bash "$P/create-waf.sh"
+check "웹 ACL이 이미 있으면 멈춤" "$(ok stopped '웹 ACL catchu-edge(abc123)')"
 run_sut env STUB_KEY_COUNT=1 bash "$P/create-efs.sh" --apply
-check "EFS 암호화 키가 이미 있으면 덮어쓰지 않음" "$(ok test "$rc" = 0 -a -z "$(call_of 'ssm put-parameter')")"
-run_sut env STUB_ACL=abc123 bash "$P/create-waf.sh" --apply
-check "웹 ACL이 이미 있으면 만들지 않고 로그 설정 없음을 확인" "$(ok test "$rc" = 0 -a -z "$(ops)" -a "$(grep -c 'WAF 로그 설정: 없음' "$OUT")" = 1)"
-run_sut env STUB_ACL=abc123 STUB_LOGGING=error bash "$P/create-waf.sh"
-check "WAF 로그 설정 조회가 권한 오류면 '없음'으로 보지 않고 멈춤" "$(ok test "$rc" = 1)"
+check "EFS 암호화 키가 이미 있으면 새 파일 시스템에 그대로 씀(덮어쓰지 않음)" "$(ok test "$rc" = 0 -a -z "$(call_of 'ssm put-parameter')")"
+
+# ---------- 기다리기 ----------
+run_sut env STUB_WAIT_FAILS=1 bash "$P/create-rds.sh" --apply
+check "DB 대기가 한 번 시간이 다 돼도 이어서 기다려 끝남(최대 2번)" "$(ok test "$rc" = 0 -a "$(wc -l < "$S/waits" | tr -d ' ')" = 2 -a "$(grep -c multiAZ "$OUT")" = 1)"
+run_sut env STUB_WAIT_FAILS=2 bash "$P/create-rds.sh" --apply
+check "DB 대기가 2번 모두 끝나면 다시 실행하지 말라고 하고 멈춤" "$(ok test "$rc" = 1 -a "$(wc -l < "$S/waits" | tr -d ' ')" = 2 -a "$(grep -c '다시 실행하지 말고' "$OUT")" = 1)"
+run_sut env STUB_WAIT_FAILS=3 bash "$P/create-queue.sh" --apply
+check "큐 대기는 최대 4번까지 이어서 기다림" "$(ok test "$rc" = 0 -a "$(wc -l < "$S/waits" | tr -d ' ')" = 4)"
+run_sut env STUB_WAIT_FAILS=4 bash "$P/create-queue.sh" --apply
+check "큐 대기가 4번 모두 끝나면 멈춤" "$(ok test "$rc" = 1 -a "$(wc -l < "$S/waits" | tr -d ' ')" = 4)"
 
 # ---------- 큐 비밀번호 ----------
 run_sut env STUB_TOKEN='short"tok' bash "$P/create-queue.sh" --apply

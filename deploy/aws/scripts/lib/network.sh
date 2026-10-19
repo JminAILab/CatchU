@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# eksctl이 만든 VPC·프라이빗 서브넷·노드 보안 그룹을 찾고, DB·큐·EFS용 보안 그룹을 만든다(#276 1단계).
+# eksctl이 만든 VPC·프라이빗 서브넷·노드 보안 그룹을 찾고, DB·큐·EFS용 보안 그룹을 새로 만든다(#276 1단계).
 # guard.sh를 먼저 읽고 catchu_guard_aws를 마친 뒤에 쓴다.
 
 catchu_count_lines() {
@@ -56,7 +56,7 @@ catchu_node_sg() {
   printf '%s\n' "$sgs"
 }
 
-# 이름이 같은 보안 그룹 ID. 없으면 빈 줄.
+# 이름이 같은 보안 그룹 ID. 없으면 빈 줄. 생성 스크립트가 맨 앞에서 이미 있는 자원을 찾을 때 쓴다.
 catchu_sg_id() {
   local name=$1 vpc=$2 id
   id=$(aws_catchu ec2 describe-security-groups \
@@ -66,36 +66,18 @@ catchu_sg_id() {
   printf '%s\n' "$id"
 }
 
-# 노드 보안 그룹에서 오는 TCP <포트>만 받는 보안 그룹을 만든다. 이미 있으면 그 규칙이 있는지 보고 없으면 더한다.
-catchu_ensure_sg() {
-  local name=$1 description=$2 port=$3 vpc=$4 node_sg=$5 id rule others
-  # 명령 치환 안에서는 set -e가 이어지지 않으므로(bash 3.2) 실패를 직접 넘긴다.
-  id=$(catchu_sg_id "$name" "$vpc") || exit 1
-  if [ -z "$id" ]; then
-    id=$(aws_catchu ec2 create-security-group --group-name "$name" --description "$description" --vpc-id "$vpc" \
-      --tag-specifications "ResourceType=security-group,Tags=[{Key=Name,Value=${name}},{Key=project,Value=catchu},{Key=issue,Value=276}]" \
-      --query GroupId --output text) || catchu_die "보안 그룹 ${name}를 만들지 못했다"
-    catchu_info "보안 그룹 ${name}: 만듦(${id})"
-  else
-    catchu_info "보안 그룹 ${name}: 이미 있음(${id})"
-  fi
-  rule=$(catchu_count "보안 그룹 ${name}의 규칙" ec2 describe-security-group-rules \
-    --filters "Name=group-id,Values=${id}" \
-    --query "SecurityGroupRules[?IsEgress==\`false\` && IpProtocol=='tcp' && FromPort==\`${port}\` && ToPort==\`${port}\` && ReferencedGroupInfo.GroupId=='${node_sg}'] | length(@)") ||
-    exit 1
-  # 이 스크립트가 넣는 규칙 말고 들어오는 규칙이 더 있으면 누군가 넓게 연 것이다. 그대로 쓰지 않고 멈춘다.
-  others=$(catchu_count "보안 그룹 ${name}의 다른 규칙" ec2 describe-security-group-rules \
-    --filters "Name=group-id,Values=${id}" \
-    --query "SecurityGroupRules[?IsEgress==\`false\` && !(IpProtocol=='tcp' && FromPort==\`${port}\` && ToPort==\`${port}\` && ReferencedGroupInfo.GroupId=='${node_sg}')] | length(@)") ||
-    exit 1
-  [ "$others" = 0 ] || catchu_die "보안 그룹 ${name}(${id})에 노드 ${port} 말고 들어오는 규칙이 ${others}개 있다. 확인한 뒤 다시 실행한다"
-  if [ "$rule" = 0 ]; then
-    aws_catchu ec2 authorize-security-group-ingress --group-id "$id" \
-      --ip-permissions "IpProtocol=tcp,FromPort=${port},ToPort=${port},UserIdGroupPairs=[{GroupId=${node_sg},Description=catchu-nodes}]" \
-      --tag-specifications "ResourceType=security-group-rule,Tags=[{Key=project,Value=catchu},{Key=issue,Value=276}]" \
-      --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text >/dev/null ||
-      catchu_die "보안 그룹 ${name}에 ${port} 규칙을 넣지 못했다"
-    catchu_info "보안 그룹 ${name}: 노드 보안 그룹에서 TCP ${port} 허용"
-  fi
+# 노드 보안 그룹에서 오는 TCP <포트>만 받는 보안 그룹을 새로 만든다. 같은 이름이 없는지는 부르는 쪽이 먼저 확인한다.
+catchu_create_sg() {
+  local name=$1 description=$2 port=$3 vpc=$4 node_sg=$5 id
+  id=$(aws_catchu ec2 create-security-group --group-name "$name" --description "$description" --vpc-id "$vpc" \
+    --tag-specifications "ResourceType=security-group,Tags=[{Key=Name,Value=${name}},{Key=project,Value=catchu},{Key=issue,Value=276}]" \
+    --query GroupId --output text) || catchu_die "보안 그룹 ${name}를 만들지 못했다"
+  catchu_info "보안 그룹 ${name}: 만듦(${id})"
+  aws_catchu ec2 authorize-security-group-ingress --group-id "$id" \
+    --ip-permissions "IpProtocol=tcp,FromPort=${port},ToPort=${port},UserIdGroupPairs=[{GroupId=${node_sg},Description=catchu-nodes}]" \
+    --tag-specifications "ResourceType=security-group-rule,Tags=[{Key=project,Value=catchu},{Key=issue,Value=276}]" \
+    --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text >/dev/null ||
+    catchu_die "보안 그룹 ${name}에 ${port} 규칙을 넣지 못했다"
+  catchu_info "보안 그룹 ${name}: 노드 보안 그룹에서 TCP ${port} 허용"
   printf '%s\n' "$id"
 }

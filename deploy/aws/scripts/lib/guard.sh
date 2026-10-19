@@ -47,6 +47,31 @@ catchu_count() {
   printf '%s\n' "$n"
 }
 
+# 생성 스크립트는 깨끗할 때 한 번 만드는 용도다. 만들 자원 가운데 이미 있는 것(인자 하나에 하나)이 있으면
+# 확인 모드에서도 아무것도 만들지 않고 그 목록을 보여 준 뒤 멈춘다. 이미 있는 자원의 상태를 맞추거나 점검하지 않는다.
+catchu_require_clean() {
+  local item
+  [ "$#" = 0 ] && return 0
+  catchu_info "이미 있는 것:"
+  for item in "$@"; do
+    catchu_info "  - ${item}"
+  done
+  catchu_die "만들 자원이 이미 있어 아무것도 만들지 않는다. 만들다 멈춘 것이면 README.md 「생성이 중간에 멈췄을 때」대로 정리한 뒤 다시 실행한다"
+}
+
+# AWS CLI 대기 명령은 한 번에 기다리는 시간이 정해져 있다(rds 30초×60번 = 30분, elasticache 15초×40번 = 10분).
+# 만드는 데 그보다 오래 걸릴 수 있어 같은 대기 명령을 <횟수>만큼 이어서 부른다. 실패 상태에 닿으면 대기 명령이 곧바로 끝나므로
+# 남은 횟수도 금방 끝난다. 모두 끝나도 준비되지 않으면 1을 돌려준다.
+catchu_wait() { # 횟수 대기 명령 인자…
+  local tries=$1 i
+  shift
+  for i in $(seq "$tries"); do
+    aws_catchu "$@" && return 0
+    catchu_info "기다리기 ${i}/${tries}번째가 끝났다."
+  done
+  return 1
+}
+
 catchu_tool_version() {
   case $1 in
     aws) command aws --version 2>&1 | sed -E 's#^aws-cli/([0-9.]+).*#\1#' ;;

@@ -6,6 +6,8 @@
 #   google-start-per-ip  Google 로그인 시작(/v1/auth/google/authorization)을 주소당 5분 20회 넘게 보내면 429(api 오류 형식, ../waf/response-bodies.json).
 # 요청 표본과 WAF 로그는 끈다. 주소에 공유 링크 토큰·로그인 code가 남기 때문이다. 지표(CloudWatch)만 켠다.
 # 인자 없이 실행하면 규칙 형식과 용량만 AWS에 확인하고(자원을 만들지 않음) 끝낸다. --apply를 주면 만든다(팀장 승인 뒤).
+# 깨끗할 때 한 번 만드는 용도다. 웹 ACL catchu-edge가 이미 있으면 확인 모드에서도 아무것도 만들지 않고 멈춘다.
+# 이미 있는 웹 ACL의 상태(규칙·로그 설정)를 맞추거나 점검하지 않는다. 이 스크립트는 로그 설정을 만들지 않는다.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 . "$here/lib/guard.sh"
@@ -21,26 +23,12 @@ acl=catchu-edge
 rules="file://${here}/../waf/rules.json"
 bodies="file://${here}/../waf/response-bodies.json"
 
-acl_id() {
-  aws_catchu wafv2 list-web-acls --scope REGIONAL --query "WebACLs[?Name=='${acl}'] | [0].Id" --output text
-}
-
 show_evidence() {
-  local id=$1 arn err
-  aws_catchu wafv2 get-web-acl --scope REGIONAL --name "$acl" --id "$id" --output json | jq '.WebACL | {
+  aws_catchu wafv2 get-web-acl --scope REGIONAL --name "$acl" --id "$1" --output json | jq '.WebACL | {
     name: .Name, capacity: .Capacity, defaultAction: (.DefaultAction | keys),
     sampledRequests: .VisibilityConfig.SampledRequestsEnabled,
     rules: [.Rules[] | {name: .Name, priority: .Priority, sampledRequests: .VisibilityConfig.SampledRequestsEnabled,
       response: .Action.Block.CustomResponse.ResponseCode}]}'
-  arn=$(aws_catchu wafv2 list-web-acls --scope REGIONAL --query "WebACLs[?Name=='${acl}'] | [0].ARN" --output text)
-  # 로그 설정이 없다는 응답(WAFNonexistentItemException)만 '없음'으로 본다. 권한·일시 오류는 확인 실패로 멈춘다.
-  if err=$(aws_catchu wafv2 get-logging-configuration --resource-arn "$arn" 2>&1 > /dev/null); then
-    catchu_info "경고: WAF 로그 설정이 있다. 끄기로 했으므로 확인한다"
-  elif printf '%s' "$err" | grep -q WAFNonexistentItemException; then
-    catchu_info "WAF 로그 설정: 없음"
-  else
-    catchu_die "WAF 로그 설정을 조회하지 못했다"
-  fi
 }
 
 catchu_require_tools aws jq
@@ -50,19 +38,18 @@ catchu_guard_aws
 capacity=$(aws_catchu wafv2 check-capacity --scope REGIONAL --rules "$rules" --cli-binary-format raw-in-base64-out --query Capacity --output text)
 catchu_info "규칙 형식 확인: 통과(용량 ${capacity} WCU)"
 
-id=$(acl_id)
-if [ "$id" != None ]; then
-  catchu_info "${acl}가 이미 있다. 다시 만들지 않는다. 확인 값:"
-  show_evidence "$id"
-  exit 0
-fi
+id=$(aws_catchu wafv2 list-web-acls --scope REGIONAL --query "WebACLs[?Name=='${acl}'] | [0].Id" --output text)
+found=()
+[ "$id" = None ] || found+=("웹 ACL ${acl}(${id})")
+catchu_require_clean ${found[@]+"${found[@]}"}
+
 catchu_info "만들 것: 웹 ACL ${acl}(REGIONAL, 기본 허용, 규칙 2개, 요청 표본 끔)"
 if [ "$apply" != 1 ]; then
   catchu_info "확인만 했다. 만들려면 팀장 승인 뒤 --apply로 다시 실행한다."
   exit 0
 fi
 
-aws_catchu wafv2 create-web-acl --name "$acl" --scope REGIONAL \
+id=$(aws_catchu wafv2 create-web-acl --name "$acl" --scope REGIONAL \
   --description 'catchu ALB: internal path 404, Google login start rate limit' \
   --default-action 'Allow={}' \
   --rules "$rules" \
@@ -70,6 +57,6 @@ aws_catchu wafv2 create-web-acl --name "$acl" --scope REGIONAL \
   --visibility-config "SampledRequestsEnabled=false,CloudWatchMetricsEnabled=true,MetricName=${acl}" \
   --cli-binary-format raw-in-base64-out \
   --tags Key=project,Value=catchu Key=issue,Value=276 \
-  --query 'Summary.[Name, Id]' --output text
-
-show_evidence "$(acl_id)"
+  --query 'Summary.Id' --output text)
+catchu_info "웹 ACL ${acl}: 만듦(${id})"
+show_evidence "$id"
