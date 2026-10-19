@@ -253,7 +253,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## Worker 내부 분석 컨텍스트 — #232
 
-서비스 인증·실제 DB 조회·필수 선정 공급자 조립과 후속 경계는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 AppModule에는 자동 등록하지 않으며, 실제 선정 공급자와 명시적 활성화가 모두 필요하다.
+제품 기동 시 실제 DB 선정 공급자를 연결하는 조건, 서비스 인증과 검사 범위는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 비활성이며 `WORKER_CONTEXT_ENABLED=true`와 유효한 별도 서비스 키를 준비해야 내부 조회 경로를 등록한다.
 
 ## E 수신 기록과 Catch 반영 연결 — #105
 

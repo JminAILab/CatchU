@@ -67,6 +67,8 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
     AUTH_WEB_ORIGIN: 'https://catchu.example',
     CORS_ALLOWED_ORIGINS: undefined,
     DEV_LOGIN_ENABLED: 'true',
+    WORKER_CONTEXT_ENABLED: undefined,
+    WORKER_CONTEXT_API_KEY: undefined,
     NODE_ENV: 'development',
     PORT: String(port),
     BIND_HOST: undefined, // 터미널의 값이 섞이지 않게 기본은 두지 않는다
@@ -215,5 +217,26 @@ for (const [label, file, open, other] of [
     await assert.rejects(fetch(`${urlOf(other, server.port)}/health`, {
       signal: AbortSignal.timeout(1000),
     }), `${other}에는 열리지 않아야 한다`);
+  });
+}
+
+for (const enabled of ['false', 'true']) {
+  test(`main: worker 내부 조회는 명시적 활성화(${enabled})와 서비스 키에 따라 등록한다`, { timeout: 15000 }, async t => {
+    const serviceKey = randomBytes(32).toString('hex');
+    const server = await launch(t, { file: { WORKER_CONTEXT_ENABLED: enabled, WORKER_CONTEXT_API_KEY: serviceKey } });
+    await server.ready();
+    const path = '/v1/internal/analysis-attempts/00000000-0000-4000-8000-000000000001/context';
+    const response = await server.request(path, { headers: { 'x-worker-key': serviceKey } });
+    assert.equal(response.status, 404);
+    const body = await response.json();
+    assert.equal(body.code, 'RESOURCE_UNAVAILABLE');
+    if (enabled === 'true') {
+      assert.deepEqual(body.details, { violations: [{ field: 'attemptId', reason: 'ATTEMPT_NOT_ACTIVE' }] });
+      assert.equal((await server.request(path)).status, 401);
+    } else {
+      assert.equal(body.details, undefined, '비활성일 때 내부 컨트롤러를 등록하지 않는다');
+      assert.equal((await server.request(path)).status, 404);
+    }
+    assert.equal(server.logs().includes(serviceKey), false);
   });
 }
