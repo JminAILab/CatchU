@@ -20,9 +20,11 @@ export type RequestSnapshot = {
   repositories: Load<readonly AnalyzableRepository[]>;
   notice: Load<AnalysisNotice>;
   selectedId: string | null;
-  /** editing: 입력 가능 / submitting: 요청 중 / unknown: 응답 불명(같은 키·본문으로만 다시 보냄) */
-  phase: "editing" | "submitting" | "unknown";
-  /** 요청 중·응답 불명일 때 붙잡은 본문의 저장소. 입력 중이면 null. */
+  /** editing: 입력 가능 / submitting: 요청 중 / unknown: 응답 불명 / limited: 빈도 제한(같은 키·본문 유지) */
+  phase: "editing" | "submitting" | "unknown" | "limited";
+  /** 빈도 제한 후 다시 보낼 수 있는 시각(ms). 유효한 Retry-After가 없으면 null이며 시간을 추정하지 않는다. */
+  retryAt: number | null;
+  /** 요청 중·응답 불명·빈도 제한일 때 붙잡은 본문의 저장소. 입력 중이면 null. */
   pendingRepositoryId: string | null;
   message: Message | null;
 };
@@ -32,6 +34,7 @@ const INITIAL: RequestSnapshot = {
   notice: { state: "loading" },
   selectedId: null,
   phase: "editing",
+  retryAt: null,
   pendingRepositoryId: null,
   message: null,
 };
@@ -43,6 +46,8 @@ export const TEXT = {
   // 200은 같은 키 재전송과 같은 저장소의 진행 중 작업 반환을 모두 포함한다. 앞선 시도가 만든 요청이라고 특정하지 않는다.
   resentExisting: "이 저장소의 접수된 분석 요청을 확인했습니다. 이번 재전송으로 새 요청을 만들지 않았습니다.",
   unknown: "요청이 접수됐는지 확인하지 못했습니다. [같은 요청 다시 보내기]는 같은 요청을 다시 보내 결과를 확인합니다. 이미 접수됐다면 새 분석을 만들지 않습니다.",
+  limited: "요청이 많아 이번 시도는 처리되지 않았습니다. [같은 요청 다시 보내기]로 같은 요청을 다시 보낼 수 있습니다.",
+  limitedUncertain: "요청이 많아 이번 시도는 처리되지 않았습니다. 앞선 요청이 접수됐는지는 아직 확인하지 못했습니다. [같은 요청 다시 보내기]로 결과를 확인해 주세요.",
   auth: "로그인이 필요합니다. 다시 로그인한 뒤 확인해 주세요.",
   inProgress: "다른 저장소의 분석이 진행 중이라 이번 요청은 접수되지 않았습니다. 진행 중인 분석이 끝난 뒤 다시 요청해 주세요.",
   // 아래 세 안내는 다시 읽기를 시작한 시점에 보인다. 다시 읽기가 끝났다고 단정하지 않는다(실패하면 각 영역에 조회 실패가 따로 보인다).
@@ -62,6 +67,7 @@ export type AnalysisRequestStoreOptions = {
   repositories: (signal?: AbortSignal) => Promise<Lookup<AnalyzableRepository[]>>;
   requests: AnalysisRequestApi;
   keys?: IdempotencyKeyHolder;
+  now?: () => number;
 };
 
 const LOOKUP_FAILED = { kind: "lookup-failed", status: null, code: "LOOKUP_FAILED" } as const;
@@ -75,6 +81,7 @@ function toLoad<T>(result: Result<T>): Load<T> {
 
 export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions) {
   const keys = options.keys ?? createIdempotencyKeyHolder();
+  const now = options.now ?? Date.now;
   let state = INITIAL;
   const listeners = new Set<() => void>();
   /** 접수 결과나 진행 상태가 바뀌었을 수 있을 때 부를 함수들(#153의 「연결된 저장소」 다시 불러오기). */
@@ -85,7 +92,7 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
   let noticeVersion = 0;
   let repositoryAbort: AbortController | undefined;
   let noticeAbort: AbortController | undefined;
-  /** 요청 중·응답 불명일 때 다시 보낼 본문. 같은 키에는 같은 본문만 보낸다. */
+  /** 요청 중·응답 불명·빈도 제한일 때 다시 보낼 본문. 같은 키에는 같은 본문만 보낸다. */
   let pendingBody: AnalysisCreateBody | null = null;
   /** 붙잡은 요청에 결과를 모르는 시도가 있었는지. 200을 받았을 때 안내를 고른다. */
   let uncertain = false;
@@ -147,7 +154,7 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
     return Promise.all([loadRepositories(), loadNotice()]).then(() => undefined);
   }
 
-  /** 모달을 열 때. 입력 중이면 이전 안내 문구를 지우고 목록·고지를 다시 읽는다. 응답 불명이면 그 안내와 붙잡은 요청을 그대로 둔다. */
+  /** 모달을 열 때. 입력 중이면 이전 안내 문구를 지우고 목록·고지를 다시 읽는다. 응답 불명·빈도 제한이면 안내·요청·대기 기한을 그대로 둔다. */
   function open(): Promise<void> {
     if (state.phase === "editing" && state.message !== null) emit({ message: null });
     return load();
@@ -183,13 +190,13 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
     const text = outcome.kind === "accepted" ? TEXT.accepted : uncertain ? TEXT.resentExisting : TEXT.existing;
     releasePending();
     // 같은 요청을 실수로 다시 누르지 않게 선택을 푼다. 다음 요청은 저장소를 다시 골라야 만든다.
-    emit({ phase: "editing", pendingRepositoryId: null, selectedId: null, message: { tone: "success", text } });
+    emit({ phase: "editing", retryAt: null, pendingRepositoryId: null, selectedId: null, message: { tone: "success", text } });
     statusChanged();
   }
 
   /** 서버가 판정한 거부(4xx)의 안내와 뒤따를 다시 읽기. 키는 이미 놓았다. 403 전체를 판본 거부로 보지 않고 코드로 나눈다. */
   function rejected(code: string, status: number) {
-    const reset = { phase: "editing" as const, pendingRepositoryId: null };
+    const reset = { phase: "editing" as const, retryAt: null, pendingRepositoryId: null };
     const error = (text: string, action?: "github"): Message => (action ? { tone: "error", text, action } : { tone: "error", text });
     switch (code) {
       case "CONSENT_REQUIRED":
@@ -233,12 +240,21 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
 
   async function send(body: AnalysisCreateBody): Promise<void> {
     // 응답을 기다리기 전에 요청 중 표시와 입력·버튼 차단을 먼저 적용한다(같은 틱의 두 번째 클릭도 막는다).
-    emit({ phase: "submitting", pendingRepositoryId: body.repositoryId, message: null });
+    emit({ phase: "submitting", retryAt: null, pendingRepositoryId: body.repositoryId, message: null });
     const key = keys.current();
     const gen = generation;
     const result = await safely(() => options.requests.create(body, key));
     if (gen !== generation) return;
     if (result.kind === "success") return settle(result.data);
+    if (result.kind === "api-error" && result.status === 429) {
+      // 이번 시도는 처리되지 않았지만, 앞선 불명 시도의 결과까지 확인된 것은 아니다. 키·본문과 uncertain은 유지한다.
+      const seconds = "retryAfterSeconds" in result ? result.retryAfterSeconds : undefined;
+      const retryAt = typeof seconds === "number" && Number.isSafeInteger(seconds) && seconds > 0 ? now() + seconds * 1000 : null;
+      return emit({
+        phase: "limited", retryAt,
+        message: { tone: "error", text: uncertain ? TEXT.limitedUncertain : TEXT.limited },
+      });
+    }
     if (result.kind === "api-error" && result.status === 401) {
       // 인증 단계에서 거부돼 이번 시도는 처리되지 않았다. 앞선 시도의 결과를 모르면 그 결과는 여전히 모른다.
       if (uncertain) return emit({ phase: "unknown", message: { tone: "error", text: TEXT.auth } });
@@ -249,7 +265,7 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
       releasePending();
       return rejected(result.code, result.status);
     }
-    // 조회 실패·5xx·429·계약과 다른 성공 응답. 서버가 처리했는지 알 수 없으므로 키·본문을 붙잡고 자동으로 다시 보내지 않는다.
+    // 조회 실패·5xx·계약과 다른 성공 응답. 서버가 처리했는지 알 수 없으므로 키·본문을 붙잡고 자동으로 다시 보내지 않는다.
     uncertain = true;
     emit({ phase: "unknown", message: { tone: "error", text: TEXT.unknown } });
   }
@@ -264,11 +280,16 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
     await send(body);
   }
 
-  function canResend(): boolean {
-    return state.phase === "unknown" && pendingBody !== null;
+  /** 빈도 제한의 남은 초(올림). 대기 중이 아니면 0. */
+  function retryWaitSeconds(): number {
+    return state.retryAt === null ? 0 : Math.max(0, Math.ceil((state.retryAt - now()) / 1000));
   }
 
-  /** 응답 불명 뒤 [같은 요청 다시 보내기]: 같은 키·같은 본문으로만 보낸다. */
+  function canResend(): boolean {
+    return (state.phase === "unknown" || state.phase === "limited") && pendingBody !== null && retryWaitSeconds() === 0;
+  }
+
+  /** 응답 불명·빈도 제한 뒤 [같은 요청 다시 보내기]: 기한이 지난 뒤 같은 키·같은 본문으로만 보낸다. */
   async function resend(): Promise<void> {
     if (!canResend() || pendingBody === null) return;
     await send(pendingBody);
@@ -285,7 +306,7 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
       statusWatchers.add(watch);
       return () => { statusWatchers.delete(watch); };
     },
-    open, load, loadRepositories, loadNotice, select, canSubmit, submit, canResend, resend,
+    open, load, loadRepositories, loadNotice, select, canSubmit, submit, canResend, resend, retryWaitSeconds,
     /** 화면(내 자산)을 떠날 때: 진행 중 조회를 취소하고 늦은 응답을 버리며 처음 상태로 돌린다. 보낸 POST는 취소하지 않는다. */
     dispose() {
       generation += 1;

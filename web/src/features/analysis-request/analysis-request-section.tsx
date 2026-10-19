@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useSyncExternalStore } from "react";
+import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { routes } from "@/lib/routes";
 import type { AnalyzableRepository } from "../repository-management/repository-api";
 import { repositoryDisplayName } from "../repository-management/repository-status";
@@ -16,7 +16,17 @@ import styles from "./analysis-request.module.css";
 export function AnalysisRequestSection({ store }: { store: AnalysisRequestStore }) {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const baseId = useId();
-  const { repositories, notice, selectedId, phase, pendingRepositoryId, message } = snapshot;
+  const { repositories, notice, selectedId, phase, retryAt, pendingRepositoryId, message } = snapshot;
+  const [, setTick] = useState(0);
+  const waitSeconds = retryAt === null ? 0 : store.retryWaitSeconds();
+  const limitedWaiting = waitSeconds > 0;
+
+  // 시간 경과는 화면에만 반영하고 자동 전송하지 않는다. 모달을 닫거나 기한이 지나면 타이머를 정리한다.
+  useEffect(() => {
+    if (!limitedWaiting) return;
+    const timer = setInterval(() => setTick((tick) => tick + 1), 1000);
+    return () => clearInterval(timer);
+  }, [limitedWaiting, retryAt]);
   const editing = phase === "editing";
   const selected = repositories.state === "ready" ? repositories.value.find((item) => item.repositoryId === selectedId) ?? null : null;
   const pendingName = pendingRepositoryId === null ? null : nameOf(repositories, pendingRepositoryId);
@@ -43,7 +53,7 @@ export function AnalysisRequestSection({ store }: { store: AnalysisRequestStore 
 
       {pendingName && (
         <p className={styles.pending}>
-          {phase === "submitting" ? "요청 중인 저장소: " : "결과를 확인할 요청: "}<strong>{pendingName}</strong>
+          {phase === "submitting" ? "요청 중인 저장소: " : phase === "limited" ? "다시 보낼 요청: " : "결과를 확인할 요청: "}<strong>{pendingName}</strong>
         </p>
       )}
 
@@ -55,6 +65,10 @@ export function AnalysisRequestSection({ store }: { store: AnalysisRequestStore 
         </div>
       )}
 
+      {limitedWaiting && (
+        <p className={styles.muted} role="status">같은 요청을 다시 보내기까지 {waitSeconds}초 남았습니다.</p>
+      )}
+
       <div className={styles.actions}>
         {phase === "editing" && (
           <button type="button" className={styles.primaryButton} disabled={!store.canSubmit()} onClick={() => { void store.submit(); }}>
@@ -64,7 +78,7 @@ export function AnalysisRequestSection({ store }: { store: AnalysisRequestStore 
         {phase === "submitting" && (
           <button type="button" className={styles.primaryButton} disabled aria-busy="true">요청 중…</button>
         )}
-        {phase === "unknown" && (
+        {(phase === "unknown" || phase === "limited") && (
           <button type="button" className={styles.primaryButton} disabled={!store.canResend()} onClick={() => { void store.resend(); }}>
             같은 요청 다시 보내기
           </button>

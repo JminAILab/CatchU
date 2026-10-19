@@ -81,6 +81,8 @@ const NOTICE = { noticeRevision: "preview-notice-v1", text: "[미리보기 합�
 const rejectWith = (code: string, status: number) => json({ code, message: "모의 거부" }, status);
 /** 받은 키별 결과. 응답 불명 시나리오에서 같은 키로 다시 보내면 앞서 받아 둔 요청을 200으로 돌려준다. */
 const acceptedKeys = new Map<string, string>();
+/** 최초 전송만 429로 거부한다. 같은 키로 다시 보내면 아래의 202 접수로 이어진다. */
+const limitedKeys = new Set<string>();
 let consentRejected = false;
 
 const requestApi = createAnalysisRequestApi(async (path, request) => {
@@ -97,6 +99,13 @@ const requestApi = createAnalysisRequestApi(async (path, request) => {
   if (acceptedKeys.has(key)) return json(status(body.repositoryId, "QUEUED", "NOT_READY", { requestId: acceptedKeys.get(key) }), 200);
   switch (mode) {
     case "existing": return json(status(body.repositoryId, "RUNNING", "NOT_READY"), 200);
+    case "limited":
+      if (!limitedKeys.has(key)) {
+        limitedKeys.add(key);
+        // 공통 호출이 Retry-After: 3에서 읽은 남은 초를 합성한다. 실제 접수 API를 부르지 않는다.
+        return { ...await rejectWith("RATE_LIMITED", 429), retryAfterSeconds: 3 };
+      }
+      break;
     case "in-progress": return json({ code: "ANALYSIS_IN_PROGRESS", message: "모의 거부", details: { existingRequestId: "req-queue-repo" } }, 409);
     case "consent":
       if (!consentRejected) { consentRejected = true; return rejectWith("CONSENT_REQUIRED", 403); }
@@ -133,8 +142,8 @@ export function RepositoryManagementPreview() {
         <p>자료와 응답은 모두 예시입니다. 실제 로그인·API·분석 결과가 아닙니다.</p>
         <p>주소에 scenario=empty · failed · me-failed · disconnected · reauth를 붙여 상태를 바꿉니다.</p>
         <p>
-          분석 요청(#154)은 intake=accepted(기본) · existing · in-progress · consent · unknown · github · not-allowed · unavailable
-          · deferred · notice-failed · notice-unavailable로 바꿉니다.
+          분석 요청(#154)은 intake=accepted(기본) · existing · in-progress · consent · unknown · limited · github · not-allowed · unavailable
+          · deferred · notice-failed · notice-unavailable로 바꿉니다. limited는 3초 제한 뒤 같은 요청을 다시 보내면 접수됩니다.
         </p>
       </aside>
       <AssetsConnected api={catchApi} repositories={previewRepositories}

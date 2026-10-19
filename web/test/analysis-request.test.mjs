@@ -193,7 +193,6 @@ for (const [name, result] of [
   ['5xx', apiError(500, 'INTERNAL_ERROR')],
   ['네트워크(조회 실패)', LOOKUP_FAILED],
   ['계약과 다른 202 본문', http(202, { requestId: 'x' })],
-  ['429', apiError(429, 'RATE_LIMITED')],
 ]) {
   test(`응답 불명(${name}): 자동으로 다시 보내지 않고, [같은 요청 다시 보내기]만 같은 키·같은 본문으로 보낸다`, async () => {
     const h = harness({ create: () => result });
