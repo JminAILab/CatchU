@@ -9,7 +9,7 @@ import type { LogoutResult } from "./auth-state.ts";
  *   - 로그아웃 결과 불명: #251 5번 합의(https://github.com/JminAILab/CatchU/issues/251#issuecomment-6139957700).
  *     다시 시도할 수 없는 상태에서는 다시 시도를 안내하지 않는다(같은 합의).
  *   - Google 사용 불가(`unavailable`, 시도 보관 실패 포함): A 답변 2(https://github.com/JminAILab/CatchU/issues/251#issuecomment-6187946262).
- * - [제안]: 아직 확정되지 않은 문구. 연결 전에 #251에서 정한다. #251 12번 초안(https://github.com/JminAILab/CatchU/issues/251#issuecomment-6162564432)과
+ * - [제안]: 아직 확정되지 않은 문구. 통합 시험 전환 아래에서는 이 문구로 연결해 두고, 제품 전환 전에 #251에서 정한다. #251 12번 초안(https://github.com/JminAILab/CatchU/issues/251#issuecomment-6162564432)과
  *   이번에 새로 쓴 문구가 여기에 든다. 안내의 종류(취소·실패·네트워크·새 로그인 안내)는 #251 1번·접점 답변으로 합의됐다.
  */
 export const authScreenMessages = {
