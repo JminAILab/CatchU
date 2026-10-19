@@ -13,7 +13,7 @@ const { DEV_LOGIN_IDENTITY_PREFIX, GOOGLE_IDENTITY_PREFIX } = require('../../dis
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
   APP_LOCK_TIMEOUT, APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, cleanUpLocks, createLockWaitRoles,
-  holdAdvisory, holdRow, sleep, summarize, timed, waitUntilBlocked, withAppAccount,
+  holdAdvisory, holdRow, sleepUntil, summarize, timed, waitUntilBlocked, withAppAccount,
 } = require('../support/lock-wait-limit.cjs');
 const { defineShareLinkLockCases } = require('../support/share-link-lock-cases.cjs');
 
@@ -177,9 +177,10 @@ test('개발 로그인: 짧게 쥔 신원 잠금과 같은 신원의 동시 로�
   if (!ready(t)) return;
   const identity = 'lock-dev-' + randomUUID();
   const held = await holdAdvisory(db, DEV_LOGIN_IDENTITY_PREFIX + identity);
+  const startedAt = Date.now();
   const pending = timed(() => devLogin(identity));
   await waitUntilBlocked(db, held.pid, '개발 로그인');
-  await sleep(1000);
+  await sleepUntil(startedAt + 1000);
   const heldMs = await held.release();
   const waited = await pending;
   assert.equal(waited.value.status, 200, JSON.stringify(waited.value.body));
@@ -287,9 +288,10 @@ test('세션 갱신: 짧게 쥔 세션 행 잠금은 기다린 뒤 성공하고,
   if (!ready(t)) return;
   const user = await login('lock-session-short');
   const held = await holdRow(db, 'auth_session', 'session_id', user.sessionId);
+  const startedAt = Date.now();
   const pending = timed(() => refresh(user.cookie));
   await waitUntilBlocked(db, held.pid, '세션 갱신');
-  await sleep(1000);
+  await sleepUntil(startedAt + 1000);
   const heldMs = await held.release();
   const waited = await pending;
   assert.equal(waited.value.status, 200, JSON.stringify(waited.value.body));

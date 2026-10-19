@@ -22,7 +22,7 @@ const { ANALYSIS_PROCESSING_DEADLINE_MS, AnalysisDeadlineService } = require('..
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
   APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, assertQueuedCapWait, cleanUpLocks, createLockWaitRoles, hold, holdAdvisory,
-  holdRow, sleep, timed, waitUntilBlocked, waitUntilWaiting, withAppAccount,
+  holdRow, sleepUntil, timed, waitUntilBlocked, waitUntilWaiting, withAppAccount,
 } = require('../support/lock-wait-limit.cjs');
 
 // #220: 결과 수신·반영과, 반영 중인 요청에 겹치는 접수 재응답·결과 재전달·진행 알림·시한 닫기의 잠금 대기를
@@ -351,12 +351,13 @@ async function receivedResult(identity, count) {
 /**
  * 반영은 요청 → 시도 순서로 잠근다. 시도 행(gate)을 쥐어 반영이 요청 행을 잡고 기다리게 한 뒤, 같은 요청의 접수 재응답
  * REPLAYS건·결과 재전달·진행 알림을 보내 모두 잠금을 기다리는 것까지 본다. 첫 재응답·재전달·진행 알림은 반영이 쥔
- * 요청 행에서, 나머지 재응답은 같은 키 잠금에서 기다린다. at.startedAt은 반영이 시도 행에 막힌 것을 보고 경쟁 요청을
- * 보내기 직전, at.observedAt은 경쟁 요청이 모두 기다리는 것을 본 때, at.appliedAt은 반영이 끝난 때다.
+ * 요청 행에서, 나머지 재응답은 같은 키 잠금에서 기다린다. at.applyingAt은 반영을 시작한 때(곧바로 요청 행을 잡고 시도 행을
+ * 기다린다), at.startedAt은 반영이 시도 행에 막힌 것을 보고 경쟁 요청을 보내기 직전, at.observedAt은 경쟁 요청이 모두
+ * 기다리는 것을 본 때, at.appliedAt은 반영이 끝난 때다.
  */
 async function contend({ user, body, result, accepted }) {
   const gate = await holdRow(db, 'analysis_attempt', 'attempt_id', result.attemptId);
-  const at = {};
+  const at = { applyingAt: Date.now() };
   const applying = timed(() => applier(result).apply(accepted).finally(() => { at.appliedAt = Date.now(); }));
   const applyPid = await waitUntilBlocked(db, gate.pid, '반영 시작');
   const competitors = pipeline();
@@ -416,7 +417,7 @@ for (const candidates of [40, 100, 300, 500]) {
     const holdMs = at.appliedAt - releasedAt;
 
     // 반영도 사전 조율 동안 시도 행을 기다린다. 그 대기가 상한을 넘으면 반영이 실패하므로 함께 남긴다.
-    assert.equal(applied.ok, true, `반영의 시도 행 대기 ${releasedAt - at.startedAt}ms: ${applied.error}`);
+    assert.equal(applied.ok, true, `반영의 시도 행 대기 ${releasedAt - at.applyingAt}ms: ${applied.error}`);
     assert.equal(applied.value.registeredCatchIds.length, candidates);
     assert.deepEqual(closing.value, { closed: 0, failed: 0 });
     assert.ok(closing.ms < 2000, `시한 닫기는 반영을 기다리지 않고 건너뛴다(${closing.ms}ms)`);
@@ -434,8 +435,9 @@ test('결과 반영과 겹친 짧은 대기: 경쟁 요청을 보낸 뒤 반영�
   const prepared = await receivedResult('apply-short', 1);
   const { result } = prepared;
   const { gate, applying, at, competing } = await contend(prepared);
-  // 경쟁 요청을 보내고 약 1초 뒤 시도 행을 푼다. 사전 조율이 그보다 길었으면 바로 푼다.
-  await sleep(Math.max(0, at.startedAt + 1000 - Date.now()));
+  // 반영을 시작하고 약 1초 뒤 시도 행을 푼다. 반영이 막힌 것과 경쟁 요청이 모두 기다리는 것을 확인하는 시간도 이 1초에 들어
+  // 반영의 시도 행 대기에 더해지지 않는다. 사전 조율이 그보다 길었으면 바로 푼다.
+  await sleepUntil(at.applyingAt + 1000);
   await gate.release();
   const applied = await applying;
   // 경쟁 요청의 잠금 대기는 보낸 뒤 시작하고, 반영이 끝나면 앞 요청의 짧은 처리만 더 기다린다. 이 구간이 상한보다
@@ -456,15 +458,20 @@ test('결과 반영과 겹친 상한 초과: 반영이 잠금마다 상한보다
   // 반영은 요청 행을 쥔 채 시도 행 → 첫 작업 → 마지막 작업 잠금을 차례로 기다린다. 두 작업 잠금은 미리 쥐어 둔다.
   const [firstWork, lastWork] = await Promise.all(workLocks(result).map(text => holdAdvisory(db, text)));
   const { gate, applying, at, competing } = await contend(prepared);
-  const gateMs = Date.now() - at.startedAt;
+  // 반영의 잠금 대기는 그 잠금을 기다리기 전의 시각(시도 행은 반영 시작, 작업 잠금은 앞 잠금을 풀기 직전)부터 그 잠금을 풀기
+  // 직전까지로 잰다.
+  let releasedAt = Date.now();
+  const gateMs = releasedAt - at.applyingAt;
   await gate.release();
-  // 작업 잠금은 반영이 막힌 것을 본 뒤 2초씩 쥐고 푼다. 반영의 대기는 매번 상한보다 짧고, 요청 행 보유는 그 합만큼 길어진다.
+  // 작업 잠금은 앞 잠금을 풀고 2초 뒤 하나씩 푼다. 반영이 막힌 것을 확인하는 시간도 이 2초에 들어, 반영의 대기는 매번 상한보다
+  // 짧고 요청 행 보유는 그 합만큼 길어진다. 확인이 2초보다 늦었으면 확인 직후 푼다.
   const workMs = [];
   for (const [held, label] of [[firstWork, '첫 작업 잠금'], [lastWork, '마지막 작업 잠금']]) {
     await waitUntilBlocked(db, held.pid, label);
-    const blockedAt = Date.now();
-    await sleep(2000);
-    workMs.push(Date.now() - blockedAt);
+    await sleepUntil(releasedAt + 2000);
+    const now = Date.now();
+    workMs.push(now - releasedAt);
+    releasedAt = now;
     await held.release();
   }
   const applied = await applying;
@@ -490,9 +497,10 @@ test('시한 닫기: 요청을 잡은 뒤 시도 행을 기다리며, 짧은 보
   // 제품 경로는 시도보다 요청을 먼저 잠그므로 시도 행만 쥔 연결은 이 시험에서만 만든다. 닫기가 기다리는 곳은 여기뿐이다.
   const waiting = await prepare();
   let held = await holdRow(db, 'analysis_attempt', 'attempt_id', waiting.attemptId);
+  const startedAt = Date.now();
   const pending = timed(() => deadline(DEADLINE).service.closeOverdue());
   await waitUntilBlocked(db, held.pid, '시한 닫기');
-  await sleep(1000);
+  await sleepUntil(startedAt + 1000);
   const heldMs = await held.release();
   const closed = await pending;
   assert.deepEqual(closed.value, { closed: 1, failed: 0 });

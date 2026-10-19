@@ -10,7 +10,7 @@ const { SYNTHETIC_REPOSITORY } = require('../../dist/member-analysis/dev-member.
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
   APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, cleanUpLocks, createLockWaitRoles, holdAdvisory, holdRow,
-  sleep, summarize, timed, waitUntilBlocked, withAppAccount,
+  sleepUntil, summarize, timed, waitUntilBlocked, withAppAccount,
 } = require('../support/lock-wait-limit.cjs');
 
 // #220: 분석 접수(POST /v1/analysis-requests)와 같은 키 재응답이 기다리는 잠금을 앱 계정 3초 조건에서 본다.
@@ -166,9 +166,10 @@ test('분석 접수: 짧게 쥔 회원 잠금은 기다린 뒤 접수되고, 첫
   const user = await login('intake-normal');
   const body = await consentBody(user);
   const held = await holdAdvisory(db, intakeLockText(user.memberId));
+  const startedAt = Date.now();
   const pending = timed(() => submit(user, 'normal-key', body));
   await waitUntilBlocked(db, held.pid, '분석 접수');
-  await sleep(1000);
+  await sleepUntil(startedAt + 1000);
   const heldMs = await held.release();
   const waited = await pending;
   assert.equal(waited.value.status, 202, JSON.stringify(waited.value.body));

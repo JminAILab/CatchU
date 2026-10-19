@@ -17,7 +17,7 @@ const { insertInitialAnalysis } = require('../../dist/member-analysis/initial-an
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
   APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, cleanUpLocks, createLockWaitRoles, holdRow,
-  sleep, summarize, timed, waitUntilBlocked, withAppAccount,
+  sleepUntil, summarize, timed, waitUntilBlocked, withAppAccount,
 } = require('../support/lock-wait-limit.cjs');
 
 // #220: worker 맥락 조회(GET /v1/internal/analysis-attempts/:id/context)의 잠금 대기를 앱 계정 3초 조건에서 본다.
@@ -149,9 +149,10 @@ test('worker 맥락 조회: 짧게 쥔 요청 행은 기다린 뒤 성공하고,
   if (!ready(t)) return;
   const request = await prepare();
   let held = await holdRow(db, 'analysis_request', 'request_id', request.requestId);
+  let startedAt = Date.now();
   const pending = timed(() => context(request.currentAttemptId));
   await waitUntilBlocked(db, held.pid, 'worker 맥락 조회');
-  await sleep(1000);
+  await sleepUntil(startedAt + 1000);
   const heldMs = await held.release();
   const waited = await pending;
   assert.equal(waited.value.status, 200);
@@ -161,9 +162,10 @@ test('worker 맥락 조회: 짧게 쥔 요청 행은 기다린 뒤 성공하고,
   const free = await Promise.all(Array.from({ length: concurrent }, () => timed(() => context(request.currentAttemptId))));
   assert.deepEqual(free.map(r => r.value.status), Array(concurrent).fill(200));
   held = await holdRow(db, 'analysis_request', 'request_id', request.requestId);
+  startedAt = Date.now();
   const queued = Array.from({ length: concurrent }, () => timed(() => context(request.currentAttemptId)));
   await waitUntilBlocked(db, held.pid, 'worker 맥락 동시 조회');
-  await sleep(500);
+  await sleepUntil(startedAt + 500);
   const shortMs = await held.release();
   const behind = await Promise.all(queued);
   assert.deepEqual(behind.map(r => r.value.status), Array(concurrent).fill(200));

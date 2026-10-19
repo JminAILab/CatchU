@@ -21,6 +21,12 @@ const CLEANUP_WAIT_MS = 30000;
 
 const quote = name => `"${name.replaceAll('"', '""')}"`;
 const sleep = ms => new Promise(done => setTimeout(done, ms));
+/**
+ * at(Date.now() 기준 시각)까지 기다리고, 이미 지났으면 바로 돌아온다. 짧게 쥐는 시험은 요청이 잠금을 기다리기 전의 시각
+ * (요청을 보내기 직전, 차례로 기다리는 잠금은 앞 잠금을 풀기 직전)부터 정한 보유 시간이 지나면 잠금을 푼다. 잠금 대기를
+ * 확인(waitUntilBlocked)하는 시간도 그 안에 들어 보유 시간에 더해지지 않고, 확인이 그 시각보다 늦으면 확인 직후 푼다.
+ */
+const sleepUntil = at => sleep(Math.max(0, at - Date.now()));
 
 async function canCreateRoles(db) {
   const [row] = await db.query('SELECT rolsuper OR rolcreaterole AS allowed FROM pg_roles WHERE rolname = current_user');
@@ -234,5 +240,5 @@ function summarize(values) {
 module.exports = {
   APP_LOCK_TIMEOUT, APP_LOCK_TIMEOUT_MS, LOCK_NOT_AVAILABLE, NO_ROLE_PRIVILEGE, ROLE_PREFIX,
   assertCapWait, assertQueuedCapWait, canCreateRoles, cleanUpLocks, createLockWaitRoles, driverCode, hold, holdAdvisory, holdRow,
-  sleep, summarize, timed, waitUntilBlocked, waitUntilWaiting, withAppAccount,
+  sleep, sleepUntil, summarize, timed, waitUntilBlocked, waitUntilWaiting, withAppAccount,
 };
