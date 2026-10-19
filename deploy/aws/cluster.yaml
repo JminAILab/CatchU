@@ -1,0 +1,141 @@
+# AWS 실행 환경(#276): VPC·서브넷·NAT 2개·EKS 클러스터·노드 그룹·애드온.
+# 구성은 #276 본문과 2026-10-19 결정(가용 영역 장애 대비, 노드 2대로 시작·정한 시간 패치·자동 복구)을 따른다.
+# 비밀값과 계정 번호는 이 파일에 넣지 않는다. 만들기·지우기 순서와 승인 지점은 README.md 「단계와 시작 조건」·「삭제 순서」.
+# 형식 확인(자원을 만들지 않음): AWS_PROFILE=catchu eksctl create cluster -f deploy/aws/cluster.yaml --dry-run
+#   eksctl은 --dry-run과 --profile을 함께 받지 않는다. 셸에 AWS 키 환경변수가 없어야 프로필 값이 쓰인다(README.md 「처음 준비」).
+# 만들기는 비용이 생기므로 팀장 승인 뒤에만 한다: eksctl create cluster -f deploy/aws/cluster.yaml --profile catchu
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: catchu
+  region: ap-northeast-2
+  # 1.37 표준 지원은 2027-12-01까지다(2026-10-17 조회). 운영 기간에 클러스터 판본은 올리지 않는다.
+  version: "1.37"
+  tags:
+    project: catchu
+    issue: "276"
+
+# 가용 영역 2곳. 정하지 않으면 eksctl이 3곳을 골라 NAT·ALB 공인 IP가 늘어난다. 두 곳 모두 t4g.large를 제공한다(2026-10-17 조회).
+availabilityZones:
+  - ap-northeast-2a
+  - ap-northeast-2c
+
+accessConfig:
+  # 클러스터 접근 권한은 EKS API(접근 항목)로만 관리하고 aws-auth ConfigMap 경로는 열지 않는다. 만든 뒤 ConfigMap 방식으로 되돌릴 수 없다.
+  authenticationMode: API
+  # 만드는 사람(팀장 IAM 사용자)이 클러스터 관리자 권한을 받는다. 팀원에게는 클러스터 권한을 주지 않는다.
+  bootstrapClusterCreatorAdminPermissions: true
+
+vpc:
+  # 대역을 정하지 않으면 eksctl 기본(192.168.0.0/16)으로 가용 영역마다 퍼블릭·프라이빗 서브넷을 만든다.
+  # 퍼블릭 서브넷에는 ALB와 NAT만, 프라이빗 서브넷에는 노드·RDS·ElastiCache·EFS 마운트 지점을 둔다.
+  nat:
+    # 가용 영역마다 NAT 하나(10/19 결정 1). 2a가 멈춰도 2c 노드가 바깥(Google·GitHub·Anthropic·ECR)에 닿는다.
+    # NAT 수는 클러스터를 만들 때만 정할 수 있다.
+    gateway: HighlyAvailable
+  clusterEndpoints:
+    # 공개 주소는 팀장 kubectl과 EKS 자동 배포(#342, GitHub 러너)용이며 IAM 인증을 거친다.
+    # 러너 대역이 클러스터당 허용 대역 수(40)를 넘어 접근 대역을 좁히지 않는다. 노드는 VPC 안 주소로 붙는다.
+    publicAccess: true
+    privateAccess: true
+
+# 판본을 고정한다. 정하지 않으면 만들 때의 기본판이 깔려 10/15 NetworkPolicy 시험과 다른 판이 될 수 있다.
+# 값은 2026-10-19 aws eks describe-addon-versions --kubernetes-version 1.37 조회 결과다. 만들기 직전에 다시 보고 바뀌었으면 이 파일을 고친다.
+addons:
+  - name: vpc-cni
+    # 10/15 시험은 판본을 적지 않아 그때 기본판(1.22.4 계열)이 깔렸다. 더 새 판을 쓰려면 NetworkPolicy 시험을 다시 한다.
+    version: v1.22.4-eksbuild.3
+    # NetworkPolicy로 worker의 DB 접근과 허용 목록 밖 바깥 연결을 막는다(t 계열 노드는 Pod 보안 그룹을 쓸 수 없다).
+    # 기본(standard) 모드라 새 Pod는 정책이 걸리기 전 몇 초 동안 막히지 않는다. #276 계획에서 받아들인 한계다.
+    # strict 모드는 kube-system을 포함한 모든 Pod에 정책이 있어야 해서 쓰지 않는다. 만든 뒤에도 애드온 설정으로 바꿀 수 있다.
+    configurationValues: |-
+      enableNetworkPolicy: "true"
+  - name: coredns
+    version: v1.14.7-eksbuild.11
+    # 두 CoreDNS를 가용 영역마다 하나씩 둔다. 기본 설정은 같은 노드를 피하기를 '선호'만 해서 10/15에 두 개가 한 노드에 몰렸다.
+    # 노드가 하나만 남은 때(장애·패치)에도 둘째 Pod가 대기하지 않도록 ScheduleAnyway로 둔다.
+    configurationValues: |-
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              k8s-app: kube-dns
+  - name: kube-proxy
+    version: v1.37.0-eksbuild.22
+  # Load Balancer Controller 등의 AWS 권한을 Pod Identity로 준다.
+  - name: eks-pod-identity-agent
+    version: v1.3.10-eksbuild.3
+  # 목록에 없어도 eksctl이 넣는다. 판본을 고정하려고 적는다. Pod 사용량 측정(kubectl top)에 쓴다.
+  - name: metrics-server
+    version: v0.9.0-eksbuild.13
+  # GitHub 토큰 보관 폴더(EFS)를 api에 붙이는 드라이버. 접근점을 미리 만드는 정적 방식이라 먼저 AWS 권한 없이 설치해
+  # 마운트가 되는지 실측한다. 안 되면 efs-csi-controller-sa에만 AmazonEFSCSIDriverPolicy를 Pod Identity로 더한다.
+  # 애드온 기본 권한 묶음(useDefaultPodIdentityAssociations)은 S3 읽기 권한까지 붙어 쓰지 않는다.
+  - name: aws-efs-csi-driver
+    version: v3.5.1-eksbuild.1
+
+iam:
+  podIdentityAssociations:
+    # 서비스 계정은 Load Balancer Controller Helm 차트가 만든다. 앱 Pod에는 AWS 권한을 주지 않는다.
+    - namespace: kube-system
+      serviceAccountName: aws-load-balancer-controller
+      wellKnownPolicies:
+        awsLoadBalancerController: true
+
+managedNodeGroups:
+  - name: app
+    amiFamily: AmazonLinux2023
+    # ARM(arm64). 이미지도 arm64로 만든다(#275).
+    instanceType: t4g.large
+    # 노드 이미지 판본. 만들기 직전 공개 파라미터
+    # /aws/service/eks/optimized-ami/1.37/amazon-linux-2023/arm64/standard/recommended/release_version 값으로 다시 맞춘다.
+    releaseVersion: "1.37.0-20261012"
+    # 2대 고정. 자동 확장은 두지 않는다. 비상 때 3대째는 README.md 「노드 작업」 순서로 손으로 늘린다.
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 2
+    # 노드 이미지 패치는 한 번에 한 대씩 비운다(새 노드를 먼저 띄운 뒤 옮김).
+    updateConfig:
+      maxUnavailable: 1
+    # Ready가 아닌 상태가 30분 이어진 노드를 바꾼다. 끊긴 채 살아 있는 노드의 옛 api·worker가 겹쳐 도는 시간을 그 안으로 줄인다.
+    nodeRepairConfig:
+      enabled: true
+      maxParallelNodesRepairedCount: 1
+    volumeSize: 30
+    volumeType: gp3
+    volumeEncrypted: true
+    # 프라이빗 서브넷에 두고 공인 IP를 붙이지 않는다. 바깥 연결은 그 가용 영역의 NAT를 거친다.
+    privateNetworking: true
+    # Pod가 노드의 인스턴스 메타데이터(노드 IAM 권한)에 닿지 못하게 한다. 호스트 망을 쓰는 시스템 Pod는 막히지 않는다(아래 거부 규칙).
+    disablePodIMDS: true
+    disableIMDSv1: true
+    iam:
+      # attachPolicyARNs를 적지 않아 eksctl 기본 정책(WorkerNode·CNI·ECR PullOnly·SSM Core)이 그대로 붙는다.
+      # SSM Core는 노드 Session Manager 접속에 남기지만 SSM 파라미터 읽기를 모든 자원에 허용하므로, 호스트 망 Pod(aws-node·kube-proxy·
+      # 로그 수집기)가 노드 권한으로 앱 비밀값을 읽지 못하게 /catchu 아래 읽기와 Secrets Manager 읽기를 거부한다(개발 서버 거부 규칙과 같은 동작).
+      # 계정 자리는 *로 둔다. 거부 규칙이라 범위가 넓어져도 허용이 늘지 않는다.
+      attachPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyCatchuParameterRead
+            Effect: Deny
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:GetParametersByPath
+              - ssm:GetParameterHistory
+            Resource:
+              - arn:aws:ssm:*:*:parameter/catchu
+              - arn:aws:ssm:*:*:parameter/catchu/*
+          - Sid: DenySecretsManagerRead
+            Effect: Deny
+            Action: secretsmanager:GetSecretValue
+            Resource: "*"
+    labels:
+      catchu.io/node-role: app
+    tags:
+      project: catchu
+      issue: "276"
