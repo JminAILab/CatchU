@@ -23,7 +23,7 @@ GitHub 메타데이터의 고유 숫자 ID를 문자열로 쓴다. 두 저장소
 모르는 참조·합성 참조·불일치는 `null`, DB 장애는 예외다. 결과 URL에서 좌표를 추측하지 않는다.
 
 ```ts
-// 수신 모듈 또는 큐 모듈 중 한 곳에서만 조립한다. AppModule에는 아직 등록하지 않는다.
+// LIVE 결과 등록용 예시. 수신 모듈 또는 큐 모듈 중 한 곳에서만 조립한다. AppModule에는 아직 등록하지 않는다.
 AnalysisReceiverModule.registerDatabase({
   contractDirectory,
   observationsFactory: db => new OctoberRepositoryObservationSource(
@@ -35,11 +35,18 @@ AnalysisReceiverModule.registerDatabase({
 `AnalysisQueueModule.register`도 같은 `observationsFactory`를 받는다. 기존 `observations` 객체와는 둘 중 하나만 쓴다.
 [10월 정책](october-registration-policy.md)에 따라 공개 여부는 관측하지 않고 Catch는 처음 PRIVATE로 저장한다.
 
-## 실제 실행 전에 남은 연결
+**위 예시는 LIVE 전용이다.** 이 좌표 공급자는 MOCK에 `null`을 반환하므로, 이것만 연결하면 후보가 있는 MOCK 결과는 `CATCH_NOT_READY`로 등록되지 않는다.
+큐에서 MOCK 결과도 반영하려면 MOCK 맥락을 검증하는 별도의 명시적 합성 좌표 공급자를 함께 준비하고, `sourceMode`에 맞게 공급자를 선택하도록 연결해야 한다.
+이 선택은 한 개의 `observations` 또는 `observationsFactory` 안에서 조립하며, 두 옵션을 동시에 넘기지 않는다.
+별도 MOCK 공급은 이 구현에 포함되지 않는다. LIVE 좌표 조회 실패를 합성 좌표로 대체하지 않는다.
 
-- **A/E·#252:** 이 목록을 회원에게 제공하고, 접수 때 동일한 선정 참조를 저장한다. 현재 선정·회원 자격·자료 범위 판본을 접수/실행 시점에 확인한다. 이 등록 조회는 실행 허가 API(#232)를 대신하지 않는다.
-- **팀장/E·#138:** 실제 분석 고지, 허용 자료 종류·범위와 판본을 확정하고 LIVE 접수에 연결한다. 현재 자료에는 이를 임의로 넣지 않았다.
-- **E·#233:** 위 공급자를 앱·큐에 명시적으로 조립한 뒤 실제 worker 왕복을 검사한다.
+## 고지와 실제 실행 연결
+
+실제 분석 고지·판본은 [#322](https://github.com/JminAILab/CatchU/issues/322)에서 확정해 [PR #328](https://github.com/JminAILab/CatchU/pull/328)에 반영했다. 고지 제공과 LIVE 접수 활성화는 별개다.
+
+- **선정 공급 — A·[#252](https://github.com/JminAILab/CatchU/issues/252):** 현재 선정의 DB 정본으로 목록·접수 재확인·worker 선정 판정에 필요한 정보를 공급한다. 과거 좌표 조회는 같은 선정 참조와 보관 판본을 사용한다. 이 등록 조회는 현재 접수 자격이나 실행 허가 API(#232)를 대신하지 않는다.
+- **실제 접수 — E·[#323](https://github.com/JminAILab/CatchU/issues/323):** #322의 실제 고지 판본과 #252의 현재 선정·범위 판본을 대조하고, 선정 참조를 기존 동의 형식에 보존하고 실제 요청의 첫 시도를 LIVE로 저장한다. 개발 접수는 MOCK을 유지한다.
+- **앱·큐 조립 — E·[#233](https://github.com/JminAILab/CatchU/issues/233):** LIVE·MOCK에 맞는 공급자를 명시적으로 연결한 뒤 실제 worker 왕복을 검사한다.
 
 ## 검사 범위
 

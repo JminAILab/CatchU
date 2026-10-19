@@ -54,10 +54,11 @@ MOCK은 명시적인 합성 좌표 제공자를 연결하고, LIVE 조회 실패
 
 이 파일은 정책 공급자의 구현 안내다. 다음 연결을 대체하지 않는다.
 
-- #252의 실제 선정·접수에서 [보관 좌표 판본](selected-repository-coordinates.md)의 참조를 저장하고 실제 동의 범위를 확정한다.
+- #252가 현재 선정·범위 정보를 공급하고, #323이 #322의 실제 고지와 판본을 대조해 [보관 좌표 판본](selected-repository-coordinates.md)의 참조를 동의에 저장한다.
 - #233의 큐 및 앱 조립에서 공급자를 명시적으로 전달하고 실제 왕복 검사를 한다.
 
-기존 SOURCE_PRIVATE의 상태·출처·시각 보존과 LIVE 주소의 대소문자 구분 없는 대조는 [PR #317](https://github.com/JminAILab/CatchU/pull/317)로 반영됐다.
+LIVE 근거 주소의 소유자·저장소 이름을 대소문자 구분 없이 대조하고 URL 원문을 보존하는 변경은 [PR #316](https://github.com/JminAILab/CatchU/pull/316)이다.
+기존 SOURCE_PRIVATE의 제한·상태·출처·시각을 보존하는 변경은 [PR #317](https://github.com/JminAILab/CatchU/pull/317)이다.
 보호 행을 잠근 저장 트랜잭션 안에서 보존하며, 조회 단계에서 과거 값을 복사해 우회하지 않는다.
 
 ## 검사

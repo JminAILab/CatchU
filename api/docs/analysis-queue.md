@@ -13,8 +13,9 @@ api가 대기 중인 분석 시도를 큐(BullMQ)로 worker에 보내고, worker
 모듈은 안에서 실제 수신·등록 조립(`AnalysisReceiverModule.registerDatabase`)을 한 번 불러온다. 같은 앱에서 그 조립을 따로 또 부르지 않는다.
 
 **`AppModule`에는 등록하지 않았다.** 10월에는 ‘관측 안 함’을 명시하는 공급자를 쓴다.
-기존 비공개 근거 보존·주소 대조는 PR #317로 반영됐고, DB 기반 좌표 공급은 [선정 저장소 좌표 연결](selected-repository-coordinates.md)을 따른다.
-#252의 실제 목록·접수 연결과 실제 동의 범위가 준비된 뒤 별도 작업에서 앱 등록, `listen` 뒤
+LIVE 근거 주소의 대소문자 구분 없는 대조는 [PR #316](https://github.com/JminAILab/CatchU/pull/316), 기존 SOURCE_PRIVATE 제한·판단 근거 보존은 [PR #317](https://github.com/JminAILab/CatchU/pull/317)로 반영됐다.
+DB 기반 LIVE 좌표와 별도 MOCK 공급자의 조립 경계는 [선정 저장소 좌표 연결](selected-repository-coordinates.md)을 따른다.
+#252의 선정 공급과 #323의 실제 접수·동의 판본 대조가 준비된 뒤 별도 작업에서 앱 등록, `listen` 뒤
 `app.get(AnalysisQueueRunner).start(onFailure)` 호출, 배포 큐 주소를 연결한다.
 `onFailure`는 앱을 닫고 종료 코드 1로 끝내며 아래 수명주기를 따른다.
 이때 개발 주입 제공자가 함께 들어오므로 기존 ‘제품 AppModule에 주입 제공자 없음’ 검사도 함께 대조한다.

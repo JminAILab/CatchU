@@ -53,7 +53,9 @@ DB를 사용하는 공급자는 `registerDatabase({ contractDirectory, observati
 기존 `observations` 객체와 공급 함수 중 하나를 명시해야 한다.
 
 #231의 GitHub 자격정보 및 #232의 실행 허가 조회는 종결 결과의 등록 조회와 다르다.
-목록·접수 측에서 같은 선정 참조를 저장하고 실제 동의 범위를 확정하는 연결(#252·#138), 앱·큐 활성화와 실제 왕복(#233)은 남아 있다.
+실제 고지·판본은 [#322](https://github.com/JminAILab/CatchU/issues/322)에서 확정해 [PR #328](https://github.com/JminAILab/CatchU/pull/328)에 반영했다.
+[#252](https://github.com/JminAILab/CatchU/issues/252)는 현재 선정·범위 정보 공급을, [#323](https://github.com/JminAILab/CatchU/issues/323)은 실제 접수에서 고지·범위 판본을 대조하고 같은 선정 참조를 동의에 저장하는 연결을 맡는다.
+앱·큐 활성화와 실제 왕복은 [#233](https://github.com/JminAILab/CatchU/issues/233)의 별도 연결이며, LIVE 전용 예시에 MOCK 처리가 자동으로 붙지 않는다. MOCK 공급 조건은 [선정 저장소 좌표 연결](selected-repository-coordinates.md)을 따른다.
 10월의 공개 관측 생략은 위 정책을 따르며, 이 좌표 제공자가 GitHub 공개 여부를 확인했다고 표시하지 않는다.
 
 [10/6 최신 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)과 [#234 철회 기록](https://github.com/JminAILab/CatchU/issues/234#issuecomment-6028927385)에 따라 결과 원문 보관·자동 재반영·worker 결과 14일 보관을 구현하지 않는다. 수신 커밋 후 중단·Receipt 전달 실패·공급 실패는 각각 `PENDING`/`APPLY_FAILED`에 남을 수 있다. [#237 처리 시한·실패 종료](https://github.com/JminAILab/CatchU/issues/237)는 [PR #295](https://github.com/JminAILab/CatchU/pull/295)로 구현돼 주기 작업이 시한을 넘긴 요청을 닫는다([규칙](analysis-deadline.md)). 이 수신·반영 서비스 자체는 시간만으로 요청을 닫거나 재요청을 허용하지 않는다. 잠금 순서는 요청 → 현재 시도로 맞춘다.
