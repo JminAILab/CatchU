@@ -234,3 +234,35 @@ test('응답 불명→429→200에서도 앞선 접수 여부 불명과 같은 �
   assert.equal(h.store.getSnapshot().message.text, TEXT.resentExisting);
   assert.deepEqual(h.watched, [TEXT.resentExisting]);
 });
+
+test('429 뒤 잘못된 200도 응답 불명으로 남겨 정상 재응답 전까지 같은 키·본문을 보존한다', async (t) => {
+  const malformed = status();
+  delete malformed.consentId;
+  const closed = { ...status(), lifecycle: 'CLOSED', processing: 'EMPTY', application: 'APPLIED', retry: { allowed: false, reason: 'REANALYSIS_DEFERRED' } };
+  const h = harness(t, [() => limited(), () => Response.json(malformed), () => Response.json(closed)]);
+  await submit(h);
+  const initialGets = { ...h.gets };
+  await h.store.open();
+  await h.advance(2000);
+  assert.equal(h.posts.length, 1, '대기 만료·모달 재열기는 POST를 만들지 않는다');
+  await h.store.resend();
+  assert.equal(h.store.getSnapshot().phase, 'unknown');
+  assert.equal(h.store.getSnapshot().message.text, TEXT.unknown);
+  assert.equal(h.store.getSnapshot().pendingRepositoryId, 'r1');
+  assert.deepEqual(h.watched, [], '잘못된 응답은 접수 안내·상태 갱신을 만들지 않는다');
+
+  await h.store.open();
+  h.store.select('r2');
+  await h.advance(10_000);
+  assert.equal(h.posts.length, 2, '응답 불명 중 모달 재열기·대기는 자동 POST를 만들지 않는다');
+  assert.equal(h.store.getSnapshot().selectedId, 'r1');
+  assert.deepEqual(h.gets, initialGets, '원래 동의 본문을 유지하며 고지·목록도 다시 읽지 않는다');
+  await h.store.resend();
+  assert.equal(h.posts.length, 3);
+  assert.deepEqual(h.posts[1], h.posts[0]);
+  assert.deepEqual(h.posts[2], h.posts[0]);
+  assert.equal(h.store.getSnapshot().message.text, TEXT.resentExisting);
+  assert.equal(h.store.getSnapshot().phase, 'editing');
+  assert.equal(h.store.getSnapshot().pendingRepositoryId, null);
+  assert.deepEqual(h.watched, [TEXT.resentExisting], '정상 응답에서만 상태 갱신을 한 번 알린다');
+});
