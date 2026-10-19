@@ -98,9 +98,12 @@ async function prepare() {
   const authorization = await github.authorize(memberId);
   await github.connect(memberId, 'SYNTHETIC_CODE', authorization.state);
   const repositoryId = 'synthetic-context-repository', scopeRevision = randomUUID();
+  // #138 접수의 동의 범위 모양(판본·저장소·자료 종류·선정 참조)에 시험 공급자 표식을 더한다(worker-context-api.test.cjs의 fixtureScope와 같다).
+  // 판본·저장소·자료 종류가 동의 행·요청과 맞지 않으면 조회가 행 잠금을 기다리기 전에 404로 끝나 잠금 경쟁을 재현하지 못한다.
+  const consentedScope = { revision: scopeRevision, repositoryId, allowedResourceTypes: ['COMMIT', 'PULL_REQUEST', 'ISSUE'],
+    selectionReference: 'synthetic-selection', wholeRepository: true, fixture: true };
   const request = await db.transaction(manager => insertInitialAnalysis(manager, { memberId, repositoryId, scopeRevision,
-    noticeRevision: 'synthetic-notice', consentedScope: { wholeRepository: true, repositoryId, scopeRevision, fixture: true },
-    sourceMode: 'LIVE' }));
+    noticeRevision: 'synthetic-notice', consentedScope, sourceMode: 'LIVE' }));
   fixtures.set(request.currentAttemptId, { requestId: request.requestId, memberId, repositoryId, scopeRevision });
   return request;
 }
