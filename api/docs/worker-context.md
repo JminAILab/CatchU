@@ -4,7 +4,7 @@ worker가 분석 `attemptId`로 접수 기록(요청·회원·동의·허용 범
 
 ## 조립 조건과 후속 공급자
 
-`WorkerContextModule.register({ selectionSource })`는 실제 PostgreSQL과 `GitHubConnectionModule`을 연결한다. 공급자가 없으면 조립을 거부한다. **기본 AppModule에는 자동 등록하지 않는다.** #252의 실제 선정 저장소 목록과 접수 동의 범위를 해석하는 공급자가 준비되지 않았기 때문이다. 기존 `consentedScope`의 `synthetic: true`·자료 종류 목록을 전체 저장소 동의로 추정하지 않는다. 환경변수만 켜도 경로가 생기지 않는다.
+`WorkerContextModule.register({ selectionSource })`는 실제 PostgreSQL과 `GitHubConnectionModule`을 연결한다. 공급자가 없으면 조립을 거부한다. **기본 AppModule에는 자동 등록하지 않는다.** #252의 실제 공급자 `DatabaseRepositorySelectionSource`([선정 공급](repository-selection.md#worker-선정--232))는 있지만 앱 등록과 worker 연결은 #232 후속에서 검증한다. 기존 `consentedScope`의 `synthetic: true`·자료 종류 목록을 전체 저장소 동의로 추정하지 않는다. 환경변수만 켜도 경로가 생기지 않는다.
 
 `WorkerRepositorySelectionSource.resolve(manager, context, { lock })`는 접수 기록의 attemptId·requestId·memberId·repositoryId·scopeRevision·consentedScope를 받아 아래를 확인해야 한다.
 
@@ -12,9 +12,9 @@ worker가 분석 `attemptId`로 접수 기록(요청·회원·동의·허용 범
 - 저장된 동의가 해당 저장소의 전체 선정임을 명시적으로 뜻한다. 알 수 없는 구조·부분 선정·철회·미지원 판본은 `null`이다.
 - 반환값은 같은 attemptId·requestId·memberId·repositoryId·scopeRevision, `repository: { owner, name }`, `wholeRepository: true`다. 토큰을 받거나 반환하지 않는다.
 
-제공받은 `EntityManager`로 조회하고 외부 통신을 하지 않는다. 자격정보 조회 전에는 `lock: null`, 최종 트랜잭션 안에서는 `lock: 'pessimistic_read'`로 호출한다. 최종 공급자는 선정 여부·판본·좌표 등 판정 근거 행을 같은 manager로 읽기 잠금한 뒤 최신 자료를 판정하고, 트랜잭션 종료까지 잠금을 유지해야 한다. 여러 근거 행은 일관된 순서로 잠근다. 서비스는 분석 요청 → 분석 시도를 별도 SQL로 순서대로 잠근 뒤 회원·동의 → 선정 근거 → GitHub 연결을 잠근다. 수신·결과 반영과 요청·시도 잠금 순서를 맞춰 교착을 막는다. 조회 장애는 예외로 전달해 `500 INTERNAL_ERROR`로 남긴다. 서비스는 공급자 반환 식별자와 좌표 형식도 검사한다. 실제 공급자는 이 인터페이스의 새 구현으로 #252의 저장소 선정 근거에 연결하고 같은 잠금·경쟁 검증을 통과해야 한다. 테스트 공급자를 앱에 등록해서는 안 된다.
+제공받은 `EntityManager`로 조회하고 외부 통신을 하지 않는다. 자격정보 조회 전에는 `lock: null`, 최종 트랜잭션 안에서는 `lock: 'pessimistic_read'`로 호출한다. 최종 공급자는 선정 여부·판본·좌표 등 판정 근거 행을 같은 manager로 읽기 잠금한 뒤 최신 자료를 판정하고, 트랜잭션 종료까지 잠금을 유지해야 한다. 여러 근거 행은 일관된 순서로 잠근다. 서비스는 분석 요청 → 분석 시도를 별도 SQL로 순서대로 잠근 뒤 회원·동의 → 선정 근거 → GitHub 연결을 잠근다. 수신·결과 반영과 요청·시도 잠금 순서를 맞춰 교착을 막는다. 조회 장애는 예외로 전달해 `500 INTERNAL_ERROR`로 남긴다. 서비스는 공급자 반환 식별자와 좌표 형식도 검사한다. #252의 실제 공급자는 DB 선정 근거로 이 인터페이스를 구현하고 같은 잠금·경쟁 검증(`test/db/repository-selection-worker-api.test.cjs`)을 통과한다. 테스트 공급자를 앱에 등록해서는 안 된다.
 
-#252가 실제 선정 공급자를 제공한 뒤, #232의 후속 PR에서 그 공급자를 전달해 앱 등록과 worker 연결을 검증한다. 이 PR의 병합만으로 기본 앱의 내부 경로가 활성화되지는 않는다. `selectedRepositories`는 실제 공급자를 준비해 전달하는 값이며 이 문서가 구현을 제공하지 않는다.
+#232의 후속 PR에서 그 공급자를 전달해 앱 등록과 worker 연결을 검증한다. 공급자 병합만으로 기본 앱의 내부 경로가 활성화되지는 않는다. 아래 `selectedRepositories`에는 `new DatabaseRepositorySelectionSource()`를 넘긴다.
 
 ```typescript
 import { Module } from '@nestjs/common';
