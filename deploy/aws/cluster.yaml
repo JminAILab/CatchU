@@ -47,6 +47,8 @@ addons:
     # 10/15 시험은 판본을 적지 않아 그때 기본판(1.22.4 계열)이 깔렸다. 더 새 판을 쓰려면 NetworkPolicy 시험을 다시 한다.
     version: v1.22.4-eksbuild.3
     # NetworkPolicy로 worker의 DB 접근과 허용 목록 밖 바깥 연결을 막는다(t 계열 노드는 Pod 보안 그룹을 쓸 수 없다).
+    # 기본(standard) 모드라 새 Pod는 정책이 걸리기 전 몇 초 동안 막히지 않는다. #276 계획에서 받아들인 한계다.
+    # strict 모드는 kube-system을 포함한 모든 Pod에 정책이 있어야 해서 쓰지 않는다. 만든 뒤에도 애드온 설정으로 바꿀 수 있다.
     configurationValues: |-
       enableNetworkPolicy: "true"
   - name: coredns
