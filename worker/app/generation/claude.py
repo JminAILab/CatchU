@@ -48,9 +48,9 @@ logger = logging.getLogger(__name__)
 
 BASE_URL: Final = "https://api.anthropic.com"
 INFERENCE_GEO: Final = "us"
-# 호출 종류별 기본 모델. 둘 다 Haiku 5.5다(#119 결정 「호출 종류별 모델」). 2026-10-16~18 로컬 비교에서는 생성
-# 호출을 Sonnet 5.5로 했을 때 실패가 적었지만(generation-limits.md 「모델」), 생성 호출 모델은 실패 대응 방식과
-# 함께 따로 정한다(2026-10-18 팀장 결정).
+# 호출 종류별 기본 모델. 둘 다 Haiku 5.5다(#119 결정 「호출 종류별 모델」, 2026-10-19 팀장 결정으로 생성 호출도
+# Haiku 유지). 로컬 비교에서 생성 호출을 Sonnet 5.5로 하면 실패가 적었지만 비용이 약 20배였다
+# (generation-limits.md 「모델」).
 GENERATE_MODEL: Final = "claude-haiku-5-5"
 REWRITE_MODEL: Final = "claude-haiku-5-5"
 # 최대 출력 바이트(4,000)보다 적게 잡지 않는다. 토큰 수와 응답 글 길이는 일대일이 아니어서 이 값으로 최대 출력
