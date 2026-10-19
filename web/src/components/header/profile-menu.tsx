@@ -22,6 +22,8 @@ type ProfileMenuProps = {
  * 닫기: [프로필] 버튼·Esc·바깥 클릭(#171 A 담당 검토 9/29로 미결을 정함). 메뉴 안을 누르면 닫히지 않는다.
  * - Esc로 닫으면 [프로필] 버튼으로 초점을 돌린다.
  * - 바깥 클릭은 메뉴만 닫는다. 누른 요소의 동작과 초점은 막거나 옮기지 않는다.
+ * - [로그아웃]을 누르면 메뉴를 닫고 [프로필] 버튼으로 초점을 돌린 뒤 로그아웃을 요청한다. 열린 메뉴가 로그아웃 실패·불명 안내의
+ *   [다시 시도]를 가리지 않게 하기 위해서다(#287, [#311 리뷰](https://github.com/JminAILab/CatchU/pull/311#pullrequestreview-5543242144)).
  */
 export function ProfileMenu({ onLogout, logoutPending = false }: ProfileMenuProps) {
   const [open, setOpen] = useState(false);
@@ -70,7 +72,17 @@ export function ProfileMenu({ onLogout, logoutPending = false }: ProfileMenuProp
             프로필 보기
           </Link>
           {onLogout ? (
-            <button type="button" className={styles.profileMenuItem} onClick={onLogout} disabled={logoutPending} aria-busy={logoutPending}>
+            <button
+              type="button"
+              className={styles.profileMenuItem}
+              onClick={() => {
+                setOpen(false);
+                buttonRef.current?.focus();
+                onLogout();
+              }}
+              disabled={logoutPending}
+              aria-busy={logoutPending}
+            >
               {logoutPending ? authScreenMessages.logoutPending : "로그아웃"}
             </button>
           ) : (
