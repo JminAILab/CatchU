@@ -1,8 +1,8 @@
 # CatchU EKS 실행 파일과 앱 교체
 
-EKS(#276)에서 web·api·worker를 띄우는 쿠버네티스 실행 파일과 교체 스크립트 [`deploy.sh`](../scripts/deploy.sh)의 사용법이다. 단계·승인 지점·처음 준비(프로필·기대 계정 번호·kubeconfig)는 [../README.md](../README.md)를 따른다. 이미지와 migration·교체의 공통 규칙은 [../../README.md](../../README.md)에 있다.
+EKS(#276)에서 web·api·worker를 띄우는 쿠버네티스 실행 파일과 교체 스크립트 [`deploy.sh`](../scripts/deploy.sh), 앱 Secret 만들기와 DB 관리 Pod의 사용법이다. 단계·승인 지점·처음 준비(프로필·기대 계정 번호·kubeconfig)는 [../README.md](../README.md)를 따른다. 이미지와 migration·교체의 공통 규칙은 [../../README.md](../../README.md)에 있다.
 
-**AWS 자원이 없는 지금은 적용하지 않는다.** 처음 적용은 2단계(빈 DB로 지금 main 판본을 띄워 확인)다. 모두 namespace `catchu`에 들어가고, 그 뒤에는 바뀔 때만 다시 적용한다.
+**AWS 자원이 없는 지금은 적용하지 않는다.** 처음 적용은 2단계(빈 DB로 지금 main 판본을 띄워 확인)다. 앱은 모두 namespace `catchu`에, DB 관리용 psql Pod는 `catchu-ops`에 들어가고, 그 뒤에는 바뀔 때만 다시 적용한다.
 
 ## 파일
 
@@ -14,25 +14,70 @@ EKS(#276)에서 web·api·worker를 띄우는 쿠버네티스 실행 파일과 �
 | [`ingress.yaml`](ingress.yaml) | 손으로 | 공개 ALB. 80은 443으로 이동(301), TLS 1.2·1.3만, `/v1/internal`은 404, `/v1`은 api, 그 밖은 web, HSTS 300초, 유휴 60초, 삭제 보호, WAF `catchu-edge` |
 | [`api.yaml`](api.yaml)·[`worker.yaml`](worker.yaml)·[`web.yaml`](web.yaml) | `deploy.sh`만 | api·worker는 한 개씩 `Recreate`, web은 새 Pod를 먼저 띄우고 옛 Pod를 내린다. 모두 UID 1000·읽기 전용 루트·권한 전부 제거·`/tmp` 크기 상한, 자원 요청과 메모리 상한(worker는 실제 분석을 재기 전의 임시값) |
 | [`migration-pod.yaml`](migration-pod.yaml) | `deploy.sh`만 | migration 일회 Pod 틀. controller 없이 한 번 실행하고 다시 띄우지 않으며 10분 한도가 있다 |
+| [`ops/namespace.yaml`](ops/namespace.yaml)·[`ops/network-policy.yaml`](ops/network-policy.yaml) | 손으로 | 관리 작업 namespace `catchu-ops`(Pod 보안 검사 `restricted`, 토큰 자동 탑재 끔)와 그 연결 허용 목록(기본 차단, DNS, psql Pod는 DB 5432만) |
+| [`ops/db-admin-pod.yaml`](ops/db-admin-pod.yaml) | `db-admin.sh`만 | DB 관리용 psql 일회 Pod 틀(postgres 16.15, 사용자 999·읽기 전용 루트·권한 전부 제거, TLS `verify-full`, 5분 한도) |
 
 Deployment 파일은 이미지·실행 수·커밋 자리를 비워 둔 틀이다. 그대로 `kubectl apply`하면 실행 수 자리가 숫자가 아니어서 거부된다. 운영 중인 판본을 덮지 않게 하려는 것이다. 이미지는 `deploy.sh`가 그때그때 넣으므로 저장소에는 digest를 적지 않는다.
 
 ## Secret과 ConfigMap
 
-실행 파일은 아래 이름과 키를 읽는다. 값은 SSM `/catchu/prod/*`에서 만들고 저장소·화면에 남기지 않는다. 만드는 스크립트는 다음 PR이다. web은 비밀값을 받지 않고, worker에는 DB 값을 주지 않는다.
+실행 파일은 아래 이름과 키를 읽는다. [`make-secrets.sh`](../scripts/make-secrets.sh)가 SSM `/catchu/prod/*` 값과 RDS·큐 주소로 만든다. web은 비밀값을 받지 않고, worker에는 DB 값을 주지 않는다.
 
-| 이름 | 종류 | 키 | 쓰는 곳 |
+| 이름 | 종류 | 키 ← 원본 | 쓰는 곳 |
 |---|---|---|---|
-| `catchu-db` | ConfigMap | `DB_HOST`(RDS 주소), `ca.pem`(RDS CA 묶음) | api·migration |
-| `catchu-api` | Secret | `AUTH_JWT_SECRET`, `LINK_GRANT_SECRET`, `DB_PASSWORD`(앱 계정 `catchu_app`) | api |
-| `catchu-migration` | Secret | `DB_PASSWORD`(migration 계정 `catchu_migrator`) | migration |
-| `catchu-worker` | Secret | `CATCHU_QUEUE_REDIS_URL`(`rediss://`, 비밀번호 포함), `WORKER_CONTEXT_API_KEY`, `CATCHU_GENERATION_API_KEY` | worker |
+| `catchu-db` | ConfigMap | `DB_HOST` ← RDS `catchu-db` 주소, `ca.pem` ← 저장소의 RDS 루트 인증서 | api·migration |
+| `catchu-api` | Secret | `AUTH_JWT_SECRET` ← `/catchu/prod/api/AUTH_JWT_SECRET`, `LINK_GRANT_SECRET` ← `/catchu/prod/api/LINK_GRANT_SECRET`, `DB_PASSWORD` ← `/catchu/prod/db/catchu_app-password`(앱 계정 `catchu_app`) | api |
+| `catchu-migration` | Secret | `DB_PASSWORD` ← `/catchu/prod/db/catchu_migrator-password`(migration 계정 `catchu_migrator`) | migration |
+| `catchu-worker` | Secret | `CATCHU_QUEUE_REDIS_URL` ← `rediss://:`큐 비밀번호(`/catchu/prod/queue/auth-token`)`@`큐 주 엔드포인트`:6379`, `WORKER_CONTEXT_API_KEY` ← `/catchu/prod/worker/WORKER_CONTEXT_API_KEY`, `CATCHU_GENERATION_API_KEY` ← `/catchu/prod/worker/CATCHU_GENERATION_API_KEY` | worker |
 
 꺼 둔 기능(Google 로그인·GitHub 연결·worker 요청 정보 조회·api 큐 연결)은 켤 때 그 값을 api 실행 파일과 Secret에 더하는 PR을 낸다([../README.md](../README.md) 5단계). GitHub 연결은 EFS 보관 폴더도 함께 붙인다.
 
+**SSM에 없는 두 값.** `/catchu/prod/worker/` 두 값은 아직 SSM에 없다(2026-10-19 확인. 있는 것은 서명 키 둘·DB 계정 둘·큐 하나). 운영 모드 worker는 둘 다 없으면 뜨지 않으므로 2단계 전에 넣는다. [`put-parameter.sh`](../scripts/put-parameter.sh)는 이미 있는 이름이면 멈추고, 값을 화면·명령 인자·셸 기록에 남기지 않는다.
+
+```bash
+bash deploy/aws/scripts/put-parameter.sh --random /catchu/prod/worker/WORKER_CONTEXT_API_KEY
+bash deploy/aws/scripts/put-parameter.sh --stdin /catchu/prod/worker/CATCHU_GENERATION_API_KEY   # 생성 제공자(Claude API) 콘솔에서 발급한 키를 붙여 넣는다. 화면에 찍히지 않는다
+```
+
+**만들기.** `bash deploy/aws/scripts/make-secrets.sh`(순서는 아래 「적용(2단계)」).
+
+- 시작 전에 계정·클러스터, namespace `catchu`, RDS(available, CA `rds-ca-rsa2048-g1`), 큐(available, TLS와 비밀번호 켬), SSM 이름 일곱 개가 모두 SecureString인지 본다. 값도 앱이 시작할 때 거부하는 형식인지(서명 키·조회 키는 64자리 hex, 큐 비밀번호는 주소에 그대로 넣을 수 있는 영문·숫자), 서로 달라야 하는 값(서명 키 둘과 조회 키, 두 계정 비밀번호)이 다른지 본다. 하나라도 어긋나면 아무것도 바꾸지 않고 멈춘다(종료 코드 1).
+- 값은 SSM에서 파이프로만 jq를 거쳐 `kubectl apply --server-side`의 표준 입력으로 넘긴다. 그래서 화면·명령 인자·임시 파일·`last-applied` 주석에 값이 남지 않는다. 화면에는 Secret 이름과 `키=SSM 판 번호`만 찍히고, 같은 판 번호가 Secret 주석 `catchu.io/ssm-versions`에 남는다.
+- 적용 뒤 Secret의 키 목록, `last-applied` 주석이 없음, ConfigMap의 주소와 인증서를 다시 읽어 확인한다. 적용이 실패했거나 확인이 어긋나면 2(일부만 바뀌었을 수 있다)다. 원인을 고쳐 다시 실행하면 SSM의 지금 값으로 다시 맞춘다.
+- 값을 보지 않고 확인하기: `k get secret -o json | jq '.items[] | {name: .metadata.name, keys: (.data | keys), annotations: .metadata.annotations}'`
+
+**RDS 루트 인증서.** [`../db/rds-ca-rsa2048-g1.pem`](../db/rds-ca-rsa2048-g1.pem)은 서울 리전 `rds-ca-rsa2048-g1` 루트 인증서 하나다(2061-05-20까지). AWS 공식 묶음 `https://truststore.pki.rds.amazonaws.com/ap-northeast-2/ap-northeast-2-bundle.pem`(루트 3개)에서 꺼냈고, SHA-1 지문 `58fe7e8c3b1f561be7e51f69dcfc8acfbb546e02`가 `aws rds describe-certificates --certificate-identifier rds-ca-rsa2048-g1`의 `Thumbprint`와 같다(2026-10-19 확인). AWS 안내대로 신뢰 목록에는 루트만 넣는다(중간 인증서를 넣으면 서버 인증서 자동 교체 때 끊길 수 있다). 파일이 바뀌면 스크립트가 멈춘다(`scripts/lib/rds.sh`의 해시).
+
+**값을 바꿀 때.** 값은 누출됐을 때만 바꾼다(서명 키를 바꾸면 로그인과 열람 증표가 모두 무효가 된다). 환경변수로 받은 값은 Pod가 다시 떠야 바뀌는데 `deploy.sh`는 구성이 같으면 다시 띄우지 않는다. 그래서 바꾸는 순서와 바뀐 값으로 api·worker를 다시 띄우는 일은 `deploy.sh`를 고치는 다음 PR에서 정하고, 그 전에는 `make-secrets.sh`를 값만 바꾸는 데 쓰지 않는다.
+
+## DB 관리 Pod(db-admin.sh)
+
+DB 계정 만들기처럼 RDS 관리자로 SQL을 실행할 때 쓴다. [`db-admin.sh`](../scripts/db-admin.sh)가 namespace `catchu-ops`에 psql 일회 Pod를 띄워 [`../db/`](../db)의 SQL 파일 하나를 한 트랜잭션으로 실행하고, 끝나면 성공·실패와 관계없이 Pod·Secret·ConfigMap을 지운다.
+
+```bash
+bash deploy/aws/scripts/db-admin.sh deploy/aws/db/roles.sql
+```
+
+- **어디서:** `catchu-ops`에서만 돈다. 자동 배포 역할(#342)은 `catchu`에서 Pod를 만들 수 있어 같은 namespace의 Secret을 읽을 수 있으므로, 관리자 비밀번호는 그 역할이 닿지 않는 곳에 둔다. 배포 역할에는 `catchu-ops` 권한을 주지 않는다.
+- **비밀번호:** RDS 관리자 비밀번호는 RDS가 Secrets Manager에서 관리하며 7일마다 바꾸므로 실행할 때마다 읽는다. 계정 비밀번호 둘은 SSM에서 읽는다. 셋 다 Pod와 같은 이름의 임시 Secret으로만 넘기고, 값은 파이프로만 지난다.
+- **시작 전 확인(아무것도 만들지 않고 1로 멈춤):** 계정·클러스터, `catchu-ops`와 NetworkPolicy 셋, 지난 실행에서 남은 임시 자원이 없음, RDS(available, CA `rds-ca-rsa2048-g1`, 관리자 비밀번호 상태 active), 파라미터 그룹 `catchu-pg16`이 반영됐고(in-sync) `log_min_error_statement=panic`·`log_statement=none`인지(실패한 문장의 비밀번호가 DB 로그에 남지 않게), SSM 계정 비밀번호 둘.
+- **Pod:** postgres 16.15 이미지(로컬 합성 DB와 같은 digest. 앱 이미지에는 psql이 없다)를 사용자 999·읽기 전용 루트·권한 전부 제거로 띄운다. psql은 psqlrc 없이, 문장을 출력에 되풀이하지 않고, 오류에서 멈추며 한 트랜잭션으로 실행한다. 오류가 나도 문장 원문은 찍지 않는다(psql 기본값은 위치 오류 때 비밀번호가 든 문장 줄을 그대로 보여 준다). TLS는 `PGSSLMODE=verify-full`과 저장소의 루트 인증서로 검증한다.
+- **기록:** 출력 끝의 「DB 관리 기록」(Pod 이름, 이미지 digest, SQL 파일의 SHA-256, 종료 코드, 시각, 임시 자원 지움 확인)과 psql 출력을 남긴다. 출력에는 계정 번호가 들어가지 않는다.
+
+| 종료 코드 | 상태와 다음 행동 |
+|---|---|
+| 0 | SQL 성공, 임시 자원 지움 확인 |
+| 1 | 시작 전 확인에서 멈췄다. 아무것도 만들지 않았다. 출력의 원인을 고친 뒤 다시 실행한다 |
+| 3 | SQL 실패 또는 결과 불명. 임시 자원은 지웠다. 실패면 한 트랜잭션이라 DB는 바뀌지 않았다. 결과 불명(시간 초과·조회 실패)이면 DB에서 결과를 확인한다 |
+| 4 | 임시 자원을 지웠는지 확인하지 못했다. 관리자 비밀번호가 든 Secret이 남았을 수 있으니 출력의 명령으로 곧바로 지우고 없어졌는지 본다 |
+
+**계정 SQL([`roles.sql`](../db/roles.sql)).** 2단계에서 첫 `deploy.sh` 전에 한 번 실행한다. migration 계정이 DB와 public 스키마를 소유하고 앱 계정은 자료 읽기·쓰기만 한다. RDS 관리자는 슈퍼유저가 아니어서 로컬 [`init-roles.sh`](../../local-db/init-roles.sh)와 달리 만든 역할을 관리자 자신에게 SET으로 준 뒤 소유자를 넘긴다(PostgreSQL 16 조건). 앱 계정에는 `lock_timeout` 3초를 건다(#220). `idle_in_transaction_session_timeout`은 #220에서 값을 정하면 SQL 파일을 더해 같은 방법으로 실행한다(그때까지 RDS 기본값). 다시 실행하면 이미 있는 계정에서 실패하고 아무것도 바뀌지 않는다. 출력의 확인 표(역할 속성·`lock_timeout`·DB와 스키마 소유자·기본 권한)를 #276 완료 기준 증거로 남긴다.
+
+기본 권한은 migration이 새로 만드는 표마다 앱 계정에 DELETE를 준다. 그래서 동의 기록(`analysis_consent`)의 DELETE 회수와 확인을 migration 뒤마다 해야 하고, 이것은 `deploy.sh`에 잇는 다음 PR에서 한다. 그 PR이 2단계 첫 배포 전에 병합되어야 한다.
+
 ## 적용(2단계)
 
-**적용 전 확인.** NetworkPolicy와 api의 `TRUST_PROXY_CIDRS`에는 eksctl이 `cluster.yaml`로 정하는 대역을 적어 두었다(퍼블릭 192.168.0.0/19·192.168.32.0/19, 프라이빗 192.168.64.0/19·192.168.96.0/19). 클러스터를 만든 뒤 실제 대역과 같은지 본다. 다르면 두 파일을 고치는 PR을 먼저 낸다.
+**적용 전 확인.** NetworkPolicy(`network-policy.yaml`·`ops/network-policy.yaml`)와 api의 `TRUST_PROXY_CIDRS`에는 eksctl이 `cluster.yaml`로 정하는 대역을 적어 두었다(퍼블릭 192.168.0.0/19·192.168.32.0/19, 프라이빗 192.168.64.0/19·192.168.96.0/19). 클러스터를 만든 뒤 실제 대역과 같은지 본다. 다르면 세 파일을 고치는 PR을 먼저 낸다.
 
 ```bash
 vpc=$(aws eks describe-cluster --name catchu --profile catchu --region ap-northeast-2 --query cluster.resourcesVpcConfig.vpcId --output text)
@@ -43,11 +88,13 @@ aws ec2 describe-subnets --profile catchu --region ap-northeast-2 --filters "Nam
 
 ```bash
 k() { kubectl --kubeconfig ~/.kube/catchu --namespace catchu "$@"; }
-kubectl --kubeconfig ~/.kube/catchu apply -f deploy/aws/k8s/namespace.yaml
+kubectl --kubeconfig ~/.kube/catchu apply -f deploy/aws/k8s/namespace.yaml -f deploy/aws/k8s/ops/namespace.yaml
 k apply -f deploy/aws/k8s/network-policy.yaml -f deploy/aws/k8s/services.yaml
-# Secret·ConfigMap 만들기(다음 PR)
+kubectl --kubeconfig ~/.kube/catchu apply -f deploy/aws/k8s/ops/network-policy.yaml
+bash deploy/aws/scripts/make-secrets.sh                        # 「Secret과 ConfigMap」. worker 키 두 개를 SSM에 먼저 넣는다
+bash deploy/aws/scripts/db-admin.sh deploy/aws/db/roles.sql    # 「DB 관리 Pod」. 확인 표를 증거로 남긴다
 k apply -f deploy/aws/k8s/ingress.yaml   # Load Balancer Controller·catchu.dev ACM 인증서(발급 완료)·WAF가 있은 뒤
-bash deploy/aws/scripts/deploy.sh --commit <main 커밋 40자>
+bash deploy/aws/scripts/deploy.sh --commit <main 커밋 40자>   # 동의 기록 DELETE 회수·확인이 이어진 판(다음 PR)으로 실행한다
 ```
 
 손으로 적용하는 파일을 바꿀 때도 그 파일만 같은 명령으로 다시 적용하고, 그동안은 자동 배포를 꺼 둔다. Ingress를 지웠다 다시 만들면 ALB 주소가 바뀌어 Route 53 별칭을 다시 맞춰야 하므로 지우지 않는다(지우는 것은 [../README.md](../README.md) 「삭제 순서」 B뿐이다).
@@ -113,3 +160,14 @@ bash·jq·git·ruby가 필요하고 30초쯤 걸린다. kubectl·aws·sleep을 �
 - 합성 kubectl의 감시 출력은 kubectl 1.37.1을 이 컴퓨터의 가짜 API에 붙여 확인한 모양을 흉내 낸다. 탭은 공백으로 바뀌고, `range` 안에서 없는 값을 만나면 첫 객체 뒤 오류로 끝난다. `deploy.sh`가 그 밖의 식을 쓰면 시험이 실패한다.
 - 확인하지 못하는 것: 실제 API 서버의 스키마·승인 검사(Pod 보안 검사 포함), 노드에서의 실제 종료 코드와 준비 시간, NetworkPolicy·ALB의 실제 동작. 이것은 2단계에서 본다(「적용(2단계)」의 확인).
 - CI에는 아직 넣지 않았다. 이 폴더나 `deploy.sh`를 바꾸면 손으로 돌린다.
+
+Secret 만들기·SSM 값 넣기·DB 관리 Pod는 두 시험으로 본다.
+
+```bash
+bash deploy/aws/scripts/secrets.test.sh    # 20초쯤. bash·jq·ruby·openssl·shasum·aws CLI v2
+bash deploy/aws/scripts/db-roles.test.sh   # 1분쯤. Docker가 돌고 있어야 한다
+```
+
+- `secrets.test.sh`: aws·kubectl을 합성 명령으로 바꾸고 이 폴더를 복사한 곳에서 `make-secrets.sh`·`put-parameter.sh`·`db-admin.sh`를 실제로 실행한다. 만드는 내용(Secret 키·값·판 번호 주석, 큐 주소, ConfigMap, 임시 Secret·Pod), 시작 전 확인이 하나라도 어긋나면 아무것도 바꾸지 않고 멈춤, 종료 코드, 임시 자원을 늘 지움, 시험마다 새로 만든 합성 비밀값이 출력·aws·kubectl·jq의 명령 인자·임시 폴더에 없음, 계정 번호가 출력에 없음, `catchu-ops` 실행 파일 조건, 루트 인증서의 지문을 본다.
+- `db-roles.test.sh`: RDS처럼 슈퍼유저가 아닌 관리자를 둔 PostgreSQL 16.15 컨테이너에 psql Pod 틀의 이미지·명령·환경 그대로(사용자 999·읽기 전용 루트·TLS `verify-full`) `roles.sql`을 실행하고, 각 계정으로 붙어 권한(앱 계정의 읽기·쓰기와 `lock_timeout`, 스키마 변경 거부, 다른 계정의 접속·스키마 사용 거부, 두 계정에 특별 권한 없음, 다시 실행하거나 중간 문장이 실패하면 바뀌지 않음, 인증서와 다른 이름으로 붙으면 거부, 위치 오류 때도 문장 원문을 찍지 않음, 비밀번호가 출력·DB 로그에 없음)을 본다.
+- 확인하지 못하는 것: 실제 server-side apply와 Pod 보안 검사, 실제 RDS 관리자(`rds_superuser`)의 특성과 실제 Secrets Manager 응답. 이것은 2단계에서 본다.
