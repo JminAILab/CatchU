@@ -94,6 +94,7 @@ PostgreSQL이 그 문장을 `55P03`(lock_not_available)으로 끝내고 트랜�
 |---|---|
 | `test/support/lock-wait-limit.cjs` | 시험 전용 앱·마이그레이션 계정 생성(앱 계정에만 `ALTER ROLE … IN DATABASE <시험 DB> SET lock_timeout = '3s'`)·삭제, 권한 확인, 잠금 쥐기·대기 확인·시간 측정, 시험이 쥔 잠금과 시작한 작업의 정리(`cleanUpLocks()`) |
 | `test/db/lock-wait-limit-role.test.cjs` | 계정별 설정(앱 계정의 시험 DB 1건뿐), `buildDataSourceOptions`로 연 새 연결의 적용값(앱 `3s`·마이그레이션 계정 `0`·다른 DB `0`), 그 계정으로 띄운 앱의 연결 `3s`, 공통 설정에 상한 없음, 삭제 뒤 계정·설정 없음. 3초 조건의 링크 발급 두 잠금 시험, 개발·Google 로그인, 세션 갱신·로그아웃 |
+| `test/db/lock-wait-limit-cleanup.test.cjs` | 일반 CREATEROLE·NOINHERIT 실행자의 생성·삭제, 삭제 실패 후 재호출, 생성 중 실패의 전체 롤백. 연결·역할·설정·멤버십 잔류 없음 |
 | `test/db/lock-wait-limit-intake.test.cjs` | 분석 접수의 키·회원 잠금, 요청 행을 쥔 동안의 재응답·다른 키 접수, 정상 대기와 첫 접수 동시 요청 |
 | `test/db/lock-wait-limit-worker-context.test.cjs` | 요청·시도 행을 쥔 동안의 worker 맥락 조회, 정상 대기와 동시 조회 |
 | `test/integration/lock-wait-limit-application.test.cjs` | 결과·진행 알림 수신, 반영 ①②③, 후보 40·100·300·500건 반영 측정, 반영과 겹친 짧은 대기(경쟁 요청 모두 성공)와 상한 초과(맨 앞 경쟁 요청 실패, 반영 성공, 실패한 요청의 기록 없음), 시한 닫기 |
@@ -105,4 +106,5 @@ PostgreSQL이 그 문장을 `55P03`(lock_not_available)으로 끝내고 트랜�
 - 연결 시작 옵션(`-c lock_timeout=500ms`)은 계정 설정보다 우선한다. 시험 파일은 각자 다른 프로세스에서 하나씩 돌므로(`--test-concurrency=1`) 500ms 주입이 계정 파일에 닿지 않고, 각 파일이 자기 적용값을 확인한다.
 - 계정은 DB 서버 전체에 생기므로 시험이 끝나면 지운다. 이름은 `catchu_t220_app_<난수>`·`catchu_t220_mig_<난수>`이고 비밀번호는 실행마다 만든 난수이며 로그에 남기지 않는다. 실행을 강제로 끊어 계정이 남았으면 테스트 DB 서버에서 `SELECT rolname FROM pg_roles WHERE rolname LIKE 'catchu\_t220\_%'`로 찾아 `DROP OWNED BY <이름>; DROP ROLE <이름>;`으로 지운다.
 - 테스트 DB 계정에 역할 생성 권한(superuser 또는 CREATEROLE)이 필요하다. [README 「DB 테스트」](../README.md#db-테스트)의 `docker run` 계정과 CI의 PostgreSQL 서비스 계정은 superuser다. 권한이 없으면 로컬에서는 3초 시험을 이유와 함께 건너뛰고, `CI=true`(GitHub Actions)에서는 건너뛰지 않고 실패한다. 2026-10-18 CREATEROLE 없는 계정으로 두 동작을 확인했다.
+- PostgreSQL 16의 일반 CREATEROLE 실행자도 정리할 수 있도록, 새 시험 역할을 실행자가 `INHERIT TRUE, SET FALSE`로 상속하게 한다. 앱이 실행자 권한을 받는 방향이 아니다. 생성·멤버십·권한·상한 설정은 한 트랜잭션으로 묶어 중간 실패 시 모두 롤백하고, 삭제 완료 표시는 실제 삭제 성공 뒤에만 남겨 실패한 정리를 다시 호출할 수 있게 한다. 일반 계정 재현용 시험은 별도 역할·스키마를 준비할 superuser로 실행하며, 이 준비 권한이 없으면 로컬은 이유와 함께 건너뛰고 CI는 실패한다.
 - 시험 앱 계정은 자료 읽기·쓰기만 받고(운영 앱 계정과 같은 범위), 시험 마이그레이션 계정은 접속만 받아 적용값 확인에만 쓴다. 비밀번호는 16진수 난수라 SQL 따옴표를 깨지 않는다.

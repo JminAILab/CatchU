@@ -54,22 +54,21 @@ async function createLockWaitRoles(db) {
   const app = { username: `${ROLE_PREFIX}app_${suffix}`, password: randomBytes(24).toString('hex') };
   const migrator = { username: `${ROLE_PREFIX}mig_${suffix}`, password: randomBytes(24).toString('hex') };
   const [{ schema }] = await db.query('SELECT current_schema() AS schema');
-  const created = [];
-  try {
+  // 역할·멤버십·권한 설정을 함께 롤백한다. 중간 실패를 별도 DROP으로 복구하다 역할이 남지 않게 한다.
+  await db.transaction(async manager => {
     for (const role of [app, migrator]) {
       // 비밀번호는 16진수 난수라 따옴표를 깨지 않는다. 시험 계정 밖에서는 쓰지 않는다.
-      await db.query(`CREATE ROLE ${quote(role.username)} LOGIN PASSWORD '${role.password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION`);
-      created.push(role.username);
+      await manager.query(`CREATE ROLE ${quote(role.username)} LOGIN PASSWORD '${role.password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION`);
+      // PG16의 CREATEROLE만으로는 DROP OWNED·연결 종료에 필요한 상속 권한이 생기지 않는다.
+      // 실행자가 새 시험 역할만 상속한다. 앱 역할이 실행자의 권한을 받는 방향이 아니다.
+      await manager.query(`GRANT ${quote(role.username)} TO CURRENT_USER WITH INHERIT TRUE, SET FALSE`);
     }
-    await db.query(`GRANT CONNECT ON DATABASE ${quote(database)} TO ${quote(app.username)}, ${quote(migrator.username)}`);
-    await db.query(`GRANT USAGE ON SCHEMA ${quote(schema)} TO ${quote(app.username)}`);
-    await db.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${quote(schema)} TO ${quote(app.username)}`);
-    await db.query(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ${quote(schema)} TO ${quote(app.username)}`);
-    await db.query(`ALTER ROLE ${quote(app.username)} IN DATABASE ${quote(database)} SET lock_timeout = '${APP_LOCK_TIMEOUT}'`);
-  } catch (error) {
-    await dropRoles(db, created);
-    throw error;
-  }
+    await manager.query(`GRANT CONNECT ON DATABASE ${quote(database)} TO ${quote(app.username)}, ${quote(migrator.username)}`);
+    await manager.query(`GRANT USAGE ON SCHEMA ${quote(schema)} TO ${quote(app.username)}`);
+    await manager.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${quote(schema)} TO ${quote(app.username)}`);
+    await manager.query(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ${quote(schema)} TO ${quote(app.username)}`);
+    await manager.query(`ALTER ROLE ${quote(app.username)} IN DATABASE ${quote(database)} SET lock_timeout = '${APP_LOCK_TIMEOUT}'`);
+  });
   const config = (role, overrides = {}) => ({ host: db.options.host, port: db.options.port, database,
     username: role.username, password: role.password, ...overrides });
   let dropped = false;
@@ -79,8 +78,8 @@ async function createLockWaitRoles(db) {
     open: (role, overrides = {}) => new DataSource(buildDataSourceOptions(config(role, overrides))).initialize(),
     async drop() {
       if (dropped) return;
-      dropped = true;
       await dropRoles(db, [app.username, migrator.username]);
+      dropped = true;
     },
   };
 }
