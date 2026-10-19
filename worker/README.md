@@ -157,7 +157,7 @@ uv run --locked python -m app.processing succeeded-one-candidate
 
 ## 설명 초안·질문·제목 생성
 
-[docs/generation.md](docs/generation.md)에 있다. 실제 제공자 어댑터(Anthropic Claude API)는 [docs/generation-provider.md](docs/generation-provider.md)에 있다.
+[docs/generation.md](docs/generation.md)에 있다. 호출 한도와 운영 로그는 [docs/generation-limits.md](docs/generation-limits.md), 실제 제공자 어댑터(Anthropic Claude API)는 [docs/generation-provider.md](docs/generation-provider.md)에 있다.
 
 ## 분석 요청 큐 소비자
 

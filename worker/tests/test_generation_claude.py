@@ -279,6 +279,8 @@ def test_max_tokens_is_at_least_4000(max_output: int, max_tokens: int) -> None:
 @pytest.mark.parametrize(
     ("models", "generate", "rewrite"),
     [
+        # 기본은 둘 다 Haiku 5.5다(#119 결정, 2026-10-19 팀장 결정으로 생성 호출도 Haiku 유지).
+        (ClaudeModels(), "claude-haiku-5-5", "claude-haiku-5-5"),
         (
             ClaudeModels(generate="claude-sonnet-5-5"),
             "claude-sonnet-5-5",

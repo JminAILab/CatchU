@@ -20,8 +20,9 @@ from pathlib import PurePosixPath
 from typing import Literal
 
 from app.collection.records import CommitRecord
+from app.generation.names import name_in
 from app.generation.request import FileState, PreparedCandidate
-from app.generation.response import LineRef, Ref, name_in
+from app.generation.response import LineRef, Ref
 
 Kind = Literal["시험", "문서", "설정", "코드"]
 Action = Literal["추가", "삭제", "수정", "이름 변경"]

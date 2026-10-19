@@ -48,7 +48,11 @@ logger = logging.getLogger(__name__)
 
 BASE_URL: Final = "https://api.anthropic.com"
 INFERENCE_GEO: Final = "us"
-DEFAULT_MODEL: Final = "claude-haiku-5-5"
+# 호출 종류별 기본 모델. 둘 다 Haiku 5.5다(#119 결정 「호출 종류별 모델」, 2026-10-19 팀장 결정으로 생성 호출도
+# Haiku 유지). 로컬 비교에서 생성 호출을 Sonnet 5.5로 하면 실패가 적었지만 비용이 약 20배였다
+# (generation-limits.md 「모델」).
+GENERATE_MODEL: Final = "claude-haiku-5-5"
+REWRITE_MODEL: Final = "claude-haiku-5-5"
 # 최대 출력 바이트(4,000)보다 적게 잡지 않는다. 토큰 수와 응답 글 길이는 일대일이 아니어서 이 값으로 최대 출력
 # 안의 응답이 잘리지 않는다고 보장하지는 못한다. 잘리면 `max_tokens` 멈춤으로 와 전체 응답을 쓰지 않는다.
 MIN_MAX_TOKENS: Final = 4_000
@@ -57,8 +61,8 @@ MAX_RESPONSE_BYTES: Final = 256 * 1024
 
 # 받는 모델과 그 모델에서 생각을 끄는 설정. 표에 없는 모델은 받지 않는다(30일 보관이 필수인 모델이나 단가가
 # 큰 모델을 설정 실수로 쓰지 않게 한다). Haiku 5.5는 `disabled`로 끄고(노력 수준 high 이하, 기본 medium),
-# Sonnet 5.5는 `disabled`를 400으로 거절해 `between_tools`로 끈다. Sonnet은 생성 호출 품질 비교 후보다(#119
-# 4.2). Sonnet 설정은 실제 호출로 확인하지 않았다.
+# Sonnet 5.5는 `disabled`를 400으로 거절해 `between_tools`로 끈다. 두 설정 모두 2026-10-16~18 로컬 실제
+# 호출에서 받아들여졌다(모두 `end_turn`).
 THINKING_OFF: Final[Mapping[str, ThinkingConfigParam]] = {
     "claude-haiku-5-5": {"type": "disabled"},
     "claude-sonnet-5-5": {"type": "between_tools"},
@@ -132,8 +136,8 @@ class ClaudeModels:
     실패한 호출을 다른 모델로 다시 보내는 경로는 두지 않는다(#120 「모델 대체」를 추가하지 않음).
     """
 
-    generate: str = DEFAULT_MODEL
-    rewrite_title: str = DEFAULT_MODEL
+    generate: str = GENERATE_MODEL
+    rewrite_title: str = REWRITE_MODEL
 
     def __post_init__(self) -> None:
         # 설정 값이 다른 칸(키 등)과 바뀌어 들어왔을 수 있어 예외에 값을 싣지 않는다.
