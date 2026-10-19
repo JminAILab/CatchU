@@ -15,7 +15,7 @@
 
 `collection_terms`는 `method`·`range`·`limits`·`retries` 각각을 `{ status, value }`로 적는다. `status`는 `DECIDED`(팀장 결정)·`PROPOSED`(실측 전 제안)·`CONTRACT`(현행 계약)다. api는 이 값을 해석하지 않고 판본의 의미로 보존한다. 세 공급은 자료 종류 목록이 아니라 이 정의의 `whole_repository`로 전체 선정을 판정한다.
 
-두 테이블은 [ERD v1](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)에 없다. 기존 엔티티와 관계를 맺지 않는 내부 근거 테이블이며, ERD 반영 여부는 리뷰에서 정한다.
+두 테이블은 [ERD v1](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)에 없다. 기존 엔티티와 외래 키로 잇지 않는 내부 근거 테이블이다. ERD 반영은 팀장이 별도 PR로 한다. 두 테이블과 관계·불변 조건만 넣고 초기 자료 값·좌표 카탈로그는 넣지 않으며, 동의의 범위 판본은 외래 키 없이 대조 관계로 적는다([2026-10-19 팀장 결정](https://github.com/JminAILab/CatchU/pull/346#pullrequestreview-5568166382)).
 
 ## 초기 자료와 출처
 
@@ -37,7 +37,7 @@
 | 한도(`limits`) | 호출 300회, 수집 600초, 총량 50MB, 단일 응답 10MB, 연결 5초·응답 15초, 비교 10쪽, 기준 브랜치 커밋 100, 연결 PR 묶음 100 | `PROPOSED`. 같은 표, worker `CollectionLimits` 기본값 |
 | 재시도(`retries`) | 하지 않음(`NONE`) | `CONTRACT`. 현행 계약을 따르며 제안이 아니다 |
 
-수치는 정의 시점(2026-10-19) [worker 기본값](../../worker/app/collection/limits.py)의 사본이며 확정 정책이 아니다. worker는 이 행을 읽지 않으므로 worker 기본값이 바뀌어도 이 판본은 바뀌지 않는다. 둘의 일치를 자동으로 검사하지 않는다. 수치가 확정되거나 바뀌면 아래 절차로 새 범위 판본을 추가한다.
+수치는 정의 시점(2026-10-19) [worker 기본값](../../worker/app/collection/limits.py)의 사본이며 확정 정책이 아니다. worker는 이 행을 읽지 않으므로 worker 기본값이 바뀌어도 이 판본은 바뀌지 않는다. 둘의 일치를 자동으로 검사하지 않는다. 수치가 바뀌면 아래 절차로 새 범위 판본을 추가한다. 값이 그대로 확정되면 새 범위 판본을 만들지 않고 [수집 통제 문서](../../docs/CatchU_collection_control_scope.md)에만 기록한다([2026-10-19 팀장 결정](https://github.com/JminAILab/CatchU/pull/346#pullrequestreview-5568166382)). 판본 행은 고칠 수 없으므로 `status`도 정의 시점 값 그대로다.
 
 ## 입력 방식과 초기화·갱신
 
@@ -53,7 +53,7 @@
 | 좌표(이름·소유자) | 카탈로그에 **새 선정 참조**의 판본을 더하고 행의 `selection_reference`를 바꾼다. 이전 판본은 고치거나 지우지 않는다 | 이전 참조에 동의한 시도는 `SCOPE_UNVERIFIED`, 그 결과·과거 분석은 이전 좌표로 등록·조회된다 |
 | 범위 의미(자료 종류·범위·한도) | `allowed_scope_revision`에 새 판본을 넣고 행의 `scope_revision`을 바꾼다 | 이전 판본에 동의한 시도는 `SCOPE_UNVERIFIED` |
 
-고지 판본은 #322가 따로 관리한다. 선정 자료의 관리 책임은 #252 본문 「협업·검토」에 따라 별도로 조율한다.
+고지 판본은 #322가 따로 관리한다. 선정 대상과 수집 한도는 팀장이 정하고, 바꿀 때 마이그레이션 PR도 팀장이 올려 A 담당 리뷰를 받는다. 좌표 카탈로그를 바꾸면 B 담당 리뷰도 받는다([2026-10-19 팀장 결정](https://github.com/JminAILab/CatchU/pull/346#pullrequestreview-5568166382)).
 
 ## 세 공급
 
