@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import type { GoogleStartResult } from "@/lib/auth-screen-contract";
+import type { GoogleStartResult } from "@/lib/auth-google";
 import { authScreenMessages } from "@/lib/auth-screen-messages";
 import { createGoogleStartControl } from "@/lib/google-login-screen";
 import styles from "./auth.module.css";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { ReauthNoticeProps } from "@/lib/auth-screen-contract";
+import type { ReauthNoticeProps } from "@/lib/auth-gate";
 import { authScreenMessages } from "@/lib/auth-screen-messages";
 import { confirmReauthLeave } from "@/lib/member-session-screen";
 import { loginPath } from "@/lib/member-navigation";

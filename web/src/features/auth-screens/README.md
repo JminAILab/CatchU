@@ -21,9 +21,10 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 
 ## 파일
 
+화면이 받는 값의 타입은 #286의 `auth-google.ts`·`auth-state.ts`·`auth-logout.ts`·`auth-gate.ts`·`member-lookup.ts`를 그대로 쓴다. 화면 쪽에 같은 모양의 타입을 따로 두지 않는다.
+
 | 파일 | 내용 |
 |---|---|
-| `src/lib/auth-screen-contract.ts` | 화면이 #286에서 받는 값의 최소 타입. #286 연결 때 #286 타입으로 바꾸고 지운다 |
 | `src/lib/auth-screen-messages.ts` | 안내 문구와 결과별 선택. [합의]·[제안] 표시 |
 | `src/lib/google-login-screen.ts` | Google 버튼(`createGoogleStartControl`)·콜백 화면(`createGoogleCallbackControl`)의 진행 |
 | `src/lib/member-session-screen.ts` | 로그아웃 요청·표시(`createMemberLogoutControl`·`logoutView`), 재인증 [다시 로그인] 판단 |
@@ -88,15 +89,14 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 
 ## 남은 연결 작업(#286 병합 뒤)
 
-1. 화면이 `auth-screen-contract.ts` 대신 #286의 타입을 쓰게 바꾸고 이 파일을 지운다.
-2. 통합 시험 전환(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`) 아래에서만 연결한다. 전환을 끈 기본 빌드는 기존 동작 그대로여야 한다.
+1. 통합 시험 전환(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`) 아래에서만 연결한다. 전환을 끈 기본 빌드는 기존 동작 그대로여야 한다.
    - 공통 인증판 로그인 화면에 `GoogleLoginButton`(`authRuntime().google.startGoogleLogin`).
    - `/google/callback` 페이지에 `GoogleCallbackScreen`(`readGoogleCallback`·`completeGoogleLogin`·공통 인증판 회원 조회). 전환을 끄면 이 주소는 열지 않는다.
    - 공통 인증판 가드의 `renderReauthNotice`에 `ReauthNotice`. 표식 변경 뒤 정리된 탭의 표시와 `inputCleared` 전달은 #286이 팀장 답변 2를 반영할 때 정한다.
    - 공통 인증판 셸에 `useMemberLogout`(`useAuth()`·`session.logout()`)·`LogoutStatus`와 헤더 `logoutPending`.
-3. 각 화면 담당이 작성 중 입력을 `useUnsavedChanges`로 알린다. 등록한 화면이 없으면 미저장 확인은 묻지 않는다.
-4. [제안] 문구를 #251에서 정한다.
-5. 실제 Google 승인·콜백·쿠키·다중 탭 검증은 #286이 수행해 #251에 기록하고, 그 결과에서 나온 화면 보완은 #287에서 한다.
+2. 각 화면 담당이 작성 중 입력을 `useUnsavedChanges`로 알린다. 등록한 화면이 없으면 미저장 확인은 묻지 않는다.
+3. [제안] 문구를 #251에서 정한다.
+4. 실제 Google 승인·콜백·쿠키·다중 탭 검증은 #286이 수행해 #251에 기록하고, 그 결과에서 나온 화면 보완은 #287에서 한다.
 
 ## 검사
 

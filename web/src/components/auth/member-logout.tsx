@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import type { LogoutOutcome, LogoutSnapshot } from "@/lib/auth-screen-contract";
-import { confirmLogout, createMemberLogoutControl, logoutView, type LogoutView } from "@/lib/member-session-screen";
+import type { LogoutOutcome } from "@/lib/auth-logout";
+import { confirmLogout, createMemberLogoutControl, logoutView, type LogoutSnapshot, type LogoutView } from "@/lib/member-session-screen";
 import { unsavedChanges } from "@/lib/unsaved-changes";
 import styles from "./auth.module.css";
 
