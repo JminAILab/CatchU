@@ -40,6 +40,21 @@ AnalysisReceiverModule.registerDatabase({
 이 선택은 한 개의 `observations` 또는 `observationsFactory` 안에서 조립하며, 두 옵션을 동시에 넘기지 않는다.
 별도 MOCK 공급은 이 구현에 포함되지 않는다. LIVE 좌표 조회 실패를 합성 좌표로 대체하지 않는다.
 
+## 분석 조회와 Catch 저장이 공유하는 판본
+
+#252에서 구현할 DB를 현재 선정·활성·범위 판본의 정본으로 사용한다. 카탈로그의 `listCurrent()`나 `ALL_AUTHENTICATED`만으로 접수·실행을 허가하지 않는다.
+
+| 값 | 연결 규칙 |
+|---|---|
+| `repositoryId`·`scopeRevision` | 접수된 요청·시도·동의와 일치해야 한다. #252의 공급자는 실행 때 현재 허가와 저장된 전체 범위 의미도 재검사해야 한다. |
+| DB 동의의 `selectionReference` | #232의 선정 공급자와 B 등록 공급자가 **같은 보관 판본**에서 `owner/name`을 해석한다. 현재 이름으로 대체하지 않는다. |
+| 큐 Request의 두 참조 | 내부 조회용 `attemptId`다. 이를 좌표 판본으로 해석하지 않고 #232가 DB의 원래 동의를 조회한다. 큐 조립은 DB 동의를 바꾸지 않는다. |
+
+분석을 허가한 뒤 현재 선정에서 제외되거나 이름이 바뀌어도, B는 접수 당시 좌표 판본으로 결과 근거를 대조한다. 알 수 없는 참조·저장소 불일치는 거부한다.
+여기서 판본은 선정 좌표·분석 범위의 판본이며 Git 커밋 SHA를 고정해 수집했다는 뜻은 아니다.
+
+#252의 실제 공급자가 아직 없어 실제 실행과의 연결 완료를 선언하지 않는다. 연결 담당자는 #232에 넘길 좌표와 B의 `catalog.resolve(저장된 selectionReference)`가 같은지 대조해야 한다. 전체 범위 허가·최종 DB 잠금은 [worker 컨텍스트 계약](worker-context.md)을 따른다.
+
 ## 고지와 실제 실행 연결
 
 실제 분석 고지·판본은 [#322](https://github.com/JminAILab/CatchU/issues/322)에서 확정해 [PR #328](https://github.com/JminAILab/CatchU/pull/328)에 반영했다. 고지 제공과 LIVE 접수 활성화는 별개다.
@@ -52,4 +67,5 @@ AnalysisReceiverModule.registerDatabase({
 
 전용 PostgreSQL에서 두 실제 저장소 좌표에 **합성 동의와 분석 결과**를 붙여 수신 → 좌표 조회 → Catch·근거 저장 → 본인 조회를 검사한다.
 일곱 맥락 불일치, 과거 판본, MOCK 거부, 조회 장애, 다른 저장소 근거, 중복 결과도 검사한다.
+추가 연결 검사는 실제 큐 메시지 조립·worker 컨텍스트 서비스·Catch 등록을 같은 테스트 DB로 묶는다. 선정·GitHub 자격정보는 명시적 테스트 대역이며 #252의 실제 DB 공급 구현이나 실제 큐·worker 왕복 검증을 대신하지 않는다.
 실제 회원의 동의·GitHub 자료 수집·LLM 분석·운영 DB 검증은 아니다.

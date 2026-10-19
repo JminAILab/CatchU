@@ -23,7 +23,8 @@ const INITIAL_VERSIONS: readonly SelectedRepositoryVersion[] = Object.freeze([
 ]);
 
 /**
- * 서버 내부 선정 자료. ALL_AUTHENTICATED는 선정 대상 범위이며 GitHub 연결·분석 동의를 대신하지 않는다.
+ * 보관 좌표 자료. 현재 선정·활성·범위 판본의 정본은 #252에서 구현할 DB이며 listCurrent로 접수·실행을 허가하지 않는다.
+ * ALL_AUTHENTICATED는 대상 범위 표기일 뿐 현재 회원 자격·GitHub 연결·분석 동의를 대신하지 않는다.
  * current 목록에서 제외된 판본도 resolve로 읽어 종료된 분석의 당시 좌표를 보존한다.
  */
 export class SelectedRepositoryCatalog {
