@@ -16,7 +16,7 @@ const IORedis = require('ioredis');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { CONTRACT_DIR, captureLogger, insertAttempt, observation, useAppSettings, waitFor, workerEvent, workerResult } =
   require('../helpers/queue-harness.cjs');
-const { checkMessage } = require('../helpers/worker-messages.cjs');
+const { applyPatch, checkMessage, readFixture } = require('../helpers/worker-messages.cjs');
 const { AppModule } = require('../../dist/app.module');
 const { AnalysisQueueModule, AnalysisQueueRunner } = require('../../dist/analysis-queue/analysis-queue.module');
 const { requestJobOptions } = require('../../dist/analysis-queue/queue-spec');
@@ -101,6 +101,20 @@ const attemptOf = row => db.query('SELECT * FROM analysis_attempt WHERE attempt_
 const counts = () => db.query(`SELECT (SELECT count(*)::int FROM result_application_record) receipts,
   (SELECT count(*)::int FROM catch_asset) catches`).then(rows => rows[0]);
 const stateOf = (queue, id) => queue.getJobState(id);
+// 수신·반영이 쓰는 표. 거부된 결과는 여기에 아무것도 남기지 않고 앞선 수신·반영 자료도 바꾸지 않는다.
+const STORED_TABLES = ['result_application_record', 'candidate_registration', 'catch_asset', 'catch_evidence', 'repository_protection'];
+/** 요청·시도 행과 수신·반영 표 전체. 시각까지 그대로인지 비교한다. */
+async function snapshot(row) {
+  const tables = {};
+  for (const table of STORED_TABLES) tables[table] = await db.query(`SELECT * FROM ${table} ORDER BY 1`);
+  return { request: await requestOf(row), attempt: await attemptOf(row), tables };
+}
+/** worker처럼 결과를 넣고(작업 ID = 메시지 ID) 끝날 때까지 기다린 뒤 Redis에서 그 작업을 다시 읽는다. */
+async function deliverResult(s, message) {
+  await s.messages.add('Result', message, resultOptions(message.messageId));
+  await waitFor(async () => ['completed', 'failed'].includes(await stateOf(s.messages, message.messageId)), '결과 작업 끝남');
+  return { state: await stateOf(s.messages, message.messageId), job: await Job.fromId(s.messages, message.messageId) };
+}
 
 test('같은 대기 시도를 두 번 보내고 같은 작업 ID로 다른 내용을 직접 넣어도 작업은 하나이고 첫 데이터 그대로다(대기·완료 보관·실패 보관)', { skip }, async t => {
   const s = await startQueueApp(t);
@@ -185,7 +199,7 @@ for (const finish of ['completed', 'failed']) {
   });
 }
 
-test('worker 형식 알림·결과: 받음·실행 중 반영, 수신 확인을 결과 작업 반환값으로, 같은 결과 재전달은 DUPLICATE, 다른 작업 ID는 실패', { skip }, async t => {
+test('worker 형식 알림·결과: 받음·실행 중 반영, 수신 확인을 결과 작업 반환값으로, 같은 결과 재전달은 DUPLICATE, 같은 결과 ID의 다른 내용은 PAYLOAD_CONFLICT, 다른 작업 ID는 실패', { skip }, async t => {
   const s = await startQueueApp(t);
   const row = await insertAttempt(db, { submittedAt: new Date(Date.now() - 1000) });
   const initial = await requestOf(row);
@@ -217,6 +231,22 @@ test('worker 형식 알림·결과: 받음·실행 중 반영, 수신 확인을 
   assert.deepEqual([duplicate.disposition, duplicate.code], ['DUPLICATE', 'ALREADY_RECEIVED']);
   assert.deepEqual(await counts(), { receipts: 1, catches: 1 });
 
+  // 같은 결과 ID에 다른 내용(메시지·작업 ID도 새 것)이면 PAYLOAD_CONFLICT이고 첫 수신·반영 자료는 그대로다(#121).
+  // 바로 위 DUPLICATE가 같은 첫 결과로 '이미 받은 결과' 갈래에 닿으므로, 이 거부는 내용 차이 때문이다.
+  const changed = workerResult(row, 'same-id-different-content');
+  assert.deepEqual([changed.resultId, changed.requestId, changed.attemptId], [result.resultId, result.requestId, result.attemptId]);
+  assert.notEqual(changed.messageId, result.messageId);
+  assert.notDeepEqual(changed.candidates, result.candidates);
+  assert.equal(checkMessage('Result', changed).verdict, 'VALID');
+  const kept = await snapshot(row);
+  const conflict = await deliverResult(s, changed);
+  assert.equal(conflict.state, 'completed');
+  const rejected = conflict.job.returnvalue;
+  assert.equal(checkMessage('ResultReceipt', rejected).verdict, 'VALID');
+  assert.deepEqual([rejected.resultId, rejected.requestId, rejected.attemptId], [result.resultId, row.requestId, row.attemptId]);
+  assert.deepEqual([rejected.disposition, rejected.code], ['REJECTED', 'PAYLOAD_CONFLICT']);
+  assert.deepEqual(await snapshot(row), kept);
+
   // 같은 데이터를 다른 작업 ID로 넣으면 수신 경로에 넘기지 않고 고정 코드로 실패한다.
   const otherRow = await insertAttempt(db);
   const other = workerResult(otherRow);
@@ -236,6 +266,55 @@ test('worker 형식 알림·결과: 받음·실행 중 반영, 수신 확인을 
   // 기록에 본문·밖에서 온 작업 ID를 싣지 않는다.
   for (const value of [result.candidates[0].title, result.candidates[0].draft.content, otherId]) assert.equal(logs.includes(value), false);
 });
+
+// 결과 수신 경계(#121): 세 식별자 중 하나라도 읽을 수 없는 결과는 수신 확인 없이(null) 끝나고, 세 식별자가 읽히는 잘못된 결과는
+// 보낸 식별자를 그대로 담은 거부 수신 확인이 된다. 실제 큐를 거쳐 worker가 읽는 결과 작업 반환값으로 확인한다.
+// 입력은 #103 공용 합성 세트의 식별 불가 사례·음성 대조다. 정상 결과의 대조군은 위 왕복 시험이다.
+const NEGATIVE_CONTROLS = readFixture('cases.json').negativeControls;
+const negativePatch = id => NEGATIVE_CONTROLS.find(control => control.id === id).patch;
+const RECEIPT_BOUNDARY = [
+  { name: '시도 ID 누락', code: null, build: row => workerResult(row, 'unidentifiable-missing-attempt-id') },
+  { name: '결과 ID 빈 값', code: null, build: row => applyPatch(workerResult(row), negativePatch('empty-result-id')) },
+  { name: '요청 ID가 문자열 아님', code: null, build: row => applyPatch(workerResult(row), negativePatch('non-string-request-id')) },
+  { name: '후보 제목 키 없음', code: 'SCHEMA_INVALID', build: row => applyPatch(workerResult(row), negativePatch('missing-title')) },
+  { name: '다른 회원', code: 'CONTEXT_MISMATCH', build: row => ({ ...workerResult(row), memberId: randomUUID() }) },
+];
+for (const c of RECEIPT_BOUNDARY) {
+  const expected = c.code === null ? '반환값 null' : `보낸 식별자를 담은 REJECTED·${c.code}`;
+  test(`결과 수신 경계(${c.name}): 실제 큐를 거치면 작업은 완료·${expected}이고 DB·보호 관측은 그대로다`, { skip }, async t => {
+    const observed = [];
+    const s = await startQueueApp(t, { observe: async context => { observed.push(context); return observation(context); } });
+    const row = await insertAttempt(db);
+    const message = c.build(row);
+    // 작업 ID 검사(JOB_ID_MISMATCH)를 지나 E 수신까지 가는 메시지다.
+    assert.equal(message.messageId, `message-mock-${row.attemptId}-result`);
+    const before = await snapshot(row);
+    const from = s.lines.length;
+
+    const { state, job } = await deliverResult(s, message);
+    assert.equal(state, 'completed');
+    assert.equal(job.name, 'Result');
+    assert.deepEqual(job.data, message);
+    const logs = s.lines.slice(from).join('\n');
+    if (c.code === null) {
+      // 식별자를 추정하거나 새로 만들어 수신 확인을 채우지 않는다.
+      assert.strictEqual(job.returnvalue, null);
+      assert.ok(logs.includes('{"kind":"Result","code":"UNIDENTIFIABLE"}'));
+      assert.ok(logs.includes(`"event":"WORKER_RESULT_RECEIVED","jobId":"${message.messageId}","disposition":null,"code":null`));
+    } else {
+      const receipt = job.returnvalue;
+      assert.equal(checkMessage('ResultReceipt', receipt).verdict, 'VALID');
+      assert.deepEqual([receipt.resultId, receipt.requestId, receipt.attemptId], [message.resultId, message.requestId, message.attemptId]);
+      assert.deepEqual([receipt.disposition, receipt.code], ['REJECTED', c.code]);
+      assert.ok(logs.includes(`{"kind":"Result","code":"${c.code}"}`));
+      assert.ok(logs.includes(`"event":"WORKER_RESULT_RECEIVED","jobId":"${message.messageId}","disposition":"REJECTED","code":"${c.code}"`));
+    }
+    assert.deepEqual(await snapshot(row), before);
+    for (const rows of Object.values(before.tables)) assert.deepEqual(rows, []);
+    assert.deepEqual(observed, []);
+    assert.equal(logs.includes(message.candidates[0].draft.content), false);
+  });
+}
 
 test('처리 중인 결과가 있으면 종료는 그 작업이 끝날 때까지 기다리고, 끝난 작업은 완료·수신 확인으로 남는다', { skip }, async t => {
   let release;
