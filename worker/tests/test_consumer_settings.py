@@ -1,6 +1,7 @@
-"""분석 소비자 기동 설정. 계획 「PR① 자동 시험」 1·20과 큐 규격 ID 검사."""
+"""분석 소비자 기동 설정. 계획 「PR① 자동 시험」 1·20, PR② LIVE 설정과 큐 규격 ID 검사."""
 
 import logging
+import pickle
 import tomllib
 from pathlib import Path
 
@@ -17,11 +18,23 @@ from app.consumer.settings import (
 )
 
 SECRET = "s3cr3t-queue-password"
+CONTEXT_KEY = "c0" * 32
+GENERATION_KEY = "sk-ant-synthetic-generation-key-must-not-leak"
+# 운영 LIVE 설정(요청 정보 조회 목적지·키, 생성 키). PR②부터 운영 필수다.
+LIVE = {
+    "WORKER_CONTEXT_API_URL": "https://api.internal",
+    "WORKER_CONTEXT_API_KEY": CONTEXT_KEY,
+    "CATCHU_GENERATION_API_KEY": GENERATION_KEY,
+}
 WORKER_DIR = Path(__file__).resolve().parents[1]
 
 
 def load(**values: str) -> ConsumerSettings:
     return ConsumerSettings.from_environment(values)
+
+
+def production(**values: str) -> ConsumerSettings:
+    return ConsumerSettings.from_environment({**LIVE, **values})
 
 
 # 1. 설정 --------------------------------------------------------------------------------
@@ -44,13 +57,16 @@ def test_development_without_queue_url_disables_consumer(node_env: str) -> None:
 
 
 def test_production_accepts_only_tls_queue_url_and_turns_mock_off() -> None:
-    settings = load(CATCHU_QUEUE_REDIS_URL=f"rediss://:{SECRET}@queue.internal:6379")
+    settings = production(
+        CATCHU_QUEUE_REDIS_URL=f"rediss://:{SECRET}@queue.internal:6379"
+    )
 
     assert settings.environment == "production"
     assert settings.consumer_enabled is True
     assert settings.mock_enabled is False
+    assert settings.live is not None
     with pytest.raises(SettingsError):
-        load(CATCHU_QUEUE_REDIS_URL="redis://queue.internal:6379")
+        production(CATCHU_QUEUE_REDIS_URL="redis://queue.internal:6379")
 
 
 @pytest.mark.parametrize(
@@ -100,12 +116,12 @@ def test_concurrency_prefix_and_mock_values() -> None:
 
 def test_mock_cannot_be_turned_on_in_production() -> None:
     with pytest.raises(SettingsError):
-        load(
+        production(
             CATCHU_QUEUE_REDIS_URL="rediss://queue.internal:6379",
             CATCHU_WORKER_MOCK="true",
         )
     assert (
-        load(
+        production(
             CATCHU_QUEUE_REDIS_URL="rediss://queue.internal:6379",
             CATCHU_WORKER_MOCK="false",
         ).mock_enabled
@@ -131,7 +147,7 @@ def test_queue_url_secret_stays_out_of_repr_and_logs(
     assert SECRET not in caplog.text
 
 
-def test_queue_url_is_dropped_before_children_can_inherit_it(
+def test_secrets_are_dropped_before_children_can_inherit_them(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import subprocess
@@ -141,10 +157,16 @@ def test_queue_url_is_dropped_before_children_can_inherit_it(
 
     url = f"redis://user:{SECRET}@127.0.0.1:6379"
     seen: dict[str, object] = {}
+    names = (
+        "CATCHU_QUEUE_REDIS_URL",
+        "WORKER_CONTEXT_API_KEY",
+        "CATCHU_GENERATION_API_KEY",
+    )
 
     class FakeService:
         def __init__(self, settings: ConsumerSettings, **_: object) -> None:
             seen["settings_url"] = settings.queue_url
+            seen["live"] = settings.live
 
         async def run(self) -> int:
             # 서비스가 뜬 뒤 띄우는 자식 프로세스는 부모의 환경변수를 물려받는다.
@@ -152,7 +174,10 @@ def test_queue_url_is_dropped_before_children_can_inherit_it(
                 [
                     sys.executable,
                     "-c",
-                    "import os; print(os.environ.get('CATCHU_QUEUE_REDIS_URL', 'absent'))",
+                    "import os, sys; print(' '.join(os.environ.get(n, 'absent')"
+                    " for n in sys.argv[1:]))",
+                    *names,
+                    "WORKER_CONTEXT_API_URL",
                 ],
                 capture_output=True,
                 text=True,
@@ -163,11 +188,112 @@ def test_queue_url_is_dropped_before_children_can_inherit_it(
     monkeypatch.setattr(service_module, "ConsumerService", FakeService)
     monkeypatch.setenv("NODE_ENV", "test")
     monkeypatch.setenv("CATCHU_QUEUE_REDIS_URL", url)
+    for name, value in LIVE.items():
+        monkeypatch.setenv(name, value)
 
     assert main([]) == 0
     queue_url = seen["settings_url"]
     assert isinstance(queue_url, QueueUrl) and queue_url.reveal() == url
-    assert seen["child_env"] == "absent"
+    assert seen["live"] is not None
+    # 비밀값만 지운다. 목적지 주소는 비밀값이 아니라 남는다.
+    assert seen["child_env"] == "absent absent absent https://api.internal"
+
+
+# PR② LIVE 설정 ------------------------------------------------------------------------------
+
+QUEUE = "rediss://queue.internal:6379"
+
+
+@pytest.mark.parametrize("missing", sorted(LIVE))
+def test_production_requires_live_settings(missing: str) -> None:
+    values = {**LIVE, "CATCHU_QUEUE_REDIS_URL": QUEUE}
+    del values[missing]
+    with pytest.raises(SettingsError) as raised:
+        ConsumerSettings.from_environment(values)
+    assert CONTEXT_KEY not in str(raised.value) and GENERATION_KEY not in str(
+        raised.value
+    )
+    with pytest.raises(SettingsError) as none_given:
+        load(CATCHU_QUEUE_REDIS_URL=QUEUE)
+    assert "WORKER_CONTEXT_API_URL" in str(none_given.value)
+
+
+@pytest.mark.parametrize("node_env", ["development", "test"])
+def test_development_without_live_settings_turns_live_off(node_env: str) -> None:
+    settings = load(NODE_ENV=node_env)
+
+    assert settings.live is None and settings.for_child().live is None
+
+
+@pytest.mark.parametrize("missing", sorted(LIVE))
+def test_partial_live_settings_fail_even_in_development(missing: str) -> None:
+    values = {**LIVE, "NODE_ENV": "test"}
+    del values[missing]
+    with pytest.raises(SettingsError):
+        ConsumerSettings.from_environment(values)
+
+
+@pytest.mark.parametrize(
+    ("changes", "ok"),
+    [
+        # 10/15 팀장 결정 질문 4: 운영 http는 명시 설정 + 클러스터 안 서비스 이름일 때만.
+        (
+            {
+                "WORKER_CONTEXT_API_URL": "http://api.catchu.svc.cluster.local:3001",
+                "WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP": "true",
+            },
+            True,
+        ),
+        ({"WORKER_CONTEXT_API_URL": "http://api.catchu.svc.cluster.local:3001"}, False),
+        (
+            {
+                "WORKER_CONTEXT_API_URL": "http://api.internal:3001",
+                "WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP": "true",
+            },
+            False,
+        ),
+        ({"WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP": "yes"}, False),
+        ({"WORKER_CONTEXT_API_KEY": "short"}, False),
+        ({"CATCHU_GENERATION_API_KEY": "has space"}, False),
+    ],
+)
+def test_production_live_destination_and_keys(
+    changes: dict[str, str], ok: bool
+) -> None:
+    values = {**LIVE, "CATCHU_QUEUE_REDIS_URL": QUEUE, **changes}
+    if ok:
+        settings = ConsumerSettings.from_environment(values)
+        assert settings.live is not None
+        assert settings.live.context_api.scheme == "http"
+    else:
+        with pytest.raises(SettingsError) as raised:
+            ConsumerSettings.from_environment(values)
+        assert all(value not in str(raised.value) for value in changes.values())
+
+
+def test_live_keys_reach_the_child_settings_but_not_repr_or_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    settings = production(CATCHU_QUEUE_REDIS_URL=QUEUE)
+    child = settings.for_child()
+
+    assert child.live is not None and child.live == settings.live
+    for rendered in (repr(settings), repr(child), str(child.live)):
+        assert CONTEXT_KEY not in rendered and GENERATION_KEY not in rendered
+    # 자식은 spawn으로 설정 객체를 받아 쓴다. 넘어간 값으로 조회·생성을 할 수 있어야 한다.
+    restored = pickle.loads(pickle.dumps(child))
+    assert restored.live is not None
+    assert restored.live.context_api.api_key.reveal() == CONTEXT_KEY
+    assert restored.live.generation_key.reveal() == GENERATION_KEY
+    assert restored.live.context_api.authority == "api.internal"
+
+    caplog.set_level(logging.INFO)
+    with env(
+        {**LIVE, "CATCHU_QUEUE_REDIS_URL": QUEUE, "CATCHU_GENERATION_API_KEY": ""}
+    ):
+        assert main([]) == 2
+    assert "CATCHU_GENERATION_API_KEY" in caplog.text
+    assert CONTEXT_KEY not in caplog.text
 
 
 # 큐 규격 ---------------------------------------------------------------------------------

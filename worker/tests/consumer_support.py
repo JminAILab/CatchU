@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from app.consumer.receipts import ResultJobView
-from app.consumer.settings import ChildSettings, Limits
+from app.consumer.settings import ChildSettings, Limits, LiveSettings
 from app.processing import synthetic_accepted_context, synthetic_request
 
 # 실제 Redis 시험(계획의 ㉣). 값이 있으면 반드시 돌고(CI), 없으면 건너뛴다(로컬).
@@ -46,12 +46,14 @@ def child_settings(
     mock_enabled: bool = True,
     scenario: str = "succeeded-one-candidate",
     limits: Limits = FAST,
+    live: LiveSettings | None = None,
 ) -> ChildSettings:
     return ChildSettings(
         environment="test",
         mock_enabled=mock_enabled,
         mock_scenario=scenario,
         limits=limits,
+        live=live,
     )
 
 

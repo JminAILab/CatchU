@@ -3,21 +3,25 @@
 전체를 해석할 수 없는 응답(크기 초과, JSON이 아님, 최상위가 객체가 아님, 같은 키가 겹침)은 전체 호출
 실패다. 그 밖의 문제는 해당 부분에만 적용한다(2026-10-12 결정 10·12).
 
-- 설명(fragments)·질문(questions): 개수·종류·항목 모양 위반은 그 부분 전체의 형식 위반이고, 지목한 줄·
-  파일·이름이 보낸 자료와 맞지 않으면 그 부분 전체의 확인 실패다. 넘친 항목만 버리고 나머지를 쓰지
+- 설명(fragments)·질문(questions): 항목마다 판정해 맞는 항목만 쓰고 틀린 항목은 버린다(2026-10-19 팀장
+  결정). 목록이 아니거나 비었거나 맞는 항목이 하나도 없으면 그 부분 전체 실패다. 상한을 넘으면 맞는 항목을
+  앞에서부터 상한까지 쓰고, 같은 종류 질문은 처음 것만 쓰며, 조각 종류가 지목한 줄의 종류와 다르면 실제 줄
+  종류로 쓴다. 문장을 만들 수 없는 항목(문장 틀이 없는 파일 상태, 파일 이름으로 줄여도 너무 긴 질문)은 상한·
+  종류를 세기 전에 버린다. 문장은 코드가 확인한 줄·이름으로만 만들므로 모양을 이렇게 풀어도 틀린 문장은 나오지
   않는다.
+  지목한 줄·파일이 보낸 자료에 있는지, 가린 줄이 아닌지, 이름이 그 줄에 식별자 경계로 있는지(사실 검사)는
+  그대로 본다.
 - 제목(title): 칸 누락·모양 위반·40자 초과는 형식 위반이라 고쳐 쓰기 대상이다. 확인 실패는 null이다.
 - 최상위의 모르는 키는 어느 부분에도 쓰지 않고 판정에서 무시한다(건수만 운영 로그에 남긴다). 모르는
-  키 하나로 설명·질문 전체를 실패로 넓히지 않기 위해서다. 항목 안의 모르는 키는 그 부분의 형식 위반이다.
+  키 하나로 설명·질문 전체를 실패로 넓히지 않기 위해서다. 항목 안의 모르는 키는 그 항목의 형식 위반이다.
 """
 
 import json
-import re
-import unicodedata
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from app.generation.names import NameMatch, name_match, valid_name
 from app.generation.request import PreparedFile, PreparedLine
 
 FragmentKind = Literal["ADDED_LINE_WITH", "REMOVED_LINE_WITH", "FILE_STATUS"]
@@ -33,7 +37,6 @@ _QUESTION_TYPES: tuple[QuestionType, ...] = (
     "VERIFICATION",
 )
 TOP_LEVEL_KEYS = frozenset({"fragments", "title", "questions"})
-_NAME = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
 
 
 class Unreadable(Exception):
@@ -79,35 +82,6 @@ def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return found
 
 
-def valid_name(name: object, max_chars: int) -> bool:
-    """코드 이름 모양: 식별자 글자만, 영문자 하나 이상, 길이 상한 안. 공백·백틱·주소·명령문은 거부."""
-    return (
-        isinstance(name, str)
-        and len(name) <= max_chars
-        and _NAME.fullmatch(name) is not None
-        and any(char.isalpha() for char in name)
-    )
-
-
-def _joins(char: str) -> bool:
-    """이름에 이어 붙어 한 식별자가 되는 글자: 유니코드 글자·숫자, 밑줄, $, 결합 문자."""
-    return char.isalnum() or char in "_$" or unicodedata.category(char).startswith("M")
-
-
-def name_in(name: str, text: str) -> bool:
-    """식별자 경계로 일치하는가. `limit`이 `loginRateLimit`에, `func_1`이 `func_10`에, `한글limit`에 묻어
-    확인되지 않는다. 한글 조사가 바로 붙은 이름(「limit을」)도 한 덩어리라 확인하지 않는다."""
-    start = text.find(name)
-    while start >= 0:
-        end = start + len(name)
-        joined_before = start > 0 and _joins(text[start - 1])
-        joined_after = end < len(text) and _joins(text[end])
-        if not joined_before and not joined_after:
-            return True
-        start = text.find(name, start + 1)
-    return False
-
-
 # 부분 판정 결과
 
 
@@ -139,12 +113,49 @@ class Question:
 
 
 PartProblem = Literal["RULE_VIOLATION", "UNVERIFIED"]
+# 항목을 버린 원인과 부분이 실패한 첫 원인. 운영 로그의 원인별 건수에만 쓰고(값·경로·이름은 남기지 않음)
+# 실패 코드·회원 문구는 problem으로 정한다.
+LineMiss = Literal[
+    "UNKNOWN_LINE",  # 보낸 자료에 없는 줄 id
+    "MASKED_LINE",  # 가린 줄(selectable false)
+    "NAME_SHAPE",  # 이름이 식별자 하나의 모양이 아님
+    "NAME_MISSING",  # 이름이 그 줄에 없음
+    "NAME_JOINED_ASCII",  # 이름이 영문자·숫자·밑줄·$에 붙어서만 있음
+    "NAME_JOINED_NON_ASCII",  # 이름이 한글 등 ASCII 밖 글자에 붙어서만 있음
+]
+PartReason = (
+    LineMiss
+    | Literal[
+        "UNKNOWN_FILE",  # 보낸 자료에 없는 파일 id
+        "KIND_MISMATCH",  # 추가 줄 조각인데 삭제 줄(또는 반대)을 지목. 실제 줄 종류로 고쳐 쓴다
+        "NO_TEMPLATE",  # 파일 상태에 맞는 문장 틀이 없음
+        "COUNT",  # 목록이 아니거나 비었음, 또는 상한 뒤라 버린 맞는 항목
+        "ITEM_SHAPE",  # 항목 모양·종류 값·키 위반
+        "DUPLICATE_TYPE",  # 앞에 같은 종류 질문이 있음
+        "TOO_LONG",  # 파일 이름으로 줄여도 질문이 글자 상한을 넘음
+    ]
+)
 
 
 @dataclass(frozen=True)
 class PartVerdict[T]:
     items: tuple[T, ...] = ()
     problem: PartProblem | None = None
+    reason: PartReason | None = None
+    # 부분이 살았는지와 별개로 버리거나 고친 항목. 운영 로그의 건수에만 쓴다. "dropped:<원인>"(틀려서 버림),
+    # "fixed:KIND_MISMATCH"(실제 줄 종류로 고침), "over:COUNT"(맞지만 상한 뒤라 버림).
+    notes: tuple[str, ...] = ()
+
+
+def _miss[T](problem: PartProblem, reason: PartReason) -> PartVerdict[T]:
+    return PartVerdict(problem=problem, reason=reason)
+
+
+_NAME_MISS: dict[NameMatch, LineMiss] = {
+    "MISSING": "NAME_MISSING",
+    "JOINED_ASCII": "NAME_JOINED_ASCII",
+    "JOINED_NON_ASCII": "NAME_JOINED_NON_ASCII",
+}
 
 
 class Sent:
@@ -156,16 +167,28 @@ class Sent:
         self.lines = lines
         self.files = files
 
+    def locate_line(
+        self, line_id: object, name: object, max_chars: int
+    ) -> LineRef | LineMiss:
+        """고를 수 있는 보낸 줄이고 이름이 그 줄에 식별자 경계로 있으면 지목, 아니면 맞지 않은 첫 이유."""
+        if not isinstance(line_id, str):
+            return "UNKNOWN_LINE"
+        line = self.lines.get(line_id)
+        if line is None:
+            return "UNKNOWN_LINE"
+        if line.masked:
+            return "MASKED_LINE"
+        if not isinstance(name, str) or not valid_name(name, max_chars):
+            return "NAME_SHAPE"
+        match = name_match(name, line.text)
+        if match != "FOUND":
+            return _NAME_MISS[match]
+        return LineRef(line, self.files[line.file_id], name)
+
     def line(self, line_id: object, name: object, max_chars: int) -> LineRef | None:
         """고를 수 있는 보낸 줄이고 이름이 그 줄에 식별자 경계로 있으면 지목을 돌려준다."""
-        if not isinstance(line_id, str) or not isinstance(name, str):
-            return None
-        line = self.lines.get(line_id)
-        if line is None or line.masked or not valid_name(name, max_chars):
-            return None
-        if not name_in(name, line.text):
-            return None
-        return LineRef(line, self.files[line.file_id], name)
+        found = self.locate_line(line_id, name, max_chars)
+        return found if isinstance(found, LineRef) else None
 
     def file(self, file_id: object) -> FileRef | None:
         if not isinstance(file_id, str):
@@ -182,74 +205,144 @@ def _keys(item: Mapping[str, Any], *expected: str) -> bool:
     )
 
 
+_ItemMiss = tuple[PartProblem, PartReason]
+# 확인된 항목으로 문장을 만들 수 없는 원인. 만들 수 있으면 None을 돌려주는 판정은 문장 틀을 가진 쪽(render)이
+# 넘긴다. 상한·같은 종류 질문을 세기 전에 보아야 문장이 되는 뒤 항목을 잃지 않는다.
+SentenceMiss = Literal["NO_TEMPLATE", "TOO_LONG"]
+_SENTENCE_PROBLEMS: dict[SentenceMiss, PartProblem] = {
+    "NO_TEMPLATE": "UNVERIFIED",
+    "TOO_LONG": "RULE_VIOLATION",
+}
+
+
+def _line_miss(found: LineMiss) -> _ItemMiss:
+    return ("RULE_VIOLATION" if found == "NAME_SHAPE" else "UNVERIFIED", found)
+
+
+def _with_sentence[T](
+    item: T, sentence: Callable[[T], SentenceMiss | None]
+) -> T | _ItemMiss:
+    miss = sentence(item)
+    return item if miss is None else (_SENTENCE_PROBLEMS[miss], miss)
+
+
+def _fragment(
+    item: object, sent: Sent, max_name: int, notes: list[str]
+) -> Fragment | _ItemMiss:
+    """조각 하나. 맞지 않으면 (문제, 원인). 조각 종류가 지목한 줄의 종류와 다르면 실제 줄 종류로 고친다
+    (문장은 코드가 아는 줄 종류로만 만들므로 사실이 바뀌지 않는다)."""
+    if not isinstance(item, dict) or item.get("kind") not in _FRAGMENT_KINDS:
+        return ("RULE_VIOLATION", "ITEM_SHAPE")
+    kind: FragmentKind = item["kind"]
+    if kind == "FILE_STATUS":
+        if not _keys(item, "kind", "file"):
+            return ("RULE_VIOLATION", "ITEM_SHAPE")
+        file = sent.file(item["file"])
+        if file is None:
+            return ("UNVERIFIED", "UNKNOWN_FILE")
+        return Fragment(kind, file)
+    if not _keys(item, "kind", "line", "name"):
+        return ("RULE_VIOLATION", "ITEM_SHAPE")
+    found = sent.locate_line(item["line"], item["name"], max_name)
+    if not isinstance(found, LineRef):
+        return _line_miss(found)
+    actual: FragmentKind = (
+        "ADDED_LINE_WITH" if found.line.kind == "+" else "REMOVED_LINE_WITH"
+    )
+    if actual != kind:
+        notes.append("fixed:KIND_MISMATCH")
+    return Fragment(actual, found)
+
+
 def fragments(
-    response: Mapping[str, Any], sent: Sent, *, low: int, high: int, max_name: int
+    response: Mapping[str, Any],
+    sent: Sent,
+    *,
+    low: int,
+    high: int,
+    max_name: int,
+    sentence: Callable[[Fragment], SentenceMiss | None],
 ) -> PartVerdict[Fragment]:
+    """맞고 문장을 만들 수 있는 조각만 앞에서부터 상한까지 쓰고 나머지는 버린다. 목록이 아니거나 하한보다
+    적으면, 또는 쓸 조각이 하나도 없으면 첫 원인으로 실패한다."""
     items = response.get("fragments")
-    if not isinstance(items, list) or not low <= len(items) <= high:
-        return PartVerdict(problem="RULE_VIOLATION")
-    shaped: list[tuple[FragmentKind, Mapping[str, Any]]] = []
-    for item in items:
-        if not isinstance(item, dict) or item.get("kind") not in _FRAGMENT_KINDS:
-            return PartVerdict(problem="RULE_VIOLATION")
-        kind: FragmentKind = item["kind"]
-        if kind == "FILE_STATUS":
-            if not _keys(item, "kind", "file"):
-                return PartVerdict(problem="RULE_VIOLATION")
-        elif not _keys(item, "kind", "line", "name") or not valid_name(
-            item["name"], max_name
-        ):
-            return PartVerdict(problem="RULE_VIOLATION")
-        shaped.append((kind, item))
+    if not isinstance(items, list) or len(items) < low:
+        return _miss("RULE_VIOLATION", "COUNT")
     verified: list[Fragment] = []
-    for kind, item in shaped:
-        ref: Ref | None
-        if kind == "FILE_STATUS":
-            ref = sent.file(item["file"])
-        else:
-            ref = sent.line(item["line"], item["name"], max_name)
-            expected = "+" if kind == "ADDED_LINE_WITH" else "-"
-            if ref is not None and ref.line.kind != expected:
-                ref = None
-        if ref is None:
-            return PartVerdict(problem="UNVERIFIED")
-        verified.append(Fragment(kind, ref))
-    return PartVerdict(tuple(verified))
+    notes: list[str] = []
+    first: _ItemMiss | None = None
+    for item in items:
+        outcome = _fragment(item, sent, max_name, notes)
+        if isinstance(outcome, Fragment):
+            outcome = _with_sentence(outcome, sentence)
+        if isinstance(outcome, Fragment):
+            if len(verified) < high:
+                verified.append(outcome)
+            else:
+                notes.append("over:COUNT")
+            continue
+        first = first or outcome
+        notes.append(f"dropped:{outcome[1]}")
+    if not verified:
+        assert first is not None
+        return PartVerdict(problem=first[0], reason=first[1], notes=tuple(notes))
+    return PartVerdict(tuple(verified), notes=tuple(notes))
+
+
+def _question(item: object, sent: Sent, max_name: int) -> Question | _ItemMiss:
+    if not isinstance(item, dict) or item.get("type") not in _QUESTION_TYPES:
+        return ("RULE_VIOLATION", "ITEM_SHAPE")
+    kind: QuestionType = item["type"]
+    if _keys(item, "type", "file"):
+        file = sent.file(item["file"])
+        if file is None:
+            return ("UNVERIFIED", "UNKNOWN_FILE")
+        return Question(kind, file)
+    if not _keys(item, "type", "line", "name"):
+        return ("RULE_VIOLATION", "ITEM_SHAPE")
+    found = sent.locate_line(item["line"], item["name"], max_name)
+    if not isinstance(found, LineRef):
+        return _line_miss(found)
+    return Question(kind, found)
 
 
 def questions(
-    response: Mapping[str, Any], sent: Sent, *, low: int, high: int, max_name: int
+    response: Mapping[str, Any],
+    sent: Sent,
+    *,
+    low: int,
+    high: int,
+    max_name: int,
+    sentence: Callable[[Question], SentenceMiss | None],
 ) -> PartVerdict[Question]:
+    """맞고 문장을 만들 수 있는 질문만 종류마다 처음 것 하나씩 상한까지 쓰고 나머지는 버린다. 목록이 아니거나
+    하한보다 적으면, 또는 쓸 질문이 하나도 없으면 첫 원인으로 실패한다."""
     items = response.get("questions")
-    if not isinstance(items, list) or not low <= len(items) <= high:
-        return PartVerdict(problem="RULE_VIOLATION")
-    shaped: list[tuple[QuestionType, Mapping[str, Any]]] = []
-    for item in items:
-        if not isinstance(item, dict) or item.get("type") not in _QUESTION_TYPES:
-            return PartVerdict(problem="RULE_VIOLATION")
-        if not (
-            _keys(item, "type", "file")
-            or (
-                _keys(item, "type", "line", "name")
-                and valid_name(item["name"], max_name)
-            )
-        ):
-            return PartVerdict(problem="RULE_VIOLATION")
-        shaped.append((item["type"], item))
-    if len({kind for kind, _ in shaped}) != len(shaped):
-        # 같은 종류의 질문이 둘 이상이면 질문 전체가 형식 위반이다(결정 12).
-        return PartVerdict(problem="RULE_VIOLATION")
+    if not isinstance(items, list) or len(items) < low:
+        return _miss("RULE_VIOLATION", "COUNT")
     verified: list[Question] = []
-    for kind, item in shaped:
-        ref: Ref | None = (
-            sent.file(item["file"])
-            if "file" in item
-            else sent.line(item["line"], item["name"], max_name)
-        )
-        if ref is None:
-            return PartVerdict(problem="UNVERIFIED")
-        verified.append(Question(kind, ref))
-    return PartVerdict(tuple(verified))
+    used: set[QuestionType] = set()
+    notes: list[str] = []
+    first: _ItemMiss | None = None
+    for item in items:
+        outcome = _question(item, sent, max_name)
+        if isinstance(outcome, Question):
+            outcome = _with_sentence(outcome, sentence)
+        if isinstance(outcome, Question):
+            if outcome.type in used:
+                notes.append("dropped:DUPLICATE_TYPE")
+            elif len(verified) >= high:
+                notes.append("over:COUNT")
+            else:
+                used.add(outcome.type)
+                verified.append(outcome)
+            continue
+        first = first or outcome
+        notes.append(f"dropped:{outcome[1]}")
+    if not verified:
+        assert first is not None
+        return PartVerdict(problem=first[0], reason=first[1], notes=tuple(notes))
+    return PartVerdict(tuple(verified), notes=tuple(notes))
 
 
 TitleProblem = Literal["MISSING", "SHAPE", "NAME"]

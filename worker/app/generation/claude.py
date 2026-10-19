@@ -13,6 +13,8 @@
   이하로 줄이고 마감이 지났으면 바로 시간 초과로 끊는다(`_DeadlineBackend`). 이름 조회(DNS)는 이 마감 밖이다.
   시간 제한을 넘겨 끝난 호출은 생성 흐름(`flow._call`)도 시간 초과로 본다.
 - 추론 위치는 미국으로 고정하고(`inference_geo="us"`), 모델의 생각(thinking)은 끈다.
+- 응답 모양은 구조화된 출력(`output_config.format`)으로 API가 지키게 한다(2026-10-19 팀장 결정). 개수·이름이
+  맞는지는 생성 흐름이 그대로 확인한다.
 - 지시문은 system 칸에, 신뢰할 수 없는 자료는 user 칸에 따로 둔다.
 
 운영 로그에는 호출마다 호출 종류·모델 ID·토큰 사용량·멈춘 이유·실패 원인 구분·Anthropic 요청 ID·걸린
@@ -48,7 +50,11 @@ logger = logging.getLogger(__name__)
 
 BASE_URL: Final = "https://api.anthropic.com"
 INFERENCE_GEO: Final = "us"
-DEFAULT_MODEL: Final = "claude-haiku-5-5"
+# 호출 종류별 기본 모델. 둘 다 Haiku 5.5다(#119 결정 「호출 종류별 모델」, 2026-10-19 팀장 결정으로 생성 호출도
+# Haiku 유지). 로컬 비교에서 생성 호출을 Sonnet 5.5로 하면 실패가 적었지만 비용이 약 20배였다
+# (generation-limits.md 「모델」).
+GENERATE_MODEL: Final = "claude-haiku-5-5"
+REWRITE_MODEL: Final = "claude-haiku-5-5"
 # 최대 출력 바이트(4,000)보다 적게 잡지 않는다. 토큰 수와 응답 글 길이는 일대일이 아니어서 이 값으로 최대 출력
 # 안의 응답이 잘리지 않는다고 보장하지는 못한다. 잘리면 `max_tokens` 멈춤으로 와 전체 응답을 쓰지 않는다.
 MIN_MAX_TOKENS: Final = 4_000
@@ -57,11 +63,76 @@ MAX_RESPONSE_BYTES: Final = 256 * 1024
 
 # 받는 모델과 그 모델에서 생각을 끄는 설정. 표에 없는 모델은 받지 않는다(30일 보관이 필수인 모델이나 단가가
 # 큰 모델을 설정 실수로 쓰지 않게 한다). Haiku 5.5는 `disabled`로 끄고(노력 수준 high 이하, 기본 medium),
-# Sonnet 5.5는 `disabled`를 400으로 거절해 `between_tools`로 끈다. Sonnet은 생성 호출 품질 비교 후보다(#119
-# 4.2). Sonnet 설정은 실제 호출로 확인하지 않았다.
+# Sonnet 5.5는 `disabled`를 400으로 거절해 `between_tools`로 끈다. 두 설정 모두 2026-10-16~18 로컬 실제
+# 호출에서 받아들여졌다(모두 `end_turn`).
 THINKING_OFF: Final[Mapping[str, ThinkingConfigParam]] = {
     "claude-haiku-5-5": {"type": "disabled"},
     "claude-sonnet-5-5": {"type": "between_tools"},
+}
+
+
+def _object(properties: dict[str, object]) -> dict[str, object]:
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": list(properties),
+        "additionalProperties": False,
+    }
+
+
+_STR: Final = {"type": "string"}
+_LINE_PICK: Final = {"line": _STR, "name": _STR}
+_TITLE: Final = {
+    "anyOf": [
+        _object({"target": {"type": "string", "const": "CODE_NAME"}, **_LINE_PICK}),
+        _object({"target": {"type": "string", "const": "FILE_NAME"}, "file": _STR}),
+    ]
+}
+_QUESTION_TYPE: Final = {
+    "type": "string",
+    "enum": ["BACKGROUND", "ALTERNATIVES", "VERIFICATION"],
+}
+# 호출 종류별 응답 모양(구조화된 출력). 생성 흐름이 받는 키·종류 값과 같다(response 모듈, 지시문). 배열 개수
+# 제약은 구조화된 출력이 받지 않아 넣지 않고, 개수·지목한 줄·이름이 맞는지는 생성 흐름이 확인한다. 스키마가
+# 고정이라 처음 컴파일한 뒤에는 API 쪽 캐시(24시간)를 쓴다.
+OUTPUT_SCHEMAS: Final[Mapping[Purpose, dict[str, object]]] = {
+    "GENERATE": _object(
+        {
+            "fragments": {
+                "type": "array",
+                "items": {
+                    "anyOf": [
+                        _object(
+                            {
+                                "kind": {
+                                    "type": "string",
+                                    "enum": ["ADDED_LINE_WITH", "REMOVED_LINE_WITH"],
+                                },
+                                **_LINE_PICK,
+                            }
+                        ),
+                        _object(
+                            {
+                                "kind": {"type": "string", "const": "FILE_STATUS"},
+                                "file": _STR,
+                            }
+                        ),
+                    ]
+                },
+            },
+            "title": _TITLE,
+            "questions": {
+                "type": "array",
+                "items": {
+                    "anyOf": [
+                        _object({"type": _QUESTION_TYPE, **_LINE_PICK}),
+                        _object({"type": _QUESTION_TYPE, "file": _STR}),
+                    ]
+                },
+            },
+        }
+    ),
+    "REWRITE_TITLE": _object({"title": _TITLE}),
 }
 
 # 지출 상한·크레딧 소진을 운영 로그에서 가르는 공식 문서 문구(2026-10-14 확인). 원문은 로그에 남기지 않는다.
@@ -132,8 +203,8 @@ class ClaudeModels:
     실패한 호출을 다른 모델로 다시 보내는 경로는 두지 않는다(#120 「모델 대체」를 추가하지 않음).
     """
 
-    generate: str = DEFAULT_MODEL
-    rewrite_title: str = DEFAULT_MODEL
+    generate: str = GENERATE_MODEL
+    rewrite_title: str = REWRITE_MODEL
 
     def __post_init__(self) -> None:
         # 설정 값이 다른 칸(키 등)과 바뀌어 들어왔을 수 있어 예외에 값을 싣지 않는다.
@@ -190,6 +261,12 @@ class ClaudeProvider:
                 system=request.instructions,
                 messages=[{"role": "user", "content": request.data}],
                 thinking=THINKING_OFF[model],
+                output_config={
+                    "format": {
+                        "type": "json_schema",
+                        "schema": OUTPUT_SCHEMAS[request.purpose],
+                    }
+                },
                 inference_geo=INFERENCE_GEO,
                 timeout=request.timeout_seconds,
             )

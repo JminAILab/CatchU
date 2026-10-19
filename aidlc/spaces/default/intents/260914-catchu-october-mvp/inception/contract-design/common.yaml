@@ -221,13 +221,14 @@ components:
     PublicProfile:
       type: "object"
       additionalProperties: false
-      required: ["displayName","introduction","desiredRole","skills","fieldSource"]
+      required: ["displayName","introduction","desiredRole","skills","fieldSource","githubAccountLogin"]
       properties:
         displayName: {"type":"string"}
         introduction: {"type":"string"}
         desiredRole: {"type":"string"}
         skills: {"type":"array","items":{"type":"string"}}
-        fieldSource: {"type":"string","enum":["SELF_REPORTED"]}
+        fieldSource: {"type":"string","enum":["SELF_REPORTED"],"description":"displayName·introduction·desiredRole·skills 네 항목의 출처. githubAccountLogin에는 적용하지 않는다"}
+        githubAccountLogin: {"type":"string","nullable":true,"description":"링크 소유자의 GitHub 연결이 CONNECTED일 때 마지막 연결 때 확인해 저장한 계정명. REAUTH_REQUIRED·DISCONNECTED·연결 기록 없음이면 null. null은 현재 표시할 GitHub 계정 정보가 없다는 뜻이며 미연동으로 단정하지 않는다. 수신자 조회는 연결 상태를 바꾸거나 GitHub·자격정보 보관소를 호출하지 않고 저장값을 쓰므로, 승인 철회나 계정명 변경이 아직 반영되지 않았으면 이전 계정명일 수 있다. 연결 상태값은 내보내지 않는다. 자가 입력 값이 아니다"}
     PublicEvidence:
       type: "object"
       additionalProperties: false

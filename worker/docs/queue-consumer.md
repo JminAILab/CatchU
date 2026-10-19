@@ -1,18 +1,23 @@
 # 분석 요청 큐 소비자
 
-[#121](https://github.com/JminAILab/CatchU/issues/121)의 첫 단계(큐 연결 기본 틀)다. api가 넣은 분석 요청을 큐에서 꺼내 처리하고, 진행 알림과 결과를 api로 가는 큐에 넣는다. 지금은 개발·시험 설정의 MOCK 요청만 가짜 생성기로 처리한다. 실제 수집·후보·생성을 잇는 LIVE 처리는 요청 정보 조회([PR #283](https://github.com/JminAILab/CatchU/pull/283))가 병합된 뒤 다음 단계에서 붙인다. api 쪽 큐 연결은 [#233](https://github.com/JminAILab/CatchU/issues/233)이다. 보장하지 않는 범위는 [worker README](../README.md#보장하지-않는-범위)에 있다.
+[#121](https://github.com/JminAILab/CatchU/issues/121)의 큐 연결이다. api가 넣은 분석 요청을 큐에서 꺼내 처리하고, 진행 알림과 결과를 api로 가는 큐에 넣는다. LIVE 요청은 요청 정보 조회([요청 정보 조회](request-context.md)) 뒤 실제 수집·후보·생성으로, MOCK 요청은 개발·시험 설정에서만 가짜 생성기로 처리한다. LIVE는 합성 GitHub·합성 제공자·합성 조회 API로만 검사했고 실제 api·GitHub·Claude 연결 확인은 남았다. api 쪽 큐 연결은 [#233](https://github.com/JminAILab/CatchU/issues/233)이다. 보장하지 않는 범위는 [worker README](../README.md#보장하지-않는-범위)에 있다.
 
 ## 구조
 
 - **부모 프로세스**(`python -m app.consumer`)가 BullMQ로 `analysis-requests` 큐에서 요청을 꺼낸다. 작업마다 자식 프로세스 하나를 새로 띄우고(`multiprocessing`의 spawn), 자식이 파이프로 보낸 진행 알림·결과를 `worker-messages` 큐에 넣는다. 같은 포트(8000)로 상태 확인 `GET /health`만 연다. 상태 확인 외 HTTP 기능은 이 프로세스에 넣지 않는다.
-- **자식 프로세스**는 작업 하나를 처리하고 끝난다. 부모에게서 작업 ID, 작업 데이터(JSON), 꺼낸 시각, 비밀값 없는 설정만 받고 BullMQ·Redis·FastAPI를 불러오지 않는다. 그래서 생성 제공자·자격정보·임시 자료의 수명이 자식 프로세스의 수명과 같다.
+- **자식 프로세스**는 작업 하나를 처리하고 끝난다. 부모에게서 작업 ID, 작업 데이터(JSON), 꺼낸 시각, 큐 접속 정보 없는 설정(LIVE 키는 이 설정 객체로만)을 받고 BullMQ·Redis·FastAPI를 불러오지 않는다. 그래서 생성 제공자·자격정보·임시 자료의 수명이 자식 프로세스의 수명과 같다.
 - **부모는 스스로 진행 알림을 만들지 않는다.** 상한 초과·자식 비정상 종료·종료 신호 때도 "실행 불명"을 보내지 않는다. 생성기가 실행 여부를 확인하지 못하면 자식이 기존 규칙대로 `UNCERTAIN`을 알린다([README 「요청 검사와 합성 결과 생성」](../README.md#요청-검사와-합성-결과-생성)).
 
 자식 안의 순서는 다음과 같다.
 
 1. **조회 전 자체 검사**: 메시지 스키마 v1, 요청·시도 ID가 uuid인지, 큐 작업 ID가 시도 ID와 같은지, 두 참조(`credentialContextReference`, `allowedScope.selectionReference`)가 시도 ID와 같은지, 허용 범위의 저장소 ID가 요청의 저장소 ID와 같은지 본다. 어긋나면 진행 알림도 결과도 없이 거부한다.
-2. **LIVE**: 다음 단계 전이라 처리 전에 거부한다.
+2. **LIVE**: 요청 정보를 한 번 조회한다([요청 정보 조회](request-context.md)).
+   - 찾음: 응답의 접수 기록으로 요청의 열 개 항목을 대조한다(`check_request`). 다르면 진행 알림도 결과도 없이 거부한다. 같으면 `RECEIVED`·`RUNNING`을 알리고 `LiveGenerator`가 수집(`collect`, 시계와 수집 10분은 꺼낸 시각부터, 관계 조회 포함) → 후보 판정(`build_candidates`) → 생성(`run_generation`, 마감 = 꺼낸 시각 + 20분 − 60초)을 한 번씩 부른다. 생성 제공자(Claude API)는 후보가 있을 때 자식 안에서 한 번 만든다. 요청 전체의 실행 여부를 모르면 `UNCERTAIN`만 알린다.
+   - 모름·실패: 수집 없이, 진행 알림 없이 FAILED 결과 하나(`stage: COLLECTION`, 이유 코드와 회원 문구)를 보낸다. 판정은 E가 한다.
+   - LIVE 설정이 없는 개발·시험 실행이면 처리 전에 거부한다(`LIVE_NOT_CONFIGURED`). 운영은 설정이 없으면 기동하지 않는다.
 3. **MOCK**: 개발·시험 설정에서만 요청 정보를 조회하지 않고 메시지 값으로 맥락을 만들어 기존 처리 순서(`process_request`)와 가짜 생성기로 처리한다. 운영 설정은 처리 전에 거부한다. 결과의 맥락은 E가 접수 기록과 다시 대조한다.
+
+추가 기준 브랜치(통합 브랜치)는 넘길 공급원이 없어 기본값(없음)이다. 그래서 통합 브랜치를 쓰는 저장소는 기본 브랜치만 기준으로 판정한다([관계 조회 「추가 기준 브랜치」](relation-collection.md#추가-기준-브랜치)).
 
 ## 실행
 
@@ -36,8 +41,11 @@ NODE_ENV=development CATCHU_QUEUE_REDIS_URL=redis://127.0.0.1:6379 uv run --lock
 | `CATCHU_QUEUE_PREFIX` | 선택(기본 `catchu`) | 큐 키 접두사. api와 같아야 한다. 영문·숫자·`_`·`-` 64자 이하 |
 | `CATCHU_WORKER_CONCURRENCY` | 선택(기본 1) | 이 프로세스의 동시 분석 수. 지금은 1만 받고 2 이상이면 기동하지 않는다(아래 「배포에서 지킬 것」). 소비자를 여러 개 띄우면 전체 동시 수는 그 합이다 |
 | `CATCHU_WORKER_MOCK` | 선택 | `true`·`false`. 개발·시험 기본 켬, 운영 기본 끔. 운영에서 `true`면 기동하지 않는다 |
+| `WORKER_CONTEXT_API_URL`·`WORKER_CONTEXT_API_KEY` | 운영 필수 | 요청 정보 조회의 api 주소와 worker 전용 키([요청 정보 조회 「설정」](request-context.md#설정)) |
+| `WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP` | 선택 | `true`면 클러스터 안 서비스 이름(`*.svc.cluster.local`)에 한해 운영에서도 http 조회 주소를 받는다. 그 밖의 http는 거부한다 |
+| `CATCHU_GENERATION_API_KEY` | 운영 필수 | 생성 제공자(Claude API) 키. SDK 환경변수(`ANTHROPIC_API_KEY`)는 쓰지 않는다([생성의 실제 제공자](generation-provider.md#만들-때-넘길-것)) |
 
-운영에서 큐 주소가 없거나 위 값이 틀리면 설정 이름만 로그에 남기고 종료 코드 2로 끝난다. 실행 명령은 설정을 읽은 뒤 큐 주소를 환경변수에서 지운다. 분석 자식(spawn)은 부모의 환경변수를 물려받으므로, 큐 비밀번호가 자식에 넘어가지 않게 하기 위해서다. 운영 큐 TLS는 시스템 CA로 검증한다. 시간 상한은 환경변수로 열지 않는다(아래 「시간 상한」). 요청 정보 조회 주소·키와 생성 키는 LIVE 처리를 붙이는 다음 단계에서 더한다.
+운영에서 큐 주소나 LIVE 설정(조회 주소·키, 생성 키)이 없거나 위 값이 틀리면 설정 이름만 로그에 남기고 종료 코드 2로 끝난다. 개발·시험에서는 LIVE 설정 셋을 모두 비우면 LIVE를 끄고, 일부만 넣으면 기동하지 않는다. 실행 명령은 설정을 읽은 뒤 비밀값(큐 주소, 조회 키, 생성 키)을 환경변수에서 지운다. 분석 자식(spawn)은 부모의 환경변수를 물려받으므로, 큐 비밀번호는 자식에 넘어가지 않고 LIVE 키는 자식용 설정 객체로만 넘어가게 하기 위해서다. 운영 큐 TLS는 시스템 CA로 검증한다. 시간 상한은 환경변수로 열지 않는다(아래 「시간 상한」).
 
 ## 상태 확인
 
@@ -73,7 +81,8 @@ Python BullMQ는 작업 ID 형식을 검사하지 않으므로 앱이 검사한�
 | 처리 결과 | 큐에 넣는 것 | 요청 작업 | 반환값·실패 사유 |
 |---|---|---|---|
 | 작업 봉투 이상(이름, 작업 ID ≠ 시도 ID, ID 형식) | 없음 | 실패 | `REQUEST_JOB_INVALID` |
-| 처리 전 거부(스키마, 자체 검사, 받지 않는 MOCK, LIVE) | 없음 | 완료 | `{"handled":"REJECTED","reason":…}`(`SCHEMA_INVALID`·`SELF_CHECK_FAILED`·`MOCK_NOT_ACCEPTED`·`LIVE_NOT_ASSEMBLED` 등) |
+| 처리 전 거부(스키마, 자체 검사, 조회한 접수 기록과 다름, 지난 시도, 받지 않는 MOCK, LIVE 설정 없음) | 없음 | 완료 | `{"handled":"REJECTED","reason":…}`(`SCHEMA_INVALID`·`SELF_CHECK_FAILED`·`CONTEXT_MISMATCH`·`STALE_ATTEMPT`·`MOCK_NOT_ACCEPTED`·`LIVE_NOT_CONFIGURED`) |
+| 요청 정보 조회 모름·실패 | FAILED 결과(진행 알림 없음) | 완료 | `{"handled":"RESULT_SENT","outcome":"FAILED"}` |
 | 정상 종결 | RECEIVED·RUNNING·결과 | 완료 | `{"handled":"RESULT_SENT","outcome":…}` |
 | 자식 안의 실행 불명 | RECEIVED·RUNNING·UNCERTAIN | 완료 | `{"handled":"UNCERTAIN"}` |
 | 결함(자식 안 예외, 만든 메시지가 규격에 맞지 않음) | 그때까지의 알림만 | 실패 | `WORKER_DEFECT` |
@@ -87,7 +96,7 @@ Python BullMQ는 작업 ID 형식을 검사하지 않으므로 앱이 검사한�
 
 ## 시간 상한
 
-시계는 부모가 작업을 받은 순간 하나다. 그때부터 20분 안에 자식 띄우기, 처리, 진행 알림 전송, 종결 프레임 전달이 끝나야 한다. 자식 띄우기가 상한을 넘거나 그 사이 종료 신호가 오면 띄우기를 기다리지 않고, 늦게 뜬 자식은 뜨는 즉시 끝내 회수한다. 종결 프레임을 받으면 20분 감시를 멈추므로, 그 뒤에 상한이나 종료 신호가 와도 결과를 "결과 없음"으로 바꾸지 않는다. 자식도 꺼낸 시각 + 20분 30초가 되면 스스로 끝내고, 1초마다 부모 프로세스가 바뀌었는지(부모가 죽음) 보고 바뀌면 끝낸다.
+시계는 부모가 작업을 받은 순간 하나다. 그때부터 20분 안에 자식 띄우기, 요청 정보 조회, 처리, 진행 알림 전송, 종결 프레임 전달이 끝나야 한다. LIVE의 수집 시간 상한(10분)도 이 시각부터 재고, 생성 마감은 이 시각 + 20분 − 60초다(60초는 결과 조합·검사·프레임 전달 여유). 자식 띄우기가 상한을 넘거나 그 사이 종료 신호가 오면 띄우기를 기다리지 않고, 늦게 뜬 자식은 뜨는 즉시 끝내 회수한다. 종결 프레임을 받으면 20분 감시를 멈추므로, 그 뒤에 상한이나 종료 신호가 와도 결과를 "결과 없음"으로 바꾸지 않는다. 자식도 꺼낸 시각 + 20분 30초가 되면 스스로 끝내고, 1초마다 부모 프로세스가 바뀌었는지(부모가 죽음) 보고 바뀌면 끝낸다.
 
 | 대기 | 상한 | 넘으면 |
 |---|---|---|
@@ -109,11 +118,11 @@ SIGTERM·SIGINT를 앱이 직접 받는다(uvicorn은 신호를 가로채지 않
 
 ## 로그
 
-작업 ID·시도 ID·처리 결과 코드·상태만 남기고 메시지 본문·회원 값·토큰·예외 원문은 남기지 않는다. 자식의 모든 로그 줄에는 `attemptId=`가 붙는다. 예외는 종류 이름만 남긴다.
+작업 ID·시도 ID·처리 결과 코드·상태와 요청 정보 조회의 이유·원인 코드만 남기고 메시지 본문·회원 값·토큰·조회 응답·예외 원문은 남기지 않는다. 자식의 모든 로그 줄에는 `attemptId=`가 붙어, 생성 제공자의 호출별 줄도 요청과 이을 수 있다. 예외는 종류 이름만 남긴다.
 
 ## 검사
 
-[README 「변경 후 검사」](../README.md#변경-후-검사)의 명령이 큐 소비자 시험(`tests/test_consumer_*.py`)도 돈다. 실제 Redis가 필요한 시험(종료 신호 경쟁, 정체 0회, 잠금 갱신, Node가 넣은 요청 옵션, 보관 정리, 상태 확인, 실패 사유)은 `CATCHU_TEST_REDIS_URL`이 있을 때만 돈다. CI는 Valkey 8.1.6 서비스 컨테이너로 이 값을 주므로 건너뛰지 않는다. 로컬에서는 위 「실행」의 컨테이너를 띄운 뒤 다음처럼 돌린다.
+[README 「변경 후 검사」](../README.md#변경-후-검사)의 명령이 큐 소비자 시험(`tests/test_consumer_*.py`)과 LIVE 처리 시험(`tests/test_live_processing.py`)도 돈다. LIVE는 loopback 합성 조회 API·합성 GitHub·합성 제공자로 조회 1회·요청 대조·수집부터 생성까지·생성 마감·조회 모름과 실패·자격정보 해제를 보고, 실제 자식 프로세스로도 한 번씩 돈다. 실제 Redis가 필요한 시험(종료 신호 경쟁, 정체 0회, 잠금 갱신, Node가 넣은 요청 옵션, 보관 정리, 상태 확인, 실패 사유)은 `CATCHU_TEST_REDIS_URL`이 있을 때만 돈다. CI는 Valkey 8.1.6 서비스 컨테이너로 이 값을 주므로 건너뛰지 않는다. 로컬에서는 위 「실행」의 컨테이너를 띄운 뒤 다음처럼 돌린다.
 
 ```sh
 CATCHU_TEST_REDIS_URL=redis://127.0.0.1:6379 uv run --locked pytest tests/test_consumer_redis.py

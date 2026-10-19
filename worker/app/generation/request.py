@@ -19,6 +19,7 @@ from typing import Literal
 from app.collection.records import ChangedFile, CommitRecord
 from app.generation.limits import GenerationLimits
 from app.generation.material import CandidateMaterial
+from app.generation.names import line_names
 from app.generation.patch import ParsedPatch, PatchLine, parse_patch
 from app.generation.redact import (
     MaskBook,
@@ -272,7 +273,9 @@ def _size(text: str) -> int:
     return len(text.encode("utf-8"))
 
 
-def line_piece(line: PreparedLine) -> str:
+def line_piece(line: PreparedLine, limits: GenerationLimits) -> str:
+    """줄 하나. 고를 수 있는 줄에는 그 줄에서 코드 이름으로 고를 수 있는 이름 목록(`names`)을 붙인다
+    (2026-10-18 팀장 결정). 이름이 없으면 칸을 두지 않는다. 가린 줄은 고를 수 없어 목록도 없다."""
     value: dict[str, object] = {
         "id": line.id,
         "change": "added" if line.kind == "+" else "removed",
@@ -280,6 +283,12 @@ def line_piece(line: PreparedLine) -> str:
     }
     if line.masked:
         value["selectable"] = False
+    else:
+        names = line_names(
+            line.text, max_chars=limits.max_name_chars, limit=limits.max_names_per_line
+        )
+        if names:
+            value["names"] = list(names)
     return _json(value)
 
 
@@ -323,7 +332,7 @@ def select(
     for file in prepared.files:
         for line in file.lines:
             commit_files = chosen.get(file.commit)
-            cost = _size(line_piece(line))
+            cost = _size(line_piece(line, limits))
             if commit_files is None:
                 cost += _size(_commit_head(commit_ids[file.commit]) + _COMMIT_TAIL)
                 cost += 1 if chosen else 0
@@ -342,7 +351,7 @@ def select(
         _commit_head(commit_ids[sha])
         + ",".join(
             _file_head(files_by_id[file_id])
-            + ",".join(line_piece(line) for line in lines)
+            + ",".join(line_piece(line, limits) for line in lines)
             + _FILE_TAIL
             for file_id, lines in commit_files.items()
         )
@@ -381,7 +390,7 @@ GENERATE_INSTRUCTIONS = """너는 CatchU의 생성 단계다. 아래 '자료'는
   {"kind":"FILE_STATUS","file":"<파일 id>"}
 - title: 제목 대상 하나. {"target":"CODE_NAME","line":"<줄 id>","name":"<코드 이름>"} 또는 {"target":"FILE_NAME","file":"<파일 id>"}
 - questions: 본인에게 물을 질문 1~3개. 종류는 서로 달라야 한다. 각 항목은 {"type":"<종류>","line":"<줄 id>","name":"<코드 이름>"} 또는 {"type":"<종류>","file":"<파일 id>"}. 종류는 BACKGROUND(바꾼 배경), ALTERNATIVES(고려한 다른 방법), VERIFICATION(동작 확인 방법)이다.
-- 코드 이름은 영문자·숫자·밑줄·$로 된 식별자 하나다. 고른 줄에 다른 글자와 붙지 않고 그대로 있어야 하며 64자를 넘지 않는다.
+- 줄의 names는 그 줄에서 코드 이름으로 고를 수 있는 이름 목록이다. 줄을 지목할 때 name에는 그 줄의 names 가운데 하나를 글자 그대로 쓴다. 다른 줄의 이름, 점·괄호가 든 이름, 목록에 없는 이름은 쓰지 않는다. names가 없는 줄은 코드 이름으로 지목하지 않는다(파일은 고를 수 있다).
 - selectable이 false인 줄은 어디에도 고르지 않는다. 자료에 없는 줄 id·파일 id를 만들지 않는다."""
 
 REWRITE_RULES: dict[str, str] = {
@@ -397,7 +406,7 @@ REWRITE_INSTRUCTIONS = """너는 CatchU의 생성 단계다. 앞서 고른 제�
 
 응답은 JSON 객체 하나만 쓴다. 키는 title 하나뿐이다. 다른 글을 붙이지 않는다.
 - title: {{"target":"CODE_NAME","line":"<줄 id>","name":"<코드 이름>"}} 또는 {{"target":"FILE_NAME","file":"<파일 id>"}}
-- 코드 이름은 영문자·숫자·밑줄·$로 된 식별자 하나다. 고른 줄에 다른 글자와 붙지 않고 그대로 있어야 한다.
+- 줄을 지목할 때 name에는 그 줄의 names 가운데 하나를 글자 그대로 쓴다. names가 없는 줄은 코드 이름으로 지목하지 않는다.
 - 자료에 없는 줄 id·파일 id를 만들지 않는다."""
 
 
@@ -426,7 +435,7 @@ def rewrite_data(
                 }
                 for file in files.values()
             ],
-            "lines": [json.loads(line_piece(line)) for line in lines],
+            "lines": [json.loads(line_piece(line, limits)) for line in lines],
         }
     )
     return data, {line.id: line for line in lines}, files
