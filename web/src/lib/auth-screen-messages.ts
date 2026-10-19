@@ -1,4 +1,5 @@
-import type { GoogleCompletionResult, GoogleFailureReason, CallbackParse, LogoutResult } from "./auth-screen-contract.ts";
+import type { CallbackParse, GoogleCompletionResult, GoogleFailureReason } from "./auth-google.ts";
+import type { LogoutResult } from "./auth-state.ts";
 
 /**
  * 인증 화면(#287)의 안내 문구. 화면은 이 파일의 문구만 쓰고, code·state·`loginAttemptToken`·토큰이나 서버 응답 원문을 섞지 않는다.

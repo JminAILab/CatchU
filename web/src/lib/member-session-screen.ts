@@ -2,11 +2,15 @@
  * 회원 화면 묶음의 로그아웃·재인증 안내(#287). React와 분리해 시험한다.
  * 인증 상태 판단·입력 정리·복원·로그아웃 뒤 이동은 공통 인증(#286)과 그 가드가 맡는다. 여기서는 미저장 확인·요청·진행·실패·불명 표시만 정한다.
  */
-import type { LogoutOutcome, LogoutResult, LogoutSnapshot } from "./auth-screen-contract.ts";
+import type { LogoutOutcome } from "./auth-logout.ts";
+import type { AuthSnapshot, LogoutResult } from "./auth-state.ts";
 import { authScreenMessages, logoutNotice } from "./auth-screen-messages.ts";
 import { confirmDiscardUnsaved, type ConfirmDialog, type UnsavedRegistry } from "./unsaved-changes.ts";
 
 type Listener = () => void;
+
+/** 로그아웃 표시에 쓰는 공통 인증 상태(#286 `AuthSnapshot`)의 일부. */
+export type LogoutSnapshot = Pick<AuthSnapshot, "generation" | "logout" | "canRetryLogout">;
 
 /* ---------- 로그아웃 ---------- */
 
