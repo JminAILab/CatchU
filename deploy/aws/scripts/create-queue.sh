@@ -50,6 +50,13 @@ if [ "$existing" != 0 ]; then
   # 앞선 실행이 만드는 중에 끊겼을 수 있으므로 쓸 수 있게 될 때까지 기다린다.
   catchu_info "${group}가 이미 있다. 다시 만들지 않고 쓸 수 있게 될 때까지 기다린 뒤 확인 값을 찍는다."
   aws_catchu elasticache wait replication-group-available --replication-group-id "$group"
+  # 큐 노드마다 실제로 연결된 파라미터 그룹이 이 그룹인지 본다. 값은 연결된 노드에만 적용되기 때문이다.
+  attached=$(aws_catchu elasticache describe-cache-clusters \
+    --query "CacheClusters[?ReplicationGroupId=='${group}'].CacheParameterGroup.CacheParameterGroupName" --output text)
+  attached=$(printf '%s\n' "$attached" | tr '\t ' '\n\n' | awk 'NF')
+  [ -n "$attached" ] || catchu_die "${group}의 노드를 조회하지 못했다"
+  [ "$(printf '%s\n' "$attached" | sort -u)" = "$parameter_group" ] ||
+    catchu_die "${group}의 노드가 파라미터 그룹 ${parameter_group}만 쓰지 않는다($(printf '%s' "$attached" | sort -u | tr '\n' ' '))"
   # 메모리가 차도 지우지 않는 설정이 그대로인지 본다. 다르면 고치지 않고 멈춘다.
   policy=$(aws_catchu elasticache describe-cache-parameters --cache-parameter-group-name "$parameter_group" \
     --query "Parameters[?ParameterName=='maxmemory-policy'] | [0].ParameterValue" --output text)

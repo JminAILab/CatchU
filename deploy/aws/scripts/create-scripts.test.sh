@@ -96,6 +96,7 @@ case "$svc $op" in
   "rds wait" | "elasticache wait") printf 'wait %s\n' "$all" >> "$S/waits" ;;
   "elasticache describe-replication-groups") case "$all" in *length*) echo "${STUB_QUEUE_COUNT:-0}" ;; *) echo '{"multiAZ": "enabled"}' ;; esac ;;
   "elasticache describe-cache-parameter-groups" | "elasticache describe-cache-subnet-groups") echo 0 ;;
+  "elasticache describe-cache-clusters") echo "${STUB_QUEUE_PGS:-catchu-valkey8-noeviction${tab}catchu-valkey8-noeviction}" ;;
   "elasticache describe-cache-parameters")
     case "$all" in
       *"=='maxmemory-policy'"*) echo "${STUB_MAXMEMORY:-noeviction}" ;;
@@ -281,6 +282,8 @@ run_sut env STUB_QUEUE_COUNT=1 bash "$P/create-queue.sh" --apply
 check "큐가 이미 있으면 만들지 않고 준비를 기다림" "$(ok test "$rc" = 0 -a -z "$(ops)" -a -s "$S/waits")"
 run_sut env STUB_QUEUE_COUNT=1 STUB_TOKEN_COUNT=0 bash "$P/create-queue.sh" --apply
 check "큐가 이미 있어도 비밀번호 SSM이 없으면 성공으로 끝내지 않음" "$(ok test "$rc" = 1)"
+run_sut env STUB_QUEUE_COUNT=1 STUB_QUEUE_PGS="default.valkey8$(printf '\t')catchu-valkey8-noeviction" bash "$P/create-queue.sh" --apply
+check "큐가 이미 있고 노드 하나라도 다른 파라미터 그룹을 쓰면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
 run_sut env STUB_QUEUE_COUNT=1 STUB_MAXMEMORY=volatile-lru bash "$P/create-queue.sh" --apply
 check "큐가 이미 있고 noeviction이 아니면 고치지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
 run_sut env STUB_DB_COUNT=1 STUB_VERBOSITY=default bash "$P/create-rds.sh" --apply
