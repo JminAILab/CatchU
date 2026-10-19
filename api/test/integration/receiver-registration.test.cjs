@@ -184,6 +184,37 @@ test('진행 이벤트를 실제 DB에 저장하고 늦은 진행/닫힌 요청/
   assert.equal((await counts()).receipts, 1);
 });
 
+// #121 요청 정보 조회가 모름·실패면 worker는 진행 알림 없이, 수집하지 않은 FAILED 결과 하나를 보낸다
+// (worker `compose_unresolved_result`의 모양: 후보·미제공 없음, COLLECTION 실패 1건, 이유 코드와 회원 문구).
+function unresolved(result, code, message) {
+  return { ...result, sourceMode: 'LIVE', outcome: 'FAILED', candidates: [], notProvided: [],
+    failures: [{ stage: 'COLLECTION', code, message }] };
+}
+test('요청 정보 조회 모름의 FAILED 결과: 대기 시도는 진행 알림 없이 수락·0건 반영·재요청 가능, 닫힌 요청은 거부', async () => {
+  const { readAnalysisStatus } = require('../../dist/analysis-intake/analysis-status');
+  const queued = unresolved(await prepare('failed', { sourceMode: 'LIVE' }), 'SCOPE_UNVERIFIED',
+    '동의한 저장소 범위를 확인하지 못해 분석하지 않았습니다. 다시 동의한 뒤 요청해 주세요.');
+  assert.equal((await state(queued)).processing, 'QUEUED');
+  const { service } = pipeline();
+  const output = await receive(service, queued);
+  assert.equal(output.receipt.disposition, 'ACCEPTED');
+  assert.equal(output.application.registeredCatchIds.length, 0);
+  const attempt = await state(queued);
+  assert.deepEqual([attempt.processing, attempt.application], ['FAILED', 'APPLIED']);
+  assert.deepEqual(attempt.failures, queued.failures);
+  const { status } = await db.transaction(manager => readAnalysisStatus(manager, queued.memberId, queued.requestId));
+  assert.equal(status.lifecycle, 'CLOSED');
+  assert.deepEqual(status.retry, { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' });
+  // 이미 닫힌 요청(처리 시한 등)에 온 같은 모양의 결과는 거부하고 기존 상태를 바꾸지 않는다.
+  const closed = unresolved(await prepare('failed', { sourceMode: 'LIVE' }), 'REQUEST_CONTEXT_UNAVAILABLE',
+    '분석 요청 정보를 잠시 확인하지 못해 분석하지 않았습니다. 잠시 후 다시 요청해 주세요.');
+  await db.manager.update(AnalysisRequest, { requestId: closed.requestId }, { lifecycle: 'CLOSED' });
+  const rejected = await receive(service, closed);
+  assert.equal(rejected.receipt.disposition, 'REJECTED');
+  assert.deepEqual([(await state(closed)).processing, (await state(closed)).application], ['QUEUED', 'NOT_READY']);
+  assert.deepEqual(await counts(), { catches: 0, evidence: 0, registrations: 0, receipts: 1 });
+});
+
 for (const [label, supply] of [
   ['부재', async () => null], ['조회 실패', async () => { throw Error('private-source-error'); }],
   ['다른 회원', async c => ({ ...observation(c), ownerId: randomUUID() })],

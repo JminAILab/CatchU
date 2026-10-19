@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from app.processing.generation import EligibleCandidate, GenerationOutput
-from app.processing.request_check import CheckedRequest
+from app.processing.request_check import CheckedRequest, UnverifiedRequest
 
 Outcome = Literal["SUCCEEDED", "EMPTY", "PARTIAL_FAILED", "FAILED"]
 
@@ -72,6 +72,25 @@ def _candidate(
     }
 
 
+def _envelope(
+    request: CheckedRequest | UnverifiedRequest, id_label: str
+) -> dict[str, Any]:
+    """식별자와 요청 맥락. ID는 `<종류>-<id_label>-<attemptId>` 모양으로 결정적으로 만든다."""
+    prefix = f"{id_label}-{request.attempt_id}"
+    return {
+        "schemaVersion": "1",
+        "messageId": f"message-{prefix}-result",
+        "resultId": f"result-{prefix}",
+        "requestId": request.request_id,
+        "attemptId": request.attempt_id,
+        "memberId": request.member_id,
+        "repositoryId": request.repository_id,
+        "consentId": request.consent_id,
+        "scopeRevision": request.scope_revision,
+        "sourceMode": request.source_mode,
+    }
+
+
 def compose_result(
     request: CheckedRequest,
     output: GenerationOutput,
@@ -81,8 +100,7 @@ def compose_result(
 ) -> dict[str, Any]:
     """요청 맥락을 그대로 옮기고, 초안·질문 실패는 후보를 두고 failures에 더한다.
 
-    ID는 `<종류>-<id_label>-<attemptId>` 모양으로 결정적으로 만든다. 합성 실행은
-    id_label에 사례 ID를 넣어 M1 합성 결과 세트와 같은 ID를 만든다.
+    합성 실행은 id_label에 사례 ID를 넣어 M1 합성 결과 세트와 같은 ID를 만든다.
     """
     prefix = f"{id_label}-{request.attempt_id}"
     candidates: list[dict[str, Any]] = []
@@ -102,21 +120,34 @@ def compose_result(
                 )
 
     return {
-        "schemaVersion": "1",
-        "messageId": f"message-{prefix}-result",
-        "resultId": f"result-{prefix}",
-        "requestId": request.request_id,
-        "attemptId": request.attempt_id,
-        "memberId": request.member_id,
-        "repositoryId": request.repository_id,
-        "consentId": request.consent_id,
-        "scopeRevision": request.scope_revision,
-        "sourceMode": request.source_mode,
+        **_envelope(request, id_label),
         "outcome": outcome_for(len(candidates), len(failures)),
         "candidates": candidates,
         "notProvided": [
             {"reason": item.reason, "count": item.count} for item in output.not_provided
         ],
         "failures": failures,
+        "finishedAt": rfc3339(finished_at),
+    }
+
+
+def compose_unresolved_result(
+    request: UnverifiedRequest,
+    *,
+    code: str,
+    message: str,
+    finished_at: datetime,
+    id_label: str,
+) -> dict[str, Any]:
+    """요청 정보 조회가 모름·실패인 요청의 결과: 수집하지 않은 FAILED, 수집 단계 실패 1건(#121).
+
+    맥락 값은 대조하지 못한 메시지 값이다. 같은 시도의 다른 결과와 같은 ID 규칙을 쓴다.
+    """
+    return {
+        **_envelope(request, id_label),
+        "outcome": "FAILED",
+        "candidates": [],
+        "notProvided": [],
+        "failures": [_failure("COLLECTION", code, message)],
         "finishedAt": rfc3339(finished_at),
     }

@@ -1,4 +1,4 @@
-"""부모 처리 함수와 실제 자식 프로세스(가짜 출력 큐). 계획 「PR① 자동 시험」 2~9·18·19."""
+"""부모 처리 함수와 실제 자식 프로세스(가짜 출력 큐). 계획 「PR① 자동 시험」 2~9·18·19와 PR②의 LIVE."""
 
 import asyncio
 import logging
@@ -24,6 +24,8 @@ from consumer_support import (
     request_job,
     wait_until,
 )
+from context_synthetic import ApiReply, context_api
+from live_synthetic import ATTEMPT, live_message, live_payload, live_settings
 
 from app.consumer import queues
 from app.consumer.child import ChildInput, child_main
@@ -34,6 +36,7 @@ from app.consumer.settings import ChildSettings, QueueUrl
 from app.contract import Verdict, check_message
 
 WORKER_DIR = Path(__file__).resolve().parents[1]
+__all__ = ["context_api"]
 
 
 @dataclass
@@ -157,7 +160,7 @@ def test_schema_invalid_and_mode_refusals_send_nothing() -> None:
 
     assert [run.value for run in results] == [
         {"handled": "REJECTED", "reason": "SCHEMA_INVALID"},
-        {"handled": "REJECTED", "reason": "LIVE_NOT_ASSEMBLED"},
+        {"handled": "REJECTED", "reason": "LIVE_NOT_CONFIGURED"},
         {"handled": "REJECTED", "reason": "MOCK_NOT_ACCEPTED"},
     ]
     assert all(run.output.attempts == [] for run in results)
@@ -224,6 +227,68 @@ def test_execution_unknown_sends_only_uncertain_and_no_result() -> None:
     ]
     assert run.processor.spawned == 1
     assert run.receipts_watched == 0
+
+
+# PR②. LIVE 요청을 실제 자식 프로세스로 ----------------------------------------------------------
+
+
+def test_live_request_through_child_sends_events_then_live_result(
+    context_api: ApiReply,
+) -> None:
+    # 자식은 실제 시계를 쓰므로 자격정보 만료를 멀리 둔다.
+    context_api.payload = live_payload(expires_at="2099-01-01T00:00:00Z")
+    message = live_message()
+    run = run_job(
+        request_job(message),
+        # 생성 마감은 꺼낸 시각 + 총 상한 − 60초다. 생성 호출 상한(45초)이 들어가게 총 상한을 늘린다.
+        settings=child_settings(
+            limits=replace(FAST, total=120), live=live_settings(context_api.base_url)
+        ),
+        target=consumer_children.live_synthetic,
+    )
+
+    assert run.value == {"handled": "RESULT_SENT", "outcome": "SUCCEEDED"}
+    assert names(run) == ["ProcessingEvent", "ProcessingEvent", "Result"]
+    received, running, result = run.output.added
+    assert received.data["messageId"] == f"event-live-{ATTEMPT}-received"
+    assert running.data["messageId"] == f"event-live-{ATTEMPT}-running"
+    assert result.opts == {
+        **queues.RESULT_JOB_OPTIONS,
+        "jobId": f"message-live-{ATTEMPT}-result",
+    }
+    assert result.data["sourceMode"] == "LIVE"
+    for key in ("requestId", "attemptId", "memberId", "repositoryId", "consentId"):
+        assert result.data[key] == message[key]
+    assert len(result.data["candidates"]) == 1
+    assert context_api.requests == context_api.valid_requests == 1
+    assert run.receipts_watched == 1
+
+
+def test_live_unknown_through_child_sends_only_a_failed_result(
+    context_api: ApiReply,
+) -> None:
+    context_api.status = 404
+    context_api.payload = {
+        "code": "RESOURCE_UNAVAILABLE",
+        "message": "현재 열람할 수 없는 자료입니다.",
+        "details": {
+            "violations": [{"field": "attemptId", "reason": "SCOPE_UNVERIFIED"}]
+        },
+    }
+    # 실제 자식 진입점 그대로다. 조회가 모름이면 GitHub 연결·생성 제공자를 만들지 않는다.
+    run = run_job(
+        request_job(live_message()),
+        settings=child_settings(live=live_settings(context_api.base_url)),
+    )
+
+    assert run.value == {"handled": "RESULT_SENT", "outcome": "FAILED"}
+    assert names(run) == ["Result"]
+    [result] = run.output.added
+    assert result.data["failures"][0]["code"] == "SCOPE_UNVERIFIED"
+    assert result.data["failures"][0]["stage"] == "COLLECTION"
+    assert check_message("Result", result.data).verdict is Verdict.VALID
+    assert context_api.requests == 1
+    assert run.receipts_watched == 1
 
 
 # 6·7. 상한 초과와 자식 회수 -------------------------------------------------------------------

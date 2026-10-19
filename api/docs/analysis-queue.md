@@ -4,7 +4,7 @@ api가 대기 중인 분석 시도를 큐(BullMQ)로 worker에 보내고, worker
 
 ## 지금 상태: 모듈은 있고 실제 서버에서는 아직 켜지 않았다
 
-`AnalysisQueueModule.register({ queue, observations, contractDirectory })`로 조립한다. 셋 중 하나라도 없으면 조립하지 않고 오류를 낸다. 보호 관측 공급자(`observations`)의 가짜 기본값은 없다(2026-10-15 팀장 결정).
+`AnalysisQueueModule.register({ queue, observations, contractDirectory })`로 조립한다. DB가 필요한 공급자는 `observations` 대신 `observationsFactory(db)`를 넘긴다. 두 방식 중 하나와 큐 설정·계약 경로가 필요하다. 보호 관측 공급자(`observations`)의 가짜 기본값은 없다(2026-10-15 팀장 결정).
 
 - `queue`: `readAnalysisQueueConfig()`가 읽은 큐 설정(아래 「설정」). 큐 주소가 없으면 `null`이므로 조립하지 않는다.
 - `observations`: 수신 뒤 반영이 쓰는 보호 관측 공급자(`RepositoryObservationSource`, [수신 연결 안내](receiver-registration.md)). 10월에는 [#314](https://github.com/JminAILab/CatchU/pull/314)의 `OctoberRepositoryObservationSource`를 여기에 넘긴다. 그 안내의 `registerDatabase` 직접 호출 예시는 큐 없이 조립할 때의 방법이며, 큐를 쓸 때는 이 모듈에만 넘긴다.
@@ -12,7 +12,13 @@ api가 대기 중인 분석 시도를 큐(BullMQ)로 worker에 보내고, worker
 
 모듈은 안에서 실제 수신·등록 조립(`AnalysisReceiverModule.registerDatabase`)을 한 번 불러온다. 같은 앱에서 그 조립을 따로 또 부르지 않는다.
 
-**`AppModule`에는 등록하지 않았다.** 받기는 보호 관측 공급자가 있어야 돈다. 10월에는 실제 관측 대신 "10월 관측 안 함(정책 NONE)"을 명시하는 공급자를 쓰기로 했고(10/15 보호 결정), 그 공급자는 [#314](https://github.com/JminAILab/CatchU/pull/314)가 더한다. 다만 이 공급자는 시도마다 저장소 좌표를 받아야 돌고, 기존 비공개 근거를 덮지 않게 하는 E 쪽 수정 전에는 켜지 않는다. 그래서 [#252](https://github.com/JminAILab/CatchU/issues/252)의 좌표 제공자와 [#105](https://github.com/JminAILab/CatchU/issues/105)의 근거 보존·주소 대소문자 대조 수정이 들어온 뒤 별도 작업에서 다음을 한다: `AppModule`에 이 모듈 등록, `main.ts`에서 `listen` 뒤 `app.get(AnalysisQueueRunner).start(onFailure)` 호출(`onFailure`는 받기가 멈췄을 때 앱을 닫고 종료 코드 1로 끝낸다. 아래 「수명주기」), 배포 설정에 큐 주소 추가. 그때 `registerDatabase`가 개발 주입(`DevAnalysisInjection`)도 함께 들여오므로 "제품 AppModule에 주입 제공자 없음"을 보는 기존 시험과 맞춰야 한다.
+**`AppModule`에는 등록하지 않았다.** 10월에는 ‘관측 안 함’을 명시하는 공급자를 쓴다.
+LIVE 근거 주소의 대소문자 구분 없는 대조는 [PR #316](https://github.com/JminAILab/CatchU/pull/316), 기존 SOURCE_PRIVATE 제한·판단 근거 보존은 [PR #317](https://github.com/JminAILab/CatchU/pull/317)로 반영됐다.
+DB 기반 LIVE 좌표와 별도 MOCK 공급자의 조립 경계는 [선정 저장소 좌표 연결](selected-repository-coordinates.md)을 따른다.
+#252의 선정 공급과 #323의 실제 접수·동의 판본 대조가 준비된 뒤 별도 작업에서 앱 등록, `listen` 뒤
+`app.get(AnalysisQueueRunner).start(onFailure)` 호출, 배포 큐 주소를 연결한다.
+`onFailure`는 앱을 닫고 종료 코드 1로 끝내며 아래 수명주기를 따른다.
+이때 개발 주입 제공자가 함께 들어오므로 기존 ‘제품 AppModule에 주입 제공자 없음’ 검사도 함께 대조한다.
 
 연결은 `start()`에서 연다. 조립과 Nest 초기화만으로는 큐 서버에 붙지 않는다.
 
@@ -43,7 +49,7 @@ api가 대기 중인 분석 시도를 큐(BullMQ)로 worker에 보내고, worker
 4. **메시지**: 모든 값이 DB 접수 기록이다. 두 참조만 시도 ID로 바꾼 사본을 보내며 DB의 동의 범위는 바꾸지 않는다.
 5. **넣기**: 큐에 같은 작업 ID의 작업이 있으면(대기·처리 중·완료/실패 보관 중) 넣지 않고 기록도 남기지 않는다. 없으면 넣고 `ANALYSIS_REQUEST_ENQUEUED`를 남긴다(큐에 넣었다는 기록이지 분석 완료가 아니다). 확인과 넣기 사이에 같은 시도가 들어가면 큐가 같은 작업 ID를 무시하고, 이때 넣음 기록이 두 번 남을 수 있다.
 
-MOCK·LIVE를 거르지 않는다. 받을지는 worker가 정한다(지금 worker는 개발·시험의 MOCK만 처리하고 LIVE는 처리 전에 거부한다). 보관 2시간은 처리 시한 60분보다 길고 대상 조회도 60분 안의 시도만 고르므로, **큐에 같은 작업이 남아 있는 동안은** 같은 시도를 다시 넣지 않는다. 막는 근거는 큐의 같은 작업 ID 하나뿐이다. 큐 서버가 자료 없이 다시 떠서 그 작업이 사라졌는데 시도가 아직 `QUEUED`이고 60분 안이면, 다음 회차가 같은 시도를 다시 넣고 worker가 한 번 더 분석할 수 있다. 10/6 결정이 받아들인 위험이다([worker README 「보장하지 않는 범위」](../../worker/README.md#보장하지-않는-범위)).
+MOCK·LIVE를 거르지 않는다. 받을지는 worker가 정한다(worker는 LIVE를 요청 정보 조회 뒤 처리하고, MOCK은 개발·시험 설정에서만 처리한다. [worker 큐 소비자 「구조」](../../worker/docs/queue-consumer.md#구조)). 보관 2시간은 처리 시한 60분보다 길고 대상 조회도 60분 안의 시도만 고르므로, **큐에 같은 작업이 남아 있는 동안은** 같은 시도를 다시 넣지 않는다. 막는 근거는 큐의 같은 작업 ID 하나뿐이다. 큐 서버가 자료 없이 다시 떠서 그 작업이 사라졌는데 시도가 아직 `QUEUED`이고 60분 안이면, 다음 회차가 같은 시도를 다시 넣고 worker가 한 번 더 분석할 수 있다. 10/6 결정이 받아들인 위험이다([worker README 「보장하지 않는 범위」](../../worker/README.md#보장하지-않는-범위)).
 
 **큐를 쓸 수 없을 때**: 보내기 연결은 끊긴 동안 명령을 쌓지 않는다. 연결이 준비되지 않았으면 명령 없이 그 회차를 건너뛴다. 큐 명령 하나는 5초까지만 기다린다. 넘으면 명령을 취소하지 못하므로 "실행됐는지 모름"으로 보고 그 회차를 멈추며, 그 명령이 끝나기 전에는 다음 회차가 새 명령을 보내지 않는다. 멈춤·재개 기록은 이유가 바뀔 때만 남긴다. 큐에서 사라진 요청을 따로 찾거나 보관하는 장치는 없다(10/6 결정, 위 문단의 다시 넣기는 대상 조회의 결과일 뿐이다). 끝나지 않은 요청은 [처리 시한 닫기](analysis-deadline.md)가 닫는다.
 

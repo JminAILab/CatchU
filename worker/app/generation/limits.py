@@ -1,8 +1,8 @@
 """생성 호출·고쳐 쓰기·입출력 크기·시간 상한(#120).
 
-수치는 모두 실측 전 제안값이다. 제목당 고쳐 쓰기 3회만 2026-10-08 팀장 결정(결정 문서 「Catch 제목」)이고,
-나머지는 #120이 정하도록 맡긴 값의 첫 제안이다. 요청 전체 마감은 #121이 정해 넘기며 여기서는 그 마감
-시각만 지킨다(요청당 총 처리 시간의 수치는 #117·#121 실측 뒤 확정).
+제목당 고쳐 쓰기 3회는 2026-10-08 팀장 결정(결정 문서 「Catch 제목」), 요청당 생성 호출 200회는 실제 연결
+실측 뒤 2026-10-17 팀장 결정이다(근거는 worker/docs/generation.md 「호출 한도와 시간」). 나머지는 #120이
+정하도록 맡긴 값의 첫 제안이다. 요청 전체 마감은 #121이 정해 넘기며 여기서는 그 마감 시각만 지킨다.
 """
 
 from collections.abc import Callable
@@ -15,7 +15,7 @@ Clock = Callable[[], datetime]
 @dataclass(frozen=True)
 class GenerationLimits:
     # 요청당 생성 호출 수(후보당 1회). 고쳐 쓰기는 세지 않는다.
-    max_generation_calls: int = 40
+    max_generation_calls: int = 200
     # 요청당 제목 형식 고쳐 쓰기 호출 수와 제목당 최대 횟수(제목당 3회는 팀장 결정).
     max_rewrite_calls: int = 20
     max_rewrites_per_title: int = 3
@@ -37,6 +37,8 @@ class GenerationLimits:
     max_title_chars: int = 40
     max_question_chars: int = 150
     max_name_chars: int = 64
+    # 줄마다 싣는 고를 수 있는 이름 수(나온 순서대로). 실측 전 제안값이다.
+    max_names_per_line: int = 12
 
     def __post_init__(self) -> None:
         counts = (
@@ -50,6 +52,7 @@ class GenerationLimits:
             self.max_title_chars,
             self.max_question_chars,
             self.max_name_chars,
+            self.max_names_per_line,
         )
         if any(value < 0 for value in counts):
             raise ValueError("상한은 0 이상이어야 한다")

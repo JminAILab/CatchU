@@ -20,7 +20,8 @@ const repositories = [
     const [ownerLogin, name] = repo.name.split("/");
     return { repositoryId: repo.repositoryId, ownerLogin, name, url: `https://example.invalid/${repo.name}`, allowedScopeRevision: "v1" };
   }),
-  ...["queue-repo", "uncertain-repo", "apply-failed-repo", "recovering-repo", "failed-repo"].map((name) => ({
+  ...["queue-repo", "uncertain-repo", "apply-failed-repo", "recovering-repo", "failed-repo",
+    "closed-deadline-repo", "closed-partial-repo", "closed-rejected-repo"].map((name) => ({
     repositoryId: name, ownerLogin: "example-org", name, url: `https://example.invalid/example-org/${name}`, allowedScopeRevision: "v1",
   })),
 ];
@@ -36,6 +37,7 @@ function status(repositoryId: string, processing: string, application: string, e
     ...extra,
   };
 }
+const APPLICATION_DEADLINE = { stage: "APPLICATION", code: "PROCESSING_DEADLINE_EXCEEDED", message: "정해진 시간 안에 결과를 반영하지 못했습니다." };
 const catchIds = (repositoryId: string) => previewCatches.filter((item) => item.repositoryId === repositoryId).map((item) => item.catchId);
 const analyses = [
   status("demo-api", "SUCCEEDED", "APPLIED", { registeredCatchIds: catchIds("demo-api"), ownerResultsReady: true, retry: { allowed: false, reason: "RESULTS_EXIST" } }),
@@ -49,6 +51,13 @@ const analyses = [
   status("failed-repo", "FAILED", "APPLIED", { retry: { allowed: true, reason: "FAILURE_WITHOUT_RESULTS" },
     failures: [{ stage: "COLLECTION", code: "COLLECTION_FAILED", message: "저장소 기록을 읽지 못했습니다." }] }),
   status("missing-from-list", "SUCCEEDED", "APPLIED", { ownerResultsReady: true, retry: { allowed: false, reason: "NOT_FAILED" } }),
+  // #288 닫힌 반영 실패(합성). 반영 대기 중 처리 시한 초과 두 가지와, 시한 항목 없이 업무 거부로 닫힌 경우.
+  status("closed-deadline-repo", "SUCCEEDED", "APPLY_FAILED", { lifecycle: "CLOSED", retry: { allowed: true, reason: "FAILURE_WITHOUT_RESULTS" },
+    failures: [APPLICATION_DEADLINE] }),
+  status("closed-partial-repo", "PARTIAL_FAILED", "APPLY_FAILED", { lifecycle: "CLOSED", retry: { allowed: true, reason: "FAILURE_WITHOUT_RESULTS" },
+    failures: [{ stage: "DRAFT", code: "DRAFT_FAILED", message: "일부 후보의 설명 초안을 만들지 못했습니다." }, APPLICATION_DEADLINE] }),
+  status("closed-rejected-repo", "SUCCEEDED", "APPLY_FAILED", { lifecycle: "CLOSED", retry: { allowed: true, reason: "FAILURE_WITHOUT_RESULTS" },
+    failures: [{ stage: "APPLICATION", code: "CANDIDATE_REJECTED", message: "결과 반영에 실패했습니다." }] }),
 ];
 
 const repositoryApi = createRepositoryApi(async (path) => {

@@ -34,8 +34,9 @@ const repositoryApi = createRepositoryApi(api.member); // 모듈 단위로 한 �
 
 - **연결된 저장소:** 분석 접수 이력이 있는 저장소. 이름은 `/me/repositories` 선정 목록과 `repositoryId`로 합치고, 목록에 없으면 식별자로 표시한다. 선정 목록과 이력 중 하나라도 조회에 실패하면 부분 목록 없이 조회 실패로 보인다.
 - **최신 요청:** 저장소별로 `submittedAt`이 가장 늦은 요청, 같으면 `updatedAt`이 늦은 요청, 둘 다 같으면 먼저 받은 요청을 유지한다([E 담당 확인](https://github.com/JminAILab/CatchU/pull/187#pullrequestreview-5423798795)).
-- **아이콘:** 처리 중·실행 불명·반영 전(반영 대기·반영 중·반영 실패·복구 중)은 분석 중, 반영 뒤 성공·부분 실패, `FAILED`는 반영 상태와 무관하게 실패.
+- **아이콘:** 요청이 닫히기 전(`lifecycle` `ACTIVE`)의 처리 중·실행 불명·반영 전(반영 대기·반영 중·반영 실패·복구 중)은 분석 중, 반영 뒤 성공·부분 실패, `FAILED`는 반영 상태와 무관하게 실패. 요청이 닫혔는데(`CLOSED`) `application`이 `APPLIED`가 아니면(닫힌 반영 실패, #288) 처리 결과와 관계없이 실패.
 - **설명:** 실행 불명·반영 실패·복구를 분석 실패나 재요청 가능으로 쓰지 않는다. 성공 0건은 ‘검토할 Catch가 없습니다’. `FAILED`·`NOT_READY`는 반영 설명을 붙이지 않는다(E 담당 확인).
+- **닫힌 반영 실패(#288):** 처리 결과를 분석 실패로 바꾸지 않고 ‘결과를 서비스에 반영하지 못하고 요청이 종료되었습니다’로 안내한다(`FAILED`는 기존 처리 실패 문구 유지). `failures`에 반영 단계 시한 초과 항목(`stage` `APPLICATION`, `code` `PROCESSING_DEADLINE_EXCEEDED`)이 있을 때만 그 아래 종료 사유를 보이며, 처리 결과(성공·부분 실패 등)에 따라 달리하지 않는다. 수집·생성 실패나 전달 단계(`DISPATCH`)의 시한 초과는 종료 사유로 쓰지 않는다. 업무 거부처럼 이 항목이 없으면 종료 사유는 추가하지 않으며 기존 실패 항목 표시는 유지한다. 그래서 부분 실패가 업무 거부로 닫히면 그 `APPLICATION` 항목도 ‘실패한 부분’ 목록에 남지만 처리 시한 종료 사유로 표시하지는 않는다. 종료 사유로 보인 반영 시한 항목은 ‘실패한 부분’ 목록에 다시 넣지 않는다. 기준: [web 기능 설계](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md)의 분석 중·실패 표시, [계약 요약 「분석 접수·상태·재요청」](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md).
 - **Catch 보기:** `ownerResultsReady`이고 `registeredCatchIds`가 1개 이상일 때만.
 - **재요청:** 화면이 판단하지 않고 `retry.allowed`가 참일 때 안내 문구만 보인다. 버튼과 새 동의는 #154.
 - **GitHub 미연동·재연동 필요:** [연결 관리] 대신 `/profile/github`로 가는 링크를 보인다. 연동 뒤 돌아오는 경로와 모달 자동 열기는 A 연동 화면(#133·#137)과 정한다.
@@ -43,4 +44,6 @@ const repositoryApi = createRepositoryApi(api.member); // 모듈 단위로 한 �
 
 ## 검사
 
-`npm test`의 `test/repository-management.test.mjs`: 조회·페이지·검증 실패, 최신 요청 선택, 이름 결합, 아이콘 조합, 설명 문구, Catch 보기 조건.
+`npm test`의 `test/repository-management.test.mjs`: 조회·페이지·검증 실패(`lifecycle`·실패 항목 `stage`·`code` 포함), 최신 요청 선택, 이름 결합, 아이콘 조합(닫힘 여부 포함), 설명 문구(닫힌 반영 실패의 종료 사유 포함), Catch 보기 조건. 모두 합성 응답이며 실제 조회 API(`GET /v1/analysis-requests`, #140) 연결은 검사하지 않는다.
+
+미리보기 `/preview/repository-management`의 `closed-deadline-repo`·`closed-partial-repo`·`closed-rejected-repo`가 닫힌 반영 실패의 세 경우(성공·부분 실패의 반영 시한 초과, 시한 항목 없는 업무 거부)를, `apply-failed-repo`가 닫히기 전 반영 실패를 보여 준다.
