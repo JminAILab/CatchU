@@ -131,11 +131,11 @@
 
 ## 담당별 확인 기록
 
-[PR #160](https://github.com/JminAILab/CatchU/pull/160) 리뷰나 해당 구현 PR 리뷰에서 각 담당이 자기 행의 기대 결과와 경계를 확인한 기록이다. 확인한 행과 판본을 밝힌 리뷰 댓글만 확인으로 적는다. Approve만 있으면 확인으로 적지 않는다. 작성자(팀원 1)의 F 행 작성은 다른 담당의 확인을 대신하지 않는다.
+[PR #160](https://github.com/JminAILab/CatchU/pull/160) 리뷰, 해당 구현 PR 리뷰나 [#112][i112] 댓글에서 각 담당이 자기 행의 기대 결과와 경계를 확인한 기록이다. 확인한 행과 판본을 밝힌 댓글만 확인으로 적는다. Approve만 있으면 확인으로 적지 않는다. 작성자(팀원 1)의 F 행 작성은 다른 담당의 확인을 대신하지 않는다.
 
 | 담당 | 확인할 행 | 확인 판본 | 확인 기록 | 미확인일 때 영향과 다음 행동 |
 |---|---|---|---|---|
-| 팀원 2 A/E (`yeongyeon1802`) | IV-01~IV-15, IV-17~IV-21, IV-23, IV-24, IV-31, IV-34, IV-37 | 미확인 | 미확인 | 접수·수신·상태 행이 E 구현([#138][i138]~[#140][i140])과 어긋날 수 있다. [#114][i114]에서 쓰는 행만 실행 전에 확인한다 |
+| 팀원 2 A/E (`yeongyeon1802`) | IV-01~IV-15, IV-17~IV-21, IV-23, IV-24, IV-31, IV-34, IV-37 | `2430ba8` | IV-01·IV-04·IV-12 확인([댓글][i112c1019]). 기대 결과·합성 경계가 구현·시험 근거와 맞아 문구는 그대로 둔다 | 나머지 행(IV-02, IV-03, IV-05~IV-11, IV-13~IV-15, IV-17~IV-21, IV-23, IV-24, IV-31, IV-34, IV-37)은 미확인이다. 접수·수신·상태 행이 E 구현([#138][i138]~[#140][i140])과 어긋날 수 있어 [#123][i123]·[#124][i124]에서 쓰기 전에 확인한다 |
 | 팀원 4 B (`leechaeah`) | IV-06, IV-12~IV-29, IV-31~IV-33, IV-35, IV-40 | 미확인 | 미확인 | 등록·반영·공개 행이 B 구현([#105][i105]·[#130][i130]·[#131][i131])과 어긋날 수 있다. [#114][i114]·[#123][i123]에서 쓰는 행만 실행 전에 확인한다 |
 | 팀원 3 C/D (`csyg0616`) | IV-05~IV-07, IV-20~IV-35, IV-37, IV-40 | `145d7a6` | IV-24·IV-29~IV-34 확인([리뷰][rv3]). 보완 요청 4건은 이 PR에 반영했고, 그 반영으로 새로 만든 IV-40은 확인 전이다 | 나머지 행(IV-05~IV-07, IV-20~IV-23, IV-25~IV-28, IV-35, IV-37, IV-40)은 미확인이다. 결과 진입·수신자 행이 C/D 구현([#145][i145]·[#146][i146] 하위)과 어긋날 수 있어 [#123][i123]에서 쓰는 행만 실행 전에 확인한다 |
 
@@ -157,6 +157,7 @@
 [i105]: https://github.com/JminAILab/CatchU/issues/105
 [i111]: https://github.com/JminAILab/CatchU/issues/111
 [i112]: https://github.com/JminAILab/CatchU/issues/112
+[i112c1019]: https://github.com/JminAILab/CatchU/issues/112#issuecomment-6252128495
 [i114]: https://github.com/JminAILab/CatchU/issues/114
 [i118]: https://github.com/JminAILab/CatchU/issues/118
 [i119]: https://github.com/JminAILab/CatchU/issues/119
