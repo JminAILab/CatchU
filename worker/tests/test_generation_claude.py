@@ -44,6 +44,80 @@ ERROR_TEXT = "upstream detail ERROR-MARK-88"
 REFUSAL_TEXT = "refusal explanation REFUSAL-MARK-64"
 LEAKS = (KEY, "INSTRUCTION-MARK-51", "DATA-MARK-73", "ANSWER-MARK-29", "ERROR-MARK-88")
 SDK_LOGGERS = ("anthropic", "anthropic._base_client")
+
+
+def _strict(properties: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": list(properties),
+        "additionalProperties": False,
+    }
+
+
+# 구조화된 출력으로 보내는 응답 모양(generation.md 「응답과 판정」의 키·종류 값). 기대값이라 어댑터 코드에서
+# 가져오지 않는다. 배열 개수 제약은 구조화된 출력이 받지 않아 없다.
+_TEXT = {"type": "string"}
+_TITLE_SCHEMA = {
+    "anyOf": [
+        _strict(
+            {
+                "target": {"type": "string", "const": "CODE_NAME"},
+                "line": _TEXT,
+                "name": _TEXT,
+            }
+        ),
+        _strict({"target": {"type": "string", "const": "FILE_NAME"}, "file": _TEXT}),
+    ]
+}
+_QUESTION_TYPE = {
+    "type": "string",
+    "enum": ["BACKGROUND", "ALTERNATIVES", "VERIFICATION"],
+}
+GENERATE_SCHEMA = _strict(
+    {
+        "fragments": {
+            "type": "array",
+            "items": {
+                "anyOf": [
+                    _strict(
+                        {
+                            "kind": {
+                                "type": "string",
+                                "enum": ["ADDED_LINE_WITH", "REMOVED_LINE_WITH"],
+                            },
+                            "line": _TEXT,
+                            "name": _TEXT,
+                        }
+                    ),
+                    _strict(
+                        {
+                            "kind": {"type": "string", "const": "FILE_STATUS"},
+                            "file": _TEXT,
+                        }
+                    ),
+                ]
+            },
+        },
+        "title": _TITLE_SCHEMA,
+        "questions": {
+            "type": "array",
+            "items": {
+                "anyOf": [
+                    _strict({"type": _QUESTION_TYPE, "line": _TEXT, "name": _TEXT}),
+                    _strict({"type": _QUESTION_TYPE, "file": _TEXT}),
+                ]
+            },
+        },
+    }
+)
+REWRITE_SCHEMA = _strict({"title": _TITLE_SCHEMA})
+
+
+def output_config(schema: dict[str, Any]) -> dict[str, Any]:
+    return {"format": {"type": "json_schema", "schema": schema}}
+
+
 LIBRARY_PREFIXES = ("anthropic", "httpx2", "httpcore2")
 
 
@@ -210,9 +284,9 @@ def assert_detached(error: BaseException) -> None:
 def test_normal_response_returns_text_with_fixed_settings(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """정상 응답의 글만 돌려준다. 요청은 고정 주소·지시문과 자료 분리·Haiku 5.5·생각 끔·미국 처리·
-    최대 출력 4,000 토큰·압축하지 않은 응답·호출 시간 제한 45초로 한 번 나간다. 운영 로그에는 모델 ID·토큰
-    사용량만 남는다."""
+    """정상 응답의 글만 돌려준다. 요청은 고정 주소·지시문과 자료 분리·Haiku 5.5·생각 끔·응답 모양 고정(구조화된
+    출력)·미국 처리·최대 출력 4,000 토큰·압축하지 않은 응답·호출 시간 제한 45초로 한 번 나간다. 운영 로그에는
+    모델 ID·토큰 사용량만 남는다."""
     api = FakeApi(message())
 
     with caplog.at_level(logging.INFO, logger="app.generation.claude"):
@@ -231,6 +305,7 @@ def test_normal_response_returns_text_with_fixed_settings(
         "system": INSTRUCTIONS,
         "messages": [{"role": "user", "content": DATA}],
         "thinking": {"type": "disabled"},
+        "output_config": output_config(GENERATE_SCHEMA),
         "inference_geo": "us",
     }
     assert sent.extensions["timeout"] == {
@@ -296,8 +371,8 @@ def test_max_tokens_is_at_least_4000(max_output: int, max_tokens: int) -> None:
 def test_models_are_fixed_per_call_kind(
     models: ClaudeModels, generate: str, rewrite: str
 ) -> None:
-    """생성 호출과 제목 고쳐 쓰기 호출의 모델을 따로 정한다. 고쳐 쓰기는 자기 시간 제한(20초)을 쓴다.
-    Sonnet 5.5는 `disabled`를 받지 않아 `between_tools`로 생각을 끈다."""
+    """생성 호출과 제목 고쳐 쓰기 호출의 모델을 따로 정한다. 고쳐 쓰기는 자기 시간 제한(20초)과 제목 칸만 있는
+    응답 모양을 쓴다. Sonnet 5.5는 `disabled`를 받지 않아 `between_tools`로 생각을 끈다."""
     thinking = {
         "claude-haiku-5-5": {"type": "disabled"},
         "claude-sonnet-5-5": {"type": "between_tools"},
@@ -310,8 +385,10 @@ def test_models_are_fixed_per_call_kind(
 
     assert api.body(0)["model"] == generate
     assert api.body(0)["thinking"] == thinking[generate]
+    assert api.body(0)["output_config"] == output_config(GENERATE_SCHEMA)
     assert api.body(1)["model"] == rewrite
     assert api.body(1)["thinking"] == thinking[rewrite]
+    assert api.body(1)["output_config"] == output_config(REWRITE_SCHEMA)
     assert api.requests[1].extensions["timeout"]["read"] == 20.0
 
 
