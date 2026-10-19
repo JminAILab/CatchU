@@ -244,7 +244,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 본인 회원·프로필 조회와 전체 저장 — #135
 
-`GET /v1/me`, `PUT /v1/me/profile`의 입력 제한·이름 저장 판정·호출 예시·공개 경계는 [docs/member-profile.md](docs/member-profile.md)에 있다.
+`GET /v1/me`, `PUT /v1/me/profile`의 입력 제한·이름 저장 판정·호출 예시·공개 경계는 [docs/member-profile.md](docs/member-profile.md)에 있다. 수신자 조회(#151)에 소유 회원 상태·공개 프로필을 주는 읽기 전용 공급 함수와 그 스냅샷 조건도 같은 문서에 있다.
 
 ## 실제 GitHub 계정 연결 — #231
 
