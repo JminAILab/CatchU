@@ -63,8 +63,10 @@ from app.generation.request import (
 )
 from app.generation.response import (
     TOP_LEVEL_KEYS,
-    PartReason,
+    Fragment,
+    Question,
     Sent,
+    SentenceMiss,
     TitleProblem,
     Unreadable,
     fragments,
@@ -90,8 +92,6 @@ _PART_CODES = {
     "RULE_VIOLATION": GenerationFailureCode.RULE_VIOLATION,
     "UNVERIFIED": GenerationFailureCode.UNVERIFIED,
 }
-_NO_TEMPLATE: PartReason = "NO_TEMPLATE"
-_TOO_LONG: PartReason = "TOO_LONG"
 
 
 @dataclass
@@ -335,25 +335,22 @@ def _draft(
         low=limits.min_fragments,
         high=limits.max_fragments,
         max_name=limits.max_name_chars,
+        sentence=_fragment_sentence,
     )
-    notes = list(verdict.notes)
+    report.draft_notes.update(verdict.notes)
     if verdict.problem is not None:
         assert verdict.reason is not None
         report.draft_reasons[verdict.reason] += 1
-        report.draft_notes.update(notes)
         return failed_draft(_PART_CODES[verdict.problem])
-    # 문장 틀이 없는 파일 상태의 조각만 버린다. 남은 조각이 없으면 확인 실패다.
-    usable = tuple(f for f in verdict.items if render.fragment_sentence(f) is not None)
-    notes += [f"dropped:{_NO_TEMPLATE}"] * (len(verdict.items) - len(usable))
-    report.draft_notes.update(notes)
-    if not usable:
-        report.draft_reasons[_NO_TEMPLATE] += 1
-        return failed_draft(GenerationFailureCode.UNVERIFIED)
-    text = render.description(usable)
-    assert text is not None
-    if any(note.startswith("dropped:") for note in notes):
+    if _salvaged(verdict.notes):
         report.draft_salvaged += 1
+    text = render.description(verdict.items)
+    assert text is not None  # 문장을 만들 수 있는 조각만 남았다
     return DraftOutcome.generated(text)
+
+
+def _fragment_sentence(fragment: Fragment) -> SentenceMiss | None:
+    return None if render.fragment_sentence(fragment) is not None else "NO_TEMPLATE"
 
 
 def _reflection(
@@ -362,40 +359,42 @@ def _reflection(
     limits: GenerationLimits,
     report: GenerationReport,
 ) -> ReflectionOutcome:
+    def sentence(question: Question) -> SentenceMiss | None:
+        return _question_miss(render.question(question, limits.max_question_chars))
+
     verdict = questions(
         response,
         sent,
         low=limits.min_questions,
         high=limits.max_questions,
         max_name=limits.max_name_chars,
+        sentence=sentence,
     )
-    notes = list(verdict.notes)
+    report.reflection_notes.update(verdict.notes)
     if verdict.problem is not None:
         assert verdict.reason is not None
         report.reflection_reasons[verdict.reason] += 1
-        report.reflection_notes.update(notes)
         return failed_reflection(_PART_CODES[verdict.problem])
-    # 문장 틀이 없거나 파일 이름으로 줄여도 너무 긴 질문만 버린다. 남은 질문이 없으면 첫 원인으로 실패한다.
-    texts: list[str] = []
-    first: PartReason | None = None
-    for item in verdict.items:
-        text = render.question(item, limits.max_question_chars)
-        if text == "UNSUPPORTED" or text == "TOO_LONG":
-            reason: PartReason = _NO_TEMPLATE if text == "UNSUPPORTED" else _TOO_LONG
-            first = first or reason
-            notes.append(f"dropped:{reason}")
-            continue
-        texts.append(text)
-    report.reflection_notes.update(notes)
-    if not texts:
-        assert first is not None
-        report.reflection_reasons[first] += 1
-        if first == _TOO_LONG:
-            return failed_reflection(GenerationFailureCode.RULE_VIOLATION)
-        return failed_reflection(GenerationFailureCode.UNVERIFIED)
-    if any(note.startswith("dropped:") for note in notes):
+    if _salvaged(verdict.notes):
         report.reflection_salvaged += 1
-    return ReflectionOutcome.generated(tuple(texts))
+    return ReflectionOutcome.generated(
+        tuple(
+            render.question(item, limits.max_question_chars) for item in verdict.items
+        )
+    )
+
+
+def _question_miss(text: str) -> SentenceMiss | None:
+    if text == "UNSUPPORTED":
+        return "NO_TEMPLATE"
+    if text == "TOO_LONG":
+        return "TOO_LONG"
+    return None
+
+
+def _salvaged(notes: tuple[str, ...]) -> bool:
+    """틀린 항목을 버리고도 그 부분이 만들어졌는가. 상한 뒤 항목·종류를 고친 조각만 있으면 아니다."""
+    return any(note.startswith("dropped:") for note in notes)
 
 
 def _rewrite_title(

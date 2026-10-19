@@ -1035,6 +1035,69 @@ def test_unsupported_file_status_question_is_dropped() -> None:
     assert reasons(alone) == (Counter(), Counter(), one("NO_TEMPLATE"))
 
 
+LONG_FILE = "src/" + "a" * 90 + ".ts"
+VERIFICATION_QUESTION = (
+    f"{AUTH}에서 loginRateLimit 이름이 포함된 줄을 추가한 뒤 "
+    "의도대로 동작하는지 확인했다면 어떻게 확인했나요?"
+)
+
+
+@pytest.mark.parametrize(
+    ("scenario", "questions", "expected", "reason"),
+    [
+        pytest.param(
+            lambda: single(
+                change(AUTH, patch=AUTH_PATCH),
+                change(FLAG, status="changed", patch=STATUS_FILES["modified"]),
+            ),
+            lambda r: [
+                file_question("BACKGROUND", file_id_of(r, FLAG)),
+                line_question("BACKGROUND", login(r), "loginRateLimit"),
+            ],
+            QUESTION,
+            "NO_TEMPLATE",
+            id="no-template-first",
+        ),
+        pytest.param(
+            lambda: single(
+                change(LONG_FILE, patch=AUTH_PATCH), change(AUTH, patch=AUTH_PATCH)
+            ),
+            lambda r: [
+                line_question(
+                    "VERIFICATION",
+                    pick(r, contains="loginRateLimit", path=LONG_FILE),
+                    "loginRateLimit",
+                ),
+                line_question(
+                    "VERIFICATION",
+                    pick(r, contains="loginRateLimit", path=AUTH),
+                    "loginRateLimit",
+                ),
+            ],
+            VERIFICATION_QUESTION,
+            "TOO_LONG",
+            id="too-long-first",
+        ),
+    ],
+)
+def test_question_without_a_sentence_does_not_hide_a_later_one_of_the_same_type(
+    scenario: Callable[[], Scenario], questions: Part, expected: str, reason: str
+) -> None:
+    """문장을 만들 수 없는 질문은 같은 종류를 세기 전에 버린다. 그래서 뒤에 온 같은 종류의 질문이 쓰인다.
+
+    틀이 없는 파일 상태를 가리키거나 파일 이름으로 줄여도 150자를 넘는 앞 질문이 같은 종류의 정상 질문을
+    밀어내지 않는다(2026-10-19 결정: 틀린 항목만 버린다).
+    """
+    case = run(reply_with(questions=questions), scenario())
+
+    (made,) = case.output.candidates
+    assert made.reflection.status == "GENERATED"
+    assert made.reflection.questions == (expected,)
+    assert case.run.report.reflection_reasons == Counter()
+    assert drops(case)[1] == one(f"dropped:{reason}")
+    assert salvaged(case)[1] == 1
+
+
 # 길이 150자: 경로 대신 파일 이름, 그래도 넘으면 형식 위반(impl.md 상한)
 
 LONG_DIR = "src/core/" + "nested_module/" * 6
@@ -1176,11 +1239,7 @@ def test_question_with_free_text_or_premise_is_dropped(make: Part) -> None:
     )
     alone = run(reply_with(questions=lambda r: [make(r)]))
 
-    verification = (
-        f"{AUTH}에서 loginRateLimit 이름이 포함된 줄을 추가한 뒤 "
-        "의도대로 동작하는지 확인했다면 어떻게 확인했나요?"
-    )
-    check(case, draft=SENTENCE, questions=(verification,), title=TITLE)
+    check(case, draft=SENTENCE, questions=(VERIFICATION_QUESTION,), title=TITLE)
     check(alone, draft=SENTENCE, questions=Failed(RULE), title=TITLE)
     for each in (case, alone):
         text = result_text(each)
@@ -1406,6 +1465,38 @@ QUESTION_SHAPE_REASONS = {
 }
 
 
+def test_fragment_without_a_sentence_takes_no_place_under_the_limit() -> None:
+    """문장 틀이 없는 파일 조각은 상한(3개)을 세기 전에 버린다. 그래서 그 뒤의 확인된 조각이 상한 안에 든다
+    (2026-10-19 결정: 틀린 항목만 버린다)."""
+    scenario = single(
+        change(AUTH, patch=AUTH_PATCH),
+        change(FLAG, status="changed", patch=STATUS_FILES["modified"]),
+    )
+    case = run(
+        reply_with(
+            fragments=lambda r: [
+                line_fragment(login(r), "loginRateLimit"),
+                line_fragment(pick(r, contains="limit", change="removed"), "limit"),
+                file_fragment(file_id_of(r, FLAG)),
+                line_fragment(pick(r, contains="func_10"), "func_10"),
+            ]
+        ),
+        scenario,
+    )
+
+    check(
+        case,
+        draft=(
+            f"{SENTENCE} {AUTH}에서 limit 이름이 포함된 줄이 삭제되었습니다. "
+            f"{AUTH}에서 func_10 이름이 포함된 줄이 추가되었습니다."
+        ),
+        questions=(QUESTION,),
+        title=TITLE,
+    )
+    assert drops(case) == (one("dropped:NO_TEMPLATE"), Counter())
+    assert salvaged(case) == (1, 0)
+
+
 @pytest.mark.parametrize(
     ("questions", "expected"),
     [
@@ -1415,8 +1506,7 @@ QUESTION_SHAPE_REASONS = {
                 QUESTION,
                 f"{AUTH}에서 loginRateLimit 이름이 포함된 줄을 추가할 때 "
                 "다른 방법도 고려했다면 무엇이었나요?",
-                f"{AUTH}에서 loginRateLimit 이름이 포함된 줄을 추가한 뒤 "
-                "의도대로 동작하는지 확인했다면 어떻게 확인했나요?",
+                VERIFICATION_QUESTION,
             ),
             id="four",
         ),
