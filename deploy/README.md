@@ -4,7 +4,7 @@ web·api·worker 운영 이미지를 만들고, 한 호스트에서 API 한 프�
 
 명령은 모두 저장소 루트에서 실행한다. 서비스별 설치·개발 실행·검사는 각 서비스 README를 따른다.
 
-12월 전 개발 단계에는 이 한 호스트 실행을 AWS 서버 한 대에 올려 운영한다(앞단 Caddy 포함): [dev-server/README.md](dev-server/README.md).
+12월 전 개발 단계에는 이 한 호스트 실행을 AWS 서버 한 대에 올려 운영한다(앞단 Caddy 포함): [dev-server/README.md](dev-server/README.md). 11월부터 쓸 AWS 환경(EKS)의 설정·생성 명령·운영 순서는 [aws/README.md](aws/README.md)에 있다.
 
 ## 구성
 
