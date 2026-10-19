@@ -12,7 +12,8 @@ reflection·title)과 본인 커밋 근거의 한계 끝 문구(결정 5·6)만 
 4. 크기 선별. 선별 뒤 고를 수 있는 줄이 없으면 2와 같이 끝내고 크기 전체 문구를 붙인다.
 5. 생성 호출 1회. 호출 오류·시간 초과·늦은 응답·전체를 읽을 수 없는 응답은 설명·질문 모두 FAILED(DRAFT·
    REFLECTION 실패 각 1건, 같은 호출의 ANALYSIS는 없음), 제목 None.
-6. 설명·질문·제목은 각자 판정한다. 설명이 실패해도 확인된 질문·제목은 둔다.
+6. 설명·질문·제목은 각자 판정한다. 설명이 실패해도 확인된 질문·제목은 둔다. 설명·질문은 맞는 항목만 쓰고
+   틀린 항목은 버린다(response 모듈 설명, 2026-10-19 팀장 결정).
 모든 후보의 생성·미생성 판정이 끝난 뒤, 남은 시간 안에서 형식을 어긴 제목만 고쳐 쓴다(결정 15).
 제공자 오류·시간 초과는 후보마다 결과로 바꾸고 다시 부르지 않는다. 그 밖의 예외(결함, 요청 전체의
 ExecutionUnknown)는 그대로 올린다.
@@ -121,6 +122,12 @@ class GenerationReport:
     whole_reasons: Counter[str] = field(default_factory=Counter)
     draft_reasons: Counter[str] = field(default_factory=Counter)
     reflection_reasons: Counter[str] = field(default_factory=Counter)
+    # 버리거나 고친 항목 건수(response.PartVerdict.notes → 건수)와, 틀린 항목을 버리고도 살아남은 부분 수.
+    # 부분이 실패했어도 그 부분에서 버린 항목은 센다.
+    draft_notes: Counter[str] = field(default_factory=Counter)
+    reflection_notes: Counter[str] = field(default_factory=Counter)
+    draft_salvaged: int = 0
+    reflection_salvaged: int = 0
 
 
 @dataclass(frozen=True)
@@ -257,8 +264,8 @@ def _generate_one(
     report.unknown_response_keys += unknown_keys(response, TOP_LEVEL_KEYS)
     sent = Sent(selection.lines, selection.files)
     result = _Result(selection=selection, called=True)
-    result.draft = _draft(response, sent, limits, report.draft_reasons)
-    result.reflection = _reflection(response, sent, limits, report.reflection_reasons)
+    result.draft = _draft(response, sent, limits, report)
+    result.reflection = _reflection(response, sent, limits, report)
     choice = title_choice(response.get("title"), sent, max_name=limits.max_name_chars)
     if choice.problem is not None:
         result.title_problem = choice.problem
@@ -320,7 +327,7 @@ def _draft(
     response: dict[str, object],
     sent: Sent,
     limits: GenerationLimits,
-    reasons: Counter[str],
+    report: GenerationReport,
 ) -> DraftOutcome:
     verdict = fragments(
         response,
@@ -329,14 +336,23 @@ def _draft(
         high=limits.max_fragments,
         max_name=limits.max_name_chars,
     )
+    notes = list(verdict.notes)
     if verdict.problem is not None:
         assert verdict.reason is not None
-        reasons[verdict.reason] += 1
+        report.draft_reasons[verdict.reason] += 1
+        report.draft_notes.update(notes)
         return failed_draft(_PART_CODES[verdict.problem])
-    text = render.description(verdict.items)
-    if text is None:
-        reasons[_NO_TEMPLATE] += 1
+    # 문장 틀이 없는 파일 상태의 조각만 버린다. 남은 조각이 없으면 확인 실패다.
+    usable = tuple(f for f in verdict.items if render.fragment_sentence(f) is not None)
+    notes += [f"dropped:{_NO_TEMPLATE}"] * (len(verdict.items) - len(usable))
+    report.draft_notes.update(notes)
+    if not usable:
+        report.draft_reasons[_NO_TEMPLATE] += 1
         return failed_draft(GenerationFailureCode.UNVERIFIED)
+    text = render.description(usable)
+    assert text is not None
+    if any(note.startswith("dropped:") for note in notes):
+        report.draft_salvaged += 1
     return DraftOutcome.generated(text)
 
 
@@ -344,7 +360,7 @@ def _reflection(
     response: dict[str, object],
     sent: Sent,
     limits: GenerationLimits,
-    reasons: Counter[str],
+    report: GenerationReport,
 ) -> ReflectionOutcome:
     verdict = questions(
         response,
@@ -353,20 +369,32 @@ def _reflection(
         high=limits.max_questions,
         max_name=limits.max_name_chars,
     )
+    notes = list(verdict.notes)
     if verdict.problem is not None:
         assert verdict.reason is not None
-        reasons[verdict.reason] += 1
+        report.reflection_reasons[verdict.reason] += 1
+        report.reflection_notes.update(notes)
         return failed_reflection(_PART_CODES[verdict.problem])
+    # 문장 틀이 없거나 파일 이름으로 줄여도 너무 긴 질문만 버린다. 남은 질문이 없으면 첫 원인으로 실패한다.
     texts: list[str] = []
+    first: PartReason | None = None
     for item in verdict.items:
         text = render.question(item, limits.max_question_chars)
-        if text == "UNSUPPORTED":
-            reasons[_NO_TEMPLATE] += 1
-            return failed_reflection(GenerationFailureCode.UNVERIFIED)
-        if text == "TOO_LONG":
-            reasons[_TOO_LONG] += 1
-            return failed_reflection(GenerationFailureCode.RULE_VIOLATION)
+        if text == "UNSUPPORTED" or text == "TOO_LONG":
+            reason: PartReason = _NO_TEMPLATE if text == "UNSUPPORTED" else _TOO_LONG
+            first = first or reason
+            notes.append(f"dropped:{reason}")
+            continue
         texts.append(text)
+    report.reflection_notes.update(notes)
+    if not texts:
+        assert first is not None
+        report.reflection_reasons[first] += 1
+        if first == _TOO_LONG:
+            return failed_reflection(GenerationFailureCode.RULE_VIOLATION)
+        return failed_reflection(GenerationFailureCode.UNVERIFIED)
+    if any(note.startswith("dropped:") for note in notes):
+        report.reflection_salvaged += 1
     return ReflectionOutcome.generated(tuple(texts))
 
 
@@ -472,7 +500,8 @@ def _log(request: CheckedRequest, report: GenerationReport) -> None:
         "draftGenerated=%d draftFailed=%d reflectionFailed=%d titleOnlyNull=%d "
         "titlesRewritten=%d maskedValues=%d secretFiles=%d maskedToEmpty=%d "
         "sizeLimitedCommits=%d truncatedCommits=%d unknownResponseKeys=%d "
-        "wholeReasons=%s draftReasons=%s reflectionReasons=%s",
+        "wholeReasons=%s draftReasons=%s reflectionReasons=%s "
+        "draftDropReasons=%s reflectionDropReasons=%s draftSalvaged=%d reflectionSalvaged=%d",
         request.request_id,
         request.attempt_id,
         report.candidates,
@@ -495,4 +524,8 @@ def _log(request: CheckedRequest, report: GenerationReport) -> None:
         _reasons(report.whole_reasons),
         _reasons(report.draft_reasons),
         _reasons(report.reflection_reasons),
+        _reasons(report.draft_notes),
+        _reasons(report.reflection_notes),
+        report.draft_salvaged,
+        report.reflection_salvaged,
     )

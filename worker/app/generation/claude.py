@@ -13,6 +13,8 @@
   이하로 줄이고 마감이 지났으면 바로 시간 초과로 끊는다(`_DeadlineBackend`). 이름 조회(DNS)는 이 마감 밖이다.
   시간 제한을 넘겨 끝난 호출은 생성 흐름(`flow._call`)도 시간 초과로 본다.
 - 추론 위치는 미국으로 고정하고(`inference_geo="us"`), 모델의 생각(thinking)은 끈다.
+- 응답 모양은 구조화된 출력(`output_config.format`)으로 API가 지키게 한다(2026-10-19 팀장 결정). 개수·이름이
+  맞는지는 생성 흐름이 그대로 확인한다.
 - 지시문은 system 칸에, 신뢰할 수 없는 자료는 user 칸에 따로 둔다.
 
 운영 로그에는 호출마다 호출 종류·모델 ID·토큰 사용량·멈춘 이유·실패 원인 구분·Anthropic 요청 ID·걸린
@@ -66,6 +68,71 @@ MAX_RESPONSE_BYTES: Final = 256 * 1024
 THINKING_OFF: Final[Mapping[str, ThinkingConfigParam]] = {
     "claude-haiku-5-5": {"type": "disabled"},
     "claude-sonnet-5-5": {"type": "between_tools"},
+}
+
+
+def _object(properties: dict[str, object]) -> dict[str, object]:
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": list(properties),
+        "additionalProperties": False,
+    }
+
+
+_STR: Final = {"type": "string"}
+_LINE_PICK: Final = {"line": _STR, "name": _STR}
+_TITLE: Final = {
+    "anyOf": [
+        _object({"target": {"type": "string", "const": "CODE_NAME"}, **_LINE_PICK}),
+        _object({"target": {"type": "string", "const": "FILE_NAME"}, "file": _STR}),
+    ]
+}
+_QUESTION_TYPE: Final = {
+    "type": "string",
+    "enum": ["BACKGROUND", "ALTERNATIVES", "VERIFICATION"],
+}
+# 호출 종류별 응답 모양(구조화된 출력). 생성 흐름이 받는 키·종류 값과 같다(response 모듈, 지시문). 배열 개수
+# 제약은 구조화된 출력이 받지 않아 넣지 않고, 개수·지목한 줄·이름이 맞는지는 생성 흐름이 확인한다. 스키마가
+# 고정이라 처음 컴파일한 뒤에는 API 쪽 캐시(24시간)를 쓴다.
+OUTPUT_SCHEMAS: Final[Mapping[Purpose, dict[str, object]]] = {
+    "GENERATE": _object(
+        {
+            "fragments": {
+                "type": "array",
+                "items": {
+                    "anyOf": [
+                        _object(
+                            {
+                                "kind": {
+                                    "type": "string",
+                                    "enum": ["ADDED_LINE_WITH", "REMOVED_LINE_WITH"],
+                                },
+                                **_LINE_PICK,
+                            }
+                        ),
+                        _object(
+                            {
+                                "kind": {"type": "string", "const": "FILE_STATUS"},
+                                "file": _STR,
+                            }
+                        ),
+                    ]
+                },
+            },
+            "title": _TITLE,
+            "questions": {
+                "type": "array",
+                "items": {
+                    "anyOf": [
+                        _object({"type": _QUESTION_TYPE, **_LINE_PICK}),
+                        _object({"type": _QUESTION_TYPE, "file": _STR}),
+                    ]
+                },
+            },
+        }
+    ),
+    "REWRITE_TITLE": _object({"title": _TITLE}),
 }
 
 # 지출 상한·크레딧 소진을 운영 로그에서 가르는 공식 문서 문구(2026-10-14 확인). 원문은 로그에 남기지 않는다.
@@ -194,6 +261,12 @@ class ClaudeProvider:
                 system=request.instructions,
                 messages=[{"role": "user", "content": request.data}],
                 thinking=THINKING_OFF[model],
+                output_config={
+                    "format": {
+                        "type": "json_schema",
+                        "schema": OUTPUT_SCHEMAS[request.purpose],
+                    }
+                },
                 inference_geo=INFERENCE_GEO,
                 timeout=request.timeout_seconds,
             )

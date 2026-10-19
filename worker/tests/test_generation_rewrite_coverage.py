@@ -468,7 +468,8 @@ def flow_counts(caplog: pytest.LogCaptureFixture) -> dict[str, int]:
 
 
 def flow_reasons(caplog: pytest.LogCaptureFixture) -> dict[str, str]:
-    """같은 로그 줄의 실패 원인별 건수 칸(`wholeReasons`·`draftReasons`·`reflectionReasons`) 글자 그대로."""
+    """같은 로그 줄의 원인별 건수 칸 글자 그대로: 실패 원인(`wholeReasons`·`draftReasons`·`reflectionReasons`)과
+    버리거나 고친 항목(`draftDropReasons`·`reflectionDropReasons`)."""
     (line,) = [
         record.getMessage() for record in caplog.records if record.name == FLOW_LOGGER
     ]
@@ -1149,6 +1150,8 @@ def test_title_only_null_count_leaves_out_failed_drafts(
         "wholeReasons": "GENERATION_CALL_FAILED:1",
         "draftReasons": "-",
         "reflectionReasons": "-",
+        "draftDropReasons": "-",
+        "reflectionDropReasons": "-",
     }
 
 
@@ -1200,13 +1203,67 @@ def test_failure_reasons_are_counted_per_part_in_code_order(
     counts = flow_counts(caplog)
     assert (counts["wholeFailures"], counts["draftFailed"]) == (0, 2)
     assert counts["reflectionFailed"] == 1
+    # 실패한 부분에서 버린 항목도 버린 항목 건수에 든다. 살아남은 부분은 없다.
     assert flow_reasons(caplog) == {
         "wholeReasons": "-",
         "draftReasons": "NAME_MISSING:1,UNKNOWN_LINE:1",
         "reflectionReasons": "NAME_JOINED_ASCII:1",
+        "draftDropReasons": "dropped:NAME_MISSING:1,dropped:UNKNOWN_LINE:1",
+        "reflectionDropReasons": "dropped:NAME_JOINED_ASCII:1",
     }
+    assert (counts["draftSalvaged"], counts["reflectionSalvaged"]) == (0, 0)
     (line,) = [r.getMessage() for r in caplog.records if r.name == FLOW_LOGGER]
     for value in ("alphaHelper", "bet ", "c9f9", "app/"):
+        assert value not in line
+
+
+def test_dropped_items_are_counted_by_cause_without_names(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """틀려서 버린 항목·상한 뒤 항목·종류를 고친 조각은 원인별 건수로만 남고, 틀린 항목을 버리고도 만들어진
+    부분 수를 따로 센다. 실패 원인 칸에는 들지 않는다. 값·경로·이름은 남지 않는다(generation-limits.md
+    「운영 로그」, 2026-10-19 결정)."""
+    caplog.set_level(logging.DEBUG)
+
+    def mixed(request: ProviderRequest) -> str:
+        line = label_line(request)
+        good = line_fragment(line, "alpha")
+        return json.dumps(
+            {
+                "fragments": [
+                    line_fragment(line, "alphaHelper"),
+                    good | {"kind": "REMOVED_LINE_WITH"},
+                    good,
+                    good,
+                    good,
+                ],
+                "title": code_title(line, "alpha"),
+                "questions": [
+                    line_question("BACKGROUND", line, "alpha"),
+                    line_question("BACKGROUND", line, "alpha"),
+                    line_question("VERIFICATION", "c9f9:L9", "alpha"),
+                ],
+            }
+        )
+
+    case = generation_case(
+        pulls(opened(3, own(31, 3, wordy("alpha")))), ScriptedProvider(mixed)
+    )
+
+    assert generated(case, 3).draft.status == "GENERATED"
+    assert len(generated(case, 3).reflection.questions) == 1
+    counts = flow_counts(caplog)
+    assert (counts["draftFailed"], counts["reflectionFailed"]) == (0, 0)
+    assert (counts["draftSalvaged"], counts["reflectionSalvaged"]) == (1, 1)
+    assert flow_reasons(caplog) == {
+        "wholeReasons": "-",
+        "draftReasons": "-",
+        "reflectionReasons": "-",
+        "draftDropReasons": "dropped:NAME_MISSING:1,fixed:KIND_MISMATCH:1,over:COUNT:1",
+        "reflectionDropReasons": "dropped:DUPLICATE_TYPE:1,dropped:UNKNOWN_LINE:1",
+    }
+    (line,) = [r.getMessage() for r in caplog.records if r.name == FLOW_LOGGER]
+    for value in ("alphaHelper", "alpha ", "c9f9", "app/"):
         assert value not in line
 
 
