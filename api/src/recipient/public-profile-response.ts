@@ -1,51 +1,47 @@
-/** common.yaml PublicProfile. 자가 입력 네 항목과 출처만 담는다. */
+import { OwnerPublicProfile } from '../member-profile/owner-profile-reader';
+
+/** common.yaml PublicProfile. 자가 입력 네 항목·출처(fieldSource는 네 항목에만 적용)·저장된 GitHub 계정명만 담는다. */
 export interface PublicProfileResponse {
   displayName: string;
   introduction: string;
   desiredRole: string;
   skills: string[];
   fieldSource: 'SELF_REPORTED';
+  githubAccountLogin: string | null;
 }
 
-/** 공급자 값이 계약 모양이 아니면 빈 값·기본값으로 채우지 않고 500으로 보낸다. 입력값은 메시지에 넣지 않는다. */
+/** 공급 값이 계약 모양이 아니면 빈 값·기본값으로 채우지 않고 500으로 보낸다. 입력값은 메시지에 넣지 않는다. */
 export class PublicProfileIntegrityError extends Error {
   constructor(readonly reason: string) {
-    super(`public profile source returned an invalid value: ${reason}`);
+    super(`public profile value is invalid: ${reason}`);
     this.name = 'PublicProfileIntegrityError';
   }
 }
 
 /**
- * 공급자 호출이 실패했다. 공급자가 던진 예외의 종류(ApiError·HttpException 포함)와 관계없이 500으로 보낸다.
- * 비활성 소유자 등 공급자 사유별 수신 응답은 A와 합의 전이라, 공급자가 수신자 응답 코드를 정하지 않게 막는 임시 처리다.
- * 원래 예외는 `cause`로만 두고 메시지에 넣지 않는다.
+ * A 공급 함수(`OwnerProfileReader.readPublicProfile`)의 프로필에서 허용 필드만 골라 응답을 만든다.
+ * 다른 필드가 섞여 와도 복사하지 않는다. 문자열이 비어 있는 것은 계약상 정상이다(값이 없는 문자열은 빈 문자열).
+ * `githubAccountLogin`의 상태별 값(CONNECTED만 저장값, 나머지 null)은 공급 함수가 정하며 여기서는 모양만 확인한다.
  */
-export class PublicProfileSourceError extends Error {
-  constructor(cause: unknown) {
-    super('public profile source failed', { cause });
-    this.name = 'PublicProfileSourceError';
-  }
-}
-
-/**
- * 공급자 값에서 허용 필드만 골라 응답을 만든다. 다른 필드(회원 ID·연동 상태 등)가 섞여 와도 복사하지 않는다.
- * 문자열이 비어 있는 것은 계약상 정상이다(값이 없는 문자열은 빈 문자열).
- */
-export function toPublicProfile(value: unknown): PublicProfileResponse {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new PublicProfileIntegrityError('object');
-  const source = value as Record<string, unknown>;
+export function toPublicProfile(value: OwnerPublicProfile): PublicProfileResponse {
+  const source: unknown = value;
+  if (source === null || typeof source !== 'object' || Array.isArray(source)) throw new PublicProfileIntegrityError('object');
+  const fields = source as Record<string, unknown>;
   for (const field of ['displayName', 'introduction', 'desiredRole'] as const) {
-    if (typeof source[field] !== 'string') throw new PublicProfileIntegrityError(field);
+    if (typeof fields[field] !== 'string') throw new PublicProfileIntegrityError(field);
   }
-  const skills = source.skills;
+  const skills = fields.skills;
   if (!Array.isArray(skills) || !skills.every((skill) => typeof skill === 'string')) {
     throw new PublicProfileIntegrityError('skills');
   }
+  const login = fields.githubAccountLogin;
+  if (login !== null && (typeof login !== 'string' || login === '')) throw new PublicProfileIntegrityError('githubAccountLogin');
   return {
-    displayName: source.displayName as string,
-    introduction: source.introduction as string,
-    desiredRole: source.desiredRole as string,
+    displayName: fields.displayName as string,
+    introduction: fields.introduction as string,
+    desiredRole: fields.desiredRole as string,
     skills: [...skills] as string[],
     fieldSource: 'SELF_REPORTED',
+    githubAccountLogin: login,
   };
 }

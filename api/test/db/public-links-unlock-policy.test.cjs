@@ -8,6 +8,7 @@ const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
 const { LinkAccessService } = require('../../dist/share-links/link-access.service');
 const { LINK_GRANT_KEY } = require('../../dist/share-links/link-grant');
+const { OwnerProfileReader } = require('../../dist/member-profile/owner-profile-reader');
 const passwordModule = require('../../dist/share-links/link-password');
 const { createUnlockControls, PRODUCT_UNLOCK_POLICY, UNLOCK_CONTROLS } = require('../../dist/share-links/unlock-policy');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
@@ -79,7 +80,8 @@ function service(overrides = {}, clock = () => new Date()) {
     rate: { ...PRODUCT_UNLOCK_POLICY.rate, ...overrides.rate },
   };
   const controls = createUnlockControls(policy);
-  const access = new LinkAccessService(app.get(DataSource), app.get(LINK_GRANT_KEY, { strict: false }), controls, clock);
+  const access = new LinkAccessService(app.get(DataSource), app.get(LINK_GRANT_KEY, { strict: false }), controls, clock,
+    app.get(OwnerProfileReader, { strict: false }));
   return { access, controls };
 }
 /** unlock 결과를 상태로 바꾼다: 'ok' | 'invalid' | { limited: 남은 초 } | { code } */
@@ -162,8 +164,8 @@ test('동시 검사 상한: 한 링크에 서로 다른 주소 6곳이 동시에
   idle(controls);
 });
 
-test('해시 차례를 기다리는 동안 링크가 중단·만료되면 해시를 계산하지 않고 404이며, 실패로 세지 않는다', async () => {
-  for (const change of ['stop', 'expire']) {
+test('해시 차례를 기다리는 동안 링크가 중단·만료되거나 소유 회원이 비활성이 되면 해시를 계산하지 않고 404이며, 실패로 세지 않는다', async () => {
+  for (const change of ['stop', 'expire', 'deactivate']) {
     await resetTestDatabase(db);
     ownerToken = undefined;
     const { access, controls } = service({ link: { maxFailures: 20 } });
@@ -173,13 +175,76 @@ test('해시 차례를 기다리는 동안 링크가 중단·만료되면 해시
     await waitFor(() => controls.hashes.stats.waiting === 1);
     // 발급 시각은 Node 시계로 정한다. DB 시계가 조금 늦어도 중단 시각 ≥ 발급 시각 제약을 지키게 한다.
     if (change === 'stop') await db.query('UPDATE share_link SET stopped_at = GREATEST(now(), issued_at) WHERE link_id = $1', [link.linkId]);
-    else await db.query("UPDATE share_link SET issued_at = now() - interval '721 hours', expires_at = now() - interval '1 hour' WHERE link_id = $1", [link.linkId]);
+    else if (change === 'expire') await db.query("UPDATE share_link SET issued_at = now() - interval '721 hours', expires_at = now() - interval '1 hour' WHERE link_id = $1", [link.linkId]);
+    else await db.query("UPDATE member_account SET account_state = 'SUSPENDED' WHERE member_id = (SELECT owner_id FROM share_link WHERE link_id = $1)", [link.linkId]);
     await held.release();
     assert.deepEqual(await pending, { code: 'LINK_UNAVAILABLE' }, change);
     assert.equal(controls.links.size, 0, '링크 실패로 세지 않았다');
     assert.equal(controls.addresses.blockedFor(`${link.linkId}|4:198.51.100.1`, new Date()), null);
     idle(controls);
   }
+});
+
+/** 앱의 OwnerProfileReader 인스턴스의 readOwnerState를 감싼다. 감싼 함수는 (ownerId, manager, original)을 받는다. */
+function wrapOwnerState(t, wrapper) {
+  const reader = app.get(OwnerProfileReader, { strict: false });
+  const original = OwnerProfileReader.prototype.readOwnerState;
+  reader.readOwnerState = function (ownerId, manager) { return wrapper(ownerId, manager, (...args) => original.apply(this, args)); };
+  t.after(() => { delete reader.readOwnerState; });
+}
+
+test('unlock은 비밀번호 계산 전에 링크·소유 회원을 두 번(처음·해시 직전) 읽기 전용 REPEATABLE READ 트랜잭션에서 판정하고, 계산 중에는 그 트랜잭션·잠금을 두지 않는다', async (t) => {
+  const { access, controls } = service({ link: { maxFailures: 20 } });
+  const link = await issue('해시 중 트랜잭션');
+  const judged = [];
+  wrapOwnerState(t, async (ownerId, manager, original) => {
+    const [{ transaction_isolation: isolation }] = await manager.query('SHOW transaction_isolation');
+    const [{ transaction_read_only: readOnly }] = await manager.query('SHOW transaction_read_only');
+    judged.push({ isolation, readOnly, active: manager.queryRunner?.isTransactionActive === true });
+    return original(ownerId, manager);
+  });
+  const originalHash = passwordModule.verifyLinkPassword;
+  const during = [];
+  passwordModule.verifyLinkPassword = async (...args) => {
+    // 비밀번호 계산이 시작된 시점의 다른 연결 상태. 판정 트랜잭션이 남아 있으면 idle in transaction·테이블 잠금으로 보인다.
+    const [row] = await db.query(`SELECT
+      (SELECT count(*)::int FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()
+         AND state LIKE 'idle in transaction%') AS "idleInTransaction",
+      (SELECT count(*)::int FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
+         WHERE c.relname IN ('share_link', 'member_account') AND l.pid <> pg_backend_pid()) AS "tableLocks"`);
+    during.push(row);
+    return originalHash(...args);
+  };
+  t.after(() => { passwordModule.verifyLinkPassword = originalHash; });
+
+  assert.equal(await attempt(access, link.token, PASSWORD, '4:198.51.100.30'), 'ok');
+  assert.equal(await attempt(access, link.token, 'wrong', '4:198.51.100.31'), 'invalid');
+  assert.deepEqual(judged, Array(4).fill({ isolation: 'repeatable read', readOnly: 'on', active: true }), '요청마다 처음·해시 직전 두 번');
+  assert.deepEqual(during, [{ idleInTransaction: 0, tableLocks: 0 }, { idleInTransaction: 0, tableLocks: 0 }]);
+  idle(controls);
+});
+
+test('unlock의 링크·소유 회원 판정은 같은 시점이다: 링크를 읽은 뒤 커밋된 비활성화는 그 판정에 보이지 않고, 해시 직전 새 판정에서 404로 반영된다', async (t) => {
+  const { access, controls } = service({ link: { maxFailures: 20 } });
+  const link = await issue('판정 시점');
+  const seen = [];
+  wrapOwnerState(t, async (ownerId, manager, original) => {
+    // 첫 판정에서만, 링크 조회가 끝난 뒤 소유 회원 조회 전에 다른 연결로 비활성화를 커밋한다.
+    if (seen.length === 0) await db.query("UPDATE member_account SET account_state = 'SUSPENDED' WHERE member_id = $1", [ownerId]);
+    const state = await original(ownerId, manager);
+    seen.push(state);
+    return state;
+  });
+  const originalHash = passwordModule.verifyLinkPassword;
+  let hashed = 0;
+  passwordModule.verifyLinkPassword = async (...args) => { hashed += 1; return originalHash(...args); };
+  t.after(() => { passwordModule.verifyLinkPassword = originalHash; });
+
+  assert.deepEqual(await attempt(access, link.token, PASSWORD, '4:198.51.100.40'), { code: 'LINK_UNAVAILABLE' });
+  assert.deepEqual(seen, ['AVAILABLE', 'INACTIVE'], '첫 판정은 링크 조회 시점의 ACTIVE, 해시 직전 새 판정은 비활성');
+  assert.equal(hashed, 0, '해시를 계산하지 않았다');
+  assert.equal(controls.links.size, 0, '실패로 세지 않았다');
+  idle(controls);
 });
 
 test('해시 차례를 기다리는 동안 차단되면 맞는 비밀번호도 해시 없이 429이고 grant를 주지 않는다', async () => {

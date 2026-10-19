@@ -12,6 +12,7 @@ import { CatchesModule } from './catches/catches.module';
 import { MemberRepositoriesModule } from './member-repositories/member-repositories.module';
 import { GoogleLoginModule } from './google-login/google-login.module';
 import { AnalysisIntakeModule } from './analysis-intake/analysis-intake.module';
+import { RecipientModule } from './recipient/recipient.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AnalysisIntakeModule } from './analysis-intake/analysis-intake.module';
     MemberProfileModule,
     GoogleLoginModule,
     AnalysisIntakeModule,
+    RecipientModule,
     // #232는 #252의 실제 선정 공급자를 받는 WorkerContextModule.register로 별도 조립한다.
     // 기본 앱에 가짜 선정/동의 해석을 등록하지 않는다(docs/worker-context.md).
   ],

@@ -1,27 +1,18 @@
-import { DynamicModule, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { CatchesModule } from '../catches/catches.module';
+import { OwnerProfileReaderModule } from '../member-profile/owner-profile-reader.module';
 import { ShareLinksModule } from '../share-links/share-links.module';
-import { PUBLIC_PROFILE_SOURCE, PublicProfileSource } from './public-profile-source';
 import { RecipientController } from './recipient.controller';
 import { RecipientService } from './recipient.service';
 
 /**
- * 수신자 조회 모듈(#151). 공개 프로필 공급자를 받아야만 조립된다.
- *
- * A의 실제 공급자가 정해지기 전이라 기본 앱(`AppModule`)에는 등록하지 않는다. 시험의 대역 공급자가 제품 경로에서
- * 쓰이지 않게 하기 위해서다. 실제 공급자가 생기면 `AppModule`에서 `RecipientModule.register({ profileSource })`로 연결한다.
+ * 수신자 조회 모듈(#151). 기본 앱(`AppModule`)에 등록한다.
+ * 링크·소유 회원 판정은 ShareLinksModule(#150), 공개 Catch는 CatchesModule(B), 소유 회원 상태·공개 프로필은
+ * OwnerProfileReaderModule(A)의 실제 구현을 쓴다. 시험 대역을 주입받는 조립 경로는 두지 않는다.
  */
-@Module({})
-export class RecipientModule {
-  static register(options: { profileSource: PublicProfileSource }): DynamicModule {
-    if (!options?.profileSource || typeof options.profileSource.read !== 'function') {
-      throw new Error('RecipientModule requires a public profile source');
-    }
-    return {
-      module: RecipientModule,
-      imports: [ShareLinksModule, CatchesModule],
-      controllers: [RecipientController],
-      providers: [RecipientService, { provide: PUBLIC_PROFILE_SOURCE, useValue: options.profileSource }],
-    };
-  }
-}
+@Module({
+  imports: [ShareLinksModule, CatchesModule, OwnerProfileReaderModule],
+  controllers: [RecipientController],
+  providers: [RecipientService],
+})
+export class RecipientModule {}

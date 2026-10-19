@@ -252,7 +252,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 비로그인 수신자 조회 — #151
 
-`GET /v1/public/links/{token}`·`/catches/{catchId}`의 판정 순서·재사용·공개 프로필 공급자 경계는 [docs/recipient-read.md](docs/recipient-read.md)를 따른다. A의 공개 프로필 공급자가 정해지기 전이라 기본 AppModule에는 등록하지 않으며, 시험만 프로필 대역으로 조립한다.
+`GET /v1/public/links/{token}`·`/catches/{catchId}`의 판정 순서·소유 회원 같은 시점 판정·재사용 경계는 [docs/recipient-read.md](docs/recipient-read.md)를 따른다. 기본 AppModule에 등록하며, 공개 프로필·소유 회원 상태는 A의 `OwnerProfileReader`를 쓴다.
 
 ## Worker 내부 분석 컨텍스트 — #232
 

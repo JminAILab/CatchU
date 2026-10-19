@@ -9,11 +9,12 @@ const CONFIRMED = { workFactsConfirmed: true, contributionConfirmed: true };
 const PASSWORD = 'synthetic-recipient-password';
 const HOUR = 60 * 60 * 1000;
 const PUBLIC_CATCH_KEYS = ['catchId', 'title', 'workFacts', 'subjectContribution', 'evidence', 'draft'];
-const PROFILE_KEYS = ['displayName', 'introduction', 'desiredRole', 'skills', 'fieldSource'];
+const PROFILE_KEYS = ['displayName', 'introduction', 'desiredRole', 'skills', 'fieldSource', 'githubAccountLogin'];
 
 // #151 수신자 조회를 실제 Nest HTTP·PostgreSQL(격리 스키마)·#150 링크 판정·B 공개 Catch 조회로 검증한다.
-// 공개 프로필은 A의 공급자가 정해지기 전이라 시험 대역을 주입한다. 대역 결과를 A 프로필 연동 검증으로 보지 않는다.
-// 원본 비공개 제한은 합성 보호 관측 행으로 만든다. 실제 GitHub 원본 상태 관측을 검증하지 않는다.
+// 공개 프로필·소유 회원 상태는 A의 실제 공급 함수(OwnerProfileReader)가 같은 격리 스키마의 합성 회원·프로필·GitHub 연결 행을 읽는다.
+// 정상 DB에서 만들 수 없는 결과(유효 링크의 회원 없음, DB 오류 등)만 공급 함수 인스턴스의 메서드를 시험 안에서 잠시 감싼 대역으로 만든다.
+// 원본 비공개 제한은 합성 보호 관측 행으로 만든다. 실제 GitHub OAuth·원본 상태 관측을 검증하지 않는다.
 describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false, timeout: 180000 }, () => {
   let fixture;
   let db;
@@ -22,6 +23,8 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
   let registerCandidates;
   let grantKey;
   let issueLinkGrant;
+  let reader;
+  let OwnerProfileReaderClass;
   const logs = [];
   const sessions = new Map();
   const secrets = new Set();
@@ -29,23 +32,43 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     'SHARE_LINK_WEB_BASE_URL', 'LINK_GRANT_SECRET'];
   let previousEnv;
 
-  // 시험 대역 공급자. 소유자별 값 또는 오류를 돌려주고 호출된 소유자 ID를 기록한다.
-  const profileStub = {
-    values: new Map(),
-    calls: [],
-    async read(ownerId) {
-      this.calls.push(ownerId);
-      const value = this.values.get(ownerId);
-      if (value instanceof Error) throw value;
-      if (typeof value === 'function') return value();
-      return value;
-    },
-  };
   const profileOf = (name) => ({
     displayName: `[합성] ${name}`, introduction: `[합성] ${name} 소개`, desiredRole: '[합성] 백엔드', skills: ['[합성] TypeScript'],
-    // 공급자가 다른 필드를 섞어 보내도 응답에 복사하지 않는지 확인하는 값이다.
-    memberId: 'synthetic-leak-member-id', githubLogin: 'synthetic-leak-login', connectionState: 'REAUTH_REQUIRED',
   });
+  /** 응답에 기대하는 공개 프로필. GitHub 계정명은 CONNECTED일 때만 저장값이다. */
+  const publicOf = (name, githubAccountLogin = null) => ({ ...profileOf(name), fieldSource: 'SELF_REPORTED', githubAccountLogin });
+
+  /**
+   * 합성 소유 회원(회원·프로필·GitHub 연결 행). fixture.receipt가 같은 식별 문자열로 회원 행을 넣으므로(ON CONFLICT DO NOTHING) 먼저 만든다.
+   * profile: null이면 프로필 행을 만들지 않는다. github: { state, login }이면 연결 행을 만든다.
+   */
+  async function ownerOf(name, { profile = profileOf(name), github } = {}) {
+    const ownerId = randomUUID();
+    await db.query(`INSERT INTO member_account(member_id, identity_reference, account_state) VALUES ($1, $2, 'ACTIVE')`,
+      [ownerId, `synthetic:catch-db-fixture:${ownerId}`]);
+    if (profile) {
+      await db.query(`INSERT INTO member_profile(profile_id, member_id, display_name, introduction, desired_role, skills)
+        VALUES ($1, $2, $3, $4, $5, $6)`, [randomUUID(), ownerId, profile.displayName, profile.introduction, profile.desiredRole, profile.skills]);
+    }
+    if (github) {
+      await db.query(`INSERT INTO github_connection(connection_id, member_id, external_account_reference, account_login, credential_reference, connection_state)
+        VALUES ($1, $2, $3, $4, $5, $6)`, [randomUUID(), ownerId, github.login ? '42' : null, github.login ?? null, null, github.state]);
+    }
+    return ownerId;
+  }
+  const setAccountState = (ownerId, state) => db.query('UPDATE member_account SET account_state = $2 WHERE member_id = $1', [ownerId, state]);
+
+  /** 앱이 쓰는 A 공급 함수 인스턴스의 메서드를 시험 안에서만 감싼다. 감싼 함수는 (args, original)을 받는다. 시험이 끝나면 원래대로 돌린다. */
+  function wrapReader(t, method, wrapper) {
+    const original = OwnerProfileReaderClass.prototype[method];
+    const calls = [];
+    reader[method] = function (...args) {
+      calls.push({ ownerId: args[0], manager: args[1] !== undefined });
+      return wrapper(args, (...again) => original.apply(this, again), calls.length);
+    };
+    t.after(() => { delete reader[method]; });
+    return calls;
+  }
 
   before(async () => {
     previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
@@ -75,8 +98,8 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     Module({ providers: [{ provide: DataSource, useValue: db }], exports: [DataSource] })(FixtureDatabaseModule);
     class RecipientHttpModule {}
     Module({
-      imports: [FixtureDatabaseModule, AuthModule, ErrorsModule, ShareLinksModule, CatchesModule,
-        RecipientModule.register({ profileSource: profileStub })],
+      // 제품 RecipientModule을 그대로 가져온다(A 공급 함수·#150 판정·B 조회의 실제 구현). DB만 격리 스키마로 바꾼다.
+      imports: [FixtureDatabaseModule, AuthModule, ErrorsModule, ShareLinksModule, CatchesModule, RecipientModule],
       providers: [{ provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor }],
     })(RecipientHttpModule);
     const logger = Object.fromEntries(['log', 'error', 'warn', 'debug', 'verbose', 'fatal'].map((level) =>
@@ -86,6 +109,8 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     await app.listen(0, '127.0.0.1');
     origin = await app.getUrl();
     grantKey = app.get(LINK_GRANT_KEY, { strict: false });
+    ({ OwnerProfileReader: OwnerProfileReaderClass } = require('../../dist/member-profile/owner-profile-reader'));
+    reader = app.get(OwnerProfileReaderClass, { strict: false });
   });
 
   after(async () => {
@@ -104,8 +129,6 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
 
   beforeEach(async () => {
     sessions.clear();
-    profileStub.values.clear();
-    profileStub.calls.length = 0;
     await db.query('TRUNCATE repository_protection');
     await fixture.reset();
   });
@@ -181,6 +204,15 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     return body.grant;
   }
 
+  async function unlockRaw(token, password = PASSWORD) {
+    const response = await fetch(`${origin}/v1/public/links/${token}/unlock`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }), signal: AbortSignal.timeout(10000),
+    });
+    const text = await response.text();
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    return { status: response.status, body: JSON.parse(text), text };
+  }
+
   /** 수신자 요청. Authorization을 붙이지 않는다. */
   async function recipient(path, { grant, headers = {} } = {}) {
     const response = await fetch(origin + path, {
@@ -220,10 +252,9 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
   const ids = (items) => items.map((item) => item.catchId).sort();
 
   test('비밀번호 없는 링크는 회원 토큰 없이 프로필과 현재 공개·제한 없음 Catch만 돌려준다', async () => {
-    const owner = randomUUID();
-    const other = randomUUID();
-    profileStub.values.set(owner, profileOf('소유자'));
-    profileStub.values.set(other, profileOf('다른 회원'));
+    // 재인증 필요 연결은 계정명이 남아 있어도 공개하지 않는다(연결 상태값도 내보내지 않는다).
+    const owner = await ownerOf('소유자', { github: { state: 'REAUTH_REQUIRED', login: 'synthetic-leak-login' } });
+    const other = await ownerOf('다른 회원');
     const [visible] = await publish(owner);
     const [hidden] = await seed(owner);
     // 공개 뒤 원본 비공개 관측이 적용된 상태를 합성 보호 행으로 만든다(SOURCE_PRIVATE는 새로 공개할 수 없다).
@@ -235,15 +266,11 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
 
     const body = ok(await recipient(collectionPath(link.token)));
     assertCollectionShape(body);
-    assert.deepEqual(body.profile, {
-      displayName: '[합성] 소유자', introduction: '[합성] 소유자 소개', desiredRole: '[합성] 백엔드',
-      skills: ['[합성] TypeScript'], fieldSource: 'SELF_REPORTED',
-    });
+    assert.deepEqual(body.profile, publicOf('소유자', null));
     assert.deepEqual(ids(body.catches), [visible]);
     assert.deepEqual(body.page, { nextCursor: null });
-    assert.deepEqual(profileStub.calls, [owner]);
-    // 링크 제목·링크 ID·소유자 ID와 공급자가 섞어 보낸 필드는 응답 어디에도 없다.
-    for (const leaked of [link.linkId, owner, link.title, 'synthetic-leak-member-id', 'synthetic-leak-login', 'REAUTH_REQUIRED']) {
+    // 링크 제목·링크 ID·소유자 ID·저장된 계정명·연결 상태값은 응답 어디에도 없다.
+    for (const leaked of [link.linkId, owner, link.title, 'synthetic-leak-login', 'REAUTH_REQUIRED', 'CONNECTED', 'accountState']) {
       assert.ok(!JSON.stringify(body).includes(leaked), leaked);
     }
 
@@ -258,14 +285,13 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
   });
 
   test('공개 Catch가 0건이면 빈 목록 200이고, 제목·설명 초안의 null은 그대로 둔다', async () => {
-    const owner = randomUUID();
-    profileStub.values.set(owner, { displayName: '', introduction: '', desiredRole: '', skills: [] });
+    const owner = await ownerOf('빈 프로필', { profile: { displayName: '', introduction: '', desiredRole: '', skills: [] } });
     await seed(owner, { count: 2 });
     const link = await issue(owner);
     const empty = ok(await recipient(collectionPath(link.token)));
     assertCollectionShape(empty);
     assert.deepEqual(empty, {
-      profile: { displayName: '', introduction: '', desiredRole: '', skills: [], fieldSource: 'SELF_REPORTED' },
+      profile: { displayName: '', introduction: '', desiredRole: '', skills: [], fieldSource: 'SELF_REPORTED', githubAccountLogin: null },
       catches: [], page: { nextCursor: null },
     });
 
@@ -290,10 +316,10 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     assert.deepEqual(ok(await recipient(catchPath(link.token, nullable))), listed.catches[0]);
   });
 
-  test('비밀번호 링크는 이 링크의 유효한 grant만 통과하고, 다른 링크·위조·만료 grant는 401이다', async () => {
-    const owner = randomUUID();
-    profileStub.values.set(owner, profileOf('소유자'));
+  test('비밀번호 링크는 이 링크의 유효한 grant만 통과하고, 다른 링크·위조·만료 grant는 401이다', async (t) => {
+    const owner = await ownerOf('소유자', { github: { state: 'CONNECTED', login: 'synthetic-owner-login' } });
     const [visible] = await publish(owner);
+    const profileReads = wrapReader(t, 'readPublicProfile', (args, original) => original(...args));
     const locked = await issue(owner, PASSWORD);
     const sibling = await issue(owner, PASSWORD);
 
@@ -316,10 +342,11 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     }
     // grant는 헤더로만 받는다. 쿼리로 보내면 grant로 쓰지 않는다.
     fails(await recipient(collectionPath(locked.token, { grant })), 401, 'LINK_PASSWORD_REQUIRED');
-    assert.deepEqual(profileStub.calls, [], '비밀번호 확인 전에는 프로필을 읽지 않는다');
+    assert.deepEqual(profileReads, [], '비밀번호 확인 전에는 프로필을 읽지 않는다');
 
     const body = ok(await recipient(collectionPath(locked.token), { grant }));
     assertCollectionShape(body);
+    assert.deepEqual(body.profile, publicOf('소유자', 'synthetic-owner-login'), 'CONNECTED는 저장된 계정명');
     assert.deepEqual(ids(body.catches), [visible]);
     assert.deepEqual(ok(await recipient(catchPath(locked.token, visible), { grant })), body.catches[0]);
     // 다른 링크의 grant는 그 링크에서만 통한다.
@@ -330,8 +357,7 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
   });
 
   test('비밀번호 시도 제한으로 unlock이 막힌 동안에도 받아 둔 유효한 grant로 열람된다', async () => {
-    const owner = randomUUID();
-    profileStub.values.set(owner, profileOf('소유자'));
+    const owner = await ownerOf('소유자');
     const [visible] = await publish(owner);
     const link = await issue(owner, PASSWORD);
     const grant = await unlock(link.token);
@@ -352,9 +378,8 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     fails(await recipient(collectionPath(link.token)), 401, 'LINK_PASSWORD_REQUIRED');
   });
 
-  test('유효한 grant가 있어도 중단·만료·없는 링크는 같은 404 LINK_UNAVAILABLE이다', async () => {
-    const owner = randomUUID();
-    profileStub.values.set(owner, profileOf('소유자'));
+  test('유효한 grant가 있어도 중단·만료·없는 링크는 같은 404 LINK_UNAVAILABLE이다', async (t) => {
+    const owner = await ownerOf('소유자');
     const [visible] = await publish(owner);
     const stopped = await issue(owner, PASSWORD);
     const expired = await issue(owner, PASSWORD);
@@ -368,7 +393,7 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     assert.equal(stop.status, 200, JSON.stringify(stop.body));
     await db.query("UPDATE share_link SET issued_at = $2, expires_at = $2::timestamptz + interval '720 hours' WHERE link_id = $1",
       [expired.linkId, new Date(Date.now() - 721 * HOUR)]);
-    profileStub.calls.length = 0;
+    const profileReads = wrapReader(t, 'readPublicProfile', (args, original) => original(...args));
     const { generateLinkToken } = require('../../dist/share-links/link-token');
     for (const [token, grant] of [[stopped.token, stoppedGrant], [expired.token, expiredGrant], [generateLinkToken(), stoppedGrant],
       ['not-a-token', undefined], [stopped.token, undefined]]) {
@@ -376,12 +401,11 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
       fails(await recipient(catchPath(token, visible), { grant }), 404, 'LINK_UNAVAILABLE');
       fails(await recipient(collectionPath(token, { limit: 'bad' }), { grant }), 404, 'LINK_UNAVAILABLE');
     }
-    assert.deepEqual(profileStub.calls, []);
+    assert.deepEqual(profileReads, []);
   });
 
-  test('다음 페이지도 매번 링크·grant와 현재 공개 상태를 다시 판정한다', async () => {
-    const owner = randomUUID();
-    profileStub.values.set(owner, profileOf('소유자'));
+  test('다음 페이지도 매번 링크·소유 회원·grant와 현재 공개 상태를 다시 판정한다', async () => {
+    const owner = await ownerOf('소유자');
     const published = (await publish(owner, { count: 4 })).sort();
     const link = await issue(owner, PASSWORD);
     const grant = await unlock(link.token);
@@ -401,6 +425,11 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     assert.deepEqual(ok(await recipient(collectionPath(link.token, { limit: '2', cursor: first.page.nextCursor }), { grant })).catches, []);
     fails(await recipient(catchPath(link.token, published[3]), { grant }), 404, 'RESOURCE_UNAVAILABLE');
     await db.query("UPDATE repository_protection SET applied_restriction = 'NONE' WHERE owner_id = $1", [owner]);
+    // 소유 회원이 비활성이면 받아 둔 cursor·grant로도 열 수 없고, 다시 이용 가능해지면 다음 요청부터 열린다.
+    await setAccountState(owner, 'SUSPENDED');
+    fails(await recipient(collectionPath(link.token, { limit: '2', cursor: first.page.nextCursor }), { grant }), 404, 'LINK_UNAVAILABLE');
+    await setAccountState(owner, 'ACTIVE');
+    ok(await recipient(collectionPath(link.token, { limit: '2', cursor: first.page.nextCursor }), { grant }));
     // 링크를 중단하면 받아 둔 cursor·grant로도 열 수 없다.
     const stop = await memberRequest(owner, `/v1/share-links/${link.linkId}/stop`, { method: 'PUT' });
     assert.equal(stop.status, 200, JSON.stringify(stop.body));
@@ -408,10 +437,8 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
   });
 
   test('잘못된 쿼리와 다른 소유자 링크의 cursor는 400이다', async () => {
-    const owner = randomUUID();
-    const other = randomUUID();
-    profileStub.values.set(owner, profileOf('소유자'));
-    profileStub.values.set(other, profileOf('다른 회원'));
+    const owner = await ownerOf('소유자');
+    const other = await ownerOf('다른 회원');
     const [visible] = await publish(owner, { count: 3 });
     await publish(other, { count: 3 });
     const link = await issue(owner);
@@ -428,9 +455,7 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
   });
 
   test('링크마다 사본을 만들지 않고 소유자의 현재 프로필·Catch를 읽는다', async () => {
-    const owner = randomUUID();
-    let version = 1;
-    profileStub.values.set(owner, () => ({ ...profileOf(`소유자 ${version}`) }));
+    const owner = await ownerOf('소유자 1');
     const [first, second] = (await publish(owner, { count: 2 })).sort();
     const linkA = await issue(owner);
     const linkB = await issue(owner, PASSWORD);
@@ -439,11 +464,14 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
 
     const a1 = ok(await recipient(collectionPath(linkA.token)));
     assert.deepEqual(ok(await recipient(collectionPath(linkB.token), { grant: grantB })), a1);
-    version = 2;
+    await db.query("UPDATE member_profile SET display_name = '[합성] 소유자 2' WHERE member_id = $1", [owner]);
+    await db.query(`INSERT INTO github_connection(connection_id, member_id, external_account_reference, account_login, credential_reference, connection_state)
+      VALUES ($1, $2, '42', 'synthetic-now-login', NULL, 'CONNECTED')`, [randomUUID(), owner]);
     await setVisibility(owner, first, 'PRIVATE');
     for (const [token, grant] of [[linkA.token, undefined], [linkB.token, grantB]]) {
       const now = ok(await recipient(collectionPath(token), { grant }));
       assert.equal(now.profile.displayName, '[합성] 소유자 2');
+      assert.equal(now.profile.githubAccountLogin, 'synthetic-now-login');
       assert.deepEqual(ids(now.catches), [second]);
       fails(await recipient(catchPath(token, first), { grant }), 404, 'RESOURCE_UNAVAILABLE');
     }
@@ -451,33 +479,189 @@ describe('수신자 공개 조회 HTTP·PostgreSQL(#151)', { concurrency: false,
     assert.deepEqual(await db.query('SELECT count(*)::int AS n FROM catch_asset'), before);
   });
 
-  test('프로필·Catch 읽기 실패는 빈 결과가 아니라 500이다', async () => {
-    const owner = randomUUID();
+  test('소유 회원이 비활성이면 unlock·목록·상세 모두 같은 404이고, 비밀번호 없는 링크의 unlock도 400보다 먼저 404다', async () => {
+    const owner = await ownerOf('소유자');
+    const [visible] = await publish(owner);
+    const open = await issue(owner);
+    const locked = await issue(owner, PASSWORD);
+    const grant = await unlock(locked.token);
+    // 이용 가능할 때 기준: 비밀번호 없는 링크의 불필요한 unlock은 400이다.
+    fails(await unlockRaw(open.token), 400, 'INVALID_REQUEST');
+
+    for (const state of ['SUSPENDED', 'WITHDRAWN', 'active']) {
+      await setAccountState(owner, state);
+      fails(await unlockRaw(open.token), 404, 'LINK_UNAVAILABLE');
+      fails(await unlockRaw(locked.token), 404, 'LINK_UNAVAILABLE');
+      fails(await unlockRaw(locked.token, 'wrong-password'), 404, 'LINK_UNAVAILABLE');
+      for (const [token, withGrant] of [[open.token, undefined], [locked.token, grant], [locked.token, undefined]]) {
+        fails(await recipient(collectionPath(token), { grant: withGrant }), 404, 'LINK_UNAVAILABLE');
+        fails(await recipient(catchPath(token, visible), { grant: withGrant }), 404, 'LINK_UNAVAILABLE');
+        fails(await recipient(catchPath(token, randomUUID()), { grant: withGrant }), 404, 'LINK_UNAVAILABLE');
+        fails(await recipient(collectionPath(token, { limit: 'bad' }), { grant: withGrant }), 404, 'LINK_UNAVAILABLE');
+      }
+    }
+    // 다시 이용 가능해지면 다음 요청부터 같은 링크·grant로 열린다(판정은 요청마다 한다).
+    await setAccountState(owner, 'ACTIVE');
+    assert.deepEqual(ids(ok(await recipient(collectionPath(locked.token), { grant })).catches), [visible]);
+    ok(await recipient(catchPath(open.token, visible)));
+    fails(await unlockRaw(open.token), 400, 'INVALID_REQUEST');
+  });
+
+  test('접근 판정은 링크와 소유 회원을 같은 시점으로 읽는다: 링크 조회 뒤 커밋된 비활성화는 그 요청에 보이지 않고 다음 요청에 반영된다', async (t) => {
+    const owner = await ownerOf('소유자');
     const [visible] = await publish(owner);
     const link = await issue(owner);
-    const { ApiError } = require('../../dist/common/errors');
-    const { ForbiddenException, NotFoundException, UnauthorizedException } = require('@nestjs/common');
-    // 공급자가 업무 오류·HTTP 예외를 던져도 수신자 응답 코드를 정하지 못하고 500이다(비활성 소유자 정책은 A와 합의 전).
-    for (const error of [new ApiError('RESOURCE_UNAVAILABLE'), new ApiError('AUTH_REQUIRED'), new ApiError('LINK_UNAVAILABLE'),
-      new ApiError('INTERNAL_ERROR'), new NotFoundException(), new UnauthorizedException(), new ForbiddenException()]) {
-      profileStub.values.set(owner, error);
-      fails(await recipient(collectionPath(link.token)), 500, 'INTERNAL_ERROR');
-    }
-    // 공급자 오류와 계약 모양이 아닌 값은 기본값으로 채우지 않는다.
-    for (const value of [new Error('synthetic profile source failure'), undefined, null, [], 'text',
-      { displayName: '[합성]', introduction: '', desiredRole: '' },
-      { displayName: '[합성]', introduction: '', desiredRole: '', skills: [1] },
-      { displayName: null, introduction: '', desiredRole: '', skills: [] }]) {
-      profileStub.values.set(owner, value);
-      fails(await recipient(collectionPath(link.token)), 500, 'INTERNAL_ERROR');
-    }
-    // 상세는 프로필을 읽지 않는다(계약의 PublicCatch만 돌려준다).
-    profileStub.calls.length = 0;
+    const states = [];
+    let deactivate = true;
+    wrapReader(t, 'readOwnerState', async ([ownerId, manager], original) => {
+      // 링크 조회가 끝난 뒤, 소유 회원 조회 전에 다른 연결로 비활성화를 커밋한다(첫 번째 판정에서만).
+      if (deactivate) { deactivate = false; await setAccountState(ownerId, 'SUSPENDED'); }
+      const [{ transaction_isolation: isolation }] = await manager.query('SHOW transaction_isolation');
+      const [{ transaction_read_only: readOnly }] = await manager.query('SHOW transaction_read_only');
+      const state = await original(ownerId, manager);
+      states.push({ state, isolation, readOnly });
+      return state;
+    });
+    // 그 요청의 판정 시점(링크 조회)에는 이용 가능이었다. 목록의 프로필은 판정 뒤 분리된 조회라 이미 비활성을 본다.
+    fails(await recipient(collectionPath(link.token)), 404, 'LINK_UNAVAILABLE');
+    assert.deepEqual(states, [{ state: 'AVAILABLE', isolation: 'repeatable read', readOnly: 'on' }]);
+    // 상세는 프로필을 읽지 않으므로 같은 상황에서 판정 시점의 결과로 열린다. 다음 요청은 비활성을 반영한다.
+    await setAccountState(owner, 'ACTIVE');
+    deactivate = true;
+    states.length = 0;
     ok(await recipient(catchPath(link.token, visible)));
-    assert.deepEqual(profileStub.calls, []);
+    fails(await recipient(catchPath(link.token, visible)), 404, 'LINK_UNAVAILABLE');
+    assert.deepEqual(states.map((entry) => entry.state), ['AVAILABLE', 'INACTIVE']);
+  });
+
+  test('[시험 대역] 같은 판정 시점에 유효한 링크의 소유 회원이 없으면 unlock·목록·상세 모두 500이다', async (t) => {
+    // 링크의 소유자는 회원을 외래 키로 참조하므로 정상 DB에서는 만들 수 없다. 판정의 상태 조회 결과만 대역으로 바꾼다.
+    const owner = await ownerOf('소유자');
+    const [visible] = await publish(owner);
+    const open = await issue(owner);
+    const locked = await issue(owner, PASSWORD);
+    const grant = await unlock(locked.token);
+    const calls = wrapReader(t, 'readOwnerState', async () => 'NO_MEMBER');
+    const profileReads = wrapReader(t, 'readPublicProfile', (args, original) => original(...args));
+    fails(await unlockRaw(locked.token), 500, 'INTERNAL_ERROR');
+    fails(await unlockRaw(open.token), 500, 'INTERNAL_ERROR');
+    fails(await recipient(collectionPath(locked.token), { grant }), 500, 'INTERNAL_ERROR');
+    fails(await recipient(catchPath(open.token, visible)), 500, 'INTERNAL_ERROR');
+    assert.ok(calls.every((call) => call.manager), '판정의 상태 조회는 판정 트랜잭션의 manager로 한다');
+    assert.deepEqual(profileReads, [], '판정에서 끝나므로 프로필을 읽지 않는다');
+  });
+
+  test('[시험 대역] 판정의 소유 회원 상태 조회가 실패하면 unlock·목록·상세 모두 500이고, 응답에 SQL·내부 메시지가 없다', async (t) => {
+    const owner = await ownerOf('소유자');
+    const [visible] = await publish(owner);
+    const open = await issue(owner);
+    const locked = await issue(owner, PASSWORD);
+    const grant = await unlock(locked.token);
+    const { QueryFailedError } = require('typeorm');
+    const marker = 'synthetic-judgment-internal-marker';
+    secrets.add(marker); // 마지막 로그 검사에서 서버 로그에도 없는지 확인한다
+    wrapReader(t, 'readOwnerState', async () => {
+      throw new QueryFailedError(`SELECT ${marker}`, [marker], Object.assign(new Error(marker), { code: '57014' }));
+    });
+    for (const response of [await unlockRaw(open.token), await unlockRaw(locked.token),
+      await recipient(collectionPath(locked.token), { grant }), await recipient(catchPath(open.token, visible))]) {
+      fails(response, 500, 'INTERNAL_ERROR');
+      assert.ok(!response.text.includes(marker) && !response.text.includes('SELECT'));
+    }
+  });
+
+  test('목록의 분리된 프로필 조회: 비활성은 바로 404, 회원 없음은 같은 시점으로 한 번만 다시 판정한다', async (t) => {
+    const owner = await ownerOf('소유자', { github: { state: 'CONNECTED', login: 'synthetic-owner-login' } });
+    const [visible] = await publish(owner);
+    const link = await issue(owner);
+    const expected = publicOf('소유자', 'synthetic-owner-login');
+    const run = async (first, second) => {
+      const calls = [];
+      reader.readPublicProfile = async function (ownerId, manager) {
+        calls.push({ manager: manager !== undefined });
+        const step = calls.length === 1 ? first : second;
+        if (typeof step === 'function') return step(ownerId, manager);
+        return OwnerProfileReaderClass.prototype.readPublicProfile.call(this, ownerId, manager);
+      };
+      try {
+        return { response: await recipient(collectionPath(link.token)), calls };
+      } finally { delete reader.readPublicProfile; }
+    };
+    t.after(() => { delete reader.readPublicProfile; });
+
+    // [시험 대역] 분리된 조회에서 비활성이 관측되면 다시 조회하지 않고 404.
+    let result = await run(async () => ({ ownerState: 'INACTIVE' }));
+    fails(result.response, 404, 'LINK_UNAVAILABLE');
+    assert.deepEqual(result.calls, [{ manager: false }]);
+
+    // [시험 대역] 첫 조회의 회원 없음 → 재판정(실제 DB). 링크·회원이 유효하므로 같은 시점에서 프로필을 한 번 다시 읽어 200.
+    result = await run(async () => ({ ownerState: 'NO_MEMBER' }));
+    assert.deepEqual(ok(result.response).profile, expected);
+    assert.deepEqual(ids(result.response.body.catches), [visible]);
+    assert.deepEqual(result.calls, [{ manager: false }, { manager: true }], '재조회는 판정 트랜잭션의 manager로 한 번');
+
+    // [시험 대역] 재판정 사이 링크가 중단되면 프로필을 다시 읽지 않고 404.
+    result = await run(async () => {
+      await db.query('UPDATE share_link SET stopped_at = GREATEST(now(), issued_at) WHERE link_id = $1', [link.linkId]);
+      return { ownerState: 'NO_MEMBER' };
+    });
+    fails(result.response, 404, 'LINK_UNAVAILABLE');
+    assert.deepEqual(result.calls, [{ manager: false }]);
+    await db.query('UPDATE share_link SET stopped_at = NULL WHERE link_id = $1', [link.linkId]);
+
+    // [시험 대역] 재판정에서 비활성은 404, 다시 회원 없음은 500. 세 번째 조회는 없다.
+    result = await run(async () => ({ ownerState: 'NO_MEMBER' }), async () => ({ ownerState: 'INACTIVE' }));
+    fails(result.response, 404, 'LINK_UNAVAILABLE');
+    assert.deepEqual(result.calls, [{ manager: false }, { manager: true }]);
+    result = await run(async () => ({ ownerState: 'NO_MEMBER' }), async () => ({ ownerState: 'NO_MEMBER' }));
+    fails(result.response, 500, 'INTERNAL_ERROR');
+    assert.deepEqual(result.calls, [{ manager: false }, { manager: true }], '재판정을 반복하지 않는다');
+
+    // 재판정(실제 DB)에서 필수 프로필 행이 없으면 빈 프로필이 아니라 500. 첫 조회 뒤 프로필 행을 지워 만든다.
+    result = await run(async () => {
+      await db.query('DELETE FROM member_profile WHERE member_id = $1', [owner]);
+      return { ownerState: 'NO_MEMBER' };
+    });
+    fails(result.response, 500, 'INTERNAL_ERROR');
+    assert.deepEqual(result.calls, [{ manager: false }, { manager: true }]);
+  });
+
+  test('프로필·Catch 읽기 실패는 빈 결과가 아니라 500이다', async (t) => {
+    const owner = await ownerOf('소유자');
+    const [visible] = await publish(owner);
+    const link = await issue(owner);
+    // 실제 DB: 이용 가능한 소유 회원의 필수 프로필 행이 없으면 500(OwnerProfileMissingError). 상세는 프로필을 읽지 않아 열린다.
+    await db.query('DELETE FROM member_profile WHERE member_id = $1', [owner]);
+    fails(await recipient(collectionPath(link.token)), 500, 'INTERNAL_ERROR');
+    ok(await recipient(catchPath(link.token, visible)));
+    await db.query(`INSERT INTO member_profile(profile_id, member_id, display_name, introduction, desired_role, skills)
+      VALUES ($1, $2, '[합성] 소유자', '', '', '{}')`, [randomUUID(), owner]);
+    ok(await recipient(collectionPath(link.token)));
+
+    // [시험 대역] 공급 함수의 DB 오류와 계약 모양이 아닌 값은 기본값으로 채우지 않고 500이다. 응답·로그에 SQL·내부 메시지가 없다.
+    const { QueryFailedError } = require('typeorm');
+    const marker = 'synthetic-profile-internal-marker';
+    secrets.add(marker); // 마지막 로그 검사에서 서버 로그에도 없는지 확인한다
+    const values = [
+      () => { throw new QueryFailedError(`SELECT ${marker}`, [marker], Object.assign(new Error(marker), { code: '55P03' })); },
+      () => { throw new Error(marker); },
+      () => ({ ownerState: 'AVAILABLE', profile: { displayName: '[합성]', introduction: '', desiredRole: '', skills: [1], githubAccountLogin: null } }),
+      () => ({ ownerState: 'AVAILABLE', profile: { displayName: null, introduction: '', desiredRole: '', skills: [], githubAccountLogin: null } }),
+      () => ({ ownerState: 'AVAILABLE', profile: { displayName: '', introduction: '', desiredRole: '', skills: [], githubAccountLogin: '' } }),
+      () => ({ ownerState: 'AVAILABLE', profile: { displayName: '', introduction: '', desiredRole: '', skills: [] } }),
+      () => ({ ownerState: 'AVAILABLE' }),
+    ];
+    let current;
+    wrapReader(t, 'readPublicProfile', async () => current());
+    for (const value of values) {
+      current = value;
+      const response = await recipient(collectionPath(link.token));
+      fails(response, 500, 'INTERNAL_ERROR');
+      assert.ok(!response.text.includes(marker) && !response.text.includes('SELECT'));
+    }
 
     // Catch 조회가 실패하면(격리 스키마의 근거 표를 잠시 치운다) 목록·상세 모두 500이다.
-    profileStub.values.set(owner, profileOf('소유자'));
+    delete reader.readPublicProfile;
     await db.query('ALTER TABLE catch_evidence RENAME TO catch_evidence_hidden_for_test');
     try {
       fails(await recipient(collectionPath(link.token)), 500, 'INTERNAL_ERROR');
