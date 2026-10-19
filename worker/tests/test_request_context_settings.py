@@ -114,3 +114,97 @@ def test_environment_factory_uses_explicit_values_only() -> None:
 def test_limits_must_be_finite_positive(options: dict[str, float]) -> None:
     with pytest.raises(ValueError):
         ContextApiSettings("https://api.internal", AccessToken(KEY), **options)  # type: ignore[arg-type]
+
+
+# 운영에서 클러스터 안 주소만 http를 받는다(10/15 팀장 결정 질문 4의 조건 3) ------------------------
+
+CLUSTER_URL = "http://api.catchu.svc.cluster.local:3001"
+
+
+@pytest.mark.parametrize("environment", ["production", "staging", "test"])
+@pytest.mark.parametrize(
+    "url",
+    [
+        CLUSTER_URL,
+        "http://api.catchu.svc.cluster.local",
+        "http://API.Catchu.svc.cluster.local:3001",
+        "http://catchu-api-1.prod-ns.svc.cluster.local:80/",
+    ],
+)
+def test_cluster_service_http_needs_explicit_setting(
+    url: str, environment: str
+) -> None:
+    allowed = ContextApiSettings(
+        url, AccessToken(KEY), environment, allow_cluster_http=True
+    )
+    assert allowed.scheme == "http"
+    with pytest.raises(ValueError):
+        ContextApiSettings(url, AccessToken(KEY), environment)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        # 클러스터 안 서비스 이름이 아닌 http는 설정을 켜도 받지 않는다.
+        "http://api.internal:3001",
+        "http://10.0.1.5:3001",
+        "http://127.0.0.1:3001",
+        "http://api.svc.cluster.local:3001",
+        "http://a.b.c.svc.cluster.local:3001",
+        "http://api.catchu.pod.cluster.local:3001",
+        "http://api.catchu.svc.cluster.local.:3001",
+        "http://api.catchu.svc.cluster.local.evil.invalid:3001",
+        "http://-api.catchu.svc.cluster.local:3001",
+        "http://api_x.catchu.svc.cluster.local:3001",
+    ],
+)
+def test_cluster_http_allowance_is_narrow(url: str) -> None:
+    with pytest.raises(ValueError):
+        ContextApiSettings(url, AccessToken(KEY), "production", allow_cluster_http=True)
+
+
+def test_cluster_setting_keeps_https_and_local_http() -> None:
+    settings = ContextApiSettings(
+        "https://api.internal", AccessToken(KEY), allow_cluster_http=True
+    )
+    assert settings.scheme == "https"
+    local = ContextApiSettings(
+        "http://127.0.0.1:3001", AccessToken(KEY), "test", allow_cluster_http=True
+    )
+    assert local.scheme == "http"
+
+
+@pytest.mark.parametrize(
+    ("flag", "allowed"),
+    [("true", True), ("false", False), ("", False), (None, False)],
+)
+def test_cluster_setting_from_environment(flag: str | None, allowed: bool) -> None:
+    values = {"WORKER_CONTEXT_API_URL": CLUSTER_URL, "WORKER_CONTEXT_API_KEY": KEY}
+    if flag is not None:
+        values["WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP"] = flag
+    if allowed:
+        assert ContextApiSettings.from_environment(values).scheme == "http"
+    else:
+        with pytest.raises(ValueError):
+            ContextApiSettings.from_environment(values)
+
+
+@pytest.mark.parametrize("flag", ["TRUE", "1", "yes", " true"])
+def test_cluster_setting_rejects_other_values(flag: str) -> None:
+    values = {
+        "WORKER_CONTEXT_API_URL": "https://api.internal",
+        "WORKER_CONTEXT_API_KEY": KEY,
+        "WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP": flag,
+    }
+    with pytest.raises(ValueError) as raised:
+        ContextApiSettings.from_environment(values)
+    assert raised.value.__cause__ is raised.value.__context__ is None
+
+
+def test_cluster_setting_must_be_a_real_boolean() -> None:
+    with pytest.raises(ValueError):
+        ContextApiSettings(
+            CLUSTER_URL,
+            AccessToken(KEY),
+            allow_cluster_http="true",  # type: ignore[arg-type]
+        )

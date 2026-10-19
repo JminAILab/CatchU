@@ -7,7 +7,7 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal, Self
 
 from app.contract import SchemaError, Verdict, check_message
 
@@ -66,6 +66,35 @@ class CheckedRequest:
     source_mode: SourceMode
     # A/F가 해석할 작업 맥락 참조. 이 검사는 해석하지 않고 권한으로도 쓰지 않는다.
     credential_context_reference: str
+
+
+@dataclass(frozen=True)
+class UnverifiedRequest:
+    """접수 기록과 대조하지 못한 요청에서 결과 맥락으로 옮길 값(#121).
+
+    요청 정보 조회가 모름·실패일 때만 쓴다. 스키마 v1과 조회 전 자체 검사만 통과한 메시지 값이라
+    `CheckedRequest`가 아니며 수집·생성에 넘기지 않는다. E가 결과의 맥락 값을 접수 기록과 다시 대조한다.
+    """
+
+    request_id: str
+    attempt_id: str
+    member_id: str
+    repository_id: str
+    consent_id: str
+    scope_revision: str
+    source_mode: SourceMode
+
+    @classmethod
+    def from_message(cls, message: Mapping[str, Any]) -> Self:
+        return cls(
+            request_id=message["requestId"],
+            attempt_id=message["attemptId"],
+            member_id=message["memberId"],
+            repository_id=message["repositoryId"],
+            consent_id=message["consentId"],
+            scope_revision=message["allowedScope"]["revision"],
+            source_mode=message["sourceMode"],
+        )
 
 
 def check_request(

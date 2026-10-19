@@ -1,8 +1,9 @@
 """자식 프로세스 진입점: 작업 하나를 처리하고 프레임을 보낸 뒤 끝난다.
 
-spawn으로 뜨며 부모에게서 순수 자료(작업 ID, 작업 데이터 JSON, 꺼낸 시각, 비밀값 없는 설정)만
-받는다. BullMQ·FastAPI·Redis 연결을 불러오지 않는다. 자식은 SIGINT를 무시해 종료 순서를 부모가
-쥐고, 부모가 사라졌거나 자기 마감(꺼낸 시각 + 총 상한 + 유예)이 지나면 스스로 끝낸다.
+spawn으로 뜨며 부모에게서 순수 자료(작업 ID, 작업 데이터 JSON, 꺼낸 시각, 큐 접속 정보 없는 설정)만
+받는다. LIVE 설정(요청 정보 조회·생성 키)은 그 설정 객체로만 받는다. BullMQ·FastAPI·Redis 연결을 불러오지
+않는다. 자식은 SIGINT를 무시해 종료 순서를 부모가 쥐고, 부모가 사라졌거나 자기 마감(꺼낸 시각 + 총 상한 +
+유예)이 지나면 스스로 끝낸다.
 """
 
 import json
@@ -17,10 +18,14 @@ from datetime import UTC, datetime, timedelta
 from multiprocessing.connection import Connection
 from typing import Any, Final
 
+from app.collection.transport import HttpsTransport
 from app.consumer.frames import Frame, encode
 from app.consumer.settings import ChildSettings
+from app.generation import GenerationProvider
+from app.processing.live import LiveAssembly
 from app.processing.pipeline import Finished, Uncertain
 from app.processing.runner import Refused, run_request
+from app.request_context import RequestContextClient
 
 EXIT_PARENT_GONE: Final = 70
 EXIT_SELF_DEADLINE: Final = 71
@@ -91,6 +96,32 @@ def start_watchdog(child_input: ChildInput) -> None:
     thread.start()
 
 
+def live_assembly(settings: ChildSettings) -> LiveAssembly | None:
+    """기동 때 검사한 설정으로 LIVE 부품을 만든다. 설정이 없으면(개발·시험) None이다.
+
+    생성 제공자(Claude API)는 후보가 있을 때 한 번 만든다. SDK도 그때 불러와 MOCK·후보 없는 요청의 자식 기동을
+    늦추지 않는다. 키는 SDK 환경변수가 아니라 설정 객체로 넘긴다.
+    """
+    live = settings.live
+    if live is None:
+        return None
+    key = live.generation_key
+
+    def claude() -> GenerationProvider:
+        from app.generation.claude import ClaudeProvider
+
+        return ClaudeProvider(key)
+
+    return LiveAssembly(
+        context_client=RequestContextClient(live.context_api),
+        open_transport=HttpsTransport,
+        provider_factory=claude,
+        generation_budget=timedelta(
+            seconds=settings.limits.total - settings.limits.generation_margin
+        ),
+    )
+
+
 def _terminal(outcome: Refused | Finished | Uncertain) -> Frame:
     if isinstance(outcome, Refused):
         return Frame("rejected", reason=outcome.reason.value, fields=outcome.fields)
@@ -113,8 +144,10 @@ def child_main(conn: Connection, child_input: ChildInput) -> None:
         outcome = run_request(
             json.loads(child_input.job_data),
             job_id=child_input.job_id,
+            picked_at=datetime.fromisoformat(child_input.picked_at).astimezone(UTC),
             mock_enabled=settings.mock_enabled,
             mock_scenario=settings.mock_scenario,
+            live=live_assembly(settings),
             emit=emit,
             clock=lambda: datetime.now(UTC),
         )

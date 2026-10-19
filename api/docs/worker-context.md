@@ -1,6 +1,6 @@
-# Worker 분석 시도 컨텍스트 — #232
+# Worker 분석 시도 컨텍스트 — #232, #121
 
-worker가 분석 `attemptId`로 접수 회원·동의·선정 범위와 GitHub 자격정보를 조회하는 내부 연결이다. [수집 통제의 A→F 인계](../../docs/CatchU_collection_control_scope.md#3-af-자격정보-인계), [회원·분석 저장 모델](member-analysis.md), [#231/#254 단일 자격정보 함수](github-connection.md#토큰-보관과-232-접점)를 사용한다. 아래 HTTP 형식은 #232의 구현 연결안이며 승인된 `aidlc/` 계약을 소급 수정하지 않는다.
+worker가 분석 `attemptId`로 접수 기록(요청·회원·동의·허용 범위)·선정 범위와 GitHub 자격정보를 조회하는 내부 연결이다. worker는 이 접수 기록으로 요청 메시지를 대조하고, 404이면 이유 코드로 회원 실패 문구를 골라 실패 결과를 보낸다([worker 요청 정보 조회](../../worker/docs/request-context.md)). [수집 통제의 A→F 인계](../../docs/CatchU_collection_control_scope.md#3-af-자격정보-인계), [회원·분석 저장 모델](member-analysis.md), [#231/#254 단일 자격정보 함수](github-connection.md#토큰-보관과-232-접점)를 사용한다. 아래 HTTP 형식은 #232의 구현 연결안이며 승인된 `aidlc/` 계약을 소급 수정하지 않는다.
 
 ## 조립 조건과 후속 공급자
 
@@ -30,7 +30,7 @@ export function workerContextApplication(selectedRepositories: WorkerRepositoryS
 // NestFactory.create(workerContextApplication(실제공급자)) 후 기존 configureApp(app), listen을 사용한다.
 ```
 
-이 조립과 `WORKER_CONTEXT_ENABLED=true`, 별도 `WORKER_CONTEXT_API_KEY`가 모두 필요하다. 키는 안전한 난수 32바이트의 64자리 hex이며 기본값이 없다. AUTH JWT·링크 grant·GitHub 보관 암호화 키와 같으면 기동을 거부한다. 잘못된 활성화 값·키는 development/test/staging/production을 포함해 어느 환경에서도 기동을 거부한다. 기능 자체는 운영용 내부 조회이므로 개발 환경으로 제한하지 않는다. 배포에서는 HTTPS 내부 통신·worker에서만 접근할 네트워크 제한과 비밀 주입을 별도로 준비한다. 자세한 목록은 [환경변수 표](environment.md)에 있다.
+이 조립과 `WORKER_CONTEXT_ENABLED=true`, 별도 `WORKER_CONTEXT_API_KEY`가 모두 필요하다. 키는 안전한 난수 32바이트의 64자리 hex이며 기본값이 없다. AUTH JWT·링크 grant·GitHub 보관 암호화 키와 같으면 기동을 거부한다. 잘못된 활성화 값·키는 development/test/staging/production을 포함해 어느 환경에서도 기동을 거부한다. 기능 자체는 운영용 내부 조회이므로 개발 환경으로 제한하지 않는다. api는 평문 HTTP로 듣고 TLS는 바깥 ALB에서 끝나므로, 배포에서 worker는 클러스터 안 서비스 주소로 이 경로를 http로 부른다(10/15 팀장 결정). 조건은 셋이다: NetworkPolicy(기본 차단, api 3001은 ALB·worker에서만, worker의 나가는 연결 제한, [#276](https://github.com/JminAILab/CatchU/issues/276)), 특권 없는 Pod(호스트 망 금지, 권한 전부 제거, root 아님, Pod Security `restricted`, [#275](https://github.com/JminAILab/CatchU/issues/275)), worker가 명시 설정과 `*.svc.cluster.local` 주소에만 http를 허용하는 것. 세부는 [worker 요청 정보 조회 「설정」](../../worker/docs/request-context.md#설정)에 있다. 응답의 GitHub 토큰은 Pod 사이 망을 평문으로 지나 노드·망을 엿볼 수 있는 쪽에는 보인다. 비밀 주입은 별도로 준비한다. 자세한 목록은 [환경변수 표](environment.md)에 있다.
 
 ## HTTP 입력과 응답
 
@@ -42,6 +42,10 @@ export function workerContextApplication(selectedRepositories: WorkerRepositoryS
 {
   attemptId: string,
   requestId: string,
+  consentId: string,
+  noticeRevision: string,
+  allowedResourceTypes: ('COMMIT' | 'PULL_REQUEST' | 'ISSUE')[],
+  sourceMode: 'LIVE',
   credential: {
     memberId: string,
     repositoryId: string,
@@ -55,18 +59,21 @@ export function workerContextApplication(selectedRepositories: WorkerRepositoryS
 }
 ```
 
-externalAccountId는 정밀도 손실 없는 양의 십진 문자열이다. expiresAt은 GitHub 발급 토큰의 확인된 만료를 ISO UTC로 옮긴 값이다. 분석 처리 시한이나 CatchU JWT 수명이 아니다. 토큰 원문은 이 인증된 응답을 만들 때만 `reveal()`하며 DB·큐·로그·일반 회원 응답에 넣지 않는다. worker는 메모리에서만 사용하고 요청과 회원·저장소·판본을 다시 대조한다.
+최상위 `consentId`·`noticeRevision`·`allowedResourceTypes`·`sourceMode`(#121)는 worker가 요청 메시지와 대조할 접수 기록이다. 값은 동의 행(동의 ID·고지 판본)·동의 범위 JSON(허용 자료 종류)·시도 행(`sourceMode`, LIVE만 답하므로 늘 `LIVE`)에서 읽는다. 동의 범위 JSON은 동의 행·요청과 판본·저장소 ID가 이중 저장이라, JSON의 `revision`이 동의 행의 `scope_revision`과, `repositoryId`가 요청과 같고 `allowedResourceTypes`가 계약 값의 목록일 때만 답한다. 다르면 선정 공급자·GitHub 확인 전에 `SCOPE_UNVERIFIED`다. 저장된 목록은 그대로 돌려준다. externalAccountId는 정밀도 손실 없는 양의 십진 문자열이다. expiresAt은 GitHub 발급 토큰의 확인된 만료를 ISO UTC로 옮긴 값이다. 분석 처리 시한이나 CatchU JWT 수명이 아니다. 토큰 원문은 이 인증된 응답을 만들 때만 `reveal()`하며 DB·큐·로그·일반 회원 응답에 넣지 않는다. worker는 메모리에서만 사용하고 요청과 회원·저장소·판본을 다시 대조한다.
 
-| 상황 | 응답 |
-|---|---|
-| 키 없음 | 401 AUTH_REQUIRED |
-| 틀린 키·형식 오류·회원 Authorization 포함 | 401 AUTH_INVALID |
-| 추가 query/body | 400 INVALID_REQUEST |
-| 잘못된/없는 attemptId, 지난 시도, 닫힌 요청, MOCK 시도, QUEUED/RUNNING이 아닌 상태 | 404 RESOURCE_UNAVAILABLE |
-| 비활성 회원, 불일치/미확인 동의·선정, 사용 불가 GitHub 자격정보 | 404 RESOURCE_UNAVAILABLE |
-| DB·선정 공급자·GitHub 일시 장애 | 500 INTERNAL_ERROR |
+| 상황 | 응답 | 404 이유 |
+|---|---|---|
+| 키 없음 | 401 AUTH_REQUIRED | — |
+| 틀린 키·형식 오류·회원 Authorization 포함 | 401 AUTH_INVALID | — |
+| 추가 query/body | 400 INVALID_REQUEST | — |
+| 잘못된/없는 attemptId, 지난 시도, 닫힌 요청, MOCK 시도, QUEUED/RUNNING이 아닌 상태 | 404 RESOURCE_UNAVAILABLE | `ATTEMPT_NOT_ACTIVE` |
+| 비활성 회원(외부 확인 중 비활성화 포함) | 404 RESOURCE_UNAVAILABLE | `MEMBER_INACTIVE` |
+| 불일치/미확인 동의·선정, 동의 범위 JSON의 판본·저장소가 동의 행·요청과 다름 | 404 RESOURCE_UNAVAILABLE | `SCOPE_UNVERIFIED` |
+| GitHub 연결 없음·해제, 보관 자격정보 없는 연결 | 404 RESOURCE_UNAVAILABLE | `GITHUB_NOT_CONNECTED` |
+| 재인증 필요, 자격정보 사용 불가·만료, 조회 중 연결이 바뀜 | 404 RESOURCE_UNAVAILABLE | `GITHUB_REAUTH_REQUIRED` |
+| DB·선정 공급자·GitHub 일시 장애 | 500 INTERNAL_ERROR | — |
 
-이용 불가 본문은 `{ "code": "RESOURCE_UNAVAILABLE", "message": "현재 열람할 수 없는 자료입니다." }`다. worker는 이 코드의 404만 미해석으로 취급하고 인증/5xx/비정상 응답은 오류로 처리한다. 예상 밖 5xx의 기존 안전한 로그와 AUTH_INVALID 보안 로그에는 토큰·키·원문을 넣지 않는다.
+이용 불가 본문은 `{ "code": "RESOURCE_UNAVAILABLE", "message": "현재 열람할 수 없는 자료입니다.", "details": { "violations": [{ "field": "attemptId", "reason": <이유> }] } }`다. 공통 오류 필터가 `details`에서 `violations`·`existingRequestId`만 복사하므로 계약을 바꾸지 않고 이유 하나를 이 칸에 싣는다. 이유는 worker가 회원 문구를 고르는 데만 쓰고 허용 판정을 나누지 않는다. 주 조회가 비면 같은 시도를 다시 읽어 위 순서(시도 → 회원 → 동의)로 첫 원인을 고른다. worker는 이 코드의 404만 모름으로 취급하고 인증/5xx/비정상 응답은 조회 실패로 처리한다. 조회 경로가 등록되지 않은 앱의 404는 이유가 없다. 예상 밖 5xx의 기존 안전한 로그와 AUTH_INVALID 보안 로그에는 토큰·키·원문을 넣지 않는다.
 
 ## 유효성 재확인
 
@@ -84,4 +91,4 @@ npm run typecheck
 npm test -- test/worker-context-auth.test.cjs test/db/worker-context-api.test.cjs
 ```
 
-시험은 실제 Nest HTTP·PostgreSQL·암호문 보관과 기존 자격정보 함수를 사용한다. GitHub 응답과 선정 공급자만 합성 대역이다. LIVE 활성 시도·MOCK의 선정/자격정보 조회 전 거부·조회 중 LIVE→MOCK 전환·실제 DB 선정 근거의 철회/변경과 최종 잠금 경쟁·수신의 요청 잠금과 겹치는 조회(진행 저장 뒤 200, 종결 저장 뒤 토큰 없는 404)·키/JWT 거부·일반 회원의 유효/폐기/만료 세션·회원 두 명·동의/선정 불일치·지난/종결 시도·만료/해제/재연결·외부 확인 중 종결 경쟁·자격정보 조회가 끝난 뒤 최종 선정 확인 대기 중 해제/동일 계정 재연결 경쟁·오류/로그 비노출을 검사한다. 실제 GitHub 승인·실제 #252 선정 공급·운영 내부 네트워크 검증을 대신하지 않는다. `npm test`가 두 파일을 자동 탐색한다.
+시험은 실제 Nest HTTP·PostgreSQL·암호문 보관과 기존 자격정보 함수를 사용한다. GitHub 응답과 선정 공급자만 합성 대역이다. 응답 최상위 접수 기록 4항목·404마다의 이유 코드·동의 범위 JSON 불일치(판본·저장소·자료 종류)의 조회 전 거부를 보고, 조회 모름의 실패 결과를 실제 E 수신에 넣는 시험은 `test/integration/receiver-registration.test.cjs`에 있다. LIVE 활성 시도·MOCK의 선정/자격정보 조회 전 거부·조회 중 LIVE→MOCK 전환·실제 DB 선정 근거의 철회/변경과 최종 잠금 경쟁·수신의 요청 잠금과 겹치는 조회(진행 저장 뒤 200, 종결 저장 뒤 토큰 없는 404)·키/JWT 거부·일반 회원의 유효/폐기/만료 세션·회원 두 명·동의/선정 불일치·지난/종결 시도·만료/해제/재연결·외부 확인 중 종결 경쟁·자격정보 조회가 끝난 뒤 최종 선정 확인 대기 중 해제/동일 계정 재연결 경쟁·오류/로그 비노출을 검사한다. 실제 GitHub 승인·실제 #252 선정 공급·운영 내부 네트워크 검증을 대신하지 않는다. `npm test`가 두 파일을 자동 탐색한다.

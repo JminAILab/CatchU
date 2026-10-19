@@ -9,6 +9,7 @@ import signal
 import struct
 import time
 from multiprocessing.connection import Connection
+from typing import Any
 
 from app.consumer.child import ChildInput, child_main, start_watchdog
 from app.consumer.frames import Frame, encode
@@ -117,6 +118,33 @@ def raise_in_child(conn: Connection, child_input: ChildInput) -> None:
         raise RuntimeError("비밀 원문 sk-test-should-not-leak")
 
     setattr(runner, "process_request", broken)  # noqa: B010
+    child_main(conn, child_input)
+
+
+def live_synthetic(conn: Connection, child_input: ChildInput) -> None:
+    """LIVE 요청을 합성 GitHub 저장소(열린 PR 하나)와 합성 제공자로 처리한다.
+
+    요청 정보 조회는 자식이 받은 설정의 실제 HTTP 클라이언트로 부른다(시험 프로세스의 loopback 서버).
+    """
+    from dataclasses import replace
+
+    from live_synthetic import ONE_PULL, Parts
+
+    from app.consumer import child
+
+    original = child.live_assembly
+
+    def assembly(settings: Any) -> Any:
+        built = original(settings)
+        assert built is not None, "LIVE 설정 없이 띄웠다"
+        parts = Parts(ONE_PULL)
+        return replace(
+            built,
+            open_transport=parts.open_transport,
+            provider_factory=parts.make_provider,
+        )
+
+    setattr(child, "live_assembly", assembly)  # noqa: B010
     child_main(conn, child_input)
 
 
