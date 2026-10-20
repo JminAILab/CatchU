@@ -176,16 +176,25 @@ was_running=$(jq -r '.items[] | select(any(.status.containerStatuses[]?; .state.
 existing=$(jq -r "${items} | .metadata.name | select(. == \"api\" or . == \"worker\")" <<< "$deployments")
 
 # 실행 중인 Pod의 마지막 종료 코드를 보려고 멈추기 전에 상태 기록을 켠다. 모든 Pod가 기록에 보이기 전에 멈추면 종료 순간을 놓친다.
+# 기록은 Pod마다 '이름=종료 코드' 한 줄이다(끝나기 전에는 코드가 비어 있다). kubectl 1.37.1의 감시 출력에서 확인한 두 가지 때문에
+# 이 모양으로 쓴다: 출력이 TabWriter를 거쳐 탭이 공백으로 바뀌므로 탭으로 나누지 않는다(Pod 이름에는 '='이 없다).
+# range … end 안에서 없는 값(아직 끝나지 않은 Pod의 종료 코드)을 만나면 다음 객체부터 템플릿 오류로 감시가 끝나므로 range를 쓰지 않는다.
+in_watch() { # 상태 기록에 그 Pod가 나왔는지
+  awk -F'=' -v p="$1" '$1 == p { found = 1 } END { exit !found }' "${tmp}/watch"
+}
+exit_code() { # 상태 기록에서 그 Pod의 마지막 종료 코드
+  awk -F'=' -v p="$1" '$1 == p && $2 != "" { c = $2 } END { print c }' "${tmp}/watch"
+}
 if [ -n "$was_running" ]; then
   command kubectl --kubeconfig "$CATCHU_KUBECONFIG" --namespace "$namespace" get pod -l "$selector" --watch \
-    -o jsonpath='{.metadata.name}{"\t"}{range .status.containerStatuses[*]}{.state.terminated.exitCode}{end}{"\n"}' \
+    -o jsonpath='{.metadata.name}{"="}{.status.containerStatuses[0].state.terminated.exitCode}{"\n"}' \
     > "${tmp}/watch" 2> /dev/null &
   watch_pid=$!
   seen=0
   for _ in $(seq 20); do
     seen=1
     for pod in $was_running; do
-      grep -q "^${pod}"$'\t' "${tmp}/watch" || seen=0
+      in_watch "$pod" || seen=0
     done
     [ "$seen" = 1 ] && break
     sleep 0.5
@@ -229,9 +238,6 @@ if [ -n "$existing$was_running" ]; then
   running_list=${was_running//$'\n'/ }
   note "옛 api·worker 멈춤 시작(실행 중이던 Pod: ${running_list:-없음})"
 fi
-exit_code() { # 상태 기록에서 그 Pod의 마지막 종료 코드
-  awk -F'\t' -v p="$1" '$1 == p && $2 != "" { c = $2 } END { print c }' "${tmp}/watch"
-}
 stop_pods && stopped_ok=1 || stopped_ok=0
 if [ -n "$watch_pid" ]; then
   # Pod가 없어진 것을 본 뒤에도 상태 기록이 마지막 종료 코드를 늦게 받을 수 있어 10초까지 기다린다.

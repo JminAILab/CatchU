@@ -98,7 +98,7 @@ bash deploy/aws/scripts/deploy.sh --commit <main 커밋 40자>
 3~7로 멈추면 api·worker는 0으로 멈춘 채다. 다음 실행은 이 상태를 보고 2로 멈추므로, 원인을 확인한 뒤 `--resume`을 붙여 다시 실행한다. 자동 배포(#342)의 다음 실행도 결과를 확인하기 전에는 덮어쓰지 않는다.
 
 - **자동 배포(#342)에서 쓸 때 맞출 것:** 이 스크립트는 프로필 `catchu`, kubeconfig `~/.kube/catchu`, 기대 계정 번호를 전제로 한다([../README.md](../README.md) 「처음 준비」). 배포 역할에 필요한 권한은 ECR 네 저장소 조회, `eks:DescribeCluster`, namespace `catchu`의 Deployment 조회·적용과 실행 수 바꾸기, Pod 조회·감시·만들기와 로그 읽기, NetworkPolicy·ConfigMap 조회다. Secret 읽기와 exec는 필요 없다.
-- **확인하지 못한 것(2단계에서 본다):** 실제 API 서버의 스키마와 Pod 보안 검사 통과, kubectl 감시 출력으로 옛 실행의 종료 코드를 받는지, 실제 준비·중단 시간.
+- **확인하지 못한 것(2단계에서 본다):** 실제 API 서버의 스키마와 Pod 보안 검사 통과, 실제 노드에서 끝난 옛 실행의 종료 코드가 감시 출력에 오는지(출력 모양은 kubectl 1.37.1을 이 컴퓨터의 가짜 API에 붙여 확인했다), 실제 준비·중단 시간.
 
 ## 시험
 
@@ -110,5 +110,6 @@ bash·jq·git·ruby가 필요하고 30초쯤 걸린다. kubectl·aws·sleep을 �
 
 - 확인하는 것: 처음 설치와 교체의 순서(옛 api·worker 멈춤 → migration → api → worker → web), 같은 판본·구성이면 아무것도 바꾸지 않음, 멈춘 상태에서 `--resume` 없이는 멈춤, 시작 전 확인이 하나라도 어긋나면 아무것도 바꾸지 않고 2, 종료 확인 실패 3(늦게 오는 종료 코드는 기다림), 강제 종료 7, migration 실패 4·결과 불명 5·같은 이름 Pod 처리, 새 실행 실패 때 api·worker를 다시 멈추고 6, 출력에 계정 번호가 없음.
 - 실행 파일 조건: `deploy.sh`가 자리를 채운 Deployment·migration Pod와 손으로 적용하는 파일을 Ruby(YAML→JSON)·jq로 읽는다. api·worker 한 개·`Recreate`, web 교체 방식, UID 1000·읽기 전용 루트·권한 제거·seccomp·토큰 자동 탑재 끔·호스트 망 없음, `/tmp` 크기 상한, 자원 요청과 메모리 상한(CPU 상한 없음), 이미지 digest, 비밀값은 Secret에서만, worker에 DB 값 없음, Service 포트, NetworkPolicy·Ingress 규칙, 계정 번호 없음.
-- 확인하지 못하는 것: 실제 API 서버의 스키마·승인 검사(Pod 보안 검사 포함), kubectl 감시 출력의 실제 모양, 노드에서의 실제 종료 코드와 준비 시간, NetworkPolicy·ALB의 실제 동작. 이것은 2단계에서 본다(「적용(2단계)」의 확인).
+- 합성 kubectl의 감시 출력은 kubectl 1.37.1을 이 컴퓨터의 가짜 API에 붙여 확인한 모양을 흉내 낸다. 탭은 공백으로 바뀌고, `range` 안에서 없는 값을 만나면 첫 객체 뒤 오류로 끝난다. `deploy.sh`가 그 밖의 식을 쓰면 시험이 실패한다.
+- 확인하지 못하는 것: 실제 API 서버의 스키마·승인 검사(Pod 보안 검사 포함), 노드에서의 실제 종료 코드와 준비 시간, NetworkPolicy·ALB의 실제 동작. 이것은 2단계에서 본다(「적용(2단계)」의 확인).
 - CI에는 아직 넣지 않았다. 이 폴더나 `deploy.sh`를 바꾸면 손으로 돌린다.

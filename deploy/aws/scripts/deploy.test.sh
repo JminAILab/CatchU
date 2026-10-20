@@ -3,7 +3,7 @@
 # - deploy.sh: kubectl·aws·sleep을 합성 명령으로 바꾸고, 지금 작업 폴더의 deploy.sh·guard.sh·k8s/를 담은 합성 git 저장소에서 실제로 실행한다.
 #   합성 kubectl은 Deployment·Pod·migration Pod 상태를 파일로 흉내 내고, 바꾸는 호출(scale·create·apply·rollout)을 순서대로 남긴다.
 # - 실행 파일: deploy.sh가 자리를 채워 적용한 Deployment·migration Pod와 손으로 적용하는 파일을 Ruby(YAML→JSON)·jq로 읽어 조건을 본다.
-# 확인하지 못하는 것: 실제 API 서버의 스키마·승인 검사(Pod 보안 검사 restricted 포함), kubectl 감시 출력의 실제 모양, 노드에서의 실제 종료 코드와
+# 확인하지 못하는 것: 실제 API 서버의 스키마·승인 검사(Pod 보안 검사 restricted 포함), 노드에서의 실제 종료 코드와
 # 준비 시간, NetworkPolicy·ALB의 실제 동작. 이것은 2단계 실제 클러스터에서 본다(deploy/aws/k8s/README.md).
 # 필요한 것: bash·jq·git·ruby. 사용: bash deploy/aws/scripts/deploy.test.sh   (실패가 하나라도 있으면 종료 코드 1)
 set -uo pipefail
@@ -124,17 +124,34 @@ migration_pod() {
   printf '{"metadata":{"name":"%s","uid":"0000-uid"},"status":{"phase":"%s","containerStatuses":[{"imageID":"123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/catchu-api-migration@%s"%s}]}}\n' \
     "$(cat "$S/mig-name")" "$phase" "$digest" "$terminated"
 }
-watch_pods() { # 처음 Pod 목록을 찍고, 멈추기(scale) 뒤에는 STUB_EXIT의 종료 코드를 찍는다.
+watch_line() { # 템플릿 이름 종료코드 → 실제 kubectl 1.37.1의 감시 출력 한 줄
+  # 그 판본을 이 컴퓨터의 가짜 API에 붙여 확인한 동작을 흉내 낸다: 감시 출력은 TabWriter를 거쳐 탭이 공백(간격 3)으로 바뀐다.
+  # 흉내 내지 않는 식이 남으면 실패한다(새 식을 쓰면 실제 출력을 먼저 확인하고 여기에 더한다).
+  local out=$1
+  out=${out//'{.metadata.name}'/$2}
+  out=${out//'{.status.containerStatuses[0].state.terminated.exitCode}'/$3}
+  out=${out//'{"\n"}'/$'\n'}
+  out=${out//'{"\t"}'/$'\t'}
+  out=${out//'{"="}'/=}
+  case $out in *'{'*) echo "합성 kubectl: 흉내 내지 않는 jsonpath 식 $1" >&2; printf 'kubectl watch %s\n' "$1" >> "$S/unknown"; exit 99 ;; esac
+  printf '%s' "${out//$'\t'/   }"
+}
+watch_pods() { # 템플릿 — 처음 Pod 목록을 찍고, 멈추기(scale) 뒤에는 STUB_EXIT의 종료 코드를 찍는다.
   [ "${STUB_WATCH_SILENT:-0}" = 1 ] && exec "$STUB_REAL_SLEEP" 20
   local name state pair
-  while IFS=$'\t' read -r name state; do [ -n "$name" ] && printf '%s\t\n' "$name"; done < "$S/pods.start"
+  while IFS=$'\t' read -r name state; do
+    [ -n "$name" ] || continue
+    # 실제 kubectl은 range … end 안에서 없는 값을 만나면 첫 객체만 찍고 다음 객체부터 템플릿 오류로 끝난다.
+    case $1 in *'{range'*) printf '%s\n' "$name"; echo "error: Error executing template: not in range, nothing to end" >&2; exit 1 ;; esac
+    watch_line "$1" "$name" ''
+  done < "$S/pods.start"
   for _ in $(seq 400); do [ -f "$S/scaled" ] && break; "$STUB_REAL_SLEEP" 0.01; done
   # STUB_WATCH_LATE=1: 목록 조회에서 Pod가 없어진 것이 보인 뒤에야 마지막 종료 코드를 찍는다(감시 기록이 늦게 도착하는 경우).
   if [ "${STUB_WATCH_LATE:-0}" = 1 ]; then
     for _ in $(seq 400); do [ -f "$S/gone-seen" ] && break; "$STUB_REAL_SLEEP" 0.01; done
     "$STUB_REAL_SLEEP" 0.3
   fi
-  for pair in ${STUB_EXIT:-}; do printf '%s\t%s\n' "${pair%%=*}" "${pair#*=}"; done
+  for pair in ${STUB_EXIT:-}; do watch_line "$1" "${pair%%=*}" "${pair#*=}"; done
   exec "$STUB_REAL_SLEEP" 20
 }
 case "$*" in
@@ -153,7 +170,7 @@ case "$*" in
     for n in api worker; do [ -f "$S/deploy-$n" ] && echo "deployment.apps/$n"; done ;;
   "diff -f "*) [ "${STUB_DIFF:-1}" = 1 ] && echo "synthetic diff"; exit "${STUB_DIFF:-1}" ;;
   "get pod -l app.kubernetes.io/name in (api,worker) -o json") pods ;;
-  "get pod -l app.kubernetes.io/name in (api,worker) --watch -o jsonpath="*) watch_pods ;;
+  "get pod -l app.kubernetes.io/name in (api,worker) --watch -o jsonpath="*) last=${*: -1}; watch_pods "${last#jsonpath=}" ;;
   "get pod -l app.kubernetes.io/name in (api,worker) -o name")
     [ -s "$S/pods" ] || touch "$S/gone-seen"
     while IFS=$'\t' read -r name _; do [ -n "$name" ] && echo "pod/$name"; done < "$S/pods" ;;
