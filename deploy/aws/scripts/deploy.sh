@@ -324,7 +324,7 @@ fi
 start_failed() { # 사유
   say "새 실행 확인 실패: $*. api·worker를 다시 멈춘다"
   if stop_pods; then
-    stop 6 "$*. api·worker를 다시 멈추고 종료를 확인했다"
+    stop 6 "$*. api·worker를 다시 멈추고 종료를 확인했다(종료 코드는 보지 않았다). 새 worker가 떴던 뒤였으면 분석 중이던 작업이 실패로 기록됐는지 큐 상태도 본다"
   fi
   stop 3 "$*. 그 뒤 api·worker를 다시 멈추지 못했다: ${why}"
 }
