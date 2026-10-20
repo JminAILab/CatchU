@@ -195,6 +195,7 @@ docker run -d --name catchu-db-test -p 127.0.0.1:5433:5432 -e POSTGRES_USER=catc
 - 파일 하나만 실행: `npm test -- test/db/timestamptz.test.cjs`. `node --test`로 직접 실행하면 `DB_*`가 없어 실패한다.
 - 테스트 DB를 새로 만들려면 `docker rm -f catchu-db-test` 뒤 다시 `docker run`한다. 다음 `npm test`가 마이그레이션을 처음부터 적용한다.
 - 큐 연결(#233)의 실제 Valkey 시험은 `CATCHU_TEST_REDIS_URL`을 **셸 환경변수**로 줄 때만 돌고(`.env`로는 넘어가지 않는다), 없으면 건너뛴다. 준비 명령은 [docs/analysis-queue.md 「시험」](docs/analysis-queue.md#시험).
+- 잠금 대기 상한 시험(#220)은 시험 전용 DB 계정을 만들었다 지우므로 테스트 DB 계정에 역할 생성 권한이 필요하다(위 명령의 `catchu`는 superuser). 권한이 없으면 로컬에서는 건너뛰고 `CI=true`에서는 실패한다([docs/lock-wait-limit.md 「시험」](docs/lock-wait-limit.md#시험)).
 
 DB를 쓰는 테스트를 추가할 때:
 
@@ -269,6 +270,10 @@ DB를 쓰는 테스트를 추가할 때:
 ## 분석 요청 보내기와 알림·결과 받기(큐 연결) — #233
 
 큐 설정은 `CATCHU_QUEUE_REDIS_URL`(큐 서버 주소, 없으면 모듈을 조립하지 않음)과 `CATCHU_QUEUE_PREFIX`(기본 `catchu`, worker와 같아야 함)다. 보내기 주기: 이전 보내기가 끝나고 5초 뒤 다음 보내기를 하며, 한 번에 대기 시도 100건을 읽는다. 큐 이름·작업 옵션·받기 규칙·수동 검증은 [docs/analysis-queue.md](docs/analysis-queue.md)에 있다. 모듈은 아직 `AppModule`에 등록하지 않았다(켜는 조건도 같은 문서).
+
+## 잠금 대기 상한 — #220
+
+상한은 코드가 아니라 앱 DB 계정에 3초로 건다. 적용 위치, 경로별로 상한을 넘었을 때 남는 것, 측정과 판단이 필요한 결과는 [docs/lock-wait-limit.md](docs/lock-wait-limit.md)에 있다.
 
 ## 실행 실패 시 확인
 
