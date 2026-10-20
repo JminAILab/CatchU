@@ -2,7 +2,7 @@
 
 ## 모델 정본
 
-개발 기준 ERD v1의 승인 검토본. 업무 엔티티 10개와 멱등·반영 연결·로그인 세션용 기술 기록 5개를 구분한다. YAML이 논리 모델 정본이며 관계도는 [functional-spec](functional-spec.md)의 파생 뷰다. 확정된 저장 기술로 옮길 때 아래 제약을 유지한다. 코드·DDL은 개발 이슈에서 작성한다.
+개발 기준 ERD v1의 승인 검토본. 업무 엔티티 10개와 멱등·반영 연결·로그인 세션·저장소 선정 근거용 기술 기록 7개를 구분한다. YAML이 논리 모델 정본이며 관계도는 [functional-spec](functional-spec.md)의 파생 뷰다. 확정된 저장 기술로 옮길 때 아래 제약을 유지한다. 코드·DDL은 개발 이슈에서 작성한다.
 
 ```yaml
 model: api-erd-v1
@@ -225,6 +225,24 @@ technical_records:
       - {name: createdAt, type: instant, required: true}
       - {name: usedAt, type: instant, required: false, constraints: "갱신에 쓴 시각; 재사용 탐지·로그아웃을 위해 사용한 행도 남김"}
     constraints: ["세션마다 usedAt 없는 행 최대 1개(부분 유일)", "사용한 토큰이 다시 오면 그 세션을 끝냄", "갱신은 이전 토큰 사용 표시·새 토큰 저장·lastRefreshedAt 변경을 한 트랜잭션으로"]
+  - name: RepositorySelection
+    owner: A
+    description: "실제 회원에게 허용하는 현재 선정 저장소의 정본; 목록·접수 재확인·worker 실행 판정이 같은 행을 읽음"
+    attributes:
+      - {name: repositoryId, type: external-id, required: true, unique: true, primary: true, constraints: "GitHub 저장소 숫자 ID 문자열"}
+      - {name: selectionReference, type: id, required: true, unique: true, constraints: "저장소 좌표 판본의 참조. 좌표가 바뀌면 새 참조로 바꾸고 이전 참조를 다른 좌표에 다시 쓰지 않음"}
+      - {name: scopeRevision, type: id, required: true, references: AllowedScopeRevision.scopeRevision}
+      - {name: active, type: boolean, required: true, constraints: "선정 제외는 false"}
+    constraints: ["회원별 허용 행 없음; 활성 실제 회원 모두에게 같은 현재 선정", "제외는 active=false이며 행을 지우지 않음", "저장소 좌표(소유자·이름)는 저장하지 않고 selectionReference로 해석", "실제 접수는 요청 저장소가 활성 행이고 동의의 scopeRevision이 그 행과 같을 때만 받고 selectionReference를 그 행에서 동의에 저장; worker 실행 판정은 저장된 동의의 repositoryId·selectionReference·scopeRevision·자료 종류를 현재 활성 행과 다시 대조", "동의에 저장된 selectionReference는 이 행의 FK가 아님; 행 제외·참조 교체 뒤에도 종결된 분석은 저장된 참조로 좌표를 읽음"]
+  - name: AllowedScopeRevision
+    owner: A
+    description: "범위 판본 정의; 허용 자료 종류·수집 범위·한도·전체 선정 의미를 한 판본으로 식별"
+    attributes:
+      - {name: scopeRevision, type: id, required: true, unique: true, primary: true}
+      - {name: allowedResourceTypes, type: "list<enum>", required: true, allowed: [COMMIT, PULL_REQUEST, ISSUE], min_items: 1}
+      - {name: wholeRepository, type: boolean, required: true, allowed: [true], constraints: "10월은 저장소 전체 선정만 정의"}
+      - {name: collectionTerms, type: collection-terms-value, required: true, constraints: "수집 방식·범위·한도·재시도 각각의 값과 지위(DECIDED·PROPOSED·CONTRACT); api는 해석하지 않고 판본 의미로 보존"}
+    constraints: ["행 수정·삭제 금지; 의미가 바뀌면 새 판본을 추가", "전체 선정 판정은 자료 종류 목록이 아니라 wholeRepository로 함", "AnalysisConsent.scopeRevision과는 FK 없이 값으로 대조; 개발(MOCK) 합성 판본은 이 표에 없음"]
 relationships:
   - {from: MemberAccount, to: MemberProfile, cardinality: "1 : 0..1", via: memberId}
   - {from: MemberAccount, to: GitHubConnection, cardinality: "1 : 0..1", via: memberId}
@@ -244,6 +262,8 @@ relationships:
   - {from: CatchAsset, to: CandidateRegistration, cardinality: "1 : 1..N", via: catchId}
   - {from: MemberAccount, to: AuthSession, cardinality: "1 : 0..N", via: memberId}
   - {from: AuthSession, to: SessionRefreshToken, cardinality: "1 : 1..N", via: sessionId}
+  - {from: AllowedScopeRevision, to: RepositorySelection, cardinality: "1 : 0..N", via: scopeRevision}
+  - {from: AllowedScopeRevision, to: AnalysisConsent, cardinality: "0..1 : 0..N", via: "scopeRevision 값 대조; FK 아님"}
 ```
 
 ## 물리 스키마 전환 제약
