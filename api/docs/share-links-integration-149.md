@@ -17,7 +17,7 @@
 - 최초 429 → 폼 닫기·새 작성 → 대기 유지·제출 차단 → 만료 뒤 자동 요청 없음 → 새 키·수정 본문으로 201, DB 각 1건.
 - 제목 51→50, 비밀번호 7→8·65→64 수정: 400 뒤 필드 안내, DB 변화 없음, 새 키로 201. 비밀번호 생략 시 본문에 필드가 없고 DB 보호값도 null.
 
-Docker Desktop을 시작한 뒤 전용 테스트 DB를 준비한다. 자동 검사는 테스트마다 테이블을 초기화하므로 기존 개발 DB와 공유하지 않는다. 수동 브라우저 검사와 동시에 돌리지 않는다.
+Docker Desktop을 시작한 뒤 전용 테스트 DB를 준비한다. 자동 검사는 파일을 시작할 때 테이블을 초기화하므로 기존 개발 DB와 공유하지 않는다. 수동 브라우저 검사와 동시에 돌리지 않는다.
 
 ```powershell
 # 저장소 루트에서 처음 한 번. 이미 만들었으면 docker start catchu-149-db
@@ -34,7 +34,7 @@ $env:TEST_DB_NAME='catchu_149_test'
 npm.cmd test -- test/db/share-links-web-integration.test.cjs
 ```
 
-실제 1분 대기 세 번이 포함되어 약 3분 이상 걸린다. 수동 자료를 보존할 때는 별도로 만든 `catchu_149_regression_test`를 TEST_DB_NAME으로 지정한다. 일반 `npm test`도 이 파일을 찾는다. 실행 중 `MODULE_TYPELESS_PACKAGE_JSON` 경고는 web TypeScript 모듈을 Node가 ES module로 다시 해석했다는 안내이며 검사 실패가 아니다.
+실제 1분을 기다리는 위 세 시험은 함께 기다리도록 동시에 돌아 약 1분 이상 걸린다. 그래서 DB 건수는 시험마다 그 회원의 링크·멱등 기록만 센다. 수동 자료를 보존할 때는 별도로 만든 `catchu_149_regression_test`를 TEST_DB_NAME으로 지정한다. 일반 `npm test`도 이 파일을 찾는다. 실행 중 `MODULE_TYPELESS_PACKAGE_JSON` 경고는 web TypeScript 모듈을 Node가 ES module로 다시 해석했다는 안내이며 검사 실패가 아니다.
 
 ## 수동 브라우저: 실제 응답 유실과 429
 
