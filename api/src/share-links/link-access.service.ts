@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { ApiError } from '../common/errors';
+import { OwnerProfileReader, OwnerState } from '../member-profile/owner-profile-reader';
 import { issueLinkGrant, LINK_GRANT_KEY, verifyLinkGrant } from './link-grant';
 import { verifyLinkPassword } from './link-password';
 import { isLinkTokenFormat } from './link-token';
@@ -13,13 +14,30 @@ import { UNLOCK_CONTROLS, UnlockControls } from './unlock-policy';
 import { SHARE_LINKS_CLOCK } from './share-links.service';
 
 function unavailable(): ApiError {
-  // 없는 URL·중단·만료를 구분하지 않는다. 문구는 명세 고정값, details 없음.
+  // 없는 URL·중단·만료·소유 회원 비활성을 구분하지 않는다. 문구는 명세 고정값, details 없음.
   return new ApiError('LINK_UNAVAILABLE');
 }
 
+/** 같은 판정 시점에 유효한 링크가 있는데 소유 회원 행이 없다(데이터 불일치). 응답은 500 INTERNAL_ERROR이며 링크 값을 담지 않는다. */
+export class LinkOwnerMissingError extends Error {
+  constructor() {
+    super('Valid share link has no owner member');
+    this.name = 'LinkOwnerMissingError';
+  }
+}
+
 /**
- * 수신자 접근 판정(#150). 판정 순서는 계약대로 링크 존재·중단·만료 → (unlock만) 시도 제한 → 비밀번호 → 현재 자료다.
- * 회원 JWT를 쓰지 않는다. 링크·비밀번호·grant 값은 로그·오류에 넣지 않는다.
+ * 소유 회원 상태를 수신자 응답으로 바꾼다(계약 「P — 수신자 API」). 비활성은 다른 링크 불가 사유와 같은 404,
+ * 회원 없음은 이 함수를 같은 판정 시점의 결과에만 쓰므로 데이터 불일치 500이다.
+ */
+export function assertOwnerAvailable(state: OwnerState): void {
+  if (state === 'INACTIVE') throw unavailable();
+  if (state === 'NO_MEMBER') throw new LinkOwnerMissingError();
+}
+
+/**
+ * 수신자 접근 판정(#150·#151). 판정 순서는 계약대로 링크 존재·중단·만료 → 소유 회원 상태 → (unlock만) 시도 제한 → 비밀번호 → 현재 자료다.
+ * 링크와 소유 회원 상태는 같은 시점으로 읽는다(`withLinkSnapshot`). 회원 JWT를 쓰지 않는다. 링크·비밀번호·grant 값은 로그·오류에 넣지 않는다.
  */
 @Injectable()
 export class LinkAccessService {
@@ -28,19 +46,39 @@ export class LinkAccessService {
     @Inject(LINK_GRANT_KEY) private readonly grantKey: Buffer,
     @Inject(UNLOCK_CONTROLS) private readonly controls: UnlockControls,
     @Inject(SHARE_LINKS_CLOCK) private readonly clock: Clock,
+    private readonly owners: OwnerProfileReader,
   ) {}
 
-  /** 지금 열 수 있는 링크. 형식이 틀린 토큰·없음·중단·만료는 같은 404다. 모두 같은 조회 경로를 탄다. */
-  private async usableLink(token: string, now: Date): Promise<ShareLink> {
+  /**
+   * 링크(토큰 형식·존재·중단·만료)를 읽기 전용 REPEATABLE READ 트랜잭션에서 판정하고, 같은 시점의 manager로 `read`를 실행한다.
+   * 형식이 틀린 토큰·없음·중단·만료는 같은 404이며 형식 오류 외에는 같은 조회 경로를 탄다. 소유 회원 해석은 `read`가 정한다.
+   *
+   * - REPEATABLE READ에서는 첫 조회 문장(링크 조회)의 스냅샷을 뒤의 문장이 함께 쓴다. 행 잠금은 잡지 않는다.
+   * - 트랜잭션은 이 함수가 끝나기 전에 닫힌다. manager는 `read` 안에서만 쓰고 밖으로 돌려주지 않는다(닫힌 트랜잭션의 manager를 다시 쓰지 않게).
+   * - grant는 검사하지 않는다. 판정 안에서 grant를 함께 보는 것은 `assertReadable`이고, 이 함수를 직접 쓰는 것은 같은 요청에서 이미 grant를
+   *   확인한 뒤의 한 번 재판정(목록의 분리된 프로필 조회, recipient.service.ts)뿐이다.
+   */
+  async withLinkSnapshot<T>(token: string, read: (link: ShareLink, manager: EntityManager) => Promise<T>, now = this.clock()): Promise<T> {
     if (!isLinkTokenFormat(token)) throw unavailable();
-    const link = await this.dataSource.getRepository(ShareLink).findOneBy({ linkTokenReference: token });
-    if (!link || !isShareLinkValidAt(link, now)) throw unavailable();
-    return link;
+    return this.dataSource.transaction('REPEATABLE READ', async (manager) => {
+      await manager.query('SET TRANSACTION READ ONLY');
+      const link = await manager.getRepository(ShareLink).findOneBy({ linkTokenReference: token });
+      if (!link || !isShareLinkValidAt(link, now)) throw unavailable();
+      return read(link, manager);
+    });
+  }
+
+  /** 지금 열 수 있는 링크. 링크 판정(404)과 같은 시점의 소유 회원 상태(비활성 404, 회원 없음 500)를 함께 본다. */
+  private usableLink(token: string, now: Date): Promise<ShareLink> {
+    return this.withLinkSnapshot(token, async (link, manager) => {
+      assertOwnerAvailable(await this.owners.readOwnerState(link.ownerId, manager));
+      return link;
+    }, now);
   }
 
   /**
-   * 수신 조회(#151)가 쓰는 공통 판정. 비밀번호 링크는 이 링크의 유효한 grant가 있어야 하며, 없거나 무효·만료면 401 LINK_PASSWORD_REQUIRED다.
-   * grant가 있어도 링크를 매번 다시 판정하므로 중단·만료를 우회하지 못한다. 시도 제한은 적용하지 않는다.
+   * 수신 조회(#151)가 쓰는 공통 판정. 링크·소유 회원 판정 뒤, 비밀번호 링크는 이 링크의 유효한 grant가 있어야 하며 없거나 무효·만료면
+   * 401 LINK_PASSWORD_REQUIRED다. grant가 있어도 링크와 소유 회원을 매번 다시 판정하므로 중단·만료·비활성을 우회하지 못한다. 시도 제한은 적용하지 않는다.
    */
   async assertReadable(token: string, grant: string | undefined): Promise<ShareLink> {
     const now = this.clock();
@@ -55,9 +93,10 @@ export class LinkAccessService {
    * 비밀번호 확인(POST /v1/public/links/{token}/unlock). 성공하면 이 링크 한정 grant를 준다.
    * `clientAddress`는 시도 제한을 세는 주소 단위다(client-address.ts의 `clientAddressKey`, IPv4 또는 IPv6 /64).
    *
-   * 판정 순서: 링크(404) → 비밀번호 없는 링크(400) → 본문(400) → 주소·링크 차단(429, 남은 초) →
+   * 판정 순서: 링크(404) → 소유 회원(비활성 404, 회원 없음 500) → 비밀번호 없는 링크(400) → 본문(400) → 주소·링크 차단(429, 남은 초) →
    * 같은 링크·주소 요청 빈도(429, 창이 빌 때까지) → 진행 중 상한·같은 주소 대기 상한(429, 1초) → 차례가 오면 주소·링크 자리 예약 → 해시 차례 대기 →
-   * 해시 직전 재확인(중단·만료 404, 차단 429) → 비밀번호(401·200). 어떤 결과로 끝나도 잡은 자리는 모두 돌려준다.
+   * 해시 직전 재확인(중단·만료·소유 회원 비활성 404, 차단 429) → 비밀번호(401·200). 어떤 결과로 끝나도 잡은 자리는 모두 돌려준다.
+   * 링크·소유 회원 판정 트랜잭션은 두 번 모두 비밀번호 계산 전에 닫힌다.
    */
   async unlock(token: string, body: unknown, clientAddress: string): Promise<{ grant: string }> {
     const now = this.clock();
@@ -112,7 +151,8 @@ export class LinkAccessService {
     let settled = false;
     try {
       return await ticket.runHash(async () => {
-        // 해시 직전 재확인: 기다리는 동안 링크가 중단·만료되거나 주소·링크가 차단됐으면 해시를 계산하지 않는다.
+        // 해시 직전 재확인: 기다리는 동안 링크가 중단·만료되거나 소유 회원이 비활성이 됐거나 주소·링크가 차단됐으면 해시를 계산하지 않는다.
+        // 링크·소유 회원은 새 트랜잭션에서 같은 시점으로 다시 읽고, 그 트랜잭션은 해시 전에 닫힌다.
         const before = this.clock();
         const current = await this.usableLink(token, before);
         this.assertNotBlocked(addressKey, linkId, before);

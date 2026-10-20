@@ -251,6 +251,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 추가 scope 없는 OAuth App 연결·해제, 발급 응답의 실제 만료 시각, 암호화 보관 설정과 #232의 단일 자격정보 제공 함수는 [docs/github-connection.md](docs/github-connection.md)를 따른다. 기능은 기본 비활성이며 실제 앱 설정·토큰 검증과 API·DB 대역 검사 범위를 구분한다.
 
+## 비로그인 수신자 조회 — #151
+
+`GET /v1/public/links/{token}`·`/catches/{catchId}`의 판정 순서·소유 회원 같은 시점 판정·재사용 경계는 [docs/recipient-read.md](docs/recipient-read.md)를 따른다. 기본 AppModule에 등록하며, 공개 프로필·소유 회원 상태는 A의 `OwnerProfileReader`를 쓴다.
+
 ## Worker 내부 분석 컨텍스트 — #232
 
 제품 기동 시 실제 DB 선정 공급자를 연결하는 조건, 서비스 인증과 검사 범위는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 비활성이며 `WORKER_CONTEXT_ENABLED=true`와 유효한 별도 서비스 키를 준비해야 내부 조회 경로를 등록한다.
