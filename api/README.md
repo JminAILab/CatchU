@@ -163,7 +163,7 @@ curl.exe -i http://127.0.0.1:3001/health
 | `npm run lint`      | ESLint 정적 검사. 경고도 실패 처리                                                                                   |
 | `npm run typecheck` | 산출물 생성 없이 TypeScript 타입 검사                                                                                |
 | `npm test`          | 빌드 후 테스트 DB에 마이그레이션을 적용하고 `test/**/*.test.cjs`를 한 파일씩 실행. health·인증 HTTP, 실제 main 진입점의 설정 로딩/기동 실패, DB 규약·테스트 DB, 분석 수신·개발 주입 대역 검사. **테스트 DB 필요**(「DB 테스트」). 서버·임시 설정은 검사 후 정리 |
-| `npm run test:analysis-fixtures` | 별도 준비한 #103 공용 합성 자료로 수신 처리 검사. 자료 경로는 아래 #139 절 참고. 자료가 없으면 실패하며 묵시적으로 생략하지 않음 |
+| `npm run test:analysis-fixtures` | 별도 준비한 #103 공용 합성 자료로 수신 처리 검사. 자료 경로는 아래 #139 절 참고. 자료가 없으면 실패하며 묵시적으로 생략하지 않음. 이미 빌드했으면 `node --test test/analysis/shared-fixtures.check.cjs`로 빌드 없이 같은 검사(CI는 `npm test` 뒤에 이렇게 돈다) |
 | `npm run build`     | 이전 `dist/`를 지운 뒤 `src/`를 `dist/`로 컴파일. 소스에서 지운 엔티티·마이그레이션이 `dist/`에 남아 탐색되지 않게 한다 |
 | `node --test test/worker-messages.test.cjs` | 빌드 없이 [M1 합성 결과 세트](../worker/fixtures/m1-synthetic/README.md)의 사례·음성 대조가 worker와 같은 스키마 판정을 내는지만 검사. `npm test`에도 포함 |
 | `npm start`         | `dist/main.js` 실행. 먼저 빌드 필요                                                                                  |
@@ -195,6 +195,7 @@ docker run -d --name catchu-db-test -p 127.0.0.1:5433:5432 -e POSTGRES_USER=catc
 - 파일 하나만 실행: `npm test -- test/db/timestamptz.test.cjs`. `node --test`로 직접 실행하면 `DB_*`가 없어 실패한다.
 - 테스트 DB를 새로 만들려면 `docker rm -f catchu-db-test` 뒤 다시 `docker run`한다. 다음 `npm test`가 마이그레이션을 처음부터 적용한다.
 - 큐 연결(#233)의 실제 Valkey 시험은 `CATCHU_TEST_REDIS_URL`을 **셸 환경변수**로 줄 때만 돌고(`.env`로는 넘어가지 않는다), 없으면 건너뛴다. 준비 명령은 [docs/analysis-queue.md 「시험」](docs/analysis-queue.md#시험).
+- 잠금 대기 상한 시험(#220)은 시험 전용 DB 계정을 만들었다 지우므로 테스트 DB 계정에 역할 생성 권한이 필요하다(위 명령의 `catchu`는 superuser). 권한이 없으면 로컬에서는 건너뛰고 `CI=true`에서는 실패한다([docs/lock-wait-limit.md 「시험」](docs/lock-wait-limit.md#시험)).
 
 DB를 쓰는 테스트를 추가할 때:
 
@@ -236,11 +237,11 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 선정 지원 저장소 조회 — #136
 
-[docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다.
+[docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다. 실제 회원의 DB 선정 공급과 #323·#232 접점·초기화·갱신 절차(#252)는 [docs/repository-selection.md](docs/repository-selection.md)에 있다.
 
 ## 분석 고지·접수·실패 재요청 — #138
 
-[docs/analysis-intake.md](docs/analysis-intake.md)에서 개발용 합성 고지·실제 회원의 실제 자료용 고지(#322)·원자 접수·동시 요청·멱등 처리·확정 실패 재요청을 확인한다. 실제 회원의 접수(#323)와 worker 전송은 포함하지 않는다.
+[docs/analysis-intake.md](docs/analysis-intake.md)에서 개발용 합성 고지·실제 회원의 실제 자료용 고지(#322)·실제 회원의 LIVE 접수(#323)·원자 접수·동시 요청·멱등 처리·확정 실패 재요청을 확인한다. 큐 전송·worker 실행은 포함하지 않는다.
 
 ## 본인 회원·프로필 조회와 전체 저장 — #135
 
@@ -256,7 +257,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## Worker 내부 분석 컨텍스트 — #232
 
-서비스 인증·실제 DB 조회·필수 선정 공급자 조립과 후속 경계는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 AppModule에는 자동 등록하지 않으며, 실제 선정 공급자와 명시적 활성화가 모두 필요하다.
+제품 기동 시 실제 DB 선정 공급자를 연결하는 조건, 서비스 인증과 검사 범위는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 비활성이며 `WORKER_CONTEXT_ENABLED=true`와 유효한 별도 서비스 키를 준비해야 내부 조회 경로를 등록한다.
 
 ## E 수신 기록과 Catch 반영 연결 — #105
 
@@ -272,7 +273,11 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 분석 요청 보내기와 알림·결과 받기(큐 연결) — #233
 
-큐 설정은 `CATCHU_QUEUE_REDIS_URL`(큐 서버 주소, 없으면 모듈을 조립하지 않음)과 `CATCHU_QUEUE_PREFIX`(기본 `catchu`, worker와 같아야 함)다. 보내기 주기: 이전 보내기가 끝나고 5초 뒤 다음 보내기를 하며, 한 번에 대기 시도 100건을 읽는다. 큐 이름·작업 옵션·받기 규칙·수동 검증은 [docs/analysis-queue.md](docs/analysis-queue.md)에 있다. 모듈은 아직 `AppModule`에 등록하지 않았다(켜는 조건도 같은 문서).
+큐 설정은 `CATCHU_QUEUE_REDIS_URL`(큐 서버 주소, 없으면 모듈을 조립하지 않음)과 `CATCHU_QUEUE_PREFIX`(기본 `catchu`, worker와 같아야 함)다. 보내기 주기: 이전 보내기가 끝나고 5초 뒤 다음 보내기를 하며, 한 번에 대기 시도 100건을 읽는다. 큐 이름·작업 옵션·받기 규칙·수동 검증은 [docs/analysis-queue.md](docs/analysis-queue.md)에 있다. 큐 주소가 있으면 제품 main이 큐 연결을 조립해 `listen` 뒤 시작하고, 받기가 멈추면 종료 코드 1로 끝난다(켜는 조건·MOCK 결과의 한계도 같은 문서).
+
+## 잠금 대기 상한 — #220
+
+상한은 코드가 아니라 앱 DB 계정에 3초로 건다. 적용 위치, 경로별로 상한을 넘었을 때 남는 것, 측정과 판단이 필요한 결과는 [docs/lock-wait-limit.md](docs/lock-wait-limit.md)에 있다.
 
 ## 실행 실패 시 확인
 

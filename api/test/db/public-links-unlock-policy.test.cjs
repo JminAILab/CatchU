@@ -14,11 +14,14 @@ const { createUnlockControls, PRODUCT_UNLOCK_POLICY, UNLOCK_CONTROLS } = require
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
 // #150 10/4 보안 의견 2·3: 링크 전체 제한·동시 요청·해시 직전 재확인·자원 해제를 실제 DB와 실제 해시로 검증한다.
-// 링크 전체 상한은 운영값 30과 후보 20·50을 주입한 서비스를 직접 만들어 쓴다(운영 정책값은 바꾸지 않는다).
+// 링크 전체 상한은 값을 주입한 서비스를 직접 만들어 쓴다(운영 정책값은 바꾸지 않는다). 틀린 시도마다 실제 해시를 계산하므로
+// 여기서는 주입한 값을 따르는지(작은 N 순차)와 운영값의 동시 요청(N=30)만 본다. 운영값 30과 후보 20·50의 같은 규칙은
+// link-limiter 단위 시험(가짜 시계)이, 운영값 30의 HTTP 순차 차단은 public-links-client-address 시험이 본다.
 // 주소 인자는 client-address.ts가 만든 주소 단위 문자열을 흉내 낸 합성 값이다.
 
 const PASSWORD = 'synthetic-recipient-password';
-const CANDIDATES = [20, 30, 50];
+const SEQUENTIAL_N = 5;
+const CONCURRENT_N = 30;
 const ENV = {
   AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
   AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
@@ -111,44 +114,44 @@ function holdHashSlots(controls, count) {
   return { release: async () => { open(); await Promise.all(holders); tickets.forEach((ticket) => ticket.leave()); } };
 }
 
-for (const N of CANDIDATES) {
-  test(`[N=${N}] 여러 주소에서 차례로 N번 틀리면 링크가 차단되고, 새 주소의 맞는 비밀번호도 429다. 받아 둔 grant와 다른 링크는 영향이 없다`, async () => {
-    const { access, controls } = service({ link: { maxFailures: N } });
-    const link = await issue('누적 차단');
-    const other = await issue('다른 링크');
-    assert.equal(await attempt(access, link.token, PASSWORD, '4:192.0.2.250'), 'ok');
-    const grant = (await access.unlock(link.token, { password: PASSWORD }, '4:192.0.2.251')).grant;
-    for (let i = 0; i < N; i++) assert.equal(await attempt(access, link.token, 'wrong', `4:198.51.100.${i}`), 'invalid', `${i + 1}번째`);
-    const blocked = await attempt(access, link.token, PASSWORD, '4:203.0.113.1');
-    assert.ok(blocked.limited >= 899 && blocked.limited <= 900, JSON.stringify(blocked));
-    assert.equal((await access.assertReadable(link.token, grant)).linkId, link.linkId, '받아 둔 grant로는 계속 열람');
-    assert.equal(await attempt(access, other.token, PASSWORD, '4:203.0.113.1'), 'ok', '다른 링크는 막지 않음');
-    idle(controls);
-  });
+test(`[N=${SEQUENTIAL_N}] 여러 주소에서 차례로 N번 틀리면 링크가 차단되고, 새 주소의 맞는 비밀번호도 429다. 받아 둔 grant와 다른 링크는 영향이 없다`, async () => {
+  const N = SEQUENTIAL_N;
+  const { access, controls } = service({ link: { maxFailures: N } });
+  const link = await issue('누적 차단');
+  const other = await issue('다른 링크');
+  assert.equal(await attempt(access, link.token, PASSWORD, '4:192.0.2.250'), 'ok');
+  const grant = (await access.unlock(link.token, { password: PASSWORD }, '4:192.0.2.251')).grant;
+  for (let i = 0; i < N; i++) assert.equal(await attempt(access, link.token, 'wrong', `4:198.51.100.${i}`), 'invalid', `${i + 1}번째`);
+  const blocked = await attempt(access, link.token, PASSWORD, '4:203.0.113.1');
+  assert.ok(blocked.limited >= 899 && blocked.limited <= 900, JSON.stringify(blocked));
+  assert.equal((await access.assertReadable(link.token, grant)).linkId, link.linkId, '받아 둔 grant로는 계속 열람');
+  assert.equal(await attempt(access, other.token, PASSWORD, '4:203.0.113.1'), 'ok', '다른 링크는 막지 않음');
+  idle(controls);
+});
 
-  test(`[N=${N}] 서로 다른 주소에서 동시에 몰아 보내도, 모두 틀리면 차단 전 검사는 정확히 N번이다`, async () => {
-    const { access, controls } = service({ link: { maxFailures: N } });
-    const link = await issue('동시 누적');
-    let checked = 0;
-    let busy = 0;
-    let blocked = false;
-    let next = 0;
-    for (let wave = 0; wave < N && !blocked; wave++) {
-      const results = await Promise.all(Array.from({ length: 5 }, () => attempt(access, link.token, 'wrong', `4:198.51.100.${next++ % 250}`)));
-      for (const result of results) {
-        if (result === 'invalid') checked += 1;
-        else if (result.limited === 1) busy += 1;
-        else if (result.limited > 1) blocked = true;
-        else assert.fail(JSON.stringify(result));
-      }
+test(`[N=${CONCURRENT_N}] 서로 다른 주소에서 동시에 몰아 보내도, 모두 틀리면 차단 전 검사는 정확히 N번이다`, async () => {
+  const N = CONCURRENT_N;
+  const { access, controls } = service({ link: { maxFailures: N } });
+  const link = await issue('동시 누적');
+  let checked = 0;
+  let busy = 0;
+  let blocked = false;
+  let next = 0;
+  for (let wave = 0; wave < N && !blocked; wave++) {
+    const results = await Promise.all(Array.from({ length: 5 }, () => attempt(access, link.token, 'wrong', `4:198.51.100.${next++ % 250}`)));
+    for (const result of results) {
+      if (result === 'invalid') checked += 1;
+      else if (result.limited === 1) busy += 1;
+      else if (result.limited > 1) blocked = true;
+      else assert.fail(JSON.stringify(result));
     }
-    assert.equal(checked, N);
-    assert.ok(busy > 0, '검사 중 상한을 넘는 요청은 1초로 거절됐다');
-    if (!blocked) blocked = (await attempt(access, link.token, PASSWORD, '4:203.0.113.9')).limited > 1;
-    assert.equal(blocked, true);
-    idle(controls);
-  });
-}
+  }
+  assert.equal(checked, N);
+  assert.ok(busy > 0, '검사 중 상한을 넘는 요청은 1초로 거절됐다');
+  if (!blocked) blocked = (await attempt(access, link.token, PASSWORD, '4:203.0.113.9')).limited > 1;
+  assert.equal(blocked, true);
+  idle(controls);
+});
 
 test('동시 검사 상한: 한 링크에 서로 다른 주소 6곳이 동시에 보내면 3개만 검사하고 3개는 실패로 세지 않고 1초로 거절한다', async () => {
   const { access, controls } = service({ link: { maxFailures: 20 } });

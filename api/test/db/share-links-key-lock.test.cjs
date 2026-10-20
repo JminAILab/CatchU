@@ -3,13 +3,14 @@ const assert = require('node:assert/strict');
 const { randomBytes } = require('node:crypto');
 const { after, before, beforeEach, test } = require('node:test');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
+const { PASSWORD, defineShareLinkLockCases } = require('../support/share-link-lock-cases.cjs');
 
 // #220: 같은 키로 다시 보낸 링크 발급의 비밀번호 해시 비교는 키 잠금과 DB 트랜잭션을 놓은 뒤에 한다.
-// 잠금 대기 상한은 아직 합의되지 않아 제품 설정을 바꾸지 않는다. 이 시험은 상한이 걸린 연결(시험 전용 -c lock_timeout)에서
-// 잠금을 얻지 못한 요청의 500·전체 롤백·같은 키 재시도가 지금 코드로 성립하는지만 확인한다.
+// 잠금 대기 상한은 앱 DB 계정에만 3초로 건다(2026-10-16 합의, 개발 서버 적용은 #310). 코드의 DB 연결 설정에는 넣지 않는다.
+// 이 파일은 계정 생성 권한 없이도 돌도록 이 파일의 앱 연결에만 짧은 상한(-c lock_timeout=500ms)을 주입한다.
+// 앱 계정 3초 조건은 lock-wait-limit-role.test.cjs가 같은 시험으로 따로 확인하며, 이 주입은 그 파일에 닿지 않는다.
 // 비밀번호·토큰은 합성 값만 쓴다.
 
-const PASSWORD = 'synthetic-only-link-password';
 const LOCK_TIMEOUT_MS = 500;
 const ENV = {
   AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
@@ -26,7 +27,7 @@ let restoreConfig;
 
 before(async () => {
   for (const [key, value] of Object.entries(ENV)) { saved[key] = process.env[key]; process.env[key] = value; }
-  // 시험 전용: 앱이 쓰는 연결에만 lock_timeout을 건다. 제품 설정은 바꾸지 않는다.
+  // 시험 전용: 이 파일의 앱이 여는 연결에만 lock_timeout을 건다. 제품 설정은 바꾸지 않는다.
   const config = require('../../dist/database/database.config');
   const original = config.buildDataSourceOptions;
   config.buildDataSourceOptions = (databaseConfig) => {
@@ -118,8 +119,6 @@ async function holdLock(text) {
     },
   };
 }
-const keyLockText = (memberId, key) => JSON.stringify(['catchu:idempotency', memberId, 'createShareLink', key]);
-const issuanceLockText = (memberId) => `catchu:share-link-issue:${memberId}`;
 
 test('같은 키 재요청의 비밀번호 비교는 잠금과 열린 트랜잭션을 놓은 뒤에 하고 판정은 그대로다', async (t) => {
   const { token } = await login();
@@ -196,65 +195,15 @@ test('같은 키·같은 본문의 최초 동시 요청은 링크 하나와 멱�
   assert.equal(await count('idempotency_record'), 1);
 });
 
-test('회원 발급 잠금을 상한 안에 얻지 못하면 500 INTERNAL_ERROR로 끝나고 전체 롤백되며 같은 키로 다시 보낼 수 있다', async () => {
-  const { token, memberId } = await login();
-  const held = await holdLock(issuanceLockText(memberId));
-  let failed;
-  const started = Date.now();
-  try {
-    failed = await create(token, 'issuance-key', { title: '대기 링크', password: PASSWORD });
-  } finally {
-    await held.release();
-  }
-  assert.equal(failed.status, 500, JSON.stringify(failed.body));
-  assert.equal(failed.body.code, 'INTERNAL_ERROR');
-  assert.equal(failed.cacheControl, 'no-store');
-  assert.ok(Date.now() - started >= LOCK_TIMEOUT_MS - 100, '상한만큼은 기다린다');
-  assert.equal(await count('share_link'), 0);
-  assert.equal(await count('idempotency_record'), 0);
-
-  const retried = await create(token, 'issuance-key', { title: '대기 링크', password: PASSWORD });
-  assert.equal(retried.status, 201, JSON.stringify(retried.body));
-  assert.equal(await count('share_link'), 1);
-  assert.equal(await count('idempotency_record'), 1);
+test('이 파일의 앱 연결에는 주입한 500ms 상한이 걸리고 테스트 DB 계정 연결에는 걸리지 않는다', async () => {
+  const { DataSource } = require('typeorm');
+  const [{ lock_timeout: appTimeout }] = await app.get(DataSource).query('SHOW lock_timeout');
+  assert.equal(appTimeout, `${LOCK_TIMEOUT_MS}ms`);
+  const [{ lock_timeout: holderTimeout }] = await db.query('SHOW lock_timeout');
+  assert.equal(holderTimeout, '0', '잠금을 쥐는 시험 연결은 상한 없이 기다린다');
 });
 
-test('키 잠금을 상한 안에 얻지 못하면 최초·재요청 모두 500 INTERNAL_ERROR이고 기존 기록은 그대로다', async () => {
-  const { token, memberId } = await login();
-  const held = await holdLock(keyLockText(memberId, 'key-lock'));
-  let failed;
-  try {
-    failed = await create(token, 'key-lock', { title: '키 대기', password: PASSWORD });
-  } finally {
-    await held.release();
-  }
-  assert.equal(failed.status, 500, JSON.stringify(failed.body));
-  assert.equal(failed.body.code, 'INTERNAL_ERROR');
-  assert.equal(await count('share_link'), 0);
-  assert.equal(await count('idempotency_record'), 0);
-
-  const created = await create(token, 'key-lock', { title: '키 대기', password: PASSWORD });
-  assert.equal(created.status, 201);
-
-  const again = await holdLock(keyLockText(memberId, 'key-lock'));
-  let replayFailed;
-  try {
-    replayFailed = await create(token, 'key-lock', { title: '키 대기', password: PASSWORD });
-  } finally {
-    await again.release();
-  }
-  assert.equal(replayFailed.status, 500);
-  assert.equal(replayFailed.body.code, 'INTERNAL_ERROR');
-  assert.equal(await count('share_link'), 1);
-  assert.equal(await count('idempotency_record'), 1);
-
-  const replayed = await create(token, 'key-lock', { title: '키 대기', password: PASSWORD });
-  assert.equal(replayed.status, 200);
-  assert.equal(replayed.body.linkId, created.body.linkId);
-  const wrong = await create(token, 'key-lock', { title: '키 대기', password: 'synthetic-wrong-password' });
-  assert.equal(wrong.status, 409);
-  assert.equal(wrong.body.code, 'IDEMPOTENCY_CONFLICT');
-});
+defineShareLinkLockCases({ test, timeoutMs: LOCK_TIMEOUT_MS, db: () => db, login, create, holdLock });
 
 // 비밀번호 비교가 끝난 뒤의 응답은 비교 전에 만든 응답이 아니라 그 시점의 링크 상태여야 한다(PR #302 Codex P2).
 

@@ -43,7 +43,7 @@ GitHubConnection의 credentialReference에는 github-v1:UUID만 저장한다. �
 
 ## 필수·선택 설정과 실제 검토 절차
 
-기본 GITHUB_CONNECTION_ENABLED=false면 기존 개발 대역과 회원 API를 유지한다. 켜면 아래 설정을 모두 요구하고 형식 오류 시 기동을 거부한다.
+기본 GITHUB_CONNECTION_ENABLED=false면 기존 개발 대역과 회원 API를 유지한다. 이때는 보관 자격정보를 읽지 못하므로 실제 회원의 분석 접수([#323](analysis-intake.md#실제-회원의-접수--323))도 남은 연결 행과 관계없이 403 GITHUB_CONNECTION_REQUIRED다(`requireAvailable()`). 켜면 아래 설정을 모두 요구하고 형식 오류 시 기동을 거부한다.
 
 | 설정 | 필수 여부 / 준비 |
 |---|---|

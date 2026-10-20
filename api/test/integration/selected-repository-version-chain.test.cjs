@@ -27,7 +27,8 @@ const renamed = {...version, name: 'renamed-fixture', url: 'https://github.com/'
 
 // #252의 현재 선정/전체 범위 판정과 GitHub 자격정보는 명시적 시험 대역이다.
 // 실제 DB 요청·동의·시도, 큐 메시지 조립, 실행 조회와 Catch 저장을 연결한다.
-// 실제 #252 선정 행 잠금·HTTP·Redis·GitHub 수집·LLM 실행을 검증하지 않는다.
+// 실제 #252 선정 행 잠금·HTTP·Redis·GitHub 수집·LLM 실행을 검증하지 않는다. 실제 선정 공급의 같은 흐름은
+// repository-selection-chain.test.cjs, 선정 행 잠금은 test/db/repository-selection-*.test.cjs에 있다.
 const selectionSource = {resolve: async (manager, context, options) => {
   assert.ok([null, 'pessimistic_read'].includes(options.lock));
   if (options.lock) assert.equal(manager.queryRunner?.isTransactionActive, true);
