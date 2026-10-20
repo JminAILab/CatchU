@@ -195,12 +195,12 @@ docker run -d --name catchu-db-test -p 127.0.0.1:5433:5432 -e POSTGRES_USER=catc
 - 파일 하나만 실행: `npm test -- test/db/timestamptz.test.cjs`. `node --test`로 직접 실행하면 `DB_*`가 없어 실패한다.
 - 테스트 DB를 새로 만들려면 `docker rm -f catchu-db-test` 뒤 다시 `docker run`한다. 다음 `npm test`가 마이그레이션을 처음부터 적용한다.
 - 큐 연결(#233)의 실제 Valkey 시험은 `CATCHU_TEST_REDIS_URL`을 **셸 환경변수**로 줄 때만 돌고(`.env`로는 넘어가지 않는다), 없으면 건너뛴다. 준비 명령은 [docs/analysis-queue.md 「시험」](docs/analysis-queue.md#시험).
-- 잠금 대기 상한 시험(#220)은 시험 전용 DB 계정을 만들었다 지우므로 테스트 DB 계정에 역할 생성 권한이 필요하다(위 명령의 `catchu`는 superuser). 권한이 없으면 로컬에서는 건너뛰고 `CI=true`에서는 실패한다([docs/lock-wait-limit.md 「시험」](docs/lock-wait-limit.md#시험)).
+- 잠금 대기 상한 시험(#220)은 시험 전용 DB 계정을 만들었다 지우므로 테스트 DB 계정에 역할·데이터베이스 생성 권한이 필요하다(위 명령의 `catchu`는 superuser). 권한이 없으면 로컬에서는 건너뛰고 `CI=true`에서는 실패한다([docs/lock-wait-limit.md 「시험」](docs/lock-wait-limit.md#시험)).
 
 DB를 쓰는 테스트를 추가할 때:
 
 - `test/support/test-database.cjs`의 `openTestDataSource()`로 접속하고, 각 테스트 앞(`beforeEach`)에서 `resetTestDatabase(dataSource)`를 불러 앞선 테스트의 자료 없이 시작한다. 초기화는 마이그레이션 기록을 뺀 모든 테이블을 비운다.
-- 테스트 파일은 한 번에 하나씩 돈다(`--test-concurrency=1`). 동시 요청 검사는 한 테스트 안에서 연결을 여러 개 열어 만든다.
+- 테스트 파일은 줄마다 한 번에 하나씩 돈다(`--test-concurrency=1`). 줄은 둘이다. 잠금 대기 시험(`test/**/lock-wait-limit-*.test.cjs`)은 실행기가 만드는 둘째 DB(`…_lock_test`)에서 나머지와 동시에 돌고, `test/db/build-output.test.cjs`는 공용 `dist`를 다시 만들어 두 줄 앞에서 혼자 돈다. 서버 전체를 세는 조회(`pg_stat_activity`·`pg_locks`)는 `current_database()`로 한정한다. 동시 요청 검사는 한 테스트 안에서 연결을 여러 개 열어 만든다.
 - 확인용 테이블이 필요하면 그 테스트 안에서 만들고 지운다. 제품 테이블은 마이그레이션으로만 만든다.
 
 ## 파일 역할과 모듈 추가 위치

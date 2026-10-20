@@ -192,7 +192,8 @@ async function waitUntilWaiting(db, count, except = [], label = '잠금 대기',
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     const [{ n }] = await db.query(
-      'SELECT count(*)::int AS n FROM pg_stat_activity WHERE cardinality(pg_blocking_pids(pid)) > 0 AND pid <> ALL($1::integer[])',
+      'SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = current_database()'
+      + ' AND cardinality(pg_blocking_pids(pid)) > 0 AND pid <> ALL($1::integer[])',
       [except]);
     if (n >= count) return n;
     await sleep(5);

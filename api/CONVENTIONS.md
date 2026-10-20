@@ -42,7 +42,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/database/snake-naming.strategy.ts` | 테이블·칼럼 snake_case, 제약·인덱스의 결정적 이름 |
 | `src/database/checks.ts`                | `@Check()`용 식: enum 허용 값, 문자열 길이 |
 | `src/database/migrations/`              | 모든 마이그레이션의 한 위치 |
-| `scripts/test-with-db.cjs`              | `npm test` 실행기: 테스트 DB 확인·마이그레이션 적용·테스트 순차 실행 |
+| `scripts/test-with-db.cjs`              | `npm test` 실행기: 테스트 DB 확인·마이그레이션 적용·테스트 실행(두 줄, README 「DB 테스트」) |
 | `scripts/clean-dist.cjs`                | `npm run build`의 첫 단계: 이전 빌드 결과 `dist/` 삭제 |
 | `test/support/test-database.cjs`        | 테스트 DB 접속, `_test` 이름 확인, 테스트 사이 자료 초기화 |
 | `test/support/repository-selection.cjs` | 초기화로 지워진 #252 초기 선정 자료를 격리 스키마의 실제 마이그레이션 값으로 되돌림 |

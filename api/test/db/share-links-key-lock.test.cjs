@@ -86,7 +86,9 @@ function instrumentVerify(t, delayMs = 0, during = null) {
     probe.active += 1;
     probe.peak = Math.max(probe.peak, probe.active);
     try {
-      const [{ locks }] = await db.query("SELECT count(*)::int AS locks FROM pg_locks WHERE locktype = 'advisory' AND granted");
+      const [{ locks }] = await db.query(
+        "SELECT count(*)::int AS locks FROM pg_locks WHERE locktype = 'advisory' AND granted"
+        + ' AND database = (SELECT oid FROM pg_database WHERE datname = current_database())');
       const [{ open }] = await db.query(
         `SELECT count(*)::int AS open FROM pg_stat_activity
           WHERE datname = current_database() AND state LIKE 'idle in transaction%' AND pid <> pg_backend_pid()`);
