@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { isIP } from 'node:net';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { createApplicationModule } from './application.module';
 import { AnalysisDeadlineScheduler } from './analysis-deadline/analysis-deadline.module';
 import { configureApp } from './app.setup';
 
@@ -19,7 +19,7 @@ async function bootstrap(): Promise<void> {
     throw new Error('BIND_HOST는 IP 주소여야 합니다(예: 127.0.0.1, 0.0.0.0).');
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(createApplicationModule());
   try {
     await configureApp(app);
     app.enableShutdownHooks();

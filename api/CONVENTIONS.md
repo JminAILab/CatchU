@@ -10,7 +10,8 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | --------------------------------------- | -------------------------------------------------- |
 | `package.json` / `package-lock.json`    | 실행·검사 명령, 도구 버전, 재현 가능한 의존성 설치 |
 | `src/main.ts`                           | 환경변수 검사, HTTP 서버 시작, 종료 훅, 주기 작업 시작(#237) |
-| `src/app.module.ts`                     | 최상위 Nest 모듈과 기능 모듈 연결                  |
+| `src/application.module.ts`             | main에서 호출하는 제품 조립. 기본 앱에 명시적으로 활성화한 실제 worker 컨텍스트 공급을 연결 |
+| `src/app.module.ts`                     | 기본 기능 모듈 묶음. 독립 시험에서도 사용하며 제품의 조건부 연결은 application.module.ts에서 처리 |
 | `src/cors.ts`                           | 개발용 CORS. 개발/test에서만 정확한 허용 출처·쿠키를 지원하고 운영은 동일 출처(#250) |
 | `src/common/http/request-id.ts`         | 요청별 서버 내부 식별자(#222). 응답·web으로 내보내지 않음 |
 | `src/common/http/security-headers.ts`   | 모든 응답의 보안 헤더와 `X-Powered-By` 끄기. HSTS는 `NODE_ENV`가 development·test가 아닐 때만(#217) |
