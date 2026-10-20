@@ -269,7 +269,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 분석 요청 보내기와 알림·결과 받기(큐 연결) — #233
 
-큐 설정은 `CATCHU_QUEUE_REDIS_URL`(큐 서버 주소, 없으면 모듈을 조립하지 않음)과 `CATCHU_QUEUE_PREFIX`(기본 `catchu`, worker와 같아야 함)다. 보내기 주기: 이전 보내기가 끝나고 5초 뒤 다음 보내기를 하며, 한 번에 대기 시도 100건을 읽는다. 큐 이름·작업 옵션·받기 규칙·수동 검증은 [docs/analysis-queue.md](docs/analysis-queue.md)에 있다. 모듈은 아직 `AppModule`에 등록하지 않았다(켜는 조건도 같은 문서).
+큐 설정은 `CATCHU_QUEUE_REDIS_URL`(큐 서버 주소, 없으면 모듈을 조립하지 않음)과 `CATCHU_QUEUE_PREFIX`(기본 `catchu`, worker와 같아야 함)다. 보내기 주기: 이전 보내기가 끝나고 5초 뒤 다음 보내기를 하며, 한 번에 대기 시도 100건을 읽는다. 큐 이름·작업 옵션·받기 규칙·수동 검증은 [docs/analysis-queue.md](docs/analysis-queue.md)에 있다. 큐 주소가 있으면 제품 main이 큐 연결을 조립해 `listen` 뒤 시작하고, 받기가 멈추면 종료 코드 1로 끝난다(켜는 조건·MOCK 결과의 한계도 같은 문서).
 
 ## 잠금 대기 상한 — #220
 

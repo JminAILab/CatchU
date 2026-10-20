@@ -69,6 +69,8 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
     DEV_LOGIN_ENABLED: 'true',
     WORKER_CONTEXT_ENABLED: undefined,
     WORKER_CONTEXT_API_KEY: undefined,
+    CATCHU_QUEUE_REDIS_URL: undefined, // 터미널의 큐 주소로 큐 연결이 켜지지 않게 한다
+    CATCHU_QUEUE_PREFIX: undefined,
     NODE_ENV: 'development',
     PORT: String(port),
     BIND_HOST: undefined, // 터미널의 값이 섞이지 않게 기본은 두지 않는다
@@ -240,3 +242,41 @@ for (const enabled of ['false', 'true']) {
     assert.equal(server.logs().includes(serviceKey), false);
   });
 }
+
+// 큐 연결(#233). 운영 모드 api는 비밀번호가 든 rediss://만 받는다. 앱을 만들기 전에 멈추고 주소를 로그에 싣지 않는다.
+test('main: production에서 큐 주소가 평문 redis://이면 기동하지 않고 주소 없이 실패 종료한다', { timeout: 15000 }, async (t) => {
+  const queueUrl = 'redis://:synthetic-queue-password@127.0.0.1:6379';
+  const server = await launch(t, { file: { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example',
+    LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111', CATCHU_QUEUE_REDIS_URL: queueUrl } });
+  assert.equal(await server.closed, 1);
+  assert.ok(server.logs().includes('CATCHU_QUEUE_REDIS_URL'), '잘못된 설정 이름을 안내한다');
+  assert.equal(server.logs().includes('synthetic-queue-password'), false, '큐 주소·비밀번호는 로그에 넣지 않는다');
+  assert.equal(server.logs().includes(server.secret), false);
+});
+
+// 실제 큐 시험(CATCHU_TEST_REDIS_URL이 있을 때만). main이 listen 뒤 큐를 시작해 DB의 대기 시도를 요청 큐로 보내는지 본다.
+test('main: 큐 주소가 있으면 listen 뒤 큐를 시작해 대기 시도를 요청 큐로 보낸다', {
+  timeout: 20000, skip: process.env.CATCHU_TEST_REDIS_URL ? false : 'CATCHU_TEST_REDIS_URL이 없어 실제 큐 시험을 건너뜀',
+}, async (t) => {
+  const { Queue } = require('bullmq');
+  const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
+  const { insertAttempt, waitFor } = require('../helpers/queue-harness.cjs');
+  const prefix = `catchu-test-${randomBytes(4).toString('hex')}`;
+  // 정리 함수는 등록 순서대로 돈다. launch의 정리(프로세스 종료)가 먼저 돌도록 그 뒤에 큐·DB 정리를 등록한다.
+  const server = await launch(t, { file: { CATCHU_QUEUE_REDIS_URL: process.env.CATCHU_TEST_REDIS_URL, CATCHU_QUEUE_PREFIX: prefix } });
+  const db = await openTestDataSource();
+  const requests = new Queue('analysis-requests', { connection: { url: process.env.CATCHU_TEST_REDIS_URL }, prefix });
+  t.after(async () => {
+    try {
+      await requests.obliterate({ force: true });
+      await requests.close();
+      await resetTestDatabase(db);
+    } finally { await db.destroy(); }
+  });
+  await server.ready();
+  await resetTestDatabase(db);
+  const row = await insertAttempt(db);
+  const job = await waitFor(() => requests.getJob(row.attemptId), 'main이 대기 시도를 요청 큐에 넣음');
+  assert.equal(job.data.attemptId, row.attemptId);
+  assert.ok(server.logs().includes('ANALYSIS_REQUEST_ENQUEUED'));
+});

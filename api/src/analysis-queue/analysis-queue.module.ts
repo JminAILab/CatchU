@@ -250,7 +250,7 @@ export type AnalysisQueueModuleOptions = {
 /**
  * 큐 연결 모듈. 큐 설정과 보호 관측 공급자가 모두 있을 때만 조립한다(10/15 팀장 결정). 가짜 공급자를 기본으로 넣지 않는다.
  * 실제 수신·등록 조립(AnalysisReceiverModule.registerDatabase)을 여기서 한 번 불러온다. 같은 앱에서 따로 또 부르지 않는다.
- * AppModule에는 아직 등록하지 않는다. 켜는 일은 실제 선정·동의·접수 연결을 확인한 뒤다(api/docs/analysis-queue.md).
+ * AppModule에는 등록하지 않는다. 제품 조립(application.module.ts)이 큐 주소가 있을 때만 부른다(api/docs/analysis-queue.md).
  */
 @Module({})
 export class AnalysisQueueModule {
