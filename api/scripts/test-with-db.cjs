@@ -21,6 +21,7 @@ const DEFAULTS = {
   TEST_DB_NAME: 'catchu_test',
 };
 const PRE_PHASE = 'test/db/build-output.test.cjs';
+const MAX_DB_NAME_BYTES = 63; // PostgreSQL 식별자 한도. 넘으면 잘려서 만든 이름과 접속하는 이름이 달라진다.
 const LOCK_WAIT_LANE = /^test\/(?:.*\/)?lock-wait-limit-[^/]*\.test\.cjs$/;
 
 function readSettings() {
@@ -135,16 +136,23 @@ async function main() {
     return 1;
   }
 
-  // 0. dist를 지우고 다시 만드는 시험은 두 줄이 dist를 읽기 전에 혼자 끝낸다.
-  const pre = spawnSync(process.execPath, nodeTest([PRE_PHASE]), { cwd: apiDir, env: process.env, stdio: 'inherit', windowsHide: true });
-  if ((pre.status ?? 1) !== 0) return pre.status ?? 1;
-
-  // 둘째 줄의 데이터베이스를 만들고 마이그레이션한다.
+  // 둘째 줄 데이터베이스 이름은 시험을 시작하기 전에 확인한다.
   const laneDatabase = laneDatabaseName(settings.TEST_DB_NAME);
   if (laneDatabase === settings.TEST_DB_NAME || !laneDatabase.endsWith('_test')) {
     console.error(`둘째 줄 데이터베이스 이름이 잘못됐습니다(${laneDatabase}).`);
     return 1;
   }
+  if (Buffer.byteLength(laneDatabase) > MAX_DB_NAME_BYTES) {
+    const limit = MAX_DB_NAME_BYTES - (Buffer.byteLength(laneDatabase) - Buffer.byteLength(settings.TEST_DB_NAME));
+    console.error(`둘째 줄 데이터베이스 이름(${laneDatabase})이 ${MAX_DB_NAME_BYTES}바이트를 넘습니다. TEST_DB_NAME을 ${limit}바이트 이하로 줄이세요.`);
+    return 1;
+  }
+
+  // 0. dist를 지우고 다시 만드는 시험은 두 줄이 dist를 읽기 전에 혼자 끝낸다.
+  const pre = spawnSync(process.execPath, nodeTest([PRE_PHASE]), { cwd: apiDir, env: process.env, stdio: 'inherit', windowsHide: true });
+  if ((pre.status ?? 1) !== 0) return pre.status ?? 1;
+
+  // 둘째 줄의 데이터베이스를 만들고 마이그레이션한다.
   await ensureDatabase(settings, laneDatabase);
   if (!await migrate(settings, laneDatabase)) return 1;
 
