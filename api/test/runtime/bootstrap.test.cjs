@@ -278,5 +278,6 @@ test('main: 큐 주소가 있으면 listen 뒤 큐를 시작해 대기 시도를
   const row = await insertAttempt(db);
   const job = await waitFor(() => requests.getJob(row.attemptId), 'main이 대기 시도를 요청 큐에 넣음');
   assert.equal(job.data.attemptId, row.attemptId);
-  assert.ok(server.logs().includes('ANALYSIS_REQUEST_ENQUEUED'));
+  // 기록은 큐에 넣은 뒤 남고 자식 프로세스의 출력으로 늦게 도착할 수 있어, 작업이 보인 직후가 아니라 도착을 기다린다.
+  await waitFor(() => server.logs().includes('ANALYSIS_REQUEST_ENQUEUED'), 'main이 보낸 기록을 남김');
 });
