@@ -20,10 +20,13 @@
 | [`k8s/`](k8s) | 쿠버네티스 실행 파일. namespace·NetworkPolicy·Service·Ingress(ALB)는 손으로 적용하고, Deployment(web·api·worker)와 migration 일회 Pod 틀은 `deploy.sh`만 쓴다([k8s/README.md](k8s/README.md)) |
 | [`scripts/deploy.sh`](scripts/deploy.sh) | 앱 교체. 옛 api·worker 종료 확인 → migration 일회 Pod → 새 api·worker·web 시작과 확인([k8s/README.md](k8s/README.md) 「앱 교체(deploy.sh)」) |
 | [`scripts/deploy.test.sh`](scripts/deploy.test.sh) | `deploy.sh` 회귀 시험과 실행 파일 조건 검사(AWS·클러스터에 닿지 않음, [k8s/README.md](k8s/README.md) 「시험」) |
+| [`scripts/make-secrets.sh`](scripts/make-secrets.sh)·[`put-parameter.sh`](scripts/put-parameter.sh) | 앱 Secret·ConfigMap 만들기와 SSM에 새 비밀값 넣기([k8s/README.md](k8s/README.md) 「Secret과 ConfigMap」) |
+| [`scripts/db-admin.sh`](scripts/db-admin.sh)·[`db/`](db)·[`k8s/ops/`](k8s/ops) | DB 관리용 psql 일회 Pod(namespace `catchu-ops`)와 RDS 계정 SQL·루트 인증서([k8s/README.md](k8s/README.md) 「DB 관리 Pod」). 공통 RDS 조회는 [`scripts/lib/rds.sh`](scripts/lib/rds.sh) |
+| [`scripts/secrets.test.sh`](scripts/secrets.test.sh)·[`db-roles.test.sh`](scripts/db-roles.test.sh) | 위 스크립트 회귀 시험과 계정 SQL의 실제 PostgreSQL 시험(Docker) |
 
 생성 스크립트는 **깨끗할 때 한 번 만드는 용도**다. 인자 없이 실행하면 확인만 하고 아무것도 만들지 않으며(무엇을 만들지 보여 준다), `--apply`를 줄 때만 만든다. 그 스크립트가 만들 자원(이름은 각 파일 머리말) 가운데 하나라도 이미 있으면, 확인 모드에서도 `--apply`에서도 아무것도 만들지 않고 그 목록을 보여 준 뒤 멈춘다(「생성이 중간에 멈췄을 때」). 이미 있는 자원의 상태를 맞추거나 점검하지는 않는다. 조회가 실패해도 '있음'이나 '없음'으로 넘기지 않고 멈춘다. 모두 저장소 루트에서 실행하고, [`scripts/create-scripts.test.sh`](scripts/create-scripts.test.sh)로 AWS에 닿지 않고 시험한다(「시험」).
 
-다음 PR로 남긴 것: 서비스별 Secret·ConfigMap 만들기(이름과 키는 [k8s/README.md](k8s/README.md)에 정했다), DB 계정 SQL과 migration 뒤 동의 기록 삭제 권한 재확인, 로그 수집(관측 애드온·로그 그룹 미리 만들기·토큰 줄 버림), 경보, ACM 인증서·Route 53, Load Balancer Controller 설치, 노드 패치 절차, 전환 절차.
+다음 PR로 남긴 것: migration 뒤 동의 기록 삭제 권한 회수·확인과 Secret 값이 바뀌었을 때 api·worker를 다시 띄우는 일(`deploy.sh`에 잇는다), 로그 수집(관측 애드온·로그 그룹 미리 만들기·토큰 줄 버림), 경보, ACM 인증서·Route 53, Load Balancer Controller 설치, 노드 패치 절차, 전환 절차.
 
 ## 처음 준비
 
@@ -115,7 +118,7 @@
    bash deploy/aws/scripts/create-waf.sh --apply    # ALB에는 Ingress 주석(이름 catchu-edge)으로 붙인다(k8s/ingress.yaml)
    ```
    큐는 SNS 주제 `catchu-alerts`가 있으면 장애 조치 같은 이벤트를 그 주제로 보낸다. 없으면 알림 없이 만들고 나중에 붙인다.
-6. **다음 PR에서 이어서:** ACM 인증서·Route 53, Load Balancer Controller(Helm 차트 3.6.0), 경보, 서비스별 Secret·ConfigMap, DB 계정 SQL(앱 계정 `lock_timeout` 3초, `idle_in_transaction_session_timeout`은 #220에서 정할 값). 앱 실행 파일과 교체는 2단계에서 [k8s/README.md](k8s/README.md)대로 한다.
+6. **다음 PR에서 이어서:** ACM 인증서·Route 53, Load Balancer Controller(Helm 차트 3.6.0), 경보. Secret·ConfigMap, DB 계정(앱 계정 `lock_timeout` 3초, `idle_in_transaction_session_timeout`은 #220에서 정할 값), 앱 실행 파일과 교체는 2단계에서 [k8s/README.md](k8s/README.md)대로 한다.
 
 ## 생성이 중간에 멈췄을 때
 
@@ -202,6 +205,8 @@
 ```bash
 bash deploy/aws/scripts/create-scripts.test.sh
 bash deploy/aws/scripts/deploy.test.sh
+bash deploy/aws/scripts/secrets.test.sh
+bash deploy/aws/scripts/db-roles.test.sh   # Docker가 돌고 있어야 한다
 ```
 
 **생성 스크립트(`create-scripts.test.sh`).** bash·jq·aws CLI v2가 필요하고 30초쯤 걸린다. aws·kubectl·sleep을 합성 명령으로 바꿔 네 생성 스크립트와 공통 확인을 실제로 실행한다.
@@ -210,7 +215,7 @@ bash deploy/aws/scripts/deploy.test.sh
 - 만들기 시험에서는 진짜 AWS CLI를 합성 키와 닫힌 로컬 주소(`127.0.0.1:9`)로 실행해, 옵션 이름·값 형식·입력 파일을 CLI가 받아들이는지도 본다.
 - 확인하지 못하는 것: AWS 서버 쪽 검사(함께 쓸 수 없는 옵션, 이름 규칙, 권한, 할당량)와 실제로 만들어진 자원의 설정. 이것은 1단계에서 각 스크립트가 끝에 찍는 확인 값으로 본다.
 
-`deploy.test.sh`(앱 교체와 실행 파일 조건)는 [k8s/README.md](k8s/README.md) 「시험」에 적었다. 두 시험은 CI에 아직 넣지 않았다. 이 폴더를 바꾸면 손으로 돌린다.
+나머지 세 시험은 [k8s/README.md](k8s/README.md) 「시험」에 적었다. 네 시험은 CI에 아직 넣지 않았다. 이 폴더를 바꾸면 손으로 돌린다.
 
 ## 완료 기준 대응
 
@@ -221,12 +226,12 @@ bash deploy/aws/scripts/deploy.test.sh
 | 서비스·사양·권한·할당량·비용·사용 기간·종료 절차를 확인하고 합의한 구성으로 자원 준비 | vCPU 할당량 조회, 생성 스크립트의 확인 값, 예산 누적액, 이 문서의 삭제 순서 | 0·1 | `cluster.yaml`, `scripts/` 전체, 「삭제 순서」 |
 | API·migration만 DB 접속, worker·외부는 직접 접속 불가 | RDS 공개 접근 끔·보안 그룹(노드에서 5432만), 실제 Deployment Pod에서 한 NetworkPolicy 접속 시험 | 1·2 | `create-rds.sh`, `k8s/network-policy.yaml`(worker에는 5432가 없다) |
 | worker 나가는 연결을 허용 대상·경로로 제한 | 실제 worker Pod의 허용·거부 시험 | 2 | `k8s/network-policy.yaml` |
-| 앱·migration 계정 분리, 암호화·신뢰 CA·인증서·호스트명 검증 | RDS 확인 값(저장 암호화, CA `rds-ca-rsa2048-g1`), 파라미터(`rds.force_ssl=1`, TLS 1.2 이상), 계정 SQL 결과, `PGSSLMODE=verify-full` 접속 | 1·2 | `create-rds.sh`, `k8s/`(api는 `catchu_app`, migration은 `catchu_migrator`, 둘 다 `verify-full`). 계정 SQL은 다음 PR |
-| 앱 계정 `lock_timeout`·`idle_in_transaction_session_timeout` 적용, 동의 기록 직접 삭제 권한 없음 | 앱 계정 새 연결의 `SHOW` 결과, 권한 확인 SQL 결과 | 2 | 다음 PR. `idle_in_transaction_session_timeout` 값은 #220에서 정한다(RDS 기본값은 24시간) |
+| 앱·migration 계정 분리, 암호화·신뢰 CA·인증서·호스트명 검증 | RDS 확인 값(저장 암호화, CA `rds-ca-rsa2048-g1`), 파라미터(`rds.force_ssl=1`, TLS 1.2 이상), 계정 SQL 결과, `PGSSLMODE=verify-full` 접속 | 1·2 | `create-rds.sh`, `k8s/`(api는 `catchu_app`, migration은 `catchu_migrator`, 둘 다 `verify-full`), `db/roles.sql`(계정 SQL 결과 표), `db/rds-ca-rsa2048-g1.pem` |
+| 앱 계정 `lock_timeout`·`idle_in_transaction_session_timeout` 적용, 동의 기록 직접 삭제 권한 없음 | 앱 계정 새 연결의 `SHOW` 결과, 권한 확인 SQL 결과 | 2 | `db/roles.sql`(`lock_timeout` 3초). `idle_in_transaction_session_timeout`은 #220에서 정하면 더한다(RDS 기본값 24시간). 동의 기록 삭제 권한은 다음 PR(`deploy.sh`) |
 | 큐 `noeviction`, 키트 시나리오, 재시작·장애 조치 뒤 재접속 | 큐 확인 값(`maxmemory-policy noeviction`, TLS·비밀번호·스냅샷 0), #77 키트 결과 | 1·2 | `create-queue.sh` |
 | ALB TLS 종료·80→443·사설 서비스 접근 제한·신뢰 프록시 대역 | `curl -sI http://catchu.dev/`가 https로 이동, TLS 1.1 접속 거부(`openssl s_client -tls1_1`), 바깥 확인(`/v1/INTERNAL/x`, `/v1/Internal/…`, `/V1/internal/x`, `/v1//internal/x`, `/v1/%69nternal/x` 모두 404), ALB 규칙 우선순위, 퍼블릭 서브넷 대역 | 2 | `create-waf.sh`·`waf/`, `k8s/ingress.yaml` |
 | 관리형 DB 자동 백업·보관 기간·암호화·열람 권한 제한 | RDS 확인 값(백업 7일, 저장 암호화, 삭제 보호, 태그 스냅샷 복사), 스냅샷이 공개·공유되지 않음(`aws rds describe-db-snapshot-attributes`), AWS 권한을 가진 IAM 사용자가 팀장 한 명뿐임(`aws iam list-users`) | 1 | `create-rds.sh` |
-| 비밀값·짧은 Access 토큰 수명·로그 수집/보관·토큰 가림·경보 | 노드 역할 모의 판정 `explicitDeny`, 서비스별 Secret 이름 목록(값 아님), api 실행 값 `AUTH_ACCESS_TOKEN_TTL_SECONDS=900`, 로그 그룹 보존 14일, 가짜 표식 0건, 경보 수신 | 0·1·2 | `cluster.yaml`(노드 역할 거부), `k8s/api.yaml`(Access 토큰 900초). Secret 만들기·로그·경보는 다음 PR |
+| 비밀값·짧은 Access 토큰 수명·로그 수집/보관·토큰 가림·경보 | 노드 역할 모의 판정 `explicitDeny`, 서비스별 Secret 이름 목록(값 아님), api 실행 값 `AUTH_ACCESS_TOKEN_TTL_SECONDS=900`, 로그 그룹 보존 14일, 가짜 표식 0건, 경보 수신 | 0·1·2 | `cluster.yaml`(노드 역할 거부), `k8s/api.yaml`(Access 토큰 900초), `make-secrets.sh`(Secret 이름·키=SSM 판 번호 출력). 로그·경보는 다음 PR |
 | RDS·큐 장애 조치 뒤 api·worker 재연결, 가용 영역별 NAT 경로 | 「1단계 만드는 순서」의 NAT 경로 조회, `check-target.sh` 뒤 `aws rds reboot-db-instance --db-instance-identifier catchu-db --force-failover --profile catchu --region ap-northeast-2`와 `aws elasticache test-failover --replication-group-id catchu-queue --node-group-id 0001 --profile catchu --region ap-northeast-2`, 그 뒤 api·worker 상태 | 1·2 | `cluster.yaml`(NAT 2개), `create-rds.sh`(Multi-AZ), `create-queue.sh`(복제본·자동 장애 조치) |
 | EKS로 옮긴 뒤 개발 서버 삭제, 과금 자원 없음 | 「삭제 순서」 A의 7번 조회 결과 | 4 | 「삭제 순서」 |
 
