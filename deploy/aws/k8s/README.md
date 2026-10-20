@@ -41,7 +41,7 @@ bash deploy/aws/scripts/put-parameter.sh --stdin /catchu/prod/worker/CATCHU_GENE
 
 **만들기.** `bash deploy/aws/scripts/make-secrets.sh`(순서는 아래 「적용(2단계)」).
 
-- 시작 전에 계정·클러스터, namespace `catchu`, RDS(available, CA `rds-ca-rsa2048-g1`), 큐(available, TLS와 비밀번호 켬), SSM 이름 일곱 개가 모두 SecureString인지 본다. 값도 앱이 시작할 때 거부하는 형식인지(서명 키·조회 키는 64자리 hex, 큐 비밀번호는 주소에 그대로 넣을 수 있는 영문·숫자), 서로 달라야 하는 값(서명 키 둘과 조회 키, 두 계정 비밀번호)이 다른지 본다. 하나라도 어긋나면 아무것도 바꾸지 않고 멈춘다(종료 코드 1).
+- 시작 전에 계정·클러스터, namespace `catchu`, RDS(available, CA `rds-ca-rsa2048-g1`), 큐(available, TLS와 비밀번호 켬), SSM 이름 일곱 개가 모두 SecureString인지 본다. 값도 앱이 시작할 때 거부하는 형식인지(서명 키·조회 키는 64자리 hex, 큐 비밀번호는 주소에 그대로 넣을 수 있는 영문·숫자. 형식은 값 전체에 맞추므로 끝에 줄바꿈이 붙어도 멈춘다), 서로 달라야 하는 값(서명 키 둘과 조회 키, 두 계정 비밀번호)이 다른지 본다. 하나라도 어긋나면 아무것도 바꾸지 않고 멈춘다(종료 코드 1).
 - 값은 SSM에서 파이프로만 jq를 거쳐 `kubectl apply --server-side`의 표준 입력으로 넘긴다. 그래서 화면·명령 인자·임시 파일·`last-applied` 주석에 값이 남지 않는다. 화면에는 Secret 이름과 `키=SSM 판 번호`만 찍히고, 같은 판 번호가 Secret 주석 `catchu.io/ssm-versions`에 남는다.
 - 적용 뒤 Secret의 키 목록, `last-applied` 주석이 없음, ConfigMap의 주소와 인증서를 다시 읽어 확인한다. 적용이 실패했거나 확인이 어긋나면 2(일부만 바뀌었을 수 있다)다. 원인을 고쳐 다시 실행하면 SSM의 지금 값으로 다시 맞춘다.
 - 값을 보지 않고 확인하기: `k get secret -o json | jq '.items[] | {name: .metadata.name, keys: (.data | keys), annotations: .metadata.annotations}'`
@@ -168,6 +168,6 @@ bash deploy/aws/scripts/secrets.test.sh    # 20초쯤. bash·jq·ruby·openssl·
 bash deploy/aws/scripts/db-roles.test.sh   # 1분쯤. Docker가 돌고 있어야 한다
 ```
 
-- `secrets.test.sh`: aws·kubectl을 합성 명령으로 바꾸고 이 폴더를 복사한 곳에서 `make-secrets.sh`·`put-parameter.sh`·`db-admin.sh`를 실제로 실행한다. 만드는 내용(Secret 키·값·판 번호 주석, 큐 주소, ConfigMap, 임시 Secret·Pod), 시작 전 확인이 하나라도 어긋나면 아무것도 바꾸지 않고 멈춤, 종료 코드, 임시 자원을 늘 지움, 시험마다 새로 만든 합성 비밀값이 출력·aws·kubectl·jq의 명령 인자·임시 폴더에 없음, 계정 번호가 출력에 없음, `catchu-ops` 실행 파일 조건, 루트 인증서의 지문을 본다.
+- `secrets.test.sh`: aws·kubectl을 합성 명령으로 바꾸고 이 폴더를 복사한 곳에서 `make-secrets.sh`·`put-parameter.sh`·`db-admin.sh`를 실제로 실행한다. 만드는 내용(Secret 키·값·판 번호 주석, 큐 주소, ConfigMap, 임시 Secret·Pod), 시작 전 확인이나 값 검사(값 끝의 줄바꿈 포함)가 하나라도 어긋나면 아무것도 바꾸지 않고 멈춤, 종료 코드, 임시 자원을 늘 지움, 시험마다 새로 만든 합성 비밀값이 출력·aws·kubectl·jq의 명령 인자·임시 폴더에 없음, 계정 번호가 출력에 없음, `catchu-ops` 실행 파일 조건, 루트 인증서의 지문을 본다.
 - `db-roles.test.sh`: RDS처럼 슈퍼유저가 아닌 관리자를 둔 PostgreSQL 16.15 컨테이너에 psql Pod 틀의 이미지·명령·환경 그대로(사용자 999·읽기 전용 루트·TLS `verify-full`) `roles.sql`을 실행하고, 각 계정으로 붙어 권한(앱 계정의 읽기·쓰기와 `lock_timeout`, 스키마 변경 거부, 다른 계정의 접속·스키마 사용 거부, 두 계정에 특별 권한 없음, 다시 실행하거나 중간 문장이 실패하면 바뀌지 않음, 인증서와 다른 이름으로 붙으면 거부, 위치 오류 때도 문장 원문을 찍지 않음, 비밀번호가 출력·DB 로그에 없음)을 본다.
 - 확인하지 못하는 것: 실제 server-side apply와 Pod 보안 검사, 실제 RDS 관리자(`rds_superuser`)의 특성과 실제 Secrets Manager 응답. 이것은 2단계에서 본다.

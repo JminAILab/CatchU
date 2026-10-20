@@ -23,6 +23,7 @@ migrator_param=/catchu/prod/db/catchu_migrator-password
 labels='{"app.kubernetes.io/part-of": "catchu", "catchu.io/db-admin": "once"}'
 
 # 관리자 비밀번호(SecretString JSON)와 SSM 응답 → 임시 Secret. 멈출 때는 "확인 실패:"로 시작하는 문구만 낸다(값은 넣지 않는다).
+# 형식은 값 전체에 맞춘다(jq의 $는 마지막 줄바꿈 앞에서도 맞으므로 \A·\z를 쓴다).
 # shellcheck disable=SC2016 # jq 변수다.
 program='
 def fail($msg): error("확인 실패: " + $msg);
@@ -30,10 +31,10 @@ if length != 2 then fail("관리자 비밀번호와 계정 비밀번호를 모�
 | .[0] as $admin | .[1] as $ssm
 | if ($admin | type) != "object" or ($admin.username // "") != $user
   then fail("Secrets Manager의 관리자 이름이 RDS 관리자와 다르다") else . end
-| if ($admin.password // "" | test("^[!-~]+$")) | not then fail("관리자 비밀번호가 비었거나 형식이 다르다") else . end
+| if ($admin.password // "" | test("\\A[!-~]+\\z")) | not then fail("관리자 비밀번호가 비었거나 형식이 다르다") else . end
 | if ($ssm.InvalidParameters // []) != [] then fail("SSM에 없는 이름이 있다(" + ($ssm.InvalidParameters | join(", ")) + ")") else . end
 | (reduce $ssm.Parameters[] as $p ({}; .[$p.Name] = $p.Value)) as $v
-| if ($v[$app] // "" | test("^[!-~]{16,}$")) and ($v[$migrator] // "" | test("^[!-~]{16,}$")) | not
+| if ($v[$app] // "" | test("\\A[!-~]{16,}\\z")) and ($v[$migrator] // "" | test("\\A[!-~]{16,}\\z")) | not
   then fail("계정 비밀번호가 없거나 형식이 다르다") else . end
 | {apiVersion: "v1", kind: "Secret", type: "Opaque", metadata: {name: $name, namespace: $namespace, labels: $labels},
    data: {PGPASSWORD: ($admin.password | @base64), CATCHU_APP_PASSWORD: ($v[$app] | @base64),

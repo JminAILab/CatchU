@@ -26,14 +26,14 @@ catchu-worker CATCHU_QUEUE_REDIS_URL /catchu/prod/queue/auth-token
 catchu-worker WORKER_CONTEXT_API_KEY /catchu/prod/worker/WORKER_CONTEXT_API_KEY
 catchu-worker CATCHU_GENERATION_API_KEY /catchu/prod/worker/CATCHU_GENERATION_API_KEY'
 
-# SSM 응답 → 적용할 List. 값 형식(앱이 기동 때 거부하는 형식)과 서로 달라야 하는 값을 여기서 본다.
-# 멈출 때는 "확인 실패:"로 시작하는 문구만 낸다(값은 넣지 않는다).
+# SSM 응답 → 적용할 List. 값 형식(앱이 기동 때 거부하는 형식)과 서로 달라야 하는 값을 여기서 본다. 형식은 값 전체에 맞춘다
+# (jq의 $는 마지막 줄바꿈 앞에서도 맞으므로 \A·\z로 감싼다). 멈출 때는 "확인 실패:"로 시작하는 문구만 낸다(값은 넣지 않는다).
 # shellcheck disable=SC2016 # jq 변수다.
 program='
 def fail($msg): error("확인 실패: " + $msg);
 def rule($key):
-  {AUTH_JWT_SECRET: "^[0-9a-fA-F]{64}$", LINK_GRANT_SECRET: "^[0-9a-fA-F]{64}$", WORKER_CONTEXT_API_KEY: "^[0-9a-fA-F]{64}$",
-   DB_PASSWORD: "^[!-~]{16,}$", CATCHU_QUEUE_REDIS_URL: "^[A-Za-z0-9]{16,128}$", CATCHU_GENERATION_API_KEY: "^[!-~]+$"}[$key]
+  {AUTH_JWT_SECRET: "[0-9a-fA-F]{64}", LINK_GRANT_SECRET: "[0-9a-fA-F]{64}", WORKER_CONTEXT_API_KEY: "[0-9a-fA-F]{64}",
+   DB_PASSWORD: "[!-~]{16,}", CATCHU_QUEUE_REDIS_URL: "[A-Za-z0-9]{16,128}", CATCHU_GENERATION_API_KEY: "[!-~]+"}[$key]
   // fail("검사 규칙이 없는 키 " + $key);
 def labels: {"app.kubernetes.io/part-of": "catchu", "app.kubernetes.io/managed-by": "make-secrets"};
 (if (.InvalidParameters // []) == [] then . else fail("SSM에 없는 이름이 있다(" + (.InvalidParameters | join(", ")) + ")") end)
@@ -42,7 +42,7 @@ def labels: {"app.kubernetes.io/part-of": "catchu", "app.kubernetes.io/managed-b
 | map(. as $row
     | ($ssm[$row.ssm] // fail("SSM " + $row.ssm + "을 읽지 못했다")) as $p
     | if $p.Type != "SecureString" then fail("SSM " + $row.ssm + "이 SecureString이 아니다") else . end
-    | if ($p.Value | test(rule($row.key))) | not then fail("SSM " + $row.ssm + " 값이 " + $row.key + " 형식에 맞지 않는다") else . end
+    | if ($p.Value | test("\\A(?:" + rule($row.key) + ")\\z")) | not then fail("SSM " + $row.ssm + " 값이 " + $row.key + " 형식에 맞지 않는다") else . end
     | . + {version: $p.Version, value: (if $row.key == "CATCHU_QUEUE_REDIS_URL"
         then "rediss://:" + $p.Value + "@" + $queue_host + ":" + $queue_port else $p.Value end)})
 | if ([.[] | select(.key | IN("AUTH_JWT_SECRET", "LINK_GRANT_SECRET", "WORKER_CONTEXT_API_KEY")) | .value | ascii_downcase] | unique | length) != 3

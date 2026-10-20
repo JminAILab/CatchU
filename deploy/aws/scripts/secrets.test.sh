@@ -126,7 +126,8 @@ case "$1 $2" in
     mv "$S/ssm.new" "$S/ssm.json"
     echo 1 ;;
   "secretsmanager get-secret-value")
-    printf '{"username":"%s","password":"%s"}\n' "${STUB_SM_USER:-catchu_admin}" "${STUB_ADMIN_PW:?}" ;;
+    # SecretString은 JSON 글이다. 값에 줄바꿈 등이 있어도 맞는 JSON이 되게 jq로 만든다(값은 표준 입력으로만 넘긴다).
+    printf '%s' "${STUB_ADMIN_PW:?}" | "$STUB_REAL_JQ" -Rsc --arg u "${STUB_SM_USER:-catchu_admin}" '{username: $u, password: .}' ;;
   *) echo "합성 aws: 정해 두지 않은 호출 $1 $2" >&2; printf 'aws %s %s\n' "$1" "$2" >> "$S/unknown"; exit 253 ;;
 esac
 EOF
@@ -369,6 +370,14 @@ reset_state
 ssm_set /catchu/prod/worker/CATCHU_GENERATION_API_KEY SecureString "has space"
 run make-secrets.sh
 check "make-secrets: 생성 키에 공백이 있으면 멈춤" "$(ok untouched)"
+# jq의 $는 마지막 줄바꿈 앞에서도 맞는다. 일곱 값 모두 끝에 줄바꿈 하나를 붙여 본다(복사·파일 입력으로 섞이는 경우).
+while read -r n t v <&3; do
+  reset_state
+  ssm_set "$n" "$t" "${v}"$'\n'
+  run make-secrets.sh
+  check "make-secrets: 값 끝에 줄바꿈이 붙으면 적용하지 않고 멈춤(${n#/catchu/prod/})" \
+    "$( { untouched && says "SSM ${n} 값이" && secret_free; } > /dev/null 2>&1; echo $?)"
+done 3<<< "$(store_default)"
 reset_state
 run STUB_FAIL="ssm get-parameters" make-secrets.sh
 check "make-secrets: SSM 값을 읽지 못하면 멈춤(1)" "$(ok untouched)"
@@ -486,6 +495,15 @@ reset_state
 run STUB_CREATE_FAIL=Pod db-admin.sh "$SQL"
 check "db-admin: Pod를 만들지 못하면(예: Pod 보안 검사 거부) 3, Secret·ConfigMap은 지움" \
   "$(ok test "$rc" = 3 -a "$(calls)" = "create ConfigMap,create Secret,create Pod 실패,delete configmap secret," -a "$(ops_left)" = 0)"
+reset_state
+ssm_set /catchu/prod/db/catchu_app-password SecureString "${APP_PW}"$'\n'
+run db-admin.sh "$SQL"
+check "db-admin: 계정 비밀번호 끝에 줄바꿈이 붙으면 Secret을 만들지 않고 3" \
+  "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap,delete configmap," && says '계정 비밀번호가 없거나 형식이 다르다' && secret_free; } > /dev/null 2>&1; echo $?)"
+reset_state
+run STUB_ADMIN_PW="${ADMIN_PW}"$'\n' db-admin.sh "$SQL"
+check "db-admin: 관리자 비밀번호 끝에 줄바꿈이 붙으면 Secret을 만들지 않고 3" \
+  "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap,delete configmap," && says '관리자 비밀번호가 비었거나 형식이 다르다' && secret_free; } > /dev/null 2>&1; echo $?)"
 only_left() { # 남은 임시 자원이 그 종류 하나뿐이다(같은 이름으로 이미 있던 것, 다른 실행의 것으로 본다)
   test "$(ops_left)" = 1 && ls "$S/objects/catchu-ops" | grep -q "^$1-db-admin-"
 }

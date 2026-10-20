@@ -40,7 +40,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 # 값 검사와 요청 JSON 만들기는 jq가 한다(값은 파이프로만 넘긴다). 멈출 때 값은 찍지 않는다.
 # shellcheck disable=SC2016 # jq 변수다.
-printf '%s' "$value" | jq -Rs --arg name "$name" 'if test("^[!-~]{1,4096}$") | not then error("값 형식") else
+printf '%s' "$value" | jq -Rs --arg name "$name" 'if test("\\A[!-~]{1,4096}\\z") | not then error("값 형식") else
   {Name: $name, Type: "SecureString", Value: ., Tags: [{Key: "project", Value: "catchu"}, {Key: "issue", Value: "276"}]} end' \
   > "${tmp}/request.json" 2> /dev/null ||
   catchu_die "값이 비었거나 공백·제어 문자가 있거나 4096자를 넘는다(값은 찍지 않음)"
