@@ -4,7 +4,7 @@
 
 활성 실제 회원 모두에게 같은 현재 선정을 허용한다(2026-10-17 팀장 결정, #252 본문 「범위」). GitHub 연결·요청별 분석 동의·본인 기여 판정은 그대로 필요하며, 공통 허용이 기여나 Catch 생성을 보장하지 않는다. 목록에 GitHub 소유·기여 조회를 더하지 않았다. 개발 회원은 실제 GitHub 연결이 있어도 [#104 개발 공급](member-analysis.md#개발-회원과-합성-github-연결)을 유지한다. 실제·개발 구분은 [#322 회원 구분](member-analysis.md#실제개발-회원-구분--322) 하나만 쓴다.
 
-이 작업은 #323 접수 API, #232 앱 등록·worker 연결, 화면, 관리 화면·회원별 허용표를 만들지 않는다. `AppModule`에는 목록 공급만 연결됐다.
+이 작업은 #323 접수 API, #232 앱 등록·worker 연결, 화면, 관리 화면·회원별 허용표를 만들지 않는다. `AppModule`에는 목록 공급과 [#323 접수](analysis-intake.md#실제-회원의-접수--323)의 재확인이 연결됐다.
 
 ## 선정 근거 테이블
 
@@ -85,6 +85,7 @@ if (input.consent.scopeRevision !== selection.scopeRevision ||
 - 거부: 개발·미지원·비활성 회원은 `ForbiddenException`(`403 INTERNAL_ERROR`), 연결 상태는 목록과 같은 `GITHUB_CONNECTION_REQUIRED`, 현재 선정에 없거나 제외한 저장소는 `REPOSITORY_NOT_ALLOWED`.
 - 장애: 선정 자료 불일치·DB 오류는 그대로 던진다. 합성 자료·선정 없음으로 바꾸지 않는다.
 - 회원 → GitHub 연결 → 선정 → 범위 정의를 읽기 잠금하고 그 트랜잭션이 끝날 때까지 유지한다. `refreshStatus`의 상태 변경은 같은 연결 행을 고치므로 트랜잭션 안에서 부르지 않는다.
+- 사용처: `AnalysisIntakeService`가 실제 회원의 새 접수·실패 재요청에 쓰고 같은 키 재전송에는 부르지 않는다. 판정·응답·검사는 [분석 접수 「실제 회원의 접수 — #323」](analysis-intake.md#실제-회원의-접수--323).
 
 ### worker 선정 — #232
 
@@ -121,4 +122,4 @@ FROM repository_selection s JOIN allowed_scope_revision d USING (scope_revision)
 | 실제 공급 | `test/integration/repository-selection-chain.test.cjs` | 큐 메시지 조립 → 실행 조회 → Catch 등록, 제외·새 좌표 판본·시도 종결 뒤 원래 좌표 조회 |
 | 합성 대역 | `test/member-repositories.test.cjs`·`test/db/worker-context-api.test.cjs`·`test/integration/selected-repository-version-chain.test.cjs` | 개발 공급·페이지 계약, 시험용 선정 공급자로 본 worker 계약·좌표 연쇄 |
 
-실제 공급 검사의 시험 대역은 GitHub OAuth·사용자 조회 응답, 연쇄 검사의 `resolveCredential`, 이름 변경을 가정한 새 좌표 판본, 경쟁 시점을 만드는 멈춤 지점뿐이다. 실제 GitHub·Google 호출, 큐·worker 실제 왕복, #323 접수 API는 검증하지 않았다.
+실제 공급 검사의 시험 대역은 GitHub OAuth·사용자 조회 응답, 연쇄 검사의 `resolveCredential`, 이름 변경을 가정한 새 좌표 판본, 경쟁 시점을 만드는 멈춤 지점뿐이다. 실제 GitHub·Google 호출, 큐·worker 실제 왕복은 검증하지 않았다. #323 접수 API의 공급 연결 검사는 [분석 접수 「개발 재현과 검사」](analysis-intake.md#개발-재현과-검사)에 있다.
