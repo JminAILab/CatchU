@@ -44,6 +44,8 @@ export class AnalysisIntakeService {
    * 범위 정의 읽기 잠금). 현재 실제 고지·범위 판본에 동의해야 하고, 원래 선정 참조를 담은 네 칸 동의로 LIVE 접수한다.
    */
   private async realContext(manager: EntityManager, memberId: string, input: AnalysisInput) {
+    // 연동이 꺼진 서버는 보관 자격정보를 읽지 못해 #232 실행 조회가 거부하므로 남은 연결 행으로 LIVE 접수하지 않는다(403).
+    this.github.requireAvailable();
     const selection = await this.selections.confirmForIntake(manager, memberId, input.repositoryId);
     if (input.consent.scopeRevision !== selection.scopeRevision ||
         input.consent.noticeRevision !== this.notices.real().noticeRevision) throw new ApiError('CONSENT_REQUIRED');

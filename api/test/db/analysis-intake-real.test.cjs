@@ -30,9 +30,10 @@ const { openTestDataSource, resetTestDatabase } = require('../support/test-datab
 const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 
 // #323 실제 회원 접수. 기본은 실제 공급 검사다: 실제 Nest HTTP·인증 Guard·PostgreSQL, #252 DB 선정 근거(실제 마이그레이션
-// 초기 자료)·#319 좌표 카탈로그, #231 연결 행·보관소를 쓴다. 실제 회원은 Google 로그인 대신 같은 식별 접두사의 회원 행과
-// 실제 세션 발급으로 만들고, 연결 행은 #231 connect가 남기는 모양으로 넣는다. 시험 대역은 이름에 「대역」을 적은 시험의
-// 오류 주입·판본 교체와 GitHub OAuth 응답(exchange)뿐이다. Google·GitHub·큐 서버·worker는 부르지 않는다.
+// 초기 자료)·#319 좌표 카탈로그, #231 연결·보관소를 쓴다. 실제 회원은 Google 로그인 대신 같은 식별 접두사의 회원 행과
+// 실제 세션 발급으로 만들고, 연결은 GitHub 연동을 켠 서버에서 #231 authorize·connect로 시험 전용 보관소에 만든다(거부 사례는
+// #231이 남기는 행 모양을 직접 넣는다). 시험 대역은 이름에 「대역」을 적은 시험의 오류 주입·판본 교체와 GitHub OAuth
+// 응답(exchange)뿐이다. Google·GitHub·큐 서버·worker는 부르지 않는다.
 const THEME = '570342307', ZOO = '547322698';
 const SCOPE = 'catchu:allowed-scope:2026-10-19:v1';
 const NEXT_SCOPE = 'catchu:allowed-scope:test-323:v2';
@@ -52,15 +53,19 @@ const consent = (changes = {}) => ({ accepted: true, noticeRevision: REAL_NOTICE
 const command = (changes = {}) => ({ repositoryId: THEME, consent: consent(), ...changes });
 const synthetic = (changes = {}) => ({ repositoryId: SYNTHETIC_REPOSITORY.repositoryId, consent: { accepted: true,
   noticeRevision: SYNTHETIC_NOTICE.noticeRevision, scopeRevision: SYNTHETIC_NOTICE.scopeRevision }, ...changes });
+// 운영 설정에서도 받는 HTTPS 콜백이다. GitHub로 이동하지 않는다.
 const github = directory => ({ GITHUB_CONNECTION_ENABLED: 'true', GITHUB_OAUTH_CLIENT_ID: 'fake-client',
-  GITHUB_OAUTH_CLIENT_SECRET: 'FAKE_SECRET', GITHUB_OAUTH_CALLBACK_URL: 'http://localhost:3000/github/callback',
+  GITHUB_OAUTH_CLIENT_SECRET: 'FAKE_SECRET', GITHUB_OAUTH_CALLBACK_URL: 'https://catchu.example/github/callback',
   GITHUB_CREDENTIAL_DIRECTORY: directory, GITHUB_CREDENTIAL_ENCRYPTION_KEY: randomBytes(32).toString('hex') });
 
+/** GitHub 연동을 켜고 이 시험 전용 보관소로 앱을 띄운다. 디렉터리는 mkdtemp에서 받은 이 경로만 지운다. */
 async function start(t, overrides = {}) {
+  const directory = await mkdtemp(join(tmpdir(), 'catchu-323-vault-test-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
   const settings = { NODE_ENV: 'test', DEV_LOGIN_ENABLED: 'true', AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
     AUTH_ACCESS_TOKEN_TTL_SECONDS: '900', AUTH_WEB_ORIGIN: 'https://catchu.example',
     SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
-    CORS_ALLOWED_ORIGINS: undefined, ...overrides };
+    CORS_ALLOWED_ORIGINS: undefined, ...github(directory), ...overrides };
   const previous = Object.fromEntries(Object.keys(settings).map(k => [k, process.env[k]]));
   for (const [k, v] of Object.entries(settings)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   let app;
@@ -78,18 +83,28 @@ async function start(t, overrides = {}) {
   const post = (user, key = randomUUID(), body = command()) => call('/v1/analysis-requests', { method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + user.token, 'Idempotency-Key': key },
     body: JSON.stringify(body) });
-  /** 회원 행과 실제 세션으로 회원을 만든다. connection은 #231 connect가 남기는 연결 행에 덮어쓸 값이고 null이면 연결 행이 없다. */
-  const member = (identityReference, connection = {}) => db.transaction(async manager => {
-    const memberId = randomUUID();
-    await manager.insert(MemberAccount, { memberId, identityReference, accountState: 'ACTIVE' });
-    if (connection) {
-      accounts++;
-      await manager.insert(GitHubConnection, Object.assign(new GitHubConnection(), { memberId, connectionState: 'CONNECTED',
-        accountLogin: 'real-user-' + accounts, externalAccountReference: String(70000 + accounts),
-        credentialReference: 'github-v1:' + randomUUID(), ...connection }));
+  /**
+   * 회원 행과 실제 세션으로 회원을 만든다. connection을 생략하면 #231 authorize·connect로 시험 보관소에 실제 연결을 만들고,
+   * 객체면 #231 connect가 남기는 연결 행에 그 값을 덮어써 직접 넣으며, null이면 연결 행이 없다.
+   */
+  const member = async (identityReference, connection) => {
+    const user = await db.transaction(async manager => {
+      const memberId = randomUUID();
+      await manager.insert(MemberAccount, { memberId, identityReference, accountState: 'ACTIVE' });
+      if (connection) {
+        accounts++;
+        await manager.insert(GitHubConnection, Object.assign(new GitHubConnection(), { memberId, connectionState: 'CONNECTED',
+          accountLogin: 'real-user-' + accounts, externalAccountReference: String(70000 + accounts),
+          credentialReference: 'github-v1:' + randomUUID(), ...connection }));
+      }
+      return { memberId, token: (await app.get(SessionService).create(manager, memberId)).access.accessToken };
+    });
+    if (connection === undefined) {
+      const { state } = await connections.authorize(user.memberId);
+      await connections.connect(user.memberId, 'SYNTHETIC_CODE', state);
     }
-    return { memberId, token: (await app.get(SessionService).create(manager, memberId)).access.accessToken };
-  });
+    return user;
+  };
   const real = connection => member('catchu:google:' + randomUUID(), connection);
   const devLogin = async identifier => {
     const r = await call('/v1/auth/dev-login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -103,7 +118,14 @@ async function start(t, overrides = {}) {
   const refreshStatus = connections.refreshStatus.bind(connections);
   const refreshed = [];
   connections.refreshStatus = async memberId => { refreshed.push(memberId); return refreshStatus(memberId); };
-  return { app, call, auth, post, member, real, devLogin, logs, refreshed, connections,
+  // GitHub OAuth 응답만 시험 대역이다. 회원마다 다른 계정을 준다. 연결·보관·상태 갱신은 실제 #231 함수다.
+  const client = app.get(GitHubClient);
+  client.exchange = async () => {
+    accounts++;
+    return { accountLogin: 'real-user-' + accounts, externalAccountReference: String(70000 + accounts),
+      token: new GitHubAccessToken(TOKEN), expiresAt: new Date(Date.now() + 3600000) };
+  };
+  return { app, call, auth, post, member, real, devLogin, logs, refreshed, connections, client, vault: app.get(CredentialVault),
     notices: app.get(AnalysisNoticeService), selections: app.get(RepositorySelectionService) };
 }
 async function error(r, status, code) {
@@ -193,13 +215,6 @@ async function waitForMemberWaiters(blockerPid, expected) {
     await delay(20);
   }
   assert.fail('회원 접수 잠금의 대기 요청 수가 ' + expected + '가 되지 않았다');
-}
-/** 이 시험 전용 GitHub 보관소로 앱을 띄운다. 디렉터리는 mkdtemp에서 받은 이 경로만 지운다. */
-async function startWithVault(t) {
-  const directory = await mkdtemp(join(tmpdir(), 'catchu-323-vault-test-'));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  const s = await start(t, github(directory));
-  return { ...s, client: s.app.get(GitHubClient), vault: s.app.get(CredentialVault) };
 }
 
 for (const [label, overrides] of [['개발 로그인 켬', {}], ['DEV_LOGIN_ENABLED=false', { DEV_LOGIN_ENABLED: 'false' }],
@@ -318,9 +333,9 @@ test('실제 공급: 연결 없음·해제·재인증 필요·보관 자격정�
   assert.deepEqual(await counts(), NONE);
 });
 
-test('실제 보관소: GitHub 연동을 켜면 만료·이용 불가 자격정보는 상태 갱신 뒤 403, 보관소 오류는 500이고 같은 키 재전송은 갱신 없이 현재 상태다', async t => {
-  const s = await startWithVault(t);
-  // GitHub OAuth 응답만 시험 대역이다. 연결·보관·상태 갱신은 실제 #231 함수다.
+test('실제 보관소: 만료·이용 불가 자격정보는 상태 갱신 뒤 403, 보관소 오류는 500이고 같은 키 재전송은 갱신 없이 현재 상태다', async t => {
+  const s = await start(t);
+  // 보관 자격정보를 다시 저장할 수 있게 회원별 계정을 정해 연결한다. GitHub OAuth 응답만 시험 대역이다.
   const users = [];
   for (let index = 0; index < 5; index++) {
     const user = await s.real(null);
@@ -367,8 +382,31 @@ test('실제 보관소: GitHub 연동을 켜면 만료·이용 불가 자격정�
   assert.equal(s.logs.join('\n').includes(TOKEN), false);
 });
 
+test('실제 보관소: GitHub 연동을 끈 서버는 남은 실제 연결로 새 접수·실패 재요청을 받지 않고 같은 키 재전송은 현재 상태를 준다', async t => {
+  // 연동을 켠 서버에서 #231로 연결해 접수한 뒤, 같은 DB·세션 서명 키로 연동을 끈 서버를 띄운다. 연결 행·보관 참조는 남아 있다.
+  const secret = randomBytes(32).toString('hex');
+  const enabled = await start(t, { AUTH_JWT_SECRET: secret });
+  const user = await enabled.real();
+  const key = randomUUID();
+  const first = await accepted(await enabled.post(user, key));
+  const disabled = await start(t, { AUTH_JWT_SECRET: secret, GITHUB_CONNECTION_ENABLED: 'false' });
+  const before = await counts();
+  const replay = await disabled.post(user, key);
+  assert.equal(replay.status, 200); assert.deepEqual(await replay.json(), first);
+  await error(await disabled.post(user), 403, 'GITHUB_CONNECTION_REQUIRED');
+  await terminal(first.requestId);
+  const retry = command({ retryOfRequestId: first.requestId });
+  await error(await disabled.post(user, randomUUID(), retry), 403, 'GITHUB_CONNECTION_REQUIRED');
+  assert.deepEqual(await counts(), before);
+  const connection = await db.manager.findOneByOrFail(GitHubConnection, { memberId: user.memberId });
+  assert.equal(connection.connectionState, 'CONNECTED');
+  // 같은 연결로 연동을 켠 서버에는 실패 재요청이 접수된다.
+  const retried = await accepted(await enabled.post(user, randomUUID(), retry));
+  assert.equal((await db.manager.findOneByOrFail(AnalysisRequest, { requestId: retried.requestId })).retryOfRequestId, first.requestId);
+});
+
 test('실제 보관소: 개발 회원에 실제 GitHub 연결이 섞이면 새 접수·실패 재요청을 거부하고 LIVE 시도·자격정보 갱신이 없다', async t => {
-  const s = await startWithVault(t);
+  const s = await start(t);
   // 합성 연결의 개발 접수는 MOCK이다. 확정 실패로 닫아 실패 재요청 경로도 본다.
   const developer = await s.devLogin('intake-323-developer');
   const mock = await s.post(developer, randomUUID(), synthetic());

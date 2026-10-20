@@ -25,6 +25,10 @@ export class GitHubConnectionService {
     if (!this.config.enabled) throw new ApiError('GITHUB_CONNECTION_REQUIRED');
     return this.config;
   }
+  /** 실제 회원 분석 접수(#323)가 새 접수 전에 확인한다. 연동이 꺼지면 보관 자격정보를 읽지 못해 남은 연결 행도 실행에 쓸 수 없다. */
+  requireAvailable(): void {
+    this.requireEnabled();
+  }
   private async requireMember(manager: EntityManager, memberId: string, lock = true): Promise<void> {
     if (!isUUID(memberId)) throw new ApiError('RESOURCE_UNAVAILABLE');
     if (lock) await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', ['catchu:github:' + memberId]);

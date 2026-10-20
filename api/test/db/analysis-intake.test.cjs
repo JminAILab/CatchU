@@ -316,7 +316,8 @@ test('개발 플래그가 켜져도 실제 회원에게는 합성 고지 대신 
   await db.query('UPDATE member_account SET identity_reference=$1 WHERE member_id=$2',['catchu:google:synthetic-test',u.memberId]);
   const notice=await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}});
   assert.equal(notice.status,200); assert.deepEqual(await notice.json(),{noticeRevision:REAL_NOTICE.noticeRevision,text:REAL_NOTICE.text});
-  // 실제 회원은 #323 실제 접수 경로로 간다. 보관 자격정보 없는 합성 연결은 실제 연결이 아니다(analysis-intake-real.test.cjs).
+  // 실제 회원은 #323 실제 접수 경로로 간다. 이 시험 서버는 GitHub 연동이 꺼져 있고, 보관 자격정보 없는 합성 연결도
+  // 실제 연결이 아니다(연동을 켠 서버의 거부는 analysis-intake-real.test.cjs).
   await error(await s.post(u),403,'GITHUB_CONNECTION_REQUIRED');
   assert.equal((await counts()).requests,0);
 });
