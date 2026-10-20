@@ -2,14 +2,16 @@ require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { randomBytes, randomUUID } = require('node:crypto');
 const { setTimeout: delay } = require('node:timers/promises');
-const { before, after, beforeEach, test } = require('node:test');
+const { before, after, describe, test } = require('node:test');
 const { NestFactory } = require('@nestjs/core');
 const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
+const { DEV_LOGIN_IDENTITY_PREFIX } = require('../../dist/member-analysis/member-kind');
 const { verifyLinkPassword } = require('../../dist/share-links/link-password');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
 // 실제 web 상태/HTTP 해석 + 실제 Nest HTTP/PostgreSQL. React/브라우저 검증은 별도다.
+// 1분 대기 시험들이 동시에 돌므로 DB는 파일 시작 때 한 번만 비우고, 건수는 시험마다 자기 회원 것만 센다.
 let app, db, url, createStore, createApi, createClient, createTokens;
 const saved = {};
 before(async () => {
@@ -18,6 +20,7 @@ before(async () => {
     SHARE_LINK_WEB_BASE_URL: 'http://127.0.0.1:3000' };
   for (const [key, value] of Object.entries(env)) { saved[key] = process.env[key]; process.env[key] = value; }
   db = await openTestDataSource();
+  await resetTestDatabase(db);
   app = await configureApp(await NestFactory.create(AppModule, { logger: false, abortOnError: false }));
   await app.listen(0, '127.0.0.1');
   url = await app.getUrl();
@@ -32,15 +35,18 @@ after(async () => {
     if (value === undefined) delete process.env[key]; else process.env[key] = value;
   }
 });
-beforeEach(() => resetTestDatabase(db));
-const counts = async () => (await db.query(`SELECT
-  (SELECT count(*)::int FROM share_link) AS links,
-  (SELECT count(*)::int FROM idempotency_record) AS records`))[0];
+/** 이 회원의 링크·멱등 기록 건수. 동시에 도는 다른 시험의 자료는 세지 않는다. */
+const counts = async (memberId) => (await db.query(`SELECT
+  (SELECT count(*)::int FROM share_link WHERE owner_id = $1) AS links,
+  (SELECT count(*)::int FROM idempotency_record WHERE member_id = $1) AS records`, [memberId]))[0];
 
 async function setup({ drop = false } = {}) {
+  const identity = randomUUID();
   const login = await fetch(`${url}/v1/auth/dev-login`, { method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId: randomUUID() }) });
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId: identity }) });
   assert.equal(login.status, 200);
+  const [{ member_id: memberId }] = await db.query('SELECT member_id FROM member_account WHERE identity_reference = $1',
+    [DEV_LOGIN_IDENTITY_PREFIX + identity]);
   const tokens = createTokens(); tokens.set((await login.json()).accessToken);
   const calls = [];
   const client = createClient({ baseUrl: url, nodeEnv: 'test', tokens, fetch: async (input, init) => {
@@ -62,91 +68,94 @@ async function setup({ drop = false } = {}) {
   } });
   const store = createStore(createApi(client.member));
   await store.load(); store.openForm();
-  return { store, calls, client };
+  return { store, calls, client, memberId };
 }
 
-for (const lost of [false, true]) {
-  test(`${lost ? '응답 유실' : '최초 429'} 뒤 실제 Retry-After 대기·같은 키/본문·DB 단일 발급`, { timeout: 90000 }, async () => {
-    const { store, calls, client } = await setup({ drop: lost });
-    // 400도 빈도에 포함된다. 시계/limiter를 교체하지 않고 실제 1분 정책을 쓴다.
-    for (let i = 0; i < (lost ? 9 : 10); i++) {
-      const result = await client.member('/share-links', { method: 'POST', idempotencyKey: randomUUID(), body: { title: '' } });
-      assert.equal(result.status, 400);
-    }
-    calls.length = 0;
-    store.setTitle('통합 재전송'); store.setUsePassword(true); store.setPassword('synthetic-149');
-    await store.submit();
-    if (lost) { assert.equal(store.getSnapshot().form.phase, 'unknown'); await store.resend(); }
-    assert.equal(store.getSnapshot().form.phase, 'limited');
-    const limited = calls.at(-1);
-    assert.equal(limited.status, 429); assert.equal(limited.code, 'RATE_LIMITED'); assert.equal(limited.cache, 'no-store');
-    assert.ok(Number.isInteger(limited.retry) && limited.retry >= 1 && limited.retry <= 60);
-    const expected = { links: lost ? 1 : 0, records: lost ? 1 : 0 };
-    assert.deepEqual(await counts(), expected);
-    const n = calls.length;
-    store.setTitle('변경 시도'); store.setPassword('changed-password');
-    await store.resend(); await store.submit();
-    assert.equal(calls.length, n);
-    assert.equal(store.canResend(), false);
-    assert.equal(store.canSubmit(), false);
-    if (lost) {
-      const retryAt = store.getSnapshot().form.retryAt;
-      store.closeForm(); store.openForm();
+// 실제 1분 정책을 그대로 쓰되, 세 시험이 1분을 함께 기다리도록 동시에 돌린다(차례로 돌면 3분이다).
+describe('발급 429 뒤 실제 Retry-After 대기', { concurrency: true }, () => {
+  for (const lost of [false, true]) {
+    test(`${lost ? '응답 유실' : '최초 429'} 뒤 실제 Retry-After 대기·같은 키/본문·DB 단일 발급`, { timeout: 90000 }, async () => {
+      const { store, calls, client, memberId } = await setup({ drop: lost });
+      // 400도 빈도에 포함된다. 시계/limiter를 교체하지 않고 실제 1분 정책을 쓴다.
+      for (let i = 0; i < (lost ? 9 : 10); i++) {
+        const result = await client.member('/share-links', { method: 'POST', idempotencyKey: randomUUID(), body: { title: '' } });
+        assert.equal(result.status, 400);
+      }
+      calls.length = 0;
+      store.setTitle('통합 재전송'); store.setUsePassword(true); store.setPassword('synthetic-149');
+      await store.submit();
+      if (lost) { assert.equal(store.getSnapshot().form.phase, 'unknown'); await store.resend(); }
       assert.equal(store.getSnapshot().form.phase, 'limited');
-      assert.equal(store.getSnapshot().form.retryAt, retryAt);
+      const limited = calls.at(-1);
+      assert.equal(limited.status, 429); assert.equal(limited.code, 'RATE_LIMITED'); assert.equal(limited.cache, 'no-store');
+      assert.ok(Number.isInteger(limited.retry) && limited.retry >= 1 && limited.retry <= 60);
+      const expected = { links: lost ? 1 : 0, records: lost ? 1 : 0 };
+      assert.deepEqual(await counts(memberId), expected);
+      const n = calls.length;
+      store.setTitle('변경 시도'); store.setPassword('changed-password');
+      await store.resend(); await store.submit();
+      assert.equal(calls.length, n);
       assert.equal(store.canResend(), false);
       assert.equal(store.canSubmit(), false);
-      await store.resend(); await store.submit();
-      assert.equal(calls.length, n, '목록 왕복 뒤 대기 중 POST 없음');
-    }
-    await delay(limited.retry * 1000 + 100);
-    assert.equal(calls.length, n, '대기 뒤 자동 전송 없음');
-    assert.equal(store.canResend(), true);
-    await store.resend();
-    assert.equal(store.getSnapshot().form.phase, 'issued');
-    assert.equal(calls.at(-1).status, lost ? 200 : 201);
-    assert.ok(calls.every(c => c.key === calls[0].key && c.body === calls[0].body), '키/본문 보존');
-    if (lost) assert.equal(calls.at(-1).linkId, calls[0].linkId);
-    assert.deepEqual(await counts(), { links: 1, records: 1 });
-    assert.equal(store.getSnapshot().form.password, '');
-    store.dispose();
-  });
-}
+      if (lost) {
+        const retryAt = store.getSnapshot().form.retryAt;
+        store.closeForm(); store.openForm();
+        assert.equal(store.getSnapshot().form.phase, 'limited');
+        assert.equal(store.getSnapshot().form.retryAt, retryAt);
+        assert.equal(store.canResend(), false);
+        assert.equal(store.canSubmit(), false);
+        await store.resend(); await store.submit();
+        assert.equal(calls.length, n, '목록 왕복 뒤 대기 중 POST 없음');
+      }
+      await delay(limited.retry * 1000 + 100);
+      assert.equal(calls.length, n, '대기 뒤 자동 전송 없음');
+      assert.equal(store.canResend(), true);
+      await store.resend();
+      assert.equal(store.getSnapshot().form.phase, 'issued');
+      assert.equal(calls.at(-1).status, lost ? 200 : 201);
+      assert.ok(calls.every(c => c.key === calls[0].key && c.body === calls[0].body), '키/본문 보존');
+      if (lost) assert.equal(calls.at(-1).linkId, calls[0].linkId);
+      assert.deepEqual(await counts(memberId), { links: 1, records: 1 });
+      assert.equal(store.getSnapshot().form.password, '');
+      store.dispose();
+    });
+  }
 
-test('최초 429 뒤 폼을 닫고 새로 작성해도 대기하며 만료 후 새 키로 발급', { timeout: 90000 }, async () => {
-  const { store, calls, client } = await setup();
-  try {
-    for (let i = 0; i < 10; i++) {
-      const result = await client.member('/share-links', { method: 'POST', idempotencyKey: randomUUID(), body: { title: '' } });
-      assert.equal(result.status, 400);
-    }
-    calls.length = 0;
-    store.setTitle('최초 요청');
-    await store.submit();
-    assert.equal(calls[0].status, 429);
-    const retryAt = store.getSnapshot().form.retryAt;
-    assert.ok(store.retryWaitSeconds() > 0);
-    store.closeForm(); store.openForm();
-    assert.equal(store.getSnapshot().form.phase, 'editing');
-    assert.equal(store.getSnapshot().form.retryAt, retryAt);
-    store.setTitle('수정한 새 요청');
-    store.setUsePassword(true); store.setPassword('synthetic-149');
-    assert.equal(store.canSubmit(), false);
-    assert.equal(store.canResend(), false);
-    await store.submit(); await store.resend();
-    assert.equal(calls.length, 1, '새 작성 상태에서도 대기 중 POST 없음');
-    assert.deepEqual(await counts(), { links: 0, records: 0 });
-    await delay(calls[0].retry * 1000 + 100);
-    assert.equal(store.retryWaitSeconds(), 0);
-    assert.equal(store.canSubmit(), true);
-    assert.equal(calls.length, 1, '대기 만료만으로 발급하지 않음');
-    await store.submit();
-    assert.equal(calls[1].status, 201);
-    assert.notEqual(calls[1].key, calls[0].key);
-    assert.notEqual(calls[1].body, calls[0].body);
-    assert.equal(store.getSnapshot().form.phase, 'issued');
-    assert.deepEqual(await counts(), { links: 1, records: 1 });
-  } finally { store.dispose(); }
+  test('최초 429 뒤 폼을 닫고 새로 작성해도 대기하며 만료 후 새 키로 발급', { timeout: 90000 }, async () => {
+    const { store, calls, client, memberId } = await setup();
+    try {
+      for (let i = 0; i < 10; i++) {
+        const result = await client.member('/share-links', { method: 'POST', idempotencyKey: randomUUID(), body: { title: '' } });
+        assert.equal(result.status, 400);
+      }
+      calls.length = 0;
+      store.setTitle('최초 요청');
+      await store.submit();
+      assert.equal(calls[0].status, 429);
+      const retryAt = store.getSnapshot().form.retryAt;
+      assert.ok(store.retryWaitSeconds() > 0);
+      store.closeForm(); store.openForm();
+      assert.equal(store.getSnapshot().form.phase, 'editing');
+      assert.equal(store.getSnapshot().form.retryAt, retryAt);
+      store.setTitle('수정한 새 요청');
+      store.setUsePassword(true); store.setPassword('synthetic-149');
+      assert.equal(store.canSubmit(), false);
+      assert.equal(store.canResend(), false);
+      await store.submit(); await store.resend();
+      assert.equal(calls.length, 1, '새 작성 상태에서도 대기 중 POST 없음');
+      assert.deepEqual(await counts(memberId), { links: 0, records: 0 });
+      await delay(calls[0].retry * 1000 + 100);
+      assert.equal(store.retryWaitSeconds(), 0);
+      assert.equal(store.canSubmit(), true);
+      assert.equal(calls.length, 1, '대기 만료만으로 발급하지 않음');
+      await store.submit();
+      assert.equal(calls[1].status, 201);
+      assert.notEqual(calls[1].key, calls[0].key);
+      assert.notEqual(calls[1].body, calls[0].body);
+      assert.equal(store.getSnapshot().form.phase, 'issued');
+      assert.deepEqual(await counts(memberId), { links: 1, records: 1 });
+    } finally { store.dispose(); }
+  });
 });
 
 test('제목 51→50·비밀번호 7→8/65→64 수정과 비밀번호 생략을 web→HTTP→DB로 확인', async () => {
@@ -155,15 +164,15 @@ test('제목 51→50·비밀번호 7→8/65→64 수정과 비밀번호 생략�
     [{ title: '8자', password: 'p'.repeat(7) }, { title: '8자', password: 'p'.repeat(8) }, 'password'],
     [{ title: '64자', password: 'p'.repeat(65) }, { title: '64자', password: 'p'.repeat(64) }, 'password'],
   ]) {
-    const { store, calls } = await setup();
+    const { store, calls, memberId } = await setup();
     store.setTitle(bad.title); store.setUsePassword(bad.password !== undefined);
     if (bad.password) store.setPassword(bad.password);
-    const initial = await counts();
+    const initial = await counts(memberId);
     await store.submit();
     assert.equal(calls[0].status, 400);
     assert.equal(calls[0].code, 'VALIDATION_FAILED');
     assert.ok(store.getSnapshot().form.fieldErrors[field]);
-    assert.deepEqual(await counts(), initial);
+    assert.deepEqual(await counts(memberId), initial);
     store.setTitle(good.title); if (good.password) store.setPassword(good.password);
     await store.submit();
     assert.equal(calls[1].status, 201);
@@ -176,7 +185,7 @@ test('제목 51→50·비밀번호 7→8/65→64 수정과 비밀번호 생략�
       assert.equal(await verifyLinkPassword(bad.password, stored.verifier), false, '거부됐던 비밀번호는 저장되지 않음');
     }
     assert.equal(Object.hasOwn(JSON.parse(calls[1].body), 'password'), good.password !== undefined);
-    assert.deepEqual(await counts(), { links: initial.links + 1, records: initial.records + 1 });
+    assert.deepEqual(await counts(memberId), { links: initial.links + 1, records: initial.records + 1 });
     store.dispose();
   }
 });
