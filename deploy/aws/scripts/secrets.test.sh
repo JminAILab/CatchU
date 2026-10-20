@@ -198,6 +198,13 @@ case "$*" in
     o=$(printf '%s' "$input" | ruby -ryaml -rjson -e 'puts JSON.generate(YAML.load(STDIN.read))') || { echo "error: synthetic parse" >&2; exit 1; }
     kind=$(printf '%s' "$o" | jq -r .kind)
     has "$kind" "${STUB_CREATE_FAIL:-}" && { call "create $kind 실패"; echo "error: synthetic create failure" >&2; exit 1; }
+    # STUB_CREATE_EXISTS: 같은 이름이 이미 있다(다른 실행이 만든 것으로 본다). 그 객체를 남겨 두고 만들기는 거부한다.
+    if has "$kind" "${STUB_CREATE_EXISTS:-}"; then
+      store "$o"
+      call "create $kind 이미 있음"
+      echo "Error from server (AlreadyExists): synthetic" >&2
+      exit 1
+    fi
     store "$o"
     call "create $kind"
     echo "$(printf '%s' "$kind" | tr 'A-Z' 'a-z')/$(printf '%s' "$o" | jq -r .metadata.name)" ;;
@@ -215,12 +222,25 @@ case "$*" in
   "logs "*" --tail=200")
     [ "${STUB_POD:-ok}" = pending ] && { echo "Error from server (BadRequest): container is waiting to start" >&2; exit 1; }
     printf ' rolname | rolconfig\n catchu_app | {lock_timeout=3s}\n' ;;
-  "delete pod/"*" secret/"*" configmap/"*" --ignore-not-found --wait=true --timeout=90s")
-    call "delete"
+  "delete "*" --ignore-not-found --wait=true --timeout=90s")
+    # 지운 대상(종류/이름)을 남긴다. 다른 실행의 것을 지우지 않는지 보려고.
+    shift
+    refs=()
+    while [ "$#" -gt 0 ] && [ "${1#--}" = "$1" ]; do refs+=("$1"); shift; done
+    kinds=''
+    for ref in "${refs[@]}"; do kinds="${kinds}${kinds:+ }${ref%%/*}"; done
+    call "delete ${kinds}"
     [ "${STUB_DELETE_FAIL:-0}" = 1 ] && { echo "error: synthetic delete failure" >&2; exit 1; }
-    for ref in "$2" "$3" "$4"; do
-      case $ref in pod/*) k=Pod ;; secret/*) k=Secret ;; configmap/*) k=ConfigMap ;; esac
+    for ref in "${refs[@]}"; do
+      case $ref in pod/*) k=Pod ;; secret/*) k=Secret ;; configmap/*) k=ConfigMap ;; *) echo "합성 kubectl: 모르는 대상 $ref" >&2; exit 99 ;; esac
       rm -f "$S/objects/$ns/$k-${ref#*/}.json"
+    done ;;
+  "get "*/*" --ignore-not-found -o name")
+    shift
+    while [ "$#" -gt 0 ] && [ "${1#--}" = "$1" ]; do
+      case $1 in pod/*) k=Pod ;; secret/*) k=Secret ;; configmap/*) k=ConfigMap ;; *) echo "합성 kubectl: 모르는 대상 $1" >&2; exit 99 ;; esac
+      [ -f "$S/objects/$ns/$k-${1#*/}.json" ] && echo "$1"
+      shift
     done ;;
   *) echo "합성 kubectl: 정해 두지 않은 호출 $*" >&2; printf 'kubectl %s\n' "$*" >> "$S/unknown"; exit 99 ;;
 esac
@@ -415,7 +435,7 @@ ops_left() { ls "$S/objects/catchu-ops" 2> /dev/null | grep -c . ; }
 reset_state
 run db-admin.sh "$SQL"
 check "db-admin: 종료 0, ConfigMap → Secret → Pod 순서로 만들고 끝나면 지움" \
-  "$(ok test "$rc" = 0 -a "$(calls)" = "create ConfigMap,create Secret,create Pod,delete," -a "$(ops_left)" = 0)"
+  "$(ok test "$rc" = 0 -a "$(calls)" = "create ConfigMap,create Secret,create Pod,delete configmap secret pod," -a "$(ops_left)" = 0)"
 check "db-admin: 비밀값이 출력·명령 인자·임시 폴더에 없고 계정 번호(관리자 비밀번호 ARN)도 찍지 않음" "$(ok secret_free)"
 check "db-admin: 기록에 SQL 해시·이미지 digest·종료 코드·지움 확인을 남김" \
   "$( { says "sha256 ${SQL_SUM}" && says '이미지 sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d' \
@@ -426,7 +446,7 @@ run STUB_DELETE_FAIL=1 db-admin.sh "$SQL"
 name=$(ls "$S/objects/catchu-ops" | sed -n 's/^Pod-\(.*\)\.json$/\1/p')
 cm=$S/objects/catchu-ops/ConfigMap-$name.json
 sec=$S/objects/catchu-ops/Secret-$name.json
-check "db-admin: 지웠는지 확인하지 못하면 4, 손으로 지우는 명령을 알려 줌" "$( { test "$rc" = 4 && says 'delete pod,secret,configmap -l catchu.io/db-admin'; } > /dev/null 2>&1; echo $?)"
+check "db-admin: 지웠는지 확인하지 못하면 4, 손으로 지우는 명령을 알려 줌" "$( { test "$rc" = 4 && says "delete configmap/${name} secret/${name} pod/${name} 를 실행"; } > /dev/null 2>&1; echo $?)"
 check "db-admin: 이름은 db-admin-<UTC 시각>, 세 임시 자원이 같은 이름·표식" \
   "$( { [[ $name =~ ^db-admin-[0-9]{8}-[0-9]{6}$ ]] && "$REAL_JQ" -s -e 'all(.[]; .metadata.labels["catchu.io/db-admin"] == "once"
     and .metadata.namespace == "catchu-ops")' "$cm" "$sec" "$S/objects/catchu-ops/Pod-$name.json"; } > /dev/null 2>&1; echo $?)"
@@ -457,15 +477,30 @@ check "db-admin: 시간 안에 끝나지 않으면 3(결과 불명), 정해 둔 
 reset_state
 run STUB_FAIL="secretsmanager get-secret-value" db-admin.sh "$SQL"
 check "db-admin: 관리자 비밀번호를 읽지 못하면 Secret·Pod 없이 3, 만든 ConfigMap은 지움" \
-  "$(ok test "$rc" = 3 -a "$(calls)" = "create ConfigMap,delete," -a "$(ops_left)" = 0)"
+  "$(ok test "$rc" = 3 -a "$(calls)" = "create ConfigMap,delete configmap," -a "$(ops_left)" = 0)"
 reset_state
 run STUB_SM_USER=someone db-admin.sh "$SQL"
 check "db-admin: Secrets Manager의 관리자 이름이 RDS와 다르면 3, Secret을 만들지 않음" \
-  "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap,delete," && says '관리자 이름'; } > /dev/null 2>&1; echo $?)"
+  "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap,delete configmap," && says '관리자 이름'; } > /dev/null 2>&1; echo $?)"
 reset_state
 run STUB_CREATE_FAIL=Pod db-admin.sh "$SQL"
 check "db-admin: Pod를 만들지 못하면(예: Pod 보안 검사 거부) 3, Secret·ConfigMap은 지움" \
-  "$(ok test "$rc" = 3 -a "$(calls)" = "create ConfigMap,create Secret,create Pod 실패,delete," -a "$(ops_left)" = 0)"
+  "$(ok test "$rc" = 3 -a "$(calls)" = "create ConfigMap,create Secret,create Pod 실패,delete configmap secret," -a "$(ops_left)" = 0)"
+only_left() { # 남은 임시 자원이 그 종류 하나뿐이다(같은 이름으로 이미 있던 것, 다른 실행의 것으로 본다)
+  test "$(ops_left)" = 1 && ls "$S/objects/catchu-ops" | grep -q "^$1-db-admin-"
+}
+reset_state
+run STUB_CREATE_EXISTS=ConfigMap db-admin.sh "$SQL"
+check "db-admin: 같은 이름의 ConfigMap이 이미 있으면 3, 이 실행이 만든 것이 없어 아무것도 지우지 않음" \
+  "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap 이미 있음," && only_left ConfigMap && says '이 실행이 만든 임시 자원은 없다'; } > /dev/null 2>&1; echo $?)"
+reset_state
+run STUB_CREATE_EXISTS=Secret db-admin.sh "$SQL"
+check "db-admin: 같은 이름의 Secret이 이미 있으면 3, 이 실행이 만든 ConfigMap만 지움" \
+  "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap,create Secret 이미 있음,delete configmap," && only_left Secret; } > /dev/null 2>&1; echo $?)"
+reset_state
+run STUB_CREATE_EXISTS=Pod db-admin.sh "$SQL"
+check "db-admin: 같은 이름의 Pod가 이미 있으면 3, 이 실행이 만든 ConfigMap·Secret만 지우고 그 Pod는 둠" \
+  "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap,create Secret,create Pod 이미 있음,delete configmap secret," && only_left Pod; } > /dev/null 2>&1; echo $?)"
 no_create() { test "$rc" = 1 -a -z "$(calls)"; }
 for c in STUB_LEFTOVER=1 STUB_NO_NS=catchu-ops STUB_NO_NETPOL=db-admin STUB_PARAMETER_STATUS=pending-reboot \
   STUB_PARAMETER_GROUP=default.postgres16 STUB_LOG_MIN=error STUB_SECRET_STATUS=rotating STUB_RDS_STATUS=backing-up; do

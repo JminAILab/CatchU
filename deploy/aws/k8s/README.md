@@ -52,7 +52,7 @@ bash deploy/aws/scripts/put-parameter.sh --stdin /catchu/prod/worker/CATCHU_GENE
 
 ## DB 관리 Pod(db-admin.sh)
 
-DB 계정 만들기처럼 RDS 관리자로 SQL을 실행할 때 쓴다. [`db-admin.sh`](../scripts/db-admin.sh)가 namespace `catchu-ops`에 psql 일회 Pod를 띄워 [`../db/`](../db)의 SQL 파일 하나를 한 트랜잭션으로 실행하고, 끝나면 성공·실패와 관계없이 Pod·Secret·ConfigMap을 지운다.
+DB 계정 만들기처럼 RDS 관리자로 SQL을 실행할 때 쓴다. [`db-admin.sh`](../scripts/db-admin.sh)가 namespace `catchu-ops`에 psql 일회 Pod를 띄워 [`../db/`](../db)의 SQL 파일 하나를 한 트랜잭션으로 실행하고, 끝나면 성공·실패와 관계없이 이 실행이 만든 Pod·Secret·ConfigMap을 지운다. 같은 이름이 이미 있어 만들지 못한 것은 다른 실행의 것일 수 있어 지우지 않는다.
 
 ```bash
 bash deploy/aws/scripts/db-admin.sh deploy/aws/db/roles.sql

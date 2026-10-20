@@ -2,7 +2,8 @@
 # DB 관리용 psql 일회 Pod(#276, 계획 Dv1). deploy/aws/db/의 SQL 파일 하나를 RDS 관리자로 한 트랜잭션 안에서 실행한다.
 # namespace catchu-ops에서만 돌린다(자동 배포 역할이 닿지 않는 곳, k8s/ops/namespace.yaml). RDS 관리자 비밀번호(Secrets Manager. 7일마다
 # 바뀌므로 실행할 때마다 읽는다)와 두 계정 비밀번호(SSM)는 Pod와 같은 이름의 임시 Secret으로만 넘기고, 값은 파이프로만 지난다.
-# 끝나면 성공·실패와 관계없이 Pod·Secret·ConfigMap을 지우고 없어졌는지 확인한다. 화면에는 SQL 출력과 기록만 찍는다.
+# 끝나면 성공·실패와 관계없이 이 실행이 만든 Pod·Secret·ConfigMap을 지우고 없어졌는지 확인한다. 같은 이름이 이미 있어 만들지 못한 것은
+# 다른 실행의 것일 수 있어 지우지 않는다. 화면에는 SQL 출력과 기록만 찍는다.
 #
 # 사용: bash deploy/aws/scripts/db-admin.sh deploy/aws/db/<파일>.sql   (저장소 루트에서. 내용은 deploy/aws/k8s/README.md 「DB 관리 Pod」)
 # 종료 코드: 0 SQL 성공, 임시 자원 지움 확인
@@ -102,22 +103,27 @@ fi
 # ---------- 2. 임시 ConfigMap·Secret·Pod를 만들고 끝나기를 기다린다 ----------
 tmp=$(mktemp -d)
 created=0
+made=() # 이 실행이 실제로 만든 것(종류/이름)만 적는다. 정리는 이것만 지운다(같은 이름이 이미 있어 만들지 못한 것은 건드리지 않는다).
 record=''
 note() { # 기록에 한 줄을 남기고 화면에도 찍는다.
   record="${record}  $*"$'\n'
   say "$*"
 }
-cleanup() { # 성공·실패와 관계없이 임시 자원을 지우고 없어졌는지 확인한다. 만들기 시작한 뒤의 멈춤은 모두 3(지움 확인 실패는 4)이다.
-  local rc=$? remaining
+cleanup() { # 성공·실패와 관계없이 이 실행이 만든 임시 자원을 지우고 없어졌는지 확인한다. 만들기 시작한 뒤의 멈춤은 모두 3(지움 확인 실패는 4)이다.
+  local rc=$? remaining=''
   rm -rf "$tmp"
   if [ "$created" = 1 ]; then
     [ "$rc" = 0 ] || rc=3
-    ko delete "pod/${name}" "secret/${name}" "configmap/${name}" --ignore-not-found --wait=true --timeout=90s > /dev/null 2>&1 || true
-    if remaining=$(ko get pod,secret,configmap -l catchu.io/db-admin -o name 2> /dev/null) && [ -z "$remaining" ]; then
-      note "임시 자원(Pod·Secret·ConfigMap ${name}): 지움 확인"
+    if [ "${#made[@]}" = 0 ]; then
+      note "이 실행이 만든 임시 자원은 없다"
     else
-      note "임시 자원을 지웠는지 확인하지 못했다(${remaining//$'\n'/ }). 곧바로 kubectl --kubeconfig ~/.kube/catchu -n ${namespace} delete pod,secret,configmap -l catchu.io/db-admin 를 실행하고 없어졌는지 본다"
-      rc=4
+      ko delete "${made[@]}" --ignore-not-found --wait=true --timeout=90s > /dev/null 2>&1 || true
+      if remaining=$(ko get "${made[@]}" --ignore-not-found -o name 2> /dev/null) && [ -z "$remaining" ]; then
+        note "이 실행이 만든 임시 자원(${made[*]}): 지움 확인"
+      else
+        note "임시 자원을 지웠는지 확인하지 못했다(${remaining:-조회 실패}). 곧바로 kubectl --kubeconfig ~/.kube/catchu -n ${namespace} delete ${made[*]} 를 실행하고 없어졌는지 본다"
+        rc=4
+      fi
     fi
     printf 'DB 관리 기록(SQL %s)\n%s' "${sql#"${repo}"/}" "$record" >&2
   fi
@@ -137,7 +143,8 @@ jq -n --arg name "$name" --arg namespace "$namespace" --argjson labels "$labels"
   --rawfile sql "$sql" --rawfile ca "$CATCHU_DB_CA_FILE" '{apiVersion: "v1", kind: "ConfigMap",
   metadata: {name: $name, namespace: $namespace, labels: $labels}, data: {PGHOST: $host, PGUSER: $user, "run.sql": $sql, "ca.pem": $ca}}' |
   ko create -f - -o name > /dev/null 2> "${tmp}/create.err" ||
-  finish 3 "ConfigMap ${name}를 만들지 못했다: $(head -c 300 "${tmp}/create.err" | tr '\n' ' ')"
+  finish 3 "ConfigMap ${name}를 만들지 못했다(같은 이름이 이미 있었다면 그대로 둔다): $(head -c 300 "${tmp}/create.err" | tr '\n' ' ')"
+made+=("configmap/${name}")
 
 set +e
 {
@@ -157,10 +164,13 @@ if [ "${codes[1]}" != 0 ]; then
   grep -o '확인 실패: .*' "${tmp}/jq.err" >&2 || say "임시 Secret을 만들지 못했다(오류 원문은 값이 섞일 수 있어 찍지 않는다)"
   finish 3 "값 검사에서 멈췄다"
 fi
-[ "${codes[2]}" = 0 ] || finish 3 "임시 Secret ${name}를 만들지 못했다: $(head -c 300 "${tmp}/create.err" | tr '\n' ' ')"
+[ "${codes[2]}" = 0 ] ||
+  finish 3 "임시 Secret ${name}를 만들지 못했다(같은 이름이 이미 있었다면 그대로 둔다): $(head -c 300 "${tmp}/create.err" | tr '\n' ' ')"
+made+=("secret/${name}")
 
 printf '%s\n' "$pod_text" | ko create -f - -o name > /dev/null 2> "${tmp}/create.err" ||
-  finish 3 "psql Pod ${name}를 만들지 못했다: $(head -c 300 "${tmp}/create.err" | tr '\n' ' ')"
+  finish 3 "psql Pod ${name}를 만들지 못했다(같은 이름이 이미 있었다면 그대로 둔다): $(head -c 300 "${tmp}/create.err" | tr '\n' ' ')"
+made+=("pod/${name}")
 note "psql Pod 시작: ${name}"
 
 phase=''
