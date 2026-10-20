@@ -12,7 +12,7 @@ process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS = '900';
 process.env.NODE_ENV = 'test';
 delete process.env.DEV_LOGIN_ENABLED;
 
-test('GET /health는 200과 status만 반환한다', { timeout: 10000 }, async (t) => {
+test('GET /health는 200과 status만 반환하고 연결 유지 65초를 알린다', { timeout: 10000 }, async (t) => {
   const app = await configureApp(await NestFactory.create(AppModule, { logger: false, abortOnError: false }));
   t.after(() => app.close());
   // 다른 개발 서버와 충돌하지 않도록 테스트에서만 임의의 로컬 포트를 사용한다.
@@ -23,4 +23,7 @@ test('GET /health는 200과 status만 반환한다', { timeout: 10000 }, async (
   assert.equal(response.status, 200);
   assert.match(response.headers.get('content-type'), /^application\/json\b/);
   assert.deepEqual(await response.json(), { status: 'ok' });
+  // 앞단 유휴 시간(ALB 60초)보다 길게 쉬는 연결을 유지한다(Node 기본 5초). 머리글은 서버의 연결 유지 시간으로 만들어진다.
+  assert.equal(app.getHttpServer().keepAliveTimeout, 65000);
+  assert.equal(response.headers.get('keep-alive'), 'timeout=65');
 });
