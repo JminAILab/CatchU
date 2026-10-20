@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { DynamicModule, INestApplication, Logger, Module } from '@nestjs/common';
 import { readAnalysisQueueConfig } from './analysis-queue/analysis-queue.config';
 import { AnalysisQueueModule, AnalysisQueueRunner } from './analysis-queue/analysis-queue.module';
+import { FAILURE_APP_CLOSE_TIMEOUT_MS } from './analysis-queue/queue-spec';
 import { OctoberRepositoryObservationSource } from './analysis-receiver/october-repository-observation.source';
 import { SelectedRepositoryRegistrationSource } from './analysis-receiver/selected-repository-registration.source';
 import { AppModule } from './app.module';
@@ -47,19 +48,39 @@ export function createApplicationModule(): DynamicModule {
   };
 }
 
+export interface AnalysisQueueStartOptions {
+  /** 시험만 바꾼다. 실제 서버는 process.exit다. */
+  exit?: (code: number) => void;
+  /** 시험만 짧게 바꾼다. 운영 값은 queue-spec.ts의 FAILURE_APP_CLOSE_TIMEOUT_MS다. */
+  closeTimeoutMs?: number;
+}
+
 /**
  * main이 listen 뒤에 부른다. 큐 연결을 조립했으면 보내기·받기를 시작하고 true를 돌려준다.
  * 받기가 예상 밖으로 멈추면 실행기가 보내기까지 멈춘 뒤, 여기서 앱을 닫고 exit(1)을 부른다. 다시 띄우는 것은 실행 환경의 몫이다.
+ * 앱 닫기는 상한까지만 기다린다. Nest는 종료 훅이 끝나야 HTTP 서버를 닫으므로, 다른 종료 훅이 멎으면 /health가 계속 응답하기 때문이다.
  * /health는 큐를 보지 않으므로 프로세스가 끝나야 실행 환경이 알아챈다(api/docs/analysis-queue.md 「수명주기」).
  */
-export function startAnalysisQueue(app: INestApplication, exit: (code: number) => void = code => process.exit(code)): boolean {
+export function startAnalysisQueue(app: INestApplication, options: AnalysisQueueStartOptions = {}): boolean {
+  const { exit = (code: number) => process.exit(code), closeTimeoutMs = FAILURE_APP_CLOSE_TIMEOUT_MS } = options;
   const runner = app.get<AnalysisQueueRunner | null>(ANALYSIS_QUEUE);
   if (!runner) return false;
   runner.start(() => {
     Logger.error('분석 큐 받기가 멈춰 API를 닫고 종료 코드 1로 끝냅니다.', undefined, 'Bootstrap');
-    app.close().catch((error: unknown) => {
+    const closed = app.close().catch((error: unknown) => {
       Logger.error(error instanceof Error ? error.message : 'API 종료 실패', undefined, 'Bootstrap');
-    }).finally(() => exit(1));
+    });
+    let timer: NodeJS.Timeout | undefined;
+    const timedOut = new Promise<void>(resolve => {
+      timer = setTimeout(() => {
+        Logger.error('API 종료가 상한 안에 끝나지 않아 더 기다리지 않고 끝냅니다.', undefined, 'Bootstrap');
+        resolve();
+      }, closeTimeoutMs);
+    });
+    void Promise.race([closed, timedOut]).then(() => {
+      clearTimeout(timer);
+      exit(1);
+    });
   });
   return true;
 }

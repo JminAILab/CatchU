@@ -13,6 +13,7 @@ const { captureLogger, insertAttempt, useAppSettings, waitFor, workerResult } = 
 const { createApplicationModule, startAnalysisQueue } = require('../../dist/application.module');
 const { configureApp } = require('../../dist/app.setup');
 const { AnalysisQueueRunner } = require('../../dist/analysis-queue/analysis-queue.module');
+const { AnalysisDeadlineScheduler } = require('../../dist/analysis-deadline/analysis-deadline.module');
 const { SelectedRepositoryCatalog } = require('../../dist/member-repositories/selected-repository-catalog');
 
 const REDIS_URL = process.env.CATCHU_TEST_REDIS_URL;
@@ -27,7 +28,7 @@ after(async () => { await db?.destroy(); });
 beforeEach(async () => { await resetTestDatabase(db); });
 
 /** main과 같은 조립 함수로 앱을 띄우고 main과 같이 listen 뒤 큐를 시작한다. exit는 부른 값만 기록한다. */
-async function startProduct(t, extra = {}) {
+async function startProduct(t, extra = {}, { closeTimeoutMs } = {}) {
   useAppSettings(t, { CATCHU_QUEUE_REDIS_URL: undefined, CATCHU_QUEUE_PREFIX: undefined, ...extra });
   const { lines, logger } = captureLogger();
   const app = await configureApp(await NestFactory.create(createApplicationModule(), { logger, abortOnError: false }));
@@ -37,14 +38,14 @@ async function startProduct(t, extra = {}) {
   await app.listen(0, '127.0.0.1');
   const url = await app.getUrl();
   const exits = [];
-  const started = startAnalysisQueue(app, code => exits.push(code));
+  const started = startAnalysisQueue(app, { exit: code => exits.push(code), closeTimeoutMs });
   return { app, url, lines, exits, started, close };
 }
 
 /** 시험마다 새 접두사를 쓰고, 끝나면 앱을 닫은 뒤 두 큐를 지운다. */
-async function startQueuedProduct(t) {
+async function startQueuedProduct(t, options = {}) {
   const prefix = `catchu-test-${randomUUID().slice(0, 8)}`;
-  const product = await startProduct(t, { CATCHU_QUEUE_REDIS_URL: REDIS_URL, CATCHU_QUEUE_PREFIX: prefix });
+  const product = await startProduct(t, { CATCHU_QUEUE_REDIS_URL: REDIS_URL, CATCHU_QUEUE_PREFIX: prefix }, options);
   const connection = new IORedis(REDIS_URL, { maxRetriesPerRequest: null });
   const requests = new Queue('analysis-requests', { connection, prefix });
   const messages = new Queue('worker-messages', { connection, prefix });
@@ -147,4 +148,38 @@ test('받기가 예상 밖으로 멈추면 앱을 닫고 exit(1)을 한 번 부�
   await assert.rejects(fetch(s.url + '/health', { signal: AbortSignal.timeout(1000) }), 'HTTP 서버가 닫혀야 한다');
   assert.ok(s.lines.some(line => line.includes('ANALYSIS_QUEUE_CONSUMER_STOPPED')));
   assert.ok(s.lines.some(line => line.includes('분석 큐 받기가 멈춰')));
+});
+
+/** 처리 시한 판정의 후보 조회가 잠금을 기다리는 중인지. */
+async function deadlineQueryWaiting() {
+  const [row] = await db.query(`SELECT count(*)::int AS n FROM pg_stat_activity
+    WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%FOR NO KEY UPDATE OF r SKIP LOCKED%'`);
+  return row.n > 0;
+}
+
+test('받기가 멈춘 뒤 처리 시한 판정의 DB 조회가 잠금에 걸려 있어도 앱 닫기는 상한까지만 기다리고 exit(1)을 부른다', { skip, timeout: 30_000 }, async t => {
+  const s = await startQueuedProduct(t, { closeTimeoutMs: 500 });
+  await waitFor(() => s.runner.worker.isRunning(), '받기 시작');
+  // 다른 연결에서 요청 표를 잠가 실제 처리 시한 판정의 조회를 멈춘다. 시험 DB는 lock_timeout이 0이라 풀 때까지 기다린다.
+  // 잠금은 시험 본문에서 푼다. 정리 함수(앱 닫기)가 먼저 돌면 그 닫기가 이 잠금을 기다리기 때문이다.
+  const holder = db.createQueryRunner();
+  await holder.connect();
+  await holder.startTransaction();
+  try {
+    await holder.query('LOCK TABLE analysis_request IN ACCESS EXCLUSIVE MODE');
+    const scheduler = s.app.get(AnalysisDeadlineScheduler);
+    // 시험에서만 주기를 줄인다(실제 60초). main처럼 시작해 판정 조회가 잠금 대기에 들어갈 때까지 기다린다.
+    scheduler.task.options.intervalMs = 20;
+    scheduler.start();
+    await waitFor(deadlineQueryWaiting, '처리 시한 판정이 잠금을 기다림');
+    // 받기 실행이 끝나는 경우를 만든다(시험에서만 내부 객체를 닫는다). 보내기 조회도 잠금에 걸리면 보내기 상한(6초)까지 기다린다.
+    await s.runner.worker.close();
+    await waitFor(() => s.exits.length > 0, 'exit 호출', 15_000);
+    assert.deepEqual(s.exits, [1]);
+    assert.ok(s.lines.some(line => line.includes('API 종료가 상한 안에 끝나지 않아')));
+    assert.equal(await deadlineQueryWaiting(), true, '판정 조회가 끝나기를 기다리지 않고 끝냈다');
+  } finally {
+    await holder.rollbackTransaction();
+    await holder.release();
+  }
 });

@@ -14,7 +14,7 @@ api가 대기 중인 분석 시도를 큐(BullMQ)로 worker에 보내고, worker
 
 **제품 조립.** `AppModule`에는 등록하지 않는다. `main.ts`가 쓰는 `createApplicationModule()`(`src/application.module.ts`)이 `CATCHU_QUEUE_REDIS_URL`이 있을 때만 이 모듈을 조립하고, 주소가 틀리면 기동을 멈춘다. 계약 경로는 저장소와 api 이미지에서 같은 상대 위치다. 보호 관측은 ‘관측 안 함’을 명시하는 10월 정책 공급자([#314](https://github.com/JminAILab/CatchU/pull/314) `OctoberRepositoryObservationSource`)에 동의에 저장된 선정 판본의 좌표(`SelectedRepositoryRegistrationSource`)를 넘긴 것이다. 이 좌표 공급은 LIVE 전용이라 **후보가 있는 MOCK 결과는 Catch로 등록되지 않고 `CATCH_NOT_READY`로 끝난다.** MOCK용 합성 좌표는 넣지 않는다([선정 저장소 좌표 연결](selected-repository-coordinates.md)). LIVE 근거 주소의 대소문자 구분 없는 대조는 [PR #316](https://github.com/JminAILab/CatchU/pull/316), 기존 SOURCE_PRIVATE 제한·판단 근거 보존은 [PR #317](https://github.com/JminAILab/CatchU/pull/317)로 반영됐다. 큐 조립에 함께 들어오는 개발 주입 제공자(`DevAnalysisInjection`)에는 HTTP 경로가 없다(아래 「시험」의 제품 조립 시험).
 
-**시작과 실패 종료.** `main.ts`는 `listen` 뒤 `startAnalysisQueue(app)`로 `start(onFailure)`를 부른다. 받기가 예상 밖으로 멈추면 실행기가 보내기까지 멈추고(아래 「수명주기」) `onFailure`가 앱을 닫은 뒤 종료 코드 1로 프로세스를 끝낸다. 다시 띄우는 것은 실행 환경의 몫이다.
+**시작과 실패 종료.** `main.ts`는 `listen` 뒤 `startAnalysisQueue(app)`로 `start(onFailure)`를 부른다. 받기가 예상 밖으로 멈추면 실행기가 보내기까지 멈추고(아래 「수명주기」) `onFailure`가 앱을 닫은 뒤 종료 코드 1로 프로세스를 끝낸다. 앱 닫기는 10초(`FAILURE_APP_CLOSE_TIMEOUT_MS`)까지만 기다리고, 넘으면 기다리지 않고 끝낸다. Nest는 종료 훅이 끝나야 HTTP 서버를 닫으므로, 다른 종료 훅(처리 시한 판정의 DB 조회 등)이 멎으면 `/health`가 계속 응답하며 남기 때문이다. 다시 띄우는 것은 실행 환경의 몫이다.
 
 **어디서 켜는가.** 개발 서버([#304](https://github.com/JminAILab/CatchU/issues/304))에서는 켜지 않는다. api가 운영 모드라 비밀번호가 든 `rediss://`만 받는데, 그 서버의 합성 큐는 평문이고 api는 큐 망 밖에 있다. 실제 서버에서는 11월 EKS([#276](https://github.com/JminAILab/CatchU/issues/276))의 api 실행 파일과 Secret에 큐 주소를 넣을 때 켠다. 실제 회원 접수([#323](https://github.com/JminAILab/CatchU/issues/323)) 전에는 LIVE 시도가 없다.
 
@@ -121,7 +121,7 @@ CATCHU_TEST_REDIS_URL=redis://127.0.0.1:6380 npm test
 | `test/integration/analysis-queue-consumer.test.cjs` | 실제 DB와 처리 함수: 받음·실행 중·실행 불명, 결과·수신 확인 스키마, 중복, 작업 ID 불일치, 알림 없는 실패 결과, 닫힌 요청, 반영 실패·실패 기록 실패·커밋 실패, 식별 불가, 비밀 표지 비노출 |
 | `test/integration/analysis-queue-valkey.test.cjs` | 실제 Valkey: 같은 시도의 작업 하나(대기·완료·실패 보관), Redis에서 다시 읽은 옵션, 보관 정리(점수를 90분·130분 전으로 옮김), worker 형식 알림·결과 왕복과 반환값, 같은 결과 ID의 다른 내용은 `PAYLOAD_CONFLICT`이고 첫 수신·반영 자료 그대로, 결과 수신 경계(#103 식별 불가 3종은 반환값 `null`과 E 거부 기록, 형식 오류·다른 회원은 보낸 식별자를 담은 거부 수신 확인, 모두 DB·보호 관측 그대로), 처리 중 종료와 종료 상한, 시작 전에 쌓인 결과를 처리하는 중의 종료, TCP 중계를 끊어 만든 재접속 중 종료, 요청 테이블 잠금으로 멎은 보내기 조회 중 종료, 받기 실행이 예상 밖으로 끝나면 보내기까지 멈추고 `onFailure` 호출, AppModule에 실행기 없음, 큐 서버 없음, 오류 기록 억제(내부 객체에 합성 사건을 보내는 배선 시험이며 실제 재접속 검증이 아님) |
 
-| `test/integration/analysis-queue-application.test.cjs` | 실제 Valkey와 제품 조립(`createApplicationModule`·`startAnalysisQueue`): 큐 주소가 없으면 실행기 없음, 대기 시도 보내기, 두 선정 저장소의 LIVE 결과를 저장 당시 좌표로 본인 PRIVATE Catch에 반영, 후보가 있는 MOCK 결과는 Catch 없이 `APPLY_FAILED`, 개발 주입·결과를 받는 HTTP 경로 없음, 받기가 멈추면 앱을 닫고 `exit(1)` |
+| `test/integration/analysis-queue-application.test.cjs` | 실제 Valkey와 제품 조립(`createApplicationModule`·`startAnalysisQueue`): 큐 주소가 없으면 실행기 없음, 대기 시도 보내기, 두 선정 저장소의 LIVE 결과를 저장 당시 좌표로 본인 PRIVATE Catch에 반영, 후보가 있는 MOCK 결과는 Catch 없이 `APPLY_FAILED`, 개발 주입·결과를 받는 HTTP 경로 없음, 받기가 멈추면 앱을 닫고 `exit(1)`, 처리 시한 판정의 조회가 표 잠금에 걸려 있어도 앱 닫기 상한 뒤 `exit(1)` |
 | `test/runtime/bootstrap.test.cjs`(큐 부분) | 실제 main 프로세스: production에서 평문 큐 주소면 주소 없이 기동 실패, 큐 주소가 있으면 `listen` 뒤 대기 시도를 요청 큐로 보냄 |
 
 worker 쪽은 시험 대역이다(요청 작업은 시험용 BullMQ Worker가 끝내고 알림·결과는 worker와 같은 이름·ID·옵션으로 직접 넣는다). 보호 관측은 제품 조립 시험만 제품 공급(10월 정책 + 저장 당시 좌표)이고 나머지는 합성 대역이다. DB와 E 수신·등록은 실제 코드이고, 수신 확인은 worker가 읽는 결과 작업 반환값을 Redis에서 다시 읽어 확인한다. Python worker의 읽기 코드를 실행하지는 않는다.
