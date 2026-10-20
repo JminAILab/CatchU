@@ -149,12 +149,12 @@ test('개발 회원은 합성 연결·연결 없음·해제·재인증 필요·�
     await expectNotice(await notice(s, user), SYNTHETIC_NOTICE);
   }
 });
-test('접수는 기존 합성 판정을 유지하고 실제 판본 동의로 확대하지 않는다', async t => {
+test('개발 회원 접수는 합성 판정을 유지하고 실제 회원은 합성 저장소로 접수하지 않는다', async t => {
   const s = await start(t);
-  // 실제 회원의 접수 전환은 #323 범위다. 실제 판본에 동의해도 기존처럼 개발 공급 경계에서 거부한다.
+  // 실제 회원은 #323 실제 접수 경로로 간다. 합성 저장소는 현재 선정 밖이다(analysis-intake-real.test.cjs).
   const real = await member(s, GOOGLE_IDENTITY_PREFIX + 'intake-' + randomUUID());
   await connect(real.memberId, 'CONNECTED');
-  await error(await post(s, real, REAL_NOTICE.noticeRevision), 403, 'INTERNAL_ERROR');
+  await error(await post(s, real, REAL_NOTICE.noticeRevision), 403, 'REPOSITORY_NOT_ALLOWED');
   const developer = await s.login('intake-322');
   await error(await post(s, developer, REAL_NOTICE.noticeRevision), 403, 'CONSENT_REQUIRED');
   // 개발 회원에 실제 GitHub 연결이 섞이면 고지는 합성이지만 접수는 기존처럼 합성 연결이 아니라서 거부한다.

@@ -311,13 +311,13 @@ test('LIVE 공급은 합성 동의로 접수하지 않고 개발 회원 고지�
   await error(await s.post(u),403,'CONSENT_REQUIRED');
   assert.equal((await counts()).requests,0);
 });
-test('개발 플래그가 켜져도 실제 회원에게는 합성 고지 대신 실제 고지를 주고 접수는 기존처럼 거부한다',async t=>{
+test('개발 플래그가 켜져도 실제 회원에게는 합성 고지 대신 실제 고지를 주고 합성 연결로는 접수하지 않는다',async t=>{
   const s=await start(t);const u=await s.login();
   await db.query('UPDATE member_account SET identity_reference=$1 WHERE member_id=$2',['catchu:google:synthetic-test',u.memberId]);
   const notice=await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}});
   assert.equal(notice.status,200); assert.deepEqual(await notice.json(),{noticeRevision:REAL_NOTICE.noticeRevision,text:REAL_NOTICE.text});
-  // 실제 회원의 접수 전환은 #323 범위다.
-  await error(await s.post(u),403,'INTERNAL_ERROR');
+  // 실제 회원은 #323 실제 접수 경로로 간다. 보관 자격정보 없는 합성 연결은 실제 연결이 아니다(analysis-intake-real.test.cjs).
+  await error(await s.post(u),403,'GITHUB_CONNECTION_REQUIRED');
   assert.equal((await counts()).requests,0);
 });
 for(const overrides of [{DEV_LOGIN_ENABLED:'false'},{NODE_ENV:'production'},{NODE_ENV:undefined},{NODE_ENV:'preview'}]){
