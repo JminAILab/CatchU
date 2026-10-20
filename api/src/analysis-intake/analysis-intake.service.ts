@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { ApiError } from '../common/errors';
 import { GitHubConnectionService } from '../github-connection/github-connection.service';
@@ -17,6 +17,7 @@ import { blocksReanalysis, readAnalysisStatus } from './analysis-status';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 @Injectable()
 export class AnalysisIntakeService {
+  private readonly logger = new Logger('AnalysisIntake');
   constructor(private readonly database: DataSource, private readonly connections: DevMemberService,
     private readonly notices: AnalysisNoticeService, private readonly members: MemberKindService,
     private readonly selections: RepositorySelectionService, private readonly github: GitHubConnectionService) {}
@@ -69,11 +70,18 @@ export class AnalysisIntakeService {
    * 실제 회원의 새 접수·실패 재요청 전에 #231 보관 자격정보의 만료·이용 불가를 연결 상태에 반영한다(목록과 같다, #252).
    * 연결 행을 고치므로 생성 트랜잭션 밖에서 부른다. 이미 접수된 키의 재전송은 현재 조건을 보지 않으므로 부르지 않고,
    * 형식이 틀린 키는 생성 트랜잭션이 400으로 거부한다. 개발 회원의 연결은 건드리지 않는다.
+   * 같은 키 요청이 겹치면 이 확인 뒤에 다른 요청이 먼저 접수할 수 있다. 그래서 갱신 실패는 던지지 않고 돌려주며,
+   * 생성 트랜잭션이 멱등 잠금 안에서 새 접수로 판정한 때에만 알린다.
    */
-  private async refreshRealConnection(memberId: string, key: string | undefined) {
+  private async refreshRealConnection(memberId: string, key: string | undefined): Promise<{ error: unknown } | null> {
     if (!isIdempotencyKey(key) || await this.members.read(memberId) !== 'REAL' ||
-        await this.database.manager.existsBy(IdempotencyRecord, { memberId, operation: 'createAnalysisRequest', key })) return;
-    await this.github.refreshStatus(memberId);
+        await this.database.manager.existsBy(IdempotencyRecord, { memberId, operation: 'createAnalysisRequest', key })) return null;
+    try {
+      await this.github.refreshStatus(memberId);
+      return null;
+    } catch (error) {
+      return { error };
+    }
   }
   private async lockMember(manager: EntityManager, memberId: string) {
     await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
@@ -82,11 +90,13 @@ export class AnalysisIntakeService {
   async create(memberId: string, key: string | undefined, raw: unknown) {
     if (!UUID.test(memberId)) throw new ApiError('AUTH_INVALID');
     const input = parseAnalysisInput(raw);
-    await this.refreshRealConnection(memberId, key);
+    const refreshFailure = await this.refreshRealConnection(memberId, key);
     let reusedActive = false;
     const result = await this.database.transaction('READ COMMITTED', manager => runIdempotentCreation(manager,
       { memberId, operation: 'createAnalysisRequest', key: key as string, requestFingerprint: analysisFingerprint(input) }, {
         create: async same => {
+          // 새 접수로 판정됐을 때만 연결 상태 갱신 실패를 알린다. 같은 키 재전송은 아래 isSame에서 현재 상태로 답한다.
+          if (refreshFailure) throw refreshFailure.error;
           await this.lockMember(same, memberId);
           const { consentedScope, sourceMode } = await this.context(same, memberId, input);
           // 타인·없는 retry 참조는 같은 404. ACTIVE 처리로 숨겨 성공시키지 않는다.
@@ -129,6 +139,10 @@ export class AnalysisIntakeService {
         },
         readResponse: async (same, record) => (await readAnalysisStatus(same, memberId, record.requestId!)).status,
       }));
+    // 재전송이면 갱신이 필요 없었으므로 응답에는 쓰지 않고, 보관소 장애 신호만 남긴다. 오류 원문은 넣지 않는다.
+    if (refreshFailure && result.replayed) {
+      this.logger.warn(`같은 키 재전송 전의 GitHub 연결 상태 갱신 실패는 응답에 쓰지 않음 requestId=${result.response.requestId}`);
+    }
     return { existing: result.replayed || reusedActive, status: result.response };
   }
 

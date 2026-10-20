@@ -405,6 +405,30 @@ test('실제 보관소: GitHub 연동을 끈 서버는 남은 실제 연결로 �
   assert.equal((await db.manager.findOneByOrFail(AnalysisRequest, { requestId: retried.requestId })).retryOfRequestId, first.requestId);
 });
 
+test('대역(같은 키 동시 요청·보관소 일시 오류): 기록 확인 뒤 같은 키 요청이 먼저 접수되면 갱신 실패 대신 그 접수의 현재 상태를 준다', async t => {
+  const s = await start(t);
+  const user = await s.real();
+  const key = randomUUID();
+  const refresh = s.connections.refreshStatus;
+  let first;
+  // 대역: 이 요청이 기록 확인을 지나 상태를 갱신하는 동안 같은 키·같은 본문 요청이 접수를 마치고, 그 뒤 갱신이 실패한다.
+  s.connections.refreshStatus = async () => {
+    s.connections.refreshStatus = refresh;
+    first = await accepted(await s.post(user, key));
+    throw new Error('synthetic-vault-io-323');
+  };
+  const replay = await s.post(user, key);
+  assert.equal(replay.status, 200);
+  assert.deepEqual(await replay.json(), first);
+  assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 1 });
+  assert.ok(s.logs.some(line => line.includes('갱신 실패는 응답에 쓰지 않음 requestId=' + first.requestId)));
+  // 새 키라면 같은 갱신 실패는 그대로 500이고 행을 남기지 않는다.
+  s.connections.refreshStatus = async () => { throw new Error('synthetic-vault-io-323'); };
+  await error(await s.post(user), 500, 'INTERNAL_ERROR');
+  assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 1 });
+  assert.equal(s.logs.join('\n').includes('synthetic-vault-io-323'), false);
+});
+
 test('실제 보관소: 개발 회원에 실제 GitHub 연결이 섞이면 새 접수·실패 재요청을 거부하고 LIVE 시도·자격정보 갱신이 없다', async t => {
   const s = await start(t);
   // 합성 연결의 개발 접수는 MOCK이다. 확정 실패로 닫아 실패 재요청 경로도 본다.
