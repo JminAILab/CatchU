@@ -163,7 +163,7 @@ curl.exe -i http://127.0.0.1:3001/health
 | `npm run lint`      | ESLint 정적 검사. 경고도 실패 처리                                                                                   |
 | `npm run typecheck` | 산출물 생성 없이 TypeScript 타입 검사                                                                                |
 | `npm test`          | 빌드 후 테스트 DB에 마이그레이션을 적용하고 `test/**/*.test.cjs`를 한 파일씩 실행. health·인증 HTTP, 실제 main 진입점의 설정 로딩/기동 실패, DB 규약·테스트 DB, 분석 수신·개발 주입 대역 검사. **테스트 DB 필요**(「DB 테스트」). 서버·임시 설정은 검사 후 정리 |
-| `npm run test:analysis-fixtures` | 별도 준비한 #103 공용 합성 자료로 수신 처리 검사. 자료 경로는 아래 #139 절 참고. 자료가 없으면 실패하며 묵시적으로 생략하지 않음 |
+| `npm run test:analysis-fixtures` | 별도 준비한 #103 공용 합성 자료로 수신 처리 검사. 자료 경로는 아래 #139 절 참고. 자료가 없으면 실패하며 묵시적으로 생략하지 않음. 이미 빌드했으면 `node --test test/analysis/shared-fixtures.check.cjs`로 빌드 없이 같은 검사(CI는 `npm test` 뒤에 이렇게 돈다) |
 | `npm run build`     | 이전 `dist/`를 지운 뒤 `src/`를 `dist/`로 컴파일. 소스에서 지운 엔티티·마이그레이션이 `dist/`에 남아 탐색되지 않게 한다 |
 | `node --test test/worker-messages.test.cjs` | 빌드 없이 [M1 합성 결과 세트](../worker/fixtures/m1-synthetic/README.md)의 사례·음성 대조가 worker와 같은 스키마 판정을 내는지만 검사. `npm test`에도 포함 |
 | `npm start`         | `dist/main.js` 실행. 먼저 빌드 필요                                                                                  |
