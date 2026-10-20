@@ -1,6 +1,7 @@
 "use client";
 
 import { readApiResponse } from "../../lib/api-response";
+import { createAnalysisRequestApi } from "../analysis-request/analysis-request-api";
 import { AssetsConnected } from "../assets/assets-connected";
 import { createCatchApi } from "../assets/catch-api";
 import { previewCatches, previewRepositories } from "../assets/fixtures";
@@ -74,6 +75,54 @@ const repositoryApi = createRepositoryApi(async (path) => {
   return json({ code: "RESOURCE_UNAVAILABLE", message: "없음" }, 404);
 });
 
+// #154 첫 분석 요청의 합성 응답. 주소의 intake 값으로 접수 결과를 바꾼다. 실제 접수·분석이 아니다.
+const intake = () => new URLSearchParams(window.location.search).get("intake") ?? "accepted";
+const NOTICE = { noticeRevision: "preview-notice-v1", text: "[미리보기 합성 안내]\n선택한 저장소의 커밋·PR·이슈를 분석합니다.\n\n이 화면의 동의는 실제 자료 처리 동의가 아닙니다." };
+const rejectWith = (code: string, status: number) => json({ code, message: "모의 거부" }, status);
+/** 받은 키별 결과. 응답 불명 시나리오에서 같은 키로 다시 보내면 앞서 받아 둔 요청을 200으로 돌려준다. */
+const acceptedKeys = new Map<string, string>();
+/** 최초 전송만 429로 거부한다. 같은 키로 다시 보내면 아래의 202 접수로 이어진다. */
+const limitedKeys = new Set<string>();
+let consentRejected = false;
+
+const requestApi = createAnalysisRequestApi(async (path, request) => {
+  await delay(400);
+  const mode = intake();
+  if (path === "/analysis-notice") {
+    if (mode === "notice-failed") return serverError();
+    if (mode === "notice-unavailable") return rejectWith("INTERNAL_ERROR", 403);
+    return json(consentRejected ? { ...NOTICE, noticeRevision: "preview-notice-v2" } : NOTICE);
+  }
+  if (path !== "/analysis-requests" || request.method !== "POST") return json({ code: "RESOURCE_UNAVAILABLE", message: "없음" }, 404);
+  const body = request.body as { repositoryId: string };
+  const key = request.idempotencyKey ?? "";
+  if (acceptedKeys.has(key)) return json(status(body.repositoryId, "QUEUED", "NOT_READY", { requestId: acceptedKeys.get(key) }), 200);
+  switch (mode) {
+    case "existing": return json(status(body.repositoryId, "RUNNING", "NOT_READY"), 200);
+    case "limited":
+      if (!limitedKeys.has(key)) {
+        limitedKeys.add(key);
+        // 공통 호출이 Retry-After: 3에서 읽은 남은 초를 합성한다. 실제 접수 API를 부르지 않는다.
+        return { ...await rejectWith("RATE_LIMITED", 429), retryAfterSeconds: 3 };
+      }
+      break;
+    case "in-progress": return json({ code: "ANALYSIS_IN_PROGRESS", message: "모의 거부", details: { existingRequestId: "req-queue-repo" } }, 409);
+    case "consent":
+      if (!consentRejected) { consentRejected = true; return rejectWith("CONSENT_REQUIRED", 403); }
+      break;
+    case "github": return rejectWith("GITHUB_CONNECTION_REQUIRED", 403);
+    case "not-allowed": return rejectWith("REPOSITORY_NOT_ALLOWED", 403);
+    case "unavailable": return rejectWith("INTERNAL_ERROR", 403);
+    case "deferred": return rejectWith("REANALYSIS_DEFERRED", 409);
+    case "unknown":
+      // 서버는 받아 두었는데 응답만 잃은 경우를 흉내 낸다. 같은 키의 다음 전송은 위에서 200이 된다.
+      acceptedKeys.set(key, `req-new-${body.repositoryId}`);
+      return serverError();
+  }
+  acceptedKeys.set(key, `req-new-${body.repositoryId}`);
+  return json(status(body.repositoryId, "QUEUED", "NOT_READY", { requestId: `req-new-${body.repositoryId}` }), 202);
+});
+
 const catchApi = createCatchApi(async (path) => {
   await delay(120);
   const url = new URL(path, "https://fixture.invalid");
@@ -92,9 +141,13 @@ export function RepositoryManagementPreview() {
         <strong>저장소 연결 관리 · 모의 응답</strong>
         <p>자료와 응답은 모두 예시입니다. 실제 로그인·API·분석 결과가 아닙니다.</p>
         <p>주소에 scenario=empty · failed · me-failed · disconnected · reauth를 붙여 상태를 바꿉니다.</p>
+        <p>
+          분석 요청(#154)은 intake=accepted(기본) · existing · in-progress · consent · unknown · limited · github · not-allowed · unavailable
+          · deferred · notice-failed · notice-unavailable로 바꿉니다. limited는 3초 제한 뒤 같은 요청을 다시 보내면 접수됩니다.
+        </p>
       </aside>
       <AssetsConnected api={catchApi} repositories={previewRepositories}
-        repositoryManagement={(bindings) => <RepositoryManagement api={repositoryApi} bindings={bindings} />} />
+        repositoryManagement={(bindings) => <RepositoryManagement api={repositoryApi} requestApi={requestApi} bindings={bindings} />} />
     </>
   );
 }
