@@ -60,6 +60,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openButtonRef = useRef<HTMLButtonElement>(null);
+  const areaActionRef = useRef<HTMLDivElement>(null);
   const pressStartedOnBackdrop = useRef(false);
   const loadVersion = useRef(0);
   /** 연동 상태 조회의 차례. 나중에 시작한 조회(다시 불러오기·목록 뒤 재조회)의 결과만 영역 표시에 반영한다. */
@@ -176,13 +177,14 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
     [open, requestStore, loadConnected]);
 
   // 열림 상태와 dialog를 맞춘다. 닫을 때는 연 버튼으로 초점을 돌린다.
+  // 연 버튼이 그사이 사라졌으면(재조회로 연결 해제·재인증 필요·연동 상태 조회 실패가 된 경우) 영역에 남은 연동 링크·버튼으로 돌린다.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (open && !dialog.open) dialog.showModal();
     if (!open && dialog.open) {
       dialog.close();
-      openButtonRef.current?.focus();
+      (openButtonRef.current ?? areaActionRef.current?.querySelector<HTMLElement>("a[href], button:not([disabled])"))?.focus();
     }
   }, [open]);
 
@@ -233,7 +235,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
           <p className={styles.muted}>결과를 확인하지 못한 분석 요청이 있습니다. [보낸 분석 요청 확인]에서 같은 요청으로 결과를 확인할 수 있습니다.</p>
         )}
       </div>
-      <div className={styles.areaAction}>
+      <div ref={areaActionRef} className={styles.areaAction}>
         {github.state === "failed" && (
           <button type="button" className={styles.secondaryButton} onClick={retryGithub}>다시 불러오기</button>
         )}
