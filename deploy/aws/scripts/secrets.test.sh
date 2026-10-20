@@ -187,11 +187,19 @@ case "$*" in
   "get configmap catchu-db -o json")
     [ -f "$S/objects/$ns/ConfigMap-catchu-db.json" ] || { echo "Error from server (NotFound): synthetic" >&2; exit 1; }
     jq --arg t "${STUB_CM_TAMPER:-0}" 'if $t == "1" then .data["ca.pem"] += "x" else . end' "$S/objects/$ns/ConfigMap-catchu-db.json" ;;
-  "get pod,secret,configmap -l catchu.io/db-admin -o name")
-    [ "${STUB_LEFTOVER:-0}" = 1 ] && echo "secret/db-admin-20261110-000000"
-    for f in "$S/objects/$ns"/*.json; do
-      [ -f "$f" ] || continue
-      jq -r 'select(.metadata.labels["catchu.io/db-admin"] != null) | "\(.kind | ascii_downcase)/\(.metadata.name)"' "$f"
+  "get pod,secret,configmap -l "*" -o name")
+    # 표식 이름만 주면 그 표식이 있는 것 모두, 이름=값이면 그 값인 것만 찾는다.
+    # STUB_LEFTOVER: 지난 실행이 남긴 것이 있다. STUB_GET_FAIL: 이름=값 조회(정리 뒤 확인)가 실패한다.
+    key=$4 want=''
+    case $key in *=*) want=${key#*=} key=${key%%=*} ;; esac
+    if [ -n "$want" ] && [ "${STUB_GET_FAIL:-0}" = 1 ]; then echo "error: synthetic list failure" >&2; exit 1; fi
+    if [ -z "$want" ] && [ "${STUB_LEFTOVER:-0}" = 1 ]; then echo "secret/db-admin-20261110-000000"; fi
+    for k in Pod Secret ConfigMap; do
+      for f in "$S/objects/$ns/$k"-*.json; do
+        [ -f "$f" ] || continue
+        jq -r --arg k "$key" --arg v "$want" 'select(.metadata.labels[$k] != null and ($v == "" or .metadata.labels[$k] == $v))
+          | "\(.kind | ascii_downcase)/\(.metadata.name)"' "$f"
+      done
     done ;;
   "create -f - -o name")
     input=$(cat)
@@ -199,9 +207,16 @@ case "$*" in
     o=$(printf '%s' "$input" | ruby -ryaml -rjson -e 'puts JSON.generate(YAML.load(STDIN.read))') || { echo "error: synthetic parse" >&2; exit 1; }
     kind=$(printf '%s' "$o" | jq -r .kind)
     has "$kind" "${STUB_CREATE_FAIL:-}" && { call "create $kind 실패"; echo "error: synthetic create failure" >&2; exit 1; }
-    # STUB_CREATE_EXISTS: 같은 이름이 이미 있다(다른 실행이 만든 것으로 본다). 그 객체를 남겨 두고 만들기는 거부한다.
-    if has "$kind" "${STUB_CREATE_EXISTS:-}"; then
+    # STUB_CREATE_LOST: 서버에는 저장됐지만 응답이 끊겼다(만들기 결과를 모른다).
+    if has "$kind" "${STUB_CREATE_LOST:-}"; then
       store "$o"
+      call "create $kind 응답 끊김"
+      echo "error: unexpected EOF" >&2
+      exit 1
+    fi
+    # STUB_CREATE_EXISTS: 같은 이름이 이미 있다(같은 초에 시작한 다른 실행이 만든 것으로 보고 실행 표식만 다르게 둔다). 만들기는 거부한다.
+    if has "$kind" "${STUB_CREATE_EXISTS:-}"; then
+      store "$(printf '%s' "$o" | jq -c '.metadata.labels["catchu.io/db-admin-run"] = "ffffffffffffffff"')"
       call "create $kind 이미 있음"
       echo "Error from server (AlreadyExists): synthetic" >&2
       exit 1
@@ -223,26 +238,20 @@ case "$*" in
   "logs "*" --tail=200")
     [ "${STUB_POD:-ok}" = pending ] && { echo "Error from server (BadRequest): container is waiting to start" >&2; exit 1; }
     printf ' rolname | rolconfig\n catchu_app | {lock_timeout=3s}\n' ;;
-  "delete "*" --ignore-not-found --wait=true --timeout=90s")
-    # 지운 대상(종류/이름)을 남긴다. 다른 실행의 것을 지우지 않는지 보려고.
-    shift
-    refs=()
-    while [ "$#" -gt 0 ] && [ "${1#--}" = "$1" ]; do refs+=("$1"); shift; done
-    kinds=''
-    for ref in "${refs[@]}"; do kinds="${kinds}${kinds:+ }${ref%%/*}"; done
-    call "delete ${kinds}"
-    [ "${STUB_DELETE_FAIL:-0}" = 1 ] && { echo "error: synthetic delete failure" >&2; exit 1; }
-    for ref in "${refs[@]}"; do
-      case $ref in pod/*) k=Pod ;; secret/*) k=Secret ;; configmap/*) k=ConfigMap ;; *) echo "합성 kubectl: 모르는 대상 $ref" >&2; exit 99 ;; esac
-      rm -f "$S/objects/$ns/$k-${ref#*/}.json"
-    done ;;
-  "get "*/*" --ignore-not-found -o name")
-    shift
-    while [ "$#" -gt 0 ] && [ "${1#--}" = "$1" ]; do
-      case $1 in pod/*) k=Pod ;; secret/*) k=Secret ;; configmap/*) k=ConfigMap ;; *) echo "합성 kubectl: 모르는 대상 $1" >&2; exit 99 ;; esac
-      [ -f "$S/objects/$ns/$k-${1#*/}.json" ] && echo "$1"
-      shift
-    done ;;
+  "delete pod,secret,configmap -l "*=*" --wait=true --timeout=90s")
+    # 표식 이름=값이 맞는 것만 지우고, 지운 종류를 남긴다(다른 실행의 것을 지우지 않는지 보려고).
+    key=${4%%=*} want=${4#*=}
+    [ "${STUB_DELETE_FAIL:-0}" = 1 ] && { call "delete 실패"; echo "error: synthetic delete failure" >&2; exit 1; }
+    gone=''
+    for k in Pod Secret ConfigMap; do
+      for f in "$S/objects/$ns/$k"-*.json; do
+        [ -f "$f" ] || continue
+        jq -e --arg k "$key" --arg v "$want" '.metadata.labels[$k] == $v' "$f" > /dev/null || continue
+        rm -f "$f"
+        gone="${gone} $(printf '%s' "$k" | tr 'A-Z' 'a-z')"
+      done
+    done
+    call "delete${gone:- 없음}" ;;
   *) echo "합성 kubectl: 정해 두지 않은 호출 $*" >&2; printf 'kubectl %s\n' "$*" >> "$S/unknown"; exit 99 ;;
 esac
 exit 0
@@ -443,8 +452,9 @@ SQL_SUM=${SQL_SUM%% *}
 ops_left() { ls "$S/objects/catchu-ops" 2> /dev/null | grep -c . ; }
 reset_state
 run db-admin.sh "$SQL"
-check "db-admin: 종료 0, ConfigMap → Secret → Pod 순서로 만들고 끝나면 지움" \
-  "$(ok test "$rc" = 0 -a "$(calls)" = "create ConfigMap,create Secret,create Pod,delete configmap secret pod," -a "$(ops_left)" = 0)"
+first_run=$(sed -n 's/.*catchu\.io\/db-admin-run=\([0-9a-f]\{16\}\).*/\1/p' "$OUT" | head -1)
+check "db-admin: 종료 0, ConfigMap → Secret → Pod 순서로 만들고 끝나면 실행 표식으로 찾아 지움" \
+  "$(ok test "$rc" = 0 -a "$(calls)" = "create ConfigMap,create Secret,create Pod,delete pod secret configmap," -a "$(ops_left)" = 0)"
 check "db-admin: 비밀값이 출력·명령 인자·임시 폴더에 없고 계정 번호(관리자 비밀번호 ARN)도 찍지 않음" "$(ok secret_free)"
 check "db-admin: 기록에 SQL 해시·이미지 digest·종료 코드·지움 확인을 남김" \
   "$( { says "sha256 ${SQL_SUM}" && says '이미지 sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d' \
@@ -455,10 +465,14 @@ run STUB_DELETE_FAIL=1 db-admin.sh "$SQL"
 name=$(ls "$S/objects/catchu-ops" | sed -n 's/^Pod-\(.*\)\.json$/\1/p')
 cm=$S/objects/catchu-ops/ConfigMap-$name.json
 sec=$S/objects/catchu-ops/Secret-$name.json
-check "db-admin: 지웠는지 확인하지 못하면 4, 손으로 지우는 명령을 알려 줌" "$( { test "$rc" = 4 && says "delete configmap/${name} secret/${name} pod/${name} 를 실행"; } > /dev/null 2>&1; echo $?)"
-check "db-admin: 이름은 db-admin-<UTC 시각>, 세 임시 자원이 같은 이름·표식" \
-  "$( { [[ $name =~ ^db-admin-[0-9]{8}-[0-9]{6}$ ]] && "$REAL_JQ" -s -e 'all(.[]; .metadata.labels["catchu.io/db-admin"] == "once"
-    and .metadata.namespace == "catchu-ops")' "$cm" "$sec" "$S/objects/catchu-ops/Pod-$name.json"; } > /dev/null 2>&1; echo $?)"
+run_id=$("$REAL_JQ" -r '.metadata.labels["catchu.io/db-admin-run"] // ""' "$cm")
+check "db-admin: 지웠는지 확인하지 못하면 4, 남은 것과 실행 표식으로 지우는 명령을 알려 줌" \
+  "$( { test "$rc" = 4 && says "pod/${name} secret/${name} configmap/${name}" \
+    && says "delete pod,secret,configmap -l catchu.io/db-admin-run=${run_id} 를 실행"; } > /dev/null 2>&1; echo $?)"
+check "db-admin: 이름은 db-admin-<UTC 시각>, 세 임시 자원이 같은 이름·표식, 실행 표식은 실행마다 새 16자리 난수" \
+  "$( { [[ $name =~ ^db-admin-[0-9]{8}-[0-9]{6}$ ]] && [[ $run_id =~ ^[0-9a-f]{16}$ ]] && [[ $first_run =~ ^[0-9a-f]{16}$ ]] \
+    && test "$run_id" != "$first_run" && "$REAL_JQ" -s -e --arg r "$run_id" 'all(.[]; .metadata.labels["catchu.io/db-admin"] == "once"
+    and .metadata.labels["catchu.io/db-admin-run"] == $r and .metadata.namespace == "catchu-ops")' "$cm" "$sec" "$S/objects/catchu-ops/Pod-$name.json"; } > /dev/null 2>&1; echo $?)"
 check "db-admin: ConfigMap에 DB 주소·관리자 이름·SQL 원문·저장소 루트 인증서" \
   "$( { "$REAL_JQ" -e --arg h "$DB_HOST" '.data.PGHOST == $h and .data.PGUSER == "catchu_admin"
     and (.data | keys) == ["PGHOST", "PGUSER", "ca.pem", "run.sql"]' "$cm" \
@@ -494,7 +508,26 @@ check "db-admin: Secrets Manager의 관리자 이름이 RDS와 다르면 3, Secr
 reset_state
 run STUB_CREATE_FAIL=Pod db-admin.sh "$SQL"
 check "db-admin: Pod를 만들지 못하면(예: Pod 보안 검사 거부) 3, Secret·ConfigMap은 지움" \
-  "$(ok test "$rc" = 3 -a "$(calls)" = "create ConfigMap,create Secret,create Pod 실패,delete configmap secret," -a "$(ops_left)" = 0)"
+  "$(ok test "$rc" = 3 -a "$(calls)" = "create ConfigMap,create Secret,create Pod 실패,delete secret configmap," -a "$(ops_left)" = 0)"
+# 만들기 응답이 끊겼지만 서버에는 저장된 경우. 만들었다고 확인하지 못한 것도 실행 표식으로 찾아 지워야 한다.
+for c in "ConfigMap:create ConfigMap 응답 끊김,delete configmap," "Secret:create ConfigMap,create Secret 응답 끊김,delete secret configmap," \
+  "Pod:create ConfigMap,create Secret,create Pod 응답 끊김,delete pod secret configmap,"; do
+  reset_state
+  run STUB_CREATE_LOST="${c%%:*}" db-admin.sh "$SQL"
+  check "db-admin: ${c%%:*} 만들기 응답이 끊겨도(서버에는 저장됨) 실행 표식으로 찾아 지우고 3" \
+    "$( { test "$rc" = 3 -a "$(calls)" = "${c#*:}" -a "$(ops_left)" = 0 && says '지움 확인' && secret_free; } > /dev/null 2>&1; echo $?)"
+done
+check "db-admin: Pod 만들기 결과를 모르면 SQL이 실행됐을 수 있어 DB에서 확인하라고 알림" "$(ok says '응답만 끊겼다면 SQL이 실행됐을 수 있으니 DB에서 확인')"
+reset_state
+run STUB_CREATE_LOST=Secret STUB_DELETE_FAIL=1 db-admin.sh "$SQL"
+name=$(ls "$S/objects/catchu-ops" | sed -n 's/^Secret-\(.*\)\.json$/\1/p')
+check "db-admin: 응답이 끊긴 Secret을 지우지 못하면 4, 남은 대상과 실행 표식으로 지우는 명령을 알려 줌" \
+  "$( { test "$rc" = 4 && test -n "$name" && says "secret/${name} configmap/${name})" && says 'delete pod,secret,configmap -l catchu.io/db-admin-run=' \
+    && secret_free; } > /dev/null 2>&1; echo $?)"
+reset_state
+run STUB_GET_FAIL=1 db-admin.sh "$SQL"
+check "db-admin: 지운 뒤 실행 표식으로 조회하지 못하면 4(조회 실패), 관리자 비밀번호 Secret 이름을 알려 줌" \
+  "$( { test "$rc" = 4 && says '확인하지 못했다(조회 실패)' && says 'Secret(이름 db-admin-' && secret_free; } > /dev/null 2>&1; echo $?)"
 reset_state
 ssm_set /catchu/prod/db/catchu_app-password SecureString "${APP_PW}"$'\n'
 run db-admin.sh "$SQL"
@@ -504,21 +537,21 @@ reset_state
 run STUB_ADMIN_PW="${ADMIN_PW}"$'\n' db-admin.sh "$SQL"
 check "db-admin: 관리자 비밀번호 끝에 줄바꿈이 붙으면 Secret을 만들지 않고 3" \
   "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap,delete configmap," && says '관리자 비밀번호가 비었거나 형식이 다르다' && secret_free; } > /dev/null 2>&1; echo $?)"
-only_left() { # 남은 임시 자원이 그 종류 하나뿐이다(같은 이름으로 이미 있던 것, 다른 실행의 것으로 본다)
+only_left() { # 남은 임시 자원이 그 종류 하나뿐이다(같은 이름으로 이미 있던 것. 실행 표식이 다른 다른 실행의 것으로 본다)
   test "$(ops_left)" = 1 && ls "$S/objects/catchu-ops" | grep -q "^$1-db-admin-"
 }
 reset_state
 run STUB_CREATE_EXISTS=ConfigMap db-admin.sh "$SQL"
-check "db-admin: 같은 이름의 ConfigMap이 이미 있으면 3, 이 실행이 만든 것이 없어 아무것도 지우지 않음" \
-  "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap 이미 있음," && only_left ConfigMap && says '이 실행이 만든 임시 자원은 없다'; } > /dev/null 2>&1; echo $?)"
+check "db-admin: 같은 이름의 ConfigMap이 이미 있으면 3, 실행 표식이 달라 지우지 않음" \
+  "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap 이미 있음,delete 없음," && only_left ConfigMap && says '남은 것 없음'; } > /dev/null 2>&1; echo $?)"
 reset_state
 run STUB_CREATE_EXISTS=Secret db-admin.sh "$SQL"
-check "db-admin: 같은 이름의 Secret이 이미 있으면 3, 이 실행이 만든 ConfigMap만 지움" \
+check "db-admin: 같은 이름의 Secret이 이미 있으면 3, 이 실행의 ConfigMap만 지움" \
   "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap,create Secret 이미 있음,delete configmap," && only_left Secret; } > /dev/null 2>&1; echo $?)"
 reset_state
 run STUB_CREATE_EXISTS=Pod db-admin.sh "$SQL"
-check "db-admin: 같은 이름의 Pod가 이미 있으면 3, 이 실행이 만든 ConfigMap·Secret만 지우고 그 Pod는 둠" \
-  "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap,create Secret,create Pod 이미 있음,delete configmap secret," && only_left Pod; } > /dev/null 2>&1; echo $?)"
+check "db-admin: 같은 이름의 Pod가 이미 있으면 3, 이 실행의 ConfigMap·Secret만 지우고 그 Pod는 둠" \
+  "$( { test "$rc" = 3 -a "$(calls)" = "create ConfigMap,create Secret,create Pod 이미 있음,delete secret configmap," && only_left Pod; } > /dev/null 2>&1; echo $?)"
 no_create() { test "$rc" = 1 -a -z "$(calls)"; }
 for c in STUB_LEFTOVER=1 STUB_NO_NS=catchu-ops STUB_NO_NETPOL=db-admin STUB_PARAMETER_STATUS=pending-reboot \
   STUB_PARAMETER_GROUP=default.postgres16 STUB_LOG_MIN=error STUB_SECRET_STATUS=rotating STUB_RDS_STATUS=backing-up; do

@@ -52,7 +52,7 @@ bash deploy/aws/scripts/put-parameter.sh --stdin /catchu/prod/worker/CATCHU_GENE
 
 ## DB 관리 Pod(db-admin.sh)
 
-DB 계정 만들기처럼 RDS 관리자로 SQL을 실행할 때 쓴다. [`db-admin.sh`](../scripts/db-admin.sh)가 namespace `catchu-ops`에 psql 일회 Pod를 띄워 [`../db/`](../db)의 SQL 파일 하나를 한 트랜잭션으로 실행하고, 끝나면 성공·실패와 관계없이 이 실행이 만든 Pod·Secret·ConfigMap을 지운다. 같은 이름이 이미 있어 만들지 못한 것은 다른 실행의 것일 수 있어 지우지 않는다.
+DB 계정 만들기처럼 RDS 관리자로 SQL을 실행할 때 쓴다. [`db-admin.sh`](../scripts/db-admin.sh)가 namespace `catchu-ops`에 psql 일회 Pod를 띄워 [`../db/`](../db)의 SQL 파일 하나를 한 트랜잭션으로 실행하고, 끝나면 성공·실패와 관계없이 임시 Pod·Secret·ConfigMap을 지운다(아래 「정리」).
 
 ```bash
 bash deploy/aws/scripts/db-admin.sh deploy/aws/db/roles.sql
@@ -62,14 +62,15 @@ bash deploy/aws/scripts/db-admin.sh deploy/aws/db/roles.sql
 - **비밀번호:** RDS 관리자 비밀번호는 RDS가 Secrets Manager에서 관리하며 7일마다 바꾸므로 실행할 때마다 읽는다. 계정 비밀번호 둘은 SSM에서 읽는다. 셋 다 Pod와 같은 이름의 임시 Secret으로만 넘기고, 값은 파이프로만 지난다.
 - **시작 전 확인(아무것도 만들지 않고 1로 멈춤):** 계정·클러스터, `catchu-ops`와 NetworkPolicy 셋, 지난 실행에서 남은 임시 자원이 없음, RDS(available, CA `rds-ca-rsa2048-g1`, 관리자 비밀번호 상태 active), 파라미터 그룹 `catchu-pg16`이 반영됐고(in-sync) `log_min_error_statement=panic`·`log_statement=none`인지(실패한 문장의 비밀번호가 DB 로그에 남지 않게), SSM 계정 비밀번호 둘.
 - **Pod:** postgres 16.15 이미지(로컬 합성 DB와 같은 digest. 앱 이미지에는 psql이 없다)를 사용자 999·읽기 전용 루트·권한 전부 제거로 띄운다. psql은 psqlrc 없이, 문장을 출력에 되풀이하지 않고, 오류에서 멈추며 한 트랜잭션으로 실행한다. 오류가 나도 문장 원문은 찍지 않는다(psql 기본값은 위치 오류 때 비밀번호가 든 문장 줄을 그대로 보여 준다). TLS는 `PGSSLMODE=verify-full`과 저장소의 루트 인증서로 검증한다.
+- **정리:** 세 임시 자원에 실행마다 새로 만든 표식 `catchu.io/db-admin-run`(16자리 난수)을 붙이고, 끝나면 그 표식으로 찾아 지운 뒤 없어졌는지 확인한다. 만들기 응답이 끊겨 결과를 모르는 것도 서버에 저장됐으면 지우고, 같은 이름이어도 표식이 다른 것(같은 초에 시작한 다른 실행의 것)은 건드리지 않는다. 정리한 뒤에 서버가 늦게 저장한 것은 다음 실행의 시작 전 확인이 남은 임시 자원으로 찾아 멈춘다.
 - **기록:** 출력 끝의 「DB 관리 기록」(Pod 이름, 이미지 digest, SQL 파일의 SHA-256, 종료 코드, 시각, 임시 자원 지움 확인)과 psql 출력을 남긴다. 출력에는 계정 번호가 들어가지 않는다.
 
 | 종료 코드 | 상태와 다음 행동 |
 |---|---|
 | 0 | SQL 성공, 임시 자원 지움 확인 |
 | 1 | 시작 전 확인에서 멈췄다. 아무것도 만들지 않았다. 출력의 원인을 고친 뒤 다시 실행한다 |
-| 3 | SQL 실패 또는 결과 불명. 임시 자원은 지웠다. 실패면 한 트랜잭션이라 DB는 바뀌지 않았다. 결과 불명(시간 초과·조회 실패)이면 DB에서 결과를 확인한다 |
-| 4 | 임시 자원을 지웠는지 확인하지 못했다. 관리자 비밀번호가 든 Secret이 남았을 수 있으니 출력의 명령으로 곧바로 지우고 없어졌는지 본다 |
+| 3 | SQL 실패 또는 결과 불명. 임시 자원은 표식으로 찾아 지웠다. 실패면 한 트랜잭션이라 DB는 바뀌지 않았다. 결과 불명(시간 초과·조회 실패, Pod 만들기 응답이 끊김)이면 DB에서 결과를 확인한다 |
+| 4 | 임시 자원을 지웠는지 확인하지 못했다(표식으로 조회하지 못했거나 지운 뒤에도 남았다). 관리자 비밀번호가 든 Secret이 남았을 수 있으니 출력의 명령(표식으로 지운다)으로 곧바로 지우고 없어졌는지 본다 |
 
 **계정 SQL([`roles.sql`](../db/roles.sql)).** 2단계에서 첫 `deploy.sh` 전에 한 번 실행한다. migration 계정이 DB와 public 스키마를 소유하고 앱 계정은 자료 읽기·쓰기만 한다. RDS 관리자는 슈퍼유저가 아니어서 로컬 [`init-roles.sh`](../../local-db/init-roles.sh)와 달리 만든 역할을 관리자 자신에게 SET으로 준 뒤 소유자를 넘긴다(PostgreSQL 16 조건). 앱 계정에는 `lock_timeout` 3초를 건다(#220). `idle_in_transaction_session_timeout`은 #220에서 값을 정하면 SQL 파일을 더해 같은 방법으로 실행한다(그때까지 RDS 기본값). 다시 실행하면 이미 있는 계정에서 실패하고 아무것도 바뀌지 않는다. 출력의 확인 표(역할 속성·`lock_timeout`·DB와 스키마 소유자·기본 권한)를 #276 완료 기준 증거로 남긴다.
 
@@ -164,10 +165,10 @@ bash·jq·git·ruby가 필요하고 30초쯤 걸린다. kubectl·aws·sleep을 �
 Secret 만들기·SSM 값 넣기·DB 관리 Pod는 두 시험으로 본다.
 
 ```bash
-bash deploy/aws/scripts/secrets.test.sh    # 20초쯤. bash·jq·ruby·openssl·shasum·aws CLI v2
+bash deploy/aws/scripts/secrets.test.sh    # 25초쯤. bash·jq·ruby·openssl·shasum·aws CLI v2
 bash deploy/aws/scripts/db-roles.test.sh   # 1분쯤. Docker가 돌고 있어야 한다
 ```
 
-- `secrets.test.sh`: aws·kubectl을 합성 명령으로 바꾸고 이 폴더를 복사한 곳에서 `make-secrets.sh`·`put-parameter.sh`·`db-admin.sh`를 실제로 실행한다. 만드는 내용(Secret 키·값·판 번호 주석, 큐 주소, ConfigMap, 임시 Secret·Pod), 시작 전 확인이나 값 검사(값 끝의 줄바꿈 포함)가 하나라도 어긋나면 아무것도 바꾸지 않고 멈춤, 종료 코드, 임시 자원을 늘 지움, 시험마다 새로 만든 합성 비밀값이 출력·aws·kubectl·jq의 명령 인자·임시 폴더에 없음, 계정 번호가 출력에 없음, `catchu-ops` 실행 파일 조건, 루트 인증서의 지문을 본다.
+- `secrets.test.sh`: aws·kubectl을 합성 명령으로 바꾸고 이 폴더를 복사한 곳에서 `make-secrets.sh`·`put-parameter.sh`·`db-admin.sh`를 실제로 실행한다. 만드는 내용(Secret 키·값·판 번호 주석, 큐 주소, ConfigMap, 임시 Secret·Pod), 시작 전 확인이나 값 검사(값 끝의 줄바꿈 포함)가 하나라도 어긋나면 아무것도 바꾸지 않고 멈춤, 종료 코드, 임시 자원을 늘 지움(만들기 응답이 끊겨 서버에만 저장된 것 포함, 표식이 다른 같은 이름은 둠), 시험마다 새로 만든 합성 비밀값이 출력·aws·kubectl·jq의 명령 인자·임시 폴더에 없음, 계정 번호가 출력에 없음, `catchu-ops` 실행 파일 조건, 루트 인증서의 지문을 본다.
 - `db-roles.test.sh`: RDS처럼 슈퍼유저가 아닌 관리자를 둔 PostgreSQL 16.15 컨테이너에 psql Pod 틀의 이미지·명령·환경 그대로(사용자 999·읽기 전용 루트·TLS `verify-full`) `roles.sql`을 실행하고, 각 계정으로 붙어 권한(앱 계정의 읽기·쓰기와 `lock_timeout`, 스키마 변경 거부, 다른 계정의 접속·스키마 사용 거부, 두 계정에 특별 권한 없음, 다시 실행하거나 중간 문장이 실패하면 바뀌지 않음, 인증서와 다른 이름으로 붙으면 거부, 위치 오류 때도 문장 원문을 찍지 않음, 비밀번호가 출력·DB 로그에 없음)을 본다.
 - 확인하지 못하는 것: 실제 server-side apply와 Pod 보안 검사, 실제 RDS 관리자(`rds_superuser`)의 특성과 실제 Secrets Manager 응답. 이것은 2단계에서 본다.
