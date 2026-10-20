@@ -1,8 +1,8 @@
 # 실제 선정 저장소 좌표 연결 — #105·#252
 
 10/16 담당자 요청으로 아래 두 저장소를 **로그인한 모든 회원**의 선정 대상으로 등록한다.
-GitHub 연결과 유효한 분석 동의는 계속 필요하다. 현재 구현은 서버 내부 자료와 Catch 등록 조회 접점이며,
-목록 API나 LIVE 분석 접수를 활성화한 상태는 아니다.
+GitHub 연결과 유효한 분석 동의는 계속 필요하다. 이 문서는 좌표 보관과 Catch 등록 조회 접점이다.
+현재 선정과 실제 회원 목록 공급은 [#252 선정 공급](repository-selection.md)이 맡고, LIVE 분석 접수는 #323 범위다.
 
 | 저장소 | repositoryId | 선정 좌표 판본 |
 |---|---|---|
@@ -14,7 +14,7 @@ GitHub 메타데이터의 고유 숫자 ID를 문자열로 쓴다. 두 저장소
 
 ## 보관과 등록 조회
 
-`SelectedRepositoryCatalog`는 현재 목록과 과거 좌표 판본을 분리한다. 선정 제외는 현재 참조 목록만 바꾸고,
+`SelectedRepositoryCatalog`는 좌표 판본을 보관한다. 현재 선정은 #252의 DB 행이 정하므로 선정 제외는 그 행만 바꾸고,
 이름·소유자가 바뀌면 새 판본을 추가한다. 요청이 참조한 이전 판본을 수정·삭제하지 않는다.
 
 `SelectedRepositoryRegistrationSource`는 저장된 요청·시도·동의를 같은 DB 스냅샷으로 읽고 일곱 맥락을 대조한다.
@@ -42,7 +42,7 @@ AnalysisReceiverModule.registerDatabase({
 
 ## 분석 조회와 Catch 저장이 공유하는 판본
 
-#252에서 구현할 DB를 현재 선정·활성·범위 판본의 정본으로 사용한다. 카탈로그의 `listCurrent()`나 `ALL_AUTHENTICATED`만으로 접수·실행을 허가하지 않는다.
+#252의 DB 행(`repository_selection`, [선정 공급](repository-selection.md))을 현재 선정·활성·범위 판본의 정본으로 사용한다. 카탈로그의 `listCurrent()`나 `ALL_AUTHENTICATED`만으로 목록·접수·실행을 허가하지 않는다.
 
 | 값 | 연결 규칙 |
 |---|---|
@@ -53,7 +53,7 @@ AnalysisReceiverModule.registerDatabase({
 분석을 허가한 뒤 현재 선정에서 제외되거나 이름이 바뀌어도, B는 접수 당시 좌표 판본으로 결과 근거를 대조한다. 알 수 없는 참조·저장소 불일치는 거부한다.
 여기서 판본은 선정 좌표·분석 범위의 판본이며 Git 커밋 SHA를 고정해 수집했다는 뜻은 아니다.
 
-#252의 실제 공급자가 아직 없어 실제 실행과의 연결 완료를 선언하지 않는다. 연결 담당자는 #232에 넘길 좌표와 B의 `catalog.resolve(저장된 selectionReference)`가 같은지 대조해야 한다. 전체 범위 허가·최종 DB 잠금은 [worker 컨텍스트 계약](worker-context.md)을 따른다.
+#252의 worker 선정 공급은 같은 카탈로그의 `resolve`로 #232에 넘길 좌표를 만든다. 그 좌표와 B의 `catalog.resolve(저장된 selectionReference)`가 같은지는 `test/integration/repository-selection-chain.test.cjs`가 대조하며, 실제 큐·worker 왕복은 검증하지 않았다. 전체 범위 허가·최종 DB 잠금은 [worker 컨텍스트 계약](worker-context.md)을 따른다.
 
 ## 고지와 실제 실행 연결
 
@@ -67,5 +67,5 @@ AnalysisReceiverModule.registerDatabase({
 
 전용 PostgreSQL에서 두 실제 저장소 좌표에 **합성 동의와 분석 결과**를 붙여 수신 → 좌표 조회 → Catch·근거 저장 → 본인 조회를 검사한다.
 일곱 맥락 불일치, 과거 판본, MOCK 거부, 조회 장애, 다른 저장소 근거, 중복 결과도 검사한다.
-추가 연결 검사는 실제 큐 메시지 조립·worker 컨텍스트 서비스·Catch 등록을 같은 테스트 DB로 묶는다. 선정·GitHub 자격정보는 명시적 테스트 대역이며 #252의 실제 DB 공급 구현이나 실제 큐·worker 왕복 검증을 대신하지 않는다.
+추가 연결 검사는 실제 큐 메시지 조립·worker 컨텍스트 서비스·Catch 등록을 같은 테스트 DB로 묶는다. 선정·GitHub 자격정보는 명시적 테스트 대역이며 #252의 실제 DB 공급 검사(같은 연쇄는 `repository-selection-chain.test.cjs`)나 실제 큐·worker 왕복 검증을 대신하지 않는다.
 실제 회원의 동의·GitHub 자료 수집·LLM 분석·운영 DB 검증은 아니다.

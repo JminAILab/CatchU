@@ -236,7 +236,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 선정 지원 저장소 조회 — #136
 
-[docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다.
+[docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다. 실제 회원의 DB 선정 공급과 #323·#232 접점·초기화·갱신 절차(#252)는 [docs/repository-selection.md](docs/repository-selection.md)에 있다.
 
 ## 분석 고지·접수·실패 재요청 — #138
 
