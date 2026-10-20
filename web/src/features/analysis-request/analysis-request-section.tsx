@@ -110,7 +110,7 @@ function ConnectionRequired({ notice, linked }: { notice: ConnectionNotice; link
   const reauth = notice === "REAUTH_REQUIRED";
   return (
     <div className={styles.lookupFailed}>
-      <p>{reauth ? "GitHub 연동을 다시 확인해야 새 분석을 요청할 수 있습니다." : "GitHub 연동이 해제되어 새 분석을 요청할 수 없습니다."} 연동한 뒤 저장소와 분석 안내를 다시 확인해 주세요.</p>
+      <p>{reauth ? "GitHub 연동을 다시 확인해야 새 분석을 요청할 수 있습니다." : "GitHub가 연동되어 있지 않아 새 분석을 요청할 수 없습니다."} 연동한 뒤 저장소와 분석 안내를 다시 확인해 주세요.</p>
       {!linked && <Link href={routes.profileGithub} className={styles.inlineLink}>{reauth ? "GitHub 다시 연동하기" : "GitHub 연동하기"}</Link>}
     </div>
   );

@@ -324,7 +324,7 @@ function ConnectedList({ connected, expanded, titleId, onToggle, onShowRepositor
     const reauth = connected.github === "REAUTH_REQUIRED";
     return (
       <div className={styles.lookupFailed} role="alert">
-        <p>{reauth ? "GitHub 연동을 다시 확인해야 저장소 상태를 불러올 수 있습니다." : "GitHub 연동이 해제되어 저장소 상태를 불러올 수 없습니다."} 분석이 실패한 것은 아닙니다.</p>
+        <p>{reauth ? "GitHub 연동을 다시 확인해야 저장소 상태를 불러올 수 있습니다." : "GitHub가 연동되어 있지 않아 저장소 상태를 불러올 수 없습니다."} 분석이 실패한 것은 아닙니다.</p>
         <Link href={routes.profileGithub} className={styles.secondaryButton}>{reauth ? "GitHub 다시 연동하기" : "GitHub 연동하기"}</Link>
       </div>
     );
