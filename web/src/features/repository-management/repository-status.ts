@@ -1,4 +1,5 @@
-import type { AnalysisFailure, AnalysisSummary, Application, EligibleRepository } from "./repository-api.ts";
+import type { AnalysisFailure, AnalysisSummary, Application, EligibleRepository, GitHubState, Lookup } from "./repository-api.ts";
+import type { RequestSnapshot } from "../analysis-request/analysis-request-store.ts";
 
 /**
  * 연결된 저장소의 상태 표시 규칙(#153). web 기능 설계 「내 자산 화면 구조」·「화면 상태 전이」와
@@ -156,4 +157,47 @@ export function statusDetails(status: AnalysisSummary): string[] {
   }
   if (status.retryAllowed) lines.push("새로 동의하고 다시 요청할 수 있습니다.");
   return lines;
+}
+
+/**
+ * 선정 목록의 연결 필요(403) 뒤 `/me` 재조회 결과를 화면 상태로 바꾼다(#153).
+ * - 연결 해제·재인증 필요: 영역의 연동 상태를 그 값으로 바꾸고, 「연결된 저장소」에는 연동 안내를 보인다.
+ * - 다시 연결됨: 연동 상태는 그대로, 목록은 일반 조회 실패로 남겨 사용자가 다시 시도한다.
+ * - 재조회 실패: 연동 해제나 재인증 필요로 추정하지 않는다. 연동 상태도 목록도 조회 실패다.
+ */
+export type ConnectionCheckView = {
+  github: { state: "ready"; value: GitHubState } | { state: "failed" };
+  connected: { state: "failed"; github?: Exclude<GitHubState, "CONNECTED"> };
+};
+export function connectionCheckView(github: Lookup<GitHubState>): ConnectionCheckView {
+  if (github.kind !== "success") return { github: { state: "failed" }, connected: { state: "failed" } };
+  const value = github.data;
+  return { github: { state: "ready", value }, connected: value === "CONNECTED" ? { state: "failed" } : { state: "failed", github: value } };
+}
+
+/** 영역의 연동 상태 표시. 화면의 연동 상태 조회 결과와 같은 모양이다. */
+export type GitHubLoad = { state: "loading" } | { state: "failed" } | { state: "ready"; value: GitHubState };
+
+/**
+ * 영역에 [보낸 분석 요청 확인]을 보일지(#153). 확인하지 못한 분석 요청(#154의 요청 중·응답 불명·빈도 제한)이 남았는데
+ * 영역에 [연결 관리]가 없을 때만 참이다. 목록 403 뒤 재조회로 연동 상태가 연결 해제·재인증 필요·조회 실패로 바뀌어도
+ * 같은 화면에 남은 키·본문·대기 기한으로 그 요청의 결과를 확인하게 하려는 것이며, 새 요청을 시작하는 수단이 아니다.
+ */
+export function showsPendingRequestEntry(github: GitHubLoad, phase: RequestSnapshot["phase"]): boolean {
+  if (phase === "editing") return false;
+  return !(github.state === "ready" && github.value === "CONNECTED");
+}
+
+/**
+ * 분석 요청 영역에 보일 연결 안내(#153). 입력 단계에서 이 값이 있으면 새 요청 조작 대신 재연동 안내를 보인다.
+ * - 영역에서 연결 해제·재인증 필요가 확인됐으면 그 값.
+ * - 서버가 접수를 연결 필요(403 `GITHUB_CONNECTION_REQUIRED`)로 거부한 뒤 「연결된 저장소」를 다시 불러오는 중이면 `CHECKING`.
+ * - 연동 상태 로딩·조회 실패는 미연결로 추정하지 않는다(없음).
+ */
+export function requestConnectionNotice(
+  github: GitHubLoad, rejectedForConnection: boolean, connectedState: "loading" | "checking" | "ready" | "failed",
+): "DISCONNECTED" | "REAUTH_REQUIRED" | "CHECKING" | undefined {
+  if (github.state === "ready" && github.value !== "CONNECTED") return github.value;
+  if (rejectedForConnection && (connectedState === "loading" || connectedState === "checking")) return "CHECKING";
+  return undefined;
 }
