@@ -195,7 +195,7 @@ docker run -d --name catchu-db-test -p 127.0.0.1:5433:5432 -e POSTGRES_USER=catc
 - 파일 하나만 실행: `npm test -- test/db/timestamptz.test.cjs`. `node --test`로 직접 실행하면 `DB_*`가 없어 실패한다.
 - 테스트 DB를 새로 만들려면 `docker rm -f catchu-db-test` 뒤 다시 `docker run`한다. 다음 `npm test`가 마이그레이션을 처음부터 적용한다.
 - 큐 연결(#233)의 실제 Valkey 시험은 `CATCHU_TEST_REDIS_URL`을 **셸 환경변수**로 줄 때만 돌고(`.env`로는 넘어가지 않는다), 없으면 건너뛴다. 준비 명령은 [docs/analysis-queue.md 「시험」](docs/analysis-queue.md#시험).
-- 잠금 대기 상한 시험(#220)은 시험 전용 DB 계정을 만들었다 지우므로 테스트 DB 계정에 역할·데이터베이스 생성 권한이 필요하다(위 명령의 `catchu`는 superuser). 권한이 없으면 로컬에서는 건너뛰고 `CI=true`에서는 실패한다([docs/lock-wait-limit.md 「시험」](docs/lock-wait-limit.md#시험)).
+- 잠금 대기 상한 시험(#220)은 시험 전용 DB 계정을 만들었다 지우므로 테스트 DB 계정에 역할 생성 권한이 필요하다(위 명령의 `catchu`는 superuser). 권한이 없으면 로컬에서는 건너뛰고 `CI=true`에서는 실패한다([docs/lock-wait-limit.md 「시험」](docs/lock-wait-limit.md#시험)). 실행기가 둘째 줄 DB도 만들므로 `CREATEDB`도 필요하고, 없으면 `npm test`가 시험 전에 멈춘다(권한을 주거나 `…_lock_test` DB를 미리 만든다).
 
 DB를 쓰는 테스트를 추가할 때:
 
