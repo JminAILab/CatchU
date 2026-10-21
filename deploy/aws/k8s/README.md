@@ -14,7 +14,7 @@ EKS(#276)에서 web·api·worker를 띄우는 쿠버네티스 실행 파일과 �
 | [`ingress.yaml`](ingress.yaml) | 손으로 | 공개 ALB. 80은 443으로 이동(301), TLS 1.2·1.3만, `/v1/internal`은 404, `/v1`은 api, 그 밖은 web, HSTS 300초, 유휴 60초, 삭제 보호, WAF `catchu-edge` |
 | [`api.yaml`](api.yaml)·[`worker.yaml`](worker.yaml)·[`web.yaml`](web.yaml) | `deploy.sh`만 | api·worker는 한 개씩 `Recreate`, web은 새 Pod를 먼저 띄우고 옛 Pod를 내린다. 모두 UID 1000·읽기 전용 루트·권한 전부 제거·`/tmp` 크기 상한, 자원 요청과 메모리 상한(worker는 실제 분석을 재기 전의 임시값) |
 | [`migration-pod.yaml`](migration-pod.yaml) | `deploy.sh`만 | migration 일회 Pod 틀. controller 없이 한 번 실행하고 다시 띄우지 않으며 10분 한도가 있다 |
-| [`consent-guard-pod.yaml`](consent-guard-pod.yaml) | `deploy.sh`만(작업 폴더의 판) | 동의 기록 삭제 권한 확인 일회 Pod 틀. migration 계정으로 붙어 앱 계정의 동의 기록 DELETE·TRUNCATE 권한을 확인·회수·재확인한다(postgres 16.15, 사용자 999·읽기 전용 루트·권한 전부 제거, TLS `verify-full`, 5분 한도). 연결 허용은 migration과 같다 |
+| [`consent-guard-pod.yaml`](consent-guard-pod.yaml) | `deploy.sh`만 | 동의 기록 삭제 권한 확인 일회 Pod 틀. migration 계정으로 붙어 앱 계정의 동의 기록 DELETE·TRUNCATE 권한을 확인·회수·재확인한다(postgres 16.15, 사용자 999·읽기 전용 루트·권한 전부 제거, TLS `verify-full`, 5분 한도). 연결 허용은 migration과 같다 |
 | [`ops/namespace.yaml`](ops/namespace.yaml)·[`ops/network-policy.yaml`](ops/network-policy.yaml) | 손으로 | 관리 작업 namespace `catchu-ops`(Pod 보안 검사 `restricted`, 토큰 자동 탑재 끔)와 그 연결 허용 목록(기본 차단, DNS, psql Pod는 DB 5432만) |
 | [`ops/db-admin-pod.yaml`](ops/db-admin-pod.yaml) | `db-admin.sh`만 | DB 관리용 psql 일회 Pod 틀(postgres 16.15, 사용자 999·읽기 전용 루트·권한 전부 제거, TLS `verify-full`, 5분 한도) |
 
@@ -127,11 +127,11 @@ bash deploy/aws/scripts/check-target.sh --cluster
 bash deploy/aws/scripts/deploy.sh --commit <main 커밋 40자>
 ```
 
-- **입력은 커밋 하나다.** 이미지는 ECR 네 저장소에서 태그 `main-<커밋 앞 12자>`(main 자동 배포가 올린 태그)의 digest로 띄운다. Deployment·migration 틀은 그 커밋의 `deploy/aws/k8s/` 파일을 git에서 읽는다. 그래서 배포할 커밋이 로컬 저장소에 있어야 하고(`git fetch origin main`), 그 커밋에 이 실행 파일이 들어 있어야 한다. `deploy.sh` 자신과 동의 기록 확인 Pod 틀은 지금 작업 폴더의 판을 쓴다. 옛 커밋으로 되돌려 배포해도 그 확인이 빠지지 않게 하려는 것이다.
+- **입력은 커밋 하나다.** 이미지는 ECR 네 저장소에서 태그 `main-<커밋 앞 12자>`(main 자동 배포가 올린 태그)의 digest로 띄운다. Deployment·migration·동의 기록 확인 틀은 그 커밋의 `deploy/aws/k8s/` 파일을 git에서 읽는다. 그래서 배포할 커밋이 로컬 저장소에 있어야 하고(`git fetch origin main`), 그 커밋에 이 실행 파일이 들어 있어야 한다. 동의 기록 확인 틀이 없는 커밋(이 확인이 들어오기 전 판)은 아무것도 바꾸지 않고 2로 멈춘다. `deploy.sh` 자신은 지금 작업 폴더의 판을 쓴다.
 - **같은 판본·구성이 이미 정상으로 돌면 아무것도 바꾸지 않는다.**
-- **순서:** ① 시작 전 확인(계정·클러스터, 이미지 네 개, 실행 파일, 기본 차단 NetworkPolicy와 ConfigMap `catchu-db`) → ② 옛 api·worker를 0으로 줄이고 없어질 때까지 기다린 뒤 종료 코드를 본다(web은 그대로 둔다) → ③ migration 일회 Pod `catchu-migrate-<커밋 앞 12자>`를 한 번 실행한다. 같은 이미지로 이미 성공한 같은 이름의 Pod가 있으면 건너뛴다 → ④ 동의 기록 확인 Pod `catchu-consent-guard-<UTC 시각>`을 한 번 실행한다. migration을 건너뛰었어도 매번 한다. 앱 계정(`catchu_app`)이 동의 기록에 DELETE·TRUNCATE 권한을 갖고 있으면 회수하고 다시 본다. 확인 대상은 실제로 쓸 수 있는 권한이라 PUBLIC이나 다른 역할에서 받은 권한도 들어가는데, 회수는 앱 계정에 직접 준 것만 지운다. 그런 권한이 있어 다시 볼 때도 남아 있으면 같은 트랜잭션의 회수까지 되돌리고 8로 멈춘다 → ⑤ api → worker → web 순서로 적용하고 하나씩 준비되기를 기다린 뒤, 셋이 모두 정상인지 다시 본다.
+- **순서:** ① 시작 전 확인(계정·클러스터, 이미지 네 개, 실행 파일, 기본 차단 NetworkPolicy와 ConfigMap `catchu-db`) → ② 옛 api·worker를 0으로 줄이고 없어질 때까지 기다린 뒤 종료 코드를 본다(web은 그대로 둔다) → ③ migration 일회 Pod `catchu-migrate-<커밋 앞 12자>`를 한 번 실행한다. 같은 이미지로 이미 성공한 같은 이름의 Pod가 있으면 건너뛴다 → ④ 동의 기록 확인 Pod `catchu-consent-guard-<UTC 시각>`을 한 번 실행한다. 교체할 때마다(migration을 건너뛰었어도) 한다. 앱 계정(`catchu_app`)이 동의 기록에 DELETE·TRUNCATE 권한을 갖고 있으면 회수하고 다시 본다. 확인 대상은 실제로 쓸 수 있는 권한이라 PUBLIC이나 다른 역할에서 받은 권한도 들어가는데, 회수는 앱 계정에 직접 준 것만 지운다. 그런 권한이 있어 다시 볼 때도 남아 있으면 같은 트랜잭션의 회수까지 되돌리고 8로 멈춘다. 물려받지 않고 역할 바꾸기(`SET ROLE`)로만 쓸 수 있는 역할의 권한은 잡지 못한다(`roles.sql`은 앱 계정에 어떤 역할도 주지 않는다. 역할을 줄 일이 생기면 이 확인부터 다시 본다) → ⑤ api → worker → web 순서로 적용하고 하나씩 준비되기를 기다린 뒤, 셋이 모두 정상인지 다시 본다.
 - **중단 시간:** ②부터 ⑤의 api 준비까지 api·worker가 없다. 그동안 `/v1` 요청은 ALB가 503으로 돌려준다(화면은 뜬다). 분석 중이던 작업은 worker가 실패로 남기고 처리 시한에 닫힌다([../../README.md](../../README.md) 「계획 교체」).
-- **기록:** 출력 끝의 「교체 기록」(커밋, 대상 DB, 이미지 digest, 옛 실행의 종료 코드, migration Pod의 uid·종료 코드·시각, 동의 기록 확인 Pod의 uid·종료 코드와 `동의 기록 직접 삭제 권한(catchu_app): 회수 전 있음|없음, 회수 뒤 없음` 줄)을 남긴다. 이 줄이 #276 완료 기준 '동의 기록 직접 삭제 권한 없음'의 증거다. 두 Pod는 지우지 않으므로 로그는 `k logs catchu-migrate-<커밋 앞 12자>`·`k logs catchu-consent-guard-<UTC 시각>`으로 다시 볼 수 있다. 출력에는 계정 번호가 들어가지 않는다(이미지 주소 대신 digest만 찍는다).
+- **기록:** 출력 끝의 「교체 기록」(커밋, 대상 DB, 이미지 digest, 옛 실행의 종료 코드, migration Pod의 uid·종료 코드·시각, 동의 기록 확인 Pod의 uid·종료 코드와 `동의 기록 직접 삭제 권한(catchu_app): 회수 전 있음|없음, 회수 뒤 없음` 줄)을 남긴다. 이 줄이 #276 완료 기준 '동의 기록 직접 삭제 권한 없음'의 증거다. 로그를 읽지 못하면 그 줄 대신 안내가 남으므로 아래 명령으로 Pod 로그를 다시 본다. 두 Pod는 지우지 않으므로 로그는 `k logs catchu-migrate-<커밋 앞 12자>`·`k logs catchu-consent-guard-<UTC 시각>`으로 다시 볼 수 있다. 출력에는 계정 번호가 들어가지 않는다(이미지 주소 대신 digest만 찍는다).
 - **되돌리기:** 이전 main 커밋으로 다시 실행한다. **이전 이미지가 지금 DB 스키마와 호환될 때만** 한다. migration은 되돌리지 않는다([../../README.md](../../README.md) 「실패 시 정지와 되돌리기」).
 
 | 종료 코드 | 상태와 다음 행동 |
@@ -145,7 +145,7 @@ bash deploy/aws/scripts/deploy.sh --commit <main 커밋 40자>
 | 7 | 옛 실행이 종료 유예 안에 끝나지 않아 강제 종료(137)됐다. 분석 중이던 작업이 실패로 기록되지 않았을 수 있으니 큐 상태를 본다 |
 | 8 | 동의 기록 삭제 권한을 회수·확인하지 못했다(회수 뒤에도 남음, 확인 Pod 실패, 만들기 요청 실패·시간 초과·조회 실패). 새 실행은 시작하지 않았다. 출력의 psql 줄로 원인을 본다. 회수 뒤에도 남았으면 PUBLIC이나 다른 역할에서 받은 권한이고, 표가 없거나 접속하지 못해도 실패한다. 확인·회수는 다시 해도 결과가 같으므로 원인을 고친 뒤 `--resume`으로 다시 실행한다 |
 
-3~8로 멈추면 api·worker는 0으로 멈춘 채다. 다음 실행은 이 상태를 보고 2로 멈추므로, 원인을 확인한 뒤 `--resume`을 붙여 다시 실행한다. 자동 배포(#342)의 다음 실행도 결과를 확인하기 전에는 덮어쓰지 않는다.
+3~8로 멈추면 api·worker는 0으로 멈춘 채다. 다음 실행은 이 상태를 보고 2로 멈추므로, 원인을 확인한 뒤 `--resume`을 붙여 다시 실행한다. 다만 처음 설치에서 8로 멈췄으면 Deployment가 아직 없어 다음 실행은 `--resume` 없이도 migration을 건너뛰고 확인부터 다시 한다. 그때도 원인을 먼저 확인한 뒤 다시 실행한다. 자동 배포(#342)의 다음 실행도 결과를 확인하기 전에는 덮어쓰지 않는다.
 
 - **자동 배포(#342)에서 쓸 때 맞출 것:** 이 스크립트는 프로필 `catchu`, kubeconfig `~/.kube/catchu`, 기대 계정 번호를 전제로 한다([../README.md](../README.md) 「처음 준비」). 배포 역할에 필요한 권한은 ECR 네 저장소 조회, `eks:DescribeCluster`, namespace `catchu`의 Deployment 조회·적용과 실행 수 바꾸기, Pod 조회·감시·만들기와 로그 읽기(migration·동의 기록 확인 Pod 포함), NetworkPolicy·ConfigMap 조회다. Secret 읽기와 exec는 필요 없다. 동의 기록 확인은 표 소유자인 migration 계정으로 하므로 RDS 관리자 비밀번호와 `catchu-ops`에도 닿지 않는다.
 - **확인하지 못한 것(2단계에서 본다):** 실제 API 서버의 스키마와 Pod 보안 검사 통과, 실제 노드에서 끝난 옛 실행의 종료 코드가 감시 출력에 오는지(출력 모양은 kubectl 1.37.1을 이 컴퓨터의 가짜 API에 붙여 확인했다), 실제 준비·중단 시간, 동의 기록 확인 Pod가 실제 RDS에서 migration이 만든 표의 권한을 회수하는지와 그 출력.
@@ -158,7 +158,7 @@ bash deploy/aws/scripts/deploy.test.sh
 
 bash·jq·git·ruby가 필요하고 30초쯤 걸린다. kubectl·aws·sleep을 합성 명령으로 바꾸고, 지금 작업 폴더의 `deploy.sh`·이 폴더로 만든 합성 git 저장소에서 `deploy.sh`를 실제로 실행한다. AWS·클러스터에는 닿지 않는다.
 
-- 확인하는 것: 처음 설치와 교체의 순서(옛 api·worker 멈춤 → migration → 동의 기록 확인 → api → worker → web), 같은 판본·구성이면 아무것도 바꾸지 않음, 멈춘 상태에서 `--resume` 없이는 멈춤, 시작 전 확인이 하나라도 어긋나면 아무것도 바꾸지 않고 2, 종료 확인 실패 3(늦게 오는 종료 코드는 기다림), 강제 종료 7, migration 실패 4·결과 불명 5·같은 이름 Pod 처리, 새 실행 실패 때 api·worker를 다시 멈추고 6, 동의 기록 확인(migration을 건너뛰어도 함, 실패·만들기 실패·시간 초과면 8이고 새 실행 없음, `--resume`이면 새 확인 Pod로 다시 함, 옛 커밋을 배포해도 작업 폴더의 틀을 씀, 작업 폴더에 틀이 없으면 2), 출력에 계정 번호가 없음.
+- 확인하는 것: 처음 설치와 교체의 순서(옛 api·worker 멈춤 → migration → 동의 기록 확인 → api → worker → web), 같은 판본·구성이면 아무것도 바꾸지 않음, 멈춘 상태에서 `--resume` 없이는 멈춤, 시작 전 확인이 하나라도 어긋나면 아무것도 바꾸지 않고 2, 종료 확인 실패 3(늦게 오는 종료 코드는 기다림), 강제 종료 7, migration 실패 4·결과 불명 5·같은 이름 Pod 처리, 새 실행 실패 때 api·worker를 다시 멈추고 6, 동의 기록 확인(migration을 건너뛰어도 함, 실패·만들기 실패·시간 초과면 8이고 새 실행 없음, `--resume`이면 새 확인 Pod로 다시 함, 배포할 커밋에 확인 틀이 없으면 아무것도 바꾸지 않고 2), 출력에 계정 번호가 없음.
 - 실행 파일 조건: `deploy.sh`가 자리를 채운 Deployment·migration Pod·동의 기록 확인 Pod와 손으로 적용하는 파일을 Ruby(YAML→JSON)·jq로 읽는다. api·worker 한 개·`Recreate`, web 교체 방식, UID 1000·읽기 전용 루트·권한 제거·seccomp·토큰 자동 탑재 끔·호스트 망 없음, `/tmp` 크기 상한, 자원 요청과 메모리 상한(CPU 상한 없음), 이미지 digest, 비밀값은 Secret에서만, worker에 DB 값 없음, 동의 기록 확인 Pod는 migration 계정·migration 연결 허용 라벨·DB 관리 Pod와 같은 이미지이고 명령에 쿠버네티스가 바꾸는 `$(`·`$$`가 없음, Service 포트, NetworkPolicy·Ingress 규칙, 계정 번호 없음.
 - 합성 kubectl의 감시 출력은 kubectl 1.37.1을 이 컴퓨터의 가짜 API에 붙여 확인한 모양을 흉내 낸다. 탭은 공백으로 바뀌고, `range` 안에서 없는 값을 만나면 첫 객체 뒤 오류로 끝난다. `deploy.sh`가 그 밖의 식을 쓰면 시험이 실패한다.
 - 확인하지 못하는 것: 실제 API 서버의 스키마·승인 검사(Pod 보안 검사 포함), 노드에서의 실제 종료 코드와 준비 시간, NetworkPolicy·ALB의 실제 동작. 이것은 2단계에서 본다(「적용(2단계)」의 확인).

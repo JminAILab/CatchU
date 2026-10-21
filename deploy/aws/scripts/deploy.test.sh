@@ -425,12 +425,8 @@ run_sut STUB_DEPLOYS="api=0 worker=0 web=1" STUB_MIG_EXISTING=Succeeded:0:same -
 check "8로 멈춘 뒤 --resume: migration은 건너뛰고 새 확인 Pod로 다시 확인한 뒤 새 실행" \
   "$( { test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,${GUARD}${START}" && says '동의 기록 삭제 권한 확인 성공'; } > /dev/null 2>&1; echo $?)"
 run_sut --commit "$C4"
-check "확인 Pod 틀이 없는 옛 커밋을 배포해도 작업 폴더의 틀로 확인함" \
-  "$( { test "$rc" = 0 -a "$(calls)" = "create migration,${GUARD}${START}" && grep -qF "catchu.io/source-revision: ${C4}" "$S/guard.yaml"; } > /dev/null 2>&1; echo $?)"
-mv "$REPO/deploy/aws/k8s/consent-guard-pod.yaml" "$WORK/consent-guard-pod.yaml.away"
-run_sut --commit "$C1"
-check "작업 폴더에 확인 Pod 틀이 없으면 아무것도 바꾸지 않고 멈춤" "$( { untouched && says 'consent-guard-pod.yaml'; } > /dev/null 2>&1; echo $?)"
-mv "$WORK/consent-guard-pod.yaml.away" "$REPO/deploy/aws/k8s/consent-guard-pod.yaml"
+check "배포할 커밋에 확인 Pod 틀이 없으면(작업 폴더에 있어도) 아무것도 바꾸지 않고 멈춤" \
+  "$( { untouched && says 'consent-guard-pod.yaml'; } > /dev/null 2>&1; echo $?)"
 
 # ---------- 새 실행 확인(6, 다시 멈추기 실패는 3) ----------
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_ROLLOUT_FAIL=api --commit "$C1"

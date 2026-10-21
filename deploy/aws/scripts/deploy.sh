@@ -5,9 +5,8 @@
 #
 # 사용: bash deploy/aws/scripts/deploy.sh --commit <40자 커밋> [--resume]
 #   이미지: ECR 네 저장소에서 태그 main-<커밋 앞 12자>(main 자동 배포가 붙인 태그)의 digest를 찾아 digest로 띄운다.
-#   실행 파일: 그 커밋의 deploy/aws/k8s/{api,worker,web}.yaml·migration-pod.yaml을 git에서 읽어 자리를 채운다.
+#   실행 파일: 그 커밋의 deploy/aws/k8s/{api,worker,web}.yaml·migration-pod.yaml·consent-guard-pod.yaml을 git에서 읽어 자리를 채운다.
 #     namespace·NetworkPolicy·Service·Ingress는 적용하지 않는다(바뀔 때 손으로 적용한다).
-#     동의 기록 삭제 권한 확인 Pod 틀(consent-guard-pod.yaml)만은 배포할 커밋이 아니라 이 작업 폴더의 판을 쓴다.
 #   같은 판본·구성이 이미 정상으로 돌고 있으면 아무것도 바꾸지 않는다.
 #   --resume: api·worker가 0으로 멈춰 있을 때(지난 교체가 멈췄거나 손으로 멈춤) 원인을 확인한 뒤 이어서 교체할 때만 붙인다.
 #
@@ -132,14 +131,9 @@ render api.yaml "$image_api"
 render worker.yaml "$image_worker"
 render web.yaml "$image_web"
 render migration-pod.yaml "$image_migration" "$migration_pod"
-# 동의 기록 삭제 권한 확인 Pod는 이 작업 폴더의 틀을 쓴다. 옛 커밋으로 되돌려 배포해도 확인이 빠지지 않게 하려는 것이다.
+# 동의 기록 삭제 권한 확인 Pod의 SQL은 표 이름·앱 계정 이름을 담으므로, 같은 커밋의 migration·api 설정과 함께 읽는다(이미지는 틀에 고정).
 guard_pod="catchu-consent-guard-$(date -u +%Y%m%d-%H%M%S)"
-guard_text=$(sed -e "s|__NAME__|${guard_pod}|g" -e "s|__COMMIT__|${commit}|g" "${here}/../k8s/consent-guard-pod.yaml" 2> /dev/null) ||
-  catchu_die "이 작업 폴더에 deploy/aws/k8s/consent-guard-pod.yaml이 없다"
-if printf '%s\n' "$guard_text" | grep -q '__[A-Z][A-Z_]*__'; then
-  catchu_die "deploy/aws/k8s/consent-guard-pod.yaml에 채우지 않은 자리가 있다"
-fi
-printf '%s\n' "$guard_text" > "${tmp}/consent-guard-pod.yaml"
+render consent-guard-pod.yaml '' "$guard_pod"
 
 # 기본 차단 NetworkPolicy 없이 앱을 띄우지 않는다. DB 주소·CA(ConfigMap)가 없으면 api·migration이 뜨지 못하므로 먼저 본다.
 k get networkpolicy default-deny -o name > /dev/null ||
@@ -332,7 +326,7 @@ else
   esac
 fi
 
-# ---------- 4. 동의 기록 직접 삭제 권한을 확인·회수·재확인한다(migration을 건너뛰었어도 매번) ----------
+# ---------- 4. 동의 기록 직접 삭제 권한을 확인·회수·재확인한다(교체할 때마다, migration을 건너뛰었어도) ----------
 # 기본 권한이 migration이 새로 만드는 표마다 앱 계정에 DELETE를 준다(deploy/aws/db/roles.sql). 확인·회수·재확인은 Pod 안의 한 트랜잭션이고
 # 다시 실행해도 결과가 같아서, 멈춘 뒤에는 --resume으로 새 Pod를 띄워 다시 본다. 판정은 Pod의 종료 코드로만 한다.
 k create -f "${tmp}/consent-guard-pod.yaml" > /dev/null ||
