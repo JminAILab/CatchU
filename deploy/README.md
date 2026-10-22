@@ -187,7 +187,7 @@ GitHub Actions의 `images` 워크플로가 같은 명령을 x86_64 러너에서 
 | 노드 CPU 아키텍처·OS, EKS 판본, cluster·namespace, 리소스 범위 | 최종 이미지 빌드 플랫폼, EKS 실행 파일 |
 | 레지스트리 경로·push/pull 권한 | 이미지 게시(#275는 게시하지 않는다) |
 | 실제 공개 https 출처, `/v1` 경로 보존 분배 | 운영 web 빌드, `SHARE_LINK_WEB_BASE_URL`·`AUTH_WEB_ORIGIN` |
-| 앞단 대상 유형·`X-Forwarded-For` 처리·유휴 시간, 유입 차단·노드 종료 확인 경로 | `TRUST_PROXY_CIDRS`, 연결 유지 시간(web `KEEP_ALIVE_TIMEOUT`은 ms. api에는 연결 유지 시간 설정이 없어 앞단 유휴 시간과 어긋나면 간헐 502가 날 수 있으므로 배포 전에 api 담당과 조율한다), 교체 절차 2·3단계 |
+| 앞단 대상 유형·`X-Forwarded-For` 처리·유휴 시간, 유입 차단·노드 종료 확인 경로 | `TRUST_PROXY_CIDRS`, 연결 유지 시간(web `KEEP_ALIVE_TIMEOUT`은 ms. api는 코드에 65초로 고정했다(#364). 둘 다 앞단 유휴 시간보다 길게 둔다. 짧으면 간헐 502가 날 수 있다), 교체 절차 2·3단계 |
 | worker→DB 차단과 나가는 연결 제한의 집행 수단(NetworkPolicy·보안 그룹·egress 규칙) | EKS 실행 파일, 운영 Compose 호스트의 망 구성. 공유 노드 보안 그룹이나 같은 호스트 IP만으로 분리됐다고 보지 않는다 |
 | DB 주소·판본, 앱·migration 계정과 비밀값 참조, CA 파일과 주입 방식 | `api.env`·`migration.env`·CA 파일 |
 | 큐 주소·비밀번호 참조(ElastiCache Valkey 8.1, TLS) | `worker.env`의 `CATCHU_QUEUE_REDIS_URL`(`rediss://`), api 실행 값(#233) |
