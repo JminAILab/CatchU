@@ -5,11 +5,31 @@ import { confirmLogout, confirmReauthLeave, createMemberLogoutControl, logoutVie
 import { confirmDiscardUnsaved, createUnsavedRegistry } from '../src/lib/unsaved-changes.ts';
 
 /**
- * #287 로그아웃·재인증 안내·미저장 확인의 대역 시험. 공통 인증(#286)의 `logout()`과 상태는 대역이다.
+ * #287 로그아웃·재인증 안내·이동 전 확인(미저장 입력·미확정 분석 요청)의 대역 시험. 공통 인증(#286)의 `logout()`과 상태는 대역이다.
+ * 확인 사유는 #286 등록 수단(`createUnsavedRegistry`)을 그대로 쓴다. 분석 요청을 사유로 등록하는 화면(#153·#154)은 여기 없다.
  * 정리·이동은 #286 가드가 맡으므로 여기의 제어는 이동 함수를 받지 않는다. 실제 API·브라우저·다중 탭 검증이 아니다.
  */
 
 function deferred() { let resolve; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; }
+
+const INPUT = 'unsaved-input';
+const REQUEST = 'unconfirmed-analysis-request';
+
+/** 화면들이 #286 등록 수단에 사유를 등록한 상태. 사유를 생략한 등록(`useUnsavedChanges`)은 `unsaved-input`이다. */
+function registryWith(...reasons) {
+  const registry = createUnsavedRegistry();
+  for (const reason of reasons) registry.register(() => true, reason);
+  return registry;
+}
+
+/** 사유 조합별 기대 문구(null은 묻지 않음). 같은 사유를 여러 곳에서 등록하거나 등록 순서가 달라도 같다. */
+const LEAVE_CASES = [
+  { reasons: [], logout: null, reauth: null },
+  { reasons: [INPUT], logout: M.logoutUnsavedConfirm, reauth: M.reauthUnsavedConfirm },
+  { reasons: [REQUEST], logout: M.logoutRequestConfirm, reauth: M.reauthRequestConfirm },
+  { reasons: [INPUT, REQUEST], logout: M.logoutUnsavedRequestConfirm, reauth: M.reauthUnsavedRequestConfirm },
+  { reasons: [REQUEST, INPUT, REQUEST], logout: M.logoutUnsavedRequestConfirm, reauth: M.reauthUnsavedRequestConfirm },
+];
 
 const idle = (generation = 3, canRetryLogout = false) => ({ generation, logout: { phase: 'idle' }, canRetryLogout });
 const pending = (generation = 3) => ({ generation, logout: { phase: 'pending', fromGeneration: generation, loginStartedAfter: false }, canRetryLogout: false });
@@ -17,9 +37,8 @@ const settled = (result, { generation = 3, from = generation, loginStartedAfter 
   generation, logout: { phase: 'settled', result, fromGeneration: from, loginStartedAfter }, canRetryLogout,
 });
 
-function logoutHarness({ dirty = false, stay = false } = {}) {
-  const registry = createUnsavedRegistry();
-  if (dirty) registry.register(() => true);
+function logoutHarness({ dirty = false, reasons = dirty ? [INPUT] : [], stay = false } = {}) {
+  const registry = registryWith(...reasons);
   const asked = [];
   const calls = [];
   const gates = [];
@@ -27,7 +46,7 @@ function logoutHarness({ dirty = false, stay = false } = {}) {
     logout() { calls.push('logout'); const d = deferred(); gates.push(d); return d.promise; },
     confirmLeave: () => confirmLogout(registry, (message) => { asked.push(message); return !stay; }),
   });
-  return { control, asked, calls, gates };
+  return { control, asked, calls, gates, registry };
 }
 
 test('미저장 확인: 입력이 없으면 묻지 않고, 있으면 묻는다. 등록을 풀면 다시 묻지 않는다', () => {
@@ -55,6 +74,59 @@ test('로그아웃: 미저장 확인에서 머무르면 요청·이동 없이 �
   assert.deepEqual(h.asked, [M.logoutUnsavedConfirm]);
   assert.deepEqual(h.calls, []);
   assert.deepEqual(logoutView(idle(), h.control.getLocal()), { pending: false, notice: null });
+});
+
+test('이동 전 확인(로그아웃): 사유 없음은 묻지 않고, 입력만은 기존 문구, 분석 요청만은 요청 문구, 둘 다는 두 내용을 담은 창을 한 번만 띄운다', () => {
+  for (const { reasons, logout } of LEAVE_CASES) {
+    for (const answer of [false, true]) {
+      const asked = [];
+      const go = confirmLogout(registryWith(...reasons), (m) => { asked.push(m); return answer; });
+      assert.deepEqual(asked, logout === null ? [] : [logout], reasons.join('+'));
+      assert.equal(go, logout === null || answer, `${reasons.join('+')} ${answer}`);
+    }
+  }
+});
+
+test('로그아웃: 분석 요청만·둘 다에서 머무르면 요청·이동 없이 끝나고 등록(입력·요청 정보)은 그대로이며, 계속하면 기존대로 한 번 보낸다', async () => {
+  for (const reasons of [[REQUEST], [INPUT, REQUEST]]) {
+    const stay = logoutHarness({ reasons, stay: true });
+    const stayed = stay.control.request(idle());
+    // 보냈다면 끝나지 않는 대역 응답을 기다리지 않고 여기서 바로 실패한다.
+    assert.deepEqual(stay.calls, [], `${reasons.join('+')}: 머무르면 보내지 않는다`);
+    assert.equal(await stayed, 'stayed');
+    assert.equal(stay.asked.length, 1);
+    assert.deepEqual(stay.registry.activeReasons(), reasons, '머물러도 등록을 풀지 않는다');
+    assert.deepEqual(logoutView(idle(), stay.control.getLocal()), { pending: false, notice: null });
+
+    const go = logoutHarness({ reasons });
+    const sent = go.control.request(idle());
+    assert.deepEqual(go.calls, ['logout']);
+    assert.equal(go.asked.length, 1);
+    go.gates[0].resolve({ kind: 'settled', result: 'done' });
+    assert.deepEqual(await sent, { kind: 'settled', result: 'done' });
+  }
+});
+
+test('로그아웃: 사유는 누를 때마다 다시 읽는다(제어를 만든 뒤 생긴 분석 요청·풀린 입력이 그 클릭의 문구가 된다)', async () => {
+  const registry = createUnsavedRegistry();
+  const now = { input: true, request: false };
+  registry.register(() => now.input);
+  registry.register(() => now.request, REQUEST);
+  const asked = [];
+  const calls = [];
+  const control = createMemberLogoutControl({
+    logout: async () => { calls.push('logout'); return { kind: 'settled', result: 'done' }; },
+    confirmLeave: () => confirmLogout(registry, (m) => { asked.push(m); return false; }),
+  });
+  assert.equal(await control.request(idle()), 'stayed');
+  now.request = true;
+  assert.equal(await control.request(idle()), 'stayed');
+  now.input = false;
+  assert.equal(await control.request(idle()), 'stayed');
+  now.request = false;
+  assert.deepEqual(await control.request(idle()), { kind: 'settled', result: 'done' }, '사유가 모두 풀리면 묻지 않고 보낸다');
+  assert.deepEqual(asked, [M.logoutUnsavedConfirm, M.logoutUnsavedRequestConfirm, M.logoutRequestConfirm]);
+  assert.deepEqual(calls, ['logout']);
 });
 
 test('로그아웃: 확인하면 한 번 보내고, 진행 중에는 다시 묻거나 보내지 않는다', async () => {
@@ -156,6 +228,35 @@ test('재인증 [다시 로그인]: login-changed(가드가 화면·입력을 �
   const registry = createUnsavedRegistry();
   registry.register(() => true);
   assert.equal(confirmReauthLeave('login-changed', registry, () => assert.fail('login-changed는 묻지 않는다')), true);
+});
+
+test('재인증 [다시 로그인]: variant 생략·reauth는 로그아웃과 같은 사유 조합으로 한 번만 묻고, 머무르면 이동하지 않는다', () => {
+  for (const variant of [undefined, 'reauth']) {
+    for (const { reasons, reauth } of LEAVE_CASES) {
+      for (const answer of [false, true]) {
+        const asked = [];
+        const go = confirmReauthLeave(variant, registryWith(...reasons), (m) => { asked.push(m); return answer; });
+        assert.deepEqual(asked, reauth === null ? [] : [reauth], `${variant} ${reasons.join('+')}`);
+        assert.equal(go, reauth === null || answer, `${variant} ${reasons.join('+')} ${answer}`);
+      }
+    }
+  }
+});
+
+test('재인증 [다시 로그인]: login-changed는 미확정 분석 요청이 함께 있어도 사유를 읽지 않고 묻지 않는다', () => {
+  assert.equal(confirmReauthLeave('login-changed', registryWith(INPUT, REQUEST), () => assert.fail('login-changed는 묻지 않는다')), true);
+  const unread = { activeReasons: () => assert.fail('login-changed는 사유를 읽지 않는다') };
+  assert.equal(confirmReauthLeave('login-changed', unread, () => assert.fail('login-changed는 묻지 않는다')), true);
+});
+
+test('이동 전 확인 문구: 입력만이면 기존 문구 그대로이고, 분석 요청이 들면 요청 확인 정보가 사라지지만 이미 보낸 요청은 취소되지 않는다고 알린다', () => {
+  assert.equal(M.logoutUnsavedConfirm, '저장하지 않은 입력이 있습니다. 로그아웃하면 입력한 내용이 사라집니다. 로그아웃하시겠습니까?');
+  assert.equal(M.reauthUnsavedConfirm, '다시 로그인하면 입력하던 내용이 사라질 수 있습니다. 로그인 화면으로 이동하시겠습니까?');
+  for (const message of [M.logoutRequestConfirm, M.logoutUnsavedRequestConfirm, M.reauthRequestConfirm, M.reauthUnsavedRequestConfirm]) {
+    assert.ok(message.includes('이 화면의 요청 확인 정보가 사라집니다.'), message);
+    assert.ok(message.includes('이미 보낸 분석 요청은 취소되지 않습니다.'), message);
+  }
+  for (const message of [M.logoutUnsavedRequestConfirm, M.reauthUnsavedRequestConfirm]) assert.ok(message.includes('저장하지 않은 입력'), message);
 });
 
 test('안내 문구: 합의 문구를 그대로 쓰고 code·state·토큰 같은 값을 담지 않는다', () => {

@@ -1,5 +1,6 @@
 import type { CallbackParse, GoogleCompletionResult, GoogleFailureReason } from "./auth-google.ts";
 import type { LogoutResult } from "./auth-state.ts";
+import type { UnsavedReason } from "./unsaved-changes.ts";
 
 /**
  * 인증 화면(#287)의 안내 문구. 화면은 이 파일의 문구만 쓰고, code·state·`loginAttemptToken`·토큰이나 서버 응답 원문을 섞지 않는다.
@@ -11,6 +12,8 @@ import type { LogoutResult } from "./auth-state.ts";
  *   - Google 사용 불가(`unavailable`, 시도 보관 실패 포함): A 답변 2(https://github.com/JminAILab/CatchU/issues/251#issuecomment-6187946262).
  * - [제안]: 아직 확정되지 않은 문구. 통합 시험 전환 아래에서는 이 문구로 연결해 두고, 제품 전환 전에 #251에서 정한다. #251 12번 초안(https://github.com/JminAILab/CatchU/issues/251#issuecomment-6162564432)과
  *   이번에 새로 쓴 문구가 여기에 든다. 안내의 종류(취소·실패·네트워크·새 로그인 안내)는 #251 1번·접점 답변으로 합의됐다.
+ *   - 이동 전 확인의 분석 요청 문구: #287 D 초안(https://github.com/JminAILab/CatchU/issues/287#issuecomment-6306296347)을
+ *     A 답변 1(https://github.com/JminAILab/CatchU/issues/287#issuecomment-6310239160)대로 쓴다. 사유 조합(없음·입력만·분석 요청만·둘 다)의 처리는 같은 답변을 따른다.
  */
 export const authScreenMessages = {
   /** [합의] #251 5번 */
@@ -47,8 +50,16 @@ export const authScreenMessages = {
   logoutPending: "로그아웃하는 중",
   /** [제안] 새 문구: 로그아웃 전 미저장 확인(#51 이탈 확인). 확인=로그아웃, 취소=머무르기. */
   logoutUnsavedConfirm: "저장하지 않은 입력이 있습니다. 로그아웃하면 입력한 내용이 사라집니다. 로그아웃하시겠습니까?",
+  /** [제안] #287 D 초안: 접수 결과를 확인하지 못한 분석 요청만 있을 때. 사라지는 것은 이 화면의 요청 확인 정보이고, 이미 보낸 요청은 취소되지 않는다. */
+  logoutRequestConfirm: "아직 접수 결과를 확인하지 못한 분석 요청이 있습니다. 로그아웃하면 이 화면의 요청 확인 정보가 사라집니다. 이미 보낸 분석 요청은 취소되지 않습니다. 로그아웃하시겠습니까?",
+  /** [제안] 새 문구: 미저장 입력과 분석 요청이 함께 있을 때 두 내용을 한 창에서 묻는다. */
+  logoutUnsavedRequestConfirm: "저장하지 않은 입력과 아직 접수 결과를 확인하지 못한 분석 요청이 있습니다. 로그아웃하면 입력한 내용과 이 화면의 요청 확인 정보가 사라집니다. 이미 보낸 분석 요청은 취소되지 않습니다. 로그아웃하시겠습니까?",
   /** [제안] 11번 초안에 확인 질문을 더한 문구: 재인증 [다시 로그인] 전 미저장 확인. */
   reauthUnsavedConfirm: "다시 로그인하면 입력하던 내용이 사라질 수 있습니다. 로그인 화면으로 이동하시겠습니까?",
+  /** [제안] #287 D 초안의 [다시 로그인] 문구: 분석 요청만 있을 때. */
+  reauthRequestConfirm: "아직 접수 결과를 확인하지 못한 분석 요청이 있습니다. 로그인 화면으로 이동하면 이 화면의 요청 확인 정보가 사라집니다. 이미 보낸 분석 요청은 취소되지 않습니다. 로그인 화면으로 이동하시겠습니까?",
+  /** [제안] 새 문구: 미저장 입력과 분석 요청이 함께 있을 때의 [다시 로그인] 확인. */
+  reauthUnsavedRequestConfirm: "저장하지 않은 입력과 아직 접수 결과를 확인하지 못한 분석 요청이 있습니다. 로그인 화면으로 이동하면 입력하던 내용과 이 화면의 요청 확인 정보가 사라집니다. 이미 보낸 분석 요청은 취소되지 않습니다. 로그인 화면으로 이동하시겠습니까?",
 } as const;
 
 /** 실패 이유별 안내. `superseded`는 안내하지 않는다(null). */
@@ -96,4 +107,31 @@ export function logoutNotice(result: LogoutResult, canRetry: boolean): string | 
   if (result === "failed") return canRetry ? authScreenMessages.logoutFailedRetry : authScreenMessages.logoutFailed;
   if (result === "unknown") return canRetry ? authScreenMessages.logoutUnknownRetry : authScreenMessages.logoutUnknown;
   return null;
+}
+
+/** 이동 전 확인을 거치는 동작: 로그아웃과 재인증 안내의 [다시 로그인]. */
+export type LeaveAction = "logout" | "reauth";
+
+/** 동작별·사유별 확인 문구. 사유는 지금 두 가지라 둘이 함께 있으면 `both` 문구 하나로 묻는다. */
+const leaveConfirmMessages: Record<LeaveAction, Record<UnsavedReason | "both", string>> = {
+  logout: {
+    "unsaved-input": authScreenMessages.logoutUnsavedConfirm,
+    "unconfirmed-analysis-request": authScreenMessages.logoutRequestConfirm,
+    both: authScreenMessages.logoutUnsavedRequestConfirm,
+  },
+  reauth: {
+    "unsaved-input": authScreenMessages.reauthUnsavedConfirm,
+    "unconfirmed-analysis-request": authScreenMessages.reauthRequestConfirm,
+    both: authScreenMessages.reauthUnsavedRequestConfirm,
+  },
+};
+
+/**
+ * 이동 전 확인 문구. `reasons`는 누른 시점의 `activeReasons()`(사유마다 한 번)다.
+ * 사유가 없으면 묻지 않는다(null). 하나면 그 사유의 문구이고, 둘이면 두 내용을 담은 문구 하나다.
+ */
+export function leaveConfirmMessage(action: LeaveAction, reasons: readonly UnsavedReason[]): string | null {
+  if (reasons.length === 0) return null;
+  const messages = leaveConfirmMessages[action];
+  return reasons.length === 1 ? messages[reasons[0]] : messages.both;
 }
