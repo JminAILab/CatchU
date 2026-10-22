@@ -14,6 +14,7 @@ const { parseRepositoryQuery, repositoryPage } = require('../dist/member-reposit
 const { openTestDataSource, resetTestDatabase } = require('./support/test-database.cjs');
 const context = require('../../worker/fixtures/m1-synthetic/context.sample.json');
 
+// 개발 회원의 합성 공급(#104·#136)과 페이지 계약 검사다. 실제 회원의 DB 선정 공급은 test/db/repository-selection-*.test.cjs가 맡는다.
 let database;
 before(async () => { database = await openTestDataSource(); });
 beforeEach(async () => { await resetTestDatabase(database); });
@@ -248,10 +249,10 @@ for (const [state, reference] of [['CONNECTED', null], ['DISCONNECTED', 'not-syn
 for (const overrides of [{ DEV_LOGIN_ENABLED: undefined }, { NODE_ENV: 'production' }]) {
   test(`기존 #104 개발 대역 제한 유지: ${JSON.stringify(overrides)}`, async (t) => {
     const server = await start(t, overrides);
-    // 개발 대역 자체의 기본 비활성/운영 차단을 같은 설정으로 재사용한다.
+    // 개발 대역 자체의 기본 비활성/운영 차단을 같은 설정으로 재사용한다. 개발 회원이어야 개발 경로까지 간다(#252).
     const memberId = randomUUID();
     const token = await server.app.get(DataSource).transaction(async manager => {
-      await manager.insert(MemberAccount, { memberId, identityReference: 'repository-block-' + memberId, accountState: 'ACTIVE' });
+      await manager.insert(MemberAccount, { memberId, identityReference: 'catchu:dev-login:' + memberId, accountState: 'ACTIVE' });
       return (await server.app.get(SessionService).create(manager, memberId)).access.accessToken;
     });
     await errorBody(await server.list(token), 403, 'INTERNAL_ERROR');

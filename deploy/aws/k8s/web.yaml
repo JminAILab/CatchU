@@ -1,0 +1,93 @@
+# web Deployment(#276). deploy.sh만 적용한다. 밑줄 두 개로 감싼 자리(이미지 digest·실행 수·커밋)를 채워서 쓴다.
+# 이 파일을 그대로 kubectl apply하면 실행 수 자리가 숫자가 아니어서 거부된다(운영 중인 판본을 자리표시 이미지로 덮지 않게).
+# web은 DB·큐에 붙지 않아 옛 web을 둔 채 새 web을 먼저 띄운다(최대 2개). 새 web이 ALB 상태 확인을 통과한 뒤 옛 web이 내려간다.
+# 자원 값은 개발 서버 대기 상태 측정(web 약 57MiB) 기준의 시작값이다. 이미지는 공개 주소 https://catchu.dev로 빌드한 것이어야 한다.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: catchu
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: catchu
+spec:
+  replicas: __REPLICAS__
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+        app.kubernetes.io/part-of: catchu
+      annotations:
+        catchu.io/source-revision: __COMMIT__
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: __IMAGE__
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            # 쿠버네티스가 HOSTNAME에 Pod 이름을 넣으므로, 모든 주소에서 듣도록 이미지 값을 다시 적는다.
+            - name: HOSTNAME
+              value: 0.0.0.0
+            - name: PORT
+              value: "3000"
+            # 연결 유지 65초(밀리초). ALB 유휴 시간 60초보다 길어야 ALB가 닫힌 연결을 다시 쓰다 502를 내지 않는다.
+            - name: KEEP_ALIVE_TIMEOUT
+              value: "65000"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 384Mi
+              ephemeral-storage: 256Mi
+          startupProbe:
+            httpGet:
+              path: /
+              port: 3000
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

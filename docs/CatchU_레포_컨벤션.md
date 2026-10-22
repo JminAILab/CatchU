@@ -225,7 +225,7 @@ chore: worker 의존성에 httpx 추가
 | 리뷰 대화 해소 후 머지 (Require conversation resolution before merging) | ✅ | ✅ |
 | 강제 푸시 차단 (Block force pushes) | ✅ | ✅ |
 | 삭제 차단 (Restrict deletions) | ✅ | ✅ |
-| 필수 상태 검사 (Require status checks to pass) | ✅ `images`·`cd-scripts` (`main-ci`, 2026-10-16 첫 배포 PR 전에 적용) | ✅ `changes`·`docs-size`·`web`·`api`·`worker`·`deps-audit` (`dev-ci`, PR #208 머지 직후 적용, `deps-audit`는 #215 반영 PR 머지 직후 추가) |
+| 필수 상태 검사 (Require status checks to pass) | ✅ `images`·`cd-scripts` (`main-ci`, 2026-10-16 첫 배포 PR 전에 적용) | ✅ `changes`·`web`·`api`·`worker`·`deps-audit` (`dev-ci`, PR #208 머지 직후 적용, `deps-audit`는 #215 반영 PR 머지 직후 추가, 문서 크기 검사는 2026-10-20부터 `changes` 안에서 돈다) |
 
 켜지 않기로 한 항목은 이 표에 없다 — 그 목록과 사유는 §6에 있다.
 
@@ -285,3 +285,4 @@ chore: worker 의존성에 httpx 추가
 - **2026-10-06** — Dependabot의 action 갱신 PR을 팀장이 2근무일 안에 처리하기로 하고 §6에 12행을 더했다([#215](https://github.com/JminAILab/CatchU/issues/215), 팀장 결정). 커밋으로 고정한 action은 주 판본 태그(`@v7`)처럼 수정판을 저절로 받지 못하고, 이 action들은 보안 수정을 취약점 등록 없이 내기도 해서 갱신 PR이 수정을 받는 유일한 길이기 때문이다. 같은 작업에서 갓 나온 판본이 검토 전에 PR CI에서 도는 위험을 줄이려고 대기를 3일에서 7일로 늘렸다(2025~2026년 태그 바꿔치기 사고 4건의 노출 기간이 최장 약 6일). 큰 판본 변경 하나가 묶음 PR 전체를 막지 않게 따로 받게 했고, CI의 checkout이 토큰을 작업 폴더에 남기지 않게 하고 uv 내려받기 파일의 체크섬을 고정했다.
 - **2026-10-06** — §1 배포 대상을 NCP에서 AWS로 바꿨다(팀장 결정). 2026-09-13에 NCP를 고른 이유는 소속 기관의 지원이었는데, 기관이 AWS도 지원하도록 정책을 바꿨다. 지원 조건이 같아진 상태에서, AWS는 쓸 수 있는 서비스와 자료가 더 잘 갖춰져 있고 실제 기업에서도 많이 쓰여 AWS로 정했다. AWS에서 쓸 서비스(큐 서버 등)는 정하지 않았다. README·AGENTS.md·docs/README의 배포 대상 문장을 함께 고쳤다. 지난 AI-DLC 기록과 입력 문서(`docs/ai-dlc-input-mvp/`)의 NCP 서술은 소급 수정하지 않는다.
 - **2026-10-16** — main 배포 PR의 필수 상태 검사를 정했다([#277](https://github.com/JminAILab/CatchU/issues/277), 팀장 결정). images 워크플로의 운영 이미지 검사(`images`)와 자동 배포 스크립트 회귀 시험(`cd-scripts`)이며, `dev-ci`처럼 우회 권한이 없는 별도 ruleset `main-ci`에 두고 첫 배포 PR 전에 적용했다. dev의 CI(web·api·worker 등)는 main 필수 검사로 걸지 않았다. dev push 때는 마지막으로 병합된 PR이 바꾼 서비스만 검사하므로, 걸어도 대부분 건너뜀(통과)으로 남기 때문이다. 대신 배포 PR을 올리기 전에 dev 최신으로 CI를 수동 실행해 모든 서비스를 검사하고 결과를 PR에 남긴다. §2에 「main의 검증」을 더하고 §7을 고쳤다.
+- **2026-10-20** — 문서 크기 검사를 별도 job `docs-size`에서 `changes` job의 단계로 옮기고 `dev-ci` 필수 상태 검사에서 `docs-size`를 뺐다([#352](https://github.com/JminAILab/CatchU/issues/352), 팀장 결정). Actions는 job마다 실행 시간을 1분 단위로 올려 과금해, 각각 5초 남짓 걸리는 `changes`·`docs-size`가 10월 1~19일 사용 시간의 30%를 차지했다. 조직의 Actions 예산이 $0이라 포함 시간을 넘으면 그달 CI가 멈추고 dev 병합이 막힌다. 문서 크기 검사가 실패하면 `changes`가 실패해 병합을 막고, 바뀐 서비스의 검사는 그대로 돈다. §7을 고쳤다.

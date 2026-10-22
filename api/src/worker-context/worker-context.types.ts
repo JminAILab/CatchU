@@ -32,7 +32,8 @@ export interface WorkerRepositorySelection {
 }
 
 /**
- * #252의 실제 선정 목록/동의 범위를 해석하는 명시적 접점. 기본/합성 공급자는 없다.
+ * #252의 실제 선정 목록/동의 범위를 해석하는 명시적 접점. 실제 공급자는 DatabaseRepositorySelectionSource
+ * (member-repositories/repository-selection.source.ts)이며 기본/합성 공급자는 없다.
  * 제공받은 manager만 사용해 현재 선정·저장소 좌표·동의 범위를 확인한다.
  * 알 수 없는 범위, 부분 선정, 철회 또는 판본 불일치는 null. 장애는 예외로 전달한다.
  * 이 함수 안에서 외부 통신을 하지 않는다. 자격정보 조회 전후 각각 호출된다.

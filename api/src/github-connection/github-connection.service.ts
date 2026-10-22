@@ -11,7 +11,8 @@ import { GitHubClient, GitHubProviderError } from './github.client';
 interface Authorization { memberId: string; state: string; verifier: string; expiresAt: number; claimed: boolean }
 const STATE_LIFETIME_MS = 10 * 60 * 1000;
 const MAX_AUTHORIZATIONS = 1000;
-const isCredentialReference = (value: string | null): value is string => !!value?.startsWith('github-v1:');
+// 이 서비스가 보관한 실제 자격정보 참조인가. #252 선정 공급도 같은 기준으로 실제 연결을 가른다.
+export const isCredentialReference = (value: string | null): value is string => !!value?.startsWith('github-v1:');
 
 @Injectable()
 export class GitHubConnectionService {
@@ -23,6 +24,10 @@ export class GitHubConnectionService {
   private requireEnabled(): Extract<GitHubConfig, { enabled: true }> {
     if (!this.config.enabled) throw new ApiError('GITHUB_CONNECTION_REQUIRED');
     return this.config;
+  }
+  /** 실제 회원 분석 접수(#323)가 새 접수 전에 확인한다. 연동이 꺼지면 보관 자격정보를 읽지 못해 남은 연결 행도 실행에 쓸 수 없다. */
+  requireAvailable(): void {
+    this.requireEnabled();
   }
   private async requireMember(manager: EntityManager, memberId: string, lock = true): Promise<void> {
     if (!isUUID(memberId)) throw new ApiError('RESOURCE_UNAVAILABLE');

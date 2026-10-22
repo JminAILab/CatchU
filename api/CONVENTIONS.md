@@ -9,8 +9,9 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | 파일                                    | 역할                                               |
 | --------------------------------------- | -------------------------------------------------- |
 | `package.json` / `package-lock.json`    | 실행·검사 명령, 도구 버전, 재현 가능한 의존성 설치 |
-| `src/main.ts`                           | 환경변수 검사, HTTP 서버 시작, 종료 훅, 주기 작업 시작(#237) |
-| `src/app.module.ts`                     | 최상위 Nest 모듈과 기능 모듈 연결                  |
+| `src/main.ts`                           | 환경변수 검사, HTTP 서버 시작, 종료 훅, 주기 작업 시작(#237), 큐 연결 시작(#233) |
+| `src/application.module.ts`             | main에서 호출하는 제품 조립. 기본 앱에 명시적으로 활성화한 실제 worker 컨텍스트 공급과, 큐 주소가 있을 때의 큐 연결(#233)을 붙이고 큐 실행을 시작 |
+| `src/app.module.ts`                     | 기본 기능 모듈 묶음. 독립 시험에서도 사용하며 제품의 조건부 연결은 application.module.ts에서 처리 |
 | `src/cors.ts`                           | 개발용 CORS. 개발/test에서만 정확한 허용 출처·쿠키를 지원하고 운영은 동일 출처(#250) |
 | `src/common/http/request-id.ts`         | 요청별 서버 내부 식별자(#222). 응답·web으로 내보내지 않음 |
 | `src/common/http/security-headers.ts`   | 모든 응답의 보안 헤더와 `X-Powered-By` 끄기. HSTS는 `NODE_ENV`가 development·test가 아닐 때만(#217) |
@@ -18,6 +19,8 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/common/periodic-task.ts`           | api 안의 주기 실행 장치. 겹치지 않게 다음 실행 예약, 실패 뒤 계속, 종료 때 진행 중 실행 대기(#237) |
 | `src/analysis-deadline/`                | 처리 시한을 넘긴 분석 요청과 반영 실패 요청을 닫는 판정과 그 주기 작업([docs/analysis-deadline.md](docs/analysis-deadline.md)) |
 | `src/analysis-queue/`                   | 대기 시도를 요청 큐로 보내고 worker의 진행 알림·결과를 받아 E 수신 경로로 넘기는 큐 연결과 그 연결·주기·종료(#233, [docs/analysis-queue.md](docs/analysis-queue.md)). 큐 규격 값은 `queue-spec.ts` 한곳. 기본 앱에는 미등록 |
+| `src/recipient/`                        | 비로그인 수신자 조회(#151, [docs/recipient-read.md](docs/recipient-read.md)). #150 링크·소유 회원 판정·B 공개 Catch 조회·A `OwnerProfileReader`를 재사용. 기본 앱에 등록 |
+| `src/member-repositories/repository-selection.*.ts` | 현재 선정의 DB 정본(엔티티)과 목록·#323 접수 재확인·#232 worker 선정 공급(#252, [docs/repository-selection.md](docs/repository-selection.md)). 좌표는 같은 폴더의 #319 카탈로그에서 읽음 |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
 | `src/auth/access-token.guard.ts`       | Bearer 토큰 검증 후 요청에 인증 회원 정보 저장 |
 | `src/auth/dev-login.guard.ts` / `dev-login.dto.ts` | 개발 로그인 실행 제한을 먼저 검사하고 기존 회원 ID 조건·추가 필드를 공통 입력 검증에 연결 |
@@ -40,9 +43,10 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/database/snake-naming.strategy.ts` | 테이블·칼럼 snake_case, 제약·인덱스의 결정적 이름 |
 | `src/database/checks.ts`                | `@Check()`용 식: enum 허용 값, 문자열 길이 |
 | `src/database/migrations/`              | 모든 마이그레이션의 한 위치 |
-| `scripts/test-with-db.cjs`              | `npm test` 실행기: 테스트 DB 확인·마이그레이션 적용·테스트 순차 실행 |
+| `scripts/test-with-db.cjs`              | `npm test` 실행기: 테스트 DB 확인·마이그레이션 적용·테스트 실행(두 줄, README 「DB 테스트」) |
 | `scripts/clean-dist.cjs`                | `npm run build`의 첫 단계: 이전 빌드 결과 `dist/` 삭제 |
 | `test/support/test-database.cjs`        | 테스트 DB 접속, `_test` 이름 확인, 테스트 사이 자료 초기화 |
+| `test/support/repository-selection.cjs` | 초기화로 지워진 #252 초기 선정 자료를 격리 스키마의 실제 마이그레이션 값으로 되돌림 |
 | `test/db/*.test.cjs`                    | DB 규약으로 생성되는 SQL, 시각 왕복, 테스트 DB 격리, 트랜잭션 전달, 재빌드 뒤 지운 마이그레이션 미탐색 검사 |
 | `test/worker-messages.test.cjs`         | M1 합성 결과 세트의 worker 메시지 스키마 v1 판정 검사 |
 | `test/helpers/queue-harness.cjs` / `scripts/verify-analysis-queue.cjs` | 큐 연결 시험의 접수 기록 픽스처·메모리 요청 큐·worker 형식 메시지 / 큐 검증 키트·실제 worker와 한 번 왕복하는 수동 검증(CI 미실행). 운영 코드에서 쓰지 않음 |

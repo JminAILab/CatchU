@@ -49,6 +49,7 @@ export function buildDataSourceOptions(config: DatabaseConfig): PostgresDataSour
     logging: false,
     connectTimeoutMS: 5000,
     // 세션 시간대를 UTC로 고정한다. timestamptz 값은 시간대와 무관하게 같은 시각이다.
+    // 잠금 대기 상한(lock_timeout)은 마이그레이션도 쓰는 이 설정에 넣지 않고 앱 DB 계정에만 건다(#220, docs/lock-wait-limit.md).
     extra: { options: '-c TimeZone=UTC' },
   };
 }
