@@ -6,6 +6,12 @@ import type { CatchMutation } from "./assets-store";
 import type { CatchAsset } from "./types";
 import styles from "./assets.module.css";
 
+/** 서버가 처리하지 않은 저장의 안내(#286 후속, B 동의). 앞선 요청의 결과 불명은 재조회 전 저장을 막으므로 이 안내와 겹치지 않는다. */
+function notProcessedText(mutation: CatchMutation): string {
+  if (mutation.reason === "renewed-rejected") return "로그인이 연장되었습니다. 다시 눌러 주세요.";
+  return mutation.kind === "confirmation" ? "지금은 요청을 보내지 않았습니다. 입력은 그대로 두었습니다." : "지금은 요청을 보내지 않았습니다.";
+}
+
 export function CatchActions({ item, mutation, onChange, onReload }: {
   item: CatchAsset;
   mutation: CatchMutation | null;
@@ -24,6 +30,7 @@ export function CatchActions({ item, mutation, onChange, onReload }: {
   return <section className={styles.actions} aria-label="Catch 확인과 공개">
     {saving && <p role="status">변경 내용을 저장하고 있습니다. 창을 닫아도 요청이 취소되지는 않습니다.</p>}
     {current?.status === "success" && <p role="status">변경 내용을 저장했습니다.</p>}
+    {current?.status === "not-processed" && <p role="alert" className={styles.actionError}>{notProcessedText(current)}</p>}
     {needsReload && <div role="alert" className={styles.actionError}>
       <p>{catchErrorText(current.error)}</p>
       <p>아래 상태는 마지막으로 확인한 값입니다. 현재 상태를 다시 불러온 뒤 진행해 주세요.</p>
