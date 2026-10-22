@@ -153,3 +153,35 @@ export function createRepositoryApi(transport: RepositoryTransport) {
 }
 
 export type RepositoryApi = ReturnType<typeof createRepositoryApi>;
+
+/**
+ * 「연결된 저장소」 한 번의 조회 결과(#153). 선정 목록과 상태 이력을 함께 읽는다.
+ * - `ready`: 둘 다 성공. 정상 0건도 여기다.
+ * - `connection`: 선정 목록이 403 `GITHUB_CONNECTION_REQUIRED`를 돌려줘 `/me`를 한 번 다시 읽은 결과(`github`).
+ *   화면이 처음 읽은 연동 상태가 그사이 바뀌었을 수 있어서다. 목록은 다시 보내지 않고 자동으로 반복하지 않는다.
+ * - `failed`: 그 밖의 조회 실패(500·통신 오류·커서 오류·다른 403·이력 실패)와 취소. 연동 상태를 추정하지 않는다.
+ *   `listed`는 선정 목록은 받았고 이력만 실패했다는 뜻이다. 목록 표시는 조회 실패 그대로이며, 화면이 연결 해제로 보던
+ *   연동 상태가 돌아왔는지 `/me`로 확인할 때만 쓴다.
+ */
+export type ConnectedLoad =
+  | { kind: "ready"; repositories: EligibleRepository[]; analyses: AnalysisSummary[] }
+  | { kind: "connection"; github: Lookup<GitHubState> }
+  | { kind: "failed"; listed?: true };
+
+const needsConnection = (result: Lookup<unknown>) =>
+  result.kind === "api-error" && result.status === 403 && result.code === "GITHUB_CONNECTION_REQUIRED";
+
+/** `onChecking`은 `/me` 재조회를 시작할 때 한 번 부른다(확인 중 표시용). 취소된 조회는 재조회하지 않는다. */
+export async function loadConnectedRepositories(
+  api: Pick<RepositoryApi, "githubState" | "repositories" | "analyses">, signal?: AbortSignal, onChecking?: () => void,
+): Promise<ConnectedLoad> {
+  const [repositories, analyses] = await Promise.all([api.repositories(signal), api.analyses(signal)]);
+  if (repositories.kind === "success" && analyses.kind === "success") {
+    return { kind: "ready", repositories: repositories.data, analyses: analyses.data };
+  }
+  if (signal?.aborted) return { kind: "failed" };
+  if (repositories.kind === "success") return { kind: "failed", listed: true };
+  if (!needsConnection(repositories)) return { kind: "failed" };
+  onChecking?.();
+  return { kind: "connection", github: await api.githubState(signal) };
+}
