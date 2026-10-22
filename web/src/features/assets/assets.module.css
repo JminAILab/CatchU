@@ -27,7 +27,7 @@
 .tab, .activeTab { min-height: 44px; border: 1px solid transparent; border-radius: 9px; padding: 9px 16px; background: #edf2fc; color: #4b5e7a; font-size: 14px; }
 .tab:hover { border-color: #bdc8d6; }
 .activeTab { color: var(--color-surface); background: var(--color-accent); font-weight: 700; }
-.tab span, .activeTab span { font-size: 10px; margin-left: 7px; background: #e9edf2; padding: 3px 5px; border-radius: 3px; }
+.tab span, .activeTab span { font-size: 10px; margin-left: 7px; background: #e9edf2; color: #4b5e7a; padding: 3px 5px; border-radius: 3px; }
 .managementPlaceholder { display: flex; justify-content: space-between; gap: 24px; align-items: center; border: 1px dashed #bac6d7; border-radius: 16px; padding: 22px 24px; background: #f0f3f7; }
 .managementPlaceholder h2 { font-size: 16px; margin-bottom: 4px; }
 .managementPlaceholder p { font-size: 13px; color: var(--muted); margin-bottom: 0; }
