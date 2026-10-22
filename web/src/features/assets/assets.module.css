@@ -76,7 +76,8 @@
 .readOnlyNotice { font-size: 13px; line-height: 1.8; padding: 16px 18px; background: #f1f5fc; color: #496185; margin: 20px 0; border: 1px solid var(--line); border-radius: 10px; }
 .listOverview > .readOnlyNotice { margin: 20px 0 0; }
 .dialog > .readOnlyNotice { margin-top: 20px; }
-.dialog > .readOnlyNotice + .readOnlyNotice { background: transparent; border: 0; padding: 0; color: var(--muted); margin-top: -8px; }
+/* 실제 자료의 일반 안내만 보조 문장으로 낮춘다. 예시·합성 자료를 구분하는 안내는 상자를 유지한다. */
+.dialog > .readOnlyNotice.subtleNotice { background: transparent; border: 0; padding: 0; color: var(--muted); margin-top: -8px; }
 .factGrid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-top: 24px; }
 .factPanel { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--color-background); }
 .factPanel h3, .detailSection h3, .actionSection h3 { font-size: 17px; line-height: 1.5; margin: 0 0 14px; }

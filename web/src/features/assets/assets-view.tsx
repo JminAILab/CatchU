@@ -239,7 +239,7 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
           {item.title !== null && <h3 className={styles.detailTitle}>{item.title}</h3>}
           <StatusBadges item={item} />
           <GeneratedContentNotice item={item} />
-          <p className={styles.readOnlyNotice}>{dataMode === "preview" ? "예시 자료입니다. 확인·불일치·공개 설정은 바뀌지 않습니다." : item.sourceMode === "MOCK" ? "합성 자료로 생성된 Catch입니다. 실제 분석 결과와 구분해 확인해 주세요." : "확인과 공개 선택은 별도입니다."}</p>
+          <p className={dataMode === "preview" || item.sourceMode === "MOCK" ? styles.readOnlyNotice : `${styles.readOnlyNotice} ${styles.subtleNotice}`}>{dataMode === "preview" ? "예시 자료입니다. 확인·불일치·공개 설정은 바뀌지 않습니다." : item.sourceMode === "MOCK" ? "합성 자료로 생성된 Catch입니다. 실제 분석 결과와 구분해 확인해 주세요." : "확인과 공개 선택은 별도입니다."}</p>
           <div className={styles.factGrid}>
             <section className={styles.factPanel}><h3>작업에서 확인된 사실</h3>
               {item.workFacts.length ? <ul>{item.workFacts.map((fact, index) => <li key={index}>{fact}</li>)}</ul> : <p>제공된 작업 사실이 없습니다.</p>}
