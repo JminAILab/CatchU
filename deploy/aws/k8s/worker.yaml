@@ -1,0 +1,105 @@
+# worker Deployment(#276). deploy.sh만 적용한다. 밑줄 두 개로 감싼 자리(이미지 digest·실행 수·커밋)를 채워서 쓴다.
+# 이 파일을 그대로 kubectl apply하면 실행 수 자리가 숫자가 아니어서 거부된다(운영 중인 판본을 자리표시 이미지로 덮지 않게).
+# 한 개만 띄우고(Recreate) 자동 확장은 두지 않는다. DB에는 붙지 않는다(DB 값을 주지 않고, NetworkPolicy가 5432를 막는다).
+# 값의 뜻은 worker/docs/queue-consumer.md·request-context.md. 비밀값은 Secret catchu-worker에서 받는다(deploy/aws/k8s/README.md 「Secret과 ConfigMap」).
+# api 요청 정보 조회는 클러스터 안 서비스 주소를 http로 부른다(10/15 결정). 그 조건인 기본 차단 NetworkPolicy·Pod 보안 검사
+# restricted·권한 제거가 namespace.yaml·network-policy.yaml과 아래 securityContext에 있다.
+# 자원 값은 실제 분석(LIVE)을 재기 전의 임시값이다. 재면 메모리 상한을 max(1Gi, 잰 최대의 2배)로 고친다.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: catchu
+  labels:
+    app.kubernetes.io/name: worker
+    app.kubernetes.io/part-of: catchu
+spec:
+  replicas: __REPLICAS__
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: worker
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: worker
+        app.kubernetes.io/part-of: catchu
+      annotations:
+        catchu.io/source-revision: __COMMIT__
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # 앱은 SIGTERM을 받고 25초 안에 분석 중인 작업을 실패로 남긴 뒤 끝난다. 그보다 길게 기다린다.
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: __IMAGE__
+          ports:
+            - name: health
+              containerPort: 8000
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: CATCHU_QUEUE_PREFIX
+              value: catchu
+            - name: WORKER_CONTEXT_API_URL
+              value: http://api.catchu.svc.cluster.local:3001
+            - name: WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP
+              value: "true"
+            - name: CATCHU_QUEUE_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: catchu-worker
+                  key: CATCHU_QUEUE_REDIS_URL
+            - name: WORKER_CONTEXT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: catchu-worker
+                  key: WORKER_CONTEXT_API_KEY
+            - name: CATCHU_GENERATION_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: catchu-worker
+                  key: CATCHU_GENERATION_API_KEY
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1536Mi
+              ephemeral-storage: 512Mi
+          # health는 큐에 처음 붙기 전에는 503이다. 시작 확인을 5분까지 기다린다. 생존 확인은 두지 않는다:
+          # 큐 재시작·장애 조치 중의 503으로 다시 시작되지 않게 하려는 것이고, 소비가 멈추면 앱이 스스로 끝나 다시 뜬다.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 2
+            failureThreshold: 150
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 128Mi

@@ -1,3 +1,4 @@
+import type { Server } from 'node:http';
 import { INestApplication, NotFoundException, RequestMethod } from '@nestjs/common';
 import { AbstractHttpAdapter, HttpAdapterHost } from '@nestjs/core';
 import { writeErrorResponse } from './common/errors/api-exception.filter';
@@ -9,6 +10,9 @@ import { applyTrustProxy } from './trust-proxy';
 /** 명세 v1의 기본 URI. 기능 컨트롤러는 이 접두사 아래에서 응답한다. */
 export const API_PREFIX = 'v1';
 
+/** 쉬는 HTTP 연결을 유지하는 시간(ms). 앞단 유휴 시간(ALB 60초)보다 길어야 한다. web도 65초다. */
+const KEEP_ALIVE_TIMEOUT_MS = 65_000;
+
 type Next = (error?: unknown) => void;
 
 /**
@@ -19,6 +23,7 @@ type Next = (error?: unknown) => void;
  * - 모든 응답에 보안 헤더를 붙이고 X-Powered-By를 끈다(security-headers.ts). HSTS는 `NODE_ENV`가 development·test가 아닐 때만.
  * - `CORS_ALLOWED_ORIGINS`가 있으면 개발용 CORS를 켠다(cors.ts). 없으면 교차 출처 요청을 허용하지 않는다.
  * - `TRUST_PROXY_CIDRS`에 적은 프록시만 신뢰해 `request.ip`를 정한다(trust-proxy.ts). 없으면 직접 연결 주소다.
+ * - 쉬는 HTTP 연결을 65초 유지한다. Node 기본(5초)이면 앞단(ALB 유휴 60초)이 api가 먼저 닫은 연결에 요청을 보내 간헐적으로 502가 날 수 있다.
  * - 기능 경로는 /v1 아래. GET /health는 배포 점검용이라 접두사 없이 둔다(#81).
  * - Nest는 전역 접두사를 쓰면 "경로 없음"·요청 해석 오류 처리를 /v1 아래에만 붙인다.
  *   /v1 밖에서 끝나는 요청이 Express 기본 HTML 응답으로 나가지 않도록, 초기화 뒤 맨 끝에 같은 오류 응답을 붙인다.
@@ -28,6 +33,7 @@ export async function configureApp(app: INestApplication): Promise<INestApplicat
   applySecurityHeaders(app, process.env);
   applyCors(app, process.env);
   applyTrustProxy(app, process.env.TRUST_PROXY_CIDRS);
+  (app.getHttpServer() as Server).keepAliveTimeout = KEEP_ALIVE_TIMEOUT_MS;
   app.setGlobalPrefix(API_PREFIX, { exclude: [{ path: 'health', method: RequestMethod.GET }] });
   await app.init();
 

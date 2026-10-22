@@ -2,19 +2,21 @@
 
 api가 대기 중인 분석 시도를 큐(BullMQ)로 worker에 보내고, worker가 보낸 진행 알림과 결과를 큐에서 받아 기존 E 수신 경로로 넘긴다. worker 쪽은 [#121](https://github.com/JminAILab/CatchU/issues/121)의 [분석 요청 큐 소비자](../../worker/docs/queue-consumer.md)다. 코드는 `src/analysis-queue/`에 있다.
 
-## 지금 상태: 모듈은 있고 실제 서버에서는 아직 켜지 않았다
+## 조립과 켜는 조건
 
-`AnalysisQueueModule.register({ queue, observations, contractDirectory })`로 조립한다. 셋 중 하나라도 없으면 조립하지 않고 오류를 낸다. 보호 관측 공급자(`observations`)의 가짜 기본값은 없다(2026-10-15 팀장 결정).
+`AnalysisQueueModule.register({ queue, observations, contractDirectory })`로 조립한다. DB가 필요한 공급자는 `observations` 대신 `observationsFactory(db)`를 넘긴다. 두 방식 중 하나와 큐 설정·계약 경로가 필요하다. 보호 관측 공급자(`observations`)의 가짜 기본값은 없다(2026-10-15 팀장 결정).
 
 - `queue`: `readAnalysisQueueConfig()`가 읽은 큐 설정(아래 「설정」). 큐 주소가 없으면 `null`이므로 조립하지 않는다.
-- `observations`: 수신 뒤 반영이 쓰는 보호 관측 공급자(`RepositoryObservationSource`, [수신 연결 안내](receiver-registration.md)). 10월에는 [#314](https://github.com/JminAILab/CatchU/pull/314)의 `OctoberRepositoryObservationSource`를 여기에 넘긴다. 그 안내의 `registerDatabase` 직접 호출 예시는 큐 없이 조립할 때의 방법이며, 큐를 쓸 때는 이 모듈에만 넘긴다.
+- `observations`: 수신 뒤 반영이 쓰는 보호 관측 공급자(`RepositoryObservationSource`, [수신 연결 안내](receiver-registration.md)). 그 안내의 `registerDatabase` 직접 호출 예시는 큐 없이 조립할 때의 방법이며, 큐를 쓸 때는 이 모듈에만 넘긴다.
 - `contractDirectory`: `worker-messages.yaml`·`common.yaml`이 있는 절대 경로.
 
-모듈은 안에서 실제 수신·등록 조립(`AnalysisReceiverModule.registerDatabase`)을 한 번 불러온다. 같은 앱에서 그 조립을 따로 또 부르지 않는다.
+모듈은 안에서 실제 수신·등록 조립(`AnalysisReceiverModule.registerDatabase`)을 한 번 불러온다. 같은 앱에서 그 조립을 따로 또 부르지 않는다. 연결은 `start()`에서 연다. 조립과 Nest 초기화만으로는 큐 서버에 붙지 않는다.
 
-**`AppModule`에는 등록하지 않았다.** 받기는 보호 관측 공급자가 있어야 돈다. 10월에는 실제 관측 대신 "10월 관측 안 함(정책 NONE)"을 명시하는 공급자를 쓰기로 했고(10/15 보호 결정), 그 공급자는 [#314](https://github.com/JminAILab/CatchU/pull/314)가 더한다. 다만 이 공급자는 시도마다 저장소 좌표를 받아야 돌고, 기존 비공개 근거를 덮지 않게 하는 E 쪽 수정 전에는 켜지 않는다. 그래서 [#252](https://github.com/JminAILab/CatchU/issues/252)의 좌표 제공자와 [#105](https://github.com/JminAILab/CatchU/issues/105)의 근거 보존·주소 대소문자 대조 수정이 들어온 뒤 별도 작업에서 다음을 한다: `AppModule`에 이 모듈 등록, `main.ts`에서 `listen` 뒤 `app.get(AnalysisQueueRunner).start(onFailure)` 호출(`onFailure`는 받기가 멈췄을 때 앱을 닫고 종료 코드 1로 끝낸다. 아래 「수명주기」), 배포 설정에 큐 주소 추가. 그때 `registerDatabase`가 개발 주입(`DevAnalysisInjection`)도 함께 들여오므로 "제품 AppModule에 주입 제공자 없음"을 보는 기존 시험과 맞춰야 한다.
+**제품 조립.** `AppModule`에는 등록하지 않는다. `main.ts`가 쓰는 `createApplicationModule()`(`src/application.module.ts`)이 `CATCHU_QUEUE_REDIS_URL`이 있을 때만 이 모듈을 조립하고, 주소가 틀리면 기동을 멈춘다. 계약 경로는 저장소와 api 이미지에서 같은 상대 위치다. 보호 관측은 ‘관측 안 함’을 명시하는 10월 정책 공급자([#314](https://github.com/JminAILab/CatchU/pull/314) `OctoberRepositoryObservationSource`)에 동의에 저장된 선정 판본의 좌표(`SelectedRepositoryRegistrationSource`)를 넘긴 것이다. 이 좌표 공급은 LIVE 전용이라 **후보가 있는 MOCK 결과는 Catch로 등록되지 않고 `CATCH_NOT_READY`로 끝난다.** MOCK용 합성 좌표는 넣지 않는다([선정 저장소 좌표 연결](selected-repository-coordinates.md)). LIVE 근거 주소의 대소문자 구분 없는 대조는 [PR #316](https://github.com/JminAILab/CatchU/pull/316), 기존 SOURCE_PRIVATE 제한·판단 근거 보존은 [PR #317](https://github.com/JminAILab/CatchU/pull/317)로 반영됐다. 큐 조립에 함께 들어오는 개발 주입 제공자(`DevAnalysisInjection`)에는 HTTP 경로가 없다(아래 「시험」의 제품 조립 시험).
 
-연결은 `start()`에서 연다. 조립과 Nest 초기화만으로는 큐 서버에 붙지 않는다.
+**시작과 실패 종료.** `main.ts`는 `listen` 뒤 `startAnalysisQueue(app)`로 `start(onFailure)`를 부른다. 받기가 예상 밖으로 멈추면 실행기가 보내기까지 멈추고(아래 「수명주기」) `onFailure`가 앱을 닫은 뒤 종료 코드 1로 프로세스를 끝낸다. 앱 닫기는 10초(`FAILURE_APP_CLOSE_TIMEOUT_MS`)까지만 기다리고, 넘으면 기다리지 않고 끝낸다. Nest는 종료 훅이 끝나야 HTTP 서버를 닫으므로, 다른 종료 훅(처리 시한 판정의 DB 조회 등)이 멎으면 `/health`가 계속 응답하며 남기 때문이다. 다시 띄우는 것은 실행 환경의 몫이다.
+
+**어디서 켜는가.** 개발 서버([#304](https://github.com/JminAILab/CatchU/issues/304))에서는 켜지 않는다. api가 운영 모드라 비밀번호가 든 `rediss://`만 받는데, 그 서버의 합성 큐는 평문이고 api는 큐 망 밖에 있다. 실제 서버에서는 11월 EKS([#276](https://github.com/JminAILab/CatchU/issues/276))의 api 실행 파일과 Secret에 큐 주소를 넣을 때 켠다. 실제 회원 접수([#323](https://github.com/JminAILab/CatchU/issues/323)) 전에는 LIVE 시도가 없다.
 
 ## worker 문서와의 대조
 
@@ -43,7 +45,7 @@ api가 대기 중인 분석 시도를 큐(BullMQ)로 worker에 보내고, worker
 4. **메시지**: 모든 값이 DB 접수 기록이다. 두 참조만 시도 ID로 바꾼 사본을 보내며 DB의 동의 범위는 바꾸지 않는다.
 5. **넣기**: 큐에 같은 작업 ID의 작업이 있으면(대기·처리 중·완료/실패 보관 중) 넣지 않고 기록도 남기지 않는다. 없으면 넣고 `ANALYSIS_REQUEST_ENQUEUED`를 남긴다(큐에 넣었다는 기록이지 분석 완료가 아니다). 확인과 넣기 사이에 같은 시도가 들어가면 큐가 같은 작업 ID를 무시하고, 이때 넣음 기록이 두 번 남을 수 있다.
 
-MOCK·LIVE를 거르지 않는다. 받을지는 worker가 정한다(지금 worker는 개발·시험의 MOCK만 처리하고 LIVE는 처리 전에 거부한다). 보관 2시간은 처리 시한 60분보다 길고 대상 조회도 60분 안의 시도만 고르므로, **큐에 같은 작업이 남아 있는 동안은** 같은 시도를 다시 넣지 않는다. 막는 근거는 큐의 같은 작업 ID 하나뿐이다. 큐 서버가 자료 없이 다시 떠서 그 작업이 사라졌는데 시도가 아직 `QUEUED`이고 60분 안이면, 다음 회차가 같은 시도를 다시 넣고 worker가 한 번 더 분석할 수 있다. 10/6 결정이 받아들인 위험이다([worker README 「보장하지 않는 범위」](../../worker/README.md#보장하지-않는-범위)).
+MOCK·LIVE를 거르지 않는다. 받을지는 worker가 정한다(worker는 LIVE를 요청 정보 조회 뒤 처리하고, MOCK은 개발·시험 설정에서만 처리한다. [worker 큐 소비자 「구조」](../../worker/docs/queue-consumer.md#구조)). 보관 2시간은 처리 시한 60분보다 길고 대상 조회도 60분 안의 시도만 고르므로, **큐에 같은 작업이 남아 있는 동안은** 같은 시도를 다시 넣지 않는다. 막는 근거는 큐의 같은 작업 ID 하나뿐이다. 큐 서버가 자료 없이 다시 떠서 그 작업이 사라졌는데 시도가 아직 `QUEUED`이고 60분 안이면, 다음 회차가 같은 시도를 다시 넣고 worker가 한 번 더 분석할 수 있다. 10/6 결정이 받아들인 위험이다([worker README 「보장하지 않는 범위」](../../worker/README.md#보장하지-않는-범위)).
 
 **큐를 쓸 수 없을 때**: 보내기 연결은 끊긴 동안 명령을 쌓지 않는다. 연결이 준비되지 않았으면 명령 없이 그 회차를 건너뛴다. 큐 명령 하나는 5초까지만 기다린다. 넘으면 명령을 취소하지 못하므로 "실행됐는지 모름"으로 보고 그 회차를 멈추며, 그 명령이 끝나기 전에는 다음 회차가 새 명령을 보내지 않는다. 멈춤·재개 기록은 이유가 바뀔 때만 남긴다. 큐에서 사라진 요청을 따로 찾거나 보관하는 장치는 없다(10/6 결정, 위 문단의 다시 넣기는 대상 조회의 결과일 뿐이다). 끝나지 않은 요청은 [처리 시한 닫기](analysis-deadline.md)가 닫는다.
 
@@ -117,9 +119,12 @@ CATCHU_TEST_REDIS_URL=redis://127.0.0.1:6380 npm test
 | `test/analysis-queue/versions.test.cjs` | api `package.json`·잠금 파일·설치본, 키트 `package.json`·잠금 파일, bullmq가 불러오는 ioredis까지 같은 판본 |
 | `test/integration/analysis-queue-dispatch.test.cjs` | 실제 DB와 메모리 큐: 실제 접수 API 행과 보낸 메시지 대조·DB 불변, 넣기 전 검사, 보내지 않는 상태, 60분 경계, 101번째 시도, 연결 준비 전·명령 상한·실패, 겹침·멈춤, 멈춤 뒤 넣기 없음 |
 | `test/integration/analysis-queue-consumer.test.cjs` | 실제 DB와 처리 함수: 받음·실행 중·실행 불명, 결과·수신 확인 스키마, 중복, 작업 ID 불일치, 알림 없는 실패 결과, 닫힌 요청, 반영 실패·실패 기록 실패·커밋 실패, 식별 불가, 비밀 표지 비노출 |
-| `test/integration/analysis-queue-valkey.test.cjs` | 실제 Valkey: 같은 시도의 작업 하나(대기·완료·실패 보관), Redis에서 다시 읽은 옵션, 보관 정리(점수를 90분·130분 전으로 옮김), worker 형식 알림·결과 왕복과 반환값, 처리 중 종료와 종료 상한, 시작 전에 쌓인 결과를 처리하는 중의 종료, TCP 중계를 끊어 만든 재접속 중 종료, 요청 테이블 잠금으로 멎은 보내기 조회 중 종료, 받기 실행이 예상 밖으로 끝나면 보내기까지 멈추고 `onFailure` 호출, AppModule에 실행기 없음, 큐 서버 없음, 오류 기록 억제(내부 객체에 합성 사건을 보내는 배선 시험이며 실제 재접속 검증이 아님) |
+| `test/integration/analysis-queue-valkey.test.cjs` | 실제 Valkey: 같은 시도의 작업 하나(대기·완료·실패 보관), Redis에서 다시 읽은 옵션, 보관 정리(점수를 90분·130분 전으로 옮김), worker 형식 알림·결과 왕복과 반환값, 같은 결과 ID의 다른 내용은 `PAYLOAD_CONFLICT`이고 첫 수신·반영 자료 그대로, 결과 수신 경계(#103 식별 불가 3종은 반환값 `null`과 E 거부 기록, 형식 오류·다른 회원은 보낸 식별자를 담은 거부 수신 확인, 모두 DB·보호 관측 그대로), 처리 중 종료와 종료 상한, 시작 전에 쌓인 결과를 처리하는 중의 종료, TCP 중계를 끊어 만든 재접속 중 종료, 요청 테이블 잠금으로 멎은 보내기 조회 중 종료, 받기 실행이 예상 밖으로 끝나면 보내기까지 멈추고 `onFailure` 호출, AppModule에 실행기 없음, 큐 서버 없음, 오류 기록 억제(내부 객체에 합성 사건을 보내는 배선 시험이며 실제 재접속 검증이 아님) |
 
-worker 쪽은 시험 대역이다(요청 작업은 시험용 BullMQ Worker가 끝내고 알림·결과는 worker와 같은 이름·ID·옵션으로 직접 넣는다). 보호 관측은 합성 대역이다.
+| `test/integration/analysis-queue-application.test.cjs` | 실제 Valkey와 제품 조립(`createApplicationModule`·`startAnalysisQueue`): 큐 주소가 없으면 실행기 없음, 대기 시도 보내기, 두 선정 저장소의 LIVE 결과를 저장 당시 좌표로 본인 PRIVATE Catch에 반영, 후보가 있는 MOCK 결과는 Catch 없이 `APPLY_FAILED`, 개발 주입·결과를 받는 HTTP 경로 없음, 받기가 멈추면 앱을 닫고 `exit(1)`, 처리 시한 판정의 조회가 표 잠금에 걸려 있어도 앱 닫기 상한 뒤 `exit(1)` |
+| `test/runtime/bootstrap.test.cjs`(큐 부분) | 실제 main 프로세스: production에서 평문 큐 주소면 주소 없이 기동 실패, 큐 주소가 있으면 `listen` 뒤 대기 시도를 요청 큐로 보냄 |
+
+worker 쪽은 시험 대역이다(요청 작업은 시험용 BullMQ Worker가 끝내고 알림·결과는 worker와 같은 이름·ID·옵션으로 직접 넣는다). 보호 관측은 제품 조립 시험만 제품 공급(10월 정책 + 저장 당시 좌표)이고 나머지는 합성 대역이다. DB와 E 수신·등록은 실제 코드이고, 수신 확인은 worker가 읽는 결과 작업 반환값을 Redis에서 다시 읽어 확인한다. Python worker의 읽기 코드를 실행하지는 않는다.
 
 ## 수동 검증
 

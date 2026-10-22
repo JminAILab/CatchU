@@ -53,7 +53,8 @@ Caddy가 하는 일:
 
 - 서버가 하나라 고장 나면 고칠 때까지 멈춘다. DB 백업은 두지 않는다(합성·시험 자료, 12월 전 초기화).
 - 큐는 합성 큐(평문, 영속성 없음)이고 worker는 시험 모드다. 운영 큐(TLS·비밀번호)와 운영 모드 worker는 11월 EKS에서 쓴다. 운영 모드에서만 도는 worker 설정 검사도 그때 처음 확인된다.
-- worker는 합성 처리를 끄므로, 실제 처리(LIVE)가 조립되기 전([#121](https://github.com/JminAILab/CatchU/issues/121))에는 분석 요청을 처리 전에 거부한다.
+- api의 큐 연결([#233](https://github.com/JminAILab/CatchU/issues/233))은 켜지 않는다. `api.env`에 `CATCHU_QUEUE_REDIS_URL`을 넣지 않는다. api는 운영 모드라 평문 `redis://` 주소로는 기동하지 않고, api는 큐 망에 붙어 있지도 않다. 그래서 분석 요청은 대기로 남다가 처리 시한에 닫힌다.
+- worker는 합성 처리를 끄고 LIVE 설정(요청 정보 조회 주소·키, 생성 키)도 넣지 않으므로, 분석 요청을 처리 전에 거부한다([#121](https://github.com/JminAILab/CatchU/issues/121)). 시험 모드라 LIVE 설정이 없어도 기동은 한다.
 - worker의 바깥 연결 제한은 코드 쪽 통제([#117](https://github.com/JminAILab/CatchU/issues/117))뿐이다. 네트워크 차단은 11월 EKS의 NetworkPolicy에서 한다. worker의 DB 차단은 Docker 내부 망으로 된다.
 - 로그인(Google·GitHub)·GitHub 연결·LLM은 아직 켜지 않았다. GitHub 연결을 켜려면 OAuth 앱 등록·암호화 키와 함께 api가 쓸 수 있는 지속 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)가 필요하다. 이 구성의 api는 읽기 전용 루트와 임시 `/tmp`만 있어 그 폴더가 없으므로, 켤 때 함께 만든다([배포 안내 「#276에서 받을 값과 남은 일」](../README.md#276에서-받을-값과-남은-일)).
 - 요청 빈도 제한이 없다. Google 로그인을 켜기 전에 시작 경로 보호를 [#277](https://github.com/JminAILab/CatchU/issues/277)에서 정한다.

@@ -140,7 +140,7 @@ PR 커밋 목록은 PR 하나를 끝까지 읽은 뒤에만 남긴다. 읽는 �
 
 개수 상한(다음 쪽 있음)이나 응답 크기 상한으로 끝까지 받지 못한 브랜치가 처음 나오면 커밋 공유 한계 하나(「따로 지정한 기준 브랜치 가운데 커밋을 끝까지 받지 못한 브랜치가 있어, 그 브랜치를 받아온 병합을 작업과 구별하지 못했을 수 있다」)를 남긴다. 브랜치 이름·개수는 넣지 않는다. 그 사슬이 뿌리 커밋에 닿지 않았으면 후보 처리는 본선에 없는 PR 없는 병합을 흡수 병합인지 모르는 것으로 보고 확정하지 않는다. 브랜치가 없다는 응답은 다른 조회 오류처럼 수집을 멈춘다(「멈추는 응답」).
 
-**지금은 비어 있다.** 기본값은 빈 목록이고, 요청 계약의 `Request`·`Scope`는 정의 밖 필드를 받지 않아(`additionalProperties: false`, [메시지 스키마 v1](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml)) 요청에서 이 값을 받을 칸이 없다. LIVE 조립([#121](https://github.com/JminAILab/CatchU/issues/121))에서 저장소별 내부 설정으로 넘기지 않으면 기본 브랜치만 기준 브랜치가 된다. 그때는 통합 브랜치를 작업 브랜치로 받아온 병합이 흡수 병합으로 가려지지 않는다. 그 병합이 PR 없는 병합 후보가 되거나, 들인 커밋이 실제보다 넓게 잡힐 수 있다.
+**지금은 비어 있다.** 기본값은 빈 목록이고, 요청 계약의 `Request`·`Scope`는 정의 밖 필드를 받지 않아(`additionalProperties: false`, [메시지 스키마 v1](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml)) 요청에서 이 값을 받을 칸이 없다. LIVE 조립([#121](https://github.com/JminAILab/CatchU/issues/121))은 넘길 공급원이 없어 이 값을 넘기지 않으므로 기본 브랜치만 기준 브랜치가 된다. 그때는 통합 브랜치를 작업 브랜치로 받아온 병합이 흡수 병합으로 가려지지 않는다. 그 병합이 PR 없는 병합 후보가 되거나, 들인 커밋이 실제보다 넓게 잡힐 수 있다.
 
 ## API 판본 고정
 

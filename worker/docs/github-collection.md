@@ -4,7 +4,7 @@
 
 [#117](https://github.com/JminAILab/CatchU/issues/117)의 범위다. 검사를 통과한 요청(`CheckedRequest`) 하나의 허용 범위 안에서 GitHub 자료를 REST API로 모으고(관계 조회의 연결 PR 조회만 GraphQL 묶음 조회, [#267](https://github.com/JminAILab/CatchU/issues/267)), 출처 주소·판본·관측 사실·기여 관측·한계를 가진 기록으로 정리해 후보 처리([#118](https://github.com/JminAILab/CatchU/issues/118))에 넘긴다. 저장소 복제·체크아웃·수집 자료 실행은 하지 않는다. 통제의 근거는 [수집 통제 문서](../../docs/CatchU_수집통제_임시자료.md)다.
 
-후보·Catch·종결값은 만들지 않는다. 공개 HTTP 경로나 개발용 실행 명령 없이 `app.collection.collect` 함수로 부르며, 요청 수신부터 결과 전달까지의 LIVE 조립은 [#121](https://github.com/JminAILab/CatchU/issues/121)에서 한다.
+후보·Catch·종결값은 만들지 않는다. 공개 HTTP 경로나 개발용 실행 명령 없이 `app.collection.collect` 함수로 부르며, 요청 수신부터 결과 전달까지의 LIVE 조립은 [#121](https://github.com/JminAILab/CatchU/issues/121)의 `app/processing/live.py`이고, 자격정보·선택 범위는 [요청 정보 조회](request-context.md)의 고정 resolver로 받는다.
 
 1. **첫 호출 전 검사**: 허용 자료 종류가 비어 있으면 멈춘다. 요청의 자격정보 참조로 A에 작업 맥락을 물어, 회원·저장소·허용 범위 판본이 요청과 모두 같고 만료가 수집 시간 상한 뒤일 때만 통과한다. 선택 범위 참조는 제공자가 저장소 단위 선택이라고 밝힌 경우만 통과하며, 알 수 없는 범위를 저장소 전체로 넓히지 않는다. 하나라도 어긋나면 연결을 열지 않고(호출 0회) 실패 하나로 끝나며, 조회를 다시 시도하지 않는다.
 2. **수집**: 저장소 확인(요청한 저장소이고 공개 저장소인지) → 허용된 종류의 목록(기본 브랜치 최근 커밋, 최근 PR, 최근 이슈) → 상세(연동 계정이 작성자로 기록된 최근 커밋의 변경 내용, 연동 계정이 연 최근 PR의 커밋 목록) 순으로 부른다. 받은 쪽은 곧바로 보존하므로 중간에 멈춰도 그때까지 받은 기록이 남는다. 상세를 연동 계정의 기록으로 좁힌 것은 호출 수를 아끼려는 수집 순서이며, 본인 기여의 최종 판정은 #118이 한다.

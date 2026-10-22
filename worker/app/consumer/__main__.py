@@ -15,7 +15,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     from app.consumer.settings import (
         ConsumerSettings,
         SettingsError,
-        drop_parent_only_env,
+        drop_secret_env,
     )
 
     parser = argparse.ArgumentParser(
@@ -38,8 +38,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     except SettingsError as error:
         logging.getLogger("app.consumer").error("기동 설정 오류: %s", error)
         return 2
-    # 분석 자식(spawn)이 큐 비밀번호를 환경변수로 물려받지 않게 한다. 설정 객체에는 이미 담았다.
-    drop_parent_only_env()
+    # 분석 자식(spawn)이 큐 비밀번호·LIVE 키를 환경변수로 물려받지 않게 한다. 설정 객체에는 이미 담았다.
+    drop_secret_env()
     return asyncio.run(ConsumerService(settings, host=args.host, port=args.port).run())
 
 

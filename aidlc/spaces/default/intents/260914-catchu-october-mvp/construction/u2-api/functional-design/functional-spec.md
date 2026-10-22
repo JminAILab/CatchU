@@ -26,9 +26,11 @@ erDiagram
   CatchAsset ||--|{ CandidateRegistration : registration
   MemberAccount ||--o{ AuthSession : sessions
   AuthSession ||--|{ SessionRefreshToken : refresh_tokens
+  AllowedScopeRevision ||--o{ RepositorySelection : scope_definition
+  AllowedScopeRevision |o..o{ AnalysisConsent : scope_revision_match
 ```
 
-텍스트 대체: A 회원은 프로필/현재 연동을 최대 하나씩, 요청·Catch·보호·링크·로그인 세션을 여러 개 갖는다. 로그인 세션은 교체된 Refresh 기록을 1개 이상 갖는다. 요청은 새 동의 하나와 현재 시도를 갖고, 시도는 검증된 결과 메타데이터를 최대 하나 갖는다. B Catch는 근거 1개 이상과 등록 연결 1개 이상을 갖는다. 결과별 여러 후보 등록 연결이 새 Catch 또는 기존 같은 작업을 가리킨다. IdempotencyRecord는 operation에 맞는 요청 또는 링크 하나만 참조한다. 그림의 다중 시도 관계는 이력 모델이며 현재 MVP의 자동 재시도 허가가 아니다.
+텍스트 대체: A 회원은 프로필/현재 연동을 최대 하나씩, 요청·Catch·보호·링크·로그인 세션을 여러 개 갖는다. 로그인 세션은 교체된 Refresh 기록을 1개 이상 갖는다. 요청은 새 동의 하나와 현재 시도를 갖고, 시도는 검증된 결과 메타데이터를 최대 하나 갖는다. B Catch는 근거 1개 이상과 등록 연결 1개 이상을 갖는다. 결과별 여러 후보 등록 연결이 새 Catch 또는 기존 같은 작업을 가리킨다. IdempotencyRecord는 operation에 맞는 요청 또는 링크 하나만 참조한다. 현재 선정 저장소는 범위 판본 하나를 참조하고, 범위 판본 하나를 여러 선정이 함께 쓸 수 있다. 동의의 범위 판본은 실제 접수 때 이 범위 판본과 값으로 대조하며(점선) 외래 키가 아니다. 개발 합성 판본은 범위 판본 표에 없다. 그림의 다중 시도 관계는 이력 모델이며 현재 MVP의 자동 재시도 허가가 아니다.
 
 ## 업무 흐름
 

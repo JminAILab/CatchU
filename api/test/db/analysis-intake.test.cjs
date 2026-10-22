@@ -12,7 +12,7 @@ const { AnalysisRequest, AnalysisConsent, AnalysisAttempt, MemberAccount } = req
 const { AUTH_CONFIG } = require('../../dist/auth/auth.config');
 const { SessionService } = require('../../dist/auth/session.service');
 const { AnalysisIntakeService } = require('../../dist/analysis-intake/analysis-intake.service');
-const { AnalysisNoticeService, SYNTHETIC_NOTICE } = require('../../dist/analysis-intake/analysis-notice');
+const { AnalysisNoticeService, REAL_NOTICE, SYNTHETIC_NOTICE } = require('../../dist/analysis-intake/analysis-notice');
 const { parseAnalysisInput, analysisFingerprint } = require('../../dist/analysis-intake/analysis-input');
 const { retryDecision } = require('../../dist/analysis-intake/analysis-status');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
@@ -282,34 +282,43 @@ test('공급자/DB 조회 실패와 잘못된 공급 자료는 빈 목록·접�
   s.provider.readConnection=async()=>{ throw Error('synthetic-secret-provider'); };
   const body=await error(await s.post(u),500,'INTERNAL_ERROR');
   assert(!JSON.stringify(body).includes('synthetic-secret-provider'));
-  await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}}),500,'INTERNAL_ERROR');
+  // 고지는 회원 생성 출처로 고르므로 연결 공급 장애와 무관하다(#322). 회원 조회 장애는 analysis-notice.test.cjs에서 본다.
+  const notice=await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}});
+  assert.equal(notice.status,200); assert.equal((await notice.json()).noticeRevision,SYNTHETIC_NOTICE.noticeRevision);
   s.provider.readConnection=async()=>({connectionState:'CONNECTED',sourceMode:'MOCK',repositories:[{}]});
   await error(await s.post(u),500,'INTERNAL_ERROR');
   assert.equal((await counts()).requests,0);
 });
 for (const [state, reference] of [['CONNECTED', null], ['DISCONNECTED', 'not-synthetic'], ['REAUTH_REQUIRED', null]]) {
-  test('합성 연결의 잘못된 상태·참조 조합은 미연결로 숨기지 않는다: ' + state, async t => {
+  test('합성 연결의 잘못된 상태·참조 조합은 접수에서 미연결로 숨기지 않는다: ' + state, async t => {
     const s = await start(t); const u = await s.login();
     await db.query('UPDATE github_connection SET connection_state=$1, external_account_reference=$2 WHERE member_id=$3',
       [state, reference, u.memberId]);
     await error(await s.post(u),500,'INTERNAL_ERROR');
-    await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}}),500,'INTERNAL_ERROR');
+    // 고지 선택은 GitHub 연결 상태와 분리했다(#322). 연결 자료는 접수가 계속 검사한다.
+    const notice = await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}});
+    assert.equal(notice.status,200); assert.equal((await notice.json()).noticeRevision,SYNTHETIC_NOTICE.noticeRevision);
     assert.equal((await counts()).requests,0);
   });
 }
-test('실제 자료용 설정 부재·LIVE 공급에 합성 고지를 대신 쓰지 않는다',async t=>{
+test('LIVE 공급은 합성 동의로 접수하지 않고 개발 회원 고지는 공급 방식과 무관하게 합성 판본이다',async t=>{
   const s=await start(t); const u=await s.login();
   const original=s.provider.readConnection.bind(s.provider);
   s.provider.readConnection=async(member,manager)=>({...await original(member,manager),sourceMode:'LIVE'});
-  await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}}),403,'CONSENT_REQUIRED');
+  // 고지는 회원 생성 출처로 고른다(#322). 실제 판본 부재는 analysis-notice.test.cjs에서 403 CONSENT_REQUIRED로 본다.
+  const notice=await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}});
+  assert.equal(notice.status,200); assert.equal((await notice.json()).noticeRevision,SYNTHETIC_NOTICE.noticeRevision);
   await error(await s.post(u),403,'CONSENT_REQUIRED');
   assert.equal((await counts()).requests,0);
 });
-test('개발 플래그가 켜져도 일반 회원에게 합성 고지를 대신 제공하지 않는다',async t=>{
+test('개발 플래그가 켜져도 실제 회원에게는 합성 고지 대신 실제 고지를 주고 합성 연결로는 접수하지 않는다',async t=>{
   const s=await start(t);const u=await s.login();
   await db.query('UPDATE member_account SET identity_reference=$1 WHERE member_id=$2',['catchu:google:synthetic-test',u.memberId]);
-  await error(await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}}),403,'INTERNAL_ERROR');
-  await error(await s.post(u),403,'INTERNAL_ERROR');
+  const notice=await s.call('/v1/analysis-notice',{headers:{Authorization:'Bearer '+u.token}});
+  assert.equal(notice.status,200); assert.deepEqual(await notice.json(),{noticeRevision:REAL_NOTICE.noticeRevision,text:REAL_NOTICE.text});
+  // 실제 회원은 #323 실제 접수 경로로 간다. 이 시험 서버는 GitHub 연동이 꺼져 있고, 보관 자격정보 없는 합성 연결도
+  // 실제 연결이 아니다(연동을 켠 서버의 거부는 analysis-intake-real.test.cjs).
+  await error(await s.post(u),403,'GITHUB_CONNECTION_REQUIRED');
   assert.equal((await counts()).requests,0);
 });
 for(const overrides of [{DEV_LOGIN_ENABLED:'false'},{NODE_ENV:'production'},{NODE_ENV:undefined},{NODE_ENV:'preview'}]){

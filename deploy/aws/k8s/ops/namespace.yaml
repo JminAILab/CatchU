@@ -1,0 +1,23 @@
+# 관리 작업 namespace(#276). DB 관리용 psql 일회 Pod(db-admin.sh)와 그 임시 Secret·ConfigMap만 여기서 돌린다.
+# 앱 namespace catchu와 나눈 까닭: 자동 배포 역할(#342)은 catchu에서 Pod를 만들 수 있어 같은 namespace의 Secret을 Pod에 붙여 읽을 수
+# 있다. RDS 관리자 비밀번호가 든 임시 Secret은 그 역할이 닿지 않는 이 namespace에만 두고, 배포 역할에는 이 namespace 권한을 주지 않는다.
+# Pod 보안 검사는 catchu와 같은 restricted다(psql Pod는 이미지의 postgres 사용자 999로 돈다). 적용은 deploy/aws/k8s/README.md 「적용(2단계)」.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: catchu-ops
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.37
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.37
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.37
+---
+# 관리 Pod도 쿠버네티스 API를 쓰지 않는다. API 토큰이 자동으로 들어가지 않게 한다.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: catchu-ops
+automountServiceAccountToken: false

@@ -46,7 +46,7 @@ test('선정 공급자가 없는 모듈은 조립을 거부한다', () => {
   }
 });
 
-for (const [name, badKey] of [['누락', undefined], ['잘못된 값', 'DO_NOT_LOG_INVALID_SERVICE_KEY']]) {
+for (const [name, badKey] of [['누락', undefined], ['잘못된 값', 'DO_NOT_LOG_INVALID_SERVICE_KEY'], ['JWT 키 재사용', 'reuse-jwt']]) {
   test(`실제 staging main은 서비스 키 ${name} 시 안전한 설정 오류로 기동 실패`, { timeout: 20000 }, async t => {
     const { spawn } = require('node:child_process');
     const { resolve } = require('node:path');
@@ -54,7 +54,8 @@ for (const [name, badKey] of [['누락', undefined], ['잘못된 값', 'DO_NOT_L
       NODE_ENV: 'staging', AUTH_WEB_ORIGIN: 'https://synthetic.example', SHARE_LINK_WEB_BASE_URL: 'https://synthetic.example', LINK_GRANT_SECRET: key(),
       GOOGLE_LOGIN_ENABLED: 'false', GITHUB_CONNECTION_ENABLED: 'false', WORKER_CONTEXT_ENABLED: 'true',
       BIND_HOST: '127.0.0.1', PORT: '3001', CORS_ALLOWED_ORIGINS: '', TRUST_PROXY_CIDRS: '' };
-    if (badKey === undefined) delete env.WORKER_CONTEXT_API_KEY; else env.WORKER_CONTEXT_API_KEY = badKey;
+    if (badKey === undefined) delete env.WORKER_CONTEXT_API_KEY;
+    else env.WORKER_CONTEXT_API_KEY = badKey === 'reuse-jwt' ? env.AUTH_JWT_SECRET : badKey;
     const child = spawn(process.execPath, ['dist/main.js'], { cwd: resolve(__dirname, '..'), env,
       windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     t.after(() => { if (child.exitCode === null && child.signalCode === null) child.kill(); });

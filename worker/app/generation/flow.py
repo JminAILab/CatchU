@@ -1,8 +1,8 @@
 """생성 흐름(#120): 후보 판정 결과(#118)의 후보마다 설명 초안·생각해볼 질문·제목을 채운다.
 
 입구는 `run_generation`이다. 후보 순서·근거·미제공 집계·기존 실패는 그대로 두고, 후보의 생성 칸(draft·
-reflection·title)과 본인 커밋 근거의 한계 끝 문구(결정 5·6)만 바꾼다. 처리 순서에 실제 수집·후보·큐·E
-전달을 잇는 것은 #121이다.
+reflection·title)과 본인 커밋 근거의 한계 끝 문구(결정 5·6)만 바꾼다. 처리 순서에 잇는 것은 #121의 LIVE
+조립(`app.processing.live`)이다.
 
 후보 하나의 처리(2026-10-12 결정 4·7·8·9·13 및 #120 본문 「응답과 실패 판정」):
 1. 재료 준비: 재료 커밋의 파일마다 patch 온전성 확인과 가리기(request.prepare).
@@ -12,13 +12,15 @@ reflection·title)과 본인 커밋 근거의 한계 끝 문구(결정 5·6)만 
 4. 크기 선별. 선별 뒤 고를 수 있는 줄이 없으면 2와 같이 끝내고 크기 전체 문구를 붙인다.
 5. 생성 호출 1회. 호출 오류·시간 초과·늦은 응답·전체를 읽을 수 없는 응답은 설명·질문 모두 FAILED(DRAFT·
    REFLECTION 실패 각 1건, 같은 호출의 ANALYSIS는 없음), 제목 None.
-6. 설명·질문·제목은 각자 판정한다. 설명이 실패해도 확인된 질문·제목은 둔다.
+6. 설명·질문·제목은 각자 판정한다. 설명이 실패해도 확인된 질문·제목은 둔다. 설명·질문은 맞는 항목만 쓰고
+   틀린 항목은 버린다(response 모듈 설명, 2026-10-19 팀장 결정).
 모든 후보의 생성·미생성 판정이 끝난 뒤, 남은 시간 안에서 형식을 어긴 제목만 고쳐 쓴다(결정 15).
 제공자 오류·시간 초과는 후보마다 결과로 바꾸고 다시 부르지 않는다. 그 밖의 예외(결함, 요청 전체의
 ExecutionUnknown)는 그대로 올린다.
 """
 
 import logging
+from collections import Counter
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Literal
@@ -61,7 +63,10 @@ from app.generation.request import (
 )
 from app.generation.response import (
     TOP_LEVEL_KEYS,
+    Fragment,
+    Question,
     Sent,
+    SentenceMiss,
     TitleProblem,
     Unreadable,
     fragments,
@@ -112,6 +117,17 @@ class GenerationReport:
     size_limited_commits: int = 0
     truncated_commits: int = 0
     unknown_response_keys: int = 0
+    # 실패 원인별 건수(원인 코드 → 건수). 전체 호출 실패는 실패 코드, 설명·질문 실패는 부분이 실패한 첫
+    # 원인(response.PartReason)으로 센다. 설명 실패 수 = 전체 호출 실패 수 + 설명 원인 건수의 합이다.
+    whole_reasons: Counter[str] = field(default_factory=Counter)
+    draft_reasons: Counter[str] = field(default_factory=Counter)
+    reflection_reasons: Counter[str] = field(default_factory=Counter)
+    # 버리거나 고친 항목 건수(response.PartVerdict.notes → 건수)와, 틀린 항목을 버리고도 살아남은 부분 수.
+    # 부분이 실패했어도 그 부분에서 버린 항목은 센다.
+    draft_notes: Counter[str] = field(default_factory=Counter)
+    reflection_notes: Counter[str] = field(default_factory=Counter)
+    draft_salvaged: int = 0
+    reflection_salvaged: int = 0
 
 
 @dataclass(frozen=True)
@@ -146,7 +162,8 @@ def run_generation(
 ) -> GenerationRun:
     """built는 같은 요청·수집 결과로 만든 `build_candidates(request, outcome)`의 결과다.
 
-    deadline은 생성 몫이 끝나야 할 시각이다(요청 전체 마감에서 결과 조합·전송 여유를 뺀 값, #121이 정한다).
+    deadline은 생성 몫이 끝나야 할 시각이다(요청 전체 마감에서 결과 조합·전송 여유를 뺀 값). 큐 소비자는
+    꺼낸 시각 + 20분 − 60초를 넘긴다(#121).
     """
     report = GenerationReport()
     materials = gather(request, outcome, built)
@@ -238,6 +255,7 @@ def _generate_one(
     if response is None:
         assert code is not None
         report.whole_failures += 1
+        report.whole_reasons[code.value] += 1
         return _Result(
             draft=failed_draft(code),
             reflection=failed_reflection(code),
@@ -247,8 +265,8 @@ def _generate_one(
     report.unknown_response_keys += unknown_keys(response, TOP_LEVEL_KEYS)
     sent = Sent(selection.lines, selection.files)
     result = _Result(selection=selection, called=True)
-    result.draft = _draft(response, sent, limits)
-    result.reflection = _reflection(response, sent, limits)
+    result.draft = _draft(response, sent, limits, report)
+    result.reflection = _reflection(response, sent, limits, report)
     choice = title_choice(response.get("title"), sent, max_name=limits.max_name_chars)
     if choice.problem is not None:
         result.title_problem = choice.problem
@@ -307,7 +325,10 @@ def _call(
 
 
 def _draft(
-    response: dict[str, object], sent: Sent, limits: GenerationLimits
+    response: dict[str, object],
+    sent: Sent,
+    limits: GenerationLimits,
+    report: GenerationReport,
 ) -> DraftOutcome:
     verdict = fragments(
         response,
@@ -315,36 +336,66 @@ def _draft(
         low=limits.min_fragments,
         high=limits.max_fragments,
         max_name=limits.max_name_chars,
+        sentence=_fragment_sentence,
     )
+    report.draft_notes.update(verdict.notes)
     if verdict.problem is not None:
+        assert verdict.reason is not None
+        report.draft_reasons[verdict.reason] += 1
         return failed_draft(_PART_CODES[verdict.problem])
+    if _salvaged(verdict.notes):
+        report.draft_salvaged += 1
     text = render.description(verdict.items)
-    if text is None:
-        return failed_draft(GenerationFailureCode.UNVERIFIED)
+    assert text is not None  # 문장을 만들 수 있는 조각만 남았다
     return DraftOutcome.generated(text)
 
 
+def _fragment_sentence(fragment: Fragment) -> SentenceMiss | None:
+    return None if render.fragment_sentence(fragment) is not None else "NO_TEMPLATE"
+
+
 def _reflection(
-    response: dict[str, object], sent: Sent, limits: GenerationLimits
+    response: dict[str, object],
+    sent: Sent,
+    limits: GenerationLimits,
+    report: GenerationReport,
 ) -> ReflectionOutcome:
+    def sentence(question: Question) -> SentenceMiss | None:
+        return _question_miss(render.question(question, limits.max_question_chars))
+
     verdict = questions(
         response,
         sent,
         low=limits.min_questions,
         high=limits.max_questions,
         max_name=limits.max_name_chars,
+        sentence=sentence,
     )
+    report.reflection_notes.update(verdict.notes)
     if verdict.problem is not None:
+        assert verdict.reason is not None
+        report.reflection_reasons[verdict.reason] += 1
         return failed_reflection(_PART_CODES[verdict.problem])
-    texts: list[str] = []
-    for item in verdict.items:
-        text = render.question(item, limits.max_question_chars)
-        if text == "UNSUPPORTED":
-            return failed_reflection(GenerationFailureCode.UNVERIFIED)
-        if text == "TOO_LONG":
-            return failed_reflection(GenerationFailureCode.RULE_VIOLATION)
-        texts.append(text)
-    return ReflectionOutcome.generated(tuple(texts))
+    if _salvaged(verdict.notes):
+        report.reflection_salvaged += 1
+    return ReflectionOutcome.generated(
+        tuple(
+            render.question(item, limits.max_question_chars) for item in verdict.items
+        )
+    )
+
+
+def _question_miss(text: str) -> SentenceMiss | None:
+    if text == "UNSUPPORTED":
+        return "NO_TEMPLATE"
+    if text == "TOO_LONG":
+        return "TOO_LONG"
+    return None
+
+
+def _salvaged(notes: tuple[str, ...]) -> bool:
+    """틀린 항목을 버리고도 그 부분이 만들어졌는가. 상한 뒤 항목·종류를 고친 조각만 있으면 아니다."""
+    return any(note.startswith("dropped:") for note in notes)
 
 
 def _rewrite_title(
@@ -435,6 +486,11 @@ def _apply(
     )
 
 
+def _reasons(counts: Counter[str]) -> str:
+    """원인 코드:건수를 코드순으로 쉼표로 잇는다. 없으면 '-'. 코드는 고정 값이라 자료가 들어가지 않는다."""
+    return ",".join(f"{code}:{count}" for code, count in sorted(counts.items())) or "-"
+
+
 def _log(request: CheckedRequest, report: GenerationReport) -> None:
     """건수만 남긴다. SHA·경로·이름·제목·본문·응답 원문·가린 값은 남기지 않는다."""
     logger.log(
@@ -443,7 +499,9 @@ def _log(request: CheckedRequest, report: GenerationReport) -> None:
         "rewriteCalls=%d noMaterial=%d budgetSkipped=%d wholeFailures=%d "
         "draftGenerated=%d draftFailed=%d reflectionFailed=%d titleOnlyNull=%d "
         "titlesRewritten=%d maskedValues=%d secretFiles=%d maskedToEmpty=%d "
-        "sizeLimitedCommits=%d truncatedCommits=%d unknownResponseKeys=%d",
+        "sizeLimitedCommits=%d truncatedCommits=%d unknownResponseKeys=%d "
+        "wholeReasons=%s draftReasons=%s reflectionReasons=%s "
+        "draftDropReasons=%s reflectionDropReasons=%s draftSalvaged=%d reflectionSalvaged=%d",
         request.request_id,
         request.attempt_id,
         report.candidates,
@@ -463,4 +521,11 @@ def _log(request: CheckedRequest, report: GenerationReport) -> None:
         report.size_limited_commits,
         report.truncated_commits,
         report.unknown_response_keys,
+        _reasons(report.whole_reasons),
+        _reasons(report.draft_reasons),
+        _reasons(report.reflection_reasons),
+        _reasons(report.draft_notes),
+        _reasons(report.reflection_notes),
+        report.draft_salvaged,
+        report.reflection_salvaged,
     )

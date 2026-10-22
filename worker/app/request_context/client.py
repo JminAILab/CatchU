@@ -1,22 +1,107 @@
-"""내부 API 호출과 요청 하나에 묶인 resolver pair. 응답·참조를 기록하지 않는다."""
+"""내부 API 조회 한 번과, 그 응답을 그대로 돌려주는 요청 하나 수명의 고정 resolver.
+
+`lookup`은 찾음(`ContextFound`)·모름(`ContextUnknown`, 이유)·실패(`ContextLookupFailed`, 원인) 셋 중 하나를
+돌려준다. 응답·토큰·참조를 기록하지 않는다.
+"""
 
 import http.client
 import ssl
-import threading
+from dataclasses import dataclass
 from types import TracebackType
 
 from app.collection.credentials import CredentialContext, CredentialLookupError
 from app.collection.selection import SelectedRange, SelectionLookupError
 from app.collection.transport import HttpsTransport, TransportError, TransportTimeout
-from app.processing.request_check import CheckedRequest
+from app.processing.request_check import AcceptedContext
 from app.request_context.decode import (
+    DecodedContext,
     decode_context,
     decode_unavailable,
     valid_reference,
 )
+from app.request_context.reasons import UnresolvedReason
 from app.request_context.settings import ContextApiSettings
 
-Context = tuple[CredentialContext, SelectedRange]
+
+@dataclass(frozen=True)
+class ContextUnknown:
+    """api가 404로 답했다(접수 기록이 없거나 지금 수집할 수 없음). 이유는 회원 실패 문구를 고르는 데만 쓴다."""
+
+    reason: UnresolvedReason
+
+
+@dataclass(frozen=True)
+class ContextLookupFailed:
+    """조회 자체가 실패했다. cause는 운영 로그용 고정 코드다(`CONTEXT_HTTP_<상태>` 등). 다시 묻지 않는다."""
+
+    cause: str
+
+    @property
+    def reason(self) -> UnresolvedReason:
+        return UnresolvedReason.REQUEST_CONTEXT_UNAVAILABLE
+
+
+class ContextFound:
+    """찾음. 접수 맥락과, 수집에 넘길 고정 resolver 한 쌍을 가진다.
+
+    resolver는 조회로 받은 값을 그대로 돌려주므로 HTTP는 조회 한 번뿐이다. 반드시 with로 쓰고, 성공·거부·예외
+    어느 쪽이든 끝나면 자격정보와 선택 범위를 놓는다. 닫힌 뒤에는 다시 돌려주지 않는다. Python 메모리를 안전하게
+    덮어쓰는 기능을 보장하는 것은 아니다.
+    """
+
+    def __init__(self, decoded: DecodedContext) -> None:
+        self.accepted: AcceptedContext = decoded.accepted
+        self._attempt_id = decoded.accepted.attempt_id
+        self._credential: CredentialContext | None = decoded.credential
+        self._selection: SelectedRange | None = decoded.selection
+        self._closed = False
+        self.credentials = _FixedCredentials(self)
+        self.selections = _FixedSelections(self)
+
+    def __enter__(self) -> "ContextFound":
+        if self._closed:
+            raise ValueError("이미 닫힌 요청 정보다")
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()
+
+    def close(self) -> None:
+        self._credential = None
+        self._selection = None
+        self._closed = True
+
+    def _held(self, reference: str) -> bool:
+        """같은 시도 ID의 참조만 받은 값을 가리킨다. 다른 참조는 모름(None)이다."""
+        return reference == self._attempt_id
+
+
+class _FixedCredentials:
+    def __init__(self, state: ContextFound) -> None:
+        self._state = state
+
+    def resolve(self, reference: str) -> CredentialContext | None:
+        if self._state._closed:
+            raise CredentialLookupError("CONTEXT_CLOSED")
+        return self._state._credential if self._state._held(reference) else None
+
+
+class _FixedSelections:
+    def __init__(self, state: ContextFound) -> None:
+        self._state = state
+
+    def resolve(self, reference: str) -> SelectedRange | None:
+        if self._state._closed:
+            raise SelectionLookupError("CONTEXT_CLOSED")
+        return self._state._selection if self._state._held(reference) else None
+
+
+LookupResult = ContextFound | ContextUnknown | ContextLookupFailed
 
 
 class RequestContextClient:
@@ -25,12 +110,11 @@ class RequestContextClient:
     def __init__(self, settings: ContextApiSettings) -> None:
         self._settings = settings
 
-    def for_request(self, request: CheckedRequest) -> "RequestResolvers":
-        return RequestResolvers(self, request)
-
-    def _lookup(
-        self, request_id: str, attempt_id: str
-    ) -> tuple[Context | None, str | None]:
+    def lookup(self, attempt_id: str) -> LookupResult:
+        """시도 ID로 한 번 묻는다. redirect·재시도·자격정보 갱신은 하지 않는다."""
+        if not valid_reference(attempt_id):
+            # 경로에 넣기 전에 형식을 본다. 조회 전 자체 검사를 거친 요청이면 생기지 않는다.
+            return ContextLookupFailed("CONTEXT_REFERENCE_INVALID")
         settings = self._settings
 
         def connect(host: str, timeout: float) -> http.client.HTTPConnection:
@@ -55,9 +139,9 @@ class RequestContextClient:
             )
             if response.status not in {200, 404}:
                 # 응답 메시지·Location 등은 읽거나 예외에 옮기지 않는다.
-                return None, f"CONTEXT_HTTP_{response.status}"
+                return ContextLookupFailed(f"CONTEXT_HTTP_{response.status}")
             if response.body is None:
-                return None, "CONTEXT_RESPONSE_TOO_LARGE"
+                return ContextLookupFailed("CONTEXT_RESPONSE_TOO_LARGE")
             if (
                 response.headers.get("content-type", "")
                 .split(";", 1)[0]
@@ -65,103 +149,21 @@ class RequestContextClient:
                 .lower()
                 != "application/json"
             ):
-                return None, "CONTEXT_RESPONSE_INVALID"
+                return ContextLookupFailed("CONTEXT_RESPONSE_INVALID")
             if (
                 response.headers.get("content-encoding", "identity").lower()
                 != "identity"
             ):
-                return None, "CONTEXT_RESPONSE_INVALID"
+                return ContextLookupFailed("CONTEXT_RESPONSE_INVALID")
             if response.status == 404:
-                decode_unavailable(response.body)
-                return None, None
-            return decode_context(
-                response.body, request_id=request_id, attempt_id=attempt_id
-            ), None
+                return ContextUnknown(decode_unavailable(response.body))
+            return ContextFound(decode_context(response.body, attempt_id=attempt_id))
         except TransportTimeout:
-            return None, "CONTEXT_TIMEOUT"
+            return ContextLookupFailed("CONTEXT_TIMEOUT")
         except (TransportError, OSError, http.client.HTTPException):
-            return None, "CONTEXT_TRANSPORT_FAILED"
+            return ContextLookupFailed("CONTEXT_TRANSPORT_FAILED")
         except (ValueError, TypeError, RecursionError):
             # JSON decode 예외에는 원문이 포함된다. 예외 객체·체인을 보존하지 않는다.
-            return None, "CONTEXT_RESPONSE_INVALID"
+            return ContextLookupFailed("CONTEXT_RESPONSE_INVALID")
         finally:
             transport.close()
-
-
-class RequestResolvers:
-    """반드시 요청마다 만들고 with로 수집 끝에 닫는다. 닫힌 pair는 재사용하지 않는다."""
-
-    def __init__(self, client: RequestContextClient, request: CheckedRequest) -> None:
-        self._client = client
-        self._request_id: str | None = request.request_id
-        self._attempt_id: str | None = request.attempt_id
-        self._invalid = not (
-            valid_reference(request.attempt_id)
-            and valid_reference(request.request_id)
-            and request.credential_context_reference == request.attempt_id
-            and request.selection_reference == request.attempt_id
-        )
-        self._attempted = False
-        self._closed = False
-        self._context: Context | None = None
-        self._error: str | None = None
-        self._lock = threading.Lock()
-        self.credentials = _Credentials(self)
-        self.selections = _Selections(self)
-
-    def __enter__(self) -> "RequestResolvers":
-        if self._closed:
-            raise ValueError("이미 닫힌 내부 맥락 조회다")
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        self.close()
-
-    def close(self) -> None:
-        with self._lock:
-            self._context = None
-            self._request_id = None
-            self._attempt_id = None
-            self._closed = True
-
-    def _resolve(self, reference: str) -> tuple[Context | None, str | None]:
-        with self._lock:
-            if self._closed:
-                return None, "CONTEXT_CLOSED"
-            if self._invalid or reference != self._attempt_id:
-                return None, "CONTEXT_REFERENCE_INVALID"
-            if not self._attempted:
-                # 실패·404도 시도했다는 상태를 남긴다. 다음 resolver는 다시 호출하지 않는다.
-                self._attempted = True
-                assert self._request_id is not None and self._attempt_id is not None
-                self._context, self._error = self._client._lookup(
-                    self._request_id, self._attempt_id
-                )
-            return self._context, self._error
-
-
-class _Credentials:
-    def __init__(self, state: RequestResolvers) -> None:
-        self._state = state
-
-    def resolve(self, reference: str) -> CredentialContext | None:
-        context, error = self._state._resolve(reference)
-        if error is not None:
-            raise CredentialLookupError(error)
-        return None if context is None else context[0]
-
-
-class _Selections:
-    def __init__(self, state: RequestResolvers) -> None:
-        self._state = state
-
-    def resolve(self, reference: str) -> SelectedRange | None:
-        context, error = self._state._resolve(reference)
-        if error is not None:
-            raise SelectionLookupError(error)
-        return None if context is None else context[1]

@@ -49,3 +49,8 @@ export const DISPATCH_STOP_TIMEOUT_MS = QUEUE_COMMAND_TIMEOUT_MS + 1_000;
 export const CONSUMER_CLOSE_TIMEOUT_MS = 15_000;
 /** 요청 큐 닫기와 연결 하나를 정상 종료(QUIT)로 닫기를 기다리는 상한. 넘으면 끊는다. */
 export const CONNECTION_QUIT_TIMEOUT_MS = 2_000;
+/**
+ * 받기가 예상 밖으로 멈춘 뒤 앱 닫기를 기다리는 상한. 넘으면 기다리지 않고 종료 코드 1로 끝낸다.
+ * 다른 종료 훅(처리 시한 판정의 DB 조회 등)이 끝나지 않아도 HTTP 서버가 열린 채 남지 않게 한다.
+ */
+export const FAILURE_APP_CLOSE_TIMEOUT_MS = 10_000;

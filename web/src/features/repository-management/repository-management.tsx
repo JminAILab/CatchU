@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createAnalysisRequestApi, type AnalysisRequestApi } from "@/features/analysis-request/analysis-request-api";
+import { AnalysisRequestSection } from "@/features/analysis-request/analysis-request-section";
+import { createAnalysisRequestStore } from "@/features/analysis-request/analysis-request-store";
 import type { RepositoryManagementBindings } from "@/features/assets/assets-connected";
+import { api as client } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import type { GitHubState, RepositoryApi } from "./repository-api";
 import {
@@ -15,11 +19,19 @@ type Props = {
   api: RepositoryApi;
   /** B(#172)가 주는 콜백. 모달 열기 직전 onOpen, 일반 닫기 onClosed, [이 저장소 Catch 보기]는 onShowRepository만 부른다. */
   bindings: RepositoryManagementBindings;
-  /** 모달 아래쪽 「연결할 수 있는 저장소」의 선택·동의·요청(#154)이 들어갈 자리. */
+  /**
+   * 분석 고지 조회·첫 분석 요청 API(#154). 생략하면 #106의 api.member로 만든 제품 호출을 쓴다.
+   * 미리보기·시험은 합성 호출을 넘긴다. 처음 렌더에서 받은 값을 계속 쓴다.
+   */
+  requestApi?: AnalysisRequestApi;
+  /** 「연결할 수 있는 저장소」 자리를 직접 채울 때. 주면 #154 요청 영역 대신 이것을 그린다. */
   connectSection?: ReactNode;
 };
 
 type Load<T> = { state: "loading" } | { state: "failed" } | { state: "ready"; value: T };
+
+/** 제품 화면의 분석 고지·요청 호출. 모듈 단위로 한 번 만든다(회원 토큰·기준 주소는 api.member가 맡는다). */
+const memberRequestApi = createAnalysisRequestApi(client.member);
 
 const GLYPH: Record<StatusIcon, string> = { analyzing: "…", success: "✓", partial: "!", failed: "×" };
 const timeFormat = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
@@ -32,7 +44,7 @@ function formatTime(value: string): string {
  * 내 자산 Catch 탭 위쪽의 GitHub 저장소 연결 관리 영역과 모달(D, #153).
  * 조회 실패를 0건으로, 실행 불명·반영 실패·복구를 분석 실패로 바꿔 보이지 않는다. 새 분석·재요청은 자동으로 부르지 않는다.
  */
-export function RepositoryManagement({ api, bindings, connectSection }: Props) {
+export function RepositoryManagement({ api, bindings, requestApi, connectSection }: Props) {
   const [github, setGithub] = useState<Load<GitHubState>>({ state: "loading" });
   const [open, setOpen] = useState(false);
   const [connected, setConnected] = useState<Load<ConnectedRepository[]>>({ state: "loading" });
@@ -79,6 +91,18 @@ export function RepositoryManagement({ api, bindings, connectSection }: Props) {
 
   useEffect(() => () => { ++loadVersion.current; loadAbort.current?.abort(); }, []);
 
+  // #154 요청 상태. 모달을 닫아도 버리지 않아, 응답 불명으로 붙잡은 키·본문이 다시 열었을 때도 남는다.
+  // 이 컴포넌트가 내려가면(회원 변경·화면 이동) 버린다.
+  const [requestStore] = useState(() => connectSection === undefined ? createAnalysisRequestStore({
+    repositories: (signal) => api.analyzableRepositories(signal),
+    requests: requestApi ?? memberRequestApi,
+  }) : null);
+  useEffect(() => () => requestStore?.dispose(), [requestStore]);
+  // 접수·거부 결과가 진행 상태를 바꿨을 수 있으면 열려 있는 모달의 「연결된 저장소」를 다시 불러온다.
+  // 그 조회가 실패해도 접수 결과 안내는 바꾸지 않는다(각자 따로 표시). 닫혀 있으면 부르지 않는다.
+  useEffect(() => (open && requestStore ? requestStore.watchStatusChanges(loadConnected) : undefined),
+    [open, requestStore, loadConnected]);
+
   // 열림 상태와 dialog를 맞춘다. 닫을 때는 연 버튼으로 초점을 돌린다.
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -95,6 +119,7 @@ export function RepositoryManagement({ api, bindings, connectSection }: Props) {
     setExpanded(new Set());
     setOpen(true);
     loadConnected();
+    void requestStore?.open();
   }
 
   function stopLoading() {
@@ -181,7 +206,7 @@ export function RepositoryManagement({ api, bindings, connectSection }: Props) {
 
             <section className={styles.block} aria-labelledby={`${titleId}-connect`}>
               <h3 id={`${titleId}-connect`}>연결할 수 있는 저장소</h3>
-              {connectSection ?? <p className={styles.muted}>저장소 선택과 분석 요청은 준비 중입니다.</p>}
+              {requestStore ? <AnalysisRequestSection store={requestStore} /> : connectSection}
             </section>
 
             <footer className={styles.panelFooter}>

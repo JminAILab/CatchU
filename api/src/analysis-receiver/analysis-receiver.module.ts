@@ -9,14 +9,25 @@ import { DatabaseReceiverStore } from './database-receiver.store';
 import { AnalysisRegistrationService } from './analysis-registration.service';
 import { RepositoryObservationSource } from './repository-observation.source';
 
+export type ObservationProvider =
+  | { observations: RepositoryObservationSource; observationsFactory?: never }
+  | { observations?: never; observationsFactory: (database: DataSource) => RepositoryObservationSource };
+
 @Module({})
 export class AnalysisReceiverModule {
   /** 실제 수신 저장·B 등록을 조립한다. 내부 호출만 제공하며 worker 공개 라우트를 만들지 않는다. */
   static registerDatabase(options: {
     contractDirectory: string;
-    observations: RepositoryObservationSource;
     log?: RejectionLog;
-  }): DynamicModule {
+  } & ObservationProvider): DynamicModule {
+    if ((options.observations === undefined) === (options.observationsFactory === undefined)) {
+      throw new TypeError('Exactly one repository observation provider is required');
+    }
+    const observations = (database: DataSource) => {
+      const source = options.observationsFactory ? options.observationsFactory(database) : options.observations;
+      if (!source || typeof source.observe !== 'function') throw new TypeError('Invalid repository observation provider');
+      return source;
+    };
     const logger = new Logger('AnalysisRegistration');
     const log = options.log ?? { record: (kind: 'Result' | 'ProcessingEvent', code: string) => logger.warn({ kind, code }) };
     return {
@@ -30,7 +41,7 @@ export class AnalysisReceiverModule {
             new WorkerMessageValidator(options.contractDirectory), log) },
         { provide: AnalysisRegistrationService, inject: [AnalysisReceiver, DataSource],
           useFactory: (receiver: AnalysisReceiver, db: DataSource) => new AnalysisRegistrationService(
-            receiver, db, options.observations, { failed: code => logger.error({ stage: 'APPLICATION', code }) }) },
+            receiver, db, observations(db), { failed: code => logger.error({ stage: 'APPLICATION', code }) }) },
         { provide: DevAnalysisInjection, inject: [DatabaseReceiverStore, AnalysisRegistrationService],
           useFactory: (store: DatabaseReceiverStore, registration: AnalysisRegistrationService) => new DevAnalysisInjection(store, {
             receiveResult: input => registration.receiveResult(input, async () => {}),

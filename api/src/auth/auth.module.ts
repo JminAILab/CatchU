@@ -7,6 +7,7 @@ import { AUTH_CONFIG, readAuthConfig } from './auth.config';
 import { DevLoginController } from './dev-login.controller';
 import { DevLoginGuard } from './dev-login.guard';
 import { DevMemberService } from '../member-analysis/dev-member.service';
+import { MemberKindService } from '../member-analysis/member-kind';
 import { SessionService } from './session.service';
 import { SessionController } from './session.controller';
 import { readSessionConfig, SESSION_CLOCK, SESSION_CONFIG } from './session.config';
@@ -22,8 +23,9 @@ import { readSessionConfig, SESSION_CLOCK, SESSION_CONFIG } from './session.conf
     AccessTokenService,
     DevLoginGuard,
     DevMemberService,
+    MemberKindService,
     { provide: APP_GUARD, useClass: AccessTokenGuard },
   ],
-  exports: [DevMemberService, AccessTokenService, SessionService, SESSION_CONFIG],
+  exports: [DevMemberService, MemberKindService, AccessTokenService, SessionService, SESSION_CONFIG],
 })
 export class AuthModule {}
