@@ -33,13 +33,24 @@ export function blocksReanalysis(status: { processing: string; lifecycle: string
   if (status.lifecycle === 'CLOSED' && status.application === 'APPLY_FAILED') return false;
   return ['SUCCEEDED', 'EMPTY', 'PARTIAL_FAILED'].includes(status.processing);
 }
+const STATUS_LOCK = { mode: 'for_no_key_update' } as const;
 /** 상태 변경을 막되 멱등 소유 확인의 KEY SHARE와 경합하지 않는 요청→시도 잠금으로 읽는다. */
 export async function readAnalysisStatus(manager: EntityManager, memberId: string, requestId: string) {
-  const request = await manager.findOne(AnalysisRequest, { where: { requestId, memberId },
-    lock: { mode: 'for_no_key_update' } });
+  const request = await manager.findOne(AnalysisRequest, { where: { requestId, memberId }, lock: STATUS_LOCK });
   if (!request) throw new Error('Analysis reference is missing');
+  return statusOf(manager, request, true);
+}
+/**
+ * 조회 API(#140)가 이미 읽은 본인 요청 행의 상태를 접수와 같은 판정으로 구한다. 행 잠금을 잡지 않으므로 호출자가
+ * REPEATABLE READ 이상의 읽기 전용 트랜잭션에서 불러 요청·현재 시도·등록 연결·Catch·수신 기록을 한 시점으로 읽는다.
+ */
+export function readAnalysisStatusSnapshot(manager: EntityManager, request: AnalysisRequest) {
+  return statusOf(manager, request, false);
+}
+async function statusOf(manager: EntityManager, request: AnalysisRequest, lock: boolean) {
+  const { requestId, memberId } = request;
   const attempt = await manager.findOne(AnalysisAttempt, { where: { attemptId: request.currentAttemptId, requestId },
-    lock: { mode: 'for_no_key_update' } });
+    ...(lock ? { lock: STATUS_LOCK } : {}) });
   if (!attempt) throw new Error('Analysis attempt is missing');
   const registrations: { catchId: string; ready: boolean }[] = await manager.query(
     'SELECT cr.catch_id AS "catchId", cr.owner_view_ready AS ready FROM candidate_registration cr JOIN result_application_record r ON r.application_record_id = cr.application_record_id WHERE r.request_id = $1 AND r.attempt_id = $2',
