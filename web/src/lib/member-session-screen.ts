@@ -1,7 +1,7 @@
 /**
  * 회원 화면 묶음의 로그아웃·재인증 안내(#287). React와 분리해 시험한다.
  * 인증 상태 판단·입력 정리·복원·로그아웃 뒤 이동은 공통 인증(#286)과 그 가드가 맡는다.
- * 여기서는 이동 전 확인(미저장 입력·미확정 분석 요청)·요청·진행·실패·불명 표시만 정한다. 확인 사유의 판정·등록은 각 화면이 #286 등록 수단으로 한다.
+ * 여기서는 이동 전 확인(미저장 입력·미확정 분석 요청)·요청·진행·실패·불명 표시와 [다시 로그인]의 한 번 이동만 정한다. 확인 사유의 판정·등록은 각 화면이 #286 등록 수단으로 한다.
  */
 import type { ReauthNoticeProps } from "./auth-gate.ts";
 import type { LogoutOutcome } from "./auth-logout.ts";
@@ -131,4 +131,40 @@ export function confirmReauthLeave(
   confirm: ConfirmDialog,
 ): boolean {
   return variant === "login-changed" || confirmLeave("reauth", registry, confirm);
+}
+
+export type ReauthLeaveResult = "busy" | "stayed" | "leaving";
+
+export type ReauthLeaveControl = {
+  /** 재인증 안내의 [다시 로그인]. `notice`는 누른 시점의 안내 값(`returnTo`·`variant`)이다. */
+  request(notice: ReauthNoticeProps): ReauthLeaveResult;
+};
+
+/**
+ * [다시 로그인]의 이동을 한 번만 시작한다([#287 D 재현](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6335776141)).
+ * 확인 창이 떠 있는 동안 들어온 더블클릭의 두 번째 클릭·Enter 반복은 창이 닫힌 뒤 같은 버튼에 이어서 들어온다.
+ * 버튼 표시·초점은 바꾸지 않고, 누를 때마다 이 제어의 값으로 바로 판단한다.
+ * - 이동을 시작한 뒤(확인에서 계속했거나 물을 사유가 없음)에는 묻지도 이동하지도 않는다. 이동하면 안내가 회원 화면과 함께 사라지므로 되돌리지 않는다.
+ * - 머무르면 아무것도 바꾸지 않는다. 화면·입력·요청 정보가 그대로이고, 다시 누르면 그 시점의 사유로 다시 묻는다.
+ * - 이동을 시작하지 못하면(예상 밖 예외) 다시 누를 수 있게 되돌리고 예외를 그대로 올린다.
+ */
+export function createReauthLeaveControl(deps: {
+  confirmLeave(variant: ReauthNoticeProps["variant"]): boolean;
+  navigate(returnTo: ReauthNoticeProps["returnTo"]): void;
+}): ReauthLeaveControl {
+  let leaving = false;
+  return {
+    request({ returnTo, variant }) {
+      if (leaving) return "busy";
+      if (!deps.confirmLeave(variant)) return "stayed";
+      leaving = true;
+      try {
+        deps.navigate(returnTo);
+      } catch (error) {
+        leaving = false;
+        throw error;
+      }
+      return "leaving";
+    },
+  };
 }

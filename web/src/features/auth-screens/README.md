@@ -55,6 +55,7 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 - 두 경우 모두 [다시 로그인]은 로그아웃·갱신 요청 없이 `/login?next=<현재 경로>`로 간다.
 - `variant` 생략·`reauth`: 회원 화면 위의 안내이며 아래 화면·입력은 유지된다. 로그아웃과 같은 「이동 전 확인」을 거치고, 머무르면 아무것도 하지 않는다.
 - `login-changed`: 다른 탭의 새 로그인을 감지했지만 이 탭에서 복원할 수 없어 가드가 화면·입력을 이미 정리한 탭이다(가드의 `relogin-only`). 같은 문구에 [다시 로그인]만 두고 확인 없이 간다(사유도 읽지 않는다). 자동 이동·복원·로그아웃은 하지 않는다(팀장 결정 2).
+- 두 경우 모두 이동은 한 번만 시작한다(`createReauthLeaveControl`). 확인에서 계속했거나 물을 사유가 없어 이동을 시작한 뒤에는 다시 눌러도 묻거나 이동하지 않는다. 확인 창이 떠 있는 동안 들어온 더블클릭의 두 번째 클릭·Enter 반복도 같다([D 재현](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6335776141)). 머무르면 아무것도 바꾸지 않으므로 다시 누르면 그 시점의 사유로 다시 묻는다.
 
 **로그아웃**
 - [로그아웃]을 누르면 프로필 메뉴를 먼저 닫는다. 열린 메뉴가 실패·불명 안내의 [다시 시도]를 가리지 않게 하기 위해서다([#311 리뷰](https://github.com/JminAILab/CatchU/pull/311#pullrequestreview-5543242144)).
@@ -121,6 +122,6 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 
 ## 검사
 
-- `test/auth-screens-google.test.mjs`·`test/auth-screens-session.test.mjs`: 화면 제어를 함수 대역으로 확인한다. 이동 전 확인은 사유 조합(없음·입력만·분석 요청만·둘 다)과 누를 때마다 다시 읽는지를 본다.
+- `test/auth-screens-google.test.mjs`·`test/auth-screens-session.test.mjs`: 화면 제어를 함수 대역으로 확인한다. 이동 전 확인은 사유 조합(없음·입력만·분석 요청만·둘 다)과 누를 때마다 다시 읽는지를 본다. [다시 로그인]은 계속한 뒤 다시 눌러도 묻거나 이동하지 않는지와 머무른 뒤 다시 묻는지를 제어와 `ReauthNotice` 양쪽에서 본다. `ReauthNotice`는 서버 렌더링으로 그린 버튼의 클릭 함수를 연달아 부른다.
 - `test/auth-screens-connected.test.mjs`: 화면 제어에 #286 공통 함수(시도 보관·콜백 해석·완료, 세션·보호 API, 가드 판정)를 연결 코드와 같은 방식으로 붙이고, 서버와 `sessionStorage`·`localStorage`만 대역으로 바꿔 확인한다.
-- React 렌더링과 실제 브라우저 조작은 이 시험에 들지 않는다.
+- 실제 브라우저 조작(확인 창·초점·화면 이동)과 `ReauthNotice` 밖의 React 렌더링은 이 시험에 들지 않는다.
