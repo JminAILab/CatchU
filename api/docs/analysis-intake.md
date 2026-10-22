@@ -4,7 +4,7 @@
 
 [회원 API](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml)와 [접수·재요청 계약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#분석-접수상태재요청), [업무 규칙](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md)의 현재 판본을 따른다. 이슈에 연결된 9093d2e 판본 이후 제목 null·제목 고쳐 쓰기 등 변경을 확인했다. 제목만 없다고 실패 재요청을 허용하지 않으며 접수·동시성·실패 재요청 기준을 바꾸지 않는다.
 
-첫 연결은 [#104 개발 회원·합성 GitHub 연결](member-analysis.md)과 [#136 선정 저장소 공급](member-repositories.md)을 사용한다. 실제 Nest HTTP·PostgreSQL로 접수와 롤백을 검사하지만 GitHub 자료·worker·LLM을 호출하지 않는다. 기존 Google·GitHub·세션 기능을 대체하지 않는다. #139 수신/개발 주입·#140 이력/개별 상태 GET은 새로 구현하지 않는다. 실제 회원의 고지 조회는 [#322](https://github.com/JminAILab/CatchU/issues/322)에서, 실제 회원의 접수는 [#323](https://github.com/JminAILab/CatchU/issues/323)에서 더했다(아래 「실제 자료용 고지와 고지 선택」·「실제 회원의 접수 — #323」). 실제 회원 접수는 [#231 GitHub 연결](github-connection.md)과 [#252 DB 선정 공급](repository-selection.md)을 쓴다.
+첫 연결은 [#104 개발 회원·합성 GitHub 연결](member-analysis.md)과 [#136 선정 저장소 공급](member-repositories.md)을 사용한다. 실제 Nest HTTP·PostgreSQL로 접수와 롤백을 검사하지만 GitHub 자료·worker·LLM을 호출하지 않는다. 기존 Google·GitHub·세션 기능을 대체하지 않는다. #139 수신/개발 주입은 새로 구현하지 않는다. #140 이력/개별 상태 GET은 [이력·상태 조회](analysis-history.md)에 있다. 실제 회원의 고지 조회는 [#322](https://github.com/JminAILab/CatchU/issues/322)에서, 실제 회원의 접수는 [#323](https://github.com/JminAILab/CatchU/issues/323)에서 더했다(아래 「실제 자료용 고지와 고지 선택」·「실제 회원의 접수 — #323」). 실제 회원 접수는 [#231 GitHub 연결](github-connection.md)과 [#252 DB 선정 공급](repository-selection.md)을 쓴다.
 
 ## 합성 고지의 정본·활성화
 
@@ -134,7 +134,7 @@
 
 `retry.reason`은 재요청 판정의 사유이며 결과 유무나 실패 원인을 뜻하지 않는다. `RESULTS_EXIST`는 등록 연결(본인 열람 준비 전 포함)이나 원 요청의 Catch 본체가 있으면 내려가고, 반영 실패로 닫히지 않은 요청에 적합 후보가 있을 때도 내려가므로 열람 가능한 Catch가 없어도 나올 수 있다. `registeredCatchIds`에는 위처럼 본인 열람 준비가 확인된 Catch만 담긴다. 화면 안내는 `reason`이 아니라 `lifecycle`·`application`·`registeredCatchIds`로 만든다.
 
-이전 실패 키를 다시 조회해도 현재 다른 ACTIVE가 있으면 retry.allowed=false/IN_PROGRESS다. 이미 후속 요청을 만든 오래된 실패는 후속 작업이 끝나도 재요청 대상으로 표시하지 않는다. 같은 키 재응답의 현재 판정과 새 POST의 선행 이력 판정이 엇갈리지 않게 한다. 두 판정은 `analysis-status.ts`의 `retryDecision`·`blocksReanalysis` 한 곳에서 계산한다.
+이전 실패 키를 다시 조회해도 현재 다른 ACTIVE가 있으면 retry.allowed=false/IN_PROGRESS다. 이미 후속 요청을 만든 오래된 실패는 후속 작업이 끝나도 재요청 대상으로 표시하지 않는다. 같은 키 재응답의 현재 판정과 새 POST의 선행 이력 판정이 엇갈리지 않게 한다. 두 판정은 `analysis-status.ts`의 `retryDecision`·`blocksReanalysis` 한 곳에서 계산한다. #140 조회도 같은 판정을 잠금 없는 한 시점 읽기로 부른다([이력·상태 조회](analysis-history.md#한-시점-읽기와-상태-불변)).
 
 ## 실행 요청 맥락의 준비와 경계
 

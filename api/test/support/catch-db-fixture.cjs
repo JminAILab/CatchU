@@ -50,11 +50,14 @@ async function createUpstreamTables(dataSource) {
   const { CreateResultApplicationRecord1790550000000 } = require('../../dist/database/migrations/1790550000000-CreateResultApplicationRecord');
   const { CreateShareLink1790745895865 } = require('../../dist/database/migrations/1790745895865-CreateShareLink');
   const { CreateAuthSessions1791648335731 } = require('../../dist/database/migrations/1791648335731-CreateAuthSessions');
+  const { AddAnalysisRequestHistoryIndex1792640486167 } = require('../../dist/database/migrations/1792640486167-AddAnalysisRequestHistoryIndex');
   assertTestDatabaseName(dataSource.options.database);
   // 공통 npm test가 이어서 runMigrations해도 기반을 중복 생성하지 않도록 이력도 남긴다.
+  // 되돌리기는 마지막에 실행한 마이그레이션을 고른다. B 되돌리기 검사가 B만 취소하도록 이력 인덱스(#140)도 여기서 B보다 먼저 적용한다.
   const foundation = new DataSource({
     ...dataSource.options,
-    migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000, CreateShareLink1790745895865, CreateAuthSessions1791648335731],
+    migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000, CreateShareLink1790745895865, CreateAuthSessions1791648335731,
+      AddAnalysisRequestHistoryIndex1792640486167],
   });
   try {
     await foundation.initialize();

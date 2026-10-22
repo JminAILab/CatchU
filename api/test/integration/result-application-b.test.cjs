@@ -210,12 +210,15 @@ test('E 수신 기록의 시도 유일성·복합 FK·지문 형식·엔티티 �
   const foundation = require('../../dist/member-analysis/member-analysis.entity');
   const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
   const { CreateResultApplicationRecord1790550000000 } = require('../../dist/database/migrations/1790550000000-CreateResultApplicationRecord');
+  const { AddAnalysisRequestHistoryIndex1792640486167 } = require('../../dist/database/migrations/1792640486167-AddAnalysisRequestHistoryIndex');
   const isolated = await openTestDataSource({ schema, extra: { options: '-c search_path=' + schema },
     entities: [...Object.values(foundation).filter(v => typeof v === 'function'), ResultApplicationRecord, ShareLink],
-    migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000, CreateShareLink1790745895865] });
+    migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000, CreateShareLink1790745895865,
+      AddAnalysisRequestHistoryIndex1792640486167] });
   try {
     assert.deepEqual((await isolated.runMigrations()).map(m => m.name),
-      ['CreateMemberAnalysisFoundation1790500000000', 'CreateResultApplicationRecord1790550000000', 'CreateShareLink1790745895865']);
+      ['CreateMemberAnalysisFoundation1790500000000', 'CreateResultApplicationRecord1790550000000', 'CreateShareLink1790745895865',
+        'AddAnalysisRequestHistoryIndex1792640486167']);
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 10);
     const diff = await isolated.driver.createSchemaBuilder().log();
     assert.deepEqual(diff.upQueries.map(q => q.query), []);
@@ -273,11 +276,14 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
     assert.deepEqual(migrations.map(m => m.name), ['CreateMemberAnalysisFoundation1790500000000',
       'CreateResultApplicationRecord1790550000000', 'CreateCatchAssets1790600000000', 'CreateRepositoryProtection1790601000000', 'CreateShareLink1790745895865',
       'CreateAuthSessions1791648335731', 'AllowNullCatchTitle1791784385918', 'AddCatchEvidencePosition1792029036359',
-      'CreateRepositorySelection1792383899264']);
+      'CreateRepositorySelection1792383899264', 'AddAnalysisRequestHistoryIndex1792640486167']);
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 18);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
+    await isolated.undoLastMigration(); // E 본인 이력 순서 인덱스(#140)
+    assert.equal((await isolated.query("SELECT to_regclass('ix_analysis_request_member_id_submitted_at_request_id') AS name"))[0].name, null);
+    assert.equal(await isolated.manager.count(MemberAccount), 1);
     await isolated.undoLastMigration(); // A 현재 선정·범위 판본(#252)
     assert.equal((await isolated.query("SELECT to_regclass('repository_selection') AS name"))[0].name, null);
     assert.equal((await isolated.query("SELECT to_regclass('allowed_scope_revision') AS name"))[0].name, null);

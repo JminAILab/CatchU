@@ -402,20 +402,23 @@ test('접수한 동의 변경과 재요청 선행 참조의 역방향 변경을 
 test('일곱 테이블은 빈 스키마에 up/down/re-up 가능하고 엔티티와 생성 DDL이 일치',async()=>{
   const schema='test_104_'+randomUUID().replaceAll('-','');
   await db.query('CREATE SCHEMA "'+schema+'"');
-  // #104와 멱등 기록이 참조하는 실제 C 엔티티를 대조한다. 후속 E/B는 각 기능 검사에서 확인한다.
+  // #104와 멱등 기록이 참조하는 실제 C 엔티티, #140 이력 인덱스를 대조한다. 후속 E/B는 각 기능 검사에서 확인한다.
   const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
   const { ShareLink } = require('../../dist/share-links/share-link.entity');
   const { CreateShareLink1790745895865 } = require('../../dist/database/migrations/1790745895865-CreateShareLink');
+  const { AddAnalysisRequestHistoryIndex1792640486167 } = require('../../dist/database/migrations/1792640486167-AddAnalysisRequestHistoryIndex');
   const isolated=await openTestDataSource({schema,extra:{options:'-c search_path='+schema+' -c TimeZone=UTC'},
     entities:[MemberAccount,MemberProfile,GitHubConnection,AnalysisRequest,AnalysisConsent,AnalysisAttempt,IdempotencyRecord,ShareLink],
-    migrations:[CreateMemberAnalysisFoundation1790500000000,CreateShareLink1790745895865]});
+    migrations:[CreateMemberAnalysisFoundation1790500000000,CreateShareLink1790745895865,AddAnalysisRequestHistoryIndex1792640486167]});
   try {
     assert.deepEqual((await isolated.runMigrations()).map(m=>m.name),
-      ['CreateMemberAnalysisFoundation1790500000000','CreateShareLink1790745895865']);
+      ['CreateMemberAnalysisFoundation1790500000000','CreateShareLink1790745895865','AddAnalysisRequestHistoryIndex1792640486167']);
     const tables=await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema]);
     assert.equal(tables.length,9,'일곱 테이블 + C share_link(#147) + migrations');
     const diff=await isolated.driver.createSchemaBuilder().log();
     assert.deepEqual(diff.upQueries.map(q=>q.query),[]);
+    await isolated.undoLastMigration(); // #140 이력 순서 인덱스
+    assert.equal((await isolated.query("SELECT to_regclass('ix_analysis_request_member_id_submitted_at_request_id') AS name"))[0].name,null);
     await isolated.undoLastMigration(); // #147 share_link
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).length,8);
     await isolated.undoLastMigration();

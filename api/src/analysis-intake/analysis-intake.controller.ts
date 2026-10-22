@@ -1,11 +1,12 @@
-import { Body, Controller, Get, Headers, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query, Res } from '@nestjs/common';
 import { CurrentMemberId } from '../auth/auth.decorators';
 import { ApiError } from '../common/errors';
+import { AnalysisHistoryService } from './analysis-history';
 import { AnalysisIntakeService } from './analysis-intake.service';
 
 @Controller()
 export class AnalysisIntakeController {
-  constructor(private readonly intake: AnalysisIntakeService) {}
+  constructor(private readonly intake: AnalysisIntakeService, private readonly history: AnalysisHistoryService) {}
   @Get('analysis-notice')
   notice(@CurrentMemberId() memberId: string, @Query() query: Record<string, unknown>) {
     if (Object.keys(query).length) throw new ApiError('VALIDATION_FAILED');
@@ -19,5 +20,19 @@ export class AnalysisIntakeController {
     const result = await this.intake.create(memberId, key, body);
     response.status(result.existing ? 200 : 202);
     return result.status;
+  }
+  /** 본인 분석 이력(#140). 쿼리는 `cursor`·`limit`만 받는다. */
+  @Get('analysis-requests')
+  list(@CurrentMemberId() memberId: string, @Query() query: Record<string, unknown>) {
+    return this.history.list(memberId, query);
+  }
+  /** 개별 분석 상태(#140). 계약에 쿼리가 없으므로 붙으면 400이다. */
+  @Get('analysis-requests/:requestId')
+  status(@CurrentMemberId() memberId: string, @Param('requestId') requestId: string,
+    @Query() query: Record<string, unknown>) {
+    if (Object.keys(query).length) {
+      throw new ApiError('VALIDATION_FAILED', { details: { violations: [{ field: 'query', reason: 'whitelistValidation' }] } });
+    }
+    return this.history.get(memberId, requestId);
   }
 }

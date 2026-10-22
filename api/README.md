@@ -241,7 +241,11 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 분석 고지·접수·실패 재요청 — #138
 
-[docs/analysis-intake.md](docs/analysis-intake.md)에서 개발용 합성 고지·실제 회원의 실제 자료용 고지(#322)·실제 회원의 LIVE 접수(#323)·원자 접수·동시 요청·멱등 처리·확정 실패 재요청을 확인한다. 큐 전송·worker 실행은 포함하지 않는다.
+[docs/analysis-intake.md](docs/analysis-intake.md)에서 합성·실제 고지(#322), 실제 회원 LIVE 접수(#323), 원자·동시·멱등 접수와 실패 재요청을 확인한다. 큐 전송·worker 실행은 포함하지 않는다.
+
+## 본인 분석 이력·개별 상태 조회 — #140
+
+[docs/analysis-history.md](docs/analysis-history.md)에 있다.
 
 ## 본인 회원·프로필 조회와 전체 저장 — #135
 
