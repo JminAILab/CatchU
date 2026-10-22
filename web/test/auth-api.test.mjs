@@ -7,6 +7,12 @@ import { createFetchRefreshTransport } from '../src/lib/auth-refresh.ts';
 import { createFetchLogoutTransport } from '../src/lib/auth-logout.ts';
 import { createAuthApi, memberCallBlock, memberMutationOutcome, toClientResult } from '../src/lib/auth-api.ts';
 import { readProfile, saveProfileDetailed } from '../src/features/profile/profile-api.ts';
+import { createCatchApi } from '../src/features/assets/catch-api.ts';
+import { createAssetsStore } from '../src/features/assets/assets-store.ts';
+import { createAssetsSessionScope } from '../src/features/assets/assets-session-scope.ts';
+import { previewCatches } from '../src/features/assets/fixtures.ts';
+import { bindLegacyTokenSignal, createSessionScope } from '../src/lib/auth-scope.ts';
+import { createAccessTokenStore } from '../src/lib/access-token.ts';
 
 const BASE = 'http://127.0.0.1:3001';
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -55,6 +61,10 @@ function fakeLockManager() {
  * 서버·쿠키 대역. 실제 `Response`를 돌려주는 fetch 하나로 개발 로그인·갱신·로그아웃·보호 API를 흉내 낸다.
  * Refresh 쿠키는 `credentials: "include"`일 때만 보내고 받는다. 실제 서버·브라우저 검증이 아니다.
  */
+/** 합성 Catch(공개 전, 확인 완료). 저장 대역이 쓴다. */
+const catchItem = () => ({ ...previewCatches[0], catchId: 'c1', repositoryId: 'repo-a', visibility: 'PRIVATE', mismatch: false,
+  restriction: 'NONE', confirmation: { workFactsConfirmed: true, contributionConfirmed: true } });
+
 function fakeServer() {
   let serial = 0;
   const refreshTokens = new Map();
@@ -109,6 +119,10 @@ function fakeServer() {
     if (entry === 'GET /me') return { response: json(200, { profile: { displayName: member } }) };
     if (entry === 'POST /catches') { state.mutations += 1; return { response: json(201, { id: 'c' + state.mutations, member }) }; }
     if (entry === 'PUT /me/profile') { state.mutations += 1; return { response: json(200, JSON.parse(init.body)) }; }
+    // 내 자산 Catch(#286 후속, B 동의): 합성 Catch 하나의 목록·상세·저장. 저장은 본문의 값을 반영해 돌려준다.
+    if (entry === 'GET /catches') return { response: json(200, { items: [catchItem()], page: { nextCursor: null } }) };
+    if (entry === 'GET /catches/c1') return { response: json(200, catchItem()) };
+    if (entry.startsWith('PUT /catches/c1/')) { state.mutations += 1; return { response: json(200, { ...catchItem(), ...JSON.parse(init.body) }) }; }
     return { response: json(404, { code: 'NOT_FOUND', message: '없음' }) };
   }
 
@@ -790,4 +804,91 @@ test('변경 요청 결과 구분: 표시는 결과 모양을 바꾸지 않고, 
   assert.equal(memberMutationOutcome({ ...failed }), 'other');
   assert.equal(memberMutationOutcome({ ...notSent }), 'other', '복사하면 표시가 없어져 기존 처리로 돌아간다');
   assert.equal(memberMutationOutcome({ kind: 'success', status: 200, data: null }), 'other');
+});
+
+// ---- 내 자산 Catch 저장 결과 구분(#286 후속, B 동의 #308 pullrequestreview-5565777761) ----
+// 전환을 켠 api.member와 같은 변환(featureApi) → createCatchApi → createAssetsStore 경로를 대역 서버로 확인한다. 실제 브라우저·서버 검증이 아니다.
+
+async function catchScreen(t) {
+  const store = createAssetsStore(createCatchApi(featureApi(t).member));
+  await store.refresh('repo-a');
+  await store.openDetail('c1');
+  assert.equal(store.getSnapshot().detailState, 'ready');
+  return store;
+}
+const PUBLISH = { kind: 'visibility', visibility: 'PUBLIC' };
+
+test('Catch 저장: Access 갱신 성공 뒤 401 거부는 처리되지 않음(renewed-rejected)으로 안내하고 다시 보내지 않으며, 다시 누르면 보낸다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  const store = await catchScreen(t);
+  server.expire(t.store.accessToken());
+  await store.update(PUBLISH);
+  assert.deepEqual(store.getSnapshot().mutation, { catchId: 'c1', kind: 'visibility', status: 'not-processed', error: null, reason: 'renewed-rejected' });
+  assert.equal(store.getSnapshot().detail.visibility, 'PRIVATE', '마지막 확인 값 그대로');
+  assert.deepEqual([server.count('PUT /catches/c1/visibility'), server.count('POST /auth/refresh'), server.state.mutations], [1, 1, 0]);
+  await store.update(PUBLISH);
+  assert.equal(store.getSnapshot().mutation.status, 'success');
+  assert.equal(store.getSnapshot().detail.visibility, 'PUBLIC');
+  assert.deepEqual([server.count('PUT /catches/c1/visibility'), server.state.mutations], [2, 1]);
+});
+
+test('Catch 저장: 재인증 필요 상태의 저장은 보내지 않음(not-sent)으로 안내하고 서버에 보내지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  const store = await catchScreen(t);
+  server.revokeAll();
+  server.expire(t.store.accessToken());
+  assert.equal(await readProfile(featureApi(t)), null);
+  assert.equal(t.store.getSnapshot().status, 'reauth-required');
+  await store.update(PUBLISH);
+  assert.deepEqual(store.getSnapshot().mutation, { catchId: 'c1', kind: 'visibility', status: 'not-processed', error: null, reason: 'not-sent' });
+  assert.equal(server.count('PUT /catches/c1/visibility'), 0, '보내지 않은 요청은 서버에 가지 않는다');
+  assert.equal(store.getSnapshot().detailState, 'ready', '상세를 지우지 않는다');
+});
+
+test('Catch 저장: 응답을 기다리는 사이 다른 회원으로 로그인하면 화면 세대가 바뀌고, 해제 전에 온 응답도 성공으로 확정하지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server, 'X');
+  const tokens = createAccessTokenStore();
+  bindLegacyTokenSignal(t.store, createSessionScope(t.store), tokens);
+  const assets = createAssetsSessionScope(tokens);
+  const opened = assets.getSnapshot();
+  const store = await catchScreen(t);
+  const gate = server.hold('PUT /catches/c1/visibility');
+  const saving = store.update(PUBLISH);
+  await tick(); await tick();
+  assert.equal((await t.api.devLogin('Y')).kind, 'success');
+  assert.notEqual(assets.getSnapshot(), opened, '회원 전환: 내 자산 화면을 새로 만든다');
+  gate.resolve();
+  await saving;
+  assert.equal(server.state.mutations, 1, '서버에는 반영됐을 수 있다');
+  const { mutation } = store.getSnapshot();
+  assert.equal(mutation.status, 'error', '반영하지 않은 응답은 결과 불명(성공·실패로 확정하지 않음)');
+  assert.equal(mutation.reason, undefined);
+  assert.equal(store.getSnapshot().detail.visibility, 'PRIVATE');
+
+  const late = server.hold('PUT /catches/c1/visibility');
+  const next = await catchScreen(t);
+  const pending = next.update(PUBLISH);
+  await tick(); await tick();
+  next.dispose(); // 화면 해제(회원 경계 key 변경)
+  late.resolve();
+  await pending;
+  assert.equal(next.getSnapshot().mutation.status, 'saving', '해제된 화면에는 결과를 반영하지 않는다');
+});
+
+test('Catch 화면: 같은 세션의 Access 갱신은 조회를 다시 보내 성공시키고 화면 세대를 바꾸지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  const tokens = createAccessTokenStore();
+  bindLegacyTokenSignal(t.store, createSessionScope(t.store), tokens);
+  const assets = createAssetsSessionScope(tokens);
+  const opened = assets.getSnapshot();
+  const store = await catchScreen(t);
+  server.expire(t.store.accessToken());
+  await store.openDetail('c1', true);
+  assert.equal(store.getSnapshot().detailState, 'ready');
+  assert.equal(server.count('POST /auth/refresh'), 1);
+  assert.equal(assets.getSnapshot(), opened, '같은 세션 갱신만으로 화면을 초기화하지 않는다');
 });
