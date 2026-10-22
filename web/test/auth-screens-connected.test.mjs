@@ -11,7 +11,7 @@ import { createAuthSession, createSessionLock } from '../src/lib/auth-session.ts
 import { createAuthStore } from '../src/lib/auth-state.ts';
 import { createGoogleCallbackControl, createGoogleStartControl } from '../src/lib/google-login-screen.ts';
 import { lookupMemberWithAuth } from '../src/lib/member-lookup.ts';
-import { confirmReauthLeave, createMemberLogoutControl, logoutView } from '../src/lib/member-session-screen.ts';
+import { confirmLogout, confirmReauthLeave, createMemberLogoutControl, logoutView } from '../src/lib/member-session-screen.ts';
 import { createUnsavedRegistry } from '../src/lib/unsaved-changes.ts';
 
 /**
@@ -146,6 +146,8 @@ async function signInWithGoogle(server, p, code = 'c1') {
 
 const query = (s) => new URLSearchParams(s);
 const dirtyRegistry = () => { const r = createUnsavedRegistry(); r.register(() => true); return r; };
+/** 사유별 등록. 분석 요청(`unconfirmed-analysis-request`)은 #153·#154 화면이 할 등록의 대역이다. */
+const reasonRegistry = (...reasons) => { const r = createUnsavedRegistry(); for (const reason of reasons) r.register(() => true, reason); return r; };
 
 // ---- 콜백 화면 ----
 
@@ -339,6 +341,29 @@ test('로그아웃: 미저장 확인에서 머무르면 요청하지 않는다',
   assert.equal(p.store.getSnapshot().status, 'signed-in');
 });
 
+test('로그아웃: 미저장 입력과 미확정 분석 요청이 함께 있으면 확인 창을 한 번 띄우고, 머무르면 요청 없이 로그인을 유지하며, 계속하면 기존 흐름대로 가드가 비로그인 홈으로 보낸다', async () => {
+  const server = fakeServer();
+  const p = page(server);
+  const shown = await signInWithGoogle(server, p);
+  const registry = reasonRegistry('unsaved-input', 'unconfirmed-analysis-request');
+  const asked = [];
+  let answer = false;
+  // session-member-shell.tsx의 useMemberLogout과 같은 연결이다.
+  const control = createMemberLogoutControl({
+    logout: () => p.session.logout(),
+    confirmLeave: () => confirmLogout(registry, (m) => { asked.push(m); return answer; }),
+  });
+  assert.equal(await control.request(p.store.getSnapshot()), 'stayed');
+  assert.equal(server.count('POST /auth/logout'), 0);
+  assert.equal(p.store.getSnapshot().status, 'signed-in');
+  assert.deepEqual(decideAuthGate(p.store.getSnapshot(), shown), { action: 'show', reauth: false });
+  answer = true;
+  assert.deepEqual(await control.request(p.store.getSnapshot()), { kind: 'settled', result: 'done' });
+  assert.equal(server.count('POST /auth/logout'), 1);
+  assert.deepEqual(decideAuthGate(p.store.getSnapshot(), shown), { action: 'to-landing' });
+  assert.deepEqual(asked, [M.logoutUnsavedRequestConfirm, M.logoutUnsavedRequestConfirm]);
+});
+
 // ---- 재인증 안내 ----
 
 test('재인증: 같은 세션의 갱신 거부는 회원 화면 위 안내(variant 생략)이고, [다시 로그인]은 미저장 확인을 거치며 로그아웃을 보내지 않는다', async () => {
@@ -355,6 +380,27 @@ test('재인증: 같은 세션의 갱신 거부는 회원 화면 위 안내(vari
   // session-member-guard.tsx는 이때 variant 없이 넘긴다.
   assert.equal(confirmReauthLeave(undefined, dirtyRegistry(), (m) => { asked.push(m); return false; }), false);
   assert.deepEqual(asked, [M.reauthUnsavedConfirm]);
+  assert.equal(server.count('POST /auth/logout'), 0);
+});
+
+test('재인증: 미확정 분석 요청만 있거나 미저장 입력과 함께 있으면 사유에 맞는 확인을 한 번 거치고, [다시 로그인]으로 갱신·로그아웃을 보내지 않는다', async () => {
+  const server = fakeServer();
+  const p = page(server);
+  const shown = await signInWithGoogle(server, p);
+  server.state.jar = null; // 세션이 끝나 갱신이 401로 거부된다.
+  await p.session.refresh();
+  assert.deepEqual(decideAuthGate(p.store.getSnapshot(), shown), { action: 'show', reauth: true });
+  const refreshes = server.count('POST /auth/refresh');
+  for (const [registry, message] of [
+    [reasonRegistry('unconfirmed-analysis-request'), M.reauthRequestConfirm],
+    [reasonRegistry('unsaved-input', 'unconfirmed-analysis-request'), M.reauthUnsavedRequestConfirm],
+  ]) {
+    const asked = [];
+    assert.equal(confirmReauthLeave(undefined, registry, (m) => { asked.push(m); return false; }), false, '머무르면 이동하지 않는다');
+    assert.equal(confirmReauthLeave(undefined, registry, (m) => { asked.push(m); return true; }), true, '계속하면 로그인 화면으로 간다');
+    assert.deepEqual(asked, [message, message]);
+  }
+  assert.equal(server.count('POST /auth/refresh'), refreshes);
   assert.equal(server.count('POST /auth/logout'), 0);
 });
 

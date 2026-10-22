@@ -1,12 +1,13 @@
 /**
  * 회원 화면 묶음의 로그아웃·재인증 안내(#287). React와 분리해 시험한다.
- * 인증 상태 판단·입력 정리·복원·로그아웃 뒤 이동은 공통 인증(#286)과 그 가드가 맡는다. 여기서는 미저장 확인·요청·진행·실패·불명 표시만 정한다.
+ * 인증 상태 판단·입력 정리·복원·로그아웃 뒤 이동은 공통 인증(#286)과 그 가드가 맡는다.
+ * 여기서는 이동 전 확인(미저장 입력·미확정 분석 요청)·요청·진행·실패·불명 표시만 정한다. 확인 사유의 판정·등록은 각 화면이 #286 등록 수단으로 한다.
  */
 import type { ReauthNoticeProps } from "./auth-gate.ts";
 import type { LogoutOutcome } from "./auth-logout.ts";
 import type { AuthSnapshot, LogoutResult } from "./auth-state.ts";
-import { authScreenMessages, logoutNotice } from "./auth-screen-messages.ts";
-import { confirmDiscardUnsaved, type ConfirmDialog, type UnsavedRegistry } from "./unsaved-changes.ts";
+import { leaveConfirmMessage, logoutNotice, type LeaveAction } from "./auth-screen-messages.ts";
+import type { ConfirmDialog, UnsavedRegistry } from "./unsaved-changes.ts";
 
 type Listener = () => void;
 
@@ -34,7 +35,7 @@ export type MemberLogoutControl = {
 
 /**
  * - 진행 중(이 화면의 요청 또는 공통 상태 `pending`)이면 묻지도 보내지도 않는다.
- * - 미저장 확인에서 머무르면 요청·이동 없이 끝낸다.
+ * - 이동 전 확인(`confirmLogout`)에서 머무르면 요청·이동 없이 끝낸다.
  * - `done`이어도 여기서는 이동하지 않는다. 정리·이동은 가드가 현재 유효한 완료일 때만 한다.
  * - `not-started`·`discarded`는 안내 없이 진행 표시만 지운다.
  */
@@ -96,23 +97,38 @@ export function logoutView(snapshot: LogoutSnapshot, local: LogoutLocal): Logout
   return { pending, notice: message === null ? null : { message, retry: snapshot.canRetryLogout } };
 }
 
-/** 로그아웃 전 미저장 확인. */
-export function confirmLogout(registry: Pick<UnsavedRegistry, "hasUnsaved">, confirm: ConfirmDialog): boolean {
-  return confirmDiscardUnsaved(registry, confirm, authScreenMessages.logoutUnsavedConfirm);
+/* ---------- 이동 전 확인 ---------- */
+
+/** 이동 전 확인이 읽는 등록 수단(#286 `unsavedChanges`)의 일부. */
+type LeaveReasons = Pick<UnsavedRegistry, "activeReasons">;
+
+/**
+ * 누를 때마다 `activeReasons()`를 한 번 읽어 그 시점의 사유로 묻는다([#287 접점 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6313395220)).
+ * 사유가 없으면 묻지 않고 true(계속)다. 있으면 사유에 맞는 문구로 한 번만 묻고, 머무르면 false다. 입력·요청 정보와 그 등록은 건드리지 않는다.
+ * 어떤 상태를 사유로 등록할지는 각 화면 담당이 정한다(미확정 분석 요청은 #153·#154). 여기서는 분석 상태를 판정하지 않는다.
+ */
+function confirmLeave(action: LeaveAction, registry: LeaveReasons, confirm: ConfirmDialog): boolean {
+  const message = leaveConfirmMessage(action, registry.activeReasons());
+  return message === null || confirm(message);
+}
+
+/** 로그아웃 전 확인. 계속하면 기존 흐름대로 `logout()`을 보낸다. */
+export function confirmLogout(registry: LeaveReasons, confirm: ConfirmDialog): boolean {
+  return confirmLeave("logout", registry, confirm);
 }
 
 /* ---------- 재인증 안내 ---------- */
 
 /**
  * 재인증 안내의 [다시 로그인]을 눌렀을 때 로그인 화면으로 갈지. 로그아웃·갱신 요청은 보내지 않는다(#251 A 답변 3, 팀장 결정 2).
- * - `variant` 생략·`reauth`: 화면·입력을 유지하고 있으므로 로그아웃과 같은 미저장 확인을 거친다. 머무르면 false.
- * - `login-changed`: 다른 탭의 새 로그인 감지로 가드가 화면·입력을 이미 정리한 탭이다. 잃을 입력이 없으므로 묻지 않는다.
+ * - `variant` 생략·`reauth`: 화면·입력을 유지하고 있으므로 로그아웃과 같은 이동 전 확인을 거친다. 머무르면 false.
+ * - `login-changed`: 다른 탭의 새 로그인 감지로 가드가 화면·입력을 이미 정리한 탭이다. 잃을 입력이 없으므로 사유를 읽지 않고 묻지 않는다.
  *   이 값은 #286 가드가 정해 넘긴다(`relogin-only` 판정).
  */
 export function confirmReauthLeave(
   variant: ReauthNoticeProps["variant"],
-  registry: Pick<UnsavedRegistry, "hasUnsaved">,
+  registry: LeaveReasons,
   confirm: ConfirmDialog,
 ): boolean {
-  return variant === "login-changed" || confirmDiscardUnsaved(registry, confirm, authScreenMessages.reauthUnsavedConfirm);
+  return variant === "login-changed" || confirmLeave("reauth", registry, confirm);
 }

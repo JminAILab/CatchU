@@ -8,7 +8,7 @@ import styles from "./auth.module.css";
 
 /**
  * 회원 셸의 로그아웃(#287). 셸이 공통 인증(#286) 상태와 `logout()`을 넘긴다.
- * 미저장 확인 → `logout()`. 진행 중에는 다시 보내지 않고, 실패·불명은 안내한다. `done` 뒤 정리·이동은 가드가 한다.
+ * 이동 전 확인(누른 시점의 미저장 입력·미확정 분석 요청) → `logout()`. 진행 중에는 다시 보내지 않고, 실패·불명은 안내한다. `done` 뒤 정리·이동은 가드가 한다.
  */
 export function useMemberLogout({ snapshot, logout }: {
   snapshot: LogoutSnapshot;
