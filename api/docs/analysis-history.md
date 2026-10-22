@@ -10,7 +10,7 @@
 
 이슈에 연결된 9093d2e 판본과 현재 판본의 두 경로·`AnalysisStatus`·`PageInfo`는 같다. 상태 전이와 재요청 두 경우는 현재 [API 기능 설계](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md)를 따른다. 이 기준은 [#138 접수](analysis-intake.md), [PR #296](https://github.com/JminAILab/CatchU/pull/296)(닫힌 반영 실패 재요청), [#237 처리 시한 닫기](analysis-deadline.md)에 이미 반영돼 있다.
 
-상태는 접수와 같은 `src/analysis-intake/analysis-status.ts`로 계산한다. 응답 필드·오류 코드·환경변수는 새로 두지 않는다. 다음은 이 범위가 아니다.
+상태는 접수와 같은 `src/analysis-intake/analysis-status.ts`로 계산한다. 응답 필드·오류 코드·환경변수는 새로 두지 않는다. DB에는 목록 순서를 받치는 인덱스 하나만 더한다(마이그레이션 `1792640486167-AddAnalysisRequestHistoryIndex`). 로컬은 `npm run migration:run`, 배포는 [배포 안내 「migration」](../../deploy/README.md#migration)대로 적용한다. 다음은 이 범위가 아니다.
 
 - 화면: #153·#154
 - B의 Catch 조회·상세
@@ -39,7 +39,7 @@
 
 오류 응답에는 입력값·SQL·스택·토큰을 넣지 않는다.
 
-**목록 순서.** 본인 요청만 접수 시각(`submittedAt`) 최신순으로 준다. 접수 시각이 같으면 `requestId` 역순이다. 이 순서는 재요청 판정이 고르는 '같은 저장소의 가장 최근 요청'과 같다.
+**목록 순서.** 본인 요청만 접수 시각(`submittedAt`) 최신순으로 준다. 접수 시각이 같으면 `requestId` 역순이다. 이 순서는 재요청 판정이 고르는 '같은 저장소의 가장 최근 요청'과 같다. 회원별 `(member_id, submitted_at, request_id)` 인덱스로 이 순서를 바로 읽으므로, 전체 요청을 훑거나 정렬하지 않는다.
 
 **cursor.** 회원과 마지막 위치(접수 시각·`requestId`)를 담은 불투명 문자열이며 권한 증표가 아니다. 서버는 매 페이지 인증된 회원의 요청만 다시 조회한다.
 
@@ -135,4 +135,4 @@ npm test
 
 **검증하지 않은 것.** 실제 Google 로그인·GitHub 연결·LIVE 자료, 큐·worker 왕복, 화면 연결, 시간 경과에 따른 주기 실행.
 
-**알려진 한계.** 목록은 항목마다 접수와 같은 상태 판정을 따로 읽으므로, 한 페이지의 쿼리 수가 항목 수에 비례한다(기본 20·최대 100). 이력이 많을 때의 응답 시간은 측정하지 않았다.
+**알려진 한계.** 페이지 위치는 위 인덱스로 찾지만, 항목마다 접수와 같은 상태 판정을 따로 읽는다. 그래서 한 페이지의 쿼리 수가 항목 수에 비례한다(기본 20·최대 100). 이력이 많을 때의 응답 시간은 측정하지 않았다.

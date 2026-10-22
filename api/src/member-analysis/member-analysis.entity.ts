@@ -49,6 +49,8 @@ export class GitHubConnection {
 @Unique(['requestId', 'memberId', 'repositoryId'])
 @Unique(['requestId', 'memberId'])
 @Index(['memberId'], { unique: true, where: `"lifecycle" = 'ACTIVE'` })
+// 본인 이력(#140)과 재요청 판정의 최근 요청은 회원별 접수 시각·requestId 역순으로 읽는다. 전체 이력을 훑고 정렬하지 않게 한다.
+@Index(['memberId', 'submittedAt', 'requestId'])
 @ForeignKey(() => MemberAccount, ['memberId'], ['memberId'])
 @ForeignKey(() => AnalysisConsent, ['consentId', 'requestId', 'memberId', 'repositoryId'],
   ['consentId', 'requestId', 'memberId', 'repositoryId'], deferred)
