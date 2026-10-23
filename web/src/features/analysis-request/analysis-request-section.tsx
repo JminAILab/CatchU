@@ -13,7 +13,17 @@ import styles from "./analysis-request.module.css";
  * 서버가 허용한 저장소를 고르고, 현재 고지를 버튼 앞에 보인 뒤 버튼 하나로 동의와 첫 요청을 보낸다.
  * 고지 본문은 React 텍스트로만 그린다(HTML로 해석하지 않음). 줄바꿈은 CSS로 살린다.
  */
-export function AnalysisRequestSection({ store }: { store: AnalysisRequestStore }) {
+/**
+ * 연결 상태 때문에 새 요청을 받지 않을 때 보일 안내(#153 조립이 정한다).
+ * 연결 해제·재인증 필요가 확인됐거나, 연결 필요 거부 뒤 연동 상태를 다시 확인하는 중이다.
+ */
+export type ConnectionNotice = "DISCONNECTED" | "REAUTH_REQUIRED" | "CHECKING";
+
+/**
+ * `connectionNotice`가 있으면 입력 단계에서 저장소 선택·고지·[동의하고 분석 요청] 대신 재연동 안내를 보인다.
+ * 이미 보낸 요청(요청 중·응답 불명·빈도 제한)의 표시와 [같은 요청 다시 보내기], 결과 안내는 그대로다.
+ */
+export function AnalysisRequestSection({ store, connectionNotice }: { store: AnalysisRequestStore; connectionNotice?: ConnectionNotice }) {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const baseId = useId();
   const { repositories, notice, selectedId, phase, retryAt, pendingRepositoryId, message } = snapshot;
@@ -28,11 +38,16 @@ export function AnalysisRequestSection({ store }: { store: AnalysisRequestStore 
     return () => clearInterval(timer);
   }, [limitedWaiting, retryAt]);
   const editing = phase === "editing";
+  // 입력 단계에서만 막는다. 이미 보낸 요청의 확인·재전송은 연결 상태와 관계없이 그대로 둔다.
+  const blockedNotice = editing ? connectionNotice : undefined;
   const selected = repositories.state === "ready" ? repositories.value.find((item) => item.repositoryId === selectedId) ?? null : null;
   const pendingName = pendingRepositoryId === null ? null : nameOf(repositories, pendingRepositoryId);
 
   return (
     <div className={styles.section}>
+      {blockedNotice ? (
+        <ConnectionRequired notice={blockedNotice} linked={message?.action === "github"} />
+      ) : (<>
       <RepositoryChoices repositories={repositories} selectedId={selectedId} disabled={!editing}
         name={`${baseId}-repository`} onSelect={(id) => store.select(id)} onRetry={() => { void store.loadRepositories(); }} />
 
@@ -50,6 +65,7 @@ export function AnalysisRequestSection({ store }: { store: AnalysisRequestStore 
       <p className={styles.muted}>
         [동의하고 분석 요청]을 누르면 위 안내에 동의하고 선택한 저장소의 분석을 요청합니다. 이 동의는 이번 요청에만 쓰입니다.
       </p>
+      </>)}
 
       {pendingName && (
         <p className={styles.pending}>
@@ -70,7 +86,7 @@ export function AnalysisRequestSection({ store }: { store: AnalysisRequestStore 
       )}
 
       <div className={styles.actions}>
-        {phase === "editing" && (
+        {phase === "editing" && !blockedNotice && (
           <button type="button" className={styles.primaryButton} disabled={!store.canSubmit()} onClick={() => { void store.submit(); }}>
             동의하고 분석 요청
           </button>
@@ -84,6 +100,18 @@ export function AnalysisRequestSection({ store }: { store: AnalysisRequestStore 
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/** 연결 해제·재인증 필요·확인 중의 재연동 안내. 거부 안내에 이미 연동 링크가 있으면 링크를 겹쳐 보이지 않는다. */
+function ConnectionRequired({ notice, linked }: { notice: ConnectionNotice; linked: boolean }) {
+  if (notice === "CHECKING") return <p className={styles.muted} role="status">GitHub 연동 상태를 확인하고 있습니다.</p>;
+  const reauth = notice === "REAUTH_REQUIRED";
+  return (
+    <div className={styles.lookupFailed}>
+      <p>{reauth ? "GitHub 연동을 다시 확인해야 새 분석을 요청할 수 있습니다." : "GitHub가 연동되어 있지 않아 새 분석을 요청할 수 없습니다."} 연동한 뒤 저장소와 분석 안내를 다시 확인해 주세요.</p>
+      {!linked && <Link href={routes.profileGithub} className={styles.inlineLink}>{reauth ? "GitHub 다시 연동하기" : "GitHub 연동하기"}</Link>}
     </div>
   );
 }

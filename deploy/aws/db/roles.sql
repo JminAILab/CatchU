@@ -6,7 +6,7 @@
 --      관리자가 만든 역할(만든 역할에는 ADMIN 권한이 있다)을 자신에게 SET으로 준 뒤 넘긴다. 스키마는 그 역할로 바꿔서 넘긴다.
 --   2) 앱 계정에 잠금 대기 상한 3초(#220 합의). 트랜잭션 안 유휴 상한은 #220에서 값을 정하면 따로 SQL 파일을 더해 같은 방법으로
 --      실행한다(그때까지는 RDS 기본값).
--- 동의 기록(analysis_consent)의 삭제 권한 회수는 migration이 그 표를 만든 뒤에 한다(deploy/aws/k8s/README.md 「적용(2단계)」).
+-- 동의 기록(analysis_consent)의 DELETE·TRUNCATE 권한은 deploy.sh가 migration 뒤마다 확인·회수·재확인한다(deploy/aws/k8s/README.md 「앱 교체(deploy.sh)」).
 -- 비밀번호는 Pod 환경변수에서 \getenv로 읽는다. 문장이 실패해도 DB 로그에 남지 않는다(파라미터 그룹 catchu-pg16의
 -- log_min_error_statement=panic, db-admin.sh가 실행 전에 확인한다). 다시 실행하면 CREATE ROLE에서 실패하고 아무것도 바뀌지 않는다.
 \set ON_ERROR_STOP on

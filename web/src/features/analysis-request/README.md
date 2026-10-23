@@ -16,6 +16,8 @@
 
 `RepositoryManagement`가 상태 객체를 만들어 모달을 닫아도 유지하고, 컴포넌트가 내려가면(회원 변경·화면 이동) 버린다. `requestApi`를 생략하면 `api.member`로 만든 제품 호출을 쓴다. 미리보기·시험은 합성 호출을 넘긴다. `connectSection`을 넘기면 이 영역 대신 그것을 그린다.
 
+`connectionNotice`(`DISCONNECTED`·`REAUTH_REQUIRED`·`CHECKING`)는 #153 조립이 연결 상태로 정한다. 값이 있으면 입력 단계에서 저장소 선택·분석 안내·[동의하고 분석 요청] 대신 재연동 안내(또는 확인 중)를 보인다. 요청 중·응답 불명·빈도 제한의 표시와 [같은 요청 다시 보내기], 결과 안내는 바꾸지 않으며 상태 객체의 판정·키 처리도 그대로다. 규칙은 [저장소 연결 관리 표시 규칙](../repository-management/README.md#표시-규칙)을 따른다.
+
 선정 목록은 `RepositoryApi.analyzableRepositories`로 읽는다. 같은 `GET /me/repositories`를 계약 `Repository`의 필수 필드인 `allowedScopeRevision`까지 검증한다(빈 값·문자열 아님·누락이면 목록 전체를 조회 실패로 본다). #153의 이름 결합용 `repositories`는 바꾸지 않았다.
 
 ## 동작
