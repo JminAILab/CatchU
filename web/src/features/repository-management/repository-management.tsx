@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createAnalysisRequestApi, type AnalysisRequestApi } from "@/features/analysis-request/analysis-request-api";
-import { AnalysisRequestSection } from "@/features/analysis-request/analysis-request-section";
+import { AnalysisRequestSection, RetryRequest } from "@/features/analysis-request/analysis-request-section";
 import { createAnalysisRequestStore } from "@/features/analysis-request/analysis-request-store";
 import type { RepositoryManagementBindings } from "@/features/assets/assets-connected";
 import { api as client } from "@/lib/api";
@@ -52,6 +52,7 @@ function formatTime(value: string): string {
 /**
  * 내 자산 Catch 탭 위쪽의 GitHub 저장소 연결 관리 영역과 모달(D, #153).
  * 조회 실패를 0건으로, 실행 불명·반영 실패·복구를 분석 실패로 바꿔 보이지 않는다. 새 분석·재요청은 자동으로 부르지 않는다.
+ * 서버가 retry.allowed를 참으로 준 최신 요청에는 아코디언 안에 #154의 [동의하고 다시 요청]을 그린다(같은 요청 상태 객체).
  */
 export function RepositoryManagement({ api, bindings, requestApi, connectSection }: Props) {
   const [github, setGithub] = useState<Load<GitHubState>>({ state: "loading" });
@@ -284,7 +285,10 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
                   disabled={connected.state === "loading" || connected.state === "checking"}>상태 새로고침</button>
               </div>
               <ConnectedList connected={connected} expanded={expanded} titleId={titleId}
-                onToggle={toggle} onShowRepository={showRepository} onRetry={loadConnected} />
+                onToggle={toggle} onShowRepository={showRepository} onRetry={loadConnected}
+                renderRetry={requestStore ? (latest) => (
+                  <RetryRequest store={requestStore} target={latest} connectionNotice={connectionNotice} />
+                ) : undefined} />
             </section>
 
             <section className={styles.block} aria-labelledby={`${titleId}-connect`}>
@@ -310,13 +314,15 @@ function AreaMessage({ github }: { github: Load<GitHubState> }) {
   return <p className={styles.muted}>GitHub 계정을 연동하면 공개 저장소를 골라 분석을 요청할 수 있습니다.</p>;
 }
 
-function ConnectedList({ connected, expanded, titleId, onToggle, onShowRepository, onRetry }: {
+function ConnectedList({ connected, expanded, titleId, onToggle, onShowRepository, onRetry, renderRetry }: {
   connected: ConnectedState;
   expanded: ReadonlySet<string>;
   titleId: string;
   onToggle: (repositoryId: string) => void;
   onShowRepository: (repositoryId: string) => void;
   onRetry: () => void;
+  /** 서버가 재요청을 허용한 최신 요청에 그릴 재요청 영역(#154). 허용 여부는 그 영역이 서버 값으로 다시 확인한다. */
+  renderRetry?: (latest: ConnectedRepository["latest"]) => ReactNode;
 }) {
   if (connected.state === "loading") return <p className={styles.muted} role="status">저장소 상태를 불러오고 있습니다.</p>;
   if (connected.state === "checking") return <p className={styles.muted} role="status">GitHub 연동 상태를 다시 확인하고 있습니다.</p>;
@@ -360,6 +366,7 @@ function ConnectedList({ connected, expanded, titleId, onToggle, onShowRepositor
                 {item.displayName === null && (
                   <p className={styles.muted}>선정 목록에서 이 저장소의 이름을 찾지 못해 식별자로 표시합니다.</p>
                 )}
+                {item.latest.retryAllowed && renderRetry?.(item.latest)}
                 {canShowCatches(item.latest) && (
                   <button type="button" className={styles.primaryButton} onClick={() => onShowRepository(item.repositoryId)}>
                     이 저장소 Catch 보기

@@ -94,7 +94,7 @@ const requestApi = createAnalysisRequestApi(async (path, request) => {
     return json(consentRejected ? { ...NOTICE, noticeRevision: "preview-notice-v2" } : NOTICE);
   }
   if (path !== "/analysis-requests" || request.method !== "POST") return json({ code: "RESOURCE_UNAVAILABLE", message: "없음" }, 404);
-  const body = request.body as { repositoryId: string };
+  const body = request.body as { repositoryId: string; retryOfRequestId?: string };
   const key = request.idempotencyKey ?? "";
   if (acceptedKeys.has(key)) return json(status(body.repositoryId, "QUEUED", "NOT_READY", { requestId: acceptedKeys.get(key) }), 200);
   switch (mode) {
@@ -114,13 +114,19 @@ const requestApi = createAnalysisRequestApi(async (path, request) => {
     case "not-allowed": return rejectWith("REPOSITORY_NOT_ALLOWED", 403);
     case "unavailable": return rejectWith("INTERNAL_ERROR", 403);
     case "deferred": return rejectWith("REANALYSIS_DEFERRED", 409);
+    // 실패 재요청(retryOfRequestId 있음)만 거부한다. 첫 요청은 아래 202로 이어진다.
+    case "retry-not-allowed": if (body.retryOfRequestId) return rejectWith("RETRY_NOT_ALLOWED", 409); break;
+    case "retry-missing": if (body.retryOfRequestId) return json({ code: "RESOURCE_UNAVAILABLE", message: "모의 거부" }, 404); break;
     case "unknown":
       // 서버는 받아 두었는데 응답만 잃은 경우를 흉내 낸다. 같은 키의 다음 전송은 위에서 200이 된다.
       acceptedKeys.set(key, `req-new-${body.repositoryId}`);
       return serverError();
   }
   acceptedKeys.set(key, `req-new-${body.repositoryId}`);
-  return json(status(body.repositoryId, "QUEUED", "NOT_READY", { requestId: `req-new-${body.repositoryId}` }), 202);
+  const created = status(body.repositoryId, "QUEUED", "NOT_READY", { requestId: `req-new-${body.repositoryId}` });
+  // 접수 뒤 「연결된 저장소」를 다시 읽으면 이 저장소의 최신 요청이 새 대기 요청으로 보이게 합성 이력에 더한다.
+  analyses.push(created);
+  return json(created, 202);
 });
 
 const catchApi = createCatchApi(async (path) => {
@@ -143,7 +149,8 @@ export function RepositoryManagementPreview() {
         <p>주소에 scenario=empty · failed · me-failed · disconnected · reauth를 붙여 상태를 바꿉니다.</p>
         <p>
           분석 요청(#154)은 intake=accepted(기본) · existing · in-progress · consent · unknown · limited · github · not-allowed · unavailable
-          · deferred · notice-failed · notice-unavailable로 바꿉니다. limited는 3초 제한 뒤 같은 요청을 다시 보내면 접수됩니다.
+          · deferred · notice-failed · notice-unavailable · retry-not-allowed · retry-missing으로 바꿉니다. limited는 3초 제한 뒤 같은 요청을 다시 보내면 접수됩니다.
+          실패 재요청은 failed-repo·closed-* 저장소를 펼쳐 [동의하고 다시 요청]으로 봅니다.
         </p>
       </aside>
       <AssetsConnected api={catchApi} repositories={previewRepositories}
