@@ -27,11 +27,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "aidlc engine adapter codex bind-bash-session",
+            "command": "aidlc engine adapter codex guard-tool-call",
             "timeout": 1800
           }
-        ],
-        "matcher": "Bash"
+        ]
       },
       {
         "hooks": [
@@ -42,42 +41,6 @@
           }
         ],
         "matcher": "spawn_agent"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "aidlc engine adapter codex state-transition-guard",
-            "timeout": 1800
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "aidlc engine adapter codex reviewer-scope",
-            "timeout": 1800
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "aidlc engine adapter codex review-freeze",
-            "timeout": 1800
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "aidlc engine adapter codex plan-approval-guard",
-            "timeout": 1800
-          }
-        ]
       }
     ],
     "PostToolUse": [

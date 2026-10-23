@@ -4,7 +4,7 @@
 
 이슈의 필요성·범위·완료 기준 검토도 AGENTS.md의 공통 개발 목표 읽기 경로를 따른다. 일반 작업은 AGENTS.md의 `AI의 작업 관리` 표에 따라 필요한 절을 읽고 적용한다. 작업관리 상세와 질문 기준의 정본은 `docs/CatchU_작업관리.md`, 코드 수정·검사·PR 절차의 정본은 `docs/CatchU_coding_procedures.md`다. 팀 규칙과 읽기 경로는 여기에 복제하지 않는다.
 
-이 저장소는 Codex·Claude Code용 AI-DLC 2.11.0 하네스를 함께 관리한다. Claude Code의 실행 절차는 `.claude/CLAUDE.md`, 팀원별 런타임 설치·신뢰·복귀는 `docs/ai-dlc/AI_DLC_2.11.0_GUIDE.md`를 따른다. Projects 작업만으로 AI-DLC를 시작·재개하거나 승인하지 않고, 코딩에는 담당자가 요청할 때만 쓴다. AI-DLC 실행 요청이 있으면 현재 환경의 런타임과 프로젝트 판본이 일치하는지 먼저 확인한다.
+이 저장소는 Codex·Claude Code용 AI-DLC 2.11.1 하네스를 함께 관리한다. Claude Code의 실행 절차는 `.claude/CLAUDE.md`, 팀원별 런타임 설치·신뢰·복귀는 `docs/ai-dlc/AI_DLC_2.11.1_GUIDE.md`를 따른다. Projects 작업만으로 AI-DLC를 시작·재개하거나 승인하지 않고, 코딩에는 담당자가 요청할 때만 쓴다. AI-DLC 실행 요청이 있으면 현재 환경의 런타임과 프로젝트 판본이 일치하는지 먼저 확인한다.
 
 수정할 경로에 하위 AGENTS.md가 있으면 함께 읽는다. GitHub 조작은 현재 사용자의 인증과 사용 가능한 CLI·연결 도구로 실행하고, 상세 절차는 공통 작업관리 문서를 따른다.
 
