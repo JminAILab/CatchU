@@ -87,6 +87,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/(guest)/`, `(member)/`, `s/` | 화면 묶음별 레이아웃(헤더). 아래 「공통 레이아웃」 참조 |
 | `src/app/(guest)/page.tsx` | `/` 기본 화면. 서비스 소개는 #155에서 채운다 |
 | `src/app/preview/common/` | 헤더·상태 표시 개발용 미리보기(`npm run dev`에서만) |
+| `src/app/(member)/home/` | 회원 가드 안의 로그인 후 홈. 연결 상태 안내와 다음 행동을 조립한다([기능 안내](src/features/home/README.md)) |
 | `src/app/(member)/assets/` | 회원 가드 안의 실제 내 자산 페이지. B 목록·상세와 D 저장소 모달을 조립한다([기능 안내](src/features/assets/README.md)) |
 | `src/app/s/[token]/` | 공유 링크 수신자 목록·Catch 상세. 회원 로그인 없이 수신자 API에 연결한다([기능 안내](src/features/recipient/README.md)) |
 | `src/components/header/` | 로그인·비로그인·수신자 헤더와 프로필 메뉴 |
@@ -140,7 +141,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 |---|---|---|---|---|---|
 | `/` | 서비스 소개 | D | 불필요 | 제안 | 로그아웃 성공 후 비로그인 홈 이동은 확정(#55) |
 | `/login` | 로그인 진입 | A / 틀 D | 불필요 | 제안 | 회원 경로 가드의 이동 목적지. Google 로그인은 연결 전(A), 개발용 로그인은 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`일 때만 |
-| `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 Catch 탭 저장소 연결 관리로 이동(확정) |
+| `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 Catch 탭 저장소 연결 관리로 이동(확정). GitHub 미연동·재연동 필요의 연동 화면(`/profile/github`) 버튼은 #253 전까지 비활성으로 두고 준비 중 이유를 보인다([홈](src/features/home/README.md)) |
 | `/profile/setup` | 최초 프로필 입력 (W02) | A | 필요 | 제안 | 저장 성공 후 회원 정보를 다시 불러온 뒤 `/home` |
 | `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지. 수정(`/profile/edit`)으로 진입하는 링크를 둔다. GitHub 연동(`/profile/github`) 진입은 #253 전까지 '연결 전'으로 표시하고 이동하지 않는다 |
 | `/profile/edit` | 프로필 수정 (W02) | A | 필요 | 제안 | 저장 성공·취소 후 `/profile`로 복귀하고, 저장 실패 시 이 화면과 입력을 유지 |
