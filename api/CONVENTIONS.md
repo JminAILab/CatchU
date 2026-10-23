@@ -1,6 +1,6 @@
 # api 코딩 규약
 
-api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 사용 규약이다. 설치·실행·검사와 [공통 오류 처리(ApiError·오류 코드 추가)](README.md#공통-오류-처리--api-명세-v1)는 [api README](README.md), 기능별 동작과 연결은 `api/docs/<기능>.md`에 있다. 새 규약은 이 문서에 쓰고, 이미 있는 규약은 적힌 곳에서 고친다.
+api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 사용·공통 오류 처리(ApiError·오류 코드 추가) 규약이다. 설치·실행·검사는 [api README](README.md), 기능별 동작과 연결은 `api/docs/<기능>.md`에 있다. 새 규약은 이 문서에 쓰고, 이미 있는 규약은 적힌 곳에서 고친다.
 
 본문이 가리키는 다른 파일의 절: 「로컬 DB 준비」와 #87 절의 '앞의 초기화 기준'(「초기화 기준과 도구」)은 README, 「회원·분석 선행 테이블과 멱등 처리 — #104」는 [docs/member-analysis.md](docs/member-analysis.md), #87 절의 '날짜별 검증 기록'은 [docs/verification-records.md](docs/verification-records.md)에 있다.
 
@@ -186,3 +186,42 @@ export class ExamplePublicController {
 현재 내부 토큰 구현은 HS256, 발급자 `catchu-api`, 대상 `catchu-member-api`, `sub` 회원 UUID·`sid` 세션 UUID와 `iat`·`exp`를 서명·검증한다. 서명 알고리즘을 제한하고 비어 있는/공백 회원 ID, 누락된 만료·발급 시각, 잘못된 대상·발급자도 거부한다. 이는 #87 개발 기반의 내부 형식이며 기능 코드의 의존 대상이나 실제 OAuth 발급 계약이 아니다. 토큰 원문과 검증 라이브러리의 상세 오류는 로그·오류 응답에 포함하지 않는다.
 
 [#104](https://github.com/JminAILab/CatchU/issues/104)의 개발 회원 공급자가 받은 문자열을 개발 전용 identityReference에 연결하고 회원·기본 프로필·최초 합성 연동을 준비한다. 토큰에는 실제 회원 UUID를 사용하며 기능 코드의 `@CurrentMemberId()` 사용 방식은 유지한다. 상세는 「회원·분석 선행 테이블과 멱등 처리 — #104」를 따른다. 이는 #104 당시 경계다. 현재 Google 발급은 [Google 안내](docs/google-login.md), 세션·재발급·로그아웃·쿠키·Origin 검사는 [#250 세션 안내](docs/auth-sessions.md)를 따른다. GitHub·자원 소유권은 별도 기능의 기준을 적용한다.
+
+## 공통 오류 처리 — API 명세 v1
+
+정본은 [API 명세 v1 공통 오류·요청 안전성](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#공통-오류요청-안전성)과 [common.yaml의 Error](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml)다. 오류 본문은 `{code, message, details?}`이며 화면은 문구 대신 `code`로 분기한다. `details`는 `violations: [{field, reason}]`와 `existingRequestId`만 허용한다. 입력값·SQL·stack·토큰을 응답에 넣지 않는다.
+
+| 기본 구분 | HTTP | 코드 |
+|---|---|---|
+| 입력 | 400 | INVALID_REQUEST, VALIDATION_FAILED |
+| 미인증·수신자 비밀번호 | 401 | AUTH_REQUIRED, AUTH_INVALID, LINK_PASSWORD_REQUIRED, LINK_PASSWORD_INVALID |
+| 권한·선행 조건·요청 출처 | 403 | GITHUB_CONNECTION_REQUIRED, REPOSITORY_NOT_ALLOWED, CONSENT_REQUIRED, AUTH_ORIGIN_FORBIDDEN |
+| 없음·열람 불가 | 404 | RESOURCE_UNAVAILABLE, LINK_UNAVAILABLE |
+| 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED |
+| 수신자 비밀번호 시도 제한 | 429 | LINK_UNLOCK_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds })`) |
+| 회원 링크 발급 빈도 제한 | 429 | RATE_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('RATE_LIMITED', { retryAfterSeconds })`) |
+| 서버 오류 | 500 | INTERNAL_ERROR |
+
+기능에서는 `src/common/errors`의 `ApiError`를 던진다. HTTP 상태는 코드에 따라 정해진다.
+
+```typescript
+import { ApiError } from '../common/errors'; // 현재 파일 위치에 맞게 상대 경로 조정
+
+throw new ApiError('CONSENT_REQUIRED');
+// 진행 중 요청을 안내할 때:
+throw new ApiError('ANALYSIS_IN_PROGRESS', { details: { existingRequestId: requestId } });
+```
+
+새 오류 코드는 계약 변경 이슈로 상태·의미·문구를 합의한 뒤 `error-codes.ts`의 상태/기본 문구, 이 표, 기능 테스트를 함께 추가한다. #250의 `403 AUTH_ORIGIN_FORBIDDEN`(갱신·로그아웃 요청의 출처 거부)은 2026-10-14 API 명세에 반영됐다. 상태·의미는 위 공통 오류·요청 안전성 표와 [M — 회원 API](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api)가 정본이고, 구현 동작은 [세션 안내](docs/auth-sessions.md)에 있다. 과거 승인 문서를 소급 수정하지 않는다. 기존 코드의 사용자 문구를 지정할 때도 내부 예외의 message를 그대로 전달하지 않는다.
+
+전역 ValidationPipe는 class-validator 데코레이터가 있는 DTO 클래스의 검증 실패·추가 필드를 `400 VALIDATION_FAILED`와 필드/규칙 이름으로 응답한다. `unknown`·인터페이스·직접 수동 검증은 DTO 검증 대상이 아니다.
+
+[9/28 팀장 결정](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5861430583)에 따라 명세 밖 예외를 처리한다.
+
+- 코드 없는 403·409는 상태를 유지하고 `INTERNAL_ERROR`와 경고 로그를 남긴다. 업무 코드가 있는 거부는 `ApiError`를 사용한다.
+- 본문 크기 초과(413 예외 포함)는 `400 INVALID_REQUEST`, 안내는 `요청 본문이 너무 큽니다.`다.
+- 없는 경로는 `404 RESOURCE_UNAVAILABLE`이다. `/v1` 밖에서도 HTML 대신 같은 형식으로 응답한다.
+- 예상 밖 예외는 `500 INTERNAL_ERROR`와 일반 안내다. 5xx 로그는 `ApiError`를 포함해 예외 분류명과 코드 위치(`파일:줄:칸`)만 남긴다. 분류명은 `error.name` 원문이 아니라 `instanceof` 기반으로 고른 허용 목록의 고정 분류명(`ApiError`·`ForbiddenException`·`TypeError`·`Error` 등)이며, 목록 밖의 하위 클래스는 가장 가까운 상위 분류로 기록한다. 코드 위치는 stack 문자열이 아니라 V8의 구조화된 호출 위치에서 따로 수집하므로 원문 메시지가 섞이지 않으며, 함수 이름은 기록하지 않는다. 수집 기록이 없으면 위치를 생략한다(`src/common/errors/stack-frames.ts`). 요청 주소는 토큰이 들어가는 실제 경로 대신 등록된 경로 틀만 기록하고, 없으면 `[unmatched]`로 표시한다.
+- 업무 코드가 있는 4xx 거부는 기본적으로 기록하지 않는다. 보안 사건 세 코드의 예외·기록 형식·검사는 [보안 사건 기록](docs/security-events.md)을 따른다.
+
+전역 설정은 `configureApp`에 모았다. 기능 경로는 `/v1` 아래, `GET /health`는 접두사 없이 유지하며 성공·오류 응답에 `Cache-Control: no-store`를 붙인다. `/v1` 밖 오류와 CORS 사전 요청을 포함한 모든 응답에 보안 헤더 `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`·`X-Content-Type-Options: nosniff`·`Referrer-Policy: no-referrer`를 붙이고 `X-Powered-By`를 끈다. `Strict-Transport-Security: max-age=300`은 `NODE_ENV`가 development·test가 아닐 때(값이 없거나 다른 값 포함) 붙인다. 기간은 5분으로 시작해 도메인·인증서가 정해지면 늘린다(`src/common/http/security-headers.ts`, #217). `npm test`는 실제 로컬 HTTP 서버에서 위 상태/본문/헤더/로그, ValidationPipe, 인증 Guard를 검증한다. 오류 재현 전용 경로는 `test/errors.test.cjs`에만 있고 제품 앱에 추가하지 않는다.
