@@ -81,7 +81,7 @@
 | 실패 안내 | `failures[]`의 `stage`·`code`·`message`를 쓴다. `PARTIAL_FAILED`에는 유효 결과가 함께 있을 수 있다. 처리 시한으로 닫힌 요청은 `code=PROCESSING_DEADLINE_EXCEEDED`다 |
 | 재요청 버튼 | `retry.allowed=true`일 때만 보인다. 새 `Idempotency-Key`, 현재 고지·범위에 대한 새 동의, `retryOfRequestId=<requestId>`로 `POST /v1/analysis-requests`를 보낸다([#138](analysis-intake.md#선행-이력과-실패-재요청)) |
 | 저장소 이름 | 응답 구조는 접수와 같다. `repositoryId`를 [`GET /v1/me/repositories`](member-repositories.md)의 `repositoryId`와 맞춰 이름을 붙인다. 지금 선정 목록에 없는 저장소의 이력도 그대로 온다 |
-| 조회 실패 | 401은 다시 로그인, 404는 본인 요청이 아니거나 없음, 500은 일시 오류다. 화면은 상태를 바꾸거나 분석 실패로 표시하지 않고 다시 조회한다 |
+| 조회 실패 | 401은 web 공통 인증(#286)이 세션을 갱신하고, 갱신에 실패하면 다시 로그인하게 한다. 404는 본인 요청이 아니거나 없음, 500은 일시 오류다. 화면은 상태를 바꾸거나 분석 실패로 표시하지 않고, 사용자가 [다시 불러오기]를 누르면 다시 조회한다 |
 
 `retry.reason`은 재요청을 판정한 사유일 뿐, 결과 유무나 실패 원인을 뜻하지 않는다. 화면 안내는 위 표의 필드로 만든다.
 
