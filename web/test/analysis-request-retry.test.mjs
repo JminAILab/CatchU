@@ -30,7 +30,7 @@ function keyHolder() {
 }
 
 /** 합성 전송 대역. 모든 POST의 키·본문(JSON 직렬화 기준)을 기록한다. */
-function harness({ repositories = [repo('r1'), repo('r2')], notice = http(200, NOTICE), create = () => http(202, status('r1')) } = {}) {
+function harness({ repositories = [repo('r1'), repo('r2')], notice = http(200, NOTICE), create = () => http(202, status('r1')), now } = {}) {
   const posts = [];
   const gets = { notice: 0 };
   const state = { repositories, notice, create };
@@ -40,7 +40,7 @@ function harness({ repositories = [repo('r1'), repo('r2')], notice = http(200, N
     return state.create(request.body, request.idempotencyKey);
   });
   const store = createAnalysisRequestStore({
-    repositories: async () => ({ kind: 'success', data: state.repositories }), requests, keys: keyHolder(),
+    repositories: async () => ({ kind: 'success', data: state.repositories }), requests, keys: keyHolder(), ...(now ? { now } : {}),
   });
   const watched = [];
   store.watchStatusChanges(() => watched.push(store.getSnapshot().message?.text));
@@ -207,6 +207,71 @@ test('재요청 429는 같은 키·본문을 붙잡고, 401(앞선 불명 없음
   assert.equal(auth.store.getSnapshot().message.text, TEXT.auth);
   await auth.store.retry(failed('r1'));
   assert.deepEqual(auth.posts.map((post) => post.key), ['key-1', 'key-2']);
+});
+
+test('재요청 429 Retry-After: 대기 중에는 다시 보내지 않고, 대기가 끝난 뒤 사용자가 누를 때만 같은 키·본문(retryOfRequestId 포함)으로 보낸다', async () => {
+  let clock = 1_000_000;
+  const h = harness({ create: () => ({ ...apiError(429, 'RATE_LIMITED'), retryAfterSeconds: 3 }), now: () => clock });
+  await h.store.open();
+  await h.store.retry(failed('r1'));
+  assert.equal(h.store.getSnapshot().phase, 'limited');
+  assert.equal(h.store.getSnapshot().pendingRetry, true);
+  assert.equal(h.store.getSnapshot().pendingRepositoryId, 'r1');
+  assert.equal(h.store.retryWaitSeconds(), 3);
+
+  // 대기 중: 다시 보내기·새 재요청 모두 보내지 않는다. 시간이 지나도 스스로 보내지 않는다.
+  assert.equal(h.store.canResend(), false);
+  await h.store.resend();
+  await h.store.retry(failed('r1'));
+  clock += 2_999;
+  await tick();
+  assert.equal(h.store.retryWaitSeconds(), 1);
+  assert.equal(h.store.canResend(), false);
+  await h.store.resend();
+  assert.equal(h.posts.length, 1, '대기 중 전송 없음');
+  assert.deepEqual(h.watched, []);
+
+  // 대기 끝: 사용자가 누르면 같은 키·같은 본문으로만 보낸다.
+  clock += 1;
+  assert.equal(h.store.retryWaitSeconds(), 0);
+  assert.equal(h.store.canResend(), true);
+  assert.equal(h.posts.length, 1, '대기가 끝나도 자동 전송 없음');
+  h.state.create = () => http(202, status('r1'));
+  await h.store.resend();
+  assert.deepEqual(h.posts.map((post) => post.key), ['key-1', 'key-1']);
+  assert.equal(h.posts[1].json, h.posts[0].json);
+  assert.equal(h.posts[1].body.retryOfRequestId, 'req-old-r1');
+  assert.equal(h.store.getSnapshot().message.text, TEXT.retryAccepted);
+});
+
+test('재요청 응답 불명 → 같은 요청 재전송 → 401: 키·본문·retryOfRequestId와 결과 불명을 유지하고, 새 키로 보내거나 미접수로 확정하지 않는다', async () => {
+  const h = harness({ create: () => LOOKUP_FAILED });
+  await h.store.open();
+  await h.store.retry(failed('r1'));
+  assert.equal(h.store.getSnapshot().phase, 'unknown');
+
+  h.state.create = () => apiError(401, 'AUTH_REQUIRED');
+  await h.store.resend();
+  const snapshot = h.store.getSnapshot();
+  assert.deepEqual(h.posts.map((post) => post.key), ['key-1', 'key-1']);
+  assert.equal(h.posts[1].json, h.posts[0].json);
+  assert.equal(h.posts[1].body.retryOfRequestId, 'req-old-r1');
+  assert.equal(snapshot.phase, 'unknown', '앞선 시도의 결과는 여전히 모른다');
+  assert.equal(snapshot.pendingRetry, true);
+  assert.equal(snapshot.pendingRepositoryId, 'r1');
+  assert.equal(snapshot.message.text, TEXT.auth);
+  assert.deepEqual(h.watched, [], '미접수 안내·목록 다시 읽기로 넘어가지 않는다');
+
+  // 새 재요청은 받지 않는다. 같은 상태 객체를 유지한 채 성공 응답 대역으로 바꾸면 기존 키·본문으로 재전송한다.
+  // 실제 로그인 이동·복원은 검사하지 않는다.
+  await h.store.retry(failed('r1'));
+  assert.equal(h.posts.length, 2, '새 키 자동 전송 없음');
+  assert.equal(h.store.canResend(), true);
+  h.state.create = () => http(200, status('r1'));
+  await h.store.resend();
+  assert.deepEqual(h.posts.map((post) => post.key), ['key-1', 'key-1', 'key-1']);
+  assert.equal(h.posts[2].json, h.posts[0].json);
+  assert.equal(h.store.getSnapshot().message.text, TEXT.resentExisting);
 });
 
 test('화면을 떠나면(dispose) 재요청 표시와 붙잡은 키·본문을 버리고, 늦은 응답은 반영하지 않는다', async () => {

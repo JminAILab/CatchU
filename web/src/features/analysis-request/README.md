@@ -39,7 +39,7 @@
 | 409 `ANALYSIS_IN_PROGRESS` | 다른 저장소가 진행 중. 「연결된 저장소」를 다시 불러온다 |
 | 409 `REANALYSIS_DEFERRED`·`RETRY_NOT_ALLOWED` | 이 저장소의 이전 요청 때문에 새 요청으로 받지 않음. 재분석 사유로 바꾸지 않는다 |
 | 400 | 고지와 목록을 다시 읽는다 |
-| 401 | 로그인 안내. 앞선 시도가 응답 불명이었으면 그 요청은 계속 붙잡는다 |
+| 401 | 로그인 안내. 앞선 시도가 응답 불명이었으면 상태 객체가 유지되는 동안 그 요청을 계속 붙잡는다. 인증 통합을 끈 화면에서는 공통 401 처리로 로그인 화면으로 이동하므로 상태 객체와 붙잡은 요청이 사라지며, 로그인 뒤 복원하지 않는다(아래 「붙잡은 요청의 보관 범위와 한계」) |
 
 - **고지 조회:** 403이면 조회 실패와 나눠 ‘지금은 분석을 요청할 수 없음’으로 보이고 재동의를 유도하지 않는다. 선정 목록 403 `GITHUB_CONNECTION_REQUIRED`는 연동 확인 링크를 보인다.
 - **「연결된 저장소」 갱신:** 접수(202·200)와 상태를 바꿨을 수 있는 거부(409 `ANALYSIS_IN_PROGRESS`·`REANALYSIS_DEFERRED`·`RETRY_NOT_ALLOWED`·`IDEMPOTENCY_CONFLICT`, 재요청의 404)는 모달이 열려 있으면 이력(`GET /analysis-requests`, #140)을 다시 읽는다. 그 조회가 실패하면 목록 자리에 조회 실패(‘분석이 실패한 것은 아닙니다’)가 보이고 접수 안내는 그대로이며 POST를 다시 보내지 않는다. 응답 불명은 접수 결과가 아니라서 다시 읽지 않는다([상태 새로고침]으로 확인).
@@ -82,4 +82,4 @@
 
 ## 검사
 
-`npm test`의 `test/analysis-request.test.mjs`·`test/analysis-request-rate-limit.test.mjs`·`test/analysis-request-response.test.mjs`·`test/analysis-request-retry.test.mjs`: 판본 필드 검증, 고지 응답, 접수 응답 필수 필드·중첩 형식 오류와 429 뒤 잘못된 200의 키 보존, 202·200·409·403 코드별 처리, 중복 클릭, 응답 불명 뒤 같은 키·본문 재전송, 429 대기 기한·직접 재전송 차단·무효 헤더·기한 갱신, 늦은 응답, 모달 재열기 유지·초기화, 접수 성공과 상태 조회 실패의 분리, 실패 재요청의 제공 조건·본문(새 판본 동의·`retryOfRequestId`)·새 키·응답 불명 뒤 같은 키·본문·거부 코드별 안내와 상태 갱신. 모두 합성 응답이다. 미리보기는 `/preview/repository-management?intake=…`(값은 화면 위쪽 안내). `intake=limited`는 최초 전송에서 3초 제한을 받고, 기한 뒤 사용자가 같은 요청을 다시 보내면 202로 접수되는 합성 시나리오다. 재요청은 `failed-repo`·`closed-*` 저장소를 펼쳐 보며, `intake=retry-not-allowed`·`retry-missing`이 재요청 거부를 흉내 낸다.
+`npm test`의 `test/analysis-request.test.mjs`·`test/analysis-request-rate-limit.test.mjs`·`test/analysis-request-response.test.mjs`·`test/analysis-request-retry.test.mjs`: 판본 필드 검증, 고지 응답, 접수 응답 필수 필드·중첩 형식 오류와 429 뒤 잘못된 200의 키 보존, 202·200·409·403 코드별 처리, 중복 클릭, 응답 불명 뒤 같은 키·본문 재전송, 429 대기 기한·직접 재전송 차단·무효 헤더·기한 갱신, 늦은 응답, 모달 재열기 유지·초기화, 접수 성공과 상태 조회 실패의 분리, 실패 재요청의 제공 조건·본문(새 판본 동의·`retryOfRequestId`)·새 키·응답 불명 뒤 같은 키·본문·거부 코드별 안내와 상태 갱신, 재요청의 429 대기 중 재전송 차단·대기 뒤 같은 요청 재전송, 응답 불명 뒤 401의 키·본문 유지(같은 상태 객체 안. 실제 로그인 이동·복원은 검사하지 않음). 모두 합성 응답이다. 미리보기는 `/preview/repository-management?intake=…`(값은 화면 위쪽 안내). `intake=limited`는 최초 전송에서 3초 제한을 받고, 기한 뒤 사용자가 같은 요청을 다시 보내면 202로 접수되는 합성 시나리오다. 재요청은 `failed-repo`·`closed-*` 저장소를 펼쳐 보며, `intake=retry-not-allowed`·`retry-missing`이 재요청 거부를 흉내 낸다.
