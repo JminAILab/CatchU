@@ -165,7 +165,7 @@ docker run -d --name catchu-db-test -p 127.0.0.1:5433:5432 -e POSTGRES_USER=catc
 DB를 쓰는 테스트를 추가할 때:
 
 - `test/support/test-database.cjs`의 `openTestDataSource()`로 접속하고, 각 테스트 앞(`beforeEach`)에서 `resetTestDatabase(dataSource)`를 불러 앞선 테스트의 자료 없이 시작한다. 초기화는 마이그레이션 기록을 뺀 모든 테이블을 비운다.
-- 테스트 파일은 줄마다 한 번에 하나씩 돈다(`--test-concurrency=1`). 잠금 대기 시험(`test/**/lock-wait-limit-*.test.cjs`)은 실행기가 만드는 둘째 DB(`…_lock_test`)에서 나머지와 동시에 돌고, `test/db/build-output.test.cjs`는 공용 `dist`를 다시 만들어 두 줄 앞에서 혼자 돈다. 서버 전체를 세는 조회(`pg_stat_activity`·`pg_locks`)는 `current_database()`로 한정한다. 동시 요청 검사는 한 테스트 안에서 연결을 여러 개 열어 만든다.
+- 테스트 파일은 줄마다 한 번에 하나씩 돈다(`--test-concurrency=1`). 잠금 대기 시험(`test/**/lock-wait-limit-*.test.cjs`)과 실제 1분을 기다리는 발급 통합 시험(`test/db/share-links-web-integration.test.cjs`)은 실행기가 만드는 둘째 DB(`…_lock_test`)에서 나머지와 동시에 돌고, `test/db/build-output.test.cjs`는 공용 `dist`를 다시 만들어 두 줄 앞에서 혼자 돈다. 서버 전체를 세는 조회(`pg_stat_activity`·`pg_locks`)는 `current_database()`로 한정한다. 동시 요청 검사는 한 테스트 안에서 연결을 여러 개 열어 만든다.
 - 확인용 테이블이 필요하면 그 테스트 안에서 만들고 지운다. 제품 테이블은 마이그레이션으로만 만든다.
 
 ## 파일 역할과 모듈 추가 위치
