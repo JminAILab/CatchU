@@ -12,8 +12,10 @@ const { ResultApplicationRecord } = require('../../dist/result-application/resul
 const { CreateCatchAssets1790600000000 } = require('../../dist/database/migrations/1790600000000-CreateCatchAssets');
 const { CreateRepositoryProtection1790601000000 } =
   require('../../dist/database/migrations/1790601000000-CreateRepositoryProtection');
+const { CascadeCatchAssetsOnDelete1792817978014 } =
+  require('../../dist/database/migrations/1792817978014-CascadeCatchAssetsOnDelete');
 
-test('B의 외부 FK 메타데이터가 실제 A/E 엔티티와 기존 마이그레이션의 참조·이름·옵션을 보존한다', async (t) => {
+test('B의 외부 FK 메타데이터가 실제 A/E 엔티티와 마이그레이션의 참조·이름·옵션과 같다', async (t) => {
   // DB 접속·DDL 실행 없이 실제 엔티티의 참조를 해석하고 기존 up SQL과 대조한다.
   const dataSource = new DataSource({
     type: 'postgres', database: 'catch_metadata_test', synchronize: false,
@@ -26,6 +28,7 @@ test('B의 외부 FK 메타데이터가 실제 A/E 엔티티와 기존 마이그
   const runner = { async query(sql) { statements.push(sql); } };
   await new CreateCatchAssets1790600000000().up(runner);
   await new CreateRepositoryProtection1790601000000().up(runner);
+  await new CascadeCatchAssetsOnDelete1792817978014().up(runner);
 
   const cases = [
     { entity: CatchAssetEntity, target: MemberAccount, name: 'fk_catch_asset_owner_id', column: 'owner_id', referenced: 'member_id' },
@@ -42,7 +45,7 @@ test('B의 외부 FK 메타데이터가 실제 A/E 엔티티와 기존 마이그
       assert.equal(fk.referencedEntityMetadata.target, target, '시험용 사본이 아닌 실제 A/E 엔티티를 참조한다');
       assert.deepEqual(fk.columnNames, [column]);
       assert.deepEqual(fk.referencedColumnNames, [referenced]);
-      assert.equal(fk.onDelete, 'NO ACTION');
+      assert.equal(fk.onDelete, 'CASCADE', '회원 탈퇴 때 부모를 따라 지운다(#387)');
       assert.equal(fk.onUpdate, 'NO ACTION');
       assert.equal(fk.deferrable, undefined);
 
@@ -51,7 +54,11 @@ test('B의 외부 FK 메타데이터가 실제 A/E 엔티티와 기존 마이그
       const constraint = tableSql.split('\n').map(line => line.trim()).find(line => line.startsWith(`CONSTRAINT "${name}"`));
       assert.equal(constraint?.replace(/,$/, ''),
         `CONSTRAINT "${name}" FOREIGN KEY ("${column}") REFERENCES "${fk.referencedTablePath}"("${referenced}")`,
-        '기존 FK의 참조와 기본 NO ACTION·즉시 제약을 바꾸지 않는다');
+        '병합된 마이그레이션의 FK 생성문은 고치지 않는다');
+      assert.ok(statements.includes(`ALTER TABLE "${metadata.tableName}" DROP CONSTRAINT "${name}"`));
+      assert.ok(statements.includes(`ALTER TABLE "${metadata.tableName}" ADD CONSTRAINT "${name}" FOREIGN KEY ("${column}") ` +
+        `REFERENCES "${fk.referencedTablePath}"("${referenced}") ON DELETE CASCADE ON UPDATE NO ACTION`),
+        '새 마이그레이션이 같은 이름·참조·즉시 제약으로 삭제 규칙만 바꾼다');
     });
   }
 });

@@ -13,11 +13,13 @@ const { CreateResultApplicationRecord1790550000000 } = require('../../dist/datab
 const { ShareLink } = require('../../dist/share-links/share-link.entity');
 const { CreateShareLink1790745895865 } = require('../../dist/database/migrations/1790745895865-CreateShareLink');
 const { AddAnalysisRequestHistoryIndex1792640486167 } = require('../../dist/database/migrations/1792640486167-AddAnalysisRequestHistoryIndex');
+const { CascadeMemberAnalysisOnDelete1792817978011 } = require('../../dist/database/migrations/1792817978011-CascadeMemberAnalysisOnDelete');
+const { CascadeResultApplicationOnDelete1792817978012 } = require('../../dist/database/migrations/1792817978012-CascadeResultApplicationOnDelete');
 // ShareLink는 회원 멱등 기록의 실제 FK 참조이며 B 등록 대역과는 별개다.
 // 이력 인덱스(#140)는 회원·분석 기반 엔티티에 선언되어 엔티티 DDL 대조에 필요하다.
 const entities = [...Object.values(foundation).filter(v => typeof v === 'function'),ResultApplicationRecord,ShareLink];
 const migrations = [CreateMemberAnalysisFoundation1790500000000,CreateResultApplicationRecord1790550000000,CreateShareLink1790745895865,
-  AddAnalysisRequestHistoryIndex1792640486167];
+  AddAnalysisRequestHistoryIndex1792640486167,CascadeMemberAnalysisOnDelete1792817978011,CascadeResultApplicationOnDelete1792817978012];
 const selfSchema = 'e_self_' + randomUUID().replaceAll('-','');
 let db, schemaOwner;
 before(async () => {
@@ -258,10 +260,13 @@ test('E 수신 제약·물리 매핑 및 실제 기반→E 적용·역순 되돌
   try {
     assert.deepEqual((await isolated.runMigrations()).map(m => m.name),
       ['CreateMemberAnalysisFoundation1790500000000','CreateResultApplicationRecord1790550000000','CreateShareLink1790745895865',
-        'AddAnalysisRequestHistoryIndex1792640486167']);
+        'AddAnalysisRequestHistoryIndex1792640486167','CascadeMemberAnalysisOnDelete1792817978011','CascadeResultApplicationOnDelete1792817978012']);
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).length,10);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries,[]);
     await isolated.manager.insert(MemberAccount,{memberId:randomUUID(),identityReference:'preserve',accountState:'ACTIVE'});
+    await isolated.undoLastMigration(); // #387 E 수신 기록 연쇄 삭제
+    await isolated.undoLastMigration(); // #387 회원·분석 연쇄 삭제
+    assert.equal(await isolated.manager.count(MemberAccount),1);
     await isolated.undoLastMigration(); // E 본인 이력 순서 인덱스(#140)
     assert.equal((await isolated.query("SELECT to_regclass('ix_analysis_request_member_id_submitted_at_request_id') AS name"))[0].name,null);
     assert.equal(await isolated.manager.count(MemberAccount),1);

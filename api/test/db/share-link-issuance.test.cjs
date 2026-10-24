@@ -64,9 +64,9 @@ test('마이그레이션의 share_link가 DB 물리 규약·ERD 제약과 회원
   assert.equal(def.pk_share_link, 'PRIMARY KEY (link_id)');
   assert.equal(def.uq_share_link_link_token_reference, 'UNIQUE (link_token_reference)');
   assert.equal(def.uq_share_link_link_id_owner_id, 'UNIQUE (link_id, owner_id)');
-  assert.equal(def.fk_share_link_owner_id, 'FOREIGN KEY (owner_id) REFERENCES member_account(member_id)');
+  assert.equal(def.fk_share_link_owner_id, 'FOREIGN KEY (owner_id) REFERENCES member_account(member_id) ON DELETE CASCADE');
   assert.equal(def.fk_idempotency_record_link_id_member_id,
-    'FOREIGN KEY (link_id, member_id) REFERENCES share_link(link_id, owner_id)');
+    'FOREIGN KEY (link_id, member_id) REFERENCES share_link(link_id, owner_id) ON DELETE CASCADE');
   const checks = constraints.filter(({ conname }) => conname.startsWith('ck_share_link_')).map(({ def: d }) => d);
   assert.ok(checks.some((d) => d.includes('char_length(title) >= 1')));
   assert.ok(checks.some((d) => d.includes("expires_at = (issued_at + '720:00:00'::interval)")));

@@ -42,6 +42,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/database/data-source.ts`           | 마이그레이션 명령과 테스트 실행기가 쓰는 DataSource |
 | `src/database/snake-naming.strategy.ts` | 테이블·칼럼 snake_case, 제약·인덱스의 결정적 이름 |
 | `src/database/checks.ts`                | `@Check()`용 식: enum 허용 값, 문자열 길이 |
+| `src/database/foreign-keys.ts`          | 외래 키 삭제 규칙. 회원 자료는 부모를 따라 지운다([탈퇴 연쇄 삭제](docs/member-withdrawal-deletion.md)) |
 | `src/database/migrations/`              | 모든 마이그레이션의 한 위치 |
 | `scripts/test-with-db.cjs`              | `npm test` 실행기: 테스트 DB 확인·마이그레이션 적용·테스트 실행(두 줄, README 「DB 테스트」) |
 | `scripts/clean-dist.cjs`                | `npm run build`의 첫 단계: 이전 빌드 결과 `dist/` 삭제 |
@@ -87,7 +88,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | 테이블 | 엔티티 클래스 이름의 단수 snake_case(`MemberAccount` → `member_account`). 약어가 있으면 이름을 적는다: `@Entity('github_connection')`(자동 변환은 `git_hub_connection`) |
 | 칼럼 | 속성 이름의 snake_case(`sourceRequestId` → `source_request_id`). 칼럼 이름은 따로 쓰지 않는다 |
 | 내부 ID(ERD `id`) | `uuid`. `@PrimaryColumn({ type: 'uuid' })`로 두고 저장 전에 앱이 `randomUUID()`(`node:crypto`)로 채운다. DB 생성값(`@PrimaryGeneratedColumn`)은 쓰지 않는다. 요청·동의·첫 시도처럼 서로 참조하는 행을 한 트랜잭션에서 미리 연결해야 하기 때문이다 |
-| 참조 | 참조 대상과 같은 `uuid` 칼럼 속성을 두고, 관계에는 `@JoinColumn({ name: '<그 칼럼>' })`을 붙인다. ERD가 삭제·cascade를 정하지 않았으므로 `onDelete`는 두지 않는다 |
+| 참조 | 참조 대상과 같은 `uuid` 칼럼 속성을 두고, 관계에는 `@JoinColumn({ name: '<그 칼럼>' })`을 붙인다. 회원이나 회원 자료를 참조하면 `deleteWithParent`(`ON DELETE CASCADE`)를 붙인다. 회원 탈퇴는 회원 행 하나를 지워 그 자료를 함께 지운다([탈퇴 연쇄 삭제](docs/member-withdrawal-deletion.md)) |
 | 외부 ID(ERD `external-id`·`external-work-key`) | `text`. 서비스 DB의 FK를 걸지 않는다 |
 | 문자열 길이 | ERD에 길이 제한이 있으면 `text` + `@Check(lengthBetween('<칼럼>', 최소, 최대))`. 예: 멱등 key 1~128 |
 | 시각 | 모든 시각 칼럼에 `type: 'timestamptz'`를 적는다. `@CreateDateColumn`·`@UpdateDateColumn`도 `{ type: 'timestamptz' }`를 적는다(생략하면 시간대 없는 `timestamp`). 앱은 `Date`로 다루며, DB 세션 시간대는 UTC다 |
@@ -96,7 +97,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | 복합 유일성 | `@Unique(['ownerId', 'workIdentity'])`(속성 이름) |
 | 부분 유일성 | `@Index(['memberId'], { unique: true, where: `"status" = 'ACTIVE'` })`. `where` 안의 칼럼은 큰따옴표로 감싼 DB 이름으로 쓴다 |
 | 시간에 따라 달라지는 유일성 | 정적 unique로 풀지 않는다(예: ShareLink의 유효 기간 안 제목 유일·개수 제한). 같은 회원 단위로 직렬화한 트랜잭션 안에서 판정하며, 방법은 해당 기능 이슈에서 정한다 |
-| 순환 FK | 요청·동의·첫 시도처럼 서로 참조하면 FK를 `DEFERRABLE INITIALLY DEFERRED`로 두어 커밋 때 검사한다. 적용은 [#104](https://github.com/JminAILab/CatchU/issues/104)에서 한다 |
+| 순환 FK | 요청·동의·첫 시도처럼 서로 참조하면 FK를 `DEFERRABLE INITIALLY DEFERRED`로 두어 커밋 때 검사한다. 적용은 [#104](https://github.com/JminAILab/CatchU/issues/104)에서 한다. 같은 회원 자료끼리의 순환은 연쇄 삭제가 없어도 탈퇴 때 함께 지워진다 |
 | ID 형식 확인 | 경로·메시지로 받은 ID가 uuid 형식이 아니면 조회 전에 걸러 명세의 응답(없는 자원과 같은 404 등)으로 돌려준다. 그대로 조회하면 PostgreSQL 오류(`22P02`)가 서버 오류(500)가 된다 |
 
 ```typescript
