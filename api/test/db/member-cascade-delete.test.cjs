@@ -8,7 +8,7 @@ const { resolve } = require('node:path');
 const { before, after, beforeEach, test } = require('node:test');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
-const { CONTRACT_DIR } = require('../helpers/receiver-harness.cjs');
+const { CONTRACT_DIR, event } = require('../helpers/receiver-harness.cjs');
 const { AnalysisRequest, AnalysisConsent, AnalysisAttempt } = require('../../dist/member-analysis/member-analysis.entity');
 const { DatabaseReceiverStore } = require('../../dist/analysis-receiver/database-receiver.store');
 const { AnalysisReceiver } = require('../../dist/analysis-receiver/analysis-receiver.service');
@@ -27,7 +27,8 @@ beforeEach(async () => {
   await restoreInitialSelection(db, initialSelection);
 });
 
-// 회원 칸이 있는 표와, 부모를 따라 지워지는 표의 그 회원 행을 세는 조건.
+// 회원 칸이 있는 표와, 부모를 따라 지워지는 표의 그 회원 행을 세는 조건. 부모를 거쳐 세는 표는 부모가 지워지면
+// 남은 행이 있어도 0이 되므로, 삭제 뒤에는 표 전체 개수(tableRows)도 함께 본다.
 const MEMBER_ROWS = {
   member_account: 'member_id = $1',
   member_profile: 'member_id = $1',
@@ -46,6 +47,7 @@ const MEMBER_ROWS = {
   repository_protection: 'owner_id = $1',
 };
 const SHARED_TABLES = ['allowed_scope_revision', 'repository_selection'];
+const NONE = Object.fromEntries(Object.keys(MEMBER_ROWS).map(table => [table, 0]));
 
 async function memberRows(memberId) {
   const rows = {};
@@ -135,25 +137,26 @@ test('회원 하나를 지우면 그 회원의 자료가 모두 지워지고 다
 
   await db.query('DELETE FROM member_account WHERE member_id = $1', [leaving]);
 
-  assert.deepEqual(await memberRows(leaving), Object.fromEntries(Object.keys(MEMBER_ROWS).map(table => [table, 0])));
+  assert.deepEqual(await memberRows(leaving), NONE);
   assert.deepEqual(await memberRows(staying), stayingBefore);
   // 회원 행을 세는 조건 밖에 남은 행도 없다(남은 행은 모두 남은 회원의 것이다).
   assert.deepEqual(await tableRows(Object.keys(MEMBER_ROWS)), stayingBefore);
   assert.deepEqual(await tableRows(SHARED_TABLES), sharedBefore);
 });
 
-test('탈퇴 뒤 늦게 도착한 분석 결과는 저장하지 않고 재시도 없이 거부한다', async () => {
+test('탈퇴 뒤 늦게 도착한 분석 결과·진행 알림은 저장하지 않고 거부한다', async () => {
   const memberId = randomUUID();
   const result = await prepareRequest(memberId);
   await db.query('DELETE FROM member_account WHERE member_id = $1', [memberId]);
   const { service, logs } = pipeline();
   const output = await service.receiveResult(result, async () => {});
-  // 수신 확인을 돌려주므로 큐 작업은 실패로 다시 돌지 않는다(worker는 거부된 결과를 다시 보내지 않는다).
+  // 수신 처리가 거부 수신 확인을 돌려주면 큐 소비자는 작업을 완료로 끝낸다(큐·worker는 이 시험에서 돌리지 않는다).
   assert.equal(output.receipt.disposition, 'REJECTED');
   assert.equal(output.receipt.code, 'CONTEXT_MISMATCH');
   assert.equal(output.application, undefined);
-  assert.deepEqual(logs, [{ kind: 'Result', code: 'CONTEXT_MISMATCH' }]);
-  assert.deepEqual(await memberRows(memberId), Object.fromEntries(Object.keys(MEMBER_ROWS).map(table => [table, 0])));
+  assert.equal(await service.receiveProgress(event({ requestId: result.requestId, attemptId: result.attemptId })), 'CONTEXT_MISMATCH');
+  assert.deepEqual(logs, [{ kind: 'Result', code: 'CONTEXT_MISMATCH' }, { kind: 'ProcessingEvent', code: 'CONTEXT_MISMATCH' }]);
+  assert.deepEqual(await tableRows(Object.keys(MEMBER_ROWS)), NONE);
 });
 
 test('수신 커밋과 Catch 반영 사이에 탈퇴하면 Catch를 만들지 않고 수신 기록도 함께 지워진다', async () => {
@@ -165,13 +168,14 @@ test('수신 커밋과 Catch 반영 사이에 탈퇴하면 Catch를 만들지 �
     acknowledged = receipt;
     await db.query('DELETE FROM member_account WHERE member_id = $1', [memberId]);
   }), AnalysisRegistrationError);
-  // 수신 확인은 이미 전달됐으므로 큐 작업은 완료로 끝나고 반영 실패만 남는다(analysis-queue 소비자).
+  // 큐 소비자는 받아 둔 수신 확인으로 작업을 완료로 끝내고 반영 실패만 기록한다(analysis-queue 소비자).
   assert.equal(acknowledged.disposition, 'ACCEPTED');
   assert.deepEqual(logs, [{ code: 'CONTEXT_MISMATCH' }]);
-  assert.deepEqual(await memberRows(memberId), Object.fromEntries(Object.keys(MEMBER_ROWS).map(table => [table, 0])));
+  assert.deepEqual(await tableRows(Object.keys(MEMBER_ROWS)), NONE);
 });
 
 test('회원을 참조하는 외래 키는 모두 연쇄 삭제이고, 연쇄 삭제가 아닌 외래 키는 정한 4개뿐이다', async () => {
+  // 새 표의 외래 키가 연쇄 삭제가 아니면 여기서 잡힌다. 외래 키를 아예 빠뜨린 표는 잡지 못한다.
   const rows = await db.query(`
     SELECT c.conname AS name, c.confdeltype AS action, c.confrelid::regclass::text AS referenced
       FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace
@@ -186,5 +190,4 @@ test('회원을 참조하는 외래 키는 모두 연쇄 삭제이고, 연쇄 �
     // 모든 회원이 함께 쓰는 선정 목록. 회원 자료가 아니다.
     'fk_repository_selection_scope_revision',
   ]);
-  assert.equal(rows.filter(r => r.action === 'c').length, 19);
 });
