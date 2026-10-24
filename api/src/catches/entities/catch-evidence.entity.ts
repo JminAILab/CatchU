@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Check, Column, Entity, JoinColumn, ManyToOne, PrimaryColumn, Unique } from 'typeorm';
+import { deleteWithParent } from '../../database/foreign-keys';
 import { CatchAssetEntity } from './catch-asset.entity';
 
 @Entity('catch_evidence')
@@ -18,7 +19,7 @@ export class CatchEvidenceEntity {
   @Column({ name: 'catch_id', type: 'uuid' })
   catchId!: string;
 
-  @ManyToOne(() => CatchAssetEntity, { nullable: false })
+  @ManyToOne(() => CatchAssetEntity, { nullable: false, ...deleteWithParent })
   @JoinColumn({ name: 'catch_id', referencedColumnName: 'catchId' })
   catchAsset!: CatchAssetEntity;
 

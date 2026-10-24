@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Check, Column, Entity, ForeignKey, Index, PrimaryColumn, Unique } from 'typeorm';
+import { deleteWithParent } from '../database/foreign-keys';
 import { MemberAccount } from '../member-analysis/member-analysis.entity';
 
 @Entity()
-@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'])
+@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'], deleteWithParent)
 @Index(['memberId'])
 @Check('"expires_at" > "created_at"')
 @Check('"last_refreshed_at" >= "created_at" AND "last_refreshed_at" < "expires_at"')
@@ -17,7 +18,7 @@ export class AuthSession {
 }
 
 @Entity()
-@ForeignKey(() => AuthSession, ['sessionId'], ['sessionId'])
+@ForeignKey(() => AuthSession, ['sessionId'], ['sessionId'], deleteWithParent)
 @Unique(['tokenHash'])
 @Index(['sessionId'], { unique: true, where: '"used_at" IS NULL' })
 @Check('"token_hash" ~ \'^[a-f0-9]{64}$\'')

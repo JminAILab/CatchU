@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Check, Column, Entity, ForeignKey, Index, PrimaryColumn, Unique } from 'typeorm';
 import { lengthBetween } from '../database/checks';
+import { deleteWithParent } from '../database/foreign-keys';
 import { MemberAccount } from '../member-analysis/member-analysis.entity';
 
 /** 발급 시각부터 정확히 30×24시간(ERD ShareLink). */
@@ -17,7 +18,7 @@ export const SHARE_LINK_TTL_HOURS = 720;
  *   같음을 DB에서도 보장하기 위한 것이다(IdempotencyRecord의 외래 키).
  */
 @Entity('share_link')
-@ForeignKey(() => MemberAccount, ['ownerId'], ['memberId'])
+@ForeignKey(() => MemberAccount, ['ownerId'], ['memberId'], deleteWithParent)
 @Unique(['linkId', 'ownerId'])
 @Check(lengthBetween('title', 1))
 @Check(`"expires_at" = "issued_at" + interval '${SHARE_LINK_TTL_HOURS} hours'`)

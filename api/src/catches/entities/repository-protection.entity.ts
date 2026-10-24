@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { Check, Column, Entity, ForeignKey, PrimaryColumn, Unique } from 'typeorm';
+import { deleteWithParent } from '../../database/foreign-keys';
 import { MemberAccount } from '../../member-analysis/member-analysis.entity';
 
 @Entity('repository_protection')
 @Unique('uq_repository_protection_owner_repository', ['ownerId', 'repositoryId'])
-@ForeignKey(() => MemberAccount, ['ownerId'], ['memberId'], { name: 'fk_repository_protection_owner_id' })
+@ForeignKey(() => MemberAccount, ['ownerId'], ['memberId'], { name: 'fk_repository_protection_owner_id', ...deleteWithParent })
 @Check('ck_repository_protection_repository_id', 'char_length("repository_id") >= 1')
 @Check('ck_repository_protection_restriction', '"applied_restriction" IN (\'NONE\', \'SOURCE_PRIVATE\')')
 export class RepositoryProtectionEntity {
