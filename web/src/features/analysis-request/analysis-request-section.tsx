@@ -5,7 +5,7 @@ import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { routes } from "@/lib/routes";
 import type { AnalyzableRepository } from "../repository-management/repository-api";
 import { repositoryDisplayName } from "../repository-management/repository-status";
-import type { AnalysisRequestStore, Load, RequestSnapshot } from "./analysis-request-store";
+import type { AnalysisRequestStore, Load, RequestSnapshot, RetryTarget } from "./analysis-request-store";
 import styles from "./analysis-request.module.css";
 
 /**
@@ -26,7 +26,7 @@ export type ConnectionNotice = "DISCONNECTED" | "REAUTH_REQUIRED" | "CHECKING";
 export function AnalysisRequestSection({ store, connectionNotice }: { store: AnalysisRequestStore; connectionNotice?: ConnectionNotice }) {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const baseId = useId();
-  const { repositories, notice, selectedId, phase, retryAt, pendingRepositoryId, message } = snapshot;
+  const { repositories, notice, selectedId, phase, retryAt, pendingRepositoryId, pendingRetry, message } = snapshot;
   const [, setTick] = useState(0);
   const waitSeconds = retryAt === null ? 0 : store.retryWaitSeconds();
   const limitedWaiting = waitSeconds > 0;
@@ -69,7 +69,7 @@ export function AnalysisRequestSection({ store, connectionNotice }: { store: Ana
 
       {pendingName && (
         <p className={styles.pending}>
-          {phase === "submitting" ? "요청 중인 저장소: " : phase === "limited" ? "다시 보낼 요청: " : "결과를 확인할 요청: "}<strong>{pendingName}</strong>
+          {pendingLabel(phase, pendingRetry)}<strong>{pendingName}</strong>
         </p>
       )}
 
@@ -99,6 +99,66 @@ export function AnalysisRequestSection({ store, connectionNotice }: { store: Ana
             같은 요청 다시 보내기
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** 붙잡은 요청의 표시 이름 앞 문구. 실패 재요청이면 그렇다고 밝힌다. */
+function pendingLabel(phase: RequestSnapshot["phase"], retry: boolean): string {
+  if (phase === "submitting") return retry ? "다시 요청 중인 저장소: " : "요청 중인 저장소: ";
+  if (phase === "limited") return retry ? "다시 보낼 재요청: " : "다시 보낼 요청: ";
+  return retry ? "결과를 확인할 재요청: " : "결과를 확인할 요청: ";
+}
+
+/**
+ * 「연결된 저장소」 아코디언 안의 실패 재요청(#154). 서버 이력의 retry.allowed가 참인 저장소별 최신 요청에만 그린다.
+ * 현재 고지와 [동의하고 다시 요청] 하나로 새 동의·새 요청을 보낸다(과거 동의 재사용 없음, retryOfRequestId 포함).
+ * 요청 중·응답 불명·빈도 제한의 표시와 [같은 요청 다시 보내기], 결과 안내는 모달 아래쪽 요청 영역 한 곳에서 보인다.
+ * 「연결된 저장소」 조회가 실패해도 그 영역은 남아 있어 붙잡은 요청을 확인할 수 있다.
+ */
+export function RetryRequest({ store, target, connectionNotice }: {
+  store: AnalysisRequestStore;
+  target: RetryTarget;
+  connectionNotice?: ConnectionNotice;
+}) {
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const baseId = useId();
+  if (!target.retryAllowed) return null;
+  const { repositories, notice, phase, pendingRepositoryId, pendingRetry } = snapshot;
+  if (phase !== "editing") {
+    const mine = pendingRetry && pendingRepositoryId === target.repositoryId;
+    return (
+      <p className={styles.muted} role="status">
+        {mine
+          ? "이 저장소의 다시 요청을 보냈습니다. 결과는 아래 「연결할 수 있는 저장소」의 요청 안내에서 확인합니다."
+          : "보낸 분석 요청의 결과를 확인한 뒤 다시 요청할 수 있습니다. 결과는 아래 「연결할 수 있는 저장소」에서 확인합니다."}
+      </p>
+    );
+  }
+  if (connectionNotice) {
+    return <p className={styles.muted}>GitHub 연동을 확인한 뒤 다시 요청할 수 있습니다.</p>;
+  }
+  const listed = repositories.state === "ready" && repositories.value.some((item) => item.repositoryId === target.repositoryId);
+  return (
+    <div className={styles.retry}>
+      <section className={styles.notice} aria-labelledby={`${baseId}-notice`}>
+        <h4 id={`${baseId}-notice`}>다시 요청할 때의 분석 안내</h4>
+        <NoticeBody notice={notice} labelledBy={`${baseId}-notice`} onRetry={() => { void store.loadNotice(); }} />
+      </section>
+      {repositories.state === "ready" && !listed && (
+        <p className={styles.muted}>이 저장소는 지금 분석할 수 있는 저장소 목록에 없어 다시 요청할 수 없습니다.</p>
+      )}
+      {repositories.state !== "ready" && (
+        <p className={styles.muted}>분석할 수 있는 저장소 목록을 확인해야 다시 요청할 수 있습니다. 아래 「연결할 수 있는 저장소」에서 목록을 확인해 주세요.</p>
+      )}
+      <p className={styles.muted}>
+        [동의하고 다시 요청]을 누르면 위 안내에 새로 동의하고 이 저장소의 분석을 다시 요청합니다. 이전 요청의 동의는 다시 쓰지 않습니다.
+      </p>
+      <div className={styles.actions}>
+        <button type="button" className={styles.primaryButton} disabled={!store.canRetry(target)} onClick={() => { void store.retry(target); }}>
+          동의하고 다시 요청
+        </button>
       </div>
     </div>
   );
