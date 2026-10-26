@@ -22,6 +22,7 @@ dependencies = [
 dev = [
     "mypy==2.3.1",
     "pytest==9.1.1",
+    "pytest-cov==7.1.0",
     "ruff==0.16.8",
     "types-jsonschema==4.26.0.20260518",
     "types-pyyaml==6.0.12.20260906",
@@ -49,3 +50,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+# 커버리지(README 「변경 후 검사」의 pytest --cov). 시험이 불러오지 않은 app/ 파일도 0%로 표에 넣고,
+# 큐 소비자 시험이 띄우는 자식 프로세스의 실행도 함께 잰다(patch).
+[tool.coverage.run]
+source = ["app"]
+patch = ["subprocess"]
