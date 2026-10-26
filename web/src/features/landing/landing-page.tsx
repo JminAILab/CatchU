@@ -21,7 +21,7 @@ export function LandingPage() {
             Catch는 GitHub의 작업 기록을 작업 단위로 묶고, 기록으로 확인한 내용과 근거를 함께 보여 주는 카드입니다.
           </p>
           <p className={styles.lead}>
-            선정된 공개 저장소를 분석해 경험 후보와 근거, 생각해볼 질문과 설명 초안을 Catch로 정리합니다.
+            선정된 공개 저장소를 분석해 경험 후보와 근거, 생각해 볼 질문과 설명 초안을 Catch로 정리합니다.
           </p>
           <StartAction />
         </div>
@@ -58,7 +58,7 @@ const STEPS = [
   },
   {
     title: "Catch와 근거 확인",
-    text: "작업 기록을 묶은 Catch에서 기록으로 확인한 내용과 근거를 봅니다. 내 작업과 다르면 불일치로 표시할 수 있습니다.",
+    text: "작업 기록을 묶은 Catch에서 확인된 사실과 근거를 봅니다. 설명이 기록과 맞지 않으면 불일치로 표시할 수 있습니다.",
   },
   {
     title: "공개 선택",
@@ -66,7 +66,7 @@ const STEPS = [
   },
   {
     title: "링크로 공유",
-    text: "공유 링크를 발급해 공개한 Catch를 보여 줍니다. 다시 숨긴 Catch는 이미 보낸 링크에서도 보이지 않습니다.",
+    text: "공유 링크를 발행해 공개한 Catch를 보여 줍니다. 다시 숨긴 Catch는 이미 보낸 링크에서도 보이지 않습니다.",
   },
 ] as const;
 
@@ -81,7 +81,10 @@ function StartAction() {
   );
 }
 
-/** 설명용 가상 Catch. 실제 Catch 상세의 최종 배치를 정하는 안이 아니다(초안 §5.2). */
+/**
+ * 설명용 가상 Catch. 실제 Catch 상세의 최종 배치를 정하는 안이 아니다(초안 §5.2).
+ * 항목 이름은 가입 뒤 실제 상세(내 자산)에서 알아보도록 그 화면과 맞추고, 질문은 실제 상세처럼 본인만 확인하는 항목임을 표시한다.
+ */
 function ExampleCatch() {
   return (
     <section className={styles.example} aria-labelledby="landing-example-title">
@@ -93,19 +96,19 @@ function ExampleCatch() {
       <h2 id="landing-example-title" className={styles.exampleTitle}>중복 요청을 줄인 경험</h2>
       <dl className={styles.exampleFields}>
         <div className={styles.exampleField}>
-          <dt>기록으로 확인한 내용</dt>
+          <dt>작업에서 확인된 사실</dt>
           <dd>요청 처리 파일과 관련 테스트의 변경이 기록돼 있습니다.</dd>
         </div>
         <div className={styles.exampleField}>
-          <dt>설명 초안</dt>
-          <dd>요청 중 버튼을 잠가 반복 클릭을 줄였습니다.</dd>
+          <dt>Catch 설명 초안</dt>
+          <dd>요청 중에는 버튼을 잠그도록 바꿨습니다.</dd>
         </div>
         <div className={styles.exampleField}>
-          <dt>근거 예시</dt>
+          <dt>근거</dt>
           <dd>버튼 처리 변경 커밋 · 관련 테스트 변경</dd>
         </div>
         <div className={styles.exampleField}>
-          <dt>생각해볼 질문</dt>
+          <dt>생각해 볼 질문 <span className={styles.ownerOnly}>본인만 확인</span></dt>
           <dd>서버에서도 중복 요청을 막았나요?</dd>
         </div>
       </dl>

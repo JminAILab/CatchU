@@ -153,6 +153,12 @@
   font-weight: 700;
 }
 
+/* 실제 상세처럼 질문이 공유되지 않고 본인만 보는 항목임을 표시한다. */
+.ownerOnly {
+  margin-left: 6px;
+  font-weight: 400;
+}
+
 .exampleField dd {
   margin: 0;
   overflow-wrap: anywhere;
