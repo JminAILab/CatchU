@@ -1,6 +1,6 @@
 name: "작업 등록"
-description: "10월 MVP 설계·구현·공통 준비 작업의 결과와 완료 기준을 정리합니다."
-labels: ["mvp-october"]
+description: "설계·구현·공통 준비 작업의 결과와 완료 기준을 정리합니다."
+labels: ["release-december"]
 body:
   - type: markdown
     attributes:
