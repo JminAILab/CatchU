@@ -30,7 +30,7 @@ web·api·worker 운영 이미지를 만들고, 한 호스트에서 API 한 프�
 | web·api 기반 | `node:24.21.0-trixie-slim`(Debian 13, npm 11.19.0 포함). Dockerfile에 digest로 고정 |
 | worker 기반 | `debian:trixie-slim` 위에 uv 0.12.18이 설치한 CPython 3.12.10. 공식 `python:3.12.10` 이미지는 2025-05 이후 다시 빌드되지 않아 그 뒤의 기반 OS 패키지 갱신(보안 갱신 포함)이 들어 있지 않으므로 쓰지 않는다(Python 판본은 그대로). 다만 이 Python에 묶여 들어온 OpenSSL(3.0.16)·SQLite 등은 Debian 갱신으로 바뀌지 않고 Python 패치 판본을 올릴 때만 바뀐다 |
 | 의존성 | 각 서비스 잠금 파일(`package-lock.json`, `uv.lock`) 그대로 설치 |
-| 로컬 합성 DB | `postgres:16`(CI 테스트 DB와 같은 주 판본). digest로 고정 |
+| 로컬 합성 DB | `pgvector/pgvector:0.8.7-pg16-trixie`(pgvector가 든 PostgreSQL 16, #389). CI 테스트 DB·EKS의 psql Pod 틀과 같은 이미지를 digest로 고정. `vector` 확장은 슈퍼유저만 만들 수 있어 처음 초기화 때 `local-db/init-roles.sh`가 만든다 |
 
 기반 이미지 digest를 바꿀 때는 같은 PR에서 이미지 검사를 다시 돌린다. 기반 이미지 갱신을 자동으로 알려 주는 설정(Dependabot docker)은 아직 없다.
 
@@ -76,7 +76,7 @@ docker build -f worker/Dockerfile --build-arg SOURCE_REVISION=$(git rev-parse HE
 
 ## 처음 실행(로컬 합성 환경)
 
-작성자 외 재현도 이 절차를 따른다. 필요한 것은 Docker Engine 25 이상, Docker Compose 2.24 이상, openssl, git이다. 포트 3000·3001·8000을 비워 두거나 `compose.env`에서 바꾼다. 합성 DB 이미지(`postgres:16`, digest 고정)는 없으면 `replace-single.sh`가 받는다.
+작성자 외 재현도 이 절차를 따른다. 필요한 것은 Docker Engine 25 이상, Docker Compose 2.24 이상, openssl, git이다. 포트 3000·3001·8000을 비워 두거나 `compose.env`에서 바꾼다. 합성 DB 이미지(pgvector가 든 PostgreSQL 16, digest 고정)는 없으면 `replace-single.sh`가 받는다.
 
 ```bash
 docker build -f web/Dockerfile --build-arg NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3001 -t catchu-web:local .

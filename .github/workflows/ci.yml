@@ -123,8 +123,9 @@ jobs:
           --health-timeout 5s
           --health-retries 10
       # api README 「DB 테스트」의 docker run과 같은 값이다. 테스트 실행기의 기본 TEST_DB_*와 맞으므로 따로 넘기지 않는다.
+      # 이미지는 pgvector가 든 PostgreSQL 16으로, 로컬 합성 DB(deploy/compose.local-db.yaml)와 같은 digest로 고정한다(#389).
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:0.8.7-pg16-trixie@sha256:40d828eda66737aaacb934387a337babf1455ebd56e9bdd13fc08e211257c972
         env:
           POSTGRES_USER: catchu
           POSTGRES_PASSWORD: catchu_local

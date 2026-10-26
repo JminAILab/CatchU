@@ -5,7 +5,8 @@
 # 합성 큐는 운영(TLS·비밀번호)과 달리 내부 망(queue)에서 평문으로만 열고, worker만 연결해 시험 모드로 띄운다.
 services:
   db:
-    image: postgres:16@sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d
+    # pgvector가 든 PostgreSQL 16(#389). CI 테스트 DB·EKS의 psql Pod 틀과 같은 이미지다.
+    image: pgvector/pgvector:0.8.7-pg16-trixie@sha256:40d828eda66737aaacb934387a337babf1455ebd56e9bdd13fc08e211257c972
     container_name: ${CATCHU_SINGLE_NAME:-catchu-single}-db
     env_file:
       - path: ${CATCHU_ENV_DIR:?저장소 밖 환경 폴더(CATCHU_ENV_DIR)가 필요합니다}/db.env
