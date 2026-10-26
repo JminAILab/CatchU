@@ -96,7 +96,7 @@ main   배포 브랜치
 | 이름·목적 | `intent/260925-intent-12`. 11월 개발의 Unit 제출을 모아 `dev`에 올리는 동안만 쓴다 |
 | 만들기 | 이 표와 [#389](https://github.com/JminAILab/CatchU/issues/389)의 CI 설정이 `dev`에 들어간 뒤 그 `dev`에서 팀장이 만든다(팀원 AI는 통합 브랜치에 든 지침을 읽는다) |
 | U1 | 첫 Unit U1(처음 이어 보기)은 맡기 없이 저장소 본체 폴더(새 clone)에서 통합 브랜치로 짓는다. linked worktree에서는 AI-DLC가 이 우회를 거부한다 |
-| Unit 브랜치·제출 | Unit을 맡으면 AI-DLC가 `claim/<intent 앞 8자>/<unit>` 브랜치를 만들고, 제출은 AI-DLC가 담당의 커밋을 그 브랜치에 올리는 것이다(PR 없음). 이 브랜치로 PR을 열거나 손으로 지우지 않는다 |
+| Unit 브랜치·제출 | Unit을 맡으면 AI-DLC가 `claim/aa0d9c26/<unit>` 브랜치를 만들고(`aa0d9c26`은 12월 intent ID의 끝 8자), 제출은 AI-DLC가 담당의 커밋을 그 브랜치에 올리는 것이다(PR 없음). 이 브랜치로 PR을 열거나 손으로 지우지 않는다 |
 | Unit 합치기 | 팀장이 AI-DLC 합치기 승인을 거쳐 Unit을 이 브랜치에 merge commit으로 합친다. 고정·합치기·놓기(`pin`·`land`·`release`)는 Unit을 맡지 않은 저장소 본체 폴더에서만 한다. AI-DLC는 합친 결과를 push하지 않으므로, 합친 뒤 팀장이 이 브랜치를 바로 push한다 |
 | 경계·계약 PR | 첫 주 경계 선합치(인터페이스·표·가짜 구현)와 계약 문서 수정(깨는 변경의 계약 수정 포함)은 Unit 제출과 따로 이 브랜치 대상 PR로 올린다. 가져다 쓰는 Unit 담당이 리뷰하고 팀장이 merge commit으로 합친다 |
 | `dev` 반영 | 이 브랜치 → `dev`는 PR·CI 통과·작성자 외 승인 1건·merge commit으로 올린다. 그 밖의 Unit 밖 작업은 지금처럼 `dev` 대상 PR로 한다 |
