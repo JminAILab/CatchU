@@ -19,7 +19,8 @@ test('api package.json의 큐 의존성은 키트와 같은 정확한 판본이�
     assert.equal(api.dependencies[name], kit.dependencies[name], name);
   }
   // typeorm 1.1.1이 선택 peer로 ioredis 5를 요구해 설치가 충돌하므로 같은 ioredis 하나를 쓰게 한다(api README 「초기화 기준과 도구」).
-  assert.deepEqual(api.overrides, { typeorm: { ioredis: '$ioredis' } });
+  // overrides의 다른 항목(고친 판본을 쓰게 한 multer 등)은 보지 않는다. 큐 의존성 판본이 달라지면 아래 잠금 파일·설치본 시험이 잡는다.
+  assert.deepEqual(api.overrides.typeorm, { ioredis: '$ioredis' });
 });
 
 test('api·키트 잠금 파일과 설치본이 같은 판본이고 ioredis는 하나뿐이다', () => {

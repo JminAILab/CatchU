@@ -42,7 +42,7 @@ Google 인증 코드 교환·회원 연결 API와 앱 등록·검사 절차는 [
 
 직접 의존성은 `package.json`, 전이 의존성을 포함한 설치본은 `package-lock.json`으로 고정한다. 전역 Nest CLI나 루트 workspace는 필요하지 않다. typeorm 1.1.1의 선택 peer(ioredis 5)가 ioredis 6과 충돌하므로 `overrides`로 typeorm도 같은 ioredis를 쓰게 했다(api는 TypeORM 캐시를 쓰지 않는다).
 
-초기 NestJS 11 의존성에서 보고된 multer 취약점을 해소하기 위해 NestJS 12로 갱신했다. 현재 잠금 파일의 multer는 `2.4.0`이다. ESLint도 10으로 갱신하고 기존 flat config를 유지했다. Node.js 24.21.0과 TypeScript 5.9.3·typescript-eslint 8.70.1의 호환 범위를 확인했으며 실제 검사·실행 결과는 아래에 기록한다. `--force`·`--legacy-peer-deps`는 사용하지 않았다.
+초기 NestJS 11 의존성에서 보고된 multer 취약점을 해소하기 위해 NestJS 12로 갱신했다. 그 뒤 multer `2.4.0`에도 취약점이 나왔으나 2026-10-26 기준 최신 platform-express(12.2.0)도 multer를 `2.4.0`으로 고정하므로, `overrides`로 고친 판본 `2.5.0`을 쓰게 했다(api는 파일 업로드를 쓰지 않는다). platform-express가 `2.5.0` 이상을 받게 되면 이 `overrides` 항목을 지운다. ESLint도 10으로 갱신하고 기존 flat config를 유지했다. Node.js 24.21.0과 TypeScript 5.9.3·typescript-eslint 8.70.1의 호환 범위를 확인했으며 실제 검사·실행 결과는 아래에 기록한다. `--force`·`--legacy-peer-deps`는 사용하지 않았다.
 
 호환성 참고: [NestJS 마이그레이션](https://docs.nestjs.com/migration-guide), [ESLint 10 마이그레이션](https://eslint.org/docs/latest/use/migrate-to-10.0.0), [typescript-eslint 의존성 범위](https://typescript-eslint.io/users/dependency-versions/). NestJS 12는 ESM 배포이지만, 이 프로젝트는 지정 Node.js의 ESM 로딩 지원으로 CommonJS 빌드·실행을 유지한다.
 
