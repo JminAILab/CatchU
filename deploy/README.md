@@ -109,6 +109,17 @@ docker compose --env-file ~/catchu-local-env/compose.env -f deploy/compose.singl
 - 로컬 구성에는 web과 api를 같은 출처로 묶는 앞단이 없다. production 모드 api는 교차 출처 호출을 받지 않으므로, 브라우저 화면에서 api를 부르는 흐름은 같은 출처 경로 분배가 있는 AWS 환경(#276·#277)에서 확인한다. 합성 공유 링크 주소·로그인 출처(`https://catchu-single.invalid`)로는 링크를 열거나 로그인 유지(갱신·로그아웃)를 확인할 수 없다.
 - 합성 DB는 TLS 연결만 받고(평문 거부), migration 계정이 스키마를 소유하며 앱 계정은 자료 읽기·쓰기만 한다([`local-db/init-roles.sh`](local-db/init-roles.sh)). 운영 DB의 계정·권한(동의 기록 직접 삭제 불가, 시간 상한 포함)은 #276에서 정한다. worker는 DB 망에 연결하지 않는다.
 
+수동 교체(작성자 외 재현은 위 정상 확인 뒤, `stop` 전에 한다). 표식만 다른 api 이미지로 바꾼다. 같은 이미지면 같은 컨테이너를 다시 띄울 뿐이라 판본이 바뀌는 것을 볼 수 없다.
+
+```bash
+docker build -f api/Dockerfile --build-arg SOURCE_REVISION=local-r2 -t catchu-api:local-r2 .
+sed -i.bak 's|^CATCHU_API_IMAGE=.*|CATCHU_API_IMAGE=catchu-api:local-r2|' ~/catchu-local-env/compose.env
+deploy/scripts/replace-single.sh --env-file ~/catchu-local-env/compose.env --local-db
+docker ps --filter label=com.docker.compose.project=catchu-single --format '{{.Names}} {{.Image}}'
+```
+
+- 기대: 종료 코드 0, 중지(web·api → worker) 뒤 시작(api → worker → web) 순서, 마지막 줄 「완료. 중지 시작부터 web 정상 확인까지 N초」. api·worker·web이 하나씩 떠 있고 api 이미지는 `catchu-api:local-r2`이며, 정상 확인 결과는 교체 전과 같다. 만든 이미지는 끝난 뒤 지운다.
+
 ## migration
 
 migration은 별도 이미지로 **한 번 실행하고 끝난다.** 앱은 기동할 때 스키마를 바꾸지 않고(`synchronize`·`migrationsRun` 꺼짐) migration을 기다리거나 대신 실행하지 않는다. 컨테이너 안에서는 같은 소스의 TypeORM 명령(`migration:run`, ts-node)을 쓴다.
