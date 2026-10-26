@@ -22,6 +22,8 @@ const CONTRACT = "/app/aidlc/spaces/default/intents/260914-catchu-october-mvp/in
 // 실행마다 다른 이름을 써서 다른 검사(다른 작업 폴더 포함)가 남긴 자원을 건드리지 않는다.
 const PROJECT = `catchu-check-${randomBytes(3).toString("hex")}`;
 const PORTS = { web: 23000, api: 23001, worker: 28000 };
+// web 첫 화면(서비스 소개)이 그려졌는지 보는 표식. web/scripts/smoke.mjs의 LANDING_MARKER와 함께 고친다.
+const WEB_LANDING_MARKER = 'id="landing-title"';
 // .dockerignore가 여는 경로(그 밖의 파일이 맥락에 있으면 실패). 둘을 함께 고친다.
 const CONTEXT_ALLOWED = [
   "web/package.json", "web/package-lock.json", "web/.npmrc", "web/next.config.ts", "web/tsconfig.json", "web/src/",
@@ -338,7 +340,7 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
     const res = await fetch(`http://127.0.0.1:${PORTS.web}/`);
     const html = await res.text();
     const csp = res.headers.get("content-security-policy") ?? "";
-    expect(res.status === 200 && html.includes("CatchU web"), `status=${res.status}`);
+    expect(res.status === 200 && html.includes(WEB_LANDING_MARKER), `status=${res.status}, 서비스 소개 제목(${WEB_LANDING_MARKER}) ${html.includes(WEB_LANDING_MARKER) ? "있음" : "없음"}`);
     expect(csp.includes(`connect-src 'self' ${apiBase}`) && csp.includes("frame-ancestors 'none'"), `CSP ${csp}`);
     expect(res.headers.get("x-content-type-options") === "nosniff" && res.headers.get("referrer-policy") === "strict-origin-when-cross-origin", "nosniff·Referrer-Policy");
     expect(res.headers.get("strict-transport-security") === "max-age=300" && !res.headers.has("x-powered-by"), "HSTS·X-Powered-By");

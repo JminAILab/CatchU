@@ -103,7 +103,7 @@ docker compose --env-file ~/catchu-local-env/compose.env -f deploy/compose.singl
 docker compose --env-file ~/catchu-local-env/compose.env -f deploy/compose.single.yaml -f deploy/compose.local-db.yaml --profile migration down -v
 ```
 
-- web `/`는 200과 `CatchU web` 화면, api `/health`는 200과 `{"status":"ok"}`, worker `/health`는 200과 `{"status":"ok","consumer":"running"}`(합성 큐에 붙어 기다리는 중)다. api health는 기동할 때 DB 접속에 성공했다는 데까지만 말하고, 큐·분석 연결 성공을 뜻하지 않는다. worker health도 분석 성공을 뜻하지 않는다.
+- web `/`는 200과 서비스 소개 화면(본문에 `id="landing-title"`), api `/health`는 200과 `{"status":"ok"}`, worker `/health`는 200과 `{"status":"ok","consumer":"running"}`(합성 큐에 붙어 기다리는 중)다. api health는 기동할 때 DB 접속에 성공했다는 데까지만 말하고, 큐·분석 연결 성공을 뜻하지 않는다. worker health도 분석 성공을 뜻하지 않는다.
 - 마지막 명령(`down -v`)은 이 구성의 컨테이너·망·합성 DB 볼륨만 지운다. 합성 환경 폴더는 직접 지운다.
 - 합성 CA·DB 서버 인증서는 만든 날부터 30일 뒤 만료된다. 만료되면 api가 DB에 접속하지 못해 교체가 종료 코드 6으로 멈춘다. 이어서 쓰려면 위 `down -v`, 환경 폴더 삭제, `make-local-env.sh`부터 다시 한다(합성 DB 자료도 새로 만든다).
 - 로컬 구성에는 web과 api를 같은 출처로 묶는 앞단이 없다. production 모드 api는 교차 출처 호출을 받지 않으므로, 브라우저 화면에서 api를 부르는 흐름은 같은 출처 경로 분배가 있는 AWS 환경(#276·#277)에서 확인한다. 합성 공유 링크 주소·로그인 출처(`https://catchu-single.invalid`)로는 링크를 열거나 로그인 유지(갱신·로그아웃)를 확인할 수 없다.

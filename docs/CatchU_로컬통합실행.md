@@ -107,10 +107,10 @@ npm ci
 npm run dev
 ```
 
-`Ready`가 나오면 브라우저에서 <http://localhost:3000>을 연다. 제목 "CatchU web"이 보이면 된다. 터미널에서 확인하려면:
+`Ready`가 나오면 브라우저에서 <http://localhost:3000>을 연다. 서비스 소개 화면(제목 "GitHub의 작업 기록을, 내 경험을 설명하는 근거로.")이 보이면 된다. 터미널에서 확인하려면:
 
 ```sh
-curl -s http://localhost:3000/ | grep -o 'CatchU web'
+curl -s http://localhost:3000/ | grep -o 'id="landing-title"'
 ```
 
 ### 5. web에서 로그인해 api 부르기
