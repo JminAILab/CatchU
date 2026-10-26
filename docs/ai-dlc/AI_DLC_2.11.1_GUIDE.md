@@ -72,7 +72,7 @@ Codex의 프로젝트·hook 신뢰는 각 사용자의 컴퓨터와 프로젝트
 
 Claude Code도 프로젝트의 [`.claude/settings.json`](../../.claude/settings.json)을 확인하고 도구가 요구하는 프로젝트 신뢰 절차를 따른다. `permissions.allow`에는 프로젝트 안의 파일 생성·편집을 허용하는 `Edit(/**)`, 하위 에이전트 호출 `Task`, 웹 검색 `WebSearch`, `Bash(aidlc engine *)`와 AI-DLC 진단·조회 명령이 추가된다. 이 설정의 선행 `/`는 프로젝트 루트를 가리키며, 프로젝트 밖 쓰기나 `aidlc update`·`use` 등 기계 설치 변경을 일괄 허용하지 않는다.
 
-또한 hooks가 세션 이벤트에 따라 실행된다. 2.11.1부터 AI-DLC 상태줄은 공유 설정에 넣지 않고 각자 고른다. `aidlc config`가 한 번 묻고, `/aidlc --statusline on|off`로 바꾸며, 선택은 개인 `.claude/settings.local.json`에 남는다. Codex의 상태줄은 공유 `.codex/config.toml`의 `status_line` 한 줄이라 바꾸면 모든 팀원에게 적용된다. hooks 설정은 `/aidlc`를 시작하지 않은 일반 Claude 대화에도 로드된다. 두 하네스는 같은 `aidlc/` 기록을 참조하므로 같은 intent를 서로 다른 세션에서 동시에 진행하지 않는다.
+또한 hooks가 세션 이벤트에 따라 실행된다. 2.11.1부터 AI-DLC 상태줄은 공유 설정에 넣지 않고 각자 고른다. `aidlc config`가 한 번 묻고, `/aidlc --statusline on|off`로 바꾸며, 선택은 개인 `.claude/settings.local.json`에 남는다. Codex의 상태줄은 공유 `.codex/config.toml`의 `status_line` 한 줄이라 바꾸면 모든 팀원에게 적용된다. hooks 설정은 `/aidlc`를 시작하지 않은 일반 Claude 대화에도 로드된다. 두 하네스는 같은 `aidlc/` 기록을 참조하므로 한 작업 폴더에서 같은 intent를 서로 다른 세션으로 동시에 진행하지 않는다. 팀 방식에서는 각자 자기 작업 폴더에서 맡은 Unit만 진행한다.
 
 Windows에서 Claude Code로 AI-DLC를 쓰려면 Git Bash를 설치하고, 개인 설정 `.claude/settings.local.json`의 `env`에 `"CLAUDE_CODE_USE_POWERSHELL_TOOL": "0"`을 넣는다. AI-DLC의 Claude hook은 셸 명령 중 Bash 도구에만 걸리는데, Windows의 Claude Code는 claude.ai 계정이면 [PowerShell 도구](https://code.claude.com/docs/en/tools-reference#powershell-tool)를 기본으로 써서 그 명령이 상태·승인 확인을 거치지 않기 때문이다.
 

@@ -1,6 +1,6 @@
 name: "버그 보고"
-description: "10월 MVP 버그의 재현 조건과 기대·실제 동작, 영향과 해결 확인 기준을 남깁니다."
-labels: ["mvp-october"]
+description: "버그의 재현 조건과 기대·실제 동작, 영향과 해결 확인 기준을 남깁니다."
+labels: ["release-december"]
 body:
   - type: markdown
     attributes:

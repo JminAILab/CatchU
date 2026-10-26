@@ -63,11 +63,11 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 
 - 엔티티: `src/<기능>/<이름>.entity.ts`. 이름이 `.entity.ts`로 끝나면 앱과 마이그레이션 명령이 자동으로 찾는다. 서비스에서 Repository를 주입받으려면 기능 모듈의 `imports`에 `TypeOrmModule.forFeature([엔티티])`를 넣는다.
 - 마이그레이션: `src/database/migrations/` 한 곳. 파일은 생성 명령으로 만든다.
-- 테이블은 ERD의 속성·필수 값·enum·유일성을 따른다. 관계·유일성이 ERD와 달라지면 계약 수정이다([코딩 운영](../docs/CatchU_작업관리.md#코딩-운영)).
+- 테이블은 승인된 ERD의 속성·필수 값·enum·유일성을 따른다(11월 Unit은 계약 설계의 공유 표와 그 Unit 기능 설계의 entities). 바꿀 때 계약 수정인지는 [코딩 운영](../docs/CatchU_coding_procedures.md#코딩-운영)의 계약 수정 규칙을 따른다.
 
 순서:
 
-1. `git fetch origin` 뒤 작업 브랜치를 `origin/dev` 기준으로 최신화한다([레포 컨벤션 §3](../docs/CatchU_레포_컨벤션.md)).
+1. `git fetch origin` 뒤 작업 브랜치를 합칠 대상 브랜치(보통 `origin/dev`, 11월 팀 방식은 통합 브랜치 `intent/260925-intent-12`) 기준으로 최신화한다([레포 컨벤션 §3](../docs/CatchU_레포_컨벤션.md)).
 2. `npm run migration:run`: 다른 사람이 병합한 마이그레이션까지 개발 DB에 적용한다. 빼먹으면 다음 단계가 남의 테이블까지 다시 만드는 마이그레이션을 생성한다.
 3. 엔티티를 추가하거나 고친다(「DB 물리 규약」).
 4. `npm run migration:generate -- src/database/migrations/<변경이름>`: 개발 DB와 엔티티의 차이로 `<시각>-<변경이름>.ts`가 생긴다. 예: `CreateMemberAccount`.
@@ -75,8 +75,8 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 6. `npm run migration:run`으로 적용하고, `npm run migration:revert`로 되돌린 뒤 다시 적용해 `down`도 확인한다.
 7. 엔티티와 마이그레이션을 같은 PR에 넣는다. `npm test`가 테스트 DB에 새 마이그레이션을 적용해 함께 검사한다.
 
-- **dev에 병합된 마이그레이션은 고치지 않는다.** 이미 적용한 DB에는 고친 파일이 다시 실행되지 않으므로, 바꿀 것은 새 마이그레이션으로 추가한다.
-- 두 PR이 각각 마이그레이션을 추가하면 나중에 병합되는 쪽이 rebase 뒤 2~6단계를 다시 한다. 실행 순서는 파일 이름의 시각이다.
+- **dev나 통합 브랜치에 합쳐진 마이그레이션은 고치지 않는다.** 이미 적용한 DB에는 고친 파일이 다시 실행되지 않으므로, 바꿀 것은 새 마이그레이션으로 추가한다.
+- 두 작업이 각각 마이그레이션을 추가하면 나중에 합쳐지는 쪽이 최신화 뒤 2~6단계를 다시 한다. 실행 순서는 파일 이름의 시각이다.
 - 다른 브랜치에서 적용한 마이그레이션이 개발 DB에 남아 있으면 4단계 결과에 그 테이블의 `DROP`이 섞인다. 그 브랜치에서 `migration:revert`로 되돌리거나 「로컬 DB 준비」의 볼륨 삭제 뒤 다시 적용한다.
 
 ## DB 물리 규약
@@ -213,7 +213,7 @@ throw new ApiError('CONSENT_REQUIRED');
 throw new ApiError('ANALYSIS_IN_PROGRESS', { details: { existingRequestId: requestId } });
 ```
 
-새 오류 코드는 계약 변경 이슈로 상태·의미·문구를 합의한 뒤 `error-codes.ts`의 상태/기본 문구, 이 표, 기능 테스트를 함께 추가한다. #250의 `403 AUTH_ORIGIN_FORBIDDEN`(갱신·로그아웃 요청의 출처 거부)은 2026-10-14 API 명세에 반영됐다. 상태·의미는 위 공통 오류·요청 안전성 표와 [M — 회원 API](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api)가 정본이고, 구현 동작은 [세션 안내](docs/auth-sessions.md)에 있다. 과거 승인 문서를 소급 수정하지 않는다. 기존 코드의 사용자 문구를 지정할 때도 내부 예외의 message를 그대로 전달하지 않는다.
+새 오류 코드가 계약 수정인지는 [코딩 운영](../docs/CatchU_coding_procedures.md#코딩-운영)의 계약 수정 규칙을 따르고, 정해지면 `error-codes.ts`의 상태/기본 문구, 이 표, 기능 테스트를 함께 추가한다. #250의 `403 AUTH_ORIGIN_FORBIDDEN`(갱신·로그아웃 요청의 출처 거부)은 2026-10-14 API 명세에 반영됐다. 상태·의미는 위 공통 오류·요청 안전성 표와 [M — 회원 API](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api)가 정본이고, 구현 동작은 [세션 안내](docs/auth-sessions.md)에 있다. 과거 승인 문서를 소급 수정하지 않는다. 기존 코드의 사용자 문구를 지정할 때도 내부 예외의 message를 그대로 전달하지 않는다.
 
 전역 ValidationPipe는 class-validator 데코레이터가 있는 DTO 클래스의 검증 실패·추가 필드를 `400 VALIDATION_FAILED`와 필드/규칙 이름으로 응답한다. `unknown`·인터페이스·직접 수동 검증은 DTO 검증 대상이 아니다.
 

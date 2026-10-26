@@ -4,7 +4,7 @@
 
 > 코드를 고치기 전에 [api 코딩 규약](CONVENTIONS.md), 이 문서, 맡은 기능의 `api/docs/<기능>.md`를 한 파일씩 따로 열어 읽는다(여러 파일을 한 번에 출력하면 가운데가 잘릴 수 있다). 기능별 안내는 이 README에 덧붙이지 않고 `api/docs/<기능>.md`로 쓴다.
 
-NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준을 확인한다.
+NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 10월 작업이면 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준, 11월 Unit이면 12월 intent 요구사항과 그 Unit 기능 설계를 확인한다.
 
 현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 독립 수신 로직과 필수 공급자를 받는 실제 DB/E·B 조립을 제공하며 `AppModule`에는 자동 등록하지 않는다. [#104 회원·분석 선행 테이블](https://github.com/JminAILab/CatchU/issues/104)과 개발 회원·합성 연동·공통 멱등 처리를 제공한다. 기능 API는 [#135 본인 회원 조회·프로필 저장](docs/member-profile.md)(`GET /v1/me`, `PUT /v1/me/profile`), [#147 공유 링크 발급](https://github.com/JminAILab/CatchU/issues/147)(`POST /v1/share-links`)과 [#148 목록·중단](https://github.com/JminAILab/CatchU/issues/148)(`GET /v1/share-links`, `PUT /v1/share-links/{linkId}/stop`)이 있다([docs/share-links.md](docs/share-links.md)). 본인 Catch 조회·확인·불일치 API는 [docs/catch-owner-read-preparation.md](docs/catch-owner-read-preparation.md), 공개·숨김은 [docs/catch-visibility.md](docs/catch-visibility.md)를 따른다. 세션 유지·갱신·로그아웃은 [세션 안내 — #250](docs/auth-sessions.md)를 따른다. 실제 로그인 화면·나머지 기능 API·worker 연결은 후속 작업이다.
 
@@ -18,7 +18,7 @@ Google 인증 코드 교환·회원 연결 API와 앱 등록·검사 절차는 [
 
 - [공통 작업관리](../docs/CatchU_작업관리.md)를 읽고 해당 이슈의 범위·완료 기준·관련 계약을 확인한다.
 - api 초기화 담당이 모든 API 기능·결함을 맡는 것은 아니다. 기능 담당자가 api와 web을 함께 수정할 수 있으며, 각 작업의 책임·연결 상대는 이슈에서 확인한다.
-- 착수·브랜치·기술·검사 기준은 [코딩 운영](../docs/CatchU_작업관리.md#코딩-운영)을 따른다. [아키텍처 검토초안 PR #70](https://github.com/JminAILab/CatchU/pull/70)은 설계 입력으로 참고한다.
+- 착수·브랜치·기술·검사 기준은 [코딩 운영](../docs/CatchU_coding_procedures.md#코딩-운영)을 따른다. [아키텍처 검토초안 PR #70](https://github.com/JminAILab/CatchU/pull/70)은 설계 입력으로 참고한다.
 
 ## 초기화 기준과 도구
 

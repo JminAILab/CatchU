@@ -21,8 +21,10 @@ merge target is that same branch — never `main` or `dev` directly. Bolt
 branches merge back with a merge commit (`--strategy merge`); the squash
 strategy is not used, and intermediate Bolt commits must survive on the
 intent branch. Protected branches receive the intent branch only through a
-pull request with a merge commit. Parent-branch refresh (`git rebase dev`)
-happens at Bolt boundaries, not while a Bolt is in flight.
+pull request with a merge commit. Parent-branch refresh: the team lead merges
+`dev` into the intent branch with a merge commit (once before members claim
+Units, then as needed); the shared intent branch is never rebased or
+force-pushed.
 
 Commits created by the framework follow the team prefix rule
 (`feat|fix|refactor|docs|chore:` + a one-line reason in Korean) wherever

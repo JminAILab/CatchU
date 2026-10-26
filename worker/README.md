@@ -4,7 +4,7 @@
 
 분석 요청을 큐에서 받아 처리하는 worker다. 운영 실행은 분석 요청 큐 소비자(`python -m app.consumer`, [분석 요청 큐 소비자](#분석-요청-큐-소비자))이며, 같은 포트로 상태 확인 `GET /health`만 연다. LIVE 요청은 내부 api에 요청 정보를 한 번 조회한 뒤 허용 GitHub 자료 수집([허용 GitHub 자료 수집과 근거 정규화](docs/github-collection.md)) → 후보 묶음·작업 동일성 판별([후보 묶음과 작업 동일성](docs/candidate-decision.md)) → 설명 초안·질문·제목 생성([설명 초안·생각해볼 질문·Catch 제목 생성](docs/generation.md))으로 처리하고, MOCK 요청은 개발·시험 설정에서만 가짜 생성기로 처리한다([요청 검사와 합성 결과 생성](#요청-검사와-합성-결과-생성)). FastAPI 앱(`app.main`)은 HTTP 경로가 `GET /health`뿐이며 HTTP `200`과 `{"status":"ok"}`를 반환한다. LIVE 처리는 합성 조회 API·합성 GitHub 응답·합성 생성 제공자로만 검사했다. 실제 api·GitHub·Claude API와 이은 확인과 AWS 배포는 후속 작업이다([#121](https://github.com/JminAILab/CatchU/issues/121) 실제 연결 확인). 운영 이미지와 한 호스트 실행은 [배포 안내](../deploy/README.md)에 있다. worker 관련 파일(worker 폴더, 계약 폴더, 루트 `.gitignore`, CI 파일)이 바뀐 PR에서는 「변경 후 검사」의 명령을 CI가 실행한다.
 
-작업 범위는 [#84](https://github.com/JminAILab/CatchU/issues/84), 공통 착수·브랜치·검사·PR 기준은 [코딩 운영](../docs/CatchU_작업관리.md#코딩-운영)을 따른다. worker 초기화 담당이 이후 분석 기능과 공통 환경까지 자동으로 맡는 것은 아니다.
+작업 범위는 [#84](https://github.com/JminAILab/CatchU/issues/84), 공통 착수·브랜치·검사·PR 기준은 [코딩 운영](../docs/CatchU_coding_procedures.md#코딩-운영)을 따른다. worker 초기화 담당이 이후 분석 기능과 공통 환경까지 자동으로 맡는 것은 아니다.
 
 ## 도구와 버전
 
