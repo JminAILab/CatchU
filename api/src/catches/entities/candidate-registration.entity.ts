@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { Check, Column, Entity, ForeignKey, JoinColumn, ManyToOne, PrimaryColumn, Unique } from 'typeorm';
+import { deleteWithParent } from '../../database/foreign-keys';
 import { CatchAssetEntity } from './catch-asset.entity';
 import { ResultApplicationRecord } from '../../result-application/result-application.entity';
 
 export type CandidateDisposition = 'CREATED' | 'EXISTING';
 
 @Entity('candidate_registration')
-@ForeignKey(() => ResultApplicationRecord, ['applicationRecordId'], ['applicationRecordId'])
+@ForeignKey(() => ResultApplicationRecord, ['applicationRecordId'], ['applicationRecordId'], deleteWithParent)
 @Unique(['applicationRecordId', 'candidateId'])
 @Check('char_length("candidate_id") >= 1')
 @Check('"disposition" IN (\'CREATED\', \'EXISTING\')')
@@ -23,7 +24,7 @@ export class CandidateRegistrationEntity {
   @Column({ name: 'catch_id', type: 'uuid' })
   catchId!: string;
 
-  @ManyToOne(() => CatchAssetEntity, { nullable: false })
+  @ManyToOne(() => CatchAssetEntity, { nullable: false, ...deleteWithParent })
   @JoinColumn({ name: 'catch_id', referencedColumnName: 'catchId' })
   catchAsset!: CatchAssetEntity;
 

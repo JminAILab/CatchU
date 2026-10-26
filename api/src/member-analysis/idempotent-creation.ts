@@ -36,6 +36,11 @@ function assertReference(record: CreationKey & CreationReference): void {
   }
 }
 
+/** 사용자가 보낸 Idempotency-Key가 1~128자인가. 아니면 생성 함수가 400 INVALID_REQUEST로 거부한다. */
+export function isIdempotencyKey(key: unknown): key is string {
+  return typeof key === 'string' && [...key].length >= 1 && [...key].length <= 128;
+}
+
 async function assertOwner(manager: EntityManager, record: CreationKey & CreationReference): Promise<void> {
   assertReference(record);
   // 이 고정 분기만 SQL에 쓰며 외부 입력을 식별자에 삽입하지 않는다.
@@ -54,9 +59,7 @@ export async function runIdempotentCreation<T>(
   manager: EntityManager, input: CreationKey, callbacks: CreationCallbacks<T>,
 ): Promise<{ replayed: boolean; response: T }> {
   await requireCreationTransaction(manager);
-  if (typeof input.key !== 'string' || [...input.key].length < 1 || [...input.key].length > 128) {
-    throw new ApiError('INVALID_REQUEST');
-  }
+  if (!isIdempotencyKey(input.key)) throw new ApiError('INVALID_REQUEST');
   // operation과 지문은 서버 내부 값이다. 원문을 오류 메시지에 포함하지 않는다.
   if (!['createAnalysisRequest', 'createShareLink'].includes(input.operation) ||
       typeof input.requestFingerprint !== 'string' || !/^[0-9a-f]{64}$/.test(input.requestFingerprint)) {

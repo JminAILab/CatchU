@@ -10,8 +10,8 @@
 - 커밋마다 동작이 갈리는 사례는 합성 git 저장소의 실제 커밋으로 만든다. 그래서 hunk의 줄 위치가 실제
   diff와 같다. 같은 이력을 PR·PR 없는 병합·커밋 묶음 세 단위로 각각 돌린다(PR 조회를 허용하지 않은
   요청이면 PR 없는 병합과 커밋 묶음이 단위가 된다).
-- 결과 조합의 제목 임시 대체값(작업 사실 첫 항목)은 이 파일의 대상이 아니다. 제목은 생성 출력의 후보
-  값(None 포함)으로 본다.
+- 결과 조합이 제목을 그대로(None이면 null로) 내보내는 것은 이 파일의 대상이 아니다. 제목은 생성
+  출력의 후보 값(None 포함)으로 본다.
 """
 
 import inspect
@@ -531,7 +531,7 @@ def test_code_name_title_kind_follows_the_target_file(
     [
         ("unverified", "GENERATION_UNVERIFIED"),
         ("none", "GENERATION_RULE_VIOLATION"),
-        ("too-many", "GENERATION_RULE_VIOLATION"),
+        ("malformed", "GENERATION_RULE_VIOLATION"),
     ],
 )
 def test_failed_description_keeps_a_verified_title(fragments: str, code: str) -> None:
@@ -546,7 +546,8 @@ def test_failed_description_keeps_a_verified_title(fragments: str, code: str) ->
             # 이름이 그 줄에 없다: 변경 내용과 대조해 확인하지 못한다.
             "unverified": [line_fragment(line, "sessionStore")],
             "none": [],
-            "too-many": [line_fragment(line, "loginRateLimit")] * 4,
+            # 이름 칸이 없는 조각뿐이다: 형식 위반으로 버려 남는 조각이 없다.
+            "malformed": [{"kind": "ADDED_LINE_WITH", "line": line.id}],
         }[fragments]
         return answer(
             fragments=chosen,

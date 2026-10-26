@@ -5,7 +5,7 @@
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
@@ -17,9 +17,10 @@ from app.processing.request_check import (
     CheckedRequest,
     Rejected,
     RejectReason,
+    UnverifiedRequest,
     check_request,
 )
-from app.processing.result import compose_result, rfc3339
+from app.processing.result import compose_result, compose_unresolved_result, rfc3339
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,34 @@ def process_request(
         checked.request_id,
         checked.attempt_id,
         result["outcome"],
+        result["sourceMode"],
+    )
+    return Finished(result)
+
+
+def finish_unresolved(
+    message: Mapping[str, Any],
+    *,
+    code: str,
+    text: str,
+    clock: Clock,
+    id_label: str,
+) -> Finished:
+    """요청 정보 조회가 모름·실패인 요청을 수집 없이, 진행 알림 없이 FAILED 결과 하나로 끝낸다(#121).
+
+    message는 스키마 v1과 조회 전 자체 검사를 통과한 값이다. 접수 기록과 대조하지 못했으므로
+    `CheckedRequest`를 만들지 않는다. 결과를 받아들일지는 맥락 값을 접수 기록과 대조하는 E가 정한다.
+    """
+    request = UnverifiedRequest.from_message(message)
+    result = compose_unresolved_result(
+        request, code=code, message=text, finished_at=clock(), id_label=id_label
+    )
+    _require_valid("Result", result)
+    # 메시지의 식별자는 대조하지 않은 값이라 로그에 싣지 않는다(큐 소비자 자식은 줄마다 작업 ID를 붙인다).
+    logger.info(
+        "종결 결과 생성(조회 모름·실패, 진행 알림 없음): outcome=%s code=%s sourceMode=%s",
+        result["outcome"],
+        code,
         result["sourceMode"],
     )
     return Finished(result)

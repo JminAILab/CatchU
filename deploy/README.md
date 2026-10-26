@@ -1,10 +1,10 @@
 # CatchU 배포 이미지와 단일 실행
 
-web·api·worker 운영 이미지를 만들고, 한 호스트에서 API 한 프로세스·worker 한 실행으로 띄우고 바꾸는 방법이다([#275](https://github.com/JminAILab/CatchU/issues/275)). AWS 실행 자원(EKS·DB·큐·공개 주소·비밀값 주입)은 [#276](https://github.com/JminAILab/CatchU/issues/276)에서 정하고, 실제 배포 결과는 [#277](https://github.com/JminAILab/CatchU/issues/277)에서 확인한다. 그 값이 필요한 EKS 실행 파일과 운영 web 이미지는 아직 만들지 않았다(「#276에서 받을 값」).
+web·api·worker 운영 이미지를 만들고, 한 호스트에서 API 한 프로세스·worker 한 실행으로 띄우고 바꾸는 방법이다([#275](https://github.com/JminAILab/CatchU/issues/275)). AWS 실행 자원(EKS·DB·큐·공개 주소·비밀값 주입)은 [#276](https://github.com/JminAILab/CatchU/issues/276)에서 정하고, 실제 배포 결과는 [#277](https://github.com/JminAILab/CatchU/issues/277)에서 확인한다. 그 값이 필요한 운영 web 이미지는 아직 만들지 않았다(「#276에서 받을 값」). EKS 실행 파일과 교체 스크립트는 [aws/k8s/README.md](aws/k8s/README.md)에 있다.
 
 명령은 모두 저장소 루트에서 실행한다. 서비스별 설치·개발 실행·검사는 각 서비스 README를 따른다.
 
-12월 전 개발 단계에는 이 한 호스트 실행을 AWS 서버 한 대에 올려 운영한다(앞단 Caddy 포함): [dev-server/README.md](dev-server/README.md).
+12월 전 개발 단계에는 이 한 호스트 실행을 AWS 서버 한 대에 올려 운영한다(앞단 Caddy 포함): [dev-server/README.md](dev-server/README.md). 11월부터 쓸 AWS 환경(EKS)의 설정·생성 명령·운영 순서는 [aws/README.md](aws/README.md)에 있다.
 
 ## 구성
 
@@ -65,7 +65,7 @@ docker build -f worker/Dockerfile --build-arg SOURCE_REVISION=$(git rev-parse HE
 | `compose.env` | 실행 묶음. 네 이미지, 환경 폴더, DB CA 파일, 포트. 비밀값 없음. `docker compose --env-file`로 읽는다 |
 | `api.env` | api 값. 인증·grant 키, DB 앱 계정, 공개 주소 등 |
 | `migration.env` | migration 전용 DB 계정 |
-| `worker.env` | worker 큐 설정. 큐 주소(비밀번호 포함, 운영은 `rediss://`)·접두사·동시 수 |
+| `worker.env` | worker 큐 설정. 큐 주소(비밀번호 포함, 운영은 `rediss://`)·접두사·동시 수, LIVE 처리의 요청 정보 조회 주소·키와 생성 키(운영 필수, 하나라도 없으면 worker가 기동하지 않는다) |
 | `db.env`, `tls/` | 로컬 합성 DB 전용(`make-local-env.sh`가 만든다) |
 
 - **운영 값의 기준**은 [api 환경변수](../api/docs/environment.md)와 같다. `AUTH_JWT_SECRET`·`LINK_GRANT_SECRET`은 64자리 hex로 서로 달라야 하고, 환경마다 한 번 만들어 고정한다. 재배포 때 새로 만들면 로그인과 비밀번호 링크 열람이 끊긴다. `AUTH_ACCESS_TOKEN_TTL_SECONDS=900`, `CORS_ALLOWED_ORIGINS`는 비운다(web·api 같은 출처). `AUTH_WEB_ORIGIN`에는 그 공개 https 출처를 끝 슬래시 없이 넣는다. 이 세 값 중 하나라도 어긋나면 api가 기동하지 않는다.
@@ -187,12 +187,13 @@ GitHub Actions의 `images` 워크플로가 같은 명령을 x86_64 러너에서 
 | 노드 CPU 아키텍처·OS, EKS 판본, cluster·namespace, 리소스 범위 | 최종 이미지 빌드 플랫폼, EKS 실행 파일 |
 | 레지스트리 경로·push/pull 권한 | 이미지 게시(#275는 게시하지 않는다) |
 | 실제 공개 https 출처, `/v1` 경로 보존 분배 | 운영 web 빌드, `SHARE_LINK_WEB_BASE_URL`·`AUTH_WEB_ORIGIN` |
-| 앞단 대상 유형·`X-Forwarded-For` 처리·유휴 시간, 유입 차단·노드 종료 확인 경로 | `TRUST_PROXY_CIDRS`, 연결 유지 시간(web `KEEP_ALIVE_TIMEOUT`은 ms. api에는 연결 유지 시간 설정이 없어 앞단 유휴 시간과 어긋나면 간헐 502가 날 수 있으므로 배포 전에 api 담당과 조율한다), 교체 절차 2·3단계 |
+| 앞단 대상 유형·`X-Forwarded-For` 처리·유휴 시간, 유입 차단·노드 종료 확인 경로 | `TRUST_PROXY_CIDRS`, 연결 유지 시간(web `KEEP_ALIVE_TIMEOUT`은 ms. api는 코드에 65초로 고정했다(#364). 둘 다 앞단 유휴 시간보다 길게 둔다. 짧으면 간헐 502가 날 수 있다), 교체 절차 2·3단계 |
 | worker→DB 차단과 나가는 연결 제한의 집행 수단(NetworkPolicy·보안 그룹·egress 규칙) | EKS 실행 파일, 운영 Compose 호스트의 망 구성. 공유 노드 보안 그룹이나 같은 호스트 IP만으로 분리됐다고 보지 않는다 |
 | DB 주소·판본, 앱·migration 계정과 비밀값 참조, CA 파일과 주입 방식 | `api.env`·`migration.env`·CA 파일 |
 | 큐 주소·비밀번호 참조(ElastiCache Valkey 8.1, TLS) | `worker.env`의 `CATCHU_QUEUE_REDIS_URL`(`rediss://`), api 실행 값(#233) |
+| worker의 요청 정보 조회 주소·키 참조, 생성 키(Claude API) 참조 | `worker.env`의 `WORKER_CONTEXT_API_URL`·`WORKER_CONTEXT_API_KEY`(api와 같은 값)·`CATCHU_GENERATION_API_KEY`, 클러스터 안 http면 `WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP=true` |
 | GitHub 연결의 자격정보 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)용 지속 volume·UID/GID·권한, 암호화 키·OAuth 값 참조, #232 내부 자격정보 경로·인증키 참조 | GitHub 연결 코드(PR #254)는 dev에 있고 기본은 꺼짐이다(`GITHUB_CONNECTION_ENABLED`, 값은 [api 환경변수](../api/docs/environment.md)). 켜려면 api에 쓰기 가능한 지속 volume을 더해야 한다(지금 구성은 읽기 전용 루트라 `/tmp` 말고 쓸 곳이 없고, `/tmp`는 재시작하면 지워진다). #232 내부 경로는 공개 `/v1/*` 분배에서 제외한다 |
 
-EKS 실행 파일을 쓸 때 지킬 조건: api·worker `replicas: 1`과 업데이트 방식 `Recreate`, 자동 확장(HPA) 없음, `runAsNonRoot`·`runAsUser: 1000`·`readOnlyRootFilesystem`과 `/tmp` 빈 볼륨, api·migration의 `PGSSLMODE=verify-full`·DB CA 파일 읽기 전용 mount·`NODE_EXTRA_CA_CERTS`, web의 `HOSTNAME=0.0.0.0` 명시, worker에서 DB로의 접근 차단, api·worker·DB·큐를 외부에 여는 Service 없음, worker health는 내부용(큐에 처음 붙기 전에는 503이므로 시작 확인 시간을 넉넉히 둔다), worker 종료 유예는 30초 이상(앱 안 종료 예산 25초), migration은 위 일회 Pod. `Recreate`는 업데이트 순서일 뿐 장애 때 대체 실행과의 중복을 막지 않는다. Google 로그인은 시작 경로의 앞단 보호를 #277에서 확인하기 전에는 켜지 않는다.
+EKS 실행 파일을 쓸 때 지킬 조건: api·worker `replicas: 1`과 업데이트 방식 `Recreate`, 자동 확장(HPA) 없음, `runAsNonRoot`·`runAsUser: 1000`·`readOnlyRootFilesystem`과 `/tmp` 빈 볼륨, api·migration의 `PGSSLMODE=verify-full`·DB CA 파일 읽기 전용 mount·`NODE_EXTRA_CA_CERTS`, web의 `HOSTNAME=0.0.0.0` 명시, worker에서 DB로의 접근 차단, api·worker·DB·큐를 외부에 여는 Service 없음, worker health는 내부용(큐에 처음 붙기 전에는 503이므로 시작 확인 시간을 넉넉히 둔다), worker 종료 유예는 30초 이상(앱 안 종료 예산 25초), migration은 위 일회 Pod. worker가 api를 클러스터 안 http로 부르면 10/15 결정의 조건(NetworkPolicy 기본 차단과 worker 나가는 연결 제한, 호스트 망 금지·권한 전부 제거·네임스페이스 Pod Security `restricted`)을 함께 둔다([요청 정보 조회 「설정」](../worker/docs/request-context.md#설정)). `Recreate`는 업데이트 순서일 뿐 장애 때 대체 실행과의 중복을 막지 않는다. Google 로그인은 시작 경로의 앞단 보호를 #277에서 확인하기 전에는 켜지 않는다.
 
 제공 판본이 나오면 실행 값·종료 방법을 다시 확인할 기능: 로그인 유지의 화면 연결(#251. api 쪽 #250은 `AUTH_WEB_ORIGIN`까지 반영), GitHub 연결 켜기와 내부 자격정보 조회(#231·#232), 결과 수신 공급(#105), api 쪽 큐 연결(#233)과 worker의 LIVE 처리(#121), 처리 시한 정리(#237).

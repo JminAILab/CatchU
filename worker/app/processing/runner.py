@@ -1,20 +1,40 @@
 """큐 소비자의 자식 프로세스가 부르는 요청 처리(#121).
 
-조회 전 자체 검사 → MOCK은 요청 정보 조회 없이 `process_request`와 가짜 생성기로 처리하고, LIVE는
-실제 조립(PR②) 전이라 처리 전에 거부한다. 메시지를 보내거나 저장하지 않으며, 진행 알림은 emit에
-넘기고 종결은 돌려준다. 큐·BullMQ를 불러오지 않는다.
+조회 전 자체 검사를 거친 뒤 두 갈래다.
+
+- MOCK: 개발·시험 설정에서만 요청 정보 조회 없이 `process_request`와 가짜 생성기로 처리한다.
+- LIVE: 요청 정보를 한 번 조회한다. 찾으면 그 접수 기록으로 `process_request`가 요청을 대조하고(다르면 거부)
+  실제 수집·후보·생성(`LiveGenerator`)을 부른다. 모름·실패면 수집 없이, 진행 알림 없이 FAILED 결과 하나로
+  끝낸다(10/15 팀장 결정 질문 1·3).
+
+메시지를 보내거나 저장하지 않으며, 진행 알림은 emit에 넘기고 종결은 돌려준다. 큐·BullMQ를 불러오지 않는다.
 """
 
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
 from app.contract import SchemaError, Verdict, check_message
 from app.processing.fake_generator import FakeGenerator
-from app.processing.pipeline import Clock, Emit, Finished, Uncertain, process_request
+from app.processing.live import LiveAssembly, LiveGenerator
+from app.processing.pipeline import (
+    Clock,
+    Emit,
+    Finished,
+    Uncertain,
+    finish_unresolved,
+    process_request,
+)
 from app.processing.request_check import AcceptedContext, Rejected
+from app.request_context import (
+    FAILURE_MESSAGES,
+    ContextFound,
+    ContextLookupFailed,
+    ContextUnknown,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +49,8 @@ class RefusalReason(StrEnum):
     CONTEXT_MISMATCH = "CONTEXT_MISMATCH"
     STALE_ATTEMPT = "STALE_ATTEMPT"
     MOCK_NOT_ACCEPTED = "MOCK_NOT_ACCEPTED"
-    LIVE_NOT_ASSEMBLED = "LIVE_NOT_ASSEMBLED"
+    # 개발·시험에서 LIVE 설정(요청 정보 조회·생성 키)을 넣지 않았다. 운영은 설정이 없으면 기동하지 않는다.
+    LIVE_NOT_CONFIGURED = "LIVE_NOT_CONFIGURED"
 
 
 @dataclass(frozen=True)
@@ -105,16 +126,72 @@ def _refuse(reason: RefusalReason, fields: tuple[str, ...]) -> Refused:
     return Refused(reason, fields)
 
 
+def _run_outcome(outcome: Rejected | Finished | Uncertain) -> RunOutcome:
+    if isinstance(outcome, Rejected):
+        places = outcome.fields or _schema_places(outcome.schema_errors)
+        return Refused(RefusalReason(outcome.reason.value), places)
+    return outcome
+
+
+def _unresolved(
+    message: Mapping[str, Any],
+    looked_up: ContextUnknown | ContextLookupFailed,
+    clock: Clock,
+) -> Finished:
+    # 이유·원인은 고정 코드만 남긴다. 응답 본문·토큰·원문은 남기지 않는다.
+    if isinstance(looked_up, ContextLookupFailed):
+        logger.warning("요청 정보 조회 실패: cause=%s", looked_up.cause)
+    else:
+        logger.warning("요청 정보 조회 모름: reason=%s", looked_up.reason)
+    reason = looked_up.reason
+    return finish_unresolved(
+        message,
+        code=reason.value,
+        text=FAILURE_MESSAGES[reason],
+        clock=clock,
+        id_label="live",
+    )
+
+
+def _run_live(
+    message: Mapping[str, Any],
+    live: LiveAssembly,
+    *,
+    picked_at: datetime,
+    emit: Emit,
+    clock: Clock,
+) -> RunOutcome:
+    looked_up = live.context_client.lookup(message["attemptId"])
+    if not isinstance(looked_up, ContextFound):
+        return _unresolved(message, looked_up, clock)
+    # 성공·거부·예외 어느 쪽이든 with가 끝나면 자격정보와 선택 범위를 놓는다.
+    with looked_up as found:
+        outcome = process_request(
+            message,
+            accepted=found.accepted,
+            generator=LiveGenerator(found, live, picked_at=picked_at, clock=clock),
+            emit=emit,
+            clock=clock,
+            id_label="live",
+        )
+    return _run_outcome(outcome)
+
+
 def run_request(
     message: object,
     *,
     job_id: str,
+    picked_at: datetime,
     mock_enabled: bool,
     mock_scenario: str,
+    live: LiveAssembly | None,
     emit: Emit,
     clock: Clock,
 ) -> RunOutcome:
-    """요청 하나를 처리한다. 예외(결함)는 결과로 바꾸지 않고 그대로 올린다."""
+    """요청 하나를 처리한다. 예외(결함)는 결과로 바꾸지 않고 그대로 올린다.
+
+    picked_at은 부모가 작업을 꺼낸 시각이다. LIVE의 수집 시계와 생성 마감이 여기서 시작한다.
+    """
     schema = check_message("Request", message)
     if schema.verdict is not Verdict.VALID or not isinstance(message, Mapping):
         return _refuse(RefusalReason.SCHEMA_INVALID, _schema_places(schema.errors))
@@ -122,8 +199,9 @@ def run_request(
     if mismatched:
         return _refuse(RefusalReason.SELF_CHECK_FAILED, mismatched)
     if message["sourceMode"] == "LIVE":
-        # 요청 정보 조회와 실제 수집·생성 조립은 PR②에서 연결한다.
-        return _refuse(RefusalReason.LIVE_NOT_ASSEMBLED, ("/sourceMode",))
+        if live is None:
+            return _refuse(RefusalReason.LIVE_NOT_CONFIGURED, ("/sourceMode",))
+        return _run_live(message, live, picked_at=picked_at, emit=emit, clock=clock)
     if not mock_enabled:
         return _refuse(RefusalReason.MOCK_NOT_ACCEPTED, ("/sourceMode",))
 
@@ -135,7 +213,4 @@ def run_request(
         clock=clock,
         id_label="mock",
     )
-    if isinstance(outcome, Rejected):
-        places = outcome.fields or _schema_places(outcome.schema_errors)
-        return Refused(RefusalReason(outcome.reason.value), places)
-    return outcome
+    return _run_outcome(outcome)

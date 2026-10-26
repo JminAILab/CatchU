@@ -124,3 +124,32 @@ test('큐 모듈은 큐 설정·보호 관측 공급자·계약 경로가 모두
   const assembled = AnalysisQueueModule.register(full);
   assert.equal(assembled.imports.filter(entry => entry.module === AnalysisReceiverModule).length, 1);
 });
+
+test('큐 모듈은 DB 공급 함수만 받아도 수신·등록 조립을 한 번 만들며 함수를 미리 실행하지 않는다', () => {
+  require('reflect-metadata');
+  const { AnalysisQueueModule } = require('../../dist/analysis-queue/analysis-queue.module');
+  const { AnalysisReceiverModule } = require('../../dist/analysis-receiver/analysis-receiver.module');
+  const { CONTRACT_DIR } = require('../helpers/receiver-harness.cjs');
+  let calls = 0;
+  const assembled = AnalysisQueueModule.register({
+    queue: dev('redis://127.0.0.1:6379'),
+    observationsFactory: () => { calls += 1; return { observe: async () => null }; },
+    contractDirectory: CONTRACT_DIR,
+  });
+  assert.equal(assembled.imports.filter(entry => entry.module === AnalysisReceiverModule).length, 1);
+  assert.equal(calls, 0, 'DB를 주입하기 전 모듈 등록 단계에서는 공급 함수를 실행하지 않는다');
+});
+
+test('큐 모듈은 객체와 DB 공급 함수를 동시에 받으면 기존 설정 오류로 거부한다', () => {
+  require('reflect-metadata');
+  const { AnalysisQueueModule } = require('../../dist/analysis-queue/analysis-queue.module');
+  const { CONTRACT_DIR } = require('../helpers/receiver-harness.cjs');
+  let calls = 0;
+  assert.throws(() => AnalysisQueueModule.register({
+    queue: dev('redis://127.0.0.1:6379'),
+    observations: { observe: async () => null },
+    observationsFactory: () => { calls += 1; return { observe: async () => null }; },
+    contractDirectory: CONTRACT_DIR,
+  }), /큐 설정·보호 관측 공급자·계약 경로/);
+  assert.equal(calls, 0);
+});

@@ -3,12 +3,16 @@
 
 ## Interpretations
 <!-- example: 2026-05-29T10:14:32Z — chose REST over GraphQL; the consuming team only needs CRUD, revisit if subscriptions land -->
+- 2026-10-24T06:44:56Z — 재승인 때 설명 없는 Catch도 발행 선택 가능으로 해석했다(A03); 주장의 제목·본문 필수 조건이 주장과 함께 없어졌고 새 입력이 설명을 발행 조건으로 두지 않아서다. 승인 때 바로잡을 수 있게 전제로 적었다.
+- 2026-10-24T06:44:56Z — 내려놓을 순서(OQ3)를 Q119의 두 후순위 먼저로 해석했다; 입력 §2-3과 「아직 정하지 않은 것」을 함께 읽은 추론이며 요약 확인 때 이 점을 따로 알렸다.
 
 ## Deviations
 <!-- example: 2026-05-29T10:14:32Z — skipped the optional caching layer the stage prose suggested; the dataset is small enough that it adds risk -->
+- 2026-10-24T06:44:56Z — 기존 질문 파일의 9월 통합 요약 확인 제목을 「2026-09-28 통합 요약 확인 (당시 기록)」으로 바꿨다; 확인 절이 둘이면 현행 확인을 가릴 수 없어서이며, 본문과 당시 답은 그대로 두었다.
 
 ## Tradeoffs
 <!-- example: 2026-05-29T10:14:32Z — picked TDD over BDD this run; the team is unit-first and the domain is well-understood -->
+- 2026-10-24T06:44:56Z — 요구사항 ID를 새로 매기지 않고 9월 ID를 유지했다(바뀐 것은 같은 ID, 제외한 것은 재사용 안 함, 새 것은 다음 번호·FR20); 입력이 9월 ID로 대체·제외를 지정해서 대조가 쉽고, 대신 FR7~12·15·17·18이 빈 번호로 남는다.
 
 ## Open questions
 

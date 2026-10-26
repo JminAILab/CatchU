@@ -4,9 +4,8 @@ import IORedis from 'ioredis';
 import { DataSource } from 'typeorm';
 import { PeriodicTask } from '../common/periodic-task';
 import { DatabaseModule } from '../database/database.module';
-import { AnalysisReceiverModule } from '../analysis-receiver/analysis-receiver.module';
+import { AnalysisReceiverModule, ObservationProvider } from '../analysis-receiver/analysis-receiver.module';
 import { AnalysisRegistrationService } from '../analysis-receiver/analysis-registration.service';
-import { RepositoryObservationSource } from '../analysis-receiver/repository-observation.source';
 import { WorkerMessageValidator } from '../analysis-receiver/worker-message.validator';
 import { AnalysisQueueConfig } from './analysis-queue.config';
 import { AnalysisRequestDispatcher, DispatchLog, DispatchSummary, errorName } from './analysis-request.dispatcher';
@@ -243,27 +242,27 @@ export class AnalysisQueueRunner implements OnModuleDestroy {
   }
 }
 
-export interface AnalysisQueueModuleOptions {
+export type AnalysisQueueModuleOptions = {
   queue: AnalysisQueueConfig;
-  observations: RepositoryObservationSource;
   contractDirectory: string;
-}
+} & ObservationProvider;
 
 /**
  * 큐 연결 모듈. 큐 설정과 보호 관측 공급자가 모두 있을 때만 조립한다(10/15 팀장 결정). 가짜 공급자를 기본으로 넣지 않는다.
  * 실제 수신·등록 조립(AnalysisReceiverModule.registerDatabase)을 여기서 한 번 불러온다. 같은 앱에서 따로 또 부르지 않는다.
- * AppModule에는 아직 등록하지 않는다. 켜는 일은 #252 좌표 제공자와 #105 근거 보존 수정이 들어온 뒤다(api/docs/analysis-queue.md).
+ * AppModule에는 등록하지 않는다. 제품 조립(application.module.ts)이 큐 주소가 있을 때만 부른다(api/docs/analysis-queue.md).
  */
 @Module({})
 export class AnalysisQueueModule {
   static register(options: AnalysisQueueModuleOptions): DynamicModule {
-    if (!options?.queue || !options.observations || !options.contractDirectory) {
+    if (!options?.queue || !options.contractDirectory
+      || ((options.observations === undefined) === (options.observationsFactory === undefined))) {
       throw new Error('AnalysisQueueModule에는 큐 설정·보호 관측 공급자·계약 경로가 모두 필요합니다.');
     }
     return {
       module: AnalysisQueueModule,
       imports: [DatabaseModule, AnalysisReceiverModule.registerDatabase({
-        contractDirectory: options.contractDirectory, observations: options.observations,
+        ...options,
       })],
       providers: [{
         provide: AnalysisQueueRunner,

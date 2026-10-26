@@ -2,7 +2,7 @@
 
 > 기능별 동작·연결 안내는 이 README에 덧붙이지 않고 `web/src/features/<기능>/README.md`로 쓴다.
 
-Next.js로 만드는 10월 MVP의 사용자 화면이다. 로그인·프로필·GitHub 연동, 홈·분석 상태, 본인 자산 확인·공개/숨김, 공유 링크·수신자 열람 흐름을 다룬다. 적용 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 담당 이슈의 완료 기준으로 확인한다.
+Next.js로 만드는 10월 MVP의 사용자 화면이다. 로그인·프로필·GitHub 연동, 홈·분석 상태, 본인 자산 확인·공개/숨김, 공유 링크·수신자 열람 흐름을 다룬다. 적용 범위는 10월 작업이면 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 담당 이슈의 완료 기준, 11월 Unit이면 12월 intent 요구사항과 그 Unit 기능 설계로 확인한다.
 
 이 README는 [#82 web 최소 실행 골격](https://github.com/JminAILab/CatchU/issues/82)과 [#106 공통 기반](https://github.com/JminAILab/CatchU/issues/106) PR①(레이아웃·헤더·주소·공통 표시)과 PR②(API 호출·토큰·로그인 진입·회원 경로 가드) 기준이다. 각 화면은 기능 이슈에서 추가한다.
 
@@ -43,7 +43,7 @@ npm ci
 
 | 목적 | 명령 | 확인 |
 |---|---|---|
-| 개발 서버 | `npm run dev` | http://localhost:3000 에 "CatchU web" 화면. 파일 수정 시 자동 반영 |
+| 개발 서버 | `npm run dev` | http://localhost:3000 에 비로그인 서비스 소개 화면. 파일 수정 시 자동 반영 |
 | 배포용 빌드 | `npm run build` | `.next/` 생성, 오류 없이 종료 |
 | 빌드 결과 실행 | `npm run start` | `npm run build` 뒤에만 가능. 주소는 개발 서버와 같음 |
 
@@ -58,7 +58,7 @@ npm ci
 | `npm run lint` | ESLint (`eslint-config-next` core-web-vitals + typescript) | 조건문 안의 React Hook 호출 |
 | `npm run typecheck` | `tsc --noEmit`. 생성 파일(`next-env.d.ts`, `.next/types`) 없이도 통과해야 함 | `const n: number = "x"` |
 | `npm run build` | 프로덕션 빌드 | 빌드 중 타입·import 오류 |
-| `npm run check:run` | `scripts/smoke.mjs`: 포트가 비어 있는지 확인한 뒤 빌드 결과를 `next start`로 띄우고, Ready 출력 후 `GET /`가 200이고 본문에 "CatchU web"이 있는지, 보안 헤더(아래 「보안 응답 헤더」)가 붙고 `X-Powered-By`가 없는지 확인하고 종료(전체 30초 제한). **`npm run build` 이후에만, 개발 서버를 끈 상태에서 실행** | 포트 사용 중, 서버 미기동, 200 아님, 본문 불일치, 보안 헤더 누락, 30초 초과 |
+| `npm run check:run` | `scripts/smoke.mjs`: 포트가 비어 있는지 확인한 뒤 빌드 결과를 `next start`로 띄우고, Ready 출력 후 `GET /`가 200이고 본문에 서비스 소개 제목(`id="landing-title"`)이 있는지, 보안 헤더(아래 「보안 응답 헤더」)가 붙고 `X-Powered-By`가 없는지 확인하고 종료(전체 30초 제한). **`npm run build` 이후에만, 개발 서버를 끈 상태에서 실행** | 포트 사용 중, 서버 미기동, 200 아님, 본문 불일치, 보안 헤더 누락, 30초 초과 |
 | `npm test` | Node 기본 테스트 도구로 공통 응답 해석 검사 | 오류를 빈 목록으로 처리, HTTP 상태·code 소실 |
 | `npm run check` | lint → typecheck → test → build → check:run | 하나라도 실패하면 중단 |
 
@@ -86,9 +86,11 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/layout.tsx` | 루트 레이아웃(`<html lang="ko">`, 기본 메타데이터, `globals.css`) |
 | `src/app/globals.css` | 전역 기본값과 공통 색·폭 변수. 화면 스타일은 넣지 않는다 |
 | `src/app/(guest)/`, `(member)/`, `s/` | 화면 묶음별 레이아웃(헤더). 아래 「공통 레이아웃」 참조 |
-| `src/app/(guest)/page.tsx` | `/` 기본 화면. 서비스 소개는 #155에서 채운다 |
+| `src/app/(guest)/page.tsx` | `/` 비로그인 서비스 소개([기능 안내](src/features/landing/README.md)) |
 | `src/app/preview/common/` | 헤더·상태 표시 개발용 미리보기(`npm run dev`에서만) |
+| `src/app/(member)/home/` | 회원 가드 안의 로그인 후 홈. 연결 상태 안내와 다음 행동을 조립한다([기능 안내](src/features/home/README.md)) |
 | `src/app/(member)/assets/` | 회원 가드 안의 실제 내 자산 페이지. B 목록·상세와 D 저장소 모달을 조립한다([기능 안내](src/features/assets/README.md)) |
+| `src/app/s/[token]/` | 공유 링크 수신자 목록·Catch 상세. 회원 로그인 없이 수신자 API에 연결한다([기능 안내](src/features/recipient/README.md)) |
 | `src/components/header/` | 로그인·비로그인·수신자 헤더와 프로필 메뉴 |
 | `src/components/notice-dialog/` | 채용공고·알림 안내창 |
 | `src/components/status/` | 불러오는 중·조회 실패·정상 0건 공통 표시 |
@@ -134,13 +136,13 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 
 ## 페이지 주소
 
-**정본은 이 표이며, `src/lib/routes.ts`와 함께 고친다.** 구분: **확정** 결정 문서에 있음 / **제안** 담당자 확인 전 안 / **미정** 담당자가 정함. `[token]`·`[catchId]`·`…`는 자리표시자다. 근거: [9/24 팀장 결정](../docs/ai-dlc-input-mvp/2026-09-14_followup.md), [web 기능 설계 「내 자산 화면 구조」](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md), #55 「10월 헤더 합의」, [#106 주소 표 초안](https://github.com/JminAILab/CatchU/issues/106#issuecomment-5865962875).
+**정본은 이 표이며, `src/lib/routes.ts`와 함께 고친다.** A~D 담당과 '제안' 구분은 10월 기준이다. 11월 Unit은 주소를 그 Unit 기능 설계(받은 사람 링크 화면은 계약 C-11·C-12)에 따라 정하고, 이 표와 `routes.ts`를 함께 고치며 담당 칸에는 Unit 번호를 적는다. 구분: **확정** 결정 문서에 있음 / **제안** 담당자 확인 전 안 / **미정** 담당자가 정함. `[token]`·`[catchId]`·`…`는 자리표시자다. 근거: [9/24 팀장 결정](../docs/ai-dlc-input-mvp/2026-09-14_followup.md), [web 기능 설계 「내 자산 화면 구조」](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md), #55 「10월 헤더 합의」, [#106 주소 표 초안](https://github.com/JminAILab/CatchU/issues/106#issuecomment-5865962875).
 
 | 주소 | 화면 | 담당 | 로그인 | 구분 | 비고 |
 |---|---|---|---|---|---|
 | `/` | 서비스 소개 | D | 불필요 | 제안 | 로그아웃 성공 후 비로그인 홈 이동은 확정(#55) |
 | `/login` | 로그인 진입 | A / 틀 D | 불필요 | 제안 | 회원 경로 가드의 이동 목적지. Google 로그인은 연결 전(A), 개발용 로그인은 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`일 때만 |
-| `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 Catch 탭 저장소 연결 관리로 이동(확정) |
+| `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 Catch 탭 저장소 연결 관리로 이동(확정). GitHub 미연동·재연동 필요의 연동 화면(`/profile/github`) 버튼은 #253 전까지 비활성으로 두고 준비 중 이유를 보인다([홈](src/features/home/README.md)) |
 | `/profile/setup` | 최초 프로필 입력 (W02) | A | 필요 | 제안 | 저장 성공 후 회원 정보를 다시 불러온 뒤 `/home` |
 | `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지. 수정(`/profile/edit`)으로 진입하는 링크를 둔다. GitHub 연동(`/profile/github`) 진입은 #253 전까지 '연결 전'으로 표시하고 이동하지 않는다 |
 | `/profile/edit` | 프로필 수정 (W02) | A | 필요 | 제안 | 저장 성공·취소 후 `/profile`로 복귀하고, 저장 실패 시 이 화면과 입력을 유지 |
@@ -259,6 +261,6 @@ if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLi
 
 - 착수·브랜치·기록·검토 기준은 [공통 작업관리](../docs/CatchU_작업관리.md)를 따른다.
 - Next.js 16은 이전 판과 API·파일 규칙이 달라진 부분이 있다. 사람이든 AI든 Next.js 코드를 쓰기 전에 설치된 판본의 문서 `node_modules/next/dist/docs/`를 확인한다.
-- 화면 문구·상태는 각 흐름 초안(`docs/ai-dlc-input-mvp/`)과 승인 요구사항을 근거로 하고, 요청 중·저장 중을 성공으로, 조회 실패를 데이터 없음으로 표시하지 않는다.
+- 화면 문구·상태는 승인 요구사항과 근거 화면 설계(10월은 `docs/ai-dlc-input-mvp/`의 흐름 초안, 11월은 Unit 기능 설계의 화면 구성)를 근거로 하고, 요청 중·저장 중을 성공으로, 조회 실패를 데이터 없음으로 표시하지 않는다.
 - 브라우저 로그에는 민감정보를 출력하지 않는다.
 - 로컬 실행 확인과 AWS 배포 검증은 각각 기록한다.

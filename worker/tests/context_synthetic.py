@@ -9,9 +9,10 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 import pytest
-from github_synthetic import MEMBER, REPOSITORY, REQUEST, TOKEN
+from github_synthetic import ACCEPTED, MEMBER, REPOSITORY, REQUEST, TOKEN
 
 from app.collection.credentials import AccessToken
+from app.processing.synthetic import ALLOWED_RESOURCE_TYPES
 from app.request_context import ContextApiSettings, RequestContextClient
 
 KEY = "a1" * 32
@@ -23,9 +24,14 @@ CONTEXT_REQUEST = replace(
 
 
 def context_body() -> dict[str, Any]:
+    """api 조회 응답(#232·#121)의 합성 값. 접수 기록은 합성 접수 맥락과 같고 sourceMode는 LIVE다."""
     return {
         "requestId": REQUEST.request_id,
         "attemptId": REQUEST.attempt_id,
+        "consentId": REQUEST.consent_id,
+        "noticeRevision": ACCEPTED.notice_revision,
+        "allowedResourceTypes": list(ALLOWED_RESOURCE_TYPES),
+        "sourceMode": "LIVE",
         "credential": {
             "memberId": REQUEST.member_id,
             "repositoryId": REQUEST.repository_id,
@@ -53,6 +59,7 @@ class ApiReply:
     drip: bool = False
     requests: int = 0
     valid_requests: int = 0
+    paths: list[str] = field(default_factory=list)
     client: RequestContextClient | None = None
     base_url: str = ""
 
@@ -64,6 +71,7 @@ def context_api() -> Iterator[ApiReply]:
     class Handler(http.server.BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             reply.requests += 1
+            reply.paths.append(self.path)
             if (
                 self.path
                 == f"/v1/internal/analysis-attempts/{REQUEST.attempt_id}/context"

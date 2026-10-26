@@ -12,6 +12,7 @@ test('제목 nullable 마이그레이션은 기존 자료·빈 제목 제약을 
     const input = await fixture.receipt();
     const [registration] = await db.transaction(manager => registerCandidates(manager, input));
     const [original] = await db.query('SELECT * FROM catch_asset WHERE catch_id = $1', [registration.catchId]);
+    await db.undoLastMigration(); // #387 B 연쇄 삭제를 먼저 되돌린다.
     await db.undoLastMigration(); // 근거 position 추가를 먼저 되돌린다.
     await db.undoLastMigration();
     assert.equal(await nullable(), 'NO');
@@ -22,6 +23,7 @@ test('제목 nullable 마이그레이션은 기존 자료·빈 제목 제약을 
     assert.deepEqual((await db.query('SELECT * FROM catch_asset WHERE catch_id = $1', [registration.catchId]))[0], original);
     await assert.rejects(db.query('UPDATE catch_asset SET title = $1 WHERE catch_id = $2', ['', registration.catchId]),
       error => error.driverError?.code === '23514');
+    await db.undoLastMigration(); // #387 B 연쇄 삭제
     await db.undoLastMigration(); // 이후 실패 검사는 제목 migration만 대상으로 한다.
     await db.query('UPDATE catch_asset SET title = NULL WHERE catch_id = $1', [registration.catchId]);
     const history = await db.query('SELECT * FROM migrations ORDER BY id');

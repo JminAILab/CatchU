@@ -134,19 +134,21 @@ export function AssetsView(props: AssetsViewProps) {
         <>
           {props.repositoryManagement}
           <section className={styles.listSection} aria-labelledby="catch-list-title">
-            <div className={styles.listHeading}>
-              <div><h2 id="catch-list-title">내 Catch</h2><p>카드를 눌러 설명과 근거를 자세히 살펴보세요.</p></div>
-              <label className={styles.filter}>저장소
-                <select value={repositoryId} onChange={(event) => props.onRepositoryChange(event.target.value)}>
-                  <option value="">전체 저장소</option>
-                  {repositoryId && !selectedRepository && <option value={repositoryId}>저장소 이름 확인 전</option>}
-                  {repositories.map((repo) => <option key={repo.repositoryId} value={repo.repositoryId}>{repo.name}</option>)}
-                </select>
-              </label>
-            </div>
+            <div className={styles.listOverview}>
+              <div className={styles.listHeading}>
+                <div><h2 id="catch-list-title">내 Catch</h2><p>카드를 눌러 설명과 근거를 자세히 살펴보세요.</p></div>
+                <label className={styles.filter}>저장소
+                  <select value={repositoryId} onChange={(event) => props.onRepositoryChange(event.target.value)}>
+                    <option value="">전체 저장소</option>
+                    {repositoryId && !selectedRepository && <option value={repositoryId}>저장소 이름 확인 전</option>}
+                    {repositories.map((repo) => <option key={repo.repositoryId} value={repo.repositoryId}>{repo.name}</option>)}
+                  </select>
+                </label>
+              </div>
 
-            <GeneratedContentNotice />
-            {props.repositoryNotice}
+              <GeneratedContentNotice />
+              {props.repositoryNotice}
+            </div>
             {listState === "loading" ? (
               <StateMessage title="Catch를 불러오고 있습니다">목록을 확인하고 있어요. 잠시만 기다려 주세요.</StateMessage>
             ) : listState === "error" ? (
@@ -165,12 +167,14 @@ export function AssetsView(props: AssetsViewProps) {
                 <ul className={styles.grid}>
                   {visibleItems.map((item) => (
                     <li key={item.catchId} className={styles.card}>
-                      <p className={styles.repository}>{repositories.find((repo) => repo.repositoryId === item.repositoryId)?.name ?? "저장소 정보 없음"}</p>
+                      <div className={styles.cardMeta}>
+                        <p className={styles.repository}>{repositories.find((repo) => repo.repositoryId === item.repositoryId)?.name ?? "저장소 정보 없음"}</p>
+                        <StatusBadges item={item} />
+                      </div>
                       {item.title !== null && <h3><button className={styles.cardTitle} onClick={(event) => {
                         returnFocusRef.current = event.currentTarget;
                         props.onOpen(item.catchId);
                       }}>{item.title}</button></h3>}
-                      <StatusBadges item={item} />
                       <p className={styles.summary}>{item.workFacts[0] || "상세에서 근거를 확인해 주세요."}</p>
                       <div className={styles.cardFooter}><span>근거 {item.evidence.length}개</span>
                         {item.title === null ? <button className={styles.cardDetails} onClick={(event) => {
@@ -221,7 +225,7 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
   }, []);
 
   return (
-    <dialog ref={dialogRef} className={styles.dialog} aria-labelledby="catch-detail-title"
+    <dialog ref={dialogRef} className={`${styles.dialog} ${styles.catchDialog}`} aria-labelledby="catch-detail-title"
       onCancel={(event) => { event.preventDefault(); onClose(); }}>
       <div className={styles.dialogHeading}>
         <div><p className={styles.eyebrow}>CATCH DETAIL{dataMode === "preview" ? " · 임시 데이터" : ""}</p><h2 id="catch-detail-title">Catch 상세</h2></div>
@@ -235,11 +239,13 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
           {item.title !== null && <h3 className={styles.detailTitle}>{item.title}</h3>}
           <StatusBadges item={item} />
           <GeneratedContentNotice item={item} />
-          <p className={styles.readOnlyNotice}>{dataMode === "preview" ? "예시 자료입니다. 확인·불일치·공개 설정은 바뀌지 않습니다." : item.sourceMode === "MOCK" ? "합성 자료로 생성된 Catch입니다. 실제 분석 결과와 구분해 확인해 주세요." : "확인과 공개 선택은 별도입니다."}</p>
-          <section className={styles.detailSection}><h3>작업에서 확인된 사실</h3>
-            {item.workFacts.length ? <ul>{item.workFacts.map((fact, index) => <li key={index}>{fact}</li>)}</ul> : <p>제공된 작업 사실이 없습니다.</p>}
-          </section>
-          <section className={styles.detailSection}><h3>나의 기여</h3><p>{item.subjectContribution || "제공된 기여 설명이 없습니다."}</p></section>
+          <p className={dataMode === "preview" || item.sourceMode === "MOCK" ? styles.readOnlyNotice : `${styles.readOnlyNotice} ${styles.subtleNotice}`}>{dataMode === "preview" ? "예시 자료입니다. 확인·불일치·공개 설정은 바뀌지 않습니다." : item.sourceMode === "MOCK" ? "합성 자료로 생성된 Catch입니다. 실제 분석 결과와 구분해 확인해 주세요." : "확인과 공개 선택은 별도입니다."}</p>
+          <div className={styles.factGrid}>
+            <section className={styles.factPanel}><h3>작업에서 확인된 사실</h3>
+              {item.workFacts.length ? <ul>{item.workFacts.map((fact, index) => <li key={index}>{fact}</li>)}</ul> : <p>제공된 작업 사실이 없습니다.</p>}
+            </section>
+            <section className={styles.factPanel}><h3>나의 기여</h3><p>{item.subjectContribution || "제공된 기여 설명이 없습니다."}</p></section>
+          </div>
           <section className={styles.detailSection}><h3>근거</h3>
             {item.evidence.length === 0 ? <p>제공된 근거가 없습니다.</p> : item.evidence.map((evidence, index) => (
               <article key={evidence.catchEvidenceId} className={styles.evidence}>

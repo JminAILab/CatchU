@@ -463,8 +463,17 @@ def flow_counts(caplog: pytest.LogCaptureFixture) -> dict[str, int]:
     return {
         key: int(value)
         for key, value in _PAIR.findall(lines[0])
-        if key not in ("requestId", "attemptId")
+        if key not in ("requestId", "attemptId") and not key.endswith("Reasons")
     }
+
+
+def flow_reasons(caplog: pytest.LogCaptureFixture) -> dict[str, str]:
+    """같은 로그 줄의 원인별 건수 칸 글자 그대로: 실패 원인(`wholeReasons`·`draftReasons`·`reflectionReasons`)과
+    버리거나 고친 항목(`draftDropReasons`·`reflectionDropReasons`)."""
+    (line,) = [
+        record.getMessage() for record in caplog.records if record.name == FLOW_LOGGER
+    ]
+    return {key: value for key, value in _PAIR.findall(line) if key.endswith("Reasons")}
 
 
 def log_lines(caplog: pytest.LogCaptureFixture) -> list[str]:
@@ -666,8 +675,7 @@ def test_title_check_failure_is_not_rewritten(
     assert found.reflection.status == "GENERATED"
     assert new_failures(case) == []
     assert case.result["outcome"] == case.before.result["outcome"]
-    # 제목 null은 결과 조합의 임시 대체값(작업 사실 첫 항목)으로 나간다(결정 문서 「담당과 순서」 ③).
-    assert entry(case, 3)["title"] == found.work_facts[0]
+    assert entry(case, 3)["title"] is None
     assert flow_counts(caplog)["titleOnlyNull"] == 1
 
 
@@ -1106,7 +1114,7 @@ def test_title_only_null_keeps_failures_and_outcome(
     assert case.result["failures"] == case.before.result["failures"]
     assert case.result["outcome"] == fixed.result["outcome"]
     assert case.result["outcome"] == case.before.result["outcome"]
-    assert entry(case, 3)["title"] == found.work_facts[0]
+    assert entry(case, 3)["title"] is None
     counts = flow_counts(caplog)
     assert counts["titleOnlyNull"] == 1
     assert counts["draftGenerated"] == 1
@@ -1136,6 +1144,126 @@ def test_title_only_null_count_leaves_out_failed_drafts(
     counts = flow_counts(caplog)
     assert counts["draftFailed"] == 1
     assert counts["titleOnlyNull"] == 1
+    # 호출 오류는 전체 호출 실패 원인으로만 센다. 제목 확인 실패(null)는 실패가 아니라 원인을 세지 않는다.
+    assert flow_reasons(caplog) == {
+        "wholeReasons": "GENERATION_CALL_FAILED:1",
+        "draftReasons": "-",
+        "reflectionReasons": "-",
+        "draftDropReasons": "-",
+        "reflectionDropReasons": "-",
+    }
+
+
+def test_failure_reasons_are_counted_per_part_in_code_order(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """설명·질문 실패마다 실패한 첫 원인 하나를 세고, 원인 코드순으로 `코드:건수`를 쉼표로 잇는다.
+
+    값·경로·이름은 남지 않는다. 설명 실패 수는 전체 호출 실패 수와 설명 원인 건수 합을 더한 값이다
+    (generation-limits.md 「운영 로그」).
+    """
+    caplog.set_level(logging.DEBUG)
+
+    def unsent_line_and_joined_name(request: ProviderRequest) -> str:
+        # 생성 순서 첫 후보(#4, beta): 설명은 보내지 않은 줄 id, 질문은 beta 줄의 bet(붙은 이름).
+        line = label_line(request)
+        return json.dumps(
+            {
+                "fragments": [
+                    {"kind": "ADDED_LINE_WITH", "line": "c9f9:L9", "name": "beta"}
+                ],
+                "title": code_title(line, "beta"),
+                "questions": [line_question("BACKGROUND", line, "bet")],
+            }
+        )
+
+    def missing_name(request: ProviderRequest) -> str:
+        # 둘째 후보(#3, alpha): 설명은 그 줄에 없는 이름, 질문은 확인된다.
+        line = label_line(request)
+        return json.dumps(
+            {
+                "fragments": [line_fragment(line, "alphaHelper")],
+                "title": code_title(line, "alpha"),
+                "questions": [line_question("BACKGROUND", line, "alpha")],
+            }
+        )
+
+    provider = ScriptedProvider(unsent_line_and_joined_name, missing_name, repeat=False)
+    scenario = pulls(
+        opened(3, own(31, 3, wordy("alpha"))), opened(4, own(32, 9, wordy("beta")))
+    )
+
+    case = generation_case(scenario, provider)
+
+    assert generated(case, 4).draft.status == "FAILED"
+    assert generated(case, 4).reflection.status == "FAILED"
+    assert generated(case, 3).draft.status == "FAILED"
+    assert generated(case, 3).reflection.status == "GENERATED"
+    counts = flow_counts(caplog)
+    assert (counts["wholeFailures"], counts["draftFailed"]) == (0, 2)
+    assert counts["reflectionFailed"] == 1
+    # 실패한 부분에서 버린 항목도 버린 항목 건수에 든다. 살아남은 부분은 없다.
+    assert flow_reasons(caplog) == {
+        "wholeReasons": "-",
+        "draftReasons": "NAME_MISSING:1,UNKNOWN_LINE:1",
+        "reflectionReasons": "NAME_JOINED_ASCII:1",
+        "draftDropReasons": "dropped:NAME_MISSING:1,dropped:UNKNOWN_LINE:1",
+        "reflectionDropReasons": "dropped:NAME_JOINED_ASCII:1",
+    }
+    assert (counts["draftSalvaged"], counts["reflectionSalvaged"]) == (0, 0)
+    (line,) = [r.getMessage() for r in caplog.records if r.name == FLOW_LOGGER]
+    for value in ("alphaHelper", "bet ", "c9f9", "app/"):
+        assert value not in line
+
+
+def test_dropped_items_are_counted_by_cause_without_names(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """틀려서 버린 항목·상한 뒤 항목·종류를 고친 조각은 원인별 건수로만 남고, 틀린 항목을 버리고도 만들어진
+    부분 수를 따로 센다. 실패 원인 칸에는 들지 않는다. 값·경로·이름은 남지 않는다(generation-limits.md
+    「운영 로그」, 2026-10-19 결정)."""
+    caplog.set_level(logging.DEBUG)
+
+    def mixed(request: ProviderRequest) -> str:
+        line = label_line(request)
+        good = line_fragment(line, "alpha")
+        return json.dumps(
+            {
+                "fragments": [
+                    line_fragment(line, "alphaHelper"),
+                    good | {"kind": "REMOVED_LINE_WITH"},
+                    good,
+                    good,
+                    good,
+                ],
+                "title": code_title(line, "alpha"),
+                "questions": [
+                    line_question("BACKGROUND", line, "alpha"),
+                    line_question("BACKGROUND", line, "alpha"),
+                    line_question("VERIFICATION", "c9f9:L9", "alpha"),
+                ],
+            }
+        )
+
+    case = generation_case(
+        pulls(opened(3, own(31, 3, wordy("alpha")))), ScriptedProvider(mixed)
+    )
+
+    assert generated(case, 3).draft.status == "GENERATED"
+    assert len(generated(case, 3).reflection.questions) == 1
+    counts = flow_counts(caplog)
+    assert (counts["draftFailed"], counts["reflectionFailed"]) == (0, 0)
+    assert (counts["draftSalvaged"], counts["reflectionSalvaged"]) == (1, 1)
+    assert flow_reasons(caplog) == {
+        "wholeReasons": "-",
+        "draftReasons": "-",
+        "reflectionReasons": "-",
+        "draftDropReasons": "dropped:NAME_MISSING:1,fixed:KIND_MISMATCH:1,over:COUNT:1",
+        "reflectionDropReasons": "dropped:DUPLICATE_TYPE:1,dropped:UNKNOWN_LINE:1",
+    }
+    (line,) = [r.getMessage() for r in caplog.records if r.name == FLOW_LOGGER]
+    for value in ("alphaHelper", "alpha ", "c9f9", "app/"):
+        assert value not in line
 
 
 # coverageLimits: 크기 상한(35·37)

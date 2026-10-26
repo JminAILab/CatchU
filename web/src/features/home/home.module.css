@@ -1,0 +1,151 @@
+/*
+ * 로그인 홈 외형(#385). 홈 상태 시안 v4의 배치(큰 안내 카드 안에 단계 표시·제목·설명·주 버튼)를 따르고,
+ * 색·글꼴은 globals.css 공통 변수만 쓴다. 시안의 강점 주장·서류 카드는 10월 범위가 아니라 두지 않는다.
+ */
+
+.lead {
+  margin: 0 0 20px;
+  font-size: clamp(22px, 3vw, 28px);
+  line-height: 1.4;
+  letter-spacing: -0.3px;
+  word-break: keep-all;
+}
+
+.guide {
+  padding: 32px;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background: var(--color-surface);
+  word-break: keep-all;
+}
+
+/* 연동 상태 이름: 단계와 겹쳐 보이지 않게 작은 글자 표시로 둔다. */
+.status {
+  display: inline-block;
+  margin: 0 0 16px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* 연결 단계: 알약 모양, 현재 단계만 채운다. 현재 단계는 aria-current로도 구분한다. */
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+  counter-reset: home-step;
+}
+
+.step,
+.currentStep {
+  padding: 6px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  font-size: 14px;
+  counter-increment: home-step;
+}
+
+.step::before,
+.currentStep::before {
+  content: counter(home-step) ". ";
+}
+
+.step {
+  background: var(--color-surface);
+  color: var(--color-muted);
+}
+
+.currentStep {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-surface);
+  font-weight: 700;
+}
+
+.guideTitle {
+  margin: 0 0 12px;
+  font-size: clamp(22px, 2.6vw, 28px);
+  line-height: 1.35;
+  letter-spacing: -0.3px;
+}
+
+.guideText {
+  max-width: 640px;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.guideAction {
+  margin-top: 28px;
+}
+
+.primaryLink,
+.unavailableButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 240px;
+  min-height: 48px;
+  padding: 0 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.primaryLink {
+  background: var(--color-accent);
+  color: var(--color-surface);
+  text-decoration: none;
+}
+
+.primaryLink:hover {
+  background: #1a418a;
+}
+
+.primaryLink:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+/* 이동할 화면이 아직 없는 버튼: 주 버튼과 같은 크기로 두되 누를 수 없음을 색으로도 구분한다. */
+.unavailableButton {
+  border: 1px solid var(--color-line);
+  background: var(--color-background);
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: not-allowed;
+}
+
+.unavailableReason {
+  margin: 10px 0 0;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.note {
+  margin: 16px 0 0;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 560px) {
+  .guide {
+    padding: 20px;
+  }
+
+  .primaryLink,
+  .unavailableButton {
+    width: 100%;
+    min-width: 0;
+  }
+}

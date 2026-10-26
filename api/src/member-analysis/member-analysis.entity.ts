@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Check, Column, Entity, ForeignKey, Index, PrimaryColumn, Unique } from 'typeorm';
 import { inValues, lengthBetween } from '../database/checks';
+import { deleteWithParent } from '../database/foreign-keys';
 import { ShareLink } from '../share-links/share-link.entity';
 
 const deferred = { deferrable: 'INITIALLY DEFERRED' as const };
@@ -18,7 +19,7 @@ export class MemberAccount {
 
 @Entity()
 @Unique(['memberId'])
-@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'])
+@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'], deleteWithParent)
 @Check(inValues('input_provenance', ['SELF_REPORTED']))
 export class MemberProfile {
   @PrimaryColumn({ type: 'uuid' }) profileId: string = randomUUID();
@@ -32,7 +33,7 @@ export class MemberProfile {
 
 @Entity('github_connection')
 @Unique(['memberId'])
-@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'])
+@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'], deleteWithParent)
 @Check(inValues('connection_state', ['CONNECTED', 'DISCONNECTED', 'REAUTH_REQUIRED']))
 export class GitHubConnection {
   @PrimaryColumn({ type: 'uuid' }) connectionId: string = randomUUID();
@@ -49,7 +50,9 @@ export class GitHubConnection {
 @Unique(['requestId', 'memberId', 'repositoryId'])
 @Unique(['requestId', 'memberId'])
 @Index(['memberId'], { unique: true, where: `"lifecycle" = 'ACTIVE'` })
-@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'])
+// 본인 이력(#140)과 재요청 판정의 최근 요청은 회원별 접수 시각·requestId 역순으로 읽는다. 전체 이력을 훑고 정렬하지 않게 한다.
+@Index(['memberId', 'submittedAt', 'requestId'])
+@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'], deleteWithParent)
 @ForeignKey(() => AnalysisConsent, ['consentId', 'requestId', 'memberId', 'repositoryId'],
   ['consentId', 'requestId', 'memberId', 'repositoryId'], deferred)
 @ForeignKey(() => AnalysisAttempt, ['currentAttemptId', 'requestId'], ['attemptId', 'requestId'], deferred)
@@ -76,8 +79,8 @@ export class AnalysisRequest {
 @Unique(['requestId'])
 @Unique(['consentId', 'requestId', 'memberId', 'repositoryId'])
 @ForeignKey(() => AnalysisRequest, ['requestId', 'memberId', 'repositoryId'],
-  ['requestId', 'memberId', 'repositoryId'], deferred)
-@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'])
+  ['requestId', 'memberId', 'repositoryId'], { ...deferred, ...deleteWithParent })
+@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'], deleteWithParent)
 @Check('"accepted" = true')
 @Check(lengthBetween('repository_id', 1))
 @Check(lengthBetween('notice_revision', 1))
@@ -101,7 +104,7 @@ export const APPLICATION_STATES = ['NOT_READY', 'PENDING', 'APPLYING', 'RECOVERI
 
 @Entity()
 @Unique(['attemptId', 'requestId'])
-@ForeignKey(() => AnalysisRequest, ['requestId'], ['requestId'], deferred)
+@ForeignKey(() => AnalysisRequest, ['requestId'], ['requestId'], { ...deferred, ...deleteWithParent })
 @Check(inValues('processing', PROCESSING_STATES))
 @Check(inValues('application', APPLICATION_STATES))
 @Check(inValues('source_mode', ['MOCK', 'LIVE']))
@@ -125,10 +128,10 @@ export type CreationOperation = 'createAnalysisRequest' | 'createShareLink';
 
 @Entity()
 @Unique(['memberId', 'operation', 'key'])
-@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'])
-@ForeignKey(() => AnalysisRequest, ['requestId', 'memberId'], ['requestId', 'memberId'], deferred)
+@ForeignKey(() => MemberAccount, ['memberId'], ['memberId'], deleteWithParent)
+@ForeignKey(() => AnalysisRequest, ['requestId', 'memberId'], ['requestId', 'memberId'], { ...deferred, ...deleteWithParent })
 // 링크가 있고 그 소유자가 이 기록의 회원임을 DB에서도 보장한다(#147).
-@ForeignKey(() => ShareLink, ['linkId', 'memberId'], ['linkId', 'ownerId'])
+@ForeignKey(() => ShareLink, ['linkId', 'memberId'], ['linkId', 'ownerId'], deleteWithParent)
 @Check(inValues('operation', ['createAnalysisRequest', 'createShareLink']))
 @Check(lengthBetween('key', 1, 128))
 @Check(`"request_fingerprint" ~ '^[0-9a-f]{64}$'`)

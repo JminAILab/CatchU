@@ -3,6 +3,8 @@ require('reflect-metadata');
 // 요청·동의·시도는 직접 넣지 않고 실제 HTTP 접수(POST /v1/analysis-requests)로 만든다. #103 공용 합성 세트
 // (worker/fixtures/m1-synthetic)의 사례 목록을 그대로 따른다. worker·큐·GitHub는 연결하지 않는다.
 // 보호 기록에는 실제 10월 정책 공급자를 쓰고 좌표는 합성 저장소 어댑터로 공급한다. 제품 앱에는 이 시험 조립을 등록하지 않는다.
+// #114 연결 시험은 처리 시한 닫기(서비스 직접 호출)와 보내기 대상(메모리 요청 큐)까지 잇는다. 실제 큐·worker 실행은 보지 않는다.
+// #140 연결 시험은 이 경로로 만든 상태를 본인 이력·개별 상태 조회 API로 읽어 같은 키 재응답과 비교한다.
 const assert = require('node:assert/strict');
 const { randomBytes, randomUUID } = require('node:crypto');
 const { readFileSync } = require('node:fs');
@@ -13,6 +15,7 @@ const { NestFactory } = require('@nestjs/core');
 const { decodeJwt } = require('jose');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { CONTRACT_DIR } = require('../helpers/receiver-harness.cjs');
+const { MemoryRequestQueue, dispatchLog } = require('../helpers/queue-harness.cjs');
 const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
 const { CurrentMemberId } = require('../../dist/auth/auth.decorators');
@@ -20,8 +23,12 @@ const { AnalysisReceiverModule } = require('../../dist/analysis-receiver/analysi
 const { DevAnalysisInjection } = require('../../dist/analysis-receiver/dev-analysis-injection');
 const { DatabaseReceiverStore } = require('../../dist/analysis-receiver/database-receiver.store');
 const { OctoberRepositoryObservationSource } = require('../../dist/analysis-receiver/october-repository-observation.source');
+const { WorkerMessageValidator } = require('../../dist/analysis-receiver/worker-message.validator');
+const { AnalysisDeadlineService } = require('../../dist/analysis-deadline/analysis-deadline.service');
+const { AnalysisNoticeService } = require('../../dist/analysis-intake/analysis-notice');
+const { AnalysisRequestDispatcher } = require('../../dist/analysis-queue/analysis-request.dispatcher');
 const { PublicCatchStore } = require('../../dist/catches/public-catch-store');
-const { SYNTHETIC_REPOSITORY } = require('../../dist/member-analysis/dev-member.service');
+const { DevMemberService, SYNTHETIC_REPOSITORY } = require('../../dist/member-analysis/dev-member.service');
 
 const FIXTURES = resolve(__dirname, '../../../worker/fixtures/m1-synthetic');
 const read = file => JSON.parse(readFileSync(resolve(FIXTURES, file), 'utf8'));
@@ -91,14 +98,15 @@ async function start(t, { injection = true, protection = observations } = {}) {
     return { token: accessToken, memberId: decodeJwt(accessToken).sub };
   };
   const auth = user => ({ Authorization: 'Bearer ' + user.token });
-  // 실제 고지·선정 저장소 API의 응답으로 동의를 만들고 실제 접수 API를 호출한다.
-  const submit = async (user, key = randomUUID()) => {
+  // 실제 고지·선정 저장소 API의 응답으로 동의를 만들고 실제 접수 API를 호출한다. 재요청은 원 요청 ID를 함께 보낸다.
+  const submit = async (user, key = randomUUID(), { repositoryId = SYNTHETIC_REPOSITORY.repositoryId, retryOfRequestId } = {}) => {
     const notice = await (await call('/v1/analysis-notice', { headers: auth(user) })).json();
     const repositories = await (await call('/v1/me/repositories', { headers: auth(user) })).json();
-    const repository = repositories.items.find(item => item.repositoryId === SYNTHETIC_REPOSITORY.repositoryId);
-    assert.ok(repository, '합성 저장소가 선정 저장소 API에 있어야 한다');
+    const repository = repositories.items.find(item => item.repositoryId === repositoryId);
+    assert.ok(repository, '접수할 합성 저장소가 선정 저장소 API에 있어야 한다');
     const body = { repositoryId: repository.repositoryId,
-      consent: { accepted: true, noticeRevision: notice.noticeRevision, scopeRevision: repository.allowedScopeRevision } };
+      consent: { accepted: true, noticeRevision: notice.noticeRevision, scopeRevision: repository.allowedScopeRevision },
+      ...(retryOfRequestId ? { retryOfRequestId } : {}) };
     const response = await call('/v1/analysis-requests', { method: 'POST',
       headers: { ...json, ...auth(user), 'Idempotency-Key': key }, body: JSON.stringify(body) });
     assert.equal(response.status, 202, await response.clone().text());
@@ -119,7 +127,17 @@ async function start(t, { injection = true, protection = observations } = {}) {
     try { body = JSON.parse(text); } catch { /* 진행 이벤트는 문자열 */ }
     return { status: response.status, body, text };
   };
-  return { app, logs, login, submit, status, inject, call };
+  // #140 조회 API: 개별 상태와 본인 이력을 같은 회원 인증으로 읽는다.
+  const lookup = async (user, requestId) => {
+    const response = await call(`/v1/analysis-requests/${requestId}`, { headers: auth(user) });
+    return { status: response.status, body: await response.json() };
+  };
+  const history = async (user, search = '') => {
+    const response = await call(`/v1/analysis-requests${search}`, { headers: auth(user) });
+    assert.equal(response.status, 200, await response.clone().text());
+    return response.json();
+  };
+  return { app, logs, login, submit, status, inject, call, lookup, history };
 }
 
 async function counts() {
@@ -132,6 +150,25 @@ async function counts() {
 const attemptOf = requestId => db.query(`SELECT a.* FROM analysis_attempt a JOIN analysis_request r
   ON r.current_attempt_id = a.attempt_id WHERE r.request_id = $1`, [requestId]).then(rows => rows[0]);
 const requestOf = requestId => db.query('SELECT * FROM analysis_request WHERE request_id = $1', [requestId]).then(rows => rows[0]);
+// 표 전체를 행 순서와 무관하게 읽는다. 표 이름은 시험 안의 상수만 넣는다.
+const tableRows = tables => Promise.all(tables.map(table =>
+  db.query(`SELECT to_jsonb(t) AS row FROM ${table} t ORDER BY to_jsonb(t)::text`).then(rows => [table, rows.map(r => r.row)])))
+  .then(Object.fromEntries);
+const requestRows = requestId => db.query(`SELECT to_jsonb(r) AS request, to_jsonb(c) AS consent, to_jsonb(a) AS attempt
+  FROM analysis_request r JOIN analysis_consent c ON c.request_id = r.request_id
+  JOIN analysis_attempt a ON a.request_id = r.request_id WHERE r.request_id = $1`, [requestId]);
+/** 개발 회원의 선정 저장소에 둘째 합성 저장소를 더한다(db/analysis-intake.test.cjs의 otherRepository와 같은 방식). */
+function secondRepository(app) {
+  const second = { ...SYNTHETIC_REPOSITORY, repositoryId: 'synthetic-second' };
+  const members = app.get(DevMemberService);
+  const readConnection = members.readConnection.bind(members);
+  members.readConnection = async (memberId, manager) =>
+    ({ ...await readConnection(memberId, manager), repositories: [SYNTHETIC_REPOSITORY, second] });
+  const notices = app.get(AnalysisNoticeService);
+  const scope = notices.scope.bind(notices);
+  notices.scope = (repositoryId, revision, mode) => ({ ...scope(SYNTHETIC_REPOSITORY.repositoryId, revision, mode), repositoryId });
+  return second;
+}
 function patch(input, operations) {
   for (const operation of operations) {
     const segments = operation.path.split('/').slice(1).map(part => part.replaceAll('~1', '/').replaceAll('~0', '~'));
@@ -312,6 +349,14 @@ test('접수 맥락과 다른 메시지는 거부되고 기존 수신 기록·Ca
     assert.equal(response.body.receipt.disposition, 'REJECTED', label);
     assert.equal(response.body.receipt.code, code, label);
   }
+  // 형식이 틀리거나 식별할 수 없는 결과(#103 음성 대조)도 이미 받은 수신 기록·Catch를 바꾸지 못한다(#114 기준 4).
+  for (const control of manifest.negativeControls) {
+    const template = patch({ ...read(control.file), resultId: 'format-' + control.id, messageId: randomUUID() }, control.patch);
+    const response = await s.inject(user, requestId, control.schema, template, 'mismatch');
+    assert.equal(response.status, 201, response.text);
+    if (control.check.verdict === 'UNIDENTIFIABLE') assert.deepEqual(response.body, { receipt: null }, control.id);
+    else assert.deepEqual([response.body.receipt.disposition, response.body.receipt.code], ['REJECTED', 'SCHEMA_INVALID'], control.id);
+  }
   // 같은 결과 ID의 다른 내용은 기존 기록을 유지하고 거부한다.
   const conflict = await s.inject(user, requestId, 'Result', read('results/same-id-different-content.json'), 'succeeded-one-candidate');
   assert.equal(conflict.body.receipt.disposition, 'REJECTED');
@@ -429,6 +474,116 @@ test('10월 정책으로 실제 접수·Catch 저장·본인 조회·확인·공
   assert.deepEqual(await db.query('SELECT * FROM repository_protection'), [protection]);
 });
 
+// #114 기준 5: 위 시험은 다시 숨긴 뒤 재전달한다. 공개 상태에서 온 재전달도 Catch·근거·확인·공개 상태를 바꾸지 않는다.
+for (const file of ['succeeded-one-candidate', 'two-candidates-same-work']) {
+  test(`공개로 바꾼 Catch에 같은 결과(${file})가 다시 와도 Catch·근거·등록·확인·공개 상태를 그대로 둔다`, async t => {
+    const s = await start(t);
+    const { user, requestId, intake } = await accepted(s, 'public-' + file);
+    const template = read(`results/${file}.json`);
+    const first = await s.inject(user, requestId, 'Result', template, 'public-' + file);
+    assert.equal(first.body.receipt.disposition, 'ACCEPTED');
+    const [catchId] = first.body.application.registeredCatchIds;
+    const headers = { Authorization: 'Bearer ' + user.token, 'Content-Type': 'application/json' };
+    const put = (suffix, body) => s.call(`/v1/catches/${catchId}${suffix}`, { method: 'PUT', headers, body: JSON.stringify(body) });
+    assert.equal((await put('/confirmation', { workFactsConfirmed: true, contributionConfirmed: true })).status, 200);
+    assert.equal((await put('/visibility', { visibility: 'PUBLIC' })).status, 200);
+    const TABLES = ['catch_asset', 'catch_evidence', 'candidate_registration', 'repository_protection', 'result_application_record'];
+    const before = await tableRows(TABLES);
+    for (const table of TABLES) assert.ok(before[table].length > 0, `${table}에 비교할 행이 있어야 한다`);
+    assert.equal(before.catch_asset.length, 1);
+    assert.equal(before.catch_asset[0].visibility, 'PUBLIC');
+    assert.equal(before.catch_asset[0].work_facts_confirmed, true);
+    const settled = await s.status(user, intake);
+    const again = await s.inject(user, requestId, 'Result', template, 'public-' + file);
+    assert.equal(again.status, 201, again.text);
+    assert.deepEqual([again.body.receipt.disposition, again.body.receipt.code], ['DUPLICATE', 'ALREADY_RECEIVED']);
+    assert.equal(again.body.application, undefined);
+    assert.deepEqual(await tableRows(TABLES), before);
+    assert.deepEqual(await s.status(user, intake), settled);
+  });
+}
+
+// #114 IV-17·IV-18: 한 개발 회원이 합성 저장소 두 개로, 실제 접수부터 반영 실패 → 닫기 → 같은 결과 재전달 → 새 동의 재요청을 잇는다.
+// 저장소 B는 위 좌표 어댑터가 모르는 저장소라 좌표 없음으로 반영이 실패한다(실패는 시험에서 강제). 닫기는 main만 주기 실행하므로
+// 처리 시한 서비스를 직접 부르고, 새 분석을 보내지 않는지는 실제 보내기 코드를 메모리 요청 큐에 붙여 본다.
+test('반영에 실패한 요청은 같은 결과로 다시 반영하지 않고 닫히며, 새 동의로 다시 요청해도 다른 요청의 Catch·링크는 그대로다', async t => {
+  const s = await start(t);
+  const second = secondRepository(s.app);
+  const user = await s.login('intake-receiver-apply-failure-chain');
+  const headers = { Authorization: 'Bearer ' + user.token, 'Content-Type': 'application/json' };
+  const template = read('results/succeeded-one-candidate.json');
+
+  // 저장소 A: 정상 반영된 Catch를 확인·공개하고 링크로 수신자에게 보인다. 끝까지 바뀌지 않아야 할 기존 자료·링크다.
+  const a = await s.submit(user);
+  const applied = await s.inject(user, a.status.requestId, 'Result', template, 'chain-a');
+  assert.equal(applied.body.receipt.disposition, 'ACCEPTED');
+  const [catchId] = applied.body.application.registeredCatchIds;
+  const put = (suffix, body) => s.call(`/v1/catches/${catchId}${suffix}`, { method: 'PUT', headers, body: JSON.stringify(body) });
+  assert.equal((await put('/confirmation', { workFactsConfirmed: true, contributionConfirmed: true })).status, 200);
+  assert.equal((await put('/visibility', { visibility: 'PUBLIC' })).status, 200);
+  const issued = await s.call('/v1/share-links', { method: 'POST', headers: { ...headers, 'Idempotency-Key': randomUUID() },
+    body: JSON.stringify({ title: '[합성] #114 연결 시험 링크' }) });
+  assert.equal(issued.status, 201, await issued.clone().text());
+  const token = (await issued.json()).url.split('/s/')[1];
+  const recipient = () => s.call(`/v1/public/links/${token}/catches/${catchId}`);
+  const shown = await recipient();
+  assert.equal(shown.status, 200);
+  const shownBody = await shown.json();
+  const KEPT = ['catch_asset', 'catch_evidence', 'candidate_registration', 'repository_protection', 'share_link'];
+  const kept = await tableRows(KEPT);
+  for (const table of KEPT) assert.ok(kept[table].length > 0, `${table}에 지킬 행이 있어야 한다`);
+  const requestA = await requestRows(a.status.requestId);
+
+  // 저장소 B: 실제 접수 → 결과 수신 → 반영 실패. 수신 기록은 남고 Catch는 생기지 않는다.
+  const b = await s.submit(user, randomUUID(), { repositoryId: second.repositoryId });
+  const failed = await s.inject(user, b.status.requestId, 'Result', template, 'chain-b');
+  assert.equal(failed.status, 500, failed.text);
+  assert.equal(failed.body.code, 'INTERNAL_ERROR');
+  const receipts = await tableRows(['result_application_record']);
+  assert.equal(receipts.result_application_record.length, 2);
+  const unresolved = await s.status(user, b);
+  assert.deepEqual([unresolved.application, unresolved.lifecycle], ['APPLY_FAILED', 'ACTIVE']);
+  assert.deepEqual(await tableRows(KEPT), kept);
+
+  // 처리 시한 판정이 반영 실패 요청을 시한 전에 닫는다. A는 반영이 끝나 이미 닫혀 있어 대상이 아니다.
+  assert.deepEqual(await s.app.get(AnalysisDeadlineService).closeOverdue(), { closed: 1, failed: 0 });
+  const closed = await s.status(user, b);
+  assert.deepEqual([closed.processing, closed.application, closed.lifecycle], ['SUCCEEDED', 'APPLY_FAILED', 'CLOSED']);
+  assert.deepEqual(closed.registeredCatchIds, []);
+  assert.equal(closed.ownerResultsReady, false);
+  assert.deepEqual(closed.retry, { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' });
+  const requestB = await requestRows(b.status.requestId);
+
+  // 같은 결과가 다시 와도 이미 받은 것으로 답할 뿐 반영을 다시 시도하지 않는다.
+  const again = await s.inject(user, b.status.requestId, 'Result', template, 'chain-b');
+  assert.equal(again.status, 201, again.text);
+  assert.deepEqual([again.body.receipt.disposition, again.body.receipt.code], ['DUPLICATE', 'ALREADY_RECEIVED']);
+  assert.equal(again.body.application, undefined);
+  assert.deepEqual(await s.status(user, b), closed);
+
+  // 새 분석을 보내지 않는다: 보내기 대상에 A·B의 시도가 없다.
+  const queue = new MemoryRequestQueue();
+  const dispatcher = new AnalysisRequestDispatcher(db, queue, new WorkerMessageValidator(CONTRACT_DIR), dispatchLog());
+  assert.deepEqual(await dispatcher.dispatchOnce(), { read: 0, enqueued: 0, existing: 0, skipped: 0, paused: null });
+
+  // 사용자가 새 동의로 다시 요청하면 새 요청·동의·시도가 생기고, 보내기 대상은 그 새 시도뿐이다.
+  const retry = await s.submit(user, randomUUID(), { repositoryId: second.repositoryId, retryOfRequestId: b.status.requestId });
+  for (const field of ['requestId', 'consentId', 'attemptId']) assert.notEqual(retry.status[field], b.status[field]);
+  assert.deepEqual([retry.status.processing, retry.status.application, retry.status.lifecycle], ['QUEUED', 'NOT_READY', 'ACTIVE']);
+  assert.equal((await requestOf(retry.status.requestId)).retry_of_request_id, b.status.requestId);
+  assert.deepEqual(await dispatcher.dispatchOnce(), { read: 1, enqueued: 1, existing: 0, skipped: 0, paused: null });
+  assert.deepEqual([...queue.jobs.keys()], [retry.status.attemptId]);
+
+  // 다른 요청의 Catch·근거·보호 기록·링크, 두 원 요청과 수신 기록, 수신자 열람이 그대로다.
+  assert.deepEqual(await tableRows(KEPT), kept);
+  assert.deepEqual(await tableRows(['result_application_record']), receipts);
+  assert.deepEqual(await requestRows(a.status.requestId), requestA);
+  assert.deepEqual(await requestRows(b.status.requestId), requestB);
+  const stillShown = await recipient();
+  assert.equal(stillShown.status, 200);
+  assert.deepEqual(await stillShown.json(), shownBody);
+});
+
 for (const [label, findForRegistration] of [
   ['좌표 없음', async () => null],
   ['다른 시도', async context => ({ ...context, attemptId: randomUUID(), githubRepository: { owner: 'synthetic', name: 'repo' } })],
@@ -461,4 +616,119 @@ test('10월 정책 저장 후 Catch 근거 저장이 실패하면 같은 반영 
   const status = await s.status(user, intake);
   assert.equal(status.application, 'APPLY_FAILED');
   assert.equal(status.ownerResultsReady, false);
+});
+
+const STATUS_TABLES = ['analysis_request', 'analysis_consent', 'analysis_attempt', 'idempotency_record',
+  'result_application_record', 'candidate_registration', 'catch_asset'];
+
+// #140: 실제 접수(#138) → 개발 주입·DB 수신(#139) → 반영·B 등록(#105)으로 만든 상태를 조회 API로 읽는다. 사례 목록은 #103 공용 합성 세트다.
+// 조회 응답은 같은 키 재응답(접수의 잠금 판정)과 같아야 하고, 조회는 행을 바꾸지 않는다.
+test('#140 #103 사례별 실제 접수 → 개발 주입 → DB 수신·반영 상태를 개별 상태·이력 조회 API가 같은 키 재응답과 같게 읽는다', async t => {
+  const s = await start(t);
+  const settled = [];
+  for (const entry of manifest.cases) {
+    let current = null;
+    for (const [index, message] of entry.messages.entries()) {
+      if (!current || entry.delivery === 'SEPARATE_REQUESTS') {
+        current = { ...await accepted(s, `history-${entry.caseId}-${index}`), entry };
+        settled.push(current);
+      }
+      const response = await s.inject(current.user, current.requestId, message.schema, read(message.file), entry.caseId);
+      assert.equal(response.status, 201, response.text);
+      current.expected = message.expected;
+    }
+  }
+  const rows = await tableRows(STATUS_TABLES);
+  const reads = [];
+  for (const item of settled) {
+    const one = await s.lookup(item.user, item.requestId);
+    assert.equal(one.status, 200);
+    reads.push({ item, one: one.body, listed: await s.history(item.user) });
+  }
+  assert.deepEqual(await tableRows(STATUS_TABLES), rows, '조회는 수신·반영 결과를 바꾸지 않는다');
+  for (const { item, one, listed } of reads) {
+    const label = item.entry.caseId;
+    assert.deepEqual(listed, { items: [one], page: { nextCursor: null } }, label);
+    assert.deepEqual(one, await s.status(item.user, item.intake), label);
+    assert.equal(one.processing, item.expected.processingAfter, label);
+    // 결과 진입 대상은 B가 본인 열람 준비를 마친 원 요청의 Catch뿐이다.
+    const catches = await db.query('SELECT catch_id FROM catch_asset WHERE source_request_id = $1 ORDER BY catch_id', [item.requestId]);
+    assert.equal(catches.length, item.expected.catchesAfter, label);
+    assert.deepEqual([...one.registeredCatchIds].sort(), catches.map(row => row.catch_id), label);
+    assert.equal(one.ownerResultsReady, catches.length > 0, label);
+  }
+  const byCase = caseId => reads.filter(entry => entry.item.entry.caseId === caseId).map(entry => entry.one);
+  const pick = status => [status.processing, status.application, status.lifecycle, status.eligibleCandidateCount, status.retry];
+  // 정상 0건은 정상 완료로 닫히며, 아직 처리 전이라 후보 수가 0인 대기 요청과 구분된다.
+  assert.deepEqual(pick(byCase('empty')[0]), ['EMPTY', 'APPLIED', 'CLOSED', 0, { allowed: false, reason: 'REANALYSIS_DEFERRED' }]);
+  assert.deepEqual(pick(byCase('unidentifiable')[0]), ['QUEUED', 'NOT_READY', 'ACTIVE', 0, { allowed: false, reason: 'IN_PROGRESS' }]);
+  assert.deepEqual(pick(byCase('failed')[0]), ['FAILED', 'APPLIED', 'CLOSED', 0, { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' }]);
+  const [running, uncertain] = byCase('progress-events');
+  assert.deepEqual(pick(running), ['RUNNING', 'NOT_READY', 'ACTIVE', 0, { allowed: false, reason: 'IN_PROGRESS' }]);
+  assert.deepEqual(pick(uncertain), ['UNCERTAIN', 'NOT_READY', 'ACTIVE', 0, { allowed: false, reason: 'EXECUTION_UNCERTAIN' }]);
+  // 같은 작업을 가리키는 두 후보는 B 등록 연결 두 건이지만 결과 진입 Catch ID는 하나다.
+  const sameWork = reads.find(entry => entry.item.entry.caseId === 'two-candidates-same-work');
+  const links = await db.query(`SELECT cr.catch_id FROM candidate_registration cr JOIN result_application_record r
+    ON r.application_record_id = cr.application_record_id WHERE r.request_id = $1`, [sameWork.item.requestId]);
+  assert.equal(links.length, 2);
+  assert.deepEqual(sameWork.one.registeredCatchIds, [links[0].catch_id]);
+  // 다른 회원의 요청 ID는 없는 요청과 같은 404다.
+  const foreign = await s.lookup(reads[0].item.user, reads[1].item.requestId);
+  const missing = await s.lookup(reads[0].item.user, randomUUID());
+  assert.deepEqual([foreign.status, missing.status, missing.body.code], [404, 404, 'RESOURCE_UNAVAILABLE']);
+  assert.deepEqual(foreign.body, missing.body);
+});
+
+test('#140 반영 실패 → 처리 시한 닫기 → 실패 재요청까지의 이력을 조회 API가 같은 키 재응답과 같게 읽는다', async t => {
+  const s = await start(t);
+  const second = secondRepository(s.app);
+  const user = await s.login('history-apply-failure-chain');
+  const template = read('results/succeeded-one-candidate.json');
+  const a = await s.submit(user);
+  const applied = await s.inject(user, a.status.requestId, 'Result', template, 'history-a');
+  assert.equal(applied.body.receipt.disposition, 'ACCEPTED');
+  // 저장소 B는 좌표 어댑터가 모르는 저장소라 반영이 실패한다(위 #114 연결 시험과 같은 강제 실패).
+  const b = await s.submit(user, randomUUID(), { repositoryId: second.repositoryId });
+  assert.equal((await s.inject(user, b.status.requestId, 'Result', template, 'history-b')).status, 500);
+
+  // 닫히기 전 반영 실패: 처리 결과(SUCCEEDED)를 처리 실패로 바꾸지 않고 재요청도 열지 않는다.
+  const unresolved = await s.lookup(user, b.status.requestId);
+  assert.equal(unresolved.status, 200);
+  assert.deepEqual(unresolved.body, await s.status(user, b));
+  assert.deepEqual([unresolved.body.processing, unresolved.body.application, unresolved.body.lifecycle,
+    unresolved.body.registeredCatchIds, unresolved.body.ownerResultsReady, unresolved.body.retry.allowed],
+  ['SUCCEEDED', 'APPLY_FAILED', 'ACTIVE', [], false, false]);
+
+  // 처리 시한 닫기 뒤 반영 실패로 닫힌 요청은 등록 Catch가 없으므로 재요청할 수 있다(PR #296).
+  assert.deepEqual(await s.app.get(AnalysisDeadlineService).closeOverdue(), { closed: 1, failed: 0 });
+  const closed = await s.lookup(user, b.status.requestId);
+  assert.deepEqual(closed.body, await s.status(user, b));
+  assert.deepEqual([closed.body.application, closed.body.lifecycle, closed.body.retry],
+    ['APPLY_FAILED', 'CLOSED', { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' }]);
+
+  const retry = await s.submit(user, randomUUID(), { repositoryId: second.repositoryId, retryOfRequestId: b.status.requestId });
+  const before = await counts();
+  const listed = await s.history(user);
+  assert.deepEqual(listed.items.map(item => item.requestId), [retry.status.requestId, b.status.requestId, a.status.requestId]);
+  assert.equal(listed.page.nextCursor, null);
+  const [newest, failedApply, done] = listed.items;
+  assert.deepEqual([newest.processing, newest.application, newest.lifecycle], ['QUEUED', 'NOT_READY', 'ACTIVE']);
+  // 새 요청이 생긴 원 요청은 다시 재요청 대상으로 보이지 않는다.
+  assert.deepEqual(failedApply.retry, { allowed: false, reason: 'IN_PROGRESS' });
+  assert.deepEqual([done.registeredCatchIds, done.ownerResultsReady, done.retry],
+    [applied.body.application.registeredCatchIds, true, { allowed: false, reason: 'RESULTS_EXIST' }]);
+  for (const [item, accepted] of [[newest, retry], [failedApply, b], [done, a]]) {
+    assert.deepEqual((await s.lookup(user, item.requestId)).body, item);
+    assert.deepEqual(await s.status(user, accepted), item);
+  }
+  const paged = [];
+  let cursor = null;
+  do {
+    const page = await s.history(user, '?limit=1' + (cursor ? '&cursor=' + cursor : ''));
+    paged.push(...page.items);
+    cursor = page.page.nextCursor;
+  } while (cursor);
+  assert.deepEqual(paged, listed.items);
+  // 조회·재응답은 새 요청·시도·수신 기록·Catch를 만들지 않는다.
+  assert.deepEqual(await counts(), before);
 });

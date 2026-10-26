@@ -4,7 +4,7 @@
 
 > 코드를 고치기 전에 [api 코딩 규약](CONVENTIONS.md), 이 문서, 맡은 기능의 `api/docs/<기능>.md`를 한 파일씩 따로 열어 읽는다(여러 파일을 한 번에 출력하면 가운데가 잘릴 수 있다). 기능별 안내는 이 README에 덧붙이지 않고 `api/docs/<기능>.md`로 쓴다.
 
-NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준을 확인한다.
+NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 10월 작업이면 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 해당 작업의 합의된 기준, 11월 Unit이면 12월 intent 요구사항과 그 Unit 기능 설계를 확인한다.
 
 현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 독립 수신 로직과 필수 공급자를 받는 실제 DB/E·B 조립을 제공하며 `AppModule`에는 자동 등록하지 않는다. [#104 회원·분석 선행 테이블](https://github.com/JminAILab/CatchU/issues/104)과 개발 회원·합성 연동·공통 멱등 처리를 제공한다. 기능 API는 [#135 본인 회원 조회·프로필 저장](docs/member-profile.md)(`GET /v1/me`, `PUT /v1/me/profile`), [#147 공유 링크 발급](https://github.com/JminAILab/CatchU/issues/147)(`POST /v1/share-links`)과 [#148 목록·중단](https://github.com/JminAILab/CatchU/issues/148)(`GET /v1/share-links`, `PUT /v1/share-links/{linkId}/stop`)이 있다([docs/share-links.md](docs/share-links.md)). 본인 Catch 조회·확인·불일치 API는 [docs/catch-owner-read-preparation.md](docs/catch-owner-read-preparation.md), 공개·숨김은 [docs/catch-visibility.md](docs/catch-visibility.md)를 따른다. 세션 유지·갱신·로그아웃은 [세션 안내 — #250](docs/auth-sessions.md)를 따른다. 실제 로그인 화면·나머지 기능 API·worker 연결은 후속 작업이다.
 
@@ -12,48 +12,13 @@ Google 인증 코드 교환·회원 연결 API와 앱 등록·검사 절차는 [
 
 ## 공통 오류 처리 — API 명세 v1
 
-정본은 [API 명세 v1 공통 오류·요청 안전성](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#공통-오류요청-안전성)과 [common.yaml의 Error](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml)다. 오류 본문은 `{code, message, details?}`이며 화면은 문구 대신 `code`로 분기한다. `details`는 `violations: [{field, reason}]`와 `existingRequestId`만 허용한다. 입력값·SQL·stack·토큰을 응답에 넣지 않는다.
-
-| 기본 구분 | HTTP | 코드 |
-|---|---|---|
-| 입력 | 400 | INVALID_REQUEST, VALIDATION_FAILED |
-| 미인증·수신자 비밀번호 | 401 | AUTH_REQUIRED, AUTH_INVALID, LINK_PASSWORD_REQUIRED, LINK_PASSWORD_INVALID |
-| 권한·선행 조건·요청 출처 | 403 | GITHUB_CONNECTION_REQUIRED, REPOSITORY_NOT_ALLOWED, CONSENT_REQUIRED, AUTH_ORIGIN_FORBIDDEN |
-| 없음·열람 불가 | 404 | RESOURCE_UNAVAILABLE, LINK_UNAVAILABLE |
-| 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED |
-| 수신자 비밀번호 시도 제한 | 429 | LINK_UNLOCK_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds })`) |
-| 회원 링크 발급 빈도 제한 | 429 | RATE_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('RATE_LIMITED', { retryAfterSeconds })`) |
-| 서버 오류 | 500 | INTERNAL_ERROR |
-
-기능에서는 `src/common/errors`의 `ApiError`를 던진다. HTTP 상태는 코드에 따라 정해진다.
-
-```typescript
-import { ApiError } from '../common/errors'; // 현재 파일 위치에 맞게 상대 경로 조정
-
-throw new ApiError('CONSENT_REQUIRED');
-// 진행 중 요청을 안내할 때:
-throw new ApiError('ANALYSIS_IN_PROGRESS', { details: { existingRequestId: requestId } });
-```
-
-새 오류 코드는 계약 변경 이슈로 상태·의미·문구를 합의한 뒤 `error-codes.ts`의 상태/기본 문구, 이 표, 기능 테스트를 함께 추가한다. #250의 `403 AUTH_ORIGIN_FORBIDDEN`(갱신·로그아웃 요청의 출처 거부)은 2026-10-14 API 명세에 반영됐다. 상태·의미는 위 공통 오류·요청 안전성 표와 [M — 회원 API](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api)가 정본이고, 구현 동작은 [세션 안내](docs/auth-sessions.md)에 있다. 과거 승인 문서를 소급 수정하지 않는다. 기존 코드의 사용자 문구를 지정할 때도 내부 예외의 message를 그대로 전달하지 않는다.
-
-전역 ValidationPipe는 class-validator 데코레이터가 있는 DTO 클래스의 검증 실패·추가 필드를 `400 VALIDATION_FAILED`와 필드/규칙 이름으로 응답한다. `unknown`·인터페이스·직접 수동 검증은 DTO 검증 대상이 아니다.
-
-[9/28 팀장 결정](https://github.com/JminAILab/CatchU/issues/88#issuecomment-5861430583)에 따라 명세 밖 예외를 처리한다.
-
-- 코드 없는 403·409는 상태를 유지하고 `INTERNAL_ERROR`와 경고 로그를 남긴다. 업무 코드가 있는 거부는 `ApiError`를 사용한다.
-- 본문 크기 초과(413 예외 포함)는 `400 INVALID_REQUEST`, 안내는 `요청 본문이 너무 큽니다.`다.
-- 없는 경로는 `404 RESOURCE_UNAVAILABLE`이다. `/v1` 밖에서도 HTML 대신 같은 형식으로 응답한다.
-- 예상 밖 예외는 `500 INTERNAL_ERROR`와 일반 안내다. 5xx 로그는 `ApiError`를 포함해 예외 분류명과 코드 위치(`파일:줄:칸`)만 남긴다. 분류명은 `error.name` 원문이 아니라 `instanceof` 기반으로 고른 허용 목록의 고정 분류명(`ApiError`·`ForbiddenException`·`TypeError`·`Error` 등)이며, 목록 밖의 하위 클래스는 가장 가까운 상위 분류로 기록한다. 코드 위치는 stack 문자열이 아니라 V8의 구조화된 호출 위치에서 따로 수집하므로 원문 메시지가 섞이지 않으며, 함수 이름은 기록하지 않는다. 수집 기록이 없으면 위치를 생략한다(`src/common/errors/stack-frames.ts`). 요청 주소는 토큰이 들어가는 실제 경로 대신 등록된 경로 틀만 기록하고, 없으면 `[unmatched]`로 표시한다.
-- 업무 코드가 있는 4xx 거부는 기본적으로 기록하지 않는다. 보안 사건 세 코드의 예외·기록 형식·검사는 [보안 사건 기록](docs/security-events.md)을 따른다.
-
-전역 설정은 `configureApp`에 모았다. 기능 경로는 `/v1` 아래, `GET /health`는 접두사 없이 유지하며 성공·오류 응답에 `Cache-Control: no-store`를 붙인다. `/v1` 밖 오류와 CORS 사전 요청을 포함한 모든 응답에 보안 헤더 `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`·`X-Content-Type-Options: nosniff`·`Referrer-Policy: no-referrer`를 붙이고 `X-Powered-By`를 끈다. `Strict-Transport-Security: max-age=300`은 `NODE_ENV`가 development·test가 아닐 때(값이 없거나 다른 값 포함) 붙인다. 기간은 5분으로 시작해 도메인·인증서가 정해지면 늘린다(`src/common/http/security-headers.ts`, #217). `npm test`는 실제 로컬 HTTP 서버에서 위 상태/본문/헤더/로그, ValidationPipe, 인증 Guard를 검증한다. 오류 재현 전용 경로는 `test/errors.test.cjs`에만 있고 제품 앱에 추가하지 않는다.
+[api 코딩 규약](CONVENTIONS.md#공통-오류-처리--api-명세-v1)에 있다.
 
 ## 작업 시작
 
 - [공통 작업관리](../docs/CatchU_작업관리.md)를 읽고 해당 이슈의 범위·완료 기준·관련 계약을 확인한다.
 - api 초기화 담당이 모든 API 기능·결함을 맡는 것은 아니다. 기능 담당자가 api와 web을 함께 수정할 수 있으며, 각 작업의 책임·연결 상대는 이슈에서 확인한다.
-- 착수·브랜치·기술·검사 기준은 [코딩 운영](../docs/CatchU_작업관리.md#코딩-운영)을 따른다. [아키텍처 검토초안 PR #70](https://github.com/JminAILab/CatchU/pull/70)은 설계 입력으로 참고한다.
+- 착수·브랜치·기술·검사 기준은 [코딩 운영](../docs/CatchU_coding_procedures.md#코딩-운영)을 따른다. [아키텍처 검토초안 PR #70](https://github.com/JminAILab/CatchU/pull/70)은 설계 입력으로 참고한다.
 
 ## 초기화 기준과 도구
 
@@ -162,8 +127,8 @@ curl.exe -i http://127.0.0.1:3001/health
 | ------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `npm run lint`      | ESLint 정적 검사. 경고도 실패 처리                                                                                   |
 | `npm run typecheck` | 산출물 생성 없이 TypeScript 타입 검사                                                                                |
-| `npm test`          | 빌드 후 테스트 DB에 마이그레이션을 적용하고 `test/**/*.test.cjs`를 한 파일씩 실행. health·인증 HTTP, 실제 main 진입점의 설정 로딩/기동 실패, DB 규약·테스트 DB, 분석 수신·개발 주입 대역 검사. **테스트 DB 필요**(「DB 테스트」). 서버·임시 설정은 검사 후 정리 |
-| `npm run test:analysis-fixtures` | 별도 준비한 #103 공용 합성 자료로 수신 처리 검사. 자료 경로는 아래 #139 절 참고. 자료가 없으면 실패하며 묵시적으로 생략하지 않음 |
+| `npm test`          | 빌드 후 테스트 DB에 마이그레이션을 적용하고 `test/**/*.test.cjs`를 두 줄로(줄마다 한 파일씩) 실행. health·인증 HTTP, 실제 main 진입점의 설정 로딩/기동 실패, DB 규약·테스트 DB, 분석 수신·개발 주입 대역 검사. **테스트 DB 필요**(「DB 테스트」). 서버·임시 설정은 검사 후 정리 |
+| `npm run test:analysis-fixtures` | 별도 준비한 #103 공용 합성 자료로 수신 처리 검사. 자료 경로는 아래 #139 절 참고. 자료가 없으면 실패하며 묵시적으로 생략하지 않음. 이미 빌드했으면 `node --test test/analysis/shared-fixtures.check.cjs`로 빌드 없이 같은 검사(CI는 `npm test` 뒤에 이렇게 돈다) |
 | `npm run build`     | 이전 `dist/`를 지운 뒤 `src/`를 `dist/`로 컴파일. 소스에서 지운 엔티티·마이그레이션이 `dist/`에 남아 탐색되지 않게 한다 |
 | `node --test test/worker-messages.test.cjs` | 빌드 없이 [M1 합성 결과 세트](../worker/fixtures/m1-synthetic/README.md)의 사례·음성 대조가 worker와 같은 스키마 판정을 내는지만 검사. `npm test`에도 포함 |
 | `npm start`         | `dist/main.js` 실행. 먼저 빌드 필요                                                                                  |
@@ -195,11 +160,12 @@ docker run -d --name catchu-db-test -p 127.0.0.1:5433:5432 -e POSTGRES_USER=catc
 - 파일 하나만 실행: `npm test -- test/db/timestamptz.test.cjs`. `node --test`로 직접 실행하면 `DB_*`가 없어 실패한다.
 - 테스트 DB를 새로 만들려면 `docker rm -f catchu-db-test` 뒤 다시 `docker run`한다. 다음 `npm test`가 마이그레이션을 처음부터 적용한다.
 - 큐 연결(#233)의 실제 Valkey 시험은 `CATCHU_TEST_REDIS_URL`을 **셸 환경변수**로 줄 때만 돌고(`.env`로는 넘어가지 않는다), 없으면 건너뛴다. 준비 명령은 [docs/analysis-queue.md 「시험」](docs/analysis-queue.md#시험).
+- 잠금 대기 상한 시험(#220)은 시험 전용 DB 계정을 만들었다 지우므로 테스트 DB 계정에 역할 생성 권한이 필요하다(위 명령의 `catchu`는 superuser). 권한이 없으면 로컬에서는 건너뛰고 `CI=true`에서는 실패한다([docs/lock-wait-limit.md 「시험」](docs/lock-wait-limit.md#시험)). 둘째 줄 DB를 만들 `CREATEDB`도 필요하며, 없으면 `npm test`가 시험 전에 멈춘다(권한을 주거나 `…_lock_test` DB를 미리 만든다).
 
 DB를 쓰는 테스트를 추가할 때:
 
 - `test/support/test-database.cjs`의 `openTestDataSource()`로 접속하고, 각 테스트 앞(`beforeEach`)에서 `resetTestDatabase(dataSource)`를 불러 앞선 테스트의 자료 없이 시작한다. 초기화는 마이그레이션 기록을 뺀 모든 테이블을 비운다.
-- 테스트 파일은 한 번에 하나씩 돈다(`--test-concurrency=1`). 동시 요청 검사는 한 테스트 안에서 연결을 여러 개 열어 만든다.
+- 테스트 파일은 줄마다 한 번에 하나씩 돈다(`--test-concurrency=1`). 잠금 대기 시험(`test/**/lock-wait-limit-*.test.cjs`)과 실제 1분을 기다리는 발급 통합 시험(`test/db/share-links-web-integration.test.cjs`)은 실행기가 만드는 둘째 DB(`…_lock_test`)에서 나머지와 동시에 돌고, `test/db/build-output.test.cjs`는 공용 `dist`를 다시 만들어 두 줄 앞에서 혼자 돈다. 서버 전체를 세는 조회(`pg_stat_activity`·`pg_locks`)는 `current_database()`로 한정한다. 동시 요청 검사는 한 테스트 안에서 연결을 여러 개 열어 만든다.
 - 확인용 테이블이 필요하면 그 테스트 안에서 만들고 지운다. 제품 테이블은 마이그레이션으로만 만든다.
 
 ## 파일 역할과 모듈 추가 위치
@@ -236,23 +202,31 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 선정 지원 저장소 조회 — #136
 
-[docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다.
+[docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다. 실제 회원의 DB 선정 공급과 #323·#232 접점·초기화·갱신 절차(#252)는 [docs/repository-selection.md](docs/repository-selection.md)에 있다.
 
 ## 분석 고지·접수·실패 재요청 — #138
 
-[docs/analysis-intake.md](docs/analysis-intake.md)에서 개발용 합성 고지·실제 회원의 실제 자료용 고지(#322)·원자 접수·동시 요청·멱등 처리·확정 실패 재요청을 확인한다. 실제 회원의 접수(#323)와 worker 전송은 포함하지 않는다.
+[docs/analysis-intake.md](docs/analysis-intake.md)에서 합성·실제 고지(#322), 실제 회원 LIVE 접수(#323), 원자·동시·멱등 접수와 실패 재요청을 확인한다. 큐 전송·worker 실행은 포함하지 않는다.
+
+## 본인 분석 이력·개별 상태 조회 — #140
+
+[docs/analysis-history.md](docs/analysis-history.md)에 있다.
 
 ## 본인 회원·프로필 조회와 전체 저장 — #135
 
-`GET /v1/me`, `PUT /v1/me/profile`의 입력 제한·이름 저장 판정·호출 예시·공개 경계는 [docs/member-profile.md](docs/member-profile.md)에 있다.
+`GET /v1/me`, `PUT /v1/me/profile`의 입력 제한·이름 저장 판정·호출 예시·공개 경계는 [docs/member-profile.md](docs/member-profile.md)에 있다. 수신자 조회(#151)에 소유 회원 상태·공개 프로필을 주는 읽기 전용 공급 함수와 그 스냅샷 조건도 같은 문서에 있다.
 
 ## 실제 GitHub 계정 연결 — #231
 
 추가 scope 없는 OAuth App 연결·해제, 발급 응답의 실제 만료 시각, 암호화 보관 설정과 #232의 단일 자격정보 제공 함수는 [docs/github-connection.md](docs/github-connection.md)를 따른다. 기능은 기본 비활성이며 실제 앱 설정·토큰 검증과 API·DB 대역 검사 범위를 구분한다.
 
+## 비로그인 수신자 조회 — #151
+
+`GET /v1/public/links/{token}`·`/catches/{catchId}`의 판정 순서·소유 회원 같은 시점 판정·재사용 경계는 [docs/recipient-read.md](docs/recipient-read.md)를 따른다. 기본 AppModule에 등록하며, 공개 프로필·소유 회원 상태는 A의 `OwnerProfileReader`를 쓴다.
+
 ## Worker 내부 분석 컨텍스트 — #232
 
-서비스 인증·실제 DB 조회·필수 선정 공급자 조립과 후속 경계는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 AppModule에는 자동 등록하지 않으며, 실제 선정 공급자와 명시적 활성화가 모두 필요하다.
+제품 기동 시 실제 DB 선정 공급자를 연결하는 조건, 서비스 인증과 검사 범위는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 비활성이며 `WORKER_CONTEXT_ENABLED=true`와 유효한 별도 서비스 키를 준비해야 내부 조회 경로를 등록한다.
 
 ## E 수신 기록과 Catch 반영 연결 — #105
 
@@ -268,7 +242,11 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 분석 요청 보내기와 알림·결과 받기(큐 연결) — #233
 
-큐 설정은 `CATCHU_QUEUE_REDIS_URL`(큐 서버 주소, 없으면 모듈을 조립하지 않음)과 `CATCHU_QUEUE_PREFIX`(기본 `catchu`, worker와 같아야 함)다. 보내기 주기: 이전 보내기가 끝나고 5초 뒤 다음 보내기를 하며, 한 번에 대기 시도 100건을 읽는다. 큐 이름·작업 옵션·받기 규칙·수동 검증은 [docs/analysis-queue.md](docs/analysis-queue.md)에 있다. 모듈은 아직 `AppModule`에 등록하지 않았다(켜는 조건도 같은 문서).
+큐 설정은 `CATCHU_QUEUE_REDIS_URL`(큐 서버 주소, 없으면 모듈을 조립하지 않음)과 `CATCHU_QUEUE_PREFIX`(기본 `catchu`, worker와 같아야 함)다. 보내기 주기: 이전 보내기가 끝나고 5초 뒤 다음 보내기를 하며, 한 번에 대기 시도 100건을 읽는다. 큐 이름·작업 옵션·받기 규칙·수동 검증은 [docs/analysis-queue.md](docs/analysis-queue.md)에 있다. 큐 주소가 있으면 제품 main이 큐 연결을 조립해 `listen` 뒤 시작하고, 받기가 멈추면 종료 코드 1로 끝난다(켜는 조건·MOCK 결과의 한계도 같은 문서).
+
+## 잠금 대기 상한 — #220
+
+상한은 코드가 아니라 앱 DB 계정에 3초로 건다. 적용 위치, 경로별로 상한을 넘었을 때 남는 것, 측정과 판단이 필요한 결과는 [docs/lock-wait-limit.md](docs/lock-wait-limit.md)에 있다.
 
 ## 실행 실패 시 확인
 

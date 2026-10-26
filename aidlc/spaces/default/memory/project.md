@@ -62,3 +62,5 @@
 
 <!-- Project-specific corrections from human feedback. -->
 <!-- Format: NEVER/ALWAYS [behavior] (learned [date]) -->
+- 승인된 요구사항을 재승인으로 다시 쓸 때 요구사항 ID를 새로 매기지 않는다. 바뀐 항목은 같은 ID에 새 내용을 적고, 제외한 ID는 재사용하지 않고 제외 표에 남기며, 새 항목은 묶음의 다음 번호나 새 묶음 번호를 쓴다. (learned 2026-10-24) <!-- cid:260925-intent-12:requirements-analysis:88856121707618f894629c8d871491362371c7047e5645d1b720a6f19d880ead -->
+- ALWAYS 12월 intent(11월 개발)는 포트폴리오 MVP로 설계한다. 요구사항·재승인 입력에 근거가 없는 기능·화면·운영 장치·검증 절차는 넣지 말고 질문으로 올리며, 선택지는 가장 단순한 안을 기본값으로 내고 더 무거운 안은 무엇을 더 막는지와 늘어나는 공수를 함께 적는다. 제외한 기능과 채택하지 않은 안은 되살리지 않는다. (learned 2026-10-24) <!-- cid:260925-intent-12:requirements-analysis:ebd083a76b506f1776b327a9642875dcfc9feb547387bbcd52f96958c26192e8 -->
