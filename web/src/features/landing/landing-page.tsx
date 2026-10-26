@@ -158,8 +158,8 @@ const SCENES: { id: string; title: string; text: string; visual: ReactNode }[] =
       <Visual label="확인과 공개 선택">
         <div className={styles.cardHead}><b>request-handler.ts 코드 수정</b><Fiction /></div>
         <ul className={styles.checkList}>
-          <li><span className={styles.tick} aria-hidden="true">✓</span>기록에서 확인한 작업이 내 작업과 맞아요.</li>
-          <li><span className={styles.tick} aria-hidden="true">✓</span>근거에 나온 커밋이 내 작업 기록이 맞아요.</li>
+          <li><span className={styles.tick} aria-hidden="true">✓</span>근거를 보고 작업 사실을 확인했습니다.</li>
+          <li><span className={styles.tick} aria-hidden="true">✓</span>나의 기여 범위를 확인했습니다.</li>
         </ul>
         <p className={styles.fictionNote}>확인만으로는 공개되지 않습니다. 공개는 다음 단계에서 따로 고릅니다.</p>
         <div className={styles.segment}><span>미공개</span><span className={styles.segmentOn}>공개 설정</span></div>
