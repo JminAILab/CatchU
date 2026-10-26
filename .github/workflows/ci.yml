@@ -1,4 +1,5 @@
 # dev 대상 PR의 최소 CI(#201). 각 서비스 README의 기존 검사 명령을 그대로 실행한다.
+# 11월 개발 통합 브랜치(intent/260925-intent-12, 레포 컨벤션 §2.1)에 들어가는 PR·Unit 합치기·dev 가져오기에도 같은 검사를 돌린다(#389).
 # 서비스 job은 관련 경로가 바뀐 경우에만 돌고, 아니면 건너뛴다. 건너뛴 job은 필수 상태 검사에서 통과로 취급된다.
 # 필수 상태 검사로 거는 job 이름(changes·web·api·worker·deps-audit)을 바꾸면 dev ruleset도 함께 고친다.
 # Actions는 job마다 1분 단위로 올려 과금하므로, 몇 초면 끝나는 검사는 job을 따로 두지 않고 changes의 단계로 붙인다.
@@ -8,17 +9,18 @@ name: CI
 
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, 'intent/**']
   push:
-    branches: [dev]
+    branches: [dev, 'intent/**']
   workflow_dispatch: # 수동 실행은 경로와 관계없이 모든 서비스를 검사한다.
 
 permissions:
   contents: read
 
-# 같은 PR에 새 push가 오면 이전 실행을 취소한다. dev push와 수동 실행은 커밋마다 따로 돈다.
+# 같은 PR에 새 push가 오면 이전 실행을 취소한다. 브랜치 push와 수동 실행은 실행마다 따로 돈다.
+# 커밋으로 묶으면 같은 커밋이 dev와 통합 브랜치에 올라올 때 뒤 실행이 앞 실행을 기다리고, 셋이 겹치면 대기 중인 실행이 취소된다.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -35,18 +37,24 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 2
+          # push는 push 직전 커밋과 비교하므로 이력 전체를 받는다(약 17MB, 커밋 2개만 받을 때보다 1초 안쪽 더 걸린다).
+          fetch-depth: 0
       - id: detect
         env:
           EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          # PR은 GitHub이 만든 시험 병합 커밋, dev push는 PR의 merge commit이라 첫 부모와 비교하면 그 PR의 변경 전체가 나온다.
+          # PR은 GitHub이 만든 시험 병합 커밋이라 첫 부모(대상 브랜치)와 비교하면 그 PR의 변경 전체가 나온다.
+          # push는 push 직전 커밋과 비교한다. 통합 브랜치에 Unit 여러 개를 합친 뒤 한 번에 올려도 바뀐 서비스를 모두 잡는다.
+          # 브랜치를 처음 만든 push(직전 커밋이 0)나 직전 커밋을 이력에서 찾지 못하면 모든 서비스를 검사한다.
           contract=aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/
           web=false api=false worker=false deps=''
-          if [ "$EVENT" = workflow_dispatch ] || ! git rev-parse -q --verify HEAD^1 >/dev/null; then
+          base=HEAD^1
+          case "$EVENT" in push) base=$BEFORE ;; esac
+          if [ "$EVENT" = workflow_dispatch ] || ! git rev-parse -q --verify "$base^{commit}" >/dev/null; then
             web=true api=true worker=true deps='web api worker'
           else
-            files=$(git -c core.quotePath=false diff --name-only --no-renames HEAD^1 HEAD)
+            files=$(git -c core.quotePath=false diff --name-only --no-renames "$base" HEAD)
             while IFS= read -r file; do
               case "$file" in .github/workflows/ci.yml) web=true api=true worker=true ;; esac
               case "$file" in web/*) web=true ;; esac
