@@ -3,6 +3,8 @@
 
 ## Interpretations
 <!-- example: 2026-05-29T10:14:32Z — chose REST over GraphQL; the consuming team only needs CRUD, revisit if subscriptions land -->
+- 2026-10-24T07:30:00Z — 9월 US13.3(기업 회원의 받은 공유본 검토)을 받은 사람의 Claude 연결로 대체해 같은 번호를 썼다; 입력의 "US13.3~13.4의 구직자 탐색 MCP 흐름" 제외는 탐색 흐름에만 걸린다고 읽었고, FR13.3이 대체(유지)됐기 때문이다.
+- 2026-10-24T07:30:00Z — AI 기본 요약을 입력의 대응표(FR2.7·US4.2)대로 US4.2에 두되 FR2 묶음 절 안에 배치했다; ID는 입력을 따르고 위치는 요구사항 묶음을 따랐다.
 
 ## Deviations
 <!-- example: 2026-05-29T10:14:32Z — skipped the optional caching layer the stage prose suggested; the dataset is small enough that it adds risk -->
