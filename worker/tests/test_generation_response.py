@@ -1577,14 +1577,13 @@ def test_question_failure_keeps_description_and_title() -> None:
 def test_unverified_title_keeps_description_and_questions() -> None:
     """제목 지목만 확인되지 않으면 제목만 null이고 설명·질문은 남으며 실패는 없다(11).
 
-    확인 실패라 고쳐 쓰기를 부르지 않는다. 결과의 제목 칸은 결과 조합의 임시 대체값(작업 사실 첫
-    항목)이다.
+    확인 실패라 고쳐 쓰기를 부르지 않는다. 결과의 제목 칸도 null로 나간다.
     """
     case = run(reply_with(title=lambda r: code_title(login(r), "limit")))
 
     check(case, draft=SENTENCE, questions=(QUESTION,), title=None)
     (entry,) = case.result["candidates"]
-    assert entry["title"] == entry["workFacts"][0]
+    assert entry["title"] is None
 
 
 # 전체를 읽을 수 없는 응답(설명·질문 모두 FAILED, DRAFT·REFLECTION 각 1건)
