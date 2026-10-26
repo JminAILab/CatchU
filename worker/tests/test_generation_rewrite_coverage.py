@@ -675,8 +675,7 @@ def test_title_check_failure_is_not_rewritten(
     assert found.reflection.status == "GENERATED"
     assert new_failures(case) == []
     assert case.result["outcome"] == case.before.result["outcome"]
-    # 제목 null은 결과 조합의 임시 대체값(작업 사실 첫 항목)으로 나간다(결정 문서 「담당과 순서」 ③).
-    assert entry(case, 3)["title"] == found.work_facts[0]
+    assert entry(case, 3)["title"] is None
     assert flow_counts(caplog)["titleOnlyNull"] == 1
 
 
@@ -1115,7 +1114,7 @@ def test_title_only_null_keeps_failures_and_outcome(
     assert case.result["failures"] == case.before.result["failures"]
     assert case.result["outcome"] == fixed.result["outcome"]
     assert case.result["outcome"] == case.before.result["outcome"]
-    assert entry(case, 3)["title"] == found.work_facts[0]
+    assert entry(case, 3)["title"] is None
     counts = flow_counts(caplog)
     assert counts["titleOnlyNull"] == 1
     assert counts["draftGenerated"] == 1

@@ -315,8 +315,7 @@ def assert_failed_whole(case: GenerationCase, number: int) -> None:
     found = entry(case, number)
     assert found["draft"] == {"status": "FAILED", "content": None}
     assert found["reflection"] == {"status": "FAILED", "questions": []}
-    # 제목 null은 결과 조합의 임시 대체값(작업 사실 첫 항목)으로 나간다(결정 문서 「담당과 순서」 ③).
-    assert found["title"] == each.work_facts[0]
+    assert found["title"] is None
 
 
 def generate_after(
@@ -926,7 +925,7 @@ def test_title_only_null_keeps_failures_and_outcome(
     assert each.title is None
     assert case.result["failures"] == case.before.result["failures"] == []
     assert case.result["outcome"] == case.before.result["outcome"] == "SUCCEEDED"
-    assert entry(case, 3)["title"] == each.work_facts[0]
+    assert entry(case, 3)["title"] is None
     assert case.run.report.title_only_null == 1
     assert "titleOnlyNull=1" in caplog.text
 
