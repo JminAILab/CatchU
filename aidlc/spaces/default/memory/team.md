@@ -9,6 +9,7 @@
 
 ## Way of Working
 
+- 이 파일의 11월 규칙(팀 방식·Unit 담당·승인·커버리지·인프라 담당·U1 뒤 착수)은 12월 intent(11월 개발)에 적용한다. 10월 MVP의 남은 작업은 코딩 절차 「코딩 운영」 끝의 10월 문단을 따르고, 이 파일과 `org.md`의 Construction 브랜치·커버리지 기준을 머지 조건으로 삼지 않는다.
 - 11월 개발(12월 intent)의 통합 브랜치(integration branch)는 `intent/260925-intent-12`다. 다른 브랜치를 Unit 맡기·합치기의 기준으로 쓰지 않는다.
 - 공통 작업 절차는 `docs/CatchU_작업관리.md`, 코딩 기준은 `docs/CatchU_coding_procedures.md` 「코딩 운영」을 따른다. 구현은 AI-DLC 공식 팀 방식이다. 각 담당이 자기 Unit을 맡아 기능 설계부터 시험까지 진행·제출하고, 팀장이 통합 브랜치에 merge commit으로 합친 뒤 통합 브랜치를 PR·작성자 외 승인 1건·merge commit으로 `dev`에 올린다. 팀 방식 사전 시험이 실패하면 구현만 이슈 → `영역/작업내용` 브랜치 → `dev` PR로 바꾼다. 보호 브랜치에 squash·rebase 머지는 쓰지 않는다.
 - 각 담당은 12월 intent 납품 계획 담당표의 자기 Unit을 맡는다. 미배정 공통 업무를 팀원 1이나 초기화 담당에게 자동 배정하지 않는다.

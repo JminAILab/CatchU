@@ -78,7 +78,7 @@ AI는 바뀌는 사용자 행동과 영향을 확인해 필요한 검사를 골�
 | 기술 | PostgreSQL·TypeORM·Redis를 쓰고 큐는 BullMQ로 연결한다([#77](https://github.com/JminAILab/CatchU/issues/77)). 서버·worker·큐·DB가 끊기는 장애는 앱에서 복구하지 않고 운영 설정·운영자에게 맡긴다. 실패 처리는 계약 설계 「공통 전제」의 「에러 대응 최소선」을 따른다. 실패는 숨기지 않고, 동시 요청·재전송·늦은 결과는 남의 자료 노출이나 삭제 실패로 이어질 때만 막는다. 서비스 LLM은 Claude API다([#119](https://github.com/JminAILab/CatchU/issues/119)). 일반 개발·검사는 제공자 비종속 인터페이스와 합성 제공자로 한다 |
 | 검사 | `dev` 대상 PR은 [CI](../.github/workflows/ci.yml)를 통과해야 머지된다([레포 컨벤션 「dev의 검증」](CatchU_레포_컨벤션.md#2-브랜치)). 통합 브랜치 대상 PR과 push에도 CI가 돈다(레포 컨벤션 §2.1). 검사와 결과 보고는 [검사 선택과 결과 보고](#검사-선택과-결과-보고)를 따른다 |
 
-10월 MVP의 남은 작업은 10월 요구사항·계약과 이슈 → `dev` PR 흐름을 따른다([10월 판본](https://github.com/JminAILab/CatchU/blob/08822dc2f3107e2a13ff5580d35f8e65c1b14b1c/docs/CatchU_coding_procedures.md#코딩-운영)). 10월 작업이 끝나면 이 문단을 지운다.
+10월 MVP의 남은 작업은 10월 기준을 따른다: 이슈 → `dev` PR, 계약 수정은 응답 필드·상태 의미·권한·DB 관계와 유일성 변경(새 오류 코드도 계약 변경 이슈로 합의), 중복 요청·늦은 결과 반영 막기 유지, `org.md`·`team.md`의 Construction 브랜치·80% 커버리지·AI-DLC 단계 승인은 머지 조건이 아니다. 전문은 `git show 08822dc2:docs/CatchU_coding_procedures.md`의 「코딩 운영」. 10월 작업이 끝나면 이 문단을 지운다.
 
 ## 결정 이력
 
