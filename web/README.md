@@ -43,7 +43,7 @@ npm ci
 
 | 목적 | 명령 | 확인 |
 |---|---|---|
-| 개발 서버 | `npm run dev` | http://localhost:3000 에 "CatchU web" 화면. 파일 수정 시 자동 반영 |
+| 개발 서버 | `npm run dev` | http://localhost:3000 에 비로그인 서비스 소개 화면. 파일 수정 시 자동 반영 |
 | 배포용 빌드 | `npm run build` | `.next/` 생성, 오류 없이 종료 |
 | 빌드 결과 실행 | `npm run start` | `npm run build` 뒤에만 가능. 주소는 개발 서버와 같음 |
 
@@ -58,7 +58,7 @@ npm ci
 | `npm run lint` | ESLint (`eslint-config-next` core-web-vitals + typescript) | 조건문 안의 React Hook 호출 |
 | `npm run typecheck` | `tsc --noEmit`. 생성 파일(`next-env.d.ts`, `.next/types`) 없이도 통과해야 함 | `const n: number = "x"` |
 | `npm run build` | 프로덕션 빌드 | 빌드 중 타입·import 오류 |
-| `npm run check:run` | `scripts/smoke.mjs`: 포트가 비어 있는지 확인한 뒤 빌드 결과를 `next start`로 띄우고, Ready 출력 후 `GET /`가 200이고 본문에 "CatchU web"이 있는지, 보안 헤더(아래 「보안 응답 헤더」)가 붙고 `X-Powered-By`가 없는지 확인하고 종료(전체 30초 제한). **`npm run build` 이후에만, 개발 서버를 끈 상태에서 실행** | 포트 사용 중, 서버 미기동, 200 아님, 본문 불일치, 보안 헤더 누락, 30초 초과 |
+| `npm run check:run` | `scripts/smoke.mjs`: 포트가 비어 있는지 확인한 뒤 빌드 결과를 `next start`로 띄우고, Ready 출력 후 `GET /`가 200이고 본문에 서비스 소개 제목(`id="landing-title"`)이 있는지, 보안 헤더(아래 「보안 응답 헤더」)가 붙고 `X-Powered-By`가 없는지 확인하고 종료(전체 30초 제한). **`npm run build` 이후에만, 개발 서버를 끈 상태에서 실행** | 포트 사용 중, 서버 미기동, 200 아님, 본문 불일치, 보안 헤더 누락, 30초 초과 |
 | `npm test` | Node 기본 테스트 도구로 공통 응답 해석 검사 | 오류를 빈 목록으로 처리, HTTP 상태·code 소실 |
 | `npm run check` | lint → typecheck → test → build → check:run | 하나라도 실패하면 중단 |
 
@@ -85,7 +85,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/layout.tsx` | 루트 레이아웃(`<html lang="ko">`, 기본 메타데이터, `globals.css`) |
 | `src/app/globals.css` | 전역 기본값과 공통 색·폭 변수. 화면 스타일은 넣지 않는다 |
 | `src/app/(guest)/`, `(member)/`, `s/` | 화면 묶음별 레이아웃(헤더). 아래 「공통 레이아웃」 참조 |
-| `src/app/(guest)/page.tsx` | `/` 기본 화면. 서비스 소개는 #155에서 채운다 |
+| `src/app/(guest)/page.tsx` | `/` 비로그인 서비스 소개([기능 안내](src/features/landing/README.md)) |
 | `src/app/preview/common/` | 헤더·상태 표시 개발용 미리보기(`npm run dev`에서만) |
 | `src/app/(member)/home/` | 회원 가드 안의 로그인 후 홈. 연결 상태 안내와 다음 행동을 조립한다([기능 안내](src/features/home/README.md)) |
 | `src/app/(member)/assets/` | 회원 가드 안의 실제 내 자산 페이지. B 목록·상세와 D 저장소 모달을 조립한다([기능 안내](src/features/assets/README.md)) |
