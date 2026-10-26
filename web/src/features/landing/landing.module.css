@@ -495,6 +495,34 @@
   }
 }
 
+/* 좁은 폭에서 겹친 카드가 비좁아 제목이 어색하게 꺾이지 않도록 글자와 안쪽 여백을 줄인다. */
+@media (max-width: 900px) {
+  .card {
+    padding: 14px;
+  }
+
+  .cardCatch {
+    padding: 16px;
+  }
+
+  .cardHead {
+    gap: 6px;
+  }
+
+  .cardHead b {
+    font-size: 14px;
+  }
+
+  .fictionBadge {
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+
+  .cardTitle {
+    font-size: 18px;
+  }
+}
+
 /* 760px 이하: 카드를 겹치지 않고 세로로 쌓는다. 움직임도 없다. */
 @media (max-width: 760px) {
   .page {

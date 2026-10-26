@@ -46,6 +46,11 @@ export function Reveal({ children, className }: { children: ReactNode; className
       else if (timer === undefined) timer = setTimeout(show, FALLBACK_DELAY);
     }, { threshold: THRESHOLDS });
     observer.observe(element);
+    // 끝으로 한 번에 건너뛰면 한 번도 화면에 걸리지 않아 관찰 알림이 오지 않으므로 위치로도 확인한다.
+    const onScroll = () => {
+      if (element.getBoundingClientRect().bottom <= 0) show();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
     reduced.addEventListener("change", show);
     wide.addEventListener("change", show);
     window.addEventListener("beforeprint", show);
@@ -53,6 +58,7 @@ export function Reveal({ children, className }: { children: ReactNode; className
     function stop() {
       observer.disconnect();
       clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
       reduced.removeEventListener("change", show);
       wide.removeEventListener("change", show);
       window.removeEventListener("beforeprint", show);
