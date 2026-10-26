@@ -3022,7 +3022,7 @@ def test_split_does_not_depend_on_input_order() -> None:
 
 
 def test_titles_are_left_empty_and_texts_avoid_counts_and_query_jargon() -> None:
-    """#118은 제목을 만들지 않고, 결과 조합의 임시 대체값(작업 사실 첫 항목)이 센 숫자 없는 단위
+    """#118은 제목을 만들지 않아 결과의 제목이 null이고, 작업 사실 첫 항목은 센 숫자 없는 단위
     이름이다. 문장에는 센 숫자·'작성한'·조회 방식의 말이 없다(2026-10-08 팀장 결정 「Catch 제목」·
     「수신자에게 나가는 숫자와 근거 순서」·「본인 기여의 뜻」, 결정 문서 「담당과 순서」 ③)."""
     merge_window = [
@@ -3051,7 +3051,7 @@ def test_titles_are_left_empty_and_texts_avoid_counts_and_query_jargon() -> None
     single = outputs[2].candidates[0]
     assert single.title is None
     assert single.work_facts == (f"PR·병합에 속하지 않은 본인 커밋 {sha(60)[:12]}",)
-    assert result(outputs[2])["candidates"][0]["title"] == single.work_facts[0]
+    assert result(outputs[2])["candidates"][0]["title"] is None
     for output in outputs:
         assert output.candidates
         assert_member_text(output)
@@ -3090,7 +3090,7 @@ def test_other_authors_follow_the_whole_pull_request_list(
 
     (candidate,) = output.candidates
     assert candidate.work_facts == ("PR #3, 상태 병합됨", PULL_OTHERS[expected])
-    assert result(output)["candidates"][0]["title"] == "PR #3, 상태 병합됨"
+    assert result(output)["candidates"][0]["title"] is None
 
 
 @pytest.mark.parametrize(

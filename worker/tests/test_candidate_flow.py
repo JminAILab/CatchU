@@ -322,7 +322,7 @@ def test_candidates_are_eligible_and_drafts_are_not_generated(kind: str) -> None
         }
         assert entry["draft"] == {"status": "NOT_GENERATED", "content": None}
         assert entry["reflection"] == {"status": "NOT_GENERATED", "questions": []}
-        assert entry["title"].strip()
+        assert entry["title"] is None
         assert entry["workFacts"]
         assert entry["subjectContribution"].strip()
         assert entry["groupingBasis"].strip()

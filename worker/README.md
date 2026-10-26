@@ -123,7 +123,7 @@ uv run --locked python -m app.processing succeeded-one-candidate
 | `two-candidates-same-work` | SUCCEEDED, 같은 작업의 후보 2건. 두 번째 후보는 초안 미생성(`null`) |
 | `draft-failed` | PARTIAL_FAILED, 후보 유지·초안 `null`·초안 실패 1건 |
 | `reflection-failed` | PARTIAL_FAILED, 후보 유지·질문 없음·질문 실패 1건 |
-| `title-failed` | SUCCEEDED, 제목 없음(대체값 임시 동작으로 제목이 `workFacts` 첫 항목) |
+| `title-failed` | SUCCEEDED, 제목 `null`·실패 없음 |
 | `execution-unknown` | 결과 없음(`null`), 마지막 알림 `UNCERTAIN` |
 
 - 처음 다섯 개는 [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 같은 이름 템플릿과 결과가 같다. 개발용 실행에서는 `finishedAt`·`observedAt`만 실행 시각이다. 나머지는 `succeeded-one-candidate` 템플릿에서 한 부분만 바꿨다.
