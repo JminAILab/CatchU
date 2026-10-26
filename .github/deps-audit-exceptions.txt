@@ -1,4 +1,3 @@
 # 의존성 취약점 검사(.github/scripts/check-deps-audit.sh)가 넘기는 취약점(#215).
 # 고친 판본이 없는 취약점만 적는다. 고친 판본이 나오면 검사가 다시 실패하므로, 그때 의존성을 올리고 이 줄을 지운다.
 # 한 줄에 "서비스 취약점ID 이유". 서비스는 web·api·worker이고, 취약점 ID는 GitHub 취약점 ID(GHSA-)를 쓴다.
-web GHSA-vfj7-8cjw-p6xm braces: 린트 도구 eslint-config-next가 끌어오는 개발 의존성. 2026-10-05 기준 고친 판본 없음.
