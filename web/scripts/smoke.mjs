@@ -9,6 +9,7 @@ import process from "node:process";
 
 const port = process.env.PORT || "3000";
 const url = `http://127.0.0.1:${port}/`;
+const LANDING_MARKER = 'id="landing-title"';
 const nextBin = path.join("node_modules", "next", "dist", "bin", "next");
 const TOTAL_MS = 30_000;
 
@@ -76,7 +77,8 @@ try {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(remaining) });
       const body = await res.text();
-      result = { status: res.status, ok: res.status === 200 && body.includes("CatchU web"), headerErrors: checkHeaders(res.headers) };
+      // 서비스 소개(#384)의 제목 id로 기본 화면을 확인한다. 문구가 바뀌어도 검사가 깨지지 않게 문구 대신 id를 본다.
+      result = { status: res.status, ok: res.status === 200 && body.includes(LANDING_MARKER), headerErrors: checkHeaders(res.headers) };
       break;
     } catch (e) {
       if (e?.name === "TimeoutError") break;
@@ -89,6 +91,6 @@ try {
 
 if (error) fail(`${error}\n${serverLog}`);
 if (!result) fail(`${TOTAL_MS / 1000}초 안에 ${url} 응답을 받지 못했습니다.\n${serverLog}`);
-if (!result.ok) fail(`실패: status=${result.status}, 본문에 'CatchU web'이 없습니다.\n${serverLog}`);
+if (!result.ok) fail(`실패: status=${result.status}, 본문에 서비스 소개 제목(${LANDING_MARKER})이 없습니다.\n${serverLog}`);
 if (result.headerErrors.length > 0) fail(`보안 헤더 실패: ${result.headerErrors.join(", ")}`);
 console.log(`[smoke] 통과: GET ${url} -> ${result.status}, 기본 화면·보안 헤더 확인`);
