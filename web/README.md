@@ -60,6 +60,7 @@ npm ci
 | `npm run build` | 프로덕션 빌드 | 빌드 중 타입·import 오류 |
 | `npm run check:run` | `scripts/smoke.mjs`: 포트가 비어 있는지 확인한 뒤 빌드 결과를 `next start`로 띄우고, Ready 출력 후 `GET /`가 200이고 본문에 서비스 소개 제목(`id="landing-title"`)이 있는지, 보안 헤더(아래 「보안 응답 헤더」)가 붙고 `X-Powered-By`가 없는지 확인하고 종료(전체 30초 제한). **`npm run build` 이후에만, 개발 서버를 끈 상태에서 실행** | 포트 사용 중, 서버 미기동, 200 아님, 본문 불일치, 보안 헤더 누락, 30초 초과 |
 | `npm test` | Node 기본 테스트 도구로 공통 응답 해석 검사 | 오류를 빈 목록으로 처리, HTTP 상태·code 소실 |
+| `npm run test:coverage` | `npm test`와 같은 시험을 Node 기본 커버리지로 돌려 `src/`의 `.ts`·`.tsx` 파일별 줄·분기·함수 비율을 표로 낸다. Unit의 비율은 범위를 그 Unit 폴더로 좁혀 잰 맨 아래 `all files` 줄로 본다: `node --test --experimental-test-coverage --test-coverage-include="src/features/<폴더>/**" test/*.test.mjs`(여러 폴더는 `"src/{lib,features/<폴더>}/**"`처럼 묶는다). 시험이 한 번도 불러오지 않은 파일은 표와 맨 아래 비율에 들어가지 않으므로 0%로 따로 센다. `assets-view.tsx`는 시험(`test/assets-view.test.mjs`)이 직접 변환해 불러와 비율·빠진 줄 번호가 원본과 다를 수 있다. CI는 재지 않는다 | `npm test`와 같음 |
 | `npm run check` | lint → typecheck → test → build → check:run | 하나라도 실패하면 중단 |
 
 PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 적는다.

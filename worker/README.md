@@ -14,7 +14,7 @@
 | 가상환경·의존성 관리 | `uv` (`0.12.18` 기준) |
 | 웹 앱·서버 | FastAPI `0.141.1`, Uvicorn `0.53.0` |
 | 정적·서식·타입 검사 | Ruff `0.16.8`, mypy `2.3.1` |
-| 테스트 | pytest `9.1.1` |
+| 테스트 | pytest `9.1.1`, 커버리지 pytest-cov `7.1.0`(coverage `7.17.0`) |
 | 생성 LLM 제공자 SDK | anthropic `1.13.0`, HTTP는 HTTPX2 `2.13.0`·HTTPCore2 `2.13.0`(FastAPI 시험 클라이언트도 HTTPX2를 쓴다, [생성의 실제 제공자](docs/generation-provider.md)) |
 | 메시지 스키마 검사 | jsonschema `4.26.0`, referencing `0.37.0`, PyYAML `6.0.3`, 형식 검사 rfc3339-validator `0.1.4`·rfc3986-validator `0.1.1` |
 | 큐 | bullmq `3.3.0`, redis(redis-py) `7.4.1`. 큐 검증 키트와 같은 판본이어야 한다([분석 요청 큐 소비자](docs/queue-consumer.md#큐-규격-233과-공동)) |
@@ -183,6 +183,8 @@ uv run --locked ruff format --check .
 uv run --locked mypy
 uv run --locked pytest
 ```
+
+커버리지는 `uv run --locked pytest --cov --cov-report=term-missing`으로 잰다. `app/` 파일별 줄 비율과 빠진 줄을 표로 내고, 시험이 불러오지 않은 파일도 0%로 넣으며, 큐 소비자 시험이 띄우는 자식 프로세스의 실행도 함께 센다(`pyproject.toml`의 `[tool.coverage.run]`). Unit의 비율은 `--cov=app/<폴더>`로 범위를 그 Unit 폴더로 좁혀 잰 맨 아래 `TOTAL` 줄로 본다(여러 폴더는 `--cov`를 폴더마다 준다). 강제 종료(SIGKILL·`os._exit`)로 끝난 자식의 실행은 저장되지 않아 그만큼 낮게 나올 수 있다. CI는 재지 않는다.
 
 Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요하면 `uv run --locked ruff format .`을 실행한 뒤 다시 검사한다. mypy는 `app/`과 `tests/`를 strict 설정으로 검사한다. pytest는 외부 서비스 연결 없이 FastAPI `TestClient`로 `/health`의 상태 코드와 응답 본문을 확인하고, [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 사례마다 메시지 스키마 v1 판정과 음성 대조를 확인한다. 요청 검사와 합성 결과 생성은 거부 조건, 시나리오별 결과, 실행 불명 처리를 확인하며, 네트워크 연결을 막은 상태에서도 모든 시나리오가 끝나는지 본다. 수집 검사는 합성 GitHub 응답으로 사전 거부·호출 통제·상한·실패 보존·정규화·근거·결과 조합 연결·정리와 비밀값 누출을 확인하고, 관계 조회의 단계·조회 대상·멈춤 처리와 연결 PR 묶음 조회(GraphQL)의 요청 본문·응답 대응·실패 분류·묶음 경계·호출 수를 확인한다. 후보 판별 검사는 작업 동일성 값([wi1 규칙](docs/candidate-decision.md)), 실제 git과 대조한 공백을 무시한 diff 값, 배정·보류·같은 변경·커밋 묶음·나누기·집계, 판별 기준 문서의 합성 사례를 수집부터 결과 조합까지 확인한다. 생성 검사는 합성 제공자로 재료 고르기·patch 확인·가리기·크기 선별·응답 판정·문장 틀·제목·상태와 실패·호출 한도와 시간·제목 고쳐 쓰기·근거 한계 문구를 수집부터 결과 조합까지 확인하고, 제공자 입력·결과·로그에 가린 값이 남지 않는지 본다. 실제 제공자 어댑터는 진짜 SDK에 가짜 HTTP 전송을 붙여 요청 설정·재시도 끔·오류 변환을 확인한다. 실제 git으로 만드는 시험은 git이 없으면 건너뛴다. LIVE 처리 검사는 loopback 합성 조회 API·합성 GitHub·합성 제공자로 조회 1회·요청 대조·수집부터 생성까지·생성 마감·조회 모름과 실패의 실패 결과·자격정보 해제를 확인한다. 큐 소비자 검사는 가짜 큐와 실제 자식 프로세스로 작업 봉투·자체 검사·MOCK과 LIVE 종결·실행 불명·상한 초과·자식 회수·통신 경계·결과 전송 상한·수신 확인·설정·로그를 확인하고, `CATCHU_TEST_REDIS_URL`이 있으면 실제 Redis로 종료 신호 경쟁·정체 0회·잠금 갱신·Node가 넣은 요청 옵션·보관 정리·상태 확인·실패 사유를 확인한다(CI는 Valkey 8.1.6으로 늘 돈다, [검사](docs/queue-consumer.md#검사)). 테스트는 실제 서버 기동 확인을 대신하지 않으므로 실행·확인 절차도 수행한다.
 
