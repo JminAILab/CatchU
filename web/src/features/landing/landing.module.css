@@ -41,6 +41,8 @@
 
 .titleLine {
   display: block;
+  /* 줄이 꺾일 때 마지막 줄에 한 어절만 남지 않게 한다. 지원하지 않는 브라우저는 기본 줄바꿈을 쓴다. */
+  text-wrap: balance;
 }
 
 .title em {
@@ -249,7 +251,7 @@
   align-items: center;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1060px) {
   .stepList {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
