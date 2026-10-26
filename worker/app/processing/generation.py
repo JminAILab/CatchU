@@ -100,9 +100,8 @@ class EligibleCandidate:
     """근거·본인 기여를 실패 영향과 분리해 확인한 후보.
 
     확인하지 못한 작업은 후보로 만들지 않고 NotProvided로 센다. #118은 제목을 만들지 않아
-    title이 None이다. title이 None이거나 비어 있으면 결과 조합이 workFacts 첫 항목을 넣는다.
-    계약 정정과 B·C·E 수정이 병합되기 전까지의 임시 동작이며, 그 뒤 뺀다(2026-10-08 결정 문서
-    「담당과 순서」 ③).
+    title이 None이고, 생성이 확인한 제목만 채운다. title이 None이거나 비어 있으면 결과 조합이
+    제목 null로 보낸다(2026-10-08 결정 문서 「담당과 순서」 ③).
     """
 
     work_identity: str

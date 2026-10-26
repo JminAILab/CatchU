@@ -391,22 +391,22 @@ def test_questions_exist_only_when_generated() -> None:
 # 제목
 
 
-def test_title_failure_uses_first_work_fact() -> None:
+def test_title_failure_sends_null_title() -> None:
     result = _finish("title-failed")
 
     (candidate,) = result["candidates"]
-    assert candidate["title"] == candidate["workFacts"][0]
+    assert candidate["title"] is None
     assert result["failures"] == []
     assert result["outcome"] == "SUCCEEDED"
 
 
 @pytest.mark.parametrize("title", [None, "", "   "])
-def test_blank_title_falls_back_to_first_work_fact(title: str | None) -> None:
+def test_blank_title_is_sent_as_null(title: str | None) -> None:
     candidate: EligibleCandidate = replace(BASE_CANDIDATE, title=title)
 
     result = _result_of(GenerationOutput(candidates=(candidate,)))
 
-    assert result["candidates"][0]["title"] == BASE_CANDIDATE.work_facts[0]
+    assert result["candidates"][0]["title"] is None
 
 
 # 진행 관측과 실행 불명

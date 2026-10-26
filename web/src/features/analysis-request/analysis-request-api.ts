@@ -21,11 +21,12 @@ export type AnalysisNotice = { noticeRevision: string; text: string };
 
 /**
  * 동의와 요청을 한 번에 보내는 본문(AnalysisCreate). 같은 키에는 같은 본문만 보낸다.
- * 이번 범위는 첫 요청이라 retryOfRequestId를 보내지 않는다(실패 재요청은 #154 다음 묶음).
+ * 첫 요청은 retryOfRequestId를 넣지 않는다. 실패 재요청은 「연결된 저장소」의 최신 요청 ID를 넣고 새 동의·새 키로 보낸다.
  */
 export type AnalysisCreateBody = {
   repositoryId: string;
   consent: { accepted: true; noticeRevision: string; scopeRevision: string };
+  retryOfRequestId?: string;
 };
 
 /** 202는 새 요청 접수, 200은 같은 저장소의 진행 중 작업이거나 같은 키의 기존 결과다. 둘 다 처리 완료가 아니다. */
