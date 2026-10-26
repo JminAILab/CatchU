@@ -49,7 +49,7 @@
 
 - **Construction Verification Command**: npm --prefix api run lint && npm --prefix api run typecheck && npm --prefix api test && npm --prefix web run lint && npm --prefix web run typecheck && npm --prefix web test && (cd worker && uv run --locked ruff check . && uv run --locked mypy && uv run --locked pytest)
 
-- **Parked**: 2026-10-26T03:47:10Z
+- **Parked**: 2026-10-26T04:40:38Z
 
 - **Parked At Stage**: functional-design
 
@@ -116,7 +116,7 @@ Per unit: [TBD]
 - **Current Stage**: functional-design
 - **Next Stage**: nfr-requirements
 - **Status**: Running
-- **Last Updated**: 2026-10-26T03:47:10Z
+- **Last Updated**: 2026-10-26T04:40:38Z
 
 ## Session Resume Point
 - **Last Completed Stage**: delivery-planning

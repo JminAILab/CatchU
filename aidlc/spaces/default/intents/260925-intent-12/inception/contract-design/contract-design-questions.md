@@ -53,6 +53,10 @@ X. Other (please specify)
   - U10으로 옮기는 곳: C-01 AI 생성 관문, C-02 AiRun(JD 요약 실행), C-04 첫 이용 동의, C-07 발행본 최소 DB 읽기, C-09 발행본 검색, C-10 발행본 접근, C-11 받은 사람 화면 붙는 자리, C-12 받은 사람 API, `jd`·`jd_summary_run`·`jd_summary_result` 표 소유, JdSummaryPanel, JD 요약 실행·다시 열기 경로.
   - C-03 하루 횟수 소비 Unit은 U4·U5·U7에 U10을 더해 U4·U5·U7·U10으로 한다.
 - 2026-10-26 Unit 나누기 Q5(의존 YAML의 `depends_on`을 모두 빈 목록으로 둠)는 계약에 영향이 없다. 계약 요약은 그대로 둔다.
+- Q5(2026-10-26, PR #394 자동 리뷰 지적): dev의 BullMQ 6.3.11이 콜론(:)이 든 사용자 지정 작업 ID를 거부하므로, 그 한 가지만 고친다. 다른 계약과 문장은 바꾸지 않는다.
+  - C-02 runKey 구분자를 `-`로 바꾼다. 자동 작업은 "{종류}-{publicationId}".
+  - C-02 runKey 설명에 "콜론(:)을 쓰지 않는다(BullMQ 작업 ID 제약). 접수 때 새로 만드는 키도 같다" 한 줄을 더한다.
+  - C-08 발행 순서 4의 두 키를 "EMBED_PUBLICATION-{publicationId}", "BASE_SUMMARY-{publicationId}"로 고친다.
 
 Does this all look correct before I generate the artifact?
 
@@ -70,3 +74,15 @@ B. 계약 설계를 다시 한다.
 X. Other (please specify)
 
 [Answer]: A. 팀장 지시(2026-10-25): "계약 설계는 소비 Unit 이름을 U7/U10으로 나누고 하루 횟수 소비 Unit에 U10을 더하는 것만 하며 계약 내용은 바꾸지 않는다."
+
+## Q5. [설계] 이번에 계약 요약에서 무엇을 고칠까요? (2026-10-26 기능 설계에서 계약 설계로 되돌아온 뒤 추가)
+
+배경: 기능 설계 진행 중 계약 설계로 되돌아와 기존 계약 요약을 출발점으로 고치기로 했다(수정 선택). 고칠 곳을 정해야 그 부분만 바꾼다.
+
+A. 특정 계약(C-01~C-17)의 모양 — 인터페이스·표·경로·오류를 고친다(어느 계약의 무엇인지 적어 주세요)
+B. 공통 전제·에러 대응 최소선
+C. Contract ownership rules(주인·선합치·더하는/깨는 변경 규칙)
+D. 계약 행 추가·삭제(경계가 새로 생기거나 없어짐)
+X. Other (please specify)
+
+[Answer]: X. 승인된 계약 요약을 그대로 두고 아래 한 가지만 고친다. 다른 계약과 문장은 바꾸지 않는다.- 이유: PR #394 자동 리뷰 지적. dev의 BullMQ 6.3.11은 콜론(:)이 든 사용자 지정 작업 ID를 거부한다(`Custom Id cannot contain :`). C-02는 작업 ID = runKey인데 자동 작업의 runKey가 "{종류}:{publicationId}"라서 발행 뒤 임베딩·기본 요약 작업 등록이 거부된다.- 수정: C-02 runKey의 구분자를 `-`로 바꾼다. 자동 작업은 "{종류}-{publicationId}"로 쓰고, C-08 발행 순서 4의 두 키도 "EMBED_PUBLICATION-{publicationId}", "BASE_SUMMARY-{publicationId}"로 고친다. C-02 runKey 설명에 "콜론(:)을 쓰지 않는다(BullMQ 작업 ID 제약). 접수 때 새로 만드는 키도 같다" 한 줄을 더한다.

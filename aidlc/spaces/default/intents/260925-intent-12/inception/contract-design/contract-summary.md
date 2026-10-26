@@ -114,8 +114,9 @@ interface AiRun:
     # 반드시 DB 커밋 뒤에 부른다. 실패해도 예외를 던지지 않는다(상태는 시한으로 실패 확정)
     # 작업 ID = runKey, 시도 1회, 재시도·backoff 없음(10월 큐 규칙)
 runKey:                      # 실행마다 고유
-  자동 작업(발행 뒤 임베딩·기본 요약): "{종류}:{publicationId}"
+  자동 작업(발행 뒤 임베딩·기본 요약): "{종류}-{publicationId}"
   [다시 만들기]·[검색 다시 준비]·JD 요약: 접수 때 새 키
+  콜론(:)을 쓰지 않는다(BullMQ 작업 ID 제약). 접수 때 새로 만드는 키도 같다
 payload:
   EMBED_PUBLICATION, BASE_SUMMARY: { publicationId }
   JD_SUMMARY: { runId }
@@ -320,8 +321,8 @@ publish-sequence (U4):
   3: 트랜잭션 시작 → DailyRunLimit.consume(작성자, BASE_SUMMARY, manager)로 자동 첫 기본 요약 1회를 센다
      (LIMIT_REACHED면 트랜잭션을 되돌리고 429 DAILY_LIMIT_REACHED로 발행하지 않는다, C-03)
      → publication·published_item(·published_pdf_page) 쓰기 → 비공개 Catch 공개 전환(10월 로직) → chunkInTransaction → 커밋
-  4: 커밋 뒤 AiRun.enqueueAfterCommit(EMBED_PUBLICATION, "EMBED_PUBLICATION:{publicationId}", { publicationId })
-     그리고 (BASE_SUMMARY, "BASE_SUMMARY:{publicationId}", { publicationId })를 항상 등록한다
+  4: 커밋 뒤 AiRun.enqueueAfterCommit(EMBED_PUBLICATION, "EMBED_PUBLICATION-{publicationId}", { publicationId })
+     그리고 (BASE_SUMMARY, "BASE_SUMMARY-{publicationId}", { publicationId })를 항상 등록한다
   5: 4의 등록이 실패해도 3이 커밋됐으면 발행은 성공(작업은 시한으로 실패 확정, C-02 row-creation)
 ```
 
