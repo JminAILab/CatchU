@@ -6,22 +6,18 @@ require('reflect-metadata');
 // #114 연결 시험은 처리 시한 닫기(서비스 직접 호출)와 보내기 대상(메모리 요청 큐)까지 잇는다. 실제 큐·worker 실행은 보지 않는다.
 // #140 연결 시험은 이 경로로 만든 상태를 본인 이력·개별 상태 조회 API로 읽어 같은 키 재응답과 비교한다.
 const assert = require('node:assert/strict');
-const { randomBytes, randomUUID } = require('node:crypto');
+const { randomUUID } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { after, before, beforeEach, test } = require('node:test');
-const { Body, Controller, Inject, Module, Param, Post } = require('@nestjs/common');
 const { NestFactory } = require('@nestjs/core');
-const { decodeJwt } = require('jose');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { CONTRACT_DIR } = require('../helpers/receiver-harness.cjs');
+const { startIntakeApp } = require('../helpers/intake-app.cjs');
 const { MemoryRequestQueue, dispatchLog } = require('../helpers/queue-harness.cjs');
 const { AppModule } = require('../../dist/app.module');
 const { configureApp } = require('../../dist/app.setup');
-const { CurrentMemberId } = require('../../dist/auth/auth.decorators');
-const { AnalysisReceiverModule } = require('../../dist/analysis-receiver/analysis-receiver.module');
 const { DevAnalysisInjection } = require('../../dist/analysis-receiver/dev-analysis-injection');
-const { DatabaseReceiverStore } = require('../../dist/analysis-receiver/database-receiver.store');
 const { OctoberRepositoryObservationSource } = require('../../dist/analysis-receiver/october-repository-observation.source');
 const { WorkerMessageValidator } = require('../../dist/analysis-receiver/worker-message.validator');
 const { AnalysisDeadlineService } = require('../../dist/analysis-deadline/analysis-deadline.service');
@@ -34,110 +30,15 @@ const FIXTURES = resolve(__dirname, '../../../worker/fixtures/m1-synthetic');
 const read = file => JSON.parse(readFileSync(resolve(FIXTURES, file), 'utf8'));
 const manifest = read('cases.json');
 
-// 네트워크 재현 전용 컨트롤러. 운영 worker·회원 API를 추가하지 않는다.
-class InjectionProbe {
-  constructor(injection) { this.injection = injection; }
-  inject(memberId, requestId, body) { return this.injection.inject(memberId, requestId, body.kind, body.template, body.caseId); }
-}
-Controller('__test/analysis-receiver')(InjectionProbe);
-Inject(DevAnalysisInjection)(InjectionProbe, undefined, 0);
-Post(':requestId')(InjectionProbe.prototype, 'inject', Object.getOwnPropertyDescriptor(InjectionProbe.prototype, 'inject'));
-CurrentMemberId()(InjectionProbe.prototype, 'inject', 0);
-Param('requestId')(InjectionProbe.prototype, 'inject', 1);
-Body()(InjectionProbe.prototype, 'inject', 2);
-
-// 시험용 좌표 어댑터: 접수 정본을 DB에서 읽고 #104 합성 저장소만 매핑한다.
-// LIVE 좌표를 임의로 만들거나 #252의 실제 제공자 구현으로 취급하지 않는다.
-const observations = new OctoberRepositoryObservationSource({
-  findForRegistration: context => new DatabaseReceiverStore(db).withRequest(context.requestId, async tx => {
-    const stored = tx.snapshot?.context;
-    if (!stored || stored.sourceMode !== 'MOCK' || stored.repositoryId !== SYNTHETIC_REPOSITORY.repositoryId ||
-      stored.scopeRevision !== SYNTHETIC_REPOSITORY.allowedScopeRevision) return null;
-    return { ...stored, githubRepository: { owner: SYNTHETIC_REPOSITORY.ownerLogin, name: SYNTHETIC_REPOSITORY.name } };
-  }),
-});
-
 let db;
 before(async () => { db = await openTestDataSource(); });
 after(async () => { await db?.destroy(); });
 beforeEach(async () => { await resetTestDatabase(db); });
 
-async function start(t, { injection = true, protection = observations } = {}) {
-  const settings = { NODE_ENV: 'test', DEV_LOGIN_ENABLED: 'true',
-    DEV_ANALYSIS_INJECTION_ENABLED: injection ? 'true' : undefined,
-    AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
-    AUTH_WEB_ORIGIN: 'https://catchu.example', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example',
-    LINK_GRANT_SECRET: randomBytes(32).toString('hex') };
-  const previous = Object.fromEntries(Object.keys(settings).map(key => [key, process.env[key]]));
-  for (const [key, value] of Object.entries(settings)) {
-    if (value === undefined) delete process.env[key]; else process.env[key] = value;
-  }
-  const logs = [];
-  const logger = Object.fromEntries(['log', 'error', 'warn', 'debug', 'verbose', 'fatal'].map(level =>
-    [level, (...args) => logs.push(args.map(String).join(' '))]));
-  let app;
-  t.after(async () => {
-    try { await app?.close(); } finally {
-      for (const [key, value] of Object.entries(previous)) {
-        if (value === undefined) delete process.env[key]; else process.env[key] = value;
-      }
-    }
-  });
-  class TestModule {}
-  Module({ imports: [AppModule, AnalysisReceiverModule.registerDatabase({ contractDirectory: CONTRACT_DIR, observations: protection })],
-    controllers: [InjectionProbe] })(TestModule);
-  app = await configureApp(await NestFactory.create(TestModule, { logger, abortOnError: false }));
-  await app.listen(0, '127.0.0.1');
-  const base = await app.getUrl();
-  const call = (path, options = {}) => fetch(base + path, { ...options, signal: AbortSignal.timeout(15000) });
-  const json = { 'Content-Type': 'application/json' };
-  const login = async id => {
-    const response = await call('/v1/auth/dev-login', { method: 'POST', headers: json, body: JSON.stringify({ memberId: id }) });
-    assert.equal(response.status, 200);
-    const { accessToken } = await response.json();
-    return { token: accessToken, memberId: decodeJwt(accessToken).sub };
-  };
-  const auth = user => ({ Authorization: 'Bearer ' + user.token });
-  // 실제 고지·선정 저장소 API의 응답으로 동의를 만들고 실제 접수 API를 호출한다. 재요청은 원 요청 ID를 함께 보낸다.
-  const submit = async (user, key = randomUUID(), { repositoryId = SYNTHETIC_REPOSITORY.repositoryId, retryOfRequestId } = {}) => {
-    const notice = await (await call('/v1/analysis-notice', { headers: auth(user) })).json();
-    const repositories = await (await call('/v1/me/repositories', { headers: auth(user) })).json();
-    const repository = repositories.items.find(item => item.repositoryId === repositoryId);
-    assert.ok(repository, '접수할 합성 저장소가 선정 저장소 API에 있어야 한다');
-    const body = { repositoryId: repository.repositoryId,
-      consent: { accepted: true, noticeRevision: notice.noticeRevision, scopeRevision: repository.allowedScopeRevision },
-      ...(retryOfRequestId ? { retryOfRequestId } : {}) };
-    const response = await call('/v1/analysis-requests', { method: 'POST',
-      headers: { ...json, ...auth(user), 'Idempotency-Key': key }, body: JSON.stringify(body) });
-    assert.equal(response.status, 202, await response.clone().text());
-    return { key, body, status: await response.json() };
-  };
-  // 같은 멱등 키 재호출은 저장된 현재 상태를 돌려준다(접수 API의 기존 재응답 계약).
-  const status = async (user, accepted) => {
-    const response = await call('/v1/analysis-requests', { method: 'POST',
-      headers: { ...json, ...auth(user), 'Idempotency-Key': accepted.key }, body: JSON.stringify(accepted.body) });
-    assert.equal(response.status, 200);
-    return response.json();
-  };
-  const inject = async (user, requestId, kind, template, caseId = 'case') => {
-    const response = await call(`/v1/__test/analysis-receiver/${requestId}`, { method: 'POST',
-      headers: { ...json, ...(user ? auth(user) : {}) }, body: JSON.stringify({ kind, template, caseId }) });
-    const text = await response.text();
-    let body = text;
-    try { body = JSON.parse(text); } catch { /* 진행 이벤트는 문자열 */ }
-    return { status: response.status, body, text };
-  };
-  // #140 조회 API: 개별 상태와 본인 이력을 같은 회원 인증으로 읽는다.
-  const lookup = async (user, requestId) => {
-    const response = await call(`/v1/analysis-requests/${requestId}`, { headers: auth(user) });
-    return { status: response.status, body: await response.json() };
-  };
-  const history = async (user, search = '') => {
-    const response = await call(`/v1/analysis-requests${search}`, { headers: auth(user) });
-    assert.equal(response.status, 200, await response.clone().text());
-    return response.json();
-  };
-  return { app, logs, login, submit, status, inject, call, lookup, history };
+async function start(t, options) {
+  const s = await startIntakeApp(db, options);
+  t.after(() => s.close());
+  return s;
 }
 
 async function counts() {
