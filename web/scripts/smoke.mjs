@@ -9,6 +9,7 @@ import process from "node:process";
 
 const port = process.env.PORT || "3000";
 const url = `http://127.0.0.1:${port}/`;
+// 첫 화면(서비스 소개)이 그려졌는지 보는 표식. 운영 이미지 검사(deploy/scripts/check-images.mjs)의 WEB_LANDING_MARKER와 함께 고친다.
 const LANDING_MARKER = 'id="landing-title"';
 const nextBin = path.join("node_modules", "next", "dist", "bin", "next");
 const TOTAL_MS = 30_000;
