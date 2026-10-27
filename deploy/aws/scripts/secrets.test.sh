@@ -457,7 +457,7 @@ check "db-admin: 종료 0, ConfigMap → Secret → Pod 순서로 만들고 끝�
   "$(ok test "$rc" = 0 -a "$(calls)" = "create ConfigMap,create Secret,create Pod,delete pod secret configmap," -a "$(ops_left)" = 0)"
 check "db-admin: 비밀값이 출력·명령 인자·임시 폴더에 없고 계정 번호(관리자 비밀번호 ARN)도 찍지 않음" "$(ok secret_free)"
 check "db-admin: 기록에 SQL 해시·이미지 digest·종료 코드·지움 확인을 남김" \
-  "$( { says "sha256 ${SQL_SUM}" && says '이미지 sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d' \
+  "$( { says "sha256 ${SQL_SUM}" && says '이미지 sha256:40d828eda66737aaacb934387a337babf1455ebd56e9bdd13fc08e211257c972' \
     && says '종료 코드 0' && says '지움 확인' && says '{lock_timeout=3s}'; } > /dev/null 2>&1; echo $?)"
 reset_state
 # 지우기 전의 임시 자원을 보려고 지우기만 실패시킨다(그 경우의 종료 코드도 함께 본다).
@@ -604,7 +604,7 @@ check "psql Pod 틀: root 아님(postgres 999)·seccomp·토큰 자동 탑재 �
 check "psql Pod 틀: 이미지는 digest로 고정했고 로컬 합성 DB(compose.local-db.yaml)와 같음, CPU 상한 없음" \
   "$( { q "$OPS/db-admin-pod.yaml" "${POD}.containers[0] | (.image | test(\"@sha256:[0-9a-f]{64}$\")) and .resources.requests.memory != null
     and .resources.limits.memory != null and .resources.limits.cpu == null" \
-    && grep -qF "postgres:16@$(json "$OPS/db-admin-pod.yaml" | "$REAL_JQ" -r '.[0].spec.containers[0].image | split("@")[1]')" "$HERE/../../compose.local-db.yaml"; } > /dev/null 2>&1; echo $?)"
+    && grep -qF "image: $(json "$OPS/db-admin-pod.yaml" | "$REAL_JQ" -r '.[0].spec.containers[0].image | ltrimstr("docker.io/")')" "$HERE/../../compose.local-db.yaml"; } > /dev/null 2>&1; echo $?)"
 check "psql Pod 틀: psqlrc 없이 한 트랜잭션·오류 때 멈춤, 오류 때도 문장 원문을 찍지 않음, 문장 되풀이 옵션 없음" \
   "$(ok q "$OPS/db-admin-pod.yaml" "${POD}.containers[0].command as \$c | \$c[0] == \"psql\" and (\$c | index(\"--no-psqlrc\")) != null
     and (\$c | index(\"--single-transaction\")) != null and (\$c | index(\"ON_ERROR_STOP=1\")) != null

@@ -112,8 +112,8 @@ ok() { "$@" > /dev/null 2>&1; echo $?; }
 says() { grep -qF -- "$1" "$OUT"; }
 
 # ---------- 시험 ----------
-check "psql Pod 틀의 이미지가 로컬 합성 DB(compose.local-db.yaml)와 같은 postgres digest" \
-  "$(ok grep -qF "postgres:16@${IMAGE##*@}" "$ROOT/deploy/compose.local-db.yaml")"
+check "psql Pod 틀의 이미지가 로컬 합성 DB(compose.local-db.yaml)와 같은 이미지·digest" \
+  "$(ok grep -qF "image: ${IMAGE#docker.io/}" "$ROOT/deploy/compose.local-db.yaml")"
 
 run_pod "$ROOT/deploy/aws/db/roles.sql"
 check "roles.sql: 슈퍼유저 아닌 관리자로 Pod 틀 그대로(사용자 999·읽기 전용 루트·TLS verify-full·한 트랜잭션) 실행해 종료 0" "$(ok test "$rc" = 0)"

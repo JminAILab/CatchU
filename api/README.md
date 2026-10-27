@@ -37,7 +37,7 @@ Google 인증 코드 교환·회원 연결 API와 앱 등록·검사 절차는 [
 | ajv / ajv-formats / yaml (분석 메시지 계약 검사) | `8.20.0` / `3.0.1` / `2.9.1` |
 | TypeORM / @nestjs/typeorm / pg          | `1.1.1` / `12.0.1` / `8.23.0`   |
 | BullMQ / ioredis (분석 큐 연결, 큐 검증 키트와 같은 판본) | `6.3.11` / `6.0.0` |
-| PostgreSQL (로컬·테스트 Docker 이미지)  | `postgres:16`                   |
+| PostgreSQL (로컬·테스트 Docker 이미지)  | `pgvector/pgvector:0.8.7-pg16-trixie`(pgvector가 든 PostgreSQL 16) |
 | Valkey (큐 시험 Docker 이미지)          | `valkey/valkey:8.1.6-alpine`    |
 
 직접 의존성은 `package.json`, 전이 의존성을 포함한 설치본은 `package-lock.json`으로 고정한다. 전역 Nest CLI나 루트 workspace는 필요하지 않다. typeorm 1.1.1의 선택 peer(ioredis 5)가 ioredis 6과 충돌하므로 `overrides`로 typeorm도 같은 ioredis를 쓰게 했다(api는 TypeORM 캐시를 쓰지 않는다).
@@ -79,7 +79,7 @@ $env:DEV_LOGIN_ENABLED = 'true'
 api는 기동할 때 PostgreSQL에 접속한다. 접속하지 못하면 `DB에 접속하지 못했습니다(<주소>/<DB>)` 안내와 함께 종료 코드 1로 끝나며 `/health`도 열리지 않는다. `/health`는 DB를 조회하지 않는다. 로컬 PostgreSQL은 Docker로 띄운다(Docker Desktop 등 필요, Compose 파일 없음). 개발 DB는 이름 있는 볼륨에 자료를 보관하고, 테스트 DB(「DB 테스트」)와 분리한다.
 
 ```powershell
-docker run -d --name catchu-db -p 127.0.0.1:5432:5432 -e POSTGRES_USER=catchu -e POSTGRES_PASSWORD=catchu_local -e POSTGRES_DB=catchu -v catchu-db-data:/var/lib/postgresql/data postgres:16
+docker run -d --name catchu-db -p 127.0.0.1:5432:5432 -e POSTGRES_USER=catchu -e POSTGRES_PASSWORD=catchu_local -e POSTGRES_DB=catchu -v catchu-db-data:/var/lib/postgresql/data pgvector/pgvector:0.8.7-pg16-trixie
 ```
 
 `.env.example`의 `DB_*` 값이 이 명령과 같다. 이 비밀번호는 내 컴퓨터의 로컬 컨테이너 전용이며 다른 환경에 쓰지 않는다. 5432가 이미 쓰이면 `-p 127.0.0.1:<다른 포트>:5432`로 바꾸고 `DB_PORT`를 같게 맞춘다. 비밀번호·사용자는 볼륨을 처음 만들 때 정해지므로, 나중에 바꾸려면 볼륨을 지우고 다시 만든다.
@@ -103,7 +103,7 @@ DB를 멈추거나 자료를 지우는 명령의 영향:
 | `docker rm -f catchu-db` | 컨테이너만 지운다. 볼륨이 남아 있으면 같은 `docker run`으로 자료가 돌아온다 |
 | `docker volume rm catchu-db-data` | 개발 DB 자료 전체를 지운다. 되돌릴 수 없다. 다시 `docker run`과 `npm run migration:run`부터 한다 |
 
-PostgreSQL 주 버전: 로컬·테스트는 `postgres:16`을 유지한다. 배포 대상은 AWS다(2026-10-06 NCP에서 변경, [레포 컨벤션 §1](../docs/CatchU_레포_컨벤션.md#1-레포-구조)). 배포 DB 서비스·주 버전과 TLS·서버 인증서 검증 등 접속 옵션은 AWS 배포 작업을 재개할 때 확인한다(「아직 필요한 입력」). 로컬 검사 통과만으로 배포 DB 호환성·접속 검증을 마쳤다고 보지 않는다.
+PostgreSQL 주 버전: 로컬·테스트는 pgvector가 든 PostgreSQL 16(`pgvector/pgvector:0.8.7-pg16-trixie`, CI와 로컬 합성 DB는 같은 이미지를 digest로 고정)을 쓴다(#389). `postgres:16`으로 만든 `catchu-db-data` 볼륨은 그대로 쓸 수 있으니, `docker rm -f catchu-db` 뒤 위 `docker run`을 다시 하면 자료가 남은 채 이미지만 바뀐다. 배포 대상은 AWS다(2026-10-06 NCP에서 변경, [레포 컨벤션 §1](../docs/CatchU_레포_컨벤션.md#1-레포-구조)). 배포 DB 서비스·주 버전과 TLS·서버 인증서 검증 등 접속 옵션은 AWS 배포 작업을 재개할 때 확인한다(「아직 필요한 입력」). 로컬 검사 통과만으로 배포 DB 호환성·접속 검증을 마쳤다고 보지 않는다.
 
 ## 개발 실행·응답 확인·종료
 
@@ -152,7 +152,7 @@ npm start
 `npm test`는 빌드 → 테스트 DB에 마이그레이션 적용 → 테스트 실행 순서로 돈다(`scripts/test-with-db.cjs`). AppModule을 쓰는 기존 테스트도 DB에 접속하므로, **테스트 DB가 없으면 `npm test`는 이 절을 안내하며 실패한다.** 테스트 DB는 개발 DB와 다른 컨테이너이고, 자료를 메모리(`--tmpfs`)에만 두어 컨테이너를 지우면 사라진다.
 
 ```powershell
-docker run -d --name catchu-db-test -p 127.0.0.1:5433:5432 -e POSTGRES_USER=catchu -e POSTGRES_PASSWORD=catchu_local -e POSTGRES_DB=catchu_test --tmpfs /var/lib/postgresql/data postgres:16
+docker run -d --name catchu-db-test -p 127.0.0.1:5433:5432 -e POSTGRES_USER=catchu -e POSTGRES_PASSWORD=catchu_local -e POSTGRES_DB=catchu_test --tmpfs /var/lib/postgresql/data pgvector/pgvector:0.8.7-pg16-trixie
 ```
 
 - 접속값은 터미널 환경변수 → `api/.env`의 `TEST_DB_*` → 위 명령과 같은 기본값 순서로 정한다. 실행기는 이 값을 테스트에 `DB_*`로 넘기므로 테스트는 개발 DB를 쓰지 않는다.
@@ -270,7 +270,7 @@ API↔worker의 메시지 형식은 [메시지 스키마 v1](../aidlc/spaces/def
 
 | 필요한 입력                                               | 결정할 곳                                                                                        | 결정 전 가능한 작업                                                            |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| 배포 DB의 PostgreSQL 주 버전, SSL 등 관리형 DB 접속 옵션  | AWS 배포 작업 재개 때([#24](https://github.com/JminAILab/CatchU/issues/24))                      | 로컬·테스트는 `postgres:16`을 유지한다(「로컬 DB 준비」) |
+| 배포 DB의 PostgreSQL 주 버전, SSL 등 관리형 DB 접속 옵션  | AWS 배포 작업 재개 때([#24](https://github.com/JminAILab/CatchU/issues/24))                      | 로컬·테스트는 pgvector가 든 PostgreSQL 16을 쓴다(「로컬 DB 준비」) |
 | 큐 선정·버전과 실제 전달 방식 | [#77 큐 기술 검증](https://github.com/JminAILab/CatchU/issues/77): Node·Python 호환성, 중복 전달·worker 중단 시 분석 재실행 방지, 배포 서버 제약과 실행 불명 처리 확인 후 결정 | BullMQ로 정했다. 큐 송수신 모듈(#233)은 있고 `AppModule` 등록은 #252 좌표 제공자·#105 근거 보존 수정 뒤 |
 | 현행 E·B·F 계약으로 해결되지 않는 연결 쟁점 | 기존 계약·기능 설계를 먼저 확인하고 실제 기능 담당자 사이에서 남은 쟁점을 조율 | 합의된 책임·반영 기준으로 독립 구현을 진행하고, 미결의 영향 범위만 보류. api 초기화 담당에게 자동 배정하지 않음 |
 | 인증·외부 서비스·큐의 개발·테스트 환경                    | 관련 계약과 공통 환경 준비 작업                                                                  | 필요한 설정·계정·실제 연결 검증 범위 정리                                      |

@@ -32,7 +32,7 @@ spec:
       type: RuntimeDefault
   containers:
     - name: psql
-      image: docker.io/library/postgres:16@sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d
+      image: docker.io/pgvector/pgvector:0.8.7-pg16-trixie@sha256:40d828eda66737aaacb934387a337babf1455ebd56e9bdd13fc08e211257c972
       # psqlrc를 읽지 않고, 오류에서 멈추며 한 트랜잭션으로 실행한다. 다시 볼 때 권한이 남아 있으면 예외로 앞의 회수까지 되돌리고 0이 아닌 코드로 끝난다.
       # 확인 대상은 실제로 쓸 수 있는 권한(has_table_privilege)이라 PUBLIC이나 다른 역할에서 물려받은 권한도 '있음'이다. 회수는 앱 계정에 직접
       # 준 것만 지우므로, 그런 권한이면 다시 볼 때 남아 멈춘다.
