@@ -1,0 +1,25 @@
+{
+  "stage": "functional-design",
+  "unit": "u1-ai-generation-gate",
+  "upstream_ids": ["AC6.3.1", "AC6.3.2", "AC6.3.3", "AC6.3.4", "AC6.3.5", "AC6.3.6", "AC6.3.7"],
+  "coverage": [
+    { "id": "AC6.3.1", "status": "OK", "target": "BR1.1, BR1.2, BR1.3, BR1.4, BR2.3, BR3.1, BR3.2, BR4.2, BR4.3" },
+    { "id": "AC6.3.2", "status": "N/A", "target": "delivered by u2-shared-foundation (기계 대조·버림)" },
+    { "id": "AC6.3.3", "status": "OK", "target": "BR3.3" },
+    { "id": "AC6.3.4", "status": "N/A", "target": "호출 Unit(u3-published-index·u5-rag-answer·u10-jd)이 근거에서 AI 설명 초안을 뺀다(C-01 caller-rule)" },
+    { "id": "AC6.3.5", "status": "OK", "target": "BR4.1, BR4.4" },
+    { "id": "AC6.3.6", "status": "N/A", "target": "delivered by u2-shared-foundation and u10-jd (면접 질문 대조)" },
+    { "id": "AC6.3.7", "status": "N/A", "target": "delivered by u2-shared-foundation (숨긴 지시 방어·역량 평가 표현 금지 공통 문구)" }
+  ],
+  "reverse": [
+    { "id": "BR2.1", "status": "N/A", "target": "C-01 계약의 빈 근거 처리(sources가 비면 호출하지 않음)" },
+    { "id": "BR2.2", "status": "N/A", "target": "FR6.9 모델 선택과 사전 시험 호출 설정" },
+    { "id": "BR2.4", "status": "N/A", "target": "C-01 오류 AiProviderError, 계약 요약 에러 대응 최소선 2(자동 재시도 없음)" },
+    { "id": "BR3.4", "status": "N/A", "target": "A04 관문 응답을 항목으로 묶기(사전 시험 방식, Q3)" },
+    { "id": "BR5.1", "status": "N/A", "target": "A04 관문 거부 사례 처리 ①잘린 응답(Q4)" },
+    { "id": "BR5.2", "status": "N/A", "target": "A04 관문 거부 사례 처리 ②거절 응답(Q4)" },
+    { "id": "BR5.3", "status": "N/A", "target": "A04 관문 거부 사례 처리 ②항목 없는 응답(Q4)" },
+    { "id": "BR5.4", "status": "N/A", "target": "C-01 오류와 에러 대응 최소선 1(실패를 숨기지 않음)" },
+    { "id": "BR5.5", "status": "N/A", "target": "에러 대응 최소선 1, team.md Code Style(비밀값·사용자 자료를 로그에 남기지 않음)" }
+  ]
+}

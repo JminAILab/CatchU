@@ -35,7 +35,7 @@
 - **In Progress**: functional-design
 
 ## Runtime State
-- **Revision Count**: 12
+- **Revision Count**: 14
 - **Construction Checkpoints**: enabled
 - **Construction Iteration**: unit-major
 - **Construction Execution**: serial
@@ -49,7 +49,32 @@
 
 - **Construction Verification Command**: npm --prefix api run lint && npm --prefix api run typecheck && npm --prefix api test && npm --prefix web run lint && npm --prefix web run typecheck && npm --prefix web test && (cd worker && uv run --locked ruff check . && uv run --locked mypy && uv run --locked pytest)
 
-- **Parked**: 2026-10-26T04:40:38Z
+
+
+
+- **Unit Ownership**: team
+
+- **Skeleton Stance**: on
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+- **Parked**: 2026-10-27T04:22:26Z
 
 - **Parked At Stage**: functional-design
 
@@ -95,10 +120,10 @@
 ### CONSTRUCTION PHASE
 Per unit: [TBD]
 - [-] functional-design — EXECUTE
-- [ ] nfr-requirements — EXECUTE
-- [ ] nfr-design — EXECUTE
+- [-] nfr-requirements — EXECUTE
+- [-] nfr-design — EXECUTE
 - [ ] infrastructure-design — SKIP
-- [ ] code-generation — EXECUTE
+- [-] code-generation — EXECUTE
 - [ ] build-and-test — EXECUTE
 - [ ] ci-pipeline — SKIP
 
@@ -111,12 +136,27 @@ Per unit: [TBD]
 - [ ] performance-validation — SKIP
 - [ ] feedback-optimization — SKIP
 
+## Unit Progress
+<!-- Derived, engine-owned projection; routing ignores hand edits. -->
+| unit | owner | functional-design | nfr-requirements | nfr-design | code-generation | gate |
+| --- | --- | --- | --- | --- | --- | --- |
+| u1-ai-generation-gate | - | [x] | [x] | [x] | [x] | [x] |
+| u10-jd | - | [ ] | [ ] | [ ] | [ ] | [ ] |
+| u2-shared-foundation | - | [ ] | [ ] | [ ] | [ ] | [ ] |
+| u3-published-index | - | [ ] | [ ] | [ ] | [ ] | [ ] |
+| u4-publication-link | - | [ ] | [ ] | [ ] | [ ] | [ ] |
+| u5-rag-answer | - | [ ] | [ ] | [ ] | [ ] | [ ] |
+| u6-claude-mcp | - | [ ] | [ ] | [ ] | [ ] | [ ] |
+| u7-repository-analysis | - | [ ] | [ ] | [ ] | [ ] | [ ] |
+| u8-pdf-materials | - | [ ] | [ ] | [ ] | [ ] | [ ] |
+| u9-recipient-claude | - | [ ] | [ ] | [ ] | [ ] | [ ] |
+
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
 - **Current Stage**: functional-design
 - **Next Stage**: nfr-requirements
 - **Status**: Running
-- **Last Updated**: 2026-10-26T04:40:38Z
+- **Last Updated**: 2026-10-27T04:22:26Z
 
 ## Session Resume Point
 - **Last Completed Stage**: delivery-planning
