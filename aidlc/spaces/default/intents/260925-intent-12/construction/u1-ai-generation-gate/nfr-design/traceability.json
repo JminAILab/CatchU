@@ -1,0 +1,20 @@
+{
+  "stage": "nfr-design",
+  "unit": "u1-ai-generation-gate",
+  "upstream_ids": ["NFR1.1", "NFR1.2", "NFR2.1", "NFR2.2", "NFR2.3", "NFR2.4", "NFR4.1", "NFR4.2", "NFR4.3", "NFR4.4", "NFR6.1", "NFR6.2", "NFR6.3"],
+  "coverage": [
+    { "id": "NFR1.1", "status": "OK", "target": "security-design: 키를 SDK에 명시해 넘기고 비었으면 게이트 생성 거부" },
+    { "id": "NFR1.2", "status": "OK", "target": "security-design: 요청 만들개가 요청 칸만 씀" },
+    { "id": "NFR2.1", "status": "OK", "target": "security-design: Claude 호출기가 모델·생각 끔·처리 위치 미국을 실음" },
+    { "id": "NFR2.2", "status": "OK", "target": "security-design: 고정 주소 상수, 지키는 fetch(redirect 실패·본문 256 KiB), 시간 제한 45초·재시도 0" },
+    { "id": "NFR2.3", "status": "OK", "target": "security-design: 시스템 지시·인용 문서·사용자 메시지 분리" },
+    { "id": "NFR2.4", "status": "OK", "target": "security-design: PR 리뷰 요청 쟁점 기록, logical-components: 앱 미등록" },
+    { "id": "NFR4.1", "status": "OK", "target": "performance-design: 게이트 기본 시간 제한 45초" },
+    { "id": "NFR4.2", "status": "OK", "target": "performance-design: 게이트 기본 출력 상한 4,000 토큰, S8 시험 상수" },
+    { "id": "NFR4.3", "status": "OK", "target": "scalability-design: 상태 없는 게이트" },
+    { "id": "NFR4.4", "status": "OK", "target": "reliability-design: SDK 재시도 0과 실패 원인 표" },
+    { "id": "NFR6.1", "status": "OK", "target": "reliability-design: 실패를 오류로 끝냄, observability-design: S8 결과 기록" },
+    { "id": "NFR6.2", "status": "OK", "target": "observability-design: 호출 로그 한 줄" },
+    { "id": "NFR6.3", "status": "OK", "target": "security-design: 로그·오류에 원문·키 없음, observability-design: 정해진 칸만 기록" }
+  ]
+}
