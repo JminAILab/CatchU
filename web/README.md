@@ -131,7 +131,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | 대상 | 닫는 방법 | 초점 | 닫히지 않는 경우 |
 |---|---|---|---|
 | 안내창 | [확인]·X·Esc·바깥 클릭 | 어느 방법이든 연 메뉴로 돌아감 | 창 안 클릭, 창 안에서 누르기 시작해 바깥에서 뗀 경우 |
-| 프로필 메뉴 | [프로필] 버튼·Esc·바깥 클릭 | Esc로 닫으면 [프로필] 버튼으로 돌아감. 바깥 클릭은 누른 요소의 동작·초점을 막지 않음 | 메뉴 안 클릭 |
+| 프로필 메뉴 | [프로필] 버튼·Esc·바깥 클릭. [로그아웃]을 누르면 메뉴를 먼저 닫고 로그아웃을 요청한다(#287) | Esc·[로그아웃]으로 닫으면 [프로필] 버튼으로 돌아감. 바깥 클릭은 누른 요소의 동작·초점을 막지 않음 | 메뉴 안 클릭([로그아웃] 제외) |
 - **조회 상태:** `src/components/status/status.tsx`의 세 컴포넌트를 쓴다. 불러오는 중은 `LoadingState`, `readApiResponse`가 `lookup-failed`를 돌려주면 `LookupFailedState`, 성공 응답의 빈 목록일 때만 `EmptyState`다. 조회 실패를 0건으로, 요청 중을 성공으로 표시하지 않는다.
 - **스타일:** 컴포넌트 옆 CSS Modules(`*.module.css`)를 쓴다. 공통 색·폭은 `globals.css`의 `--color-*`·`--content-width` 변수를 쓴다. `globals.css`가 `body` 기본 여백을 없애므로 화면에서 여백을 되돌리는 음수 여백은 필요 없다.
 - **미리보기:** `npm run dev` 뒤 `http://localhost:3000/preview/common`에서 세 헤더와 상태 표시를 모의 상태로 확인한다. 로그인 헤더는 실제 화면 상태(로그아웃 연결 전)와 모의 로그아웃 연결을 나란히 보여 준다. 배포용 실행에서는 404다. 미리보기 접속 주소는 `http://localhost:3000/preview/common`으로 통일한다.
@@ -143,7 +143,8 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | 주소 | 화면 | 담당 | 로그인 | 구분 | 비고 |
 |---|---|---|---|---|---|
 | `/` | 서비스 소개 | D | 불필요 | 제안 | 로그아웃 성공 후 비로그인 홈 이동은 확정(#55) |
-| `/login` | 로그인 진입 | A / 틀 D | 불필요 | 제안 | 회원 경로 가드의 이동 목적지. Google 로그인은 연결 전(A), 개발용 로그인은 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`일 때만 |
+| `/login` | 로그인 진입 | A / 틀 D | 불필요 | 제안 | 회원 경로 가드의 이동 목적지. Google 로그인은 통합 시험 전환(아래 「공통 인증」)을 켰을 때만 연결되고 끄면 연결 전 표시(A, #287), 개발용 로그인은 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`일 때만 |
+| `/google/callback` | Google 로그인 콜백 | A | 불필요 | 확정 | api `GOOGLE_REDIRECT_URI`와 같은 주소(로컬 `http://localhost:3000/google/callback`). 통합 시험 전환을 켰을 때만 열고 끄면 404. 주소의 `code`·`state`·`error`는 해석 뒤 지운다([인증 화면](src/features/auth-screens/README.md)) |
 | `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 Catch 탭 저장소 연결 관리로 이동(확정). GitHub 미연동·재연동 필요의 연동 화면(`/profile/github`) 버튼은 #253 전까지 비활성으로 두고 준비 중 이유를 보인다([홈](src/features/home/README.md)) |
 | `/profile/setup` | 최초 프로필 입력 (W02) | A | 필요 | 제안 | 저장 성공 후 회원 정보를 다시 불러온 뒤 `/home` |
 | `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지. 수정(`/profile/edit`)으로 진입하는 링크를 둔다. GitHub 연동(`/profile/github`) 진입은 #253 전까지 '연결 전'으로 표시하고 이동하지 않는다 |

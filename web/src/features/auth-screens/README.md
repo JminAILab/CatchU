@@ -1,39 +1,40 @@
 # 로그인·인증 화면 — #287
 
-Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 로그아웃 진행·실패·불명 표시를 다룬다.
+Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 로그아웃 진행·실패·불명 표시와 로그아웃·[다시 로그인] 전 확인을 다룬다.
 상위 작업은 [#251](https://github.com/JminAILab/CatchU/issues/251)이고, 공통 인증은 [#286](https://github.com/JminAILab/CatchU/issues/286)이 맡는다.
 
-## 현재 상태: 화면 준비, 제품 경로 미연결
+## 현재 상태: 통합 시험 전환 아래 연결, 제품 기본 꺼짐
 
-- 공통 인증(#286, [PR #308](https://github.com/JminAILab/CatchU/pull/308))이 아직 `dev`에 없다. 그래서 화면은 #286의 함수를 props로 받는 컴포넌트와 화면 제어 로직까지만 있고, 어느 페이지에서도 쓰지 않는다.
-- `/google/callback` 페이지와 로그인 화면의 Google 버튼은 아직 없다. 제품의 로그인·로그아웃은 기존 #106 동작 그대로다.
-- 이 상태의 검사는 함수 대역 시험이다. 실제 Google·API·쿠키·브라우저·다중 탭 검증은 하지 않았다.
+- 공통 인증(#286)의 통합 시험 전환 `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`일 때만 화면이 연결된다(`src/lib/auth-integration.ts`, 아래 「연결」).
+- 기본(꺼짐)에서는 로그인·로그아웃이 기존 #106 동작 그대로이고, 로그인 화면의 Google 버튼은 '연결 전' 표시이며 `/google/callback`은 404다.
+- 실제 Google·쿠키·다중 탭을 합친 통합 브라우저 검증은 #286이 맡아 #251에 기록한다. 제품 전환은 그 검증 뒤 별도 승인으로 정한다.
 
 ## 담당 경계
 
 | 맡는 곳 | 내용 |
 |---|---|
 | #286 공통 인증 | 인증 상태·세대·잠금·로그인 표식, 갱신·복원·로그아웃 요청, Google 시작 API·시도 보관·콜백 해석·완료 요청, 가드의 인증 판정·입력 정리·로그아웃 뒤 이동, 다른 탭 로그아웃 판정, 통합 브라우저 검증 |
-| #287 이 화면 | Google 버튼·이동, 콜백 화면(해석 결과 보존·query 제거 포함)과 안내, 재인증 안내 컴포넌트, 로그아웃의 미저장 확인·진행·실패·불명 표시, 화면 대역 시험 |
-| 각 화면 담당 | 내 자산·공유 링크·최초 입력에서 어떤 입력을 미저장으로 볼지와 공통 인증 결과를 받는 방식 |
+| #287 이 화면 | Google 버튼·이동, 콜백 화면(해석 결과 보존·query 제거 포함)과 안내, 재인증 안내 컴포넌트, 로그아웃·재인증 [다시 로그인]의 이동 전 확인(사유별 문구), 로그아웃 진행·실패·불명 표시, 화면 대역 시험 |
+| 각 화면 담당 | 내 자산·공유 링크·최초 입력에서 어떤 입력을 미저장으로 볼지, 어떤 분석 요청을 미확정으로 등록할지(#153·#154)와 공통 인증 결과를 받는 방식 |
 
-근거: [#287 연결 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6187890290), [1~9번 답변](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6139957700), [A 답변](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6187946262), [팀장 답변](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443).
+근거: [#287 연결 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6187890290), [재인증 안내 `variant` 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6207895905), [1~9번 답변](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6139957700), [A 답변](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6187946262), [팀장 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6206414443), [확인 사유 문의](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6306296347)·[A 답변 1](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6310239160)·[사유 조회 접점](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6313395220).
 
 ## 파일
 
+화면이 받는 값의 타입은 #286의 `auth-google.ts`·`auth-state.ts`·`auth-logout.ts`·`auth-gate.ts`·`member-lookup.ts`를 그대로 쓴다. 화면 쪽에 같은 모양의 타입을 따로 두지 않는다.
+
 | 파일 | 내용 |
 |---|---|
-| `src/lib/auth-screen-contract.ts` | 화면이 #286에서 받는 값의 최소 타입. #286 연결 때 #286 타입으로 바꾸고 지운다 |
 | `src/lib/auth-screen-messages.ts` | 안내 문구와 결과별 선택. [합의]·[제안] 표시 |
 | `src/lib/google-login-screen.ts` | Google 버튼(`createGoogleStartControl`)·콜백 화면(`createGoogleCallbackControl`)의 진행 |
-| `src/lib/member-session-screen.ts` | 로그아웃 요청·표시(`createMemberLogoutControl`·`logoutView`), 재인증 [다시 로그인] 판단 |
-| `src/lib/unsaved-changes.ts` | 미저장 입력 등록과 확인. 로그아웃과 재인증이 같은 수단을 쓴다 |
+| `src/lib/member-session-screen.ts` | 로그아웃 요청·표시(`createMemberLogoutControl`·`logoutView`), 이동 전 확인(`confirmLogout`·재인증 [다시 로그인]의 `confirmReauthLeave`) |
+| `src/lib/unsaved-changes.ts` | #286 공통 등록 수단. 확인 사유(`unsaved-input`·`unconfirmed-analysis-request`) 등록과 `activeReasons()` 조회. 로그아웃과 재인증이 같은 수단을 쓴다 |
 | `src/components/auth/google-login-button.tsx` | Google 버튼 |
 | `src/components/auth/google-callback-screen.tsx` | 콜백 화면 |
 | `src/components/auth/reauth-notice.tsx` | 재인증 안내(가드의 `renderReauthNotice` 자리) |
 | `src/components/auth/member-logout.tsx` | 셸의 `useMemberLogout`·`LogoutStatus` |
 | `src/components/auth/use-unsaved-changes.ts` | 화면이 미저장 입력을 알리는 hook |
-| `src/components/header/` | `logoutPending`을 주면 [로그아웃]을 막고 "로그아웃하는 중"을 보인다. 주지 않으면 기존과 같다 |
+| `src/components/header/` | `logoutPending`을 주면 [로그아웃]을 막고 "로그아웃하는 중"을 보인다. 주지 않으면 기존과 같다. [로그아웃]을 누르면 프로필 메뉴를 닫고 초점을 [프로필]로 돌린다 |
 
 ## 동작
 
@@ -50,22 +51,31 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 - 취소·실패·응답 유실·다시 열린 콜백은 재전송 없이 안내하고 [다시 로그인](로그인 화면, 새 시작)을 둔다. 로그인 실패 안내는 회원 인증 만료 안내와 다르다.
 
 **재인증 안내**
-- 가드가 회원 화면 위에 그린다. 안내 중에도 아래 화면·입력은 유지된다.
-- [다시 로그인]은 로그아웃·갱신 요청 없이 `/login?next=<현재 경로>`로 간다.
-- 일반 재인증: 미저장 입력이 있으면 로그아웃과 같은 확인을 거친다. 머무르면 아무것도 하지 않는다.
-- 로그인 표식 변경 뒤 #286이 화면·입력을 이미 정리한 탭(`inputCleared`): 같은 문구에 [다시 로그인]만 두고 묻지 않는다. 자동 복원·로그아웃 재전송은 하지 않는다(팀장 답변 2). 정리 여부는 #286이 정해 넘긴다.
+- 가드가 `renderReauthNotice({ returnTo, variant })`로 그린다. `variant`는 #286 `auth-gate.ts`의 `ReauthNoticeProps`다([#287 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6207895905)).
+- 두 경우 모두 [다시 로그인]은 로그아웃·갱신 요청 없이 `/login?next=<현재 경로>`로 간다.
+- `variant` 생략·`reauth`: 회원 화면 위의 안내이며 아래 화면·입력은 유지된다. 로그아웃과 같은 「이동 전 확인」을 거치고, 머무르면 아무것도 하지 않는다.
+- `login-changed`: 다른 탭의 새 로그인을 감지했지만 이 탭에서 복원할 수 없어 가드가 화면·입력을 이미 정리한 탭이다(가드의 `relogin-only`). 같은 문구에 [다시 로그인]만 두고 확인 없이 간다(사유도 읽지 않는다). 자동 이동·복원·로그아웃은 하지 않는다(팀장 결정 2).
+- 두 경우 모두 이동은 한 번만 시작한다(`createReauthLeaveControl`). 확인에서 계속했거나 물을 사유가 없어 이동을 시작한 뒤에는 다시 눌러도 묻거나 이동하지 않는다. 확인 창이 떠 있는 동안 들어온 더블클릭의 두 번째 클릭·Enter 반복도 같다([D 재현](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6335776141)). 머무르면 아무것도 바꾸지 않으므로 다시 누르면 그 시점의 사유로 다시 묻는다.
 
 **로그아웃**
-- 미저장 확인 → `logout()`. 머무르면 요청·이동이 없다.
+- [로그아웃]을 누르면 프로필 메뉴를 먼저 닫는다. 열린 메뉴가 실패·불명 안내의 [다시 시도]를 가리지 않게 하기 위해서다([#311 리뷰](https://github.com/JminAILab/CatchU/pull/311#pullrequestreview-5543242144)).
+- 「이동 전 확인」 → `logout()`. 머무르면 요청·이동이 없다.
 - 이 화면의 요청이나 공통 상태가 진행 중이면 다시 묻거나 보내지 않는다.
 - `done`이어도 셸은 이동하지 않는다. 현재 유효한 완료일 때 입력 정리·비로그인 홈 이동은 가드가 한다. 다른 탭의 유효한 완료도 가드가 처리한다.
 - `failed`·`unknown`은 완료로 표시하지 않고 화면·입력을 유지한 채 안내한다. [다시 시도]는 `canRetryLogout`일 때만 보인다.
 - 이전 결과는 그사이 새 로그인이 시작됐거나 인증 세대가 바뀌었거나 다른 로그아웃이 진행 중이면 보이지 않는다. 다른 탭의 실패·불명으로는 안내하지 않는다.
 - `not-started`·`discarded`는 안내 없이 진행 표시만 지운다.
 
+**이동 전 확인(로그아웃·재인증 [다시 로그인])**
+- 누를 때마다 #286 등록 수단의 `activeReasons()`를 한 번 읽고, 그 시점의 사유로 문구를 고른다([사유 조회 접점](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6313395220)).
+- 사유가 없으면 묻지 않는다. 미저장 입력만이면 기존 문구, 미확정 분석 요청만이면 요청 문구이고, 둘 다면 두 내용을 담은 확인 창을 한 번만 띄운다([A 답변 1](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6310239160)).
+- 분석 요청이 든 문구는 이 화면의 요청 확인 정보가 사라진다는 것과 이미 보낸 분석 요청은 취소되지 않는다는 것을 함께 알린다.
+- 머무르면 요청·이동 없이 끝나고 입력·요청 정보와 그 등록을 건드리지 않는다. 계속하면 기존 흐름(로그아웃 `logout()`, [다시 로그인] `loginPath(returnTo)`)을 따른다.
+- 사유 판정·등록은 각 화면 담당이 한다(미확정 분석 요청은 #153·#154). 이 화면은 분석 상태를 판정하지 않는다.
+
 ## 안내 문구
 
-[합의]는 #251에서 양쪽이 확인한 문구, [제안]은 연결 전에 #251에서 정할 문구다. 안내의 종류는 합의됐다.
+[합의]는 #251에서 양쪽이 확인한 문구, [제안]은 #251에서 아직 확정하지 않은 문구다. 통합 시험 전환 아래에서는 [제안] 문구로 연결해 두고, 제품 전환 전에 #251에서 정한다. 안내의 종류는 합의됐다.
 
 | 상황 | 문구 | 구분 |
 |---|---|---|
@@ -81,24 +91,37 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 | 시도 없음·만료 | 로그인 시간이 지났거나 로그인 정보를 찾을 수 없습니다. 다시 로그인해 주세요. | [제안] |
 | 다른 시도의 콜백(`state-mismatch`) | 다른 로그인 요청의 결과입니다. 다시 로그인해 주세요. | [제안] |
 | 완료 대기·버튼 진행·로그아웃 진행 | Google 로그인을 확인하고 있습니다. / Google로 이동하는 중 / 로그아웃하는 중 | [제안] |
-| 로그아웃 전 미저장 확인 | 저장하지 않은 입력이 있습니다. 로그아웃하면 입력한 내용이 사라집니다. 로그아웃하시겠습니까? | [제안] |
-| 재인증 전 미저장 확인 | 다시 로그인하면 입력하던 내용이 사라질 수 있습니다. 로그인 화면으로 이동하시겠습니까? | [제안] 11번 초안 |
+| 로그아웃 전 확인(미저장 입력만) | 저장하지 않은 입력이 있습니다. 로그아웃하면 입력한 내용이 사라집니다. 로그아웃하시겠습니까? | [제안] |
+| 로그아웃 전 확인(미확정 분석 요청만) | 아직 접수 결과를 확인하지 못한 분석 요청이 있습니다. 로그아웃하면 이 화면의 요청 확인 정보가 사라집니다. 이미 보낸 분석 요청은 취소되지 않습니다. 로그아웃하시겠습니까? | [제안] #287 D 초안 |
+| 로그아웃 전 확인(둘 다) | 저장하지 않은 입력과 아직 접수 결과를 확인하지 못한 분석 요청이 있습니다. 로그아웃하면 입력한 내용과 이 화면의 요청 확인 정보가 사라집니다. 이미 보낸 분석 요청은 취소되지 않습니다. 로그아웃하시겠습니까? | [제안] |
+| 재인증 전 확인(미저장 입력만) | 다시 로그인하면 입력하던 내용이 사라질 수 있습니다. 로그인 화면으로 이동하시겠습니까? | [제안] 11번 초안 |
+| 재인증 전 확인(미확정 분석 요청만) | 아직 접수 결과를 확인하지 못한 분석 요청이 있습니다. 로그인 화면으로 이동하면 이 화면의 요청 확인 정보가 사라집니다. 이미 보낸 분석 요청은 취소되지 않습니다. 로그인 화면으로 이동하시겠습니까? | [제안] #287 D 초안 |
+| 재인증 전 확인(둘 다) | 저장하지 않은 입력과 아직 접수 결과를 확인하지 못한 분석 요청이 있습니다. 로그인 화면으로 이동하면 입력하던 내용과 이 화면의 요청 확인 정보가 사라집니다. 이미 보낸 분석 요청은 취소되지 않습니다. 로그인 화면으로 이동하시겠습니까? | [제안] |
 
-12번·11번 초안: [#251 착수 전 접점](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6162564432).
+12번·11번 초안: [#251 착수 전 접점](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6162564432). #287 D 초안: [확인 사유 문의](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6306296347)의 확인 창 문구 초안이며, [A 답변 1](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6310239160)대로 쓴다.
 
-## 남은 연결 작업(#286 병합 뒤)
+## 연결(통합 시험 전환을 켰을 때)
 
-1. 화면이 `auth-screen-contract.ts` 대신 #286의 타입을 쓰게 바꾸고 이 파일을 지운다.
-2. 통합 시험 전환(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`) 아래에서만 연결한다. 전환을 끈 기본 빌드는 기존 동작 그대로여야 한다.
-   - 공통 인증판 로그인 화면에 `GoogleLoginButton`(`authRuntime().google.startGoogleLogin`).
-   - `/google/callback` 페이지에 `GoogleCallbackScreen`(`readGoogleCallback`·`completeGoogleLogin`·공통 인증판 회원 조회). 전환을 끄면 이 주소는 열지 않는다.
-   - 공통 인증판 가드의 `renderReauthNotice`에 `ReauthNotice`. 표식 변경 뒤 정리된 탭의 표시와 `inputCleared` 전달은 #286이 팀장 답변 2를 반영할 때 정한다.
-   - 공통 인증판 셸에 `useMemberLogout`(`useAuth()`·`session.logout()`)·`LogoutStatus`와 헤더 `logoutPending`.
-3. 각 화면 담당이 작성 중 입력을 `useUnsavedChanges`로 알린다. 등록한 화면이 없으면 미저장 확인은 묻지 않는다.
-4. [제안] 문구를 #251에서 정한다.
-5. 실제 Google 승인·콜백·쿠키·다중 탭 검증은 #286이 수행해 #251에 기록하고, 그 결과에서 나온 화면 보완은 #287에서 한다.
+전환을 끈 기본 빌드는 아래 연결을 쓰지 않고 기존 동작 그대로다.
+
+| 자리 | 연결 |
+|---|---|
+| `/login`(`session-login-panel.tsx`) | 새 로그인을 받을 때만(복원 확인 중·로그인 확인 뒤가 아닐 때) `GoogleLoginButton`에 `authRuntime().google.startGoogleLogin`을 넘긴다 |
+| `/google/callback`(`src/app/(guest)/google/callback/page.tsx`) | `session-google-callback.tsx`가 `GoogleCallbackScreen`에 `readGoogleCallback`·`completeGoogleLogin`·`lookupMemberWithAuth(api.member)`를 넘긴다. 전환을 끄면 `notFound()`(404) |
+| 회원 셸(`session-member-shell.tsx`) | `useMemberLogout`(`useAuth()`·`session.logout()`)과 헤더 `logoutPending`, 헤더 아래 `LogoutStatus`, 가드의 `renderReauthNotice`에 `ReauthNotice` |
+| 이동 전 확인 | 로그아웃·재인증 [다시 로그인]은 누른 시점에 #286 등록 수단(`unsavedChanges`)의 `activeReasons()`를 읽는다. 미저장 입력은 `useUnsavedChanges(dirty)`(사유 생략 = `unsaved-input`)로 등록되며, 최초 입력·프로필 수정은 #286에서 기존 `dirty`를 함께 등록했다. 미확정 분석 요청 등록은 #153·#154 화면 연결이 맡고 이 판본에는 아직 없다. 등록한 화면이 없으면 묻지 않는다 |
+
+- 확인 사유 등록은 #286 공통 수단(`unsavedChanges`·`useUnsavedChanges`)만 쓰고 이 화면에서 새로 만들지 않는다. 화면 안의 링크 이동·새로고침·창 닫기 확인(`useUnsavedGuard`, [PR #300](https://github.com/JminAILab/CatchU/pull/300))은 역할이 달라 그대로 둔다.
+
+## 남은 일
+
+1. [제안] 문구를 #251에서 정한다.
+2. 실제 Google 승인·콜백·쿠키·다중 탭 검증은 #286이 수행해 #251에 기록하고, 그 결과에서 나온 화면 보완은 #287에서 한다.
+3. 제품 전환은 각 화면 담당 확인·통합 검증 뒤 별도 승인으로 정한다(#286).
+4. 미확정 분석 요청 등록·모달 안 [다시 로그인](#153·#154)과 합친 판본에서 취소 시 입력·요청 정보 보존, 계속 동작, 모달 초점 복귀, 중복 조작을 확인한다([사유 조회 접점](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6313395220)의 후속 확인).
 
 ## 검사
 
-`npm test`의 `test/auth-screens-google.test.mjs`·`test/auth-screens-session.test.mjs`가 위 동작을 함수 대역으로 확인한다.
-#286 함수·응답 대역과 합친 검사는 연결 단계에서 추가한다. React 렌더링과 실제 브라우저 조작은 이 시험에 들지 않는다.
+- `test/auth-screens-google.test.mjs`·`test/auth-screens-session.test.mjs`: 화면 제어를 함수 대역으로 확인한다. 이동 전 확인은 사유 조합(없음·입력만·분석 요청만·둘 다)과 누를 때마다 다시 읽는지를 본다. [다시 로그인]은 계속한 뒤 다시 눌러도 묻거나 이동하지 않는지와 머무른 뒤 다시 묻는지를 제어와 `ReauthNotice` 양쪽에서 본다. `ReauthNotice`는 서버 렌더링으로 그린 버튼의 클릭 함수를 연달아 부른다.
+- `test/auth-screens-connected.test.mjs`: 화면 제어에 #286 공통 함수(시도 보관·콜백 해석·완료, 세션·보호 API, 가드 판정)를 연결 코드와 같은 방식으로 붙이고, 서버와 `sessionStorage`·`localStorage`만 대역으로 바꿔 확인한다.
+- 실제 브라우저 조작(확인 창·초점·화면 이동)과 `ReauthNotice` 밖의 React 렌더링은 이 시험에 들지 않는다.

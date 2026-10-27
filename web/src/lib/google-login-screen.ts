@@ -2,11 +2,16 @@
  * Google 로그인 화면(#287)의 버튼·콜백 처리. React와 분리해 시험한다. 시작 API 호출·시도 보관·콜백 해석·완료 요청은
  * 공통 인증(#286)의 함수가 맡고, 여기서는 그 결과로 안내·이동만 정한다(#287 연결 안내 「호출 순서」).
  */
-import type {
-  CallbackParse, GoogleCompletionInput, GoogleCompletionResult, GoogleStartResult, MemberLookupOutcome,
-} from "./auth-screen-contract.ts";
+import type { CallbackParse, GoogleCompletionInput, GoogleCompletionResult, GoogleStartResult } from "./auth-google.ts";
 import { authScreenMessages, googleCallbackNotice, googleCompletionNotice, googleStartNotice } from "./auth-screen-messages.ts";
+import type { lookupMemberWithAuth } from "./member-lookup.ts";
 import { afterLoginPath, loginPath } from "./member-navigation.ts";
+
+/**
+ * 공통 인증판 회원 조회(#286 `lookupMemberWithAuth`)의 결과. `skipped`는 보내지 않았거나 이전 세션 응답이라 결과가 없는 조회다.
+ * 조회 실패로도 성공으로도 보이지 않는다(#251 A 답변 1).
+ */
+export type MemberLookupOutcome = Awaited<ReturnType<typeof lookupMemberWithAuth>>;
 
 type Listener = () => void;
 

@@ -7,6 +7,8 @@ export const routes = {
   landing: "/",
   /** 로그인 진입. 회원 경로 가드의 이동 목적지(#106 PR②). */
   login: "/login",
+  /** Google 로그인 콜백(#287). api `GOOGLE_REDIRECT_URI`와 같아야 한다. 통합 시험 전환을 끄면 404. */
+  googleCallback: "/google/callback",
   /** 로그인 후 홈. 회원 헤더의 로고 목적지. */
   home: "/home",
   /** 최초 프로필 입력(W02). */
