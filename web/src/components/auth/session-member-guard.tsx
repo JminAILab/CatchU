@@ -81,7 +81,15 @@ export function SessionMemberGuard({ children, renderReauthNotice }: {
   }
   // 진행 중인 조회도 보일 결과도 없다(보내지 않은 조회·보낼 수 없는 상태). 실패 안내·진행 표시 없이 인증 상태 표시만 둔다.
   if (me.state === "idle") return <main className={styles.page}>{gate.reauth && renderReauthNotice?.({ returnTo: safeNextPath(pathname) })}</main>;
-  if (entry?.action === "retry") return <main className={styles.page}><LookupFailedState title="회원 정보를 불러오지 못했습니다" onRetry={retry} /></main>;
+  // 조회가 실패한 뒤 재인증이 필요해지면(재조회의 401 → 갱신 401 등) 재조회를 보낼 수 없으므로 실패 표시와 함께 재인증 안내를 둔다.
+  if (entry?.action === "retry") {
+    return (
+      <main className={styles.page}>
+        {gate.reauth && renderReauthNotice?.({ returnTo: safeNextPath(pathname) })}
+        <LookupFailedState title="회원 정보를 불러오지 못했습니다" onRetry={retry} />
+      </main>
+    );
+  }
   if (entry?.action !== "allow") return <main className={styles.page}><LoadingState>회원 정보를 확인하고 있습니다.</LoadingState></main>;
   return (
     <Fragment key={sessionScope ?? "none"}>
