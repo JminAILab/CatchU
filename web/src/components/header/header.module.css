@@ -142,29 +142,7 @@
   font-size: 11px;
 }
 
-/* 회원 헤더만 줄바꿈한다. 비로그인·수신자 헤더와 375px 이상 배치는 유지한다. */
-@media (max-width: 374px) {
-  .memberInner {
-    height: auto;
-    min-height: var(--header-height);
-    flex-wrap: wrap;
-    gap: 8px;
-    padding-block: 12px;
-  }
-
-  .memberInner > .group {
-    flex-wrap: wrap;
-    row-gap: 4px;
-  }
-
-  .memberInner > .group:last-child {
-    margin-left: auto;
-  }
-
-  .memberInner .brand,
-  .memberInner .menuItem,
-  .memberInner .menuItemActive,
-  .memberInner .inactiveItem {
-    white-space: nowrap;
-  }
+/* 회원 화면의 최소 폭과 함께 메뉴 글자가 세로로 쪼개지는 것을 막는다. */
+.memberInner {
+  white-space: nowrap;
 }
