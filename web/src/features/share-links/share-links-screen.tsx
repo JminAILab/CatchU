@@ -6,7 +6,10 @@ import { EmptyState, LoadingState, LookupFailedState } from "@/components/status
 import { accessTokenStore } from "@/lib/access-token";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
+import { createCatchApi } from "@/features/assets/catch-api";
 import { copyText } from "./copy-text";
+import { assetCatchHref, createPublicCatchSummary } from "./public-catch-summary";
+import { createPublicProfileSummary } from "./public-profile-summary";
 import { createShareLinkApi, type ShareLink } from "./share-link-api";
 import { alsoExpired, formatKst, remainingText, STATE_LABELS } from "./share-link-format";
 import { createMemberSessionScope } from "./member-session-scope";
@@ -112,6 +115,8 @@ function IssuePanel({ store }: { store: ShareLinksStore }) {
         링크는 수신자가 열 때의 공개 프로필과 공개한 Catch 전체를 보여 줍니다. 공개 자료를 바꾸면 이미 발행한 링크에서도 다음 조회부터 바뀐 내용이 보입니다.{" "}
         <Link href={routes.assets}>공개 자료 확인으로</Link>
       </p>
+      <PublicProfileSummaryView />
+      <PublicCatchSummary />
       <form onSubmit={onSubmit} noValidate>
         <label className={styles.field}>
           <span className={styles.label}>링크 제목(필수)</span>
@@ -212,6 +217,96 @@ function IssuePanel({ store }: { store: ShareLinksStore }) {
           )}
         </div>
       </form>
+    </section>
+  );
+}
+
+/**
+ * L01 공개 프로필 요약(#149). 발행 준비를 열 때마다 `/me`를 다시 읽어 수신자에게 공개되는 필드만 보인다.
+ * 표시 이름·빈 값 안내는 수신자 화면(V02)과 같게 둔다. 조회 실패를 빈 프로필로 보이지 않는다.
+ */
+function PublicProfileSummaryView() {
+  const summary = useMemo(() => createPublicProfileSummary(api.member), []);
+  const state = useSyncExternalStore(summary.subscribe, summary.getSnapshot, summary.getSnapshot);
+
+  useEffect(() => {
+    void summary.load();
+    return () => summary.dispose();
+  }, [summary]);
+
+  const empty = (value: string) => (value.trim().length > 0 ? value : "입력하지 않음");
+  return (
+    <section className={styles.summary} aria-labelledby="public-profile-title">
+      <h3 id="public-profile-title" className={styles.summaryTitle}>공개 프로필</h3>
+      {state.status === "idle" || state.status === "loading" ? (
+        <LoadingState>공개 프로필을 확인하고 있습니다.</LoadingState>
+      ) : state.status === "failed" ? (
+        <LookupFailedState title="공개 프로필을 확인하지 못했습니다" onRetry={() => void summary.load()}>
+          링크 발행은 그대로 할 수 있습니다.
+        </LookupFailedState>
+      ) : (
+        <>
+          <dl className={styles.details}>
+            <dt>이름</dt><dd>{empty(state.profile.displayName)}</dd>
+            <dt>한 줄 소개</dt><dd>{empty(state.profile.introduction)}</dd>
+            <dt>희망 직무</dt><dd>{empty(state.profile.desiredRole)}</dd>
+            <dt>기술</dt><dd>{state.profile.skills.length > 0 ? state.profile.skills.join(", ") : "입력하지 않음"}</dd>
+            {state.profile.githubAccountLogin !== null && <><dt>GitHub 계정</dt><dd>{state.profile.githubAccountLogin}</dd></>}
+          </dl>
+          <p className={styles.help}>이름·한 줄 소개·희망 직무·기술은 직접 입력한 정보입니다.</p>
+          {state.profile.githubAccountLogin !== null && <p className={styles.help}>GitHub 계정은 GitHub 연결 때 확인해 저장한 이름입니다.</p>}
+        </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * L01 공개 Catch 요약(#149). 발행 준비를 열 때마다 첫 페이지부터 다시 읽는다.
+ * 차례로 읽은 요약이므로 수신자 화면과 같은 시점의 확정 목록이라고 안내하지 않는다.
+ * 발급은 요약 결과와 무관하다. 0건 허용은 초안 §4.7 결정이고, 조회 중·실패 중 허용은 정한 결정이 없어
+ * (§4.8 화면 제안은 잠시 차단) 기능 문서 README와 PR 리뷰에서 확인한다.
+ */
+function PublicCatchSummary() {
+  const summary = useMemo(() => createPublicCatchSummary(createCatchApi(api.member)), []);
+  const state = useSyncExternalStore(summary.subscribe, summary.getSnapshot, summary.getSnapshot);
+
+  useEffect(() => {
+    void summary.load();
+    return () => summary.dispose();
+  }, [summary]);
+
+  return (
+    <section className={styles.summary} aria-labelledby="public-summary-title">
+      <h3 id="public-summary-title" className={styles.summaryTitle}>현재 공개 Catch</h3>
+      {state.status === "idle" || state.status === "loading" ? (
+        <LoadingState>공개한 Catch를 확인하고 있습니다.</LoadingState>
+      ) : state.status === "failed" ? (
+        <LookupFailedState title="공개한 Catch를 확인하지 못했습니다" onRetry={() => void summary.load()}>
+          공개 Catch가 없다는 뜻은 아닙니다. 링크 발행은 그대로 할 수 있습니다.
+        </LookupFailedState>
+      ) : state.items.length === 0 ? (
+        <EmptyState title="현재 공개된 Catch가 없습니다">
+          공개 Catch가 없어도 링크를 발행할 수 있습니다. 공개는 내 자산에서 따로 선택합니다.
+        </EmptyState>
+      ) : (
+        <>
+          <p className={styles.help}>불러온 시점에 공개 중인 Catch {state.items.length}개</p>
+          <ul className={styles.summaryList}>
+            {state.items.map((item) => (
+              <li key={item.catchId} className={styles.summaryItem}>
+                <Link href={assetCatchHref(item.catchId)}>{item.title ?? "제목 없는 Catch"}</Link>
+                {item.firstFact && <span className={styles.muted}>{item.firstFact}</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {state.status === "ready" && (
+        <p className={styles.help}>
+          이 요약은 조회하는 동안이나 조회 후에 달라질 수 있습니다. 수신자에게는 링크를 여는 시점에 공개 중인 자료가 보입니다.
+        </p>
+      )}
     </section>
   );
 }
@@ -405,6 +500,7 @@ function StopDialog({ store }: { store: ShareLinksStore }) {
           <p className={styles.url}>{stop.url}</p>
           {stop.phase === "confirm" && (
             <>
+              {stop.message && <p className={styles.messageError} role="alert">{stop.message}</p>}
               <ul className={styles.dialogList}>
                 <li>중단하면 이 URL로 자료를 열람할 수 없습니다.</li>
                 <li>이미 열린 화면에는 다음 이동·새로고침부터 반영됩니다.</li>

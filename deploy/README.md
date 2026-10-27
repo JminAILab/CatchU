@@ -87,11 +87,10 @@ deploy/scripts/make-local-env.sh ~/catchu-local-env
 deploy/scripts/replace-single.sh --env-file ~/catchu-local-env/compose.env --local-db --migrate
 ```
 
-**Windows에서 실행할 때(아직 확인하지 않은 절차):** 스크립트는 bash 전용이라 PowerShell에서는 돌지 않는다. Docker Desktop의 WSL2 연동을 켜고, WSL2 안의 Linux(예: Ubuntu) 터미널에서 위 명령을 실행한다.
+**Windows에서 실행할 때:** 스크립트는 bash 전용이라 PowerShell에서는 돌지 않는다. Docker Desktop 설정의 WSL Integration에서 쓸 배포판(예: Ubuntu-22.04)을 따로 켜고, 그 배포판 터미널에서 위 명령을 실행한다. 2026-10-27 WSL2 Ubuntu 22.04(x86_64)에서 작성자 외 재현으로 확인했다(#275).
 
 - 저장소와 합성 환경 폴더를 WSL2 안의 Linux 경로(예: `~/CatchU`, `~/catchu-local-env`)에 둔다. `/mnt/c/...` 아래에서는 실행 권한·파일 권한(0600)·줄바꿈(CRLF) 때문에 스크립트와 인증서가 깨질 수 있다.
-- WSL2 안에서 `git`으로 clone하고, `openssl`이 있는지, `docker version`·`docker compose version`이 되는지 먼저 확인한다(검사 스크립트를 돌릴 때만 Node 24.21.0이 더 필요하다).
-- 처음 따라 한 사람이 막힌 곳과 해결 방법을 PR에 남기고, 확인되면 이 문단의 "아직 확인하지 않은"을 지운다.
+- WSL2 안에서 `git`으로 clone하고(WSL에서 GitHub clone이 진행되지 않으면 Windows에서 받은 저장소를 `git bundle create`로 묶어 WSL 안의 Linux 경로에서 clone한다), `openssl`이 있는지, `docker version`·`docker compose version`이 되는지 먼저 확인한다(검사 스크립트를 돌릴 때만 Node 24.21.0이 더 필요하다).
 
 정상 확인과 종료:
 

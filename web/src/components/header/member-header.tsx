@@ -33,7 +33,7 @@ export function MemberHeader({ onLogout, logoutPending }: MemberHeaderProps) {
 
   return (
     <header className={styles.header}>
-      <div className={styles.inner}>
+      <div className={`${styles.inner} ${styles.memberInner}`}>
         <nav className={styles.group} aria-label="주요 메뉴">
           <Link href={routes.home} className={styles.brand}>
             CatchU
