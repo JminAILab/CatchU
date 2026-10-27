@@ -500,6 +500,7 @@ function StopDialog({ store }: { store: ShareLinksStore }) {
           <p className={styles.url}>{stop.url}</p>
           {stop.phase === "confirm" && (
             <>
+              {stop.message && <p className={styles.messageError} role="alert">{stop.message}</p>}
               <ul className={styles.dialogList}>
                 <li>중단하면 이 URL로 자료를 열람할 수 없습니다.</li>
                 <li>이미 열린 화면에는 다음 이동·새로고침부터 반영됩니다.</li>

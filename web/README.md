@@ -73,6 +73,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 |---|---|---|---|
 | API 호출 시 필수 | `NEXT_PUBLIC_API_BASE_URL` | `http://127.0.0.1:3001` | api 기준 주소. `/v1`은 넣지 않는다(호출 함수가 붙인다). 없거나 잘못되면 호출하지 않고 조회 실패로 돌려준다. `npm run build`로 만든 운영 빌드처럼 `NODE_ENV`가 `development`·`test`가 아니면 https 주소나 로컬 주소(`localhost`·`127.0.0.1`)의 http만 받고, 그 밖의 http 주소도 잘못된 주소로 본다(#218). 이 주소의 출처를 CSP 연결 허용에도 넣는다(「보안 응답 헤더」). IPv6 주소(`[::1]` 등)는 CSP에 적을 수 없어 형식과 관계없이 `npm run dev`·`npm run build`가 오류로 멈추므로 `127.0.0.1`이나 `localhost`를 쓴다 |
 | 선택 | `NEXT_PUBLIC_DEV_LOGIN_ENABLED` | `false` | 기본 비활성. 정확히 `true`일 때만 `/login`에 개발용 로그인을 보인다. api도 `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development` 또는 `test`가 함께 지정돼야 허용하며, 그 밖에는 403이다 |
+| 선택 | `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION` | `false` | 공통 인증(#286) 화면 연결의 통합 시험 전환. 정확히 `true`일 때만 켠다. 각 화면 담당 확인·#287 연결·통합 검증 전에는 제품에서 켜지 않는다([공통 인증 안내](src/features/auth-session/README.md)) |
 
 - 이름이 `NEXT_PUBLIC_`으로 시작하는 변수만 브라우저에 노출된다. 비밀값·토큰은 이 이름으로 두지 않는다.
 - `NEXT_PUBLIC_` 값은 `npm run dev`·`npm run build`를 시작할 때 읽힌다. 바꾸면 다시 시작한다.
@@ -210,8 +211,12 @@ if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLi
 - 자동 재시도하지 않는다. 서버가 저장했는지 알 수 없는 결과(조회 실패·5xx)면 키를 유지하고, 사용자가 다시 누르면 같은 키로 보낸다. 401도 앞선 같은 키 요청의 저장 여부를 알려 주지 않으므로 키를 유지한다. 429(빈도 제한)도 요청을 처리하지 않은 것이라 키를 유지하고, `Retry-After`가 지난 뒤 사용자가 다시 누르면 같은 키·본문으로 보낸다(#235 계약). 성공과 401·429를 뺀 4xx 업무 거부만 확정으로 본다(`isSettledResult`).
 - 로그인 복귀 후 키 보존은 아직 구현하지 않았다. 지금은 401이면 로그인 화면으로 이동하면서 화면이 다시 만들어져 키도 새로 생긴다. 후속 구현 조건: 로그인 뒤 키를 이어 쓰려면 실제 생성 화면에서 **같은 회원·같은 생성 요청일 때만** 이어 쓰고, 다른 계정으로 로그인했으면 키를 버린다. 로그인 뒤 이전 요청을 자동으로 다시 보내지 않는다.
 - 오류 응답에 `Retry-After`가 1 이상의 정수 초로 오면 `retryAfterSeconds`로 전달한다. 헤더가 없거나 다른 형식이면 붙이지 않으며, 남은 시간을 추정하지 않는다.
-- 토큰은 탭의 메모리(`src/lib/access-token.ts`)에만 둔다. localStorage·sessionStorage·쿠키·URL·로그에 쓰지 않으며, 새로고침하면 사라져 다시 로그인한다. 실제 유지 방식은 OQ-A1에서 정한다.
+- 토큰은 탭의 메모리(`src/lib/access-token.ts`)에만 둔다. localStorage·sessionStorage·쿠키·URL·로그에 쓰지 않으며, 새로고침하면 사라져 다시 로그인한다. 실제 유지 방식은 OQ-A1에서 정한다. 예외는 Google 로그인 시도 값 하나뿐이다([팀장 T1 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6182257830), [공통 인증 안내](src/features/auth-session/README.md)).
 - 개발용 로그인은 `api.devLogin(memberId, { signal })`다. `memberId`에는 개발용 식별 문자열을 넣으며, api가 해당 회원을 찾거나 만들어 그 회원의 토큰을 준다. 성공하면 토큰을 메모리에 넣고, 결과에는 토큰을 담지 않는다. 가장 늦게 시작한 로그인만 반영하며, 먼저 보낸 로그인이 늦게 오거나 로그인 화면을 떠나 취소되면 토큰을 바꾸지 않는다.
+
+## 공통 인증 (#286)
+
+회원 인증 상태·세션 갱신·로그아웃·로그인 완료와 통합 시험 전환 `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION`의 동작은 [공통 인증 안내](src/features/auth-session/README.md)에 있다.
 
 ## 보안 응답 헤더 (#217)
 

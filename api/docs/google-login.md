@@ -22,7 +22,7 @@ Google 기준은 [서버 인증 코드 흐름](https://developers.google.com/ide
 - Google 로그인 완료 API의 `401 AUTH_INVALID`는 로그인 시도·인증 코드·Google 토큰 검증 실패일 수 있으며, 기존 CatchU 회원 세션 만료로 일괄 처리하지 않는다. 현재 web의 `api.member`는 `AUTH_REQUIRED`·`AUTH_INVALID` 응답을 받으면 보관 중인 회원 토큰을 정리한다. #251에서는 로그인 시작·완료 호출을 이 회원 인증 오류 처리 경로와 구분해야 한다. 요청에서 회원 토큰을 생략하는 것만으로 응답의 오류 처리까지 분리되지는 않는다.
 - 완료 API에 전달할 취소 오류는 `access_denied`만 지원한다. 다른 Google 오류는 화면에서 실패로 안내하고, 사용자가 다시 시도하기를 선택하면 새 인증을 시작한다. 지원하지 않는 오류를 완료 API로 보내면 `400 VALIDATION_FAILED`와 `details.violations`를 반환한다. 컨트롤러의 입력 검증이 인증 시도 소비 전에 실행되므로 이 단계에서는 시도를 소비하지 않는다. 입력 검증 통과 후의 취소·외부 교환·DB 실패는 아래 일회용 처리 기준을 따른다.
 
-시작자 확인값·복귀 경로의 `sessionStorage` 보관은 후속 제안이며 확정된 정책이 아니다. 세션 유지·갱신·로그아웃은 [#250 후속 안내](auth-sessions.md), 이름 저장 회원의 프로필 설정 화면 접근·복귀·저장 후 재진입 처리는 [PR #261](https://github.com/JminAILab/CatchU/pull/261) 범위로 구분한다.
+시작자 확인값·복귀 경로는 [팀장 T1 결정(#251)](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6182257830)대로 web이 `sessionStorage`의 키 하나에 보관한다(요청 직전 `sent` 표시, 완료 응답 후 삭제, 시한 경과 시 삭제, 로그 금지, 저장 실패 시 Google로 이동하지 않음, `next`는 저장·복귀 때 모두 검사). Access·Refresh는 여기에 두지 않는다. web 구현은 #286(`web/src/lib/auth-google.ts`)이 맡는다. 세션 유지·갱신·로그아웃은 [#250 후속 안내](auth-sessions.md), 이름 저장 회원의 프로필 설정 화면 접근·복귀·저장 후 재진입 처리는 [PR #261](https://github.com/JminAILab/CatchU/pull/261) 범위로 구분한다.
 
 ## API 연결안
 
