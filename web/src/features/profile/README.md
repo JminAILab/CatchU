@@ -24,8 +24,7 @@ PUT /v1/me/profile 성공 후 GET /v1/me를 다시 조회하고 이름이 저장
 조회 중에는 불러오는 중, 실패·응답 형식 오류에는 '다시 불러오기'를 보이고 빈 프로필이나 이름 미저장으로 바꾸지 않는다.
 
 - [프로필 수정] → /profile/edit.
-- [GitHub 연결 상태]는 '연결 전'으로 표시하고 누를 수 없게 둔다(프로필 메뉴의 [로그아웃] 표시와 같다). 실제 GitHub 연동 상태 조회·표시와 연동 화면(/profile/github) 연결은 [#253](https://github.com/JminAILab/CatchU/issues/253) 범위이며 이 PR에는 없다.
-  #253 전에는 이 주소가 없어, 이동하면 문서가 새로 열려 메모리의 로그인 정보가 사라지고 404가 된다([#300 리뷰](https://github.com/JminAILab/CatchU/pull/300#pullrequestreview-5541683061)). #253에서 실제 화면과 함께 이동을 연결한다.
+- [GitHub 연결 상태] → /profile/github([GitHub 연동 화면](../github-connection/README.md), #253). 연결 상태 조회·표시는 그 화면이 한다.
 
 ## 프로필 수정 — /profile/edit
 
@@ -48,7 +47,6 @@ PUT /v1/me/profile 성공 후 GET /v1/me를 다시 조회하고 이름이 저장
 - 수정 화면의 '프로필 수정은 기존 공유 링크의 다음 조회에도 반영됩니다' 안내는 넣지 않았다. 팀장 결정은 있으나 수신자 화면이 현재 프로필을 읽는지 이 PR에서 확인하지 않았다.
 - Google 이름을 미리 채우지 않는다. 저장된 표시 이름을 Google 이름으로 덮어쓰지 않는다.
 - 상세의 [돌아가기]는 두지 않았다(헤더로 이동).
-- 상세의 [GitHub 연결 상태]는 '연결 전' 버튼으로만 표시한다. 실제 GitHub 연동 상태 조회·표시와 연동 화면(/profile/github) 연결은 #253 범위다.
 
 ## 검사와 남은 범위
 

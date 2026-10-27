@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRepositoryApi } from '../src/features/repository-management/repository-api.ts';
-import { GITHUB_SCREEN_NOT_READY, homeView } from '../src/features/home/home-readiness.ts';
+import { homeView } from '../src/features/home/home-readiness.ts';
 
 // 홈(#155) 준비 상태 판정. 기대 결과의 근거: #155 완료 기준, 홈 흐름 초안 §5.3·§5.4·§6.2(합성 응답).
 const me = (github) => ({ memberId: 'm-1', profile: { displayName: '수영', introduction: '', desiredRole: '', skills: [] }, github });
@@ -21,16 +21,16 @@ test('조회 중에는 연결 안내를 보이지 않는다', () => {
   assert.deepEqual(homeView({ state: 'loading' }), { kind: 'loading' });
 });
 
-test('GitHub 미연동이 정상 조회되면 미연결 상태와 GitHub 연결 단계를 보이고, 연동 화면(#253)이 없어 비활성·준비 중 이유를 보인다', async () => {
+test('GitHub 미연동이 정상 조회되면 미연결 상태와 GitHub 연결 단계를 보이고, GitHub 연동 화면(#253)으로 보낸다', async () => {
   const { view, calls } = await viewFor(ok(me({ state: 'DISCONNECTED', accountLogin: null })));
   assert.deepEqual(calls, [{ path: '/me', method: 'GET' }]);
   assert.equal(view.kind, 'guide');
   assert.equal(view.status, 'GitHub 미연결');
   assert.equal(view.step, 'github');
-  assert.deepEqual(view.action, { kind: 'unavailable', label: '프로필에서 GitHub 연결', reason: GITHUB_SCREEN_NOT_READY });
+  assert.deepEqual(view.action, { kind: 'link', label: '프로필에서 GitHub 연결', href: '/profile/github' });
 });
 
-test('재연동 필요는 미연동과 상태·제목·설명·버튼을 구분하고, 같은 이유로 비활성이다', async () => {
+test('재연동 필요는 미연동과 상태·제목·설명·버튼을 구분하고, 같은 GitHub 연동 화면으로 보낸다', async () => {
   const { view } = await viewFor(ok(me({ state: 'REAUTH_REQUIRED', accountLogin: 'octo' })));
   const disconnected = (await viewFor(ok(me({ state: 'DISCONNECTED', accountLogin: null })))).view;
   assert.equal(view.kind, 'guide');
@@ -38,7 +38,7 @@ test('재연동 필요는 미연동과 상태·제목·설명·버튼을 구분�
   assert.equal(view.step, 'github');
   for (const key of ['status', 'title', 'description']) assert.notEqual(view[key], disconnected[key], key);
   assert.notEqual(view.action.label, disconnected.action.label);
-  assert.deepEqual(view.action, { kind: 'unavailable', label: 'GitHub 다시 연결', reason: GITHUB_SCREEN_NOT_READY });
+  assert.deepEqual(view.action, { kind: 'link', label: 'GitHub 다시 연결', href: '/profile/github' });
 });
 
 test('GitHub 연결됨은 저장소 연결 여부를 단정하지 않고 내 자산의 저장소 연결 관리로 보낸다', async () => {
