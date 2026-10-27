@@ -6,7 +6,7 @@ import {
   completeConnection, isGitHubAuthorizationUrl, readCallbackParams, readConnection, startConnection,
 } from '../src/features/github-connection/github-connection-api.ts';
 import {
-  connectionStatusView, createCallbackControl, createStartControl, githubNotices,
+  connectionStatusView, createCallbackControl, createStartControl, githubNotices, githubStartBlockedReason, noticeNextStep,
 } from '../src/features/github-connection/github-connection-screen.ts';
 
 /**
@@ -188,12 +188,24 @@ test('공통 API 호출 함수로: 완료가 401이면 토큰을 지우고(공�
   assert.equal(server.tokens.get().token, 'token-1', '서버 오류·통신 실패는 로그인을 끊지 않는다');
 });
 
-/* ---------- 상태 표시 ---------- */
+/* ---------- 연결 시작 가능 여부·상태 표시 ---------- */
+
+// 통합 시험 전환을 켰을 때(시작 가능)와 끈 제품 기본값(시작 막음)의 판정 입력.
+const ON = { startBlockedReason: githubStartBlockedReason(true) };
+const OFF = { startBlockedReason: githubStartBlockedReason(false) };
+const DISCONNECTED = { state: 'DISCONNECTED', accountLogin: null };
+const REAUTH = { state: 'REAUTH_REQUIRED', accountLogin: 'octo' };
+const CONNECTED = { state: 'CONNECTED', accountLogin: 'octo' };
+
+test('시작 가능 여부: 세션 복원(#286) 통합 시험 전환이 켜졌을 때만 시작하고, 꺼져 있으면 사용할 수 없는 이유를 돌려준다', () => {
+  assert.equal(ON.startBlockedReason, null);
+  assert.equal(OFF.startBlockedReason, 'GitHub 인증 뒤 로그인을 유지하는 기능이 준비 중이라 아직 GitHub 연결을 시작할 수 없습니다.');
+});
 
 test('상태 표시: 세 상태의 이름이 서로 다르고, 연결됨만 내 자산 이동이며 연결 해제·교체 행동이 없다', () => {
-  const disconnected = connectionStatusView({ state: 'DISCONNECTED', accountLogin: null }, false);
-  const reauth = connectionStatusView({ state: 'REAUTH_REQUIRED', accountLogin: 'octo' }, false);
-  const connected = connectionStatusView({ state: 'CONNECTED', accountLogin: 'octo' }, false);
+  const disconnected = connectionStatusView(DISCONNECTED, { retried: false, ...ON });
+  const reauth = connectionStatusView(REAUTH, { retried: false, ...ON });
+  const connected = connectionStatusView(CONNECTED, { retried: false, ...ON });
   assert.deepEqual(new Set([disconnected.label, reauth.label, connected.label]).size, 3);
   assert.deepEqual(disconnected.action, { kind: 'start', label: 'GitHub 연결' });
   assert.deepEqual(reauth.action, { kind: 'start', label: '다시 연결' });
@@ -204,8 +216,38 @@ test('상태 표시: 세 상태의 이름이 서로 다르고, 연결됨만 내 
 });
 
 test('상태 표시: 취소·실패 안내 뒤 미연결이면 버튼은 [다시 연결]이다', () => {
-  assert.deepEqual(connectionStatusView({ state: 'DISCONNECTED', accountLogin: null }, true).action, { kind: 'start', label: '다시 연결' });
-  assert.equal(connectionStatusView({ state: 'CONNECTED', accountLogin: '' }, false).account, null);
+  assert.deepEqual(connectionStatusView(DISCONNECTED, { retried: true, ...ON }).action, { kind: 'start', label: '다시 연결' });
+  assert.equal(connectionStatusView({ state: 'CONNECTED', accountLogin: '' }, { retried: false, ...ON }).account, null);
+});
+
+test('상태 표시(전환 꺼짐): 미연결·재연결 필요는 같은 이름의 버튼을 누를 수 없게 두고 이유를 보이며, 상태·계정과 연결됨의 내 자산 이동은 그대로다', () => {
+  for (const [connection, retried, label] of [
+    [DISCONNECTED, false, 'GitHub 연결'], [DISCONNECTED, true, '다시 연결'], [REAUTH, false, '다시 연결'],
+  ]) {
+    const on = connectionStatusView(connection, { retried, ...ON });
+    const off = connectionStatusView(connection, { retried, ...OFF });
+    assert.deepEqual(off.action, { kind: 'unavailable', label, reason: OFF.startBlockedReason });
+    assert.deepEqual({ ...off, action: null }, { ...on, action: null }, '상태 이름·계정·설명은 전환과 관계없다');
+  }
+  assert.deepEqual(connectionStatusView(CONNECTED, { retried: false, ...OFF }), connectionStatusView(CONNECTED, { retried: false, ...ON }));
+});
+
+test('실패 안내: 없는 연결 버튼을 가리키지 않고, 다음 행동은 지금 상태와 실제 버튼에 맞춘다', () => {
+  assert.equal(githubNotices.failed.text, 'GitHub 계정을 연결하지 못했습니다.');
+  const nextStep = (connection, mode) => noticeNextStep(githubNotices.failed, connectionStatusView(connection, { retried: true, ...mode }));
+  assert.equal(nextStep(DISCONNECTED, ON), '연결하려면 [다시 연결]을 눌러 주세요.');
+  assert.equal(nextStep(REAUTH, ON), '연결하려면 [다시 연결]을 눌러 주세요.');
+  assert.equal(nextStep(CONNECTED, ON), '기존 연결은 그대로입니다.', '연결됨에는 연결 버튼이 없다');
+  assert.equal(nextStep(CONNECTED, OFF), '기존 연결은 그대로입니다.');
+  assert.equal(nextStep(DISCONNECTED, OFF), null, '시작을 막았으면 누를 버튼을 안내하지 않는다(이유는 버튼 옆)');
+  assert.equal(nextStep(REAUTH, OFF), null);
+  assert.equal(noticeNextStep(githubNotices.failed, null), null, '상태를 아직 모르면 덧붙이지 않는다');
+  for (const notice of [githubNotices.cancelled, githubNotices.unknown, githubNotices.unavailable, githubNotices.startFailed]) {
+    for (const connection of [DISCONNECTED, REAUTH, CONNECTED]) {
+      assert.equal(noticeNextStep(notice, connectionStatusView(connection, { retried: true, ...ON })), null, notice.text);
+    }
+  }
+  for (const notice of Object.values(githubNotices)) assert.doesNotMatch(notice.text, /연결 버튼/);
 });
 
 /* ---------- 연결 시작 버튼 ---------- */

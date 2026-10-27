@@ -40,17 +40,31 @@ export const githubConnectionMessages = {
 
 export const githubNotices = {
   cancelled: { tone: "info", text: "GitHub 연결을 취소했습니다. 기존 연결 상태는 바뀌지 않았습니다." },
-  failed: { tone: "error", text: "GitHub 계정을 연결하지 못했습니다. 다시 연결하려면 연결 버튼을 눌러 주세요." },
+  // 다음 행동은 지금 상태·버튼에 따라 다르므로 `noticeNextStep()`이 덧붙인다(연결됨이면 연결 버튼이 없다).
+  failed: { tone: "error", text: "GitHub 계정을 연결하지 못했습니다." },
   unknown: { tone: "error", text: "GitHub 연결 결과를 확인하지 못했습니다. 아래에서 현재 연결 상태를 확인해 주세요." },
   unavailable: { tone: "error", text: "지금은 GitHub 연결을 사용할 수 없습니다." },
   startFailed: { tone: "error", text: "GitHub 연결을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요." },
 } as const satisfies Record<string, GitHubNotice>;
+
+/* ---------- 연결 시작 가능 여부 ---------- */
+
+/**
+ * GitHub 연결 시작을 막는 이유. 막지 않으면 null이다. 연동 화면과 홈 안내(#155)가 같은 기준·문구를 쓴다.
+ * 같은 탭에서 GitHub에 다녀오면 기존 메모리 토큰(#106)이 사라져 콜백에서 연결을 마칠 수 없다. 그래서 세션 복원(#286)을 쓰는
+ * 통합 시험 전환(`auth-integration.ts`)이 켜졌을 때만 시작하고, 제품 기본값(꺼짐)에서는 막는다.
+ * 막아도 연결 상태 조회와 내 자산 이동은 그대로 둔다.
+ */
+export function githubStartBlockedReason(sessionIntegrationEnabled: boolean): string | null {
+  return sessionIntegrationEnabled ? null : "GitHub 인증 뒤 로그인을 유지하는 기능이 준비 중이라 아직 GitHub 연결을 시작할 수 없습니다.";
+}
 
 /* ---------- 연결 상태 표시 ---------- */
 
 /**
  * 조회한 연결 상태의 표시. 세 상태의 이름이 서로 다르다(홈 안내와 같은 이름).
  * - 미연결·재연결 필요: 연결 시작 버튼. 직전에 취소·실패 안내가 있었으면 [다시 연결]이다.
+ *   시작을 막았으면(`githubStartBlockedReason`) 같은 이름의 버튼을 누를 수 없게 두고 이유를 함께 보인다(`unavailable`).
  * - 연결됨: 계정과 내 자산의 저장소 연결 관리 이동. 10월 화면에는 연결 해제·다른 계정 교체가 없다.
  */
 export type ConnectionStatusView = {
@@ -58,22 +72,30 @@ export type ConnectionStatusView = {
   label: string;
   account: string | null;
   description: string | null;
-  action: { kind: "start"; label: string } | { kind: "link"; label: string; href: string };
+  action:
+    | { kind: "start"; label: string }
+    | { kind: "unavailable"; label: string; reason: string }
+    | { kind: "link"; label: string; href: string };
 };
 
-export function connectionStatusView(connection: GitHubConnection, retried: boolean): ConnectionStatusView {
+export function connectionStatusView(
+  connection: GitHubConnection,
+  { retried, startBlockedReason }: { retried: boolean; startBlockedReason: string | null },
+): ConnectionStatusView {
   const account = connection.accountLogin === "" ? null : connection.accountLogin;
+  const start = (label: string): ConnectionStatusView["action"] =>
+    startBlockedReason === null ? { kind: "start", label } : { kind: "unavailable", label, reason: startBlockedReason };
   switch (connection.state) {
     case "DISCONNECTED":
       return {
         github: "DISCONNECTED", label: "GitHub 미연결", account: null, description: null,
-        action: { kind: "start", label: retried ? "다시 연결" : "GitHub 연결" },
+        action: start(retried ? "다시 연결" : "GitHub 연결"),
       };
     case "REAUTH_REQUIRED":
       return {
         github: "REAUTH_REQUIRED", label: "GitHub 재연결 필요", account,
         description: "GitHub 연결을 다시 확인해 주세요. 다시 연결해야 저장소를 연결하고 분석을 요청할 수 있습니다.",
-        action: { kind: "start", label: "다시 연결" },
+        action: start("다시 연결"),
       };
     case "CONNECTED":
       return {
@@ -81,6 +103,21 @@ export function connectionStatusView(connection: GitHubConnection, retried: bool
         description: "저장소 연결과 분석 요청은 내 자산의 저장소 연결 관리에서 합니다.",
         action: { kind: "link", label: "내 자산에서 저장소 연결 관리", href: routes.assets },
       };
+  }
+}
+
+/**
+ * 안내 뒤에 덧붙이는 다음 행동. 연결 실패 안내에만 쓰며, 지금 보이는 상태와 실제 버튼에 맞춘다.
+ * - 시작 버튼이 있으면 그 버튼을 누르게 한다.
+ * - 연결됨이면 연결 버튼이 없다. 기존 연결이 그대로임만 알린다(콜백 재전송·이미 쓴 state 등).
+ * - 시작을 막았거나(막은 이유는 버튼 옆에 있다) 상태를 아직 모르면 덧붙이지 않는다.
+ */
+export function noticeNextStep(notice: GitHubNotice, status: ConnectionStatusView | null): string | null {
+  if (notice !== githubNotices.failed || status === null) return null;
+  switch (status.action.kind) {
+    case "start": return `연결하려면 [${status.action.label}]을 눌러 주세요.`;
+    case "link": return "기존 연결은 그대로입니다.";
+    case "unavailable": return null;
   }
 }
 
