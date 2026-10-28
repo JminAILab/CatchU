@@ -1,12 +1,18 @@
 /**
  * 회원 화면 묶음의 로그아웃·재인증 안내(#287). React와 분리해 시험한다.
- * 인증 상태 판단·입력 정리·복원·로그아웃 뒤 이동은 공통 인증(#286)과 그 가드가 맡는다. 여기서는 미저장 확인·요청·진행·실패·불명 표시만 정한다.
+ * 인증 상태 판단·입력 정리·복원·로그아웃 뒤 이동은 공통 인증(#286)과 그 가드가 맡는다.
+ * 여기서는 이동 전 확인(미저장 입력·미확정 분석 요청)·요청·진행·실패·불명 표시와 [다시 로그인]의 한 번 이동만 정한다. 확인 사유의 판정·등록은 각 화면이 #286 등록 수단으로 한다.
  */
-import type { LogoutOutcome, LogoutResult, LogoutSnapshot } from "./auth-screen-contract.ts";
-import { authScreenMessages, logoutNotice } from "./auth-screen-messages.ts";
-import { confirmDiscardUnsaved, type ConfirmDialog, type UnsavedRegistry } from "./unsaved-changes.ts";
+import type { ReauthNoticeProps } from "./auth-gate.ts";
+import type { LogoutOutcome } from "./auth-logout.ts";
+import type { AuthSnapshot, LogoutResult } from "./auth-state.ts";
+import { leaveConfirmMessage, logoutNotice, type LeaveAction } from "./auth-screen-messages.ts";
+import type { ConfirmDialog, UnsavedRegistry } from "./unsaved-changes.ts";
 
 type Listener = () => void;
+
+/** 로그아웃 표시에 쓰는 공통 인증 상태(#286 `AuthSnapshot`)의 일부. */
+export type LogoutSnapshot = Pick<AuthSnapshot, "generation" | "logout" | "canRetryLogout">;
 
 /* ---------- 로그아웃 ---------- */
 
@@ -29,7 +35,7 @@ export type MemberLogoutControl = {
 
 /**
  * - 진행 중(이 화면의 요청 또는 공통 상태 `pending`)이면 묻지도 보내지도 않는다.
- * - 미저장 확인에서 머무르면 요청·이동 없이 끝낸다.
+ * - 이동 전 확인(`confirmLogout`)에서 머무르면 요청·이동 없이 끝낸다.
  * - `done`이어도 여기서는 이동하지 않는다. 정리·이동은 가드가 현재 유효한 완료일 때만 한다.
  * - `not-started`·`discarded`는 안내 없이 진행 표시만 지운다.
  */
@@ -91,23 +97,74 @@ export function logoutView(snapshot: LogoutSnapshot, local: LogoutLocal): Logout
   return { pending, notice: message === null ? null : { message, retry: snapshot.canRetryLogout } };
 }
 
-/** 로그아웃 전 미저장 확인. */
-export function confirmLogout(registry: Pick<UnsavedRegistry, "hasUnsaved">, confirm: ConfirmDialog): boolean {
-  return confirmDiscardUnsaved(registry, confirm, authScreenMessages.logoutUnsavedConfirm);
+/* ---------- 이동 전 확인 ---------- */
+
+/** 이동 전 확인이 읽는 등록 수단(#286 `unsavedChanges`)의 일부. */
+type LeaveReasons = Pick<UnsavedRegistry, "activeReasons">;
+
+/**
+ * 누를 때마다 `activeReasons()`를 한 번 읽어 그 시점의 사유로 묻는다([#287 접점 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6313395220)).
+ * 사유가 없으면 묻지 않고 true(계속)다. 있으면 사유에 맞는 문구로 한 번만 묻고, 머무르면 false다. 입력·요청 정보와 그 등록은 건드리지 않는다.
+ * 어떤 상태를 사유로 등록할지는 각 화면 담당이 정한다(미확정 분석 요청은 #153·#154). 여기서는 분석 상태를 판정하지 않는다.
+ */
+function confirmLeave(action: LeaveAction, registry: LeaveReasons, confirm: ConfirmDialog): boolean {
+  const message = leaveConfirmMessage(action, registry.activeReasons());
+  return message === null || confirm(message);
+}
+
+/** 로그아웃 전 확인. 계속하면 기존 흐름대로 `logout()`을 보낸다. */
+export function confirmLogout(registry: LeaveReasons, confirm: ConfirmDialog): boolean {
+  return confirmLeave("logout", registry, confirm);
 }
 
 /* ---------- 재인증 안내 ---------- */
 
 /**
- * 재인증 안내의 [다시 로그인]을 눌렀을 때 로그인 화면으로 갈지. 로그아웃·갱신 요청은 보내지 않는다(#251 A 답변 3, 팀장 답변 2).
- * - 일반 재인증(`inputCleared` false): 화면·입력을 유지하고 있으므로 로그아웃과 같은 미저장 확인을 거친다. 머무르면 false.
- * - 로그인 표식 변경 뒤 공통 인증이 이미 화면·입력을 정리한 탭(`inputCleared` true): 잃을 입력이 없으므로 묻지 않는다.
- *   정리 여부는 #286이 정해 넘긴다.
+ * 재인증 안내의 [다시 로그인]을 눌렀을 때 로그인 화면으로 갈지. 로그아웃·갱신 요청은 보내지 않는다(#251 A 답변 3, 팀장 결정 2).
+ * - `variant` 생략·`reauth`: 화면·입력을 유지하고 있으므로 로그아웃과 같은 이동 전 확인을 거친다. 머무르면 false.
+ * - `login-changed`: 다른 탭의 새 로그인 감지로 가드가 화면·입력을 이미 정리한 탭이다. 잃을 입력이 없으므로 사유를 읽지 않고 묻지 않는다.
+ *   이 값은 #286 가드가 정해 넘긴다(`relogin-only` 판정).
  */
 export function confirmReauthLeave(
-  inputCleared: boolean,
-  registry: Pick<UnsavedRegistry, "hasUnsaved">,
+  variant: ReauthNoticeProps["variant"],
+  registry: LeaveReasons,
   confirm: ConfirmDialog,
 ): boolean {
-  return inputCleared || confirmDiscardUnsaved(registry, confirm, authScreenMessages.reauthUnsavedConfirm);
+  return variant === "login-changed" || confirmLeave("reauth", registry, confirm);
+}
+
+export type ReauthLeaveResult = "busy" | "stayed" | "leaving";
+
+export type ReauthLeaveControl = {
+  /** 재인증 안내의 [다시 로그인]. `notice`는 누른 시점의 안내 값(`returnTo`·`variant`)이다. */
+  request(notice: ReauthNoticeProps): ReauthLeaveResult;
+};
+
+/**
+ * [다시 로그인]의 이동을 한 번만 시작한다([#287 D 재현](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6335776141)).
+ * 확인 창이 떠 있는 동안 들어온 더블클릭의 두 번째 클릭·Enter 반복은 창이 닫힌 뒤 같은 버튼에 이어서 들어온다.
+ * 버튼 표시·초점은 바꾸지 않고, 누를 때마다 이 제어의 값으로 바로 판단한다.
+ * - 이동을 시작한 뒤(확인에서 계속했거나 물을 사유가 없음)에는 묻지도 이동하지도 않는다. 이동하면 안내가 회원 화면과 함께 사라지므로 되돌리지 않는다.
+ * - 머무르면 아무것도 바꾸지 않는다. 화면·입력·요청 정보가 그대로이고, 다시 누르면 그 시점의 사유로 다시 묻는다.
+ * - 이동을 시작하지 못하면(예상 밖 예외) 다시 누를 수 있게 되돌리고 예외를 그대로 올린다.
+ */
+export function createReauthLeaveControl(deps: {
+  confirmLeave(variant: ReauthNoticeProps["variant"]): boolean;
+  navigate(returnTo: ReauthNoticeProps["returnTo"]): void;
+}): ReauthLeaveControl {
+  let leaving = false;
+  return {
+    request({ returnTo, variant }) {
+      if (leaving) return "busy";
+      if (!deps.confirmLeave(variant)) return "stayed";
+      leaving = true;
+      try {
+        deps.navigate(returnTo);
+      } catch (error) {
+        leaving = false;
+        throw error;
+      }
+      return "leaving";
+    },
+  };
 }

@@ -1,0 +1,6 @@
+/* 창 폭 기준이다. 지원 폭에서는 세로 스크롤바가 차지하는 너비도 자연스럽게 뺀다. */
+@media (width < 760px) {
+  .memberLayout {
+    min-width: 760px;
+  }
+}
