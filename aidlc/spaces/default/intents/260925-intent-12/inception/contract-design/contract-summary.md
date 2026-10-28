@@ -390,12 +390,13 @@ RecipientSlotProps:
   onAccessLost: (code: LINK_UNAVAILABLE | LINK_PASSWORD_REQUIRED) -> void   # U4 제공. 화면 전환·grant 삭제
   isLoggedIn: boolean
 slots (화면 순서):
-  0: RecipientGuide(U2)                # 화면 위쪽 시작 안내. props는 showClaudeConnect: boolean 하나(U9 받은 사람 Claude 연결이 켜졌을 때만 true)
+  0: RecipientGuide(U2)                # 화면 위쪽 시작 안내. 링크 판정을 통과한 자료 화면에만 둔다(비밀번호 입력·접근 불가 화면 안내는 U4). props는 showClaudeConnect: boolean 하나이고 RecipientSlotProps는 받지 않는다. 정적 안내라 API를 부르지 않는다
   1: 발행본 자료(U4)
   2: BaseSummaryPanel(U5)
   3: QnaPanel(U5)                      # 입력란 옆 외부 AI 고지 한 줄 포함
   4: JdSummaryPanel(U10)               # 로그인 회원에게만, 비로그인은 로그인 안내
 rule: 붙는 컴포넌트는 401 LINK_PASSWORD_REQUIRED·404 LINK_UNAVAILABLE을 받으면 스스로 처리하지 않고 onAccessLost를 부른다
+guide-rule: RecipientGuide는 제목(h1)과 첫 초점을 갖지 않고, 다른 자리의 안내(질의응답 외부 AI 고지 U5, JD 로그인 안내 U10)를 되풀이하지 않는다. showClaudeConnect는 U9를 켜기 전까지 false이고, 켤 때의 링크별 조건(비밀번호 링크 포함)과 문구는 그때 U9·U4·U2가 정한다
 auth-rule: 401 AUTH_REQUIRED·AUTH_INVALID(로그인 없음·만료)는 링크 접근 문제가 아니므로 받은 컴포넌트가 처리한다. JdSummaryPanel(U10)은 로그인 안내로 바꾼다
 evidence-highlight:                    # 근거 원문 강조(입력 §3 RAG 덩어리). AC6.3.5의 화면 부분을 U4·U5·U10이 나눠 맡는다
   provider: U4 — RecipientSlotProps에 showEvidence: (location: AiSource.location) -> void를 준다.
