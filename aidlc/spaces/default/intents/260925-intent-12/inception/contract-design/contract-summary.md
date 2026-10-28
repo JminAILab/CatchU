@@ -40,7 +40,7 @@
 | C-08 | u3-published-index | u4-publication-link | api 안 TS 인터페이스(`PublishedIndexWriter`), 발행 트랜잭션 참여 | U3 담당 |
 | C-09 | u3-published-index | u5-rag-answer, u10-jd | api 안 TS 인터페이스(`PublishedSearch`) | U3 담당 |
 | C-10 | u4-publication-link | u5-rag-answer, u10-jd, u9-recipient-claude | api 안 TS 인터페이스(`PublicationAccess`) | U4 담당 |
-| C-11 | u4-publication-link | u5-rag-answer, u10-jd | web 받은 사람 화면(`/s/[token]`)의 붙는 자리 + 받은 사람 API 경로 규칙 | U4 담당 |
+| C-11 | u4-publication-link | u2-shared-foundation, u5-rag-answer, u10-jd | web 받은 사람 화면(`/s/[token]`)의 붙는 자리 + 받은 사람 API 경로 규칙 | U4 담당 |
 | C-12 | u4-publication-link, u5-rag-answer, u10-jd | External: 받은 사람 브라우저 | HTTP REST·SSE(`/v1/public/links/{token}/...`) | 경로별 제공 Unit 담당 |
 | C-13 | u4-publication-link | u6-claude-mcp | 공유 DB 표(`text_material`) | U4 담당 |
 | C-14 | u4-publication-link | u6-claude-mcp | 공유 DB 칸(`catch_asset`의 작성자 설명) | U4 담당 |
@@ -69,12 +69,15 @@ AiGenerationRequest:
   feature: BASE_SUMMARY | QNA | JD_SUMMARY
   instruction: string         # 기능별 지시문. 숨긴 지시 방어·역량 평가 표현 금지 공통 문구는 게이트가 붙인다
   sources: AiSource[]         # 비면 호출하지 않고 빈 결과
-  userText: string|null       # 질문·JD 요구사항 줄. 신뢰하지 않는 입력
+  userText: string|null       # 질문·JD 요구사항 줄. 신뢰하지 않는 입력. JD_SUMMARY는 한 호출에 요구사항 한 줄
   publicationText: string|null  # 그 발행본 조각 글 전부(C-09 search가 준 값). 검사에만 쓰고 모델 입력에 넣지 않는다
                                 # 넘기지 않으면(기본 요약처럼) 게이트는 넘긴 근거 글 전체를 발행본 글로 본다
   model: HAIKU | SONNET       # 기본 HAIKU. SONNET은 NFR3 조정 때 QNA에만
 GatedItem:
-  kind: CITED | AI_INTERPRETATION
+  kind: CITED | AI_INTERPRETATION | SERVER_NOTICE
+    # SERVER_NOTICE는 AI가 아니라 게이트가 만든 "찾지 못함" 안내(JD_SUMMARY만). 대조·droppedCount 대상이 아니고 'AI 해석' 표시를 붙이지 않는다
+  jdRole: EVIDENCE | UNCONFIRMED | INTERVIEW_QUESTION | null
+    # JD_SUMMARY만 채운다(근거 / 자료로 확인되지 않는 점 / 면접 질문). BASE_SUMMARY·QNA는 null
   text: string
   citations: [{ sourceId: string, quote: string, location: AiSource.location, sourceLabel: "GitHub 기록 원문" | "작성자 자료 원문" }]   # CITED만(FR6.5, AC6.3.5)
     # location은 quote 자체의 범위로 좁혀서 준다(같은 칸, 새 칸 없음). quote는 그 범위의 원문이다
@@ -89,7 +92,10 @@ check-scope:                  # 기계 대조(FR6.4). 추출은 U2 게이트 안
   CITED 근거 대조: 숫자·PR 번호·파일 이름·영어 표기를 근거 원문과 대조해 맞지 않는 항목을 버린다. 그 근거 글의 Catch PR 번호(catchEvidenceUrls의 /pull/{n})는 맞는 것으로 본다(AC6.3.2·AC6.3.3)
   AI_INTERPRETATION: 숫자·PR 번호가 있으면 허용 없이 버린다. 발행본 글(publicationText)에 없는 영어 표기가 있으면 버린다
   JD 면접 질문: 영어 표기는 근거 원문과 userText(그 JD 요구사항 줄)에서, 숫자·PR 번호는 같은 요구사항 근거 칸이 인용한 원문과 그 근거의 Catch PR 번호(catchEvidenceUrls)에서 찾는다(AC6.3.2·6.3.3·6.3.6)
+  JD 확인되지 않는 점: 인용이 있으면 CITED 근거 대조, 없으면 AI_INTERPRETATION 대조를 쓴다. JD 요구사항 줄의 표기는 허용 근거가 아니다
+  JD 서버 안내: userText의 기술·제품 이름 후보가 이번 sources 글에 없으면 게이트가 SERVER_NOTICE 항목(jdRole UNCONFIRMED)을 결과 끝에 더한다. 후보 규칙은 U2 기능 설계 BR4.7
 caller-rule: 호출 Unit은 원문을 따로 모으지 않는다. U5가 사본에서 근거를 만들 때(기본 요약)는 catchEvidenceUrls를 같은 규칙으로 붙인다
+jd-rule: U10은 JD 요구사항마다 generate를 한 번씩 부르고(FR6.1), jdRole로 항목을 세 칸에 나눠 보인다. 합성 제공자는 JD_SUMMARY에서 역할마다 항목을 하나씩 돌려준다
 GatedOutput:
   items: GatedItem[]          # 기계 대조를 통과한 항목만. 버린 항목은 경고 없이 빠진다
   droppedCount: int           # 로그용, 화면에 보이지 않음
@@ -374,7 +380,7 @@ rule: 받은 사람 쪽 API는 판정에 통과한 뒤에만 사본·색인·요
 
 ### C-11 받은 사람 화면의 붙는 자리
 
-U4가 받은 사람 화면(`web/src/app/s/[token]`)과 비밀번호 통과를 소유하고, U5·U10은 정해진 자리에 자기 컴포넌트를 붙인다. grant 보관은 10월 그대로(`sessionStorage`의 링크별 키, `X-Link-Grant` 헤더, 401·404를 받으면 그 링크 grant만 지움)이며 U4의 `recipient-grants` 도구를 쓴다.
+U4가 받은 사람 화면(`web/src/app/s/[token]`)과 비밀번호 통과를 소유하고, U2·U5·U10은 정해진 자리에 자기 컴포넌트를 붙인다. grant 보관은 10월 그대로(`sessionStorage`의 링크별 키, `X-Link-Grant` 헤더, 401·404를 받으면 그 링크 grant만 지움)이며 U4의 `recipient-grants` 도구를 쓴다.
 
 ```yaml
 # shared-schema: web 붙는 자리(React props)
@@ -384,11 +390,13 @@ RecipientSlotProps:
   onAccessLost: (code: LINK_UNAVAILABLE | LINK_PASSWORD_REQUIRED) -> void   # U4 제공. 화면 전환·grant 삭제
   isLoggedIn: boolean
 slots (화면 순서):
+  0: RecipientGuide(U2)                # 화면 위쪽 시작 안내. 링크 판정을 통과한 자료 화면에만 둔다(비밀번호 입력·접근 불가 화면 안내는 U4). props는 showClaudeConnect: boolean 하나이고 RecipientSlotProps는 받지 않는다. 정적 안내라 API를 부르지 않는다
   1: 발행본 자료(U4)
   2: BaseSummaryPanel(U5)
   3: QnaPanel(U5)                      # 입력란 옆 외부 AI 고지 한 줄 포함
   4: JdSummaryPanel(U10)               # 로그인 회원에게만, 비로그인은 로그인 안내
 rule: 붙는 컴포넌트는 401 LINK_PASSWORD_REQUIRED·404 LINK_UNAVAILABLE을 받으면 스스로 처리하지 않고 onAccessLost를 부른다
+guide-rule: RecipientGuide는 제목(h1)과 첫 초점을 갖지 않고, 다른 자리의 안내(질의응답 외부 AI 고지 U5, JD 로그인 안내 U10)를 되풀이하지 않는다. showClaudeConnect는 U9를 켜기 전까지 false이고, 켤 때의 링크별 조건(비밀번호 링크 포함)과 문구는 그때 U9·U4·U2가 정한다
 auth-rule: 401 AUTH_REQUIRED·AUTH_INVALID(로그인 없음·만료)는 링크 접근 문제가 아니므로 받은 컴포넌트가 처리한다. JdSummaryPanel(U10)은 로그인 안내로 바꾼다
 evidence-highlight:                    # 근거 원문 강조(입력 §3 RAG 덩어리). AC6.3.5의 화면 부분을 U4·U5·U10이 나눠 맡는다
   provider: U4 — RecipientSlotProps에 showEvidence: (location: AiSource.location) -> void를 준다.
