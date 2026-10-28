@@ -99,6 +99,7 @@ async function createCatchDbFixture(config) {
     const { AllowNullCatchTitle1791784385918 } = require('../../dist/database/migrations/1791784385918-AllowNullCatchTitle');
     const { AddCatchEvidencePosition1792029036359 } = require('../../dist/database/migrations/1792029036359-AddCatchEvidencePosition');
     const { CascadeCatchAssetsOnDelete1792817978014 } = require('../../dist/database/migrations/1792817978014-CascadeCatchAssetsOnDelete');
+    const { AddCatchAuthorDescription1793162230852 } = require('../../dist/database/migrations/1793162230852-AddCatchAuthorDescription');
     const { CatchAssetEntity } = require('../../dist/catches/entities/catch-asset.entity');
     const { CatchEvidenceEntity } = require('../../dist/catches/entities/catch-evidence.entity');
     const { CandidateRegistrationEntity } = require('../../dist/catches/entities/candidate-registration.entity');
@@ -116,7 +117,7 @@ async function createCatchDbFixture(config) {
         CandidateRegistrationEntity, RepositoryProtectionEntity, AuthSession, SessionRefreshToken],
       // 되돌리기 검사는 B 마이그레이션만 취소하여 실제 선행 테이블의 보존을 확인한다.
       migrations: [CreateCatchAssets1790600000000, CreateRepositoryProtection1790601000000, AllowNullCatchTitle1791784385918, AddCatchEvidencePosition1792029036359,
-        CascadeCatchAssetsOnDelete1792817978014],
+        CascadeCatchAssetsOnDelete1792817978014, AddCatchAuthorDescription1793162230852],
       extra: { options: `-c TimeZone=UTC -c search_path=${schema}` },
     });
     await dataSource.initialize();

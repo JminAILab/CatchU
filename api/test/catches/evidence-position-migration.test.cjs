@@ -20,6 +20,7 @@ test('근거 position은 기존 Catch별 UUID 조회 순서와 ID·본문을 보
     await db.transaction(manager => registerCandidates(manager, input));
     // 기존 DB에서 마지막으로 보던 UUID 정렬을 기준으로 backfill한다. 과거 입력 순서를 추측하지 않는다.
     const original = await readRows();
+    await db.undoLastMigration(); // U4 작성자 설명 칸(C-14)을 먼저 되돌린다.
     await db.undoLastMigration(); // #387 B 연쇄 삭제를 먼저 되돌린다.
     await db.undoLastMigration();
     assert.equal(await hasPosition(), false);
@@ -44,6 +45,7 @@ test('근거 position은 기존 Catch별 UUID 조회 순서와 ID·본문을 보
         [value, evidenceId]), error => error.driverError?.code === code);
     }
     assert.deepEqual(await readRows(), expected);
+    await db.undoLastMigration(); // U4 작성자 설명 칸(C-14)을 먼저 되돌린다.
     await db.undoLastMigration(); // #387 B 연쇄 삭제를 먼저 되돌린다.
     await db.undoLastMigration();
     assert.equal(await hasPosition(), false);

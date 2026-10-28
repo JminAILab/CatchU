@@ -279,11 +279,20 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
       'CreateResultApplicationRecord1790550000000', 'CreateCatchAssets1790600000000', 'CreateRepositoryProtection1790601000000', 'CreateShareLink1790745895865',
       'CreateAuthSessions1791648335731', 'AllowNullCatchTitle1791784385918', 'AddCatchEvidencePosition1792029036359',
       'CreateRepositorySelection1792383899264', 'AddAnalysisRequestHistoryIndex1792640486167', 'CascadeMemberAnalysisOnDelete1792817978011',
-      'CascadeResultApplicationOnDelete1792817978012', 'CascadeAuthSessionsOnDelete1792817978013', 'CascadeCatchAssetsOnDelete1792817978014']);
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 18);
+      'CascadeResultApplicationOnDelete1792817978012', 'CascadeAuthSessionsOnDelete1792817978013', 'CascadeCatchAssetsOnDelete1792817978014',
+      'CreatePublicationTables1793162230851', 'AddCatchAuthorDescription1793162230852']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 21);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
+    await isolated.undoLastMigration(); // U4 Catch 작성자 설명 칸(C-14)
+    assert.equal((await isolated.query(`SELECT count(*)::int AS n FROM information_schema.columns
+      WHERE table_schema = $1 AND table_name = 'catch_asset' AND column_name LIKE 'author_description%'`, [schema]))[0].n, 0);
+    await isolated.undoLastMigration(); // U4 발행본·항목·텍스트 자료 표(C-07·C-13)
+    for (const table of ['publication', 'published_item', 'text_material']) {
+      assert.equal((await isolated.query('SELECT to_regclass($1) AS name', [table]))[0].name, null);
+    }
+    assert.equal(await isolated.manager.count(MemberAccount), 1);
     for (let i = 0; i < 4; i++) await isolated.undoLastMigration(); // #387 B·세션·E 수신·회원 분석 연쇄 삭제
     assert.deepEqual((await isolated.query(`SELECT DISTINCT confdeltype FROM pg_constraint WHERE contype = 'f'
       AND connamespace = $1::regnamespace`, [schema])).map(r => r.confdeltype), ['a']);
