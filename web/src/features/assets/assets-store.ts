@@ -1,12 +1,20 @@
+import { memberMutationOutcome } from "../../lib/auth-api.ts";
 import type { CatchApi, CatchChange, CatchFailure, CatchResult } from "./catch-api";
 import type { CatchAsset } from "./types";
 
 export type QueryState = "loading" | "ready" | "error";
+/**
+ * 저장 상태. `error`는 실패 확정 또는 결과 불명이라 현재 상태를 다시 읽기 전까지 저장을 막는다.
+ * `not-processed`는 서버가 이번 요청을 처리하지 않은 경우다(#286 후속, B 동의). 잠그지 않고 다시 누를 수 있다.
+ * - `renewed-rejected`: 로그인 연장 뒤 401로 거부됐다. 자동으로 다시 보내지 않는다.
+ * - `not-sent`: 요청을 보내지 않았다. 다시 눌렀을 때 보낼지는 그때의 공통 인증 상태가 정한다.
+ */
 export type CatchMutation = {
   catchId: string;
   kind: CatchChange["kind"];
-  status: "saving" | "success" | "error";
+  status: "saving" | "success" | "error" | "not-processed";
   error: CatchFailure | null;
+  reason?: "renewed-rejected" | "not-sent";
 };
 export type AssetsSnapshot = {
   mutation: CatchMutation | null;
@@ -146,6 +154,13 @@ export function createAssetsStore(api: CatchApi) {
     emit({ mutation: { catchId, kind: change.kind, status: "saving", error: null } });
     const task = safely(() => api.update(catchId, change)).then((result) => {
       if (version !== mutationVersion) return;
+      // 서버가 처리하지 않은 요청은 진행 표시만 정리한다. 상세·목록과 진행 중인 조회는 그대로 두고 잠그지 않는다.
+      // 반영하지 않은 응답(discarded)은 보낸 뒤라 반영됐을 수 있으므로 아래 결과 불명 처리로 간다.
+      const outcome = result.kind === "success" ? "other" : memberMutationOutcome(result);
+      if (outcome === "renewed-rejected" || outcome === "not-sent") {
+        emit({ mutation: { catchId, kind: change.kind, status: "not-processed", error: null, reason: outcome } });
+        return;
+      }
       // 저장 전/중의 GET 응답이 저장 결과를 덮어쓰지 않게 무효화한다.
       if (state.selectedId === catchId) { ++detailVersion; detailAbort?.abort(); detailTask = undefined; }
       const reloadList = state.listState === "loading" || pendingRefresh?.version === listVersion;
