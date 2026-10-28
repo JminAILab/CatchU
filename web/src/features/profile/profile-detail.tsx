@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { accessTokenStore } from "@/lib/access-token";
 import { routes } from "@/lib/routes";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
+import { WithdrawalSection } from "@/features/withdrawal/withdrawal-section";
 import { readProfile, type Profile } from "./profile-api";
 import authStyles from "@/components/auth/auth.module.css";
 import styles from "./profile.module.css";
@@ -56,5 +57,7 @@ export function ProfileDetail() {
         GitHub 연결 상태 <span className={authStyles.pendingTag}>연결 전</span>
       </button>
     </div>
+    {/* 12월 intent U2: 회원 정보 화면의 [탈퇴](BR7.1). */}
+    <WithdrawalSection />
   </div></main>;
 }

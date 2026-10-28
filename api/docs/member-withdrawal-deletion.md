@@ -18,6 +18,7 @@
 | `catch_asset` | 회원, 분석 요청 |
 | `catch_evidence` | Catch |
 | `candidate_registration` | 결과 수신 기록, Catch |
+| `daily_execution_count`, `ai_consent` | 회원(12월 intent U2, 계약 C-03·C-04·C-06. 마이그레이션 `1793161114211-CreateU2UsageAndConsent`) |
 
 공유 링크를 지우면 그 링크를 가리키는 중복 요청 방지 기록도 함께 지워진다. 전에는 이 기록이 링크 삭제를 막았다(#147). 어느 쪽이든 없는 링크를 가리키는 기록은 생기지 않는다.
 

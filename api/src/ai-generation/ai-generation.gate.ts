@@ -1,5 +1,6 @@
 // AI 생성 관문(C-01 AiGenerationGate)의 U1 최소 경로와 그것을 만드는 함수.
-// api 앱 모듈에는 등록하지 않는다(U1 비기능 설계 Q1). Nest 등록·주입은 U2가 방어 문구·입력 상한과 함께 한다.
+// U1 시험과 실제 호출 시험(S8)만 쓴다. 소비 Unit은 U2가 방어 문구·입력 상한·기계 대조·스트림을 더해
+// Nest에 등록한 CheckedAiGenerationGate(checked-gate.ts, ai-generation.module.ts)를 쓴다.
 import { Logger } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 import {
@@ -28,7 +29,12 @@ export interface AiGenerationGateConfig {
 }
 
 /** 설정을 검사해 게이트를 만든다. 키가 비었거나 값이 잘못되면 만들지 않고 멈춘다(오류에 키 값을 넣지 않는다). */
-export function createAiGenerationGate(config: AiGenerationGateConfig): AiGenerationGate {
+export function createAiGenerationGate(config: AiGenerationGateConfig): ClaudeAiGenerationGate {
+  return new ClaudeAiGenerationGate(createCitationClient(config));
+}
+
+/** 설정을 검사해 Claude 호출기를 만든다. U1 게이트와 U2 게이트가 같은 검사·호출기를 쓴다. */
+export function createCitationClient(config: AiGenerationGateConfig): ClaudeCitationClient {
   if (typeof config.apiKey !== 'string' || config.apiKey.trim() === '') {
     throw new Error('CATCHU_GENERATION_API_KEY가 비어 있어 AI 생성 관문을 만들 수 없습니다.');
   }
@@ -40,13 +46,12 @@ export function createAiGenerationGate(config: AiGenerationGateConfig): AiGenera
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
     throw new Error('AI 생성 시간 제한은 1 이상의 정수(밀리초)여야 합니다.');
   }
-  const client = new ClaudeCitationClient({
+  return new ClaudeCitationClient({
     apiKey: config.apiKey,
     maxOutputTokens,
     timeoutMs,
     fetch: createGuardedFetch(config.fetch ?? globalThis.fetch),
   });
-  return new ClaudeAiGenerationGate(client);
 }
 
 /** 호출 로그 한 줄의 칸(관측 설계 NFR6.2). 근거 글·인용문·userText·키는 넣지 않는다. */
@@ -63,7 +68,7 @@ interface GenerationLog {
   requestId: string | null;
 }
 
-export class ClaudeAiGenerationGate implements AiGenerationGate {
+export class ClaudeAiGenerationGate implements Pick<AiGenerationGate, 'generate'> {
   private readonly logger = new Logger(ClaudeAiGenerationGate.name);
 
   constructor(private readonly client: ClaudeCitationClient) {}
@@ -133,7 +138,7 @@ function countFields(collected: ResponseItems): Partial<GenerationLog> {
   return { itemCount: collected.items.length, droppedCount: collected.droppedCount, nonItemLineCount: collected.nonItemLineCount };
 }
 
-function describeFailure(error: unknown): string {
+export function describeFailure(error: unknown): string {
   if (!(error instanceof AiProviderError)) return 'UNEXPECTED_ERROR';
   const status = error.status === null ? '' : `:${error.status}`;
   return error.failure === null ? error.reason : `${error.reason}/${error.failure}${status}`;

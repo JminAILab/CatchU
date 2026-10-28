@@ -128,3 +128,16 @@ API 폴더에서 `npm run lint`, `npm run typecheck`, `npm run build` 후 README
 - 소개·희망 직무·기술 목록은 당시 값의 보존을 비교했다. 각 항목에 비어 있지 않은 새 값을 입력해 실제 Google 흐름에서 검사한 것은 아니다.
 
 실제 Google 승인 취소·외부 오류·다른 실제 계정 간 분리·동시 최초 로그인은 이 수동 재현에 포함하지 않았다. 해당 분기는 합성 제공자 응답과 실제 로컬 API·전용 DB의 자동 검사로 확인하며, 실제 Google 환경 검사와 구분한다. 세션 유지·갱신·로그아웃은 [#250 세션 기능](https://github.com/JminAILab/CatchU/issues/250), 실제 화면 연결은 [#251 인증 화면 연결](https://github.com/JminAILab/CatchU/issues/251)의 별도 범위다.
+
+## 배포 환경 앱의 '프로덕션' 게시 — 12월 intent U2
+
+팀원이 아닌 Google 계정도 배포 환경에 로그인할 수 있게, 배포 환경용 OAuth 앱의 게시 상태를 '테스트'에서 '프로덕션'으로 바꾼다([U2 업무 규칙](../../aidlc/spaces/default/intents/260925-intent-12/construction/u2-shared-foundation/functional-design/rules.md) BR9.1, 기능 명세 W10). 로컬 개발 앱은 지금대로 둔다. 로그인 수단은 Google뿐이고 기업 계정·기업 탭은 만들지 않는다(BR9.2).
+
+1. 배포 환경용 프로젝트의 **Google Auth platform → Data Access**에서 범위가 기본 범위(`openid`·`email`·`profile` 안)뿐인지 확인한다. 지금 api가 요청하는 범위는 `openid profile`이다(`src/google-login/google-login.service.ts`). 민감·제한 범위를 더하지 않는다.
+2. **Audience**에서 게시 상태를 **프로덕션(In production)**으로 바꾼다. 기본 범위만 쓰면 Google 확인 절차 없이 바뀌는지 화면 안내를 확인하고, 다른 요구가 나오면 그대로 따르지 않고 팀장에게 알린다.
+3. 팀원이 아닌 Google 계정 1개로 배포 환경에 로그인해 본다. 새 회원으로 시작되고 "앱이 테스트 중" 거부가 없어야 한다(시나리오 S29).
+4. 아래 표와 [통합 확인 표](../../docs/CatchU_통합확인.md)에 한 행씩 남긴다. 계정 주소·Client ID·비밀값·화면 캡처의 개인정보는 남기지 않는다.
+
+| 날짜 | 한 사람 | 대상 프로젝트(별칭) | 바꾼 것 | 외부 계정 로그인 결과(통과·실패·미실행) | 메모 |
+|---|---|---|---|---|---|
+| | | | | 미실행 | 아직 하지 않음 |

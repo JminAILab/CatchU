@@ -45,6 +45,9 @@ const MEMBER_ROWS = {
   catch_evidence: 'catch_id IN (SELECT catch_id FROM catch_asset WHERE owner_id = $1)',
   candidate_registration: 'catch_id IN (SELECT catch_id FROM catch_asset WHERE owner_id = $1)',
   repository_protection: 'owner_id = $1',
+  // 12월 intent U2(C-03·C-04): 하루 실행 횟수와 첫 이용 동의.
+  daily_execution_count: 'member_id = $1',
+  ai_consent: 'member_id = $1',
 };
 const SHARED_TABLES = ['allowed_scope_revision', 'repository_selection'];
 const NONE = Object.fromEntries(Object.keys(MEMBER_ROWS).map(table => [table, 0]));
@@ -122,6 +125,9 @@ async function memberWithAllData() {
       VALUES ($1, $2, 'createShareLink', 'link-key', repeat('a', 64), $3, $4)`, [randomUUID(), memberId, linkId, linkId]);
     await m.query(`INSERT INTO idempotency_record (idempotency_id, member_id, operation, key, request_fingerprint, request_id, response_reference)
       VALUES ($1, $2, 'createAnalysisRequest', 'analysis-key', repeat('b', 64), $3, $4)`, [randomUUID(), memberId, result.requestId, result.requestId]);
+    await m.query(`INSERT INTO daily_execution_count (member_id, usage_date, count) VALUES ($1, '2026-11-02', 3), ($1, '2026-11-03', 1)`, [memberId]);
+    await m.query(`INSERT INTO ai_consent (consent_id, member_id, notice_version, consented_at) VALUES ($1, $2, 'fixture-notice', now())`,
+      [randomUUID(), memberId]);
   });
   const rows = await memberRows(memberId);
   for (const [table, n] of Object.entries(rows)) assert.ok(n > 0, `${table}에 시험 회원의 행이 있어야 한다`);
