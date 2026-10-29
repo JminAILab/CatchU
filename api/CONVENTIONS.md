@@ -20,6 +20,8 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/analysis-deadline/`                | 처리 시한을 넘긴 분석 요청과 반영 실패 요청을 닫는 판정과 그 주기 작업([docs/analysis-deadline.md](docs/analysis-deadline.md)) |
 | `src/analysis-queue/`                   | 대기 시도를 요청 큐로 보내고 worker의 진행 알림·결과를 받아 E 수신 경로로 넘기는 큐 연결과 그 연결·주기·종료(#233, [docs/analysis-queue.md](docs/analysis-queue.md)). 큐 규격 값은 `queue-spec.ts` 한곳. 기본 앱에는 미등록 |
 | `src/ai-generation/`                    | C-01 AI 생성 관문의 U1 최소 경로: 줄 나누기·Claude 인용 호출(공식 SDK)·항목 묶기·원문 위치·거부 사례([docs/ai-generation.md](docs/ai-generation.md)). `createAiGenerationGate`로만 만들고 기본 앱에는 미등록(U2가 등록) |
+| `src/publications/`                     | 12월 U4 발행본의 첫 경계 제출: C-07 `publication`·`published_item` 엔티티와 사본 모양, C-10 `PublicationAccess` 인터페이스와 시험 전용 메모리 가짜 구현(앱 미등록, [docs/publications.md](docs/publications.md)) |
+| `src/materials/`                        | 12월 U4 텍스트 자료 표 C-13 `text_material` 엔티티([docs/publications.md](docs/publications.md)) |
 | `src/recipient/`                        | 비로그인 수신자 조회(#151, [docs/recipient-read.md](docs/recipient-read.md)). #150 링크·소유 회원 판정·B 공개 Catch 조회·A `OwnerProfileReader`를 재사용. 기본 앱에 등록 |
 | `src/member-repositories/repository-selection.*.ts` | 현재 선정의 DB 정본(엔티티)과 목록·#323 접수 재확인·#232 worker 선정 공급(#252, [docs/repository-selection.md](docs/repository-selection.md)). 좌표는 같은 폴더의 #319 카탈로그에서 읽음 |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
