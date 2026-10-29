@@ -1,7 +1,7 @@
 // U2 탈퇴 DELETE /v1/me(계약 C-06, 기능 설계 W7·W8·BR7.1~BR7.6, 시나리오 S24~S27, 비기능 NFR1.1·NFR1.2·NFR5.1·NFR5.5·NFR6.7).
 // 실제 AppModule·Guard·테스트 DB를 쓴다. 파일 저장 두 값과 GitHub 자격정보 폴더는 시험 안의 임시 폴더다.
-// U4 publication·U6 mcp_* 표는 통합 브랜치에 아직 없어 C-07·C-15 모양의 시험용 표를 시험 안에서 만들고 지운다.
-// 두 Unit을 합친 뒤에는 실제 표로 이 시험을 다시 돌리는 것이 U2 완료 조건이다(기능 설계 가정 4).
+// U4 표(publication·published_item·text_material)는 #422로 합쳐진 실제 표를 쓴다. U6 mcp_* 표는 통합 브랜치에 아직 없어
+// C-15 모양의 시험용 표를 시험 안에서 만들고 지운다. U6를 합친 뒤 실제 표로 이 시험을 다시 돌리는 것이 U2 완료 조건이다(기능 설계 가정 4).
 require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { randomBytes, randomUUID } = require('node:crypto');
@@ -23,13 +23,10 @@ const { HttpGoogleProvider } = require('../../dist/google-login/google-provider'
 const { GOOGLE_CONFIG } = require('../../dist/google-login/google.config');
 const { APP_SETTINGS, WEB_ORIGIN, setEnv, startApp, expectError } = require('./support.cjs');
 
-// 실제 표가 이미 있으면(U4·U6를 합친 뒤) 만들지도 지우지도 않는다. 그때는 아래 자료 넣기가 실제 표 모양과 달라 실패하므로,
+// 실제 표가 이미 있으면(U6를 합친 뒤) 만들지도 지우지도 않는다. 그때는 아래 자료 넣기가 실제 표 모양과 달라 실패하므로,
 // 실제 표 모양으로 이 시험을 고쳐 다시 돌린다(U2 완료 조건). 시험이 실제 마이그레이션 표를 지우는 일은 없다.
-const PROBE_TABLES = ['publication', 'mcp_connection', 'mcp_authorization_code', 'mcp_access_token'];
+const PROBE_TABLES = ['mcp_connection', 'mcp_authorization_code', 'mcp_access_token'];
 const PROBE_SQL = {
-  publication: `CREATE TABLE publication (publication_id uuid PRIMARY KEY,
-    member_id uuid NOT NULL REFERENCES member_account(member_id) ON DELETE CASCADE,
-    published_at timestamptz NOT NULL, stopped_at timestamptz NULL CHECK (stopped_at IS NULL OR stopped_at >= published_at))`,
   mcp_connection: 'CREATE TABLE mcp_connection (connection_id uuid PRIMARY KEY, member_id uuid NOT NULL REFERENCES member_account(member_id) ON DELETE CASCADE)',
   mcp_authorization_code: 'CREATE TABLE mcp_authorization_code (code_id uuid PRIMARY KEY, member_id uuid NOT NULL REFERENCES member_account(member_id) ON DELETE CASCADE)',
   mcp_access_token: 'CREATE TABLE mcp_access_token (token_id uuid PRIMARY KEY, member_id uuid NOT NULL REFERENCES member_account(member_id) ON DELETE CASCADE)',
@@ -108,14 +105,25 @@ async function fakeGoogle() {
   };
 }
 
-/** 탈퇴할 회원의 자료를 모두 만든다: 세션 둘, 발행 링크(진행 중·이미 중지), MCP 세 표, 회원 파일, GitHub 자격정보 파일, U2 표. */
+/** 탈퇴할 회원의 자료를 모두 만든다: 세션 둘, 텍스트 자료와 발행본(진행 중·이미 중지)·발행 항목, MCP 세 표, 회원 파일, GitHub 자격정보 파일, U2 표. */
 async function memberWithData(identity = `u2-withdraw-${randomUUID()}`) {
   const first = await server.login(identity);
   const second = await server.login(identity); // 다른 기기 세션
   const { memberId } = first;
   const publishedAt = new Date(Date.now() - 60_000);
   const stoppedBefore = new Date(Date.now() - 30_000);
-  await db.query('INSERT INTO publication VALUES ($1, $2, $3, NULL), ($4, $2, $3, $5)', [randomUUID(), memberId, publishedAt, randomUUID(), stoppedBefore]);
+  const textMaterialId = randomUUID();
+  await db.query(`INSERT INTO text_material (text_material_id, member_id, title, body, created_at, updated_at)
+    VALUES ($1, $2, '합성 자료', '합성 본문', now(), now())`, [textMaterialId, memberId]);
+  const [live, stopped] = [randomUUID(), randomUUID()];
+  await db.query(`INSERT INTO publication (publication_id, member_id, title, link_token_reference, published_at, expires_at, stopped_at)
+    VALUES ($1, $2, '합성 발행본', $3, $4, $4::timestamptz + interval '2160 hours', NULL),
+           ($5, $2, '합성 발행본', $6, $4, $4::timestamptz + interval '2160 hours', $7)`,
+  [live, memberId, randomUUID(), publishedAt, stopped, randomUUID(), stoppedBefore]);
+  for (const publicationId of [live, stopped]) {
+    await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot)
+      VALUES ($1, $2, 1, 'TEXT_MATERIAL', $3, '합성 자료', '{"body":"합성 본문"}')`, [randomUUID(), publicationId, textMaterialId]);
+  }
   for (const table of ['mcp_connection', 'mcp_authorization_code', 'mcp_access_token']) {
     await db.query(`INSERT INTO ${table} VALUES ($1, $2)`, [randomUUID(), memberId]);
   }
@@ -128,9 +136,11 @@ async function memberWithData(identity = `u2-withdraw-${randomUUID()}`) {
   return { memberId, tokens: [first.token, second.token], credentialFile: join(vaultRoot, `${reference.slice(10)}.enc`), stoppedBefore };
 }
 
-const count = async (table, memberId) => (await db.query(`SELECT count(*)::int AS n FROM ${table} WHERE member_id = $1`, [memberId]))[0].n;
-const MEMBER_TABLES = ['member_account', 'member_profile', 'github_connection', 'auth_session', 'publication', 'mcp_connection',
-  'mcp_authorization_code', 'mcp_access_token', 'daily_execution_count', 'ai_consent'];
+const MEMBER_WHERE = { published_item: 'publication_id IN (SELECT publication_id FROM publication WHERE member_id = $1)' };
+const count = async (table, memberId) =>
+  (await db.query(`SELECT count(*)::int AS n FROM ${table} WHERE ${MEMBER_WHERE[table] ?? 'member_id = $1'}`, [memberId]))[0].n;
+const MEMBER_TABLES = ['member_account', 'member_profile', 'github_connection', 'auth_session', 'text_material', 'publication', 'published_item',
+  'mcp_connection', 'mcp_authorization_code', 'mcp_access_token', 'daily_execution_count', 'ai_consent'];
 async function rowsOf(memberId) {
   return Object.fromEntries(await Promise.all(MEMBER_TABLES.map(async (table) => [table, await count(table, memberId)])));
 }
@@ -234,9 +244,9 @@ test('파일 저장 설정이 없으면 2단계에서 실패하고(성공으로 
   assert.equal(await count('mcp_access_token', member.memberId), 0);
 });
 
-test('U4·U6 표가 아직 없으면 1단계는 세션만 막고 건너뛰며 탈퇴는 끝난다(자격정보 파일이 없어도 성공)', async (t) => {
+test('U6 표가 아직 없으면 1단계는 MCP 표를 건너뛰며 탈퇴는 끝난다(자격정보 파일이 없어도 성공)', async (t) => {
   if (createdProbes.length !== PROBE_TABLES.length) {
-    t.skip('U4·U6 실제 표가 있어 "표 없음" 경우를 만들 수 없다');
+    t.skip('U6 실제 표가 있어 "표 없음" 경우를 만들 수 없다');
     return;
   }
   await dropProbes();
