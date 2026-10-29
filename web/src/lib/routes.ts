@@ -17,8 +17,10 @@ export const routes = {
   profile: "/profile",
   /** 프로필 수정(W02). */
   profileEdit: "/profile/edit",
-  /** GitHub 연동(W02-G). */
+  /** GitHub 연동(W02-G). 상세 프로필·홈 안내·저장소 연결 관리의 미연동 안내가 가리킨다. */
   profileGithub: "/profile/github",
+  /** GitHub 연동 콜백(#253). api의 GITHUB_OAUTH_CALLBACK_URL이 가리키는 web 주소다. 화면 사이 이동 목적지로 쓰지 않는다. */
+  githubCallback: "/github/callback",
   /** 내 자산(Catch 탭). 필터·상세는 쿼리 `repositoryId`·`catchId`(B 제안). */
   assets: "/assets",
   /** 공유 링크 목록·발급·복사·중단. */

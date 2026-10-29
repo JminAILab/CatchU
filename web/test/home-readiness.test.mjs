@@ -1,36 +1,39 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRepositoryApi } from '../src/features/repository-management/repository-api.ts';
-import { GITHUB_SCREEN_NOT_READY, homeView } from '../src/features/home/home-readiness.ts';
+import { githubStartBlockedReason } from '../src/features/github-connection/github-connection-screen.ts';
+import { homeView } from '../src/features/home/home-readiness.ts';
 
 // 홈(#155) 준비 상태 판정. 기대 결과의 근거: #155 완료 기준, 홈 흐름 초안 §5.3·§5.4·§6.2(합성 응답).
+// GitHub 연결 시작을 막는 기준은 #253 연동 화면과 같다(공통 인증 통합 시험 전환이 꺼져 있으면 막는다). 아래 시험은 따로 적지 않으면 전환을 켠 판정이다.
 const me = (github) => ({ memberId: 'm-1', profile: { displayName: '수영', introduction: '', desiredRole: '', skills: [] }, github });
 const ok = (data) => ({ kind: 'success', status: 200, data });
+const BLOCKED = githubStartBlockedReason(false);
 
-async function viewFor(result) {
+async function viewFor(result, startBlockedReason = githubStartBlockedReason(true)) {
   const calls = [];
   const api = createRepositoryApi(async (path, request) => {
     calls.push({ path, method: request.method });
     if (result instanceof Error) throw result;
     return result;
   });
-  return { view: homeView(await api.githubState()), calls };
+  return { view: homeView(await api.githubState(), startBlockedReason), calls };
 }
 
 test('조회 중에는 연결 안내를 보이지 않는다', () => {
-  assert.deepEqual(homeView({ state: 'loading' }), { kind: 'loading' });
+  for (const reason of [null, BLOCKED]) assert.deepEqual(homeView({ state: 'loading' }, reason), { kind: 'loading' });
 });
 
-test('GitHub 미연동이 정상 조회되면 미연결 상태와 GitHub 연결 단계를 보이고, 연동 화면(#253)이 없어 비활성·준비 중 이유를 보인다', async () => {
+test('GitHub 미연동이 정상 조회되면 미연결 상태와 GitHub 연결 단계를 보이고, GitHub 연동 화면(#253)으로 보낸다', async () => {
   const { view, calls } = await viewFor(ok(me({ state: 'DISCONNECTED', accountLogin: null })));
   assert.deepEqual(calls, [{ path: '/me', method: 'GET' }]);
   assert.equal(view.kind, 'guide');
   assert.equal(view.status, 'GitHub 미연결');
   assert.equal(view.step, 'github');
-  assert.deepEqual(view.action, { kind: 'unavailable', label: '프로필에서 GitHub 연결', reason: GITHUB_SCREEN_NOT_READY });
+  assert.deepEqual(view.action, { kind: 'link', label: '프로필에서 GitHub 연결', href: '/profile/github' });
 });
 
-test('재연동 필요는 미연동과 상태·제목·설명·버튼을 구분하고, 같은 이유로 비활성이다', async () => {
+test('재연동 필요는 미연동과 상태·제목·설명·버튼을 구분하고, 같은 GitHub 연동 화면으로 보낸다', async () => {
   const { view } = await viewFor(ok(me({ state: 'REAUTH_REQUIRED', accountLogin: 'octo' })));
   const disconnected = (await viewFor(ok(me({ state: 'DISCONNECTED', accountLogin: null })))).view;
   assert.equal(view.kind, 'guide');
@@ -38,7 +41,7 @@ test('재연동 필요는 미연동과 상태·제목·설명·버튼을 구분�
   assert.equal(view.step, 'github');
   for (const key of ['status', 'title', 'description']) assert.notEqual(view[key], disconnected[key], key);
   assert.notEqual(view.action.label, disconnected.action.label);
-  assert.deepEqual(view.action, { kind: 'unavailable', label: 'GitHub 다시 연결', reason: GITHUB_SCREEN_NOT_READY });
+  assert.deepEqual(view.action, { kind: 'link', label: 'GitHub 다시 연결', href: '/profile/github' });
 });
 
 test('GitHub 연결됨은 저장소 연결 여부를 단정하지 않고 내 자산의 저장소 연결 관리로 보낸다', async () => {
@@ -47,6 +50,20 @@ test('GitHub 연결됨은 저장소 연결 여부를 단정하지 않고 내 자
   assert.equal(view.status, 'GitHub 연결됨');
   assert.equal(view.step, null, '연결된 repo 유무를 받지 않으므로 레포 연결 단계를 표시하지 않는다');
   assert.deepEqual(view.action, { kind: 'link', label: '내 자산에서 저장소 연결 관리', href: '/assets' });
+});
+
+test('GitHub 연결 시작을 막은 환경(통합 시험 전환 꺼짐)에서는 미연결·재연결 필요 버튼을 누를 수 없게 두고 연동 화면과 같은 이유를 보인다. 상태 안내와 연결됨의 이동은 그대로다', async () => {
+  for (const [state, label] of [['DISCONNECTED', '프로필에서 GitHub 연결'], ['REAUTH_REQUIRED', 'GitHub 다시 연결']]) {
+    const result = ok(me({ state, accountLogin: state === 'DISCONNECTED' ? null : 'octo' }));
+    const on = (await viewFor(result)).view;
+    const { view, calls } = await viewFor(result, BLOCKED);
+    assert.deepEqual(calls, [{ path: '/me', method: 'GET' }], '연결 상태 조회는 그대로 한다');
+    assert.deepEqual(view.action, { kind: 'unavailable', label, reason: BLOCKED });
+    assert.deepEqual({ ...view, action: null }, { ...on, action: null }, '상태 이름·단계·문구는 전환과 관계없다');
+  }
+  const connected = ok(me({ state: 'CONNECTED', accountLogin: 'octo' }));
+  assert.deepEqual((await viewFor(connected, BLOCKED)).view, (await viewFor(connected)).view);
+  assert.deepEqual((await viewFor(new Error('network'), BLOCKED)).view, { kind: 'failed' });
 });
 
 test('조회 실패와 계약과 다른 응답은 미연동으로 바꾸지 않고 조회 실패로 보인다', async () => {
@@ -69,7 +86,9 @@ test('조회 실패와 계약과 다른 응답은 미연동으로 바꾸지 않�
 
 test("연동 상태 안내에는 미연결로 오해될 '연결 전' 표기를 쓰지 않는다", async () => {
   for (const state of ['DISCONNECTED', 'REAUTH_REQUIRED', 'CONNECTED']) {
-    const { view } = await viewFor(ok(me({ state, accountLogin: state === 'DISCONNECTED' ? null : 'octo' })));
-    assert.ok(!JSON.stringify(view).includes('연결 전'), state);
+    for (const reason of [null, BLOCKED]) {
+      const { view } = await viewFor(ok(me({ state, accountLogin: state === 'DISCONNECTED' ? null : 'octo' })), reason);
+      assert.ok(!JSON.stringify(view).includes('연결 전'), state);
+    }
   }
 });
