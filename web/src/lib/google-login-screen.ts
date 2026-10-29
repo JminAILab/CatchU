@@ -76,7 +76,7 @@ export function createGoogleStartControl(deps: {
         result = await deps.start(next);
       } catch (error) {
         // 공통 함수는 결과로 실패를 돌려준다. 예외는 예상 밖 오류이므로 버튼을 다시 열고 그대로 올린다.
-        store.set({ busy: false, notice: authScreenMessages.loginFailed });
+        store.set({ busy: false, notice: authScreenMessages.startLoginFailed });
         throw error;
       }
       if (result.kind === "ready") {
@@ -170,7 +170,7 @@ export function createGoogleCallbackControl(deps: {
       next = parsed.next;
       run = deps.completeGoogleLogin(parsed.input).then(settle, (error: unknown) => {
         // 공통 함수는 결과로 실패를 돌려준다. 예외는 예상 밖 오류이므로 새 로그인을 안내하고 그대로 올린다.
-        store.set({ phase: "notice", notice: authScreenMessages.loginFailed, loginHref: loginPath(next ?? undefined) });
+        store.set({ phase: "notice", notice: authScreenMessages.callbackLoginFailed, loginHref: loginPath(next ?? undefined) });
         throw error;
       });
       return run;

@@ -204,7 +204,7 @@ test('콜백: 완료 뒤 뒤로 가기로 다시 열린 콜백(보관값 없음)
   await callbackScreen(p).begin(() => query(`state=${state}&code=c1`), () => {});
   const back = callbackScreen(page(server, { attempts: p.attempts, markers: p.markers }));
   await back.begin(() => query(`state=${state}&code=c1`), () => {});
-  assert.deepEqual(back.getView(), { phase: 'notice', notice: M.callbackAttemptMissing, loginHref: '/login' });
+  assert.deepEqual(back.getView(), { phase: 'notice', notice: M.callbackAttemptUnverified, loginHref: '/login' });
   assert.equal(server.count('POST /auth/google/login'), 1);
 });
 
@@ -228,7 +228,7 @@ test('콜백 완료 실패(401 시도 무효·500)는 로그인 실패 안내이
     else p.attempts.setItem(GOOGLE_ATTEMPT_KEY, JSON.stringify({ ...JSON.parse(p.attempts.getItem(GOOGLE_ATTEMPT_KEY)), loginAttemptToken: 'wrong' }));
     const control = callbackScreen(p);
     await control.begin(() => query(`state=${state}&code=c1`), () => {});
-    assert.deepEqual(control.getView(), { phase: 'notice', notice: M.loginFailed, loginHref: '/login?next=%2Fassets' }, mode);
+    assert.deepEqual(control.getView(), { phase: 'notice', notice: M.callbackLoginFailed, loginHref: '/login?next=%2Fassets' }, mode);
     assert.notEqual(p.store.getSnapshot().status, 'reauth-required', mode);
     assert.equal(server.count('POST /auth/google/login'), 1, mode);
   }
@@ -241,7 +241,7 @@ test('콜백 응답 유실은 다시 보내지 않고 새 로그인을 안내하
   server.fail('POST /auth/google/login');
   const control = callbackScreen(p);
   await control.begin(() => query(`state=${state}&code=c1`), () => {});
-  assert.deepEqual(control.getView(), { phase: 'notice', notice: M.networkFailed, loginHref: '/login?next=%2Fassets' });
+  assert.deepEqual(control.getView(), { phase: 'notice', notice: M.callbackNetworkFailed, loginHref: '/login?next=%2Fassets' });
   assert.equal(server.count('POST /auth/google/login'), 1);
   // 로그인 화면은 복원 중이면서 확인하지 못한 상태에서 새 로그인을 받는다(session-login-panel.tsx의 canLogin).
   const snapshot = p.store.getSnapshot();
@@ -284,7 +284,7 @@ test('Google 버튼: 연타해도 시작 요청 1회이고, 준비되면 Google 
 
 test('Google 버튼: 시작 실패·보관 실패는 이유별로 안내하고 이동하지 않으며 다시 누를 수 있다', async () => {
   const cases = [
-    ['disabled', M.googleUnavailable], ['server', M.loginFailed], ['malformed', M.loginFailed], ['network', M.networkFailed], ['storage', M.googleUnavailable],
+    ['disabled', M.googleUnavailable], ['server', M.startLoginFailed], ['malformed', M.startLoginFailed], ['network', M.startNetworkFailed], ['storage', M.googleUnavailable],
   ];
   for (const [mode, notice] of cases) {
     const server = fakeServer();
