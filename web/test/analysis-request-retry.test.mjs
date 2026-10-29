@@ -259,7 +259,7 @@ test('재요청 응답 불명 → 같은 요청 재전송 → 401: 키·본문·
   assert.equal(snapshot.phase, 'unknown', '앞선 시도의 결과는 여전히 모른다');
   assert.equal(snapshot.pendingRetry, true);
   assert.equal(snapshot.pendingRepositoryId, 'r1');
-  assert.equal(snapshot.message.text, TEXT.auth);
+  assert.equal(snapshot.message.text, TEXT.unknownAuth, '앞선 불명 안내를 지우지 않고 이번 시도가 처리되지 않은 이유를 함께 알린다');
   assert.deepEqual(h.watched, [], '미접수 안내·목록 다시 읽기로 넘어가지 않는다');
 
   // 새 재요청은 받지 않는다. 같은 상태 객체를 유지한 채 성공 응답 대역으로 바꾸면 기존 키·본문으로 재전송한다.
