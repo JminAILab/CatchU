@@ -48,7 +48,7 @@ if [ "$svc $op" = "${STUB_FAIL:-}" ]; then
   exit 254
 fi
 mutating=0
-case "$op" in create-* | modify-* | put-* | authorize-* | check-capacity | subscribe | publish) mutating=1 ;; esac
+case "$op" in create-* | modify-* | put-* | authorize-* | check-capacity | subscribe | publish | set-topic-attributes) mutating=1 ;; esac
 if [ "$mutating" = 1 ]; then
   printf '%s\n' "$all" >> "$S/calls"
   # 비밀값을 넘긴 입력 파일이 있으면 값을 기록해 둔다(출력에 새지 않았는지 보려고).
@@ -105,6 +105,18 @@ case "$svc $op" in
   "sns subscribe") echo 'pending confirmation' ;;
   "sns list-subscriptions-by-topic") echo "${STUB_CONFIRMED:-1}" ;;
   "sns publish") echo 01234567-89ab-cdef-0123-456789abcdef ;;
+  "sns get-topic-attributes")
+    # 고친 정책이 있으면 그것을, 없으면 새 주제의 기본 정책(aws:SourceAccount 조건)을 돌려준다. STUB_TOPIC_POLICY로 바꿀 수 있다.
+    if [ -s "$S/topic-policy" ]; then cat "$S/topic-policy"; exit 0; fi
+    echo "${STUB_TOPIC_POLICY:-$(jq -cn '{Version: "2008-10-17", Statement: [{Sid: "__default_statement_ID", Effect: "Allow", Principal: {AWS: "*"},
+      Action: ["SNS:Publish", "SNS:Subscribe"], Resource: "arn:aws:sns:ap-northeast-2:123456789012:catchu-alerts",
+      Condition: {StringEquals: {"AWS:SourceAccount": "123456789012"}}}]}')}" ;;
+  "sns set-topic-attributes")
+    i=0
+    while [ "$i" -lt "${#args[@]}" ]; do
+      [ "${args[$i]}" = --attribute-value ] && printf '%s\n' "${args[$((i + 1))]}" > "$S/topic-policy"
+      i=$((i + 1))
+    done ;;
   "cloudwatch describe-alarms") case "$all" in *length*) echo "${STUB_ALARM_COUNT:-0}" ;; *) echo '{"MetricAlarms":[]}' ;; esac ;;
   "elbv2 describe-target-groups") echo "${STUB_LB_ARNS:-arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/k8s-catchu-0123456789/0123456789abcdef${tab}arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/k8s-catchu-0123456789/0123456789abcdef}" ;;
   "efs describe-file-systems")
@@ -316,18 +328,29 @@ TOPIC=arn:aws:sns:ap-northeast-2:123456789012:catchu-alerts
 run_sut env CATCHU_ALERT_EMAIL=$MAIL bash "$P/create-alert-topic.sh"
 check "주제 확인 모드: 종료 0, 만드는 호출 0, --apply 안내" "$(ok test "$rc" = 0 -a -z "$(ops)" -a "$(grep -c -- '--apply로 다시 실행' "$OUT")" = 1)"
 run_sut env STUB_VALIDATE=1 CATCHU_ALERT_EMAIL=$MAIL bash "$P/create-alert-topic.sh" --apply
-check "주제 만들기: 주제·이메일 구독 순서, CLI 인자 검사 2건 통과, 화면에 주소 원문 없음(가린 주소만)" \
-  "$( { test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "sns create-topic,sns subscribe," -a "$(wc -l < "$S/valid" | tr -d ' ')" = 2 && has_all "$(call_of 'sns subscribe')" --protocol email "$MAIL" && ! grep -qF "$MAIL" "$OUT" && grep -qF 'a***@example.com' "$OUT" && clean; } > /dev/null 2>&1; echo $?)"
+check "주제 만들기: 주제·정책·이메일 구독 순서, CLI 인자 검사 3건 통과, 화면에 주소 원문 없음(가린 주소만)" \
+  "$( { test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "sns create-topic,sns set-topic-attributes,sns subscribe," -a "$(wc -l < "$S/valid" | tr -d ' ')" = 3 && has_all "$(call_of 'sns subscribe')" --protocol email "$MAIL" && ! grep -qF "$MAIL" "$OUT" && grep -qF 'a***@example.com' "$OUT" && clean; } > /dev/null 2>&1; echo $?)"
+want='[["__default_statement_ID","AWS:SourceAccount"],["AllowSourceOwnerPublish","AWS:SourceOwner"]]'
+check "주제 정책: 기본 문장은 두고, 이 계정 소유의 Publish 허용 문장(주제 ARN·계정 번호로 묶음)을 덧붙이며 계정 번호를 찍지 않음" \
+  "$( { test "$(jq -c '[.Statement[] | [.Sid, (.Condition.StringEquals | keys[0])]]' "$S/topic-policy")" = "$want" &&
+    test "$(jq -c '.Statement[1] | [.Principal.AWS, .Action, .Resource, .Condition.StringEquals["AWS:SourceOwner"]]' "$S/topic-policy")" = "[\"*\",\"SNS:Publish\",\"$TOPIC\",\"123456789012\"]" &&
+    ! grep -q 123456789012 "$OUT"; } > /dev/null 2>&1; echo $?)"
 run_sut bash "$P/create-alert-topic.sh" --apply
 check "주제: 받을 주소가 없으면 AWS를 부르기 전에 멈춤" "$(ok test "$rc" = 1 -a ! -s "$S/seen")"
 run_sut env CATCHU_ALERT_EMAIL='a b@example' bash "$P/create-alert-topic.sh" --apply
 check "주제: 주소 형식이 아니면 멈춤" "$(ok test "$rc" = 1 -a ! -s "$S/seen")"
 run_sut env STUB_TOPIC=$TOPIC CATCHU_ALERT_EMAIL=$MAIL bash "$P/create-alert-topic.sh" --apply
 check "주제가 이미 있으면 멈춤" "$(ok stopped 'SNS 주제 catchu-alerts')"
-run_sut env STUB_VALIDATE=1 STUB_TOPIC=$TOPIC bash "$P/create-alert-topic.sh" --test
+# 주제 정책: 기본 문장과 --apply가 덧붙인 문장이 모두 있는 상태
+good_policy=$(jq -cn --arg t "$TOPIC" '{Statement: [{Sid: "__default_statement_ID", Effect: "Allow", Principal: {AWS: "*"}, Action: ["SNS:Publish"], Resource: $t,
+  Condition: {StringEquals: {"AWS:SourceAccount": "123456789012"}}}, {Sid: "AllowSourceOwnerPublish", Effect: "Allow", Principal: {AWS: "*"},
+  Action: "SNS:Publish", Resource: $t, Condition: {StringEquals: {"AWS:SourceOwner": "123456789012"}}}]}')
+run_sut env STUB_VALIDATE=1 STUB_TOPIC=$TOPIC STUB_TOPIC_POLICY="$good_policy" bash "$P/create-alert-topic.sh" --test
 check "수신 시험: 확인된 구독이 있으면 시험 메시지 1통(주소 없이 실행), CLI 인자 검사 통과" \
   "$(ok test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "sns publish," -a "$(wc -l < "$S/valid" | tr -d ' ')" = 1)"
-run_sut env STUB_TOPIC=$TOPIC STUB_CONFIRMED=0 bash "$P/create-alert-topic.sh" --test
+run_sut env STUB_TOPIC=$TOPIC bash "$P/create-alert-topic.sh" --test
+check "수신 시험: 주제 정책에 ElastiCache용 발행 허용이 없으면(기본 정책만) 보내지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)" -a "$(grep -c 'AllowSourceOwnerPublish 문장이 없어' "$OUT")" = 1)"
+run_sut env STUB_TOPIC=$TOPIC STUB_TOPIC_POLICY="$good_policy" STUB_CONFIRMED=0 bash "$P/create-alert-topic.sh" --test
 check "수신 시험: 확인된 구독이 없으면 보내지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
 run_sut bash "$P/create-alert-topic.sh" --test
 check "수신 시험: 주제가 없으면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
