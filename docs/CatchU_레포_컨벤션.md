@@ -1,6 +1,6 @@
 # 레포 구조·컨벤션
 
-> **지위: 기존 규칙은 확정 (2026-08-24). §2 임시 통합 브랜치 운영안은 검토용 (2026-09-20). §2.1 12월 intent 통합 브랜치는 확정 (2026-10-25 팀장 결정).**
+> **지위: 기존 규칙은 확정 (2026-08-24). §2 임시 통합 브랜치 운영안은 검토용 (2026-09-20). §2.1 12월 intent 통합 브랜치는 확정 (2026-10-25 팀장 결정, 10-28 Unit 제출·합치기 변경).**
 > 08-18 회의 상정 → 08-20 Slack 의견 수렴.
 > 커밋 접두사 항목 외 이견 없이 확정.
 > 수정·기각된 항목은 §6에 사유와 함께 남긴다.
@@ -96,13 +96,14 @@ main   배포 브랜치
 | 이름·목적 | `intent/260925-intent-12`. 11월 개발의 Unit 제출을 모아 `dev`에 올리는 동안만 쓴다 |
 | 만들기 | 이 표와 [#389](https://github.com/JminAILab/CatchU/issues/389)의 CI 설정이 `dev`에 들어간 뒤 그 `dev`에서 팀장이 만든다(팀원 AI는 통합 브랜치에 든 지침을 읽는다) |
 | U1 | 첫 Unit U1(처음 이어 보기)은 맡기 없이 저장소 본체 폴더(새 clone)에서 통합 브랜치로 짓는다. linked worktree에서는 AI-DLC가 이 우회를 거부한다 |
-| Unit 브랜치·제출 | Unit을 맡으면 AI-DLC가 `claim/aa0d9c26/<unit>` 브랜치를 만들고(`aa0d9c26`은 12월 intent ID의 끝 8자), 제출은 AI-DLC가 담당의 커밋을 그 브랜치에 올리는 것이다(PR 없음). 이 브랜치로 PR을 열거나 손으로 지우지 않는다 |
-| Unit 합치기 | 팀장이 AI-DLC 합치기 승인을 거쳐 Unit을 이 브랜치에 merge commit으로 합친다. 고정·합치기·놓기(`pin`·`land`·`release`)는 Unit을 맡지 않은 저장소 본체 폴더에서만 한다. AI-DLC는 합친 결과를 push하지 않으므로, 합친 뒤 팀장이 이 브랜치를 바로 push한다 |
+| Unit 브랜치·제출 | Unit을 맡으면 AI-DLC가 `claim/aa0d9c26/<unit>` 브랜치를 만든다(`aa0d9c26`은 12월 intent ID의 끝 8자). 맡기 기록이므로 이 브랜치로 PR을 열거나 손으로 지우지 않는다. 제출은 Unit 폴더의 커밋을 `git push origin HEAD:<영역/작업내용>`으로 올려 이 브랜치 대상 PR을 여는 것이다. AI-DLC의 제출·고정·합치기 명령(`publish`·`pin`·`gate`·`land`)은 쓰지 않는다. Unit 폴더의 브랜치 이름이 이 브랜치와 같으므로 브랜치를 적지 않은 `git push`는 하지 않는다 |
+| 상태 파일 | Unit 폴더에서는 12월 intent의 `aidlc-state.md`를 커밋하지 않는다. 맡은 직후 그 폴더에서 `git update-index --skip-worktree aidlc/spaces/default/intents/260925-intent-12/aidlc-state.md`를 한 번 실행하면 `git add -A`에도 빠진다. 엔진이 폴더마다 고쳐 쓰는 파일이라 올리면 합칠 때마다 충돌하고, 맡기 표시는 폴더 밖으로 나가지 않아 올려도 다른 폴더에서 이어 가지 못한다 |
+| Unit 합치기 | 팀장이 Unit PR을 확인하고 merge commit으로 합친다. 공용 기반(U2) PR은 가져다 쓰는 Unit 담당이 리뷰한다. `aidlc-state.md`가 바뀐 PR은 합치지 않는다. 놓기(`release`)는 Unit을 맡지 않은 저장소 본체 폴더에서만 한다 |
 | 경계·계약 PR | 첫 주 경계 선합치(인터페이스·표·가짜 구현)와 계약 문서 수정(깨는 변경의 계약 수정 포함)은 Unit 제출과 따로 이 브랜치 대상 PR로 올린다. 가져다 쓰는 Unit 담당이 리뷰하고 팀장이 merge commit으로 합친다 |
 | `dev` 반영 | 이 브랜치 → `dev`는 PR·CI 통과·작성자 외 승인 1건·merge commit으로 올린다. 그 밖의 Unit 밖 작업은 지금처럼 `dev` 대상 PR로 한다 |
-| 최신화 | `dev`의 변경은 팀장이 merge commit으로 이 브랜치에 가져온다. 팀원이 Unit을 맡기 전에 한 번 가져오고, rebase·강제 push로 이력을 다시 쓰지 않는다. Unit 쪽 최신화는 AI-DLC 도구 안내를 따른다 |
+| 최신화 | `dev`의 변경은 팀장이 merge commit으로 이 브랜치에 가져온다. 팀원이 Unit을 맡기 전에 한 번 가져오고, rebase·강제 push로 이력을 다시 쓰지 않는다. Unit 폴더는 작업을 커밋한 뒤 `git pull --no-rebase --no-edit origin intent/260925-intent-12`로 가져온다. `aidlc-state.md` 때문에 가져오기가 멈추면 팀장에게 알린다 |
 | CI | 이 브랜치 대상 PR과 push(Unit 합치기, `dev` 가져오기)에도 CI가 돈다([#389](https://github.com/JminAILab/CatchU/issues/389)) |
-| 커밋 메시지 | AI-DLC가 만드는 고정 메시지 커밋(`aidlc unit …`, `Merge Unit …`)은 §4 접두사 규칙의 예외다. 담당이 직접 만드는 커밋은 접두사 규칙을 따른다 |
+| 커밋 메시지 | AI-DLC가 만드는 고정 메시지 커밋(`aidlc unit …`)은 §4 접두사 규칙의 예외다. 담당이 직접 만드는 커밋은 접두사 규칙을 따른다 |
 | 삭제 | 마지막 `dev` PR 병합 뒤 남은 Unit 제출·후속 작업이 없으면 이 브랜치와 Unit 브랜치(`claim/…`)를 함께 지운다 |
 
 #### `260920-catchu-web-mock` (중단)
@@ -307,3 +308,4 @@ chore: worker 의존성에 httpx 추가
 - **2026-10-16** — main 배포 PR의 필수 상태 검사를 정했다([#277](https://github.com/JminAILab/CatchU/issues/277), 팀장 결정). images 워크플로의 운영 이미지 검사(`images`)와 자동 배포 스크립트 회귀 시험(`cd-scripts`)이며, `dev-ci`처럼 우회 권한이 없는 별도 ruleset `main-ci`에 두고 첫 배포 PR 전에 적용했다. dev의 CI(web·api·worker 등)는 main 필수 검사로 걸지 않았다. dev push 때는 마지막으로 병합된 PR이 바꾼 서비스만 검사하므로, 걸어도 대부분 건너뜀(통과)으로 남기 때문이다. 대신 배포 PR을 올리기 전에 dev 최신으로 CI를 수동 실행해 모든 서비스를 검사하고 결과를 PR에 남긴다. §2에 「main의 검증」을 더하고 §7을 고쳤다.
 - **2026-10-20** — 문서 크기 검사를 별도 job `docs-size`에서 `changes` job의 단계로 옮기고 `dev-ci` 필수 상태 검사에서 `docs-size`를 뺐다([#352](https://github.com/JminAILab/CatchU/issues/352), 팀장 결정). Actions는 job마다 실행 시간을 1분 단위로 올려 과금해, 각각 5초 남짓 걸리는 `changes`·`docs-size`가 10월 1~19일 사용 시간의 30%를 차지했다. 조직의 Actions 예산이 $0이라 포함 시간을 넘으면 그달 CI가 멈추고 dev 병합이 막힌다. 문서 크기 검사가 실패하면 `changes`가 실패해 병합을 막고, 바뀐 서비스의 검사는 그대로 돈다. §7을 고쳤다.
 - **2026-10-25** — 11월 개발(12월 intent)을 AI-DLC 팀 방식으로 하는 팀장 결정(2026-10-24, [11월 개발 범위 결정](CatchU_11월_범위_결정.md))에 맞춰 §2의 10월 문장을 고치고, §2.1에 통합 브랜치 `intent/260925-intent-12`의 운영(만들기·U1·Unit 브랜치와 제출·Unit 합치기와 push·경계·계약 PR·`dev` 반영·최신화·CI·고정 메시지 커밋 예외·삭제)을 적었다([#381](https://github.com/JminAILab/CatchU/issues/381), 이름과 운영은 10-25·10-26 팀장 결정). 맨 위 지위 줄과 결정 이력 머리말에서 §2.1을 확정으로 나눠 적고, §3의 rebase·강제 푸시 예외가 §2.1 통합 브랜치에도 적용됨을 밝혔다. 9/21 web 모의 시연 안내는 바꾸지 않고 제목만 붙였다.
+- **2026-10-28** — §2.1의 Unit 제출·합치기를 AI-DLC 명령 대신 통합 브랜치 대상 PR로 바꾸고, Unit 폴더에서 `aidlc-state.md`를 커밋하지 않기로 했다(팀장 결정). AI-DLC 2.11.1의 고정(`pin`)은 Unit이 실어 보내는 기록 파일의 모든 줄을 허용 목록과 대조하는데, 맡은 폴더에서는 사람 입력·세션 시작·결정 기록 같은 목록 밖 줄이 같은 파일에 반드시 쌓여 실제 Unit은 고정되지 않는다(격리 저장소에서 확인, 상류 [awslabs/aidlc-workflows#1287](https://github.com/awslabs/aidlc-workflows/issues/1287)이 2026-09-21부터 열려 있음). 그래서 Unit의 단계 진행·승인은 AI-DLC로 하고 합치기만 PR로 한다. 상태 파일은 엔진이 폴더마다 고쳐 써서 올리면 합칠 때마다 충돌하므로 올리지 않는다(올리지 않으면 합치기·가져오기 충돌이 없음을 격리 저장소에서 확인). 이 때문에 통합 쪽 AI-DLC 상태에는 Unit 완료가 찍히지 않고 AI-DLC의 통합 시험 단계는 쓰지 않으며, Unit 진행은 이슈·Project로 본다. 구현만 이슈 → `dev` PR로 바꾸는 대안(11월 범위 결정)은 개발을 AI-DLC로 하려고, PR을 `dev`로 바로 올리는 안은 통합 브랜치에만 있는 U1을 먼저 옮겨야 하고 경계·계약 PR 대상까지 바뀌어서, 기록 파일을 손으로 걸러 고정을 통과시키는 안은 도구만 쓰게 한 기록을 사람이 고치게 되어 택하지 않았다.

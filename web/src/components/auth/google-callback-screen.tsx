@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
-import type { CallbackParse, GoogleCompletionInput, GoogleCompletionResult, MemberLookupOutcome } from "@/lib/auth-screen-contract";
+import type { CallbackParse, GoogleCompletionInput, GoogleCompletionResult } from "@/lib/auth-google";
 import { authScreenMessages } from "@/lib/auth-screen-messages";
-import { createGoogleCallbackControl } from "@/lib/google-login-screen";
+import { createGoogleCallbackControl, type MemberLookupOutcome } from "@/lib/google-login-screen";
 import styles from "./auth.module.css";
 
 /**
