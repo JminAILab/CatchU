@@ -11,9 +11,9 @@ export type RecipientGuideItem = {
 export const RECIPIENT_GUIDE_TITLE = "이 링크에서 할 수 있는 것";
 
 export const RECIPIENT_GUIDE_ITEMS: readonly RecipientGuideItem[] = [
-  { id: "link-conditions", text: "링크는 정해진 기간 동안만 열리고, 비밀번호가 걸린 링크는 비밀번호를 넣어야 볼 수 있습니다." },
+  { id: "link-conditions", text: "이 링크는 정해진 기간 동안만 열리고, 작성자가 중지하면 더 볼 수 없습니다." },
   { id: "fixed-copy", text: "보이는 자료는 발행할 때 고정한 내용입니다. 그 뒤 작성자가 고친 내용은 반영되지 않습니다." },
-  { id: "base-summary", text: "기본 요약은 이 자료로 AI가 만든 요약입니다. 근거를 누르면 원문 위치를 보여 줍니다." },
+  { id: "base-summary", text: "기본 요약은 이 자료로 AI가 만든 요약입니다. 근거를 누르면 발행본 자료 안의 해당 위치를 보여 줍니다." },
   { id: "questions", text: "질의응답은 로그인 없이 쓸 수 있고, 답은 이 자료 안에서만 찾습니다." },
   { id: "jd-summary", text: "JD 요약은 로그인한 뒤 내 채용공고와 이 자료를 견주어 볼 수 있습니다." },
 ];

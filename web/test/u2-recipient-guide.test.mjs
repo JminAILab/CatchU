@@ -4,14 +4,15 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { load } from "./u2-render.mjs";
 
-// 12월 intent U2 받은 사람 안내 묶음(기능 설계 BR8.2, AC16.2.2). 모양은 계약 C-11 수정 PR #421(slots 0번 RecipientGuide,
-// props showClaudeConnect 하나)을 따른다. 리뷰에서 모양이 바뀌면 이 파일과 components/recipient-guide만 고친다.
+// 12월 intent U2 받은 사람 안내 묶음(기능 설계 BR8.2, AC16.2.2). 모양은 합쳐진 계약 C-11(#421, slots 0번 RecipientGuide,
+// props showClaudeConnect 하나)을 따르고, 문구 두 줄(link-conditions·base-summary)은 #416 팀장 답에 맞췄다.
 const { RECIPIENT_GUIDE_ITEMS, CLAUDE_CONNECT_ITEM, recipientGuideItems } = await load("components/recipient-guide/recipient-guide-items.ts");
 const { RecipientGuide } = await load("components/recipient-guide/recipient-guide.tsx");
 
 test("안내 항목은 링크 조건·고정 자료·기본 요약·질의응답·JD 요약(로그인 필요) 다섯이다", () => {
   assert.deepEqual(RECIPIENT_GUIDE_ITEMS.map((item) => item.id), ["link-conditions", "fixed-copy", "base-summary", "questions", "jd-summary"]);
-  assert.ok(RECIPIENT_GUIDE_ITEMS.find((item) => item.id === "link-conditions").text.includes("비밀번호"));
+  assert.ok(RECIPIENT_GUIDE_ITEMS.find((item) => item.id === "link-conditions").text.includes("작성자가 중지하면"));
+  assert.ok(!RECIPIENT_GUIDE_ITEMS.find((item) => item.id === "link-conditions").text.includes("비밀번호"), "판정 통과 화면에만 보이므로 비밀번호 안내는 없다");
   assert.ok(RECIPIENT_GUIDE_ITEMS.find((item) => item.id === "jd-summary").text.includes("로그인"));
 });
 
