@@ -1,6 +1,7 @@
 // C-01 AI 생성 공통(AiGenerationGate)의 입력·출력·오류 모양.
 // 계약 원본: aidlc/spaces/default/intents/260925-intent-12/inception/contract-design/contract-summary.md 「C-01」.
-// U1은 generate() 최소 경로만 만든다. generateStream·숨긴 지시 방어·입력 상한·기계 대조는 U2가 더한다.
+// U1은 generate() 최소 경로(ClaudeAiGenerationGate)만 만든다. generateStream·숨긴 지시 방어·입력 상한·기계 대조는
+// U2의 CheckedAiGenerationGate(checked-gate.ts)가 더하며, 소비 Unit은 그 게이트만 쓴다.
 
 export type AiSourceKind = 'GITHUB_RECORD' | 'AUTHOR_MATERIAL';
 export type AiFeature = 'BASE_SUMMARY' | 'QNA' | 'JD_SUMMARY';
@@ -55,11 +56,17 @@ export interface ItemCitation {
   sourceLabel: SourceLabel;
 }
 
+/** JD 요약 항목의 역할(근거 / 자료로 확인되지 않는 점 / 면접 질문). 계약 C-01 수정 PR #421, U2 BR4.2. */
+export type JdRole = 'EVIDENCE' | 'UNCONFIRMED' | 'INTERVIEW_QUESTION';
+
 export interface GatedItem {
-  kind: 'CITED' | 'AI_INTERPRETATION';
+  /** SERVER_NOTICE는 AI가 아니라 U2 게이트가 만든 "찾지 못함" 안내(JD_SUMMARY만, U2 BR4.7). 'AI 해석' 표시를 붙이지 않는다. */
+  kind: 'CITED' | 'AI_INTERPRETATION' | 'SERVER_NOTICE';
   text: string;
-  /** CITED는 1개 이상, AI_INTERPRETATION은 빈 목록. */
+  /** CITED는 1개 이상, AI_INTERPRETATION·SERVER_NOTICE는 빈 목록. */
   citations: ItemCitation[];
+  /** JD_SUMMARY만 채운다. BASE_SUMMARY·QNA는 null(U2 게이트) 또는 없음(U1 게이트). 더하는 선택 칸이다. */
+  jdRole?: JdRole | null;
 }
 
 export interface GatedOutput {
@@ -68,9 +75,11 @@ export interface GatedOutput {
   droppedCount: number;
 }
 
-/** C-01 인터페이스 중 U1 범위. generateStream(QNA)은 U2가 더한다. */
+/** C-01 인터페이스. U1의 ClaudeAiGenerationGate는 generate만 구현하고, U2의 CheckedAiGenerationGate가 둘 다 구현한다. */
 export interface AiGenerationGate {
   generate(request: AiGenerationRequest): Promise<GatedOutput>;
+  /** QNA용. 항목 하나가 끝나고 대조를 통과했을 때만 그 항목을 내보낸다(U2 BR3.8). */
+  generateStream(request: AiGenerationRequest): AsyncIterable<GatedItem>;
 }
 
 /** 실패 원인. 호출자는 오류 이름만으로 실패를 기록할 수 있고, reason은 로그 구분용이다. */
@@ -84,6 +93,8 @@ export type AiCallFailure =
   | 'REDIRECT_REJECTED'
   | 'RESPONSE_TOO_LARGE'
   | 'INVALID_RESPONSE'
+  /** U2: 키(CATCHU_GENERATION_API_KEY)가 없어 부르지 않았다. api 기동은 막지 않는다. */
+  | 'NOT_CONFIGURED'
   | 'UNKNOWN';
 
 export interface AiProviderErrorDetail {
@@ -107,7 +118,7 @@ export class AiProviderError extends Error {
   }
 }
 
-/** 입력 상한 초과(C-01). 판정과 던지기는 U2가 넣는다. U1은 던지지 않는다. */
+/** 입력 상한 초과(C-01). U2 게이트가 모델을 부르기 전에 던진다(U2 BR3.1). U1 게이트는 던지지 않는다. */
 export class AiInputTooLarge extends Error {
   override readonly name = 'AiInputTooLarge';
 

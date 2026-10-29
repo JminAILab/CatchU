@@ -19,6 +19,7 @@
 | `catch_evidence` | Catch |
 | `candidate_registration` | 결과 수신 기록, Catch |
 | `published_item` | 발행본 |
+| `daily_execution_count`, `ai_consent` | 회원(12월 intent U2, 계약 C-03·C-04·C-06. 마이그레이션 `1793161114211-CreateU2UsageAndConsent`) |
 
 `text_material`·`publication`·`published_item`은 12월 범위 U4가 만든 표다(계약 C-06·C-07·C-13). 발행 사본(`published_item`)은 원본 Catch·자료와 외래 키가 없어, 원본을 지워도 사본은 발행본 수명을 따른다.
 

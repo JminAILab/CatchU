@@ -95,6 +95,10 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/components/header/` | 로그인·비로그인·수신자 헤더와 프로필 메뉴 |
 | `src/components/notice-dialog/` | 채용공고·알림 안내창 |
 | `src/components/status/` | 불러오는 중·조회 실패·정상 0건 공통 표시 |
+| `src/components/ai-consent/` | 12월 U2: 외부 AI 첫 이용 동의 창·한 줄 안내([안내](src/components/ai-consent/README.md)) |
+| `src/components/recipient-guide/` | 12월 U2: 받은 사람 안내 묶음(U4가 받은 사람 화면 위쪽에 닮, [시작 안내](src/features/start-guide/README.md)) |
+| `src/components/error-pages/`, `src/app/not-found.tsx`, `src/app/error.tsx` | 12월 U2: 404·기본 오류 화면([시작 안내](src/features/start-guide/README.md)) |
+| `src/features/start-guide/`, `src/features/withdrawal/` | 12월 U2: 회원 홈 시작 안내, 회원 탈퇴([탈퇴](src/features/withdrawal/README.md)) |
 | `src/lib/routes.ts` | 페이지 주소 상수. 아래 「페이지 주소」 표와 함께 고친다 |
 | `scripts/smoke.mjs` | 최소 실행 검사(`check:run`) |
 | `package.json` / `package-lock.json` | 의존성·스크립트·Node 버전 고정 |

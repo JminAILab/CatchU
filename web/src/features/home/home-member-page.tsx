@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
+import { MemberStartGuide } from "@/features/start-guide/member-start-guide";
 import type { HomeAction } from "./home-readiness";
 import { HomeGuide } from "./home-guide";
 import { useHomeReadiness } from "./use-home-readiness";
@@ -16,6 +17,8 @@ export function HomeMemberPage() {
   return (
     <>
       <h1 className={styles.lead}>GitHub 기록을 나의 경험으로 정리해 보세요.</h1>
+      {/* 12월 intent U2: 회원 홈 위쪽의 고정 여섯 단계 시작 안내(BR8.1). 조회 상태와 관계없이 늘 보인다. */}
+      <MemberStartGuide />
       {view.kind === "loading" && <LoadingState>계정 연결 상태를 확인하고 있습니다.</LoadingState>}
       {view.kind === "failed" && (
         <LookupFailedState title="계정 연결 상태를 확인하지 못했습니다" onRetry={retry}>

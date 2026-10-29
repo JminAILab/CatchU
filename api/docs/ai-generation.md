@@ -6,9 +6,9 @@
 
 ## 앱 미등록과 쓰는 조건
 
-- `src/ai-generation/`은 api 앱 모듈(`AppModule`·`application.module.ts`)에 **등록하지 않는다**. 게이트는 `createAiGenerationGate(config)`로만 만들고, 지금은 시험만 만든다(비기능 설계 Q1).
-- U2가 숨긴 지시 방어 문구·입력 상한·기계 대조를 붙이기 전에는 시험 밖에서 `generate()`를 쓰지 않는다. 키가 없거나 Claude가 멈춰도 api 기동과 다른 기능에는 영향이 없다.
-- 최소 연결이나 기록한 응답 시험의 통과를 U2·U5·U10의 실제 처리 성공으로 보지 않는다.
+- U1 게이트(`createAiGenerationGate`, `ClaudeAiGenerationGate`)는 U1 시험과 실제 호출 시험(S8)만 쓴다. **소비 Unit(U5·U10)은 아래 「U2 게이트」를 쓴다.** U2 게이트는 U1 경로에 방어 문구·입력 상한·기계 대조·JD 역할·스트림을 더한 것이다.
+- `AppModule`·`application.module.ts`에는 등록하지 않는다. 쓰는 Unit의 모듈이 `AiGenerationModule`을 `imports`에 넣는다. 키가 없거나 Claude가 멈춰도 api 기동과 다른 기능에는 영향이 없다.
+- 최소 연결이나 기록한 응답 시험의 통과를 U5·U10의 실제 처리 성공으로 보지 않는다.
 
 ## 구성 요소
 
@@ -67,6 +67,73 @@
 - Nest 모듈 등록·주입, 숨긴 지시 방어·역량 평가 표현 금지 공통 문구, 입력 상한(`AiInputTooLarge`), 숫자·PR 번호·파일 이름·영어 표기 기계 대조와 버림(버림은 `droppedCount`에 더함), `generateStream`(QNA).
 - 줄 규칙(BR1)과 위치 계산(BR4)은 U2가 그대로 쓴다.
 - U5·U10은 C-01 모양 그대로 부르고, `AiProviderError`를 받으면 다시 부르지 않고 실패로 기록한다.
+
+위 항목은 아래 「U2 게이트」(2026-10-28)에서 구현했다.
+
+## U2 게이트 — 12월 intent U2
+
+기준 문서: [U2 기능 명세](../../aidlc/spaces/default/intents/260925-intent-12/construction/u2-shared-foundation/functional-design/functional-spec.md) W3·W4, [U2 업무 규칙](../../aidlc/spaces/default/intents/260925-intent-12/construction/u2-shared-foundation/functional-design/rules.md) BR3·BR4, 계약 C-01과 그 수정 PR #421(`GatedItem.jdRole`, `kind: SERVER_NOTICE`). 이 절의 규칙 ID는 U2 문서의 것이다.
+
+### 쓰는 법
+
+```typescript
+import { Inject } from '@nestjs/common';
+import { AI_GENERATION_GATE } from '../ai-generation/ai-generation.module';
+import type { AiGenerationGate } from '../ai-generation/ai-generation.types';
+// 모듈 imports에 AiGenerationModule을 넣는다. 키는 CATCHU_GENERATION_API_KEY에서 읽는다.
+constructor(@Inject(AI_GENERATION_GATE) private readonly gate: AiGenerationGate) {}
+const output = await this.gate.generate(request);            // 기본 요약·JD 요약
+for await (const item of this.gate.generateStream(request)) { /* 질의응답: 항목 하나씩 */ }
+```
+
+키가 없으면 근거가 없는 요청은 빈 결과이고, 부를 일이 생기면 `AiProviderError(CALL_FAILED/NOT_CONFIGURED)`다.
+
+### 구성 요소
+
+| 파일 | 하는 일 | 규칙 |
+|---|---|---|
+| `gate-policy.ts` | 상수 `AI_INPUT_MAX_CHARS = 80000`, 입구 검사(입력 상한·SONNET은 QNA만), 공통 문구 `COMMON_GUARD_INSTRUCTION` | BR3.1·BR3.2, NFR2.1·NFR4.2 |
+| `fact-check.ts` | 대조 낱말 뽑기(숫자·PR 번호·파일 이름·영어 표기, 예외 약어 15개 `ENGLISH_TERM_EXCEPTIONS`), 인용 항목·AI 해석 대조 | BR3.3~BR3.5 |
+| `jd-checks.ts` | JD 형식 지시·머리줄 셋, 역할 모양 검사, 근거·확인되지 않는 점·면접 질문 대조, "찾지 못함" 서버 안내 | BR4.1~BR4.7 |
+| `checked-gate.ts` | `CheckedAiGenerationGate`(`generate`·`generateStream`)와 `createCheckedAiGenerationGate` | W3·W4, BR3.6~BR3.8 |
+| `ai-generation.module.ts` | Nest 모듈, 주입 토큰 `AI_GENERATION_GATE` | — |
+| `claude-citation-client.ts`의 `stream()`·`StreamAssembler` | 스트림 호출(같은 주소·재시도 0·지키는 fetch), 글 블록이 끝날 때마다 조각 하나 | BR3.8 |
+
+U1 파일에는 U1 동작을 바꾸지 않는 자리만 더했다: `buildCitationRequest`의 선택 인자(형식 지시·공통 문구), `collectResponseItems`의 선택 인자(JD 머리줄), `ResponseItems`의 이유별 버림 수, 줄 하나 판정 `readResponseLine`. U1 시험은 그대로 통과한다.
+
+### generate (W3)
+
+1. 입구: 근거 글 길이 합 + `userText` 길이(UTF-16) > 80,000이면 부르지 않고 `AiInputTooLarge`(호출 Unit은 422 `INPUT_TOO_LARGE` 등). `publicationText`·지시문은 세지 않는다. `SONNET`은 `QNA`에만 쓰고 그 밖이면 `TypeError`.
+2. 시스템 지시 = 형식 지시 + 기능 지시 + 공통 문구. 형식 지시는 `JD_SUMMARY`만 JD용(`JD_FORMAT_INSTRUCTION`, 머리줄 "근거:"·"자료로 확인되지 않는 점:"·"면접 질문:", 면접 질문은 물음표로 끝나는 의문문)이고 나머지는 U1 그대로다.
+3. U1 호출·묶기·위치. `JD_SUMMARY`는 '- '가 아닌 줄을 버리기 전에 머리줄인지 보고 지금 칸을 바꿔 항목에 `jdRole`을 붙인다(머리줄 자체는 항목도 항목 아닌 줄도 아님). 모델이 낸 항목이 0개면 U1처럼 `NO_ITEMS`.
+4. 대조: 인용 항목은 인용 원문(+ 그 근거의 Catch PR 번호 `/pull/n`)에 숫자·PR 번호·파일 이름·영어 표기가 모두 있어야 남는다. AI 해석은 숫자·PR 번호가 있으면 버리고, 영어 표기·파일 이름이 발행본 글(없으면 근거 글 전체)에 있어야 남는다.
+5. `JD_SUMMARY`: 머리줄 밖 항목, 인용 없는 근거, 물음표로 끝나지 않는 면접 질문, 물음표로 끝난 확인되지 않는 점은 버린다. 근거는 인용 항목 대조, 확인되지 않는 점은 인용이 있으면 인용 대조·없으면 AI 해석 대조(JD 줄 허용 없음). 면접 질문은 근거 대조가 끝난 뒤, 남은 근거 항목의 인용 원문(숫자·파일 이름), 그 원문과 Catch PR 번호(PR 번호), 그 원문과 JD 줄(영어 표기)로 대조한다.
+6. `JD_SUMMARY`의 "찾지 못함": JD 줄의 영어 표기 중 대문자가 든 것(예외 약어 제외, 한글 없는 줄은 첫 낱말 제외, 나온 순서대로 앞 3개)이 이번 근거 글 전체에 없으면 `{ kind: 'SERVER_NOTICE', text: "이번에 찾은 자료에서 '<표기>' 표기를 찾지 못함", citations: [], jdRole: 'UNCONFIRMED' }`를 결과 끝에 붙인다. 대조·버림 수 대상이 아니다.
+7. 버린 수를 U1 버림 수에 더한다. 남은 항목이 0개여도 정상 결과다(호출 Unit이 "결과 없음"을 보임). `BASE_SUMMARY`·`QNA` 항목은 `jdRole: null`이다.
+
+### generateStream (W4, QNA)
+
+글 블록이 끝날 때마다 끝난 줄을 U1 규칙으로 항목으로 만들고 위 4번 대조를 통과한 것만 하나씩 내보낸다. 마지막 줄은 응답이 끝난 뒤 판정하며, 출력 상한에서 끝났으면 끝나지 않은 마지막 항목은 내보내지 않는다. 거절·예상 밖 중단은 이미 내보낸 항목 뒤에 `AiProviderError`로 끝난다. `JD_SUMMARY`는 스트림으로 부르지 않는다(`TypeError`). 받는 쪽이 중간에 그만두면 제공자 스트림도 닫는다.
+
+### 로그
+
+호출마다 한 줄. 성공 `ai_gate_result`: feature, mode(`GENERATE`·`STREAM`), itemCount, droppedCount, dropReasons(`truncated`·`location`·`fact`·`role`·`outside_heading`), nonItemLineCount, stopReason, inputTokens, outputTokens, durationMs, requestId. 실패 `ai_gate_failed`: feature, mode, failure(`INPUT_TOO_LARGE`·`INVALID_REQUEST`·`CALL_FAILED/…` 등), itemCount, droppedCount, requestId, durationMs. 항목 글·근거 글·질문·JD 줄·키는 남기지 않는다(NFR3.1·NFR6.9).
+
+### 시험
+
+```bash
+npm test -- test/u2/ai-gate-checks.test.cjs test/u2/ai-gate-jd.test.cjs test/u2/ai-gate-stream.test.cjs
+```
+
+기록한 응답 JSON(스트림은 SSE 사건)을 시험용 fetch로 넘긴다(`test/u2/gate-fixtures.cjs`). 실제 Claude는 부르지 않는다. JD 시험(`ai-gate-jd`)은 계약 수정 PR #421의 모양으로 썼으며, 리뷰에서 모양이 바뀌면 그 시험과 `jd-checks.ts`만 고친다.
+
+### 한계
+
+- "찾지 못함" 후보에 복수형(APIs) 같은 대문자 든 일반 낱말이 섞일 수 있다. 영어 줄이 기술명으로 시작하면 그 이름이 빠진다. 소문자 표기(k8s, npm)는 안내하지 않는다(BR4.7).
+- 확인되지 않는 점에서 JD 줄의 숫자(예: "3년 이상")를 되풀이한 문장은 버려진다(BR4.6).
+- 면접 질문의 물음표 규칙은 처음 쓰는 규칙이라 실제 JD 호출로 맞는 질문이 많이 버려지는지 확인해야 한다(기능 명세 열린 확인 5). 이 확인은 아직 하지 않았다.
+- 스트림은 끝난 조각을 응답 끝까지 메모리에 둔다(응답 상한 4,000토큰 안). 내보낸 항목은 쥐고 있지 않는다.
+- 파일 이름(`main.ts`, `Node.js`)은 대소문자를 가리지 않고 대조한다.
 
 ## 시험
 
