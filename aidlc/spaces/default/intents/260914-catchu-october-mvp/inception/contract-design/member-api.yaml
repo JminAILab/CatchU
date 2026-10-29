@@ -475,6 +475,25 @@ paths:
         "403": {"$ref":"./common.yaml#/components/responses/Error403"}
         "404": {"$ref":"./common.yaml#/components/responses/Error404"}
         "500": {"$ref":"./common.yaml#/components/responses/Error500"}
+  "/me/analysis-summary":
+    get:
+      operationId: "getAnalysisSummary"
+      summary: "홈용 본인 분석 접수 이력 유무"
+      description: "인증된 본인의 영속 접수 요청(requestState ACCEPTED)이 1건 이상이면 true, 정상 조회 결과 0건이면 false다. 처리 상태와 무관하고 현재 선정 목록에서 빠진 저장소의 요청도 센다. 거절된 시도와 다른 회원의 요청은 세지 않는다. true는 현재 분석 가능이나 분석 완료를 뜻하지 않는다. query가 붙으면 400/VALIDATION_FAILED, 조회 실패는 false가 아닌 500/INTERNAL_ERROR다"
+      responses:
+        "200":
+          description: "성공"
+          headers: {"Cache-Control":{"$ref":"./common.yaml#/components/headers/NoStore"}}
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                additionalProperties: false
+                required: ["hasAcceptedAnalysisRepository"]
+                properties: {"hasAcceptedAnalysisRepository":{"type":"boolean"}}
+        "400": {"$ref":"./common.yaml#/components/responses/Error400"}
+        "401": {"$ref":"./common.yaml#/components/responses/Error401"}
+        "500": {"$ref":"./common.yaml#/components/responses/Error500"}
 components:
   securitySchemes: {"AccessJWT":{"type":"http","scheme":"bearer","bearerFormat":"JWT"},"RefreshCookie":{"type":"apiKey","in":"cookie","name":"catchu_refresh"}}
   parameters: {"Origin":{"name":"Origin","in":"header","required":true,"schema":{"type":"string"},"description":"web 출처(AUTH_WEB_ORIGIN)와 정확히 같아야 한다. 브라우저가 보낸다"}}

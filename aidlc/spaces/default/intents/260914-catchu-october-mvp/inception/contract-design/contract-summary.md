@@ -38,6 +38,7 @@ paths:
   "/auth/logout": {$ref: "./member-api.yaml#/paths/~1auth~1logout"}
   "/me/github/authorization": {$ref: "./member-api.yaml#/paths/~1me~1github~1authorization"}
   "/me/github/connection": {$ref: "./member-api.yaml#/paths/~1me~1github~1connection"}
+  "/me/analysis-summary": {$ref: "./member-api.yaml#/paths/~1me~1analysis-summary"}
 security: [{AccessJWT: []}]
 components:
   securitySchemes:
@@ -48,7 +49,7 @@ components:
 | 경로 묶음 | 의미·소유 | FR |
 |---|---|---|
 | me, me/profile, me/repositories | 본인 계정·프로필/연동 상태와 선정 지원 저장소. 프로필 직무/기술은 자가 입력; 검증 사실 아님 | FR11.1~11.3, FR1.1 |
-| analysis-notice, analysis-requests | 현재 고지·새 동의 접수·이력/개별 상태·실패 후 명시 재요청 | FR1.1, FR1.4 |
+| analysis-notice, analysis-requests, me/analysis-summary | 현재 고지·새 동의 접수·이력/개별 상태·실패 후 명시 재요청·홈용 본인 접수 이력 유무 | FR1.1, FR1.4, FR11.1 |
 | catches 및 confirmation/visibility/mismatch | 목록/상세·명시 확인·개별 공개/숨김·불일치 표시; 목록은 선택 repositoryId로 저장소 필터링하며 sourceRequestId와 함께 주면 둘 다 만족하는 Catch만 반환; 직접 편집/재생성 없음 | FR2.1~2.2, FR3.5, FR4.1 |
 | share-links 및 stop | 대표 없이 발급·현재 상태 관리·중단; 제목 변경/복구/기간 연장 없음 | FR3.1~3.2, FR4.2~4.5 |
 | auth/google/authorization, auth/google/login | Google 로그인 시작·완료·취소. 첫 로그인은 회원·빈 프로필 생성 | FR11.1 |
@@ -77,6 +78,7 @@ components:
 | application | NOT_READY / PENDING / APPLYING / RECOVERING / APPLIED / APPLY_FAILED | 결과 전 / 전달받아 대기 / 반영 중 / 쓰지 않음(값만 유지, 반영 복구 없음) / 결과 의미·등록 처리 반영 완료 / 반영 실패(처리 시한을 기다리지 않고 E의 다음 주기 판정에서 CLOSED) |
 | 결과 진입 | ownerResultsReady + registeredCatchIds | B가 등록·본인 열람 준비를 확인한 Catch만 E가 전달. 후보 존재·F 종료만으로 true 불가 |
 | 재요청 | retry.allowed + reason | E의 현재 서버 판정. 결과 열람 가능 여부와 별개 |
+| 접수 이력 유무 | GET /me/analysis-summary → hasAcceptedAnalysisRepository | 인증된 본인의 영속 접수 요청(ACCEPTED)이 1건 이상이면 true(처리 상태 무관, 현재 선정 목록에서 빠진 저장소 포함), 정상 조회 결과 0건이면 false. 거절된 시도·다른 회원 요청은 세지 않음. true는 현재 분석 가능·분석 완료를 뜻하지 않음. 조회 실패는 false가 아닌 500/INTERNAL_ERROR |
 
 **전이·불변 조건**
 
