@@ -103,8 +103,10 @@ export function createEmbedPublicationHandler(deps: EmbedPublicationHandlerDeps)
   /** 짧은 트랜잭션 하나: 잠그고 다시 확인 → 조각 벡터를 한 문장으로 → DONE(BR2.4, NFR5.2). */
   async function save(progress: Progress, chunks: ChunkRow[], vectors: number[][]): Promise<DiscardReason | null> {
     return dataSource.transaction(async (manager) => {
+      // 시각은 잠금을 얻은 뒤 읽는다. 잠금을 기다리는 사이 마감이 지나면 버려야 한다(C-02 늦은 결과, BR2.4).
+      const rows = await readIndexRow(progress.publicationId, true, manager);
       const now = clock();
-      const reason = checkPending(await readIndexRow(progress.publicationId, true, manager), now);
+      const reason = checkPending(rows, now);
       if (reason !== null) return reason;
       if (chunks.length > 0) {
         const updated = affectedRows(await manager.query(

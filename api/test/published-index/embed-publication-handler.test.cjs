@@ -3,6 +3,7 @@
 require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { before, after, beforeEach, test } = require('node:test');
+const { setTimeout: delay } = require('node:timers/promises');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { createEmbedPublicationHandler } = require('../../dist/published-index/embed-publication-handler');
 const { createPublishedIndexWriter } = require('../../dist/published-index/published-index-writer');
@@ -163,6 +164,45 @@ test('제공자 호출 중에 발행본이 지워지면 저장하지 않고 버�
   await run(job(a.publicationId));
   assert.equal(provider.calls.length, 1);
   assert.equal(logger.entries[0].entry.reason, 'NO_INDEX');
+});
+
+test('저장 때 색인 행 잠금을 기다리는 사이 마감이 지나면 벡터와 DONE을 쓰지 않고 버린다(BR2.4)', { timeout: 10_000 }, async () => {
+  const b = await publicationB(db);
+  await chunkPublication(db, writer(), b.publicationId, NOW);
+  const deadline = new Date(NOW.getTime() + 600_000);
+  let now = new Date(deadline.getTime() - 1);
+  // 제공자 호출 중에 다른 연결이 색인 행을 잠가 두어, 처리기가 저장 잠금에서 기다리게 한다.
+  const blocker = db.createQueryRunner();
+  const provider = recordingProvider({ onCall: async () => {
+    await blocker.connect();
+    await blocker.startTransaction();
+    await blocker.query('SELECT publication_id FROM publication_index WHERE publication_id = $1 FOR UPDATE', [b.publicationId]);
+  } });
+  const { run, logger } = handler(provider, () => new Date(now));
+  let running;
+  try {
+    running = run(job(b.publicationId));
+    let waiting = false;
+    for (let tries = 0; tries < 300 && !waiting; tries++) {
+      waiting = (await db.query(`SELECT pid FROM pg_stat_activity
+        WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock'
+          AND query LIKE 'SELECT status, deadline_at FROM publication_index%FOR UPDATE'`)).length > 0;
+      if (!waiting) await delay(10);
+    }
+    assert.ok(waiting, '처리기가 저장 잠금에서 기다려야 한다');
+    now = new Date(deadline.getTime() + 1);
+    await blocker.commitTransaction();
+    await running;
+  } finally {
+    if (blocker.isTransactionActive) await blocker.rollbackTransaction();
+    await running?.catch(() => undefined);
+    await blocker.release();
+  }
+  assert.equal(await embeddedCount(db, b.publicationId), 0);
+  assert.equal((await indexRow(db, b.publicationId)).status, 'PENDING');
+  assert.equal(logger.entries[0].entry.reason, 'DEADLINE_PASSED');
+  const search = createPublishedSearch({ dataSource: db, provider: recordingProvider(), logger: recordingLogger() });
+  assert.equal(await search.getIndexState(b.publicationId, now), 'FAILED');
 });
 
 test('제공자 실패 때 색인이 이미 PENDING이 아니면 FAILED로 덮지 않고 버림으로 남긴다', async () => {
