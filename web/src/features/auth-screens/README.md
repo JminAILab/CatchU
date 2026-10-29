@@ -117,7 +117,8 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 | `/login`(`session-login-panel.tsx`) | 새 로그인을 받을 때만(복원 확인 중·로그인 확인 뒤가 아닐 때) `GoogleLoginButton`에 `authRuntime().google.startGoogleLogin`을 넘긴다 |
 | `/google/callback`(`src/app/(guest)/google/callback/page.tsx`) | `session-google-callback.tsx`가 `GoogleCallbackScreen`에 `readGoogleCallback`·`completeGoogleLogin`·`lookupMemberWithAuth(api.member)`를 넘긴다. 전환을 끄면 `notFound()`(404) |
 | 회원 셸(`session-member-shell.tsx`) | `useMemberLogout`(`useAuth()`·`session.logout()`)과 헤더 `logoutPending`, 헤더 아래 `LogoutStatus`, 가드의 `renderReauthNotice`에 `ReauthNotice` |
-| 이동 전 확인 | 로그아웃·재인증 [다시 로그인]은 누른 시점에 #286 등록 수단(`unsavedChanges`)의 `activeReasons()`를 읽는다. 미저장 입력은 `useUnsavedChanges(dirty)`(사유 생략 = `unsaved-input`)로 등록되며, 최초 입력·프로필 수정은 #286에서 기존 `dirty`를 함께 등록했다. 미확정 분석 요청 등록은 #153·#154 화면 연결이 맡고 이 판본에는 아직 없다. 등록한 화면이 없으면 묻지 않는다 |
+| 이동 전 확인 | 로그아웃·재인증 [다시 로그인]은 누른 시점에 #286 등록 수단(`unsavedChanges`)의 `activeReasons()`를 읽는다. 미저장 입력은 `useUnsavedChanges(dirty)`(사유 생략 = `unsaved-input`)로 등록되며, 최초 입력·프로필 수정은 #286에서 기존 `dirty`를 함께 등록했다. 미확정 분석 요청은 내 자산(`/assets`)의 저장소 연결 관리가 결과를 확인하지 못한 요청을 `unconfirmed-analysis-request`로 등록한다([PR #417](https://github.com/JminAILab/CatchU/pull/417), [저장소 연결 관리 「표시 규칙」](../repository-management/README.md#표시-규칙)). 등록은 전환과 상관없이 하지만 꺼짐 화면은 이 사유를 읽지 않는다. 등록한 화면이 없으면 묻지 않는다 |
+| 분석 요청 모달 안 재인증 안내 | 내 자산의 분석 요청 모달이 열려 바깥 [다시 로그인]에 닿을 수 없으면 모달 머리말 아래에 `ReauthNotice`를 그린다(PR #417, 같은 「표시 규칙」). 확인·이동은 바깥 안내와 같다 |
 
 - 확인 사유 등록은 #286 공통 수단(`unsavedChanges`·`useUnsavedChanges`)만 쓰고 이 화면에서 새로 만들지 않는다. 화면 안의 링크 이동·새로고침·창 닫기 확인(`useUnsavedGuard`, [PR #300](https://github.com/JminAILab/CatchU/pull/300))은 역할이 달라 그대로 둔다.
 
@@ -125,7 +126,7 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 
 1. 실제 Google 승인·콜백·쿠키·다중 탭 검증은 #286이 수행해 #251에 기록하고, 그 결과에서 나온 화면 보완은 #287에서 한다.
 2. 제품 전환은 각 화면 담당 확인·통합 검증 뒤 별도 승인으로 정한다(#286).
-3. 미확정 분석 요청 등록·모달 안 [다시 로그인](#153·#154)과 합친 판본에서 취소 시 입력·요청 정보 보존, 계속 동작, 모달 초점 복귀, 중복 조작을 확인한다([사유 조회 접점](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6313395220)의 후속 확인).
+3. 미확정 분석 요청 등록과 모달 안 [다시 로그인]은 [PR #417](https://github.com/JminAILab/CatchU/pull/417)로 연결됐다(「연결」). 그 PR에서 확인 창을 대역 함수로 둔 브라우저 검사로 취소 시 입력·요청 정보 보존, 계속 동작, 모달 초점 복귀, 중복 조작을 확인했다([사유 조회 접점](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6313395220)의 후속 확인). 남은 것은 브라우저 기본 확인 창의 실제 표시·선택과 실제 Google 로그인을 합친 통합 검증이며, #286에서 이어진다.
 
 ## 검사
 
