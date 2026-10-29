@@ -80,7 +80,7 @@
 
 ## 남은 연결
 
-- 실제 GitHub 승인으로 같은 탭 왕복(성공·취소·만료·다른 회원)을 확인한다. 통합 시험 전환을 켠 대역 왕복(GitHub 인증 화면·토큰 교환·계정 조회를 합성) 결과는 PR #409에 있다. #308의 `memberMutationOutcome()`으로 보내지 않은 완료 요청을 따로 안내할지는 실제 왕복 확인 뒤 정한다(지금은 응답 유실과 같이 상태 확인만 한다).
+- 실제 GitHub 승인으로 하는 같은 탭 왕복(성공·취소·만료·다른 회원)은 확인하지 않았다. [#231의 실제 GitHub 연결 확인](https://github.com/JminAILab/CatchU/issues/231#issuecomment-6051939540)과 통합 시험 전환을 켠 대역 왕복(GitHub 인증 화면·토큰 교환·계정 조회를 합성, 결과는 PR #409)을 근거로 추가 확인은 생략하기로 D와 합의했다([D 리뷰](https://github.com/JminAILab/CatchU/pull/409#pullrequestreview-5665493550)). #308의 `memberMutationOutcome()`으로 보내지 않은 완료 요청을 따로 안내할지는 정하지 않았다. 지금은 응답 유실과 같이 상태 확인만 한다.
 - 연동 성공 뒤 저장소 연결 관리 모달 자동 열기와 그 주소 표현은 필요하면 #153(D) 후속에서 정한다. 지금은 쿼리 없는 `/assets`로만 가고 이전 필터·Catch 상세를 복원하지 않는다([D 답변](https://github.com/JminAILab/CatchU/pull/409#issuecomment-6432457026)·[B 답변](https://github.com/JminAILab/CatchU/pull/409#issuecomment-6433912541)).
 - 외부 인증은 같은 탭 전체 이동으로 D와 합의했다(위 D 답변). 복귀 초점은 `/assets` 화면의 기본 초점을 따른다.
 - 이미 승인한 OAuth 앱이면 `/assets`에서 뒤로 가기로 GitHub 인증 주소에 돌아갔을 때 GitHub가 곧바로 다시 콜백으로 보낼 수 있다. 이미 쓴 state라 서버가 거부하므로 'GitHub 계정을 연결하지 못했습니다. 기존 연결은 그대로입니다.'와 현재 상태(연결됨)가 함께 보인다.
