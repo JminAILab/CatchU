@@ -52,6 +52,9 @@ const MEMBER_ROWS = {
   text_material: 'member_id = $1',
   publication: 'member_id = $1',
   published_item: 'publication_id IN (SELECT publication_id FROM publication WHERE member_id = $1)',
+  // 12월 intent U3(C-06·C-08): 발행본 색인 상태와 조각(발행본·발행 항목을 따라 지워짐).
+  publication_index: 'publication_id IN (SELECT publication_id FROM publication WHERE member_id = $1)',
+  published_chunk: 'publication_id IN (SELECT publication_id FROM publication WHERE member_id = $1)',
 };
 const SHARED_TABLES = ['allowed_scope_revision', 'repository_selection'];
 const NONE = Object.fromEntries(Object.keys(MEMBER_ROWS).map(table => [table, 0]));
@@ -138,8 +141,13 @@ async function memberWithAllData() {
       VALUES ($1, $2, '합성 자료', '합성 본문', now(), now())`, [textMaterialId, memberId]);
     await m.query(`INSERT INTO publication (publication_id, member_id, title, link_token_reference, published_at, expires_at)
       VALUES ($1, $2, '합성 발행본', $3, now(), now() + interval '2160 hours')`, [publicationId, memberId, randomUUID()]);
+    const publishedItemId = randomUUID();
     await m.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot)
-      VALUES ($1, $2, 1, 'TEXT_MATERIAL', $3, '합성 자료', '{"body":"합성 본문"}')`, [randomUUID(), publicationId, textMaterialId]);
+      VALUES ($1, $2, 1, 'TEXT_MATERIAL', $3, '합성 자료', '{"body":"합성 본문"}')`, [publishedItemId, publicationId, textMaterialId]);
+    await m.query(`INSERT INTO publication_index (publication_id, status, deadline_at, updated_at)
+      VALUES ($1, 'PENDING', now() + interval '10 minutes', now())`, [publicationId]);
+    await m.query(`INSERT INTO published_chunk (chunk_id, publication_id, published_item_id, seq, field_path, char_start, char_end, source_kind, text)
+      VALUES ($1, $2, $3, 1, 'body', 0, 5, 'AUTHOR_MATERIAL', '합성 본문')`, [randomUUID(), publicationId, publishedItemId]);
   });
   const rows = await memberRows(memberId);
   for (const [table, n] of Object.entries(rows)) assert.ok(n > 0, `${table}에 시험 회원의 행이 있어야 한다`);
