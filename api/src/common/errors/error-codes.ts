@@ -33,6 +33,10 @@ export const ERROR_STATUS = {
   RATE_LIMITED: 429,
   DAILY_LIMIT_REACHED: 429,
   INTERNAL_ERROR: 500,
+  // 12월 intent U2(계약 C-03·C-04, U2 기능 설계 BR1.4·BR2.2·BR7.4).
+  AI_CONSENT_REQUIRED: 403,
+  DAILY_LIMIT_REACHED: 429,
+  WITHDRAWAL_FAILED: 500,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_STATUS;
@@ -71,4 +75,8 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   RATE_LIMITED: '요청이 많아 잠시 뒤에 다시 시도할 수 있습니다.',
   DAILY_LIMIT_REACHED: '오늘 한도에 도달했습니다.',
   INTERNAL_ERROR: '처리 중 오류가 발생했습니다.',
+  AI_CONSENT_REQUIRED: '외부 AI 전송에 먼저 동의해 주세요.',
+  // 계약 C-03이 문구를 정했다. 남은 횟수·한도 값은 어디에도 넣지 않는다(BR1.4).
+  DAILY_LIMIT_REACHED: '오늘 한도에 도달했습니다',
+  WITHDRAWAL_FAILED: '탈퇴를 끝내지 못했습니다. 팀에 알려 주세요',
 };

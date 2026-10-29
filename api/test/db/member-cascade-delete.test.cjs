@@ -45,6 +45,13 @@ const MEMBER_ROWS = {
   catch_evidence: 'catch_id IN (SELECT catch_id FROM catch_asset WHERE owner_id = $1)',
   candidate_registration: 'catch_id IN (SELECT catch_id FROM catch_asset WHERE owner_id = $1)',
   repository_protection: 'owner_id = $1',
+  // 12월 intent U2(C-03·C-04): 하루 실행 횟수와 첫 이용 동의.
+  daily_execution_count: 'member_id = $1',
+  ai_consent: 'member_id = $1',
+  // 12월 intent U4(C-07·C-13): 텍스트 자료·발행본·발행 항목.
+  text_material: 'member_id = $1',
+  publication: 'member_id = $1',
+  published_item: 'publication_id IN (SELECT publication_id FROM publication WHERE member_id = $1)',
 };
 const SHARED_TABLES = ['allowed_scope_revision', 'repository_selection'];
 const NONE = Object.fromEntries(Object.keys(MEMBER_ROWS).map(table => [table, 0]));
@@ -122,6 +129,17 @@ async function memberWithAllData() {
       VALUES ($1, $2, 'createShareLink', 'link-key', repeat('a', 64), $3, $4)`, [randomUUID(), memberId, linkId, linkId]);
     await m.query(`INSERT INTO idempotency_record (idempotency_id, member_id, operation, key, request_fingerprint, request_id, response_reference)
       VALUES ($1, $2, 'createAnalysisRequest', 'analysis-key', repeat('b', 64), $3, $4)`, [randomUUID(), memberId, result.requestId, result.requestId]);
+    await m.query(`INSERT INTO daily_execution_count (member_id, usage_date, count) VALUES ($1, '2026-11-02', 3), ($1, '2026-11-03', 1)`, [memberId]);
+    await m.query(`INSERT INTO ai_consent (consent_id, member_id, notice_version, consented_at) VALUES ($1, $2, 'fixture-notice', now())`,
+      [randomUUID(), memberId]);
+    const textMaterialId = randomUUID();
+    const publicationId = randomUUID();
+    await m.query(`INSERT INTO text_material (text_material_id, member_id, title, body, created_at, updated_at)
+      VALUES ($1, $2, '합성 자료', '합성 본문', now(), now())`, [textMaterialId, memberId]);
+    await m.query(`INSERT INTO publication (publication_id, member_id, title, link_token_reference, published_at, expires_at)
+      VALUES ($1, $2, '합성 발행본', $3, now(), now() + interval '2160 hours')`, [publicationId, memberId, randomUUID()]);
+    await m.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot)
+      VALUES ($1, $2, 1, 'TEXT_MATERIAL', $3, '합성 자료', '{"body":"합성 본문"}')`, [randomUUID(), publicationId, textMaterialId]);
   });
   const rows = await memberRows(memberId);
   for (const [table, n] of Object.entries(rows)) assert.ok(n > 0, `${table}에 시험 회원의 행이 있어야 한다`);

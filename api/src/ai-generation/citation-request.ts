@@ -25,12 +25,20 @@ export const SOURCE_KIND_CONTEXT: Record<AiSourceKind, string> = {
   AUTHOR_MATERIAL: '자료 종류: 작성자 자료 원문',
 };
 
+/** U2가 시스템 지시를 바꾸는 자리. 주지 않으면 U1 그대로(항목 형식 지시 + 기능 지시). */
+export interface CitationRequestOptions {
+  /** 항목 형식 지시를 바꾼다(U2 BR4.1, JD_SUMMARY만). */
+  formatInstruction?: string;
+  /** 기능 지시 뒤에 붙이는 공통 문구(U2 BR3.2). */
+  guardInstruction?: string;
+}
+
 /**
  * 근거 순서대로 줄이 있는 근거만 인용 문서로 만든다. 줄이 없는 근거는 자리 문서로도 넘기지 않는다.
  * 근거가 없거나 남은 문서가 없으면 Claude를 부르지 않는다는 표시(SKIP)를 돌려준다(BR2.1).
  * publicationText는 모델에 보내지 않는다(BR2.3).
  */
-export function buildCitationRequest(request: AiGenerationRequest): CitationRequestPlan {
+export function buildCitationRequest(request: AiGenerationRequest, options: CitationRequestOptions = {}): CitationRequestPlan {
   const documents: CitationDocument[] = [];
   const documentBlocks: DocumentBlockParam[] = [];
   request.sources.forEach((source, sourceIndex) => {
@@ -50,5 +58,7 @@ export function buildCitationRequest(request: AiGenerationRequest): CitationRequ
   if (request.userText !== null && request.userText !== '') {
     userContent.push({ type: 'text', text: request.userText });
   }
-  return { kind: 'CALL', system: `${ITEM_FORMAT_INSTRUCTION}\n\n${request.instruction}`, userContent, documents };
+  const format = options.formatInstruction ?? ITEM_FORMAT_INSTRUCTION;
+  const guard = options.guardInstruction === undefined ? '' : `\n\n${options.guardInstruction}`;
+  return { kind: 'CALL', system: `${format}\n\n${request.instruction}${guard}`, userContent, documents };
 }

@@ -13,6 +13,8 @@ import { MemberRepositoriesModule } from './member-repositories/member-repositor
 import { GoogleLoginModule } from './google-login/google-login.module';
 import { AnalysisIntakeModule } from './analysis-intake/analysis-intake.module';
 import { RecipientModule } from './recipient/recipient.module';
+import { AiConsentModule } from './ai-consent/ai-consent.module';
+import { WithdrawalModule } from './withdrawal/withdrawal.module';
 
 @Module({
   imports: [
@@ -27,6 +29,9 @@ import { RecipientModule } from './recipient/recipient.module';
     GoogleLoginModule,
     AnalysisIntakeModule,
     RecipientModule,
+    // 12월 intent U2: 첫 이용 동의 API(C-04), 탈퇴 DELETE /v1/me(C-06). 파일 저장 설정이 있으면 여기서 기동 때 검사한다.
+    AiConsentModule,
+    WithdrawalModule,
     // #232는 #252의 실제 선정 공급자(DatabaseRepositorySelectionSource)를 받는 WorkerContextModule.register로 별도 조립한다.
     // 기본 앱에 가짜 선정/동의 해석을 등록하지 않는다(docs/worker-context.md).
   ],

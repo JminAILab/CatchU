@@ -1,0 +1,35 @@
+.guide {
+  margin: 0 0 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.steps {
+  margin: 0;
+  padding-left: 1.5rem;
+  display: grid;
+  gap: 0.375rem;
+}
+
+.step {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.stepTitle {
+  font-weight: 600;
+}
+
+.stepLink {
+  color: var(--color-accent);
+  font-size: 0.875rem;
+}
