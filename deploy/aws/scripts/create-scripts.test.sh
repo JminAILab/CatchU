@@ -118,6 +118,7 @@ case "$svc $op" in
       i=$((i + 1))
     done ;;
   "cloudwatch describe-alarms") case "$all" in *length*) echo "${STUB_ALARM_COUNT:-0}" ;; *) echo '{"MetricAlarms":[]}' ;; esac ;;
+  "logs describe-log-groups") case "$all" in *length*) echo "${STUB_LOG_GROUP_COUNT:-0}" ;; *) echo '{"logGroups":[{"logGroupName":"/catchu/eks/app","retentionInDays":14}]}' ;; esac ;;
   "elbv2 describe-target-groups") echo "${STUB_LB_ARNS:-arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/k8s-catchu-0123456789/0123456789abcdef${tab}arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/k8s-catchu-0123456789/0123456789abcdef}" ;;
   "efs describe-file-systems")
     case "$all" in
@@ -246,7 +247,7 @@ run_sut env AWS_REGION=us-east-1 bash "$P/create-waf.sh"
 check "AWS_REGION이 다르면 멈춤" "$(ok test "$rc" = 1 -a ! -s "$S/seen")"
 run_sut env CATCHU_EXPECTED_ACCOUNT= bash "$P/create-waf.sh"
 check "기대 계정 번호가 없으면 멈춤" "$(ok test "$rc" = 1 -a "$(grep -c '기대 계정 번호가 없다' "$OUT")" = 1)"
-for s in rds queue efs waf alert-topic alarms; do
+for s in rds queue efs waf alert-topic alarms log-group; do
   run_sut env CATCHU_EXPECTED_ACCOUNT=999999999999 CATCHU_ALERT_EMAIL=alerts.synthetic@example.com bash "$P/create-$s.sh" --apply
   check "계정이 다르면 $s: 계정 조회 말고는 AWS를 부르지 않고 멈추며 번호를 찍지 않음" \
     "$( { test "$rc" = 1 -a "$(sort -u "$S/seen")" = 'sts get-caller-identity' && test "$(grep -c -E '123456789012|999999999999' "$OUT")" = 0; } > /dev/null 2>&1; echo $?)"
@@ -391,6 +392,19 @@ run_sut env "${ready[@]}" STUB_ALARM_COUNT=2 bash "$P/create-alarms.sh"
 check "경보가 하나라도 있으면 확인 모드에서도 멈춤" "$(ok stopped '이 스크립트가 만드는 이름의 경보 2개')"
 run_sut env "${ready[@]}" STUB_SERVER=https://OTHER.example bash "$P/create-alarms.sh" --apply
 check "경보: kubectl이 다른 클러스터를 가리키면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+
+# ---------- 로그 그룹(create-log-group.sh) ----------
+run_sut bash "$P/create-log-group.sh"
+check "로그 그룹 확인 모드: 종료 0, 만드는 호출 0, --apply 안내" "$(ok test "$rc" = 0 -a -z "$(ops)" -a "$(grep -c -- '--apply로 다시 실행' "$OUT")" = 1)"
+run_sut env STUB_VALIDATE=1 bash "$P/create-log-group.sh" --apply
+check "로그 그룹 만들기: 그룹 → 보존 기간 순서, CLI 인자 검사 2건 통과, 확인 값에 보존 14일" \
+  "$( { test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "logs create-log-group,logs put-retention-policy," -a "$(wc -l < "$S/valid" | tr -d ' ')" = 2 && grep -q '"retentionInDays": 14' "$OUT" && clean; } > /dev/null 2>&1; echo $?)"
+check "로그 그룹: 이름 /catchu/eks/app, 보존 14일, 태그" \
+  "$( { has_all "$(call_of 'logs create-log-group')" --log-group-name /catchu/eks/app project=catchu,issue=276 && has_all "$(call_of 'logs put-retention-policy')" --log-group-name /catchu/eks/app --retention-in-days 14; } > /dev/null 2>&1; echo $?)"
+run_sut env STUB_LOG_GROUP_COUNT=1 bash "$P/create-log-group.sh"
+check "로그 그룹이 이미 있으면 확인 모드에서도 멈춤" "$(ok stopped '로그 그룹 /catchu/eks/app')"
+run_sut env STUB_FAIL='logs describe-log-groups' bash "$P/create-log-group.sh" --apply
+check "로그 그룹 조회 실패면 '없음'으로 넘기지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
 
 echo
 echo "통과 $pass, 실패 $fail"
