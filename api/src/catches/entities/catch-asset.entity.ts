@@ -35,6 +35,7 @@ export interface RegistrationAssessment {
 @Check('jsonb_typeof("registration_assessment") = \'object\'')
 @Check('"visibility" IN (\'PRIVATE\', \'PUBLIC\')')
 @Check('"source_mode" IN (\'MOCK\', \'LIVE\')')
+@Check('("author_description" IS NULL) = ("author_description_updated_at" IS NULL)')
 export class CatchAssetEntity {
   @PrimaryColumn({ name: 'catch_id', type: 'uuid' })
   catchId: string = randomUUID();
@@ -92,4 +93,14 @@ export class CatchAssetEntity {
 
   @Column({ name: 'source_mode', type: 'varchar' })
   sourceMode!: CatchSourceMode;
+
+  /**
+   * 작성자 설명(계약 C-14, U4 소유). 없으면 NULL이고 저장 시각도 함께 NULL이다. 길이 상한은 U4 API 검증이다.
+   * 초기값을 두지 않는다: 기존 저장 코드가 이 칸을 모른 채 행을 저장해도 설명을 덮어쓰지 않게 한다(재분석 유지, ADR-004).
+   */
+  @Column({ name: 'author_description', type: 'text', nullable: true })
+  authorDescription!: string | null;
+
+  @Column({ name: 'author_description_updated_at', type: 'timestamptz', nullable: true })
+  authorDescriptionUpdatedAt!: Date | null;
 }

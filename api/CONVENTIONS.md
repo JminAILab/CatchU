@@ -24,6 +24,8 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/daily-run-limit/` / `src/ai-consent/` | C-03 계정당 하루 실행 제한, C-04 첫 이용 동의와 `GET/POST /v1/ai-consent`([docs/daily-run-limit.md](docs/daily-run-limit.md)). 동의 API는 기본 앱에 등록 |
 | `src/file-storage/`                     | C-05 파일 저장 인터페이스·키·로컬 드라이버와 설정 검사([docs/file-storage.md](docs/file-storage.md)) |
 | `src/withdrawal/`                       | C-06 탈퇴 `DELETE /v1/me`의 1~4단계([docs/withdrawal.md](docs/withdrawal.md)). 기본 앱에 등록 |
+| `src/publications/`                     | 12월 U4 발행본의 첫 경계 제출: C-07 `publication`·`published_item` 엔티티와 사본 모양, C-10 `PublicationAccess` 인터페이스와 시험 전용 메모리 가짜 구현(앱 미등록, [docs/publications.md](docs/publications.md)) |
+| `src/materials/`                        | 12월 U4 텍스트 자료 표 C-13 `text_material` 엔티티([docs/publications.md](docs/publications.md)) |
 | `src/recipient/`                        | 비로그인 수신자 조회(#151, [docs/recipient-read.md](docs/recipient-read.md)). #150 링크·소유 회원 판정·B 공개 Catch 조회·A `OwnerProfileReader`를 재사용. 기본 앱에 등록 |
 | `src/member-repositories/repository-selection.*.ts` | 현재 선정의 DB 정본(엔티티)과 목록·#323 접수 재확인·#232 worker 선정 공급(#252, [docs/repository-selection.md](docs/repository-selection.md)). 좌표는 같은 폴더의 #319 카탈로그에서 읽음 |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
