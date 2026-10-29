@@ -1,0 +1,129 @@
+{
+  "stage": "nfr-design",
+  "unit": "u7-repository-analysis",
+  "upstream_ids": [
+    "NFR1.1",
+    "NFR1.2",
+    "NFR1.3",
+    "NFR2.1",
+    "NFR2.2",
+    "NFR2.3",
+    "NFR2.4",
+    "NFR4.1",
+    "NFR4.2",
+    "NFR4.3",
+    "NFR4.4",
+    "NFR4.5",
+    "NFR4.6",
+    "NFR5.1",
+    "NFR5.2",
+    "NFR6.1",
+    "NFR6.2",
+    "NFR6.3",
+    "NFR7.1",
+    "NFR7.2"
+  ],
+  "coverage": [
+    {
+      "id": "NFR1.1",
+      "status": "OK",
+      "target": "security-design.md § SD1: 회원 조건·내부 인증·동일 소유자 복합 FK"
+    },
+    {
+      "id": "NFR1.2",
+      "status": "OK",
+      "target": "security-design.md § SD2: 루트 주소 파싱·고정 호스트·허용 메시지 필드·시간/크기 보호"
+    },
+    {
+      "id": "NFR1.3",
+      "status": "OK",
+      "target": "security-design.md § SD5: 자격정보 경계·운영 설정·안전한 오류/로그"
+    },
+    {
+      "id": "NFR2.1",
+      "status": "OK",
+      "target": "security-design.md § SD3: 요청별 불변 동의와 범위·접수 전후 대조"
+    },
+    {
+      "id": "NFR2.2",
+      "status": "OK",
+      "target": "security-design.md § SD4: 저장소 자료 가리기·자료와 지시 분리"
+    },
+    {
+      "id": "NFR2.3",
+      "status": "OK",
+      "target": "security-design.md § SD4: 숫자 계정 ID 기여·근거·출력 검사·텍스트 표시"
+    },
+    {
+      "id": "NFR2.4",
+      "status": "OK",
+      "target": "security-design.md § SD5: 기존 ClaudeProvider Haiku 5.5·고정 주소·재시도 0"
+    },
+    {
+      "id": "NFR4.1",
+      "status": "OK",
+      "target": "performance-design.md § PD1: 목록→상세/관계→후보/생성→반영 집계와 제외 이유 대조"
+    },
+    {
+      "id": "NFR4.2",
+      "status": "OK",
+      "target": "performance-design.md § PD2: 접수/worker 시계와 큐·수집·생성·전달·반영 예산"
+    },
+    {
+      "id": "NFR4.3",
+      "status": "OK",
+      "target": "performance-design.md § PD3: 개수·호출·시간·총량·응답·입출력·프레임 상한"
+    },
+    {
+      "id": "NFR4.4",
+      "status": "OK",
+      "target": "scalability-design.md § SC1: worker 동시 1/프로세스와 실제 소비자 수 기록"
+    },
+    {
+      "id": "NFR4.5",
+      "status": "OK",
+      "target": "scalability-design.md § SC2: 새 접수 트랜잭션의 C-03 소비·롤백·재응답 비소비"
+    },
+    {
+      "id": "NFR4.6",
+      "status": "OK",
+      "target": "reliability-design.md § RD1: 기존 시한 전이·요청→시도 잠금·닫기 판정"
+    },
+    {
+      "id": "NFR5.1",
+      "status": "OK",
+      "target": "reliability-design.md § RD3: 신규 등록/요청 CASCADE·복합 FK·삭제 표 갱신"
+    },
+    {
+      "id": "NFR5.2",
+      "status": "OK",
+      "target": "reliability-design.md § RD3: 수신/반영 부모 확인·삭제 결과 버림·재생성 금지"
+    },
+    {
+      "id": "NFR6.1",
+      "status": "OK",
+      "target": "observability-design.md § OD1: 실제 새 경로·Catch/근거·거부 1~2종·병합 증거"
+    },
+    {
+      "id": "NFR6.2",
+      "status": "OK",
+      "target": "observability-design.md § OD2: requestId/attemptId 연결·최소 집계·로그 허용 목록"
+    },
+    {
+      "id": "NFR6.3",
+      "status": "OK",
+      "target": "observability-design.md § OD3 및 OD4: 실제/합성/미실행 구분·U2 공통 보호 흐름 인계"
+    },
+    {
+      "id": "NFR7.1",
+      "status": "OK",
+      "target": "reliability-design.md § RD1: 처리/반영/수명과 ownerResultsReady로 화면 판정"
+    },
+    {
+      "id": "NFR7.2",
+      "status": "OK",
+      "target": "reliability-design.md § RD2: UNKNOWN/NONE/FOUND·후보 0·한계·이유별 오류 구분"
+    }
+  ],
+  "reverse": []
+}

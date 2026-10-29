@@ -14,6 +14,10 @@ export const ERROR_STATUS = {
   LINK_PASSWORD_INVALID: 401,
   GITHUB_CONNECTION_REQUIRED: 403,
   REPOSITORY_NOT_ALLOWED: 403,
+  REPOSITORY_URL_INVALID: 400,
+  REPOSITORY_PRIVATE: 403,
+  REPOSITORY_UNSUPPORTED: 403,
+  REPOSITORY_UNVERIFIED: 422,
   CONSENT_REQUIRED: 403,
   RESOURCE_UNAVAILABLE: 404,
   LINK_UNAVAILABLE: 404,
@@ -27,6 +31,7 @@ export const ERROR_STATUS = {
   LINK_LIMIT_REACHED: 409,
   LINK_UNLOCK_LIMITED: 429,
   RATE_LIMITED: 429,
+  DAILY_LIMIT_REACHED: 429,
   INTERNAL_ERROR: 500,
 } as const;
 
@@ -47,6 +52,10 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   LINK_PASSWORD_INVALID: '비밀번호가 올바르지 않습니다.',
   GITHUB_CONNECTION_REQUIRED: 'GitHub 연결이 필요합니다.',
   REPOSITORY_NOT_ALLOWED: '분석할 수 없는 저장소입니다.',
+  REPOSITORY_URL_INVALID: 'https://github.com/소유자/저장소 형태의 주소를 입력해 주세요.',
+  REPOSITORY_PRIVATE: '비공개 저장소는 분석할 수 없습니다.',
+  REPOSITORY_UNSUPPORTED: '현재 지원하지 않는 저장소입니다.',
+  REPOSITORY_UNVERIFIED: '저장소를 확인할 수 없습니다. 주소와 접근 상태를 확인해 주세요.',
   CONSENT_REQUIRED: '분석 동의가 필요합니다.',
   RESOURCE_UNAVAILABLE: '현재 열람할 수 없는 자료입니다.',
   LINK_UNAVAILABLE: '이 링크는 열람할 수 없습니다.',
@@ -60,5 +69,6 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   LINK_LIMIT_REACHED: '유효한 링크는 최대 5개까지 만들 수 있습니다.',
   LINK_UNLOCK_LIMITED: '비밀번호 시도가 많아 잠시 뒤에 다시 시도할 수 있습니다.',
   RATE_LIMITED: '요청이 많아 잠시 뒤에 다시 시도할 수 있습니다.',
+  DAILY_LIMIT_REACHED: '오늘 한도에 도달했습니다.',
   INTERNAL_ERROR: '처리 중 오류가 발생했습니다.',
 };

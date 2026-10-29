@@ -76,6 +76,8 @@ async function statusOf(manager: EntityManager, request: AnalysisRequest, lock: 
     application: attempt.application, sourceMode: attempt.sourceMode, eligibleCandidateCount: attempt.eligibleCandidateCount,
     registeredCatchIds: [...new Set(registrations.filter(r => r.ready).map(r => r.catchId))],
     ownerResultsReady: attempt.ownerResultsReady, retry, failures: attempt.failures,
+    ownCommitObservation: attempt.ownCommitObservation, observedOwnCommitCount: attempt.observedOwnCommitCount,
+    collectionLimitNotes: attempt.collectionLimitNotes,
   };
   return { request, attempt, status };
 }

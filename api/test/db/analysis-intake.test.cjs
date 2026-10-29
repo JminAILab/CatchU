@@ -43,6 +43,7 @@ async function start(t, overrides = {}) {
     for (const [k,v] of Object.entries(previous)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   } });
   app = await configureApp(await NestFactory.create(AppModule, { logger, abortOnError: false }));
+  require('../support/synthetic-daily-limit.cjs').bindSyntheticDailyLimit(app);
   await app.listen(0, '127.0.0.1');
   const base = await app.getUrl();
   const call = (path, options) => fetch(base + path, { ...options, signal: AbortSignal.timeout(10000) });
@@ -168,10 +169,11 @@ test('원자 접수·현재 상태 재응답·새 키 ACTIVE 200은 새 동의�
   const active = await s.post(u); assert.equal(active.status, 200); assert.deepEqual(await active.json(), first);
   assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 2 });
   const responseKeys = ['requestId','repositoryId','consentId','attemptId','submittedAt','updatedAt','requestState',
-    'lifecycle','processing','application','sourceMode','eligibleCandidateCount','registeredCatchIds','ownerResultsReady','retry','failures'];
+    'lifecycle','processing','application','sourceMode','eligibleCandidateCount','registeredCatchIds','ownerResultsReady','retry','failures',
+    'ownCommitObservation','observedOwnCommitCount','collectionLimitNotes'];
   assert.deepEqual(Object.keys(first).sort(), responseKeys.sort());
   const message = await s.intake.prepareExecutionRequest(u.memberId, first.requestId);
-  const contract = YAML.parse(readFileSync(resolve(__dirname, '../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml'), 'utf8'));
+  const contract = YAML.parse(readFileSync(resolve(__dirname, '../../../api/contracts/repository-analysis/worker-messages.yaml'), 'utf8'));
   const ajv = new Ajv({ strict: false }); addFormats(ajv);
   const validate = ajv.compile({ ...contract.components.schemas.Request, components: contract.components });
   assert.equal(validate(message), true, JSON.stringify(validate.errors));
@@ -459,7 +461,7 @@ test('기존 E의 검증된 실패 Result·반영 완료를 확정 근거로 쓰
   const {DatabaseReceiverStore}=require('../../dist/analysis-receiver/database-receiver.store');
   const {WorkerMessageValidator}=require('../../dist/analysis-receiver/worker-message.validator');
   const {ResultApplicationService}=require('../../dist/result-application/result-application.service');
-  const contract=resolve(__dirname,'../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design');
+  const contract=resolve(__dirname,'../../../api/contracts/repository-analysis');
   const receiver=new AnalysisReceiver(new DatabaseReceiverStore(db),new WorkerMessageValidator(contract),{record(){}});
   const values={...first,memberId:u.memberId,scopeRevision:command().consent.scopeRevision,caseId:'intake-failed-138'};
   const template=readFileSync(resolve(__dirname,'../../../worker/fixtures/m1-synthetic/results/failed.json'),'utf8');

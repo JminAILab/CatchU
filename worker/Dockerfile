@@ -5,7 +5,7 @@
 # 한계: 이 Python에 묶여 들어온 OpenSSL(3.0.16)·SQLite 등은 Debian 갱신으로 바뀌지 않는다. Python 패치 판본을 올릴 때만 바뀐다.
 ARG DEBIAN_IMAGE=debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.12.18@sha256:3adc3706091ce7c2fe595e669628caedd6d951551b92b258b7e7dbe06d9440bc
-ARG CONTRACT_DIR=aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design
+ARG CONTRACT_DIR=api/contracts/repository-analysis
 
 FROM ${UV_IMAGE} AS uv
 

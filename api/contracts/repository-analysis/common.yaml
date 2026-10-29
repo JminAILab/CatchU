@@ -1,0 +1,304 @@
+# U7 현행 정본. 원본: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml
+# 10월 승인 원본을 보존하고 U7 메시지 v2/본인 커밋 관측을 추가한다.
+openapi: "3.0.3"
+info: {"title":"CatchU API v1 공통 스키마","version":"1.0.0"}
+paths: {}
+components:
+  schemas:
+    Error:
+      type: "object"
+      additionalProperties: false
+      required: ["code","message"]
+      properties:
+        code: {"type":"string","description":"분기용 안정 코드"}
+        message: {"type":"string","description":"내부 정보를 포함하지 않는 사용자 안내"}
+        details:
+          type: "object"
+          additionalProperties: false
+          required: []
+          properties:
+            violations:
+              type: "array"
+              items:
+                type: "object"
+                additionalProperties: false
+                required: ["field","reason"]
+                properties: {"field":{"type":"string"},"reason":{"type":"string"}}
+            existingRequestId: {"type":"string","minLength":1}
+    Profile:
+      type: "object"
+      additionalProperties: false
+      required: ["displayName","introduction","desiredRole","skills"]
+      properties:
+        displayName: {"type":"string"}
+        introduction: {"type":"string"}
+        desiredRole: {"type":"string"}
+        skills: {"type":"array","items":{"type":"string"}}
+    GitHubConnection:
+      type: "object"
+      additionalProperties: false
+      required: ["state","accountLogin"]
+      properties: {"state":{"type":"string","enum":["CONNECTED","DISCONNECTED","REAUTH_REQUIRED"]},"accountLogin":{"type":"string","nullable":true}}
+    Member:
+      type: "object"
+      additionalProperties: false
+      required: ["memberId","profile","github"]
+      properties:
+        memberId: {"type":"string","minLength":1}
+        profile: {"$ref":"#/components/schemas/Profile"}
+        github: {"$ref":"#/components/schemas/GitHubConnection"}
+    Repository:
+      type: "object"
+      additionalProperties: false
+      required: ["repositoryId","name","ownerLogin","url","allowedScopeRevision"]
+      properties:
+        repositoryId: {"type":"string","minLength":1}
+        name: {"type":"string"}
+        ownerLogin: {"type":"string"}
+        url: {"type":"string","format":"uri"}
+        allowedScopeRevision: {"type":"string","minLength":1}
+    ConsentInput:
+      type: "object"
+      additionalProperties: false
+      required: ["accepted","noticeRevision","scopeRevision"]
+      properties:
+        accepted: {"type":"boolean","enum":[true]}
+        noticeRevision: {"type":"string","minLength":1}
+        scopeRevision: {"type":"string","minLength":1}
+    AnalysisCreate:
+      type: "object"
+      additionalProperties: false
+      required: ["repositoryId","consent"]
+      properties:
+        repositoryId: {"type":"string","minLength":1}
+        consent: {"$ref":"#/components/schemas/ConsentInput"}
+        retryOfRequestId: {"type":"string","minLength":1}
+    Failure:
+      type: "object"
+      additionalProperties: false
+      required: ["stage","code","message"]
+      properties:
+        stage: {"type":"string","enum":["COLLECTION","ANALYSIS","DRAFT","REFLECTION","APPLICATION","DISPATCH"]}
+        code: {"type":"string"}
+        message: {"type":"string"}
+        candidateId: {"type":"string","minLength":1}
+    AnalysisStatus:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "requestId"
+        - "repositoryId"
+        - "consentId"
+        - "attemptId"
+        - "submittedAt"
+        - "updatedAt"
+        - "requestState"
+        - "lifecycle"
+        - "processing"
+        - "application"
+        - "sourceMode"
+        - "eligibleCandidateCount"
+        - "registeredCatchIds"
+        - "ownerResultsReady"
+        - "ownCommitObservation"
+        - "observedOwnCommitCount"
+        - "collectionLimitNotes"
+        - "retry"
+        - "failures"
+      properties:
+        requestId: {"type":"string","minLength":1}
+        repositoryId: {"type":"string","minLength":1}
+        consentId: {"type":"string","minLength":1}
+        attemptId: {"type":"string","minLength":1}
+        submittedAt: {"type":"string","format":"date-time"}
+        updatedAt: {"type":"string","format":"date-time"}
+        requestState: {"type":"string","enum":["ACCEPTED"]}
+        lifecycle: {"type":"string","enum":["ACTIVE","CLOSED"]}
+        processing: {"type":"string","enum":["QUEUED","RUNNING","UNCERTAIN","SUCCEEDED","EMPTY","PARTIAL_FAILED","FAILED"]}
+        application: {"type":"string","enum":["NOT_READY","PENDING","APPLYING","RECOVERING","APPLIED","APPLY_FAILED"]}
+        sourceMode: {"type":"string","enum":["MOCK","LIVE"]}
+        eligibleCandidateCount: {"type":"integer","minimum":0}
+        registeredCatchIds: {"type":"array","items":{"type":"string","minLength":1}}
+        ownerResultsReady: {"type":"boolean"}
+        ownCommitObservation: {"type":"string","enum":["NONE","FOUND","UNKNOWN"]}
+        observedOwnCommitCount: {"type":["integer","null"],"minimum":0}
+        collectionLimitNotes: {"type":"array","maxItems":100,"items":{"type":"string","minLength":1,"maxLength":500}}
+        retry:
+          type: "object"
+          additionalProperties: false
+          required: ["allowed","reason"]
+          properties:
+            allowed: {"type":"boolean"}
+            reason:
+              type: "string"
+              enum: ["FAILURE_WITHOUT_RESULTS","IN_PROGRESS","RESULTS_EXIST","NOT_FAILED","EXECUTION_UNCERTAIN","APPLICATION_UNRESOLVED","REANALYSIS_DEFERRED"]
+        failures: {"type":"array","items":{"$ref":"#/components/schemas/Failure"}}
+    Evidence:
+      type: "object"
+      additionalProperties: false
+      required: ["catchEvidenceId","sourceEvidenceId","sourceUrl","sourceRevision","representedFacts","contributionScope","coverageLimits"]
+      properties:
+        catchEvidenceId: {"type":"string","minLength":1}
+        sourceEvidenceId: {"type":"string","minLength":1}
+        sourceUrl: {"type":"string","format":"uri"}
+        sourceRevision: {"type":"string"}
+        representedFacts: {"type":"array","items":{"type":"string"}}
+        contributionScope: {"type":"string"}
+        coverageLimits: {"type":"array","items":{"type":"string"}}
+    Draft:
+      type: "object"
+      additionalProperties: false
+      required: ["status","content"]
+      properties: {"status":{"type":"string","enum":["GENERATED","FAILED","NOT_GENERATED"]},"content":{"type":"string","nullable":true}}
+    Reflection:
+      type: "object"
+      additionalProperties: false
+      required: ["status","questions"]
+      properties: {"status":{"type":"string","enum":["GENERATED","FAILED","NOT_GENERATED"]},"questions":{"type":"array","items":{"type":"string"}}}
+    Catch:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "catchId"
+        - "title"
+        - "repositoryId"
+        - "sourceRequestId"
+        - "sourceResultId"
+        - "sourceCandidateId"
+        - "workFacts"
+        - "subjectContribution"
+        - "evidence"
+        - "draft"
+        - "reflection"
+        - "confirmation"
+        - "mismatch"
+        - "visibility"
+        - "restriction"
+        - "sourceMode"
+      properties:
+        catchId: {"type":"string","minLength":1}
+        title: {"type":"string","minLength":1,"nullable":true}
+        repositoryId: {"type":"string","minLength":1}
+        sourceRequestId: {"type":"string","minLength":1}
+        sourceResultId: {"type":"string","minLength":1}
+        sourceCandidateId: {"type":"string","minLength":1}
+        workFacts: {"type":"array","items":{"type":"string"}}
+        subjectContribution: {"type":"string"}
+        evidence: {"type":"array","items":{"$ref":"#/components/schemas/Evidence"}}
+        draft: {"$ref":"#/components/schemas/Draft"}
+        reflection: {"$ref":"#/components/schemas/Reflection"}
+        confirmation:
+          type: "object"
+          additionalProperties: false
+          required: ["workFactsConfirmed","contributionConfirmed"]
+          properties: {"workFactsConfirmed":{"type":"boolean"},"contributionConfirmed":{"type":"boolean"}}
+        mismatch: {"type":"boolean"}
+        visibility: {"type":"string","enum":["PRIVATE","PUBLIC"]}
+        restriction: {"type":"string","enum":["NONE","SOURCE_PRIVATE"]}
+        sourceMode: {"type":"string","enum":["MOCK","LIVE"]}
+    PublicCatch:
+      type: "object"
+      additionalProperties: false
+      required: ["catchId","title","workFacts","subjectContribution","evidence","draft"]
+      properties:
+        catchId: {"type":"string","minLength":1}
+        title: {"type":"string","minLength":1,"nullable":true}
+        workFacts: {"type":"array","items":{"type":"string"}}
+        subjectContribution: {"type":"string"}
+        evidence: {"type":"array","items":{"$ref":"#/components/schemas/PublicEvidence"}}
+        draft: {"$ref":"#/components/schemas/Draft"}
+    ShareLink:
+      type: "object"
+      additionalProperties: false
+      required: ["linkId","title","url","passwordRequired","createdAt","expiresAt","stoppedAt","state"]
+      properties:
+        linkId: {"type":"string","minLength":1}
+        title: {"type":"string"}
+        url: {"type":"string","format":"uri"}
+        passwordRequired: {"type":"boolean"}
+        createdAt: {"type":"string","format":"date-time"}
+        expiresAt: {"type":"string","format":"date-time"}
+        stoppedAt: {"type":"string","format":"date-time","nullable":true}
+        state: {"type":"string","enum":["ACTIVE","STOPPED","EXPIRED"]}
+    ShareCreate:
+      type: "object"
+      additionalProperties: false
+      required: ["title"]
+      properties: {"title":{"type":"string","minLength":1,"description":"trim 후 1~50자. 글자 수는 유니코드 코드 포인트(DB char_length 기준)"},"password":{"type":"string","minLength":8,"maxLength":64,"description":"trim·정규화 없이 입력 그대로 8~64자. 글자 수는 유니코드 코드 포인트(DB char_length 기준)"}}
+    PageInfo: {"type":"object","additionalProperties":false,"required":["nextCursor"],"properties":{"nextCursor":{"type":"string","nullable":true}}}
+    PublicProfile:
+      type: "object"
+      additionalProperties: false
+      required: ["displayName","introduction","desiredRole","skills","fieldSource","githubAccountLogin"]
+      properties:
+        displayName: {"type":"string"}
+        introduction: {"type":"string"}
+        desiredRole: {"type":"string"}
+        skills: {"type":"array","items":{"type":"string"}}
+        fieldSource: {"type":"string","enum":["SELF_REPORTED"],"description":"displayName·introduction·desiredRole·skills 네 항목의 출처. githubAccountLogin에는 적용하지 않는다"}
+        githubAccountLogin: {"type":"string","nullable":true,"description":"링크 소유자의 GitHub 연결이 CONNECTED일 때 마지막 연결 때 확인해 저장한 계정명. REAUTH_REQUIRED·DISCONNECTED·연결 기록 없음이면 null. null은 현재 표시할 GitHub 계정 정보가 없다는 뜻이며 미연동으로 단정하지 않는다. 수신자 조회는 연결 상태를 바꾸거나 GitHub·자격정보 보관소를 호출하지 않고 저장값을 쓰므로, 승인 철회나 계정명 변경이 아직 반영되지 않았으면 이전 계정명일 수 있다. 연결 상태값은 내보내지 않는다. 자가 입력 값이 아니다"}
+    PublicEvidence:
+      type: "object"
+      additionalProperties: false
+      required: ["sourceUrl","sourceRevision","representedFacts","contributionScope","coverageLimits"]
+      properties:
+        sourceUrl: {"type":"string","format":"uri"}
+        sourceRevision: {"type":"string"}
+        representedFacts: {"type":"array","items":{"type":"string"}}
+        contributionScope: {"type":"string"}
+        coverageLimits: {"type":"array","items":{"type":"string"}}
+    AccessToken:
+      type: "object"
+      additionalProperties: false
+      required: ["accessToken","tokenType","expiresIn"]
+      description: "Google 로그인 성공과 Refresh 갱신이 주는 Access 응답(개발 로그인도 같은 형식). Refresh 값은 본문에 넣지 않고 Set-Cookie로만 보낸다"
+      properties:
+        accessToken: {"type":"string","minLength":1}
+        tokenType: {"type":"string","enum":["Bearer"]}
+        expiresIn: {"type":"integer","minimum":1,"description":"Access 수명(초). 10월 기준 900(15분)"}
+    GoogleLoginResult:
+      type: "object"
+      additionalProperties: false
+      required: ["accessToken","tokenType","expiresIn","suggestedDisplayName"]
+      description: "AccessToken의 세 필드와 이름 제안"
+      properties:
+        accessToken: {"type":"string","minLength":1}
+        tokenType: {"type":"string","enum":["Bearer"]}
+        expiresIn: {"type":"integer","minimum":1,"description":"AccessToken.expiresIn과 같다"}
+        suggestedDisplayName: {"type":"string","nullable":true,"description":"표시 이름이 빈 회원에게만 주는 Google 이름. 저장하지 않으며 프로필 입력 제한을 거친 값이 아니다. 이름이 이미 저장됐거나 Google 이름이 없으면 null"}
+    EmptyRequest: {"type":"object","additionalProperties":false,"maxProperties":0,"description":"본문 없음 또는 {}. 다른 필드는 400/VALIDATION_FAILED"}
+  headers: {"NoStore":{"description":"회원·수신자 응답에 Cache-Control: no-store","schema":{"type":"string","enum":["no-store"]}},"RetryAfter":{"description":"다시 보낼 수 있을 때까지 남은 초(비밀번호 시도 차단·발급 빈도 제한)","schema":{"type":"integer","minimum":1}},"SetRefreshCookie":{"description":"Refresh 쿠키 설정·교체. catchu_refresh=<값>; Path=/v1/auth; HttpOnly; SameSite=Strict; Expires=min(세션 절대 만료, 마지막 정상 갱신+24시간). Domain 없음, https 출처에서 Secure","schema":{"type":"string"}},"ClearRefreshCookie":{"description":"Refresh 쿠키 제거. 같은 이름·Path·속성에 Max-Age=0과 과거 Expires","schema":{"type":"string"}}}
+  responses:
+    Error400:
+      description: "오류 코드 표 및 경계 규칙 참조"
+      headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"}}
+      content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}
+    Error401:
+      description: "오류 코드 표 및 경계 규칙 참조"
+      headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"}}
+      content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}
+    Error403:
+      description: "오류 코드 표 및 경계 규칙 참조"
+      headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"}}
+      content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}
+    Error404:
+      description: "오류 코드 표 및 경계 규칙 참조"
+      headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"}}
+      content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}
+    Error409:
+      description: "오류 코드 표 및 경계 규칙 참조"
+      headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"}}
+      content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}
+    Error429:
+      description: "오류 코드 표 및 경계 규칙 참조"
+      headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"},"Retry-After":{"$ref":"#/components/headers/RetryAfter"}}
+      content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}
+    Error500:
+      description: "오류 코드 표 및 경계 규칙 참조"
+      headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"}}
+      content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}
+    Error401ClearRefresh:
+      description: "Refresh 거부(AUTH_INVALID). Refresh 쿠키를 제거한다"
+      headers: {"Cache-Control":{"$ref":"#/components/headers/NoStore"},"Set-Cookie":{"$ref":"#/components/headers/ClearRefreshCookie"}}
+      content: {"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}
+

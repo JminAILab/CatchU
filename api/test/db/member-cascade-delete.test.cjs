@@ -80,7 +80,7 @@ async function prepareRequest(memberId) {
   result.sourceMode = 'MOCK';
   await db.transaction(async manager => {
     await manager.query("INSERT INTO member_account VALUES ($1,$2,'ACTIVE') ON CONFLICT DO NOTHING", [memberId, 'fixture:' + memberId]);
-    await manager.insert(AnalysisRequest, { ...context, currentAttemptId: context.attemptId, submittedAt: new Date(), updatedAt: new Date() });
+    await manager.insert(AnalysisRequest, { ...context, registrationId: await require('../support/registered-analysis.cjs').ensureRegistration(manager, context), currentAttemptId: context.attemptId, submittedAt: new Date(), updatedAt: new Date() });
     await manager.insert(AnalysisConsent, { ...context, accepted: true, noticeRevision: 'fixture', consentedScope: { synthetic: true }, consentedAt: new Date() });
     await manager.insert(AnalysisAttempt, { attemptId: context.attemptId, requestId: context.requestId, sourceMode: result.sourceMode });
   });

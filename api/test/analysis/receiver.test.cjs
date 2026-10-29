@@ -16,7 +16,7 @@ for (const state of ['RECEIVED', 'RUNNING', 'UNCERTAIN']) {
 
 test('진행 형식/맥락/현재 시도 오류는 상태에 반영하지 않는다', async () => {
   const { receiver, store } = harness();
-  for (const invalid of [null, {}, event({ resultId: 'unexpected' }), event({ schemaVersion: '2' }),
+  for (const invalid of [null, {}, event({ resultId: 'unexpected' }), event({ schemaVersion: '1' }),
     event({ messageId: '' }), event({ state: 'SUCCEEDED' }), event({ observedAt: '2026-09-29 01:00:00Z' })]) {
     assert.equal(await receiver.receiveProgress(invalid), 'SCHEMA_INVALID');
   }
@@ -98,7 +98,7 @@ test('세 ID 누락/빈 값/타입 오류는 Receipt 없이 안전한 거부 코
 
 test('식별 가능한 형식/의미 오류는 REJECTED/SCHEMA_INVALID이고 입력을 보정하지 않는다', async () => {
   const { receiver, store } = harness();
-  const invalids = [result({ schemaVersion: '2' }), result({ memberId: '' }), result({ finishedAt: 'invalid' }),
+  const invalids = [result({ schemaVersion: '1' }), result({ memberId: '' }), result({ finishedAt: 'invalid' }),
     result({ finishedAt: '2026-02-30T00:00:00Z' }), result({ finishedAt: '2026-09-29 00:00:00Z' }),
     result({ extra: 'secret' }), result({ sourceMode: 'OTHER' }), result({ outcome: 'EMPTY' })];
   const missingTitle = result(); delete missingTitle.candidates[0].title; invalids.push(missingTitle);

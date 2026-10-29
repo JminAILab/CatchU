@@ -13,7 +13,7 @@ const { configureApp } = require('../../dist/app.setup');
 const { WorkerContextModule } = require('../../dist/worker-context/worker-context.module');
 const { GitHubConnectionService } = require('../../dist/github-connection/github-connection.service');
 const { GitHubClient, GitHubAccessToken } = require('../../dist/github-connection/github.client');
-const { insertInitialAnalysis } = require('../../dist/member-analysis/initial-analysis');
+const { insertInitialAnalysis } = require('../support/registered-analysis.cjs');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
   APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, cleanUpLocks, createLockWaitRoles, holdRow,

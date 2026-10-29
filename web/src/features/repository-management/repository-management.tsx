@@ -9,6 +9,7 @@ import type { RepositoryManagementBindings } from "@/features/assets/assets-conn
 import { api as client } from "@/lib/api";
 import { routes } from "@/lib/routes";
 import { loadConnectedRepositories, type GitHubState, type RepositoryApi } from "./repository-api";
+import { createRepositoryRegistrationStore } from "./repository-registration-store";
 import {
   canShowCatches, connectedRepositories, connectionCheckView, requestConnectionNotice, showsPendingRequestEntry, STATUS_LABEL, statusDetails, statusIcon,
   type ConnectedRepository, type ConnectionCheckView, type StatusIcon,
@@ -138,6 +139,10 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
     requests: requestApi ?? memberRequestApi,
   }) : null);
   useEffect(() => () => requestStore?.dispose(), [requestStore]);
+  const [registrationStore] = useState(() => requestStore ? createRepositoryRegistrationStore(api.register, async (repositoryId, signal) => {
+    await requestStore.load(); if (!signal.aborted) requestStore.select(repositoryId);
+  }, () => requestStore.select(null)) : null);
+  useEffect(() => () => registrationStore?.dispose(), [registrationStore]);
   // 확인하지 못한 요청이 남았는지는 #154 상태 객체의 phase만 읽는다(상태 복제·영속 보관 없음).
   // 연동 상태가 연결 해제 등으로 바뀌어 [연결 관리]가 사라져도 그 요청의 결과를 확인하러 모달을 다시 열 수 있게 한다.
   const requestPhase = useSyncExternalStore(requestStore?.subscribe ?? noSubscription,
@@ -163,6 +168,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
   // 요청 중·응답 불명·빈도 제한이면 읽지 않고(#154 규칙), 입력 단계로 돌아온 뒤 읽는다.
   const requestLoadedFor = useRef<GitHubState | null>(null);
   const connection = github.state === "ready" ? github.value : null;
+  useEffect(() => { if (connection !== "CONNECTED") registrationStore?.cancel(); }, [connection, registrationStore]);
   useEffect(() => {
     if (!requestStore || connection === null || requestLoadedFor.current === connection) return;
     if (open && requestPhase === "editing") {
@@ -207,6 +213,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
   /** 일반 닫기(닫기 버튼·X·Esc·바깥 클릭). B가 현재 필터로 목록을 다시 불러온다. */
   function closeModal() {
     if (!open) return;
+    registrationStore?.cancel();
     stopLoading();
     setOpen(false);
     bindings.onClosed();
@@ -214,6 +221,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
 
   /** [이 저장소 Catch 보기]. 모달을 닫고 onShowRepository만 부른다(onClosed 중복 호출 없음). */
   function showRepository(repositoryId: string) {
+    registrationStore?.cancel();
     stopLoading();
     setOpen(false);
     bindings.onShowRepository(repositoryId);
@@ -292,8 +300,8 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
             </section>
 
             <section className={styles.block} aria-labelledby={`${titleId}-connect`}>
-              <h3 id={`${titleId}-connect`}>연결할 수 있는 저장소</h3>
-              {requestStore ? <AnalysisRequestSection store={requestStore} connectionNotice={connectionNotice} /> : connectSection}
+              <h3 id={`${titleId}-connect`}>저장소 등록과 분석 요청</h3>
+              {requestStore ? <AnalysisRequestSection store={requestStore} connectionNotice={connectionNotice} registration={registrationStore ?? undefined} /> : connectSection}
             </section>
 
             <footer className={styles.panelFooter}>
@@ -364,7 +372,7 @@ function ConnectedList({ connected, expanded, titleId, onToggle, onShowRepositor
                 {statusDetails(item.latest).map((line) => <p key={line}>{line}</p>)}
                 <p className={styles.muted}>마지막 갱신 {formatTime(item.latest.updatedAt)}</p>
                 {item.displayName === null && (
-                  <p className={styles.muted}>선정 목록에서 이 저장소의 이름을 찾지 못해 식별자로 표시합니다.</p>
+                  <p className={styles.muted}>등록 목록에서 이 저장소의 이름을 찾지 못해 식별자로 표시합니다.</p>
                 )}
                 {item.latest.retryAllowed && renderRetry?.(item.latest)}
                 {canShowCatches(item.latest) && (

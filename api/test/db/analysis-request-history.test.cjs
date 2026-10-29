@@ -22,10 +22,10 @@ const { readAnalysisStatus } = require('../../dist/analysis-intake/analysis-stat
 const { encodeHistoryCursor, parseHistoryQuery } = require('../../dist/analysis-intake/analysis-history');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
-const CONTRACT = resolve(__dirname, '../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design');
+const CONTRACT = resolve(__dirname, '../../../api/contracts/repository-analysis');
 const contract = file => YAML.parse(readFileSync(resolve(CONTRACT, file), 'utf8'));
 const common = contract('common.yaml');
-const memberApi = contract('member-api.yaml');
+const memberApi = YAML.parse(readFileSync(resolve(__dirname, '../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml'), 'utf8'));
 const ajv = new Ajv({ strict: false, allErrors: true });
 addFormats(ajv);
 // 회원 API의 `./common.yaml#` 참조를 공통 스키마와 같은 문서 안 참조로 바꿔 200 응답 스키마를 그대로 컴파일한다.
@@ -64,6 +64,7 @@ async function start(t) {
     }
   });
   app = await configureApp(await NestFactory.create(AppModule, { logger, abortOnError: false }));
+  require('../support/synthetic-daily-limit.cjs').bindSyntheticDailyLimit(app);
   await app.listen(0, '127.0.0.1');
   const base = await app.getUrl();
   const call = (path, options = {}) => fetch(base + path, { ...options, signal: AbortSignal.timeout(10000) });
@@ -95,7 +96,7 @@ async function insertRequest(memberId, { repositoryId = 'synthetic-history-repo'
   retryOfRequestId = null, ...attempt } = {}) {
   const [requestId, consentId, attemptId] = [randomUUID(), randomUUID(), randomUUID()];
   await db.transaction('READ COMMITTED', async manager => {
-    await manager.insert(AnalysisRequest, { requestId, memberId, repositoryId, consentId, currentAttemptId: attemptId,
+    await manager.insert(AnalysisRequest, { registrationId: await require('../support/registered-analysis.cjs').ensureRegistration(manager, { memberId, repositoryId }), requestId, memberId, repositoryId, consentId, currentAttemptId: attemptId,
       retryOfRequestId, submittedAt, updatedAt: submittedAt, lifecycle });
     await manager.insert(AnalysisConsent, { consentId, requestId, memberId, repositoryId, accepted: true,
       noticeRevision: SYNTHETIC_NOTICE.noticeRevision, scopeRevision: SYNTHETIC_NOTICE.scopeRevision,

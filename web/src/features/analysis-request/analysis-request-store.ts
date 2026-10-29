@@ -56,6 +56,7 @@ export const TEXT = {
   resentExisting: "이 저장소의 접수된 분석 요청을 확인했습니다. 이번 재전송으로 새 요청을 만들지 않았습니다.",
   unknown: "요청이 접수됐는지 확인하지 못했습니다. [같은 요청 다시 보내기]는 같은 요청을 다시 보내 결과를 확인합니다. 이미 접수됐다면 새 분석을 만들지 않습니다.",
   limited: "요청이 많아 이번 시도는 처리되지 않았습니다. [같은 요청 다시 보내기]로 같은 요청을 다시 보낼 수 있습니다.",
+  dailyLimit: "오늘의 분석 요청 한도에 도달했습니다. 한국 시간 기준 다음 날 다시 요청할 수 있습니다.",
   limitedUncertain: "요청이 많아 이번 시도는 처리되지 않았습니다. 앞선 요청이 접수됐는지는 아직 확인하지 못했습니다. [같은 요청 다시 보내기]로 결과를 확인해 주세요.",
   auth: "로그인이 필요합니다. 다시 로그인한 뒤 확인해 주세요.",
   inProgress: "다른 저장소의 분석이 진행 중이라 이번 요청은 접수되지 않았습니다. 진행 중인 분석이 끝난 뒤 다시 요청해 주세요.",
@@ -179,8 +180,8 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
       : null;
 
   /** 서버가 준 선정 목록 안에서만 고른다. */
-  function select(repositoryId: string) {
-    if (!editable() || !findRepository(repositoryId)) return;
+  function select(repositoryId: string | null) {
+    if (!editable() || (repositoryId !== null && !findRepository(repositoryId))) return;
     emit({ selectedId: repositoryId, message: null });
   }
 
@@ -252,6 +253,9 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
         emit({ ...reset, message: error(TEXT.github, "github") });
         return;
       case "REPOSITORY_NOT_ALLOWED":
+      case "REPOSITORY_PRIVATE":
+      case "REPOSITORY_UNSUPPORTED":
+      case "REPOSITORY_UNVERIFIED":
         emit({ ...reset, selectedId: null, message: error(TEXT.notAllowed) });
         void loadRepositories();
         return;
@@ -288,6 +292,10 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
     const result = await safely(() => options.requests.create(body, key));
     if (gen !== generation) return;
     if (result.kind === "success") return settle(result.data, isRetry);
+    if (result.kind === "api-error" && result.status === 429 && result.code === "DAILY_LIMIT_REACHED") {
+      releasePending();
+      return emit({ ...idle, selectedId: null, message: { tone: "error", text: TEXT.dailyLimit } });
+    }
     if (result.kind === "api-error" && result.status === 429) {
       // 이번 시도는 처리되지 않았지만, 앞선 불명 시도의 결과까지 확인된 것은 아니다. 키·본문과 uncertain은 유지한다.
       const seconds = "retryAfterSeconds" in result ? result.retryAfterSeconds : undefined;

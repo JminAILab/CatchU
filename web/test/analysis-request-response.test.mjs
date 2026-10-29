@@ -10,6 +10,7 @@ const status = () => ({
   submittedAt: '2026-10-19T00:00:00Z', updatedAt: '2026-10-19T09:00:00+09:00',
   requestState: 'ACCEPTED', lifecycle: 'ACTIVE', processing: 'QUEUED', application: 'NOT_READY', sourceMode: 'MOCK',
   eligibleCandidateCount: 0, registeredCatchIds: [], ownerResultsReady: false,
+  ownCommitObservation: 'UNKNOWN', observedOwnCommitCount: null, collectionLimitNotes: [],
   retry: { allowed: false, reason: 'IN_PROGRESS' }, failures: [],
 });
 const failure = () => ({ stage: 'COLLECTION', code: 'FAILED', message: '합성 실패', candidateId: 'candidate-1' });

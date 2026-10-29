@@ -18,7 +18,7 @@ import process from "node:process";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const DEPLOY = path.join(ROOT, "deploy");
-const CONTRACT = "/app/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design";
+const CONTRACT = "/app/api/contracts/repository-analysis";
 // 실행마다 다른 이름을 써서 다른 검사(다른 작업 폴더 포함)가 남긴 자원을 건드리지 않는다.
 const PROJECT = `catchu-check-${randomBytes(3).toString("hex")}`;
 const PORTS = { web: 23000, api: 23001, worker: 28000 };
@@ -30,8 +30,8 @@ const CONTEXT_ALLOWED = [
   "web/scripts/check-image-build-env.mjs",
   "api/package.json", "api/package-lock.json", "api/tsconfig.json", "api/tsconfig.build.json", "api/scripts/clean-dist.cjs", "api/src/",
   "worker/.python-version", "worker/pyproject.toml", "worker/uv.lock", "worker/app/", "worker/fixtures/m1-synthetic/",
-  "aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml",
-  "aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml",
+  "api/contracts/repository-analysis/common.yaml",
+  "api/contracts/repository-analysis/worker-messages.yaml",
 ];
 // 맥락 검사 미끼 파일. 허용한 폴더 안(.env·키)과 서비스 폴더의 허용하지 않은 자료를 함께 둔다. 모두 .gitignore 대상 이름이다.
 const DECOYS = ["web/.env.catchu-check", "web/src/.env.catchu-check", "api/src/catchu-check.pem", "worker/app/.env.catchu-check",

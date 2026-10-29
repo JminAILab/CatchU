@@ -2,7 +2,7 @@ const { join } = require('node:path');
 const { AnalysisReceiver } = require('../../dist/analysis-receiver/analysis-receiver.service');
 const { WorkerMessageValidator } = require('../../dist/analysis-receiver/worker-message.validator');
 
-const CONTRACT_DIR = join(__dirname, '../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design');
+const CONTRACT_DIR = join(__dirname, '../../../api/contracts/repository-analysis');
 const validator = new WorkerMessageValidator(CONTRACT_DIR);
 
 function context(overrides = {}) {
@@ -27,15 +27,16 @@ function candidate() {
 
 function result(overrides = {}) {
   return {
-    ...context(), schemaVersion: '1', messageId: 'result-message', resultId: 'test-result',
+    ...context(), schemaVersion: '2', messageId: 'result-message', resultId: 'test-result',
     outcome: 'SUCCEEDED', candidates: [candidate()], notProvided: [], failures: [],
+    ownCommitObservation: 'UNKNOWN', observedOwnCommitCount: null, collectionLimitNotes: [],
     finishedAt: '2026-09-29T01:00:00Z', ...overrides,
   };
 }
 
 function event(overrides = {}) {
   return {
-    schemaVersion: '1', messageId: 'event-message', requestId: 'test-request', attemptId: 'test-attempt',
+    schemaVersion: '2', messageId: 'event-message', requestId: 'test-request', attemptId: 'test-attempt',
     state: 'RUNNING', observedAt: '2026-09-29T00:59:00Z', ...overrides,
   };
 }

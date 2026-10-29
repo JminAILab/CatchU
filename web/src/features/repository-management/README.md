@@ -1,5 +1,15 @@
 # 저장소 연결 관리 (D, #153)
 
+## 현행 U7 직접 등록 — #424
+
+모달 상단의 이력·상태·Catch 보기·허용된 실패 재요청을 유지하고 하단은 공개 GitHub 주소 등록과 본인 등록 목록을 제공한다. `POST /me/repositories`로 등록한 뒤 현재 목록·고지를 읽고 선택한다. 등록만으로 접수하지 않으며 [동의하고 분석 요청]을 눌러야 새 동의로 접수한다. 비공개·지원 불가·확인 불가·주소 오류는 개별 안내와 입력 오류 연결(`aria-invalid`, `aria-describedby`)을 가진다.
+
+주소 초안과 분석 요청 객체는 같은 회원·내 자산 화면 수명에 묶인다. 닫기/재열기에서 유지하고 화면 이동·회원 변경에서 버린다. 닫기는 진행 중 등록을 취소하며 늦은 응답으로 선택하지 않는다. 등록 뒤 주소를 수정하면 이전 선택을 해제해 다시 등록 확인하도록 한다.
+
+상태의 NONE은 본인 커밋 없음, UNKNOWN은 관측 불명, FOUND는 본인 커밋 확인이며 후보 수와 다르다. 수집 한계와 부분 결과를 별도로 표시한다. 하루 제한은 한국 시간 다음 날 안내이며 남은 횟수를 표시하지 않는다. 응답 불명은 원래 키·본문을 유지한다. API 및 실제 실행 선행 조건은 [U7 등록·분석](../../../../api/docs/repository-analysis-u7.md)에 있다.
+
+`node --test test/repository-registration.test.mjs`는 상태 객체와 기존 TypeScript·React SSR로 실제 JSX의 등록 오류 연결·고지 가리기·조건별 안내를 검사한다. 미리보기 `/preview/repository-management`는 합성 응답이며 `registration=REPOSITORY_PRIVATE`, `REPOSITORY_UNSUPPORTED`, `REPOSITORY_UNVERIFIED`와 `intake=daily-limit`를 제공한다. 실제 화면 폭·키보드·초점은 별도 브라우저 검사로 확인한다.
+
 내 자산 Catch 탭 위쪽의 **GitHub 저장소 연결 관리** 영역과 모달이다. 정본은 [web 기능 설계 「내 자산 화면 구조」·「화면 상태 전이」](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md)이며, 상태 아이콘과 B 연결 방식은 [#153 입출력 제안](https://github.com/JminAILab/CatchU/issues/153#issuecomment-5868058724)을 따른다.
 
 ## 파일

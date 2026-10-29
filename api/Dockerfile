@@ -3,7 +3,7 @@
 #   docker build -f api/Dockerfile --target migration -t <migration 이미지> .
 # 비밀값·DB 접속값은 실행할 때 주입한다. 빌드 입력(ARG)·이미지에 넣지 않는다.
 ARG NODE_IMAGE=node:24.21.0-trixie-slim@sha256:173f125896c3b47ddf056734c7ea789d04595a6a08769a8f78e0df642781fb66
-ARG CONTRACT_DIR=aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design
+ARG CONTRACT_DIR=api/contracts/repository-analysis
 
 # 전체 의존성과 TypeScript 소스. 빌드와 migration 단계가 같은 잠금 파일·소스에서 출발한다.
 FROM ${NODE_IMAGE} AS source

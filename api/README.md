@@ -1,5 +1,7 @@
 # api — API 서버
 
+회원별 공개 저장소 직접 등록, 요청별 동의·하루 제한 소비 경계, 메시지 v2와 관측 상태는 [U7 등록·분석](docs/repository-analysis-u7.md)을 따른다. 이 문서에 DB 전환·양쪽 이미지 교체와 실제 실행 선행 조건도 정리했다.
+
 공유 링크 발급의 자동 통합 검사(`test/db/share-links-web-integration.test.cjs`)와 수동 재현 도구 `node scripts/verify-share-links-browser.cjs`의 실행 방법·판정 기준은 [#149 실행 안내](docs/share-links-integration-149.md)를 따른다. 실행 결과는 검증한 PR에 기록한다(첫 기록: [PR #266](https://github.com/JminAILab/CatchU/pull/266)).
 
 공개 선택·링크 수신자 열람의 화면 통합 검사(`test/integration/sharing-screen-web.test.cjs`)와 수동 확인 도구 `node scripts/verify-sharing-screen-browser.cjs`는 [#123 실행 안내](docs/sharing-screen-integration-123.md)를 따른다.
@@ -268,7 +270,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 아직 필요한 입력
 
-API↔worker의 메시지 형식은 [메시지 스키마 v1](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml), 수신 확인·상태 의미는 [worker 메시지 계약](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#w--worker-메시지-계약)과 [수신 업무 흐름](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)·[상태 전이 정본](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본)을 따른다. 실제 전달 방식은 아래 검증이 남아 있지만 이 계약에 따른 독립 구현·MOCK 검사는 진행할 수 있다.
+API↔worker의 메시지 형식은 [현행 메시지 스키마 v2](contracts/repository-analysis/worker-messages.yaml), 수신 확인·상태 의미는 [worker 메시지 계약](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#w--worker-메시지-계약)과 [수신 업무 흐름](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)·[상태 전이 정본](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본)을 따른다. 실제 전달 방식은 아래 검증이 남아 있지만 이 계약에 따른 독립 구현·MOCK 검사는 진행할 수 있다.
 
 | 필요한 입력                                               | 결정할 곳                                                                                        | 결정 전 가능한 작업                                                            |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |

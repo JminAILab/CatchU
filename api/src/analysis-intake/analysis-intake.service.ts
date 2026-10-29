@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { ApiError } from '../common/errors';
 import { GitHubConnectionService } from '../github-connection/github-connection.service';
@@ -9,7 +9,9 @@ import { MemberKindService } from '../member-analysis/member-kind';
 import { insertInitialAnalysis } from '../member-analysis/initial-analysis';
 import { isIdempotencyKey, runIdempotentCreation } from '../member-analysis/idempotent-creation';
 import { repositoryPage } from '../member-repositories/repository-page';
-import { RepositorySelectionService } from '../member-repositories/repository-selection.source';
+import { RepositoryRegistrationService, RegistrationSnapshot } from '../member-repositories/repository-registration.service';
+import { RepositoryRegistration } from '../member-repositories/repository-registration.entity';
+import { ANALYSIS_DAILY_RUN_LIMIT, AnalysisDailyRunLimit } from './daily-run-limit.consumer';
 import { AnalysisInput, analysisFingerprint, parseAnalysisInput } from './analysis-input';
 import { AnalysisNoticeService } from './analysis-notice';
 import { blocksReanalysis, readAnalysisStatus } from './analysis-status';
@@ -20,7 +22,8 @@ export class AnalysisIntakeService {
   private readonly logger = new Logger('AnalysisIntake');
   constructor(private readonly database: DataSource, private readonly connections: DevMemberService,
     private readonly notices: AnalysisNoticeService, private readonly members: MemberKindService,
-    private readonly selections: RepositorySelectionService, private readonly github: GitHubConnectionService) {}
+    private readonly selections: RepositoryRegistrationService, private readonly github: GitHubConnectionService,
+    @Optional() @Inject(ANALYSIS_DAILY_RUN_LIMIT) private readonly dailyLimit?: AnalysisDailyRunLimit) {}
 
   async notice(memberId: string) {
     if (!UUID.test(memberId)) throw new ApiError('AUTH_INVALID');
@@ -33,9 +36,9 @@ export class AnalysisIntakeService {
   }
 
   /** 회원 생성 출처로 접수 경로를 고른다(#322). 회원 행을 읽기 잠금해 커밋 전에 판정이 바뀌지 않게 한다. */
-  private async context(manager: EntityManager, memberId: string, input: AnalysisInput) {
+  private async context(manager: EntityManager, memberId: string, input: AnalysisInput, prepared?: RegistrationSnapshot) {
     const kind = await this.members.read(memberId, manager);
-    if (kind === 'REAL') return this.realContext(manager, memberId, input);
+    if (kind === 'REAL') return this.realContext(manager, memberId, input, prepared);
     // 미지원 출처는 실제 회원으로 보지 않고 기존 개발 회원 경계처럼 거부한다.
     if (kind !== 'DEVELOPMENT') throw new ForbiddenException();
     return this.developmentContext(manager, memberId, input);
@@ -44,13 +47,14 @@ export class AnalysisIntakeService {
    * 실제 회원(#323)은 개발 로그인 설정과 관계없이 #252 선정 근거를 같은 생성 manager로 재확인한다(회원 → 연결 → 선정 →
    * 범위 정의 읽기 잠금). 현재 실제 고지·범위 판본에 동의해야 하고, 원래 선정 참조를 담은 네 칸 동의로 LIVE 접수한다.
    */
-  private async realContext(manager: EntityManager, memberId: string, input: AnalysisInput) {
+  private async realContext(manager: EntityManager, memberId: string, input: AnalysisInput, prepared?: RegistrationSnapshot) {
     // 연동이 꺼진 서버는 보관 자격정보를 읽지 못해 #232 실행 조회가 거부하므로 남은 연결 행으로 LIVE 접수하지 않는다(403).
     this.github.requireAvailable();
-    const selection = await this.selections.confirmForIntake(manager, memberId, input.repositoryId);
+    if (!prepared) throw new ApiError('REPOSITORY_UNVERIFIED');
+    const selection = await this.selections.confirmForIntake(manager, memberId, input.repositoryId, prepared);
     if (input.consent.scopeRevision !== selection.scopeRevision ||
         input.consent.noticeRevision !== this.notices.real().noticeRevision) throw new ApiError('CONSENT_REQUIRED');
-    return { consentedScope: { ...selection.consentedScope }, sourceMode: 'LIVE' as const };
+    return { registrationId: selection.registrationId, consentedScope: { ...selection.consentedScope }, sourceMode: 'LIVE' as const };
   }
   /** 개발 회원은 #104 합성 연결·저장소만 MOCK으로 받는다. 실제 GitHub 연결이 섞이면 보정하지 않고 거부한다(500). */
   private async developmentContext(manager: EntityManager, memberId: string, input: AnalysisInput) {
@@ -63,7 +67,12 @@ export class AnalysisIntakeService {
     if (!repository) throw new ApiError('REPOSITORY_NOT_ALLOWED');
     if (input.consent.scopeRevision !== repository.allowedScopeRevision ||
         input.consent.noticeRevision !== this.notices.current().noticeRevision) throw new ApiError('CONSENT_REQUIRED');
-    return { consentedScope: this.notices.scope(repository.repositoryId, repository.allowedScopeRevision, connection.sourceMode),
+    let registration = await manager.findOneBy(RepositoryRegistration, { memberId, repositoryId: repository.repositoryId });
+    registration ??= await manager.save(Object.assign(new RepositoryRegistration(), { memberId, repositoryId: repository.repositoryId,
+      owner: repository.ownerLogin, name: repository.name, repositoryUrl: repository.url,
+      scopeRevision: repository.allowedScopeRevision, registeredAt: new Date(), lastVerifiedAt: new Date() }));
+    return { registrationId: registration.registrationId,
+      consentedScope: this.notices.scope(repository.repositoryId, repository.allowedScopeRevision, connection.sourceMode),
       sourceMode: 'MOCK' as const };
   }
   /**
@@ -73,12 +82,13 @@ export class AnalysisIntakeService {
    * 같은 키 요청이 겹치면 이 확인 뒤에 다른 요청이 먼저 접수할 수 있다. 그래서 갱신 실패는 던지지 않고 돌려주며,
    * 생성 트랜잭션이 멱등 잠금 안에서 새 접수로 판정한 때에만 알린다.
    */
-  private async refreshRealConnection(memberId: string, key: string | undefined): Promise<{ error: unknown } | null> {
+  private async refreshRealConnection(memberId: string, key: string | undefined, input: AnalysisInput):
+    Promise<{ error: unknown } | { prepared: RegistrationSnapshot } | null> {
     if (!isIdempotencyKey(key) || await this.members.read(memberId) !== 'REAL' ||
         await this.database.manager.existsBy(IdempotencyRecord, { memberId, operation: 'createAnalysisRequest', key })) return null;
     try {
       await this.github.refreshStatus(memberId);
-      return null;
+      return { prepared: await this.selections.prepareForIntake(memberId, input.repositoryId) };
     } catch (error) {
       return { error };
     }
@@ -90,7 +100,9 @@ export class AnalysisIntakeService {
   async create(memberId: string, key: string | undefined, raw: unknown) {
     if (!UUID.test(memberId)) throw new ApiError('AUTH_INVALID');
     const input = parseAnalysisInput(raw);
-    const refreshFailure = await this.refreshRealConnection(memberId, key);
+    const preparation = await this.refreshRealConnection(memberId, key, input);
+    const refreshFailure = preparation && 'error' in preparation ? preparation : null;
+    const prepared = preparation && 'prepared' in preparation ? preparation.prepared : undefined;
     let reusedActive = false;
     const result = await this.database.transaction('READ COMMITTED', manager => runIdempotentCreation(manager,
       { memberId, operation: 'createAnalysisRequest', key: key as string, requestFingerprint: analysisFingerprint(input) }, {
@@ -98,7 +110,7 @@ export class AnalysisIntakeService {
           // 새 접수로 판정됐을 때만 연결 상태 갱신 실패를 알린다. 같은 키 재전송은 아래 isSame에서 현재 상태로 답한다.
           if (refreshFailure) throw refreshFailure.error;
           await this.lockMember(same, memberId);
-          const { consentedScope, sourceMode } = await this.context(same, memberId, input);
+          const { registrationId, consentedScope, sourceMode } = await this.context(same, memberId, input, prepared);
           // 타인·없는 retry 참조는 같은 404. ACTIVE 처리로 숨겨 성공시키지 않는다.
           if (input.retryOfRequestId && (!UUID.test(input.retryOfRequestId) ||
               !await same.existsBy(AnalysisRequest, { requestId: input.retryOfRequestId, memberId, repositoryId: input.repositoryId }))) {
@@ -124,7 +136,12 @@ export class AnalysisIntakeService {
             const { status } = await readAnalysisStatus(same, memberId, latest.requestId);
             if (input.retryOfRequestId !== latest.requestId || !status.retry.allowed) throw new ApiError('RETRY_NOT_ALLOWED');
           } else if (input.retryOfRequestId) throw new ApiError('RETRY_NOT_ALLOWED');
-          const request = await insertInitialAnalysis(same, { memberId, repositoryId: input.repositoryId,
+          // 제공자가 없으면 한도를 무시한 실행을 만들지 않는다. U2 실제 조립은 별도로 검증한다.
+          if (!this.dailyLimit) throw new ApiError('INTERNAL_ERROR');
+          const consumed = await this.dailyLimit.consume(memberId, 'ANALYSIS', new Date(), same);
+          if (consumed === 'LIMIT_REACHED') throw new ApiError('DAILY_LIMIT_REACHED');
+          if (consumed !== 'ALLOWED') throw new ApiError('INTERNAL_ERROR');
+          const request = await insertInitialAnalysis(same, { memberId, repositoryId: input.repositoryId, registrationId,
             noticeRevision: input.consent.noticeRevision, scopeRevision: input.consent.scopeRevision,
             consentedScope, sourceMode, retryOfRequestId: input.retryOfRequestId ?? null });
           return { requestId: request.requestId, linkId: null, responseReference: request.requestId };
@@ -152,7 +169,7 @@ export class AnalysisIntakeService {
       const { request, attempt } = await readAnalysisStatus(manager, memberId, requestId);
       const consent = await manager.findOneByOrFail(AnalysisConsent, { consentId: request.consentId, requestId });
       if (attempt.sourceMode !== 'MOCK') throw new ApiError('CONSENT_REQUIRED');
-      return { schemaVersion: '1', messageId: randomUUID(), requestId, attemptId: attempt.attemptId, memberId,
+      return { schemaVersion: '2', messageId: randomUUID(), requestId, attemptId: attempt.attemptId, memberId,
         repositoryId: request.repositoryId, consentId: consent.consentId, noticeRevision: consent.noticeRevision,
         consentedAt: consent.consentedAt.toISOString(), allowedScope: consent.consentedScope,
         credentialContextReference: 'catchu:mock-credential:' + createHash('sha256').update(memberId).digest('hex'),

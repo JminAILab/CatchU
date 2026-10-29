@@ -13,6 +13,7 @@ const { SYNTHETIC_REPOSITORY } = require('../../dist/member-analysis/dev-member.
 const { GitHubConnection, MemberAccount } = require('../../dist/member-analysis/member-analysis.entity');
 const { DEV_LOGIN_IDENTITY_PREFIX, GOOGLE_IDENTITY_PREFIX, MemberKindService, memberKindOf } = require('../../dist/member-analysis/member-kind');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
+const { bindSyntheticDailyLimit } = require('../support/synthetic-daily-limit.cjs');
 
 // #322 본문 확정 문구(2026-10-17 팀장 확정)의 SHA-256. 문구를 바꾸면 판본과 이 값을 함께 바꾸고 반영 PR에서 팀장 승인을 받는다.
 const CONFIRMED_NOTICE_SHA256 = 'a99907b58e8feea585c64fbe15550460993fca7fc3423019a38896c1b391ce1f';
@@ -39,6 +40,7 @@ async function start(t, overrides = {}) {
     for (const [k, v] of Object.entries(previous)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   } });
   app = await configureApp(await NestFactory.create(AppModule, { logger, abortOnError: false }));
+  bindSyntheticDailyLimit(app);
   await app.listen(0, '127.0.0.1');
   const base = await app.getUrl();
   const call = (path, options) => fetch(base + path, { ...options, signal: AbortSignal.timeout(10000) });

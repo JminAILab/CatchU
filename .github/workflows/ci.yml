@@ -47,7 +47,7 @@ jobs:
           # PR은 GitHub이 만든 시험 병합 커밋이라 첫 부모(대상 브랜치)와 비교하면 그 PR의 변경 전체가 나온다.
           # push는 push 직전 커밋과 비교한다. 통합 브랜치에 Unit 여러 개를 합친 뒤 한 번에 올려도 바뀐 서비스를 모두 잡는다.
           # 브랜치를 처음 만든 push(직전 커밋이 0)나 직전 커밋을 이력에서 찾지 못하면 모든 서비스를 검사한다.
-          contract=aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/
+          contract=api/contracts/repository-analysis/
           web=false api=false worker=false deps=''
           base=HEAD^1
           case "$EVENT" in push) base=$BEFORE ;; esac

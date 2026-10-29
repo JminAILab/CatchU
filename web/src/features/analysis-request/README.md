@@ -1,5 +1,7 @@
 # 저장소 선택·동의·분석 요청과 실패 재요청 (D, #154)
 
+현행 U7은 [직접 주소 등록](../repository-management/README.md#현행-u7-직접-등록--424) 후 본인 등록을 고른다. 하단 제목은 「저장소 등록과 분석 요청」이다. 등록 완료와 접수는 별개이며 현재 고지·새 동의가 필요하다. `DAILY_LIMIT_REACHED`의 429는 확정된 하루 제한이므로 키를 놓고 한국 시간 다음 날 안내를 한다. 아래 빈도 제한의 `RATE_LIMITED` 429는 같은 키·본문을 유지한다. 관측 세 필드는 상태 응답에서 검사하며 NONE/UNKNOWN/FOUND와 수집 한계를 구분한다. 실제 고지 v1과 지문은 유지하며 [v2 문구 확정](../../../../api/docs/analysis-intake.md#현행-u7-직접-등록-접수와-고지-미결--424)이 실제 실행 전에 남아 있다.
+
 [저장소 연결 관리 모달](../repository-management/README.md)(#153) 아래쪽 **연결할 수 있는 저장소** 영역이다. 서버가 허용한 저장소를 고르고, 현재 분석 안내(고지)를 버튼 앞에 보인 뒤 **[동의하고 분석 요청]** 하나로 동의와 첫 요청을 보낸다. 정본은 [web 기능 설계 W2·「내 자산 화면 구조」](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md)와 [회원 API](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml)의 `GET /analysis-notice`·`POST /analysis-requests`, 서버 동작은 [api 분석 고지·접수](../../../../api/docs/analysis-intake.md)다.
 
 「연결된 저장소」의 허용된 실패에는 아코디언 안에 **[동의하고 다시 요청]**을 둔다(아래 「실패 재요청」). 첫 요청과 재요청은 같은 상태 객체가 맡아 한 번에 하나만 보내고, 접수·거부 결과에 따라 「연결된 저장소」를 실제 이력(#140)으로 다시 읽는다.

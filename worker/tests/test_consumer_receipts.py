@@ -33,7 +33,7 @@ LIMITS = replace(FAST, receipt_interval=0.01, receipt_window=0.3)
 
 def receipt(disposition: str, code: str, **changes: str) -> dict[str, str]:
     return {
-        "schemaVersion": "1",
+        "schemaVersion": "2",
         "messageId": "receipt-0001",
         "resultId": SENT["resultId"],
         "requestId": SENT["requestId"],

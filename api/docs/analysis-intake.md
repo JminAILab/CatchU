@@ -1,5 +1,16 @@
 # 분석 고지·접수·실패 재요청 — #138
 
+## 현행 U7 직접 등록 접수와 고지 미결 — #424
+
+실제 회원의 새 경로는 [U7 등록·분석](repository-analysis-u7.md)을 따른다. 아래 #323의 전역 선정 목록·네 칸 DB 동의 설명은 10월 구현 기록이다. 현행은 본인 등록과 서버 확인 좌표를 포함한 여섯 칸 불변 사본, 요청별 C-03 소비 경계를 사용한다. 기존 고지·멱등·두 실패 재요청 조건은 유지한다.
+
+`REAL_NOTICE` v1과 시험 지문은 변경하지 않았다. 현재 고지의 소유/커밋 사전 조건과 성공 재분석 시 Catch 전면 교체 문장은 U7 동작과 맞지 않는다. 다음은 **팀장 확인용 미확정 수정안**이며 승인·확정 문구가 아니다.
+
+- 직접 등록한 공개 저장소 하나를 읽고, 분석에서 연결 계정의 커밋을 확인합니다.
+- 확인된 실패에 한해 다시 요청할 수 있으며, 이미 생성된 Catch를 교체하는 재분석은 제공하지 않습니다.
+
+사용자 확인(2026-10-29)은 “아직 미확정 — 수정안을 남겨 주세요”였다. 팀장 이슈 문구 확정 → v2 판본·지문 동시 변경 → 반영 PR 팀장 승인 절차가 남아 있다. 실제 분석·출시 전에 이 미결을 해결해야 한다.
+
 ## 기준과 검증 범위
 
 [회원 API](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml)와 [접수·재요청 계약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#분석-접수상태재요청), [업무 규칙](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md)의 현재 판본을 따른다. 이슈에 연결된 9093d2e 판본 이후 제목 null·제목 고쳐 쓰기 등 변경을 확인했다. 제목만 없다고 실패 재요청을 허용하지 않으며 접수·동시성·실패 재요청 기준을 바꾸지 않는다.

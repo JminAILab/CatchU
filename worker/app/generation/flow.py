@@ -208,9 +208,7 @@ def run_generation(
     report.rewrite_calls = budget.rewrite_calls
     _log(request, report)
     return GenerationRun(
-        GenerationOutput(
-            candidates=candidates, not_provided=built.not_provided, failures=failures
-        ),
+        replace(built, candidates=candidates, failures=failures),
         report,
     )
 

@@ -208,20 +208,24 @@ test('E 수신 기록의 시도 유일성·복합 FK·지문 형식·엔티티 �
   const schema = 'e_metadata_' + randomUUID().replaceAll('-', '');
   await db.query('CREATE SCHEMA "' + schema + '"');
   const foundation = require('../../dist/member-analysis/member-analysis.entity');
+  const { RepositoryRegistration } = require('../../dist/member-repositories/repository-registration.entity');
+  const { AddRepositoryRegistration1793245460352 } = require('../../dist/database/migrations/1793245460352-AddRepositoryRegistration');
   const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
   const { CreateResultApplicationRecord1790550000000 } = require('../../dist/database/migrations/1790550000000-CreateResultApplicationRecord');
   const { AddAnalysisRequestHistoryIndex1792640486167 } = require('../../dist/database/migrations/1792640486167-AddAnalysisRequestHistoryIndex');
   const { CascadeMemberAnalysisOnDelete1792817978011 } = require('../../dist/database/migrations/1792817978011-CascadeMemberAnalysisOnDelete');
   const { CascadeResultApplicationOnDelete1792817978012 } = require('../../dist/database/migrations/1792817978012-CascadeResultApplicationOnDelete');
   const isolated = await openTestDataSource({ schema, extra: { options: '-c search_path=' + schema },
-    entities: [...Object.values(foundation).filter(v => typeof v === 'function'), ResultApplicationRecord, ShareLink],
+    entities: [...Object.values(foundation).filter(v => typeof v === 'function'), ResultApplicationRecord, ShareLink, RepositoryRegistration],
     migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000, CreateShareLink1790745895865,
-      AddAnalysisRequestHistoryIndex1792640486167, CascadeMemberAnalysisOnDelete1792817978011, CascadeResultApplicationOnDelete1792817978012] });
+      AddAnalysisRequestHistoryIndex1792640486167, CascadeMemberAnalysisOnDelete1792817978011, CascadeResultApplicationOnDelete1792817978012,
+      AddRepositoryRegistration1793245460352] });
   try {
     assert.deepEqual((await isolated.runMigrations()).map(m => m.name),
       ['CreateMemberAnalysisFoundation1790500000000', 'CreateResultApplicationRecord1790550000000', 'CreateShareLink1790745895865',
-        'AddAnalysisRequestHistoryIndex1792640486167', 'CascadeMemberAnalysisOnDelete1792817978011', 'CascadeResultApplicationOnDelete1792817978012']);
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 10);
+        'AddAnalysisRequestHistoryIndex1792640486167', 'CascadeMemberAnalysisOnDelete1792817978011', 'CascadeResultApplicationOnDelete1792817978012',
+        'AddRepositoryRegistration1793245460352']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 11);
     const diff = await isolated.driver.createSchemaBuilder().log();
     assert.deepEqual(diff.upQueries.map(q => q.query), []);
   } finally { await isolated.destroy(); await db.query('DROP SCHEMA "' + schema + '" CASCADE'); }
@@ -279,11 +283,13 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
       'CreateResultApplicationRecord1790550000000', 'CreateCatchAssets1790600000000', 'CreateRepositoryProtection1790601000000', 'CreateShareLink1790745895865',
       'CreateAuthSessions1791648335731', 'AllowNullCatchTitle1791784385918', 'AddCatchEvidencePosition1792029036359',
       'CreateRepositorySelection1792383899264', 'AddAnalysisRequestHistoryIndex1792640486167', 'CascadeMemberAnalysisOnDelete1792817978011',
-      'CascadeResultApplicationOnDelete1792817978012', 'CascadeAuthSessionsOnDelete1792817978013', 'CascadeCatchAssetsOnDelete1792817978014']);
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 18);
+      'CascadeResultApplicationOnDelete1792817978012', 'CascadeAuthSessionsOnDelete1792817978013', 'CascadeCatchAssetsOnDelete1792817978014',
+      'AddRepositoryRegistration1793245460352']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 19);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
+    await isolated.undoLastMigration(); // U7 회원별 등록·불변 사본 참조
     for (let i = 0; i < 4; i++) await isolated.undoLastMigration(); // #387 B·세션·E 수신·회원 분석 연쇄 삭제
     assert.deepEqual((await isolated.query(`SELECT DISTINCT confdeltype FROM pg_constraint WHERE contype = 'f'
       AND connamespace = $1::regnamespace`, [schema])).map(r => r.confdeltype), ['a']);

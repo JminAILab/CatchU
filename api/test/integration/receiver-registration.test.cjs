@@ -38,7 +38,7 @@ function fill(value, context) {
 // 접수 API(#138)를 대신한 준비만 한다. 수신 행/보호 판단/Catch는 미리 넣지 않는다.
 async function prepare(file, options = {}) {
   const context = { requestId: randomUUID(), attemptId: randomUUID(), consentId: randomUUID(),
-    memberId: options.memberId ?? randomUUID(), repositoryId: 'synthetic-repository',
+    memberId: options.memberId ?? randomUUID(), repositoryId: options.sourceMode === 'LIVE' ? '123456' : 'synthetic-repository',
     scopeRevision: 'synthetic-scope', caseId: options.caseId ?? randomUUID() };
   const result = fill(template(file), context);
   result.sourceMode = options.sourceMode ?? 'MOCK';
@@ -47,8 +47,12 @@ async function prepare(file, options = {}) {
   }
   await db.transaction(async manager => {
     await manager.query("INSERT INTO member_account VALUES ($1,$2,'ACTIVE') ON CONFLICT DO NOTHING", [context.memberId, 'fixture:' + context.memberId]);
-    await manager.insert(AnalysisRequest, { ...context, currentAttemptId: context.attemptId, submittedAt: new Date(), updatedAt: new Date() });
-    await manager.insert(AnalysisConsent, { ...context, accepted: true, noticeRevision: 'fixture', consentedScope: { synthetic: true }, consentedAt: new Date() });
+    const registrationId = await require('../support/registered-analysis.cjs').ensureRegistration(manager, context);
+    await manager.insert(AnalysisRequest, { ...context, registrationId, currentAttemptId: context.attemptId, submittedAt: new Date(), updatedAt: new Date() });
+    const consentedScope = result.sourceMode === 'LIVE' ? { revision: context.scopeRevision, repositoryId: context.repositoryId,
+      registrationId, selectionReference: registrationId, allowedResourceTypes: ['COMMIT', 'PULL_REQUEST', 'ISSUE'],
+      repository: { owner: 'synthetic-owner', name: 'synthetic-repo', url: 'https://github.com/synthetic-owner/synthetic-repo' } } : { synthetic: true };
+    await manager.insert(AnalysisConsent, { ...context, accepted: true, noticeRevision: 'fixture', consentedScope, consentedAt: new Date() });
     await manager.insert(AnalysisAttempt, { attemptId: context.attemptId, requestId: context.requestId, sourceMode: result.sourceMode });
   });
   return result;

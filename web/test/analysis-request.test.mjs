@@ -16,6 +16,7 @@ const status = (repositoryId, overrides = {}) => ({
   submittedAt: '2026-10-18T01:00:00Z', updatedAt: '2026-10-18T01:00:00Z',
   requestState: 'ACCEPTED', lifecycle: 'ACTIVE', processing: 'QUEUED', application: 'NOT_READY', sourceMode: 'MOCK',
   eligibleCandidateCount: 0, registeredCatchIds: [], ownerResultsReady: false,
+  ownCommitObservation: 'UNKNOWN', observedOwnCommitCount: null, collectionLimitNotes: [],
   retry: { allowed: false, reason: 'IN_PROGRESS' }, failures: [], ...overrides,
 });
 const http = (status, data) => ({ kind: 'success', status, data });
