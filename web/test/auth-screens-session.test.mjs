@@ -476,6 +476,9 @@ test('화면 재인증 안내 위치: 스크롤 영역 위쪽에 붙고, 안내�
   assert.match(rule, /top: 0;/, '스크롤 영역 경계에 바로 붙어 뒤 내용이 틈으로 비치지 않는다');
   assert.match(rule, /margin-bottom: 8px;/, '맨 위에서는 아래 여백이 그림자를 받아 헤더에 걸치지 않는다');
   assert.doesNotMatch(rule, /position: fixed/, '흐름 밖으로 빼서 헤더·입력을 덮지 않는다');
+  assert.match(css, /@media \(width < 760px\) \{\s*\.reauthNotice \{\s*justify-content: flex-start;\s*\}\s*\}/,
+    '760px 미만에서만 [다시 로그인]을 문구 바로 뒤에 둔다(#437 리뷰 안 A)');
+  assert.doesNotMatch(rule, /justify-content/, '760px 이상은 공용 .notice의 배치(space-between) 그대로다');
   assert.match(css, /:root:has\(\.reauthNotice:not\(dialog \.reauthNotice\)\),\s*dialog:has\(\.reauthNotice\) \{\s*overflow-anchor: none;/,
     '안내가 나타날 때 화면을 안내 높이만큼 내려 위쪽 입력을 안내 밑으로 넣지 않는다');
   assert.match(css, /:root:has\(dialog\[open\] \.reauthNotice\) \.reauthNotice:not\(dialog \.reauthNotice\) \{\s*visibility: hidden;/,
