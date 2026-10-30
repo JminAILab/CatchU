@@ -99,8 +99,9 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
   });
   return {
     request, closed, logs: () => output, secret, port,
-    async ready() {
-      for (let attempt = 0; attempt < 200; attempt++) {
+    /** 50ms 간격으로 attempts번(기본 약 10초) /health를 기다린다. */
+    async ready(attempts = 200) {
+      for (let attempt = 0; attempt < attempts; attempt++) {
         if (child.exitCode !== null || child.signalCode !== null) {
           assert.fail('main 진입점이 정상 기동 전에 종료됨');
         }
@@ -116,10 +117,12 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
   };
 }
 
+// 개발 소스 실행은 기동 때 TypeScript를 컴파일해 앱 모듈이 늘수록 느려진다(CI 10초 안팎, #431에서 상한을 넘음).
+// 소스 실행만 약 25초까지 기다린다. 확인하는 내용은 빌드 실행과 같다.
 for (const source of [false, true]) {
-  test(`${source ? '개발 소스' : '빌드'} main: env 파일의 인증 설정으로 기동·발급·종료`, { timeout: 15000 }, async (t) => {
+  test(`${source ? '개발 소스' : '빌드'} main: env 파일의 인증 설정으로 기동·발급·종료`, { timeout: source ? 30000 : 15000 }, async (t) => {
     const server = await launch(t, { source });
-    await server.ready();
+    await server.ready(source ? 500 : undefined);
     const response = await server.request('/v1/auth/dev-login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ memberId: 'bootstrap-member' }),
