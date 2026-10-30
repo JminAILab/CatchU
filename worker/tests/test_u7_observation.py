@@ -4,11 +4,19 @@ from dataclasses import replace
 from typing import Literal
 
 import pytest
-from candidate_scenarios import ROOT, Scenario, commit, root_commit, run_case
-from github_synthetic import MEMBER, OTHER, sha
+from candidate_scenarios import (
+    ROOT,
+    Pull,
+    Scenario,
+    commit,
+    live_request,
+    root_commit,
+    run_case,
+)
+from github_synthetic import MEMBER, OTHER, oversized, pull_commits_path, respond, sha
 
 from app.collection import CollectionOutcome, GitHubAccount
-from app.collection.records import CoverageLimit
+from app.collection.records import CoverageLimit, DetailStatus
 from app.processing import GenerationOutput
 
 
@@ -16,6 +24,119 @@ def test_complete_no_own_commit_is_none() -> None:
     run = run_case(Scenario(default_branch=(root_commit(),)))
     assert run.result["ownCommitObservation"] == "NONE"
     assert run.result["observedOwnCommitCount"] == 0
+    assert run.result["candidates"] == []
+
+
+@pytest.mark.parametrize("known_own", [False, True])
+@pytest.mark.parametrize(
+    "status", [DetailStatus.OVERSIZED, DetailStatus.REVISION_MISMATCH]
+)
+def test_unread_pr_commits_preserve_uncertainty_and_confirmed_own_commits(
+    status: DetailStatus, known_own: bool
+) -> None:
+    unread = commit(sha(2), MEMBER, parents=(ROOT,))
+    known = commit(sha(4), MEMBER, parents=(ROOT,))
+    pull = Pull(
+        10,
+        OTHER,
+        commits=(unread,),
+        state="open",
+        head=sha(3) if status is DetailStatus.REVISION_MISMATCH else None,
+    )
+    run = run_case(
+        Scenario(
+            default_branch=(known, root_commit()) if known_own else (root_commit(),),
+            pulls=(pull,),
+            lookups={known.sha: ()} if known_own else {},
+            overrides=(
+                {pull_commits_path(10): oversized()}
+                if status is DetailStatus.OVERSIZED
+                else {}
+            ),
+        ),
+        request=live_request("COMMIT", "PULL_REQUEST"),
+    )
+    assert run.outcome.completed
+    assert run.outcome.failures == ()
+    assert run.outcome.coverage_limits == ()
+    assert run.outcome.relations is not None
+    (listing,) = run.outcome.relations.pull_request_commits
+    assert listing.status is status
+    assert not listing.complete
+    assert listing.commits == ()
+    assert run.result["ownCommitObservation"] == ("FOUND" if known_own else "UNKNOWN")
+    assert run.result["observedOwnCommitCount"] == (1 if known_own else None)
+    assert run.result["collectionLimitNotes"]
+
+
+@pytest.mark.parametrize("known_own", [False, True])
+def test_partial_pr_commits_keep_listing_limit_and_confirmed_own_commit(
+    known_own: bool,
+) -> None:
+    # 포크 PR의 250건 상한: 받은 목록 안의 본인 커밋은 여전히 유효하다.
+    commits = tuple(
+        commit(
+            sha(3000 + index),
+            MEMBER if known_own and index == 0 else OTHER,
+            parents=(ROOT if index == 0 else sha(2999 + index),),
+        )
+        for index in range(250)
+    )
+    run = run_case(
+        Scenario(
+            default_branch=(root_commit(),),
+            pulls=(Pull(10, OTHER, commits=commits, state="open", fork=True),),
+            overrides={
+                pull_commits_path(10, page): respond(
+                    [entry.item for entry in commits[start : start + 100]],
+                    next_page=page < 3,
+                )
+                for page, start in enumerate(range(0, 250, 100), 1)
+            },
+        ),
+        request=live_request("COMMIT", "PULL_REQUEST"),
+    )
+    assert run.outcome.completed
+    assert run.outcome.failures == ()
+    assert run.outcome.coverage_limits == ()
+    assert run.outcome.relations is not None
+    (listing,) = run.outcome.relations.pull_request_commits
+    assert listing.status is DetailStatus.FETCHED
+    assert not listing.complete
+    assert listing.limits
+    assert len(listing.commits) == 250
+    assert run.result["ownCommitObservation"] == ("FOUND" if known_own else "UNKNOWN")
+    assert run.result["observedOwnCommitCount"] == (1 if known_own else None)
+    assert set(listing.limits) <= set(run.result["collectionLimitNotes"])
+
+
+@pytest.mark.parametrize("empty_listing", [False, True])
+def test_complete_pr_without_own_commits_is_none(empty_listing: bool) -> None:
+    commits = () if empty_listing else (commit(sha(2), OTHER, parents=(ROOT,)),)
+    run = run_case(
+        Scenario(
+            default_branch=(root_commit(),),
+            pulls=(
+                Pull(
+                    10,
+                    OTHER,
+                    commits=commits,
+                    state="open",
+                    head=ROOT if empty_listing else None,
+                    base_sha=ROOT,
+                ),
+            ),
+        ),
+        request=live_request("COMMIT", "PULL_REQUEST"),
+    )
+    assert run.outcome.relations is not None
+    (listing,) = run.outcome.relations.pull_request_commits
+    assert listing.status is DetailStatus.FETCHED
+    assert listing.complete
+    assert listing.limits == ()
+    assert run.result["ownCommitObservation"] == "NONE"
+    assert run.result["observedOwnCommitCount"] == 0
+    assert run.result["collectionLimitNotes"] == []
     assert run.result["candidates"] == []
 
 

@@ -106,6 +106,11 @@ class CollectionOutcome:
             and self.linked_account.same_account(record.author)
         }
         notes = list(dict.fromkeys(limit.message for limit in self.coverage_limits))
+        if self.relations is not None:
+            for listing in self.relations.pull_request_commits:
+                notes.extend(listing.limits)
+                if listing.status is not DetailStatus.FETCHED or not listing.complete:
+                    notes.append("PR 커밋 목록을 완전히 확인하지 못했습니다.")
         if self.failures:
             notes.append("수집이 중단되어 필요한 조회를 끝내지 못했습니다.")
         if any(record.author is None for record in records):
@@ -117,6 +122,7 @@ class CollectionOutcome:
         )
         if not checked and not notes:
             notes.append("본인 커밋 확인에 필요한 조회의 완료를 확인하지 못했습니다.")
+        notes = list(dict.fromkeys(notes))
         if len(notes) > 100:
             notes = [*notes[:99], "추가 수집 한계가 있습니다."]
         safe_notes = tuple(note[:500] for note in notes)
