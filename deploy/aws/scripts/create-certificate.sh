@@ -8,6 +8,7 @@
 # 인자 없이 실행하면 확인만 한다. 깨끗할 때 한 번 만드는 용도라 catchu.dev 인증서가 상태와 관계없이 하나라도 있으면 멈춘다.
 # 요청 뒤 검증 기록을 넣기 전에 멈췄으면 aws acm delete-certificate --certificate-arn <ARN> --profile catchu --region ap-northeast-2로
 # 지우고 다시 실행한다(ARN은 aws acm list-certificates로 찾는다). 기다리다 멈췄으면 다시 실행하지 말고 상태를 본다(멈출 때 찍는 명령).
+# 상태가 FAILED면 인증서를 지우고 원인(DNS 위임·CAA 기록)을 본 뒤 다시 실행한다.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 . "$here/lib/guard.sh"
@@ -68,7 +69,7 @@ catchu_info "검증 기록(CNAME): 넣음"
 
 # acm 대기 명령은 60초 간격으로 40번(40분) 본다.
 catchu_wait 1 acm wait certificate-validated --certificate-arn "$arn" ||
-  catchu_die "40분 안에 발급되지 않았다. 다시 실행하지 말고 aws acm list-certificates --profile catchu --region ap-northeast-2로 상태를 본다"
+  catchu_die "발급되지 않았다(40분이 지났거나 검증이 실패함). 다시 실행하지 말고 aws acm list-certificates --profile catchu --region ap-northeast-2로 상태를 본다"
 
 catchu_info "확인 값:"
 aws_catchu acm describe-certificate --certificate-arn "$arn" --output json |
