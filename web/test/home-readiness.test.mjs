@@ -75,7 +75,8 @@ test('GitHub 연결됨 + 접수 이력 있음(true)은 준비 완료로 단계 �
   assert.equal(view.readiness, 'ready');
   assert.equal(view.step, null);
   assert.deepEqual(view.action, { kind: 'link', label: '내 자산으로 가기', href: '/assets' });
-  assert.equal(view.title, '분석 요청 내역은 내 자산에서 확인해 보세요.', '문구는 #155 제안');
+  assert.equal(view.title, '분석 요청 내역은 내 자산의 저장소 연결 관리에서 확인해 보세요', '문구는 #155 제안, 위치는 #438 리뷰 반영');
+  assert.doesNotMatch(view.title, /[.。]$/, '다른 단계 제목처럼 마침표 없이 끝낸다');
   assert.equal(view.description, null, '제목 한 줄만 둔다');
   for (const key of ['status', 'title']) assert.notEqual(view[key], before[key], key);
   assert.doesNotMatch(view.title, /완료|분석할 수 있|분석 가능/, '이력 있음은 분석 완료나 지금 분석 가능을 뜻하지 않는다');

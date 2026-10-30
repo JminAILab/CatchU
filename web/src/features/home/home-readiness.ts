@@ -111,7 +111,7 @@ export function homeView(lookup: HomeLookup, startBlockedReason: string | null):
         readiness: "ready",
         status: "GitHub 연결됨 · 레포 연결됨",
         step: null,
-        title: "분석 요청 내역은 내 자산에서 확인해 보세요.",
+        title: "분석 요청 내역은 내 자산의 저장소 연결 관리에서 확인해 보세요",
         description: null,
         action: { kind: "link", label: "내 자산으로 가기", href: routes.assets },
       };
