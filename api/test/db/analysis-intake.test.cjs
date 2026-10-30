@@ -32,6 +32,7 @@ async function start(t, overrides = {}) {
   const settings = { NODE_ENV: 'test', DEV_LOGIN_ENABLED: 'true', AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
     AUTH_ACCESS_TOKEN_TTL_SECONDS: '900', AUTH_WEB_ORIGIN: 'https://catchu.example',
     SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key', // 운영 모드 기동에 필요한 합성 임베딩 키(#431)
     CORS_ALLOWED_ORIGINS: undefined, ...overrides };
   const previous = Object.fromEntries(Object.keys(settings).map(k => [k, process.env[k]]));
   for (const [k,v] of Object.entries(settings)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }

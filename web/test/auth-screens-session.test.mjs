@@ -316,19 +316,49 @@ test('재인증 [다시 로그인]: 이동을 시작하지 못한 예상 밖 예
   assert.deepEqual(navigated, ['/links']);
 });
 
-test('이동 전 확인 문구: 입력만이면 기존 문구 그대로이고, 분석 요청이 들면 요청 확인 정보가 사라지지만 이미 보낸 요청은 취소되지 않는다고 알린다', () => {
-  assert.equal(M.logoutUnsavedConfirm, '저장하지 않은 입력이 있습니다. 로그아웃하면 입력한 내용이 사라집니다. 로그아웃하시겠습니까?');
-  assert.equal(M.reauthUnsavedConfirm, '다시 로그인하면 입력하던 내용이 사라질 수 있습니다. 로그인 화면으로 이동하시겠습니까?');
-  for (const message of [M.logoutRequestConfirm, M.logoutUnsavedRequestConfirm, M.reauthRequestConfirm, M.reauthUnsavedRequestConfirm]) {
-    assert.ok(message.includes('이 화면의 요청 확인 정보가 사라집니다.'), message);
-    assert.ok(message.includes('이미 보낸 분석 요청은 취소되지 않습니다.'), message);
+test('이동 전 확인 문구: 사라지는 것 → 이미 보낸 분석 요청은 취소되지 않음(분석 요청이 들 때) → 빈 줄 뒤 확인 질문 순서다', () => {
+  for (const { reasons, logout, reauth } of LEAVE_CASES.slice(1)) {
+    const hasRequest = reasons.includes(REQUEST);
+    for (const [message, question] of [[logout, '로그아웃하시겠습니까?'], [reauth, '로그인 화면으로 이동하시겠습니까?']]) {
+      const [body, asked, ...rest] = message.split('\n\n');
+      assert.deepEqual([asked, rest], [question, []], message);
+      const lines = body.split('\n');
+      assert.ok(lines[0].endsWith('사라집니다.'), message);
+      assert.equal(lines[0].includes('저장하지 않은 입력'), reasons.includes(INPUT), message);
+      assert.equal(lines[0].includes('이 화면의 분석 요청 확인 정보'), hasRequest, message);
+      assert.deepEqual(lines.slice(1), hasRequest ? ['이미 보낸 분석 요청은 취소되지 않습니다.'] : [], message);
+    }
   }
-  for (const message of [M.logoutUnsavedRequestConfirm, M.reauthUnsavedRequestConfirm]) assert.ok(message.includes('저장하지 않은 입력'), message);
 });
 
-test('안내 문구: 합의 문구를 그대로 쓰고 code·state·토큰 같은 값을 담지 않는다', () => {
-  assert.equal(M.logoutUnknownRetry, '로그아웃이 완료됐는지 확인하지 못했습니다. 다시 시도해 주세요.');
-  assert.equal(M.googleUnavailable, '지금은 Google 로그인을 사용할 수 없습니다.');
+/** #251 기록의 합의 문구(D 검토안의 「수정 제안」, 「유지」는 그 전 문구). 검토 표의 `<br>`은 `\n`이다. */
+const AGREED_MESSAGES = {
+  logoutUnknownRetry: '로그아웃이 완료됐는지 확인하지 못했습니다. 다시 시도해 주세요.',
+  logoutUnknown: '로그아웃이 완료됐는지 확인하지 못했습니다.',
+  googleUnavailable: '지금은 Google 로그인을 사용할 수 없습니다.',
+  googleCancelled: 'Google 로그인을 취소했습니다.',
+  startLoginFailed: '로그인하지 못했습니다. 다시 시도해 주세요.',
+  callbackLoginFailed: '로그인하지 못했습니다. 다시 로그인해 주세요.',
+  startNetworkFailed: '네트워크 연결을 확인한 뒤 다시 시도해 주세요.',
+  callbackNetworkFailed: '네트워크 연결을 확인한 뒤 다시 로그인해 주세요.',
+  reauthRequired: '로그인 상태를 확인할 수 없습니다. 다시 로그인해 주세요.',
+  logoutFailedRetry: '로그아웃하지 못했습니다. 다시 시도해 주세요.',
+  logoutFailed: '로그아웃하지 못했습니다.',
+  callbackAlreadySent: '로그인 결과를 확인하지 못했습니다. 다시 로그인해 주세요.',
+  callbackAttemptUnverified: '로그인 정보를 확인할 수 없습니다. 다시 로그인해 주세요.',
+  callbackChecking: 'Google 로그인을 확인하고 있습니다.',
+  googleStarting: 'Google로 이동하는 중',
+  logoutPending: '로그아웃하는 중',
+  logoutUnsavedConfirm: '저장하지 않은 입력이 사라집니다.\n\n로그아웃하시겠습니까?',
+  logoutRequestConfirm: '이 화면의 분석 요청 확인 정보가 사라집니다.\n이미 보낸 분석 요청은 취소되지 않습니다.\n\n로그아웃하시겠습니까?',
+  logoutUnsavedRequestConfirm: '저장하지 않은 입력과 이 화면의 분석 요청 확인 정보가 사라집니다.\n이미 보낸 분석 요청은 취소되지 않습니다.\n\n로그아웃하시겠습니까?',
+  reauthUnsavedConfirm: '저장하지 않은 입력이 사라집니다.\n\n로그인 화면으로 이동하시겠습니까?',
+  reauthRequestConfirm: '이 화면의 분석 요청 확인 정보가 사라집니다.\n이미 보낸 분석 요청은 취소되지 않습니다.\n\n로그인 화면으로 이동하시겠습니까?',
+  reauthUnsavedRequestConfirm: '저장하지 않은 입력과 이 화면의 분석 요청 확인 정보가 사라집니다.\n이미 보낸 분석 요청은 취소되지 않습니다.\n\n로그인 화면으로 이동하시겠습니까?',
+};
+
+test('안내 문구: #251 기록의 합의 문구를 글자 그대로 쓰고 code·state·토큰 같은 값을 담지 않는다', () => {
+  assert.deepEqual({ ...M }, AGREED_MESSAGES);
   assert.equal(logoutNotice('done', true), null);
   for (const message of Object.values(M)) {
     assert.equal(typeof message, 'string');

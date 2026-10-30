@@ -54,7 +54,7 @@ const result = await aiRun.enqueueAfterCommit('BASE_SUMMARY', `BASE_SUMMARY-${pu
 
 ## 조립과 수명
 
-- `AiRunModule`은 기본 앱(`AppModule`)에 넣지 않는다. 쓰는 Unit의 모듈이 `imports`에 넣으면 같은 AiRun 하나를 함께 쓴다.
+- `AiRunModule`은 기본 앱(`AppModule`)에 넣지 않는다. 쓰는 Unit의 모듈이 `imports`에 넣으면 같은 AiRun 하나를 함께 쓴다. 지금은 U3 `PublishedIndexModule`이 기본 앱에 들어 있어(#431) api마다 AiRun이 함께 뜬다.
 - 큐 주소가 없으면 연결하지 않는다. 등록은 모두 `ENQUEUE_FAILED`(`QUEUE_NOT_CONFIGURED`)이고, 상태는 처리 시한으로 FAILED가 된다. 주소가 틀리면 기동이 멈춘다(10월 판정 그대로).
 - 큐 주소가 있으면 앱 기동이 끝난 뒤(모든 모듈의 처리기 등록 뒤) 소비를 시작하고, 앱 종료 때 처리 중 작업을 15초까지 기다린 뒤 연결을 닫는다.
 - **개발 서버(EC2)에는 지금 큐 주소가 없다**([분석 큐 「어디서 켜는가」](analysis-queue.md)). 그대로면 U3·U5·U10의 백그라운드 실행은 개발 서버에서 모두 처리 시한으로 FAILED가 된다. 개발 서버에 큐를 연결하는 일은 팀장 공용 기반 작업이다.

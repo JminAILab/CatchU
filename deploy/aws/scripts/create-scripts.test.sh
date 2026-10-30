@@ -48,7 +48,7 @@ if [ "$svc $op" = "${STUB_FAIL:-}" ]; then
   exit 254
 fi
 mutating=0
-case "$op" in create-* | modify-* | put-* | authorize-* | check-capacity) mutating=1 ;; esac
+case "$op" in create-* | modify-* | put-* | authorize-* | check-capacity | subscribe | publish | set-topic-attributes) mutating=1 ;; esac
 if [ "$mutating" = 1 ]; then
   printf '%s\n' "$all" >> "$S/calls"
   # 비밀값을 넘긴 입력 파일이 있으면 값을 기록해 둔다(출력에 새지 않았는지 보려고).
@@ -101,6 +101,25 @@ case "$svc $op" in
   "ssm describe-parameters") case "$all" in *auth-token*) echo "${STUB_TOKEN_COUNT:-1}" ;; *) echo "${STUB_KEY_COUNT:-0}" ;; esac ;;
   "ssm get-parameter") echo "${STUB_TOKEN:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}" ;;
   "sns list-topics") echo "${STUB_TOPIC:-None}" ;;
+  "sns create-topic") echo arn:aws:sns:ap-northeast-2:123456789012:catchu-alerts ;;
+  "sns subscribe") echo 'pending confirmation' ;;
+  "sns list-subscriptions-by-topic") echo "${STUB_CONFIRMED:-1}" ;;
+  "sns publish") echo 01234567-89ab-cdef-0123-456789abcdef ;;
+  "sns get-topic-attributes")
+    # 고친 정책이 있으면 그것을, 없으면 새 주제의 기본 정책(aws:SourceAccount 조건)을 돌려준다. STUB_TOPIC_POLICY로 바꿀 수 있다.
+    if [ -s "$S/topic-policy" ]; then cat "$S/topic-policy"; exit 0; fi
+    echo "${STUB_TOPIC_POLICY:-$(jq -cn '{Version: "2008-10-17", Statement: [{Sid: "__default_statement_ID", Effect: "Allow", Principal: {AWS: "*"},
+      Action: ["SNS:Publish", "SNS:Subscribe"], Resource: "arn:aws:sns:ap-northeast-2:123456789012:catchu-alerts",
+      Condition: {StringEquals: {"AWS:SourceAccount": "123456789012"}}}]}')}" ;;
+  "sns set-topic-attributes")
+    i=0
+    while [ "$i" -lt "${#args[@]}" ]; do
+      [ "${args[$i]}" = --attribute-value ] && printf '%s\n' "${args[$((i + 1))]}" > "$S/topic-policy"
+      i=$((i + 1))
+    done ;;
+  "cloudwatch describe-alarms") case "$all" in *length*) echo "${STUB_ALARM_COUNT:-0}" ;; *) echo '{"MetricAlarms":[]}' ;; esac ;;
+  "logs describe-log-groups") case "$all" in *length*) echo "${STUB_LOG_GROUP_COUNT:-0}" ;; *) echo '{"logGroups":[{"logGroupName":"/catchu/eks/app","retentionInDays":14}]}' ;; esac ;;
+  "elbv2 describe-target-groups") echo "${STUB_LB_ARNS:-arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/k8s-catchu-0123456789/0123456789abcdef${tab}arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/k8s-catchu-0123456789/0123456789abcdef}" ;;
   "efs describe-file-systems")
     case "$all" in
       *--creation-token*) echo "${STUB_FS:-None}" ;;
@@ -127,6 +146,12 @@ cat > "$BIN/kubectl" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
   "config view"*) echo "${STUB_SERVER:-https://SYNTHETIC.eks.example}" ;;
+  "-n catchu get targetgroupbindings -o json")
+    # STUB_TGB가 있으면 그것을, 없으면 api·web 대상 그룹 하나씩을 돌려준다.
+    if [ -n "${STUB_TGB:-}" ]; then printf '%s\n' "$STUB_TGB"; exit 0; fi
+    tg=arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:targetgroup
+    jq -cn --arg a "$tg/k8s-catchu-api-0123456789/0123456789abcdef" --arg w "$tg/k8s-catchu-web-0123456789/fedcba9876543210" \
+      '{items: [{spec: {serviceRef: {name: "api"}, targetGroupARN: $a}}, {spec: {serviceRef: {name: "web"}, targetGroupARN: $w}}]}' ;;
   "version --client -o json") echo '{"clientVersion":{"gitVersion":"v1.37.1"}}' ;;
 esac
 EOF
@@ -222,8 +247,8 @@ run_sut env AWS_REGION=us-east-1 bash "$P/create-waf.sh"
 check "AWS_REGION이 다르면 멈춤" "$(ok test "$rc" = 1 -a ! -s "$S/seen")"
 run_sut env CATCHU_EXPECTED_ACCOUNT= bash "$P/create-waf.sh"
 check "기대 계정 번호가 없으면 멈춤" "$(ok test "$rc" = 1 -a "$(grep -c '기대 계정 번호가 없다' "$OUT")" = 1)"
-for s in rds queue efs waf; do
-  run_sut env CATCHU_EXPECTED_ACCOUNT=999999999999 bash "$P/create-$s.sh" --apply
+for s in rds queue efs waf alert-topic alarms log-group; do
+  run_sut env CATCHU_EXPECTED_ACCOUNT=999999999999 CATCHU_ALERT_EMAIL=alerts.synthetic@example.com bash "$P/create-$s.sh" --apply
   check "계정이 다르면 $s: 계정 조회 말고는 AWS를 부르지 않고 멈추며 번호를 찍지 않음" \
     "$( { test "$rc" = 1 -a "$(sort -u "$S/seen")" = 'sts get-caller-identity' && test "$(grep -c -E '123456789012|999999999999' "$OUT")" = 0; } > /dev/null 2>&1; echo $?)"
 done
@@ -297,6 +322,89 @@ run_sut env STUB_TOKEN_COUNT=0 bash "$P/create-queue.sh"
 check "큐 비밀번호 SSM이 없으면 멈춤" "$(ok test "$rc" = 1)"
 run_sut env STUB_TOPIC=arn:aws:sns:ap-northeast-2:123456789012:catchu-alerts bash "$P/create-queue.sh" --apply
 check "알림 주제가 있으면 큐 이벤트를 그 주제로 보냄" "$( { test "$rc" = 0 && has_all "$(call_of 'elasticache create-replication-group')" --notification-topic-arn; } > /dev/null 2>&1; echo $?)"
+
+# ---------- 경보 받는 주제(create-alert-topic.sh) ----------
+MAIL=alerts.synthetic@example.com
+TOPIC=arn:aws:sns:ap-northeast-2:123456789012:catchu-alerts
+run_sut env CATCHU_ALERT_EMAIL=$MAIL bash "$P/create-alert-topic.sh"
+check "주제 확인 모드: 종료 0, 만드는 호출 0, --apply 안내" "$(ok test "$rc" = 0 -a -z "$(ops)" -a "$(grep -c -- '--apply로 다시 실행' "$OUT")" = 1)"
+run_sut env STUB_VALIDATE=1 CATCHU_ALERT_EMAIL=$MAIL bash "$P/create-alert-topic.sh" --apply
+check "주제 만들기: 주제·정책·이메일 구독 순서, CLI 인자 검사 3건 통과, 화면에 주소 원문 없음(가린 주소만)" \
+  "$( { test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "sns create-topic,sns set-topic-attributes,sns subscribe," -a "$(wc -l < "$S/valid" | tr -d ' ')" = 3 && has_all "$(call_of 'sns subscribe')" --protocol email "$MAIL" && ! grep -qF "$MAIL" "$OUT" && grep -qF 'a***@example.com' "$OUT" && clean; } > /dev/null 2>&1; echo $?)"
+want='[["__default_statement_ID","AWS:SourceAccount"],["AllowSourceOwnerPublish","AWS:SourceOwner"]]'
+check "주제 정책: 기본 문장은 두고, 이 계정 소유의 Publish 허용 문장(주제 ARN·계정 번호로 묶음)을 덧붙이며 계정 번호를 찍지 않음" \
+  "$( { test "$(jq -c '[.Statement[] | [.Sid, (.Condition.StringEquals | keys[0])]]' "$S/topic-policy")" = "$want" &&
+    test "$(jq -c '.Statement[1] | [.Principal.AWS, .Action, .Resource, .Condition.StringEquals["AWS:SourceOwner"]]' "$S/topic-policy")" = "[\"*\",\"SNS:Publish\",\"$TOPIC\",\"123456789012\"]" &&
+    ! grep -q 123456789012 "$OUT"; } > /dev/null 2>&1; echo $?)"
+run_sut bash "$P/create-alert-topic.sh" --apply
+check "주제: 받을 주소가 없으면 AWS를 부르기 전에 멈춤" "$(ok test "$rc" = 1 -a ! -s "$S/seen")"
+run_sut env CATCHU_ALERT_EMAIL='a b@example' bash "$P/create-alert-topic.sh" --apply
+check "주제: 주소 형식이 아니면 멈춤" "$(ok test "$rc" = 1 -a ! -s "$S/seen")"
+run_sut env STUB_TOPIC=$TOPIC CATCHU_ALERT_EMAIL=$MAIL bash "$P/create-alert-topic.sh" --apply
+check "주제가 이미 있으면 멈춤" "$(ok stopped 'SNS 주제 catchu-alerts')"
+# 주제 정책: 기본 문장과 --apply가 덧붙인 문장이 모두 있는 상태
+good_policy=$(jq -cn --arg t "$TOPIC" '{Statement: [{Sid: "__default_statement_ID", Effect: "Allow", Principal: {AWS: "*"}, Action: ["SNS:Publish"], Resource: $t,
+  Condition: {StringEquals: {"AWS:SourceAccount": "123456789012"}}}, {Sid: "AllowSourceOwnerPublish", Effect: "Allow", Principal: {AWS: "*"},
+  Action: "SNS:Publish", Resource: $t, Condition: {StringEquals: {"AWS:SourceOwner": "123456789012"}}}]}')
+run_sut env STUB_VALIDATE=1 STUB_TOPIC=$TOPIC STUB_TOPIC_POLICY="$good_policy" bash "$P/create-alert-topic.sh" --test
+check "수신 시험: 확인된 구독이 있으면 시험 메시지 1통(주소 없이 실행), CLI 인자 검사 통과" \
+  "$(ok test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "sns publish," -a "$(wc -l < "$S/valid" | tr -d ' ')" = 1)"
+run_sut env STUB_TOPIC=$TOPIC bash "$P/create-alert-topic.sh" --test
+check "수신 시험: 주제 정책에 ElastiCache용 발행 허용이 없으면(기본 정책만) 보내지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)" -a "$(grep -c 'AllowSourceOwnerPublish 문장이 없어' "$OUT")" = 1)"
+run_sut env STUB_TOPIC=$TOPIC STUB_TOPIC_POLICY="$good_policy" STUB_CONFIRMED=0 bash "$P/create-alert-topic.sh" --test
+check "수신 시험: 확인된 구독이 없으면 보내지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut bash "$P/create-alert-topic.sh" --test
+check "수신 시험: 주제가 없으면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+
+# ---------- 경보(create-alarms.sh) ----------
+ready=(STUB_TOPIC=$TOPIC STUB_DB_COUNT=1)
+run_sut env "${ready[@]}" bash "$P/create-alarms.sh"
+check "경보 확인 모드: 종료 0, 만드는 호출 0, --apply 안내" "$(ok test "$rc" = 0 -a -z "$(ops)" -a "$(grep -c -- '--apply로 다시 실행' "$OUT")" = 1)"
+run_sut env STUB_VALIDATE=1 "${ready[@]}" bash "$P/create-alarms.sh" --apply
+check "경보 만들기: 종료 0, 4건, CLI 인자 검사 4건 통과" \
+  "$(ok test "$rc" = 0 -a "$(ops | sort -u)" = 'cloudwatch put-metric-alarm' -a "$(wc -l < "$S/calls" | tr -d ' ')" = 4 -a "$(wc -l < "$S/valid" | tr -d ' ')" = 4)"
+alarm_of() { grep -m1 -- "--alarm-name $1 " "$S/calls"; }
+lb=Name=LoadBalancer,Value=app/k8s-catchu-0123456789/0123456789abcdef
+a=$(alarm_of catchu-api-no-target)
+w=$(alarm_of catchu-web-no-target)
+check "경보: 정상 대상 0은 api·web 각자의 대상 그룹과 ALB 차원, 최솟값 1 미만 5분, 값 없으면 경보" \
+  "$( { has_all "$a" Name=TargetGroup,Value=targetgroup/k8s-catchu-api-0123456789/0123456789abcdef "$lb" HealthyHostCount Minimum LessThanThreshold breaching && has_all "$w" Name=TargetGroup,Value=targetgroup/k8s-catchu-web-0123456789/fedcba9876543210 "$lb" && test "$(printf '%s' "$a" | sed -E 's/.*--evaluation-periods ([0-9]+).*/\1/')" = 5; } > /dev/null 2>&1; echo $?)"
+x=$(alarm_of catchu-alb-target-5xx)
+d=$(alarm_of catchu-db-free-storage)
+check "경보: 5xx는 ALB 차원 합계 10 이상·값 없으면 정상, 저장 공간은 catchu-db 2GiB 미만" \
+  "$( { has_all "$x" HTTPCode_Target_5XX_Count "$lb" Sum GreaterThanOrEqualToThreshold notBreaching && has_none "$x" Name=TargetGroup,Value=targetgroup/k8s-catchu-api-0123456789/0123456789abcdef && has_all "$d" FreeStorageSpace Name=DBInstanceIdentifier,Value=catchu-db 2147483648 LessThanThreshold; } > /dev/null 2>&1; echo $?)"
+check "경보: 모두 경보·회복을 catchu-alerts로 보냄" \
+  "$(ok test "$(grep -c -- "--alarm-actions $TOPIC --ok-actions $TOPIC" "$S/calls")" = 4)"
+run_sut env STUB_DB_COUNT=1 bash "$P/create-alarms.sh" --apply
+check "경보: 주제가 없으면 만들지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env "${ready[@]}" STUB_CONFIRMED=0 bash "$P/create-alarms.sh" --apply
+check "경보: 확인된 이메일 구독이 없으면 만들지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_TOPIC=$TOPIC bash "$P/create-alarms.sh" --apply
+check "경보: RDS가 없으면 만들지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env "${ready[@]}" STUB_TGB='{"items":[]}' bash "$P/create-alarms.sh" --apply
+check "경보: 대상 그룹을 찾지 못하면(Ingress 전) 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)" -a "$(grep -c 'TargetGroupBinding이 하나가 아니다' "$OUT")" = 1)"
+two_lb="arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/a/1$(printf '\t')arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/b/2"
+run_sut env "${ready[@]}" STUB_LB_ARNS="$two_lb" bash "$P/create-alarms.sh" --apply
+check "경보: api·web 대상 그룹이 서로 다른 ALB면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env "${ready[@]}" STUB_FAIL='cloudwatch describe-alarms' bash "$P/create-alarms.sh" --apply
+check "경보: 경보 조회 실패면 '없음'으로 넘기지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env "${ready[@]}" STUB_ALARM_COUNT=2 bash "$P/create-alarms.sh"
+check "경보가 하나라도 있으면 확인 모드에서도 멈춤" "$(ok stopped '이 스크립트가 만드는 이름의 경보 2개')"
+run_sut env "${ready[@]}" STUB_SERVER=https://OTHER.example bash "$P/create-alarms.sh" --apply
+check "경보: kubectl이 다른 클러스터를 가리키면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+
+# ---------- 로그 그룹(create-log-group.sh) ----------
+run_sut bash "$P/create-log-group.sh"
+check "로그 그룹 확인 모드: 종료 0, 만드는 호출 0, --apply 안내" "$(ok test "$rc" = 0 -a -z "$(ops)" -a "$(grep -c -- '--apply로 다시 실행' "$OUT")" = 1)"
+run_sut env STUB_VALIDATE=1 bash "$P/create-log-group.sh" --apply
+check "로그 그룹 만들기: 그룹 → 보존 기간 순서, CLI 인자 검사 2건 통과, 확인 값에 보존 14일" \
+  "$( { test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "logs create-log-group,logs put-retention-policy," -a "$(wc -l < "$S/valid" | tr -d ' ')" = 2 && grep -q '"retentionInDays": 14' "$OUT" && clean; } > /dev/null 2>&1; echo $?)"
+check "로그 그룹: 이름 /catchu/eks/app, 보존 14일, 태그" \
+  "$( { has_all "$(call_of 'logs create-log-group')" --log-group-name /catchu/eks/app project=catchu,issue=276 && has_all "$(call_of 'logs put-retention-policy')" --log-group-name /catchu/eks/app --retention-in-days 14; } > /dev/null 2>&1; echo $?)"
+run_sut env STUB_LOG_GROUP_COUNT=1 bash "$P/create-log-group.sh"
+check "로그 그룹이 이미 있으면 확인 모드에서도 멈춤" "$(ok stopped '로그 그룹 /catchu/eks/app')"
+run_sut env STUB_FAIL='logs describe-log-groups' bash "$P/create-log-group.sh" --apply
+check "로그 그룹 조회 실패면 '없음'으로 넘기지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
 
 echo
 echo "통과 $pass, 실패 $fail"

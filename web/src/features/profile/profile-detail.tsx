@@ -13,8 +13,7 @@ import styles from "./profile.module.css";
 /**
  * 상세 프로필(W02-P). GET /v1/me의 저장된 본인 프로필만 표시한다.
  * 조회 실패는 빈 프로필이나 이름 미저장으로 바꾸지 않고 다시 불러오기로 처리한다.
- * GitHub 연동 화면(/profile/github)은 #253 범위다. 그 전에는 없는 주소로 이동해 404와 로그인 정보 유실이 생기므로
- * 프로필 메뉴의 [로그아웃]처럼 '연결 전'으로 표시하고 아무 동작도 하지 않는다(초점은 받아 보조기기가 읽을 수 있다).
+ * [GitHub 연결 상태]는 GitHub 연동 화면(/profile/github, #253)으로 간다. 연결 상태는 그 화면이 조회한다.
  */
 export function ProfileDetail() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -53,9 +52,7 @@ export function ProfileDetail() {
     <p className={styles.note}>직접 입력한 정보이며 검증된 경력이나 기술을 뜻하지 않습니다.</p>
     <div className={styles.actions}>
       <Link className={styles.primaryLink} href={routes.profileEdit}>프로필 수정</Link>
-      <button type="button" className={styles.pendingAction} aria-disabled="true">
-        GitHub 연결 상태 <span className={authStyles.pendingTag}>연결 전</span>
-      </button>
+      <Link className={styles.secondaryLink} href={routes.profileGithub}>GitHub 연결 상태</Link>
     </div>
     {/* 12월 intent U2: 회원 정보 화면의 [탈퇴](BR7.1). */}
     <WithdrawalSection />

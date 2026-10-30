@@ -13,7 +13,7 @@ const src = new URL('../src/', import.meta.url);
 const hooks = registerHooks({
   resolve(specifier, context, next) {
     if (specifier === 'react' && context.parentURL?.endsWith('/repository-management.tsx')) return { url: new URL('./u7-hooks.mjs', import.meta.url).href, shortCircuit: true };
-    if (specifier === 'next/link') return next('next/link.js', context);
+    if (specifier === 'next/link' || specifier === 'next/navigation') return next(`${specifier}.js`, context);
     if (specifier.startsWith('@/') || (specifier.startsWith('.') && context.parentURL?.startsWith(src.href))) {
       const base = specifier.startsWith('@/') ? new URL(specifier.slice(2), src) : new URL(specifier, context.parentURL);
       for (const extension of ['', '.ts', '.tsx']) {

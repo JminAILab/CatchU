@@ -17,8 +17,8 @@ export type HomeStep = "github" | "repository";
 /**
  * 다음 행동.
  * - `link`: 이동한다.
- * - `unavailable`: 이동할 화면이 아직 없어 누를 수 없게 두고 `reason`을 함께 보인다.
- *   GitHub 연동 화면(`/profile/github`)은 #253 범위다. 그 전에는 이동하지 않는다(web README 「페이지 주소」).
+ * - `unavailable`: 지금은 할 수 없어 누를 수 없게 두고 `reason`을 함께 보인다.
+ *   GitHub 연결 시작을 막은 환경(통합 시험 전환 꺼짐, #253)의 미연결·재연결 필요가 쓴다.
  */
 export type HomeAction =
   | { kind: "link"; label: string; href: string }
@@ -45,12 +45,17 @@ export const HOME_STEPS: readonly { step: HomeStep; label: string }[] = [
   { step: "repository", label: "레포 연결" },
 ];
 
-/** #253 GitHub 연동 화면이 연결되기 전 비활성 버튼의 이유. */
-export const GITHUB_SCREEN_NOT_READY = "GitHub 연결 화면은 준비 중이라 아직 이동할 수 없습니다.";
-
-export function homeView(lookup: HomeLookup): HomeView {
+/**
+ * `startBlockedReason`은 GitHub 연결 시작을 막는 이유다(#253 `githubStartBlockedReason`, 연동 화면과 같은 기준·문구).
+ * null이면 미연결·재연결 필요가 연동 화면으로 보낸다. 막으면 같은 이름의 버튼을 누를 수 없게 두고 이유를 보인다.
+ * 연결됨의 내 자산 이동은 그대로다.
+ */
+export function homeView(lookup: HomeLookup, startBlockedReason: string | null): HomeView {
   if ("state" in lookup) return { kind: "loading" };
   if (lookup.kind !== "success") return { kind: "failed" };
+  const toGitHub = (label: string): HomeAction => startBlockedReason === null
+    ? { kind: "link", label, href: routes.profileGithub }
+    : { kind: "unavailable", label, reason: startBlockedReason };
   switch (lookup.data) {
     case "DISCONNECTED":
       return {
@@ -60,7 +65,7 @@ export function homeView(lookup: HomeLookup): HomeView {
         step: "github",
         title: "GitHub를 먼저 연결해 주세요",
         description: "분석을 요청하려면 먼저 프로필에서 GitHub를 연결해야 합니다. 연결한 뒤 내 자산에서 레포를 연결합니다.",
-        action: { kind: "unavailable", label: "프로필에서 GitHub 연결", reason: GITHUB_SCREEN_NOT_READY },
+        action: toGitHub("프로필에서 GitHub 연결"),
       };
     case "REAUTH_REQUIRED":
       // 재연동 안내 방식은 초안 §6.2에서 [미정]이다. 미연동과 상태·문구를 구분하고 같은 연동 화면을 가리킨다.
@@ -71,7 +76,7 @@ export function homeView(lookup: HomeLookup): HomeView {
         step: "github",
         title: "GitHub 연결을 다시 확인해 주세요",
         description: "연결된 GitHub를 다시 확인해야 저장소를 연결하고 분석을 요청할 수 있습니다.",
-        action: { kind: "unavailable", label: "GitHub 다시 연결", reason: GITHUB_SCREEN_NOT_READY },
+        action: toGitHub("GitHub 다시 연결"),
       };
     case "CONNECTED":
       // 연결된 repo(분석 접수 저장소) 유무는 아직 받지 않으므로 단계를 표시하지 않는다.

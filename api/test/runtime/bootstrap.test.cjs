@@ -75,6 +75,7 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
     PORT: String(port),
     BIND_HOST: undefined, // 터미널의 값이 섞이지 않게 기본은 두지 않는다
     LINK_GRANT_SECRET: undefined, // 같은 이유로 두지 않는다. development에서는 임시 키로 기동한다
+    CATCHU_EMBEDDING_API_KEY: undefined, // 터미널의 실제 키가 섞이지 않게 한다. development에서는 합성 제공자로 기동한다
     ...file,
   };
   await writeFile(envPath, Object.entries(settings)
@@ -98,8 +99,9 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
   });
   return {
     request, closed, logs: () => output, secret, port,
-    async ready() {
-      for (let attempt = 0; attempt < 200; attempt++) {
+    /** 50ms 간격으로 attempts번(기본 약 10초) /health를 기다린다. */
+    async ready(attempts = 200) {
+      for (let attempt = 0; attempt < attempts; attempt++) {
         if (child.exitCode !== null || child.signalCode !== null) {
           assert.fail('main 진입점이 정상 기동 전에 종료됨');
         }
@@ -115,10 +117,12 @@ async function launch(t, { source = false, file = {}, environment = {}, address 
   };
 }
 
+// 개발 소스 실행은 기동 때 TypeScript를 컴파일해 앱 모듈이 늘수록 느려진다(CI 10초 안팎, #431에서 상한을 넘음).
+// 소스 실행만 약 25초까지 기다린다. 확인하는 내용은 빌드 실행과 같다.
 for (const source of [false, true]) {
-  test(`${source ? '개발 소스' : '빌드'} main: env 파일의 인증 설정으로 기동·발급·종료`, { timeout: 15000 }, async (t) => {
+  test(`${source ? '개발 소스' : '빌드'} main: env 파일의 인증 설정으로 기동·발급·종료`, { timeout: source ? 30000 : 15000 }, async (t) => {
     const server = await launch(t, { source });
-    await server.ready();
+    await server.ready(source ? 500 : undefined);
     const response = await server.request('/v1/auth/dev-login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ memberId: 'bootstrap-member' }),
@@ -133,8 +137,9 @@ for (const source of [false, true]) {
 }
 
 test('main: 터미널 production 설정이 env 파일보다 우선하여 개발 로그인을 거부한다', { timeout: 15000 }, async (t) => {
-  // production은 공유 URL 주소(#147)와 grant 서명 키(#150)가 필수라 합성 값을 함께 준다.
-  const server = await launch(t, { environment: { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' } });
+  // production은 공유 URL 주소(#147)·grant 서명 키(#150)·임베딩 키(#431)가 필수라 합성 값을 함께 준다.
+  const server = await launch(t, { environment: { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111',
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key' } });
   await server.ready();
   const response = await server.request('/v1/auth/dev-login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -151,13 +156,19 @@ for (const [label, file, expected] of [
   ['DB 비밀번호 누락', { DB_PASSWORD: undefined }, 'DB_PASSWORD'],
   ['바인딩 주소 형식 오류', { BIND_HOST: 'localhost' }, 'BIND_HOST'],
   // http 주소와 공유 URL 기본값(http)은 development·test에서만 받는다(#218).
-  // grant 서명 키(#150)는 합성 값을 줘서 공유 URL 주소만 실패 원인이 되게 한다.
+  // grant 서명 키(#150)·임베딩 키(#431)는 합성 값을 줘서 공유 URL 주소만 실패 원인이 되게 한다.
   ['production에서 공유 URL 주소가 http', { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'http://catchu.example',
-    LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' }, 'SHARE_LINK_WEB_BASE_URL'],
+    LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111',
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key' }, 'SHARE_LINK_WEB_BASE_URL'],
   ['NODE_ENV 미지정에 공유 URL 주소 없음', { NODE_ENV: undefined, SHARE_LINK_WEB_BASE_URL: undefined,
-    LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' }, 'SHARE_LINK_WEB_BASE_URL'],
+    LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111',
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key' }, 'SHARE_LINK_WEB_BASE_URL'],
   // grant 서명 키 임시 생성도 development·test에서만 한다(#242). 공유 URL 주소는 https로 줘서 키만 실패 원인이 되게 한다.
-  ['NODE_ENV 미지정에 grant 서명 키 없음', { NODE_ENV: undefined, SHARE_LINK_WEB_BASE_URL: 'https://catchu.example' }, 'LINK_GRANT_SECRET'],
+  ['NODE_ENV 미지정에 grant 서명 키 없음', { NODE_ENV: undefined, SHARE_LINK_WEB_BASE_URL: 'https://catchu.example',
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key' }, 'LINK_GRANT_SECRET'],
+  // 임베딩 제공자 판정(#431, BR6.1): production에서 키가 없으면 합성 제공자로 대신하지 않고 기동을 멈춘다.
+  ['production에서 임베딩 키 없음', { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example',
+    LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' }, 'CATCHU_EMBEDDING_API_KEY'],
 ]) {
   test(`main: ${label}이면 기동하지 않고 실패 종료한다`, { timeout: 15000 }, async (t) => {
     const server = await launch(t, { file });
@@ -182,7 +193,7 @@ async function holdPort(t) {
 for (const [label, settings, expected] of [
   ['production에서 CORS 허용 출처가 http', async () => ({ NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example',
     LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111',
-    CORS_ALLOWED_ORIGINS: 'http://web.catchu.example' }), 'CORS_ALLOWED_ORIGINS'],
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key', CORS_ALLOWED_ORIGINS: 'http://web.catchu.example' }), 'CORS_ALLOWED_ORIGINS'],
   ['포트가 이미 사용 중', async (t) => ({ PORT: String(await holdPort(t)) }), 'EADDRINUSE'],
 ]) {
   test(`main: 앱 생성 뒤 ${label}이면 DB 연결을 닫고 바로 실패 종료한다`, { timeout: 15000 }, async (t) => {

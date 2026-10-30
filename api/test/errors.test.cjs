@@ -199,8 +199,10 @@ test('예상 밖 예외는 500 일반 안내만 응답하고 원인은 서버 �
 
 test('업무 거부(ApiError 4xx)는 서버 오류 로그를 남기지 않는다', { timeout: 10000 }, async (t) => {
   const { request, logs } = await start(t);
+  // 기동 때의 경고(합성 임베딩 제공자, #431)는 보지 않고 이 요청 뒤의 로그만 본다.
+  const before = logs.length;
   await request('/v1/__test/api-error/CONSENT_REQUIRED');
-  assert.equal(logs.some((l) => l.startsWith('[error]') || l.startsWith('[warn]')), false);
+  assert.equal(logs.slice(before).some((l) => l.startsWith('[error]') || l.startsWith('[warn]')), false);
 });
 
 test('요청 본문 오류와 없는 경로는 9/28 결정의 형식으로 응답한다', { timeout: 10000 }, async (t) => {

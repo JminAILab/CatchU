@@ -4,7 +4,7 @@
 # 이어서 deploy.sh가 migration 뒤마다 띄우는 동의 기록 삭제 권한 확인 Pod 틀(k8s/consent-guard-pod.yaml)의 명령을 migration 계정으로 실행해
 # 권한이 있을 때(회수 뒤 0)·없을 때(그대로 0)·회수로 없어지지 않을 때(0이 아니고 회수도 되돌림)를 본다.
 # 클라이언트는 Pod처럼 사용자 999·읽기 전용 루트·권한 제거·TLS verify-full로 돈다. 비밀번호는 시험마다 새로 만드는 합성 값이다.
-# 확인하지 못하는 것: RDS 관리자(rds_superuser)만의 특성, 실제 RDS 인증서·파라미터 그룹, migration이 실제로 만든 동의 기록 표
+# 확인하지 못하는 것: RDS 관리자(rds_superuser)만의 특성(vector 만들기는 신뢰 확장으로 바꿔 흉내 낸다), RDS의 vector 판본, 실제 RDS 인증서·파라미터 그룹, migration이 실제로 만든 동의 기록 표
 # (같은 이름의 합성 표로 본다). 이것은 2단계 실제 RDS에서 본다.
 # 필요한 것: docker·openssl·jq·ruby. 사용: bash deploy/aws/scripts/db-roles.test.sh   (1분쯤, 실패가 하나라도 있으면 종료 코드 1)
 set -uo pipefail
@@ -78,6 +78,12 @@ ALTER SYSTEM SET log_statement = 'none';
 SELECT pg_reload_conf();\n" "$ADMIN_PW" "$OUTSIDER_PW" |
   docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres > /dev/null ||
   { echo "시험용 관리자·DB를 만들지 못했다" >&2; exit 1; }
+# RDS 관리자(rds_superuser)는 슈퍼유저가 아니어도 vector를 만들 수 있다. 이 컨테이너에서는 vector를 신뢰 확장으로 바꿔
+# 'DB에 CREATE 권한이 있는 계정만 만든다'로 흉내 낸다. roles.sql이 끝나면 그 권한은 migration 계정에 넘어가므로, 확장을 만든 뒤에는
+# 원래 설정으로 되돌려 migration 계정이 새로 만들 수 없는 실제 조건에서 migration 문장(IF NOT EXISTS)을 본다.
+VECTOR_CONTROL=$(docker exec "$DB" pg_config --sharedir)/extension/vector.control
+docker exec "$DB" sh -c "cp '$VECTOR_CONTROL' /tmp/vector.control.orig && echo 'trusted = true' >> '$VECTOR_CONTROL'" ||
+  { echo "vector 확장 설정을 바꾸지 못했다" >&2; exit 1; }
 
 # ---------- 실행 도우미 ----------
 runs=0
@@ -119,6 +125,12 @@ run_pod "$ROOT/deploy/aws/db/roles.sql"
 check "roles.sql: 슈퍼유저 아닌 관리자로 Pod 틀 그대로(사용자 999·읽기 전용 루트·TLS verify-full·한 트랜잭션) 실행해 종료 0" "$(ok test "$rc" = 0)"
 check "roles.sql 확인 출력: 앱 계정 lock_timeout 3초, DB·public 스키마 소유자가 migration 계정" \
   "$( { says '{lock_timeout=3s}' && grep -q '^ catchu *| catchu_migrator' "$OUT" && grep -q '^ public *| catchu_migrator' "$OUT"; } > /dev/null 2>&1; echo $?)"
+check "roles.sql 확인 출력: vector 확장이 public 스키마에 있음" "$(ok grep -qE '^ vector +\| [0-9.]+ +\| public' "$OUT")"
+docker exec "$DB" cp /tmp/vector.control.orig "$VECTOR_CONTROL" || { echo "vector 확장 설정을 되돌리지 못했다" >&2; exit 1; }
+sql_as catchu_migrator "$MIGRATOR_PW" 'CREATE EXTENSION IF NOT EXISTS vector; CREATE TABLE emb (id integer PRIMARY KEY, e vector(3));'
+check "migration 계정: 확장을 만들 권한 없이도 migration 문장(IF NOT EXISTS)이 통과하고 벡터 열을 만듦" "$(ok test "$rc" = 0)"
+sql_as catchu_app "$APP_PW" "INSERT INTO emb VALUES (1, '[1,2,3]'); SELECT round((e <-> '[1,2,4]')::numeric, 3) FROM emb;"
+check "앱 계정: 벡터 열에 쓰고 거리 계산으로 읽음" "$(ok test "$rc" = 0 -a "$(cat "$OUT")" = 1.000)"
 # 같은 서버를 인증서와 다른 이름(db-other)으로 부르면 Pod 설정이 연결을 거부해야 한다(TLS가 호스트 이름까지 검증하는지).
 printf '%s\n' 'SELECT 1;' > "$WORK/select1.sql"
 POD_HOST=db-other run_pod "$WORK/select1.sql"

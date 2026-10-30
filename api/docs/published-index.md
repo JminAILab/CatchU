@@ -6,8 +6,10 @@
 
 ## 조립 상태
 
-- 기본 앱(`AppModule`)에 넣지 않았고 Nest 모듈도 없다. 시험과 통합 PR이 만들기 함수로 직접 만든다. 그래서 이 코드가 합쳐져도 api 기동과 다른 기능은 바뀌지 않는다(키가 없어도 영향 없음).
-- **통합 PR에서 할 일(U3 담당):** Nest 모듈 등록·주입, 모듈 초기화에서 `AiRun.registerHandler('EMBED_PUBLICATION', createEmbedPublicationHandler(...))`, api 기동 때 `createEmbeddingProvider(readEmbeddingConfig(), process.env)` 호출(아래 키 판정이 기동 때 돈다). 그 PR보다 먼저 팀장이 배포 환경에 `CATCHU_EMBEDDING_API_KEY`(SSM)와 RDS의 pgvector 확장을 넣어야 한다.
+- `PublishedIndexModule`(`published-index.module.ts`)을 기본 앱(`AppModule`)이 가져온다(#431). api 기동 때 한 번 아래 두 일이 돈다.
+  - 임베딩 제공자를 만든다. [키 판정](#키와-합성-제공자-br61)이 여기서 돌므로 **운영(`production`)에서 `CATCHU_EMBEDDING_API_KEY`가 없으면 api가 기동하지 않는다.** 배포 환경에는 키(SSM)와 DB의 pgvector 확장이 먼저 있어야 한다.
+  - 모듈 초기화에서 `AiRun.registerHandler('EMBED_PUBLICATION', …)`를 부른다. AiRun은 앱 기동이 끝난 뒤 소비를 시작하므로 첫 작업보다 먼저 등록된다. 큐 주소가 없는 곳(개발 서버)에서는 작업이 큐에 들어가지 않아 색인은 처리 시한으로 FAILED가 된다([AiRun](ai-run.md)).
+- 쓰는 Unit(U4·U5·U10)은 자기 모듈 `imports`에 `PublishedIndexModule`을 넣고 `@Inject(PUBLISHED_INDEX_WRITER)`(C-08)·`@Inject(PUBLISHED_SEARCH)`(C-09)로 받는다. Nest는 같은 모듈을 한 번만 만들므로 여러 모듈이 가져와도 판정과 처리기 등록은 한 번이다. U4가 발행 커밋 뒤 부를 `enqueueAfterCommit`은 U4 모듈이 `AiRunModule`을 가져와 같은 AiRun에서 부른다.
 
 ## 공개 함수와 호출 순서
 
@@ -103,11 +105,13 @@ Voyage 호출 중에는 DB 트랜잭션을 열어 두지 않는다.
 저장소 맨 위에서(테스트 DB 필요, README 「DB 테스트」):
 
 ```bash
-npm --prefix api test -- test/published-index/chunker.test.cjs test/published-index/embedding-provider.test.cjs test/published-index/published-index-writer.test.cjs test/published-index/embed-publication-handler.test.cjs test/published-index/published-search.test.cjs test/published-index/live-embedding.test.cjs test/db/member-cascade-delete.test.cjs test/integration/result-application-b.test.cjs
+npm --prefix api test -- test/published-index/chunker.test.cjs test/published-index/embedding-provider.test.cjs test/published-index/published-index-writer.test.cjs test/published-index/embed-publication-handler.test.cjs test/published-index/published-search.test.cjs test/published-index/live-embedding.test.cjs test/published-index/published-index-module.test.cjs test/published-index/queue-embedding.test.cjs test/db/member-cascade-delete.test.cjs test/integration/result-application-b.test.cjs
 ```
 
 - S1~S11은 테스트 DB와 시험용 임베딩 제공자·기록용 AiRun으로 돈다. 실제 임베딩 성공으로 보고하지 않는다.
 - S12(`test/published-index/live-embedding.test.cjs`)는 `CATCHU_EMBEDDING_API_KEY`를 셸 환경변수로 줄 때만 실제 Voyage를 부르고, 없으면 "미실행"으로 건너뛴다(통과 아님). 출력에는 상태·조각 개수·맞은 조각 위치만 남는다.
+- 앱 등록(`published-index-module.test.cjs`): 기본 앱 기동 때 처리기 한 번 등록(소비 모듈 둘이 가져와도), C-08·C-09 주입, 키 판정표(Voyage는 가로챈 fetch로 확인, 실제 호출 없음).
+- 실제 큐(`queue-embedding.test.cjs`): `CATCHU_TEST_REDIS_URL`이 있을 때만 돈다. 기본 앱을 실제 Valkey에 붙여 발행본 하나의 `EMBED_PUBLICATION`이 처리되어 DONE이 되는지 본다. 셸에 `CATCHU_EMBEDDING_API_KEY`가 있으면 실제 Voyage, 없으면 합성 제공자다(CI는 합성, 큐·처리기 연결 확인일 뿐 실제 임베딩 성공이 아니다). 출력에는 제공자·상태·개수만 남는다.
 - 줄 커버리지: `TEST_COVERAGE_INCLUDE='dist/published-index/**' npm --prefix api run test:coverage -- <위 파일들>`.
 
 ## 알려진 한계

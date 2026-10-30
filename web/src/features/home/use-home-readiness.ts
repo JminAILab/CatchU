@@ -1,12 +1,16 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { githubStartBlockedReason } from "@/features/github-connection/github-connection-screen";
 import { createRepositoryApi } from "@/features/repository-management/repository-api";
 import { accessTokenStore, EMPTY_ACCESS_TOKEN_STATE } from "@/lib/access-token";
 import { api } from "@/lib/api";
+import { authSessionIntegrationEnabled } from "@/lib/auth-integration";
 import { homeView, type HomeLookup, type HomeView } from "./home-readiness";
 
 // 인증·기준 주소·/v1·공통 오류 해석은 #106의 api.member가 맡는다. 렌더마다 호출 객체를 새로 만들지 않는다.
 const repositories = createRepositoryApi(api.member);
+// GitHub 연결 시작을 막는 기준·문구는 연동 화면(#253)과 같다. 통합 시험 전환은 빌드할 때 정해진다.
+const startBlockedReason = githubStartBlockedReason(authSessionIntegrationEnabled);
 
 /**
  * 홈의 GitHub 연동 상태를 읽어 표시 상태로 바꾼다(#155).
@@ -26,5 +30,5 @@ export function useHomeReadiness(): { view: HomeView; retry: () => void } {
     return () => abort.abort();
   }, [session, attempt]);
   const lookup: HomeLookup = result?.session === session && result.attempt === attempt ? result.lookup : { state: "loading" };
-  return { view: homeView(lookup), retry: () => setAttempt((value) => value + 1) };
+  return { view: homeView(lookup, startBlockedReason), retry: () => setAttempt((value) => value + 1) };
 }
