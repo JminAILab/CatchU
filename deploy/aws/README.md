@@ -173,7 +173,7 @@
 6. RDS: `aws rds modify-db-instance --db-instance-identifier catchu-db --no-deletion-protection --apply-immediately …` → `aws rds delete-db-instance --db-instance-identifier catchu-db --skip-final-snapshot --delete-automated-backups …` → **`aws rds wait db-instance-deleted --db-instance-identifier catchu-db …`**(30분까지만 기다리므로, 시간이 다 됐다고 나오면 같은 명령을 다시 실행한다) → 서브넷 그룹 `catchu-db`·파라미터 그룹 `catchu-pg16`. 마지막 스냅샷을 남길지는 그때 팀장이 정한다(남기면 그만큼 요금이 계속 나간다). RDS가 관리하는 관리자 비밀번호는 인스턴스와 함께 지워진다.
 7. 큐: `aws elasticache delete-replication-group --replication-group-id catchu-queue …`(마지막 스냅샷 없이) → **`aws elasticache wait replication-group-deleted --replication-group-id catchu-queue …`**(10분까지만 기다리므로, 시간이 다 됐다고 나오면 같은 명령을 다시 실행한다) → 서브넷 그룹 `catchu-queue`·파라미터 그룹 `catchu-valkey8-noeviction`.
 8. 직접 만든 보안 그룹 `catchu-db`·`catchu-queue`·`catchu-efs`.
-9. `helm uninstall aws-load-balancer-controller -n kube-system --kubeconfig ~/.kube/catchu`, 같은 꼴로 `aws-for-fluent-bit`
+9. `helm uninstall aws-load-balancer-controller -n kube-system --kubeconfig ~/.kube/catchu`
 10. `eksctl delete cluster -f deploy/aws/cluster.yaml --wait --profile catchu`(노드 그룹·애드온·Pod Identity 역할·NAT와 그 공인 IP·VPC).
 11. 로그 그룹, SNS 주제 `catchu-alerts`.
 12. ECR 저장소(이미지가 있으면 `--force`), SSM `/catchu/*`, EKS 배포 역할·GitHub environment·OIDC 공급자(#342 결정에 따름).

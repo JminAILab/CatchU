@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# 로그 수집기 설정(deploy/aws/logging/fluent-bit-values.yaml) 시험(#276). 설정값의 이미지(aws-for-fluent-bit)를 Docker로 띄워
-# 설정값의 수집 경로와 토큰 줄 버림 필터를 그대로 쓰고, 합성 컨테이너 로그 파일(CRI 형식)을 읽혀 무엇이 나가는지 본다.
+# 로그 수집기 실행 파일(deploy/aws/logging/fluent-bit.yaml) 시험(#276). 파일의 이미지(aws-for-fluent-bit)를 Docker로 띄워
+# 파일의 ConfigMap 설정을 그대로 쓰되 보내는 곳만 화면으로 바꾸고, 합성 컨테이너 로그 파일(CRI 형식)을 읽혀 무엇이 나가는지 본다.
+# 먼저 파일 자체를 본다: 쿠버네티스 권한(Role·ClusterRole과 그 연결)이 없고, API 토큰을 붙이지 않으며, 호스트 망을 쓰지 않고,
+# 서비스 계정 이름이 cluster.yaml의 Pod Identity 연결과 같고, 로그 그룹을 스스로 만들지 않는다.
 # - 버려야 하는 줄: 토큰 꼴마다 하나씩(가짜 값). 나가면 실패다.
 # - 남아야 하는 줄: 토큰 꼴과 비슷하지만 값이 아닌 줄과 보통 로그. 버려지면 실패다(필터가 모두 버려 0건이 되는 것을 막는다).
 # - namespace catchu가 아닌 파일(catchu-ops·kube-system)의 줄은 나가지 않아야 한다.
@@ -35,16 +37,25 @@ check() { # 이름 조건(0이면 통과)
   fi
 }
 
-# ---------- 설정값에서 이미지·수집 경로·필터를 읽는다 ----------
-values=$(ruby -ryaml -rjson -e 'puts JSON.generate(YAML.safe_load(STDIN.read))' < "$ROOT/deploy/aws/logging/fluent-bit-values.yaml")
-IMAGE="public.ecr.aws/aws-observability/aws-for-fluent-bit:$(jq -r .image.tag <<< "$values")"
-path=$(jq -r .input.path <<< "$values")
-jq -r .additionalFilters <<< "$values" > "$WORK/filters.conf"
-case $path in
-  /var/log/containers/*) ;;
-  *) echo "수집 경로가 /var/log/containers 아래가 아니다: ${path}" >&2; exit 1 ;;
-esac
-check "필터가 grep 하나다" "$(grep -c '^\[FILTER\]' "$WORK/filters.conf" | grep -qx 1; echo $?)"
+# ---------- 실행 파일 자체 ----------
+docs=$(ruby -ryaml -rjson -e 'puts JSON.generate(YAML.load_stream(STDIN.read).compact)' < "$ROOT/deploy/aws/logging/fluent-bit.yaml") ||
+  { echo "실행 파일을 읽지 못했다" >&2; exit 1; }
+of() { jq -c --arg k "$1" '[.[] | select(.kind == $k)] | first' <<< "$docs"; }
+sa=$(of ServiceAccount)
+ds=$(of DaemonSet)
+conf=$(of ConfigMap | jq -r '.data["fluent-bit.conf"]')
+check "종류는 ServiceAccount·ConfigMap·DaemonSet뿐(Role·ClusterRole·연결·Service 없음)" \
+  "$(test "$(jq -r '[.[].kind] | sort | join(",")' <<< "$docs")" = ConfigMap,DaemonSet,ServiceAccount; echo $?)"
+check "서비스 계정은 API 토큰을 붙이지 않음" "$(test "$(jq -r .automountServiceAccountToken <<< "$sa")" = false; echo $?)"
+check "DaemonSet은 그 서비스 계정을 쓰고 호스트 망을 쓰지 않음" \
+  "$(test "$(jq -r '[.spec.template.spec.serviceAccountName, (.spec.template.spec.hostNetwork // false)] | join(",")' <<< "$ds")" = "$(jq -r .metadata.name <<< "$sa"),false"; echo $?)"
+check "서비스 계정 이름이 cluster.yaml의 Pod Identity 연결에 있음" \
+  "$(grep -q "serviceAccountName: $(jq -r .metadata.name <<< "$sa")\$" "$ROOT/deploy/aws/cluster.yaml"; echo $?)"
+IMAGE=$(jq -r '.spec.template.spec.containers[0].image' <<< "$ds")
+check "이미지는 aws-for-fluent-bit의 정한 판" "$(printf '%s' "$IMAGE" | grep -qE '^public\.ecr\.aws/aws-observability/aws-for-fluent-bit:[0-9]+\.[0-9]+\.[0-9]+$'; echo $?)"
+check "보내는 곳은 /catchu/eks/app이고 그룹을 스스로 만들지 않음" \
+  "$( { printf '%s\n' "$conf" | grep -qE '^ *log_group_name +/catchu/eks/app$' && ! printf '%s\n' "$conf" | grep -qiE 'auto_create_group +(on|true)'; }; echo $?)"
+check "필터가 grep 하나다" "$(test "$(printf '%s\n' "$conf" | grep -c '^ *\[FILTER\]')" = 1; echo $?)"
 
 # ---------- 합성 로그 파일 ----------
 rep() { printf "%${2}s" '' | tr ' ' "$1"; }
@@ -55,6 +66,8 @@ drop=(
   "{\"level\":\"error\",\"token\":\"${jwt}\"}"
   "upstream sent Authorization: Bearer $(rep x 24)"
   "github said bearer $(rep y 16)"
+  "proxy sent AUTHORIZATION: BEARER $(rep x 24)"
+  "mixed case bEaReR $(rep y 16)"
   "clone with gh""p_$(rep x 36)"
   "oauth gh""o_$(rep x 36)"
   "pat github""_pat_$(rep x 30)"
@@ -93,24 +106,14 @@ for i in "${!keep[@]}"; do cri "${mark}-keep-${i} ${keep[$i]}" >> "$app"; done
 cri "${mark}-ops psql output" > "$WORK/containers/db-admin_catchu-ops_psql-0123456789abcdef.log"
 cri "${mark}-sys coredns" > "$WORK/containers/coredns-1_kube-system_coredns-0123456789abcdef.log"
 
-# 차트의 입력 설정(README.md에 적은 차트 0.2.0 기본값)에 시험용 처음부터 읽기만 더하고, 바깥으로 보내는 대신 화면에 찍는다.
-cat > "$WORK/fluent-bit.conf" << EOF
-[SERVICE]
-    Flush        1
-    Parsers_File /fluent-bit/parsers/parsers.conf
-[INPUT]
-    Name              tail
-    Tag               kube.*
-    Path              ${path}
-    multiline.parser  docker, cri
-    Skip_Long_Lines   On
-    Read_from_Head    On
-$(cat "$WORK/filters.conf")
-[OUTPUT]
-    Name   stdout
-    Match  *
-    Format json_lines
-EOF
+# 실행 파일의 설정을 그대로 쓰되, 이미 있는 파일을 처음부터 읽게 하고 [OUTPUT](CloudWatch) 대신 화면에 찍는다.
+{
+  printf '%s\n' "$conf" | sed '/^ *\[OUTPUT\]/,$d' | sed -E 's/^( *)Name( +)tail$/&\
+\1Read_from_Head On/'
+  printf '[OUTPUT]\n    Name   stdout\n    Match  *\n    Format json_lines\n'
+} > "$WORK/fluent-bit.conf"
+check "시험 설정이 실행 파일의 입력·필터를 담음" \
+  "$( { grep -q 'Path *\/var\/log\/containers\/' "$WORK/fluent-bit.conf" && grep -q 'Read_from_Head On' "$WORK/fluent-bit.conf" && grep -q 'Exclude log' "$WORK/fluent-bit.conf" && ! grep -q cloudwatch_logs "$WORK/fluent-bit.conf"; }; echo $?)"
 
 docker run -d --name "$NAME" --platform linux/arm64 --entrypoint /fluent-bit/bin/fluent-bit \
   -v "$WORK/containers:/var/log/containers:ro" -v "$WORK/fluent-bit.conf:/fluent-bit/etc/test.conf:ro" \
