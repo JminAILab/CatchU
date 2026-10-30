@@ -1,0 +1,32 @@
+{
+  "stage": "code-generation",
+  "unit": "u3-published-index",
+  "version": 1,
+  "writes": [
+    { "path": "api/src/published-index/embedding-config.ts" },
+    { "path": "api/src/published-index/embedding-types.ts" },
+    { "path": "api/src/published-index/embedding-provider.ts" },
+    { "path": "api/src/published-index/voyage-embedding-provider.ts" },
+    { "path": "api/src/published-index/synthetic-embedding-provider.ts" },
+    { "path": "api/src/published-index/chunker.ts" },
+    { "path": "api/src/published-index/publication-index.entity.ts" },
+    { "path": "api/src/published-index/published-chunk.entity.ts" },
+    { "path": "api/src/published-index/published-index-writer.ts" },
+    { "path": "api/src/published-index/embed-publication-handler.ts" },
+    { "path": "api/src/published-index/published-search.ts" },
+    { "path": "api/src/published-index/published-index-log.ts" },
+    { "path": "api/src/database/migrations/1793257382741-CreatePublishedIndexTables.ts" },
+    { "path": "api/test/published-index/support.cjs" },
+    { "path": "api/test/published-index/chunker.test.cjs" },
+    { "path": "api/test/published-index/embedding-provider.test.cjs" },
+    { "path": "api/test/published-index/published-index-writer.test.cjs" },
+    { "path": "api/test/published-index/embed-publication-handler.test.cjs" },
+    { "path": "api/test/published-index/published-search.test.cjs" },
+    { "path": "api/test/published-index/live-embedding.test.cjs" },
+    { "path": "api/test/db/member-cascade-delete.test.cjs" },
+    { "path": "api/test/integration/result-application-b.test.cjs" },
+    { "path": "api/docs/published-index.md" },
+    { "path": "api/docs/member-withdrawal-deletion.md" },
+    { "path": "api/CONVENTIONS.md" }
+  ]
+}

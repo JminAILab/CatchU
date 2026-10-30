@@ -276,7 +276,10 @@ test('늦은 실패 기록은 새 현재 시도로 옮겨간 요청을 덮어쓰
 test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 선행 데이터 보존', async () => {
   const schema = 'e_application_' + randomUUID().replaceAll('-', '');
   await db.query('CREATE SCHEMA "' + schema + '"');
-  const isolated = await openTestDataSource({ schema, extra: { options: '-c search_path=' + schema } });
+  // U3 마이그레이션의 vector 형식은 public에 설치된 pgvector 확장의 것이라 public도 찾는 경로에 둔다.
+  // 그래서 표가 있는지는 격리 스키마로 한정해 본다(public의 같은 이름 표를 찾지 않게).
+  const isolated = await openTestDataSource({ schema, extra: { options: '-c search_path=' + schema + ',public' } });
+  const regclass = async (name) => (await isolated.query('SELECT to_regclass($1)::text AS name', [`"${schema}".${name}`]))[0].name;
   try {
     const migrations = await isolated.runMigrations();
     assert.deepEqual(migrations.map(m => m.name), ['CreateMemberAnalysisFoundation1790500000000',
@@ -285,47 +288,49 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
       'CreateRepositorySelection1792383899264', 'AddAnalysisRequestHistoryIndex1792640486167', 'CascadeMemberAnalysisOnDelete1792817978011',
       'CascadeResultApplicationOnDelete1792817978012', 'CascadeAuthSessionsOnDelete1792817978013', 'CascadeCatchAssetsOnDelete1792817978014',
       'CreateU2UsageAndConsent1793161114211', 'CreatePublicationTables1793162230851', 'AddCatchAuthorDescription1793162230852',
-      'AddRepositoryRegistration1793245460352']);
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 24);
+      'AddRepositoryRegistration1793245460352', 'CreatePublishedIndexTables1793257382741']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 26);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
+    await isolated.undoLastMigration(); // U3 발행본 색인 상태·조각 표(C-08). vector 확장은 down에서 지우지 않는다
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 24);
+    for (const table of ['publication_index', 'published_chunk']) assert.equal(await regclass(table), null);
+    assert.equal((await isolated.query("SELECT count(*)::int AS n FROM pg_extension WHERE extname = 'vector'"))[0].n, 1);
     await isolated.undoLastMigration(); // U7 회원별 등록·불변 사본 참조
     await isolated.undoLastMigration(); // U4 Catch 작성자 설명 칸(C-14)
     assert.equal((await isolated.query(`SELECT count(*)::int AS n FROM information_schema.columns
       WHERE table_schema = $1 AND table_name = 'catch_asset' AND column_name LIKE 'author_description%'`, [schema]))[0].n, 0);
     await isolated.undoLastMigration(); // U4 발행본·항목·텍스트 자료 표(C-07·C-13)
-    for (const table of ['publication', 'published_item', 'text_material']) {
-      assert.equal((await isolated.query('SELECT to_regclass($1) AS name', [table]))[0].name, null);
-    }
+    for (const table of ['publication', 'published_item', 'text_material']) assert.equal(await regclass(table), null);
     await isolated.undoLastMigration(); // 12월 intent U2 하루 실행 횟수·첫 이용 동의 표
-    assert.equal((await isolated.query("SELECT to_regclass('daily_execution_count') AS name"))[0].name, null);
-    assert.equal((await isolated.query("SELECT to_regclass('ai_consent') AS name"))[0].name, null);
+    assert.equal(await regclass('daily_execution_count'), null);
+    assert.equal(await regclass('ai_consent'), null);
     assert.equal(await isolated.manager.count(MemberAccount), 1);
     for (let i = 0; i < 4; i++) await isolated.undoLastMigration(); // #387 B·세션·E 수신·회원 분석 연쇄 삭제
     assert.deepEqual((await isolated.query(`SELECT DISTINCT confdeltype FROM pg_constraint WHERE contype = 'f'
       AND connamespace = $1::regnamespace`, [schema])).map(r => r.confdeltype), ['a']);
     assert.equal(await isolated.manager.count(MemberAccount), 1);
     await isolated.undoLastMigration(); // E 본인 이력 순서 인덱스(#140)
-    assert.equal((await isolated.query("SELECT to_regclass('ix_analysis_request_member_id_submitted_at_request_id') AS name"))[0].name, null);
+    assert.equal(await regclass('ix_analysis_request_member_id_submitted_at_request_id'), null);
     assert.equal(await isolated.manager.count(MemberAccount), 1);
     await isolated.undoLastMigration(); // A 현재 선정·범위 판본(#252)
-    assert.equal((await isolated.query("SELECT to_regclass('repository_selection') AS name"))[0].name, null);
-    assert.equal((await isolated.query("SELECT to_regclass('allowed_scope_revision') AS name"))[0].name, null);
+    assert.equal(await regclass('repository_selection'), null);
+    assert.equal(await regclass('allowed_scope_revision'), null);
     assert.equal(await isolated.manager.count(MemberAccount), 1);
     await isolated.undoLastMigration(); // B 근거 position
     await isolated.undoLastMigration(); // B 제목 null 허용
     await isolated.undoLastMigration(); // A 회원 세션·Refresh 기록
-    assert.equal((await isolated.query("SELECT to_regclass('auth_session') AS name"))[0].name, null);
-    assert.equal((await isolated.query("SELECT to_regclass('session_refresh_token') AS name"))[0].name, null);
+    assert.equal(await regclass('auth_session'), null);
+    assert.equal(await regclass('session_refresh_token'), null);
     assert.equal(await isolated.manager.count(MemberAccount), 1);
     await isolated.undoLastMigration(); // C 공유 링크 및 멱등 FK
-    assert.equal((await isolated.query("SELECT to_regclass('share_link') AS name"))[0].name,null);
+    assert.equal(await regclass('share_link'), null);
     await isolated.undoLastMigration(); await isolated.undoLastMigration(); // B 보호 판단·등록 테이블
-    assert.equal((await isolated.query("SELECT to_regclass('result_application_record') AS table_name"))[0].table_name, 'result_application_record');
+    assert.equal(await regclass('result_application_record'), 'result_application_record');
     await isolated.undoLastMigration();
     assert.equal(await isolated.manager.count(MemberAccount), 1);
-    assert.equal((await isolated.query("SELECT to_regclass('result_application_record') AS name"))[0].name,null);
+    assert.equal(await regclass('result_application_record'), null);
     await isolated.undoLastMigration(); // 회원·분석 기반
     assert.deepEqual((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).map(r=>r.tablename),['migrations']);
     await isolated.runMigrations();
