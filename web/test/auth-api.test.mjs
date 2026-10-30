@@ -5,7 +5,7 @@ import { createAuthSession, createSessionLock } from '../src/lib/auth-session.ts
 import { createLoginMarker, LOGIN_MARKER_KEY } from '../src/lib/auth-login-marker.ts';
 import { createFetchRefreshTransport } from '../src/lib/auth-refresh.ts';
 import { createFetchLogoutTransport } from '../src/lib/auth-logout.ts';
-import { createAuthApi, memberCallBlock, memberMutationOutcome, toClientResult } from '../src/lib/auth-api.ts';
+import { createAuthApi, memberAuthRejected, memberCallBlock, memberMutationOutcome, toClientResult } from '../src/lib/auth-api.ts';
 import { readProfile, saveProfileDetailed } from '../src/features/profile/profile-api.ts';
 import { createCatchApi } from '../src/features/assets/catch-api.ts';
 import { createAssetsStore } from '../src/features/assets/assets-store.ts';
@@ -765,11 +765,12 @@ test('변경 요청 결과 구분: Access 갱신 성공 뒤 401 거부는 renewe
   assert.deepEqual([server.count('PUT /me/profile'), server.state.mutations], [2, 1]);
 });
 
-test('변경 요청 결과 구분: 갱신하지 못한 401은 기존 처리(save-failed)이고, 그 뒤 재인증 필요 상태의 요청은 not-sent다', async () => {
+test('변경 요청 결과 구분: 갱신하지 못한 401은 reauth-rejected(저장 안 됨)이고, 그 뒤 재인증 필요 상태의 요청은 not-sent다', async () => {
   const server = fakeServer();
   const t = await signedInTab(server);
   server.revokeAll();
-  assert.equal(await saveProfileDetailed(featureApi(t), profile), 'save-failed');
+  assert.equal(await saveProfileDetailed(featureApi(t), profile), 'reauth-rejected');
+  assert.equal(server.state.mutations, 0, '서버가 인증 단계에서 거부해 저장되지 않았다');
   assert.equal(t.store.getSnapshot().status, 'reauth-required');
   assert.equal(await saveProfileDetailed(featureApi(t), profile), 'not-sent');
   assert.deepEqual([server.count('PUT /me/profile'), server.count('POST /auth/refresh')], [1, 1], '보내지 않은 요청은 서버에 가지 않는다');
@@ -804,6 +805,17 @@ test('변경 요청 결과 구분: 표시는 결과 모양을 바꾸지 않고, 
   assert.equal(memberMutationOutcome({ ...failed }), 'other');
   assert.equal(memberMutationOutcome({ ...notSent }), 'other', '복사하면 표시가 없어져 기존 처리로 돌아간다');
   assert.equal(memberMutationOutcome({ kind: 'success', status: 200, data: null }), 'other');
+});
+
+test('갱신하지 못한 회원 인증 401만 인증 거부로 본다: 연장 뒤 거부·전환을 끈 401·다른 401·그 밖은 아니다', () => {
+  assert.equal(memberAuthRejected({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm', authRenewal: 'not-renewed' }), true);
+  assert.equal(memberAuthRejected({ kind: 'api-error', status: 401, code: 'AUTH_REQUIRED', message: 'm', authRenewal: 'not-renewed' }), true);
+  assert.equal(memberAuthRejected({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm', authRenewal: 'renewed' }), false, '연장 뒤 거부는 따로 나눈다');
+  assert.equal(memberAuthRejected({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm' }), false, '전환을 끈 기존 호출은 기존 처리 그대로다');
+  assert.equal(memberAuthRejected({ kind: 'api-error', status: 401, code: 'LINK_PASSWORD_INVALID', message: 'm', authRenewal: 'not-renewed' }), false);
+  assert.equal(memberAuthRejected({ kind: 'api-error', status: 500, code: 'INTERNAL_ERROR', message: 'm' }), false);
+  assert.equal(memberAuthRejected({ kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' }), false, '응답 유실·보내지 않음은 아니다');
+  assert.equal(memberAuthRejected(toClientResult({ kind: 'discarded', sent: true })), false, '반영하지 않은 응답은 결과 불명이다');
 });
 
 // ---- 내 자산 Catch 저장 결과 구분(#286 후속, B 동의 #308 pullrequestreview-5565777761) ----
