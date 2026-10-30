@@ -16,10 +16,11 @@ export function HomeMemberPage() {
   return (
     <>
       <h1 className={styles.lead}>GitHub 기록을 나의 경험으로 정리해 보세요.</h1>
-      {view.kind === "loading" && <LoadingState>계정 연결 상태를 확인하고 있습니다.</LoadingState>}
+      {view.kind === "loading" && <LoadingState>홈 준비 상태를 확인하고 있습니다.</LoadingState>}
       {view.kind === "failed" && (
-        <LookupFailedState title="계정 연결 상태를 확인하지 못했습니다" onRetry={retry}>
-          GitHub가 연결되지 않았다는 뜻은 아닙니다. 다시 불러와 주세요.
+        // 연결 상태와 접수 이력 중 어느 조회가 실패해도 같은 안내다. GitHub 연결 실패로 읽히지 않게 홈 준비 상태라고 쓴다(문구는 제안).
+        <LookupFailedState title="홈 준비 상태를 불러오지 못했습니다" onRetry={retry}>
+          다시 불러와 주세요.
         </LookupFailedState>
       )}
       {view.kind === "guide" && (
