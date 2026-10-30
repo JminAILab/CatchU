@@ -15,6 +15,7 @@ import { AnalysisIntakeModule } from './analysis-intake/analysis-intake.module';
 import { RecipientModule } from './recipient/recipient.module';
 import { AiConsentModule } from './ai-consent/ai-consent.module';
 import { WithdrawalModule } from './withdrawal/withdrawal.module';
+import { PublishedIndexModule } from './published-index/published-index.module';
 
 @Module({
   imports: [
@@ -32,6 +33,9 @@ import { WithdrawalModule } from './withdrawal/withdrawal.module';
     // 12월 intent U2: 첫 이용 동의 API(C-04), 탈퇴 DELETE /v1/me(C-06). 파일 저장 설정이 있으면 여기서 기동 때 검사한다.
     AiConsentModule,
     WithdrawalModule,
+    // 12월 intent U3: 발행본 색인·검색(C-08·C-09). 기동 때 임베딩 키를 판정하고 EMBED_PUBLICATION 처리기를 AiRun에 한 번 등록한다(#431).
+    // 큐 주소가 있으면 AiRun이 앱 기동 뒤 ai-run 큐 소비를 시작한다(docs/ai-run.md).
+    PublishedIndexModule,
     // #232는 #252의 실제 선정 공급자(DatabaseRepositorySelectionSource)를 받는 WorkerContextModule.register로 별도 조립한다.
     // 기본 앱에 가짜 선정/동의 해석을 등록하지 않는다(docs/worker-context.md).
   ],
