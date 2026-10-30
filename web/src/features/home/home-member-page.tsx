@@ -36,7 +36,7 @@ export function HomeMemberPage() {
 
 function HomeActionButton({ action }: { action: HomeAction }) {
   if (action.kind === "link") return <Link className={styles.primaryLink} href={action.href}>{action.label}</Link>;
-  // 이동할 화면이 없다. 누를 수 없게 두고, 이유를 버튼 옆에 보이며 보조기기에도 연결한다.
+  // 지금은 할 수 없는 행동이다(GitHub 연결 시작을 막은 환경 등). 누를 수 없게 두고, 이유를 버튼 옆에 보이며 보조기기에도 연결한다.
   return (
     <>
       <button type="button" className={styles.unavailableButton} disabled aria-describedby="home-action-reason">

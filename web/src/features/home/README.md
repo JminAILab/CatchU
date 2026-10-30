@@ -18,12 +18,12 @@
 |---|---|---|---|
 | 조회 중 | — | ‘계정 연결 상태를 확인하고 있습니다’ | 없음 |
 | 조회 실패·계약과 다른 응답 | — | ‘계정 연결 상태를 확인하지 못했습니다’ + [다시 불러오기] | 같은 조회만 다시 보낸다 |
-| `DISCONNECTED` | GitHub 미연결 | 단계 표시(현재: GitHub 연결) + 연결 안내 | [프로필에서 GitHub 연결] 비활성 + 준비 중 이유 |
-| `REAUTH_REQUIRED` | GitHub 재연결 필요 | 단계 표시(현재: GitHub 연결) + 재확인 안내 | [GitHub 다시 연결] 비활성 + 준비 중 이유 |
+| `DISCONNECTED` | GitHub 미연결 | 단계 표시(현재: GitHub 연결) + 연결 안내 | [프로필에서 GitHub 연결] → `/profile/github`. 전환 꺼짐: 비활성 + 이유 |
+| `REAUTH_REQUIRED` | GitHub 재연결 필요 | 단계 표시(현재: GitHub 연결) + 재확인 안내 | [GitHub 다시 연결] → `/profile/github`. 전환 꺼짐: 비활성 + 이유 |
 | `CONNECTED` | GitHub 연결됨 | 단계 표시 없이 관리 안내 | [내 자산에서 저장소 연결 관리] → `/assets` |
 
 - 조회 중·조회 실패는 미연동으로 표시하지 않는다(#155 완료 기준).
-- 미연동·재연동 필요의 목적지는 GitHub 연동 화면(`/profile/github`, #253)이다. 아직 없어 버튼을 비활성(`disabled`)으로 두고 ‘GitHub 연결 화면은 준비 중이라 아직 이동할 수 없습니다.’를 버튼 아래에 보인다(`aria-describedby`로 연결). #253이 연결되면 `home-readiness.ts`의 두 `unavailable`을 `link`로 바꾼다.
+- 미연동·재연동 필요의 목적지는 GitHub 연동 화면(`/profile/github`, [#253](../github-connection/README.md))이다. 공통 인증 통합 시험 전환(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION`)을 끈 제품 기본값에서는 GitHub에 다녀오면 로그인이 사라져 연결을 마칠 수 없으므로, 두 버튼을 비활성(`unavailable`)으로 두고 연동 화면과 같은 이유를 버튼 아래에 보인다(`aria-describedby`). 기준과 문구는 #253의 `githubStartBlockedReason`이며 `use-home-readiness.ts`가 `homeView()`에 넘긴다. 전환을 켜면 연동 화면으로 이동한다.
 - 재연동 필요의 안내 방식은 초안 §6.2에서 [미정]이다. 지금은 미연동과 상태 이름·문구·버튼 이름을 구분하고 같은 연동 화면을 가리킨다.
 - `/me` 조회는 회원 가드의 조회와 별도로 한 번 더 보낸다(`/assets`의 저장소 연결 관리와 같은 방식).
 
@@ -50,5 +50,5 @@
 
 ## 검사
 
-- `npm test`의 `test/home-readiness.test.mjs`: 조회 중, 세 연동 상태의 상태 이름·단계·다음 행동(이동·비활성과 이유), 미연동과 재연동 필요의 구분, ‘연결 전’ 표기 미사용, 조회 실패·통신 오류·계약과 다른 응답(연동 필드 없음·알 수 없는 값)이 미연동이 아닌 조회 실패가 되는지. 합성 응답이며 실제 로그인·API 연결은 검사하지 않는다.
+- `npm test`의 `test/home-readiness.test.mjs`: 조회 중, 세 연동 상태의 상태 이름·단계·다음 행동(이동 대상, 전환 꺼짐의 비활성과 이유), 미연동과 재연동 필요의 구분, ‘연결 전’ 표기 미사용, 조회 실패·통신 오류·계약과 다른 응답(연동 필드 없음·알 수 없는 값)이 미연동이 아닌 조회 실패가 되는지. 합성 응답이며 실제 로그인·API 연결은 검사하지 않는다.
 - 브라우저 확인 기록은 #155 PR에 남긴다.

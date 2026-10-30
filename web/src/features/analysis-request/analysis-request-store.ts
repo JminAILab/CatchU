@@ -1,3 +1,4 @@
+import { memberMutationOutcome } from "../../lib/auth-api.ts";
 import { createIdempotencyKeyHolder, isSettledResult, type IdempotencyKeyHolder } from "../../lib/idempotency.ts";
 import type { AnalysisSummary, AnalyzableRepository, Lookup } from "../repository-management/repository-api.ts";
 import type { AnalysisCreateBody, AnalysisNotice, AnalysisRequestApi, CreateOutcome, Result } from "./analysis-request-api.ts";
@@ -58,6 +59,16 @@ export const TEXT = {
   limited: "요청이 많아 이번 시도는 처리되지 않았습니다. [같은 요청 다시 보내기]로 같은 요청을 다시 보낼 수 있습니다.",
   limitedUncertain: "요청이 많아 이번 시도는 처리되지 않았습니다. 앞선 요청이 접수됐는지는 아직 확인하지 못했습니다. [같은 요청 다시 보내기]로 결과를 확인해 주세요.",
   auth: "로그인이 필요합니다. 다시 로그인한 뒤 확인해 주세요.",
+  // 앞선 결과 불명이 없는 요청이 로그인 연장(갱신 성공) 뒤 401로 거부된 경우. #286 기준 1과 같은 문구다.
+  firstRenewed: "로그인이 연장되었습니다. 다시 눌러 주세요.",
+  // 공통 인증이 보내지 않은 요청(재인증 필요·로그아웃 처리 중 등)은 서버에 가지 않았다. 결과 불명과 나눈다(#286 기준 2).
+  notSent: "지금은 요청을 보내지 않았습니다. 입력은 그대로 두었습니다.",
+  limitedNotSent: "지금은 요청을 보내지 않았습니다. [같은 요청 다시 보내기]로 같은 요청을 다시 보낼 수 있습니다.",
+  // 앞선 시도의 접수 여부를 모르는 채 이번 시도가 처리되지 않은 경우. 이번 결과로 앞선 시도를 확정하지 않는다.
+  unknownNotSent: "앞서 보낸 요청이 접수됐는지 아직 확인하지 못했습니다. 이번에는 요청을 보내지 않았습니다. [같은 요청 다시 보내기]로 같은 요청을 다시 보내 결과를 확인할 수 있습니다.",
+  // 연장(갱신)은 성공했고, 이번 요청만 서버가 인증 오류(401)로 거부한 경우다. 연장을 거부 원인처럼 쓰지 않는다.
+  unknownRenewed: "앞서 보낸 요청이 접수됐는지 아직 확인하지 못했습니다. 로그인이 연장됐지만 이번 요청은 인증 오류로 거부되었습니다. [같은 요청 다시 보내기]를 다시 눌러 결과를 확인해 주세요.",
+  unknownAuth: "앞서 보낸 요청이 접수됐는지 아직 확인하지 못했습니다. 로그인이 필요해 이번 요청은 처리되지 않았습니다.",
   inProgress: "다른 저장소의 분석이 진행 중이라 이번 요청은 접수되지 않았습니다. 진행 중인 분석이 끝난 뒤 다시 요청해 주세요.",
   // 아래 세 안내는 다시 읽기를 시작한 시점에 보인다. 다시 읽기가 끝났다고 단정하지 않는다(실패하면 각 영역에 조회 실패가 따로 보인다).
   consent: "분석 안내나 허용 범위가 바뀌어 이번 요청은 접수되지 않았습니다. 최신 안내와 저장소 목록을 확인한 뒤 다시 동의해 주세요.",
@@ -279,7 +290,7 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
     }
   }
 
-  async function send(body: AnalysisCreateBody): Promise<void> {
+  async function send(body: AnalysisCreateBody, resending = false): Promise<void> {
     const isRetry = body.retryOfRequestId !== undefined;
     // 응답을 기다리기 전에 요청 중 표시와 입력·버튼 차단을 먼저 적용한다(같은 틱의 두 번째 클릭도 막는다).
     emit({ phase: "submitting", retryAt: null, pendingRepositoryId: body.repositoryId, pendingRetry: isRetry, message: null });
@@ -288,6 +299,16 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
     const result = await safely(() => options.requests.create(body, key));
     if (gen !== generation) return;
     if (result.kind === "success") return settle(result.data, isRetry);
+    // 통합 시험 전환을 켰을 때만 원래 구분이 있다(memberMutationOutcome). 끈 기존 호출은 언제나 "other"라 아래 기존 처리다.
+    const outcome = memberMutationOutcome(result);
+    if (outcome === "not-sent") {
+      // 공통 인증이 보내지 않았다(재인증 필요·로그아웃 처리 중 등). 서버에 가지 않았으므로 결과 불명으로 만들지 않는다.
+      // 앞선 시도가 있으면 그 상태(키·본문·안내)를 그대로 두고, 없으면 입력을 둔 채 입력 단계로 돌린다. 다시 보낼지는 사용자가 정한다.
+      if (uncertain) return emit({ phase: "unknown", message: { tone: "error", text: TEXT.unknownNotSent } });
+      if (resending) return emit({ phase: "limited", retryAt: null, message: { tone: "error", text: TEXT.limitedNotSent } });
+      releasePending();
+      return emit({ ...idle, message: { tone: "error", text: TEXT.notSent } });
+    }
     if (result.kind === "api-error" && result.status === 429) {
       // 이번 시도는 처리되지 않았지만, 앞선 불명 시도의 결과까지 확인된 것은 아니다. 키·본문과 uncertain은 유지한다.
       const seconds = "retryAfterSeconds" in result ? result.retryAfterSeconds : undefined;
@@ -299,9 +320,17 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
     }
     if (result.kind === "api-error" && result.status === 401) {
       // 인증 단계에서 거부돼 이번 시도는 처리되지 않았다. 앞선 시도의 결과를 모르면 그 결과는 여전히 모른다.
-      if (uncertain) return emit({ phase: "unknown", message: { tone: "error", text: TEXT.auth } });
+      // 앞선 불명 안내를 지우지 않고, 이번 시도의 인증 결과(연장됨·로그인 필요)를 함께 알린다.
+      if (uncertain) {
+        const text = outcome === "renewed-rejected" ? TEXT.unknownRenewed : TEXT.unknownAuth;
+        return emit({ phase: "unknown", message: { tone: "error", text } });
+      }
+      // 앞선 결과 불명이 없으면 이 요청은 서버의 인증 단계에서 거부돼 접수 기록이 남지 않았으므로 지금처럼 키·본문을 놓는다(다시 누르면 새 키).
+      // 보내지 않음(not-sent)은 위에서 따로 처리했다. 여기는 서버에 도달한 뒤 401로 거부된 경우다.
+      // 연장된 경우에는 재로그인이 아니라 다시 누르라고 안내한다. 연장되지 않았으면 기존 안내다.
       releasePending();
-      return emit({ ...idle, message: { tone: "error", text: TEXT.auth } });
+      const text = outcome === "renewed-rejected" ? TEXT.firstRenewed : TEXT.auth;
+      return emit({ ...idle, message: { tone: "error", text } });
     }
     if (result.kind === "api-error" && isSettledResult(result)) {
       releasePending();
@@ -348,7 +377,18 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
   /** 응답 불명·빈도 제한 뒤 [같은 요청 다시 보내기]: 기한이 지난 뒤 같은 키·같은 본문으로만 보낸다. */
   async function resend(): Promise<void> {
     if (!canResend() || pendingBody === null) return;
-    await send(pendingBody);
+    await send(pendingBody, true);
+  }
+
+  /**
+   * 사용자가 로그아웃·다시 로그인하면 잃게 될 미확정 요청의 확인·재전송 정보를 아직 붙잡고 있는지(O-3, D 결정 10/21).
+   * 상태 이름이 아니라 서버가 이미 받았을 수 있는 요청이 있는지로 정한다. 부를 때마다 현재 상태를 읽는다.
+   * - 대상: 요청 중(응답 대기), 응답 불명, 앞선 시도의 결과 불명이 남은 빈도 제한(그 뒤 보내지 않음 포함).
+   * - 대상 아님: 입력 단계(아직 안 보냄·최초 보내지 않음·연장 뒤 401·확정 뒤), 앞선 결과 불명이 없는 빈도 제한
+   *   (서버가 처리하지 않은 시도뿐이다. 일반 미저장 입력으로 볼지는 정하지 않았다).
+   */
+  function holdsUnconfirmedRequest(): boolean {
+    return state.phase === "submitting" || state.phase === "unknown" || (state.phase === "limited" && uncertain);
   }
 
   return {
@@ -362,7 +402,7 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
       statusWatchers.add(watch);
       return () => { statusWatchers.delete(watch); };
     },
-    open, load, loadRepositories, loadNotice, select, canSubmit, submit, canRetry, retry, canResend, resend, retryWaitSeconds,
+    open, load, loadRepositories, loadNotice, select, canSubmit, submit, canRetry, retry, canResend, resend, retryWaitSeconds, holdsUnconfirmedRequest,
     /** 화면(내 자산)을 떠날 때: 진행 중 조회를 취소하고 늦은 응답을 버리며 처음 상태로 돌린다. 보낸 POST는 취소하지 않는다. */
     dispose() {
       generation += 1;

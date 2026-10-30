@@ -91,6 +91,16 @@ spec:
                 secretKeyRef:
                   name: catchu-api
                   key: LINK_GRANT_SECRET
+            - name: CATCHU_GENERATION_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: catchu-api
+                  key: CATCHU_GENERATION_API_KEY
+            - name: CATCHU_EMBEDDING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: catchu-api
+                  key: CATCHU_EMBEDDING_API_KEY
           resources:
             requests:
               cpu: 100m

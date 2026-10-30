@@ -78,20 +78,6 @@
   cursor: progress;
 }
 
-/* 아직 연결되지 않은 항목: 누를 수 없음을 글자색·표시·커서로 함께 알린다(프로필 메뉴의 [로그아웃]과 같은 표시). */
-.pendingAction {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: 1px solid var(--color-line);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-muted);
-  font-size: 15px;
-  cursor: not-allowed;
-}
-
 .formActions {
   display: flex;
   gap: 8px;

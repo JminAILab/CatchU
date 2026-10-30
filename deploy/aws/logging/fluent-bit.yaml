@@ -1,0 +1,123 @@
+# 로그 수집기 aws-for-fluent-bit(이미지 3.2.1 = Fluent Bit 4.2.2) 실행 파일(#276, 2026-10-29 MVP 결정). 설치·확인은 README.md.
+# Helm 차트 aws-for-fluent-bit 0.2.0(sha256 666c244b9cfca211be57cf97d9e224157f581d41f413eb89744575fbc9b8980c)을
+# helm template으로 그린 것에서 ClusterRole·ClusterRoleBinding·Service와 Helm 표시를 뺐다. 차트는 끌 수 없는 ClusterRole에
+# nodes/proxy get을 넣는데, 이 권한은 kubelet API로 그 노드의 모든 Pod에서 명령 실행까지 허용한다(Kubernetes 「RBAC good practices」).
+# 이 수집기는 쿠버네티스 API를 부르지 않으므로 쿠버네티스 권한을 하나도 두지 않는다(#430 리뷰).
+# 차트 판을 올릴 때는 다시 그려 이 파일과 비교한다. 이미지만 올릴 때는 아래 image 한 줄을 바꾼다.
+# 적용은 kubectl apply -f로 하고, ConfigMap만 바꿨으면 수집기를 다시 띄운다(README.md 「설정 바꾸기」).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aws-for-fluent-bit
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-for-fluent-bit
+    app.kubernetes.io/part-of: catchu
+# AWS 권한은 cluster.yaml의 Pod Identity 연결(이 이름)로 받는다. Pod Identity는 자기 토큰(대상 pods.eks.amazonaws.com)을
+# 따로 붙이므로 쿠버네티스 API 토큰은 붙이지 않는다.
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-for-fluent-bit
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-for-fluent-bit
+    app.kubernetes.io/part-of: catchu
+data:
+  # [INPUT] 컨테이너 로그 파일 이름은 <Pod>_<namespace>_<컨테이너>-<ID>.log다. namespace가 catchu인 것만 맞는다(catchu-ops는 맞지 않는다).
+  #   kube-system·catchu-ops(DB 관리 psql)는 모으지 않는다. 쿠버네티스 정보 붙이기(API 조회)는 두지 않는다. Pod·컨테이너 이름은 스트림 이름에 있다.
+  # [FILTER] 모양을 아는 토큰이 든 줄은 통째로 버린다. 일부만 가리면 꼴을 조금 바꾼 값이 빠져나가기 때문이다. 대소문자를 가리지 않는다.
+  #   정규식 하나로 둔다(Exclude를 여러 줄로 나누면 묶는 방식에 따라 결과가 달라진다). 버리는 꼴: JWT(Access 토큰 등), Bearer 값,
+  #   GitHub 토큰(ghp_ 등·github_pat_), Anthropic 키(sk-ant-), Voyage 키(pa-), Google 클라이언트 비밀(GOCSPX-),
+  #   공유 링크 토큰이 든 주소(/s/·/public/links/ 뒤 43자), 로그인 콜백의 code·state 값.
+  #   DB 비밀번호처럼 꼴이 정해지지 않은 값은 잡지 못한다. 앱이 값을 로그에 쓰지 않는 것이 먼저다(코딩 절차 「자료와 실행 로그」).
+  #   바꾸면 logs.test.sh로 실제 Fluent Bit에서 시험한다.
+  # [OUTPUT] 로그 그룹 /catchu/eks/app(보존 14일)은 create-log-group.sh가 미리 만든다. auto_create_group을 적지 않아 기본값(false)이라
+  #   그룹을 만들지 않는다. log_key로 로그 줄 원문만 보낸다. 스트림 이름은 app-kube.var.log.containers.<파일 이름>이 된다.
+  fluent-bit.conf: |
+    [SERVICE]
+        HTTP_Server  On
+        HTTP_Listen  0.0.0.0
+        HTTP_PORT    2020
+        Health_Check On
+        HC_Errors_Count 5
+        HC_Retry_Failure_Count 5
+        HC_Period 5
+        Parsers_File /fluent-bit/parsers/parsers.conf
+    [INPUT]
+        Name              tail
+        Tag               kube.*
+        Path              /var/log/containers/*_catchu_*.log
+        DB                /var/log/flb_kube.db
+        multiline.parser  docker, cri
+        Mem_Buf_Limit     5MB
+        Skip_Long_Lines   On
+        Refresh_Interval  10
+    [FILTER]
+        Name    grep
+        Match   kube.*
+        Exclude log (?i)(eyJ[A-Za-z0-9_-]{8,}\.eyJ|bearer\s+[A-Za-z0-9._~+/=-]{8,}|gh[opusr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-ant-[A-Za-z0-9_-]{8,}|\bpa-[A-Za-z0-9_-]{30,}|GOCSPX-[A-Za-z0-9_-]{8,}|/(s|public/links)/[A-Za-z0-9_-]{43}|[?&](code|state)=[^&\s]{8,})
+    [OUTPUT]
+        Name                  cloudwatch_logs
+        Match                 *
+        region                ap-northeast-2
+        log_group_name        /catchu/eks/app
+        log_stream_prefix     app-
+        log_key               log
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: aws-for-fluent-bit
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-for-fluent-bit
+    app.kubernetes.io/part-of: catchu
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aws-for-fluent-bit
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aws-for-fluent-bit
+        app.kubernetes.io/part-of: catchu
+    spec:
+      serviceAccountName: aws-for-fluent-bit
+      # 호스트 망을 쓰지 않는다. 노드의 인스턴스 메타데이터(노드 IAM 권한)는 cluster.yaml의 disablePodIMDS로 막혀 있다.
+      dnsPolicy: ClusterFirst
+      containers:
+        - name: aws-for-fluent-bit
+          image: public.ecr.aws/aws-observability/aws-for-fluent-bit:3.2.1
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: config
+              mountPath: /fluent-bit/etc/
+            # 컨테이너 로그를 읽고 읽은 위치(flb_kube.db)를 노드에 남긴다. containerd 노드라 /var/lib/docker/containers는 붙이지 않는다.
+            - name: varlog
+              mountPath: /var/log
+          resources:
+            requests:
+              cpu: 50m
+              memory: 50Mi
+            limits:
+              memory: 250Mi
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 2020
+              scheme: HTTP
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 2
+      volumes:
+        - name: config
+          configMap:
+            name: aws-for-fluent-bit
+        - name: varlog
+          hostPath:
+            path: /var/log
