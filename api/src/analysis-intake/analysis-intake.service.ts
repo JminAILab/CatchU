@@ -136,7 +136,7 @@ export class AnalysisIntakeService {
             const { status } = await readAnalysisStatus(same, memberId, latest.requestId);
             if (input.retryOfRequestId !== latest.requestId || !status.retry.allowed) throw new ApiError('RETRY_NOT_ALLOWED');
           } else if (input.retryOfRequestId) throw new ApiError('RETRY_NOT_ALLOWED');
-          // 제공자가 없으면 한도를 무시한 실행을 만들지 않는다. U2 실제 조립은 별도로 검증한다.
+          // 제품 모듈은 U2 DailyRunLimit을 연결한다. 누락된 별도 조립도 한도 없이 접수하지 않는다.
           if (!this.dailyLimit) throw new ApiError('INTERNAL_ERROR');
           const consumed = await this.dailyLimit.consume(memberId, 'ANALYSIS', new Date(), same);
           if (consumed === 'LIMIT_REACHED') throw new ApiError('DAILY_LIMIT_REACHED');
