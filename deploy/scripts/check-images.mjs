@@ -319,7 +319,7 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
   cleanups.push(() => docker(["rm", "-f", ...docker(["ps", "-aq", "--filter", `name=^${PROJECT}-`]).stdout.split("\n").filter(Boolean)]));
   const envValues = (file) => Object.fromEntries(readFileSync(path.join(envDir, file), "utf8").split("\n").filter((line) => /^[A-Z_]+=/.test(line)).map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]));
   const apiEnv = envValues("api.env");
-  const secrets = [apiEnv.AUTH_JWT_SECRET, apiEnv.LINK_GRANT_SECRET, apiEnv.DB_PASSWORD, envValues("migration.env").DB_PASSWORD, envValues("db.env").POSTGRES_PASSWORD].filter(Boolean);
+  const secrets = [apiEnv.AUTH_JWT_SECRET, apiEnv.LINK_GRANT_SECRET, apiEnv.CATCHU_EMBEDDING_API_KEY, apiEnv.DB_PASSWORD, envValues("migration.env").DB_PASSWORD, envValues("db.env").POSTGRES_PASSWORD].filter(Boolean);
   const wrongCa = path.join(work, "wrong-ca.pem");
   must("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=catchu wrong CA", "-keyout", path.join(work, "wrong-ca.key"), "-out", wrongCa]);
   run("chmod", ["644", wrongCa]);
@@ -785,7 +785,7 @@ fi`));
       collect(`${img} 기록`, ["history", "--no-trunc", "--format", "{{.CreatedBy}}", img]);
     }
     const verdict = secretVerdict(secrets, captured, collectFailed);
-    expect(secrets.length === 5 && verdict.ok, verdict.detail);
+    expect(secrets.length === 6 && verdict.ok, verdict.detail);
     return verdict.detail;
   });
 
