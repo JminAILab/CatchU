@@ -1,0 +1,40 @@
+{
+  "publicationId": "00000000-0000-4000-8000-0000000000bb",
+  "targetVersion": "test-fixture",
+  "snapshot": {
+    "title": "평가 시험 발행본",
+    "publishedAt": "2026-11-02T03:00:00.000Z",
+    "expiresAt": "2027-01-31T03:00:00.000Z",
+    "items": [
+      {
+        "publishedItemId": "00000000-0000-4000-8000-0000000000c1",
+        "position": 1,
+        "itemKind": "CATCH",
+        "title": "합성 Catch",
+        "pdfPages": null,
+        "snapshot": {
+          "workFacts": ["SYNTHETIC-GOLD 검색 결과 화면에 빈 목록 안내를 더했다.", "목록을 다시 불러오는 버튼을 만들었다."],
+          "subjectContribution": "안내 문구와 버튼을 직접 만들고 리뷰를 반영했다.",
+          "evidence": [{ "sourceUrl": "https://github.com/synthetic-owner/synthetic-repo/pull/12", "sourceRevision": "def5678", "representedFacts": ["PR #12에서 안내 문구를 더했다."] }],
+          "authorDescription": null,
+          "aiDraft": "SYNTHETIC-AIDRAFT 초안",
+          "mismatch": false
+        }
+      },
+      {
+        "publishedItemId": "00000000-0000-4000-8000-0000000000c2",
+        "position": 2,
+        "itemKind": "TEXT_MATERIAL",
+        "title": "합성 자료",
+        "pdfPages": null,
+        "snapshot": { "body": "배포는 개발 서버에 먼저 올린다.\n\n시험은 합성 자료로만 한다. 시험은 합성 자료로만 한다." }
+      }
+    ]
+  },
+  "questions": [
+    { "question": "SYNTHETIC-QUESTION 빈 목록일 때 무엇을 보여 주나요?", "goldQuotes": ["SYNTHETIC-GOLD 검색 결과 화면에 빈 목록 안내를 더했다."] },
+    { "question": "배포는 어디에 먼저 하나요?", "goldQuotes": ["개발 서버에 먼저"] },
+    { "question": "시험 자료는 무엇을 쓰나요?", "goldQuotes": ["합성 자료로만"] }
+  ],
+  "jd": "SYNTHETIC-JD 오류 안내 화면 경험\n\n배포 절차 이해"
+}

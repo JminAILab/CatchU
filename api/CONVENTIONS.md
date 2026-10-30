@@ -27,6 +27,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/publications/`                     | 12월 U4 발행본의 첫 경계 제출: C-07 `publication`·`published_item` 엔티티와 사본 모양, C-10 `PublicationAccess` 인터페이스와 시험 전용 메모리 가짜 구현(앱 미등록, [docs/publications.md](docs/publications.md)) |
 | `src/published-index/`                  | 12월 U3 발행본 색인·검색: C-08 `PublishedIndexWriter`(발행 트랜잭션 안 조각 나누기·[검색 다시 준비]), `EMBED_PUBLICATION` 처리기, C-09 `PublishedSearch`(색인 상태·발행본 하나 안 의미 검색), Voyage·합성 임베딩 제공자, `publication_index`·`published_chunk` 엔티티([docs/published-index.md](docs/published-index.md)). 기본 앱에는 미등록 |
 | `src/materials/`                        | 12월 U4 텍스트 자료 표 C-13 `text_material` 엔티티([docs/publications.md](docs/publications.md)) |
+| `src/rag-answer/`                       | 12월 U5 받은 사람 질의응답(SSE·질문 다시 쓰기·링크당 하루 질문 횟수)과 AI 기본 요약(`BASE_SUMMARY` 처리기·받은 사람/작성자 읽기·[다시 만들기]), `base_summary` 엔티티. 평가 스크립트는 `scripts/rag-eval/`([docs/rag-answer.md](docs/rag-answer.md)). U4 DB `PublicationAccess` 합류 전이라 기본 앱에는 미등록 |
 | `src/recipient/`                        | 비로그인 수신자 조회(#151, [docs/recipient-read.md](docs/recipient-read.md)). #150 링크·소유 회원 판정·B 공개 Catch 조회·A `OwnerProfileReader`를 재사용. 기본 앱에 등록 |
 | `src/member-repositories/repository-selection.*.ts` | 현재 선정의 DB 정본(엔티티)과 목록·#323 접수 재확인·#232 worker 선정 공급(#252, [docs/repository-selection.md](docs/repository-selection.md)). 좌표는 같은 폴더의 #319 카탈로그에서 읽음 |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
@@ -207,10 +208,11 @@ export class ExamplePublicController {
 | 미인증·수신자 비밀번호 | 401 | AUTH_REQUIRED, AUTH_INVALID, LINK_PASSWORD_REQUIRED, LINK_PASSWORD_INVALID |
 | 권한·선행 조건·요청 출처 | 403 | GITHUB_CONNECTION_REQUIRED, REPOSITORY_NOT_ALLOWED, CONSENT_REQUIRED, AUTH_ORIGIN_FORBIDDEN, AI_CONSENT_REQUIRED(12월 U2, 외부 AI 첫 이용 동의 없음) |
 | 없음·열람 불가 | 404 | RESOURCE_UNAVAILABLE, LINK_UNAVAILABLE |
-| 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED |
+| 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED, INDEX_NOT_READY(12월 U5 질의응답·U10 JD 요약, 계약 C-09·C-12, 문구 "아직 쓸 수 없습니다". 화면 문구는 각 기능의 web 문구 표가 정함) |
 | 수신자 비밀번호 시도 제한 | 429 | LINK_UNLOCK_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds })`) |
 | 회원 링크 발급 빈도 제한 | 429 | RATE_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('RATE_LIMITED', { retryAfterSeconds })`) |
 | 계정당 하루 실행 한도(12월 U2) | 429 | DAILY_LIMIT_REACHED (문구 "오늘 한도에 도달했습니다", 남은 횟수·`Retry-After` 없음, [docs/daily-run-limit.md](docs/daily-run-limit.md)) |
+| 링크당 하루 질문 한도(12월 U5) | 429 | QUESTION_LIMIT_REACHED (계약 C-12, 문구 "오늘 한도에 도달했습니다", 남은 횟수·`Retry-After` 없음, [docs/rag-answer.md](docs/rag-answer.md)) |
 | 서버 오류 | 500 | INTERNAL_ERROR, WITHDRAWAL_FAILED(12월 U2 탈퇴 단계 실패, [docs/withdrawal.md](docs/withdrawal.md)) |
 
 기능에서는 `src/common/errors`의 `ApiError`를 던진다. HTTP 상태는 코드에 따라 정해진다.
