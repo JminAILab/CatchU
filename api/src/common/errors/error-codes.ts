@@ -72,7 +72,7 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   LINK_LIMIT_REACHED: '유효한 링크는 최대 5개까지 만들 수 있습니다.',
   LINK_UNLOCK_LIMITED: '비밀번호 시도가 많아 잠시 뒤에 다시 시도할 수 있습니다.',
   RATE_LIMITED: '요청이 많아 잠시 뒤에 다시 시도할 수 있습니다.',
-  DAILY_LIMIT_REACHED: '오늘 한도에 도달했습니다.',
+  DAILY_LIMIT_REACHED: '오늘 한도에 도달했습니다',
   INTERNAL_ERROR: '처리 중 오류가 발생했습니다.',
   AI_CONSENT_REQUIRED: '외부 AI 전송에 먼저 동의해 주세요.',
   // 계약 C-03이 문구를 정했다. 남은 횟수·한도 값은 어디에도 넣지 않는다(BR1.4).

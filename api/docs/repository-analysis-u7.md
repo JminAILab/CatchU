@@ -20,7 +20,7 @@
 
 등록은 분석을 접수하지 않는다. 현재 고지와 등록의 범위 판본을 읽고 새 동의를 받아 기존 `POST /v1/analysis-requests`로 접수한다. 같은 키·같은 본문이면 먼저 저장된 요청의 현재 상태를 반환한다. 새 접수는 외부 공개 확인을 트랜잭션 밖에서 하고, 회원·연결·등록·범위를 기존 회원 잠금 안에서 재대조한다. 등록 ID·GitHub ID·확인 좌표·자료 종류·범위 판본을 불변 동의 사본에 저장한다. 이후 등록 이름을 바꿔도 과거 요청의 좌표는 바뀌지 않는다.
 
-`ANALYSIS_DAILY_RUN_LIMIT` 소비 경계는 모든 조건을 통과한 뒤 같은 `EntityManager`에서 C-03 `consume(memberId, 'ANALYSIS', now, manager)`를 호출한다. 등록·조회·동일 키·같은 ACTIVE 재응답은 소비하지 않고 접수 롤백은 소비도 롤백한다. 실행 실패는 환급하지 않는다. 현재 U2 #414 실제 제공자가 연결되지 않아 제품 신규 접수는 `500 INTERNAL_ERROR`로 닫힌다. 시험용 제공자 통과는 KST 계산·실제 C-03 통합 증거가 아니다. 무제한 제품 대체 구현은 없다.
+`ANALYSIS_DAILY_RUN_LIMIT` 소비 경계는 모든 조건을 통과한 뒤 같은 `EntityManager`에서 C-03 `consume(memberId, 'ANALYSIS', now, manager)`를 호출한다. 제품 `AnalysisIntakeModule`이 `DailyRunLimitModule`을 가져오고 소비 토큰을 U2 `DailyRunLimit`에 `useExisting`으로 연결한다. 등록·조회·동일 키·같은 ACTIVE 재응답은 소비하지 않고 접수 롤백은 소비도 롤백한다. 실행 실패는 환급하지 않는다. 분석·기본 요약·JD 요약은 회원별 KST 날짜의 같은 횟수를 사용한다([C-03 안내](daily-run-limit.md)). 별도 조립에서 제공자를 누락하면 `500 INTERNAL_ERROR`로 거부하며 무제한 제품 대체 구현은 없다.
 
 기존 두 실패 재요청 분기와 새 키·새 동의·현재 한도 조건을 유지한다. `FAILED/APPLIED/CLOSED`는 실패 확정·후보/등록 Catch 없음이 필요하다. `APPLY_FAILED/CLOSED`는 처리 상태와 무관하게 등록 Catch가 없어야 한다. 정상·EMPTY·유효 부분 결과·실행 불명·복구 중에는 재생성하지 않는다.
 
@@ -44,4 +44,6 @@ Result와 회원 상태에 `ownCommitObservation`, `observedOwnCommitCount`, `co
 
 `npm.cmd test -- test/repository-registration.test.cjs test/db/repository-registration.test.cjs test/db/u7-analysis-intake.test.cjs test/u7-worker-context.test.cjs test/analysis/u7-receiver.test.cjs test/integration/u7-analysis-chain.test.cjs`는 전용 `_test` PostgreSQL에 실행한다. `CATCHU_TEST_REDIS_URL`은 전용 시험 Valkey로 지정한다. 미설정 skip은 통과가 아니다. 전체 명령·커버리지 대상은 [Unit 검사 지침](../../aidlc/spaces/default/intents/260925-intent-12/construction/u7-repository-analysis/code-generation/unit-test-instructions.md)을 따른다.
 
-실제 GitHub·LLM 분석, 실제 거부 1~2종, 약 500개 실측은 합성 외부 응답 검사와 별개다. 사용자는 CatchU 공개 전환을 선택했지만 공개 적용, 실제 C-03, 고지 확정 및 실행 조건이 남아 있다. 합성 500개에서 기존 상세·생성 상한 200을 유지하며 전체 500개 분석 성공으로 기록하지 않는다. 상한 확정은 실제 측정 후 결정한다.
+`npm.cmd test -- test/integration/u7-c03-product.test.cjs`는 제품 `createApplicationModule()`·인증·HTTP 접수·U2 실제 C-03·PostgreSQL 연결을 확인한다. 회원/연결 자료와 GitHub 응답은 합성이며 큐·worker·외부 생성은 실행하지 않는다. 등록·조회·동의 거부의 미소비, 동시 접수·재응답의 1회 소비, 요약과 합산한 한도 거부, KST 자정, 접수 저장 실패의 전체 롤백, 확정 실패 뒤 재요청 소비를 검사한다. C-03 연결은 [팀장 결정](https://github.com/JminAILab/CatchU/issues/424#issuecomment-6491890788)에 따라 AI-DLC 승인 뒤 직접 수정했으며, [새 폴더에서 검사·PR을 진행하는 후속 결정](https://github.com/JminAILab/CatchU/issues/424#issuecomment-6511087844)을 따른다. 실행 결과는 제출 PR에 기록한다.
+
+실제 GitHub·LLM 분석, 실제 거부 1~2종, 약 500개 실측은 합성 외부 응답 검사와 별개다. 사용자는 CatchU 공개 전환을 선택했지만 공개 적용, 고지 확정 및 실제 실행 조건 확인이 남아 있다. 합성 500개에서 기존 상세·생성 상한 200을 유지하며 전체 500개 분석 성공으로 기록하지 않는다. 상한 확정은 실제 측정 후 결정한다.
