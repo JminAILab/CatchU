@@ -166,8 +166,9 @@ test('Nest 조립 시 주입 설정 없음이면 인증해도 거부한다', asy
 });
 
 test('Nest 조립 시 production + 주입 설정 true라도 인증된 주입을 거부한다', async (t) => {
-  // production은 공유 URL 주소(#147)와 grant 서명 키(#150)가 필수라 합성 값을 함께 준다.
-  const app = await server(t, { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' });
+  // production은 공유 URL 주소(#147)·grant 서명 키(#150)·임베딩 키(#431)가 필수라 합성 값을 함께 준다.
+  const app = await server(t, { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111',
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key' });
   assert.equal((await app.post('/v1/__test/analysis/test-request/message',
     { kind: 'Result', template: template(), caseId: 'case' }, await app.issueTestToken())).status, 403);
   assert.equal(app.store.commits, 0);

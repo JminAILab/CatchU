@@ -33,6 +33,7 @@ before(async () => {
   Object.assign(settings, { NODE_ENV: 'production', DEV_LOGIN_ENABLED: undefined, AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
     AUTH_ACCESS_TOKEN_TTL_SECONDS: '900', AUTH_WEB_ORIGIN: 'https://catchu.example',
     SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key', // 운영 모드 기동에 필요한 합성 임베딩 키(#431)
     CORS_ALLOWED_ORIGINS: undefined, WORKER_CONTEXT_ENABLED: 'true', WORKER_CONTEXT_API_KEY: randomBytes(32).toString('hex'),
     GITHUB_CONNECTION_ENABLED: 'true', GITHUB_OAUTH_CLIENT_ID: 'synthetic-client', GITHUB_OAUTH_CLIENT_SECRET: 'SYNTHETIC_SECRET',
     GITHUB_OAUTH_CALLBACK_URL: 'https://catchu.example/github/callback', GITHUB_CREDENTIAL_DIRECTORY: directory,
