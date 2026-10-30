@@ -147,7 +147,7 @@ npm test
 |---|---|---|
 | `GET /v1/me/analysis-summary` | 쿼리 없음. 기존 전역 회원 Guard와 `@CurrentMemberId()`로 본인 요청만 본다 | 200 `{"hasAcceptedAnalysisRepository": boolean}` |
 
-- `true`: 본인의 영속 접수 요청(`requestState` ACCEPTED)이 1건 이상이다. 처리 상태(대기·진행·실행 불명·성공·0건·부분 실패·실패·반영 실패)와 실패 뒤 재요청에 관계없이 세고, 지금 선정 목록에서 빠진 저장소의 요청도 센다.
+- `true`: 본인의 영속 접수 요청(`requestState` ACCEPTED)이 1건 이상이다. 처리 상태(대기·진행·실행 불명·반영 대기·성공·0건·부분 실패·실패·반영 실패)와 실패 뒤 재요청에 관계없이 세고, 지금 선정 목록에서 빠진 저장소의 요청도 센다.
 - `false`: 정상 조회 결과 본인 접수 요청이 0건이다.
 - 거절된 접수 시도는 분석 요청을 만들지 않으므로 세지 않는다. 다른 회원의 요청도 세지 않는다.
 - `true`는 지금 분석할 수 있다거나 분석이 끝났다는 뜻이 아니다. GitHub 연결 상태는 `GET /v1/me`, 저장소 선정은 [`GET /v1/me/repositories`](member-repositories.md), 요청별 상태는 위 이력·개별 상태 조회가 맡는다. `GET /v1/me` 응답은 바꾸지 않았다.
