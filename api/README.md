@@ -213,7 +213,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 본인 분석 이력·개별 상태 조회 — #140
 
-[docs/analysis-history.md](docs/analysis-history.md)에 있다.
+[docs/analysis-history.md](docs/analysis-history.md)에 있다. 홈용 본인 접수 이력 유무(`GET /v1/me/analysis-summary`, #428)도 같은 문서에 있다.
 
 ## 본인 회원·프로필 조회와 전체 저장 — #135
 

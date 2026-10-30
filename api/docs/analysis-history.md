@@ -1,5 +1,7 @@
 # 본인 분석 이력·개별 상태 조회 — #140
 
+홈용 본인 접수 이력 유무(`GET /v1/me/analysis-summary`, #428)는 [아래 절](#홈용-본인-접수-이력-유무--428)에 있다.
+
 ## 기준과 범위
 
 다음 기준을 따른다.
@@ -136,3 +138,38 @@ npm test
 **검증하지 않은 것.** 실제 Google 로그인·GitHub 연결·LIVE 자료, 큐·worker 왕복, 화면 연결, 시간 경과에 따른 주기 실행.
 
 **알려진 한계.** 페이지 위치는 위 인덱스로 찾지만, 항목마다 접수와 같은 상태 판정을 따로 읽는다. 그래서 한 페이지의 쿼리 수가 항목 수에 비례한다(기본 20·최대 100). 이력이 많을 때의 응답 시간은 측정하지 않았다.
+
+## 홈용 본인 접수 이력 유무 — #428
+
+홈([#155](https://github.com/JminAILab/CatchU/issues/155))이 ‘저장소 연결 전’과 ‘준비 완료’를 나누는 데 쓰는 값이다. 기준은 [회원 API](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml)의 `GET /me/analysis-summary`(getAnalysisSummary)와 [계약 요약 「분석 접수·상태·재요청」](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#분석-접수상태재요청)의 ‘접수 이력 유무’ 행이다. 계약은 [#155 합의](https://github.com/JminAILab/CatchU/issues/155#issuecomment-6488715811)대로 [PR #432](https://github.com/JminAILab/CatchU/pull/432)에서 정했다.
+
+| 경로 | 입력 | 성공 |
+|---|---|---|
+| `GET /v1/me/analysis-summary` | 쿼리 없음. 기존 전역 회원 Guard와 `@CurrentMemberId()`로 본인 요청만 본다 | 200 `{"hasAcceptedAnalysisRepository": boolean}` |
+
+- `true`: 본인의 영속 접수 요청(`requestState` ACCEPTED)이 1건 이상이다. 처리 상태(대기·진행·실행 불명·성공·0건·부분 실패·실패·반영 실패)와 실패 뒤 재요청에 관계없이 세고, 지금 선정 목록에서 빠진 저장소의 요청도 센다.
+- `false`: 정상 조회 결과 본인 접수 요청이 0건이다.
+- 거절된 접수 시도는 분석 요청을 만들지 않으므로 세지 않는다. 다른 회원의 요청도 세지 않는다.
+- `true`는 지금 분석할 수 있다거나 분석이 끝났다는 뜻이 아니다. GitHub 연결 상태는 `GET /v1/me`, 저장소 선정은 [`GET /v1/me/repositories`](member-repositories.md), 요청별 상태는 위 이력·개별 상태 조회가 맡는다. `GET /v1/me` 응답은 바꾸지 않았다.
+
+| 상황 | 응답 |
+|---|---|
+| 인증 없음 | `401 AUTH_REQUIRED`(공통 Guard) |
+| 토큰·세션 오류 | `401 AUTH_INVALID`(공통 Guard) |
+| 쿼리가 붙음(이름·값과 무관) | `400 VALIDATION_FAILED`, `details.violations=[{field:"query", reason:"whitelistValidation"}]` |
+| DB 조회 오류 | `500 INTERNAL_ERROR`. `false`로 바꾸지 않는다 |
+
+성공·오류 모두 `Cache-Control: no-store`다. 오류 응답에는 입력값·SQL·스택·토큰을 넣지 않는다. 연결·저장소·동의를 판단하지 않고 경로에 자원 ID가 없어 403·404는 없다. 홈에서 `500`은 이력 유무를 알 수 없다는 뜻이며 `false`(이력 없음)가 아니다. 401은 다른 회원 경로처럼 web 공통 인증(#286)이 세션 갱신·재로그인으로 처리한다.
+
+**구현.** `AnalysisHistoryService.summary`가 회원 ID와 `ACCEPTED` 조건으로 `analysis_request`에 행이 있는지 한 문장(`existsBy`)으로 확인한다. 회원 조건은 기존 회원별 인덱스 `(member_id, submitted_at, request_id)`의 앞 칼럼이며, 실행 계획과 응답 시간은 측정하지 않았다. 쓰기·행 잠금이 없고, 새 마이그레이션·환경변수·오류 코드도 없다.
+
+**`test/db/analysis-summary.test.cjs`.** 실제 Nest HTTP·인증 Guard·전용 PostgreSQL에서 다음을 본다(`npm test -- test/db/analysis-summary.test.cjs`).
+
+- 이력 없음은 false다. 처리 상태 9가지와 실제 실패 재요청 뒤에는 true이고, 조회 전후 접수 관련 표가 같으며, `GET /v1/me`에는 이 값이 없다.
+- 다른 회원에게만 이력이 있으면 false이고, 쿼리로 회원을 고를 수 없다.
+- 현재 선정 목록에 없는 저장소의 지난 접수도 true다.
+- 조회 장애는 500이고, 로그에는 경로 틀·코드만 남는다. 장애가 풀리면 같은 값을 다시 읽는다.
+- 인증 없음·잘못된 토큰은 401, 쿼리는 400이다.
+- 모든 응답을 dev에 병합된 계약의 응답 코드 목록·본문 스키마(Ajv)·no-store 헤더와 대조한다.
+
+처리 상태와 선정 목록에 없는 저장소의 요청은 시험 DB에 직접 구성했고, 조회 장애는 시험 중 표 이름을 잠시 바꿔 만든다. 개발 회원만 썼다(실제 회원도 같은 회원 ID 조건으로 읽는다). 실제 Google 로그인·실제 회원의 LIVE 접수와 홈 화면 연결(#155)은 검증하지 않았다.
