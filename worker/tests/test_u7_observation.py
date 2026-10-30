@@ -1,6 +1,7 @@
 """C4 본인 커밋 관측: 후보 수와 분리한 실제 숫자 ID 기준 판정."""
 
 from dataclasses import replace
+from typing import Literal
 
 import pytest
 from candidate_scenarios import ROOT, Scenario, commit, root_commit, run_case
@@ -84,14 +85,15 @@ def test_found_survives_no_candidate_and_deduplicates_commit_sha() -> None:
 
 
 def test_generation_output_rejects_invalid_observation_combinations() -> None:
-    for state, count in [
+    cases: list[tuple[Literal["NONE", "FOUND", "UNKNOWN"], int | None]] = [
         ("NONE", None),
         ("FOUND", None),
         ("FOUND", 0),
         ("UNKNOWN", 0),
         ("NONE", True),
-    ]:
+    ]
+    for state, count in cases:
         with pytest.raises(ValueError):
             GenerationOutput(
                 own_commit_observation=state, observed_own_commit_count=count
-            )  # type: ignore[arg-type]
+            )
