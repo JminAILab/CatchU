@@ -99,6 +99,7 @@ class CollectionOutcome:
             records.extend(self.relations.commits)
             for branch in self.relations.base_branches:
                 records.extend(branch.commits)
+        # GitHub 계정이 연결되지 않은 작성자는 숫자 ID 기준 본인 커밋에 포함하지 않는다.
         own = {
             record.sha
             for record in records
@@ -113,8 +114,6 @@ class CollectionOutcome:
                     notes.append("PR 커밋 목록을 완전히 확인하지 못했습니다.")
         if self.failures:
             notes.append("수집이 중단되어 필요한 조회를 끝내지 못했습니다.")
-        if any(record.author is None for record in records):
-            notes.append("작성자 계정을 확인하지 못한 커밋이 있습니다.")
         checked = (
             self.own_commits_checked
             and self.linked_account is not None

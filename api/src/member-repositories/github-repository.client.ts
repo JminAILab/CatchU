@@ -20,6 +20,7 @@ export class GitHubRepositoryClient {
         headers: { Authorization: `Bearer ${token.reveal()}`, Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28' },
       });
+      if (response.status === 404) throw new ApiError('REPOSITORY_PRIVATE');
       if (!response.ok) throw new ApiError('REPOSITORY_UNVERIFIED');
       const reader = response.body?.getReader();
       if (!reader) throw new ApiError('REPOSITORY_UNVERIFIED');

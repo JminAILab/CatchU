@@ -366,6 +366,23 @@ test('그 밖의 403은 판본 거부로 다루지 않는다: 고지를 다시 �
   assert.equal(notAllowed.gets.notice, 1);
 });
 
+test('등록과 접수는 비공개·없는 저장소와 GitHub 확인 장애를 같은 문구로 구분한다', async () => {
+  const cases = [
+    ['REPOSITORY_PRIVATE', 403, '비공개이거나 없는 저장소라 확인할 수 없습니다. 공개 저장소 주소인지 확인해 주세요.'],
+    ['REPOSITORY_UNVERIFIED', 422, 'GitHub에서 저장소를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.'],
+    ['REPOSITORY_UNSUPPORTED', 403, TEXT.repositoryUnsupported],
+  ];
+  for (const [code, status, text] of cases) {
+    const h = harness({ create: () => apiError(status, code) });
+    await ready(h);
+    await h.store.submit();
+    await tick();
+    assert.equal(h.store.getSnapshot().message.text, text);
+    assert.equal(h.store.getSnapshot().selectedId, null);
+    assert.equal(h.posts.length, 1, '자동 재전송 없음');
+  }
+});
+
 test('409: 다른 저장소 진행·재분석 보류·이전 요청 있음은 접수되지 않았다고 안내하고 상태를 다시 불러온다', async () => {
   for (const [code, text] of [
     ['ANALYSIS_IN_PROGRESS', TEXT.inProgress], ['REANALYSIS_DEFERRED', TEXT.deferred], ['RETRY_NOT_ALLOWED', TEXT.previousRequest],

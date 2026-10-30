@@ -14,7 +14,7 @@ import { RepositoryRegistration } from '../member-repositories/repository-regist
 import { ANALYSIS_DAILY_RUN_LIMIT, AnalysisDailyRunLimit } from './daily-run-limit.consumer';
 import { AnalysisInput, analysisFingerprint, parseAnalysisInput } from './analysis-input';
 import { AnalysisNoticeService } from './analysis-notice';
-import { blocksReanalysis, readAnalysisStatus } from './analysis-status';
+import { readAnalysisStatus } from './analysis-status';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 @Injectable()
@@ -123,16 +123,10 @@ export class AnalysisIntakeService {
             reusedActive = true;
             return { requestId: active.requestId, linkId: null, responseReference: active.requestId };
           }
-          const previous = await same.find(AnalysisRequest, { where: { memberId, repositoryId: input.repositoryId },
+          const latest = await same.findOne(AnalysisRequest, { where: { memberId, repositoryId: input.repositoryId },
             order: { submittedAt: 'DESC', requestId: 'DESC' } });
-          // 같은 저장소의 과거 정상·부분 결과를 새 ID로 우회하지 않는다. 반영 실패로 닫혀 등록이 없는 요청은
-          // 정상 완료가 아니므로 막지 않고 아래의 가장 최근 요청 재요청 판정으로 넘긴다.
-          for (const request of previous) {
-            const { status } = await readAnalysisStatus(same, memberId, request.requestId);
-            if (blocksReanalysis(status)) throw new ApiError('REANALYSIS_DEFERRED');
-          }
-          if (previous.length > 0) {
-            const latest = previous[0];
+          // 과거 결과는 보존하고 최신 요청의 종료 여부만 확인한다. 참조·동의·한도 조건은 다시 검사한다.
+          if (latest) {
             const { status } = await readAnalysisStatus(same, memberId, latest.requestId);
             if (input.retryOfRequestId !== latest.requestId || !status.retry.allowed) throw new ApiError('RETRY_NOT_ALLOWED');
           } else if (input.retryOfRequestId) throw new ApiError('RETRY_NOT_ALLOWED');

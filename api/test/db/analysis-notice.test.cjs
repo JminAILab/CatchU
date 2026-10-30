@@ -15,8 +15,8 @@ const { DEV_LOGIN_IDENTITY_PREFIX, GOOGLE_IDENTITY_PREFIX, MemberKindService, me
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { bindSyntheticDailyLimit } = require('../support/synthetic-daily-limit.cjs');
 
-// #322 본문 확정 문구(2026-10-17 팀장 확정)의 SHA-256. 문구를 바꾸면 판본과 이 값을 함께 바꾸고 반영 PR에서 팀장 승인을 받는다.
-const CONFIRMED_NOTICE_SHA256 = 'a99907b58e8feea585c64fbe15550460993fca7fc3423019a38896c1b391ce1f';
+// #424 본문 확정 v2(2026-10-30 팀장, #322에서 네 줄만 변경)의 SHA-256. 반영 PR에서 팀장 승인을 받는다.
+const CONFIRMED_NOTICE_SHA256 = '8da5543d1caa356fb819961a5882b7ebe614e68ee8fad3fd044b3ea921d2e2e3';
 const GOOGLE = { GOOGLE_LOGIN_ENABLED: 'true', GOOGLE_CLIENT_ID: 'synthetic.apps.googleusercontent.com',
   GOOGLE_CLIENT_SECRET: 'synthetic-google-secret', GOOGLE_REDIRECT_URI: 'http://localhost:3000/google/callback' };
 const UNSUPPORTED = ['catchu:github:1234567', 'test:unsupported-origin', 'CATCHU:GOOGLE:upper-case', GOOGLE_IDENTITY_PREFIX, DEV_LOGIN_IDENTITY_PREFIX];
@@ -93,12 +93,13 @@ async function counts() {
   return row;
 }
 
-test('실제 고지는 #322 확정 문구·문단·줄바꿈 그대로이고 합성 판본과 구분된다', () => {
+test('실제 고지는 #424 확정 v2 문구·문단·줄바꿈 그대로이고 합성 판본과 구분된다', () => {
   assert.equal(createHash('sha256').update(REAL_NOTICE.text, 'utf8').digest('hex'), CONFIRMED_NOTICE_SHA256);
   const lines = REAL_NOTICE.text.split('\n');
+  // v1의 네 줄만 교체하므로 전체 줄 수와 문단 구분 수는 유지한다.
   assert.equal(lines.length, 30); assert.equal(lines.filter(line => line === '').length, 6);
   assert.equal(lines[0], '[CatchU 저장소 분석 안내]'); assert.ok(!REAL_NOTICE.text.includes('\r'));
-  assert.equal(REAL_NOTICE.noticeRevision, 'catchu-real-analysis-notice-v1');
+  assert.equal(REAL_NOTICE.noticeRevision, 'catchu-real-analysis-notice-v2');
   assert.notEqual(REAL_NOTICE.noticeRevision, SYNTHETIC_NOTICE.noticeRevision);
   assert.ok(Object.isFrozen(REAL_NOTICE));
 });

@@ -55,7 +55,9 @@ test('C6-3 URL·비공개·지원 불가·확인 불가와 연결 오류는 각�
 });
 
 test('C6-4 NONE·UNKNOWN·FOUND와 수집 한계를 구별하고 잘못된 관측 조합은 조회 실패다', () => {
-  assert.match(statusDetails(readAnalysis(summary({ ownCommitObservation: 'NONE', observedOwnCommitCount: 0 }))).join(' '), /본인 커밋이 확인되지 않아/);
+  assert.equal(REGISTRATION_ERRORS.REPOSITORY_PRIVATE, '비공개이거나 없는 저장소라 확인할 수 없습니다. 공개 저장소 주소인지 확인해 주세요.');
+  assert.equal(REGISTRATION_ERRORS.REPOSITORY_UNVERIFIED, 'GitHub에서 저장소를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  assert.ok(statusDetails(readAnalysis(summary({ ownCommitObservation: 'NONE', observedOwnCommitCount: 0 }))).includes('확인한 범위에서 본인 기록이 없습니다. GitHub 계정에 연결되지 않은 메일로 쓴 커밋은 본인 기록으로 세지 않습니다.'));
   assert.match(statusDetails(readAnalysis(summary())).join(' '), /없다는 뜻은 아닙니다/);
   const found = summary({ ownCommitObservation: 'FOUND', observedOwnCommitCount: 4, collectionLimitNotes: ['상세 상한'] });
   assert.match(statusDetails(readAnalysis(found)).join(' '), /본인 커밋을 확인했습니다.*수집 한계/);

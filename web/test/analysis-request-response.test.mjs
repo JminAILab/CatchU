@@ -89,7 +89,7 @@ test('계약의 상태 enum·실패 단계·재요청 사유 전체를 읽고 �
   for (const stage of ['COLLECTION', 'ANALYSIS', 'DRAFT', 'REFLECTION', 'APPLICATION', 'DISPATCH']) {
     assert.equal((await create(200, { ...status(), failures: [{ stage, code: '', message: '' }] })).kind, 'success', stage);
   }
-  for (const reason of ['FAILURE_WITHOUT_RESULTS', 'IN_PROGRESS', 'RESULTS_EXIST', 'NOT_FAILED', 'EXECUTION_UNCERTAIN', 'APPLICATION_UNRESOLVED', 'REANALYSIS_DEFERRED']) {
+  for (const reason of ['FAILURE_WITHOUT_RESULTS', 'ANALYSIS_FINISHED', 'IN_PROGRESS', 'RESULTS_EXIST', 'NOT_FAILED', 'EXECUTION_UNCERTAIN', 'APPLICATION_UNRESOLVED', 'REANALYSIS_DEFERRED']) {
     assert.equal((await create(200, { ...status(), retry: { allowed: true, reason } })).kind, 'success', reason);
   }
 });

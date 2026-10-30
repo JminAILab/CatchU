@@ -103,13 +103,13 @@ test('JSX 상단 이력은 조회 실패·NONE·부분 결과·Catch 보기·실
     assert.doesNotMatch(html, /Catch 보기/);
     if (connected.state === 'failed') assert.match(html, /분석이 실패한 것은 아닙니다/);
   }
-  for (const state of [latest, { ...latest, retryAllowed: true, processing:'FAILED', ownerResultsReady:false, registeredCatchIds:[] },
+  for (const state of [latest, { ...latest, retryAllowed: true }, { ...latest, retryAllowed: true, processing:'FAILED', ownerResultsReady:false, registeredCatchIds:[] },
     { ...latest, processing:'EMPTY', registeredCatchIds:[], ownCommitObservation:'NONE', observedOwnCommitCount:0 }]) {
     const html = markup(ConnectedList, { connected:ready([{ repositoryId:'123', displayName:null, latest:state }]), expanded:new Set(['123']), titleId:'t', renderRetry:() => '합성 재요청' });
     assert.match(html, /마지막 갱신/); assert.match(html, /등록 목록에서/);
     if (state.retryAllowed) assert.match(html, /합성 재요청/);
     else if (state.registeredCatchIds.length) assert.match(html, /이 저장소 Catch 보기/);
-    else assert.match(html, /본인 커밋이 확인되지 않아/);
+    else assert.match(html, /확인한 범위에서 본인 기록이 없습니다/);
   }
   for (const github of [{state:'loading'},{state:'failed'},ready('CONNECTED'),ready('DISCONNECTED'),ready('REAUTH_REQUIRED')]) assert.ok(markup(AreaMessage,{github}));
   assert.match(markup(RepositoryManagement, { api: {}, bindings: {}, connectSection: '합성' }), /연동 상태를 확인/);

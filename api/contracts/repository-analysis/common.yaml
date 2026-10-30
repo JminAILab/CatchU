@@ -131,7 +131,7 @@ components:
             allowed: {"type":"boolean"}
             reason:
               type: "string"
-              enum: ["FAILURE_WITHOUT_RESULTS","IN_PROGRESS","RESULTS_EXIST","NOT_FAILED","EXECUTION_UNCERTAIN","APPLICATION_UNRESOLVED","REANALYSIS_DEFERRED"]
+              enum: ["FAILURE_WITHOUT_RESULTS","ANALYSIS_FINISHED","IN_PROGRESS","RESULTS_EXIST","NOT_FAILED","EXECUTION_UNCERTAIN","APPLICATION_UNRESOLVED","REANALYSIS_DEFERRED"]
         failures: {"type":"array","items":{"$ref":"#/components/schemas/Failure"}}
     Evidence:
       type: "object"

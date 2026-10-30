@@ -320,7 +320,7 @@ test('실제 공급: 합성·이전 고지나 현재 선정과 다른 범위 판
   const s = await start(t);
   const user = await s.real();
   for (const changes of [{ accepted: false }, { noticeRevision: SYNTHETIC_NOTICE.noticeRevision },
-    { noticeRevision: 'catchu-real-analysis-notice-v0' }, { scopeRevision: SYNTHETIC_NOTICE.scopeRevision }, { scopeRevision: NEXT_SCOPE }]) {
+    { noticeRevision: 'catchu-real-analysis-notice-v1' }, { scopeRevision: SYNTHETIC_NOTICE.scopeRevision }, { scopeRevision: NEXT_SCOPE }]) {
     await error(await s.post(user, randomUUID(), command({ consent: consent(changes) })), 403, 'CONSENT_REQUIRED');
   }
   // 합성 저장소·합성 판본 본문은 실제 회원의 현재 선정 밖이다.
@@ -531,7 +531,7 @@ for (const change of ['연결 해제', '재인증 필요', '고지 판본 변경
       code = 'GITHUB_CONNECTION_REQUIRED';
     } else if (change === '고지 판본 변경') {
       // 대역: 새 고지 판본 배포를 같은 서버의 판본 교체로 흉내 낸다.
-      s.notices.realNotice = { noticeRevision: 'catchu-real-analysis-notice-v2', text: '변경된 실제 고지' };
+      s.notices.realNotice = { noticeRevision: 'catchu-real-analysis-notice-v3', text: '변경된 실제 고지' };
     } else if (change === '범위 판본 변경') {
       await moveScope(THEME);
     } else {
@@ -586,7 +586,7 @@ test('실제 공급: 원자 접수·현재 상태 재응답·같은 저장소 �
   assert.equal(active.status, 200); assert.deepEqual(await active.json(), first);
   assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 2 });
   for (const body of [command({ repositoryId: ZOO }), command({ retryOfRequestId: randomUUID() }),
-    command({ consent: consent({ noticeRevision: 'old' }) }), command({ consent: consent({ scopeRevision: 'old' }) })]) {
+    command({ consent: consent({ noticeRevision: 'catchu-real-analysis-notice-v1' }) }), command({ consent: consent({ scopeRevision: 'old' }) })]) {
     await error(await s.post(user, key, body), 409, 'IDEMPOTENCY_CONFLICT');
   }
   assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 2 });
@@ -613,7 +613,7 @@ test('실제 공급: 동시 같은 키·다른 키에도 회원 ACTIVE는 하나
   await accepted(await s.post(other, randomUUID(), command({ repositoryId: created.repositoryId === THEME ? ZOO : THEME })));
 });
 
-test('실제 공급: 확정 실패만 새 실제 동의·요청·시도로 재요청하고 정상 완료 뒤에는 재분석을 우회하지 못한다', async t => {
+test('실제 공급: 실패와 정상 완료 모두 최신 참조·새 실제 동의로 재분석하며 옛 요청은 재사용하지 못한다', async t => {
   const s = await start(t);
   const user = await s.real();
   const originalKey = randomUUID();
@@ -633,13 +633,14 @@ test('실제 공급: 확정 실패만 새 실제 동의·요청·시도로 재�
   assert.deepEqual((await (await s.post(user, originalKey)).json()).retry, { allowed: false, reason: 'IN_PROGRESS' });
   await terminal(next.requestId, 'EMPTY');
   assert.deepEqual((await (await s.post(user, originalKey)).json()).retry, { allowed: false, reason: 'REANALYSIS_DEFERRED' });
-  for (const retryOfRequestId of [undefined, first.requestId, next.requestId]) {
-    await error(await s.post(user, randomUUID(), command(retryOfRequestId ? { retryOfRequestId } : {})), 409, 'REANALYSIS_DEFERRED');
+  for (const retryOfRequestId of [undefined, first.requestId]) {
+    await error(await s.post(user, randomUUID(), command(retryOfRequestId ? { retryOfRequestId } : {})), 409, 'RETRY_NOT_ALLOWED');
   }
-  assert.deepEqual(await counts(), { requests: 2, consents: 2, attempts: 2, keys: 2 });
+  await accepted(await s.post(user, randomUUID(), command({ retryOfRequestId: next.requestId })));
+  assert.deepEqual(await counts(), { requests: 3, consents: 3, attempts: 3, keys: 3 });
 });
 
-test('실제 공급: 반영 실패로 닫히고 등록 Catch가 없으면 새 실제 동의로 재요청하고, 등록 Catch가 있으면 거부한다', async t => {
+test('실제 공급: 반영 실패로 닫힌 요청은 기존 Catch 유무와 무관하게 새 실제 동의로 재분석한다', async t => {
   const s = await start(t);
   const user = await s.real();
   const key = randomUUID();
@@ -653,25 +654,27 @@ test('실제 공급: 반영 실패로 닫히고 등록 Catch가 없으면 새 �
   const registered = await accepted(await s.post(other));
   await applyFailed(registered.requestId, { processing: 'SUCCEEDED', eligibleCandidateCount: 1 });
   await registerCatch(registered.requestId);
-  for (const body of [command(), command({ retryOfRequestId: registered.requestId })]) {
-    await error(await s.post(other, randomUUID(), body), 409, 'REANALYSIS_DEFERRED');
-  }
-  assert.deepEqual(await counts(), { requests: 3, consents: 3, attempts: 3, keys: 3 });
+  await error(await s.post(other, randomUUID(), command()), 409, 'RETRY_NOT_ALLOWED');
+  await accepted(await s.post(other, randomUUID(), command({ retryOfRequestId: registered.requestId })));
+  assert.deepEqual(await counts(), { requests: 4, consents: 4, attempts: 4, keys: 4 });
 });
 
-test('실제 공급: 정상 결과 뒤 재분석과 실행 불명·반영 미해결·근거 부족·유효 결과의 재요청을 거부한다', async t => {
+test('실제 공급: 닫힌 최신 요청은 결과 무관 재분석하고 복구 중만 거부한다', async t => {
   const s = await start(t);
-  for (const [processing, changes, code] of [['EMPTY', {}, 'REANALYSIS_DEFERRED'], ['SUCCEEDED', {}, 'REANALYSIS_DEFERRED'],
-    ['PARTIAL_FAILED', {}, 'REANALYSIS_DEFERRED'], ['FAILED', { failureConfirmationReference: null }, 'RETRY_NOT_ALLOWED'],
-    ['FAILED', { failures: [] }, 'RETRY_NOT_ALLOWED'], ['FAILED', { processing: 'UNCERTAIN' }, 'RETRY_NOT_ALLOWED'],
-    ['FAILED', { application: 'RECOVERING' }, 'RETRY_NOT_ALLOWED'], ['FAILED', { eligibleCandidateCount: 1 }, 'REANALYSIS_DEFERRED'],
-    ['FAILED', { ownerResultsReady: true }, 'REANALYSIS_DEFERRED']]) {
+  for (const [processing, changes] of [['EMPTY', {}], ['SUCCEEDED', {}],
+    ['PARTIAL_FAILED', {}], ['FAILED', { failureConfirmationReference: null }],
+    ['FAILED', { failures: [] }], ['FAILED', { processing: 'UNCERTAIN' }],
+    ['FAILED', { application: 'RECOVERING' }], ['FAILED', { eligibleCandidateCount: 1 }],
+    ['FAILED', { ownerResultsReady: true }]]) {
     const user = await s.real();
     const first = await accepted(await s.post(user));
     await terminal(first.requestId, processing, changes);
-    const bodies = processing === 'FAILED' ? [command({ retryOfRequestId: first.requestId })] : [command(), command({ retryOfRequestId: first.requestId })];
-    for (const body of bodies) await error(await s.post(user, randomUUID(), body), 409, code);
-    assert.equal(await db.manager.countBy(AnalysisRequest, { memberId: user.memberId }), 1, JSON.stringify([processing, changes]));
+    await error(await s.post(user, randomUUID(), command()), 409, 'RETRY_NOT_ALLOWED');
+    const response = await s.post(user, randomUUID(), command({ retryOfRequestId: first.requestId }));
+    if (changes.application === 'RECOVERING') await error(response, 409, 'RETRY_NOT_ALLOWED');
+    else await accepted(response);
+    assert.equal(await db.manager.countBy(AnalysisRequest, { memberId: user.memberId }), changes.application === 'RECOVERING' ? 1 : 2,
+      JSON.stringify([processing, changes]));
   }
 });
 

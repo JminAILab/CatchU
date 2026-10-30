@@ -5,6 +5,7 @@ const { before, after, beforeEach, test } = require('node:test');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 const { u7Fixture } = require('../support/u7-fixture.cjs');
+const { ApiError } = require('../../dist/common/errors');
 const { AnalysisRequest, AnalysisAttempt, AnalysisConsent, GitHubConnection } = require('../../dist/member-analysis/member-analysis.entity');
 let db, initial, calls, deny, broken;
 const provider = { async consume(memberId, kind, now, manager) {
@@ -45,6 +46,21 @@ test('C2 외부 확인 뒤 연결 교체와 등록 범위 변경을 접수 잠�
   f.client.verify = async coords => { await db.manager.update(GitHubConnection, { memberId: f.memberId }, { credentialReference: 'github-v1:' + randomUUID() }); return verify(coords); };
   await assert.rejects(f.create(), e => e.code === 'GITHUB_CONNECTION_REQUIRED'); assert.equal(calls, 0);
 });
+test('C2 접수의 공개 확인 실패는 404 계열과 장애 안내를 구분하고 동의·한도를 저장하지 않는다', async () => {
+  for (const [code, message] of [
+    ['REPOSITORY_PRIVATE', '비공개이거나 없는 저장소라 확인할 수 없습니다. 공개 저장소 주소인지 확인해 주세요.'],
+    ['REPOSITORY_UNVERIFIED', 'GitHub에서 저장소를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.'],
+  ]) {
+    const f = await u7Fixture(db, provider);
+    f.client.verify = async () => { throw new ApiError(code); };
+    await assert.rejects(f.create(), error => {
+      assert.equal(error.code, code); assert.equal(error.getResponse().message, message); return true;
+    });
+  }
+  assert.equal(calls, 0); assert.equal(await used(), 0);
+  assert.equal(await db.manager.count(AnalysisConsent), 0);
+  assert.equal(await db.manager.count(AnalysisRequest), 0);
+});
 test('C2 동일 키 재응답·동시 접수·같은 ACTIVE의 다른 키는 중복 소비하지 않는다', async () => {
   const f = await u7Fixture(db, provider), key = randomUUID();
   const outcomes = await Promise.all([f.create(key), f.create(key), f.create()]);
@@ -72,11 +88,27 @@ test('C2 두 허용 실패 분기는 새 동의·키·요청 연결과 한도를
   }
   assert.equal(await used(), 4);
 });
-test('C2 정상 0개·부분 결과·복구 중·실행 불명은 관측값으로 재요청을 풀지 않는다', async () => {
+test('C2 종료된 최신 분석은 결과와 무관하게 새 동의·하루 제한으로 재분석한다', async () => {
   for (const [processing, application, extra] of [['EMPTY','APPLIED',{}], ['PARTIAL_FAILED','APPLIED',{eligibleCandidateCount:1}],
-    ['FAILED','RECOVERING',{}], ['UNCERTAIN','NOT_READY',{}], ['SUCCEEDED','APPLIED',{ownerResultsReady:true}]]) {
+    ['UNCERTAIN','APPLIED',{}], ['SUCCEEDED','APPLIED',{ownerResultsReady:true}], ['FAILED','APPLIED',{failureConfirmationReference:null}]]) {
     const f = await u7Fixture(db, provider); const first = await f.create(); await terminal(first.status, processing, application, extra);
-    await assert.rejects(f.create(randomUUID(), { ...f.input(), retryOfRequestId: first.status.requestId }), e => ['RETRY_NOT_ALLOWED','REANALYSIS_DEFERRED'].includes(e.code));
+    deny = true;
+    const body = { ...f.input(), retryOfRequestId: first.status.requestId };
+    await assert.rejects(f.create(randomUUID(), body), e => e.code === 'DAILY_LIMIT_REACHED');
+    deny = false;
+    await assert.rejects(f.create(randomUUID(), { ...body, consent: { ...body.consent, accepted: false } }));
+    const key = randomUUID(), next = await f.create(key, body);
+    assert.notEqual(next.status.requestId, first.status.requestId);
+    assert.notEqual(next.status.consentId, first.status.consentId);
+    assert.equal((await f.create(key, body)).status.requestId, next.status.requestId);
   }
-  assert.equal(calls, 5);
+  assert.equal(await used(), 10);
+});
+test('C2 진행·반영·복구 중에는 재분석을 접수하거나 한도를 소비하지 않는다', async () => {
+  for (const application of ['NOT_READY', 'PENDING', 'APPLYING', 'RECOVERING']) {
+    const f = await u7Fixture(db, provider), first = await f.create();
+    await terminal(first.status, 'FAILED', application);
+    await assert.rejects(f.create(randomUUID(), { ...f.input(), retryOfRequestId: first.status.requestId }), e => e.code === 'RETRY_NOT_ALLOWED');
+  }
+  assert.equal(await used(), 4);
 });

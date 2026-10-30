@@ -36,6 +36,7 @@ def test_unread_pr_commits_preserve_uncertainty_and_confirmed_own_commits(
 ) -> None:
     unread = commit(sha(2), MEMBER, parents=(ROOT,))
     known = commit(sha(4), MEMBER, parents=(ROOT,))
+    unlinked = commit(sha(5), None, parents=(ROOT,))
     pull = Pull(
         10,
         OTHER,
@@ -45,7 +46,11 @@ def test_unread_pr_commits_preserve_uncertainty_and_confirmed_own_commits(
     )
     run = run_case(
         Scenario(
-            default_branch=(known, root_commit()) if known_own else (root_commit(),),
+            default_branch=(
+                (known, unlinked, root_commit())
+                if known_own
+                else (unlinked, root_commit())
+            ),
             pulls=(pull,),
             lookups={known.sha: ()} if known_own else {},
             overrides=(
@@ -67,6 +72,10 @@ def test_unread_pr_commits_preserve_uncertainty_and_confirmed_own_commits(
     assert run.result["ownCommitObservation"] == ("FOUND" if known_own else "UNKNOWN")
     assert run.result["observedOwnCommitCount"] == (1 if known_own else None)
     assert run.result["collectionLimitNotes"]
+    assert (
+        "작성자 계정을 확인하지 못한 커밋이 있습니다."
+        not in run.result["collectionLimitNotes"]
+    )
 
 
 @pytest.mark.parametrize("known_own", [False, True])
@@ -185,14 +194,40 @@ def test_collection_limit_makes_zero_unknown() -> None:
     assert output.observed_own_commit_count is None
 
 
-def test_missing_author_makes_zero_unknown() -> None:
-    run = run_case(Scenario(default_branch=(root_commit(),)))
-    missing = replace(
-        run.outcome, commits=(replace(run.outcome.commits[0], author=None),)
+@pytest.mark.parametrize("known_own", [False, True])
+@pytest.mark.parametrize("unlinked_in_pull", [False, True])
+def test_unlinked_author_does_not_block_complete_own_commit_observation(
+    known_own: bool, unlinked_in_pull: bool
+) -> None:
+    unlinked = commit(sha(2), None, parents=(ROOT,))
+    known = commit(sha(4), MEMBER, parents=(ROOT,))
+    default_branch = (root_commit(),) if unlinked_in_pull else (unlinked, root_commit())
+    if known_own:
+        default_branch = (known, *default_branch)
+    run = run_case(
+        Scenario(
+            default_branch=default_branch,
+            pulls=(
+                (Pull(10, OTHER, commits=(unlinked,), state="open", base_sha=ROOT),)
+                if unlinked_in_pull
+                else ()
+            ),
+            lookups={known.sha: ()} if known_own else {},
+        ),
+        request=live_request("COMMIT", "PULL_REQUEST"),
     )
-    assert (
-        missing.with_observation(GenerationOutput()).own_commit_observation == "UNKNOWN"
+    assert run.outcome.completed
+    assert run.outcome.own_commits_checked
+    assert run.outcome.relations is not None
+    records = (*run.outcome.commits, *run.outcome.relations.commits)
+    assert any(
+        record.sha == unlinked.sha and record.author is None for record in records
     )
+    assert run.result["ownCommitObservation"] == ("FOUND" if known_own else "NONE")
+    assert run.result["observedOwnCommitCount"] == (1 if known_own else 0)
+    assert run.result["collectionLimitNotes"] == []
+    if not known_own:
+        assert run.result["candidates"] == []
 
 
 def test_found_survives_no_candidate_and_deduplicates_commit_sha() -> None:

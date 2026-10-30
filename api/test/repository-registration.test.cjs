@@ -40,12 +40,17 @@ test('C1 비공개 확인과 지원 불가를 구분한다', () => {
   // fork·archived·언어·별 수로 새 제한을 만들지 않는다.
   assert.equal(verifiedMetadata({ ...metadata, fork: true, archived: true, stargazers_count: 0 }).repositoryId, '123');
 });
-test('C1 404·권한 오류·redirect는 비공개로 추정하지 않는다', async () => {
+test('C1 404는 비공개·없는 저장소 안내, 그 밖의 오류는 확인 장애로 구분한다', async () => {
   const previous = global.fetch;
   try {
     for (const status of [301, 403, 404, 500]) {
       global.fetch = async () => new Response('', { status });
-      await assert.rejects(new GitHubRepositoryClient().verify(parseRepositoryAddress('https://github.com/a/b'), new GitHubAccessToken('test')), code('REPOSITORY_UNVERIFIED'));
+      const expected = status === 404 ? 'REPOSITORY_PRIVATE' : 'REPOSITORY_UNVERIFIED';
+      const message = status === 404
+        ? '비공개이거나 없는 저장소라 확인할 수 없습니다. 공개 저장소 주소인지 확인해 주세요.'
+        : 'GitHub에서 저장소를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+      await assert.rejects(new GitHubRepositoryClient().verify(parseRepositoryAddress('https://github.com/a/b'), new GitHubAccessToken('test')),
+        error => code(expected)(error) && error.message === message);
     }
   } finally { global.fetch = previous; }
 });
@@ -58,6 +63,9 @@ test('C1 과대·잘못된 JSON·통신 오류를 원문 없는 확인 불가로
     }
     global.fetch = async () => { throw new Error('secret-url'); };
     await assert.rejects(new GitHubRepositoryClient().verify(parseRepositoryAddress('https://github.com/a/b'), new GitHubAccessToken('test')), error => code('REPOSITORY_UNVERIFIED')(error) && !error.message.includes('secret'));
+    global.fetch = async () => { throw new DOMException('synthetic-timeout', 'AbortError'); };
+    await assert.rejects(new GitHubRepositoryClient().verify(parseRepositoryAddress('https://github.com/a/b'), new GitHubAccessToken('test')),
+      error => code('REPOSITORY_UNVERIFIED')(error) && error.message === 'GitHub에서 저장소를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
   } finally { global.fetch = previous; }
 });
 test('C1 메타데이터의 ID·공개 여부·좌표를 검증하고 응답 URL을 신뢰하지 않는다', () => {

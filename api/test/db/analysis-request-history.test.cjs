@@ -169,7 +169,7 @@ const COMBINATIONS = [
   { label: '실행 불명', state: { processing: 'UNCERTAIN' }, retry: { allowed: false, reason: 'EXECUTION_UNCERTAIN' } },
   // 처리 종료·후보 존재만으로 본인 열람 준비를 true로 만들지 않는다.
   { label: '반영 대기(후보 2건)', state: { processing: 'SUCCEEDED', application: 'PENDING', eligibleCandidateCount: 2 },
-    retry: { allowed: false, reason: 'RESULTS_EXIST' } },
+    retry: { allowed: false, reason: 'APPLICATION_UNRESOLVED' } },
   { label: '반영 중(정상 0건)', state: { processing: 'EMPTY', application: 'APPLYING' },
     retry: { allowed: false, reason: 'APPLICATION_UNRESOLVED' } },
   { label: '복구 중(처리 실패)', state: { ...CONFIRMED_FAILURE, application: 'RECOVERING' },
@@ -177,30 +177,30 @@ const COMBINATIONS = [
   { label: '닫히지 않은 반영 실패(처리 실패)', state: { ...CONFIRMED_FAILURE, application: 'APPLY_FAILED' },
     retry: { allowed: false, reason: 'APPLICATION_UNRESOLVED' } },
   { label: '닫히지 않은 반영 실패(처리 성공·후보 1건)', state: { processing: 'SUCCEEDED', application: 'APPLY_FAILED', eligibleCandidateCount: 1 },
-    retry: { allowed: false, reason: 'RESULTS_EXIST' } },
+    retry: { allowed: false, reason: 'APPLICATION_UNRESOLVED' } },
   // 같은 Catch를 가리키는 후보 연결 두 건은 ID 하나로, 열람 준비 전 등록은 결과 진입 대상에서 뺀다.
   { label: '정상 완료', state: { processing: 'SUCCEEDED', application: 'APPLIED', eligibleCandidateCount: 3, ownerResultsReady: true, lifecycle: 'CLOSED' },
     catches: [{ ready: true, candidates: ['candidate-1', 'candidate-2'] }, { ready: false, candidates: ['candidate-3'] }],
-    registered: [0], retry: { allowed: false, reason: 'RESULTS_EXIST' }, retryAfter: [409, 'REANALYSIS_DEFERRED'] },
+    registered: [0], retry: { allowed: true, reason: 'ANALYSIS_FINISHED' }, retryAfter: [202] },
   { label: '정상 완료·열람 준비 전', state: { processing: 'SUCCEEDED', application: 'APPLIED', eligibleCandidateCount: 1, lifecycle: 'CLOSED' },
-    catches: [{ ready: false }], registered: [], retry: { allowed: false, reason: 'RESULTS_EXIST' }, retryAfter: [409, 'REANALYSIS_DEFERRED'] },
+    catches: [{ ready: false }], registered: [], retry: { allowed: true, reason: 'ANALYSIS_FINISHED' }, retryAfter: [202] },
   { label: '정상 0건', state: { processing: 'EMPTY', application: 'APPLIED', lifecycle: 'CLOSED' }, receipt: true,
-    retry: { allowed: false, reason: 'REANALYSIS_DEFERRED' }, retryAfter: [409, 'REANALYSIS_DEFERRED'] },
+    retry: { allowed: true, reason: 'ANALYSIS_FINISHED' }, retryAfter: [202] },
   { label: '부분 실패', state: { processing: 'PARTIAL_FAILED', application: 'APPLIED', eligibleCandidateCount: 1, ownerResultsReady: true,
     lifecycle: 'CLOSED', failures: [{ stage: 'ANALYSIS', code: 'SYNTHETIC_PARTIAL', message: '[합성] 일부 후보 분석 실패' }] },
-  catches: [{ ready: true }], registered: [0], retry: { allowed: false, reason: 'RESULTS_EXIST' }, retryAfter: [409, 'REANALYSIS_DEFERRED'] },
+  catches: [{ ready: true }], registered: [0], retry: { allowed: true, reason: 'ANALYSIS_FINISHED' }, retryAfter: [202] },
   { label: '실패(확정)', state: { ...CONFIRMED_FAILURE, lifecycle: 'CLOSED' }, retry: { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' },
     retryAfter: [202] },
   { label: '실패(확정 근거 없음)', state: { ...CONFIRMED_FAILURE, failureConfirmationReference: null, lifecycle: 'CLOSED' },
-    retry: { allowed: false, reason: 'NOT_FAILED' }, retryAfter: [409, 'RETRY_NOT_ALLOWED'] },
+    retry: { allowed: true, reason: 'ANALYSIS_FINISHED' }, retryAfter: [202] },
   // PR #296: 반영 실패로 닫힌 요청은 처리 결과·후보 수와 관계없이 등록 Catch가 없으면 재요청할 수 있다.
   { label: '반영 실패로 닫힘', state: { processing: 'SUCCEEDED', application: 'APPLY_FAILED', eligibleCandidateCount: 2, lifecycle: 'CLOSED' },
     retry: { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' }, retryAfter: [202] },
   { label: '반영 실패로 닫힘·열람 준비 전 등록', state: { processing: 'SUCCEEDED', application: 'APPLY_FAILED', eligibleCandidateCount: 1,
-    lifecycle: 'CLOSED' }, catches: [{ ready: false }], registered: [], retry: { allowed: false, reason: 'RESULTS_EXIST' },
-  retryAfter: [409, 'REANALYSIS_DEFERRED'] },
+    lifecycle: 'CLOSED' }, catches: [{ ready: false }], registered: [], retry: { allowed: true, reason: 'ANALYSIS_FINISHED' },
+  retryAfter: [202] },
   { label: '반영 실패로 닫힘·Catch 본체만', state: { processing: 'EMPTY', application: 'APPLY_FAILED', lifecycle: 'CLOSED' },
-    catches: [{ link: false }], registered: [], retry: { allowed: false, reason: 'RESULTS_EXIST' }, retryAfter: [409, 'REANALYSIS_DEFERRED'] },
+    catches: [{ link: false }], registered: [], retry: { allowed: true, reason: 'ANALYSIS_FINISHED' }, retryAfter: [202] },
 ];
 
 for (const combination of COMBINATIONS) {
@@ -267,7 +267,7 @@ test('정상 0건·초기 후보 수 0·조회 실패를 서로 다른 응답으
   assert.deepEqual(pick((await s.one(initial, queued)).body),
     ['QUEUED', 'NOT_READY', 'ACTIVE', 0, [], false, { allowed: false, reason: 'IN_PROGRESS' }]);
   assert.deepEqual(pick((await s.one(empty, finished)).body),
-    ['EMPTY', 'APPLIED', 'CLOSED', 0, [], false, { allowed: false, reason: 'REANALYSIS_DEFERRED' }]);
+    ['EMPTY', 'APPLIED', 'CLOSED', 0, [], false, { allowed: true, reason: 'ANALYSIS_FINISHED' }]);
   await withHiddenTable('analysis_attempt', async () => {
     for (const [user, requestId] of [[initial, queued], [empty, finished]]) {
       const failed = await s.one(user, requestId);

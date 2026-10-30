@@ -11,9 +11,9 @@
 | 상황 | 응답 |
 |---|---|
 | 주소 형식 오류 | 400 `REPOSITORY_URL_INVALID` |
-| private 확인 | 403 `REPOSITORY_PRIVATE` |
+| private 확인 또는 GitHub 404 | 403 `REPOSITORY_PRIVATE` |
 | 지원하지 않는 저장소 | 403 `REPOSITORY_UNSUPPORTED` |
-| 404·외부 오류·redirect·시간/크기 초과 등 확인 불가 | 422 `REPOSITORY_UNVERIFIED` |
+| 외부 오류·redirect·시간/크기 초과 등 확인 불가 | 422 `REPOSITORY_UNVERIFIED` |
 | 연결 부재·변경·재인증 필요 | 403 `GITHUB_CONNECTION_REQUIRED` |
 | 본인 등록 없음 | 404 `RESOURCE_UNAVAILABLE` |
 | 하루 제한 도달 | 429 `DAILY_LIMIT_REACHED` |
@@ -22,7 +22,15 @@
 
 `ANALYSIS_DAILY_RUN_LIMIT` 소비 경계는 모든 조건을 통과한 뒤 같은 `EntityManager`에서 C-03 `consume(memberId, 'ANALYSIS', now, manager)`를 호출한다. 제품 `AnalysisIntakeModule`이 `DailyRunLimitModule`을 가져오고 소비 토큰을 U2 `DailyRunLimit`에 `useExisting`으로 연결한다. 등록·조회·동일 키·같은 ACTIVE 재응답은 소비하지 않고 접수 롤백은 소비도 롤백한다. 실행 실패는 환급하지 않는다. 분석·기본 요약·JD 요약은 회원별 KST 날짜의 같은 횟수를 사용한다([C-03 안내](daily-run-limit.md)). 별도 조립에서 제공자를 누락하면 `500 INTERNAL_ERROR`로 거부하며 무제한 제품 대체 구현은 없다.
 
-기존 두 실패 재요청 분기와 새 키·새 동의·현재 한도 조건을 유지한다. `FAILED/APPLIED/CLOSED`는 실패 확정·후보/등록 Catch 없음이 필요하다. `APPLY_FAILED/CLOSED`는 처리 상태와 무관하게 등록 Catch가 없어야 한다. 정상·EMPTY·유효 부분 결과·실행 불명·복구 중에는 재생성하지 않는다.
+GitHub 연결 권한으로는 404 응답의 비공개 저장소와 없는 저장소를 구분할 수 없다. 두 경우는 "비공개이거나 없는 저장소라 확인할 수 없습니다. 공개 저장소 주소인지 확인해 주세요."로 안내한다. 그 밖의 확인 장애는 "GitHub에서 저장소를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."로 안내하며 분석 접수에서도 같은 구분을 쓴다.
+
+### 기존 Catch를 보존하는 재분석
+
+[2026-10-30 #424 팀장 결정](https://github.com/JminAILab/CatchU/issues/424)에 따라 승인 요구사항 FR1.3·U7 설계 BR4.3의 정상 완료 재분석 금지를 대체한다. 과거 승인 원본은 보존한다. 같은 저장소의 최신 요청이 `CLOSED`이고 반영이 `APPLIED` 또는 `APPLY_FAILED`로 끝났으면 결과·기존 Catch 유무와 무관하게 재분석할 수 있다. 진행·반영·복구 중이거나 반영 완료를 확인하지 못한 요청에는 허용하지 않는다. 접수 때 최신 본인 요청의 `retryOfRequestId`, 새 키·현재 고지/범위에 대한 새 동의·하루 제한을 다시 확인한다. 동일 키 재전송과 같은 ACTIVE 재응답은 새 요청·동의·소비를 만들지 않는다. 자동 재시도는 없다.
+
+기존 Catch 등록의 회원+`workIdentity` 중복 판정을 재사용한다. 같은 작업은 기존 Catch ID·최초 내용·작성자 설명·공개 상태·근거를 유지하고 새 작업만 비공개 Catch로 추가한다. 진행·실패에도 기존 Catch를 삭제하지 않으며 이미 발행한 발행본을 변경하지 않는다. 상태의 `retry.allowed`는 최신 종료 요청에서 참이며 일반 종료 허용 이유는 `ANALYSIS_FINISHED`, 기존 결과 없는 확정 실패 이유는 `FAILURE_WITHOUT_RESULTS`다. 옛 요청은 후속 요청이 있으면 허용하지 않는다.
+
+실제 고지는 #424 본문에서 확정한 네 줄과 판본 `catchu-real-analysis-notice-v2`를 적용한다. [PR #433](https://github.com/JminAILab/CatchU/pull/433)의 팀장 승인이 고지 승인 기록이며, 문구 확정과 실제 실행 완료는 구분한다.
 
 ## 메시지와 결과
 
@@ -38,7 +46,7 @@ Result와 회원 상태에 `ownCommitObservation`, `observedOwnCommitCount`, `co
 2. 새 마이그레이션 `1793245460352-AddRepositoryRegistration.ts`는 기존 `analysis_request`가 있으면 명확히 거부한다. 과거 동의로 새 등록·좌표 사본을 추측하지 않는다. 기존 자료가 있는 환경은 보존/전환 결정을 별도로 검토해야 한다.
 3. 전용 시험 DB에서 up/down/up을 확인한다. down도 등록 자료가 남아 있으면 거부하며 자동 삭제하지 않는다. 운영 적용 전 백업·검증된 자료 준비와 별도 되돌리기 계획이 필요하다.
 4. API·worker 이미지를 함께 교체하고 이미지 안 두 YAML 해시와 네 메시지 동등 판정을 확인한다. `.dockerignore`, 두 Dockerfile, 기존 CI 변경 감지와 `deploy/scripts/check-images.mjs`는 새 정본 경로를 사용한다.
-5. C-03 실제 제공자, 고지 v2 확정, CatchU 공개 적용과 자료·외부 전송·비용 조건을 확인한 뒤 실제 분석을 검증한다. 조건 미충족 환경의 배포·실제 실행은 미실행이다.
+5. C-03 실제 제공자, 확정 고지 v2 반영 PR의 팀장 승인, CatchU 공개 적용과 자료·외부 전송·비용 조건을 확인한 뒤 실제 분석을 검증한다. 조건 미충족 환경의 배포·실제 실행은 미실행이다.
 
 ## 검사와 현재 남은 증거
 
@@ -48,4 +56,4 @@ Result와 회원 상태에 `ownCommitObservation`, `observedOwnCommitCount`, `co
 
 `npm.cmd test -- test/integration/u7-c03-product.test.cjs`는 제품 `createApplicationModule()`·인증·HTTP 접수·U2 실제 C-03·PostgreSQL 연결을 확인한다. 회원/연결 자료와 GitHub 응답은 합성이며 큐·worker·외부 생성은 실행하지 않는다. 등록·조회·동의 거부의 미소비, 동시 접수·재응답의 1회 소비, 요약과 합산한 한도 거부, KST 자정, 접수 저장 실패의 전체 롤백, 확정 실패 뒤 재요청 소비를 검사한다. C-03 연결은 [팀장 결정](https://github.com/JminAILab/CatchU/issues/424#issuecomment-6491890788)에 따라 AI-DLC 승인 뒤 직접 수정했으며, [새 폴더에서 검사·PR을 진행하는 후속 결정](https://github.com/JminAILab/CatchU/issues/424#issuecomment-6511087844)을 따른다. 실행 결과는 제출 PR에 기록한다.
 
-실제 GitHub·LLM 분석, 실제 거부 1~2종, 약 500개 실측은 합성 외부 응답 검사와 별개다. 사용자는 CatchU 공개 전환을 선택했지만 공개 적용, 고지 확정 및 실제 실행 조건 확인이 남아 있다. 합성 500개에서 기존 상세·생성 상한 200을 유지하며 전체 500개 분석 성공으로 기록하지 않는다. 상한 확정은 실제 측정 후 결정한다.
+실제 GitHub·LLM 분석, 실제 거부 1~2종, 약 500개 실측은 합성 외부 응답 검사와 별개다. 사용자는 CatchU 공개 전환을 선택했지만 공개 적용, 확정 고지 v2 반영 PR의 팀장 승인 및 실제 실행 조건 확인이 남아 있다. 합성 500개에서 기존 상세·생성 상한 200을 유지하며 전체 500개 분석 성공으로 기록하지 않는다. 상한 확정은 실제 측정 후 결정한다.

@@ -3,9 +3,9 @@ import type { RepositoryApi } from "./repository-api.ts";
 export type RegistrationState = { url: string; phase: "editing" | "registering" | "registered"; message: string | null; failed: boolean };
 export const REGISTRATION_ERRORS: Record<string, string> = {
   REPOSITORY_URL_INVALID: "https://github.com/소유자/저장소 형식의 저장소 루트 주소를 입력해 주세요.",
-  REPOSITORY_PRIVATE: "비공개 저장소는 등록할 수 없습니다. 공개 저장소 주소를 입력해 주세요.",
+  REPOSITORY_PRIVATE: "비공개이거나 없는 저장소라 확인할 수 없습니다. 공개 저장소 주소인지 확인해 주세요.",
   REPOSITORY_UNSUPPORTED: "이 저장소는 현재 지원 조건에 맞지 않아 등록할 수 없습니다.",
-  REPOSITORY_UNVERIFIED: "저장소의 공개 여부를 확인하지 못했습니다. 주소와 접근 상태를 확인해 주세요.",
+  REPOSITORY_UNVERIFIED: "GitHub에서 저장소를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   GITHUB_CONNECTION_REQUIRED: "GitHub 연결을 다시 확인한 뒤 등록해 주세요.",
 };
 
