@@ -44,6 +44,8 @@ Result와 회원 상태에 `ownCommitObservation`, `observedOwnCommitCount`, `co
 
 `npm.cmd test -- test/repository-registration.test.cjs test/db/repository-registration.test.cjs test/db/u7-analysis-intake.test.cjs test/u7-worker-context.test.cjs test/analysis/u7-receiver.test.cjs test/integration/u7-analysis-chain.test.cjs`는 전용 `_test` PostgreSQL에 실행한다. `CATCHU_TEST_REDIS_URL`은 전용 시험 Valkey로 지정한다. 미설정 skip은 통과가 아니다. 전체 명령·커버리지 대상은 [Unit 검사 지침](../../aidlc/spaces/default/intents/260925-intent-12/construction/u7-repository-analysis/code-generation/unit-test-instructions.md)을 따른다.
 
+`u7-analysis-chain.test.cjs`는 실제 worker Python 함수를 합성 자료로 호출하므로 먼저 `worker/`에서 `uv python install`, `uv sync --locked`로 [worker의 고정 도구·잠금 의존성](../../worker/README.md)을 준비한다. 기본 실행 파일은 Windows에서 `worker/.venv/Scripts/python.exe`, 그 밖에서는 `worker/.venv/bin/python`이다. 다른 위치의 동일 환경을 쓰면 `CATCHU_TEST_WORKER_PYTHON`을 지정한다. API CI도 worker와 같은 도구·잠금 의존성을 준비하며, 실행 파일이 없을 때 시험을 건너뛰지 않는다.
+
 `npm.cmd test -- test/integration/u7-c03-product.test.cjs`는 제품 `createApplicationModule()`·인증·HTTP 접수·U2 실제 C-03·PostgreSQL 연결을 확인한다. 회원/연결 자료와 GitHub 응답은 합성이며 큐·worker·외부 생성은 실행하지 않는다. 등록·조회·동의 거부의 미소비, 동시 접수·재응답의 1회 소비, 요약과 합산한 한도 거부, KST 자정, 접수 저장 실패의 전체 롤백, 확정 실패 뒤 재요청 소비를 검사한다. C-03 연결은 [팀장 결정](https://github.com/JminAILab/CatchU/issues/424#issuecomment-6491890788)에 따라 AI-DLC 승인 뒤 직접 수정했으며, [새 폴더에서 검사·PR을 진행하는 후속 결정](https://github.com/JminAILab/CatchU/issues/424#issuecomment-6511087844)을 따른다. 실행 결과는 제출 PR에 기록한다.
 
 실제 GitHub·LLM 분석, 실제 거부 1~2종, 약 500개 실측은 합성 외부 응답 검사와 별개다. 사용자는 CatchU 공개 전환을 선택했지만 공개 적용, 고지 확정 및 실제 실행 조건 확인이 남아 있다. 합성 500개에서 기존 상세·생성 상한 200을 유지하며 전체 500개 분석 성공으로 기록하지 않는다. 상한 확정은 실제 측정 후 결정한다.

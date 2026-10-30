@@ -155,6 +155,17 @@ jobs:
           node-version-file: api/package.json
           cache: npm
           cache-dependency-path: api/package-lock.json
+      # U7 연결 시험이 실제 Python 함수를 호출하므로 API job에도 worker의 잠금 환경을 준비한다.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: '0.12.18'
+          checksum: '89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16'
+          working-directory: worker
+          cache-dependency-glob: uv.lock
+      - run: uv python install
+        working-directory: worker
+      - run: uv sync --locked
+        working-directory: worker
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
