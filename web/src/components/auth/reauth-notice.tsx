@@ -43,7 +43,8 @@ export function ReauthNotice({ returnTo, variant }: ReauthNoticeProps) {
 
 /**
  * 붙어 있는 안내 밑으로 키보드 초점이 숨지 않게, 안내가 붙는 스크롤 영역(모달 안이면 그 dialog, 아니면 문서)에
- * 안내 높이와 아래 여백만큼 scroll-padding-top을 둔다. 안내 높이가 바뀌면(줄바꿈·확대) 다시 맞추고, 안내가 사라지면 원래 값으로 돌린다.
+ * 안내 높이에 16px(안내 아래 여백 8px + 초점 테두리가 붙지 않게 둔 여유 8px)을 더한 scroll-padding-top을 둔다.
+ * 안내 높이가 바뀌면(줄바꿈·창 크기 변경) ResizeObserver로 다시 맞추고, 안내가 사라지면 원래 값으로 돌린다.
  */
 function keepFocusBelowNotice(notice: HTMLElement | null): (() => void) | undefined {
   if (!notice || typeof ResizeObserver === "undefined") return undefined;
