@@ -50,6 +50,7 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 - `signed-in`이면 #261 회원 조회 뒤 `afterLoginPath(이름, 다시 검사한 next)`로 간다. 조회 실패는 다시 불러오기만 하고 완료 요청은 다시 보내지 않는다. 보내지 않은 조회(`skipped`)는 실패로 안내하지 않고 이동 없이 [다시 로그인]만 둔다.
 - 취소·실패·응답 유실·다시 열린 콜백은 재전송 없이 안내하고 [다시 로그인](로그인 화면, 새 시작)을 둔다. 로그인 실패 안내는 회원 인증 만료 안내와 다르다.
 - query를 지운 주소를 새로고침·탭 복제로 다시 열면 새 페이지라 다시 해석한다. 이때 보낸 시도(`sent`)가 남아 있으면 `already-sent`로 안내하고, 시도 없음·만료·보내지 않은 시도는 그대로 `no-attempt`·`expired`·`malformed`다. 복제한 탭은 원래 탭의 로그인이 끝나도 따라 이동하지 않고 [다시 로그인]을 유지한다(의도한 동작, [#286 담당 답변](https://github.com/JminAILab/CatchU/issues/286#issuecomment-6542688675)).
+- 콜백 주소는 `npm run dev` 요청 로그에 찍히지 않는다([web README 「실행」](../../../README.md#실행)).
 
 **재인증 안내**
 - 가드가 `renderReauthNotice({ returnTo, variant })`로 그린다. `variant`는 #286 `auth-gate.ts`의 `ReauthNoticeProps`다([#287 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6207895905)).
