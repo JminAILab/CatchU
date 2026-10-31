@@ -46,7 +46,7 @@ export type GoogleCompletionResult =
 export type CallbackParse =
   /** 완료 API를 부른다(취소 `access_denied` 포함). `next`는 돌아올 때 다시 검사한 회원 경로다. */
   | { kind: "complete"; input: GoogleCompletionInput; next: string | null }
-  /** 이미 완료 요청을 보낸 시도(새로고침 등). 다시 보내지 않고 새 로그인을 안내한다. */
+  /** 이미 완료 요청을 보낸 시도(새로고침·탭 복제 등, 주소의 query가 지워진 경우 포함). 다시 보내지 않고 새 로그인을 안내한다. */
   | { kind: "already-sent" }
   /** 보관한 시도가 없다. */
   | { kind: "no-attempt" }
@@ -287,6 +287,8 @@ export function createGoogleAuth(options: GoogleAuthOptions): GoogleAuth {
         remove();
         return { kind: "expired" };
       }
+      // 콜백 화면은 해석 뒤 주소의 query를 지우므로, 보낸 시도의 콜백을 새로고침·탭 복제로 다시 열면 매개변수가 없다.
+      if (stored.sent && !query.has("state") && !query.has("code") && !query.has("error")) return { kind: "already-sent" };
       const states = query.getAll("state");
       if (states.length !== 1 || states[0].length === 0) return { kind: "malformed" };
       if (states[0] !== stored.state) return { kind: "state-mismatch" };

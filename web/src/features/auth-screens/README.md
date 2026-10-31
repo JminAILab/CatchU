@@ -49,6 +49,7 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 - 해석이 `complete`일 때만 완료 요청을 한 번 보낸다. 같은 입력의 중복은 #286도 하나로 묶는다. 화면이 닫히면 결과만 무시하고 요청을 중단하거나 다시 보내지 않는다.
 - `signed-in`이면 #261 회원 조회 뒤 `afterLoginPath(이름, 다시 검사한 next)`로 간다. 조회 실패는 다시 불러오기만 하고 완료 요청은 다시 보내지 않는다. 보내지 않은 조회(`skipped`)는 실패로 안내하지 않고 이동 없이 [다시 로그인]만 둔다.
 - 취소·실패·응답 유실·다시 열린 콜백은 재전송 없이 안내하고 [다시 로그인](로그인 화면, 새 시작)을 둔다. 로그인 실패 안내는 회원 인증 만료 안내와 다르다.
+- query를 지운 주소를 새로고침·탭 복제로 다시 열면 새 페이지라 다시 해석한다. 이때 보낸 시도(`sent`)가 남아 있으면 `already-sent`로 안내하고, 시도 없음·만료·보내지 않은 시도는 그대로 `no-attempt`·`expired`·`malformed`다. 복제한 탭은 원래 탭의 로그인이 끝나도 따라 이동하지 않고 [다시 로그인]을 유지한다(의도한 동작, [#286 담당 답변](https://github.com/JminAILab/CatchU/issues/286#issuecomment-6542688675)).
 
 **재인증 안내**
 - 가드가 `renderReauthNotice({ returnTo, variant })`로 그린다. `variant`는 #286 `auth-gate.ts`의 `ReauthNoticeProps`다([#287 안내](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6207895905)).
@@ -132,5 +133,5 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 ## 검사
 
 - `test/auth-screens-google.test.mjs`·`test/auth-screens-session.test.mjs`: 화면 제어를 함수 대역으로 확인한다. 이동 전 확인은 사유 조합(없음·입력만·분석 요청만·둘 다)과 누를 때마다 다시 읽는지를 본다. [다시 로그인]은 계속한 뒤 다시 눌러도 묻거나 이동하지 않는지와 머무른 뒤 다시 묻는지를 제어와 `ReauthNotice` 양쪽에서 본다. `ReauthNotice`는 서버 렌더링으로 그린 버튼의 클릭 함수를 연달아 부른다. 안내 문구는 #251 기록의 합의 문구와 글자까지 같은지, 시작·콜백 화면별 선택과 확인 창의 줄 순서를 본다.
-- `test/auth-screens-connected.test.mjs`: 화면 제어에 #286 공통 함수(시도 보관·콜백 해석·완료, 세션·보호 API, 가드 판정)를 연결 코드와 같은 방식으로 붙이고, 서버와 `sessionStorage`·`localStorage`만 대역으로 바꿔 확인한다.
+- `test/auth-screens-connected.test.mjs`: 화면 제어에 #286 공통 함수(시도 보관·콜백 해석·완료, 세션·보호 API, 가드 판정)를 연결 코드와 같은 방식으로 붙이고, 서버와 `sessionStorage`·`localStorage`만 대역으로 바꿔 확인한다. query가 지워진 주소를 탭 복제·새로고침으로 다시 연 콜백도 여기서 본다.
 - 실제 브라우저 조작(확인 창·초점·화면 이동)과 `ReauthNotice` 밖의 React 렌더링은 이 시험에 들지 않는다.
