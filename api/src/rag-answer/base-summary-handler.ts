@@ -2,13 +2,13 @@
 // 하루 횟수를 세지 않고 작업 출처를 보지 않으며 base_summary 행만 보고 생성 여부를 정한다(BR5.3). 시도는 1회다.
 // 생성 실패(사본 읽기·근거 모양·게이트 예외)는 조건부 FAILED로 쓰고 정상 반환하며, DB 오류는 로그 뒤 다시 던진다(AiRun이 실패로 기록).
 // AI 호출 중에는 트랜잭션을 열어 두지 않는다(logical-components 「공유 자원」).
-import { DataSource } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import type { AiGenerationGate, GatedOutput } from '../ai-generation/ai-generation.types';
 import type { AiRunHandler } from '../ai-run/ai-run';
 import { errorName } from '../ai-run/ai-run-spec';
 import { NotFound, type PublicationAccess, type PublishedSnapshot } from '../publications/publication-access';
 import {
-  createPendingIfAbsent, isWorkable, readSummaryRow, saveDone, saveFailed, summaryDeadline,
+  createPendingIfAbsent, isWorkable, lockSummaryRow, readSummaryRow, saveDone, saveFailed, summaryDeadline,
 } from './base-summary-store';
 import { BASE_SUMMARY_INSTRUCTION } from './rag-answer-config';
 import {
@@ -58,18 +58,31 @@ export function createBaseSummaryHandler(deps: BaseSummaryHandlerDeps): AiRunHan
   const logger = deps.logger ?? createRagAnswerLogger();
   const manager = () => dataSource.manager;
 
-  /** 결과 쓰기. 바뀐 행이 없으면 늦은 결과라 버린다(BR5.4, FR14.10). */
+  /**
+   * 짧은 트랜잭션 하나: 행을 잠근 뒤 시각을 읽고 조건부로 쓴다. 잠금을 기다리는 사이 마감이 지나면 버려야 하기 때문이다
+   * (C-02 late-result, BR5.4). 바뀐 행이 없으면 늦은 결과라 버린다(FR14.10).
+   */
+  function save(publicationId: string, write: (lockedManager: EntityManager, now: Date) => Promise<boolean>): Promise<boolean> {
+    return dataSource.transaction(async (lockedManager) => {
+      await lockSummaryRow(lockedManager, publicationId);
+      return write(lockedManager, clock());
+    });
+  }
+
   async function finish(progress: Progress, output: GatedOutput): Promise<BaseSummaryOutcome> {
     progress.itemCount = output.items.length;
     progress.droppedCount = output.droppedCount;
-    const now = clock();
-    if (output.items.length === 0) return await saveFailed(manager(), progress.publicationId, now) ? 'FAILED' : 'DISCARDED';
-    return await saveDone(manager(), progress.publicationId, output.items, now) ? 'DONE' : 'DISCARDED';
+    const { publicationId } = progress;
+    if (output.items.length === 0) {
+      return await save(publicationId, (lockedManager, now) => saveFailed(lockedManager, publicationId, now)) ? 'FAILED' : 'DISCARDED';
+    }
+    return await save(publicationId, (lockedManager, now) => saveDone(lockedManager, publicationId, output.items, now)) ? 'DONE' : 'DISCARDED';
   }
 
   async function failed(progress: Progress, error: unknown): Promise<BaseSummaryOutcome> {
     progress.failure = errorName(error);
-    return await saveFailed(manager(), progress.publicationId, clock()) ? 'FAILED' : 'DISCARDED';
+    const { publicationId } = progress;
+    return await save(publicationId, (lockedManager, now) => saveFailed(lockedManager, publicationId, now)) ? 'FAILED' : 'DISCARDED';
   }
 
   /** 행 판정(BR5.3). 일해도 되면 그 사본, 아니면 null(SKIPPED). 행이 없고 시한 전이면 PENDING 행을 만든다. */

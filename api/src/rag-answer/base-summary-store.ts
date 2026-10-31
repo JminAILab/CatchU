@@ -43,6 +43,14 @@ export async function readSummaryRow(manager: EntityManager, publicationId: stri
   return { status: rows[0].status, deadlineAt: rows[0].deadline_at, items: Array.isArray(rows[0].items) ? rows[0].items : [] };
 }
 
+/**
+ * 결과를 쓰기 전에 그 행을 잠근다(호출자의 트랜잭션 manager로). 시각은 잠금을 얻은 뒤 읽어야 한다. 잠금을 기다리는 사이
+ * 마감이 지날 수 있기 때문이다(C-02 late-result, BR5.4). 행이 없으면(발행본과 함께 지워짐) 잠글 것 없이 지나간다.
+ */
+export async function lockSummaryRow(manager: EntityManager, publicationId: string): Promise<void> {
+  await manager.query('SELECT publication_id FROM base_summary WHERE publication_id = $1 FOR UPDATE', [publicationId]);
+}
+
 /** 처리기가 일해도 되는 행인가(BR5.3): PENDING이고 마감 전. */
 export function isWorkable(row: SummaryRow | null, now: Date): row is SummaryRow {
   return row !== null && row.status === 'PENDING' && now.getTime() < row.deadlineAt.getTime();

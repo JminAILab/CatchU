@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { after, before, beforeEach, test } = require('node:test');
+const { setTimeout: delay } = require('node:timers/promises');
 const { AiInputTooLarge, AiProviderError } = require('../../dist/ai-generation/ai-generation.types');
 const { InMemoryPublicationAccess } = require('../../dist/publications/in-memory-publication-access');
 const { createBaseSummaryHandler } = require('../../dist/rag-answer/base-summary-handler');
@@ -186,4 +187,37 @@ test('마감이 생성 중에 지나면 결과를 버린다. DB 오류는 로그
   assert.deepEqual({ ...handled().at(-1), durationMs: 0 }, { event: 'base-summary.handled', publicationId: value.publicationId, outcome: 'ERROR',
     failure: 'QueryFailedError', itemCount: 0, droppedCount: 0, durationMs: 0 });
   await assert.rejects(handler({ runKey: 'BASE_SUMMARY-y', payload: {} }), TypeError);
+});
+
+test('저장 때 행 잠금을 기다리는 사이 마감이 지나면 DONE을 쓰지 않고 버린다(C-02 late-result, BR5.4)', { timeout: 10_000 }, async () => {
+  const value = await publication();
+  // 생성 중에 다른 연결이 요약 행을 잠가 두어, 처리기가 결과 저장에서 기다리게 한다.
+  const blocker = db.createQueryRunner();
+  gate.onGenerate = async () => {
+    await blocker.connect();
+    await blocker.startTransaction();
+    await blocker.query('SELECT publication_id FROM base_summary WHERE publication_id = $1 FOR UPDATE', [value.publicationId]);
+  };
+  let running;
+  try {
+    running = run(value.publicationId);
+    let waiting = false;
+    for (let tries = 0; tries < 300 && !waiting; tries++) {
+      waiting = (await db.query(`SELECT pid FROM pg_stat_activity
+        WHERE datname = current_database() AND pid <> pg_backend_pid() AND wait_event_type = 'Lock' AND query LIKE '%base_summary%'`)).length > 0;
+      if (!waiting) await delay(10);
+    }
+    assert.ok(waiting, '처리기가 결과 저장의 행 잠금에서 기다려야 한다');
+    now = new Date(DEADLINE.getTime() + 1);
+    await blocker.commitTransaction();
+    await running;
+  } finally {
+    if (blocker.isTransactionActive) await blocker.rollbackTransaction();
+    await running?.catch(() => undefined);
+    await blocker.release();
+  }
+  const saved = await row(value.publicationId);
+  assert.equal(saved.status, 'PENDING', '마감 뒤 결과는 쓰지 않는다(읽을 때 FAILED로 판정)');
+  assert.deepEqual(saved.items, []);
+  assert.equal(handled().at(-1).outcome, 'DISCARDED');
 });
