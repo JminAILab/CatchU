@@ -197,6 +197,66 @@ test('콜백: 완료 응답 전에 새로고침으로 다시 열린 콜백은 �
   assert.equal(server.count('POST /auth/google/login'), 1);
 });
 
+test('콜백: 완료 응답 전에 query가 지워진 주소를 탭 복제·새로고침으로 다시 열면 합의 문구로 안내하고 다시 보내지 않는다', async () => {
+  const server = fakeServer();
+  const p = page(server);
+  const state = await pressGoogle(p, '/assets');
+  const gate = server.hold('POST /auth/google/login');
+  let q = query(`state=${state}&code=c1`);
+  const run = callbackScreen(p).begin(() => q, () => { q = new URLSearchParams(); });
+  await tick(); await tick();
+  assert.equal(q.toString(), '', '원래 탭이 해석 뒤 query를 지웠다');
+  assert.equal(server.count('POST /auth/google/login'), 1);
+  const notice = { phase: 'notice', notice: '로그인 결과를 확인하지 못했습니다. 다시 로그인해 주세요.', loginHref: '/login' };
+  // 탭 복제: 그때의 sessionStorage가 복사되고 localStorage는 같다. 주소는 query가 지워진 그대로다.
+  const copied = fakeStorage();
+  copied.map.set(GOOGLE_ATTEMPT_KEY, p.attempts.map.get(GOOGLE_ATTEMPT_KEY));
+  const duplicate = callbackScreen(page(server, { attempts: copied, markers: p.markers }));
+  await duplicate.begin(() => q, () => {});
+  assert.deepEqual(duplicate.getView(), notice);
+  // 새로고침: 같은 sessionStorage로 새 페이지를 만든다.
+  const reloaded = callbackScreen(page(server, { attempts: p.attempts, markers: p.markers }));
+  await reloaded.begin(() => q, () => {});
+  assert.deepEqual(reloaded.getView(), notice);
+  gate.resolve();
+  await run;
+  // 원래 탭이 로그인을 마쳐도 복제 탭은 따라 이동하지 않고 [다시 로그인]을 유지한다(의도한 동작).
+  assert.equal(p.store.getSnapshot().status, 'signed-in');
+  assert.deepEqual(duplicate.getView(), notice);
+  assert.equal(server.count('POST /auth/google/login'), 1, '완료 요청을 다시 보내지 않는다');
+  assert.equal(server.count('POST /auth/refresh'), 0, '세션 확인으로 성공을 판정하지 않는다');
+});
+
+test('콜백: 응답을 받지 못한 시도(sent 유지)를 query 없이 다시 열어도 합의 문구로 안내하고 다시 보내지 않는다', async () => {
+  const server = fakeServer();
+  const p = page(server);
+  const state = await pressGoogle(p, '/assets');
+  server.fail('POST /auth/google/login');
+  await callbackScreen(p).begin(() => query(`state=${state}&code=c1`), () => {});
+  const reloaded = callbackScreen(page(server, { attempts: p.attempts, markers: p.markers }));
+  await reloaded.begin(() => query(''), () => {});
+  assert.deepEqual(reloaded.getView(), { phase: 'notice', notice: '로그인 결과를 확인하지 못했습니다. 다시 로그인해 주세요.', loginHref: '/login' });
+  assert.equal(server.count('POST /auth/google/login'), 1);
+});
+
+test('콜백: query 없는 주소의 안내는 시도 없음·만료·보내지 않은 시도에서 그대로이고 완료 요청을 보내지 않는다', async () => {
+  const server = fakeServer();
+  const open = async (attempts) => {
+    const control = callbackScreen(page(server, { attempts }));
+    await control.begin(() => query(''), () => {});
+    return control.getView();
+  };
+  assert.deepEqual(await open(fakeStorage()), { phase: 'notice', notice: M.callbackAttemptUnverified, loginHref: '/login' }, '시도 없음');
+  const p = page(server);
+  await pressGoogle(p, '/assets');
+  const stored = JSON.parse(p.attempts.map.get(GOOGLE_ATTEMPT_KEY));
+  assert.deepEqual(await open(p.attempts), { phase: 'notice', notice: M.callbackLoginFailed, loginHref: '/login' }, '보내지 않은 시도');
+  p.attempts.map.set(GOOGLE_ATTEMPT_KEY, JSON.stringify({ ...stored, sent: true, expiresAt: 0 }));
+  assert.deepEqual(await open(p.attempts), { phase: 'notice', notice: M.callbackAttemptUnverified, loginHref: '/login' }, '보낸 시도의 만료');
+  assert.equal(p.attempts.map.has(GOOGLE_ATTEMPT_KEY), false);
+  assert.equal(server.count('POST /auth/google/login'), 0);
+});
+
 test('콜백: 완료 뒤 뒤로 가기로 다시 열린 콜백(보관값 없음)은 새 로그인을 안내하고 보내지 않는다', async () => {
   const server = fakeServer();
   const p = page(server);

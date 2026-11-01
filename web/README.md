@@ -51,6 +51,8 @@ npm ci
 
 종료는 서버를 띄운 터미널에서 `Ctrl+C`. 포트 3000이 이미 사용 중이면 `npm run dev -- -p 3001`처럼 실행 인자로 임시로 바꾸되(Windows·macOS 공통), 팀 공통 포트는 3000이다. `.env`·`.env.local`의 `PORT`는 적용되지 않는다.
 
+`npm run dev`는 들어온 요청을 주소째 터미널에 찍는다. `/google/callback`·`/github/callback`은 query에 일회용 `code`·`state`가 실리므로 `next.config.ts`의 `logging.incomingRequests.ignore`로 뺐고, 다른 경로는 그대로 찍힌다(#287). 개발 서버에만 적용되는 설정이며 운영 접근 로그와는 별개다. 개발 서버가 `.next/dev/trace`에 남기는 내부 추적 기록에는 적용되지 않아 두 주소도 값째 들어가므로, `.next/`를 검증 증거로 공유하지 않는다.
+
 ## 검사
 
 | 명령 | 내용 | 실패 예 |
@@ -102,7 +104,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `.node-version` | Node.js 버전(버전 관리 도구용) |
 | `.env.example` | 환경변수 목록 예시(포트는 여기서 못 바꿈) |
 | `.npmrc` | `engine-strict=true` — Node 버전 강제 |
-| `next.config.ts` | Next.js 설정. `agentRules: false`로 `npm run dev`가 `web/`에 `AGENTS.md`·`CLAUDE.md`를 자동으로 만들지 않게 한다. 보안 응답 헤더와 `X-Powered-By` 끄기도 여기에 둔다 |
+| `next.config.ts` | Next.js 설정. `agentRules: false`로 `npm run dev`가 `web/`에 `AGENTS.md`·`CLAUDE.md`를 자동으로 만들지 않게 한다. 보안 응답 헤더와 `X-Powered-By` 끄기, 개발 요청 로그에서 콜백 주소 빼기(「실행」)도 여기에 둔다 |
 | `tsconfig.json`, `eslint.config.mjs` | TypeScript·ESLint 설정(create-next-app 기본값) |
 | `.gitignore` | `node_modules/`, `.next/`, `next-env.d.ts` 등 생성물 제외 |
 
