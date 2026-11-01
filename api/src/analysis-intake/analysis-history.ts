@@ -55,8 +55,8 @@ export function parseHistoryQuery(memberId: string, query: Record<string, unknow
 }
 
 /**
- * 본인 분석 이력·개별 상태 조회(#140). 상태는 접수(#138)와 같은 `analysis-status.ts`로 계산하고 쓰기·행 잠금·새 분석 실행을 하지 않는다.
- * 조회 오류는 빈 목록·404·다른 상태로 바꾸지 않고 그대로 공통 500 처리로 넘긴다.
+ * 본인 분석 이력·개별 상태 조회(#140)와 홈용 접수 이력 유무(#428). 상태는 접수(#138)와 같은 `analysis-status.ts`로 계산하고
+ * 쓰기·행 잠금·새 분석 실행을 하지 않는다. 조회 오류는 빈 목록·404·다른 상태·false로 바꾸지 않고 그대로 공통 500 처리로 넘긴다.
  */
 @Injectable()
 export class AnalysisHistoryService {
@@ -91,6 +91,17 @@ export class AnalysisHistoryService {
       if (!request) throw new ApiError('RESOURCE_UNAVAILABLE');
       return (await readAnalysisStatusSnapshot(manager, request)).status;
     });
+  }
+
+  /**
+   * 홈용 접수 이력 유무(GET /v1/me/analysis-summary, #428). 본인의 영속 접수 요청(requestState ACCEPTED)이 1건 이상이면 true다.
+   * 처리 상태와 현재 선정 목록은 보지 않으므로 실패·재요청 요청과 선정에서 빠진 저장소의 요청도 센다. 문장 하나라 트랜잭션을 열지 않는다.
+   */
+  async summary(memberId: string): Promise<{ hasAcceptedAnalysisRepository: boolean }> {
+    if (!UUID.test(memberId)) throw new ApiError('AUTH_INVALID');
+    const hasAcceptedAnalysisRepository = await this.database.getRepository(AnalysisRequest)
+      .existsBy({ memberId, requestState: 'ACCEPTED' });
+    return { hasAcceptedAnalysisRepository };
   }
 
   /**

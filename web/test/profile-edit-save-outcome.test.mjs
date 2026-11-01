@@ -9,6 +9,7 @@ import { toClientResult } from '../src/lib/auth-api.ts';
 const profile = { displayName: '이름', introduction: '', desiredRole: '', skills: [] };
 const saved = { kind: 'success', status: 200, data: profile };
 const renewed401 = () => ({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm', authRenewal: 'renewed' });
+const reauth401 = () => ({ kind: 'api-error', status: 401, code: 'AUTH_REQUIRED', message: 'm', authRenewal: 'not-renewed' });
 const notSent = () => toClientResult({ kind: 'not-sent', reason: 'reauth-required' });
 const discarded = () => toClientResult({ kind: 'discarded', sent: true });
 
@@ -25,8 +26,8 @@ function fake(...responses) {
   };
 }
 
-test('프로필 수정 저장: 연장 뒤 거부·보내지 않음은 그대로 돌려주고 한 번만 보낸다(자동 재전송 없음)', async () => {
-  for (const [result, expected] of [[renewed401(), 'renewed-rejected'], [notSent(), 'not-sent']]) {
+test('프로필 수정 저장: 연장 뒤 거부·재인증 거부·보내지 않음은 그대로 돌려주고 한 번만 보낸다(자동 재전송 없음)', async () => {
+  for (const [result, expected] of [[renewed401(), 'renewed-rejected'], [reauth401(), 'reauth-rejected'], [notSent(), 'not-sent']]) {
     const api = fake(result);
     assert.equal(await updateProfile(api, profile, { isCurrent: () => true }), expected);
     assert.deepEqual(api.calls, [{ path: '/me/profile', method: 'PUT' }]);
@@ -39,9 +40,9 @@ test('프로필 수정 저장: 반영하지 않은 응답은 세션이 그대로
   assert.equal(await updateProfile(fake(() => { current = false; return discarded(); }), profile, { isCurrent: () => current }), 'cancelled');
 });
 
-test('프로필 수정 저장 회귀: 성공·갱신하지 못한 401·5xx·예외·취소 처리는 그대로다', async () => {
+test('프로필 수정 저장 회귀: 성공·전환을 끈 401·5xx·예외·취소 처리는 그대로다', async () => {
   assert.equal(await updateProfile(fake(saved), profile, { isCurrent: () => true }), 'saved');
-  assert.equal(await updateProfile(fake({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm', authRenewal: 'not-renewed' }), profile,
+  assert.equal(await updateProfile(fake({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm' }), profile,
     { isCurrent: () => true }), 'save-failed');
   assert.equal(await updateProfile(fake({ kind: 'api-error', status: 503, code: 'INTERNAL_ERROR', message: 'm' }), profile, { isCurrent: () => true }), 'save-failed');
   assert.equal(await updateProfile(fake(new Error('network')), profile, { isCurrent: () => true }), 'save-failed');
