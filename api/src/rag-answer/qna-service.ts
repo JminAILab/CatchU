@@ -81,6 +81,7 @@ function closed(result: QnaRunResult): QnaRunResult {
  */
 export async function answerQuestion(deps: QnaDeps, input: QnaRunInput): Promise<QnaRunResult> {
   const result = emptyResult();
+  if (input.isAborted()) return closed(result); // 확인 단계 중에 이미 끊겼으면 다시 쓰기부터 하지 않는다
   let searchQuestion = input.question;
   if (input.history.length > 0) {
     const startedAt = performance.now();

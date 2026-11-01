@@ -257,3 +257,32 @@ test('로그에는 질문·앞 대화·답·링크 토큰·grant 글이 없다(B
     assert.ok(!text.includes(secret), `로그에 ${secret}가 없다`);
   }
 });
+
+test('확인 단계 중에 연결이 끊기면 다시 쓰기·검색·생성을 부르지 않고 연결 끊김으로 남긴다(BR4.8, NFR4.3)', async () => {
+  const { fakes } = app;
+  // 질문 횟수를 세는 동안(확인 단계 마지막) 받는 쪽이 끊게 한다. close 이벤트는 SSE를 열기 전에 지나간다.
+  let entered;
+  const counting = new Promise((resolve) => { entered = resolve; });
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  fakes.counter.current = {
+    async count(publicationId, now) { entered(); await held; return memory.count(publicationId, now); },
+    async close() {},
+  };
+  const controller = new AbortController();
+  const pending = fetch(`${app.server.url}/v1/public/links/${publication.token}/questions`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question: '질문', history: [{ role: 'USER', text: '앞 질문' }] }), signal: controller.signal,
+  }).catch(() => undefined);
+  await counting;
+  controller.abort();
+  await pending;
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  release();
+  const entry = await waitFor(() => completed()[0]);
+  assert.equal(entry.outcome, 'CLIENT_CLOSED');
+  assert.equal(fakes.rewriter.calls.length, 0, '다시 쓰기를 부르지 않는다');
+  assert.equal(fakes.search.calls.length, 0, '검색을 부르지 않는다');
+  assert.equal(fakes.gate.streamRequests.length, 0, '생성을 부르지 않는다');
+  assert.equal(countOf(publication.publicationId), 1, '이미 센 횟수는 돌려주지 않는다');
+});

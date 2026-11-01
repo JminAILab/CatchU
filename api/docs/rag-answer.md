@@ -40,7 +40,7 @@
 | `done` | `{}` |
 | `error` | `{ "code": "ANSWER_FAILED" \| "INDEX_NOT_READY" }`. 이미 보낸 항목은 그대로 두고 닫는다 |
 
-머리: `Content-Type: text/event-stream; charset=utf-8`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`, `Connection: keep-alive`. 항목을 기다리는 동안 15초마다 `: keep-alive` 주석을 쓴다. 받은 사람이 연결을 끊으면(응답 `close`가 끝나기 전에 옴) 끊김 깃발을 세워 검색·생성을 부르지 않고, 생성 반복을 `break`해 게이트 스트림의 `return`을 부른다. 센 질문 횟수는 돌려주지 않는다.
+머리: `Content-Type: text/event-stream; charset=utf-8`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`, `Connection: keep-alive`. 항목을 기다리는 동안 15초마다 `: keep-alive` 주석을 쓴다. 받은 사람이 연결을 끊으면(응답 `close`가 끝나기 전에 옴, 또는 확인 단계를 기다리는 사이 이미 끊겨 응답이 `destroyed`) 끊김으로 보아 아직 시작하지 않은 다시 쓰기·검색·생성을 부르지 않고, 생성 반복을 `break`해 게이트 스트림의 `return`을 부른다. 센 질문 횟수는 돌려주지 않는다.
 
 ## 단계 순서
 

@@ -117,7 +117,8 @@ export class QnaController {
     try {
       result = await answerQuestion({ rewriter: this.rewriter, search: this.search, gate: this.gate }, {
         publicationId, question: input.question, history: input.history,
-        isAborted: () => aborted,
+        // 확인 단계(admit)를 기다리는 사이 이미 끊겼으면 close 이벤트가 지나가 다시 오지 않으므로 응답의 현재 상태도 본다.
+        isAborted: () => aborted || response.destroyed,
         onItem: (item: GatedItem) => write(sseEvent('item', item)),
       });
       if (result.outcome === 'OK') write(sseEvent('done', {}));
