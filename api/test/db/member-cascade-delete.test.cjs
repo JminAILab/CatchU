@@ -55,6 +55,8 @@ const MEMBER_ROWS = {
   // 12월 intent U3(C-06·C-08): 발행본 색인 상태와 조각(발행본·발행 항목을 따라 지워짐).
   publication_index: 'publication_id IN (SELECT publication_id FROM publication WHERE member_id = $1)',
   published_chunk: 'publication_id IN (SELECT publication_id FROM publication WHERE member_id = $1)',
+  // 12월 intent U5(C-06, BR9.1): 발행본마다 AI 기본 요약 하나(발행본을 따라 지워짐).
+  base_summary: 'publication_id IN (SELECT publication_id FROM publication WHERE member_id = $1)',
 };
 const SHARED_TABLES = ['allowed_scope_revision', 'repository_selection'];
 const NONE = Object.fromEntries(Object.keys(MEMBER_ROWS).map(table => [table, 0]));
@@ -148,6 +150,9 @@ async function memberWithAllData() {
       VALUES ($1, 'PENDING', now() + interval '10 minutes', now())`, [publicationId]);
     await m.query(`INSERT INTO published_chunk (chunk_id, publication_id, published_item_id, seq, field_path, char_start, char_end, source_kind, text)
       VALUES ($1, $2, $3, 1, 'body', 0, 5, 'AUTHOR_MATERIAL', '합성 본문')`, [randomUUID(), publicationId, publishedItemId]);
+    await m.query(`INSERT INTO base_summary (base_summary_id, publication_id, status, deadline_at, items, generated_at, updated_at)
+      VALUES ($1, $2, 'DONE', now() + interval '10 minutes', '[{"kind":"AI_INTERPRETATION","text":"합성 요약","citations":[],"jdRole":null}]', now(), now())`,
+    [randomUUID(), publicationId]);
   });
   const rows = await memberRows(memberId);
   for (const [table, n] of Object.entries(rows)) assert.ok(n > 0, `${table}에 시험 회원의 행이 있어야 한다`);
