@@ -38,7 +38,7 @@ class LiveAssembly:
     # GitHub 연결. 수집이 모든 사전 검사를 통과한 뒤에만 연다.
     open_transport: Callable[[], Transport]
     provider_factory: Callable[[], GenerationProvider]
-    # 꺼낸 시각부터 생성 마감까지. 운영은 총 상한 20분에서 결과 조합·전송 여유 60초를 뺀 값이다.
+    # 꺼낸 시각부터 생성 마감까지. 운영은 총 상한 60분에서 결과 조합·전송 여유 60초를 뺀 값이다.
     generation_budget: timedelta
     collection_limits: CollectionLimits = PROPOSED_LIMITS
     generation_limits: GenerationLimits = PROPOSED_GENERATION_LIMITS

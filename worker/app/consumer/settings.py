@@ -67,9 +67,10 @@ class QueueUrl:
 
 @dataclass(frozen=True)
 class Limits:
-    """대기·처리 상한(초). 계획 「부모의 전송·조회 대기 상한」과 「총 마감의 범위」의 값이다."""
+    """대기·처리 상한(초). 총 처리는 #424 후속 결정, 나머지는 기존 소비자 계획을 따른다."""
 
-    total: float = 20 * 60  # 꺼낸 시각부터 종결 프레임까지
+    # #424 후속 결정의 60분에 맞춘다. 이전 구현의 20분에서 변경하며 시작점은 꺼낸 시각 그대로다.
+    total: float = 60 * 60  # 꺼낸 시각부터 종결 프레임까지
     child_grace: float = 30  # 자식은 total + child_grace에 스스로 끝낸다
     parent_watch_interval: float = 1  # 자식이 부모 PID를 확인하는 간격
     event_send: float = 5

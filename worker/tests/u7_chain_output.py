@@ -20,6 +20,7 @@ from app.collection import (
     SelectedRange,
     collect,
 )
+from app.consumer.settings import Limits
 from app.contract import Verdict, check_message
 from app.generation import run_generation
 from app.processing import (
@@ -99,7 +100,8 @@ def run(message: dict[str, Any], count: int) -> dict[str, Any]:
         built,
         provider=ScriptedProvider(naive),
         clock=clock,
-        deadline=clock() + timedelta(minutes=19),
+        deadline=clock()
+        + timedelta(seconds=Limits().total - Limits().generation_margin),
     )
     result = compose_result(
         request, generation.output, finished_at=datetime.now(UTC), id_label="u7-chain"
