@@ -39,6 +39,9 @@ export const ERROR_STATUS = {
   // 12월 intent U5(계약 C-09·C-12, U5 기능 설계 BR2.2·BR3.1). 받은 사람 질의응답 경로의 거부.
   INDEX_NOT_READY: 409,
   QUESTION_LIMIT_REACHED: 429,
+  // 12월 intent U6(U6 기능 설계 BR3.2·BR3.3). U6 안 승인 API만 쓰는 코드라 계약 문서에는 없다.
+  MCP_CONSENT_REQUIRED: 409,
+  MCP_AUTHORIZATION_INVALID: 400,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_STATUS;
@@ -84,4 +87,7 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   // QUESTION_LIMIT_REACHED는 U5 기능 설계 BR3.1이 문구를 정했다. 남은 질문 수·한도 값은 넣지 않는다(BR3.3).
   INDEX_NOT_READY: '아직 쓸 수 없습니다',
   QUESTION_LIMIT_REACHED: '오늘 한도에 도달했습니다',
+  // U6 기능 설계 BR3.2·BR3.3. web은 문구가 아닌 code로 분기한다.
+  MCP_CONSENT_REQUIRED: '자료 읽기에 먼저 동의해 주세요.',
+  MCP_AUTHORIZATION_INVALID: '연결 요청을 확인할 수 없습니다. Claude에서 다시 시작해 주세요.',
 };

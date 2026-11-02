@@ -38,6 +38,9 @@ api가 읽는 환경변수 목록이다. 설치, `.env` 준비, 값의 우선순
 | 선택 | `CATCHU_GENERATION_API_KEY` | 없음 | 12월 intent AI 생성 게이트의 Claude API 키(U1·U2). 없으면 api는 기동하고 게이트를 부를 때 `AiProviderError(CALL_FAILED/NOT_CONFIGURED)`로 끝난다. Git·로그·PR에 남기지 않는다([AI 생성 게이트](ai-generation.md)) |
 | 선택(탈퇴·파일 저장에 필요) | `FILE_STORAGE_DRIVER` | 없음 | 12월 intent U2 파일 저장 드라이버. 지금은 `local`만 받는다(`s3`는 U8). 이 값과 아래 값이 둘 다 없거나 빈 문자열이면 api는 기동하고 파일 저장의 모든 호출이 `StorageUnavailable`(탈퇴는 2단계에서 500). 한쪽만 있거나 모르는 값이면 기동 실패([파일 저장](file-storage.md)) |
 | 선택(탈퇴·파일 저장에 필요) | `FILE_STORAGE_LOCAL_ROOT` | 없음 | `local` 드라이버의 뿌리 폴더. 이미 있는 폴더의 절대 경로여야 하며 상대 경로·없는 폴더는 기동 실패. 오류에 경로 값을 넣지 않는다. 개발 서버에는 U2 코드를 올리기 전에 두 값을 넣는다 |
+| 선택 | `MCP_ACCESS_TOKEN_TTL_SECONDS` | `604800`(7일) | 12월 intent U6 Claude 연결의 접근 토큰 수명(초). `604800` 이하의 양의 정수만 받고 그 밖은 기동 실패. 만료 재승인을 확인할 때만 줄인다([Claude 연결](claude-mcp.md)) |
+| 선택(개발·test 전용) | `MCP_DEV_PUBLIC_ORIGIN` | 없음(`http://127.0.0.1:{PORT}`) | OAuth 메타데이터·MCP 주소에 쓸 공개 주소. 끝 슬래시 없는 http(s) 출처만 받는다. `NODE_ENV`가 `development`·`test`가 아닌데(미지정 포함) 값이 있으면 기동 실패이고, 그때 공개 주소는 `AUTH_WEB_ORIGIN`이다. 터널로 실제 Claude를 붙여 볼 때만 쓴다([Claude 연결](claude-mcp.md)) |
+| 선택(개발·test 전용) | `MCP_DEV_REDIRECT_URIS` | 없음 | Claude 콜백 말고 더 받을 돌아갈 주소. 쉼표로 구분하고 정확히 일치로 비교한다. 주소가 아니면 기동 실패. `NODE_ENV`가 `development`·`test`가 아닌데(미지정 포함) 값이 있으면 기동 실패([Claude 연결](claude-mcp.md)) |
 | 선택 | `CATCHU_TEST_REDIS_URL` | 없음(큐 시험 건너뜀) | `npm test`의 실제 Valkey 시험이 쓰는 큐 주소. 있으면 시험이 반드시 돌고 닿지 않으면 실패한다. 실행기가 `.env`에서 넘기지 않으므로 셸 환경변수로 준다(CI는 `redis://127.0.0.1:6379`) |
 | 선택 | `TEST_COVERAGE_INCLUDE` | `dist/**` | `npm run test:coverage`가 표에 넣을 범위(glob). Unit 폴더(예: `dist/share-links/**`)만 넣으면 맨 아래 비율이 그 Unit의 값이다. 실행기가 `.env`에서 넘기지 않으므로 셸 환경변수로 준다([README 「검사와 빌드 후 실행」](../README.md#검사와-빌드-후-실행)) |
 | 선택 | `TEST_DB_HOST` / `TEST_DB_PORT` / `TEST_DB_USER` / `TEST_DB_PASSWORD` / `TEST_DB_NAME` | `127.0.0.1` / `5433` / `catchu` / `catchu_local` / `catchu_test` | `npm test`가 쓰는 테스트 DB(「DB 테스트」). 이름은 `_test`로 끝나야 함 |
