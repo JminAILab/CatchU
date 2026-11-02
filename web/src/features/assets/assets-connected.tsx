@@ -6,6 +6,10 @@ import { AssetsView, assetTabs, type AssetTab } from "./assets-view";
 import { CatchActions } from "./catch-actions";
 import { createAssetsStore } from "./assets-store";
 import { catchErrorText, type CatchApi } from "./catch-api";
+import type { AuthorDescriptionApi } from "./author-description-api";
+import { AuthorDescriptionEditor } from "./author-description-editor";
+import { UNSAVED_MESSAGE } from "@/features/profile/use-unsaved-guard";
+import { confirmDiscardUnsaved, unsavedChanges } from "@/lib/unsaved-changes";
 import type { RepositoryOption } from "./types";
 import styles from "./assets.module.css";
 
@@ -20,6 +24,8 @@ export type RepositoryManagementBindings = {
 type Props = {
   /** AssetsMemberBoundary 안에 조립해 회원 전환 때 이 컴포넌트도 새로 마운트한다. */
   api: CatchApi;
+  /** U4 작성자 설명 읽기·저장. 없으면 상세에 설명 편집 영역을 그리지 않는다. */
+  descriptionApi?: AuthorDescriptionApi;
   repositories: readonly RepositoryOption[];
   /** 저장소 이름 조회는 Catch 목록·상세 조회를 막지 않는다. */
   repositoryNotice?: ReactNode;
@@ -27,7 +33,7 @@ type Props = {
 };
 
 /** #106의 인증 가드 안에 조립하는 B 화면. 제품 경로나 토큰 저장소를 소유하지 않는다. */
-export function AssetsConnected({ api, repositories, repositoryNotice, repositoryManagement }: Props) {
+export function AssetsConnected({ api, descriptionApi, repositories, repositoryNotice, repositoryManagement }: Props) {
   const store = useMemo(() => createAssetsStore(api), [api]);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const params = useSearchParams();
@@ -78,13 +84,19 @@ export function AssetsConnected({ api, repositories, repositoryNotice, repositor
           item={snapshot.detail} mutation={snapshot.mutation}
           onChange={(change) => { void store.update(change); }}
           onReload={() => { if (catchId) void store.openDetail(catchId, true); }} /> : null}
+        descriptionEditor={detailMatches && snapshot.detail && descriptionApi
+          ? <AuthorDescriptionEditor key={snapshot.detail.catchId} catchId={snapshot.detail.catchId} api={descriptionApi} /> : null}
         selectedId={visibleCatchId}
         hasMore={listMatches && snapshot.nextCursor !== null} moreState={snapshot.moreState}
         onLoadMore={() => { void store.loadMore(); }}
         onTabChange={(next) => changeQuery({ tab: next === "catch" ? null : next, catchId: null })}
         onRepositoryChange={(id) => changeQuery({ repositoryId: id || null, catchId: null })}
         onOpen={(id) => changeQuery({ catchId: id })}
-        onClose={() => changeQuery({ catchId: null })}
+        onClose={() => {
+          // 작성자 설명을 저장하지 않았으면 모달을 닫기 전에 묻는다(BR2.2). 머무르면 입력을 그대로 둔다.
+          if (!confirmDiscardUnsaved(unsavedChanges, (message) => window.confirm(message), UNSAVED_MESSAGE)) return;
+          changeQuery({ catchId: null });
+        }}
         onRetryList={() => { void store.refresh(repositoryId); }}
         onRetryDetail={() => { if (catchId) void store.openDetail(catchId, true); }}
         repositoryManagement={repositoryManagement(bindings)} />

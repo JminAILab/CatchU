@@ -22,6 +22,18 @@ B 담당의 제품 `/assets`와 개발용 미리보기를 관리한다. 제품 �
 
 연결 기반은 [#185 공통 인증](https://github.com/JminAILab/CatchU/pull/185)·[#187 저장소 관리](https://github.com/JminAILab/CatchU/pull/187)다. 실제 API에는 `/me`, `/me/repositories`, `/analysis-requests`와 B Catch 조회·저장 경로가 필요하다. 없는 API를 모의 성공 응답으로 바꾸지 않는다. 검증 시 실제 서버·DB와 합성 HTTP 대역을 구분한다.
 
+## Catch 작성자 설명 편집 (12월 U4 W1)
+
+Catch 상세 모달의 근거 아래, 「Catch 설명 초안」(AI 초안) 위에 「작성자 설명」 영역을 둔다. 기록에서 확인한 내용·작성자 설명·AI 초안을 다른 제목으로 나누고, AI 초안은 입력칸에 넣지 않는다(U4 BR1.3).
+
+- `author-description-api.ts`: `GET`·`PUT /v1/catches/{catchId}/description` 호출, 응답 모양 확인, 4,000자(코드 포인트) 검사, 저장 결과 반영(`applyDescriptionSave`). `author-description-panel.tsx`는 그리기, `author-description-editor.tsx`는 상태·요청을 맡는다. `AssetsMemberPage`가 `createAuthorDescriptionApi(api.member)`를 `AssetsConnected`의 `descriptionApi`로 넘기며, 넘기지 않으면(미리보기) 영역을 그리지 않는다.
+- 열 때 현재 설명을 읽고, 읽지 못하면 빈 설명으로 추정하지 않고 다시 불러오기를 보인다. 저장은 200과 맞는 모양일 때만 “저장됨”이며, 실패하면 입력을 남기고 “저장되지 않았습니다”와 이유(로그인 만료 포함)를 보인다. 비워 두고 저장하면 설명이 지워진다.
+- 저장하지 않은 입력이 있으면 새로고침·링크 이동·로그아웃과 모달 닫기 전에 묻는다. 공통 문구는 `src/lib/save-outcome.ts`에 있고 텍스트 자료 화면(`src/features/materials`)과 함께 쓴다.
+- 상태 전이는 `author-description-editor.tsx`의 `createDescriptionEditorModel`이 맡는다. 늦게 온 불러오기 응답과 로그인이 바뀐 뒤의 응답은 버리고, 저장 중에 더 쓴 입력은 저장 성공 응답이 덮지 않는다.
+- 로그인 만료 때 입력 유지는 공통 인증 모드에 따른다: 기존 모드(기본값)는 401에서 로그인 화면으로 이동해 입력이 남지 않고, 통합 시험 전환을 켜면 갱신 성공 시 "다시 눌러 주세요", 갱신 실패 시 재인증 안내와 함께 입력이 남는다([텍스트 자료 화면 README](../materials/README.md) 「한계」).
+- 시험: `node --test test/author-description.test.mjs test/author-description-editor.test.mjs`(합성 응답·서버 렌더링·원본 tsx를 변환한 상태 전이). 2026-10-29 로컬 브라우저에서 저장·실패(합성 500)·상세 창 닫기 취소·실제 서버 401(기존 모드)을 확인했다. 이 401은 api를 다른 서명 키로 다시 띄워 Access 토큰을 무효로 만든 것이며 시간 만료는 아니다.
+- 2026-11-02에는 Access 토큰 수명 900초를 실제로 기다린 만료로 다시 확인했다(서명 키·세션은 건드리지 않음). 기존 모드(기본값)는 PUT 401 뒤 `/login?next=…`로 이동해 입력이 사라진다(BR2.3 미충족). 통합 모드는 갱신이 성공해 "저장되지 않았습니다 / 로그인이 연장되었습니다. 다시 눌러 주세요."와 함께 입력이 남고, 다시 누르면 "저장됨"이다.
+
 ## 실행
 
 `web/README.md`의 Node.js 24.21.0 환경에서 `npm ci`, `npm run dev`를 실행하고 `/preview/assets`를 연다. 개발 모드에서만 제공하며 `npm run build` 뒤 `npm run start`에서는 404다. 기본 `/`와 공통 레이아웃을 바꾸지 않는다.

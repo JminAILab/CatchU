@@ -17,6 +17,8 @@ type AssetsViewProps = {
   dataMode?: "preview" | "api";
   detailItem?: CatchAsset;
   detailActions?: ReactNode;
+  /** U4 작성자 설명 편집 영역. 근거와 AI 초안(「Catch 설명 초안」) 사이에 둔다(BR1.3). 없으면 그리지 않는다. */
+  descriptionEditor?: ReactNode;
   listMessage?: string;
   detailMessage?: string;
   hasMore?: boolean;
@@ -200,16 +202,18 @@ export function AssetsView(props: AssetsViewProps) {
       {selectedId && tab === "catch" && (
         <CatchDetail key={selectedId} item={selected} state={detailState}
           repositoryName={repositories.find((repo) => repo.repositoryId === selected?.repositoryId)?.name}
-          onClose={props.onClose} onRetry={props.onRetryDetail} dataMode={props.dataMode} errorMessage={props.detailMessage} actions={props.detailActions} />
+          onClose={props.onClose} onRetry={props.onRetryDetail} dataMode={props.dataMode} errorMessage={props.detailMessage} actions={props.detailActions}
+          descriptionEditor={props.descriptionEditor} />
       )}
     </main>
   );
 }
 
-function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage, actions }: {
+function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage, actions, descriptionEditor }: {
   dataMode?: "preview" | "api";
   errorMessage?: string;
   actions?: ReactNode;
+  descriptionEditor?: ReactNode;
   item?: CatchAsset;
   state: LoadState;
   repositoryName?: string;
@@ -259,6 +263,7 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
               </article>
             ))}
           </section>
+          {descriptionEditor}
           <section className={styles.detailSection}><h3>Catch 설명 초안</h3>
             {hasGeneratedDraft(item) ? <p className={styles.draft}>{item.draft.content}</p>
               : <p>{item.draft.status === "FAILED" ? "설명 초안을 생성하지 못했습니다. 위의 사실과 근거는 확인할 수 있습니다." : "생성된 설명 초안이 없습니다."}</p>}
