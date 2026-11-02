@@ -505,10 +505,12 @@ note: draft_content(AI 설명 초안)는 MCP 도구가 내보내지 않는다(FR
 # shared-schema: MCP tools
 list_my_catches:              # U6
   input:  { cursor?: string }
-  output: { catches: [{ catchId, title, visibility: PUBLIC|PRIVATE, workFacts: string[], subjectContribution, authorDescription: string|null, evidenceUrls: string[], mismatch: boolean }], nextCursor: string|null }
+  output: { catches: [{ catchId, title: string|null, visibility: PUBLIC|PRIVATE, workFacts: string[], subjectContribution, authorDescription: string|null, evidenceUrls: string[], mismatch: boolean, omitted?: true }], nextCursor: string|null }
+    # omitted: 항목 하나가 한 쪽 응답 크기 상한을 넘어 글을 뺐다는 표시. 그 항목의 workFacts는 빈 배열, subjectContribution은 빈 글, authorDescription은 null이다
 list_my_text_materials:       # U6
   input:  { cursor?: string }
-  output: { materials: [{ textMaterialId, title, body, updatedAt }], nextCursor: string|null }
+  output: { materials: [{ textMaterialId, title, body, updatedAt, bodyOmitted?: true }], nextCursor: string|null }
+    # bodyOmitted: 항목 하나가 한 쪽 응답 크기 상한을 넘어 글을 뺐다는 표시. 그 항목의 body는 빈 글이다
 read_shared_publication:      # U9, 후순위
   input:  { link: string, cursor?: string }      # 링크 전체 주소 또는 토큰
   output: { title, publishedAt, expiresAt, items: [{ position, itemKind, title, content: string }], nextCursor: string|null }
@@ -519,6 +521,8 @@ read_shared_publication:      # U9, 후순위
   access: 페이지(cursor)마다 C-10 판정을 다시 한다
 common-errors:
   RATE_LIMITED                 # 회원 기준 짧은 시간 빈도(값·형태는 U6 결정, IP로 세지 않음)
+  INVALID_CURSOR               # 서버가 준 모양이 아닌 cursor
+  INTERNAL_ERROR               # DB 실패. 로그를 남기고 오류에는 입력 원문·SQL·stack·토큰을 넣지 않는다
   UNAUTHORIZED                 # MCP 채널 인증 실패의 문서상 이름(토큰 만료·해제·탈퇴). OAuth 표준 401은 공식 SDK가 처리하고
                                # REST 오류 코드에는 더하지 않는다. 갱신 토큰 없음, 다시 승인
 auth-check: U6은 요청마다 저장된 접근 토큰·만료·연결을 확인한다
