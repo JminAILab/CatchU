@@ -1,19 +1,30 @@
 """연결 PR 묶음 조회(#267)로 요청당 호출 상한 안에서 후보 판정까지 가는지.
 
-합성 저장소 모양(`call_budget_shapes`)을 운영 제안 상한(PROPOSED_LIMITS) 그대로 수집 → 후보 판정 →
+합성 저장소 모양(`call_budget_shapes`)을 2026-10-12 비교 당시 상한 그대로 수집 → 후보 판정 →
 결과 조합까지 돌리고, 호출을 종류별로 센다. 같은 모양을 기준 판본(연결 PR을 커밋마다 REST로 조회)에서
-돌린 호출 수는 worker/docs/associated-pr-lookup.md의 비교표에 있다. 상한을 시험에만 키우지 않는다.
+돌린 호출 수는 worker/docs/associated-pr-lookup.md의 비교표에 있다. 현행 상한은 test_u7_budget.py에서 본다.
 """
 
 import math
 import re
 from collections import Counter
+from datetime import timedelta
 
 import pytest
 from call_budget_shapes import SHAPES, Shape, build
 from candidate_scenarios import run_case
 
-from app.collection import PROPOSED_LIMITS, Lookup
+from app.collection import CollectionLimits, Lookup
+
+# 옛 실측 비교의 500건 창과 상세 200건·호출 300회를 명시해 현재 운영값과 분리한다.
+COMPARISON_LIMITS = CollectionLimits(
+    max_calls=300,
+    max_collection_time=timedelta(minutes=10),
+    max_commits=500,
+    max_pull_requests=100,
+    max_issue_items=100,
+    max_commit_details=200,
+)
 
 
 def kind(key: str) -> str:
@@ -57,10 +68,10 @@ def test_shape_finishes_collection_under_the_call_limit_and_reaches_decision(
 ) -> None:
     built = build(shape)
 
-    run = run_case(built.scenario, limits=PROPOSED_LIMITS)
+    run = run_case(built.scenario, limits=COMPARISON_LIMITS)
 
     assert run.outcome.completed, run.outcome.failures
-    assert run.outcome.calls <= PROPOSED_LIMITS.max_calls
+    assert run.outcome.calls <= COMPARISON_LIMITS.max_calls
     assert run.output.candidates, "후보 판정까지 가서 후보가 나와야 한다"
     counts = Counter(kind(key) for key in run.transport.paths)
     assert dict(counts) == EXPECTED[shape.name]
@@ -89,7 +100,7 @@ def test_five_hundred_own_commits_without_pull_requests_need_six_lookup_posts() 
     shape = SHAPES[0]
     built = build(shape)
 
-    run = run_case(built.scenario, limits=PROPOSED_LIMITS)
+    run = run_case(built.scenario, limits=COMPARISON_LIMITS)
 
     assert run.outcome.calls == 216
     assert [len(batch) for batch in run.transport.batches] == [
@@ -104,5 +115,5 @@ def test_five_hundred_own_commits_without_pull_requests_need_six_lookup_posts() 
     assert run.transport.batches[-1] == built.lookups[-2:]
     assert len(built.boundaries) == 2
     details = [key for key in run.transport.paths if kind(key) == "detail"]
-    assert len(details) == PROPOSED_LIMITS.max_commit_details
+    assert len(details) == COMPARISON_LIMITS.max_commit_details
     assert run.result["outcome"] == "SUCCEEDED"

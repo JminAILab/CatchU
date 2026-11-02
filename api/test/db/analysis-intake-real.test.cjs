@@ -31,7 +31,7 @@ const { AnalysisRequestDispatcher } = require('../../dist/analysis-queue/analysi
 const { WorkerMessageValidator } = require('../../dist/analysis-receiver/worker-message.validator');
 const { CONTRACT_DIR, MemoryRequestQueue, dispatchLog } = require('../helpers/queue-harness.cjs');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
-const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
+const { readCurrentSelection: readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 
 // #323 접수 회귀를 U7 회원 등록으로 전환했다. GitHub 메타데이터/C-03은 합성 대역이다.
 // 검증 경계: 실제 Nest HTTP·인증 Guard·PostgreSQL, #252 DB 선정 근거(실제 마이그레이션
@@ -40,7 +40,7 @@ const { readInitialSelection, restoreInitialSelection } = require('../support/re
 // #231이 남기는 행 모양을 직접 넣는다). 시험 대역은 이름에 「대역」을 적은 시험의 오류 주입·판본 교체와 GitHub OAuth
 // 응답(exchange)뿐이다. Google·GitHub·큐 서버·worker는 부르지 않는다.
 const THEME = '570342307', ZOO = '547322698';
-const SCOPE = 'catchu:allowed-scope:2026-10-19:v1';
+const { REGISTRATION_SCOPE_REVISION: SCOPE } = require('../../dist/member-repositories/registration-scope');
 const NEXT_SCOPE = 'catchu:allowed-scope:test-323:v2';
 const TYPES = ['COMMIT', 'PULL_REQUEST', 'ISSUE'];
 const CONSENT_KEYS = ['allowedResourceTypes', 'registrationId', 'repository', 'repositoryId', 'revision', 'selectionReference'];
@@ -183,7 +183,7 @@ async function stored(requestId) {
 function supplied(repositoryId) { return structuredClone(registered.get(repositoryId)); }
 /** #252 갱신 절차와 같은 모양으로 새 범위 판본을 더하고 선정을 옮긴다. 이전 판본 행은 그대로다. */
 async function moveScope(repositoryId) {
-  await db.manager.insert(AllowedScopeRevision, { ...structuredClone(initial.scopes[0]), scopeRevision: NEXT_SCOPE });
+  await db.manager.insert(AllowedScopeRevision, { ...structuredClone(initial.scopes.find(scope => scope.scopeRevision === SCOPE)), scopeRevision: NEXT_SCOPE });
   await db.manager.update(RepositoryRegistration, { repositoryId }, { scopeRevision: NEXT_SCOPE });
 }
 async function terminal(requestId, processing = 'FAILED', changes = {}) {
@@ -317,7 +317,7 @@ test('실제 공급: 저장 동의는 큐 보내기의 모양·저장소·판본
   }
 });
 
-test('실제 공급: 합성·이전 고지나 현재 선정과 다른 범위 판본의 동의는 403 CONSENT_REQUIRED이고 판본을 옮기면 새 판본만 받는다', async t => {
+test('실제 공급: 합성·이전 고지나 배포된 현재 범위와 다른 판본은 403 CONSENT_REQUIRED다', async t => {
   const s = await start(t);
   const user = await s.real();
   for (const changes of [{ accepted: false }, { noticeRevision: SYNTHETIC_NOTICE.noticeRevision },
@@ -330,8 +330,9 @@ test('실제 공급: 합성·이전 고지나 현재 선정과 다른 범위 판
   await moveScope(THEME);
   await error(await s.post(user), 403, 'CONSENT_REQUIRED');
   assert.deepEqual(await counts(), NONE);
-  const status = await accepted(await s.post(user, randomUUID(), command({ consent: consent({ scopeRevision: NEXT_SCOPE }) })));
-  assert.deepEqual((await stored(status.requestId)).consented_scope, { ...supplied(THEME), revision: NEXT_SCOPE });
+  // DB에만 추가한 미배포 범위는 worker가 지원하지 않으므로 새 동의로도 접수하지 않는다.
+  await error(await s.post(user, randomUUID(), command({ consent: consent({ scopeRevision: NEXT_SCOPE }) })), 403, 'CONSENT_REQUIRED');
+  assert.deepEqual(await counts(), NONE);
 });
 
 test('대역(실제 고지 판본 제거): 현재 실제 고지가 없으면 합성 판본으로 대신하지 않고 403 CONSENT_REQUIRED', async t => {

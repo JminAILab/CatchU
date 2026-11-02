@@ -19,7 +19,7 @@ const { WorkerMessageValidator } = require('../../dist/analysis-receiver/worker-
 const { SelectedRepositoryCatalog } = require('../../dist/member-repositories/selected-repository-catalog');
 const { CONTRACT_DIR, MemoryRequestQueue, dispatchLog } = require('../helpers/queue-harness.cjs');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
-const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
+const { readCurrentSelection: readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 
 // 운영 설정의 제품 조립에서 회원 등록→고지→접수→실행 조회를 연결한다.
 // GitHub OAuth·identity·공개 메타데이터와 C-03·메모리 요청 큐는 합성 대역이다.

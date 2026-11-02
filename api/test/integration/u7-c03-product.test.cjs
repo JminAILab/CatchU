@@ -13,7 +13,7 @@ const { GitHubConnectionService } = require('../../dist/github-connection/github
 const { GitHubRepositoryClient } = require('../../dist/member-repositories/github-repository.client');
 const { MemberAccount, GitHubConnection, AnalysisRequest, AnalysisAttempt } = require('../../dist/member-analysis/member-analysis.entity');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
-const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
+const { readCurrentSelection: readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 const { APP_SETTINGS, setEnv, startApp } = require('../u2/support.cjs');
 
 let db, initial;

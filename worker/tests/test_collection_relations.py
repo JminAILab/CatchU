@@ -762,7 +762,7 @@ def test_optional_details_stop_before_the_call_limit() -> None:
 # 건너뛴 본인 커밋 수는 CatchU가 센 수라 쓰지 않고 정해 둔 상한 값만 쓴다(2026-10-08 팀장 결정 「수신자에게
 # 나가는 숫자와 근거 순서」).
 SKIPPED_DETAILS = (
-    "연동 계정이 작성자로 기록된 커밋 일부는 상세 조회 개수(200건)나 남은 호출·시간·총량 "
+    "연동 계정이 작성자로 기록된 커밋 일부는 상세 조회 개수(1500건)나 남은 호출·시간·총량 "
     "여유 밖이라 변경 내용을 조회하지 않았다"
 )
 
@@ -775,7 +775,7 @@ def test_skipped_details_limit_names_the_cap_not_the_skipped_count() -> None:
 
     skipped = len(DETAILS) - 3
     (limit,) = outcome.shared_limits("COMMIT")
-    assert limit == SKIPPED_DETAILS.replace("200건", "3건")
+    assert limit == SKIPPED_DETAILS.replace("1500건", "3건")
     assert f"{skipped}건" not in limit
     assert "작성한" not in limit
 

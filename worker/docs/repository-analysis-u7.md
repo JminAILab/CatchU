@@ -10,8 +10,12 @@ PR 커밋 목록의 상태·전체 조회 완료 여부·개별 한계도 이 �
 
 안전 집계는 기존 로그의 목록·상세·관계·호출·응답 bytes·후보/제외·생성 건수에 수집 소요초, 결과 bytes·관측 수·한계 수·처리 소요초를 더한다. 토큰·저장소 원문·diff·SHA·파일 경로를 새 집계 로그에 넣지 않는다. 동시 실행 수는 1이다.
 
-`tests/test_u7_budget.py`는 합성 커밋 500개와 필수 관계를 읽고 기존 상세 상한 200·후보 200·생성 200·Result 200을 대조한다. 관측 FOUND/500과 수집 한계가 함께 남는다. `tests/u7_chain_output.py`는 API 통합 시험이 넘긴 실제 v2 요청 맥락에 이 합성 흐름을 실행하고 Result와 안전 집계만 stdout으로 반환한다. 실제 GitHub·모델 실행이나 상한 확정의 근거가 아니다.
+[2026-11-01 #424 후속 결정](https://github.com/JminAILab/CatchU/issues/424)과 [후속 승인](https://github.com/JminAILab/CatchU/pull/433#pullrequestreview-5731151180)에 따라 최근 커밋 3,000건·PR 600건·이슈 목록 항목 1,000건, 커밋 변경 내용 상세 1,500건, GitHub HTTP 호출 2,500회, 수집 1,800초, 생성 300회를 적용한다. 이슈 목록 항목에는 GitHub API가 함께 돌려주는 PR도 포함한다. 필수 관계 판정의 상세 조회는 개수로 생략하지 않는 기존 규칙을 유지하므로 상세 1,500건은 선택 조회의 범위이며, 필수 호출도 요청 전체 호출·시간·총량 상한을 지킨다. 관계 조회 없는 경로의 PR 커밋 목록 30건, 연결 PR 묶음 100건, 단일 응답 10MB·수집 총량 50MB, 제목 고쳐 쓰기 20회 등 나머지 상한은 그대로다.
+
+요청 전체 처리는 이번 변경에서 코드에 남아 있던 20분을 사용자 결정의 3,600초로 맞춘다. worker는 큐에서 꺼낸 시각부터 종결 프레임까지 60분을 재며, 생성 마감은 그 시각에서 결과 조합·전송 여유 60초를 뺀 59분이다. API의 기존 처리 시한은 **접수 시각부터** 60분이므로 시작점이 다르다. 큐 대기가 길면 API가 먼저 닫을 수 있으며, 닫힌 요청의 늦은 결과를 거부하는 기존 동작을 바꾸지 않는다.
+
+`tests/test_u7_budget.py`는 본인 커밋 500개·1,501개의 합성 자료로 상세 500·1,500건과 생성 300회, 나머지 후보의 `NOT_GENERATED` 및 프레임을 대조한다. 생성 호출 상한은 후보·Result·Catch 개수 상한이 아니다. 500개 사례에서는 타인 뿌리 커밋까지 목록 501건, 본인 관측 FOUND/500, 상세·후보·Result 500건, 생성 300회와 미생성 200건이며 결과는 `PARTIAL_FAILED`다. `tests/u7_chain_output.py`는 API 통합 시험이 넘긴 실제 v2 요청 맥락에 이 합성 흐름을 실행하고 Result와 안전 집계만 stdout으로 반환한다. 합성 검사는 실제 GitHub·모델 실행의 성능·비용 실측을 대신하지 않는다.
 
 검사: `uv run --locked pytest tests/test_u7_observation.py tests/test_u7_pipeline.py tests/test_u7_budget.py tests/test_worker_messages.py tests/test_request_check.py tests/test_processing.py tests/test_live_processing.py`. 전체 수집·후보·생성·소비자 회귀와 80% 줄 커버리지는 [Unit 검사 지침](../../aidlc/spaces/default/intents/260925-intent-12/construction/u7-repository-analysis/code-generation/unit-test-instructions.md)을 따른다. 실제 큐는 전용 `CATCHU_TEST_REDIS_URL`이 필요하다. Linux 프로세스 신호 검사는 배포 플랫폼에서 확인하며 Windows의 `/proc`, SIGKILL, signal handler 차이는 별도 기록한다.
 
-현재 실제 분석은 CatchU 공개 적용, 실제 C-03 제공자, 고지 v2 확정, 계정·자료·외부 전송·비용 조건을 확인하기 전에는 실행하지 않는다. 실제 약 500개에서 목록/상세/관계/묶음·제외/생성/전달/DB 반영 수와 시간·bytes를 대조한 뒤 최종 상한을 결정한다.
+실제 분석은 허용된 저장소·계정·자료·외부 전송·비용 조건을 확인한 별도 실행에서만 한다. 위 상한 적용 자체는 실제 연결 확인이나 실측 완료를 뜻하지 않는다. 실제 실행의 목록/상세/관계/묶음·제외/생성/전달/DB 반영 수와 시간·bytes는 해당 실행 기록에서 대조한다.
