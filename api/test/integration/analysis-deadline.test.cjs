@@ -41,7 +41,7 @@ async function prepare({ processing = 'QUEUED', application = 'NOT_READY', membe
   result.sourceMode = 'MOCK';
   await db.transaction(async manager => {
     await manager.query("INSERT INTO member_account VALUES ($1,$2,'ACTIVE') ON CONFLICT DO NOTHING", [memberId, 'fixture:' + memberId]);
-    await manager.insert(AnalysisRequest, { ...context, currentAttemptId: context.attemptId, submittedAt: SUBMITTED, updatedAt: SUBMITTED });
+    await manager.insert(AnalysisRequest, { ...context, registrationId: await require('../support/registered-analysis.cjs').ensureRegistration(manager, context), currentAttemptId: context.attemptId, submittedAt: SUBMITTED, updatedAt: SUBMITTED });
     await manager.insert(AnalysisConsent, { ...context, accepted: true, noticeRevision: 'fixture', consentedScope: { synthetic: true }, consentedAt: SUBMITTED });
     await manager.insert(AnalysisAttempt, { attemptId: context.attemptId, requestId: context.requestId, sourceMode: 'MOCK', processing, application });
   });
@@ -409,7 +409,7 @@ test('닫힌 요청의 회원은 같은 저장소에 새 동의·요청·시도�
   const create = () => db.transaction('READ COMMITTED', async manager => {
     const next = { requestId: randomUUID(), attemptId: randomUUID(), consentId: randomUUID() };
     const now = new Date();
-    await manager.insert(AnalysisRequest, { requestId: next.requestId, memberId, repositoryId: result.repositoryId,
+    await manager.insert(AnalysisRequest, { registrationId: await require('../support/registered-analysis.cjs').ensureRegistration(manager, { memberId, repositoryId: result.repositoryId }), requestId: next.requestId, memberId, repositoryId: result.repositoryId,
       consentId: next.consentId, currentAttemptId: next.attemptId, retryOfRequestId: result.requestId, submittedAt: now, updatedAt: now });
     await manager.insert(AnalysisConsent, { consentId: next.consentId, requestId: next.requestId, memberId, repositoryId: result.repositoryId,
       accepted: true, noticeRevision: 'fixture', scopeRevision: 'synthetic-scope', consentedScope: { synthetic: true }, consentedAt: now });

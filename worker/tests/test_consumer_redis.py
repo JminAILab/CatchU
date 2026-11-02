@@ -398,7 +398,7 @@ def test_events_removed_on_completion_and_result_kept_until_read(prefix: str) ->
         message = mock_request(attempt)
         events = [
             {
-                "schemaVersion": "1",
+                "schemaVersion": "2",
                 "messageId": queues.event_message_id("MOCK", attempt, state),
                 "requestId": message["requestId"],
                 "attemptId": attempt,
@@ -429,7 +429,7 @@ def test_events_removed_on_completion_and_result_kept_until_read(prefix: str) ->
             if job.name != queues.RESULT_JOB:
                 return None
             return {
-                "schemaVersion": "1",
+                "schemaVersion": "2",
                 "messageId": f"receipt-{job.data['resultId']}",
                 "resultId": job.data["resultId"],
                 "requestId": job.data["requestId"],

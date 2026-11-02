@@ -71,6 +71,7 @@ async function startIntakeApp(db, { injection = true, protection = syntheticObse
     Module({ imports: [AppModule, AnalysisReceiverModule.registerDatabase({ contractDirectory: CONTRACT_DIR, observations: protection })],
       controllers: [InjectionProbe] })(TestModule);
     app = await configureApp(await NestFactory.create(TestModule, { logger, abortOnError: false }));
+    require('../support/synthetic-daily-limit.cjs').bindSyntheticDailyLimit(app);
     await app.listen(port, '127.0.0.1');
   } catch (error) {
     await close();

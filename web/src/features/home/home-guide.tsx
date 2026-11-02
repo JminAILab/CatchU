@@ -13,6 +13,7 @@ export function HomeGuide({ status, step, title, description, action }: {
   /** 현재 단계. null이면 단계 표시를 하지 않는다. */
   step: HomeStep | null;
   title: ReactNode;
+  /** 제목을 보충하는 설명. null이면 그리지 않는다. */
   description: ReactNode;
   /** 다음 행동 버튼·링크와 그 안내. 이동 대상·비활성 여부는 호출하는 쪽이 정한다. */
   action: ReactNode;
@@ -31,7 +32,7 @@ export function HomeGuide({ status, step, title, description, action }: {
         </ol>
       )}
       <h2 id="home-guide-title" className={styles.guideTitle}>{title}</h2>
-      <p className={styles.guideText}>{description}</p>
+      {description !== null && <p className={styles.guideText}>{description}</p>}
       <div className={styles.guideAction}>{action}</div>
     </section>
   );

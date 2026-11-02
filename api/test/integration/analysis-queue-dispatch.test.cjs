@@ -35,6 +35,7 @@ test('실제 접수 API가 저장한 대기 시도를 접수 기록 그대로(�
   useAppSettings(t);
   const app = await configureApp(await NestFactory.create(AppModule, { logger: false, abortOnError: false }));
   t.after(() => app.close());
+  require('../support/synthetic-daily-limit.cjs').bindSyntheticDailyLimit(app);
   await app.listen(0, '127.0.0.1');
   const base = await app.getUrl();
   const json = { 'Content-Type': 'application/json' };
@@ -65,7 +66,7 @@ test('실제 접수 API가 저장한 대기 시도를 접수 기록 그대로(�
     removeOnFail: { age: 7200 }, stackTraceLimit: 0 });
   // 보낸 메시지 13개 필드 = DB 접수 기록. 두 참조만 시도 ID로 바꾼 사본이다.
   assert.deepEqual(job.data, {
-    schemaVersion: '1', messageId: `request-${attempt.attempt_id}`, requestId: request.request_id, attemptId: attempt.attempt_id,
+    schemaVersion: '2', messageId: `request-${attempt.attempt_id}`, requestId: request.request_id, attemptId: attempt.attempt_id,
     memberId: request.member_id, repositoryId: request.repository_id, consentId: consent.consent_id,
     noticeRevision: consent.notice_revision, consentedAt: consent.consented_at.toISOString(),
     allowedScope: { revision: consent.scope_revision, repositoryId: consent.repository_id,

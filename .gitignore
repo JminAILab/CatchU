@@ -16,6 +16,10 @@ credentials.json
 _sandbox/
 _notes/
 
+# ===== RAG 평가 원문 =====
+# 평가 입력·답 항목·인용 원문은 저장소에 넣지 않는다(U5 기능 설계 BR10.5, api/docs/rag-answer.md 「RAG 품질 평가」)
+api/.rag-eval/
+
 # ===== 안전망 =====
 # 앱별 .gitignore가 있지만, 루트에서 실수로 install한 경우를 잡는다
 node_modules/

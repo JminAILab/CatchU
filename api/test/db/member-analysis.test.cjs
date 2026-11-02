@@ -8,7 +8,7 @@ const { openTestDataSource, resetTestDatabase } = require('../support/test-datab
 const { MemberAccount, MemberProfile, GitHubConnection, AnalysisRequest, AnalysisConsent,
   AnalysisAttempt, IdempotencyRecord } = require('../../dist/member-analysis/member-analysis.entity');
 const { DevMemberService, SYNTHETIC_REPOSITORY } = require('../../dist/member-analysis/dev-member.service');
-const { insertInitialAnalysis } = require('../../dist/member-analysis/initial-analysis');
+const { insertInitialAnalysis } = require('../support/registered-analysis.cjs');
 const { runIdempotentCreation } = require('../../dist/member-analysis/idempotent-creation');
 const { readAuthConfig } = require('../../dist/auth/auth.config');
 let db;
@@ -143,6 +143,7 @@ test('중간 미완료 요청은 커밋에서 실패하며 동의·시도의 다
   const id=await dev().resolveMember('incomplete');
   await assert.rejects(transaction(async m=>{
     await m.insert(AnalysisRequest,Object.assign(new AnalysisRequest(),{memberId:id,repositoryId:'repo',
+      registrationId: await require('../support/registered-analysis.cjs').ensureRegistration(m,{memberId:id,repositoryId:'repo'}),
       consentId:randomUUID(),currentAttemptId:randomUUID(),submittedAt:new Date(),updatedAt:new Date()}));
   }), e=>e.code==='23503');
   const r=await create(id);
@@ -409,18 +410,21 @@ test('일곱 테이블은 빈 스키마에 up/down/re-up 가능하고 엔티티�
   const { CreateShareLink1790745895865 } = require('../../dist/database/migrations/1790745895865-CreateShareLink');
   const { AddAnalysisRequestHistoryIndex1792640486167 } = require('../../dist/database/migrations/1792640486167-AddAnalysisRequestHistoryIndex');
   const { CascadeMemberAnalysisOnDelete1792817978011 } = require('../../dist/database/migrations/1792817978011-CascadeMemberAnalysisOnDelete');
+  const { RepositoryRegistration } = require('../../dist/member-repositories/repository-registration.entity');
+  const { AddRepositoryRegistration1793245460352 } = require('../../dist/database/migrations/1793245460352-AddRepositoryRegistration');
   const isolated=await openTestDataSource({schema,extra:{options:'-c search_path='+schema+' -c TimeZone=UTC'},
-    entities:[MemberAccount,MemberProfile,GitHubConnection,AnalysisRequest,AnalysisConsent,AnalysisAttempt,IdempotencyRecord,ShareLink],
+    entities:[MemberAccount,MemberProfile,GitHubConnection,RepositoryRegistration,AnalysisRequest,AnalysisConsent,AnalysisAttempt,IdempotencyRecord,ShareLink],
     migrations:[CreateMemberAnalysisFoundation1790500000000,CreateShareLink1790745895865,AddAnalysisRequestHistoryIndex1792640486167,
-      CascadeMemberAnalysisOnDelete1792817978011]});
+      CascadeMemberAnalysisOnDelete1792817978011,AddRepositoryRegistration1793245460352]});
   try {
     assert.deepEqual((await isolated.runMigrations()).map(m=>m.name),
       ['CreateMemberAnalysisFoundation1790500000000','CreateShareLink1790745895865','AddAnalysisRequestHistoryIndex1792640486167',
-        'CascadeMemberAnalysisOnDelete1792817978011']);
+        'CascadeMemberAnalysisOnDelete1792817978011','AddRepositoryRegistration1793245460352']);
     const tables=await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema]);
-    assert.equal(tables.length,9,'일곱 테이블 + C share_link(#147) + migrations');
+    assert.equal(tables.length,10,'회원 분석 + 등록 + C share_link + migrations');
     const diff=await isolated.driver.createSchemaBuilder().log();
     assert.deepEqual(diff.upQueries.map(q=>q.query),[]);
+    await isolated.undoLastMigration(); // U7 등록
     await isolated.undoLastMigration(); // #387 연쇄 삭제
     assert.equal((await isolated.query(`SELECT confdeltype FROM pg_constraint WHERE conname='fk_analysis_request_member_id'
       AND connamespace=$1::regnamespace`,[schema]))[0].confdeltype,'a');

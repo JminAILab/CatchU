@@ -44,6 +44,7 @@ async function start(t, overrides = {}) {
     for (const [k,v] of Object.entries(previous)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   } });
   app = await configureApp(await NestFactory.create(AppModule, { logger, abortOnError: false }));
+  require('../support/synthetic-daily-limit.cjs').bindSyntheticDailyLimit(app);
   await app.listen(0, '127.0.0.1');
   const base = await app.getUrl();
   const call = (path, options) => fetch(base + path, { ...options, signal: AbortSignal.timeout(10000) });
@@ -169,10 +170,11 @@ test('원자 접수·현재 상태 재응답·새 키 ACTIVE 200은 새 동의�
   const active = await s.post(u); assert.equal(active.status, 200); assert.deepEqual(await active.json(), first);
   assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 2 });
   const responseKeys = ['requestId','repositoryId','consentId','attemptId','submittedAt','updatedAt','requestState',
-    'lifecycle','processing','application','sourceMode','eligibleCandidateCount','registeredCatchIds','ownerResultsReady','retry','failures'];
+    'lifecycle','processing','application','sourceMode','eligibleCandidateCount','registeredCatchIds','ownerResultsReady','retry','failures',
+    'ownCommitObservation','observedOwnCommitCount','collectionLimitNotes'];
   assert.deepEqual(Object.keys(first).sort(), responseKeys.sort());
   const message = await s.intake.prepareExecutionRequest(u.memberId, first.requestId);
-  const contract = YAML.parse(readFileSync(resolve(__dirname, '../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml'), 'utf8'));
+  const contract = YAML.parse(readFileSync(resolve(__dirname, '../../../api/contracts/repository-analysis/worker-messages.yaml'), 'utf8'));
   const ajv = new Ajv({ strict: false }); addFormats(ajv);
   const validate = ajv.compile({ ...contract.components.schemas.Request, components: contract.components });
   assert.equal(validate(message), true, JSON.stringify(validate.errors));
@@ -427,18 +429,20 @@ for (let run = 1; run <= 3; run++) {
   });
 }
 for(const processing of ['EMPTY','SUCCEEDED','PARTIAL_FAILED']){
-  test('정상·정상 0건·부분 결과의 재분석 및 참조 생략 우회 거부: '+processing,async t=>{
+  test('정상·정상 0건·부분 결과도 최신 참조와 새 동의로 재분석한다: '+processing,async t=>{
     const s=await start(t);const u=await s.login();const first=await(await s.post(u)).json();await terminal(first.requestId,processing);
-    for(const body of [command(),command({retryOfRequestId:first.requestId})])await error(await s.post(u,randomUUID(),body),409,'REANALYSIS_DEFERRED');
-    assert.equal((await counts()).requests,1);
+    await error(await s.post(u,randomUUID(),command()),409,'RETRY_NOT_ALLOWED');
+    assert.equal((await s.post(u,randomUUID(),command({retryOfRequestId:first.requestId}))).status,202);
+    assert.equal((await counts()).requests,2);
   });
 }
 for(const changes of [{failureConfirmationReference:null},{failures:[]},{processing:'UNCERTAIN'},{application:'RECOVERING'},{eligibleCandidateCount:1},{ownerResultsReady:true}]){
-  test('실행 불명·반영 미해결·근거 부족·유효 결과 재요청 거부: '+JSON.stringify(changes),async t=>{
+  test('종료된 분석은 결과 무관 재요청하며 복구 중은 거부한다: '+JSON.stringify(changes),async t=>{
     const s=await start(t);const u=await s.login();const first=await(await s.post(u)).json();await terminal(first.requestId,'FAILED',changes);
-    await error(await s.post(u,randomUUID(),command({retryOfRequestId:first.requestId})),409,
-      changes.eligibleCandidateCount||changes.ownerResultsReady?'REANALYSIS_DEFERRED':'RETRY_NOT_ALLOWED');
-    assert.equal((await counts()).requests,1);
+    const response=await s.post(u,randomUUID(),command({retryOfRequestId:first.requestId}));
+    if(changes.application==='RECOVERING') await error(response,409,'RETRY_NOT_ALLOWED');
+    else assert.equal(response.status,202);
+    assert.equal((await counts()).requests,changes.application==='RECOVERING'?1:2);
   });
 }
 test('타인·잘못된 retry 참조는 ACTIVE로 숨기지 않고 같은 404',async t=>{
@@ -447,10 +451,10 @@ test('타인·잘못된 retry 참조는 ACTIVE로 숨기지 않고 같은 404',a
   for(const ref of [owned.requestId,randomUUID(),'not-uuid'])await error(await s.post(a,randomUUID(),command({retryOfRequestId:ref})),404,'RESOURCE_UNAVAILABLE');
   assert.equal((await counts()).requests,2);
 });
-test('Catch 본체가 있으면 등록 연결이 없어도 재분석을 허용하지 않는다',()=>{
+test('종료된 요청에 Catch 본체가 있어도 재분석을 허용한다',()=>{
   const request=Object.assign(new AnalysisRequest(),{lifecycle:'CLOSED'});
   const attempt=Object.assign(new AnalysisAttempt(),{processing:'FAILED',application:'APPLIED',failureConfirmationReference:'confirmed',failures:[{stage:'DISPATCH',code:'FAIL',message:'합성'}]});
-  assert.equal(retryDecision(request,attempt,1).allowed,false);
+  assert.equal(retryDecision(request,attempt,1).allowed,true);
   assert.equal(retryDecision(request,attempt,0).allowed,true);
 });
 
@@ -460,7 +464,7 @@ test('기존 E의 검증된 실패 Result·반영 완료를 확정 근거로 쓰
   const {DatabaseReceiverStore}=require('../../dist/analysis-receiver/database-receiver.store');
   const {WorkerMessageValidator}=require('../../dist/analysis-receiver/worker-message.validator');
   const {ResultApplicationService}=require('../../dist/result-application/result-application.service');
-  const contract=resolve(__dirname,'../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design');
+  const contract=resolve(__dirname,'../../../api/contracts/repository-analysis');
   const receiver=new AnalysisReceiver(new DatabaseReceiverStore(db),new WorkerMessageValidator(contract),{record(){}});
   const values={...first,memberId:u.memberId,scopeRevision:command().consent.scopeRevision,caseId:'intake-failed-138'};
   const template=readFileSync(resolve(__dirname,'../../../worker/fixtures/m1-synthetic/results/failed.json'),'utf8');
@@ -520,18 +524,17 @@ for (const changes of closedApplyCases) {
   });
 }
 for (const registration of [{ ready: true }, { ready: false }, { link: false }]) {
-  test('반영 실패로 닫혔어도 등록 Catch가 있으면 재요청·참조 생략 모두 거부한다: ' + JSON.stringify(registration), async t => {
+  test('반영 실패로 닫힌 요청의 기존 Catch도 새 분석 접수 때 보존한다: ' + JSON.stringify(registration), async t => {
     const s = await start(t); const u = await s.login(); const key = randomUUID();
     const first = await (await s.post(u, key)).json();
     await applyFailed(first.requestId, { processing: 'SUCCEEDED', eligibleCandidateCount: 1 });
     await registerCatch(first.requestId, registration);
     const original = await snapshot(first.requestId);
     const shown = await (await s.post(u, key)).json();
-    assert.deepEqual(shown.retry, { allowed: false, reason: 'RESULTS_EXIST' });
-    for (const body of [command(), command({ retryOfRequestId: first.requestId })]) {
-      await error(await s.post(u, randomUUID(), body), 409, 'REANALYSIS_DEFERRED');
-    }
-    assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 1 });
+    assert.deepEqual(shown.retry, { allowed: true, reason: 'ANALYSIS_FINISHED' });
+    await error(await s.post(u, randomUUID(), command()), 409, 'RETRY_NOT_ALLOWED');
+    assert.equal((await s.post(u, randomUUID(), command({ retryOfRequestId: first.requestId }))).status, 202);
+    assert.deepEqual(await counts(), { requests: 2, consents: 2, attempts: 2, keys: 2 });
     assert.deepEqual(await snapshot(first.requestId), original);
   });
 }
@@ -548,7 +551,7 @@ test('반영 실패라도 닫히기 전 ACTIVE 요청은 재요청하지 않고 
   assert.equal(other.details.existingRequestId, first.requestId);
   assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 2 });
 });
-test('반영 실패 재요청 뒤에는 최신 요청만 판정하고 정상 완료 뒤에는 다시 분석하지 못한다', async t => {
+test('반영 실패 재요청 뒤에도 최신 종료 요청만 재분석 대상으로 허용한다', async t => {
   const s = await start(t); const u = await s.login(); const key = randomUUID();
   const first = await (await s.post(u, key)).json();
   await applyFailed(first.requestId, { processing: 'SUCCEEDED', eligibleCandidateCount: 3 });
@@ -561,21 +564,22 @@ test('반영 실패 재요청 뒤에는 최신 요청만 판정하고 정상 완
   assert.equal(thirdResponse.status, 202);
   const third = await thirdResponse.json();
   await terminal(third.requestId, 'EMPTY');
-  for (const retryOfRequestId of [undefined, first.requestId, second.requestId, third.requestId]) {
-    await error(await s.post(u, randomUUID(), command(retryOfRequestId ? { retryOfRequestId } : {})), 409, 'REANALYSIS_DEFERRED');
+  for (const retryOfRequestId of [undefined, first.requestId, second.requestId]) {
+    await error(await s.post(u, randomUUID(), command(retryOfRequestId ? { retryOfRequestId } : {})), 409, 'RETRY_NOT_ALLOWED');
   }
-  assert.deepEqual(await counts(), { requests: 3, consents: 3, attempts: 3, keys: 3 });
+  assert.equal((await s.post(u, randomUUID(), command({ retryOfRequestId: third.requestId }))).status, 202);
+  assert.deepEqual(await counts(), { requests: 4, consents: 4, attempts: 4, keys: 4 });
 });
-test('retryDecision은 닫힌 반영 실패를 등록 Catch가 없을 때만 허용한다', () => {
+test('retryDecision은 반영 실패의 종료와 진행·복구 여부를 구분한다', () => {
   const make = (lifecycle, changes) => [Object.assign(new AnalysisRequest(), { lifecycle }),
     Object.assign(new AnalysisAttempt(), { processing: 'SUCCEEDED', application: 'APPLY_FAILED', eligibleCandidateCount: 3,
       ownerResultsReady: false, failures: [], failureConfirmationReference: null, ...changes })];
   const allowed = { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' };
   assert.deepEqual(retryDecision(...make('CLOSED', {}), 0), allowed);
   assert.deepEqual(retryDecision(...make('CLOSED', { processing: 'UNCERTAIN' }), 0), allowed);
-  assert.deepEqual(retryDecision(...make('CLOSED', {}), 1), { allowed: false, reason: 'RESULTS_EXIST' });
-  assert.deepEqual(retryDecision(...make('CLOSED', { ownerResultsReady: true }), 0), { allowed: false, reason: 'RESULTS_EXIST' });
-  assert.deepEqual(retryDecision(...make('ACTIVE', {}), 0), { allowed: false, reason: 'RESULTS_EXIST' });
+  assert.deepEqual(retryDecision(...make('CLOSED', {}), 1), { allowed: true, reason: 'ANALYSIS_FINISHED' });
+  assert.deepEqual(retryDecision(...make('CLOSED', { ownerResultsReady: true }), 0), { allowed: true, reason: 'ANALYSIS_FINISHED' });
+  assert.deepEqual(retryDecision(...make('ACTIVE', {}), 0), { allowed: false, reason: 'APPLICATION_UNRESOLVED' });
   assert.deepEqual(retryDecision(...make('ACTIVE', { eligibleCandidateCount: 0 }), 0), { allowed: false, reason: 'APPLICATION_UNRESOLVED' });
   assert.deepEqual(retryDecision(...make('CLOSED', { application: 'RECOVERING', eligibleCandidateCount: 0 }), 0),
     { allowed: false, reason: 'APPLICATION_UNRESOLVED' });

@@ -380,7 +380,8 @@ const hooks = registerHooks({
     return nextResolve(specifier, context);
   },
   load(url, context, nextLoad) {
-    if (url === noticeCssUrl.href) return { format: 'module', shortCircuit: true, source: 'export default {};' };
+    // CSS 모듈 대역: 클래스 이름을 그대로 돌려줘 그려진 class를 확인할 수 있게 한다.
+    if (url === noticeCssUrl.href) return { format: 'module', shortCircuit: true, source: 'export default new Proxy({}, { get: (_, name) => name });' };
     if (url !== noticeUrl.href) return nextLoad(url, context);
     return {
       format: 'module', shortCircuit: true,
@@ -463,4 +464,26 @@ test('화면 [다시 로그인]: 묻지 않는 경우(사유 없음·login-chang
       assert.deepEqual(navigation.pushed, ['/login?next=%2Flinks'], `${variant}: 이동은 한 번`);
     });
   }
+});
+
+test('화면 재인증 안내 위치: 스크롤 영역 위쪽에 붙고, 안내를 담은 모달이 열리면 바깥 안내를 숨긴다(#286 10/29 확인 필요 2)', () => {
+  // 브라우저의 실제 배치·초점·낭독은 PR의 브라우저 확인으로 본다. 여기서는 그 배치를 만드는 class와 규칙이 남아 있는지만 본다.
+  const { html } = renderNotice({ returnTo: '/links' }, []);
+  assert.match(html, /class="notice reauthNotice" role="alert"/);
+  const css = readFileSync(noticeCssUrl, 'utf8');
+  const rule = css.match(/\n\.reauthNotice \{([^}]*)\}/)?.[1] ?? '';
+  assert.match(rule, /position: sticky;/, '문서·모달 스크롤 영역 위쪽에 붙는다');
+  assert.match(rule, /top: 0;/, '스크롤 영역 경계에 바로 붙어 뒤 내용이 틈으로 비치지 않는다');
+  assert.match(rule, /margin-bottom: 8px;/, '맨 위에서는 아래 여백이 그림자를 받아 헤더에 걸치지 않는다');
+  assert.doesNotMatch(rule, /position: fixed/, '흐름 밖으로 빼서 헤더·입력을 덮지 않는다');
+  const narrow = css.match(/@media \(width < 760px\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
+  assert.match(narrow, /\.reauthNotice \{\s*justify-content: flex-start;\s*gap: 8px;\s*padding-left: 12px;\s*\}/,
+    '760px 미만에서만 [다시 로그인]을 문구 바로 뒤에 두고 오른쪽 끝을 당긴다(#437 리뷰 안 A·500px 보완)');
+  assert.match(narrow, /\.reauthNotice \.noticeAction \{\s*padding-inline: 10px;\s*\}/, '버튼 좌우 여백은 760px 미만의 재인증 안내에서만 줄인다');
+  assert.doesNotMatch(narrow, /padding-(top|bottom)|height/, '안내 높이는 바꾸지 않는다');
+  assert.doesNotMatch(rule, /justify-content|gap|padding/, '760px 이상은 공용 .notice의 배치·여백 그대로다');
+  assert.match(css, /:root:has\(\.reauthNotice:not\(dialog \.reauthNotice\)\),\s*dialog:has\(\.reauthNotice\) \{\s*overflow-anchor: none;/,
+    '안내가 나타날 때 화면을 안내 높이만큼 내려 위쪽 입력을 안내 밑으로 넣지 않는다');
+  assert.match(css, /:root:has\(dialog\[open\] \.reauthNotice\) \.reauthNotice:not\(dialog \.reauthNotice\) \{\s*visibility: hidden;/,
+    '모달 안 안내가 있으면 바깥 안내는 보이지도 읽히지도 않는다');
 });

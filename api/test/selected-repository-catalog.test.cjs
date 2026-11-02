@@ -75,16 +75,18 @@ test('입력 맥락은 비동기 DB 조회 전에 복사하고 일관된 스냅�
   const input = context();
   const expected = {...input};
   const selected = new SelectedRepositoryCatalog().listCurrent()[0];
+  const registrationId = randomUUID();
   let release;
   const pending = new Promise(resolve => { release = resolve; });
   const source = new SelectedRepositoryRegistrationSource({transaction: async (isolation, work) => {
     assert.equal(isolation, 'REPEATABLE READ');
     await pending;
     return work({findOneBy: async (entity, where) => {
-      assert.equal(where.requestId, expected.requestId);
+      if (['AnalysisRequest','AnalysisAttempt','AnalysisConsent'].includes(entity.name)) assert.equal(where.requestId, expected.requestId);
       if (entity.name === 'AnalysisConsent') return {consentedScope: {revision: expected.scopeRevision,
-        repositoryId: expected.repositoryId, selectionReference: selected.selectionReference}};
-      return {};
+        repositoryId: expected.repositoryId, selectionReference: registrationId, registrationId, allowedResourceTypes: ['COMMIT'],
+        repository: { owner: selected.owner, name: selected.name, url: selected.url } }};
+      return {registrationId};
     }});
   }});
   const result = source.findForRegistration(input);

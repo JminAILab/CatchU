@@ -3,35 +3,26 @@ import { AnalysisAttempt, AnalysisRequest } from '../member-analysis/member-anal
 import { ResultApplicationRecord } from '../result-application/result-application.entity';
 
 export type RetryReason = 'FAILURE_WITHOUT_RESULTS' | 'IN_PROGRESS' | 'RESULTS_EXIST' | 'NOT_FAILED' |
-  'EXECUTION_UNCERTAIN' | 'APPLICATION_UNRESOLVED' | 'REANALYSIS_DEFERRED';
+  'EXECUTION_UNCERTAIN' | 'APPLICATION_UNRESOLVED' | 'REANALYSIS_DEFERRED' | 'ANALYSIS_FINISHED';
 /** 반영 실패로 닫힌 요청이다. 처리 결과와 적합 후보 수는 재요청 판정에서 보지 않는다. */
 const closedApplyFailure = (request: AnalysisRequest, attempt: AnalysisAttempt) =>
   request.lifecycle === 'CLOSED' && attempt.application === 'APPLY_FAILED';
 export function retryDecision(request: AnalysisRequest, attempt: AnalysisAttempt, registrationCount: number,
-  confirmedFailure = attempt.failureConfirmationReference) {
+  confirmedFailure = attempt.failureConfirmationReference): { allowed: boolean; reason: RetryReason } {
   const closedApply = closedApplyFailure(request, attempt);
   let reason: RetryReason;
-  // 등록 Catch가 하나라도 있으면 어느 경우에도 재요청하지 않는다(기존 Catch·공개·링크 불변).
-  if (registrationCount > 0 || attempt.ownerResultsReady || (!closedApply && attempt.eligibleCandidateCount > 0)) reason = 'RESULTS_EXIST';
-  else if (closedApply) reason = 'FAILURE_WITHOUT_RESULTS';
-  else if (attempt.processing === 'UNCERTAIN') reason = 'EXECUTION_UNCERTAIN';
-  else if (['PENDING', 'APPLYING', 'RECOVERING', 'APPLY_FAILED'].includes(attempt.application)) reason = 'APPLICATION_UNRESOLVED';
-  else if (request.lifecycle === 'ACTIVE' || ['QUEUED', 'RUNNING'].includes(attempt.processing)) reason = 'IN_PROGRESS';
-  else if (attempt.processing !== 'FAILED') reason = 'REANALYSIS_DEFERRED';
-  else if (attempt.application !== 'APPLIED' || attempt.failures.length === 0 ||
-      !confirmedFailure?.trim()) reason = 'NOT_FAILED';
-  else reason = 'FAILURE_WITHOUT_RESULTS';
-  return { allowed: reason === 'FAILURE_WITHOUT_RESULTS', reason };
-}
-/**
- * 같은 저장소의 새 분석을 막는 과거 결과인지 판정한다. 정상 완료·정상 0건·유효 결과가 반영된 부분 실패와
- * 등록 Catch가 있는 요청은 막는다. 반영 실패로 닫혀 등록이 없는 요청은 정상 완료가 아니므로 막지 않는다.
- */
-export function blocksReanalysis(status: { processing: string; lifecycle: string; application: string;
-  retry: { reason: RetryReason } }) {
-  if (status.retry.reason === 'RESULTS_EXIST') return true;
-  if (status.lifecycle === 'CLOSED' && status.application === 'APPLY_FAILED') return false;
-  return ['SUCCEEDED', 'EMPTY', 'PARTIAL_FAILED'].includes(status.processing);
+  if (attempt.processing === 'UNCERTAIN' && request.lifecycle !== 'CLOSED') reason = 'EXECUTION_UNCERTAIN';
+  else if (['PENDING', 'APPLYING', 'RECOVERING'].includes(attempt.application) ||
+      (attempt.application === 'APPLY_FAILED' && !closedApply)) reason = 'APPLICATION_UNRESOLVED';
+  else if (request.lifecycle !== 'CLOSED' || ['QUEUED', 'RUNNING'].includes(attempt.processing)) reason = 'IN_PROGRESS';
+  else if (!['APPLIED', 'APPLY_FAILED'].includes(attempt.application)) reason = 'APPLICATION_UNRESOLVED';
+  // #424(2026-10-30): 닫힌 최신 요청은 결과와 무관하게 새 동의로 다시 분석한다.
+  // 결과 등록은 기존 workIdentity의 Catch를 참조하므로 기존 내용·설명을 교체하지 않는다.
+  else if (registrationCount === 0 && !attempt.ownerResultsReady && (closedApply ||
+      (attempt.processing === 'FAILED' && attempt.eligibleCandidateCount === 0 &&
+       attempt.application === 'APPLIED' && attempt.failures.length > 0 && confirmedFailure?.trim()))) reason = 'FAILURE_WITHOUT_RESULTS';
+  else reason = 'ANALYSIS_FINISHED';
+  return { allowed: reason === 'FAILURE_WITHOUT_RESULTS' || reason === 'ANALYSIS_FINISHED', reason };
 }
 const STATUS_LOCK = { mode: 'for_no_key_update' } as const;
 /** 상태 변경을 막되 멱등 소유 확인의 KEY SHARE와 경합하지 않는 요청→시도 잠금으로 읽는다. */
@@ -76,6 +67,8 @@ async function statusOf(manager: EntityManager, request: AnalysisRequest, lock: 
     application: attempt.application, sourceMode: attempt.sourceMode, eligibleCandidateCount: attempt.eligibleCandidateCount,
     registeredCatchIds: [...new Set(registrations.filter(r => r.ready).map(r => r.catchId))],
     ownerResultsReady: attempt.ownerResultsReady, retry, failures: attempt.failures,
+    ownCommitObservation: attempt.ownCommitObservation, observedOwnCommitCount: attempt.observedOwnCommitCount,
+    collectionLimitNotes: attempt.collectionLimitNotes,
   };
   return { request, attempt, status };
 }

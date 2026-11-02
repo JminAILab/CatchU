@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { completeProfileSetup, saveProfile, saveProfileDetailed } from '../src/features/profile/profile-api.ts';
+import { completeProfileSetup, saveProfile, saveProfileDetailed, unprocessedSaveMessages } from '../src/features/profile/profile-api.ts';
 import { toClientResult } from '../src/lib/auth-api.ts';
 
 // 프로필 저장 결과 구분(#286 후속, 담당 합의 6209853081). 기존 `saveProfile` 계약과 최초 입력 저장 완료 함수의 회귀를 함께 본다.
@@ -12,6 +12,8 @@ const me = { kind: 'success', status: 200, data: { profile: saved.data } };
 const notSent = () => toClientResult({ kind: 'not-sent', reason: 'logout-hold' });
 const discarded = () => toClientResult({ kind: 'discarded', sent: true });
 const renewed401 = () => ({ kind: 'api-error', status: 401, code: 'AUTH_REQUIRED', message: 'm', authRenewal: 'renewed' });
+/** 갱신하지 못해 재인증이 필요해진 401. 서버가 인증 단계에서 거부해 저장되지 않았다. */
+const reauth401 = () => ({ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm', authRenewal: 'not-renewed' });
 
 /** 호출을 기록하고 큐의 응답을 차례로 돌려주는 api.member 대역. */
 function fake(...responses) {
@@ -28,13 +30,13 @@ function fake(...responses) {
   };
 }
 
-test('saveProfileDetailed: 성공·연장 뒤 거부·보내지 않음·반영하지 않음을 나누고, 그 밖은 기존과 같은 저장 실패다', async () => {
+test('saveProfileDetailed: 성공·연장 뒤 거부·재인증 거부·보내지 않음·반영하지 않음을 나누고, 그 밖은 기존과 같은 저장 실패다', async () => {
   const cases = [
     [saved, 'saved'],
     [renewed401(), 'renewed-rejected'],
+    [reauth401(), 'reauth-rejected'],
     [notSent(), 'not-sent'],
     [discarded(), 'discarded'],
-    [{ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm', authRenewal: 'not-renewed' }, 'save-failed'],
     [{ kind: 'api-error', status: 401, code: 'AUTH_INVALID', message: 'm' }, 'save-failed'],
     [{ kind: 'api-error', status: 400, code: 'VALIDATION_FAILED', message: 'm' }, 'save-failed'],
     [{ kind: 'api-error', status: 503, code: 'INTERNAL_ERROR', message: 'm' }, 'save-failed'],
@@ -51,14 +53,14 @@ test('saveProfileDetailed: 성공·연장 뒤 거부·보내지 않음·반영�
 
 test('saveProfile 호출 계약 유지: 성공일 때만 true이고, 새 구분 결과도 모두 false다', async () => {
   assert.equal(await saveProfile(fake(saved), profile), true);
-  for (const result of [renewed401(), notSent(), discarded(), { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' }]) {
+  for (const result of [renewed401(), reauth401(), notSent(), discarded(), { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' }]) {
     assert.equal(await saveProfile(fake(result), profile), false);
   }
   await assert.rejects(saveProfile(fake(new Error('network')), profile), '예외는 기존처럼 호출부로 전달한다');
 });
 
-test('최초 입력 저장 완료: 연장 뒤 거부·보내지 않음은 그대로 돌려주고 저장 표시·재조회·자동 재전송을 하지 않는다', async () => {
-  for (const [result, expected] of [[renewed401(), 'renewed-rejected'], [notSent(), 'not-sent']]) {
+test('최초 입력 저장 완료: 연장 뒤 거부·재인증 거부·보내지 않음은 그대로 돌려주고 저장 표시·재조회·자동 재전송을 하지 않는다', async () => {
+  for (const [result, expected] of [[renewed401(), 'renewed-rejected'], [reauth401(), 'reauth-rejected'], [notSent(), 'not-sent']]) {
     const api = fake(result);
     let onSaved = 0;
     const outcome = await completeProfileSetup(api, profile, { alreadySaved: false, onSaved: () => { onSaved += 1; }, isCurrent: () => true });
@@ -90,4 +92,20 @@ test('최초 입력 저장 완료 회귀: 정상 저장은 재조회 뒤 ready, 
   const retry = fake(me);
   assert.equal(await completeProfileSetup(retry, profile, { alreadySaved: true, onSaved: () => {}, isCurrent: () => true }), 'ready');
   assert.deepEqual(retry.calls.map((call) => call.method), ['GET'], '저장 뒤에는 조회만 다시 한다');
+});
+
+test('처리되지 않은 저장의 안내: 이번 결과만 알리고, 앞선 저장의 결과 불명 안내는 지우지 않는다(수정·최초 입력 공통)', () => {
+  const earlier = '앞선 저장 요청의 결과는 아직 확인하지 못했습니다.';
+  const cases = [
+    ['renewed-rejected', '로그인이 연장되었습니다. 다시 눌러 주세요.'],
+    ['reauth-rejected', '로그인이 필요해 저장하지 않았습니다. 입력은 그대로 두었습니다.'],
+    ['not-sent', '지금은 요청을 보내지 않았습니다. 입력은 그대로 두었습니다.'],
+  ];
+  for (const [outcome, text] of cases) {
+    assert.deepEqual(unprocessedSaveMessages(outcome, false), [text], outcome);
+    assert.deepEqual(unprocessedSaveMessages(outcome, true), [text, earlier], `${outcome}: 이번 401·미전송으로 앞선 결과 불명을 확정하지 않는다`);
+  }
+  for (const text of cases.map(([, value]) => value)) {
+    assert.doesNotMatch(text, /확인하지 못했습니다/, '처리되지 않은 저장을 결과 불명으로 안내하지 않는다');
+  }
 });

@@ -4,12 +4,12 @@ import { GitHubConnectionService } from '../github-connection/github-connection.
 import { DevMemberService } from '../member-analysis/dev-member.service';
 import { MemberKindService } from '../member-analysis/member-kind';
 import { parseRepositoryQuery, repositoryPage, RepositoryQuery } from './repository-page';
-import { RepositorySelectionService } from './repository-selection.source';
+import { RepositoryRegistrationService } from './repository-registration.service';
 
 @Injectable()
 export class MemberRepositoriesService {
   constructor(private readonly connections: DevMemberService, private readonly members: MemberKindService,
-    private readonly github: GitHubConnectionService, private readonly selections: RepositorySelectionService) {}
+    private readonly github: GitHubConnectionService, private readonly selections: RepositoryRegistrationService) {}
 
   async list(memberId: string, rawQuery: Record<string, unknown>) {
     // #104 이전 문자열 토큰을 PostgreSQL UUID 조회에 넘기지 않는다.

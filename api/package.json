@@ -21,7 +21,8 @@
     "migration:generate": "node --env-file-if-exists=.env ./node_modules/typeorm/cli-ts-node-commonjs.js migration:generate -d src/database/data-source.ts",
     "migration:run": "node --env-file-if-exists=.env ./node_modules/typeorm/cli-ts-node-commonjs.js migration:run -d src/database/data-source.ts",
     "migration:revert": "node --env-file-if-exists=.env ./node_modules/typeorm/cli-ts-node-commonjs.js migration:revert -d src/database/data-source.ts",
-    "test:catches:db": "npm run build && node scripts/test-catches-db.cjs"
+    "test:catches:db": "npm run build && node scripts/test-catches-db.cjs",
+    "rag-eval": "npm run build && node --env-file-if-exists=.env scripts/rag-eval/rag-eval.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.133.0",

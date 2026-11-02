@@ -119,6 +119,7 @@ export function toClientResult(result: MemberCallResult): ClientResult {
  * - `not-sent`: 요청을 보내지 않았다(재인증 필요·로그아웃 처리 중 등). 결과 불명이 아니다. 다시 눌렀을 때 보낼지는 그때의 인증 상태가 정한다.
  * - `discarded`: 보낸 뒤 로그인이 바뀌어 응답을 반영하지 않았다. 서버에 반영됐을 수 있어 성공·실패로 확정하지 않는다(결과 불명).
  * - `other`: 그 밖. 성공·업무 거부·결과 불명(응답 유실·5xx)·갱신하지 못한 401은 화면의 기존 처리를 따른다.
+ *   갱신하지 못한 401을 저장 안 됨으로 따로 안내할 화면은 `memberAuthRejected()`로 나눈다.
  * 통합 시험 전환을 끈 기존 호출(`api-client.ts`)의 결과는 언제나 `other`다.
  */
 export type MemberMutationOutcome = "renewed-rejected" | "not-sent" | "discarded" | "other";
@@ -129,6 +130,16 @@ export function memberMutationOutcome(result: ClientResult): MemberMutationOutco
   if (result.kind === "api-error" && result.status === 401 && MEMBER_AUTH_FAILURES.has(result.code)
     && "authRenewal" in result && result.authRenewal === "renewed") return "renewed-rejected";
   return "other";
+}
+
+/**
+ * 이 요청이 회원 인증 단계에서 거부됐고 갱신하지 못했는지(재인증 필요 등, #286 10/29 검증 확인 필요 1).
+ * 서버가 401 `AUTH_REQUIRED`·`AUTH_INVALID`로 답했으면 Guard가 처리 전에 거부한 것이라 저장되지 않았다(계약 「인증」).
+ * 공통 인증이 갱신을 시도한 결과(`authRenewal: "not-renewed"`)에만 true다. 연장 뒤 거부는 `memberMutationOutcome()`의
+ * `renewed-rejected`이고, 전환을 끈 기존 호출의 401·응답 유실·반영하지 않은 응답은 false라 화면의 기존 처리를 따른다.
+ */
+export function memberAuthRejected(result: ClientResult): boolean {
+  return isMemberAuthFailure(result) && "authRenewal" in result && result.authRenewal === "not-renewed";
 }
 
 /** 보호 API를 지금 보낼 수 없는 이유. 보낼 수 있으면 null. `status`만으로 판단하지 않는다. */

@@ -103,7 +103,7 @@ main   배포 브랜치
 | `dev` 반영 | 이 브랜치 → `dev`는 PR·CI 통과·작성자 외 승인 1건·merge commit으로 올린다. 그 밖의 Unit 밖 작업은 지금처럼 `dev` 대상 PR로 한다 |
 | 최신화 | `dev`의 변경은 팀장이 merge commit으로 이 브랜치에 가져온다. 팀원이 Unit을 맡기 전에 한 번 가져오고, rebase·강제 push로 이력을 다시 쓰지 않는다. Unit 폴더는 작업을 커밋한 뒤 `git pull --no-rebase --no-edit origin intent/260925-intent-12`로 가져온다. `aidlc-state.md` 때문에 가져오기가 멈추면 팀장에게 알린다 |
 | CI | 이 브랜치 대상 PR과 push(Unit 합치기, `dev` 가져오기)에도 CI가 돈다([#389](https://github.com/JminAILab/CatchU/issues/389)) |
-| 커밋 메시지 | AI-DLC가 만드는 고정 메시지 커밋(`aidlc unit …`)은 §4 접두사 규칙의 예외다. 담당이 직접 만드는 커밋은 접두사 규칙을 따른다 |
+| 커밋 | Unit 폴더에서는 AI-DLC 단계 승인을 기록한 뒤 다음 단계에 들어가기 전에 그 단계 결과를 커밋한다. 메시지는 §4를 따르고(기록만 바뀌면 `docs:`), 이유는 질문 답·승인 때 담당이 적은 말에서 옮기며 없으면 지어내지 않고 정한 것만 쓴다. 이유를 남기려면 답할 때 '기타'(Claude는 「Type something」)에 `A. 이유` 꼴로 한 줄 쓴다(요약 확인·계획 승인은 정해진 답만 받음). AI-DLC의 고정 메시지 커밋(`aidlc unit …`)은 §4의 예외다 |
 | 삭제 | 마지막 `dev` PR 병합 뒤 남은 Unit 제출·후속 작업이 없으면 이 브랜치와 Unit 브랜치(`claim/…`)를 함께 지운다 |
 
 #### `260920-catchu-web-mock` (중단)

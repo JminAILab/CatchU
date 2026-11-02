@@ -21,8 +21,8 @@
 !worker/app/
 !worker/fixtures/m1-synthetic/
 # 두 서비스가 읽는 계약 YAML 두 개(worker_messages.py·worker-message.validator.ts)
-!aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml
-!aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml
+!api/contracts/repository-analysis/common.yaml
+!api/contracts/repository-analysis/worker-messages.yaml
 
 # 연 경로 안에서도 다시 뺀다: 실값 환경 파일(Next는 빌드 때 .env*를 자동으로 읽는다)·키·인증서·자격정보·캐시
 **/.env

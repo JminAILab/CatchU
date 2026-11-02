@@ -2,6 +2,7 @@
 > This file is kept up to date automatically while the stage runs. Add observations at the review step, not by editing here directly.
 
 ## Interpretations
+- 2026-10-29T01:35:04Z [unit u7-repository-analysis] — 약 500개 커밋 반영은 목록 개수만으로 판정하지 않고 상세·관계 조회, 후보, 생성, 반영의 개수와 한계를 함께 대조한다. 현재 수집 10분·worker 20분·접수 후 60분은 시작점과 역할이 달라 같은 지연 목표로 합치지 않는다. 새 수치는 NFR4에 따라 실측에 맡긴다.
 <!-- example: 2026-05-29T10:14:32Z — chose REST over GraphQL; the consuming team only needs CRUD, revisit if subscriptions land -->
 - 2026-10-27T01:50:00Z [unit u1-ai-generation-gate] — 키가 비었을 때는 api 기동이 아니라 게이트를 만들 때 멈추게 했다(NFR1.1); 일반 개발·시험은 합성 제공자로 돌고 키를 비워 두므로(api/.env.example) 기동을 막으면 모든 개발이 멈추기 때문이다.
 

@@ -11,7 +11,7 @@ const { configureApp } = require('../../dist/app.setup');
 const { GitHubConnectionService } = require('../../dist/github-connection/github-connection.service');
 const { GitHubClient, GitHubAccessToken } = require('../../dist/github-connection/github.client');
 const { MemberAccount, AnalysisAttempt } = require('../../dist/member-analysis/member-analysis.entity');
-const { insertInitialAnalysis } = require('../../dist/member-analysis/initial-analysis');
+const { insertCurrentAnalysis: insertInitialAnalysis } = require('../support/registered-analysis.cjs');
 const { REAL_NOTICE } = require('../../dist/analysis-intake/analysis-notice');
 const { RepositorySelectionService } = require('../../dist/member-repositories/repository-selection.source');
 const { SelectedRepositoryCatalog } = require('../../dist/member-repositories/selected-repository-catalog');
@@ -116,12 +116,12 @@ test('제품 내부 경로는 서비스 키 누락·오류·정상 회원 JWT와
   }
 });
 
-test('제품 조립은 현재 선정을 제외하거나 원래 동의가 다르면 자격정보를 반환하지 않는다', async () => {
+test('제품 조립은 원래 동의가 다르면 거부하고 전역 선정 제외는 회원 등록의 실행을 바꾸지 않는다', async () => {
   const mismatched = await accepted('570342307', scope => ({ ...scope, selectionReference: 'unknown-original-reference' }));
   unavailable(await lookup(mismatched.request.currentAttemptId), 'SCOPE_UNVERIFIED');
   const excluded = await accepted();
   await db.query('UPDATE repository_selection SET active = false WHERE repository_id = $1', ['570342307']);
-  unavailable(await lookup(excluded.request.currentAttemptId), 'SCOPE_UNVERIFIED');
+  assert.equal((await lookup(excluded.request.currentAttemptId)).status, 200);
 });
 
 test('제품 조립은 GitHub 연결이 해제된 회원의 자격정보를 반환하지 않는다', async () => {

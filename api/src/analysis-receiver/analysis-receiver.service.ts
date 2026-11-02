@@ -65,7 +65,7 @@ export class AnalysisReceiver {
           if (state.received.resultId !== result.resultId || state.received.payloadFingerprint !== fingerprint) {
             return this.reject(ids, 'PAYLOAD_CONFLICT');
           }
-          return { receipt: { ...ids, schemaVersion: '1', messageId: randomUUID(), disposition: 'DUPLICATE', code: 'ALREADY_RECEIVED' } };
+          return { receipt: { ...ids, schemaVersion: '2', messageId: randomUUID(), disposition: 'DUPLICATE', code: 'ALREADY_RECEIVED' } };
         }
         // 종결 기록 없이 이미 반영 단계인 모순된 저장 상태를 덮어쓰지 않는다.
         if (state.lifecycle === 'CLOSED' || TERMINAL.has(state.processing) || state.application !== 'NOT_READY') {
@@ -77,10 +77,11 @@ export class AnalysisReceiver {
         };
         await tx.saveResult(metadata, {
           processing: result.outcome, application: 'PENDING', eligibleCandidateCount: result.candidates.length,
-          failures: result.failures,
+          failures: result.failures, ownCommitObservation: result.ownCommitObservation,
+          observedOwnCommitCount: result.observedOwnCommitCount, collectionLimitNotes: result.collectionLimitNotes,
         });
         return {
-          receipt: { ...ids, schemaVersion: '1', messageId: randomUUID(), disposition: 'ACCEPTED', code: 'OK' },
+          receipt: { ...ids, schemaVersion: '2', messageId: randomUUID(), disposition: 'ACCEPTED', code: 'OK' },
           accepted: { result, metadata },
         };
       });
@@ -113,7 +114,7 @@ export class AnalysisReceiver {
 
   private reject(ids: ReceiptIds, code: RejectionCode): ReceiveResult {
     this.log.record('Result', code);
-    return { receipt: { ...ids, schemaVersion: '1', messageId: randomUUID(), disposition: 'REJECTED', code } };
+    return { receipt: { ...ids, schemaVersion: '2', messageId: randomUUID(), disposition: 'REJECTED', code } };
   }
 
   private rejectProgress(code: RejectionCode): ProgressDecision {
