@@ -13,6 +13,7 @@ import { MemberRepositoriesModule } from './member-repositories/member-repositor
 import { GoogleLoginModule } from './google-login/google-login.module';
 import { AnalysisIntakeModule } from './analysis-intake/analysis-intake.module';
 import { RecipientModule } from './recipient/recipient.module';
+import { MaterialsModule } from './materials/materials.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { RecipientModule } from './recipient/recipient.module';
     GoogleLoginModule,
     AnalysisIntakeModule,
     RecipientModule,
+    MaterialsModule,
     // #232는 #252의 실제 선정 공급자(DatabaseRepositorySelectionSource)를 받는 WorkerContextModule.register로 별도 조립한다.
     // 기본 앱에 가짜 선정/동의 해석을 등록하지 않는다(docs/worker-context.md).
   ],
