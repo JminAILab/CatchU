@@ -12,7 +12,7 @@
 
 ## 규칙
 
-- 브랜치·머지·커밋: `docs/CatchU_레포_컨벤션.md`. 작업 브랜치는 `영역/작업내용`, `dev`·`main`에는 PR·승인 1건·merge commit으로만 반영하고 squash·rebase 머지는 쓰지 않는다. 커밋은 접두사 5종(`feat` `fix` `refactor` `docs` `chore`) 필수 + 바꾼 이유 한 줄.
+- 브랜치·머지·커밋: `docs/CatchU_레포_컨벤션.md`. 작업 브랜치는 `영역/작업내용`, `dev`·`main`에는 PR·승인 1건·merge commit으로만 반영하고 squash·rebase 머지는 쓰지 않는다. 커밋은 접두사 5종(`feat` `fix` `refactor` `docs` `chore`) 필수 + 바꾼 이유 한 줄. 11월 Unit은 AI-DLC 단계 승인마다 커밋한다(§2.1).
 - 회의·소통 운영: `docs/CatchU_그라운드룰_2026-08-04.md`.
 - 언어: 대화·문서·커밋 설명은 한국어. 커밋 접두사와 코드 식별자는 영문.
 - AI-DLC 워크플로우 진행 중에는 계획되지 않은 `aidlc` 버전 변경을 하지 않는다. 기계 버전은 프로젝트 스탬프와 맞춘다(`aidlc doctor`).

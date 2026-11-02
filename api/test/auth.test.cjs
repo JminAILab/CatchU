@@ -24,7 +24,8 @@ class ProbeModule {}
 Module({ imports: [AppModule], controllers: [ProbeController] })(ProbeModule);
 
 async function start(t, overrides = {}) {
-  const envKeys = ['AUTH_WEB_ORIGIN', 'AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'SHARE_LINK_WEB_BASE_URL', 'LINK_GRANT_SECRET'];
+  const envKeys = ['AUTH_WEB_ORIGIN', 'AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'SHARE_LINK_WEB_BASE_URL', 'LINK_GRANT_SECRET',
+    'CATCHU_EMBEDDING_API_KEY'];
   const before = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
   const secret = randomBytes(32).toString('hex');
   const settings = {
@@ -189,10 +190,11 @@ for (const [label, overrides] of [
   ['운영 환경에서 활성화 요청', { NODE_ENV: 'production' }],
 ]) {
   test(`개발 로그인 거부: ${label}`, async (t) => {
-    // development·test가 아니면 https 공유 URL 주소(#147·#218)와 grant 서명 키(#150·#242)가 필수라 합성 값을 함께 준다.
-    // 키가 없어 기동이 실패하면 아래 403 확인이 grant 설정 오류에 가려진다.
+    // development·test가 아니면 https 공유 URL 주소(#147·#218)·grant 서명 키(#150·#242)·임베딩 키(#431)가 필수라 합성 값을 함께 준다.
+    // 키가 없어 기동이 실패하면 아래 403 확인이 설정 오류에 가려진다.
     const server = await start(t, {
-      SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex'), ...overrides,
+      SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
+      CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key', ...overrides,
     });
     for (const body of [
       { memberId: 'test-member-87' }, {}, { memberId: ' id ', admin: true }, [],

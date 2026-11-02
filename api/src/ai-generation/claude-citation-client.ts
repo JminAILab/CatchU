@@ -103,6 +103,116 @@ export class ClaudeCitationClient {
     });
     return toProviderResponse(message);
   }
+
+  /**
+   * 스트림으로 한 번 부른다(U2 generateStream, BR3.8). 글 블록이 끝날 때마다 조각 하나를 내보내고,
+   * 마지막에 중단 이유·사용량을 담은 끝 사건을 내보낸다. 같은 설정(주소·재시도 0·지키는 fetch)을 쓴다.
+   */
+  async *stream(request: ClaudeCitationCall): AsyncGenerator<ProviderStreamEvent> {
+    const { data, request_id: requestId } = await this.client.messages.create({
+      model: CLAUDE_MODEL_IDS[request.model],
+      max_tokens: this.options.maxOutputTokens,
+      thinking: THINKING_OFF[request.model],
+      inference_geo: INFERENCE_GEO,
+      system: request.system,
+      messages: [{ role: 'user', content: request.userContent }],
+      stream: true,
+    }).withResponse();
+    const assembler = new StreamAssembler(typeof requestId === 'string' && /^[\w-]{1,128}$/.test(requestId) ? requestId : null);
+    for await (const event of data) {
+      const fragment = assembler.accept(event);
+      if (fragment !== null) yield { kind: 'FRAGMENT', fragment };
+    }
+    yield assembler.finish();
+  }
+}
+
+/** 스트림 사건. 조각은 글 블록 하나가 끝난 뒤에만 나온다(인용이 다 붙은 뒤). */
+export type ProviderStreamEvent =
+  | { kind: 'FRAGMENT'; fragment: ResponseFragment }
+  | { kind: 'END'; response: Omit<ProviderResponse, 'fragments'> };
+
+/** 스트림 원시 사건을 밖에서 온 값으로 보고 검사하며 글 블록을 모은다. 모양이 틀리면 ProviderResponseShapeError. */
+export class StreamAssembler {
+  private readonly blocks = new Map<number, ResponseFragment>();
+  private rawStopReason: string | null = null;
+  private inputTokens: number | null = null;
+  private outputTokens: number | null = null;
+  private ended = false;
+
+  constructor(private readonly requestId: string | null) {}
+
+  accept(event: unknown): ResponseFragment | null {
+    if (!isRecord(event) || typeof event.type !== 'string') throw new ProviderResponseShapeError();
+    switch (event.type) {
+      case 'message_start':
+        this.readUsage(isRecord(event.message) ? event.message.usage : undefined);
+        return null;
+      case 'content_block_start':
+        return this.startBlock(event);
+      case 'content_block_delta':
+        return this.applyDelta(event);
+      case 'content_block_stop':
+        return this.stopBlock(event);
+      case 'message_delta':
+        if (isRecord(event.delta) && typeof event.delta.stop_reason === 'string' && /^[a-z_]{1,40}$/.test(event.delta.stop_reason)) {
+          this.rawStopReason = event.delta.stop_reason;
+        }
+        this.readUsage(event.usage);
+        return null;
+      case 'message_stop':
+        this.ended = true;
+        return null;
+      default:
+        return null; // ping 등 내용 없는 사건
+    }
+  }
+
+  /** 스트림이 끝난 뒤의 중단 이유·사용량. message_stop 없이 끝났으면 모양 오류다. */
+  finish(): ProviderStreamEvent {
+    if (!this.ended) throw new ProviderResponseShapeError();
+    return { kind: 'END', response: { stopReason: toStopReason(this.rawStopReason), rawStopReason: this.rawStopReason,
+      inputTokens: this.inputTokens, outputTokens: this.outputTokens, requestId: this.requestId } };
+  }
+
+  private startBlock(event: Record<string, unknown>): null {
+    const index = toIndex(event.index);
+    if (index === null || !isRecord(event.content_block)) throw new ProviderResponseShapeError();
+    const block = event.content_block;
+    if (block.type !== 'text') return null; // 생각 블록 등은 버린다
+    if (typeof block.text !== 'string') throw new ProviderResponseShapeError();
+    this.blocks.set(index, { text: block.text, citations: toCitations(block.citations) });
+    return null;
+  }
+
+  private applyDelta(event: Record<string, unknown>): null {
+    const index = toIndex(event.index);
+    if (index === null || !isRecord(event.delta)) throw new ProviderResponseShapeError();
+    const block = this.blocks.get(index);
+    if (block === undefined) return null; // 글 블록이 아닌 블록의 조각
+    const { delta } = event;
+    if (delta.type === 'text_delta') {
+      if (typeof delta.text !== 'string') throw new ProviderResponseShapeError();
+      block.text += delta.text;
+    } else if (delta.type === 'citations_delta') {
+      block.citations.push(...toCitations([delta.citation]));
+    }
+    return null;
+  }
+
+  private stopBlock(event: Record<string, unknown>): ResponseFragment | null {
+    const index = toIndex(event.index);
+    if (index === null) throw new ProviderResponseShapeError();
+    const block = this.blocks.get(index) ?? null;
+    this.blocks.delete(index);
+    return block;
+  }
+
+  private readUsage(usage: unknown): void {
+    if (!isRecord(usage)) return;
+    this.inputTokens = toCount(usage.input_tokens) ?? this.inputTokens;
+    this.outputTokens = toCount(usage.output_tokens) ?? this.outputTokens;
+  }
 }
 
 /** SDK가 돌려준 값을 밖에서 온 값으로 보고 검사한 뒤 옮긴다. 생각 블록 등 글 블록이 아닌 것은 버린다. */

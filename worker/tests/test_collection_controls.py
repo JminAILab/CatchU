@@ -434,7 +434,7 @@ def test_full_count_range_with_own_records_fits_the_default_call_limit() -> None
     상세는 상세 조회 개수만큼만 부르고 나머지는 실패가 아니라 한계로 남는다.
     """
     routes = standard_routes()
-    for page in range(1, 6):
+    for page in range(1, 31):
         numbers = range(page * 1000, page * 1000 + 100)
         routes[f"{BASE}/commits?per_page=100&page={page}"] = respond(
             [commit_json(n, MEMBER) for n in numbers], next_page=True
@@ -443,32 +443,42 @@ def test_full_count_range_with_own_records_fits_the_default_call_limit() -> None
             routes[f"{BASE}/commits/{sha(n)}"] = respond(
                 commit_detail_json(n, MEMBER, [file_json("a.py", 1, 0)])
             )
-    routes[PULLS] = respond(
-        [pull_json(n, MEMBER) for n in range(1, 101)], next_page=True
-    )
-    for number in range(1, 101):
+    for page in range(1, 7):
+        numbers = range((page - 1) * 100 + 1, page * 100 + 1)
+        routes[PULLS.replace("&page=1", f"&page={page}")] = respond(
+            [pull_json(n, MEMBER) for n in numbers], next_page=True
+        )
+    for number in range(1, 31):
         for page, count in ((1, 100), (2, 100), (3, 50)):
             routes[f"{BASE}/pulls/{number}/commits?per_page=100&page={page}"] = respond(
                 [{"sha": sha(90000 + page * 1000 + n)} for n in range(count)],
                 next_page=page < 3,
             )
-    routes[ISSUES] = respond(
-        [issue_json(n, MEMBER) for n in range(1, 101)], next_page=True
-    )
+    for page in range(1, 11):
+        numbers = range((page - 1) * 100 + 1, page * 100 + 1)
+        routes[ISSUES.replace("&page=1", f"&page={page}")] = respond(
+            [issue_json(n, MEMBER) for n in numbers], next_page=True
+        )
 
     outcome, transport = _run(routes)
 
     assert outcome.completed
-    assert len(transport.calls) == 298 <= PROPOSED_LIMITS.max_calls
+    assert len(outcome.commits) == 3000
+    assert len(outcome.pull_requests) == 600
+    assert len(outcome.issues) == 1000
+    # 관계 조회 없는 경로: 목록 47 + 상세 1500 + PR 목록 30 * 3.
+    assert len(transport.calls) == 1637 <= PROPOSED_LIMITS.max_calls
     statuses = [c.changes_status for c in outcome.commits]
-    assert statuses == [DetailStatus.FETCHED] * 200 + [DetailStatus.BEYOND_RANGE] * 300
+    assert (
+        statuses == [DetailStatus.FETCHED] * 1500 + [DetailStatus.BEYOND_RANGE] * 1500
+    )
     pulls = [p.commits_status for p in outcome.pull_requests]
-    assert pulls == [DetailStatus.FETCHED] * 30 + [DetailStatus.BEYOND_RANGE] * 70
+    assert pulls == [DetailStatus.FETCHED] * 30 + [DetailStatus.BEYOND_RANGE] * 570
     limits = {(limit.resource_type, limit.message) for limit in outcome.coverage_limits}
-    # 2026-10-08 팀장 결정(본인 기여의 뜻): '작성한'이 아니라 '작성자로 기록된'. 상한 값은 그대로다.
+    # 작성자 계정 기준은 유지하고 #424 후속 결정의 상세 1500건을 적용한다.
     assert (
         "COMMIT",
-        "연동 계정이 작성자로 기록된 최근 커밋 200건 밖은 변경 내용을 조회하지 않았다",
+        "연동 계정이 작성자로 기록된 최근 커밋 1500건 밖은 변경 내용을 조회하지 않았다",
     ) in limits
     assert (
         "PULL_REQUEST",

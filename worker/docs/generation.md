@@ -15,14 +15,14 @@
 - 설명·질문·재료·실패·제목 동작·한계 문구는 2026-10-12 팀장 결정 1~17을 따른다: [설명 결정 1·2](https://github.com/JminAILab/CatchU/issues/120#issuecomment-6118569221), [생성 규칙 결정 3~16](https://github.com/JminAILab/CatchU/issues/120#issuecomment-6125259129), [결정 17과 커밋 순서·같은 문자열 보완](https://github.com/JminAILab/CatchU/issues/120#issuecomment-6125925482). 범위·완료 기준은 [#120 본문](https://github.com/JminAILab/CatchU/issues/120)이다. 확인할 수 없는 본인 커밋이 섞인 후보의 제목은 [2026-10-13 팀장 결정 18](https://github.com/JminAILab/CatchU/issues/120#issuecomment-6142728696)을 따른다.
 - 제목의 조각 방식·확인 기준·40자·고쳐 쓰기 3회·제목만 null은 [결정 문서 「Catch 제목」](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#catch-제목), 허용하는 재호출이 제목 고쳐 쓰기뿐인 것은 같은 문서 「[한 분석 안의 LLM 재호출](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#한-분석-안의-llm-재호출)」이다.
 - 설명·질문에서 틀린 항목만 버리고 맞는 항목을 쓰는 것, 상한 뒤 항목·같은 종류 질문·조각 종류의 처리는 2026-10-19 팀장 결정이다([#120 본문 「응답과 실패 판정」](https://github.com/JminAILab/CatchU/issues/120)). 모양 검사만 풀고 지목한 줄·이름의 대조는 그대로이며, 다시 부르지 않는다.
-- 아래의 응답 모양·문장 틀·위치 분류·실패 코드·수치는 이슈가 구현에 맡긴 부분에서 이번에 고른 것이다. 수치는 모두 실측 전 제안값이다(제목당 고쳐 쓰기 3회만 팀장 결정).
+- 아래의 응답 모양·문장 틀·위치 분류·실패 코드는 이슈가 구현에 맡긴 부분에서 고른 것이다. 수치의 현행 결정과 기존 제안값은 [호출 한도](generation-limits.md#호출-한도와-시간)에서 구분한다.
 
 ## 경계
 
 - 입구는 `run_generation(request, outcome, built, *, provider, clock, deadline, limits)`다. `built`는 같은 요청·수집 결과로 만든 `build_candidates(request, outcome)`의 결과다. 돌려주는 값은 생성 칸을 채운 `GenerationOutput`과 운영 로그 건수다.
 - 바꾸는 것은 후보의 `title`·`draft`·`reflection`과, 본인 커밋 근거의 `coverageLimits` 끝 고정 문구(아래 「coverageLimits」)뿐이다. 후보 순서·작업 사실·기여·묶음 설명·근거와 그 순서·미제공 집계·기존 실패는 그대로다. 실패는 요청 단위 `ANALYSIS` 1건이 끝에 더해질 수 있다.
 - 제공자는 `GenerationProvider` Protocol 하나다(`complete(ProviderRequest) -> str`). 요청에는 지시문·자료·시간 제한·최대 출력이 따로 들어간다. 제공자는 시간 제한 안에 끝내지 못하면 `TimeoutError`, 다른 실패는 `ProviderError`를 내고 스스로 다시 시도하지 않는다. 호출은 됐지만 거절·출력 상한으로 응답 전체를 쓸 수 없으면 하위 예외 `UnusableResponse`를 내고, 생성 흐름은 이를 읽을 수 없는 응답·크기 초과 응답으로 다룬다. 실제 제공자는 SDK 기본 재시도를 끈 Anthropic Claude API 어댑터(`claude.py`)이고, 시험은 합성 제공자로 한다.
-- 처리 순서에 잇기와 큐·E 전달은 [#121](https://github.com/JminAILab/CatchU/issues/121)의 LIVE 조립(`app/processing/live.py`)이다. `deadline`은 생성 몫의 마감 시각으로, 큐 소비자는 꺼낸 시각 + 20분 − 60초(결과 조합·전송 여유)를 넘긴다.
+- 처리 순서에 잇기와 큐·E 전달은 [#121](https://github.com/JminAILab/CatchU/issues/121)의 LIVE 조립(`app/processing/live.py`)이다. `deadline`은 생성 몫의 마감 시각으로, 큐 소비자는 꺼낸 시각 + 60분 − 60초(결과 조합·전송 여유)를 넘긴다([현행 상한](repository-analysis-u7.md)).
 
 ## 재료 찾기
 
@@ -134,7 +134,7 @@
 
 ## 호출 한도와 시간
 
-[생성 호출 한도와 운영 로그](generation-limits.md#호출-한도와-시간)로 옮겼다. 요청당 생성 호출 200회(2026-10-17 팀장 결정)·고쳐 쓰기 20회(제목당 3회), 호출마다 생성 45초·고쳐 쓰기 20초, 입력 32,000 B, 출력 4,000 B이고, 생성 순서와 200회의 근거도 그 문서에 있다.
+[생성 호출 한도와 운영 로그](generation-limits.md#호출-한도와-시간)로 옮겼다. 요청당 생성 호출 300회(#424 후속 결정)·고쳐 쓰기 20회(제목당 3회), 호출마다 생성 45초·고쳐 쓰기 20초, 입력 32,000 B, 출력 4,000 B다. 생성 순서와 과거 200회를 정한 당시의 실측 기록도 그 문서에 있다.
 
 ## coverageLimits
 
@@ -175,7 +175,7 @@
 - 문장 틀은 이름이 줄에 있다는 것만 말한다. 이름이 주석 안에 있어도 "포함된 줄"은 사실이지만, 그 줄이 무엇을 하는지는 말하지 않는다.
 - 코드 이름은 ASCII 식별자만 받는다. 한글 변수 이름 등은 이름으로 고를 수 없어 파일 조각을 고르거나 실패한다. 한글 조사가 바로 붙은 이름(「limit을」)이 든 주석·문서 줄에서도 그 이름을 고를 수 없다.
 - 가리기는 정규식이다. 따옴표 없는 소문자 대입(`password = hunter2`, YAML `password: …`·`secret_key_base: …`), 점 이름 설정(`spring.datasource.password=…`), `curl -u 사용자:비밀번호`, 띄어 쓰거나 국제 표기한 전화번호·하이픈 없는 주민번호는 놓친다. 같은 값을 다른 줄에서 가리는 것도 한 줄에서 꼴로 알아본 값에만 적용된다. `git@github.com`·`logo@2x.png`·`tokenizer = "bert"`·`MAX_TOKENS = 4096`·인증서·공개 키 내용 줄은 잘못 가린다. 잘못 가린 줄은 고를 수 없어 재료가 줄어들 뿐 값이 새지는 않는다. 알려진 경우는 시험으로 고정했다.
-- 제목: 대상 파일을 건드렸는지 모르는 본인 커밋이 하나라도 있으면 제목을 두지 않으므로, 응답이 아주 큰 커밋이나 상세 조회 범위 밖 커밋이 섞인 후보는 제목이 빠진다(상세 조회 상한은 요청당 200건).
+- 제목: 대상 파일을 건드렸는지 모르는 본인 커밋이 하나라도 있으면 제목을 두지 않으므로, 응답이 아주 큰 커밋이나 상세 조회 범위 밖 커밋이 섞인 후보는 제목이 빠진다(선택 상세 조회 범위는 요청당 1,500건).
 - 제목 전후 비교는 이름 바꿈이 낀 흐름, 부모가 둘 이상인 사이 커밋, 같은 변경이지만 부모 관계가 없는 커밋을 모두 null로 둔다. 되살림은 지운 자리에 같은 내용을 다시 더한 경우만 알아보며, 그 밖의 위치에 더한 같은 내용은 옮긴 것으로 보아 수정이 될 수 있다. 커밋 하나를 파일 경로로 나눈 부분은 지금 #118 출력에 없어 직접 만든 묶음으로만 시험했다.
 
 ## 남은 연결

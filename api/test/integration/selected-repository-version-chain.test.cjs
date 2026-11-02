@@ -8,7 +8,7 @@ const { DataSource } = require('typeorm');
 const { resetTestDatabase } = require('../support/test-database.cjs');
 const { CONTRACT_DIR, validator, result: makeResult } = require('../helpers/receiver-harness.cjs');
 const { MemberAccount, GitHubConnection, AnalysisConsent, AnalysisAttempt } = require('../../dist/member-analysis/member-analysis.entity');
-const { insertInitialAnalysis } = require('../../dist/member-analysis/initial-analysis');
+const { insertCurrentAnalysis: insertInitialAnalysis } = require('../support/registered-analysis.cjs');
 const { buildRequestMessage } = require('../../dist/analysis-queue/analysis-request.dispatcher');
 const { WorkerContextService } = require('../../dist/worker-context/worker-context.service');
 const { GitHubAccessToken } = require('../../dist/github-connection/github.client');
@@ -39,8 +39,8 @@ const selectionSource = {resolve: async (manager, context, options) => {
       !isDeepStrictEqual(context.consentedScope, fixture.scope) ||
       ['attemptId', 'requestId', 'memberId', 'repositoryId', 'scopeRevision']
         .some(key => context[key] !== fixture.context[key])) return null;
-  const selected = catalog.resolve(context.consentedScope.selectionReference);
-  if (!selected || selected.repositoryId !== context.repositoryId) return null;
+  const selected = context.consentedScope.repository;
+  if (!selected || !context.consentedScope.registrationId) return null;
   return {...fixture.context, repository: {owner: selected.owner, name: selected.name}, wholeRepository: true};
 }};
 
@@ -72,7 +72,7 @@ async function prepare() {
     memberId: member.memberId, connectionState: 'CONNECTED', credentialReference: 'fixture:credential',
     accountLogin: 'fixture-user', externalAccountReference: '123456',
   }));
-  const scope = {revision: 'fixture-approved-full-scope', repositoryId: version.repositoryId,
+  let scope = {revision: 'fixture-approved-full-scope', repositoryId: version.repositoryId,
     allowedResourceTypes: ['COMMIT'], selectionReference: version.selectionReference};
   const request = await db.transaction(manager => insertInitialAnalysis(manager, {
     memberId: member.memberId, repositoryId: version.repositoryId, sourceMode: 'LIVE',
@@ -80,10 +80,11 @@ async function prepare() {
   }));
   const context = {requestId: request.requestId, attemptId: request.currentAttemptId, memberId: member.memberId,
     repositoryId: version.repositoryId, scopeRevision: scope.revision};
-  fixtures.set(context.attemptId, {context, scope: structuredClone(scope), active: true, wholeRepository: true});
   const consent = await db.manager.findOneByOrFail(AnalysisConsent, {consentId: request.consentId});
+  scope = consent.consentedScope;
+  fixtures.set(context.attemptId, {context, scope: structuredClone(scope), active: true, wholeRepository: true});
   const attempt = await db.manager.findOneByOrFail(AnalysisAttempt, {attemptId: context.attemptId});
-  const built = buildRequestMessage({...context, submittedAt: request.submittedAt, sourceMode: attempt.sourceMode,
+  const built = buildRequestMessage({...context, registrationId: request.registrationId, submittedAt: request.submittedAt, sourceMode: attempt.sourceMode,
     consentId: consent.consentId, noticeRevision: consent.noticeRevision, scopeRevision: consent.scopeRevision,
     consentedScope: consent.consentedScope, consentedAt: consent.consentedAt}, validator);
   assert.ok(built.message, JSON.stringify(built));

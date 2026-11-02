@@ -1,0 +1,392 @@
+{
+  "stage": "code-generation",
+  "unit": "u7-repository-analysis",
+  "version": 1,
+  "writes": [
+    {
+      "path": ".dockerignore"
+    },
+    {
+      "path": ".github/workflows/ci.yml"
+    },
+    {
+      "path": "api/contracts/repository-analysis/common.yaml"
+    },
+    {
+      "path": "api/contracts/repository-analysis/worker-messages.yaml"
+    },
+    {
+      "path": "api/Dockerfile"
+    },
+    {
+      "path": "api/docs/analysis-intake.md"
+    },
+    {
+      "path": "api/docs/analysis-queue.md"
+    },
+    {
+      "path": "api/docs/analysis-receiver.md"
+    },
+    {
+      "path": "api/docs/member-repositories.md"
+    },
+    {
+      "path": "api/docs/receiver-registration.md"
+    },
+    {
+      "path": "api/docs/repository-analysis-u7.md"
+    },
+    {
+      "path": "api/README.md"
+    },
+    {
+      "path": "api/src/analysis-intake/analysis-intake.service.ts"
+    },
+    {
+      "path": "api/src/analysis-intake/analysis-status.ts"
+    },
+    {
+      "path": "api/src/analysis-intake/daily-run-limit.consumer.ts"
+    },
+    {
+      "path": "api/src/analysis-queue/analysis-request.dispatcher.ts"
+    },
+    {
+      "path": "api/src/analysis-receiver/analysis-receiver.service.ts"
+    },
+    {
+      "path": "api/src/analysis-receiver/database-receiver.store.ts"
+    },
+    {
+      "path": "api/src/analysis-receiver/receiver.types.ts"
+    },
+    {
+      "path": "api/src/analysis-receiver/selected-repository-registration.source.ts"
+    },
+    {
+      "path": "api/src/application.module.ts"
+    },
+    {
+      "path": "api/src/common/errors/error-codes.ts"
+    },
+    {
+      "path": "api/src/database/migrations/1793245460352-AddRepositoryRegistration.ts"
+    },
+    {
+      "path": "api/src/member-analysis/initial-analysis.ts"
+    },
+    {
+      "path": "api/src/member-analysis/member-analysis.entity.ts"
+    },
+    {
+      "path": "api/src/member-repositories/github-repository.client.ts"
+    },
+    {
+      "path": "api/src/member-repositories/member-repositories.controller.ts"
+    },
+    {
+      "path": "api/src/member-repositories/member-repositories.module.ts"
+    },
+    {
+      "path": "api/src/member-repositories/member-repositories.service.ts"
+    },
+    {
+      "path": "api/src/member-repositories/registration-context.source.ts"
+    },
+    {
+      "path": "api/src/member-repositories/registration-scope.ts"
+    },
+    {
+      "path": "api/src/member-repositories/repository-address.ts"
+    },
+    {
+      "path": "api/src/member-repositories/repository-registration.entity.ts"
+    },
+    {
+      "path": "api/src/member-repositories/repository-registration.service.ts"
+    },
+    {
+      "path": "api/test/analysis/receiver.test.cjs"
+    },
+    {
+      "path": "api/test/analysis/u7-receiver.test.cjs"
+    },
+    {
+      "path": "api/test/catches/upstream-foreign-keys.test.cjs"
+    },
+    {
+      "path": "api/test/db/analysis-intake-real.test.cjs"
+    },
+    {
+      "path": "api/test/db/analysis-intake.test.cjs"
+    },
+    {
+      "path": "api/test/db/analysis-notice.test.cjs"
+    },
+    {
+      "path": "api/test/db/analysis-request-history.test.cjs"
+    },
+    {
+      "path": "api/test/db/lock-wait-limit-intake.test.cjs"
+    },
+    {
+      "path": "api/test/db/lock-wait-limit-worker-context.test.cjs"
+    },
+    {
+      "path": "api/test/db/member-analysis.test.cjs"
+    },
+    {
+      "path": "api/test/db/member-cascade-delete.test.cjs"
+    },
+    {
+      "path": "api/test/db/repository-registration.test.cjs"
+    },
+    {
+      "path": "api/test/db/repository-selection-list-api.test.cjs"
+    },
+    {
+      "path": "api/test/db/repository-selection-worker-api.test.cjs"
+    },
+    {
+      "path": "api/test/db/result-application.test.cjs"
+    },
+    {
+      "path": "api/test/db/selected-repository-registration.test.cjs"
+    },
+    {
+      "path": "api/test/db/u7-analysis-intake.test.cjs"
+    },
+    {
+      "path": "api/test/db/worker-context-api.test.cjs"
+    },
+    {
+      "path": "api/test/db/worker-context-application.test.cjs"
+    },
+    {
+      "path": "api/test/helpers/intake-app.cjs"
+    },
+    {
+      "path": "api/test/helpers/queue-harness.cjs"
+    },
+    {
+      "path": "api/test/helpers/receiver-harness.cjs"
+    },
+    {
+      "path": "api/test/helpers/worker-messages.cjs"
+    },
+    {
+      "path": "api/test/integration/analysis-deadline.test.cjs"
+    },
+    {
+      "path": "api/test/integration/analysis-intake-real-chain.test.cjs"
+    },
+    {
+      "path": "api/test/integration/analysis-queue-dispatch.test.cjs"
+    },
+    {
+      "path": "api/test/integration/lock-wait-limit-application.test.cjs"
+    },
+    {
+      "path": "api/test/integration/receiver-parent-locking.test.cjs"
+    },
+    {
+      "path": "api/test/integration/receiver-registration.test.cjs"
+    },
+    {
+      "path": "api/test/integration/repository-selection-chain.test.cjs"
+    },
+    {
+      "path": "api/test/integration/result-application-b.test.cjs"
+    },
+    {
+      "path": "api/test/integration/selected-repository-registration.test.cjs"
+    },
+    {
+      "path": "api/test/integration/selected-repository-version-chain.test.cjs"
+    },
+    {
+      "path": "api/test/integration/u7-analysis-chain.test.cjs"
+    },
+    {
+      "path": "api/test/repository-registration.test.cjs"
+    },
+    {
+      "path": "api/test/selected-repository-catalog.test.cjs"
+    },
+    {
+      "path": "api/test/support/catch-db-fixture.cjs"
+    },
+    {
+      "path": "api/test/support/registered-analysis.cjs"
+    },
+    {
+      "path": "api/test/support/result-application-fixture.cjs"
+    },
+    {
+      "path": "api/test/support/synthetic-daily-limit.cjs"
+    },
+    {
+      "path": "api/test/support/u7-fixture.cjs"
+    },
+    {
+      "path": "api/test/u7-worker-context.test.cjs"
+    },
+    {
+      "path": "deploy/scripts/check-images.mjs"
+    },
+    {
+      "path": "web/src/features/analysis-request/analysis-request-section.tsx"
+    },
+    {
+      "path": "web/src/features/analysis-request/analysis-request-store.ts"
+    },
+    {
+      "path": "web/src/features/analysis-request/analysis-request.module.css"
+    },
+    {
+      "path": "web/src/features/analysis-request/README.md"
+    },
+    {
+      "path": "web/src/features/repository-management/README.md"
+    },
+    {
+      "path": "web/src/features/repository-management/repository-api.ts"
+    },
+    {
+      "path": "web/src/features/repository-management/repository-management-preview.tsx"
+    },
+    {
+      "path": "web/src/features/repository-management/repository-management.tsx"
+    },
+    {
+      "path": "web/src/features/repository-management/repository-registration-form.tsx"
+    },
+    {
+      "path": "web/src/features/repository-management/repository-registration-store.ts"
+    },
+    {
+      "path": "web/src/features/repository-management/repository-status.ts"
+    },
+    {
+      "path": "web/test/analysis-request-rate-limit.test.mjs"
+    },
+    {
+      "path": "web/test/analysis-request-response.test.mjs"
+    },
+    {
+      "path": "web/test/analysis-request-retry.test.mjs"
+    },
+    {
+      "path": "web/test/analysis-request.test.mjs"
+    },
+    {
+      "path": "web/test/repository-connection-recheck.test.mjs"
+    },
+    {
+      "path": "web/test/repository-management.test.mjs"
+    },
+    {
+      "path": "web/test/repository-registration.test.mjs"
+    },
+    {
+      "path": "web/test/u7-hooks.mjs"
+    },
+    {
+      "path": "web/test/u7-repository-views.mjs"
+    },
+    {
+      "path": "worker/app/candidates/build.py"
+    },
+    {
+      "path": "worker/app/collection/collect.py"
+    },
+    {
+      "path": "worker/app/collection/collectors.py"
+    },
+    {
+      "path": "worker/app/contract/worker_messages.py"
+    },
+    {
+      "path": "worker/app/generation/flow.py"
+    },
+    {
+      "path": "worker/app/processing/generation.py"
+    },
+    {
+      "path": "worker/app/processing/pipeline.py"
+    },
+    {
+      "path": "worker/app/processing/result.py"
+    },
+    {
+      "path": "worker/app/processing/synthetic.py"
+    },
+    {
+      "path": "worker/Dockerfile"
+    },
+    {
+      "path": "worker/docs/queue-consumer.md"
+    },
+    {
+      "path": "worker/docs/repository-analysis-u7.md"
+    },
+    {
+      "path": "worker/docs/request-context.md"
+    },
+    {
+      "path": "worker/fixtures/m1-synthetic/cases.json"
+    },
+    {
+      "path": "worker/fixtures/m1-synthetic/events/running.json"
+    },
+    {
+      "path": "worker/fixtures/m1-synthetic/events/uncertain.json"
+    },
+    {
+      "path": "worker/fixtures/m1-synthetic/results/empty.json"
+    },
+    {
+      "path": "worker/fixtures/m1-synthetic/results/failed.json"
+    },
+    {
+      "path": "worker/fixtures/m1-synthetic/results/partial-failed.json"
+    },
+    {
+      "path": "worker/fixtures/m1-synthetic/results/same-id-different-content.json"
+    },
+    {
+      "path": "worker/fixtures/m1-synthetic/results/succeeded-one-candidate.json"
+    },
+    {
+      "path": "worker/fixtures/m1-synthetic/results/two-candidates-same-work.json"
+    },
+    {
+      "path": "worker/fixtures/m1-synthetic/results/unidentifiable-missing-attempt-id.json"
+    },
+    {
+      "path": "worker/README.md"
+    },
+    {
+      "path": "worker/tests/test_consumer_receipts.py"
+    },
+    {
+      "path": "worker/tests/test_consumer_redis.py"
+    },
+    {
+      "path": "worker/tests/test_request_check.py"
+    },
+    {
+      "path": "worker/tests/test_u7_budget.py"
+    },
+    {
+      "path": "worker/tests/test_u7_observation.py"
+    },
+    {
+      "path": "worker/tests/test_u7_pipeline.py"
+    },
+    {
+      "path": "worker/tests/u7_chain_output.py"
+    }
+  ]
+}
+

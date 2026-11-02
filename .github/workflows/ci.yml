@@ -47,7 +47,7 @@ jobs:
           # PR은 GitHub이 만든 시험 병합 커밋이라 첫 부모(대상 브랜치)와 비교하면 그 PR의 변경 전체가 나온다.
           # push는 push 직전 커밋과 비교한다. 통합 브랜치에 Unit 여러 개를 합친 뒤 한 번에 올려도 바뀐 서비스를 모두 잡는다.
           # 브랜치를 처음 만든 push(직전 커밋이 0)나 직전 커밋을 이력에서 찾지 못하면 모든 서비스를 검사한다.
-          contract=aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/
+          contract=api/contracts/repository-analysis/
           web=false api=false worker=false deps=''
           base=HEAD^1
           case "$EVENT" in push) base=$BEFORE ;; esac
@@ -155,6 +155,17 @@ jobs:
           node-version-file: api/package.json
           cache: npm
           cache-dependency-path: api/package-lock.json
+      # U7 연결 시험이 실제 Python 함수를 호출하므로 API job에도 worker의 잠금 환경을 준비한다.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: '0.12.18'
+          checksum: '89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16'
+          working-directory: worker
+          cache-dependency-glob: uv.lock
+      - run: uv python install
+        working-directory: worker
+      - run: uv sync --locked
+        working-directory: worker
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck

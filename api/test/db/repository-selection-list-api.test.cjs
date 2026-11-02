@@ -16,15 +16,14 @@ const { GitHubConnection, MemberAccount } = require('../../dist/member-analysis/
 const { GitHubConnectionService } = require('../../dist/github-connection/github-connection.service');
 const { GitHubClient, GitHubAccessToken } = require('../../dist/github-connection/github.client');
 const { CredentialVault } = require('../../dist/github-connection/credential-vault');
-const { AllowedScopeRevision, RepositorySelection } = require('../../dist/member-repositories/repository-selection.entity');
-const { RepositorySelectionService } = require('../../dist/member-repositories/repository-selection.source');
-const { SelectedRepositoryCatalog } = require('../../dist/member-repositories/selected-repository-catalog');
+const { AllowedScopeRevision } = require('../../dist/member-repositories/repository-selection.entity');
+const { RepositoryRegistration } = require('../../dist/member-repositories/repository-registration.entity');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 
-// 실제 공급 검사: 실제 Nest HTTP·인증 Guard·PostgreSQL 선정 행·#231 연결 행/상태 갱신으로 GET /v1/me/repositories를 부른다.
+// U7 목록 회귀: 실제 Nest HTTP·인증 Guard·PostgreSQL 회원별 등록·#231 연결 상태 갱신을 검사한다.
 // 실제 회원은 Google 로그인 대신 같은 식별 접두사의 회원 행과 실제 세션 발급으로 만든다. GitHub OAuth 응답만 시험 대역이며
-// GitHub API·Google을 호출하지 않는다. 페이지 사이 새 좌표 판본은 시험 카탈로그(이름 변경 가정)로 바꾼다.
+// GitHub API·Google을 호출하지 않는다. 등록 행은 합성 자료이며 공개 저장소 메타데이터 검사는 별도 C1에서 한다.
 const THEME = '570342307', ZOO = '547322698';
 const SCOPE = 'catchu:allowed-scope:2026-10-19:v1';
 const EXPECTED = [
@@ -42,6 +41,7 @@ async function start(t, overrides = {}) {
     AUTH_WEB_ORIGIN: 'https://catchu.example',
     AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
     SHARE_LINK_WEB_BASE_URL: 'https://example.invalid', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key', // 운영 모드 기동에 필요한 합성 임베딩 키(#431)
     NODE_ENV: 'test', DEV_LOGIN_ENABLED: 'true', ...overrides,
   };
   const saved = Object.fromEntries(Object.keys(settings).map(key => [key, process.env[key]]));
@@ -77,7 +77,18 @@ async function start(t, overrides = {}) {
     }
     return { memberId, token: (await app.get(SessionService).create(manager, memberId)).access.accessToken };
   });
-  const real = connection => account('catchu:google:' + randomUUID(), connection);
+  const real = async connection => {
+    const user = await account('catchu:google:' + randomUUID(), connection);
+    user.items = [];
+    for (const item of EXPECTED) {
+      const row = Object.assign(new RepositoryRegistration(), { memberId: user.memberId, repositoryId: item.repositoryId,
+        owner: item.ownerLogin, name: item.name, repositoryUrl: item.url, scopeRevision: item.allowedScopeRevision,
+        registeredAt: new Date(), lastVerifiedAt: new Date() });
+      await database.manager.insert(RepositoryRegistration, row);
+      user.items.push({ ...item });
+    }
+    return user;
+  };
   const devLogin = async identifier => {
     const response = await request('/v1/auth/dev-login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ memberId: identifier }) });
@@ -107,14 +118,16 @@ async function page(server, token, query = '') {
 
 for (const [label, overrides] of [['개발 로그인 켬', {}], ['DEV_LOGIN_ENABLED 미지정', { DEV_LOGIN_ENABLED: undefined }],
   ['DEV_LOGIN_ENABLED=false', { DEV_LOGIN_ENABLED: 'false' }], ['NODE_ENV=production', { NODE_ENV: 'production' }]]) {
-  test(`실제 회원들은 서로 다른 GitHub 연결로도 같은 현재 선정 목록을 받는다(개발 로그인 설정과 무관): ${label}`,
+  test(`실제 회원은 자신의 등록 목록만 받는다(개발 로그인 설정과 무관): ${label}`,
     async t => {
       const server = await start(t, overrides);
       const a = await server.real();
       const b = await server.real({ accountLogin: 'another-account', externalAccountReference: '424242' });
+      await database.manager.delete(RepositoryRegistration, { memberId: b.memberId, repositoryId: THEME });
+      b.items = b.items.filter(item => item.repositoryId !== THEME);
       for (const user of [a, b]) {
         const body = await page(server, user.token);
-        assert.deepEqual(body, { items: EXPECTED, page: { nextCursor: null } });
+        assert.deepEqual(body, { items: user.items, page: { nextCursor: null } });
         for (const item of body.items) {
           assert.deepEqual(Object.keys(item).sort(), ['allowedScopeRevision', 'name', 'ownerLogin', 'repositoryId', 'url']);
         }
@@ -162,7 +175,7 @@ test('실제 회원의 연결 없음·해제·재인증 필요·보관 자격정
     const user = await server.real(connection);
     await errorBody(await server.list(user.token), 403, 'GITHUB_CONNECTION_REQUIRED');
   }
-  assert.deepEqual((await page(server, connected.token)).items, EXPECTED);
+  assert.deepEqual((await page(server, connected.token)).items, connected.items);
 });
 
 test('GitHub 연동을 켜면 만료·이용 불가 자격정보는 #231 상태 갱신 뒤 403, 보관소 오류는 500', async t => {
@@ -184,7 +197,7 @@ test('GitHub 연동을 켜면 만료·이용 불가 자격정보는 #231 상태 
   await connect(valid, 'valid-user', '1001');
   await connect(expired, 'expired-user', '1002');
   await connect(missing, 'missing-user', '1003');
-  assert.deepEqual((await page(server, valid.token)).items, EXPECTED);
+  assert.deepEqual((await page(server, valid.token)).items, valid.items);
   const old = await vault.save({ memberId: expired.memberId, accountLogin: 'expired-user', externalAccountReference: '1002',
     token: new GitHubAccessToken('SYNTHETIC_LIST_TOKEN_252'), expiresAt: new Date(Date.now() - 1000) });
   await database.manager.update(GitHubConnection, { memberId: expired.memberId }, { credentialReference: old });
@@ -200,77 +213,62 @@ test('GitHub 연동을 켜면 만료·이용 불가 자격정보는 #231 상태 
   await database.manager.update(GitHubConnection, { memberId: broken.memberId }, { credentialReference: 'github-v1:not-a-vault-reference' });
   await errorBody(await server.list(broken.token), 500, 'INTERNAL_ERROR');
   assert.equal((await database.manager.findOneByOrFail(GitHubConnection, { memberId: broken.memberId })).connectionState, 'CONNECTED');
-  assert.deepEqual((await page(server, valid.token)).items, EXPECTED);
+  assert.deepEqual((await page(server, valid.token)).items, valid.items);
   assert.equal(server.logs.join('\n').includes('SYNTHETIC_LIST_TOKEN_252'), false);
 });
 
-test('페이지: 커서로 끝까지 가고 다른 회원 커서·페이지 사이 선정 변경은 400, 연결 변경은 403', async t => {
+test('페이지: 다른 회원 커서·페이지 사이 등록 변경은 400, 연결 변경은 403', async t => {
   const server = await start(t);
   const a = await server.real(), b = await server.real();
   const first = await page(server, a.token, '?limit=1');
-  assert.deepEqual(first.items, [EXPECTED[0]]);
+  assert.deepEqual(first.items, [a.items[0]]);
   const next = `?limit=1&cursor=${first.page.nextCursor}`;
-  assert.deepEqual(await page(server, a.token, next), { items: [EXPECTED[1]], page: { nextCursor: null } });
-  // 같은 공통 목록이라도 커서는 발급 회원에게만 묶인다.
+  assert.deepEqual(await page(server, a.token, next), { items: [a.items[1]], page: { nextCursor: null } });
+  // 같은 GitHub 저장소라도 커서는 발급 회원에게만 묶인다.
   await errorBody(await server.list(b.token, next), 400, 'VALIDATION_FAILED');
 
-  const service = server.app.get(RepositorySelectionService);
-  const versions = new SelectedRepositoryCatalog().listCurrent();
-  const theme = versions.find(version => version.repositoryId === THEME);
-  const renamed = { ...theme, name: 'renamed-fixture', url: 'https://github.com/ljm0850/renamed-fixture',
-    selectionReference: 'catchu:selected-repository:test-renamed:570342307:v2' };
+  const renamed = { name: 'renamed-fixture', repositoryUrl: 'https://github.com/ljm0850/renamed-fixture' };
   const changes = {
-    '선정 제외': () => database.manager.update(RepositorySelection, { repositoryId: THEME }, { active: false }),
-    '새 범위 판본': async () => {
+    '등록 삭제': user => database.manager.delete(RepositoryRegistration, { memberId: user.memberId, repositoryId: THEME }),
+    '새 범위 판본': async user => {
       await database.manager.insert(AllowedScopeRevision, { ...structuredClone(initial.scopes[0]), scopeRevision: 'catchu:allowed-scope:test-next:v2' });
-      await database.manager.update(RepositorySelection, { repositoryId: ZOO }, { scopeRevision: 'catchu:allowed-scope:test-next:v2' });
+      await database.manager.update(RepositoryRegistration, { memberId: user.memberId, repositoryId: ZOO }, { scopeRevision: 'catchu:allowed-scope:test-next:v2' });
     },
-    '새 좌표 판본': async () => {
-      service.catalog = new SelectedRepositoryCatalog([...versions, renamed], [renamed.selectionReference, ...versions
-        .filter(version => version.repositoryId !== THEME).map(version => version.selectionReference)]);
-      await database.manager.update(RepositorySelection, { repositoryId: THEME }, { selectionReference: renamed.selectionReference });
-    },
+    '새 좌표': user => database.manager.update(RepositoryRegistration, { memberId: user.memberId, repositoryId: THEME }, renamed),
   };
   for (const [label, change] of Object.entries(changes)) {
     await resetTestDatabase(database); await restoreInitialSelection(database, initial);
-    service.catalog = new SelectedRepositoryCatalog();
     const user = await server.real();
     const cursor = (await page(server, user.token, '?limit=1')).page.nextCursor;
-    await change();
+    await change(user);
     await errorBody(await server.list(user.token, `?limit=1&cursor=${cursor}`), 400, 'VALIDATION_FAILED');
     const fresh = await page(server, user.token);
-    assert.notDeepEqual(fresh.items, EXPECTED, label);
-    if (label === '새 좌표 판본') {
+    assert.notDeepEqual(fresh.items, user.items, label);
+    if (label === '새 좌표') {
       assert.deepEqual(fresh.items.find(item => item.repositoryId === THEME),
-        { repositoryId: THEME, name: renamed.name, ownerLogin: 'ljm0850', url: renamed.url, allowedScopeRevision: SCOPE });
+        { ...user.items.find(item => item.repositoryId === THEME), name: renamed.name, url: renamed.repositoryUrl });
     }
   }
   await resetTestDatabase(database); await restoreInitialSelection(database, initial);
-  service.catalog = new SelectedRepositoryCatalog();
   const user = await server.real();
   const cursor = (await page(server, user.token, '?limit=1')).page.nextCursor;
   await database.manager.update(GitHubConnection, { memberId: user.memberId }, { connectionState: 'REAUTH_REQUIRED', credentialReference: null });
   await errorBody(await server.list(user.token, `?limit=1&cursor=${cursor}`), 403, 'GITHUB_CONNECTION_REQUIRED');
 });
 
-test('정상 빈 목록: 현재 선정을 모두 제외하면 200 빈 목록이고 이전 커서는 400', async t => {
+test('정상 빈 목록: 회원 등록이 없으면 전역 선정이 있어도 200 빈 목록이고 이전 커서는 400', async t => {
   const server = await start(t);
   const user = await server.real();
   const cursor = (await page(server, user.token, '?limit=1')).page.nextCursor;
-  await database.query('UPDATE repository_selection SET active = false');
+  await database.manager.delete(RepositoryRegistration, { memberId: user.memberId });
   assert.deepEqual(await page(server, user.token), { items: [], page: { nextCursor: null } });
   await errorBody(await server.list(user.token, `?cursor=${cursor}`), 400, 'VALIDATION_FAILED');
 });
 
-test('공급 장애: 카탈로그에 없는 선정 참조와 DB 오류는 500이며 빈 목록·합성 저장소로 바꾸지 않고 내부 값을 노출하지 않는다', async t => {
+test('공급 장애: DB 오류는 500이며 빈 목록·합성 저장소로 바꾸지 않고 내부 값을 노출하지 않는다', async t => {
   const server = await start(t);
   const user = await server.real();
-  await database.manager.update(RepositorySelection, { repositoryId: THEME }, { selectionReference: 'catchu:selected-repository:missing-252:v1' });
-  const body = await errorBody(await server.list(user.token), 500, 'INTERNAL_ERROR');
-  const output = JSON.stringify(body) + server.logs.join('\n');
-  for (const value of ['missing-252', 'ljm0850', SYNTHETIC_REPOSITORY.repositoryId, user.token]) assert.equal(output.includes(value), false, value);
-  await database.manager.update(RepositorySelection, { repositoryId: THEME }, { selectionReference: initial.selections[1].selectionReference });
-  assert.deepEqual((await page(server, user.token)).items, EXPECTED);
+  assert.deepEqual((await page(server, user.token)).items, user.items);
   const dataSource = server.app.get(DataSource);
   const transaction = dataSource.transaction.bind(dataSource);
   // 실제 PostgreSQL에서 오류를 낸다. 다른 테스트 DB나 제품 테이블은 변경하지 않는다.

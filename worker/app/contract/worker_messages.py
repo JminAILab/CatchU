@@ -18,10 +18,7 @@ from referencing import Registry
 from referencing.jsonschema import DRAFT7
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-CONTRACT_DIR = (
-    REPO_ROOT
-    / "aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design"
-)
+CONTRACT_DIR = REPO_ROOT / "api/contracts/repository-analysis"
 WORKER_MESSAGES_FILE = "worker-messages.yaml"
 COMMON_FILE = "common.yaml"
 FIXTURE_DIR = REPO_ROOT / "worker/fixtures/m1-synthetic"

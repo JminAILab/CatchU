@@ -19,29 +19,34 @@ const { AnalysisIntakeService } = require('../../dist/analysis-intake/analysis-i
 const { GitHubConnectionService } = require('../../dist/github-connection/github-connection.service');
 const { GitHubClient, GitHubAccessToken } = require('../../dist/github-connection/github.client');
 const { CredentialVault } = require('../../dist/github-connection/credential-vault');
-const { AllowedScopeRevision, RepositorySelection } = require('../../dist/member-repositories/repository-selection.entity');
-const { RepositorySelectionService, DatabaseRepositorySelectionSource } =
-  require('../../dist/member-repositories/repository-selection.source');
+const { RepositoryRegistration } = require('../../dist/member-repositories/repository-registration.entity');
+const { RepositoryRegistrationService } = require('../../dist/member-repositories/repository-registration.service');
+const { GitHubRepositoryClient } = require('../../dist/member-repositories/github-repository.client');
+const { RegistrationContextSource } = require('../../dist/member-repositories/registration-context.source');
+const { ApiError } = require('../../dist/common/errors');
+const registered = new Map();
+const { AllowedScopeRevision } = require('../../dist/member-repositories/repository-selection.entity');
 const { SelectedRepositoryCatalog } = require('../../dist/member-repositories/selected-repository-catalog');
 const { AnalysisRequestDispatcher } = require('../../dist/analysis-queue/analysis-request.dispatcher');
 const { WorkerMessageValidator } = require('../../dist/analysis-receiver/worker-message.validator');
 const { CONTRACT_DIR, MemoryRequestQueue, dispatchLog } = require('../helpers/queue-harness.cjs');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
-const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
+const { readCurrentSelection: readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 
-// #323 실제 회원 접수. 기본은 실제 공급 검사다: 실제 Nest HTTP·인증 Guard·PostgreSQL, #252 DB 선정 근거(실제 마이그레이션
+// #323 접수 회귀를 U7 회원 등록으로 전환했다. GitHub 메타데이터/C-03은 합성 대역이다.
+// 검증 경계: 실제 Nest HTTP·인증 Guard·PostgreSQL, #252 DB 선정 근거(실제 마이그레이션
 // 초기 자료)·#319 좌표 카탈로그, #231 연결·보관소를 쓴다. 실제 회원은 Google 로그인 대신 같은 식별 접두사의 회원 행과
 // 실제 세션 발급으로 만들고, 연결은 GitHub 연동을 켠 서버에서 #231 authorize·connect로 시험 전용 보관소에 만든다(거부 사례는
 // #231이 남기는 행 모양을 직접 넣는다). 시험 대역은 이름에 「대역」을 적은 시험의 오류 주입·판본 교체와 GitHub OAuth
 // 응답(exchange)뿐이다. Google·GitHub·큐 서버·worker는 부르지 않는다.
 const THEME = '570342307', ZOO = '547322698';
-const SCOPE = 'catchu:allowed-scope:2026-10-19:v1';
+const { REGISTRATION_SCOPE_REVISION: SCOPE } = require('../../dist/member-repositories/registration-scope');
 const NEXT_SCOPE = 'catchu:allowed-scope:test-323:v2';
 const TYPES = ['COMMIT', 'PULL_REQUEST', 'ISSUE'];
-const CONSENT_KEYS = ['allowedResourceTypes', 'repositoryId', 'revision', 'selectionReference'];
+const CONSENT_KEYS = ['allowedResourceTypes', 'registrationId', 'repository', 'repositoryId', 'revision', 'selectionReference'];
 const RESPONSE_KEYS = ['requestId', 'repositoryId', 'consentId', 'attemptId', 'submittedAt', 'updatedAt', 'requestState',
   'lifecycle', 'processing', 'application', 'sourceMode', 'eligibleCandidateCount', 'registeredCatchIds', 'ownerResultsReady',
-  'retry', 'failures'].sort();
+  'retry', 'failures', 'ownCommitObservation', 'observedOwnCommitCount', 'collectionLimitNotes'].sort();
 const NONE = { requests: 0, consents: 0, attempts: 0, keys: 0 };
 const TOKEN = 'SYNTHETIC_INTAKE_TOKEN_323';
 let db, initial, accounts = 0;
@@ -65,6 +70,7 @@ async function start(t, overrides = {}) {
   const settings = { NODE_ENV: 'test', DEV_LOGIN_ENABLED: 'true', AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
     AUTH_ACCESS_TOKEN_TTL_SECONDS: '900', AUTH_WEB_ORIGIN: 'https://catchu.example',
     SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key', // 운영 모드 기동에 필요한 합성 임베딩 키(#431)
     CORS_ALLOWED_ORIGINS: undefined, ...github(directory), ...overrides };
   const previous = Object.fromEntries(Object.keys(settings).map(k => [k, process.env[k]]));
   for (const [k, v] of Object.entries(settings)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
@@ -76,6 +82,7 @@ async function start(t, overrides = {}) {
     for (const [k, v] of Object.entries(previous)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   } });
   app = await configureApp(await NestFactory.create(AppModule, { logger, abortOnError: false }));
+  require('../support/synthetic-daily-limit.cjs').bindSyntheticDailyLimit(app);
   await app.listen(0, '127.0.0.1');
   const base = await app.getUrl();
   const call = (path, options) => fetch(base + path, { ...options, signal: AbortSignal.timeout(10000) });
@@ -103,6 +110,14 @@ async function start(t, overrides = {}) {
       const { state } = await connections.authorize(user.memberId);
       await connections.connect(user.memberId, 'SYNTHETIC_CODE', state);
     }
+    for (const version of new SelectedRepositoryCatalog().listCurrent()) {
+      const registrationId = await require('../support/registered-analysis.cjs').ensureRegistration(db.manager, {
+        memberId: user.memberId, repositoryId: version.repositoryId, scopeRevision: SCOPE,
+        consentedScope: { repository: { owner: version.owner, name: version.name, url: version.url } },
+      });
+      registered.set(version.repositoryId, { revision: SCOPE, repositoryId: version.repositoryId, allowedResourceTypes: TYPES,
+        selectionReference: registrationId, registrationId, repository: { owner: version.owner, name: version.name, url: version.url } });
+    }
     return user;
   };
   const real = connection => member('catchu:google:' + randomUUID(), connection);
@@ -123,10 +138,22 @@ async function start(t, overrides = {}) {
   client.exchange = async () => {
     accounts++;
     return { accountLogin: 'real-user-' + accounts, externalAccountReference: String(70000 + accounts),
-      token: new GitHubAccessToken(TOKEN), expiresAt: new Date(Date.now() + 3600000) };
+      token: new GitHubAccessToken(TOKEN + '-' + accounts), expiresAt: new Date(Date.now() + 3600000) };
   };
-  return { app, call, auth, post, member, real, devLogin, logs, refreshed, connections, client, vault: app.get(CredentialVault),
-    notices: app.get(AnalysisNoticeService), selections: app.get(RepositorySelectionService) };
+  client.identity = async token => {
+    const value = token.reveal();
+    const vault = /-vault-(\d+)$/.exec(value);
+    const index = Number(value.split('-').at(-1));
+    return vault ? { accountLogin: 'vault-user-' + vault[1], externalAccountReference: String(5000 + Number(vault[1])) }
+      : { accountLogin: 'real-user-' + index, externalAccountReference: String(70000 + index) };
+  };
+  const metadata = app.get(GitHubRepositoryClient);
+  metadata.verify = async coordinates => {
+    const version = new SelectedRepositoryCatalog().listCurrent().find(item => item.owner === coordinates.owner && item.name === coordinates.name);
+    return version ? { repositoryId: version.repositoryId, owner: version.owner, name: version.name, url: version.url } : { repositoryId: THEME, ...coordinates, url: 'https://github.com/' + coordinates.owner + '/' + coordinates.name };
+  };
+  return { app, call, auth, post, member, real, devLogin, logs, refreshed, connections, client, metadata, vault: app.get(CredentialVault),
+    notices: app.get(AnalysisNoticeService), selections: app.get(RepositoryRegistrationService) };
 }
 async function error(r, status, code) {
   assert.equal(r.status, status); assert.equal(r.headers.get('cache-control'), 'no-store');
@@ -152,17 +179,12 @@ async function stored(requestId) {
     JOIN analysis_attempt a ON a.attempt_id = r.current_attempt_id WHERE r.request_id = $1`, [requestId]);
   return row;
 }
-/** 실제 마이그레이션 초기 자료(#252 공급값)로 만든 저장 동의 네 칸의 기대값. */
-function supplied(repositoryId) {
-  const selection = initial.selections.find(row => row.repositoryId === repositoryId);
-  const scope = initial.scopes.find(row => row.scopeRevision === selection.scopeRevision);
-  return { revision: scope.scopeRevision, repositoryId, allowedResourceTypes: [...scope.allowedResourceTypes],
-    selectionReference: selection.selectionReference };
-}
+/** 실제 마이그레이션 초기 자료(#252 공급값)로 만든 저장 동의 여섯 칸의 기대값. */
+function supplied(repositoryId) { return structuredClone(registered.get(repositoryId)); }
 /** #252 갱신 절차와 같은 모양으로 새 범위 판본을 더하고 선정을 옮긴다. 이전 판본 행은 그대로다. */
 async function moveScope(repositoryId) {
-  await db.manager.insert(AllowedScopeRevision, { ...structuredClone(initial.scopes[0]), scopeRevision: NEXT_SCOPE });
-  await db.manager.update(RepositorySelection, { repositoryId }, { scopeRevision: NEXT_SCOPE });
+  await db.manager.insert(AllowedScopeRevision, { ...structuredClone(initial.scopes.find(scope => scope.scopeRevision === SCOPE)), scopeRevision: NEXT_SCOPE });
+  await db.manager.update(RepositoryRegistration, { repositoryId }, { scopeRevision: NEXT_SCOPE });
 }
 async function terminal(requestId, processing = 'FAILED', changes = {}) {
   const request = await db.manager.findOneByOrFail(AnalysisRequest, { requestId });
@@ -220,7 +242,7 @@ async function waitForMemberWaiters(blockerPid, expected) {
 for (const [label, overrides] of [['개발 로그인 켬', {}], ['DEV_LOGIN_ENABLED=false', { DEV_LOGIN_ENABLED: 'false' }],
   ['DEV_LOGIN_ENABLED 미지정', { DEV_LOGIN_ENABLED: undefined }], ['NODE_ENV=production', { NODE_ENV: 'production' }],
   ['NODE_ENV 미지정', { NODE_ENV: undefined }], ['NODE_ENV=preview', { NODE_ENV: 'preview' }]]) {
-  test('실제 공급: 목록 판본과 실제 고지로 두 선정 저장소를 LIVE 접수하고 동의 네 칸이 #252 공급값과 같다(' + label + ')', async t => {
+  test('실제 공급: 목록 판본과 실제 고지로 두 회원 등록 저장소를 LIVE 접수하고 동의 여섯 칸이 #252 공급값과 같다(' + label + ')', async t => {
     const s = await start(t, overrides);
     for (const repositoryId of [THEME, ZOO]) {
       const user = await s.real();
@@ -263,7 +285,7 @@ test('실제 공급: 저장 동의는 큐 보내기의 모양·저장소·판본
   const status = await accepted(await s.post(user));
   const row = await stored(status.requestId);
   // 저장 동의는 #252 접수 재확인이 같은 근거에서 주는 네 칸과 같다.
-  const confirmed = await db.transaction('READ COMMITTED', manager => s.selections.confirmForIntake(manager, user.memberId, THEME));
+  const confirmed = await db.transaction('READ COMMITTED', async manager => s.selections.confirmForIntake(manager, user.memberId, THEME, await s.selections.prepareForIntake(user.memberId, THEME)));
   assert.deepEqual(row.consented_scope, confirmed.consentedScope);
   const queue = new MemoryRequestQueue();
   const log = dispatchLog();
@@ -283,7 +305,7 @@ test('실제 공급: 저장 동의는 큐 보내기의 모양·저장소·판본
   const context = { attemptId: status.attemptId, requestId: status.requestId, memberId: user.memberId, repositoryId: THEME,
     consentId: status.consentId, noticeRevision: row.notice_revision, scopeRevision: row.scope_revision,
     consentedScope: row.consented_scope, sourceMode: 'LIVE' };
-  const source = new DatabaseRepositorySelectionSource();
+  const source = new RegistrationContextSource();
   const whole = { attemptId: status.attemptId, requestId: status.requestId, memberId: user.memberId, repositoryId: THEME,
     scopeRevision: SCOPE, repository: { owner: 'ljm0850', name: 'TheMe' }, wholeRepository: true };
   assert.deepEqual(await source.resolve(db.manager, context, { lock: null }), whole);
@@ -295,21 +317,22 @@ test('실제 공급: 저장 동의는 큐 보내기의 모양·저장소·판본
   }
 });
 
-test('실제 공급: 합성·이전 고지나 현재 선정과 다른 범위 판본의 동의는 403 CONSENT_REQUIRED이고 판본을 옮기면 새 판본만 받는다', async t => {
+test('실제 공급: 합성·이전 고지나 배포된 현재 범위와 다른 판본은 403 CONSENT_REQUIRED다', async t => {
   const s = await start(t);
   const user = await s.real();
   for (const changes of [{ accepted: false }, { noticeRevision: SYNTHETIC_NOTICE.noticeRevision },
-    { noticeRevision: 'catchu-real-analysis-notice-v0' }, { scopeRevision: SYNTHETIC_NOTICE.scopeRevision }, { scopeRevision: NEXT_SCOPE }]) {
+    { noticeRevision: 'catchu-real-analysis-notice-v1' }, { scopeRevision: SYNTHETIC_NOTICE.scopeRevision }, { scopeRevision: NEXT_SCOPE }]) {
     await error(await s.post(user, randomUUID(), command({ consent: consent(changes) })), 403, 'CONSENT_REQUIRED');
   }
   // 합성 저장소·합성 판본 본문은 실제 회원의 현재 선정 밖이다.
-  await error(await s.post(user, randomUUID(), synthetic()), 403, 'REPOSITORY_NOT_ALLOWED');
+  await error(await s.post(user, randomUUID(), synthetic()), 404, 'RESOURCE_UNAVAILABLE');
   assert.deepEqual(await counts(), NONE);
   await moveScope(THEME);
   await error(await s.post(user), 403, 'CONSENT_REQUIRED');
   assert.deepEqual(await counts(), NONE);
-  const status = await accepted(await s.post(user, randomUUID(), command({ consent: consent({ scopeRevision: NEXT_SCOPE }) })));
-  assert.deepEqual((await stored(status.requestId)).consented_scope, { ...supplied(THEME), revision: NEXT_SCOPE });
+  // DB에만 추가한 미배포 범위는 worker가 지원하지 않으므로 새 동의로도 접수하지 않는다.
+  await error(await s.post(user, randomUUID(), command({ consent: consent({ scopeRevision: NEXT_SCOPE }) })), 403, 'CONSENT_REQUIRED');
+  assert.deepEqual(await counts(), NONE);
 });
 
 test('대역(실제 고지 판본 제거): 현재 실제 고지가 없으면 합성 판본으로 대신하지 않고 403 CONSENT_REQUIRED', async t => {
@@ -340,7 +363,7 @@ test('실제 보관소: 만료·이용 불가 자격정보는 상태 갱신 뒤 
   for (let index = 0; index < 5; index++) {
     const user = await s.real(null);
     s.client.exchange = async () => ({ accountLogin: 'vault-user-' + index, externalAccountReference: String(5000 + index),
-      token: new GitHubAccessToken(TOKEN), expiresAt: new Date(Date.now() + 1800000) });
+      token: new GitHubAccessToken(TOKEN + '-vault-' + index), expiresAt: new Date(Date.now() + 1800000) });
     const authorization = await s.connections.authorize(user.memberId);
     await s.connections.connect(user.memberId, 'SYNTHETIC_CODE', authorization.state);
     users.push(user);
@@ -464,10 +487,10 @@ test('실제 공급: 현재 선정 목록 밖 저장소와 제외된 선정은 4
   const s = await start(t);
   const user = await s.real();
   for (const repositoryId of [SYNTHETIC_REPOSITORY.repositoryId, '999999999', 'TheMe']) {
-    await error(await s.post(user, randomUUID(), command({ repositoryId })), 403, 'REPOSITORY_NOT_ALLOWED');
+    await error(await s.post(user, randomUUID(), command({ repositoryId })), 404, 'RESOURCE_UNAVAILABLE');
   }
-  await db.manager.update(RepositorySelection, { repositoryId: THEME }, { active: false });
-  await error(await s.post(user), 403, 'REPOSITORY_NOT_ALLOWED');
+  await db.manager.delete(RepositoryRegistration, { memberId: user.memberId, repositoryId: THEME });
+  await error(await s.post(user), 404, 'RESOURCE_UNAVAILABLE');
   assert.deepEqual(await counts(), NONE);
   // 제외하지 않은 현재 선정은 그대로 받는다.
   await accepted(await s.post(user, randomUUID(), command({ repositoryId: ZOO })));
@@ -477,8 +500,10 @@ test('실제 공급·대역: 선정 공급 장애는 500이고 합성 자료·�
   const s = await start(t);
   const user = await s.real();
   // 실제 공급: 선정 행이 카탈로그에 없는 선정 참조를 가리킨다(선정 자료 불일치).
-  await db.manager.update(RepositorySelection, { repositoryId: THEME }, { selectionReference: 'catchu:selected-repository:missing-323:v1' });
+  const verify = s.metadata.verify;
+  s.metadata.verify = async () => { throw new Error('synthetic missing-323 metadata failure'); };
   const mismatch = await error(await s.post(user), 500, 'INTERNAL_ERROR');
+  s.metadata.verify = verify;
   // 대역: 같은 생성 트랜잭션 안에서 실제 PostgreSQL 오류를 낸다.
   s.selections.confirmForIntake = manager => manager.query('SELECT 1 FROM __synthetic_missing_table_323');
   const failed = await error(await s.post(user, randomUUID(), command({ repositoryId: ZOO })), 500, 'INTERNAL_ERROR');
@@ -488,11 +513,10 @@ test('실제 공급·대역: 선정 공급 장애는 500이고 합성 자료·�
   }
   assert.deepEqual(await counts(), NONE);
   delete s.selections.confirmForIntake;
-  await db.manager.update(RepositorySelection, { repositoryId: THEME }, { selectionReference: supplied(THEME).selectionReference });
   await accepted(await s.post(user));
 });
 
-for (const change of ['연결 해제', '재인증 필요', '고지 판본 변경', '범위 판본 변경', '선정 제외']) {
+for (const change of ['연결 해제', '재인증 필요', '고지 판본 변경', '범위 판본 변경', '공개 상태 변경']) {
   const kind = change === '고지 판본 변경' ? '대역(고지 판본 교체)' : '실제 공급';
   test(kind + ': 같은 키·같은 본문 재전송은 접수 뒤 ' + change + '에도 현재 상태를 주고 새 접수·실패 재요청에는 현재 조건을 적용한다', async t => {
     const s = await start(t);
@@ -509,12 +533,12 @@ for (const change of ['연결 해제', '재인증 필요', '고지 판본 변경
       code = 'GITHUB_CONNECTION_REQUIRED';
     } else if (change === '고지 판본 변경') {
       // 대역: 새 고지 판본 배포를 같은 서버의 판본 교체로 흉내 낸다.
-      s.notices.realNotice = { noticeRevision: 'catchu-real-analysis-notice-v2', text: '변경된 실제 고지' };
+      s.notices.realNotice = { noticeRevision: 'catchu-real-analysis-notice-v3', text: '변경된 실제 고지' };
     } else if (change === '범위 판본 변경') {
       await moveScope(THEME);
     } else {
-      await db.manager.update(RepositorySelection, { repositoryId: THEME }, { active: false });
-      code = 'REPOSITORY_NOT_ALLOWED';
+      s.metadata.verify = async () => { throw new ApiError('REPOSITORY_PRIVATE'); };
+      code = 'REPOSITORY_PRIVATE';
     }
     const before = await counts();
     const refreshes = s.refreshed.length;
@@ -543,11 +567,9 @@ test('대역(새 좌표 판본): 좌표 판본이 바뀐 뒤 실패 재요청은
   const renamed = { ...theme, name: 'renamed-fixture', url: 'https://github.com/' + theme.owner + '/renamed-fixture',
     selectionReference: 'catchu:selected-repository:test-323-renamed:570342307:v2' };
   // 이름 변경을 가정한 새 좌표 판본은 시험 카탈로그로 더한다. 선정 행의 참조 변경은 #252 갱신 절차와 같다.
-  s.selections.catalog = new SelectedRepositoryCatalog([...versions, renamed], [renamed.selectionReference,
-    ...versions.filter(version => version.repositoryId !== THEME).map(version => version.selectionReference)]);
-  await db.manager.update(RepositorySelection, { repositoryId: THEME }, { selectionReference: renamed.selectionReference });
+  await db.manager.update(RepositoryRegistration, { memberId: user.memberId, repositoryId: THEME }, { name: renamed.name, repositoryUrl: renamed.url });
   const next = await accepted(await s.post(user, randomUUID(), command({ retryOfRequestId: first.requestId })));
-  assert.deepEqual((await stored(next.requestId)).consented_scope, { ...supplied(THEME), selectionReference: renamed.selectionReference });
+  assert.deepEqual((await stored(next.requestId)).consented_scope, { ...supplied(THEME), repository: { owner: renamed.owner, name: renamed.name, url: renamed.url } });
   assert.deepEqual((await stored(first.requestId)).consented_scope, supplied(THEME));
 });
 
@@ -566,13 +588,13 @@ test('실제 공급: 원자 접수·현재 상태 재응답·같은 저장소 �
   assert.equal(active.status, 200); assert.deepEqual(await active.json(), first);
   assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 2 });
   for (const body of [command({ repositoryId: ZOO }), command({ retryOfRequestId: randomUUID() }),
-    command({ consent: consent({ noticeRevision: 'old' }) }), command({ consent: consent({ scopeRevision: 'old' }) })]) {
+    command({ consent: consent({ noticeRevision: 'catchu-real-analysis-notice-v1' }) }), command({ consent: consent({ scopeRevision: 'old' }) })]) {
     await error(await s.post(user, key, body), 409, 'IDEMPOTENCY_CONFLICT');
   }
   assert.deepEqual(await counts(), { requests: 1, consents: 1, attempts: 1, keys: 2 });
 });
 
-test('실제 공급: 동시 같은 키·다른 키에도 회원 ACTIVE는 하나이고 두 선정 저장소 동시 요청은 한 건 접수·한 건 409', async t => {
+test('실제 공급: 동시 같은 키·다른 키에도 회원 ACTIVE는 하나이고 두 회원 등록 저장소 동시 요청은 한 건 접수·한 건 409', async t => {
   const s = await start(t);
   const user = await s.real();
   const key = randomUUID();
@@ -593,7 +615,7 @@ test('실제 공급: 동시 같은 키·다른 키에도 회원 ACTIVE는 하나
   await accepted(await s.post(other, randomUUID(), command({ repositoryId: created.repositoryId === THEME ? ZOO : THEME })));
 });
 
-test('실제 공급: 확정 실패만 새 실제 동의·요청·시도로 재요청하고 정상 완료 뒤에는 재분석을 우회하지 못한다', async t => {
+test('실제 공급: 실패와 정상 완료 모두 최신 참조·새 실제 동의로 재분석하며 옛 요청은 재사용하지 못한다', async t => {
   const s = await start(t);
   const user = await s.real();
   const originalKey = randomUUID();
@@ -613,13 +635,14 @@ test('실제 공급: 확정 실패만 새 실제 동의·요청·시도로 재�
   assert.deepEqual((await (await s.post(user, originalKey)).json()).retry, { allowed: false, reason: 'IN_PROGRESS' });
   await terminal(next.requestId, 'EMPTY');
   assert.deepEqual((await (await s.post(user, originalKey)).json()).retry, { allowed: false, reason: 'REANALYSIS_DEFERRED' });
-  for (const retryOfRequestId of [undefined, first.requestId, next.requestId]) {
-    await error(await s.post(user, randomUUID(), command(retryOfRequestId ? { retryOfRequestId } : {})), 409, 'REANALYSIS_DEFERRED');
+  for (const retryOfRequestId of [undefined, first.requestId]) {
+    await error(await s.post(user, randomUUID(), command(retryOfRequestId ? { retryOfRequestId } : {})), 409, 'RETRY_NOT_ALLOWED');
   }
-  assert.deepEqual(await counts(), { requests: 2, consents: 2, attempts: 2, keys: 2 });
+  await accepted(await s.post(user, randomUUID(), command({ retryOfRequestId: next.requestId })));
+  assert.deepEqual(await counts(), { requests: 3, consents: 3, attempts: 3, keys: 3 });
 });
 
-test('실제 공급: 반영 실패로 닫히고 등록 Catch가 없으면 새 실제 동의로 재요청하고, 등록 Catch가 있으면 거부한다', async t => {
+test('실제 공급: 반영 실패로 닫힌 요청은 기존 Catch 유무와 무관하게 새 실제 동의로 재분석한다', async t => {
   const s = await start(t);
   const user = await s.real();
   const key = randomUUID();
@@ -633,25 +656,27 @@ test('실제 공급: 반영 실패로 닫히고 등록 Catch가 없으면 새 �
   const registered = await accepted(await s.post(other));
   await applyFailed(registered.requestId, { processing: 'SUCCEEDED', eligibleCandidateCount: 1 });
   await registerCatch(registered.requestId);
-  for (const body of [command(), command({ retryOfRequestId: registered.requestId })]) {
-    await error(await s.post(other, randomUUID(), body), 409, 'REANALYSIS_DEFERRED');
-  }
-  assert.deepEqual(await counts(), { requests: 3, consents: 3, attempts: 3, keys: 3 });
+  await error(await s.post(other, randomUUID(), command()), 409, 'RETRY_NOT_ALLOWED');
+  await accepted(await s.post(other, randomUUID(), command({ retryOfRequestId: registered.requestId })));
+  assert.deepEqual(await counts(), { requests: 4, consents: 4, attempts: 4, keys: 4 });
 });
 
-test('실제 공급: 정상 결과 뒤 재분석과 실행 불명·반영 미해결·근거 부족·유효 결과의 재요청을 거부한다', async t => {
+test('실제 공급: 닫힌 최신 요청은 결과 무관 재분석하고 복구 중만 거부한다', async t => {
   const s = await start(t);
-  for (const [processing, changes, code] of [['EMPTY', {}, 'REANALYSIS_DEFERRED'], ['SUCCEEDED', {}, 'REANALYSIS_DEFERRED'],
-    ['PARTIAL_FAILED', {}, 'REANALYSIS_DEFERRED'], ['FAILED', { failureConfirmationReference: null }, 'RETRY_NOT_ALLOWED'],
-    ['FAILED', { failures: [] }, 'RETRY_NOT_ALLOWED'], ['FAILED', { processing: 'UNCERTAIN' }, 'RETRY_NOT_ALLOWED'],
-    ['FAILED', { application: 'RECOVERING' }, 'RETRY_NOT_ALLOWED'], ['FAILED', { eligibleCandidateCount: 1 }, 'REANALYSIS_DEFERRED'],
-    ['FAILED', { ownerResultsReady: true }, 'REANALYSIS_DEFERRED']]) {
+  for (const [processing, changes] of [['EMPTY', {}], ['SUCCEEDED', {}],
+    ['PARTIAL_FAILED', {}], ['FAILED', { failureConfirmationReference: null }],
+    ['FAILED', { failures: [] }], ['FAILED', { processing: 'UNCERTAIN' }],
+    ['FAILED', { application: 'RECOVERING' }], ['FAILED', { eligibleCandidateCount: 1 }],
+    ['FAILED', { ownerResultsReady: true }]]) {
     const user = await s.real();
     const first = await accepted(await s.post(user));
     await terminal(first.requestId, processing, changes);
-    const bodies = processing === 'FAILED' ? [command({ retryOfRequestId: first.requestId })] : [command(), command({ retryOfRequestId: first.requestId })];
-    for (const body of bodies) await error(await s.post(user, randomUUID(), body), 409, code);
-    assert.equal(await db.manager.countBy(AnalysisRequest, { memberId: user.memberId }), 1, JSON.stringify([processing, changes]));
+    await error(await s.post(user, randomUUID(), command()), 409, 'RETRY_NOT_ALLOWED');
+    const response = await s.post(user, randomUUID(), command({ retryOfRequestId: first.requestId }));
+    if (changes.application === 'RECOVERING') await error(response, 409, 'RETRY_NOT_ALLOWED');
+    else await accepted(response);
+    assert.equal(await db.manager.countBy(AnalysisRequest, { memberId: user.memberId }), changes.application === 'RECOVERING' ? 1 : 2,
+      JSON.stringify([processing, changes]));
   }
 });
 

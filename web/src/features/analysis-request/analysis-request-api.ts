@@ -21,7 +21,7 @@ export type AnalysisNotice = { noticeRevision: string; text: string };
 
 /**
  * 동의와 요청을 한 번에 보내는 본문(AnalysisCreate). 같은 키에는 같은 본문만 보낸다.
- * 첫 요청은 retryOfRequestId를 넣지 않는다. 실패 재요청은 「연결된 저장소」의 최신 요청 ID를 넣고 새 동의·새 키로 보낸다.
+ * 첫 요청은 retryOfRequestId를 넣지 않는다. 재분석은 「연결된 저장소」의 최신 요청 ID를 넣고 새 동의·새 키로 보낸다.
  */
 export type AnalysisCreateBody = {
   repositoryId: string;
@@ -39,7 +39,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isId = (value: unknown): value is string => typeof value === "string" && value.length > 0;
 
 const FAILURE_STAGES = ["COLLECTION", "ANALYSIS", "DRAFT", "REFLECTION", "APPLICATION", "DISPATCH"] as const;
-const RETRY_REASONS = ["FAILURE_WITHOUT_RESULTS", "IN_PROGRESS", "RESULTS_EXIST", "NOT_FAILED", "EXECUTION_UNCERTAIN", "APPLICATION_UNRESOLVED", "REANALYSIS_DEFERRED"] as const;
+const RETRY_REASONS = ["FAILURE_WITHOUT_RESULTS", "ANALYSIS_FINISHED", "IN_PROGRESS", "RESULTS_EXIST", "NOT_FAILED", "EXECUTION_UNCERTAIN", "APPLICATION_UNRESOLVED", "REANALYSIS_DEFERRED"] as const;
 const oneOf = (values: readonly string[], value: unknown): boolean => typeof value === "string" && values.includes(value);
 
 /** date-time에는 시각·시간대가 필요하다. Date.parse가 보정하는 2월 30일 등도 받지 않는다. */

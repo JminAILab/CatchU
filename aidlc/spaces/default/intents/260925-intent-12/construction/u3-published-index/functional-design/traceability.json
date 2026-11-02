@@ -1,0 +1,48 @@
+{
+  "stage": "functional-design",
+  "unit": "u3-published-index",
+  "upstream_ids": [
+    "AC4.1.1", "AC4.1.2", "AC4.1.3", "AC4.1.4", "AC4.1.5", "AC4.1.6", "AC4.1.7", "AC4.1.8", "AC4.1.9",
+    "AC6.2.1", "AC6.2.2", "AC6.2.3", "AC6.2.4", "AC6.2.5", "AC6.2.6", "AC6.2.7", "AC6.2.8"
+  ],
+  "coverage": [
+    { "id": "AC4.1.1", "status": "OK", "target": "BR1.1, BR1.2, BR1.3, BR1.7, BR1.9" },
+    { "id": "AC4.1.2", "status": "N/A", "target": "delivered by u4-publication-link (비공개 Catch 공개 전환 안내)" },
+    { "id": "AC4.1.3", "status": "N/A", "target": "delivered by u4-publication-link (뺀 Catch의 공개 상태 유지)" },
+    { "id": "AC4.1.4", "status": "N/A", "target": "delivered by u4-publication-link (발행 불가 Catch와 이유 안내)" },
+    { "id": "AC4.1.5", "status": "N/A", "target": "delivered by u4-publication-link (불일치 표시 Catch 발행)" },
+    { "id": "AC4.1.6", "status": "N/A", "target": "delivered by u4-publication-link (발행 전 선택·순서·접근 조건 안내)" },
+    { "id": "AC4.1.7", "status": "N/A", "target": "delivered by u4-publication-link (발행 후 확인)" },
+    { "id": "AC4.1.8", "status": "OK", "target": "BR1.7" },
+    { "id": "AC4.1.9", "status": "N/A", "target": "delivered by u4-publication-link (권한·선택·크기 재확인)" },
+    { "id": "AC6.2.1", "status": "OK", "target": "BR2.3, BR2.4, BR5.1, BR5.2, BR5.3, BR5.4" },
+    { "id": "AC6.2.2", "status": "N/A", "target": "delivered by u5-rag-answer (SSE 항목 전달)" },
+    { "id": "AC6.2.3", "status": "OK", "target": "BR1.1, BR1.5, BR5.2" },
+    { "id": "AC6.2.4", "status": "N/A", "target": "delivered by u5-rag-answer and u4-publication-link (질문마다 링크 조건 판정, C-10)" },
+    { "id": "AC6.2.5", "status": "N/A", "target": "delivered by u5-rag-answer (서버에 대화 저장 없음)" },
+    { "id": "AC6.2.6", "status": "N/A", "target": "delivered by u5-rag-answer (대화 턴·길이 상한)" },
+    { "id": "AC6.2.7", "status": "OK", "target": "BR5.2" },
+    { "id": "AC6.2.8", "status": "N/A", "target": "delivered by u5-rag-answer (링크당 하루 질문 횟수)" }
+  ],
+  "reverse": [
+    { "id": "BR1.4", "status": "N/A", "target": "Q1 조각 규칙(앞뒤 공백 제외), C-07 chunk-text" },
+    { "id": "BR1.6", "status": "N/A", "target": "C-07 sourceKind-rule, FR6.5 출처 표시" },
+    { "id": "BR1.8", "status": "N/A", "target": "C-02 row-creation, C-08, Q3 처리 시한 10분" },
+    { "id": "BR1.10", "status": "N/A", "target": "C-09 ChunkHit.catchEvidenceUrls, C-07 읽기 범위(발행 트랜잭션 안에서만 발행본 표를 읽음)" },
+    { "id": "BR2.1", "status": "N/A", "target": "C-02 late-result, FR14.10 늦은 결과 버림" },
+    { "id": "BR2.2", "status": "N/A", "target": "요약 확인에서 정한 단순한 안(조각 0개 발행본)" },
+    { "id": "BR2.5", "status": "N/A", "target": "FR6.8 자동 재시도 없음, ADR-007, 에러 대응 최소선 1·2" },
+    { "id": "BR2.6", "status": "N/A", "target": "에러 대응 최소선 6(겹침 한계)" },
+    { "id": "BR3.1", "status": "N/A", "target": "C-02 readStatus, FR6.8 처리 시한, ADR-005" },
+    { "id": "BR3.2", "status": "N/A", "target": "C-02 '대기'에 영원히 남지 않음" },
+    { "id": "BR3.3", "status": "N/A", "target": "C-02 status-names" },
+    { "id": "BR4.1", "status": "N/A", "target": "ADR-007 [검색 다시 준비](요구사항 밖 팀장 결정), C-08 requestReindex" },
+    { "id": "BR4.2", "status": "N/A", "target": "ADR-007, C-02 runKey, C-03(하루 제한에 세지 않음)" },
+    { "id": "BR5.5", "status": "N/A", "target": "C-09 search(limit), 요구사항 개발 담당 결정(상한 값)" },
+    { "id": "BR5.6", "status": "N/A", "target": "에러 대응 최소선 1(빈 질문의 불필요한 외부 호출 없음)" },
+    { "id": "BR5.7", "status": "N/A", "target": "C-09 publicationText, C-01 check-scope" },
+    { "id": "BR5.8", "status": "N/A", "target": "C-09 ChunkHit.catchEvidenceUrls, C-01 AiSource" },
+    { "id": "BR6.1", "status": "N/A", "target": "C07 합성 제공자, api/.env.example CATCHU_EMBEDDING_API_KEY(#389), team.md Walking Skeleton" },
+    { "id": "BR6.2", "status": "N/A", "target": "team.md Code Style(비밀값·사용자 자료를 로그에 남기지 않음), NFR1, NFR2" }
+  ]
+}

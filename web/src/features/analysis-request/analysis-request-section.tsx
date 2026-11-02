@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { routes } from "@/lib/routes";
 import type { AnalyzableRepository } from "../repository-management/repository-api";
+import type { RepositoryRegistrationStore } from "../repository-management/repository-registration-store";
+import { RepositoryRegistrationForm } from "../repository-management/repository-registration-form";
 import { repositoryDisplayName } from "../repository-management/repository-status";
 import type { AnalysisRequestStore, Load, RequestSnapshot, RetryTarget } from "./analysis-request-store";
 import styles from "./analysis-request.module.css";
@@ -23,7 +25,7 @@ export type ConnectionNotice = "DISCONNECTED" | "REAUTH_REQUIRED" | "CHECKING";
  * `connectionNotice`가 있으면 입력 단계에서 저장소 선택·고지·[동의하고 분석 요청] 대신 재연동 안내를 보인다.
  * 이미 보낸 요청(요청 중·응답 불명·빈도 제한)의 표시와 [같은 요청 다시 보내기], 결과 안내는 그대로다.
  */
-export function AnalysisRequestSection({ store, connectionNotice }: { store: AnalysisRequestStore; connectionNotice?: ConnectionNotice }) {
+export function AnalysisRequestSection({ store, connectionNotice, registration }: { store: AnalysisRequestStore; connectionNotice?: ConnectionNotice; registration?: RepositoryRegistrationStore }) {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const baseId = useId();
   const { repositories, notice, selectedId, phase, retryAt, pendingRepositoryId, pendingRetry, message } = snapshot;
@@ -48,6 +50,7 @@ export function AnalysisRequestSection({ store, connectionNotice }: { store: Ana
       {blockedNotice ? (
         <ConnectionRequired notice={blockedNotice} linked={message?.action === "github"} />
       ) : (<>
+      {registration && <RepositoryRegistrationForm store={registration} disabled={!editing} />}
       <RepositoryChoices repositories={repositories} selectedId={selectedId} disabled={!editing}
         name={`${baseId}-repository`} onSelect={(id) => store.select(id)} onRetry={() => { void store.loadRepositories(); }} />
 
@@ -58,7 +61,7 @@ export function AnalysisRequestSection({ store, connectionNotice }: { store: Ana
 
       {editing && selected && notice.state === "ready" && (
         <p className={styles.muted}>
-          선택한 저장소: {repositoryDisplayName(selected)} · 허용 범위 판본 {selected.allowedScopeRevision}
+          분석할 저장소: {repositoryDisplayName(selected)}
         </p>
       )}
 
@@ -250,7 +253,7 @@ function RepositoryChoices({ repositories, selectedId, disabled, name, onSelect,
   if (repositories.value.length === 0) return <p className={styles.muted}>지금 분석을 요청할 수 있는 저장소가 없습니다.</p>;
   return (
     <fieldset className={styles.choices} disabled={disabled}>
-      <legend>분석할 저장소</legend>
+      <legend>등록한 저장소에서 분석 대상 선택</legend>
       {repositories.value.map((item) => (
         <label key={item.repositoryId} className={styles.choice}>
           <input type="radio" name={name} value={item.repositoryId} checked={selectedId === item.repositoryId}

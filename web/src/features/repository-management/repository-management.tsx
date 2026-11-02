@@ -1,14 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { ReauthNotice } from "@/components/auth/reauth-notice";
+import { useAuth } from "@/components/auth/use-auth";
 import { createAnalysisRequestApi, type AnalysisRequestApi } from "@/features/analysis-request/analysis-request-api";
 import { AnalysisRequestSection, RetryRequest } from "@/features/analysis-request/analysis-request-section";
 import { createAnalysisRequestStore } from "@/features/analysis-request/analysis-request-store";
 import type { RepositoryManagementBindings } from "@/features/assets/assets-connected";
 import { api as client } from "@/lib/api";
+import { decideAuthGate } from "@/lib/auth-gate";
+import { authSessionIntegrationEnabled } from "@/lib/auth-integration";
+import { safeNextPath } from "@/lib/member-navigation";
 import { routes } from "@/lib/routes";
+import { unsavedChanges } from "@/lib/unsaved-changes";
 import { loadConnectedRepositories, type GitHubState, type RepositoryApi } from "./repository-api";
+import { createRepositoryRegistrationStore } from "./repository-registration-store";
 import {
   canShowCatches, connectedRepositories, connectionCheckView, requestConnectionNotice, showsPendingRequestEntry, STATUS_LABEL, statusDetails, statusIcon,
   type ConnectedRepository, type ConnectionCheckView, type StatusIcon,
@@ -138,6 +146,15 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
     requests: requestApi ?? memberRequestApi,
   }) : null);
   useEffect(() => () => requestStore?.dispose(), [requestStore]);
+  const [registrationStore] = useState(() => requestStore ? createRepositoryRegistrationStore(api.register, async (repositoryId, signal) => {
+    await requestStore.load(); if (!signal.aborted) requestStore.select(repositoryId);
+  }, () => requestStore.select(null)) : null);
+  useEffect(() => () => registrationStore?.dispose(), [registrationStore]);
+  // 미확정 요청이 남아 있으면 로그아웃·다시 로그인 확인(#287)에 알린다(O-3). 모달 열림과 상관없이 요청 상태가 살아 있는 동안 등록하고,
+  // 판정은 확인하는 순간 상태 객체를 읽는다. 이 컴포넌트가 내려가면 풀린다. 문구·확인 창은 #287 확인 흐름이 정한다.
+  useEffect(() => (requestStore
+    ? unsavedChanges.register(() => requestStore.holdsUnconfirmedRequest(), "unconfirmed-analysis-request")
+    : undefined), [requestStore]);
   // 확인하지 못한 요청이 남았는지는 #154 상태 객체의 phase만 읽는다(상태 복제·영속 보관 없음).
   // 연동 상태가 연결 해제 등으로 바뀌어 [연결 관리]가 사라져도 그 요청의 결과를 확인하러 모달을 다시 열 수 있게 한다.
   const requestPhase = useSyncExternalStore(requestStore?.subscribe ?? noSubscription,
@@ -163,6 +180,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
   // 요청 중·응답 불명·빈도 제한이면 읽지 않고(#154 규칙), 입력 단계로 돌아온 뒤 읽는다.
   const requestLoadedFor = useRef<GitHubState | null>(null);
   const connection = github.state === "ready" ? github.value : null;
+  useEffect(() => { if (connection !== "CONNECTED") registrationStore?.cancel(); }, [connection, registrationStore]);
   useEffect(() => {
     if (!requestStore || connection === null || requestLoadedFor.current === connection) return;
     if (open && requestPhase === "editing") {
@@ -207,6 +225,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
   /** 일반 닫기(닫기 버튼·X·Esc·바깥 클릭). B가 현재 필터로 목록을 다시 불러온다. */
   function closeModal() {
     if (!open) return;
+    registrationStore?.cancel();
     stopLoading();
     setOpen(false);
     bindings.onClosed();
@@ -214,6 +233,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
 
   /** [이 저장소 Catch 보기]. 모달을 닫고 onShowRepository만 부른다(onClosed 중복 호출 없음). */
   function showRepository(repositoryId: string) {
+    registrationStore?.cancel();
     stopLoading();
     setOpen(false);
     bindings.onShowRepository(repositoryId);
@@ -274,6 +294,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
               <h2 id={`${titleId}-dialog`}>GitHub 저장소 연결 관리</h2>
               <button type="button" className={styles.closeIcon} aria-label="닫기" onClick={closeModal}>×</button>
             </header>
+            {authSessionIntegrationEnabled && <ModalReauthNotice />}
 
             <section className={styles.block} aria-labelledby={`${titleId}-connected`}>
               <div className={styles.blockHeading}>
@@ -292,8 +313,8 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
             </section>
 
             <section className={styles.block} aria-labelledby={`${titleId}-connect`}>
-              <h3 id={`${titleId}-connect`}>연결할 수 있는 저장소</h3>
-              {requestStore ? <AnalysisRequestSection store={requestStore} connectionNotice={connectionNotice} /> : connectSection}
+              <h3 id={`${titleId}-connect`}>저장소 등록과 분석 요청</h3>
+              {requestStore ? <AnalysisRequestSection store={requestStore} connectionNotice={connectionNotice} registration={registrationStore ?? undefined} /> : connectSection}
             </section>
 
             <footer className={styles.panelFooter}>
@@ -304,6 +325,20 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
       </dialog>
     </section>
   );
+}
+
+/**
+ * 모달 안 재인증 안내(O-4). 모달(`showModal()`)이 열리면 바깥 내용은 조작할 수 없어, 가드가 그린 바깥 [다시 로그인]에 닿지 못한다.
+ * CatchU 회원 세션의 재인증 필요(#286 `decideAuthGate`)일 때만 #287 `ReauthNotice`를 그대로 그린다(GitHub 재연동과 다른 판정).
+ * 확인은 같은 `confirmReauthLeave`, 이동은 같은 `loginPath`를 지나며 로그아웃·갱신 요청을 보내지 않는다.
+ * 공통 인증 상태는 통합 시험 전환이 켜졌을 때만 쓰므로 전환을 끄면 그리지 않는다. 다른 탭 새 로그인(`relogin-only`)은 가드가 화면을 정리한다.
+ */
+function ModalReauthNotice() {
+  const auth = useAuth();
+  const pathname = usePathname();
+  const gate = decideAuthGate(auth, null);
+  if (gate.action !== "show" || !gate.reauth) return null;
+  return <ReauthNotice returnTo={safeNextPath(pathname)} />;
 }
 
 function AreaMessage({ github }: { github: Load<GitHubState> }) {
@@ -364,7 +399,7 @@ function ConnectedList({ connected, expanded, titleId, onToggle, onShowRepositor
                 {statusDetails(item.latest).map((line) => <p key={line}>{line}</p>)}
                 <p className={styles.muted}>마지막 갱신 {formatTime(item.latest.updatedAt)}</p>
                 {item.displayName === null && (
-                  <p className={styles.muted}>선정 목록에서 이 저장소의 이름을 찾지 못해 식별자로 표시합니다.</p>
+                  <p className={styles.muted}>등록 목록에서 이 저장소의 이름을 찾지 못해 식별자로 표시합니다.</p>
                 )}
                 {item.latest.retryAllowed && renderRetry?.(item.latest)}
                 {canShowCatches(item.latest) && (

@@ -1,4 +1,4 @@
-// worker-messages.yaml v1의 전송 자료와 수신 내부 자료. HTTP 계약이 아니다.
+// worker-messages.yaml v2의 전송 자료와 수신 내부 자료. HTTP 계약이 아니다.
 export type ProcessingState = 'QUEUED' | 'RUNNING' | 'UNCERTAIN' |
   'SUCCEEDED' | 'EMPTY' | 'PARTIAL_FAILED' | 'FAILED';
 export type ApplicationState = 'NOT_READY' | 'PENDING' | 'APPLYING' |
@@ -16,7 +16,7 @@ export interface RequestContext {
 }
 
 export interface ProcessingEvent {
-  schemaVersion: '1';
+  schemaVersion: '2';
   messageId: string;
   requestId: string;
   attemptId: string;
@@ -49,8 +49,14 @@ export interface Candidate {
   reflection: { status: 'GENERATED' | 'FAILED' | 'NOT_GENERATED'; questions: string[] };
 }
 
-export interface Result extends RequestContext {
-  schemaVersion: '1';
+export interface CommitObservation {
+  ownCommitObservation: 'UNKNOWN' | 'NONE' | 'FOUND';
+  observedOwnCommitCount: number | null;
+  collectionLimitNotes: string[];
+}
+
+export interface Result extends RequestContext, CommitObservation {
+  schemaVersion: '2';
   messageId: string;
   resultId: string;
   outcome: Outcome;
@@ -67,7 +73,7 @@ export interface Result extends RequestContext {
 
 export type ReceiptIds = Pick<Result, 'resultId' | 'requestId' | 'attemptId'>;
 export type RejectionCode = 'CONTEXT_MISMATCH' | 'STALE_ATTEMPT' | 'PAYLOAD_CONFLICT' | 'SCHEMA_INVALID';
-export type ResultReceipt = ReceiptIds & { schemaVersion: '1'; messageId: string } & (
+export type ResultReceipt = ReceiptIds & { schemaVersion: '2'; messageId: string } & (
   { disposition: 'ACCEPTED'; code: 'OK' } |
   { disposition: 'DUPLICATE'; code: 'ALREADY_RECEIVED' } |
   { disposition: 'REJECTED'; code: RejectionCode }
@@ -99,7 +105,7 @@ export interface AttemptSnapshot {
 export interface ReceiverTransaction {
   readonly snapshot: AttemptSnapshot | null;
   saveObservation(event: ProcessingEvent, processing: ProcessingState): Promise<void>;
-  saveResult(metadata: ResultMetadata, state: {
+  saveResult(metadata: ResultMetadata, state: CommitObservation & {
     processing: Outcome;
     application: 'PENDING';
     eligibleCandidateCount: number;

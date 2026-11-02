@@ -156,6 +156,12 @@ export function statusDetails(status: AnalysisSummary): string[] {
     lines.push(...parts.map((failure) => `실패한 부분: ${failure.message}`));
   }
   if (status.retryAllowed) lines.push("새로 동의하고 다시 요청할 수 있습니다.");
+  if (["SUCCEEDED", "EMPTY", "PARTIAL_FAILED", "FAILED"].includes(status.processing)) {
+    if (status.ownCommitObservation === "NONE") lines.push("확인한 범위에서 본인 기록이 없습니다. GitHub 계정에 연결되지 않은 메일로 쓴 커밋은 본인 기록으로 세지 않습니다.");
+    else if (status.ownCommitObservation === "UNKNOWN") lines.push("본인 커밋 유무를 끝까지 확인하지 못했습니다. 본인 기록이 없다는 뜻은 아닙니다.");
+    else if (status.ownCommitObservation === "FOUND") lines.push("연결한 GitHub 계정의 본인 커밋을 확인했습니다.");
+    lines.push(...(status.collectionLimitNotes ?? []).map(note => `수집 한계: ${note}`));
+  }
   return lines;
 }
 

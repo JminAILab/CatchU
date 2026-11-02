@@ -16,6 +16,7 @@ const analysis = {
   submittedAt: '2026-09-30T01:00:00Z', updatedAt: '2026-09-30T01:05:00Z', requestState: 'ACCEPTED', lifecycle: 'ACTIVE',
   processing: 'SUCCEEDED', application: 'APPLIED', sourceMode: 'MOCK', eligibleCandidateCount: 1, registeredCatchIds: ['cat-1'],
   ownerResultsReady: true, retry: { allowed: false, reason: 'NOT_FAILED' }, failures: [],
+  ownCommitObservation: 'UNKNOWN', observedOwnCommitCount: null, collectionLimitNotes: [],
 };
 const required = () => apiError(403, 'GITHUB_CONNECTION_REQUIRED');
 

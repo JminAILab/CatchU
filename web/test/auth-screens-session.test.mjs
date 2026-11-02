@@ -316,19 +316,49 @@ test('재인증 [다시 로그인]: 이동을 시작하지 못한 예상 밖 예
   assert.deepEqual(navigated, ['/links']);
 });
 
-test('이동 전 확인 문구: 입력만이면 기존 문구 그대로이고, 분석 요청이 들면 요청 확인 정보가 사라지지만 이미 보낸 요청은 취소되지 않는다고 알린다', () => {
-  assert.equal(M.logoutUnsavedConfirm, '저장하지 않은 입력이 있습니다. 로그아웃하면 입력한 내용이 사라집니다. 로그아웃하시겠습니까?');
-  assert.equal(M.reauthUnsavedConfirm, '다시 로그인하면 입력하던 내용이 사라질 수 있습니다. 로그인 화면으로 이동하시겠습니까?');
-  for (const message of [M.logoutRequestConfirm, M.logoutUnsavedRequestConfirm, M.reauthRequestConfirm, M.reauthUnsavedRequestConfirm]) {
-    assert.ok(message.includes('이 화면의 요청 확인 정보가 사라집니다.'), message);
-    assert.ok(message.includes('이미 보낸 분석 요청은 취소되지 않습니다.'), message);
+test('이동 전 확인 문구: 사라지는 것 → 이미 보낸 분석 요청은 취소되지 않음(분석 요청이 들 때) → 빈 줄 뒤 확인 질문 순서다', () => {
+  for (const { reasons, logout, reauth } of LEAVE_CASES.slice(1)) {
+    const hasRequest = reasons.includes(REQUEST);
+    for (const [message, question] of [[logout, '로그아웃하시겠습니까?'], [reauth, '로그인 화면으로 이동하시겠습니까?']]) {
+      const [body, asked, ...rest] = message.split('\n\n');
+      assert.deepEqual([asked, rest], [question, []], message);
+      const lines = body.split('\n');
+      assert.ok(lines[0].endsWith('사라집니다.'), message);
+      assert.equal(lines[0].includes('저장하지 않은 입력'), reasons.includes(INPUT), message);
+      assert.equal(lines[0].includes('이 화면의 분석 요청 확인 정보'), hasRequest, message);
+      assert.deepEqual(lines.slice(1), hasRequest ? ['이미 보낸 분석 요청은 취소되지 않습니다.'] : [], message);
+    }
   }
-  for (const message of [M.logoutUnsavedRequestConfirm, M.reauthUnsavedRequestConfirm]) assert.ok(message.includes('저장하지 않은 입력'), message);
 });
 
-test('안내 문구: 합의 문구를 그대로 쓰고 code·state·토큰 같은 값을 담지 않는다', () => {
-  assert.equal(M.logoutUnknownRetry, '로그아웃이 완료됐는지 확인하지 못했습니다. 다시 시도해 주세요.');
-  assert.equal(M.googleUnavailable, '지금은 Google 로그인을 사용할 수 없습니다.');
+/** #251 기록의 합의 문구(D 검토안의 「수정 제안」, 「유지」는 그 전 문구). 검토 표의 `<br>`은 `\n`이다. */
+const AGREED_MESSAGES = {
+  logoutUnknownRetry: '로그아웃이 완료됐는지 확인하지 못했습니다. 다시 시도해 주세요.',
+  logoutUnknown: '로그아웃이 완료됐는지 확인하지 못했습니다.',
+  googleUnavailable: '지금은 Google 로그인을 사용할 수 없습니다.',
+  googleCancelled: 'Google 로그인을 취소했습니다.',
+  startLoginFailed: '로그인하지 못했습니다. 다시 시도해 주세요.',
+  callbackLoginFailed: '로그인하지 못했습니다. 다시 로그인해 주세요.',
+  startNetworkFailed: '네트워크 연결을 확인한 뒤 다시 시도해 주세요.',
+  callbackNetworkFailed: '네트워크 연결을 확인한 뒤 다시 로그인해 주세요.',
+  reauthRequired: '로그인 상태를 확인할 수 없습니다. 다시 로그인해 주세요.',
+  logoutFailedRetry: '로그아웃하지 못했습니다. 다시 시도해 주세요.',
+  logoutFailed: '로그아웃하지 못했습니다.',
+  callbackAlreadySent: '로그인 결과를 확인하지 못했습니다. 다시 로그인해 주세요.',
+  callbackAttemptUnverified: '로그인 정보를 확인할 수 없습니다. 다시 로그인해 주세요.',
+  callbackChecking: 'Google 로그인을 확인하고 있습니다.',
+  googleStarting: 'Google로 이동하는 중',
+  logoutPending: '로그아웃하는 중',
+  logoutUnsavedConfirm: '저장하지 않은 입력이 사라집니다.\n\n로그아웃하시겠습니까?',
+  logoutRequestConfirm: '이 화면의 분석 요청 확인 정보가 사라집니다.\n이미 보낸 분석 요청은 취소되지 않습니다.\n\n로그아웃하시겠습니까?',
+  logoutUnsavedRequestConfirm: '저장하지 않은 입력과 이 화면의 분석 요청 확인 정보가 사라집니다.\n이미 보낸 분석 요청은 취소되지 않습니다.\n\n로그아웃하시겠습니까?',
+  reauthUnsavedConfirm: '저장하지 않은 입력이 사라집니다.\n\n로그인 화면으로 이동하시겠습니까?',
+  reauthRequestConfirm: '이 화면의 분석 요청 확인 정보가 사라집니다.\n이미 보낸 분석 요청은 취소되지 않습니다.\n\n로그인 화면으로 이동하시겠습니까?',
+  reauthUnsavedRequestConfirm: '저장하지 않은 입력과 이 화면의 분석 요청 확인 정보가 사라집니다.\n이미 보낸 분석 요청은 취소되지 않습니다.\n\n로그인 화면으로 이동하시겠습니까?',
+};
+
+test('안내 문구: #251 기록의 합의 문구를 글자 그대로 쓰고 code·state·토큰 같은 값을 담지 않는다', () => {
+  assert.deepEqual({ ...M }, AGREED_MESSAGES);
   assert.equal(logoutNotice('done', true), null);
   for (const message of Object.values(M)) {
     assert.equal(typeof message, 'string');
@@ -350,7 +380,8 @@ const hooks = registerHooks({
     return nextResolve(specifier, context);
   },
   load(url, context, nextLoad) {
-    if (url === noticeCssUrl.href) return { format: 'module', shortCircuit: true, source: 'export default {};' };
+    // CSS 모듈 대역: 클래스 이름을 그대로 돌려줘 그려진 class를 확인할 수 있게 한다.
+    if (url === noticeCssUrl.href) return { format: 'module', shortCircuit: true, source: 'export default new Proxy({}, { get: (_, name) => name });' };
     if (url !== noticeUrl.href) return nextLoad(url, context);
     return {
       format: 'module', shortCircuit: true,
@@ -433,4 +464,26 @@ test('화면 [다시 로그인]: 묻지 않는 경우(사유 없음·login-chang
       assert.deepEqual(navigation.pushed, ['/login?next=%2Flinks'], `${variant}: 이동은 한 번`);
     });
   }
+});
+
+test('화면 재인증 안내 위치: 스크롤 영역 위쪽에 붙고, 안내를 담은 모달이 열리면 바깥 안내를 숨긴다(#286 10/29 확인 필요 2)', () => {
+  // 브라우저의 실제 배치·초점·낭독은 PR의 브라우저 확인으로 본다. 여기서는 그 배치를 만드는 class와 규칙이 남아 있는지만 본다.
+  const { html } = renderNotice({ returnTo: '/links' }, []);
+  assert.match(html, /class="notice reauthNotice" role="alert"/);
+  const css = readFileSync(noticeCssUrl, 'utf8');
+  const rule = css.match(/\n\.reauthNotice \{([^}]*)\}/)?.[1] ?? '';
+  assert.match(rule, /position: sticky;/, '문서·모달 스크롤 영역 위쪽에 붙는다');
+  assert.match(rule, /top: 0;/, '스크롤 영역 경계에 바로 붙어 뒤 내용이 틈으로 비치지 않는다');
+  assert.match(rule, /margin-bottom: 8px;/, '맨 위에서는 아래 여백이 그림자를 받아 헤더에 걸치지 않는다');
+  assert.doesNotMatch(rule, /position: fixed/, '흐름 밖으로 빼서 헤더·입력을 덮지 않는다');
+  const narrow = css.match(/@media \(width < 760px\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
+  assert.match(narrow, /\.reauthNotice \{\s*justify-content: flex-start;\s*gap: 8px;\s*padding-left: 12px;\s*\}/,
+    '760px 미만에서만 [다시 로그인]을 문구 바로 뒤에 두고 오른쪽 끝을 당긴다(#437 리뷰 안 A·500px 보완)');
+  assert.match(narrow, /\.reauthNotice \.noticeAction \{\s*padding-inline: 10px;\s*\}/, '버튼 좌우 여백은 760px 미만의 재인증 안내에서만 줄인다');
+  assert.doesNotMatch(narrow, /padding-(top|bottom)|height/, '안내 높이는 바꾸지 않는다');
+  assert.doesNotMatch(rule, /justify-content|gap|padding/, '760px 이상은 공용 .notice의 배치·여백 그대로다');
+  assert.match(css, /:root:has\(\.reauthNotice:not\(dialog \.reauthNotice\)\),\s*dialog:has\(\.reauthNotice\) \{\s*overflow-anchor: none;/,
+    '안내가 나타날 때 화면을 안내 높이만큼 내려 위쪽 입력을 안내 밑으로 넣지 않는다');
+  assert.match(css, /:root:has\(dialog\[open\] \.reauthNotice\) \.reauthNotice:not\(dialog \.reauthNotice\) \{\s*visibility: hidden;/,
+    '모달 안 안내가 있으면 바깥 안내는 보이지도 읽히지도 않는다');
 });

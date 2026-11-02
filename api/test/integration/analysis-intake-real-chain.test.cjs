@@ -11,6 +11,7 @@ const { configureApp } = require('../../dist/app.setup');
 const { SessionService } = require('../../dist/auth/session.service');
 const { GitHubConnectionService } = require('../../dist/github-connection/github-connection.service');
 const { GitHubClient, GitHubAccessToken } = require('../../dist/github-connection/github.client');
+const { GitHubRepositoryClient } = require('../../dist/member-repositories/github-repository.client');
 const { MemberAccount } = require('../../dist/member-analysis/member-analysis.entity');
 const { REAL_NOTICE } = require('../../dist/analysis-intake/analysis-notice');
 const { AnalysisRequestDispatcher } = require('../../dist/analysis-queue/analysis-request.dispatcher');
@@ -18,12 +19,11 @@ const { WorkerMessageValidator } = require('../../dist/analysis-receiver/worker-
 const { SelectedRepositoryCatalog } = require('../../dist/member-repositories/selected-repository-catalog');
 const { CONTRACT_DIR, MemoryRequestQueue, dispatchLog } = require('../helpers/queue-harness.cjs');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
-const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
+const { readCurrentSelection: readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 
-// #323 실제 공급 연결 확인. main과 같은 제품 조립(createApplicationModule)을 운영과 같은 설정(production, 개발 로그인 꺼짐)으로 띄워
-// 실제 #231 연결·#252 DB 선정 공급·#322 실제 고지로 목록 → 고지 → 접수(HTTP)를 하고, 그 접수 기록을 #233 보내기 검사와
-// #232 실행 조회(HTTP)가 같은 판본·전체 선정으로 읽는지 본다. 시험 대역은 GitHub OAuth·사용자 확인 응답(exchange·identity)과
-// 메모리 요청 큐뿐이다. Google·GitHub·큐 서버·worker는 부르지 않는다.
+// 운영 설정의 제품 조립에서 회원 등록→고지→접수→실행 조회를 연결한다.
+// GitHub OAuth·identity·공개 메타데이터와 C-03·메모리 요청 큐는 합성 대역이다.
+// Google·GitHub·모델을 실제 호출하지 않으며 실제 고지의 U7 수정 승인을 대신하지 않는다.
 const FAKE_TOKEN = 'SYNTHETIC_REAL_INTAKE_CHAIN_TOKEN';
 const TYPES = ['COMMIT', 'PULL_REQUEST', 'ISSUE'];
 const saved = {}, settings = {}, logs = [];
@@ -33,6 +33,7 @@ before(async () => {
   Object.assign(settings, { NODE_ENV: 'production', DEV_LOGIN_ENABLED: undefined, AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
     AUTH_ACCESS_TOKEN_TTL_SECONDS: '900', AUTH_WEB_ORIGIN: 'https://catchu.example',
     SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key', // 운영 모드 기동에 필요한 합성 임베딩 키(#431)
     CORS_ALLOWED_ORIGINS: undefined, WORKER_CONTEXT_ENABLED: 'true', WORKER_CONTEXT_API_KEY: randomBytes(32).toString('hex'),
     GITHUB_CONNECTION_ENABLED: 'true', GITHUB_OAUTH_CLIENT_ID: 'synthetic-client', GITHUB_OAUTH_CLIENT_SECRET: 'SYNTHETIC_SECRET',
     GITHUB_OAUTH_CALLBACK_URL: 'https://catchu.example/github/callback', GITHUB_CREDENTIAL_DIRECTORY: directory,
@@ -44,6 +45,7 @@ before(async () => {
   const logger = Object.fromEntries(['log', 'error', 'warn', 'debug', 'verbose', 'fatal']
     .map(level => [level, (...args) => logs.push(args.map(String).join(' '))]));
   app = await configureApp(await NestFactory.create(createApplicationModule(), { logger, abortOnError: false }));
+  require('../support/synthetic-daily-limit.cjs').bindSyntheticDailyLimit(app);
   await app.listen(0, '127.0.0.1');
   url = await app.getUrl();
   db = await openTestDataSource();
@@ -71,7 +73,7 @@ beforeEach(async () => {
 
 const call = (path, options = {}) => fetch(url + path, { ...options, signal: AbortSignal.timeout(10000) });
 
-test('실제 공급 연결: 운영 설정의 제품 조립에서 목록 판본·실제 고지로 LIVE 접수하고 보내기 검사와 실행 조회가 같은 전체 선정으로 읽는다', async () => {
+test('운영 설정의 제품 조립에서 직접 등록·동의 후 LIVE 접수하고 실행 조회가 같은 불변 사본을 읽는다', async () => {
   const devLogin = await call('/v1/auth/dev-login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ memberId: 'chain-323' }) });
   assert.equal(devLogin.status, 403, '운영 설정에서는 개발 로그인이 꺼져 있다');
@@ -87,6 +89,12 @@ test('실제 공급 연결: 운영 설정의 제품 조립에서 목록 판본·
     const authorization = await github.authorize(memberId);
     await github.connect(memberId, 'SYNTHETIC_CODE', authorization.state);
     const headers = { Authorization: 'Bearer ' + token };
+    app.get(GitHubRepositoryClient).verify = async () => ({ repositoryId: repository.repositoryId,
+      owner: repository.owner, name: repository.name, url: repository.url });
+    const registered = await call('/v1/me/repositories', { method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: repository.url }) });
+    assert.ok([200, 201].includes(registered.status));
+    const registration = await registered.json();
     const listed = await call('/v1/me/repositories', { headers });
     assert.equal(listed.status, 200);
     const item = (await listed.json()).items.find(row => row.repositoryId === repository.repositoryId);
@@ -102,12 +110,13 @@ test('실제 공급 연결: 운영 설정의 제품 조립에서 목록 판본·
     assert.equal(response.status, 202);
     const status = await response.json();
     assert.equal(status.sourceMode, 'LIVE');
-    // 목록 판본·고지 판본·접수 판정과 저장 동의가 같다. 저장 동의는 원래 선정 참조를 담은 네 칸이다.
+    // 저장 동의는 등록 참조와 당시 좌표를 담은 여섯 필드다.
     const [consent] = await db.query(`SELECT c.notice_revision, c.scope_revision, c.consented_scope, a.source_mode
       FROM analysis_consent c JOIN analysis_attempt a ON a.request_id = c.request_id WHERE c.consent_id = $1`, [status.consentId]);
     assert.deepEqual(consent, { notice_revision: noticeRevision, scope_revision: item.allowedScopeRevision, source_mode: 'LIVE',
       consented_scope: { revision: item.allowedScopeRevision, repositoryId: item.repositoryId, allowedResourceTypes: TYPES,
-        selectionReference: repository.selectionReference } });
+        selectionReference: registration.registrationId, registrationId: registration.registrationId,
+        repository: { owner: repository.owner, name: repository.name, url: repository.url } } });
     // 보내기 검사(모양·저장소·판본·계약 스키마)를 통과하고 큐 사본만 두 참조를 시도 ID로 바꾼다.
     const summary = await dispatcher.dispatchOnce();
     assert.deepEqual([summary.enqueued, summary.skipped, summary.paused], [1, 0, null]);

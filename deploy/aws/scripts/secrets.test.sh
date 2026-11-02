@@ -38,9 +38,11 @@ MIGRATOR_PW=$(openssl rand -hex 32)
 QUEUE_TOKEN=$(openssl rand -hex 32)
 CONTEXT_KEY=$(openssl rand -hex 32)
 GENERATION_KEY="sk-ant-synthetic-$(openssl rand -hex 24)"
+API_GENERATION_KEY="sk-ant-api-synthetic-$(openssl rand -hex 24)"
+EMBEDDING_KEY="pa-synthetic-$(openssl rand -hex 24)"
 ADMIN_PW="Adm1n-$(openssl rand -hex 20)"
 INPUT_KEY="sk-ant-input-$(openssl rand -hex 24)"
-SECRETS="$JWT $LINK $APP_PW $MIGRATOR_PW $QUEUE_TOKEN $CONTEXT_KEY $GENERATION_KEY $ADMIN_PW $INPUT_KEY"
+SECRETS="$JWT $LINK $APP_PW $MIGRATOR_PW $QUEUE_TOKEN $CONTEXT_KEY $GENERATION_KEY $API_GENERATION_KEY $EMBEDDING_KEY $ADMIN_PW $INPUT_KEY"
 DB_HOST=catchu-db.abcdefghijkl.ap-northeast-2.rds.amazonaws.com
 QUEUE_HOST=master.catchu-queue.abc123.apn2.cache.amazonaws.com
 store_default() { # 이름 Type Value 줄 → SSM 합성 저장소(JSON)
@@ -48,6 +50,8 @@ store_default() { # 이름 Type Value 줄 → SSM 합성 저장소(JSON)
     "/catchu/prod/api/AUTH_JWT_SECRET SecureString $JWT" \
     "/catchu/prod/api/LINK_GRANT_SECRET SecureString $LINK" \
     "/catchu/prod/db/catchu_app-password SecureString $APP_PW" \
+    "/catchu/prod/api/CATCHU_GENERATION_API_KEY SecureString $API_GENERATION_KEY" \
+    "/catchu/prod/api/CATCHU_EMBEDDING_API_KEY SecureString $EMBEDDING_KEY" \
     "/catchu/prod/db/catchu_migrator-password SecureString $MIGRATOR_PW" \
     "/catchu/prod/queue/auth-token SecureString $QUEUE_TOKEN" \
     "/catchu/prod/worker/WORKER_CONTEXT_API_KEY SecureString $CONTEXT_KEY" \
@@ -327,18 +331,19 @@ check "make-secrets: kubectl에는 표준 입력으로만 넘김(--server-side, 
     && "$REAL_JQ" -e 'all(.items[]; .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"] == null)' "$S/applied.json"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: Secret 키는 계약(k8s/README.md)과 같고 worker에는 DB 값이 없음, 모두 namespace catchu·Opaque" \
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | {name: .metadata.name, keys: (.data | keys), ns: .metadata.namespace, type}]
-    == [{name: "catchu-api", keys: ["AUTH_JWT_SECRET", "DB_PASSWORD", "LINK_GRANT_SECRET"], ns: "catchu", type: "Opaque"},
+    == [{name: "catchu-api", keys: ["AUTH_JWT_SECRET", "CATCHU_EMBEDDING_API_KEY", "CATCHU_GENERATION_API_KEY", "DB_PASSWORD", "LINK_GRANT_SECRET"], ns: "catchu", type: "Opaque"},
         {name: "catchu-migration", keys: ["DB_PASSWORD"], ns: "catchu", type: "Opaque"},
         {name: "catchu-worker", keys: ["CATCHU_GENERATION_API_KEY", "CATCHU_QUEUE_REDIS_URL", "WORKER_CONTEXT_API_KEY"], ns: "catchu", type: "Opaque"}]' "$S/applied.json")"
 check "make-secrets: 값은 SSM 원본 그대로(앱·migration 계정 비밀번호가 바뀌지 않음)" \
   "$( { test "$(decoded catchu-api AUTH_JWT_SECRET)" = "$JWT" && test "$(decoded catchu-api LINK_GRANT_SECRET)" = "$LINK" \
     && test "$(decoded catchu-api DB_PASSWORD)" = "$APP_PW" && test "$(decoded catchu-migration DB_PASSWORD)" = "$MIGRATOR_PW" \
-    && test "$(decoded catchu-worker WORKER_CONTEXT_API_KEY)" = "$CONTEXT_KEY" && test "$(decoded catchu-worker CATCHU_GENERATION_API_KEY)" = "$GENERATION_KEY"; } > /dev/null 2>&1; echo $?)"
+    && test "$(decoded catchu-worker WORKER_CONTEXT_API_KEY)" = "$CONTEXT_KEY" && test "$(decoded catchu-worker CATCHU_GENERATION_API_KEY)" = "$GENERATION_KEY" \
+    && test "$(decoded catchu-api CATCHU_GENERATION_API_KEY)" = "$API_GENERATION_KEY" && test "$(decoded catchu-api CATCHU_EMBEDDING_API_KEY)" = "$EMBEDDING_KEY"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: 큐 주소는 rediss://, 큐 비밀번호와 큐 주 엔드포인트 6379" \
   "$(ok test "$(decoded catchu-worker CATCHU_QUEUE_REDIS_URL)" = "rediss://:${QUEUE_TOKEN}@${QUEUE_HOST}:6379")"
 check "make-secrets: Secret마다 키=SSM 판 번호 주석(값 없음)" \
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | .metadata.annotations["catchu.io/ssm-versions"]]
-    == ["AUTH_JWT_SECRET=1,DB_PASSWORD=1,LINK_GRANT_SECRET=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
+    == ["AUTH_JWT_SECRET=1,CATCHU_EMBEDDING_API_KEY=1,CATCHU_GENERATION_API_KEY=1,DB_PASSWORD=1,LINK_GRANT_SECRET=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
 check "make-secrets: ConfigMap catchu-db는 RDS 주소와 저장소의 루트 인증서 그대로" \
   "$( { "$REAL_JQ" -e --arg h "$DB_HOST" '.items[0] | .kind == "ConfigMap" and .metadata.name == "catchu-db" and .data.DB_HOST == $h
       and (.data | keys) == ["DB_HOST", "ca.pem"]' "$S/applied.json" \
@@ -379,7 +384,11 @@ reset_state
 ssm_set /catchu/prod/worker/CATCHU_GENERATION_API_KEY SecureString "has space"
 run make-secrets.sh
 check "make-secrets: 생성 키에 공백이 있으면 멈춤" "$(ok untouched)"
-# jq의 $는 마지막 줄바꿈 앞에서도 맞는다. 일곱 값 모두 끝에 줄바꿈 하나를 붙여 본다(복사·파일 입력으로 섞이는 경우).
+reset_state
+ssm_set /catchu/prod/api/CATCHU_EMBEDDING_API_KEY SecureString "has space"
+run make-secrets.sh
+check "make-secrets: 임베딩 키에 공백이 있으면 멈춤" "$(ok untouched)"
+# jq의 $는 마지막 줄바꿈 앞에서도 맞는다. 아홉 값 모두 끝에 줄바꿈 하나를 붙여 본다(복사·파일 입력으로 섞이는 경우).
 while read -r n t v <&3; do
   reset_state
   ssm_set "$n" "$t" "${v}"$'\n'

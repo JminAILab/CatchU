@@ -17,6 +17,7 @@ const status = (repositoryId = 'r1') => ({
   submittedAt: '2026-10-19T00:00:00Z', updatedAt: '2026-10-19T00:00:00Z',
   requestState: 'ACCEPTED', lifecycle: 'ACTIVE', processing: 'QUEUED', application: 'NOT_READY', sourceMode: 'MOCK',
   eligibleCandidateCount: 0, registeredCatchIds: [], ownerResultsReady: false,
+  ownCommitObservation: 'UNKNOWN', observedOwnCommitCount: null, collectionLimitNotes: [],
   retry: { allowed: false, reason: 'IN_PROGRESS' }, failures: [],
 });
 const limited = (retryAfter = '2') => Response.json({ code: 'RATE_LIMITED', message: '요청 빈도 제한' }, {

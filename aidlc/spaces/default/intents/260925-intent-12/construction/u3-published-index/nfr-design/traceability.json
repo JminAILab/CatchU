@@ -1,0 +1,25 @@
+{
+  "stage": "nfr-design",
+  "unit": "u3-published-index",
+  "upstream_ids": ["NFR1.1", "NFR1.2", "NFR1.3", "NFR2.1", "NFR2.2", "NFR2.3", "NFR2.4", "NFR4.1", "NFR4.2", "NFR4.3", "NFR4.4", "NFR4.5", "NFR5.1", "NFR5.2", "NFR5.3", "NFR6.1", "NFR6.2", "NFR6.3"],
+  "coverage": [
+    { "id": "NFR1.1", "status": "OK", "target": "security-design: publication_id 하나로 범위를 정한 검색 쿼리, 범위 인자 없음, 공개 함수 설명에 C-10 선행 명시" },
+    { "id": "NFR1.2", "status": "OK", "target": "security-design: 조각 나누개의 C-07 필드 목록(aiDraft·제목 제외), reliability-design: 연쇄 삭제" },
+    { "id": "NFR1.3", "status": "OK", "target": "security-design: readEmbeddingConfig와 제공자 만들기 함수의 키·NODE_ENV 판정표(U3 PR에서는 시험으로 확인). 기동 확인은 통합 PR(U2 AiRun이 들어온 뒤)에서 완료한다: logical-components 「통합 때 할 일」이 이 항목을 닫는다" },
+    { "id": "NFR2.1", "status": "OK", "target": "security-design: voyage-4-lite·1024차원 요청 모양과 착수 첫 확인 항목" },
+    { "id": "NFR2.2", "status": "OK", "target": "security-design: 주소 상수, createGuardedFetch(8 MiB 인자), AbortSignal.timeout이 본문 읽기까지 덮음, 재시도 0, SDK 없음" },
+    { "id": "NFR2.3", "status": "OK", "target": "security-design: 요청 본문 input에는 조각 글 배열 또는 질문 글만" },
+    { "id": "NFR2.4", "status": "OK", "target": "security-design: 묶음 수만큼 호출·실패 시 중단, 조건부 UPDATE 뒤에만 다시 등록, 호출 전 검사 순서, 횟수 상한은 호출 Unit" },
+    { "id": "NFR4.1", "status": "OK", "target": "performance-design: 호출별 시간 제한, 128개 묶음 상수, 묶음 차례 전송" },
+    { "id": "NFR4.2", "status": "OK", "target": "performance-design: now + 10분 마감, 시작·저장 때 다시 확인" },
+    { "id": "NFR4.3", "status": "OK", "target": "performance-design: search의 검사 순서, chunkInTransaction의 외부 호출 없음" },
+    { "id": "NFR4.4", "status": "OK", "target": "scalability-design: 발행본 하나 안 정확 비교, (publication_id, seq) 유일 색인, 근사 색인 없음" },
+    { "id": "NFR4.5", "status": "OK", "target": "reliability-design: 시도 1회·조건부 FAILED, 한 트랜잭션 저장과 갱신 수 검사, 실패와 결과 표" },
+    { "id": "NFR5.1", "status": "OK", "target": "reliability-design: 두 외래 키 ON DELETE CASCADE와 member-withdrawal-deletion.md 행 추가" },
+    { "id": "NFR5.2", "status": "OK", "target": "reliability-design: 시작 확인과 SELECT FOR UPDATE 다시 확인, 외래 키 오류는 버림" },
+    { "id": "NFR5.3", "status": "OK", "target": "reliability-design: 벡터·글은 published_chunk에만, 처리기 지역 변수" },
+    { "id": "NFR6.1", "status": "OK", "target": "observability-design: S12 키 없으면 skip, 통과·미실행 구분 보고, 합성 결과를 실제 성공으로 적지 않음" },
+    { "id": "NFR6.2", "status": "OK", "target": "observability-design: 사건별 로그 칸 표" },
+    { "id": "NFR6.3", "status": "OK", "target": "observability-design: 칸만 가진 로그 타입, security-design: 오류 응답 본문을 읽지 않고 취소, 고정 문구 오류" }
+  ]
+}
