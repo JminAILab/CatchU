@@ -36,6 +36,9 @@ export const ERROR_STATUS = {
   AI_CONSENT_REQUIRED: 403,
   DAILY_LIMIT_REACHED: 429,
   WITHDRAWAL_FAILED: 500,
+  // 12월 intent U5(계약 C-09·C-12, U5 기능 설계 BR2.2·BR3.1). 받은 사람 질의응답 경로의 거부.
+  INDEX_NOT_READY: 409,
+  QUESTION_LIMIT_REACHED: 429,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_STATUS;
@@ -77,4 +80,8 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   AI_CONSENT_REQUIRED: '외부 AI 전송에 먼저 동의해 주세요.',
   // 계약 C-03이 문구를 정했다. 남은 횟수·한도 값은 어디에도 넣지 않는다(BR1.4).
   WITHDRAWAL_FAILED: '탈퇴를 끝내지 못했습니다. 팀에 알려 주세요',
+  // 계약 C-09·C-12. INDEX_NOT_READY는 U5 질의응답과 U10 JD 요약이 함께 쓰므로 기능 이름 없이 둔다(화면 문구는 web 문구 표가 정한다).
+  // QUESTION_LIMIT_REACHED는 U5 기능 설계 BR3.1이 문구를 정했다. 남은 질문 수·한도 값은 넣지 않는다(BR3.3).
+  INDEX_NOT_READY: '아직 쓸 수 없습니다',
+  QUESTION_LIMIT_REACHED: '오늘 한도에 도달했습니다',
 };

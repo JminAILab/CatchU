@@ -23,6 +23,7 @@
 | `daily_execution_count`, `ai_consent` | 회원(12월 intent U2, 계약 C-03·C-04·C-06. 마이그레이션 `1793161114211-CreateU2UsageAndConsent`) |
 | `publication_index` | 발행본(12월 intent U3, 계약 C-06·C-08. 마이그레이션 `1793257382741-CreatePublishedIndexTables`) |
 | `published_chunk` | 발행 항목(발행본을 거쳐, 복합 외래 키 `(publication_id, published_item_id)`. 12월 intent U3, 같은 마이그레이션) |
+| `base_summary` | 발행본(12월 intent U5, 계약 C-06·C-02. 마이그레이션 `1793348947970-CreateBaseSummaryTable`) |
 
 `text_material`·`publication`·`published_item`은 12월 범위 U4가 만든 표다(계약 C-06·C-07·C-13). 발행 사본(`published_item`)은 원본 Catch·자료와 외래 키가 없어, 원본을 지워도 사본은 발행본 수명을 따른다.
 

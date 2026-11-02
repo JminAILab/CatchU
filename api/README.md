@@ -138,6 +138,7 @@ curl.exe -i http://127.0.0.1:3001/health
 | `node --test test/worker-messages.test.cjs` | 빌드 없이 [M1 합성 결과 세트](../worker/fixtures/m1-synthetic/README.md)의 사례·음성 대조가 worker와 같은 스키마 판정을 내는지만 검사. `npm test`에도 포함 |
 | `npm start`         | `dist/main.js` 실행. 먼저 빌드 필요                                                                                  |
 | `npm run migration:run` / `migration:revert` / `migration:generate` | 개발 DB(`.env`의 `DB_*`)에 마이그레이션 적용·마지막 1개 되돌리기·엔티티와의 차이로 새 마이그레이션 생성(「엔티티와 마이그레이션」) |
+| `npm run rag-eval -- synthetic` / `-- measure --input <파일>` | 12월 U5 RAG 품질 평가(손 실행, CI 밖). synthetic은 합성 확인이며 결과를 `api/.rag-eval/`에만 쓴다. 입력·모드·결과 위치는 [docs/rag-answer.md](docs/rag-answer.md) 「RAG 품질 평가」 |
 
 ```powershell
 npm run lint
@@ -215,7 +216,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 본인 분석 이력·개별 상태 조회 — #140
 
-[docs/analysis-history.md](docs/analysis-history.md)에 있다.
+[docs/analysis-history.md](docs/analysis-history.md)에 있다. 홈용 본인 접수 이력 유무(`GET /v1/me/analysis-summary`, #428)도 같은 문서에 있다.
 
 ## 본인 회원·프로필 조회와 전체 저장 — #135
 
