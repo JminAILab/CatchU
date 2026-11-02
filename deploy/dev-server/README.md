@@ -30,13 +30,14 @@ Caddy가 하는 일:
 - `worker.env`: `CATCHU_QUEUE_REDIS_URL=redis://queue:6379`, `CATCHU_QUEUE_PREFIX=catchu`, `CATCHU_WORKER_CONCURRENCY=1`, **`CATCHU_WORKER_MOCK=false`**. 시험 모드에서는 이 값을 빼면 합성(MOCK) 처리가 켜지므로 꼭 적는다([worker 설정](../../worker/docs/queue-consumer.md)).
 - `compose.env`: `CATCHU_SINGLE_NAME=catchu-dev`, 이미지 네 개는 ECR digest(`…@sha256:…`), `CATCHU_DOMAIN=<도메인>`(Caddy용).
 - `api.env`: `SHARE_LINK_WEB_BASE_URL`·`AUTH_WEB_ORIGIN`에 `https://<도메인>`(끝 슬래시 없이), `TRUST_PROXY_CIDRS`에 앱 Compose 망의 게이트웨이 주소 하나(`/32`).
+  - Google 로그인: `GOOGLE_LOGIN_ENABLED=true`, `GOOGLE_REDIRECT_URI=https://<도메인>/google/callback`, `GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`은 SSM `/catchu/prod/api/GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`을 서버 안에서 읽어 쓴다(위 서명 키와 같은 방법). 리디렉션 주소는 Google OAuth 클라이언트에 등록한 값과 글자 하나까지 같아야 한다.
   - Caddy는 서버 망에서 127.0.0.1로 api에 붙고, Docker는 그 연결을 망의 게이트웨이 주소로 넘긴다. 그래서 api에는 Caddy가 그 주소로 보인다. 처음 띄운 뒤 `docker network inspect catchu-dev_default -f '{{(index .IPAM.Config 0).Gateway}}'`로 확인해 넣는다. 망을 지웠다 다시 만들면 바뀔 수 있으니 다시 확인한다.
 
 ## 순서
 
 서버 명령은 Session Manager 셸에서 root로 실행한다. 저장소의 필요한 파일(`deploy/` 중 compose 파일·`local-db/`·`scripts/replace-single.sh`·`dev-server/`)을 서버의 저장소 밖 작업 폴더로 옮겨 그 루트에서 실행한다.
 
-1. **이미지:** 서버와 같은 arm64 컴퓨터에서 [빌드](../README.md#빌드)와 [이미지 검사](../README.md#검사)를 한 뒤 ECR에 올린다. web은 `NEXT_PUBLIC_API_BASE_URL=https://<도메인>`으로 만든다.
+1. **이미지:** 서버와 같은 arm64 컴퓨터에서 [빌드](../README.md#빌드)와 [이미지 검사](../README.md#검사)를 한 뒤 ECR에 올린다. web은 `NEXT_PUBLIC_API_BASE_URL=https://<도메인>`, `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`로 만든다.
    - 빌드 명령에 `--provenance=false --sbom=false`를 더한다. Docker Desktop의 containerd 이미지 저장소는 빌드에 출처 증명을 붙이는데, 그대로 올리면 ECR 태그가 실행 이미지가 아닌 증명 문서에 붙을 수 있고 태그를 덮어쓸 수 없어 지우고 다시 올려야 한다.
    - 올린 뒤 태그마다 `aws ecr batch-get-image`로 manifest를 받아, 층이 여러 개이고 `in-toto` 층이 없는(실행 이미지인) 것을 확인한다.
 2. **이미지 받기:** 서버에서 `aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin <계정>.dkr.ecr.ap-northeast-2.amazonaws.com` 뒤 네 이미지를 digest로 받고 `docker logout`한다. `compose.env`의 이미지 값을 `<레지스트리>/<저장소>@sha256:…`로 바꾼다.
@@ -56,7 +57,7 @@ Caddy가 하는 일:
 - api의 큐 연결([#233](https://github.com/JminAILab/CatchU/issues/233))은 켜지 않는다. `api.env`에 `CATCHU_QUEUE_REDIS_URL`을 넣지 않는다. api는 운영 모드라 평문 `redis://` 주소로는 기동하지 않고, api는 큐 망에 붙어 있지도 않다. 그래서 분석 요청은 대기로 남다가 처리 시한에 닫힌다.
 - worker는 합성 처리를 끄고 LIVE 설정(요청 정보 조회 주소·키, 생성 키)도 넣지 않으므로, 분석 요청을 처리 전에 거부한다([#121](https://github.com/JminAILab/CatchU/issues/121)). 시험 모드라 LIVE 설정이 없어도 기동은 한다.
 - worker의 바깥 연결 제한은 코드 쪽 통제([#117](https://github.com/JminAILab/CatchU/issues/117))뿐이다. 네트워크 차단은 11월 EKS의 NetworkPolicy에서 한다. worker의 DB 차단은 Docker 내부 망으로 된다.
-- 로그인(Google·GitHub)·GitHub 연결·LLM은 아직 켜지 않았다. GitHub 연결을 켜려면 OAuth 앱 등록·암호화 키와 함께 api가 쓸 수 있는 지속 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)가 필요하다. 이 구성의 api는 읽기 전용 루트와 임시 `/tmp`만 있어 그 폴더가 없으므로, 켤 때 함께 만든다([배포 안내 「#276에서 받을 값과 남은 일」](../README.md#276에서-받을-값과-남은-일)).
+- Google 로그인과 공통 인증 화면 연결(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`)은 켠다(2026-11-02 팀장 승인). 남은 통합 검증([#286](https://github.com/JminAILab/CatchU/issues/286))은 이 서버에서 이어 하며, 켰다고 검증이 끝난 것은 아니다. GitHub 로그인·GitHub 연결·LLM은 아직 켜지 않았다. GitHub 연결을 켜려면 OAuth 앱 등록·암호화 키와 함께 api가 쓸 수 있는 지속 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)가 필요하다. 이 구성의 api는 읽기 전용 루트와 임시 `/tmp`만 있어 그 폴더가 없으므로, 켤 때 함께 만든다([배포 안내 「#276에서 받을 값과 남은 일」](../README.md#276에서-받을-값과-남은-일)).
 - 앞단(Caddy)에 요청 빈도 제한이 없다. Google 로그인도 시작 경로(`POST /v1/auth/google/authorization`) 보호 없이 켠다(2026-10-26 팀장 결정). api는 로그인 시작 요청을 메모리에 10분 동안 최대 1,000건 보관하므로, 누가 시작 요청을 몰아 보내면 다른 사람은 로그인을 시작하지 못하고 `500`을 받는다([Google 로그인 안내](../../api/docs/google-login.md)). 10분은 요청 하나의 보관 시간이지 막히는 시간의 상한이 아니다. 만료로 빈 자리를 새 요청이 바로 채우므로, 요청이 계속 들어오면 로그인 시작 불가도 계속될 수 있다. api를 다시 띄우면 보관함이 비지만 잠시뿐이라 요청이 계속되면 다시 차고, 진행 중이던 로그인은 처음부터 다시 시작해야 한다. 자료가 새지는 않는다. 개발 서버는 팀 확인용이고 EKS로 옮길 때까지만 쓰므로 이 위험을 받아들인다. EKS에서는 WAF가 주소당 5분 20회를 넘는 시작 요청을 막는다([#276 10/19 결정](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6260130109)).
 - Caddy는 서버 망(host)에서 돌아 서버의 AWS 권한(인스턴스 메타데이터)에 닿는다. 다른 컨테이너는 hop 제한으로 막힌다. Caddy가 뚫려도 비밀값 파라미터는 읽지 못하게 서버 역할에 거부 규칙을 둔다(위 「환경 폴더」). 11월 EKS에서는 ALB가 앞단을 맡아 이 예외가 없어진다.
 - 서버 접속은 SSH가 아니라 AWS Session Manager다. 비밀값은 환경변수로 들어가므로 서버에서 `docker inspect`를 쓸 수 있는 사람은 값을 볼 수 있다.

@@ -77,7 +77,8 @@ build_app() {
   local repo=$1 ref=$2 arch
   local args=(--provenance=false --sbom=false --build-arg "SOURCE_REVISION=${COMMIT}" -t "$ref")
   case "$repo" in
-    catchu-web) args+=(-f web/Dockerfile --build-arg "NEXT_PUBLIC_API_BASE_URL=https://${DEV_SERVER_DOMAIN}") ;;
+    # 공통 인증 화면 연결은 개발 서버에서 켠다(2026-11-02 팀장 승인, Google 로그인 켜기 #389).
+    catchu-web) args+=(-f web/Dockerfile --build-arg "NEXT_PUBLIC_API_BASE_URL=https://${DEV_SERVER_DOMAIN}" --build-arg NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true) ;;
     catchu-api) args+=(-f api/Dockerfile) ;;
     catchu-api-migration) args+=(-f api/Dockerfile --target migration) ;;
     catchu-worker) args+=(-f worker/Dockerfile) ;;
