@@ -15,6 +15,7 @@
 Caddy가 하는 일:
 - 인증서를 Let's Encrypt에서 자동으로 받고 갱신하며, http를 https로 돌려보낸다.
 - `/v1/internal`·`/v1/internal/*`는 404, `/v1/*`는 api(127.0.0.1:3001), 나머지는 web(127.0.0.1:3000)으로 보낸다. web과 api가 같은 출처가 된다([#250](https://github.com/JminAILab/CatchU/issues/250) 조건).
+  - 예외로 Claude MCP 연결([#440](https://github.com/JminAILab/CatchU/issues/440))의 OAuth 주소 `/authorize`·`/token`·`/register`, `/.well-known/oauth-protected-resource`·`/.well-known/oauth-authorization-server`(둘 다 뒤에 경로가 붙는 꼴 포함)는 `/v1` 밖이지만 api로 보낸다. MCP 공식 SDK의 인증 라우터가 앱 루트에 만들기 때문이다. 목록은 U6 기능 설계를 따른다.
 - HSTS를 `max-age=300`으로 붙인다. 앱이 보낸 같은 헤더는 이 값 하나로 바뀐다.
 - 접근 로그를 쓰지 않는다(공유 링크 토큰이 든 주소가 남지 않게). 앱이 멈췄을 때(502 등) 남는 오류 로그에는 요청 주소와 헤더가 들어가므로, 주소는 통째로 지우고 헤더도 남기지 않는다. 공유 링크 토큰·로그인 콜백의 code·state 자리만 가리면, 주소를 조금 바꾼 형태(`//`, `%73` 등)가 가리는 규칙을 빠져나간다.
 
@@ -46,6 +47,7 @@ Caddy가 하는 일:
      - 앱 망 게이트웨이 주소를 `api.env`의 `TRUST_PROXY_CIDRS`에 넣는다(위 「환경 폴더」).
      - 앱 DB 계정에 잠금 대기 상한 3초를 건다([#220 합의](https://github.com/JminAILab/CatchU/issues/220#issuecomment-6206164416)): `docker exec catchu-dev-db psql -U postgres -d catchu -c "ALTER ROLE catchu_app SET lock_timeout = '3s'"`. migration 계정에는 걸지 않는다. 계정 설정은 새 연결부터 적용되므로 api를 다시 띄워야 한다.
    - DB 볼륨을 지우고 다시 만들면(초기화) 계정도 새로 만들어지므로 잠금 대기 상한을 다시 걸고 api를 다시 띄운다.
+   - pgvector 확장(`vector`)은 DB를 처음 만들 때 [`init-roles.sh`](../local-db/init-roles.sh)가 만든다. `postgres:16` 시절에 만든 볼륨처럼 그 뒤에 이미지만 pgvector로 바뀐 DB에는 없으므로 관리자 계정으로 만든다: `docker exec catchu-dev-db psql -U postgres -d catchu -c "CREATE EXTENSION IF NOT EXISTS vector"`. migration 계정은 확장을 만들지 못하므로 벡터 열을 만드는 migration이 배포되기 전에 해 둔다(2026-11-02에 이 서버에 만들었다, [#389](https://github.com/JminAILab/CatchU/issues/389)).
 4. **앞단:** 도메인 A 기록이 이 서버의 탄력적 IP를 가리킨 뒤 `docker compose --env-file /opt/catchu/env/compose.env -f deploy/dev-server/compose.caddy.yaml up -d`. 인증서 보관 볼륨(`catchu-dev-edge_caddy-data`)은 지우지 않는다. 지우면 다시 발급받다가 Let's Encrypt 발급 횟수 제한에 걸릴 수 있다.
    - 서버의 배포 파일 폴더를 통째로 바꿨다면 같은 명령에 `--force-recreate`를 붙여 다시 띄운다. 이미 뜬 Caddy는 옛 Caddyfile을 계속 붙들고 있다. 인증서는 보관 볼륨에서 다시 쓴다.
 5. **확인:** `https://<도메인>/` 화면, `http://`가 `https://`로 이동, `/v1/internal/…` 404, 응답의 HSTS가 `max-age=300` 하나, api·worker·web health, worker 컨테이너에서 DB(`db:5432`)에 닿지 않음, 앱 계정 새 연결의 잠금 대기 상한이 `3s`(`docker exec catchu-dev-db psql -U catchu_app -d catchu -tAc 'show lock_timeout'`), 로그에 비밀값 없음.
@@ -59,5 +61,6 @@ Caddy가 하는 일:
 - worker의 바깥 연결 제한은 코드 쪽 통제([#117](https://github.com/JminAILab/CatchU/issues/117))뿐이다. 네트워크 차단은 11월 EKS의 NetworkPolicy에서 한다. worker의 DB 차단은 Docker 내부 망으로 된다.
 - Google 로그인과 공통 인증 화면 연결(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`)은 켠다(2026-11-02 팀장 승인). 남은 통합 검증([#286](https://github.com/JminAILab/CatchU/issues/286))은 이 서버에서 이어 하며, 켰다고 검증이 끝난 것은 아니다. GitHub 로그인·GitHub 연결·LLM은 아직 켜지 않았다. GitHub 연결을 켜려면 OAuth 앱 등록·암호화 키와 함께 api가 쓸 수 있는 지속 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)가 필요하다. 이 구성의 api는 읽기 전용 루트와 임시 `/tmp`만 있어 그 폴더가 없으므로, 켤 때 함께 만든다([배포 안내 「#276에서 받을 값과 남은 일」](../README.md#276에서-받을-값과-남은-일)).
 - 앞단(Caddy)에 요청 빈도 제한이 없다. Google 로그인도 시작 경로(`POST /v1/auth/google/authorization`) 보호 없이 켠다(2026-10-26 팀장 결정). api는 로그인 시작 요청을 메모리에 10분 동안 최대 1,000건 보관하므로, 누가 시작 요청을 몰아 보내면 다른 사람은 로그인을 시작하지 못하고 `500`을 받는다([Google 로그인 안내](../../api/docs/google-login.md)). 10분은 요청 하나의 보관 시간이지 막히는 시간의 상한이 아니다. 만료로 빈 자리를 새 요청이 바로 채우므로, 요청이 계속 들어오면 로그인 시작 불가도 계속될 수 있다. api를 다시 띄우면 보관함이 비지만 잠시뿐이라 요청이 계속되면 다시 차고, 진행 중이던 로그인은 처음부터 다시 시작해야 한다. 자료가 새지는 않는다. 개발 서버는 팀 확인용이고 EKS로 옮길 때까지만 쓰므로 이 위험을 받아들인다. EKS에서는 WAF가 주소당 5분 20회를 넘는 시작 요청을 막는다([#276 10/19 결정](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6260130109)).
+- Claude MCP 연결([#440](https://github.com/JminAILab/CatchU/issues/440))의 회원별 도구 호출 빈도 제한(분당 60회)은 큐와 같은 Redis로 세는데, 이 서버의 api는 큐에 연결하지 않아 꺼진다. 기동 로그에 "MCP 빈도 제한 꺼짐"이 남는다. 인증 전 경로(등록·토큰·승인 시작)는 MCP SDK 기본 IP 제한으로 세며, 요청 주소는 `TRUST_PROXY_CIDRS`로 정한다. 개발 서버는 팀 확인용이므로 받아들인다. EKS에서는 api에 큐를 연결하면 같은 Redis로 켜진다.
 - Caddy는 서버 망(host)에서 돌아 서버의 AWS 권한(인스턴스 메타데이터)에 닿는다. 다른 컨테이너는 hop 제한으로 막힌다. Caddy가 뚫려도 비밀값 파라미터는 읽지 못하게 서버 역할에 거부 규칙을 둔다(위 「환경 폴더」). 11월 EKS에서는 ALB가 앞단을 맡아 이 예외가 없어진다.
 - 서버 접속은 SSH가 아니라 AWS Session Manager다. 비밀값은 환경변수로 들어가므로 서버에서 `docker inspect`를 쓸 수 있는 사람은 값을 볼 수 있다.
