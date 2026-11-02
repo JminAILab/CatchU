@@ -47,6 +47,7 @@ Caddy가 하는 일:
      - 앱 망 게이트웨이 주소를 `api.env`의 `TRUST_PROXY_CIDRS`에 넣는다(위 「환경 폴더」).
      - 앱 DB 계정에 잠금 대기 상한 3초를 건다([#220 합의](https://github.com/JminAILab/CatchU/issues/220#issuecomment-6206164416)): `docker exec catchu-dev-db psql -U postgres -d catchu -c "ALTER ROLE catchu_app SET lock_timeout = '3s'"`. migration 계정에는 걸지 않는다. 계정 설정은 새 연결부터 적용되므로 api를 다시 띄워야 한다.
    - DB 볼륨을 지우고 다시 만들면(초기화) 계정도 새로 만들어지므로 잠금 대기 상한을 다시 걸고 api를 다시 띄운다.
+   - pgvector 확장(`vector`)은 DB를 처음 만들 때 [`init-roles.sh`](../local-db/init-roles.sh)가 만든다. `postgres:16` 시절에 만든 볼륨처럼 그 뒤에 이미지만 pgvector로 바뀐 DB에는 없으므로 관리자 계정으로 만든다: `docker exec catchu-dev-db psql -U postgres -d catchu -c "CREATE EXTENSION IF NOT EXISTS vector"`. migration 계정은 확장을 만들지 못하므로 벡터 열을 만드는 migration이 배포되기 전에 해 둔다(2026-11-02에 이 서버에 만들었다, [#389](https://github.com/JminAILab/CatchU/issues/389)).
 4. **앞단:** 도메인 A 기록이 이 서버의 탄력적 IP를 가리킨 뒤 `docker compose --env-file /opt/catchu/env/compose.env -f deploy/dev-server/compose.caddy.yaml up -d`. 인증서 보관 볼륨(`catchu-dev-edge_caddy-data`)은 지우지 않는다. 지우면 다시 발급받다가 Let's Encrypt 발급 횟수 제한에 걸릴 수 있다.
    - 서버의 배포 파일 폴더를 통째로 바꿨다면 같은 명령에 `--force-recreate`를 붙여 다시 띄운다. 이미 뜬 Caddy는 옛 Caddyfile을 계속 붙들고 있다. 인증서는 보관 볼륨에서 다시 쓴다.
 5. **확인:** `https://<도메인>/` 화면, `http://`가 `https://`로 이동, `/v1/internal/…` 404, 응답의 HSTS가 `max-age=300` 하나, api·worker·web health, worker 컨테이너에서 DB(`db:5432`)에 닿지 않음, 앱 계정 새 연결의 잠금 대기 상한이 `3s`(`docker exec catchu-dev-db psql -U catchu_app -d catchu -tAc 'show lock_timeout'`), 로그에 비밀값 없음.
