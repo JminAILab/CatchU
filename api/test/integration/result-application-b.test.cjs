@@ -288,11 +288,13 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
       'CreateRepositorySelection1792383899264', 'AddAnalysisRequestHistoryIndex1792640486167', 'CascadeMemberAnalysisOnDelete1792817978011',
       'CascadeResultApplicationOnDelete1792817978012', 'CascadeAuthSessionsOnDelete1792817978013', 'CascadeCatchAssetsOnDelete1792817978014',
       'CreateU2UsageAndConsent1793161114211', 'CreatePublicationTables1793162230851', 'AddCatchAuthorDescription1793162230852',
-      'AddRepositoryRegistration1793245460352', 'CreatePublishedIndexTables1793257382741', 'CreateBaseSummaryTable1793348947970']);
+      'AddRepositoryRegistration1793245460352', 'CreatePublishedIndexTables1793257382741', 'CreateBaseSummaryTable1793348947970',
+      'ExpandRepositoryAnalysisScope1793585769819']);
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 27);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
+    await isolated.undoLastMigration(); // U7 수집 범위의 현재 포인터만 복원한다. 판본 정의는 보존한다.
     await isolated.undoLastMigration(); // U5 발행본 AI 기본 요약 표(C-06·C-02)
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 26);
     assert.equal(await regclass('base_summary'), null);

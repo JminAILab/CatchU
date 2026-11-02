@@ -16,7 +16,7 @@ const { REAL_NOTICE } = require('../../dist/analysis-intake/analysis-notice');
 const { RepositorySelectionService } = require('../../dist/member-repositories/repository-selection.source');
 const { SelectedRepositoryCatalog } = require('../../dist/member-repositories/selected-repository-catalog');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
-const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
+const { readCurrentSelection: readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 
 // main과 같은 조립 함수 사용: 선정 공급자를 시험에서 따로 등록하거나 대체하지 않는다.
 // 실제 PostgreSQL·HTTP·GitHub 보관소를 쓰며 외부 GitHub 응답만 합성으로 대체한다.

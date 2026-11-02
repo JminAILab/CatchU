@@ -9,9 +9,9 @@ import { GitHubRepositoryClient } from './github-repository.client';
 import { parseRepositoryAddress } from './repository-address';
 import { AllowedScopeRevision } from './repository-selection.entity';
 import { RepositoryRegistration } from './repository-registration.entity';
+import { REGISTRATION_SCOPE_REVISION } from './registration-scope';
 
-// 현행 수집 정의는 그대로 재사용한다. 수집 상한을 바꿀 때 새 불변 판본을 발급한다.
-export const REGISTRATION_SCOPE_REVISION = 'catchu:allowed-scope:2026-10-19:v1';
+export { REGISTRATION_SCOPE_REVISION } from './registration-scope';
 export interface RegistrationSnapshot {
   registration: RepositoryRegistration;
   connection: GitHubConnection;
@@ -102,7 +102,7 @@ export class RepositoryRegistrationService {
     const row = await manager.findOne(RepositoryRegistration, { where: { memberId, repositoryId }, lock: { mode: 'pessimistic_read' } });
     if (!row) throw new ApiError('RESOURCE_UNAVAILABLE');
     const old = prepared.registration;
-    if (row.registrationId !== old.registrationId || row.scopeRevision !== old.scopeRevision || row.owner !== old.owner ||
+    if (row.scopeRevision !== REGISTRATION_SCOPE_REVISION || row.registrationId !== old.registrationId || row.scopeRevision !== old.scopeRevision || row.owner !== old.owner ||
         row.name !== old.name || row.repositoryUrl !== old.repositoryUrl) throw new ApiError('CONSENT_REQUIRED');
     const scope = await this.scope(manager, row.scopeRevision);
     return { registrationId: row.registrationId, scopeRevision: row.scopeRevision,

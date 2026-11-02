@@ -5,7 +5,7 @@ const { before, after, beforeEach, test } = require('node:test');
 const { NestFactory } = require('@nestjs/core');
 const { DataSource } = require('typeorm');
 const { resetTestDatabase } = require('../support/test-database.cjs');
-const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
+const { readCurrentSelection: readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 const { CONTRACT_DIR, validator, result: makeResult } = require('../helpers/receiver-harness.cjs');
 const { MemberAccount, GitHubConnection, AnalysisConsent, AnalysisAttempt, AnalysisRequest } =
   require('../../dist/member-analysis/member-analysis.entity');

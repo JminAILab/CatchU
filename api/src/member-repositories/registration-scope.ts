@@ -1,5 +1,8 @@
 import { parseRepositoryAddress, RepositoryCoordinates } from './repository-address';
 
+// #424 2026-11-01 수집 상한 결정. 정의는 새 불변 DB 판본으로만 추가한다.
+export const REGISTRATION_SCOPE_REVISION = 'catchu:allowed-scope:2026-11-01:v1';
+
 export interface RegistrationScope {
   revision: string;
   repositoryId: string;
