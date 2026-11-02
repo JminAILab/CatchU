@@ -21,6 +21,8 @@ queue_group=catchu-queue
 sources='catchu-api AUTH_JWT_SECRET /catchu/prod/api/AUTH_JWT_SECRET
 catchu-api LINK_GRANT_SECRET /catchu/prod/api/LINK_GRANT_SECRET
 catchu-api DB_PASSWORD /catchu/prod/db/catchu_app-password
+catchu-api CATCHU_GENERATION_API_KEY /catchu/prod/api/CATCHU_GENERATION_API_KEY
+catchu-api CATCHU_EMBEDDING_API_KEY /catchu/prod/api/CATCHU_EMBEDDING_API_KEY
 catchu-migration DB_PASSWORD /catchu/prod/db/catchu_migrator-password
 catchu-worker CATCHU_QUEUE_REDIS_URL /catchu/prod/queue/auth-token
 catchu-worker WORKER_CONTEXT_API_KEY /catchu/prod/worker/WORKER_CONTEXT_API_KEY
@@ -33,7 +35,7 @@ program='
 def fail($msg): error("확인 실패: " + $msg);
 def rule($key):
   {AUTH_JWT_SECRET: "[0-9a-fA-F]{64}", LINK_GRANT_SECRET: "[0-9a-fA-F]{64}", WORKER_CONTEXT_API_KEY: "[0-9a-fA-F]{64}",
-   DB_PASSWORD: "[!-~]{16,}", CATCHU_QUEUE_REDIS_URL: "[A-Za-z0-9]{16,128}", CATCHU_GENERATION_API_KEY: "[!-~]+"}[$key]
+   DB_PASSWORD: "[!-~]{16,}", CATCHU_QUEUE_REDIS_URL: "[A-Za-z0-9]{16,128}", CATCHU_GENERATION_API_KEY: "[!-~]+", CATCHU_EMBEDDING_API_KEY: "[!-~]+"}[$key]
   // fail("검사 규칙이 없는 키 " + $key);
 def labels: {"app.kubernetes.io/part-of": "catchu", "app.kubernetes.io/managed-by": "make-secrets"};
 (if (.InvalidParameters // []) == [] then . else fail("SSM에 없는 이름이 있다(" + (.InvalidParameters | join(", ")) + ")") end)

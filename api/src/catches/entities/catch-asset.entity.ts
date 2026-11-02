@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Check, Column, Entity, ForeignKey, PrimaryColumn, Unique } from 'typeorm';
+import { deleteWithParent } from '../../database/foreign-keys';
 import { AnalysisRequest, MemberAccount } from '../../member-analysis/member-analysis.entity';
 
 export type CatchGenerationStatus = 'GENERATED' | 'FAILED' | 'NOT_GENERATED';
@@ -18,8 +19,8 @@ export interface RegistrationAssessment {
 @Entity('catch_asset')
 @Unique(['ownerId', 'workIdentity'])
 @Unique(['sourceRequestId', 'sourceResultId', 'sourceCandidateId'])
-@ForeignKey(() => MemberAccount, ['ownerId'], ['memberId'], { name: 'fk_catch_asset_owner_id' })
-@ForeignKey(() => AnalysisRequest, ['sourceRequestId'], ['requestId'], { name: 'fk_catch_asset_source_request_id' })
+@ForeignKey(() => MemberAccount, ['ownerId'], ['memberId'], { name: 'fk_catch_asset_owner_id', ...deleteWithParent })
+@ForeignKey(() => AnalysisRequest, ['sourceRequestId'], ['requestId'], { name: 'fk_catch_asset_source_request_id', ...deleteWithParent })
 @Check('char_length("title") >= 1')
 @Check('char_length("source_result_id") >= 1')
 @Check('char_length("source_candidate_id") >= 1')

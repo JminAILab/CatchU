@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { authScreenMessages as M } from '../src/lib/auth-screen-messages.ts';
+import { authScreenMessages as M, googleCallbackNotice, googleCompletionNotice, googleStartNotice } from '../src/lib/auth-screen-messages.ts';
 import { createGoogleCallbackControl, createGoogleStartControl } from '../src/lib/google-login-screen.ts';
 
 /**
@@ -48,8 +48,8 @@ test('Google 버튼: 연타해도 시작은 한 번이고, ready면 Google로 �
 
 test('Google 버튼: 실패는 이유별로 안내하고 다시 누르면 새 시작이다. superseded는 안내 없이 버튼만 연다', async () => {
   const cases = [
-    ['attempt-invalid', M.loginFailed], ['invalid-request', M.loginFailed], ['server', M.loginFailed],
-    ['invalid-response', M.loginFailed], ['network', M.networkFailed], ['unavailable', M.googleUnavailable],
+    ['attempt-invalid', M.startLoginFailed], ['invalid-request', M.startLoginFailed], ['server', M.startLoginFailed],
+    ['invalid-response', M.startLoginFailed], ['network', M.startNetworkFailed], ['unavailable', M.googleUnavailable],
     ['superseded', null],
   ];
   for (const [reason, notice] of cases) {
@@ -63,7 +63,7 @@ test('Google 버튼: 실패는 이유별로 안내하고 다시 누르면 새 �
     assert.equal(h.calls.length, 2, `${reason}: 다시 누르면 새 시작`);
   }
   // 로그인 실패 문구는 회원 인증 만료(재인증) 문구와 다르다.
-  assert.notEqual(M.loginFailed, M.reauthRequired);
+  assert.notEqual(M.startLoginFailed, M.reauthRequired);
 });
 
 test('Google 버튼: 시도 보관 실패(unavailable)는 합의 문구로 안내하고 Google로 이동하지 않는다', async () => {
@@ -102,22 +102,22 @@ test('Google 버튼: 예상 밖 예외는 삼키지 않고 버튼을 다시 연�
   const control = createGoogleStartControl({ start: () => Promise.reject(new Error('boom')), redirect: () => assert.fail('이동하면 안 된다') });
   control.attach();
   await assert.rejects(control.press(null), /boom/);
-  assert.deepEqual(control.getView(), { busy: false, notice: M.loginFailed });
+  assert.deepEqual(control.getView(), { busy: false, notice: M.startLoginFailed });
 });
 
 /* ---------- 콜백 ---------- */
 
-function callbackHarness({ parse, completion, lookups = [] } = {}) {
+function callbackHarness({ parse, emptyParse = { kind: 'malformed' }, initialQuery = `code=${SECRET.code}&state=${SECRET.state}`, completion, lookups = [] } = {}) {
   const log = [];
   const completeCalls = [];
   const completeGate = deferred();
-  let query = new URLSearchParams(`code=${SECRET.code}&state=${SECRET.state}`);
+  let query = new URLSearchParams(initialQuery);
   const lookupQueue = [...lookups];
   const control = createGoogleCallbackControl({
     readCallback(q) {
       log.push(`read:${q.toString() === '' ? 'empty' : 'query'}`);
-      // query가 지워진 뒤 다시 해석하면 state가 없어 malformed가 되는 #286 동작을 흉내 낸다.
-      return q.toString() === '' ? { kind: 'malformed' } : parse;
+      // query가 지워진 뒤 다시 해석하면 보내지 않은 시도는 state가 없어 malformed, 보낸 시도는 already-sent가 되는 #286 동작을 흉내 낸다.
+      return q.toString() === '' ? emptyParse : parse;
     },
     completeGoogleLogin(input) { completeCalls.push(input); log.push('complete'); return completion ?? completeGate.promise; },
     lookupMember() { log.push('lookup'); return Promise.resolve(lookupQueue.shift() ?? { state: 'failed' }); },
@@ -199,11 +199,11 @@ test('콜백 성공 뒤 보내지 않은 회원 조회(skipped)는 실패로 안
 test('콜백: 취소는 취소 안내, 완료 실패는 회원 인증 만료와 다른 로그인 실패로 안내하고 다시 로그인은 새 시작(로그인 화면)이다', async () => {
   const cases = [
     [{ kind: 'cancelled' }, M.googleCancelled],
-    [{ kind: 'failed', reason: 'attempt-invalid' }, M.loginFailed],
-    [{ kind: 'failed', reason: 'invalid-request' }, M.loginFailed],
-    [{ kind: 'failed', reason: 'server' }, M.loginFailed],
-    [{ kind: 'failed', reason: 'invalid-response' }, M.loginFailed],
-    [{ kind: 'failed', reason: 'network' }, M.networkFailed],
+    [{ kind: 'failed', reason: 'attempt-invalid' }, M.callbackLoginFailed],
+    [{ kind: 'failed', reason: 'invalid-request' }, M.callbackLoginFailed],
+    [{ kind: 'failed', reason: 'server' }, M.callbackLoginFailed],
+    [{ kind: 'failed', reason: 'invalid-response' }, M.callbackLoginFailed],
+    [{ kind: 'failed', reason: 'network' }, M.callbackNetworkFailed],
     [{ kind: 'failed', reason: 'unavailable' }, M.googleUnavailable],
   ];
   for (const [result, notice] of cases) {
@@ -228,14 +228,40 @@ test('콜백: superseded 결과는 안내·이동 없이 무시한다', async ()
 
 test('콜백: 완료 요청을 보내지 않는 해석 결과는 재전송·세션 확인 없이 새 로그인을 안내한다', () => {
   for (const [kind, notice] of [
-    ['already-sent', M.callbackAlreadySent], ['no-attempt', M.callbackAttemptMissing], ['expired', M.callbackAttemptMissing],
-    ['state-mismatch', M.callbackStateMismatch], ['provider-error', M.loginFailed], ['malformed', M.loginFailed],
+    ['already-sent', M.callbackAlreadySent], ['no-attempt', M.callbackAttemptUnverified], ['expired', M.callbackAttemptUnverified],
+    ['state-mismatch', M.callbackAttemptUnverified], ['provider-error', M.callbackLoginFailed], ['malformed', M.callbackLoginFailed],
   ]) {
     const h = callbackHarness({ parse: { kind } });
     h.begin();
     assert.deepEqual(h.log, ['read:query', 'clear'], kind);
     assert.deepEqual(h.control.getView(), { phase: 'notice', notice, loginHref: '/login' }, kind);
   }
+});
+
+test('콜백: query가 지워진 주소로 다시 열린 콜백(already-sent)은 완료 요청 없이 합의 문구와 새 로그인을 안내한다', () => {
+  const h = callbackHarness({ emptyParse: { kind: 'already-sent' }, initialQuery: '' });
+  h.begin();
+  assert.deepEqual(h.log, ['read:empty', 'clear']);
+  assert.equal(h.completeCalls.length, 0);
+  assert.deepEqual(h.control.getView(), { phase: 'notice', notice: '로그인 결과를 확인하지 못했습니다. 다시 로그인해 주세요.', loginHref: '/login' });
+});
+
+test('안내 문구: 일반 실패·네트워크 오류는 시작 화면은 다시 시도, 콜백 화면은 [다시 로그인]에 맞추고, 콜백 해석 오류는 완료 실패와 같은 문구다', () => {
+  for (const reason of ['attempt-invalid', 'invalid-request', 'server', 'invalid-response', 'network']) {
+    assert.match(googleStartNotice(reason), /다시 시도해 주세요\.$/, reason);
+    assert.match(googleCompletionNotice({ kind: 'failed', reason }), /다시 로그인해 주세요\.$/, reason);
+  }
+  const callbackFailed = googleCompletionNotice({ kind: 'failed', reason: 'server' });
+  assert.equal(googleCallbackNotice('provider-error'), callbackFailed);
+  assert.equal(googleCallbackNotice('malformed'), callbackFailed);
+  // 취소·네트워크 오류·Google 사용 불가는 각자의 안내다.
+  for (const result of [{ kind: 'cancelled' }, { kind: 'failed', reason: 'network' }, { kind: 'failed', reason: 'unavailable' }]) {
+    assert.notEqual(googleCompletionNotice(result), callbackFailed, JSON.stringify(result));
+  }
+  // 시도 없음·만료와 다른 시도의 콜백은 문구만 같다. 다시 열린 콜백은 따로 안내한다.
+  const unverified = googleCallbackNotice('no-attempt');
+  assert.deepEqual([googleCallbackNotice('expired'), googleCallbackNotice('state-mismatch')], [unverified, unverified]);
+  assert.notEqual(googleCallbackNotice('already-sent'), unverified);
 });
 
 test('콜백: 화면이 결과를 무시해도 늦게 온 결과는 화면이 붙어 있을 때만 이동으로 쓰인다(제어는 이동하지 않는다)', async () => {
@@ -255,7 +281,7 @@ test('콜백: 완료 함수의 예상 밖 예외는 새 로그인을 안내하�
   const run = h.begin();
   assert.equal(h.begin(), run, '다시 실행돼도 같은 진행');
   await assert.rejects(run, /boom/);
-  assert.deepEqual(h.control.getView(), { phase: 'notice', notice: M.loginFailed, loginHref: '/login' });
+  assert.deepEqual(h.control.getView(), { phase: 'notice', notice: M.callbackLoginFailed, loginHref: '/login' });
 });
 
 test('콜백: 회원 조회의 예상 밖 예외는 다시 불러오기를 보이고 삼키지 않는다', async () => {

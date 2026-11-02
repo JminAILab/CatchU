@@ -7,6 +7,8 @@ export const routes = {
   landing: "/",
   /** 로그인 진입. 회원 경로 가드의 이동 목적지(#106 PR②). */
   login: "/login",
+  /** Google 로그인 콜백(#287). api `GOOGLE_REDIRECT_URI`와 같아야 한다. 통합 시험 전환을 끄면 404. */
+  googleCallback: "/google/callback",
   /** 로그인 후 홈. 회원 헤더의 로고 목적지. */
   home: "/home",
   /** 최초 프로필 입력(W02). */
@@ -15,8 +17,10 @@ export const routes = {
   profile: "/profile",
   /** 프로필 수정(W02). */
   profileEdit: "/profile/edit",
-  /** GitHub 연동(W02-G). */
+  /** GitHub 연동(W02-G). 상세 프로필·홈 안내·저장소 연결 관리의 미연동 안내가 가리킨다. */
   profileGithub: "/profile/github",
+  /** GitHub 연동 콜백(#253). api의 GITHUB_OAUTH_CALLBACK_URL이 가리키는 web 주소다. 화면 사이 이동 목적지로 쓰지 않는다. */
+  githubCallback: "/github/callback",
   /** 내 자산(Catch 탭). 필터·상세는 쿼리 `repositoryId`·`catchId`(B 제안). */
   assets: "/assets",
   /** 공유 링크 목록·발급·복사·중단. */

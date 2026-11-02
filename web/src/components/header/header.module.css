@@ -141,3 +141,8 @@
   color: #5f6d80;
   font-size: 11px;
 }
+
+/* 회원 화면의 최소 폭과 함께 메뉴 글자가 세로로 쪼개지는 것을 막는다. */
+.memberInner {
+  white-space: nowrap;
+}

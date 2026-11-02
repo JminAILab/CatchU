@@ -35,11 +35,9 @@ def _candidate(
     candidate: EligibleCandidate, candidate_id: str, evidence_prefix: str
 ) -> dict[str, Any]:
     title = candidate.title
-    if title is None or not title.strip():
-        # #118은 제목을 만들지 않아 title이 None이다. 지금 계약과 B·C·E는 빈 제목을 받지 않으므로
-        # workFacts 첫 항목을 넣는다. 계약 정정과 B·C·E 수정이 병합되기 전까지의 임시 동작이며, 그
-        # 뒤 뺀다(2026-10-08 결정 문서 「담당과 순서」 ③).
-        title = candidate.work_facts[0]
+    if title is not None and not title.strip():
+        # 계약은 제목 없음을 null로만 나타낸다. 빈 문자열·공백만인 제목도 null로 보낸다.
+        title = None
     return {
         "candidateId": candidate_id,
         "title": title,

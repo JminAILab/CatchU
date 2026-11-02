@@ -13,7 +13,7 @@
 
 | 도구 | 버전 | 쓰는 곳 | 설치 안내 |
 |---|---|---|---|
-| Docker (Docker Desktop 등) | `postgres:16` 이미지를 받을 수 있으면 된다 | PostgreSQL | [api README 「로컬 DB 준비」](../api/README.md#로컬-db-준비) |
+| Docker (Docker Desktop 등) | pgvector가 든 PostgreSQL 16 이미지(`pgvector/pgvector:0.8.7-pg16-trixie`)를 받을 수 있으면 된다 | PostgreSQL | [api README 「로컬 DB 준비」](../api/README.md#로컬-db-준비) |
 | Node.js / npm | `24.21.0` / `11.19.0` | api, web | [api README 「설치와 환경변수」](../api/README.md#설치와-환경변수), [web README 「설치」](../web/README.md#설치) |
 | uv (Python `3.12.10`은 uv가 준비) | worker README 기준 | worker | [worker README 「설치와 가상환경」](../worker/README.md#설치와-가상환경) |
 
@@ -26,8 +26,10 @@
 처음 한 번만 컨테이너를 만든다. 다음부터는 `docker start catchu-db`만 한다.
 
 ```sh
-docker run -d --name catchu-db -p 127.0.0.1:5432:5432 -e POSTGRES_USER=catchu -e POSTGRES_PASSWORD=catchu_local -e POSTGRES_DB=catchu -v catchu-db-data:/var/lib/postgresql/data postgres:16
+docker run -d --name catchu-db -p 127.0.0.1:5432:5432 -e POSTGRES_USER=catchu -e POSTGRES_PASSWORD=catchu_local -e POSTGRES_DB=catchu -v catchu-db-data:/var/lib/postgresql/data pgvector/pgvector:0.8.7-pg16-trixie
 ```
+
+전에 `postgres:16`으로 만든 `catchu-db`가 있으면 `docker rm -f catchu-db` 뒤 위 명령을 다시 한다. 볼륨이 그대로라 자료는 남는다.
 
 정상 확인:
 
@@ -107,10 +109,10 @@ npm ci
 npm run dev
 ```
 
-`Ready`가 나오면 브라우저에서 <http://localhost:3000>을 연다. 제목 "CatchU web"이 보이면 된다. 터미널에서 확인하려면:
+`Ready`가 나오면 브라우저에서 <http://localhost:3000>을 연다. 서비스 소개 화면(제목 "GitHub의 작업 기록을, 내 경험을 설명하는 근거로.")이 보이면 된다. 터미널에서 확인하려면:
 
 ```sh
-curl -s http://localhost:3000/ | grep -o 'CatchU web'
+curl -s http://localhost:3000/ | grep -o 'id="landing-title"'
 ```
 
 ### 5. web에서 로그인해 api 부르기

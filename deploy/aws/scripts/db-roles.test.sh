@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # deploy/aws/db/roles.sql 시험(#276). RDS처럼 슈퍼유저가 아닌 관리자(CREATEROLE·CREATEDB, DB catchu의 소유자)를 둔 PostgreSQL 16 컨테이너에
 # psql Pod 틀(k8s/ops/db-admin-pod.yaml)의 이미지·명령·환경 그대로 roles.sql을 실행하고, 각 계정으로 실제로 붙어 권한을 확인한다.
+# 이어서 deploy.sh가 migration 뒤마다 띄우는 동의 기록 삭제 권한 확인 Pod 틀(k8s/consent-guard-pod.yaml)의 명령을 migration 계정으로 실행해
+# 권한이 있을 때(회수 뒤 0)·없을 때(그대로 0)·회수로 없어지지 않을 때(0이 아니고 회수도 되돌림)를 본다.
 # 클라이언트는 Pod처럼 사용자 999·읽기 전용 루트·권한 제거·TLS verify-full로 돈다. 비밀번호는 시험마다 새로 만드는 합성 값이다.
-# 확인하지 못하는 것: RDS 관리자(rds_superuser)만의 특성, 실제 RDS 인증서·파라미터 그룹. 이것은 2단계 실제 RDS에서 본다.
+# 확인하지 못하는 것: RDS 관리자(rds_superuser)만의 특성(vector 만들기는 신뢰 확장으로 바꿔 흉내 낸다), RDS의 vector 판본, 실제 RDS 인증서·파라미터 그룹, migration이 실제로 만든 동의 기록 표
+# (같은 이름의 합성 표로 본다). 이것은 2단계 실제 RDS에서 본다.
 # 필요한 것: docker·openssl·jq·ruby. 사용: bash deploy/aws/scripts/db-roles.test.sh   (1분쯤, 실패가 하나라도 있으면 종료 코드 1)
 set -uo pipefail
 
@@ -75,6 +78,12 @@ ALTER SYSTEM SET log_statement = 'none';
 SELECT pg_reload_conf();\n" "$ADMIN_PW" "$OUTSIDER_PW" |
   docker exec -i "$DB" psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres > /dev/null ||
   { echo "시험용 관리자·DB를 만들지 못했다" >&2; exit 1; }
+# RDS 관리자(rds_superuser)는 슈퍼유저가 아니어도 vector를 만들 수 있다. 이 컨테이너에서는 vector를 신뢰 확장으로 바꿔
+# 'DB에 CREATE 권한이 있는 계정만 만든다'로 흉내 낸다. roles.sql이 끝나면 그 권한은 migration 계정에 넘어가므로, 확장을 만든 뒤에는
+# 원래 설정으로 되돌려 migration 계정이 새로 만들 수 없는 실제 조건에서 migration 문장(IF NOT EXISTS)을 본다.
+VECTOR_CONTROL=$(docker exec "$DB" pg_config --sharedir)/extension/vector.control
+docker exec "$DB" sh -c "cp '$VECTOR_CONTROL' /tmp/vector.control.orig && echo 'trusted = true' >> '$VECTOR_CONTROL'" ||
+  { echo "vector 확장 설정을 바꾸지 못했다" >&2; exit 1; }
 
 # ---------- 실행 도우미 ----------
 runs=0
@@ -109,13 +118,19 @@ ok() { "$@" > /dev/null 2>&1; echo $?; }
 says() { grep -qF -- "$1" "$OUT"; }
 
 # ---------- 시험 ----------
-check "psql Pod 틀의 이미지가 로컬 합성 DB(compose.local-db.yaml)와 같은 postgres digest" \
-  "$(ok grep -qF "postgres:16@${IMAGE##*@}" "$ROOT/deploy/compose.local-db.yaml")"
+check "psql Pod 틀의 이미지가 로컬 합성 DB(compose.local-db.yaml)와 같은 이미지·digest" \
+  "$(ok grep -qF "image: ${IMAGE#docker.io/}" "$ROOT/deploy/compose.local-db.yaml")"
 
 run_pod "$ROOT/deploy/aws/db/roles.sql"
 check "roles.sql: 슈퍼유저 아닌 관리자로 Pod 틀 그대로(사용자 999·읽기 전용 루트·TLS verify-full·한 트랜잭션) 실행해 종료 0" "$(ok test "$rc" = 0)"
 check "roles.sql 확인 출력: 앱 계정 lock_timeout 3초, DB·public 스키마 소유자가 migration 계정" \
   "$( { says '{lock_timeout=3s}' && grep -q '^ catchu *| catchu_migrator' "$OUT" && grep -q '^ public *| catchu_migrator' "$OUT"; } > /dev/null 2>&1; echo $?)"
+check "roles.sql 확인 출력: vector 확장이 public 스키마에 있음" "$(ok grep -qE '^ vector +\| [0-9.]+ +\| public' "$OUT")"
+docker exec "$DB" cp /tmp/vector.control.orig "$VECTOR_CONTROL" || { echo "vector 확장 설정을 되돌리지 못했다" >&2; exit 1; }
+sql_as catchu_migrator "$MIGRATOR_PW" 'CREATE EXTENSION IF NOT EXISTS vector; CREATE TABLE emb (id integer PRIMARY KEY, e vector(3));'
+check "migration 계정: 확장을 만들 권한 없이도 migration 문장(IF NOT EXISTS)이 통과하고 벡터 열을 만듦" "$(ok test "$rc" = 0)"
+sql_as catchu_app "$APP_PW" "INSERT INTO emb VALUES (1, '[1,2,3]'); SELECT round((e <-> '[1,2,4]')::numeric, 3) FROM emb;"
+check "앱 계정: 벡터 열에 쓰고 거리 계산으로 읽음" "$(ok test "$rc" = 0 -a "$(cat "$OUT")" = 1.000)"
 # 같은 서버를 인증서와 다른 이름(db-other)으로 부르면 Pod 설정이 연결을 거부해야 한다(TLS가 호스트 이름까지 검증하는지).
 printf '%s\n' 'SELECT 1;' > "$WORK/select1.sql"
 POD_HOST=db-other run_pod "$WORK/select1.sql"
@@ -161,13 +176,81 @@ run_pod "$WORK/positional.sql" "$APP_PW2"
 check "SQL 파일이 VERBOSITY를 켜지 않아도 위치 오류 때 비밀번호가 든 문장을 되풀이하지 않음(Pod 명령)" \
   "$( { test "$rc" != 0 && says 'at character' && ! grep -qF "$APP_PW2" "$OUT"; } > /dev/null 2>&1; echo $?)"
 
+# ---------- 동의 기록 삭제 권한 확인 Pod(k8s/consent-guard-pod.yaml) ----------
+# deploy.sh가 migration 뒤마다 띄우는 Pod다. 틀의 이미지·명령(SQL 포함)·고정 환경값을 그대로 쓰고, ConfigMap catchu-db(DB 주소·CA)와
+# Secret catchu-migration(비밀번호) 자리는 이 시험의 값으로 채운다. 동의 기록 표는 실제 migration 대신 같은 이름의 합성 표로 만든다.
+guard=$(ruby -ryaml -rjson -e 'puts JSON.generate(YAML.load_stream(STDIN.read).compact)' < "$ROOT/deploy/aws/k8s/consent-guard-pod.yaml" |
+  jq -c '.[0].spec.containers[0]')
+GUARD_IMAGE=$(jq -r .image <<< "$guard")
+guard_cmd=()
+while IFS= read -r -d '' part; do guard_cmd+=("$part"); done < <(jq -j '.command[] | ., "\u0000"' <<< "$guard")
+guard_fixed=()
+while IFS= read -r pair; do guard_fixed+=(-e "$pair"); done < <(jq -r '.env[] | select(.value != null) | "\(.name)=\(.value)"' <<< "$guard")
+run_guard() { # Pod 틀과 같은 이미지·명령·환경·보안 설정으로 migration 계정이 실행한다. 결과는 $OUT, 종료 코드는 rc.
+  PGPASSWORD=$MIGRATOR_PW docker run --rm --network "$NET" --read-only --tmpfs /tmp --user 999:999 --cap-drop ALL --security-opt no-new-privileges \
+    "${guard_fixed[@]}" -e "PGHOST=${POD_HOST:-db}" -e PGPASSWORD -v "$WORK/ca:/run/catchu:ro" "$GUARD_IMAGE" "${guard_cmd[@]}" > "$OUT" 2>&1
+  rc=$?
+  cat "$OUT" >> "$LOGS"
+}
+app_privileges() { # 앱 계정이 동의 기록에 실제로 쓸 수 있는 권한(SELECT·INSERT·UPDATE·DELETE·TRUNCATE 순서로 true/false)
+  sql_as catchu_admin "$ADMIN_PW" "SELECT string_agg(has_table_privilege('catchu_app', 'public.analysis_consent', p)::text, ',' ORDER BY n)
+    FROM unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) WITH ORDINALITY AS x(p, n);"
+}
+check "확인 Pod 틀: DB 관리 Pod 틀과 같은 postgres digest, 명령은 psql 한 번(SQL 포함 ${#guard_cmd[@]}개 인자)" \
+  "$(ok test "$GUARD_IMAGE" = "$IMAGE" -a "${guard_cmd[0]}" = psql)"
+
+run_guard
+check "확인 Pod: 동의 기록 표가 없으면(migration이 만들지 않음) 0이 아님" "$( { test "$rc" != 0 && says 'does not exist'; } > /dev/null 2>&1; echo $?)"
+sql_as catchu_migrator "$MIGRATOR_PW" 'CREATE TABLE analysis_consent (consent_id integer PRIMARY KEY, accepted boolean NOT NULL);'
+app_privileges
+check "준비: migration 계정이 만든 동의 기록 표에 앱 계정이 기본 권한으로 DELETE를 받음(TRUNCATE는 없음)" "$(ok test "$rc" = 0 -a "$(cat "$OUT")" = true,true,true,true,false)"
+
+run_guard
+check "확인 Pod: 권한이 있으면 회수하고 0, 결과 줄 '회수 전 있음, 회수 뒤 없음'" \
+  "$( { test "$rc" = 0 && says '동의 기록 직접 삭제 권한(catchu_app): 회수 전 있음, 회수 뒤 없음'; } > /dev/null 2>&1; echo $?)"
+app_privileges
+check "회수 뒤: 앱 계정은 동의 기록을 읽고 쓰는 권한은 그대로, DELETE·TRUNCATE는 없음" "$(ok test "$rc" = 0 -a "$(cat "$OUT")" = true,true,true,false,false)"
+sql_as catchu_app "$APP_PW" 'INSERT INTO analysis_consent VALUES (1, true); SELECT count(*) FROM analysis_consent;'
+check "회수 뒤: 앱 계정이 동의 기록을 남기고 읽음" "$(ok test "$rc" = 0 -a "$(cat "$OUT")" = 1)"
+sql_as catchu_app "$APP_PW" 'DELETE FROM analysis_consent;'
+check "회수 뒤: 앱 계정이 동의 기록을 DELETE하지 못함" "$( { test "$rc" != 0 && says 'permission denied for table analysis_consent'; } > /dev/null 2>&1; echo $?)"
+sql_as catchu_app "$APP_PW" 'TRUNCATE analysis_consent;'
+check "회수 뒤: 앱 계정이 동의 기록을 TRUNCATE하지 못함" "$( { test "$rc" != 0 && says 'permission denied for table analysis_consent'; } > /dev/null 2>&1; echo $?)"
+
+run_guard
+check "확인 Pod: 권한이 없으면 바꾸지 않고 0, 결과 줄 '회수 전 없음, 회수 뒤 없음'" \
+  "$( { test "$rc" = 0 && says '동의 기록 직접 삭제 권한(catchu_app): 회수 전 없음, 회수 뒤 없음'; } > /dev/null 2>&1; echo $?)"
+sql_as catchu_migrator "$MIGRATOR_PW" 'GRANT TRUNCATE ON analysis_consent TO catchu_app;'
+run_guard
+guard_rc=$rc
+guard_out=$(cat "$OUT")
+app_privileges
+check "확인 Pod: 앱 계정에 직접 준 TRUNCATE도 직접 삭제 권한으로 보고 회수" \
+  "$( { test "$guard_rc" = 0 -a "$(cat "$OUT")" = true,true,true,false,false && grep -qF '회수 전 있음, 회수 뒤 없음' <<< "$guard_out"; } > /dev/null 2>&1; echo $?)"
+
+# 회수로 없어지지 않는 권한: PUBLIC에 준 DELETE는 앱 계정에서 회수해도 남는다. 앱 계정에 직접 준 DELETE도 함께 두어 되돌림을 본다.
+sql_as catchu_migrator "$MIGRATOR_PW" 'GRANT DELETE ON analysis_consent TO catchu_app; GRANT DELETE ON analysis_consent TO PUBLIC;'
+run_guard
+check "확인 Pod: 회수 뒤에도 권한이 남으면(PUBLIC에 준 DELETE) 0이 아니고 남았다고 알림" \
+  "$( { test "$rc" != 0 && says '회수 뒤에도 남아 있다(회수 전 있음)'; } > /dev/null 2>&1; echo $?)"
+sql_as catchu_admin "$ADMIN_PW" "SELECT count(*) FROM pg_class c, aclexplode(c.relacl) a
+  WHERE c.oid = 'public.analysis_consent'::regclass AND a.grantee = 'catchu_app'::regrole AND a.privilege_type = 'DELETE';"
+check "확인 Pod: 실패하면 한 트랜잭션이라 앞의 회수(앱 계정에 직접 준 DELETE)도 되돌림" "$(ok test "$rc" = 0 -a "$(cat "$OUT")" = 1)"
+sql_as catchu_migrator "$MIGRATOR_PW" 'REVOKE DELETE ON analysis_consent FROM PUBLIC;'
+run_guard
+check "원인(PUBLIC 권한)을 고친 뒤 다시 실행하면 회수하고 0" \
+  "$( { test "$rc" = 0 && says '회수 전 있음, 회수 뒤 없음'; } > /dev/null 2>&1; echo $?)"
+POD_HOST=db-other run_guard
+check "확인 Pod: 인증서와 다른 이름으로 붙으면 거부(TLS verify-full이 호스트 이름까지 검증)" \
+  "$( { test "$rc" != 0 && says 'does not match host name'; } > /dev/null 2>&1; echo $?)"
+
 docker logs "$DB" > "$WORK/server.log" 2>&1
 leaked=0
 for pw in "$ADMIN_PW" "$APP_PW" "$MIGRATOR_PW" "$APP_PW2" "$MIGRATOR_PW2" "$OUTSIDER_PW"; do
   grep -qF "$pw" "$LOGS" "$WORK/server.log" && leaked=1
 done
 : > "$OUT"
-check "비밀번호가 psql 출력과 DB 로그에 남지 않음(실패한 다시 실행 포함)" "$(ok test "$leaked" = 0)"
+check "비밀번호가 psql 출력과 DB 로그에 남지 않음(실패한 다시 실행·동의 기록 확인 Pod 포함)" "$(ok test "$leaked" = 0)"
 
 echo
 echo "통과 $pass, 실패 $fail"

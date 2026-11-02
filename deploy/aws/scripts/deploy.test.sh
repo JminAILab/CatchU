@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # deploy.sh 회귀 시험과 쿠버네티스 실행 파일 조건 검사(#276). 실제 클러스터·AWS에는 닿지 않는다.
 # - deploy.sh: kubectl·aws·sleep을 합성 명령으로 바꾸고, 지금 작업 폴더의 deploy.sh·guard.sh·k8s/를 담은 합성 git 저장소에서 실제로 실행한다.
-#   합성 kubectl은 Deployment·Pod·migration Pod 상태를 파일로 흉내 내고, 바꾸는 호출(scale·create·apply·rollout)을 순서대로 남긴다.
-# - 실행 파일: deploy.sh가 자리를 채워 적용한 Deployment·migration Pod와 손으로 적용하는 파일을 Ruby(YAML→JSON)·jq로 읽어 조건을 본다.
+#   합성 kubectl은 Deployment·Pod·migration Pod·동의 기록 확인 Pod 상태를 파일로 흉내 내고, 바꾸는 호출(scale·create·apply·rollout)을 순서대로 남긴다.
+#   동의 기록 확인 Pod 안의 SQL은 여기서 보지 않는다(db-roles.test.sh가 실제 PostgreSQL에서 본다).
+# - 실행 파일: deploy.sh가 자리를 채워 적용한 Deployment·migration Pod·동의 기록 확인 Pod와 손으로 적용하는 파일을 Ruby(YAML→JSON)·jq로 읽어 조건을 본다.
 # 확인하지 못하는 것: 실제 API 서버의 스키마·승인 검사(Pod 보안 검사 restricted 포함), 노드에서의 실제 종료 코드와
 # 준비 시간, NetworkPolicy·ALB의 실제 동작. 이것은 2단계 실제 클러스터에서 본다(deploy/aws/k8s/README.md).
 # 필요한 것: bash·jq·git·ruby. 사용: bash deploy/aws/scripts/deploy.test.sh   (실패가 하나라도 있으면 종료 코드 1)
@@ -41,6 +42,10 @@ g checkout -q "$C1"
 g rm -q deploy/aws/k8s/web.yaml
 g commit -q -m no-web
 C3=$(g rev-parse HEAD)
+g checkout -q "$C1"
+g rm -q deploy/aws/k8s/consent-guard-pod.yaml
+g commit -q -m no-consent-guard
+C4=$(g rev-parse HEAD)
 g checkout -q "$C1"
 digest_of() { printf 'sha256:%s' "$(printf '%s' "$1" | shasum -a 256 | cut -d' ' -f1)"; }
 MIG=catchu-migrate-${C1:0:12}
@@ -124,6 +129,13 @@ migration_pod() {
   printf '{"metadata":{"name":"%s","uid":"0000-uid"},"status":{"phase":"%s","containerStatuses":[{"imageID":"123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/catchu-api-migration@%s"%s}]}}\n' \
     "$(cat "$S/mig-name")" "$phase" "$digest" "$terminated"
 }
+guard_pod() {
+  local code terminated=''
+  code=$(cat "$S/guard-code")
+  [ -n "$code" ] && terminated=",\"state\":{\"terminated\":{\"exitCode\":$code,\"startedAt\":\"2026-11-10T01:01:00Z\",\"finishedAt\":\"2026-11-10T01:01:02Z\"}}"
+  printf '{"metadata":{"name":"%s","uid":"1111-uid"},"status":{"phase":"%s","containerStatuses":[{"imageID":"docker.io/library/postgres@sha256:%s"%s}]}}\n' \
+    "$(cat "$S/guard-name")" "$(cat "$S/guard-phase")" "$(printf '1%.0s' $(seq 64))" "$terminated"
+}
 watch_line() { # 템플릿 이름 종료코드 → 실제 kubectl 1.37.1의 감시 출력 한 줄
   # 그 판본을 이 컴퓨터의 가짜 API에 붙여 확인한 동작을 흉내 낸다: 감시 출력은 TabWriter를 거쳐 탭이 공백(간격 3)으로 바뀐다.
   # 흉내 내지 않는 식이 남으면 실패한다(새 식을 쓰면 실제 출력을 먼저 확인하고 여기에 더한다).
@@ -195,6 +207,17 @@ case "$*" in
     [ -f "$S/mig-phase" ] || { echo 'Error from server (NotFound): synthetic' >&2; exit 1; }
     migration_pod ;;
   "create -f "*)
+    if grep -q '^    app.kubernetes.io/component: consent-guard$' "$3"; then
+      # 동의 기록 확인 Pod. STUB_GUARD_RESULT: Succeeded(기본)·Failed(회수 뒤에도 권한이 남음)·Pending(끝나지 않음)
+      [ "${STUB_GUARD_CREATE_FAIL:-0}" = 1 ] && { call "create consent-guard 실패"; echo "error: synthetic timeout" >&2; exit 1; }
+      cp "$3" "$S/guard.yaml"
+      call "create consent-guard"
+      awk '/^  name: / { print $2; exit }' "$3" > "$S/guard-name"
+      result=${STUB_GUARD_RESULT:-Succeeded}
+      echo "$result" > "$S/guard-phase"
+      case $result in Succeeded) echo 0 ;; Failed) echo 1 ;; *) echo '' ;; esac > "$S/guard-code"
+      exit 0
+    fi
     [ "${STUB_CREATE_FAIL:-0}" = 1 ] && { call "create 실패"; echo "error: synthetic timeout" >&2; exit 1; }
     cp "$3" "$S/created.yaml"
     call "create migration"
@@ -204,6 +227,14 @@ case "$*" in
     echo "$result" > "$S/mig-phase"
     case $result in Succeeded) echo 0 ;; Failed) echo 1 ;; *) echo '' ;; esac > "$S/mig-code" ;;
   "logs catchu-migrate-"*" --tail=20") printf 'query: SELECT * FROM "migrations"\nMigration Synthetic1790500000000 has been executed successfully.\n' ;;
+  "get pod catchu-consent-guard-"*" -o json")
+    [ -f "$S/guard-phase" ] || { echo 'Error from server (NotFound): synthetic' >&2; exit 1; }
+    guard_pod ;;
+  "logs catchu-consent-guard-"*" --tail=20")
+    case $(cat "$S/guard-phase") in
+      Succeeded) echo 'NOTICE:  동의 기록 직접 삭제 권한(catchu_app): 회수 전 있음, 회수 뒤 없음' ;;
+      Failed) echo 'ERROR:  동의 기록 직접 삭제 권한(catchu_app)이 회수 뒤에도 남아 있다(회수 전 있음). PUBLIC이나 다른 역할에서 받은 권한인지 본다' ;;
+    esac ;;
   "apply -f "*)
     n=$(basename "$3" .yaml)
     has "$n" "${STUB_APPLY_FAIL:-}" && { call "apply $n 실패"; echo "error: synthetic" >&2; exit 1; }
@@ -272,12 +303,13 @@ clean() { # 알 수 없는 호출이 없고, 계정 번호가 출력에 없고, 
 says() { grep -qF -- "$1" "$OUT"; }
 REPLACE="STUB_DEPLOYS=api=1 worker=1 web=1"
 RUNNING="STUB_PODS=api-old:running worker-old:running"
+GUARD='create consent-guard,'
 START='apply api,rollout api,apply worker,rollout worker,apply web,rollout web,'
 
 # ---------- 처음 설치와 교체 ----------
 run_sut --commit "$C1"
 check "처음 설치: 종료 0, migration → api → worker → web 순서, 멈추기 없음" \
-  "$(ok test "$rc" = 0 -a "$(calls)" = "create migration,${START}")"
+  "$(ok test "$rc" = 0 -a "$(calls)" = "create migration,${GUARD}${START}")"
 check "처음 설치: migration Pod 이름은 커밋 앞 12자, 이미지는 그 커밋 태그의 digest" \
   "$( { says "migration 성공: ${MIG}" && test "$(cat "$S/mig-name")" = "$MIG" && test "$(cat "$S/mig-digest")" = "$(digest_of catchu-api-migration)"; } > /dev/null 2>&1; echo $?)"
 check "처음 설치: 알 수 없는 호출·계정 번호 출력·남은 임시 파일 없음" "$(ok clean)"
@@ -290,29 +322,36 @@ for n in api worker web; do
     "$( { grep -qxF "          ${want}" "$S/applied-${n}.yaml" && grep -qx '  replicas: 1' "$S/applied-${n}.yaml" \
       && grep -qF "catchu.io/source-revision: ${C1}" "$S/applied-${n}.yaml" && ! grep -q '__[A-Z]' "$S/applied-${n}.yaml"; } > /dev/null 2>&1; echo $?)"
 done
+check "처음 설치: 동의 기록 확인 Pod 이름은 catchu-consent-guard-<UTC 시각>, 커밋 표식, 남은 자리 없음" \
+  "$( { grep -qE '^catchu-consent-guard-[0-9]{8}-[0-9]{6}$' "$S/guard-name" && grep -qF "catchu.io/source-revision: ${C1}" "$S/guard.yaml" \
+    && ! grep -q '__[A-Z]' "$S/guard.yaml"; } > /dev/null 2>&1; echo $?)"
+in_record() { awk -v s="$1" 'f && index($0, s) { found = 1 } /^교체 기록\(커밋/ { f = 1 } END { exit !found }' "$OUT"; }
+check "처음 설치: 교체 기록에 동의 기록 직접 삭제 권한 결과 줄을 남김(#276 증거)" \
+  "$(ok in_record '동의 기록 직접 삭제 권한(catchu_app): 회수 전 있음, 회수 뒤 없음')"
 cp "$S"/applied-*.yaml "$S/created.yaml" "$WORK/"
+cp "$S/guard.yaml" "$WORK/guard.yaml"
 
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=143 worker-old=0" --commit "$C1"
 check "교체: 옛 api·worker를 멈춘 뒤 migration, 그다음 새 실행" \
-  "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${START}")"
+  "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}")"
 check "교체: 옛 실행의 종료 코드(143·0)를 기록에 남김" "$( { says 'api-old 종료 코드 143' && says 'worker-old 종료 코드 0' && says '교체 기록'; } > /dev/null 2>&1; echo $?)"
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=143 worker-old=0" STUB_WATCH_LATE=1 --commit "$C1"
-check "교체: 마지막 종료 코드가 Pod가 없어진 뒤에 늦게 와도 기다려 받음" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${START}")"
+check "교체: 마지막 종료 코드가 Pod가 없어진 뒤에 늦게 와도 기다려 받음" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}")"
 
 run_sut "$REPLACE" STUB_PODS="api-old:waiting worker-old:running" STUB_EXIT="worker-old=0" --commit "$C1"
-check "교체: 실행 중이 아니던 Pod(재시작 대기)는 종료 코드 없이 지워지기만 확인" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${START}")"
+check "교체: 실행 중이 아니던 Pod(재시작 대기)는 종료 코드 없이 지워지기만 확인" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}")"
 
 run_sut "$REPLACE" STUB_DIFF=0 --commit "$C1"
 check "같은 판본·구성이 정상으로 돌면 아무것도 바꾸지 않음" "$(ok test "$rc" = 0 -a -z "$(calls)" -a "$(grep -c '바꿀 것 없음' "$OUT")" = 1)"
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_DIFF=0 STUB_UNREADY=worker --commit "$C1"
-check "같은 구성이어도 정상이 아니면 다시 띄움" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${START}")"
+check "같은 구성이어도 정상이 아니면 다시 띄움" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}")"
 
 # ---------- 시작 전 확인(아무것도 바꾸지 않음, 종료 코드 2) ----------
 untouched() { test "$rc" = 2 -a -z "$(calls)"; }
 run_sut STUB_DEPLOYS="api=0 worker=0 web=1" --commit "$C1"
 check "api·worker가 0으로 멈춰 있으면 --resume 없이는 멈춤" "$( { untouched && says '--resume'; } > /dev/null 2>&1; echo $?)"
 run_sut STUB_DEPLOYS="api=0 worker=0 web=1" --commit "$C1" --resume
-check "--resume이면 이어서 교체" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${START}")"
+check "--resume이면 이어서 교체" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}")"
 run_sut STUB_NO_NETPOL=1 --commit "$C1"
 check "기본 차단 NetworkPolicy가 없으면 멈춤" "$(ok untouched)"
 run_sut STUB_NO_CONFIGMAP=1 --commit "$C1"
@@ -365,27 +404,44 @@ run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_MIG_RESULT
 check "migration이 시간 안에 끝나지 않으면 5, 대기 이유를 알려 줌" "$( { test "$rc" = 5 -a "$(calls)" = "scale api 0,scale worker 0,create migration," && test "$(grep -c '^sleep 3$' "$S/sleeps")" = 220 && says '대기 이유 CreateContainerConfigError'; } > /dev/null 2>&1; echo $?)"
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_MIG_EXISTING=Succeeded:0:same --commit "$C1"
 check "같은 이름 migration Pod가 같은 이미지로 성공해 있으면 다시 만들지 않고 진행" \
-  "$( { test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,${START}" && says '다시 실행하지 않는다'; } > /dev/null 2>&1; echo $?)"
+  "$( { test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,${GUARD}${START}" && says '다시 실행하지 않는다'; } > /dev/null 2>&1; echo $?)"
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_MIG_EXISTING=Failed:1:same --commit "$C1"
 check "같은 이름 migration Pod가 실패 상태로 남아 있으면 5, 다시 만들지 않음" "$(ok test "$rc" = 5 -a "$(calls)" = "scale api 0,scale worker 0,")"
 other=sha256:$(printf '0%.0s' $(seq 64))
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_MIG_EXISTING="Succeeded:0:${other}" --commit "$C1"
 check "같은 이름 migration Pod가 다른 이미지로 성공해 있으면 5" "$(ok test "$rc" = 5 -a "$(calls)" = "scale api 0,scale worker 0,")"
 
+# ---------- 동의 기록 삭제 권한 확인(8) ----------
+run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_GUARD_RESULT=Failed --commit "$C1"
+check "동의 기록 삭제 권한이 회수 뒤에도 남으면(확인 Pod 실패) 8, 새 실행 없음, psql 출력을 보여 줌" \
+  "$( { test "$rc" = 8 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}" && says '회수 뒤에도 남아 있다'; } > /dev/null 2>&1; echo $?)"
+run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_GUARD_CREATE_FAIL=1 --commit "$C1"
+check "동의 기록 확인 Pod를 만드는 요청이 실패하면 8, 새 실행 없음" \
+  "$( { test "$rc" = 8 -a "$(calls)" = "scale api 0,scale worker 0,create migration,create consent-guard 실패," && grep -qE '멈춤\(8\): .*만드는 요청이 실패했다' "$OUT"; } > /dev/null 2>&1; echo $?)"
+run_sut STUB_GUARD_RESULT=Pending --commit "$C1"
+check "동의 기록 확인이 시간 안에 끝나지 않으면 8, 새 실행 없음" \
+  "$(ok test "$rc" = 8 -a "$(calls)" = "create migration,${GUARD}" -a "$(grep -c '^sleep 3$' "$S/sleeps")" = 120)"
+run_sut STUB_DEPLOYS="api=0 worker=0 web=1" STUB_MIG_EXISTING=Succeeded:0:same --commit "$C1" --resume
+check "8로 멈춘 뒤 --resume: migration은 건너뛰고 새 확인 Pod로 다시 확인한 뒤 새 실행" \
+  "$( { test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,${GUARD}${START}" && says '동의 기록 삭제 권한 확인 성공'; } > /dev/null 2>&1; echo $?)"
+run_sut --commit "$C4"
+check "배포할 커밋에 확인 Pod 틀이 없으면(작업 폴더에 있어도) 아무것도 바꾸지 않고 멈춤" \
+  "$( { untouched && says 'consent-guard-pod.yaml'; } > /dev/null 2>&1; echo $?)"
+
 # ---------- 새 실행 확인(6, 다시 멈추기 실패는 3) ----------
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_ROLLOUT_FAIL=api --commit "$C1"
 check "새 api가 준비되지 않으면 api·worker를 다시 멈추고 6, worker·web은 띄우지 않음" \
-  "$(ok test "$rc" = 6 -a "$(calls)" = "scale api 0,scale worker 0,create migration,apply api,rollout api,scale api 0,scale worker 0,")"
+  "$(ok test "$rc" = 6 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}apply api,rollout api,scale api 0,scale worker 0,")"
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_ROLLOUT_FAIL=web --commit "$C1"
 check "새 web이 준비되지 않아도 api·worker를 다시 멈추고 6" \
-  "$(ok test "$rc" = 6 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${START}scale api 0,scale worker 0,")"
+  "$(ok test "$rc" = 6 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}scale api 0,scale worker 0,")"
 run_sut STUB_APPLY_FAIL=worker --commit "$C1"
 check "처음 설치에서 worker 적용이 실패하면 띄운 api를 다시 멈추고 6" \
-  "$(ok test "$rc" = 6 -a "$(calls)" = "create migration,apply api,rollout api,apply worker 실패,scale api 0,")"
+  "$(ok test "$rc" = 6 -a "$(calls)" = "create migration,${GUARD}apply api,rollout api,apply worker 실패,scale api 0,")"
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_FINAL_UNREADY=worker --commit "$C1"
-check "마지막 확인에서 하나라도 준비 상태가 아니면 6" "$(ok test "$rc" = 6 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${START}scale api 0,scale worker 0,")"
+check "마지막 확인에서 하나라도 준비 상태가 아니면 6" "$(ok test "$rc" = 6 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}scale api 0,scale worker 0,")"
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_ROLLOUT_FAIL=api STUB_SCALE_FAIL=after-start --commit "$C1"
-check "새 실행 실패 뒤 다시 멈추기도 실패하면 3" "$(ok test "$rc" = 3 -a "$(calls)" = "scale api 0,scale worker 0,create migration,apply api,rollout api,scale api 실패,scale worker 실패,")"
+check "새 실행 실패 뒤 다시 멈추기도 실패하면 3" "$(ok test "$rc" = 3 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}apply api,rollout api,scale api 실패,scale worker 실패,")"
 
 # ---------- 쿠버네티스 실행 파일 조건 ----------
 # 처음 설치 시험에서 deploy.sh가 자리를 채워 적용한 파일(api·worker·web·migration)과, 손으로 적용하는 파일을 읽는다.
@@ -396,11 +452,12 @@ q() { # 파일 jq식 — 결과가 true여야 통과
   json "$1" | jq -e "$2" > /dev/null 2>> "$OUT"
 }
 POD='(if .kind == "Pod" then .spec else .spec.template.spec end)'
-for f in api worker web created; do
+for f in api worker web created guard; do
   file=$WORK/$f.yaml
-  [ "$f" = created ] || file=$WORK/applied-$f.yaml
-  check "실행 파일 ${f}: root 아님(UID 1000)·seccomp·토큰 자동 탑재 끔·Service 환경변수 끔·호스트 망 없음" \
-    "$(ok q "$file" ".[0] | ${POD} | .securityContext.runAsNonRoot == true and .securityContext.runAsUser == 1000
+  uid=1000
+  case $f in created) ;; guard) uid=999 ;; *) file=$WORK/applied-$f.yaml ;; esac
+  check "실행 파일 ${f}: root 아님(UID ${uid})·seccomp·토큰 자동 탑재 끔·Service 환경변수 끔·호스트 망 없음" \
+    "$(ok q "$file" ".[0] | ${POD} | .securityContext.runAsNonRoot == true and .securityContext.runAsUser == ${uid}
       and .securityContext.seccompProfile.type == \"RuntimeDefault\" and .automountServiceAccountToken == false
       and .enableServiceLinks == false and (.hostNetwork // false) == false and (.hostPID // false) == false and (.hostIPC // false) == false")"
   check "실행 파일 ${f}: 권한 상승 금지·읽기 전용 루트·권한 전부 제거, /tmp는 크기 상한 있는 빈 볼륨" \
@@ -433,6 +490,17 @@ check "migration Pod: controller 없음·다시 띄우지 않음·시간 한도,
   "$(ok q "$WORK/created.yaml" '.[0] | .kind == "Pod" and .metadata.ownerReferences == null and .spec.restartPolicy == "Never"
       and .spec.activeDeadlineSeconds > 0 and .metadata.labels["app.kubernetes.io/name"] == "migration"
       and any(.spec.containers[0].env[]; .name == "DB_USER" and .value == "catchu_migrator")')"
+ADMIN_IMAGE=$(json "$K8S/ops/db-admin-pod.yaml" | jq -r '.[0].spec.containers[0].image')
+check "동의 기록 확인 Pod: controller 없음·다시 띄우지 않음·시간 한도, migration 계정·Secret·연결 허용 라벨, TLS 검증, DB 관리 Pod와 같은 이미지" \
+  "$(ok q "$WORK/guard.yaml" ".[0] | .kind == \"Pod\" and .metadata.namespace == \"catchu\" and .metadata.ownerReferences == null
+      and .spec.restartPolicy == \"Never\" and .spec.activeDeadlineSeconds > 0 and .metadata.labels[\"app.kubernetes.io/name\"] == \"migration\"
+      and .spec.containers[0].image == \"${ADMIN_IMAGE}\"
+      and (.spec.containers[0].env | map({(.name): (.value // .valueFrom.secretKeyRef.name // .valueFrom.configMapKeyRef.name)}) | add
+        | .PGUSER == \"catchu_migrator\" and .PGPASSWORD == \"catchu-migration\" and .PGHOST == \"catchu-db\" and .PGSSLMODE == \"verify-full\")")"
+check "동의 기록 확인 Pod: 한 트랜잭션·오류에서 멈춤·문장 되풀이 없음, 쿠버네티스가 바꾸는 \$(·\$\$가 명령에 없음" \
+  "$(ok q "$WORK/guard.yaml" '.[0].spec.containers[0] | .args == null and (.command | index("--single-transaction") != null
+      and index("ON_ERROR_STOP=1") != null and index("VERBOSITY=terse") != null and index("--echo-all") == null
+      and all(.[]; (contains("$(") or contains("$$")) | not))')"
 check "Deployment 원본은 자리표시 그대로라 손으로 apply하면 거부됨(실행 수가 숫자가 아님)" \
   "$(ok test "$(cat "$K8S/api.yaml" "$K8S/worker.yaml" "$K8S/web.yaml" | grep -c '^  replicas: __REPLICAS__$')" = 3)"
 check "namespace: Pod 보안 검사 restricted, 기본 서비스 계정 토큰 자동 탑재 끔" \

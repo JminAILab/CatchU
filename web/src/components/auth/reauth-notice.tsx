@@ -1,36 +1,61 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { ReauthNoticeProps } from "@/lib/auth-screen-contract";
+import { useEffect, useRef, useState } from "react";
+import type { ReauthNoticeProps } from "@/lib/auth-gate";
 import { authScreenMessages } from "@/lib/auth-screen-messages";
-import { confirmReauthLeave } from "@/lib/member-session-screen";
+import { confirmReauthLeave, createReauthLeaveControl } from "@/lib/member-session-screen";
 import { loginPath } from "@/lib/member-navigation";
 import { unsavedChanges } from "@/lib/unsaved-changes";
 import styles from "./auth.module.css";
 
 /**
- * 재인증 안내(#287). 가드가 `renderReauthNotice`로 회원 화면 위에 그린다. 아래 화면·입력은 가드가 유지한다.
- * [다시 로그인]은 로그아웃·갱신 요청 없이 `loginPath(returnTo)`로 간다(#251 A 답변 3).
- * - 일반 재인증: 로그아웃과 같은 미저장 확인을 거친다. 머무르면 아무것도 하지 않는다.
- * - `inputCleared`: 로그인 표식 변경 뒤 공통 인증이 화면·입력을 이미 정리한 탭(팀장 답변 2). 같은 문구에 [다시 로그인]만 두고 묻지 않는다.
- *   이 값은 #286이 정해 넘긴다.
+ * 재인증 안내(#287). 가드가 `renderReauthNotice`로 그린다. 화면·입력의 유지·정리는 가드가 맡는다.
+ * [다시 로그인]은 로그아웃·갱신 요청 없이 `loginPath(returnTo)`로 간다(#251 A 답변 3, 팀장 결정 2). 판단은 `confirmReauthLeave()`를 따른다.
+ * 이동은 한 번만 시작한다(`createReauthLeaveControl()`). 계속한 뒤의 더블클릭·Enter 반복은 묻지도 이동하지도 않는다.
+ * - `variant` 생략·`reauth`: 회원 화면 위의 안내다. 로그아웃과 같은 이동 전 확인(누른 시점의 미저장 입력·미확정 분석 요청)을 거치고, 머무르면 아무것도 하지 않는다.
+ * - `login-changed`: 다른 탭의 새 로그인 감지로 가드가 화면·입력을 이미 정리한 탭이다. 같은 문구에 [다시 로그인]만 두고 묻지 않는다.
+ * 안내는 스크롤 영역 위쪽에 붙는다(`.reauthNotice`, #286 10/29 확인 필요 2). 자동 스크롤·초점 이동은 하지 않는다.
  */
-export function ReauthNotice({ returnTo, inputCleared = false }: ReauthNoticeProps & { inputCleared?: boolean }) {
+export function ReauthNotice({ returnTo, variant }: ReauthNoticeProps) {
   const router = useRouter();
+  const [leave] = useState(() => createReauthLeaveControl({
+    confirmLeave: (current) => confirmReauthLeave(current, unsavedChanges, (message) => window.confirm(message)),
+    navigate: (to) => router.push(loginPath(to ?? undefined)),
+  }));
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => keepFocusBelowNotice(box.current), []);
   return (
-    <div className={styles.notice} role="alert">
+    <div ref={box} className={`${styles.notice} ${styles.reauthNotice}`} role="alert">
       <p className={styles.noticeText}>{authScreenMessages.reauthRequired}</p>
       <button
         type="button"
         className={styles.noticeAction}
         onClick={() => {
-          if (confirmReauthLeave(inputCleared, unsavedChanges, (message) => window.confirm(message))) {
-            router.push(loginPath(returnTo ?? undefined));
-          }
+          leave.request({ returnTo, variant });
         }}
       >
         다시 로그인
       </button>
     </div>
   );
+}
+
+/**
+ * 붙어 있는 안내 밑으로 키보드 초점이 숨지 않게, 안내가 붙는 스크롤 영역(모달 안이면 그 dialog, 아니면 문서)에
+ * 안내 높이에 16px(안내 아래 여백 8px + 초점 테두리가 붙지 않게 둔 여유 8px)을 더한 scroll-padding-top을 둔다.
+ * 안내 높이가 바뀌면(줄바꿈·창 크기 변경) ResizeObserver로 다시 맞추고, 안내가 사라지면 원래 값으로 돌린다.
+ */
+function keepFocusBelowNotice(notice: HTMLElement | null): (() => void) | undefined {
+  if (!notice || typeof ResizeObserver === "undefined") return undefined;
+  const scroller = notice.closest("dialog") ?? document.documentElement;
+  const previous = scroller.style.scrollPaddingTop;
+  const apply = () => { scroller.style.scrollPaddingTop = `${notice.offsetHeight + 16}px`; };
+  apply();
+  const observer = new ResizeObserver(apply);
+  observer.observe(notice);
+  return () => {
+    observer.disconnect();
+    scroller.style.scrollPaddingTop = previous;
+  };
 }

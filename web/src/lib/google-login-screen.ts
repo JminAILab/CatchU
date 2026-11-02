@@ -2,11 +2,16 @@
  * Google 로그인 화면(#287)의 버튼·콜백 처리. React와 분리해 시험한다. 시작 API 호출·시도 보관·콜백 해석·완료 요청은
  * 공통 인증(#286)의 함수가 맡고, 여기서는 그 결과로 안내·이동만 정한다(#287 연결 안내 「호출 순서」).
  */
-import type {
-  CallbackParse, GoogleCompletionInput, GoogleCompletionResult, GoogleStartResult, MemberLookupOutcome,
-} from "./auth-screen-contract.ts";
+import type { CallbackParse, GoogleCompletionInput, GoogleCompletionResult, GoogleStartResult } from "./auth-google.ts";
 import { authScreenMessages, googleCallbackNotice, googleCompletionNotice, googleStartNotice } from "./auth-screen-messages.ts";
+import type { lookupMemberWithAuth } from "./member-lookup.ts";
 import { afterLoginPath, loginPath } from "./member-navigation.ts";
+
+/**
+ * 공통 인증판 회원 조회(#286 `lookupMemberWithAuth`)의 결과. `skipped`는 보내지 않았거나 이전 세션 응답이라 결과가 없는 조회다.
+ * 조회 실패로도 성공으로도 보이지 않는다(#251 A 답변 1).
+ */
+export type MemberLookupOutcome = Awaited<ReturnType<typeof lookupMemberWithAuth>>;
 
 type Listener = () => void;
 
@@ -71,7 +76,7 @@ export function createGoogleStartControl(deps: {
         result = await deps.start(next);
       } catch (error) {
         // 공통 함수는 결과로 실패를 돌려준다. 예외는 예상 밖 오류이므로 버튼을 다시 열고 그대로 올린다.
-        store.set({ busy: false, notice: authScreenMessages.loginFailed });
+        store.set({ busy: false, notice: authScreenMessages.startLoginFailed });
         throw error;
       }
       if (result.kind === "ready") {
@@ -165,7 +170,7 @@ export function createGoogleCallbackControl(deps: {
       next = parsed.next;
       run = deps.completeGoogleLogin(parsed.input).then(settle, (error: unknown) => {
         // 공통 함수는 결과로 실패를 돌려준다. 예외는 예상 밖 오류이므로 새 로그인을 안내하고 그대로 올린다.
-        store.set({ phase: "notice", notice: authScreenMessages.loginFailed, loginHref: loginPath(next ?? undefined) });
+        store.set({ phase: "notice", notice: authScreenMessages.callbackLoginFailed, loginHref: loginPath(next ?? undefined) });
         throw error;
       });
       return run;

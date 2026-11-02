@@ -17,22 +17,10 @@ trusted_hash = "sha256:0ba8b12bad0f77c2bf9a996ec8e533c53a6e451fe37c31de2626e2751
 trusted_hash = "sha256:cffea2d0da8cfaf81b0b107a023d79a6f10ea9d1015bb3530be1e4c828181d62"
 
 [hooks.state."<PROJECT_DIR>/.codex/hooks.json:pre_tool_use:0:0"]
-trusted_hash = "sha256:300611f50500fcc20cc68c0d72dfe8aab2804e596f333f271ea170570a876d1e"
+trusted_hash = "sha256:5b354bc905a2229116d009c55e041776fdb0d44e889afc78b2cdca8655d3879d"
 
 [hooks.state."<PROJECT_DIR>/.codex/hooks.json:pre_tool_use:1:0"]
 trusted_hash = "sha256:8c2412a9f6fbd0d2fe744b9716b0f997efc0075c564be0e6ab524626df3efa5c"
-
-[hooks.state."<PROJECT_DIR>/.codex/hooks.json:pre_tool_use:2:0"]
-trusted_hash = "sha256:1c195452f0942d247631d0545b7c2f5843a1232090144cce04acb86c72804651"
-
-[hooks.state."<PROJECT_DIR>/.codex/hooks.json:pre_tool_use:3:0"]
-trusted_hash = "sha256:8136182cb65946ec81926fd9677a82d5f9a3f4ed3277cfc680a336c4b7e6fbcc"
-
-[hooks.state."<PROJECT_DIR>/.codex/hooks.json:pre_tool_use:4:0"]
-trusted_hash = "sha256:f6fd42355e2f764f300e23ebd3f15547f11436045719ffeb5270c940097d94dc"
-
-[hooks.state."<PROJECT_DIR>/.codex/hooks.json:pre_tool_use:5:0"]
-trusted_hash = "sha256:914e39d66b7c8ca44aa8e3a691e58fe77ffe3fd9514d58f648e8c31071509afe"
 
 [hooks.state."<PROJECT_DIR>/.codex/hooks.json:post_tool_use:0:0"]
 trusted_hash = "sha256:25419c91f88cf38568cd1fa2cb55bfe67cb3342712c4f682862cc48f0ba2e2ba"

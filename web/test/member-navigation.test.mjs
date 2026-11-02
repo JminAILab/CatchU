@@ -10,6 +10,7 @@ test('next는 서비스 안 회원 경로만 받는다', () => {
     ['/links', '/links'],
     ['/profile/edit', '/profile/edit'],
     ['/profile/setup', '/profile/setup'],
+    ['/profile/github', '/profile/github'],
   ]) assert.equal(safeNextPath(value), expected, value);
 
   for (const value of [
@@ -23,6 +24,13 @@ test('로그인 진입 주소는 회원 경로일 때만 next를 인코딩해 �
   assert.equal(loginPath('/assets?repositoryId=r1'), '/login?next=%2Fassets%3FrepositoryId%3Dr1');
   assert.equal(loginPath('/s/token'), '/login');
   assert.equal(loginPath(undefined), '/login');
+});
+
+test('GitHub 콜백 주소는 next에 싣지 않는다: 로그인으로 가면 code·state를 버린다(#253)', () => {
+  const callback = `/github/callback?code=c&state=${'a'.repeat(64)}`;
+  assert.equal(safeNextPath(callback), null);
+  assert.equal(safeNextPath('/github/callback'), null);
+  assert.equal(loginPath(callback), '/login');
 });
 
 test('이름 규칙: 조회 중 대기, 실패는 다시 불러오기, 빈 이름만 최초 입력으로', () => {

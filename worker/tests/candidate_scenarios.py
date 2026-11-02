@@ -538,11 +538,11 @@ def assert_member_text(
 ) -> None:
     """후보 문장이 2026-10-08 팀장 결정과 조회 방식의 말 규칙을 지킨다.
 
-    - #118은 제목을 만들지 않는다(title=None). 조합된 결과의 제목은 임시 대체값인 작업 사실 첫
-      항목이다(결정 문서 「담당과 순서」 ③).
-    - 제목·작업 사실·나의 기여에 센 숫자가 없다.
+    - #118은 제목을 만들지 않는다(title=None). 조합된 결과의 제목도 null이다(결정 문서 「담당과
+      순서」 ③).
+    - 작업 사실·나의 기여에 센 숫자가 없다.
     - '작성한'을 쓰지 않는다(「본인 기여의 뜻」).
-    result를 주지 않으면 LIVE 요청으로 조합해 본다(제목 대체는 요청 값과 무관하다).
+    result를 주지 않으면 LIVE 요청으로 조합해 본다(제목 null은 요청 값과 무관하다).
     """
     if result is None:
         result = compose_result(
@@ -551,8 +551,8 @@ def assert_member_text(
     assert len(result["candidates"]) == len(output.candidates)
     for each, entry in zip(output.candidates, result["candidates"], strict=True):
         assert each.title is None, each.title
-        assert entry["title"] == each.work_facts[0], entry["title"]
-        for text in (entry["title"], *each.work_facts, each.subject_contribution):
+        assert entry["title"] is None, entry["title"]
+        for text in (*each.work_facts, each.subject_contribution):
             assert not COUNTED_NUMBER.search(text), text
         texts = (
             *each.work_facts,

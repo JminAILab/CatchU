@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# EKS 앱 교체(#276). 옛 api·worker를 멈추고 종료를 확인한 뒤 migration 일회 Pod를 한 번 실행하고, 새 api → worker → web 순서로
-# 띄워 확인한다. 자동 배포(#342)도 이 스크립트를 그대로 쓴다. 단계와 멈췄을 때 할 일은 deploy/aws/k8s/README.md 「앱 교체(deploy.sh)」.
+# EKS 앱 교체(#276). 옛 api·worker를 멈추고 종료를 확인한 뒤 migration 일회 Pod를 한 번 실행하고, 앱 계정이 동의 기록을 직접 지울
+# 권한을 확인·회수·재확인한 다음, 새 api → worker → web 순서로 띄워 확인한다. 자동 배포(#342)도 이 스크립트를 그대로 쓴다.
+# 단계와 멈췄을 때 할 일은 deploy/aws/k8s/README.md 「앱 교체(deploy.sh)」.
 #
 # 사용: bash deploy/aws/scripts/deploy.sh --commit <40자 커밋> [--resume]
 #   이미지: ECR 네 저장소에서 태그 main-<커밋 앞 12자>(main 자동 배포가 붙인 태그)의 digest를 찾아 digest로 띄운다.
-#   실행 파일: 그 커밋의 deploy/aws/k8s/{api,worker,web}.yaml·migration-pod.yaml을 git에서 읽어 자리를 채운다.
+#   실행 파일: 그 커밋의 deploy/aws/k8s/{api,worker,web}.yaml·migration-pod.yaml·consent-guard-pod.yaml을 git에서 읽어 자리를 채운다.
 #     namespace·NetworkPolicy·Service·Ingress는 적용하지 않는다(바뀔 때 손으로 적용한다).
 #   같은 판본·구성이 이미 정상으로 돌고 있으면 아무것도 바꾸지 않는다.
 #   --resume: api·worker가 0으로 멈춰 있을 때(지난 교체가 멈췄거나 손으로 멈춤) 원인을 확인한 뒤 이어서 교체할 때만 붙인다.
@@ -16,7 +17,8 @@
 #   4 migration 실패   5 migration 결과 불명, 또는 같은 이름의 migration Pod가 성공 아닌 상태로 남아 있음
 #   6 새 실행 확인 실패. api·worker를 다시 멈추고 종료를 확인했다
 #   7 옛 실행이 강제 종료(137)됐다. 분석 중이던 작업이 실패로 기록되지 않았을 수 있다
-#   3~7로 멈추면 api·worker는 0으로 멈춰 있다. 원인을 확인한 뒤 --resume을 붙여 다시 실행한다.
+#   8 동의 기록 삭제 권한을 회수·확인하지 못함(회수 뒤에도 남음, 확인 Pod 실패, 결과 불명). 새 실행은 시작하지 않았다
+#   3~8로 멈추면 api·worker는 0으로 멈춰 있다. 원인을 확인한 뒤 --resume을 붙여 다시 실행한다.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 . "$here/lib/guard.sh"
@@ -32,6 +34,7 @@ selector='app.kubernetes.io/name in (api,worker)'
 poll=3                # 상태를 다시 보는 간격(초)
 stop_tries=30         # 옛 api·worker가 없어지기를 기다리는 횟수(3초 × 30 = 90초, 종료 유예 30초보다 넉넉히)
 migration_tries=220   # migration이 끝나기를 기다리는 횟수(3초 × 220 = 11분, Pod 자체 한도 10분보다 길게)
+guard_tries=120       # 동의 기록 삭제 권한 확인이 끝나기를 기다리는 횟수(3초 × 120 = 6분, Pod 자체 한도 5분보다 길게)
 rollout_timeout=360s  # 새 실행 하나가 준비되기를 기다리는 시간(worker 시작 확인 5분 포함)
 
 commit=''
@@ -128,6 +131,9 @@ render api.yaml "$image_api"
 render worker.yaml "$image_worker"
 render web.yaml "$image_web"
 render migration-pod.yaml "$image_migration" "$migration_pod"
+# 동의 기록 삭제 권한 확인 Pod의 SQL은 표 이름·앱 계정 이름을 담으므로, 같은 커밋의 migration·api 설정과 함께 읽는다(이미지는 틀에 고정).
+guard_pod="catchu-consent-guard-$(date -u +%Y%m%d-%H%M%S)"
+render consent-guard-pod.yaml '' "$guard_pod"
 
 # 기본 차단 NetworkPolicy 없이 앱을 띄우지 않는다. DB 주소·CA(ConfigMap)가 없으면 api·migration이 뜨지 못하므로 먼저 본다.
 k get networkpolicy default-deny -o name > /dev/null ||
@@ -278,12 +284,12 @@ pod_state() { # Pod JSON → "상태 종료코드 digest uid 시작 끝 대기�
     .metadata.uid // "-", .status.containerStatuses[0].state.terminated.startedAt // "-",
     .status.containerStatuses[0].state.terminated.finishedAt // "-", .status.containerStatuses[0].state.waiting.reason // "-"] | join(" ")'
 }
-show_logs() {
-  local logs
-  if logs=$(k logs "$migration_pod" --tail=20 2> /dev/null); then
-    printf '%s\n' "$logs" | sed 's/^/    | /' >&2
+show_logs() { # Pod 이름. 마지막 20줄을 화면에 찍고 shown_logs에 둔다(읽지 못하면 비운다).
+  if shown_logs=$(k logs "$1" --tail=20 2> /dev/null); then
+    printf '%s\n' "$shown_logs" | sed 's/^/    | /' >&2
   else
-    say "migration 로그를 읽지 못했다(kubectl logs ${migration_pod})"
+    shown_logs=''
+    say "${1} 로그를 읽지 못했다(kubectl logs ${1})"
   fi
 }
 
@@ -310,17 +316,44 @@ else
   case $phase in
     Succeeded)
       note "migration 성공: ${migration_pod}(uid ${uid}, 종료 코드 ${code}, 이미지 ${digest}, 시작 ${started}, 끝 ${finished})"
-      show_logs
+      show_logs "$migration_pod"
       ;;
     Failed)
-      show_logs
+      show_logs "$migration_pod"
       stop 4 "migration 실패: ${migration_pod}(종료 코드 ${code}). Pod를 남겨 두었다. 로그와 DB 적용 이력을 확인하기 전에는 다시 실행하지 않는다"
       ;;
     *) stop 5 "migration Pod ${migration_pod}가 시간 안에 끝나지 않았다(상태 ${phase:-모름}, 대기 이유 ${waiting:--}). Secret·ConfigMap·이미지가 없으면 대기에 머문다. 실행 상태와 DB 적용 이력을 확인한다" ;;
   esac
 fi
 
-# ---------- 4. 새 api → worker → web을 띄우고 확인한다 ----------
+# ---------- 4. 동의 기록 직접 삭제 권한을 확인·회수·재확인한다(교체할 때마다, migration을 건너뛰었어도) ----------
+# 기본 권한이 migration이 새로 만드는 표마다 앱 계정에 DELETE를 준다(deploy/aws/db/roles.sql). 확인·회수·재확인은 Pod 안의 한 트랜잭션이고
+# 다시 실행해도 결과가 같아서, 멈춘 뒤에는 --resume으로 새 Pod를 띄워 다시 본다. 판정은 Pod의 종료 코드로만 한다.
+k create -f "${tmp}/consent-guard-pod.yaml" > /dev/null ||
+  stop 8 "동의 기록 삭제 권한 확인 Pod ${guard_pod}를 만드는 요청이 실패했다. 새 실행은 시작하지 않았다"
+note "동의 기록 삭제 권한 확인 시작: ${guard_pod}"
+phase=''
+for _ in $(seq "$guard_tries"); do
+  state=$(k get pod "$guard_pod" -o json) ||
+    stop 8 "동의 기록 삭제 권한 확인 Pod ${guard_pod}의 상태를 조회하지 못했다. 새 실행은 시작하지 않았다"
+  read -r phase code digest uid started finished waiting <<< "$(pod_state <<< "$state")"
+  case $phase in Succeeded | Failed) break ;; esac
+  sleep "$poll"
+done
+case $phase in
+  Succeeded)
+    show_logs "$guard_pod"
+    guard_line=$(printf '%s\n' "$shown_logs" | grep -o '동의 기록 직접 삭제 권한(catchu_app): .*' | tail -n 1) || guard_line=''
+    note "동의 기록 삭제 권한 확인 성공: ${guard_pod}(uid ${uid}, 종료 코드 ${code}, 끝 ${finished}). ${guard_line:-결과 줄은 로그를 읽지 못해 남기지 못했다}"
+    ;;
+  Failed)
+    show_logs "$guard_pod"
+    stop 8 "동의 기록 삭제 권한을 회수·확인하지 못했다: ${guard_pod}(종료 코드 ${code}). 새 실행은 시작하지 않았다. 위 출력으로 원인을 본다"
+    ;;
+  *) stop 8 "동의 기록 삭제 권한 확인 Pod ${guard_pod}가 시간 안에 끝나지 않았다(상태 ${phase:-모름}, 대기 이유 ${waiting:--}). 새 실행은 시작하지 않았다" ;;
+esac
+
+# ---------- 5. 새 api → worker → web을 띄우고 확인한다 ----------
 start_failed() { # 사유
   say "새 실행 확인 실패: $*. api·worker를 다시 멈춘다"
   if stop_pods; then

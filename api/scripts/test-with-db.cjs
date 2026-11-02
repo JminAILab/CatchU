@@ -2,11 +2,15 @@
 // 테스트 DB 값은 셸 환경변수 > api/.env > 기본값(README 「DB 테스트」의 docker run 명령과 같은 값) 순서로 정한다.
 // 실행하는 테스트에는 이 값을 DB_*로 넘기므로 개발 DB(.env의 DB_*)는 쓰지 않는다.
 //
-// [실험] 두 줄 실행: 대기 시간이 대부분인 잠금 대기 시험(test/**/lock-wait-limit-*.test.cjs)은 둘째 DB에서 첫째 줄과 동시에 돌린다.
+// [실험] 두 줄 실행: 대기 시간이 대부분인 잠금 대기 시험(test/**/lock-wait-limit-*.test.cjs)과
+// 실제 Retry-After 1분을 기다리는 발급 통합 시험(test/db/share-links-web-integration.test.cjs)은 둘째 DB에서 첫째 줄과 동시에 돌린다.
 //   0. 공용 dist를 지우고 다시 만드는 test/db/build-output.test.cjs는 두 줄이 시작하기 전에 혼자 끝낸다.
 //   1. 첫째 줄(TEST_DB_NAME)과 둘째 줄(둘째 DB)은 각각 파일을 한 번에 하나씩 돌린다(--test-concurrency=1).
 //   2. 둘 다 끝나기를 기다리고, 어느 쪽이 실패해도 실패로 끝낸다.
 // 인자를 주면(npm test -- test/db/x.test.cjs) 그 파일만 첫째 DB에서 한 줄로 돌린다.
+// 커버리지(npm run test:coverage, 첫 인자 --coverage): 줄을 나누면 보고도 둘로 갈리므로 build-output 뒤의 모든 파일을 첫째 DB에서
+// 한 줄로 돌려 표 하나로 낸다. 표는 dist/의 컴파일된 JS 기준이다(원본 위치 대응을 켜 본 시험에서 줄 수가 틀리게 나왔다).
+// 표에 넣을 범위는 셸 환경변수 TEST_COVERAGE_INCLUDE(glob, 기본 dist/**)로 좁힌다. Unit 폴더만 넣으면 맨 아래 비율이 그 Unit의 값이다.
 const { spawn, spawnSync } = require('node:child_process');
 const { existsSync, readFileSync, readdirSync } = require('node:fs');
 const { relative, resolve } = require('node:path');
@@ -23,6 +27,8 @@ const DEFAULTS = {
 const PRE_PHASE = 'test/db/build-output.test.cjs';
 const MAX_DB_NAME_BYTES = 63; // PostgreSQL 식별자 한도. 넘으면 잘려서 만든 이름과 접속하는 이름이 달라진다.
 const LOCK_WAIT_LANE = /^test\/(?:.*\/)?lock-wait-limit-[^/]*\.test\.cjs$/;
+const REAL_WAIT_TEST = 'test/db/share-links-web-integration.test.cjs';
+const inWaitLane = (file) => LOCK_WAIT_LANE.test(file) || file === REAL_WAIT_TEST;
 
 function readSettings() {
   const envPath = resolve(apiDir, '.env');
@@ -79,7 +85,11 @@ async function ensureDatabase(settings, name) {
   }
 }
 
-const nodeTest = (files) => ['--test', '--test-concurrency=1', ...files];
+const COVERAGE = ['--experimental-test-coverage', `--test-coverage-include=${process.env.TEST_COVERAGE_INCLUDE || 'dist/**'}`];
+const nodeTest = (files, extra = []) => ['--test', '--test-concurrency=1', ...extra, ...files];
+// 첫째 DB에서 한 줄로 돌리고 종료 코드를 돌려준다.
+const runSync = (files, extra = []) => spawnSync(process.execPath, nodeTest(files, extra),
+  { cwd: apiDir, env: process.env, stdio: 'inherit', windowsHide: true }).status ?? 1;
 
 function runLane(label, files, settings, database, { buffer }) {
   return new Promise((done) => {
@@ -121,19 +131,26 @@ async function main() {
   }
   if (!await migrate(settings, settings.TEST_DB_NAME)) return 1;
 
-  // 인자를 주면 그 파일만 한 줄로 실행한다(npm test -- test/db/x.test.cjs).
-  const targets = process.argv.slice(2);
-  if (targets.length > 0) {
-    const result = spawnSync(process.execPath, nodeTest(targets), { cwd: apiDir, env: process.env, stdio: 'inherit', windowsHide: true });
-    return result.status ?? 1;
-  }
+  // 인자를 주면 그 파일만 한 줄로 실행한다(npm test -- test/db/x.test.cjs, 커버리지는 npm run test:coverage -- test/x.test.cjs).
+  const args = process.argv.slice(2);
+  const coverage = args[0] === '--coverage';
+  const targets = coverage ? args.slice(1) : args;
+  if (targets.length > 0) return runSync(targets, coverage ? COVERAGE : []);
 
   const all = listTests();
-  const lockLane = all.filter((file) => LOCK_WAIT_LANE.test(file));
-  const mainLane = all.filter((file) => file !== PRE_PHASE && !LOCK_WAIT_LANE.test(file));
-  if (!all.includes(PRE_PHASE) || lockLane.length === 0 || lockLane.length + mainLane.length + 1 !== all.length) {
+  const waitLane = all.filter(inWaitLane);
+  const mainLane = all.filter((file) => file !== PRE_PHASE && !inWaitLane(file));
+  if (!all.includes(PRE_PHASE) || !waitLane.some((file) => LOCK_WAIT_LANE.test(file))
+    || waitLane.length + mainLane.length + 1 !== all.length) {
     console.error('시험 파일을 줄로 나누지 못했습니다(build-output·잠금 대기 파일을 찾지 못했거나 중복·누락이 있습니다).');
     return 1;
+  }
+
+  // 커버리지는 dist를 다시 만드는 시험을 먼저 혼자 끝내고(표에 넣지 않는다), 나머지를 첫째 DB에서 한 줄로 잰다.
+  // node --test는 인자 순서대로 돌리지 않으므로 한 번에 넘기지 않는다.
+  if (coverage) {
+    const preCode = runSync([PRE_PHASE]);
+    return preCode !== 0 ? preCode : runSync(all.filter((file) => file !== PRE_PHASE), COVERAGE);
   }
 
   // 둘째 줄 데이터베이스 이름은 시험을 시작하기 전에 확인한다.
@@ -149,18 +166,18 @@ async function main() {
   }
 
   // 0. dist를 지우고 다시 만드는 시험은 두 줄이 dist를 읽기 전에 혼자 끝낸다.
-  const pre = spawnSync(process.execPath, nodeTest([PRE_PHASE]), { cwd: apiDir, env: process.env, stdio: 'inherit', windowsHide: true });
-  if ((pre.status ?? 1) !== 0) return pre.status ?? 1;
+  const preCode = runSync([PRE_PHASE]);
+  if (preCode !== 0) return preCode;
 
   // 둘째 줄의 데이터베이스를 만들고 마이그레이션한다.
   await ensureDatabase(settings, laneDatabase);
   if (!await migrate(settings, laneDatabase)) return 1;
 
-  const [mainCode, lockCode] = await Promise.all([
+  const [mainCode, waitCode] = await Promise.all([
     runLane('첫째 줄', mainLane, settings, settings.TEST_DB_NAME, { buffer: false }),
-    runLane('둘째 줄(잠금 대기)', lockLane, settings, laneDatabase, { buffer: true }),
+    runLane('둘째 줄(대기)', waitLane, settings, laneDatabase, { buffer: true }),
   ]);
-  return mainCode !== 0 ? mainCode : lockCode;
+  return mainCode !== 0 ? mainCode : waitCode;
 }
 
 main().then((code) => { process.exitCode = code; }, (error) => {

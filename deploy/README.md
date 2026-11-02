@@ -30,7 +30,7 @@ web·api·worker 운영 이미지를 만들고, 한 호스트에서 API 한 프�
 | web·api 기반 | `node:24.21.0-trixie-slim`(Debian 13, npm 11.19.0 포함). Dockerfile에 digest로 고정 |
 | worker 기반 | `debian:trixie-slim` 위에 uv 0.12.18이 설치한 CPython 3.12.10. 공식 `python:3.12.10` 이미지는 2025-05 이후 다시 빌드되지 않아 그 뒤의 기반 OS 패키지 갱신(보안 갱신 포함)이 들어 있지 않으므로 쓰지 않는다(Python 판본은 그대로). 다만 이 Python에 묶여 들어온 OpenSSL(3.0.16)·SQLite 등은 Debian 갱신으로 바뀌지 않고 Python 패치 판본을 올릴 때만 바뀐다 |
 | 의존성 | 각 서비스 잠금 파일(`package-lock.json`, `uv.lock`) 그대로 설치 |
-| 로컬 합성 DB | `postgres:16`(CI 테스트 DB와 같은 주 판본). digest로 고정 |
+| 로컬 합성 DB | `pgvector/pgvector:0.8.7-pg16-trixie`(pgvector가 든 PostgreSQL 16, #389). CI 테스트 DB·EKS의 psql Pod 틀과 같은 이미지를 digest로 고정. `vector` 확장은 슈퍼유저만 만들 수 있어 처음 초기화 때 `local-db/init-roles.sh`가 만든다 |
 
 기반 이미지 digest를 바꿀 때는 같은 PR에서 이미지 검사를 다시 돌린다. 기반 이미지 갱신을 자동으로 알려 주는 설정(Dependabot docker)은 아직 없다.
 
@@ -76,7 +76,7 @@ docker build -f worker/Dockerfile --build-arg SOURCE_REVISION=$(git rev-parse HE
 
 ## 처음 실행(로컬 합성 환경)
 
-작성자 외 재현도 이 절차를 따른다. 필요한 것은 Docker Engine 25 이상, Docker Compose 2.24 이상, openssl, git이다. 포트 3000·3001·8000을 비워 두거나 `compose.env`에서 바꾼다. 합성 DB 이미지(`postgres:16`, digest 고정)는 없으면 `replace-single.sh`가 받는다.
+작성자 외 재현도 이 절차를 따른다. 필요한 것은 Docker Engine 25 이상, Docker Compose 2.24 이상, openssl, git이다. 포트 3000·3001·8000을 비워 두거나 `compose.env`에서 바꾼다. 합성 DB 이미지(pgvector가 든 PostgreSQL 16, digest 고정)는 없으면 `replace-single.sh`가 받는다.
 
 ```bash
 docker build -f web/Dockerfile --build-arg NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3001 -t catchu-web:local .
@@ -87,11 +87,10 @@ deploy/scripts/make-local-env.sh ~/catchu-local-env
 deploy/scripts/replace-single.sh --env-file ~/catchu-local-env/compose.env --local-db --migrate
 ```
 
-**Windows에서 실행할 때(아직 확인하지 않은 절차):** 스크립트는 bash 전용이라 PowerShell에서는 돌지 않는다. Docker Desktop의 WSL2 연동을 켜고, WSL2 안의 Linux(예: Ubuntu) 터미널에서 위 명령을 실행한다.
+**Windows에서 실행할 때:** 스크립트는 bash 전용이라 PowerShell에서는 돌지 않는다. Docker Desktop 설정의 WSL Integration에서 쓸 배포판(예: Ubuntu-22.04)을 따로 켜고, 그 배포판 터미널에서 위 명령을 실행한다. 2026-10-27 WSL2 Ubuntu 22.04(x86_64)에서 작성자 외 재현으로 확인했다(#275).
 
 - 저장소와 합성 환경 폴더를 WSL2 안의 Linux 경로(예: `~/CatchU`, `~/catchu-local-env`)에 둔다. `/mnt/c/...` 아래에서는 실행 권한·파일 권한(0600)·줄바꿈(CRLF) 때문에 스크립트와 인증서가 깨질 수 있다.
-- WSL2 안에서 `git`으로 clone하고, `openssl`이 있는지, `docker version`·`docker compose version`이 되는지 먼저 확인한다(검사 스크립트를 돌릴 때만 Node 24.21.0이 더 필요하다).
-- 처음 따라 한 사람이 막힌 곳과 해결 방법을 PR에 남기고, 확인되면 이 문단의 "아직 확인하지 않은"을 지운다.
+- WSL2 안에서 `git`으로 clone하고(WSL에서 GitHub clone이 진행되지 않으면 Windows에서 받은 저장소를 `git bundle create`로 묶어 WSL 안의 Linux 경로에서 clone한다), `openssl`이 있는지, `docker version`·`docker compose version`이 되는지 먼저 확인한다(검사 스크립트를 돌릴 때만 Node 24.21.0이 더 필요하다).
 
 정상 확인과 종료:
 
@@ -103,11 +102,22 @@ docker compose --env-file ~/catchu-local-env/compose.env -f deploy/compose.singl
 docker compose --env-file ~/catchu-local-env/compose.env -f deploy/compose.single.yaml -f deploy/compose.local-db.yaml --profile migration down -v
 ```
 
-- web `/`는 200과 `CatchU web` 화면, api `/health`는 200과 `{"status":"ok"}`, worker `/health`는 200과 `{"status":"ok","consumer":"running"}`(합성 큐에 붙어 기다리는 중)다. api health는 기동할 때 DB 접속에 성공했다는 데까지만 말하고, 큐·분석 연결 성공을 뜻하지 않는다. worker health도 분석 성공을 뜻하지 않는다.
+- web `/`는 200과 서비스 소개 화면(본문에 `id="landing-title"`), api `/health`는 200과 `{"status":"ok"}`, worker `/health`는 200과 `{"status":"ok","consumer":"running"}`(합성 큐에 붙어 기다리는 중)다. api health는 기동할 때 DB 접속에 성공했다는 데까지만 말하고, 큐·분석 연결 성공을 뜻하지 않는다. worker health도 분석 성공을 뜻하지 않는다.
 - 마지막 명령(`down -v`)은 이 구성의 컨테이너·망·합성 DB 볼륨만 지운다. 합성 환경 폴더는 직접 지운다.
 - 합성 CA·DB 서버 인증서는 만든 날부터 30일 뒤 만료된다. 만료되면 api가 DB에 접속하지 못해 교체가 종료 코드 6으로 멈춘다. 이어서 쓰려면 위 `down -v`, 환경 폴더 삭제, `make-local-env.sh`부터 다시 한다(합성 DB 자료도 새로 만든다).
 - 로컬 구성에는 web과 api를 같은 출처로 묶는 앞단이 없다. production 모드 api는 교차 출처 호출을 받지 않으므로, 브라우저 화면에서 api를 부르는 흐름은 같은 출처 경로 분배가 있는 AWS 환경(#276·#277)에서 확인한다. 합성 공유 링크 주소·로그인 출처(`https://catchu-single.invalid`)로는 링크를 열거나 로그인 유지(갱신·로그아웃)를 확인할 수 없다.
 - 합성 DB는 TLS 연결만 받고(평문 거부), migration 계정이 스키마를 소유하며 앱 계정은 자료 읽기·쓰기만 한다([`local-db/init-roles.sh`](local-db/init-roles.sh)). 운영 DB의 계정·권한(동의 기록 직접 삭제 불가, 시간 상한 포함)은 #276에서 정한다. worker는 DB 망에 연결하지 않는다.
+
+수동 교체(작성자 외 재현은 위 정상 확인 뒤, `stop` 전에 한다). 표식만 다른 api 이미지로 바꾼다. 같은 이미지면 같은 컨테이너를 다시 띄울 뿐이라 판본이 바뀌는 것을 볼 수 없다.
+
+```bash
+docker build -f api/Dockerfile --build-arg SOURCE_REVISION=local-r2 -t catchu-api:local-r2 .
+sed -i.bak 's|^CATCHU_API_IMAGE=.*|CATCHU_API_IMAGE=catchu-api:local-r2|' ~/catchu-local-env/compose.env
+deploy/scripts/replace-single.sh --env-file ~/catchu-local-env/compose.env --local-db
+docker ps --filter label=com.docker.compose.project=catchu-single --format '{{.Names}} {{.Image}}'
+```
+
+- 기대: 종료 코드 0, 중지(web·api → worker) 뒤 시작(api → worker → web) 순서, 마지막 줄 「완료. 중지 시작부터 web 정상 확인까지 N초」. api·worker·web이 하나씩 떠 있고 api 이미지는 `catchu-api:local-r2`이며, 정상 확인 결과는 교체 전과 같다. 만든 이미지는 끝난 뒤 지운다.
 
 ## migration
 
@@ -187,7 +197,7 @@ GitHub Actions의 `images` 워크플로가 같은 명령을 x86_64 러너에서 
 | 노드 CPU 아키텍처·OS, EKS 판본, cluster·namespace, 리소스 범위 | 최종 이미지 빌드 플랫폼, EKS 실행 파일 |
 | 레지스트리 경로·push/pull 권한 | 이미지 게시(#275는 게시하지 않는다) |
 | 실제 공개 https 출처, `/v1` 경로 보존 분배 | 운영 web 빌드, `SHARE_LINK_WEB_BASE_URL`·`AUTH_WEB_ORIGIN` |
-| 앞단 대상 유형·`X-Forwarded-For` 처리·유휴 시간, 유입 차단·노드 종료 확인 경로 | `TRUST_PROXY_CIDRS`, 연결 유지 시간(web `KEEP_ALIVE_TIMEOUT`은 ms. api에는 연결 유지 시간 설정이 없어 앞단 유휴 시간과 어긋나면 간헐 502가 날 수 있으므로 배포 전에 api 담당과 조율한다), 교체 절차 2·3단계 |
+| 앞단 대상 유형·`X-Forwarded-For` 처리·유휴 시간, 유입 차단·노드 종료 확인 경로 | `TRUST_PROXY_CIDRS`, 연결 유지 시간(web `KEEP_ALIVE_TIMEOUT`은 ms. api는 코드에 65초로 고정했다(#364). 둘 다 앞단 유휴 시간보다 길게 둔다. 짧으면 간헐 502가 날 수 있다), 교체 절차 2·3단계 |
 | worker→DB 차단과 나가는 연결 제한의 집행 수단(NetworkPolicy·보안 그룹·egress 규칙) | EKS 실행 파일, 운영 Compose 호스트의 망 구성. 공유 노드 보안 그룹이나 같은 호스트 IP만으로 분리됐다고 보지 않는다 |
 | DB 주소·판본, 앱·migration 계정과 비밀값 참조, CA 파일과 주입 방식 | `api.env`·`migration.env`·CA 파일 |
 | 큐 주소·비밀번호 참조(ElastiCache Valkey 8.1, TLS) | `worker.env`의 `CATCHU_QUEUE_REDIS_URL`(`rediss://`), api 실행 값(#233) |

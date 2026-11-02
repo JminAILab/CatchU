@@ -15,6 +15,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "npm run build && node scripts/test-with-db.cjs",
+    "test:coverage": "npm run build && node scripts/test-with-db.cjs --coverage",
     "test:analysis-fixtures": "npm run build && node --test test/analysis/shared-fixtures.check.cjs",
     "build": "node scripts/clean-dist.cjs && tsc -p tsconfig.build.json",
     "migration:generate": "node --env-file-if-exists=.env ./node_modules/typeorm/cli-ts-node-commonjs.js migration:generate -d src/database/data-source.ts",
@@ -51,6 +52,9 @@
     "typescript-eslint": "8.70.1"
   },
   "overrides": {
+    "@nestjs/platform-express": {
+      "multer": "2.5.0"
+    },
     "typeorm": {
       "ioredis": "$ioredis"
     }

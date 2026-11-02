@@ -354,8 +354,9 @@ test('C 링크 연결: 같은 지문·다른 비밀번호 판정은 409, 같은 
   // 비교 중 기록 불일치·DB 오류는 409로 감싸지 않고 그대로 서버 오류로 전달한다.
   await assert.rejects(transaction(m=>runIdempotentCreation(m,k,{...cb('first'),async isSame(){throw new Error('synthetic record inconsistency');}})),
     e=>e.message==='synthetic record inconsistency'&&e.code!=='IDEMPOTENCY_CONFLICT');
-  // 기록이 가리키는 링크는 DB 외래 키 때문에 지울 수 없다(없는 링크를 가리키는 기록이 생기지 않음).
-  await assert.rejects(db.query('DELETE FROM share_link'),/fk_idempotency_record_link_id_member_id/);
+  // 기록이 가리키는 링크를 지우면 그 기록도 함께 지워진다(#387). 없는 링크를 가리키는 기록은 생기지 않는다.
+  await db.query('DELETE FROM share_link');
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM idempotency_record WHERE operation='createShareLink'"))[0].n,0);
 });
 
 test('개발 로그인 HTTP 토큰의 UUID로 실제 분석 FK를 저장하며 반복 발급도 같은 회원', async (t)=>{
@@ -402,20 +403,29 @@ test('접수한 동의 변경과 재요청 선행 참조의 역방향 변경을 
 test('일곱 테이블은 빈 스키마에 up/down/re-up 가능하고 엔티티와 생성 DDL이 일치',async()=>{
   const schema='test_104_'+randomUUID().replaceAll('-','');
   await db.query('CREATE SCHEMA "'+schema+'"');
-  // #104와 멱등 기록이 참조하는 실제 C 엔티티를 대조한다. 후속 E/B는 각 기능 검사에서 확인한다.
+  // #104와 멱등 기록이 참조하는 실제 C 엔티티, #140 이력 인덱스를 대조한다. 후속 E/B는 각 기능 검사에서 확인한다.
   const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
   const { ShareLink } = require('../../dist/share-links/share-link.entity');
   const { CreateShareLink1790745895865 } = require('../../dist/database/migrations/1790745895865-CreateShareLink');
+  const { AddAnalysisRequestHistoryIndex1792640486167 } = require('../../dist/database/migrations/1792640486167-AddAnalysisRequestHistoryIndex');
+  const { CascadeMemberAnalysisOnDelete1792817978011 } = require('../../dist/database/migrations/1792817978011-CascadeMemberAnalysisOnDelete');
   const isolated=await openTestDataSource({schema,extra:{options:'-c search_path='+schema+' -c TimeZone=UTC'},
     entities:[MemberAccount,MemberProfile,GitHubConnection,AnalysisRequest,AnalysisConsent,AnalysisAttempt,IdempotencyRecord,ShareLink],
-    migrations:[CreateMemberAnalysisFoundation1790500000000,CreateShareLink1790745895865]});
+    migrations:[CreateMemberAnalysisFoundation1790500000000,CreateShareLink1790745895865,AddAnalysisRequestHistoryIndex1792640486167,
+      CascadeMemberAnalysisOnDelete1792817978011]});
   try {
     assert.deepEqual((await isolated.runMigrations()).map(m=>m.name),
-      ['CreateMemberAnalysisFoundation1790500000000','CreateShareLink1790745895865']);
+      ['CreateMemberAnalysisFoundation1790500000000','CreateShareLink1790745895865','AddAnalysisRequestHistoryIndex1792640486167',
+        'CascadeMemberAnalysisOnDelete1792817978011']);
     const tables=await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema]);
     assert.equal(tables.length,9,'일곱 테이블 + C share_link(#147) + migrations');
     const diff=await isolated.driver.createSchemaBuilder().log();
     assert.deepEqual(diff.upQueries.map(q=>q.query),[]);
+    await isolated.undoLastMigration(); // #387 연쇄 삭제
+    assert.equal((await isolated.query(`SELECT confdeltype FROM pg_constraint WHERE conname='fk_analysis_request_member_id'
+      AND connamespace=$1::regnamespace`,[schema]))[0].confdeltype,'a');
+    await isolated.undoLastMigration(); // #140 이력 순서 인덱스
+    assert.equal((await isolated.query("SELECT to_regclass('ix_analysis_request_member_id_submitted_at_request_id') AS name"))[0].name,null);
     await isolated.undoLastMigration(); // #147 share_link
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).length,8);
     await isolated.undoLastMigration();

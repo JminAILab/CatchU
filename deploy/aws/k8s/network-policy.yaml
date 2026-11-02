@@ -202,7 +202,7 @@ spec:
         - protocol: TCP
           port: 443
 ---
-# migration 일회 Pod: DB 5432(프라이빗 서브넷)로만 나간다. 들어오는 연결은 없다.
+# migration 일회 Pod: DB 5432(프라이빗 서브넷)로만 나간다. 들어오는 연결은 없다. 동의 기록 확인 Pod(consent-guard-pod.yaml)도 같은 라벨로 이 규칙을 받는다.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

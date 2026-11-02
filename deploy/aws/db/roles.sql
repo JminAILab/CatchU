@@ -6,7 +6,10 @@
 --      관리자가 만든 역할(만든 역할에는 ADMIN 권한이 있다)을 자신에게 SET으로 준 뒤 넘긴다. 스키마는 그 역할로 바꿔서 넘긴다.
 --   2) 앱 계정에 잠금 대기 상한 3초(#220 합의). 트랜잭션 안 유휴 상한은 #220에서 값을 정하면 따로 SQL 파일을 더해 같은 방법으로
 --      실행한다(그때까지는 RDS 기본값).
--- 동의 기록(analysis_consent)의 삭제 권한 회수는 migration이 그 표를 만든 뒤에 한다(deploy/aws/k8s/README.md 「적용(2단계)」).
+--   3) pgvector 확장(vector)은 로컬과 같이 여기서 만든다(#389). 신뢰 확장이 아니어서 migration 계정은 만들지 못하고
+--      CREATE EXTENSION IF NOT EXISTS vector만 부른다. RDS에서는 rds_superuser인 관리자가 만들 수 있다. public 스키마가
+--      아직 관리자 소유일 때 만들려고 맨 앞에 둔다.
+-- 동의 기록(analysis_consent)의 DELETE·TRUNCATE 권한은 deploy.sh가 migration 뒤마다 확인·회수·재확인한다(deploy/aws/k8s/README.md 「앱 교체(deploy.sh)」).
 -- 비밀번호는 Pod 환경변수에서 \getenv로 읽는다. 문장이 실패해도 DB 로그에 남지 않는다(파라미터 그룹 catchu-pg16의
 -- log_min_error_statement=panic, db-admin.sh가 실행 전에 확인한다). 다시 실행하면 CREATE ROLE에서 실패하고 아무것도 바뀌지 않는다.
 \set ON_ERROR_STOP on
@@ -15,6 +18,7 @@
 \getenv migrator_password CATCHU_MIGRATOR_PASSWORD
 \getenv app_password CATCHU_APP_PASSWORD
 
+CREATE EXTENSION IF NOT EXISTS vector;
 CREATE ROLE catchu_migrator LOGIN PASSWORD :'migrator_password';
 CREATE ROLE catchu_app LOGIN PASSWORD :'app_password';
 GRANT catchu_migrator TO CURRENT_USER WITH SET TRUE;
@@ -40,3 +44,4 @@ SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolconfig
 SELECT datname, pg_get_userbyid(datdba) AS owner, datacl FROM pg_database WHERE datname = current_database();
 SELECT nspname, pg_get_userbyid(nspowner) AS owner, nspacl FROM pg_namespace WHERE nspname = 'public';
 SELECT pg_get_userbyid(defaclrole) AS for_role, defaclobjtype, defaclacl FROM pg_default_acl ORDER BY defaclobjtype;
+SELECT extname, extversion, extnamespace::regnamespace AS schema FROM pg_extension WHERE extname = 'vector';

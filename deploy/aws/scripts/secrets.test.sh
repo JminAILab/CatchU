@@ -38,9 +38,11 @@ MIGRATOR_PW=$(openssl rand -hex 32)
 QUEUE_TOKEN=$(openssl rand -hex 32)
 CONTEXT_KEY=$(openssl rand -hex 32)
 GENERATION_KEY="sk-ant-synthetic-$(openssl rand -hex 24)"
+API_GENERATION_KEY="sk-ant-api-synthetic-$(openssl rand -hex 24)"
+EMBEDDING_KEY="pa-synthetic-$(openssl rand -hex 24)"
 ADMIN_PW="Adm1n-$(openssl rand -hex 20)"
 INPUT_KEY="sk-ant-input-$(openssl rand -hex 24)"
-SECRETS="$JWT $LINK $APP_PW $MIGRATOR_PW $QUEUE_TOKEN $CONTEXT_KEY $GENERATION_KEY $ADMIN_PW $INPUT_KEY"
+SECRETS="$JWT $LINK $APP_PW $MIGRATOR_PW $QUEUE_TOKEN $CONTEXT_KEY $GENERATION_KEY $API_GENERATION_KEY $EMBEDDING_KEY $ADMIN_PW $INPUT_KEY"
 DB_HOST=catchu-db.abcdefghijkl.ap-northeast-2.rds.amazonaws.com
 QUEUE_HOST=master.catchu-queue.abc123.apn2.cache.amazonaws.com
 store_default() { # 이름 Type Value 줄 → SSM 합성 저장소(JSON)
@@ -48,6 +50,8 @@ store_default() { # 이름 Type Value 줄 → SSM 합성 저장소(JSON)
     "/catchu/prod/api/AUTH_JWT_SECRET SecureString $JWT" \
     "/catchu/prod/api/LINK_GRANT_SECRET SecureString $LINK" \
     "/catchu/prod/db/catchu_app-password SecureString $APP_PW" \
+    "/catchu/prod/api/CATCHU_GENERATION_API_KEY SecureString $API_GENERATION_KEY" \
+    "/catchu/prod/api/CATCHU_EMBEDDING_API_KEY SecureString $EMBEDDING_KEY" \
     "/catchu/prod/db/catchu_migrator-password SecureString $MIGRATOR_PW" \
     "/catchu/prod/queue/auth-token SecureString $QUEUE_TOKEN" \
     "/catchu/prod/worker/WORKER_CONTEXT_API_KEY SecureString $CONTEXT_KEY" \
@@ -327,18 +331,19 @@ check "make-secrets: kubectl에는 표준 입력으로만 넘김(--server-side, 
     && "$REAL_JQ" -e 'all(.items[]; .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"] == null)' "$S/applied.json"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: Secret 키는 계약(k8s/README.md)과 같고 worker에는 DB 값이 없음, 모두 namespace catchu·Opaque" \
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | {name: .metadata.name, keys: (.data | keys), ns: .metadata.namespace, type}]
-    == [{name: "catchu-api", keys: ["AUTH_JWT_SECRET", "DB_PASSWORD", "LINK_GRANT_SECRET"], ns: "catchu", type: "Opaque"},
+    == [{name: "catchu-api", keys: ["AUTH_JWT_SECRET", "CATCHU_EMBEDDING_API_KEY", "CATCHU_GENERATION_API_KEY", "DB_PASSWORD", "LINK_GRANT_SECRET"], ns: "catchu", type: "Opaque"},
         {name: "catchu-migration", keys: ["DB_PASSWORD"], ns: "catchu", type: "Opaque"},
         {name: "catchu-worker", keys: ["CATCHU_GENERATION_API_KEY", "CATCHU_QUEUE_REDIS_URL", "WORKER_CONTEXT_API_KEY"], ns: "catchu", type: "Opaque"}]' "$S/applied.json")"
 check "make-secrets: 값은 SSM 원본 그대로(앱·migration 계정 비밀번호가 바뀌지 않음)" \
   "$( { test "$(decoded catchu-api AUTH_JWT_SECRET)" = "$JWT" && test "$(decoded catchu-api LINK_GRANT_SECRET)" = "$LINK" \
     && test "$(decoded catchu-api DB_PASSWORD)" = "$APP_PW" && test "$(decoded catchu-migration DB_PASSWORD)" = "$MIGRATOR_PW" \
-    && test "$(decoded catchu-worker WORKER_CONTEXT_API_KEY)" = "$CONTEXT_KEY" && test "$(decoded catchu-worker CATCHU_GENERATION_API_KEY)" = "$GENERATION_KEY"; } > /dev/null 2>&1; echo $?)"
+    && test "$(decoded catchu-worker WORKER_CONTEXT_API_KEY)" = "$CONTEXT_KEY" && test "$(decoded catchu-worker CATCHU_GENERATION_API_KEY)" = "$GENERATION_KEY" \
+    && test "$(decoded catchu-api CATCHU_GENERATION_API_KEY)" = "$API_GENERATION_KEY" && test "$(decoded catchu-api CATCHU_EMBEDDING_API_KEY)" = "$EMBEDDING_KEY"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: 큐 주소는 rediss://, 큐 비밀번호와 큐 주 엔드포인트 6379" \
   "$(ok test "$(decoded catchu-worker CATCHU_QUEUE_REDIS_URL)" = "rediss://:${QUEUE_TOKEN}@${QUEUE_HOST}:6379")"
 check "make-secrets: Secret마다 키=SSM 판 번호 주석(값 없음)" \
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | .metadata.annotations["catchu.io/ssm-versions"]]
-    == ["AUTH_JWT_SECRET=1,DB_PASSWORD=1,LINK_GRANT_SECRET=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
+    == ["AUTH_JWT_SECRET=1,CATCHU_EMBEDDING_API_KEY=1,CATCHU_GENERATION_API_KEY=1,DB_PASSWORD=1,LINK_GRANT_SECRET=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
 check "make-secrets: ConfigMap catchu-db는 RDS 주소와 저장소의 루트 인증서 그대로" \
   "$( { "$REAL_JQ" -e --arg h "$DB_HOST" '.items[0] | .kind == "ConfigMap" and .metadata.name == "catchu-db" and .data.DB_HOST == $h
       and (.data | keys) == ["DB_HOST", "ca.pem"]' "$S/applied.json" \
@@ -379,7 +384,11 @@ reset_state
 ssm_set /catchu/prod/worker/CATCHU_GENERATION_API_KEY SecureString "has space"
 run make-secrets.sh
 check "make-secrets: 생성 키에 공백이 있으면 멈춤" "$(ok untouched)"
-# jq의 $는 마지막 줄바꿈 앞에서도 맞는다. 일곱 값 모두 끝에 줄바꿈 하나를 붙여 본다(복사·파일 입력으로 섞이는 경우).
+reset_state
+ssm_set /catchu/prod/api/CATCHU_EMBEDDING_API_KEY SecureString "has space"
+run make-secrets.sh
+check "make-secrets: 임베딩 키에 공백이 있으면 멈춤" "$(ok untouched)"
+# jq의 $는 마지막 줄바꿈 앞에서도 맞는다. 아홉 값 모두 끝에 줄바꿈 하나를 붙여 본다(복사·파일 입력으로 섞이는 경우).
 while read -r n t v <&3; do
   reset_state
   ssm_set "$n" "$t" "${v}"$'\n'
@@ -457,7 +466,7 @@ check "db-admin: 종료 0, ConfigMap → Secret → Pod 순서로 만들고 끝�
   "$(ok test "$rc" = 0 -a "$(calls)" = "create ConfigMap,create Secret,create Pod,delete pod secret configmap," -a "$(ops_left)" = 0)"
 check "db-admin: 비밀값이 출력·명령 인자·임시 폴더에 없고 계정 번호(관리자 비밀번호 ARN)도 찍지 않음" "$(ok secret_free)"
 check "db-admin: 기록에 SQL 해시·이미지 digest·종료 코드·지움 확인을 남김" \
-  "$( { says "sha256 ${SQL_SUM}" && says '이미지 sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d' \
+  "$( { says "sha256 ${SQL_SUM}" && says '이미지 sha256:40d828eda66737aaacb934387a337babf1455ebd56e9bdd13fc08e211257c972' \
     && says '종료 코드 0' && says '지움 확인' && says '{lock_timeout=3s}'; } > /dev/null 2>&1; echo $?)"
 reset_state
 # 지우기 전의 임시 자원을 보려고 지우기만 실패시킨다(그 경우의 종료 코드도 함께 본다).
@@ -604,7 +613,7 @@ check "psql Pod 틀: root 아님(postgres 999)·seccomp·토큰 자동 탑재 �
 check "psql Pod 틀: 이미지는 digest로 고정했고 로컬 합성 DB(compose.local-db.yaml)와 같음, CPU 상한 없음" \
   "$( { q "$OPS/db-admin-pod.yaml" "${POD}.containers[0] | (.image | test(\"@sha256:[0-9a-f]{64}$\")) and .resources.requests.memory != null
     and .resources.limits.memory != null and .resources.limits.cpu == null" \
-    && grep -qF "postgres:16@$(json "$OPS/db-admin-pod.yaml" | "$REAL_JQ" -r '.[0].spec.containers[0].image | split("@")[1]')" "$HERE/../../compose.local-db.yaml"; } > /dev/null 2>&1; echo $?)"
+    && grep -qF "image: $(json "$OPS/db-admin-pod.yaml" | "$REAL_JQ" -r '.[0].spec.containers[0].image | ltrimstr("docker.io/")')" "$HERE/../../compose.local-db.yaml"; } > /dev/null 2>&1; echo $?)"
 check "psql Pod 틀: psqlrc 없이 한 트랜잭션·오류 때 멈춤, 오류 때도 문장 원문을 찍지 않음, 문장 되풀이 옵션 없음" \
   "$(ok q "$OPS/db-admin-pod.yaml" "${POD}.containers[0].command as \$c | \$c[0] == \"psql\" and (\$c | index(\"--no-psqlrc\")) != null
     and (\$c | index(\"--single-transaction\")) != null and (\$c | index(\"ON_ERROR_STOP=1\")) != null

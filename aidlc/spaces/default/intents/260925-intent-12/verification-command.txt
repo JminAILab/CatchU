@@ -1,0 +1,1 @@
+npm --prefix api run lint && npm --prefix api run typecheck && npm --prefix api test && npm --prefix web run lint && npm --prefix web run typecheck && npm --prefix web test && (cd worker && uv run --locked ruff check . && uv run --locked mypy && uv run --locked pytest)
