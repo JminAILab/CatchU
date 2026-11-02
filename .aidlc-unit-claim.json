@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "status": "claimed",
+  "owner": "leechaeah",
+  "space": "default",
+  "intent_uuid": "01a0d734-bd22-7c19-89ad-e507aa0d9c26",
+  "intent_id8": "aa0d9c26",
+  "unit": "u10-jd",
+  "generation": 1,
+  "nonce": "3847bf53-3916-4948-add1-063c40522633",
+  "base_oid": "e24942724e7515f083a903f4c84371414ffa0075",
+  "integration_ref": "refs/remotes/origin/intent/260925-intent-12",
+  "claim_ref": "refs/heads/claim/aa0d9c26/u10-jd",
+  "predecessor_oid": null,
+  "gate_rhythm": "per-stage",
+  "audit_shard": "aica-hrd-71eeb4b00683.md"
+}
