@@ -4,6 +4,7 @@
 import IORedis from 'ioredis';
 import type { AnalysisQueueConfig } from '../analysis-queue/analysis-queue.config';
 import { errorName } from '../ai-run/ai-run-spec';
+import { watchRedisErrors } from '../common/redis-connection-errors';
 import { nextKoreanMidnightSeconds, questionCountKey } from './korean-date';
 import { QUESTION_COUNTER_TIMEOUT_MS, QUESTION_DAILY_LIMIT } from './rag-answer-config';
 import { type CountBypassReason, createRagAnswerLogger, type RagAnswerLogger, writeRagAnswerLog } from './rag-answer-log';
@@ -62,14 +63,8 @@ export class RedisQuestionCounter implements QuestionCounter {
   constructor(private readonly options: RedisQuestionCounterOptions) {
     this.logger = options.logger ?? createRagAnswerLogger();
     this.timeoutMs = options.timeoutMs ?? QUESTION_COUNTER_TIMEOUT_MS;
-    // 연결 오류를 처리되지 않은 사건으로 두지 않는다. 같은 끊김이 이어지면 첫 오류만 남긴다(AiRun과 같은 방식).
-    let reported = false;
-    options.redis.on('ready', () => { reported = false; });
-    options.redis.on('error', (error: Error) => {
-      if (reported) return;
-      reported = true;
-      writeRagAnswerLog(this.logger, { event: 'qna.count-connection-error', error: errorName(error) });
-    });
+    // 같은 끊김이 이어지면 첫 오류만 남긴다.
+    watchRedisErrors(options.redis, (error) => writeRagAnswerLog(this.logger, { event: 'qna.count-connection-error', error: errorName(error) }));
   }
 
   async count(publicationId: string, now: Date): Promise<QuestionCountDecision> {
