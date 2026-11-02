@@ -77,6 +77,9 @@ export function LandingPage() {
           <p className={styles["hero-context"]}>
             선정된 공개 저장소에서 경험 후보와 근거,<br className={styles["context-break"]} />생각해 볼 질문과 설명 초안을 확인합니다.
           </p>
+          <p className={styles["hero-context"]}>
+            분석은 GitHub 연결과 저장소 선택·동의 뒤에 시작합니다. 결과 확인과 공개 선택은 별도입니다.
+          </p>
         </div>
         <div
           className={styles["hero-product"]}
@@ -262,6 +265,7 @@ export function LandingPage() {
                 Catch는 GitHub의 작업 기록을 작업 단위로 묶고,<br />확인한 내용과 근거를 함께
                 보여주는 카드입니다.
               </p>
+              <p>설명이 기록과 맞지 않으면 불일치로 표시할 수 있습니다.</p>
             </div>
             <Reveal className={[styles["scene-visual"], styles["evidence-visual"]].join(" ")}>
               <div className={[styles["evidence-connector"], styles["top"]].join(" ")} aria-hidden="true"></div>
