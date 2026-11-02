@@ -57,8 +57,13 @@ const MEMBER_ROWS = {
   published_chunk: 'publication_id IN (SELECT publication_id FROM publication WHERE member_id = $1)',
   // 12월 intent U5(C-06, BR9.1): 발행본마다 AI 기본 요약 하나(발행본을 따라 지워짐).
   base_summary: 'publication_id IN (SELECT publication_id FROM publication WHERE member_id = $1)',
+  // 12월 intent U6(C-06·C-15): Claude 연결·승인 코드·접근 토큰.
+  mcp_connection: 'member_id = $1',
+  mcp_authorization_code: 'member_id = $1',
+  mcp_access_token: 'member_id = $1',
 };
-const SHARED_TABLES = ['allowed_scope_revision', 'repository_selection'];
+// mcp_client(U6)는 회원을 가리키지 않아 탈퇴 뒤에도 남는다. 승인에 쓰인 등록은 정리 대상도 아니다(U6 기능 설계 BR2.4·S19).
+const SHARED_TABLES = ['allowed_scope_revision', 'repository_selection', 'mcp_client'];
 const NONE = Object.fromEntries(Object.keys(MEMBER_ROWS).map(table => [table, 0]));
 
 async function memberRows(memberId) {
@@ -153,6 +158,16 @@ async function memberWithAllData() {
     await m.query(`INSERT INTO base_summary (base_summary_id, publication_id, status, deadline_at, items, generated_at, updated_at)
       VALUES ($1, $2, 'DONE', now() + interval '10 minutes', '[{"kind":"AI_INTERPRETATION","text":"합성 요약","citations":[],"jdRole":null}]', now(), now())`,
     [randomUUID(), publicationId]);
+    const mcpClientId = randomUUID();
+    await m.query(`INSERT INTO mcp_client (mcp_client_id, client_name, redirect_uris, registered_at, approved_at)
+      VALUES ($1, '합성 Claude', ARRAY['https://claude.ai/api/mcp/auth_callback'], now(), now())`, [mcpClientId]);
+    await m.query(`INSERT INTO mcp_connection (connection_id, member_id, mcp_client_id, consented_at, expires_at)
+      VALUES ($1, $2, $3, now(), now() + interval '7 days')`, [randomUUID(), memberId, mcpClientId]);
+    await m.query(`INSERT INTO mcp_authorization_code (code_hash, member_id, mcp_client_id, code_challenge, redirect_uri, consented_at, expires_at)
+      VALUES ($1, $2, $3, 'fixture-challenge', 'https://claude.ai/api/mcp/auth_callback', now(), now() + interval '5 minutes')`,
+    [randomBytes(32).toString('hex'), memberId, mcpClientId]);
+    await m.query(`INSERT INTO mcp_access_token (token_hash, member_id, mcp_client_id, expires_at)
+      VALUES ($1, $2, $3, now() + interval '7 days')`, [randomBytes(32).toString('hex'), memberId, mcpClientId]);
   });
   const rows = await memberRows(memberId);
   for (const [table, n] of Object.entries(rows)) assert.ok(n > 0, `${table}에 시험 회원의 행이 있어야 한다`);

@@ -1,7 +1,7 @@
 // U2 탈퇴 DELETE /v1/me(계약 C-06, 기능 설계 W7·W8·BR7.1~BR7.6, 시나리오 S24~S27, 비기능 NFR1.1·NFR1.2·NFR5.1·NFR5.5·NFR6.7).
 // 실제 AppModule·Guard·테스트 DB를 쓴다. 파일 저장 두 값과 GitHub 자격정보 폴더는 시험 안의 임시 폴더다.
-// U4 표(publication·published_item·text_material)는 #422로 합쳐진 실제 표를 쓴다. U6 mcp_* 표는 통합 브랜치에 아직 없어
-// C-15 모양의 시험용 표를 시험 안에서 만들고 지운다. U6를 합친 뒤 실제 표로 이 시험을 다시 돌리는 것이 U2 완료 조건이다(기능 설계 가정 4).
+// U4 표(publication·published_item·text_material)는 #422로 합쳐진 실제 표를 쓴다. U6 mcp_* 표도 U6 마이그레이션의 실제 표를 쓴다.
+// U6를 합친 뒤 실제 표로 이 시험을 다시 돌리는 것이 U2 완료 조건이었다(기능 설계 가정 4).
 require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { randomBytes, randomUUID } = require('node:crypto');
@@ -23,8 +23,8 @@ const { HttpGoogleProvider } = require('../../dist/google-login/google-provider'
 const { GOOGLE_CONFIG } = require('../../dist/google-login/google.config');
 const { APP_SETTINGS, WEB_ORIGIN, setEnv, startApp, expectError } = require('./support.cjs');
 
-// 실제 표가 이미 있으면(U6를 합친 뒤) 만들지도 지우지도 않는다. 그때는 아래 자료 넣기가 실제 표 모양과 달라 실패하므로,
-// 실제 표 모양으로 이 시험을 고쳐 다시 돌린다(U2 완료 조건). 시험이 실제 마이그레이션 표를 지우는 일은 없다.
+// 실제 표가 있으면(U6를 합친 뒤) 시험용 표를 만들지도 지우지도 않고, 「U6 표가 아직 없으면」 시험은 건너뜀으로 나온다.
+// 시험이 실제 마이그레이션 표를 지우는 일은 없다.
 const PROBE_TABLES = ['mcp_connection', 'mcp_authorization_code', 'mcp_access_token'];
 const PROBE_SQL = {
   mcp_connection: 'CREATE TABLE mcp_connection (connection_id uuid PRIMARY KEY, member_id uuid NOT NULL REFERENCES member_account(member_id) ON DELETE CASCADE)',
@@ -124,9 +124,16 @@ async function memberWithData(identity = `u2-withdraw-${randomUUID()}`) {
     await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot)
       VALUES ($1, $2, 1, 'TEXT_MATERIAL', $3, '합성 자료', '{"body":"합성 본문"}')`, [randomUUID(), publicationId, textMaterialId]);
   }
-  for (const table of ['mcp_connection', 'mcp_authorization_code', 'mcp_access_token']) {
-    await db.query(`INSERT INTO ${table} VALUES ($1, $2)`, [randomUUID(), memberId]);
-  }
+  const mcpClientId = randomUUID();
+  await db.query(`INSERT INTO mcp_client (mcp_client_id, client_name, redirect_uris, registered_at, approved_at)
+    VALUES ($1, '합성 Claude', ARRAY['https://claude.ai/api/mcp/auth_callback'], now(), now())`, [mcpClientId]);
+  await db.query(`INSERT INTO mcp_connection (connection_id, member_id, mcp_client_id, consented_at, expires_at)
+    VALUES ($1, $2, $3, now(), now() + interval '7 days')`, [randomUUID(), memberId, mcpClientId]);
+  await db.query(`INSERT INTO mcp_authorization_code (code_hash, member_id, mcp_client_id, code_challenge, redirect_uri, consented_at, expires_at)
+    VALUES ($1, $2, $3, 'fixture-challenge', 'https://claude.ai/api/mcp/auth_callback', now(), now() + interval '5 minutes')`,
+  [randomBytes(32).toString('hex'), memberId, mcpClientId]);
+  await db.query(`INSERT INTO mcp_access_token (token_hash, member_id, mcp_client_id, expires_at)
+    VALUES ($1, $2, $3, now() + interval '7 days')`, [randomBytes(32).toString('hex'), memberId, mcpClientId]);
   await storage.put(materialKey(memberId, randomUUID()), Buffer.from('합성 PDF'), 'application/pdf');
   const reference = await vault.save({ memberId, accountLogin: 'synthetic-login', externalAccountReference: '42',
     expiresAt: new Date(Date.now() + 3_600_000), token: new GitHubAccessToken('gho_synthetic_token') });

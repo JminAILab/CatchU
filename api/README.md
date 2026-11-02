@@ -258,6 +258,10 @@ DB를 쓰는 테스트를 추가할 때:
 
 계정당 하루 실행 제한·첫 이용 동의(`GET/POST /v1/ai-consent`)는 [docs/daily-run-limit.md](docs/daily-run-limit.md), 백그라운드 AI 실행은 [docs/ai-run.md](docs/ai-run.md), 파일 저장(`FILE_STORAGE_*`)은 [docs/file-storage.md](docs/file-storage.md), 탈퇴(`DELETE /v1/me`)는 [docs/withdrawal.md](docs/withdrawal.md), AI 생성 게이트의 U2 검사·스트림·JD 역할은 [docs/ai-generation.md 「U2 게이트」](docs/ai-generation.md#u2-게이트--12월-intent-u2)에 있다.
 
+## Claude 연결 — 12월 intent U6
+
+구직자 본인의 Claude 웹·Desktop 연결(OAuth 주소, `/v1/mcp`와 조회 도구 둘, 연결 상태·승인·전체 해제)의 주소, 앞단이 api로 보내야 할 경로, 설정, 로그 사건, 시험 방법, 받아들인 한계는 [docs/claude-mcp.md](docs/claude-mcp.md)에 있다.
+
 ## 실행 실패 시 확인
 
 - `EADDRINUSE`: 지정 포트가 사용 중인지 확인하고 자신이 실행한 이전 서버를 종료하거나 선택 포트를 바꾼다. 다른 사람의 프로세스를 임의 종료하지 않는다.
