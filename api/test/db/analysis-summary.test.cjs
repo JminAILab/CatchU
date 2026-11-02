@@ -19,6 +19,7 @@ const { SYNTHETIC_REPOSITORY } = require('../../dist/member-analysis/dev-member.
 const { AnalysisAttempt, AnalysisConsent, AnalysisRequest } = require('../../dist/member-analysis/member-analysis.entity');
 const { SYNTHETIC_NOTICE } = require('../../dist/analysis-intake/analysis-notice');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
+const { ensureRegistration } = require('../support/registered-analysis.cjs');
 
 const CONTRACT = resolve(__dirname, '../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design');
 const contract = file => YAML.parse(readFileSync(resolve(CONTRACT, file), 'utf8'));
@@ -107,7 +108,8 @@ async function start(t) {
 async function insertRequest(memberId, { repositoryId, submittedAt = new Date(), lifecycle = 'CLOSED', ...attempt }) {
   const [requestId, consentId, attemptId] = [randomUUID(), randomUUID(), randomUUID()];
   await db.transaction('READ COMMITTED', async manager => {
-    await manager.insert(AnalysisRequest, { requestId, memberId, repositoryId, consentId, currentAttemptId: attemptId,
+    const registrationId = await ensureRegistration(manager, { memberId, repositoryId });
+    await manager.insert(AnalysisRequest, { requestId, memberId, repositoryId, registrationId, consentId, currentAttemptId: attemptId,
       submittedAt, updatedAt: submittedAt, lifecycle });
     await manager.insert(AnalysisConsent, { consentId, requestId, memberId, repositoryId, accepted: true,
       noticeRevision: SYNTHETIC_NOTICE.noticeRevision, scopeRevision: SYNTHETIC_NOTICE.scopeRevision,
