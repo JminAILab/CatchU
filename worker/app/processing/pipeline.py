@@ -4,6 +4,7 @@
 메시지를 보내거나 저장하지 않고, 진행 알림은 emit에 넘기고 결과는 돌려준다.
 """
 
+import json
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -48,21 +49,21 @@ ProcessingOutcome = Rejected | Finished | Uncertain
 
 
 class ContractViolation(ValueError):
-    """만든 메시지가 스키마 v1에 맞지 않는다. 보내지 않는다."""
+    """만든 메시지가 현행 스키마 v2에 맞지 않는다. 보내지 않는다."""
 
 
 def _require_valid(schema_name: str, message: dict[str, Any]) -> None:
     checked = check_message(schema_name, message)
     if checked.verdict is not Verdict.VALID:
         places = ", ".join(f"{e.path or '/'}:{e.keyword}" for e in checked.errors)
-        raise ContractViolation(f"{schema_name} 스키마 v1 위반: {places}")
+        raise ContractViolation(f"{schema_name} 스키마 v2 위반: {places}")
 
 
 def _event(
     request: CheckedRequest, state: EventState, observed_at: datetime, id_label: str
 ) -> dict[str, Any]:
     event = {
-        "schemaVersion": "1",
+        "schemaVersion": "2",
         "messageId": f"event-{id_label}-{request.attempt_id}-{state.lower()}",
         "requestId": request.request_id,
         "attemptId": request.attempt_id,
@@ -106,7 +107,8 @@ def process_request(
         return _reject(Rejected(RejectReason.CONTEXT_MISMATCH, ("/sourceMode",)))
 
     emit(_event(checked, "RECEIVED", clock(), id_label))
-    emit(_event(checked, "RUNNING", clock(), id_label))
+    started_at = clock()
+    emit(_event(checked, "RUNNING", started_at, id_label))
     logger.info(
         "생성 시작: requestId=%s attemptId=%s sourceMode=%s",
         checked.request_id,
@@ -124,14 +126,23 @@ def process_request(
         )
         return Uncertain()
 
-    result = compose_result(checked, output, finished_at=clock(), id_label=id_label)
+    finished_at = clock()
+    result = compose_result(checked, output, finished_at=finished_at, id_label=id_label)
     _require_valid("Result", result)
     logger.info(
-        "종결 결과 생성: requestId=%s attemptId=%s outcome=%s sourceMode=%s",
+        "종결 결과 생성: requestId=%s attemptId=%s outcome=%s sourceMode=%s "
+        "candidates=%d ownCommitObservation=%s observedOwnCommitCount=%s "
+        "collectionLimitCount=%d resultBytes=%d elapsedSeconds=%.3f",
         checked.request_id,
         checked.attempt_id,
         result["outcome"],
         result["sourceMode"],
+        len(output.candidates),
+        output.own_commit_observation,
+        output.observed_own_commit_count,
+        len(output.collection_limit_notes),
+        len(json.dumps(result, ensure_ascii=False).encode("utf-8")),
+        max(0, (finished_at - started_at).total_seconds()),
     )
     return Finished(result)
 
@@ -146,7 +157,7 @@ def finish_unresolved(
 ) -> Finished:
     """요청 정보 조회가 모름·실패인 요청을 수집 없이, 진행 알림 없이 FAILED 결과 하나로 끝낸다(#121).
 
-    message는 스키마 v1과 조회 전 자체 검사를 통과한 값이다. 접수 기록과 대조하지 못했으므로
+    message는 스키마 v2와 조회 전 자체 검사를 통과한 값이다. 접수 기록과 대조하지 못했으므로
     `CheckedRequest`를 만들지 않는다. 결과를 받아들일지는 맥락 값을 접수 기록과 대조하는 E가 정한다.
     """
     request = UnverifiedRequest.from_message(message)

@@ -1,4 +1,7 @@
 const { createHash, randomUUID } = require('node:crypto');
+const { RepositoryRegistration } = require('../../dist/member-repositories/repository-registration.entity');
+const { AddRepositoryRegistration1793245460352 } = require('../../dist/database/migrations/1793245460352-AddRepositoryRegistration');
+const { ensureRegistration } = require('./registered-analysis.cjs');
 
 const TEST_KEYS = ['TEST_DB_HOST', 'TEST_DB_PORT', 'TEST_DB_USER', 'TEST_DB_PASSWORD', 'TEST_DB_NAME'];
 
@@ -61,7 +64,7 @@ async function createUpstreamTables(dataSource) {
     ...dataSource.options,
     migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000, CreateShareLink1790745895865, CreateAuthSessions1791648335731,
       AddAnalysisRequestHistoryIndex1792640486167, CascadeMemberAnalysisOnDelete1792817978011, CascadeResultApplicationOnDelete1792817978012,
-      CascadeAuthSessionsOnDelete1792817978013],
+      CascadeAuthSessionsOnDelete1792817978013, AddRepositoryRegistration1793245460352],
   });
   try {
     await foundation.initialize();
@@ -112,7 +115,7 @@ async function createCatchDbFixture(config) {
     const { AuthSession, SessionRefreshToken } = require('../../dist/auth/session.entity');
     dataSource = new DataSource({
       ...config, schema, namingStrategy: new SnakeNamingStrategy(),
-      entities: [MemberAccount, MemberProfile, GitHubConnection, AnalysisRequest, AnalysisConsent,
+      entities: [MemberAccount, MemberProfile, GitHubConnection, RepositoryRegistration, AnalysisRequest, AnalysisConsent,
         AnalysisAttempt, IdempotencyRecord, ShareLink, ResultApplicationRecord, CatchAssetEntity, CatchEvidenceEntity,
         CandidateRegistrationEntity, RepositoryProtectionEntity, AuthSession, SessionRefreshToken],
       // 되돌리기 검사는 B 마이그레이션만 취소하여 실제 선행 테이블의 보존을 확인한다.
@@ -144,6 +147,7 @@ async function createCatchDbFixture(config) {
           // worker 공용 합성 자료가 지정한 ID를 보존하고 순환 FK 세 행을 같은 트랜잭션에 준비한다.
           // 이전 ACTIVE 요청은 자동으로 종료하지 않는다. 후속 요청 시험이 종료를 명시해야 한다.
           await manager.insert(AnalysisRequest, {
+            registrationId: await ensureRegistration(manager, { memberId: input.ownerId, repositoryId }),
             requestId: input.requestId, memberId: input.ownerId, repositoryId, consentId,
             currentAttemptId: input.attemptId, submittedAt: now, updatedAt: now,
           });

@@ -10,7 +10,7 @@ const YAML = require('yaml');
 const REPO_ROOT = path.resolve(__dirname, '../../..');
 const CONTRACT_DIR = path.join(
   REPO_ROOT,
-  'aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design',
+  'api/contracts/repository-analysis',
 );
 const FIXTURE_DIR = path.join(REPO_ROOT, 'worker/fixtures/m1-synthetic');
 const CONTRACT_FILES = ['worker-messages.yaml', 'common.yaml'];

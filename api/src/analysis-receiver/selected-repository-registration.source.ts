@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
-import { AnalysisAttempt, AnalysisConsent, AnalysisRequest } from '../member-analysis/member-analysis.entity';
-import { SelectedRepositoryCatalog } from '../member-repositories/selected-repository-catalog';
+import { AnalysisAttempt, AnalysisConsent, AnalysisRequest, MemberAccount } from '../member-analysis/member-analysis.entity';
+import { RepositoryRegistration } from '../member-repositories/repository-registration.entity';
+import { readRegistrationScope } from '../member-repositories/registration-scope';
 import type { RequestContext } from './receiver.types';
 import type { RegistrationRepositorySnapshot, RegistrationRepositorySource } from './october-repository-observation.source';
 
@@ -11,8 +12,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * 현재 선정 목록·GitHub 연결·진행 중 전용 API와 무관하게 종결된 시도도 읽는다.
  */
 export class SelectedRepositoryRegistrationSource implements RegistrationRepositorySource {
-  constructor(private readonly dataSource: DataSource,
-    private readonly catalog: Pick<SelectedRepositoryCatalog, 'resolve'> = new SelectedRepositoryCatalog()) {}
+  constructor(private readonly dataSource: DataSource) {}
 
   async findForRegistration(input: Readonly<RequestContext>): Promise<RegistrationRepositorySnapshot | null> {
     if (!input || typeof input !== 'object') return null;
@@ -43,15 +43,16 @@ export class SelectedRepositoryRegistrationSource implements RegistrationReposit
         repositoryId: context.repositoryId, scopeRevision: context.scopeRevision, accepted: true,
       });
       if (!consent) return null;
-      const scope = consent.consentedScope;
+      const scope = readRegistrationScope(consent.consentedScope);
       if (!scope || typeof scope !== 'object' || Array.isArray(scope) ||
         scope.revision !== context.scopeRevision || scope.repositoryId !== context.repositoryId ||
-        typeof scope.selectionReference !== 'string') return null;
-      const selected = this.catalog.resolve(scope.selectionReference);
-      if (!selected || selected.repositoryId !== context.repositoryId ||
-        selected.selectionReference !== scope.selectionReference) return null;
+        scope.registrationId !== request.registrationId) return null;
+      const member = await manager.findOneBy(MemberAccount, { memberId: context.memberId, accountState: 'ACTIVE' });
+      const registration = await manager.findOneBy(RepositoryRegistration, { memberId: context.memberId,
+        registrationId: scope.registrationId, repositoryId: context.repositoryId });
+      if (!member || !registration) return null;
       return Object.freeze({ ...context,
-        githubRepository: Object.freeze({ owner: selected.owner, name: selected.name }),
+        githubRepository: Object.freeze({ owner: scope.repository.owner, name: scope.repository.name }),
       });
     });
   }

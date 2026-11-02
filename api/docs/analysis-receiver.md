@@ -1,6 +1,8 @@
 # 분석 메시지 수신과 개발용 주입 — #139
 
-이 구현은 [#139의 독립 준비 범위](https://github.com/JminAILab/CatchU/issues/139)다. 기준은 [메시지 계약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml), [수신 업무 흐름](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)·[상태 전이 정본](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본), [수신 기록 모델](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)이다. 실제 큐/worker 연결이나 HTTP 주입 API를 추가하지 않는다.
+현행 U7은 [v2 정본과 등록 소유/관측 저장](repository-analysis-u7.md#메시지와-결과)을 적용한다. 런타임 계약 디렉터리는 `api/contracts/repository-analysis`이며 아래 10월 경로의 YAML은 과거 승인 기록이다.
+
+이 구현은 [#139의 독립 준비 범위](https://github.com/JminAILab/CatchU/issues/139)다. 기준은 [현행 메시지 계약 v2](../contracts/repository-analysis/worker-messages.yaml), [수신 업무 흐름](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)·[상태 전이 정본](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본), [수신 기록 모델](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)이다. 실제 큐/worker 연결이나 HTTP 주입 API를 추가하지 않는다.
 
 ## 수신 결과와 저장 경계
 
@@ -12,11 +14,15 @@
 
 `ReceiverStore.withRequest`는 요청·현재 시도 조회, 판정, 저장을 같은 원자 구간에서 수행하고 **커밋 이후에만 resolve**해야 한다. 예외와 커밋 실패는 rollback하며, 현재 시도당 종결 결과 하나와 수신 식별자 유일성을 DB에서도 보장해야 한다. 서로 다른 인스턴스의 동시 수신도 DB에서 직렬화해야 한다. 테스트의 메모리 저장소는 이 경계를 흉내 낸 것이므로 실제 DB의 잠금·유일성·장애 복구 검증을 대신하지 않는다.
 
+실제 `DatabaseReceiverStore`는 비잠금 요청 조회에서 부모 식별자만 얻고, **회원 → 회원별 등록 → 요청 → 현재 시도 → 수신 기록** 순서로 잠근다. 부모 두 행은 읽기 잠금으로 삭제를 막고, 자식 세 행은 기존 쓰기 잠금으로 수신을 직렬화한다. 잠근 요청의 회원·등록·저장소가 최초 조회와 다르면 새 부모를 추가로 잠그지 않고 `CONTEXT_MISMATCH`로 거부한다. 현재 시도와 동의는 잠금 뒤 요청에서 다시 읽으므로 최초 조회 뒤 교체된 시도의 메시지는 기존 `STALE_ATTEMPT`로 거부한다. 부모/요청이 사라졌거나 회원이 비활성이면 맥락을 만들지 않는다. 교착 오류를 재시도하거나 삭제 자료를 복구하지 않는다.
+
+`api/`의 전용 `_test` DB에서 `npm.cmd test -- test/integration/receiver-parent-locking.test.cjs test/integration/receiver-registration.test.cjs test/db/member-cascade-delete.test.cjs`로 실제 동시 삭제·수신과 기존 수신·삭제를 확인한다. 새 시험은 회원/등록 × 진행/결과 × 삭제/수신 선행 8종을 장벽과 `pg_blocking_pids`로 확인하고, 최초 조회 뒤 부모 삭제·참조 변경·현재 시도 변경도 검사한다. 자식 자료 부활과 타 회원 변경이 없는지 확인하며, 시험이 만든 회원만 정리한다.
+
 수신 기록에는 식별자·지문·수신 시각만 저장하고 F 결과 원문을 복제하지 않는다. Receipt 전송과 그 이후 #105 호출을 구분한다. [10/6 최신 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)으로 결과 보관·자동 복구 계획은 철회됐다. [#237 처리 시한·실패 종료](https://github.com/JminAILab/CatchU/issues/237)는 [PR #295](https://github.com/JminAILab/CatchU/pull/295)로 구현돼 있으며, 시한을 넘긴 요청의 닫기와 닫힌 뒤 결과 거부는 [처리 시한 닫기](analysis-deadline.md)가 정한다. 이 수신 모듈 자체는 미반영 결과를 자동 복구하거나 시간만으로 요청을 닫지 않는다.
 
 ## 내부 주입 사용과 검사
 
-`AnalysisReceiverModule.register({ store, contractDirectory })`에 위 트랜잭션을 구현한 저장소와 `worker-messages.yaml`·`common.yaml`이 있는 절대 경로를 넘긴다. 현재 저장소의 계약 디렉터리는 `aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design`이다. 실행·배포 시 두 파일을 함께 제공해야 하며, 스키마를 읽지 못하면 모듈 조립에 실패한다. 테스트는 저장소 정본을 읽고, 승인 파일을 변경하지 않는다.
+`AnalysisReceiverModule.register({ store, contractDirectory })`에 위 트랜잭션을 구현한 저장소와 `worker-messages.yaml`·`common.yaml`이 있는 절대 경로를 넘긴다. 현행 계약 디렉터리는 `api/contracts/repository-analysis`다. 실행·배포 시 두 파일을 함께 제공해야 하며, 스키마를 읽지 못하면 모듈 조립에 실패한다. 테스트는 이 정본을 읽고, 과거 10월 승인 YAML은 보존한다.
 
 개발 내부 호출은 `DevAnalysisInjection.inject(memberId, requestId, kind, template, caseId)`다. `kind`는 `Result` 또는 `ProcessingEvent`다. 회원 ID는 [#87 인증 접근자](../src/auth/auth.decorators.ts)의 `CurrentMemberId`에서 전달하고 요청 body의 회원 ID로 대체하지 않는다. 저장소에서 본인 요청인지 확인한 다음 MOCK 접수 맥락으로만 `{{requestId}}`·`{{attemptId}}`·`{{memberId}}`·`{{repositoryId}}`·`{{consentId}}`·`{{scopeRevision}}`·`{{caseId}}`를 채운다. 템플릿에 없는 ID는 생성하지 않으며 타인 요청·다른 요청으로의 바꿔치기·LIVE 자료 주입을 거부한다.
 
@@ -68,7 +74,7 @@ try {
 
 | 연결 | 필요한 결과 |
 | --- | --- |
-| [#104 요청·시도 모델](https://github.com/JminAILab/CatchU/issues/104) + [#105 수신 기록 테이블](https://github.com/JminAILab/CatchU/issues/105) | [DB 수신 어댑터](receiver-registration.md)에서 기존 실제 테이블과 요청 → 시도 → 수신 기록 잠금을 사용. 커밋 실패·동시 수신을 전용 DB로 검사 |
+| [#104 요청·시도 모델](https://github.com/JminAILab/CatchU/issues/104) + [#105 수신 기록 테이블](https://github.com/JminAILab/CatchU/issues/105) | [DB 수신 어댑터](receiver-registration.md)에서 회원·등록을 먼저 보호하고 요청 → 시도 → 수신 기록을 잠금. 커밋 실패·동시 수신·부모 삭제를 전용 DB로 검사 |
 | [#138 분석 접수 API](https://github.com/JminAILab/CatchU/issues/138) | 위 「실제 접수 연결 검증」으로 재현했다. 접수 API가 저장한 행을 큐 보내기(#233)가 같은 맥락으로 보내는지도 [큐 연결 시험](analysis-queue.md#시험)이 확인한다 |
 | [#105 등록·반영](https://github.com/JminAILab/CatchU/issues/105) | 수신 커밋 후 실제 B/E 반영 조립은 제공됐다. 실제 보호 관측·저장소 주소의 공급 주체와 조립 책임은 #105에서 확인하며 #231·#232의 책임으로 배정하지 않는다. ACCEPTED는 APPLIED가 아님 |
 | [#233 전송 연결](https://github.com/JminAILab/CatchU/issues/233) | 큐 송수신 모듈이 있다([큐 연결](analysis-queue.md)). 결과 작업을 받아 `AnalysisRegistrationService`에 넘기고 수신 확인을 작업 반환값으로 돌려준다. 모듈은 `AppModule`에 아직 등록하지 않았고, 켜는 일은 #252 좌표 제공자와 #105 근거 보존 수정 뒤다(10월 정책 공급자는 #314). 결과 원문 보관·자동 재반영은 추가하지 않음 |

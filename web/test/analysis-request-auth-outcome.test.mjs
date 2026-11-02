@@ -13,6 +13,7 @@ const status = (repositoryId) => ({
   submittedAt: '2026-10-18T01:00:00Z', updatedAt: '2026-10-18T01:00:00Z',
   requestState: 'ACCEPTED', lifecycle: 'ACTIVE', processing: 'QUEUED', application: 'NOT_READY', sourceMode: 'MOCK',
   eligibleCandidateCount: 0, registeredCatchIds: [], ownerResultsReady: false, retry: { allowed: false, reason: 'IN_PROGRESS' }, failures: [],
+  ownCommitObservation: 'UNKNOWN', observedOwnCommitCount: null, collectionLimitNotes: [],
 });
 const http = (code, data) => ({ kind: 'success', status: code, data });
 const LOOKUP_FAILED = { kind: 'lookup-failed', status: null, code: 'LOOKUP_FAILED' };

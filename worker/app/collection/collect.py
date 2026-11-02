@@ -14,7 +14,7 @@ relations를 주면 목록 뒤에 같은 연결로 관계 조회(`relations.py`)
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from app.collection import evidence
@@ -58,7 +58,7 @@ from app.collection.relations import (
 )
 from app.collection.selection import SelectionResolver, check_selection
 from app.collection.transport import Transport
-from app.processing.generation import StageFailure
+from app.processing.generation import GenerationOutput, StageFailure
 from app.processing.request_check import CheckedRequest
 
 logger = logging.getLogger(__name__)
@@ -89,6 +89,64 @@ class CollectionOutcome:
     graphql: GraphQLUsage = GraphQLUsage()
     # 관계 조회를 요청했고 첫 호출 전에 멈추지 않았을 때만 있다.
     relations: RelationObservations | None = None
+    # 실제 조회가 끝난 경우에만 설정한다. 기본 생성한 빈 결과로 NONE을 추측하지 않는다.
+    own_commits_checked: bool = False
+    elapsed_seconds: float = 0
+
+    def with_observation(self, output: GenerationOutput) -> GenerationOutput:
+        records = list(self.commits)
+        if self.relations is not None:
+            records.extend(self.relations.commits)
+            for branch in self.relations.base_branches:
+                records.extend(branch.commits)
+        # GitHub 계정이 연결되지 않은 작성자는 숫자 ID 기준 본인 커밋에 포함하지 않는다.
+        own = {
+            record.sha
+            for record in records
+            if self.linked_account is not None
+            and self.linked_account.same_account(record.author)
+        }
+        notes = list(dict.fromkeys(limit.message for limit in self.coverage_limits))
+        if self.relations is not None:
+            for listing in self.relations.pull_request_commits:
+                notes.extend(listing.limits)
+                if listing.status is not DetailStatus.FETCHED or not listing.complete:
+                    notes.append("PR 커밋 목록을 완전히 확인하지 못했습니다.")
+        if self.failures:
+            notes.append("수집이 중단되어 필요한 조회를 끝내지 못했습니다.")
+        checked = (
+            self.own_commits_checked
+            and self.linked_account is not None
+            and "COMMIT" in self.allowed_resource_types
+        )
+        if not checked and not notes:
+            notes.append("본인 커밋 확인에 필요한 조회의 완료를 확인하지 못했습니다.")
+        notes = list(dict.fromkeys(notes))
+        if len(notes) > 100:
+            notes = [*notes[:99], "추가 수집 한계가 있습니다."]
+        safe_notes = tuple(note[:500] for note in notes)
+        if own:
+            return replace(
+                output,
+                own_commit_observation="FOUND",
+                observed_own_commit_count=len(own),
+                collection_limit_notes=safe_notes,
+            )
+        if checked and not safe_notes and not output.failures:
+            # PR/이슈 기여만으로 후보가 생겨도 완전 조회에서 본인 커밋이 없으면 Catch를 만들지 않는다.
+            return replace(
+                output,
+                candidates=(),
+                own_commit_observation="NONE",
+                observed_own_commit_count=0,
+                collection_limit_notes=(),
+            )
+        return replace(
+            output,
+            own_commit_observation="UNKNOWN",
+            observed_own_commit_count=None,
+            collection_limit_notes=safe_notes,
+        )
 
     @property
     def completed(self) -> bool:
@@ -188,13 +246,17 @@ def _run(
     paths: RepositoryPaths,
     data: CollectedData,
     relations: RelationCollector | None = None,
+    expected_repository_id: str | None = None,
 ) -> CollectionFailure | None:
     """저장소 확인 → 목록 → 상세(관계 조회면 관계 조회). 멈추면 실패와, 확인하지 못한 종류의
     한계를 남긴다."""
     listed: set[ResourceType] = set()
     try:
         default_branch = verify_repository(
-            gateway, paths, read_default_branch=relations is not None
+            gateway,
+            paths,
+            read_default_branch=relations is not None,
+            expected_repository_id=expected_repository_id,
         )
         if relations is not None:
             relations.default_branch = default_branch
@@ -321,6 +383,9 @@ def _collect_with(
             paths,
             data,
             relation,
+            request.repository_id
+            if request.source_mode == "LIVE" and request.repository_id.isdecimal()
+            else None,
         )
     finally:
         # 성공·실패·예외 모두 자격정보를 놓고 연결을 닫는다.
@@ -333,7 +398,7 @@ def _collect_with(
         logging.WARNING if failure else logging.INFO,
         "수집 종료: requestId=%s attemptId=%s completed=%s code=%s calls=%d bytes=%d "
         "graphqlCalls=%d graphqlCost=%d graphqlCostUnobserved=%d "
-        "commits=%d pullRequests=%d issues=%d",
+        "commits=%d pullRequests=%d issues=%d elapsedSeconds=%.3f",
         request.request_id,
         request.attempt_id,
         failure is None,
@@ -346,6 +411,7 @@ def _collect_with(
         len(data.commits),
         len(data.pull_requests),
         len(data.issues),
+        max(0, (clock() - started).total_seconds()),
     )
     observations = None if relation is None else relation.observations(data)
     if observations is not None:
@@ -364,6 +430,8 @@ def _collect_with(
         received_bytes=budget.received_bytes,
         graphql=graphql,
         relations=observations,
+        own_commits_checked=failure is None,
+        elapsed_seconds=max(0, (clock() - started).total_seconds()),
     )
 
 

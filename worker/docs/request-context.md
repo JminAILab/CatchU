@@ -1,5 +1,7 @@
 # 내부 API 요청 정보 조회 — #232, #121
 
+현행 U7의 실행 좌표는 현재 전역 선정 목록이 아니라 요청 당시 회원 등록·불변 동의 사본에서 복원한다. 기존 서비스 인증·현재 시도·연결 교체 차단은 유지한다. 큐 참조는 attemptId이며 자세한 v2 전환은 [U7 문서](repository-analysis-u7.md)를 따른다.
+
 LIVE 요청마다 `attemptId`로 내부 api에 한 번 묻는다. 응답의 접수 기록으로 요청 메시지를 대조하고, 같은 응답의 자격정보·선택 범위를 기존 수집 경계(`check_credential`·`check_selection`)에 넘긴다. 요청의 `credentialContextReference`와 `allowedScope.selectionReference`는 모두 그 `attemptId`와 같아야 한다(조회 전 자체 검사, [큐 소비자 「구조」](queue-consumer.md#구조)). 참조 자체는 권한이나 GitHub 토큰이 아니다. 기준은 [수집 통제 §3 A→F 자격정보 인계](../../docs/CatchU_collection_control_scope.md#3-af-자격정보-인계)이고, api 쪽은 [Worker 분석 시도 컨텍스트](../../api/docs/worker-context.md)다.
 
 ## 호출과 세 가지 결과

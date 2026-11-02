@@ -1,4 +1,5 @@
 import { DataSource, QueryFailedError } from 'typeorm';
+import { readRegistrationScope } from '../member-repositories/registration-scope';
 import { ANALYSIS_PROCESSING_DEADLINE_MS } from '../analysis-deadline/analysis-deadline.service';
 import { WorkerMessageValidator } from '../analysis-receiver/worker-message.validator';
 import { DISPATCH_BATCH_SIZE, QUEUE_COMMAND_TIMEOUT_MS, REQUEST_JOB_NAME, requestJobOptions } from './queue-spec';
@@ -8,6 +9,7 @@ export interface PendingAttempt {
   requestId: string;
   memberId: string;
   repositoryId: string;
+  registrationId: string;
   submittedAt: Date;
   attemptId: string;
   sourceMode: 'MOCK' | 'LIVE';
@@ -20,7 +22,7 @@ export interface PendingAttempt {
 
 /** 계약 v1 Request(worker-messages.yaml). */
 export interface AnalysisRequestMessage {
-  schemaVersion: '1';
+  schemaVersion: '2';
   messageId: string;
   requestId: string;
   attemptId: string;
@@ -50,14 +52,18 @@ export function buildRequestMessage(attempt: PendingAttempt, validator: Pick<Wor
   if (scope === null || typeof scope !== 'object' || Array.isArray(scope)) return { skip: 'CONSENT_SCOPE_INVALID' };
   const fields = scope as Record<string, unknown>;
   const keys = Object.keys(fields).sort();
-  if (keys.length !== SCOPE_KEYS.length || keys.some((key, index) => key !== SCOPE_KEYS[index]) ||
+  if (attempt.sourceMode === 'LIVE') {
+    const registration = readRegistrationScope(scope);
+    if (!registration) return { skip: 'CONSENT_SCOPE_INVALID' };
+    if (registration.registrationId !== attempt.registrationId) return { skip: 'CONSENT_SCOPE_MISMATCH' };
+  } else if (keys.length !== SCOPE_KEYS.length || keys.some((key, index) => key !== SCOPE_KEYS[index]) ||
       !Array.isArray(fields.allowedResourceTypes)) return { skip: 'CONSENT_SCOPE_INVALID' };
   // worker는 범위의 저장소 ID가 요청과 다르면 알림 없이 거부하고, E는 판본이 다르면 결과를 CONTEXT_MISMATCH로 거부한다.
   if (fields.repositoryId !== attempt.repositoryId || fields.revision !== attempt.scopeRevision) {
     return { skip: 'CONSENT_SCOPE_MISMATCH' };
   }
   const message: AnalysisRequestMessage = {
-    schemaVersion: '1',
+    schemaVersion: '2',
     // worker 합성 요청(worker/app/processing/synthetic.py)과 같은 규칙이다.
     messageId: `request-${attempt.attemptId}`,
     requestId: attempt.requestId,
@@ -201,7 +207,7 @@ export class AnalysisRequestDispatcher {
    */
   private pending(cutoff: Date): Promise<PendingAttempt[]> {
     return this.dataSource.query(`
-      SELECT r.request_id AS "requestId", r.member_id AS "memberId", r.repository_id AS "repositoryId",
+      SELECT r.request_id AS "requestId", r.member_id AS "memberId", r.repository_id AS "repositoryId", r.registration_id AS "registrationId",
              r.submitted_at AS "submittedAt", a.attempt_id AS "attemptId", a.source_mode AS "sourceMode",
              c.consent_id AS "consentId", c.notice_revision AS "noticeRevision", c.scope_revision AS "scopeRevision",
              c.consented_scope AS "consentedScope", c.consented_at AS "consentedAt"

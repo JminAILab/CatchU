@@ -9,23 +9,23 @@ const { readInitialSelection, restoreInitialSelection } = require('../support/re
 const { CONTRACT_DIR, validator, result: makeResult } = require('../helpers/receiver-harness.cjs');
 const { MemberAccount, GitHubConnection, AnalysisConsent, AnalysisAttempt, AnalysisRequest } =
   require('../../dist/member-analysis/member-analysis.entity');
-const { insertInitialAnalysis } = require('../../dist/member-analysis/initial-analysis');
+const { insertCurrentAnalysis: insertInitialAnalysis } = require('../support/registered-analysis.cjs');
 const { REAL_NOTICE } = require('../../dist/analysis-intake/analysis-notice');
 const { buildRequestMessage } = require('../../dist/analysis-queue/analysis-request.dispatcher');
 const { WorkerContextService } = require('../../dist/worker-context/worker-context.service');
 const { GitHubAccessToken } = require('../../dist/github-connection/github.client');
 const { RepositorySelection } = require('../../dist/member-repositories/repository-selection.entity');
-const { RepositorySelectionService, DatabaseRepositorySelectionSource } =
-  require('../../dist/member-repositories/repository-selection.source');
+const { RepositoryRegistrationService } = require('../../dist/member-repositories/repository-registration.service');
+const { RepositoryRegistration } = require('../../dist/member-repositories/repository-registration.entity');
+const { RegistrationContextSource } = require('../../dist/member-repositories/registration-context.source');
 const { SelectedRepositoryCatalog } = require('../../dist/member-repositories/selected-repository-catalog');
 const { SelectedRepositoryRegistrationSource } = require('../../dist/analysis-receiver/selected-repository-registration.source');
 const { OctoberRepositoryObservationSource } = require('../../dist/analysis-receiver/october-repository-observation.source');
 const { AnalysisReceiverModule } = require('../../dist/analysis-receiver/analysis-receiver.module');
 const { AnalysisRegistrationService, AnalysisRegistrationError } = require('../../dist/analysis-receiver/analysis-registration.service');
 
-// 실제 공급 검사: DB 선정 행·범위 정의를 실제 접수 재확인·worker 선정 공급·#319 등록 좌표 공급이 같은 카탈로그로 읽는다.
-// 시험 대역은 GitHub 자격정보(resolveCredential)와 이름 변경을 가정한 새 좌표 판본 하나다. HTTP·Redis·GitHub·LLM은 쓰지 않는다.
-// 합성 선정 대역으로 같은 흐름을 본 검사는 selected-repository-version-chain.test.cjs에 있다.
+// 회원별 등록·접수 재확인·worker 컨텍스트·수신이 같은 불변 좌표 사본을 읽는다.
+// GitHub 자격정보·공개 메타데이터만 합성 대역이며 HTTP·Redis·GitHub·LLM을 실제 호출하지 않는다.
 const THEME = '570342307';
 const versions = new SelectedRepositoryCatalog().listCurrent();
 const theme = versions.find(version => version.repositoryId === THEME);
@@ -43,13 +43,16 @@ before(async () => {
   db = app.get(DataSource);
   service = app.get(AnalysisRegistrationService);
   initial = await readInitialSelection(db);
-  selections = new RepositorySelectionService(db, catalog);
+  selections = new RepositoryRegistrationService(db, {
+    requireAvailable() {}, resolveCredential: async memberId => ({memberId, externalAccountReference: '123456',
+      token: new GitHubAccessToken('SYNTHETIC_SELECTION_CHAIN_TOKEN')}) },
+    { verify: async coordinates => ({...coordinates, repositoryId: THEME}) });
   registration = new SelectedRepositoryRegistrationSource(db, catalog);
   workerContext = new WorkerContextService(db, { resolveCredential: async memberId => {
     credentialCalls++;
     return { memberId, accountLogin: 'chain-user', externalAccountReference: '123456',
       token: new GitHubAccessToken('SYNTHETIC_SELECTION_CHAIN_TOKEN'), expiresAt: new Date(Date.now() + 3600000) };
-  } }, new DatabaseRepositorySelectionSource(catalog));
+  } }, new RegistrationContextSource());
 });
 after(async () => { await app?.close(); });
 beforeEach(async () => {
@@ -61,8 +64,8 @@ beforeEach(async () => {
 const scopeUnverified = reason => error => error?.code === 'RESOURCE_UNAVAILABLE' && error.details?.violations?.[0]?.reason === reason;
 const CHANGES = {
   '현재 선정 제외': () => db.manager.update(RepositorySelection, { repositoryId: THEME }, { active: false }),
-  '새 좌표 판본 추가': () => db.manager.update(RepositorySelection, { repositoryId: THEME },
-    { selectionReference: renamed.selectionReference }),
+  '새 좌표 판본 추가': () => db.manager.update(RepositoryRegistration, { repositoryId: THEME },
+    { name: renamed.name, repositoryUrl: renamed.url }),
 };
 
 async function prepare() {
@@ -72,9 +75,11 @@ async function prepare() {
   await db.manager.insert(GitHubConnection, Object.assign(new GitHubConnection(), { memberId: member.memberId,
     connectionState: 'CONNECTED', credentialReference: 'github-v1:' + randomUUID(), accountLogin: 'chain-user',
     externalAccountReference: '123456' }));
-  // #323이 할 접수와 같은 순서: 생성 트랜잭션에서 재확인한 동의 네 칸을 그대로 저장한다.
+  await selections.register(member.memberId, {url: theme.url});
+  const prepared = await selections.prepareForIntake(member.memberId, THEME);
+  // 외부 확인 뒤 생성 트랜잭션에서 등록·범위를 다시 대조하고 동의 사본을 고정한다.
   const { request, selection } = await db.transaction('READ COMMITTED', async manager => {
-    const current = await selections.confirmForIntake(manager, member.memberId, THEME);
+    const current = await selections.confirmForIntake(manager, member.memberId, THEME, prepared);
     return { selection: current, request: await insertInitialAnalysis(manager, { memberId: member.memberId, repositoryId: THEME,
       sourceMode: 'LIVE', noticeRevision: REAL_NOTICE.noticeRevision, scopeRevision: current.scopeRevision,
       consentedScope: current.consentedScope }) };
@@ -83,7 +88,7 @@ async function prepare() {
     repositoryId: THEME, scopeRevision: selection.scopeRevision };
   const consent = await db.manager.findOneByOrFail(AnalysisConsent, { consentId: request.consentId });
   const attempt = await db.manager.findOneByOrFail(AnalysisAttempt, { attemptId: context.attemptId });
-  const built = buildRequestMessage({ ...context, submittedAt: request.submittedAt, sourceMode: attempt.sourceMode,
+  const built = buildRequestMessage({ ...context, registrationId: request.registrationId, submittedAt: request.submittedAt, sourceMode: attempt.sourceMode,
     consentId: consent.consentId, noticeRevision: consent.noticeRevision, scopeRevision: consent.scopeRevision,
     consentedScope: consent.consentedScope, consentedAt: consent.consentedAt }, validator);
   assert.ok(built.message, JSON.stringify(built));
@@ -92,7 +97,7 @@ async function prepare() {
   assert.equal(message.allowedScope.selectionReference, context.attemptId);
   assert.equal(message.credentialContextReference, context.attemptId);
   assert.equal(message.allowedScope.revision, selection.scopeRevision);
-  assert.deepEqual(message.allowedScope.allowedResourceTypes, selection.allowedResourceTypes);
+  assert.deepEqual(message.allowedScope.allowedResourceTypes, selection.consentedScope.allowedResourceTypes);
   const execution = await workerContext.read(message.credentialContextReference);
   assert.deepEqual(execution.credential.repository, { owner: theme.owner, name: theme.name });
   assert.deepEqual(execution.selection, { repositoryId: THEME, wholeRepository: true });
@@ -109,10 +114,11 @@ async function prepare() {
 }
 
 for (const [label, change] of Object.entries(CHANGES)) {
-  test('실행 조회 뒤 ' + label + ': 새 실행 허가는 막고 원래 선정 참조의 당시 좌표로 Catch를 저장한다', async () => {
+  test('실행 조회 뒤 ' + label + ': 현재 요청의 불변 좌표로 실행 조회와 Catch 반영을 유지한다', async () => {
     const { request, context, consent, result } = await prepare();
     await change();
-    await assert.rejects(workerContext.read(context.attemptId), scopeUnverified('SCOPE_UNVERIFIED'));
+    assert.deepEqual((await workerContext.read(context.attemptId)).credential.repository,
+      {owner: theme.owner, name: theme.name});
     const received = await service.receiveResult(result, async receipt => assert.equal(receipt.disposition, 'ACCEPTED'));
     assert.equal(received.application.registeredCatchIds.length, 1);
     const [stored] = await db.query('SELECT source_url FROM catch_evidence WHERE catch_id = $1', [received.application.registeredCatchIds[0]]);
@@ -120,7 +126,7 @@ for (const [label, change] of Object.entries(CHANGES)) {
     assert.deepEqual((await db.manager.findOneByOrFail(AnalysisConsent, { consentId: request.consentId })).consentedScope,
       consent.consentedScope, '저장 동의의 선정 참조를 덮어쓰지 않는다');
     assert.equal((await db.manager.findOneByOrFail(AnalysisAttempt, { attemptId: context.attemptId })).application, 'APPLIED');
-    assert.equal(credentialCalls, 1, 'Catch 등록은 실행 허가나 GitHub 자격정보를 다시 조회하지 않는다');
+    assert.equal(credentialCalls, 2, '두 실행 조회 외에 Catch 등록은 자격정보를 다시 조회하지 않는다');
   });
 }
 
@@ -145,7 +151,7 @@ test('시도 종결·요청 닫힘·선정 제외·새 좌표 판본 뒤에도 �
   await assert.rejects(workerContext.read(context.attemptId), scopeUnverified('ATTEMPT_NOT_ACTIVE'));
   const snapshot = await registration.findForRegistration({ ...context, consentId: consent.consentId, sourceMode: 'LIVE' });
   assert.deepEqual(snapshot.githubRepository, { owner: theme.owner, name: theme.name });
-  const stored = catalog.resolve(consent.consentedScope.selectionReference);
-  assert.deepEqual([stored.repositoryId, stored.owner, stored.name, stored.url], [THEME, theme.owner, theme.name, theme.url]);
+  const stored = consent.consentedScope.repository;
+  assert.deepEqual([consent.consentedScope.repositoryId, stored.owner, stored.name, stored.url], [THEME, theme.owner, theme.name, theme.url]);
   assert.deepEqual(catalog.resolve(renamed.selectionReference).name, renamed.name, '새 판본은 이전 판본을 바꾸지 않고 더해진다');
 });

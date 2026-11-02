@@ -4,7 +4,8 @@ const { randomUUID } = require('node:crypto');
 const { before, after, beforeEach, test } = require('node:test');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { MemberAccount, AnalysisRequest, AnalysisAttempt } = require('../../dist/member-analysis/member-analysis.entity');
-const { insertInitialAnalysis } = require('../../dist/member-analysis/initial-analysis');
+const { RepositoryRegistration } = require('../../dist/member-repositories/repository-registration.entity');
+const { insertInitialAnalysis, ensureRegistration } = require('../support/registered-analysis.cjs');
 const { SelectedRepositoryCatalog } = require('../../dist/member-repositories/selected-repository-catalog');
 const { SelectedRepositoryRegistrationSource } = require('../../dist/analysis-receiver/selected-repository-registration.source');
 const versions = new SelectedRepositoryCatalog().listCurrent();
@@ -19,10 +20,15 @@ async function seed({version = versions[0], sourceMode = 'LIVE', processing = 'S
   const member = Object.assign(new MemberAccount(), {identityReference: `fixture:${randomUUID()}`, accountState: 'ACTIVE'});
   await db.manager.insert(MemberAccount, member);
   const request = await db.transaction('READ COMMITTED', async manager => {
+    const registrationId = await ensureRegistration(manager, { memberId: member.memberId, repositoryId: version.repositoryId,
+      scopeRevision: 'fixture-scope-not-product-approved', consentedScope: { repository: version } });
+    const valid = { revision: 'fixture-scope-not-product-approved', repositoryId: version.repositoryId,
+      selectionReference: registrationId, registrationId, allowedResourceTypes: ['COMMIT'],
+      repository: { owner: version.owner, name: version.name, url: version.url } };
     const created = await insertInitialAnalysis(manager, {memberId: member.memberId, repositoryId: version.repositoryId,
+      registrationId,
       noticeRevision: 'fixture-notice-not-product-approved', scopeRevision: 'fixture-scope-not-product-approved', sourceMode,
-      consentedScope: consentedScope ?? {revision: 'fixture-scope-not-product-approved', repositoryId: version.repositoryId,
-        selectionReference: version.selectionReference}});
+      consentedScope: typeof consentedScope === 'function' ? consentedScope(valid) : consentedScope ?? valid});
     await manager.update(AnalysisAttempt, {attemptId: created.currentAttemptId}, {processing});
     await manager.update(AnalysisRequest, {requestId: created.requestId}, {lifecycle});
     return created;
@@ -31,10 +37,10 @@ async function seed({version = versions[0], sourceMode = 'LIVE', processing = 'S
     repositoryId: version.repositoryId, consentId: request.consentId,
     scopeRevision: 'fixture-scope-not-product-approved', sourceMode};
 }
-const source = catalog => new SelectedRepositoryRegistrationSource(db, catalog);
+const source = () => new SelectedRepositoryRegistrationSource(db);
 const expected = (context, version = versions[0]) => ({...context, githubRepository: {owner: version.owner, name: version.name}});
 
-test('실제 DB의 LIVE 요청·동의·시도와 선정 판본을 대조해 두 저장소의 정확한 좌표를 읽는다', async () => {
+test('실제 DB의 LIVE 요청·동의·시도와 회원 등록을 대조해 당시 좌표를 읽는다', async () => {
   for (const version of versions) {
     const context = await seed({version});
     assert.deepEqual(await source().findForRegistration(context), expected(context, version));
@@ -73,33 +79,31 @@ test('저장된 MOCK 시도는 LIVE로 바꿔 요청해도 사용할 수 없다'
   assert.equal(await source().findForRegistration({...context, sourceMode: 'LIVE'}), null);
 });
 
-test('동의 범위의 누락·타입 오류·다른 저장소·미등록/합성 선정 참조는 모두 거부한다', async () => {
-  const valid = {revision: 'fixture-scope-not-product-approved', repositoryId: versions[0].repositoryId,
-    selectionReference: versions[0].selectionReference};
-  const invalid = [{}, {revision: valid.revision}, {...valid, revision: null}, {...valid, revision: 1},
-    {...valid, revision: 'other-scope'}, {...valid, repositoryId: Number(valid.repositoryId)},
-    {...valid, repositoryId: versions[1].repositoryId}, {...valid, selectionReference: null},
-    {...valid, selectionReference: 1}, {...valid, selectionReference: ''}, {...valid, selectionReference: 'unknown'},
-    {...valid, selectionReference: 'catchu:synthetic-selection:v1'},
-    {...valid, selectionReference: versions[1].selectionReference}];
-  for (const scope of invalid) {
-    const context = await seed({consentedScope: scope});
+test('동의 범위의 누락·타입 오류·다른 저장소·등록 참조 위조는 모두 거부한다', async () => {
+  const invalid = [() => ({}), valid => ({revision: valid.revision}),
+    ...[null, 1, 'other-scope'].map(revision => valid => ({...valid, revision})),
+    valid => ({...valid, repositoryId: Number(valid.repositoryId)}),
+    valid => ({...valid, repositoryId: versions[1].repositoryId}),
+    ...[null, 1, '', 'unknown', 'catchu:synthetic-selection:v1', versions[1].selectionReference]
+      .map(selectionReference => valid => ({...valid, selectionReference})),
+    valid => ({...valid, registrationId: randomUUID()}), valid => ({...valid, repository: undefined}),
+    valid => ({...valid, repository: {...valid.repository, owner: 'other-owner'}})];
+  for (const change of invalid) {
+    const context = await seed({consentedScope: change});
     assert.equal(await source().findForRegistration(context), null);
   }
 });
 
-test('현재 선정에서 제외하거나 같은 ID의 이름 판본을 추가해도 과거 동의의 좌표를 보존한다', async () => {
+test('현재 등록의 표시 이름을 갱신해도 과거 동의의 좌표를 보존한다', async () => {
   const context = await seed();
-  const renamed = {...versions[0], name: 'renamed-fixture', url: 'https://github.com/ljm0850/renamed-fixture', selectionReference: 'fixture:renamed'};
-  for (const catalog of [new SelectedRepositoryCatalog(versions, []),
-    new SelectedRepositoryCatalog([...versions, renamed], [renamed.selectionReference])]) {
-    assert.deepEqual(await source(catalog).findForRegistration(context), expected(context));
-  }
+  await db.manager.update(RepositoryRegistration, { memberId: context.memberId, repositoryId: context.repositoryId },
+    { name: 'renamed-fixture', repositoryUrl: 'https://github.com/ljm0850/renamed-fixture' });
+  assert.deepEqual(await source().findForRegistration(context), expected(context));
 });
 
-test('선정 좌표 판본이 보관되지 않았으면 현재 저장소나 URL에서 추론하지 않는다', async () => {
-  const context = await seed();
-  assert.equal(await source(new SelectedRepositoryCatalog([], [])).findForRegistration(context), null);
+test('동의 좌표 사본이 없으면 현재 등록이나 URL에서 추론하지 않는다', async () => {
+  const context = await seed({consentedScope: valid => ({...valid, repository: undefined})});
+  assert.equal(await source().findForRegistration(context), null);
 });
 
 test('분석이 조회 도중 완료돼도 세 행은 같은 DB 스냅샷으로 읽는다', async () => {

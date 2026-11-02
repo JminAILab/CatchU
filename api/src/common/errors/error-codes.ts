@@ -14,6 +14,10 @@ export const ERROR_STATUS = {
   LINK_PASSWORD_INVALID: 401,
   GITHUB_CONNECTION_REQUIRED: 403,
   REPOSITORY_NOT_ALLOWED: 403,
+  REPOSITORY_URL_INVALID: 400,
+  REPOSITORY_PRIVATE: 403,
+  REPOSITORY_UNSUPPORTED: 403,
+  REPOSITORY_UNVERIFIED: 422,
   CONSENT_REQUIRED: 403,
   RESOURCE_UNAVAILABLE: 404,
   LINK_UNAVAILABLE: 404,
@@ -54,6 +58,10 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   LINK_PASSWORD_INVALID: '비밀번호가 올바르지 않습니다.',
   GITHUB_CONNECTION_REQUIRED: 'GitHub 연결이 필요합니다.',
   REPOSITORY_NOT_ALLOWED: '분석할 수 없는 저장소입니다.',
+  REPOSITORY_URL_INVALID: 'https://github.com/소유자/저장소 형태의 주소를 입력해 주세요.',
+  REPOSITORY_PRIVATE: '비공개이거나 없는 저장소라 확인할 수 없습니다. 공개 저장소 주소인지 확인해 주세요.',
+  REPOSITORY_UNSUPPORTED: '현재 지원하지 않는 저장소입니다.',
+  REPOSITORY_UNVERIFIED: 'GitHub에서 저장소를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.',
   CONSENT_REQUIRED: '분석 동의가 필요합니다.',
   RESOURCE_UNAVAILABLE: '현재 열람할 수 없는 자료입니다.',
   LINK_UNAVAILABLE: '이 링크는 열람할 수 없습니다.',
@@ -67,10 +75,10 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   LINK_LIMIT_REACHED: '유효한 링크는 최대 5개까지 만들 수 있습니다.',
   LINK_UNLOCK_LIMITED: '비밀번호 시도가 많아 잠시 뒤에 다시 시도할 수 있습니다.',
   RATE_LIMITED: '요청이 많아 잠시 뒤에 다시 시도할 수 있습니다.',
+  DAILY_LIMIT_REACHED: '오늘 한도에 도달했습니다',
   INTERNAL_ERROR: '처리 중 오류가 발생했습니다.',
   AI_CONSENT_REQUIRED: '외부 AI 전송에 먼저 동의해 주세요.',
   // 계약 C-03이 문구를 정했다. 남은 횟수·한도 값은 어디에도 넣지 않는다(BR1.4).
-  DAILY_LIMIT_REACHED: '오늘 한도에 도달했습니다',
   WITHDRAWAL_FAILED: '탈퇴를 끝내지 못했습니다. 팀에 알려 주세요',
   // 계약 C-09·C-12. INDEX_NOT_READY는 U5 질의응답과 U10 JD 요약이 함께 쓰므로 기능 이름 없이 둔다(화면 문구는 web 문구 표가 정한다).
   // QUESTION_LIMIT_REACHED는 U5 기능 설계 BR3.1이 문구를 정했다. 남은 질문 수·한도 값은 넣지 않는다(BR3.3).

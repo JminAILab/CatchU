@@ -55,6 +55,7 @@ before(async () => {
   const logger = Object.fromEntries(['log', 'error', 'warn', 'debug', 'verbose', 'fatal'].map(level => [level, () => {}]));
   app = await withAppAccount(roles, async () =>
     configureApp(await NestFactory.create(AppModule, { logger, abortOnError: false })));
+  require('../support/synthetic-daily-limit.cjs').bindSyntheticDailyLimit(app);
   await app.listen(0, '127.0.0.1');
   url = await app.getUrl();
   // 수신·반영·닫기 서비스도 앱 계정으로 연 이 앱의 DB 연결을 쓴다.
@@ -106,7 +107,7 @@ async function prepare(count = 1) {
     repositoryId: 'synthetic-repository', scopeRevision: 'synthetic-scope' };
   await db.transaction(async manager => {
     await manager.query("INSERT INTO member_account VALUES ($1, $2, 'ACTIVE')", [context.memberId, 'fixture:' + context.memberId]);
-    await manager.insert(AnalysisRequest, { requestId: context.requestId, memberId: context.memberId, repositoryId: context.repositoryId,
+    await manager.insert(AnalysisRequest, { registrationId: await require('../support/registered-analysis.cjs').ensureRegistration(manager, context), requestId: context.requestId, memberId: context.memberId, repositoryId: context.repositoryId,
       consentId: context.consentId, currentAttemptId: context.attemptId, submittedAt: SUBMITTED, updatedAt: SUBMITTED });
     await manager.insert(AnalysisConsent, { consentId: context.consentId, requestId: context.requestId, memberId: context.memberId,
       repositoryId: context.repositoryId, accepted: true, noticeRevision: 'fixture', scopeRevision: context.scopeRevision,

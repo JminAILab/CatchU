@@ -1,10 +1,12 @@
 import { EntityManager } from 'typeorm';
 import { AnalysisAttempt, AnalysisConsent, AnalysisRequest } from './member-analysis.entity';
 import { requireCreationTransaction } from './transaction';
+import { RepositoryRegistration } from '../member-repositories/repository-registration.entity';
 
 export interface InitialAnalysisInput {
   memberId: string;
   repositoryId: string;
+  registrationId?: string;
   noticeRevision: string;
   scopeRevision: string;
   consentedScope: Record<string, unknown>;
@@ -19,11 +21,14 @@ export interface InitialAnalysisInput {
  */
 export async function insertInitialAnalysis(manager: EntityManager, input: InitialAnalysisInput): Promise<AnalysisRequest> {
   await requireCreationTransaction(manager);
+  const registration = await manager.findOneBy(RepositoryRegistration, { memberId: input.memberId,
+    repositoryId: input.repositoryId, ...(input.registrationId ? { registrationId: input.registrationId } : {}) });
+  if (!registration) throw new Error('Analysis requires an owned repository registration');
   const request = new AnalysisRequest();
   const consent = new AnalysisConsent();
   const attempt = new AnalysisAttempt();
   const now = new Date();
-  Object.assign(request, { memberId: input.memberId, repositoryId: input.repositoryId,
+  Object.assign(request, { memberId: input.memberId, repositoryId: input.repositoryId, registrationId: registration.registrationId,
     consentId: consent.consentId, currentAttemptId: attempt.attemptId, submittedAt: now, updatedAt: now,
     retryOfRequestId: input.retryOfRequestId ?? null });
   Object.assign(consent, { requestId: request.requestId, memberId: input.memberId, repositoryId: input.repositoryId,

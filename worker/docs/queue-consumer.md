@@ -1,5 +1,7 @@
 # 분석 요청 큐 소비자
 
+현행 네 메시지 종류는 [U7 v2](repository-analysis-u7.md)이며 v1 혼입을 거부한다. 수신 확인과 Catch 반영 완료는 별개이고, 결과에는 본인 커밋 관측과 수집 한계를 필수로 보낸다. 기존 큐 이름·동시 실행 1·재시도 정책은 유지한다.
+
 [#121](https://github.com/JminAILab/CatchU/issues/121)의 큐 연결이다. api가 넣은 분석 요청을 큐에서 꺼내 처리하고, 진행 알림과 결과를 api로 가는 큐에 넣는다. LIVE 요청은 요청 정보 조회([요청 정보 조회](request-context.md)) 뒤 실제 수집·후보·생성으로, MOCK 요청은 개발·시험 설정에서만 가짜 생성기로 처리한다. LIVE는 합성 GitHub·합성 제공자·합성 조회 API로만 검사했고 실제 api·GitHub·Claude 연결 확인은 남았다. api 쪽 큐 연결은 [#233](https://github.com/JminAILab/CatchU/issues/233)이다. 보장하지 않는 범위는 [worker README](../README.md#보장하지-않는-범위)에 있다.
 
 ## 구조
@@ -10,7 +12,7 @@
 
 자식 안의 순서는 다음과 같다.
 
-1. **조회 전 자체 검사**: 메시지 스키마 v1, 요청·시도 ID가 uuid인지, 큐 작업 ID가 시도 ID와 같은지, 두 참조(`credentialContextReference`, `allowedScope.selectionReference`)가 시도 ID와 같은지, 허용 범위의 저장소 ID가 요청의 저장소 ID와 같은지 본다. 어긋나면 진행 알림도 결과도 없이 거부한다.
+1. **조회 전 자체 검사**: 메시지 스키마 v2, 요청·시도 ID가 uuid인지, 큐 작업 ID가 시도 ID와 같은지, 두 참조(`credentialContextReference`, `allowedScope.selectionReference`)가 시도 ID와 같은지, 허용 범위의 저장소 ID가 요청의 저장소 ID와 같은지 본다. 어긋나면 진행 알림도 결과도 없이 거부한다.
 2. **LIVE**: 요청 정보를 한 번 조회한다([요청 정보 조회](request-context.md)).
    - 찾음: 응답의 접수 기록으로 요청의 열 개 항목을 대조한다(`check_request`). 다르면 진행 알림도 결과도 없이 거부한다. 같으면 `RECEIVED`·`RUNNING`을 알리고 `LiveGenerator`가 수집(`collect`, 시계와 수집 10분은 꺼낸 시각부터, 관계 조회 포함) → 후보 판정(`build_candidates`) → 생성(`run_generation`, 마감 = 꺼낸 시각 + 20분 − 60초)을 한 번씩 부른다. 생성 제공자(Claude API)는 후보가 있을 때 자식 안에서 한 번 만든다. 요청 전체의 실행 여부를 모르면 `UNCERTAIN`만 알린다.
    - 모름·실패: 수집 없이, 진행 알림 없이 FAILED 결과 하나(`stage: COLLECTION`, 이유 코드와 회원 문구)를 보낸다. 판정은 E가 한다.

@@ -4,6 +4,7 @@ const { randomBytes, randomUUID } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { CONTRACT_DIR } = require('./receiver-harness.cjs');
+const { ensureRegistration } = require('../support/registered-analysis.cjs');
 
 const FIXTURES = resolve(__dirname, '../../../worker/fixtures/m1-synthetic');
 
@@ -25,9 +26,19 @@ async function insertAttempt(db, overrides = {}) {
   await db.transaction(async manager => {
     await manager.query("INSERT INTO member_account (member_id, identity_reference, account_state) VALUES ($1,$2,'ACTIVE') ON CONFLICT DO NOTHING",
       [row.memberId, 'queue-fixture:' + row.memberId]);
+    row.registrationId = await ensureRegistration(manager, row);
+    if (row.sourceMode === 'LIVE' && Object.keys(row.consentedScope).every(key =>
+      ['revision', 'repositoryId', 'allowedResourceTypes', 'selectionReference'].includes(key))) {
+      const version = new (require('../../dist/member-repositories/selected-repository-catalog').SelectedRepositoryCatalog)()
+        .resolve(row.consentedScope.selectionReference);
+      const repository = version ? { owner: version.owner, name: version.name, url: version.url }
+        : { owner: 'synthetic-owner', name: 'synthetic-repo', url: 'https://github.com/synthetic-owner/synthetic-repo' };
+      row.consentedScope = { ...row.consentedScope, registrationId: row.registrationId,
+        selectionReference: row.registrationId, repository };
+    }
     await manager.query(`INSERT INTO analysis_request (request_id, member_id, repository_id, consent_id, current_attempt_id,
-      submitted_at, updated_at, lifecycle) VALUES ($1,$2,$3,$4,$5,$6,$6,$7)`,
-    [row.requestId, row.memberId, row.repositoryId, row.consentId, row.attemptId, row.submittedAt, row.lifecycle]);
+      submitted_at, updated_at, lifecycle, registration_id) VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8)`,
+    [row.requestId, row.memberId, row.repositoryId, row.consentId, row.attemptId, row.submittedAt, row.lifecycle, row.registrationId]);
     await manager.query(`INSERT INTO analysis_consent (consent_id, request_id, member_id, repository_id, accepted, notice_revision,
       scope_revision, consented_scope, consented_at) VALUES ($1,$2,$3,$4,true,$5,$6,$7,$8)`,
     [row.consentId, row.requestId, row.memberId, row.repositoryId, row.noticeRevision, row.scopeRevision, row.consentedScope, row.consentedAt]);
@@ -54,7 +65,7 @@ function workerResult(row, file = 'succeeded-one-candidate') {
 
 /** worker가 보내는 형식의 진행 알림. 메시지 ID event-mock-<시도>-<상태>. */
 function workerEvent(row, state) {
-  return { schemaVersion: '1', messageId: `event-${row.sourceMode === 'LIVE' ? 'live' : 'mock'}-${row.attemptId}-${state.toLowerCase()}`,
+  return { schemaVersion: '2', messageId: `event-${row.sourceMode === 'LIVE' ? 'live' : 'mock'}-${row.attemptId}-${state.toLowerCase()}`,
     requestId: row.requestId, attemptId: row.attemptId, state, observedAt: new Date().toISOString() };
 }
 

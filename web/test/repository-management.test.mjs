@@ -10,10 +10,12 @@ const analysis = (overrides = {}) => ({
   submittedAt: '2026-09-30T01:00:00Z', updatedAt: '2026-09-30T01:05:00Z',
   requestState: 'ACCEPTED', lifecycle: 'ACTIVE', processing: 'SUCCEEDED', application: 'APPLIED', sourceMode: 'MOCK',
   eligibleCandidateCount: 1, registeredCatchIds: ['cat-1'], ownerResultsReady: true,
+  ownCommitObservation: 'UNKNOWN', observedOwnCommitCount: null, collectionLimitNotes: [],
   retry: { allowed: false, reason: 'NOT_FAILED' }, failures: [], ...overrides,
 });
 const repo = (id, name = id, ownerLogin = 'octo') => ({ repositoryId: id, name, ownerLogin, url: `https://github.com/${ownerLogin}/${name}`, allowedScopeRevision: 'v1' });
 const summary = (overrides = {}) => readAnalysis(analysis(overrides));
+const UNKNOWN_TEXT = '본인 커밋 유무를 끝까지 확인하지 못했습니다. 본인 기록이 없다는 뜻은 아닙니다.';
 const ok = (data) => ({ kind: 'success', status: 200, data });
 
 function fakeTransport(routes) {
@@ -116,8 +118,8 @@ test('Catch 보기는 ownerResultsReady이고 등록 Catch가 있을 때만', ()
 });
 
 test('설명 문구: 성공 0건·실행 불명·반영 실패·복구·실패 반영·부분 실패를 구분하고 재요청은 retry.allowed만 따른다', () => {
-  assert.deepEqual(statusDetails(summary({ processing: 'EMPTY', registeredCatchIds: [] })), ['분석을 마쳤습니다. 검토할 Catch가 없습니다.']);
-  assert.deepEqual(statusDetails(summary()), ['분석을 마쳤습니다. Catch 1개가 준비되었습니다.']);
+  assert.deepEqual(statusDetails(summary({ processing: 'EMPTY', registeredCatchIds: [] })), ['분석을 마쳤습니다. 검토할 Catch가 없습니다.', UNKNOWN_TEXT]);
+  assert.deepEqual(statusDetails(summary()), ['분석을 마쳤습니다. Catch 1개가 준비되었습니다.', UNKNOWN_TEXT]);
   assert.match(statusDetails(summary({ processing: 'UNCERTAIN', application: 'NOT_READY' }))[0], /아직 확인되지 않았습니다.*실패로 정해진 것은 아니/);
   const applyFailed = statusDetails(summary({ application: 'APPLY_FAILED', ownerResultsReady: false }));
   assert.match(applyFailed[0], /반영하지 못했습니다.*분석 실패와는 다른/);
@@ -126,12 +128,12 @@ test('설명 문구: 성공 0건·실행 불명·반영 실패·복구·실패 �
 
   const failed = statusDetails(summary({ processing: 'FAILED', application: 'APPLY_FAILED', registeredCatchIds: [], ownerResultsReady: false,
     retry: { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' }, failures: [{ stage: 'COLLECTION', code: 'X', message: '저장소를 읽지 못했습니다.' }] }));
-  assert.deepEqual(failed, ['분석에 실패했습니다.', '실패 결과를 서비스에 반영하지 못했습니다.', '실패한 부분: 저장소를 읽지 못했습니다.', '새로 동의하고 다시 요청할 수 있습니다.']);
-  assert.equal(statusDetails(summary({ processing: 'FAILED', application: 'NOT_READY', registeredCatchIds: [], ownerResultsReady: false })).length, 1,
+  assert.deepEqual(failed, ['분석에 실패했습니다.', '실패 결과를 서비스에 반영하지 못했습니다.', '실패한 부분: 저장소를 읽지 못했습니다.', '새로 동의하고 다시 요청할 수 있습니다.', UNKNOWN_TEXT]);
+  assert.equal(statusDetails(summary({ processing: 'FAILED', application: 'NOT_READY', registeredCatchIds: [], ownerResultsReady: false })).length, 2,
     'FAILED·NOT_READY는 반영 설명을 붙이지 않는다(E 확인 대기)');
 
   const partial = statusDetails(summary({ processing: 'PARTIAL_FAILED', failures: [{ stage: 'DRAFT', code: 'Y', message: '설명 초안 생성 실패' }] }));
-  assert.deepEqual(partial, ['일부 결과만 제공되었습니다. 준비된 Catch 1개를 볼 수 있습니다.', '실패한 부분: 설명 초안 생성 실패']);
+  assert.deepEqual(partial, ['일부 결과만 제공되었습니다. 준비된 Catch 1개를 볼 수 있습니다.', '실패한 부분: 설명 초안 생성 실패', UNKNOWN_TEXT]);
 });
 
 // #288 닫힌 반영 실패. 응답은 모두 합성이며, 서버가 처리 시한으로 실제 닫은 요청을 읽은 결과가 아니다.
@@ -169,42 +171,42 @@ test('닫힌(CLOSED) 반영 실패는 처리 결과와 관계없이 실패 아�
 });
 
 test('성공 결과가 반영 대기 중 처리 시한으로 닫히면 반영 실패 안내 아래 종료 사유를 보이고, 재요청 안내는 retry.allowed만 따른다', () => {
-  assert.deepEqual(statusDetails(closedApplyFailed({ failures: [APPLICATION_DEADLINE] })), [CLOSED_TEXT, DEADLINE_TEXT, RETRY_TEXT]);
+  assert.deepEqual(statusDetails(closedApplyFailed({ failures: [APPLICATION_DEADLINE] })), [CLOSED_TEXT, DEADLINE_TEXT, RETRY_TEXT, UNKNOWN_TEXT]);
   // 서버가 재요청을 허용하지 않으면(예: 다른 요청이 진행 중) 같은 닫힌 반영 실패라도 안내하지 않는다. reason으로 다시 계산하지 않는다.
   assert.deepEqual(statusDetails(closedApplyFailed({ failures: [APPLICATION_DEADLINE], retry: { allowed: false, reason: 'FAILURE_WITHOUT_RESULTS' } })),
-    [CLOSED_TEXT, DEADLINE_TEXT]);
+    [CLOSED_TEXT, DEADLINE_TEXT, UNKNOWN_TEXT]);
   assert.deepEqual(statusDetails(closedApplyFailed({ processing: 'EMPTY', failures: [APPLICATION_DEADLINE], retry: { allowed: false, reason: 'IN_PROGRESS' } })),
-    [CLOSED_TEXT, DEADLINE_TEXT]);
+    [CLOSED_TEXT, DEADLINE_TEXT, UNKNOWN_TEXT]);
 });
 
 test('부분 실패 결과도 같은 안내·종료 사유를 쓰고, 원래 있던 수집·생성 실패나 전달 단계 시한 초과를 종료 사유로 쓰지 않는다', () => {
   const draft = { stage: 'DRAFT', code: 'DRAFT_FAILED', message: '설명 초안 생성 실패' };
   assert.deepEqual(statusDetails(closedApplyFailed({ processing: 'PARTIAL_FAILED', failures: [draft, APPLICATION_DEADLINE] })),
-    [CLOSED_TEXT, DEADLINE_TEXT, '실패한 부분: 설명 초안 생성 실패', RETRY_TEXT]);
+    [CLOSED_TEXT, DEADLINE_TEXT, '실패한 부분: 설명 초안 생성 실패', RETRY_TEXT, UNKNOWN_TEXT]);
   // 같은 code라도 반영 단계가 아니면 종료 사유가 아니다.
   const dispatch = { stage: 'DISPATCH', code: 'PROCESSING_DEADLINE_EXCEEDED', message: '정해진 시간 안에 분석을 마치지 못했습니다.' };
   assert.deepEqual(statusDetails(closedApplyFailed({ processing: 'PARTIAL_FAILED', failures: [draft, dispatch] })),
-    [CLOSED_TEXT, '실패한 부분: 설명 초안 생성 실패', '실패한 부분: 정해진 시간 안에 분석을 마치지 못했습니다.', RETRY_TEXT]);
+    [CLOSED_TEXT, '실패한 부분: 설명 초안 생성 실패', '실패한 부분: 정해진 시간 안에 분석을 마치지 못했습니다.', RETRY_TEXT, UNKNOWN_TEXT]);
 });
 
 test('업무 거부 등 다른 반영 실패로 닫히면 종료 사유 없이 반영 실패 안내만 보인다', () => {
   const rejected = { stage: 'APPLICATION', code: 'CANDIDATE_REJECTED', message: '결과 반영에 실패했습니다.' };
-  assert.deepEqual(statusDetails(closedApplyFailed({ failures: [rejected] })), [CLOSED_TEXT, RETRY_TEXT]);
-  assert.deepEqual(statusDetails(closedApplyFailed({ failures: [] })), [CLOSED_TEXT, RETRY_TEXT]);
+  assert.deepEqual(statusDetails(closedApplyFailed({ failures: [rejected] })), [CLOSED_TEXT, RETRY_TEXT, UNKNOWN_TEXT]);
+  assert.deepEqual(statusDetails(closedApplyFailed({ failures: [] })), [CLOSED_TEXT, RETRY_TEXT, UNKNOWN_TEXT]);
   // 부분 실패는 기존 규칙대로 실패 항목을 나열한다. 반영 단계 항목도 목록에 남지만 종료 사유 문장은 만들지 않는다.
   const partial = statusDetails(closedApplyFailed({ processing: 'PARTIAL_FAILED', failures: [rejected] }));
-  assert.deepEqual(partial, [CLOSED_TEXT, '실패한 부분: 결과 반영에 실패했습니다.', RETRY_TEXT]);
+  assert.deepEqual(partial, [CLOSED_TEXT, '실패한 부분: 결과 반영에 실패했습니다.', RETRY_TEXT, UNKNOWN_TEXT]);
   assert.equal(partial.includes(DEADLINE_TEXT), false);
 });
 
 test('닫히기 전(ACTIVE) 반영 실패는 분석 중 아이콘과 기존 반영 실패 문구를 유지하고 종료 사유를 만들지 않는다', () => {
   const active = summary({ application: 'APPLY_FAILED', ownerResultsReady: false, failures: [APPLICATION_DEADLINE] });
   assert.equal(statusIcon(active), 'analyzing');
-  assert.deepEqual(statusDetails(active), ['분석은 끝났지만 결과를 서비스에 반영하지 못했습니다. 분석 실패와는 다른 상태입니다.']);
+  assert.deepEqual(statusDetails(active), ['분석은 끝났지만 결과를 서비스에 반영하지 못했습니다. 분석 실패와는 다른 상태입니다.', UNKNOWN_TEXT]);
 });
 
 test('처리 실패(FAILED) 결과가 반영 대기 중 시한으로 닫히면 처리 실패 문구에 종료 사유를 덧붙이고 시한 항목을 실패한 부분에 다시 넣지 않는다', () => {
   const collection = { stage: 'COLLECTION', code: 'X', message: '저장소를 읽지 못했습니다.' };
   assert.deepEqual(statusDetails(closedApplyFailed({ processing: 'FAILED', failures: [collection, APPLICATION_DEADLINE] })),
-    ['분석에 실패했습니다.', '실패 결과를 서비스에 반영하지 못했습니다.', DEADLINE_TEXT, '실패한 부분: 저장소를 읽지 못했습니다.', RETRY_TEXT]);
+    ['분석에 실패했습니다.', '실패 결과를 서비스에 반영하지 못했습니다.', DEADLINE_TEXT, '실패한 부분: 저장소를 읽지 못했습니다.', RETRY_TEXT, UNKNOWN_TEXT]);
 });

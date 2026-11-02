@@ -208,20 +208,24 @@ test('E 수신 기록의 시도 유일성·복합 FK·지문 형식·엔티티 �
   const schema = 'e_metadata_' + randomUUID().replaceAll('-', '');
   await db.query('CREATE SCHEMA "' + schema + '"');
   const foundation = require('../../dist/member-analysis/member-analysis.entity');
+  const { RepositoryRegistration } = require('../../dist/member-repositories/repository-registration.entity');
+  const { AddRepositoryRegistration1793245460352 } = require('../../dist/database/migrations/1793245460352-AddRepositoryRegistration');
   const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
   const { CreateResultApplicationRecord1790550000000 } = require('../../dist/database/migrations/1790550000000-CreateResultApplicationRecord');
   const { AddAnalysisRequestHistoryIndex1792640486167 } = require('../../dist/database/migrations/1792640486167-AddAnalysisRequestHistoryIndex');
   const { CascadeMemberAnalysisOnDelete1792817978011 } = require('../../dist/database/migrations/1792817978011-CascadeMemberAnalysisOnDelete');
   const { CascadeResultApplicationOnDelete1792817978012 } = require('../../dist/database/migrations/1792817978012-CascadeResultApplicationOnDelete');
   const isolated = await openTestDataSource({ schema, extra: { options: '-c search_path=' + schema },
-    entities: [...Object.values(foundation).filter(v => typeof v === 'function'), ResultApplicationRecord, ShareLink],
+    entities: [...Object.values(foundation).filter(v => typeof v === 'function'), ResultApplicationRecord, ShareLink, RepositoryRegistration],
     migrations: [CreateMemberAnalysisFoundation1790500000000, CreateResultApplicationRecord1790550000000, CreateShareLink1790745895865,
-      AddAnalysisRequestHistoryIndex1792640486167, CascadeMemberAnalysisOnDelete1792817978011, CascadeResultApplicationOnDelete1792817978012] });
+      AddAnalysisRequestHistoryIndex1792640486167, CascadeMemberAnalysisOnDelete1792817978011, CascadeResultApplicationOnDelete1792817978012,
+      AddRepositoryRegistration1793245460352] });
   try {
     assert.deepEqual((await isolated.runMigrations()).map(m => m.name),
       ['CreateMemberAnalysisFoundation1790500000000', 'CreateResultApplicationRecord1790550000000', 'CreateShareLink1790745895865',
-        'AddAnalysisRequestHistoryIndex1792640486167', 'CascadeMemberAnalysisOnDelete1792817978011', 'CascadeResultApplicationOnDelete1792817978012']);
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 10);
+        'AddAnalysisRequestHistoryIndex1792640486167', 'CascadeMemberAnalysisOnDelete1792817978011', 'CascadeResultApplicationOnDelete1792817978012',
+        'AddRepositoryRegistration1793245460352']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 11);
     const diff = await isolated.driver.createSchemaBuilder().log();
     assert.deepEqual(diff.upQueries.map(q => q.query), []);
   } finally { await isolated.destroy(); await db.query('DROP SCHEMA "' + schema + '" CASCADE'); }
@@ -284,18 +288,19 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
       'CreateRepositorySelection1792383899264', 'AddAnalysisRequestHistoryIndex1792640486167', 'CascadeMemberAnalysisOnDelete1792817978011',
       'CascadeResultApplicationOnDelete1792817978012', 'CascadeAuthSessionsOnDelete1792817978013', 'CascadeCatchAssetsOnDelete1792817978014',
       'CreateU2UsageAndConsent1793161114211', 'CreatePublicationTables1793162230851', 'AddCatchAuthorDescription1793162230852',
-      'CreatePublishedIndexTables1793257382741', 'CreateBaseSummaryTable1793348947970']);
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 26);
+      'AddRepositoryRegistration1793245460352', 'CreatePublishedIndexTables1793257382741', 'CreateBaseSummaryTable1793348947970']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 27);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
     await isolated.undoLastMigration(); // U5 발행본 AI 기본 요약 표(C-06·C-02)
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 25);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 26);
     assert.equal(await regclass('base_summary'), null);
     await isolated.undoLastMigration(); // U3 발행본 색인 상태·조각 표(C-08). vector 확장은 down에서 지우지 않는다
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 23);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 24);
     for (const table of ['publication_index', 'published_chunk']) assert.equal(await regclass(table), null);
     assert.equal((await isolated.query("SELECT count(*)::int AS n FROM pg_extension WHERE extname = 'vector'"))[0].n, 1);
+    await isolated.undoLastMigration(); // U7 회원별 등록·불변 사본 참조
     await isolated.undoLastMigration(); // U4 Catch 작성자 설명 칸(C-14)
     assert.equal((await isolated.query(`SELECT count(*)::int AS n FROM information_schema.columns
       WHERE table_schema = $1 AND table_name = 'catch_asset' AND column_name LIKE 'author_description%'`, [schema]))[0].n, 0);

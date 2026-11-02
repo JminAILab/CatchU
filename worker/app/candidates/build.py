@@ -244,7 +244,7 @@ def build_candidates(
         if not failures:
             raise ValueError("저장소를 확인하지 않은 수집 결과에 수집 실패가 없다")
         _log(request, outcome, 0, tally, 0)
-        return GenerationOutput(failures=failures)
+        return outcome.with_observation(GenerationOutput(failures=failures))
     grouping = group(outcome)
     built: list[EligibleCandidate] = []
     for unit in grouping.units:
@@ -263,12 +263,14 @@ def build_candidates(
         ("UNDETERMINED", tally.undetermined),
     )
     _log(request, outcome, len(candidates), tally, merged)
-    return GenerationOutput(
-        candidates=candidates,
-        not_provided=tuple(
-            NotProvided(reason, count) for reason, count in counts if count
-        ),
-        failures=failures,
+    return outcome.with_observation(
+        GenerationOutput(
+            candidates=candidates,
+            not_provided=tuple(
+                NotProvided(reason, count) for reason, count in counts if count
+            ),
+            failures=failures,
+        )
     )
 
 

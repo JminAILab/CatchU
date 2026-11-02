@@ -10,7 +10,8 @@
 | --- | --- |
 | `member_profile`, `github_connection`, `auth_session`, `share_link`, `repository_protection`, `text_material`, `publication` | 회원 |
 | `session_refresh_token` | 세션 |
-| `analysis_request` | 회원 |
+| `repository_registration` | 회원(12월 intent U7, 계약 C-06) |
+| `analysis_request` | 회원, 저장소 등록(복합 외래 키로 같은 회원·저장소를 참조, 12월 intent U7) |
 | `analysis_consent` | 회원, 분석 요청 |
 | `analysis_attempt` | 분석 요청 |
 | `result_application_record` | 분석 시도 |
