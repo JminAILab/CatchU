@@ -4,12 +4,12 @@ import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react"
 import { usePathname, useSearchParams } from "next/navigation";
 import { AssetsView, assetTabs, type AssetTab } from "./assets-view";
 import { CatchActions } from "./catch-actions";
-import { createAssetsStore } from "./assets-store";
+import { createAssetsStore, type AssetsStore } from "./assets-store";
 import { catchErrorText, type CatchApi } from "./catch-api";
 import type { AuthorDescriptionApi } from "./author-description-api";
 import { AuthorDescriptionEditor } from "./author-description-editor";
 import { UNSAVED_MESSAGE } from "@/features/profile/use-unsaved-guard";
-import { confirmDiscardUnsaved, unsavedChanges } from "@/lib/unsaved-changes";
+import { confirmDiscardUnsaved, unsavedChanges, type ConfirmDialog, type UnsavedRegistry } from "@/lib/unsaved-changes";
 import type { RepositoryOption } from "./types";
 import styles from "./assets.module.css";
 
@@ -31,6 +31,16 @@ type Props = {
   repositoryNotice?: ReactNode;
   repositoryManagement: (bindings: RepositoryManagementBindings) => ReactNode;
 };
+
+/**
+ * [현재 상태 다시 불러오기]. 다시 읽는 동안 상세가 비어 작성자 설명 편집기가 해제되므로,
+ * 저장하지 않은 설명이 있으면 먼저 묻는다(BR2.2). 머무르면 다시 읽지 않고 입력을 그대로 둔다.
+ */
+export function reloadDetail(store: Pick<AssetsStore, "openDetail">, catchId: string | null, confirm: ConfirmDialog,
+  registry: Pick<UnsavedRegistry, "hasUnsaved"> = unsavedChanges) {
+  if (!catchId || !confirmDiscardUnsaved(registry, confirm, UNSAVED_MESSAGE)) return;
+  void store.openDetail(catchId, true);
+}
 
 /** #106의 인증 가드 안에 조립하는 B 화면. 제품 경로나 토큰 저장소를 소유하지 않는다. */
 export function AssetsConnected({ api, descriptionApi, repositories, repositoryNotice, repositoryManagement }: Props) {
@@ -83,7 +93,7 @@ export function AssetsConnected({ api, descriptionApi, repositories, repositoryN
         detailActions={detailMatches && snapshot.detail ? <CatchActions key={snapshot.detail.catchId}
           item={snapshot.detail} mutation={snapshot.mutation}
           onChange={(change) => { void store.update(change); }}
-          onReload={() => { if (catchId) void store.openDetail(catchId, true); }} /> : null}
+          onReload={() => reloadDetail(store, catchId, (message) => window.confirm(message))} /> : null}
         descriptionEditor={detailMatches && snapshot.detail && descriptionApi
           ? <AuthorDescriptionEditor key={snapshot.detail.catchId} catchId={snapshot.detail.catchId} api={descriptionApi} /> : null}
         selectedId={visibleCatchId}

@@ -7,6 +7,8 @@
  * - 저장 실패(서버·연결·로그인 만료)는 입력을 남긴다. 검사 거부는 요청하지 않는다.
  * - 저장하지 않은 입력이 있을 때 다른 자료·목록으로 가려 하면 묻고, 머무르기를 고르면 그대로 남는다.
  * - 로그인이 바뀐 뒤 도착한 응답은 반영하지 않는다.
+ * - 목록 조회 중 끝난 저장·삭제는 목록을 다시 읽어, 변경 전에 읽은 늦은 응답이 새 자료·제목·삭제를 덮지 않는다(#461 리뷰 지적).
+ * - 목록을 다시 읽은 뒤 도착한 [더 보기] 응답은 붙이지 않는다. 자동으로 다시 읽은 목록이 실패해도 저장 결과·입력은 편집기에 남는다.
  * 원본 tsx를 변환해 불러온다. 서버는 계약 모양 대역이며 실제 브라우저·api·DB 검증이 아니다.
  */
 import assert from "node:assert/strict";
@@ -17,6 +19,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 import { SAVED_TEXT, editStatusLines } from "../src/lib/save-outcome.ts";
+import { materialListErrorText } from "../src/features/materials/materials-api.ts";
 
 const srcUrl = new URL("../src/", import.meta.url);
 const screenUrl = new URL("../src/features/materials/materials-screen.tsx", import.meta.url);
@@ -59,6 +62,8 @@ const AT = "2026-10-29T01:02:03.456Z";
 const LATER = "2026-10-29T01:05:00.000Z";
 const ID = "11111111-1111-4111-8111-111111111111";
 const ID2 = "22222222-2222-4222-8222-222222222222";
+const ID3 = "33333333-3333-4333-8333-333333333333";
+const ID4 = "44444444-4444-4444-8444-444444444444";
 const material = (id = ID, title = "자료 제목", body = "자료 본문", updatedAt = AT) =>
   ({ textMaterialId: id, title, body, createdAt: AT, updatedAt });
 const ok = (value) => ({ kind: "ok", value });
@@ -410,6 +415,163 @@ test("경합: 기존 자료 A 저장 중 B로 옮기면, A의 늦은 저장 성�
   const state = screen.store.get();
   assert.deepEqual(state.list.items.map((i) => i.title), ["바뀐 제목", "둘째"]);
   assert.deepEqual(state.selection, { kind: "existing", textMaterialId: ID2 });
+});
+
+test("경합: 첫 목록 조회가 늦는 동안 새 자료 저장이 성공하면 목록을 다시 읽어, 늦은 이전 응답이 새 자료를 지우지 않고 선택·입력·미저장 상태가 남는다", async () => {
+  const late = deferred();
+  const fresh = deferred();
+  const api = fakeApi({ list: [late, fresh] });
+  const screen = createMaterialsScreenModel(api, deps());
+  const loading = screen.load();
+  screen.select({ kind: "new" });
+  const session = screen.store.get().editorSession;
+  screen.setDirty(true); // 저장 뒤 더 쓴 입력
+  screen.saved(item(material(ID, "새 자료")), true, session);
+  const lists = api.calls.filter((c) => c.name === "list");
+  assert.equal(lists.length, 2);
+  assert.equal(lists[0].signal.aborted, true);
+  late.resolve(page([item(material(ID2, "기존"))])); // 생성 전에 읽은 응답
+  await loading;
+  assert.equal(screen.store.get().list.state, "loading");
+  fresh.resolve(page([item(material(ID, "새 자료")), item(material(ID2, "기존"))]));
+  await tick();
+  const state = screen.store.get();
+  assert.deepEqual(state.list.items.map((i) => i.textMaterialId), [ID, ID2]);
+  assert.deepEqual(state.selection, { kind: "existing", textMaterialId: ID });
+  assert.equal(state.editorSession, session);
+  assert.equal(state.dirty, true);
+});
+
+test("경합: 목록 조회 중 끝난 수정 저장·삭제는 늦은 이전 응답의 옛 제목·지운 자료로 돌아가지 않는다", async () => {
+  const late = deferred();
+  const api = fakeApi({ list: [late, page([item(material(ID, "새 제목", "b", LATER))])] });
+  const screen = createMaterialsScreenModel(api, deps());
+  const loading = screen.load();
+  screen.saved(item(material(ID, "새 제목", "b", LATER)), false);
+  late.resolve(page([item(material(ID, "옛 제목"))]));
+  await loading;
+  await tick();
+  assert.deepEqual(screen.store.get().list.items.map((i) => i.title), ["새 제목"]);
+
+  // 첫 조회 실패 → 새 자료 저장 → 다시 시도 중 그 자료를 삭제하면, 삭제 전에 읽은 응답이 자료를 되살리지 않는다.
+  const before = deferred();
+  const api2 = fakeApi({ list: [failed("server"), before, page([])] });
+  const screen2 = createMaterialsScreenModel(api2, deps());
+  await screen2.load();
+  screen2.select({ kind: "new" });
+  screen2.saved(item(material(ID)), true, screen2.store.get().editorSession);
+  const retrying = screen2.load();
+  screen2.deleted(ID);
+  before.resolve(page([item(material(ID))]));
+  await retrying;
+  await tick();
+  assert.equal(api2.calls.filter((c) => c.name === "list").length, 3);
+  assert.deepEqual(screen2.store.get().list, { state: "ready", items: [], nextCursor: null });
+  assert.equal(screen2.store.get().selection, null);
+});
+
+test("경합: 목록 조회 중 새 자료 저장을 기다리며 다른 새 자료를 열면, 늦은 성공은 목록에만 남고 지금 선택·입력은 그대로다. 화면을 닫은 뒤에는 다시 읽지 않는다", async () => {
+  const late = deferred();
+  const api = fakeApi({ list: [late, page([item(material(ID, "먼저 저장한 자료"))])] });
+  const screen = createMaterialsScreenModel(api, deps());
+  const loading = screen.load();
+  screen.select({ kind: "new" });
+  const first = screen.store.get().editorSession;
+  screen.select({ kind: "new" }); // 미저장 입력이 없어 묻지 않고 옮긴다
+  screen.setDirty(true);
+  screen.saved(item(material(ID, "먼저 저장한 자료")), true, first);
+  late.resolve(page([]));
+  await loading;
+  await tick();
+  const state = screen.store.get();
+  assert.deepEqual(state.list.items.map((i) => i.textMaterialId), [ID]);
+  assert.deepEqual(state.selection, { kind: "new" });
+  assert.equal(state.editorSession, first + 1);
+  assert.equal(state.dirty, true);
+
+  const pending = deferred();
+  const api2 = fakeApi({ list: [pending] });
+  const screen2 = createMaterialsScreenModel(api2, deps());
+  void screen2.load();
+  screen2.dispose();
+  screen2.saved(item(material(ID)), true);
+  screen2.deleted(ID2);
+  assert.equal(api2.calls.filter((c) => c.name === "list").length, 1);
+});
+
+test("경합: [더 보기]를 기다리는 동안 끝난 새 자료·수정·삭제는 늦은 다음 쪽 응답과 겹쳐도 중복·옛 제목·삭제 자료를 만들지 않는다", async () => {
+  // 서버 목록은 만든 시각 역순 커서다. 다음 쪽은 첫 쪽 마지막 자료보다 먼저 만든 자료만 담는다.
+  const more = deferred();
+  const api = fakeApi({ list: [page([item(material(ID, "첫째")), item(material(ID2, "둘째"))], "cursor-1"), more] });
+  const screen = createMaterialsScreenModel(api, deps());
+  await screen.load();
+  const loadingMore = screen.loadMore();
+  screen.saved(item(material(ID3, "새 자료")), true);
+  screen.saved(item(material(ID, "첫째-새제목", "b", LATER)), false);
+  screen.deleted(ID2);
+  assert.equal(api.calls.filter((c) => c.name === "list").length, 2); // 첫 쪽 조회가 끝났으므로 다시 읽지 않는다
+  more.resolve(page([item(material(ID4, "셋째"))]));
+  await loadingMore;
+  assert.deepEqual(screen.store.get().list.items.map((i) => i.title), ["새 자료", "첫째-새제목", "셋째"]);
+  assert.equal(screen.store.get().moreState, "idle");
+});
+
+test("경합: [더 보기]를 기다리는 동안 목록을 다시 읽으면, 늦은 다음 쪽 응답을 새 목록에 붙이지 않는다", async () => {
+  const more = deferred();
+  const api = fakeApi({ list: [
+    page([item(material(ID, "첫째")), item(material(ID2, "둘째"))], "cursor-1"), more,
+    page([item(material(ID2, "둘째")), item(material(ID4, "셋째"))], "cursor-2"),
+  ] });
+  const screen = createMaterialsScreenModel(api, deps());
+  await screen.load();
+  const loadingMore = screen.loadMore();
+  await screen.load(); // 예: 첫째가 지워진 뒤 다시 읽음
+  more.resolve(page([item(material(ID4, "셋째"))], null));
+  await loadingMore;
+  assert.deepEqual(screen.store.get().list, {
+    state: "ready", items: [item(material(ID2, "둘째")), item(material(ID4, "셋째"))], nextCursor: "cursor-2",
+  });
+  assert.equal(screen.store.get().moreState, "idle");
+});
+
+test("경합: 새 자료 저장 뒤 자동으로 다시 읽은 목록이 실패하면, 저장됨·입력은 편집기에 남고 목록만 실패를 알리며 다시 불러오면 저장한 자료가 나타난다", async () => {
+  const late = deferred();
+  const api = fakeApi({
+    list: [late, failed("server"), page([item(material(ID, "새 제목"))])],
+    create: [ok(material(ID, "새 제목", "새 본문"))],
+  });
+  const d = deps();
+  const screen = createMaterialsScreenModel(api, d);
+  const loading = screen.load();
+  screen.select({ kind: "new" });
+  const session = screen.store.get().editorSession;
+  const editor = createMaterialEditorModel(api, null, {
+    onSaved: (saved, created) => screen.saved(saved, created, session), onDeleted: screen.deleted,
+  }, d);
+  await editor.load();
+  editor.change({ title: "새 제목", body: "새 본문" });
+  await editor.save();
+  late.resolve(page([]));
+  await loading;
+  await tick();
+  const failedState = screen.store.get();
+  assert.equal(failedState.list.state, "error");
+  assert.equal(failedState.list.errorText, materialListErrorText("server"));
+  assert.deepEqual(failedState.selection, { kind: "existing", textMaterialId: ID });
+  assert.equal(failedState.editorSession, session);
+  const { edit } = editor.store.get();
+  assert.deepEqual(editStatusLines(edit.status).lines, [SAVED_TEXT]);
+  assert.equal(edit.textMaterialId, ID);
+  assert.deepEqual(edit.draft, { title: "새 제목", body: "새 본문" });
+  // 목록 실패 중에도 이어 쓴 입력은 편집기와 미저장 상태에 남는다.
+  editor.change({ title: "새 제목", body: "새 본문 더 씀" });
+  screen.setDirty(editor.isDirty());
+  await screen.load(); // [다시 불러오기]
+  assert.deepEqual(screen.store.get().list.items.map((i) => i.textMaterialId), [ID]);
+  assert.deepEqual(screen.store.get().selection, { kind: "existing", textMaterialId: ID });
+  assert.equal(screen.store.get().dirty, true);
+  assert.equal(editor.store.get().edit.draft.body, "새 본문 더 씀");
+  assert.equal(api.calls.filter((c) => c.name === "create").length, 1);
 });
 
 test("화면 렌더: 첫 화면은 제목과 목록 불러오기 상태를 보이고 편집기는 열지 않는다(효과는 돌지 않음)", () => {

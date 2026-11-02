@@ -44,15 +44,28 @@ export function createMaterialsScreenModel(client: MaterialsApi, deps: ScreenDep
   const store = createViewStore<MaterialsScreenState>({
     list: { state: "loading", items: [], nextCursor: null }, moreState: "idle", selection: null, dirty: false, editorSession: 0,
   });
+  /** 진행 중인 목록 조회. 응답을 받으면 비운다. */
   let listRequest: AbortController | null = null;
+  /** 첫 쪽 조회를 시작할 때마다 바뀐다. 그 전에 보낸 [더 보기] 응답은 새 목록에 붙이지 않는다. */
+  let listGeneration = 0;
+
+  /**
+   * 목록 조회 중에 끝난 저장·삭제는 조회를 다시 시작한다. 진행 중인 조회는 변경 전에 읽었을 수 있어,
+   * 그 응답이 방금 반영한 새 자료·제목·삭제를 덮지 않게 버리고 변경 뒤의 목록을 다시 읽는다. 화면을 닫은 뒤에는 다시 읽지 않는다.
+   */
+  function reloadIfLoading() {
+    if (listRequest && !listRequest.signal.aborted) void load();
+  }
 
   async function load() {
     listRequest?.abort();
     const abort = new AbortController();
     listRequest = abort;
+    ++listGeneration;
     const session = deps.session();
     store.set((prev) => ({ ...prev, list: { state: "loading", items: [], nextCursor: null }, moreState: "idle" }));
     const result = await client.list(null, abort.signal);
+    if (listRequest === abort) listRequest = null;
     if (abort.signal.aborted || deps.session() !== session) return;
     store.set((prev) => ({
       ...prev,
@@ -67,8 +80,9 @@ export function createMaterialsScreenModel(client: MaterialsApi, deps: ScreenDep
     if (list.state !== "ready" || list.nextCursor === null || moreState === "loading") return;
     store.set((prev) => ({ ...prev, moreState: "loading" }));
     const session = deps.session();
+    const generation = listGeneration;
     const result = await client.list(list.nextCursor);
-    if (deps.session() !== session) return;
+    if (generation !== listGeneration || deps.session() !== session) return;
     if (result.kind === "failed") { store.set((prev) => ({ ...prev, moreState: "error" })); return; }
     store.set((prev) => ({
       ...prev, moreState: "idle",
@@ -103,6 +117,7 @@ export function createMaterialsScreenModel(client: MaterialsApi, deps: ScreenDep
         selection: created && current ? { kind: "existing", textMaterialId: item.textMaterialId } : prev.selection,
       };
     });
+    reloadIfLoading();
   }
 
   /**
@@ -117,6 +132,7 @@ export function createMaterialsScreenModel(client: MaterialsApi, deps: ScreenDep
         ? { ...prev, dirty: false, selection: null, list: { ...prev.list, items } }
         : { ...prev, list: { ...prev.list, items } };
     });
+    reloadIfLoading();
   }
 
   return {
