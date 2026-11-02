@@ -153,7 +153,7 @@ def test_live_request_runs_collection_candidates_and_generation_once(
     assert parts.providers_made == 1
     assert isinstance(parts.provider, ScriptedProvider)
     assert len(parts.provider.generate_requests()) == 1
-    assert deadlines == [START + timedelta(minutes=20) - timedelta(seconds=60)]
+    assert deadlines == [START + timedelta(minutes=60) - timedelta(seconds=60)]
 
 
 # 6. 관계 조회와 후보 없음 ------------------------------------------------------------------------
@@ -430,7 +430,8 @@ def test_child_assembly_uses_total_limit_minus_margin_as_generation_deadline(
     """
     default = child.live_assembly(_child_settings(context_api.base_url, Limits()))
     assert default is not None
-    assert default.generation_budget == timedelta(minutes=20) - timedelta(seconds=60)
+    assert Limits().total == 3600
+    assert default.generation_budget == timedelta(seconds=3540)
 
     built = child.live_assembly(
         _child_settings(

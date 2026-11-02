@@ -166,7 +166,7 @@ class RequestProcessor:
         run = ChildRun.create(self._target, child_input, self._limits.frame_max_bytes)
         self._runs[attempt_id] = run
         try:
-            # 자식 띄우기도 20분 안에 든다. 기다리기를 그만두면 늦게 뜬 자식은 abandon이 회수한다.
+            # 자식 띄우기도 총 상한 안에 든다. 기다리기를 그만두면 늦게 뜬 자식은 abandon이 회수한다.
             launch_failed = await self._launch(run, stop, deadline)
             if launch_failed is not None:
                 logger.warning(
@@ -189,7 +189,7 @@ class RequestProcessor:
                     exit_code,
                 )
                 return terminal
-            # 종결 프레임을 받은 순간 20분 감시를 멈춘다. 그 뒤의 상한·종료는 결과를 바꾸지 않는다.
+            # 종결 프레임을 받은 순간 총 상한 감시를 멈춘다. 그 뒤의 상한·종료는 결과를 바꾸지 않는다.
             exit_code = await run.wait_exit(self._limits.child_exit_wait)
             if run.is_alive():
                 exit_code = await run.stop(
@@ -280,7 +280,7 @@ class RequestProcessor:
             ):
                 return "WORKER_DEFECT"
             # 앞 알림을 다 넣은 뒤 다음 프레임을 본다(진행 알림은 결과보다 먼저 들어간다).
-            # 알림 전송도 20분 안에 든다. 남은 시간이 전송 상한보다 짧으면 남은 시간만 기다린다.
+            # 알림 전송도 총 상한 안에 든다. 남은 시간이 전송 상한보다 짧으면 남은 시간만 기다린다.
             remaining = deadline - self._monotonic()
             if remaining <= 0:
                 return "TIME_LIMIT_EXCEEDED"

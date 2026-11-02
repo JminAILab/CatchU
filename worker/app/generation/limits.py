@@ -1,7 +1,7 @@
 """생성 호출·고쳐 쓰기·입출력 크기·시간 상한(#120).
 
-제목당 고쳐 쓰기 3회는 2026-10-08 팀장 결정(결정 문서 「Catch 제목」), 요청당 생성 호출 200회는 실제 연결
-실측 뒤 2026-10-17 팀장 결정이다(근거는 worker/docs/generation.md 「호출 한도와 시간」). 나머지는 #120이
+제목당 고쳐 쓰기 3회는 2026-10-08 팀장 결정(결정 문서 「Catch 제목」), 요청당 생성 호출 300회는
+#424의 2026-11-01 팀장 결정이다(근거는 worker/docs/generation-limits.md). 나머지는 #120이
 정하도록 맡긴 값의 첫 제안이다. 요청 전체 마감은 #121이 정해 넘기며 여기서는 그 마감 시각만 지킨다.
 """
 
@@ -15,7 +15,7 @@ Clock = Callable[[], datetime]
 @dataclass(frozen=True)
 class GenerationLimits:
     # 요청당 생성 호출 수(후보당 1회). 고쳐 쓰기는 세지 않는다.
-    max_generation_calls: int = 200
+    max_generation_calls: int = 300
     # 요청당 제목 형식 고쳐 쓰기 호출 수와 제목당 최대 횟수(제목당 3회는 팀장 결정).
     max_rewrite_calls: int = 20
     max_rewrites_per_title: int = 3

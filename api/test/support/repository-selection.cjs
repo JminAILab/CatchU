@@ -6,12 +6,12 @@ const { AllowedScopeRevision, RepositorySelection } = require('../../dist/member
 const { CreateRepositorySelection1792383899264 } = require('../../dist/database/migrations/1792383899264-CreateRepositorySelection');
 
 /** 빈 격리 스키마에 선정 마이그레이션만 적용해 그 초기 자료를 읽는다. 스키마는 끝나면 지운다. */
-async function readInitialSelection(db) {
+async function readInitialSelection(db, current = false) {
   const schema = 'test_252_' + randomUUID().replaceAll('-', '');
   await db.query('CREATE SCHEMA "' + schema + '"');
   try {
-    const isolated = await openTestDataSource({ schema, extra: { options: '-c search_path=' + schema + ' -c TimeZone=UTC' },
-      entities: [AllowedScopeRevision, RepositorySelection], migrations: [CreateRepositorySelection1792383899264] });
+    const isolated = await openTestDataSource({ schema, extra: { options: '-c search_path=' + schema + ',public -c TimeZone=UTC' },
+      ...(current ? {} : { entities: [AllowedScopeRevision, RepositorySelection], migrations: [CreateRepositorySelection1792383899264] }) });
     try {
       await isolated.runMigrations();
       return Object.freeze({
@@ -27,4 +27,6 @@ async function restoreInitialSelection(db, initial) {
   await db.manager.insert(RepositorySelection, initial.selections.map(row => ({ ...row })));
 }
 
-module.exports = { readInitialSelection, restoreInitialSelection };
+// U7 제품 경로는 최신 마이그레이션의 판본/포인터를 쓴다. 구 #252 판본 자체의 회귀는 위 기본값을 유지한다.
+const readCurrentSelection = db => readInitialSelection(db, true);
+module.exports = { readInitialSelection, readCurrentSelection, restoreInitialSelection };

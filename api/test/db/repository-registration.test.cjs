@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { before, after, beforeEach, test } = require('node:test');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
-const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
+const { readCurrentSelection: readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 const { MemberAccount, GitHubConnection, AnalysisRequest, AnalysisAttempt, AnalysisConsent } = require('../../dist/member-analysis/member-analysis.entity');
 const { RepositoryRegistration } = require('../../dist/member-repositories/repository-registration.entity');
 const { RepositoryRegistrationService, REGISTRATION_SCOPE_REVISION } = require('../../dist/member-repositories/repository-registration.service');
@@ -96,5 +96,5 @@ test('C1 마이그레이션 up/down/up과 미준비 자료 거부를 실제 Post
     await assert.rejects(migration.down(runner), e => e.code === '23514' && e.message.includes('preservation'));
     await assert.rejects(migration.up(runner), e => e.code === '23514' && e.message.includes('retrospective consent'));
   } finally { if (runner.isTransactionActive) await runner.rollbackTransaction(); await runner.release(); }
-  assert.equal(REGISTRATION_SCOPE_REVISION, 'catchu:allowed-scope:2026-10-19:v1');
+  assert.equal(REGISTRATION_SCOPE_REVISION, 'catchu:allowed-scope:2026-11-01:v1');
 });

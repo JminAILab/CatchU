@@ -11,7 +11,7 @@ const { NestFactory } = require('@nestjs/core');
 const { Queue } = require('bullmq');
 const IORedis = require('ioredis');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
-const { readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
+const { readCurrentSelection: readInitialSelection, restoreInitialSelection } = require('../support/repository-selection.cjs');
 const { u7Fixture } = require('../support/u7-fixture.cjs');
 const { CONTRACT_DIR, MemoryRequestQueue, dispatchLog, waitFor } = require('../helpers/queue-harness.cjs');
 const { AnalysisRequest, AnalysisAttempt, AnalysisConsent, MemberAccount } = require('../../dist/member-analysis/member-analysis.entity');
@@ -159,15 +159,25 @@ test('I7 web 응답 해석→실제 Nest 등록·접수·상태→본인 Catch �
   const history = await (await fetch(url + '/v1/analysis-requests/' + status.requestId)).json();
   assert.equal(web.readAnalysis(history).requestId, status.requestId); assert.equal(consumed, 1);
 });
-test('I8 합성500 목록·상세·관계·생성·Result·DB 반영 수/크기/한계를 대조한다', async t => {
+test('I8 합성500 상세·후보는 보존하고 생성300 상한과 미생성200을 Result·DB에 반영한다', async t => {
   const f = await prepare(), generated = worker(f.message, 500);
-  assert.equal(generated.metrics.listed, 500); assert.equal(generated.metrics.relations, 500);
-  assert.equal(generated.metrics.details, 200); assert.equal(generated.metrics.candidates, 200); assert.equal(generated.metrics.generationCalls, 200);
+  // #424 2026-11-01 상한: 목록3000·상세1500 안에서 본인500과 타인 뿌리 커밋1을 모두 읽는다.
+  assert.equal(generated.metrics.listed, 501); assert.equal(generated.metrics.relations, 500);
+  assert.equal(generated.metrics.details, 500); assert.equal(generated.metrics.candidates, 500); assert.equal(generated.metrics.generationCalls, 300);
   assert.ok(generated.metrics.receivedBytes > 0); assert.ok(generated.metrics.elapsedSeconds > 0);
   assert.ok(generated.metrics.resultBytes < 8 * 1024 * 1024); assert.equal(generated.result.observedOwnCommitCount, 500);
-  assert.ok(generated.result.collectionLimitNotes.length > 0);
+  assert.equal(generated.result.ownCommitObservation, 'FOUND'); assert.deepEqual(generated.result.collectionLimitNotes, []);
+  assert.equal(generated.result.outcome, 'PARTIAL_FAILED'); assert.equal(generated.result.candidates.length, 500);
+  assert.equal(generated.result.candidates.filter(candidate => candidate.draft.status === 'GENERATED').length, 300);
+  assert.equal(generated.result.candidates.filter(candidate => candidate.draft.status === 'NOT_GENERATED').length, 200);
+  assert.deepEqual(generated.result.failures.map(({ stage, code }) => ({ stage, code })),
+    [{ stage: 'ANALYSIS', code: 'GENERATION_BUDGET_EXHAUSTED' }]);
   const applied = await pipeline().receiveResult(generated.result, async receipt => assert.equal(receipt.disposition, 'ACCEPTED'));
-  assert.equal(applied.application.registeredCatchIds.length, 200);
-  assert.equal((await db.query('SELECT count(*)::int n FROM catch_asset WHERE source_request_id=$1', [f.status.requestId]))[0].n, 200);
-  t.diagnostic(JSON.stringify({ synthetic: true, ...generated.metrics, applied: 200, full500Analysis: false }));
+  assert.equal(applied.application.registeredCatchIds.length, 500);
+  const stored = await db.query('SELECT draft_status, count(*)::int n FROM catch_asset WHERE source_request_id=$1 GROUP BY draft_status ORDER BY draft_status', [f.status.requestId]);
+  assert.deepEqual(stored, [{ draft_status: 'GENERATED', n: 300 }, { draft_status: 'NOT_GENERATED', n: 200 }]);
+  const status = await new AnalysisHistoryService(db).get(f.memberId, f.status.requestId);
+  assert.equal(status.processing, 'PARTIAL_FAILED'); assert.equal(status.application, 'APPLIED'); assert.equal(status.ownerResultsReady, true);
+  assert.equal(status.registeredCatchIds.length, 500);
+  t.diagnostic(JSON.stringify({ synthetic: true, ...generated.metrics, applied: 500, full500Analysis: false }));
 });
