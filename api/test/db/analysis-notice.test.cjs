@@ -16,7 +16,7 @@ const { openTestDataSource, resetTestDatabase } = require('../support/test-datab
 const { bindSyntheticDailyLimit } = require('../support/synthetic-daily-limit.cjs');
 
 // #424 본문 확정 v2(2026-10-30 팀장, #322에서 네 줄만 변경)의 SHA-256. 반영 PR에서 팀장 승인을 받는다.
-const CONFIRMED_NOTICE_SHA256 = '8da5543d1caa356fb819961a5882b7ebe614e68ee8fad3fd044b3ea921d2e2e3';
+const CONFIRMED_NOTICE_SHA256 = '08a53bb637cb54845626546cd8d90e11a2ae351434f3cf5408ef63df717e1e28';
 const GOOGLE = { GOOGLE_LOGIN_ENABLED: 'true', GOOGLE_CLIENT_ID: 'synthetic.apps.googleusercontent.com',
   GOOGLE_CLIENT_SECRET: 'synthetic-google-secret', GOOGLE_REDIRECT_URI: 'http://localhost:3000/google/callback' };
 const UNSUPPORTED = ['catchu:github:1234567', 'test:unsupported-origin', 'CATCHU:GOOGLE:upper-case', GOOGLE_IDENTITY_PREFIX, DEV_LOGIN_IDENTITY_PREFIX];
