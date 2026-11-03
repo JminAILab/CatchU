@@ -4,6 +4,7 @@
 import { Inject, Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { Job, Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
+import { watchRedisErrors } from '../common/redis-connection-errors';
 import {
   AI_RUN_CLOSE_TIMEOUT_MS, AI_RUN_ENQUEUE_TIMEOUT_MS, AI_RUN_QUEUE, AI_RUN_WORKER_OPTIONS, aiRunJobOptions, type AiRunKind,
   errorName, isAiRunKind, isValidPayload, isValidRunKey,
@@ -137,16 +138,9 @@ export class AiRun implements OnApplicationBootstrap, OnApplicationShutdown {
     return 'ENQUEUE_FAILED';
   }
 
-  /** 연결 오류를 처리되지 않은 사건으로 두지 않는다. 같은 끊김이 이어지면 첫 오류만 남긴다. */
+  /** 같은 끊김이 이어지면 첫 오류만 남긴다. */
   private watch(connection: IORedis): IORedis {
-    let reported = false;
-    connection.on('ready', () => { reported = false; });
-    connection.on('error', (error: Error) => {
-      if (reported) return;
-      reported = true;
-      this.logger.warn({ event: 'ai_run_connection_error', error: errorName(error) });
-    });
-    return connection;
+    return watchRedisErrors(connection, (error) => this.logger.warn({ event: 'ai_run_connection_error', error: errorName(error) }));
   }
 
   private async closeAll(): Promise<void> {
