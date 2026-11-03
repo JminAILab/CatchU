@@ -18,6 +18,7 @@ import { AiConsentModule } from './ai-consent/ai-consent.module';
 import { WithdrawalModule } from './withdrawal/withdrawal.module';
 import { PublishedIndexModule } from './published-index/published-index.module';
 import { ClaudeMcpModule } from './claude-mcp/claude-mcp.module';
+import { PublicationsModule } from './publications/publications.module';
 
 @Module({
   imports: [
@@ -41,6 +42,9 @@ import { ClaudeMcpModule } from './claude-mcp/claude-mcp.module';
     PublishedIndexModule,
     // 12월 intent U6: Claude 본인 연결(C-15). /v1/mcp와 연결 관리 API를 두고 기동 때 앱 루트에 OAuth 주소를 건다(docs/claude-mcp.md).
     ClaudeMcpModule,
+    // 12월 intent U4 제출 2: 발행·작성자 발행본 관리 API(/v1/publications)와 C-10 DB 구현(PUBLICATION_ACCESS). 받은 사람 경로 교체와
+    // ShareLinksModule·RecipientModule 해제는 제출 3(W6)에서 한 변경으로 한다(docs/publications.md).
+    PublicationsModule,
     // #232는 #252의 실제 선정 공급자(DatabaseRepositorySelectionSource)를 받는 WorkerContextModule.register로 별도 조립한다.
     // 기본 앱에 가짜 선정/동의 해석을 등록하지 않는다(docs/worker-context.md).
   ],

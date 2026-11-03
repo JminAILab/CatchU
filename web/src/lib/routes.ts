@@ -29,9 +29,18 @@ export const routes = {
   assets: "/assets",
   /** 텍스트 자료 목록·편집(U4 W2). */
   materials: "/materials",
+  /** 발행본 목록(U4 W5). */
+  publications: "/publications",
+  /** 발행(U4 W3). 본인 Catch·텍스트 자료를 골라 고정 발행본과 링크를 만든다. */
+  publicationNew: "/publications/new",
   /** 공유 링크 목록·발급·복사·중단. */
   links: "/links",
 } as const;
+
+/** 발행본 상세(U4 W5). 사본·상태·링크 주소·중지·삭제. */
+export function publicationDetailPath(publicationId: string): string {
+  return `${routes.publications}/${encodeURIComponent(publicationId)}`;
+}
 
 /** 수신자 링크. token은 경로에만 두고 쿼리·로그에 싣지 않는다. */
 export function recipientLinkPath(token: string): string {

@@ -138,7 +138,9 @@ function base(code: ErrorCode): ErrorBody {
   return { code, message: DEFAULT_ERROR_MESSAGES[code] };
 }
 
-/** details 는 명세의 두 키만 복사한다. 다른 키·항목의 추가 속성은 버린다. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** details 는 명세의 두 키와 U4 발행 거부의 `catchIds`(UUID만)를 복사한다. 다른 키·항목의 추가 속성은 버린다. */
 function withDetails(body: ErrorBody, details: ErrorDetails | undefined): ErrorBody {
   if (!details) return body;
   const safe: ErrorDetails = {};
@@ -147,6 +149,10 @@ function withDetails(body: ErrorBody, details: ErrorDetails | undefined): ErrorB
   }
   if (typeof details.existingRequestId === 'string' && details.existingRequestId.length > 0) {
     safe.existingRequestId = details.existingRequestId;
+  }
+  if (Array.isArray(details.catchIds)) {
+    const catchIds = details.catchIds.filter((id): id is string => typeof id === 'string' && UUID.test(id));
+    if (catchIds.length > 0) safe.catchIds = catchIds;
   }
   return Object.keys(safe).length > 0 ? { ...body, details: safe } : body;
 }

@@ -1,0 +1,281 @@
+import type { ApiClient, ClientResult } from "../../lib/api-client.ts";
+import { memberMutationOutcome } from "../../lib/auth-api.ts";
+import { codePointLength, saveFailureOf, type SaveFailure } from "../../lib/save-outcome.ts";
+import { U2_ERROR_MESSAGES } from "../../lib/u2-error-messages.ts";
+import { catchErrorText } from "../assets/catch-api.ts";
+
+/** 발행 입력 상한(BR4.1·BR4.5). 제목은 앞뒤 공백을 지운 뒤 코드 포인트로 세고, 비밀번호는 다듬지 않는다(10월 링크 비밀번호 규칙). */
+export const PUBLISH_LIMITS = Object.freeze({ title: 50, password: Object.freeze({ min: 8, max: 64 }), items: 20 });
+/** 링크 유효 기간(BR5.4). 발행 시각부터이며 연장이 없다. */
+export const LINK_VALID_DAYS = 90;
+
+export type PublicationState = "ACTIVE" | "STOPPED" | "EXPIRED";
+export type PublicationItemKind = "CATCH" | "TEXT_MATERIAL";
+export type PublishItemRef = { kind: PublicationItemKind; sourceId: string };
+export type PublishRequest = { title: string; password?: string; items: PublishItemRef[] };
+
+/** `POST /publications` 201 응답. 토큰은 `url` 안에만 있다(BR10.2). */
+export type PublishedLink = {
+  publicationId: string; url: string; state: PublicationState; publishedAt: string; expiresAt: string; passwordProtected: boolean;
+};
+export type PublicationListItem = PublishedLink & { title: string };
+export type PublicationPage = { items: PublicationListItem[]; page: { nextCursor: string | null } };
+
+/** C-07 사본 모양. Catch는 기록 확인 내용·작성자 설명·AI 초안·불일치 표지를 나눠 보인다(BR1.3·BR7.5). */
+export type SnapshotEvidence = { sourceUrl: string; sourceRevision: string; representedFacts: string[] };
+export type CatchSnapshot = {
+  workFacts: string[]; subjectContribution: string; evidence: SnapshotEvidence[];
+  authorDescription: string | null; aiDraft: string | null; mismatch: boolean;
+};
+export type TextMaterialSnapshot = { body: string };
+export type PublishedItem =
+  | { publishedItemId: string; position: number; itemKind: "CATCH"; title: string; snapshot: CatchSnapshot }
+  | { publishedItemId: string; position: number; itemKind: "TEXT_MATERIAL"; title: string; snapshot: TextMaterialSnapshot }
+  /** U8 몫. U4는 만들지 않지만 사본에 있으면 자리만 보인다. */
+  | { publishedItemId: string; position: number; itemKind: "PDF_MATERIAL"; title: string; snapshot: Record<string, unknown> };
+export type PublishedSnapshot = { title: string; publishedAt: string; expiresAt: string; items: PublishedItem[] };
+/** `GET /publications/{id}` 200 응답. C-09 합의 전이라 `indexState`는 없다(있어도 무시한다). */
+export type PublicationDetail = {
+  publicationId: string; url: string; state: PublicationState; passwordProtected: boolean; snapshot: PublishedSnapshot;
+};
+export type StopResult = { state: PublicationState; stoppedAt: string | null };
+
+const record = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const text = (v: unknown): v is string => typeof v === "string" && v.length > 0;
+const time = (v: unknown): v is string => typeof v === "string" && !Number.isNaN(Date.parse(v));
+const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
+const STATES: readonly string[] = ["ACTIVE", "STOPPED", "EXPIRED"];
+const isState = (v: unknown): v is PublicationState => typeof v === "string" && STATES.includes(v);
+
+export function isPublishedLink(value: unknown): value is PublishedLink {
+  return record(value) && text(value.publicationId) && text(value.url) && isState(value.state)
+    && time(value.publishedAt) && time(value.expiresAt) && typeof value.passwordProtected === "boolean";
+}
+
+export function isPublicationPage(value: unknown): value is PublicationPage {
+  return record(value) && Array.isArray(value.items)
+    && value.items.every((item) => isPublishedLink(item) && text((item as Record<string, unknown>).title))
+    && record(value.page) && (value.page.nextCursor === null || text(value.page.nextCursor));
+}
+
+function isCatchSnapshot(value: unknown): value is CatchSnapshot {
+  return record(value) && strings(value.workFacts) && typeof value.subjectContribution === "string"
+    && Array.isArray(value.evidence) && value.evidence.every((e) => record(e) && typeof e.sourceUrl === "string"
+      && typeof e.sourceRevision === "string" && strings(e.representedFacts))
+    && (value.authorDescription === null || typeof value.authorDescription === "string")
+    && (value.aiDraft === null || typeof value.aiDraft === "string") && typeof value.mismatch === "boolean";
+}
+
+function isPublishedItem(value: unknown): value is PublishedItem {
+  if (!record(value) || !text(value.publishedItemId) || !Number.isInteger(value.position) || typeof value.title !== "string") return false;
+  if (value.itemKind === "CATCH") return isCatchSnapshot(value.snapshot);
+  if (value.itemKind === "TEXT_MATERIAL") return record(value.snapshot) && typeof value.snapshot.body === "string";
+  return value.itemKind === "PDF_MATERIAL" && record(value.snapshot);
+}
+
+export function isPublishedSnapshot(value: unknown): value is PublishedSnapshot {
+  return record(value) && typeof value.title === "string" && time(value.publishedAt) && time(value.expiresAt)
+    && Array.isArray(value.items) && value.items.every(isPublishedItem);
+}
+
+export function isPublicationDetail(value: unknown): value is PublicationDetail {
+  return record(value) && text(value.publicationId) && text(value.url) && isState(value.state)
+    && typeof value.passwordProtected === "boolean" && isPublishedSnapshot(value.snapshot);
+}
+
+export function isStopResult(value: unknown): value is StopResult {
+  return record(value) && isState(value.state) && (value.stoppedAt === null || time(value.stoppedAt));
+}
+
+/** 사본 항목을 `position` 오름차순으로 돌려준다(서버 순서를 믿되 화면은 한 번 더 정렬한다). */
+export function orderedItems(snapshot: PublishedSnapshot): PublishedItem[] {
+  return [...snapshot.items].sort((a, b) => a.position - b.position);
+}
+
+/** 보내기 전 검사(BR4.1·BR4.5). 서버 검증이 기준이며 화면 검사는 미리 알려 주는 것이다. 값을 고치지 않는다. */
+export function publishDraftErrors(draft: { title: string; usePassword: boolean; password: string; itemCount: number }): string[] {
+  const errors: string[] = [];
+  const title = draft.title.trim();
+  if (title.length === 0) errors.push("제목을 입력해 주세요.");
+  else if (codePointLength(title) > PUBLISH_LIMITS.title) errors.push(`제목은 ${PUBLISH_LIMITS.title}자까지 쓸 수 있습니다.`);
+  if (draft.usePassword) {
+    const length = codePointLength(draft.password);
+    if (length < PUBLISH_LIMITS.password.min || length > PUBLISH_LIMITS.password.max) {
+      errors.push(`비밀번호는 ${PUBLISH_LIMITS.password.min}~${PUBLISH_LIMITS.password.max}자로 입력해 주세요.`);
+    }
+  }
+  if (draft.itemCount < 1) errors.push("발행할 항목을 하나 이상 골라 주세요.");
+  else if (draft.itemCount > PUBLISH_LIMITS.items) errors.push(`항목은 ${PUBLISH_LIMITS.items}개까지 고를 수 있습니다.`);
+  return errors;
+}
+
+/**
+ * 발행 실패 구분(신뢰성 설계 「작성자 실패 안내」 NFR7.5). 어떤 경우든 화면은 고른 항목·순서·제목·비밀번호 입력을 그대로 둔다.
+ * `consent-required`는 동의 창(`components/ai-consent`)이 먼저 처리하므로 창을 거친 뒤에도 403이면 안내 문구로만 보인다.
+ */
+export type PublishFailure =
+  | { kind: "confirmation-required"; catchIds: string[] }
+  | { kind: "source-restricted"; catchIds: string[] }
+  | { kind: "source-unavailable" }
+  | { kind: "validation"; violations: { field: string; reason: string }[] }
+  | { kind: "consent-required" }
+  | { kind: "daily-limit" }
+  | { kind: "rate-limited"; retryAfterSeconds?: number }
+  | { kind: "login-expired" }
+  | { kind: "renewed-rejected" }
+  | { kind: "not-sent" }
+  | { kind: "failed" };
+
+export type PublishResult = { kind: "ok"; value: PublishedLink } | { kind: "failed"; failure: PublishFailure };
+
+const MEMBER_AUTH_FAILURES = new Set(["AUTH_REQUIRED", "AUTH_INVALID"]);
+
+/** 공통 클라이언트 결과를 발행 결과로 바꾼다. 201과 응답 모양이 맞을 때만 성공이다. 접수만으로 성공을 표시하지 않는다. */
+export function publishOutcome(result: ClientResult): PublishResult {
+  if (result.kind === "success") {
+    return result.status === 201 && isPublishedLink(result.data) ? { kind: "ok", value: result.data } : { kind: "failed", failure: { kind: "failed" } };
+  }
+  const outcome = memberMutationOutcome(result);
+  if (outcome === "renewed-rejected" || outcome === "not-sent") return { kind: "failed", failure: { kind: outcome } };
+  if (result.kind !== "api-error") return { kind: "failed", failure: { kind: "failed" } };
+  const catchIds = result.details?.catchIds ?? [];
+  if (result.status === 409 && result.code === "CONFIRMATION_REQUIRED") return { kind: "failed", failure: { kind: "confirmation-required", catchIds } };
+  if (result.status === 409 && result.code === "SOURCE_RESTRICTED") return { kind: "failed", failure: { kind: "source-restricted", catchIds } };
+  if (result.status === 404) return { kind: "failed", failure: { kind: "source-unavailable" } };
+  if (result.status === 400) return { kind: "failed", failure: { kind: "validation", violations: result.details?.violations ?? [] } };
+  if (result.status === 403 && result.code === "AI_CONSENT_REQUIRED") return { kind: "failed", failure: { kind: "consent-required" } };
+  if (result.status === 429 && result.code === "DAILY_LIMIT_REACHED") return { kind: "failed", failure: { kind: "daily-limit" } };
+  if (result.status === 429) {
+    return { kind: "failed", failure: result.retryAfterSeconds === undefined ? { kind: "rate-limited" } : { kind: "rate-limited", retryAfterSeconds: result.retryAfterSeconds } };
+  }
+  if (result.status === 401 && MEMBER_AUTH_FAILURES.has(result.code)) return { kind: "failed", failure: { kind: "login-expired" } };
+  return { kind: "failed", failure: { kind: "failed" } };
+}
+
+export const PUBLISH_FAILED_TEXT = "발행되지 않았습니다";
+/** 404 안내(신뢰성 설계가 코드 생성 때 정하게 둔 문구, 결정 D5). */
+export const SOURCE_UNAVAILABLE_TEXT = "고른 자료 중 지금 발행할 수 없는 것이 있습니다. 목록을 다시 불러온 뒤 다시 골라 주세요.";
+/** 10월 Catch 거부 문구를 그대로 쓴다(`features/assets/catch-api.ts`). */
+export const CATCH_REJECTION_TEXT = Object.freeze({
+  "confirmation-required": catchErrorText({ kind: "api-error", status: 409, code: "CONFIRMATION_REQUIRED", message: "" }),
+  "source-restricted": catchErrorText({ kind: "api-error", status: 409, code: "SOURCE_RESTRICTED", message: "" }),
+});
+
+/** 빈도 초과 안내(결정 D6). 남은 초는 `Retry-After`가 있을 때만 적고, 없으면 시간을 추정하지 않는다. */
+export function rateLimitedText(retryAfterSeconds?: number): string {
+  return retryAfterSeconds === undefined
+    ? "발행 요청이 잦아 잠시 발행할 수 없습니다. 잠시 뒤 [발행]을 다시 눌러 주세요."
+    : `발행 요청이 잦아 잠시 발행할 수 없습니다. ${retryAfterSeconds}초 뒤에 [발행]을 다시 누를 수 있습니다.`;
+}
+
+const FIELD_TEXT: Record<string, string> = {
+  title: `제목은 1~${PUBLISH_LIMITS.title}자(앞뒤 공백 제외)로 입력해 주세요.`,
+  password: `비밀번호는 ${PUBLISH_LIMITS.password.min}~${PUBLISH_LIMITS.password.max}자로 입력해 주세요.`,
+  items: `항목은 1~${PUBLISH_LIMITS.items}개이며 같은 항목을 두 번 고를 수 없습니다.`,
+};
+
+/** 400 `details`의 칸별 안내. 서버의 이유 코드는 그대로 보이지 않고 칸 이름으로 안내한다. 칸을 모르면 전체 글 상한을 함께 적는다. */
+export function validationLines(violations: { field: string; reason: string }[]): string[] {
+  if (violations.length === 0) return ["입력 길이나 형식을 확인해 주세요."];
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  for (const { field } of violations) {
+    const key = field.split(/[.[]/)[0];
+    const line = FIELD_TEXT[key] ?? `입력(${key})을 확인해 주세요. 발행본 전체 글이 상한을 넘었을 수도 있습니다.`;
+    if (!seen.has(line)) { seen.add(line); lines.push(line); }
+  }
+  return lines;
+}
+
+/** 실패 안내 줄. 첫 줄은 "발행되지 않았습니다"이고 아래에 이유를 둔다. 409는 해당 Catch를 선택 목록에서 함께 표시한다. */
+export function publishFailureLines(failure: PublishFailure): string[] {
+  switch (failure.kind) {
+    case "confirmation-required": return [PUBLISH_FAILED_TEXT, CATCH_REJECTION_TEXT["confirmation-required"], "표시된 Catch를 확인하거나 빼고 다시 발행해 주세요."];
+    case "source-restricted": return [PUBLISH_FAILED_TEXT, CATCH_REJECTION_TEXT["source-restricted"], "표시된 Catch를 빼고 다시 발행해 주세요."];
+    case "source-unavailable": return [PUBLISH_FAILED_TEXT, SOURCE_UNAVAILABLE_TEXT];
+    case "validation": return [PUBLISH_FAILED_TEXT, ...validationLines(failure.violations)];
+    case "consent-required": return [PUBLISH_FAILED_TEXT, U2_ERROR_MESSAGES.AI_CONSENT_REQUIRED];
+    case "daily-limit": return [PUBLISH_FAILED_TEXT, U2_ERROR_MESSAGES.DAILY_LIMIT_REACHED];
+    case "rate-limited": return [PUBLISH_FAILED_TEXT, rateLimitedText(failure.retryAfterSeconds)];
+    case "login-expired": return [PUBLISH_FAILED_TEXT, "로그인이 만료되었습니다. 다시 로그인한 뒤 발행해 주세요. 고른 항목과 입력은 화면에 남아 있습니다."];
+    case "renewed-rejected": return [PUBLISH_FAILED_TEXT, "로그인이 연장되었습니다. [발행]을 다시 눌러 주세요."];
+    case "not-sent": return [PUBLISH_FAILED_TEXT, "지금은 요청을 보내지 않았습니다. 입력은 그대로 두었습니다."];
+    case "failed": return [PUBLISH_FAILED_TEXT, "서버에서 처리하지 못했거나 응답을 받지 못했습니다. 잠시 뒤 다시 시도해 주세요."];
+  }
+}
+
+export type OwnerResult<T> = { kind: "ok"; value: T } | { kind: "failed"; failure: SaveFailure };
+
+export function publicationListErrorText(failure: SaveFailure): string {
+  if (failure === "login-expired") return "로그인이 만료되었습니다. 다시 로그인한 뒤 확인해 주세요.";
+  return "발행본 목록을 불러오지 못했습니다. 발행본이 없다는 뜻은 아닙니다. 다시 불러와 주세요.";
+}
+
+export function publicationOpenErrorText(failure: SaveFailure): string {
+  if (failure === "login-expired") return "로그인이 만료되었습니다. 다시 로그인한 뒤 확인해 주세요.";
+  if (failure === "not-found") return "이 발행본을 열 수 없습니다. 삭제됐거나 내 발행본이 아닙니다. 목록으로 돌아가 다시 선택해 주세요.";
+  return "발행본을 불러오지 못했습니다. 다시 불러와 주세요.";
+}
+
+export function stopErrorText(failure: SaveFailure): string {
+  if (failure === "login-expired") return "링크가 중지되지 않았습니다. 로그인이 만료되었습니다. 다시 로그인한 뒤 중지해 주세요.";
+  if (failure === "not-found") return "링크가 중지되지 않았습니다. 이 발행본을 열 수 없습니다. 목록을 다시 불러와 주세요.";
+  return "링크가 중지되지 않았습니다. 다시 시도해 주세요.";
+}
+
+/** 삭제 실패 안내(BR8.4·NFR5.3). 접수만으로 삭제됨을 표시하지 않고 발행본을 화면에 그대로 둔다. */
+export function deleteErrorText(failure: SaveFailure): string {
+  if (failure === "login-expired") return "삭제되지 않았습니다. 로그인이 만료되었습니다. 다시 로그인한 뒤 삭제해 주세요.";
+  if (failure === "not-found") return "삭제되지 않았습니다. 이미 지워졌거나 열 수 없는 발행본입니다. 목록을 다시 불러와 주세요.";
+  return "삭제되지 않았습니다. 다시 시도해 주세요.";
+}
+
+async function call<T>(run: () => Promise<ClientResult>, ok: (status: number, data: unknown) => data is T): Promise<OwnerResult<T>> {
+  try {
+    const result = await run();
+    if (result.kind === "success") {
+      return ok(result.status, result.data) ? { kind: "ok", value: result.data } : { kind: "failed", failure: "unknown" };
+    }
+    return { kind: "failed", failure: saveFailureOf(result) };
+  } catch {
+    return { kind: "failed", failure: "unknown" };
+  }
+}
+
+const itemPath = (id: string) => `/publications/${encodeURIComponent(id)}`;
+
+/**
+ * 회원 API(`api.member`)로 발행본을 다룬다(기능 명세 「작성자 API」). `publishRaw`는 동의 창(`useAiConsent().run`)이 같은 요청을
+ * 한 번 다시 보낼 수 있게 공통 결과를 그대로 돌려주고, 해석은 `publishOutcome`이 한다. 재전송 키는 받지 않는다(BR4.9).
+ */
+export function createPublicationsApi(member: ApiClient["member"]) {
+  return {
+    list(cursor: string | null, signal?: AbortSignal) {
+      const query = new URLSearchParams({ limit: "20" });
+      if (cursor !== null) query.set("cursor", cursor);
+      return call(() => member(`/publications?${query}`, { method: "GET", signal }),
+        (status, data): data is PublicationPage => status === 200 && isPublicationPage(data));
+    },
+    get(id: string, signal?: AbortSignal) {
+      return call(() => member(itemPath(id), { method: "GET", signal }),
+        (status, data): data is PublicationDetail => status === 200 && isPublicationDetail(data) && data.publicationId === id);
+    },
+    async publishRaw(body: PublishRequest, signal?: AbortSignal): Promise<ClientResult> {
+      try {
+        return await member("/publications", { method: "POST", body, signal });
+      } catch {
+        return { kind: "lookup-failed", status: null, code: "LOOKUP_FAILED" };
+      }
+    },
+    stop(id: string, signal?: AbortSignal) {
+      return call(() => member(`${itemPath(id)}/stop`, { method: "PUT", signal }),
+        (status, data): data is StopResult => status === 200 && isStopResult(data));
+    },
+    remove(id: string, signal?: AbortSignal) {
+      return call(() => member(itemPath(id), { method: "DELETE", signal }),
+        (status, data): data is null => status === 204 && data === null);
+    },
+  };
+}
+
+export type PublicationsApi = ReturnType<typeof createPublicationsApi>;
