@@ -13,6 +13,7 @@ import { MemberRepositoriesModule } from './member-repositories/member-repositor
 import { GoogleLoginModule } from './google-login/google-login.module';
 import { AnalysisIntakeModule } from './analysis-intake/analysis-intake.module';
 import { RecipientModule } from './recipient/recipient.module';
+import { MaterialsModule } from './materials/materials.module';
 import { AiConsentModule } from './ai-consent/ai-consent.module';
 import { WithdrawalModule } from './withdrawal/withdrawal.module';
 import { PublishedIndexModule } from './published-index/published-index.module';
@@ -31,6 +32,7 @@ import { ClaudeMcpModule } from './claude-mcp/claude-mcp.module';
     GoogleLoginModule,
     AnalysisIntakeModule,
     RecipientModule,
+    MaterialsModule,
     // 12월 intent U2: 첫 이용 동의 API(C-04), 탈퇴 DELETE /v1/me(C-06). 파일 저장 설정이 있으면 여기서 기동 때 검사한다.
     AiConsentModule,
     WithdrawalModule,

@@ -111,6 +111,9 @@
 .actionSection input { width: 18px; height: 18px; flex-shrink: 0; margin: 3px 0 0; accent-color: var(--color-accent); }
 .actionError { padding: 18px; background: #fff1dc; margin-top: 20px; border-radius: 12px; }
 .dialog button:disabled { opacity: .55; cursor: not-allowed; }
+/* U4 작성자 설명 입력칸. AI 초안(.draft)과 다른 모양으로 둔다(BR1.3). */
+.descriptionInput { display: block; width: 100%; box-sizing: border-box; margin: 10px 0 4px; padding: 12px 14px; border: 1px solid #c9d2df; border-radius: 9px; font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; }
+.descriptionInput:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 
 @media (prefers-reduced-motion: reduce) {
   .card { transition: none; }

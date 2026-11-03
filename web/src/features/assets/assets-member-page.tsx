@@ -9,11 +9,13 @@ import { api } from "@/lib/api";
 import { AssetsConnected } from "./assets-connected";
 import { AssetsMemberBoundary } from "./assets-member-boundary";
 import { createCatchApi } from "./catch-api";
+import { createAuthorDescriptionApi } from "./author-description-api";
 import { createRepositoryOptionsStore } from "./repository-options-store";
 
 // api.member가 기준 주소·Bearer·401을 담당한다. 렌더마다 호출 객체를 새로 만들지 않는다.
 const catches = createCatchApi(api.member);
 const repositories = createRepositoryApi(api.member);
+const descriptions = createAuthorDescriptionApi(api.member);
 
 /** (member) layout의 회원 가드 안에서만 조립한다. */
 export function AssetsMemberPage() {
@@ -42,7 +44,7 @@ function MemberAssets() {
   ) : null;
 
   return (
-    <AssetsConnected api={catches} repositories={snapshot.repositories} repositoryNotice={repositoryNotice}
+    <AssetsConnected api={catches} descriptionApi={descriptions} repositories={snapshot.repositories} repositoryNotice={repositoryNotice}
       repositoryManagement={(bindings) => (
         <RepositoryManagement api={repositories} bindings={{
           onOpen: bindings.onOpen,

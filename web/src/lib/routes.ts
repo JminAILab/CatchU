@@ -27,6 +27,8 @@ export const routes = {
   profileClaudeAuthorize: "/profile/claude/authorize",
   /** 내 자산(Catch 탭). 필터·상세는 쿼리 `repositoryId`·`catchId`(B 제안). */
   assets: "/assets",
+  /** 텍스트 자료 목록·편집(U4 W2). */
+  materials: "/materials",
   /** 공유 링크 목록·발급·복사·중단. */
   links: "/links",
 } as const;
