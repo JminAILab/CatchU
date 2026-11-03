@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { AssetsView, assetTabs, type AssetTab } from "./assets-view";
+import { AssetsView, assetTabs, parseVisibilityFilter, type AssetTab } from "./assets-view";
 import { CatchActions } from "./catch-actions";
 import { createAssetsStore, type AssetsStore } from "./assets-store";
 import { catchErrorText, type CatchApi } from "./catch-api";
@@ -49,6 +49,8 @@ export function AssetsConnected({ api, descriptionApi, repositories, repositoryN
   const params = useSearchParams();
   const pathname = usePathname();
   const repositoryId = params.get("repositoryId") ?? "";
+  // API 목록은 저장소로만 거르고, 공개 상태는 불러온 목록 안에서 거른다.
+  const visibility = parseVisibilityFilter(params.get("visibility"));
   const catchId = params.get("catchId");
   const tab: AssetTab = assetTabs.find((item) => item.id === params.get("tab"))?.id ?? "catch";
 
@@ -73,7 +75,8 @@ export function AssetsConnected({ api, descriptionApi, repositories, repositoryN
     onClosed() { store.setManagementOpen(false); void store.invalidateList(repositoryId); },
     onShowRepository(id) {
       store.setManagementOpen(false);
-      changeQuery({ repositoryId: id || null, catchId: null, tab: null });
+      // 막 분석한 Catch는 미공개로 생기므로 공개 상태 걸러 보기를 풀어 저장소 전체를 보여 준다.
+      changeQuery({ repositoryId: id || null, visibility: null, catchId: null, tab: null });
       void store.invalidateList(id);
     },
   };
@@ -84,7 +87,7 @@ export function AssetsConnected({ api, descriptionApi, repositories, repositoryN
   return (
     <div className={styles.preview}>
       <AssetsView dataMode="api" items={listMatches ? snapshot.items : []}
-        repositories={repositories} repositoryNotice={repositoryNotice} repositoryId={repositoryId} tab={tab}
+        repositories={repositories} repositoryNotice={repositoryNotice} repositoryId={repositoryId} visibility={visibility} tab={tab}
         listState={listMatches ? snapshot.listState : "loading"}
         listMessage={catchErrorText(snapshot.listError, "list")}
         detailState={detailMatches ? snapshot.detailState : "loading"}
@@ -101,6 +104,7 @@ export function AssetsConnected({ api, descriptionApi, repositories, repositoryN
         onLoadMore={() => { void store.loadMore(); }}
         onTabChange={(next) => changeQuery({ tab: next === "catch" ? null : next, catchId: null })}
         onRepositoryChange={(id) => changeQuery({ repositoryId: id || null, catchId: null })}
+        onVisibilityChange={(next) => changeQuery({ visibility: next || null, catchId: null })}
         onOpen={(id) => changeQuery({ catchId: id })}
         onClose={() => {
           // 작성자 설명을 저장하지 않았으면 모달을 닫기 전에 묻는다(BR2.2). 머무르면 입력을 그대로 둔다.

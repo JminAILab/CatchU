@@ -37,6 +37,7 @@
 .listHeading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .listHeading h2 { font-size: 22px; letter-spacing: -0.4px; margin-bottom: 6px; }
 .listHeading p { color: var(--muted); font-size: 14px; margin-bottom: 0; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; }
 .filter { font-size: 12px; font-weight: 700; display: grid; gap: 7px; min-width: 235px; max-width: 100%; }
 .filter select { font-size: 14px; font-weight: 400; width: 100%; }
 .listSection > .count { font-size: 13px; margin: 24px 0 12px; color: var(--muted); }
@@ -126,6 +127,7 @@
   .grid, .factGrid { grid-template-columns: 1fr; }
   .tab, .activeTab { padding: 9px 12px; }
   .listOverview, .card { padding: 20px; }
+  .filters { flex-direction: column; }
   .filter { min-width: 0; }
   .dialog { padding: 22px; }
   .catchDialog { padding: 0 20px 22px; }

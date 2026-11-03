@@ -107,17 +107,17 @@ test('Google 버튼: 예상 밖 예외는 삼키지 않고 버튼을 다시 연�
 
 /* ---------- 콜백 ---------- */
 
-function callbackHarness({ parse, completion, lookups = [] } = {}) {
+function callbackHarness({ parse, emptyParse = { kind: 'malformed' }, initialQuery = `code=${SECRET.code}&state=${SECRET.state}`, completion, lookups = [] } = {}) {
   const log = [];
   const completeCalls = [];
   const completeGate = deferred();
-  let query = new URLSearchParams(`code=${SECRET.code}&state=${SECRET.state}`);
+  let query = new URLSearchParams(initialQuery);
   const lookupQueue = [...lookups];
   const control = createGoogleCallbackControl({
     readCallback(q) {
       log.push(`read:${q.toString() === '' ? 'empty' : 'query'}`);
-      // query가 지워진 뒤 다시 해석하면 state가 없어 malformed가 되는 #286 동작을 흉내 낸다.
-      return q.toString() === '' ? { kind: 'malformed' } : parse;
+      // query가 지워진 뒤 다시 해석하면 보내지 않은 시도는 state가 없어 malformed, 보낸 시도는 already-sent가 되는 #286 동작을 흉내 낸다.
+      return q.toString() === '' ? emptyParse : parse;
     },
     completeGoogleLogin(input) { completeCalls.push(input); log.push('complete'); return completion ?? completeGate.promise; },
     lookupMember() { log.push('lookup'); return Promise.resolve(lookupQueue.shift() ?? { state: 'failed' }); },
@@ -236,6 +236,14 @@ test('콜백: 완료 요청을 보내지 않는 해석 결과는 재전송·세�
     assert.deepEqual(h.log, ['read:query', 'clear'], kind);
     assert.deepEqual(h.control.getView(), { phase: 'notice', notice, loginHref: '/login' }, kind);
   }
+});
+
+test('콜백: query가 지워진 주소로 다시 열린 콜백(already-sent)은 완료 요청 없이 합의 문구와 새 로그인을 안내한다', () => {
+  const h = callbackHarness({ emptyParse: { kind: 'already-sent' }, initialQuery: '' });
+  h.begin();
+  assert.deepEqual(h.log, ['read:empty', 'clear']);
+  assert.equal(h.completeCalls.length, 0);
+  assert.deepEqual(h.control.getView(), { phase: 'notice', notice: '로그인 결과를 확인하지 못했습니다. 다시 로그인해 주세요.', loginHref: '/login' });
 });
 
 test('안내 문구: 일반 실패·네트워크 오류는 시작 화면은 다시 시도, 콜백 화면은 [다시 로그인]에 맞추고, 콜백 해석 오류는 완료 실패와 같은 문구다', () => {

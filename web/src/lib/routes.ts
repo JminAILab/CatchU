@@ -21,6 +21,10 @@ export const routes = {
   profileGithub: "/profile/github",
   /** GitHub 연동 콜백(#253). api의 GITHUB_OAUTH_CALLBACK_URL이 가리키는 web 주소다. 화면 사이 이동 목적지로 쓰지 않는다. */
   githubCallback: "/github/callback",
+  /** Claude 연결 관리(12월 U6). 상세 프로필·시작 안내가 가리킨다. */
+  profileClaude: "/profile/claude",
+  /** Claude 연결 승인(12월 U6). api `/authorize`가 쿼리와 함께 보내는 web 주소다. 화면 사이 이동 목적지로 쓰지 않는다. */
+  profileClaudeAuthorize: "/profile/claude/authorize",
   /** 내 자산(Catch 탭). 필터·상세는 쿼리 `repositoryId`·`catchId`(B 제안). */
   assets: "/assets",
   /** 텍스트 자료 목록·편집(U4 W2). */

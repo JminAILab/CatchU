@@ -48,6 +48,20 @@ test('API 기준 주소가 IPv6 주소면 CSP에 적을 수 없으므로 시작�
   }
 });
 
+test('개발 요청 로그: 두 콜백 주소만 빼고 다른 경로는 남긴다', () => {
+  const { ignore } = nextConfig.logging.incomingRequests;
+  const ignored = (url) => ignore.some((pattern) => pattern.test(url));
+  for (const url of ['/google/callback', '/github/callback', '/google/callback?code=c&state=s', '/github/callback?code=c&state=s',
+    '/google/callback?error=access_denied&state=s', '/google/callback?_rsc=abc']) {
+    assert.equal(ignored(url), true, url);
+    assert.equal(ignored(url), true, `${url}: 다시 대조해도 같다`);
+  }
+  for (const url of ['/', '/login', '/login?next=%2Fhome', '/home', '/profile/github', '/google/callbacks', '/google/callback/extra',
+    '/github/callback2?code=c', '/s/google/callback?code=c', '/preview/google/callback', '/s/x?next=/google/callback']) {
+    assert.equal(ignored(url), false, url);
+  }
+});
+
 test('모든 경로에 헤더 생성 함수의 헤더를 붙이고 X-Powered-By를 끈다', async () => {
   // headers()는 process.env를 읽으므로, 실행하는 셸의 값과 관계없이 합성 값으로 확인하고 되돌린다.
   const env = { NODE_ENV: 'production', NEXT_PUBLIC_API_BASE_URL: 'https://api.catchu.example' };
