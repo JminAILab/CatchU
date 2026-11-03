@@ -40,6 +40,15 @@ test('고른 칩을 다시 누르면 미확정 수정을 버리고 선택을 풀
   assert.deepEqual(skills, ['TS', 'React']);
 });
 
+test('미확정 변경이 있어도 다른 칩을 누르면 확인 없이 그 변경을 버리고 누른 칩의 수정 모드로 바뀐다(#469 확정 사항)', () => {
+  const skills = ['TS', 'React', 'Go'];
+  // 새 기술을 쓰던 중
+  assert.deepEqual(selectSkill(skills, { draft: 'Vue', selected: null }, 1), { draft: 'React', selected: 1 });
+  // 고른 칩을 고치던 중
+  assert.deepEqual(selectSkill(skills, { draft: 'TypeScript', selected: 0 }, 2), { draft: 'Go', selected: 2 });
+  assert.deepEqual(skills, ['TS', 'React', 'Go']);
+});
+
 test('×는 그 기술만 지운다. 고른 칩을 지우면 추가 모드이고, 그 밖에는 입력과 선택한 칩을 유지한다', () => {
   assert.deepEqual(removeSkill(['TS', 'TS', 'React'], empty, 1), { skills: ['TS', 'React'], editor: empty });
   assert.deepEqual(removeSkill(['TS', 'React'], { draft: 'Re', selected: 1 }, 1), { skills: ['TS'], editor: empty });
