@@ -15,7 +15,10 @@ export function emptySkillEditor(): SkillEditor {
   return { draft: '', selected: null };
 }
 
-/** 칩 이름 클릭. 고른 칩을 강조하고 이름을 입력칸에 채운다. 이미 고른 칩을 다시 누르면 미확정 수정을 버리고 추가 모드로 돌아간다. */
+/**
+ * 칩 이름 클릭. 고른 칩을 강조하고 이름을 입력칸에 채운다. 이미 고른 칩을 다시 누르면 미확정 수정을 버리고 추가 모드로 돌아간다.
+ * 입력칸에 미확정 변경이 있어도 다른 칩을 누르면 확인 없이 그 변경을 버리고 누른 칩의 수정 모드로 바꾼다(#469 확정 사항).
+ */
 export function selectSkill(skills: readonly string[], editor: SkillEditor, index: number): SkillEditor {
   if (index < 0 || index >= skills.length) return editor;
   if (activeSelection(skills, editor) === index) return emptySkillEditor();
