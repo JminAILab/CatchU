@@ -232,6 +232,33 @@ test('콜백 해석: 시도 없음·시한 지남(보관값 삭제)·이미 보�
   assert.deepEqual(t.google.readGoogleCallback(query(`state=${state}&code=b`)), { kind: 'no-attempt' });
 });
 
+test('콜백 해석: query가 지워진 주소로 다시 열면 보낸 시도만 already-sent이고, 시도 없음·만료·보내지 않은 시도의 판정은 그대로다', async () => {
+  const server = fakeServer();
+  let clock = 1_000_000;
+  const t = tab(server, { now: () => clock });
+  const empty = query('');
+  assert.deepEqual(t.google.readGoogleCallback(empty), { kind: 'no-attempt' });
+  const started = await t.google.startGoogleLogin('/home');
+  const state = new URL(started.authorizationUrl).searchParams.get('state');
+  assert.deepEqual(t.google.readGoogleCallback(empty), { kind: 'malformed' }, '보내지 않은 시도');
+  assert.deepEqual(t.google.readGoogleCallback(query('other=1')), { kind: 'malformed' }, '보내지 않은 시도');
+  t.attempts.map.set(GOOGLE_ATTEMPT_KEY, JSON.stringify({ ...stored(t), sent: true }));
+  assert.deepEqual(t.google.readGoogleCallback(empty), { kind: 'already-sent' });
+  assert.deepEqual(t.google.readGoogleCallback(query('other=1')), { kind: 'already-sent' }, 'state·code·error가 아닌 매개변수는 보지 않는다');
+  // 세 매개변수 중 하나라도 있으면(빈 값 포함) 지금까지의 판정을 그대로 따른다.
+  for (const q of ['state=', 'code=', 'error=', 'code=abc', 'error=access_denied', 'error=server_error', `state=${state}&state=${state}`]) {
+    assert.deepEqual(t.google.readGoogleCallback(query(q)), { kind: 'malformed' }, q);
+  }
+  assert.deepEqual(t.google.readGoogleCallback(query('state=other')), { kind: 'state-mismatch' });
+  assert.deepEqual(t.google.readGoogleCallback(query(`state=${state}`)), { kind: 'already-sent' });
+  assert.equal(stored(t).sent, true, '해석만으로 지우지 않는다');
+  clock += 600_000;
+  assert.deepEqual(t.google.readGoogleCallback(empty), { kind: 'expired' }, '보낸 시도도 시한이 지나면 만료다');
+  assert.equal(t.attempts.map.size, 0);
+  assert.deepEqual(t.google.readGoogleCallback(empty), { kind: 'no-attempt' });
+  assert.equal(server.count('POST /auth/google/login'), 0, '해석은 완료 요청을 보내지 않는다');
+});
+
 // ---- 완료 ----
 
 test('완료 성공: 잠금 안에서 sent 표시 후 쿠키 포함으로 보내고, 응답 뒤 보관값 삭제·로그인 반영·표식 기록', async () => {
@@ -324,6 +351,7 @@ test('완료 응답 없음: 다시 보내지 않고 network, 보관값은 sent�
     assert.equal(stored(t).sent, true, mode);
     const state = parsed.input.state;
     assert.deepEqual(t.google.readGoogleCallback(query(`state=${state}&code=c1`)), { kind: 'already-sent' }, mode);
+    assert.deepEqual(t.google.readGoogleCallback(query('')), { kind: 'already-sent' }, mode); // query가 지워진 주소로 다시 열어도 같다
     assert.equal(t.store.loginChangeDetected(), true, mode);
     assert.equal(t.store.getSnapshot().reloginOnly, true, mode); // A 합의 1: 세션 확인으로 이번 로그인 성공을 판정하지 않으므로 자동 복원 없음
     assert.deepEqual(await t.session.refresh(), { kind: 'not-started' }, mode); // 이전 세션 갱신으로 새 쿠키의 토큰을 받지 않음

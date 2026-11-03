@@ -216,7 +216,7 @@ for key_repo in web:catchu-web api:catchu-api migration:catchu-api-migration wor
   output_has "${key_repo%%:*}=$(digest_of "$r" "$t")" || all=1
 done
 check "push 새로: 올린 digest 다섯 개를 출력" "$all"
-check "push 새로: web 빌드 입력(공개 주소·판본)" "$(grep -E '^docker build' "$S/calls" | grep 'web/Dockerfile' | grep -q "NEXT_PUBLIC_API_BASE_URL=https://catchu.dev" && grep -E '^docker build' "$S/calls" | grep -q "SOURCE_REVISION=${TARGET}"; echo $?)"
+check "push 새로: web 빌드 입력(공개 주소·인증 연결·판본)" "$(grep -E '^docker build' "$S/calls" | grep 'web/Dockerfile' | grep "NEXT_PUBLIC_API_BASE_URL=https://catchu.dev" | grep -q "NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true" && grep -E '^docker build' "$S/calls" | grep -q "SOURCE_REVISION=${TARGET}"; echo $?)"
 check "push 새로: 출처 증명 끔" "$(ok test "$(grep -E '^docker build' "$S/calls" | grep -c -- '--provenance=false --sbom=false')" = 5)"
 check "push 새로: 묶음의 cd/는 도구 판본" "$(ok grep -qx '# current tools' "$S/bundle/deploy/dev-server/cd/server-deploy.sh")"
 check "push 새로: 묶음의 Caddyfile·교체 스크립트는 배포할 커밋 판본" "$(grep -qx '# target Caddyfile' "$S/bundle/deploy/dev-server/Caddyfile" 2> /dev/null && test -x "$S/bundle/deploy/scripts/replace-single.sh"; echo $?)"

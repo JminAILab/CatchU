@@ -51,6 +51,8 @@ npm ci
 
 종료는 서버를 띄운 터미널에서 `Ctrl+C`. 포트 3000이 이미 사용 중이면 `npm run dev -- -p 3001`처럼 실행 인자로 임시로 바꾸되(Windows·macOS 공통), 팀 공통 포트는 3000이다. `.env`·`.env.local`의 `PORT`는 적용되지 않는다.
 
+`npm run dev`는 들어온 요청을 주소째 터미널에 찍는다. `/google/callback`·`/github/callback`은 query에 일회용 `code`·`state`가 실리므로 `next.config.ts`의 `logging.incomingRequests.ignore`로 뺐고, 다른 경로는 그대로 찍힌다(#287). 개발 서버에만 적용되는 설정이며 운영 접근 로그와는 별개다. 개발 서버가 `.next/dev/trace`에 남기는 내부 추적 기록에는 적용되지 않아 두 주소도 값째 들어가므로, `.next/`를 검증 증거로 공유하지 않는다.
+
 ## 검사
 
 | 명령 | 내용 | 실패 예 |
@@ -73,7 +75,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 |---|---|---|---|
 | API 호출 시 필수 | `NEXT_PUBLIC_API_BASE_URL` | `http://127.0.0.1:3001` | api 기준 주소. `/v1`은 넣지 않는다(호출 함수가 붙인다). 없거나 잘못되면 호출하지 않고 조회 실패로 돌려준다. `npm run build`로 만든 운영 빌드처럼 `NODE_ENV`가 `development`·`test`가 아니면 https 주소나 로컬 주소(`localhost`·`127.0.0.1`)의 http만 받고, 그 밖의 http 주소도 잘못된 주소로 본다(#218). 이 주소의 출처를 CSP 연결 허용에도 넣는다(「보안 응답 헤더」). IPv6 주소(`[::1]` 등)는 CSP에 적을 수 없어 형식과 관계없이 `npm run dev`·`npm run build`가 오류로 멈추므로 `127.0.0.1`이나 `localhost`를 쓴다 |
 | 선택 | `NEXT_PUBLIC_DEV_LOGIN_ENABLED` | `false` | 기본 비활성. 정확히 `true`일 때만 `/login`에 개발용 로그인을 보인다. api도 `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development` 또는 `test`가 함께 지정돼야 허용하며, 그 밖에는 403이다 |
-| 선택 | `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION` | `false` | 공통 인증(#286) 화면 연결의 통합 시험 전환. 정확히 `true`일 때만 켠다. 각 화면 담당 확인·#287 연결·통합 검증 전에는 제품에서 켜지 않는다([공통 인증 안내](src/features/auth-session/README.md)) |
+| 선택 | `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION` | `false` | 공통 인증(#286) 화면 연결의 통합 시험 전환. 정확히 `true`일 때만 켠다. 각 화면 담당 확인·#287 연결·통합 검증 전에는 제품에서 켜지 않는다([공통 인증 안내](src/features/auth-session/README.md)). 팀 확인용 개발 서버는 2026-11-02 팀장 승인으로 켠다([개발 서버 안내](../deploy/dev-server/README.md)) |
 
 - 이름이 `NEXT_PUBLIC_`으로 시작하는 변수만 브라우저에 노출된다. 비밀값·토큰은 이 이름으로 두지 않는다.
 - `NEXT_PUBLIC_` 값은 `npm run dev`·`npm run build`를 시작할 때 읽힌다. 바꾸면 다시 시작한다.
@@ -107,7 +109,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `.node-version` | Node.js 버전(버전 관리 도구용) |
 | `.env.example` | 환경변수 목록 예시(포트는 여기서 못 바꿈) |
 | `.npmrc` | `engine-strict=true` — Node 버전 강제 |
-| `next.config.ts` | Next.js 설정. `agentRules: false`로 `npm run dev`가 `web/`에 `AGENTS.md`·`CLAUDE.md`를 자동으로 만들지 않게 한다. 보안 응답 헤더와 `X-Powered-By` 끄기도 여기에 둔다 |
+| `next.config.ts` | Next.js 설정. `agentRules: false`로 `npm run dev`가 `web/`에 `AGENTS.md`·`CLAUDE.md`를 자동으로 만들지 않게 한다. 보안 응답 헤더와 `X-Powered-By` 끄기, 개발 요청 로그에서 콜백 주소 빼기(「실행」)도 여기에 둔다 |
 | `tsconfig.json`, `eslint.config.mjs` | TypeScript·ESLint 설정(create-next-app 기본값) |
 | `.gitignore` | `node_modules/`, `.next/`, `next-env.d.ts` 등 생성물 제외 |
 
