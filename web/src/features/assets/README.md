@@ -28,11 +28,18 @@ Catch 상세 모달의 근거 아래, 「Catch 설명 초안」(AI 초안) 위�
 
 - `author-description-api.ts`: `GET`·`PUT /v1/catches/{catchId}/description` 호출, 응답 모양 확인, 4,000자(코드 포인트) 검사, 저장 결과 반영(`applyDescriptionSave`). `author-description-panel.tsx`는 그리기, `author-description-editor.tsx`는 상태·요청을 맡는다. `AssetsMemberPage`가 `createAuthorDescriptionApi(api.member)`를 `AssetsConnected`의 `descriptionApi`로 넘기며, 넘기지 않으면(미리보기) 영역을 그리지 않는다.
 - 열 때 현재 설명을 읽고, 읽지 못하면 빈 설명으로 추정하지 않고 다시 불러오기를 보인다. 저장은 200과 맞는 모양일 때만 “저장됨”이며, 실패하면 입력을 남기고 “저장되지 않았습니다”와 이유(로그인 만료 포함)를 보인다. 비워 두고 저장하면 설명이 지워진다.
-- 저장하지 않은 입력이 있으면 새로고침·링크 이동·로그아웃과 모달 닫기 전에 묻는다. 확인·불일치·공개 변경이 실패한 뒤의 [현재 상태 다시 불러오기]도 다시 읽는 동안 상세가 비어 편집기가 해제되므로 먼저 묻고(`assets-connected.tsx`의 `reloadDetail`), 머무르면 다시 읽지 않는다. 공통 문구는 `src/lib/save-outcome.ts`에 있고 텍스트 자료 화면(`src/features/materials`)과 함께 쓴다.
+- 저장하지 않은 입력이 있으면 새로고침·링크 이동·로그아웃과 모달 닫기 전에 묻는다. 확인·불일치·공개 변경이 실패한 뒤의 [현재 상태 다시 불러오기]도 다시 읽는 동안 상세가 비어 편집기가 해제되므로 먼저 묻고(`assets-connected.tsx`의 `reloadDetail`), 머무르면 다시 읽지 않는다. 상세를 연 채 브라우저 뒤로·앞으로 가기를 하면, Navigation API를 지원하는 브라우저에서 취소할 수 있는 이동일 때 같은 확인을 거친다(`src/lib/unsaved-traverse-guard.ts`, 텍스트 자료 화면과 같음). 보호하지 않는 경우는 아래 「한계」에 적었다. 공통 문구는 `src/lib/save-outcome.ts`에 있고 텍스트 자료 화면(`src/features/materials`)과 함께 쓴다.
 - 상태 전이는 `author-description-editor.tsx`의 `createDescriptionEditorModel`이 맡는다. 늦게 온 불러오기 응답과 로그인이 바뀐 뒤의 응답은 버리고, 저장 중에 더 쓴 입력은 저장 성공 응답이 덮지 않는다.
 - 로그인 만료 때 입력 유지는 공통 인증 모드에 따른다: 기존 모드(기본값)는 401에서 로그인 화면으로 이동해 입력이 남지 않고, 통합 시험 전환을 켜면 갱신 성공 시 "다시 눌러 주세요", 갱신 실패 시 재인증 안내와 함께 입력이 남는다([텍스트 자료 화면 README](../materials/README.md) 「한계」).
-- 시험: `node --test test/author-description.test.mjs test/author-description-editor.test.mjs test/assets-description-reload.test.mjs`(합성 응답·서버 렌더링·원본 tsx를 변환한 상태 전이, 다시 불러오기 전 미저장 확인). 2026-10-29 로컬 브라우저에서 저장·실패(합성 500)·상세 창 닫기 취소·실제 서버 401(기존 모드)을 확인했다. 이 401은 api를 다른 서명 키로 다시 띄워 Access 토큰을 무효로 만든 것이며 시간 만료는 아니다.
+- 시험: `node --test test/author-description.test.mjs test/author-description-editor.test.mjs test/assets-description-reload.test.mjs test/unsaved-traverse-guard.test.mjs`(합성 응답·서버 렌더링·원본 tsx를 변환한 상태 전이, 다시 불러오기 전 미저장 확인, 뒤로·앞으로 가기 확인 판정). 2026-10-29 로컬 브라우저에서 저장·실패(합성 500)·상세 창 닫기 취소·실제 서버 401(기존 모드)을 확인했다. 이 401은 api를 다른 서명 키로 다시 띄워 Access 토큰을 무효로 만든 것이며 시간 만료는 아니다.
 - 2026-11-02에는 Access 토큰 수명 900초를 실제로 기다린 만료로 다시 확인했다(서명 키·세션은 건드리지 않음). 기존 모드(기본값)는 PUT 401 뒤 `/login?next=…`로 이동해 입력이 사라진다(BR2.3 미충족). 통합 모드는 갱신이 성공해 "저장되지 않았습니다 / 로그인이 연장되었습니다. 다시 눌러 주세요."와 함께 입력이 남고, 다시 누르면 "저장됨"이다.
+
+### 한계
+
+- 브라우저 뒤로·앞으로 가기 보호는 부분 보호다. 다음 두 경우에는 묻지 않고 이동해 상세가 닫히고 입력이 사라진다. #461 팀장 결정(2026-11-02, [댓글](https://github.com/JminAILab/CatchU/pull/461#issuecomment-6576416474))으로 받아들였고, 이동 뒤 입력 복원은 하지 않는다. 이유는 [텍스트 자료 화면 README](../materials/README.md) 「한계」와 같다.
+  - 확인 창에서 머무른 직후 클릭·입력 없이 다시 뒤로 가기(브라우저가 취소할 수 없는 이동으로 보낸다. 한 번 클릭하거나 입력하면 다시 묻는다)
+  - Navigation API를 지원하지 않는 브라우저
+- 로그인 만료(401) 때 입력 유실은 위 로그인 만료 항목과 같고, 이 한계와 별개다.
 
 ## 실행
 

@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useUnsavedChanges } from "@/components/auth/use-unsaved-changes";
-import { useUnsavedGuard } from "@/features/profile/use-unsaved-guard";
+import { UNSAVED_MESSAGE, useUnsavedGuard } from "@/features/profile/use-unsaved-guard";
 import { accessTokenStore } from "@/lib/access-token";
 import { saveFailureReason } from "@/lib/save-outcome";
+import { useUnsavedTraverseGuard } from "@/lib/unsaved-traverse-guard";
 import { createViewStore } from "@/lib/view-store";
 import {
   applyDescriptionSave, authorDescriptionInputError, isDescriptionDirty,
@@ -98,6 +99,8 @@ export function AuthorDescriptionEditor({ catchId, api, deps }: { catchId: strin
   const dirty = view.load === "ready" && isDescriptionDirty(view.edit);
   useEffect(() => { void model.load(); return () => model.dispose(); }, [model]);
   useUnsavedGuard(dirty);
+  // 상세를 연 채 뒤로·앞으로 가기로 catchId가 바뀌면 이 편집기가 해제된다.
+  useUnsavedTraverseGuard(dirty, UNSAVED_MESSAGE);
   useUnsavedChanges(dirty);
 
   return <AuthorDescriptionPanel loadState={view.load} value={view.edit.value} status={view.edit.status} dirty={dirty}

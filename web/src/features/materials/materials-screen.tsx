@@ -6,6 +6,7 @@ import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { UNSAVED_MESSAGE, useUnsavedGuard } from "@/features/profile/use-unsaved-guard";
 import { accessTokenStore } from "@/lib/access-token";
 import { api } from "@/lib/api";
+import { useUnsavedTraverseGuard } from "@/lib/unsaved-traverse-guard";
 import { createViewStore } from "@/lib/view-store";
 import {
   applyMaterialSave, createMaterialsApi, isMaterialDirty, loadedMaterialState, materialDeleteErrorText, materialDraftErrors,
@@ -285,6 +286,7 @@ function MaterialEditor({ api: client, deps, openId, onDirtyChange, onSaved, onD
   useEffect(() => { void model.load(); return () => model.dispose(); }, [model]);
   useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
   useUnsavedGuard(dirty);
+  useUnsavedTraverseGuard(dirty, UNSAVED_MESSAGE);
   useUnsavedChanges(dirty);
 
   if (view.load === "loading") return <LoadingState>자료를 불러오고 있습니다.</LoadingState>;
