@@ -4,6 +4,7 @@ import { OnApplicationShutdown } from '@nestjs/common';
 import IORedis from 'ioredis';
 import type { AnalysisQueueConfig } from '../analysis-queue/analysis-queue.config';
 import { errorName } from '../ai-run/ai-run-spec';
+import { watchRedisErrors } from '../common/redis-connection-errors';
 import { MCP_RATE_COMMAND_TIMEOUT_MS, MCP_RATE_KEY_TTL_SECONDS, MCP_RATE_LIMIT_PER_WINDOW, MCP_RATE_WINDOW_MS } from './mcp-limits';
 import { createMcpLogger, McpLogger, writeMcpLog } from './mcp-log';
 
@@ -21,9 +22,10 @@ export class McpRateLimiter implements OnApplicationShutdown {
       return;
     }
     // 끊긴 동안에는 명령을 쌓지 않고 바로 실패시키고, 멈춘 Redis에는 1초 뒤 실패한다(BR6.3).
-    this.redis = this.watch(new IORedis(config.redisUrl, {
+    // 같은 끊김이 이어지면 첫 오류만 남긴다.
+    this.redis = watchRedisErrors(new IORedis(config.redisUrl, {
       enableOfflineQueue: false, maxRetriesPerRequest: 1, commandTimeout: MCP_RATE_COMMAND_TIMEOUT_MS,
-    }));
+    }), (error) => writeMcpLog(this.logger, { event: 'mcp_rate_limit_error', error: errorName(error) }));
   }
 
   /** 이번 호출을 세고 통과 여부를 돌려준다. 61번째부터 false다. 예외를 던지지 않는다. now는 다음 창 시험에서만 넘긴다. */
@@ -41,17 +43,5 @@ export class McpRateLimiter implements OnApplicationShutdown {
 
   onApplicationShutdown(): void {
     this.redis?.disconnect();
-  }
-
-  /** 연결 오류를 처리되지 않은 사건으로 두지 않는다. 같은 끊김이 이어지면 첫 오류만 남긴다(AiRun.watch와 같은 방식). */
-  private watch(connection: IORedis): IORedis {
-    let reported = false;
-    connection.on('ready', () => { reported = false; });
-    connection.on('error', (error: Error) => {
-      if (reported) return;
-      reported = true;
-      writeMcpLog(this.logger, { event: 'mcp_rate_limit_error', error: errorName(error) });
-    });
-    return connection;
   }
 }
