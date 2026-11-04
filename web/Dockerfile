@@ -15,6 +15,8 @@ COPY web/src ./src
 COPY web/scripts/check-image-build-env.mjs ./scripts/
 ARG NEXT_PUBLIC_API_BASE_URL
 ARG NEXT_PUBLIC_DEV_LOGIN_ENABLED=false
+# 공통 인증 화면 연결 전환(web/src/lib/auth-integration.ts). 기본 꺼짐이고, 켜는 곳은 배포 쪽 빌드 입력이 정한다.
+ARG NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=false
 # standalone 출력은 이미지 빌드에서만 켠다(next.config.ts).
 RUN node scripts/check-image-build-env.mjs && CATCHU_STANDALONE_BUILD=1 npm run build
 

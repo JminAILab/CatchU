@@ -56,6 +56,9 @@ const nextConfig: NextConfig = {
   agentRules: false,
   // 응답에서 X-Powered-By: Next.js를 뺀다(#217).
   poweredByHeader: false,
+  // Google·GitHub 콜백 주소에는 일회용 code·state가 실리므로 next dev 요청 로그에서 뺀다(#287). 다른 경로는 그대로 찍는다.
+  // Next는 찍을 주소(경로+query)에 패턴을 그대로 대조한다. 개발 서버에서만 쓰며 next start·운영 이미지에는 영향이 없다.
+  logging: { incomingRequests: { ignore: [/^\/(?:google|github)\/callback(?:\?|$)/] } },
   // 운영 이미지(web/Dockerfile)만 .next/standalone의 server.js로 실행한다(#275). 이미지 빌드가 CATCHU_STANDALONE_BUILD=1을 줄 때만
   // standalone으로 만든다. 켜 두면 `npm run start`(next start)가 지원하지 않는 구성이라는 경고를 내므로 개발·CI 빌드는 그대로 둔다.
   ...(process.env.CATCHU_STANDALONE_BUILD === "1" ? { output: "standalone" as const } : {}),

@@ -14,6 +14,7 @@ import styles from "./profile.module.css";
  * 상세 프로필(W02-P). GET /v1/me의 저장된 본인 프로필만 표시한다.
  * 조회 실패는 빈 프로필이나 이름 미저장으로 바꾸지 않고 다시 불러오기로 처리한다.
  * [GitHub 연결 상태]는 GitHub 연동 화면(/profile/github, #253)으로 간다. 연결 상태는 그 화면이 조회한다.
+ * [Claude 연결]은 연결 관리 화면(/profile/claude, 12월 intent U6 BR7.5)으로 간다.
  */
 export function ProfileDetail() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -53,6 +54,7 @@ export function ProfileDetail() {
     <div className={styles.actions}>
       <Link className={styles.primaryLink} href={routes.profileEdit}>프로필 수정</Link>
       <Link className={styles.secondaryLink} href={routes.profileGithub}>GitHub 연결 상태</Link>
+      <Link className={styles.secondaryLink} href={routes.profileClaude}>Claude 연결</Link>
     </div>
     {/* 12월 intent U2: 회원 정보 화면의 [탈퇴](BR7.1). */}
     <WithdrawalSection />

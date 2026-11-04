@@ -51,6 +51,8 @@ npm ci
 
 종료는 서버를 띄운 터미널에서 `Ctrl+C`. 포트 3000이 이미 사용 중이면 `npm run dev -- -p 3001`처럼 실행 인자로 임시로 바꾸되(Windows·macOS 공통), 팀 공통 포트는 3000이다. `.env`·`.env.local`의 `PORT`는 적용되지 않는다.
 
+`npm run dev`는 들어온 요청을 주소째 터미널에 찍는다. `/google/callback`·`/github/callback`은 query에 일회용 `code`·`state`가 실리므로 `next.config.ts`의 `logging.incomingRequests.ignore`로 뺐고, 다른 경로는 그대로 찍힌다(#287). 개발 서버에만 적용되는 설정이며 운영 접근 로그와는 별개다. 개발 서버가 `.next/dev/trace`에 남기는 내부 추적 기록에는 적용되지 않아 두 주소도 값째 들어가므로, `.next/`를 검증 증거로 공유하지 않는다.
+
 ## 검사
 
 | 명령 | 내용 | 실패 예 |
@@ -73,7 +75,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 |---|---|---|---|
 | API 호출 시 필수 | `NEXT_PUBLIC_API_BASE_URL` | `http://127.0.0.1:3001` | api 기준 주소. `/v1`은 넣지 않는다(호출 함수가 붙인다). 없거나 잘못되면 호출하지 않고 조회 실패로 돌려준다. `npm run build`로 만든 운영 빌드처럼 `NODE_ENV`가 `development`·`test`가 아니면 https 주소나 로컬 주소(`localhost`·`127.0.0.1`)의 http만 받고, 그 밖의 http 주소도 잘못된 주소로 본다(#218). 이 주소의 출처를 CSP 연결 허용에도 넣는다(「보안 응답 헤더」). IPv6 주소(`[::1]` 등)는 CSP에 적을 수 없어 형식과 관계없이 `npm run dev`·`npm run build`가 오류로 멈추므로 `127.0.0.1`이나 `localhost`를 쓴다 |
 | 선택 | `NEXT_PUBLIC_DEV_LOGIN_ENABLED` | `false` | 기본 비활성. 정확히 `true`일 때만 `/login`에 개발용 로그인을 보인다. api도 `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development` 또는 `test`가 함께 지정돼야 허용하며, 그 밖에는 403이다 |
-| 선택 | `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION` | `false` | 공통 인증(#286) 화면 연결의 통합 시험 전환. 정확히 `true`일 때만 켠다. 각 화면 담당 확인·#287 연결·통합 검증 전에는 제품에서 켜지 않는다([공통 인증 안내](src/features/auth-session/README.md)) |
+| 선택 | `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION` | `false` | 공통 인증(#286) 화면 연결의 통합 시험 전환. 정확히 `true`일 때만 켠다. 각 화면 담당 확인·#287 연결·통합 검증 전에는 제품에서 켜지 않는다([공통 인증 안내](src/features/auth-session/README.md)). 팀 확인용 개발 서버는 2026-11-02 팀장 승인으로 켠다([개발 서버 안내](../deploy/dev-server/README.md)) |
 
 - 이름이 `NEXT_PUBLIC_`으로 시작하는 변수만 브라우저에 노출된다. 비밀값·토큰은 이 이름으로 두지 않는다.
 - `NEXT_PUBLIC_` 값은 `npm run dev`·`npm run build`를 시작할 때 읽힌다. 바꾸면 다시 시작한다.
@@ -92,6 +94,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/(member)/home/` | 회원 가드 안의 로그인 후 홈. 연결 상태 안내와 다음 행동을 조립한다([기능 안내](src/features/home/README.md)) |
 | `src/app/(member)/assets/` | 회원 가드 안의 실제 내 자산 페이지. B 목록·상세와 D 저장소 모달을 조립한다([기능 안내](src/features/assets/README.md)) |
 | `src/app/(member)/profile/github/`, `(member)/github/callback/` | 회원 가드 안의 GitHub 연동 화면과 GitHub 콜백 화면([기능 안내](src/features/github-connection/README.md)) |
+| `src/app/(member)/profile/claude/` | 12월 U6: 회원 가드 안의 Claude 연결 관리·승인 화면([기능 안내](src/features/claude-connection/README.md)) |
 | `src/app/s/[token]/` | 공유 링크 수신자 목록·Catch 상세. 회원 로그인 없이 수신자 API에 연결한다([기능 안내](src/features/recipient/README.md)) |
 | `src/components/header/` | 로그인·비로그인·수신자 헤더와 프로필 메뉴 |
 | `src/components/notice-dialog/` | 채용공고·알림 안내창 |
@@ -106,7 +109,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `.node-version` | Node.js 버전(버전 관리 도구용) |
 | `.env.example` | 환경변수 목록 예시(포트는 여기서 못 바꿈) |
 | `.npmrc` | `engine-strict=true` — Node 버전 강제 |
-| `next.config.ts` | Next.js 설정. `agentRules: false`로 `npm run dev`가 `web/`에 `AGENTS.md`·`CLAUDE.md`를 자동으로 만들지 않게 한다. 보안 응답 헤더와 `X-Powered-By` 끄기도 여기에 둔다 |
+| `next.config.ts` | Next.js 설정. `agentRules: false`로 `npm run dev`가 `web/`에 `AGENTS.md`·`CLAUDE.md`를 자동으로 만들지 않게 한다. 보안 응답 헤더와 `X-Powered-By` 끄기, 개발 요청 로그에서 콜백 주소 빼기(「실행」)도 여기에 둔다 |
 | `tsconfig.json`, `eslint.config.mjs` | TypeScript·ESLint 설정(create-next-app 기본값) |
 | `.gitignore` | `node_modules/`, `.next/`, `next-env.d.ts` 등 생성물 제외 |
 
@@ -125,7 +128,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | 묶음 폴더 | 헤더 | 구성 (#55 10월 헤더 합의) |
 |---|---|---|
 | `src/app/(guest)/` | 비로그인 일반 | 왼쪽 로고(→ `/`) / 오른쪽 [Google로 시작하기](→ 로그인 진입). 내 자산·공유 링크·프로필은 없음 |
-| `src/app/(member)/` | 로그인 일반·발행자 | 왼쪽 로고(→ `/home`)·내 자산·공유 링크·채용공고 / 오른쪽 알림·프로필. 대표 구성 진입점은 10월에 없음 |
+| `src/app/(member)/` | 로그인 일반·발행자 | 왼쪽 로고(→ `/home`)·내 자산·텍스트 자료(U4)·공유 링크·채용공고 / 오른쪽 알림·프로필. 대표 구성 진입점은 10월에 없음 |
 | `src/app/s/` | 공유 링크 수신자 | 이동 없는 CatchU 브랜드만. 로그인 여부와 무관하며 로그인·프로필 버튼 없음 |
 
 - **회원 화면 폭:** 창 폭 760px부터 지원한다. `(member)/layout.tsx`의 전용 CSS는 760px 미만에서만 헤더·본문 폭을 760px로 유지하고 문서 가로 스크롤을 허용한다. 760px 이상에서는 세로 스크롤바를 뺀 가용 폭에 맞추며, 헤더 메뉴는 글자 단위로 줄바꿈하지 않는다. 회원 화면 검증 폭은 760·1024·1536px이다. 비로그인·공유 링크 수신자 레이아웃에는 이 최소 폭을 적용하지 않는다([#412 회원 화면 범위](https://github.com/JminAILab/CatchU/issues/412)).
@@ -152,13 +155,16 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/google/callback` | Google 로그인 콜백 | A | 불필요 | 확정 | api `GOOGLE_REDIRECT_URI`와 같은 주소(로컬 `http://localhost:3000/google/callback`). 통합 시험 전환을 켰을 때만 열고 끄면 404. 주소의 `code`·`state`·`error`는 해석 뒤 지운다([인증 화면](src/features/auth-screens/README.md)) |
 | `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 Catch 탭 저장소 연결 관리로 이동(확정). GitHub 미연동·재연동 필요는 연동 화면(`/profile/github`)으로 이동하되, 공통 인증 통합 시험 전환을 끈 제품 기본값에서는 비활성과 이유를 보인다([홈](src/features/home/README.md)) |
 | `/profile/setup` | 최초 프로필 입력 (W02) | A | 필요 | 제안 | 저장 성공 후 회원 정보를 다시 불러온 뒤 `/home` |
-| `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지. 수정(`/profile/edit`)·GitHub 연동(`/profile/github`)으로 진입하는 링크를 둔다 |
+| `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지. 수정(`/profile/edit`)·GitHub 연동(`/profile/github`)·Claude 연결(`/profile/claude`)로 진입하는 링크를 둔다 |
 | `/profile/edit` | 프로필 수정 (W02) | A | 필요 | 제안 | 저장 성공·취소 후 `/profile`로 복귀하고, 저장 실패 시 이 화면과 입력을 유지 |
 | `/profile/github` | GitHub 연동 (W02-G) | A | 필요 | 제안 | 성공 후 Catch 탭 저장소 연결 관리(`/assets`)로 복귀(확정). 연결 시작은 공통 인증 통합 시험 전환을 켰을 때만 하고, 끈 제품 기본값에서는 상태 조회와 `/assets` 이동만 한다. 모달 자동 열기는 #153에서 정한다([GitHub 연동](src/features/github-connection/README.md)) |
 | `/github/callback` | GitHub 연동 콜백 | A | 필요 | 제안 | api `GITHUB_OAUTH_CALLBACK_URL`의 목적지. 처리 뒤 주소의 `code`·`state`를 지운다. `next`에 싣지 않는다 |
+| `/profile/claude` | Claude 연결 관리 | U6 | 필요 | 확정 | 상태, MCP 주소 복사, 확인 뒤 전체 해제. 상세 프로필과 시작 안내에서 이어 준다([Claude 연결](src/features/claude-connection/README.md)) |
+| `/profile/claude/authorize` | Claude 연결 승인 | U6 | 필요 | 확정 | api `/authorize`가 쿼리(`client_id`·`redirect_uri`·`state`·`code_challenge`·`resource`)와 함께 보내는 주소. 로그인이 안 됐으면 로그인 화면을 거쳐 돌아온다 |
 | `/assets` | 내 자산 (Catch 탭) | B / 연결 관리 D | 필요 | 제안 | Catch 탭을 기본으로 표시. 준비 중 탭의 주소(`tab`) 반영 여부는 미정 |
 | `/assets?repositoryId=…` | 저장소 필터 | B | 필요 | 제안 | PR #156의 B 제안. 값은 저장소 식별자 |
 | `/assets?catchId=…` | Catch 상세 모달 | B | 필요 | 제안 | PR #156 제안: 닫으면 `catchId`만 제거하고 필터 유지. 새로고침·뒤로 가기·재로그인 후 상태 유지는 확정 |
+| `/materials` | 텍스트 자료 목록·편집 | U4 | 필요 | 확정 | U4 담당 결정 D3(2026-10-29, [U4 코드 요약](../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/code-generation/code-summary.md) 「구현 결정과 설계 후속 변경 기록」). 목록과 편집을 한 화면에 둔다([텍스트 자료](src/features/materials/README.md)) |
 | `/links` | 링크 목록·발급·복사·중단 | C | 필요 | 제안 | 발급은 이 페이지의 폼·모달로 처리 |
 | `/s/[token]` | 수신자 링크 | C | 불필요 | 제안 | 수신자 전용 헤더 |
 | `/s/[token]/catches/[catchId]` | 수신자 Catch 상세 | C | 불필요 | 제안 | 직접 진입해도 접근 판정·비밀번호 확인 후 표시 |

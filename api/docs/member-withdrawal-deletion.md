@@ -24,8 +24,12 @@
 | `publication_index` | 발행본(12월 intent U3, 계약 C-06·C-08. 마이그레이션 `1793257382741-CreatePublishedIndexTables`) |
 | `published_chunk` | 발행 항목(발행본을 거쳐, 복합 외래 키 `(publication_id, published_item_id)`. 12월 intent U3, 같은 마이그레이션) |
 | `base_summary` | 발행본(12월 intent U5, 계약 C-06·C-02. 마이그레이션 `1793348947970-CreateBaseSummaryTable`) |
+| `mcp_connection`, `mcp_authorization_code` | 회원, 클라이언트 등록(12월 intent U6, 계약 C-06·C-15. 마이그레이션 `1793588083309-CreateMcpTables`) |
+| `mcp_access_token` | 회원, 연결(복합 외래 키 `(member_id, mcp_client_id)`. 12월 intent U6, 같은 마이그레이션) |
 
 `text_material`·`publication`·`published_item`은 12월 범위 U4가 만든 표다(계약 C-06·C-07·C-13). 발행 사본(`published_item`)은 원본 Catch·자료와 외래 키가 없어, 원본을 지워도 사본은 발행본 수명을 따른다.
+
+클라이언트 등록(`mcp_client`)은 회원을 가리키지 않아 회원 행을 지워도 남고, 승인에 쓰인 등록은 정리 대상도 아니다([Claude 연결](claude-mcp.md)의 받아들인 한계).
 
 공유 링크를 지우면 그 링크를 가리키는 중복 요청 방지 기록도 함께 지워진다. 전에는 이 기록이 링크 삭제를 막았다(#147). 어느 쪽이든 없는 링크를 가리키는 기록은 생기지 않는다.
 
@@ -50,6 +54,6 @@
 
 [`test/db/member-cascade-delete.test.cjs`](../test/db/member-cascade-delete.test.cjs)가 실제 테스트 DB에서 확인한다.
 
-- 지금 있는 회원 자료를 모두 가진 회원 둘 중 하나를 지우면, 그 회원의 행은 위 표 모두에서 0이 되고 다른 회원의 행과 선정 표는 그대로다.
+- 지금 있는 회원 자료를 모두 가진 회원 둘 중 하나를 지우면, 그 회원의 행은 위 표 모두에서 0이 되고 다른 회원의 행과 선정 표·클라이언트 등록은 그대로다.
 - 위 늦은 결과·진행 알림 경우. 수신·반영 서비스와 DB는 실제로 쓰고, 큐·worker는 돌리지 않는다.
 - DB의 외래 키 중 회원을 참조하는 것은 모두 연쇄 삭제이고, 연쇄 삭제가 아닌 것은 위 넷뿐이다. 새 표의 외래 키가 연쇄 삭제가 아니면 이 시험이 실패한다. 외래 키를 아예 빠뜨린 표는 잡지 못하므로 새 표의 부모 관계는 설계에서 확인한다.

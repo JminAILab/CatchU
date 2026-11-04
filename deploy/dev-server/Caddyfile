@@ -25,6 +25,10 @@
 	# 앞단 HSTS(2026-10-07 결정: 5분부터 단계적으로). 앱이 붙인 같은 헤더를 응답 직전에 이 값 하나로 바꾼다.
 	header >Strict-Transport-Security "max-age=300"
 
+	# Claude MCP 연결(#440)의 OAuth 주소. MCP 공식 SDK의 인증 라우터가 api 앱 루트에 만드므로 /v1 밖이지만 api로 보낸다.
+	# 목록은 U6 기능 설계가 정했다. MCP 주소(/v1/mcp)는 아래 /v1/* 규칙으로 가고, 승인 화면 /profile/claude/authorize는 web 화면이다.
+	@mcp_oauth path /authorize /token /register /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/* /.well-known/oauth-authorization-server /.well-known/oauth-authorization-server/*
+
 	# 위에서부터 차례로 맞춘다. 접근 로그는 쓰지 않는다(공유 링크 토큰이 든 주소가 남지 않게, Caddy 기본값).
 	route {
 		# worker 전용 내부 경로(/v1/internal/…)는 밖에서 쓰지 못하게 막는다. worker는 서버 안에서 api를 직접 부른다.
@@ -32,6 +36,7 @@
 		respond /v1/internal/* 404
 		# web과 api를 같은 출처로 묶는다(#250). api·web은 compose.single.yaml이 127.0.0.1에만 연 포트다.
 		reverse_proxy /v1/* 127.0.0.1:3001
+		reverse_proxy @mcp_oauth 127.0.0.1:3001
 		reverse_proxy 127.0.0.1:3000
 	}
 }
