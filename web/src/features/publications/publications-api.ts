@@ -5,7 +5,8 @@ import { U2_ERROR_MESSAGES } from "../../lib/u2-error-messages.ts";
 import { catchErrorText } from "../assets/catch-api.ts";
 
 /** 발행 입력 상한(BR4.1·BR4.5). 제목은 앞뒤 공백을 지운 뒤 코드 포인트로 세고, 비밀번호는 다듬지 않는다(10월 링크 비밀번호 규칙). */
-export const PUBLISH_LIMITS = Object.freeze({ title: 50, password: Object.freeze({ min: 8, max: 64 }), items: 20 });
+/** 화면 안내용 상한. 서버 검증이 기준이다. `totalText`는 api `SNAPSHOT_TEXT_TOTAL_MAX`(OQ-U4-4 임시값)와 같은 값이며 화면에서 미리 세지 않는다. */
+export const PUBLISH_LIMITS = Object.freeze({ title: 50, password: Object.freeze({ min: 8, max: 64 }), items: 20, totalText: 60_000 });
 /** 링크 유효 기간(BR5.4). 발행 시각부터이며 연장이 없다. */
 export const LINK_VALID_DAYS = 90;
 
@@ -174,14 +175,24 @@ const FIELD_TEXT: Record<string, string> = {
   items: `항목은 1~${PUBLISH_LIMITS.items}개이며 같은 항목을 두 번 고를 수 없습니다.`,
 };
 
-/** 400 `details`의 칸별 안내. 서버의 이유 코드는 그대로 보이지 않고 칸 이름으로 안내한다. 칸을 모르면 전체 글 상한을 함께 적는다. */
+/**
+ * 전체 글 상한 초과 안내. 서버는 고른 자료의 글(작업 사실·기여·근거 사실·작성자 설명·본문) 합이 상한을 넘으면
+ * `{ field: 'items', reason: 'maxTotalLength' }`로 거부한다(api `PublishService`). 항목 개수·중복과 다른 원인이므로 따로 안내한다(PR #468 Codex P2).
+ */
+export const TOTAL_TEXT_LIMIT_TEXT = `고른 자료의 전체 글이 ${String(PUBLISH_LIMITS.totalText).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}자를 넘었습니다. 자료를 빼거나, 수정할 수 있는 Catch 설명·텍스트 자료 원문을 줄인 뒤 다시 발행해 주세요.`;
+
+/**
+ * 400 `details`의 칸별 안내. 서버의 이유 코드는 그대로 보이지 않고 칸 이름으로 안내한다.
+ * `items`의 `maxTotalLength`만 전체 글 상한 안내로 구분하고, 그 밖의 `items` 이유는 개수·중복 안내다. 칸을 모르면 전체 글 상한을 함께 적는다.
+ */
 export function validationLines(violations: { field: string; reason: string }[]): string[] {
   if (violations.length === 0) return ["입력 길이나 형식을 확인해 주세요."];
   const seen = new Set<string>();
   const lines: string[] = [];
-  for (const { field } of violations) {
+  for (const { field, reason } of violations) {
     const key = field.split(/[.[]/)[0];
-    const line = FIELD_TEXT[key] ?? `입력(${key})을 확인해 주세요. 발행본 전체 글이 상한을 넘었을 수도 있습니다.`;
+    const line = key === "items" && reason === "maxTotalLength" ? TOTAL_TEXT_LIMIT_TEXT
+      : FIELD_TEXT[key] ?? `입력(${key})을 확인해 주세요. 발행본 전체 글이 상한을 넘었을 수도 있습니다.`;
     if (!seen.has(line)) { seen.add(line); lines.push(line); }
   }
   return lines;

@@ -47,7 +47,7 @@ GitHub 주소 판정 `isGithubSourceUrl`과 본문 나누기 `splitGithubLinks`�
 | --- | --- | --- |
 | 409 `CONFIRMATION_REQUIRED` / `SOURCE_RESTRICTED` | 10월 Catch 문구("작업 사실과 나의 기여를 먼저 확인해 주세요." / "원본 저장소가 보호되어 지금은 공개할 수 없습니다.") | `details.catchIds`의 Catch를 고르기·고른 목록에서 표시하고 편집 단계로 돌아간다. 다른 Catch는 그대로 |
 | 404 `RESOURCE_UNAVAILABLE` | "고른 자료 중 지금 발행할 수 없는 것이 있습니다. 목록을 다시 불러온 뒤 다시 골라 주세요." | 편집 단계로 돌아간다. [목록 다시 불러오기]는 고르기 패널에 있다 |
-| 400 `VALIDATION_FAILED` | `details.violations`의 칸(`title`·`password`·`items`)별 안내. 모르는 칸은 전체 글 상한을 함께 적는다 | 편집 단계로 돌아간다 |
+| 400 `VALIDATION_FAILED` | `details.violations`의 칸(`title`·`password`·`items`)별 안내. `items`의 `maxTotalLength`(고른 자료의 전체 글 60,000자 초과)는 개수·중복 안내와 구분해 자료를 빼거나 수정할 수 있는 Catch 설명·텍스트 자료 원문을 줄이라고 안내한다. 모르는 칸은 전체 글 상한을 함께 적는다 | 편집 단계로 돌아간다 |
 | 403 `AI_CONSENT_REQUIRED` | 동의 창. 창을 거친 뒤에도 403이면 "외부 AI 전송에 먼저 동의해 주세요." | 확인 단계에 남는다 |
 | 429 `DAILY_LIMIT_REACHED` | "오늘 한도에 도달했습니다" | 확인 단계에 남는다. 남은 횟수는 보이지 않는다 |
 | 429 `RATE_LIMITED` | "발행 요청이 잦아 잠시 발행할 수 없습니다. N초 뒤에 [발행]을 다시 누를 수 있습니다."(`Retry-After`가 있을 때) / "… 잠시 뒤 [발행]을 다시 눌러 주세요."(없을 때) | 남은 초 동안 [발행]을 막고 1초마다 남은 초를 보인다. 자동으로 다시 보내지 않는다. `Retry-After`가 없으면 시간을 추정하지 않고 막지 않는다 |

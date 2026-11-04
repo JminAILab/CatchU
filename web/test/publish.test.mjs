@@ -25,8 +25,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 import { U2_ERROR_MESSAGES } from "../src/lib/u2-error-messages.ts";
 import {
-  CATCH_REJECTION_TEXT, PUBLISH_FAILED_TEXT, SOURCE_UNAVAILABLE_TEXT, createPublicationsApi, publishDraftErrors, publishFailureLines,
-  publishOutcome, rateLimitedText,
+  CATCH_REJECTION_TEXT, PUBLISH_FAILED_TEXT, SOURCE_UNAVAILABLE_TEXT, TOTAL_TEXT_LIMIT_TEXT, createPublicationsApi, publishDraftErrors,
+  publishFailureLines, publishOutcome, rateLimitedText,
 } from "../src/features/publications/publications-api.ts";
 import { INELIGIBLE_REASONS, catchSourceOf } from "../src/features/publications/publish-sources.ts";
 import { EXPIRY_NOTICE, PRIVATE_CATCH_NOTICE } from "../src/features/publications/publication-format.ts";
@@ -181,6 +181,25 @@ test("발행 실패 구분: 작성자 실패 안내 표의 각 응답을 구분�
   assert.match(publishFailureLines({ kind: "consent-required" })[1], /동의/);
 });
 
+test("400 items·maxTotalLength는 전체 글 60,000자 상한과 자료 빼기·원문 줄이기 안내이고, 항목 개수·중복 안내와 구분된다(Codex P2)", () => {
+  const itemsCount = "항목은 1~20개이며 같은 항목을 두 번 고를 수 없습니다.";
+  assert.match(TOTAL_TEXT_LIMIT_TEXT, /60,000자/);
+  assert.match(TOTAL_TEXT_LIMIT_TEXT, /자료를 빼거나/);
+  assert.match(TOTAL_TEXT_LIMIT_TEXT, /원문을 줄인/);
+  // 전체 글 초과만: 개수·중복 안내를 보이지 않는다.
+  assert.deepEqual(publishFailureLines({ kind: "validation", violations: [{ field: "items", reason: "maxTotalLength" }] }),
+    [PUBLISH_FAILED_TEXT, TOTAL_TEXT_LIMIT_TEXT]);
+  // 개수·중복 이유는 그대로 개수·중복 안내다.
+  for (const reason of ["arrayMinSize", "arrayMaxSize", "unique", "x"]) {
+    assert.deepEqual(publishFailureLines({ kind: "validation", violations: [{ field: "items", reason }] }), [PUBLISH_FAILED_TEXT, itemsCount], reason);
+  }
+  assert.deepEqual(publishFailureLines({ kind: "validation", violations: [{ field: "items[3].kind", reason: "isEnum" }] }), [PUBLISH_FAILED_TEXT, itemsCount]);
+  // 둘이 함께 오면 두 안내를 각각 한 번씩, 온 순서대로 보인다.
+  assert.deepEqual(publishFailureLines({ kind: "validation", violations: [
+    { field: "items", reason: "arrayMaxSize" }, { field: "items", reason: "maxTotalLength" }, { field: "items", reason: "maxTotalLength" },
+  ] }), [PUBLISH_FAILED_TEXT, itemsCount, TOTAL_TEXT_LIMIT_TEXT]);
+});
+
 test("입력 검사: 제목 1~50자(앞뒤 공백 제외)·비밀번호 8~64자(다듬지 않음)·항목 1~20개를 넘기면 보내지 않는다", () => {
   assert.deepEqual(publishDraftErrors({ title: ` ${"가".repeat(48)}😀😀 `, usePassword: true, password: " 1234567", itemCount: 20 }), []);
   assert.deepEqual(publishDraftErrors({ title: "제목", usePassword: false, password: "", itemCount: 1 }), []);
@@ -267,6 +286,7 @@ test("모델: 실패 응답마다 고른 항목·순서·제목·비밀번호 �
     [apiError(409, "SOURCE_RESTRICTED", { details: { catchIds: [C1] } }), "source-restricted", "edit"],
     [apiError(404, "RESOURCE_UNAVAILABLE"), "source-unavailable", "edit"],
     [apiError(400, "VALIDATION_FAILED", { details: { violations: [{ field: "title", reason: "maxLength" }] } }), "validation", "edit"],
+    [apiError(400, "VALIDATION_FAILED", { details: { violations: [{ field: "items", reason: "maxTotalLength" }] } }), "validation", "edit"],
     [apiError(403, "AI_CONSENT_REQUIRED"), "consent-required", "confirm"],
     [apiError(429, "DAILY_LIMIT_REACHED"), "daily-limit", "confirm"],
     [apiError(429, "RATE_LIMITED"), "rate-limited", "confirm"],
@@ -295,6 +315,12 @@ test("모델: 실패 응답마다 고른 항목·순서·제목·비밀번호 �
     const lines = publishStatusLines(after.status);
     assert.equal(lines.tone, "alert");
     assert.equal(lines.lines[0], PUBLISH_FAILED_TEXT);
+    if (kind === "validation") {
+      // 전체 글 초과는 전체 글 안내만, 제목 초과는 제목 안내만 보인다. 둘 다 선택·순서·입력은 위에서 확인한 대로 그대로다.
+      const totalLength = response.details.violations[0].reason === "maxTotalLength";
+      assert.equal(lines.lines.includes(TOTAL_TEXT_LIMIT_TEXT), totalLength, kind);
+      assert.equal(lines.lines.some((line) => line.startsWith("항목은 1~20개")), false, kind);
+    }
   }
   // 409 표시는 다음 발행 요청을 보낼 때 비우고, 다시 확인 단계로 가도 입력은 그대로다.
   const { model } = await readyModel({ publish: [apiError(409, "CONFIRMATION_REQUIRED", { details: { catchIds: [C2] } }), success(published())] });
