@@ -4,10 +4,12 @@
 // 논리 구성 요소 「의존 방향 (R-05)」, NFR1.5·NFR1.6, team.md Testing Posture). 세부 시험 코드는 구현 뒤 쓴다.
 //
 // 공급자 선언 (R-01)
-//   - 기대: 모듈 안에 grant 키(readLinkGrantKey)·web 주소 설정(readShareLinksConfig)·unlock 정책·제어·발행 빈도 제한기·시계(PUBLICATIONS_CLOCK)·
+//   - 기대: 모듈 안에 grant 키(readLinkGrantKey)·web 주소 설정(readShareLinksConfig)·발행 빈도 제한기·시계(PUBLICATIONS_CLOCK)·
 //           C-10 DB 구현이 있고, C-10 DB 구현은 내보낸 토큰 PUBLICATION_ACCESS로 다른 모듈(U5)이 주입받는다. 발행 빈도 제한기는 10월 발급
-//           제한기와 다른 인스턴스다.
-//   - 실패 조건: 토큰이 내보내지지 않음, 가짜 PublicationAccess가 앱에 등록됨.
+//           제한기와 다른 인스턴스다. unlock 정책·제어(UNLOCK_POLICY·UNLOCK_CONTROLS)는 제출 3이 받은 사람 unlock을 옮길 때 넣는다:
+//           지금 선언하면 ShareLinksModule과 인스턴스가 둘이 되어 app.get(UNLOCK_CONTROLS, { strict: false })로 제한기를 얻는 10월
+//           unlock 시험이 실제 unlock 경로와 다른 제한기를 본다(PR #468 CI).
+//   - 실패 조건: 토큰이 내보내지지 않음, 가짜 PublicationAccess가 앱에 등록됨, UNLOCK_CONTROLS가 이 모듈에 선언됨.
 // 기동 검사 (NFR1.5·NFR1.6, #218·#242)
 //   - 기대: 운영 설정(NODE_ENV가 development·test가 아님)에서 LINK_GRANT_SECRET 없음·64자 hex 아님·AUTH_JWT_SECRET과 같음이면 기동 실패,
 //           SHARE_LINK_WEB_BASE_URL이 없거나 http면 기동 실패. test에서는 둘 다 없어도 기동한다. 오류 메시지에 키 값이 없다.
@@ -40,7 +42,7 @@ const { RequestRateLimiter } = require('../../dist/share-links/request-rate-limi
 const { SHARE_LINK_ISSUE_LIMITER } = require('../../dist/share-links/issue-rate-limit');
 const { SHARE_LINKS_CONFIG } = require('../../dist/share-links/share-links.config');
 const { ShareLinksModule } = require('../../dist/share-links/share-links.module');
-const { UNLOCK_CONTROLS, UNLOCK_POLICY, PRODUCT_UNLOCK_POLICY } = require('../../dist/share-links/unlock-policy');
+const { UNLOCK_CONTROLS, UNLOCK_POLICY } = require('../../dist/share-links/unlock-policy');
 const { DbPublicationAccess } = require('../../dist/publications/db-publication-access');
 const {
   PUBLICATION_ACCESS, PUBLICATIONS_CLOCK, PUBLISH_RATE_LIMITER, PublicationsModule,
@@ -106,7 +108,7 @@ function registeredRoutes(app) {
     Object.keys(layer.route.methods).filter((method) => layer.route.methods[method]).map((method) => `${method.toUpperCase()} ${layer.route.path}`));
 }
 
-test('PublicationsModule이 자기 공급자(grant 키·web 주소·unlock·발행 빈도 제한기·시계·C-10 DB 구현)를 선언하고 PUBLICATION_ACCESS를 내보낸다', async (t) => {
+test('PublicationsModule이 자기 공급자(grant 키·web 주소·발행 빈도 제한기·시계·C-10 DB 구현)를 선언하고 PUBLICATION_ACCESS를 내보내며, unlock 제어는 선언하지 않는다', async (t) => {
   const { app, consumer } = await bootApp(t);
   const scope = app.select(PublicationsModule);
   const access = scope.get(PUBLICATION_ACCESS);
@@ -115,8 +117,11 @@ test('PublicationsModule이 자기 공급자(grant 키·web 주소·unlock·발�
   assert.deepEqual(['resolveForRecipient', 'resolveForOwner', 'readSnapshot'].every((name) => typeof access[name] === 'function'), true);
   assert.ok(Buffer.isBuffer(scope.get(LINK_GRANT_KEY)) && scope.get(LINK_GRANT_KEY).length === 32);
   assert.equal(scope.get(SHARE_LINKS_CONFIG).webBaseUrl, 'https://catchu.example');
-  assert.equal(scope.get(UNLOCK_POLICY), PRODUCT_UNLOCK_POLICY);
-  assert.deepEqual(Object.keys(scope.get(UNLOCK_CONTROLS)).sort(), ['addresses', 'hashes', 'links', 'rates']);
+  // unlock 제어는 ShareLinksModule 하나에만 있어야 한다. 둘이면 10월 unlock 시험의 비엄격 조회가 뒤에 등록된 이 모듈의 인스턴스를 받아
+  // 실제 unlock 경로(LinkAccessService)와 다른 제한기를 본다.
+  for (const token of [UNLOCK_POLICY, UNLOCK_CONTROLS]) assert.throws(() => scope.get(token, { strict: true }), /Nest could not find/);
+  assert.equal(app.get(UNLOCK_CONTROLS, { strict: false }), app.select(ShareLinksModule).get(UNLOCK_CONTROLS),
+    '앱 전체에서 비엄격으로 찾은 unlock 제어가 ShareLinksModule의 것이다');
   const limiter = scope.get(PUBLISH_RATE_LIMITER);
   assert.ok(limiter instanceof RequestRateLimiter);
   assert.notEqual(limiter, app.select(ShareLinksModule).get(SHARE_LINK_ISSUE_LIMITER), '10월 발급 제한기와 다른 인스턴스');

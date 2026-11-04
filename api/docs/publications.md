@@ -99,10 +99,11 @@ access.remove(publicationId);                                   // 삭제 상황
 | --- | --- | --- | --- |
 | grant 키 | `LINK_GRANT_KEY` | `readLinkGrantKey()` | 운영(`NODE_ENV`가 development·test가 아님)에서 `LINK_GRANT_SECRET`이 없거나 64자 hex가 아니거나 `AUTH_JWT_SECRET`과 같으면 기동 실패(#242) |
 | web 주소 설정 | `SHARE_LINKS_CONFIG` | `readShareLinksConfig()` | 운영에서 `SHARE_LINK_WEB_BASE_URL`이 없거나 https가 아니면 기동 실패(#218). 발행 응답 `url`의 web 주소 |
-| unlock 정책·제어 | `UNLOCK_POLICY`·`UNLOCK_CONTROLS` | `PRODUCT_UNLOCK_POLICY`·`createUnlockControls` | 없음. 제출 3의 받은 사람 unlock이 쓸 자리(지금은 선언만) |
 | 발행 빈도 제한기 | `PUBLISH_RATE_LIMITER` | `new RequestRateLimiter(PUBLISH_RATE_LIMIT)` | 없음. 10월 발급 제한기와 다른 인스턴스, 프로세스 메모리(api 하나 전제, NFR4.13) |
 | 시계 | `PUBLICATIONS_CLOCK` | `() => new Date()` | 없음. 시험이 발행·관리·C-10의 시계를 바꾼다 |
 | C-10 DB 구현 | `PUBLICATION_ACCESS`(export) | `DbPublicationAccess` | 없음 |
+
+unlock 정책·제어(`UNLOCK_POLICY`·`UNLOCK_CONTROLS`)는 제출 3이 받은 사람 unlock을 이 모듈로 옮길 때 함께 넣는다. 지금 선언하면 `ShareLinksModule`의 같은 토큰과 인스턴스가 둘이 되어, `app.get(UNLOCK_CONTROLS, { strict: false })`로 제한기를 얻는 10월 unlock 시험(`test/db/public-links-unlock*.test.cjs`)이 실제 unlock 경로와 다른 제한기를 본다(PR #468 CI 실패). `LINK_GRANT_KEY`·`SHARE_LINKS_CONFIG`도 두 모듈에 있지만 둘 다 같은 환경변수에서 같은 값을 만들어 어느 쪽을 받아도 결과가 같다.
 
 imports: `OwnerProfileReaderModule`(소유 회원 상태), U2 `AiRunModule`·`DailyRunLimitModule`·`AiConsentModule`·`FileStorageModule`, U3 `PublishedIndexModule`(`PUBLISHED_INDEX_WRITER`). 환경변수 이름은 10월 그대로라 배포 설정을 바꾸지 않는다.
 
