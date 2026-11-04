@@ -13,11 +13,13 @@ test("시작 안내는 고정 여섯 단계를 정한 순서로 두고, 단계�
   assert.deepEqual(MEMBER_START_STEPS.map((step) => step.title), [
     "Google 로그인 완료", "GitHub 연결·분석 동의", "저장소 등록·분석", "Catch 설명 쓰기", "자료 올리기", "발행·본인 Claude 연결",
   ]);
-  const memberRoutes = new Set([routes.profile, routes.assets, routes.links, routes.profileClaude]);
+  const memberRoutes = new Set([routes.profile, routes.assets, routes.materials, routes.links, routes.profileClaude]);
   for (const step of MEMBER_START_STEPS) assert.ok(memberRoutes.has(step.link.href), `${step.id} → ${step.link.href}`);
   assert.equal(new Set(MEMBER_START_STEPS.map((step) => step.id)).size, 6);
   // U6: 발행·본인 Claude 연결 단계는 Claude 연결 화면으로 잇는다(U6 기능 설계 BR7.5, 시나리오 S21).
   assert.equal(MEMBER_START_STEPS.find((step) => step.id === "publish-claude").link.href, routes.profileClaude);
+  // U4: 자료 올리기 단계는 텍스트 자료 화면으로 잇는다(#416 2026-11-03 팀장 요청). 내 자산으로 보내지 않는다.
+  assert.equal(MEMBER_START_STEPS.find((step) => step.id === "materials").link.href, routes.materials);
 });
 
 test("화면에는 제목과 여섯 링크가 순서대로 그려지고, 완료 표시·닫기 버튼은 없다(상태를 저장하지 않음)", () => {

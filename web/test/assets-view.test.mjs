@@ -28,7 +28,7 @@ hooks.deregister();
 function detailMarkup(item) {
   const html = renderToStaticMarkup(createElement(AssetsView, {
     dataMode: "api", items: [item], detailItem: item, selectedId: item.catchId,
-    repositories: [], repositoryId: "", tab: "catch", listState: "ready", detailState: "ready",
+    repositories: [], repositoryId: "", listState: "ready", detailState: "ready",
     repositoryManagement: null,
   }));
   return html.match(/<dialog\b[\s\S]*?<\/dialog>/)?.[0] ?? assert.fail("Catch 상세가 렌더링되어야 한다");
@@ -68,7 +68,7 @@ for (const [name, content] of [["null", null], ["빈 문자열", ""], ["공백",
 // #454 완료 기준: 공개 상태 걸러 보기, 저장소와 함께 쓰기, 맞는 Catch가 없을 때 안내.
 function listMarkup({ repositoryId = "", visibility = "", items = previewCatches, hasMore = false } = {}) {
   return renderToStaticMarkup(createElement(AssetsView, {
-    items, repositories: previewRepositories, repositoryId, visibility, hasMore, tab: "catch",
+    items, repositories: previewRepositories, repositoryId, visibility, hasMore,
     listState: "ready", detailState: "ready", selectedId: null, repositoryManagement: null,
   }));
 }

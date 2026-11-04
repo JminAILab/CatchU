@@ -18,6 +18,8 @@
 | 2. 파일 저장소 설정은 `main` 전 팀장이 넣음 | 코드는 BR8.4 그대로. S11은 시험 전용 임시 폴더(로컬 드라이버)로 성공을, `StorageUnavailable` 가짜로 실패(500·DB 유지)를 봄 |
 | 3. '링크 열기' 검증 범위 | 세 화면의 버튼 주소·새 탭 속성은 web 시험으로 확인. 받은 사람 판정의 브라우저 확인은 제출 3(Step 23) |
 | 4. 중지·만료 때 [링크 열기] | `state === 'ACTIVE'`일 때만 표시, [URL 복사]는 유지(`publication-link-actions.tsx`) |
+| 5. (11/3 추가 요청) 내 자산의 포트폴리오·자기소개서·이력서 탭 지우기 | 탭 줄 전체를 지웠다(Catch만 남으므로). `AssetsView`의 `tab`·`onTabChange`, `assets-connected.tsx`·`assets-preview.tsx`의 `tab` 쿼리 처리, 탭 CSS를 없앴고 예전 `tab` 쿼리는 무시한다. 목록 화면 안내 「자산 종류」 줄과 README·web README를 맞췄다 |
+| 6. (11/3 추가 요청) 회원 홈 시작 안내 "자료 올리기" 링크 | `member-start-steps.ts`의 `materials` 단계를 `routes.materials`(텍스트 자료)로 바꾸고 주석·시작 안내 README·시험을 맞췄다 |
 
 계획 반영: 미결 표의 OQ-U4-NFR-1·2를 "결정됨(Q1 B)"으로, Step 16·17에 [링크 열기]·Q1 B·검증 범위를 적었다. Guard Policy relaxed라 재승인 정지는 없었고 brief가 현재 내용으로 다시 기록됐다.
 
