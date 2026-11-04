@@ -17,6 +17,7 @@ type MemberHeaderProps = {
 const navItems = [
   { href: routes.assets, label: "내 자산" },
   { href: routes.materials, label: "텍스트 자료" },
+  { href: routes.publications, label: "발행본" },
   { href: routes.links, label: "공유 링크" },
 ] as const;
 
