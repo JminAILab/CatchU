@@ -202,7 +202,7 @@ export class ExamplePublicController {
 
 ## 공통 오류 처리 — API 명세 v1
 
-정본은 [API 명세 v1 공통 오류·요청 안전성](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#공통-오류요청-안전성)과 [common.yaml의 Error](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml)다. 오류 본문은 `{code, message, details?}`이며 화면은 문구 대신 `code`로 분기한다. `details`는 `violations: [{field, reason}]`와 `existingRequestId`만 허용한다. 입력값·SQL·stack·토큰을 응답에 넣지 않는다.
+정본은 [API 명세 v1 공통 오류·요청 안전성](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#공통-오류요청-안전성)과 [common.yaml의 Error](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml)다. 오류 본문은 `{code, message, details?}`이며 화면은 문구 대신 `code`로 분기한다. `details`는 `violations: [{field, reason}]`와 `existingRequestId`만 허용한다. 예외로 12월 발행 거부 409(`CONFIRMATION_REQUIRED`·`SOURCE_RESTRICTED`)는 해당 Catch의 UUID 목록 `catchIds`를 더 싣는다. 한 Unit 안 API 세부라 [U4 기능 설계](../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/functional-design/functional-spec.md)가 정본이다(계약 요약 「Contract ownership rules」의 Unit 안 세부, #468에서 팀장 확인). 입력값·SQL·stack·토큰을 응답에 넣지 않는다.
 
 | 기본 구분 | HTTP | 코드 |
 |---|---|---|
