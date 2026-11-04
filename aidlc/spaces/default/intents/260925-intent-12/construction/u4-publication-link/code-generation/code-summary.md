@@ -125,6 +125,38 @@
 4. 상세 응답에 `stoppedAt`이 없어 다시 열면 중지 시각이 안 보임. 필요하면 더하는 변경으로 요청.
 5. 단계 일지(`construction/code-generation/memory.md`)는 이 체크아웃이 U4 범위로 제한돼 쓰기가 거부됐다. 관찰은 이 문서에 적는다.
 
+### 제출 3 준비안 (2026-11-04, #468 병합 대기)
+
+계획 「선행 조건과 제출 나누기」대로 #468이 통합 브랜치에 합쳐지기 전에는 제출 3 구현을 시작하지 않는다. 아래는 그 전에 정리한 상태·계획 변경·미결이다. 승인된 계획 본문은 고치지 않고, Step 20·22·23에 이 절과 같은 내용의 메모만 더했다.
+
+**2026-11-04 상태**
+
+- #468 `5e8a173`(제출 2 `717f49b` + CI 수정 `9bb64ec` + #416 11/3 추가 요청 반영): CI 통과, Codex 미해결 스레드 0. leechaeah가 B 범위를 확인하고 수정 요청 없음(11/4 리뷰). D5·D12·D13의 팀장 답은 없다. Draft 유지.
+- #416 후속: U6의 Catch 설명 상한 확인은 끝났고 U4 조치가 없다(yeongyeon1802, 11/4). U10(#452)이 C-10·C-11 제공 판본을 물어 11/4에 답했다(C-10은 `5e8a173`으로 사전 연결 가능, C-11은 제출 3). OQ-U4-NFR-5·6의 팀장 답은 아직 없다.
+
+**계획과 달라진 점(제출 3에 반영)**
+
+1. unlock 공급자 전환: 계획 Step 11은 `UNLOCK_POLICY`·`UNLOCK_CONTROLS`를 제출 2에서 등록했으나 `9bb64ec`에서 뺐다(`ShareLinksModule`과 중복 등록으로 10월 unlock 시험이 다른 제한기 인스턴스를 보던 CI 실패). 제출 3에서는 `PublicationsModule`의 두 토큰 등록(Step 20), `AppModule`의 `ShareLinksModule` 등록 제거(Step 21), 관련 시험 변경(Step 23: `publications-module.test.cjs`의 부재 단언을 "이 모듈에만 선언"으로, 10월 unlock·client-address 시험을 발행본 경로로 이전)을 **같은 커밋**으로 반영한다. 두 모듈이 함께 등록된 판본을 만들지 않는 것이 조건이며, `api/docs/publications.md`의 unlock 문단은 Step 24에서 맞춘다.
+2. C-11 제공 약속(#416 11/4 댓글): `web/src/features/recipient/recipient-screen.tsx`에 0~4번 자리와 `token/getGrant/onAccessLost/isLoggedIn/showEvidence`, `recipient-grants.ts`에 grant 보관. props 형은 OQ-U4-7대로 화면 안 형. U5·U10 컴포넌트는 제공된 뒤 자리에 연결하고, 제출 3 PR을 열 때 #416에 알린다(leechaeah 요청).
+3. Step 21 import 사전 확인(`5e8a173`): api에서 `share-links/`를 가져오는 곳은 `app.module.ts`, `member-analysis/member-analysis.entity.ts`(`share-link.entity` 관계, 남김), `recipient/*`(지움), `publications/*`(도구만)이고, `recipient/`는 `app.module.ts`만 가져온다. 계획과 다른 의존은 없다. api 시험 37개 파일이 share-links·recipient를 참조하며, 10월 발급·공개 링크 시험 밖의 파일(`client-address`·`hash-gate`·`link-grant`·`link-limiter`·`link-password`·`link-token`·`public-links-auth-boundary`, `db/lock-wait-limit-role`·`member-analysis`·`result-application`, `integration/*`, `publications/*`)은 Step 23에서 참조 내용을 보고 유지·응답 모양 수정·제거를 정한다(보안 설계 「web 시험 유지·제거」 표).
+4. web 제거 전 의존 확인(`5e8a173`): `web/src/features/share-links/`의 `copy-text.ts`는 publications 밖에서도 쓴다. U6 `claude-connection/claude-connection-panel.tsx`와 `test/u6-claude-connection.test.mjs`, 10월 `share-links-screen.tsx`·`test/share-links.test.mjs`가 가져온다. 따라서 Step 22에서 `copy-text.ts`를 공용 위치(`web/src/lib/`)로 옮기고 U6 패널·시험의 import를 고친 뒤 기존 파일을 지운다. publications가 D14로 같은 동작을 따로 둔 것은 삭제 가능의 근거가 아니다. 그 밖의 share-links 파일 사용처: `app/(member)/links/page.tsx`(`share-links-screen`), `test/share-links.test.mjs`·`test/share-links-public-summary.test.mjs`(api·format·store·session-scope·public-*-summary). `/links` 페이지·`routes.links`·회원 헤더 메뉴·두 시험 파일은 같은 변경에서 정리하고, 지우기 직전에 전체 사용처를 다시 확인한다.
+
+**미결과 결정 시점**
+
+| 미결 | 결정 시점 | 상대 | 영향 |
+|---|---|---|---|
+| D5 `details.catchIds`를 공통 계약에 더할지 | 제출 2 검토·병합(#468 병합 전 해결) | 팀장 | 거절이면 409 Catch 목록 전달 방식을 다시 정해 제출 2의 api 예외 필터·web 안내·시험을 고친다 |
+| D12(안내는 CATCH 항목이 있을 때만)·D13(실패 뒤 단계) | 제출 2 검토·병합 | 팀장 | 제출 2 web 수정 여부 |
+| OQ-U4-NFR-5 C-10을 따로 부를 때 `resolveForRecipient`와 `readSnapshot` 사이의 중지·삭제 | U5·U10 실제 연결 전 합의 | 팀장·U5·U10 | 현재 계획의 U4 열람 경로는 판정·읽기를 한 읽기 전용 REPEATABLE READ 트랜잭션으로 처리한다(D10, Step 20). 소비 Unit 연결이나 계약 변경(묶음 호출 추가 등)의 영향은 합의 결과에 따라 확인한다 |
+| OQ-U4-NFR-6 소유 회원 비활성 404·회원 없음 500 | 받은 사람 경로 구현·시험 전 확인(Step 20·23 전) | 팀장 | 확인 전에는 합의 전 처리(10월 동작)대로 구현하고, 바뀌면 그 단계만 고친다 |
+| U4 고정 안내(BR7.1) 축소 문구 | 제출 3에서 작성하고 PR 「리뷰 요청」으로 검토 | 팀장(G5·G6) | Step 22·24 |
+
+**착수 순서(#468 병합 뒤)**
+
+1. 통합 브랜치의 merge commit을 확인하고 그 판본에서 새 브랜치를 낸다. 제출 3은 W4·W6를 한 PR로 낸다.
+2. Step 19(시나리오·기대 결과) → Step 20·21(받은 사람 컨트롤러·unlock 공급자 등록·10월 경로 해제를 한 커밋으로) → Step 22(받은 사람 화면, `copy-text` 이동 뒤 share-links 제거) → Step 23(시험, 10월 unlock·client-address 사례 이전 포함) → Step 24(문서) → Step 25(전체 확인, S15 미실행 기록).
+3. 받은 사람 판정(비밀번호·중지·만료·삭제)의 브라우저 확인은 이 제출에서 한다(#416 결정 3).
+
 ## 만든·고친 파일 (제출 1)
 
 - api 새 파일: `api/src/catches/author-description-input.ts`·`author-description-store.ts`·`author-description.controller.ts`, `api/src/materials/materials.module.ts`·`text-material-input.ts`·`text-material-store.ts`·`text-materials.controller.ts`, 시험 `api/test/catches/author-description-api.test.cjs`·`api/test/materials/text-materials-api.test.cjs`
