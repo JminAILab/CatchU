@@ -58,7 +58,7 @@
 
 ### DB 구현과 주입 토큰 (제출 2)
 
-`src/publications/db-publication-access.ts`의 `DbPublicationAccess`가 실제 구현이다. `PublicationsModule`이 토큰 **`PUBLICATION_ACCESS`**(`src/publications/publications-config.ts`, `publications.module.ts`가 다시 내보냄)로 등록하고 `exports`에 넣는다. 다른 Unit은 자기 모듈 `imports`에 `PublicationsModule`을 넣고 `@Inject(PUBLICATION_ACCESS)`로 받는다. U5는 [rag-answer.md](rag-answer.md)대로 `RagAnswerModule.register({ publicationAccess: PUBLICATION_ACCESS, imports: [PublicationsModule] })`처럼 쓴다(U5 처리기 등록은 U5 PR에서 한다, 팀장 결정 2026-11-03).
+`src/publications/db-publication-access.ts`의 `DbPublicationAccess`가 실제 구현이다. `PublicationsModule`이 토큰 **`PUBLICATION_ACCESS`**(`src/publications/publications-config.ts`, `publications.module.ts`가 다시 내보냄)로 등록하고 `exports`에 넣는다. 다른 Unit은 자기 모듈 `imports`에 `PublicationsModule`을 넣고 `@Inject(PUBLICATION_ACCESS)`로 받는다. U5는 [rag-answer.md](rag-answer.md)대로 `RagAnswerModule.register({ imports: [PublicationsModule], publicationAccess: { useExisting: PUBLICATION_ACCESS } })`처럼 쓴다(U5 처리기 등록은 U5 PR에서 한다, 팀장 결정 2026-11-03).
 
 ```typescript
 import { Inject, Module } from '@nestjs/common';
@@ -131,7 +131,7 @@ imports: `OwnerProfileReaderModule`(소유 회원 상태), U2 `AiRunModule`·`Da
 3. 동의 `AiConsentGate.require` → 403(하루 횟수를 쓰지 않음).
 4. 트랜잭션 밖에서 토큰(`generateLinkToken`)과 scrypt 검증값(`hashLinkPassword`)을 만든다.
 5. READ COMMITTED 트랜잭션: 회원 행 `FOR KEY SHARE` → `DailyRunLimit.consume(작성자, 'BASE_SUMMARY', now, manager)`(`LIMIT_REACHED`면 되돌리고 429) → Catch를 `catch_id` 오름차순으로 `FOR NO KEY UPDATE`(10월 공개 전환과 같은 잠금), 그다음 텍스트 자료를 `text_material_id` 오름차순으로 `FOR UPDATE`로 잠그고 다시 읽음(남의 것·없음 404) → 자격: 미확인 Catch가 하나라도 있으면 409 `CONFIRMATION_REQUIRED`, 그다음 원 요청의 저장소 보호 관측을 `FOR SHARE`로 읽어 확인된 `SOURCE_PRIVATE`면 409 `SOURCE_RESTRICTED`(둘 다 `details.catchIds`에 해당 Catch만; 원 요청 불일치·관측 없음·불완전은 10월처럼 500, 비공개로 단정하지 않음 BR7.4) → 전체 글(SnapshotTextTotal: `workFacts`·`subjectContribution`·`evidence[].representedFacts`·`authorDescription`·`body`의 코드 포인트 합, 제목·`aiDraft`·주소 제외)이 60,000자를 넘으면 400 `{ field: 'items', reason: 'maxTotalLength' }` → `publication`(`published_at = now`, `expires_at = now + 2160시간`)·`published_item`(요청 순서 1..n, 사본은 C-07 모양, Catch 제목이 없으면 '제목 없는 Catch', `aiDraft`는 `draft_status = GENERATED`일 때만) 쓰기 → 고른 PRIVATE Catch를 PUBLIC으로 → `PublishedIndexWriter.chunkInTransaction(manager, publicationId, now)` → 커밋. 어느 단계든 실패하면 전부(하루 횟수 포함) 되돌아간다.
-6. 커밋 뒤 `AiRun.enqueueAfterCommit('EMBED_PUBLICATION', 'EMBED_PUBLICATION-{publicationId}', { publicationId })`와 `('BASE_SUMMARY', 'BASE_SUMMARY-{publicationId}', { publicationId })`를 **항상** 차례로 등록한다(C-08 publish-sequence 4, 팀장 결정 2026-11-03 1: 켜고 끄는 설정 없음). `ENQUEUE_FAILED`는 로그만 남기고 201이다(시한으로 실패 확정, C-02). U5 처리기가 등록되기 전에는 `BASE_SUMMARY` 작업이 모르는 종류로 실패 처리되어 기본 요약이 10분 뒤 FAILED가 되고 작성자가 [다시 만들기]로 복구한다([rag-answer.md](rag-answer.md)).
+6. 커밋 뒤 `AiRun.enqueueAfterCommit('EMBED_PUBLICATION', 'EMBED_PUBLICATION-{publicationId}', { publicationId })`와 `('BASE_SUMMARY', 'BASE_SUMMARY-{publicationId}', { publicationId })`를 **항상** 차례로 등록한다(C-08 publish-sequence 4, 팀장 결정 2026-11-03 1: 켜고 끄는 설정 없음). `ENQUEUE_FAILED`는 로그만 남기고 201이다(시한으로 실패 확정, C-02). 앱 기동 시 U5가 `BASE_SUMMARY` 처리기를 등록한다. 큐가 없어 작업이 실행되지 않으면 발행 후 10분부터 요약은 `FAILED`로 표시된다([rag-answer.md](rag-answer.md)).
 
 - 토큰은 응답 `url`(`buildRecipientLinkUrl(SHARE_LINK_WEB_BASE_URL, token)`) 안에만 있다. 비밀번호 원문은 저장·응답·로그에 없다.
 - 재전송·두 번 누르기 방지는 없다(BR4.9). web이 응답까지 버튼을 막는다.

@@ -86,8 +86,9 @@ const events = (logs, name) => logs.filter((log) => log.args[0]?.event === name)
 test('기본 앱 기동 때 U3 모듈이 로드되고 EMBED_PUBLICATION 처리기가 한 번 등록된다(소비 모듈 둘이 가져와도 한 번)', async (t) => {
   const { app, registered, error } = await boot(t, { NODE_ENV: 'test' });
   assert.equal(error, null);
-  assert.deepEqual(registered, ['EMBED_PUBLICATION']);
-  assert.deepEqual(app.get(AiRun).registeredKinds(), ['EMBED_PUBLICATION']);
+  // 기본 앱에는 U5의 BASE_SUMMARY 처리기도 있다(rag-answer-app.test.cjs). 여기서는 U3 처리기만 센다.
+  assert.deepEqual(registered.filter((kind) => kind === 'EMBED_PUBLICATION'), ['EMBED_PUBLICATION']);
+  assert.ok(app.get(AiRun).registeredKinds().includes('EMBED_PUBLICATION'));
 });
 
 test('다른 Unit 모듈이 C-08 PublishedIndexWriter·C-09 PublishedSearch를 같은 모양 그대로 주입받는다', async (t) => {
