@@ -21,6 +21,7 @@ from typing import Any, Literal
 
 import pytest
 from candidate_scenarios import (
+    DEFAULT_MESSAGE,
     LIVE,
     ROOT,
     Commit,
@@ -180,7 +181,8 @@ def build_history(
     for number, step in enumerate(steps, start=1):
         apply_step(repo, step)
         minute = None if minutes is None else minutes[number - 1]
-        made.append(repo.commit(f"작업 {number}", minute=minute))
+        # 부실 목록의 메시지라 기록의 글이 제목이 되지 않고 조각 제목을 본다(CR1 BR3.2).
+        made.append(repo.commit(DEFAULT_MESSAGE, minute=minute))
     repo.checkout("main")
     merged = repo.merge("work", "작업 병합", minute=None if minutes is None else 300)
     return History(root, tuple(made), merged)
@@ -361,6 +363,45 @@ def test_overlapping_location_rules_take_the_earlier_kind(path: str, kind: str) 
 
 
 @pytest.mark.parametrize(
+    ("path", "kind"),
+    [
+        # S11(AC3.2.2): 파일 이름(확장자 앞)이 Test·Tests로 끝나는 꼴(대문자 T)은 시험이다.
+        ("src/main/java/com/app/FooTest.java", "시험"),
+        ("Sources/AppTests/LoginTests.swift", "시험"),
+        ("app/src/main/kotlin/UserServiceTest.kt", "시험"),
+        ("Test.java", "시험"),
+        # 소문자 test로 끝나는 이름은 시험 꼴이 아니다(Contest·latest).
+        ("src/Contest.java", "코드"),
+        ("src/latest.py", "코드"),
+        # Android androidTest 폴더, 이름이 Tests로 끝나는 폴더(iOS 앱Tests·앱UITests).
+        ("app/src/androidTest/java/LoginScreen.kt", "시험"),
+        ("MyAppTests/LoginViewModelSpecHelper.swift", "시험"),
+        ("MyAppUITests/Launch.swift", "시험"),
+        # 대문자 T가 아닌 폴더 이름은 그대로다.
+        ("src/contests/Board.java", "코드"),
+        # 모바일 설정 파일.
+        ("app/src/main/AndroidManifest.xml", "설정"),
+        ("build.gradle", "설정"),
+        ("app/build.gradle.kts", "설정"),
+        ("settings.gradle.kts", "설정"),
+        ("MyApp/Info.plist", "설정"),
+        ("Configs/Debug.xcconfig", "설정"),
+        ("Podfile", "설정"),
+        ("MyApp.xcodeproj/project.pbxproj", "설정"),
+        # .kts만이면 코드다(Kotlin 스크립트).
+        ("scripts/release.kts", "코드"),
+        # 노트북은 코드다.
+        ("notebooks/analysis.ipynb", "코드"),
+        # 폴더 test·tests의 대소문자 무시는 그대로다.
+        ("Test/helper.py", "시험"),
+    ],
+)
+def test_cr1_mobile_test_and_notebook_kinds(path: str, kind: str) -> None:
+    """CR1 BR5.1: 시험 → 문서 → 설정 → 코드 순서로 판정하고 모바일·노트북 꼴을 더했다."""
+    assert classify(path) == kind
+
+
+@pytest.mark.parametrize(
     "path",
     [
         "assets/logo.png",
@@ -384,7 +425,7 @@ def test_paths_outside_the_location_rules_have_no_kind(path: str) -> None:
 # 2. 파일 상태 대응과 제목 표기: 커밋 하나의 커밋 묶음
 
 
-def single_commit(*files: dict[str, Any], message: str = "합성 커밋") -> Unit:
+def single_commit(*files: dict[str, Any], message: str = DEFAULT_MESSAGE) -> Unit:
     """기본 브랜치에 바로 올린 본인 커밋 하나(PR 조회를 허용하지 않은 요청의 커밋 묶음)."""
     one = commit(
         sha(4001), MEMBER, parents=(ROOT,), minute=2, message=message, files=files
@@ -437,6 +478,10 @@ def test_file_status_gives_the_action(
         ("uv.lock", None),
         ("package-lock.json", None),
         ("assets/logo.svg", None),
+        # CR1 BR5.1: 판정이 바뀐 파일은 조각 제목의 종류도 바뀐다(기능 설계 8절 한계).
+        ("app/build.gradle.kts", "build.gradle.kts 설정 수정"),
+        ("src/test/java/FooTest.java", "FooTest.java 시험 수정"),
+        ("notebooks/analysis.ipynb", "analysis.ipynb 코드 수정"),
     ],
 )
 def test_file_title_is_target_kind_action(path: str, expected: str | None) -> None:
@@ -605,7 +650,7 @@ def test_title_pointing_at_a_context_line_is_null(pointer: str) -> None:
 
 
 def pull_with_other_account(
-    *, message: str = "합성 커밋", title: str | None = None, body: str | None = None
+    *, message: str = DEFAULT_MESSAGE, title: str | None = None, body: str | None = None
 ) -> Unit:
     """회원 커밋 하나와 다른 계정 커밋 하나가 든 병합된 PR #5."""
     own = commit(
@@ -670,18 +715,25 @@ def test_title_pointing_at_another_accounts_commit_is_null(pointer: str) -> None
 
 
 @pytest.mark.parametrize(
-    ("unit", "name"),
+    ("unit", "name", "expected"),
     [
-        (pull_with_other_account(message="sessionCache 연결"), "sessionCache"),
-        (pull_with_other_account(title="cacheWarmup 정리"), "cacheWarmup"),
-        (pull_with_other_account(body="warmupQueue를 쓴다"), "warmupQueue"),
+        # 커밋 메시지 첫 줄은 쓸 만한 기록의 글이라 그 글이 그대로 제목이다(CR1 BR3.1). 생성 요청에는
+        # 들어가지 않고(NFR1.1), 모델이 지목한 조각 제목은 쓰이지 않는다.
+        (
+            pull_with_other_account(message="sessionCache 연결"),
+            "sessionCache",
+            "sessionCache 연결",
+        ),
+        # 다른 계정 커밋이 섞인 PR이라 PR 제목은 기록의 글이 아니다(BR2.1). 본인 커밋 첫 줄은 부실이다.
+        (pull_with_other_account(title="cacheWarmup 정리"), "cacheWarmup", None),
+        (pull_with_other_account(body="warmupQueue를 쓴다"), "warmupQueue", None),
     ],
     ids=["commit-message", "pull-request-title", "pull-request-body"],
 )
 def test_title_naming_only_message_or_pull_request_text_is_null(
-    unit: Unit, name: str
+    unit: Unit, name: str, expected: str | None
 ) -> None:
-    """커밋 메시지·PR 제목·본문에만 있는 이름을 지목한 제목은 null이다(완료 기준 17)."""
+    """커밋 메시지·PR 제목·본문에만 있는 이름을 지목한 조각 제목은 null이다(완료 기준 17)."""
 
     def reply(request: ProviderRequest) -> str:
         assert name not in request.data
@@ -692,7 +744,7 @@ def test_title_naming_only_message_or_pull_request_text_is_null(
             questions=[line_question("BACKGROUND", own, "loginRateLimit")],
         )
 
-    assert generated_title(unit, reply) is None
+    assert generated_title(unit, reply) == expected
 
 
 # 5. 동작이 갈릴 때 시작 전·끝 비교(결정 11·17): PR·PR 없는 병합·커밋 묶음 각각
@@ -997,7 +1049,8 @@ def child_with_sha_order(
     """
     for attempt in range(256):
         apply_step(repo, step)
-        child = repo.commit(f"작업 2-{attempt}", minute=minute)
+        # 끝 문장 부호만 바꿔 SHA를 바꾼다. 앞뒤 문장 부호를 빼면 부실 목록의 낱말이다(BR2.5).
+        child = repo.commit(f"{DEFAULT_MESSAGE}{'.' * attempt}", minute=minute)
         if (child < parent) == smaller:
             return child
         repo.git("reset", "-q", "--hard", parent)
@@ -1028,7 +1081,7 @@ def test_application_order_follows_parents_not_time_sha_or_evidence(
     repo.checkout("work")
     parent_minute, child_minute = (60, 30) if child_earlier else (30, 60)
     apply_step(repo, {DOC: DOC_V1, CODE: python_module("limit = 5")})
-    parent = repo.commit("작업 1", minute=parent_minute)
+    parent = repo.commit(DEFAULT_MESSAGE, minute=parent_minute)
     child = child_with_sha_order(
         repo,
         {DOC: DOC_V2, CODE: python_module("limit = 10")},
@@ -1091,11 +1144,12 @@ def picked_bundle(repo: GitRepo) -> Unit:
     apply_step(repo, {CODE: python_module("limit = 5", *MIDDLE)})
     root = repo.commit("기준")
     apply_step(repo, {CODE: python_module("limit = 5", *MIDDLE, "limit = 5")})
-    first = repo.commit("아래 한도 줄 추가")
+    # 메시지는 부실 목록의 낱말이다(기록의 글이 제목이 되지 않게, CR1 BR3.2).
+    first = repo.commit(DEFAULT_MESSAGE)
     reverted = repo.revert(first)
     picked = repo.cherry_pick_x(first)
     apply_step(repo, {CODE: python_module(*MIDDLE, "limit = 5")})
-    last = repo.commit("위 한도 줄 삭제")
+    last = repo.commit(DEFAULT_MESSAGE)
     assert repo.parents(picked) == (reverted,)
     default_branch = (
         git_commit(repo, last, MEMBER),

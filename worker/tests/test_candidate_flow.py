@@ -354,18 +354,39 @@ def repository_texts(scenario: Scenario) -> set[str]:
 def test_token_and_repository_text_stay_out_of_result_and_logs(
     caplog: pytest.LogCaptureFixture, kind: str
 ) -> None:
-    """네 종결값 모두에서 본다."""
+    """네 종결값 모두에서 본다.
+
+    작성자 원문은 기록의 글(PR 제목·커밋 첫 줄)로 작업 사실 둘째 항목에만 나간다(CR1 BR4.2). 그 줄을
+    뺀 결과와 모든 로그에는 저장소 글자가 없다. 로그에는 기록의 글도 남기지 않는다.
+    """
     caplog.set_level(logging.DEBUG)
 
     run = run_outcome(kind)
 
-    text = json.dumps(run.result, ensure_ascii=False)
+    record_lines = [
+        line for entry in run.result["candidates"] for line in entry["workFacts"][1:]
+    ]
+    assert all(
+        line.startswith(('PR 제목: "', '본인 커밋 메시지 첫 줄: "'))
+        for line in record_lines
+    )
+    stripped = {
+        **run.result,
+        "candidates": [
+            {**entry, "workFacts": entry["workFacts"][:1]}
+            for entry in run.result["candidates"]
+        ],
+    }
+    text = json.dumps(stripped, ensure_ascii=False)
     assert TOKEN not in text
     assert EVIL not in text
-    # 사실·제목·근거는 구조 값으로만 만든다. 제목·본문·메시지·파일 경로를 옮기지 않는다.
+    # 기록의 글 줄 밖의 사실·제목·근거는 구조 값으로만 만든다. 제목·본문·메시지·파일 경로를 옮기지
+    # 않는다(후보 판정은 제목을 만들지 않는다).
     for marker in repository_texts(run.scenario):
         assert marker not in text
         assert marker not in caplog.text
+    for line in record_lines:
+        assert line not in caplog.text
     assert TOKEN not in caplog.text
     # 토큰은 Authorization 머리글에만 싣는다. 경로·다른 머리글·연결 PR 묶음 조회 본문에는 없다.
     posted = [call for call in run.transport.calls if call.method == "POST"]
@@ -376,6 +397,11 @@ def test_token_and_repository_text_stay_out_of_result_and_logs(
         others = [v for k, v in call.headers.items() if k != "Authorization"]
         assert all(TOKEN not in value for value in others)
         assert call.body is None or TOKEN.encode() not in call.body
+
+
+# 로그 비노출 시험이 찾는 커밋 메시지. 기본 메시지(「wip」)는 짧은 흔한 낱말이라 로그에 우연히 있을 수
+# 있어, 알아볼 수 있는 글로 정한다.
+LOG_PROBE_MESSAGE = "결정 로그 비노출 확인용 커밋 메시지"
 
 
 def _decision_log(caplog: pytest.LogCaptureFixture) -> str:
@@ -401,10 +427,10 @@ def test_hold_log_has_counts_only(
 ) -> None:
     caplog.set_level(logging.DEBUG)
     if kind == "C16":
-        run = run_case(open_pull_with_direct_commit())
+        run = run_case(open_pull_with_direct_commit(message=LOG_PROBE_MESSAGE))
     else:
         run = run_case(
-            open_pull_with_direct_commit(lookup=()),
+            open_pull_with_direct_commit(lookup=(), message=LOG_PROBE_MESSAGE),
             limits=CollectionLimits(max_calls=5),
         )
 
@@ -420,7 +446,7 @@ def test_hold_log_has_counts_only(
         assert value not in caplog.text
         assert value[:12] not in caplog.text
     pull = run.scenario.pull(3).item()
-    for text in (pull["title"], pull["body"], "합성 커밋"):
+    for text in (pull["title"], pull["body"], LOG_PROBE_MESSAGE):
         assert text not in caplog.text
     assert TOKEN not in caplog.text
 

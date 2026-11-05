@@ -2,7 +2,7 @@
 
 재료는 후보 근거가 가리키는 연동 계정 커밋의 바뀐 줄이다(#120 본문 「근거와 설명·질문」). 그래서
 근거 주소가 커밋 화면 주소가 아닌 근거(PR·PR 없는 병합의 병합 커밋), 다른 계정 커밋, 근거 20건 상한 밖
-커밋, 나눈 부분 밖 경로는 재료가 아니다. 재료가 없으면 원인과 관계없이 제공자를 부르지 않고 설명·질문
+커밋은 재료가 아니다. 재료가 없으면 원인과 관계없이 제공자를 부르지 않고 설명·질문
 NOT_GENERATED, 제목 null, 새 실패 없음이며 기존 수집 실패·근거 한계·미제공 집계·다른 후보 결과는
 그대로다(2026-10-12 결정 4·7·8, 완료 기준 09·10). 생성 순서는 근거에 든 본인 커밋의 가장 최근 작성
 시각 → 그 SHA → 결과 순서다(결정 9·14, 완료 기준 15).
@@ -62,12 +62,11 @@ from github_synthetic import (
     status_only,
 )
 
-import app.candidates.build as build_module
 import app.generation.material as material_module
 from app.candidates import build_candidates
 from app.candidates.grouping import Grouping
 from app.candidates.grouping import group as real_group
-from app.candidates.identity import Part, PullRequestUnit
+from app.candidates.identity import PullRequestUnit
 from app.collection import CollectionOutcome, RepositoryCoordinates
 from app.contract import Verdict, check_message
 from app.generation import GenerationRun, ProviderError, ProviderRequest, run_generation
@@ -445,18 +444,11 @@ def test_own_commit_beyond_the_evidence_cap_is_not_material() -> None:
     assert "app/f00.py" not in call.data
 
 
-# 경로로 나눈 부분
+# 나눈 부분 없음(CR1 BR1.1·BR7.2)
 
 
-def test_path_part_limits_material_to_its_paths(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """경로로 나눈 부분(Part(커밋, 경로))의 후보는 그 커밋에서 그 경로 파일만 재료로 쓴다(계획 「어댑터
-    규칙」, 완료 기준 08의 허용 파일).
-
-    지금 #118은 경로로 나누지 않으므로(한계 L8) 묶음 결과를 직접 고쳐 PR #3 단위를 `app/a.py` 부분으로
-    나눈다. 후보 판정과 어댑터가 같은 묶음 결과를 본다.
-    """
+def test_every_file_of_a_material_commit_is_material_without_path_parts() -> None:
+    """이슈 번호 나누기와 함께 경로 허용 목록을 지웠다. 재료 커밋의 파일은 모두 재료 후보다."""
     mine = commit(
         sha(451),
         MEMBER,
@@ -464,32 +456,16 @@ def test_path_part_limits_material_to_its_paths(
         minute=3,
         files=[change("app/a.py"), change("app/b.py")],
     )
-    part = Part(mine.sha, "app/a.py")
-
-    def split(outcome: CollectionOutcome) -> Grouping:
-        grouping = real_group(outcome)
-        return replace(
-            grouping,
-            units=tuple(
-                replace(unit, parts=(part,))
-                if unit.unit == PullRequestUnit(3)
-                else unit
-                for unit in grouping.units
-            ),
-        )
-
-    monkeypatch.setattr(build_module, "group", split)
-    monkeypatch.setattr(material_module, "group", split)
     provider = ScriptedProvider(naive)
 
     case = generation_case(open_pulls(mine), provider)
 
-    assert identities(case.result) == [identity(PullRequestUnit(3), [part])]
+    assert identities(case.result) == [identity(PullRequestUnit(3))]
     (material,) = gather(case.before.request, case.before.outcome, case.before.output)
     assert material_shas(material) == [mine.sha]
+    assert not hasattr(material, "paths")
     (call,) = provider.generate_requests()
-    assert sent_paths(call) == {"app/a.py"}
-    assert "app/b.py" not in call.data
+    assert sent_paths(call) == {"app/a.py", "app/b.py"}
 
 
 # 재료 없음
@@ -880,3 +856,79 @@ def test_unencodable_path_is_not_sent_and_counts_as_incomplete() -> None:
 
     assert [file.path for file in prepared.files] == ["app/b.py"]
     assert prepared.truncated == frozenset({record.sha})
+
+
+# 재료 순서와 변경 묶음(CR1 BR5.2~BR5.6, S10·S12)
+
+
+def sent_file_order(request: ProviderRequest) -> list[str]:
+    """보낸 자료의 파일 경로를 자료 순서대로."""
+    data = json.loads(request.data)
+    return [file["path"] for commit in data["commits"] for file in commit["files"]]
+
+
+def big_patch(stem: str, lines: int) -> str:
+    body = [f"+{stem}_{index} = '{'y' * 80}'" for index in range(lines)]
+    return f"@@ -0,0 +1,{lines} @@\n" + "\n".join(body)
+
+
+def test_s10_code_lines_come_before_document_lines() -> None:
+    """S10(AC3.2.1): 문서 파일이 앞, 코드 파일이 뒤인 PR에서도 코드 줄이 먼저 담긴다."""
+    mine = commit(
+        sha(461),
+        MEMBER,
+        parents=(ROOT,),
+        minute=3,
+        files=[
+            change("docs/guide.md"),
+            change("README.md"),
+            change("tests/test_login.py"),
+            change("app/login.py"),
+        ],
+    )
+    provider = ScriptedProvider(naive)
+
+    generation_case(open_pulls(mine), provider)
+
+    (call,) = provider.generate_requests()
+    assert sent_file_order(call) == [
+        "app/login.py",
+        "tests/test_login.py",
+        "docs/guide.md",
+        "README.md",
+    ]
+
+
+def test_s12_large_pull_request_keeps_both_folders_within_limits() -> None:
+    """S12(AC3.2.3): 서로 다른 폴더 두 곳을 크게 고친 PR은 큰 후보다. 두 묶음 줄이 모두 재료에 들고, 한
+    파일은 머리글을 포함해 6,000 B 이하, 전체는 자료 상한 안이다."""
+    api = [
+        change(
+            f"api/module{index}.py", patch=big_patch(f"api{index}", 80), status="added"
+        )
+        for index in range(3)
+    ]
+    web = [
+        change(
+            f"web/page{index}.ts", patch=big_patch(f"web{index}", 80), status="added"
+        )
+        for index in range(3)
+    ]
+    mine = commit(sha(471), MEMBER, parents=(ROOT,), minute=3, files=[*api, *web])
+    provider = ScriptedProvider(naive)
+
+    case = generation_case(open_pulls(mine), provider)
+
+    (call,) = provider.generate_requests()
+    data = json.loads(call.data)
+    files = [file for commit in data["commits"] for file in commit["files"]]
+    folders = {file["path"].split("/")[0] for file in files}
+    assert folders == {"api", "web"}
+    for file in files:
+        size = len(
+            json.dumps(file, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        )
+        assert size <= 6_000
+    assert len(call.data.encode("utf-8")) <= 24_000
+    # 크기로 뺀 줄이 있는 커밋에는 지금처럼 크기 제외 문구가 붙는다.
+    assert case.run.report.size_limited_commits == 1

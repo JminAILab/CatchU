@@ -382,10 +382,15 @@ _QUESTION = re.compile(
 def assert_generated_text(output: GenerationOutput) -> None:
     """생성 글은 정해 둔 틀로만 이루어지고, 틀 밖에 숫자·효과·동기·전체성 표현이 없다.
 
-    설명에 든 숫자는 확인한 경로·이름 안에만 있다(CatchU가 센 활동량은 들어가지 않는다).
+    설명에 든 숫자는 확인한 경로·이름 안에만 있다(CatchU가 센 활동량은 들어가지 않는다). 쓸 만한 기록의
+    글이 있는 후보는 그 글이 그대로 제목이다(CR1 BR3.1). 기록의 글 제목에는 40자 상한과 조각 틀을 대지
+    않는다(BR3.3). 그 밖의 제목은 조각 제목 틀이다.
     """
     for candidate in output.candidates:
-        if candidate.title is not None:
+        record = candidate.record_text
+        if record is not None and record.usable:
+            assert candidate.title == record.text, candidate.title
+        elif candidate.title is not None:
             assert len(candidate.title) <= 40
             assert _TITLE.fullmatch(candidate.title), candidate.title
         content = candidate.draft.content
@@ -404,8 +409,11 @@ def assert_generated_text(output: GenerationOutput) -> None:
         for question in candidate.reflection.questions:
             assert len(question) <= 150
             assert _QUESTION.fullmatch(question), question
+        generated_title = (
+            "" if record is not None and record.usable else candidate.title or ""
+        )
         for text in (
-            candidate.title or "",
+            generated_title,
             content or "",
             *candidate.reflection.questions,
         ):

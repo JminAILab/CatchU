@@ -150,7 +150,7 @@ function CatchCard({ item, token }: { item: PublicCatch; token: string }) {
   const labelId = useId();
   return (
     <li className={styles.card} aria-labelledby={item.title !== null ? labelId : undefined}>
-      {item.title !== null && <h3 id={labelId} className={styles.cardTitle}>{item.title}</h3>}
+      {item.title !== null && <h3 id={labelId} className={`${styles.cardTitle} ${styles.titleClamp}`}>{item.title}</h3>}
       <p className={styles.summary}>{item.workFacts[0] || "상세에서 근거를 확인해 주세요."}</p>
       <Link className={styles.link} href={recipientCatchPath(token, item.catchId)}
         aria-label={item.title !== null ? `${item.title} 상세 보기` : "제목 없는 Catch 상세 보기"}>

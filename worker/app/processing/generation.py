@@ -95,13 +95,43 @@ class EvidenceItem:
     coverage_limits: tuple[str, ...]
 
 
+RecordTextSource = Literal["PR_TITLE", "COMMIT_FIRST_LINE"]
+
+
+@dataclass(frozen=True)
+class RecordText:
+    """기록의 글(CR1 BR2.1~BR2.7). 작성자가 GitHub에 남긴 원문 한 줄이다.
+
+    후보 판정(`app.candidates.record_text`)이 한 번 계산해 후보 자료의 한 칸에 싣고, 작업 사실
+    둘째 줄과 제목은 이 칸만 본다. 가리기 검사에 걸린 글은 이 값이 되지 않는다. 결과 메시지에는
+    싣지 않는다(계약 C5 그대로). 글은 자르지 않는다.
+    """
+
+    source: RecordTextSource
+    text: str
+    # 부실 판단(BR2.5) 결과. 참이면 작업 사실 둘째 줄과 제목에 쓰지 않는다.
+    weak: bool
+
+    def __post_init__(self) -> None:
+        if not _has_text(self.text) or self.text != self.text.strip():
+            raise ValueError("기록의 글은 앞뒤 공백을 뺀, 비어 있지 않은 글이어야 한다")
+        if len(self.text.splitlines()) != 1:
+            raise ValueError("기록의 글은 한 줄이어야 한다")
+
+    @property
+    def usable(self) -> bool:
+        """작업 사실 둘째 줄과 제목에 쓸 수 있다(부실이 아니다)."""
+        return not self.weak
+
+
 @dataclass(frozen=True)
 class EligibleCandidate:
     """근거·본인 기여를 실패 영향과 분리해 확인한 후보.
 
-    확인하지 못한 작업은 후보로 만들지 않고 NotProvided로 센다. #118은 제목을 만들지 않아
-    title이 None이고, 생성이 확인한 제목만 채운다. title이 None이거나 비어 있으면 결과 조합이
-    제목 null로 보낸다(2026-10-08 결정 문서 「담당과 순서」 ③).
+    확인하지 못한 작업은 후보로 만들지 않고 NotProvided로 센다. 후보 판정은 제목을 만들지 않아
+    title이 None이고, 생성 단계가 쓸 만한 기록의 글(record_text) 또는 확인한 조각 제목으로 채운다.
+    title이 None이거나 비어 있으면 결과 조합이 제목 null로 보낸다(2026-10-08 결정 문서 「담당과
+    순서」 ③). record_text는 worker 안에서만 쓰고 결과 메시지에 싣지 않는다.
     """
 
     work_identity: str
@@ -113,6 +143,8 @@ class EligibleCandidate:
     evidence: tuple[EvidenceItem, ...]
     draft: DraftOutcome
     reflection: ReflectionOutcome
+    # 기록의 글 칸. 없거나 하나다(BR2.7). 값이 같은 후보를 합치면 첫 후보의 칸이 남는다(BR4.5).
+    record_text: RecordText | None = None
 
     def __post_init__(self) -> None:
         if not _has_text(self.work_identity):

@@ -69,10 +69,11 @@ function hasGeneratedDraft(item: CatchAsset) {
   return item.draft.status === "GENERATED" && item.draft.content !== null && item.draft.content.trim().length > 0;
 }
 
+/** 자동 생성 안내. 목록과 상세가 같은 컴포넌트를 써서 「설명」을 「설명 초안」으로 함께 바꾼다(CR1 BR6.3). */
 function GeneratedContentNotice({ item }: { item?: CatchAsset }) {
   const hasTitle = !item || item.title !== null;
   const hasDraft = !item || hasGeneratedDraft(item);
-  const subject = hasTitle ? (hasDraft ? "제목과 설명" : "제목") : hasDraft ? "설명" : null;
+  const subject = hasTitle ? (hasDraft ? "제목과 설명 초안" : "제목") : hasDraft ? "설명 초안" : null;
   return (
     <p className={styles.readOnlyNotice}>
       {subject && <>{subject}은 CatchU가 GitHub 기록에서 자동으로 만들었습니다<br /></>}
@@ -177,7 +178,7 @@ export function AssetsView(props: AssetsViewProps) {
                   {item.title !== null && <h3><button className={styles.cardTitle} onClick={(event) => {
                     returnFocusRef.current = event.currentTarget;
                     props.onOpen(item.catchId);
-                  }}>{item.title}</button></h3>}
+                  }}><span className={styles.titleClamp}>{item.title}</span></button></h3>}
                   <p className={styles.summary}>{item.workFacts[0] || "상세에서 근거를 확인해 주세요."}</p>
                   <div className={styles.cardFooter}><span>근거 {item.evidence.length}개</span>
                     {item.title === null ? <button className={styles.cardDetails} onClick={(event) => {

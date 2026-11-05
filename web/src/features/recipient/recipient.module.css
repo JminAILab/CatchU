@@ -160,6 +160,16 @@
   overflow-wrap: anywhere;
 }
 
+/* 목록 카드 제목은 2줄까지 보이고 넘치면 말줄임이다. 글은 그대로 두어 상세 보기 링크의 이름에 전체
+   제목이 있다(CR1 BR6.1). 상세 제목에는 쓰지 않는다. */
+.titleClamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
 .summary {
   margin: 0;
   color: var(--color-muted);

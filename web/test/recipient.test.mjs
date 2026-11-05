@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createRecipientApi, readPublicCatch, readPublicCollection } from "../src/features/recipient/recipient-api.ts";
 import { createGrantStore, GRANT_KEY_PREFIX, GRANT_MAX_LENGTH } from "../src/features/recipient/recipient-grants.ts";
@@ -663,16 +664,44 @@ test("상세: 다른 Catch로 바꾼 뒤 늦게 온 이전 응답은 새 화면�
 
 // ── 표시 문구·링크 ─────────────────────────────────────────────
 
-test("자동 생성 안내는 10/8 결정 문장을 쓰고, 제목·설명이 없는 Catch에서는 있는 것만 가리킨다. 없는 초안을 채우지 않는다", () => {
-  assert.equal(generatedNotice(), "제목과 설명은 CatchU가 GitHub 기록에서 자동으로 만들었습니다");
+test("S14: 자동 생성 안내는 목록에 늘 두 절이고, 상세는 있는 것만 가리킨다. 없는 초안을 채우지 않는다", () => {
+  // CR1 BR6.2: 제목은 GitHub 기록의 글(PR 제목·커밋 첫 줄)이거나 CatchU가 만든 글이다.
+  assert.equal(
+    generatedNotice(),
+    "제목은 GitHub 기록의 글이거나 CatchU가 만든 글이고, 설명은 CatchU가 GitHub 기록에서 자동으로 만들었습니다",
+  );
+  const both = readPublicCatch(catchItem("c0"));
   const noTitle = readPublicCatch(catchItem("c1", { title: null }));
   const noDraft = readPublicCatch(catchItem("c2", { draft: { status: "FAILED", content: null } }));
   const neither = readPublicCatch(catchItem("c3", { title: null, draft: { status: "NOT_GENERATED", content: null } }));
+  assert.equal(generatedNotice(both), generatedNotice());
   assert.equal(generatedNotice(noTitle), "설명은 CatchU가 GitHub 기록에서 자동으로 만들었습니다");
-  assert.equal(generatedNotice(noDraft), "제목은 CatchU가 GitHub 기록에서 자동으로 만들었습니다");
+  assert.equal(generatedNotice(noDraft), "제목은 GitHub 기록의 글이거나 CatchU가 만든 글입니다");
   assert.equal(generatedNotice(neither), null);
   assert.match(missingDraftText(noDraft), /생성하지 못했습니다/);
   assert.equal(missingDraftText(neither), "생성된 설명 초안이 없습니다.");
+});
+
+test("S13: 받은 사람 목록 카드 제목에 2줄 말줄임 클래스를 달고 글은 전체 제목이다. 상세 제목은 줄이지 않는다", () => {
+  // 화면 컴포넌트는 store·라우팅을 함께 불러와 여기서 그리지 않는다. 카드 제목 요소와 CSS 규칙을 원문으로 본다.
+  // 2줄 말줄임 모양 자체는 브라우저에서 확인한다.
+  const screen = readFileSync(new URL("../src/features/recipient/recipient-screen.tsx", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../src/features/recipient/recipient.module.css", import.meta.url), "utf8");
+  const card = screen.match(/function CatchCard[\s\S]*?\n}\n/)?.[0] ?? assert.fail("목록 카드 컴포넌트가 있어야 한다");
+  assert.match(card, /<h3 id=\{labelId\} className=\{`\$\{styles\.cardTitle\} \$\{styles\.titleClamp\}`\}>\{item\.title\}<\/h3>/);
+  // 상세 보기 링크의 접근 이름에도 전체 제목이 든다.
+  assert.match(card, /aria-label=\{item\.title !== null \? `\$\{item\.title\} 상세 보기`/);
+  assert.match(css, /\.titleClamp\s*\{[^}]*-webkit-line-clamp:\s*2;[^}]*overflow:\s*hidden;/);
+  const detail = screen.match(/<h2 className=\{styles\.subtitle\}>\{item\.title\}<\/h2>/);
+  assert.ok(detail, "상세 제목은 줄임 클래스 없이 전체를 그린다");
+  // 제목은 글자 노드로만 그린다(HTML 삽입 없음).
+  assert.doesNotMatch(screen, /dangerouslySetInnerHTML/);
+});
+
+test("옛 꼴 작업 사실(SHA가 든 첫 줄, 다른 계정 문장)도 받은 그대로 화면 자료가 된다", () => {
+  const oldFacts = ["PR·병합에 속하지 않은 본인 커밋 0123456789ab", "이 PR 커밋 목록에 연동 계정이 작성자로 기록되지 않은 커밋이 있다"];
+  const item = readPublicCatch(catchItem("c9", { workFacts: oldFacts }));
+  assert.deepEqual(item.workFacts, oldFacts);
 });
 
 test("근거 원문은 GitHub https 주소만 링크로 연다", () => {

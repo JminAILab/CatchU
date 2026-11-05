@@ -10,16 +10,20 @@ export function hasGeneratedDraft(item: PublicCatch): boolean {
   return item.draft.status === "GENERATED" && item.draft.content !== null && item.draft.content.trim().length > 0;
 }
 
+const TITLE_NOTICE = "제목은 GitHub 기록의 글이거나 CatchU가 만든 글";
+const DRAFT_NOTICE = "설명은 CatchU가 GitHub 기록에서 자동으로 만들었습니다";
+
 /**
- * 자동 생성 안내(10/8 팀장 결정 「제목과 설명은 CatchU가 GitHub 기록에서 자동으로 만들었습니다」).
- * 회원 화면(B, `assets-view.tsx`)과 같이 제목·설명이 없는 Catch에서는 있는 것만 가리키고, 둘 다 없으면 null이다.
- * 회원 화면에만 붙는 불일치·공개 안내는 넣지 않는다. 목록처럼 특정 Catch가 없으면 결정 문장 그대로다.
+ * 자동 생성 안내(CR1 BR6.2). 제목은 작성자가 GitHub에 남긴 글(PR 제목·커밋 첫 줄)이거나 CatchU가 만든 글이다.
+ * 있는 것만 가리키고, 둘 다 없으면 null이다. 목록처럼 특정 Catch가 없으면 두 절 문장 그대로다.
+ * 회원 화면에만 붙는 불일치·공개 안내는 넣지 않는다.
  */
 export function generatedNotice(item?: PublicCatch): string | null {
   const hasTitle = !item || item.title !== null;
   const hasDraft = !item || hasGeneratedDraft(item);
-  const subject = hasTitle ? (hasDraft ? "제목과 설명" : "제목") : hasDraft ? "설명" : null;
-  return subject === null ? null : `${subject}은 CatchU가 GitHub 기록에서 자동으로 만들었습니다`;
+  if (hasTitle && hasDraft) return `${TITLE_NOTICE}이고, ${DRAFT_NOTICE}`;
+  if (hasTitle) return `${TITLE_NOTICE}입니다`;
+  return hasDraft ? DRAFT_NOTICE : null;
 }
 
 /** 설명 초안이 없을 때의 문구. 없는 설명을 다른 값으로 채우지 않는다. */

@@ -1087,3 +1087,188 @@ def test_huge_hunk_number_excludes_only_that_file() -> None:
     assert paths(provider.requests[0]) == {"app/alpha.py"}
     assert generated(case, 3).draft.status == "GENERATED"
     assert added_limits(case, 3)[commit_url(sha(31))] == (TRUNCATED,)
+
+
+# 제목 우선순위(CR1 BR3.1~BR3.3, S16, NFR1.1·NFR2.1)
+
+RECORD_TITLE = "로그인 오류 수정"
+RECORD_MESSAGE = "결제 실패 알림 메모"
+
+
+def titled(number: int, title: str, *commits: Commit) -> Pull:
+    """연동 계정이 연 열린 PR. 커밋 목록을 끝까지 받고 본인 커밋뿐이라 PR 제목이 기록의 글이다."""
+    return Pull(number, MEMBER, commits, state="open", created=number - 1, title=title)
+
+
+def own_message(
+    number: int, minute: int, message: str, *files: dict[str, Any]
+) -> Commit:
+    return commit(
+        sha(number),
+        MEMBER,
+        parents=(ROOT,),
+        minute=minute,
+        message=message,
+        files=files,
+    )
+
+
+def without_title(request: ProviderRequest) -> str:
+    """조각 제목만 빠진 응답(형식 위반 MISSING). 조각 제목이면 고쳐 쓰기 대상이다."""
+    value = json.loads(naive(request))
+    del value["title"]
+    return json.dumps(value)
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [ProviderError(), TimeoutError(), "{not json"],
+    ids=["call-failed", "timeout", "unreadable"],
+)
+def test_s16_failed_generation_keeps_the_record_text_title(reply: Reply) -> None:
+    """S16: 생성 호출이 실패해도 쓸 만한 기록의 글이 제목이다. 설명 초안은 실패, 고쳐 쓰기 호출은 없다."""
+    provider = ScriptedProvider(reply)
+
+    case = generation_case(
+        pulls(titled(3, RECORD_TITLE, own(31, 3, short("alpha")))), provider
+    )
+
+    each = generated(case, 3)
+    assert each.title == RECORD_TITLE
+    assert each.draft.status == "FAILED"
+    assert entry(case, 3)["title"] == RECORD_TITLE
+    assert entry(case, 3)["workFacts"] == [
+        "PR #3, 상태 열림",
+        f'PR 제목: "{RECORD_TITLE}"',
+    ]
+    assert provider.rewrite_requests() == []
+    assert case.run.report.rewrite_calls == 0
+
+
+def test_record_text_title_skips_rewriting_a_broken_fragment_title(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """BR3.3·NFR2.1: 조각 제목이 형식을 어겨도 기록의 글이 제목이면 고쳐 쓰기를 부르지 않는다. 생성 호출은
+    후보마다 한 번 그대로다. 「제목만 없음」은 최종 제목 기준이라 세지 않는다."""
+    provider = ScriptedProvider(without_title, repeat=False)
+
+    with caplog.at_level(logging.INFO, logger="app.generation"):
+        case = generation_case(
+            pulls(titled(3, RECORD_TITLE, own(31, 3, short("alpha")))), provider
+        )
+
+    assert_calls(provider, 1)
+    each = generated(case, 3)
+    assert each.title == RECORD_TITLE
+    assert each.draft.status == "GENERATED"
+    assert case.run.report.rewrite_calls == 0
+    assert case.run.report.title_only_null == 0
+    assert "rewriteCalls=0" in caplog.text
+    assert "titleOnlyNull=0" in caplog.text
+
+
+def test_weak_record_text_leaves_the_fragment_title_and_its_rewrite() -> None:
+    """BR3.2: 기록의 글이 부실하면(PR 제목 「WIP」) 조각 제목 경로다. 형식을 어긴 조각 제목은 고쳐 쓴다."""
+
+    def reply(request: ProviderRequest) -> str:
+        if request.purpose == "REWRITE_TITLE":
+            line = json.loads(request.data)["lines"][0]
+            return json.dumps({"title": code_title(line["id"], line["names"][0])})
+        return without_title(request)
+
+    provider = ScriptedProvider(reply)
+
+    case = generation_case(
+        pulls(titled(3, "WIP", own(31, 3, short("alpha")))), provider
+    )
+
+    each = generated(case, 3)
+    assert each.record_text is not None and each.record_text.weak
+    assert len(provider.rewrite_requests()) == 1
+    assert each.title == "alpha 코드 수정"
+    assert len(each.work_facts) == 1
+
+
+def test_record_text_title_is_counted_out_of_title_only_null() -> None:
+    """「제목만 없음」은 최종 제목이 없는 후보만 센다. 조각 제목이 null이어도 기록의 글이 제목이면 0이다."""
+
+    def unverified(request: ProviderRequest) -> str:
+        value = json.loads(naive(request))
+        value["title"] = code_title(pick(request), "notInTheLine")
+        return json.dumps(value)
+
+    provider = ScriptedProvider(unverified)
+
+    record_case = generation_case(
+        pulls(titled(3, RECORD_TITLE, own(31, 3, short("alpha")))), provider
+    )
+    weak_case = generation_case(
+        pulls(titled(3, "wip", own(31, 3, short("alpha")))),
+        ScriptedProvider(unverified),
+    )
+
+    assert generated(record_case, 3).title == RECORD_TITLE
+    assert record_case.run.report.title_only_null == 0
+    assert generated(weak_case, 3).title is None
+    assert weak_case.run.report.title_only_null == 1
+
+
+def test_record_text_never_reaches_the_generation_request() -> None:
+    """NFR1.1: 생성 요청에는 바뀐 줄만 보낸다. PR 제목·커밋 첫 줄(기록의 글)은 요청 본문에 없다."""
+    provider = ScriptedProvider(naive)
+    other_title = "다른 PR 제목 표식"
+
+    case = generation_case(
+        pulls(
+            titled(3, RECORD_TITLE, own_message(31, 3, RECORD_MESSAGE, short("alpha"))),
+            Pull(
+                4,
+                MEMBER,
+                (own_message(32, 9, RECORD_MESSAGE + " 둘째", short("beta")),),
+                state="open",
+                created=3,
+                title=other_title,
+            ),
+        ),
+        provider,
+    )
+
+    assert generated(case, 3).title == RECORD_TITLE
+    assert generated(case, 4).title == other_title
+    for request in provider.requests:
+        for text in (RECORD_TITLE, RECORD_MESSAGE, other_title):
+            assert text not in request.data
+            assert text not in request.instructions
+
+
+def test_budget_skipped_candidate_still_gets_the_record_text_title() -> None:
+    """마감이 가까워 생성 호출을 건너뛰어도(budget_skipped) 기록의 글 제목은 남는다(BR3.1, S16의 건너뜀 갈래)."""
+    provider = ScriptedProvider(naive)
+
+    case = generation_case(
+        pulls(titled(3, RECORD_TITLE, own(31, 3, short("alpha")))),
+        provider,
+        deadline=timedelta(seconds=GENERATION_TIMEOUT_SECONDS - 1),
+    )
+
+    assert provider.requests == []
+    assert case.run.report.budget_skipped == 1
+    each = generated(case, 3)
+    assert each.title == RECORD_TITLE
+    assert each.draft.status == "NOT_GENERATED"
+    assert entry(case, 3)["title"] == RECORD_TITLE
+    assert case.run.report.title_only_null == 0
+
+
+def test_candidate_without_material_still_gets_the_record_text_title() -> None:
+    """고를 줄이 없어 생성 호출을 건너뛰어도 기록의 글 제목은 남는다(BR3.1)."""
+    target = own(31, 3, change("assets/logo.png", with_patch=False))
+    provider = ScriptedProvider(naive)
+
+    case = generation_case(pulls(titled(3, RECORD_TITLE, target)), provider)
+
+    assert provider.requests == []
+    each = generated(case, 3)
+    assert each.title == RECORD_TITLE
+    assert each.draft.status == "NOT_GENERATED"
+    assert case.run.report.no_material == 1

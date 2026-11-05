@@ -12,7 +12,7 @@ workIdentity 기대값은 wi1 함수로 따로 계산한다.
 """
 
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -62,7 +62,6 @@ import app.candidates as candidates
 from app.candidates.identity import (
     CommitsUnit,
     MergeUnit,
-    Part,
     PullRequestUnit,
     WorkUnit,
     work_identity,
@@ -168,12 +167,19 @@ def _signature(minute: int) -> dict[str, str]:
     }
 
 
+# 합성 커밋 메시지와 PR 제목의 기본값. 부실 목록(CR1 BR2.6)의 낱말이라 기본 사례에는 쓸 만한 기록의
+# 글이 없다. 그래서 기존 생성 시험은 조각 제목 경로(BR3.2)를 그대로 보고, 기록의 글 제목·작업 사실
+# 둘째 줄은 메시지·제목을 정해 주는 시험이 따로 본다.
+DEFAULT_MESSAGE = "wip"
+DEFAULT_PULL_TITLE = "WIP"
+
+
 def commit(
     sha_value: str,
     author: GitHubAccount | None,
     *,
     parents: Sequence[str] = (),
-    message: str = "합성 커밋",
+    message: str = DEFAULT_MESSAGE,
     minute: int = 0,
     files: Sequence[dict[str, Any]] | None = None,
     committer: GitHubAccount | None = None,
@@ -262,7 +268,7 @@ class Pull:
     base_sha: str | None = sha(9999)
     base_ref: str = DEFAULT_BRANCH
     fork: bool = False
-    title: str | None = None
+    title: str | None = DEFAULT_PULL_TITLE
     body: str | None = "합성 PR 본문"
 
     @property
@@ -377,6 +383,7 @@ def open_pull_with_direct_commit(
     pull_author: GitHubAccount = MEMBER,
     lookup: tuple[int, ...] | Reply = (3,),
     with_pull: bool = True,
+    message: str = DEFAULT_MESSAGE,
 ) -> Scenario:
     """열린 PR #3(커밋 하나)과, PR #3의 전체 커밋 목록에 없는 기본 브랜치의 본인 커밋 ffff.
 
@@ -384,13 +391,24 @@ def open_pull_with_direct_commit(
     기본 브랜치 목록에 둔다. 사례표의 강제 푸시 같은 어긋남은 연결 PR 조회 응답(lookup)으로 만든다.
     연결 PR 묶음 조회는 ffff 하나만 묻는다. 그래서 lookup이 PR 번호, 그 커밋의 PR 목록 응답(다음 쪽
     표시 포함), MISSING_COMMIT이면 ffff의 결과로 두고, 그 밖의 응답(오류 상태·크기 초과·전송
-    오류)은 그 POST 전체의 응답(graphql_route(ffff))으로 둔다.
+    오류)은 그 POST 전체의 응답(graphql_route(ffff))으로 둔다. message는 두 커밋의 메시지다(로그
+    비노출 시험이 알아볼 수 있는 글을 정한다).
     """
     own = commit(
-        sha(31), pull_author, parents=(ROOT,), minute=3, files=[change("app/page.py")]
+        sha(31),
+        pull_author,
+        parents=(ROOT,),
+        minute=3,
+        message=message,
+        files=[change("app/page.py")],
     )
     direct = commit(
-        named("f"), MEMBER, parents=(ROOT,), minute=4, files=[change("app/list.py")]
+        named("f"),
+        MEMBER,
+        parents=(ROOT,),
+        minute=4,
+        message=message,
+        files=[change("app/list.py")],
     )
     pulls = (
         (Pull(3, pull_author, (own,), state="open", created=2),) if with_pull else ()
@@ -531,6 +549,13 @@ MEMBER_TEXT_JARGON = ("API", "쪽", "연결 PR 조회")
 # 제목·작업 사실·나의 기여에 쓰지 않는 CatchU가 센 숫자(2026-10-08 팀장 결정 「수신자에게 나가는
 # 숫자와 근거 순서」). #번호와 SHA는 셈이 아니므로 허용한다.
 COUNTED_NUMBER = re.compile(r"[0-9]+ ?(건|줄|개)")
+# 작업 사실 둘째 항목(기록의 글 줄, CR1 BR4.2)의 꼴. 따옴표 안은 작성자 원문이다.
+RECORD_FACT = re.compile(r'(PR 제목|본인 커밋 메시지 첫 줄): "[^\n]+"')
+# 작업 사실 첫 항목(종류 줄, CR1 BR4.1)의 꼴. SHA·날짜는 들지 않는다.
+KIND_FACT = re.compile(
+    r"PR #[0-9]+, 상태 (병합됨|열림|닫힘)|PR 없이 합친 병합"
+    r"|(PR·)?병합 없이 들어간 본인 커밋( 묶음)?"
+)
 
 
 def assert_member_text(
@@ -538,9 +563,11 @@ def assert_member_text(
 ) -> None:
     """후보 문장이 2026-10-08 팀장 결정과 조회 방식의 말 규칙을 지킨다.
 
-    - #118은 제목을 만들지 않는다(title=None). 조합된 결과의 제목도 null이다(결정 문서 「담당과
+    - 후보 판정은 제목을 만들지 않는다(title=None). 조합된 결과의 제목도 null이다(결정 문서 「담당과
       순서」 ③).
-    - 작업 사실·나의 기여에 센 숫자가 없다.
+    - CatchU가 만든 문장(작업 사실 첫 항목·나의 기여)에 센 숫자가 없다. 작업 사실 둘째 항목은 작성자
+      원문(기록의 글)이라 숫자·낱말 규칙을 대지 않는다(CR1 BR4.6).
+    - 작업 사실은 1~2항목이다(BR4.5).
     - '작성한'을 쓰지 않는다(「본인 기여의 뜻」).
     result를 주지 않으면 LIVE 요청으로 조합해 본다(제목 null은 요청 값과 무관하다).
     """
@@ -552,10 +579,15 @@ def assert_member_text(
     for each, entry in zip(output.candidates, result["candidates"], strict=True):
         assert each.title is None, each.title
         assert entry["title"] is None, entry["title"]
-        for text in (*each.work_facts, each.subject_contribution):
+        assert 1 <= len(each.work_facts) <= 2, each.work_facts
+        assert KIND_FACT.fullmatch(each.work_facts[0]), each.work_facts[0]
+        for line in each.work_facts[1:]:
+            assert RECORD_FACT.fullmatch(line), line
+        catchu_facts = each.work_facts[:1]
+        for text in (*catchu_facts, each.subject_contribution):
             assert not COUNTED_NUMBER.search(text), text
         texts = (
-            *each.work_facts,
+            *catchu_facts,
             each.subject_contribution,
             each.grouping_basis,
             *each.grouping_limitations,
@@ -573,21 +605,13 @@ def assert_member_text(
 # 기대값 계산과 결과 읽기
 
 
-def identity(
-    unit: WorkUnit, parts: Iterable[Part] = (), *, request: CheckedRequest = LIVE
-) -> str:
-    return work_identity(request.source_mode, request.repository_id, unit, parts)
+def identity(unit: WorkUnit, *, request: CheckedRequest = LIVE) -> str:
+    return work_identity(request.source_mode, request.repository_id, unit)
 
 
-def pull_identity(
-    number: int, *part_commits: str, request: CheckedRequest = LIVE
-) -> str:
-    """PR 단위 값. 커밋을 주면 그 커밋들로 나눈 부분의 값이다."""
-    return identity(
-        PullRequestUnit(number),
-        [Part(each) for each in part_commits],
-        request=request,
-    )
+def pull_identity(number: int, *, request: CheckedRequest = LIVE) -> str:
+    """PR 단위 값. 이슈 번호로 나누지 않으므로 PR 전체가 한 값이다(CR1 BR1.1)."""
+    return identity(PullRequestUnit(number), request=request)
 
 
 def merge_identity(sha_value: str, *, request: CheckedRequest = LIVE) -> str:
