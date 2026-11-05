@@ -31,7 +31,7 @@ export interface PublicationAccess {
   resolveForOwner(memberId: string, publicationId: string): Promise<OwnerAccess>;
   /**
    * 발행 사본만 읽는다(원본 Catch·자료를 읽지 않음). 받은 사람 쪽은 resolveForRecipient를 통과한 뒤에만 부른다.
-   * 발행본 상태(중지·만료·소유 회원 상태)는 판정하지 않으며, 판정 뒤 커밋된 중지·만료는 같은 요청의 사본 읽기에 반영되지 않는다.
+   * 발행본 상태(중지·만료)는 판정하지 않으며, 판정 뒤 커밋된 중지·만료는 같은 요청의 사본 읽기에 반영되지 않는다.
    * 발행본 행이 없으면(삭제) 빈 사본 대신 NotFound. 받은 사람 경로는 판정 뒤 삭제로 확인된 경우에만, 곧 이 NotFound이거나
    * 그 요청의 쓰기가 발행본(publication_id)을 참조하는 외래 키 제약에서 거부된 경우(SQLSTATE 23503이고 거부한 제약이 publication을
    * 참조하는 것일 때)에 그 요청의 저장·차감을 되돌리고 404 LINK_UNAVAILABLE로 응답한다. 다른 제약의 23503을 포함해 삭제로
