@@ -1,3 +1,42 @@
+// U4 제출 3 — 받은 사람 화면(web/src/features/recipient, /s/[token]) 시험. 아래 10월(#152) 시험은 Step 22·23에서 보안 설계 「web 시험 유지·제거 (R-03)」
+// 표대로 정리한다: 「그대로 유지」 묶음(grant 보관·삭제·손상값·저장소 오류, 근거 링크, 비밀번호·grant 비노출)은 바꾸지 않고, 「응답 모양만 바꿔 유지」 묶음은
+// 성공 응답만 C-10 PublishedSnapshot으로 바꾸며, 「W6와 함께 제거」 묶음(공개 프로필·Catch 목록·다음 페이지·Catch 상세·10/8 자동 생성 안내)은 지운다.
+//
+// 먼저 정한 시나리오·기대 결과·실패 조건(U4 기능 명세 W4와 S8·S9·S14의 화면 부분, 보안 요구사항 「안내 중복 통과 조건」 G1~G7, 보안 설계 「web 화면 출력 (Q2 A)」·
+// 「받은 사람 화면 자리 (C-11)」, 계약 C-11, BR6.6·BR7.1·BR7.5·BR7.6, NFR1.10·NFR1.11·NFR7.1~NFR7.4, team.md Testing Posture). Step 19(2026-11-05)에서 확정했고,
+// 세부 시험 코드는 Step 22 구현 뒤 Step 23에서 쓴다.
+//
+// 표시: [답 전 10월 동작] = OQ-U4-NFR-6 팀장 답 전 처리. 소유 회원 비활성은 api가 404 LINK_UNAVAILABLE로 주므로 화면은 링크 불가 공통 화면이고 따로 구분하지
+//      않는다. 회원 없음 500은 조회 실패(링크 불가 아님). 답이 바뀌어도 화면은 api 응답 코드만 따른다.
+//
+// 화면 자리 G1~G4 (C-11 slot 0·guide-rule; 세 상태를 그려 확인)
+//   - 기대: 판정 통과 화면 = U4 h1(tabIndex={-1}, 첫 초점) → 0번 RecipientGuide(U2, showClaudeConnect={false}) 정확히 1개 → U4 고정 안내(발행 시각 위주, 문구는
+//           Step 22에서 G5·G6 안에서 정함) → 1번 발행본 자료 → 2·3·4번 자리(U5·U10 컴포넌트 제공 전에는 빈 자리). 비밀번호 입력 화면과 접근 불가 화면 = U4 h1(첫 초점)과
+//           U4 안내만, RecipientGuide 0개(G1·G2). 각 상태의 h1은 U4 것 하나뿐이고 RecipientGuide 안에 h1이 없다(G3). 상태가 바뀔 때 첫 초점은 U4 h1로 가고
+//           RecipientGuide 안 요소로 가지 않는다(G4).
+//   - 실패 조건: RecipientGuide가 2개이거나 비밀번호·불가 화면에 있음, showClaudeConnect 생략, h1 2개, 첫 초점이 안내 안으로 감.
+// G5~G7 (web 시험이 아니라 문구 검토): G5·G6은 Step 22에서 정한 U4 고정 안내 문구를 PR 「리뷰 요청」 체크리스트로 본다(U2 fixed-copy의 고정 발행본 설명·link-conditions·
+//   U5 외부 AI 고지·U10 JD 로그인 안내와 같은 뜻의 문장이 U4 영역에 없음). G7은 #423 병합 뒤 U2 base-summary·link-conditions 문구를 #416 결정 문장과 대조하고, 다르면
+//   U4는 고치지 않고 U2 담당에게 알린다.
+// 발행본 자료 1번 자리 (US4.4, BR6.6·BR7.5·BR7.6, NFR1.10·NFR1.11·NFR7.1, C-11)
+//   - 기대: items를 position 순서로 그린다. Catch 항목은 기록(workFacts·subjectContribution·evidence)·작성자 설명(authorDescription)·AI 설명 초안(aiDraft, 있을 때만
+//           "AI 설명 초안" 표지)·불일치 표지(mismatch)를 서로 다른 표지로 구분하고 섞지 않는다. 텍스트 자료 항목은 제목·본문. 근거 원문은 evidence[].sourceUrl이
+//           isGithubSourceUrl일 때만 target="_blank"·rel="noopener noreferrer"·"(새 탭)" 링크이고 그 밖은 글자. aiDraft·본문·작성자 설명은 React 텍스트로만 그리고
+//           자동 링크를 만들지 않는다(OQ-U4-NFR-1·2·3 합의 전 처리; 작성자 사본과 같은 Q1 B 규칙 함수를 쓸 때만 GitHub 주소 링크). showEvidence(location)는
+//           publishedItemId·fieldPath 항목을 보이고 [charStart, charEnd)를 강조하며, 사본에 없는 위치면 강조 없이 그 항목만 보인다. token·getGrant·onAccessLost·
+//           isLoggedIn·showEvidence를 RecipientSlotProps로 넘긴다(OQ-U4-7대로 화면 안 형).
+//   - 실패 조건: aiDraft가 작성자 설명과 섞임, GitHub 외 주소가 링크, 본문이 HTML로 삽입됨, 10월 PublicProfile·PublicCatch 모양을 기대함, 빠진 위치에 강조.
+// 판정 응답 처리 (W4-3·4, S8·S9·S14 화면 부분; 기대 동작은 10월과 같고 성공 응답만 PublishedSnapshot)
+//   - 기대: GET 404 LINK_UNAVAILABLE → 사유 없는 공통 「이 링크는 열람할 수 없습니다」 화면, 그 링크 grant만 삭제(다른 링크 grant 유지). 401 LINK_PASSWORD_REQUIRED →
+//           비밀번호 입력 화면, 받아 둔 grant가 거부되면 지우고 다시 입력 안내. unlock 200 { grant } → 그 링크에만 grant 저장(sessionStorage 링크별 키) 뒤 X-Link-Grant로
+//           다시 GET. unlock 401 LINK_PASSWORD_INVALID만 비밀번호 오류로 안내하고 통신 실패·500·400은 확인 실패. 429 LINK_UNLOCK_LIMITED + Retry-After → 남은 시간 동안
+//           보내지 않고 자동 재시도 없음, Retry-After가 없거나 틀리면 추정하지 않음. 확인 중 404 → 공통 화면이고 grant를 남기지 않음. 빈 비밀번호는 보내지 않고 확인 중
+//           중복 전송 없음. 손상된 성공 응답은 성공으로 바꾸지 않음. 다시 조회 실패는 이전 화면 유지(NFR6.1), 확정 거부(404·401)는 이전 자료 삭제. 늦은 응답·화면 해제 뒤
+//           응답은 버림. 붙는 컴포넌트가 onAccessLost(code)를 부르면 같은 전환과 grant 삭제. 토큰은 경로에만, 비밀번호는 본문으로만, grant는 헤더로만.
+//   - 실패 조건: 404 사유 노출, 다른 링크 grant 사용, 429 중 자동 재전송, 비밀번호·grant 원문이 상태·로그에 남음, 조회 실패를 링크 불가로 바꿈.
+//
+// 세부 시험 코드는 Step 23(구현 뒤)에서 쓴다. 그때까지 아래 10월 시험은 그대로 돈다.
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createRecipientApi, readPublicCatch, readPublicCollection } from "../src/features/recipient/recipient-api.ts";

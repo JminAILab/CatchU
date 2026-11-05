@@ -4,7 +4,33 @@
 
 입력: [코드 생성 계획](code-generation-plan.md) Step 1~8, [단위 시험 안내](unit-test-instructions.md), [U4 기능 명세](../functional-design/functional-spec.md) 「작성자 API」·W1·W2, [업무 규칙](../functional-design/rules.md) BR1~BR3, [계약 요약](../../../inception/contract-design/contract-summary.md)의 C-12(작성자 쪽 경로는 각 Unit 기능 설계에서 정함)·C-13·C-14, 10월 본인 Catch 응답 시험 `api/test/catches/owner-catch-response.test.cjs`, 공통 인증 코드 `web/src/lib/api.ts`·`web/src/lib/auth-integration.ts`·`web/src/components/auth/member-guard.tsx`·`session-member-guard.tsx`·`reauth-notice.tsx`.
 
-이 문서는 제출 1(Step 1~8, PR #461로 2026-11-03 통합 브랜치 병합)과 제출 2(Step 9~18, 2026-11-03 구현·로컬 검증)까지의 상태다. 제출 3(Step 19~25)은 진행하지 않았다. 제출 2는 PR #468로 2026-11-04 팀장 승인 뒤 통합 브랜치에 병합됐다(merge commit `32ab046`). 그 뒤 2026-11-05 C-10 결정 반영을 PR #474로 따로 올렸다(아래 「2026-11-05 #416 OQ-U4-NFR-5 결정 반영」). 최신 상태는 「제출 3 준비안」의 「2026-11-05 상태」를 본다.
+이 문서는 제출 1(Step 1~8, PR #461로 2026-11-03 통합 브랜치 병합)과 제출 2(Step 9~18, PR #468로 2026-11-04 병합, merge commit `32ab046`), C-10 결정 반영 PR #474(2026-11-05 병합, merge commit `a11ad96`), 제출 3의 Step 19(2026-11-05, 시나리오 확정)까지의 상태다. 제출 3의 구현(Step 20~)은 OQ-U4-NFR-6 팀장 답 전이라 시작하지 않았다. 최신 상태는 바로 아래 「제출 3」을 본다.
+
+## 제출 3 (2026-11-05 착수) — W4 받은 사람·W6 10월 제거
+
+### 착수 (2026-11-05)
+
+- PR #474가 2026-11-05 05:27 UTC 통합 브랜치에 병합됐다(merge commit `a11ad96`, ljm0850·leechaeah 승인). 계획 「선행 조건과 제출 나누기」대로 `a11ad96`에서 `api/u4-recipient` 브랜치를 내고, 계획 승인 기록 커밋 `caf547f`(로컬 `docs/u4-plan-approval-1105`)를 `2199ed5`로 cherry-pick해 제출 3의 첫 커밋으로 삼았다.
+- OQ-U4-NFR-6(#416) 팀장 답은 아직 없다. 계획대로 Step 19까지만 진행하고 Step 20·21(받은 사람 컨트롤러·10월 경로 해제)·Step 23은 답이 온 뒤 시작한다.
+
+### Step 19 시나리오 확정 (2026-11-05)
+
+제출 1·2와 같은 방식으로 시험 파일 머리 주석에 시나리오·기대 결과·실패 조건을 적었다. 구현 전이라 api 세 파일은 머리 주석만 있고 시험을 담지 않으며(`node --test`에서 0건 통과), web 파일은 10월 시험 위에 머리 주석만 더했다. 세부 시험 코드는 Step 23에서 쓴다.
+
+| 파일 | 담은 시나리오 | 근거 |
+|---|---|---|
+| `api/test/publications/recipient-api.test.cjs` | 열람 판정 순서, S8(grant 없음·틀림·맞음·다른 발행본), S9 받은 사람 쪽(중지·만료·삭제 404, 작성자 대조 1건), 판정과 읽기의 시점(한 REPEATABLE READ 트랜잭션, 판정 뒤 중지·삭제 커밋 때 그 요청은 판정 시점 사본·다음 요청 404, NotFound → 404), S14(unlock 순서, 10회 뒤 429, 비밀번호 없는 링크 400), 소유 회원 상태, 거부 사례, 로그 비노출 | 기능 명세 W4·S8·S9·S14, 보안 설계 「링크 판정」·R-04·R-06·unlock, C-10·C-12, BR6.1~BR6.5 |
+| `api/test/publications/recipient-unlock-policy.test.cjs` | 10월 `public-links-unlock`(12건)·`public-links-unlock-policy`(14건)·`public-links-client-address`(8건)의 사례를 발행본 경로로 옮길 때의 기대 결과. 운영 정책값(주소 10회·링크 30회/15분·동시 검사 3·해시 2/20·빈도 20회/분)과 키의 링크 단위 `publicationId` | 보안 설계 R-03 api 문단·unlock, BR6.3, NFR1.7, 10월 시험 제목 |
+| `api/test/publications/app-routes.test.cjs` | (메서드, 경로) 중복 없음, 받은 사람 두 경로가 새 컨트롤러 하나에만, 10월 경로(`/catches/:catchId`, `/share-links` 발급·목록·중지) 없음, `@Public()` 메서드 단위, `ShareLinksModule`·`RecipientModule` 미등록, unlock 공급자는 `PublicationsModule`에만, 운영 기동 검사 유지 | 보안 설계 R-01·R-02·R-07, BR9.1, 10월 두 경계 시험 |
+| `web/test/recipient.test.mjs`(머리 주석 추가) | G1~G4(세 상태의 `RecipientGuide` 개수·`showClaudeConnect={false}`·h1 하나·첫 초점), G5~G7은 문구 검토로 표시, 1번 자리 사본 표지 구분·근거 링크·`showEvidence`·`RecipientSlotProps`, 판정 응답 처리(404·401·unlock·429·grant 유지 묶음), 10월 시험의 유지·응답 모양 변경·제거 묶음 | 보안 요구사항 G1~G7, 보안 설계 Q2 A·C-11 자리·R-03 표, C-11, BR6.6·BR7.1·BR7.5·BR7.6 |
+
+표시 규칙(머리 주석에 같은 문구로 적음):
+
+- `[답 전 10월 동작]`: OQ-U4-NFR-6에 걸린 사례(소유 회원 비활성 404, 회원 행 없음 500, unlock 대기 중 비활성 404, 링크·소유 회원 같은 시점 판정)는 합의 전 처리로 표시했다. 팀장 답이 바뀌면 그 사례만 고친다.
+- `[U10 몫]`: C-10 deletion-rule의 404 `LINK_UNAVAILABLE` 매핑과 저장·차감 롤백은 U10 자기 경로의 검증으로 두고 U4 시험에 넣지 않았다. U4 열람 경로는 같은 트랜잭션이라 그 틈이 없고, 트랜잭션 밖 `readSnapshot`의 `NotFound`만 404로 바꾼다.
+- 10월 시험에서 옮기는 사례는 10월 제목 요지를 그대로 적어, Step 23에서 빠진 사례를 대조할 수 있게 했다.
+
+Step 19 뒤 남은 것: Step 20·21·23은 OQ-U4-NFR-6 답 뒤 같은 커밋으로(unlock 공급자 전환 조건), Step 22(받은 사람 화면)는 `copy-text` 이동을 먼저, Step 24(문서)·Step 25(전체 확인·S15 미실행 기록). 제출 3 PR은 통합 브랜치 대상 하나로 낸다.
 
 ## 제출 2 (2026-11-03) — C-10 DB 구현·W3 발행·W5 작성자 관리
 
@@ -190,7 +216,7 @@
 - #468: 팀장이 D5·D12·D13을 수용한 뒤(11/4 08:14 UTC, 댓글 6626005142) 승인해(08:38 UTC) 통합 브랜치에 병합됐다(08:40 UTC, `32ab046`). 제출 3의 선행 조건(#468 병합)은 충족됐다.
 - #472(팀장): `api/CONVENTIONS.md` 공통 오류 규약에 발행 거부 409의 `details.catchIds` 예외를 적었다(11/4 23:48 UTC 병합, `0dfe9fb`). D5의 공통 계약 반영이 이것으로 끝났다.
 - PR #474(U4, 리뷰 대기): OQ-U4-NFR-5 결정의 C-10 계약 문구와 경계 시험. 통합 브랜치 `0dfe9fb` 기준. U10 경로의 삭제 404 매핑·롤백은 이 PR에 없고 U10 담당이다.
-- 남은 미결: OQ-U4-NFR-6(팀장 답 대기), 제출 3 착수 전 계획 재승인(위 「이 반영 뒤 남은 미결·확인 요청」). 제출 3은 착수하지 않았다.
+- 남은 미결: OQ-U4-NFR-6(팀장 답 대기), 제출 3 착수 전 계획 재승인(위 「이 반영 뒤 남은 미결·확인 요청」). 제출 3은 착수하지 않았다. (이후: 계획은 11/5 재승인, #474는 11/5 병합 `a11ad96`, 제출 3은 Step 19까지 진행 — 위 「제출 3」 절)
 
 **계획과 달라진 점(제출 3에 반영)**
 
