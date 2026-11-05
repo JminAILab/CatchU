@@ -74,6 +74,7 @@ export class InMemoryPublicationAccess implements PublicationAccess {
     return { publicationId, state: publicationState(publication.stoppedAt, publication.expiresAt, this.clock()) };
   }
 
+  /** 상태(중지·만료)는 판정하지 않고 사본만 돌려준다. 없으면(삭제) NotFound. DB 구현과 같다(#416 OQ-U4-NFR-5 결정 A) */
   async readSnapshot(publicationId: string): Promise<PublishedSnapshot> {
     const publication = this.publications.get(publicationId);
     if (!publication) throw new NotFound();
