@@ -12361,3 +12361,519 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-03T03:32:13Z#1
 
 ---
+
+## Artifact Created
+**Timestamp**: 2026-11-05T04:25:03Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/nfr-design-questions.md
+**Context**: construction > cr1-readable-catch > nfr-design > nfr-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-05T04:25:05Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-design
+**Decision**: Q1, Q2
+**Options**: |Q1 A. 시간 단언 없이 결과만, 시간은 한 번 재서 기록|Q1 B. 일반 시험에 5초 단언|Q1 C. Not yet defined|Q2 A. worker/app/redact.py로 옮기고 옛 위치 지움|Q2 B. 옮기고 옛 위치는 다시 내보내기만|Q2 C. Not yet defined
+**Unit**: cr1-readable-catch
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-05T04:25:15Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/nfr-design-questions.md
+**Context**: construction > cr1-readable-catch > nfr-design > nfr-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-05T04:25:19Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/nfr-design-questions.md
+**Context**: construction > cr1-readable-catch > nfr-design > nfr-design-questions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-05T04:29:58Z
+**Event**: HUMAN_TURN
+**Session**: 400a094a-35aa-4c64-9ac0-4dcca1289101
+**Origin**: person
+**Source**: picker
+**Picked**: ["A. 결과만 단언","A. 옮기고 옛 위치 지움"]
+**Message Id**: cfc1385d
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-05T04:29:58Z
+**Event**: QUESTION_REPLIED
+**Session**: 400a094a-35aa-4c64-9ac0-4dcca1289101
+**Question**: 처리 시간 5초 기준(커밋 3,000개인 합성 후보의 재료 고르기)을 시험에서 어떻게 확인할까요? 시간을 단언하는 시험은 CI 컴퓨터가 느리면 잘못 실패할 수 있습니다.
+**Reply**: A. 결과만 단언
+**Options**: ["A. 결과만 단언","B. 5초 단언","C. Not yet defined"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-05T04:29:58Z
+**Event**: QUESTION_REPLIED
+**Session**: 400a094a-35aa-4c64-9ac0-4dcca1289101
+**Question**: 후보 판정과 생성이 함께 쓸 가리기 검사는 어디에 둘까요? 지금은 worker/app/generation/redact.py에 있고, 불러오는 곳은 request.py와 시험 파일 하나, 둘뿐입니다.
+**Reply**: A. 옮기고 옛 위치 지움
+**Options**: ["A. 옮기고 옛 위치 지움","B. 옛 위치에 다시 내보내기","C. Not yet defined"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-05T04:30:02Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/nfr-design-questions.md
+**Context**: construction > cr1-readable-catch > nfr-design > nfr-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-05T04:30:04Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/nfr-design-questions.md
+**Context**: construction > cr1-readable-catch > nfr-design > nfr-design-questions.md
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-05T04:30:05Z
+**Event**: QUESTION_ANSWERED
+**Stage**: nfr-design
+**Details**: Q1 A(일반 시험은 결과만 단언, 시간은 코드 생성 때 한 번 재서 기록), Q2 A(가리기 검사를 worker/app/redact.py로 옮기고 옛 위치 지움)
+**Unit**: cr1-readable-catch
+**Person Reply**: 지금 고침 (권장)\nA. 결과만 단언\nA. 옮기고 옛 위치 지움
+**Message Id**: cfc1385d
+**Message Ids**: fe98fd6f,cfc1385d
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-05T04:30:07Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/nfr-design-questions.md
+**Unit**: cr1-readable-catch
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-05T04:33:46Z
+**Event**: HUMAN_TURN
+**Session**: 400a094a-35aa-4c64-9ac0-4dcca1289101
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: 43df6774
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-05T04:33:46Z
+**Event**: QUESTION_REPLIED
+**Session**: 400a094a-35aa-4c64-9ac0-4dcca1289101
+**Question**: Does this all look correct before I generate the artifact? (위 요약대로 CR1 비기능 설계 산출물을 만들까요?)
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-05T04:33:49Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/nfr-design-questions.md
+**Context**: construction > cr1-readable-catch > nfr-design > nfr-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-05T04:33:50Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: nfr-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/nfr-design-questions.md
+**Questions SHA-256**: d60fadd55d34e4ec3560aebd808d1a98711d616a368a27e668f5033ac6e59581
+**Hash Scope**: confirmed-content-v2
+**Unit**: cr1-readable-catch
+**Message Id**: 43df6774
+**Person Reply**: Looks correct
+**Summary Authorization Id**: 8ee44dda6be070daf9d0ea2ffacb43ebcebcf908976801e63a84fce57d26c98f
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-05T04:34:06Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/security-design.md
+**Context**: construction > cr1-readable-catch > nfr-design > security-design.md
+**Summary Authorization Id**: 8ee44dda6be070daf9d0ea2ffacb43ebcebcf908976801e63a84fce57d26c98f
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-05T04:34:14Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/performance-design.md
+**Context**: construction > cr1-readable-catch > nfr-design > performance-design.md
+**Summary Authorization Id**: 8ee44dda6be070daf9d0ea2ffacb43ebcebcf908976801e63a84fce57d26c98f
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-05T04:34:20Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/scalability-design.md
+**Context**: construction > cr1-readable-catch > nfr-design > scalability-design.md
+**Summary Authorization Id**: 8ee44dda6be070daf9d0ea2ffacb43ebcebcf908976801e63a84fce57d26c98f
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-05T04:34:29Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/reliability-design.md
+**Context**: construction > cr1-readable-catch > nfr-design > reliability-design.md
+**Summary Authorization Id**: 8ee44dda6be070daf9d0ea2ffacb43ebcebcf908976801e63a84fce57d26c98f
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-05T04:34:35Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/observability-design.md
+**Context**: construction > cr1-readable-catch > nfr-design > observability-design.md
+**Summary Authorization Id**: 8ee44dda6be070daf9d0ea2ffacb43ebcebcf908976801e63a84fce57d26c98f
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-05T04:34:45Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/logical-components.md
+**Context**: construction > cr1-readable-catch > nfr-design > logical-components.md
+**Summary Authorization Id**: 8ee44dda6be070daf9d0ea2ffacb43ebcebcf908976801e63a84fce57d26c98f
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-05T04:34:57Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/traceability.json
+**Context**: construction > cr1-readable-catch > nfr-design > traceability.json
+**Summary Authorization Id**: 8ee44dda6be070daf9d0ea2ffacb43ebcebcf908976801e63a84fce57d26c98f
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-05T04:35:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: 2e14bf52
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-05T04:35:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: 2e14bf52
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/performance-design.md
+**Duration ms**: 78
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-05T04:35:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: ffd37d59
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/security-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-05T04:35:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: ffd37d59
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/security-design.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-05T04:35:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: 92920d9f
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/scalability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-05T04:35:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: 92920d9f
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/scalability-design.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-05T04:35:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: a72e9283
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/reliability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-05T04:35:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: a72e9283
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/reliability-design.md
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-05T04:35:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: d69c45bc
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/observability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-05T04:35:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: d69c45bc
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/observability-design.md
+**Duration ms**: 74
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-05T04:35:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: 091416c9
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/logical-components.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-05T04:35:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: 091416c9
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/logical-components.md
+**Duration ms**: 71
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-05T04:35:02Z
+**Event**: SENSOR_FIRED
+**Fire id**: ba382a1f
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-05T04:35:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: ba382a1f
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/traceability.json
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-05T04:35:02Z
+**Event**: SENSOR_FIRED
+**Fire id**: c1ae9af1
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-05T04:35:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: c1ae9af1
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/performance-design.md
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-05T04:35:02Z
+**Event**: SENSOR_FIRED
+**Fire id**: 18a60cbd
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-05T04:35:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: 18a60cbd
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: cr1-readable-catch
+**Output path**: aidlc/spaces/default/intents/261103-catch-redesign/construction/cr1-readable-catch/nfr-design/traceability.json
+**Duration ms**: 76
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-05T04:35:02Z
+**Event**: REVIEW_REQUESTED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: cr1-readable-catch
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:7f11649d24f82112ac1818adeac0bdddf197515e02380cfb5c15b294805ddc5f
+**Request Id**: review:45753557e6ee8929680b415bff72db04
+**Review File**: .aidlc-engine/reviews/nfr-design/units/cr1-readable-catch/ca50fe313847ab16/1.45753557e6ee8929680b415bff72db04.review.md
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-05T04:35:14Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-05T04:36:44Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261103-catch-redesign/.aidlc-engine/reviews/nfr-design/units/cr1-readable-catch/ca50fe313847ab16/1.45753557e6ee8929680b415bff72db04.review.md
+**Context**: .aidlc-engine > reviews > nfr-design > units > cr1-readable-catch > ca50fe313847ab16 > 1.45753557e6ee8929680b415bff72db04.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-05T04:36:52Z
+**Event**: HOST_TURN
+**Session**: 400a094a-35aa-4c64-9ac0-4dcca1289101
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-05T04:36:52Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: a0970295d9f2a9c74
+**Review File Digest**: .aidlc-engine/reviews/nfr-design/units/cr1-readable-catch/ca50fe313847ab16/1.45753557e6ee8929680b415bff72db04.review.md=ca0411a96bff70396f8560191f114adadd6c6b7efd6e9a150a3e32bf280aa4a6
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-05T04:36:57Z
+**Event**: REVIEW_COMPLETED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: cr1-readable-catch
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:7f11649d24f82112ac1818adeac0bdddf197515e02380cfb5c15b294805ddc5f
+**Artifact Fingerprint**: sha256:7f11649d24f82112ac1818adeac0bdddf197515e02380cfb5c15b294805ddc5f
+**Request Id**: review:45753557e6ee8929680b415bff72db04
+**Review Record**: .aidlc-engine/reviews/nfr-design/units/cr1-readable-catch/ca50fe313847ab16/1.json
+**Review Record Digest**: sha256:c5897abfbafd2773c8c21ec80440f93f7ec5356f7adb45e8097e9f796fa4aad5
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-05T04:36:58Z
+**Event**: UNIT_STARTED
+**Stage**: nfr-design
+**Unit**: cr1-readable-catch
+**Run floor**: WORKFLOW_STARTED:2026-11-03T03:32:13Z#1
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-05T04:36:59Z
+**Event**: UNIT_COMPLETED
+**Stage**: nfr-design
+**Unit**: cr1-readable-catch
+**Run floor**: WORKFLOW_STARTED:2026-11-03T03:32:13Z#1
+
+---
