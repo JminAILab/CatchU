@@ -42,6 +42,9 @@ export const ERROR_STATUS = {
   // 12월 intent U6(U6 기능 설계 BR3.2·BR3.3). U6 안 승인 API만 쓰는 코드라 계약 문서에는 없다.
   MCP_CONSENT_REQUIRED: 409,
   MCP_AUTHORIZATION_INVALID: 400,
+  // U10 기능 설계: JD 경계만 422. 공용 ValidationPipe의 400은 유지한다.
+  INVALID_INPUT: 422,
+  INPUT_TOO_LARGE: 422,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_STATUS;
@@ -90,4 +93,6 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   // U6 기능 설계 BR3.2·BR3.3. web은 문구가 아닌 code로 분기한다.
   MCP_CONSENT_REQUIRED: '자료 읽기에 먼저 동의해 주세요.',
   MCP_AUTHORIZATION_INVALID: '연결 요청을 확인할 수 없습니다. Claude에서 다시 시작해 주세요.',
+  INVALID_INPUT: '입력값을 확인해 주세요.',
+  INPUT_TOO_LARGE: '입력 길이와 요구사항 수를 줄여 주세요.',
 };

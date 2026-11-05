@@ -29,6 +29,8 @@ export const routes = {
   assets: "/assets",
   /** 텍스트 자료 목록·편집(U4 W2). */
   materials: "/materials",
+  /** 본인 JD 목록·편집(U10). */
+  jds: "/jds",
   /** 공유 링크 목록·발급·복사·중단. */
   links: "/links",
 } as const;

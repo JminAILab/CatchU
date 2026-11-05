@@ -1,0 +1,148 @@
+{
+  "stage": "code-generation",
+  "unit": "u10-jd",
+  "version": 1,
+  "writes": [
+    {
+      "path": "api/CONVENTIONS.md"
+    },
+    {
+      "path": "api/README.md"
+    },
+    {
+      "path": "api/docs/jd.md"
+    },
+    {
+      "path": "api/docs/member-withdrawal-deletion.md"
+    },
+    {
+      "path": "api/src/app.module.ts"
+    },
+    {
+      "path": "api/src/common/errors/error-codes.ts"
+    },
+    {
+      "path": "api/src/database/migrations/1793762571117-CreateJdSummary.ts"
+    },
+    {
+      "path": "api/src/jd-summary/jd-generation-request.ts"
+    },
+    {
+      "path": "api/src/jd-summary/jd-summary-log.ts"
+    },
+    {
+      "path": "api/src/jd-summary/jd-summary-processor.ts"
+    },
+    {
+      "path": "api/src/jd-summary/jd-summary-result.entity.ts"
+    },
+    {
+      "path": "api/src/jd-summary/jd-summary-run.entity.ts"
+    },
+    {
+      "path": "api/src/jd-summary/jd-summary-store.ts"
+    },
+    {
+      "path": "api/src/jd-summary/jd-summary-tokens.ts"
+    },
+    {
+      "path": "api/src/jd-summary/jd-summary.controller.ts"
+    },
+    {
+      "path": "api/src/jd-summary/jd-summary.module.ts"
+    },
+    {
+      "path": "api/src/jd-summary/jd-summary.service.ts"
+    },
+    {
+      "path": "api/src/jd/jd-cursor.ts"
+    },
+    {
+      "path": "api/src/jd/jd-input.ts"
+    },
+    {
+      "path": "api/src/jd/jd.controller.ts"
+    },
+    {
+      "path": "api/src/jd/jd.entity.ts"
+    },
+    {
+      "path": "api/src/jd/jd.module.ts"
+    },
+    {
+      "path": "api/src/jd/jd.service.ts"
+    },
+    {
+      "path": "api/test/jd/fixtures.cjs"
+    },
+    {
+      "path": "api/test/jd/jd-integration.test.cjs"
+    },
+    {
+      "path": "api/test/jd/jd-management.test.cjs"
+    },
+    {
+      "path": "api/test/jd/jd-summary.test.cjs"
+    },
+    {
+      "path": "web/README.md"
+    },
+    {
+      "path": "web/src/app/(member)/jds/page.tsx"
+    },
+    {
+      "path": "web/src/components/header/member-header.tsx"
+    },
+    {
+      "path": "web/src/features/jd/README.md"
+    },
+    {
+      "path": "web/src/features/jd/jd-api.ts"
+    },
+    {
+      "path": "web/src/features/jd/jd-management-model.ts"
+    },
+    {
+      "path": "web/src/features/jd/jd-management-page.tsx"
+    },
+    {
+      "path": "web/src/features/jd/jd-management-view.tsx"
+    },
+    {
+      "path": "web/src/features/jd/jd-parsers.ts"
+    },
+    {
+      "path": "web/src/features/jd/jd-result-view.tsx"
+    },
+    {
+      "path": "web/src/features/jd/jd-session.ts"
+    },
+    {
+      "path": "web/src/features/jd/jd-summary-model.ts"
+    },
+    {
+      "path": "web/src/features/jd/jd-summary-panel.tsx"
+    },
+    {
+      "path": "web/src/features/jd/jd-types.ts"
+    },
+    {
+      "path": "web/src/features/jd/jd.module.css"
+    },
+    {
+      "path": "web/src/lib/member-navigation.ts"
+    },
+    {
+      "path": "web/src/lib/routes.ts"
+    },
+    {
+      "path": "web/test/jd-management.test.mjs"
+    },
+    {
+      "path": "web/test/jd-summary.test.mjs"
+    },
+    {
+      "path": "web/test/member-navigation.test.mjs"
+    }
+  ]
+}
