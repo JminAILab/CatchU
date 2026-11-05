@@ -116,6 +116,51 @@
 
 - **전체 글 상한 안내 구분**: web `publications-api.ts`의 `validationLines`가 400 `{ field: 'items', reason: 'maxTotalLength' }`를 항목 개수·중복 안내와 구분해 "고른 자료의 전체 글이 60,000자를 넘었습니다. 자료를 빼거나, 수정할 수 있는 Catch 설명·텍스트 자료 원문을 줄인 뒤 다시 발행해 주세요."(`TOTAL_TEXT_LIMIT_TEXT`)로 보인다. 다른 `items` 이유와 `title`·`password`·모르는 칸 안내는 그대로다. `PUBLISH_LIMITS.totalText`(60,000)는 안내용이며 화면에서 미리 세지 않는다(서버 `SNAPSHOT_TEXT_TOTAL_MAX`가 기준, OQ-U4-4). 회귀 시험: `test/publish.test.mjs`에 안내 구분 사례와, 전체 글 초과 400 뒤 편집 단계 복귀·선택·순서·제목·비밀번호 유지 사례를 더했다. 발행 화면 README 400 행을 맞췄다. D5·D12·D13과 제출 3 범위는 건드리지 않았다.
 
+### 2026-11-05 #416 OQ-U4-NFR-5 결정 반영 (브랜치 `api/u4-c10-nfr5-decision`, 통합 브랜치 `0dfe9fb` 기준)
+
+**결정 근거**: 이슈 #416 팀장 결정(ljm0850, 2026-11-04 08:44 UTC, 댓글 6626574160) — **A안**(현재 per-call 동작 허용) + 세부 2건(U4 제안 6624371983, U10 leechaeah 동의 조건 6624259839 반영).
+
+1. 판정을 통과한 요청은 중지·만료만을 이유로 취소하지 않는다. 그 요청의 접수와 횟수 차감은 유효하고, 차단은 다음 요청의 재판정으로 한다(10월에 판정·읽기를 한 스냅샷으로 묶었을 때와 같은 허용 수준). U5 질의응답·요약은 코드상 이미 이 방식이라 고칠 곳이 없다(팀장 확인).
+2. 판정 직후 발행본이 삭제된 것이 확인되면(`readSnapshot`의 `NotFound`, 또는 발행본 참조로 확인된 외래 키 거부) 저장·차감을 되돌리고 404 `LINK_UNAVAILABLE`로 응답한다. 삭제 때문으로 확인되지 않은 DB 오류는 500 유지.
+3. `readSnapshot`의 오류 이름은 `NotFound` 유지(U5 `base-summary-handler.ts`의 `instanceof NotFound` 분기). B(묶음 함수)·C(`readSnapshot` 상태 판정)는 넣지 않는다. 계약 문구·경계 시험은 U4, 자기 경로 404 매핑·시험은 U10. OQ-U4-NFR-6은 제출 3 전 별도 답, 그때까지 10월 동작.
+
+**변경 분류**: 이름·자료형·의미·오류를 바꾸지 않는 **더하는 변경(문구 명시)**이다(코딩 운영 「기준 문서」·계약 요약 「Contract ownership rules」). 함수 시그니처·오류 클래스·DB 구현과 가짜의 동작은 그대로이고 주석·문서·시험만 더했다. D10(계약 밖 `resolveForRecipientIn`·`readSnapshotIn`, 제출 3 열람 경로용)은 그대로다. 계약 문서 변경은 Unit 변경에 넣지 않고 통합 브랜치 대상 PR로 내며(레포 컨벤션 §2.1), 이 브랜치가 그 PR 후보다. 아직 커밋·push·PR 전이다.
+
+| 반영 | 파일 | 내용 |
+|---|---|---|
+| 계약(코드 주석) | `api/src/publications/publication-access.ts` | `resolveForRecipient`에 판정 뒤 중지·만료 허용·다음 요청 차단, `readSnapshot`에 상태 판정 없음·삭제 `NotFound`·받은 사람 경로 404 매핑(외래 키 거부는 SQLSTATE 23503이고 거부한 제약이 `publication`을 참조하는 것일 때만. 다른 제약의 23503은 500)·그 밖의 DB 오류 500, `NotFound` 설명. 소유 회원 비활성 허용은 팀장 결정 문구(중지·만료)에 없어 계약 규칙에 넣지 않았다 |
+| 계약 문서 | `aidlc/.../inception/contract-design/contract-summary.md` 「C-10」 | yaml 블록에 `resolveForRecipient`·`readSnapshot` 주석과 `post-judgment-rule`·`deletion-rule` 두 줄 추가. 블록 밖 설명·다른 계약은 그대로 |
+| 안내 문서 | `api/docs/publications.md` 「C-10 PublicationAccess」 | `readSnapshot` 행, 「판정 뒤 상태 변경」 문단, 가짜 구현 문단(중지·만료 사본 그대로, 소유 회원 상태 없음), 「시험」 두 항목 |
+| 구현 주석 | `api/src/publications/db-publication-access.ts`·`in-memory-publication-access.ts` | `readSnapshotIn`·`readSnapshot` 주석을 "계약의 NotFound·상태 판정 없음"으로. 코드 변경 없음 |
+| 경계 시험 | `api/test/publications/publication-access-db.test.cjs` | 머리 주석 블록과 시험 3개: (a) 판정 뒤 중지(비밀번호 없음·비밀번호 링크)·만료 경과·소유자 비활성 → 같은 요청 `readSnapshot` 사본 그대로, 다음 `resolveForRecipient` `LinkUnavailable`, 재활성 뒤 열림 (b) 판정 뒤 삭제 → `readSnapshot` `NotFound`(`LinkUnavailable` 아님, 토큰·SQL 비노출), 발행본 참조 INSERT는 `23503`, 다음 판정 `LinkUnavailable` (c) 대조: 같은 REPEATABLE READ 트랜잭션의 `resolveForRecipientIn`·`readSnapshotIn`은 그사이 커밋된 중지·삭제를 보지 않고(판정 시점 제목·항목), 밖의 새 판정·별도 `readSnapshot`은 바로 막힘 |
+| 경계 시험(가짜) | `api/test/publications/in-memory-publication-access.test.cjs` | 판정 뒤 `put`(중지·만료)에도 `readSnapshot` 사본 그대로·다음 판정 `LinkUnavailable`, `remove` 뒤 `readSnapshot` `NotFound`(`LinkUnavailable` 아님) |
+
+**의도적으로 고치지 않은 것**
+
+- 승인된 계획 `code-generation-plan.md`의 미결 표 OQ-U4-NFR-5 행("U5·U10 실제 연결 전 / U4 열람 경로만 한 트랜잭션, C-10 계약은 바꾸지 않는다"): 본문을 고치지 않았다. "계약을 바꾸지 않는다"는 함수 모양 기준이라 이번 문구 추가와 어긋나지 않으며, 결정 기록은 이 문서로 갈음한다. 승인 뒤 계획 변경 알림이 이미 열려 있어(아래 「AI-DLC 기록」) 더 겹치지 않게 했다.
+- 보안 설계 `nfr-design/security-design.md`(「판정과 읽기의 시점」 미결 표·OQ-U4-NFR-5 행): 승인본을 소급 수정하지 않는다. 미결 해소는 이 절로 기록하고, 제출 3 PR 「리뷰 요청」에 같은 내용을 옮긴다.
+- U10 자기 경로의 404 매핑·시험(U10 담당), U5(변경 불필요), 제출 3 Step 19~25, 가짜 구현의 소유 회원 상태(없음, 문서에 명시).
+
+**검증(2026-11-05, 테스트 DB `catchu-db-test-u4` 127.0.0.1:5443, 마이그레이션 22개 적용, 합성 자료만)**
+
+| 확인 | 명령 | 결과 |
+|---|---|---|
+| 새 경계 시험 + 같은 파일의 기존 시험 | `cd api && TEST_DB_PORT=5443 npm test -- test/publications/in-memory-publication-access.test.cjs test/publications/publication-access-db.test.cjs` | **16개 통과, 실패 0**(가짜 7, DB 9; 새 시험 4) |
+| 제출 2 api 회귀(제출 1·공통 오류 포함) | `cd api && TEST_DB_PORT=5443 npm test -- test/catches/author-description-api.test.cjs test/materials/text-materials-api.test.cjs test/publications/in-memory-publication-access.test.cjs test/publications/publication-access-db.test.cjs test/publications/publish-api.test.cjs test/publications/publications-manage-api.test.cjs test/publications/publications-logging.test.cjs test/publications/publications-module.test.cjs test/errors.test.cjs` | **69개 통과, 실패 0** |
+| api 타입·lint | `npx tsc --noEmit`, 바꾼 파일 5개 `npx eslint` | 오류 없음 |
+
+- 실행하지 않은 것: U5·U10의 실제 C-10 연결, 진짜 동시 요청 재현(시험은 한 요청의 두 호출 사이에 다른 연결의 커밋을 순차로 넣어 "사이" 상태를 만든 것), 커버리지 재측정(주석·시험만 더해 `dist/publications` 비율은 11/3 측정값 그대로), web 시험.
+- 소비 Unit에 알릴 것(계약 더하는 변경): U5·U10·U9 담당에게 #416에서 계약 문구 반영과 시험 파일을 알린다. U10은 접수 중 삭제의 404 매핑을 자기 경로에서 구현·시험한다.
+
+**이 반영 뒤 남은 미결·확인 요청**
+
+| 미결 | 결정 시점 | 상대 | 내용 |
+|---|---|---|---|
+| 제출 3 착수 전 계획 재승인 | 제출 3(Step 19~25) 시작 전 | 담당자(U4) | 승인된 계획(2026-11-02 지문 `95b59991…`) 뒤 Step 16·17·20·22·23과 미결 표 두 행(OQ-U4-NFR-1·2, 이 문서의 OQ-U4-NFR-5)이 바뀌었다. 2026-11-05 담당자가 "지금 계획대로"로 답해 승인본 복원은 하지 않았고 현재 계획으로 이어간다. 다만 제출 3은 바뀐 Step 20·22·23을 실행하므로 착수 전에 현재 계획을 다시 승인받는다(Code Generation Step 3의 Review the plan) |
+| 판정 뒤 소유 회원 비활성의 허용 여부 | OQ-U4-NFR-6 답과 함께 | 팀장 | 팀장 결정 문구는 중지·만료만 허용한다. 소유 회원 비활성은 `readSnapshot`이 상태를 보지 않아 지금은 같은 per-call 동작이지만(경계 시험 (a)에 기록), 계약 규칙에는 넣지 않았다. NFR-6 결정 때 함께 적는다 |
+
+**AI-DLC 기록(2026-11-05)**: Code Generation `u4-publication-link`가 열린 상태(UNIT_RESUMED 2026-11-03T08:04:38Z)로 이어서 진행했다. 개발자 persona dispatch(Task)가 두 번 거부돼(Claude Code auto mode가 규칙 전달 훅이 바꾼 입력을 검토하지 못함) conductor가 같은 brief 범위를 직접 수행했고 감사 기록에 `Error: developer agent dispatch blocked`(2026-11-05T01:18:54Z) 노트를 남겼다. 승인된 계획(지문 `95b59991…`, 2026-11-02 승인) 대비 현재 계획의 차이는 Step 16·17(11/3, #416 [링크 열기]·Q1 B·검증 범위 결정)과 Step 20·22·23(11/4, `9bb64ec` unlock 공급자 전환·`copy-text.ts` 이동·시험 단언 반전)과 미결 표 OQ-U4-NFR-1·2 행이며, 모두 이미 결정된 사항의 메모이고 이번 작업(C-10 문구·경계 시험)과 무관하다. 담당자가 2026-11-05 "지금 계획대로"로 답해 승인본을 복원하지 않았다(임의 간주·일괄 복원 없음). 제출 3 착수 전 재승인은 위 미결 표.
+
 ### 실행하지 않은 시험 (제출 2)
 
 - 받은 사람 판정(비밀번호·중지·만료·삭제)의 브라우저 확인 — 제출 3(#416 결정 3).
@@ -136,7 +181,7 @@
 **2026-11-04 상태**
 
 - #468 `5e8a173`(제출 2 `717f49b` + CI 수정 `9bb64ec` + #416 11/3 추가 요청 반영): CI 통과, Codex 미해결 스레드 0. leechaeah가 B 범위를 확인하고 수정 요청 없음(11/4 리뷰). D5·D12·D13의 팀장 답은 없다. Draft 유지.
-- #416 후속: U6의 Catch 설명 상한 확인은 끝났고 U4 조치가 없다(yeongyeon1802, 11/4). U10(#452)이 C-10·C-11 제공 판본을 물어 11/4에 답했다(C-10은 `5e8a173`으로 사전 연결 가능, C-11은 제출 3). OQ-U4-NFR-5·6의 팀장 답은 아직 없다.
+- #416 후속: U6의 Catch 설명 상한 확인은 끝났고 U4 조치가 없다(yeongyeon1802, 11/4). U10(#452)이 C-10·C-11 제공 판본을 물어 11/4에 답했다(C-10은 `5e8a173`으로 사전 연결 가능, C-11은 제출 3). OQ-U4-NFR-5는 11/4 팀장이 A안으로 결정했고 11/5에 반영했다(위 「2026-11-05 #416 OQ-U4-NFR-5 결정 반영」). OQ-U4-NFR-6의 팀장 답은 아직 없다.
 
 **계획과 달라진 점(제출 3에 반영)**
 
@@ -151,7 +196,7 @@
 |---|---|---|---|
 | D5 `details.catchIds`를 공통 계약에 더할지 | 제출 2 검토·병합(#468 병합 전 해결) | 팀장 | 거절이면 409 Catch 목록 전달 방식을 다시 정해 제출 2의 api 예외 필터·web 안내·시험을 고친다 |
 | D12(안내는 CATCH 항목이 있을 때만)·D13(실패 뒤 단계) | 제출 2 검토·병합 | 팀장 | 제출 2 web 수정 여부 |
-| OQ-U4-NFR-5 C-10을 따로 부를 때 `resolveForRecipient`와 `readSnapshot` 사이의 중지·삭제 | U5·U10 실제 연결 전 합의 | 팀장·U5·U10 | 현재 계획의 U4 열람 경로는 판정·읽기를 한 읽기 전용 REPEATABLE READ 트랜잭션으로 처리한다(D10, Step 20). 소비 Unit 연결이나 계약 변경(묶음 호출 추가 등)의 영향은 합의 결과에 따라 확인한다 |
+| OQ-U4-NFR-5 C-10을 따로 부를 때 `resolveForRecipient`와 `readSnapshot` 사이의 중지·삭제 | **결정됨**(#416 팀장, 2026-11-04, A안) | 팀장·U5·U10 | 계약 문구·경계 시험 반영 완료(위 「2026-11-05 #416 OQ-U4-NFR-5 결정 반영」). U4 열람 경로(Step 20)는 계획대로 한 트랜잭션. 계약 함수 모양 변경 없음. U10 자기 경로 404 매핑은 U10 담당 |
 | OQ-U4-NFR-6 소유 회원 비활성 404·회원 없음 500 | 받은 사람 경로 구현·시험 전 확인(Step 20·23 전) | 팀장 | 확인 전에는 합의 전 처리(10월 동작)대로 구현하고, 바뀌면 그 단계만 고친다 |
 | U4 고정 안내(BR7.1) 축소 문구 | 제출 3에서 작성하고 PR 「리뷰 요청」으로 검토 | 팀장(G5·G6) | Step 22·24 |
 
