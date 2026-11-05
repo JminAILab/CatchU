@@ -30,7 +30,7 @@ export { PUBLICATION_ACCESS, PUBLICATIONS_CLOCK, PUBLISH_RATE_LIMITER } from './
  * - 발행 빈도 제한기는 10월 발급 제한기와 같은 설정 모양의 새 인스턴스다(키 공간이 겹치지 않는다).
  * - C-10 DB 구현은 `PUBLICATION_ACCESS` 토큰으로 내보낸다. U5는 `RagAnswerModule.register({ publicationAccess: PUBLICATION_ACCESS,
  *   imports: [PublicationsModule] })`처럼 받는다(docs/publications.md 「C-10 PublicationAccess」).
- * - imports: `OwnerProfileReaderModule`(OQ-U4-NFR-6 합의 전 소유 회원 상태), U2 `AiRunModule`·`DailyRunLimitModule`·`AiConsentModule`·
+ * - imports: `OwnerProfileReaderModule`(소유 회원 상태, #416 OQ-U4-NFR-6 결정), U2 `AiRunModule`·`DailyRunLimitModule`·`AiConsentModule`·
  *   `FileStorageModule`, U3 `PublishedIndexModule`(`PUBLISHED_INDEX_WRITER`). TypeORM 엔티티는 앱의 DataSource가 `*.entity.ts`를 찾는다.
  */
 @Module({
