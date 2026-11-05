@@ -61,6 +61,9 @@ jobs:
               # api 테스트는 worker 합성 자료와 계약 YAML도 읽고, web 통합 시험(공유 링크 #149·화면 통합 #123)은 web의 기능·lib 코드를 직접 불러온다.
               # 큐 판본 시험은 api의 BullMQ·ioredis가 큐 검증 키트에 고정한 판본과 같은지 본다.
               case "$file" in api/* | worker/fixtures/* | "$contract"* | web/src/features/share-links/* | web/src/features/assets/* | web/src/features/recipient/* | web/src/features/repository-management/* | web/src/lib/* | docs/queue-verification/package.json | docs/queue-verification/package-lock.json) api=true ;; esac
+              # U7의 API 연결 시험은 worker 제품 코드·시험 도우미를 Python으로 직접 실행한다.
+              # 실행 코드나 Python 환경이 바뀌어도 API 쪽 연결 검사를 건너뛰지 않는다(#389).
+              case "$file" in worker/app/* | worker/tests/* | worker/.python-version | worker/pyproject.toml | worker/uv.lock) api=true ;; esac
               # worker 메시지 검사는 계약 YAML을 읽고, ruff는 루트 .gitignore에 적힌 파일을 검사에서 뺀다.
               # 큐 소비자 시험은 큐 검증 키트의 판본(BullMQ·redis)과 같은지 보고 키트의 Node BullMQ로 요청을 넣는다.
               case "$file" in worker/* | "$contract"* | .gitignore | docs/queue-verification/pyproject.toml | docs/queue-verification/uv.lock | docs/queue-verification/package.json | docs/queue-verification/package-lock.json) worker=true ;; esac
@@ -75,6 +78,9 @@ jobs:
           printf 'web=%s\napi=%s\nworker=%s\ndeps=%s\n' "$web" "$api" "$worker" "$deps" | tee -a "$GITHUB_OUTPUT"
           printf '### 실행할 서비스 검사\n\n| web | api | worker |\n|---|---|---|\n| %s | %s | %s |\n\n의존성 취약점 검사: %s\n' \
             "$web" "$api" "$worker" "${deps:-없음}" >> "$GITHUB_STEP_SUMMARY"
+      - name: ci-changes-regression
+        if: ${{ !cancelled() }}
+        run: python3 .github/scripts/test-ci-changes.py
       # 문서 크기 검사는 앞 단계가 실패해도 돈다. 이 단계가 실패하면 changes가 실패해 머지를 막고,
       # 서비스 job은 !cancelled() 조건이라 detect 결과대로 그대로 돈다(job 출력은 job이 끝날 때 계산된다).
       - name: docs-size
