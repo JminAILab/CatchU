@@ -50,6 +50,14 @@ export class PublicationOwnerMissing extends Error {
   }
 }
 
+/** unlock 판정 결과(제출 3). 검증값은 비밀번호 비교에만 쓰고 응답·로그에 싣지 않는다. */
+export interface UnlockJudgement {
+  publicationId: string;
+  expiresAt: Date;
+  /** 비밀번호 링크의 scrypt 검증값. 비밀번호 없는 링크는 null */
+  passwordVerifier: string | null;
+}
+
 export const PUBLICATION_COLUMNS = `publication_id AS "publicationId", member_id AS "memberId", title,
   link_token_reference AS "linkTokenReference", password_protection_reference AS "passwordProtectionReference",
   published_at AS "publishedAt", expires_at AS "expiresAt", stopped_at AS "stoppedAt"`;
@@ -85,16 +93,7 @@ export class DbPublicationAccess implements PublicationAccess {
    * 순서: 토큰 형식 → 발행본 조회 → 중지·만료 → 소유 회원 비활성(404)·회원 없음(500) → 비밀번호 링크면 grant.
    */
   async resolveForRecipientIn(manager: EntityManager, token: string, grant: string | null, now: Date): Promise<RecipientAccess> {
-    // 형식이 틀린 토큰은 조회 없이 없는 링크와 같다(NFR1.12, 10월 동작 그대로).
-    if (!isLinkTokenFormat(token)) throw new LinkUnavailable();
-    const rows: PublicationRow[] = await manager.query(
-      `SELECT ${PUBLICATION_COLUMNS} FROM publication WHERE link_token_reference = $1`, [token]);
-    const publication = rows[0];
-    if (!publication || publicationState(publication.stoppedAt, publication.expiresAt, now) !== 'ACTIVE') throw new LinkUnavailable();
-    // #416 OQ-U4-NFR-6 결정(2026-11-05): 비활성 소유자(작성자)는 다른 불가 사유와 같은 404, 회원 행 없음은 데이터 불일치 500. 중지·만료 다음, grant 앞.
-    const ownerState = await this.owners.readOwnerState(publication.memberId, manager);
-    if (ownerState === 'INACTIVE') throw new LinkUnavailable();
-    if (ownerState === 'NO_MEMBER') throw new PublicationOwnerMissing();
+    const publication = await this.readUsablePublicationIn(manager, token, now);
     if (publication.passwordProtectionReference !== null
       && !verifyLinkGrant(this.grantKey, grant, publication.publicationId, now)) {
       throw new LinkPasswordRequired();
@@ -105,6 +104,38 @@ export class DbPublicationAccess implements PublicationAccess {
       passwordProtected: publication.passwordProtectionReference !== null,
       expiresAt: new Date(publication.expiresAt),
     };
+  }
+
+  /**
+   * unlock용 판정(U4 제출 3, 계약 밖의 클래스 메서드). grant를 보지 않고 토큰 형식 → 발행본 → 중지·만료 → 소유 회원 상태까지만 판정해
+   * 비밀번호 검증값을 돌려준다(BR6.3 ①, 10월 `usableLink`와 같은 순서). 읽기 전용 REPEATABLE READ 트랜잭션 하나에서 돌고 돌아오기 전에 닫힌다.
+   */
+  async resolveForUnlock(token: string, now: Date): Promise<UnlockJudgement> {
+    if (!isLinkTokenFormat(token)) throw new LinkUnavailable();
+    const publication = await this.readOnly((manager) => this.readUsablePublicationIn(manager, token, now));
+    return {
+      publicationId: publication.publicationId,
+      expiresAt: new Date(publication.expiresAt),
+      passwordVerifier: publication.passwordProtectionReference,
+    };
+  }
+
+  /**
+   * 지금 열 수 있는 발행본 한 행. 순서: 토큰 형식 → 발행본 조회 → 중지·만료 → 소유 회원 비활성(404)·회원 행 없음(500).
+   * 발행본과 소유 회원 상태는 같은 스냅샷(manager)으로 읽는다. grant는 보지 않는다.
+   */
+  private async readUsablePublicationIn(manager: EntityManager, token: string, now: Date): Promise<PublicationRow> {
+    // 형식이 틀린 토큰은 조회 없이 없는 링크와 같다(NFR1.12, 10월 동작 그대로).
+    if (!isLinkTokenFormat(token)) throw new LinkUnavailable();
+    const rows: PublicationRow[] = await manager.query(
+      `SELECT ${PUBLICATION_COLUMNS} FROM publication WHERE link_token_reference = $1`, [token]);
+    const publication = rows[0];
+    if (!publication || publicationState(publication.stoppedAt, publication.expiresAt, now) !== 'ACTIVE') throw new LinkUnavailable();
+    // #416 OQ-U4-NFR-6 결정(2026-11-05): 비활성 소유자(작성자)는 다른 불가 사유와 같은 404, 회원 행 없음은 데이터 불일치 500. 중지·만료 다음, grant 앞.
+    const ownerState = await this.owners.readOwnerState(publication.memberId, manager);
+    if (ownerState === 'INACTIVE') throw new LinkUnavailable();
+    if (ownerState === 'NO_MEMBER') throw new PublicationOwnerMissing();
+    return publication;
   }
 
   /** 계약상 시각을 받지 않으므로 상태 계산에 모듈 시계를 쓴다. 중지가 만료보다 우선한다(BR6.5). */

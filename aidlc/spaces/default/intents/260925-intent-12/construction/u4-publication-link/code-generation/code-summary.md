@@ -32,6 +32,41 @@
 
 Step 19 뒤 남은 것: Step 20·21·23은 OQ-U4-NFR-6 답 뒤 같은 커밋으로(unlock 공급자 전환 조건), Step 22(받은 사람 화면)는 `copy-text` 이동을 먼저, Step 24(문서)·Step 25(전체 확인·S15 미실행 기록). 제출 3 PR은 통합 브랜치 대상 하나로 낸다.
 
+### 계약 PR #478 (2026-11-05)
+
+OQ-U4-NFR-6 결정의 C-10 문구 반영을 [PR #478](https://github.com/JminAILab/CatchU/pull/478)(`api/u4-c10-nfr6-decision`, 통합 브랜치 `8d15206` 기준, 커밋 `2a3da84`, 리뷰어 ljm0850·leechaeah)로 열었다. 주석·문서만 바꾸고 코드 동작은 그대로다. 같은 커밋을 `api/u4-recipient`에 `159584e`로 cherry-pick해 두 브랜치의 C-10 주석 기준을 맞췄다(제출 3 PR이 #478 뒤에 병합되면 같은 변경이라 충돌하지 않는다). 검증: C-10 시험 두 파일 16개 통과, 바꾼 `.ts` 3개·DB 시험 파일 eslint, api `tsc --noEmit` 통과.
+
+### Step 20·21·23(api) 받은 사람 경로·10월 경로 해제 (2026-11-05, 한 커밋)
+
+계획대로 받은 사람 컨트롤러 등록(Step 20), `AppModule`의 10월 모듈 해제·파일 삭제(Step 21), 그와 묶인 시험 변경(Step 23의 api 부분)을 한 커밋으로 반영했다. 두 모듈이 함께 등록된 판본은 없다. Step 23의 web 부분(`web/test/recipient.test.mjs` 고쳐 쓰기)은 Step 22(받은 사람 화면)와 함께 한다.
+
+**만든·고친 파일(api)**
+
+- 새 파일: `api/src/publications/recipient-access.service.ts`(열람·unlock), `api/src/publications/recipient-links.controller.ts`(`GET /v1/public/links/:token`·`POST /v1/public/links/:token/unlock`, 메서드 단위 `@Public()`), 시험 `api/test/publications/recipient-api.test.cjs`(8개)·`recipient-unlock-policy.test.cjs`(28개)·`app-routes.test.cjs`(4개)
+- 고친 파일: `api/src/publications/db-publication-access.ts`(판정 공통부 `readUsablePublicationIn` 분리, unlock용 `resolveForUnlock` 추가, 동작 변경 없음), `publications.module.ts`(`UNLOCK_POLICY`·`UNLOCK_CONTROLS`·`RecipientAccessService`·`RecipientLinksController` 등록), `api/src/app.module.ts`(`ShareLinksModule`·`RecipientModule` 제거), 시험 `publications-module.test.cjs`(unlock 제어 "이 모듈에만 선언"으로 뒤집음, 받은 사람 경로 포함·10월 경로 없음), `support.cjs`(`publishLink`·`recipientCall`·`recipientGet`·`unlockRaw`, `setClock`에 받은 사람 서비스 포함), `db/lock-wait-limit-role.test.cjs`, `integration/analysis-intake-receiver.test.cjs`, `security-headers.test.cjs`, `share-links-config.test.cjs`
+- 지운 파일(계획 Step 21 목록 그대로): `api/src/share-links/` 중 `share-create.ts`·`share-create-fingerprint.ts`·`share-link-issuance.ts`·`share-link-list.ts`·`share-link-response.ts`·`share-link-state.ts`·`issue-rate-limit.ts`·`share-links.service.ts`·`share-links.controller.ts`·`public-links.controller.ts`·`link-access.service.ts`·`share-links.module.ts`, `api/src/recipient/` 전체. 남긴 것: `link-token`·`link-password`·`link-grant`·`link-limiter`·`unlock-limiter`·`hash-gate`·`request-rate-limiter`·`client-address`·`unlock-policy`·`share-links.config`·`share-link.entity.ts`(OQ-U4-3), `member-analysis`·`idempotent-creation.ts`
+- 지운 시험(보안 설계 R-03 표의 "W6 변경에서 바꾼다" 묶음): `test/db/share-link-issuance`·`share-links-api`·`share-links-key-lock`·`share-links-manage-api`·`share-links-web-integration`·`public-links-unlock`·`public-links-unlock-policy`·`public-links-client-address`, `test/share-create`·`share-create-fingerprint`·`share-link-state`, `test/recipient/*`, `test/public-links-auth-boundary`·`recipient-module-boundary`, `test/integration/sharing-screen-web`, `test/support/share-link-lock-cases.cjs`. unlock·주소 제한 34개 사례는 `recipient-unlock-policy.test.cjs`로, 두 경계 시험은 `app-routes.test.cjs`로 옮겼다. 도구 단위 시험(`link-*`·`hash-gate`·`unlock-limiter`·`request-rate-limiter`·`client-address`·`share-links-config`)은 그대로다
+
+**구현 결정(D18~)**
+
+| # | 결정 | 근거 |
+|---|---|---|
+| D18 | unlock 판정은 `DbPublicationAccess.resolveForUnlock(token, now)`(계약 밖 클래스 메서드)로 둔다: grant 없이 토큰 형식 → 발행본 → 중지·만료 → 소유 회원 상태(404·500)까지 판정하고 비밀번호 검증값을 돌려준다. `resolveForRecipientIn`과 공통부를 나눠 판정 순서가 한곳에 있다 | 10월 `usableLink`와 같은 순서(BR6.3 ①). C-10 함수 모양은 바꾸지 않는다 |
+| D19 | 열람 `GET`은 `RecipientAccessService.read`가 `DataSource.transaction('REPEATABLE READ')` + `SET TRANSACTION READ ONLY` 안에서 `resolveForRecipientIn` → `readSnapshotIn`을 부른다. `LinkUnavailable`·`NotFound` → 404 `LINK_UNAVAILABLE`, `LinkPasswordRequired` → 401, `PublicationOwnerMissing`·그 밖은 공통 필터의 500 | 보안 설계 R-04, OQ-U4-NFR-5 결정 A(판정 뒤 삭제의 NotFound는 404) |
+| D20 | `GET /v1/public/links/:token`은 정의 밖 쿼리를 400 `VALIDATION_FAILED`(`query`·`whitelistValidation`)로 거부한다(`emptyPublicationQuery`). 10월 목록용 `limit`·`cursor`는 받지 않는다 | 작성자 경로와 같은 규칙. web은 Step 22에서 PublishedSnapshot 응답으로 바꾸며 쿼리를 보내지 않는다 |
+| D21 | 제한 키의 링크 단위는 `publicationId`(주소 키 `${publicationId}|${clientAddress}`), grant는 `issueLinkGrant(key, publicationId, 발행본 만료, now)` | BR6.2·BR6.3, 계획 Step 20 |
+| D22 | `test/db/lock-wait-limit-role.test.cjs`의 10월 링크 발급 잠금 사례 2개(회원 발급 잠금·같은 키 잠금)는 발급 API와 함께 지우고, 발행의 원본 Catch 행 `FOR UPDATE` 잠금 사례(3초 뒤 500, 발행본·사본·공개 전환·하루 횟수 롤백, 재시도 201)로 바꿨다 | #220 상한 확인을 U4 경로로 유지. 로그인·세션 사례는 그대로 |
+| D23 | `test/integration/analysis-intake-receiver.test.cjs`의 "반영 실패 연쇄" 시험에서 10월 링크 발급·수신자 Catch 상세 확인과 `share_link` 보존 표 항목을 뺐다. 발행본의 고정 사본은 U4 시험(S10·recipient-api)이 본다 | 10월 경로 제거. 그 시험의 본래 목적(수신 기록·Catch 보존·재요청)은 유지 |
+| D24 | `security-headers.test.cjs`의 "/v1 인증 거부" 경로를 `/v1/share-links` → `/v1/publications`로, `share-links-config.test.cjs`의 발급 입력 검사 사례는 지웠고(발행 입력 검사는 `publish-api` 시험), `request-rate-limiter.test.cjs`의 운영 정책 사례는 10월 발급 빈도 상수 대신 U4 `PUBLISH_RATE_LIMIT`(1분 10회 임시값)를 본다 | 10월 발급 경로·`share-create.ts`·`issue-rate-limit.ts` 제거 |
+
+**검증(2026-11-05, 테스트 DB `catchu-db-test-u4` 5443, 작업 트리 판본)**
+
+- `npm run typecheck`·바꾼 src·test 파일 eslint(`--max-warnings=0`) 통과.
+- `TEST_DB_PORT=5443 npm test -- <U4 제출 3 파일 12개 + lock-wait-limit-role + analysis-intake-receiver + security-headers + share-links-config + member-analysis>`: 170개 통과·0 실패(새 시험 40개 포함, 잠금 대기 사례는 역할 생성 권한이 있어 실행됨).
+- api 전체 `TEST_DB_PORT=5443 npm test`(작업 트리, 약 11분): 1,635개 중 1,593 통과·6 실패·36 건너뜀. 실패 6개 중 4개(`integration/u7-analysis-chain` 3개: worker 실행 파일 필요, `S22` 심볼릭 링크: Windows 권한)는 #474 때와 같은 환경 실패, 1개(`claude-mcp/mcp-endpoint` S9 만료 시각)는 같은 파일만 다시 돌리면 14개 모두 통과하는 시각 경합이며 이 변경과 무관, 1개(`request-rate-limiter`)는 지운 `issue-rate-limit.ts`를 가져오던 것이라 위 D24대로 고쳤다(고친 뒤 단독 통과).
+
+**남은 것**: Step 22(받은 사람 화면, `copy-text` 이동 뒤 share-links 제거)와 Step 23 web 부분, Step 24(문서: `api/docs/publications.md` 받은 사람 경로·`api/docs/share-links.md`·`recipient-read.md` 대체 안내, `api/README.md` 시험 표의 10월 항목), Step 25(전체 확인·커버리지·S15 미실행 기록). 받은 사람 판정의 브라우저 확인(#416 결정 3)은 Step 22 뒤.
+
 ## 제출 2 (2026-11-03) — C-10 DB 구현·W3 발행·W5 작성자 관리
 
 판본: 통합 브랜치 `a0d5676`(#461·#466 병합 뒤)을 merge commit `19572db`로 반영한 작업 트리. Step 9 시작 조건(U2 `AiRun`·`DailyRunLimit`·`AiConsentGate`·`FILE_STORAGE`, U3 `PUBLISHED_INDEX_WRITER`)을 확인했다.
