@@ -18,7 +18,8 @@ import { AiConsentModule } from './ai-consent/ai-consent.module';
 import { WithdrawalModule } from './withdrawal/withdrawal.module';
 import { PublishedIndexModule } from './published-index/published-index.module';
 import { ClaudeMcpModule } from './claude-mcp/claude-mcp.module';
-import { PublicationsModule } from './publications/publications.module';
+import { PUBLICATION_ACCESS, PublicationsModule } from './publications/publications.module';
+import { RagAnswerModule } from './rag-answer/rag-answer.module';
 
 @Module({
   imports: [
@@ -45,6 +46,9 @@ import { PublicationsModule } from './publications/publications.module';
     // 12월 intent U4 제출 2: 발행·작성자 발행본 관리 API(/v1/publications)와 C-10 DB 구현(PUBLICATION_ACCESS). 받은 사람 경로 교체와
     // ShareLinksModule·RecipientModule 해제는 제출 3(W6)에서 한 변경으로 한다(docs/publications.md).
     PublicationsModule,
+    // 12월 intent U5: 질의응답(SSE)·AI 기본 요약 경로와 BASE_SUMMARY 처리기(기동 때 AiRun에 한 번 등록). C-10은 U4의 DB 구현을
+    // 그 모듈이 내보낸 토큰으로 받는다. 메모리 가짜(in-memory-publication-access.ts)는 앱에 넣지 않는다(docs/rag-answer.md).
+    RagAnswerModule.register({ imports: [PublicationsModule], publicationAccess: { useExisting: PUBLICATION_ACCESS } }),
     // #232는 #252의 실제 선정 공급자(DatabaseRepositorySelectionSource)를 받는 WorkerContextModule.register로 별도 조립한다.
     // 기본 앱에 가짜 선정/동의 해석을 등록하지 않는다(docs/worker-context.md).
   ],

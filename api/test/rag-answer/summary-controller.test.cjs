@@ -1,22 +1,16 @@
 // U5 기본 요약 읽기·[다시 만들기](계약 C-12·C-11 owner-summary, 기능 설계 W4~W6·BR6·BR7, security-design NFR1.1·NFR1.2,
-// reliability-design NFR5.4) 와 RagAnswerModule 조립(logical-components 「앱 등록 시점」).
-// 실제 AppModule(공통 Guard·오류 필터·개발 로그인)·테스트 DB·실제 로컬 HTTP를 쓰고, 링크 판정·사본(C-10)·AiRun(C-02)·하루 제한(C-03)은 대역이다.
+// reliability-design NFR5.4). 앱 등록(RagAnswerModule 조립)은 rag-answer-app.test.cjs가 본다.
+// 실제 앱 조립(공통 Guard·오류 필터·개발 로그인, U5 등록만 뺌)·테스트 DB·실제 로컬 HTTP를 쓰고, 링크 판정·사본(C-10)·AiRun(C-02)·하루 제한(C-03)은 대역이다.
 // 기대 결과는 기능 명세 「주요 시나리오와 확인」의 요약·다시 만들기 행들이다.
 require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { after, before, beforeEach, test } = require('node:test');
-const { Module } = require('@nestjs/common');
-const { NestFactory } = require('@nestjs/core');
-const { AiRun } = require('../../dist/ai-run/ai-run');
 const { isValidRunKey } = require('../../dist/ai-run/ai-run-spec');
-const { AppModule } = require('../../dist/app.module');
 const { DailyRunLimit } = require('../../dist/daily-run-limit/daily-run-limit');
-const { InMemoryPublicationAccess } = require('../../dist/publications/in-memory-publication-access');
-const { InMemoryQuestionCounter, QUESTION_COUNTER } = require('../../dist/rag-answer/question-counter');
-const { RagAnswerModule } = require('../../dist/rag-answer/rag-answer.module');
+const { InMemoryQuestionCounter } = require('../../dist/rag-answer/question-counter');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
-const { APP_SETTINGS, collectingLogger, setEnv } = require('../u2/support.cjs');
+const { APP_SETTINGS, setEnv } = require('../u2/support.cjs');
 const { citedItem, counterSlot, putPublication, startRagAnswerApp } = require('./support.cjs');
 
 const PUBLISHED_AT = new Date('2026-11-02T03:00:00.000Z');
@@ -183,28 +177,4 @@ test('횟수 쓰기와 행 쓰기는 같은 트랜잭션이라 행 쓰기가 실
   const value = await ownedPublication(member);
   assert.equal((await regenerate(member.token, value.publicationId)).status, 202);
   assert.equal((await db.query('SELECT count FROM daily_execution_count WHERE member_id = $1', [member.memberId]))[0].count, 1);
-});
-
-test('RagAnswerModule.register: 앱과 함께 기동하면 BASE_SUMMARY 처리기를 한 번 등록하고 경로를 열며, 종료 때 계수기를 닫는다', async (t) => {
-  // 시험 전용 조립이다. 메모리 PublicationAccess를 기본 앱(AppModule)에 넣지 않는다(비기능 설계 Q1).
-  const access = new InMemoryPublicationAccess();
-  class RootModule {}
-  Module({ imports: [AppModule, RagAnswerModule.register({ publicationAccess: { useValue: access } })] })(RootModule);
-  const nest = await NestFactory.create(RootModule, { logger: collectingLogger([]), abortOnError: false });
-  let closedApp = false;
-  t.after(async () => { if (!closedApp) await nest.close(); });
-  await nest.listen(0, '127.0.0.1');
-  assert.deepEqual(nest.get(AiRun).registeredKinds().sort(), ['BASE_SUMMARY', 'EMBED_PUBLICATION']);
-  const counter = nest.get(QUESTION_COUNTER, { strict: false });
-  assert.equal(counter.constructor.name, 'NoRedisQuestionCounter', '큐 주소가 없으면 늘 통과하는 계수기');
-  const url = await nest.getUrl();
-  const response = await fetch(`${url}/public/links/no-such-token/summary`);
-  assert.equal(response.status, 404, '전역 접두사 없이 띄운 앱에서도 U5 경로가 열려 링크 판정에 닿는다');
-  assert.equal((await response.json()).code, 'LINK_UNAVAILABLE');
-  let closed = 0;
-  const close = counter.close.bind(counter);
-  counter.close = async () => { closed += 1; return close(); };
-  await nest.close();
-  closedApp = true;
-  assert.equal(closed, 1);
 });
