@@ -123,7 +123,8 @@ export class DbPublicationAccess implements PublicationAccess {
 
   /**
    * published_item만 읽는다(원본 catch_asset·text_material은 읽지 않음, BR6.4·NFR1.4).
-   * 발행본 행이 없으면 빈 사본을 만들지 않고 NotFound로 실패한다(계약에 이름이 없어 메모리 가짜와 같은 값을 쓴다, OQ-U4-NFR-5).
+   * 발행본 행이 없으면 빈 사본을 만들지 않고 NotFound로 실패한다(계약의 NotFound, #416 OQ-U4-NFR-5 결정 2026-11-04).
+   * 상태(중지·만료·소유 회원)는 판정하지 않는다. 판정 뒤 커밋된 중지·만료는 다음 호출의 resolveForRecipient가 막는다.
    * PDF 항목(U8)이 있을 때만 쪽 사본 표를 읽는다. U4 항목의 pdfPages는 null이다.
    */
   async readSnapshotIn(manager: EntityManager, publicationId: string): Promise<PublishedSnapshot> {

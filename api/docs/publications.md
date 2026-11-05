@@ -72,8 +72,10 @@ constructor(@Inject(PUBLICATION_ACCESS) private readonly access: PublicationAcce
 | --- | --- |
 | `resolveForRecipient(token, grant, now)` | 읽기 전용 REPEATABLE READ 트랜잭션 하나에서 판정한다. 순서: 토큰 형식(10월 `isLinkTokenFormat`, 아니면 조회 없이 `LinkUnavailable`) → `link_token_reference`로 발행본 조회 → 중지·만료(`publication-state.ts`, 없음·삭제와 구분 없이 `LinkUnavailable`) → 소유 회원 상태(`OwnerProfileReader.readOwnerState`, 같은 스냅샷): 비활성이면 `LinkUnavailable`(404), 회원 행 없음이면 `PublicationOwnerMissing`(공통 필터가 500 `INTERNAL_ERROR`, 토큰·SQL 비노출) → 비밀번호 링크면 10월 `verifyLinkGrant(key, grant, publicationId, now)` 실패 시 `LinkPasswordRequired`. 캐시 없음 |
 | `resolveForOwner(memberId, publicationId)` | `member_id`·`publication_id` 조건으로 한 행을 읽는다. 남의 것·없는 것·UUID 형식이 아닌 ID는 구분 없이 `NotFound`. 상태는 모듈 시계(`PUBLICATIONS_CLOCK`)로 구하며 중지가 만료보다 우선 |
-| `readSnapshot(publicationId)` | 읽기 전용 REPEATABLE READ 트랜잭션에서 `publication`(제목·시각)과 `published_item`만 position 순으로 읽는다. 원본 `catch_asset`·`text_material`은 읽지 않는다. 발행본 행이 없으면 빈 사본을 만들지 않고 `NotFound`(계약에 이름이 없어 메모리 가짜와 같은 값, OQ-U4-NFR-5). U4 항목의 `pdfPages`는 null이고 PDF 항목(U8)이 있을 때만 `published_pdf_page`를 읽는다 |
+| `readSnapshot(publicationId)` | 읽기 전용 REPEATABLE READ 트랜잭션에서 `publication`(제목·시각)과 `published_item`만 position 순으로 읽는다. 원본 `catch_asset`·`text_material`은 읽지 않는다. 상태(중지·만료·소유 회원)는 판정하지 않는다. 발행본 행이 없으면 빈 사본을 만들지 않고 `NotFound`(계약의 `NotFound`, #416 OQ-U4-NFR-5 결정 2026-11-04). U4 항목의 `pdfPages`는 null이고 PDF 항목(U8)이 있을 때만 `published_pdf_page`를 읽는다 |
 | `resolveForRecipientIn(manager, …)`·`readSnapshotIn(manager, …)` | 계약 밖의 클래스 메서드. 넘겨받은 활성 REPEATABLE READ manager로 같은 일을 한다. 제출 3의 받은 사람 열람 경로가 판정과 사본 읽기를 한 트랜잭션에 묶을 때 쓴다(보안 설계 R-04). 다른 Unit은 계약 함수만 쓴다 |
+
+판정 뒤 상태 변경(OQ-U4-NFR-5, #416 팀장 결정 2026-11-04, A안): `resolveForRecipient`와 `readSnapshot`은 각각 자기 트랜잭션에서 돌므로 두 호출 사이에 커밋된 중지·만료는 그 요청의 `readSnapshot`에 반영되지 않고 사본이 그대로 나온다. 중지·만료에 한해 이는 허용된 동작이다. 판정을 통과한 요청은 중지·만료만을 이유로 취소하지 않고 그 요청의 접수·횟수 차감은 유효하며, 차단은 다음 요청의 재판정으로 한다. 판정 직후 발행본이 삭제된 것이 확인되면(`readSnapshot`의 `NotFound`, 또는 그 요청의 쓰기가 발행본 `publication_id`를 참조하는 외래 키 제약에서 거부된 경우 — SQLSTATE 23503이고 거부한 제약(pg 오류의 `constraint`, 예: `fk_published_item_publication_id`)이 `publication`을 참조하는 것일 때만) 저장·차감을 되돌리고 404 `LINK_UNAVAILABLE`로 응답하고, 다른 제약의 23503을 포함해 삭제로 확인되지 않은 DB 오류는 500을 유지한다. 판정 뒤 소유 회원 상태 변경은 이 결정의 문구에 들어 있지 않다. 지금은 `readSnapshot`이 상태를 보지 않아 중지·만료와 같은 per-call 동작이지만, 소유 회원 비활성 처리 자체는 OQ-U4-NFR-6 결정 전이다. 이 매핑은 각 소비 Unit(U5·U10·U9)이 자기 경로에서 한다. U4 자신의 받은 사람 열람 경로(제출 3)는 `resolveForRecipientIn`·`readSnapshotIn`을 한 REPEATABLE READ 트랜잭션에서 불러 판정 시점의 같은 스냅샷을 읽으므로 이 틈이 없다. 경계 시험은 `test/publications/publication-access-db.test.cjs`·`in-memory-publication-access.test.cjs`에 있다.
 
 소유 회원 비활성 404·회원 없음 500은 OQ-U4-NFR-6 합의 전 10월 동작이다. 결정이 바뀌면 `resolveForRecipientIn`의 그 단계만 고친다.
 
@@ -89,7 +91,7 @@ access.put({ ...같은 발행본, stoppedAt: now });                 // 중지 �
 access.remove(publicationId);                                   // 삭제 상황 → LinkUnavailable
 ```
 
-가짜 구현은 grant 서명을 흉내 내지 않고 자기가 발급한 값만 통과시킨다. `readSnapshot`은 없는 발행본이면 `NotFound`를 던진다. DB 구현도 같은 값을 던진다(위 표).
+가짜 구현은 grant 서명을 흉내 내지 않고 자기가 발급한 값만 통과시킨다. `readSnapshot`은 없는 발행본이면 `NotFound`를 던진다. DB 구현도 같은 값을 던진다(위 표). 중지·만료된 발행본의 사본은 둘 다 그대로 돌려준다(상태 판정은 `resolveForRecipient`에서만). 가짜 구현에는 소유 회원 상태가 없어 비활성 404·회원 없음 500은 만들 수 없다.
 
 ## PublicationsModule 구성 (제출 2)
 
@@ -167,12 +169,12 @@ Nest `Logger('Publications')`(`src/publications/publications-log.ts`)로 사건�
 
 ## 시험
 
-- `test/publications/in-memory-publication-access.test.cjs`: 가짜 구현의 판정이 계약 C-10과 U4 설계의 판정 순서(삭제·중지·만료 → grant)와 같은지
+- `test/publications/in-memory-publication-access.test.cjs`: 가짜 구현의 판정이 계약 C-10과 U4 설계의 판정 순서(삭제·중지·만료 → grant)와 같은지, 판정 뒤 중지·만료·삭제와 다음 요청 재판정(OQ-U4-NFR-5 경계)
 - `test/db/publication-tables.test.cjs`: 위 표의 DB 제약
 - `test/db/member-cascade-delete.test.cjs`: 새 표도 회원 탈퇴 때 함께 지워지는지
 - `test/catches/author-description-api.test.cjs`(제출 1): S1(저장·두 번 저장·공백·4,000/4,001자·형식 거부·남의 Catch 404·로그 비노출)·S2(재분석 뒤 설명 유지, 새 Catch는 NULL). 격리 스키마(`catch-db-fixture`)와 실제 Catch 등록 코드를 쓴다
 - `test/materials/text-materials-api.test.cjs`(제출 1): S3(CRUD·경계값·회원 두 명 교차 접근 404·cursor·로그 비노출). 실제 `AppModule`과 개발 로그인 합성 회원을 쓴다
-- `test/publications/publication-access-db.test.cjs`(제출 2): C-10 DB 구현의 판정 순서(형식 오류 토큰·없음·중지·만료·삭제 404, grant 없음·위조·다른 발행본·만료 401, 중지가 grant보다 먼저, 비활성 소유자 404와 재활성, 회원 없음 500 대역), `resolveForOwner` 상태 우선순위·NotFound, `readSnapshot`
+- `test/publications/publication-access-db.test.cjs`(제출 2): C-10 DB 구현의 판정 순서(형식 오류 토큰·없음·중지·만료·삭제 404, grant 없음·위조·다른 발행본·만료 401, 중지가 grant보다 먼저, 비활성 소유자 404와 재활성, 회원 없음 500 대역), `resolveForOwner` 상태 우선순위·NotFound, `readSnapshot`, 판정 뒤 중지·만료·삭제·소유자 비활성과 다음 요청 재판정·같은 트랜잭션 변형(OQ-U4-NFR-5 경계)
 - `test/publications/publish-api.test.cjs`(제출 2): S4~S7, 빈도 429·`Retry-After`, 입력 400 칸별 이유, 동의 403, 404, 자격 409 `details.catchIds`·보호 관측 없음 500, 하루 한도 429·롤백, 조각 예외 500·롤백, 등록 실패 201, 전체 글 60,000/60,001자
 - `test/publications/publications-manage-api.test.cjs`(제출 2): 목록 cursor·`indexState` 없음, 상세 모양, S9(작성자 쪽)·S10~S13(접두어 삭제는 시험 전용 임시 폴더의 로컬 저장소, 실패는 가짜 `FileStorage`)
 - `test/publications/publications-logging.test.cjs`(제출 2): 결과 분류별 줄·칸, 등록 실패와 접두어 삭제 실패 구분, 합성 비밀값·본문 비노출
