@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { AssetsView, assetTabs, parseVisibilityFilter, type AssetTab, type LoadState } from "./assets-view";
+import { AssetsView, parseVisibilityFilter, type LoadState } from "./assets-view";
 import { previewCatches, previewRepositories } from "./fixtures";
 import styles from "./assets.module.css";
 
@@ -13,8 +13,6 @@ export function AssetsPreview() {
   const params = useSearchParams();
   const pathname = usePathname();
   const scenario = params.get("scenario") ?? "ready";
-  const selectedTab = params.get("tab");
-  const tab: AssetTab = assetTabs.find((item) => item.id === selectedTab)?.id ?? "catch";
 
   function changeQuery(changes: Record<string, string | null>) {
     // 빠르게 연속 선택해도 이전 렌더의 검색값으로 앞선 선택을 덮어쓰지 않는다.
@@ -50,10 +48,9 @@ export function AssetsPreview() {
         </div>
       </aside>
       <AssetsView items={scenario === "empty" ? [] : previewCatches} repositories={previewRepositories}
-        repositoryId={params.get("repositoryId") ?? ""} visibility={parseVisibilityFilter(params.get("visibility"))} tab={tab}
+        repositoryId={params.get("repositoryId") ?? ""} visibility={parseVisibilityFilter(params.get("visibility"))}
         listState={loadState(scenario)} detailState={loadState(params.get("detailScenario"))}
         selectedId={params.get("catchId")}
-        onTabChange={(nextTab) => changeQuery({ tab: nextTab === "catch" ? null : nextTab, catchId: null })}
         onRepositoryChange={(repositoryId) => changeQuery({ repositoryId: repositoryId || null, catchId: null })}
         onVisibilityChange={(visibility) => changeQuery({ visibility: visibility || null, catchId: null })}
         onOpen={(catchId) => changeQuery({ catchId })} onClose={() => changeQuery({ catchId: null })}

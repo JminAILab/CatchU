@@ -12,7 +12,7 @@
 
 `node --test test/repository-registration.test.mjs`는 상태 객체와 기존 TypeScript·React SSR로 실제 JSX의 등록 오류 연결·고지 가리기·조건별 안내를 검사한다. 미리보기 `/preview/repository-management`는 합성 응답이며 `registration=REPOSITORY_PRIVATE`, `REPOSITORY_UNSUPPORTED`, `REPOSITORY_UNVERIFIED`와 `intake=daily-limit`를 제공한다. 실제 화면 폭·키보드·초점은 별도 브라우저 검사로 확인한다.
 
-내 자산 Catch 탭 위쪽의 **GitHub 저장소 연결 관리** 영역과 모달이다. 정본은 [web 기능 설계 「내 자산 화면 구조」·「화면 상태 전이」](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md)이며, 상태 아이콘과 B 연결 방식은 [#153 입출력 제안](https://github.com/JminAILab/CatchU/issues/153#issuecomment-5868058724)을 따른다.
+내 자산의 Catch 목록 위쪽에 두는 **GitHub 저장소 연결 관리** 영역과 모달이다. 정본은 [web 기능 설계 「내 자산 화면 구조」·「화면 상태 전이」](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md)이며, 상태 아이콘과 B 연결 방식은 [#153 입출력 제안](https://github.com/JminAILab/CatchU/issues/153#issuecomment-5868058724)을 따른다.
 
 ## 파일
 
