@@ -25,15 +25,24 @@ export const routes = {
   profileClaude: "/profile/claude",
   /** Claude 연결 승인(12월 U6). api `/authorize`가 쿼리와 함께 보내는 web 주소다. 화면 사이 이동 목적지로 쓰지 않는다. */
   profileClaudeAuthorize: "/profile/claude/authorize",
-  /** 내 자산(Catch 탭). 필터·상세는 쿼리 `repositoryId`·`catchId`(B 제안). */
+  /** 내 자산(Catch 목록·저장소 연결 관리). 필터·상세는 쿼리 `repositoryId`·`catchId`(B 제안). */
   assets: "/assets",
   /** 텍스트 자료 목록·편집(U4 W2). */
   materials: "/materials",
   /** 본인 JD 목록·편집(U10). */
   jds: "/jds",
+  /** 발행본 목록(U4 W5). */
+  publications: "/publications",
+  /** 발행(U4 W3). 본인 Catch·텍스트 자료를 골라 고정 발행본과 링크를 만든다. */
+  publicationNew: "/publications/new",
   /** 공유 링크 목록·발급·복사·중단. */
   links: "/links",
 } as const;
+
+/** 발행본 상세(U4 W5). 사본·상태·링크 주소·중지·삭제. */
+export function publicationDetailPath(publicationId: string): string {
+  return `${routes.publications}/${encodeURIComponent(publicationId)}`;
+}
 
 /** 수신자 링크. token은 경로에만 두고 쿼리·로그에 싣지 않는다. */
 export function recipientLinkPath(token: string): string {

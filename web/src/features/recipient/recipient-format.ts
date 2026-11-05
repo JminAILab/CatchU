@@ -29,12 +29,8 @@ export function missingDraftText(item: PublicCatch): string {
     : "생성된 설명 초안이 없습니다.";
 }
 
-/** 근거 원문은 GitHub의 https 주소만 새 탭 링크로 연다(보안 점검 「화면 출력」). 그 밖의 값은 글자로만 보인다. */
-export function isGithubSourceUrl(value: string): boolean {
-  if (!URL.canParse(value)) return false;
-  const url = new URL(value);
-  return url.protocol === "https:" && url.hostname === "github.com" && !url.username && !url.password;
-}
+/** 근거 원문은 GitHub의 https 주소만 새 탭 링크로 연다. 판정은 공용 `lib/github-source-url.ts`로 옮겼고 동작은 같다(U4). */
+export { isGithubSourceUrl } from "../../lib/github-source-url.ts";
 
 /**
  * 비밀번호 단계의 안내. 비밀번호 오류는 서버가 불일치를 확인한 경우(`invalid`)에만 쓰고,

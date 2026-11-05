@@ -95,6 +95,8 @@ test('허용한 web 출처는 CORS 헤더를 받고 Retry-After를 읽을 수 �
   assert.equal(options.headers.get('access-control-allow-origin'), WEB);
   const allowed = options.headers.get('access-control-allow-headers').toLowerCase().split(',');
   for (const header of ['authorization', 'content-type', 'idempotency-key', 'x-link-grant']) assert.ok(allowed.includes(header), header);
+  const methods = options.headers.get('access-control-allow-methods').split(',');
+  for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) assert.ok(methods.includes(method), `${method}: web 회원 호출이 쓰는 메서드(#452)`);
   assert.equal(options.headers.get('access-control-allow-credentials'), 'true', '#250 개발 허용 출처는 Refresh 쿠키를 전달한다');
 
   const login = await request('/v1/auth/dev-login', {
