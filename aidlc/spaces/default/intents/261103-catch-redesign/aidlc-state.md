@@ -46,6 +46,13 @@
 
 - **Construction Verification Command**: npm --prefix api run lint && npm --prefix api run typecheck && npm --prefix api run test:coverage && npm --prefix web run lint && npm --prefix web run typecheck && npm --prefix web run test:coverage && (cd worker && uv run --locked ruff check . && uv run --locked mypy && uv run --locked pytest --cov --cov-report=term-missing)
 
+- **Unit Ownership**: solo
+
+- **Skeleton Stance**: on
+
+
+
+
 ## Phase Progress
 <!-- Status values: Pending, Active, Verified, Skipped -->
 
@@ -106,7 +113,7 @@
 - **Current Stage**: functional-design
 - **Next Stage**: nfr-requirements
 - **Status**: Running
-- **Last Updated**: 2026-11-05T01:22:06Z
+- **Last Updated**: 2026-11-05T02:44:39Z
 
 ## Session Resume Point
 - **Last Completed Stage**: delivery-planning
