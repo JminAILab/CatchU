@@ -118,6 +118,12 @@
       "path": "web/src/features/jd/jd-parsers.ts"
     },
     {
+      "path": "web/src/features/jd/jd-recipient-binding.ts"
+    },
+    {
+      "path": "web/src/features/jd/jd-recipient-panel.tsx"
+    },
+    {
       "path": "web/src/features/jd/jd-result-view.tsx"
     },
     {
@@ -136,6 +142,9 @@
       "path": "web/src/features/jd/jd.module.css"
     },
     {
+      "path": "web/src/features/recipient/recipient-view.tsx"
+    },
+    {
       "path": "web/src/lib/member-navigation.ts"
     },
     {
@@ -148,10 +157,16 @@
       "path": "web/test/jd-member-binding.test.mjs"
     },
     {
+      "path": "web/test/jd-recipient-binding.test.mjs"
+    },
+    {
       "path": "web/test/jd-summary.test.mjs"
     },
     {
       "path": "web/test/member-navigation.test.mjs"
+    },
+    {
+      "path": "web/test/recipient.test.mjs"
     }
   ]
 }

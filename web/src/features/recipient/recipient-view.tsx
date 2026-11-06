@@ -5,6 +5,7 @@ import { RecipientGuide } from "@/components/recipient-guide/recipient-guide";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { BaseSummaryPanel } from "@/features/rag-answer/base-summary-panel";
 import { QnaPanel } from "@/features/rag-answer/qna-panel";
+import { JdRecipientPanel } from "@/features/jd/jd-recipient-panel";
 import { PublishedSnapshotView, type SnapshotHighlight } from "@/features/publications/snapshot-view";
 import { LINK_UNAVAILABLE_TEXT, LOOKUP_FAILED_TITLE, PASSWORD_REQUIRED_TITLE, publishedAtText, unlockMessage } from "./recipient-format";
 import type { RecipientSlotProps } from "./recipient-slots";
@@ -82,7 +83,7 @@ export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlo
 /**
  * 2·3·4번 자리(C-11 slots). 2·3번은 U5 `BaseSummaryPanel`·`QnaPanel`(`features/rag-answer` README 「붙이는 방법」대로 `RecipientSlotProps`를
  * 그대로 넘기고 `key={token}`). 두 패널은 401·404를 스스로 처리하지 않고 `onAccessLost`를 부르며(C-11 rule), 근거 단추는 `showEvidence`를 부른다.
- * 4번 U10 `JdSummaryPanel`은 제공 뒤 단다(지금은 빈 자리, 로그인 여부만 표시). U4 영역에 안내 문장을 두지 않는다(G6).
+ * 4번은 U10 `JdRecipientPanel`이 회원 호출을 연결하고 JD 로그인 안내·요약을 소유한다. U4 영역에 안내 문장을 두지 않는다(G6).
  */
 function RecipientSlots(props: RecipientSlotProps) {
   return (
@@ -95,7 +96,9 @@ function RecipientSlots(props: RecipientSlotProps) {
         <QnaPanel key={props.token} token={props.token} getGrant={props.getGrant} onAccessLost={props.onAccessLost}
           isLoggedIn={props.isLoggedIn} showEvidence={props.showEvidence} />
       </div>
-      <div data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in={props.isLoggedIn} />
+      <div data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in={props.isLoggedIn}>
+        <JdRecipientPanel key={props.token} {...props} />
+      </div>
     </>
   );
 }

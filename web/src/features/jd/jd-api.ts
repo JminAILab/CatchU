@@ -13,7 +13,7 @@ export function memberTransport(member: ApiClient["member"]): JdTransport {
   return (path, request) => member(path, request);
 }
 
-/** 관리 페이지와 향후 C-11 소유자가 같은 회원 인증 어댑터를 사용한다. 슬롯 등록은 별도다. */
+/** 관리 페이지와 C-11의 JdRecipientPanel이 같은 공용 회원 인증 어댑터를 사용한다. */
 export function createMemberJdApi(member: ApiClient["member"]) {
   return createJdApi(memberTransport(member));
 }

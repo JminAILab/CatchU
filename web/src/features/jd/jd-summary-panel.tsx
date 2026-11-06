@@ -41,7 +41,7 @@ export function JdRunList({ state, model }: { state: JdSummaryState; model: JdSu
   </section>;
 }
 
-/** C-11 props와 U10 API를 소비한다. createMemberJdApi(api.member)를 주입하며 실제 슬롯 등록은 U4 제공 후 수행한다. */
+/** C-11 props와 U10 API를 소비한다. 실제 4번 자리는 JdRecipientPanel이 공용 회원 호출을 주입한다. */
 export function JdSummaryPanel({ client, showEvidence, ...context }: JdRecipientContext & {
   client: JdApi; showEvidence: (location: SourceLocation) => void;
 }) {

@@ -12590,3 +12590,208 @@
 **State Validity**: valid
 
 ---
+
+## Subagent Completed
+**Timestamp**: 2026-11-06T08:38:02Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: explorer
+**Agent ID**: 01a1affe-406b-7b90-b602-9d2a9a65250c
+**Message**: 읽기 전용 확인 결과입니다. 파일 변경·DB 조회/변경·제품 검사·AI-DLC 명령은 실행하지 않았습니다.\n\n**최소 fixture 구성**\n\n- 기존 recipient 조회는 정확한 합성 identity 하나로 제한:\n  `catchu:dev-login:u10-browser-20261106-b7d0b905`\n- owner: 새 UUID, 고유 identi
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-06T08:39:27Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: explorer
+**Agent ID**: 01a1affe-406b-7b90-b602-9d2a9a65250c
+**Message**: 새 합성 recipient를 직접 준비한 뒤 실제 dev-login UI로 로그인할 수 있습니다.\n\n```sql\nINSERT INTO member_account\n  (member_id, identity_reference, account_state)\nVALUES\n  ($1, 'catchu:dev-login:u10-c11-20261106-de47f2f4', '
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-06T08:41:05Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/.aidlc-engine/u10-c11-browser-fixture.cjs
+**Context**: .aidlc-engine > u10-c11-browser-fixture.cjs
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T08:41:55Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/.aidlc-engine/u10-c11-browser-fixture.cjs
+**Context**: .aidlc-engine > u10-c11-browser-fixture.cjs
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T08:44:13Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/construction/u10-jd/code-generation/source-manifest.json
+**Context**: construction > u10-jd > code-generation > source-manifest.json
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T08:44:15Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/construction/u10-jd/code-generation/traceability.json
+**Context**: construction > u10-jd > code-generation > traceability.json
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T08:44:16Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/construction/u10-jd/code-generation/code-summary.md
+**Context**: construction > u10-jd > code-generation > code-summary.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T08:46:14Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/construction/u10-jd/code-generation/unit-test-instructions.md
+**Context**: construction > u10-jd > code-generation > unit-test-instructions.md
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-06T08:48:50Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: 01a1af22-ee1b-79e2-ab13-b6580a89df79
+**Message**: C-11 연결 구현과 신규 검사 7개를 준비했습니다.\n\n- U4 4번 슬롯에 U10 wrapper만 연결했습니다.\n- 콜백 교체 시 선택·결과 유지와 기존 공용 인증 복원을 보완했습니다.\n- 기존 자리 검사 하나의 기대값과 U10 산출물을 갱신했습니다.\n- 소스·검사는 고정하고 root의 검사·브라우저 결과를 기다립니다. 완료 체크는 하지 않았습니다.
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-06T08:52:57Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: plan-approval
+**Authority**: instruction
+**Grant**: none
+**Actor**: main
+**Stage**: code-generation
+**Tool**: Edit
+**Details**: <project-dir>/web/src/features/jd/README.md
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-06T08:53:01Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: plan-approval
+**Authority**: instruction
+**Grant**: none
+**Actor**: main
+**Stage**: code-generation
+**Tool**: Edit
+**Details**: <project-dir>/api/docs/jd.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T08:53:09Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/construction/u10-jd/code-generation/traceability.json
+**Context**: construction > u10-jd > code-generation > traceability.json
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T08:53:10Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/construction/u10-jd/code-generation/code-summary.md
+**Context**: construction > u10-jd > code-generation > code-summary.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T08:54:09Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/construction/u10-jd/code-generation/traceability.json
+**Context**: construction > u10-jd > code-generation > traceability.json
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-06T08:54:25Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: 01a1af22-ee1b-79e2-ab13-b6580a89df79
+**Message**: 문서와 추적표를 최신화했습니다.\n\n- 신규 7개·슬롯 1개·메뉴 8개, 총 16개 통과와 lint·타입 검사 성공을 기록했습니다.\n- 브라우저 로그아웃 관측과 진행 중인 나머지 검사를 구분했습니다.\n- 기존 JD CRUD 증거에 따라 AC6.5.1만 `OK`로 정정했습니다.\n- 소스·검사는 유지했습니다. web 사본 동기화 대상은 JD README입니다.
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-06T09:00:47Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: plan-approval
+**Authority**: instruction
+**Grant**: none
+**Actor**: main
+**Stage**: code-generation
+**Tool**: Edit
+**Details**: <project-dir>/web/src/features/jd/README.md
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-06T09:00:50Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: plan-approval
+**Authority**: instruction
+**Grant**: none
+**Actor**: main
+**Stage**: code-generation
+**Tool**: Edit
+**Details**: <project-dir>/api/docs/jd.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T09:00:55Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/construction/u10-jd/code-generation/code-generation-plan.md
+**Context**: construction > u10-jd > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T09:00:56Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/construction/u10-jd/code-generation/traceability.json
+**Context**: construction > u10-jd > code-generation > traceability.json
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T09:02:23Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/construction/u10-jd/code-generation/code-summary.md
+**Context**: construction > u10-jd > code-generation > code-summary.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-06T09:02:44Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/260925-intent-12/construction/u10-jd/code-generation/code-summary.md
+**Context**: construction > u10-jd > code-generation > code-summary.md
+
+---

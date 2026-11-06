@@ -36,7 +36,7 @@ U10 경계 입력 오류는 `422 INVALID_INPUT / INPUT_TOO_LARGE`, 남의/없는
 
 ## 조립과 검사 범위
 
-`JdManagementModule`과 `JdSummaryModule`을 AppModule에 등록한다. 요약은 `JdSummaryModule.register({ publicationAccess: { useExisting: PUBLICATION_ACCESS }, imports: [PublicationsModule] })`로 U4의 실제 `DbPublicationAccess`를 받는다. #468 병합과 #416 OQ5·OQ6 결정에 따른 등록이며 기본 앱에 합성 구현을 넣지 않는다. 공용 web PATCH/Bearer+grant 어댑터는 연결돼 있다. [U4 제출 3 병합](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6677766344)과 U10의 C-11 슬롯·근거 강조 연결은 구분하며, 후자는 사용자 지시에 따라 별도 대기다.
+`JdManagementModule`과 `JdSummaryModule`을 AppModule에 등록한다. 요약은 `JdSummaryModule.register({ publicationAccess: { useExisting: PUBLICATION_ACCESS }, imports: [PublicationsModule] })`로 U4의 실제 `DbPublicationAccess`를 받는다. #468 병합과 #416 OQ5·OQ6 결정에 따른 등록이며 기본 앱에 합성 구현을 넣지 않는다. 공용 web PATCH/Bearer+grant 어댑터는 연결돼 있다. [U4 제출 3 병합](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6677766344) 뒤 사용자 대기 해제에 따라 C-11 4번 슬롯에 U10 wrapper도 연결했다. 신규 web 영향 검사 16개와 실제 브라우저의 접수/PENDING·합성 저장 DONE 재열람·근거 강조·접근 상실을 확인했다. 이를 외부 AI·실제 큐 처리 완료 근거로 사용하지 않으며 상세 범위는 U10 코드 요약에 있다.
 
 `test/jd/*.test.cjs`는 합성 회원·발행본·제공자와 격리 PostgreSQL을 사용한다. HTTP Guard/한도/동의/연쇄 삭제와 실제 U2 검사 게이트에 합성 Messages 응답을 넣는 조합, `CATCHU_TEST_REDIS_URL`이 있으면 전용 로컬 Valkey 큐를 검사한다. 합성 게이트 통과를 실제 AI 품질·실제 공유 화면 연결·배포 완료로 해석하지 않는다. 실제 외부 AI 호출은 수행하지 않는다.
 

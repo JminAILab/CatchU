@@ -104,3 +104,18 @@ web PR 전 전체 `check` 요구는 Build and Test/PR 준비에서 적용한다.
 실제 실행 후 판본(미커밋 변경 포함 여부), 위치, 명령, 합성/실제 제공자, 통과·실패·미실행·해당 없음, 다음 조치를 코드 요약과 검토 대상 PR에 기록한다. FR19 확인 표는 그 증거를 연결한다. 로그는 허용 필드만 공유하고 사용자 원문·토큰·grant·전체 URL·감사 로그 원문·내부 절대경로는 이슈/PR에 올리지 않는다.
 
 현재는 계획 문서 정합성만 확인한다. 공식 구현 검토·Code Generation 완료 보고는 구현과 검사 산출물이 준비된 뒤 진행한다.
+
+## 7. 2026-11-06 C-11 연결 영향 확인 추가
+
+위 승인 시점의 검사 지침을 소급 변경하지 않는다. 사용자 `de47f2f4`의 C-11 대기 해제 후 #482 제공판을 반영한 연결 변경만 다음 범위로 확인한다. 기존 75개·17개·실제 C-10 9개·U7 검사 결과는 재사용한다.
+
+```sh
+node --test --test-concurrency=1 test/jd-recipient-binding.test.mjs
+node --test --test-name-pattern="^판정 통과 화면 순서:" test/recipient.test.mjs
+node node_modules/eslint/bin/eslint.js src/features/jd/jd-recipient-panel.tsx src/features/jd/jd-recipient-binding.ts src/features/recipient/recipient-view.tsx
+node node_modules/typescript/bin/tsc --noEmit --incremental false
+```
+
+신규 7개는 실제 U4 composition·grant 저장·접근 상태와 U10 호출을 연결한 합성 HTTP 응답 검사다. 회원·grant 전달의 기존 공용 재전송 검사를 반복하지 않고 새 연결에서 비로그인 표시, unlock 이후 접수·재열람, 콜백 교체 중 결과 보존, U4 링크 상실 위임, 회원·링크 교체의 늦은 응답, 제공 위치의 원문 강조를 확인한다. 통합 충돌을 해결한 회원 메뉴 검사는 conductor가 그 변경 범위만 별도로 실행한다.
+
+실제 브라우저에서는 같은 링크를 다시 열어 공용 인증 복원과 본인 기록 재조회, 요약 접수와 수동 상태 조회, 근거 클릭·반복 클릭의 위치/강조와 선택 유지, 접근 상실 화면 전환을 확인한다. 완료 결과를 합성 DB 자료로 준비한 경우 외부 AI 처리 결과와 구분한다. 실제 큐·외부 AI·성능 비교와 미실행 화면 조건은 코드 요약에 남긴다. 검사 통과 여부나 계획 체크는 실제 결과가 확인된 뒤에만 기록한다.

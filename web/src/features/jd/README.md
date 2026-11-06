@@ -18,9 +18,11 @@
 
 원문 요구사항별 근거·자료로 확인되지 않는 점·면접 질문을 React 텍스트로 표시한다. `jdRole`, 서버 안내·AI 해석 구분, 출처 라벨·인용 원문을 보존한다. 근거 선택은 받은 `citation.location`을 그대로 `showEvidence`에 전달한다. 개별 생성 실패와 개별 호출 시간 초과는 `GENERATION_FAILED`의 “이 요구사항을 처리하지 못했습니다.”, 전체 시한은 `DEADLINE_EXCEEDED`의 “전체 처리 시한이 지나 완료하지 못했습니다.”로 최초 조회와 재열람에서 동일하게 표시한다. EMPTY와 일부 실패·기존 성공 결과는 함께 구분한다.
 
-**실제 공유 화면에는 아직 연결하지 않았다.** `createMemberJdApi(api.member)` factory는 요약 접수·목록·상세에서도 회원 Bearer와 요청 시점 `getGrant()`의 `X-Link-Grant`를 함께 전달한다. 수신자 전용 호출로 회원 인증을 생략하지 않는다. LINK 401은 회원 갱신을 하지 않고 `onAccessLost`로 전달하며, AUTH 401은 회원 인증 처리와 로그인 안내로 구분한다.
+[#482](https://github.com/JminAILab/CatchU/pull/482)의 실제 공유 화면 4번 자리에 `JdRecipientPanel`을 연결했다. wrapper는 `createMemberJdApi(api.member)`를 주입해 요약 접수·목록·상세에서 회원 Bearer와 요청 시점 `getGrant()`의 `X-Link-Grant`를 함께 전달한다. 수신자 전용 호출로 회원 인증을 생략하지 않는다. LINK 401은 회원 갱신을 하지 않고 `onAccessLost`로 전달하며, AUTH 401은 회원 인증 처리와 로그인 안내로 구분한다.
 
-API의 실제 C-10 등록은 #468 병합과 #416 OQ5·OQ6 결정에 따라 AppModule에 연결했다. [U4 제출 3 병합](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6677766344)은 확인됐지만 U10의 C-11 슬롯·`showEvidence` 연결은 사용자 지시에 따라 별도 대기다. U10이 공유 화면 슬롯을 만들거나 제공자 파일을 대신 수정하지 않는다. 공유 화면 연결을 진행할 때 소유자가 위 factory의 `client`를 주입한다. API 등록·공용 코드와 합성 fetch 검사의 통과는 실제 공유 화면·원문 강조·외부 AI 연결 완료가 아니다.
+API의 실제 C-10 등록은 #468 병합과 #416 OQ5·OQ6 결정에 따라 AppModule에 연결했다. U4 제출 3 병합판을 받은 뒤 사용자의 C-11 대기 해제에 따라 제공된 슬롯 composition만 수정했다. U4의 screen/store/grants/slots·강조 로직은 그대로 사용한다. `jd-recipient-binding.ts`는 같은 링크의 최신 콜백을 참조하되 함수 교체만으로 선택·결과를 초기화하지 않는다. grant 값은 보관하지 않는다. 링크 교체 시 wrapper 자식을 해제하며, 회원 세대 교체는 기존 `JdSummaryPanel` 경계를 따른다.
+
+공유 페이지 직접 진입은 회원 Guard를 거치지 않으므로 통합 전환이 켜져 있을 때 wrapper가 기존 `authRuntime.ensureRestored()`를 호출한다. 별도 토큰·갱신 정책을 만들거나 전환 설정을 바꾸지 않는다. 실제 브라우저의 접수·재열람·근거 강조·접근 상실 결과와 합성 HTTP 검사 결과는 코드 요약에서 구분한다. 화면 연결을 외부 AI 처리 완료로 보고하지 않는다.
 
 ## 검사
 
@@ -48,3 +50,17 @@ npm run typecheck
 새 7개 검사는 실제 `createApiClient`·`createAuthApi`·`toClientResult`를 U10 adapter/model에 연결하고 fetch·갱신 세션을 합성으로 주입한다. 두 인증 분기의 PATCH와 동시 헤더, LINK/AUTH 401 구분, GET 1회 재조회, POST/PATCH 무재전송, 저장 실패 입력 보존, 로그인 상태가 true인 계정 교체의 늦은 응답 폐기를 확인한다. 기존 정적 검사는 변경된 미제공 기대와 화면의 1·4번 사례만 선택한다. 실제 web↔api·브라우저·C-11 강조와 외부 AI는 미실행이며, 이 좁은 검사에서 전체 커버리지 충족을 주장하지 않는다.
 
 이번 결과는 새 검사 7/7, 기존 선택 검사 4/4 통과(실패·skip 0), 대상 lint와 typecheck exit 0이다. 의존성·라우트·빌드 설정 변경이 없어 이번 보완에서 빌드는 반복하지 않았다. 정적 렌더는 기존 TSX 변환과 CSS 대역을 사용하며 실제 레이아웃·클릭 확인을 대신하지 않는다.
+
+2026-11-06 C-11 연결은 기존 75개·17개·C-10 9개를 반복하지 않고 아래 범위만 검사했다.
+
+```sh
+node --test --test-concurrency=1 test/jd-recipient-binding.test.mjs
+node --test --test-name-pattern="^판정 통과 화면 순서:" test/recipient.test.mjs
+node --test test/member-navigation.test.mjs
+node node_modules/eslint/bin/eslint.js src/features/jd/jd-recipient-panel.tsx src/features/jd/jd-recipient-binding.ts src/features/recipient/recipient-view.tsx
+node node_modules/typescript/bin/tsc --noEmit --incremental false
+```
+
+신규 연결 7개·변경된 슬롯 기대 1개·통합 충돌 해결의 회원 메뉴 8개, 총 16개가 통과했다. 대상 lint와 typecheck도 종료 코드 0이다. 신규 검사는 실제 U4 composition/store/grants·위치 대조와 U10을 연결하지만 fetch 응답은 합성이다.
+
+실제 브라우저와 로컬 API/DB에서는 보호 링크 unlock·회원 세션 복원, 본인 JD 선택, 새 접수/PENDING, 미리 저장한 합성 DONE의 재열람·세 칸·근거 강조와 반복 선택, 로그아웃과 발행본 중지 시 화면 정리를 확인했다. 근거의 `<mark>`가 화면 안에 보이고 항목에 초점이 옮겨져도 JD 선택·결과는 유지됐다. 브라우저 네트워크 헤더·상태 코드를 직접 캡처하지 않았으므로 제품 Guard 통과의 행동 증거와 합성 fetch의 헤더 단언은 구분한다. 완료 결과는 합성 DB 자료이며 실제 큐 처리·외부 AI 생성·성능 비교는 미실행이다. 상세 증거와 미실행 조건은 U10 코드 요약에 있다.
