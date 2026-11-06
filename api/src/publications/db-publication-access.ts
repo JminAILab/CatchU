@@ -39,7 +39,7 @@ interface PdfPageRow extends PublishedPdfPage {
 }
 
 /**
- * 같은 판정 시점에 유효한 발행본의 소유 회원 행이 없다(데이터 불일치, OQ-U4-NFR-6 합의 전 10월 동작).
+ * 같은 판정 시점에 유효한 발행본의 소유 회원 행이 없다(데이터 불일치, #416 OQ-U4-NFR-6 결정 2026-11-05).
  * 공통 필터가 500 INTERNAL_ERROR(고정 본문)로 응답하며 토큰·SQL을 담지 않는다.
  */
 export class PublicationOwnerMissing extends Error {
@@ -91,7 +91,7 @@ export class DbPublicationAccess implements PublicationAccess {
       `SELECT ${PUBLICATION_COLUMNS} FROM publication WHERE link_token_reference = $1`, [token]);
     const publication = rows[0];
     if (!publication || publicationState(publication.stoppedAt, publication.expiresAt, now) !== 'ACTIVE') throw new LinkUnavailable();
-    // OQ-U4-NFR-6 합의 전 처리: 10월처럼 비활성 소유자는 다른 불가 사유와 같은 404, 회원 행 없음은 데이터 불일치 500.
+    // #416 OQ-U4-NFR-6 결정(2026-11-05): 비활성 소유자(작성자)는 다른 불가 사유와 같은 404, 회원 행 없음은 데이터 불일치 500. 중지·만료 다음, grant 앞.
     const ownerState = await this.owners.readOwnerState(publication.memberId, manager);
     if (ownerState === 'INACTIVE') throw new LinkUnavailable();
     if (ownerState === 'NO_MEMBER') throw new PublicationOwnerMissing();
