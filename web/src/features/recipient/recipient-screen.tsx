@@ -36,6 +36,8 @@ function useFocusOnView(view: string): RefObject<HTMLHeadingElement | null> {
 }
 
 const serverLoggedIn = () => false;
+/** `snapshot-view.tsx`가 강조 범위에 그리는 `<mark>`(`data-testid="snapshot-highlight"`). 항목 안에서 첫 번째를 스크롤 대상으로 삼는다. */
+const HIGHLIGHT_SELECTOR = 'mark[data-testid="snapshot-highlight"]';
 
 function PublicationView({ token }: { token: string }) {
   const [store] = useState(() => createRecipientPublicationStore({ api: recipientApi, grants, token }));
@@ -49,6 +51,8 @@ function PublicationView({ token }: { token: string }) {
   const isLoggedIn = useSyncExternalStore(accessTokenStore.subscribe, () => accessTokenStore.get().token !== null, serverLoggedIn);
 
   // 근거 위치 강조(C-11 evidence-highlight). `seq`는 같은 위치를 다시 눌러도 다시 옮기게 한다.
+  // 강조 범위가 있으면 항목 안의 첫 `<mark>`가 화면에 보이도록 옮기고, 범위가 없거나 강조 요소를 못 찾으면 항목 시작으로 옮긴다
+  // (PR #482 리뷰: 긴 자료의 뒷부분을 가리키면 항목 시작만 보여 강조가 화면 밖에 남았다). 초점은 항목에 두되 `preventScroll`로 다시 튀지 않게 한다.
   const [target, setTarget] = useState<(EvidenceTarget & { seq: number }) | null>(null);
   const showEvidence = useCallback((location: EvidenceLocation) => {
     const current = store.getSnapshot();
@@ -61,7 +65,8 @@ function PublicationView({ token }: { token: string }) {
     if (target === null) return;
     const element = document.getElementById(publishedItemDomId(target.publishedItemId));
     if (!element) return;
-    element.scrollIntoView({ block: "start" });
+    const mark = target.highlight === null ? null : element.querySelector<HTMLElement>(HIGHLIGHT_SELECTOR);
+    (mark ?? element).scrollIntoView({ block: mark === null ? "start" : "center" });
     element.focus({ preventScroll: true });
   }, [target]);
   // 판정 통과 화면을 벗어나면 강조도 보이지 않는다(상태에서 파생).
