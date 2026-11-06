@@ -174,7 +174,7 @@ test('콜백: 이름이 빈 회원은 next 대신 최초 입력으로 간다', a
   const server = fakeServer();
   server.state.displayName = '';
   const p = page(server);
-  const state = await pressGoogle(p, '/links');
+  const state = await pressGoogle(p, '/publications');
   const control = callbackScreen(p);
   await control.begin(() => query(`state=${state}&code=c1`), () => {});
   assert.deepEqual(control.getView(), { phase: 'redirect', to: '/profile/setup' });

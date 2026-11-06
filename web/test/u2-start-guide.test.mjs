@@ -13,7 +13,7 @@ test("시작 안내는 고정 여섯 단계를 정한 순서로 두고, 단계�
   assert.deepEqual(MEMBER_START_STEPS.map((step) => step.title), [
     "Google 로그인 완료", "GitHub 연결·분석 동의", "저장소 등록·분석", "Catch 설명 쓰기", "자료 올리기", "발행·본인 Claude 연결",
   ]);
-  const memberRoutes = new Set([routes.profile, routes.assets, routes.materials, routes.links, routes.profileClaude]);
+  const memberRoutes = new Set([routes.profile, routes.assets, routes.materials, routes.publications, routes.profileClaude]);
   for (const step of MEMBER_START_STEPS) assert.ok(memberRoutes.has(step.link.href), `${step.id} → ${step.link.href}`);
   assert.equal(new Set(MEMBER_START_STEPS.map((step) => step.id)).size, 6);
   // U6: 발행·본인 Claude 연결 단계는 Claude 연결 화면으로 잇는다(U6 기능 설계 BR7.5, 시나리오 S21).

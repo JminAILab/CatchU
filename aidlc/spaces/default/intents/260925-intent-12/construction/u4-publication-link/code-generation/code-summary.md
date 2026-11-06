@@ -65,7 +65,58 @@ OQ-U4-NFR-6 결정의 C-10 문구 반영을 [PR #478](https://github.com/JminAIL
 - `TEST_DB_PORT=5443 npm test -- <U4 제출 3 파일 12개 + lock-wait-limit-role + analysis-intake-receiver + security-headers + share-links-config + member-analysis>`: 170개 통과·0 실패(새 시험 40개 포함, 잠금 대기 사례는 역할 생성 권한이 있어 실행됨).
 - api 전체 `TEST_DB_PORT=5443 npm test`(작업 트리, 약 11분): 1,635개 중 1,593 통과·6 실패·36 건너뜀. 실패 6개 중 4개(`integration/u7-analysis-chain` 3개: worker 실행 파일 필요, `S22` 심볼릭 링크: Windows 권한)는 #474 때와 같은 환경 실패, 1개(`claude-mcp/mcp-endpoint` S9 만료 시각)는 같은 파일만 다시 돌리면 14개 모두 통과하는 시각 경합이며 이 변경과 무관, 1개(`request-rate-limiter`)는 지운 `issue-rate-limit.ts`를 가져오던 것이라 위 D24대로 고쳤다(고친 뒤 단독 통과).
 
-**남은 것**: Step 22(받은 사람 화면, `copy-text` 이동 뒤 share-links 제거)와 Step 23 web 부분, Step 24(문서: `api/docs/publications.md` 받은 사람 경로·`api/docs/share-links.md`·`recipient-read.md` 대체 안내, `api/README.md` 시험 표의 10월 항목), Step 25(전체 확인·커버리지·S15 미실행 기록). 받은 사람 판정의 브라우저 확인(#416 결정 3)은 Step 22 뒤.
+**남은 것(2026-11-05 시점, Step 22는 아래에서 끝냄)**: Step 22(받은 사람 화면, `copy-text` 이동 뒤 share-links 제거)와 Step 23 web 부분, Step 24(문서: `api/docs/publications.md` 받은 사람 경로·`api/docs/share-links.md`·`recipient-read.md` 대체 안내, `api/README.md` 시험 표의 10월 항목), Step 25(전체 확인·커버리지·S15 미실행 기록). 받은 사람 판정의 브라우저 확인(#416 결정 3)은 Step 22 뒤.
+
+### Step 22 받은 사람 화면·W6 web 제거 (2026-11-06, 커밋 전)
+
+착수 전 상태: 작업 브랜치 `api/u4-recipient`(`58cac08`)에 통합 브랜치의 `ad58c6f`(#478 merge commit)가 없었고 같은 내용의 cherry-pick `159584e`만 있었다. 담당 결정(2026-11-06)대로 `origin/intent/260925-intent-12`를 merge commit `2c71423`로 반영했다(#477 U5 등록·#471 web api-client 변경 포함). 충돌은 `db-publication-access.ts` 한 곳(통합 쪽은 #478의 주석 변경, 작업 쪽은 D18의 공통 판정 `readUsablePublicationIn`)이며 결정 주석이 이미 들어 있는 작업 쪽을 유지했다. 병합 뒤 api `tsc` 통과. push는 하지 않았다.
+
+**만든·고친 파일(web)**
+
+- 새 파일: `src/features/recipient/recipient-view.tsx`(상태별 그리기, `RecipientSlots` 2·3·4번 자리), `recipient-slots.ts`(C-11 `RecipientSlotProps`·`LinkAccessCode`·`EvidenceLocation` 화면 안 형, `resolveEvidenceTarget`·`fieldText`), `src/lib/copy-text.ts`(10월 `share-links/copy-text.ts`를 옮김, 동작 같음)
+- 고친 파일: `recipient-api.ts`(C-12 `GET /public/links/{token}` 200 `PublishedSnapshot`·`unlock`, 10월 프로필·Catch 읽기 제거, 사본 검사는 publications의 `isPublishedSnapshot` 재사용), `recipient-store.ts`(목록·상세 두 상태 → `createRecipientPublicationStore` 하나, `accessLost(code)` 추가, `createAccess`는 10월 그대로), `recipient-format.ts`(10월 Catch 문구 제거, `publishedAtText`·`PASSWORD_REQUIRED_TITLE`), `recipient-screen.tsx`(상태 연결·`useFocusOnView`·`isLoggedIn`·`showEvidence`·slotProps), `recipient.module.css`(목록·상세용 규칙 제거), `publications/snapshot-view.tsx`(`highlight`·항목 `id`·`tabIndex={-1}` 추가, 작성자 상세 표시는 그대로), `publications.module.css`(`.highlight`, 항목 초점 테두리), `publication-link-actions.tsx`(`copyUrl`을 `lib/copy-text`의 `copyText`로), `claude-connection-panel.tsx`(import 경로), `app/s/[token]/page.tsx`, `lib/routes.ts`(`links`·`recipientCatchPath` 제거), `lib/member-navigation.ts`(`/links` 회원 경로 제외), `components/header/member-header.tsx`([공유 링크] 메뉴 제거), `web/README.md`(파일 역할·페이지 주소 표)
+- 지운 파일(지우기 전 전체 사용처를 다시 확인함, 준비안 4번과 같음): `src/features/share-links/` 전체, `src/app/(member)/links/page.tsx`, `src/app/s/[token]/catches/[catchId]/page.tsx`, `test/share-links.test.mjs`, `test/share-links-public-summary.test.mjs`
+- 시험: `test/recipient.test.mjs`를 보안 설계 R-03 표대로 고쳐 씀(32개: 유지 묶음 그대로, 응답 모양만 바꾼 묶음, W6 묶음 삭제, G1~G3·자리 순서·G5·G6 기계 검사·사본 표지·근거 강조·`onAccessLost`·위치 대조 추가). Step 23의 web 부분을 여기서 앞당겼고, 시험 파일 머리 주석의 기대 결과는 Step 19 것을 유지했다. `test/u6-claude-connection.test.mjs`(copy-text 경로), `test/u2-start-guide.test.mjs`·`member-navigation.test.mjs`·`member-lookup.test.mjs`·`auth-google.test.mjs`·`auth-screens-connected.test.mjs`·`auth-screens-google.test.mjs`·`auth-screens-session.test.mjs`(회원 경로 예시 `/links` → `/publications`; `/links`는 이제 복귀 대상이 아닌 경로의 예시로 남김)
+
+**구현 결정(D25~)**
+
+| # | 결정 | 근거 |
+|---|---|---|
+| D25 | 사본 표시는 작성자 상세의 `PublishedSnapshotView`를 받은 사람 화면이 그대로 쓴다. 강조는 `highlight`(항목·fieldPath·[charStart, charEnd)) 선택 props로 더했고, 항목마다 `id="published-item-<publishedItemId>"`·`tabIndex={-1}`을 둬 근거 위치로 옮길 수 있게 했다 | 계획 미결 표 OQ-U4-NFR-1·2 "작성자 상세의 사본과 받은 사람 화면에 같은 규칙", NFR1.10·NFR1.11 |
+| D26 | `showEvidence(location)`은 `resolveEvidenceTarget`으로 사본에 대조한다: 항목이 없으면 옮기지 않고, fieldPath(`workFacts[i]`·`subjectContribution`·`evidence[i].representedFacts[j]`·`authorDescription`·`body`)가 가리키는 문자열 안의 범위만 `<mark>`로 강조하며, 범위 밖·없는 경로(`aiDraft`·`pages[n]`)면 항목으로 옮기기만 한다. 옮길 때 `scrollIntoView` 뒤 항목에 초점을 둔다 | 시험 머리 주석 「발행본 자료 1번 자리」, C-11 evidence-highlight, api `summary-sources.ts`·`chunker.ts`의 fieldPath 어휘 |
+| D27 | U4 고정 안내(BR7.1) 축소 문구는 「발행 시각 YYYY-MM-DD HH:mm:ss (KST)」 한 줄이다(`publishedAtText`, 작성자 상세와 같은 `formatKst`). 고정 사본 설명·링크 기간·중지·만료 시각·외부 AI·로그인 문장은 두지 않는다 | G5·G6. PR 「리뷰 요청」 체크리스트로 팀장 확인 |
+| D28 | 2번 자리에 U5 `BaseSummaryPanel`, 3번 자리에 `QnaPanel`을 U5 README 「붙이는 방법」대로 `RecipientSlotProps` + `key={token}`으로 단다(처음에는 빈 자리로 뒀다가 2026-11-06 담당 요청으로 연결). 4번 자리는 U10 제공 전 빈 `div`이며 `data-logged-in`만 표시한다. `slotProps`(`token`·`getGrant`·`onAccessLost`·`isLoggedIn`·`showEvidence`)는 화면이 만들어 `RecipientSlots`에 넘기고, `isLoggedIn`은 이 탭의 `accessTokenStore` 토큰 유무다 | 계획 Step 22 "U5·U10 컴포넌트는 제공 뒤 연결"(U5는 #477로 제공됨), 담당 지시(2026-11-06) |
+| D29 | `onAccessLost(code)`는 `store.accessLost`로 받아 화면이 직접 받은 404·401과 같은 전환·grant 삭제를 하고, 진행 중 조회는 끊어 늦은 성공이 거부를 덮지 않게 한다. 초점은 단계(판정 통과·비밀번호·접근 불가·조회 실패)가 정해질 때마다 그 단계의 U4 h1로 옮기며 **처음 연 화면도 포함**한다(10월은 첫 화면 제외였고, 2026-11-06 담당 요청으로 바꿈). 비밀번호 입력칸의 `autoFocus`는 h1 첫 초점과 겹쳐 뺐다(Tab 한 번으로 입력, 틀린 값·빈 값 뒤에는 입력으로 돌림) | C-11 rule, G4, NFR7.3 |
+| D30 | `publication-link-actions.tsx`의 `copyUrl`은 따로 두지 않고 공용 `lib/copy-text.ts`의 `copyText`를 다시 내보낸다(D14의 사본 제거). 시험이 쓰는 이름 `copyUrl`은 유지 | 같은 동작이 두 곳에 있을 이유가 없어짐 |
+
+**검증(2026-11-06, 작업 트리 판본 `2c71423` + 이 변경)**
+
+- web `npx tsc --noEmit`(낡은 `.next/types`를 지운 뒤)·`npm run build`(라우트 `/s/[token]`만 남고 `/links`·`/s/[token]/catches/[catchId]` 없음)·바꾼 src·test 파일 eslint(`--max-warnings=0`) 통과.
+- `node --test test/recipient.test.mjs` 32개 통과. web 전체 `npm test` 860개 통과·0 실패(처음 9개 실패는 `/links`를 회원 경로 예시로 쓰던 인증 시험이며 위대로 고침).
+- api는 병합 뒤 `tsc`만 돌렸다(이 Step은 api 코드를 바꾸지 않음).
+
+**브라우저 확인(2026-11-06, `next dev` + C-12 모양의 받은 사람 API 대역, 실제 api·DB 아님)**
+
+- `/s/open`: h1(발행본 제목, `tabindex=-1`) → `RecipientGuide` 1개(Claude 연결 줄 없음) → 「발행 시각 2026-11-05 12:04:05 (KST)」 → 발행본 자료 → 2·3·4 자리 순서. 항목은 position 순(텍스트 자료 → Catch → Catch), 불일치 표지 1개, 기록·작성자 설명·AI 초안 표지 구분, 본문의 `<b>`는 글자로, GitHub 주소 3곳만 `target="_blank" rel="noopener noreferrer"` 링크, `evil.example` 주소와 AI 초안 안 GitHub 주소는 글자. 375px 폭에서 가로 스크롤 없음.
+- `/s/locked`: 비밀번호 화면(안내 0개, h1 1개, 입력에 첫 초점) → 틀린 값 「비밀번호가 맞지 않습니다.」·입력 비움·`aria-invalid` → 429(Retry-After 5) 「5초 뒤에 다시 시도」·버튼 비활성 → 5초 뒤 「이제 다시 시도할 수 있습니다.」·버튼 활성(자동 전송 없음) → 맞는 값 → 발행본 화면으로 바뀌며 초점이 `h1#recipient-title`로 이동(G4), `sessionStorage`에 `catchu.recipient.grant:locked`만 생기고 주소에 grant 없음 → 새로 고침해도 비밀번호 없이 열림.
+- `/s/gone`: 「이 링크는 열람할 수 없습니다.」만(사유·안내 없음). `/s/boom`: 숨긴 h1 「발행본」 + 「발행본을 불러오지 못했습니다」·[다시 불러오기].
+
+**확인하지 못한 것**
+
+- 실제 api(`RecipientLinksController`)·DB와의 연결, S8·S9·S14의 끝에서 끝(판정 뒤 중지·삭제·작성자 비활성 → 다음 요청 404, 회원 행 없음 500): Docker가 꺼져 있어 테스트 DB를 띄우지 못했다. Step 23·25에서 실제 api로 한다.
+- 다시 조회 실패 때 이전 화면 유지(NFR6.1)와 확정 거부 때 이전 사본 삭제: 화면에 다시 조회 단추가 없어 단위 시험으로만 봤다. 대역의 `flip` 토큰은 개발 모드의 효과 두 번 실행 때문에 첫 조회가 소모돼 쓰지 못했다.
+- U5 패널의 실제 요약·질문 응답(실제 api·DB): 대역으로만 봤다. U4가 보는 것은 자리·props·`onAccessLost`·`showEvidence` 연결이며 패널 안 동작은 U5 몫이다.
+- `web/src/features/recipient/README.md`는 아직 10월 내용이다(Step 24).
+
+**2026-11-06 보완(담당 요청, 커밋 전)**
+
+- 첫 진입 초점: 세 화면 모두 처음 열 때 h1에 초점(D29). 비밀번호 입력칸 `autoFocus` 제거. `recipient-screen.tsx`·`recipient-view.tsx`.
+- 2·3번 자리에 U5 `BaseSummaryPanel`·`QnaPanel` 연결(D28). `features/rag-answer/README.md`의 "아직 붙어 있지 않다" 문장을 현재 상태로 고쳤다.
+- 시험: `recipient.test.mjs` 32개(자리 2·3에 패널 하나씩, `autofocus` 없음, G5·G6 검사는 U2·U5 영역을 뺀 U4 영역만), web 전체 860개 통과, `tsc`·`next build`·바꾼 파일 eslint 통과.
+- 브라우저(대역 API, `document.activeElement`): `/s/open` 첫 진입 `H1#recipient-title`, `/s/locked` 첫 진입 `H1#recipient-password`(입력칸 `autofocus` 없음, Tab 한 번에 `INPUT type=password`), `/s/gone` 첫 진입 `H1#recipient-unavailable`, 비밀번호 해제 뒤 `H1#recipient-title`(패널 2개·요약 항목 4개 표시). 요약 패널 근거 단추: 「자기소개」→ `LI#published-item-item-text-1`로 초점·스크롤, `data-highlighted`, `<mark>` 1개(대역이 준 5자 범위 "두 번째 "); 「결제 모듈 리팩터링」→ `item-catch-1`, `<mark>`「결제 재시도 로직」; 사본에 없는 범위(`workFacts[3]`) → `item-catch-2`로 이동만, `<mark>` 0개. 접근 상실: `/s/lost`(요약 GET 404) → 「이 링크는 열람할 수 없습니다」·패널 0·초점 `H1#recipient-unavailable`; `/s/lostq`(질문 POST 401) → 비밀번호 화면·패널 0·초점 `H1#recipient-password`, 그 링크 grant 없음.
+
+**남은 것(제출 3)**: Step 23 web 부분은 위대로 앞당겼고 api 부분은 Step 20·21과 함께 끝났으므로, Step 23에서는 실제 api·DB로 받은 사람 판정의 브라우저 확인(#416 결정 3)과 커버리지를 본다. Step 24(문서: `web/src/features/recipient/README.md`, `api/docs/publications.md` 받은 사람 경로, `api/docs/share-links.md` 대체 안내, PR 「리뷰 요청」에 D27 문구·G5~G7·보류 범위), Step 25(전체 확인·S15 미실행 기록). U10 패널을 4번 자리에 붙이는 것은 U10 제공 뒤다(D28).
+
 
 ## 제출 2 (2026-11-03) — C-10 DB 구현·W3 발행·W5 작성자 관리
 
