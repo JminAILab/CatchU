@@ -82,7 +82,7 @@ JD 관리 → 요약 순서다. 기존 NestJS·TypeORM·PostgreSQL, api 내부 A
 
 - [x] `web/src/features/jd/`에 타입·응답 파서·주입 가능한 API 어댑터·상태 모델·JdManagementPage/JdList/JdEditor/DeleteJdConfirm 및 CSS Module을 작성한다.
 - [x] 회원 라우트 `web/src/app/(member)/jds/page.tsx`, `web/src/lib/routes.ts`, `web/src/lib/member-navigation.ts`, `web/src/components/header/member-header.tsx`에 JD 관리 진입을 연결한다. 주소는 Unit 내부 구현 선택 `/jds`로 하며 `web/README.md` 주소 표도 함께 갱신한다.
-- [ ] 공용 인증/세션 경계로 요청 결과를 적용하고 저장 실패 입력을 유지한다. PATCH 제공 전에는 실제 수정 연결을 완료로 기록하지 않는다. 공용 제공자 보완 뒤 U10 어댑터만 연결한다.
+- [x] 공용 인증/세션 경계로 요청 결과를 적용하고 저장 실패 입력을 유지한다. PATCH 제공 전에는 실제 수정 연결을 완료로 기록하지 않는다. 공용 제공자 보완 뒤 U10 어댑터만 연결한다.
 - [x] 구현 후 `web/test/jd-management.test.mjs`의 7개 시나리오와 변경한 탐색 경계의 기존 검사를 실행한다.
 
 ### Step 5 — 요약 접수·조회 API와 검사

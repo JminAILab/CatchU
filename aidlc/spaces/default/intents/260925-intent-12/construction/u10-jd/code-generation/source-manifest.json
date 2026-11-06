@@ -76,6 +76,9 @@
       "path": "api/test/jd/fixtures.cjs"
     },
     {
+      "path": "api/test/jd/jd-acceptance-race.test.cjs"
+    },
+    {
       "path": "api/test/jd/jd-integration.test.cjs"
     },
     {
@@ -137,6 +140,9 @@
     },
     {
       "path": "web/test/jd-management.test.mjs"
+    },
+    {
+      "path": "web/test/jd-member-binding.test.mjs"
     },
     {
       "path": "web/test/jd-summary.test.mjs"

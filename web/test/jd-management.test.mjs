@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
-import { createJdApi, managementTransport } from "../src/features/jd/jd-api.ts";
+import { createJdApi } from "../src/features/jd/jd-api.ts";
 import { createJdManagementModel } from "../src/features/jd/jd-management-model.ts";
 import { jdDraftErrors } from "../src/features/jd/jd-types.ts";
 import { toClientResult } from "../src/lib/auth-api.ts";
@@ -87,10 +87,7 @@ test("4. 서버·입력·미전송·인증 갱신 거부는 성공으로 보이�
     const html = renderToStaticMarkup(createElement(JdEditor, { state: model.store.get(), model, canUpdate: true }));
     assert.match(html, /&lt;script&gt;/); assert.doesNotMatch(html, /저장되었습니다|원문을 화면/);
   }
-  let sent = 0;
-  const api = createJdApi(managementTransport(async () => { sent++; return success(null); }));
-  assert.equal((await api.update(ID, { title: "a", body: "b" })).code, "CONNECTION_NOT_READY");
-  assert.equal(sent, 0);
+  // #471 이후 실제 공용 PATCH 연결은 jd-member-binding.test.mjs에서 검사한다.
   const expired = setup([error("AUTH_INVALID", 401)]); await expired.model.select(null);
   expired.model.change({ title: "이전 회원", body: "이전 입력" }); await expired.model.save();
   assert.equal(expired.model.store.get().loginRequired, true); assert.equal(expired.model.store.get().draft.body, "");

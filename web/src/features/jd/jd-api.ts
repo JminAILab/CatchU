@@ -7,24 +7,18 @@ export type JdRequest = { method: "GET" | "POST" | "PATCH" | "DELETE"; body?: un
 export type JdTransport = (path: string, request: JdRequest) => Promise<ClientResult>;
 export type JdFailure = { kind: "failed"; status: number | null; code: string; outcome: MemberMutationOutcome };
 export type JdResult<T> = { kind: "ok"; value: T } | JdFailure;
-const unavailableResults = new WeakSet<object>();
-const unavailable = (): ClientResult => {
-  const result: ClientResult = { kind: "lookup-failed", status: null, code: "LOOKUP_FAILED" };
-  unavailableResults.add(result);
-  return result;
-};
+/** #471의 공용 회원 호출을 사용한다. 요약도 Bearer와 grant를 함께 보내며 갱신·재전송은 공용 경계가 맡는다. */
+export function memberTransport(member: ApiClient["member"]): JdTransport {
+  // 결과 객체를 복사하지 않아 공용 not-sent/discarded 표식을 보존한다.
+  return (path, request) => member(path, request);
+}
 
-/** 공용 PATCH/동시 헤더 제공 전에는 우회 전송하지 않는다. 기존 회원 호출만 연결한다. */
-export function managementTransport(member: ApiClient["member"], patch?: JdTransport): JdTransport {
-  return (path, request) => {
-    if (request.linkGrant !== undefined || path.startsWith("/public/")) return Promise.resolve(unavailable());
-    if (request.method === "PATCH") return patch ? patch(path, request) : Promise.resolve(unavailable());
-    return member(path, { method: request.method, body: request.body, signal: request.signal });
-  };
+/** 관리 페이지와 향후 C-11 소유자가 같은 회원 인증 어댑터를 사용한다. 슬롯 등록은 별도다. */
+export function createMemberJdApi(member: ApiClient["member"]) {
+  return createJdApi(memberTransport(member));
 }
 export function jdFailure(result: ClientResult): JdFailure {
-  return { kind: "failed", status: result.status, code: unavailableResults.has(result) ? "CONNECTION_NOT_READY"
-    : result.kind === "success" ? "INVALID_RESPONSE" : result.code,
+  return { kind: "failed", status: result.status, code: result.kind === "success" ? "INVALID_RESPONSE" : result.code,
     outcome: memberAuthRejected(result) ? "not-sent" : memberMutationOutcome(result) };
 }
 export async function safelySend(transport: JdTransport, path: string, request: JdRequest): Promise<ClientResult> {
@@ -42,7 +36,7 @@ const summaryPath = (token: string) => `/public/links/${encodeURIComponent(token
 export function createJdApi(transport: JdTransport) {
   const call = <T>(path: string, request: JdRequest, expected: number, valid: (v: unknown) => v is T) =>
     safelySend(transport, path, request).then((result) => decode(result, expected, valid));
-  const recipientRequest = (context: JdRecipientContext, method: "GET" | "POST", signal?: AbortSignal): JdRequest => {
+  const summaryRequest = (context: JdRecipientContext, method: "GET" | "POST", signal?: AbortSignal): JdRequest => {
     const grant = context.getGrant();
     return { method, signal, ...(grant ? { linkGrant: grant } : {}) };
   };
@@ -56,12 +50,12 @@ export function createJdApi(transport: JdTransport) {
       (v): v is Jd => isJd(v) && v.jdId === id),
     remove: (id: string) => call(itemPath(id), { method: "DELETE" }, 204, (v): v is null => v === null),
     acceptRaw: (context: JdRecipientContext, jdId: string) => safelySend(transport, summaryPath(context.token),
-      { ...recipientRequest(context, "POST"), body: { jdId } }),
+      { ...summaryRequest(context, "POST"), body: { jdId } }),
     accepted: (result: ClientResult) => decode(result, 202, isAccepted),
     listRuns: (context: JdRecipientContext, cursor: string | null = null) => call(`${summaryPath(context.token)}${pageQuery(cursor)}`,
-      recipientRequest(context, "GET"), 200, (v): v is Page<JdRunItem> => isPage(v, isJdRunItem)),
+      summaryRequest(context, "GET"), 200, (v): v is Page<JdRunItem> => isPage(v, isJdRunItem)),
     getRun: (context: JdRecipientContext, runId: string) => call(`${summaryPath(context.token)}/${encodeURIComponent(runId)}`,
-      recipientRequest(context, "GET"), 200, (v): v is JdRun => isJdRun(v)),
+      summaryRequest(context, "GET"), 200, (v): v is JdRun => isJdRun(v)),
   };
 }
 export type JdApi = ReturnType<typeof createJdApi>;
@@ -78,7 +72,6 @@ export function jdErrorText(failure: JdFailure): string {
     INPUT_TOO_LARGE: "입력 상한을 넘었습니다. JD 관리에서 내용을 수정해 주세요.",
     INVALID_INPUT: "입력을 확인해 주세요. 실행은 접수되지 않았습니다.",
     DAILY_LIMIT_REACHED: "오늘의 JD 요약 실행 한도에 도달했습니다.",
-    CONNECTION_NOT_READY: "수정 기능을 준비하고 있습니다. 입력은 그대로 유지됩니다.",
   };
   return messages[failure.code] ?? "요청 결과를 확인하지 못했습니다. 잠시 뒤 목록을 다시 확인해 주세요.";
 }

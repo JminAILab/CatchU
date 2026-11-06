@@ -24,6 +24,8 @@ U10 경계 입력 오류는 `422 INVALID_INPUT / INPUT_TOO_LARGE`, 남의/없는
 
 본인 입력 → C-04 동의 → C-09 DONE 확인 후 짧은 JD 행 잠금에서 최신 입력을 재검증한다. 같은 EntityManager에 C-03 하루 횟수와 실행·입력 사본·PENDING 결과를 저장한다. 커밋 후 C-02에 `JD_SUMMARY, runId, {runId}`만 등록한다. 등록 실패는 차감을 유지하고 PENDING으로 응답한다.
 
+[#474](https://github.com/JminAILab/CatchU/pull/474)의 접수 경합 결정에 따라, C-10 판정 후 발행본이 삭제되어 TypeORM `QueryFailedError.driverError`가 `code=23503`과 `constraint=fk_jd_summary_run_publication_id`를 함께 반환한 경우만 전체 트랜잭션 롤백 후 `404 LINK_UNAVAILABLE`로 바꾼다. 실행·결과·입력 사본·하루 차감은 남지 않는다. 다른 FK·DB 오류는 기존 `500 INTERNAL_ERROR`를 유지하며 SQL·오류 메시지를 문자열로 판별하지 않는다. `readSnapshot` 재조회는 추가하지 않는다. 접근 판정 후의 중지·만료는 현재 요청의 접수와 차감을 허용하고 다음 요청의 C-10 판정부터 차단한다.
+
 요구사항을 순차 처리하며 C-09 검색 limit 6, C-01 HAIKU/JD_SUMMARY를 사용한다. 원문 위치·인용·역할을 그대로 저장한다. U2의 `assertGenerationRequest`가 실제 sources.text + userText 길이를 검사한다. 6개 초과·조각 1,000자 초과는 CONTRACT_INVALID이며 공용 80,000 초과는 INPUT_TOO_LARGE다. 입력을 잘라 호출하거나 자동 재시도하지 않는다.
 
 정상 빈 반환/서버 안내만은 DONE/EMPTY다. NO_ITEMS 예외·개별 호출 시간 초과는 FAILED/GENERATION_FAILED이며 화면은 “이 요구사항을 처리하지 못했습니다.”를 쓴다. 전체 접수 시한 20분 초과는 DEADLINE_EXCEEDED로 구분한다. 이 값은 SLO가 아니다. 실행 행 잠금 안에서 PENDING 요구사항만 시한 실패로 바꾸고 이미 저장한 DONE은 보존한다. 쓰기는 기존 행 UPDATE만 사용한다. 전 행 terminal이고 하나라도 DONE이면 실행 DONE, 전 행 실패면 ALL_REQUIREMENTS_FAILED다.
@@ -35,6 +37,8 @@ U10 경계 입력 오류는 `422 INVALID_INPUT / INPUT_TOO_LARGE`, 남의/없는
 `JdManagementModule`은 AppModule에 등록한다. `JdSummaryModule.register({publicationAccess,imports})`는 실제 C-10 제공 모듈과 토큰을 받는 경계이며 기본 앱에 합성 구현을 등록하지 않는다. #416 실제 DB C-10 및 C-11 슬롯, web 공용 PATCH/Bearer+grant 전달 보완이 완료된 뒤 제품 연결 검사를 수행해야 한다.
 
 `test/jd/*.test.cjs`는 합성 회원·발행본·제공자와 격리 PostgreSQL을 사용한다. HTTP Guard/한도/동의/연쇄 삭제와 실제 U2 검사 게이트에 합성 Messages 응답을 넣는 조합, `CATCHU_TEST_REDIS_URL`이 있으면 전용 로컬 Valkey 큐를 검사한다. 합성 게이트 통과를 실제 AI 품질·실제 공유 화면 연결·배포 완료로 해석하지 않는다. 실제 외부 AI 호출은 수행하지 않는다.
+
+`test/jd/jd-acceptance-race.test.cjs`는 #474의 삭제 롤백·정확한 오류 분류·중지/만료 경계만 좁게 검사한다. PostgreSQL과 공용 오류 응답 함수는 실제 구현이며 C-10·검색·큐와 응답 어댑터는 시험 대역이다. 제품 C-10 등록, HTTP 서버 연결, 외부 AI 검사의 완료 증거가 아니다. 해당 변경만 재검사할 때는 `npm.cmd test -- test/jd/jd-acceptance-race.test.cjs`를 사용한다.
 
 ```powershell
 npm.cmd test -- test/jd/jd-management.test.cjs test/jd/jd-summary.test.cjs test/jd/jd-integration.test.cjs

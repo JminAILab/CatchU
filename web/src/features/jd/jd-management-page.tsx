@@ -4,16 +4,16 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { api } from "../../lib/api";
 import { loginPath } from "../../lib/member-navigation";
 import { routes } from "../../lib/routes";
-import { createJdApi, managementTransport, type JdApi } from "./jd-api";
+import { createMemberJdApi, type JdApi } from "./jd-api";
 import { createJdManagementModel } from "./jd-management-model";
 import { JdEditor, JdList } from "./jd-management-view";
 import { jdSessionDeps, useJdSession } from "./jd-session";
 import styles from "./jd.module.css";
 
-const managementApi = createJdApi(managementTransport(api.member));
+const managementApi = createMemberJdApi(api.member);
 
-/** PATCH 제공 전에도 본인 JD 목록·상세·생성·삭제는 기존 회원 호출을 사용한다. */
-export function JdManagementPage({ client = managementApi, canUpdate = false }: { client?: JdApi; canUpdate?: boolean }) {
+/** 본인 JD 수정도 공용 회원 호출의 PATCH와 세션 경계를 사용한다. */
+export function JdManagementPage({ client = managementApi, canUpdate = true }: { client?: JdApi; canUpdate?: boolean }) {
   const session = useJdSession();
   const model = useMemo(() => {
     // 공용 인증 세대가 바뀌면 이전 계정의 편집·목록 저장소를 사용하지 않는다.

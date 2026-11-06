@@ -1,28 +1,28 @@
 # U10 JD 관리·요약 구현 및 검사 기록
 
-작성일: 2026-11-04. 기준 커밋은 `fdf5b787b25159c8edab9e97663129b5b3569e59`이며 아래 결과는 그 위의 현재 로컬 변경을 검사한 것이다.
+최초 작성일: 2026-11-04. 독립 구현과 기존 75개 검사 기준은 `fdf5b787b25159c8edab9e97663129b5b3569e59`다. 2026-11-05 통합 반영과 추가 변경·검사는 아래 별도 절에서 구분한다.
 
 ## 현재 상태와 승인 범위
 
 사용자의 **Approve Plan**(메시지 `695e0de9`)이 공식 Plan Approval 기록으로 남은 뒤 구현했다. 승인된 기능 설계·NFR 요구사항·NFR 설계와 기존 문서는 유지했다. 계획 본문과 검사 지침을 바꾸지 않고 완료한 체크박스만 표시했다.
 
-독립 구현과 관련 검사는 완료했다. **전체 계획은 32/37 항목 완료이며 U10 전체 완료가 아니다.** 공용 web PATCH·Bearer와 링크 grant 동시 전달, #416 실제 C-10 제공자·C-11 슬롯이 남아 있다. 기존 JD 수정 저장은 제품 화면에서 비활성이며 요약 패널은 실제 공유 화면과 AppModule에 연결하지 않았다.
+독립 구현과 관련 검사, #474 삭제 처리 보완 및 #471 공용 호출 어댑터 연결을 완료했다. **전체 계획은 33/37 항목 완료이며 U10 전체 완료가 아니다.** 제품 JD 수정 저장은 활성화했고 요약 접수·목록·상세용 어댑터도 공용 회원 호출을 소비한다. #416의 OQ6 결정 전 제품 C-10 등록과 C-11 실제 공유 화면은 대기이며 요약 패널·JdSummaryModule은 제품 화면·AppModule에 연결하지 않았다.
 
-Step 4의 실제 PATCH 연결 항목, Step 8의 세 항목, Step 9의 공식 완료 검토가 미완료다. 실제 연결이 남은 상태에서 Code Generation 완료·Unit 완료·승인·다음 단계 진입을 기록하지 않는다. 실제 제공 판본을 확인하고 남은 연결·검사를 마친 뒤 공식 완료 검토를 진행한다.
+Step 4의 공용 PATCH 연결 항목은 완료했다. Step 8의 세 항목과 Step 9의 공식 완료 검토가 미완료다. 실제 연결이 남은 상태에서 Code Generation 완료·Unit 완료·승인·다음 단계 진입을 기록하지 않는다. 남은 연결 조건과 실제 연결·검사를 마친 뒤 공식 완료 검토를 진행한다.
 
 ## 변경 파일과 구현 결정
 
-전체 47개 파일(API 27개, web 20개)의 정확한 목록은 [source-manifest.json](source-manifest.json)에 있다.
+U10 소유 전체 49개 파일(API 28개, web 21개)의 정확한 목록은 [source-manifest.json](source-manifest.json)에 있다. 11월 5일 추가한 좁은 회귀 검사 2개를 포함하며 통합 브랜치에서 받은 다른 Unit의 소유 파일을 U10 구현으로 세지 않는다.
 
 | 범위 | 주요 파일·변경 |
 |---|---|
 | JD 관리 API | `api/src/jd/` 6개: 본인 CRUD, 입력 검증, 20개 cursor, controller/module. `app.module.ts`에 관리 모듈 등록 |
 | 요약 API | `api/src/jd-summary/` 10개: 실행·결과, 접수·조회, 순차 처리, 조건부 저장, 안전 로그, 명시적 C-10 주입 경계 |
 | DB | `1793762571117-CreateJdSummary.ts`: JD 3개 표와 인덱스·CHECK·복합 FK·CASCADE. 기존 migration 변경 없음 |
-| API 검사 | `api/test/jd/`의 관리·요약·통합 검사 3개 및 합성 fixture 1개 |
+| API 검사 | `api/test/jd/`의 관리·요약·통합·접수 경합 검사 4개 및 합성 fixture 1개 |
 | 공용 오류·문서 | 승인된 422 INVALID_INPUT/INPUT_TOO_LARGE 추가, API 규약·README·삭제 책임표 및 `api/docs/jd.md` |
 | web | `web/src/features/jd/`의 API/파서·상태·화면·CSS·README와 `/jds` 라우트 |
-| 탐색·web 검사 | 회원 메뉴·복귀 허용 경로·README, JD 검사 2개와 기존 탐색 검사 보완 |
+| 탐색·web 검사 | 회원 메뉴·복귀 허용 경로·README, JD 검사 3개와 기존 탐색 검사 보완 |
 
 주요 동작은 다음과 같다.
 
@@ -34,9 +34,9 @@ Step 4의 실제 PATCH 연결 항목, Step 8의 세 항목, Step 9의 공식 완
 - 로그는 승인 O1의 허용 필드와 고정 분류만 구성한다. 실제 상태 변경 커밋 뒤 완료·시한 확정을 기록한다.
 - web은 계정/token/run 변경, 접근 상실, 늦은 조회·접수 응답을 처리한다. 접수 대기 중 선택한 과거 실행을 늦은 응답이 덮지 않는다. React 텍스트와 받은 citation.location을 사용하고 동의 뒤 한 번만 재요청한다.
 
-공용 `web/src/lib/api-client.ts`·`auth-api.ts`, U2 계약/운영 제공자, 의존성·잠금 파일·CI·새 환경설정은 변경하지 않았다. 직접 fetch·토큰 복제·운영 합성 대체를 추가하지 않았다. 새로운 성능·가동률·복구 목표도 추가하지 않았다.
+U10 보완에서 공용 `web/src/lib/api-client.ts`·`auth-api.ts`, U2 계약/운영 제공자, 의존성·잠금 파일·CI·새 환경설정은 직접 변경하지 않았다. 공용 호출 제공 변경은 #471 병합본에서 받았다. 직접 fetch·토큰 복제·운영 합성 대체를 추가하지 않았다. 새로운 성능·가동률·복구 목표도 추가하지 않았다.
 
-## 실행 환경과 검사 결과
+## 최초 독립 구현의 실행 환경과 검사 결과 — 2026-11-04
 
 Docker의 기존 `catchu-u7-api:20261029-schema-r2` 이미지에서 Node **24.21.0**, npm **11.19.0**을 사용했다. 로컬 호스트의 다른 Node 판본을 성공 근거로 사용하지 않았다. 저장소를 `/workspace`에 연결하고 API는 `/workspace/api`, web은 `/workspace/web`에서 검사했다.
 
@@ -100,7 +100,7 @@ npm run build
 | C-01 직접 대역 / 공용 검사 관문 | 합성 GatedOutput을 쓰는 흐름과 실제 CheckedAiGenerationGate에 합성 Messages 응답을 넣는 조합을 구분해 통과 | 공용 검사 통과는 실제 의미적 근거 품질·속도 보장이 아님 |
 | C-02 실제 로컬 Valkey | 커밋 후 등록·전달과 공용 실행 회귀 통과, 관련 skip 0 | 합성 payload. 개발 서버·배포 큐 완료를 뜻하지 않음 |
 | U10 화면·상태 | 합성 transport·C-11 props·정적 렌더, 세션/선택 경합·R-01·텍스트 escaping·location 전달 통과 | 실제 공유 슬롯·원문 강조·브라우저 효과/초점/760·1024·1536px 확인 미실행 |
-| 실제 C-10/C-11·제품 web↔api | **미연결·미실행** | #416 제공 판본, 실제 주입 토큰/슬롯과 공용 PATCH·Bearer+grant 지원 필요 |
+| 실제 C-10/C-11·제품 web↔api | **미연결·미실행** | 현재 #471 공용 PATCH·Bearer+grant 어댑터는 연결됨. 제품 C-10 등록은 OQ6 결정, 공유 화면은 C-11 제공 및 실제 검사 필요 |
 | 동일 JD 한 건의 전체 입력/검색 기반 비교 | **미실행** | 승인 관측성 설계 O3·계획 Step 9의 후속 검증. 실제 자료·외부 호출·비용 허용이 필요 |
 | 실제 외부 AI·배포·전체 CI/커버리지 | **미실행** | 현재 결과로 완료를 주장하지 않음. U7·#450 검사를 반복하거나 대체하지 않음 |
 
@@ -110,7 +110,7 @@ npm run build
 
 AC6.1.1·AC6.1.3·AC6.1.8·AC6.5.1은 실제 화면/제공자 연결이 남아 `GAP`으로 두었다. NFR3.1의 실제 비교도 `GAP`이다. 나머지의 상세 실행 범위는 위 FR19 표를 함께 읽어야 한다.
 
-다음 작업은 승인 계획을 유지한 채 제공 판본을 확인·반영하고 Step 4의 PATCH 연결과 Step 8을 마치는 것이다. 실제 web↔api·C-11·근거 강조·접근 상실을 확인하고 첫 실제 연결 결과의 사용자 확인을 받은 뒤 공식 완료 검토를 수행한다. 공용 기능의 의미를 바꾸거나 계획의 소유 범위를 넘는 변경이 필요하면 해당 연결을 멈추고 먼저 알린다.
+다음 작업은 승인 계획을 유지한 채 OQ6 결정과 C-11 제공 판본을 확인하고 Step 8을 마치는 것이다. 실제 web↔api·C-11·근거 강조·접근 상실을 확인하고 첫 실제 연결 결과의 사용자 확인을 받은 뒤 공식 완료 검토를 수행한다. 공용 기능의 의미를 바꾸거나 계획의 소유 범위를 넘는 변경이 필요하면 해당 연결을 멈추고 먼저 알린다.
 
 #416의 [연결 순서 답변](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6593877292)을 기준으로 독립 구현 시점에는 실제 제공자가 없었다. 이후 제공 판본과 미결 사항은 아래 사전 연결 준비에 기록한다. U10 소스·기존 설계와 승인 기록은 보존하며 다른 Unit을 release하지 않는다.
 
@@ -162,6 +162,55 @@ JdSummaryModule.register({
 
 소스·시험·PR 증거를 읽기만 했으며 검사를 실행하지 않았다. 최신 CI·나머지 기능의 승인 판단은 다음 단계로 넘기지 않았고 Approve 리뷰·병합·로컬 통합 반영·U10 어댑터 변경도 하지 않았다. 본인 계정 웹 제출을 위한 Chrome 창 선택은 앱 접근 승인 시간 초과로 열리지 않았으며 웹 제출은 없었다. 기존 U10 작업·승인·Unit 상태·#452 열린 상태와 C-10/C-11의 별도 연결 조건을 유지한다.
 
+## 통합 반영과 연결 보완 — 2026-11-05
+
+사용자 메시지 `5815dc58`에 따라 기존 미커밋 애플리케이션 47개와 Code Generation 산출물 6개·U10 감사 기록을 로컬 커밋 `e31c5376`으로 보존했다. 이어 통합 브랜치 `intent/260925-intent-12`의 `e84e70c6`을 merge commit `46bdaa73`으로 반영했다. 이 커밋들은 작업 보존과 로컬 통합이며 단계 승인·PR 병합·원격 제출이 아니다. 기존 승인 기록과 계획 본문·검사 지침은 유지한다.
+
+- [#468](https://github.com/JminAILab/CatchU/pull/468)의 실제 C-10 제공자와 [#474](https://github.com/JminAILab/CatchU/pull/474)의 결정이 통합본에 포함됐다. #474 병합 커밋은 `a11ad963`이다.
+- [#471](https://github.com/JminAILab/CatchU/pull/471)은 착수 시 미병합이었지만 작업 중 `2026-11-05T05:49:09Z`에 `e84e70c6`으로 병합됐다. 제공 head는 `c44b53d6`이다. 현재 공용 회원 호출에는 PATCH와 linkGrant가 있고 API CORS 허용 목록·검사에 PATCH가 포함된다. 기존 11월 4일의 미제공·CORS 보완 대기 기록은 당시 상태다.
+- 병합 충돌은 API AppModule, web README·routes·member-navigation의 양쪽 추가를 보존해 해결했다. JD 관리와 발행본 모듈·경로를 함께 유지하고 제품 AppModule의 JdSummary 등록은 추가하지 않았다.
+- [#416의 확정 삭제 안내](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6647902634)에 따라 U10 접수의 `23503` 및 정확한 `fk_jd_summary_run_publication_id` 조합만 삭제로 처리한다. 다른 DB 오류는 500을 유지한다. 판정 뒤 중지·만료의 현재 요청 허용과 다음 요청 차단도 확정 결정에 포함된다.
+- OQ6의 작성자 비활성·회원 없음 정책은 [기존 답변](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6626574160)의 합의 전 처리와 최종 결정을 구분한다. [실제 등록 조건](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6622737535)에 따라 OQ6 결정 확인 전 제품 C-10 등록은 대기다. 확정된 삭제 처리 보완은 전체 C-10 연결 완료가 아니다.
+- C-11 공유 화면은 제출 3 대기다. U10이 슬롯이나 공용 제공자 파일을 대신 만들지 않는다. 새 질문·중요한 막힘이 없어 GitHub 진행 댓글을 추가하지 않는다.
+
+### 변경과 좁은 검사 결과
+
+이번 소스·시험·서비스 문서 변경은 API 3개와 web 7개다. API는 `jd-summary.service.ts`에서 TypeORM 트랜잭션의 롤백이 끝난 후 `driverError.code`와 `driverError.constraint`의 정확한 조합만 변환한다. SQL·메시지·상위 속성·유사 제약 이름을 해석하지 않으며 다른 오류는 원래 객체로 전파한다. 기존 저장 순서·공용 제공자·마이그레이션은 수정하지 않았고 `readSnapshot`을 추가하지 않았다.
+
+web은 `memberTransport`·`createMemberJdApi`를 통해 기존 공용 결과 객체의 미전송·폐기·갱신 후 거부 표식을 보존한다. 관리 페이지의 PATCH를 활성화하고 요약 접수·목록·상세에 동일 factory를 제공한다. 회원 Bearer와 요청 시점 grant를 함께 전달하며 갱신·재전송은 공용 코드가 소유한다. C-11 슬롯의 실제 등록은 하지 않았다.
+
+| 이번 검사 | 결과 | 증거 범위 |
+|---|---|---|
+| `api/test/jd/jd-acceptance-race.test.cjs` | 6/6 통과, 실패·skip 0 | 실제 PostgreSQL의 발행본 FK/다른 FK/일반 DB 오류, 저장·사본·결과·차감 롤백과 큐 미등록. C-10/검색/큐는 합성, 공용 오류 응답 함수에 응답 어댑터를 주입 |
+| `web/test/jd-member-binding.test.mjs` | 7/7 통과 | 실제 공용 api-client/auth-api와 U10 adapter/model, 합성 fetch·갱신 세션. PATCH·Bearer/grant·LINK/AUTH 401·GET 1회 재조회·POST/PATCH 무재전송·입력 보존·계정 교체 |
+| 기존 web 관리·요약의 1·4번 사례 선택 | 4/4 통과 | 미제공 기대를 제거한 관련 정적 화면 검사만 선택 |
+| API build / typecheck / lint | 모두 exit 0 | build는 좁은 `npm test`의 선행 단계. DB migration 추가 적용 0개 |
+| web typecheck / 변경 파일 lint | 모두 exit 0 | 전체 제품 연결·실제 브라우저 검사의 대체 증거가 아님 |
+| 병합 보존·공백 검사 | 통과 | 충돌 4개 파일의 양쪽 추가 보존·충돌 표식 없음, API/web `git diff --check` 통과 |
+
+신규 13개와 관련 선택 회귀 4개, **총 17개 통과**다. Docker `catchu-u7-api:20261029-schema-r2`의 Node 24.21.0·npm 11.19.0과 기존 잠금 의존성으로 실행했다. 전용 `catchu_u10_test` DB만 사용했고 검사 종료 후 이번에 시작한 `catchu-u10-db-20261104`를 종료했다. Valkey는 이번 검사에 필요하지 않아 시작하지 않았다. 초기 Docker/WSL 준비 문제는 해결한 후 검사를 실행했으며 실패를 skip으로 처리하지 않았다.
+
+API 명령(`api/`):
+
+```sh
+npm test -- test/jd/jd-acceptance-race.test.cjs
+npm run typecheck
+npm run lint
+```
+
+web 명령(`web/`):
+
+```sh
+node --test test/jd-member-binding.test.mjs
+node --test --test-name-pattern='^[14]\.' test/jd-management.test.mjs test/jd-summary.test.mjs
+npm run typecheck
+npm run lint -- src/features/jd/jd-api.ts src/features/jd/jd-management-page.tsx src/features/jd/jd-summary-panel.tsx test/jd-member-binding.test.mjs test/jd-management.test.mjs test/jd-summary.test.mjs
+```
+
+기존 75개 전체 검사·U7 검사·전체 커버리지·web production build·CI·실제 외부 AI는 이번에 실행하지 않았다. 위 좁은 검사는 실제 제품 C-10 등록, HTTP 서버 연결, web↔api 브라우저, C-11 공유 화면·근거 강조의 완료 증거가 아니다. 실제 비교·성능/품질 확인도 기존 후속 조건으로 남는다. 새로운 승인·완료 기록, PR 병합·push·#452 종료·GitHub 진행 댓글은 남기지 않았다.
+
+산출물 검증에서 manifest 49개 경로 존재·중복 없음, 추적표 57개와 GAP 5개 유지, OK 대상 경로 존재를 확인했다. 승인 계획은 체크박스 외 본문 차이가 없다. 최신 소스·검사 변경은 `46bdaa73` 위의 로컬 미커밋 작업이며, 기존 작업 보존 커밋과 구분한다.
+
 ## GitHub 소통 기준
 
 2026-11-04 사용자 지시(메시지 `4ae14d65`)부터 U10의 GitHub 진행 댓글은 다른 사람의 답이 필요한 새 요청, 중요한 막힘, PR 제출·완료 결과에만 사용한다. 단계별 진행·작은 수정·검사 상세는 기존 AI-DLC 문서에 기록하고 승인·감사 기록은 기존 절차대로 유지한다. 변화 없는 대기와 이미 전달한 내용은 반복 게시하지 않으며 기존 댓글을 삭제하지 않는다.
@@ -181,3 +230,123 @@ JdSummaryModule.register({
 | traceability.json | 2026-11-04T03:57:19Z ARTIFACT_UPDATED |
 | code-summary.md | 2026-11-04T03:58:51Z ARTIFACT_CREATED |
 
+11월 5일에도 같은 U10 shard에서 새 `ARTIFACT_UPDATED` 이벤트를 확인했다. source-manifest는 `06:08:41Z`, traceability는 `06:15:03Z`, 계획 체크박스는 `06:16:14Z`, 코드 요약은 `06:17:10Z`에 기록됐다(모두 UTC). 기존 `M` 표시만으로 저장 성공을 판단하지 않았다. 승인된 기능 설계·NFR 요구사항·NFR 설계 파일은 보존 커밋과 통합 후 사이에 변경이 없다.
+
+## JD 브라우저 검사 환경 기동 진단 — 2026-11-06
+
+사용자 메시지 `e0b7a9da`의 승인 범위에서 U10 API·web 컨테이너 두 개만 만들고 상태·HTTP를 확인한 뒤 생성 ID를 지정해 정리했다. 기존 이미지 `sha256:ca31ea5bd429e78cbd4f02206bbdf4703ff5fb400957bf61a9cb6eb4e000348f`를 고정해 사용했다. Node 24.21.0 검사 뒤 web bootstrap의 `process.execArgv=[]`를 적용했다. API는 제품 `AppModule`·`configureApp`을 사용하고 분석 시한 스케줄러를 시작하지 않는 검사 bootstrap이며, 제품 `main.ts`·실제 큐 기동 검증과 구분한다.
+
+| 대상 | 관측 결과 |
+|---|---|
+| API 생성·기동 | `docker run` exit 0, 최초 상태 running. 생성 ID `6e6c0fa9705f2afd85ffe42ea44174a239868aa028e27cecbbd0ec4acc6cbe60` |
+| web 생성·기동 | `docker run` exit 0, 최초 상태 running. 생성 ID `1fa2700a83785ac355735781d1006b08abcbfa5a7414a1e0098256e73e35b004` |
+| API `/health` 첫 HTTP | `ResponseEnded`, HTTP 상태 없음. `Invoke-WebRequest` 비종료 오류로 셸 exit 0이었으나 HTTP 성공이 아님 |
+| web `/login` 첫 HTTP | `ResponseEnded`, HTTP 상태 없음, 셸 exit 1. 후속 결과 참조에서 null 오류도 발생 |
+| 후속 컨테이너 상태·로그 | API running·ExitCode 0, web exited·ExitCode 1·OOMKilled false. web은 `EACCES: permission denied, mkdir '/workspace/web/.next/dev'`. `Ready in 32.5s` 로그도 있었으나 정상 기동으로 판정하지 않음. API 선별 시작 로그에는 성공·실패 표식이 없어 HTTP 실패 원인 미확인 |
+
+HTTP를 다시 요청하거나 실패한 기동을 반복하지 않았다. 두 컨테이너의 사용자는 `1000:1000`, API bind는 읽기 전용, web bind는 `RW=true`였다. 호스트의 `web`·`.next`는 일반 디렉터리로 ReadOnly·ReparsePoint·Offline 속성이 없고 현재 사용자에게 FullControl이 있다. 공통 ACL에 `Everyone: Deny DeleteSubdirectoriesAndFiles`가 있으나 삭제 제한만으로 이번 `mkdir` 거부 원인을 단정할 수 없다. `.next/dev`는 없고 기존 디렉터리 시각은 11월 4일 그대로였다. Docker 내부 사용자·호스트 마운트의 권한 대응을 포함한 원인은 미확정이다.
+
+web의 추적 파일과 기존 미추적 파일 323개의 기동 전·후 SHA256은 모두 같았다(추가·삭제·변경 각각 0). 기존 제품 코드·승인 기록·계획 본문은 보존했다.
+
+정리는 생성 ID 두 개에 한정했다. `docker stop --time 20 <두 생성 ID>`는 exit 0이며 `--time` 사용 중단 예정 경고가 있었다(향후 `--timeout` 사용). 종료 조회는 API exited·ExitCode 0, web exited·ExitCode 1이었다. `docker rm <두 생성 ID>`와 삭제 확인용 ID 조회는 모두 exit 0이고 조회 결과가 비어 삭제를 확인했다. 기존 U10 DB·Valkey는 running이며 네트워크·DB 볼륨 보존 조회도 exit 0이다. DB 접속값은 출력하거나 별도 파일로 저장하지 않았으나 API 컨테이너의 `Config.Env`에 보관됐으며, 해당 컨테이너 삭제를 확인했다.
+
+정상 기동을 확인하지 못해 `UNIT_PAUSED`를 재개하지 않았다. 구현·JD 브라우저 검사·실제 C-10 등록·제품 검사는 미실행이다. 기존 75개·17개 결과를 재사용하며 재실행하지 않았고, C-11은 별도 대기다. 외부 AI 호출·PR 병합·#452 종료·U10 전체 완료·GitHub 게시도 수행하지 않았다.
+
+후속 제안은 기존 ACL·`.next`를 변경하지 않고 web의 `.next`에 `type=tmpfs,destination=/workspace/web/.next,tmpfs-mode=1777` 임시 마운트를 추가하는 것이다. 이 변경은 아직 승인·실행되지 않았으며 성공 근거가 아니다. 동일 오류의 반복 실행·자동 복구는 하지 않는다.
+
+## API 준비 대기와 web 임시 출력 경로 기동 확인 — 2026-11-06
+
+사용자 메시지 `f6b07cf9`의 별도 승인에 따라 API를 한 번 생성하고 최대 180초 안에서 준비 표식을 관찰했다. API `/health` 성공 뒤에만 web을 한 번 생성했다. 앞 절의 당시 미승인·미실행 기록은 유지하며 이번 허용 범위와 결과를 구분한다.
+
+| 대상 | 관측 결과 |
+|---|---|
+| API | 생성 ID `f2e9e27e25eb8a714c2d5d46280af889ce963496a8b77cf1f2a0b35a714882b7`, `docker run` exit 0. 166초에 첫 로그, 176초에 `U10_JD_BROWSER_API_READY`·running 확인. 호스트 `/health`를 `-ErrorAction Stop`으로 조회해 exit 0, HTTP 200·`{"status":"ok"}` 확인 |
+| web | 생성 ID `b37529e3e3fd18722b208c2892b1400ea30ecb0ecbd65d3166ebaaf93bbdd7b4`, `docker run` exit 0. 승인된 `.next` tmpfs(mode 1777)와 `process.execArgv=[]` 적용. `Ready in 19.3s`, 26초 관찰 시 running·실패 표식 없음 |
+| web 호스트 HTTP | `/login` 요청은 60초 뒤 시간 초과, exit 1. 선별 로그에서 `EACCES: permission denied, open '/workspace/web/next-env.d.ts'`와 `UnhandledRejection` 확인. 상태는 running·ExitCode 0·OOMKilled false였으나 정상 HTTP 응답으로 판단하지 않음 |
+| 같은 web 컨테이너의 허용된 진단 | Node 파일 메타데이터·쓰기 접근 조회: 프로세스 UID/GID 1000, web 부모 `0:0`·mode 777·쓰기 가능, `.next` tmpfs `0:0`·mode 777·쓰기 가능, `next-env.d.ts`는 `0:0`·mode 644·쓰기 불가(`EACCES`). 내부 `127.0.0.1:3000/login` 조회도 10초 `TimeoutError`, exit 1 |
+
+`next-env.d.ts`에 대한 실제 쓰기 거부는 확인했다. API의 긴 준비 시간 원인이나 web 시간 초과의 다른 원인은 추가 관측 없이 단정하지 않는다. 실패 후 재생성·설정 변경·권한 수정은 하지 않았다.
+
+생성 ID 두 개만 종료했다(`docker stop` exit 0). 두 컨테이너의 exited·ExitCode 0을 확인한 뒤 삭제했고(`docker rm` exit 0), ID 조회의 빈 결과(exit 0)로 삭제를 확인했다. 기존 U10 DB·Valkey는 running이며 기존 네트워크·DB 볼륨 보존 조회도 exit 0이다. API 접속값은 컨테이너 `Config.Env`에 보관됐으나 값 출력·별도 파일 저장은 없었고 해당 컨테이너 삭제를 확인했다.
+
+api/web의 추적 파일과 기존 미추적 파일 867개(API 544개·web 323개)의 전후 SHA256은 모두 같다(추가·삭제·변경 각각 0). 호스트 생성 파일도 다음과 같이 보존됐다.
+
+| 보존 대상 | 전후 동일한 SHA256 |
+|---|---|
+| 호스트 `.next` 731개 파일의 집계 | `67925D6CECEEEE5309FACFAEAB75D44E6363B69EFC3DE8991F747FE10F34A88C` |
+| 호스트 `next-env.d.ts` | `1862AC4BBBC5192D4BF562161DF66EA547ED3E67173100656AB606AE9797DB2B` |
+
+web 정상 응답을 확인하지 못해 `UNIT_PAUSED`를 재개하지 않았다. JD 브라우저 검사·실제 C-10 연결·제품 검사는 미실행이며 C-11은 별도 대기다. 기존 75개·17개 결과를 재사용하고 반복하지 않았다. 이번 API 기동 성공을 제품 `main.ts`의 스케줄러·큐·외부 AI 통합 통과로 보고하지 않는다. 기존 설계·계획·승인 기록을 유지하며 PR 병합·#452 종료·U10 전체 완료·GitHub 게시를 하지 않았다.
+
+다음 준비에는 호스트 `next-env.d.ts`·ACL을 보존하면서 web 생성 파일을 UID 1000이 쓸 수 있는 임시 작업 공간으로 분리할 필요가 있다. 구체적 방법은 아직 승인·실행되지 않았다.
+
+## 임시 web 실행 사본 기동과 JD 브라우저 진입 중단 — 2026-11-06
+
+사용자 `fd007a9c`가 승인한 임시 실행 사본 방식으로 API와 web을 각각 한 번 기동했다. 아래 결과는 root가 직접 관측해 전달한 사실이며, 기존 설계·계획·승인과 75개·17개 검사 결과는 유지한다.
+
+| 확인 대상 | 관측 결과 |
+|---|---|
+| API 기동 | 컨테이너 `a8d8f51d4aba17a763c441b1ef4c2205a91af1b112e81e2418313784b29f94fc` 생성 종료 코드 0. 175초에 READY, 253초에 `/health` HTTP 200과 `{status:ok}` 확인(승인한 300초 이내). |
+| web 기동 | 컨테이너 `97d04b56459f6248d605f39fbc46fca1893d432454447aed967ca2d606cb6174` 생성 종료 코드 0. 원본은 `/source-web` 읽기 전용, 실행 경로 `/workspace/web`는 mode 1777 tmpfs, `node_modules`는 별도 읽기 전용 마운트다. Node 24.21.0 검사와 `process.execArgv=[]` 뒤 `fs.cpSync`로 `.next`·`node_modules`·`.git`·`.env*`·`next-env.d.ts`를 제외한 사본을 만들었다. 원본 권한은 변경하지 않았다. |
+| 사본과 HTTP | `U10_WEB_COPY_READY`: 323개 파일, SHA256 `a9448eef9107973dcfbaad7a2ac2df2c6026170b56fe6789560dca47d52f2558`, 쓰기 가능, UID 1000. 37초 관찰에서 Ready 확인·오류 표식 없음. 실제 `GET /login`은 HTTP 200이며 로그인 문구가 있었다. 이후 원본과 사본 323개 내용 비교도 차이 0이었다. |
+| 공식 재개 | 06:15:33 UTC에 `UNIT_RESUMED`. `next` → steering 로드 2회 → Code Generation Step 8 task 31의 `run-stage` → Unit 시작과 승인된 testing brief를 확인했다. 기존 brief·규칙과 내용이 같았다. |
+| IAB 로그인 진입 | `/login?next=%2Fjds`에서 “로그인 상태를 확인하고 있습니다.”에 머물렀다. `readyState=complete`, console error/warn 없음. 같은 IAB에서 API `/health`를 직접 열면 정상 응답이었다. JD 조작이나 합성 계정·자료 생성은 시작하지 않았다. |
+| 별도 API 확인 | 호스트에서 Origin `http://127.0.0.1:3310`, 본문·Bearer·쿠키 없이 `POST /v1/auth/refresh`를 한 번 호출했다. 401 `AUTH_INVALID`, 허용 Origin 일치, `Access-Control-Allow-Credentials: true`, 명령 종료 코드 0을 확인했다. 브라우저 내부 복원 요청이 완료됐다는 증거는 아니다. |
+| 진단 한계와 중단 | 잠금 조회 도구의 읽기 전용 DOM 범위에 `navigator`가 노출되지 않아 실제 잠금 상태는 미확인이다. 페이지에 `navigator`가 없다고 판단하지 않았다. Chrome 비교를 위한 `getApp`에서 컴퓨터 사용 도구가 현재 브라우저 URL을 정책상 검증할 수 없어 중단을 지시했고, 반복하거나 우회하지 않았다. 초기 인증 대기의 원인은 미확정이다. |
+| 공식 보류 | 06:29:32 UTC에 `UNIT_PAUSED`. 공용 코드 수정·실제 C-10 등록·새 제품 검사 없이 재개 작업을 보류했다. |
+
+읽기 전용 코드 대조에서는 로그인 복원 effect에 cleanup 취소가 없고, 런타임의 한 번 시작 플래그가 중복 호출을 막는 것을 확인했다. 복원 fetch와 Web Lock 대기에 자체 시간 제한이 없지만, 이를 이번 현상의 원인으로 확정하지 않는다. C-10은 실제 DB 제공자와 U10 등록 방식·승인 설계만 대조했으며 등록이나 신규 검사 파일 작성은 하지 않았다.
+
+이번에 만든 두 컨테이너만 중지해 각각 `exited 0`을 확인한 뒤 제거했다. 제거 종료 코드 0, 해당 ID 조회 빈 결과·종료 코드 0으로 정리를 확인했다. 기존 U10 DB·Valkey는 실행 중이며 네트워크와 DB 볼륨 보존 조회도 종료 코드 0이었다. DB 접속값은 출력하거나 파일에 저장하지 않았지만 API 컨테이너의 `Config.Env`에는 보관됐으며, 해당 컨테이너의 삭제를 확인했다.
+
+기동 전후 api/web 추적 파일과 기존 미추적 파일 867개(api 544개·web 323개)의 내용 해시는 추가·삭제·변경 모두 0이었다. 호스트 `.next` 731개 파일의 집계 SHA256 `67925D6CECEEEE5309FACFAEAB75D44E6363B69EFC3DE8991F747FE10F34A88C`와 `next-env.d.ts` SHA256 `1862AC4BBBC5192D4BF562161DF66EA547ED3E67173100656AB606AE9797DB2B`도 같았다.
+
+이번 기동은 기존 `AppModule`·`configureApp`을 사용하되 큐·분석 스케줄러·외부 AI를 비활성화한 범위다. 제품 `main` 전체나 실제 큐·외부 AI 통합 통과가 아니다. JD 브라우저 CRUD와 실제 C-10 연결은 미실행이며 C-11은 별도 대기다. 기존 75개·17개 및 U7 검사를 반복하지 않았고 PR 병합·#452 종료·U10 전체 완료 처리는 하지 않았다. 다음 조치는 주소를 확인할 수 있는 브라우저 환경에서 초기 인증 대기의 위치를 구분한 뒤 JD 조작과 C-10 연결을 재개하는 것이다.
+
+## 수동 Chrome 비교를 위한 임시 개발 출처 허용 — 2026-11-06
+
+사용자는 수동 Chrome에서도 초기 로그인 확인 문구가 유지되고 `/v1/auth/refresh` 요청이 없으며, 서버 로그에 `127.0.0.1`의 HMR·개발 도구 폰트 차단이 나타났다고 보고했다. 이는 사용자 관찰이며 로그인 대기의 원인이 확정됐다는 뜻은 아니다. 사용자 메시지 `431e8a3a`는 web 임시 실행 사본의 `next.config.ts`에만 `allowedDevOrigins: ['127.0.0.1']`을 추가하고 이번 web 컨테이너를 한 번 교체하도록 허용했다. 원본 제품 코드·인증 설정·승인·계획은 변경하지 않는다.
+
+[Next.js 공식 allowedDevOrigins 문서](https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins)의 개발 서버 출처 허용 방식에 따라 hostname을 지정했다. 공식 문서의 설정 설명을 이번 로그인 대기의 원인 확정이나 해소 증거로 사용하지 않는다.
+
+| 대상 | root가 직접 확인한 결과 |
+|---|---|
+| 기존 web 정리 | `44865e1fad6e7ec6c2c8efcf39aaf1737723f682905172949e6dcfd45d8a0d2e`를 종료(종료 코드 0)하고 삭제를 확인했다. |
+| API 유지 | `03b30eebf7a3634431b10c2c24c1966cbcc1dc080500513ef50de3fdc4e306b0`를 유지했다. 최종 `/health` HTTP 200이며 시작 시각 `06:48:43 UTC`가 그대로임을 확인했다. |
+| web 한 번 교체 | 새 ID `b15e96064d570765ea156926d88b9975374632714e87009fb58944feb7833093`을 한 번 생성했다. 36초에 사본·설정 확인과 Next Ready를 관측했으며 `/login` HTTP 200, 응답 길이 15,607을 확인했다. |
+| 임시 사본 차이 | 323개 원본 사본의 SHA256 `a9448eef9107973dcfbaad7a2ac2df2c6026170b56fe6789560dca47d52f2558` 일치를 확인한 뒤 `next.config.ts` 한 줄만 추가했다. 원본 설정 SHA256은 `8df8354f2534587d94a1eb506ecb656cb495719b577cfd2bf2b3843acd103ded`, 임시 설정은 `6f85089582f74d954fe654d32f5a973812702b976126bf6ef964645b87dbce2f`다. 다른 사본 파일은 원본과 일치했다. |
+| 원본 보존 | api/web 867개 파일 재해시에서 변경 0을 확인했다. 기동용 `.aidlc-engine/u10-web-runtime-start-431e8a3a.ps1`은 Git 제외 경로에 보관하며 비밀값을 넣지 않았다. 실행 순서는 사본 복사·해시 확인 → 한 줄 추가·차이 확인 → Next 기동이다. |
+
+API와 새 web은 사용자의 수동 Chrome 재확인을 위해 유지한다. HMR·폰트 차단 해소와 초기 로그인 대기 해소는 각각 아직 미확인이다. `UNIT_PAUSED`를 유지하며 JD 조작·실제 C-10 등록·제품 검사·Chrome 자동 조작은 수행하지 않았다. 기존 75개·17개 및 U7 검사도 반복하지 않았고, C-11은 별도 대기다. 다음 조치는 사용자가 새 화면의 개발 로그인 폼과 `/v1/auth/refresh` 요청 여부·상태를 확인한 결과를 받는 것이다.
+
+## 수동 Chrome 초기 인증 확인과 공식 재개 — 2026-11-06
+
+앞선 수동 Chrome 결과 질문은 conductor가 비단계 질문으로 `DECISION_RECORDED`에 기록하고, 사용자 응답 전문을 details-file로 전달해 `QUESTION_ANSWERED` 기록을 마쳤다. 이는 설계·단계 완료 승인이 아니며 응답 원문은 여기 복제하지 않는다.
+
+사용자 메시지 `b7d0b905`는 임시 개발 출처 허용을 적용한 환경에서 수동 Chrome의 HMR 101·폰트 200·`/v1/auth/refresh` 401과 개발용 로그인 폼 표시를 확인했다. 앞선 초기 로그인 대기가 해소됐다는 사용자 관찰이며, JD CRUD나 C-10 통합 검사 결과는 아니다. 해당 응답도 공식 `log answer`에 기록됐다.
+
+conductor는 07:29:42 UTC에 `UNIT_RESUMED`를 확인하고 새 `next`와 `continue` 2회를 거쳐 승인된 Code Generation Step 8 작업 31의 `run-stage`를 받았다. Unit 시작은 `already_active`였으며 testing brief(26,981자)와 규칙 묶음이 기존 전문과 동일함을 확인했다. 기존 계획·설계·승인은 유지한다.
+
+기존 API `03b30eebf7a3634431b10c2c24c1966cbcc1dc080500513ef50de3fdc4e306b0`와 web `b15e96064d570765ea156926d88b9975374632714e87009fb58944feb7833093` 환경에서 JD 실제 브라우저 조작을 먼저 확인한다. 그 결과를 확인하기 전에는 C-10 제품 등록이나 새 검사를 진행하지 않는다. 현재는 C-10 등록 파일·DB 전체 초기화 없는 합성 fixture·연결 영향 검사만 준비하며, 기존 75개·17개·U7 검사는 재사용한다. 외부 AI·큐·분석 스케줄러 차단과 C-11 별도 대기를 유지한다.
+
+## JD 관리 실제 브라우저 확인과 작업 보존 대기 — 2026-11-06
+
+root가 IAB·로컬 실제 API(포트 3311)·기존 `catchu_u10_dev`에서 이번 확인용 합성 회원과 프로필을 생성해 아래 9개 시나리오를 확인했다. 브라우저에서 발견해 보완한 제품 문제는 없으며 이 확인 중 제품 코드를 변경하지 않았다.
+
+| 번호 | 시나리오 | 직접 관측한 결과 |
+|---|---|---|
+| 1 | 개발용 로그인과 최초 프로필 저장 | 합성 회원으로 로그인하고 합성 표시 이름을 저장해 JD 관리에 진입했다. |
+| 2 | 새 JD 저장 | 합성 제목·본문을 저장하고 저장된 JD를 확인했다. |
+| 3 | JD 수정 저장 | 제목과 본문을 바꿔 저장했다. 기존 PATCH 어댑터를 사용하는 화면 흐름이다. |
+| 4 | 수정 내용 재조회 | 페이지를 reload한 뒤 목록에서 JD를 선택해 수정한 제목·본문이 다시 조회되는 것을 확인했다. |
+| 5 | 제목 길이 실패 안내 | 제목 201자를 입력하고 저장하면 제한 안내가 나타나며 입력 원문을 유지했다. |
+| 6 | 목록 새로고침 중 입력 보존 | 실패한 201자 미저장 입력을 둔 채 목록을 새로고침해도 draft가 유지됐다. |
+| 7 | 삭제 취소 | 관련 요약 기록도 함께 삭제된다는 확인을 연 뒤 취소하면 draft가 유지됐다. |
+| 8 | 다른 탭에서 같은 JD 삭제 | 새 로그인 없이 쿠키 세션을 복원한 두 번째 탭에서 같은 합성 JD를 삭제했고 목록에서 사라졌다. |
+| 9 | 삭제된 JD의 수정 실패와 입력 보존 | 첫 탭에 남은 미저장 입력으로 저장하자 “이 JD 또는 실행을 열 수 없습니다. 목록을 다시 확인해 주세요.”가 나타났다. 제목 21자·본문 50자의 입력은 그대로 유지됐다. |
+
+9번의 HTTP 상태 코드는 네트워크에서 직접 캡처하지 않았다. `404 RESOURCE_UNAVAILABLE`은 설계·코드 대응에 따른 예상이며, 이번 직접 관측 증거는 UI 오류 안내와 입력 보존이다. 이 구분을 실제 상태 코드 캡처로 바꿔 보고하지 않는다. 이번 합성 JD는 삭제됐고 합성 회원·프로필은 기존 DB 보존 조건에 따라 남아 있다. 외부 AI·요약 접수·C-11 화면 연결은 실행하지 않았으며 기존 75개·17개·U7 검사도 반복하지 않았다.
+
+최신 [#416 답변](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6677766344)에서 U4 제출 3의 #482가 2026-11-06 14:26 KST에 통합 브랜치로 병합됐음(`af5fbf3`)과 OQ6 문서 #478 병합(`ad58c6f`)을 확인했다. OQ6의 A/예 결정과 기존 C-10 제공자 코드 유지 근거는 유효하다. C-11은 이제 “미제공”이 아니라 “U4 제출 3 병합 확인, U10 C-11 연결은 사용자 지시에 따라 별도 대기”로 구분한다. 이 기록은 해당 병합판의 현 U10 체크아웃 반영이나 C-11 연결 완료를 뜻하지 않는다.
+
+기존 변경 코드와 이번 브라우저 기록의 커밋 보존을 먼저 진행한다. 보존 확인 전까지 C-10 제품 등록과 신규 검사 파일 작성은 대기하며, 이전 설계·승인·계획 본문은 유지한다. PR 병합·#452 종료·U10 전체 완료 처리는 하지 않는다.

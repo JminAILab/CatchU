@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
-import { createJdApi, jdErrorText, managementTransport } from "../src/features/jd/jd-api.ts";
+import { createJdApi, jdErrorText } from "../src/features/jd/jd-api.ts";
 import { createJdSummaryModel } from "../src/features/jd/jd-summary-model.ts";
 import { isJdRun } from "../src/features/jd/jd-parsers.ts";
 import { runWithConsent } from "../src/components/ai-consent/ai-consent-flow.ts";
@@ -73,8 +73,7 @@ test("1. 비로그인은 JD·실행을 조회하지 않으며 요청마다 현�
   await active.model.loadRuns(); active.grant.value = "new-grant"; await active.model.loadRuns();
   assert.equal(active.calls[1].path, "/public/links/synthetic%2Ftoken/jd-summaries");
   assert.equal(active.calls[1].linkGrant, "synthetic-grant"); assert.equal(active.calls[2].linkGrant, "new-grant");
-  const notConnected = createJdApi(managementTransport(async () => { assert.fail("요약을 회원 전송만으로 우회하지 않음"); }));
-  assert.equal((await notConnected.listRuns(active.context)).code, "CONNECTION_NOT_READY");
+  // #471 이후 member의 Bearer+grant 연결은 jd-member-binding.test.mjs에서 검사한다.
 });
 
 test("2. 접수 오류를 구별하고 공용 동의 후 딱 한 번 재요청하며 반복 거부를 숨기지 않는다", async () => {

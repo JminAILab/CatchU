@@ -64,7 +64,7 @@
     {
       "id": "AC6.1.1",
       "status": "GAP",
-      "target": "web/src/features/jd/jd-result-view.tsx — 독립 표시·합성 검사는 완료. #416 실제 C-10/C-11 및 공용 전송 연결 미완료."
+      "target": "web/src/features/jd/jd-result-view.tsx — 독립 표시와 공용 회원 호출 어댑터 검사는 완료. #416 OQ6 결정 전 제품 C-10 등록과 C-11 실제 공유 화면은 미연결."
     },
     {
       "id": "AC6.1.2",
@@ -99,7 +99,7 @@
     {
       "id": "AC6.1.8",
       "status": "GAP",
-      "target": "api/test/jd/jd-integration.test.cjs — 합성 C-10 차단 검사는 통과. 실제 링크 제공자·C-11 재열람은 미연결."
+      "target": "api/test/jd/jd-integration.test.cjs — 합성 C-10 차단과 공용 회원·링크 오류 분리 검사는 통과. 실제 C-10 등록·C-11 재열람은 대기이며 확정 삭제 보완과 구분한다."
     },
     {
       "id": "AC6.1.9",
@@ -114,7 +114,7 @@
     {
       "id": "AC6.5.1",
       "status": "GAP",
-      "target": "api/test/jd/jd-management.test.cjs — API CRUD·합성 화면 검사는 통과. 공용 web PATCH 미제공으로 제품 화면의 기존 JD 수정 저장은 비활성."
+      "target": "web/test/jd-member-binding.test.mjs — #471 반영 후 공용 PATCH 연결·수정 저장 활성화와 합성 fetch 기반 인증·입력 보존 검사는 통과. 실제 브라우저 web↔api CRUD 확인은 미실행."
     },
     {
       "id": "AC6.5.2",

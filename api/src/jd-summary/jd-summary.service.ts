@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 import { AiConsentGate } from '../ai-consent/ai-consent.gate';
 import { AiRun } from '../ai-run/ai-run';
 import { ApiError } from '../common/errors';
@@ -15,6 +15,15 @@ import { JdSummaryResult } from './jd-summary-result.entity';
 import { JdSummaryRun } from './jd-summary-run.entity';
 import { JdSummaryStore } from './jd-summary-store';
 import { JD_PUBLICATION_ACCESS, JD_SUMMARY_OPTIONS, type JdSummaryOptions } from './jd-summary-tokens';
+
+/** #474: SQL·메시지나 다른 FK를 해석하지 않고 PostgreSQL의 정확한 오류 필드만 확인한다. */
+function isDeletedPublication(error: unknown): boolean {
+  if (!(error instanceof QueryFailedError)) return false;
+  const driverError: unknown = error.driverError;
+  return typeof driverError === 'object' && driverError !== null
+    && 'code' in driverError && driverError.code === '23503'
+    && 'constraint' in driverError && driverError.constraint === 'fk_jd_summary_run_publication_id';
+}
 
 @Injectable()
 export class JdSummaryService {
@@ -68,6 +77,8 @@ export class JdSummaryService {
       return run;
     }); } catch (error) {
       if (!(error instanceof ApiError)) writeJdLog(this.options.logger, { stage: 'persistence-failed', outcome: 'FAILED', runId, reason: 'PERSISTENCE_FAILED' });
+      // transaction이 전체 롤백을 마친 뒤에만 변환한다. 중지·만료는 다음 요청의 C-10 판정에 맡긴다.
+      if (isDeletedPublication(error)) throw new ApiError('LINK_UNAVAILABLE');
       throw error;
     }
   }
