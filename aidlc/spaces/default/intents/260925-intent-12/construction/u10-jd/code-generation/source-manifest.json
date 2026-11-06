@@ -85,6 +85,9 @@
       "path": "api/test/jd/jd-management.test.cjs"
     },
     {
+      "path": "api/test/jd/jd-publication-access.test.cjs"
+    },
+    {
       "path": "api/test/jd/jd-summary.test.cjs"
     },
     {

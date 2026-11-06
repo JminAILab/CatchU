@@ -19,7 +19,8 @@ import { WithdrawalModule } from './withdrawal/withdrawal.module';
 import { PublishedIndexModule } from './published-index/published-index.module';
 import { ClaudeMcpModule } from './claude-mcp/claude-mcp.module';
 import { JdManagementModule } from './jd/jd.module';
-import { PublicationsModule } from './publications/publications.module';
+import { JdSummaryModule } from './jd-summary/jd-summary.module';
+import { PUBLICATION_ACCESS, PublicationsModule } from './publications/publications.module';
 
 @Module({
   imports: [
@@ -47,6 +48,8 @@ import { PublicationsModule } from './publications/publications.module';
     // 12월 intent U4 제출 2: 발행·작성자 발행본 관리 API(/v1/publications)와 C-10 DB 구현(PUBLICATION_ACCESS). 받은 사람 경로 교체와
     // ShareLinksModule·RecipientModule 해제는 제출 3(W6)에서 한 변경으로 한다(docs/publications.md).
     PublicationsModule,
+    // U10: #468 병합과 #416 OQ5·OQ6 결정에 따라 실제 C-10을 사용한다. C-11 화면 연결은 별도다.
+    JdSummaryModule.register({ publicationAccess: { useExisting: PUBLICATION_ACCESS }, imports: [PublicationsModule] }),
     // #232는 #252의 실제 선정 공급자(DatabaseRepositorySelectionSource)를 받는 WorkerContextModule.register로 별도 조립한다.
     // 기본 앱에 가짜 선정/동의 해석을 등록하지 않는다(docs/worker-context.md).
   ],

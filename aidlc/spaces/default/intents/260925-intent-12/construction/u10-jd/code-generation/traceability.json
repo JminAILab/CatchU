@@ -64,7 +64,7 @@
     {
       "id": "AC6.1.1",
       "status": "GAP",
-      "target": "web/src/features/jd/jd-result-view.tsx — 독립 표시와 공용 회원 호출 어댑터 검사는 완료. #416 OQ6 결정 전 제품 C-10 등록과 C-11 실제 공유 화면은 미연결."
+      "target": "web/src/features/jd/jd-result-view.tsx — 독립 표시와 공용 회원 호출 어댑터 검사는 완료. OQ6 결정에 따른 API 실제 C-10 등록과 신규 영향 검사 9개가 통과했다. U4 제출 3 병합은 확인했으며 U10 C-11 연결은 별도 대기다."
     },
     {
       "id": "AC6.1.2",
@@ -99,7 +99,7 @@
     {
       "id": "AC6.1.8",
       "status": "GAP",
-      "target": "api/test/jd/jd-integration.test.cjs — 합성 C-10 차단과 공용 회원·링크 오류 분리 검사는 통과. 실제 C-10 등록·C-11 재열람은 대기이며 확정 삭제 보완과 구분한다."
+      "target": "api/test/jd/jd-publication-access.test.cjs — 실제 C-10 등록과 요청별 권한·오류 전달의 신규 영향 검사 9개가 별도 source HTTP 서버·실제 DB에서 통과했다. 회원 행 부재만 대역이며 판정 후 변경은 통제된 순서 검사다. 기존 합성 C-10 및 삭제 보완 결과를 유지하고 U10 C-11 재열람 연결은 별도 대기다."
     },
     {
       "id": "AC6.1.9",

@@ -350,3 +350,51 @@ root가 IAB·로컬 실제 API(포트 3311)·기존 `catchu_u10_dev`에서 이�
 최신 [#416 답변](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6677766344)에서 U4 제출 3의 #482가 2026-11-06 14:26 KST에 통합 브랜치로 병합됐음(`af5fbf3`)과 OQ6 문서 #478 병합(`ad58c6f`)을 확인했다. OQ6의 A/예 결정과 기존 C-10 제공자 코드 유지 근거는 유효하다. C-11은 이제 “미제공”이 아니라 “U4 제출 3 병합 확인, U10 C-11 연결은 사용자 지시에 따라 별도 대기”로 구분한다. 이 기록은 해당 병합판의 현 U10 체크아웃 반영이나 C-11 연결 완료를 뜻하지 않는다.
 
 기존 변경 코드와 이번 브라우저 기록의 커밋 보존을 먼저 진행한다. 보존 확인 전까지 C-10 제품 등록과 신규 검사 파일 작성은 대기하며, 이전 설계·승인·계획 본문은 유지한다. PR 병합·#452 종료·U10 전체 완료 처리는 하지 않는다.
+
+## C-10 실제 등록과 신규 영향 검사 준비 — 2026-11-06
+
+기존 코드·JD 브라우저 결과·기록은 커밋 `6c4ec503`(15개 파일)으로 보존했다. 그 확인 뒤 승인 범위에서 `AppModule`에 `JdSummaryModule.register`를 추가하고 `PublicationsModule`의 `PUBLICATION_ACCESS`를 `useExisting`으로 주입했다. #468 제공 코드와 OQ5·OQ6 결정에 따른 실제 `DbPublicationAccess` 연결이며, 공용 제공자·U4 화면·이전 설계와 승인 본문은 변경하지 않았다. U10에서 사용하지 않는 `readSnapshot`도 추가하지 않았다.
+
+기존 `jd-integration.test.cjs`는 두 번째 요약 모듈을 조립하지 않고 실제 AppModule 하나를 사용하도록 정리했다. 기존 합성 판정은 그 검사 프로세스의 제공자 메서드에만 적용하고 종료 때 복원한다. 기존 검사 본문과 과거 결과는 유지하며 이번에 재실행하지 않는다.
+
+새 `api/test/jd/jd-publication-access.test.cjs`에는 다음 9개 영향 시나리오를 작성했다. 아래는 작성 범위이며 실행 통과 기록이 아니다.
+
+| 번호 | 신규 영향 검사 |
+|---|---|
+| 1 | 실제 C-10 인스턴스 주입과 `JD_SUMMARY` 처리기 1회 등록, 43자 token·서명 grant로 접수·목록·상세 연결 |
+| 2 | 각 HTTP 경로의 회원 401과 링크 401 구분, Bearer와 grant 동시 요구 |
+| 3 | 실행 회원·JD 소유·발행본 경계의 자료 격리 |
+| 4 | 요청 전 중지·만료·작성자 비활성의 404 판정을 grant 검사보다 먼저 적용 |
+| 5 | C-10 통과 뒤 발행본 삭제 시 실제 `23503`·`fk_jd_summary_run_publication_id` 확인, 404와 실행·입력 사본·결과·차감 롤백 및 큐 접수 없음 |
+| 6 | C-10 통과 뒤 중지는 현재 접수·차감을 허용하고 다음 요청부터 차단 |
+| 7 | C-10 통과 뒤 만료는 현재 접수·차감을 허용하고 다음 요청부터 차단 |
+| 8 | C-10 통과 뒤 작성자 비활성은 현재 접수·차감을 허용하고 다음 요청부터 차단 |
+| 9 | 정상 FK로 구성할 수 없는 회원 행 부재만 `OwnerProfileReader` 대역으로 주입해 고정 500과 내부 정보 미노출 확인 |
+
+실제 AppModule·인증 Guard·C-10·C-09 상태 조회·PostgreSQL을 사용하며, 경합 시점은 실제 C-09 조회 뒤 검사 hook으로 고정한다. 회원·세션·발행본·JD·동의는 새 UUID와 합성 identity로 생성한다. 정리는 생성 전에 기록한 회원 ID와 identity가 함께 일치하는 행 및 그 자식에 한정한다. 기존 자료 ID 사용·DB 전체 초기화·TRUNCATE·마이그레이션은 하지 않는다. 임시 서명 키는 검사 프로세스에서만 생성하며 외부 AI·큐·Google 로그인·GitHub 연결·worker context를 해당 프로세스에서 차단한다.
+
+읽기 전용 소스 마운트의 별도 Node 프로세스에서 `DB_NAME=catchu_u10_test`, `CATCHU_U10_SOURCE_TEST=true`와 `node --require ts-node/register --test --test-concurrency=1 test/jd/jd-publication-access.test.cjs`를 사용할 준비를 마쳤다. 코드 변경을 감시하지 않는 기존 포트 3311 API에는 새 등록이 반영되지 않으며, 신규 검사는 소스를 새로 읽는 임시 HTTP 서버의 결과로 구분한다. 소스 기반 검사 결과는 실행 후 덧붙인다.
+
+기존 75개·17개·U7 검사는 반복하지 않는다. 다른 DB 오류가 삭제 오류로 바뀌지 않는 기존 검사 결과도 재사용한다. 비밀번호 unlock·C-11 공유 화면·외부 AI·실제 큐·분석 스케줄러·성능 비교는 이번 범위 밖이다. U4 제출 3 병합과 U10 C-11 연결 대기를 구분하며, task 31 전체 완료·PR 병합·#452 종료·U10 전체 완료로 처리하지 않는다.
+
+## C-10 신규 영향 검사 결과 — 2026-11-06
+
+root가 기존 API 컨테이너 안의 별도 Node 프로세스에서 아래 명령을 실행했다. 앞 절의 작성·실행 대기 기록을 보존하고 이번 실행 결과를 추가한다.
+
+```powershell
+docker exec --workdir /workspace/api --env DB_NAME=catchu_u10_test --env CATCHU_U10_SOURCE_TEST=true 03b30eebf7a3634431b10c2c24c1966cbcc1dc080500513ef50de3fdc4e306b0 node --require ts-node/register --test --test-concurrency=1 test/jd/jd-publication-access.test.cjs
+```
+
+| 확인 | 결과 |
+|---|---|
+| 신규 영향 검사 | 종료 코드 0, tests 9 / pass 9 / fail 0 / cancelled 0 / skipped 0 / todo 0. 보고 시간 160,968.293657ms는 초기 소스 로딩을 포함한 실행 시간이며 성능 비교 결과가 아니다. |
+| 실제 등록·HTTP | 동일 실제 C-10 인스턴스와 `JD_SUMMARY` 처리기 1회 등록, 접수 202·PENDING, 목록·상세 200, `no-store`를 확인했다. |
+| 권한·오류 경계 | 회원/링크 401 구분과 소유 격리, 매 요청의 중지·만료·비활성 작성자 404가 통과했다. 회원 행 부재의 고정 500은 명시한 `OwnerProfileReader` 대역 사례다. |
+| 삭제·판정 이후 경계 | 실제 DB의 정확한 `23503`·`fk_jd_summary_run_publication_id`에 대한 404와 저장·입력 사본·결과·차감 롤백을 확인했다. 판정 뒤 중지·만료·작성자 비활성은 현재 요청 접수·차감을 허용하고 다음 요청부터 차단했다. 접근 허용 뒤 상태 변경을 순서대로 삽입한 통제 검사이며 실제 동시 부하 검사는 아니다. |
+| 합성 자료 정리 | 각 fixture에서 이번에 생성한 회원 ID·identity에 한정한 삭제와 남은 회원 0 확인이 통과했다. 기존 DB 자료·스키마는 초기화하지 않았다. |
+| 문법 검사 | `jd-publication-access.test.cjs`와 조립만 보완한 `jd-integration.test.cjs`의 `node --check`가 각각 종료 코드 0이었다. 기존 통합 검사 본문은 실행하지 않았다. |
+| web 문서 사본 | root가 변경된 JD README만 임시 실행 사본으로 동기화했다. 323개 사본의 재검증은 종료 코드 0, 최신 원본 집계 SHA256은 `3b66e895e7475606000b470ae9deaefb956c89fa0022b9eee2acf5112e32024b`였다. `next.config.ts`의 승인된 `allowedDevOrigins` 한 줄 외에는 원본과 같고 원본 쓰기는 없었다. |
+
+이 결과는 새 소스를 읽은 별도 HTTP 검사 서버의 실제 C-10 연결 근거다. 기존 포트 3311 API 프로세스에 변경이 반영됐거나 제품 `main`·공용 큐·분석 스케줄러·외부 AI 전체 연결이 완료됐다는 뜻은 아니다. 비밀번호 unlock·C-11 공유 화면·외부 AI·성능 비교는 미실행이며 기존 75개·17개·U7 검사를 반복하지 않았다.
+
+U4 제출 3 병합은 확인됐지만 U10 C-11 연결은 사용자 지시에 따라 별도 대기다. 따라서 C-11을 포함하는 Step 8 작업 31을 완료로 체크하지 않으며 전체 공식 완료 검토·PR 제출·PR 병합·#452 종료·U10 전체 완료 처리를 하지 않는다. 기존 설계·계획·승인·완료 검사 원문은 보존한다.

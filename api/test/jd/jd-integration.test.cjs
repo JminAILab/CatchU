@@ -3,7 +3,6 @@ require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { before, after, beforeEach, test } = require('node:test');
-const { Module } = require('@nestjs/common');
 const { Queue } = require('bullmq');
 const IORedis = require('ioredis').default;
 const { AppModule } = require('../../dist/app.module');
@@ -12,7 +11,7 @@ const { AI_RUN_QUEUE } = require('../../dist/ai-run/ai-run-spec');
 const { DailyRunLimit } = require('../../dist/daily-run-limit/daily-run-limit');
 const { AiConsentGate, AI_NOTICE_VERSION } = require('../../dist/ai-consent/ai-consent.gate');
 const { createCheckedAiGenerationGate } = require('../../dist/ai-generation/checked-gate');
-const { JdSummaryModule } = require('../../dist/jd-summary/jd-summary.module');
+const { JD_PUBLICATION_ACCESS } = require('../../dist/jd-summary/jd-summary-tokens');
 const { JdSummaryRun } = require('../../dist/jd-summary/jd-summary-run.entity');
 const { createJdSummaryHandler } = require('../../dist/jd-summary/jd-summary-processor');
 const { LinkUnavailable, LinkPasswordRequired } = require('../../dist/publications/publication-access');
@@ -20,7 +19,7 @@ const { openTestDataSource, resetTestDatabase } = require('../support/test-datab
 const { APP_SETTINGS, setEnv, startApp, expectError } = require('../u2/support.cjs');
 const { FAKE_KEY, fragment, blockCitation, messageBody, jsonResponse, recordingFetch, captureLogs } = require('../u2/gate-fixtures.cjs');
 const { harness, hit, output, codeIs } = require('./fixtures.cjs');
-let db, server, restore;
+let db, server, restore, registeredAccess, originalResolve;
 const links = new Map();
 const access = { async resolveForRecipient(token, grant) {
   const link = links.get(token);
@@ -28,10 +27,17 @@ const access = { async resolveForRecipient(token, grant) {
   if (link.password && grant !== 'synthetic-grant') throw new LinkPasswordRequired();
   return link;
 }, async resolveForOwner() { throw new Error('소유자 우회 금지'); }, async readSnapshot() { throw new Error('직접 원문 읽기 금지'); } };
-class TestModule {}
-Module({ imports: [AppModule, JdSummaryModule.register({ publicationAccess: { useValue: access } })] })(TestModule);
-before(async () => { restore = setEnv(APP_SETTINGS); db = await openTestDataSource(); server = await startApp(TestModule); });
-after(async () => { await server?.app.close(); await db?.destroy(); restore?.(); });
+before(async () => {
+  restore = setEnv(APP_SETTINGS); db = await openTestDataSource(); server = await startApp(AppModule);
+  // 제품 앱이 JD_SUMMARY를 한 번 등록한다. 이 시험의 기존 합성 C10 경계만 시험 프로세스에서 바꾼다.
+  registeredAccess = server.app.get(JD_PUBLICATION_ACCESS);
+  originalResolve = registeredAccess.resolveForRecipient;
+  registeredAccess.resolveForRecipient = access.resolveForRecipient;
+});
+after(async () => {
+  if (registeredAccess) registeredAccess.resolveForRecipient = originalResolve;
+  await server?.app.close(); await db?.destroy(); restore?.();
+});
 beforeEach(async () => { links.clear(); await resetTestDatabase(db); });
 const processRun = (h, runId) => createJdSummaryHandler(h.deps)({ runKey: runId, payload: { runId } });
 const view = (h, runId) => h.service.detail(h.memberId, 'token', undefined, runId);

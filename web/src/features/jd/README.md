@@ -20,7 +20,7 @@
 
 **실제 공유 화면에는 아직 연결하지 않았다.** `createMemberJdApi(api.member)` factory는 요약 접수·목록·상세에서도 회원 Bearer와 요청 시점 `getGrant()`의 `X-Link-Grant`를 함께 전달한다. 수신자 전용 호출로 회원 인증을 생략하지 않는다. LINK 401은 회원 갱신을 하지 않고 `onAccessLost`로 전달하며, AUTH 401은 회원 인증 처리와 로그인 안내로 구분한다.
 
-제품의 요약 등록은 C-10/OQ-6 연결 조건과 #416의 C-11 슬롯·`showEvidence` 제공을 기다린다. U10이 공유 화면 슬롯을 만들거나 제공자 파일을 대신 수정하지 않는다. 제공 조건이 갖춰지면 소유자가 위 factory의 `client`를 주입한다. 공용 코드와 합성 fetch 검사의 통과는 실제 공유 화면·원문 강조·외부 AI 연결 완료가 아니다.
+API의 실제 C-10 등록은 #468 병합과 #416 OQ5·OQ6 결정에 따라 AppModule에 연결했다. [U4 제출 3 병합](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6677766344)은 확인됐지만 U10의 C-11 슬롯·`showEvidence` 연결은 사용자 지시에 따라 별도 대기다. U10이 공유 화면 슬롯을 만들거나 제공자 파일을 대신 수정하지 않는다. 공유 화면 연결을 진행할 때 소유자가 위 factory의 `client`를 주입한다. API 등록·공용 코드와 합성 fetch 검사의 통과는 실제 공유 화면·원문 강조·외부 AI 연결 완료가 아니다.
 
 ## 검사
 
