@@ -135,7 +135,7 @@ imports: `OwnerProfileReaderModule`(소유 회원 상태), U2 `AiRunModule`·`Da
 
 - 토큰은 응답 `url`(`buildRecipientLinkUrl(SHARE_LINK_WEB_BASE_URL, token)`) 안에만 있다. 비밀번호 원문은 저장·응답·로그에 없다.
 - 재전송·두 번 누르기 방지는 없다(BR4.9). web이 응답까지 버튼을 막는다.
-- 409의 `details.catchIds`를 위해 공통 오류 `ErrorDetails`(`src/common/errors/api-error.ts`)에 `catchIds?: string[]`(UUID만)을 더했다. 공통 필터가 UUID 형식이 아닌 값은 버린다. 계약 common.yaml의 `details` 허용 키(두 개) 바깥이라 PR 「리뷰 요청」에서 확인한다.
+- 409의 `details.catchIds`를 위해 공통 오류 `ErrorDetails`(`src/common/errors/api-error.ts`)에 `catchIds?: string[]`(UUID만)을 더했다. 공통 필터가 UUID 형식이 아닌 값은 버린다. 계약 common.yaml의 `details` 허용 키(두 개) 바깥에 추가한 항목이다. 팀장 확인(#468).
 
 ## 작성자 발행본 관리 API (제출 2)
 
