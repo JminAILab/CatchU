@@ -18,12 +18,11 @@ const navItems = [
   { href: routes.assets, label: "내 자산" },
   { href: routes.materials, label: "텍스트 자료" },
   { href: routes.publications, label: "발행본" },
-  { href: routes.links, label: "공유 링크" },
 ] as const;
 
 /**
  * 로그인 일반 서비스·발행자 헤더(#55 10월 합의).
- * 왼쪽: 로고(→ 로그인 홈) · 내 자산 · 공유 링크 · 채용공고(비활성, 클릭 시 안내창)
+ * 왼쪽: 로고(→ 로그인 홈) · 내 자산 · 텍스트 자료 · 발행본 · 채용공고(비활성, 클릭 시 안내창). 10월 [공유 링크]는 U4 제출 3(W6)에서 [발행본]으로 대체했다.
  * 오른쪽: 알림(비활성, 클릭 시 안내창) · 프로필
  * 대표 구성 진입점은 10월에 두지 않는다.
  */

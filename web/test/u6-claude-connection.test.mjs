@@ -13,7 +13,7 @@ const {
 } = await load("features/claude-connection/claude-connection.ts");
 const { ClaudeConnectionView } = await load("features/claude-connection/claude-connection-view.tsx");
 const { ClaudeConnectionPanel } = await load("features/claude-connection/claude-connection-panel.tsx");
-const { copyText } = await load("features/share-links/copy-text.ts");
+const { copyText } = await load("lib/copy-text.ts");
 
 const MCP_URL = "https://catchu.example/v1/mcp";
 const EXPIRES_AT = "2026-11-09T03:04:05.000Z";

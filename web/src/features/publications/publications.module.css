@@ -62,3 +62,8 @@
 .dangerButton { color: var(--color-danger); border-color: var(--color-danger); }
 .page button:disabled { opacity: .55; cursor: not-allowed; }
 .page button:focus-visible, .page a:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+
+/* 근거 위치 강조(C-11 evidence-highlight). 받은 사람 화면이 showEvidence로 받은 범위를 <mark>로, 옮겨 간 항목은 초점 테두리로 보인다. */
+.highlight { background: #ffe58a; color: inherit; padding: 0 1px; border-radius: 2px; }
+.snapshotItem:focus { outline: none; }
+.snapshotItem:focus-visible, .snapshotItem[data-highlighted="true"] { outline: 3px solid var(--color-focus); outline-offset: 2px; }

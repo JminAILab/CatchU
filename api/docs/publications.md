@@ -95,7 +95,7 @@ access.remove(publicationId);                                   // 삭제 상황
 
 ## PublicationsModule 구성 (제출 2)
 
-`src/publications/publications.module.ts`. `AppModule`에 등록돼 있다. 10월 `share-links` 폴더에서는 표·API·Nest 모듈에 의존하지 않는 도구(`link-token`·`link-grant`·`link-password`·`share-links.config`·`unlock-policy`·`request-rate-limiter`)만 가져오고, `ShareLinksModule`·`share-links.service`·`link-access.service`·`RecipientModule`은 가져오지 않는다. `catches`·`materials`는 `publications`를 가져오지 않는다(의존 방향 R-05, `test/publications/publications-module.test.cjs`가 확인).
+`src/publications/publications.module.ts`. `AppModule`에 등록돼 있고, 제출 3(W6)부터 `ShareLinksModule`·`RecipientModule`은 `AppModule`에 없다. 10월 `share-links` 폴더에서는 표·API·Nest 모듈에 의존하지 않는 도구(`link-token`·`link-grant`·`link-password`·`share-links.config`·`unlock-policy`와 제한기들·`request-rate-limiter`·`client-address`)만 가져온다([공유 링크 문서 「남은 도구」](share-links.md#남은-도구-srcshare-links-u4u5u9가-가져다-씀)). `catches`·`materials`는 `publications`를 가져오지 않는다(의존 방향 R-05, `test/publications/publications-module.test.cjs`가 확인).
 
 | 공급자 | 토큰 | 만드는 방법 | 기동 때 검사 |
 | --- | --- | --- | --- |
@@ -104,8 +104,8 @@ access.remove(publicationId);                                   // 삭제 상황
 | 발행 빈도 제한기 | `PUBLISH_RATE_LIMITER` | `new RequestRateLimiter(PUBLISH_RATE_LIMIT)` | 없음. 10월 발급 제한기와 다른 인스턴스, 프로세스 메모리(api 하나 전제, NFR4.13) |
 | 시계 | `PUBLICATIONS_CLOCK` | `() => new Date()` | 없음. 시험이 발행·관리·C-10의 시계를 바꾼다 |
 | C-10 DB 구현 | `PUBLICATION_ACCESS`(export) | `DbPublicationAccess` | 없음 |
-
-unlock 정책·제어(`UNLOCK_POLICY`·`UNLOCK_CONTROLS`)는 제출 3이 받은 사람 unlock을 이 모듈로 옮길 때 함께 넣는다. 지금 선언하면 `ShareLinksModule`의 같은 토큰과 인스턴스가 둘이 되어, `app.get(UNLOCK_CONTROLS, { strict: false })`로 제한기를 얻는 10월 unlock 시험(`test/db/public-links-unlock*.test.cjs`)이 실제 unlock 경로와 다른 제한기를 본다(PR #468 CI 실패). `LINK_GRANT_KEY`·`SHARE_LINKS_CONFIG`도 두 모듈에 있지만 둘 다 같은 환경변수에서 같은 값을 만들어 어느 쪽을 받아도 결과가 같다.
+| unlock 정책·제어(제출 3) | `UNLOCK_POLICY`·`UNLOCK_CONTROLS` | 10월 `unlock-policy.ts`의 `PRODUCT_UNLOCK_POLICY`·`createUnlockControls` | 없음. 이 모듈에만 선언한다(제출 2에서는 `ShareLinksModule`과 중복돼 미뤘고, W6에서 그 모듈을 빼며 옮김) |
+| 받은 사람 서비스·컨트롤러(제출 3) | `RecipientAccessService`, `RecipientLinksController` | — | 아래 「받은 사람 열람·비밀번호 통과 API」 |
 
 imports: `OwnerProfileReaderModule`(소유 회원 상태), U2 `AiRunModule`·`DailyRunLimitModule`·`AiConsentModule`·`FileStorageModule`, U3 `PublishedIndexModule`(`PUBLISHED_INDEX_WRITER`). 환경변수 이름은 10월 그대로라 배포 설정을 바꾸지 않는다.
 
@@ -135,7 +135,7 @@ imports: `OwnerProfileReaderModule`(소유 회원 상태), U2 `AiRunModule`·`Da
 
 - 토큰은 응답 `url`(`buildRecipientLinkUrl(SHARE_LINK_WEB_BASE_URL, token)`) 안에만 있다. 비밀번호 원문은 저장·응답·로그에 없다.
 - 재전송·두 번 누르기 방지는 없다(BR4.9). web이 응답까지 버튼을 막는다.
-- 409의 `details.catchIds`를 위해 공통 오류 `ErrorDetails`(`src/common/errors/api-error.ts`)에 `catchIds?: string[]`(UUID만)을 더했다. 공통 필터가 UUID 형식이 아닌 값은 버린다. 계약 common.yaml의 `details` 허용 키(두 개) 바깥이라 PR 「리뷰 요청」에서 확인한다.
+- 409의 `details.catchIds`를 위해 공통 오류 `ErrorDetails`(`src/common/errors/api-error.ts`)에 `catchIds?: string[]`(UUID만)을 더했다. 공통 필터가 UUID 형식이 아닌 값은 버린다. 계약 common.yaml의 `details` 허용 키(두 개) 바깥에 추가한 항목이다. 팀장 확인(#468).
 
 ## 작성자 발행본 관리 API (제출 2)
 
@@ -153,6 +153,10 @@ imports: `OwnerProfileReaderModule`(소유 회원 상태), U2 `AiRunModule`·`Da
 - 중지는 행을 `FOR UPDATE`로 잠근 뒤 상태를 다시 구한다(BR8.2). 되살리기·연장·비밀번호 변경은 없다(BR8.3).
 - 삭제(BR8.4): `resolveForOwner` → `FileStorage.deletePrefix(publicationPrefix(memberId, publicationId))`(없는 접두어는 성공) → 실패(`StorageUnavailable` 등)면 로그 `PREFIX_DELETE_FAILED`와 500 `INTERNAL_ERROR`로 끝내고 DB를 지우지 않는다 → 성공하면 `publication` 행을 지워 `published_item`·색인·조각·요약·JD 요약 결과가 외래 키로 함께 지워진다. 늦게 도착한 결과는 부모가 없어 거부되고 버리는 것은 각 처리기 몫이다(BR8.5). 만료는 행을 지우지 않는다(BR8.6).
 - 모든 조회·수정·삭제에 `member_id = 인증 회원` 조건을 넣는다. 남의 것·없는 것·UUID 형식이 아닌 ID는 같은 404다.
+
+## 받은 사람 열람·비밀번호 통과 API (제출 3)
+
+받은 사람 경로는 [받은 사람 열람·비밀번호 통과 API 문서](recipient-publication.md)로 옮겼다. 요지: `GET /v1/public/links/{token}`(200 C-10 `PublishedSnapshot`)과 `POST /v1/public/links/{token}/unlock`(200 `{ grant }`)을 `PublicationsModule`의 `RecipientLinksController`·`RecipientAccessService`가 맡고, 10월 `RecipientModule`·`ShareLinksModule`은 없다. 열람은 판정과 사본 읽기를 읽기 전용 REPEATABLE READ 트랜잭션 하나에서 하며(판정 뒤 커밋된 중지·만료·삭제·작성자 비활성은 다음 요청에서 막음), unlock은 최초 판정과 해시 직전 재판정 두 번이다. 작성자 비활성 404·회원 행 없음 500, unlock 순서·제한값·시험 목록은 그 문서에 있다.
 
 ## 로그 (제출 2)
 
@@ -178,7 +182,8 @@ Nest `Logger('Publications')`(`src/publications/publications-log.ts`)로 사건�
 - `test/publications/publish-api.test.cjs`(제출 2): S4~S7, 빈도 429·`Retry-After`, 입력 400 칸별 이유, 동의 403, 404, 자격 409 `details.catchIds`·보호 관측 없음 500, 하루 한도 429·롤백, 조각 예외 500·롤백, 등록 실패 201, 전체 글 60,000/60,001자
 - `test/publications/publications-manage-api.test.cjs`(제출 2): 목록 cursor·`indexState` 없음, 상세 모양, S9(작성자 쪽)·S10~S13(접두어 삭제는 시험 전용 임시 폴더의 로컬 저장소, 실패는 가짜 `FileStorage`)
 - `test/publications/publications-logging.test.cjs`(제출 2): 결과 분류별 줄·칸, 등록 실패와 접두어 삭제 실패 구분, 합성 비밀값·본문 비노출
-- `test/publications/publications-module.test.cjs`(제출 2): 공급자 선언·`PUBLICATION_ACCESS` 주입, 기본 앱 경로 중복 없음, 운영 설정 기동 실패, 의존 방향
+- `test/publications/publications-module.test.cjs`(제출 2·3): 공급자 선언(unlock 제어는 이 모듈에만)·`PUBLICATION_ACCESS` 주입, 기본 앱 경로 중복 없음·받은 사람 경로 포함·10월 경로 없음, 운영 설정 기동 실패, 의존 방향
+- 제출 3 받은 사람 시험은 [받은 사람 API 문서 「받은 사람 시험 (제출 3)」](recipient-publication.md#받은-사람-시험-제출-3)
 
 U2 `AiRun`·`FileStorage`(실패 쪽)·U3 `PublishedIndexWriter`는 계약 모양 가짜로 바꿔 돌린다. 그 결과는 '합성 연결을 포함한 사전 확인'이며 실제 연결 성공이 아니다(team.md Walking Skeleton).
 

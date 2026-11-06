@@ -278,10 +278,10 @@ test('재인증 [다시 로그인]: 계속한 뒤에는 더블클릭·Enter 반�
       const label = `${variant} ${reasons.join('+')}`;
       const asks = variant !== 'login-changed' && reauth !== null;
       const h = reauthHarness({ reasons, answers: [true] });
-      const notice = { returnTo: '/links', variant };
+      const notice = { returnTo: '/publications', variant };
       assert.deepEqual([1, 2, 3].map(() => h.control.request(notice)), ['leaving', 'busy', 'busy'], label);
       assert.deepEqual(h.asked, asks ? [reauth] : [], label);
-      assert.deepEqual(h.navigated, ['/links'], `${label}: 이동은 한 번`);
+      assert.deepEqual(h.navigated, ['/publications'], `${label}: 이동은 한 번`);
       assert.equal(h.reads(), variant === 'login-changed' ? 0 : 1, label);
     }
   }
@@ -290,8 +290,8 @@ test('재인증 [다시 로그인]: 계속한 뒤에는 더블클릭·Enter 반�
 test('재인증 [다시 로그인]: 머무르면 아무것도 바꾸지 않고, 다시 누르면 그 시점의 사유로 다시 물어 계속할 때 한 번 이동한다', () => {
   for (const variant of [undefined, 'reauth']) {
     const h = reauthHarness({ reasons: [REQUEST], answers: [false, false, true] });
-    assert.equal(h.control.request({ returnTo: '/links', variant }), 'stayed');
-    assert.equal(h.control.request({ returnTo: '/links', variant }), 'stayed');
+    assert.equal(h.control.request({ returnTo: '/publications', variant }), 'stayed');
+    assert.equal(h.control.request({ returnTo: '/publications', variant }), 'stayed');
     assert.deepEqual(h.navigated, [], `${variant}: 머무르면 이동하지 않는다`);
     assert.deepEqual(h.registry.activeReasons(), [REQUEST], `${variant}: 요청 정보 등록은 그대로`);
     h.registry.register(() => true, INPUT);
@@ -309,11 +309,11 @@ test('재인증 [다시 로그인]: 이동을 시작하지 못한 예상 밖 예
     confirmLeave: () => true,
     navigate: (returnTo) => { if (broken) throw new Error('boom'); navigated.push(returnTo); },
   });
-  assert.throws(() => control.request({ returnTo: '/links' }), /boom/);
+  assert.throws(() => control.request({ returnTo: '/publications' }), /boom/);
   broken = false;
-  assert.equal(control.request({ returnTo: '/links' }), 'leaving');
-  assert.equal(control.request({ returnTo: '/links' }), 'busy');
-  assert.deepEqual(navigated, ['/links']);
+  assert.equal(control.request({ returnTo: '/publications' }), 'leaving');
+  assert.equal(control.request({ returnTo: '/publications' }), 'busy');
+  assert.deepEqual(navigated, ['/publications']);
 });
 
 test('이동 전 확인 문구: 사라지는 것 → 이미 보낸 분석 요청은 취소되지 않음(분석 요청이 들 때) → 빈 줄 뒤 확인 질문 순서다', () => {
@@ -430,45 +430,45 @@ function withReasons(reasons, run) {
 test('화면 [다시 로그인]: 결과 불명 분석 요청이 있을 때 계속을 고르면, 이어서 들어온 클릭·Enter로 확인 창이 다시 뜨지 않고 이동은 한 번이다(#287 D 재현)', () => {
   withReasons([REQUEST], () => {
     for (const variant of [undefined, 'reauth']) {
-      const notice = renderNotice({ returnTo: '/links', variant }, [true, false, false]);
+      const notice = renderNotice({ returnTo: '/publications', variant }, [true, false, false]);
       assert.ok(notice.html.includes('다시 로그인'));
       notice.press();
       notice.press();
       notice.press();
       assert.deepEqual(notice.asked, [M.reauthRequestConfirm], `${variant}: 두 번째 확인 창을 띄우지 않는다`);
-      assert.deepEqual(navigation.pushed, ['/login?next=%2Flinks'], `${variant}: 이동은 한 번`);
+      assert.deepEqual(navigation.pushed, ['/login?next=%2Fpublications'], `${variant}: 이동은 한 번`);
     }
   });
 });
 
 test('화면 [다시 로그인]: 취소하면 이동 없이 요청 정보 등록이 그대로이고, 다시 누르면 다시 물어 계속할 때 한 번 이동한다', () => {
   withReasons([REQUEST], () => {
-    const notice = renderNotice({ returnTo: '/links' }, [false, true]);
+    const notice = renderNotice({ returnTo: '/publications' }, [false, true]);
     notice.press();
     assert.deepEqual(navigation.pushed, [], '취소: 이동하지 않는다');
     assert.deepEqual(unsavedChanges.activeReasons(), [REQUEST], '취소: 요청 정보 등록은 그대로');
     notice.press();
     notice.press();
     assert.deepEqual(notice.asked, [M.reauthRequestConfirm, M.reauthRequestConfirm]);
-    assert.deepEqual(navigation.pushed, ['/login?next=%2Flinks']);
+    assert.deepEqual(navigation.pushed, ['/login?next=%2Fpublications']);
   });
 });
 
 test('화면 [다시 로그인]: 묻지 않는 경우(사유 없음·login-changed)도 연달아 누르면 이동은 한 번이다', () => {
   for (const [variant, reasons] of [[undefined, []], ['login-changed', [INPUT, REQUEST]]]) {
     withReasons(reasons, () => {
-      const notice = renderNotice({ returnTo: '/links', variant }, []);
+      const notice = renderNotice({ returnTo: '/publications', variant }, []);
       notice.press();
       notice.press();
       assert.deepEqual(notice.asked, [], String(variant));
-      assert.deepEqual(navigation.pushed, ['/login?next=%2Flinks'], `${variant}: 이동은 한 번`);
+      assert.deepEqual(navigation.pushed, ['/login?next=%2Fpublications'], `${variant}: 이동은 한 번`);
     });
   }
 });
 
 test('화면 재인증 안내 위치: 스크롤 영역 위쪽에 붙고, 안내를 담은 모달이 열리면 바깥 안내를 숨긴다(#286 10/29 확인 필요 2)', () => {
   // 브라우저의 실제 배치·초점·낭독은 PR의 브라우저 확인으로 본다. 여기서는 그 배치를 만드는 class와 규칙이 남아 있는지만 본다.
-  const { html } = renderNotice({ returnTo: '/links' }, []);
+  const { html } = renderNotice({ returnTo: '/publications' }, []);
   assert.match(html, /class="notice reauthNotice" role="alert"/);
   const css = readFileSync(noticeCssUrl, 'utf8');
   const rule = css.match(/\n\.reauthNotice \{([^}]*)\}/)?.[1] ?? '';
