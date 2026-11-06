@@ -4,7 +4,7 @@
 
 ## 붙이는 방법(U4)
 
-아직 화면에 붙어 있지 않다. U4가 받은 사람 화면 틀(C-11 자리)과 작성자 발행본 화면을 만든 뒤 아래처럼 단다. 10월 받은 사람 화면(`features/recipient/`)은 고치지 않았다.
+받은 사람 화면 자리 2·3은 U4 제출 3 Step 22(2026-11-06)에서 `features/recipient/recipient-view.tsx`의 `RecipientSlots`가 아래 모양 그대로 단다. 작성자 발행본 화면의 작성자 모드는 아직 붙어 있지 않다.
 
 ```tsx
 // 받은 사람 화면 자리 2·3. RecipientSlotProps(C-11) + showEvidence.

@@ -449,7 +449,7 @@ test('반영에 실패한 요청은 같은 결과로 다시 반영하지 않고 
   const headers = { Authorization: 'Bearer ' + user.token, 'Content-Type': 'application/json' };
   const template = read('results/succeeded-one-candidate.json');
 
-  // 저장소 A: 정상 반영된 Catch를 확인·공개하고 링크로 수신자에게 보인다. 끝까지 바뀌지 않아야 할 기존 자료·링크다.
+  // 저장소 A: 정상 반영된 Catch를 확인·공개한다. 끝까지 바뀌지 않아야 할 기존 자료다.
   const a = await s.submit(user);
   const applied = await s.inject(user, a.status.requestId, 'Result', template, 'chain-a');
   assert.equal(applied.body.receipt.disposition, 'ACCEPTED');
@@ -457,15 +457,9 @@ test('반영에 실패한 요청은 같은 결과로 다시 반영하지 않고 
   const put = (suffix, body) => s.call(`/v1/catches/${catchId}${suffix}`, { method: 'PUT', headers, body: JSON.stringify(body) });
   assert.equal((await put('/confirmation', { workFactsConfirmed: true, contributionConfirmed: true })).status, 200);
   assert.equal((await put('/visibility', { visibility: 'PUBLIC' })).status, 200);
-  const issued = await s.call('/v1/share-links', { method: 'POST', headers: { ...headers, 'Idempotency-Key': randomUUID() },
-    body: JSON.stringify({ title: '[합성] #114 연결 시험 링크' }) });
-  assert.equal(issued.status, 201, await issued.clone().text());
-  const token = (await issued.json()).url.split('/s/')[1];
-  const recipient = () => s.call(`/v1/public/links/${token}/catches/${catchId}`);
-  const shown = await recipient();
-  assert.equal(shown.status, 200);
-  const shownBody = await shown.json();
-  const KEPT = ['catch_asset', 'catch_evidence', 'candidate_registration', 'repository_protection', 'share_link'];
+  // 10월 공유 링크 발급·수신자 Catch 상세 경로는 U4 제출 3(W6)에서 발행본 흐름으로 대체돼 여기서는 쓰지 않는다. 받은 사람 열람이 원본 변경과
+  // 무관하게 고정 사본을 돌려주는 것은 test/publications/recipient-api.test.cjs·publications-manage-api.test.cjs(S10)가 본다.
+  const KEPT = ['catch_asset', 'catch_evidence', 'candidate_registration', 'repository_protection'];
   const kept = await tableRows(KEPT);
   for (const table of KEPT) assert.ok(kept[table].length > 0, `${table}에 지킬 행이 있어야 한다`);
   const requestA = await requestRows(a.status.requestId);
@@ -510,14 +504,11 @@ test('반영에 실패한 요청은 같은 결과로 다시 반영하지 않고 
   assert.deepEqual(await dispatcher.dispatchOnce(), { read: 1, enqueued: 1, existing: 0, skipped: 0, paused: null });
   assert.deepEqual([...queue.jobs.keys()], [retry.status.attemptId]);
 
-  // 다른 요청의 Catch·근거·보호 기록·링크, 두 원 요청과 수신 기록, 수신자 열람이 그대로다.
+  // 다른 요청의 Catch·근거·보호 기록, 두 원 요청과 수신 기록이 그대로다.
   assert.deepEqual(await tableRows(KEPT), kept);
   assert.deepEqual(await tableRows(['result_application_record']), receipts);
   assert.deepEqual(await requestRows(a.status.requestId), requestA);
   assert.deepEqual(await requestRows(b.status.requestId), requestB);
-  const stillShown = await recipient();
-  assert.equal(stillShown.status, 200);
-  assert.deepEqual(await stillShown.json(), shownBody);
 });
 
 for (const [label, findForRegistration] of [

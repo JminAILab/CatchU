@@ -7,8 +7,8 @@ test('next는 서비스 안 회원 경로만 받는다', () => {
   for (const [value, expected] of [
     ['/home', '/home'],
     ['/assets?repositoryId=r1&catchId=c1', '/assets?repositoryId=r1&catchId=c1'],
-    ['/links', '/links'],
     ['/jds', '/jds'],
+    ['/publications/new', '/publications/new'],
     ['/profile/edit', '/profile/edit'],
     ['/profile/setup', '/profile/setup'],
     ['/profile/github', '/profile/github'],
@@ -16,7 +16,7 @@ test('next는 서비스 안 회원 경로만 받는다', () => {
 
   for (const value of [
     null, undefined, '', 'home', '//evil.example/home', '/\\evil.example', 'https://evil.example/home',
-    '/login', '/login?next=/home', '/', '/s/token', '/s/token/catches/c1', '/homex', '/assetsx', '/preview/common',
+    '/login', '/login?next=/home', '/', '/s/token', '/s/token/catches/c1', '/links', '/homex', '/assetsx', '/preview/common',
     '/home\nx', `/home?${'a'.repeat(2100)}`, '/%2F%2Fevil.example', '/jdsx',
   ]) assert.equal(safeNextPath(value), null, String(value));
 });
@@ -54,10 +54,10 @@ test('최초 입력 화면은 이름이 빈 회원만 열고, 이름이 있으�
 });
 
 test('로그인 후 목적지: 이름이 있으면 검증된 next, 없으면 최초 입력, 모르면 next 또는 홈', () => {
-  assert.equal(afterLoginPath('수영', '/links'), '/links');
+  assert.equal(afterLoginPath('수영', '/publications'), '/publications');
   assert.equal(afterLoginPath('수영', '//evil.example'), '/home');
   assert.equal(afterLoginPath('수영', null), '/home');
-  assert.equal(afterLoginPath('', '/links'), '/profile/setup');
+  assert.equal(afterLoginPath('', '/publications'), '/profile/setup');
   assert.equal(afterLoginPath(null, '/assets'), '/assets');
   assert.equal(afterLoginPath(null, '/login'), '/home');
 });

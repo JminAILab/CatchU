@@ -5,7 +5,7 @@
 //
 // 판정 순서 (BR6.1, C-10, NFR1.3·NFR1.12)
 //   - 기대: 토큰 형식(base64url 43자)이 아니면 조회 없이 LinkUnavailable. 발행본 없음·중지·만료(만료 시각과 같은 순간부터)는 구분 없이
-//           LinkUnavailable. 그다음 소유 회원 상태(OQ-U4-NFR-6 합의 전 10월 동작): 비활성이면 LinkUnavailable(404), 회원 행 없음이면
+//           LinkUnavailable. 그다음 소유 회원(작성자) 상태(#416 OQ-U4-NFR-6 결정 2026-11-05, 중지·만료 다음·grant 앞): 비활성이면 LinkUnavailable(404), 회원 행 없음이면
 //           내부 오류(500 INTERNAL_ERROR 계열, 토큰·SQL 비노출). 그다음 비밀번호 링크면 grant(없음·서명 틀림·다른 발행본·만료)를 확인해
 //           LinkPasswordRequired. 비밀번호 없는 링크는 grant 없이 통과한다. 판정은 호출마다 다시 하고 캐시하지 않는다.
 //   - 실패 조건: 중지·만료 링크가 grant로 열림, 비활성 소유자의 링크가 열림, 회원 없음을 404나 빈 결과로 바꿈, 형식 오류 토큰으로 DB 조회.
@@ -26,8 +26,8 @@
 //           사본을 그대로 돌려준다(상태 판정 없음). 차단은 다음 요청의 resolveForRecipient(LinkUnavailable)가 한다. 판정 뒤 삭제가
 //           커밋되면 같은 요청의 readSnapshot은 NotFound(LinkUnavailable이 아님)이고, 발행본을 참조하는 쓰기는 외래 키 거부
 //           SQLSTATE 23503이며 거부한 제약이 publication을 참조하는 것이다(소비 Unit이 "삭제로 확인"해 404 LINK_UNAVAILABLE로
-//           바꾸는 근거. 다른 제약의 23503은 해당하지 않음). 소유 회원 비활성은 OQ-U4-NFR-6 결정 전 10월 동작이라 같은 per-call
-//           동작을 기록만 한다. U4 자기 열람 경로(제출 3)가 쓰는
+//           바꾸는 근거. 다른 제약의 23503은 해당하지 않음). 소유 회원(작성자) 비활성도 같은 per-call 동작이다(#416 OQ-U4-NFR-6
+//           결정 2026-11-05: 통과한 요청을 작성자 비활성만을 이유로 취소하지 않는다). U4 자기 열람 경로(제출 3)가 쓰는
 //           resolveForRecipientIn·readSnapshotIn은 같은 REPEATABLE READ 트랜잭션에서 판정 시점 스냅샷을 읽어 이 틈이 없다(D10, R-04).
 //   - 실패 조건: readSnapshot이 중지·만료를 판정해 실패함(계약 C안, 미채택), 삭제를 LinkUnavailable로 바꿈(U5 NotFound 분기가 깨짐),
 //           다음 요청이 중지·만료·삭제 뒤에도 열림, 같은 트랜잭션 변형이 판정 뒤 커밋을 봄.
@@ -228,7 +228,7 @@ test('OQ-U4-NFR-5: 판정 뒤 중지·만료·소유자 비활성이 커밋돼�
   assert.equal((await access.readSnapshot(expiring.publicationId)).items.length, 1, '만료 시각이 지난 뒤에도 같은 요청의 사본은 그대로');
   await assert.rejects(access.resolveForRecipient(expiring.token, null, NOW), LinkUnavailable, '만료 뒤 다음 요청의 재판정');
 
-  // 판정 뒤 소유 회원 비활성(OQ-U4-NFR-6 합의 전 10월 동작) — 사본 읽기는 그대로, 다음 요청은 404, 재활성 뒤 다시 열린다.
+  // 판정 뒤 소유 회원 비활성(#416 OQ-U4-NFR-6 결정 2026-11-05) — 사본 읽기는 그대로, 다음 요청은 404, 재활성 뒤 다시 열린다.
   const owned = await insertPublication(owner);
   await insertItem(owned.publicationId, 1, 'TEXT_MATERIAL', TEXT_ITEM);
   assert.equal((await access.resolveForRecipient(owned.token, null, NOW)).ownerMemberId, owner);

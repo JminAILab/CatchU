@@ -1,7 +1,8 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { RequestRateLimiter } = require('../dist/share-links/request-rate-limiter.js');
-const { PRODUCT_ISSUE_RATE_LIMIT } = require('../dist/share-links/issue-rate-limit.js');
+// 10월 발급 빈도(issue-rate-limit.ts)는 U4 제출 3(W6)에서 발급 API와 함께 지웠다. 발행 빈도는 U4 publications-config의 임시값이다(OQ-U4-2).
+const { PUBLISH_RATE_LIMIT } = require('../dist/publications/publications-config.js');
 const { createUnlockControls, PRODUCT_UNLOCK_POLICY } = require('../dist/share-links/unlock-policy.js');
 
 // #219 요청 빈도 상한. 가짜 시각(밀리초)으로 창 경계를 확인한다.
@@ -58,8 +59,8 @@ test('상한 값이 1 이상의 정수가 아니면 만들지 않는다', () => 
   }
 });
 
-test('운영 정책: 회원 발급은 1분 10회, 같은 링크·주소의 비밀번호 확인은 1분 20회다', () => {
-  assert.deepEqual({ ...PRODUCT_ISSUE_RATE_LIMIT }, { maxRequests: 10, windowMs: 60_000, maxKeys: 10_000 });
+test('운영 정책: 회원 발행은 1분 10회(임시값), 같은 발행본·주소의 비밀번호 확인은 1분 20회다', () => {
+  assert.deepEqual({ ...PUBLISH_RATE_LIMIT }, { maxRequests: 10, windowMs: 60_000, maxKeys: 10_000 });
   assert.deepEqual({ ...PRODUCT_UNLOCK_POLICY.rate }, { maxRequests: 20, windowMs: 60_000, maxKeys: 10_000 });
   assert.throws(() => createUnlockControls({ ...PRODUCT_UNLOCK_POLICY, rate: { ...PRODUCT_UNLOCK_POLICY.rate, maxRequests: 0 } }), /정책값/);
 });

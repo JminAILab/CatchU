@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { readShareLinksConfig, DEV_SHARE_LINK_WEB_BASE_URL } = require('../dist/share-links/share-links.config.js');
-const { validateShareCreate } = require('../dist/share-links/share-create.js');
+// 10월 발급 입력 검사(share-create.ts)는 U4 제출 3(W6)에서 발급 API와 함께 지웠다. 발행 입력 검사는 test/publications/publish-api.test.cjs가 본다.
 
 const REQUIRED = /SHARE_LINK_WEB_BASE_URL is required unless NODE_ENV is development or test/;
 const HTTPS_ONLY = /SHARE_LINK_WEB_BASE_URL must be an https URL unless NODE_ENV is development or test/;
@@ -46,13 +46,4 @@ test('형식이 틀린 공유 URL 주소는 값을 드러내지 않고 기동을
       return true;
     });
   }
-});
-
-test('입력 오류의 reason은 공통 ValidationPipe처럼 규칙 이름이다', () => {
-  assert.deepEqual(validateShareCreate({ title: ' ' }).violations, [{ field: 'title', reason: 'isNotEmpty' }]);
-  assert.deepEqual(validateShareCreate({ title: 1 }).violations, [{ field: 'title', reason: 'isString' }]);
-  assert.deepEqual(validateShareCreate({ title: 'x', password: 1 }).violations, [{ field: 'password', reason: 'isString' }]);
-  assert.deepEqual(validateShareCreate({ title: 'x', password: '' }).violations, [{ field: 'password', reason: 'isNotEmpty' }]);
-  assert.deepEqual(validateShareCreate({ title: 'x', extra: 1 }).violations, [{ field: 'body', reason: 'whitelistValidation' }]);
-  assert.deepEqual(validateShareCreate('x').violations, [{ field: 'body', reason: 'isObject' }]);
 });

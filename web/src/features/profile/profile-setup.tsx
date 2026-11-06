@@ -8,6 +8,7 @@ import { routes } from "@/lib/routes";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { readProfile, completeProfileSetup, profileErrors, isUnprocessedSave, unprocessedSaveMessages, type Profile } from "./profile-api";
 import { ProfileFields } from "./profile-fields";
+import { emptySkillEditor, pendingSkill, pendingSkillMessage, type SkillEditor } from "./skill-editor";
 import { useUnsavedGuard } from "./use-unsaved-guard";
 import styles from "@/components/auth/auth.module.css";
 
@@ -20,8 +21,11 @@ export function ProfileSetup() {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [skillEditor, setSkillEditor] = useState<SkillEditor>(emptySkillEditor);
   const pending = useRef<AbortController | null>(null);
-  const dirty = profile !== null && JSON.stringify(profile) !== JSON.stringify(initial) && !saved;
+  // 저장본과 다른 입력에 더해, 기술 입력칸의 미확정 변경(#469)도 저장하지 않은 입력으로 본다.
+  const dirty = profile !== null
+    && (JSON.stringify(profile) !== JSON.stringify(initial) || pendingSkill(profile.skills, skillEditor) !== null) && !saved;
   /** 앞선 저장 요청의 결과를 아직 모르는지. 다음 요청이 처리되지 않았을 때(연장 뒤 거부·재인증 거부·보내지 않음) 이 안내를 지우지 않는다. */
   const uncertain = useRef(false);
   // 로그아웃·[다시 로그인] 전 미저장 확인(#287)에 같은 판정을 알린다. 링크 이동·새로고침 확인은 아래 effect가 맡는다.
@@ -41,6 +45,10 @@ export function ProfileSetup() {
 
   async function submit() {
     if (!profile || busy) return;
+    // 기술 입력칸에 반영하지 않은 변경이 있으면 저장 요청을 보내지 않고 입력을 둔 채 [추가]·[수정]을 안내한다(#469).
+    // 저장이 끝난 뒤의 [회원 정보 다시 확인]은 조회만 다시 하므로 막지 않는다.
+    const unconfirmed = saved ? null : pendingSkillMessage(profile.skills, skillEditor);
+    if (unconfirmed) { setErrors([unconfirmed]); return; }
     const invalid = profileErrors(profile);
     if (invalid.length) { setErrors(invalid); return; }
     setBusy(true); setErrors([]);
@@ -78,7 +86,7 @@ export function ProfileSetup() {
     <h1 className={styles.title}>최초 프로필 입력</h1>
     <p className={styles.lead}>표시 이름을 입력해 주세요. 나머지 항목은 선택 사항입니다.</p>
     <form onSubmit={event => { event.preventDefault(); void submit(); }} noValidate>
-      <ProfileFields profile={profile} disabled={busy || saved} onChange={setProfile} />
+      <ProfileFields profile={profile} disabled={busy || saved} onChange={setProfile} skillEditor={skillEditor} onSkillEditorChange={setSkillEditor} />
       {errors.length > 0 && <div className={styles.error} role="alert">{errors.map(message => <p key={message}>{message}</p>)}</div>}
       <button className={styles.submit} type="submit" disabled={busy}>{busy ? "처리 중" : saved ? "회원 정보 다시 확인" : "저장하고 시작하기"}</button>
     </form>

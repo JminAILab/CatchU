@@ -2,7 +2,7 @@
 import type { RagAnswerLogger } from './rag-answer-log';
 
 /**
- * C-10 PublicationAccess 자리. U4의 실제(DB) 구현이 통합 브랜치에 들어오면 앱 등록 때 그 구현을 넣는다.
+ * C-10 PublicationAccess 자리. 기본 앱은 U4의 실제(DB) 구현(publications 모듈이 내보낸 같은 이름의 토큰)을 넣는다.
  * 메모리 가짜(publications/in-memory-publication-access.ts)는 시험에서만 넣고 앱에는 넣지 않는다(비기능 설계 Q1).
  */
 export const PUBLICATION_ACCESS = Symbol('RAG_ANSWER_PUBLICATION_ACCESS');

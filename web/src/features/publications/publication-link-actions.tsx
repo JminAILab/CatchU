@@ -1,24 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { copyText, type ClipboardLike } from "@/lib/copy-text";
 import type { PublicationState } from "./publications-api";
 import styles from "./publications.module.css";
 
-export type ClipboardLike = { writeText(text: string): Promise<void> };
+export type { ClipboardLike };
 
 /**
  * 클립보드 쓰기. 실제로 성공했을 때만 true다. 클립보드를 쓸 수 없는 환경(권한 거부·비보안 출처)은 false이고 화면은 수동 복사를 안내한다.
- * 10월 `share-links/copy-text.ts`와 같은 동작이며, 그 파일은 제출 3(W6)에서 지워지므로 여기에 둔다.
+ * 제출 3(W6)에서 10월 `share-links/copy-text.ts`를 공용 `lib/copy-text.ts`로 옮겼으므로(U6도 쓴다) 그 함수를 그대로 쓴다.
  */
-export async function copyUrl(clipboard: ClipboardLike | undefined, text: string): Promise<boolean> {
-  if (!clipboard || typeof clipboard.writeText !== "function") return false;
-  try {
-    await clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
+export const copyUrl = copyText;
 
 /** [URL 복사]. 상태와 관계없이 보인다(#416 2026-11-03). 성공 뒤에만 완료를 표시하고 실패하면 주소를 직접 복사하게 보여 준다. */
 export function CopyUrlButton({ url, disabled = false }: { url: string; disabled?: boolean }) {

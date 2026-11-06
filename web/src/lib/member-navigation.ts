@@ -5,7 +5,7 @@ import { routes } from "./routes.ts";
  */
 
 /** 로그인 후 돌아갈 수 있는 회원 경로. 로그인 진입·수신자·서비스 소개는 복귀 대상이 아니다. */
-const MEMBER_PATH_PREFIXES = [routes.home, routes.profile, routes.assets, routes.materials, routes.jds, routes.publications, routes.links];
+const MEMBER_PATH_PREFIXES = [routes.home, routes.profile, routes.assets, routes.materials, routes.jds, routes.publications];
 const PARSE_BASE = "http://catchu.invalid";
 const MAX_NEXT_LENGTH = 2048;
 

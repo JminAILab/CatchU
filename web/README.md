@@ -96,7 +96,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/(member)/jds/` | U10 본인 JD 관리([기능·연결 안내](src/features/jd/README.md)) |
 | `src/app/(member)/profile/github/`, `(member)/github/callback/` | 회원 가드 안의 GitHub 연동 화면과 GitHub 콜백 화면([기능 안내](src/features/github-connection/README.md)) |
 | `src/app/(member)/profile/claude/` | 12월 U6: 회원 가드 안의 Claude 연결 관리·승인 화면([기능 안내](src/features/claude-connection/README.md)) |
-| `src/app/s/[token]/` | 공유 링크 수신자 목록·Catch 상세. 회원 로그인 없이 수신자 API에 연결한다([기능 안내](src/features/recipient/README.md)) |
+| `src/app/s/[token]/` | 발행본 받은 사람 화면(U4 W4). 회원 로그인 없이 받은 사람 API에 연결한다([기능 안내](src/features/recipient/README.md)) |
 | `src/components/header/` | 로그인·비로그인·수신자 헤더와 프로필 메뉴 |
 | `src/components/notice-dialog/` | 채용공고·알림 안내창 |
 | `src/components/status/` | 불러오는 중·조회 실패·정상 0건 공통 표시 |
@@ -170,9 +170,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/publications` | 발행본 목록 | U4 | 필요 | 확정 | U4 담당 결정 D4(2026-11-03). 최신순 목록, [URL 복사], [링크 열기](`ACTIVE`만)([발행·발행본](src/features/publications/README.md)) |
 | `/publications/new` | 발행 | U4 | 필요 | 확정 | 본인 Catch·텍스트 자료 고르기·순서·제목·비밀번호 → 확인 → 발행 완료를 한 화면에 둔다 |
 | `/publications/[publicationId]` | 발행본 상세 | U4 | 필요 | 확정 | 사본·상태·만료·링크 주소, 링크 중지·삭제. 기본 요약 패널(U5) 자리는 비워 둠 |
-| `/links` | 링크 목록·발급·복사·중단 | C | 필요 | 제안 | 발급은 이 페이지의 폼·모달로 처리 |
-| `/s/[token]` | 수신자 링크 | C | 불필요 | 제안 | 수신자 전용 헤더 |
-| `/s/[token]/catches/[catchId]` | 수신자 Catch 상세 | C | 불필요 | 제안 | 직접 진입해도 접근 판정·비밀번호 확인 후 표시 |
+| `/s/[token]` | 받은 사람 발행본 열람(U4 W4) | C | 불필요 | 제안 | 수신자 전용 헤더. 10월 `/links`·`/s/[token]/catches/[catchId]`는 U4 제출 3(W6)에서 없앴다 |
 
 **주소 원칙(제안):** 이름 조회·회원 가드·로그인 이동을 연결했다. 현재 범위와 최초 프로필 저장 연결은 [회원 진입 연결](src/features/member-entry/README.md), 프로필 상세·수정은 [프로필 화면](src/features/profile/README.md)을 따른다.
 - 토큰 없이 회원 경로에 들어오거나 회원 API가 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 `/login`으로 보낸다. 수신자 비밀번호 401은 수신자 화면에서 처리한다.

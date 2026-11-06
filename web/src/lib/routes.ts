@@ -33,10 +33,8 @@ export const routes = {
   jds: "/jds",
   /** 발행본 목록(U4 W5). */
   publications: "/publications",
-  /** 발행(U4 W3). 본인 Catch·텍스트 자료를 골라 고정 발행본과 링크를 만든다. */
+  /** 발행(U4 W3). 본인 Catch·텍스트 자료를 골라 고정 발행본과 링크를 만든다. 10월 `/links`(공유 링크 발급·관리)는 U4 제출 3(W6)에서 이 화면으로 대체했다. */
   publicationNew: "/publications/new",
-  /** 공유 링크 목록·발급·복사·중단. */
-  links: "/links",
 } as const;
 
 /** 발행본 상세(U4 W5). 사본·상태·링크 주소·중지·삭제. */
@@ -44,12 +42,7 @@ export function publicationDetailPath(publicationId: string): string {
   return `${routes.publications}/${encodeURIComponent(publicationId)}`;
 }
 
-/** 수신자 링크. token은 경로에만 두고 쿼리·로그에 싣지 않는다. */
+/** 받은 사람 링크(U4 W4). token은 경로에만 두고 쿼리·로그에 싣지 않는다. 10월 `/s/[token]/catches/[catchId]`(Catch 상세)는 W6에서 없앴다. */
 export function recipientLinkPath(token: string): string {
   return `/s/${encodeURIComponent(token)}`;
-}
-
-/** 수신자 Catch 상세. 직접 진입해도 접근 판정·비밀번호 확인을 먼저 한다. */
-export function recipientCatchPath(token: string, catchId: string): string {
-  return `${recipientLinkPath(token)}/catches/${encodeURIComponent(catchId)}`;
 }
