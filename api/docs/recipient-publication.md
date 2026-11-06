@@ -61,4 +61,3 @@ unlock 정책·제어(`UNLOCK_POLICY`·`UNLOCK_CONTROLS`)는 이 모듈에만 �
 ```bash
 npm test -- test/catches/author-description-api.test.cjs test/materials/text-materials-api.test.cjs test/publications/in-memory-publication-access.test.cjs test/publications/publication-access-db.test.cjs test/publications/publish-api.test.cjs test/publications/publications-manage-api.test.cjs test/publications/publications-logging.test.cjs test/publications/publications-module.test.cjs test/publications/recipient-api.test.cjs test/publications/recipient-unlock-policy.test.cjs test/publications/app-routes.test.cjs test/db/member-cascade-delete.test.cjs
 ```
-
