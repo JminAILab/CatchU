@@ -179,6 +179,58 @@ OQ-U4-NFR-6 결정의 C-10 문구 반영을 [PR #478](https://github.com/JminAIL
 
 **보류 범위**(계획 「보류 범위와 미결」 그대로): OQ-U4-2·OQ-U4-4 임시값, OQ-U4-3 `share_link` 표·엔티티 유지, OQ-U4-5 `indexState`·reindex 없음(U4 완료로 보고하지 않음), OQ-U4-7 `RecipientSlotProps`는 화면 안 형, OQ-U4-NFR-3 AI 초안 링크 없음, OQ-U4-NFR-4 형식 오류 토큰 404는 10월 동작. 4번 자리(U10)는 U10 제공 뒤 단다.
 
+### Step 25 전체 확인 (2026-11-06, 판본 `8ac5905`)
+
+판본: `api/u4-recipient` HEAD `8ac5905`(제품 코드는 `b289406`과 같고 그 뒤 두 커밋은 기록·문서만). 작업 트리는 감사 기록 1개만 미커밋. 이 Step에서 코드는 바꾸지 않았다. Step 23의 api 97개·Step 22의 web 860개 통과는 이전 판본(`b289406`)의 기록이고, 아래는 **이번 판본에서 다시 실행한 결과**다.
+
+**빌드·시험** (테스트 DB `catchu-db-test-u4`, 127.0.0.1:5443, tmpfs → 실행기가 마이그레이션 적용)
+
+| 항목 | 명령 | 대상 | 결과 |
+|---|---|---|---|
+| api 빌드 | `cd api && npm run build` | `tsc -p tsconfig.build.json` | 성공(exit 0) |
+| api 시험(지침 「제출 3(전체)」) | `cd api && TEST_DB_PORT=5443 npm test -- <12개 파일>` | `test/catches/author-description-api`, `test/materials/text-materials-api`, `test/publications/in-memory-publication-access`·`publication-access-db`·`publish-api`·`publications-manage-api`·`publications-logging`·`publications-module`·`recipient-api`·`recipient-unlock-policy`·`app-routes`, `test/db/member-cascade-delete` | **97개 통과·0 실패·0 건너뜀**(exit 0) |
+| web 행동 시험(지침 「제출 3(전체)」) | `cd web && node --test <5개 파일>` | `test/author-description`·`materials`·`publish`·`publications-owner`·`recipient.test.mjs` | **64개 통과·0 실패·0 건너뜀** |
+
+**U4 api 줄 커버리지(기대 80% 이상, 지침 「기대 커버리지」: `dist/publications`·`dist/materials`·설명 API)**
+
+1. 지침의 기본 명령 그대로: `cd api && TEST_DB_PORT=5443 npm run test:coverage -- test/publications/publication-access-db.test.cjs test/publications/publish-api.test.cjs test/publications/publications-manage-api.test.cjs test/publications/recipient-api.test.cjs` → 34개 통과. 표는 `dist/**` 전체(맨 아래 all files 64.33%는 저장소 전체 값이라 U4 판정에 쓰지 않음)이고 파일별 백분율만 준다. 이 4개 파일은 설명 API·텍스트 자료 시험을 포함하지 않아 `author-description-store.js` 82.29%·`text-materials.controller.js` 91.00% 등 설명·자료 파일이 받은 사람·발행 시험이 지나간 만큼만 덮인다. 그래서 **기본 명령만으로는 범위 전체를 확인할 수 없다**(지침 설명 "위 api 파일 목록과 같음"과 실제 명령의 4개 파일이 어긋나는 점은 지침 쪽 불일치로 남긴다).
+2. 추가 측정(같은 팀 표준 도구에 제출 3 시험 12개를 지정): `cd api && TEST_DB_PORT=5443 NODE_OPTIONS='--test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=<파일>' npm run test:coverage -- <위 12개 파일>` → 97개 통과. lcov에서 평가 범위의 줄 수를 합산했다(`TEST_COVERAGE_INCLUDE`에 중괄호 glob은 이 Node에서 아무 파일도 잡지 않아 기본 `dist/**`로 재고 범위는 lcov에서 걸렀다. 도구·CI·기준값은 바꾸지 않았다).
+
+| 범위 | 파일 수(dist) | lcov에 없는 파일 | 실행 줄 / 대상 줄 | 줄 % |
+|---|---|---|---|---|
+| `dist/publications/**` | 16 | 없음 | 1,623 / 1,645 | 98.66 |
+| `dist/materials/**` | 5 | 없음 | 446 / 451 | 98.89 |
+| `dist/catches/*author-description*` | 3 | 없음 | 189 / 193 | 97.93 |
+| **U4 평가 범위 합계** | 24 | 없음 | **2,258 / 2,289** | **98.65%** ≥ 80 |
+
+파일별(실행/대상): `db-publication-access` 181/195(92.82, 가장 낮음 — 비활성·회원 없음 분기의 일부 보조 줄과 PDF 쪽 읽기), `publication-manage.service` 184/185, `publish.service` 247/248, `recipient-access.service` 219/220, `recipient-links.controller` 68/69, `publications.controller` 102/103, `publications.module` 71/72, `publication.entity` 138/139, `publications-log` 39/40, `publish-input` 173/173, `snapshot-builder` 43/43, `published-snapshot` 6/6, `publication-state` 15/15, `publications-config` 32/32, `publication-access` 31/31, `in-memory-publication-access` 74/74; `text-material-store` 145/146, `text-material-input` 117/118, `text-materials.controller` 99/100, `text-material.entity` 63/64, `materials.module` 22/23; `author-description-store` 93/96, `author-description.controller` 62/63, `author-description-input` 34/34. 기록 파일: 스크래치 `step25/u4.lcov`·`coverage-u4-12files.log`, 기본 명령 로그 `record/step25-coverage-default.log`.
+
+**FR19.2 확인 표 (U4 제출 3, 2026-11-06, 판본 `8ac5905`)** — 구분: [자동] 이번 실행한 자동 시험(테스트 DB 5443), [브라우저] Step 23의 실제 로컬 api·DB 브라우저 확인(판본 `b289406`, 코드 동일), [대역] 시험 대역, [미실행]
+
+| ID | 시나리오 | 기대 동작 | 시험명·근거 | 환경·판본 | 결과 |
+|---|---|---|---|---|---|
+| S1 | 설명 저장·두 탭 저장·공백 저장·4,001자 | 마지막 저장이 남음, 공백은 NULL, 초과 400 | `catches/author-description-api.test.cjs` "S1: …" 5개 | [자동] `8ac5905` | 통과 |
+| S2 | 재분석으로 같은 작업 반영 | 설명 유지, 새 작업 Catch는 NULL | 같은 파일 "S2: …" | [자동] `8ac5905` | 통과 |
+| S3 | 텍스트 자료 CRUD와 남의 자료 접근 | 본인만, 남의 것 404 | `materials/text-materials-api.test.cjs` "S3…" 5개 | [자동] `8ac5905` | 통과 |
+| S4 | 공개 1 + 비공개 1 + 텍스트 1 발행 | 순서대로 사본 3개, 비공개 Catch PUBLIC, 조각 나누기 가짜가 같은 manager, 커밋 뒤 작업 2개 | `publications/publish-api.test.cjs` "S4: …" 2개 | [자동] `8ac5905`(U2·U3는 계약 모양 가짜) | 통과 |
+| S5 | 미확인 Catch·SOURCE_PRIVATE Catch 발행 | 409, 발행본 없음, 다른 비공개 Catch 그대로 | 같은 파일 "S5: …" | [자동] `8ac5905` | 통과 |
+| S6 | 하루 횟수 LIMIT_REACHED, chunkInTransaction 예외 | 429 또는 실패, 아무것도 남지 않음 | 같은 파일 "S6: …" | [자동] `8ac5905` | 통과 |
+| S7 | 작업 등록 ENQUEUE_FAILED | 발행 성공 응답 | 같은 파일 "S7: …" | [자동] `8ac5905` | 통과 |
+| S8 | 비밀번호 링크: grant 없음·틀림·맞음·다른 발행본 grant | 401·401·200·401 | `publications/recipient-api.test.cjs` "S8: …"; Step 23 curl·브라우저(`/s/<locked2>` 틀림→맞음→열림) | [자동] `8ac5905` + [브라우저] | 통과 |
+| S9 | 중지·만료·삭제 링크를 받은 사람이 엶 | 받은 사람은 중지·만료·삭제 모두 404. 작성자는 중지·만료된 발행본을 계속 조회할 수 있음 | `recipient-api.test.cjs` "S9: …", `publications-manage-api.test.cjs` "S9·S13: …"; Step 23 브라우저 세 화면 | [자동] `8ac5905` + [브라우저] | 통과 |
+| S10 | 발행 뒤 원본 변경·삭제 | 사본 그대로 | `publications-manage-api.test.cjs` "S10: …" | [자동] `8ac5905` | 통과 |
+| S11 | 삭제: 접두어 삭제 성공·실패 | 성공 204·연쇄 삭제, 실패 500·DB 유지 | 같은 파일 "S11: …"(실패는 가짜 `FileStorage`); Step 23 실제 api에서 저장소 미설정 500 → 설정 뒤 204 | [자동] `8ac5905` + [브라우저 환경 curl] | 통과 |
+| S12 | 남의 발행본 상세·중지·삭제 | 404 | 같은 파일 "S12: …" | [자동] `8ac5905` | 통과 |
+| S13 | 만료 링크 중지, 같은 링크 두 번 중지 | 200 `{EXPIRED, null}`, 처음 시각 유지 | 같은 파일 "S9·S13: …" | [자동] `8ac5905` | 통과 |
+| S14 | 시도 제한 뒤 맞는 비밀번호, 비밀번호 없는 링크 unlock | 429(확인 안 함), 400 | `recipient-api.test.cjs` "S14: …", `recipient-unlock-policy.test.cjs`; Step 23 curl(10번 틀린 뒤 429 `Retry-After: 900`, 400 `INVALID_REQUEST`) | [자동] `8ac5905` + [브라우저 환경 curl] | 통과 |
+| S15 | 색인 PENDING·DONE·FAILED 목록·상세, [검색 다시 준비] | FAILED에만 버튼, 202 PENDING | C-09 합의 전(OQ-U4-5) | — | **[미실행]** 계획대로 |
+| — | 작성자 회원 행 없음 500·비노출(S9 보호 흐름 보강) | 500 고정 본문, SQL·토큰 비노출 | `recipient-api.test.cjs` "[NFR-6 결정] … 회원 행이 없으면" | [대역] `readOwnerState` 대역 | 통과(실제 DB 재현 없음) |
+| — | 요청 도중 중지·삭제·비활성 타이밍(R-04) | 그 요청 200·다음 404 | `recipient-api.test.cjs` "R-04: …" | [자동] `8ac5905`; 브라우저 수동 재현 [미실행] | 통과 |
+| — | U5 질문 스트림 도중 발행본 삭제 | 스트림 완주·다음 404·횟수 소모(코드상 예상) | Step 23 기록 | [미실행] 실제 색인·LLM 환경 없음 | 미실행 유지 |
+
+**판정**: api 빌드·지정 시험(api 97·web 64)·U4 줄 커버리지 98.65%(≥80)·FR19.2 표(S1~S14 근거 있음, S15 미실행)가 갖춰져 Step 25를 완료로 표시한다. 남는 것은 U4 범위 밖이거나 결정 대기다: S15(OQ-U4-5), U5 스트림 도중 삭제(실제 색인·LLM 환경), 작성자 회원 행 없음의 실제 DB 재현(불가), R-04 브라우저 수동 재현(불가), 지침 「커버리지」 명령의 파일 목록 불일치(지침 문서 수정은 별도).
+
+
 ## 제출 2 (2026-11-03) — C-10 DB 구현·W3 발행·W5 작성자 관리
 
 판본: 통합 브랜치 `a0d5676`(#461·#466 병합 뒤)을 merge commit `19572db`로 반영한 작업 트리. Step 9 시작 조건(U2 `AiRun`·`DailyRunLimit`·`AiConsentGate`·`FILE_STORAGE`, U3 `PUBLISHED_INDEX_WRITER`)을 확인했다.
