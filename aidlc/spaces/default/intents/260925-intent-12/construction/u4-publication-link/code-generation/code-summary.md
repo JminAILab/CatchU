@@ -115,7 +115,7 @@ OQ-U4-NFR-6 결정의 C-10 문구 반영을 [PR #478](https://github.com/JminAIL
 - 시험: `recipient.test.mjs` 32개(자리 2·3에 패널 하나씩, `autofocus` 없음, G5·G6 검사는 U2·U5 영역을 뺀 U4 영역만), web 전체 860개 통과, `tsc`·`next build`·바꾼 파일 eslint 통과.
 - 브라우저(대역 API, `document.activeElement`): `/s/open` 첫 진입 `H1#recipient-title`, `/s/locked` 첫 진입 `H1#recipient-password`(입력칸 `autofocus` 없음, Tab 한 번에 `INPUT type=password`), `/s/gone` 첫 진입 `H1#recipient-unavailable`, 비밀번호 해제 뒤 `H1#recipient-title`(패널 2개·요약 항목 4개 표시). 요약 패널 근거 단추: 「자기소개」→ `LI#published-item-item-text-1`로 초점·스크롤, `data-highlighted`, `<mark>` 1개(대역이 준 5자 범위 "두 번째 "); 「결제 모듈 리팩터링」→ `item-catch-1`, `<mark>`「결제 재시도 로직」; 사본에 없는 범위(`workFacts[3]`) → `item-catch-2`로 이동만, `<mark>` 0개. 접근 상실: `/s/lost`(요약 GET 404) → 「이 링크는 열람할 수 없습니다」·패널 0·초점 `H1#recipient-unavailable`; `/s/lostq`(질문 POST 401) → 비밀번호 화면·패널 0·초점 `H1#recipient-password`, 그 링크 grant 없음.
 
-**남은 것(제출 3)**: Step 23 web 부분은 위대로 앞당겼고 api 부분은 Step 20·21과 함께 끝났으므로, Step 23에서는 실제 api·DB로 받은 사람 판정의 브라우저 확인(#416 결정 3)과 커버리지를 본다. Step 24(문서: `web/src/features/recipient/README.md`, `api/docs/publications.md` 받은 사람 경로, `api/docs/share-links.md` 대체 안내, PR 「리뷰 요청」에 D27 문구·G5~G7·보류 범위), Step 25(전체 확인·S15 미실행 기록). U10 패널을 4번 자리에 붙이는 것은 U10 제공 뒤다(D28).
+**남은 것(제출 3)**: Step 23 web 부분은 위대로 앞당겼고 api 부분은 Step 20·21과 함께 끝났으므로, Step 23에서는 실제 api·DB로 받은 사람 판정의 브라우저 확인(#416 결정 3)을 하고, 커버리지는 Step 25에서 잰다. Step 24(문서: `web/src/features/recipient/README.md`, `api/docs/publications.md` 받은 사람 경로, `api/docs/share-links.md` 대체 안내, PR 「리뷰 요청」에 D27 문구·G5~G7·보류 범위), Step 25(전체 확인·S15 미실행 기록). U10 패널을 4번 자리에 붙이는 것은 U10 제공 뒤다(D28).
 
 
 ### Step 23 받은 사람 경로·화면 검증 (2026-11-06, 실제 로컬 api·DB)
@@ -141,15 +141,15 @@ OQ-U4-NFR-6 결정의 C-10 문구 반영을 [PR #478](https://github.com/JminAIL
 | 정상 열람 화면 | [api·DB] 브라우저 `/s/<open>` | 첫 진입 초점 h1, 0~4 자리 순서, 사본 2개(position 순), 본문 `<b>` 글자, GitHub 주소만 링크 | 초점 `H1#recipient-title`, 안내 1개, 「발행 시각 2026-11-06 10:06:09 (KST)」, 링크 1개(github.com)·`evil.example` 글자, 요약 항목 4개·질문 패널 |
 | 비밀번호 화면·해제·새로 고침 | [api·DB] 브라우저 `/s/<locked2>` | 첫 진입 초점 h1(autoFocus 없음) → 틀림 안내 → 맞으면 전환·초점 h1·grant는 sessionStorage만 → 새로 고침 뒤 비밀번호 없이 열림 | 모두 그대로(「비밀번호가 맞지 않습니다.」 뒤 입력 비움, 해제 뒤 `H1#recipient-title`, 주소에 grant 없음) |
 | 판정 통과 뒤 중지: 진행 중 요청 유지, 다음 요청 404 | [api·DB] 브라우저+curl: flip 화면을 연 뒤 작성자 `PUT …/stop` 200 | 열린 화면은 그대로, 다음 요청 404 | 중지 커밋 직후 화면은 ready 유지, 받은 사람 GET 404, 질문 POST 404 → `onAccessLost` → 「이 링크는 열람할 수 없습니다.」 |
-| 판정 통과 뒤 같은 요청 안의 중지·삭제·작성자 비활성(사본 읽기 전 커밋) | [api·DB] `recipient-api.test.cjs` R-04 자동 시험(이번 실행, 테스트 DB 5443; 사본 읽기 직전에 DB를 고치는 훅으로 타이밍을 만듦) | 그 요청은 판정 시점 사본 200, 다음 요청 404; READ ONLY REPEATABLE READ 한 트랜잭션 | 통과. 브라우저로는 요청 안의 타이밍을 만들 수 없어 수동 재현은 하지 않음 |
+| 판정 통과 뒤 같은 요청 안의 중지·삭제·작성자 비활성(사본 읽기 전 커밋) | [api·DB] `recipient-api.test.cjs` R-04 자동 시험(이번 실행, 테스트 DB 5443; 사본 읽기 직전에 DB를 고치는 훅으로 타이밍을 만듦) | 그 요청은 판정 시점 사본 200, 다음 요청 404; READ ONLY REPEATABLE READ 한 트랜잭션 | **실제 DB 자동 시험 통과.** 요청 도중 상태가 바뀌는 타이밍의 브라우저 수동 재현은 [미실행](브라우저로는 만들 수 없음) |
 | 이미 비활성인 작성자의 링크 GET·unlock(비밀번호 링크) | [api·DB] curl + 브라우저 | 둘 다 404, 비밀번호 입력 화면이 아님 | 404·404; 브라우저는 불가 화면(`passwordInput: false`) |
-| 작성자 회원 행 없음 → 500 고정 본문, 응답·로그에 SQL·내부 메시지·토큰 없음 | [대역] `recipient-api.test.cjs` NFR-6(`readOwnerState`를 `NO_MEMBER`·`57014` 예외로 바꿈, 이번 실행에 포함) | 500 `INTERNAL_ERROR` `{code,message}`만, 로그에 marker·SELECT 없음 | 통과. 실제 DB는 외래 키 때문에 만들 수 없다 |
+| 작성자 회원 행 없음 → 500 고정 본문, 응답·로그에 SQL·내부 메시지·토큰 없음 | [대역] `recipient-api.test.cjs` NFR-6(`readOwnerState`를 `NO_MEMBER`·`57014` 예외로 바꿈, 이번 실행에 포함) | 500 `INTERNAL_ERROR` `{code,message}`만, 로그에 marker·SELECT 없음 | **시험 대역으로 통과.** 실제 DB는 외래 키 때문에 만들 수 없어 실제 DB 재현은 없다 |
 | U5 요약 패널 근거 선택 → 이동·강조 | [api·DB] 브라우저(요약 행은 DB 직접 삽입) | 항목으로 초점·스크롤, 범위 `<mark>`; 사본에 없는 경로는 항목만 | 「두 번째 자료」→ `LI#published-item-<id>` 초점·`data-highlighted`·`<mark>`「두 번째 자료의 본」(charEnd 10); 「없는 경로」→ 이동만, mark 0 |
 | U5 패널 401 → U4 비밀번호 화면 | [api·DB] 브라우저: api 재기동으로 임시 grant 키 교체 뒤 질문 POST | onAccessLost(401) → 비밀번호 화면, 다시 입력 안내, 그 링크 grant 삭제 | 그대로(「비밀번호를 다시 입력해 주세요.」, 초점 `H1#recipient-password`, sessionStorage에서 그 링크 키만 사라짐) |
 | U5 패널 404 → U4 불가 화면 | [api·DB] 위 flip 행 | onAccessLost(404) → 불가 화면 | 그대로 |
 | U5 요약 GET 401·404 | [api·DB] curl | locked grant 없음 401, stopped 404 | 401 `LINK_PASSWORD_REQUIRED`, 404 `LINK_UNAVAILABLE` |
 | U5 질문 POST(색인 없음) | [api·DB] 브라우저 | 패널 안내만, U4 전환 없음 | 409 `INDEX_NOT_READY` → 「질의응답을 아직 쓸 수 없습니다」, U4는 ready 유지 |
-| U5 질문: 판정 통과 뒤 저장 중 발행본 삭제 확인 → 저장·차감 롤백과 404 | [기록] 코드 읽기 + U5 기존 시험 | NFR-5 결정 A("삭제로 확인된 경우에만" 그 요청의 저장·차감을 되돌리고 404) | **코드상 확인한 것**: 질문 경로(`qna.controller.ts` → `qna-service.ts`)는 `resolveForRecipient` → Redis 횟수 `count` → 다시 쓰기·검색·생성이며, 발행본을 참조하는 DB 쓰기와 `readSnapshot` 호출이 없다. 그래서 "삭제로 확인되는" 지점(NotFound·23503)이 없고, 23503 처리는 기본 요약 처리기(`base-summary-handler.ts`, worker 쪽)에만 있다. **기존 시험 근거**: `qna-controller.test.cjs` 99행(스트림 전 거부는 횟수를 세지 않음), U5 기능 명세 168행(「대화 중 링크 중지·만료·삭제 → 다음 질문 404」). 둘 다 "스트림 도중 삭제"는 다루지 않는다. **코드상 예상(미실행)**: 질문 스트림 도중 `DELETE /publications/{id}`가 커밋되면 그 스트림은 끝까지 가고, 다음 질문은 404이며, 그날 횟수 1은 소모된 채 남는다. 이는 U5 결함이 아니라(결정의 "확인된 경우"가 아님) U5 담당에게 전달할 사항이다 |
+| U5 질문: 판정 통과 뒤 저장 중 발행본 삭제 확인 → 저장·차감 롤백과 404 | [미실행] 실제 색인·LLM 환경에서 돌리지 않음. 근거는 코드 읽기 + U5 기존 시험뿐 | NFR-5 결정 A("삭제로 확인된 경우에만" 그 요청의 저장·차감을 되돌리고 404) | **직접 관찰한 것: 없음.** **코드상 확인한 것**: 질문 경로(`qna.controller.ts` → `qna-service.ts`)는 `resolveForRecipient` → Redis 횟수 `count` → 다시 쓰기·검색·생성이며, 발행본을 참조하는 DB 쓰기와 `readSnapshot` 호출이 없다. 그래서 "삭제로 확인되는" 지점(NotFound·23503)이 없고, 23503 처리는 기본 요약 처리기(`base-summary-handler.ts`, worker 쪽)에만 있다. **기존 시험 근거**: `qna-controller.test.cjs` 99행(스트림 전 거부는 횟수를 세지 않음), U5 기능 명세 168행(「대화 중 링크 중지·만료·삭제 → 다음 질문 404」). 둘 다 "스트림 도중 삭제"는 다루지 않는다. **코드상 예상(미실행)**: 질문 스트림 도중 `DELETE /publications/{id}`가 커밋되면 그 스트림은 끝까지 가고, 다음 질문은 404이며, 그날 횟수 1은 소모된 채 남는다. 이는 U5 결함이 아니라(결정의 "확인된 경우"가 아님) U5 담당에게 전달할 사항이다 |
 | 위 "스트림 도중 삭제" 실제 재현 | [미실행] | 스트림 완주·다음 질문 404·횟수 1 소모 | 색인·LLM이 없어 질문 스트림이 열리지 않는다(이번 환경은 409 `INDEX_NOT_READY`). 재현 조건: 색인 READY 발행본에서 질문 스트림을 연 뒤 작성자 `DELETE`, 이어서 같은 링크에 질문 |
 | 작성자 발행본 삭제 API 500 | [api·DB] 1차 시드 | 삭제 204 | `FILE_STORAGE_*` 미설정 환경에서 `PREFIX_DELETE_FAILED` → 500·DB 유지(S11 설계대로, `docs/file-storage.md`). 설정 뒤 204. U4 결함 아님, 로컬 환경 안내 사항 |
 
@@ -157,6 +157,27 @@ OQ-U4-NFR-6 결정의 C-10 문구 반영을 [PR #478](https://github.com/JminAIL
 
 **남은 검증**: 커버리지(Step 25 명령), S15 미실행 기록(Step 25), 실제 색인·LLM이 있는 환경의 U5 질문 스트림(U5 몫), 기존 개발 DB `catchu-db-u4-dev` 마이그레이션 실패 원인(이번 범위 밖). 브라우저 확인에 쓴 `api/.env`·`web/.env.local`(gitignore)·컨테이너 `catchu-db-u4-step23`(tmpfs, 멈추면 자료 소멸)는 남겨 두었다.
 
+
+### PR 「리뷰 요청」 초안 (Step 24, 제출 3 PR 본문에 옮겨 적는다)
+
+리뷰 요청(확인용 — 재결정이 필요한 항목은 없다):
+
+1. **U4 고정 안내(BR7.1) 축소 문구(U4가 정함)** — [#416 팀장 답변(2026-10-29)](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6485884167)은 "겹치는 부분은 U4 쪽을 발행 시각 표시 위주로 줄이고 문구는 U4에서 정한다"고 했다. U4는 판정 통과 화면의 0번 안내 묶음 아래 한 줄 **「발행 시각 YYYY-MM-DD HH:mm:ss (KST)」**(`recipient-format.ts` `publishedAtText`, 작성자 발행본 상세와 같은 `formatKst`)로 정했다. 이유: U2 `fixed-copy`가 고정 발행본 설명을 맡으므로 그 설명과 겹치는 문장을 두지 않고 발행 시각만 남겨 중복을 줄이기 위해서다(D27). 만료 시각·링크 조건도 넣지 않았다. 바꾸려면 이 함수 한 곳만 고치면 된다.
+2. **G5·G6 검토 결과(문구 검토)** — 판정 통과 화면에서 "발행 당시 자료로 고정했고 원본 변경이 반영되지 않는다"는 설명은 U2 `fixed-copy` 한 줄뿐이다. U4 영역(h1·고정 안내·1번 자료·4번 빈 자리)에는 링크 기간·중지(U2 `link-conditions`), 외부 AI 전송 고지(U5 `AiNoticeLine`은 3번 자리 질의응답 패널 안에만), JD 로그인 안내(U10, 미제공)와 같은 뜻의 문장이 없다. `test/recipient.test.mjs`의 G5·G6 사례가 U2·U5 영역을 뺀 U4 영역에 `RECIPIENT_GUIDE_ITEMS` 문장과 "고정한"·"반영되지 않"·"중지하면"·"로그인"·"외부 AI"·"전송"이 없음을 기계적으로 본다. 최종 판단은 팀장 몫이다.
+3. **G7 검토 결과(U2 문구 대조) — 일치** — [#416 팀장 답변 원문(2026-10-29)](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6485884167)과 #423 병합본의 `web/src/components/recipient-guide/recipient-guide-items.ts`를 2026-11-06에 직접 대조했다. `link-conditions`: 결정 「이 링크는 정해진 기간 동안만 열리고, 작성자가 중지하면 더 볼 수 없습니다.」 = 코드 문장 전체, **일치**. `base-summary`: 결정이 교체 대상으로 지정한 둘째 문장 「근거를 누르면 발행본 자료 안의 해당 위치를 보여 줍니다.」 = 코드의 둘째 문장(첫 문장 「기본 요약은 이 자료로 AI가 만든 요약입니다.」는 교체 대상이 아님), **일치**. U4가 고칠 것도 U2에 알릴 것도 없다.
+
+**미실행으로 남은 항목**(코드상 예상만 있고 실제로 돌리지 않음):
+
+| 항목 | 상태 | 재현 조건 |
+|---|---|---|
+| U5 질문 스트림 도중 발행본 삭제 → 스트림 완주·다음 질문 404·그날 횟수 1 소모 | [미실행] 실제 색인·LLM 환경에서 돌리지 않음(이번 환경은 409 `INDEX_NOT_READY`). 위 결과는 코드상 예상이며 직접 관찰한 것이 아님 | 색인 READY 발행본에서 질문 스트림을 연 뒤 작성자 `DELETE /v1/publications/{id}`, 이어서 같은 링크에 질문. U5 결함이 아니라 U5 담당 전달 사항(질문 경로에는 되돌릴 저장이 없음) |
+| 요청 안의 중지·삭제·비활성 타이밍(R-04) | 실제 DB 자동 시험(`recipient-api.test.cjs` R-04) **통과**. 브라우저 수동 재현은 [미실행] | 브라우저로는 요청 도중의 타이밍을 만들 수 없음 |
+| 작성자 회원 행 없음 500·정보 비노출 | 시험 대역(`readOwnerState` 대역, NFR-6 사례)으로 **통과**. 실제 DB 재현은 없음 | 실제 DB는 외래 키로 만들 수 없음 |
+| 실제 색인·LLM 환경의 요약·질의응답 내용 | [미실행] U5 몫 | — |
+| S15(색인 상태·[검색 다시 준비]) | [미실행] 계획대로 C-09 합의 뒤(OQ-U4-5) | Step 25에서 미실행으로 기록 |
+| 커버리지 80% | Step 25에서 측정 예정 | `npm run test:coverage -- …`(unit-test-instructions) |
+
+**보류 범위**(계획 「보류 범위와 미결」 그대로): OQ-U4-2·OQ-U4-4 임시값, OQ-U4-3 `share_link` 표·엔티티 유지, OQ-U4-5 `indexState`·reindex 없음(U4 완료로 보고하지 않음), OQ-U4-7 `RecipientSlotProps`는 화면 안 형, OQ-U4-NFR-3 AI 초안 링크 없음, OQ-U4-NFR-4 형식 오류 토큰 404는 10월 동작. 4번 자리(U10)는 U10 제공 뒤 단다.
 
 ## 제출 2 (2026-11-03) — C-10 DB 구현·W3 발행·W5 작성자 관리
 

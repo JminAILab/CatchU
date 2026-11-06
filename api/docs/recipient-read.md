@@ -1,4 +1,6 @@
-# 비로그인 수신자 조회 — #151
+# 비로그인 수신자 조회 — #151 (10월 기록, 12월 U4 제출 3에서 대체됨)
+
+> **현재 상태(2026-11-06, #416):** 이 문서의 `GET /v1/public/links/{token}`(공개 프로필·Catch 목록)·`GET …/catches/{catchId}`와 `RecipientModule`·`LinkAccessService.assertReadable`·`withLinkSnapshot`은 **없다**. 같은 경로 `GET /v1/public/links/{token}`은 이제 발행본 사본(C-10 `PublishedSnapshot`)을 돌려주고 Catch 상세 경로는 없다. 판정 순서(링크 → 작성자 상태 → grant)와 같은 시점 판정의 뜻은 이어받았으며 현행 설명은 [발행 문서 「받은 사람 열람·비밀번호 통과 API」](publications.md#받은-사람-열람비밀번호-통과-api-제출-3)다. 아래는 10월 기록으로 남긴다.
 
 수신자가 공유 링크로 구직자의 공개 프로필과 공개 Catch를 읽는 경로다. 계약은 [수신자 API](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/recipient-api.yaml)의 `getPublicCollection`·`getPublicCatch`, [공통 스키마](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml)의 `PublicProfile`·`PublicCatch`·`PageInfo`, [계약 요약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md) 「P — 수신자 API」의 소유 회원 판정을 따른다.
 

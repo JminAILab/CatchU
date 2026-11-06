@@ -1,26 +1,47 @@
-# 공유 링크 발급(#147)·목록·중단(#148)·수신자 비밀번호 확인(#150)
+# 공유 링크(10월 #147·#148·#150) — 12월 U4 제출 3(W6)으로 대체됨
+
+> **현재 상태(2026-11-06, #416 U4 제출 3):** 10월 공유 링크 발급 `POST /v1/share-links`·목록 `GET /v1/share-links`·중단 `PUT /v1/share-links/{linkId}/stop`과 수신자 조회(#151)는 **없다**. `ShareLinksModule`·`RecipientModule`과 `share-links.controller/service`·`public-links.controller`·`link-access.service`·`share-create*`·`share-link-issuance/list/response/state`·`issue-rate-limit`은 지웠고, 받은 사람 열람·비밀번호 통과는 `PublicationsModule`의 `GET /v1/public/links/{token}`·`POST /v1/public/links/{token}/unlock`이 발행본(`publication`) 기준으로 맡는다([발행 문서 「받은 사람 열람·비밀번호 통과 API」](publications.md#받은-사람-열람비밀번호-통과-api-제출-3)). 발급·관리는 [발행 API·작성자 발행본 관리 API](publications.md)다.
+>
+> 아래 「발급 처리 순서」·「목록·중단」·「검사」의 발급·목록·중단·10월 수신자 조회 부분은 **10월 기록**이며 지금 코드와 맞지 않는다. 「수신자 비밀번호 확인·접근 판정」의 unlock 판정 순서(1~10단계)·제한값·grant 규칙은 발행본 경로가 그대로 쓰므로 현행이다(링크 단위 키만 `publicationId`). 수동 확인 도구 `scripts/verify-share-links-browser.cjs`·`verify-sharing-screen-browser.cjs`는 지운 경로를 부르므로 동작하지 않는다.
+
+## 남은 도구 (`src/share-links/`, U4·U5·U9가 가져다 씀)
+
+| 파일 | 내용 | 쓰는 곳 |
+|---|---|---|
+| `link-token.ts` | 256비트 난수 토큰(base64url 43자)·형식 검사·받은 사람 URL(`/s/<token>`) 조립 | 발행, 받은 사람 판정 |
+| `link-password.ts` | 비밀번호 검증값(scrypt N=2^15·r=8·p=3, #219), 상수 시간 비교 | 발행, unlock |
+| `link-grant.ts` | grant 서명·검증(HMAC-SHA256, `LINK_GRANT_SECRET`). `publicationId`·만료만 담고 서버에 저장하지 않는다 | C-10 판정, unlock |
+| `unlock-policy.ts`·`unlock-limiter.ts`·`link-limiter.ts`·`hash-gate.ts`·`request-rate-limiter.ts`·`client-address.ts` | unlock 시도 제한·빈도·해시 자원 상한·주소 단위(아래 「수신자 비밀번호 확인·접근 판정」) | `PublicationsModule`의 `UNLOCK_POLICY`·`UNLOCK_CONTROLS`, 발행 빈도 제한기 |
+| `share-links.config.ts` | `SHARE_LINK_WEB_BASE_URL`(발행 응답 `url`의 web 주소) | 발행 |
+| `share-link.entity.ts` | 10월 `share_link` 표의 엔티티. **표·엔티티·`member-analysis`의 `createShareLink`·`idempotent-creation.ts`는 OQ-U4-3 결정 전까지 남긴다**(발급 경로는 없어 새 행은 생기지 않는다) | 마이그레이션 기준(`test/publications/app-routes.test.cjs`가 표 존재를 확인) |
+
+단위 시험은 그대로다: `test/link-token`·`link-password`·`link-grant`·`link-limiter`·`hash-gate`·`unlock-limiter`·`request-rate-limiter`·`client-address`·`trust-proxy`·`share-links-config.test.cjs`. 10월 DB 시험(`test/db/share-link-issuance`·`share-links-api`·`share-links-key-lock`·`share-links-manage-api`·`share-links-web-integration`·`public-links-unlock*`·`public-links-client-address`, `test/recipient/*`, 두 경계 시험, `test/integration/sharing-screen-web`)은 지웠고, unlock·주소 제한 사례는 `test/publications/recipient-unlock-policy.test.cjs`로, 경계는 `app-routes.test.cjs`로 옮겼다.
+
+---
+
+## 10월 기록 — 공유 링크 발급(#147)·목록·중단(#148)·수신자 비밀번호 확인(#150)
 
 발급 UI의 병합 후 통합 검증의 실행 방법·검증 범위·판정 기준은 [#149 실행 안내](share-links-integration-149.md)를 따른다. 실행 결과는 검증한 PR에 기록한다(첫 기록: [PR #266](https://github.com/JminAILab/CatchU/pull/266)).
 
-`POST /v1/share-links`(회원 API `createShareLink`), `GET /v1/share-links`(`listShareLinks`), `PUT /v1/share-links/{linkId}/stop`(`stopShareLink`), `POST /v1/public/links/{token}/unlock`(수신자 API `unlockLink`)과 ShareLink 테이블이다. 코드는 `src/share-links/`에 있다.
+(10월 기록) `POST /v1/share-links`(회원 API `createShareLink`), `GET /v1/share-links`(`listShareLinks`), `PUT /v1/share-links/{linkId}/stop`(`stopShareLink`), `POST /v1/public/links/{token}/unlock`(수신자 API `unlockLink`)과 ShareLink 테이블이었다. 아래 파일 표에서 **삭제** 표시는 W6에서 지운 파일이다.
 
 | 파일 | 내용 |
 |---|---|
-| `share-links.controller.ts`·`share-links.service.ts`·`share-links.module.ts` | 발급(신규 201, 같은 키·같은 본문 재요청 200)·목록·중단 API. 응답은 회원 API `ShareLink` |
-| `share-link-list.ts` | 목록 쿼리(`cursor`·`limit`) 검사와 소유자에 묶인 cursor |
+| (삭제) `share-links.controller.ts`·`share-links.service.ts`·`share-links.module.ts` | 발급(신규 201, 같은 키·같은 본문 재요청 200)·목록·중단 API. 응답은 회원 API `ShareLink` |
+| (삭제) `share-link-list.ts` | 목록 쿼리(`cursor`·`limit`) 검사와 소유자에 묶인 cursor |
 | `share-links.config.ts` | `SHARE_LINK_WEB_BASE_URL`([api README 「설치와 환경변수」](../README.md#설치와-환경변수)) |
-| `share-link-response.ts` | 응답 구성. 상태는 응답 시각으로 구하고, 토큰은 `url` 안에만 넣는다 |
-| `share-create.ts` | `ShareCreate` 입력 검증(제목만 trim, 제목 1~50자·비밀번호 8~64자를 코드 포인트로 셈), 발급 시각부터 정확히 30×24시간 만료 |
+| (삭제) `share-link-response.ts` | 응답 구성. 상태는 응답 시각으로 구하고, 토큰은 `url` 안에만 넣는다 |
+| (삭제) `share-create.ts` | `ShareCreate` 입력 검증(제목만 trim, 제목 1~50자·비밀번호 8~64자를 코드 포인트로 셈), 발급 시각부터 정확히 30×24시간 만료 |
 | `link-password.ts` | 비밀번호 검증값. Node 내장 `scrypt`(N=2^15, r=8, p=3 — OWASP 권고 조합, #219), 16바이트 salt, 상수 시간 비교. 매개변수를 값에 함께 저장해 이전 값(p=1)도 검증한다. 비밀번호는 trim·정규화하지 않는다. 깨진 저장값은 서버 오류 |
 | `link-token.ts` | 256비트 난수 토큰(base64url 43자)과 수신자 URL(`/s/<token>`) 조립 |
-| `share-create-fingerprint.ts` | 멱등 지문(제목 + 비밀번호 **설정 여부**)과 같은 키 재요청 비교 |
+| (삭제) `share-create-fingerprint.ts` | 멱등 지문(제목 + 비밀번호 **설정 여부**)과 같은 키 재요청 비교 |
 | `share-link.entity.ts` | ShareLink 엔티티. 상태 칼럼 없음 |
-| `share-link-state.ts` | 상태 ACTIVE·STOPPED·EXPIRED. 중단이 만료보다 우선(#148 9/29 결정). #148도 이 함수를 쓴다 |
-| `share-link-issuance.ts` | 발급 판정·저장 `issueShareLink(manager, command)` |
+| (삭제) `share-link-state.ts` | 상태 ACTIVE·STOPPED·EXPIRED. 중단이 만료보다 우선(#148 9/29 결정). #148도 이 함수를 쓴다 |
+| (삭제) `share-link-issuance.ts` | 발급 판정·저장 `issueShareLink(manager, command)` |
 | `request-rate-limiter.ts` | 요청 빈도 상한(미끄러지는 창, 프로세스 메모리). 발급과 unlock이 함께 쓴다(#219) |
-| `issue-rate-limit.ts` | 회원별 발급 빈도 정책값 `PRODUCT_ISSUE_RATE_LIMIT`(1분 10회) |
+| (삭제) `issue-rate-limit.ts` | 회원별 발급 빈도 정책값 `PRODUCT_ISSUE_RATE_LIMIT`(1분 10회) |
 
-## 발급 처리 순서
+## 발급 처리 순서 (10월 기록, 경로 없음)
 
 1. 회원 인증(Guard) 다음, 같은 회원의 발급 요청이 최근 1분에 10번을 넘으면 입력 검사·비밀번호 해시·저장 없이 `429 RATE_LIMITED`와 `Retry-After`(창 안 가장 오래된 요청이 빠질 때까지 남은 초)로 거부한다(#219, 컨트롤러). 아래 2의 입력 오류(400)·같은 키 재요청·한도 거절(409)도 센다. 거부한 요청은 세지 않고 링크·멱등 기록도 남기지 않아 같은 키로 다시 보낼 수 있다. 429는 요청을 처리하지 않은 것이라 앞선 같은 키 요청의 결과를 알려 주지 않는다. 응답을 모르던 요청이면 클라이언트는 키를 유지하고 `Retry-After` 뒤 같은 키·같은 본문으로 다시 보낸다(계약 #235). 같은 키 재요청도 비밀번호를 해시로 비교하므로 빈도에서 빼지 않는다. 이 판정이 서비스의 회원 ID 형식 검사(아래 2)보다 먼저라, UUID가 아닌 개발 토큰도 상한을 넘으면 429다.
 2. 토큰의 회원 ID가 UUID가 아니면(#104 이전 개발 토큰) `401 AUTH_INVALID`. `Idempotency-Key` 헤더가 없으면 `400 INVALID_REQUEST`(키 길이는 아래 4에서 검사), 본문이 계약과 다르면 `400 VALIDATION_FAILED`(`details.violations`의 reason은 `isObject`·`whitelistValidation`·`isString`·`isNotEmpty`·`minLength`·`maxLength`). 길이는 아래 「비밀번호 길이」의 기준이며, trim 뒤 51자 이상 제목은 `title`의 `maxLength`, 8자 미만·64자 초과 비밀번호는 `password`의 `minLength`·`maxLength`다(#221). 빈 비밀번호는 지금처럼 `isNotEmpty`다. 알 수 없는 필드 이름은 응답에 반사하지 않고 `body` 한 건으로 알린다.
@@ -33,7 +54,7 @@
    - 비밀번호 없는 재요청은 비교 대기가 없어 트랜잭션 안에서 구성한 응답을 그대로 돌려준다(커밋 직후라 다른 조회 API와 같은 수준이다).
 5. 신규 발급은 응답 구성까지 같은 트랜잭션이다. 거절·실패하면 링크와 멱등 기록이 함께 롤백되어 같은 키를 다시 쓸 수 있다. 재요청은 쓰기가 없어 롤백할 것이 없고 기존 기록이 그대로 남는다.
 
-## 목록·중단 — #148
+## 목록·중단 — #148 (10월 기록, 경로 없음)
 
 - **목록** `GET /v1/share-links`: 본인 링크만 발행 시각 최신순, 같은 시각이면 `linkId` 역순이다. `limit`은 1~100(기본 20), `page.nextCursor`는 마지막 페이지에서 null. 0개는 `items: []`인 정상 응답이다. 상태는 응답 시각으로 구한다.
   - 쿼리는 `cursor`·`limit`만 받는다. 다른 이름, 같은 이름 반복, 범위 밖 `limit`, 고치거나 다른 회원의 `cursor`는 `400 VALIDATION_FAILED`(reason `whitelistValidation`·`isInt`·`min`·`max`·`isCursor`)이며 입력값을 담지 않는다.
@@ -51,7 +72,7 @@
 - 중단은 링크 행을 `FOR UPDATE`로 잠가 동시 중단도 같은 `stoppedAt` 하나로 모은다. `share_link` 행만 바꾸며 Catch 내용·공개 상태는 건드리지 않는다.
 - 세 API 모두 회원 UUID가 아니거나 회원 행이 없는 토큰은 `401 AUTH_INVALID`다. 이 확인은 공통 Guard가 아니라 서비스에서 하고, 트랜잭션 안에서 회원 행을 `FOR KEY SHARE`로 잡는다([#162 검토 합의](https://github.com/JminAILab/CatchU/pull/162#issuecomment-5943491118)).
 
-## 테이블
+## 테이블 (`share_link`은 OQ-U4-3 결정 전까지 유지)
 
 마이그레이션 `1790745895865-CreateShareLink`가 `share_link`와 두 외래 키를 만든다. #104(`1790500000000`) 뒤, B(`1790600000000`)와는 서로 참조하지 않는다.
 
@@ -68,12 +89,14 @@
 
 ## 수신자 비밀번호 확인·접근 판정 — #150
 
+> **현행 여부:** 아래 「unlock 판정 순서」 1~10단계·제한값·grant 규칙은 12월 U4 발행본 경로(`PublicationsModule`의 `POST /v1/public/links/{token}/unlock`)가 그대로 쓴다. 다만 판정 대상은 `share_link`가 아니라 `publication`이고 링크 단위 키는 `publicationId`이며, 1단계(최초 판정)와 8단계(해시 직전 재판정)는 `RecipientAccessService.judge`가 각각 별도 트랜잭션으로 부른다([발행 문서](publications.md#받은-사람-열람비밀번호-통과-api-제출-3)). `assertReadable`·`withLinkSnapshot`·`RecipientController`를 말하는 부분과 아래 「수신 조회 판정」 항목은 10월 기록이다.
+
 grant 형식·수명·보관·시도 제한은 [#150 9/29 결정](https://github.com/JminAILab/CatchU/issues/150#issuecomment-5883572995), 차단 응답은 #173 계약을 따른다. 회원 JWT를 쓰지 않는다. 인증 예외 `@Public()`은 클래스가 아니라 `unlock` 메서드에만 붙이며, 수신자 조회 경로(#151, 별도 `RecipientController`)도 경로마다 붙인다([보안 점검](../../docs/CatchU_security_checks.md), [수신자 조회](recipient-read.md)). `test/public-links-auth-boundary.test.cjs`가 실제 Guard로 `unlock`의 비로그인 허용과 같은 컨트롤러의 미지정 경로 인증 요구를 검사한다.
 
 | 파일 | 내용 |
 |---|---|
-| `public-links.controller.ts` | `POST /v1/public/links/{token}/unlock` |
-| `link-access.service.ts` | 링크·소유 회원 판정·unlock·수신 조회용 `assertReadable(token, grant)`와 같은 시점 판정 `withLinkSnapshot`([#151 수신자 조회](recipient-read.md)가 쓴다) |
+| (삭제) `public-links.controller.ts` | `POST /v1/public/links/{token}/unlock` |
+| (삭제) `link-access.service.ts` | 링크·소유 회원 판정·unlock·수신 조회용 `assertReadable(token, grant)`와 같은 시점 판정 `withLinkSnapshot`([#151 수신자 조회](recipient-read.md)가 쓴다) |
 | `link-grant.ts` | grant 서명·검증(HMAC-SHA256, `LINK_GRANT_SECRET`). 링크 ID·만료만 담고 서버에 저장하지 않는다 |
 | `unlock-limiter.ts` | 링크·주소 단위 시도 제한과 직렬화(프로세스 메모리) |
 | `link-limiter.ts` | 링크 전체 시도 제한과 링크별 검사 중 상한 |
@@ -119,7 +142,7 @@ grant 형식·수명·보관·시도 제한은 [#150 9/29 결정](https://github
   - 밀어낼 기록이 없으면(모두 차단·검사 중이거나 누적이 남음) 새 키·새 링크의 unlock은 검사 없이 429로 거절한다. 밀어내기로 바꿔도 용량 부족에 따른 거절이 완전히 없어지지는 않는다. 이미 기록이 있는 키·링크는 이 용량 거절을 받지 않지만, 주소·링크 차단과 전체 해시 자원 상한은 그대로 적용된다. `Retry-After`는 검사 중 자리가 있으면 1초, 없으면 가장 빨리 풀리는 기록까지다. 9/30에는 이때 새 키를 거절하는 방식을 유지하기로 했으나(PR #195 「확인받을 것」 2), 10/4 보안 의견에 따라 주소 기록은 밀어내기로 바꿨다.
 - **응답 시간:** 없음·중단·만료는 같은 조회 경로를 타고, 차단되지 않은 검증만 해시를 한 번 계산한다. 응답 시간이 같다고 보장하지 않는다. 2026-09-30 로컬 측정(직렬화 적용 판본, 각 25회 중앙값): 404 2.0ms, 400 2.1ms, 429 1.9ms, 401 94.0ms, 200 91.6ms. 해시를 계산하는 401·200만 느리고, 링크 존재 여부(404)는 비밀번호 없는 링크(400)·차단(429)과 비슷하다. 이 측정은 #151 소유 회원 판정 전 판본이다. 소유 회원 비활성의 404는 유효한 링크를 찾은 뒤 상태 조회를 한 문장 더 하므로 없음·중단·만료와 같은 경로가 아니며, 계약대로 응답 코드·본문만 같게 하고 시간은 숨기지 않는다.
 
-## 검사
+## 검사 (10월 기록 — DB 시험은 W6에서 지웠고 단위 시험만 남음)
 
 - `test/db/share-links-api.test.cjs`: 실제 앱·테스트 DB·개발 로그인 회원으로 HTTP 검증. 201·200·409(비밀번호만·제목·비밀번호 유무 차이), 제목 중복·한도·중단 제목 재사용, 동시 같은 키 5건 → 1개, 동시 다른 키 7건 → 5개, 회원별 범위, 인증·키·입력 오류, 회원 UUID가 아니거나 회원 행이 없는 토큰 401, 기록·링크 불일치 500, 비밀번호·토큰 로그 비노출.
 - `test/db/share-links-manage-api.test.cjs`: 목록·중단 HTTP 검증. 빈 목록, 본인 링크만, 최신순·동일 시각 정렬, cursor 페이지(빠짐·중복 없음), 상태 3종, 쿼리 오류, 첫·반복 중단(처음 `stoppedAt` 유지), 만료 링크 중단, 중단 뒤 만료, 타인·없는·형식 오류 ID 동일 404, 본문(객체·배열·원시값·비JSON)·쿼리 400, 동시 중단 5건, 인증 오류, 목록 조회 DB 오류 500.
