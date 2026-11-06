@@ -1,7 +1,7 @@
 // U5 RAG 응답 모듈(logical-components, 비기능 설계 Q1 「앱 등록 시점」).
 // 컨트롤러 둘(질의응답·기본 요약)과 BASE_SUMMARY 처리기 등록, 다시 쓰기·질문 횟수 자리를 조립한다.
-// C-10 PublicationAccess는 register()로 받는다. U4의 실제(DB) 구현이 통합 브랜치에 들어오기 전에는 기본 앱(AppModule)에
-// 등록하지 않고 시험만 메모리 가짜를 넣어 쓴다. 메모리 가짜는 어느 경우에도 앱에 넣지 않는다.
+// C-10 PublicationAccess는 register()로 받는다. 기본 앱(AppModule)은 U4 PublicationsModule이 내보낸 DB 구현을 넣는다.
+// 메모리 가짜는 시험에서만 쓰고 어느 경우에도 앱에 넣지 않는다.
 import {
   type DynamicModule, Inject, type InjectionToken, Module, type ModuleMetadata, type OnApplicationShutdown, type OnModuleInit,
 } from '@nestjs/common';

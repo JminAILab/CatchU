@@ -9,6 +9,7 @@ import { routes } from "@/lib/routes";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { readProfile, updateProfile, profileErrors, sameProfile, isUnprocessedSave, unprocessedSaveMessages, type Profile } from "./profile-api";
 import { ProfileFields } from "./profile-fields";
+import { emptySkillEditor, pendingSkill, pendingSkillMessage, type SkillEditor } from "./skill-editor";
 import { UNSAVED_MESSAGE, useUnsavedGuard } from "./use-unsaved-guard";
 import authStyles from "@/components/auth/auth.module.css";
 import styles from "./profile.module.css";
@@ -26,8 +27,11 @@ export function ProfileEdit() {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [skillEditor, setSkillEditor] = useState<SkillEditor>(emptySkillEditor);
   const pending = useRef<AbortController | null>(null);
-  const dirty = profile !== null && initial !== null && !sameProfile(profile, initial) && !saved;
+  // 저장본과 다른 입력에 더해, 기술 입력칸의 미확정 변경(#469)도 저장하지 않은 입력으로 본다.
+  const dirty = profile !== null && initial !== null
+    && (!sameProfile(profile, initial) || pendingSkill(profile.skills, skillEditor) !== null) && !saved;
   /** 앞선 저장 요청의 결과를 아직 모르는지. 다음 요청이 처리되지 않았을 때(연장 뒤 거부·재인증 거부·보내지 않음) 이 안내를 지우지 않는다. */
   const uncertain = useRef(false);
   useEffect(() => {
@@ -47,6 +51,9 @@ export function ProfileEdit() {
 
   async function submit() {
     if (!profile || busy || saved) return;
+    // 기술 입력칸에 반영하지 않은 변경이 있으면 저장 요청을 보내지 않고 입력을 둔 채 [추가]·[수정]을 안내한다(#469).
+    const unconfirmed = pendingSkillMessage(profile.skills, skillEditor);
+    if (unconfirmed) { setErrors([unconfirmed]); return; }
     const invalid = profileErrors(profile);
     if (invalid.length) { setErrors(invalid); return; }
     setBusy(true); setErrors([]);
@@ -89,7 +96,7 @@ export function ProfileEdit() {
     <h1 className={authStyles.title}>프로필 수정</h1>
     <p className={authStyles.lead}>서비스에 저장된 프로필을 불러왔습니다. 표시 이름만 필수입니다.</p>
     <form onSubmit={event => { event.preventDefault(); void submit(); }} noValidate>
-      <ProfileFields profile={profile} disabled={busy || saved} onChange={setProfile} />
+      <ProfileFields profile={profile} disabled={busy || saved} onChange={setProfile} skillEditor={skillEditor} onSkillEditorChange={setSkillEditor} />
       {errors.length > 0 && <div className={authStyles.error} role="alert">{errors.map(message => <p key={message}>{message}</p>)}</div>}
       <div className={styles.formActions}>
         <button className={styles.secondaryButton} type="button" disabled={busy || saved} onClick={cancel}>취소</button>

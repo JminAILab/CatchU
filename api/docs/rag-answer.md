@@ -6,9 +6,10 @@
 
 ## 앱 등록 상태와 U4 순서
 
-- **기본 앱(`AppModule`)에 아직 등록하지 않았다.** U4의 실제(DB) `PublicationAccess`(C-10)가 통합 브랜치에 없어서다(2026-10-30 확인, 메모리 가짜만 있음). 등록 전에는 U5 경로가 없고 다른 기능에 영향이 없다.
-- U4가 합쳐지면 U5 담당이 작은 PR로 `AppModule` `imports`에 `RagAnswerModule.register({ publicationAccess: …, imports: [U4 모듈] })`을 넣고 기동 시험을 더한다. 그때 U4의 발행 뒤 `BASE_SUMMARY` 등록(C-08 publish-sequence 4)은 U5 처리기 등록과 같은 때 또는 뒤에 켠다. 먼저 켜면 AiRun이 모르는 작업 종류로 실패 처리해 그 기간 발행본은 10분 뒤 `FAILED`가 되고, 작성자가 [다시 만들기]로 복구한다.
-- 메모리 `PublicationAccess`(`src/publications/in-memory-publication-access.ts`)는 시험에서만 넣고 앱에는 어느 경우에도 넣지 않는다.
+- **기본 앱(`AppModule`)에 등록했다**(#441). U4 제출 2(PR #468)가 `PublicationsModule`과 C-10 DB 구현(`DbPublicationAccess`, 토큰 `PUBLICATION_ACCESS`)을 앱에 넣은 뒤라, `AppModule` `imports`에 `RagAnswerModule.register({ imports: [PublicationsModule], publicationAccess: { useExisting: PUBLICATION_ACCESS } })`를 둔다. `PUBLICATION_ACCESS`는 `src/publications/publications.module.ts`가 내보내는 U4 토큰이고, U5 안의 같은 이름 자리(`rag-answer-tokens.ts`)와는 다른 심볼이다.
+- 순서(#416 팀장 결정 2026-11-03): U4 제출 2가 먼저 합쳐지고 이 등록이 뒤따랐다. 그 사이에 큐가 있는 환경에서 발행한 발행본은 `BASE_SUMMARY`가 모르는 작업 종류로 실패 처리되어 10분 뒤 `FAILED`이고, 작성자가 [다시 만들기]로 복구한다. 개발 서버는 큐가 없어 이 경우가 생기지 않는다(등록 뒤에도 큐가 없으면 기본 요약은 시한으로 `FAILED`, [AiRun](ai-run.md)).
+- 기동 조건은 바뀌지 않는다. 생성 키(`CATCHU_GENERATION_API_KEY`)가 없어도 api는 뜨고 다시 쓰기·게이트를 부를 때 `NOT_CONFIGURED`로 끝난다. 큐 주소(`CATCHU_QUEUE_REDIS_URL`)가 없으면 질문 횟수는 늘 통과하고, 틀리면 AiRun과 같이 기동이 멈춘다. 기동 시험은 `test/rag-answer/rag-answer-app.test.cjs`다.
+- 메모리 `PublicationAccess`(`src/publications/in-memory-publication-access.ts`)는 시험에서만 넣고 앱에는 어느 경우에도 넣지 않는다. 컨트롤러 시험(`test/rag-answer/support.cjs`)은 `AppModule`에서 U5 등록만 뺀 조립에 대역을 넣어 띄운다.
 - `base_summary` 마이그레이션(`1793348947970-CreateBaseSummaryTable`)은 등록과 관계없이 들어 있다.
 
 `RagAnswerModule.register()`가 조립하는 것: 컨트롤러 둘(`QnaController`·`SummaryController`), `QUESTION_REWRITER`(키 판정), `QUESTION_COUNTER`(Redis 주소 판정, 앱 종료 때 `close()`), `PUBLICATION_ACCESS` 자리, 모듈 초기화 때 `AiRun.registerHandler('BASE_SUMMARY', …)` 한 번. `AiGenerationModule`·`AiRunModule`·`DailyRunLimitModule`·`PublishedIndexModule`을 가져온다.
@@ -101,7 +102,7 @@ Nest `Logger('RagAnswer')`로 사건마다 객체 한 줄을 남긴다(`rag-answ
 저장소 맨 위 폴더에서 돌린다. 테스트 DB는 [README 「DB 테스트」](../README.md#db-테스트)대로 띄운다.
 
 ```bash
-npm --prefix api test -- test/rag-answer/question-input.test.cjs test/rag-answer/question-rewriter.test.cjs test/rag-answer/question-counter.test.cjs test/rag-answer/live-question-counter.test.cjs test/rag-answer/qna-controller.test.cjs test/rag-answer/summary-sources.test.cjs test/rag-answer/base-summary-handler.test.cjs test/rag-answer/summary-controller.test.cjs test/rag-answer/rag-eval.test.cjs test/db/member-cascade-delete.test.cjs test/integration/result-application-b.test.cjs
+npm --prefix api test -- test/rag-answer/question-input.test.cjs test/rag-answer/question-rewriter.test.cjs test/rag-answer/question-counter.test.cjs test/rag-answer/live-question-counter.test.cjs test/rag-answer/qna-controller.test.cjs test/rag-answer/summary-sources.test.cjs test/rag-answer/base-summary-handler.test.cjs test/rag-answer/summary-controller.test.cjs test/rag-answer/rag-answer-app.test.cjs test/rag-answer/rag-eval.test.cjs test/db/member-cascade-delete.test.cjs test/integration/result-application-b.test.cjs
 ```
 
 - 다른 Unit 자리(링크 판정·검색·게이트·AiRun·하루 제한·다시 쓰기)는 합성 대역이다(`test/rag-answer/support.cjs`). 합성으로 통과한 것은 실제 Claude·Voyage·U4 연결 성공이 아니다.

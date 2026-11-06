@@ -109,6 +109,44 @@ test('수신자 호출에는 회원 토큰을 붙이지 않고 grant만 X-Link-G
   assert.equal(calls[1].init.cache, 'no-store');
 });
 
+test('회원 PATCH는 메서드·본문·Bearer를 그대로 보낸다', async () => {
+  const { client, calls, tokens } = setup();
+  tokens.set('access-token-1');
+  await client.member('/jds/j1', { method: 'PATCH', body: { title: '백엔드' } });
+  const { url, init, headers } = calls[0];
+  assert.equal(url, `${BASE}/v1/jds/j1`);
+  assert.equal(init.method, 'PATCH');
+  assert.equal(init.body, JSON.stringify({ title: '백엔드' }));
+  assert.equal(headers.Authorization, 'Bearer access-token-1');
+  assert.equal(headers['X-Link-Grant'], undefined, '증표를 주지 않으면 붙이지 않는다');
+});
+
+test('회원 호출에 linkGrant를 주면 Bearer와 X-Link-Grant를 함께 보낸다', async () => {
+  const { client, calls, tokens } = setup();
+  tokens.set('access-token-1');
+  await client.member('/public/links/tok/jd-summaries', { method: 'POST', body: { jdId: 'j1' }, linkGrant: 'grant-1' });
+  await client.member('/public/links/tok/jd-summaries/r1', { linkGrant: 'grant-1' });
+  for (const call of calls) {
+    assert.equal(call.headers.Authorization, 'Bearer access-token-1');
+    assert.equal(call.headers['X-Link-Grant'], 'grant-1');
+    assert.equal(call.init.credentials, 'omit');
+  }
+  assert.deepEqual(calls.map((call) => call.init.method), ['POST', 'GET']);
+});
+
+test('회원 호출의 링크 401·404는 회원 토큰을 지우지 않고 code를 그대로 돌려준다', async () => {
+  const { client, tokens } = setup({ responses: [
+    Response.json({ code: 'LINK_PASSWORD_REQUIRED', message: '안내' }, { status: 401 }),
+    Response.json({ code: 'LINK_UNAVAILABLE', message: '안내' }, { status: 404 }),
+  ] });
+  tokens.set('access-token-1');
+  const password = await client.member('/public/links/tok/jd-summaries', { linkGrant: 'expired' });
+  const unavailable = await client.member('/public/links/tok/jd-summaries', { linkGrant: 'grant-1' });
+  assert.deepEqual([password.status, password.code], [401, 'LINK_PASSWORD_REQUIRED']);
+  assert.deepEqual([unavailable.status, unavailable.code], [404, 'LINK_UNAVAILABLE']);
+  assert.equal(tokens.get().token, 'access-token-1');
+});
+
 test('회원 AUTH_REQUIRED·AUTH_INVALID면 토큰을 지우고, 수신자 비밀번호 401과 다른 오류는 지우지 않는다', async () => {
   for (const code of ['AUTH_REQUIRED', 'AUTH_INVALID']) {
     const { client, tokens } = setup({ responses: [authError(code)] });
