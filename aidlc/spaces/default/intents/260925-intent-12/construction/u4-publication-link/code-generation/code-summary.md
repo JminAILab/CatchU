@@ -118,6 +118,46 @@ OQ-U4-NFR-6 결정의 C-10 문구 반영을 [PR #478](https://github.com/JminAIL
 **남은 것(제출 3)**: Step 23 web 부분은 위대로 앞당겼고 api 부분은 Step 20·21과 함께 끝났으므로, Step 23에서는 실제 api·DB로 받은 사람 판정의 브라우저 확인(#416 결정 3)과 커버리지를 본다. Step 24(문서: `web/src/features/recipient/README.md`, `api/docs/publications.md` 받은 사람 경로, `api/docs/share-links.md` 대체 안내, PR 「리뷰 요청」에 D27 문구·G5~G7·보류 범위), Step 25(전체 확인·S15 미실행 기록). U10 패널을 4번 자리에 붙이는 것은 U10 제공 뒤다(D28).
 
 
+### Step 23 받은 사람 경로·화면 검증 (2026-11-06, 실제 로컬 api·DB)
+
+판본: `api/u4-recipient` HEAD `b289406`(Step 22) + 작업 트리(감사 기록 1개만 미커밋). 이 Step에서 코드는 바꾸지 않았다(재현한 결함 없음).
+
+**기존 시험과의 대조**: 계획 Step 23의 api 항목은 Step 20·21 커밋(`58cac08`)의 `recipient-api.test.cjs`(8: 판정 순서·형식 오류 404, S8, S9, R-04 시점, S14, NFR-6 비활성 404·재활성, 회원 행 없음 500·비노출, 거부 사례·쿼리 400)·`recipient-unlock-policy.test.cjs`(29)·`app-routes.test.cjs`(4: 경로 중복 없음·두 경로가 새 컨트롤러 하나·10월 경로 없음·`@Public()` 메서드 단위·`ShareLinksModule` 미등록·`share_link` 표 유지)·`publications-module.test.cjs`에 이미 있고, web 항목(G1~G4·표지 구분·근거 링크·404·401·429·grant)은 Step 22에서 앞당긴 `recipient.test.mjs`(32)에 있다. 빠진 시나리오는 없어 새 시험을 더하지 않았다.
+
+**환경**: Docker Desktop을 켜고 테스트 DB `catchu-db-test-u4`(5443, tmpfs)로 api 시험을 돌렸다. 브라우저 확인은 새 tmpfs 개발 DB `catchu-db-u4-step23`(5445)에 마이그레이션 22개를 적용하고 `api/.env`(dev-login, `FILE_STORAGE_DRIVER=local` + 스크래치 폴더, `LINK_GRANT_SECRET` 비움 → 실행마다 임시 키)·`web/.env.local`(api 3001)로 `start:dev`·`next dev`를 띄워 했다. 기존 개발 DB `catchu-db-u4-dev`(5444)는 마이그레이션 적용이 PL/pgSQL 예외로 실패해 쓰지 않았다(원인은 보지 않음). 자료는 실제 API(dev-login 회원 2명 → 동의 → 텍스트 자료 2개 → 발행 8건 → 중지·삭제 API)로 만들고, 만료(`published_at`·`expires_at`을 91일·1일 전으로)·작성자 비활성(`account_state='INACTIVE'`)·기본 요약 DONE 행(근거 3개 + AI 해석 1개)은 DB를 직접 고쳤다. Redis·LLM·색인은 없다.
+
+**결과 표** (구분: [api·DB]=실제 로컬 api·DB, [대역]=시험 대역, [기록]=기존 시험 기록, [미실행])
+
+| 시나리오 | 환경·판본 | 기대 | 실제 결과와 근거 |
+|---|---|---|---|
+| U4 제출 3 api 시험 12개 파일 | [api·DB] 테스트 DB 5443, `TEST_DB_PORT=5443 npm test -- …` | 전부 통과 | 97개 통과·0 실패 |
+| S8 비밀번호 링크: grant 없음·틀린 비밀번호·맞는 비밀번호·위조 grant | [api·DB] curl | 401·401·200{grant}→GET 200·401 | 그대로(`LINK_PASSWORD_REQUIRED`·`LINK_PASSWORD_INVALID`·`{grant}`·`LINK_PASSWORD_REQUIRED`). `Cache-Control: no-store` |
+| S8 보호 링크에 다른 발행본의 grant | [기록] `recipient-api.test.cjs` S8(이번 실행에 포함) | 401 `LINK_PASSWORD_REQUIRED`(grant는 publicationId에 묶임) | 통과. curl로는 따로 보내지 않았다 |
+| 공개(비밀번호 없는) 링크에 다른 발행본의 grant | [api·DB] curl | 머리글을 무시하고 200 사본 | 200 `title=열린 발행본(실제 api)` |
+| S9 중지·만료·삭제 링크 GET/unlock | [api·DB] curl + 브라우저 | 모두 404 `LINK_UNAVAILABLE`, 사유 구분 없음 | curl 404; 브라우저 세 화면 모두 「이 링크는 열람할 수 없습니다.」만, 초점 `H1#recipient-unavailable`, 패널 0 |
+| S14 틀린 비밀번호 10번 뒤 맞는 비밀번호 / 비밀번호 없는 링크 unlock | [api·DB] curl | 429(확인 안 함, Retry-After) / 400 | 429 `LINK_UNLOCK_LIMITED` `Retry-After: 900` / 400 `INVALID_REQUEST` |
+| 형식 오류 토큰 GET·unlock, 정의 밖 쿼리, 10월 Catch 상세 경로 | [api·DB] curl | 404·404·400·없는 경로 | 404·404·400 `VALIDATION_FAILED`·404 `RESOURCE_UNAVAILABLE`(공통 미등록 경로 응답) |
+| 열람·해제 경로가 한 번씩만 등록, 10월 경로 미노출 | [기록] `app-routes.test.cjs`(이번 실행에 포함) | 중복 없음·새 컨트롤러 하나·`/catches/:catchId`·발급·목록·중지 없음 | 통과 |
+| 정상 열람 화면 | [api·DB] 브라우저 `/s/<open>` | 첫 진입 초점 h1, 0~4 자리 순서, 사본 2개(position 순), 본문 `<b>` 글자, GitHub 주소만 링크 | 초점 `H1#recipient-title`, 안내 1개, 「발행 시각 2026-11-06 10:06:09 (KST)」, 링크 1개(github.com)·`evil.example` 글자, 요약 항목 4개·질문 패널 |
+| 비밀번호 화면·해제·새로 고침 | [api·DB] 브라우저 `/s/<locked2>` | 첫 진입 초점 h1(autoFocus 없음) → 틀림 안내 → 맞으면 전환·초점 h1·grant는 sessionStorage만 → 새로 고침 뒤 비밀번호 없이 열림 | 모두 그대로(「비밀번호가 맞지 않습니다.」 뒤 입력 비움, 해제 뒤 `H1#recipient-title`, 주소에 grant 없음) |
+| 판정 통과 뒤 중지: 진행 중 요청 유지, 다음 요청 404 | [api·DB] 브라우저+curl: flip 화면을 연 뒤 작성자 `PUT …/stop` 200 | 열린 화면은 그대로, 다음 요청 404 | 중지 커밋 직후 화면은 ready 유지, 받은 사람 GET 404, 질문 POST 404 → `onAccessLost` → 「이 링크는 열람할 수 없습니다.」 |
+| 판정 통과 뒤 같은 요청 안의 중지·삭제·작성자 비활성(사본 읽기 전 커밋) | [api·DB] `recipient-api.test.cjs` R-04 자동 시험(이번 실행, 테스트 DB 5443; 사본 읽기 직전에 DB를 고치는 훅으로 타이밍을 만듦) | 그 요청은 판정 시점 사본 200, 다음 요청 404; READ ONLY REPEATABLE READ 한 트랜잭션 | 통과. 브라우저로는 요청 안의 타이밍을 만들 수 없어 수동 재현은 하지 않음 |
+| 이미 비활성인 작성자의 링크 GET·unlock(비밀번호 링크) | [api·DB] curl + 브라우저 | 둘 다 404, 비밀번호 입력 화면이 아님 | 404·404; 브라우저는 불가 화면(`passwordInput: false`) |
+| 작성자 회원 행 없음 → 500 고정 본문, 응답·로그에 SQL·내부 메시지·토큰 없음 | [대역] `recipient-api.test.cjs` NFR-6(`readOwnerState`를 `NO_MEMBER`·`57014` 예외로 바꿈, 이번 실행에 포함) | 500 `INTERNAL_ERROR` `{code,message}`만, 로그에 marker·SELECT 없음 | 통과. 실제 DB는 외래 키 때문에 만들 수 없다 |
+| U5 요약 패널 근거 선택 → 이동·강조 | [api·DB] 브라우저(요약 행은 DB 직접 삽입) | 항목으로 초점·스크롤, 범위 `<mark>`; 사본에 없는 경로는 항목만 | 「두 번째 자료」→ `LI#published-item-<id>` 초점·`data-highlighted`·`<mark>`「두 번째 자료의 본」(charEnd 10); 「없는 경로」→ 이동만, mark 0 |
+| U5 패널 401 → U4 비밀번호 화면 | [api·DB] 브라우저: api 재기동으로 임시 grant 키 교체 뒤 질문 POST | onAccessLost(401) → 비밀번호 화면, 다시 입력 안내, 그 링크 grant 삭제 | 그대로(「비밀번호를 다시 입력해 주세요.」, 초점 `H1#recipient-password`, sessionStorage에서 그 링크 키만 사라짐) |
+| U5 패널 404 → U4 불가 화면 | [api·DB] 위 flip 행 | onAccessLost(404) → 불가 화면 | 그대로 |
+| U5 요약 GET 401·404 | [api·DB] curl | locked grant 없음 401, stopped 404 | 401 `LINK_PASSWORD_REQUIRED`, 404 `LINK_UNAVAILABLE` |
+| U5 질문 POST(색인 없음) | [api·DB] 브라우저 | 패널 안내만, U4 전환 없음 | 409 `INDEX_NOT_READY` → 「질의응답을 아직 쓸 수 없습니다」, U4는 ready 유지 |
+| U5 질문: 판정 통과 뒤 저장 중 발행본 삭제 확인 → 저장·차감 롤백과 404 | [기록] 코드 읽기 + U5 기존 시험 | NFR-5 결정 A("삭제로 확인된 경우에만" 그 요청의 저장·차감을 되돌리고 404) | **코드상 확인한 것**: 질문 경로(`qna.controller.ts` → `qna-service.ts`)는 `resolveForRecipient` → Redis 횟수 `count` → 다시 쓰기·검색·생성이며, 발행본을 참조하는 DB 쓰기와 `readSnapshot` 호출이 없다. 그래서 "삭제로 확인되는" 지점(NotFound·23503)이 없고, 23503 처리는 기본 요약 처리기(`base-summary-handler.ts`, worker 쪽)에만 있다. **기존 시험 근거**: `qna-controller.test.cjs` 99행(스트림 전 거부는 횟수를 세지 않음), U5 기능 명세 168행(「대화 중 링크 중지·만료·삭제 → 다음 질문 404」). 둘 다 "스트림 도중 삭제"는 다루지 않는다. **코드상 예상(미실행)**: 질문 스트림 도중 `DELETE /publications/{id}`가 커밋되면 그 스트림은 끝까지 가고, 다음 질문은 404이며, 그날 횟수 1은 소모된 채 남는다. 이는 U5 결함이 아니라(결정의 "확인된 경우"가 아님) U5 담당에게 전달할 사항이다 |
+| 위 "스트림 도중 삭제" 실제 재현 | [미실행] | 스트림 완주·다음 질문 404·횟수 1 소모 | 색인·LLM이 없어 질문 스트림이 열리지 않는다(이번 환경은 409 `INDEX_NOT_READY`). 재현 조건: 색인 READY 발행본에서 질문 스트림을 연 뒤 작성자 `DELETE`, 이어서 같은 링크에 질문 |
+| 작성자 발행본 삭제 API 500 | [api·DB] 1차 시드 | 삭제 204 | `FILE_STORAGE_*` 미설정 환경에서 `PREFIX_DELETE_FAILED` → 500·DB 유지(S11 설계대로, `docs/file-storage.md`). 설정 뒤 204. U4 결함 아님, 로컬 환경 안내 사항 |
+
+**실행 명령**: `TEST_DB_PORT=5443 npm test -- <U4 제출 3 파일 12개>`(97 통과), `node scratchpad/step23/check.mjs`(curl 묶음), 브라우저 `document.activeElement` 확인은 위 표. web 시험은 이 Step에서 코드가 바뀌지 않아 Step 22의 860개 통과를 그대로 둔다.
+
+**남은 검증**: 커버리지(Step 25 명령), S15 미실행 기록(Step 25), 실제 색인·LLM이 있는 환경의 U5 질문 스트림(U5 몫), 기존 개발 DB `catchu-db-u4-dev` 마이그레이션 실패 원인(이번 범위 밖). 브라우저 확인에 쓴 `api/.env`·`web/.env.local`(gitignore)·컨테이너 `catchu-db-u4-step23`(tmpfs, 멈추면 자료 소멸)는 남겨 두었다.
+
+
 ## 제출 2 (2026-11-03) — C-10 DB 구현·W3 발행·W5 작성자 관리
 
 판본: 통합 브랜치 `a0d5676`(#461·#466 병합 뒤)을 merge commit `19572db`로 반영한 작업 트리. Step 9 시작 조건(U2 `AiRun`·`DailyRunLimit`·`AiConsentGate`·`FILE_STORAGE`, U3 `PUBLISHED_INDEX_WRITER`)을 확인했다.
