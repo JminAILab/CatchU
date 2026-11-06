@@ -2,7 +2,7 @@
 
 회원별 공개 저장소 직접 등록, 요청별 동의·하루 제한 소비 경계, 메시지 v2와 관측 상태는 [U7 등록·분석](docs/repository-analysis-u7.md)을 따른다. 이 문서에 DB 전환·양쪽 이미지 교체와 실제 실행 선행 조건도 정리했다.
 
-10월 공유 링크 발급·목록·중단과 수신자 조회는 12월 U4 제출 3(#416, W6)에서 발행본 경로로 대체돼 없다. 그 통합 검사(`test/db/share-links-web-integration.test.cjs`·`test/integration/sharing-screen-web.test.cjs`)는 지웠고, 수동 확인 도구 `scripts/verify-share-links-browser.cjs`·`verify-sharing-screen-browser.cjs`와 [#149](docs/share-links-integration-149.md)·[#123 실행 안내](docs/sharing-screen-integration-123.md)는 10월 기록이라 지금 코드에서는 동작하지 않는다. 현행 받은 사람 경로는 [docs/publications.md 「받은 사람 열람·비밀번호 통과 API」](docs/publications.md#받은-사람-열람비밀번호-통과-api-제출-3)를 따른다.
+10월 공유 링크 발급·목록·중단과 수신자 조회는 12월 U4 제출 3(#416, W6)에서 발행본 경로로 대체돼 없다. 그 통합 검사(`test/db/share-links-web-integration.test.cjs`·`test/integration/sharing-screen-web.test.cjs`)는 지웠고, 수동 확인 도구 `scripts/verify-share-links-browser.cjs`·`verify-sharing-screen-browser.cjs`와 [#149](docs/share-links-integration-149.md)·[#123 실행 안내](docs/sharing-screen-integration-123.md)는 10월 기록이라 지금 코드에서는 동작하지 않는다. 현행 받은 사람 경로는 [docs/recipient-publication.md](docs/recipient-publication.md)를 따른다.
 
 > 코드를 고치기 전에 [api 코딩 규약](CONVENTIONS.md), 이 문서, 맡은 기능의 `api/docs/<기능>.md`를 한 파일씩 따로 열어 읽는다(여러 파일을 한 번에 출력하면 가운데가 잘릴 수 있다). 기능별 안내는 이 README에 덧붙이지 않고 `api/docs/<기능>.md`로 쓴다.
 
@@ -226,7 +226,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 받은 사람 발행본 열람·비밀번호 통과 — 12월 U4 (#416)
 
-`GET /v1/public/links/{token}`(C-10 `PublishedSnapshot`)·`POST /v1/public/links/{token}/unlock`의 판정 순서(링크 → 작성자 상태 → grant), 한 트랜잭션의 판정·읽기 시점, 작성자 비활성 404·회원 행 없음 500, unlock 제한은 [docs/publications.md 「받은 사람 열람·비밀번호 통과 API」](docs/publications.md#받은-사람-열람비밀번호-통과-api-제출-3)를 따른다. `PublicationsModule`이 기본 `AppModule`에 등록돼 있고 작성자 상태는 A의 `OwnerProfileReader`를 쓴다. 10월 수신자 조회(#151, [docs/recipient-read.md](docs/recipient-read.md))는 대체됐다.
+`GET /v1/public/links/{token}`(C-10 `PublishedSnapshot`)·`POST /v1/public/links/{token}/unlock`의 판정 순서(링크 → 작성자 상태 → grant), 한 트랜잭션의 판정·읽기 시점, 작성자 비활성 404·회원 행 없음 500, unlock 제한은 [docs/recipient-publication.md](docs/recipient-publication.md)를 따른다. `PublicationsModule`이 기본 `AppModule`에 등록돼 있고 작성자 상태는 A의 `OwnerProfileReader`를 쓴다. 10월 수신자 조회(#151, [docs/recipient-read.md](docs/recipient-read.md))는 대체됐다.
 
 ## Worker 내부 분석 컨텍스트 — #232
 

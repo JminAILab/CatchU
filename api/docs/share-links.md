@@ -1,6 +1,6 @@
 # 공유 링크(10월 #147·#148·#150) — 12월 U4 제출 3(W6)으로 대체됨
 
-> **현재 상태(2026-11-06, #416 U4 제출 3):** 10월 공유 링크 발급 `POST /v1/share-links`·목록 `GET /v1/share-links`·중단 `PUT /v1/share-links/{linkId}/stop`과 수신자 조회(#151)는 **없다**. `ShareLinksModule`·`RecipientModule`과 `share-links.controller/service`·`public-links.controller`·`link-access.service`·`share-create*`·`share-link-issuance/list/response/state`·`issue-rate-limit`은 지웠고, 받은 사람 열람·비밀번호 통과는 `PublicationsModule`의 `GET /v1/public/links/{token}`·`POST /v1/public/links/{token}/unlock`이 발행본(`publication`) 기준으로 맡는다([발행 문서 「받은 사람 열람·비밀번호 통과 API」](publications.md#받은-사람-열람비밀번호-통과-api-제출-3)). 발급·관리는 [발행 API·작성자 발행본 관리 API](publications.md)다.
+> **현재 상태(2026-11-06, #416 U4 제출 3):** 10월 공유 링크 발급 `POST /v1/share-links`·목록 `GET /v1/share-links`·중단 `PUT /v1/share-links/{linkId}/stop`과 수신자 조회(#151)는 **없다**. `ShareLinksModule`·`RecipientModule`과 `share-links.controller/service`·`public-links.controller`·`link-access.service`·`share-create*`·`share-link-issuance/list/response/state`·`issue-rate-limit`은 지웠고, 받은 사람 열람·비밀번호 통과는 `PublicationsModule`의 `GET /v1/public/links/{token}`·`POST /v1/public/links/{token}/unlock`이 발행본(`publication`) 기준으로 맡는다([받은 사람 열람·비밀번호 통과 API 문서](recipient-publication.md)). 발급·관리는 [발행 API·작성자 발행본 관리 API](publications.md)다.
 >
 > 아래 「발급 처리 순서」·「목록·중단」·「검사」의 발급·목록·중단·10월 수신자 조회 부분은 **10월 기록**이며 지금 코드와 맞지 않는다. 「수신자 비밀번호 확인·접근 판정」의 unlock 판정 순서(1~10단계)·제한값·grant 규칙은 발행본 경로가 그대로 쓰므로 현행이다(링크 단위 키만 `publicationId`). 수동 확인 도구 `scripts/verify-share-links-browser.cjs`·`verify-sharing-screen-browser.cjs`는 지운 경로를 부르므로 동작하지 않는다.
 
@@ -89,7 +89,7 @@
 
 ## 수신자 비밀번호 확인·접근 판정 — #150
 
-> **현행 여부:** 아래 「unlock 판정 순서」 1~10단계·제한값·grant 규칙은 12월 U4 발행본 경로(`PublicationsModule`의 `POST /v1/public/links/{token}/unlock`)가 그대로 쓴다. 다만 판정 대상은 `share_link`가 아니라 `publication`이고 링크 단위 키는 `publicationId`이며, 1단계(최초 판정)와 8단계(해시 직전 재판정)는 `RecipientAccessService.judge`가 각각 별도 트랜잭션으로 부른다([발행 문서](publications.md#받은-사람-열람비밀번호-통과-api-제출-3)). `assertReadable`·`withLinkSnapshot`·`RecipientController`를 말하는 부분과 아래 「수신 조회 판정」 항목은 10월 기록이다.
+> **현행 여부:** 아래 「unlock 판정 순서」 1~10단계·제한값·grant 규칙은 12월 U4 발행본 경로(`PublicationsModule`의 `POST /v1/public/links/{token}/unlock`)가 그대로 쓴다. 다만 판정 대상은 `share_link`가 아니라 `publication`이고 링크 단위 키는 `publicationId`이며, 1단계(최초 판정)와 8단계(해시 직전 재판정)는 `RecipientAccessService.judge`가 각각 별도 트랜잭션으로 부른다([받은 사람 API 문서](recipient-publication.md)). `assertReadable`·`withLinkSnapshot`·`RecipientController`를 말하는 부분과 아래 「수신 조회 판정」 항목은 10월 기록이다.
 
 grant 형식·수명·보관·시도 제한은 [#150 9/29 결정](https://github.com/JminAILab/CatchU/issues/150#issuecomment-5883572995), 차단 응답은 #173 계약을 따른다. 회원 JWT를 쓰지 않는다. 인증 예외 `@Public()`은 클래스가 아니라 `unlock` 메서드에만 붙이며, 수신자 조회 경로(#151, 별도 `RecipientController`)도 경로마다 붙인다([보안 점검](../../docs/CatchU_security_checks.md), [수신자 조회](recipient-read.md)). `test/public-links-auth-boundary.test.cjs`가 실제 Guard로 `unlock`의 비로그인 허용과 같은 컨트롤러의 미지정 경로 인증 요구를 검사한다.
 
