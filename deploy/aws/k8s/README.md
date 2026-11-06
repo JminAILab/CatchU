@@ -11,7 +11,7 @@ EKS(#276)에서 web·api·worker를 띄우는 쿠버네티스 실행 파일과 �
 | [`namespace.yaml`](namespace.yaml) | 손으로 | Pod 보안 검사 `restricted`(호스트 망·특권·root로 도는 Pod 거부), ALB 상태 확인을 통과해야 web·api Pod가 준비되는 연동, 기본 서비스 계정의 쿠버네티스 API 토큰 자동 탑재 끔 |
 | [`network-policy.yaml`](network-policy.yaml) | 손으로 | 기본은 모두 막고 필요한 것만 연다. web은 ALB에서 3000만 받는다. api는 ALB·worker에서 3001을 받고 DB·큐와 바깥 443으로 나간다. worker는 api 3001·큐·GitHub API·Anthropic API 대역으로만 나간다(DB 없음). migration은 DB로만 나간다. 모두 DNS는 연다 |
 | [`services.yaml`](services.yaml) | 손으로 | web·api의 클러스터 안 주소. 바깥으로 여는 Service는 두지 않는다 |
-| [`ingress.yaml`](ingress.yaml) | 손으로 | 공개 ALB. 80은 443으로 이동(301), TLS 1.2·1.3만, `/v1/internal`은 404, `/v1`은 api, 그 밖은 web, HSTS 300초, 유휴 60초, 삭제 보호, WAF `catchu-edge` |
+| [`ingress.yaml`](ingress.yaml) | 손으로 | 공개 ALB. 80은 443으로 이동(301), TLS 1.2·1.3만, `/v1/internal`은 404, `/v1`과 Claude MCP OAuth 주소(`/authorize`·`/token`·`/register`·`/.well-known/oauth-*` 둘, 개발 서버 Caddy와 같은 목록)는 api, 그 밖은 web, HSTS 300초, 유휴 60초, 삭제 보호, WAF `catchu-edge` |
 | [`api.yaml`](api.yaml)·[`worker.yaml`](worker.yaml)·[`web.yaml`](web.yaml) | `deploy.sh`만 | api·worker는 한 개씩 `Recreate`, web은 새 Pod를 먼저 띄우고 옛 Pod를 내린다. 모두 UID 1000·읽기 전용 루트·권한 전부 제거·`/tmp` 크기 상한, 자원 요청과 메모리 상한(worker는 실제 분석을 재기 전의 임시값) |
 | [`migration-pod.yaml`](migration-pod.yaml) | `deploy.sh`만 | migration 일회 Pod 틀. controller 없이 한 번 실행하고 다시 띄우지 않으며 10분 한도가 있다 |
 | [`consent-guard-pod.yaml`](consent-guard-pod.yaml) | `deploy.sh`만 | 동의 기록 삭제 권한 확인 일회 Pod 틀. migration 계정으로 붙어 앱 계정의 동의 기록 DELETE·TRUNCATE 권한을 확인·회수·재확인한다(postgres 16.15, 사용자 999·읽기 전용 루트·권한 전부 제거, TLS `verify-full`, 5분 한도). 연결 허용은 migration과 같다 |
