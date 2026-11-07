@@ -21,7 +21,7 @@
 
 ## 제목
 
-후보 판정은 제목을 만들지 않는다(후보의 `title`은 `None`). 제목은 생성 단계가 정한다(CR1 BR3). 쓸 만한 기록의 글(`record_text`)이 있으면 그 글이 제목이고, 생성 호출이 실패하거나 건너뛰어져도 같다. 이 제목에는 40자 상한과 고쳐 쓰기를 쓰지 않는다. 없으면 [#120](https://github.com/JminAILab/CatchU/issues/120)이 설명 초안과 같은 생성에서 확인할 수 있는 조각(대상·종류·동작)으로 만든 조각 제목이고, 그것도 없으면 null이다([결정 문서 「Catch 제목」](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#catch-제목)). 조각 제목 규칙은 [생성](generation.md#제목)에 있다.
+후보 판정은 제목을 만들지 않는다(후보의 `title`은 `None`). 제목은 생성 단계가 정한다(CR1 BR3). 쓸 만한 기록의 글(`record_text`)이 있으면 그 글이 제목이고, 생성 호출이 실패하거나 건너뛰어져도 같다. 이 제목에는 40자 상한과 고쳐 쓰기를 쓰지 않는다. 없으면 [#120](https://github.com/JminAILab/CatchU/issues/120)이 설명 초안과 같은 생성에서 확인할 수 있는 조각(대상·종류·동작)으로 만든 조각 제목이고, 그것도 없으면 null이다([결정 문서 「Catch 제목」](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#catch-제목)). 조각 제목 규칙은 [생성](generation.md#제목)에 있다. 이 순서는 AI 쪽(CR3)이 꺼진 경로 기준이며, AI 쪽이 켜지면 기록의 글도 판정 결과에 따라 제목이 되거나 떨어진다([판정 「적용」](generation-judgement.md#적용)).
 
 계약은 [PR #262](https://github.com/JminAILab/CatchU/pull/262)로 제목 null을 받고, B 회원 화면([PR #274](https://github.com/JminAILab/CatchU/pull/274))·B 서버와 E([PR #272](https://github.com/JminAILab/CatchU/pull/272))·C 수신자 화면([PR #368](https://github.com/JminAILab/CatchU/pull/368))이 null을 그대로 받는다. 그래서 결과 조합(`app/processing/result.py`)은 제목이 없는 후보를 대체값 없이 `title: null`로 보낸다. 빈 문자열·공백만인 제목도 null로 보낸다(결정 문서 「[담당과 순서](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#담당과-순서)」 ③).
 

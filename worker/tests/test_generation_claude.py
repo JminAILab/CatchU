@@ -392,6 +392,49 @@ def test_models_are_fixed_per_call_kind(
     assert api.requests[1].extensions["timeout"]["read"] == 20.0
 
 
+AI_GENERATE_SCHEMA = _strict(
+    {
+        "title": _TITLE_SCHEMA,
+        "questions": GENERATE_SCHEMA["properties"]["questions"],
+        "titleCandidates": {
+            "type": "array",
+            "items": _strict(
+                {"text": _TEXT, "lines": {"type": "array", "items": _TEXT}}
+            ),
+        },
+        "sentences": {
+            "type": "array",
+            "items": _strict(
+                {"text": _TEXT, "lines": {"type": "array", "items": _TEXT}}
+            ),
+        },
+    }
+)
+
+
+def test_ai_side_generation_uses_the_ai_response_schema() -> None:
+    """CR3 BR3.1·BR5.1: AI 쪽 생성 호출은 제목 후보·설명 문장·조각 제목 대상·질문 칸의 응답 모양을 보낸다(설명
+    조각 칸은 없다). 그 밖의 설정(모델·생각 끔·미국 처리·다시 시도 없음)은 같다."""
+    api = FakeApi(message())
+    request = ProviderRequest(
+        purpose="GENERATE",
+        instructions=INSTRUCTIONS,
+        data=DATA,
+        timeout_seconds=45.0,
+        max_output_bytes=4_000,
+        ai_side=True,
+    )
+
+    api.provider().complete(request)
+
+    body = api.body()
+    assert body["output_config"] == output_config(AI_GENERATE_SCHEMA)
+    assert "fragments" not in body["output_config"]["format"]["schema"]["properties"]
+    assert body["model"] == "claude-haiku-5-5"
+    assert body["inference_geo"] == "us"
+    assert len(api.requests) == 1
+
+
 def test_unknown_model_is_rejected_without_echoing_it() -> None:
     """표에 없는 모델(30일 보관이 필수인 모델 포함)은 받지 않는다. 예외에 설정 값을 싣지 않는다."""
     for model in (

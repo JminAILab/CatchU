@@ -16,7 +16,7 @@
 | 주소 | 검사한 저장소 좌표·SHA·번호와 경로 틀로 F가 만든다. 응답의 `url`·Link 헤더의 next 주소·본문 속 주소는 부르지 않고, 쪽 번호만 F가 올린다. 관계 조회의 연결 PR 조회는 고정 주소 `POST /graphql`에 F의 쿼리 틀을 쓰고 검사한 좌표·SHA는 변수로만 넘긴다([연결 PR 묶음 조회](associated-pr-lookup.md)) |
 | 우회 이동 | 따라가지 않고 수집 실패로 멈춘다 |
 | 다른 저장소 | 포크 원본·다른 저장소 참조를 따라가지 않는다. 응답이 요청한 저장소가 아니면 멈춘다 |
-| 공개 저장소 | 저장소 확인 응답의 `private`(GitHub 응답의 필수 항목)가 false이고, `visibility`가 있으면 그것도 public일 때만 목록을 부른다. 토큰으로 접근되더라도 비공개면 실패 `REPOSITORY_UNREACHABLE`, 공개 여부를 읽을 수 없으면 실패 `COLLECTION_FETCH_FAILED`로 멈춘다. 수집 시작 때 한 번 확인하며, 수집 중 공개 여부 변경은 감시하지 않는다 |
+| 공개 저장소 | 저장소 확인 응답의 `private`(GitHub 응답의 필수 항목)가 false이고, `visibility`가 있으면 그것도 public일 때만 목록을 부른다. 토큰으로 접근되더라도 비공개면 실패 `REPOSITORY_UNREACHABLE`, 공개 여부를 읽을 수 없으면 실패 `COLLECTION_FETCH_FAILED`로 멈춘다. 수집 시작 때 한 번 확인하며, 수집 중 공개 여부 변경은 감시하지 않는다. **FR10 확인 명령만 예외**다: 개발용 `app.processing.confirm`의 직접 수집만 `collect(..., allow_private_repository=True)`로 비공개 여부를 따지지 않고(비공개 `JminAILab/CatchU` 확인용), 저장소 ID·같은 이름·크기 상한·공개 여부 칸 모양 확인은 그대로 한다. 큐 소비자의 LIVE 처리는 이 인자를 넘기지 않는다([판정 「FR10 확인 명령」](generation-judgement.md#fr10-확인-명령)) |
 | 빈 Git 저장소 | 커밋 목록 첫 쪽이 409와 `Git Repository is empty.` 문구로 오면 커밋 0건으로 받고 PR·이슈 목록을 계속 부른다. 문구가 다르거나 다른 목록·둘째 쪽 이후의 409는 수집 실패다 |
 | 자료 안의 글 | 제목·본문·커밋 메시지·변경 내용은 자료로만 옮기고 해석·실행하지 않는다. 관측 사실에는 글자를 넣지 않는다 |
 | 재시도 | 429·5xx·시간 초과·연결 오류를 다시 부르지 않는다. 자격정보를 스스로 갱신하지 않는다 |

@@ -264,10 +264,13 @@ function CatchDetail({ item, headingRef }: { item: PublicCatch; headingRef: RefO
           </div>
         ))}
       </section>
-      <section className={styles.section}>
-        <h3>Catch 설명 초안</h3>
-        <p className={styles.text}>{hasGeneratedDraft(item) ? item.draft.content : missingDraftText(item)}</p>
-      </section>
+      {/* CR3 BR7.1: 설명 초안이 NOT_GENERATED면 칸(제목·안내 글)을 그리지 않는다. FAILED·GENERATED는 그대로다. */}
+      {item.draft.status !== "NOT_GENERATED" && (
+        <section className={styles.section}>
+          <h3>Catch 설명 초안</h3>
+          <p className={styles.text}>{hasGeneratedDraft(item) ? item.draft.content : missingDraftText(item)}</p>
+        </section>
+      )}
     </article>
   );
 }

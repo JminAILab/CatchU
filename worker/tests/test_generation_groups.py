@@ -24,14 +24,18 @@ from app.generation.groups import (
     kind_order,
     strip_test_marker,
 )
+from app.generation.judged import material_ask
 from app.generation.material import CandidateMaterial
 from app.generation.request import (
     LARGE_CANDIDATE_FILE_BYTES,
     PreparedCandidate,
     Selection,
+    is_large,
+    judged_groups,
     prepare,
     select,
 )
+from app.judgement.questions import COMMON_GROUP, MaterialVerdict
 from app.processing.generation import (
     DraftOutcome,
     EligibleCandidate,
@@ -440,3 +444,185 @@ def test_same_input_gives_the_same_groups_every_time() -> None:
     assert runs == {
         (("c", ("c1f3",)), ("a", ("c1f2",)), ("b", ("c1f1",))),
     }
+
+
+# CR3 재료 판정 답 적용(BR6.2·BR6.3, 시나리오 S13~S17)
+
+# 큰 후보가 되는 작은 상한. 파일 하나는 줄 4개(약 70 B씩)라 묶음 몫 안에 일부만 든다.
+SMALL = 900
+
+
+def verdict(
+    path: str,
+    *,
+    branch: str | None = None,
+    group: str | None = None,
+    score: int | None = None,
+) -> MaterialVerdict:
+    return MaterialVerdict(path, branch, group, score, judged=True)  # type: ignore[arg-type]
+
+
+def sent_paths(selection: Selection) -> list[str]:
+    return [file["path"] for file in sent_files(selection)]
+
+
+def test_s13_generated_answer_keeps_the_file_out_of_the_material() -> None:
+    """S13: 재료 판정이 X를 GENERATED로 답하면 X의 줄은 재료에 없다."""
+    # x.lock은 따로 묶음(api)이라 규칙 순서로는 그 묶음 몫으로 담긴다.
+    candidate = prepared(record(10, [("web/a.py", 10, 60), ("api/x.lock", 1, 20)]))
+    assert is_large(candidate, LIMITS, SMALL)
+    without = select(candidate, LIMITS, SMALL)
+    assert "api/x.lock" in sent_paths(without)
+
+    judged = select(
+        candidate,
+        LIMITS,
+        SMALL,
+        {"api/x.lock": verdict("api/x.lock", branch="GENERATED")},
+    )
+
+    assert "api/x.lock" not in sent_paths(judged)
+    assert "x.lock" not in judged.data
+    assert "web/a.py" in sent_paths(judged)
+
+
+def test_s14_higher_score_goes_first_inside_a_group() -> None:
+    """S14: 같은 묶음의 A(점수 5)·B(점수 2)면 A가 B보다 먼저 담긴다(규칙 순서는 B가 먼저다)."""
+    candidate = prepared(record(10, [("app/b.py", 6, 60), ("app/a.py", 6, 60)]))
+    assert sent_paths(select(candidate, LIMITS, SMALL))[0] == "app/b.py"
+
+    judged = select(
+        candidate,
+        LIMITS,
+        SMALL,
+        {
+            "app/a.py": verdict("app/a.py", score=5),
+            "app/b.py": verdict("app/b.py", score=2),
+        },
+    )
+
+    assert sent_paths(judged)[0] == "app/a.py"
+
+
+def test_work_branch_goes_before_record_branch() -> None:
+    """묶음 안에서 WORK 갈래(규칙이 코드로 본 파일 포함)를 먼저, RECORD 갈래를 그다음에 담는다."""
+    candidate = prepared(record(10, [("app/notes.txt", 6, 60), ("app/main.py", 6, 60)]))
+    kinds = file_kinds(candidate.files)
+    groups = change_groups(candidate.files, kinds)
+    (group,) = judged_groups(
+        groups,
+        kinds,
+        {
+            "app/notes.txt": verdict("app/notes.txt", branch="RECORD", score=5),
+            "app/main.py": verdict("app/main.py", score=1),
+        },
+    )
+    assert [file.path for file in group.files] == ["app/main.py", "app/notes.txt"]
+
+
+def test_s16_common_answers_make_their_own_evenly_shared_group() -> None:
+    """S16: COMMON으로 답한 파일 2개와 씨앗 묶음 2개면 묶음 3개로 고르게 담긴다."""
+    candidate = prepared(
+        record(
+            10,
+            [
+                ("web/page.ts", 8, 60),
+                ("api/route.ts", 8, 60),
+                ("shared.ts", 2, 60),
+                ("types.ts", 2, 60),
+            ],
+        )
+    )
+    kinds = file_kinds(candidate.files)
+    groups = change_groups(candidate.files, kinds)
+    verdicts = {
+        "shared.ts": verdict("shared.ts", group=COMMON_GROUP),
+        "types.ts": verdict("types.ts", group=COMMON_GROUP),
+    }
+
+    regrouped = judged_groups(groups, kinds, verdicts)
+
+    assert len(regrouped) == 3
+    members = {tuple(file.path for file in group.files) for group in regrouped}
+    assert ("shared.ts", "types.ts") in members
+    selection = select(candidate, LIMITS, 1_500, verdicts)
+    # 몫(상한 ÷ 3)으로 세 묶음 모두에서 줄을 담는다.
+    assert {"web/page.ts", "api/route.ts", "shared.ts"} <= set(sent_paths(selection))
+
+
+def test_seed_group_answer_moves_an_ambiguous_file() -> None:
+    """MATERIAL_GROUP이 씨앗 묶음 이름이면 그 묶음으로 옮긴다."""
+    candidate = prepared(
+        record(
+            10, [("web/page.ts", 4, 40), ("api/route.ts", 4, 40), ("page.css", 4, 40)]
+        )
+    )
+    kinds = file_kinds(candidate.files)
+    regrouped = judged_groups(
+        change_groups(candidate.files, kinds),
+        kinds,
+        {"page.css": verdict("page.css", group="web")},
+    )
+    by_name = {group.name: [file.path for file in group.files] for group in regrouped}
+    # 옮긴 파일은 판정 받은 파일이라 묶음 안에서 판정 없는 파일보다 앞이다(BR6.3).
+    assert by_name["web"] == ["page.css", "web/page.ts"]
+    assert by_name["api"] == ["api/route.ts"]
+
+
+def test_s17_unjudged_files_follow_judged_files_in_rule_order() -> None:
+    """S17: 질문 400개에 들지 않아 묻지 못한 파일(판정 없음)은 판정 받은 파일 뒤에 CR1 규칙 순서로 담는다."""
+    # 그 밖(OTHER) 파일은 종류·점수 두 질문이라 250개면 200개만 묻는다.
+    specs = [(f"app/file_{index:03}.txt", 1, 20) for index in range(250)]
+    candidate = prepared(record(10, specs))
+    kinds = file_kinds(candidate.files)
+    groups = change_groups(candidate.files, kinds)
+    built = material_ask(candidate, 20.0)
+    assert built is not None
+    assert len(built.request.questions) <= 400
+    asked = set(built.asked)
+    assert len(asked) == 200
+    verdicts = {path: verdict(path, score=3) for path in asked}
+
+    (group,) = judged_groups(groups, kinds, verdicts)
+
+    order = [file.path for file in group.files]
+    judged_count = len(asked)
+    assert set(order[:judged_count]) == asked
+    rest = [file.path for file in groups[0].files if file.path not in asked]
+    assert order[judged_count:] == rest
+
+
+def test_material_ask_marks_other_and_ambiguous_files() -> None:
+    """BR6.1: 규칙이 그 밖(OTHER)으로 본 파일에는 종류를, 저장소 맨 위·얕은 곳의 파일에는 묶음을 묻는다."""
+    candidate = prepared(
+        record(
+            10,
+            [("web/page.ts", 2, 20), ("api/route.ts", 2, 20), ("data.bin.txt", 2, 20)],
+        )
+    )
+    built = material_ask(candidate, 20.0)
+    assert built is not None
+    kinds = {(q.target, q.kind) for q in built.request.questions}
+    assert ("data.bin.txt", "MATERIAL_KIND") in kinds
+    assert ("data.bin.txt", "MATERIAL_GROUP") in kinds
+    assert ("web/page.ts", "MATERIAL_KIND") not in kinds
+    assert ("web/page.ts", "MATERIAL_GROUP") not in kinds
+    group_question = next(
+        q for q in built.request.questions if q.kind == "MATERIAL_GROUP"
+    )
+    assert group_question.options == ("api", "web", COMMON_GROUP)
+
+
+def test_budget_too_small_for_the_frame_is_not_a_large_candidate() -> None:
+    """빈 자료 틀도 못 담는 상한이면 큰 후보가 아니다(재료 판정을 보내지 않는다)."""
+    candidate = prepared(record(10, [("app/a.py", 4, 40)]))
+    assert is_large(candidate, LIMITS, 5) is False
+
+
+def test_no_verdicts_keep_the_rule_order() -> None:
+    """BR6.4: 재료 판정이 없으면(빈 답 포함) CR1 규칙 순서 그대로다."""
+    candidate = prepared(record(10, [("app/b.py", 6, 60), ("app/a.py", 6, 60)]))
+    assert (
+        select(candidate, LIMITS, SMALL, {}).data
+        == select(candidate, LIMITS, SMALL).data
+    )

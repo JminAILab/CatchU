@@ -49,6 +49,7 @@ from generation_scenarios import (
     assert_preserved,
     generation_case,
     naive,
+    naive_ai,
     sent_files,
 )
 from github_synthetic import (
@@ -69,9 +70,17 @@ from app.candidates.grouping import group as real_group
 from app.candidates.identity import PullRequestUnit
 from app.collection import CollectionOutcome, RepositoryCoordinates
 from app.contract import Verdict, check_message
-from app.generation import GenerationRun, ProviderError, ProviderRequest, run_generation
+from app.generation import (
+    GenerationLimits,
+    GenerationRun,
+    ProviderError,
+    ProviderRequest,
+    run_generation,
+)
 from app.generation.material import CandidateMaterial, gather
 from app.generation.request import prepare
+from app.judgement.provider import JudgementRequest, Question
+from app.judgement.synthetic import SyntheticJudge, default_answer
 from app.processing import (
     CheckedRequest,
     DraftOutcome,
@@ -932,3 +941,107 @@ def test_s12_large_pull_request_keeps_both_folders_within_limits() -> None:
     assert len(call.data.encode("utf-8")) <= 24_000
     # 크기로 뺀 줄이 있는 커밋에는 지금처럼 크기 제외 문구가 붙는다.
     assert case.run.report.size_limited_commits == 1
+
+
+# CR3 재료 판정을 거친 생성(BR6.1·BR6.3·BR6.4, 시나리오 S13·S15·S29)
+
+SMALL_DATA = GenerationLimits(max_data_bytes=700)
+# 가리기 검사가 잡는 GitHub 토큰 꼴. 실행 중에 이어 붙여 만든다.
+TOKEN = "".join(("gh", "p_", "Synthetic", "Leak", "0" * 30))
+
+
+def big_pull() -> Scenario:
+    """`web/`의 코드 파일 넷과 `api/schema.lock`(그 밖)을 고친 본인 커밋 하나의 열린 PR #6. 작은 자료 상한에서
+    큰 후보다. schema.lock 앞 줄에 토큰 꼴 값이 있다."""
+    files = [
+        change(
+            f"web/page{index}.ts",
+            patch=f"@@ -1 +1 @@\n-page{index} = 1\n+page{index} = 2",
+        )
+        for index in range(4)
+    ]
+    files.append(
+        change(
+            "api/schema.lock",
+            patch="@@ -0,0 +1,3 @@\n"
+            f'+token = "{TOKEN}"\n+lockVersion = 3\n+lockHash = abc',
+            status="added",
+        )
+    )
+    own = commit(sha(61), MEMBER, parents=(ROOT,), minute=6, files=files)
+    return Scenario(
+        default_branch=(root_commit(),),
+        pulls=(Pull(6, MEMBER, (own,), state="open", created=5),),
+    )
+
+
+def generated_paths(provider: ScriptedProvider) -> set[str]:
+    (request,) = provider.generate_requests()
+    return sent_paths(request)
+
+
+def test_s13_generated_material_answer_leaves_the_file_out_of_generation() -> None:
+    """S13: 합성 재료 판정이 schema.lock을 GENERATED로 답하면 그 파일의 줄은 생성 요청에 없다."""
+
+    def answer(question: Question) -> object | None:
+        if question.kind == "MATERIAL_KIND":
+            return [0.0, 0.0, 1.0]
+        return default_answer(question)
+
+    without = ScriptedProvider(naive)
+    generation_case(big_pull(), without, limits=SMALL_DATA)
+    assert "api/schema.lock" in generated_paths(without)
+
+    provider = ScriptedProvider(naive_ai)
+    judge = SyntheticJudge(answer)
+    generation_case(big_pull(), provider, limits=SMALL_DATA, judge=judge)
+
+    assert "api/schema.lock" not in generated_paths(provider)
+    (material,) = judge.material_requests()
+    kinds = {(q.target, q.kind) for q in material.questions}
+    assert ("api/schema.lock", "MATERIAL_KIND") in kinds
+
+
+def test_s15_failed_material_judgement_keeps_the_rule_order() -> None:
+    """S15: 재료 판정이 실패하면 재료는 CR1 규칙 순서이고 Catch 판정은 그대로 나간다. 실패 항목은 남지 않는다."""
+    rule = ScriptedProvider(naive)
+    generation_case(big_pull(), rule, limits=SMALL_DATA)
+    calls = 0
+
+    def fail_material(request: JudgementRequest) -> None:
+        nonlocal calls
+        calls += 1
+        if request.purpose == "MATERIAL":
+            raise TimeoutError("합성 재료 판정 시간 초과")
+
+    provider = ScriptedProvider(naive_ai)
+    judge = SyntheticJudge(before=fail_material)
+    case = generation_case(big_pull(), provider, limits=SMALL_DATA, judge=judge)
+
+    assert provider.generate_requests()[0].data == rule.generate_requests()[0].data
+    assert calls == 2
+    assert len(judge.catch_requests()) == 1
+    assert case.run.report.material_judgement_reasons == {"JUDGEMENT_TIMEOUT": 1}
+    assert failure_codes(case.result) == failure_codes(case.before.result)
+
+
+def test_s29_masked_front_lines_are_not_in_the_material_judgement() -> None:
+    """S29: 큰 후보 파일의 앞 5줄에 토큰 꼴 글이 있으면 그 줄은 재료 판정 요청에 없다(다음 줄은 그대로)."""
+    judge = SyntheticJudge()
+    generation_case(
+        big_pull(), ScriptedProvider(naive_ai), limits=SMALL_DATA, judge=judge
+    )
+
+    (material,) = judge.material_requests()
+    assert TOKEN not in material.data
+    files = {entry["path"]: entry for entry in json.loads(material.data)["files"]}
+    assert files["api/schema.lock"]["lines"] == ["+lockVersion = 3", "+lockHash = abc"]
+    assert files["api/schema.lock"]["changedLines"] == 3
+    assert set(json.loads(material.data)) == {"groups", "files"}
+    assert set(files["api/schema.lock"]) == {
+        "id",
+        "path",
+        "status",
+        "changedLines",
+        "lines",
+    }

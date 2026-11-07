@@ -157,7 +157,7 @@ uv run --locked python -m app.processing succeeded-one-candidate
 
 ## 설명 초안·질문·제목 생성
 
-[docs/generation.md](docs/generation.md)에 있다. 재료 순서·변경 묶음·한 파일 상한은 [docs/generation-material.md](docs/generation-material.md), 호출 한도와 운영 로그는 [docs/generation-limits.md](docs/generation-limits.md), 실제 제공자 어댑터(Anthropic Claude API)는 [docs/generation-provider.md](docs/generation-provider.md)에 있다.
+[docs/generation.md](docs/generation.md)에 있다. 재료 순서·변경 묶음·한 파일 상한은 [docs/generation-material.md](docs/generation-material.md), 호출 한도와 운영 로그는 [docs/generation-limits.md](docs/generation-limits.md), 실제 제공자 어댑터(Anthropic Claude API)와 판정 공급자(OpenAI Decisions·Claude) 호출 설정은 [docs/generation-provider.md](docs/generation-provider.md)에 있다. AI 쪽(CR3: Claude가 쓰는 제목 후보·설명 문장과 판정, FR10 확인 명령)은 [docs/generation-judgement.md](docs/generation-judgement.md)에 있다.
 
 ## 분석 요청 큐 소비자
 
@@ -202,7 +202,7 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `app/contract/` | api–worker 메시지 스키마 v2 검사(api/contracts/repository-analysis 정본을 읽음), 세 ID 식별 판정, 합성 템플릿 채우기 |
 | `fixtures/m1-synthetic/` | E·B 시험이 함께 쓰는 M1 합성 결과 세트와 사례별 기대 결과([안내](fixtures/m1-synthetic/README.md)) |
 | `tests/test_worker_messages.py` | 합성 사례·음성 대조의 스키마 판정 검사 |
-| `app/processing/` | 요청 검사(`request_check.py`), 제공자 비종속 생성 인터페이스(`generation.py`), 결과 조합(`result.py`), 처리 순서(`pipeline.py`), 큐 소비자 자식이 부르는 요청 처리(`runner.py`), LIVE의 수집·후보·생성 조립(`live.py`), 가짜 생성기와 합성 요청(`fake_generator.py`·`synthetic.py`), 개발용 실행(`__main__.py`) |
+| `app/processing/` | 요청 검사(`request_check.py`), 제공자 비종속 생성 인터페이스(`generation.py`), 결과 조합(`result.py`), 처리 순서(`pipeline.py`), 큐 소비자 자식이 부르는 요청 처리(`runner.py`), LIVE의 수집·후보·생성 조립(`live.py`), 가짜 생성기와 합성 요청(`fake_generator.py`·`synthetic.py`), 개발용 실행(`__main__.py`), FR10 확인 명령(`confirm.py`)과 수집 결과 파일(`collection_file.py`) |
 | `app/consumer/` | 분석 요청 큐 소비자. 실행(`__main__.py`), 설정(`settings.py`), 큐 규격(`queues.py`), 서비스·종료 순서(`service.py`), 처리 함수(`parent.py`), 자식 관리(`children.py`), 자식 진입점(`child.py`), 부모·자식 프레임(`frames.py`), 수신 확인 조회(`receipts.py`), 상태 확인(`health.py`) |
 | `tests/test_consumer_*.py`, `tests/consumer_*.py`, `tests/node_add_request.cjs` | 큐 소비자 검사(가짜 큐 `processor`·`receipts`·`settings`, 실제 Redis `redis`)와 시험 도구(가짜 큐·짧은 상한, 시험용 자식, 별도 프로세스 실행, Node로 요청 넣기) |
 | `tests/test_request_check.py` | 요청 형식·접수 맥락 불일치·지난 시도의 거부 검사 |
@@ -219,7 +219,9 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `app/redact.py` | 비밀값·개인정보 가리기. 생성 재료와 후보 판정의 기록의 글 검사가 함께 쓴다 |
 | `tests/candidate_scenarios.py` | 후보 판별 사례 시험용 선언형 합성 저장소와, 수집부터 결과 조합까지 돌리는 실행 도구 |
 | `tests/test_candidate_*.py` | wi1 값(`identity`), 공백을 무시한 diff 값·관계 근거(`same_change`), 수집 관측을 직접 만든 묶음·집계·근거(`grouping`), 판별 기준 문서의 합성 사례(`cases`), 수집·판별·결과 조합 연결(`flow`) |
-| `app/generation/` | 설명 초안·질문·제목 생성(#120). 입구(`flow.py`), 재료 찾기(`material.py`), patch 확인(`patch.py`), 입력 만들기·크기 선별(`request.py`), 재료 순서·변경 묶음(`groups.py`), 응답 판정(`response.py`), 문장 틀(`render.py`), 제목(`title.py`), 실패 코드·한계 문구(`outcome.py`), 상한(`limits.py`), 제공자 경계(`provider.py`), 실제 제공자 어댑터(`claude.py`) |
+| `app/generation/` | 설명 초안·질문·제목 생성(#120). 입구(`flow.py`), 재료 찾기(`material.py`), patch 확인(`patch.py`), 입력 만들기·크기 선별(`request.py`), 재료 순서·변경 묶음(`groups.py`), 응답 판정(`response.py`), 문장 틀(`render.py`), 제목(`title.py`), 실패 코드·한계 문구(`outcome.py`), 상한(`limits.py`), 제공자 경계(`provider.py`), 실제 제공자 어댑터(`claude.py`), AI 쪽 판정 질문·적용(`judged.py`, CR3) |
+| `app/judgement/` | 판정 공급자 자리(CR3). 규약(`provider.py`), 요청 조립·재료 판정 답 정리(`questions.py`), 호출 한 번과 답 읽기(`answers.py`), 기계 대조(`factcheck.py`), 합성·OpenAI·Claude 어댑터(`synthetic.py`·`openai_judge.py`·`claude.py`) |
+| `tests/test_judgement*.py` | 판정 요청·답·어댑터(`judgement`), 기계 대조(`factcheck`), FR10 확인 명령(`confirmation`) |
 | `tests/generation_scenarios.py` | 생성 시험용 합성 제공자(받은 요청 기록, 정해 둔 응답·예외·늦은 응답)와, 수집부터 생성·결과 조합까지 돌리고 후보 보존을 확인하는 실행 도구 |
 | `tests/test_generation_*.py` | patch 확인(`patch`), 가리기(`redact`), 재료 찾기(`material`), 변경 묶음(`groups`), 응답 판정·문장 틀(`response`), 제목(`title`), 상태·실패·호출 한도(`flow`), 고쳐 쓰기·근거 한계·가리기 끝까지(`rewrite_coverage`), 실제 제공자 어댑터(`claude`) |
 | `pyproject.toml` | 프로젝트 의존성·개발 도구·검사 설정 |

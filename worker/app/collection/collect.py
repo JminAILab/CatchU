@@ -247,6 +247,7 @@ def _run(
     data: CollectedData,
     relations: RelationCollector | None = None,
     expected_repository_id: str | None = None,
+    allow_private_repository: bool = False,
 ) -> CollectionFailure | None:
     """저장소 확인 → 목록 → 상세(관계 조회면 관계 조회). 멈추면 실패와, 확인하지 못한 종류의
     한계를 남긴다."""
@@ -257,6 +258,7 @@ def _run(
             paths,
             read_default_branch=relations is not None,
             expected_repository_id=expected_repository_id,
+            allow_private_repository=allow_private_repository,
         )
         if relations is not None:
             relations.default_branch = default_branch
@@ -296,12 +298,15 @@ def collect(
     limits: CollectionLimits = PROPOSED_LIMITS,
     started_at: datetime | None = None,
     relations: RelationOptions | None = None,
+    allow_private_repository: bool = False,
 ) -> CollectionOutcome:
     """요청 하나의 허용 범위 안에서 GitHub 자료를 모은다.
 
     started_at은 수집 시간 상한의 기준 시각이다(기본: 지금). 연결은 모든 사전 검사를
     통과한 뒤에만 open_transport로 연다. 예상하지 못한 예외는 결과로 바꾸지 않고 올린다.
     relations를 주면 같은 연결로 관계 조회까지 하고 결과의 relations에 담는다.
+    allow_private_repository는 FR10 확인 명령(`app.processing.confirm`)만 켠다. 기본값(거짓)이면
+    지금처럼 공개 저장소만 모은다. 큐 소비자의 LIVE 처리는 이 인자를 넘기지 않는다.
     """
     started = clock() if started_at is None else started_at
     allowed = _allowed_types(request)
@@ -330,6 +335,7 @@ def collect(
         limits,
         started,
         relations,
+        allow_private_repository=allow_private_repository,
     )
 
 
@@ -342,6 +348,8 @@ def _collect_with(
     limits: CollectionLimits,
     started: datetime,
     relations: RelationOptions | None,
+    *,
+    allow_private_repository: bool = False,
 ) -> CollectionOutcome:
     paths = RepositoryPaths(context.repository)
     budget = CollectionBudget(limits, clock=clock, started_at=started)
@@ -386,6 +394,7 @@ def _collect_with(
             request.repository_id
             if request.source_mode == "LIVE" and request.repository_id.isdecimal()
             else None,
+            allow_private_repository=allow_private_repository,
         )
     finally:
         # 성공·실패·예외 모두 자격정보를 놓고 연결을 닫는다.

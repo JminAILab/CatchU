@@ -698,6 +698,26 @@ test("S13: 받은 사람 목록 카드 제목에 2줄 말줄임 클래스를 달
   assert.doesNotMatch(screen, /dangerouslySetInnerHTML/);
 });
 
+test("S10: 받은 사람 상세는 설명 초안이 NOT_GENERATED면 「Catch 설명 초안」 칸을 그리지 않는다(화면 낭독기에도 없다)", () => {
+  // 화면 컴포넌트는 store·라우팅을 함께 불러와 여기서 그리지 않는다(S13과 같이 원문으로 본다).
+  const screen = readFileSync(new URL("../src/features/recipient/recipient-screen.tsx", import.meta.url), "utf8");
+  const detail = screen.match(/function CatchDetail[\s\S]*?\n}\n/)?.[0] ?? assert.fail("상세 컴포넌트가 있어야 한다");
+  const guarded = detail.match(/\{item\.draft\.status !== "NOT_GENERATED" && \(\s*<section[\s\S]*?<\/section>\s*\)\}/)?.[0];
+  assert.ok(guarded, "설명 칸 전체가 NOT_GENERATED 조건 안에 있어야 한다");
+  assert.match(guarded, /<h3>Catch 설명 초안<\/h3>/);
+  // 칸 밖에는 설명 초안 제목이 없다(숨김 처리로 남겨 두지 않는다).
+  assert.equal(detail.split("Catch 설명 초안").length - 1, 1);
+  assert.doesNotMatch(detail, /visually-hidden">[^<]*설명 초안/);
+});
+
+test("S11: 받은 사람 상세는 설명 초안이 FAILED면 지금 안내를 그대로 보인다", () => {
+  const failed = readPublicCatch(catchItem("c9", { draft: { status: "FAILED", content: null } }));
+  assert.ok(failed);
+  assert.equal(missingDraftText(failed), "설명 초안을 생성하지 못했습니다. 위의 사실과 근거는 확인할 수 있습니다.");
+  const screen = readFileSync(new URL("../src/features/recipient/recipient-screen.tsx", import.meta.url), "utf8");
+  assert.match(screen, /hasGeneratedDraft\(item\) \? item\.draft\.content : missingDraftText\(item\)/);
+});
+
 test("옛 꼴 작업 사실(SHA가 든 첫 줄, 다른 계정 문장)도 받은 그대로 화면 자료가 된다", () => {
   const oldFacts = ["PR·병합에 속하지 않은 본인 커밋 0123456789ab", "이 PR 커밋 목록에 연동 계정이 작성자로 기록되지 않은 커밋이 있다"];
   const item = readPublicCatch(catchItem("c9", { workFacts: oldFacts }));
