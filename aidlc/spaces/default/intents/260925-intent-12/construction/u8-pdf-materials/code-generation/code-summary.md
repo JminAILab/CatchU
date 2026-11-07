@@ -95,6 +95,7 @@ Step 3.4(변경 뒤):
 - **C-07 readable/text 제약 강화**: `published_pdf_page`에 `CHECK (readable = (text <> ''))`를 더했다. 열 모양(열 이름·자료형·NOT NULL·UNIQUE·FK)은 C-07 그대로다. 규칙은 두 방향으로 나눠 읽는다.
   - 기존 계약 문구: "읽을 수 없는 쪽은 빈 문자열" — readable=false이면 text=''. 새 CHECK가 이 방향을 DB에서 강제한다(readable=false·text 있음 거부).
   - 이번에 추가한 규칙: "읽을 수 있는 쪽은 빈 문자열 불가" — readable=true이면 text<>''. C-07 원문에는 없던 규칙이며, 원문이 막지 않던 입력(readable=true·text='')을 DB가 거부하므로 계약 허용 입력을 좁히는 제약 강화다. 열 모양이 같다는 이유로 호환으로 단정하지 않는다.
+  - 정정 연결(2026-11-07): 승인된 [코드 생성 계획](code-generation-plan.md) Step 3.1과 시나리오 초판은 이 변경을 "C-07 더하는 변경"이라고 적었다. 승인본은 소급 수정하지 않고 이 절이 후속 정정 기록이다. 그 표현이 가리키는 변경은 코딩 운영의 "더하는 변경"(기존 호출·가짜 구현·DB 행이 그대로 유효)으로 단정할 수 없는, **허용 입력을 좁히는 제약 강화**다. 그래서 제공 Unit이 계약 문서만 고치고 알리는 절차가 아니라, 병합 전에 U3 호환성 검토와 계약 변경 절차(계약 수정 PR)를 맞춘다.
   - 이 표를 쓰는 쪽은 U8의 발행 복사(`pdf_page_text`에서 복사, 같은 CHECK)만이고 U3·U4·U5는 읽기만 한다. U3 담당에게는 새 제약의 호환성 검토를 요청하고, 계약 문서 본문 반영은 별도 계약 수정 PR로 낸다(시점은 §7).
   - 2026-11-07 담당자 검토에서 확인한 범위: (1) 코드·자료 대조 — U3 메모리 fixture(`api/test/published-index/chunker.test.cjs`의 PDF 쪽: readable=true·글 있음 2건, readable=false·'' 1건)는 새 규칙에 맞고 readable=true·text='' 사례는 없다. U3 조각 나누기 코드는 `readable`만 거르고 빈 글은 조각을 만들지 않는다. (2) 실행한 시험 — U3 chunker·published-index-writer 18개 통과(§4). (3) 미실행 — U3 DB 시험(`api/test/published-index/support.cjs`)은 `published_pdf_page`에 행을 넣지 않으므로, 새 CHECK를 U3 DB 시험이 실제로 거친 적은 없다. U3가 앞으로 DB 시험에 PDF 쪽 자료를 넣으면 이 규칙을 따라야 한다.
 - C-16·C-12 더하는 변경은 Step 6·9에서 생기며 그때 적는다.
