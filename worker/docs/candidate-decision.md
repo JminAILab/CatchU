@@ -32,17 +32,18 @@
 - 수집이 멈춰 확인하지 못한 변경은 후보로도, 후보로 내지 않은 건수로도 내지 않는다. 멈춘 확인과 무관한 단위는 다 받았을 때처럼 판정한다.
 - 팀장 결정을 따른 것: 본인 기여와 squash 커밋, 연동 계정이 연 PR을 세지 않음(「본인 기여」), 250건 넘는 PR의 비교 API 확인([수집 문서](relation-collection.md#250건에-닿은-pr))과 커밋 목록을 다 받지 못한 PR 때문의 보류(「목록을 다 받지 못한 PR」)·근거 한계(「배정」), 후보 문장의 숫자·근거 순서와 제목([후보 문장과 근거](candidate-text.md)).
 - 기준 문서에 없어 이 구현이 정한 것(리뷰 대상): 후보로 내지 않은 건수를 세는 단위, 빈 커밋만 기준 미달, 변경이 있음을 확인한 본인 기여 커밋이 없는 단위는 후보가 아님, 근거 커밋 20건 상한. PR 소속 판정은 #117이 고정한 API 판본 2022-11-28에 기댄다([수집 문서](relation-collection.md#api-판본-고정). 연결 PR 조회로만 안 PR의 병합 커밋은 GraphQL `mergeCommit`).
+- 재분석(Catch 개편 CR2): 단위를 정한 뒤 이미 다른 Catch에 속한 커밋의 변경을 빼고, 남은 새 변경으로만 후보를 만든다. 열쇠·묶음 설명·로그 두 숫자는 [소속 커밋 빼기](commit-assignment.md)에 있다.
 - 하지 않는 것: 제목·초안·질문, 이슈만으로 기여한 후보, 추가 기준 브랜치 값을 요청에서 받기(받을 칸이 없다), 총 처리 시간 측정.
 
 ## 부르는 법과 아직 하지 않는 것
 
-`app.candidates.build_candidates(request, outcome)`가 입구다. `outcome`은 `collect(..., relations=RelationOptions())`의 결과다([관계 조회](relation-collection.md)). 돌려주는 값은 결과 조합(`compose_result`)에 넘기는 `GenerationOutput`(적합 후보·`notProvided`·실패)이다. GitHub를 부르지 않고 토큰도 받지 않는다. 판정은 모두 수집한 관측에서 나온다. "같은 작업이다" 같은 결론을 밖에서 받지 않는다.
+`app.candidates.build_candidates(request, outcome, assigned)`가 입구다(`assigned`는 맥락 조회의 소속 커밋 집합, 기본은 빈 집합). `outcome`은 `collect(..., relations=RelationOptions())`의 결과다([관계 조회](relation-collection.md)). 돌려주는 값은 결과 조합(`compose_result`)에 넘기는 `GenerationOutput`(적합 후보·`notProvided`·실패)이다. GitHub를 부르지 않고 토큰도 받지 않는다. 판정은 모두 수집한 관측에서 나온다. "같은 작업이다" 같은 결론을 밖에서 받지 않는다.
 
 처리 순서에 연결할 때([#121](https://github.com/JminAILab/CatchU/issues/121))는 다음 순서로 부른다. `tests/candidate_scenarios.py`의 `run_case`가 이 순서의 예다.
 
 1. `collect(request, …, relations=RelationOptions())`
-2. `build_candidates(request, outcome)`
-3. `compose_result(request, output, …)`, 그다음 메시지 스키마 v1 검사
+2. `build_candidates(request, outcome, assigned)`
+3. `compose_result(request, output, …)`, 그다음 메시지 스키마 검사
 
 돌려준 `failures`에는 수집 실패(`outcome.stage_failures()`)가 이미 들어 있다. 다시 더하지 않는다.
 

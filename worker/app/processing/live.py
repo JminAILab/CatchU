@@ -88,7 +88,9 @@ class LiveGenerator:
             relations=RelationOptions(),
             # allow_private_repository는 넘기지 않는다: 운영은 공개 저장소만 모은다(FR10 확인 명령만 예외).
         )
-        built = build_candidates(request, outcome)
+        # 맥락 조회로 받은 소속 커밋 집합을 후보 판정과 생성 재료 찾기에 같은 값으로 넘긴다(CR2 BR1.6).
+        assigned = self._found.assigned_commits
+        built = build_candidates(request, outcome, assigned)
         if not built.candidates:
             # 생성할 후보가 없으면 제공자를 만들지 않는다. 생성 흐름도 이때는 후보·미제공·실패를 그대로 둔다.
             return built
@@ -102,5 +104,6 @@ class LiveGenerator:
             deadline=self._picked_at + assembly.generation_budget,
             limits=assembly.generation_limits,
             judge=None if factory is None else factory(),
+            assigned=assigned,
         )
         return run.output

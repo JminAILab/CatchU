@@ -44,6 +44,8 @@ const MEMBER_ROWS = {
   catch_asset: 'owner_id = $1',
   catch_evidence: 'catch_id IN (SELECT catch_id FROM catch_asset WHERE owner_id = $1)',
   candidate_registration: 'catch_id IN (SELECT catch_id FROM catch_asset WHERE owner_id = $1)',
+  // 261103 intent CR2: 커밋 소속 기록. 실제 수신·반영 경로가 쓰고, Catch를 따라 지워진다.
+  commit_assignment: 'member_id = $1',
   repository_protection: 'owner_id = $1',
   // 12월 intent U2(C-03·C-04): 하루 실행 횟수와 첫 이용 동의.
   daily_execution_count: 'member_id = $1',

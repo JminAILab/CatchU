@@ -72,6 +72,17 @@ INSERT 충돌은 PostgreSQL을 오류 상태로 만들지 않는 `ON CONFLICT DO
 맥락에 맞는 기존 Catch를 조회한다. 맞는 Catch가 없으면 거부한다.
 DB 실패를 무시하고 다음 후보를 처리하지 않는다.
 
+## 소속 기록 (CR2)
+
+Catch 개편 CR2부터 결과 v3의 후보마다 본인 커밋 목록(`ownCommitShas`, 1~3,000개, 소문자 40자, 중복 없음)이 온다. 등록은 이 목록을 검사(필드 `ownCommitShas`)하고 다음처럼 쓴다.
+
+- 위 4·6단계에서 Catch를 만들거나 기존 Catch를 찾고 보호 판단까지 확인한 뒤, 같은 트랜잭션에서 그 작업 키 후보들의 목록 합집합(앞 후보 목록 뒤에 새 SHA를 처음 나온 순서로)을 `commit_assignment`에 쓴다. 회원은 입력의 ownerId, 저장소는 수신 기록이 가리키는 분석 요청의 저장소 ID다.
+- 1,000행씩 `insert().values([...]).orIgnore()`로 쓴다. 이미 있는 (회원, 저장소, SHA)는 같은 Catch든 다른 Catch든 건너뛰고 저장된 소속을 바꾸지 않는다(갱신 없음).
+- 기존 Catch에 이을 때 더하는 쓰기는 소속 행뿐이다. 제목·작업 사실·근거·초안·작성자 설명·저장 시각은 쓰지 않는다.
+- 7단계 재호출(저장된 등록 재응답)은 소속을 다시 쓰지 않는다.
+- 소속 쓰기 DB 오류는 바꾸지 않고 올려 Catch·근거·후보 연결과 함께 롤백한다. 소속 행의 (catch_id, member_id)가 Catch의 (catch_id, owner_id)와 맞지 않으면 외래 키가 거부한다.
+- 소속은 worker 맥락 조회가 `assignedCommitShas`로 돌려주고, worker는 재분석 때 그 커밋을 뺀다([worker 소속 커밋 빼기](../../worker/docs/commit-assignment.md)). 표 모양은 [DB 적용과 검사](catch-registration-database.md)에 있다.
+
 저장소·MOCK/LIVE 대조는 잘못된 기존 Catch 연결을 막는 검사다.
 `workIdentity`는 불투명한 문자열이며 B가 형식을 강제하거나 다시 계산하지 않는다.
 원본·포크의 작업 판별이나 [PR #180](https://github.com/JminAILab/CatchU/pull/180)의

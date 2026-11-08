@@ -19,6 +19,7 @@
 | `catch_asset` | 회원, 분석 요청 |
 | `catch_evidence` | Catch |
 | `candidate_registration` | 결과 수신 기록, Catch |
+| `commit_assignment` | Catch(복합 외래 키 `(catch_id, member_id)`. Catch 개편 CR2, 마이그레이션 `1794054790720-CreateCommitAssignment`) |
 | `published_item` | 발행본 |
 | `daily_execution_count`, `ai_consent` | 회원(12월 intent U2, 계약 C-03·C-04·C-06. 마이그레이션 `1793161114211-CreateU2UsageAndConsent`) |
 | `publication_index` | 발행본(12월 intent U3, 계약 C-06·C-08. 마이그레이션 `1793257382741-CreatePublishedIndexTables`) |

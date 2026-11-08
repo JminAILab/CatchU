@@ -41,9 +41,12 @@ worker가 분석 `attemptId`로 접수 기록(요청·회원·동의·허용 범
     accessToken: string,
     expiresAt: string
   },
-  selection: { repositoryId: string, wholeRepository: true }
+  selection: { repositoryId: string, wholeRepository: true },
+  assignedCommitShas: string[]
 }
 ```
+
+`assignedCommitShas`(CR2 계약 C1)는 그 시도의 회원과 분석 요청 저장소 ID의 소속 기록(`commit_assignment`) SHA 전체다. 순서·상한은 없고 중복은 없으며, 소속이 없으면 빈 배열이다. 회원·저장소는 최종 트랜잭션에서 읽은 접수 기록 값만 쓰고 요청 값으로 받지 않는다. 소속 기록 조회 장애는 다른 조회처럼 `500 INTERNAL_ERROR`다. worker는 칸 목록을 정확히 대조하므로 이 칸이 빠진 옛 응답을 받지 않는다(api·worker 함께 배포). worker가 쓰는 법은 [소속 커밋 빼기](../../worker/docs/commit-assignment.md)에 있다.
 
 최상위 `consentId`·`noticeRevision`·`allowedResourceTypes`·`sourceMode`(#121)는 worker가 요청 메시지와 대조할 접수 기록이다. 값은 동의 행(동의 ID·고지 판본)·동의 범위 JSON(허용 자료 종류)·시도 행(`sourceMode`, LIVE만 답하므로 늘 `LIVE`)에서 읽는다. 동의 범위 JSON은 동의 행·요청과 판본·저장소 ID가 이중 저장이라, JSON의 `revision`이 동의 행의 `scope_revision`과, `repositoryId`가 요청과 같고 `allowedResourceTypes`가 계약 값의 목록일 때만 답한다. 다르면 선정 공급자·GitHub 확인 전에 `SCOPE_UNVERIFIED`다. 저장된 목록은 그대로 돌려준다. externalAccountId는 정밀도 손실 없는 양의 십진 문자열이다. expiresAt은 GitHub 발급 토큰의 확인된 만료를 ISO UTC로 옮긴 값이다. 분석 처리 시한이나 CatchU JWT 수명이 아니다. 토큰 원문은 이 인증된 응답을 만들 때만 `reveal()`하며 DB·큐·로그·일반 회원 응답에 넣지 않는다. worker는 메모리에서만 사용하고 요청과 회원·저장소·판본을 다시 대조한다.
 

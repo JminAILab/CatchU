@@ -113,6 +113,8 @@ CANDIDATE_KEYS = {
     "evidence",
     "draft",
     "reflection",
+    # Result v3(CR2): 후보의 본인 커밋 목록 전체.
+    "ownCommitShas",
 }
 
 

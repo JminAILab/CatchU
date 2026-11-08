@@ -238,8 +238,10 @@ def run_generation(
     limits: GenerationLimits = PROPOSED_GENERATION_LIMITS,
     judge: JudgementProvider | None = None,
     observe: Callable[[CatchTrace], None] | None = None,
+    assigned: frozenset[str] = frozenset(),
 ) -> GenerationRun:
-    """built는 같은 요청·수집 결과로 만든 `build_candidates(request, outcome)`의 결과다.
+    """built는 같은 요청·수집 결과·소속 커밋 집합으로 만든 `build_candidates(request, outcome, assigned)`의
+    결과다. 재료 찾기가 같은 집합으로 단위를 다시 정해야 후보마다 단위를 찾는다(CR2 BR1.6).
 
     deadline은 생성 몫이 끝나야 할 시각이다(요청 전체 마감에서 결과 조합·전송 여유를 뺀 값). 큐 소비자는
     꺼낸 시각 + 60분 − 60초를 넘긴다(#424).
@@ -252,7 +254,7 @@ def run_generation(
         ai_side=judge is not None,
         judgement_provider="-" if judge is None else judge.name,
     )
-    materials = gather(request, outcome, built)
+    materials = gather(request, outcome, built, assigned)
     report.candidates = len(materials)
     instructions = GENERATE_INSTRUCTIONS if judge is None else GENERATE_AI_INSTRUCTIONS
     data_budget = min(

@@ -486,10 +486,11 @@ def test_allowing_private_keeps_the_registered_repository_id_check() -> None:
 
 @dataclass(frozen=True)
 class _Found:
-    """LiveGenerator가 쓰는 조회 결과의 두 resolver만 가진 대역."""
+    """LiveGenerator가 쓰는 조회 결과의 두 resolver와 소속 커밋 집합(CR2)만 가진 대역."""
 
     credentials: StaticCredentials
     selections: StaticSelections
+    assigned_commits: frozenset[str] = frozenset()
 
 
 def test_live_processing_does_not_pass_the_private_exception(

@@ -826,8 +826,10 @@ def test_units_sharing_a_work_identity_join_their_own_commits(
         pulls=(Pull(3, MEMBER, (first, second), created=2),),
     )
 
-    def doubled(outcome: CollectionOutcome) -> Grouping:
-        grouping = real_group(outcome)
+    def doubled(
+        outcome: CollectionOutcome, assigned: frozenset[str] = frozenset()
+    ) -> Grouping:
+        grouping = real_group(outcome, assigned)
         (unit,) = grouping.units
         halves = tuple(replace(unit, changes=(change,)) for change in unit.changes)
         return replace(grouping, units=halves)

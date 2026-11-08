@@ -145,6 +145,10 @@ class EligibleCandidate:
     reflection: ReflectionOutcome
     # 기록의 글 칸. 없거나 하나다(BR2.7). 값이 같은 후보를 합치면 첫 후보의 칸이 남는다(BR4.5).
     record_text: RecordText | None = None
+    # 본인 커밋 목록 전체(CR2 BR2.1): 근거 20건을 고르던 본인 기여 근거 커밋 SHA, 최근 것부터, 중복
+    # 없음. 결과 메시지의 ownCommitShas가 되고 api가 그 Catch의 소속으로 쓴다. 후보 판정과 합성 생성기가
+    # 채운다. 비어 있으면 결과 계약(1개 이상)이 거부한다.
+    own_commit_shas: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not _has_text(self.work_identity):

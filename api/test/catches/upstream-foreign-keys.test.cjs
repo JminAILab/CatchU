@@ -63,3 +63,35 @@ test('B의 외부 FK 메타데이터가 실제 A/E 엔티티와 마이그레이�
     });
   }
 });
+
+test('CR2 소속 기록은 Catch (catch_id, owner_id) 한 쌍만 가리키고 Catch를 따라 연쇄 삭제된다', async () => {
+  const { CommitAssignmentEntity } = require('../../dist/catches/entities/commit-assignment.entity');
+  const { CreateCommitAssignment1794054790720 } =
+    require('../../dist/database/migrations/1794054790720-CreateCommitAssignment');
+  const dataSource = new DataSource({
+    type: 'postgres', database: 'catch_metadata_test', synchronize: false,
+    namingStrategy: new SnakeNamingStrategy(),
+    entities: [MemberAccount, AnalysisRequest, AnalysisConsent, AnalysisAttempt, CatchAssetEntity,
+      RepositoryProtectionEntity, CandidateRegistrationEntity, ResultApplicationRecord, RepositoryRegistration,
+      CommitAssignmentEntity],
+  });
+  await dataSource.buildMetadatas();
+  const metadata = dataSource.getMetadata(CommitAssignmentEntity);
+  // 회원·분석 요청을 직접 가리키는 외래 키는 두지 않는다(지우는 길은 Catch 하나, BR3.7).
+  assert.equal(metadata.foreignKeys.length, 1);
+  const [fk] = metadata.foreignKeys;
+  assert.equal(fk.name, 'fk_commit_assignment_catch_id_member_id');
+  assert.equal(fk.referencedEntityMetadata.target, CatchAssetEntity);
+  assert.deepEqual(fk.columnNames, ['catch_id', 'member_id']);
+  assert.deepEqual(fk.referencedColumnNames, ['catch_id', 'owner_id']);
+  assert.equal(fk.onDelete, 'CASCADE');
+  assert.equal(fk.onUpdate, 'NO ACTION');
+  assert.ok(dataSource.getMetadata(CatchAssetEntity).uniques.some(unique => unique.name === 'uq_catch_asset_catch_id_owner_id'));
+
+  const statements = [];
+  await new CreateCommitAssignment1794054790720().up({ async query(sql) { statements.push(sql); } });
+  assert.match(statements[0], /ADD CONSTRAINT "uq_catch_asset_catch_id_owner_id" UNIQUE \("catch_id", "owner_id"\)/,
+    '한 쌍 외래 키가 가리킬 유일 조건을 먼저 둔다');
+  assert.ok(statements.includes('ALTER TABLE "commit_assignment" ADD CONSTRAINT "fk_commit_assignment_catch_id_member_id" ' +
+    'FOREIGN KEY ("catch_id", "member_id") REFERENCES "catch_asset"("catch_id","owner_id") ON DELETE CASCADE ON UPDATE NO ACTION'));
+});

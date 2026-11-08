@@ -941,6 +941,8 @@ def test_unprovable_before_and_after_makes_no_new_github_call(repo: GitRepo) -> 
         # CR3: 판정 공급자와 FR10 확인 명령의 관찰자. 둘 다 GitHub 연결이 아니다.
         "judge",
         "observe",
+        # CR2: 맥락 조회로 받은 소속 커밋 집합. GitHub 연결이 아니다.
+        "assigned",
     }
     assert run.output.candidates[0].title is None
     assert before.transport.paths == calls

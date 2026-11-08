@@ -1,7 +1,9 @@
 """후보 구성(#118): 묶음 결과를 적합 후보·미제공 수·실패로 바꾼다.
 
-입구는 `build_candidates(request, outcome)`다. 단위 판정은 grouping.py가 하고, 여기서는 후보 자격
-(본인 기여·실패와의 분리), notProvided 집계, 후보 문장과 근거를 만든다.
+입구는 `build_candidates(request, outcome, assigned)`다. 단위 판정은 grouping.py가 하고, 여기서는 후보
+자격(본인 기여·실패와의 분리), notProvided 집계, 후보 문장과 근거를 만든다. assigned는 맥락 조회로 받은
+소속 커밋 집합(CR2)이고, 빼기는 grouping.py의 `group`이 한다. 빼고 나니 버린 단위는 미제공에 세지 않고
+종료 로그의 assignedUnits로만 센다(`docs/commit-assignment.md`).
 
 - 후보: 배정받은 변경 가운데 연동 계정이 작성자로 기록된 기여 근거 커밋이 있고, 그 가운데 변경
   파일을 확인한(비지 않은) 커밋이나 응답이 커서 받지 못한(변경이 있는) 커밋이 있는 단위만 된다.
@@ -38,7 +40,10 @@
   수집한 이슈를 번호순으로 더한다(사례 C6). B는 이 순서대로 보인다.
 - workIdentity는 identity.py로만 만든다. 한 결과 안에서 값이 같은 후보가 생기면(생기면 안 된다)
   B로 보내기 전에 첫 후보에 합친다. 첫 후보의 작업 사실과 기록의 글을 그대로 두고(BR4.5), 출처·판본이
-  같은 근거는 관측 사실과 한계를 합쳐 남긴다.
+  같은 근거는 관측 사실과 한계를 합쳐 남긴다. 본인 커밋 목록은 첫 후보의 목록 뒤에 다른 후보의 새 SHA를
+  처음 나온 순서로 잇는다(CR2 BR2.1).
+- 본인 커밋 목록(own_commit_shas): 근거 20건을 고르던 본인 기여 근거 커밋 전체를 최근 것부터 싣는다.
+  api가 그 Catch의 소속으로 쓴다(CR2 BR2.1).
 - 초안·최소 질문은 만들지 않는다(NOT_GENERATED).
 """
 
@@ -152,6 +157,8 @@ _EVIDENCE_NOTES = {
 _SHOWN_NOTES = frozenset(
     {NoteKind.RESUBMISSION_UNCONFIRMED, NoteKind.CHERRY_PICK_UNCONFIRMED}
 )
+# 소속 변경을 뺀 커밋 묶음의 묶음 설명에 더하는 고정 문장(CR2 BR1.8, 기능 설계 Q1 A).
+_VIA_ASSIGNED = "이미 다른 Catch에 속한 커밋을 거쳐 이어진 커밋도 한 묶음에 두었다."
 
 # 후보가 되지 않은 단위의 이유. NOT_OWN과 DETAILS_STOPPED는 notProvided에 세지 않는다.
 # - NOT_OWN: 본인 기여 근거 커밋이 없다. 연동 계정이 연 PR이어도 같다(PR을 연 것은 기여가 아니다).
@@ -221,10 +228,13 @@ class _Text:
 
 
 def build_candidates(
-    request: CheckedRequest, outcome: CollectionOutcome
+    request: CheckedRequest,
+    outcome: CollectionOutcome,
+    assigned: frozenset[str] = frozenset(),
 ) -> GenerationOutput:
     """수집 결과에서 적합 후보·미제공 수·실패를 만든다.
 
+    assigned는 소속 커밋 집합이다. 생성 재료 찾기에도 같은 값을 넘겨야 같은 단위를 찾는다(BR1.6).
     첫 호출 전에 멈춘 수집(저장소 없음)은 실패만 돌려준다. 그런데 실패가 없거나, 저장소를 확인한
     수집 결과에 관계 조회 결과가 없거나, 수집 결과끼리 맞지 않으면 부른 쪽이나 수집의 결함이라
     ValueError를 낸다(grouping.py).
@@ -234,9 +244,10 @@ def build_candidates(
     if outcome.repository is None or outcome.linked_account is None:
         if not failures:
             raise ValueError("저장소를 확인하지 않은 수집 결과에 수집 실패가 없다")
-        _log(request, outcome, 0, tally, 0)
+        # 단위를 정하기 전에 끝났으므로 소속 두 숫자는 계산 전이라는 뜻의 0이다.
+        _log(request, outcome, 0, tally, 0, (0, 0))
         return outcome.with_observation(GenerationOutput(failures=failures))
-    grouping = group(outcome)
+    grouping = group(outcome, assigned)
     built: list[EligibleCandidate] = []
     for unit in grouping.units:
         verdict = _candidate(request, outcome, grouping, unit)
@@ -253,7 +264,14 @@ def build_candidates(
         ("BELOW_CRITERIA", tally.below_criteria),
         ("UNDETERMINED", tally.undetermined),
     )
-    _log(request, outcome, len(candidates), tally, merged)
+    _log(
+        request,
+        outcome,
+        len(candidates),
+        tally,
+        merged,
+        (len(assigned), grouping.assigned_units),
+    )
     return outcome.with_observation(
         GenerationOutput(
             candidates=candidates,
@@ -311,6 +329,8 @@ def _candidate(
         draft=DraftOutcome.not_generated(),
         reflection=ReflectionOutcome.not_generated(),
         record_text=record_text,
+        # 근거 20건을 고르던 본인 커밋 목록 전체(최근 것부터, 중복 없음). api가 소속으로 쓴다.
+        own_commit_shas=tuple(record.sha for record in own),
     )
 
 
@@ -537,7 +557,11 @@ def _commits_text(
 
 
 def _bundle_links(where: str, unit: GroupedUnit) -> list[str]:
-    """여러 커밋을 이은 근거. 부모·변경 파일 겹침과 같은 변경을 쓴 것만 적는다."""
+    """여러 커밋을 이은 근거. 부모·변경 파일 겹침과 같은 변경을 쓴 것만 적는다.
+
+    소속 변경을 뺀 묶음(via_assigned)은 남은 연결 뒤에 고정 문장을 더하고, 남은 연결이 없으면 그 문장이
+    연결 근거의 전부다(CR2 BR1.8). 빼지 않은 묶음에 이은 근거가 없으면 묶음 처리의 결함이다.
+    """
     sentences: list[str] = []
     if unit.parent_links:
         sentences.append(
@@ -552,6 +576,8 @@ def _bundle_links(where: str, unit: GroupedUnit) -> list[str]:
             f"{lead}cherry-pick 표시가 있고 공백을 빼고 비교한 변경 내용이 같은 커밋을 같은 "
             "변경으로 보고 부모 관계와 관계없이 한 묶음에 두었다."
         )
+    if unit.via_assigned:
+        sentences.append(_VIA_ASSIGNED)
     if not sentences:
         raise ValueError("여러 커밋의 묶음에 이은 근거가 없다")
     sentences.append("작성 시각 차이와 메시지 비슷함은 보지 않았다.")
@@ -705,6 +731,10 @@ def _merge_same_identity(
                 )
             ),
             evidence=_evidence_order(evidence.values(), commits),
+            # 남긴 후보의 목록 뒤에 다른 후보의 새 SHA를 처음 나온 순서로 잇는다(CR2 BR2.1).
+            own_commit_shas=tuple(
+                dict.fromkeys((*first.own_commit_shas, *candidate.own_commit_shas))
+            ),
         )
     return tuple(merged.values()), count
 
@@ -747,13 +777,19 @@ def _log(
     candidates: int,
     tally: _Tally,
     merged: int,
+    assignment: tuple[int, int],
 ) -> None:
-    """건수만 남긴다. SHA·경로·제목·본문·토큰은 남기지 않는다."""
+    """건수만 남긴다. SHA·경로·제목·본문·토큰은 남기지 않는다.
+
+    assignment는 (받은 소속 커밋 수, 소속 변경을 빼고 버린 단위 수)다(CR2 NFR4.5). 단위를 정하기 전에
+    끝난 줄은 둘 다 0이다(계산 전).
+    """
     logger.log(
         logging.WARNING if merged else logging.INFO,
         "후보 판정 종료: requestId=%s attemptId=%s completed=%s candidates=%d "
         "insufficient=%d belowCriteria=%d undetermined=%d heldAfterStop=%d "
-        "rangeLimited=%d heldByIncompleteLists=%d sameIdentityMerged=%d",
+        "rangeLimited=%d heldByIncompleteLists=%d sameIdentityMerged=%d "
+        "assignedShas=%d assignedUnits=%d",
         request.request_id,
         request.attempt_id,
         outcome.completed,
@@ -765,4 +801,5 @@ def _log(
         tally.range_limited,
         tally.held_by_incomplete_lists,
         merged,
+        *assignment,
     )

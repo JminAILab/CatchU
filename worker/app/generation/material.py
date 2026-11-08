@@ -1,8 +1,10 @@
 """후보 입력 어댑터(#120): 후보마다 생성에 쓸 수 있는 본인 커밋 기록을 찾는다.
 
-후보에는 커밋 메시지·PR 글·변경 내용을 넣지 않았으므로(#118), 같은 수집 결과로 `group(outcome)`을 다시
-불러 단위와 커밋 기록을 얻는다. 단위와 후보는 순서가 아니라 `work_identity` 값으로 맞춘다(후보가 되지
-않은 단위가 있고, 값이 같은 후보는 첫 후보에 합쳐졌다). 후보 판정·근거·순서는 바꾸지 않는다.
+후보에는 커밋 메시지·PR 글·변경 내용을 넣지 않았으므로(#118), 같은 수집 결과와 후보 판정에 넘긴 같은 소속
+커밋 집합으로 `group(outcome, assigned)`를 다시 불러 단위와 커밋 기록을 얻는다(CR2 BR1.6, 집합이 다르면
+커밋 묶음의 열쇠가 달라져 후보에 맞는 단위를 찾지 못한다). 단위와 후보는 순서가 아니라 `work_identity` 값으로
+맞춘다(후보가 되지 않은 단위가 있고, 값이 같은 후보는 첫 후보에 합쳐졌다). 후보 판정·근거·순서는 바꾸지
+않는다.
 
 재료 커밋은 다음을 모두 지키는 근거의 커밋이다(순서대로 확인한다).
 1. 근거 주소 전체가 그 판본의 커밋 화면 주소와 같다. PR 없는 병합의 단위 근거도 `/commit/{병합 SHA}`이고,
@@ -57,9 +59,14 @@ class CandidateMaterial:
 
 
 def gather(
-    request: CheckedRequest, outcome: CollectionOutcome, built: GenerationOutput
+    request: CheckedRequest,
+    outcome: CollectionOutcome,
+    built: GenerationOutput,
+    assigned: frozenset[str] = frozenset(),
 ) -> tuple[CandidateMaterial, ...]:
     """후보마다 재료를 찾는다. 후보가 없으면 묶음을 다시 부르지 않는다.
+
+    assigned는 built를 만들 때 넘긴 소속 커밋 집합이다(같은 값이어야 한다).
 
     후보가 있는데 저장소·연동 계정이나 관계 조회 결과가 없거나, 후보에 맞는 단위가 없으면 부른 쪽이나
     후보 판정의 결함이라 ValueError를 낸다(근거 부족이나 0건으로 숨기지 않는다).
@@ -69,7 +76,7 @@ def gather(
     repository, account = outcome.repository, outcome.linked_account
     if repository is None or account is None:
         raise ValueError("후보가 있는데 수집 결과에 저장소·연동 계정이 없다")
-    grouping = group(outcome)
+    grouping = group(outcome, assigned)
     units: dict[str, list[GroupedUnit]] = {}
     for unit in grouping.units:
         key = work_identity(request.source_mode, request.repository_id, unit.unit)
