@@ -358,7 +358,9 @@ test("사본 화면: 항목 순서대로 보이고 Catch는 기록·작성자 �
 
   // 빈 설명·초안은 다른 값으로 채우지 않고, 본문은 React 텍스트로만 그린다.
   const empty = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: snapshot([catchItem({ authorDescription: null, aiDraft: null, mismatch: false, evidence: [] }), textItem("<script>alert(1)</script>")]) }));
-  assert.ok(empty.includes("작성자 설명이 없습니다.") && empty.includes("AI 설명 초안이 없습니다."));
+  assert.ok(empty.includes("작성자 설명이 없습니다."));
+  // AI 설명 초안이 없으면 칸을 그리지 않는다(Catch 개편 CR3 BR7.1, 2026-11-08 팀장 결정).
+  assert.ok(!empty.includes("snapshot-catch-ai-draft") && !empty.includes("AI 설명 초안"));
   assert.doesNotMatch(empty, /snapshot-catch-mismatch/);
   assert.ok(empty.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
   const pdf = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: snapshot([{ publishedItemId: "p", position: 1, itemKind: "PDF_MATERIAL", title: "PDF", snapshot: {} }]) }));

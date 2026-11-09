@@ -264,10 +264,11 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
             ))}
           </section>
           {descriptionEditor}
-          <section className={styles.detailSection}><h3>Catch 설명 초안</h3>
+          {/* CR3 BR7.1: 설명 초안이 NOT_GENERATED면 칸(제목·안내 글)을 그리지 않는다. FAILED·GENERATED는 그대로다. */}
+          {item.draft.status !== "NOT_GENERATED" && <section className={styles.detailSection}><h3>Catch 설명 초안</h3>
             {hasGeneratedDraft(item) ? <p className={styles.draft}>{item.draft.content}</p>
               : <p>{item.draft.status === "FAILED" ? "설명 초안을 생성하지 못했습니다. 위의 사실과 근거는 확인할 수 있습니다." : "생성된 설명 초안이 없습니다."}</p>}
-          </section>
+          </section>}
           <section className={styles.detailSection}><h3>생각해 볼 질문 <span className={styles.small}>본인만 확인</span></h3>
             {item.reflection.status === "GENERATED" && item.reflection.questions.length > 0 ? <ul>{item.reflection.questions.map((question, index) => <li key={index}>{question}</li>)}</ul>
               : <p>{item.reflection.status === "FAILED" ? "질문을 생성하지 못했습니다." : "생성된 질문이 없습니다."}</p>}

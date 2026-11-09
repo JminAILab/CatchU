@@ -460,10 +460,12 @@ def flow_counts(caplog: pytest.LogCaptureFixture) -> dict[str, int]:
     ]
     assert len(lines) == 1, lines
     assert lines[0].startswith("생성 종료:")
+    # aiSide·judgementProvider(CR3)는 건수가 아니라 켜짐 여부·공급자 이름이다.
     return {
         key: int(value)
         for key, value in _PAIR.findall(lines[0])
-        if key not in ("requestId", "attemptId") and not key.endswith("Reasons")
+        if key not in ("requestId", "attemptId", "aiSide", "judgementProvider")
+        and not key.endswith("Reasons")
     }
 
 
@@ -473,7 +475,13 @@ def flow_reasons(caplog: pytest.LogCaptureFixture) -> dict[str, str]:
     (line,) = [
         record.getMessage() for record in caplog.records if record.name == FLOW_LOGGER
     ]
-    return {key: value for key, value in _PAIR.findall(line) if key.endswith("Reasons")}
+    # AI 쪽(CR3) 원인 칸(catchJudgementReasons 등)은 CR3 시험이 따로 본다.
+    ai_side = ("catchJudgementReasons", "materialJudgementReasons", "aiDropReasons")
+    return {
+        key: value
+        for key, value in _PAIR.findall(line)
+        if key.endswith("Reasons") and key not in ai_side
+    }
 
 
 def log_lines(caplog: pytest.LogCaptureFixture) -> list[str]:

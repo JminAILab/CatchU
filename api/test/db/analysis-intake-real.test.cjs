@@ -533,7 +533,8 @@ for (const change of ['연결 해제', '재인증 필요', '고지 판본 변경
       code = 'GITHUB_CONNECTION_REQUIRED';
     } else if (change === '고지 판본 변경') {
       // 대역: 새 고지 판본 배포를 같은 서버의 판본 교체로 흉내 낸다.
-      s.notices.realNotice = { noticeRevision: 'catchu-real-analysis-notice-v3', text: '변경된 실제 고지' };
+      // 현재 판본과 다른 값이어야 하므로 현재 판본에서 만든다(고지 v3가 현재 판본이 된 뒤 고정 값 v3가 같아졌다).
+      s.notices.realNotice = { noticeRevision: REAL_NOTICE.noticeRevision + '-next', text: '변경된 실제 고지' };
     } else if (change === '범위 판본 변경') {
       await moveScope(THEME);
     } else {

@@ -1,6 +1,6 @@
-# 생성의 실제 제공자 — Anthropic Claude API (#120)
+# 생성의 실제 제공자 — Anthropic Claude API (#120)와 판정 공급자 (CR3)
 
-> [설명 초안·생각해볼 질문·Catch 제목 생성](generation.md)의 제공자 경계(`GenerationProvider`)에 붙이는 실제 제공자 어댑터다. 제공자·시작 모델·처리 위치는 [#119 결정](https://github.com/JminAILab/CatchU/issues/119#issuecomment-6159097353)(2026-10-14)을 따른다. 코드는 `app/generation/claude.py`다. 큐 소비자의 LIVE 처리가 후보가 있을 때 자식 프로세스 안에서 한 번 만든다([#121](https://github.com/JminAILab/CatchU/issues/121), [큐 소비자 「구조」](queue-consumer.md#구조)). 실제 API는 2026-10-16~18 로컬 시험대에서 팀장 저장소 자료로만 불렀다(팀장 허가 범위, 결과는 [생성 호출 한도와 운영 로그 「모델」](generation-limits.md#모델)). 실제 회원 자료는 실제 자료용 고지([#138](https://github.com/JminAILab/CatchU/issues/138))와 [#37](https://github.com/JminAILab/CatchU/issues/37)의 조건을 갖춘 뒤에 보낸다.
+> [설명 초안·생각해볼 질문·Catch 제목 생성](generation.md)의 제공자 경계(`GenerationProvider`)에 붙이는 실제 제공자 어댑터다. CR3의 판정 공급자(OpenAI Decisions·Claude) 호출 설정은 아래 [「판정 공급자 (CR3)」](#판정-공급자-cr3)에 있다. 제공자·시작 모델·처리 위치는 [#119 결정](https://github.com/JminAILab/CatchU/issues/119#issuecomment-6159097353)(2026-10-14)을 따른다. 코드는 `app/generation/claude.py`다. 큐 소비자의 LIVE 처리가 후보가 있을 때 자식 프로세스 안에서 한 번 만든다([#121](https://github.com/JminAILab/CatchU/issues/121), [큐 소비자 「구조」](queue-consumer.md#구조)). 실제 API는 2026-10-16~18 로컬 시험대에서 팀장 저장소 자료로만 불렀다(팀장 허가 범위, 결과는 [생성 호출 한도와 운영 로그 「모델」](generation-limits.md#모델)). 실제 회원 자료는 실제 자료용 고지([#138](https://github.com/JminAILab/CatchU/issues/138))와 [#37](https://github.com/JminAILab/CatchU/issues/37)의 조건을 갖춘 뒤에 보낸다.
 
 ## 요청 설정
 
@@ -80,10 +80,31 @@
 
 응답은 공식 문서 모양을 본뜬 합성 값이다. 실제 API의 응답 시간·토큰 수·결과 품질은 이 시험으로 알 수 없다.
 
+## 판정 공급자 (CR3)
+
+CR3부터 생성 제공자 옆에 판정 공급자가 하나 더 붙는다. 판정 공급자는 글을 쓰지 않고 참일 확률·고르기·점수로만 답한다. 질문·적용 규칙과 켜고 끄기는 [판정](generation-judgement.md)에 있고, 여기는 호출 설정만 적는다.
+
+| 공급자 | 코드 | 설정 |
+|---|---|---|
+| OpenAI Decisions(기본) | `app/judgement/openai_judge.py` | 공식 `openai` SDK의 `client.decisions.create`, 모델 `gpt-6-luna`(이 API가 받는 유일한 모델). 접속 주소는 클라이언트 지역 지정 `data_residency="us"`로 `https://us.api.openai.com/v1`에 고정한다(이 값이 있으면 SDK가 `OPENAI_BASE_URL`을 읽지 않는다). 키는 `CATCHU_JUDGEMENT_API_KEY` 값만 생성자 인자로 넘겨 `OPENAI_API_KEY`를 읽지 않게 하고, `OPENAI_CUSTOM_HEADERS`가 있으면 만들지 않으며, SDK가 환경에서 읽는 `OPENAI_ORG_ID`·`OPENAI_PROJECT_ID`·`OPENAI_ADMIN_KEY`는 만든 뒤 지운다. `max_retries=0`, 호출 시간 제한 20초, HTTP 전송은 생성 제공자와 같은 보호(프록시 환경변수 무시·redirect 안 따라감·응답 본문 256 KiB·압축 거부·호출 전체 마감, `guarded_transport`)를 쓴다. 지시문은 `developer`, 자료는 `user` 칸이다 |
+| Claude(대체) | `app/judgement/claude.py` | 생성 제공자의 구조화 출력 호출(`ClaudeProvider.structured`)을 그대로 쓴다: `claude-haiku-5-5`, 생각 끔, `inference_geo="us"`, `max_retries=0`. 답 모양은 `{"answers": [[질문 id, 값], ...]}` 스키마로 받고, 출력 상한은 Catch 판정 2,000·재료 판정 8,000토큰(`max_tokens`)이다 |
+
+공식 SDK에서 확인한 인자(`openai==3.46.0`의 `resources/decisions.py`·`types/decision_create_params.py`·`_client.py`, 2026-11-06):
+
+- Decisions 요청이 받는 것은 `model`·`input`·`questions`(1~400개, predicate·choice·score)·`prompt_cache_key`·`prompt_cache_options`·`safety_identifier`뿐이다. **요청마다 응답 저장을 끄는 인자(`store`), 출력 토큰 상한 인자, 요청 단위 처리 지역 인자는 없다.** 그래서 저장 끔은 보내지 않고(비기능 요구 NFR1.5의 「없으면 그대로 보내고 고지 v3에 적는다」), 출력 크기는 질문 수 상한과 응답 본문 상한으로 묶으며, 처리 지역은 클라이언트의 `data_residency`로 정한다. 공식 안내의 기본 보관(남용 감시 기록 최대 30일, 앱 상태 보관 없음)과 미국 지역 처리는 [API 데이터 관리 안내](https://developers.openai.com/api/docs/guides/your-data)로 확인해(2026-11-06) 고지 v3 3절에 적었다.
+- 답은 질문 순서대로 오고 질문마다 `predicate`(`probability`)·`choice`(`probabilities[].value·probability`)·`score`(`probabilities[].label·probability`)·`refusal` 가운데 하나다. 거절한 질문은 답이 없는 것으로 본다. 점수는 우리가 붙인 단계 이름 1~5 가운데 확률이 가장 큰 단계로 읽는다.
+- OpenAI SDK는 응답 본문을 읽다 난 상한 초과 예외를 감싸지 않고 그대로 올려, 어댑터가 따로 받아 읽을 수 없는 응답으로 끝낸다. 그 밖의 실패는 시간 초과(`TimeoutError`), 연결·상태 오류(`JUDGEMENT_CALL_FAILED`), 모양이 틀린 응답(`JUDGEMENT_RESPONSE_UNREADABLE`)으로 나눈다. 다시 보내지 않는다.
+- 운영 로그 「판정 공급자 응답」·「판정 공급자 실패」에는 공급자·호출 종류·모델 ID·토큰 수·답 수·거절 수·걸린 시간·요청 ID·원인 이름·상태 코드만 남긴다. SDK DEBUG 로그(`OPENAI_LOG=debug`)는 요청 본문을 남기므로 `openai` 로거와 그 하위에 INFO 아래 기록을 버리는 필터를 단다.
+
+의존성: `openai==3.46.0`(2026-11-05 게시, Python 3.9 이상, `httpx2>=2.12.0,<3`). 잠금 파일에는 `openai` 하나만 새로 들어갔다(나머지 의존성 `anyio`·`httpx2`·`jiter`·`pydantic`·`sniffio`·`typing-extensions`는 이미 있었다). 의존성 취약점 검사(`uv audit`)는 2026-11-06에 알려진 취약점 없음이었다.
+
+시험은 `tests/test_judgement.py`다. 두 어댑터 모두 진짜 SDK에 가짜 HTTP 전송을 넣어, 주소·키·환경변수 무시·다시 시도 없음·redirect·응답 상한·시간 초과·로그에 원문 없음과, 같은 요청이면 두 공급자의 질문 집합이 같다는 것(S2)을 본다. 실제 OpenAI API는 부르지 않았다(FR10 확인 때 처음 부른다).
+
 ## 남은 확인
 
 | 남은 일 | 시작 조건 |
 |---|---|
+| OpenAI 판정 실제 호출: 2026-11-06 FR10 확인에서 팀장이 불러 판정 실패 0, 가장 긴 재료 판정 2.4초였다(CR3 `code-summary.md` 「FR10 확인」). 기본 보관 기간은 공식 안내로 확인했다(위). 남은 것은 운영 서버의 실제 호출 | 고지 v3 배포 뒤 운영 켜기 |
 | 어댑터를 거친 실제 오류 응답(지출 상한·크레딧 소진·과부하)의 모양 확인. 응답 시간·토큰·설정 수용은 2026-10-16~18 로컬 실제 호출로 확인했다 | 팀장의 호출 허가(자료 범위·비용 한도) |
 | 운영 키 주입 | #276 |
 | 실제 회원 자료 전송 | #138 고지, #37 조건 |

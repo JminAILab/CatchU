@@ -38,7 +38,8 @@ function detailMarkup(item) {
 for (const [status, content, draftText] of [
   ["GENERATED", "[합성] 생성된 설명", "[합성] 생성된 설명"],
   ["FAILED", null, "설명 초안을 생성하지 못했습니다."],
-  ["NOT_GENERATED", null, "생성된 설명 초안이 없습니다."],
+  // CR3 BR7.1(S10): NOT_GENERATED면 설명 칸을 그리지 않는다(아래 S10 시험).
+  ["NOT_GENERATED", null, null],
 ]) {
   for (const title of ["[합성] 제목", null]) {
     test(`${status} · 제목 ${title === null ? "없음" : "있음"}: 존재하는 생성물만 완료로 안내한다`, () => {
@@ -48,11 +49,25 @@ for (const [status, content, draftText] of [
       if (expected) assert.ok(html.includes(`<p>${expected}은 CatchU가 GitHub 기록에서 자동으로 만들었습니다`));
       else assert.doesNotMatch(html, /자동으로 만들었습니다/);
       if (status !== "GENERATED") assert.doesNotMatch(html, /설명 초안은 CatchU가|설명은 CatchU가/);
-      assert.ok(html.includes(draftText));
+      if (draftText === null) assert.doesNotMatch(html, /Catch 설명 초안/);
+      else assert.ok(html.includes(draftText));
       assert.ok(html.includes("사실과 다르면 불일치를 표시하거나 공개하지 마세요."));
     });
   }
 }
+
+test("S10: 설명 초안이 NOT_GENERATED면 상세에 「Catch 설명 초안」 칸(제목·안내 글)이 없어 화면 낭독기에도 읽히지 않는다", () => {
+  const html = detailMarkup({ ...previewCatches[0], draft: { status: "NOT_GENERATED", content: null } });
+  assert.doesNotMatch(html, /Catch 설명 초안/);
+  assert.doesNotMatch(html, /생성된 설명 초안이 없습니다/);
+  // 칸만 빠지고 다른 상세 칸(질문 등)은 그대로다.
+  assert.ok(html.includes("생각해 볼 질문"));
+});
+
+test("S11: 설명 초안이 FAILED면 칸과 지금 안내를 그대로 보인다", () => {
+  const html = detailMarkup({ ...previewCatches[0], draft: { status: "FAILED", content: null } });
+  assert.ok(html.includes("<h3>Catch 설명 초안</h3><p>설명 초안을 생성하지 못했습니다. 위의 사실과 근거는 확인할 수 있습니다.</p>"));
+});
 
 for (const [name, content] of [["null", null], ["빈 문자열", ""], ["공백", " \n\t "]]) {
   for (const title of ["[합성] 제목", null]) {

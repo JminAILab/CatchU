@@ -373,3 +373,113 @@ def title_choice(value: object, sent: Sent, *, max_name: int) -> TitleChoice:
 
 def unknown_keys(response: Mapping[str, Any], allowed: frozenset[str]) -> int:
     return sum(1 for key in response if key not in allowed)
+
+
+# AI 쪽 응답(CR3 BR3.1·BR5.1): 제목 후보(titleCandidates)·설명 문장(sentences)
+
+AI_TOP_LEVEL_KEYS = frozenset({"titleCandidates", "sentences", "title", "questions"})
+MAX_AI_TITLES = 3
+MAX_AI_SENTENCES = 3
+
+
+@dataclass(frozen=True)
+class WrittenItem:
+    """AI가 쓴 제목 후보(t1~t3) 또는 설명 문장(s1~s3). 근거 줄은 보낸 자료의 고를 수 있는 줄뿐이다."""
+
+    id: str
+    text: str
+    lines: tuple[PreparedLine, ...]
+    files: tuple[PreparedFile, ...]
+
+
+@dataclass(frozen=True)
+class WrittenPart:
+    items: tuple[WrittenItem, ...] = ()
+    # 버린 항목. "dropped:<원인>"(모양·근거 줄·글자 수), "over:COUNT"(상한 뒤). 운영 로그의 건수에만 쓴다.
+    notes: tuple[str, ...] = ()
+
+
+def _written_item(
+    item: object, sent: Sent, max_chars: int | None
+) -> tuple[str, tuple[PreparedLine, ...]] | str:
+    """항목 하나를 (글, 근거 줄)로 읽는다. 맞지 않으면 버린 원인."""
+    if (
+        not isinstance(item, dict)
+        or isinstance(item, _Duplicated)
+        or set(item) != {"text", "lines"}
+    ):
+        return "ITEM_SHAPE"
+    text, refs = item["text"], item["lines"]
+    if not isinstance(text, str) or not isinstance(refs, list) or not refs:
+        return "ITEM_SHAPE"
+    text = text.strip()
+    if not text or "\n" in text or "\r" in text:
+        return "ITEM_SHAPE"
+    if max_chars is not None and len(text) > max_chars:
+        # 40자를 넘는 제목 후보는 버리고 고쳐 쓰지 않는다(Q3 A).
+        return "TOO_LONG"
+    lines: list[PreparedLine] = []
+    for ref in refs:
+        line = sent.lines.get(ref) if isinstance(ref, str) else None
+        if line is None:
+            return "UNKNOWN_LINE"
+        if line.masked:
+            return "MASKED_LINE"
+        if line not in lines:
+            lines.append(line)
+    return text, tuple(lines)
+
+
+def written(
+    value: object, sent: Sent, *, prefix: str, high: int, max_chars: int | None
+) -> WrittenPart | None:
+    """AI가 쓴 글 목록을 읽는다. 목록이 아니면 None(칸의 모양이 틀림). 맞는 항목만 앞에서부터 high개까지 쓰고
+    응답 안 순서로 prefix+번호(t1·s1…)를 붙인다. 근거 줄이 없거나 보낸 자료에 없는 줄을 가리킨 항목은 버린다."""
+    if not isinstance(value, list):
+        return None
+    items: list[WrittenItem] = []
+    notes: list[str] = []
+    for each in value:
+        found = _written_item(each, sent, max_chars)
+        if isinstance(found, str):
+            notes.append(f"dropped:{found}")
+            continue
+        if len(items) >= high:
+            notes.append("over:COUNT")
+            continue
+        text, lines = found
+        files = tuple(dict.fromkeys(sent.files[line.file_id] for line in lines))
+        items.append(WrittenItem(f"{prefix}{len(items) + 1}", text, lines, files))
+    return WrittenPart(tuple(items), tuple(notes))
+
+
+@dataclass(frozen=True)
+class AiParts:
+    titles: WrittenPart
+    sentences: WrittenPart
+
+
+def ai_parts(
+    response: Mapping[str, Any], sent: Sent, *, max_title_chars: int
+) -> AiParts | None:
+    """AI 쪽 응답 칸을 읽는다. 문장 칸이 없거나 목록이 아니면 None이다: 응답을 읽을 수 없는 것으로 보아 생성
+    호출 실패(GENERATION_RESPONSE_UNREADABLE)다(BR5.1). 제목 후보 칸이 없거나 목록이 아니면 후보가 0개다."""
+    sentences = written(
+        response.get("sentences"),
+        sent,
+        prefix="s",
+        high=MAX_AI_SENTENCES,
+        max_chars=None,
+    )
+    if sentences is None:
+        return None
+    titles = written(
+        response.get("titleCandidates"),
+        sent,
+        prefix="t",
+        high=MAX_AI_TITLES,
+        max_chars=max_title_chars,
+    )
+    if titles is None:
+        titles = WrittenPart(notes=("dropped:SHAPE",))
+    return AiParts(titles, sentences)

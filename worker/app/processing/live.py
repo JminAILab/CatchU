@@ -1,6 +1,7 @@
 """LIVE 요청의 실제 처리(#121): 수집(#117) → 후보 판정(#118) → 생성(#120).
 
-요청 정보 조회로 찾은 자격정보·선택 범위만 쓰고, 생성 제공자는 후보가 있을 때 한 번 만든다. 큐 소비자의 자식
+요청 정보 조회로 찾은 자격정보·선택 범위만 쓰고, 생성 제공자와 판정 공급자(CR3, AI 쪽이 켜졌을 때만)는 후보가
+있을 때 한 번 만든다. 큐 소비자의 자식
 프로세스 하나가 요청 하나를 맡으므로 제공자·자격정보·임시 자료의 수명이 곧 자식 프로세스 수명이다. 메시지를
 보내거나 저장하지 않는다. 이 모듈은 `app.processing` 패키지 입구에서 다시 내보내지 않는다(수집 모듈이
 `app.processing.request_check`를 불러오므로 서로 불러오는 고리가 생긴다).
@@ -24,6 +25,7 @@ from app.generation import (
     GenerationProvider,
     run_generation,
 )
+from app.judgement.provider import JudgementProvider
 from app.processing.generation import GenerationOutput
 from app.processing.pipeline import Clock
 from app.processing.request_check import CheckedRequest, SourceMode
@@ -42,6 +44,8 @@ class LiveAssembly:
     generation_budget: timedelta
     collection_limits: CollectionLimits = PROPOSED_LIMITS
     generation_limits: GenerationLimits = PROPOSED_GENERATION_LIMITS
+    # 판정 공급자(CR3). None이면 AI 쪽이 꺼져 판정 호출이 0번이다(BR1.1·BR1.3).
+    judge_factory: Callable[[], JudgementProvider] | None = None
 
 
 class LiveGenerator:
@@ -82,11 +86,13 @@ class LiveGenerator:
             # 관계 조회는 후보 판정에 꼭 필요하다(없으면 판정이 결함으로 멈춘다). 추가 기준 브랜치를 넘길
             # 공급원이 없어 기본값(없음)을 쓴다.
             relations=RelationOptions(),
+            # allow_private_repository는 넘기지 않는다: 운영은 공개 저장소만 모은다(FR10 확인 명령만 예외).
         )
         built = build_candidates(request, outcome)
         if not built.candidates:
             # 생성할 후보가 없으면 제공자를 만들지 않는다. 생성 흐름도 이때는 후보·미제공·실패를 그대로 둔다.
             return built
+        factory = assembly.judge_factory
         run = run_generation(
             request,
             outcome,
@@ -95,5 +101,6 @@ class LiveGenerator:
             clock=self._clock,
             deadline=self._picked_at + assembly.generation_budget,
             limits=assembly.generation_limits,
+            judge=None if factory is None else factory(),
         )
         return run.output

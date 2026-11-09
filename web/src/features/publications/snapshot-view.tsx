@@ -106,10 +106,13 @@ function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; h
           ? <p className={styles.muted}>작성자 설명이 없습니다.</p>
           : <LinkedText text={snapshot.authorDescription} range={rangeFor(highlight, "authorDescription")} />}
       </section>
-      <section className={styles.snapshotSection} data-testid="snapshot-catch-ai-draft">
-        <h4>AI 설명 초안</h4>
-        <p className={snapshot.aiDraft === null ? styles.muted : styles.freeText}>{snapshot.aiDraft ?? "AI 설명 초안이 없습니다."}</p>
-      </section>
+      {/* Catch 개편 CR3 BR7.1(2026-11-08 팀장 결정): AI 설명 초안이 없으면(null) 칸을 그리지 않는다. 사본에는 만든 초안만 담기므로 없음과 실패를 가르지 않는다. */}
+      {snapshot.aiDraft !== null && (
+        <section className={styles.snapshotSection} data-testid="snapshot-catch-ai-draft">
+          <h4>AI 설명 초안</h4>
+          <p className={styles.freeText}>{snapshot.aiDraft}</p>
+        </section>
+      )}
     </div>
   );
 }

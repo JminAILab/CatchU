@@ -72,6 +72,8 @@ from github_synthetic import (
 
 from app.collection import GitHubAccount
 from app.generation import ProviderRequest, run_generation
+from app.generation.request import PreparedFile, PreparedLine
+from app.generation.response import Sent, ai_parts, written
 from app.generation.title import classify
 from app.processing import CheckedRequest
 
@@ -936,6 +938,9 @@ def test_unprovable_before_and_after_makes_no_new_github_call(repo: GitRepo) -> 
         "clock",
         "deadline",
         "limits",
+        # CR3: 판정 공급자와 FR10 확인 명령의 관찰자. 둘 다 GitHub 연결이 아니다.
+        "judge",
+        "observe",
     }
     assert run.output.candidates[0].title is None
     assert before.transport.paths == calls
@@ -1441,3 +1446,76 @@ def test_zero_context_restore_after_the_line_before_is_removed_is_null() -> None
     )
 
     assert generated_title(unit, Target(CODE, "limit")) is None
+
+
+# CR3 AI 쪽 제목 후보·설명 문장 읽기(BR3.1·BR5.1, 시나리오 S18·S30)
+
+
+def _ai_sent() -> Sent:
+    shown = PreparedLine(
+        "c1f1:L2", "a" * 40, "c1f1", "+", "const loginRateLimit = 5;", False, 2
+    )
+    hidden = PreparedLine("c1f1:L3", "a" * 40, "c1f1", "+", "token = [MASKED]", True, 3)
+    file = PreparedFile(
+        "c1f1", "a" * 40, "src/auth.ts", "modified", None, (shown, hidden)
+    )
+    return Sent({shown.id: shown, hidden.id: hidden}, {file.id: file})
+
+
+def test_s18_ai_title_candidates_over_40_chars_are_dropped() -> None:
+    """S18: 40자를 넘는 후보는 버린다(고쳐 쓰지 않는다). 41자는 버리고 40자는 남는다. 3개까지 쓴다."""
+    exact = "loginRateLimit " + "가" * 25
+    over = exact + "나"
+    assert (len(exact), len(over)) == (40, 41)
+    part = written(
+        [
+            {"text": over, "lines": ["c1f1:L2"]},
+            {"text": exact, "lines": ["c1f1:L2"]},
+            {"text": "  둘째 후보  ", "lines": ["c1f1:L2", "c1f1:L2"]},
+            {"text": "셋째", "lines": ["c1f1:L2"]},
+            {"text": "넷째", "lines": ["c1f1:L2"]},
+        ],
+        _ai_sent(),
+        prefix="t",
+        high=3,
+        max_chars=40,
+    )
+    assert part is not None
+    assert [(item.id, item.text) for item in part.items] == [
+        ("t1", exact),
+        ("t2", "둘째 후보"),
+        ("t3", "셋째"),
+    ]
+    assert [line.id for line in part.items[1].lines] == ["c1f1:L2"]
+    assert part.notes == ("dropped:TOO_LONG", "over:COUNT")
+
+
+@pytest.mark.parametrize(
+    ("item", "note"),
+    [
+        ({"text": "근거 없음", "lines": []}, "dropped:ITEM_SHAPE"),
+        ({"text": "가린 줄", "lines": ["c1f1:L3"]}, "dropped:MASKED_LINE"),
+        ({"text": "없는 줄", "lines": ["c9f9:L1"]}, "dropped:UNKNOWN_LINE"),
+        ({"text": "두\n줄", "lines": ["c1f1:L2"]}, "dropped:ITEM_SHAPE"),
+        ({"text": "", "lines": ["c1f1:L2"]}, "dropped:ITEM_SHAPE"),
+        ({"text": "키 더함", "lines": ["c1f1:L2"], "why": "x"}, "dropped:ITEM_SHAPE"),
+        ("문장", "dropped:ITEM_SHAPE"),
+    ],
+)
+def test_ai_items_without_valid_lines_are_dropped(item: object, note: str) -> None:
+    """근거 줄이 없거나 가린 줄·보낸 자료에 없는 줄을 가리킨 글, 모양이 틀린 글은 버린다(BR3.1·BR5.1)."""
+    part = written([item], _ai_sent(), prefix="s", high=3, max_chars=None)
+    assert part is not None
+    assert part.items == ()
+    assert part.notes == (note,)
+
+
+def test_s30_missing_sentences_make_the_response_unreadable() -> None:
+    """S30: 문장 칸이 없거나 목록이 아니면 읽을 수 없는 응답(None)이다. 제목 후보 칸이 없으면 후보 0개다."""
+    sent = _ai_sent()
+    assert ai_parts({"titleCandidates": []}, sent, max_title_chars=40) is None
+    assert ai_parts({"sentences": "문장"}, sent, max_title_chars=40) is None
+    parts = ai_parts({"sentences": []}, sent, max_title_chars=40)
+    assert parts is not None
+    assert parts.titles.items == () and parts.titles.notes == ("dropped:SHAPE",)
+    assert parts.sentences.items == ()

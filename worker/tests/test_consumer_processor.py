@@ -694,6 +694,54 @@ def test_logs_never_carry_record_text_title_or_second_work_fact(
         assert value not in text, value
 
 
+JUDGEMENT_KEY = "sk-proj-synthetic-judgement-key-should-not-leak"
+
+
+def test_ai_side_logs_carry_counts_but_no_record_candidate_sentence_or_key(
+    context_api: ApiReply,
+    caplog: pytest.LogCaptureFixture,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    """CR3 NFR2.6·NFR3.2·NFR5.2: AI 쪽이 켜진 LIVE 처리 뒤 생성 로그 한 줄에 판정·결과 건수가 있고, 기록의 글·AI
+    후보·문장·판정 키 원문은 어느 로그에도 없다."""
+    from app.collection.credentials import AccessToken
+
+    caplog.set_level(logging.DEBUG)
+    context_api.payload = live_payload(expires_at="2099-01-01T00:00:00Z")
+    live = replace(
+        live_settings(context_api.base_url), judgement_key=AccessToken(JUDGEMENT_KEY)
+    )
+    # 생성 마감은 총 상한 − 여유 60초다. AI 쪽은 생성 45초 + 판정 20초가 남아야 생성을 시작한다.
+    run = run_job(
+        request_job(live_message()),
+        settings=child_settings(limits=replace(FAST, total=150), live=live),
+        target=consumer_children.live_synthetic_ai_side,
+    )
+    child_logs = capfd.readouterr().err
+    text = caplog.text + child_logs
+
+    assert run.value == {"handled": "RESULT_SENT", "outcome": "SUCCEEDED"}
+    (entry,) = run.output.added[-1].data["candidates"]
+    assert entry["title"] == consumer_children.AI_TITLE
+    assert entry["draft"]["content"] == consumer_children.AI_SENTENCE
+    assert entry["workFacts"] == ["PR #3, 상태 열림"]
+    assert (
+        "aiSide=on judgementProvider=synthetic catchJudgements=1 materialJudgements=0"
+        in child_logs
+    )
+    assert "secondLinesRemoved=1 titleFromRecord=0 titleFromAi=1" in child_logs
+    for value in (
+        consumer_children.RECORD_PULL_TITLE,
+        consumer_children.RECORD_COMMIT_LINE,
+        consumer_children.AI_TITLE,
+        consumer_children.AI_SENTENCE,
+        "후보표식",
+        "문장표식",
+        JUDGEMENT_KEY,
+    ):
+        assert value not in text, value
+
+
 # 실패 사유 고정: BullMQ 완료 기록이 실패해도 원문이 실패 사유가 되지 않는다 ------------------
 
 

@@ -30,7 +30,7 @@ GitHub 연결 권한으로는 404 응답의 비공개 저장소와 없는 저장
 
 기존 Catch 등록의 회원+`workIdentity` 중복 판정을 재사용한다. 같은 작업은 기존 Catch ID·최초 내용·작성자 설명·공개 상태·근거를 유지하고 새 작업만 비공개 Catch로 추가한다. 진행·실패에도 기존 Catch를 삭제하지 않으며 이미 발행한 발행본을 변경하지 않는다. 상태의 `retry.allowed`는 최신 종료 요청에서 참이며 일반 종료 허용 이유는 `ANALYSIS_FINISHED`, 기존 결과 없는 확정 실패 이유는 `FAILURE_WITHOUT_RESULTS`다. 옛 요청은 후속 요청이 있으면 허용하지 않는다.
 
-실제 고지는 #424 본문에서 확정한 네 줄과 판본 `catchu-real-analysis-notice-v2`를 적용한다. [PR #433](https://github.com/JminAILab/CatchU/pull/433)의 팀장 승인이 고지 승인 기록이며, 문구 확정과 실제 실행 완료는 구분한다.
+실제 고지는 #424 본문에서 확정한 네 줄(v2, [PR #433](https://github.com/JminAILab/CatchU/pull/433)의 팀장 승인)에 Catch 개편 CR3가 2·3·4절을 바꾼 판본 `catchu-real-analysis-notice-v3`를 적용한다([분석 고지 「고지 v3」](analysis-intake.md#고지-v3--catch-개편-cr3)). v3의 승인 기록은 CR3 PR의 팀장 승인이며, 문구 확정과 실제 실행 완료는 구분한다.
 
 ## 메시지와 결과
 

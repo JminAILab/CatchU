@@ -119,11 +119,14 @@ def verify_repository(
     *,
     read_default_branch: bool = False,
     expected_repository_id: str | None = None,
+    allow_private_repository: bool = False,
 ) -> str | None:
     """대상 저장소에 접근되고, 응답이 요청한 공개 저장소인지 확인한다.
 
     read_default_branch면 기존 확인을 모두 통과한 뒤 기본 브랜치 이름을 읽어 돌려준다(관계
     조회만 쓴다). 아니면 그 값을 읽지 않아 그 값 때문에 멈추는 일이 없다.
+    allow_private_repository면 공개 여부만 따지지 않는다(FR10 확인 명령만 켠다). 저장소 ID·
+    같은 이름·크기 상한·공개 여부 칸의 모양 확인은 그대로 한다.
     """
     fetched = gateway.get(paths.metadata())
     if isinstance(fetched, Oversized):
@@ -147,8 +150,9 @@ def verify_repository(
         )
     with reading():
         public = normalize.repository_is_public(fetched.data)
-    if not public:
+    if not public and not allow_private_repository:
         # 수집 대상은 공개 저장소뿐이다. 토큰으로 접근된다고 비공개 자료를 모으지 않는다.
+        # 예외는 FR10 확인 명령(app.processing.confirm) 하나다. 운영 경로는 이 인자를 넘기지 않는다.
         # 비공개 읽기 권한이 없는 토큰이 받을 404와 같은 코드로 둔다.
         raise stop(
             FailureCode.REPOSITORY_UNREACHABLE,

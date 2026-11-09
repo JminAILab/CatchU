@@ -738,7 +738,8 @@ test("1번 자리 사본: position 순서로 그리고, Catch는 기록·작성�
   assert.equal(count(html, 'data-testid="snapshot-catch-mismatch"'), 1, "불일치 표지는 c1에만");
   assert.equal(count(html, 'data-testid="snapshot-catch-facts"'), 2);
   assert.equal(count(html, 'data-testid="snapshot-catch-description"'), 2);
-  assert.equal(count(html, 'data-testid="snapshot-catch-ai-draft"'), 2);
+  // c2는 AI 초안이 없어 칸을 그리지 않는다(Catch 개편 CR3 BR7.1, 2026-11-08 팀장 결정).
+  assert.equal(count(html, 'data-testid="snapshot-catch-ai-draft"'), 1);
   // AI 초안은 자기 표지 안에만 있고 작성자 설명 표지 안에는 없다
   const c1 = html.slice(html.indexOf('id="published-item-c1"'), html.indexOf('id="published-item-c2"'));
   const description = c1.slice(c1.indexOf('data-testid="snapshot-catch-description"'), c1.indexOf('data-testid="snapshot-catch-ai-draft"'));
@@ -755,9 +756,9 @@ test("1번 자리 사본: position 순서로 그리고, Catch는 기록·작성�
   assert.ok(m1.includes("&lt;b&gt;본문&lt;/b&gt;") && !m1.includes("<b>본문</b>"), "본문은 텍스트로만(NFR1.10)");
   assert.ok(m1.includes('href="https://github.com/o/r/blob/main/a.md"') && !m1.includes('href="https://evil.example/x"'));
   assert.ok(!html.includes("설명 초안을 생성하지 못했습니다") && !html.includes("자동으로 만들었습니다"), "10월 Catch 문구 없음");
-  // c2: 작성자 설명·AI 초안 없음 표시
+  // c2: 작성자 설명은 없음 표시, AI 초안은 칸을 그리지 않음(Catch 개편 CR3 BR7.1, 2026-11-08 팀장 결정)
   const c2 = html.slice(html.indexOf('id="published-item-c2"'));
-  assert.ok(c2.includes("작성자 설명이 없습니다.") && c2.includes("AI 설명 초안이 없습니다."));
+  assert.ok(c2.includes("작성자 설명이 없습니다.") && !c2.includes("AI 설명 초안"));
 });
 
 test("근거 강조: highlight가 가리킨 항목만 data-highlighted이고 그 fieldPath의 [charStart, charEnd)만 <mark>다. 범위가 없으면 항목만 표시한다", () => {
