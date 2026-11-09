@@ -7,7 +7,7 @@ const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
 const { test } = require('node:test');
 const {
-  RagEvalInputError, createMeasureDeps, createSyntheticDeps, parseArgs, parseInput, runRagEval, sampleInput, splitJdRequirements,
+  RagEvalInputError, createMeasureDeps, createSyntheticDeps, dbPublicationAccess, parseArgs, parseInput, runRagEval, sampleInput, splitJdRequirements,
 } = require('../../scripts/rag-eval/rag-eval.cjs');
 const { GoldQuoteNotFound, evidencePassRate, findGoldLocations, hitRate, isHitAt } = require('../../scripts/rag-eval/gold-locations.cjs');
 const { buildRepositoryRecord, writeEvaluation } = require('../../scripts/rag-eval/rag-eval-report.cjs');
@@ -132,4 +132,32 @@ test('입력·인자 검사: measure는 질문 10개·--input·두 키·테스�
   await assert.rejects(createMeasureDeps({ env: { ...env, CATCHU_EMBEDDING_API_KEY: '' }, publicationAccess: () => ({}) }), /EMBEDDING/);
   await assert.rejects(createMeasureDeps({ env: { ...env, DB_NAME: 'catchu_test' }, publicationAccess: () => ({}) }), /테스트 DB/);
   await assert.rejects(createMeasureDeps({ env: { ...env, DB_NAME: 'catchu' }, publicationAccess: null }), /PublicationAccess/);
+});
+
+test('measure의 사본 읽기는 U4 DB 구현으로 읽기 전용 트랜잭션에서 published_item을 순서대로 읽고, 없는 발행본은 빈 사본 없이 실패한다(BR10.1, C-10)', async () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  const calls = [];
+  const item = { publishedItemId: '22222222-2222-4222-8222-222222222222', position: 1, itemKind: 'TEXT_MATERIAL', title: '머리글', snapshot: { body: '본문' } };
+  const dataSource = (publicationRows) => ({
+    async transaction(isolation, run) {
+      calls.push(isolation);
+      return run({
+        async query(sql, params) {
+          calls.push(sql.replace(/\s+/g, ' ').trim().slice(0, 40));
+          if (/^SET TRANSACTION READ ONLY/.test(sql)) return [];
+          assert.deepEqual(params, [id]);
+          if (/FROM publication WHERE/.test(sql)) return publicationRows;
+          if (/FROM published_item WHERE/.test(sql)) return [item];
+          throw new Error(`예상 밖 질의: ${sql}`);
+        },
+      });
+    },
+  });
+  const snapshot = await dbPublicationAccess(dataSource([{ title: '시연', publishedAt: '2026-11-09T00:00:00Z', expiresAt: '2027-02-07T00:00:00Z' }]))
+    .readSnapshot(id);
+  assert.equal(snapshot.title, '시연');
+  assert.deepEqual(snapshot.items, [{ ...item, pdfPages: null }]);
+  assert.equal(calls[0], 'REPEATABLE READ');
+  assert.equal(calls[1], 'SET TRANSACTION READ ONLY');
+  await assert.rejects(dbPublicationAccess(dataSource([])).readSnapshot(id), (error) => error.name === 'NotFound');
 });

@@ -10,6 +10,7 @@
 // 입력 파일 모양: { publicationId, questions: [{ question, goldQuotes: [글귀] }](measure는 10개), jd?: 문자열, targetVersion?,
 //   snapshot?: { title, publishedAt, expiresAt, items }(synthetic만, 없으면 내장 합성 발행본) }
 require('reflect-metadata');
+const { randomBytes } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { AiInputTooLarge, SOURCE_LABELS } = require('../../dist/ai-generation/ai-generation.types');
@@ -245,6 +246,17 @@ async function createMeasureDeps({ env = process.env, publicationAccess }) {
   };
 }
 
+/**
+ * measure 모드의 사본 읽기. 앱과 같은 U4 C-10 DB 구현(`DbPublicationAccess`)을 평가 스크립트의 DataSource로 만든다.
+ * 평가는 `readSnapshot`만 부른다. 그 경로는 grant 키·소유 회원·시계를 쓰지 않으므로 grant 키는 이 실행에서만 쓰는 무작위 값으로 둔다
+ * (앱의 링크 grant와 섞이지 않고, 받은 사람 판정에 쓰여도 어떤 grant도 통과하지 않는다).
+ */
+function dbPublicationAccess(dataSource) {
+  const { DbPublicationAccess } = require('../../dist/publications/db-publication-access');
+  const { OwnerProfileReader } = require('../../dist/member-profile/owner-profile-reader');
+  return new DbPublicationAccess(dataSource, randomBytes(32), new OwnerProfileReader(dataSource), () => new Date());
+}
+
 function parseArgs(argv) {
   const [mode, ...rest] = argv;
   if (mode !== 'synthetic' && mode !== 'measure') throw new RagEvalInputError('첫 인자는 synthetic 또는 measure여야 합니다.');
@@ -270,9 +282,8 @@ async function main(argv) {
     if (input.snapshot === null) input.snapshot = sampleInput().snapshot;
     deps = createSyntheticDeps(input);
   } else {
-    // TODO(U4 합류): U4의 DB PublicationAccess 만들기 함수를 여기서 넘긴다. 이 브랜치에는 그 구현이 없어(code-summary 「Step 1」)
-    // measure는 아래에서 멈춘다. 측정은 U4 합류 뒤 실제 발행 경로로 만든 시연 발행본으로만 한다(BR10.1).
-    deps = await createMeasureDeps({ publicationAccess: null });
+    // 측정은 실제 발행 경로로 만든 시연 발행본으로만 한다(BR10.1).
+    deps = await createMeasureDeps({ publicationAccess: dbPublicationAccess });
   }
   try {
     const { summary, rawPath, recordPath } = await runRagEval({ mode: options.mode, input, deps, outDir });
@@ -291,6 +302,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  EVAL_SEARCH_LIMIT, RagEvalInputError, createMeasureDeps, createSyntheticDeps, main, parseArgs, parseInput, runRagEval, sampleInput,
+  EVAL_SEARCH_LIMIT, RagEvalInputError, createMeasureDeps, createSyntheticDeps, dbPublicationAccess, main, parseArgs, parseInput, runRagEval,
+  sampleInput,
   splitJdRequirements,
 };
