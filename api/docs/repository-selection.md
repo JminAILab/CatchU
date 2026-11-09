@@ -103,7 +103,7 @@ if (input.consent.scopeRevision !== selection.scopeRevision ||
 
 ### worker 선정 — #232
 
-`DatabaseRepositorySelectionSource`가 `WorkerRepositorySelectionSource`를 구현한다. 앱 등록과 worker 연결은 #232 후속이다.
+`DatabaseRepositorySelectionSource`가 `WorkerRepositorySelectionSource`를 구현한다. 앱 등록과 worker 연결은 [PR #348](https://github.com/JminAILab/CatchU/pull/348)(#232)로 제품 조립에 들어갔다. 조립 조건은 [worker 컨텍스트 「조립 조건과 후속 공급자」](worker-context.md#조립-조건과-후속-공급자)를 따른다.
 
 ```ts
 WorkerContextModule.register({ selectionSource: new DatabaseRepositorySelectionSource() });
