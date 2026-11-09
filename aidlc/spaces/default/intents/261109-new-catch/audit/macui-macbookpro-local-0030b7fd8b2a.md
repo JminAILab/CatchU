@@ -1504,3 +1504,489 @@
 **Answer Mode**: chat (reused from intent-capture)
 
 ---
+
+## Artifact Created
+**Timestamp**: 2026-11-09T01:45:55Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-09T01:49:09Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: ac901228f730f64c4
+**Message**: 새 Catch 작업은 목적 정리 승인과 커밋을 마쳤고, 지금은 가능성·제약 검토 단계입니다. 다음은 질문 7개에 답해 주실 차례이며, Q1인 코드 기반 판본을 먼저 정해 주시면 됩니다.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-09T01:49:43Z
+**Event**: HUMAN_TURN
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Origin**: person
+**Source**: typed
+**Message Id**: 5ff38a2c
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T01:49:55Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T01:49:57Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T01:50:04Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T01:50:06Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T01:50:08Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T01:50:10Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T01:50:13Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T01:50:15Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T01:50:22Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-09T01:50:36Z
+**Event**: DECISION_RECORDED
+**Stage**: feasibility
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-09T01:53:31Z
+**Event**: HUMAN_TURN
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: 370241a9
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-09T01:53:31Z
+**Event**: QUESTION_REPLIED
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Question**: - [개발] Q1 코드 기반: X. 작업 브랜치에 Catch 개편 코드가 있고 통합 브랜치 최근 커밋 40개만 빠짐. 범위 정하기까지 이대로, 1차 통합 확인 뒤 Catch 개편 PR 3개(CR1→CR3→CR2)가 통합 브랜치에 합쳐지면 merge commit으로 들여와 대략 화면·기존 코드 읽기부터 잇는다(확인 날짜 미정)\n- [개발] Q2 바뀌는 시스템: A. web·api·worker 안에서만, 새 외부 연동·추가 호출 없음\n- [규정·고지] Q3: A. 새 수집 없음, 3단계 결과 문장을 남기면 고지 v3 4절 한 줄·팀장 승인, 지원자 화면 외부 AI 전송 안내\n- [개발] Q4 이전 승인과의 충돌: A. §7 일곱 가지를 다시 열고 승인 원본은 고치지 않음\n- [팀 운영] Q5 일정상 막는 것: X. 1차 통합 확인(날짜 미정) 뒤 Catch 개편 PR 3개, 그보다 늦게 이 intent 코드 PR. 단계별 선행·U4 W1 확인·그 사이 문서 단계는 A 그대로\n- [인프라] Q6: A. 새 AWS 자원 없음, api·worker 함께 배포, 공유 인프라는 팀장\n- [개발] Q7 기술 위험: A~E 모두 위험 목록에\n\n이대로 세 문서를 만들까요?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T01:53:34Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Context**: ideation > feasibility > feasibility-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-09T01:53:35Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: feasibility
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Questions SHA-256**: 89891bfe043e2681c0ce33be959609c2bc18858c8c61cf1a5a35fabbe39bc4ff
+**Hash Scope**: confirmed-content-v2
+**Message Id**: 370241a9
+**Message Ids**: 5ff38a2c,370241a9
+**Person Reply**: Q1은 X: 작업 브랜치 worker/새-catch는 Catch 개편 브랜치(eb2bd46d) 위에 origin/dev를 merge commit으로 합친 것이라 Catch 개편 코드는 이미 들어 있고, 통합 브랜치의 최근 커밋 40개(7ef0dd69까지)만 빠져 있다. 범위 정하기까지는 이대로 하고, 12월 intent의 1차 통합 확인이 끝나 Catch 개편 PR 3개(CR1→CR3→CR2)가 통합 브랜치에 합쳐지면, 통합 브랜치를 이 브랜치에 merge commit으로 합친 뒤 대략 화면·기존 코드 읽기부터 이어 간다. 1차 통합 확인 날짜는 정해지지 않았다. 질문 파일 「질문의 범위」의 조회 사실(「dev 기준이다. 통합 브랜치와 Catch 개편 브랜치는 담겨 있지 않다」)도 이 사실로 고쳐 달라.\nQ5는 X: A에서 「11/13」을 빼고, 「12월 intent의 1차 통합 확인(개발 서버)이 끝난 뒤 Catch 개편 PR 3개를 올리므로, 이 intent의 코드 PR은 그보다 늦다. 확인 날짜는 정해지지 않았다」로 적는다. 나머지(단계별 선행, U4 W1 확인, 그 사이 문서 단계)는 A 그대로.\nQ2~Q4, Q6은 A. Q7은 A, B, C, D, E. done\nLooks correct
+**Summary Authorization Id**: 2be6face44cde654a747a81a04eaa3e372fd467576787e115c05673f013cc8bf
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-09T01:54:00Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-assessment.md
+**Context**: ideation > feasibility > feasibility-assessment.md
+**Summary Authorization Id**: 2be6face44cde654a747a81a04eaa3e372fd467576787e115c05673f013cc8bf
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-09T01:54:19Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/constraint-register.md
+**Context**: ideation > feasibility > constraint-register.md
+**Summary Authorization Id**: 2be6face44cde654a747a81a04eaa3e372fd467576787e115c05673f013cc8bf
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-09T01:54:35Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/raid-log.md
+**Context**: ideation > feasibility > raid-log.md
+**Summary Authorization Id**: 2be6face44cde654a747a81a04eaa3e372fd467576787e115c05673f013cc8bf
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T01:54:45Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/memory.md
+**Context**: ideation > feasibility > memory.md
+**Summary Authorization Id**: 2be6face44cde654a747a81a04eaa3e372fd467576787e115c05673f013cc8bf
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T01:54:46Z
+**Event**: SENSOR_FIRED
+**Fire id**: 1f37329a
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-assessment.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T01:54:46Z
+**Event**: SENSOR_PASSED
+**Fire id**: 1f37329a
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-assessment.md
+**Duration ms**: 77
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T01:54:46Z
+**Event**: SENSOR_FIRED
+**Fire id**: 17ce66d2
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/constraint-register.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T01:54:46Z
+**Event**: SENSOR_PASSED
+**Fire id**: 17ce66d2
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/constraint-register.md
+**Duration ms**: 96
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T01:54:46Z
+**Event**: SENSOR_FIRED
+**Fire id**: 209d6998
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/raid-log.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T01:54:46Z
+**Event**: SENSOR_PASSED
+**Fire id**: 209d6998
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/raid-log.md
+**Duration ms**: 102
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T01:54:46Z
+**Event**: SENSOR_FIRED
+**Fire id**: 4d1c801a
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T01:54:46Z
+**Event**: SENSOR_PASSED
+**Fire id**: 4d1c801a
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Duration ms**: 84
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T01:54:47Z
+**Event**: SENSOR_FIRED
+**Fire id**: 36f9b2de
+**Sensor ID**: upstream-coverage
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-assessment.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T01:54:47Z
+**Event**: SENSOR_PASSED
+**Fire id**: 36f9b2de
+**Sensor ID**: upstream-coverage
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-assessment.md
+**Duration ms**: 94
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T01:54:47Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0cce2141
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-assessment.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T01:54:47Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0cce2141
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-assessment.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T01:54:47Z
+**Event**: SENSOR_FIRED
+**Fire id**: d6c24939
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/constraint-register.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T01:54:47Z
+**Event**: SENSOR_PASSED
+**Fire id**: d6c24939
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/constraint-register.md
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T01:54:47Z
+**Event**: SENSOR_FIRED
+**Fire id**: 1d18f8b7
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/raid-log.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T01:54:47Z
+**Event**: SENSOR_PASSED
+**Fire id**: 1d18f8b7
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/raid-log.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T01:54:47Z
+**Event**: SENSOR_FIRED
+**Fire id**: cdf38afb
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T01:54:47Z
+**Event**: SENSOR_PASSED
+**Fire id**: cdf38afb
+**Sensor ID**: required-sections
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T01:54:48Z
+**Event**: SENSOR_FIRED
+**Fire id**: c614eb0e
+**Sensor ID**: upstream-coverage
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-assessment.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T01:54:48Z
+**Event**: SENSOR_PASSED
+**Fire id**: c614eb0e
+**Sensor ID**: upstream-coverage
+**Stage slug**: feasibility
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-assessment.md
+**Duration ms**: 73
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-09T01:54:48Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: feasibility
+**Next Stage**: scope-definition
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-assessment.md=passed; required-sections@aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/constraint-register.md=passed; required-sections@aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/raid-log.md=passed; required-sections@aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-questions.md=passed; upstream-coverage@aidlc/spaces/default/intents/261109-new-catch/ideation/feasibility/feasibility-assessment.md=passed
+**Open Decisions**: 0
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-09T01:59:08Z
+**Event**: HUMAN_TURN
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: 0fa70c4a
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-09T01:59:09Z
+**Event**: QUESTION_REPLIED
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Question**: 가능성·제약 검토가 끝났습니다. 어떻게 할까요?
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-09T01:59:11Z
+**Event**: GATE_APPROVED
+**Stage**: feasibility
+**User Input**: Approve
+**Person Reply**: Approve
+**Message Id**: 0fa70c4a
+**Brief Digest**: none
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-09T01:59:11Z
+**Event**: STAGE_COMPLETED
+**Stage**: feasibility
+**Validation Basis**: {"graphContract":"sha256:543912e848784f58af817ec322275022445da586f78256c281d1c37d967b15aa","inputs":[{"artifact":"intent-statement","contentHash":"sha256:94f34f681ffa6259f008ff0f6b2b296e8f359576d8b8b1d0e8456d586f071421","instanceCount":1,"presentCount":1,"producer":"intent-capture","required":true,"structureHash":"sha256:6ce1cbc843fa0e60dce00be3c1e34c609718b24c193306f3fe8e018164557c9f"}],"outputs":[{"artifact":"constraint-register","contentHash":"sha256:8cd133e201f79a6ca372c2a7790b19323663e511a9c624913af2ad0600d63612","instanceCount":1,"presentCount":1,"producer":"feasibility","required":true,"structureHash":"sha256:9d034d31a49543404d0932b1336617eb12895e6e47685d2479d0f655b5edcf3a"},{"artifact":"feasibility-assessment","contentHash":"sha256:1cd49a75b4550b686c39101c44d3c2ce3525b78bc3757a3fd5d6a80864fdadba","instanceCount":1,"presentCount":1,"producer":"feasibility","required":true,"structureHash":"sha256:cd81228daa7ad3ab8fb748fb8d3e488bcddcee034fc88bb5bdcc34c15b7f0ed1"},{"artifact":"feasibility-questions","contentHash":"sha256:5d4bc66b5173ca17611e6b2e97d0435ba68a95374952a068237dcfc169097c9c","instanceCount":1,"presentCount":1,"producer":"feasibility","required":true,"structureHash":"sha256:41b9de5226f332434a7a105c6dec9e3415a648e42180b5233f89d3982caf3824"},{"artifact":"raid-log","contentHash":"sha256:67c8db64271951bd260f8db5b89273473f03381af743f2baee2cb62c6ef43668","instanceCount":1,"presentCount":1,"producer":"feasibility","required":true,"structureHash":"sha256:11429f42672dff64bc23738dbf67aceaca97f10aa5e83a9f45217dc1856ec8c6"}],"projectType":"brownfield","schema":3}
+**Details**: Stage Feasibility & Constraints approved by gate
+**Tokens In**: 48
+**Tokens Out**: 28444
+**Cache Read**: 9451858
+**Cache Write**: 66400
+**Cost USD**: 2.99
+**By Model**: opus-5-5=2.99
+**By Agent**: main=2.99
+**Tokens By Model**: opus-5-5=48/28.4k/9.5M/66.4k
+**Tokens By Agent**: main=48/28.4k/9.5M/66.4k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-09T01:59:11Z
+**Event**: STAGE_STARTED
+**Stage**: scope-definition
+**Agent**: aidlc-product-agent
+**Answer Mode**: chat (reused from intent-capture)
+
+---
