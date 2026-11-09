@@ -279,6 +279,28 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _check_saved_target(
+    outcome: CollectionOutcome, repository: RepositoryCoordinates, account_id: int
+) -> None:
+    """읽은 수집 결과가 --repository·--account-id와 같은 대상인지 본다.
+
+    확인표는 --repository 이름으로 쓰므로, 다른 저장소·계정의 수집을 읽으면
+    그 결과가 이 저장소의 확인표로 섞인다. 저장소 이름은 GitHub처럼 대소문자를 가리지
+    않고, 계정은 바뀌지 않는 숫자 식별자로 본다.
+    """
+    saved = outcome.repository
+    if saved is None or (saved.owner.lower(), saved.name.lower()) != (
+        repository.owner.lower(),
+        repository.name.lower(),
+    ):
+        raise ConfirmationError("수집 결과 파일의 저장소가 --repository와 다르다")
+    if (
+        outcome.linked_account is None
+        or outcome.linked_account.account_id != account_id
+    ):
+        raise ConfirmationError("수집 결과 파일의 연동 계정이 --account-id와 다르다")
+
+
 def _coordinates(value: str) -> RepositoryCoordinates:
     owner, _, name = value.partition("/")
     if not _COORDINATE.fullmatch(owner) or not _COORDINATE.fullmatch(name):
@@ -350,6 +372,7 @@ def run(argv: Sequence[str] | None, environment: dict[str, str]) -> int:
         clock = lambda: datetime.now(UTC)  # noqa: E731
         if collection.exists():
             outcome = collection_file.read(collection)
+            _check_saved_target(outcome, repository, args.account_id)
         else:
             if token is None:
                 raise ConfirmationError(f"수집 결과 파일이 없어 {TOKEN_ENV}가 필요하다")
