@@ -100,14 +100,10 @@ GENERATE_SCHEMA = _strict(
             },
         },
         "title": _TITLE_SCHEMA,
+        # 생각해 볼 질문은 AI가 쓴 글이다(#487): 종류와 글 둘뿐이고 줄·파일을 가리키지 않는다.
         "questions": {
             "type": "array",
-            "items": {
-                "anyOf": [
-                    _strict({"type": _QUESTION_TYPE, "line": _TEXT, "name": _TEXT}),
-                    _strict({"type": _QUESTION_TYPE, "file": _TEXT}),
-                ]
-            },
+            "items": _strict({"type": _QUESTION_TYPE, "text": _TEXT}),
         },
     }
 )

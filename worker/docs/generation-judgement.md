@@ -1,6 +1,6 @@
 # 판정 — AI 쪽 제목 후보·설명 문장과 재료 판정 (CR3)
 
-> Catch 개편 intent의 CR3 Unit이 더한 「AI 쪽」이다. AI 쪽이 켜지면 Claude가 바뀐 줄만 보고 제목 후보와 설명 문장을 쓰고, 판정 공급자가 그 글과 작성자의 기록의 글을 참일 확률·고르기·점수로만 판정해 거른다. 큰 후보는 생성 전에 재료(파일)도 판정한다. 꺼지면 [생성](generation.md)의 지금 경로(틀 문장·조각 제목·CR1 재료 순서) 그대로다. 정본은 기능 설계 `aidlc/spaces/default/intents/261103-catch-redesign/construction/cr3-ai-drafts/functional-design/`(rules.md의 BR1~BR10)와 비기능 설계 같은 폴더의 `nfr-design/`이다. 코드는 `app/judgement/`(판정 공급자 자리), `app/generation/judged.py`·`flow.py`(적용), `app/processing/confirm.py`(FR10 확인 명령)다. 호출 설정은 [생성의 실제 제공자 「판정 공급자」](generation-provider.md#판정-공급자-cr3), 상한과 로그 칸은 [생성 호출 한도와 운영 로그](generation-limits.md)에 있다.
+> Catch 개편 intent의 CR3 Unit이 더한 「AI 쪽」이다. AI 쪽이 켜지면 Claude가 바뀐 줄만 보고 제목 후보와 설명 문장을 쓰고, 판정 공급자가 그 글과 작성자의 기록의 글을 참일 확률·고르기·점수로만 판정해 거른다. 큰 후보는 생성 전에 재료(파일)도 판정한다. 꺼지면 [생성](generation.md)의 지금 경로(설명 틀 문장·조각 제목·CR1 재료 순서) 그대로다. 생각해 볼 질문은 켜짐과 관계없이 AI가 쓴다(#487). 정본은 기능 설계 `aidlc/spaces/default/intents/261103-catch-redesign/construction/cr3-ai-drafts/functional-design/`(rules.md의 BR1~BR10)와 비기능 설계 같은 폴더의 `nfr-design/`이다. 코드는 `app/judgement/`(판정 공급자 자리), `app/generation/judged.py`·`flow.py`(적용), `app/processing/confirm.py`(FR10 확인 명령)다. 호출 설정은 [생성의 실제 제공자 「판정 공급자」](generation-provider.md#판정-공급자-cr3), 상한과 로그 칸은 [생성 호출 한도와 운영 로그](generation-limits.md)에 있다.
 
 이 문서에서 쓰는 말:
 
@@ -74,7 +74,8 @@ AI 쪽이 켜진 생성 호출은 다른 지시문(`GENERATE_AI_INSTRUCTIONS`)�
 - 후보·문장마다 보낸 자료의 고를 수 있는 줄을 하나 이상 가리켜야 한다. 근거 줄이 없거나, 보낸 자료에 없는 줄·가린 줄을 가리키거나, 모양이 틀린 항목은 버린다. 맞는 항목을 앞에서부터 3개까지 쓰고 응답 안 순서로 `t1~t3`·`s1~s3`을 붙인다.
 - 40자를 넘는 후보는 버리고 고쳐 쓰지 않는다(Q3 A). 조각 제목도 고쳐 쓰지 않아, 형식 위반이거나 40자를 넘으면 조각 제목이 없다.
 - `sentences` 칸이 없거나 목록이 아니면 응답을 읽을 수 없는 것으로 보아 생성 호출 실패(`GENERATION_RESPONSE_UNREADABLE`, 설명·질문 FAILED)이고 판정하지 않는다. 칸은 맞지만 문장이 모두 버려지면 판정할 문장이 없어 NOT_GENERATED다. `titleCandidates`가 없으면 후보가 0개다.
-- 생각해 볼 질문은 지금 틀 그대로 만든다.
+- 설명 문장은 한 일부터 말한다([#487](https://github.com/JminAILab/CatchU/issues/487), 2026-11-08 팀장 결정): 첫 문장은 작업 전체가 한 일을 기능·동작 수준으로 쓰고 그 일을 보여 주는 줄을 여러 개 가리킨다. 둘째·셋째 문장은 바뀐 곳(화면·서버·시험 등)마다 한 일을 하나씩 쓰고, 바뀐 곳이 하나면 늘리지 않는다. 기술 이름은 그 기술로 한 일과 함께 쓰고, 클래스 이름·스타일 값·import 한 줄처럼 그것만으로 한 일이 드러나지 않는 세부로 문장을 만들지 않는다. 문장 수(1~3개), 목적·효과·평가·의도를 쓰지 않는 규칙, 기계 대조·판정·0.9 문턱은 그대로다.
+- 생각해 볼 질문은 AI 쪽이 꺼졌을 때와 같은 지시·응답 모양·검사로 AI가 쓴다. 판정·기계 대조를 거치지 않고 판정 요청에도 넣지 않는다([생성 「생각해볼 질문」](generation.md#생각해볼-질문), #487).
 
 ## 기계 대조
 
@@ -141,7 +142,7 @@ uv run --locked python -m app.processing.confirm \
 - 토큰은 fine-grained 토큰 하나로, 공개 저장소 읽기에 비공개 `JminAILab/CatchU`의 Contents·Metadata·Pull requests·Issues Read 권한을 더한 것이다. 명령은 키·토큰을 읽은 뒤 자기 환경에서 지우고, 파일·로그·확인표에 쓰지 않는다.
 - 출력 폴더는 기본 `~/catchu-local-live/cr3-fr10/`(`--output`으로 바꿈)다. 출력 폴더와 수집 결과 파일은 실제 경로를 풀어 이 저장소 작업 폴더 안이면 거부한다. 파일은 본인만 읽고 쓰는 권한(600)으로 쓴다.
 - 수집 결과 파일 `<owner>__<name>.collection.json`(`--collection`으로 바꿈)이 있으면 그 파일을 읽고, 없으면 운영 수집과 같은 경로로 실제 GitHub에서 모아 그 파일로 남긴다. 공개 저장소와 비공개 CatchU 모두 같은 길이다. 운영과 다른 점은 하나로, 이 명령만 `collect(..., allow_private_repository=True)`로 수집의 공개 저장소 확인을 끈다(기본값은 끄지 않음, 저장소 ID·같은 이름·크기 상한 확인은 그대로). 큐 소비자의 LIVE 처리는 이 인자를 넘기지 않아 지금처럼 공개 저장소만 모은다([GitHub 수집 「공개 저장소」](github-collection.md)). 파일은 수집 결과 모양 그대로이고(토큰 없음), 형식 정보만 보고 다시 읽는다(실행 코드 형식을 쓰지 않는다).
-- 확인표 `<owner>__<name>.sheet.json`에는 Catch마다 기록의 글(원문·규칙 부실 여부), AI 후보와 문장(근거 줄 id·기계 대조 통과·판정 값), 판정 상태·실패 코드·질문별 답, 기록의 글 판정, 고른 AI 후보(기록의 글이 제목이어도 적는다), 최종 제목과 출처, 남긴 문장, 둘째 줄 지움 여부, 재료 판정 여부·걸린 시간과 빈 맞음/틀림 칸(`marks`)이 있다. 머리에는 판정 공급자·Catch 수·분석 전체 시간·가장 긴 재료 판정 시간이 있다(비기능 설계 성능 「20초 안에 드는지」).
+- 확인표 `<owner>__<name>.sheet.json`에는 Catch마다 기록의 글(원문·규칙 부실 여부), AI 후보와 문장(근거 줄 id·기계 대조 통과·판정 값), 판정 상태·실패 코드·질문별 답, 기록의 글 판정, 고른 AI 후보(기록의 글이 제목이어도 적는다), 최종 제목과 출처, 남긴 문장, 둘째 줄 지움 여부, 재료 판정 여부·걸린 시간과 빈 맞음/틀림 칸(`marks`)이 있다. 머리에는 판정 공급자·Catch 수·분석 전체 시간·가장 긴 재료 판정 시간(비기능 설계 성능 「20초 안에 드는지」)과 설명 초안이 없는(NOT_GENERATED) Catch 수(`draftNotGenerated`)가 있다. #487 다시 확인용으로 Catch마다 설명 초안 상태·실패 코드(`draft`), 질문 상태·실패 코드·AI가 쓴 질문(`reflection`)과 빈 예/아니오 칸 셋(`marks`의 `descriptionClear` 설명만 보고 무엇을 했는지 알겠나, `firstSentenceCodeDetail` 첫 문장이 코드 세부만 옮겼나, `questionsWholeWork` 질문이 작업 전체를 묻나)이 더 있다.
 - 팀장이 `marks`에 맞음·틀림을 채우고 기준(BR9.3)을 판정한다. 커밋되는 확인 기록에는 건수·결과·조정 횟수·AI 쪽을 켤지 결정만 옮긴다. 확인표·수집 결과 원문은 Git에 넣지 않고, 확인이 끝나면 지운다(BR9.2).
 
 ## 시험
@@ -150,7 +151,7 @@ uv run --locked python -m app.processing.confirm \
 |---|---|
 | `tests/test_judgement.py` | 요청 조립(정해진 칸만, 지시문과 자료 분리, 질문 400개, 앞 5줄 가리기), 답 읽기(범위·모양·겹친 id, 고르기 합 1, 점수), 호출 한 번과 실패 셋, 합성·Claude·OpenAI 어댑터(진짜 SDK에 가짜 HTTP 전송: 주소 고정·키·환경변수 무시·다시 시도 없음·redirect·응답 상한·로그), 두 공급자의 질문 집합이 같음(S2) |
 | `tests/test_judgement_factcheck.py` | 기계 대조(S4, PR 번호·숫자 앞자리 0·예외 낱말·한글·경로 낱말) |
-| `tests/test_judgement_confirmation.py` | 수집 결과 파일 왕복, 확인표 칸(S25), 저장소 안 경로 거부, 직접 수집·키와 토큰이 파일·출력·로그·환경에 남지 않음, 비공개 저장소 직접 수집(Step 20) |
+| `tests/test_judgement_confirmation.py` | 수집 결과 파일 왕복, 확인표 칸(S25, #487 칸과 설명 없는 Catch 수), 저장소 안 경로 거부, 직접 수집·키와 토큰이 파일·출력·로그·환경에 남지 않음, 비공개 저장소 직접 수집(Step 20) |
 | `tests/test_collection_controls.py` | 비공개 저장소는 기본값이면 `REPOSITORY_UNREACHABLE`, 허용하면 끝까지 모으되 다른 저장소 확인은 그대로, LIVE 처리가 `allow_private_repository`를 넘기지 않음(Step 20) |
 | `tests/test_generation_flow.py` | 생성 요청·응답의 AI 쪽(S3·S18·S30), 호출 수·순서·시간 몫·상한(S1·S7·S27·S28), 답 적용(S5·S6·S9~S11·S19·S20·S26·S31), 판정 입력(S8), 로그 건수 |
 | `tests/test_generation_groups.py`·`test_generation_material.py` | 재료 판정 답 적용(S13~S17)과 흐름 수준의 재료 판정(S13·S15·S29) |

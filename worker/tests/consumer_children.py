@@ -215,8 +215,8 @@ def live_synthetic_ai_side(conn: Connection, child_input: ChildInput) -> None:
         ScriptedProvider,
         ai_answer,
         code_title,
-        line_question,
         pick,
+        question,
         written,
     )
     from github_synthetic import MEMBER, sha
@@ -248,7 +248,7 @@ def live_synthetic_ai_side(conn: Connection, child_input: ChildInput) -> None:
             titles=[written(AI_TITLE, line)],
             sentences=[written(AI_SENTENCE, line)],
             title=code_title(line, "alpha"),
-            questions=[line_question("BACKGROUND", line, "alpha")],
+            questions=[question("BACKGROUND")],
         )
 
     def answer(question: Question) -> object | None:

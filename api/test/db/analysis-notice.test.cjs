@@ -16,7 +16,8 @@ const { openTestDataSource, resetTestDatabase } = require('../support/test-datab
 const { bindSyntheticDailyLimit } = require('../support/synthetic-daily-limit.cjs');
 
 // 고지 v3(Catch 개편 CR3 BR8.2: #424 확정 v2에서 2·3·4절만 변경, OpenAI 판정)의 SHA-256. 반영 PR(CR3)에서 팀장 승인을 받는다.
-const CONFIRMED_NOTICE_SHA256 = '2fcc3d9a4c075266fe65a431b3e99544ae52274909c419766284d0ee72b48652';
+// #487에서 2절의 「질문은 정해진 문장으로 만듭니다」를 빼고 판본은 v3 그대로 둔다(2026-11-09 팀장 결정, 아직 배포 전).
+const CONFIRMED_NOTICE_SHA256 = '89723edf30a6e7aa42690279c6e69e18e3bcb2239466b42234ea3c75fbfd3269';
 const GOOGLE = { GOOGLE_LOGIN_ENABLED: 'true', GOOGLE_CLIENT_ID: 'synthetic.apps.googleusercontent.com',
   GOOGLE_CLIENT_SECRET: 'synthetic-google-secret', GOOGLE_REDIRECT_URI: 'http://localhost:3000/google/callback' };
 const UNSUPPORTED = ['catchu:github:1234567', 'test:unsupported-origin', 'CATCHU:GOOGLE:upper-case', GOOGLE_IDENTITY_PREFIX, DEV_LOGIN_IDENTITY_PREFIX];
@@ -109,6 +110,8 @@ test('실제 고지는 v3 문구·문단·줄바꿈 그대로이고 합성 판�
   // v2가 보내지 않는다고 적은 커밋 메시지·PR 글을 v3에서는 보내므로 그 문장을 남기지 않는다.
   assert.ok(!REAL_NOTICE.text.includes('보내지 않는 것: 커밋 메시지, PR과 이슈의 글'));
   assert.ok(!REAL_NOTICE.text.includes('설명과 질문은 확인한 변경만 넣은 정해진 문장으로 만듭니다.'));
+  // 질문은 AI가 쓴 글이다(#487). 3절이 질문에 Anthropic을 쓴다고 적는다.
+  assert.ok(!REAL_NOTICE.text.includes('질문은 정해진 문장으로 만듭니다.'));
   assert.notEqual(REAL_NOTICE.noticeRevision, SYNTHETIC_NOTICE.noticeRevision);
   assert.ok(Object.isFrozen(REAL_NOTICE));
 });

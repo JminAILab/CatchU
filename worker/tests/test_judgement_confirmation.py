@@ -21,7 +21,7 @@ from candidate_scenarios import (
     root_commit,
     run_case,
 )
-from generation_scenarios import ScriptedProvider, naive_ai
+from generation_scenarios import QUESTION_TEXTS, ScriptedProvider, naive_ai
 from github_synthetic import (
     BASE,
     MEMBER,
@@ -41,8 +41,8 @@ from app.collection import CollectionOutcome, FailureCode, collect
 from app.collection.credentials import AccessToken
 from app.collection.identifiers import RepositoryCoordinates
 from app.generation import GenerationProvider
-from app.judgement.provider import JudgementProvider
-from app.judgement.synthetic import SyntheticJudge
+from app.judgement.provider import JudgementProvider, Question
+from app.judgement.synthetic import SyntheticJudge, default_answer
 from app.processing import collection_file
 from app.processing.confirm import (
     REPOSITORY_ROOT,
@@ -200,7 +200,10 @@ def test_s25_confirmation_sheet_lists_candidates_values_and_empty_marks(
     tmp_path: Path,
 ) -> None:
     """S25: 확인표에 Catch마다 기록의 글·AI 후보와 기계 대조 결과·문장·판정 값·고른 제목·빈 맞음/틀림 칸이 있다.
-    결과 메시지는 만들지 않는다."""
+    결과 메시지는 만들지 않는다.
+
+    #487 다시 확인용으로 설명 초안 상태·AI가 쓴 질문과 빈 예/아니오 칸(설명만 보고 알겠나·첫 문장이 코드 세부만
+    옮겼나·질문이 작업 전체를 묻나), 머리의 설명 없는 Catch 수가 있다."""
     case = run_case(scenario())
     collection = tmp_path / "in.collection.json"
     collection_file.write(collection, case.outcome)
@@ -240,16 +243,56 @@ def test_s25_confirmation_sheet_lists_candidates_values_and_empty_marks(
     assert titled["title"] == RECORD_TITLE
     assert titled["chosenAiTitle"] == "alpha 값 변경"
     assert titled["keptSentences"] == ["s1"]
+    assert titled["draft"] == {"status": "GENERATED", "failure": None}
+    assert titled["reflection"] == {
+        "status": "GENERATED",
+        "failure": None,
+        "questions": [QUESTION_TEXTS["BACKGROUND"]],
+    }
     assert titled["marks"] == {
         "title": None,
         "chosenAiTitle": None,
         "sentences": {"s1": None},
+        "descriptionClear": None,
+        "firstSentenceCodeDetail": None,
+        "questionsWholeWork": None,
         "note": "",
     }
     weak = next(item for item in written["items"] if item is not titled)
     assert weak["recordText"]["weakByRule"] is True
     assert weak["titleSource"] == "AI"
+    assert weak["draft"]["status"] == "GENERATED"
+    assert written["draftNotGenerated"] == 0
     assert len(judge.catch_requests()) == 2
+
+
+def test_sheet_counts_catches_without_a_description(tmp_path: Path) -> None:
+    """#487: 판정이 모든 문장을 떨어뜨리면 그 Catch의 설명 초안은 NOT_GENERATED이고 머리의 수에 든다. 질문은
+    판정과 관계없이 AI가 쓴 글 그대로 남는다."""
+
+    def low_sentences(question: Question) -> object | None:
+        if question.kind == "SENTENCE_TRUE":
+            return 0.1
+        return default_answer(question)
+
+    case = run_case(scenario())
+
+    sheet = confirm(
+        case.request,
+        case.outcome,
+        provider=ScriptedProvider(naive_ai),
+        judge=SyntheticJudge(low_sentences),
+        sheet_path=tmp_path / "sheet.json",
+        clock=clock,
+    )
+
+    assert sheet["draftNotGenerated"] == 2
+    items = sheet["items"]
+    assert isinstance(items, list)
+    for item in items:
+        assert item["draft"] == {"status": "NOT_GENERATED", "failure": None}
+        assert item["keptSentences"] == []
+        assert item["reflection"]["questions"] == [QUESTION_TEXTS["BACKGROUND"]]
 
 
 def test_inside_repository_paths_are_refused(tmp_path: Path) -> None:

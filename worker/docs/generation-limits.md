@@ -10,9 +10,9 @@
 | 고쳐 쓰기 호출 | 제목당 3회(팀장 결정, 설정으로 늘릴 수 없음), 요청당 20회. 생성 호출 상한과 따로 센다 |
 | 호출마다 시간 제한 | 생성 45초, 고쳐 쓰기 20초. 마감까지 남은 시간이 이보다 적으면 새 호출을 시작하지 않는다(생성 호출은 크기 선별 전과 호출 직전에 두 번 본다) |
 | 입력 | 자료(직렬화한 UTF-8) 24,000 B, 지시문 포함 32,000 B |
-| 출력 | 4,000 B. 넘으면 해석하지 않는다 |
+| 출력 | 6,000 B. 넘으면 해석하지 않는다. 질문 글이 응답에 더해져 #487에서 4,000 B에서 올렸다(2026-11-09 팀장 결정) |
 | 고쳐 쓰기 입력 | 첫 호출에서 보낸 고를 수 있는 줄 최대 20줄 |
-| 설명 조각·질문 | 각 1~3개. 넘으면 확인되고 문장을 만들 수 있는 항목을 앞에서부터 3개까지 쓴다(질문은 종류마다 하나) |
+| 설명 조각·질문 | 각 1~3개. 넘으면 맞는 항목을 앞에서부터 3개까지 쓴다(질문은 종류마다 하나) |
 | 제목·질문·코드 이름 | 40자·150자·64자 |
 | 줄마다 싣는 고를 수 있는 이름(`names`) | 최대 12개, 나온 순서대로 |
 | 판정 호출(CR3, AI 쪽이 켜졌을 때만) | Catch 판정 Catch당 1회·요청당 300회, 재료 판정 큰 후보당 1회·요청당 300회. 둘 다 시간 제한 20초이고 생성 호출과 따로 센다. 생성은 「남은 시간 ≥ 생성 45초 + 판정 20초」, 재료 판정은 「≥ 20 + 45 + 20초」일 때만 시작한다. 자세한 것은 [판정 「호출 순서와 상한」](generation-judgement.md#호출-순서와-상한) |
@@ -61,8 +61,9 @@
 | `ITEM_SHAPE` | `GENERATION_RULE_VIOLATION` | 항목 모양·종류 값·키 위반 |
 | `NAME_SHAPE` | `GENERATION_RULE_VIOLATION` | 코드 이름이 식별자 하나의 모양이 아님 |
 | `DUPLICATE_TYPE` | 없음(버린 항목 칸에만) | 앞에 같은 종류 질문이 있음 |
-| `TOO_LONG` | `GENERATION_RULE_VIOLATION` | 파일 이름으로 줄여도 질문이 글자 상한을 넘음 |
-| `UNKNOWN_LINE`·`UNKNOWN_FILE` | `GENERATION_UNVERIFIED` | 그 호출에서 보낸 자료에 없는 줄·파일 id |
+| `TOO_LONG` | `GENERATION_RULE_VIOLATION` | 질문 글이 150자를 넘음 |
+| `MASKED_TEXT` | `GENERATION_RULE_VIOLATION` | 질문 글이 가리기 검사에 걸림(#487) |
+| `UNKNOWN_LINE`·`UNKNOWN_FILE` | `GENERATION_UNVERIFIED` | 그 호출에서 보낸 자료에 없는 줄·파일 id. 아래 줄·이름 원인은 설명 조각에만 있다(질문은 줄을 가리키지 않는다, #487) |
 | `MASKED_LINE` | `GENERATION_UNVERIFIED` | 가린 줄을 지목 |
 | `NAME_MISSING` | `GENERATION_UNVERIFIED` | 이름이 그 줄에 없음 |
 | `NAME_JOINED_ASCII` | `GENERATION_UNVERIFIED` | 이름이 그 줄에 영문자·숫자·밑줄·`$`와 붙어서만 있음(`loginRateLimit` 줄의 `limit`) |

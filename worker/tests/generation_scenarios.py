@@ -32,6 +32,8 @@ from app.generation import (
 from app.generation.judged import CatchTrace
 from app.judgement.provider import JudgementProvider
 from app.processing import CheckedRequest, GenerationOutput, compose_result
+from app.processing.generation import EligibleCandidate
+from app.redact import mask_text
 
 # 생성 몫의 기본 마감(합성 시계 기준). 호출 수·시간 한도 시험은 따로 정한다.
 DEFAULT_DEADLINE = timedelta(minutes=20)
@@ -224,13 +226,17 @@ def file_title(file_id: str) -> dict[str, str]:
     return {"target": "FILE_NAME", "file": file_id}
 
 
-def line_question(kind: str, line: SentLine | str, name: str) -> dict[str, str]:
-    line_id = line if isinstance(line, str) else line.id
-    return {"type": kind, "line": line_id, "name": name}
+# AI가 쓴 질문의 합성 글(#487). 줄·파일을 가리키지 않고 작업 전체를 묻는다.
+QUESTION_TEXTS = {
+    "BACKGROUND": "이 작업을 하게 된 배경은 무엇이었나요?",
+    "ALTERNATIVES": "이 작업에서 다른 방법도 고려했다면 무엇이었나요?",
+    "VERIFICATION": "이 작업이 의도대로 동작하는지 확인했다면 어떻게 확인했나요?",
+}
 
 
-def file_question(kind: str, file_id: str) -> dict[str, str]:
-    return {"type": kind, "file": file_id}
+def question(kind: str, text: str | None = None) -> dict[str, str]:
+    """생성 응답의 질문 하나. 글을 주지 않으면 종류의 합성 글을 쓴다."""
+    return {"type": kind, "text": QUESTION_TEXTS[kind] if text is None else text}
 
 
 _UNSET: Any = object()
@@ -265,7 +271,7 @@ def naive(request: ProviderRequest) -> str:
     return answer(
         fragments=[line_fragment(line, name)],
         title=code_title(line, name),
-        questions=[line_question("BACKGROUND", line, name)],
+        questions=[question("BACKGROUND")],
     )
 
 
@@ -310,7 +316,7 @@ def naive_ai(request: ProviderRequest) -> str:
         titles=[written(f"{name} 값 변경", line)],
         sentences=[written(f"{line.path}에서 {name} 줄을 바꿨습니다.", line)],
         title=code_title(line, name),
-        questions=[line_question("BACKGROUND", line, name)],
+        questions=[question("BACKGROUND")],
     )
 
 
@@ -436,16 +442,20 @@ _SENTENCE = re.compile(
     r"|(?P<file>[^ ]+) 파일이 (추가|삭제|수정)되었습니다\."
     r"|(?P<old>[^ ]+) 파일의 이름이 바뀌어 (?P<new>[^ ]+) 파일이 되었습니다\."
 )
-_QUESTION = re.compile(
-    r"(?:[^ ]+에서 [A-Za-z_$][A-Za-z0-9_$]* 이름이 포함된 줄을|[^ ]+ 파일을|[^ ]+ 파일의 이름을) "
-    r"(?:(?:추가한|삭제한|수정한|바꾼) 배경은 무엇인가요\?"
-    r"|(?:추가할|삭제할|수정할|바꿀) 때 다른 방법도 고려했다면 무엇이었나요\?"
-    r"|(?:추가한|삭제한|수정한|바꾼) 뒤 의도대로 동작하는지 확인했다면 어떻게 확인했나요\?)"
-)
+
+
+def assert_written_questions(candidate: EligibleCandidate) -> None:
+    """질문은 AI가 쓴 글이다(#487): 150자 이하 한 줄이고 가리기 검사에 걸리지 않는다. 틀·판정은 없다."""
+    for text in candidate.reflection.questions:
+        assert text and text == text.strip(), text
+        assert len(text) <= 150, text
+        assert "\n" not in text and "\r" not in text, text
+        assert mask_text(text).count == 0, text
 
 
 def assert_generated_text(output: GenerationOutput) -> None:
-    """생성 글은 정해 둔 틀로만 이루어지고, 틀 밖에 숫자·효과·동기·전체성 표현이 없다.
+    """설명·제목은 정해 둔 틀로만 이루어지고, 틀 밖에 숫자·효과·동기·전체성 표현이 없다. 질문은 AI가 쓴 글이라
+    틀 대신 글자 상한·가리기 검사만 본다(#487).
 
     설명에 든 숫자는 확인한 경로·이름 안에만 있다(CatchU가 센 활동량은 들어가지 않는다). 쓸 만한 기록의
     글이 있는 후보는 그 글이 그대로 제목이다(CR1 BR3.1). 기록의 글 제목에는 40자 상한과 조각 틀을 대지
@@ -471,17 +481,11 @@ def assert_generated_text(output: GenerationOutput) -> None:
                     if value:
                         outside = outside.replace(value, "")
                 assert not re.search(r"[0-9]", outside), sentence
-        for question in candidate.reflection.questions:
-            assert len(question) <= 150
-            assert _QUESTION.fullmatch(question), question
+        assert_written_questions(candidate)
         generated_title = (
             "" if record is not None and record.usable else candidate.title or ""
         )
-        for text in (
-            generated_title,
-            content or "",
-            *candidate.reflection.questions,
-        ):
+        for text in (generated_title, content or ""):
             assert "`" not in text
             for word in FORBIDDEN_WORDS:
                 stripped = re.sub(r"[^ ]+(에서|파일)", "", text)
@@ -489,7 +493,7 @@ def assert_generated_text(output: GenerationOutput) -> None:
 
 
 def assert_ai_text(before: GenerationOutput, after: GenerationOutput) -> None:
-    """AI 쪽이 켜진 결과: 질문은 지금 틀 그대로, 제목은 40자 이하이거나 기록의 글이다. 작업 사실에는 생성
+    """AI 쪽이 켜진 결과: 질문은 AI가 쓴 글(꺼졌을 때와 같은 검사), 제목은 40자 이하이거나 기록의 글이다. 작업 사실에는 생성
     출력의 글이 없다(작업 사실은 생성 전 후보의 것에서 둘째 줄만 빠질 수 있다, BR4.2)."""
     previous = {each.work_identity: each for each in before.candidates}
     for candidate in after.candidates:
@@ -500,9 +504,7 @@ def assert_ai_text(before: GenerationOutput, after: GenerationOutput) -> None:
             record is not None and candidate.title == record.text
         ):
             assert len(candidate.title) <= 40, candidate.title
-        for question in candidate.reflection.questions:
-            assert len(question) <= 150
-            assert _QUESTION.fullmatch(question), question
+        assert_written_questions(candidate)
 
 
 def _split_sentences(content: str) -> list[str]:

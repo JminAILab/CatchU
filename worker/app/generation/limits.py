@@ -26,7 +26,8 @@ class GenerationLimits:
     max_data_bytes: int = 24_000
     max_prompt_bytes: int = 32_000
     # 제공자가 돌려줄 수 있는 응답 크기. 넘는 응답은 읽지 않고 버린다.
-    max_output_bytes: int = 4_000
+    # #487에서 질문 글(최대 150자 × 3)이 응답에 더해져 4,000에서 올렸다(2026-11-09 팀장 결정).
+    max_output_bytes: int = 6_000
     # 고쳐 쓰기에 보내는 줄 수(첫 호출에서 보낸 줄 가운데서만 고른다).
     rewrite_max_lines: int = 20
     # 설명 조각·질문 개수와 글자 상한.
