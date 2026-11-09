@@ -302,7 +302,7 @@ table published_pdf_page:         # U8이 만든다(후순위). U3은 이 모양
   published_pdf_page_id: uuid PK
   published_item_id: uuid NOT NULL  FK published_item ON DELETE CASCADE
   page_number: integer NOT NULL CHECK (page_number >= 1)
-  text: text NOT NULL             # 읽을 수 없는 쪽은 빈 문자열
+  text: text NOT NULL             # 읽을 수 없는 쪽은 빈 문자열. 읽을 수 있는 쪽은 빈 문자열이 아니다
   readable: boolean NOT NULL
   unique: (published_item_id, page_number)
 ```
