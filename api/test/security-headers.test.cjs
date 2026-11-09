@@ -50,7 +50,7 @@ test('성공·오류·CORS 사전 요청과 Nest 밖 오류 응답 모두 보안
   const cases = [
     ['GET /health', await request('/health'), 200],
     ['/v1 기능 경로 성공', await request('/v1/auth/dev-login', json(JSON.stringify({ memberId: 'headers-member' }))), 200],
-    ['/v1 인증 거부', await request('/v1/share-links', json('{}')), 401],
+    ['/v1 인증 거부', await request('/v1/publications', json('{}')), 401],
     ['/v1 없는 경로', await request('/v1/__missing'), 404],
     ['/v1 본문 해석 오류', await request('/v1/auth/dev-login', json('{"memberId":')), 400],
     ['/v1 밖 없는 경로(Nest 밖)', await request('/nope'), 404],

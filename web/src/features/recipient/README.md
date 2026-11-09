@@ -1,52 +1,62 @@
-# 공유 링크 수신자 — W7 (#152)
+# 받은 사람 발행본 화면 — 12월 U4 W4 (#416)
 
-링크를 받은 사람이 회원 로그인 없이 `/s/[token]`에서 링크 소유자의 공개 프로필과 현재 공개 Catch를 읽고, `/s/[token]/catches/[catchId]`에서 Catch 상세를 읽는다. 실제 수신자 API(#150 접근 판정·unlock, #151 공개 조회)에 연결한다. 링크 발행·관리(`/links`)는 [W6](../share-links/README.md) 범위다.
+링크를 받은 사람이 회원 로그인 없이 `/s/[token]`에서 발행본(C-10 `PublishedSnapshot`)을 읽는 화면이다. 10월 W7(#152)의 공개 프로필·Catch 목록·상세 화면과 `/s/[token]/catches/[catchId]`, 작성자 공유 링크 화면(`/links`, `features/share-links/`)은 제출 3(W6)에서 지웠고, 작성자 쪽은 [발행·발행본 화면](../publications/README.md)이 맡는다.
 
-기준: [API 명세 「P — 수신자 API」](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md)·`recipient-api.yaml`·`common.yaml`, [web 기능 설계](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md) W7·「수신 접근」, [공유 링크 흐름 초안](../../../../docs/ai-dlc-input-mvp/CatchU_공유링크_흐름_와이어프레임_초안.md) §4.4~4.8, [#150 grant 결정](https://github.com/JminAILab/CatchU/issues/150#issuecomment-5883572995), [10/8 Catch 결정](../../../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md).
+기준: [U4 기능 명세](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/functional-design/functional-spec.md) W4·S8·S9·S14, [보안 요구사항](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/nfr-requirements/security-requirements.md) 「안내 중복 통과 조건」 G1~G7, [보안 설계](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/nfr-design/security-design.md) 「web 화면 출력」·「받은 사람 화면 자리」, [계약 요약](../../../../aidlc/spaces/default/intents/260925-intent-12/inception/contract-design/contract-summary.md) C-11·C-12, #416 팀장 결정(2026-10-29 Q1 B 주소 링크, 2026-11-04 OQ-U4-NFR-5, 2026-11-05 OQ-U4-NFR-6). api 쪽은 [api/docs/recipient-publication.md](../../../../api/docs/recipient-publication.md)에 있다.
 
 ## 파일
 
 | 파일 | 역할 |
 |---|---|
-| `src/app/s/[token]/page.tsx` | 목록(V02) 페이지. 수신자 전용 헤더는 `src/app/s/layout.tsx`가 붙인다 |
-| `src/app/s/[token]/catches/[catchId]/page.tsx` | 상세(V03) 페이지. 직접 진입해도 링크 판정·비밀번호 확인을 먼저 한다 |
-| `recipient-screen.tsx` | 비밀번호 입력(V01)·목록·상세·접근 불가 표시 |
-| `recipient-store.ts` | 목록·상세 상태. 응답 코드 분기·비밀번호 확인·시도 제한 대기·늦은 응답 버리기 |
-| `recipient-api.ts` | `api.recipient` 위의 호출과 응답 모양 검사. 계약에 있는 필드만 화면에 넘긴다 |
-| `recipient-grants.ts` | 링크별 grant 보관(`sessionStorage`) |
-| `recipient-format.ts` | 공통 문구·자동 생성 안내·근거 링크 허용 판단 |
-| `test/recipient.test.mjs` | 위 동작의 단위 테스트 |
+| `src/app/s/[token]/page.tsx` | 페이지. 수신자 전용 헤더는 `src/app/s/layout.tsx`가 붙인다 |
+| `recipient-screen.tsx` | 상태 연결(`createRecipientPublicationStore`), 단계별 h1 초점, `isLoggedIn`, `showEvidence`, 붙는 자리 props |
+| `recipient-view.tsx` | 상태별 그리기(발행본·비밀번호 입력·접근 불가·조회 실패)와 0~4번 자리 배치, 비밀번호 입력 |
+| `recipient-store.ts` | 발행본 상태. 응답 코드 분기·비밀번호 확인·시도 제한 대기·늦은 응답 버리기·`accessLost` |
+| `recipient-api.ts` | `api.recipient` 위의 호출(`publication`·`unlock`)과 응답 모양 검사. 사본 검사는 `publications-api.ts`의 `isPublishedSnapshot`을 쓰고 계약 밖 칸은 넘기지 않는다 |
+| `recipient-grants.ts` | 링크별 grant 보관(`sessionStorage`), 10월 그대로 |
+| `recipient-slots.ts` | C-11 `RecipientSlotProps`·`LinkAccessCode`·`EvidenceLocation`(화면 안 형, OQ-U4-7)과 근거 위치 대조 `resolveEvidenceTarget` |
+| `recipient-format.ts` | 공통 문구(링크 불가·비밀번호 제목·발행 시각), 비밀번호 단계 안내, `isGithubSourceUrl` 재수출 |
+| `../publications/snapshot-view.tsx` | 사본 그리기. 작성자 발행본 상세와 같은 컴포넌트이며 받은 사람 화면은 `highlight`(근거 강조)와 항목 `id`만 더 쓴다 |
+| `test/recipient.test.mjs` | 위 동작의 단위·그리기 시험 |
+
+## 화면 순서(C-11 자리)
+
+| 상태 | 위에서부터 |
+|---|---|
+| 판정 통과 | U4 h1(발행본 제목, `tabIndex={-1}`) → 0 `RecipientGuide`(U2, `showClaudeConnect={false}`) → U4 고정 안내 「발행 시각 YYYY-MM-DD HH:mm:ss (KST)」 → 1 발행본 자료 → 2 `BaseSummaryPanel`(U5) → 3 `QnaPanel`(U5) → 4 자리(U10 `JdSummaryPanel` 제공 전 빈 자리, `data-logged-in`만) |
+| 비밀번호 입력 | U4 h1 「비밀번호가 필요한 링크입니다」 → 입력. `RecipientGuide`·패널 없음 |
+| 접근 불가 | U4 h1 「이 링크는 열람할 수 없습니다.」만 |
+| 조회 실패 | 숨긴 h1 「발행본」 + 「발행본을 불러오지 못했습니다」·[다시 불러오기] |
+
+- 각 상태의 h1은 U4 것 하나뿐이고 안내 묶음 안에는 h1이 없다(G3). 단계가 정해질 때마다(처음 연 화면 포함) 그 h1로 초점을 옮기며 비밀번호 입력칸에 `autoFocus`를 두지 않는다(G4). 불러오는 중과 같은 단계 안의 갱신에는 옮기지 않는다.
+- U4 고정 안내(BR7.1)는 발행 시각 한 줄이다. 고정 사본 설명은 U2 `fixed-copy`, 링크 기간·중지는 U2 `link-conditions`, 외부 AI 고지는 U5, JD 로그인 안내는 U10이 맡으므로 같은 뜻의 문장을 두지 않는다(G5·G6).
+- 2·3번 자리는 [U5 README 「붙이는 방법」](../rag-answer/README.md)대로 `RecipientSlotProps`(`token`·`getGrant`·`onAccessLost`·`isLoggedIn`·`showEvidence`)를 그대로 넘기고 `key={token}`이다. `isLoggedIn`은 이 탭의 회원 토큰 유무이며 받은 사람 요청에는 그 토큰을 붙이지 않는다.
 
 ## 동작
 
-- **회원 로그인과 분리:** 수신자 요청에는 회원 토큰을 붙이지 않는다(`api.recipient`). 수신자 401(`LINK_PASSWORD_*`)은 비밀번호 입력으로 처리하며 로그인 화면으로 보내거나 회원 토큰을 지우지 않는다.
 - **응답 코드별 화면:** 판정은 서버가 하고 화면은 `code`로만 나눈다.
 
 | 응답 | 화면 |
 |---|---|
-| 200 | 목록·상세 |
-| 404 `LINK_UNAVAILABLE` | 「이 링크는 열람할 수 없습니다.」 — 없음·중단·만료·소유 회원 비활성을 구분하지 않는다. 그 링크의 grant를 지운다 |
+| 200 `PublishedSnapshot` | 발행본 |
+| 404 `LINK_UNAVAILABLE` | 「이 링크는 열람할 수 없습니다.」 — 없음·삭제·중지·만료·작성자 비활성을 구분하지 않는다(OQ-U4-NFR-6). 그 링크의 grant를 지운다 |
 | 401 `LINK_PASSWORD_REQUIRED` | 비밀번호 입력. 받아 둔 grant가 거부된 경우면 grant를 지우고 「비밀번호를 다시 입력해 주세요.」 |
-| 404 `RESOURCE_UNAVAILABLE`(상세) | 「현재 열람할 수 없는 자료입니다.」와 [공개 자료 목록으로]. 숨김·타인·없음을 구분하지 않고, 링크 grant는 그대로 둔다 |
-| 500·통신 실패·손상된 응답·예상 밖 코드 | 조회 실패와 [다시 불러오기]. 0건·숨김·링크 불가로 바꾸지 않는다 |
+| 500·통신 실패·손상된 응답·예상 밖 코드 | 조회 실패와 [다시 불러오기]. 링크 불가로 바꾸지 않는다(작성자 회원 행 없음 500도 여기) |
 
-- **비밀번호(V01):** 빈 값은 보내지 않고 안내한다. 확인 중에는 반복 제출을 막는다. 「비밀번호가 맞지 않습니다.」는 서버가 불일치를 확인한 401 `LINK_PASSWORD_INVALID`에만 쓰고 입력을 비운다. 통신 실패·500·400은 「비밀번호 확인을 완료하지 못했습니다.」로 두고 입력은 그대로 둔다.
-- **시도 제한(429 `LINK_UNLOCK_LIMITED`):** `Retry-After`의 남은 초를 보여 주고, 그동안 [열람하기]를 막는다. 시간이 지나도 자동으로 보내지 않는다. `Retry-After`가 없거나 형식이 틀리면 남은 시간을 추정하지 않고, 사용자가 누를 때 보낸다. 대기 시각은 이 화면이 살아 있는 동안만 기억하며(새로고침하면 서버가 다시 429로 알려 준다), 비밀번호 원문은 상태 객체에 두지 않는다.
-- **grant:** 성공한 unlock의 grant를 그 링크 키(`catchu.recipient.grant:<token>`)로 `sessionStorage`에 둔다. 다른 링크의 요청에는 그 링크의 grant만 쓴다. 수명은 서버가 정하고 응답에 없으므로 화면이 시간을 재지 않고, 401 `LINK_PASSWORD_REQUIRED`·404 `LINK_UNAVAILABLE`을 받으면 그 링크의 grant만 지운다. 이 실행(새로 고치기 전까지)에서 저장·삭제한 결과는 메모리에 따로 기록해 저장소 값보다 먼저 쓴다. 그래서 저장소가 읽기만 되고 쓰기·지우기가 실패하거나 실패했다가 복구돼도, 남아 있던 이전 grant가 새 grant나 삭제 상태를 덮지 않는다. 저장소를 쓸 수 없으면 이 메모리만 남는다. 새 값을 저장하지 못하면 이전 값을 지워 둔다. 새로 고친 뒤에는 메모리가 없으므로 지우지 못한 이전 값이 한 번 더 보내질 수 있고, 서버가 거부(401·404)하면 다시 지우고 비밀번호를 받는다. 손상된 값(빈 값·헤더에 실을 수 없는 문자·2,048자 초과)은 버린다.
-- **목록(V02):** 20개씩 받고 [더 보기]로 이어 붙이며 중복은 뺀다. 다음 페이지도 서버가 새로 판정한다. 다음 페이지 실패는 받은 목록을 두고 [다음 목록 다시 불러오기]를 보인다. 정상 0건은 「현재 열람할 수 있는 공개 GitHub 자산이 없습니다」다. 목록 카드에는 개수를 두지 않는다(10/8 결정의 배치 제안).
-- **확정 거부와 화면 유지:** 다시 조회·다음 페이지·상세에서 링크 불가·비밀번호 필요·상세 불가가 확정되면 표시하던 자료를 지우고 해당 화면으로 바꾼다. 조회 실패는 같은 링크·같은 Catch의 이미 표시한 화면만 유지하고 「최신 자료를 불러오지 못해 이전에 불러온 내용을 보여 주고 있습니다.」를 알린다(초안 §4.8 결정). 링크·Catch가 바뀌면 상태를 새로 만들므로 다른 링크의 자료를 남기지 않는다. 열린 화면을 실시간으로 회수하지 않으며 자동 조회·자동 전송을 하지 않는다.
-- **늦은 응답:** 다시 조회·화면 해제(링크·Catch 이동 포함) 뒤 도착한 이전 요청의 응답은 버린다. 화면 해제 뒤 도착한 unlock 성공도 grant를 남기지 않는다.
-- **프로필:** 이름·한 줄 소개·희망 직무·기술은 「링크를 보낸 사람이 직접 입력한 정보」로 표시한다(`fieldSource`). 빈 값은 「입력하지 않음」. `githubAccountLogin`이 있으면 「GitHub 계정」과 「GitHub 연결 때 확인해 저장한 이름」을 보이고, null이면 그 줄을 보이지 않는다(미연동으로 표시하지 않음, #332).
-- **Catch:** 제목이 null이면 다른 값으로 채우지 않고 제목 없이 보인다. 목록 카드 제목은 CSS로 2줄까지 보이고 넘치면 말줄임이다. 글은 그대로라 상세 보기 링크 이름에 전체 제목이 있고, 상세 제목은 전체를 보인다(Catch 개편 CR1 BR6.1). 자동 생성 안내는 제목이 작성자의 GitHub 기록 글일 수 있어 CR1 BR6.2 문장을 쓴다: 목록은 늘 「제목은 GitHub 기록의 글이거나 CatchU가 만든 글이고, 설명은 CatchU가 GitHub 기록에서 자동으로 만들었습니다」, 상세는 있는 것만 가리킨다(제목만 「제목은 GitHub 기록의 글이거나 CatchU가 만든 글입니다」, 설명만 「설명은 CatchU가 GitHub 기록에서 자동으로 만들었습니다」, 둘 다 없으면 안내 없음). 제목·작업 사실은 글자로만 그리고 HTML로 해석하지 않는다. 설명 초안이 실패(FAILED)면 「설명 초안을 생성하지 못했습니다.…」, GENERATED인데 본문이 비었으면 「생성된 설명 초안이 없습니다.」로 두고 생성 문구로 채우지 않는다. 설명 초안이 NOT_GENERATED면 상세의 「Catch 설명 초안」 칸(제목·안내 글)을 그리지 않는다(Catch 개편 CR3 BR7.1, AI 쪽이 꺼져도 같다). 계약 밖 필드(본인용 질문·확인 상태·내부 ID)는 받아도 넘기지 않는다.
-- **근거 링크:** `https://github.com/…` 주소만 새 탭 링크(`rel="noopener noreferrer"`)로 열고, 그 밖의 값은 글자로만 보인다(보안 점검 「화면 출력」). `PublicCatch`에는 합성·실제 구분이 없으므로, 합성 자료의 GitHub 형식 주소도 링크로 보인다.
-- **접근성:** 비밀번호 입력에 레이블과 안내 연결(`aria-describedby`)·오류 표시(`aria-invalid`)를 둔다. 안내는 `role="alert"`/`status`로 읽힌다. 단계(목록·비밀번호·접근 불가·상세)가 바뀌면 그 단계의 제목으로 초점을 옮긴다(첫 화면 제외).
-- **노출:** 비밀번호는 unlock 본문으로만 보내고 주소·상태 객체·로그에 두지 않는다. grant는 `X-Link-Grant` 헤더로만 보낸다. 링크 토큰은 경로에만 둔다(쿼리·로그에 싣지 않음).
+- **비밀번호:** 빈 값은 보내지 않고 안내한다. 확인 중에는 반복 제출을 막는다. 「비밀번호가 맞지 않습니다.」는 401 `LINK_PASSWORD_INVALID`에만 쓰고 입력을 비운다. 통신 실패·500·400은 「비밀번호 확인을 완료하지 못했습니다.」로 두고 입력은 그대로 둔다. 비밀번호는 unlock 본문으로만 보낸다.
+- **시도 제한(429 `LINK_UNLOCK_LIMITED`):** `Retry-After`의 남은 초를 보여 주고 그동안 [열람하기]를 막는다. 지나도 자동으로 보내지 않는다. `Retry-After`가 없거나 틀리면 추정하지 않는다.
+- **grant:** 성공한 unlock의 grant를 `catchu.recipient.grant:<token>` 키로 `sessionStorage`에 둔다. 다른 링크의 요청에는 그 링크의 grant만 쓴다. 401·404를 받으면 그 링크의 grant만 지운다. 저장소 오류 처리(메모리 우선·손상값 버림)는 10월과 같다(`recipient-grants.ts` 머리 주석).
+- **사본(1번 자리):** 항목을 `position` 순으로 그린다. Catch는 불일치 표지·AI 설명 초안·작성자 설명·기록(작업 사실·본인 기여·근거)을 서로 다른 표지로 나누고 위에서부터 이 순서로 둔다(#488, 면접관이 한 일과 그 이유를 먼저 본다). 기록 가운데 작업 사실은 펼쳐 두고, 본인 기여와 근거 목록은 「근거 자세히 보기」(`<details>`) 안에 처음엔 접어 둔다. 근거 목록 안 순서는 사본 그대로다. AI 설명 초안이 없으면 그 칸을 그리지 않는다(Catch 개편 CR3 BR7.1). 본문·작성자 설명·AI 초안은 React 텍스트로만 그리고(NFR1.10), 근거 원문과 본문·작성자 설명 안의 `https://github.com/…` 주소만 새 탭 링크(`rel="noopener noreferrer"`)다(`lib/github-source-url.ts`, #416 Q1 B, NFR1.11). AI 초안에는 링크를 만들지 않는다(OQ-U4-NFR-3).
+- **붙는 컴포넌트의 접근 상실(C-11 rule):** 패널이 401 `LINK_PASSWORD_REQUIRED`·404 `LINK_UNAVAILABLE`을 받아 `onAccessLost(code)`를 부르면 화면이 직접 받은 것과 같은 전환·grant 삭제를 하고, 진행 중이던 조회는 끊어 늦은 응답이 거부를 덮지 않게 한다.
+- **근거 강조(C-11 evidence-highlight):** 패널이 `showEvidence(location)`를 부르면 사본에 대조한다(`resolveEvidenceTarget`). 항목(`publishedItemId`)이 없으면 옮기지 않고, `fieldPath`(`workFacts[i]`·`subjectContribution`·`evidence[i].representedFacts[j]`·`authorDescription`·`body`)가 가리키는 문자열 안의 `[charStart, charEnd)`만 `<mark>`로 강조하며, 범위 밖·없는 경로(`aiDraft`·`pages[n]`)면 항목으로 옮기기만 한다. 강조가 접힌 「근거 자세히 보기」 안(`subjectContribution`·`evidence[i]…`)을 가리키면 같은 그리기 차례에 그 칸을 펼쳐 스크롤할 때 `<mark>`가 보인다. 사람이 다시 접을 수 있고, 같은 근거를 다시 누르면 다시 펼친다(#488). 옮길 때 강조 범위가 있으면 그 항목 안의 첫 `<mark>`가 화면에 보이도록(`block: "center"`) 스크롤하고, 범위가 없거나 강조 요소를 못 찾으면 그 항목(`id="published-item-<id>"`) 시작으로 스크롤한다. 초점은 두 경우 모두 항목에 두며(`preventScroll`), 같은 근거를 다시 눌러도 다시 옮긴다.
+- **다시 조회:** 확정 거부(404·401)는 표시하던 사본을 지우고 해당 화면으로 바꾼다. 조회 실패는 같은 링크의 이미 표시한 화면만 유지하고 「최신 자료를 불러오지 못해 이전에 불러온 내용을 보여 주고 있습니다.」를 알린다. 열린 화면을 실시간으로 회수하지 않으며 자동 조회·전송을 하지 않는다. 늦게 도착한 응답(다시 조회·화면 해제 뒤)은 버린다.
+- **노출:** 토큰은 경로에만, 비밀번호는 본문으로만, grant는 `X-Link-Grant` 머리글로만 둔다. 404 사유를 드러내지 않는다.
 
-## 범위 밖
+## 시험
 
-12월 고정 공유본·링크 연장·삭제, 실제 원본 상태 관측(OQ-B3), 실제 Google 로그인·GitHub 연동, 공통 인증 통합(#308)과의 결합.
+`node --test test/recipient.test.mjs`(34개): 응답 모양·grant 보관(10월 유지 묶음)·판정 응답 처리·`onAccessLost`·근거 위치 대조·G1~G3 구조·자리 순서·G5·G6 기계 검사·사본 표지·근거 강조·Catch 칸 순서와 근거 접기(#488). 초점 이동(G4)과 실제 api·DB 연결은 브라우저로 확인했다(U4 코드 요약 Step 22·23).
 
-## 남은 확인
+## 범위 밖·남은 것
 
-- **B 접점:** 제목이 없는 Catch의 자동 생성 안내 위치·배치를 B(회원 화면)와 맞추기(10/8 결정 「안내 위치와 제목이 없을 때의 배치는 B와 맞춘다」). 지금은 B의 `GeneratedContentNotice` 방식을 따른다.
-- **주소:** `/s/[token]`·`/s/[token]/catches/[catchId]`는 web README 「페이지 주소」의 제안 주소 그대로다.
+- 4번 자리(U10 `JdSummaryPanel`)는 U10이 제공한 뒤 단다. PDF 항목(U8)은 자리만 보인다.
+- `indexState`·[검색 다시 준비]는 C-09 합의 뒤(OQ-U4-5). 실제 색인·LLM이 있는 환경의 요약·질의응답 동작은 U5 몫이다.

@@ -520,6 +520,39 @@ def test_work_branch_goes_before_record_branch() -> None:
     assert [file.path for file in group.files] == ["app/main.py", "app/notes.txt"]
 
 
+def test_other_file_without_a_kind_answer_goes_after_judged_branches() -> None:
+    """규칙이 그 밖으로 본 파일인데 MATERIAL_KIND 답이 없으면(branch None) WORK 자리로 앞세우지 않고 뒤에 둔다.
+
+    점수가 가장 높아도 판정 받은 WORK·RECORD 파일 뒤다. 규칙이 코드로 본 파일은 답이 없어도 WORK 갈래다.
+    """
+    candidate = prepared(
+        record(
+            10,
+            [
+                ("app/notes.txt", 6, 60),
+                ("app/other.txt", 6, 60),
+                ("app/main.py", 6, 60),
+            ],
+        )
+    )
+    kinds = file_kinds(candidate.files)
+    groups = change_groups(candidate.files, kinds)
+    (group,) = judged_groups(
+        groups,
+        kinds,
+        {
+            "app/notes.txt": verdict("app/notes.txt", score=5),
+            "app/other.txt": verdict("app/other.txt", branch="RECORD", score=1),
+            "app/main.py": verdict("app/main.py", score=1),
+        },
+    )
+    assert [file.path for file in group.files] == [
+        "app/main.py",
+        "app/other.txt",
+        "app/notes.txt",
+    ]
+
+
 def test_s16_common_answers_make_their_own_evenly_shared_group() -> None:
     """S16: COMMON으로 답한 파일 2개와 씨앗 묶음 2개면 묶음 3개로 고르게 담긴다."""
     candidate = prepared(

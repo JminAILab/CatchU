@@ -287,6 +287,12 @@ class CatchTrace:
     second_line_removed: bool
     material_judged: bool
     material_seconds: float | None
+    # 최종 설명 초안 상태와 실패 코드(FAILED일 때), 생각해 볼 질문 상태·실패 코드와 AI가 쓴 질문 글(#487).
+    draft_status: str
+    draft_failure: str | None
+    reflection_status: str
+    reflection_failure: str | None
+    questions: tuple[str, ...]
 
 
 def answer_values(ask: CatchAsk | None, answers: Answers | None) -> dict[str, object]:

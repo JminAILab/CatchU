@@ -49,12 +49,11 @@ from generation_scenarios import (
     code_title,
     file_fragment,
     file_id_of,
-    file_question,
     file_title,
     generation_case,
     line_fragment,
-    line_question,
     pick,
+    question,
     sent_files,
     sent_lines,
 )
@@ -111,13 +110,13 @@ def target_reply(target: Target) -> Callable[[ProviderRequest], str]:
             return answer(
                 fragments=[file_fragment(file_id)],
                 title=file_title(file_id),
-                questions=[file_question("BACKGROUND", file_id)],
+                questions=[question("BACKGROUND")],
             )
         line = pick(request, contains=target.name, path=target.path)
         return answer(
             fragments=[line_fragment(line, target.name)],
             title=code_title(line, target.name),
-            questions=[line_question("BACKGROUND", line, target.name)],
+            questions=[question("BACKGROUND")],
         )
 
     return reply
@@ -599,7 +598,7 @@ def test_failed_description_keeps_a_verified_title(fragments: str, code: str) ->
         return answer(
             fragments=chosen,
             title=code_title(line, "loginRateLimit"),
-            questions=[line_question("BACKGROUND", line, "loginRateLimit")],
+            questions=[question("BACKGROUND")],
         )
 
     provider = ScriptedProvider(reply, repeat=False)
@@ -645,7 +644,7 @@ def test_title_pointing_at_a_context_line_is_null(pointer: str) -> None:
         return answer(
             fragments=[line_fragment(added, "loginRateLimit")],
             title=title,
-            questions=[line_question("BACKGROUND", added, "loginRateLimit")],
+            questions=[question("BACKGROUND")],
         )
 
     assert generated_title(unit, reply) is None
@@ -710,7 +709,7 @@ def test_title_pointing_at_another_accounts_commit_is_null(pointer: str) -> None
         return answer(
             fragments=[line_fragment(own, "loginRateLimit")],
             title=title,
-            questions=[line_question("BACKGROUND", own, "loginRateLimit")],
+            questions=[question("BACKGROUND")],
         )
 
     assert generated_title(unit, reply) is None
@@ -743,7 +742,7 @@ def test_title_naming_only_message_or_pull_request_text_is_null(
         return answer(
             fragments=[line_fragment(own, "loginRateLimit")],
             title=code_title(own, name),
-            questions=[line_question("BACKGROUND", own, "loginRateLimit")],
+            questions=[question("BACKGROUND")],
         )
 
     assert generated_title(unit, reply) == expected

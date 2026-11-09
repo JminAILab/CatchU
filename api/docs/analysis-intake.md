@@ -10,7 +10,7 @@
 
 현재 `REAL_NOTICE`는 `catchu-real-analysis-notice-v3`다. CR3(AI 쪽 판정)가 FR10 확인을 넘어 v2의 2·3·4절만 바꿨다(기능 설계 `aidlc/spaces/default/intents/261103-catch-redesign/construction/cr3-ai-drafts/functional-design/rules.md`의 BR8.2). 1·5절과 머리 문단은 v2 그대로이고 빈 줄 6개는 유지, 줄 수는 35줄이다.
 
-- 2절: 「설명과 질문은 정해진 문장으로 만든다」를 「AI가 바뀐 줄만 보고 쓰고, 다른 AI 서비스가 그 글과 본인 PR 제목·커밋 메시지 첫 줄이 실제 변경과 맞는지 확인해 남긴다」로 바꿨다.
+- 2절: 「설명과 질문은 정해진 문장으로 만든다」를 「AI가 바뀐 줄만 보고 쓰고, 다른 AI 서비스가 그 글과 본인 PR 제목·커밋 메시지 첫 줄이 실제 변경과 맞는지 확인해 남긴다」로 바꿨다. CR3 판에 남았던 「질문은 정해진 문장으로 만듭니다」는 [#487](https://github.com/JminAILab/CatchU/issues/487)에서 질문을 AI가 쓰게 되면서 뺐다. v3가 배포되기 전이라 판본은 올리지 않았다(2026-11-09 팀장 결정). 3절은 이미 질문에 Anthropic을 쓴다고 적는다.
 - 3절: 확인에 쓰는 OpenAI OpCo, LLC(미국)와 보내는 것(바뀐 줄·경로, 기록의 글 하나, AI가 쓴 후보·문장, 큰 작업의 파일별 경로·상태·줄 수·앞 5줄), 확인을 Anthropic에 맡길 때의 경우, OpenAI 처리 위치(미국 지역 주소)·보관(남용 감시 기록 최대 30일, 요청마다 끄는 설정 없음)·연락처를 더했다. v2의 「보내지 않는 것: 커밋 메시지, PR과 이슈의 글」은 PR 본문·이슈 글·커밋 메시지 둘째 줄부터로 좁혔다.
 - 4절: Catch의 제목과 작업 사실에 기록의 글이 들어갈 수 있다는 줄을 더했다.
 - OpenAI 사실의 출처는 [서비스 약관 v.010126](https://cdn.openai.com/osa/openai-services-agreement.pdf)(계약 당사자), [DPA](https://cdn.openai.com/pdf/openai-data-processing-addendum.pdf)(연락처), [API 데이터 관리 안내](https://developers.openai.com/api/docs/guides/your-data)(학습·보관·미국 지역 처리)다(2026-11-06 확인).

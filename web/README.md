@@ -95,7 +95,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/(member)/assets/` | 회원 가드 안의 실제 내 자산 페이지. B 목록·상세와 D 저장소 모달을 조립한다([기능 안내](src/features/assets/README.md)) |
 | `src/app/(member)/profile/github/`, `(member)/github/callback/` | 회원 가드 안의 GitHub 연동 화면과 GitHub 콜백 화면([기능 안내](src/features/github-connection/README.md)) |
 | `src/app/(member)/profile/claude/` | 12월 U6: 회원 가드 안의 Claude 연결 관리·승인 화면([기능 안내](src/features/claude-connection/README.md)) |
-| `src/app/s/[token]/` | 공유 링크 수신자 목록·Catch 상세. 회원 로그인 없이 수신자 API에 연결한다([기능 안내](src/features/recipient/README.md)) |
+| `src/app/s/[token]/` | 발행본 받은 사람 화면(U4 W4). 회원 로그인 없이 받은 사람 API에 연결한다([기능 안내](src/features/recipient/README.md)) |
 | `src/components/header/` | 로그인·비로그인·수신자 헤더와 프로필 메뉴 |
 | `src/components/notice-dialog/` | 채용공고·알림 안내창 |
 | `src/components/status/` | 불러오는 중·조회 실패·정상 0건 공통 표시 |
@@ -168,9 +168,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/publications` | 발행본 목록 | U4 | 필요 | 확정 | U4 담당 결정 D4(2026-11-03). 최신순 목록, [URL 복사], [링크 열기](`ACTIVE`만)([발행·발행본](src/features/publications/README.md)) |
 | `/publications/new` | 발행 | U4 | 필요 | 확정 | 본인 Catch·텍스트 자료 고르기·순서·제목·비밀번호 → 확인 → 발행 완료를 한 화면에 둔다 |
 | `/publications/[publicationId]` | 발행본 상세 | U4 | 필요 | 확정 | 사본·상태·만료·링크 주소, 링크 중지·삭제. 기본 요약 패널(U5) 자리는 비워 둠 |
-| `/links` | 링크 목록·발급·복사·중단 | C | 필요 | 제안 | 발급은 이 페이지의 폼·모달로 처리 |
-| `/s/[token]` | 수신자 링크 | C | 불필요 | 제안 | 수신자 전용 헤더 |
-| `/s/[token]/catches/[catchId]` | 수신자 Catch 상세 | C | 불필요 | 제안 | 직접 진입해도 접근 판정·비밀번호 확인 후 표시 |
+| `/s/[token]` | 받은 사람 발행본 열람(U4 W4) | C | 불필요 | 제안 | 수신자 전용 헤더. 10월 `/links`·`/s/[token]/catches/[catchId]`는 U4 제출 3(W6)에서 없앴다 |
 
 **주소 원칙(제안):** 이름 조회·회원 가드·로그인 이동을 연결했다. 현재 범위와 최초 프로필 저장 연결은 [회원 진입 연결](src/features/member-entry/README.md), 프로필 상세·수정은 [프로필 화면](src/features/profile/README.md)을 따른다.
 - 토큰 없이 회원 경로에 들어오거나 회원 API가 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 `/login`으로 보낸다. 수신자 비밀번호 401은 수신자 화면에서 처리한다.
@@ -218,13 +216,17 @@ if (isSettledResult(created)) key.reset();          // 성공·4xx 업무 거부
 // 수신자 API: 회원 토큰을 붙이지 않는다. 비밀번호 링크는 grant를 X-Link-Grant로 보낸다.
 const page = await api.recipient(`/public/links/${encodeURIComponent(token)}`, { linkGrant });
 
+// 공유 링크 안의 회원 API(JD 요약 등): 회원 토큰과 grant를 함께 보낸다.
+const run = await api.member(`/public/links/${encodeURIComponent(token)}/jd-summaries`, { method: 'POST', body: { jdId }, linkGrant });
+
 // 비밀번호 시도 제한(429 LINK_UNLOCK_LIMITED)·발급 빈도 제한(429 RATE_LIMITED)이면 남은 초가 retryAfterSeconds로 온다.
 const unlock = await api.recipient(`/public/links/${encodeURIComponent(token)}/unlock`, { method: 'POST', body: { password } });
 if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLimited(unlock.retryAfterSeconds);
 ```
 
 - 요청은 `cache: 'no-store'`로 보내고 쿠키를 싣지 않는다(`credentials: 'omit'`).
-- 회원 API가 401 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 그 토큰을 지운다. 회원 경로 가드가 `/login?next=<현재 경로>`로 보낸다. 수신자 401(`LINK_PASSWORD_*`)은 지우지 않고 수신자 화면이 처리한다.
+- 회원 API의 메서드는 GET·POST·PUT·PATCH·DELETE다. GET이 아닌 요청은 인증 갱신 뒤에도 자동으로 다시 보내지 않는다.
+- 회원 API가 401 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 그 토큰을 지운다. 회원 경로 가드가 `/login?next=<현재 경로>`로 보낸다. 링크 401(`LINK_PASSWORD_*`)은 수신자 호출이든 `linkGrant`를 실은 회원 호출이든 토큰을 지우지 않고 화면이 처리한다.
 - 자동 재시도하지 않는다. 서버가 저장했는지 알 수 없는 결과(조회 실패·5xx)면 키를 유지하고, 사용자가 다시 누르면 같은 키로 보낸다. 401도 앞선 같은 키 요청의 저장 여부를 알려 주지 않으므로 키를 유지한다. 429(빈도 제한)도 요청을 처리하지 않은 것이라 키를 유지하고, `Retry-After`가 지난 뒤 사용자가 다시 누르면 같은 키·본문으로 보낸다(#235 계약). 성공과 401·429를 뺀 4xx 업무 거부만 확정으로 본다(`isSettledResult`).
 - 로그인 복귀 후 키 보존은 아직 구현하지 않았다. 지금은 401이면 로그인 화면으로 이동하면서 화면이 다시 만들어져 키도 새로 생긴다. 후속 구현 조건: 로그인 뒤 키를 이어 쓰려면 실제 생성 화면에서 **같은 회원·같은 생성 요청일 때만** 이어 쓰고, 다른 계정으로 로그인했으면 키를 버린다. 로그인 뒤 이전 요청을 자동으로 다시 보내지 않는다.
 - 오류 응답에 `Retry-After`가 1 이상의 정수 초로 오면 `retryAfterSeconds`로 전달한다. 헤더가 없거나 다른 형식이면 붙이지 않으며, 남은 시간을 추정하지 않는다.

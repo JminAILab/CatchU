@@ -38,7 +38,7 @@
 | C-06 | u2-shared-foundation | 모든 Unit(새 표) | 공유 DB 규칙(외래 키 삭제 규칙) + 탈퇴 순서 | U2 담당(팀장) |
 | C-07 | u4-publication-link | u3-published-index, u5-rag-answer, u10-jd, u8-pdf-materials, u9-recipient-claude | 공유 DB 표(발행본·항목·PDF 쪽 사본) | U4 담당 |
 | C-08 | u3-published-index | u4-publication-link | api 안 TS 인터페이스(`PublishedIndexWriter`), 발행 트랜잭션 참여 | U3 담당 |
-| C-09 | u3-published-index | u5-rag-answer, u10-jd | api 안 TS 인터페이스(`PublishedSearch`) | U3 담당 |
+| C-09 | u3-published-index | u4-publication-link, u5-rag-answer, u10-jd | api 안 TS 인터페이스(`PublishedSearch`) | U3 담당 |
 | C-10 | u4-publication-link | u5-rag-answer, u10-jd, u9-recipient-claude | api 안 TS 인터페이스(`PublicationAccess`) | U4 담당 |
 | C-11 | u4-publication-link | u2-shared-foundation, u5-rag-answer, u10-jd | web 받은 사람 화면(`/s/[token]`)의 붙는 자리 + 받은 사람 API 경로 규칙 | U4 담당 |
 | C-12 | u4-publication-link, u5-rag-answer, u10-jd | External: 받은 사람 브라우저 | HTTP REST·SSE(`/v1/public/links/{token}/...`) | 경로별 제공 Unit 담당 |
@@ -302,7 +302,7 @@ table published_pdf_page:         # U8이 만든다(후순위). U3은 이 모양
   published_pdf_page_id: uuid PK
   published_item_id: uuid NOT NULL  FK published_item ON DELETE CASCADE
   page_number: integer NOT NULL CHECK (page_number >= 1)
-  text: text NOT NULL             # 읽을 수 없는 쪽은 빈 문자열
+  text: text NOT NULL             # 읽을 수 없는 쪽은 빈 문자열. 읽을 수 있는 쪽은 빈 문자열이 아니다
   readable: boolean NOT NULL
   unique: (published_item_id, page_number)
 ```
@@ -357,17 +357,24 @@ note: ChunkHit는 그대로 C-01 AiSource로 옮긴다(sourceId = chunkId). 호�
 
 ### C-10 링크 조건 판정과 사본 읽기
 
-웹·질의응답·JD 요약·MCP가 같은 판정을 쓴다(NFR1, FR4.2, FR5.1). 받은 사람 경로는 10월 오류 코드를 그대로 쓴다: 없음·삭제·중지·만료는 구분 없이 `404 LINK_UNAVAILABLE`, 비밀번호 필요 또는 grant 거부는 `401 LINK_PASSWORD_REQUIRED`. grant는 publicationId에 묶고, 링크 중지·만료·삭제 판정을 grant 확인보다 먼저 한다.
+웹·질의응답·JD 요약·MCP가 같은 판정을 쓴다(NFR1, FR4.2, FR5.1). 받은 사람 경로는 10월 오류 코드를 그대로 쓴다: 없음·삭제·중지·만료는 구분 없이 `404 LINK_UNAVAILABLE`, 비밀번호 필요 또는 grant 거부는 `401 LINK_PASSWORD_REQUIRED`. grant는 publicationId에 묶고, 링크 중지·만료·삭제 판정을 grant 확인보다 먼저 한다. 작성자(소유 회원) 계정이 비활성이면 `404 LINK_UNAVAILABLE`, 작성자 회원 행이 없으면 `500 INTERNAL_ERROR`이며, 이 판정은 중지·만료 다음, 비밀번호(grant) 앞에 한다(#416 OQ-U4-NFR-6 결정, 2026-11-05).
 
 ```yaml
 # shared-schema: api/src/publications (U4 제공)
 interface PublicationAccess:
   resolveForRecipient(token: string, grant: string|null, now) -> Promise<RecipientAccess>
-    # 호출마다 다시 판정한다(캐시 없음). 순서: 토큰으로 발행본 찾기 → 중지·만료·삭제 → 비밀번호면 grant(publicationId에 묶임) 확인
-    # 실패는 LinkUnavailable | LinkPasswordRequired
+    # 호출마다 다시 판정한다(캐시 없음). 순서: 토큰으로 발행본 찾기 → 중지·만료·삭제 → 작성자 비활성(404 LINK_UNAVAILABLE)·작성자 회원 행 없음(500 INTERNAL_ERROR)
+    #   → 비밀번호면 grant(publicationId에 묶임) 확인. 작성자 판정은 중지·만료 다음, 비밀번호 앞이다(#416 OQ-U4-NFR-6 결정, 2026-11-05)
+    # 실패는 LinkUnavailable | LinkPasswordRequired. 작성자 회원 행 없음은 이름 있는 실패가 아니라 내부 오류(500)다
+    # 판정 통과 뒤 같은 요청 중에 중지·만료·작성자 비활성이 커밋되거나 만료 시각이 지나도 그 요청을 그것만을 이유로 취소하지 않는다.
+    #   그 요청의 접수·횟수 차감은 유효하고, 차단은 다음 요청의 재판정으로 한다(#416 OQ-U4-NFR-5 결정 A, 2026-11-04; 작성자 비활성은 OQ-U4-NFR-6 결정, 2026-11-05)
   resolveForOwner(memberId: uuid, publicationId: uuid) -> Promise<OwnerAccess>
     # 작성자는 중지·만료 뒤에도 본다. 남의 발행본·없음은 NotFound
   readSnapshot(publicationId: uuid) -> Promise<PublishedSnapshot>
+    # 상태(중지·만료)는 판정하지 않는다. 발행본 없음(삭제)은 NotFound.
+    #   받은 사람 경로는 판정 뒤의 NotFound, 또는 그 요청의 쓰기가 발행본(publication_id)을 참조하는 외래 키 제약에서 거부된 경우
+    #   (SQLSTATE 23503이고 거부한 제약이 publication을 참조하는 것일 때만)를 삭제로 보고 저장·차감을 되돌린 뒤 404 LINK_UNAVAILABLE로
+    #   응답한다. 다른 제약의 23503을 포함해 그 밖의 DB 오류는 500 그대로(#416 OQ-U4-NFR-5 결정 A, 2026-11-04)
 RecipientAccess: { publicationId: uuid, ownerMemberId: uuid, passwordProtected: boolean, expiresAt: timestamptz }
 OwnerAccess:     { publicationId: uuid, state: ACTIVE | STOPPED | EXPIRED }
 PublishedSnapshot:
@@ -376,6 +383,8 @@ PublishedSnapshot:
   expiresAt: timestamptz
   items: [{ publishedItemId, position, itemKind, title, snapshot, pdfPages: [{ pageNumber, text, readable }] | null }]
 rule: 받은 사람 쪽 API는 판정에 통과한 뒤에만 사본·색인·요약을 읽는다. MCP 받은 링크 도구는 grant 없이(null) 부르므로 비밀번호 링크는 LinkPasswordRequired다
+post-judgment-rule: 판정을 통과한 요청은 그 뒤의 중지·만료·작성자 비활성만을 이유로 취소하지 않는다. 그 요청의 접수(POST 저장)와 횟수 차감은 유효하고, 차단은 다음 요청의 재판정으로 한다. 판정과 읽기를 한 트랜잭션에 묶는 것은 제공 Unit(U4) 자기 경로의 선택이며 소비 Unit에 요구하지 않는다 (#416 OQ-U4-NFR-5 결정, 2026-11-04; 작성자 비활성은 OQ-U4-NFR-6 결정, 2026-11-05)
+deletion-rule: 판정 직후 발행본이 삭제된 것이 확인되면(readSnapshot의 NotFound, 또는 발행본(publication_id)을 참조하는 외래 키 제약의 거부 — SQLSTATE 23503이고 거부한 제약이 publication을 참조하는 것일 때만) 저장·차감을 되돌리고 404 LINK_UNAVAILABLE로 응답한다. 다른 제약의 23503을 포함해 삭제 때문으로 확인되지 않은 DB 오류는 500을 유지한다. readSnapshot의 오류 이름은 NotFound 그대로다. 매핑과 시험은 각 소비 Unit이 자기 경로에서 한다 (#416 OQ-U4-NFR-5 결정, 2026-11-04)
 ```
 
 ### C-11 받은 사람 화면의 붙는 자리

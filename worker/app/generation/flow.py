@@ -93,7 +93,6 @@ from app.generation.response import (
     AI_TOP_LEVEL_KEYS,
     TOP_LEVEL_KEYS,
     Fragment,
-    Question,
     Sent,
     SentenceMiss,
     TitleProblem,
@@ -369,7 +368,7 @@ def _generate_one(
     sent = Sent(selection.lines, selection.files)
     result = _Result(selection=selection, called=True)
     result.draft = _draft(response, sent, limits, report)
-    result.reflection = _reflection(response, sent, limits, report)
+    result.reflection = _reflection(response, limits, report)
     choice = title_choice(response.get("title"), sent, max_name=limits.max_name_chars)
     if choice.problem is not None:
         result.title_problem = choice.problem
@@ -458,7 +457,7 @@ def _generate_one_ai(
         )
     report.unknown_response_keys += unknown_keys(response, AI_TOP_LEVEL_KEYS)
     result = made(_Result(selection=selection, called=True))
-    result.reflection = _reflection(response, sent, limits, report)
+    result.reflection = _reflection(response, limits, report)
     result.title = _fragment_title(response, sent, item, limits)
     report.ai_notes.update((*parts.titles.notes, *parts.sentences.notes))
     titles, sentences = factchecked(parts.titles), factchecked(parts.sentences)
@@ -608,20 +607,15 @@ def _fragment_sentence(fragment: Fragment) -> SentenceMiss | None:
 
 def _reflection(
     response: dict[str, object],
-    sent: Sent,
     limits: GenerationLimits,
     report: GenerationReport,
 ) -> ReflectionOutcome:
-    def sentence(question: Question) -> SentenceMiss | None:
-        return _question_miss(render.question(question, limits.max_question_chars))
-
+    """AI가 쓴 질문(#487). 줄·이름 대조와 판정 없이 모양·글자 상한·가리기 검사만 본다. AI 쪽 켜짐과 관계없다."""
     verdict = questions(
         response,
-        sent,
         low=limits.min_questions,
         high=limits.max_questions,
-        max_name=limits.max_name_chars,
-        sentence=sentence,
+        max_chars=limits.max_question_chars,
     )
     report.reflection_notes.update(verdict.notes)
     if verdict.problem is not None:
@@ -630,19 +624,7 @@ def _reflection(
         return failed_reflection(_PART_CODES[verdict.problem])
     if _salvaged(verdict.notes):
         report.reflection_salvaged += 1
-    return ReflectionOutcome.generated(
-        tuple(
-            render.question(item, limits.max_question_chars) for item in verdict.items
-        )
-    )
-
-
-def _question_miss(text: str) -> SentenceMiss | None:
-    if text == "UNSUPPORTED":
-        return "NO_TEMPLATE"
-    if text == "TOO_LONG":
-        return "TOO_LONG"
-    return None
+    return ReflectionOutcome.generated(tuple(item.text for item in verdict.items))
 
 
 def _salvaged(notes: tuple[str, ...]) -> bool:
@@ -803,7 +785,9 @@ def _apply_judgement(
     if facts != candidate.work_facts:
         report.second_lines_removed += 1
     if observe is not None:
-        observe(_trace(item, result, (chosen, title, source), kept, facts, verdict))
+        observe(
+            _trace(item, result, (chosen, title, source), kept, facts, verdict, draft)
+        )
     return title, draft, facts
 
 
@@ -833,6 +817,7 @@ def _trace(
     kept: tuple[Checked, ...],
     facts: tuple[str, ...],
     verdict: RecordVerdict | None,
+    draft: DraftOutcome,
 ) -> CatchTrace:
     candidate = item.material.candidate
     judged = result.judged
@@ -855,6 +840,13 @@ def _trace(
         second_line_removed=facts != candidate.work_facts,
         material_judged=result.material_judged,
         material_seconds=result.material_seconds,
+        draft_status=draft.status,
+        draft_failure=None if draft.failure is None else draft.failure.code,
+        reflection_status=result.reflection.status,
+        reflection_failure=None
+        if result.reflection.failure is None
+        else result.reflection.failure.code,
+        questions=result.reflection.questions,
     )
 
 

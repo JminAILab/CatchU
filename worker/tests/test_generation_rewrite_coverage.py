@@ -60,14 +60,13 @@ from generation_scenarios import (
     code_title,
     file_fragment,
     file_id_of,
-    file_question,
     file_title,
     generation_case,
     identifiers,
     line_fragment,
-    line_question,
     naive,
     pick,
+    question,
     sent_files,
     sent_lines,
 )
@@ -105,10 +104,10 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
 
 pytestmark = pytest.mark.usefixtures("no_network")
 
-# 구현이 고른 값(제안값): 고쳐 쓰기 시간 제한 20초, 고쳐 쓰기 입력 20줄, 응답 4,000 B.
+# 구현이 고른 값(제안값): 고쳐 쓰기 시간 제한 20초, 고쳐 쓰기 입력 20줄. 응답 6,000 B는 2026-11-09 팀장 결정(#487).
 REWRITE_TIMEOUT_SECONDS = 20.0
 REWRITE_MAX_LINES = 20
-MAX_OUTPUT_BYTES = 4_000
+MAX_OUTPUT_BYTES = 6_000
 # 구현이 고른 실패 코드와 회원용 문구.
 UNVERIFIED = "GENERATION_UNVERIFIED"
 BUDGET_EXHAUSTED = "GENERATION_BUDGET_EXHAUSTED"
@@ -341,7 +340,7 @@ def with_title(
         line = long_line(request)
         value: dict[str, Any] = {
             "fragments": [line_fragment(line, LONG)],
-            "questions": [line_question("BACKGROUND", line, LONG)],
+            "questions": [question("BACKGROUND")],
         }
         chosen = title(request)
         if chosen is not OMIT:
@@ -394,7 +393,7 @@ def extra_top_key(request: ProviderRequest) -> str:
     label = label_of(request)
     return answer(
         title=code_title(line, label),
-        questions=[line_question("BACKGROUND", line, label)],
+        questions=[question("BACKGROUND")],
     )
 
 
@@ -1000,10 +999,10 @@ def test_rewrite_stops_when_time_runs_out_between_tries() -> None:
 
 
 def oversized_title(request: ProviderRequest) -> str:
-    """맞는 제목에 덧붙임을 더해 응답 크기 상한(4,000 B)을 넘긴 고쳐 쓰기 응답."""
+    """맞는 제목에 덧붙임을 더해 응답 크기 상한(6,000 B)을 넘긴 고쳐 쓰기 응답."""
     text = answer(
         title=code_title(label_line(request), label_of(request)),
-        note="가" * 1_500,
+        note="가" * 2_100,
     )
     assert len(text.encode("utf-8")) > MAX_OUTPUT_BYTES
     return text
@@ -1173,7 +1172,7 @@ def test_failure_reasons_are_counted_per_part_in_code_order(
     caplog.set_level(logging.DEBUG)
 
     def unsent_line_and_joined_name(request: ProviderRequest) -> str:
-        # 생성 순서 첫 후보(#4, beta): 설명은 보내지 않은 줄 id, 질문은 beta 줄의 bet(붙은 이름).
+        # 생성 순서 첫 후보(#4, beta): 설명은 보내지 않은 줄 id, 질문은 150자를 넘는 글.
         line = label_line(request)
         return json.dumps(
             {
@@ -1181,7 +1180,7 @@ def test_failure_reasons_are_counted_per_part_in_code_order(
                     {"kind": "ADDED_LINE_WITH", "line": "c9f9:L9", "name": "beta"}
                 ],
                 "title": code_title(line, "beta"),
-                "questions": [line_question("BACKGROUND", line, "bet")],
+                "questions": [question("BACKGROUND", "가" * 151)],
             }
         )
 
@@ -1192,7 +1191,7 @@ def test_failure_reasons_are_counted_per_part_in_code_order(
             {
                 "fragments": [line_fragment(line, "alphaHelper")],
                 "title": code_title(line, "alpha"),
-                "questions": [line_question("BACKGROUND", line, "alpha")],
+                "questions": [question("BACKGROUND")],
             }
         )
 
@@ -1214,9 +1213,9 @@ def test_failure_reasons_are_counted_per_part_in_code_order(
     assert flow_reasons(caplog) == {
         "wholeReasons": "-",
         "draftReasons": "NAME_MISSING:1,UNKNOWN_LINE:1",
-        "reflectionReasons": "NAME_JOINED_ASCII:1",
+        "reflectionReasons": "TOO_LONG:1",
         "draftDropReasons": "dropped:NAME_MISSING:1,dropped:UNKNOWN_LINE:1",
-        "reflectionDropReasons": "dropped:NAME_JOINED_ASCII:1",
+        "reflectionDropReasons": "dropped:TOO_LONG:1",
     }
     assert (counts["draftSalvaged"], counts["reflectionSalvaged"]) == (0, 0)
     (line,) = [r.getMessage() for r in caplog.records if r.name == FLOW_LOGGER]
@@ -1246,9 +1245,9 @@ def test_dropped_items_are_counted_by_cause_without_names(
                 ],
                 "title": code_title(line, "alpha"),
                 "questions": [
-                    line_question("BACKGROUND", line, "alpha"),
-                    line_question("BACKGROUND", line, "alpha"),
-                    line_question("VERIFICATION", "c9f9:L9", "alpha"),
+                    question("BACKGROUND"),
+                    question("BACKGROUND"),
+                    question("VERIFICATION") | {"line": "c9f9:L9"},
                 ],
             }
         )
@@ -1267,7 +1266,7 @@ def test_dropped_items_are_counted_by_cause_without_names(
         "draftReasons": "-",
         "reflectionReasons": "-",
         "draftDropReasons": "dropped:NAME_MISSING:1,fixed:KIND_MISMATCH:1,over:COUNT:1",
-        "reflectionDropReasons": "dropped:DUPLICATE_TYPE:1,dropped:UNKNOWN_LINE:1",
+        "reflectionDropReasons": "dropped:DUPLICATE_TYPE:1,dropped:ITEM_SHAPE:1",
     }
     (line,) = [r.getMessage() for r in caplog.records if r.name == FLOW_LOGGER]
     for value in ("alphaHelper", "alpha ", "c9f9", "app/"):
@@ -1705,29 +1704,27 @@ def _unsent_file_id(request: ProviderRequest) -> str:
 
 
 def pointing(part: str, target: str) -> Callable[[ProviderRequest], str]:
-    """part(fragments·questions·title) 하나만 가린 줄이나 보내지 않은 비밀 파일 자리를 지목하고, 나머지는
-    가리지 않은 `limit` 줄을 지목하는 생성 응답."""
+    """part(fragments·title) 하나만 가린 줄이나 보내지 않은 비밀 파일 자리를 지목하고, 나머지는 가리지 않은
+    `limit` 줄을 지목하는 생성 응답. 질문은 줄을 가리키지 않는다(#487)."""
 
     def reply(request: ProviderRequest) -> str:
         normal = pick(request, change="added", contains="limit")
         value: dict[str, Any] = {
             "fragments": [line_fragment(normal, "limit")],
             "title": code_title(normal, "limit"),
-            "questions": [line_question("BACKGROUND", normal, "limit")],
+            "questions": [question("BACKGROUND")],
         }
         if target == "secret-file":
             file_id = _unsent_file_id(request)
             chosen = {
                 "fragments": [file_fragment(file_id)],
                 "title": file_title(file_id),
-                "questions": [file_question("BACKGROUND", file_id)],
             }
         else:
             line = _hidden_line(request, target)
             chosen = {
                 "fragments": [line_fragment(line, target)],
                 "title": code_title(line, target),
-                "questions": [line_question("BACKGROUND", line, target)],
             }
         value[part] = chosen[part]
         return json.dumps(value, ensure_ascii=False)
@@ -1736,11 +1733,13 @@ def pointing(part: str, target: str) -> Callable[[ProviderRequest], str]:
 
 
 @pytest.mark.parametrize("target", ["api_token", "owner", "secret-file"])
-@pytest.mark.parametrize("part", ["fragments", "questions", "title"])
+@pytest.mark.parametrize("part", ["fragments", "title"])
 def test_reply_pointing_at_a_masked_line_or_secret_file_is_rejected(
     part: str, target: str
 ) -> None:
-    """가림이 든 줄·비밀 파일을 설명·질문·제목의 근거로 지목하면 그 부분만 거부한다(33, 결정 10·16)."""
+    """가림이 든 줄·비밀 파일을 설명·제목의 근거로 지목하면 그 부분만 거부한다(33, 결정 10·16).
+
+    질문은 줄·파일을 가리키지 않고 글에 가릴 값이 있으면 버린다(#487, test_generation_response)."""
     provider = ScriptedProvider(pointing(part, target), short_title, repeat=False)
 
     case = generation_case(MASKED, provider)
@@ -1759,19 +1758,6 @@ def test_reply_pointing_at_a_masked_line_or_secret_file_is_rejected(
                 "stage": "DRAFT",
                 "code": UNVERIFIED,
                 "message": UNVERIFIED_DRAFT,
-                "candidateId": candidate_id,
-            }
-        ]
-    elif part == "questions":
-        assert found.draft.status == "GENERATED"
-        assert found.reflection.status == "FAILED"
-        assert found.reflection.questions == ()
-        assert found.title == "limit 코드 수정"
-        assert new_failures(case) == [
-            {
-                "stage": "REFLECTION",
-                "code": UNVERIFIED,
-                "message": UNVERIFIED_REFLECTION,
                 "candidateId": candidate_id,
             }
         ]

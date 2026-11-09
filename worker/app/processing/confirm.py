@@ -178,7 +178,10 @@ def _sentence_value(answers: Mapping[str, object]) -> Callable[[str], object]:
 
 
 def sheet_entry(trace: CatchTrace) -> dict[str, object]:
-    """Catch 하나의 확인표 칸. 맞음/틀림 칸(`marks`)은 비워 두고 팀장이 채운다."""
+    """Catch 하나의 확인표 칸. 맞음/틀림 칸과 예/아니오 칸(`marks`)은 비워 두고 팀장이 채운다.
+
+    #487 다시 확인용으로 설명 초안 상태·생각해 볼 질문과, Catch마다 「설명만 보고 무엇을 했는지 알겠나」·「첫
+    문장이 코드 세부만 옮겼나」·「질문이 작업 전체를 묻나」 칸을 둔다."""
     record = trace.record
     verdict = trace.record_verdict
     return {
@@ -202,10 +205,19 @@ def sheet_entry(trace: CatchTrace) -> dict[str, object]:
         "secondLineRemoved": trace.second_line_removed,
         "materialJudged": trace.material_judged,
         "materialSeconds": trace.material_seconds,
+        "draft": {"status": trace.draft_status, "failure": trace.draft_failure},
+        "reflection": {
+            "status": trace.reflection_status,
+            "failure": trace.reflection_failure,
+            "questions": list(trace.questions),
+        },
         "marks": {
             "title": None,
             "chosenAiTitle": None,
             "sentences": {each.item.id: None for each in trace.sentences},
+            "descriptionClear": None,
+            "firstSentenceCodeDetail": None,
+            "questionsWholeWork": None,
             "note": "",
         },
     }
@@ -248,6 +260,10 @@ def confirm(
         "catches": len(traces),
         "analysisSeconds": round((clock() - started).total_seconds(), 1),
         "largestMaterialSeconds": max(seconds) if seconds else None,
+        # 설명 초안이 없는 Catch 수(#487 완료 기준: 바꾸기 전 확인표의 수와 견준다).
+        "draftNotGenerated": sum(
+            trace.draft_status == "NOT_GENERATED" for trace in traces
+        ),
         "items": [sheet_entry(trace) for trace in traces],
     }
     collection_file.write_private(
@@ -277,6 +293,28 @@ def _parser() -> argparse.ArgumentParser:
         "--max-catches", type=int, help="앞에서부터 이 수의 Catch만 확인"
     )
     return parser
+
+
+def _check_saved_target(
+    outcome: CollectionOutcome, repository: RepositoryCoordinates, account_id: int
+) -> None:
+    """읽은 수집 결과가 --repository·--account-id와 같은 대상인지 본다.
+
+    확인표는 --repository 이름으로 쓰므로, 다른 저장소·계정의 수집을 읽으면
+    그 결과가 이 저장소의 확인표로 섞인다. 저장소 이름은 GitHub처럼 대소문자를 가리지
+    않고, 계정은 바뀌지 않는 숫자 식별자로 본다.
+    """
+    saved = outcome.repository
+    if saved is None or (saved.owner.lower(), saved.name.lower()) != (
+        repository.owner.lower(),
+        repository.name.lower(),
+    ):
+        raise ConfirmationError("수집 결과 파일의 저장소가 --repository와 다르다")
+    if (
+        outcome.linked_account is None
+        or outcome.linked_account.account_id != account_id
+    ):
+        raise ConfirmationError("수집 결과 파일의 연동 계정이 --account-id와 다르다")
 
 
 def _coordinates(value: str) -> RepositoryCoordinates:
@@ -328,6 +366,8 @@ def run(argv: Sequence[str] | None, environment: dict[str, str]) -> int:
     args = _parser().parse_args(argv)
     try:
         repository = _coordinates(args.repository)
+        if args.max_catches is not None and args.max_catches < 1:
+            raise ConfirmationError("--max-catches는 1 이상이어야 한다")
         output = outside_repository(args.output)
         collection = outside_repository(
             args.collection or output / f"{_label(repository)}.collection.json"
@@ -350,6 +390,7 @@ def run(argv: Sequence[str] | None, environment: dict[str, str]) -> int:
         clock = lambda: datetime.now(UTC)  # noqa: E731
         if collection.exists():
             outcome = collection_file.read(collection)
+            _check_saved_target(outcome, repository, args.account_id)
         else:
             if token is None:
                 raise ConfirmationError(f"수집 결과 파일이 없어 {TOKEN_ENV}가 필요하다")

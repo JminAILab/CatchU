@@ -1,7 +1,7 @@
 """생성 흐름(#120)의 상태·실패·호출 한도·시간·순서를 합성 제공자로 수집부터 결과 조합까지 돌린다.
 
 기대값은 #120 본문의 완료 기준과 2026-10-12 결정 댓글(결정 4·8·9·10·13·14), 계획의 「상태·실패 변환」
-표에서 정했다. 이슈가 구현에 맡긴 실패 코드 이름·회원용 문구·상한 수치만 이번 구현이 고른 값(45초·4,000 B,
+표에서 정했다. 이슈가 구현에 맡긴 실패 코드 이름·회원용 문구·상한 수치만 이번 구현이 고른 값(45초,
 「{원인} 설명 초안을 만들지 못했다」 등)을 기대값으로 따로 적는다. 생성 코드를 읽어 맞추지 않았다.
 
 후보는 열린 PR마다 본인 커밋 하나(또는 둘)를 둔 합성 저장소로 만든다. PR마다 고친 파일 이름이 달라서
@@ -57,10 +57,10 @@ from generation_scenarios import (
     file_title,
     generation_case,
     line_fragment,
-    line_question,
     naive,
     naive_ai,
     pick,
+    question,
     sent_files,
     written,
 )
@@ -87,6 +87,7 @@ from app.generation import (
     run_generation,
 )
 from app.generation.judged import CatchTrace
+from app.generation.request import QUESTION_RULES
 from app.judgement.provider import Question
 from app.judgement.synthetic import SyntheticJudge, default_answer
 from app.processing import (
@@ -111,9 +112,9 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
 # 모든 시험을 네트워크를 막은 채 돌린다(첫 범위의 검사 12).
 pytestmark = pytest.mark.usefixtures("no_network")
 
-# 구현이 고른 상한(제안값): 생성 호출 시간 제한 45초, 응답 4,000 B.
+# 구현이 고른 상한(제안값): 생성 호출 시간 제한 45초. 응답 6,000 B는 2026-11-09 팀장 결정(#487).
 GENERATION_TIMEOUT_SECONDS = 45.0
-MAX_OUTPUT_BYTES = 4_000
+MAX_OUTPUT_BYTES = 6_000
 
 # 구현이 고른 실패 코드와 회원용 문구. 문구는 「{원인} 설명 초안을 만들지 못했다」·「{원인} 생각해볼 질문을
 # 만들지 못했다」이고, 한도 실패는 후보에 묶이지 않은 ANALYSIS 1건이다.
@@ -891,7 +892,7 @@ def unverified_title(request: ProviderRequest) -> str:
     return answer(
         fragments=[line_fragment(line, "alpha")],
         title=code_title("c9f9:L1", "alpha"),
-        questions=[line_question("BACKGROUND", line, "alpha")],
+        questions=[question("BACKGROUND")],
     )
 
 
@@ -901,7 +902,7 @@ def unclassified_title(request: ProviderRequest) -> str:
     return answer(
         fragments=[line_fragment(line, "blob")],
         title=file_title(file_id_of(request, "tools/blob")),
-        questions=[line_question("BACKGROUND", line, "blob")],
+        questions=[question("BACKGROUND")],
     )
 
 
@@ -951,7 +952,7 @@ def test_call_limits_are_passed_and_applied_per_call() -> None:
     case = generation_case(TWO, provider, limits=limits, clock=clock)
 
     assert_calls(provider, 2, timeout=12.5, max_output=1_500)
-    # 두 번째 응답은 기본 상한(4,000 B) 안이지만 이 요청의 상한(1,500 B)은 넘는다.
+    # 두 번째 응답은 기본 상한(6,000 B) 안이지만 이 요청의 상한(1,500 B)은 넘는다.
     assert len(padded(1_500)(provider.requests[1]).encode()) < MAX_OUTPUT_BYTES
     assert_failed_whole(case, 4)
     assert_failed_whole(case, 3)
@@ -1401,6 +1402,48 @@ def test_generation_request_without_judge_is_the_template_request() -> None:
     assert case.run.report.judgement_provider == "-"
 
 
+WRITTEN = (
+    "알파 값을 바꾸게 된 배경은 무엇이었나요?",
+    "이 작업이 의도대로 동작하는지 확인했다면 어떻게 확인했나요?",
+)
+
+
+@pytest.mark.parametrize("ai_side", [False, True], ids=["ai-off", "ai-on"])
+def test_questions_are_the_model_text_on_both_sides(ai_side: bool) -> None:
+    """#487: AI 쪽을 끄든 켜든 같은 질문 지시를 보내고, 질문은 AI가 쓴 글 그대로다(틀 문장이 아니다).
+
+    질문은 판정·기계 대조를 거치지 않는다: 켰을 때 판정 요청에 질문 글이 없다.
+    """
+    seen: list[ProviderRequest] = []
+
+    def reply(request: ProviderRequest) -> str:
+        seen.append(request)
+        value = json.loads(naive_ai(request) if ai_side else naive(request))
+        value["questions"] = [
+            question("BACKGROUND", WRITTEN[0]),
+            question("VERIFICATION", WRITTEN[1]),
+        ]
+        return json.dumps(value, ensure_ascii=False)
+
+    scenario = pulls(opened(3, ALPHA))
+    if ai_side:
+        case, judge = ai_case(scenario, reply)
+        for each in judge.catch_requests():
+            for text in WRITTEN:
+                assert text not in each.data and text not in each.instructions
+    else:
+        case = generation_case(scenario, ScriptedProvider(reply))
+
+    (request,) = seen
+    assert request.ai_side is ai_side
+    assert QUESTION_RULES in request.instructions
+    made = generated(case, 3)
+    assert made.reflection.status == "GENERATED"
+    assert made.reflection.questions == WRITTEN
+    for text in made.reflection.questions:
+        assert "이름이 포함된 줄을" not in text
+
+
 def test_s18_title_candidate_over_40_chars_is_dropped_without_rewriting() -> None:
     """S18: 41자 AI 후보는 버려지고 고쳐 쓰기 호출이 없다."""
     long_text = "alpha " + "가" * 35
@@ -1412,7 +1455,7 @@ def test_s18_title_candidate_over_40_chars_is_dropped_without_rewriting() -> Non
             titles=[written(long_text, line)],
             sentences=[written("alpha 줄을 바꿨습니다.", line)],
             title={"target": "CODE_NAME", "line": line.id},
-            questions=[line_question("BACKGROUND", line, "alpha")],
+            questions=[question("BACKGROUND")],
         )
 
     case, judge = ai_case(pulls(opened(3, ALPHA)), reply)
@@ -1458,7 +1501,7 @@ def test_sentences_with_unknown_or_masked_lines_are_dropped() -> None:
                 {"text": "alpha", "lines": [line.id], "extra": 1},
             ],
             title=code_title(line, "alpha"),
-            questions=[line_question("BACKGROUND", line, "alpha")],
+            questions=[question("BACKGROUND")],
         )
 
     case, judge = ai_case(pulls(opened(3, ALPHA)), reply)
@@ -1469,6 +1512,27 @@ def test_sentences_with_unknown_or_masked_lines_are_dropped() -> None:
     assert case.run.report.ai_notes == Counter(
         {"dropped:UNKNOWN_LINE": 1, "dropped:ITEM_SHAPE": 2}
     )
+
+
+@pytest.mark.parametrize("mark", ["\n", " ", " ", "\x85"])
+def test_written_items_with_a_line_break_are_dropped(mark: str) -> None:
+    """제목 후보·설명 문장은 한 줄이다. CR·LF뿐 아니라 유니코드 줄 구분 문자가 든 글도 모양 위반으로 버린다
+    (#504 자동 리뷰 지적)."""
+
+    def reply(request: ProviderRequest) -> str:
+        line = pick(request, contains="alpha")
+        return ai_answer(
+            titles=[written(f"alpha{mark}값 변경", line)],
+            sentences=[written(f"alpha 줄을{mark}바꿨습니다.", line)],
+            title=code_title(line, "alpha"),
+            questions=[question("BACKGROUND")],
+        )
+
+    case, judge = ai_case(pulls(opened(3, ALPHA)), reply)
+
+    assert judge.requests == []
+    assert generated(case, 3).draft.status == "NOT_GENERATED"
+    assert case.run.report.ai_notes == Counter({"dropped:ITEM_SHAPE": 2})
 
 
 # Step 10: 순서·시간 몫·상한(BR2.1·BR2.2·BR2.6·BR6.1, 비기능 설계 「호출 순서」·「마감 확인」)
@@ -1669,7 +1733,7 @@ def three_sentences(request: ProviderRequest) -> str:
             written("alpha 줄이 더해졌습니다.", line),
         ],
         title=code_title(line, "alpha"),
-        questions=[line_question("BACKGROUND", line, "alpha")],
+        questions=[question("BACKGROUND")],
     )
 
 
@@ -1809,7 +1873,7 @@ def test_s19_everything_dropped_and_long_fragment_title_means_no_title() -> None
             titles=[written("sessionStore 값 변경", line)],
             sentences=[written(f"{name} 값을 바꿨습니다.", line)],
             title=code_title(line, name),
-            questions=[line_question("BACKGROUND", line, name)],
+            questions=[question("BACKGROUND")],
         )
 
     judge = SyntheticJudge(answers(RECORD_WHAT=0.2))
@@ -1933,7 +1997,7 @@ def test_log_line_counts_judgements_and_results_without_text(
             titles=[written(texts["t1"], line), written(texts["t2"], line)],
             sentences=[written(texts[key], line) for key in ("s1", "s2", "s3")],
             title=code_title(line, "alpha"),
-            questions=[line_question("BACKGROUND", line, "alpha")],
+            questions=[question("BACKGROUND")],
             extra=[],
         )
 
@@ -2026,7 +2090,7 @@ def test_observer_gets_a_trace_even_without_questions() -> None:
             titles=[],
             sentences=[],
             title=code_title(line, "alpha"),
-            questions=[line_question("BACKGROUND", line, "alpha")],
+            questions=[question("BACKGROUND")],
         )
 
     ai_case(pulls(opened(3, ALPHA)), reply, observe=traces.append)

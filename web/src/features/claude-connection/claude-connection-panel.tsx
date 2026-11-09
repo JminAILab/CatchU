@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { copyText } from "@/features/share-links/copy-text";
+import { copyText } from "@/lib/copy-text";
 import { api } from "@/lib/api";
 import {
   confirmDisconnect, copyConnectionUrl, type ConnectionNotice, type CopyResult, type DisconnectPhase,
