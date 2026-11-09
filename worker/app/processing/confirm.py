@@ -350,6 +350,8 @@ def run(argv: Sequence[str] | None, environment: dict[str, str]) -> int:
     args = _parser().parse_args(argv)
     try:
         repository = _coordinates(args.repository)
+        if args.max_catches is not None and args.max_catches < 1:
+            raise ConfirmationError("--max-catches는 1 이상이어야 한다")
         output = outside_repository(args.output)
         collection = outside_repository(
             args.collection or output / f"{_label(repository)}.collection.json"

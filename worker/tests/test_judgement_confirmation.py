@@ -593,6 +593,23 @@ def test_command_reports_an_incomplete_collection(
     assert "failures=1" in caplog.text
 
 
+def test_command_refuses_a_max_catches_below_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--max-catches가 0이나 음수면 확인표를 쓰지 않고 멈춘다(음수는 거의 전부를 뜻하게 되므로, PR #500 리뷰)."""
+    Swapped(monkeypatch)
+    collection_file.write(
+        tmp_path / f"{OWNER}__{NAME}.collection.json", run_case(scenario()).outcome
+    )
+    for value in ("0", "-1"):
+        assert (
+            confirm_module.run(args(tmp_path, "--max-catches", value), environment())
+            == 2
+        )
+        assert "--max-catches" in capsys.readouterr().err
+        assert not (tmp_path / f"{OWNER}__{NAME}.sheet.json").exists()
+
+
 def test_command_refuses_a_saved_collection_for_another_target(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
