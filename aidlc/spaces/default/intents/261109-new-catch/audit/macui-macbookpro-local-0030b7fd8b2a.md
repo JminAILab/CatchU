@@ -1990,3 +1990,496 @@
 **Answer Mode**: chat (reused from intent-capture)
 
 ---
+
+## Artifact Created
+**Timestamp**: 2026-11-09T02:00:03Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-09T02:01:51Z
+**Event**: HUMAN_TURN
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Origin**: person
+**Source**: typed
+**Message Id**: 3a0f700a
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:01:58Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:02:00Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:02:01Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:02:06Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-09T02:02:08Z
+**Event**: DECISION_RECORDED
+**Stage**: scope-definition
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-09T02:03:17Z
+**Event**: HUMAN_TURN
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Origin**: person
+**Source**: picker
+**Picked**: ["Q4만 고친다: 받은 사람 화면의 칸 제목별 보기(빈 칸 숨김 포함)는 2단계가 아니라 1단계 (1)에 든다(입력 문서 §6-1). 이 일은 받은 사람 화면 파일(web/src/features/publications/snapshot-view.tsx)을 고치므로 1단계는 #487에 더해 #488 뒤에 합친다. 2단계 (7) 링크 표지는 1단계 (2) 뒤. 나머지 Q1~Q4는 그대로."]
+**Message Id**: 9c264a8b
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-09T02:03:18Z
+**Event**: QUESTION_REPLIED
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Question**: - [제품] Q1 할 일 목록: 단계별 11개(1단계 5, 2단계 3, 3단계 3)\n- [제품] Q2 우선순위: 11개 모두 Must, Won't는 하지 않는 것 다섯 묶음, 줄일 순서는 이번 판 미정\n- [개발] Q3 의존: 링크 표지는 작성자 글 속 링크 뒤, 칸 제목별 보기는 저장 모양 뒤, 정렬은 작업 시각 뒤, 3단계는 독립, 나머지는 선행 PR만\n- [팀 운영] Q4 순서: 의존 우선(선행 PR이 풀리는 순서, 같이 풀리면 1→2→3)\n\n이대로 두 문서를 만들까요?
+**Reply**: Q4만 고친다: 받은 사람 화면의 칸 제목별 보기(빈 칸 숨김 포함)는 2단계가 아니라 1단계 (1)에 든다(입력 문서 §6-1). 이 일은 받은 사람 화면 파일(web/src/features/publications/snapshot-view.tsx)을 고치므로 1단계는 #487에 더해 #488 뒤에 합친다. 2단계 (7) 링크 표지는 1단계 (2) 뒤. 나머지 Q1~Q4는 그대로.
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:03:25Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-09T02:03:28Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: scope-definition
+**Details**: Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Questions SHA-256**: 33f96c27616b022fac1ef2fd3323dd403e4568b19e043ceda52c4b5e632cd75e
+**Hash Scope**: confirmed-content-v2
+**Feedback**: Q4만 고친다: 받은 사람 화면의 칸 제목별 보기(빈 칸 숨김 포함)는 2단계가 아니라 1단계 (1)에 든다(입력 문서 §6-1). 이 일은 받은 사람 화면 파일(web/src/features/publications/snapshot-view.tsx)을 고치므로 1단계는 #487에 더해 #488 뒤에 합친다. 2단계 (7) 링크 표지는 1단계 (2) 뒤. 나머지 Q1~Q4는 그대로.
+**Message Id**: 9c264a8b
+**Message Ids**: 3a0f700a,9c264a8b
+**Person Reply**: Q1~Q4 모두 A. done\nQ4만 고친다: 받은 사람 화면의 칸 제목별 보기(빈 칸 숨김 포함)는 2단계가 아니라 1단계 (1)에 든다(입력 문서 §6-1). 이 일은 받은 사람 화면 파일(web/src/features/publications/snapshot-view.tsx)을 고치므로 1단계는 #487에 더해 #488 뒤에 합친다. 2단계 (7) 링크 표지는 1단계 (2) 뒤. 나머지 Q1~Q4는 그대로.
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:03:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:03:38Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-09T02:03:40Z
+**Event**: DECISION_RECORDED
+**Stage**: scope-definition
+**Decision**: Does this all look correct?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-09T02:04:40Z
+**Event**: HUMAN_TURN
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: fde27222
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-09T02:04:40Z
+**Event**: QUESTION_REPLIED
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Question**: - [제품] Q1 할 일 목록: 단계별 11개(1단계 5, 2단계 3, 3단계 3)\n- [제품] Q2 우선순위: 11개 모두 Must, Won't는 하지 않는 것 다섯 묶음, 줄일 순서는 이번 판 미정\n- [개발] Q3 의존: 링크 표지는 작성자 글 속 링크 뒤, 칸 제목별 보기는 저장 모양 뒤, 정렬은 작업 시각 뒤, 3단계는 독립, 나머지는 선행 PR만\n- [팀 운영] Q4 순서(고침): 의존 우선, 같이 풀리면 1→2→3. 받은 사람 화면의 칸 제목별 보기(빈 칸 숨김 포함)는 1단계 (1)에 들고, 1단계는 #487에 더해 #488 뒤에 합침. 2단계 (7) 링크 표지는 1단계 (2) 뒤\n\nDoes this all look correct?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:04:43Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-09T02:04:44Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: scope-definition
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Questions SHA-256**: f0ed9a854c63ee585197e3eb22d752e3d51024f16fa7fb02a110daa20bc16958
+**Hash Scope**: confirmed-content-v2
+**Message Id**: fde27222
+**Person Reply**: Looks correct
+**Summary Authorization Id**: 7d4e89c4764f85f3131165a41b76de88aed8fb61969942c44f602ac318b40cbf
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-09T02:05:12Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-document.md
+**Context**: ideation > scope-definition > scope-document.md
+**Summary Authorization Id**: 7d4e89c4764f85f3131165a41b76de88aed8fb61969942c44f602ac318b40cbf
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-09T02:05:36Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/intent-backlog.md
+**Context**: ideation > scope-definition > intent-backlog.md
+**Summary Authorization Id**: 7d4e89c4764f85f3131165a41b76de88aed8fb61969942c44f602ac318b40cbf
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:05:43Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/intent-backlog.md
+**Context**: ideation > scope-definition > intent-backlog.md
+**Summary Authorization Id**: 7d4e89c4764f85f3131165a41b76de88aed8fb61969942c44f602ac318b40cbf
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:05:44Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/intent-backlog.md
+**Context**: ideation > scope-definition > intent-backlog.md
+**Summary Authorization Id**: 7d4e89c4764f85f3131165a41b76de88aed8fb61969942c44f602ac318b40cbf
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:05:46Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/intent-backlog.md
+**Context**: ideation > scope-definition > intent-backlog.md
+**Summary Authorization Id**: 7d4e89c4764f85f3131165a41b76de88aed8fb61969942c44f602ac318b40cbf
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-09T02:05:55Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/memory.md
+**Context**: ideation > scope-definition > memory.md
+**Summary Authorization Id**: 7d4e89c4764f85f3131165a41b76de88aed8fb61969942c44f602ac318b40cbf
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T02:05:55Z
+**Event**: SENSOR_FIRED
+**Fire id**: 3e61cb83
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T02:05:55Z
+**Event**: SENSOR_PASSED
+**Fire id**: 3e61cb83
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-document.md
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T02:05:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: 6e2939a2
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/intent-backlog.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T02:05:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: 6e2939a2
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/intent-backlog.md
+**Duration ms**: 74
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T02:05:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: e25622df
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T02:05:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: e25622df
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Duration ms**: 71
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T02:05:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: dda2a6fd
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T02:05:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: dda2a6fd
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-document.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T02:05:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: 55dd8e68
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T02:05:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: 55dd8e68
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-document.md
+**Duration ms**: 78
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T02:05:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: da27d955
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/intent-backlog.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T02:05:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: da27d955
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/intent-backlog.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T02:05:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: 6f548bfb
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T02:05:57Z
+**Event**: SENSOR_PASSED
+**Fire id**: 6f548bfb
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md
+**Duration ms**: 71
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-09T02:05:57Z
+**Event**: SENSOR_FIRED
+**Fire id**: 2c92c2b7
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-09T02:05:57Z
+**Event**: SENSOR_PASSED
+**Fire id**: 2c92c2b7
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-document.md
+**Duration ms**: 75
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-09T02:05:57Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: scope-definition
+**Next Stage**: rough-mockups
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-document.md=passed; required-sections@aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/intent-backlog.md=passed; required-sections@aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-definition-questions.md=passed; upstream-coverage@aidlc/spaces/default/intents/261109-new-catch/ideation/scope-definition/scope-document.md=passed
+**Open Decisions**: 0
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-09T02:07:38Z
+**Event**: HUMAN_TURN
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve. 다음 단계(대략 화면)는 지금 시작하지 말고 여기서 멈춰 둔다. Catch 개편 PR 3개가 통합 브랜치에 합쳐지고 통합 브랜치를 이 작업 브랜치에 merge commit으로 합친 뒤 대략 화면부터 이어 간다."]
+**Message Id**: a720cfbb
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-09T02:07:39Z
+**Event**: QUESTION_REPLIED
+**Session**: 867119d6-6778-42df-b14e-35671ce09437
+**Question**: 범위 정하기가 끝났습니다. 어떻게 할까요?
+**Reply**: Approve. 다음 단계(대략 화면)는 지금 시작하지 말고 여기서 멈춰 둔다. Catch 개편 PR 3개가 통합 브랜치에 합쳐지고 통합 브랜치를 이 작업 브랜치에 merge commit으로 합친 뒤 대략 화면부터 이어 간다.
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-09T02:07:41Z
+**Event**: GATE_APPROVED
+**Stage**: scope-definition
+**User Input**: Approve
+**Person Reply**: Approve. 다음 단계(대략 화면)는 지금 시작하지 말고 여기서 멈춰 둔다. Catch 개편 PR 3개가 통합 브랜치에 합쳐지고 통합 브랜치를 이 작업 브랜치에 merge commit으로 합친 뒤 대략 화면부터 이어 간다.
+**Message Id**: a720cfbb
+**Brief Digest**: none
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-09T02:07:41Z
+**Event**: STAGE_COMPLETED
+**Stage**: scope-definition
+**Validation Basis**: {"graphContract":"sha256:f507bca6811bab5a3fbe73663d1debe5d0de707829c0a8a0d3c77b97f91a29c7","inputs":[{"artifact":"constraint-register","contentHash":"sha256:8cd133e201f79a6ca372c2a7790b19323663e511a9c624913af2ad0600d63612","instanceCount":1,"presentCount":1,"producer":"feasibility","required":false,"structureHash":"sha256:9d034d31a49543404d0932b1336617eb12895e6e47685d2479d0f655b5edcf3a"},{"artifact":"feasibility-assessment","contentHash":"sha256:1cd49a75b4550b686c39101c44d3c2ce3525b78bc3757a3fd5d6a80864fdadba","instanceCount":1,"presentCount":1,"producer":"feasibility","required":false,"structureHash":"sha256:cd81228daa7ad3ab8fb748fb8d3e488bcddcee034fc88bb5bdcc34c15b7f0ed1"},{"artifact":"intent-statement","contentHash":"sha256:94f34f681ffa6259f008ff0f6b2b296e8f359576d8b8b1d0e8456d586f071421","instanceCount":1,"presentCount":1,"producer":"intent-capture","required":true,"structureHash":"sha256:6ce1cbc843fa0e60dce00be3c1e34c609718b24c193306f3fe8e018164557c9f"}],"outputs":[{"artifact":"intent-backlog","contentHash":"sha256:e761d179463edbf5ad2c98f548f446ac40894586c398137180102c6d68b77b67","instanceCount":1,"presentCount":1,"producer":"scope-definition","required":true,"structureHash":"sha256:3493a2836610457b99a66931ac7471d550b456bc093403ad2d9aa878df220ad9"},{"artifact":"scope-definition-questions","contentHash":"sha256:fd9fed511d129b62043d92b8243ff0eb9c81c78ca7eb9549e53af412c17e76c9","instanceCount":1,"presentCount":1,"producer":"scope-definition","required":true,"structureHash":"sha256:95b3979b4daea8c75ce141457a0e021e44b4352c13dfd2ef1f5daaea543df425"},{"artifact":"scope-document","contentHash":"sha256:ebd51ce79701eb197923b47a2f52b6c02ef8738c49414e5f17ad71bc541b46c4","instanceCount":1,"presentCount":1,"producer":"scope-definition","required":true,"structureHash":"sha256:a548298f02eefd8c718b37a9351ebcd6315f77e0fcc27a395924123a0a0f9d7c"}],"projectType":"brownfield","schema":3}
+**Details**: Stage Scope Definition approved by gate
+**Tokens In**: 40
+**Tokens Out**: 23255
+**Cache Read**: 8983821
+**Cache Write**: 43369
+**Cost USD**: 2.61
+**By Model**: opus-5-5=2.61
+**By Agent**: main=2.61
+**Tokens By Model**: opus-5-5=40/23.3k/9M/43.4k
+**Tokens By Agent**: main=40/23.3k/9M/43.4k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-09T02:07:41Z
+**Event**: STAGE_STARTED
+**Stage**: rough-mockups
+**Agent**: aidlc-design-agent
+**Answer Mode**: chat (reused from intent-capture)
+
+---
+
+## Workflow Parked
+**Timestamp**: 2026-11-09T02:07:41Z
+**Event**: WORKFLOW_PARKED
+**Stage**: rough-mockups
+**Person Reply**: Approve. 다음 단계(대략 화면)는 지금 시작하지 말고 여기서 멈춰 둔다. Catch 개편 PR 3개가 통합 브랜치에 합쳐지고 통합 브랜치를 이 작업 브랜치에 merge commit으로 합친 뒤 대략 화면부터 이어 간다.
+**Message Id**: a720cfbb
+
+---
