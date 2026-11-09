@@ -293,6 +293,12 @@ def fragments(
     return PartVerdict(tuple(verified), notes=tuple(notes))
 
 
+def _one_line(text: str) -> bool:
+    """비지 않은 한 줄인가. CR·LF뿐 아니라 유니코드 줄 구분 문자(U+2028·U+2029·NEL 등, `str.splitlines` 기준)도
+    줄바꿈으로 본다(#504 자동 리뷰 지적)."""
+    return len(text.splitlines()) == 1
+
+
 def _question(item: object, max_chars: int) -> Question | _ItemMiss:
     """질문 하나. 키는 type·text 둘뿐이고, 글은 한 줄이며 비어 있지 않아야 한다. 맞지 않으면 (문제, 원인).
 
@@ -306,7 +312,7 @@ def _question(item: object, max_chars: int) -> Question | _ItemMiss:
         return ("RULE_VIOLATION", "ITEM_SHAPE")
     kind: QuestionType = item["type"]
     text = item["text"].strip()
-    if not text or "\n" in text or "\r" in text:
+    if not _one_line(text):
         return ("RULE_VIOLATION", "ITEM_SHAPE")
     if len(text) > max_chars:
         return ("RULE_VIOLATION", "TOO_LONG")
@@ -418,7 +424,7 @@ def _written_item(
     if not isinstance(text, str) or not isinstance(refs, list) or not refs:
         return "ITEM_SHAPE"
     text = text.strip()
-    if not text or "\n" in text or "\r" in text:
+    if not _one_line(text):
         return "ITEM_SHAPE"
     if max_chars is not None and len(text) > max_chars:
         # 40자를 넘는 제목 후보는 버리고 고쳐 쓰지 않는다(Q3 A).

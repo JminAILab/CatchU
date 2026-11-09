@@ -1514,6 +1514,27 @@ def test_sentences_with_unknown_or_masked_lines_are_dropped() -> None:
     )
 
 
+@pytest.mark.parametrize("mark", ["\n", " ", " ", "\x85"])
+def test_written_items_with_a_line_break_are_dropped(mark: str) -> None:
+    """제목 후보·설명 문장은 한 줄이다. CR·LF뿐 아니라 유니코드 줄 구분 문자가 든 글도 모양 위반으로 버린다
+    (#504 자동 리뷰 지적)."""
+
+    def reply(request: ProviderRequest) -> str:
+        line = pick(request, contains="alpha")
+        return ai_answer(
+            titles=[written(f"alpha{mark}값 변경", line)],
+            sentences=[written(f"alpha 줄을{mark}바꿨습니다.", line)],
+            title=code_title(line, "alpha"),
+            questions=[question("BACKGROUND")],
+        )
+
+    case, judge = ai_case(pulls(opened(3, ALPHA)), reply)
+
+    assert judge.requests == []
+    assert generated(case, 3).draft.status == "NOT_GENERATED"
+    assert case.run.report.ai_notes == Counter({"dropped:ITEM_SHAPE": 2})
+
+
 # Step 10: 순서·시간 몫·상한(BR2.1·BR2.2·BR2.6·BR6.1, 비기능 설계 「호출 순서」·「마감 확인」)
 
 # 작은 자료 상한. 한 줄짜리 파일 후보는 작은 후보로, 파일 여덟 개 후보는 큰 후보로 담긴다.

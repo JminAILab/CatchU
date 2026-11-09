@@ -919,6 +919,17 @@ def test_question_is_not_matched_against_the_changed_lines() -> None:
             {"type": "BACKGROUND", "text": "배경은 무엇인가요?\n다른 방법은요?"},
             id="two-lines",
         ),
+        # 유니코드 줄 구분 문자도 줄바꿈이다(U+2028·U+2029·NEL·세로 탭, #504 자동 리뷰 지적).
+        *(
+            pytest.param(
+                {
+                    "type": "BACKGROUND",
+                    "text": f"배경은 무엇인가요?{mark}다른 방법은요?",
+                },
+                id=f"line-separator-{ord(mark):04x}",
+            )
+            for mark in (" ", " ", "\x85", "\x0b")
+        ),
         pytest.param(
             {"type": "MOTIVATION", "text": WRITTEN_QUESTIONS[0]}, id="new-type"
         ),
