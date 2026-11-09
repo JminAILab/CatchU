@@ -10,9 +10,10 @@ import { previewCatches, previewRepositories } from "../src/features/assets/fixt
 const viewUrl = new URL("../src/features/assets/assets-view.tsx", import.meta.url);
 const cssUrl = new URL("../src/features/assets/assets.module.css", import.meta.url);
 // 기존 TypeScript로 화면을 렌더링한다. 이 검사는 문구를 보며 CSS 배치는 브라우저에서 확인한다.
+// 목록 카드 제목의 2줄 말줄임 클래스(CR1 BR6.1)만 이름을 돌려줘 붙었는지 본다. 다른 클래스는 비워 둔다.
 const hooks = registerHooks({
   load(url, context, nextLoad) {
-    if (url === cssUrl.href) return { format: "module", shortCircuit: true, source: "export default {};" };
+    if (url === cssUrl.href) return { format: "module", shortCircuit: true, source: 'export default { titleClamp: "titleClamp" };' };
     if (url !== viewUrl.href) return nextLoad(url, context);
     return {
       format: "module", shortCircuit: true,
@@ -42,10 +43,11 @@ for (const [status, content, draftText] of [
   for (const title of ["[합성] 제목", null]) {
     test(`${status} · 제목 ${title === null ? "없음" : "있음"}: 존재하는 생성물만 완료로 안내한다`, () => {
       const html = detailMarkup({ ...previewCatches[0], title, draft: { status, content } });
-      const expected = status === "GENERATED" ? (title === null ? "설명" : "제목과 설명") : title === null ? null : "제목";
+      // CR1 BR6.3(S15): 상세 안내의 「설명」은 「설명 초안」이다. 「제목」만인 경우와 나머지 글은 그대로다.
+      const expected = status === "GENERATED" ? (title === null ? "설명 초안" : "제목과 설명 초안") : title === null ? null : "제목";
       if (expected) assert.ok(html.includes(`<p>${expected}은 CatchU가 GitHub 기록에서 자동으로 만들었습니다`));
       else assert.doesNotMatch(html, /자동으로 만들었습니다/);
-      if (status !== "GENERATED") assert.doesNotMatch(html, /설명은 CatchU가/);
+      if (status !== "GENERATED") assert.doesNotMatch(html, /설명 초안은 CatchU가|설명은 CatchU가/);
       assert.ok(html.includes(draftText));
       assert.ok(html.includes("사실과 다르면 불일치를 표시하거나 공개하지 마세요."));
     });
@@ -58,7 +60,7 @@ for (const [name, content] of [["null", null], ["빈 문자열", ""], ["공백",
       const html = detailMarkup({ ...previewCatches[0], title, draft: { status: "GENERATED", content } });
       if (title === null) assert.doesNotMatch(html, /자동으로 만들었습니다/);
       else assert.ok(html.includes("<p>제목은 CatchU가 GitHub 기록에서 자동으로 만들었습니다"));
-      assert.doesNotMatch(html, /설명은 CatchU가/);
+      assert.doesNotMatch(html, /설명 초안은 CatchU가|설명은 CatchU가/);
       assert.ok(html.includes("<h3>Catch 설명 초안</h3><p>생성된 설명 초안이 없습니다.</p>"));
       assert.ok(html.includes("사실과 다르면 불일치를 표시하거나 공개하지 마세요."));
     });
@@ -73,7 +75,7 @@ function listMarkup({ repositoryId = "", visibility = "", items = previewCatches
   }));
 }
 const shownCatchIds = (html) => previewCatches.filter((item) => item.title
-  ? html.includes(`>${item.title}</button>`) : html.includes("상세 보기 ↗</button>")).map((item) => item.catchId);
+  ? html.includes(`>${item.title}</span></button>`) : html.includes("상세 보기 ↗</button>")).map((item) => item.catchId);
 
 for (const [visibility, repositoryId] of [["", ""], ["PUBLIC", ""], ["PRIVATE", ""], ["PUBLIC", "demo-web"], ["PRIVATE", "demo-api"]]) {
   test(`공개 상태 ${visibility || "전체"} · 저장소 ${repositoryId || "전체"}: 두 조건에 맞는 Catch만 보인다`, () => {
@@ -110,4 +112,45 @@ test("고른 공개 상태에 맞는 Catch가 없으면 조건 안내를 보이�
   const emptyRepository = listMarkup({ visibility: "PRIVATE", repositoryId: "empty-repo" });
   assert.ok(emptyRepository.includes("<h3>이 저장소에서 표시할 Catch가 없습니다</h3>"));
   assert.doesNotMatch(emptyRepository, /미공개 Catch가 없습니다/);
+});
+
+// CR1 화면(BR6.1·BR6.3, S13·S15). 2줄 말줄임 모양 자체는 브라우저에서 확인한다.
+const longTitle = "로그인 오류 메시지를 사용자에게 보여 주는 방식과 재시도 안내를 정리하고 실패한 요청을 다시 보내는 흐름을 바꿨다 ".repeat(2).trim();
+
+test("S13: 목록 카드 제목에 2줄 말줄임 클래스가 붙고 버튼 글은 전체 제목이다. 상세 제목은 줄이지 않는다", () => {
+  assert.ok(longTitle.length >= 100);
+  const item = { ...previewCatches[0], title: longTitle };
+  const html = listMarkup({ items: [item] });
+  assert.ok(html.includes(`<span class="titleClamp">${longTitle}</span></button>`));
+  const detail = detailMarkup(item);
+  assert.ok(detail.includes(`>${longTitle}</h3>`));
+  assert.doesNotMatch(detail, /titleClamp/);
+  const css = readFileSync(cssUrl, "utf8");
+  assert.match(css, /\.titleClamp\s*\{[^}]*-webkit-line-clamp:\s*2/);
+});
+
+test("S15: 구직자 목록 안내도 상세와 같이 「제목과 설명 초안」이고 나머지 글은 그대로다", () => {
+  const html = listMarkup();
+  assert.ok(html.includes("<p>제목과 설명 초안은 CatchU가 GitHub 기록에서 자동으로 만들었습니다<br/>사실과 다르면 불일치를 표시하거나 공개하지 마세요.</p>"));
+  assert.doesNotMatch(html, /제목과 설명은/);
+});
+
+test("옛 꼴 작업 사실(SHA가 든 첫 줄, 다른 계정 문장)을 가진 Catch도 목록·상세에 그대로 그린다", () => {
+  const oldFacts = [
+    "PR 없이 병합한 병합 커밋 0123456789ab",
+    "이 병합이 들인 커밋에 연동 계정이 작성자로 기록되지 않은 커밋이 없다",
+  ];
+  const item = { ...previewCatches[0], workFacts: oldFacts };
+  assert.ok(listMarkup({ items: [item] }).includes(`>${oldFacts[0]}</p>`));
+  const detail = detailMarkup(item);
+  for (const fact of oldFacts) assert.ok(detail.includes(fact), fact);
+});
+
+test("태그 꼴 제목·작업 사실 둘째 줄은 HTML로 해석하지 않고 글자로 그린다", () => {
+  const tag = "<script>alert(1)</script><b>굵게</b>";
+  const item = { ...previewCatches[0], title: tag, workFacts: ["PR #3, 상태 병합됨", `PR 제목: "${tag}"`] };
+  for (const html of [listMarkup({ items: [item] }), detailMarkup(item)]) {
+    assert.doesNotMatch(html, /<script>|<b>굵게/);
+    assert.ok(html.includes("&lt;script&gt;alert(1)&lt;/script&gt;&lt;b&gt;굵게&lt;/b&gt;"));
+  }
 });

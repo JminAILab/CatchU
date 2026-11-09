@@ -15,6 +15,11 @@ reflection·title)과 본인 커밋 근거의 한계 끝 문구(결정 5·6)만 
 6. 설명·질문·제목은 각자 판정한다. 설명이 실패해도 확인된 질문·제목은 둔다. 설명·질문은 맞는 항목만 쓰고
    틀린 항목은 버린다(response 모듈 설명, 2026-10-19 팀장 결정).
 모든 후보의 생성·미생성 판정이 끝난 뒤, 남은 시간 안에서 형식을 어긴 제목만 고쳐 쓴다(결정 15).
+
+제목 우선순위(CR1 BR3.1~BR3.3): 후보 자료의 기록의 글 칸(record_text)이 있고 부실이 아니면 그 글이
+제목이다. 생성 호출이 성공했든 실패했든 건너뛰었든 같다. 이때는 조각 제목을 고쳐 쓰는 호출을 하지 않고,
+40자 상한도 쓰지 않는다. 기록의 글은 다시 계산하지 않고 생성 요청에도 넣지 않는다. 아니면 조각 제목,
+그것도 없으면 null이다. 운영 로그의 「제목만 없음」(titleOnlyNull)은 최종 제목이 없는 후보만 센다.
 제공자 오류·시간 초과는 후보마다 결과로 바꾸고 다시 부르지 않는다. 그 밖의 예외(결함, 요청 전체의
 ExecutionUnknown)는 그대로 올린다.
 """
@@ -405,10 +410,15 @@ def _rewrite_title(
     limits: GenerationLimits,
     report: GenerationReport,
 ) -> None:
-    """형식을 어긴 제목만 제목당 최대 N회 고친다. 호출 실패·확인 실패·한도·시간 부족이면 멈추고 None."""
+    """형식을 어긴 제목만 제목당 최대 N회 고친다. 호출 실패·확인 실패·한도·시간 부족이면 멈추고 None.
+
+    쓸 만한 기록의 글이 제목인 후보는 조각 제목을 쓰지 않으므로 고쳐 쓰기를 부르지 않는다(BR3.3).
+    """
     problem = result.title_problem
     result.title_problem = None
     if problem is None or result.selection is None:
+        return
+    if _record_title(item.material.candidate) is not None:
         return
     data, lines, files = rewrite_data(result.selection, limits)
     sent = Sent(lines, files)
@@ -450,8 +460,11 @@ def _rewrite_title(
 def _apply(
     item: PreparedCandidate, result: _Result, report: GenerationReport
 ) -> EligibleCandidate:
-    """생성 칸과 근거 한계 끝 문구만 바꾼다."""
+    """생성 칸과 근거 한계 끝 문구만 바꾼다. 작업 사실은 바꾸지 않는다(BR4.3)."""
     candidate = item.material.candidate
+    title = _record_title(candidate)
+    if title is None:
+        title = result.title
     additions: dict[str, list[str]] = {}
     if result.selection is not None:
         for sha, partial in result.selection.size_excluded.items():
@@ -469,7 +482,8 @@ def _apply(
         evidence[index] = replace(evidence[index], coverage_limits=(*limits, *new))
     if result.draft.status == "GENERATED":
         report.draft_generated += 1
-        if result.title is None:
+        if title is None:
+            # 최종 제목 기준이다. 기록의 글이 제목이면 세지 않는다(BR3.3).
             report.title_only_null += 1
     if result.draft.status == "FAILED":
         report.draft_failed += 1
@@ -477,11 +491,19 @@ def _apply(
         report.reflection_failed += 1
     return replace(
         candidate,
-        title=result.title,
+        title=title,
         draft=result.draft,
         reflection=result.reflection,
         evidence=tuple(evidence),
     )
+
+
+def _record_title(candidate: EligibleCandidate) -> str | None:
+    """쓸 만한 기록의 글이면 그 글(BR3.1). 후보 판정이 한 번 계산한 칸만 본다(BR2.7)."""
+    record = candidate.record_text
+    if record is None or not record.usable:
+        return None
+    return record.text
 
 
 def _reasons(counts: Counter[str]) -> str:

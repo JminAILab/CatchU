@@ -1,6 +1,6 @@
 """후보 묶음(#118): 수집 관측만으로 변경의 작업 단위를 정한다.
 
-`docs/CatchU_work_identity_unit.md`의 작업 단위·배정·나누기와 「PR 소속과 같은 변경을 확인하는
+`docs/CatchU_work_identity_unit.md`의 작업 단위·배정과 「PR 소속과 같은 변경을 확인하는
 근거」를 옮겼다. 입력은 `CollectionOutcome`(기본 브랜치 창·PR·이슈와 관계 관측)뿐이고 GitHub를
 부르지 않는다. 같은 작업이라는 결론을 밖에서 받지 않고, 모든 판정을 관측에서 끌어낸다.
 `group()`이 아래 단계를 차례로 부른다.
@@ -37,12 +37,8 @@
    시각 차이·메시지 유사도는 쓰지 않는다. 이웃이 확인 중단으로 보류됐거나 이웃과 잇는지 볼 변경
    내용을 수집이 멈춰 받지 못했으면 그 묶음 전체를 보류한다. 목록 단계에서 멈춰 창이 잘렸을 수
    있으면 창 밖 부모를 둔 커밋도 보류한다.
-6. 나누기: 이슈 조회가 허용된 요청에서 PR·병합 단위의 본인 커밋이 서로 다른 이슈를 둘 이상 가리킬
-   때만 시도한다. 그 단위에 걸린 확인이 수집 중단으로 끝나지 않았고(요청 전체의 완료 여부가
-   아니다)·PR이면 그 PR의 커밋 목록을 끝까지 확인·모든 변경 파일 확인·파일이 겹치지 않는 부분
-   둘 이상·부분마다 본인 변경·부분끼리 겹치지 않는 이슈를 모두 채울 때만 나눈다. 한 커밋을 파일
-   경로로 나누지는 않는다(한계 L8). 이슈 조회가 허용되지 않은 요청은 PR 번호가 아닌 서로 다른
-   번호를 가리켜도 나누지 않고 작성자가 묶은 경계를 따른다는 한계만 남긴다(2026-10-08 팀장 결정).
+6. 단위 목록: PR·PR 없는 병합 단위는 이슈 번호로 나누지 않고 단위 전체를 후보 하나로 둔다. 이슈
+   조회가 허용돼도 같고, 나누지 않은 이유의 한계도 남기지 않는다(CR1 FR2.1, BR1.1·BR1.2).
 
 병합 커밋(부모 둘 이상)은 변경으로 세지 않고 경계로만 쓴다. 후보 문장·근거·집계는 build.py가 한다.
 문장에 쓰도록 단위마다 두 가지를 더 남긴다. PR·PR 없는 병합에 연동 계정이 작성자로 기록되지 않은
@@ -62,11 +58,10 @@ from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import Literal
 
-from app.candidates.identity import CommitsUnit, MergeUnit, Part, PullRequestUnit
+from app.candidates.identity import CommitsUnit, MergeUnit, PullRequestUnit
 from app.candidates.same_change import (
     cherry_pick_sources,
     content_patch_id,
-    issue_references,
     stable_patch_id,
 )
 from app.collection.collect import CollectionOutcome
@@ -175,19 +170,8 @@ class NoteKind(StrEnum):
     # 불일치·250건에서 다 읽지 못함) PR이 있어, 이 PR에 배정한 변경이 그 PR에도 담겼을 수 있다.
     # 보류하지 않고 집계도 바꾸지 않는다(2026-10-09 팀장 결정).
     EARLIER_PULL_REQUEST_LIST_INCOMPLETE = "EARLIER_PULL_REQUEST_LIST_INCOMPLETE"
-    # 이슈 조회가 허용되지 않은 요청에서 본인 커밋이 서로 다른 번호(PR 번호 제외)를 둘 이상
-    # 가리키지만 작성자가 묶은 PR·병합의 경계를 따라 나누지 않았다(2026-10-08 팀장 결정).
-    NOT_SPLIT_AUTHOR_BOUNDARY = "NOT_SPLIT_AUTHOR_BOUNDARY"
     NEIGHBOR_DETAILS_MISSING = "NEIGHBOR_DETAILS_MISSING"
     NEIGHBOR_FILES_TRUNCATED = "NEIGHBOR_FILES_TRUNCATED"
-    NOT_SPLIT_STOPPED = "NOT_SPLIT_STOPPED"
-    # PR의 커밋 목록을 끝까지 확인하지 못했다(목록 밖 PR·크기 상한·판본 불일치·250건에서 다 읽지
-    # 못함).
-    NOT_SPLIT_MEMBERSHIP = "NOT_SPLIT_MEMBERSHIP"
-    NOT_SPLIT_DETAILS = "NOT_SPLIT_DETAILS"
-    NOT_SPLIT_OVERLAP = "NOT_SPLIT_OVERLAP"
-    NOT_SPLIT_NO_OWN = "NOT_SPLIT_NO_OWN"
-    NOT_SPLIT_ISSUES = "NOT_SPLIT_ISSUES"
 
 
 @dataclass(frozen=True, order=True)
@@ -195,14 +179,12 @@ class Note:
     """묶음의 한계 하나. 종류마다 쓰는 칸이 정해져 있다.
 
     RESUBMISSION_UNCONFIRMED는 pull_requests에 (닫힌 PR, 병합된 PR)을, CHERRY_PICK_UNCONFIRMED는
-    commits에 (원본 커밋, 옮긴 커밋)을, NOT_SPLIT_*는 count에 나누기를 시도하게 한 이슈 수(작성자
-    경계면 가리킨 번호 수)를 둔다. 나머지 종류는 칸을 쓰지 않는다.
+    commits에 (원본 커밋, 옮긴 커밋)을 둔다. 나머지 종류는 칸을 쓰지 않는다.
     """
 
     kind: NoteKind
     pull_requests: tuple[int, ...] = ()
     commits: tuple[str, ...] = ()
-    count: int = 0
 
 
 @dataclass(frozen=True)
@@ -223,10 +205,6 @@ class AssignedChange:
 class GroupedUnit:
     unit: PullRequestUnit | MergeUnit | CommitsUnit
     changes: tuple[AssignedChange, ...]
-    # 나눈 부분. 단위 전체면 비었다.
-    parts: tuple[Part, ...] = ()
-    # 나눈 부분의 커밋이 가리키는 이슈 번호.
-    issues: tuple[int, ...] = ()
     sources: frozenset[MembershipSource] = frozenset()
     notes: tuple[Note, ...] = ()
     # PR 커밋 목록의 변경 가운데 배정 규칙으로 다른 PR에 보낸 수.
@@ -244,8 +222,8 @@ class GroupedUnit:
     # 못했어도 근거 부족으로 세지 않는다.
     contribution_settled: bool = True
     # 연동 계정이 작성자로 기록되지 않은 커밋이 섞였는가(_other_authors). PR은 그 PR 커밋 목록 전체,
-    # PR 없는 병합은 그 병합이 들인 커밋 전체를 본다. 나눈 부분도 단위 전체 값이다. 커밋 묶음은
-    # None이다(2026-10-08 팀장 결정 「수신자에게 나가는 숫자와 근거 순서」).
+    # PR 없는 병합은 그 병합이 들인 커밋 전체를 본다. 커밋 묶음은 None이다. 작업 사실 문장에는 쓰지
+    # 않고(CR1 BR4.4), 기록의 글 고르기(BR2.1)와 생성 재료·제목 처리에 쓴다.
     other_authors: OtherAuthors | None = None
     # 커밋 묶음에서 실제로 이은 쌍(작은 SHA, 큰 SHA). 같은 변경으로 이은 쌍과 부모·변경 파일
     # 겹침으로 이은 쌍을 따로 둔다. 묶음 설명은 쓴 근거만 적는다. PR·병합 단위는 비었다.
@@ -343,11 +321,8 @@ class _Context:
     # 창 커밋의 자리. 창 안 조상이 늘 앞서고, 조상 관계가 없으면 커밋 시각이 이른 것, 같으면 작은
     # SHA가 앞선다(WindowGraph.parents_first).
     ancestry: Mapping[str, int]
-    # 이슈 목록으로 본 이슈 번호(PR 제외).
-    issues: frozenset[int]
     pulls_allowed: bool
     commits_allowed: bool
-    issues_allowed: bool
     # 목록 단계에서 수집이 멈춰 기본 브랜치 창이 잘렸을 수 있다. 창 밖에 닿은 판정은 확인 중단이다.
     window_cut: bool
     # 파일 모드를 확인하려 했으나 수집이 멈춰 확인하지 못한 커밋(모드 확인 미도달).
@@ -468,7 +443,7 @@ def group(outcome: CollectionOutcome) -> Grouping:
     # 5. 커밋 묶음
     pool_changes = assignment.units.pop(_POOL, [])
     bundles = _bundle(ctx, states, assignment, pool_changes)
-    # 6. 나누기와 단위 목록
+    # 6. 단위 목록
     units = _units(
         ctx,
         states,
@@ -548,10 +523,8 @@ def _context(outcome: CollectionOutcome) -> _Context:
         },
         graph=graph,
         ancestry=graph.parents_first(),
-        issues=frozenset(issue.number for issue in outcome.issues),
         pulls_allowed="PULL_REQUEST" in allowed,
         commits_allowed="COMMIT" in allowed,
-        issues_allowed="ISSUE" in allowed,
         window_cut=not outcome.completed and relations.stopped_during == "LISTS",
         modes_unreached=frozenset(
             check.sha
@@ -1618,124 +1591,7 @@ def _neighbor_links(
     )
 
 
-# 6. 나누기와 단위 목록
-
-
-@dataclass(frozen=True)
-class _Split:
-    # 나눈 부분(변경, 가리키는 이슈). 나누지 않으면 비었다.
-    parts: tuple[tuple[tuple[AssignedChange, ...], tuple[int, ...]], ...] = ()
-    note: Note | None = None
-
-
-def _references(ctx: _Context, sha: str) -> frozenset[int]:
-    return issue_references(ctx.commits[sha].message) & ctx.issues
-
-
-def _numbers_across_author_boundary(
-    ctx: _Context, states: Mapping[str, _CommitState], commits: Iterable[str]
-) -> int:
-    """이슈 조회가 허용되지 않은 요청에서 단위의 본인 커밋 메시지가 가리킨 서로 다른 번호 수.
-
-    알려진 PR(목록과 연결 PR 조회로 안 PR, 이 단위 자신 포함)의 번호는 뺀다. PR 조회가 허용되지
-    않았으면 PR 번호를 모르므로 빼지 않는다. 주소 안의 번호·코드 안의 번호는 세지 않는다.
-    """
-    numbers: set[int] = set()
-    for sha in commits:
-        if states[sha].own:
-            numbers |= issue_references(ctx.commits[sha].message)
-    if ctx.pulls_allowed:
-        numbers -= ctx.pull_requests.keys()
-    return len(numbers)
-
-
-def _split(
-    ctx: _Context,
-    states: Mapping[str, _CommitState],
-    key: PullRequestUnit | MergeUnit,
-    changes: tuple[AssignedChange, ...],
-    stopped: bool,
-) -> _Split:
-    """단위 안에 서로 다른 작업이 있다는 근거가 모두 있을 때만 나눈다.
-
-    이슈 조회가 허용되지 않은 요청은 나누지 않는다. 본인 커밋이 PR 번호가 아닌 서로 다른 번호를
-    둘 이상 가리켜도 작성자가 한 PR·병합으로 묶은 경계를 따르고 그 사실만 한계로 남긴다(2026-10-08
-    팀장 결정 「한 PR·병합 안의 서로 다른 번호」).
-
-    이슈 조회가 허용된 요청은 본인 커밋이 서로 다른 이슈를 둘 이상 가리킬 때만 시도한다. 단위에
-    배정된 모든 변경이 어느 한 부분에 속해야 하므로 단위의 구성을 다 알아야 한다. stopped는 이
-    단위의 나누기 근거나 구성에 걸린 확인이 수집 중단으로 끝나지 않았다는 뜻이다(_units가
-    _stop_touches와 목록 단계 멈춤으로 정한다).
-    PR 없는 병합은 들인 커밋을 다 본 것만 단위가 된다. PR은 커밋 목록을 끝까지 읽은 것만 나눈다.
-    목록 밖 PR(연결 PR 조회로만 앎)·크기 상한·판본 불일치·250건에서 다 읽지 못한 PR은 보지 못한
-    커밋이 부분들을 이을 수 있다.
-    """
-    commits = [sha for change in changes for sha in change.commits]
-    if not ctx.issues_allowed:
-        count = _numbers_across_author_boundary(ctx, states, commits)
-        if count < 2:
-            return _Split()
-        return _Split(note=Note(NoteKind.NOT_SPLIT_AUTHOR_BOUNDARY, count=count))
-    signal: set[int] = set()
-    for sha in commits:
-        if states[sha].own:
-            signal |= _references(ctx, sha)
-    if len(signal) < 2:
-        return _Split()
-
-    def refuse(kind: NoteKind) -> _Split:
-        return _Split(note=Note(kind, count=len(signal)))
-
-    if stopped:
-        return refuse(NoteKind.NOT_SPLIT_STOPPED)
-    if isinstance(key, PullRequestUnit):
-        entry = ctx.lists.get(key.number)
-        if (
-            entry is None
-            or entry.status is not DetailStatus.FETCHED
-            or not entry.complete
-        ):
-            return refuse(NoteKind.NOT_SPLIT_MEMBERSHIP)
-    records = [ctx.commits[sha] for sha in commits]
-    if any(r.changes is None or r.changes.files_truncated for r in records):
-        return refuse(NoteKind.NOT_SPLIT_DETAILS)
-    pieces = _UnionFind(commits)
-    owner: dict[str, str] = {}
-    for change in changes:
-        for sha in change.commits[1:]:
-            pieces.union(change.commits[0], sha)
-    for sha in sorted(commits):
-        for path in sorted(_paths(ctx.commits[sha])):
-            if path in owner:
-                pieces.union(owner[path], sha)
-            else:
-                owner[path] = sha
-    components = pieces.groups()
-    if len(components) < 2:
-        return refuse(NoteKind.NOT_SPLIT_OVERLAP)
-    parts: list[tuple[tuple[AssignedChange, ...], tuple[int, ...]]] = []
-    used: set[int] = set()
-    for component in components:
-        members = set(component)
-        part = tuple(
-            change for change in changes if members.intersection(change.commits)
-        )
-        if not any(
-            change.contributing
-            and any(
-                states[sha].own and _paths(ctx.commits[sha]) for sha in change.commits
-            )
-            for change in part
-        ):
-            return refuse(NoteKind.NOT_SPLIT_NO_OWN)
-        referenced: set[int] = set()
-        for sha in component:
-            referenced |= _references(ctx, sha)
-        if not referenced or referenced & used:
-            return refuse(NoteKind.NOT_SPLIT_ISSUES)
-        used |= referenced
-        parts.append((part, tuple(sorted(referenced))))
-    return _Split(parts=tuple(parts))
+# 6. 단위 목록
 
 
 def _outside_notes(ctx: _Context) -> tuple[Note, ...]:
@@ -1831,13 +1687,12 @@ def _units(
     uncompared: frozenset[str],
     merges: Mapping[str, _Merge],
 ) -> tuple[GroupedUnit, ...]:
-    """단위마다 변경·근거·한계와 나누기 결과를 굳힌다.
+    """단위마다 변경·근거·한계를 굳힌다. PR·병합 단위는 나누지 않고 단위 전체가 하나다(BR1.1).
 
-    uncompared는 수집이 멈춰 비교하지 못한 관계 쌍의 커밋이다. 나누기와 기여 확인은 요청 전체의
-    완료 여부가 아니라 그 단위에 걸린 확인으로 판단한다(_stop_touches). 기여 확인은 그에 더해 어느
-    PR이든 커밋 목록을 수집이 멈춰 받지 못했으면 끝나지 않은 것으로 본다. 그 목록의 커밋이 같은
-    변경으로 이 단위의 본인 기여가 될 수 있기 때문이다. 다른 계정 커밋 섞임은 단위 전체로 정해
-    나눈 부분에도 같은 값을 둔다. merges는 병합 커밋마다 PR 없는 병합 판정이다.
+    uncompared는 수집이 멈춰 비교하지 못한 관계 쌍의 커밋이다. 기여 확인은 요청 전체의 완료 여부가
+    아니라 그 단위에 걸린 확인으로 판단한다(_stop_touches). 그에 더해 어느 PR이든 커밋 목록을 수집이
+    멈춰 받지 못했으면 끝나지 않은 것으로 본다. 그 목록의 커밋이 같은 변경으로 이 단위의 본인 기여가
+    될 수 있기 때문이다. merges는 병합 커밋마다 PR 없는 병합 판정이다.
     """
     stopped_keys = _stopped_keys(states, assignment.held)
     lists_unreached = any(
@@ -1900,49 +1755,21 @@ def _units(
         settled = not touched and not (
             isinstance(key, PullRequestUnit) and lists_unreached
         )
-        # 목록 단계에서 멈췄으면 이슈 목록도 다 받지 못했을 수 있다.
-        split = _split(
-            ctx,
-            states,
-            key,
-            changes,
-            touched or ctx.relations.stopped_during == "LISTS",
+        result.append(
+            GroupedUnit(
+                key,
+                changes,
+                sources=sources,
+                notes=notes_for(changes, extra),
+                moved_out=moved,
+                merged_in=assignment.merged_in[key],
+                inner_placed=inner,
+                squash_unconfirmed=isinstance(key, PullRequestUnit)
+                and _squash_unconfirmed(ctx, states, key, changes),
+                contribution_settled=settled,
+                other_authors=other_authors,
+            )
         )
-        if not split.parts:
-            pieces: list[tuple[tuple[AssignedChange, ...], tuple[int, ...]]] = [
-                (changes, ())
-            ]
-            if split.note is not None:
-                extra = (*extra, split.note)
-        else:
-            pieces = sorted(
-                split.parts,
-                key=lambda piece: min(
-                    sha for change in piece[0] for sha in change.commits
-                ),
-            )
-        for part_changes, issues in pieces:
-            result.append(
-                GroupedUnit(
-                    key,
-                    part_changes,
-                    parts=tuple(
-                        Part(sha) for change in part_changes for sha in change.commits
-                    )
-                    if split.parts
-                    else (),
-                    issues=issues,
-                    sources=sources,
-                    notes=notes_for(part_changes, extra),
-                    moved_out=moved,
-                    merged_in=assignment.merged_in[key],
-                    inner_placed=inner,
-                    squash_unconfirmed=isinstance(key, PullRequestUnit)
-                    and _squash_unconfirmed(ctx, states, key, part_changes),
-                    contribution_settled=settled,
-                    other_authors=other_authors,
-                )
-            )
     for bundle in sorted(bundles, key=lambda item: item.commits[0]):
         changes = tuple(
             _change(ctx, states, _POOL, members) for members in bundle.changes

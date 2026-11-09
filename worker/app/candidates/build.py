@@ -20,21 +20,25 @@
   않는다(`GroupedUnit.contribution_settled`). 변경 내용을 수집이 멈춰 받지 못한 단위도 세지 않는다.
   세는 곳은 `build_candidates` 한 곳이다.
 - 실패: 수집 실패(`outcome.stage_failures()`)만 그대로 옮긴다. 보류에는 실패를 더하지 않는다.
-- 제목: 만들지 않는다(title=None). 제목은 #120이 만든다(2026-10-08 팀장 결정 「Catch 제목」). 작업
-  사실 첫 항목은 후보마다 다른 단위 이름(PR 번호·병합 SHA·커밋 SHA, 나눈 부분은 가리키는 이슈)으로
-  둔다.
-- 문장: 구조 값(번호·SHA·상태)만 쓰고 제목·본문·커밋 메시지·브랜치 이름은 넣지 않는다. 작업
-  사실(workFacts)·나의 기여(subjectContribution)에는 CatchU가 센 숫자(몇 건 중 몇 건, 줄 수 합계,
-  본인 커밋 수)를 쓰지 않는다. 근거 한계에도 센 본인 커밋 수 대신 정해 둔 상한 값을 쓴다. 커밋의
-  파일·줄 수와 PR 커밋 수 같은 원본 숫자는 근거의 관측 사실에만 있다. 본인 기여는 '작성자로 기록된'
-  커밋으로 적는다. PR·PR 없는 병합은 작업 사실 둘째 항목에 연동 계정이 작성자로 기록되지 않은 커밋이
-  있다·없다·있는지 알 수 없다를 적는다(2026-10-08 팀장 결정 「본인 기여의 뜻」·「수신자에게 나가는
-  숫자와 근거 순서」). 묶음 설명(groupingBasis)은 판정에 실제로 쓴 근거만 적는다.
+- 제목: 만들지 않는다(title=None). 제목은 생성 단계가 기록의 글 칸이나 조각 제목으로 정한다(CR1 BR3).
+- 기록의 글: 단위마다 record_text.py로 한 번 고르고 후보 자료의 record_text 칸에 싣는다(CR1 BR2.7).
+- 작업 사실(CR1 BR4): 첫 항목은 단위 종류만 쓴다(PR은 「PR #n, 상태 …」, PR 없는 병합은 「PR 없이 합친
+  병합」, 커밋 묶음은 「PR·병합 없이 들어간 본인 커밋」·「… 묶음」, PR 조회가 허용되지 않은 요청이면
+  「PR·병합 없이」 대신 「병합 없이」). SHA·날짜는 넣지 않는다. 쓸 만한(부실이 아닌) 기록의 글이 있을
+  때만 둘째 항목으로 그 글을 따옴표로 옮긴다. 작업 사실은 1~2항목이다. 다른 계정 커밋이 섞였는지
+  알리는 문장은 쓰지 않는다(값 other_authors는 그대로 쓴다).
+- 문장: 작업 사실 둘째 항목(작성자 원문)을 빼면 구조 값(번호·SHA·상태)만 쓰고 제목·본문·커밋
+  메시지·브랜치 이름은 넣지 않는다. CatchU가 만든 문장(작업 사실 첫 항목·나의 기여)에는 CatchU가 센
+  숫자(몇 건 중 몇 건, 줄 수 합계, 본인 커밋 수)를 쓰지 않는다(BR4.6). 근거 한계에도 센 본인 커밋 수
+  대신 정해 둔 상한 값을 쓴다. 커밋의 파일·줄 수와 PR 커밋 수 같은 원본 숫자는 근거의 관측 사실에만
+  있다. 본인 기여는 '작성자로 기록된' 커밋으로 적는다(2026-10-08 팀장 결정 「본인 기여의 뜻」).
+  묶음 설명(groupingBasis)은 판정에 실제로 쓴 근거만 적는다.
 - 근거 순서: PR·병합 단위는 그 단위 근거 먼저, 그다음 본인 기여 근거 커밋을 최근 것부터 최대 20건.
   커밋 묶음은 본인 커밋을 최근 것부터. 이슈 조회가 허용된 요청이면 맨 뒤에 그 본인 커밋이 가리킨
   수집한 이슈를 번호순으로 더한다(사례 C6). B는 이 순서대로 보인다.
 - workIdentity는 identity.py로만 만든다. 한 결과 안에서 값이 같은 후보가 생기면(생기면 안 된다)
-  B로 보내기 전에 첫 후보에 합친다. 출처·판본이 같은 근거는 관측 사실과 한계를 합쳐 남긴다.
+  B로 보내기 전에 첫 후보에 합친다. 첫 후보의 작업 사실과 기록의 글을 그대로 두고(BR4.5), 출처·판본이
+  같은 근거는 관측 사실과 한계를 합쳐 남긴다.
 - 초안·최소 질문은 만들지 않는다(NOT_GENERATED).
 """
 
@@ -51,7 +55,6 @@ from app.candidates.grouping import (
     MembershipSource,
     Note,
     NoteKind,
-    OtherAuthors,
     group,
 )
 from app.candidates.identity import (
@@ -60,6 +63,7 @@ from app.candidates.identity import (
     PullRequestUnit,
     work_identity,
 )
+from app.candidates.record_text import choose_record_text, pull_request_title
 from app.candidates.same_change import issue_references
 from app.collection.collect import CollectionOutcome
 from app.collection.records import (
@@ -76,6 +80,7 @@ from app.processing.generation import (
     GenerationOutput,
     NotProvided,
     NotProvidedReason,
+    RecordText,
     ReflectionOutcome,
 )
 from app.processing.request_check import CheckedRequest
@@ -111,22 +116,16 @@ _MERGE_ELSEWHERE = {
     "ELSEWHERE": "같은 변경으로 이 병합에 배정한 다른 곳의 본인 커밋",
     "MIXED": "이 병합이 들인 본인 커밋과 같은 변경으로 배정한 다른 곳의 본인 커밋",
 }
-# 다른 계정 커밋이 섞였는지. 숫자 없이 있다·없다·알 수 없다로 쓰고, 없다는 범위를 끝까지 받았을
-# 때만이다(2026-10-08 팀장 결정 「수신자에게 나가는 숫자와 근거 순서」).
-_PULL_OTHER_AUTHORS: dict[OtherAuthors, str] = {
-    "PRESENT": "이 PR 커밋 목록에 연동 계정이 작성자로 기록되지 않은 커밋이 있다",
-    "ABSENT": "이 PR 커밋 목록에 연동 계정이 작성자로 기록되지 않은 커밋이 없다",
-    "UNKNOWN": (
-        "이 PR 커밋 목록에 연동 계정이 작성자로 기록되지 않은 커밋이 있는지 알 수 없다"
-        "(목록을 끝까지 확인하지 못함)"
-    ),
-}
-_MERGE_OTHER_AUTHORS: dict[OtherAuthors, str] = {
-    "PRESENT": "이 병합이 들인 커밋에 연동 계정이 작성자로 기록되지 않은 커밋이 있다",
-    "ABSENT": "이 병합이 들인 커밋에 연동 계정이 작성자로 기록되지 않은 커밋이 없다",
-    "UNKNOWN": (
-        "이 병합이 들인 커밋에 연동 계정이 작성자로 기록되지 않은 커밋이 있는지 알 수 없다"
-    ),
+# 작업 사실 첫 항목(CR1 BR4.1). 단위 종류만 쓰고 SHA·날짜는 넣지 않는다.
+_MERGE_FACT = "PR 없이 합친 병합"
+# 커밋 묶음: PR 소속을 확인했으면 「PR·병합 없이」, PR 조회가 허용되지 않았으면 PR을 확인하지 않고 「PR
+# 없이」라고 쓰지 않도록 「병합 없이」다.
+_COMMITS_FACT = "{where} 들어간 본인 커밋"
+_COMMITS_BUNDLE_FACT = "{where} 들어간 본인 커밋 묶음"
+# 작업 사실 둘째 항목(CR1 BR4.2). 글은 작성자 원문 그대로다.
+_RECORD_FACT = {
+    "PR_TITLE": 'PR 제목: "{text}"',
+    "COMMIT_FIRST_LINE": '본인 커밋 메시지 첫 줄: "{text}"',
 }
 _MERGE_SCOPE = "PR 없이 병합한 병합 커밋(병합 커밋 자체는 변경으로 세지 않음)"
 _PULLS_NOT_ALLOWED = "PR 조회가 허용되지 않아 PR 소속은 확인하지 않았다"
@@ -153,14 +152,6 @@ _EVIDENCE_NOTES = {
 _SHOWN_NOTES = frozenset(
     {NoteKind.RESUBMISSION_UNCONFIRMED, NoteKind.CHERRY_PICK_UNCONFIRMED}
 )
-_SPLIT_REASONS = {
-    NoteKind.NOT_SPLIT_STOPPED: "수집이 멈춰 나눌 근거를 끝까지 확인하지 못해",
-    NoteKind.NOT_SPLIT_MEMBERSHIP: "PR 커밋 목록을 모두 확인하지 못해",
-    NoteKind.NOT_SPLIT_DETAILS: "일부 커밋의 변경 파일을 모두 확인하지 못해",
-    NoteKind.NOT_SPLIT_OVERLAP: "커밋들이 같은 파일을 함께 고쳐 서로 다른 작업으로 구별할 수 없어",
-    NoteKind.NOT_SPLIT_NO_OWN: "변경 파일이 겹치지 않는 부분 가운데 본인 변경이 없는 부분이 있어",
-    NoteKind.NOT_SPLIT_ISSUES: "변경 파일이 겹치지 않는 부분들이 가리키는 이슈가 비었거나 서로 겹쳐",
-}
 
 # 후보가 되지 않은 단위의 이유. NOT_OWN과 DETAILS_STOPPED는 notProvided에 세지 않는다.
 # - NOT_OWN: 본인 기여 근거 커밋이 없다. 연동 계정이 연 PR이어도 같다(PR을 연 것은 기여가 아니다).
@@ -302,25 +293,47 @@ def _candidate(
         if unknown is not None:
             return unknown
     unit_commits = {sha for change in unit.changes for sha in change.commits}
-    text = _text(outcome, grouping, unit, own, unit_commits)
+    record_text = _record_text(outcome, grouping, unit, own, unit_commits)
+    text = _text(outcome, grouping, unit, own, unit_commits, record_text)
     return EligibleCandidate(
         work_identity=work_identity(
-            request.source_mode, request.repository_id, unit.unit, unit.parts
+            request.source_mode, request.repository_id, unit.unit
         ),
-        # #118은 제목을 만들지 않는다(2026-10-08 팀장 결정 「Catch 제목」). 제목은 #120이 만든다.
+        # 후보 판정은 제목을 만들지 않는다. 제목은 생성 단계가 기록의 글 칸이나 조각 제목으로 정한다.
         title=None,
         work_facts=text.facts,
         subject_contribution=text.contribution,
         grouping_basis=text.basis,
         grouping_limitations=tuple(
-            _limitation(note, unit.unit)
-            for note in unit.notes
-            if note.kind not in _EVIDENCE_NOTES
+            _limitation(note) for note in unit.notes if note.kind not in _EVIDENCE_NOTES
         ),
         evidence=_evidence(outcome, text, own, unit_commits),
         draft=DraftOutcome.not_generated(),
         reflection=ReflectionOutcome.not_generated(),
+        record_text=record_text,
     )
+
+
+def _record_text(
+    outcome: CollectionOutcome,
+    grouping: Grouping,
+    unit: GroupedUnit,
+    own: Sequence[CommitRecord],
+    unit_commits: set[str],
+) -> RecordText | None:
+    """기록의 글(BR2.1·BR2.2). own은 본인 기여 근거 커밋이고, 그 가운데 단위 안 커밋만 고른다.
+
+    같은 변경으로 다른 곳에서 이 단위에 배정한 본인 커밋은 고르지 않는다(FR5.1의 「단위 안」).
+    """
+    title: str | None = None
+    if isinstance(unit.unit, PullRequestUnit):
+        title = pull_request_title(
+            grouping.pull_requests[unit.unit.number],
+            outcome.linked_account,
+            unit.other_authors == "ABSENT",
+        )
+    inside = [record for record in own if record.sha in unit_commits]
+    return choose_record_text(title, inside)
 
 
 def _unconfirmed_changes(
@@ -359,11 +372,12 @@ def _text(
     unit: GroupedUnit,
     own: Sequence[CommitRecord],
     unit_commits: set[str],
+    record_text: RecordText | None,
 ) -> _Text:
     evidence_limits = tuple(
         _EVIDENCE_NOTES[note.kind]
         if note.kind in _EVIDENCE_NOTES
-        else _limitation(note, unit.unit)
+        else _limitation(note)
         for note in unit.notes
         if note.kind in _EVIDENCE_NOTES or note.kind in _SHOWN_NOTES
     )
@@ -377,17 +391,27 @@ def _text(
         )
     where = _where(own, unit_commits)
     key = unit.unit
+    text: _Text
     match key:
         case PullRequestUnit():
-            return _pull_request_text(
+            text = _pull_request_text(
                 outcome, grouping, unit, key, where, evidence_limits
             )
         case MergeUnit():
-            return _merge_text(outcome, grouping, unit, key, where, evidence_limits)
+            text = _merge_text(outcome, grouping, unit, key, where, evidence_limits)
         case CommitsUnit():
-            return _commits_text(grouping, unit, key, evidence_limits)
+            text = _commits_text(unit, key, evidence_limits)
         case _:
             assert_never(key)
+    # 작업 사실은 종류 줄 하나와, 쓸 만한 기록의 글이 있을 때만 그 줄이다(BR4.1·BR4.2·BR4.5).
+    return replace(text, facts=(*text.facts, *_record_fact(record_text)))
+
+
+def _record_fact(record_text: RecordText | None) -> tuple[str, ...]:
+    """작업 사실 둘째 항목. 부실 판단(BR2.5)만 보고, 글은 원문 그대로 따옴표 안에 둔다."""
+    if record_text is None or not record_text.usable:
+        return ()
+    return (_RECORD_FACT[record_text.source].format(text=record_text.text),)
 
 
 def _where(own: Sequence[CommitRecord], unit_commits: set[str]) -> _Where:
@@ -401,27 +425,6 @@ def _contribution(context: str | None = None) -> str:
     """나의 기여. 센 숫자를 쓰지 않는다(2026-10-08 팀장 결정)."""
     text = "연동 GitHub 계정이 작성자로 기록된 커밋"
     return text if context is None else f"{text}({context})"
-
-
-def _other_authors_fact(
-    sentences: Mapping[OtherAuthors, str], unit: GroupedUnit
-) -> str:
-    if unit.other_authors is None:
-        raise ValueError("PR·병합 단위에는 다른 계정 커밋 섞임 판정이 있어야 한다")
-    return sentences[unit.other_authors]
-
-
-def _part_texts(name: str, unit: GroupedUnit) -> tuple[str, list[str]]:
-    """나눈 부분의 (첫 작업 사실, 묶음 설명 첫 문장). name은 「PR #7」·「병합 abc…」 같은 단위 이름이다.
-
-    부분끼리 가리키는 이슈가 겹치지 않으므로 첫 작업 사실이 부분마다 다르다.
-    """
-    issues = _issues(unit.issues)
-    basis = [
-        f"{name}에서 변경 파일이 겹치지 않고 가리키는 이슈가 서로 다른 부분을 나눴다. "
-        f"이 후보는 그 가운데 커밋 {len(unit.parts)}건(가리키는 이슈 {issues})이다."
-    ]
-    return f"{name}에서 나눈 부분(가리키는 이슈 {issues})", basis
 
 
 def _pull_request_text(
@@ -447,16 +450,10 @@ def _pull_request_text(
     if where != "INSIDE":
         context = _PULL_OWN[where]
     scope = f"{opened}(본인 기여는 {_PULL_OWN[where]}에 한정)"
-    facts = [
-        f"PR #{number}, 상태 {_state(record)}",
-        _other_authors_fact(_PULL_OTHER_AUTHORS, unit),
+    basis = [
+        f"PR #{number} 전체를 한 작업으로 묶었다.",
+        f"커밋의 PR 소속을 확인한 근거: {_sources(unit.sources)}.",
     ]
-    if unit.parts:
-        part_fact, basis = _part_texts(f"PR #{number}", unit)
-        facts.insert(0, part_fact)
-    else:
-        basis = [f"PR #{number} 전체를 한 작업으로 묶었다."]
-    basis.append(f"커밋의 PR 소속을 확인한 근거: {_sources(unit.sources)}.")
     if unit.moved_out:
         basis.append(
             f"이 PR 커밋 목록의 변경 {unit.moved_out}건은 다른 PR에도 담겨 있어 배정 규칙"
@@ -465,7 +462,7 @@ def _pull_request_text(
     basis.extend(_merged_in(unit))
     entry = grouping.pull_request_commits.get(number)
     return _Text(
-        facts=tuple(facts),
+        facts=(f"PR #{number}, 상태 {_state(record)}",),
         contribution=_contribution(context),
         basis=" ".join(basis),
         unit_evidence=outcome.evidence_for(record).to_evidence_item(scope),
@@ -484,17 +481,9 @@ def _merge_text(
     evidence_limits: tuple[str, ...],
 ) -> _Text:
     sha12 = key.commit[:12]
-    facts = [
-        f"PR 없이 병합한 병합 커밋 {sha12}",
-        _other_authors_fact(_MERGE_OTHER_AUTHORS, unit),
+    basis = [
+        f"PR 없이 병합한 병합 커밋({sha12})이 부모로 들인 커밋을 한 작업으로 묶었다."
     ]
-    if unit.parts:
-        part_fact, basis = _part_texts(f"병합 {sha12}", unit)
-        facts.insert(0, part_fact)
-    else:
-        basis = [
-            f"PR 없이 병합한 병합 커밋({sha12})이 부모로 들인 커밋을 한 작업으로 묶었다."
-        ]
     basis.append(
         f"들인 본인 커밋과 이 병합 커밋은 {_OUTSIDE_CHECKED}"
         if MembershipSource.LOOKUP in unit.sources
@@ -506,7 +495,7 @@ def _merge_text(
         )
     basis.extend(_merged_in(unit))
     return _Text(
-        facts=tuple(facts),
+        facts=(_MERGE_FACT,),
         contribution=_contribution(
             None if where == "INSIDE" else _MERGE_ELSEWHERE[where]
         ),
@@ -519,7 +508,6 @@ def _merge_text(
 
 
 def _commits_text(
-    grouping: Grouping,
     unit: GroupedUnit,
     key: CommitsUnit,
     evidence_limits: tuple[str, ...],
@@ -527,12 +515,12 @@ def _commits_text(
     """커밋 묶음의 문장. 묶음 설명은 실제로 이은 근거만 적는다."""
     checked = MembershipSource.LOOKUP in unit.sources
     where = "PR·병합에 속하지 않은" if checked else "병합에 속하지 않은"
+    fact_where = "PR·병합 없이" if checked else "병합 없이"
     if len(key.commits) == 1:
-        fact = f"{where} 본인 커밋 {key.commits[0][:12]}"
+        fact = _COMMITS_FACT.format(where=fact_where)
         first = [f"{where} 본인 커밋 하나를 한 작업으로 두었다."]
     else:
-        newest = newest_first(grouping.commits[sha] for sha in key.commits)[0]
-        fact = f"{where} 본인 커밋 묶음(가장 최근 커밋 {newest.sha[:12]})"
+        fact = _COMMITS_BUNDLE_FACT.format(where=fact_where)
         first = _bundle_links(where, unit)
     basis = [
         *first,
@@ -576,10 +564,6 @@ def _state(record: PullRequestRecord) -> str:
     return "열림" if record.state == "open" else "닫힘"
 
 
-def _issues(numbers: Iterable[int]) -> str:
-    return "·".join(f"#{number}" for number in numbers)
-
-
 def _sources(sources: frozenset[MembershipSource]) -> str:
     names: list[str] = []
     if MembershipSource.PULL_REQUEST_COMMITS in sources:
@@ -604,15 +588,8 @@ def _merged_in(unit: GroupedUnit) -> list[str]:
     ]
 
 
-def _limitation(note: Note, unit: PullRequestUnit | MergeUnit | CommitsUnit) -> str:
+def _limitation(note: Note) -> str:
     match note.kind:
-        case NoteKind.NOT_SPLIT_AUTHOR_BOUNDARY:
-            # 2026-10-08 팀장 결정 「한 PR·병합 안의 서로 다른 번호」의 문장. 커밋 묶음에는 붙지 않는다.
-            boundary = "한 PR로" if isinstance(unit, PullRequestUnit) else "한 병합으로"
-            return (
-                f"본인 커밋이 서로 다른 번호 {note.count}개를 가리키지만, 작성자가 "
-                f"{boundary} 묶은 경계를 따라 한 작업으로 두었다"
-            )
         case NoteKind.RESUBMISSION_UNCONFIRMED:
             first, second = note.pull_requests
             return (
@@ -631,18 +608,6 @@ def _limitation(note: Note, unit: PullRequestUnit | MergeUnit | CommitsUnit) -> 
             return "변경 내용을 확인하지 못해 이웃 커밋과 묶을지 판단하지 않았다"
         case NoteKind.NEIGHBOR_FILES_TRUNCATED:
             return "변경 파일이 많아 일부만 확인해 이웃 커밋과 겹치는지 끝까지 판단하지 못했다"
-        case (
-            NoteKind.NOT_SPLIT_STOPPED
-            | NoteKind.NOT_SPLIT_MEMBERSHIP
-            | NoteKind.NOT_SPLIT_DETAILS
-            | NoteKind.NOT_SPLIT_OVERLAP
-            | NoteKind.NOT_SPLIT_NO_OWN
-            | NoteKind.NOT_SPLIT_ISSUES
-        ):
-            return (
-                f"본인 커밋이 서로 다른 이슈 {note.count}개를 가리키지만 "
-                f"{_SPLIT_REASONS[note.kind]} 나누지 않고 한 작업으로 두었다"
-            )
         case (
             NoteKind.PULL_REQUEST_LISTS_INCOMPLETE
             | NoteKind.EARLIER_PULL_REQUEST_LIST_INCOMPLETE
@@ -690,7 +655,7 @@ def _issue_evidence(
 ) -> list[EvidenceItem]:
     """본인 기여 근거 커밋 메시지가 가리킨, 이슈 목록으로 수집한 이슈의 근거(번호순).
 
-    이슈 조회가 허용된 요청만이다. 번호 읽기는 나누기 신호와 같은 규칙(issue_references)이다. 같은
+    이슈 조회가 허용된 요청만이다. 번호 읽기는 issue_references 규칙이다. 같은
     이슈를 가리킨 서로 다른 작업이면 이슈 근거가 후보마다 따로 들어간다(사례 C6). 근거 커밋
     상한(20건) 밖의 본인 기여 근거 커밋이 가리킨 이슈도 넣는다.
     """
@@ -714,7 +679,8 @@ def _merge_same_identity(
 ) -> tuple[tuple[EligibleCandidate, ...], int]:
     """값이 같은 후보를 첫 후보에 합친다. B는 두 번째 후보의 내용을 저장하지 않기 때문이다.
 
-    출처·판본이 같은 근거는 하나로 두되 관측 사실과 한계를 순서를 지키며 합친다. 귀속 범위가
+    작업 사실과 기록의 글은 첫 후보의 것을 그대로 둔다(최대 2줄, BR4.5). 출처·판본이 같은 근거는
+    하나로 두되 관측 사실과 한계를 순서를 지키며 합친다. 귀속 범위가
     다르면 첫 근거의 범위를 두고 그 사실을 한계로 남긴다. 합친 근거는 단위 근거 먼저, 본인 커밋
     근거는 최근 것부터 다시 놓는다. commits는 본인 커밋 근거의 작성 시각을 찾는 데 쓴다.
     """
@@ -733,7 +699,6 @@ def _merge_same_identity(
             evidence[key] = item if kept is None else _merge_evidence(kept, item)
         merged[candidate.work_identity] = replace(
             first,
-            work_facts=tuple(dict.fromkeys((*first.work_facts, *candidate.work_facts))),
             grouping_limitations=tuple(
                 dict.fromkeys(
                     (*first.grouping_limitations, *candidate.grouping_limitations)

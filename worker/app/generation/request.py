@@ -3,30 +3,37 @@
 후보 하나의 재료 커밋(material.py)에서 파일마다 patch를 한 번만 해석한다. 그 결과를 가리기·크기 선별·
 응답 확인·제목 판정이 함께 쓴다(`same_change`의 비공개 diff 값은 목적이 달라 쓰지 않는다).
 
-- 쓰지 않는 파일: 비밀 파일(경로·상태도 보내지 않음), 경로로 나눈 부분 밖의 파일, patch가 없는 파일
-  (GitHub가 주지 않음, 수집 한계가 이미 적었다), 온전하지 않은 patch(결정 6의 한계 문구를 붙인다).
-- 보내는 것: '+'·'-' 줄만. 문맥 줄과 `@@` 뒤 글자, 커밋 메시지·PR 글·SHA는 보내지 않는다. 가림이 든 줄은
-  값을 자리표시로 바꾸고 "고를 수 없음"으로 표시해 보낸다.
-- 크기 선별: 근거 순서의 커밋 → 파일 → 줄 순서로 자료 상한까지 담는다. 혼자 남은 상한을 넘는 줄은
-  건너뛰고 다음 줄을 본다.
+- 쓰지 않는 파일: 비밀 파일(경로·상태도 보내지 않음), patch가 없는 파일(GitHub가 주지 않음, 수집 한계가
+  이미 적었다), 온전하지 않은 patch(결정 6의 한계 문구를 붙인다).
+- 보내는 것: '+'·'-' 줄만. 문맥 줄과 `@@` 뒤 글자, 커밋 메시지·PR 글·SHA·기록의 글(PR 제목·커밋 첫 줄,
+  후보의 record_text 칸)은 보내지 않는다(CR1 NFR1.1). 가림이 든 줄은 값을 자리표시로 바꾸고 "고를 수
+  없음"으로 표시해 보낸다.
+- 크기 선별(CR1 BR5.2~BR5.7, `groups.py`): 파일을 종류 순서(코드 → 시험 → 설정 → 문서 → 그 밖)로 놓고,
+  같은 종류 안에서는 근거 순서의 커밋 → 파일 → 줄 순서로 담는다. 모든 줄이 자료 상한 안이면 작은 후보로
+  모두 담는다. 넘으면 큰 후보로 변경 묶음마다 몫까지 담고(첫 채우기) 남은 양을 다시 채우며(두 번째 채우기),
+  한 파일은 머리글을 포함해 6,000 B까지만 담는다. 혼자 남은 상한을 넘는 줄은 건너뛰고 다음 줄을 본다.
 """
 
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from app.collection.records import ChangedFile, CommitRecord
 from app.generation.limits import GenerationLimits
 from app.generation.material import CandidateMaterial
 from app.generation.names import line_names
 from app.generation.patch import ParsedPatch, PatchLine, parse_patch
-from app.generation.redact import (
+from app.redact import (
     MaskBook,
     PrivateKeyBlock,
     is_secret_path,
     private_key_values,
 )
+
+if TYPE_CHECKING:
+    # 형식 검사에만 쓴다. 실행 중에 불러오면 groups → title → response → 이 모듈의 순환이 생긴다.
+    from app.generation.groups import ChangeGroup
 
 ChangeKind = Literal["+", "-"]
 
@@ -45,7 +52,7 @@ class PreparedLine:
 
 @dataclass(frozen=True)
 class PreparedFile:
-    """보낼 수 있는 파일: 비밀 파일이 아니고, 나눈 부분 안이고, patch가 온전하고, 바뀐 줄이 있다."""
+    """보낼 수 있는 파일: 비밀 파일이 아니고, patch가 온전하고, 바뀐 줄이 있다."""
 
     id: str
     commit: str
@@ -69,8 +76,6 @@ class FileState:
     texts: Mapping[int, str]
     masked: frozenset[int]
     secret: bool
-    # 나눈 부분 안의 파일인가.
-    allowed: bool
 
 
 @dataclass(frozen=True)
@@ -106,7 +111,7 @@ class Selection:
 
 
 def mask_book(materials: Iterable[CandidateMaterial]) -> MaskBook:
-    """요청의 모든 재료 커밋 파일(비밀 파일·나눈 부분 밖 포함)의 hunk 줄과 경로에서 가릴 값을 모은다.
+    """요청의 모든 재료 커밋 파일(비밀 파일 포함)의 hunk 줄과 경로에서 가릴 값을 모은다.
     patch가 온전하지 않아도 글자에 든 값과 PEM 개인 키 블록 내용은 모은다."""
     texts: list[str] = []
     key_values: set[str] = set()
@@ -140,10 +145,8 @@ def prepare(
     masked_values = secret_files = 0
     for commit_number, record in enumerate(material.commits, start=1):
         assert record.changes is not None
-        allowed_paths = material.paths.get(record.sha)
         for file_number, entry in enumerate(record.changes.files, start=1):
             file_id = f"c{commit_number}f{file_number}"
-            allowed = allowed_paths is None or entry.path in allowed_paths
             secret = is_secret_path(entry.path, book) or (
                 entry.previous_path is not None
                 and is_secret_path(entry.previous_path, book)
@@ -153,9 +156,9 @@ def prepare(
                 if entry.patch is None
                 else parse_patch(entry.patch, entry.additions, entry.deletions)
             )
-            # 보내지 않는 파일(나눈 부분 밖·비밀 파일)은 가리지 않는다. 제목 판정도 그 파일을 쓰지 않는다.
+            # 보내지 않는 비밀 파일은 가리지 않는다. 제목 판정도 그 파일을 쓰지 않는다.
             texts, masked, count = (
-                _mask(parsed, book) if allowed and not secret else ({}, frozenset(), 0)
+                _mask(parsed, book) if not secret else ({}, frozenset(), 0)
             )
             state = FileState(
                 commit=record.sha,
@@ -166,11 +169,8 @@ def prepare(
                 texts=texts,
                 masked=masked,
                 secret=secret,
-                allowed=allowed,
             )
             states.setdefault(record.sha, []).append(state)
-            if not allowed:
-                continue
             if secret:
                 secret_files += 1
                 continue
@@ -309,19 +309,71 @@ def _commit_head(commit_id: str) -> str:
     return f'{{"id":{_json(commit_id)},"files":['
 
 
+# 큰 후보에서 한 파일이 차지할 수 있는 양(CR1 BR5.6). 그 파일의 머리글·꼬리와 줄 조각, 줄 사이 쉼표를
+# 전체 자료 상한과 같게 직렬화한 UTF-8 바이트로 잰다. 작은 후보에는 이 상한이 없다.
+LARGE_CANDIDATE_FILE_BYTES = 6_000
+
+
+class _Packer:
+    """담은 줄과 그 직렬화 크기. 줄을 하나 더할 때 늘어나는 바이트를 정확히 센다.
+
+    담은 순서대로 커밋 → 파일을 늘어놓고, 파일 안 줄은 patch 줄 순서로 직렬화한다. 목록 안 순서는 크기에
+    영향이 없으므로(같은 조각과 같은 쉼표 수) 두 번째 채우기가 앞 줄을 나중에 더해도 크기 계산이 맞다.
+    """
+
+    def __init__(
+        self,
+        commit_ids: Mapping[str, str],
+        piece_sizes: Mapping[str, int],
+    ) -> None:
+        self._commit_ids = commit_ids
+        self._piece_sizes = piece_sizes
+        self.used = _size(_DATA_HEAD + _DATA_TAIL)
+        self.chosen: dict[str, dict[str, list[PreparedLine]]] = {}
+        self.file_used: dict[str, int] = {}
+        self.taken: set[str] = set()
+
+    def cost(self, file: PreparedFile, line: PreparedLine) -> tuple[int, int]:
+        """(전체 자료에서 늘어나는 바이트, 그 파일 몫에서 늘어나는 바이트)."""
+        piece = self._piece_sizes[line.id]
+        commit_files = self.chosen.get(file.commit)
+        total = piece
+        if commit_files is None:
+            total += _size(_commit_head(self._commit_ids[file.commit]) + _COMMIT_TAIL)
+            total += 1 if self.chosen else 0
+        if commit_files is None or file.id not in commit_files:
+            head = _size(_file_head(file) + _FILE_TAIL)
+            total += head + (1 if commit_files else 0)
+            return total, head + piece
+        return total + 1, piece + 1
+
+    def add(
+        self, file: PreparedFile, line: PreparedLine, cost: tuple[int, int]
+    ) -> None:
+        self.used += cost[0]
+        self.file_used[file.id] = self.file_used.get(file.id, 0) + cost[1]
+        self.taken.add(line.id)
+        self.chosen.setdefault(file.commit, {}).setdefault(file.id, []).append(line)
+
+
 def select(
     prepared: PreparedCandidate, limits: GenerationLimits, budget_bytes: int
 ) -> Selection:
-    """자료 상한(budget_bytes, 직렬화한 UTF-8 바이트) 안에서 보낼 줄을 고른다."""
+    """자료 상한(budget_bytes, 직렬화한 UTF-8 바이트) 안에서 보낼 줄을 고른다(CR1 BR5.2~BR5.7).
+
+    모든 줄을 담아도 상한 안이면 작은 후보로, 종류 순서대로 모두 담는다. 넘으면 큰 후보로, 변경 묶음마다
+    몫(상한 ÷ 묶음 수)까지 담고 남은 양을 같은 순서로 다시 채운다. 큰 후보의 한 파일은
+    `LARGE_CANDIDATE_FILE_BYTES`까지다. 크기로 뺀 줄이 있는 커밋은 size_excluded에 남긴다(지금 처리 그대로).
+    """
+    # groups.py가 title.py(→ response.py → 이 모듈)를 불러오므로 모듈 위에서 불러오면 순환이 생긴다.
+    from app.generation.groups import change_groups, file_kinds, kind_order
+
     commit_ids = {
         record.sha: f"c{number}"
         for number, record in enumerate(prepared.material.commits, start=1)
     }
-    used = _size(_DATA_HEAD + _DATA_TAIL)
-    chosen: dict[str, dict[str, list[PreparedLine]]] = {}
     files_by_id = {file.id: file for file in prepared.files}
-    excluded: dict[str, bool] = {}
-    if used > budget_bytes:
+    if _size(_DATA_HEAD + _DATA_TAIL) > budget_bytes:
         # 빈 자료 틀도 담지 못하는 상한이다. 모든 줄을 크기 상한으로 뺀 것으로 본다.
         return Selection(
             data="",
@@ -329,24 +381,76 @@ def select(
             files={},
             size_excluded={file.commit: False for file in prepared.files},
         )
-    for file in prepared.files:
+    piece_sizes = {
+        line.id: _size(line_piece(line, limits))
+        for file in prepared.files
+        for line in file.lines
+    }
+    kinds = file_kinds(prepared.files)
+    ordered = kind_order(prepared.files, kinds)
+    whole = _Packer(commit_ids, piece_sizes)
+    for file in ordered:
         for line in file.lines:
-            commit_files = chosen.get(file.commit)
-            cost = _size(line_piece(line, limits))
-            if commit_files is None:
-                cost += _size(_commit_head(commit_ids[file.commit]) + _COMMIT_TAIL)
-                cost += 1 if chosen else 0
-            file_lines = None if commit_files is None else commit_files.get(file.id)
-            if file_lines is None:
-                cost += _size(_file_head(file) + _FILE_TAIL)
-                cost += 1 if commit_files else 0
-            else:
-                cost += 1
-            if used + cost > budget_bytes:
-                excluded.setdefault(file.commit, False)
-                continue
-            used += cost
-            chosen.setdefault(file.commit, {}).setdefault(file.id, []).append(line)
+            whole.add(file, line, whole.cost(file, line))
+    if whole.used <= budget_bytes:
+        packer = whole
+    else:
+        packer = _Packer(commit_ids, piece_sizes)
+        _fill_large(packer, change_groups(prepared.files, kinds), budget_bytes)
+    return _selection(packer, prepared, files_by_id, commit_ids, limits, budget_bytes)
+
+
+def _fill_large(
+    packer: _Packer, groups: Sequence["ChangeGroup"], budget_bytes: int
+) -> None:
+    """큰 후보 담기(BR5.6). 첫 채우기는 묶음마다 몫까지, 두 번째 채우기는 남은 전체 양까지다."""
+    share = budget_bytes // len(groups) if groups else 0
+    for group in groups:
+        group_used = 0
+        for file in group.files:
+            for line in file.lines:
+                cost = packer.cost(file, line)
+                if group_used + cost[0] > share or not _fits(
+                    packer, file, cost, budget_bytes
+                ):
+                    continue
+                packer.add(file, line, cost)
+                group_used += cost[0]
+    for group in groups:
+        for file in group.files:
+            for line in file.lines:
+                if line.id in packer.taken:
+                    continue
+                cost = packer.cost(file, line)
+                if _fits(packer, file, cost, budget_bytes):
+                    packer.add(file, line, cost)
+
+
+def _fits(
+    packer: _Packer, file: PreparedFile, cost: tuple[int, int], budget_bytes: int
+) -> bool:
+    return (
+        packer.used + cost[0] <= budget_bytes
+        and packer.file_used.get(file.id, 0) + cost[1] <= LARGE_CANDIDATE_FILE_BYTES
+    )
+
+
+def _selection(
+    packer: _Packer,
+    prepared: PreparedCandidate,
+    files_by_id: Mapping[str, PreparedFile],
+    commit_ids: Mapping[str, str],
+    limits: GenerationLimits,
+    budget_bytes: int,
+) -> Selection:
+    """담은 줄을 직렬화한다. 커밋·파일은 담은 순서, 파일 안 줄은 patch 줄 순서다."""
+    chosen = {
+        sha: {
+            file_id: sorted(lines, key=lambda line: line.index)
+            for file_id, lines in commit_files.items()
+        }
+        for sha, commit_files in packer.chosen.items()
+    }
     data = _DATA_HEAD + ",".join(
         _commit_head(commit_ids[sha])
         + ",".join(
@@ -359,17 +463,22 @@ def select(
         for sha, commit_files in chosen.items()
     )
     data += _DATA_TAIL
-    if _size(data) != used or used > budget_bytes:
+    if _size(data) != packer.used or packer.used > budget_bytes:
         raise AssertionError("자료 크기 계산이 직렬화 결과와 다르다")
-    sent = {
-        line.id: line
-        for commit_files in chosen.values()
-        for lines in commit_files.values()
-        for line in lines
-    }
+    excluded = dict.fromkeys(
+        file.commit
+        for file in prepared.files
+        for line in file.lines
+        if line.id not in packer.taken
+    )
     return Selection(
         data=data,
-        lines=sent,
+        lines={
+            line.id: line
+            for commit_files in chosen.values()
+            for lines in commit_files.values()
+            for line in lines
+        },
         files={
             file_id: files_by_id[file_id]
             for commit_files in chosen.values()

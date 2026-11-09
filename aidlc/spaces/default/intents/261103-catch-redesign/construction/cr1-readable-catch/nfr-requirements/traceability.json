@@ -1,0 +1,14 @@
+{
+  "stage": "nfr-requirements",
+  "unit": "cr1-readable-catch",
+  "upstream_ids": ["NFR1", "NFR2", "NFR3", "NFR4", "NFR5", "NFR6", "NFR7"],
+  "coverage": [
+    { "id": "NFR1", "status": "OK", "target": "NFR1.1, NFR1.2" },
+    { "id": "NFR2", "status": "OK", "target": "NFR2.1, NFR2.2" },
+    { "id": "NFR3", "status": "N/A", "target": "판정 품질은 cr3-ai-drafts가 맡는다(CR1에는 판정이 없다)" },
+    { "id": "NFR4", "status": "OK", "target": "NFR4.1, NFR4.2" },
+    { "id": "NFR5", "status": "N/A", "target": "OpenAI 판정 키 보관은 cr3-ai-drafts가 맡는다(CR1에는 새 비밀값이 없다)" },
+    { "id": "NFR6", "status": "N/A", "target": "판본 올림과 함께 배포는 계약을 바꾸는 cr2-commit-assignment가 맡는다(CR1은 계약을 바꾸지 않는다)" },
+    { "id": "NFR7", "status": "OK", "target": "NFR7.1" }
+  ]
+}

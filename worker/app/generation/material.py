@@ -41,8 +41,6 @@ class CandidateMaterial:
     evidence_index: Mapping[str, int]
     # 후보에 맞는 단위들의 본인 기여 근거 커밋 전체(근거 20건 상한 밖 포함).
     own_commits: frozenset[str]
-    # 나눈 부분이 경로로만 든 커밋 → 그 커밋에서 쓸 경로. 없는 커밋은 전체를 쓴다.
-    paths: Mapping[str, frozenset[str]]
     # 같은 단위에 연동 계정이 작성자로 기록되지 않은 커밋이 있는가(PR은 커밋 목록 전체, 병합은 들인
     # 커밋 전체, 커밋 묶음은 묶인 커밋).
     other_authors: OtherAuthors
@@ -74,9 +72,7 @@ def gather(
     grouping = group(outcome)
     units: dict[str, list[GroupedUnit]] = {}
     for unit in grouping.units:
-        key = work_identity(
-            request.source_mode, request.repository_id, unit.unit, unit.parts
-        )
+        key = work_identity(request.source_mode, request.repository_id, unit.unit)
         units.setdefault(key, []).append(unit)
     materials: list[CandidateMaterial] = []
     for position, candidate in enumerate(built.candidates):
@@ -118,31 +114,11 @@ def gather(
                 ),
                 evidence_index=evidence_index,
                 own_commits=own,
-                paths=_paths(matched),
                 other_authors=_other_authors(matched, grouping.commits, account),
                 records=grouping.commits,
             )
         )
     return tuple(materials)
-
-
-def _paths(units: list[GroupedUnit]) -> dict[str, frozenset[str]]:
-    """경로로 나눈 부분에 든 커밋만 그 경로로 좁힌다. 단위 밖에서 같은 변경으로 배정한 커밋과, 어느
-    단위에서든 커밋 전체로 든 커밋은 좁히지 않는다. 지금 #118은 경로로 나누지 않는다(한계 L8)."""
-    restricted: dict[str, set[str]] = {}
-    whole: set[str] = set()
-    for unit in units:
-        if not unit.parts:
-            whole.update(sha for change in unit.changes for sha in change.commits)
-            continue
-        for part in unit.parts:
-            if part.path is None:
-                whole.add(part.commit)
-            else:
-                restricted.setdefault(part.commit, set()).add(part.path)
-    return {
-        sha: frozenset(paths) for sha, paths in restricted.items() if sha not in whole
-    }
 
 
 def _other_authors(
