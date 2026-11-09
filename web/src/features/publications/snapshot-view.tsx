@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { isGithubSourceUrl, splitGithubLinks, type TextSegment } from "@/lib/github-source-url";
 import { orderedItems, type CatchSnapshot, type PublishedItem, type PublishedSnapshot, type TextMaterialSnapshot } from "./publications-api";
 import styles from "./publications.module.css";
@@ -68,44 +68,32 @@ export function LinkedText({ text, testId, range = null }: { text: string; testI
 
 const EMPTY_FACTS = "기록에서 확인된 작업 사실이 없습니다.";
 
-/** Catch 사본. 기록에서 확인한 내용·작성자 설명·AI 설명 초안을 다른 표지로 나누고 불일치 표시를 단다(BR1.3·BR4.3·BR7.5). */
+/** 강조가 「근거 자세히 보기」 안(본인 기여·근거 목록)을 가리키는지. 그 안을 가리키면 접힌 칸을 펼친다(#488). */
+export const isInEvidenceDetails = (highlight: SnapshotHighlight | null): boolean =>
+  highlight !== null && (highlight.fieldPath === "subjectContribution" || highlight.fieldPath.startsWith("evidence["));
+
+/** 사람이 마지막으로 접고 편 상태와 그때의 강조. 처음에는 접혀 있다. */
+export type EvidenceToggle = { readonly open: boolean; readonly at: SnapshotHighlight | null };
+export const INITIAL_EVIDENCE_TOGGLE: EvidenceToggle = { open: false, at: null };
+
+/**
+ * 「근거 자세히 보기」가 펼쳐져 있는지(#488). 사람이 접고 편 뒤로 새 강조가 그 안을 가리키면 펼치고, 아니면 사람이 고른 상태를 따른다.
+ * 강조 객체는 근거 단추를 누를 때마다 새로 만들어지므로(`resolveEvidenceTarget`) 같은 근거를 다시 눌러도 다시 펼친다.
+ * 그리는 그 차례에 정해지므로 화면이 강조된 `<mark>`로 스크롤할 때 이미 펼쳐져 있다.
+ */
+export const evidenceDetailsOpen = (toggle: EvidenceToggle, highlight: SnapshotHighlight | null): boolean =>
+  isInEvidenceDetails(highlight) && toggle.at !== highlight ? true : toggle.open;
+
+/**
+ * Catch 사본. 위에서부터 불일치 표지 → AI 설명 초안 → 작성자 설명 → 기록에서 확인한 내용이다(#488, 면접관이 한 일과 그 이유를 먼저 본다).
+ * 세 칸은 다른 표지로 나눈다(BR1.3·BR4.3·BR7.5). 기록 가운데 작업 사실은 펼쳐 두고, 본인 기여와 근거 목록은 「근거 자세히 보기」에 접는다.
+ */
 function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; highlight: SnapshotHighlight | null }) {
+  const [toggle, setToggle] = useState<EvidenceToggle>(INITIAL_EVIDENCE_TOGGLE);
+  const open = evidenceDetailsOpen(toggle, highlight);
   return (
     <div className={styles.snapshotBody}>
       {snapshot.mismatch && <p className={styles.warningBadge} data-testid="snapshot-catch-mismatch">불일치 표시됨</p>}
-      <section className={styles.snapshotSection} data-testid="snapshot-catch-facts">
-        <h4>기록에서 확인한 내용</h4>
-        {snapshot.workFacts.length > 0
-          ? <ul>{snapshot.workFacts.map((fact, index) => <li key={index}><PlainText text={fact} range={rangeFor(highlight, `workFacts[${index}]`)} /></li>)}</ul>
-          : <p className={styles.muted}>{EMPTY_FACTS}</p>}
-        <p><strong>본인 기여:</strong> {snapshot.subjectContribution
-          ? <PlainText text={snapshot.subjectContribution} range={rangeFor(highlight, "subjectContribution")} />
-          : "제공된 기여 설명이 없습니다."}</p>
-        {snapshot.evidence.length > 0 && (
-          <ul className={styles.evidenceList}>
-            {snapshot.evidence.map((evidence, index) => (
-              <li key={index}>
-                {isGithubSourceUrl(evidence.sourceUrl)
-                  ? <a href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer" data-testid="snapshot-evidence-link">
-                    GitHub 근거 열기<span className="visually-hidden"> (새 탭)</span></a>
-                  : <span>{evidence.sourceUrl}</span>}
-                <span className={styles.muted}> · 판본 {evidence.sourceRevision}</span>
-                {evidence.representedFacts.length > 0 && (
-                  <ul>{evidence.representedFacts.map((fact, factIndex) => (
-                    <li key={factIndex}><PlainText text={fact} range={rangeFor(highlight, `evidence[${index}].representedFacts[${factIndex}]`)} /></li>
-                  ))}</ul>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <section className={styles.snapshotSection} data-testid="snapshot-catch-description">
-        <h4>작성자 설명</h4>
-        {snapshot.authorDescription === null || snapshot.authorDescription.length === 0
-          ? <p className={styles.muted}>작성자 설명이 없습니다.</p>
-          : <LinkedText text={snapshot.authorDescription} range={rangeFor(highlight, "authorDescription")} />}
-      </section>
       {/* Catch 개편 CR3 BR7.1(2026-11-08 팀장 결정): AI 설명 초안이 없으면(null) 칸을 그리지 않는다. 사본에는 만든 초안만 담기므로 없음과 실패를 가르지 않는다. */}
       {snapshot.aiDraft !== null && (
         <section className={styles.snapshotSection} data-testid="snapshot-catch-ai-draft">
@@ -113,6 +101,46 @@ function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; h
           <p className={styles.freeText}>{snapshot.aiDraft}</p>
         </section>
       )}
+      <section className={styles.snapshotSection} data-testid="snapshot-catch-description">
+        <h4>작성자 설명</h4>
+        {snapshot.authorDescription === null || snapshot.authorDescription.length === 0
+          ? <p className={styles.muted}>작성자 설명이 없습니다.</p>
+          : <LinkedText text={snapshot.authorDescription} range={rangeFor(highlight, "authorDescription")} />}
+      </section>
+      <section className={styles.snapshotSection} data-testid="snapshot-catch-facts">
+        <h4>기록에서 확인한 내용</h4>
+        {snapshot.workFacts.length > 0
+          ? <ul>{snapshot.workFacts.map((fact, index) => <li key={index}><PlainText text={fact} range={rangeFor(highlight, `workFacts[${index}]`)} /></li>)}</ul>
+          : <p className={styles.muted}>{EMPTY_FACTS}</p>}
+        <details className={styles.evidenceDetails} data-testid="snapshot-catch-evidence-details" open={open}
+          onToggle={(event) => {
+            const next = event.currentTarget.open;
+            setToggle((previous) => (previous.open === next && previous.at === highlight ? previous : { open: next, at: highlight }));
+          }}>
+          <summary>근거 자세히 보기</summary>
+          <p><strong>본인 기여:</strong> {snapshot.subjectContribution
+            ? <PlainText text={snapshot.subjectContribution} range={rangeFor(highlight, "subjectContribution")} />
+            : "제공된 기여 설명이 없습니다."}</p>
+          {snapshot.evidence.length > 0 && (
+            <ul className={styles.evidenceList} data-testid="snapshot-catch-evidence">
+              {snapshot.evidence.map((evidence, index) => (
+                <li key={index}>
+                  {isGithubSourceUrl(evidence.sourceUrl)
+                    ? <a href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer" data-testid="snapshot-evidence-link">
+                      GitHub 근거 열기<span className="visually-hidden"> (새 탭)</span></a>
+                    : <span>{evidence.sourceUrl}</span>}
+                  <span className={styles.muted}> · 판본 {evidence.sourceRevision}</span>
+                  {evidence.representedFacts.length > 0 && (
+                    <ul>{evidence.representedFacts.map((fact, factIndex) => (
+                      <li key={factIndex}><PlainText text={fact} range={rangeFor(highlight, `evidence[${index}].representedFacts[${factIndex}]`)} /></li>
+                    ))}</ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </details>
+      </section>
     </div>
   );
 }
