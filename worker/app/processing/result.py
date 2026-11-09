@@ -67,16 +67,21 @@ def _candidate(
             "status": candidate.reflection.status,
             "questions": list(candidate.reflection.questions),
         },
+        # 본인 커밋 목록 전체(Result v3, CR2 BR2.1). api가 그 Catch의 소속으로 쓴다.
+        "ownCommitShas": list(candidate.own_commit_shas),
     }
 
 
 def _envelope(
     request: CheckedRequest | UnverifiedRequest, id_label: str
 ) -> dict[str, Any]:
-    """식별자와 요청 맥락. ID는 `<종류>-<id_label>-<attemptId>` 모양으로 결정적으로 만든다."""
+    """식별자와 요청 맥락. ID는 `<종류>-<id_label>-<attemptId>` 모양으로 결정적으로 만든다.
+
+    Result 판본은 "3"이다(CR2, 후보에 ownCommitShas). 진행 상태·요청 메시지는 "2" 그대로다(BR2.2).
+    """
     prefix = f"{id_label}-{request.attempt_id}"
     return {
-        "schemaVersion": "2",
+        "schemaVersion": "3",
         "messageId": f"message-{prefix}-result",
         "resultId": f"result-{prefix}",
         "requestId": request.request_id,

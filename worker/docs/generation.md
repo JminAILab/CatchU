@@ -28,7 +28,7 @@
 
 ## 재료 찾기
 
-재료 커밋은 후보 근거에 든 본인 커밋(최근 20건) 가운데 변경 내용을 받은(`FETCHED`) 커밋이다(`app/generation/material.py`). 다른 계정 커밋, PR·병합·이슈 근거는 재료가 아니다. 후보와 단위를 맞추는 법, 파일 종류와 담는 순서, 큰 후보의 변경 묶음과 한 파일 상한은 [재료 고르기](generation-material.md)에 있다.
+재료 커밋은 후보 근거에 든 본인 커밋(최근 20건) 가운데 변경 내용을 받은(`FETCHED`) 커밋이다(`app/generation/material.py`). 다른 계정 커밋, PR·병합·이슈 근거는 재료가 아니다. 단위는 후보 판정과 같은 소속 커밋 집합으로 다시 정한다(`run_generation(..., assigned=)`, [소속 커밋 빼기](commit-assignment.md)). 후보와 단위를 맞추는 법, 파일 종류와 담는 순서, 큰 후보의 변경 묶음과 한 파일 상한은 [재료 고르기](generation-material.md)에 있다.
 
 ## 보내기 전
 

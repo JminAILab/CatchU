@@ -1,6 +1,6 @@
 # 분석 요청 큐 소비자
 
-현행 네 메시지 종류는 [U7 v2](repository-analysis-u7.md)이며 v1 혼입을 거부한다. 수신 확인과 Catch 반영 완료는 별개이고, 결과에는 본인 커밋 관측과 수집 한계를 필수로 보낸다. 기존 큐 이름·동시 실행 1·재시도 정책은 유지한다.
+현행 네 메시지 종류는 [U7 v2](repository-analysis-u7.md)(Result만 Catch 개편 CR2부터 v3)이며 다른 판본 혼입을 거부한다. 수신 확인과 Catch 반영 완료는 별개이고, 결과에는 본인 커밋 관측과 수집 한계를 필수로 보낸다. 기존 큐 이름·동시 실행 1·재시도 정책은 유지한다.
 
 [#121](https://github.com/JminAILab/CatchU/issues/121)의 큐 연결이다. api가 넣은 분석 요청을 큐에서 꺼내 처리하고, 진행 알림과 결과를 api로 가는 큐에 넣는다. LIVE 요청은 요청 정보 조회([요청 정보 조회](request-context.md)) 뒤 실제 수집·후보·생성으로, MOCK 요청은 개발·시험 설정에서만 가짜 생성기로 처리한다. LIVE는 합성 GitHub·합성 제공자·합성 조회 API로만 검사했고 실제 api·GitHub·Claude 연결 확인은 남았다. api 쪽 큐 연결은 [#233](https://github.com/JminAILab/CatchU/issues/233)이다. 보장하지 않는 범위는 [worker README](../README.md#보장하지-않는-범위)에 있다.
 

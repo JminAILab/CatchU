@@ -39,6 +39,11 @@
    있으면 창 밖 부모를 둔 커밋도 보류한다.
 6. 단위 목록: PR·PR 없는 병합 단위는 이슈 번호로 나누지 않고 단위 전체를 후보 하나로 둔다. 이슈
    조회가 허용돼도 같고, 나누지 않은 이유의 한계도 남기지 않는다(CR1 FR2.1, BR1.1·BR1.2).
+7. 소속 빼기(CR2): 단위를 위 규칙대로 다 정한 뒤, 이미 다른 Catch에 속한 커밋(맥락 조회의 소속 커밋
+   집합)이 든 변경을 각 단위에서 뺀다. 변경의 관측 커밋이나 본인 기여 커밋 가운데 하나라도 소속이면
+   그 변경 전체를 뺀다. 뺀 단위에 본인 기여 변경이 남지 않으면 단위를 버리고 `assigned_units`로만
+   센다(미제공 아님). PR·병합 단위는 열쇠 그대로, 커밋 묶음은 남은 커밋으로 단위를 다시 만든다.
+   보류와 관측은 바꾸지 않는다. 집합이 비면 결과가 지금과 같다(`docs/commit-assignment.md`).
 
 병합 커밋(부모 둘 이상)은 변경으로 세지 않고 경계로만 쓴다. 후보 문장·근거·집계는 build.py가 한다.
 문장에 쓰도록 단위마다 두 가지를 더 남긴다. PR·PR 없는 병합에 연동 계정이 작성자로 기록되지 않은
@@ -229,6 +234,9 @@ class GroupedUnit:
     # 겹침으로 이은 쌍을 따로 둔다. 묶음 설명은 쓴 근거만 적는다. PR·병합 단위는 비었다.
     same_change_links: tuple[tuple[str, str], ...] = ()
     parent_links: tuple[tuple[str, str], ...] = ()
+    # 커밋 묶음에서 소속 변경을 뺐다(CR2 BR1.8). 남은 커밋은 뺀 커밋을 거쳐 이어졌을 수 있어, 남은
+    # 연결이 비어도 묶음 설명이 고정 문장으로 설명한다. PR·병합 단위와 빼지 않은 묶음은 거짓이다.
+    via_assigned: bool = False
 
 
 @dataclass(frozen=True)
@@ -253,6 +261,8 @@ class Grouping:
     commits: Mapping[str, CommitRecord]
     pull_requests: Mapping[int, PullRequestRecord]
     pull_request_commits: Mapping[int, PullRequestCommits]
+    # 소속 변경을 빼고 나니 본인 기여 변경이 남지 않아 버린 단위 수(CR2 BR1.4). 미제공에 세지 않는다.
+    assigned_units: int = 0
 
 
 Pool = Literal["POOL"]
@@ -421,8 +431,15 @@ class _Assignment:
     merged_in: Counter[UnitKey] = field(default_factory=Counter)
 
 
-def group(outcome: CollectionOutcome) -> Grouping:
-    """수집 결과의 변경을 작업 단위에 배정하고, 배정하지 못한 변경을 보류로 남긴다."""
+def group(
+    outcome: CollectionOutcome, assigned: frozenset[str] = frozenset()
+) -> Grouping:
+    """수집 결과의 변경을 작업 단위에 배정하고, 배정하지 못한 변경을 보류로 남긴다.
+
+    assigned는 그 시도의 맥락 조회로 받은 소속 커밋 집합(CR2)이다. 단위를 다 정한 뒤 각 단위에서 소속
+    변경을 뺀다(7). 후보 판정과 생성 재료 찾기가 같은 수집 결과·같은 집합으로 부르면 같은 단위를 얻는다
+    (BR1.6). 비면(첫 분석·합성 요청·FR10 확인 명령) 결과가 지금과 같다(BR1.7).
+    """
     ctx = _context(outcome)
     # 1. 소속 관측
     states = _observe(ctx)
@@ -443,8 +460,8 @@ def group(outcome: CollectionOutcome) -> Grouping:
     # 5. 커밋 묶음
     pool_changes = assignment.units.pop(_POOL, [])
     bundles = _bundle(ctx, states, assignment, pool_changes)
-    # 6. 단위 목록
-    units = _units(
+    # 6. 단위 목록, 7. 소속 빼기
+    units, assigned_units = _units(
         ctx,
         states,
         assignment,
@@ -454,6 +471,7 @@ def group(outcome: CollectionOutcome) -> Grouping:
         inner_placed,
         uncompared.commits,
         {merge.sha: merge for merge in merges},
+        assigned,
     )
     return Grouping(
         units=units,
@@ -478,6 +496,7 @@ def group(outcome: CollectionOutcome) -> Grouping:
         commits=ctx.commits,
         pull_requests=ctx.pull_requests,
         pull_request_commits=ctx.lists,
+        assigned_units=assigned_units,
     )
 
 
@@ -1686,13 +1705,19 @@ def _units(
     inner_placed: Counter[str],
     uncompared: frozenset[str],
     merges: Mapping[str, _Merge],
-) -> tuple[GroupedUnit, ...]:
+    assigned: frozenset[str],
+) -> tuple[tuple[GroupedUnit, ...], int]:
     """단위마다 변경·근거·한계를 굳힌다. PR·병합 단위는 나누지 않고 단위 전체가 하나다(BR1.1).
 
     uncompared는 수집이 멈춰 비교하지 못한 관계 쌍의 커밋이다. 기여 확인은 요청 전체의 완료 여부가
     아니라 그 단위에 걸린 확인으로 판단한다(_stop_touches). 그에 더해 어느 PR이든 커밋 목록을 수집이
     멈춰 받지 못했으면 끝나지 않은 것으로 본다. 그 목록의 커밋이 같은 변경으로 이 단위의 본인 기여가
     될 수 있기 때문이다. merges는 병합 커밋마다 PR 없는 병합 판정이다.
+
+    assigned(소속 커밋 집합, CR2)로 각 단위의 소속 변경을 뺀다(_without_assigned). 근거·기여는 남은
+    변경으로 정하고(BR1.5), 묶음 한계 메모·기여 확인·다른 PR로 보낸 수·안쪽 병합 수처럼 단위 전체의
+    성질은 뺀 변경까지 본 그대로 둔다(BR1.8). 같은 변경으로 하나로 센 수는 남은 변경으로 다시 센다.
+    둘째 값은 빼고 나니 본인 기여 변경이 없어 버린 단위 수다.
     """
     stopped_keys = _stopped_keys(states, assignment.held)
     lists_unreached = any(
@@ -1716,6 +1741,7 @@ def _units(
         return tuple(sorted(found))
 
     result: list[GroupedUnit] = []
+    dropped = 0
     pull_keys = sorted(
         (key for key in assignment.units if isinstance(key, PullRequestUnit)),
         key=lambda key: key.number,
@@ -1726,10 +1752,13 @@ def _units(
     )
     unit_keys: list[PullRequestUnit | MergeUnit] = [*pull_keys, *merge_keys]
     for key in unit_keys:
-        changes = tuple(
-            _change(ctx, states, key, members)
-            for members in sorted(assignment.units[key])
-        )
+        all_members = tuple(sorted(assignment.units[key]))
+        every = tuple(_change(ctx, states, key, members) for members in all_members)
+        kept = _without_assigned(all_members, every, assigned)
+        if kept is None:
+            dropped += 1
+            continue
+        kept_members, changes = kept
         extra: tuple[Note, ...]
         if isinstance(key, PullRequestUnit):
             sources = frozenset(
@@ -1750,7 +1779,7 @@ def _units(
             extra = outside_notes
             moved, inner = 0, inner_placed[key.commit]
             other_authors = _merge_other_authors(ctx, merges[key.commit])
-        commits = [sha for change in changes for sha in change.commits]
+        commits = [sha for change in every for sha in change.commits]
         touched = _stop_touches(ctx, key, commits, stopped_keys, uncompared)
         settled = not touched and not (
             isinstance(key, PullRequestUnit) and lists_unreached
@@ -1760,38 +1789,92 @@ def _units(
                 key,
                 changes,
                 sources=sources,
-                notes=notes_for(changes, extra),
+                notes=notes_for(every, extra),
                 moved_out=moved,
-                merged_in=assignment.merged_in[key],
+                merged_in=assignment.merged_in[key]
+                if len(changes) == len(every)
+                else sum(
+                    1
+                    for members in kept_members
+                    if _merged_from_elsewhere(states, key, members)
+                ),
                 inner_placed=inner,
                 squash_unconfirmed=isinstance(key, PullRequestUnit)
-                and _squash_unconfirmed(ctx, states, key, changes),
+                and _squash_unconfirmed(ctx, states, key, every),
                 contribution_settled=settled,
                 other_authors=other_authors,
             )
         )
     for bundle in sorted(bundles, key=lambda item: item.commits[0]):
-        changes = tuple(
+        every = tuple(
             _change(ctx, states, _POOL, members) for members in bundle.changes
+        )
+        kept = _without_assigned(bundle.changes, every, assigned)
+        if kept is None:
+            dropped += 1
+            continue
+        kept_members, changes = kept
+        removed = len(changes) != len(every)
+        # BR1.3: 커밋 묶음은 남은 커밋으로 단위(열쇠)를 다시 만든다. 빼지 않았으면 묶음 그대로다.
+        remaining = (
+            tuple(sorted(sha for change in changes for sha in change.commits))
+            if removed
+            else bundle.commits
         )
         result.append(
             GroupedUnit(
-                CommitsUnit(bundle.commits),
+                CommitsUnit(remaining),
                 changes,
                 sources=frozenset(
                     [MembershipSource.LOOKUP] if ctx.pulls_allowed else []
                 ),
-                notes=notes_for(changes, [*outside_notes, *bundle.notes]),
+                notes=notes_for(every, [*outside_notes, *bundle.notes]),
                 merged_in=sum(
                     1
-                    for members in bundle.changes
+                    for members in kept_members
                     if _merged_from_elsewhere(states, _POOL, members)
                 ),
                 contribution_settled=not any(
                     sha in uncompared for sha in bundle.commits
                 ),
-                same_change_links=bundle.same_change_links,
-                parent_links=bundle.parent_links,
+                same_change_links=_links_kept(bundle.same_change_links, remaining),
+                parent_links=_links_kept(bundle.parent_links, remaining),
+                via_assigned=removed,
             )
         )
-    return tuple(result)
+    return tuple(result), dropped
+
+
+# 7. 소속 빼기(CR2)
+
+
+def _without_assigned(
+    members: Sequence[tuple[str, ...]],
+    changes: Sequence[AssignedChange],
+    assigned: frozenset[str],
+) -> tuple[tuple[tuple[str, ...], ...], tuple[AssignedChange, ...]] | None:
+    """단위의 (같은 변경 묶음, 변경)에서 소속 변경을 뺀다. 버릴 단위면 None이다.
+
+    변경의 관측 커밋이나 본인 기여 커밋 가운데 하나라도 소속 커밋이면 그 변경 전체가 소속 변경이다
+    (BR1.1). 뺀 변경이 없으면 그대로 돌려준다(본인 기여가 없어도 지금처럼 후보 판정이 미제공 사유를
+    정한다). 하나라도 뺐는데 기여 근거이면서 본인 커밋이 있는 변경이 남지 않으면 버린다(BR1.4).
+    """
+    pairs = [
+        (group, change)
+        for group, change in zip(members, changes, strict=True)
+        if assigned.isdisjoint(change.commits)
+        and assigned.isdisjoint(change.own_commits)
+    ]
+    if len(pairs) == len(changes):
+        return tuple(members), tuple(changes)
+    if not any(change.contributing and change.own_commits for _, change in pairs):
+        return None
+    return tuple(group for group, _ in pairs), tuple(change for _, change in pairs)
+
+
+def _links_kept(
+    links: tuple[tuple[str, str], ...], commits: tuple[str, ...]
+) -> tuple[tuple[str, str], ...]:
+    """두 끝이 모두 남은 커밋인 연결만 남긴다(BR1.8)."""
+    kept = set(commits)
+    return tuple(pair for pair in links if pair[0] in kept and pair[1] in kept)

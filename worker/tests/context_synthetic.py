@@ -45,6 +45,8 @@ def context_body() -> dict[str, Any]:
             "expiresAt": "2026-10-01T01:00:00.000Z",
         },
         "selection": {"repositoryId": REQUEST.repository_id, "wholeRepository": True},
+        # 소속 커밋 목록(CR2 계약 C1). 첫 분석처럼 비어 있다. 시험마다 직접 채운다.
+        "assignedCommitShas": [],
     }
 
 

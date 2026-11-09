@@ -19,6 +19,8 @@ export interface RegistrationAssessment {
 @Entity('catch_asset')
 @Unique(['ownerId', 'workIdentity'])
 @Unique(['sourceRequestId', 'sourceResultId', 'sourceCandidateId'])
+// 소속 기록(commit_assignment)의 (catch_id, member_id) 한 쌍 외래 키가 가리킬 대상(CR2 ADR-002).
+@Unique(['catchId', 'ownerId'])
 @ForeignKey(() => MemberAccount, ['ownerId'], ['memberId'], { name: 'fk_catch_asset_owner_id', ...deleteWithParent })
 @ForeignKey(() => AnalysisRequest, ['sourceRequestId'], ['requestId'], { name: 'fk_catch_asset_source_request_id', ...deleteWithParent })
 @Check('char_length("title") >= 1')

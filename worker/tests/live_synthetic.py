@@ -49,14 +49,22 @@ def live_message() -> dict[str, Any]:
     return synthetic_request(LIVE_ACCEPTED)
 
 
-def live_payload(*, expires_at: str = "2026-10-01T01:00:00.000Z") -> dict[str, Any]:
-    """합성 요청과 맞는 조회 응답. 연동 계정은 합성 저장소의 본인 계정이다."""
+def live_payload(
+    *,
+    expires_at: str = "2026-10-01T01:00:00.000Z",
+    assigned: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """합성 요청과 맞는 조회 응답. 연동 계정은 합성 저장소의 본인 계정이다.
+
+    assigned는 소속 커밋 목록(CR2 계약 C1)이다. 기본은 첫 분석처럼 빈 목록이다.
+    """
     body = context_body()
     body["credential"]["linkedAccount"] = {
         "login": MEMBER.login,
         "externalAccountId": str(MEMBER.account_id),
     }
     body["credential"]["expiresAt"] = expires_at
+    body["assignedCommitShas"] = list(assigned)
     return body
 
 

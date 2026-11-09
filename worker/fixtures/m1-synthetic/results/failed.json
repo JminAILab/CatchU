@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2",
+  "schemaVersion": "3",
   "messageId": "message-{{caseId}}-{{attemptId}}-result",
   "resultId": "result-{{caseId}}-{{attemptId}}",
   "requestId": "{{requestId}}",

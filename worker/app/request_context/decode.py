@@ -26,16 +26,20 @@ _ROOT_KEYS = {
     "sourceMode",
     "credential",
     "selection",
+    "assignedCommitShas",
 }
+_SHA = re.compile(r"[0-9a-f]{40}")
 
 
 @dataclass(frozen=True)
 class DecodedContext:
-    """응답 하나에서 읽은 접수 맥락·자격정보 맥락·선택 범위."""
+    """응답 하나에서 읽은 접수 맥락·자격정보 맥락·선택 범위와 소속 커밋 집합."""
 
     accepted: AcceptedContext
     credential: CredentialContext
     selection: SelectedRange
+    # 그 회원·저장소에서 이미 Catch에 속한 커밋 SHA(CR2 계약 C1). 없으면 빈 집합이다.
+    assigned_commits: frozenset[str]
 
 
 def valid_reference(value: str) -> bool:
@@ -69,6 +73,18 @@ def _resource_types(value: object) -> frozenset[str]:
     ):
         raise ValueError
     return frozenset(cast(list[str], value))
+
+
+def _assigned_commits(value: object) -> frozenset[str]:
+    """소속 커밋 목록(CR2 BR2.3): 소문자 16진수 40자 SHA의 중복 없는 배열. 빈 배열은 정상이다."""
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and _SHA.fullmatch(item) for item in value
+    ):
+        raise ValueError
+    shas = frozenset(cast(list[str], value))
+    if len(shas) != len(value):
+        raise ValueError
+    return shas
 
 
 def decode_context(body: bytes, *, attempt_id: str) -> DecodedContext:
@@ -139,6 +155,7 @@ def decode_context(body: bytes, *, attempt_id: str) -> DecodedContext:
             repository_id=_text(selected["repositoryId"]),
             whole_repository=selected["wholeRepository"],
         ),
+        assigned_commits=_assigned_commits(root["assignedCommitShas"]),
     )
 
 

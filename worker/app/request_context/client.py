@@ -51,6 +51,9 @@ class ContextFound:
 
     def __init__(self, decoded: DecodedContext) -> None:
         self.accepted: AcceptedContext = decoded.accepted
+        # 소속 커밋 집합(CR2). 비밀값이 아니라 닫아도 지우지 않는다. 후보 판정과 생성 재료 찾기에 같은 값으로
+        # 넘긴다(BR1.6).
+        self.assigned_commits: frozenset[str] = decoded.assigned_commits
         self._attempt_id = decoded.accepted.attempt_id
         self._credential: CredentialContext | None = decoded.credential
         self._selection: SelectedRange | None = decoded.selection
