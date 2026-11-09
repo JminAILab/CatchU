@@ -9,7 +9,7 @@
 | `GET /v1/me` | `Member`: `memberId`, `profile`, `github` | 인증된 본인 계정·기본 프로필·연동 상태만 조회 |
 | `PUT /v1/me/profile` | 저장된 `Profile`의 네 필드 | 네 필드를 전체 교체. 생략한 필드를 이전 값으로 채우지 않음 |
 
-두 API는 공통 인증 Guard와 `@CurrentMemberId()`로 얻은 회원 ID만 사용한다. 요청 본문·쿼리로 대상을 선택하지 않으며 추가 쿼리도 거부한다. 토큰은 공통 규약대로 검사하며, 유효한 토큰이어도 회원이 없거나 비활성인 경우 `404 RESOURCE_UNAVAILABLE`이다. 기능 코드가 개발 로그인 플래그나 JWT 내부 형식에 의존하지 않는다.
+두 API는 공통 인증 Guard와 `@CurrentMemberId()`로 얻은 회원 ID만 사용한다. 요청 본문·쿼리로 대상을 선택하지 않으며 추가 쿼리도 거부한다. 토큰은 공통 규약대로 검사한다. 회원이 없거나 비활성인 경우는 확인하는 단계에 따라 응답이 다르다. 인증 단계의 Guard(`AccessTokenGuard` → `SessionService.assertAccess`)는 세션이 끝났거나 회원이 없거나 비활성이면 `401 AUTH_INVALID`로 거부한다([회원 계약 「M — 회원 API」](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api)의 Guard 설명). Guard를 통과한 뒤 서비스가 회원을 다시 확인해 없거나 비활성이면 `404 RESOURCE_UNAVAILABLE`이다. 이 재확인은 두 API의 프로필 트랜잭션 안에서 하고, `GET /v1/me`는 트랜잭션 전의 GitHub 연결 상태 확인(`refreshStatus`)에서도 한다. 그 확인은 GitHub 연결 설정이 켜졌을 때만 회원을 조회한다. 기능 코드가 개발 로그인 플래그나 JWT 내부 형식에 의존하지 않는다.
 
 `GET`의 `profile`은 아래 네 필드만 반환한다. `github`는 `state`(`CONNECTED`·`DISCONNECTED`·`REAUTH_REQUIRED`)와 `accountLogin`(문자열 또는 `null`)만 반환한다. 연동 행이 없으면 `{ "state": "DISCONNECTED", "accountLogin": null }`이다. 개발 식별 문자열·비밀 참조·내부 행 ID·출처 메타데이터는 응답에 포함하지 않는다. 조회 중에는 일관된 DB 스냅샷을 사용한다.
 
@@ -28,9 +28,9 @@
 
 [PR #238 NUL 입력 리뷰](https://github.com/JminAILab/CatchU/pull/238#discussion_r4193329628)에 따라 네 항목의 각 문자열에 NUL(`U+0000`)이 있으면 저장 전에 `400 VALIDATION_FAILED`로 거부한다. 위반 항목은 `displayName`·`introduction`·`desiredRole` 또는 `skills.<배열 인덱스>`, 규칙 이름은 `noNul`로 반환하며 입력 원문은 응답·로그에 넣지 않는다. NUL을 제거해 저장하지 않으며 다른 제어문자를 일괄 금지하지 않는다. 기존 표시 이름 trim·코드 포인트 길이 제한·선택 항목의 빈 값 허용은 유지한다.
 
-길이는 JavaScript의 `Array.from(value).length`와 같은 **유니코드 코드 포인트**로 센다. 이모지·결합 문자에서 화면에 보이는 글자 수와 다를 수 있다. [#137 프로필 화면 연결](https://github.com/JminAILab/CatchU/issues/137)과 [#106 web 공통 기반](https://github.com/JminAILab/CatchU/issues/106)의 후속 화면 검증도 같은 기준과 표시 이름의 trim 순서를 사용해야 한다. HTML `maxlength`나 문자열의 UTF-16 `length`만으로 서버 제한을 대체하지 않는다.
+길이는 JavaScript의 `Array.from(value).length`와 같은 **유니코드 코드 포인트**로 센다. 이모지·결합 문자에서 화면에 보이는 글자 수와 다를 수 있다. web 프로필 화면도 같은 기준으로 길이를 세고, 표시 이름은 앞뒤 공백을 지운 뒤 빈 값과 길이를 검사한다([프로필 화면 안내](../../web/src/features/profile/README.md)). HTML `maxlength`나 문자열의 UTF-16 `length`만으로 서버 제한을 대체하지 않는다.
 
-이름 저장 여부는 **조회 성공 시 저장된 `profile.displayName === ""`인지**로 판단한다. 빈 문자열은 #104가 생성한 최초 기본값이며, `PUT`으로 빈 이름을 다시 저장할 수는 없다. 빈 값이면 최초 프로필 입력, 저장된 이름이 있으면 홈 진입에 사용하는 방향은 [#106 연결 제안](https://github.com/JminAILab/CatchU/issues/106#issuecomment-5865929993)을 따른다. 로딩 중에는 판정을 기다리고 조회 실패는 재시도 가능한 오류로 처리해야 한다. 조회 실패·필수 프로필 행 누락을 빈 기본 프로필로 바꾸지 않으며, 판단용 새 응답 필드를 추가하지 않았다. 실제 web 연결 검증은 후속 작업이다.
+이름 저장 여부는 **조회 성공 시 저장된 `profile.displayName === ""`인지**로 판단한다. 빈 문자열은 #104가 생성한 최초 기본값이며, `PUT`으로 빈 이름을 다시 저장할 수는 없다. 빈 값이면 최초 프로필 입력, 저장된 이름이 있으면 홈 진입에 사용하는 방향은 [#106 연결 제안](https://github.com/JminAILab/CatchU/issues/106#issuecomment-5865929993)을 따른다. 로딩 중에는 판정을 기다리고 조회 실패는 재시도 가능한 오류로 처리해야 한다. 조회 실패·필수 프로필 행 누락을 빈 기본 프로필로 바꾸지 않으며, 판단용 새 응답 필드를 추가하지 않았다. web 연결은 [#137](https://github.com/JminAILab/CatchU/issues/137)에서 끝났다. [#137 종료 정리](https://github.com/JminAILab/CatchU/issues/137#issuecomment-6257904659)(2026-10-19)는 dev `ad4fa6b`에서 실제 API·전용 시험 DB에 연결해 상세·수정 화면을 확인했다. web 개발 모드와 운영 빌드에서 Windows 헤드리스 Chrome 155로 확인했고, 개발용 로그인·합성 회원을 썼으며 API는 `NODE_ENV=development`였다. 확인하지 않은 경로는 그 댓글에, 화면 동작은 [프로필 화면 안내](../../web/src/features/profile/README.md)에 있다.
 
 [PR #238 고립 서로게이트 리뷰](https://github.com/JminAILab/CatchU/pull/238#discussion_r4201690535)에 따라 표시 이름·한 줄 소개·희망 직무·각 기술 문자열의 짝이 없는 UTF-16 상위·하위 서로게이트도 저장 전에 `400 VALIDATION_FAILED`로 거부한다. 위반 필드는 위와 같고 규칙 이름은 `isWellFormed`다. 문자를 제거하거나 대체 문자로 변환하지 않으며 입력 원문은 응답·로그에 넣지 않는다. 정상 한글·이모지·올바른 서로게이트 쌍·입력에 이미 있는 대체 문자(`U+FFFD`)는 허용한다. 기존 NUL 거부·표시 이름 trim·코드 포인트 길이 제한·선택 항목의 빈 값 정책은 유지한다.
 

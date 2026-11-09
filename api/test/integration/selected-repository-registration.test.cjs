@@ -9,7 +9,7 @@ const { DataSource } = require('typeorm');
 const { resetTestDatabase } = require('../support/test-database.cjs');
 const { CONTRACT_DIR } = require('../helpers/receiver-harness.cjs');
 const { MemberAccount, AnalysisRequest, AnalysisAttempt } = require('../../dist/member-analysis/member-analysis.entity');
-const { insertInitialAnalysis } = require('../../dist/member-analysis/initial-analysis');
+const { insertCurrentAnalysis: insertInitialAnalysis } = require('../support/registered-analysis.cjs');
 const { SelectedRepositoryCatalog } = require('../../dist/member-repositories/selected-repository-catalog');
 const { SelectedRepositoryRegistrationSource } = require('../../dist/analysis-receiver/selected-repository-registration.source');
 const { OctoberRepositoryObservationSource } = require('../../dist/analysis-receiver/october-repository-observation.source');
@@ -96,10 +96,11 @@ test('다른 실제 저장소의 근거는 승인한 좌표로 바꾸지 않고 
   assert.equal((await db.manager.findOneByOrFail(AnalysisAttempt, {attemptId: result.attemptId})).application, 'APPLY_FAILED');
 });
 
-test('알 수 없는 선정 참조는 현재 목록이나 결과 URL로 보정하지 않고 Catch를 만들지 않는다', async () => {
+test('알 수 없는 등록 동의는 현재 목록이나 결과 URL로 보정하지 않고 수신부터 거부한다', async () => {
   const result = await prepare(catalog.listCurrent()[0], 'unknown-selection');
-  await assert.rejects(service.receiveResult(result, async () => {}), AnalysisRegistrationError);
-  assert.deepEqual(await counts(), {catches: 0, evidence: 0, registrations: 0, receipts: 1});
+  const received = await service.receiveResult(result, async () => {});
+  assert.equal(received.receipt.disposition, 'REJECTED');
+  assert.deepEqual(await counts(), {catches: 0, evidence: 0, registrations: 0, receipts: 0});
 });
 
 test('수신 모듈은 객체 또는 DB 공급 함수 중 하나만 받고 큐 모듈도 같은 함수를 넘긴다', () => {

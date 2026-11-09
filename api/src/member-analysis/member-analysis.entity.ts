@@ -3,6 +3,7 @@ import { Check, Column, Entity, ForeignKey, Index, PrimaryColumn, Unique } from 
 import { inValues, lengthBetween } from '../database/checks';
 import { deleteWithParent } from '../database/foreign-keys';
 import { ShareLink } from '../share-links/share-link.entity';
+import { RepositoryRegistration } from '../member-repositories/repository-registration.entity';
 
 const deferred = { deferrable: 'INITIALLY DEFERRED' as const };
 
@@ -56,6 +57,8 @@ export class GitHubConnection {
 @ForeignKey(() => AnalysisConsent, ['consentId', 'requestId', 'memberId', 'repositoryId'],
   ['consentId', 'requestId', 'memberId', 'repositoryId'], deferred)
 @ForeignKey(() => AnalysisAttempt, ['currentAttemptId', 'requestId'], ['attemptId', 'requestId'], deferred)
+@ForeignKey(() => RepositoryRegistration, ['memberId', 'registrationId', 'repositoryId'],
+  ['memberId', 'registrationId', 'repositoryId'], deleteWithParent)
 @ForeignKey(() => AnalysisRequest, ['retryOfRequestId', 'memberId', 'repositoryId'],
   ['requestId', 'memberId', 'repositoryId'], deferred)
 @Check(inValues('request_state', ['ACCEPTED']))
@@ -65,6 +68,7 @@ export class GitHubConnection {
 export class AnalysisRequest {
   @PrimaryColumn({ type: 'uuid' }) requestId: string = randomUUID();
   @Column({ type: 'uuid' }) memberId!: string;
+  @Column({ type: 'uuid' }) registrationId!: string;
   @Column({ type: 'text' }) repositoryId!: string;
   @Column({ type: 'uuid' }) consentId!: string;
   @Column({ type: 'uuid' }) currentAttemptId!: string;
@@ -110,6 +114,10 @@ export const APPLICATION_STATES = ['NOT_READY', 'PENDING', 'APPLYING', 'RECOVERI
 @Check(inValues('source_mode', ['MOCK', 'LIVE']))
 @Check('"eligible_candidate_count" >= 0')
 @Check(`jsonb_typeof("failures") = 'array'`)
+@Check(inValues('own_commit_observation', ['UNKNOWN', 'NONE', 'FOUND']))
+@Check(`("own_commit_observation" = 'UNKNOWN' AND "observed_own_commit_count" IS NULL) OR
+  ("own_commit_observation" = 'NONE' AND "observed_own_commit_count" IS NOT NULL AND "observed_own_commit_count" = 0) OR
+  ("own_commit_observation" = 'FOUND' AND "observed_own_commit_count" IS NOT NULL AND "observed_own_commit_count" > 0)`)
 export class AnalysisAttempt {
   @PrimaryColumn({ type: 'uuid' }) attemptId: string = randomUUID();
   @Column({ type: 'uuid' }) requestId!: string;
@@ -118,6 +126,9 @@ export class AnalysisAttempt {
   @Column({ type: 'varchar' }) sourceMode!: 'MOCK' | 'LIVE';
   @Column({ type: 'integer', default: 0 }) eligibleCandidateCount = 0;
   @Column({ type: 'boolean', default: false }) ownerResultsReady = false;
+  @Column({ type: 'varchar', default: 'UNKNOWN' }) ownCommitObservation: 'UNKNOWN' | 'NONE' | 'FOUND' = 'UNKNOWN';
+  @Column({ type: 'integer', nullable: true }) observedOwnCommitCount: number | null = null;
+  @Column({ type: 'text', array: true, default: [] }) collectionLimitNotes: string[] = [];
   @Column({ type: 'jsonb', default: [] }) failures: {
     stage: string; code: string; message: string; candidateId?: string;
   }[] = [];

@@ -68,6 +68,8 @@ cat > "${dir}/api.env" <<EOF
 # 합성 값. 운영은 배포 환경의 비밀 관리에서 같은 이름으로 주입하고 재배포 때 새로 만들지 않는다.
 AUTH_JWT_SECRET=$(hex32)
 LINK_GRANT_SECRET=$(hex32)
+# 운영 모드 api는 임베딩 키가 없으면 기동하지 않는다(#431). 실제 Voyage 키가 아니므로 임베딩을 부르면 거부되어 색인이 FAILED가 된다.
+CATCHU_EMBEDDING_API_KEY=$(hex32)
 AUTH_ACCESS_TOKEN_TTL_SECONDS=900
 # production은 https만 받는다. 로컬 검증용 합성 주소다(이 주소로 공유 링크를 열거나 로그인 유지를 확인할 수 없다).
 SHARE_LINK_WEB_BASE_URL=https://catchu-single.invalid

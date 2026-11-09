@@ -22,7 +22,9 @@ const outcome = await service.receiveResult(message, async receipt => {
 
 ## 저장과 실패
 
-요청 → 현재 시도 → 수신 기록을 잠그고 요청의 동의·회원·저장소·범위·자료 방식을 조회한다. `ProcessingEvent`는 현재 처리 상태와 서버 `updatedAt`을 저장하며 이벤트 원문은 저장하지 않는다. worker의 `observedAt`을 서버 처리 시한으로 사용하지 않는다. 닫힌 요청·종결 처리 상태에 늦은 진행 관측을 적용하지 않는다.
+수신은 비잠금 요청 조회로 부모 식별자만 얻은 뒤 **회원 → 회원별 등록 → 요청 → 현재 시도 → 수신 기록** 순서로 잠근다. 회원·등록의 읽기 잠금을 먼저 얻어 부모에서 시작하는 FK CASCADE 삭제와 순서를 맞추고, 자식은 기존 쓰기 잠금으로 직렬화한다. 잠근 요청의 회원·등록·저장소 참조가 최초 조회와 다르면 자식 잠금을 쥔 채 새 부모를 추가로 잠그지 않고 맥락을 거부한다. 회원 상태·등록 소유권과 요청의 최신 현재 시도·동의·범위·자료 방식으로 판정한다. 부모나 요청 부재는 `CONTEXT_MISMATCH`, 바뀐 현재 시도의 이전 메시지는 기존 `STALE_ATTEMPT`다. 자동 재시도나 삭제 자료 복원은 하지 않는다.
+
+`ProcessingEvent`는 현재 처리 상태와 서버 `updatedAt`을 저장하며 이벤트 원문은 저장하지 않는다. worker의 `observedAt`을 서버 처리 시한으로 사용하지 않는다. 닫힌 요청·종결 처리 상태에 늦은 진행 관측을 적용하지 않는다.
 
 새 `Result`는 수신 메타데이터, 처리 종결값, 적합 후보 수, `failures`, `PENDING`을 먼저 별도 커밋한다. 수신 테이블의 기존 유일성·FK를 사용한다. 이후 B 등록·보호 관측 저장·E `APPLIED/CLOSED` 기록에는 **같은 EntityManager**를 사용한다. 반환의 `registeredCatchIds`·`ownerResultsReady`는 [기존 반영 기준](result-application.md#테이블원자성재반영)을 따른다. 후보 없는 정상 0건·실패는 보호 공급을 조회하지 않으며, 열람 준비를 true로 만들지 않는다.
 
@@ -58,9 +60,11 @@ DB를 사용하는 공급자는 `registerDatabase({ contractDirectory, observati
 앱·큐 활성화와 실제 왕복은 [#233](https://github.com/JminAILab/CatchU/issues/233)의 별도 연결이며, LIVE 전용 예시에 MOCK 처리가 자동으로 붙지 않는다. MOCK 공급 조건은 [선정 저장소 좌표 연결](selected-repository-coordinates.md)을 따른다.
 10월의 공개 관측 생략은 위 정책을 따르며, 이 좌표 제공자가 GitHub 공개 여부를 확인했다고 표시하지 않는다.
 
-[10/6 최신 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)과 [#234 철회 기록](https://github.com/JminAILab/CatchU/issues/234#issuecomment-6028927385)에 따라 결과 원문 보관·자동 재반영·worker 결과 14일 보관을 구현하지 않는다. 수신 커밋 후 중단·Receipt 전달 실패·공급 실패는 각각 `PENDING`/`APPLY_FAILED`에 남을 수 있다. [#237 처리 시한·실패 종료](https://github.com/JminAILab/CatchU/issues/237)는 [PR #295](https://github.com/JminAILab/CatchU/pull/295)로 구현돼 주기 작업이 시한을 넘긴 요청을 닫는다([규칙](analysis-deadline.md)). 이 수신·반영 서비스 자체는 시간만으로 요청을 닫거나 재요청을 허용하지 않는다. 잠금 순서는 요청 → 현재 시도로 맞춘다.
+[10/6 최신 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)과 [#234 철회 기록](https://github.com/JminAILab/CatchU/issues/234#issuecomment-6028927385)에 따라 결과 원문 보관·자동 재반영·worker 결과 14일 보관을 구현하지 않는다. 수신 커밋 후 중단·Receipt 전달 실패·공급 실패는 각각 `PENDING`/`APPLY_FAILED`에 남을 수 있다. [#237 처리 시한·실패 종료](https://github.com/JminAILab/CatchU/issues/237)는 [PR #295](https://github.com/JminAILab/CatchU/pull/295)로 구현돼 주기 작업이 시한을 넘긴 요청을 닫는다([규칙](analysis-deadline.md)). 이 수신·반영 서비스 자체는 시간만으로 요청을 닫거나 재요청을 허용하지 않는다. 결과 반영·실패 기록·시한 닫기의 기존 자식 잠금 순서는 요청 → 현재 시도로 유지한다. 수신은 그 앞에 회원·등록 읽기 잠금을 추가하며, 모든 서비스의 전체 잠금 순서가 같다는 의미는 아니다.
 
 ## 검사와 한계
+
+U7 부모 삭제 경쟁은 `npm.cmd test -- test/integration/receiver-parent-locking.test.cjs`로 검사한다. 실제 DB에서 회원/등록 × 진행/결과 × 삭제/수신 선행 8종의 대기를 `pg_blocking_pids`와 장벽으로 확인한 뒤 양쪽 커밋 결과를 대조한다. 최초 비잠금 조회 뒤 부모 삭제·요청의 부모 참조 변경·현재 시도 교체도 확인한다. `40P01`이나 수신 저장 오류를 재시도해 숨기지 않고, 삭제 뒤 요청·동의·시도·수신 기록·Catch가 남거나 부활하지 않는지와 다른 회원 자료 보존을 검사한다. 시험 생성 식별자는 등록 전에 보관하며 자신의 회원 자료만 삭제한다.
 
 `api/`에서 전용 `_test` DB를 지정한 뒤 `npm test -- test/integration/receiver-registration.test.cjs` 또는 `npm test`를 실행한다. 실제 #104/E/B 마이그레이션·수신 어댑터·B 등록·E 완료/실패 서비스를 사용한다. 정상 등록·0건·부분 실패·실패, 동일 결과 재전달·동시 수신, 동일 작업 두 후보, 수신/반영 커밋 실패·전체 롤백·수신 보존·실패 기록 오류·LIVE 주소 대조를 검사한다. ‘관측 안 함’ `NONE`과 같은 모양의 합성 공급으로 기존 `SOURCE_PRIVATE`의 제한·근거 보존, 신규 `NONE` 기록 생성, 근거 저장 실패 시 보호 기록(신규·기존 `NONE`·기존 `SOURCE_PRIVATE`)·Catch·완료의 전체 롤백도 검사한다.
 

@@ -23,11 +23,6 @@
 .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: #586c8b; margin-bottom: 8px; }
 .pageHeading h1 { font-size: 32px; line-height: 1.35; letter-spacing: -0.8px; margin-bottom: 12px; }
 .pageHeading > p:last-child { color: var(--muted); font-size: 15px; margin-bottom: 28px; }
-.tabs { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
-.tab, .activeTab { min-height: 44px; border: 1px solid transparent; border-radius: 9px; padding: 9px 16px; background: #edf2fc; color: #4b5e7a; font-size: 14px; }
-.tab:hover { border-color: #bdc8d6; }
-.activeTab { color: var(--color-surface); background: var(--color-accent); font-weight: 700; }
-.tab span, .activeTab span { font-size: 10px; margin-left: 7px; background: #e9edf2; color: #4b5e7a; padding: 3px 5px; border-radius: 3px; }
 .managementPlaceholder { display: flex; justify-content: space-between; gap: 24px; align-items: center; border: 1px dashed #bac6d7; border-radius: 16px; padding: 22px 24px; background: #f0f3f7; }
 .managementPlaceholder h2 { font-size: 16px; margin-bottom: 4px; }
 .managementPlaceholder p { font-size: 13px; color: var(--muted); margin-bottom: 0; }
@@ -37,6 +32,7 @@
 .listHeading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .listHeading h2 { font-size: 22px; letter-spacing: -0.4px; margin-bottom: 6px; }
 .listHeading p { color: var(--muted); font-size: 14px; margin-bottom: 0; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; }
 .filter { font-size: 12px; font-weight: 700; display: grid; gap: 7px; min-width: 235px; max-width: 100%; }
 .filter select { font-size: 14px; font-weight: 400; width: 100%; }
 .listSection > .count { font-size: 13px; margin: 24px 0 12px; color: var(--muted); }
@@ -110,6 +106,9 @@
 .actionSection input { width: 18px; height: 18px; flex-shrink: 0; margin: 3px 0 0; accent-color: var(--color-accent); }
 .actionError { padding: 18px; background: #fff1dc; margin-top: 20px; border-radius: 12px; }
 .dialog button:disabled { opacity: .55; cursor: not-allowed; }
+/* U4 작성자 설명 입력칸. AI 초안(.draft)과 다른 모양으로 둔다(BR1.3). */
+.descriptionInput { display: block; width: 100%; box-sizing: border-box; margin: 10px 0 4px; padding: 12px 14px; border: 1px solid #c9d2df; border-radius: 9px; font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; }
+.descriptionInput:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 
 @media (prefers-reduced-motion: reduce) {
   .card { transition: none; }
@@ -121,8 +120,8 @@
   .workspace { padding: 28px 18px 44px; }
   .pageHeading h1 { font-size: 28px; }
   .grid, .factGrid { grid-template-columns: 1fr; }
-  .tab, .activeTab { padding: 9px 12px; }
   .listOverview, .card { padding: 20px; }
+  .filters { flex-direction: column; }
   .filter { min-width: 0; }
   .dialog { padding: 22px; }
   .catchDialog { padding: 0 20px 22px; }

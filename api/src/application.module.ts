@@ -7,11 +7,11 @@ import { OctoberRepositoryObservationSource } from './analysis-receiver/october-
 import { SelectedRepositoryRegistrationSource } from './analysis-receiver/selected-repository-registration.source';
 import { AppModule } from './app.module';
 import { readWorkerContextAuthConfig } from './auth/worker-context-auth';
-import { DatabaseRepositorySelectionSource } from './member-repositories/repository-selection.source';
+import { RegistrationContextSource } from './member-repositories/registration-context.source';
 import { WorkerContextModule } from './worker-context/worker-context.module';
 
 // 결과 수신 검증기가 읽는 계약 YAML. 저장소와 api 이미지(Dockerfile)는 api/와 같은 높이의 같은 상대 위치에 둔다.
-const CONTRACT_DIRECTORY = resolve(__dirname, '../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design');
+const CONTRACT_DIRECTORY = resolve(__dirname, '../../api/contracts/repository-analysis');
 
 /** 제품 조립의 큐 실행기. 큐 주소가 없어 큐 연결을 조립하지 않았으면 null이다. */
 const ANALYSIS_QUEUE = Symbol('ANALYSIS_QUEUE');
@@ -32,7 +32,7 @@ export function createApplicationModule(): DynamicModule {
     imports: [
       AppModule,
       ...(workerContext.enabled ? [WorkerContextModule.register({
-        selectionSource: new DatabaseRepositorySelectionSource(),
+        selectionSource: new RegistrationContextSource(),
       })] : []),
       // 10월 정책 공급자(#314)에 #319의 저장 당시 좌표를 넘긴다. 이 좌표 공급은 LIVE 전용이라 후보가 있는 MOCK 결과는
       // Catch로 등록되지 않는다(CATCH_NOT_READY). MOCK용 합성 좌표는 넣지 않는다(api/docs/selected-repository-coordinates.md).

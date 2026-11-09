@@ -1,0 +1,14 @@
+{
+  "stage": "code-generation",
+  "unit": "u1-ai-generation-gate",
+  "version": 1,
+  "writes": [
+    { "path": "api/src/ai-generation/" },
+    { "path": "api/test/ai-generation/" },
+    { "path": "api/package.json" },
+    { "path": "api/package-lock.json" },
+    { "path": "api/docs/ai-generation.md" },
+    { "path": "api/CONVENTIONS.md" },
+    { "path": "api/.env.example" }
+  ]
+}

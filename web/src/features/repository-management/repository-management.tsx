@@ -16,6 +16,7 @@ import { safeNextPath } from "@/lib/member-navigation";
 import { routes } from "@/lib/routes";
 import { unsavedChanges } from "@/lib/unsaved-changes";
 import { loadConnectedRepositories, type GitHubState, type RepositoryApi } from "./repository-api";
+import { createRepositoryRegistrationStore } from "./repository-registration-store";
 import {
   canShowCatches, connectedRepositories, connectionCheckView, requestConnectionNotice, showsPendingRequestEntry, STATUS_LABEL, statusDetails, statusIcon,
   type ConnectedRepository, type ConnectionCheckView, type StatusIcon,
@@ -57,7 +58,7 @@ function formatTime(value: string): string {
 }
 
 /**
- * 내 자산 Catch 탭 위쪽의 GitHub 저장소 연결 관리 영역과 모달(D, #153).
+ * 내 자산의 Catch 목록 위쪽에 두는 GitHub 저장소 연결 관리 영역과 모달(D, #153).
  * 조회 실패를 0건으로, 실행 불명·반영 실패·복구를 분석 실패로 바꿔 보이지 않는다. 새 분석·재요청은 자동으로 부르지 않는다.
  * 서버가 retry.allowed를 참으로 준 최신 요청에는 아코디언 안에 #154의 [동의하고 다시 요청]을 그린다(같은 요청 상태 객체).
  */
@@ -145,6 +146,10 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
     requests: requestApi ?? memberRequestApi,
   }) : null);
   useEffect(() => () => requestStore?.dispose(), [requestStore]);
+  const [registrationStore] = useState(() => requestStore ? createRepositoryRegistrationStore(api.register, async (repositoryId, signal) => {
+    await requestStore.load(); if (!signal.aborted) requestStore.select(repositoryId);
+  }, () => requestStore.select(null)) : null);
+  useEffect(() => () => registrationStore?.dispose(), [registrationStore]);
   // 미확정 요청이 남아 있으면 로그아웃·다시 로그인 확인(#287)에 알린다(O-3). 모달 열림과 상관없이 요청 상태가 살아 있는 동안 등록하고,
   // 판정은 확인하는 순간 상태 객체를 읽는다. 이 컴포넌트가 내려가면 풀린다. 문구·확인 창은 #287 확인 흐름이 정한다.
   useEffect(() => (requestStore
@@ -175,6 +180,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
   // 요청 중·응답 불명·빈도 제한이면 읽지 않고(#154 규칙), 입력 단계로 돌아온 뒤 읽는다.
   const requestLoadedFor = useRef<GitHubState | null>(null);
   const connection = github.state === "ready" ? github.value : null;
+  useEffect(() => { if (connection !== "CONNECTED") registrationStore?.cancel(); }, [connection, registrationStore]);
   useEffect(() => {
     if (!requestStore || connection === null || requestLoadedFor.current === connection) return;
     if (open && requestPhase === "editing") {
@@ -219,6 +225,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
   /** 일반 닫기(닫기 버튼·X·Esc·바깥 클릭). B가 현재 필터로 목록을 다시 불러온다. */
   function closeModal() {
     if (!open) return;
+    registrationStore?.cancel();
     stopLoading();
     setOpen(false);
     bindings.onClosed();
@@ -226,6 +233,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
 
   /** [이 저장소 Catch 보기]. 모달을 닫고 onShowRepository만 부른다(onClosed 중복 호출 없음). */
   function showRepository(repositoryId: string) {
+    registrationStore?.cancel();
     stopLoading();
     setOpen(false);
     bindings.onShowRepository(repositoryId);
@@ -305,8 +313,8 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
             </section>
 
             <section className={styles.block} aria-labelledby={`${titleId}-connect`}>
-              <h3 id={`${titleId}-connect`}>연결할 수 있는 저장소</h3>
-              {requestStore ? <AnalysisRequestSection store={requestStore} connectionNotice={connectionNotice} /> : connectSection}
+              <h3 id={`${titleId}-connect`}>저장소 등록과 분석 요청</h3>
+              {requestStore ? <AnalysisRequestSection store={requestStore} connectionNotice={connectionNotice} registration={registrationStore ?? undefined} /> : connectSection}
             </section>
 
             <footer className={styles.panelFooter}>
@@ -391,7 +399,7 @@ function ConnectedList({ connected, expanded, titleId, onToggle, onShowRepositor
                 {statusDetails(item.latest).map((line) => <p key={line}>{line}</p>)}
                 <p className={styles.muted}>마지막 갱신 {formatTime(item.latest.updatedAt)}</p>
                 {item.displayName === null && (
-                  <p className={styles.muted}>선정 목록에서 이 저장소의 이름을 찾지 못해 식별자로 표시합니다.</p>
+                  <p className={styles.muted}>등록 목록에서 이 저장소의 이름을 찾지 못해 식별자로 표시합니다.</p>
                 )}
                 {item.latest.retryAllowed && renderRetry?.(item.latest)}
                 {canShowCatches(item.latest) && (

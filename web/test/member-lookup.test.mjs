@@ -23,7 +23,7 @@ for (const displayName of ['', '회원']) {
     assert.deepEqual(decideMemberEntry(me, '/assets'), displayName ? { action: 'allow' } : { action: 'redirect', to: '/profile/setup' });
     // 최초 입력 화면은 이름이 빈 회원만 연다(#261 리뷰). 이름이 있으면 홈으로 보낸다.
     assert.deepEqual(decideMemberEntry(me, '/profile/setup'), displayName ? { action: 'redirect', to: '/home' } : { action: 'allow' });
-    assert.equal(afterLoginPath(me.displayName, '/links'), displayName ? '/links' : '/profile/setup');
+    assert.equal(afterLoginPath(me.displayName, '/publications'), displayName ? '/publications' : '/profile/setup');
   });
 }
 for (const data of [null, {}, { profile: null }, { profile: {} }, { profile: { displayName: 1 } }]) {

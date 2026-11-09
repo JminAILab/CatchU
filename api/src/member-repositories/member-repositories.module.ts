@@ -5,13 +5,15 @@ import { MemberRepositoriesController } from './member-repositories.controller';
 import { MemberRepositoriesService } from './member-repositories.service';
 import { RepositorySelectionService } from './repository-selection.source';
 import { SelectedRepositoryCatalog } from './selected-repository-catalog';
+import { RepositoryRegistrationService } from './repository-registration.service';
+import { GitHubRepositoryClient } from './github-repository.client';
 
 @Module({
   imports: [AuthModule, GitHubConnectionModule],
   controllers: [MemberRepositoriesController],
   // 목록과 #323 접수가 같은 선정 공급·좌표 카탈로그를 쓴다. #323은 이 모듈을 가져와 접수 재확인에 쓴다.
-  providers: [MemberRepositoriesService, RepositorySelectionService,
+  providers: [MemberRepositoriesService, RepositorySelectionService, RepositoryRegistrationService, GitHubRepositoryClient,
     { provide: SelectedRepositoryCatalog, useFactory: () => new SelectedRepositoryCatalog() }],
-  exports: [RepositorySelectionService],
+  exports: [RepositorySelectionService, RepositoryRegistrationService],
 })
 export class MemberRepositoriesModule {}

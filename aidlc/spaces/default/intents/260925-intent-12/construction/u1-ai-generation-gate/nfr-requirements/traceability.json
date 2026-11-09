@@ -1,0 +1,14 @@
+{
+  "stage": "nfr-requirements",
+  "unit": "u1-ai-generation-gate",
+  "upstream_ids": ["NFR1", "NFR2", "NFR3", "NFR4", "NFR5", "NFR6", "NFR7"],
+  "coverage": [
+    { "id": "NFR1", "status": "OK", "target": "NFR1.1, NFR1.2" },
+    { "id": "NFR2", "status": "OK", "target": "NFR2.1, NFR2.2, NFR2.3, NFR2.4" },
+    { "id": "NFR3", "status": "N/A", "target": "질의응답 RAG 품질 평가는 u5-rag-answer 몫이다. U1은 인용 연결만 한다" },
+    { "id": "NFR4", "status": "OK", "target": "NFR4.1, NFR4.2, NFR4.3, NFR4.4" },
+    { "id": "NFR5", "status": "N/A", "target": "U1은 아무것도 저장하지 않는다. 늦은 결과 저장 차단은 호출 Unit과 AiRun(u2-shared-foundation) 몫이다" },
+    { "id": "NFR6", "status": "OK", "target": "NFR6.1, NFR6.2, NFR6.3" },
+    { "id": "NFR7", "status": "N/A", "target": "화면 표시는 u4-publication-link·u5-rag-answer 몫이다. U1은 표시에 쓸 분류(CITED·AI_INTERPRETATION)와 출처 이름만 준다(기능 설계 BR3.3·BR4.3)" }
+  ]
+}

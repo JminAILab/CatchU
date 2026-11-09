@@ -57,6 +57,7 @@ export const TEXT = {
   resentExisting: "이 저장소의 접수된 분석 요청을 확인했습니다. 이번 재전송으로 새 요청을 만들지 않았습니다.",
   unknown: "요청이 접수됐는지 확인하지 못했습니다. [같은 요청 다시 보내기]는 같은 요청을 다시 보내 결과를 확인합니다. 이미 접수됐다면 새 분석을 만들지 않습니다.",
   limited: "요청이 많아 이번 시도는 처리되지 않았습니다. [같은 요청 다시 보내기]로 같은 요청을 다시 보낼 수 있습니다.",
+  dailyLimit: "오늘의 분석 요청 한도에 도달했습니다. 한국 시간 기준 다음 날 다시 요청할 수 있습니다.",
   limitedUncertain: "요청이 많아 이번 시도는 처리되지 않았습니다. 앞선 요청이 접수됐는지는 아직 확인하지 못했습니다. [같은 요청 다시 보내기]로 결과를 확인해 주세요.",
   auth: "로그인이 필요합니다. 다시 로그인한 뒤 확인해 주세요.",
   // 앞선 결과 불명이 없는 요청이 로그인 연장(갱신 성공) 뒤 401로 거부된 경우. #286 기준 1과 같은 문구다.
@@ -74,9 +75,12 @@ export const TEXT = {
   consent: "분석 안내나 허용 범위가 바뀌어 이번 요청은 접수되지 않았습니다. 최신 안내와 저장소 목록을 확인한 뒤 다시 동의해 주세요.",
   github: "GitHub 연동을 다시 확인해야 분석을 요청할 수 있습니다. 이번 요청은 접수되지 않았습니다.",
   notAllowed: "선택한 저장소는 지금 분석을 요청할 수 없습니다. 이번 요청은 접수되지 않았습니다. 저장소 목록을 확인한 뒤 다시 선택해 주세요.",
+  repositoryPrivate: "비공개이거나 없는 저장소라 확인할 수 없습니다. 공개 저장소 주소인지 확인해 주세요.",
+  repositoryUnsupported: "지원 조건에 맞지 않는 저장소입니다. 다른 공개 저장소를 등록해 주세요.",
+  repositoryUnverified: "GitHub에서 저장소를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   unavailable: "지금은 분석을 요청할 수 없습니다. 이번 요청은 접수되지 않았습니다.",
   deferred: "이 저장소는 이미 분석을 마친 기록이 있어 지금은 다시 분석할 수 없습니다. 이번 요청은 접수되지 않았습니다.",
-  previousRequest: "이 저장소에는 이전 분석 요청이 있어 새 요청으로 받을 수 없습니다. 이번 요청은 접수되지 않았습니다. 다시 요청할 수 있는 실패라면 「연결된 저장소」의 해당 저장소에 [동의하고 다시 요청]이 보입니다.",
+  previousRequest: "이 저장소의 최신 분석 상태 때문에 이번 요청은 접수되지 않았습니다. 「연결된 저장소」에서 최신 상태를 확인해 주세요.",
   // 재요청 거부. 「연결된 저장소」를 다시 읽기 시작한 시점에 보이므로 다시 읽기가 끝났다고 단정하지 않는다.
   retryNotAllowed: "이 요청은 지금 다시 요청할 수 없어 접수되지 않았습니다. 「연결된 저장소」에서 최신 상태를 확인해 주세요.",
   retryMissing: "다시 요청할 이전 요청을 찾지 못했습니다. 이번 요청은 접수되지 않았습니다. 「연결된 저장소」에서 최신 상태를 확인해 주세요.",
@@ -190,8 +194,8 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
       : null;
 
   /** 서버가 준 선정 목록 안에서만 고른다. */
-  function select(repositoryId: string) {
-    if (!editable() || !findRepository(repositoryId)) return;
+  function select(repositoryId: string | null) {
+    if (!editable() || (repositoryId !== null && !findRepository(repositoryId))) return;
     emit({ selectedId: repositoryId, message: null });
   }
 
@@ -266,6 +270,15 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
         emit({ ...reset, selectedId: null, message: error(TEXT.notAllowed) });
         void loadRepositories();
         return;
+      case "REPOSITORY_PRIVATE":
+      case "REPOSITORY_UNSUPPORTED":
+      case "REPOSITORY_UNVERIFIED":
+        emit({ ...reset, selectedId: null, message: error(
+          code === "REPOSITORY_PRIVATE" ? TEXT.repositoryPrivate
+            : code === "REPOSITORY_UNSUPPORTED" ? TEXT.repositoryUnsupported : TEXT.repositoryUnverified,
+        ) });
+        void loadRepositories();
+        return;
       case "REANALYSIS_DEFERRED":
         emit({ ...reset, message: error(TEXT.deferred) });
         statusChanged();
@@ -308,6 +321,10 @@ export function createAnalysisRequestStore(options: AnalysisRequestStoreOptions)
       if (resending) return emit({ phase: "limited", retryAt: null, message: { tone: "error", text: TEXT.limitedNotSent } });
       releasePending();
       return emit({ ...idle, message: { tone: "error", text: TEXT.notSent } });
+    }
+    if (result.kind === "api-error" && result.status === 429 && result.code === "DAILY_LIMIT_REACHED") {
+      releasePending();
+      return emit({ ...idle, selectedId: null, message: { tone: "error", text: TEXT.dailyLimit } });
     }
     if (result.kind === "api-error" && result.status === 429) {
       // 이번 시도는 처리되지 않았지만, 앞선 불명 시도의 결과까지 확인된 것은 아니다. 키·본문과 uncertain은 유지한다.

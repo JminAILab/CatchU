@@ -8,6 +8,8 @@ const { AnalysisRequest, AnalysisAttempt, MemberAccount } = require('../../dist/
 const { ResultApplicationRecord } = require('../../dist/result-application/result-application.entity');
 const { ResultApplicationService, ResultApplicationContextError, ApplicationFailureRecordingError } = require('../../dist/result-application/result-application.service');
 const foundation = require('../../dist/member-analysis/member-analysis.entity');
+const { RepositoryRegistration } = require('../../dist/member-repositories/repository-registration.entity');
+const { AddRepositoryRegistration1793245460352 } = require('../../dist/database/migrations/1793245460352-AddRepositoryRegistration');
 const { CreateMemberAnalysisFoundation1790500000000 } = require('../../dist/database/migrations/1790500000000-CreateMemberAnalysisFoundation');
 const { CreateResultApplicationRecord1790550000000 } = require('../../dist/database/migrations/1790550000000-CreateResultApplicationRecord');
 const { ShareLink } = require('../../dist/share-links/share-link.entity');
@@ -17,9 +19,10 @@ const { CascadeMemberAnalysisOnDelete1792817978011 } = require('../../dist/datab
 const { CascadeResultApplicationOnDelete1792817978012 } = require('../../dist/database/migrations/1792817978012-CascadeResultApplicationOnDelete');
 // ShareLink는 회원 멱등 기록의 실제 FK 참조이며 B 등록 대역과는 별개다.
 // 이력 인덱스(#140)는 회원·분석 기반 엔티티에 선언되어 엔티티 DDL 대조에 필요하다.
-const entities = [...Object.values(foundation).filter(v => typeof v === 'function'),ResultApplicationRecord,ShareLink];
+const entities = [...Object.values(foundation).filter(v => typeof v === 'function'),ResultApplicationRecord,ShareLink,RepositoryRegistration];
 const migrations = [CreateMemberAnalysisFoundation1790500000000,CreateResultApplicationRecord1790550000000,CreateShareLink1790745895865,
-  AddAnalysisRequestHistoryIndex1792640486167,CascadeMemberAnalysisOnDelete1792817978011,CascadeResultApplicationOnDelete1792817978012];
+  AddAnalysisRequestHistoryIndex1792640486167,CascadeMemberAnalysisOnDelete1792817978011,CascadeResultApplicationOnDelete1792817978012,
+  AddRepositoryRegistration1793245460352];
 const selfSchema = 'e_self_' + randomUUID().replaceAll('-','');
 let db, schemaOwner;
 before(async () => {
@@ -260,10 +263,12 @@ test('E 수신 제약·물리 매핑 및 실제 기반→E 적용·역순 되돌
   try {
     assert.deepEqual((await isolated.runMigrations()).map(m => m.name),
       ['CreateMemberAnalysisFoundation1790500000000','CreateResultApplicationRecord1790550000000','CreateShareLink1790745895865',
-        'AddAnalysisRequestHistoryIndex1792640486167','CascadeMemberAnalysisOnDelete1792817978011','CascadeResultApplicationOnDelete1792817978012']);
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).length,10);
+        'AddAnalysisRequestHistoryIndex1792640486167','CascadeMemberAnalysisOnDelete1792817978011','CascadeResultApplicationOnDelete1792817978012',
+        'AddRepositoryRegistration1793245460352']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).length,11);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries,[]);
     await isolated.manager.insert(MemberAccount,{memberId:randomUUID(),identityReference:'preserve',accountState:'ACTIVE'});
+    await isolated.undoLastMigration(); // U7 등록·동의 참조·본인 관측
     await isolated.undoLastMigration(); // #387 E 수신 기록 연쇄 삭제
     await isolated.undoLastMigration(); // #387 회원·분석 연쇄 삭제
     assert.equal(await isolated.manager.count(MemberAccount),1);

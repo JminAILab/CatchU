@@ -1,0 +1,36 @@
+{
+  "stage": "functional-design",
+  "unit": "u5-rag-answer",
+  "upstream_ids": [
+    "AC4.2.1", "AC4.2.2", "AC4.2.3", "AC4.2.4", "AC4.2.5", "AC4.2.6", "AC4.2.7",
+    "AC6.2.1", "AC6.2.2", "AC6.2.3", "AC6.2.4", "AC6.2.5", "AC6.2.6", "AC6.2.7", "AC6.2.8",
+    "AC19.3.1", "AC19.3.2", "AC19.3.3", "AC19.3.4", "AC19.3.5", "AC19.3.6"
+  ],
+  "coverage": [
+    { "id": "AC4.2.1", "status": "OK", "target": "BR5.1, BR5.2, BR5.3, BR5.4, BR5.5" },
+    { "id": "AC4.2.2", "status": "OK", "target": "BR6.1, BR6.2, BR6.3, BR8.1" },
+    { "id": "AC4.2.3", "status": "OK", "target": "BR5.4, BR6.3, BR6.4, BR8.2" },
+    { "id": "AC4.2.4", "status": "OK", "target": "BR7.1, BR7.2, BR7.3, BR7.4, BR7.5" },
+    { "id": "AC4.2.5", "status": "OK", "target": "BR6.1, BR6.4" },
+    { "id": "AC4.2.6", "status": "OK", "target": "BR5.4, BR9.1" },
+    { "id": "AC4.2.7", "status": "OK", "target": "BR5.2, BR8.1" },
+    { "id": "AC6.2.1", "status": "OK", "target": "BR4.1, BR4.2, BR4.3, BR4.4, BR8.5" },
+    { "id": "AC6.2.2", "status": "OK", "target": "BR2.3, BR4.5, BR4.6, BR4.8" },
+    { "id": "AC6.2.3", "status": "OK", "target": "BR4.2, BR4.3" },
+    { "id": "AC6.2.4", "status": "OK", "target": "BR2.1, BR2.2" },
+    { "id": "AC6.2.5", "status": "OK", "target": "BR1.4, BR8.4" },
+    { "id": "AC6.2.6", "status": "OK", "target": "BR1.1, BR1.2, BR1.3" },
+    { "id": "AC6.2.7", "status": "OK", "target": "BR8.7" },
+    { "id": "AC6.2.8", "status": "OK", "target": "BR3.1, BR3.2, BR3.3, BR8.6" },
+    { "id": "AC19.3.1", "status": "OK", "target": "BR10.1, BR10.2, BR10.3, BR10.4" },
+    { "id": "AC19.3.2", "status": "OK", "target": "BR10.5, BR10.6" },
+    { "id": "AC19.3.3", "status": "OK", "target": "BR10.6, BR4.7" },
+    { "id": "AC19.3.4", "status": "OK", "target": "BR10.6" },
+    { "id": "AC19.3.5", "status": "OK", "target": "BR10.6" },
+    { "id": "AC19.3.6", "status": "OK", "target": "BR10.7" }
+  ],
+  "reverse": [
+    { "id": "BR8.3", "status": "N/A", "target": "FR20.1·AC20.1.2의 입력란 옆 고지 한 줄. US20.1은 U2 담당이고 질의응답 자리의 고지 한 줄은 C-11 자리 3에서 U5가 맡는다" },
+    { "id": "BR9.2", "status": "N/A", "target": "C-06의 Redis 키 규칙(지우지 않고 만료에 맡김)을 질문 횟수 키에 적용한 기술 규칙" }
+  ]
+}

@@ -185,11 +185,11 @@ test('시작: 오류 응답·응답 없음·형식 오류를 이유로 나누고
 test('시작 연타: 마지막 시작만 쓰고 앞의 결과는 superseded이며 보관값은 마지막 시도다', async () => {
   const server = fakeServer();
   const t = tab(server);
-  const [first, second] = await Promise.all([t.google.startGoogleLogin('/home'), t.google.startGoogleLogin('/links')]);
+  const [first, second] = await Promise.all([t.google.startGoogleLogin('/home'), t.google.startGoogleLogin('/publications')]);
   assert.deepEqual(first, { kind: 'failed', reason: 'superseded' });
   assert.equal(second.kind, 'ready');
   assert.equal(stored(t).state, new URL(second.authorizationUrl).searchParams.get('state'));
-  assert.equal(stored(t).next, '/links');
+  assert.equal(stored(t).next, '/publications');
 });
 
 // ---- 콜백 해석 ----
@@ -452,7 +452,7 @@ async function completeAWhileStartingB(server, t, { cancel = false, mode = 'ok' 
   for (let i = 0; i < 20 && server.count('POST /auth/google/login') < 1; i += 1) await tick();
   assert.equal(server.count('POST /auth/google/login'), 1); // A는 이미 보냈다
   server.state.complete = mode;
-  const startedB = await t.google.startGoogleLogin('/links');
+  const startedB = await t.google.startGoogleLogin('/publications');
   assert.equal(startedB.kind, 'ready');
   const stateB = new URL(startedB.authorizationUrl).searchParams.get('state');
   const storedB = t.attempts.map.get(GOOGLE_ATTEMPT_KEY);
@@ -474,7 +474,7 @@ test('[회귀] A 완료 응답(성공)이 늦게 와도 B 보관값을 지우지
   assert.equal(server.jarMember(), 'G-a1');
   const parsedB = t.google.readGoogleCallback(query(`state=${stateB}&code=b1`));
   assert.equal(parsedB.kind, 'complete');
-  assert.equal(parsedB.next, '/links');
+  assert.equal(parsedB.next, '/publications');
   assert.equal((await t.google.completeGoogleLogin(parsedB.input)).kind, 'signed-in');
   assert.equal(t.store.loginChangeDetected(), false);
   assert.equal(t.attempts.map.size, 0); // 정상 완료 뒤 삭제

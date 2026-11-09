@@ -76,7 +76,7 @@ def _envelope(
     """식별자와 요청 맥락. ID는 `<종류>-<id_label>-<attemptId>` 모양으로 결정적으로 만든다."""
     prefix = f"{id_label}-{request.attempt_id}"
     return {
-        "schemaVersion": "1",
+        "schemaVersion": "2",
         "messageId": f"message-{prefix}-result",
         "resultId": f"result-{prefix}",
         "requestId": request.request_id,
@@ -86,6 +86,9 @@ def _envelope(
         "consentId": request.consent_id,
         "scopeRevision": request.scope_revision,
         "sourceMode": request.source_mode,
+        "ownCommitObservation": "UNKNOWN",
+        "observedOwnCommitCount": None,
+        "collectionLimitNotes": [],
     }
 
 
@@ -120,6 +123,9 @@ def compose_result(
     return {
         **_envelope(request, id_label),
         "outcome": outcome_for(len(candidates), len(failures)),
+        "ownCommitObservation": output.own_commit_observation,
+        "observedOwnCommitCount": output.observed_own_commit_count,
+        "collectionLimitNotes": list(output.collection_limit_notes),
         "candidates": candidates,
         "notProvided": [
             {"reason": item.reason, "count": item.count} for item in output.not_provided

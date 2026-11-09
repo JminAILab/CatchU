@@ -5,18 +5,21 @@ import type { CatchAsset, RepositoryOption } from "./types";
 import styles from "./assets.module.css";
 
 export type LoadState = "ready" | "loading" | "error";
-export type AssetTab = "catch" | "portfolio" | "introduction" | "resume";
-export const assetTabs: { id: AssetTab; label: string }[] = [
-  { id: "catch", label: "Catch" },
-  { id: "portfolio", label: "포트폴리오" },
-  { id: "introduction", label: "자기소개서" },
-  { id: "resume", label: "이력서" },
-];
+// 자산 종류 탭은 두지 않는다. 텍스트 자료는 헤더의 [텍스트 자료](/materials)에서 관리한다(#416 2026-11-03 팀장 요청).
+// 공개 상태 걸러 보기는 목록 자료의 visibility만 쓴다. 빈 값은 전체다.
+export type VisibilityFilter = "" | CatchAsset["visibility"];
+const visibilityLabels: Record<CatchAsset["visibility"], string> = { PUBLIC: "공개 설정", PRIVATE: "미공개" };
+const emptyVisibilityTitles: Record<CatchAsset["visibility"], string> = { PUBLIC: "공개 설정한 Catch가 없습니다", PRIVATE: "미공개 Catch가 없습니다" };
+export function parseVisibilityFilter(value: string | null): VisibilityFilter {
+  return value === "PUBLIC" || value === "PRIVATE" ? value : "";
+}
 
 type AssetsViewProps = {
   dataMode?: "preview" | "api";
   detailItem?: CatchAsset;
   detailActions?: ReactNode;
+  /** U4 작성자 설명 편집 영역. 근거와 AI 초안(「Catch 설명 초안」) 사이에 둔다(BR1.3). 없으면 그리지 않는다. */
+  descriptionEditor?: ReactNode;
   listMessage?: string;
   detailMessage?: string;
   hasMore?: boolean;
@@ -26,14 +29,14 @@ type AssetsViewProps = {
   repositories: readonly RepositoryOption[];
   repositoryNotice?: ReactNode;
   repositoryId: string;
-  tab: AssetTab;
+  visibility: VisibilityFilter;
   listState: LoadState;
   detailState: LoadState;
   selectedId: string | null;
   // D 담당의 연결 관리 영역이 들어갈 자리. 실제 모달 구현과 분리한다.
   repositoryManagement: ReactNode;
-  onTabChange: (tab: AssetTab) => void;
   onRepositoryChange: (repositoryId: string) => void;
+  onVisibilityChange: (visibility: VisibilityFilter) => void;
   onOpen: (catchId: string) => void;
   onClose: () => void;
   onRetryList: () => void;
@@ -52,7 +55,7 @@ function StatusBadges({ item }: { item: CatchAsset }) {
     <div className={styles.badges} aria-label="Catch 상태">
       <span className={styles.badge}>{confirmationLabel(item)}</span>
       <span className={item.visibility === "PUBLIC" ? styles.publicBadge : styles.badge}>
-        {item.visibility === "PUBLIC" ? "공개 설정" : "미공개"}
+        {visibilityLabels[item.visibility]}
       </span>
       {item.mismatch && <span className={styles.warningBadge}>불일치 표시됨</span>}
       {item.restriction === "SOURCE_PRIVATE" && (
@@ -93,7 +96,7 @@ function StateMessage({ title, children, retry }: {
 }
 
 export function AssetsView(props: AssetsViewProps) {
-  const { items, repositories, repositoryId, tab, listState, selectedId, detailState } = props;
+  const { items, repositories, repositoryId, visibility, listState, selectedId, detailState } = props;
   const returnFocusRef = useRef<HTMLButtonElement | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousSelectedRef = useRef<string | null>(null);
@@ -105,7 +108,8 @@ export function AssetsView(props: AssetsViewProps) {
     }
     previousSelectedRef.current = selectedId;
   }, [selectedId]);
-  const visibleItems = items.filter((item) => !repositoryId || item.repositoryId === repositoryId);
+  const repositoryItems = items.filter((item) => !repositoryId || item.repositoryId === repositoryId);
+  const visibleItems = repositoryItems.filter((item) => !visibility || item.visibility === visibility);
   const selected = props.dataMode === "api" ? props.detailItem : items.find((item) => item.catchId === selectedId);
   const selectedRepository = repositories.find((repo) => repo.repositoryId === repositoryId);
 
@@ -117,99 +121,98 @@ export function AssetsView(props: AssetsViewProps) {
         <p>기록에서 찾은 경험을 살펴보고, 근거와 나의 기여를 확인하세요.</p>
       </div>
 
-      <nav className={styles.tabs} aria-label="자산 종류">
-        {assetTabs.map(({ id, label }) => (
-          <button key={id} className={tab === id ? styles.activeTab : styles.tab}
-            aria-current={tab === id ? "page" : undefined} onClick={() => props.onTabChange(id)}>
-            {label}{id !== "catch" && <span>준비 중</span>}
-          </button>
-        ))}
-      </nav>
-
-      {tab !== "catch" ? (
-        <StateMessage title={`${assetTabs.find((item) => item.id === tab)?.label} 준비 중`}>
-          현재는 Catch에서 분석으로 찾은 경험과 근거를 확인할 수 있습니다.
-        </StateMessage>
-      ) : (
-        <>
-          {props.repositoryManagement}
-          <section className={styles.listSection} aria-labelledby="catch-list-title">
-            <div className={styles.listOverview}>
-              <div className={styles.listHeading}>
-                <div><h2 id="catch-list-title">내 Catch</h2><p>카드를 눌러 설명과 근거를 자세히 살펴보세요.</p></div>
-                <label className={styles.filter}>저장소
-                  <select value={repositoryId} onChange={(event) => props.onRepositoryChange(event.target.value)}>
-                    <option value="">전체 저장소</option>
-                    {repositoryId && !selectedRepository && <option value={repositoryId}>저장소 이름 확인 전</option>}
-                    {repositories.map((repo) => <option key={repo.repositoryId} value={repo.repositoryId}>{repo.name}</option>)}
-                  </select>
-                </label>
-              </div>
-
-              <GeneratedContentNotice />
-              {props.repositoryNotice}
+      {props.repositoryManagement}
+      <section className={styles.listSection} aria-labelledby="catch-list-title">
+        <div className={styles.listOverview}>
+          <div className={styles.listHeading}>
+            <div><h2 id="catch-list-title">내 Catch</h2><p>카드를 눌러 설명과 근거를 자세히 살펴보세요.</p></div>
+            <div className={styles.filters}>
+              <label className={styles.filter}>저장소
+                <select value={repositoryId} onChange={(event) => props.onRepositoryChange(event.target.value)}>
+                  <option value="">전체 저장소</option>
+                  {repositoryId && !selectedRepository && <option value={repositoryId}>저장소 이름 확인 전</option>}
+                  {repositories.map((repo) => <option key={repo.repositoryId} value={repo.repositoryId}>{repo.name}</option>)}
+                </select>
+              </label>
+              <label className={styles.filter}>공개 상태
+                <select value={visibility} onChange={(event) => props.onVisibilityChange(parseVisibilityFilter(event.target.value))}>
+                  <option value="">전체</option>
+                  <option value="PUBLIC">{visibilityLabels.PUBLIC}</option>
+                  <option value="PRIVATE">{visibilityLabels.PRIVATE}</option>
+                </select>
+              </label>
             </div>
-            {listState === "loading" ? (
-              <StateMessage title="Catch를 불러오고 있습니다">목록을 확인하고 있어요. 잠시만 기다려 주세요.</StateMessage>
-            ) : listState === "error" ? (
-              <StateMessage title="Catch 목록을 불러오지 못했습니다" retry={props.onRetryList}>
-                {props.listMessage ?? "조회에 문제가 생겼습니다. Catch가 없다는 뜻은 아닙니다."}
-              </StateMessage>
-            ) : props.dataMode !== "api" && repositoryId && !selectedRepository ? (
-              <StateMessage title="저장소를 찾을 수 없습니다">필터에서 다른 저장소를 선택해 주세요.</StateMessage>
-            ) : visibleItems.length === 0 ? (
-              <StateMessage title={repositoryId ? "이 저장소에서 표시할 Catch가 없습니다" : "아직 표시할 Catch가 없습니다"}>
-                저장소 연결과 분석 상태는 위쪽 연결 관리에서 확인할 수 있습니다.
-              </StateMessage>
-            ) : (
-              <>
-                <p className={styles.count} aria-live="polite">{props.dataMode === "api" ? "불러온 " : ""}{visibleItems.length}개의 Catch</p>
-                <ul className={styles.grid}>
-                  {visibleItems.map((item) => (
-                    <li key={item.catchId} className={styles.card}>
-                      <div className={styles.cardMeta}>
-                        <p className={styles.repository}>{repositories.find((repo) => repo.repositoryId === item.repositoryId)?.name ?? "저장소 정보 없음"}</p>
-                        <StatusBadges item={item} />
-                      </div>
-                      {item.title !== null && <h3><button className={styles.cardTitle} onClick={(event) => {
-                        returnFocusRef.current = event.currentTarget;
-                        props.onOpen(item.catchId);
-                      }}>{item.title}</button></h3>}
-                      <p className={styles.summary}>{item.workFacts[0] || "상세에서 근거를 확인해 주세요."}</p>
-                      <div className={styles.cardFooter}><span>근거 {item.evidence.length}개</span>
-                        {item.title === null ? <button className={styles.cardDetails} onClick={(event) => {
-                          returnFocusRef.current = event.currentTarget;
-                          props.onOpen(item.catchId);
-                        }}>상세 보기 ↗</button> : <span>상세 보기 ↗</span>}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {listState === "ready" && props.hasMore && <div className={styles.pagination}>
-              {props.moreState === "error" && <p role="alert">{props.listMessage ?? "다음 목록을 불러오지 못했습니다."}</p>}
-              <button className={styles.secondaryButton} disabled={props.moreState === "loading"} onClick={props.onLoadMore}>
-                {props.moreState === "loading" ? "불러오는 중…" : props.moreState === "error" ? "다음 목록 다시 불러오기" : "더 보기"}
-              </button>
-            </div>}
-          </section>
-        </>
-      )}
+          </div>
 
-      {selectedId && tab === "catch" && (
+          <GeneratedContentNotice />
+          {props.repositoryNotice}
+        </div>
+        {listState === "loading" ? (
+          <StateMessage title="Catch를 불러오고 있습니다">목록을 확인하고 있어요. 잠시만 기다려 주세요.</StateMessage>
+        ) : listState === "error" ? (
+          <StateMessage title="Catch 목록을 불러오지 못했습니다" retry={props.onRetryList}>
+            {props.listMessage ?? "조회에 문제가 생겼습니다. Catch가 없다는 뜻은 아닙니다."}
+          </StateMessage>
+        ) : props.dataMode !== "api" && repositoryId && !selectedRepository ? (
+          <StateMessage title="저장소를 찾을 수 없습니다">필터에서 다른 저장소를 선택해 주세요.</StateMessage>
+        ) : repositoryItems.length === 0 ? (
+          <StateMessage title={repositoryId ? "이 저장소에서 표시할 Catch가 없습니다" : "아직 표시할 Catch가 없습니다"}>
+            저장소 연결과 분석 상태는 위쪽 연결 관리에서 확인할 수 있습니다.
+          </StateMessage>
+        ) : visibility && visibleItems.length === 0 ? (
+          <StateMessage title={`${repositoryId ? "이 저장소에 " : ""}${emptyVisibilityTitles[visibility]}`}>
+            {props.hasMore ? "불러온 Catch 중에는 없습니다. 더 보기로 이어서 불러오거나 공개 상태를 전체로 바꿔 보세요."
+              : "공개 상태를 전체로 바꾸면 다른 Catch를 볼 수 있습니다."}
+          </StateMessage>
+        ) : (
+          <>
+            <p className={styles.count} aria-live="polite">{props.dataMode === "api" ? "불러온 " : ""}{visibleItems.length}개의 Catch</p>
+            <ul className={styles.grid}>
+              {visibleItems.map((item) => (
+                <li key={item.catchId} className={styles.card}>
+                  <div className={styles.cardMeta}>
+                    <p className={styles.repository}>{repositories.find((repo) => repo.repositoryId === item.repositoryId)?.name ?? "저장소 정보 없음"}</p>
+                    <StatusBadges item={item} />
+                  </div>
+                  {item.title !== null && <h3><button className={styles.cardTitle} onClick={(event) => {
+                    returnFocusRef.current = event.currentTarget;
+                    props.onOpen(item.catchId);
+                  }}>{item.title}</button></h3>}
+                  <p className={styles.summary}>{item.workFacts[0] || "상세에서 근거를 확인해 주세요."}</p>
+                  <div className={styles.cardFooter}><span>근거 {item.evidence.length}개</span>
+                    {item.title === null ? <button className={styles.cardDetails} onClick={(event) => {
+                      returnFocusRef.current = event.currentTarget;
+                      props.onOpen(item.catchId);
+                    }}>상세 보기 ↗</button> : <span>상세 보기 ↗</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {listState === "ready" && props.hasMore && <div className={styles.pagination}>
+          {props.moreState === "error" && <p role="alert">{props.listMessage ?? "다음 목록을 불러오지 못했습니다."}</p>}
+          <button className={styles.secondaryButton} disabled={props.moreState === "loading"} onClick={props.onLoadMore}>
+            {props.moreState === "loading" ? "불러오는 중…" : props.moreState === "error" ? "다음 목록 다시 불러오기" : "더 보기"}
+          </button>
+        </div>}
+      </section>
+
+      {selectedId && (
         <CatchDetail key={selectedId} item={selected} state={detailState}
           repositoryName={repositories.find((repo) => repo.repositoryId === selected?.repositoryId)?.name}
-          onClose={props.onClose} onRetry={props.onRetryDetail} dataMode={props.dataMode} errorMessage={props.detailMessage} actions={props.detailActions} />
+          onClose={props.onClose} onRetry={props.onRetryDetail} dataMode={props.dataMode} errorMessage={props.detailMessage} actions={props.detailActions}
+          descriptionEditor={props.descriptionEditor} />
       )}
     </main>
   );
 }
 
-function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage, actions }: {
+function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage, actions, descriptionEditor }: {
   dataMode?: "preview" | "api";
   errorMessage?: string;
   actions?: ReactNode;
+  descriptionEditor?: ReactNode;
   item?: CatchAsset;
   state: LoadState;
   repositoryName?: string;
@@ -259,6 +262,7 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
               </article>
             ))}
           </section>
+          {descriptionEditor}
           <section className={styles.detailSection}><h3>Catch 설명 초안</h3>
             {hasGeneratedDraft(item) ? <p className={styles.draft}>{item.draft.content}</p>
               : <p>{item.draft.status === "FAILED" ? "설명 초안을 생성하지 못했습니다. 위의 사실과 근거는 확인할 수 있습니다." : "생성된 설명 초안이 없습니다."}</p>}

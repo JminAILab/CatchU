@@ -7,6 +7,8 @@ export type ApiFailure = {
   details?: {
     violations?: { field: string; reason: string }[];
     existingRequestId?: string;
+    /** 발행 거부 409 `CONFIRMATION_REQUIRED`·`SOURCE_RESTRICTED`가 가리키는 Catch(U4 BR4.2). */
+    catchIds?: string[];
   };
 };
 
@@ -35,7 +37,7 @@ export async function readApiResponse(response: Response | Promise<Response>): P
     const failure: ApiFailure = { kind: "api-error", status, code: body.code, message: body.message };
     if (body.details !== undefined) {
       if (!isRecord(body.details)) return { kind: "lookup-failed", status, code: "LOOKUP_FAILED" };
-      const { violations, existingRequestId } = body.details;
+      const { violations, existingRequestId, catchIds } = body.details;
       if (violations !== undefined && (!Array.isArray(violations) || !violations.every((item) =>
         isRecord(item) && typeof item.field === "string" && typeof item.reason === "string"))) {
         return { kind: "lookup-failed", status, code: "LOOKUP_FAILED" };
@@ -43,9 +45,13 @@ export async function readApiResponse(response: Response | Promise<Response>): P
       if (existingRequestId !== undefined && (typeof existingRequestId !== "string" || existingRequestId.length === 0)) {
         return { kind: "lookup-failed", status, code: "LOOKUP_FAILED" };
       }
+      if (catchIds !== undefined && (!Array.isArray(catchIds) || !catchIds.every((id) => typeof id === "string" && id.length > 0))) {
+        return { kind: "lookup-failed", status, code: "LOOKUP_FAILED" };
+      }
       failure.details = {};
       if (Array.isArray(violations)) failure.details.violations = violations.map(({ field, reason }) => ({ field, reason }));
       if (typeof existingRequestId === "string") failure.details.existingRequestId = existingRequestId;
+      if (Array.isArray(catchIds)) failure.details.catchIds = [...catchIds];
     }
     return failure;
   } catch {

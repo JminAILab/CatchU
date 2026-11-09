@@ -1,6 +1,7 @@
 require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
+const { ensureRegistration } = require('./registered-analysis.cjs');
 const { readFileSync } = require('node:fs');
 const { resolve, join } = require('node:path');
 const { AnalysisRequest, AnalysisConsent, AnalysisAttempt } = require('../../dist/member-analysis/member-analysis.entity');
@@ -8,7 +9,7 @@ const { ResultApplicationRecord } = require('../../dist/result-application/resul
 const { resultFingerprint } = require('../../dist/analysis-receiver/analysis-receiver.service');
 const { WorkerMessageValidator } = require('../../dist/analysis-receiver/worker-message.validator');
 const fixtureDir = resolve(__dirname, '../../../worker/fixtures/m1-synthetic');
-const validator = new WorkerMessageValidator(resolve(__dirname, '../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design'));
+const validator = new WorkerMessageValidator(resolve(__dirname, '../../../api/contracts/repository-analysis'));
 function fillTemplate(value, context) {
   if (Array.isArray(value)) return value.map(v => fillTemplate(v, context));
   if (value !== null && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k,v]) => [k,fillTemplate(v,context)]));
@@ -30,7 +31,7 @@ async function prepare(db, file = 'results/succeeded-one-candidate.json', option
     resultId: result.resultId, payloadFingerprint: resultFingerprint(result), receivedAt: new Date().toISOString() };
   await db.transaction('READ COMMITTED', async m => {
     await m.query("INSERT INTO member_account VALUES ($1,$2,'ACTIVE') ON CONFLICT DO NOTHING", [context.memberId, 'fixture:' + context.memberId]);
-    await m.insert(AnalysisRequest, { requestId: context.requestId, memberId: context.memberId, repositoryId: context.repositoryId,
+    await m.insert(AnalysisRequest, { registrationId: await ensureRegistration(m, context), requestId: context.requestId, memberId: context.memberId, repositoryId: context.repositoryId,
       consentId: context.consentId, currentAttemptId: context.attemptId, submittedAt: new Date(), updatedAt: new Date() });
     await m.insert(AnalysisConsent, { consentId: context.consentId, requestId: context.requestId, memberId: context.memberId,
       repositoryId: context.repositoryId, accepted: true, noticeRevision: 'fixture', scopeRevision: context.scopeRevision,

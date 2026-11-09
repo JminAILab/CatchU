@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
-import { previewCatches } from "../src/features/assets/fixtures.ts";
+import { previewCatches, previewRepositories } from "../src/features/assets/fixtures.ts";
 
 const viewUrl = new URL("../src/features/assets/assets-view.tsx", import.meta.url);
 const cssUrl = new URL("../src/features/assets/assets.module.css", import.meta.url);
@@ -28,7 +28,7 @@ hooks.deregister();
 function detailMarkup(item) {
   const html = renderToStaticMarkup(createElement(AssetsView, {
     dataMode: "api", items: [item], detailItem: item, selectedId: item.catchId,
-    repositories: [], repositoryId: "", tab: "catch", listState: "ready", detailState: "ready",
+    repositories: [], repositoryId: "", listState: "ready", detailState: "ready",
     repositoryManagement: null,
   }));
   return html.match(/<dialog\b[\s\S]*?<\/dialog>/)?.[0] ?? assert.fail("Catch 상세가 렌더링되어야 한다");
@@ -64,3 +64,50 @@ for (const [name, content] of [["null", null], ["빈 문자열", ""], ["공백",
     });
   }
 }
+
+// #454 완료 기준: 공개 상태 걸러 보기, 저장소와 함께 쓰기, 맞는 Catch가 없을 때 안내.
+function listMarkup({ repositoryId = "", visibility = "", items = previewCatches, hasMore = false } = {}) {
+  return renderToStaticMarkup(createElement(AssetsView, {
+    items, repositories: previewRepositories, repositoryId, visibility, hasMore,
+    listState: "ready", detailState: "ready", selectedId: null, repositoryManagement: null,
+  }));
+}
+const shownCatchIds = (html) => previewCatches.filter((item) => item.title
+  ? html.includes(`>${item.title}</button>`) : html.includes("상세 보기 ↗</button>")).map((item) => item.catchId);
+
+for (const [visibility, repositoryId] of [["", ""], ["PUBLIC", ""], ["PRIVATE", ""], ["PUBLIC", "demo-web"], ["PRIVATE", "demo-api"]]) {
+  test(`공개 상태 ${visibility || "전체"} · 저장소 ${repositoryId || "전체"}: 두 조건에 맞는 Catch만 보인다`, () => {
+    const html = listMarkup({ visibility, repositoryId });
+    const expected = previewCatches.filter((item) => (!visibility || item.visibility === visibility)
+      && (!repositoryId || item.repositoryId === repositoryId)).map((item) => item.catchId);
+    assert.ok(expected.length > 0);
+    assert.deepEqual(shownCatchIds(html), expected);
+    assert.ok(html.includes(`${expected.length}개의 Catch`));
+  });
+}
+
+test("공개 상태 선택지는 전체·공개 설정·미공개 세 가지다", () => {
+  const select = listMarkup({ visibility: "PRIVATE" }).match(/공개 상태<select[\s\S]*?<\/select>/)?.[0] ?? assert.fail("공개 상태 선택이 있어야 한다");
+  assert.deepEqual([...select.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)</g)].map((match) => [match[1], match[2]]),
+    [["", "전체"], ["PUBLIC", "공개 설정"], ["PRIVATE", "미공개"]]);
+  assert.match(select, /<option value="PRIVATE" selected="">/);
+});
+
+test("고른 공개 상태에 맞는 Catch가 없으면 조건 안내를 보이고 저장소 없음 안내와 구분한다", () => {
+  const privateOnly = previewCatches.filter((item) => item.visibility === "PRIVATE");
+  const html = listMarkup({ visibility: "PUBLIC", items: privateOnly });
+  assert.ok(html.includes("<h3>공개 설정한 Catch가 없습니다</h3>"));
+  assert.ok(html.includes("공개 상태를 전체로 바꾸면 다른 Catch를 볼 수 있습니다."));
+  assert.doesNotMatch(html, /개의 Catch</);
+
+  const inRepository = listMarkup({ visibility: "PUBLIC", repositoryId: "demo-api", items: privateOnly });
+  assert.ok(inRepository.includes("<h3>이 저장소에 공개 설정한 Catch가 없습니다</h3>"));
+
+  const more = listMarkup({ visibility: "PUBLIC", items: privateOnly, hasMore: true });
+  assert.ok(more.includes("불러온 Catch 중에는 없습니다. 더 보기로 이어서 불러오거나 공개 상태를 전체로 바꿔 보세요."));
+  assert.ok(more.includes(">더 보기</button>"));
+
+  const emptyRepository = listMarkup({ visibility: "PRIVATE", repositoryId: "empty-repo" });
+  assert.ok(emptyRepository.includes("<h3>이 저장소에서 표시할 Catch가 없습니다</h3>"));
+  assert.doesNotMatch(emptyRepository, /미공개 Catch가 없습니다/);
+});

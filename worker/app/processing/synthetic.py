@@ -42,7 +42,7 @@ def synthetic_accepted_context() -> AcceptedContext:
 def synthetic_request(accepted: AcceptedContext) -> dict[str, Any]:
     """접수 맥락과 일치하는 합성 Request 메시지."""
     return {
-        "schemaVersion": "1",
+        "schemaVersion": "2",
         "messageId": f"request-{accepted.attempt_id}",
         "requestId": accepted.request_id,
         "attemptId": accepted.attempt_id,

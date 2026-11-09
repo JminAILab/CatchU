@@ -25,8 +25,8 @@ from app.request_context import ContextApiSettings, RequestContextClient
 LIVE_ACCEPTED = replace(ACCEPTED, source_mode="LIVE")
 ATTEMPT = LIVE_ACCEPTED.attempt_id
 GENERATION_KEY = "sk-ant-synthetic-generation-key-must-not-leak"
-# 운영과 같은 생성 마감: 총 상한 20분 − 결과 조합·전송 여유 60초.
-GENERATION_BUDGET = timedelta(minutes=20) - timedelta(seconds=60)
+# 운영과 같은 생성 마감: 총 상한 60분 − 결과 조합·전송 여유 60초.
+GENERATION_BUDGET = timedelta(minutes=60) - timedelta(seconds=60)
 
 # 열린 PR #3 하나에 본인 커밋 하나(app/alpha.py 한 줄): 후보 1건.
 ALPHA = commit(

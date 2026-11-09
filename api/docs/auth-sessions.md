@@ -6,7 +6,7 @@
 
 로그아웃은 현재 브라우저가 쿠키로 공유하는 세션만 종료한다. 다른 기기의 세션은 유지한다. 동일 브라우저 탭들은 같은 쿠키를 사용한다. Google·개발 로그인 모두 세션을 저장한 후 Access JWT와 Refresh 쿠키를 발급한다. JWT에는 회원 UUID와 세션 UUID가 들어가며, 공통 Guard는 서명·만료 검증 후 DB의 해당 세션·회원 ACTIVE 상태를 확인한다. 세션 ID 없는 기존 토큰은 재로그인이 필요하다. 인증 통과가 GitHub 연결·분석 동의·자원 소유권을 보장하지는 않는다.
 
-API 경로·응답·새 오류 코드는 [API 명세의 회원 API](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api), 저장 모델은 [api ERD](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)에 반영했으며 그쪽이 정본이다. 실제 화면 연결 완료를 뜻하지는 않는다. 화면 연결은 [#251](https://github.com/JminAILab/CatchU/issues/251), 기존 호출 기반은 [#106](https://github.com/JminAILab/CatchU/issues/106)과 맞춘다.
+API 경로·응답·새 오류 코드는 [API 명세의 회원 API](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api), 저장 모델은 [api ERD](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)에 반영했으며 그쪽이 정본이다. 화면 연결은 [#251](https://github.com/JminAILab/CatchU/issues/251)(2026-11-04 종료) 아래에서 공통 인증 [#286](https://github.com/JminAILab/CatchU/issues/286)과 로그인·인증 화면 [#287](https://github.com/JminAILab/CatchU/issues/287)이 통합 모드(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`)에 연결했다. 통합 모드의 제품 기본값은 `false`이며, 꺼진 기본 빌드는 기존 [#106](https://github.com/JminAILab/CatchU/issues/106) 호출을 그대로 쓴다. 개발 서버는 [#451](https://github.com/JminAILab/CatchU/pull/451)로 통합 모드를 켰고, 그 환경의 확인 기록은 [#251 11/3 댓글](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6594821109)이다. 제품 기본값 전환과 활성화 승인은 [#467](https://github.com/JminAILab/CatchU/issues/467)에서 따로 한다.
 
 서버 구현의 기존 검토 근거는 [PR #269의 제품 판본](https://github.com/JminAILab/CatchU/commit/a7e9e58d11c1617625d50a5a5809996bf72c3fab)이다. 최신 dev 통합 판본·직접 회귀 검사·CI는 [PR #269 검사 기록](https://github.com/JminAILab/CatchU/pull/269)에서 구분한다. 아래 연결 합의 정리는 서버 정책·응답 계약을 변경하지 않는다.
 
@@ -18,7 +18,14 @@ API 경로·응답·새 오류 코드는 [API 명세의 회원 API](../../aidlc/
 
 공통 인증·탭 내부/탭 간 갱신 제어·`useMemberLookup`·`MemberGuard` 연결은 C 담당, Google 버튼·콜백·재인증 안내와 `MemberShell`의 미저장 확인·공통 로그아웃 호출·진행/실패/불명 표시는 A 담당 범위로 합의했다. 두 작업을 합친 뒤 실제 Google 로그인부터 로그아웃까지 통합 브라우저 검증·결과 기록은 C 담당이 맡는다. 세부 진행 상태는 #251과 하위 작업에서 확인한다.
 
-`failed.reason` 실제 값, 중복 호출·늦은 응답 처리 분담, `unknown` 재요청 조건·안내 문구와 공동 파일의 변경 위치·반영 순서는 연결 전에 맞출 사항이다. 실패·불명은 완료로 표시하지 않고 화면·입력을 유지하며, 종료 확인 중 갱신·보호 동작을 보류한다. `unknown`을 인증 유효로 확정하지 않는다. 접점 합의 완료가 실제 화면 구현·브라우저 검증 완료를 뜻하지 않는다.
+연결 전에 맞출 사항으로 남겼던 네 가지는 [#251 1~9번 합의](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6139957700)(2026-10-13)로 정했고, 현재 구현도 같다.
+
+- `failed.reason`: `attempt-invalid`·`unavailable`·`invalid-request`·`server`·`network`·`invalid-response`·`superseded` 7종이다(`web/src/lib/auth-google.ts`). `attempt-invalid`는 원인을 단정하지 않고 로그인 실패로 안내하며, `superseded`는 안내·이동 없이 무시한다.
+- 중복 호출·늦은 응답: 같은 시도·같은 입력의 결과만 공유하고, 로그아웃·새 로그인·회원 전환 뒤에는 이전 성공 결과를 다시 쓰지 않는다. Google 완료·갱신·로그아웃 사이의 경쟁 제어와 쿠키 반영은 #286 공통 인증이 맡고, 화면은 무효가 된 결과로 안내·이동하지 않는다.
+- `unknown` 재요청: 자동으로 다시 보내지 않고, 새 로그인이 시작되지 않았고 공통 인증이 허용할 때만 [다시 시도]를 보인다. 문구는 [로그인·인증 화면 「안내 문구」](../../web/src/features/auth-screens/README.md#안내-문구)의 로그아웃 결과 불명 두 줄이다.
+- 공동 파일: 회원 가드·로그인 화면·콜백·회원 셸은 6~9번 분담대로 나눴고, 통합 모드 연결은 `session-*` 컴포넌트에 있다([「담당 경계」](../../web/src/features/auth-screens/README.md#담당-경계)·[「연결」](../../web/src/features/auth-screens/README.md#연결통합-시험-전환을-켰을-때)). 공통 인증 [PR #308](https://github.com/JminAILab/CatchU/pull/308)이 먼저, 화면 연결 [PR #415](https://github.com/JminAILab/CatchU/pull/415)가 그 뒤에 병합됐다(2026-10-27).
+
+실패·불명은 완료로 표시하지 않고 화면·입력을 유지하며, 종료 확인 중 갱신·보호 동작을 보류한다. `unknown`을 인증 유효로 확정하지 않는다.
 
 ## 저장과 트랜잭션
 
@@ -39,32 +46,37 @@ API 경로·응답·새 오류 코드는 [API 명세의 회원 API](../../aidlc/
 
 로그아웃은 현재 또는 사용된 Refresh로 같은 세션을 찾아 폐기하므로 갱신/로그아웃 경쟁이나 교체 응답 유실 뒤에도 해당 세션을 종료할 수 있다. DB 커밋 후 응답만 잃었다면 같은 쿠키로 로그아웃을 반복해 204와 제거 쿠키를 받는다. DB 실패에는 재시도 여부를 사용자/화면에서 판단하며 서버가 성공으로 보정하지 않는다.
 
-[팀장 PR 검토](https://github.com/JminAILab/CatchU/pull/269#pullrequestreview-5483416011)는 현재 교체·재사용 폐기 방식을 유지할 수 있게 하면서도 **정상 동시 API 호출·다중 탭·브라우저 탭 복원에서는 로그인이 유지돼야 한다**고 정했다. 같은 이전 Refresh를 동시에 보내는 위 서버 시험은 재사용 거부의 검사이며 정상 다중 탭 사용의 로그인 유지 증거가 아니다. #251의 공통 인증에서 탭 내부의 갱신 중복 방지와 탭 사이의 순서 제어·결과 반영을 연결한다. web 처리로 기준을 충족하지 못하면 서버 보완(유예 등)을 함께 검토할 수 있으나 이번 문서로 채택하지 않는다.
+[팀장 PR 검토](https://github.com/JminAILab/CatchU/pull/269#pullrequestreview-5483416011)는 현재 교체·재사용 폐기 방식을 유지할 수 있게 하면서도 **정상 동시 API 호출·다중 탭·브라우저 탭 복원에서는 로그인이 유지돼야 한다**고 정했다. 같은 이전 Refresh를 동시에 보내는 위 서버 시험은 재사용 거부의 검사이며 정상 다중 탭 사용의 로그인 유지 증거가 아니다. #286 공통 인증이 통합 모드에서 탭 안의 갱신 중복 방지와 탭 사이의 순서 제어·결과 반영을 연결했다. 탭 사이 순서는 Web Locks를 지원하는 브라우저에서만 지키고, 지원하지 않는 환경은 탭 안 잠금만 쓴다(T4, [공통 인증 안내](../../web/src/features/auth-session/README.md)). #286은 완료 기준 「새로고침·동시 요청·여러 탭·탭 복원에서 세션이 불필요하게 끊기지 않는다」를 [10/29 검증](https://github.com/JminAILab/CatchU/issues/286#issuecomment-6492087127)과 [11/3 개발 서버 확인](https://github.com/JminAILab/CatchU/issues/286#issuecomment-6595012881)을 근거로 체크한 뒤 2026-11-03에 닫혔다. 10/29는 dev `b52ea460`의 로컬 검증 빌드에 통합 모드를 켜고, 탭 복원은 Chrome에서, 동시 새로고침·동시 401은 앱 내장 Chromium 탭 2개로 확인했다(Access 만료 401 일부는 대역). 11/3은 개발 서버(`catchu.dev`, main `9805502` 배포 기록 기준)에서 앱 내장 Chromium으로 새로고침·두 번째 탭 복원을 확인했다. 서버 보완(유예 등)은 채택하지 않았다.
 
 이번 검토에서 확정된 #250 서버 수정 요구는 발견하지 못했다. 앞으로도 서버 보완이 불필요하다고 확정한 것은 아니다.
 
 [화면 담당 의견](https://github.com/JminAILab/CatchU/issues/250#issuecomment-6110641249)과 [API 담당의 최신 답변](https://github.com/JminAILab/CatchU/issues/250#issuecomment-6115494725)은 입력 보존·재인증·늦은 응답 처리의 연결 기준을 맞춘 기록이다. 서버 갱신 완료 후 새 쿠키 반영 전에 탭 이동·종료 등으로 응답을 잃은 경우도 수용한 **갱신 응답 유실 후 재인증** 한계로 이해하고, 이전 Refresh를 반복 전송하는 대신 입력을 보존해 안내한다. 정상 사용의 중복 갱신을 이 한계에 포함하지 않는다. 실제 브라우저 검증이나 PR 승인 기록으로 확대하지 않는다.
+
+[API 담당 답변](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6567325554)에 따라 Google 로그인 완료 응답을 받지 못해 남은 세션에도 기존 만료 규칙을 적용한다. 정상 갱신이 없으면 생성 24시간 뒤 만료로 판정한다. 응답 미수신을 이유로 따로 폐기하지 않는다. 응답 본문의 Access 토큰과 응답의 Refresh 쿠키를 모두 받지 못한 브라우저는 그 세션을 쓸 수 없다. Refresh 쿠키를 받았을 수 있는 경우는 위 세션을 사용할 수 없다는 설명에 포함하지 않으며, 이후 처리는 세션 유효성·공통 인증 규칙과 web [「이 탭이 반영하지 않은 로그인」](../../web/src/features/auth-session/README.md)을 따른다. DB에는 Refresh 해시만 저장하며, 현재 회원별 세션 개수 제한이 없어 남은 세션 수 때문에 새 로그인을 거부하지 않는다. 만료 판정과 DB 행 삭제는 별개이며, 정기 삭제는 [저장과 트랜잭션](#저장과-트랜잭션)에 적은 대로 범위 밖이다.
 
 오류 응답과 처리 결과 불명은 다음과 같이 구분한다.
 
 | 확인한 결과 | 현재 구현·시험의 의미 | 화면 연결 기준 |
 |---|---|---|
 | 정확한 Origin·입력 거부 응답(403·400) | 갱신·폐기 전에 거부하며 쿠키와 세션을 변경하지 않는다 | 인증 만료와 섞지 않고 설정·입력 오류를 처리한다 |
-| API 트랜잭션에서 롤백이 확인되는 DB 조회·저장·서명·커밋 실패의 500 | 성공·새 쿠키·제거 쿠키를 보내지 않는다. 저장 중 제약 실패·지연 커밋 실패 시험은 이전 Refresh와 세션 보존을 확인한다 | 롤백 보장 오류의 재시도는 별도로 판단한다. 구체 허용 조건·횟수·공통 호출 분기는 연결 검토 사항이다 |
+| API 트랜잭션에서 롤백이 확인되는 DB 조회·저장·서명·커밋 실패의 500 | 성공·새 쿠키·제거 쿠키를 보내지 않는다. 저장 중 제약 실패·지연 커밋 실패 시험은 이전 Refresh와 세션 보존을 확인한다 | [T2 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6182257830): 통합 모드에서 갱신 요청이 HTTP 500 `INTERNAL_ERROR`를 받으면, 다시 보낼 때에도 그 갱신이 유효할 때(그사이 로그아웃·새 로그인을 시작하지 않았을 때)만 탭 간 잠금 안에서 한 번 더 보낸다. Web Locks를 못 쓰는 환경은 탭 안 잠금만 쓴다(T4). 두 번째 응답은 200이면 발급, 401 `AUTH_INVALID`면 세션 종료, 그 밖은 결과 불명이다. 로그인된 탭은 화면·입력을 둔 채 재인증을 안내하고, 결과 불명이면 이전 Refresh를 다시 보내지 않는다. 복원 중이면 세션 종료는 비로그인, 결과 불명은 [다시 로그인]만 둔다(`web/src/lib/auth-refresh.ts`, [공통 인증 안내](../../web/src/features/auth-session/README.md)). 갱신 외의 요청은 500 뒤 자동으로 다시 보내지 않으며, 공통 호출의 재전송은 아래 문단을 따른다. 롤백 확인 500과 결과 불명을 구분하는 계약은 10월 범위에 넣지 않는다 |
 | Refresh 재사용 등의 401 | 재사용은 **폐기를 커밋한 뒤** 거부한다. 모든 오류가 롤백인 것은 아니다 | 이전 Refresh를 반복하지 않고 재인증 처리한다 |
 | 응답을 받지 못함·갱신 성공 결과를 확인할 수 없음 | 서버 커밋과 브라우저 쿠키 반영 여부를 알 수 없다 | 롤백으로 추정하지 않는다. 입력 보존·재인증 안내를 적용하며 정상 다중 탭 사용과 구분한다 |
 
-상태 500만으로 프록시·통신 단절·DB 커밋 결과 불명까지 롤백을 보장한다고 확대하지 않는다. 현재 시험은 오류를 주입해 실제 롤백을 확인한 조건의 증거다. 변경 요청(분석·생성 등)은 갱신·재인증 후 자동 재전송하지 않는다.
+상태 500만으로 프록시·통신 단절·DB 커밋 결과 불명까지 롤백을 보장한다고 확대하지 않는다. 현재 시험은 오류를 주입해 실제 롤백을 확인한 조건의 증거다. 변경 요청(분석·생성 등)은 갱신·재인증 후 자동 재전송하지 않는다. 보호 API의 GET 조회는 통합 모드에서 회원 인증 401(`AUTH_REQUIRED`·`AUTH_INVALID`) 뒤 갱신에 성공하면(다른 호출이 이미 갱신한 경우 포함) 한 번 다시 보낼 수 있다. 다시 보낸 조회도 401이면 더 갱신하지 않는다(`web/src/lib/auth-api.ts`).
 
 로그아웃 실패·응답 유실은 완료로 표시하지 않고 화면·입력을 유지하며, 종료 확인 중에는 갱신·보호 동작을 보류한다. 같은 로그인 세션의 Access 갱신은 화면·작성 중 입력을 보존한다. 로그아웃·새 로그인·회원 전환 이후 이전 갱신·조회 응답이 로그인이나 이전 자료를 복원하지 않도록 처리한다. 로그아웃이 먼저 커밋했는데 늦은 갱신 응답이 쿠키를 다시 설정해도 서버 세션은 폐기돼 사용할 수 없다. 서버의 폐기 유지가 web의 늦은 응답 무시·입력 보존을 대신하지는 않는다.
 
-## 회원·로그인 세션 식별의 미결
+## 회원·로그인 세션 식별 — #251 T3 결정
 
-web 인증 세대와 탭 간 전환 알림을 **우선 검토할 방향**으로 기록한다. 같은 로그인 세션의 Access 갱신, 로그아웃 후 같은 회원의 새 로그인, 다른 회원으로의 전환을 구분해야 한다. 단순 갱신은 입력을 유지하고, 새 로그인은 이전 요청·늦은 응답과 구분하며, 회원 전환은 이전 회원 자료·요청 참조·생성 요청 키를 재사용하지 않는다.
+같은 로그인 세션의 Access 갱신, 로그아웃 후 같은 회원의 새 로그인, 다른 회원으로의 전환을 구분해야 한다. 단순 갱신은 입력을 유지하고, 새 로그인은 이전 요청·늦은 응답과 구분하며, 회원 전환은 이전 회원 자료·요청 참조·생성 요청 키를 재사용하지 않는다.
 
 `GET /v1/me`의 회원 ID로 다른 회원 여부는 확인할 수 있지만 같은 회원의 새 로그인은 식별할 수 없다. 회원 조회 실패를 같은 회원으로 간주하지 않는다. 탭 간 알림을 놓친 탭과 복원된 탭도 현재 로그인 상태를 확인할 수 있어야 한다. 새로고침 후 세션 확인이 끝나기 전에는 로그인 화면 이동을 보류한다.
 
-현재 로그인·갱신 응답에는 web용 세션 식별 필드가 따로 없다. JWT 안의 `sid`는 서버 내부 형식이며 web 연결 계약으로 직접 해석하도록 채택하지 않는다. 인증 세대·탭 알림으로 위 조건을 처리할 수 있는지 확인하고, 부족하면 서버가 제공할 식별 정보·응답 계약을 API와 화면 담당자가 함께 정한다. 추가 식별 정보의 불필요·필요 여부와 형식은 미결이다.
+[팀장 T3 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6182257830)(2026-10-15)에 따라 서버 식별 필드는 두지 않는다. 로그인·갱신 응답에는 web용 세션 식별 필드가 없다. 로그인에 성공한 탭이 무작위 로그인 표식(토큰·회원 정보 아님)을 `localStorage`에 쓰고, 각 탭은 갱신·회원 조회 요청 전과 응답 반영 직전, 탭이 다시 보일 때 자기가 아는 표식과 비교한다. 표식이 다르거나 읽을 수 없으면 같은 회원이어도 새 로그인으로 처리한다. 다른 로그인의 자료가 남는 것보다 입력을 잃는 쪽을 택한 것이며, `localStorage`를 쓸 수 없는 환경은 다중 탭 보장 범위 밖이다. JWT 안의 `sid`는 서버 내부 형식이라 web이 읽지 않는다. 이 방식이 브라우저 검증에서 막히면 서버 필드를 다시 정한다. 통합 모드에서만 적용되며, 구현과 한계는 [공통 인증 안내](../../web/src/features/auth-session/README.md)를 따른다.
+
+- [#286 10/30 통합 검증](https://github.com/JminAILab/CatchU/issues/286#issuecomment-6519527083): dev `026606d`에 통합 모드를 켠 검증 실행에서 실제 Chrome 탭을 오가며 로그인 변경 감지를 확인해 통과했다. 로그인 표식 변경은 합성이었다. 판본·환경은 [#251 10/30 기록](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6519507368)에 있다.
+- [#251 11/2 실제 Google 검증](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6571204101): 판본 `600f8019`의 로컬 검증 빌드에 통합 모드를 켜고 실제 Chrome에서 확인했다. 로그인된 탭이 다른 계정 전환과 같은 계정 재로그인을 감지해, 탭이 다시 보일 때 한 번 복원했다. 작성 중 입력은 위 선택대로 사라졌다. 계정 전환 중 원인을 확인하지 못한 갱신 401이 1건 있었다.
 
 ## API 연결안
 
@@ -85,7 +97,10 @@ Origin 검사를 통과한 로그아웃은 쿠키 없음·알 수 없는/잘못�
 - 운영: `NODE_ENV=production`, `AUTH_WEB_ORIGIN=https://정확한-web-출처`, `CORS_ALLOWED_ORIGINS`는 공란. web/API 동일 출처에 API `/v1`을 제공한다. HTTPS 쿠키는 항상 `Secure`이다. Wildcard·끝 슬래시·null·Origin 누락은 허용하지 않는다. 요청 Host나 전달 헤더로 허용 Origin을 만들지 않는다.
 - 개발·test: `AUTH_WEB_ORIGIN` 기본은 `http://localhost:3000`. HTTP는 localhost·127.0.0.1·::1 loopback에만 허용하며 이때만 Secure를 생략한다. 같은 호스트·스킴으로 web/API를 열어야 한다. `localhost`와 `127.0.0.1`을 섞지 않는다. 다른 포트에서 호출하면 정확한 개발 CORS 출처와 `credentials: "include"`가 필요하다. 허용된 개발 CORS는 credentials를 지원하지만 갱신·로그아웃은 별도의 정확한 AUTH_WEB_ORIGIN 검사도 수행한다.
 - `AUTH_ACCESS_TOKEN_TTL_SECONDS=900`은 필수다. 15분 정책과 다른 값이면 기동 실패한다. 세션 7일·24시간은 사용자 결정의 고정값이며 임의로 줄이거나 연장하는 환경설정은 두지 않는다.
-- Strict는 OAuth 복귀 문제를 아직 확인하지 않아 그대로 적용한다. 실제 브라우저에서 문제가 확인되면 근거와 함께 팀장이 허용한 Lax 전환을 검토한다. 현재 구현에는 자동 전환이나 None 완화가 없다.
+- Strict는 그대로 적용한다. 실제 브라우저에서 문제가 확인되면 근거와 함께 팀장이 허용한 Lax 전환을 검토한다. 현재 구현에는 자동 전환이나 None 완화가 없다. OAuth 복귀와 관련해 확인한 범위는 다음과 같다.
+  - 실제 Google: [#251 11/2 실제 Google 검증](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6571204101)(판본 `600f8019`의 로컬 검증 빌드에 통합 모드를 켜고 실제 Chrome)에서 로그인·계정 전환이 동작했다. 계정 전환 중 원인을 확인하지 못한 갱신 401이 1건 있었다. [#286 11/3 확인](https://github.com/JminAILab/CatchU/issues/286#issuecomment-6595012881)에서는 개발 서버(`catchu.dev`, main `9805502` 배포 기록 기준)에서 실제 Google 로그인 뒤 앱 내장 Chromium에 저장된 Refresh 쿠키를 직접 확인했고 `SameSite=Strict`였다.
+  - GitHub 대역 왕복·세션 복원: [PR #409](https://github.com/JminAILab/CatchU/pull/409) 「확인」의 대역 왕복은 head `e8e0960f`의 통합 모드를 켠 빌드를 헤드리스 Chrome 156으로 확인했다. GitHub 인증 화면·토큰 교환·계정 조회는 대역이며, 브라우저에는 github.com에서 돌아오는 이동으로 보인다. 이 경로에서 다른 사이트에서 돌아온 직후 `SameSite=Strict` Refresh 쿠키로 세션이 복원됐다. PR #409는 Chrome 밖 브라우저를 보지 않았다.
+  - 실제 GitHub 승인 전체 왕복: 실제 승인·토큰 교환을 포함한 전체 왕복은 [#253 합의](https://github.com/JminAILab/CatchU/issues/253#issuecomment-6484686338)로 추가 검증을 생략해 미검증이다.
 
 설정 전체 목록은 [환경변수](environment.md), 설치·DB 준비는 [README](../README.md)를 따른다. 기존 .env·전역 설정·다른 DB는 변경하지 않는다.
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createAnalysisRequestApi } from '../src/features/analysis-request/analysis-request-api.ts';
 import { createAnalysisRequestStore, TEXT } from '../src/features/analysis-request/analysis-request-store.ts';
+import { readAnalysis } from '../src/features/repository-management/repository-api.ts';
 
 // 실패 재요청(#154)의 합성 응답 단위 시험이다. 실제 HTTP·DB·접수가 아니다.
 const repo = (id, revision = `scope-${id}`) => ({
@@ -13,6 +14,7 @@ const status = (repositoryId, overrides = {}) => ({
   submittedAt: '2026-10-23T01:00:00Z', updatedAt: '2026-10-23T01:00:00Z',
   requestState: 'ACCEPTED', lifecycle: 'ACTIVE', processing: 'QUEUED', application: 'NOT_READY', sourceMode: 'MOCK',
   eligibleCandidateCount: 0, registeredCatchIds: [], ownerResultsReady: false,
+  ownCommitObservation: 'UNKNOWN', observedOwnCommitCount: null, collectionLimitNotes: [],
   retry: { allowed: false, reason: 'IN_PROGRESS' }, failures: [], ...overrides,
 });
 const http = (code, data) => ({ kind: 'success', status: code, data });
@@ -69,6 +71,22 @@ test('허용된 실패 재요청: 현재 고지·범위 판본의 새 동의와 
   assert.equal(snapshot.pendingRetry, false);
   assert.equal(snapshot.message.text, TEXT.retryAccepted);
   assert.deepEqual(h.watched, [TEXT.accepted, TEXT.retryAccepted]);
+});
+
+test('완료 결과와 기존 Catch에 관계없이 서버가 허용한 재분석은 현재 고지·최신 요청 참조로만 보낸다', async () => {
+  for (const processing of ['SUCCEEDED', 'EMPTY', 'PARTIAL_FAILED', 'FAILED', 'UNCERTAIN']) {
+    const h = harness({ notice: http(200, { noticeRevision: 'catchu-real-analysis-notice-v2', text: '확정 고지 합성 대역' }) });
+    await h.store.open();
+    const target = readAnalysis(status('r1', { requestId: 'latest', lifecycle: 'CLOSED', processing,
+      application: 'APPLIED', registeredCatchIds: ['existing-catch'], ownerResultsReady: true,
+      retry: { allowed: true, reason: 'ANALYSIS_FINISHED' } }));
+    assert.equal(h.store.canRetry(target), true, processing);
+    assert.equal(h.posts.length, 0, '허용 응답만으로 자동 접수하지 않는다');
+    await h.store.retry(target);
+    assert.deepEqual(h.posts[0].body, { repositoryId: 'r1', retryOfRequestId: 'latest',
+      consent: { accepted: true, noticeRevision: 'catchu-real-analysis-notice-v2', scopeRevision: 'scope-r1' } });
+    assert.deepEqual(target.registeredCatchIds, ['existing-catch']);
+  }
 });
 
 test('서버가 retry.allowed=false로 준 요청·목록에 없는 저장소·고지 미준비면 재요청 본문을 만들지 않고 POST하지 않는다', async () => {

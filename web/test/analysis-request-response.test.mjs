@@ -10,6 +10,7 @@ const status = () => ({
   submittedAt: '2026-10-19T00:00:00Z', updatedAt: '2026-10-19T09:00:00+09:00',
   requestState: 'ACCEPTED', lifecycle: 'ACTIVE', processing: 'QUEUED', application: 'NOT_READY', sourceMode: 'MOCK',
   eligibleCandidateCount: 0, registeredCatchIds: [], ownerResultsReady: false,
+  ownCommitObservation: 'UNKNOWN', observedOwnCommitCount: null, collectionLimitNotes: [],
   retry: { allowed: false, reason: 'IN_PROGRESS' }, failures: [],
 });
 const failure = () => ({ stage: 'COLLECTION', code: 'FAILED', message: '합성 실패', candidateId: 'candidate-1' });
@@ -88,7 +89,7 @@ test('계약의 상태 enum·실패 단계·재요청 사유 전체를 읽고 �
   for (const stage of ['COLLECTION', 'ANALYSIS', 'DRAFT', 'REFLECTION', 'APPLICATION', 'DISPATCH']) {
     assert.equal((await create(200, { ...status(), failures: [{ stage, code: '', message: '' }] })).kind, 'success', stage);
   }
-  for (const reason of ['FAILURE_WITHOUT_RESULTS', 'IN_PROGRESS', 'RESULTS_EXIST', 'NOT_FAILED', 'EXECUTION_UNCERTAIN', 'APPLICATION_UNRESOLVED', 'REANALYSIS_DEFERRED']) {
+  for (const reason of ['FAILURE_WITHOUT_RESULTS', 'ANALYSIS_FINISHED', 'IN_PROGRESS', 'RESULTS_EXIST', 'NOT_FAILED', 'EXECUTION_UNCERTAIN', 'APPLICATION_UNRESOLVED', 'REANALYSIS_DEFERRED']) {
     assert.equal((await create(200, { ...status(), retry: { allowed: true, reason } })).kind, 'success', reason);
   }
 });
