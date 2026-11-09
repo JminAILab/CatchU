@@ -92,14 +92,10 @@ _QUESTION_TYPE: Final = {
     "type": "string",
     "enum": ["BACKGROUND", "ALTERNATIVES", "VERIFICATION"],
 }
+# 생각해 볼 질문은 AI가 쓴 글이다(#487). 줄·파일을 가리키지 않고, AI 쪽 켜짐과 관계없이 같은 모양이다.
 _QUESTIONS: Final = {
     "type": "array",
-    "items": {
-        "anyOf": [
-            _object({"type": _QUESTION_TYPE, **_LINE_PICK}),
-            _object({"type": _QUESTION_TYPE, "file": _STR}),
-        ]
-    },
+    "items": _object({"type": _QUESTION_TYPE, "text": _STR}),
 }
 # 호출 종류별 응답 모양(구조화된 출력). 생성 흐름이 받는 키·종류 값과 같다(response 모듈, 지시문). 배열 개수
 # 제약은 구조화된 출력이 받지 않아 넣지 않고, 개수·지목한 줄·이름이 맞는지는 생성 흐름이 확인한다. 스키마가
@@ -136,8 +132,8 @@ OUTPUT_SCHEMAS: Final[Mapping[Purpose, dict[str, object]]] = {
     "REWRITE_TITLE": _object({"title": _TITLE}),
 }
 # AI 쪽이 켜졌을 때의 생성 응답 모양(CR3 BR3.1·BR5.1). 설명 조각(fragments) 대신 AI가 쓴 제목 후보와 설명
-# 문장을 받고, 조각 제목 대상(title)과 질문은 그대로 받는다. 후보·문장마다 근거 줄 id 목록을 가리킨다. 고쳐
-# 쓰기는 AI 쪽에서 부르지 않지만 모양은 같은 표에 둔다.
+# 문장을 받고, 조각 제목 대상(title)과 질문은 AI 쪽이 꺼졌을 때와 같은 모양으로 받는다. 후보·문장마다 근거 줄
+# id 목록을 가리킨다. 고쳐 쓰기는 AI 쪽에서 부르지 않지만 모양은 같은 표에 둔다.
 _WRITTEN: Final = {
     "type": "array",
     "items": _object({"text": _STR, "lines": {"type": "array", "items": _STR}}),

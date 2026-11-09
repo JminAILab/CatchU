@@ -3,14 +3,15 @@
 전체를 해석할 수 없는 응답(크기 초과, JSON이 아님, 최상위가 객체가 아님, 같은 키가 겹침)은 전체 호출
 실패다. 그 밖의 문제는 해당 부분에만 적용한다(2026-10-12 결정 10·12).
 
-- 설명(fragments)·질문(questions): 항목마다 판정해 맞는 항목만 쓰고 틀린 항목은 버린다(2026-10-19 팀장
-  결정). 목록이 아니거나 비었거나 맞는 항목이 하나도 없으면 그 부분 전체 실패다. 상한을 넘으면 맞는 항목을
-  앞에서부터 상한까지 쓰고, 같은 종류 질문은 처음 것만 쓰며, 조각 종류가 지목한 줄의 종류와 다르면 실제 줄
-  종류로 쓴다. 문장을 만들 수 없는 항목(문장 틀이 없는 파일 상태, 파일 이름으로 줄여도 너무 긴 질문)은 상한·
-  종류를 세기 전에 버린다. 문장은 코드가 확인한 줄·이름으로만 만들므로 모양을 이렇게 풀어도 틀린 문장은 나오지
-  않는다.
-  지목한 줄·파일이 보낸 자료에 있는지, 가린 줄이 아닌지, 이름이 그 줄에 식별자 경계로 있는지(사실 검사)는
-  그대로 본다.
+- 설명(fragments): 항목마다 판정해 맞는 항목만 쓰고 틀린 항목은 버린다(2026-10-19 팀장 결정). 목록이
+  아니거나 비었거나 맞는 항목이 하나도 없으면 그 부분 전체 실패다. 상한을 넘으면 맞는 항목을 앞에서부터
+  상한까지 쓰고, 조각 종류가 지목한 줄의 종류와 다르면 실제 줄 종류로 쓴다. 문장을 만들 수 없는 항목(문장 틀이
+  없는 파일 상태)은 상한을 세기 전에 버린다. 문장은 코드가 확인한 줄·이름으로만 만들므로 모양을 이렇게 풀어도
+  틀린 문장은 나오지 않는다. 지목한 줄·파일이 보낸 자료에 있는지, 가린 줄이 아닌지, 이름이 그 줄에 식별자
+  경계로 있는지(사실 검사)는 그대로 본다.
+- 질문(questions): AI가 작업 전체를 묻는 질문 글을 직접 쓴다(#487, 2026-11-08 팀장 결정). 본인만 보는 칸이라
+  판정·기계 대조는 붙이지 않는다. 모양이 틀리거나 글자 상한을 넘거나 가리기 검사(`app.redact.mask_text`)에
+  걸리는 질문은 버리고, 같은 종류 질문은 처음 것만, 상한까지 쓴다. 쓸 질문이 하나도 없으면 질문 부분 실패다.
 - 제목(title): 칸 누락·모양 위반·40자 초과는 형식 위반이라 고쳐 쓰기 대상이다. 확인 실패는 null이다.
 - 최상위의 모르는 키는 어느 부분에도 쓰지 않고 판정에서 무시한다(건수만 운영 로그에 남긴다). 모르는
   키 하나로 설명·질문 전체를 실패로 넓히지 않기 위해서다. 항목 안의 모르는 키는 그 항목의 형식 위반이다.
@@ -23,6 +24,7 @@ from typing import Any, Literal
 
 from app.generation.names import NameMatch, name_match, valid_name
 from app.generation.request import PreparedFile, PreparedLine
+from app.redact import mask_text
 
 FragmentKind = Literal["ADDED_LINE_WITH", "REMOVED_LINE_WITH", "FILE_STATUS"]
 QuestionType = Literal["BACKGROUND", "ALTERNATIVES", "VERIFICATION"]
@@ -108,8 +110,10 @@ class Fragment:
 
 @dataclass(frozen=True)
 class Question:
+    """AI가 쓴 질문 하나. 줄·파일을 가리키지 않고 작업 전체를 묻는다(#487)."""
+
     type: QuestionType
-    ref: Ref
+    text: str
 
 
 PartProblem = Literal["RULE_VIOLATION", "UNVERIFIED"]
@@ -132,7 +136,8 @@ PartReason = (
         "COUNT",  # 목록이 아니거나 비었음, 또는 상한 뒤라 버린 맞는 항목
         "ITEM_SHAPE",  # 항목 모양·종류 값·키 위반
         "DUPLICATE_TYPE",  # 앞에 같은 종류 질문이 있음
-        "TOO_LONG",  # 파일 이름으로 줄여도 질문이 글자 상한을 넘음
+        "TOO_LONG",  # 질문 글이 글자 상한을 넘음
+        "MASKED_TEXT",  # 질문 글이 가리기 검사에 걸림
     ]
 )
 
@@ -206,12 +211,11 @@ def _keys(item: Mapping[str, Any], *expected: str) -> bool:
 
 
 _ItemMiss = tuple[PartProblem, PartReason]
-# 확인된 항목으로 문장을 만들 수 없는 원인. 만들 수 있으면 None을 돌려주는 판정은 문장 틀을 가진 쪽(render)이
-# 넘긴다. 상한·같은 종류 질문을 세기 전에 보아야 문장이 되는 뒤 항목을 잃지 않는다.
-SentenceMiss = Literal["NO_TEMPLATE", "TOO_LONG"]
+# 확인된 조각으로 문장을 만들 수 없는 원인. 만들 수 있으면 None을 돌려주는 판정은 문장 틀을 가진 쪽(render)이
+# 넘긴다. 상한을 세기 전에 보아야 문장이 되는 뒤 조각을 잃지 않는다.
+SentenceMiss = Literal["NO_TEMPLATE"]
 _SENTENCE_PROBLEMS: dict[SentenceMiss, PartProblem] = {
     "NO_TEMPLATE": "UNVERIFIED",
-    "TOO_LONG": "RULE_VIOLATION",
 }
 
 
@@ -289,34 +293,37 @@ def fragments(
     return PartVerdict(tuple(verified), notes=tuple(notes))
 
 
-def _question(item: object, sent: Sent, max_name: int) -> Question | _ItemMiss:
-    if not isinstance(item, dict) or item.get("type") not in _QUESTION_TYPES:
+def _question(item: object, max_chars: int) -> Question | _ItemMiss:
+    """질문 하나. 키는 type·text 둘뿐이고, 글은 한 줄이며 비어 있지 않아야 한다. 맞지 않으면 (문제, 원인).
+
+    글자 상한은 앞뒤 공백을 뗀 글로 센다. 가리기 검사에 걸리는 글(비밀값·개인정보 꼴)은 버린다. 후보 판정이
+    기록의 글을 버리는 것과 같은 검사다(`app.candidates.record_text`)."""
+    if (
+        not isinstance(item, dict)
+        or not _keys(item, "type", "text")
+        or item["type"] not in _QUESTION_TYPES
+    ):
         return ("RULE_VIOLATION", "ITEM_SHAPE")
     kind: QuestionType = item["type"]
-    if _keys(item, "type", "file"):
-        file = sent.file(item["file"])
-        if file is None:
-            return ("UNVERIFIED", "UNKNOWN_FILE")
-        return Question(kind, file)
-    if not _keys(item, "type", "line", "name"):
+    text = item["text"].strip()
+    if not text or "\n" in text or "\r" in text:
         return ("RULE_VIOLATION", "ITEM_SHAPE")
-    found = sent.locate_line(item["line"], item["name"], max_name)
-    if not isinstance(found, LineRef):
-        return _line_miss(found)
-    return Question(kind, found)
+    if len(text) > max_chars:
+        return ("RULE_VIOLATION", "TOO_LONG")
+    if mask_text(text).count > 0:
+        return ("RULE_VIOLATION", "MASKED_TEXT")
+    return Question(kind, text)
 
 
 def questions(
     response: Mapping[str, Any],
-    sent: Sent,
     *,
     low: int,
     high: int,
-    max_name: int,
-    sentence: Callable[[Question], SentenceMiss | None],
+    max_chars: int,
 ) -> PartVerdict[Question]:
-    """맞고 문장을 만들 수 있는 질문만 종류마다 처음 것 하나씩 상한까지 쓰고 나머지는 버린다. 목록이 아니거나
-    하한보다 적으면, 또는 쓸 질문이 하나도 없으면 첫 원인으로 실패한다."""
+    """맞는 질문만 종류마다 처음 것 하나씩 상한까지 쓰고 나머지는 버린다. 목록이 아니거나 하한보다 적으면,
+    또는 쓸 질문이 하나도 없으면 첫 원인으로 실패한다."""
     items = response.get("questions")
     if not isinstance(items, list) or len(items) < low:
         return _miss("RULE_VIOLATION", "COUNT")
@@ -325,9 +332,7 @@ def questions(
     notes: list[str] = []
     first: _ItemMiss | None = None
     for item in items:
-        outcome = _question(item, sent, max_name)
-        if isinstance(outcome, Question):
-            outcome = _with_sentence(outcome, sentence)
+        outcome = _question(item, max_chars)
         if isinstance(outcome, Question):
             if outcome.type in used:
                 notes.append("dropped:DUPLICATE_TYPE")

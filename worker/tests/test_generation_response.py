@@ -31,6 +31,7 @@ from candidate_scenarios import (
     root_commit,
 )
 from generation_scenarios import (
+    QUESTION_TEXTS,
     GenerationCase,
     ScriptedProvider,
     SentLine,
@@ -39,12 +40,11 @@ from generation_scenarios import (
     code_title,
     file_fragment,
     file_id_of,
-    file_question,
     file_title,
     generation_case,
     line_fragment,
-    line_question,
     pick,
+    question,
     sent_files,
     sent_lines,
 )
@@ -84,7 +84,7 @@ GUIDE_PATCH = "@@ -0,0 +1,2 @@\n+Call installTool before tests.\n+Then run check
 
 # 문장 틀(impl.md 「문장 틀」). 기대값이라 생성 코드에서 가져오지 않는다.
 SENTENCE = f"{AUTH}에서 loginRateLimit 이름이 포함된 줄이 추가되었습니다."
-QUESTION = f"{AUTH}에서 loginRateLimit 이름이 포함된 줄을 추가한 배경은 무엇인가요?"
+QUESTION = QUESTION_TEXTS["BACKGROUND"]
 TITLE = "loginRateLimit 코드 추가"
 
 # 실패 코드와 회원용 문구(impl.md 「상태·실패」).
@@ -168,7 +168,7 @@ def good_fragments(request: ProviderRequest) -> list[dict[str, str]]:
 
 
 def good_questions(request: ProviderRequest) -> list[dict[str, str]]:
-    return [line_question("BACKGROUND", login(request), "loginRateLimit")]
+    return [question("BACKGROUND")]
 
 
 def good_title(request: ProviderRequest) -> dict[str, str]:
@@ -722,42 +722,6 @@ def test_fragment_kind_follows_the_cited_line(make: Part, draft: str) -> None:
     assert salvaged(case) == (0, 0)
 
 
-def _as_question(fragment: dict[str, str]) -> dict[str, str]:
-    if "file" in fragment:
-        return file_question("VERIFICATION", fragment["file"])
-    return line_question("VERIFICATION", fragment["line"], fragment["name"])
-
-
-@pytest.mark.parametrize(("make", "sent"), UNVERIFIED_PARAMS)
-def test_unverified_question_is_dropped_and_verified_ones_kept(
-    make: Part, sent: bool, request: pytest.FixtureRequest
-) -> None:
-    """질문도 확인한 근거만 가리킨다. 확인되지 않는 질문은 버리고 확인된 질문만 쓴다(07, 2026-10-19 결정).
-
-    확인된 질문이 하나도 없으면 질문이 확인 실패다(07·12).
-    """
-    case = run(
-        reply_with(
-            questions=lambda r: [
-                line_question("BACKGROUND", login(r), "loginRateLimit"),
-                _as_question(make(r)),
-            ]
-        )
-    )
-
-    _assert_cited(first_request(case), make(first_request(case)), sent)
-    check(case, draft=SENTENCE, questions=(QUESTION,), title=TITLE)
-    expected = UNVERIFIED_REASONS[request.node.callspec.id]
-    assert reasons(case) == (Counter(), Counter(), Counter())
-    assert drops(case) == (Counter(), one(f"dropped:{expected}"))
-    assert salvaged(case) == (0, 1)
-
-    alone = run(reply_with(questions=lambda r: [_as_question(make(r))]))
-
-    check(alone, draft=SENTENCE, questions=Failed(UNVERIFIED), title=TITLE)
-    assert reasons(alone) == (Counter(), Counter(), one(expected))
-
-
 def two_candidates() -> Scenario:
     """본인 커밋 둘이 서로 다른 경로를 고쳐 따로 두 후보가 된다. 뒤 커밋(문서)이 더 최근이다."""
     first = commit(
@@ -785,17 +749,17 @@ def install(request: ProviderRequest) -> SentLine:
 
 
 GUIDE_SENTENCE = f"{GUIDE}에서 installTool 이름이 포함된 줄이 추가되었습니다."
-GUIDE_QUESTION = f"{GUIDE}에서 installTool 이름이 포함된 줄을 추가한 배경은 무엇인가요?"
+GUIDE_QUESTION = QUESTION_TEXTS["BACKGROUND"]
 GUIDE_TITLE = "installTool 문서 추가"
 # 첫 후보(코드 커밋)의 자료에서 v2Handler 추가 줄이 받는 id(impl.md: 커밋 c1의 둘째 파일, patch 줄 순서 2).
 OTHER_CANDIDATE_LINE = "c1f2:L2"
 
 
 def test_line_of_another_candidate_is_not_accepted() -> None:
-    """다른 후보 자료에만 있는 줄 id를 지목한 조각·질문은 이 후보에서 쓰이지 않는다(05·07).
+    """다른 후보 자료에만 있는 줄 id를 지목한 조각은 이 후보에서 쓰이지 않는다(05).
 
     호출마다 자료가 따로라 다른 후보의 줄은 이 호출에서 보낸 자료가 아니다. 그 줄만 지목한 설명은 확인
-    실패이고, 확인된 질문과 함께 온 질문은 버려진다. 다른 후보의 판정은 그대로다.
+    실패다. 질문은 줄을 가리키지 않으므로(#487) 그대로 쓰인다. 다른 후보의 판정은 그대로다.
     """
 
     def build(request: ProviderRequest) -> str:
@@ -813,8 +777,8 @@ def test_line_of_another_candidate_is_not_accepted() -> None:
             fragments=[borrowed],
             title=code_title(install(request), "installTool"),
             questions=[
-                line_question("BACKGROUND", install(request), "installTool"),
-                line_question("VERIFICATION", OTHER_CANDIDATE_LINE, "v2Handler"),
+                question("BACKGROUND"),
+                question("VERIFICATION"),
             ],
         )
 
@@ -836,24 +800,23 @@ def test_line_of_another_candidate_is_not_accepted() -> None:
     assert guide_made.draft.status == "FAILED"
     assert guide_made.draft.failure is not None
     assert guide_made.draft.failure.code == UNVERIFIED
-    assert guide_made.reflection.questions == (GUIDE_QUESTION,)
+    assert guide_made.reflection.questions == (
+        GUIDE_QUESTION,
+        QUESTION_TEXTS["VERIFICATION"],
+    )
     assert guide_made.title == GUIDE_TITLE
-    assert all("v2Handler" not in each for each in guide_made.reflection.questions)
     assert [(each["stage"], each["code"]) for each in case.result["failures"]] == [
         ("DRAFT", UNVERIFIED)
     ]
-    assert drops(case) == (
-        one("dropped:UNKNOWN_LINE"),
-        one("dropped:UNKNOWN_LINE"),
-    )
+    assert drops(case) == (one("dropped:UNKNOWN_LINE"), Counter())
     assert case.provider.rewrite_requests() == []
 
 
 def test_lines_of_another_account_cannot_be_cited() -> None:
-    """같은 PR의 다른 계정 커밋 줄은 보내지 않으므로 설명·질문의 근거로 지목해도 버려진다(05·07).
+    """같은 PR의 다른 계정 커밋 줄은 보내지 않으므로 설명의 근거로 지목해도 버려진다(05).
 
-    다른 사람의 기여를 설명하거나 질문의 전제로 삼는 길이 없다는 것을 본다. 본인 줄을 지목한 조각·질문만
-    남는다.
+    다른 사람의 기여를 설명하는 길이 없다는 것을 본다. 본인 줄을 지목한 조각만 남는다. 질문은 줄을 가리키지
+    않고(#487) 다른 계정 줄은 자료에 없다.
     """
     own = commit(
         sha(31),
@@ -887,8 +850,8 @@ def test_lines_of_another_account_cannot_be_cited() -> None:
                 {"kind": "ADDED_LINE_WITH", "line": theirs_line, "name": "billingFee"},
             ],
             questions=lambda r: [
-                line_question("BACKGROUND", login(r), "loginRateLimit"),
-                line_question("VERIFICATION", theirs_line, "billingFee"),
+                question("BACKGROUND"),
+                question("VERIFICATION"),
             ],
         ),
         scenario,
@@ -896,357 +859,165 @@ def test_lines_of_another_account_cannot_be_cited() -> None:
     )
 
     assert "billingFee" not in first_request(case).data
-    check(case, draft=SENTENCE, questions=(QUESTION,), title=TITLE)
+    check(
+        case,
+        draft=SENTENCE,
+        questions=(QUESTION, QUESTION_TEXTS["VERIFICATION"]),
+        title=TITLE,
+    )
     assert "billing" not in result_text(case)
-    assert drops(case) == (
-        one("dropped:UNKNOWN_LINE"),
-        one("dropped:UNKNOWN_LINE"),
-    )
+    assert drops(case) == (one("dropped:UNKNOWN_LINE"), Counter())
 
 
-# 질문 문장 틀(07)
+# 생각해 볼 질문: AI가 작업 전체를 묻는 글을 직접 쓴다(#487, 2026-11-08 팀장 결정). 판정·기계 대조는 없고
+# 모양·150자·가리기 검사만 본다. 같은 종류 겹침과 상한은 그대로다.
 
-
-def test_line_questions_use_fixed_templates_for_added_line() -> None:
-    """추가 줄을 가리킨 질문은 종류마다 정한 틀이다: 배경·다른 방법·확인 방법(07)."""
-    case = run(
-        reply_with(
-            questions=lambda r: [
-                line_question(kind, login(r), "loginRateLimit")
-                for kind in ("BACKGROUND", "ALTERNATIVES", "VERIFICATION")
-            ]
-        )
-    )
-
-    target = f"{AUTH}에서 loginRateLimit 이름이 포함된 줄을"
-    check(
-        case,
-        draft=SENTENCE,
-        questions=(
-            f"{target} 추가한 배경은 무엇인가요?",
-            f"{target} 추가할 때 다른 방법도 고려했다면 무엇이었나요?",
-            f"{target} 추가한 뒤 의도대로 동작하는지 확인했다면 어떻게 확인했나요?",
-        ),
-        title=TITLE,
-    )
-
-
-def test_line_questions_use_fixed_templates_for_removed_line() -> None:
-    """삭제 줄을 가리킨 질문은 동사가 삭제인 같은 틀이다(07)."""
-    case = run(
-        reply_with(
-            questions=lambda r: [
-                line_question(
-                    kind, pick(r, contains="retryCount", change="removed"), "retryCount"
-                )
-                for kind in ("VERIFICATION", "BACKGROUND", "ALTERNATIVES")
-            ]
-        )
-    )
-
-    target = f"{AUTH}에서 retryCount 이름이 포함된 줄을"
-    check(
-        case,
-        draft=SENTENCE,
-        questions=(
-            f"{target} 삭제한 뒤 의도대로 동작하는지 확인했다면 어떻게 확인했나요?",
-            f"{target} 삭제한 배경은 무엇인가요?",
-            f"{target} 삭제할 때 다른 방법도 고려했다면 무엇이었나요?",
-        ),
-        title=TITLE,
-    )
-
-
-FILE_TARGETS = {
-    "added": (f"{FLAG} 파일을", "추가한", "추가할"),
-    "removed": (f"{FLAG} 파일을", "삭제한", "삭제할"),
-    "modified": (f"{FLAG} 파일을", "수정한", "수정할"),
-    "renamed": ("src/old_flags.ts 파일의 이름을", "바꾼", "바꿀"),
-}
-
-
-@pytest.mark.parametrize("status", sorted(FILE_TARGETS))
-def test_file_questions_use_fixed_templates_per_status(status: str) -> None:
-    """파일을 가리킨 질문은 파일 상태에 맞는 동사(추가·삭제·수정·이름 바꿈)로 틀을 채운다(07)."""
-    entry = (
-        renamed(FLAG, "src/old_flags.ts", STATUS_FILES["modified"])
-        if status == "renamed"
-        else change(FLAG, status=status, patch=STATUS_FILES[status])
-    )
-    case = run(
-        reply_with(
-            questions=lambda r: [
-                file_question(kind, file_id_of(r, FLAG))
-                for kind in ("BACKGROUND", "ALTERNATIVES", "VERIFICATION")
-            ]
-        ),
-        single(change(AUTH, patch=AUTH_PATCH), entry),
-    )
-
-    target, done, doing = FILE_TARGETS[status]
-    check(
-        case,
-        draft=SENTENCE,
-        questions=(
-            f"{target} {done} 배경은 무엇인가요?",
-            f"{target} {doing} 때 다른 방법도 고려했다면 무엇이었나요?",
-            f"{target} {done} 뒤 의도대로 동작하는지 확인했다면 어떻게 확인했나요?",
-        ),
-        title=TITLE,
-    )
-
-
-def test_unsupported_file_status_question_is_dropped() -> None:
-    """틀에 맞는 동사가 없는 파일 상태(changed)를 가리킨 질문은 버리고 나머지 질문을 쓴다(07).
-
-    그런 질문만 있으면 질문이 실패한다. 설명·제목은 그대로다. 실패 코드는 구현이 정하므로 부분 실패 코드
-    가운데 하나인지만 본다.
-    """
-    scenario = single(
-        change(AUTH, patch=AUTH_PATCH),
-        change(FLAG, status="changed", patch=STATUS_FILES["modified"]),
-    )
-    case = run(
-        reply_with(
-            questions=lambda r: [
-                line_question("BACKGROUND", login(r), "loginRateLimit"),
-                file_question("VERIFICATION", file_id_of(r, FLAG)),
-            ]
-        ),
-        scenario,
-    )
-
-    check(case, draft=SENTENCE, questions=(QUESTION,), title=TITLE)
-    assert drops(case) == (Counter(), one("dropped:NO_TEMPLATE"))
-    assert salvaged(case) == (0, 1)
-
-    alone = run(
-        reply_with(
-            questions=lambda r: [file_question("VERIFICATION", file_id_of(r, FLAG))]
-        ),
-        scenario,
-    )
-
-    (made,) = alone.output.candidates
-    assert made.reflection.status == "FAILED"
-    assert made.reflection.questions == ()
-    assert made.reflection.failure is not None
-    code = made.reflection.failure.code
-    assert code in (UNVERIFIED, RULE)
-    check(alone, draft=SENTENCE, questions=Failed(code), title=TITLE)
-    assert reasons(alone) == (Counter(), Counter(), one("NO_TEMPLATE"))
-
-
-LONG_FILE = "src/" + "a" * 90 + ".ts"
-VERIFICATION_QUESTION = (
-    f"{AUTH}에서 loginRateLimit 이름이 포함된 줄을 추가한 뒤 "
-    "의도대로 동작하는지 확인했다면 어떻게 확인했나요?"
+WRITTEN_QUESTIONS = (
+    "로그인 시도 횟수를 제한하게 된 배경은 무엇이었나요?",
+    "시도 횟수를 제한할 때 다른 방법도 고려했다면 무엇이었나요?",
+    "제한이 의도대로 동작하는지 확인했다면 어떻게 확인했나요?",
 )
+KINDS = ("BACKGROUND", "ALTERNATIVES", "VERIFICATION")
+
+
+def test_questions_are_the_text_the_model_wrote() -> None:
+    """질문은 응답의 글 그대로(앞뒤 공백만 뗀다) 응답 순서대로 쓰인다. 코드가 틀에 끼워 넣지 않는다.
+
+    AI 쪽을 끈 경로다(이 파일의 사례는 모두 끈 경로). 줄·파일·이름을 가리키지 않는 질문도 버리지 않는다.
+    """
+    case = run(
+        reply_with(
+            questions=lambda r: [
+                question(kind, f"  {text} ")
+                for kind, text in zip(KINDS, WRITTEN_QUESTIONS, strict=True)
+            ]
+        )
+    )
+
+    check(case, draft=SENTENCE, questions=WRITTEN_QUESTIONS, title=TITLE)
+    for text in WRITTEN_QUESTIONS:
+        assert "이름이 포함된 줄을" not in text
+    assert drops(case) == (Counter(), Counter())
+
+
+def test_question_is_not_matched_against_the_changed_lines() -> None:
+    """질문 글은 본인만 보는 칸이라 바뀐 줄과 대조하지 않는다(#487). 자료에 없는 낱말이 있어도 그대로 쓴다."""
+    text = "Redis 캐시 대신 메모리에 횟수를 둔 이유가 있었나요?"
+    case = run(reply_with(questions=lambda r: [question("ALTERNATIVES", text)]))
+
+    assert "Redis" not in first_request(case).data
+    check(case, draft=SENTENCE, questions=(text,), title=TITLE)
 
 
 @pytest.mark.parametrize(
-    ("scenario", "questions", "expected", "reason"),
+    "item",
     [
+        pytest.param({"type": "BACKGROUND"}, id="no-text"),
+        pytest.param({"type": "BACKGROUND", "text": 3}, id="text-not-string"),
+        pytest.param({"type": "BACKGROUND", "text": "   "}, id="blank-text"),
         pytest.param(
-            lambda: single(
-                change(AUTH, patch=AUTH_PATCH),
-                change(FLAG, status="changed", patch=STATUS_FILES["modified"]),
-            ),
-            lambda r: [
-                file_question("BACKGROUND", file_id_of(r, FLAG)),
-                line_question("BACKGROUND", login(r), "loginRateLimit"),
-            ],
-            QUESTION,
-            "NO_TEMPLATE",
-            id="no-template-first",
+            {"type": "BACKGROUND", "text": "배경은 무엇인가요?\n다른 방법은요?"},
+            id="two-lines",
         ),
         pytest.param(
-            lambda: single(
-                change(LONG_FILE, patch=AUTH_PATCH), change(AUTH, patch=AUTH_PATCH)
-            ),
-            lambda r: [
-                line_question(
-                    "VERIFICATION",
-                    pick(r, contains="loginRateLimit", path=LONG_FILE),
-                    "loginRateLimit",
-                ),
-                line_question(
-                    "VERIFICATION",
-                    pick(r, contains="loginRateLimit", path=AUTH),
-                    "loginRateLimit",
-                ),
-            ],
-            VERIFICATION_QUESTION,
-            "TOO_LONG",
-            id="too-long-first",
+            {"type": "MOTIVATION", "text": WRITTEN_QUESTIONS[0]}, id="new-type"
         ),
+        pytest.param({"text": WRITTEN_QUESTIONS[0]}, id="no-type"),
+        pytest.param(
+            {"type": "BACKGROUND", "text": WRITTEN_QUESTIONS[0], "line": "c1f1:L1"},
+            id="extra-key",
+        ),
+        pytest.param(
+            {"type": "BACKGROUND", "line": "c1f1:L1", "name": "loginRateLimit"},
+            id="old-line-shape",
+        ),
+        pytest.param({"type": "BACKGROUND", "file": "c1f1"}, id="old-file-shape"),
+        pytest.param(WRITTEN_QUESTIONS[0], id="plain-string"),
     ],
 )
-def test_question_without_a_sentence_does_not_hide_a_later_one_of_the_same_type(
-    scenario: Callable[[], Scenario], questions: Part, expected: str, reason: str
-) -> None:
-    """문장을 만들 수 없는 질문은 같은 종류를 세기 전에 버린다. 그래서 뒤에 온 같은 종류의 질문이 쓰인다.
+def test_question_with_a_wrong_shape_is_dropped(item: object) -> None:
+    """키가 type·text 둘이 아니거나, 글이 비었거나 여러 줄이거나, 정하지 않은 종류면 그 질문만 버린다(형식 위반).
 
-    틀이 없는 파일 상태를 가리키거나 파일 이름으로 줄여도 150자를 넘는 앞 질문이 같은 종류의 정상 질문을
-    밀어내지 않는다(2026-10-19 결정: 틀린 항목만 버린다).
+    맞는 질문과 함께 오면 맞는 질문만 남고, 그런 질문만 있으면 질문 부분이 형식 위반으로 실패한다. 설명·제목은
+    그대로다.
     """
-    case = run(reply_with(questions=questions), scenario())
+    case = run(reply_with(questions=lambda r: [question("VERIFICATION"), item]))
+    alone = run(reply_with(questions=lambda r: [item]))
 
-    (made,) = case.output.candidates
-    assert made.reflection.status == "GENERATED"
-    assert made.reflection.questions == (expected,)
-    assert case.run.report.reflection_reasons == Counter()
-    assert drops(case)[1] == one(f"dropped:{reason}")
-    assert salvaged(case)[1] == 1
-
-
-# 길이 150자: 경로 대신 파일 이름, 그래도 넘으면 형식 위반(impl.md 상한)
-
-LONG_DIR = "src/core/" + "nested_module/" * 6
-LONG_AUTH = LONG_DIR + "auth.ts"
-
-
-def test_long_question_uses_file_name_instead_of_path() -> None:
-    """150자를 넘는 질문만 경로 대신 파일 이름으로 줄인다. 넘지 않는 질문은 경로 그대로다(07)."""
-    case = run(
-        reply_with(
-            questions=lambda r: [
-                line_question(kind, login(r), "loginRateLimit")
-                for kind in ("BACKGROUND", "VERIFICATION")
-            ]
-        ),
-        single(change(LONG_AUTH, patch=AUTH_PATCH)),
-    )
-
-    full_background = (
-        f"{LONG_AUTH}에서 loginRateLimit 이름이 포함된 줄을 추가한 배경은 무엇인가요?"
-    )
-    full_verification = (
-        f"{LONG_AUTH}에서 loginRateLimit 이름이 포함된 줄을 추가한 뒤 "
-        "의도대로 동작하는지 확인했다면 어떻게 확인했나요?"
-    )
-    short_verification = full_verification.replace(LONG_DIR, "")
-    # 사례의 뜻: 배경 질문은 150자 안, 확인 질문은 경로로는 넘고 파일 이름으로는 안이다.
-    assert len(full_background) <= 150 < len(full_verification)
-    assert len(short_verification) <= 150
     check(
-        case,
-        draft=f"{LONG_AUTH}에서 loginRateLimit 이름이 포함된 줄이 추가되었습니다.",
-        questions=(full_background, short_verification),
-        title=TITLE,
+        case, draft=SENTENCE, questions=(QUESTION_TEXTS["VERIFICATION"],), title=TITLE
     )
+    assert drops(case) == (Counter(), one("dropped:ITEM_SHAPE"))
+    assert salvaged(case) == (0, 1)
+    check(alone, draft=SENTENCE, questions=Failed(RULE), title=TITLE)
+    assert reasons(alone) == (Counter(), Counter(), one("ITEM_SHAPE"))
 
 
-def test_question_still_too_long_with_file_name_is_dropped() -> None:
-    """파일 이름으로 줄여도 150자를 넘는 질문은 버리고 나머지 질문을 쓴다(07).
-
-    그런 질문만 있으면 질문이 형식 위반이다(07·12).
-    """
-    long_name = "src/" + "a" * 90 + ".ts"
-    scenario = single(change(long_name, patch=AUTH_PATCH))
+def test_question_over_150_characters_is_dropped() -> None:
+    """150자까지는 쓰고, 넘는 질문은 버린다(형식 위반). 그런 질문만 있으면 질문이 실패한다."""
+    fits = "가" * 149 + "?"
+    over = "나" * 150 + "?"
+    assert len(fits) == 150 < len(over)
     case = run(
         reply_with(
             questions=lambda r: [
-                line_question(kind, login(r), "loginRateLimit")
-                for kind in ("BACKGROUND", "VERIFICATION")
+                question("BACKGROUND", over),
+                question("VERIFICATION", fits),
             ]
-        ),
-        scenario,
+        )
     )
+    alone = run(reply_with(questions=lambda r: [question("BACKGROUND", over)]))
 
-    background = (
-        f"{long_name}에서 loginRateLimit 이름이 포함된 줄을 추가한 배경은 무엇인가요?"
-    )
-    short_verification = (
-        f"{long_name[4:]}에서 loginRateLimit 이름이 포함된 줄을 추가한 뒤 "
-        "의도대로 동작하는지 확인했다면 어떻게 확인했나요?"
-    )
-    assert len(background) <= 150 < len(short_verification)
-    draft = f"{long_name}에서 loginRateLimit 이름이 포함된 줄이 추가되었습니다."
-    check(case, draft=draft, questions=(background,), title=TITLE)
+    check(case, draft=SENTENCE, questions=(fits,), title=TITLE)
     assert drops(case) == (Counter(), one("dropped:TOO_LONG"))
-
-    alone = run(
-        reply_with(
-            questions=lambda r: [
-                line_question("VERIFICATION", login(r), "loginRateLimit")
-            ]
-        ),
-        scenario,
-    )
-
-    check(alone, draft=draft, questions=Failed(RULE), title=TITLE)
+    check(alone, draft=SENTENCE, questions=Failed(RULE), title=TITLE)
     assert reasons(alone) == (Counter(), Counter(), one("TOO_LONG"))
 
 
-# 질문에 자유 문장이 들어갈 길이 없다: 동기·성과·타인 기여·개발 범위 전제 거부(07)
-
-PREMISE = "성능을 개선하려고 팀원 대신 새 함수를 만든 배경은 무엇인가요?"
+def _asking(value: str) -> str:
+    return f"{value} 값을 쓰게 된 배경은 무엇이었나요?"
 
 
 @pytest.mark.parametrize(
-    "make",
+    "secret",
     [
-        pytest.param(
-            lambda r: (
-                line_question("BACKGROUND", login(r), "loginRateLimit")
-                | {"text": PREMISE}
-            ),
-            id="free-text-field",
-        ),
-        pytest.param(
-            lambda r: (
-                line_question("BACKGROUND", login(r), "loginRateLimit")
-                | {"premise": PREMISE}
-            ),
-            id="premise-field",
-        ),
-        pytest.param(
-            lambda r: {"type": "BACKGROUND", "question": PREMISE}, id="question-text"
-        ),
-        pytest.param(lambda r: PREMISE, id="plain-sentence"),
-        pytest.param(
-            lambda r: line_question("MOTIVATION", login(r), "loginRateLimit"),
-            id="motivation-type",
-        ),
-        pytest.param(
-            lambda r: file_question("IMPACT", file_id_of(r, AUTH)), id="impact-type"
-        ),
-        pytest.param(
-            lambda r: line_question("ALTERNATIVES", login(r), "성능 개선"),
-            id="sentence-as-name",
-        ),
-        pytest.param(
-            lambda r: line_question(
-                "ALTERNATIVES", login(r), "loginRateLimit을 새로 만들어 성능을 개선한"
-            ),
-            id="premise-in-name",
-        ),
+        pytest.param(lambda: fake_token(), id="github-token"),
+        pytest.param(lambda: "dev" + "@" + "example.com", id="email"),
+        pytest.param(lambda: "010-" + "1234-" + "5678", id="phone"),
+        pytest.param(lambda: "AKIA" + "Q7XZ" * 4, id="aws-key"),
     ],
 )
-def test_question_with_free_text_or_premise_is_dropped(make: Part) -> None:
-    """자유 글 칸·정하지 않은 종류·문장 이름을 더한 질문 항목은 형식 위반이라 버린다(07·12).
+def test_question_caught_by_masking_is_dropped(secret: Callable[[], str]) -> None:
+    """기록의 글과 같은 가리기 검사(`app.redact.mask_text`)에 걸리는 질문은 버린다(#487 완료 기준).
 
-    질문은 종류와 지목만 고를 수 있다. 확인된 질문과 함께 오면 그 질문만 남고, 그런 항목만 있으면 질문이
-    형식 위반으로 실패한다. 근거 없는 동기·성과·타인 기여·개발 범위를 전제로 한 글은 결과 어디에도
-    들어가지 않는다.
+    버린 질문의 글은 결과 어디에도 없다. 그런 질문만 있으면 질문이 형식 위반으로 실패한다.
     """
+    value = secret()
     case = run(
         reply_with(
             questions=lambda r: [
-                line_question("VERIFICATION", login(r), "loginRateLimit"),
-                make(r),
+                question("BACKGROUND", _asking(value)),
+                question("VERIFICATION"),
             ]
         )
     )
-    alone = run(reply_with(questions=lambda r: [make(r)]))
+    alone = run(
+        reply_with(questions=lambda r: [question("BACKGROUND", _asking(value))])
+    )
 
-    check(case, draft=SENTENCE, questions=(VERIFICATION_QUESTION,), title=TITLE)
+    check(
+        case, draft=SENTENCE, questions=(QUESTION_TEXTS["VERIFICATION"],), title=TITLE
+    )
+    assert drops(case) == (Counter(), one("dropped:MASKED_TEXT"))
     check(alone, draft=SENTENCE, questions=Failed(RULE), title=TITLE)
+    assert reasons(alone) == (Counter(), Counter(), one("MASKED_TEXT"))
     for each in (case, alone):
-        text = result_text(each)
-        for phrase in (PREMISE, "성능", "개선", "팀원", "새 함수"):
-            assert phrase not in text
+        assert value not in result_text(each)
+
+
+# 근거 없는 동기·성과·타인 기여를 전제로 한 글. 설명 조각의 자유 글 칸으로 와도 결과에 들어가지 않는다.
+PREMISE = "성능을 개선하려고 팀원 대신 새 함수를 만든 배경은 무엇인가요?"
+VERIFICATION_QUESTION = QUESTION_TEXTS["VERIFICATION"]
 
 
 def test_description_item_with_reason_field_fails_description() -> None:
@@ -1411,10 +1182,10 @@ def test_fragments_over_the_limit_keep_the_first_verified_three() -> None:
 
 def _four_questions(r: ProviderRequest) -> list[dict[str, str]]:
     return [
-        line_question("BACKGROUND", login(r), "loginRateLimit"),
-        line_question("ALTERNATIVES", login(r), "loginRateLimit"),
-        line_question("VERIFICATION", login(r), "loginRateLimit"),
-        file_question("BACKGROUND", file_id_of(r, AUTH)),
+        question("BACKGROUND"),
+        question("ALTERNATIVES"),
+        question("VERIFICATION"),
+        question("BACKGROUND"),
     ]
 
 
@@ -1425,20 +1196,15 @@ def _four_questions(r: ProviderRequest) -> list[dict[str, str]]:
         pytest.param(lambda r: OMIT, id="missing-key"),
         pytest.param(lambda r: None, id="null"),
         pytest.param(
-            lambda r: line_question("BACKGROUND", login(r), "loginRateLimit"),
+            lambda r: question("BACKGROUND"),
             id="not-a-list",
         ),
         pytest.param(
-            lambda r: [
-                line_question("BACKGROUND", login(r), "loginRateLimit") | {"x": "y"}
-            ],
+            lambda r: [question("BACKGROUND") | {"x": "y"}],
             id="unknown-item-key",
         ),
         pytest.param(
-            lambda r: [
-                line_question("BACKGROUND", login(r), "loginRateLimit")
-                | {"file": file_id_of(r, AUTH)}
-            ],
+            lambda r: [question("BACKGROUND") | {"file": file_id_of(r, AUTH)}],
             id="line-and-file",
         ),
     ],
@@ -1506,16 +1272,15 @@ def test_fragment_without_a_sentence_takes_no_place_under_the_limit() -> None:
             _four_questions,
             (
                 QUESTION,
-                f"{AUTH}에서 loginRateLimit 이름이 포함된 줄을 추가할 때 "
-                "다른 방법도 고려했다면 무엇이었나요?",
+                QUESTION_TEXTS["ALTERNATIVES"],
                 VERIFICATION_QUESTION,
             ),
             id="four",
         ),
         pytest.param(
             lambda r: [
-                line_question("BACKGROUND", login(r), "loginRateLimit"),
-                file_question("BACKGROUND", file_id_of(r, AUTH)),
+                question("BACKGROUND"),
+                question("BACKGROUND"),
             ],
             (QUESTION,),
             id="same-type-twice",
@@ -1545,13 +1310,13 @@ def test_both_parts_violating_counts_stay_partial_failures() -> None:
 
 
 def test_description_failure_keeps_verified_questions_and_title() -> None:
-    """설명 확인이 실패해도 같은 응답의 확인된 질문·제목은 남고 실패는 설명 1건이다(11)."""
+    """설명 확인이 실패해도 같은 응답의 질문·확인된 제목은 남고 실패는 설명 1건이다(11)."""
     case = run(
         reply_with(
             fragments=lambda r: [_context_line(r)],
             questions=lambda r: [
-                line_question("BACKGROUND", login(r), "loginRateLimit"),
-                file_question("VERIFICATION", file_id_of(r, V2)),
+                question("BACKGROUND"),
+                question("VERIFICATION"),
             ],
         )
     )
@@ -1559,21 +1324,16 @@ def test_description_failure_keeps_verified_questions_and_title() -> None:
     check(
         case,
         draft=Failed(UNVERIFIED),
-        questions=(
-            QUESTION,
-            f"{V2} 파일을 추가한 뒤 의도대로 동작하는지 확인했다면 어떻게 확인했나요?",
-        ),
+        questions=(QUESTION, QUESTION_TEXTS["VERIFICATION"]),
         title=TITLE,
     )
 
 
 def test_question_failure_keeps_description_and_title() -> None:
-    """질문 확인이 실패해도 확인된 설명·제목은 남고 실패는 질문 1건이다(11)."""
-    case = run(
-        reply_with(questions=lambda r: [line_question("BACKGROUND", login(r), "limit")])
-    )
+    """질문이 실패해도 확인된 설명·제목은 남고 실패는 질문 1건이다(11)."""
+    case = run(reply_with(questions=lambda r: [{"type": "BACKGROUND"}]))
 
-    check(case, draft=SENTENCE, questions=Failed(UNVERIFIED), title=TITLE)
+    check(case, draft=SENTENCE, questions=Failed(RULE), title=TITLE)
 
 
 def test_unverified_title_keeps_description_and_questions() -> None:
@@ -1716,7 +1476,7 @@ def _guide_fragments(r: ProviderRequest) -> list[dict[str, str]]:
 
 
 def _guide_questions(r: ProviderRequest) -> list[dict[str, str]]:
-    return [line_question("BACKGROUND", install(r), "installTool")]
+    return [question("BACKGROUND")]
 
 
 def _guide_title(r: ProviderRequest) -> dict[str, str]:
@@ -1738,7 +1498,7 @@ def _obeyed(**parts: Part) -> Build:
         pytest.param(
             _obeyed(
                 questions=lambda r: [
-                    line_question(kind, install(r), "installTool")
+                    question(kind)
                     for kind in (
                         "BACKGROUND",
                         "ALTERNATIVES",
@@ -1751,28 +1511,26 @@ def _obeyed(**parts: Part) -> Build:
             GUIDE_SENTENCE,
             (
                 GUIDE_QUESTION,
-                f"{GUIDE}에서 installTool 이름이 포함된 줄을 추가할 때 "
-                "다른 방법도 고려했다면 무엇이었나요?",
-                f"{GUIDE}에서 installTool 이름이 포함된 줄을 추가한 뒤 "
-                "의도대로 동작하는지 확인했다면 어떻게 확인했나요?",
+                QUESTION_TEXTS["ALTERNATIVES"],
+                QUESTION_TEXTS["VERIFICATION"],
             ),
             id="five-questions",
         ),
         pytest.param(
             _obeyed(
                 questions=lambda r: [
-                    line_question("BACKGROUND", install(r), "installTool")
-                    | {"text": "installTool로 성능을 개선한 이유는 무엇인가요?"}
+                    question("BACKGROUND")
+                    | {"reason": "installTool로 성능을 개선한 이유는 무엇인가요?"}
                 ]
             ),
             GUIDE_SENTENCE,
             Failed(RULE),
-            id="question-with-reason-text",
+            id="question-with-reason-field",
         ),
         pytest.param(
             _obeyed(
                 questions=lambda r: [
-                    line_question("FETCH", pick(r, contains="https"), "https")
+                    {"type": "FETCH", "text": QUESTION_TEXTS["BACKGROUND"]}
                 ]
             ),
             GUIDE_SENTENCE,
@@ -1816,11 +1574,12 @@ def _obeyed(**parts: Part) -> Build:
 def test_response_following_instructions_in_data_never_reaches_the_result(
     build: Build, draft: str | Failed, questions: tuple[str, ...] | Failed
 ) -> None:
-    """변경 줄 속 지시(질문 5개·이유 글·주소 호출·커밋 수)를 따라 출력 규칙을 바꾼 응답도 결과를 바꾸지 못한다(31).
+    """변경 줄 속 지시(질문 5개·이유 칸·주소 호출·커밋 수)를 따라 출력 규칙을 바꾼 응답도 결과를 바꾸지 못한다(31).
 
     지시를 따라 더한 항목은 버리거나 같은 종류 질문으로 걸러지고, 남은 확인된 항목이 없으면 그 부분이
-    실패한다. 문장은 확인한 줄·이름으로만 만들므로 지시문과 따로 보낸 자료 속 지시 글과 주소는 결과 어디에도
-    나오지 않는다.
+    실패한다. 설명 문장은 확인한 줄·이름으로만 만들므로 지시문과 따로 보낸 자료 속 지시 글과 주소는 결과 어디에도
+    나오지 않는다. 질문 글은 AI가 쓰고 대조하지 않으므로(#487) 자료 속 지시가 질문의 말을 바꾸는 것은 막지
+    못한다. 그 한계는 generation.md 「알려진 한계」에 있고, 여기서는 칸·종류·개수 규칙만 본다.
     """
     case = run(build, injected_scenario())
 
@@ -1844,9 +1603,7 @@ def test_response_following_instructions_in_data_never_reaches_the_result(
 CLIENT = "src/client.ts"
 CLIENT_TEXT = 'const clientName = "web";'
 CLIENT_SENTENCE = f"{CLIENT}에서 clientName 이름이 포함된 줄이 추가되었습니다."
-CLIENT_QUESTION = (
-    f"{CLIENT}에서 clientName 이름이 포함된 줄을 추가한 배경은 무엇인가요?"
-)
+CLIENT_QUESTION = QUESTION_TEXTS["BACKGROUND"]
 CLIENT_TITLE = "clientName 코드 추가"
 
 
@@ -1884,7 +1641,7 @@ def _client_reply(**parts: Part) -> Build:
         ),
         questions=parts.get(
             "questions",
-            lambda r: [line_question("BACKGROUND", client(r), "clientName")],
+            lambda r: [question("BACKGROUND")],
         ),
         title=parts.get("title", lambda r: code_title(client(r), "clientName")),
     )
@@ -1917,19 +1674,6 @@ def _client_reply(**parts: Part) -> Build:
             id="fragment-placeholder-name",
         ),
         pytest.param(
-            _client_reply(
-                questions=lambda r: [
-                    line_question("BACKGROUND", client(r), "clientName"),
-                    line_question("VERIFICATION", masked_line(r), "sessionKey"),
-                ]
-            ),
-            CLIENT_SENTENCE,
-            (CLIENT_QUESTION,),
-            CLIENT_TITLE,
-            (0, 1),
-            id="question",
-        ),
-        pytest.param(
             _client_reply(title=lambda r: code_title(masked_line(r), "sessionKey")),
             CLIENT_SENTENCE,
             (CLIENT_QUESTION,),
@@ -1940,15 +1684,13 @@ def _client_reply(**parts: Part) -> Build:
         pytest.param(
             _client_reply(
                 fragments=lambda r: [line_fragment(masked_line(r), "sessionKey")],
-                questions=lambda r: [
-                    line_question("ALTERNATIVES", masked_line(r), "sessionKey")
-                ],
+                questions=lambda r: [question("ALTERNATIVES")],
                 title=lambda r: code_title(masked_line(r), "sessionKey"),
             ),
             Failed(UNVERIFIED),
-            Failed(UNVERIFIED),
+            (QUESTION_TEXTS["ALTERNATIVES"],),
             None,
-            (1, 1),
+            (1, 0),
             id="all-parts",
         ),
     ],
@@ -1960,10 +1702,11 @@ def test_masked_line_cannot_be_cited(
     title: str | None,
     dropped: tuple[int, int],
 ) -> None:
-    """가림이 든 줄을 설명·질문의 근거로 지목한 항목은 버리고, 제목으로 지목하면 제목은 null이다(33).
+    """가림이 든 줄을 설명의 근거로 지목한 조각은 버리고, 제목으로 지목하면 제목은 null이다(33).
 
     가린 줄은 고를 수 없음으로 보내고 값은 자리표시로 바꾼다. 가린 값은 제공자 입력·결과 어디에도 없다.
-    확인된 항목이 남지 않은 설명·질문은 확인 실패(부분 실패)이고, 제목만 null이면 실패를 더하지 않는다.
+    확인된 조각이 남지 않은 설명은 확인 실패(부분 실패)이고, 제목만 null이면 실패를 더하지 않는다. 질문은 줄을
+    가리키지 않는다(#487).
     """
     secret = fake_token()
     case = run(build, masked_scenario(secret))
@@ -2016,9 +1759,9 @@ def test_title_name_also_inside_masked_line_is_null() -> None:
 
 
 def test_secret_file_cannot_be_cited_by_guessed_id() -> None:
-    """보내지 않은 비밀 파일의 id를 짐작해 지목한 조각·질문은 버리고, 제목은 null이다(05·33).
+    """보내지 않은 비밀 파일의 id를 짐작해 지목한 조각은 버리고, 제목은 null이다(05·33).
 
-    비밀 파일은 경로·상태를 보내지 않으므로 이 호출의 자료에 그 파일 id가 없다. 본인 줄을 지목한 조각·질문만
+    비밀 파일은 경로·상태를 보내지 않으므로 이 호출의 자료에 그 파일 id가 없다. 본인 줄을 지목한 조각만
     남고 비밀 파일의 경로·값은 결과 어디에도 없다.
     """
     secret = fake_token()
@@ -2035,8 +1778,8 @@ def test_secret_file_cannot_be_cited_by_guessed_id() -> None:
                 file_fragment(guessed),
             ],
             questions=lambda r: [
-                line_question("BACKGROUND", login(r), "loginRateLimit"),
-                file_question("VERIFICATION", guessed),
+                question("BACKGROUND"),
+                question("VERIFICATION"),
             ],
             title=lambda r: file_title(guessed),
         ),
@@ -2046,13 +1789,15 @@ def test_secret_file_cannot_be_cited_by_guessed_id() -> None:
     request = first_request(case)
     assert guessed not in sent_files(request)
     assert ".env" not in request.data
-    check(case, draft=SENTENCE, questions=(QUESTION,), title=None)
+    check(
+        case,
+        draft=SENTENCE,
+        questions=(QUESTION, QUESTION_TEXTS["VERIFICATION"]),
+        title=None,
+    )
     assert ".env" not in result_text(case)
     assert_nowhere(secret, provider=case.provider, result=case.result)
-    assert drops(case) == (
-        one("dropped:UNKNOWN_FILE"),
-        one("dropped:UNKNOWN_FILE"),
-    )
+    assert drops(case) == (one("dropped:UNKNOWN_FILE"), Counter())
 
 
 # 질문은 reflection.questions에만 있고 새 결과 칸이 없다(41)
@@ -2063,13 +1808,13 @@ def test_questions_live_only_in_reflection_without_new_fields() -> None:
     case = run(
         reply_with(
             questions=lambda r: [
-                line_question("BACKGROUND", login(r), "loginRateLimit"),
-                file_question("ALTERNATIVES", file_id_of(r, V2)),
+                question("BACKGROUND"),
+                question("ALTERNATIVES"),
             ]
         )
     )
 
-    second = f"{V2} 파일을 추가할 때 다른 방법도 고려했다면 무엇이었나요?"
+    second = QUESTION_TEXTS["ALTERNATIVES"]
     check(case, draft=SENTENCE, questions=(QUESTION, second), title=TITLE)
     (entry,) = case.result["candidates"]
     assert set(entry) == CANDIDATE_KEYS
@@ -2080,9 +1825,9 @@ def test_questions_live_only_in_reflection_without_new_fields() -> None:
         {key: value for key, value in entry.items() if key != "reflection"},
         ensure_ascii=False,
     )
-    for question in (QUESTION, second):
-        assert question not in outside
-        assert result_text(case).count(question) == 1
+    for written in (QUESTION, second):
+        assert written not in outside
+        assert result_text(case).count(written) == 1
 
 
 @pytest.mark.parametrize(
@@ -2145,7 +1890,9 @@ def test_name_match_tells_why_a_name_is_not_on_the_line(
 
 
 def test_citing_part_of_a_unicode_identifier_is_rejected() -> None:
-    """`한글limit`의 `limit`처럼 다른 식별자의 일부를 지목하면 설명·질문은 확인 실패, 제목은 null이다(05)."""
+    """`한글limit`의 `limit`처럼 다른 식별자의 일부를 지목하면 설명은 확인 실패, 제목은 null이다(05).
+
+    질문은 줄을 가리키지 않으므로 그대로 쓰인다(#487)."""
     work = commit(
         sha(7701),
         MEMBER,
@@ -2163,7 +1910,7 @@ def test_citing_part_of_a_unicode_identifier_is_rejected() -> None:
         return answer(
             fragments=[line_fragment(line, "limit")],
             title=code_title(line, "limit"),
-            questions=[line_question("BACKGROUND", line, "limit")],
+            questions=[question("BACKGROUND")],
         )
 
     case = generation_case(
@@ -2173,10 +1920,10 @@ def test_citing_part_of_a_unicode_identifier_is_rejected() -> None:
 
     (generated,) = case.output.candidates
     assert generated.draft.status == "FAILED"
-    assert generated.reflection.status == "FAILED"
+    assert generated.reflection.questions == (QUESTION_TEXTS["BACKGROUND"],)
     assert generated.title is None
     joined = one("NAME_JOINED_NON_ASCII")
-    assert reasons(case) == (Counter(), joined, joined)
+    assert reasons(case) == (Counter(), joined, Counter())
 
 
 # 줄마다 고를 수 있는 이름 목록(2026-10-18 팀장 결정, generation.md 「응답과 판정」)
