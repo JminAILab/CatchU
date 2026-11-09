@@ -346,9 +346,18 @@ test("사본 화면: 항목 순서대로 보이고 Catch는 기록·작성자 �
   const hrefs = links.map((anchor) => anchor.match(/href="([^"]+)"/)[1]);
   assert.deepEqual(hrefs, [
     "https://github.com/o/r/blob/main/README.md", // 텍스트 자료 본문(position 1)
-    "https://github.com/o/r/pull/1", // 근거
     "https://github.com/o/r/issues/2", // 작성자 설명(끝의 마침표 제외)
+    "https://github.com/o/r/pull/1", // 근거(#488: 기록은 작성자 설명 아래, 「근거 자세히 보기」 안)
   ]); // aiDraft의 pull/3은 링크가 없다
+  // #488: 작성자 발행본 상세도 같은 부품이라 불일치 → AI 초안 → 작성자 설명 → 기록 순서이고 근거 목록은 처음에 접혀 있다.
+  const catchHtml = items[1];
+  const order = ["snapshot-catch-mismatch", "snapshot-catch-ai-draft", "snapshot-catch-description", "snapshot-catch-facts", "snapshot-catch-evidence-details"]
+    .map((id) => catchHtml.indexOf(`data-testid="${id}"`));
+  assert.ok(order.every((position) => position >= 0), String(order));
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  assert.equal(catchHtml.split("<details").length - 1, 1);
+  assert.doesNotMatch(catchHtml.match(/<details[^>]*>/)[0], /\sopen/);
+  assert.ok(catchHtml.includes("<summary>근거 자세히 보기</summary>"));
   assert.ok(html.includes("초안 https://github.com/o/r/pull/3"));
   assert.ok(html.includes("http://github.com/o/r") && !hrefs.includes("http://github.com/o/r"));
   assert.ok(html.includes("https://example.com/x") && !hrefs.includes("https://example.com/x"));
@@ -410,6 +419,7 @@ test("상세 화면: 주소·상태·만료·[URL 복사]와 고정 안내·비�
   // 요약 근거 단추로 받은 강조 범위는 사본에 <mark>로 그린다(C-11 evidence-highlight).
   const highlighted = view({ highlight: { publishedItemId: "i1", fieldPath: "subjectContribution", charStart: 0, charEnd: 2 } });
   assert.match(highlighted, /<mark[^>]*data-testid="snapshot-highlight">기여<\/mark>/);
+  assert.match(highlighted.match(/<details[^>]*>/)[0], /\sopen=""/, "강조가 본인 기여를 가리키면 근거 칸을 펼친다(#488)");
   assert.ok(active.includes('data-testid="publication-snapshot"'));
   assert.doesNotMatch(active, /indexState|검색 다시 준비/);
 
