@@ -486,6 +486,10 @@ def judged_groups(
         verdict = verdicts.get(file.path)
         if verdict is None or not verdict.judged:
             return (1, 0, 0, KIND_RANK[kinds[file.id]])
+        if kinds[file.id] is None and verdict.branch not in ("WORK", "RECORD"):
+            # 규칙이 그 밖(OTHER)으로 본 파일인데 MATERIAL_KIND 답이 없거나 틀리면 갈래를 모른다.
+            # 작업 자리로 앞세우지 않고 묻지 못한 파일과 같이 뒤에 둔다(PR #500 리뷰).
+            return (1, 0, 0, KIND_RANK[kinds[file.id]])
         branch = 1 if verdict.branch == "RECORD" else 0
         return (0, branch, -(verdict.score or 0), KIND_RANK[kinds[file.id]])
 

@@ -593,6 +593,66 @@ def test_command_reports_an_incomplete_collection(
     assert "failures=1" in caplog.text
 
 
+def test_command_refuses_a_max_catches_below_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--max-catches가 0이나 음수면 확인표를 쓰지 않고 멈춘다(음수는 거의 전부를 뜻하게 되므로, PR #500 리뷰)."""
+    Swapped(monkeypatch)
+    collection_file.write(
+        tmp_path / f"{OWNER}__{NAME}.collection.json", run_case(scenario()).outcome
+    )
+    for value in ("0", "-1"):
+        assert (
+            confirm_module.run(args(tmp_path, "--max-catches", value), environment())
+            == 2
+        )
+        assert "--max-catches" in capsys.readouterr().err
+        assert not (tmp_path / f"{OWNER}__{NAME}.sheet.json").exists()
+
+
+def test_command_refuses_a_saved_collection_for_another_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--collection이 다른 저장소·계정의 수집이면 확인표를 쓰지 않고 멈춘다(PR #500 리뷰)."""
+    from dataclasses import replace
+
+    from app.collection.identifiers import GitHubAccount, RepositoryCoordinates
+
+    Swapped(monkeypatch)
+    outcome = run_case(scenario()).outcome
+    cases = {
+        "repository": replace(
+            outcome, repository=RepositoryCoordinates("other", "repo")
+        ),
+        "account": replace(
+            outcome,
+            linked_account=GitHubAccount("someone", MEMBER.account_id + 1),
+        ),
+    }
+    for label, saved in cases.items():
+        collection = tmp_path / f"{label}.collection.json"
+        collection_file.write(collection, saved)
+        out = tmp_path / label
+        out.mkdir()
+        argv = args(out, "--collection", str(collection))
+        assert confirm_module.run(argv, environment()) == 2, label
+        assert "다르다" in capsys.readouterr().err
+        assert not (out / f"{OWNER}__{NAME}.sheet.json").exists(), label
+
+
+def test_command_accepts_a_saved_collection_with_other_letter_case(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """저장소 이름의 대소문자만 다르면 같은 저장소로 본다(GitHub 규칙)."""
+    Swapped(monkeypatch)
+    outcome = run_case(scenario()).outcome
+    collection = tmp_path / "saved.collection.json"
+    collection_file.write(collection, outcome)
+    argv = args(tmp_path, "--collection", str(collection))
+    argv[1] = f"{OWNER.upper()}/{NAME.upper()}"
+    assert confirm_module.run(argv, environment()) == 0
+
+
 def test_real_parts_are_built_without_calling_out(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

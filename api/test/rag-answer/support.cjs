@@ -4,6 +4,7 @@
 require('reflect-metadata');
 const { randomUUID } = require('node:crypto');
 const { Module } = require('@nestjs/common');
+const { MODULE_METADATA } = require('@nestjs/common/constants');
 const { AI_GENERATION_GATE } = require('../../dist/ai-generation/ai-generation.module');
 const { AiProviderError } = require('../../dist/ai-generation/ai-generation.types');
 const { AiRun } = require('../../dist/ai-run/ai-run');
@@ -14,6 +15,7 @@ const { PUBLISHED_SEARCH } = require('../../dist/published-index/published-index
 const { QnaController } = require('../../dist/rag-answer/qna.controller');
 const { QUESTION_COUNTER } = require('../../dist/rag-answer/question-counter');
 const { QUESTION_REWRITER } = require('../../dist/rag-answer/question-rewriter');
+const { RagAnswerModule } = require('../../dist/rag-answer/rag-answer.module');
 const { PUBLICATION_ACCESS, RAG_ANSWER_OPTIONS } = require('../../dist/rag-answer/rag-answer-tokens');
 const { SummaryController } = require('../../dist/rag-answer/summary.controller');
 const { startApp } = require('../u2/support.cjs');
@@ -149,8 +151,26 @@ function putPublication(access, overrides = {}) {
 }
 
 /**
- * U5 컨트롤러 둘을 실제 AppModule(공통 Guard·오류 필터·DB·개발 로그인)과 함께 실제 로컬 HTTP로 띄운다.
- * 다른 Unit 자리는 모두 대역이다. RagAnswerModule은 쓰지 않는다(앱 미등록, 모듈 조립은 summary-controller 시험에서 따로 본다).
+ * 실제 AppModule에서 U5 등록(RagAnswerModule.register)만 뺀 조립. 나머지 imports·컨트롤러·공급자는 AppModule 그대로다.
+ * 대역을 넣은 U5 컨트롤러를 따로 붙이므로, 실제 등록이 함께 있으면 같은 경로가 둘이 되고 BASE_SUMMARY 처리기도 실제 것이 등록된다.
+ * 앱 등록 자체는 rag-answer-app.test.cjs가 실제 AppModule로 본다.
+ */
+function appModuleWithoutRagAnswer() {
+  const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule);
+  const kept = imports.filter((entry) => entry?.module !== RagAnswerModule);
+  if (kept.length !== imports.length - 1) throw new Error('AppModule imports에서 RagAnswerModule 등록을 정확히 하나 찾지 못했다');
+  class AppModuleWithoutRagAnswer {}
+  Module({
+    imports: kept,
+    controllers: Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, AppModule),
+    providers: Reflect.getMetadata(MODULE_METADATA.PROVIDERS, AppModule),
+  })(AppModuleWithoutRagAnswer);
+  return AppModuleWithoutRagAnswer;
+}
+
+/**
+ * U5 컨트롤러 둘을 실제 앱 조립(공통 Guard·오류 필터·DB·개발 로그인, U5 등록만 뺌)과 함께 실제 로컬 HTTP로 띄운다.
+ * 다른 Unit 자리는 모두 대역이다.
  */
 async function startRagAnswerApp({ clock, keepAliveMs = 15_000, counter, dailyRunLimit, aiRun, withRealDailyRunLimit = false }) {
   const fakes = {
@@ -168,7 +188,7 @@ async function startRagAnswerApp({ clock, keepAliveMs = 15_000, counter, dailyRu
     ...(withRealDailyRunLimit ? [DailyRunLimit] : [{ provide: DailyRunLimit, useValue: fakes.dailyRunLimit }]),
   ];
   class RagAnswerTestModule {}
-  Module({ imports: [AppModule], controllers: [QnaController, SummaryController], providers })(RagAnswerTestModule);
+  Module({ imports: [appModuleWithoutRagAnswer()], controllers: [QnaController, SummaryController], providers })(RagAnswerTestModule);
   const logs = [];
   const server = await startApp(RagAnswerTestModule, logs);
   return { server, fakes, logs };

@@ -1,0 +1,16 @@
+{
+  "stage": "code-generation",
+  "unit": "u8-pdf-materials",
+  "version": 1,
+  "note": "Step 1~3까지의 경로. Step 4 이후 진행 시 이어 쓴다.",
+  "writes": [
+    { "path": "api/src/database/migrations/1793977402870-CreatePdfMaterialTables.ts" },
+    { "path": "api/src/materials/pdf-material.entity.ts" },
+    { "path": "api/src/materials/pdf-page-text.entity.ts" },
+    { "path": "api/src/publications/published-pdf-page.entity.ts" },
+    { "path": "api/docs/member-withdrawal-deletion.md" },
+    { "path": "api/test/db/pdf-tables.test.cjs" },
+    { "path": "api/test/db/member-cascade-delete.test.cjs" },
+    { "path": "api/test/integration/result-application-b.test.cjs" }
+  ]
+}
