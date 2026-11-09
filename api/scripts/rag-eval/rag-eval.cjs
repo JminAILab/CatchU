@@ -7,7 +7,7 @@
 //   결과 원문과 기록 모두 로컬 폴더(api/.rag-eval/)에만 쓴다. NFR3 측정이 아니다.
 // - measure: 실제 게이트(Claude)·실제 검색(Voyage)과 테스트가 아닌 DB의 시연 발행본으로 한 번 잰다(U4 합류 뒤, BR10.1).
 //   원문은 api/.rag-eval/에, 건수·위치·빈 판정 칸 기록은 api/docs/rag-evaluation/<날짜>.md에 쓴다.
-// 입력 파일 모양: { publicationId, questions: [{ question, goldQuotes: [글귀] }](measure는 10개), jd?: 문자열, targetVersion?,
+// 입력 파일 모양: { publicationId, memberId(measure만, 실행자 본인), questions: [{ question, goldQuotes: [글귀] }](measure는 10개), jd?: 문자열, targetVersion?,
 //   snapshot?: { title, publishedAt, expiresAt, items }(synthetic만, 없으면 내장 합성 발행본) }
 require('reflect-metadata');
 const { randomBytes } = require('node:crypto');
@@ -42,6 +42,9 @@ function parseInput(raw, mode) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new RagEvalInputError('입력은 객체여야 합니다.');
   if (typeof raw.publicationId !== 'string' || !UUID.test(raw.publicationId)) throw new RagEvalInputError('publicationId는 uuid여야 합니다.');
   if (!Array.isArray(raw.questions) || raw.questions.length === 0) throw new RagEvalInputError('questions가 비어 있습니다.');
+  if (mode === 'measure' && (typeof raw.memberId !== 'string' || !UUID.test(raw.memberId))) {
+    throw new RagEvalInputError('measure 모드는 실행자 본인의 회원 번호(memberId, uuid)가 필요합니다.');
+  }
   if (mode === 'measure' && raw.questions.length !== MEASURE_QUESTION_COUNT) {
     throw new RagEvalInputError(`measure 모드는 질문 ${MEASURE_QUESTION_COUNT}개가 필요합니다.`);
   }
@@ -53,6 +56,7 @@ function parseInput(raw, mode) {
   if (raw.jd !== undefined && raw.jd !== null && typeof raw.jd !== 'string') throw new RagEvalInputError('jd는 문자열이어야 합니다.');
   return {
     publicationId: raw.publicationId,
+    memberId: mode === 'measure' ? raw.memberId : null,
     questions: raw.questions.map((entry) => ({ question: entry.question.trim(), goldQuotes: entry.goldQuotes })),
     jd: typeof raw.jd === 'string' && raw.jd.trim() !== '' ? raw.jd : null,
     targetVersion: typeof raw.targetVersion === 'string' && raw.targetVersion !== '' ? raw.targetVersion : 'unknown',
@@ -217,13 +221,14 @@ function createSyntheticDeps(input) {
  * measure 모드의 실제 연결. 키 둘이 있어야 하고 테스트 DB에서는 돌지 않는다(BR10.1, NFR3.1).
  * publicationAccess는 U4의 DB PublicationAccess다(C-10 readSnapshot). published_chunk 직접 읽기는 JD 전체 넣기의 읽기 전용 사용뿐이다.
  */
-async function createMeasureDeps({ env = process.env, publicationAccess }) {
+async function createMeasureDeps({ env = process.env, publicationAccess, memberId }) {
   if (!env.CATCHU_GENERATION_API_KEY?.trim()) throw new RagEvalInputError('measure 모드는 CATCHU_GENERATION_API_KEY가 있어야 합니다.');
   if (!env.CATCHU_EMBEDDING_API_KEY?.trim()) throw new RagEvalInputError('measure 모드는 CATCHU_EMBEDDING_API_KEY가 있어야 합니다.');
   const { buildDataSourceOptions, readDatabaseConfig } = require('../../dist/database/database.config');
   const config = readDatabaseConfig(env);
   if (config.database.endsWith('_test')) throw new RagEvalInputError('measure 모드는 테스트 DB에서 돌지 않습니다.');
   if (!publicationAccess) throw new RagEvalInputError('measure 모드는 U4의 DB PublicationAccess가 필요합니다.');
+  if (typeof memberId !== 'string' || !UUID.test(memberId)) throw new RagEvalInputError('measure 모드는 실행자 본인의 memberId가 필요합니다.');
   const { DataSource } = require('typeorm');
   const { createCheckedAiGenerationGate } = require('../../dist/ai-generation/checked-gate');
   const { readEmbeddingConfig } = require('../../dist/published-index/embedding-config');
@@ -231,7 +236,7 @@ async function createMeasureDeps({ env = process.env, publicationAccess }) {
   const { createPublishedSearch } = require('../../dist/published-index/published-search');
   const dataSource = await new DataSource(buildDataSourceOptions(config)).initialize();
   return {
-    readSnapshot: (publicationId) => publicationAccess(dataSource).readSnapshot(publicationId),
+    readSnapshot: ownedSnapshotReader(publicationAccess(dataSource), memberId),
     search: createPublishedSearch({ dataSource, provider: createEmbeddingProvider(readEmbeddingConfig(env), env) }),
     gate: createCheckedAiGenerationGate({ apiKey: env.CATCHU_GENERATION_API_KEY }),
     readAllChunks: (publicationId) => dataSource.transaction(async (manager) => {
@@ -247,8 +252,25 @@ async function createMeasureDeps({ env = process.env, publicationAccess }) {
 }
 
 /**
+ * 발행본 주인 확인 뒤 사본 읽기(#493 리뷰). runRagEval은 사본을 가장 먼저 읽으므로, 주인이 아니면 검색·생성 같은 외부 호출 전에 멈춘다.
+ * 주인 판정은 작성자 화면과 같은 C-10 resolveForOwner다. 없는 발행본과 남의 발행본은 같은 NotFound라 구분하지 않는다.
+ * 실행자 본인의 다른 발행본은 통과한다(시연용 여부는 확인하지 않는다).
+ */
+function ownedSnapshotReader(access, memberId) {
+  return async (publicationId) => {
+    try {
+      await access.resolveForOwner(memberId, publicationId);
+    } catch (error) {
+      if (error?.name === 'NotFound') throw new RagEvalInputError('memberId 회원의 발행본이 아니거나 없는 발행본입니다. 외부 호출 없이 멈춥니다.');
+      throw error;
+    }
+    return access.readSnapshot(publicationId);
+  };
+}
+
+/**
  * measure 모드의 사본 읽기. 앱과 같은 U4 C-10 DB 구현(`DbPublicationAccess`)을 평가 스크립트의 DataSource로 만든다.
- * 평가는 `readSnapshot`만 부른다. 그 경로는 grant 키·소유 회원·시계를 쓰지 않으므로 grant 키는 이 실행에서만 쓰는 무작위 값으로 둔다
+ * 평가는 `resolveForOwner`와 `readSnapshot`만 부른다. 두 경로는 grant 키를 쓰지 않으므로 grant 키는 이 실행에서만 쓰는 무작위 값으로 둔다
  * (앱의 링크 grant와 섞이지 않고, 받은 사람 판정에 쓰여도 어떤 grant도 통과하지 않는다).
  */
 function dbPublicationAccess(dataSource) {
@@ -283,7 +305,7 @@ async function main(argv) {
     deps = createSyntheticDeps(input);
   } else {
     // 측정은 실제 발행 경로로 만든 시연 발행본으로만 한다(BR10.1).
-    deps = await createMeasureDeps({ publicationAccess: dbPublicationAccess });
+    deps = await createMeasureDeps({ publicationAccess: dbPublicationAccess, memberId: input.memberId });
   }
   try {
     const { summary, rawPath, recordPath } = await runRagEval({ mode: options.mode, input, deps, outDir });
@@ -302,7 +324,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  EVAL_SEARCH_LIMIT, RagEvalInputError, createMeasureDeps, createSyntheticDeps, dbPublicationAccess, main, parseArgs, parseInput, runRagEval,
-  sampleInput,
+  EVAL_SEARCH_LIMIT, RagEvalInputError, createMeasureDeps, createSyntheticDeps, dbPublicationAccess, main, ownedSnapshotReader, parseArgs, parseInput,
+  runRagEval, sampleInput,
   splitJdRequirements,
 };

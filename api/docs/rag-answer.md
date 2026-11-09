@@ -121,7 +121,7 @@ npm --prefix api run rag-eval -- measure --input <파일> [--target <대상 버�
 입력 파일(JSON, 저장소에 넣지 않는다):
 
 ```json
-{ "publicationId": "uuid", "targetVersion": "커밋", "questions": [{ "question": "면접관 말투 질문", "goldQuotes": ["사본 원문 글귀"] }], "jd": "JD 원문(줄마다 요구사항 하나)" }
+{ "publicationId": "uuid", "memberId": "실행자 본인 회원 uuid(measure만)", "targetVersion": "커밋", "questions": [{ "question": "면접관 말투 질문", "goldQuotes": ["사본 원문 글귀"] }], "jd": "JD 원문(줄마다 요구사항 하나)" }
 ```
 
 | 모드 | 하는 일 | 결과 위치 |
@@ -133,7 +133,7 @@ npm --prefix api run rag-eval -- measure --input <파일> [--target <대상 버�
 - 질문마다 `search(…, 12)` 한 번으로 앞 5·8·12개 적중(같은 항목·같은 fieldPath에서 범위가 겹치면 적중)을 판정하고, 앞 8개로 질의응답과 같은 요청(지시문·모델)을 `generate`로 불러 통과·버린 항목 수를 모은다. 8개 기준 비적중 질문은 앞 8개 조각 위치를 기록에 남긴다.
 - JD 비교: 빈 줄을 뺀 줄마다 검색 기반(조각 8개)과 전체 넣기(`published_chunk`를 `seq` 순으로 모두 읽기 전용으로 읽음) 두 번 `JD_SUMMARY`를 부른다. 전체 넣기가 80,000자를 넘으면 `INPUT_TOO_LARGE`로 적는다. U10은 아직 합쳐지지 않아 스크립트의 나누기·지시문을 쓰고 기록에 "스크립트"로 적는다. `published_chunk` 직접 읽기는 이 평가 스크립트의 읽기 전용 사용뿐이고 서비스 경로는 C-09만 쓴다.
 - 저장소 기록에는 실행 날짜·대상 버전·모드, 적중률(5·8·12), 통과·버린 항목 수, 비적중 질문의 조각 위치, 요구사항마다 두 방식의 항목·버린 수, 빈 사람 판정 칸(남의 기여 오귀속, 근거 비뒷받침, 다른 곳의 맞는 근거 n건, 통과 여부, 조정 내용)만 있다. 질문·글귀·답 원문은 없다.
-- **`measure`의 사본 읽기는 앱과 같은 U4 DB 구현(`DbPublicationAccess.readSnapshot`)이다.** 실제 발행 경로로 만든 시연 발행본으로 한 번 잰다(BR10.1). 스크립트는 발행본의 주인이나 시연용 여부를 확인하지 않고 읽은 내용을 Claude·Voyage로 보내므로, 입력의 `publicationId`에는 실행자 본인의 시연 발행본만 넣는다. 아직 재지 않았다(#441). 판정·조정·재측정은 BR10.6을 따른다.
+- **`measure`의 사본 읽기는 앱과 같은 U4 DB 구현(`DbPublicationAccess.readSnapshot`)이다.** 실제 발행 경로로 만든 시연 발행본으로 한 번 잰다(BR10.1). 읽은 내용이 Claude·Voyage로 나가므로, 입력의 `memberId`(실행자 본인)가 그 발행본의 주인인지 작성자 화면과 같은 판정(`resolveForOwner`)으로 먼저 확인하고, 아니면 외부 호출 없이 멈춘다. 시연용 여부는 확인하지 않으니 `publicationId`에는 본인의 시연 발행본을 넣는다. 아직 재지 않았다(#441). 판정·조정·재측정은 BR10.6을 따른다.
 
 ## 알려진 한계
 
