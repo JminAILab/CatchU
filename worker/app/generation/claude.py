@@ -55,10 +55,11 @@ INFERENCE_GEO: Final = "us"
 # (generation-limits.md 「모델」).
 GENERATE_MODEL: Final = "claude-haiku-5-5"
 REWRITE_MODEL: Final = "claude-haiku-5-5"
-# 최대 출력 바이트(4,000)보다 적게 잡지 않는다. 토큰 수와 응답 글 길이는 일대일이 아니어서 이 값으로 최대 출력
-# 안의 응답이 잘리지 않는다고 보장하지는 못한다. 잘리면 `max_tokens` 멈춤으로 와 전체 응답을 쓰지 않는다.
+# max_tokens의 하한. max_tokens는 최대 출력 바이트(6,000)와 이 값 가운데 큰 값이다. 토큰 수와 응답 글 길이는
+# 일대일이 아니어서 최대 출력 안의 응답이 잘리지 않는다고 보장하지는 못한다. 잘리면 `max_tokens` 멈춤으로 와
+# 전체 응답을 쓰지 않는다.
 MIN_MAX_TOKENS: Final = 4_000
-# 받는 HTTP 응답 본문 상한(바이트, 압축하지 않은 크기). 최대 출력 4,000 B 응답의 JSON 본문보다 넉넉히 크다.
+# 받는 HTTP 응답 본문 상한(바이트, 압축하지 않은 크기). 최대 출력 6,000 B 응답의 JSON 본문보다 넉넉히 크다.
 MAX_RESPONSE_BYTES: Final = 256 * 1024
 
 # 받는 모델과 그 모델에서 생각을 끄는 설정. 표에 없는 모델은 받지 않는다(30일 보관이 필수인 모델이나 단가가

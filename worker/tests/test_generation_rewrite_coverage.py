@@ -104,10 +104,10 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
 
 pytestmark = pytest.mark.usefixtures("no_network")
 
-# 구현이 고른 값(제안값): 고쳐 쓰기 시간 제한 20초, 고쳐 쓰기 입력 20줄, 응답 4,000 B.
+# 구현이 고른 값(제안값): 고쳐 쓰기 시간 제한 20초, 고쳐 쓰기 입력 20줄. 응답 6,000 B는 2026-11-09 팀장 결정(#487).
 REWRITE_TIMEOUT_SECONDS = 20.0
 REWRITE_MAX_LINES = 20
-MAX_OUTPUT_BYTES = 4_000
+MAX_OUTPUT_BYTES = 6_000
 # 구현이 고른 실패 코드와 회원용 문구.
 UNVERIFIED = "GENERATION_UNVERIFIED"
 BUDGET_EXHAUSTED = "GENERATION_BUDGET_EXHAUSTED"
@@ -999,10 +999,10 @@ def test_rewrite_stops_when_time_runs_out_between_tries() -> None:
 
 
 def oversized_title(request: ProviderRequest) -> str:
-    """맞는 제목에 덧붙임을 더해 응답 크기 상한(4,000 B)을 넘긴 고쳐 쓰기 응답."""
+    """맞는 제목에 덧붙임을 더해 응답 크기 상한(6,000 B)을 넘긴 고쳐 쓰기 응답."""
     text = answer(
         title=code_title(label_line(request), label_of(request)),
-        note="가" * 1_500,
+        note="가" * 2_100,
     )
     assert len(text.encode("utf-8")) > MAX_OUTPUT_BYTES
     return text

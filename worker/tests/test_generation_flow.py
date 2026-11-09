@@ -1,7 +1,7 @@
 """생성 흐름(#120)의 상태·실패·호출 한도·시간·순서를 합성 제공자로 수집부터 결과 조합까지 돌린다.
 
 기대값은 #120 본문의 완료 기준과 2026-10-12 결정 댓글(결정 4·8·9·10·13·14), 계획의 「상태·실패 변환」
-표에서 정했다. 이슈가 구현에 맡긴 실패 코드 이름·회원용 문구·상한 수치만 이번 구현이 고른 값(45초·4,000 B,
+표에서 정했다. 이슈가 구현에 맡긴 실패 코드 이름·회원용 문구·상한 수치만 이번 구현이 고른 값(45초,
 「{원인} 설명 초안을 만들지 못했다」 등)을 기대값으로 따로 적는다. 생성 코드를 읽어 맞추지 않았다.
 
 후보는 열린 PR마다 본인 커밋 하나(또는 둘)를 둔 합성 저장소로 만든다. PR마다 고친 파일 이름이 달라서
@@ -112,9 +112,9 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
 # 모든 시험을 네트워크를 막은 채 돌린다(첫 범위의 검사 12).
 pytestmark = pytest.mark.usefixtures("no_network")
 
-# 구현이 고른 상한(제안값): 생성 호출 시간 제한 45초, 응답 4,000 B.
+# 구현이 고른 상한(제안값): 생성 호출 시간 제한 45초. 응답 6,000 B는 2026-11-09 팀장 결정(#487).
 GENERATION_TIMEOUT_SECONDS = 45.0
-MAX_OUTPUT_BYTES = 4_000
+MAX_OUTPUT_BYTES = 6_000
 
 # 구현이 고른 실패 코드와 회원용 문구. 문구는 「{원인} 설명 초안을 만들지 못했다」·「{원인} 생각해볼 질문을
 # 만들지 못했다」이고, 한도 실패는 후보에 묶이지 않은 ANALYSIS 1건이다.
@@ -952,7 +952,7 @@ def test_call_limits_are_passed_and_applied_per_call() -> None:
     case = generation_case(TWO, provider, limits=limits, clock=clock)
 
     assert_calls(provider, 2, timeout=12.5, max_output=1_500)
-    # 두 번째 응답은 기본 상한(4,000 B) 안이지만 이 요청의 상한(1,500 B)은 넘는다.
+    # 두 번째 응답은 기본 상한(6,000 B) 안이지만 이 요청의 상한(1,500 B)은 넘는다.
     assert len(padded(1_500)(provider.requests[1]).encode()) < MAX_OUTPUT_BYTES
     assert_failed_whole(case, 4)
     assert_failed_whole(case, 3)
