@@ -160,19 +160,28 @@ class OpenAIJudge:
 def _answers(
     request: JudgementRequest, decision: Any, started: float
 ) -> list[RawAnswer]:
-    """답을 질문 순서대로 (질문 id, 값)으로 바꾼다. 거절·모양이 틀린 답은 뺀다. 전체 모양이 틀리면 읽을 수 없다."""
+    """답을 (질문 id, 값)으로 바꾼다. 거절·모양이 틀린 답은 뺀다. 전체 모양이 틀리면 읽을 수 없다.
+
+    답은 이름(질문 id)으로 질문을 찾는다. 이름이 없는 답만 같은 자리의 질문으로 본다. 그래서 답 하나가 빠지거나
+    순서가 바뀌어도 뒤의 답이 버려지거나 다른 질문에 붙지 않는다(PR #500 리뷰). 같은 질문에 답이 둘 이상이면
+    답 읽기(`answers.read`)가 그 질문의 답을 모두 버린다.
+    """
     items = getattr(decision, "answers", None)
     if not isinstance(items, list):
         _log_failure(request, "RESPONSE_UNREADABLE", None, started)
         raise JudgementError("JUDGEMENT_RESPONSE_UNREADABLE")
+    by_id = {question.id: question for question in request.questions}
     found: list[RawAnswer] = []
     refusals = 0
     for index, item in enumerate(items):
-        if index >= len(request.questions):
-            break
-        question = request.questions[index]
         name = getattr(item, "name", None)
-        if name is not None and name != question.id:
+        if name is None:
+            question = (
+                request.questions[index] if index < len(request.questions) else None
+            )
+        else:
+            question = by_id.get(name) if isinstance(name, str) else None
+        if question is None:
             continue
         kind = getattr(item, "type", None)
         if kind == "refusal":

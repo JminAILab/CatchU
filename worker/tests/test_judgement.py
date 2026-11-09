@@ -829,6 +829,33 @@ def test_openai_unexpected_errors_are_not_hidden() -> None:
         ask(openai_judge(api), _catch(), Clock())
 
 
+def test_openai_answers_are_matched_by_name_not_position() -> None:
+    """답 하나가 빠지거나 순서가 바뀌어도 이름으로 질문을 찾는다. 이름이 없는 답만 같은 자리의 질문이다(PR #500 리뷰)."""
+    built = catch_request(
+        LINES,
+        record="Fix login",
+        ask_whole=False,
+        titles=[TITLE],
+        sentences=[SENTENCE, Written("s2", "alpha를 바꿨습니다.", ("c1f1:L3",))],
+        timeout_seconds=20.0,
+    )
+    assert built is not None
+    ids = [question.id for question in built.request.questions]
+    assert ids == ["q1", "q2", "q3", "q4"]
+    # q2(TITLE_CHOICE) 답이 빠지고 q4가 q3보다 먼저 온다. 이름 없는 답은 자리(index 2 → q3)로 본다.
+    api = FakeApi(
+        decision(
+            predicate("q1", 0.4),
+            predicate("q4", 0.95),
+            {"type": "predicate", "probability": 0.2},
+        )
+    )
+    answers = ask(openai_judge(api), built.request, Clock())
+    assert isinstance(answers, Answers)
+    assert answers.probabilities == {"q1": 0.4, "q4": 0.95, "q3": 0.2}
+    assert "q2" not in answers.choices
+
+
 def test_openai_answers_that_do_not_fit_their_question_are_dropped(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
