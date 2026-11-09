@@ -9,6 +9,7 @@ const { CatchAssetEntity } = require('../../dist/catches/entities/catch-asset.en
 const { RepositoryProtectionEntity } = require('../../dist/catches/entities/repository-protection.entity');
 const { CandidateRegistrationEntity } = require('../../dist/catches/entities/candidate-registration.entity');
 const { ResultApplicationRecord } = require('../../dist/result-application/result-application.entity');
+const { RepositoryRegistration } = require('../../dist/member-repositories/repository-registration.entity');
 const { CreateCatchAssets1790600000000 } = require('../../dist/database/migrations/1790600000000-CreateCatchAssets');
 const { CreateRepositoryProtection1790601000000 } =
   require('../../dist/database/migrations/1790601000000-CreateRepositoryProtection');
@@ -21,7 +22,7 @@ test('B의 외부 FK 메타데이터가 실제 A/E 엔티티와 마이그레이�
     type: 'postgres', database: 'catch_metadata_test', synchronize: false,
     namingStrategy: new SnakeNamingStrategy(),
     entities: [MemberAccount, AnalysisRequest, AnalysisConsent, AnalysisAttempt, CatchAssetEntity,
-      RepositoryProtectionEntity, CandidateRegistrationEntity, ResultApplicationRecord],
+      RepositoryProtectionEntity, CandidateRegistrationEntity, ResultApplicationRecord, RepositoryRegistration],
   });
   await dataSource.buildMetadatas();
   const statements = [];

@@ -1,0 +1,52 @@
+{
+  "stage": "nfr-requirements",
+  "unit": "u7-repository-analysis",
+  "upstream_ids": [
+    "NFR1",
+    "NFR2",
+    "NFR3",
+    "NFR4",
+    "NFR5",
+    "NFR6",
+    "NFR7"
+  ],
+  "coverage": [
+    {
+      "id": "NFR1",
+      "status": "OK",
+      "target": "NFR1.1, NFR1.2, NFR1.3"
+    },
+    {
+      "id": "NFR2",
+      "status": "OK",
+      "target": "NFR2.1, NFR2.2, NFR2.3, NFR2.4"
+    },
+    {
+      "id": "NFR3",
+      "status": "N/A",
+      "target": "질의응답 10개 RAG 품질 평가는 U7 저장소·분석의 소유 범위가 아니다. U7은 NFR2.2·NFR2.3으로 기존 가리기·기여·생성 검증을 유지한다."
+    },
+    {
+      "id": "NFR4",
+      "status": "OK",
+      "target": "NFR4.1, NFR4.2, NFR4.3, NFR4.4, NFR4.5, NFR4.6"
+    },
+    {
+      "id": "NFR5",
+      "status": "OK",
+      "target": "NFR5.1, NFR5.2"
+    },
+    {
+      "id": "NFR6",
+      "status": "OK",
+      "target": "NFR6.1, NFR6.2, NFR6.3"
+    },
+    {
+      "id": "NFR7",
+      "status": "OK",
+      "target": "NFR7.1, NFR7.2"
+    }
+  ],
+  "reverse": []
+}
+

@@ -1,5 +1,7 @@
 # 선정 지원 저장소 조회 — #136
 
+현행 실제 회원의 목록·직접 주소 등록은 [U7 등록·분석](repository-analysis-u7.md)을 따른다. `GET /v1/me/repositories`는 본인 등록을 읽고 `POST`는 공개 메타데이터를 확인해 회원별 등록을 만든다. 아래 전역 선정 설명은 10월 경로의 기록이며 개발 합성 공급 조건은 유지한다.
+
 `GET /v1/me/repositories`는 인증된 회원의 현재 연결에서 **선정 지원 공개 저장소**를 조회한다. [회원 API 계약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml)의 저장소 목록과 [공통 응답 규격](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml)의 Repository·PageInfo를 따른다.
 
 ## 공급자와 응답

@@ -118,6 +118,7 @@ def verify_repository(
     paths: RepositoryPaths,
     *,
     read_default_branch: bool = False,
+    expected_repository_id: str | None = None,
 ) -> str | None:
     """대상 저장소에 접근되고, 응답이 요청한 공개 저장소인지 확인한다.
 
@@ -132,6 +133,13 @@ def verify_repository(
         )
     with reading():
         full_name = normalize.repository_full_name(fetched.data)
+    if expected_repository_id is not None:
+        actual_id = fetched.data.get("id") if isinstance(fetched.data, dict) else None
+        if type(actual_id) is not int or str(actual_id) != expected_repository_id:
+            raise stop(
+                FailureCode.SCOPE_INCONSISTENT,
+                "등록 당시 저장소 ID와 일치하지 않아 수집을 멈췄다",
+            )
     if not paths.repository.same_as(full_name):
         raise stop(
             FailureCode.SCOPE_INCONSISTENT,

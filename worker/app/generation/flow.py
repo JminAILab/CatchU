@@ -163,7 +163,7 @@ def run_generation(
     """built는 같은 요청·수집 결과로 만든 `build_candidates(request, outcome)`의 결과다.
 
     deadline은 생성 몫이 끝나야 할 시각이다(요청 전체 마감에서 결과 조합·전송 여유를 뺀 값). 큐 소비자는
-    꺼낸 시각 + 20분 − 60초를 넘긴다(#121).
+    꺼낸 시각 + 60분 − 60초를 넘긴다(#424).
     """
     report = GenerationReport()
     materials = gather(request, outcome, built)
@@ -208,9 +208,7 @@ def run_generation(
     report.rewrite_calls = budget.rewrite_calls
     _log(request, report)
     return GenerationRun(
-        GenerationOutput(
-            candidates=candidates, not_provided=built.not_provided, failures=failures
-        ),
+        replace(built, candidates=candidates, failures=failures),
         report,
     )
 

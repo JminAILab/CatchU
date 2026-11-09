@@ -147,6 +147,28 @@ class GenerationOutput:
     candidates: tuple[EligibleCandidate, ...] = ()
     not_provided: tuple[NotProvided, ...] = ()
     failures: tuple[StageFailure, ...] = ()
+    own_commit_observation: Literal["UNKNOWN", "NONE", "FOUND"] = "UNKNOWN"
+    observed_own_commit_count: int | None = None
+    collection_limit_notes: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        count = self.observed_own_commit_count
+        valid = (
+            self.own_commit_observation == "UNKNOWN"
+            and count is None
+            or self.own_commit_observation == "NONE"
+            and type(count) is int
+            and count == 0
+            or self.own_commit_observation == "FOUND"
+            and type(count) is int
+            and count > 0
+        )
+        if not valid:
+            raise ValueError("본인 커밋 관측과 개수가 맞지 않는다")
+        if self.own_commit_observation == "NONE" and (
+            self.candidates or self.failures or self.collection_limit_notes
+        ):
+            raise ValueError("본인 기록 없음은 완전 조회의 정상 0건에서만 사용한다")
 
 
 class Generator(Protocol):

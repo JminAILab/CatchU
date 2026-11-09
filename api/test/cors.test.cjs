@@ -9,12 +9,13 @@ const { readCorsOrigins } = require('../dist/cors');
 
 const WEB = 'http://localhost:3000';
 
-// production은 공유 URL 주소(https, #147·#218)와 grant 서명 키(#150)가 필수라 합성 값을 함께 준다.
-const PRODUCTION = { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111' };
+// production은 공유 URL 주소(https, #147·#218)·grant 서명 키(#150)·임베딩 키(#431)가 필수라 합성 값을 함께 준다.
+const PRODUCTION = { NODE_ENV: 'production', SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: '1111111111111111111111111111111111111111111111111111111111111111',
+  CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key' };
 
 async function start(t, corsValue, environment = {}) {
   const keys = ['AUTH_WEB_ORIGIN', 'AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'SHARE_LINK_WEB_BASE_URL',
-    'LINK_GRANT_SECRET', 'CORS_ALLOWED_ORIGINS'];
+    'LINK_GRANT_SECRET', 'CORS_ALLOWED_ORIGINS', 'CATCHU_EMBEDDING_API_KEY'];
   const before = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   delete process.env.SHARE_LINK_WEB_BASE_URL;
   delete process.env.LINK_GRANT_SECRET;
@@ -94,6 +95,8 @@ test('허용한 web 출처는 CORS 헤더를 받고 Retry-After를 읽을 수 �
   assert.equal(options.headers.get('access-control-allow-origin'), WEB);
   const allowed = options.headers.get('access-control-allow-headers').toLowerCase().split(',');
   for (const header of ['authorization', 'content-type', 'idempotency-key', 'x-link-grant']) assert.ok(allowed.includes(header), header);
+  const methods = options.headers.get('access-control-allow-methods').split(',');
+  for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) assert.ok(methods.includes(method), `${method}: web 회원 호출이 쓰는 메서드(#452)`);
   assert.equal(options.headers.get('access-control-allow-credentials'), 'true', '#250 개발 허용 출처는 Refresh 쿠키를 전달한다');
 
   const login = await request('/v1/auth/dev-login', {

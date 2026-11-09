@@ -1,0 +1,37 @@
+{
+  "stage": "functional-design",
+  "unit": "u6-claude-mcp",
+  "upstream_ids": [
+    "AC13.1.1", "AC13.1.2", "AC13.1.3", "AC13.1.4",
+    "AC13.2.1", "AC13.2.2", "AC13.2.3", "AC13.2.4"
+  ],
+  "coverage": [
+    { "id": "AC13.1.1", "status": "OK", "target": "BR1.1, BR2.1, BR2.2, BR3.1, BR3.2, BR3.7, BR4.1, BR4.3" },
+    { "id": "AC13.1.2", "status": "OK", "target": "BR3.4, BR4.2, BR4.5, BR4.7, BR4.8" },
+    { "id": "AC13.1.3", "status": "OK", "target": "BR4.7, BR7.2, BR7.5" },
+    { "id": "AC13.1.4", "status": "OK", "target": "BR6.1, BR6.4, BR6.5" },
+    { "id": "AC13.2.1", "status": "OK", "target": "BR3.3, BR3.5" },
+    { "id": "AC13.2.2", "status": "OK", "target": "BR5.1, BR5.3, BR5.4, BR5.5" },
+    { "id": "AC13.2.3", "status": "OK", "target": "BR5.1" },
+    { "id": "AC13.2.4", "status": "OK", "target": "BR4.7, BR5.2" }
+  ],
+  "reverse": [
+    { "id": "BR1.2", "status": "N/A", "target": "요약 확인(로컬의 api 주소), 보안 점검 설정·개발용 기능" },
+    { "id": "BR1.3", "status": "N/A", "target": "요약 확인(주소, 로컬의 api 주소)" },
+    { "id": "BR1.4", "status": "N/A", "target": "Q1, Q2, 요약 확인(새 설정), 보안 점검 설정·개발용 기능" },
+    { "id": "BR2.3", "status": "N/A", "target": "보안 점검 요청·메시지 입력(경계 입력 검사)" },
+    { "id": "BR2.4", "status": "N/A", "target": "요약 확인(승인에 쓰이지 않은 등록 정리), C-06" },
+    { "id": "BR2.5", "status": "N/A", "target": "Q6, FR13.6의 인증 전 예외" },
+    { "id": "BR3.6", "status": "N/A", "target": "요약 확인(승인 흐름), OAuth 거절 응답" },
+    { "id": "BR4.4", "status": "N/A", "target": "요약 확인(코드·토큰), 타이머 없는 만료 행 정리" },
+    { "id": "BR4.6", "status": "N/A", "target": "요약 확인(코드·토큰), 원격 연결 resource 표시 확인" },
+    { "id": "BR5.6", "status": "N/A", "target": "C-15 원격 연결(Streamable HTTP), 요약 확인(도구)" },
+    { "id": "BR5.7", "status": "N/A", "target": "C-15 common-errors, 에러 대응 최소선 1, 요약 확인(오류)" },
+    { "id": "BR6.2", "status": "N/A", "target": "Q4, 에러 대응 최소선 1" },
+    { "id": "BR6.3", "status": "N/A", "target": "Q5, U5 기능 설계 BR3.2" },
+    { "id": "BR7.1", "status": "N/A", "target": "FR13.1 만료와 해제 안내, 요약 확인(연결 관리)" },
+    { "id": "BR7.3", "status": "N/A", "target": "FR13.1, 요약 확인(연결 관리)" },
+    { "id": "BR7.4", "status": "N/A", "target": "FR14.1, FR14.6, FR14.8, C-06, C-15 tables" },
+    { "id": "BR8.1", "status": "N/A", "target": "team.md Code Style, 보안 점검 로그·오류 응답" }
+  ]
+}

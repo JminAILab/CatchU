@@ -94,10 +94,15 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/(member)/home/` | 회원 가드 안의 로그인 후 홈. 연결 상태 안내와 다음 행동을 조립한다([기능 안내](src/features/home/README.md)) |
 | `src/app/(member)/assets/` | 회원 가드 안의 실제 내 자산 페이지. B 목록·상세와 D 저장소 모달을 조립한다([기능 안내](src/features/assets/README.md)) |
 | `src/app/(member)/profile/github/`, `(member)/github/callback/` | 회원 가드 안의 GitHub 연동 화면과 GitHub 콜백 화면([기능 안내](src/features/github-connection/README.md)) |
-| `src/app/s/[token]/` | 공유 링크 수신자 목록·Catch 상세. 회원 로그인 없이 수신자 API에 연결한다([기능 안내](src/features/recipient/README.md)) |
+| `src/app/(member)/profile/claude/` | 12월 U6: 회원 가드 안의 Claude 연결 관리·승인 화면([기능 안내](src/features/claude-connection/README.md)) |
+| `src/app/s/[token]/` | 발행본 받은 사람 화면(U4 W4). 회원 로그인 없이 받은 사람 API에 연결한다([기능 안내](src/features/recipient/README.md)) |
 | `src/components/header/` | 로그인·비로그인·수신자 헤더와 프로필 메뉴 |
 | `src/components/notice-dialog/` | 채용공고·알림 안내창 |
 | `src/components/status/` | 불러오는 중·조회 실패·정상 0건 공통 표시 |
+| `src/components/ai-consent/` | 12월 U2: 외부 AI 첫 이용 동의 창·한 줄 안내([안내](src/components/ai-consent/README.md)) |
+| `src/components/recipient-guide/` | 12월 U2: 받은 사람 안내 묶음(U4가 받은 사람 화면 위쪽에 닮, [시작 안내](src/features/start-guide/README.md)) |
+| `src/components/error-pages/`, `src/app/not-found.tsx`, `src/app/error.tsx` | 12월 U2: 404·기본 오류 화면([시작 안내](src/features/start-guide/README.md)) |
+| `src/features/start-guide/`, `src/features/withdrawal/` | 12월 U2: 회원 홈 시작 안내, 회원 탈퇴([탈퇴](src/features/withdrawal/README.md)) |
 | `src/lib/routes.ts` | 페이지 주소 상수. 아래 「페이지 주소」 표와 함께 고친다 |
 | `scripts/smoke.mjs` | 최소 실행 검사(`check:run`) |
 | `package.json` / `package-lock.json` | 의존성·스크립트·Node 버전 고정 |
@@ -123,7 +128,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | 묶음 폴더 | 헤더 | 구성 (#55 10월 헤더 합의) |
 |---|---|---|
 | `src/app/(guest)/` | 비로그인 일반 | 왼쪽 로고(→ `/`) / 오른쪽 [Google로 시작하기](→ 로그인 진입). 내 자산·공유 링크·프로필은 없음 |
-| `src/app/(member)/` | 로그인 일반·발행자 | 왼쪽 로고(→ `/home`)·내 자산·공유 링크·채용공고 / 오른쪽 알림·프로필. 대표 구성 진입점은 10월에 없음 |
+| `src/app/(member)/` | 로그인 일반·발행자 | 왼쪽 로고(→ `/home`)·내 자산·텍스트 자료(U4)·발행본(U4)·공유 링크·채용공고 / 오른쪽 알림·프로필. 대표 구성 진입점은 10월에 없음 |
 | `src/app/s/` | 공유 링크 수신자 | 이동 없는 CatchU 브랜드만. 로그인 여부와 무관하며 로그인·프로필 버튼 없음 |
 
 - **회원 화면 폭:** 창 폭 760px부터 지원한다. `(member)/layout.tsx`의 전용 CSS는 760px 미만에서만 헤더·본문 폭을 760px로 유지하고 문서 가로 스크롤을 허용한다. 760px 이상에서는 세로 스크롤바를 뺀 가용 폭에 맞추며, 헤더 메뉴는 글자 단위로 줄바꿈하지 않는다. 회원 화면 검증 폭은 760·1024·1536px이다. 비로그인·공유 링크 수신자 레이아웃에는 이 최소 폭을 적용하지 않는다([#412 회원 화면 범위](https://github.com/JminAILab/CatchU/issues/412)).
@@ -148,18 +153,22 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/` | 서비스 소개 | D | 불필요 | 제안 | 로그아웃 성공 후 비로그인 홈 이동은 확정(#55) |
 | `/login` | 로그인 진입 | A / 틀 D | 불필요 | 제안 | 회원 경로 가드의 이동 목적지. Google 로그인은 통합 시험 전환(아래 「공통 인증」)을 켰을 때만 연결되고 끄면 연결 전 표시(A, #287), 개발용 로그인은 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`일 때만 |
 | `/google/callback` | Google 로그인 콜백 | A | 불필요 | 확정 | api `GOOGLE_REDIRECT_URI`와 같은 주소(로컬 `http://localhost:3000/google/callback`). 통합 시험 전환을 켰을 때만 열고 끄면 404. 주소의 `code`·`state`·`error`는 해석 뒤 지운다([인증 화면](src/features/auth-screens/README.md)) |
-| `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 Catch 탭 저장소 연결 관리로 이동(확정). GitHub 미연동·재연동 필요는 연동 화면(`/profile/github`)으로 이동하되, 공통 인증 통합 시험 전환을 끈 제품 기본값에서는 비활성과 이유를 보인다([홈](src/features/home/README.md)) |
+| `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 내 자산의 저장소 연결 관리로 이동(확정). GitHub 미연동·재연동 필요는 연동 화면(`/profile/github`)으로 이동하되, 공통 인증 통합 시험 전환을 끈 제품 기본값에서는 비활성과 이유를 보인다([홈](src/features/home/README.md)) |
 | `/profile/setup` | 최초 프로필 입력 (W02) | A | 필요 | 제안 | 저장 성공 후 회원 정보를 다시 불러온 뒤 `/home` |
-| `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지. 수정(`/profile/edit`)·GitHub 연동(`/profile/github`)으로 진입하는 링크를 둔다 |
+| `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지. 수정(`/profile/edit`)·GitHub 연동(`/profile/github`)·Claude 연결(`/profile/claude`)로 진입하는 링크를 둔다 |
 | `/profile/edit` | 프로필 수정 (W02) | A | 필요 | 제안 | 저장 성공·취소 후 `/profile`로 복귀하고, 저장 실패 시 이 화면과 입력을 유지 |
-| `/profile/github` | GitHub 연동 (W02-G) | A | 필요 | 제안 | 성공 후 Catch 탭 저장소 연결 관리(`/assets`)로 복귀(확정). 연결 시작은 공통 인증 통합 시험 전환을 켰을 때만 하고, 끈 제품 기본값에서는 상태 조회와 `/assets` 이동만 한다. 모달 자동 열기는 #153에서 정한다([GitHub 연동](src/features/github-connection/README.md)) |
+| `/profile/github` | GitHub 연동 (W02-G) | A | 필요 | 제안 | 성공 후 내 자산의 저장소 연결 관리(`/assets`)로 복귀(확정). 연결 시작은 공통 인증 통합 시험 전환을 켰을 때만 하고, 끈 제품 기본값에서는 상태 조회와 `/assets` 이동만 한다. 모달 자동 열기는 #153에서 정한다([GitHub 연동](src/features/github-connection/README.md)) |
 | `/github/callback` | GitHub 연동 콜백 | A | 필요 | 제안 | api `GITHUB_OAUTH_CALLBACK_URL`의 목적지. 처리 뒤 주소의 `code`·`state`를 지운다. `next`에 싣지 않는다 |
-| `/assets` | 내 자산 (Catch 탭) | B / 연결 관리 D | 필요 | 제안 | Catch 탭을 기본으로 표시. 준비 중 탭의 주소(`tab`) 반영 여부는 미정 |
+| `/profile/claude` | Claude 연결 관리 | U6 | 필요 | 확정 | 상태, MCP 주소 복사, 확인 뒤 전체 해제. 상세 프로필과 시작 안내에서 이어 준다([Claude 연결](src/features/claude-connection/README.md)) |
+| `/profile/claude/authorize` | Claude 연결 승인 | U6 | 필요 | 확정 | api `/authorize`가 쿼리(`client_id`·`redirect_uri`·`state`·`code_challenge`·`resource`)와 함께 보내는 주소. 로그인이 안 됐으면 로그인 화면을 거쳐 돌아온다 |
+| `/assets` | 내 자산 (Catch 목록) | B / 연결 관리 D | 필요 | 제안 | Catch 목록과 저장소 연결 관리만 표시. 자산 종류 탭은 #416 팀장 요청(2026-11-03)으로 지웠고 예전 `tab` 쿼리는 무시한다 |
 | `/assets?repositoryId=…` | 저장소 필터 | B | 필요 | 제안 | PR #156의 B 제안. 값은 저장소 식별자 |
 | `/assets?catchId=…` | Catch 상세 모달 | B | 필요 | 제안 | PR #156 제안: 닫으면 `catchId`만 제거하고 필터 유지. 새로고침·뒤로 가기·재로그인 후 상태 유지는 확정 |
-| `/links` | 링크 목록·발급·복사·중단 | C | 필요 | 제안 | 발급은 이 페이지의 폼·모달로 처리 |
-| `/s/[token]` | 수신자 링크 | C | 불필요 | 제안 | 수신자 전용 헤더 |
-| `/s/[token]/catches/[catchId]` | 수신자 Catch 상세 | C | 불필요 | 제안 | 직접 진입해도 접근 판정·비밀번호 확인 후 표시 |
+| `/materials` | 텍스트 자료 목록·편집 | U4 | 필요 | 확정 | U4 담당 결정 D3(2026-10-29, [U4 코드 요약](../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/code-generation/code-summary.md) 「구현 결정과 설계 후속 변경 기록」). 목록과 편집을 한 화면에 둔다([텍스트 자료](src/features/materials/README.md)) |
+| `/publications` | 발행본 목록 | U4 | 필요 | 확정 | U4 담당 결정 D4(2026-11-03). 최신순 목록, [URL 복사], [링크 열기](`ACTIVE`만)([발행·발행본](src/features/publications/README.md)) |
+| `/publications/new` | 발행 | U4 | 필요 | 확정 | 본인 Catch·텍스트 자료 고르기·순서·제목·비밀번호 → 확인 → 발행 완료를 한 화면에 둔다 |
+| `/publications/[publicationId]` | 발행본 상세 | U4 | 필요 | 확정 | 사본·상태·만료·링크 주소, 링크 중지·삭제. 기본 요약 패널(U5) 자리는 비워 둠 |
+| `/s/[token]` | 받은 사람 발행본 열람(U4 W4) | C | 불필요 | 제안 | 수신자 전용 헤더. 10월 `/links`·`/s/[token]/catches/[catchId]`는 U4 제출 3(W6)에서 없앴다 |
 
 **주소 원칙(제안):** 이름 조회·회원 가드·로그인 이동을 연결했다. 현재 범위와 최초 프로필 저장 연결은 [회원 진입 연결](src/features/member-entry/README.md), 프로필 상세·수정은 [프로필 화면](src/features/profile/README.md)을 따른다.
 - 토큰 없이 회원 경로에 들어오거나 회원 API가 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 `/login`으로 보낸다. 수신자 비밀번호 401은 수신자 화면에서 처리한다.
@@ -207,13 +216,17 @@ if (isSettledResult(created)) key.reset();          // 성공·4xx 업무 거부
 // 수신자 API: 회원 토큰을 붙이지 않는다. 비밀번호 링크는 grant를 X-Link-Grant로 보낸다.
 const page = await api.recipient(`/public/links/${encodeURIComponent(token)}`, { linkGrant });
 
+// 공유 링크 안의 회원 API(JD 요약 등): 회원 토큰과 grant를 함께 보낸다.
+const run = await api.member(`/public/links/${encodeURIComponent(token)}/jd-summaries`, { method: 'POST', body: { jdId }, linkGrant });
+
 // 비밀번호 시도 제한(429 LINK_UNLOCK_LIMITED)·발급 빈도 제한(429 RATE_LIMITED)이면 남은 초가 retryAfterSeconds로 온다.
 const unlock = await api.recipient(`/public/links/${encodeURIComponent(token)}/unlock`, { method: 'POST', body: { password } });
 if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLimited(unlock.retryAfterSeconds);
 ```
 
 - 요청은 `cache: 'no-store'`로 보내고 쿠키를 싣지 않는다(`credentials: 'omit'`).
-- 회원 API가 401 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 그 토큰을 지운다. 회원 경로 가드가 `/login?next=<현재 경로>`로 보낸다. 수신자 401(`LINK_PASSWORD_*`)은 지우지 않고 수신자 화면이 처리한다.
+- 회원 API의 메서드는 GET·POST·PUT·PATCH·DELETE다. GET이 아닌 요청은 인증 갱신 뒤에도 자동으로 다시 보내지 않는다.
+- 회원 API가 401 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 그 토큰을 지운다. 회원 경로 가드가 `/login?next=<현재 경로>`로 보낸다. 링크 401(`LINK_PASSWORD_*`)은 수신자 호출이든 `linkGrant`를 실은 회원 호출이든 토큰을 지우지 않고 화면이 처리한다.
 - 자동 재시도하지 않는다. 서버가 저장했는지 알 수 없는 결과(조회 실패·5xx)면 키를 유지하고, 사용자가 다시 누르면 같은 키로 보낸다. 401도 앞선 같은 키 요청의 저장 여부를 알려 주지 않으므로 키를 유지한다. 429(빈도 제한)도 요청을 처리하지 않은 것이라 키를 유지하고, `Retry-After`가 지난 뒤 사용자가 다시 누르면 같은 키·본문으로 보낸다(#235 계약). 성공과 401·429를 뺀 4xx 업무 거부만 확정으로 본다(`isSettledResult`).
 - 로그인 복귀 후 키 보존은 아직 구현하지 않았다. 지금은 401이면 로그인 화면으로 이동하면서 화면이 다시 만들어져 키도 새로 생긴다. 후속 구현 조건: 로그인 뒤 키를 이어 쓰려면 실제 생성 화면에서 **같은 회원·같은 생성 요청일 때만** 이어 쓰고, 다른 계정으로 로그인했으면 키를 버린다. 로그인 뒤 이전 요청을 자동으로 다시 보내지 않는다.
 - 오류 응답에 `Retry-After`가 1 이상의 정수 초로 오면 `retryAfterSeconds`로 전달한다. 헤더가 없거나 다른 형식이면 붙이지 않으며, 남은 시간을 추정하지 않는다.

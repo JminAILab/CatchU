@@ -1,0 +1,273 @@
+{
+  "stage": "code-generation",
+  "unit": "u7-repository-analysis",
+  "upstream_ids": [
+    "AC1.2.1",
+    "AC1.2.2",
+    "AC1.2.3",
+    "AC1.2.4",
+    "AC1.2.5",
+    "AC1.2.6",
+    "AC1.2.7",
+    "AC1.2.8",
+    "AC1.3.1",
+    "AC1.3.2",
+    "AC1.3.3",
+    "AC1.3.4",
+    "NFR1.1",
+    "NFR1.2",
+    "NFR1.3",
+    "NFR2.1",
+    "NFR2.2",
+    "NFR2.3",
+    "NFR2.4",
+    "NFR4.1",
+    "NFR4.2",
+    "NFR4.3",
+    "NFR4.4",
+    "NFR4.5",
+    "NFR4.6",
+    "NFR5.1",
+    "NFR5.2",
+    "NFR6.1",
+    "NFR6.2",
+    "NFR6.3",
+    "NFR7.1",
+    "NFR7.2",
+    "BR1.1",
+    "BR1.2",
+    "BR1.3",
+    "BR1.4",
+    "BR2.1",
+    "BR2.2",
+    "BR2.3",
+    "BR3.1",
+    "BR4.1",
+    "BR4.2",
+    "BR4.3",
+    "BR5.1"
+  ],
+  "coverage": [
+    {
+      "id": "AC1.2.1",
+      "status": "OK",
+      "target": "api/src/member-repositories/repository-registration.service.ts"
+    },
+    {
+      "id": "AC1.2.2",
+      "status": "OK",
+      "target": "worker/tests/test_u7_observation.py"
+    },
+    {
+      "id": "AC1.2.3",
+      "status": "OK",
+      "target": "api/test/repository-registration.test.cjs"
+    },
+    {
+      "id": "AC1.2.4",
+      "status": "GAP",
+      "target": "합성 500개 관측·200개 상세/생성/반영만 확인. CatchU 공개 적용 후 실제 약 500개 실측과 상한 확정이 필요하다."
+    },
+    {
+      "id": "AC1.2.5",
+      "status": "OK",
+      "target": "worker/tests/test_generation_redact.py"
+    },
+    {
+      "id": "AC1.2.6",
+      "status": "GAP",
+      "target": "요청별 동의 사본은 구현했으나 U7 고지 수정안은 미확정이다. 기존 REAL_NOTICE v1을 보존했으며 팀장 확정·새 판본·PR 승인이 필요하다."
+    },
+    {
+      "id": "AC1.2.7",
+      "status": "OK",
+      "target": "api/test/repository-registration.test.cjs"
+    },
+    {
+      "id": "AC1.2.8",
+      "status": "GAP",
+      "target": "U2 #414 C-03 실제 제공자 미연결. 소비 경계·합성 거부/롤백 검사는 있으나 실제 KST 하루 제한은 미검증이며 제품 신규 접수는 닫힌다."
+    },
+    {
+      "id": "AC1.3.1",
+      "status": "OK",
+      "target": "web/src/features/repository-management/repository-status.ts"
+    },
+    {
+      "id": "AC1.3.2",
+      "status": "OK",
+      "target": "web/src/features/analysis-request/analysis-request-store.ts"
+    },
+    {
+      "id": "AC1.3.3",
+      "status": "OK",
+      "target": "api/test/db/u7-analysis-intake.test.cjs"
+    },
+    {
+      "id": "AC1.3.4",
+      "status": "OK",
+      "target": "api/test/db/u7-analysis-intake.test.cjs"
+    },
+    {
+      "id": "NFR1.1",
+      "status": "OK",
+      "target": "api/test/db/repository-registration.test.cjs"
+    },
+    {
+      "id": "NFR1.2",
+      "status": "OK",
+      "target": "api/test/repository-registration.test.cjs"
+    },
+    {
+      "id": "NFR1.3",
+      "status": "OK",
+      "target": "api/src/member-repositories/github-repository.client.ts"
+    },
+    {
+      "id": "NFR2.1",
+      "status": "GAP",
+      "target": "현재 고지/범위 검증과 불변 사본은 구현했다. U7 문구는 사용자 답변대로 미확정 초안이며 새 고지 판본 적용은 미실행이다."
+    },
+    {
+      "id": "NFR2.2",
+      "status": "OK",
+      "target": "worker/tests/test_generation_redact.py"
+    },
+    {
+      "id": "NFR2.3",
+      "status": "OK",
+      "target": "worker/tests/test_u7_pipeline.py"
+    },
+    {
+      "id": "NFR2.4",
+      "status": "OK",
+      "target": "worker/tests/test_generation_claude.py"
+    },
+    {
+      "id": "NFR4.1",
+      "status": "GAP",
+      "target": "실제 CatchU 약 500개 커밋의 목록·필요 상세·관계·생성·DB 반영 실측 미실행. 합성200개 반영은 대체 증거가 아니다."
+    },
+    {
+      "id": "NFR4.2",
+      "status": "GAP",
+      "target": "기존 시간/개수 상한을 유지하고 안전 집계만 추가했다. 실제 단계별 시간·큐 대기·상한 충돌 실측과 최종 수치 결정이 필요하다."
+    },
+    {
+      "id": "NFR4.3",
+      "status": "OK",
+      "target": "worker/tests/test_u7_budget.py"
+    },
+    {
+      "id": "NFR4.4",
+      "status": "OK",
+      "target": "worker/tests/test_consumer_settings.py"
+    },
+    {
+      "id": "NFR4.5",
+      "status": "GAP",
+      "target": "C-03 같은 접수 트랜잭션 소비 경계만 구현. U2 실제 제공자·KST 계산·원자 소비 통합은 #414 연결 후 확인한다."
+    },
+    {
+      "id": "NFR4.6",
+      "status": "OK",
+      "target": "api/test/integration/analysis-deadline.test.cjs"
+    },
+    {
+      "id": "NFR5.1",
+      "status": "OK",
+      "target": "api/test/db/repository-registration.test.cjs"
+    },
+    {
+      "id": "NFR5.2",
+      "status": "OK",
+      "target": "api/test/integration/receiver-parent-locking.test.cjs"
+    },
+    {
+      "id": "NFR6.1",
+      "status": "GAP",
+      "target": "새 등록→실제 GitHub→실제 생성→DB→본인 화면 Catch/근거 및 실제 거부 1~2종은 미실행. 공개 적용·C03·고지·실행 조건 준비가 필요하다."
+    },
+    {
+      "id": "NFR6.2",
+      "status": "OK",
+      "target": "worker/app/processing/pipeline.py"
+    },
+    {
+      "id": "NFR6.3",
+      "status": "OK",
+      "target": "api/test/integration/u7-analysis-chain.test.cjs"
+    },
+    {
+      "id": "NFR7.1",
+      "status": "OK",
+      "target": "web/test/repository-registration.test.mjs"
+    },
+    {
+      "id": "NFR7.2",
+      "status": "OK",
+      "target": "web/test/repository-registration.test.mjs"
+    },
+    {
+      "id": "BR1.1",
+      "status": "OK",
+      "target": "api/src/member-repositories/repository-registration.service.ts"
+    },
+    {
+      "id": "BR1.2",
+      "status": "OK",
+      "target": "api/src/member-repositories/registration-context.source.ts"
+    },
+    {
+      "id": "BR1.3",
+      "status": "OK",
+      "target": "api/src/member-repositories/github-repository.client.ts"
+    },
+    {
+      "id": "BR1.4",
+      "status": "GAP",
+      "target": "요청별 현재 고지/불변 범위 동의는 구현했으나 U7 문구 수정안은 미확정. 확정된 새 고지 판본을 적용하기 전 실제 실행하지 않는다."
+    },
+    {
+      "id": "BR2.1",
+      "status": "OK",
+      "target": "worker/tests/test_u7_pipeline.py"
+    },
+    {
+      "id": "BR2.2",
+      "status": "GAP",
+      "target": "안전 집계와 합성 경계 시험은 구현했으나 실제 약 500개 반영과 최종 상한 실측이 남았다."
+    },
+    {
+      "id": "BR2.3",
+      "status": "OK",
+      "target": "worker/tests/test_generation_redact.py"
+    },
+    {
+      "id": "BR3.1",
+      "status": "GAP",
+      "target": "C-03 소비 인터페이스와 트랜잭션 연결은 구현, 실제 제공 구현은 U2 #414 미연결이다."
+    },
+    {
+      "id": "BR4.1",
+      "status": "OK",
+      "target": "web/src/features/repository-management/repository-status.ts"
+    },
+    {
+      "id": "BR4.2",
+      "status": "OK",
+      "target": "api/test/db/u7-analysis-intake.test.cjs"
+    },
+    {
+      "id": "BR4.3",
+      "status": "OK",
+      "target": "api/test/db/u7-analysis-intake.test.cjs"
+    },
+    {
+      "id": "BR5.1",
+      "status": "GAP",
+      "target": "실제 새 경로 분석·거부 증거 및 통합 브랜치 병합이 없어 U7 전체 미완료다. 합성 결과로 대체하지 않는다."
+    }
+  ]
+}
+

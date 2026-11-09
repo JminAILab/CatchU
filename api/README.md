@@ -1,8 +1,8 @@
 # api — API 서버
 
-공유 링크 발급의 자동 통합 검사(`test/db/share-links-web-integration.test.cjs`)와 수동 재현 도구 `node scripts/verify-share-links-browser.cjs`의 실행 방법·판정 기준은 [#149 실행 안내](docs/share-links-integration-149.md)를 따른다. 실행 결과는 검증한 PR에 기록한다(첫 기록: [PR #266](https://github.com/JminAILab/CatchU/pull/266)).
+회원별 공개 저장소 직접 등록, 요청별 동의·하루 제한 소비 경계, 메시지 v2와 관측 상태는 [U7 등록·분석](docs/repository-analysis-u7.md)을 따른다. 이 문서에 DB 전환·양쪽 이미지 교체와 실제 실행 선행 조건도 정리했다.
 
-공개 선택·링크 수신자 열람의 화면 통합 검사(`test/integration/sharing-screen-web.test.cjs`)와 수동 확인 도구 `node scripts/verify-sharing-screen-browser.cjs`는 [#123 실행 안내](docs/sharing-screen-integration-123.md)를 따른다.
+10월 공유 링크 발급·목록·중단과 수신자 조회는 12월 U4 제출 3(#416, W6)에서 발행본 경로로 대체돼 없다. 그 통합 검사(`test/db/share-links-web-integration.test.cjs`·`test/integration/sharing-screen-web.test.cjs`)는 지웠고, 수동 확인 도구 `scripts/verify-share-links-browser.cjs`·`verify-sharing-screen-browser.cjs`와 [#149](docs/share-links-integration-149.md)·[#123 실행 안내](docs/sharing-screen-integration-123.md)는 10월 기록이라 지금 코드에서는 동작하지 않는다. 현행 받은 사람 경로는 [docs/recipient-publication.md](docs/recipient-publication.md)를 따른다.
 
 > 코드를 고치기 전에 [api 코딩 규약](CONVENTIONS.md), 이 문서, 맡은 기능의 `api/docs/<기능>.md`를 한 파일씩 따로 열어 읽는다(여러 파일을 한 번에 출력하면 가운데가 잘릴 수 있다). 기능별 안내는 이 README에 덧붙이지 않고 `api/docs/<기능>.md`로 쓴다.
 
@@ -136,6 +136,7 @@ curl.exe -i http://127.0.0.1:3001/health
 | `node --test test/worker-messages.test.cjs` | 빌드 없이 [M1 합성 결과 세트](../worker/fixtures/m1-synthetic/README.md)의 사례·음성 대조가 worker와 같은 스키마 판정을 내는지만 검사. `npm test`에도 포함 |
 | `npm start`         | `dist/main.js` 실행. 먼저 빌드 필요                                                                                  |
 | `npm run migration:run` / `migration:revert` / `migration:generate` | 개발 DB(`.env`의 `DB_*`)에 마이그레이션 적용·마지막 1개 되돌리기·엔티티와의 차이로 새 마이그레이션 생성(「엔티티와 마이그레이션」) |
+| `npm run rag-eval -- synthetic` / `-- measure --input <파일>` | 12월 U5 RAG 품질 평가(손 실행, CI 밖). synthetic은 합성 확인이며 결과를 `api/.rag-eval/`에만 쓴다. 입력·모드·결과 위치는 [docs/rag-answer.md](docs/rag-answer.md) 「RAG 품질 평가」 |
 
 ```powershell
 npm run lint
@@ -168,7 +169,7 @@ docker run -d --name catchu-db-test -p 127.0.0.1:5433:5432 -e POSTGRES_USER=catc
 DB를 쓰는 테스트를 추가할 때:
 
 - `test/support/test-database.cjs`의 `openTestDataSource()`로 접속하고, 각 테스트 앞(`beforeEach`)에서 `resetTestDatabase(dataSource)`를 불러 앞선 테스트의 자료 없이 시작한다. 초기화는 마이그레이션 기록을 뺀 모든 테이블을 비운다.
-- 테스트 파일은 줄마다 한 번에 하나씩 돈다(`--test-concurrency=1`). 잠금 대기 시험(`test/**/lock-wait-limit-*.test.cjs`)과 실제 1분을 기다리는 발급 통합 시험(`test/db/share-links-web-integration.test.cjs`)은 실행기가 만드는 둘째 DB(`…_lock_test`)에서 나머지와 동시에 돌고, `test/db/build-output.test.cjs`는 공용 `dist`를 다시 만들어 두 줄 앞에서 혼자 돈다. 서버 전체를 세는 조회(`pg_stat_activity`·`pg_locks`)는 `current_database()`로 한정한다. 동시 요청 검사는 한 테스트 안에서 연결을 여러 개 열어 만든다.
+- 테스트 파일은 줄마다 한 번에 하나씩 돈다(`--test-concurrency=1`). 잠금 대기 시험(`test/**/lock-wait-limit-*.test.cjs`)과 실제 대기가 있는 시험은 실행기가 만드는 둘째 DB(`…_lock_test`)에서 나머지와 동시에 돌고, `test/db/build-output.test.cjs`는 공용 `dist`를 다시 만들어 두 줄 앞에서 혼자 돈다. 서버 전체를 세는 조회(`pg_stat_activity`·`pg_locks`)는 `current_database()`로 한정한다. 동시 요청 검사는 한 테스트 안에서 연결을 여러 개 열어 만든다.
 - 확인용 테이블이 필요하면 그 테스트 안에서 만들고 지운다. 제품 테이블은 마이그레이션으로만 만든다.
 
 ## 파일 역할과 모듈 추가 위치
@@ -223,9 +224,9 @@ DB를 쓰는 테스트를 추가할 때:
 
 추가 scope 없는 OAuth App 연결·해제, 발급 응답의 실제 만료 시각, 암호화 보관 설정과 #232의 단일 자격정보 제공 함수는 [docs/github-connection.md](docs/github-connection.md)를 따른다. 기능은 기본 비활성이며 실제 앱 설정·토큰 검증과 API·DB 대역 검사 범위를 구분한다.
 
-## 비로그인 수신자 조회 — #151
+## 받은 사람 발행본 열람·비밀번호 통과 — 12월 U4 (#416)
 
-`GET /v1/public/links/{token}`·`/catches/{catchId}`의 판정 순서·소유 회원 같은 시점 판정·재사용 경계는 [docs/recipient-read.md](docs/recipient-read.md)를 따른다. 기본 AppModule에 등록하며, 공개 프로필·소유 회원 상태는 A의 `OwnerProfileReader`를 쓴다.
+`GET /v1/public/links/{token}`(C-10 `PublishedSnapshot`)·`POST /v1/public/links/{token}/unlock`의 판정 순서(링크 → 작성자 상태 → grant), 한 트랜잭션의 판정·읽기 시점, 작성자 비활성 404·회원 행 없음 500, unlock 제한은 [docs/recipient-publication.md](docs/recipient-publication.md)를 따른다. `PublicationsModule`이 기본 `AppModule`에 등록돼 있고 작성자 상태는 A의 `OwnerProfileReader`를 쓴다. 10월 수신자 조회(#151, [docs/recipient-read.md](docs/recipient-read.md))는 대체됐다.
 
 ## Worker 내부 분석 컨텍스트 — #232
 
@@ -251,6 +252,14 @@ DB를 쓰는 테스트를 추가할 때:
 
 상한은 코드가 아니라 앱 DB 계정에 3초로 건다. 적용 위치, 경로별로 상한을 넘었을 때 남는 것, 측정과 판단이 필요한 결과는 [docs/lock-wait-limit.md](docs/lock-wait-limit.md)에 있다.
 
+## 12월 intent U2 공용 기반
+
+계정당 하루 실행 제한·첫 이용 동의(`GET/POST /v1/ai-consent`)는 [docs/daily-run-limit.md](docs/daily-run-limit.md), 백그라운드 AI 실행은 [docs/ai-run.md](docs/ai-run.md), 파일 저장(`FILE_STORAGE_*`)은 [docs/file-storage.md](docs/file-storage.md), 탈퇴(`DELETE /v1/me`)는 [docs/withdrawal.md](docs/withdrawal.md), AI 생성 게이트의 U2 검사·스트림·JD 역할은 [docs/ai-generation.md 「U2 게이트」](docs/ai-generation.md#u2-게이트--12월-intent-u2)에 있다.
+
+## Claude 연결 — 12월 intent U6
+
+구직자 본인의 Claude 웹·Desktop 연결(OAuth 주소, `/v1/mcp`와 조회 도구 둘, 연결 상태·승인·전체 해제)의 주소, 앞단이 api로 보내야 할 경로, 설정, 로그 사건, 시험 방법, 받아들인 한계는 [docs/claude-mcp.md](docs/claude-mcp.md)에 있다.
+
 ## 실행 실패 시 확인
 
 - `EADDRINUSE`: 지정 포트가 사용 중인지 확인하고 자신이 실행한 이전 서버를 종료하거나 선택 포트를 바꾼다. 다른 사람의 프로세스를 임의 종료하지 않는다.
@@ -268,7 +277,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 아직 필요한 입력
 
-API↔worker의 메시지 형식은 [메시지 스키마 v1](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml), 수신 확인·상태 의미는 [worker 메시지 계약](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#w--worker-메시지-계약)과 [수신 업무 흐름](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)·[상태 전이 정본](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본)을 따른다. 실제 전달 방식은 아래 검증이 남아 있지만 이 계약에 따른 독립 구현·MOCK 검사는 진행할 수 있다.
+API↔worker의 메시지 형식은 [현행 메시지 스키마 v2](contracts/repository-analysis/worker-messages.yaml), 수신 확인·상태 의미는 [worker 메시지 계약](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#w--worker-메시지-계약)과 [수신 업무 흐름](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)·[상태 전이 정본](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본)을 따른다. 실제 전달 방식은 아래 검증이 남아 있지만 이 계약에 따른 독립 구현·MOCK 검사는 진행할 수 있다.
 
 | 필요한 입력                                               | 결정할 곳                                                                                        | 결정 전 가능한 작업                                                            |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |

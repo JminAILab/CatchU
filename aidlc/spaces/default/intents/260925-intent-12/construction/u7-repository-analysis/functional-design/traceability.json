@@ -1,0 +1,87 @@
+{
+  "stage": "functional-design",
+  "unit": "u7-repository-analysis",
+  "upstream_ids": [
+    "AC1.2.1",
+    "AC1.2.2",
+    "AC1.2.3",
+    "AC1.2.4",
+    "AC1.2.5",
+    "AC1.2.6",
+    "AC1.2.7",
+    "AC1.2.8",
+    "AC1.3.1",
+    "AC1.3.2",
+    "AC1.3.3",
+    "AC1.3.4"
+  ],
+  "coverage": [
+    {
+      "id": "AC1.2.1",
+      "status": "OK",
+      "target": "BR1.1, BR1.2"
+    },
+    {
+      "id": "AC1.2.2",
+      "status": "OK",
+      "target": "BR2.1"
+    },
+    {
+      "id": "AC1.2.3",
+      "status": "OK",
+      "target": "BR1.3"
+    },
+    {
+      "id": "AC1.2.4",
+      "status": "OK",
+      "target": "BR2.2"
+    },
+    {
+      "id": "AC1.2.5",
+      "status": "OK",
+      "target": "BR2.3"
+    },
+    {
+      "id": "AC1.2.6",
+      "status": "OK",
+      "target": "BR1.4"
+    },
+    {
+      "id": "AC1.2.7",
+      "status": "OK",
+      "target": "BR1.3"
+    },
+    {
+      "id": "AC1.2.8",
+      "status": "OK",
+      "target": "BR3.1"
+    },
+    {
+      "id": "AC1.3.1",
+      "status": "OK",
+      "target": "BR4.1"
+    },
+    {
+      "id": "AC1.3.2",
+      "status": "OK",
+      "target": "BR4.1"
+    },
+    {
+      "id": "AC1.3.3",
+      "status": "OK",
+      "target": "BR4.2, BR1.4"
+    },
+    {
+      "id": "AC1.3.4",
+      "status": "OK",
+      "target": "BR4.3"
+    }
+  ],
+  "reverse": [
+    {
+      "id": "BR5.1",
+      "status": "N/A",
+      "target": "U7 Unit 정의의 실제 분석 확인 책임, FR19.1 및 사용자의 2026-10-29 완료 조건 구체화. US19.1 전체 통합 진행은 U2 소유."
+    }
+  ]
+}

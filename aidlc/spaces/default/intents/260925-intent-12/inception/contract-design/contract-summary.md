@@ -38,9 +38,9 @@
 | C-06 | u2-shared-foundation | 모든 Unit(새 표) | 공유 DB 규칙(외래 키 삭제 규칙) + 탈퇴 순서 | U2 담당(팀장) |
 | C-07 | u4-publication-link | u3-published-index, u5-rag-answer, u10-jd, u8-pdf-materials, u9-recipient-claude | 공유 DB 표(발행본·항목·PDF 쪽 사본) | U4 담당 |
 | C-08 | u3-published-index | u4-publication-link | api 안 TS 인터페이스(`PublishedIndexWriter`), 발행 트랜잭션 참여 | U3 담당 |
-| C-09 | u3-published-index | u5-rag-answer, u10-jd | api 안 TS 인터페이스(`PublishedSearch`) | U3 담당 |
+| C-09 | u3-published-index | u4-publication-link, u5-rag-answer, u10-jd | api 안 TS 인터페이스(`PublishedSearch`) | U3 담당 |
 | C-10 | u4-publication-link | u5-rag-answer, u10-jd, u9-recipient-claude | api 안 TS 인터페이스(`PublicationAccess`) | U4 담당 |
-| C-11 | u4-publication-link | u5-rag-answer, u10-jd | web 받은 사람 화면(`/s/[token]`)의 붙는 자리 + 받은 사람 API 경로 규칙 | U4 담당 |
+| C-11 | u4-publication-link | u2-shared-foundation, u5-rag-answer, u10-jd | web 받은 사람 화면(`/s/[token]`)의 붙는 자리 + 받은 사람 API 경로 규칙 | U4 담당 |
 | C-12 | u4-publication-link, u5-rag-answer, u10-jd | External: 받은 사람 브라우저 | HTTP REST·SSE(`/v1/public/links/{token}/...`) | 경로별 제공 Unit 담당 |
 | C-13 | u4-publication-link | u6-claude-mcp | 공유 DB 표(`text_material`) | U4 담당 |
 | C-14 | u4-publication-link | u6-claude-mcp | 공유 DB 칸(`catch_asset`의 작성자 설명) | U4 담당 |
@@ -69,12 +69,15 @@ AiGenerationRequest:
   feature: BASE_SUMMARY | QNA | JD_SUMMARY
   instruction: string         # 기능별 지시문. 숨긴 지시 방어·역량 평가 표현 금지 공통 문구는 게이트가 붙인다
   sources: AiSource[]         # 비면 호출하지 않고 빈 결과
-  userText: string|null       # 질문·JD 요구사항 줄. 신뢰하지 않는 입력
+  userText: string|null       # 질문·JD 요구사항 줄. 신뢰하지 않는 입력. JD_SUMMARY는 한 호출에 요구사항 한 줄
   publicationText: string|null  # 그 발행본 조각 글 전부(C-09 search가 준 값). 검사에만 쓰고 모델 입력에 넣지 않는다
                                 # 넘기지 않으면(기본 요약처럼) 게이트는 넘긴 근거 글 전체를 발행본 글로 본다
   model: HAIKU | SONNET       # 기본 HAIKU. SONNET은 NFR3 조정 때 QNA에만
 GatedItem:
-  kind: CITED | AI_INTERPRETATION
+  kind: CITED | AI_INTERPRETATION | SERVER_NOTICE
+    # SERVER_NOTICE는 AI가 아니라 게이트가 만든 "찾지 못함" 안내(JD_SUMMARY만). 대조·droppedCount 대상이 아니고 'AI 해석' 표시를 붙이지 않는다
+  jdRole: EVIDENCE | UNCONFIRMED | INTERVIEW_QUESTION | null
+    # JD_SUMMARY만 채운다(근거 / 자료로 확인되지 않는 점 / 면접 질문). BASE_SUMMARY·QNA는 null
   text: string
   citations: [{ sourceId: string, quote: string, location: AiSource.location, sourceLabel: "GitHub 기록 원문" | "작성자 자료 원문" }]   # CITED만(FR6.5, AC6.3.5)
     # location은 quote 자체의 범위로 좁혀서 준다(같은 칸, 새 칸 없음). quote는 그 범위의 원문이다
@@ -89,7 +92,10 @@ check-scope:                  # 기계 대조(FR6.4). 추출은 U2 게이트 안
   CITED 근거 대조: 숫자·PR 번호·파일 이름·영어 표기를 근거 원문과 대조해 맞지 않는 항목을 버린다. 그 근거 글의 Catch PR 번호(catchEvidenceUrls의 /pull/{n})는 맞는 것으로 본다(AC6.3.2·AC6.3.3)
   AI_INTERPRETATION: 숫자·PR 번호가 있으면 허용 없이 버린다. 발행본 글(publicationText)에 없는 영어 표기가 있으면 버린다
   JD 면접 질문: 영어 표기는 근거 원문과 userText(그 JD 요구사항 줄)에서, 숫자·PR 번호는 같은 요구사항 근거 칸이 인용한 원문과 그 근거의 Catch PR 번호(catchEvidenceUrls)에서 찾는다(AC6.3.2·6.3.3·6.3.6)
+  JD 확인되지 않는 점: 인용이 있으면 CITED 근거 대조, 없으면 AI_INTERPRETATION 대조를 쓴다. JD 요구사항 줄의 표기는 허용 근거가 아니다
+  JD 서버 안내: userText의 기술·제품 이름 후보가 이번 sources 글에 없으면 게이트가 SERVER_NOTICE 항목(jdRole UNCONFIRMED)을 결과 끝에 더한다. 후보 규칙은 U2 기능 설계 BR4.7
 caller-rule: 호출 Unit은 원문을 따로 모으지 않는다. U5가 사본에서 근거를 만들 때(기본 요약)는 catchEvidenceUrls를 같은 규칙으로 붙인다
+jd-rule: U10은 JD 요구사항마다 generate를 한 번씩 부르고(FR6.1), jdRole로 항목을 세 칸에 나눠 보인다. 합성 제공자는 JD_SUMMARY에서 역할마다 항목을 하나씩 돌려준다
 GatedOutput:
   items: GatedItem[]          # 기계 대조를 통과한 항목만. 버린 항목은 경고 없이 빠진다
   droppedCount: int           # 로그용, 화면에 보이지 않음
@@ -296,7 +302,7 @@ table published_pdf_page:         # U8이 만든다(후순위). U3은 이 모양
   published_pdf_page_id: uuid PK
   published_item_id: uuid NOT NULL  FK published_item ON DELETE CASCADE
   page_number: integer NOT NULL CHECK (page_number >= 1)
-  text: text NOT NULL             # 읽을 수 없는 쪽은 빈 문자열
+  text: text NOT NULL             # 읽을 수 없는 쪽은 빈 문자열. 읽을 수 있는 쪽은 빈 문자열이 아니다
   readable: boolean NOT NULL
   unique: (published_item_id, page_number)
 ```
@@ -351,17 +357,24 @@ note: ChunkHit는 그대로 C-01 AiSource로 옮긴다(sourceId = chunkId). 호�
 
 ### C-10 링크 조건 판정과 사본 읽기
 
-웹·질의응답·JD 요약·MCP가 같은 판정을 쓴다(NFR1, FR4.2, FR5.1). 받은 사람 경로는 10월 오류 코드를 그대로 쓴다: 없음·삭제·중지·만료는 구분 없이 `404 LINK_UNAVAILABLE`, 비밀번호 필요 또는 grant 거부는 `401 LINK_PASSWORD_REQUIRED`. grant는 publicationId에 묶고, 링크 중지·만료·삭제 판정을 grant 확인보다 먼저 한다.
+웹·질의응답·JD 요약·MCP가 같은 판정을 쓴다(NFR1, FR4.2, FR5.1). 받은 사람 경로는 10월 오류 코드를 그대로 쓴다: 없음·삭제·중지·만료는 구분 없이 `404 LINK_UNAVAILABLE`, 비밀번호 필요 또는 grant 거부는 `401 LINK_PASSWORD_REQUIRED`. grant는 publicationId에 묶고, 링크 중지·만료·삭제 판정을 grant 확인보다 먼저 한다. 작성자(소유 회원) 계정이 비활성이면 `404 LINK_UNAVAILABLE`, 작성자 회원 행이 없으면 `500 INTERNAL_ERROR`이며, 이 판정은 중지·만료 다음, 비밀번호(grant) 앞에 한다(#416 OQ-U4-NFR-6 결정, 2026-11-05).
 
 ```yaml
 # shared-schema: api/src/publications (U4 제공)
 interface PublicationAccess:
   resolveForRecipient(token: string, grant: string|null, now) -> Promise<RecipientAccess>
-    # 호출마다 다시 판정한다(캐시 없음). 순서: 토큰으로 발행본 찾기 → 중지·만료·삭제 → 비밀번호면 grant(publicationId에 묶임) 확인
-    # 실패는 LinkUnavailable | LinkPasswordRequired
+    # 호출마다 다시 판정한다(캐시 없음). 순서: 토큰으로 발행본 찾기 → 중지·만료·삭제 → 작성자 비활성(404 LINK_UNAVAILABLE)·작성자 회원 행 없음(500 INTERNAL_ERROR)
+    #   → 비밀번호면 grant(publicationId에 묶임) 확인. 작성자 판정은 중지·만료 다음, 비밀번호 앞이다(#416 OQ-U4-NFR-6 결정, 2026-11-05)
+    # 실패는 LinkUnavailable | LinkPasswordRequired. 작성자 회원 행 없음은 이름 있는 실패가 아니라 내부 오류(500)다
+    # 판정 통과 뒤 같은 요청 중에 중지·만료·작성자 비활성이 커밋되거나 만료 시각이 지나도 그 요청을 그것만을 이유로 취소하지 않는다.
+    #   그 요청의 접수·횟수 차감은 유효하고, 차단은 다음 요청의 재판정으로 한다(#416 OQ-U4-NFR-5 결정 A, 2026-11-04; 작성자 비활성은 OQ-U4-NFR-6 결정, 2026-11-05)
   resolveForOwner(memberId: uuid, publicationId: uuid) -> Promise<OwnerAccess>
     # 작성자는 중지·만료 뒤에도 본다. 남의 발행본·없음은 NotFound
   readSnapshot(publicationId: uuid) -> Promise<PublishedSnapshot>
+    # 상태(중지·만료)는 판정하지 않는다. 발행본 없음(삭제)은 NotFound.
+    #   받은 사람 경로는 판정 뒤의 NotFound, 또는 그 요청의 쓰기가 발행본(publication_id)을 참조하는 외래 키 제약에서 거부된 경우
+    #   (SQLSTATE 23503이고 거부한 제약이 publication을 참조하는 것일 때만)를 삭제로 보고 저장·차감을 되돌린 뒤 404 LINK_UNAVAILABLE로
+    #   응답한다. 다른 제약의 23503을 포함해 그 밖의 DB 오류는 500 그대로(#416 OQ-U4-NFR-5 결정 A, 2026-11-04)
 RecipientAccess: { publicationId: uuid, ownerMemberId: uuid, passwordProtected: boolean, expiresAt: timestamptz }
 OwnerAccess:     { publicationId: uuid, state: ACTIVE | STOPPED | EXPIRED }
 PublishedSnapshot:
@@ -370,11 +383,13 @@ PublishedSnapshot:
   expiresAt: timestamptz
   items: [{ publishedItemId, position, itemKind, title, snapshot, pdfPages: [{ pageNumber, text, readable }] | null }]
 rule: 받은 사람 쪽 API는 판정에 통과한 뒤에만 사본·색인·요약을 읽는다. MCP 받은 링크 도구는 grant 없이(null) 부르므로 비밀번호 링크는 LinkPasswordRequired다
+post-judgment-rule: 판정을 통과한 요청은 그 뒤의 중지·만료·작성자 비활성만을 이유로 취소하지 않는다. 그 요청의 접수(POST 저장)와 횟수 차감은 유효하고, 차단은 다음 요청의 재판정으로 한다. 판정과 읽기를 한 트랜잭션에 묶는 것은 제공 Unit(U4) 자기 경로의 선택이며 소비 Unit에 요구하지 않는다 (#416 OQ-U4-NFR-5 결정, 2026-11-04; 작성자 비활성은 OQ-U4-NFR-6 결정, 2026-11-05)
+deletion-rule: 판정 직후 발행본이 삭제된 것이 확인되면(readSnapshot의 NotFound, 또는 발행본(publication_id)을 참조하는 외래 키 제약의 거부 — SQLSTATE 23503이고 거부한 제약이 publication을 참조하는 것일 때만) 저장·차감을 되돌리고 404 LINK_UNAVAILABLE로 응답한다. 다른 제약의 23503을 포함해 삭제 때문으로 확인되지 않은 DB 오류는 500을 유지한다. readSnapshot의 오류 이름은 NotFound 그대로다. 매핑과 시험은 각 소비 Unit이 자기 경로에서 한다 (#416 OQ-U4-NFR-5 결정, 2026-11-04)
 ```
 
 ### C-11 받은 사람 화면의 붙는 자리
 
-U4가 받은 사람 화면(`web/src/app/s/[token]`)과 비밀번호 통과를 소유하고, U5·U10은 정해진 자리에 자기 컴포넌트를 붙인다. grant 보관은 10월 그대로(`sessionStorage`의 링크별 키, `X-Link-Grant` 헤더, 401·404를 받으면 그 링크 grant만 지움)이며 U4의 `recipient-grants` 도구를 쓴다.
+U4가 받은 사람 화면(`web/src/app/s/[token]`)과 비밀번호 통과를 소유하고, U2·U5·U10은 정해진 자리에 자기 컴포넌트를 붙인다. grant 보관은 10월 그대로(`sessionStorage`의 링크별 키, `X-Link-Grant` 헤더, 401·404를 받으면 그 링크 grant만 지움)이며 U4의 `recipient-grants` 도구를 쓴다.
 
 ```yaml
 # shared-schema: web 붙는 자리(React props)
@@ -384,11 +399,13 @@ RecipientSlotProps:
   onAccessLost: (code: LINK_UNAVAILABLE | LINK_PASSWORD_REQUIRED) -> void   # U4 제공. 화면 전환·grant 삭제
   isLoggedIn: boolean
 slots (화면 순서):
+  0: RecipientGuide(U2)                # 화면 위쪽 시작 안내. 링크 판정을 통과한 자료 화면에만 둔다(비밀번호 입력·접근 불가 화면 안내는 U4). props는 showClaudeConnect: boolean 하나이고 RecipientSlotProps는 받지 않는다. 정적 안내라 API를 부르지 않는다
   1: 발행본 자료(U4)
   2: BaseSummaryPanel(U5)
   3: QnaPanel(U5)                      # 입력란 옆 외부 AI 고지 한 줄 포함
   4: JdSummaryPanel(U10)               # 로그인 회원에게만, 비로그인은 로그인 안내
 rule: 붙는 컴포넌트는 401 LINK_PASSWORD_REQUIRED·404 LINK_UNAVAILABLE을 받으면 스스로 처리하지 않고 onAccessLost를 부른다
+guide-rule: RecipientGuide는 제목(h1)과 첫 초점을 갖지 않고, 다른 자리의 안내(질의응답 외부 AI 고지 U5, JD 로그인 안내 U10)를 되풀이하지 않는다. showClaudeConnect는 U9를 켜기 전까지 false이고, 켤 때의 링크별 조건(비밀번호 링크 포함)과 문구는 그때 U9·U4·U2가 정한다
 auth-rule: 401 AUTH_REQUIRED·AUTH_INVALID(로그인 없음·만료)는 링크 접근 문제가 아니므로 받은 컴포넌트가 처리한다. JdSummaryPanel(U10)은 로그인 안내로 바꾼다
 evidence-highlight:                    # 근거 원문 강조(입력 §3 RAG 덩어리). AC6.3.5의 화면 부분을 U4·U5·U10이 나눠 맡는다
   provider: U4 — RecipientSlotProps에 showEvidence: (location: AiSource.location) -> void를 준다.
@@ -497,10 +514,12 @@ note: draft_content(AI 설명 초안)는 MCP 도구가 내보내지 않는다(FR
 # shared-schema: MCP tools
 list_my_catches:              # U6
   input:  { cursor?: string }
-  output: { catches: [{ catchId, title, visibility: PUBLIC|PRIVATE, workFacts: string[], subjectContribution, authorDescription: string|null, evidenceUrls: string[], mismatch: boolean }], nextCursor: string|null }
+  output: { catches: [{ catchId, title: string|null, visibility: PUBLIC|PRIVATE, workFacts: string[], subjectContribution, authorDescription: string|null, evidenceUrls: string[], mismatch: boolean, omitted?: true }], nextCursor: string|null }
+    # omitted: 항목 하나가 한 쪽 응답 크기 상한을 넘어 글을 뺐다는 표시. 그 항목의 workFacts는 빈 배열, subjectContribution은 빈 글, authorDescription은 null이다
 list_my_text_materials:       # U6
   input:  { cursor?: string }
-  output: { materials: [{ textMaterialId, title, body, updatedAt }], nextCursor: string|null }
+  output: { materials: [{ textMaterialId, title, body, updatedAt, bodyOmitted?: true }], nextCursor: string|null }
+    # bodyOmitted: 항목 하나가 한 쪽 응답 크기 상한을 넘어 글을 뺐다는 표시. 그 항목의 body는 빈 글이다
 read_shared_publication:      # U9, 후순위
   input:  { link: string, cursor?: string }      # 링크 전체 주소 또는 토큰
   output: { title, publishedAt, expiresAt, items: [{ position, itemKind, title, content: string }], nextCursor: string|null }
@@ -511,6 +530,8 @@ read_shared_publication:      # U9, 후순위
   access: 페이지(cursor)마다 C-10 판정을 다시 한다
 common-errors:
   RATE_LIMITED                 # 회원 기준 짧은 시간 빈도(값·형태는 U6 결정, IP로 세지 않음)
+  INVALID_CURSOR               # 서버가 준 모양이 아닌 cursor
+  INTERNAL_ERROR               # DB 실패. 로그를 남기고 오류에는 입력 원문·SQL·stack·토큰을 넣지 않는다
   UNAUTHORIZED                 # MCP 채널 인증 실패의 문서상 이름(토큰 만료·해제·탈퇴). OAuth 표준 401은 공식 SDK가 처리하고
                                # REST 오류 코드에는 더하지 않는다. 갱신 토큰 없음, 다시 승인
 auth-check: U6은 요청마다 저장된 접근 토큰·만료·연결을 확인한다

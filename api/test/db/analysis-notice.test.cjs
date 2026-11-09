@@ -13,9 +13,10 @@ const { SYNTHETIC_REPOSITORY } = require('../../dist/member-analysis/dev-member.
 const { GitHubConnection, MemberAccount } = require('../../dist/member-analysis/member-analysis.entity');
 const { DEV_LOGIN_IDENTITY_PREFIX, GOOGLE_IDENTITY_PREFIX, MemberKindService, memberKindOf } = require('../../dist/member-analysis/member-kind');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
+const { bindSyntheticDailyLimit } = require('../support/synthetic-daily-limit.cjs');
 
-// #322 본문 확정 문구(2026-10-17 팀장 확정)의 SHA-256. 문구를 바꾸면 판본과 이 값을 함께 바꾸고 반영 PR에서 팀장 승인을 받는다.
-const CONFIRMED_NOTICE_SHA256 = 'a99907b58e8feea585c64fbe15550460993fca7fc3423019a38896c1b391ce1f';
+// #424 본문 확정 v2(2026-10-30 팀장, #322에서 네 줄만 변경)의 SHA-256. 반영 PR에서 팀장 승인을 받는다.
+const CONFIRMED_NOTICE_SHA256 = '08a53bb637cb54845626546cd8d90e11a2ae351434f3cf5408ef63df717e1e28';
 const GOOGLE = { GOOGLE_LOGIN_ENABLED: 'true', GOOGLE_CLIENT_ID: 'synthetic.apps.googleusercontent.com',
   GOOGLE_CLIENT_SECRET: 'synthetic-google-secret', GOOGLE_REDIRECT_URI: 'http://localhost:3000/google/callback' };
 const UNSUPPORTED = ['catchu:github:1234567', 'test:unsupported-origin', 'CATCHU:GOOGLE:upper-case', GOOGLE_IDENTITY_PREFIX, DEV_LOGIN_IDENTITY_PREFIX];
@@ -28,6 +29,7 @@ async function start(t, overrides = {}) {
   const settings = { NODE_ENV: 'test', DEV_LOGIN_ENABLED: 'true', AUTH_JWT_SECRET: randomBytes(32).toString('hex'),
     AUTH_ACCESS_TOKEN_TTL_SECONDS: '900', AUTH_WEB_ORIGIN: 'https://catchu.example',
     SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
+    CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key', // 운영 모드 기동에 필요한 합성 임베딩 키(#431)
     CORS_ALLOWED_ORIGINS: undefined, ...overrides };
   const previous = Object.fromEntries(Object.keys(settings).map(k => [k, process.env[k]]));
   for (const [k, v] of Object.entries(settings)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
@@ -39,6 +41,7 @@ async function start(t, overrides = {}) {
     for (const [k, v] of Object.entries(previous)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   } });
   app = await configureApp(await NestFactory.create(AppModule, { logger, abortOnError: false }));
+  bindSyntheticDailyLimit(app);
   await app.listen(0, '127.0.0.1');
   const base = await app.getUrl();
   const call = (path, options) => fetch(base + path, { ...options, signal: AbortSignal.timeout(10000) });
@@ -91,12 +94,13 @@ async function counts() {
   return row;
 }
 
-test('실제 고지는 #322 확정 문구·문단·줄바꿈 그대로이고 합성 판본과 구분된다', () => {
+test('실제 고지는 #424 확정 v2 문구·문단·줄바꿈 그대로이고 합성 판본과 구분된다', () => {
   assert.equal(createHash('sha256').update(REAL_NOTICE.text, 'utf8').digest('hex'), CONFIRMED_NOTICE_SHA256);
   const lines = REAL_NOTICE.text.split('\n');
+  // v1의 네 줄만 교체하므로 전체 줄 수와 문단 구분 수는 유지한다.
   assert.equal(lines.length, 30); assert.equal(lines.filter(line => line === '').length, 6);
   assert.equal(lines[0], '[CatchU 저장소 분석 안내]'); assert.ok(!REAL_NOTICE.text.includes('\r'));
-  assert.equal(REAL_NOTICE.noticeRevision, 'catchu-real-analysis-notice-v1');
+  assert.equal(REAL_NOTICE.noticeRevision, 'catchu-real-analysis-notice-v2');
   assert.notEqual(REAL_NOTICE.noticeRevision, SYNTHETIC_NOTICE.noticeRevision);
   assert.ok(Object.isFrozen(REAL_NOTICE));
 });

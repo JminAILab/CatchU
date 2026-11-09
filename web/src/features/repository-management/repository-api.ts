@@ -6,7 +6,7 @@ import type { ApiResult } from "../../lib/api-response";
  * 응답 모양이 계약과 다르면 빈 목록으로 바꾸지 않고 조회 실패로 돌려준다.
  */
 
-export type RepositoryTransport = (path: string, request: { method: "GET"; signal?: AbortSignal }) => Promise<ApiResult>;
+export type RepositoryTransport = (path: string, request: { method: "GET" | "POST"; body?: unknown; signal?: AbortSignal }) => Promise<ApiResult>;
 export type LookupFailure = Exclude<ApiResult, { kind: "success" }>;
 export type Lookup<T> = { kind: "success"; data: T } | LookupFailure;
 
@@ -14,6 +14,7 @@ export type GitHubState = "CONNECTED" | "DISCONNECTED" | "REAUTH_REQUIRED";
 export type EligibleRepository = { repositoryId: string; name: string; ownerLogin: string; url: string };
 /** 분석 요청(#154)이 쓰는 선정 저장소. 동의 본문에 실을 현재 허용 범위 판본(allowedScopeRevision)을 보존한다. */
 export type AnalyzableRepository = EligibleRepository & { allowedScopeRevision: string };
+export type RegisteredRepository = AnalyzableRepository & { registrationId: string };
 
 export const PROCESSING = ["QUEUED", "RUNNING", "UNCERTAIN", "SUCCEEDED", "EMPTY", "PARTIAL_FAILED", "FAILED"] as const;
 export const APPLICATION = ["NOT_READY", "PENDING", "APPLYING", "RECOVERING", "APPLIED", "APPLY_FAILED"] as const;
@@ -38,6 +39,9 @@ export type AnalysisSummary = {
   ownerResultsReady: boolean;
   retryAllowed: boolean;
   failures: readonly AnalysisFailure[];
+  ownCommitObservation: "UNKNOWN" | "NONE" | "FOUND";
+  observedOwnCommitCount: number | null;
+  collectionLimitNotes: readonly string[];
 };
 
 /** 한 번의 목록 조회에서 따라갈 최대 페이지 수. 넘으면 일부만 보여 주지 않고 조회 실패로 돌려준다. */
@@ -76,6 +80,11 @@ export function readAnalysis(value: unknown): AnalysisSummary | null {
   if (typeof value.ownerResultsReady !== "boolean") return null;
   if (!isRecord(value.retry) || typeof value.retry.allowed !== "boolean") return null;
   if (!Array.isArray(value.failures) || !value.failures.every(isFailure)) return null;
+  if (!oneOf(["UNKNOWN", "NONE", "FOUND"] as const, value.ownCommitObservation)) return null;
+  const count = value.observedOwnCommitCount;
+  if (value.ownCommitObservation === "UNKNOWN" ? count !== null :
+    typeof count !== "number" || !Number.isSafeInteger(count) || (value.ownCommitObservation === "NONE" ? count !== 0 : count <= 0)) return null;
+  if (!Array.isArray(value.collectionLimitNotes) || !value.collectionLimitNotes.every(isId)) return null;
   return {
     requestId: value.requestId,
     repositoryId: value.repositoryId,
@@ -88,6 +97,8 @@ export function readAnalysis(value: unknown): AnalysisSummary | null {
     ownerResultsReady: value.ownerResultsReady,
     retryAllowed: value.retry.allowed,
     failures: value.failures.map(({ stage, code, message }) => ({ stage, code, message })),
+    ownCommitObservation: value.ownCommitObservation, observedOwnCommitCount: count as number | null,
+    collectionLimitNotes: value.collectionLimitNotes,
   };
 }
 
@@ -139,6 +150,15 @@ export function createRepositoryApi(transport: RepositoryTransport) {
   }
 
   return {
+    async register(url: string, signal?: AbortSignal): Promise<Lookup<RegisteredRepository>> {
+      try {
+        const result = await transport("/me/repositories", { method: "POST", body: { url }, signal });
+        if (result.kind !== "success") return result;
+        const repository = readAnalyzableRepository(result.data);
+        if (![200, 201].includes(result.status) || !repository || !isRecord(result.data) || !isId(result.data.registrationId)) return LOOKUP_FAILED;
+        return { kind: "success", data: { ...repository, registrationId: result.data.registrationId } };
+      } catch { return LOOKUP_FAILED; }
+    },
     async githubState(signal?: AbortSignal): Promise<Lookup<GitHubState>> {
       const result = await get("/me", signal);
       if (result.kind !== "success") return result;

@@ -33,6 +33,7 @@ before(async () => {
   const logger = Object.fromEntries(['log', 'error', 'warn', 'debug', 'verbose', 'fatal'].map(level => [level, () => {}]));
   app = await withAppAccount(roles, async () =>
     configureApp(await NestFactory.create(AppModule, { logger, abortOnError: false })));
+  require('../support/synthetic-daily-limit.cjs').bindSyntheticDailyLimit(app);
   await app.listen(0, '127.0.0.1');
   url = await app.getUrl();
 });

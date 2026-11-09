@@ -15,10 +15,11 @@ const {
   APP_LOCK_TIMEOUT, APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, cleanUpLocks, createLockWaitRoles,
   holdAdvisory, holdRow, sleepUntil, summarize, timed, waitUntilBlocked, withAppAccount,
 } = require('../support/lock-wait-limit.cjs');
-const { defineShareLinkLockCases } = require('../support/share-link-lock-cases.cjs');
+const { consent, fakeAiRun, fakeIndexWriter, bindFakes, eligibleCatch, body, catchItem } = require('../publications/support.cjs');
 
 // #220: 앱 DB 계정에만 건 잠금 대기 상한(3초, 2026-10-16 합의)을 시험 전용 계정으로 재현한다. 그 계정으로 띄운 실제 앱에서
-// 링크 발급·로그인·세션 갱신/로그아웃의 잠금 대기를 본다. 잠금을 쥐는 쪽은 상한 없는 테스트 DB 계정 연결이다.
+// 발행·로그인·세션 갱신/로그아웃의 잠금 대기를 본다. 잠금을 쥐는 쪽은 상한 없는 테스트 DB 계정 연결이다.
+// 10월 링크 발급(회원 발급 잠금·같은 키 잠금) 사례는 U4 제출 3(W6)에서 발급 API와 함께 지웠고, 발행의 원본 행 잠금 사례로 바꿨다.
 // 정상 경쟁의 시간은 이 환경에서 한 번 잰 값이며, 모든 부하에서 3초가 적정하다는 근거가 아니다.
 
 const WEB = 'http://localhost:3000';
@@ -88,14 +89,6 @@ async function login(identity = 'lock-member') {
   const claims = decodeJwt(result.body.accessToken);
   return { token: result.body.accessToken, memberId: claims.sub, sessionId: claims.sid, cookie: result.setCookie.split(';')[0] };
 }
-async function create(token, key, body) {
-  const response = await fetch(`${url}/v1/share-links`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'Idempotency-Key': key },
-    body: JSON.stringify(body), signal: AbortSignal.timeout(15000),
-  });
-  return { status: response.status, cacheControl: response.headers.get('cache-control'), body: await response.json() };
-}
 const refresh = cookie => call('/v1/auth/refresh', { cookie, origin: WEB });
 const logout = cookie => call('/v1/auth/logout', { cookie, origin: WEB });
 const count = async (table, where = '', params = []) =>
@@ -146,9 +139,31 @@ test('시험 전용 계정은 지우면 계정과 DB별 설정이 남지 않는�
   assert.equal(await count('pg_db_role_setting', 'WHERE setrole = ANY($1::oid[])', [oids]), 0);
 });
 
-defineShareLinkLockCases({
-  test, timeoutMs: APP_LOCK_TIMEOUT_MS, label: ' — 앱 계정 3초', db: () => db, ready,
-  login: () => login('key-lock-member'), create, holdLock: text => holdAdvisory(db, text),
+test('발행: 원본 Catch 행 잠금을 3초 안에 얻지 못하면 500 INTERNAL_ERROR이고 발행본·사본·공개 전환·하루 횟수가 남지 않으며 다시 보내면 201이다 — 앱 계정 3초', async t => {
+  if (!ready(t)) return;
+  const user = await login('lock-publish-member');
+  await consent(app, user.memberId);
+  const unbind = bindFakes(app, { aiRun: fakeAiRun(db), indexWriter: fakeIndexWriter(db) });
+  t.after(unbind);
+  const catchId = await eligibleCatch(db, user.memberId, { visibility: 'PRIVATE' });
+  const payload = body([catchItem(catchId)]);
+  // 발행 트랜잭션은 고른 Catch 행을 FOR UPDATE로 잠근 뒤 사본을 쓴다(성능 설계 「트랜잭션을 짧게」). 그 행을 다른 연결이 쥐고 있다.
+  const held = await holdRow(db, 'catch_asset', 'catch_id', catchId);
+  let failed;
+  try { failed = await timed(() => call('/v1/publications', { body: payload, token: user.token })); } finally { await held.release(); }
+  assertInternalError(failed.value, '발행');
+  assertCapWait(failed.ms, '발행');
+  assert.equal(await count('publication'), 0, '발행본이 남지 않는다');
+  assert.equal(await count('published_item'), 0, '사본이 남지 않는다');
+  assert.equal((await db.query('SELECT visibility FROM catch_asset WHERE catch_id = $1', [catchId]))[0].visibility, 'PRIVATE', '공개 전환이 남지 않는다');
+  assert.equal(await count('daily_execution_count'), 0, '같은 트랜잭션의 하루 횟수 차감이 되돌아간다');
+  const logged = logs.join('\n');
+  assert.match(logged, /→ 500 INTERNAL_ERROR/);
+  for (const text of ['lock timeout', 'FOR UPDATE', catchId]) assert.ok(!logged.includes(text), text);
+  const retried = await call('/v1/publications', { body: payload, token: user.token });
+  assert.equal(retried.status, 201, JSON.stringify(retried.body));
+  assert.equal(await count('publication'), 1);
+  t.diagnostic(`발행 원본 잠금 상한 초과: ${failed.ms}ms 뒤 500, 다시 보내면 201`);
 });
 
 test('개발 로그인: 신원 잠금을 3초 안에 얻지 못하면 500이고 회원·세션을 남기지 않는다', async t => {

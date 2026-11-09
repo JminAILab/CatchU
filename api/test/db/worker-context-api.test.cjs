@@ -21,7 +21,7 @@ const { GitHubConnectionService } = require('../../dist/github-connection/github
 const { GitHubClient, GitHubAccessToken, GitHubProviderError } = require('../../dist/github-connection/github.client');
 const { CredentialVault } = require('../../dist/github-connection/credential-vault');
 const { GitHubConnection, AnalysisRequest, AnalysisAttempt, MemberAccount } = require('../../dist/member-analysis/member-analysis.entity');
-const { insertInitialAnalysis } = require('../../dist/member-analysis/initial-analysis');
+const { insertInitialAnalysis } = require('../support/registered-analysis.cjs');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 
 let app, db, url, directory, github, client, vault, selectionResolver;
@@ -64,8 +64,8 @@ beforeEach(async () => {
   selectionResolver = async (_manager, context) => {
     const fixture = fixtures.get(context.attemptId);
     if (!fixture || !isDeepStrictEqual(context.consentedScope, fixture.consent) ||
-        context.consentedScope.wholeRepository !== true || context.consentedScope.repositoryId !== context.repositoryId ||
-        context.consentedScope.revision !== context.scopeRevision || context.consentedScope.fixture !== true) return null;
+        !require('../../dist/member-repositories/registration-scope').readRegistrationScope(context.consentedScope) ||
+        context.consentedScope.repositoryId !== context.repositoryId || context.consentedScope.revision !== context.scopeRevision) return null;
     return { attemptId: context.attemptId, requestId: fixture.requestId, memberId: fixture.memberId,
       repositoryId: fixture.repositoryId, scopeRevision: fixture.scopeRevision,
       repository: { owner: 'synthetic-owner', name: 'selected-repository' }, wholeRepository: true };
@@ -102,8 +102,9 @@ async function connect(user, token = FAKE_TOKEN) {
 }
 // #138 접수의 동의 범위 모양(판본·저장소·자료 종류·선정 참조)에 시험 공급자 표식을 더한다.
 const RESOURCE_TYPES = ['COMMIT', 'PULL_REQUEST', 'ISSUE'];
-const fixtureScope = (repositoryId, scopeRevision) => ({ revision: scopeRevision, repositoryId,
-  allowedResourceTypes: [...RESOURCE_TYPES], selectionReference: 'synthetic-selection', wholeRepository: true, fixture: true });
+const fixtureScope = (repositoryId, scopeRevision) => { const registrationId = randomUUID(); return { revision: scopeRevision, repositoryId,
+  allowedResourceTypes: [...RESOURCE_TYPES], selectionReference: registrationId, registrationId,
+  repository: { owner: 'synthetic-owner', name: 'selected-repository', url: 'https://github.com/synthetic-owner/selected-repository' } }; };
 async function analysis(user, consent = undefined, sourceMode = 'LIVE') {
   const repositoryId = 'synthetic-context-repository', scopeRevision = randomUUID();
   const scope = typeof consent === 'function' ? consent(fixtureScope(repositoryId, scopeRevision))
@@ -142,10 +143,9 @@ async function storedSelection(t, request) {
       (options.lock === 'pessimistic_read' ? ' FOR SHARE' : ''), [accepted.attemptId]);
     if (!row || row.scope_revision !== accepted.scopeRevision ||
         !isDeepStrictEqual(row.consented_scope, accepted.consentedScope) ||
-        accepted.consentedScope.wholeRepository !== true ||
+        !require('../../dist/member-repositories/registration-scope').readRegistrationScope(accepted.consentedScope) ||
         accepted.consentedScope.repositoryId !== accepted.repositoryId ||
-        accepted.consentedScope.revision !== accepted.scopeRevision ||
-        accepted.consentedScope.fixture !== true) return null;
+        accepted.consentedScope.revision !== accepted.scopeRevision) return null;
     return { attemptId: row.attempt_id, requestId: row.request_id, memberId: row.member_id,
       repositoryId: row.repository_id, scopeRevision: row.scope_revision,
       repository: { owner: row.repository_owner, name: row.repository_name }, wholeRepository: true };
@@ -589,7 +589,7 @@ for (const processing of ['RUNNING', 'EMPTY']) {
       const writing = receiver.withRequest(r.requestId, async tx => {
         assert.equal(tx.snapshot.context.attemptId, r.currentAttemptId);
         if (processing === 'RUNNING') {
-          await tx.saveObservation({ schemaVersion: '1', messageId: randomUUID(), requestId: r.requestId,
+          await tx.saveObservation({ schemaVersion: '2', messageId: randomUUID(), requestId: r.requestId,
             attemptId: r.currentAttemptId, state: 'RUNNING', observedAt: new Date().toISOString() }, 'RUNNING');
         } else {
           await tx.saveResult({ applicationRecordId: randomUUID(), resultId: randomUUID(),

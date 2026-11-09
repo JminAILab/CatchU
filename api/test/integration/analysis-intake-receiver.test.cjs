@@ -132,6 +132,41 @@ test('실제 접수 API가 저장한 요청·동의·시도 맥락으로 합성 
   assert.equal(catchRow.visibility, 'PRIVATE');
 });
 
+test('U7 재분석은 진행·실패·성공 동안 기존 Catch 내용·설명·공개·근거를 보존하고 새 작업만 더한다', async t => {
+  const s = await start(t), user = await s.login('u7-retained-reanalysis');
+  const first = await s.submit(user);
+  const originalResult = read('results/succeeded-one-candidate.json');
+  assert.equal((await s.inject(user, first.status.requestId, 'Result', originalResult, 'retained')).status, 201);
+  const [asset] = await db.query('SELECT catch_id FROM catch_asset WHERE owner_id = $1', [user.memberId]);
+  await db.query(`UPDATE catch_asset SET author_description=$2, author_description_updated_at=now(), visibility='PUBLIC'
+    WHERE catch_id=$1`, [asset.catch_id, '회원이 직접 작성한 설명']);
+  const preserved = async () => ({
+    asset: await db.query('SELECT to_jsonb(c) AS row FROM catch_asset c WHERE catch_id=$1', [asset.catch_id]),
+    evidence: await db.query('SELECT to_jsonb(e) AS row FROM catch_evidence e WHERE catch_id=$1 ORDER BY position', [asset.catch_id]),
+  });
+  const saved = await preserved();
+  const failed = await s.submit(user, randomUUID(), { retryOfRequestId: first.status.requestId });
+  assert.notEqual(failed.status.consentId, first.status.consentId);
+  assert.deepEqual(await preserved(), saved, '진행 중에도 기존 Catch를 지우거나 바꾸지 않는다');
+  assert.equal((await s.inject(user, failed.status.requestId, 'Result', read('results/failed.json'), 'failed-reanalysis')).status, 201);
+  assert.deepEqual(await preserved(), saved, '실패해도 기존 Catch를 보존한다');
+  const next = await s.submit(user, randomUUID(), { retryOfRequestId: failed.status.requestId });
+  const result = structuredClone(originalResult);
+  result.candidates[0].title = '같은 작업에서 새로 생성된 제목';
+  result.candidates[0].draft.content = '기존 Catch에 덮어쓰면 안 되는 새 초안';
+  const fresh = structuredClone(result.candidates[0]);
+  fresh.candidateId += '-new'; fresh.workIdentity += '-new'; fresh.evidence[0].evidenceId += '-new';
+  result.candidates.push(fresh);
+  const applied = await s.inject(user, next.status.requestId, 'Result', result, 'retained');
+  assert.equal(applied.status, 201, applied.text);
+  assert.equal(applied.body.application.registeredCatchIds.length, 2);
+  assert.ok(applied.body.application.registeredCatchIds.includes(asset.catch_id));
+  assert.deepEqual(await preserved(), saved, '같은 작업의 최초 내용·설명·공개·근거를 유지한다');
+  assert.equal((await counts()).catches, 2, '새 작업만 한 개 더한다');
+  const [added] = await db.query('SELECT visibility, author_description FROM catch_asset WHERE catch_id <> $1', [asset.catch_id]);
+  assert.deepEqual(added, { visibility: 'PRIVATE', author_description: null });
+});
+
 for (const entry of manifest.cases) {
   test(`#103 ${entry.caseId}: 실제 접수 → 개발 주입 → DB 수신 → 접수 API 상태`, async t => {
     const s = await start(t);
@@ -414,7 +449,7 @@ test('반영에 실패한 요청은 같은 결과로 다시 반영하지 않고 
   const headers = { Authorization: 'Bearer ' + user.token, 'Content-Type': 'application/json' };
   const template = read('results/succeeded-one-candidate.json');
 
-  // 저장소 A: 정상 반영된 Catch를 확인·공개하고 링크로 수신자에게 보인다. 끝까지 바뀌지 않아야 할 기존 자료·링크다.
+  // 저장소 A: 정상 반영된 Catch를 확인·공개한다. 끝까지 바뀌지 않아야 할 기존 자료다.
   const a = await s.submit(user);
   const applied = await s.inject(user, a.status.requestId, 'Result', template, 'chain-a');
   assert.equal(applied.body.receipt.disposition, 'ACCEPTED');
@@ -422,15 +457,9 @@ test('반영에 실패한 요청은 같은 결과로 다시 반영하지 않고 
   const put = (suffix, body) => s.call(`/v1/catches/${catchId}${suffix}`, { method: 'PUT', headers, body: JSON.stringify(body) });
   assert.equal((await put('/confirmation', { workFactsConfirmed: true, contributionConfirmed: true })).status, 200);
   assert.equal((await put('/visibility', { visibility: 'PUBLIC' })).status, 200);
-  const issued = await s.call('/v1/share-links', { method: 'POST', headers: { ...headers, 'Idempotency-Key': randomUUID() },
-    body: JSON.stringify({ title: '[합성] #114 연결 시험 링크' }) });
-  assert.equal(issued.status, 201, await issued.clone().text());
-  const token = (await issued.json()).url.split('/s/')[1];
-  const recipient = () => s.call(`/v1/public/links/${token}/catches/${catchId}`);
-  const shown = await recipient();
-  assert.equal(shown.status, 200);
-  const shownBody = await shown.json();
-  const KEPT = ['catch_asset', 'catch_evidence', 'candidate_registration', 'repository_protection', 'share_link'];
+  // 10월 공유 링크 발급·수신자 Catch 상세 경로는 U4 제출 3(W6)에서 발행본 흐름으로 대체돼 여기서는 쓰지 않는다. 받은 사람 열람이 원본 변경과
+  // 무관하게 고정 사본을 돌려주는 것은 test/publications/recipient-api.test.cjs·publications-manage-api.test.cjs(S10)가 본다.
+  const KEPT = ['catch_asset', 'catch_evidence', 'candidate_registration', 'repository_protection'];
   const kept = await tableRows(KEPT);
   for (const table of KEPT) assert.ok(kept[table].length > 0, `${table}에 지킬 행이 있어야 한다`);
   const requestA = await requestRows(a.status.requestId);
@@ -475,14 +504,11 @@ test('반영에 실패한 요청은 같은 결과로 다시 반영하지 않고 
   assert.deepEqual(await dispatcher.dispatchOnce(), { read: 1, enqueued: 1, existing: 0, skipped: 0, paused: null });
   assert.deepEqual([...queue.jobs.keys()], [retry.status.attemptId]);
 
-  // 다른 요청의 Catch·근거·보호 기록·링크, 두 원 요청과 수신 기록, 수신자 열람이 그대로다.
+  // 다른 요청의 Catch·근거·보호 기록, 두 원 요청과 수신 기록이 그대로다.
   assert.deepEqual(await tableRows(KEPT), kept);
   assert.deepEqual(await tableRows(['result_application_record']), receipts);
   assert.deepEqual(await requestRows(a.status.requestId), requestA);
   assert.deepEqual(await requestRows(b.status.requestId), requestB);
-  const stillShown = await recipient();
-  assert.equal(stillShown.status, 200);
-  assert.deepEqual(await stillShown.json(), shownBody);
 });
 
 for (const [label, findForRegistration] of [
@@ -561,7 +587,7 @@ test('#140 #103 사례별 실제 접수 → 개발 주입 → DB 수신·반영 
   const byCase = caseId => reads.filter(entry => entry.item.entry.caseId === caseId).map(entry => entry.one);
   const pick = status => [status.processing, status.application, status.lifecycle, status.eligibleCandidateCount, status.retry];
   // 정상 0건은 정상 완료로 닫히며, 아직 처리 전이라 후보 수가 0인 대기 요청과 구분된다.
-  assert.deepEqual(pick(byCase('empty')[0]), ['EMPTY', 'APPLIED', 'CLOSED', 0, { allowed: false, reason: 'REANALYSIS_DEFERRED' }]);
+  assert.deepEqual(pick(byCase('empty')[0]), ['EMPTY', 'APPLIED', 'CLOSED', 0, { allowed: true, reason: 'ANALYSIS_FINISHED' }]);
   assert.deepEqual(pick(byCase('unidentifiable')[0]), ['QUEUED', 'NOT_READY', 'ACTIVE', 0, { allowed: false, reason: 'IN_PROGRESS' }]);
   assert.deepEqual(pick(byCase('failed')[0]), ['FAILED', 'APPLIED', 'CLOSED', 0, { allowed: true, reason: 'FAILURE_WITHOUT_RESULTS' }]);
   const [running, uncertain] = byCase('progress-events');
@@ -617,7 +643,7 @@ test('#140 반영 실패 → 처리 시한 닫기 → 실패 재요청까지의 
   // 새 요청이 생긴 원 요청은 다시 재요청 대상으로 보이지 않는다.
   assert.deepEqual(failedApply.retry, { allowed: false, reason: 'IN_PROGRESS' });
   assert.deepEqual([done.registeredCatchIds, done.ownerResultsReady, done.retry],
-    [applied.body.application.registeredCatchIds, true, { allowed: false, reason: 'RESULTS_EXIST' }]);
+    [applied.body.application.registeredCatchIds, true, { allowed: false, reason: 'IN_PROGRESS' }]);
   for (const [item, accepted] of [[newest, retry], [failedApply, b], [done, a]]) {
     assert.deepEqual((await s.lookup(user, item.requestId)).body, item);
     assert.deepEqual(await s.status(user, accepted), item);

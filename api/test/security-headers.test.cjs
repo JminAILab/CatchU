@@ -15,7 +15,8 @@ const EXPECTED = {
 };
 
 async function start(t, env) {
-  const keys = ['AUTH_WEB_ORIGIN', 'AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'CORS_ALLOWED_ORIGINS', 'SHARE_LINK_WEB_BASE_URL', 'LINK_GRANT_SECRET'];
+  const keys = ['AUTH_WEB_ORIGIN', 'AUTH_JWT_SECRET', 'AUTH_ACCESS_TOKEN_TTL_SECONDS', 'DEV_LOGIN_ENABLED', 'NODE_ENV', 'CORS_ALLOWED_ORIGINS', 'SHARE_LINK_WEB_BASE_URL', 'LINK_GRANT_SECRET',
+    'CATCHU_EMBEDDING_API_KEY'];
   const before = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   for (const key of keys) delete process.env[key];
   Object.assign(process.env, { AUTH_WEB_ORIGIN: 'https://catchu.example', AUTH_JWT_SECRET: randomBytes(32).toString('hex'), AUTH_ACCESS_TOKEN_TTL_SECONDS: '900' }, env);
@@ -49,7 +50,7 @@ test('성공·오류·CORS 사전 요청과 Nest 밖 오류 응답 모두 보안
   const cases = [
     ['GET /health', await request('/health'), 200],
     ['/v1 기능 경로 성공', await request('/v1/auth/dev-login', json(JSON.stringify({ memberId: 'headers-member' }))), 200],
-    ['/v1 인증 거부', await request('/v1/share-links', json('{}')), 401],
+    ['/v1 인증 거부', await request('/v1/publications', json('{}')), 401],
     ['/v1 없는 경로', await request('/v1/__missing'), 404],
     ['/v1 본문 해석 오류', await request('/v1/auth/dev-login', json('{"memberId":')), 400],
     ['/v1 밖 없는 경로(Nest 밖)', await request('/nope'), 404],
@@ -65,7 +66,8 @@ test('성공·오류·CORS 사전 요청과 Nest 밖 오류 응답 모두 보안
 });
 
 // 운영처럼 다루는 환경은 운영 필수 설정을 함께 준다. NODE_ENV가 없는 경우는 키 자체를 넣지 않는다(process.env에 undefined를 넣으면 문자열이 된다).
-const PRODUCTION_LIKE = { SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex') };
+const PRODUCTION_LIKE = { SHARE_LINK_WEB_BASE_URL: 'https://catchu.example', LINK_GRANT_SECRET: randomBytes(32).toString('hex'),
+  CATCHU_EMBEDDING_API_KEY: 'synthetic-embedding-key' };
 
 for (const [label, env] of [
   ['production', { NODE_ENV: 'production', ...PRODUCTION_LIKE }],

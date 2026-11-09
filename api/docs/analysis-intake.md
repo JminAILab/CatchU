@@ -1,5 +1,11 @@
 # 분석 고지·접수·실패 재요청 — #138
 
+## 현행 U7 직접 등록·재분석과 고지 v2 — #424
+
+실제 회원의 새 경로는 [U7 등록·분석](repository-analysis-u7.md)을 따른다. 아래 #323의 전역 선정 목록·네 칸 DB 동의와 실패 한정 재요청 설명은 10월 구현 기록이다. 현행은 본인 등록과 서버 확인 좌표를 포함한 여섯 칸 불변 사본, 요청별 C-03 소비 경계를 사용한다. [#424의 2026-10-30 팀장 결정](https://github.com/JminAILab/CatchU/issues/424)에 따라 최신 분석이 끝나고 진행·반영·복구가 남지 않았으면 결과와 관계없이 새 동의·하루 1회 한도로 재분석한다. 기존 Catch와 작성한 설명은 보존하고 새 작업만 더한다. 기존 멱등 처리와 자동 재시도 없음은 유지한다.
+
+`REAL_NOTICE`는 같은 결정의 확정 고지 `catchu-real-analysis-notice-v2`다. v1에서 직접 등록 안내, 새 Catch의 공개·발행·Claude 접근 안내, Catch 삭제 없음 안내, 기존 Catch를 유지하는 재분석 안내의 네 줄만 바꿨다. 나머지 문구와 30줄·빈 줄 6개는 유지하고 시험 SHA-256을 함께 갱신했다. U4 화면은 상태를 “숨김”으로 부르지 않으므로 확정 원문의 “비공개”를 사용했다. 고지의 승인 기록은 [PR #433](https://github.com/JminAILab/CatchU/pull/433)의 팀장 승인으로 남긴다. 과거 승인 원본은 소급 수정하지 않는다.
+
 ## 기준과 검증 범위
 
 [회원 API](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/member-api.yaml)와 [접수·재요청 계약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#분석-접수상태재요청), [업무 규칙](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/rules.md)의 현재 판본을 따른다. 이슈에 연결된 9093d2e 판본 이후 제목 null·제목 고쳐 쓰기 등 변경을 확인했다. 제목만 없다고 실패 재요청을 허용하지 않으며 접수·동시성·실패 재요청 기준을 바꾸지 않는다.
@@ -18,7 +24,7 @@
 
 ## 실제 자료용 고지와 고지 선택 — #322
 
-[#322](https://github.com/JminAILab/CatchU/issues/322)의 2026-10-17 팀장 확정 문구를 `src/analysis-intake/analysis-notice.ts`의 `REAL_NOTICE`에 판본 `catchu-real-analysis-notice-v1`로 싣는다. 합성 판본 `catchu-synthetic-analysis-notice-v1`과 다른 값이다. 문구는 12월 공개판 기준이며 설명하는 기능의 현재 구현 여부에 맞춰 고치지 않는다. 배열 한 원소가 한 줄, 빈 원소가 문단 사이 빈 줄이고 응답 `text`는 이를 LF(`\n`)로 이은 일반 텍스트다(HTML·마크다운 아님). 화면 표시는 [#154](https://github.com/JminAILab/CatchU/issues/154)가 맡아 이 문단·줄바꿈에 맞춘다.
+[#322](https://github.com/JminAILab/CatchU/issues/322)의 2026-10-17 팀장 확정 원문에서 #424의 확정 네 줄을 바꾼 문구를 `src/analysis-intake/analysis-notice.ts`의 `REAL_NOTICE`에 판본 `catchu-real-analysis-notice-v2`로 싣는다. 합성 판본 `catchu-synthetic-analysis-notice-v1`과 다른 값이다. 문구는 12월 공개판 기준이며 설명하는 기능의 현재 구현 여부에 맞춰 고치지 않는다. 배열 한 원소가 한 줄, 빈 원소가 문단 사이 빈 줄이고 응답 `text`는 이를 LF(`\n`)로 이은 일반 텍스트다(HTML·마크다운 아님). 화면 표시는 [#154](https://github.com/JminAILab/CatchU/issues/154)가 맡아 이 문단·줄바꿈에 맞춘다.
 
 `GET /v1/analysis-notice`는 [공통 회원 구분](member-analysis.md#실제개발-회원-구분--322)으로 고지를 고르며 GitHub 연결 상태·공급 방식은 보지 않는다. 응답 두 필드·no-store·인증 조건은 그대로다.
 

@@ -62,7 +62,7 @@ def test_synthetic_request_matches_accepted_context() -> None:
 @pytest.mark.parametrize(
     ("pointer", "value"),
     [
-        ("/schemaVersion", "2"),
+        ("/schemaVersion", "1"),
         ("/memberId", ""),
         ("/consentedAt", "2026-10-01 00:00:00Z"),
         ("/sourceMode", "REAL"),
