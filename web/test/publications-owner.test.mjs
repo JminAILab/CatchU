@@ -358,7 +358,9 @@ test("사본 화면: 항목 순서대로 보이고 Catch는 기록·작성자 �
 
   // 빈 설명·초안은 다른 값으로 채우지 않고, 본문은 React 텍스트로만 그린다.
   const empty = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: snapshot([catchItem({ authorDescription: null, aiDraft: null, mismatch: false, evidence: [] }), textItem("<script>alert(1)</script>")]) }));
-  assert.ok(empty.includes("작성자 설명이 없습니다.") && empty.includes("AI 설명 초안이 없습니다."));
+  assert.ok(empty.includes("작성자 설명이 없습니다."));
+  // AI 설명 초안이 없으면 칸을 그리지 않는다(Catch 개편 CR3 BR7.1, 2026-11-08 팀장 결정).
+  assert.ok(!empty.includes("snapshot-catch-ai-draft") && !empty.includes("AI 설명 초안"));
   assert.doesNotMatch(empty, /snapshot-catch-mismatch/);
   assert.ok(empty.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
   const pdf = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: snapshot([{ publishedItemId: "p", position: 1, itemKind: "PDF_MATERIAL", title: "PDF", snapshot: {} }]) }));
@@ -389,9 +391,9 @@ test("GitHub 주소 판정: 받은 사람 화면의 isGithubSourceUrl과 같은 
   assert.match(html, /<a href="https:\/\/github\.com\/o\/r" target="_blank" rel="noopener noreferrer" data-testid="snapshot-github-link">https:\/\/github\.com\/o\/r<span class="visually-hidden"> \(새 탭\)<\/span><\/a>/);
 });
 
-test("상세 화면: 주소·상태·만료·[URL 복사]와 고정 안내·비공개 전환 안내를 보이고, [링크 열기]·[링크 중지]는 ACTIVE에만 있으며, 요약 패널 자리는 비어 있고 실패 안내가 보인다", () => {
+test("상세 화면: 주소·상태·만료·[URL 복사]와 고정 안내·비공개 전환 안내를 보이고, [링크 열기]·[링크 중지]는 ACTIVE에만 있으며, 요약 패널 자리에 U5 작성자 요약 패널이 있고 실패 안내가 보인다", () => {
   const view = (props) => renderToStaticMarkup(createElement(PublicationDetailView, {
-    detail: detail(), stoppedAt: null, stopState: "idle", deleteState: "idle", onStop() {}, onDelete() {}, ...props,
+    detail: detail(), stoppedAt: null, stopState: "idle", deleteState: "idle", onStop() {}, onDelete() {}, highlight: null, showEvidence() {}, ...props,
   }));
   const active = view({});
   assert.match(active, new RegExp(`<a[^>]*href="${url(1)}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*data-testid="publication-open-link"`));
@@ -402,7 +404,12 @@ test("상세 화면: 주소·상태·만료·[URL 복사]와 고정 안내·비�
   assert.ok(active.includes(FIXED_COPY_NOTICE) && active.includes('data-testid="publication-fixed-notice"'));
   assert.ok(active.includes(SOURCE_PRIVATE_NOTICE) && active.includes('data-testid="publication-private-notice"'));
   assert.ok(active.includes('data-testid="publication-stop-button"') && active.includes('data-testid="publication-delete-button"'));
-  assert.match(active, /<div data-testid="publication-summary-slot"><\/div>/);
+  // U5 작성자 모드 패널(C-11 owner-summary)이 자리 안에 있다. 서버 렌더에서는 아직 읽기 전이라 불러오는 중이다.
+  assert.match(active, /<div data-testid="publication-summary-slot"><section[^>]*data-testid="base-summary-panel"/);
+  assert.doesNotMatch(active, /snapshot-highlight/);
+  // 요약 근거 단추로 받은 강조 범위는 사본에 <mark>로 그린다(C-11 evidence-highlight).
+  const highlighted = view({ highlight: { publishedItemId: "i1", fieldPath: "subjectContribution", charStart: 0, charEnd: 2 } });
+  assert.match(highlighted, /<mark[^>]*data-testid="snapshot-highlight">기여<\/mark>/);
   assert.ok(active.includes('data-testid="publication-snapshot"'));
   assert.doesNotMatch(active, /indexState|검색 다시 준비/);
 

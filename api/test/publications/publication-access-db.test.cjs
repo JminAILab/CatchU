@@ -5,7 +5,7 @@
 //
 // 판정 순서 (BR6.1, C-10, NFR1.3·NFR1.12)
 //   - 기대: 토큰 형식(base64url 43자)이 아니면 조회 없이 LinkUnavailable. 발행본 없음·중지·만료(만료 시각과 같은 순간부터)는 구분 없이
-//           LinkUnavailable. 그다음 소유 회원 상태(OQ-U4-NFR-6 합의 전 10월 동작): 비활성이면 LinkUnavailable(404), 회원 행 없음이면
+//           LinkUnavailable. 그다음 소유 회원(작성자) 상태(#416 OQ-U4-NFR-6 결정 2026-11-05, 중지·만료 다음·grant 앞): 비활성이면 LinkUnavailable(404), 회원 행 없음이면
 //           내부 오류(500 INTERNAL_ERROR 계열, 토큰·SQL 비노출). 그다음 비밀번호 링크면 grant(없음·서명 틀림·다른 발행본·만료)를 확인해
 //           LinkPasswordRequired. 비밀번호 없는 링크는 grant 없이 통과한다. 판정은 호출마다 다시 하고 캐시하지 않는다.
 //   - 실패 조건: 중지·만료 링크가 grant로 열림, 비활성 소유자의 링크가 열림, 회원 없음을 404나 빈 결과로 바꿈, 형식 오류 토큰으로 DB 조회.
@@ -21,6 +21,16 @@
 //   - 기대: published_item만 읽어 position 오름차순 PublishedSnapshot { title, publishedAt, expiresAt, items }를 만든다. U4 항목의
 //           pdfPages는 null. 발행본 행이 없으면 빈 사본을 만들지 않고 NotFound로 실패한다.
 //   - 실패 조건: 원본 catch_asset·text_material을 읽음, 없는 발행본에 빈 사본.
+// 판정 뒤 상태 변경 (OQ-U4-NFR-5 결정 A, #416 2026-11-04; 계약 C-10 post-judgment-rule·deletion-rule)
+//   - 기대: resolveForRecipient 통과 뒤 같은 요청이 진행되는 동안 중지·만료·소유 회원 비활성이 커밋돼도 그 요청의 readSnapshot은
+//           사본을 그대로 돌려준다(상태 판정 없음). 차단은 다음 요청의 resolveForRecipient(LinkUnavailable)가 한다. 판정 뒤 삭제가
+//           커밋되면 같은 요청의 readSnapshot은 NotFound(LinkUnavailable이 아님)이고, 발행본을 참조하는 쓰기는 외래 키 거부
+//           SQLSTATE 23503이며 거부한 제약이 publication을 참조하는 것이다(소비 Unit이 "삭제로 확인"해 404 LINK_UNAVAILABLE로
+//           바꾸는 근거. 다른 제약의 23503은 해당하지 않음). 소유 회원(작성자) 비활성도 같은 per-call 동작이다(#416 OQ-U4-NFR-6
+//           결정 2026-11-05: 통과한 요청을 작성자 비활성만을 이유로 취소하지 않는다). U4 자기 열람 경로(제출 3)가 쓰는
+//           resolveForRecipientIn·readSnapshotIn은 같은 REPEATABLE READ 트랜잭션에서 판정 시점 스냅샷을 읽어 이 틈이 없다(D10, R-04).
+//   - 실패 조건: readSnapshot이 중지·만료를 판정해 실패함(계약 C안, 미채택), 삭제를 LinkUnavailable로 바꿈(U5 NotFound 분기가 깨짐),
+//           다음 요청이 중지·만료·삭제 뒤에도 열림, 같은 트랜잭션 변형이 판정 뒤 커밋을 봄.
 //
 // 실제 테스트 DB의 publication·published_item·member_account 표를 쓴다. 회원·발행본·토큰·grant는 모두 합성이다.
 // 회원 행 없음은 정상 DB에서 만들 수 없으므로 10월 recipient-http 시험처럼 OwnerProfileReader.readOwnerState 결과만 대역으로 바꾼다.
@@ -186,4 +196,95 @@ test('readSnapshot은 published_item만 position 순으로 읽어 사본을 만�
   await assert.rejects(access.readSnapshot('not-a-uuid'), NotFound);
   await db.query('DELETE FROM publication WHERE publication_id = $1', [p.publicationId]);
   await assert.rejects(access.readSnapshot(p.publicationId), NotFound, '삭제 뒤 빈 사본을 만들지 않는다');
+});
+
+const TEXT_ITEM = { body: '[합성] 본문' };
+const stop = (publicationId, at = NOW) => db.query('UPDATE publication SET stopped_at = $2 WHERE publication_id = $1', [publicationId, at]);
+
+test('OQ-U4-NFR-5: 판정 뒤 중지·만료·소유자 비활성이 커밋돼도 같은 요청의 readSnapshot은 사본을 돌려주고, 다음 요청의 판정은 LinkUnavailable이다', async () => {
+  const owner = await insertMember(db);
+
+  // 판정 뒤 중지 — 비밀번호 없는 링크와 비밀번호 링크(유효 grant) 각각.
+  const open = await insertPublication(owner);
+  await insertItem(open.publicationId, 1, 'TEXT_MATERIAL', TEXT_ITEM);
+  const locked = await insertPublication(owner, { password: true });
+  await insertItem(locked.publicationId, 1, 'CATCH', CATCH_SNAPSHOT);
+  const grant = issueLinkGrant(GRANT_KEY, locked.publicationId, locked.expiresAt, NOW);
+  for (const [p, g, label] of [[open, null, '비밀번호 없음'], [locked, grant, '비밀번호 링크']]) {
+    const passed = await access.resolveForRecipient(p.token, g, NOW);
+    assert.equal(passed.publicationId, p.publicationId, label);
+    await stop(p.publicationId);
+    const snapshot = await access.readSnapshot(passed.publicationId);
+    assert.equal(snapshot.items.length, 1, `${label}: 중지 뒤에도 같은 요청의 사본은 그대로`);
+    assert.equal(snapshot.expiresAt.getTime(), p.expiresAt.getTime(), `${label}: 사본의 만료 시각은 발행본 값`);
+    await assert.rejects(access.resolveForRecipient(p.token, g, NOW), LinkUnavailable, `${label}: 다음 요청의 재판정`);
+  }
+
+  // 판정 뒤 만료 시각 경과 — 판정은 만료 1ms 전에 통과했고, 사본 읽기 시점에는 만료됐다.
+  const expiring = await insertPublication(owner, { publishedAt: new Date(NOW.getTime() - 2160 * HOUR) });
+  await insertItem(expiring.publicationId, 1, 'TEXT_MATERIAL', TEXT_ITEM);
+  const beforeExpiry = new Date(NOW.getTime() - 1);
+  assert.equal((await access.resolveForRecipient(expiring.token, null, beforeExpiry)).publicationId, expiring.publicationId, '만료 1ms 전 판정 통과');
+  assert.equal((await access.readSnapshot(expiring.publicationId)).items.length, 1, '만료 시각이 지난 뒤에도 같은 요청의 사본은 그대로');
+  await assert.rejects(access.resolveForRecipient(expiring.token, null, NOW), LinkUnavailable, '만료 뒤 다음 요청의 재판정');
+
+  // 판정 뒤 소유 회원 비활성(#416 OQ-U4-NFR-6 결정 2026-11-05) — 사본 읽기는 그대로, 다음 요청은 404, 재활성 뒤 다시 열린다.
+  const owned = await insertPublication(owner);
+  await insertItem(owned.publicationId, 1, 'TEXT_MATERIAL', TEXT_ITEM);
+  assert.equal((await access.resolveForRecipient(owned.token, null, NOW)).ownerMemberId, owner);
+  await setState(owner, 'SUSPENDED');
+  assert.equal((await access.readSnapshot(owned.publicationId)).items.length, 1, '비활성 뒤에도 같은 요청의 사본은 그대로');
+  await assert.rejects(access.resolveForRecipient(owned.token, null, NOW), LinkUnavailable, '비활성 뒤 다음 요청의 재판정');
+  await setState(owner, 'ACTIVE');
+  assert.equal((await access.resolveForRecipient(owned.token, null, NOW)).publicationId, owned.publicationId, '재활성 뒤 다시 열림');
+});
+
+test('OQ-U4-NFR-5: 판정 뒤 삭제가 커밋되면 같은 요청의 readSnapshot은 NotFound(LinkUnavailable 아님)이고, 발행본을 참조하는 쓰기는 외래 키 거부(23503)이며, 다음 요청의 판정은 LinkUnavailable이다', async () => {
+  const owner = await insertMember(db);
+  const p = await insertPublication(owner);
+  await insertItem(p.publicationId, 1, 'TEXT_MATERIAL', TEXT_ITEM);
+  const passed = await access.resolveForRecipient(p.token, null, NOW);
+  assert.equal(passed.publicationId, p.publicationId);
+
+  await db.query('DELETE FROM publication WHERE publication_id = $1', [p.publicationId]);
+  await assert.rejects(access.readSnapshot(passed.publicationId), (error) => {
+    assert.ok(error instanceof NotFound, '삭제는 readSnapshot의 NotFound');
+    assert.ok(!(error instanceof LinkUnavailable), 'LinkUnavailable로 바꾸지 않는다(U5 NotFound 분기)');
+    assert.ok(!error.message.includes(p.token) && !error.message.includes('SELECT'), '메시지에 토큰·SQL 없음');
+    return true;
+  });
+  // 소비 Unit이 "삭제로 확인"하는 두 번째 근거: 판정 뒤 발행본을 참조하는 쓰기는 외래 키 거부(SQLSTATE 23503)이고,
+  // 거부한 제약이 publication을 참조하는 것(pg 오류의 constraint)이어야 삭제로 본다. 다른 제약의 23503은 500 그대로다.
+  await assert.rejects(insertItem(passed.publicationId, 2, 'TEXT_MATERIAL', { body: '[합성] 늦은 쓰기' }), (error) => {
+    const code = error.code ?? error.driverError?.code;
+    const constraint = error.constraint ?? error.driverError?.constraint;
+    assert.equal(code, '23503', '발행본 참조 외래 키 거부');
+    assert.equal(constraint, 'fk_published_item_publication_id', '거부한 제약이 publication을 참조하는 것');
+    return true;
+  });
+  await assert.rejects(access.resolveForRecipient(p.token, null, NOW), LinkUnavailable, '삭제 뒤 다음 요청의 재판정');
+});
+
+test('OQ-U4-NFR-5 대조(U4 자기 열람 경로): 같은 REPEATABLE READ 트랜잭션의 resolveForRecipientIn·readSnapshotIn은 그사이 커밋된 중지·삭제를 보지 않고, 트랜잭션 뒤 새 판정은 LinkUnavailable이다', async () => {
+  const owner = await insertMember(db);
+  const p = await insertPublication(owner, { title: '[합성] 판정 시점 제목' });
+  await insertItem(p.publicationId, 1, 'TEXT_MATERIAL', TEXT_ITEM);
+
+  const inside = await db.transaction('REPEATABLE READ', async (manager) => {
+    await manager.query('SET TRANSACTION READ ONLY');
+    const passed = await access.resolveForRecipientIn(manager, p.token, null, NOW);
+    assert.equal(passed.publicationId, p.publicationId);
+    // 다른 연결에서 중지 → 삭제를 차례로 커밋한다. 밖의 새 판정은 바로 막힌다.
+    await stop(p.publicationId);
+    await assert.rejects(access.resolveForRecipient(p.token, null, NOW), LinkUnavailable, '밖의 새 판정(중지)');
+    await db.query('DELETE FROM publication WHERE publication_id = $1', [p.publicationId]);
+    await assert.rejects(access.readSnapshot(p.publicationId), NotFound, '밖의 별도 트랜잭션 readSnapshot(삭제)');
+    // 같은 트랜잭션은 판정 시점 스냅샷을 읽는다(중지·삭제 전의 행).
+    return access.readSnapshotIn(manager, passed.publicationId);
+  });
+  assert.equal(inside.title, '[합성] 판정 시점 제목');
+  assert.equal(inside.items.length, 1, '같은 트랜잭션의 사본 읽기는 판정 시점 스냅샷');
+
+  await assert.rejects(access.resolveForRecipient(p.token, null, NOW), LinkUnavailable, '트랜잭션 뒤 새 판정');
+  await assert.rejects(access.readSnapshot(p.publicationId), NotFound, '트랜잭션 뒤 별도 readSnapshot');
 });

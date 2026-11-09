@@ -8,6 +8,7 @@ const { AI_NOTICE_VERSION, AiConsentGate } = require('../../dist/ai-consent/ai-c
 const { DbPublicationAccess } = require('../../dist/publications/db-publication-access');
 const { PublicationManageService } = require('../../dist/publications/publication-manage.service');
 const { PublishService } = require('../../dist/publications/publish.service');
+const { RecipientAccessService } = require('../../dist/publications/recipient-access.service');
 const { ensureRegistration } = require('../support/registered-analysis.cjs');
 const { APP_SETTINGS, setEnv, collectingLogger, startApp, insertMember, expectError } = require('../u2/support.cjs');
 
@@ -119,9 +120,9 @@ function bindFakes(app, { aiRun, indexWriter }) {
   return () => Object.assign(publisher, saved);
 }
 
-/** PUBLICATIONS_CLOCK 자리를 시험 시계로 바꾼다(발행·관리·C-10 모두). 되돌리는 함수를 돌려준다. */
+/** PUBLICATIONS_CLOCK 자리를 시험 시계로 바꾼다(발행·관리·C-10·받은 사람 경로 모두). 되돌리는 함수를 돌려준다. */
 function setClock(app, clock) {
-  const targets = [app.get(PublishService), app.get(PublicationManageService), app.get(DbPublicationAccess)];
+  const targets = [app.get(PublishService), app.get(PublicationManageService), app.get(DbPublicationAccess), app.get(RecipientAccessService)];
   const saved = targets.map((target) => target.clock);
   for (const target of targets) target.clock = clock;
   return () => targets.forEach((target, index) => { target.clock = saved[index]; });
@@ -140,8 +141,38 @@ function tokenOf(url) {
   return match[1];
 }
 
+/**
+ * 실제 발행 API로 받은 사람 시험용 발행본을 만든다(제출 3). 텍스트 자료 하나를 넣고 password를 주면 비밀번호 링크다.
+ * 돌려주는 값에 토큰이 있으므로 응답·로그 비노출 검사의 비밀값 목록에 넣는다.
+ */
+async function publishLink(server, db, member, { password, title = '[합성] 받은 사람 시험 발행본', items } = {}) {
+  const chosen = items ?? [textItem(await insertTextMaterial(db, member.memberId, { title: '[합성] 자료', body: '[합성] 본문' }))];
+  const response = await server.call('POST', '/publications', { token: member.token, body: body(chosen, { title, ...(password ? { password } : {}) }) });
+  if (response.status !== 201) throw new Error(`발행 실패 ${response.status}: ${response.text}`);
+  return { ...response.body, token: tokenOf(response.body.url), expiresAt: new Date(response.body.expiresAt), publishedAt: new Date(response.body.publishedAt) };
+}
+
+/** 받은 사람 경로 요청. /v1 아래 경로를 부르고 상태·머리글·본문·Retry-After를 돌려준다. grant는 X-Link-Grant로만 싣는다. */
+async function recipientCall(server, method, path, { grant, body: payload, headers = {} } = {}) {
+  const sent = { ...headers };
+  if (grant !== undefined) sent['X-Link-Grant'] = grant;
+  if (payload !== undefined) sent['Content-Type'] = 'application/json';
+  const response = await fetch(`${server.url}/v1${path}`, {
+    method, headers: sent, body: payload === undefined ? undefined : (typeof payload === 'string' ? payload : JSON.stringify(payload)),
+    signal: AbortSignal.timeout(15000),
+  });
+  const text = await response.text();
+  return {
+    status: response.status, headers: response.headers, text, body: text === '' ? null : JSON.parse(text),
+    cacheControl: response.headers.get('cache-control'), retryAfter: response.headers.get('retry-after'),
+  };
+}
+const recipientGet = (server, token, grant, options = {}) => recipientCall(server, 'GET', `/public/links/${encodeURIComponent(token)}${options.query ?? ''}`, { grant, headers: options.headers });
+const unlockRaw = (server, token, payload, headers = {}) => recipientCall(server, 'POST', `/public/links/${encodeURIComponent(token)}/unlock`, { body: payload, headers });
+
 module.exports = {
   APP_SETTINGS, PUBLISH_SETTINGS, WEB_BASE_URL, HOUR, setEnv, collectingLogger, startApp, insertMember, expectError,
   insertAnalysisRequest, insertProtection, insertCatch, insertEvidence, eligibleCatch, insertTextMaterial, consent,
   fakeAiRun, fakeIndexWriter, bindFakes, setClock, body, catchItem, textItem, tokenOf,
+  publishLink, recipientCall, recipientGet, unlockRaw,
 };

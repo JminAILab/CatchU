@@ -14,8 +14,8 @@ Approve the code plan for u4-publication-link?
 Full plan: aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/code-generation/code-generation-plan.md
 Test instructions: aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/code-generation/unit-test-instructions.md
 
-[Approval Fingerprint]: sha256:v3:95b59991a6d870807fb159c7f0bded4cff3afec1d6898d27fc38823256704044
-[Planned Source]: be522a8469c32602d98c0a6d557f01c8440b9e382a8c6fa963594e393f4657c7
+[Approval Fingerprint]: sha256:v3:27af3e4d66c617947f3aaf11365f6c00e9c31cdaf6534da8c3a02fbe95354bfe
+[Planned Source]: 81cbe04de987b92fa51aeb962df2cdc6f38d159ba5a27aeb7af080135ade4108
 
 - A. Approve Plan
 - B. Request Changes

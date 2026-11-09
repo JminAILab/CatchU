@@ -1,16 +1,16 @@
-import type { PublicCatch, PublicCollection, PublicProfile, RecipientApi, RecipientFailure, RecipientResult } from "./recipient-api.ts";
+import type { PublishedSnapshot, RecipientApi, RecipientFailure, RecipientResult } from "./recipient-api.ts";
 import type { GrantStore } from "./recipient-grants.ts";
+import type { LinkAccessCode } from "./recipient-slots.ts";
 
 /**
- * 수신자 목록(V02)·상세(V03) 상태(#152). 판정은 서버가 하고, 화면은 응답 코드로만 분기한다.
+ * 받은 사람 발행본 화면 상태(U4 제출 3 W4). 10월 목록(V02)·상세(V03) 두 상태를 발행본 하나로 합쳤고, 판정은 서버가 하며 화면은 응답 코드로만 분기한다.
  *
- * - 링크 불가(404 `LINK_UNAVAILABLE`): 없음·중단·만료·소유 회원 비활성을 구분하지 않는 공통 화면. 그 링크의 grant를 지운다.
+ * - 링크 불가(404 `LINK_UNAVAILABLE`): 없음·삭제·중지·만료·작성자 비활성을 구분하지 않는 공통 화면(#416 OQ-U4-NFR-6 결정). 그 링크의 grant를 지운다.
  * - 비밀번호 필요(401 `LINK_PASSWORD_REQUIRED`): 비밀번호 입력. 받아 둔 grant가 있었다면 지우고 다시 입력받는다.
- * - 상세 불가(404 `RESOURCE_UNAVAILABLE`): 숨김·타인·없는 Catch 공통 안내. 링크 자체는 열려 있다.
- * - 그 밖의 실패(500·통신 실패·손상된 응답·예상 밖 코드): 조회 실패. 0건·숨김·링크 불가로 바꾸지 않는다.
+ * - 그 밖의 실패(500·통신 실패·손상된 응답·예상 밖 코드): 조회 실패. 링크 불가로 바꾸지 않는다(작성자 회원 행 없음 500도 여기).
  *
- * 확정된 거부(링크 불가·비밀번호 필요·상세 불가)를 받으면 표시하던 자료를 지운다.
- * 조회 실패는 이미 표시한 같은 링크·같은 Catch의 화면만 유지하고 새로 요청한 자료만 보류한다.
+ * 확정된 거부(링크 불가·비밀번호 필요)를 받으면 표시하던 사본을 지운다. 조회 실패는 같은 링크의 이미 표시한 사본만 유지한다.
+ * 붙는 컴포넌트(U5·U10)가 `onAccessLost(code)`를 부르면 같은 전환과 grant 삭제를 한다(C-11 rule).
  * 자동으로 다시 조회·전송하지 않는다. 늦게 도착한 응답(다시 조회·화면 해제 뒤)은 버린다.
  * 비밀번호 원문은 이 객체에 두지 않는다(화면 입력값에만 있다).
  */
@@ -27,39 +27,27 @@ export type UnlockSnapshot = {
 
 const UNLOCK_IDLE: UnlockSnapshot = { phase: "idle", retryAt: null, reentry: false };
 
-export type CollectionSnapshot =
+export type PublicationSnapshot =
   | { readonly view: "loading" }
   | { readonly view: "unavailable" }
   | { readonly view: "password"; readonly unlock: UnlockSnapshot }
   | { readonly view: "failed" }
   | {
     readonly view: "ready";
-    readonly profile: PublicProfile;
-    readonly catches: readonly PublicCatch[];
-    readonly nextCursor: string | null;
-    readonly more: "idle" | "loading" | "failed";
+    readonly snapshot: PublishedSnapshot;
     /** 같은 링크를 다시 조회 중(이전 화면 유지) */
     readonly refreshing: boolean;
     /** 다시 조회에 실패해 이전 화면을 유지하고 있음 */
     readonly refreshFailed: boolean;
   };
 
-export type CatchSnapshot =
-  | { readonly view: "loading" }
-  | { readonly view: "unavailable" }
-  | { readonly view: "resource-unavailable" }
-  | { readonly view: "password"; readonly unlock: UnlockSnapshot }
-  | { readonly view: "failed" }
-  | { readonly view: "ready"; readonly item: PublicCatch; readonly refreshing: boolean; readonly refreshFailed: boolean };
+type Denial = "unavailable" | "password" | "failed";
 
-type Denial = "unavailable" | "password" | "resource" | "failed";
-
-/** 조회 응답의 분기. 메시지 문구가 아니라 code로 판단한다(API 명세 「공통 오류」). */
+/** 조회 응답의 분기. 메시지 문구가 아니라 code로 판단한다(API 공통 오류). */
 export function classifyReadFailure(result: RecipientFailure): Denial {
   if (result.kind !== "api-error") return "failed";
   if (result.status === 404 && result.code === "LINK_UNAVAILABLE") return "unavailable";
   if (result.status === 401 && (result.code === "LINK_PASSWORD_REQUIRED" || result.code === "LINK_PASSWORD_INVALID")) return "password";
-  if (result.status === 404 && result.code === "RESOURCE_UNAVAILABLE") return "resource";
   return "failed";
 }
 
@@ -91,7 +79,7 @@ export type RecipientStoreOptions = {
 };
 
 /**
- * 두 상태 객체가 함께 쓰는 접근 처리: grant 읽기·지우기, 비밀번호 확인, 대기 시각, 늦은 응답 버리기.
+ * 접근 처리: grant 읽기·지우기, 비밀번호 확인, 대기 시각, 늦은 응답 버리기(10월 그대로).
  * `onGranted`는 확인에 성공한 뒤 같은 화면의 자료를 다시 읽는다.
  */
 function createAccess<S extends { view: string }>(options: RecipientStoreOptions, initial: S) {
@@ -191,39 +179,33 @@ function createAccess<S extends { view: string }>(options: RecipientStoreOptions
   };
 }
 
-/** 목록(V02): 공개 프로필과 현재 공개 Catch. 다음 페이지도 서버가 새로 판정한다. */
-export function createRecipientCollectionStore(options: RecipientStoreOptions) {
-  const access = createAccess<CollectionSnapshot>(options, { view: "loading" });
-  let moreAbort: AbortController | undefined;
-  const toPassword = (unlock: UnlockSnapshot): CollectionSnapshot => ({ view: "password", unlock });
-  const toUnavailable = (): CollectionSnapshot => ({ view: "unavailable" });
+/** 발행본 화면(`/s/[token]`). 열람 한 번에 판정과 사본을 함께 받는다(다음 페이지 없음). */
+export function createRecipientPublicationStore(options: RecipientStoreOptions) {
+  const access = createAccess<PublicationSnapshot>(options, { view: "loading" });
+  const toPassword = (unlock: UnlockSnapshot): PublicationSnapshot => ({ view: "password", unlock });
+  const toUnavailable = (): PublicationSnapshot => ({ view: "unavailable" });
 
-  function deny(denial: Denial, hadGrant: boolean) {
-    if (denial === "unavailable") {
-      access.dropGrant();
-      access.set(toUnavailable());
-    } else {
-      access.dropGrant();
-      access.set(toPassword(access.unlockSnapshot({ reentry: hadGrant })));
-    }
+  /** 확정 거부: 표시하던 사본을 지우고 그 링크의 grant만 지운다. */
+  function deny(denial: Exclude<Denial, "failed">, hadGrant: boolean) {
+    access.dropGrant();
+    access.set(denial === "unavailable" ? toUnavailable() : toPassword(access.unlockSnapshot({ reentry: hadGrant })));
   }
 
-  /** 첫 페이지부터 다시 읽는다. 같은 링크의 목록이 있으면 그 목록을 유지한 채 갱신한다. */
+  /** 발행본을 읽는다. 같은 링크의 사본이 있으면 그 화면을 유지한 채 갱신한다. */
   async function load(): Promise<void> {
-    moreAbort?.abort();
     const read = access.beginRead();
     const before = access.state;
-    if (before.view === "ready") access.set({ ...before, refreshing: true, refreshFailed: false, more: before.more === "loading" ? "idle" : before.more });
+    if (before.view === "ready") access.set({ ...before, refreshing: true, refreshFailed: false });
     else access.set({ view: "loading" });
     const grant = access.grant();
-    const result = await access.safely(() => options.api.collection(options.token, grant, null, read.signal));
+    const result = await access.safely(() => options.api.publication(options.token, grant, read.signal));
     if (!read.current()) return;
     if (result.kind === "success") {
-      access.set(readyFrom(result.data));
+      access.set({ view: "ready", snapshot: result.data, refreshing: false, refreshFailed: false });
       return;
     }
     const denial = classifyReadFailure(result);
-    if (denial === "unavailable" || denial === "password") {
+    if (denial !== "failed") {
       deny(denial, grant !== null);
       return;
     }
@@ -232,109 +214,27 @@ export function createRecipientCollectionStore(options: RecipientStoreOptions) {
     else access.set({ view: "failed" });
   }
 
-  function readyFrom(data: PublicCollection): CollectionSnapshot {
-    return { view: "ready", profile: data.profile, catches: dedupe(data.catches), nextCursor: data.nextCursor, more: "idle", refreshing: false, refreshFailed: false };
-  }
-
-  /** 다음 페이지. 실패하면 받은 목록은 그대로 두고 다시 시도할 수 있게 한다. 확정 거부면 목록을 지운다. */
-  async function loadMore(): Promise<void> {
-    const before = access.state;
-    if (before.view !== "ready" || before.nextCursor === null || before.more === "loading" || before.refreshing) return;
-    moreAbort?.abort();
-    const abort = new AbortController();
-    moreAbort = abort;
-    const cursor = before.nextCursor;
-    access.set({ ...before, more: "loading" });
-    const grant = access.grant();
-    const result = await access.safely(() => options.api.collection(options.token, grant, cursor, abort.signal));
-    const now = access.state;
-    if (abort.signal.aborted || now.view !== "ready" || now.nextCursor !== cursor) return;
-    if (result.kind === "success") {
-      access.set({
-        ...now,
-        profile: result.data.profile,
-        catches: dedupe([...now.catches, ...result.data.catches]),
-        nextCursor: result.data.nextCursor,
-        more: "idle",
-      });
-      return;
-    }
-    const denial = classifyReadFailure(result);
-    if (denial === "unavailable" || denial === "password") {
-      access.beginRead();
-      deny(denial, grant !== null);
-      return;
-    }
-    access.set({ ...now, more: "failed" });
-  }
-
   return {
     getSnapshot: () => access.state,
     subscribe: access.subscribe,
     load,
-    loadMore,
     unlock: (password: string) => access.unlock(password, toPassword, toUnavailable, load),
+    /**
+     * 붙는 컴포넌트가 받은 링크 접근 오류(C-11 rule). 화면이 직접 받은 404·401과 같은 전환과 grant 삭제를 하고,
+     * 진행 중이던 이 화면의 조회는 끊어 늦은 응답이 거부를 덮지 않게 한다.
+     */
+    accessLost(code: LinkAccessCode) {
+      const hadGrant = access.grant() !== null;
+      access.beginRead();
+      deny(code === "LINK_UNAVAILABLE" ? "unavailable" : "password", hadGrant);
+    },
     retryWaitSeconds: access.retryWaitSeconds,
     now: access.now,
     /** 화면을 떠날 때: 진행 중 요청을 취소하고 늦은 응답을 버린다. 보관한 grant는 지우지 않는다(같은 탭에서 다시 열 수 있게). */
     dispose() {
-      moreAbort?.abort();
       access.dispose({ view: "loading" });
     },
   };
 }
 
-/** 상세(V03). 다른 Catch의 응답은 받지 않는다(api가 catchId를 대조). */
-export function createRecipientCatchStore(options: RecipientStoreOptions & { catchId: string }) {
-  const access = createAccess<CatchSnapshot>(options, { view: "loading" });
-  const toPassword = (unlock: UnlockSnapshot): CatchSnapshot => ({ view: "password", unlock });
-  const toUnavailable = (): CatchSnapshot => ({ view: "unavailable" });
-
-  async function load(): Promise<void> {
-    const read = access.beginRead();
-    const before = access.state;
-    if (before.view === "ready") access.set({ ...before, refreshing: true, refreshFailed: false });
-    else access.set({ view: "loading" });
-    const grant = access.grant();
-    const result = await access.safely(() => options.api.catchDetail(options.token, options.catchId, grant, read.signal));
-    if (!read.current()) return;
-    if (result.kind === "success") {
-      access.set({ view: "ready", item: result.data, refreshing: false, refreshFailed: false });
-      return;
-    }
-    const denial = classifyReadFailure(result);
-    if (denial === "unavailable") {
-      access.dropGrant();
-      access.set(toUnavailable());
-    } else if (denial === "password") {
-      access.dropGrant();
-      access.set(toPassword(access.unlockSnapshot({ reentry: grant !== null })));
-    } else if (denial === "resource") {
-      access.set({ view: "resource-unavailable" });
-    } else {
-      const now = access.state;
-      if (now.view === "ready") access.set({ ...now, refreshing: false, refreshFailed: true });
-      else access.set({ view: "failed" });
-    }
-  }
-
-  return {
-    getSnapshot: () => access.state,
-    subscribe: access.subscribe,
-    load,
-    unlock: (password: string) => access.unlock(password, toPassword, toUnavailable, load),
-    retryWaitSeconds: access.retryWaitSeconds,
-    now: access.now,
-    dispose() {
-      access.dispose({ view: "loading" });
-    },
-  };
-}
-
-function dedupe(items: readonly PublicCatch[]): PublicCatch[] {
-  const seen = new Set<string>();
-  return items.filter((item) => (seen.has(item.catchId) ? false : (seen.add(item.catchId), true)));
-}
-
-export type RecipientCollectionStore = ReturnType<typeof createRecipientCollectionStore>;
-export type RecipientCatchStore = ReturnType<typeof createRecipientCatchStore>;
+export type RecipientPublicationStore = ReturnType<typeof createRecipientPublicationStore>;

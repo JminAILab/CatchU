@@ -3,7 +3,7 @@ import { RateLimitOptions } from '../share-links/request-rate-limiter';
 
 /**
  * C-10 `PublicationAccess`의 DB 구현 주입 토큰(U4 제공). `PublicationsModule`이 내보내며 U5·U10·U9가
- * `@Inject(PUBLICATION_ACCESS)`로 받는다(예: `RagAnswerModule.register({ publicationAccess: PUBLICATION_ACCESS, imports: [PublicationsModule] })`,
+ * `@Inject(PUBLICATION_ACCESS)`로 받는다(예: `RagAnswerModule.register({ imports: [PublicationsModule], publicationAccess: { useExisting: PUBLICATION_ACCESS } })`,
  * docs/rag-answer.md). 시험용 메모리 가짜(in-memory-publication-access.ts)는 이 토큰에 묶지 않는다.
  */
 export const PUBLICATION_ACCESS = Symbol('PUBLICATION_ACCESS');
