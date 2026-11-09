@@ -123,6 +123,13 @@ function fakeServer() {
     if (entry === 'GET /catches') return { response: json(200, { items: [catchItem()], page: { nextCursor: null } }) };
     if (entry === 'GET /catches/c1') return { response: json(200, catchItem()) };
     if (entry.startsWith('PUT /catches/c1/')) { state.mutations += 1; return { response: json(200, { ...catchItem(), ...JSON.parse(init.body) }) }; }
+    // JD 수정·요약(U10이 쓸 공용 호출, #452) 합성 경로. 요약은 회원 확인 뒤 링크 증표를 본다(U10 기능 설계의 접수 순서).
+    if (entry === 'PATCH /jds/j1') { state.mutations += 1; return { response: json(200, { jdId: 'j1', member, ...JSON.parse(init.body) }) }; }
+    if (/^(POST|GET) \/public\/links\/t1\/jd-summaries(\/r1)?$/.test(entry)) {
+      if (init.headers?.['X-Link-Grant'] !== 'grant-ok') return { response: json(401, { code: 'LINK_PASSWORD_REQUIRED', message: '비밀번호가 필요합니다.' }) };
+      if (init.method === 'POST') { state.mutations += 1; return { response: json(202, { runId: 'r1' }) }; }
+      return { response: json(200, { status: 'PENDING', requirements: [], member }) };
+    }
     return { response: json(404, { code: 'NOT_FOUND', message: '없음' }) };
   }
 
@@ -141,7 +148,8 @@ function fakeServer() {
     async fetch(url, init) {
       const entry = `${init.method} ${new URL(url).pathname.replace(/^\/v1/, '')}`;
       const include = init.credentials === 'include';
-      state.log.push({ entry, auth: init.headers?.Authorization ?? null, credentials: init.credentials, jar: include ? state.jar : null });
+      state.log.push({ entry, auth: init.headers?.Authorization ?? null, grant: init.headers?.['X-Link-Grant'] ?? null,
+        credentials: init.credentials, jar: include ? state.jar : null });
       await tick();
       if (failures.has(entry)) { failures.delete(entry); throw new TypeError('network'); }
       const { response, setCookie } = await handle(entry, init, include);
@@ -348,6 +356,63 @@ test('로그아웃 결과 불명 보류 중 받은 401은 갱신하지 않고 �
   assert.equal(result.authRenewal, 'not-renewed');
   assert.deepEqual([server.count('GET /me'), server.count('POST /auth/refresh')], [1, 0]);
   assert.equal(t.store.getSnapshot().sessionHold, 'logout-unknown');
+});
+
+// ---- PATCH와 회원+링크 증표 호출(U10이 쓸 공용 호출, #452) ----
+
+test('PATCH: 현재 Access로 보내고, 401 뒤 갱신해도 다시 보내지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  const ok = await t.api.member('/jds/j1', { method: 'PATCH', body: { title: '백엔드' } });
+  assert.equal(ok.kind, 'success');
+  assert.deepEqual(ok.data, { jdId: 'j1', member: 'X', title: '백엔드' });
+  server.expire(t.store.accessToken());
+  const rejected = await t.api.member('/jds/j1', { method: 'PATCH', body: { title: '프론트' } });
+  assert.deepEqual([rejected.status, rejected.code, rejected.authRenewal], [401, 'AUTH_INVALID', 'renewed']);
+  assert.equal(memberMutationOutcome(toClientResult(rejected)), 'renewed-rejected');
+  assert.deepEqual([server.count('PATCH /jds/j1'), server.count('POST /auth/refresh'), server.state.mutations], [2, 1, 1]);
+});
+
+test('회원+링크 증표: 접수·조회에 Bearer와 X-Link-Grant를 함께 보내고 쿠키는 보내지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  const accepted = await t.api.member('/public/links/t1/jd-summaries', { method: 'POST', body: { jdId: 'j1' }, linkGrant: 'grant-ok' });
+  const run = await t.api.member('/public/links/t1/jd-summaries/r1', { linkGrant: 'grant-ok' });
+  assert.deepEqual([accepted.status, accepted.data], [202, { runId: 'r1' }]);
+  assert.equal(run.data.member, 'X');
+  for (const entry of ['POST /public/links/t1/jd-summaries', 'GET /public/links/t1/jd-summaries/r1']) {
+    const [request] = server.requests(entry);
+    assert.deepEqual([request.auth, request.grant, request.credentials], [`Bearer ${t.store.accessToken()}`, 'grant-ok', 'omit']);
+  }
+});
+
+test('회원+링크 증표: 링크 401은 갱신·토큰 변경 없이 그대로 돌려주고 로그인 상태를 유지한다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  const before = t.store.accessToken();
+  for (const request of [{ linkGrant: 'grant-old' }, { method: 'POST', body: { jdId: 'j1' }, linkGrant: 'grant-old' }]) {
+    const result = await t.api.member(request.method ? '/public/links/t1/jd-summaries' : '/public/links/t1/jd-summaries/r1', request);
+    assert.deepEqual([result.status, result.code, 'authRenewal' in result], [401, 'LINK_PASSWORD_REQUIRED', false]);
+  }
+  assert.equal(server.count('POST /auth/refresh'), 0);
+  assert.equal(server.count('GET /public/links/t1/jd-summaries/r1'), 1, '링크 401 조회는 다시 보내지 않는다');
+  assert.equal(t.store.accessToken(), before);
+  assert.equal(t.store.getSnapshot().status, 'signed-in');
+});
+
+test('회원+링크 증표: 회원 401이면 조회는 갱신 뒤 같은 증표로 한 번만 다시 보내고, 접수는 다시 보내지 않는다', async () => {
+  const server = fakeServer();
+  const t = await signedInTab(server);
+  server.expire(t.store.accessToken());
+  const run = await t.api.member('/public/links/t1/jd-summaries/r1', { linkGrant: 'grant-ok' });
+  assert.equal(run.kind, 'success');
+  const reads = server.requests('GET /public/links/t1/jd-summaries/r1');
+  assert.deepEqual(reads.map((r) => r.grant), ['grant-ok', 'grant-ok']);
+  assert.equal(reads[1].auth, `Bearer ${t.store.accessToken()}`);
+  server.expire(t.store.accessToken());
+  const accepted = await t.api.member('/public/links/t1/jd-summaries', { method: 'POST', body: { jdId: 'j1' }, linkGrant: 'grant-ok' });
+  assert.deepEqual([accepted.status, accepted.code, accepted.authRenewal], [401, 'AUTH_INVALID', 'renewed']);
+  assert.deepEqual([server.count('POST /public/links/t1/jd-summaries'), server.count('POST /auth/refresh'), server.state.mutations], [1, 2, 0]);
 });
 
 // ---- 이전 응답 무시와 표식 비교 ----

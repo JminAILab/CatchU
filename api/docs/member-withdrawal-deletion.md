@@ -26,6 +26,9 @@
 | `base_summary` | 발행본(12월 intent U5, 계약 C-06·C-02. 마이그레이션 `1793348947970-CreateBaseSummaryTable`) |
 | `mcp_connection`, `mcp_authorization_code` | 회원, 클라이언트 등록(12월 intent U6, 계약 C-06·C-15. 마이그레이션 `1793588083309-CreateMcpTables`) |
 | `mcp_access_token` | 회원, 연결(복합 외래 키 `(member_id, mcp_client_id)`. 12월 intent U6, 같은 마이그레이션) |
+| `pdf_material` | 회원(12월 intent U8, 계약 C-06. 마이그레이션 `1793977402870-CreatePdfMaterialTables`) |
+| `pdf_page_text` | PDF 자료(12월 intent U8, 같은 마이그레이션) |
+| `published_pdf_page` | 발행 항목(12월 intent U8, 계약 C-06·C-07. 같은 마이그레이션. 원본 PDF와는 외래 키가 없어 원본을 지워도 사본은 발행본 수명을 따른다) |
 
 `text_material`·`publication`·`published_item`은 12월 범위 U4가 만든 표다(계약 C-06·C-07·C-13). 발행 사본(`published_item`)은 원본 Catch·자료와 외래 키가 없어, 원본을 지워도 사본은 발행본 수명을 따른다.
 

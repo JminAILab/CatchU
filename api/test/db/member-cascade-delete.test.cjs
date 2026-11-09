@@ -61,6 +61,11 @@ const MEMBER_ROWS = {
   mcp_connection: 'member_id = $1',
   mcp_authorization_code: 'member_id = $1',
   mcp_access_token: 'member_id = $1',
+  // 12월 intent U8(C-06·C-07): PDF 원본(회원을 따라)·쪽별 글(PDF 자료를 따라)·발행 PDF 쪽 사본(발행 항목을 따라).
+  pdf_material: 'member_id = $1',
+  pdf_page_text: 'pdf_material_id IN (SELECT pdf_material_id FROM pdf_material WHERE member_id = $1)',
+  published_pdf_page: `published_item_id IN (SELECT i.published_item_id FROM published_item i
+    JOIN publication p ON p.publication_id = i.publication_id WHERE p.member_id = $1)`,
 };
 // mcp_client(U6)는 회원을 가리키지 않아 탈퇴 뒤에도 남는다. 승인에 쓰인 등록은 정리 대상도 아니다(U6 기능 설계 BR2.4·S19).
 const SHARED_TABLES = ['allowed_scope_revision', 'repository_selection', 'mcp_client'];
@@ -158,6 +163,20 @@ async function memberWithAllData() {
     await m.query(`INSERT INTO base_summary (base_summary_id, publication_id, status, deadline_at, items, generated_at, updated_at)
       VALUES ($1, $2, 'DONE', now() + interval '10 minutes', '[{"kind":"AI_INTERPRETATION","text":"합성 요약","citations":[],"jdRole":null}]', now(), now())`,
     [randomUUID(), publicationId]);
+    // U8: 추출이 끝난 PDF 원본 하나와 그 쪽별 글, 같은 발행본에 고정한 PDF 항목과 쪽 사본.
+    const pdfMaterialId = randomUUID();
+    await m.query(`INSERT INTO pdf_material (pdf_material_id, member_id, title, storage_key, file_size_bytes, page_count, extraction_state,
+      extraction_deadline_at, extraction_failure_code, created_at, updated_at)
+      VALUES ($1, $2, '합성 PDF', $3, 1024, 1, 'DONE', now() + interval '10 minutes', NULL, now(), now())`,
+    [pdfMaterialId, memberId, `members/${memberId}/materials/${pdfMaterialId}.pdf`]);
+    await m.query(`INSERT INTO pdf_page_text (pdf_page_text_id, pdf_material_id, page_number, text, readable)
+      VALUES ($1, $2, 1, '합성 쪽 글', true)`, [randomUUID(), pdfMaterialId]);
+    const pdfItemId = randomUUID();
+    await m.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, pdf_copy_key)
+      VALUES ($1, $2, 2, 'PDF_MATERIAL', $3, '합성 PDF', '{"pageCount":1}', $4)`,
+    [pdfItemId, publicationId, pdfMaterialId, `members/${memberId}/publications/${publicationId}/${pdfItemId}.pdf`]);
+    await m.query(`INSERT INTO published_pdf_page (published_pdf_page_id, published_item_id, page_number, text, readable)
+      VALUES ($1, $2, 1, '합성 쪽 글', true)`, [randomUUID(), pdfItemId]);
     const mcpClientId = randomUUID();
     await m.query(`INSERT INTO mcp_client (mcp_client_id, client_name, redirect_uris, registered_at, approved_at)
       VALUES ($1, '합성 Claude', ARRAY['https://claude.ai/api/mcp/auth_callback'], now(), now())`, [mcpClientId]);

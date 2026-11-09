@@ -5,11 +5,10 @@
 //
 // 공급자 선언 (R-01)
 //   - 기대: 모듈 안에 grant 키(readLinkGrantKey)·web 주소 설정(readShareLinksConfig)·발행 빈도 제한기·시계(PUBLICATIONS_CLOCK)·
-//           C-10 DB 구현이 있고, C-10 DB 구현은 내보낸 토큰 PUBLICATION_ACCESS로 다른 모듈(U5)이 주입받는다. 발행 빈도 제한기는 10월 발급
-//           제한기와 다른 인스턴스다. unlock 정책·제어(UNLOCK_POLICY·UNLOCK_CONTROLS)는 제출 3이 받은 사람 unlock을 옮길 때 넣는다:
-//           지금 선언하면 ShareLinksModule과 인스턴스가 둘이 되어 app.get(UNLOCK_CONTROLS, { strict: false })로 제한기를 얻는 10월
-//           unlock 시험이 실제 unlock 경로와 다른 제한기를 본다(PR #468 CI).
-//   - 실패 조건: 토큰이 내보내지지 않음, 가짜 PublicationAccess가 앱에 등록됨, UNLOCK_CONTROLS가 이 모듈에 선언됨.
+//           C-10 DB 구현이 있고, C-10 DB 구현은 내보낸 토큰 PUBLICATION_ACCESS로 다른 모듈(U5)이 주입받는다. 발행 빈도 제한기는 unlock
+//           빈도 제한기와 다른 인스턴스다. unlock 정책·제어(UNLOCK_POLICY·UNLOCK_CONTROLS)는 제출 3부터 이 모듈에만 선언한다(제출 2에서는
+//           ShareLinksModule과 중복 등록돼 10월 unlock 시험이 다른 제한기를 보던 PR #468 CI 실패로 뺐다가, ShareLinksModule을 지운 W6에서 넣었다).
+//   - 실패 조건: 토큰이 내보내지지 않음, 가짜 PublicationAccess가 앱에 등록됨, UNLOCK_CONTROLS가 이 모듈에 없거나 앱에 두 벌 있음.
 // 기동 검사 (NFR1.5·NFR1.6, #218·#242)
 //   - 기대: 운영 설정(NODE_ENV가 development·test가 아님)에서 LINK_GRANT_SECRET 없음·64자 hex 아님·AUTH_JWT_SECRET과 같음이면 기동 실패,
 //           SHARE_LINK_WEB_BASE_URL이 없거나 http면 기동 실패. test에서는 둘 다 없어도 기동한다. 오류 메시지에 키 값이 없다.
@@ -18,10 +17,10 @@
 //   - 기대: publications는 share-links 폴더에서 표·API 비의존 도구만 가져오고 share-links.module·share-links.service·link-access.service·
 //           두 컨트롤러·recipient 모듈을 import하지 않는다. catches·materials는 publications를 import하지 않는다.
 //   - 실패 조건: 금지 import.
-// 경로 (보안 설계 「경로 중복 확인」의 제출 2 부분)
-//   - 기대: 기본 앱(AppModule)에 PublicationsModule이 등록돼 /v1/publications 다섯 경로가 열리고, 등록된 (메서드, 경로) 쌍에 중복이 없다.
-//           10월 작성자 경로(/v1/share-links)는 아직 그대로다.
-//   - 실패 조건: 같은 (메서드, 경로)가 둘 이상.
+// 경로 (보안 설계 「경로 중복 확인」; 받은 사람 경로·10월 경로 제거의 상세는 app-routes.test.cjs)
+//   - 기대: 기본 앱(AppModule)에 PublicationsModule이 등록돼 /v1/publications 다섯 경로와 받은 사람 두 경로가 열리고, 등록된 (메서드, 경로)
+//           쌍에 중복이 없다. 10월 작성자 경로(/v1/share-links)는 제출 3(W6)에서 없어졌다.
+//   - 실패 조건: 같은 (메서드, 경로)가 둘 이상, 10월 경로가 남음.
 //
 // 테스트 DB를 쓰되 HTTP 요청은 보내지 않는다. 큐·임베딩 키는 비워 실제 외부에 붙지 않는다.
 require('reflect-metadata');
@@ -39,10 +38,8 @@ const { AuthModule } = require('../../dist/auth/auth.module');
 const { ErrorsModule } = require('../../dist/common/errors/errors.module');
 const { LINK_GRANT_KEY } = require('../../dist/share-links/link-grant');
 const { RequestRateLimiter } = require('../../dist/share-links/request-rate-limiter');
-const { SHARE_LINK_ISSUE_LIMITER } = require('../../dist/share-links/issue-rate-limit');
 const { SHARE_LINKS_CONFIG } = require('../../dist/share-links/share-links.config');
-const { ShareLinksModule } = require('../../dist/share-links/share-links.module');
-const { UNLOCK_CONTROLS, UNLOCK_POLICY } = require('../../dist/share-links/unlock-policy');
+const { PRODUCT_UNLOCK_POLICY, UNLOCK_CONTROLS, UNLOCK_POLICY } = require('../../dist/share-links/unlock-policy');
 const { DbPublicationAccess } = require('../../dist/publications/db-publication-access');
 const {
   PUBLICATION_ACCESS, PUBLICATIONS_CLOCK, PUBLISH_RATE_LIMITER, PublicationsModule,
@@ -108,7 +105,7 @@ function registeredRoutes(app) {
     Object.keys(layer.route.methods).filter((method) => layer.route.methods[method]).map((method) => `${method.toUpperCase()} ${layer.route.path}`));
 }
 
-test('PublicationsModule이 자기 공급자(grant 키·web 주소·발행 빈도 제한기·시계·C-10 DB 구현)를 선언하고 PUBLICATION_ACCESS를 내보내며, unlock 제어는 선언하지 않는다', async (t) => {
+test('PublicationsModule이 자기 공급자(grant 키·web 주소·발행 빈도 제한기·시계·C-10 DB 구현·unlock 정책·제어)를 선언하고 PUBLICATION_ACCESS를 내보내며, unlock 제어는 이 모듈에만 하나다', async (t) => {
   const { app, consumer } = await bootApp(t);
   const scope = app.select(PublicationsModule);
   const access = scope.get(PUBLICATION_ACCESS);
@@ -117,31 +114,32 @@ test('PublicationsModule이 자기 공급자(grant 키·web 주소·발행 빈�
   assert.deepEqual(['resolveForRecipient', 'resolveForOwner', 'readSnapshot'].every((name) => typeof access[name] === 'function'), true);
   assert.ok(Buffer.isBuffer(scope.get(LINK_GRANT_KEY)) && scope.get(LINK_GRANT_KEY).length === 32);
   assert.equal(scope.get(SHARE_LINKS_CONFIG).webBaseUrl, 'https://catchu.example');
-  // unlock 제어는 ShareLinksModule 하나에만 있어야 한다. 둘이면 10월 unlock 시험의 비엄격 조회가 뒤에 등록된 이 모듈의 인스턴스를 받아
-  // 실제 unlock 경로(LinkAccessService)와 다른 제한기를 본다.
-  for (const token of [UNLOCK_POLICY, UNLOCK_CONTROLS]) assert.throws(() => scope.get(token, { strict: true }), /Nest could not find/);
-  assert.equal(app.get(UNLOCK_CONTROLS, { strict: false }), app.select(ShareLinksModule).get(UNLOCK_CONTROLS),
-    '앱 전체에서 비엄격으로 찾은 unlock 제어가 ShareLinksModule의 것이다');
+  // unlock 제어는 이 모듈에만 선언한다(제출 3). 앱 전체에서 비엄격으로 찾아도 같은 인스턴스여야 두 벌이 아니다.
+  assert.equal(scope.get(UNLOCK_POLICY, { strict: true }), PRODUCT_UNLOCK_POLICY, '운영 정책값 그대로');
+  const controls = scope.get(UNLOCK_CONTROLS, { strict: true });
+  for (const part of ['addresses', 'links', 'hashes', 'rates']) assert.ok(controls[part], part);
+  assert.equal(app.get(UNLOCK_CONTROLS, { strict: false }), controls, '앱 전체에서 비엄격으로 찾은 unlock 제어가 이 모듈의 것이다');
   const limiter = scope.get(PUBLISH_RATE_LIMITER);
   assert.ok(limiter instanceof RequestRateLimiter);
-  assert.notEqual(limiter, app.select(ShareLinksModule).get(SHARE_LINK_ISSUE_LIMITER), '10월 발급 제한기와 다른 인스턴스');
+  assert.notEqual(limiter, controls.rates, 'unlock 요청 빈도 제한기와 다른 인스턴스');
   assert.deepEqual(limiter.take('synthetic-member', new Date()), { allowed: true });
   const clock = scope.get(PUBLICATIONS_CLOCK);
   assert.ok(clock() instanceof Date);
 });
 
-test('기본 앱에 /v1/publications 다섯 경로가 열리고 등록된 (메서드, 경로) 쌍에 중복이 없으며, 10월 /v1/share-links 경로는 아직 그대로다', async (t) => {
+test('기본 앱에 /v1/publications 다섯 경로와 받은 사람 두 경로가 열리고 등록된 (메서드, 경로) 쌍에 중복이 없으며, 10월 /v1/share-links 경로는 없다', async (t) => {
   const { app } = await bootApp(t);
   const routes = registeredRoutes(app);
   assert.ok(routes.length > 0, '경로를 읽었다');
   const duplicates = routes.filter((route, index) => routes.indexOf(route) !== index);
   assert.deepEqual(duplicates, []);
   for (const route of ['POST /v1/publications', 'GET /v1/publications', 'GET /v1/publications/:publicationId',
-    'PUT /v1/publications/:publicationId/stop', 'DELETE /v1/publications/:publicationId']) {
+    'PUT /v1/publications/:publicationId/stop', 'DELETE /v1/publications/:publicationId',
+    'GET /v1/public/links/:token', 'POST /v1/public/links/:token/unlock']) {
     assert.ok(routes.includes(route), route);
   }
   assert.ok(!routes.some((route) => route.includes('/publications/:publicationId/reindex')), 'C-09 합의 전 reindex 경로 없음');
-  assert.ok(routes.includes('POST /v1/share-links') && routes.includes('GET /v1/public/links/:token'), '10월 경로는 제출 3에서 바꾼다');
+  assert.ok(!routes.some((route) => route.includes('/share-links') || route.includes('/public/links/:token/catches')), '10월 경로는 제출 3(W6)에서 없앴다');
 });
 
 test('운영 설정에서 LINK_GRANT_SECRET 없음·64자 hex 아님·AUTH_JWT_SECRET과 같음, SHARE_LINK_WEB_BASE_URL 없음·http면 기동이 멈춘다(키 값 비노출)', async (t) => {

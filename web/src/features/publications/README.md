@@ -70,10 +70,10 @@ GitHub 주소 판정 `isGithubSourceUrl`과 본문 나누기 `splitGithubLinks`�
 
 ## 한계
 
-- 기본 요약 패널(U5 작성자 모드)·질의응답·JD 자리는 비워 두었다(`data-testid="publication-summary-slot"`). U5·U10 제공 뒤 연결한다.
+- 상세의 요약 자리(`data-testid="publication-summary-slot"`)에는 U5 `BaseSummaryPanel` 작성자 모드를 단다(#441). 근거 단추는 받은 사람 화면과 같은 규칙(`resolveEvidenceTarget`)으로 사본의 그 위치를 강조하고 옮긴다. 중지·만료 뒤에도 보인다(계약 C-11 owner-summary).
 - 색인 상태(`indexState`)와 [검색 다시 준비]는 C-09 합의 전이라 만들지 않았다(기능 명세 「C-09 합의 전 임시 상태」, OQ-U4-5). 이 상태는 미완성이며 U4 완료 전에 해소한다.
 - 받은 사람 판정(비밀번호·중지·만료·삭제 뒤 404)의 브라우저 확인과 [링크 열기]로 연 새 탭의 받은 사람 화면 확인은 제출 3(W4)에서 한다. 제출 2에서는 세 화면의 버튼 주소·새 탭 속성(화면 시험)과 원래 탭의 작성자 화면·입력 유지(브라우저)만 확인한다.
-- 10월 `share-links`의 `copyText`·`formatKst`·상태 표기는 재사용하지 않고 이 폴더에 같은 동작으로 두었다. 그 파일들은 제출 3(W6)에서 지워진다.
+- 링크 복사는 공용 `web/src/lib/copy-text.ts`의 `copyText`를 사용한다. `formatKst`와 상태 표기는 이 폴더에서 관리한다.
 - 로그인 만료 때 입력 유지와 뒤로·앞으로 가기 보호의 한계는 [텍스트 자료 README](../materials/README.md) 「한계」와 같다.
 - `node --test` 시험은 합성 응답과 서버 렌더링으로 한 행동 시험이다. 화면 컴포넌트의 마운트 효과(열 때 불러오기, 삭제 뒤 이동, 빈도 초과 1초 갱신, 동의 창 열기)는 이 시험에서 돌지 않아 브라우저에서 따로 확인한다.
 

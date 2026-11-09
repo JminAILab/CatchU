@@ -1,3 +1,6 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { routes } from "@/lib/routes";
 import styles from "./header.module.css";
@@ -8,6 +11,9 @@ import styles from "./header.module.css";
  * 내 자산·공유 링크·프로필은 노출하지 않는다.
  */
 export function GuestHeader() {
+  const pathname = usePathname();
+  // 소개는 시안 전용 헤더를 본문과 함께 그린다. 로그인·콜백은 기존 헤더를 유지한다.
+  if (pathname === routes.landing) return null;
   return (
     <header className={styles.header}>
       <div className={styles.inner}>

@@ -4,7 +4,232 @@
 
 입력: [코드 생성 계획](code-generation-plan.md) Step 1~8, [단위 시험 안내](unit-test-instructions.md), [U4 기능 명세](../functional-design/functional-spec.md) 「작성자 API」·W1·W2, [업무 규칙](../functional-design/rules.md) BR1~BR3, [계약 요약](../../../inception/contract-design/contract-summary.md)의 C-12(작성자 쪽 경로는 각 Unit 기능 설계에서 정함)·C-13·C-14, 10월 본인 Catch 응답 시험 `api/test/catches/owner-catch-response.test.cjs`, 공통 인증 코드 `web/src/lib/api.ts`·`web/src/lib/auth-integration.ts`·`web/src/components/auth/member-guard.tsx`·`session-member-guard.tsx`·`reauth-notice.tsx`.
 
-이 문서는 제출 1(Step 1~8, PR #461로 2026-11-03 통합 브랜치 병합)과 제출 2(Step 9~18, 2026-11-03 구현·로컬 검증)까지의 상태다. 제출 3(Step 19~25)은 진행하지 않았다. 제출 2는 아직 커밋·push·PR 전이다.
+이 문서는 제출 1(Step 1~8, PR #461로 2026-11-03 통합 브랜치 병합)과 제출 2(Step 9~18, PR #468로 2026-11-04 병합, merge commit `32ab046`), C-10 결정 반영 PR #474(2026-11-05 병합, merge commit `a11ad96`), 제출 3의 Step 19(2026-11-05, 시나리오 확정)까지의 상태다. 제출 3의 구현(Step 20~)은 OQ-U4-NFR-6 팀장 답 전이라 시작하지 않았다. 최신 상태는 바로 아래 「제출 3」을 본다.
+
+## 제출 3 (2026-11-05 착수) — W4 받은 사람·W6 10월 제거
+
+### 착수 (2026-11-05)
+
+- PR #474가 2026-11-05 05:27 UTC 통합 브랜치에 병합됐다(merge commit `a11ad96`, ljm0850·leechaeah 승인). 계획 「선행 조건과 제출 나누기」대로 `a11ad96`에서 `api/u4-recipient` 브랜치를 내고, 계획 승인 기록 커밋 `caf547f`(로컬 `docs/u4-plan-approval-1105`)를 `2199ed5`로 cherry-pick해 제출 3의 첫 커밋으로 삼았다.
+- OQ-U4-NFR-6(#416) 팀장 답은 Step 19 당시 없어 Step 19까지만 진행했다. 2026-11-05 06:07 UTC 팀장이 결정했다(댓글 6651073856): 1번 A(작성자 비활성 404 `LINK_UNAVAILABLE`, 회원 행 없음 500 `INTERNAL_ERROR`, #468 구현과 같아 코드는 그대로, C-10 문구에 판정 순서 중지·만료 다음·비밀번호 앞만 추가), 2번 예(통과한 요청은 작성자 비활성만을 이유로 취소하지 않고 다음 요청에서 막음). 계약 문구·주석·문서 반영은 통합 브랜치 최신 `8d15206`에서 낸 `api/u4-c10-nfr6-decision` 브랜치(로컬 커밋 `2a3da84`, 코드 동작 변경 없음)의 별도 PR로 낸다. Step 19 머리 주석의 `[답 전 10월 동작]` 표시는 `[NFR-6 결정]`으로 바꿨고 계획 미결 표의 그 행을 결정됨으로 고쳤다.
+
+### Step 19 시나리오 확정 (2026-11-05)
+
+제출 1·2와 같은 방식으로 시험 파일 머리 주석에 시나리오·기대 결과·실패 조건을 적었다. 구현 전이라 api 세 파일은 머리 주석만 있고 시험을 담지 않으며(`node --test`에서 0건 통과), web 파일은 10월 시험 위에 머리 주석만 더했다. 세부 시험 코드는 Step 23에서 쓴다.
+
+| 파일 | 담은 시나리오 | 근거 |
+|---|---|---|
+| `api/test/publications/recipient-api.test.cjs` | 열람 판정 순서, S8(grant 없음·틀림·맞음·다른 발행본), S9 받은 사람 쪽(중지·만료·삭제 404, 작성자 대조 1건), 판정과 읽기의 시점(한 REPEATABLE READ 트랜잭션, 판정 뒤 중지·삭제 커밋 때 그 요청은 판정 시점 사본·다음 요청 404, NotFound → 404), S14(unlock 순서, 10회 뒤 429, 비밀번호 없는 링크 400), 소유 회원 상태, 거부 사례, 로그 비노출 | 기능 명세 W4·S8·S9·S14, 보안 설계 「링크 판정」·R-04·R-06·unlock, C-10·C-12, BR6.1~BR6.5 |
+| `api/test/publications/recipient-unlock-policy.test.cjs` | 10월 `public-links-unlock`(12건)·`public-links-unlock-policy`(14건)·`public-links-client-address`(8건)의 사례를 발행본 경로로 옮길 때의 기대 결과. 운영 정책값(주소 10회·링크 30회/15분·동시 검사 3·해시 2/20·빈도 20회/분)과 키의 링크 단위 `publicationId` | 보안 설계 R-03 api 문단·unlock, BR6.3, NFR1.7, 10월 시험 제목 |
+| `api/test/publications/app-routes.test.cjs` | (메서드, 경로) 중복 없음, 받은 사람 두 경로가 새 컨트롤러 하나에만, 10월 경로(`/catches/:catchId`, `/share-links` 발급·목록·중지) 없음, `@Public()` 메서드 단위, `ShareLinksModule`·`RecipientModule` 미등록, unlock 공급자는 `PublicationsModule`에만, 운영 기동 검사 유지 | 보안 설계 R-01·R-02·R-07, BR9.1, 10월 두 경계 시험 |
+| `web/test/recipient.test.mjs`(머리 주석 추가) | G1~G4(세 상태의 `RecipientGuide` 개수·`showClaudeConnect={false}`·h1 하나·첫 초점), G5~G7은 문구 검토로 표시, 1번 자리 사본 표지 구분·근거 링크·`showEvidence`·`RecipientSlotProps`, 판정 응답 처리(404·401·unlock·429·grant 유지 묶음), 10월 시험의 유지·응답 모양 변경·제거 묶음 | 보안 요구사항 G1~G7, 보안 설계 Q2 A·C-11 자리·R-03 표, C-11, BR6.6·BR7.1·BR7.5·BR7.6 |
+
+표시 규칙(머리 주석에 같은 문구로 적음):
+
+- `[NFR-6 결정]`(처음 이름은 `[답 전 10월 동작]`): OQ-U4-NFR-6에 걸린 사례(소유 회원 비활성 404, 회원 행 없음 500, unlock 대기 중 비활성 404, 링크·소유 회원 같은 시점 판정)를 표시했다. 2026-11-05 팀장 결정이 10월 동작과 같아 사례 내용은 그대로 두고 표시 이름과 근거만 결정 기준으로 바꿨다.
+- `[U10 몫]`: C-10 deletion-rule의 404 `LINK_UNAVAILABLE` 매핑과 저장·차감 롤백은 U10 자기 경로의 검증으로 두고 U4 시험에 넣지 않았다. U4 열람 경로는 같은 트랜잭션이라 그 틈이 없고, 트랜잭션 밖 `readSnapshot`의 `NotFound`만 404로 바꾼다.
+- 10월 시험에서 옮기는 사례는 10월 제목 요지를 그대로 적어, Step 23에서 빠진 사례를 대조할 수 있게 했다.
+
+Step 19 뒤 남은 것: Step 20·21·23은 OQ-U4-NFR-6 답 뒤 같은 커밋으로(unlock 공급자 전환 조건), Step 22(받은 사람 화면)는 `copy-text` 이동을 먼저, Step 24(문서)·Step 25(전체 확인·S15 미실행 기록). 제출 3 PR은 통합 브랜치 대상 하나로 낸다.
+
+### 계약 PR #478 (2026-11-05)
+
+OQ-U4-NFR-6 결정의 C-10 문구 반영을 [PR #478](https://github.com/JminAILab/CatchU/pull/478)(`api/u4-c10-nfr6-decision`, 통합 브랜치 `8d15206` 기준, 커밋 `2a3da84`, 리뷰어 ljm0850·leechaeah)로 열었다. 주석·문서만 바꾸고 코드 동작은 그대로다. 같은 커밋을 `api/u4-recipient`에 `159584e`로 cherry-pick해 두 브랜치의 C-10 주석 기준을 맞췄다(제출 3 PR이 #478 뒤에 병합되면 같은 변경이라 충돌하지 않는다). 검증: C-10 시험 두 파일 16개 통과, 바꾼 `.ts` 3개·DB 시험 파일 eslint, api `tsc --noEmit` 통과.
+
+### Step 20·21·23(api) 받은 사람 경로·10월 경로 해제 (2026-11-05, 한 커밋)
+
+계획대로 받은 사람 컨트롤러 등록(Step 20), `AppModule`의 10월 모듈 해제·파일 삭제(Step 21), 그와 묶인 시험 변경(Step 23의 api 부분)을 한 커밋으로 반영했다. 두 모듈이 함께 등록된 판본은 없다. Step 23의 web 부분(`web/test/recipient.test.mjs` 고쳐 쓰기)은 Step 22(받은 사람 화면)와 함께 한다.
+
+**만든·고친 파일(api)**
+
+- 새 파일: `api/src/publications/recipient-access.service.ts`(열람·unlock), `api/src/publications/recipient-links.controller.ts`(`GET /v1/public/links/:token`·`POST /v1/public/links/:token/unlock`, 메서드 단위 `@Public()`), 시험 `api/test/publications/recipient-api.test.cjs`(8개)·`recipient-unlock-policy.test.cjs`(28개)·`app-routes.test.cjs`(4개)
+- 고친 파일: `api/src/publications/db-publication-access.ts`(판정 공통부 `readUsablePublicationIn` 분리, unlock용 `resolveForUnlock` 추가, 동작 변경 없음), `publications.module.ts`(`UNLOCK_POLICY`·`UNLOCK_CONTROLS`·`RecipientAccessService`·`RecipientLinksController` 등록), `api/src/app.module.ts`(`ShareLinksModule`·`RecipientModule` 제거), 시험 `publications-module.test.cjs`(unlock 제어 "이 모듈에만 선언"으로 뒤집음, 받은 사람 경로 포함·10월 경로 없음), `support.cjs`(`publishLink`·`recipientCall`·`recipientGet`·`unlockRaw`, `setClock`에 받은 사람 서비스 포함), `db/lock-wait-limit-role.test.cjs`, `integration/analysis-intake-receiver.test.cjs`, `security-headers.test.cjs`, `share-links-config.test.cjs`
+- 지운 파일(계획 Step 21 목록 그대로): `api/src/share-links/` 중 `share-create.ts`·`share-create-fingerprint.ts`·`share-link-issuance.ts`·`share-link-list.ts`·`share-link-response.ts`·`share-link-state.ts`·`issue-rate-limit.ts`·`share-links.service.ts`·`share-links.controller.ts`·`public-links.controller.ts`·`link-access.service.ts`·`share-links.module.ts`, `api/src/recipient/` 전체. 남긴 것: `link-token`·`link-password`·`link-grant`·`link-limiter`·`unlock-limiter`·`hash-gate`·`request-rate-limiter`·`client-address`·`unlock-policy`·`share-links.config`·`share-link.entity.ts`(OQ-U4-3), `member-analysis`·`idempotent-creation.ts`
+- 지운 시험(보안 설계 R-03 표의 "W6 변경에서 바꾼다" 묶음): `test/db/share-link-issuance`·`share-links-api`·`share-links-key-lock`·`share-links-manage-api`·`share-links-web-integration`·`public-links-unlock`·`public-links-unlock-policy`·`public-links-client-address`, `test/share-create`·`share-create-fingerprint`·`share-link-state`, `test/recipient/*`, `test/public-links-auth-boundary`·`recipient-module-boundary`, `test/integration/sharing-screen-web`, `test/support/share-link-lock-cases.cjs`. unlock·주소 제한 34개 사례는 `recipient-unlock-policy.test.cjs`로, 두 경계 시험은 `app-routes.test.cjs`로 옮겼다. 도구 단위 시험(`link-*`·`hash-gate`·`unlock-limiter`·`request-rate-limiter`·`client-address`·`share-links-config`)은 그대로다
+
+**구현 결정(D18~)**
+
+| # | 결정 | 근거 |
+|---|---|---|
+| D18 | unlock 판정은 `DbPublicationAccess.resolveForUnlock(token, now)`(계약 밖 클래스 메서드)로 둔다: grant 없이 토큰 형식 → 발행본 → 중지·만료 → 소유 회원 상태(404·500)까지 판정하고 비밀번호 검증값을 돌려준다. `resolveForRecipientIn`과 공통부를 나눠 판정 순서가 한곳에 있다 | 10월 `usableLink`와 같은 순서(BR6.3 ①). C-10 함수 모양은 바꾸지 않는다 |
+| D19 | 열람 `GET`은 `RecipientAccessService.read`가 `DataSource.transaction('REPEATABLE READ')` + `SET TRANSACTION READ ONLY` 안에서 `resolveForRecipientIn` → `readSnapshotIn`을 부른다. `LinkUnavailable`·`NotFound` → 404 `LINK_UNAVAILABLE`, `LinkPasswordRequired` → 401, `PublicationOwnerMissing`·그 밖은 공통 필터의 500 | 보안 설계 R-04, OQ-U4-NFR-5 결정 A(판정 뒤 삭제의 NotFound는 404) |
+| D20 | `GET /v1/public/links/:token`은 정의 밖 쿼리를 400 `VALIDATION_FAILED`(`query`·`whitelistValidation`)로 거부한다(`emptyPublicationQuery`). 10월 목록용 `limit`·`cursor`는 받지 않는다 | 작성자 경로와 같은 규칙. web은 Step 22에서 PublishedSnapshot 응답으로 바꾸며 쿼리를 보내지 않는다 |
+| D21 | 제한 키의 링크 단위는 `publicationId`(주소 키 `${publicationId}|${clientAddress}`), grant는 `issueLinkGrant(key, publicationId, 발행본 만료, now)` | BR6.2·BR6.3, 계획 Step 20 |
+| D22 | `test/db/lock-wait-limit-role.test.cjs`의 10월 링크 발급 잠금 사례 2개(회원 발급 잠금·같은 키 잠금)는 발급 API와 함께 지우고, 발행의 원본 Catch 행 `FOR UPDATE` 잠금 사례(3초 뒤 500, 발행본·사본·공개 전환·하루 횟수 롤백, 재시도 201)로 바꿨다 | #220 상한 확인을 U4 경로로 유지. 로그인·세션 사례는 그대로 |
+| D23 | `test/integration/analysis-intake-receiver.test.cjs`의 "반영 실패 연쇄" 시험에서 10월 링크 발급·수신자 Catch 상세 확인과 `share_link` 보존 표 항목을 뺐다. 발행본의 고정 사본은 U4 시험(S10·recipient-api)이 본다 | 10월 경로 제거. 그 시험의 본래 목적(수신 기록·Catch 보존·재요청)은 유지 |
+| D24 | `security-headers.test.cjs`의 "/v1 인증 거부" 경로를 `/v1/share-links` → `/v1/publications`로, `share-links-config.test.cjs`의 발급 입력 검사 사례는 지웠고(발행 입력 검사는 `publish-api` 시험), `request-rate-limiter.test.cjs`의 운영 정책 사례는 10월 발급 빈도 상수 대신 U4 `PUBLISH_RATE_LIMIT`(1분 10회 임시값)를 본다 | 10월 발급 경로·`share-create.ts`·`issue-rate-limit.ts` 제거 |
+
+**검증(2026-11-05, 테스트 DB `catchu-db-test-u4` 5443, 작업 트리 판본)**
+
+- `npm run typecheck`·바꾼 src·test 파일 eslint(`--max-warnings=0`) 통과.
+- `TEST_DB_PORT=5443 npm test -- <U4 제출 3 파일 12개 + lock-wait-limit-role + analysis-intake-receiver + security-headers + share-links-config + member-analysis>`: 170개 통과·0 실패(새 시험 40개 포함, 잠금 대기 사례는 역할 생성 권한이 있어 실행됨).
+- api 전체 `TEST_DB_PORT=5443 npm test`(작업 트리, 약 11분): 1,635개 중 1,593 통과·6 실패·36 건너뜀. 실패 6개 중 4개(`integration/u7-analysis-chain` 3개: worker 실행 파일 필요, `S22` 심볼릭 링크: Windows 권한)는 #474 때와 같은 환경 실패, 1개(`claude-mcp/mcp-endpoint` S9 만료 시각)는 같은 파일만 다시 돌리면 14개 모두 통과하는 시각 경합이며 이 변경과 무관, 1개(`request-rate-limiter`)는 지운 `issue-rate-limit.ts`를 가져오던 것이라 위 D24대로 고쳤다(고친 뒤 단독 통과).
+
+**남은 것(2026-11-05 시점, Step 22는 아래에서 끝냄)**: Step 22(받은 사람 화면, `copy-text` 이동 뒤 share-links 제거)와 Step 23 web 부분, Step 24(문서: `api/docs/publications.md` 받은 사람 경로·`api/docs/share-links.md`·`recipient-read.md` 대체 안내, `api/README.md` 시험 표의 10월 항목), Step 25(전체 확인·커버리지·S15 미실행 기록). 받은 사람 판정의 브라우저 확인(#416 결정 3)은 Step 22 뒤.
+
+### Step 22 받은 사람 화면·W6 web 제거 (2026-11-06, 커밋 전)
+
+착수 전 상태: 작업 브랜치 `api/u4-recipient`(`58cac08`)에 통합 브랜치의 `ad58c6f`(#478 merge commit)가 없었고 같은 내용의 cherry-pick `159584e`만 있었다. 담당 결정(2026-11-06)대로 `origin/intent/260925-intent-12`를 merge commit `2c71423`로 반영했다(#477 U5 등록·#471 web api-client 변경 포함). 충돌은 `db-publication-access.ts` 한 곳(통합 쪽은 #478의 주석 변경, 작업 쪽은 D18의 공통 판정 `readUsablePublicationIn`)이며 결정 주석이 이미 들어 있는 작업 쪽을 유지했다. 병합 뒤 api `tsc` 통과. push는 하지 않았다.
+
+**만든·고친 파일(web)**
+
+- 새 파일: `src/features/recipient/recipient-view.tsx`(상태별 그리기, `RecipientSlots` 2·3·4번 자리), `recipient-slots.ts`(C-11 `RecipientSlotProps`·`LinkAccessCode`·`EvidenceLocation` 화면 안 형, `resolveEvidenceTarget`·`fieldText`), `src/lib/copy-text.ts`(10월 `share-links/copy-text.ts`를 옮김, 동작 같음)
+- 고친 파일: `recipient-api.ts`(C-12 `GET /public/links/{token}` 200 `PublishedSnapshot`·`unlock`, 10월 프로필·Catch 읽기 제거, 사본 검사는 publications의 `isPublishedSnapshot` 재사용), `recipient-store.ts`(목록·상세 두 상태 → `createRecipientPublicationStore` 하나, `accessLost(code)` 추가, `createAccess`는 10월 그대로), `recipient-format.ts`(10월 Catch 문구 제거, `publishedAtText`·`PASSWORD_REQUIRED_TITLE`), `recipient-screen.tsx`(상태 연결·`useFocusOnView`·`isLoggedIn`·`showEvidence`·slotProps), `recipient.module.css`(목록·상세용 규칙 제거), `publications/snapshot-view.tsx`(`highlight`·항목 `id`·`tabIndex={-1}` 추가, 작성자 상세 표시는 그대로), `publications.module.css`(`.highlight`, 항목 초점 테두리), `publication-link-actions.tsx`(`copyUrl`을 `lib/copy-text`의 `copyText`로), `claude-connection-panel.tsx`(import 경로), `app/s/[token]/page.tsx`, `lib/routes.ts`(`links`·`recipientCatchPath` 제거), `lib/member-navigation.ts`(`/links` 회원 경로 제외), `components/header/member-header.tsx`([공유 링크] 메뉴 제거), `web/README.md`(파일 역할·페이지 주소 표)
+- 지운 파일(지우기 전 전체 사용처를 다시 확인함, 준비안 4번과 같음): `src/features/share-links/` 전체, `src/app/(member)/links/page.tsx`, `src/app/s/[token]/catches/[catchId]/page.tsx`, `test/share-links.test.mjs`, `test/share-links-public-summary.test.mjs`
+- 시험: `test/recipient.test.mjs`를 보안 설계 R-03 표대로 고쳐 씀(32개: 유지 묶음 그대로, 응답 모양만 바꾼 묶음, W6 묶음 삭제, G1~G3·자리 순서·G5·G6 기계 검사·사본 표지·근거 강조·`onAccessLost`·위치 대조 추가). Step 23의 web 부분을 여기서 앞당겼고, 시험 파일 머리 주석의 기대 결과는 Step 19 것을 유지했다. `test/u6-claude-connection.test.mjs`(copy-text 경로), `test/u2-start-guide.test.mjs`·`member-navigation.test.mjs`·`member-lookup.test.mjs`·`auth-google.test.mjs`·`auth-screens-connected.test.mjs`·`auth-screens-google.test.mjs`·`auth-screens-session.test.mjs`(회원 경로 예시 `/links` → `/publications`; `/links`는 이제 복귀 대상이 아닌 경로의 예시로 남김)
+
+**구현 결정(D25~)**
+
+| # | 결정 | 근거 |
+|---|---|---|
+| D25 | 사본 표시는 작성자 상세의 `PublishedSnapshotView`를 받은 사람 화면이 그대로 쓴다. 강조는 `highlight`(항목·fieldPath·[charStart, charEnd)) 선택 props로 더했고, 항목마다 `id="published-item-<publishedItemId>"`·`tabIndex={-1}`을 둬 근거 위치로 옮길 수 있게 했다 | 계획 미결 표 OQ-U4-NFR-1·2 "작성자 상세의 사본과 받은 사람 화면에 같은 규칙", NFR1.10·NFR1.11 |
+| D26 | `showEvidence(location)`은 `resolveEvidenceTarget`으로 사본에 대조한다: 항목이 없으면 옮기지 않고, fieldPath(`workFacts[i]`·`subjectContribution`·`evidence[i].representedFacts[j]`·`authorDescription`·`body`)가 가리키는 문자열 안의 범위만 `<mark>`로 강조하며, 범위 밖·없는 경로(`aiDraft`·`pages[n]`)면 항목으로 옮기기만 한다. 옮길 때 `scrollIntoView` 뒤 항목에 초점을 둔다 | 시험 머리 주석 「발행본 자료 1번 자리」, C-11 evidence-highlight, api `summary-sources.ts`·`chunker.ts`의 fieldPath 어휘 |
+| D27 | U4 고정 안내(BR7.1) 축소 문구는 「발행 시각 YYYY-MM-DD HH:mm:ss (KST)」 한 줄이다(`publishedAtText`, 작성자 상세와 같은 `formatKst`). 고정 사본 설명·링크 기간·중지·만료 시각·외부 AI·로그인 문장은 두지 않는다 | G5·G6. PR 「리뷰 요청」 체크리스트로 팀장 확인 |
+| D28 | 2번 자리에 U5 `BaseSummaryPanel`, 3번 자리에 `QnaPanel`을 U5 README 「붙이는 방법」대로 `RecipientSlotProps` + `key={token}`으로 단다(처음에는 빈 자리로 뒀다가 2026-11-06 담당 요청으로 연결). 4번 자리는 U10 제공 전 빈 `div`이며 `data-logged-in`만 표시한다. `slotProps`(`token`·`getGrant`·`onAccessLost`·`isLoggedIn`·`showEvidence`)는 화면이 만들어 `RecipientSlots`에 넘기고, `isLoggedIn`은 이 탭의 `accessTokenStore` 토큰 유무다 | 계획 Step 22 "U5·U10 컴포넌트는 제공 뒤 연결"(U5는 #477로 제공됨), 담당 지시(2026-11-06) |
+| D29 | `onAccessLost(code)`는 `store.accessLost`로 받아 화면이 직접 받은 404·401과 같은 전환·grant 삭제를 하고, 진행 중 조회는 끊어 늦은 성공이 거부를 덮지 않게 한다. 초점은 단계(판정 통과·비밀번호·접근 불가·조회 실패)가 정해질 때마다 그 단계의 U4 h1로 옮기며 **처음 연 화면도 포함**한다(10월은 첫 화면 제외였고, 2026-11-06 담당 요청으로 바꿈). 비밀번호 입력칸의 `autoFocus`는 h1 첫 초점과 겹쳐 뺐다(Tab 한 번으로 입력, 틀린 값·빈 값 뒤에는 입력으로 돌림) | C-11 rule, G4, NFR7.3 |
+| D30 | `publication-link-actions.tsx`의 `copyUrl`은 따로 두지 않고 공용 `lib/copy-text.ts`의 `copyText`를 다시 내보낸다(D14의 사본 제거). 시험이 쓰는 이름 `copyUrl`은 유지 | 같은 동작이 두 곳에 있을 이유가 없어짐 |
+
+**검증(2026-11-06, 작업 트리 판본 `2c71423` + 이 변경)**
+
+- web `npx tsc --noEmit`(낡은 `.next/types`를 지운 뒤)·`npm run build`(라우트 `/s/[token]`만 남고 `/links`·`/s/[token]/catches/[catchId]` 없음)·바꾼 src·test 파일 eslint(`--max-warnings=0`) 통과.
+- `node --test test/recipient.test.mjs` 32개 통과. web 전체 `npm test` 860개 통과·0 실패(처음 9개 실패는 `/links`를 회원 경로 예시로 쓰던 인증 시험이며 위대로 고침).
+- api는 병합 뒤 `tsc`만 돌렸다(이 Step은 api 코드를 바꾸지 않음).
+
+**브라우저 확인(2026-11-06, `next dev` + C-12 모양의 받은 사람 API 대역, 실제 api·DB 아님)**
+
+- `/s/open`: h1(발행본 제목, `tabindex=-1`) → `RecipientGuide` 1개(Claude 연결 줄 없음) → 「발행 시각 2026-11-05 12:04:05 (KST)」 → 발행본 자료 → 2·3·4 자리 순서. 항목은 position 순(텍스트 자료 → Catch → Catch), 불일치 표지 1개, 기록·작성자 설명·AI 초안 표지 구분, 본문의 `<b>`는 글자로, GitHub 주소 3곳만 `target="_blank" rel="noopener noreferrer"` 링크, `evil.example` 주소와 AI 초안 안 GitHub 주소는 글자. 375px 폭에서 가로 스크롤 없음.
+- `/s/locked`: 비밀번호 화면(안내 0개, h1 1개, 입력에 첫 초점) → 틀린 값 「비밀번호가 맞지 않습니다.」·입력 비움·`aria-invalid` → 429(Retry-After 5) 「5초 뒤에 다시 시도」·버튼 비활성 → 5초 뒤 「이제 다시 시도할 수 있습니다.」·버튼 활성(자동 전송 없음) → 맞는 값 → 발행본 화면으로 바뀌며 초점이 `h1#recipient-title`로 이동(G4), `sessionStorage`에 `catchu.recipient.grant:locked`만 생기고 주소에 grant 없음 → 새로 고침해도 비밀번호 없이 열림.
+- `/s/gone`: 「이 링크는 열람할 수 없습니다.」만(사유·안내 없음). `/s/boom`: 숨긴 h1 「발행본」 + 「발행본을 불러오지 못했습니다」·[다시 불러오기].
+
+**확인하지 못한 것**
+
+- 실제 api(`RecipientLinksController`)·DB와의 연결, S8·S9·S14의 끝에서 끝(판정 뒤 중지·삭제·작성자 비활성 → 다음 요청 404, 회원 행 없음 500): Docker가 꺼져 있어 테스트 DB를 띄우지 못했다. Step 23·25에서 실제 api로 한다.
+- 다시 조회 실패 때 이전 화면 유지(NFR6.1)와 확정 거부 때 이전 사본 삭제: 화면에 다시 조회 단추가 없어 단위 시험으로만 봤다. 대역의 `flip` 토큰은 개발 모드의 효과 두 번 실행 때문에 첫 조회가 소모돼 쓰지 못했다.
+- U5 패널의 실제 요약·질문 응답(실제 api·DB): 대역으로만 봤다. U4가 보는 것은 자리·props·`onAccessLost`·`showEvidence` 연결이며 패널 안 동작은 U5 몫이다.
+- `web/src/features/recipient/README.md`는 아직 10월 내용이다(Step 24).
+
+**2026-11-06 보완(담당 요청, 커밋 전)**
+
+- 첫 진입 초점: 세 화면 모두 처음 열 때 h1에 초점(D29). 비밀번호 입력칸 `autoFocus` 제거. `recipient-screen.tsx`·`recipient-view.tsx`.
+- 2·3번 자리에 U5 `BaseSummaryPanel`·`QnaPanel` 연결(D28). `features/rag-answer/README.md`의 "아직 붙어 있지 않다" 문장을 현재 상태로 고쳤다.
+- 시험: `recipient.test.mjs` 32개(자리 2·3에 패널 하나씩, `autofocus` 없음, G5·G6 검사는 U2·U5 영역을 뺀 U4 영역만), web 전체 860개 통과, `tsc`·`next build`·바꾼 파일 eslint 통과.
+- 브라우저(대역 API, `document.activeElement`): `/s/open` 첫 진입 `H1#recipient-title`, `/s/locked` 첫 진입 `H1#recipient-password`(입력칸 `autofocus` 없음, Tab 한 번에 `INPUT type=password`), `/s/gone` 첫 진입 `H1#recipient-unavailable`, 비밀번호 해제 뒤 `H1#recipient-title`(패널 2개·요약 항목 4개 표시). 요약 패널 근거 단추: 「자기소개」→ `LI#published-item-item-text-1`로 초점·스크롤, `data-highlighted`, `<mark>` 1개(대역이 준 5자 범위 "두 번째 "); 「결제 모듈 리팩터링」→ `item-catch-1`, `<mark>`「결제 재시도 로직」; 사본에 없는 범위(`workFacts[3]`) → `item-catch-2`로 이동만, `<mark>` 0개. 접근 상실: `/s/lost`(요약 GET 404) → 「이 링크는 열람할 수 없습니다」·패널 0·초점 `H1#recipient-unavailable`; `/s/lostq`(질문 POST 401) → 비밀번호 화면·패널 0·초점 `H1#recipient-password`, 그 링크 grant 없음.
+
+**남은 것(제출 3)**: Step 23 web 부분은 위대로 앞당겼고 api 부분은 Step 20·21과 함께 끝났으므로, Step 23에서는 실제 api·DB로 받은 사람 판정의 브라우저 확인(#416 결정 3)을 하고, 커버리지는 Step 25에서 잰다. Step 24(문서: `web/src/features/recipient/README.md`, `api/docs/publications.md` 받은 사람 경로, `api/docs/share-links.md` 대체 안내, PR 「리뷰 요청」에 D27 문구·G5~G7·보류 범위), Step 25(전체 확인·S15 미실행 기록). U10 패널을 4번 자리에 붙이는 것은 U10 제공 뒤다(D28).
+
+
+### Step 23 받은 사람 경로·화면 검증 (2026-11-06, 실제 로컬 api·DB)
+
+판본: `api/u4-recipient` HEAD `b289406`(Step 22) + 작업 트리(감사 기록 1개만 미커밋). 이 Step에서 코드는 바꾸지 않았다(재현한 결함 없음).
+
+**기존 시험과의 대조**: 계획 Step 23의 api 항목은 Step 20·21 커밋(`58cac08`)의 `recipient-api.test.cjs`(8: 판정 순서·형식 오류 404, S8, S9, R-04 시점, S14, NFR-6 비활성 404·재활성, 회원 행 없음 500·비노출, 거부 사례·쿼리 400)·`recipient-unlock-policy.test.cjs`(29)·`app-routes.test.cjs`(4: 경로 중복 없음·두 경로가 새 컨트롤러 하나·10월 경로 없음·`@Public()` 메서드 단위·`ShareLinksModule` 미등록·`share_link` 표 유지)·`publications-module.test.cjs`에 이미 있고, web 항목(G1~G4·표지 구분·근거 링크·404·401·429·grant)은 Step 22에서 앞당긴 `recipient.test.mjs`(32)에 있다. 빠진 시나리오는 없어 새 시험을 더하지 않았다.
+
+**환경**: Docker Desktop을 켜고 테스트 DB `catchu-db-test-u4`(5443, tmpfs)로 api 시험을 돌렸다. 브라우저 확인은 새 tmpfs 개발 DB `catchu-db-u4-step23`(5445)에 마이그레이션 22개를 적용하고 `api/.env`(dev-login, `FILE_STORAGE_DRIVER=local` + 스크래치 폴더, `LINK_GRANT_SECRET` 비움 → 실행마다 임시 키)·`web/.env.local`(api 3001)로 `start:dev`·`next dev`를 띄워 했다. 기존 개발 DB `catchu-db-u4-dev`(5444)는 마이그레이션 적용이 PL/pgSQL 예외로 실패해 쓰지 않았다(원인은 보지 않음). 자료는 실제 API(dev-login 회원 2명 → 동의 → 텍스트 자료 2개 → 발행 8건 → 중지·삭제 API)로 만들고, 만료(`published_at`·`expires_at`을 91일·1일 전으로)·작성자 비활성(`account_state='INACTIVE'`)·기본 요약 DONE 행(근거 3개 + AI 해석 1개)은 DB를 직접 고쳤다. Redis·LLM·색인은 없다.
+
+**결과 표** (구분: [api·DB]=실제 로컬 api·DB, [대역]=시험 대역, [기록]=기존 시험 기록, [미실행])
+
+| 시나리오 | 환경·판본 | 기대 | 실제 결과와 근거 |
+|---|---|---|---|
+| U4 제출 3 api 시험 12개 파일 | [api·DB] 테스트 DB 5443, `TEST_DB_PORT=5443 npm test -- …` | 전부 통과 | 97개 통과·0 실패 |
+| S8 비밀번호 링크: grant 없음·틀린 비밀번호·맞는 비밀번호·위조 grant | [api·DB] curl | 401·401·200{grant}→GET 200·401 | 그대로(`LINK_PASSWORD_REQUIRED`·`LINK_PASSWORD_INVALID`·`{grant}`·`LINK_PASSWORD_REQUIRED`). `Cache-Control: no-store` |
+| S8 보호 링크에 다른 발행본의 grant | [기록] `recipient-api.test.cjs` S8(이번 실행에 포함) | 401 `LINK_PASSWORD_REQUIRED`(grant는 publicationId에 묶임) | 통과. curl로는 따로 보내지 않았다 |
+| 공개(비밀번호 없는) 링크에 다른 발행본의 grant | [api·DB] curl | 머리글을 무시하고 200 사본 | 200 `title=열린 발행본(실제 api)` |
+| S9 중지·만료·삭제 링크 GET/unlock | [api·DB] curl + 브라우저 | 모두 404 `LINK_UNAVAILABLE`, 사유 구분 없음 | curl 404; 브라우저 세 화면 모두 「이 링크는 열람할 수 없습니다.」만, 초점 `H1#recipient-unavailable`, 패널 0 |
+| S14 틀린 비밀번호 10번 뒤 맞는 비밀번호 / 비밀번호 없는 링크 unlock | [api·DB] curl | 429(확인 안 함, Retry-After) / 400 | 429 `LINK_UNLOCK_LIMITED` `Retry-After: 900` / 400 `INVALID_REQUEST` |
+| 형식 오류 토큰 GET·unlock, 정의 밖 쿼리, 10월 Catch 상세 경로 | [api·DB] curl | 404·404·400·없는 경로 | 404·404·400 `VALIDATION_FAILED`·404 `RESOURCE_UNAVAILABLE`(공통 미등록 경로 응답) |
+| 열람·해제 경로가 한 번씩만 등록, 10월 경로 미노출 | [기록] `app-routes.test.cjs`(이번 실행에 포함) | 중복 없음·새 컨트롤러 하나·`/catches/:catchId`·발급·목록·중지 없음 | 통과 |
+| 정상 열람 화면 | [api·DB] 브라우저 `/s/<open>` | 첫 진입 초점 h1, 0~4 자리 순서, 사본 2개(position 순), 본문 `<b>` 글자, GitHub 주소만 링크 | 초점 `H1#recipient-title`, 안내 1개, 「발행 시각 2026-11-06 10:06:09 (KST)」, 링크 1개(github.com)·`evil.example` 글자, 요약 항목 4개·질문 패널 |
+| 비밀번호 화면·해제·새로 고침 | [api·DB] 브라우저 `/s/<locked2>` | 첫 진입 초점 h1(autoFocus 없음) → 틀림 안내 → 맞으면 전환·초점 h1·grant는 sessionStorage만 → 새로 고침 뒤 비밀번호 없이 열림 | 모두 그대로(「비밀번호가 맞지 않습니다.」 뒤 입력 비움, 해제 뒤 `H1#recipient-title`, 주소에 grant 없음) |
+| 판정 통과 뒤 중지: 진행 중 요청 유지, 다음 요청 404 | [api·DB] 브라우저+curl: flip 화면을 연 뒤 작성자 `PUT …/stop` 200 | 열린 화면은 그대로, 다음 요청 404 | 중지 커밋 직후 화면은 ready 유지, 받은 사람 GET 404, 질문 POST 404 → `onAccessLost` → 「이 링크는 열람할 수 없습니다.」 |
+| 판정 통과 뒤 같은 요청 안의 중지·삭제·작성자 비활성(사본 읽기 전 커밋) | [api·DB] `recipient-api.test.cjs` R-04 자동 시험(이번 실행, 테스트 DB 5443; 사본 읽기 직전에 DB를 고치는 훅으로 타이밍을 만듦) | 그 요청은 판정 시점 사본 200, 다음 요청 404; READ ONLY REPEATABLE READ 한 트랜잭션 | **실제 DB 자동 시험 통과.** 요청 도중 상태가 바뀌는 타이밍의 브라우저 수동 재현은 [미실행](브라우저로는 만들 수 없음) |
+| 이미 비활성인 작성자의 링크 GET·unlock(비밀번호 링크) | [api·DB] curl + 브라우저 | 둘 다 404, 비밀번호 입력 화면이 아님 | 404·404; 브라우저는 불가 화면(`passwordInput: false`) |
+| 작성자 회원 행 없음 → 500 고정 본문, 응답·로그에 SQL·내부 메시지·토큰 없음 | [대역] `recipient-api.test.cjs` NFR-6(`readOwnerState`를 `NO_MEMBER`·`57014` 예외로 바꿈, 이번 실행에 포함) | 500 `INTERNAL_ERROR` `{code,message}`만, 로그에 marker·SELECT 없음 | **시험 대역으로 통과.** 실제 DB는 외래 키 때문에 만들 수 없어 실제 DB 재현은 없다 |
+| U5 요약 패널 근거 선택 → 이동·강조 | [api·DB] 브라우저(요약 행은 DB 직접 삽입) | 항목으로 초점·스크롤, 범위 `<mark>`; 사본에 없는 경로는 항목만 | 「두 번째 자료」→ `LI#published-item-<id>` 초점·`data-highlighted`·`<mark>`「두 번째 자료의 본」(charEnd 10); 「없는 경로」→ 이동만, mark 0 |
+| U5 패널 401 → U4 비밀번호 화면 | [api·DB] 브라우저: api 재기동으로 임시 grant 키 교체 뒤 질문 POST | onAccessLost(401) → 비밀번호 화면, 다시 입력 안내, 그 링크 grant 삭제 | 그대로(「비밀번호를 다시 입력해 주세요.」, 초점 `H1#recipient-password`, sessionStorage에서 그 링크 키만 사라짐) |
+| U5 패널 404 → U4 불가 화면 | [api·DB] 위 flip 행 | onAccessLost(404) → 불가 화면 | 그대로 |
+| U5 요약 GET 401·404 | [api·DB] curl | locked grant 없음 401, stopped 404 | 401 `LINK_PASSWORD_REQUIRED`, 404 `LINK_UNAVAILABLE` |
+| U5 질문 POST(색인 없음) | [api·DB] 브라우저 | 패널 안내만, U4 전환 없음 | 409 `INDEX_NOT_READY` → 「질의응답을 아직 쓸 수 없습니다」, U4는 ready 유지 |
+| U5 질문: 판정 통과 뒤 저장 중 발행본 삭제 확인 → 저장·차감 롤백과 404 | [미실행] 실제 색인·LLM 환경에서 돌리지 않음. 근거는 코드 읽기 + U5 기존 시험뿐 | NFR-5 결정 A("삭제로 확인된 경우에만" 그 요청의 저장·차감을 되돌리고 404) | **직접 관찰한 것: 없음.** **코드상 확인한 것**: 질문 경로(`qna.controller.ts` → `qna-service.ts`)는 `resolveForRecipient` → Redis 횟수 `count` → 다시 쓰기·검색·생성이며, 발행본을 참조하는 DB 쓰기와 `readSnapshot` 호출이 없다. 그래서 "삭제로 확인되는" 지점(NotFound·23503)이 없고, 23503 처리는 기본 요약 처리기(`base-summary-handler.ts`, worker 쪽)에만 있다. **기존 시험 근거**: `qna-controller.test.cjs` 99행(스트림 전 거부는 횟수를 세지 않음), U5 기능 명세 168행(「대화 중 링크 중지·만료·삭제 → 다음 질문 404」). 둘 다 "스트림 도중 삭제"는 다루지 않는다. **코드상 예상(미실행)**: 질문 스트림 도중 `DELETE /publications/{id}`가 커밋되면 그 스트림은 끝까지 가고, 다음 질문은 404이며, 그날 횟수 1은 소모된 채 남는다. 이는 U5 결함이 아니라(결정의 "확인된 경우"가 아님) U5 담당에게 전달할 사항이다 |
+| 위 "스트림 도중 삭제" 실제 재현 | [미실행] | 스트림 완주·다음 질문 404·횟수 1 소모 | 색인·LLM이 없어 질문 스트림이 열리지 않는다(이번 환경은 409 `INDEX_NOT_READY`). 재현 조건: 색인 READY 발행본에서 질문 스트림을 연 뒤 작성자 `DELETE`, 이어서 같은 링크에 질문 |
+| 작성자 발행본 삭제 API 500 | [api·DB] 1차 시드 | 삭제 204 | `FILE_STORAGE_*` 미설정 환경에서 `PREFIX_DELETE_FAILED` → 500·DB 유지(S11 설계대로, `docs/file-storage.md`). 설정 뒤 204. U4 결함 아님, 로컬 환경 안내 사항 |
+
+**실행 명령**: `TEST_DB_PORT=5443 npm test -- <U4 제출 3 파일 12개>`(97 통과), `node scratchpad/step23/check.mjs`(curl 묶음), 브라우저 `document.activeElement` 확인은 위 표. web 시험은 이 Step에서 코드가 바뀌지 않아 Step 22의 860개 통과를 그대로 둔다.
+
+**남은 검증**: 커버리지(Step 25 명령), S15 미실행 기록(Step 25), 실제 색인·LLM이 있는 환경의 U5 질문 스트림(U5 몫), 기존 개발 DB `catchu-db-u4-dev` 마이그레이션 실패 원인(이번 범위 밖). 브라우저 확인에 쓴 `api/.env`·`web/.env.local`(gitignore)·컨테이너 `catchu-db-u4-step23`(tmpfs, 멈추면 자료 소멸)는 남겨 두었다.
+
+
+### PR 「리뷰 요청」 초안 (Step 24, 제출 3 PR 본문에 옮겨 적는다)
+
+리뷰 요청(확인용 — 재결정이 필요한 항목은 없다):
+
+1. **U4 고정 안내(BR7.1) 축소 문구(U4가 정함)** — [#416 팀장 답변(2026-10-29)](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6485884167)은 "겹치는 부분은 U4 쪽을 발행 시각 표시 위주로 줄이고 문구는 U4에서 정한다"고 했다. U4는 판정 통과 화면의 0번 안내 묶음 아래 한 줄 **「발행 시각 YYYY-MM-DD HH:mm:ss (KST)」**(`recipient-format.ts` `publishedAtText`, 작성자 발행본 상세와 같은 `formatKst`)로 정했다. 이유: U2 `fixed-copy`가 고정 발행본 설명을 맡으므로 그 설명과 겹치는 문장을 두지 않고 발행 시각만 남겨 중복을 줄이기 위해서다(D27). 만료 시각·링크 조건도 넣지 않았다. 바꾸려면 이 함수 한 곳만 고치면 된다.
+2. **G5·G6 검토 결과(문구 검토)** — 판정 통과 화면에서 "발행 당시 자료로 고정했고 원본 변경이 반영되지 않는다"는 설명은 U2 `fixed-copy` 한 줄뿐이다. U4 영역(h1·고정 안내·1번 자료·4번 빈 자리)에는 링크 기간·중지(U2 `link-conditions`), 외부 AI 전송 고지(U5 `AiNoticeLine`은 3번 자리 질의응답 패널 안에만), JD 로그인 안내(U10, 미제공)와 같은 뜻의 문장이 없다. `test/recipient.test.mjs`의 G5·G6 사례가 U2·U5 영역을 뺀 U4 영역에 `RECIPIENT_GUIDE_ITEMS` 문장과 "고정한"·"반영되지 않"·"중지하면"·"로그인"·"외부 AI"·"전송"이 없음을 기계적으로 본다. 최종 판단은 팀장 몫이다.
+3. **G7 검토 결과(U2 문구 대조) — 일치** — [#416 팀장 답변 원문(2026-10-29)](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6485884167)과 #423 병합본의 `web/src/components/recipient-guide/recipient-guide-items.ts`를 2026-11-06에 직접 대조했다. `link-conditions`: 결정 「이 링크는 정해진 기간 동안만 열리고, 작성자가 중지하면 더 볼 수 없습니다.」 = 코드 문장 전체, **일치**. `base-summary`: 결정이 교체 대상으로 지정한 둘째 문장 「근거를 누르면 발행본 자료 안의 해당 위치를 보여 줍니다.」 = 코드의 둘째 문장(첫 문장 「기본 요약은 이 자료로 AI가 만든 요약입니다.」는 교체 대상이 아님), **일치**. U4가 고칠 것도 U2에 알릴 것도 없다.
+
+**미실행으로 남은 항목**(코드상 예상만 있고 실제로 돌리지 않음):
+
+| 항목 | 상태 | 재현 조건 |
+|---|---|---|
+| U5 질문 스트림 도중 발행본 삭제 → 스트림 완주·다음 질문 404·그날 횟수 1 소모 | [미실행] 실제 색인·LLM 환경에서 돌리지 않음(이번 환경은 409 `INDEX_NOT_READY`). 위 결과는 코드상 예상이며 직접 관찰한 것이 아님 | 색인 READY 발행본에서 질문 스트림을 연 뒤 작성자 `DELETE /v1/publications/{id}`, 이어서 같은 링크에 질문. U5 결함이 아니라 U5 담당 전달 사항(질문 경로에는 되돌릴 저장이 없음) |
+| 요청 안의 중지·삭제·비활성 타이밍(R-04) | 실제 DB 자동 시험(`recipient-api.test.cjs` R-04) **통과**. 브라우저 수동 재현은 [미실행] | 브라우저로는 요청 도중의 타이밍을 만들 수 없음 |
+| 작성자 회원 행 없음 500·정보 비노출 | 시험 대역(`readOwnerState` 대역, NFR-6 사례)으로 **통과**. 실제 DB 재현은 없음 | 실제 DB는 외래 키로 만들 수 없음 |
+| 실제 색인·LLM 환경의 요약·질의응답 내용 | [미실행] U5 몫 | — |
+| S15(색인 상태·[검색 다시 준비]) | [미실행] 계획대로 C-09 합의 뒤(OQ-U4-5) | Step 25에서 미실행으로 기록 |
+| 커버리지 80% | Step 25에서 측정 예정 | `npm run test:coverage -- …`(unit-test-instructions) |
+
+**보류 범위**(계획 「보류 범위와 미결」 그대로): OQ-U4-2·OQ-U4-4 임시값, OQ-U4-3 `share_link` 표·엔티티 유지, OQ-U4-5 `indexState`·reindex 없음(U4 완료로 보고하지 않음), OQ-U4-7 `RecipientSlotProps`는 화면 안 형, OQ-U4-NFR-3 AI 초안 링크 없음, OQ-U4-NFR-4 형식 오류 토큰 404는 10월 동작. 4번 자리(U10)는 U10 제공 뒤 단다.
+
+### Step 25 전체 확인 (2026-11-06, 판본 `8ac5905`)
+
+판본: `api/u4-recipient` HEAD `8ac5905`(제품 코드는 `b289406`과 같고 그 뒤 두 커밋은 기록·문서만). 작업 트리는 감사 기록 1개만 미커밋. 이 Step에서 코드는 바꾸지 않았다. Step 23의 api 97개·Step 22의 web 860개 통과는 이전 판본(`b289406`)의 기록이고, 아래는 **이번 판본에서 다시 실행한 결과**다.
+
+**빌드·시험** (테스트 DB `catchu-db-test-u4`, 127.0.0.1:5443, tmpfs → 실행기가 마이그레이션 적용)
+
+| 항목 | 명령 | 대상 | 결과 |
+|---|---|---|---|
+| api 빌드 | `cd api && npm run build` | `tsc -p tsconfig.build.json` | 성공(exit 0) |
+| api 시험(지침 「제출 3(전체)」) | `cd api && TEST_DB_PORT=5443 npm test -- <12개 파일>` | `test/catches/author-description-api`, `test/materials/text-materials-api`, `test/publications/in-memory-publication-access`·`publication-access-db`·`publish-api`·`publications-manage-api`·`publications-logging`·`publications-module`·`recipient-api`·`recipient-unlock-policy`·`app-routes`, `test/db/member-cascade-delete` | **97개 통과·0 실패·0 건너뜀**(exit 0) |
+| web 행동 시험(지침 「제출 3(전체)」) | `cd web && node --test <5개 파일>` | `test/author-description`·`materials`·`publish`·`publications-owner`·`recipient.test.mjs` | **64개 통과·0 실패·0 건너뜀** |
+
+**U4 api 줄 커버리지(기대 80% 이상, 지침 「기대 커버리지」: `dist/publications`·`dist/materials`·설명 API)**
+
+1. 지침의 기본 명령 그대로: `cd api && TEST_DB_PORT=5443 npm run test:coverage -- test/publications/publication-access-db.test.cjs test/publications/publish-api.test.cjs test/publications/publications-manage-api.test.cjs test/publications/recipient-api.test.cjs` → 34개 통과. 표는 `dist/**` 전체(맨 아래 all files 64.33%는 저장소 전체 값이라 U4 판정에 쓰지 않음)이고 파일별 백분율만 준다. 이 4개 파일은 설명 API·텍스트 자료 시험을 포함하지 않아 `author-description-store.js` 82.29%·`text-materials.controller.js` 91.00% 등 설명·자료 파일이 받은 사람·발행 시험이 지나간 만큼만 덮인다. 그래서 **기본 명령만으로는 범위 전체를 확인할 수 없다**(지침 설명 "위 api 파일 목록과 같음"과 실제 명령의 4개 파일이 어긋나는 점은 지침 쪽 불일치로 남긴다).
+2. 추가 측정(같은 팀 표준 도구에 제출 3 시험 12개를 지정): `cd api && TEST_DB_PORT=5443 NODE_OPTIONS='--test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=<파일>' npm run test:coverage -- <위 12개 파일>` → 97개 통과. lcov에서 평가 범위의 줄 수를 합산했다(`TEST_COVERAGE_INCLUDE`에 중괄호 glob은 이 Node에서 아무 파일도 잡지 않아 기본 `dist/**`로 재고 범위는 lcov에서 걸렀다. 도구·CI·기준값은 바꾸지 않았다).
+
+| 범위 | 파일 수(dist) | lcov에 없는 파일 | 실행 줄 / 대상 줄 | 줄 % |
+|---|---|---|---|---|
+| `dist/publications/**` | 16 | 없음 | 1,623 / 1,645 | 98.66 |
+| `dist/materials/**` | 5 | 없음 | 446 / 451 | 98.89 |
+| `dist/catches/*author-description*` | 3 | 없음 | 189 / 193 | 97.93 |
+| **U4 평가 범위 합계** | 24 | 없음 | **2,258 / 2,289** | **98.65%** ≥ 80 |
+
+파일별(실행/대상): `db-publication-access` 181/195(92.82, 가장 낮음 — 비활성·회원 없음 분기의 일부 보조 줄과 PDF 쪽 읽기), `publication-manage.service` 184/185, `publish.service` 247/248, `recipient-access.service` 219/220, `recipient-links.controller` 68/69, `publications.controller` 102/103, `publications.module` 71/72, `publication.entity` 138/139, `publications-log` 39/40, `publish-input` 173/173, `snapshot-builder` 43/43, `published-snapshot` 6/6, `publication-state` 15/15, `publications-config` 32/32, `publication-access` 31/31, `in-memory-publication-access` 74/74; `text-material-store` 145/146, `text-material-input` 117/118, `text-materials.controller` 99/100, `text-material.entity` 63/64, `materials.module` 22/23; `author-description-store` 93/96, `author-description.controller` 62/63, `author-description-input` 34/34. 기록 파일: 스크래치 `step25/u4.lcov`·`coverage-u4-12files.log`, 기본 명령 로그 `record/step25-coverage-default.log`.
+
+**FR19.2 확인 표 (U4 제출 3, 2026-11-06, 판본 `8ac5905`)** — 구분: [자동] 이번 실행한 자동 시험(테스트 DB 5443), [브라우저] Step 23의 실제 로컬 api·DB 브라우저 확인(판본 `b289406`, 코드 동일), [대역] 시험 대역, [미실행]
+
+| ID | 시나리오 | 기대 동작 | 시험명·근거 | 환경·판본 | 결과 |
+|---|---|---|---|---|---|
+| S1 | 설명 저장·두 탭 저장·공백 저장·4,001자 | 마지막 저장이 남음, 공백은 NULL, 초과 400 | `catches/author-description-api.test.cjs` "S1: …" 5개 | [자동] `8ac5905` | 통과 |
+| S2 | 재분석으로 같은 작업 반영 | 설명 유지, 새 작업 Catch는 NULL | 같은 파일 "S2: …" | [자동] `8ac5905` | 통과 |
+| S3 | 텍스트 자료 CRUD와 남의 자료 접근 | 본인만, 남의 것 404 | `materials/text-materials-api.test.cjs` "S3…" 5개 | [자동] `8ac5905` | 통과 |
+| S4 | 공개 1 + 비공개 1 + 텍스트 1 발행 | 순서대로 사본 3개, 비공개 Catch PUBLIC, 조각 나누기 가짜가 같은 manager, 커밋 뒤 작업 2개 | `publications/publish-api.test.cjs` "S4: …" 2개 | [자동] `8ac5905`(U2·U3는 계약 모양 가짜) | 통과 |
+| S5 | 미확인 Catch·SOURCE_PRIVATE Catch 발행 | 409, 발행본 없음, 다른 비공개 Catch 그대로 | 같은 파일 "S5: …" | [자동] `8ac5905` | 통과 |
+| S6 | 하루 횟수 LIMIT_REACHED, chunkInTransaction 예외 | 429 또는 실패, 아무것도 남지 않음 | 같은 파일 "S6: …" | [자동] `8ac5905` | 통과 |
+| S7 | 작업 등록 ENQUEUE_FAILED | 발행 성공 응답 | 같은 파일 "S7: …" | [자동] `8ac5905` | 통과 |
+| S8 | 비밀번호 링크: grant 없음·틀림·맞음·다른 발행본 grant | 401·401·200·401 | `publications/recipient-api.test.cjs` "S8: …"; Step 23 curl·브라우저(`/s/<locked2>` 틀림→맞음→열림) | [자동] `8ac5905` + [브라우저] | 통과 |
+| S9 | 중지·만료·삭제 링크를 받은 사람이 엶 | 받은 사람은 중지·만료·삭제 모두 404. 작성자는 중지·만료된 발행본을 계속 조회할 수 있음 | `recipient-api.test.cjs` "S9: …", `publications-manage-api.test.cjs` "S9·S13: …"; Step 23 브라우저 세 화면 | [자동] `8ac5905` + [브라우저] | 통과 |
+| S10 | 발행 뒤 원본 변경·삭제 | 사본 그대로 | `publications-manage-api.test.cjs` "S10: …" | [자동] `8ac5905` | 통과 |
+| S11 | 삭제: 접두어 삭제 성공·실패 | 성공 204·연쇄 삭제, 실패 500·DB 유지 | 같은 파일 "S11: …"(실패는 가짜 `FileStorage`); Step 23 실제 api에서 저장소 미설정 500 → 설정 뒤 204 | [자동] `8ac5905` + [브라우저 환경 curl] | 통과 |
+| S12 | 남의 발행본 상세·중지·삭제 | 404 | 같은 파일 "S12: …" | [자동] `8ac5905` | 통과 |
+| S13 | 만료 링크 중지, 같은 링크 두 번 중지 | 200 `{EXPIRED, null}`, 처음 시각 유지 | 같은 파일 "S9·S13: …" | [자동] `8ac5905` | 통과 |
+| S14 | 시도 제한 뒤 맞는 비밀번호, 비밀번호 없는 링크 unlock | 429(확인 안 함), 400 | `recipient-api.test.cjs` "S14: …", `recipient-unlock-policy.test.cjs`; Step 23 curl(10번 틀린 뒤 429 `Retry-After: 900`, 400 `INVALID_REQUEST`) | [자동] `8ac5905` + [브라우저 환경 curl] | 통과 |
+| S15 | 색인 PENDING·DONE·FAILED 목록·상세, [검색 다시 준비] | FAILED에만 버튼, 202 PENDING | C-09 합의 전(OQ-U4-5) | — | **[미실행]** 계획대로 |
+| — | 작성자 회원 행 없음 500·비노출(S9 보호 흐름 보강) | 500 고정 본문, SQL·토큰 비노출 | `recipient-api.test.cjs` "[NFR-6 결정] … 회원 행이 없으면" | [대역] `readOwnerState` 대역 | 통과(실제 DB 재현 없음) |
+| — | 요청 도중 중지·삭제·비활성 타이밍(R-04) | 그 요청 200·다음 404 | `recipient-api.test.cjs` "R-04: …" | [자동] `8ac5905`; 브라우저 수동 재현 [미실행] | 통과 |
+| — | U5 질문 스트림 도중 발행본 삭제 | 스트림 완주·다음 404·횟수 소모(코드상 예상) | Step 23 기록 | [미실행] 실제 색인·LLM 환경 없음 | 미실행 유지 |
+
+**판정**: api 빌드·지정 시험(api 97·web 64)·U4 줄 커버리지 98.65%(≥80)·FR19.2 표(S1~S14 근거 있음, S15 미실행)가 갖춰져 Step 25를 완료로 표시한다. 남는 것은 U4 범위 밖이거나 결정 대기다: S15(OQ-U4-5), U5 스트림 도중 삭제(실제 색인·LLM 환경), 작성자 회원 행 없음의 실제 DB 재현(불가), R-04 브라우저 수동 재현(불가), 지침 「커버리지」 명령의 파일 목록 불일치(지침 문서 수정은 별도).
+
 
 ## 제출 2 (2026-11-03) — C-10 DB 구현·W3 발행·W5 작성자 관리
 
@@ -36,15 +261,15 @@
 | # | 결정 | 설계 원본과의 차이 | 근거·확인 대상 |
 |---|---|---|---|
 | D4 | 화면 주소 `/publications`(목록)·`/publications/new`(발행)·`/publications/[publicationId]`(상세), 회원 메뉴 [발행본]. [링크 열기] 세 화면 | 기능 명세 W3·W5는 주소를 정하지 않음. [링크 열기]는 #416 11/2·11/3 결정 | U4 담당 결정 |
-| D5 | 409 `CONFIRMATION_REQUIRED`·`SOURCE_RESTRICTED`의 `details.catchIds`를 내려고 공통 `ErrorDetails`에 `catchIds?: string[]`를 더하고 예외 필터가 UUID만 복사. web 공통 해석기(`api-response.ts`)도 같은 칸 통과(D7) | 계약 common.yaml `details` 허용 키(두 개) 밖 | **팀장 확인 필요**(계약 수정 여부). 받아들이지 않으면 409 Catch 목록 전달 방식을 다시 정함 |
+| D5 | 409 `CONFIRMATION_REQUIRED`·`SOURCE_RESTRICTED`의 `details.catchIds`를 내려고 공통 `ErrorDetails`에 `catchIds?: string[]`를 더하고 예외 필터가 UUID만 복사. web 공통 해석기(`api-response.ts`)도 같은 칸 통과(D7) | 계약 common.yaml `details` 허용 키(두 개) 밖 | **팀장 확인 필요**(계약 수정 여부). 받아들이지 않으면 409 Catch 목록 전달 방식을 다시 정함. → 2026-11-04 팀장 수용(#468 댓글 6626005142). 공통 오류 규약 반영은 팀장 PR #472(`api/CONVENTIONS.md`, 통합 브랜치 `0dfe9fb`) |
 | D6 | 발행본 제목 1~50자(rules.md BR4.5·entities.md) | 계획 Step 13 지시의 "1~100"은 텍스트 자료 값 | rules.md 우선 |
 | D7 | (web) `api-response.ts` `details.catchIds` 통과 | D5와 짝 | — |
 | D8 | Q1 B 링크 규칙: `isGithubSourceUrl`을 `web/src/lib/github-source-url.ts`로 옮기고(recipient는 재수출, 동작 동일) `splitGithubLinks` 추가. 후보는 `https://github.com` 뒤가 `/ : ? #`이거나 주소 글자가 아닌 것, 끝 문장 부호는 글자로 돌림. 본문·작성자 설명에만 적용, `aiDraft`·제목은 글자 | 판정 규칙의 세부(OQ-U4-NFR-1·2) | #416 Q1 B |
 | D9 | Catch 잠금은 `FOR NO KEY UPDATE OF c`(10월 `setVisibility`와 같음, visibility만 갱신), 텍스트 자료는 `FOR UPDATE`. 잠금 순서는 계획 그대로 | 계획 Step 13의 `FOR UPDATE` | 외래 키 KEY SHARE와 공존·10월 공개 전환과 직렬화 |
 | D10 | `readSnapshot` 발행본 없음은 메모리 가짜와 같은 `NotFound`. `DbPublicationAccess`에 계약 밖 `resolveForRecipientIn(manager, …)`·`readSnapshotIn(manager, …)`를 두어 제출 3 열람 경로가 판정·읽기를 한 읽기 전용 REPEATABLE READ 트랜잭션에 묶게 함(보안 설계 R-04). C-10 계약 함수 모양은 그대로 | 계약에 없는 실패 이름·보조 메서드 | OQ-U4-NFR-5 |
 | D11 | 동의 창은 U2 공용 `useAiConsent().run`으로 연결. 403이면 창을 열고 [동의] 뒤 같은 요청 1회 재전송, [닫기]면 입력 유지 | — | C-04 |
-| D12 | BR7.3 비공개 전환 안내는 사본에 CATCH 항목이 하나라도 있을 때 보임(사본에 전환 정보가 없음) | 설계가 조건을 정하지 않음 | 팀장 확인 대상 |
-| D13 | 실패 뒤 단계: 409·404·400은 편집 단계로(409는 `catchIds` Catch 표시), 403·429·401·500·통신 실패는 확인 단계에 남아 다시 누름. 입력은 모두 유지 | 설계가 정하지 않은 세부 | 팀장 확인 대상 |
+| D12 | BR7.3 비공개 전환 안내는 사본에 CATCH 항목이 하나라도 있을 때 보임(사본에 전환 정보가 없음) | 설계가 조건을 정하지 않음 | 팀장 확인 대상 → 2026-11-04 수용(#468 댓글 6626005142) |
+| D13 | 실패 뒤 단계: 409·404·400은 편집 단계로(409는 `catchIds` Catch 표시), 403·429·401·500·통신 실패는 확인 단계에 남아 다시 누름. 입력은 모두 유지 | 설계가 정하지 않은 세부 | 팀장 확인 대상 → 2026-11-04 수용(#468 댓글 6626005142) |
 | D14 | 10월 `share-links` 화면 도구(`copy-text`·`formatKst`)는 W6에서 지워질 파일이라 import하지 않고 publications 안에 같은 동작으로 둠 | — | — |
 | D15 | 정한 문구: 404 "고른 자료 중 지금 발행할 수 없는 것이 있습니다. 목록을 다시 불러온 뒤 다시 골라 주세요." / 빈도 초과 "발행 요청이 잦아 잠시 발행할 수 없습니다. N초 뒤에 [발행]을 다시 누를 수 있습니다."(`Retry-After` 없으면 "… 잠시 뒤 [발행]을 다시 눌러 주세요.", 잠금 없음) | 신뢰성 설계가 "코드 생성 때 정함"으로 둔 두 문구 | — |
 | D16 | 로그 칸(임시): `event`(`PUBLISH_SUCCEEDED`·`PUBLISH_FAILED`·`ENQUEUE_RESULT`·`PREFIX_DELETE_FAILED`)·`publicationId`·`memberId`·`errorCode`·`jobKind`·`enqueue` 여섯 개 고정 | NFR6.3이 코드 생성에 맡김 | — |
@@ -116,6 +341,53 @@
 
 - **전체 글 상한 안내 구분**: web `publications-api.ts`의 `validationLines`가 400 `{ field: 'items', reason: 'maxTotalLength' }`를 항목 개수·중복 안내와 구분해 "고른 자료의 전체 글이 60,000자를 넘었습니다. 자료를 빼거나, 수정할 수 있는 Catch 설명·텍스트 자료 원문을 줄인 뒤 다시 발행해 주세요."(`TOTAL_TEXT_LIMIT_TEXT`)로 보인다. 다른 `items` 이유와 `title`·`password`·모르는 칸 안내는 그대로다. `PUBLISH_LIMITS.totalText`(60,000)는 안내용이며 화면에서 미리 세지 않는다(서버 `SNAPSHOT_TEXT_TOTAL_MAX`가 기준, OQ-U4-4). 회귀 시험: `test/publish.test.mjs`에 안내 구분 사례와, 전체 글 초과 400 뒤 편집 단계 복귀·선택·순서·제목·비밀번호 유지 사례를 더했다. 발행 화면 README 400 행을 맞췄다. D5·D12·D13과 제출 3 범위는 건드리지 않았다.
 
+### 2026-11-05 #416 OQ-U4-NFR-5 결정 반영 (브랜치 `api/u4-c10-nfr5-decision`, 통합 브랜치 `0dfe9fb` 기준)
+
+**결정 근거**: 이슈 #416 팀장 결정(ljm0850, 2026-11-04 08:44 UTC, 댓글 6626574160) — **A안**(현재 per-call 동작 허용) + 세부 2건(U4 제안 6624371983, U10 leechaeah 동의 조건 6624259839 반영).
+
+1. 판정을 통과한 요청은 중지·만료만을 이유로 취소하지 않는다. 그 요청의 접수와 횟수 차감은 유효하고, 차단은 다음 요청의 재판정으로 한다(10월에 판정·읽기를 한 스냅샷으로 묶었을 때와 같은 허용 수준). U5 질의응답·요약은 코드상 이미 이 방식이라 고칠 곳이 없다(팀장 확인).
+2. 판정 직후 발행본이 삭제된 것이 확인되면(`readSnapshot`의 `NotFound`, 또는 발행본 참조로 확인된 외래 키 거부) 저장·차감을 되돌리고 404 `LINK_UNAVAILABLE`로 응답한다. 삭제 때문으로 확인되지 않은 DB 오류는 500 유지.
+3. `readSnapshot`의 오류 이름은 `NotFound` 유지(U5 `base-summary-handler.ts`의 `instanceof NotFound` 분기). B(묶음 함수)·C(`readSnapshot` 상태 판정)는 넣지 않는다. 계약 문구·경계 시험은 U4, 자기 경로 404 매핑·시험은 U10. OQ-U4-NFR-6은 제출 3 전 별도 답, 그때까지 10월 동작.
+
+**변경 분류**: 이름·자료형·의미·오류를 바꾸지 않는 **더하는 변경(문구 명시)**이다(코딩 운영 「기준 문서」·계약 요약 「Contract ownership rules」). 함수 시그니처·오류 클래스·DB 구현과 가짜의 동작은 그대로이고 주석·문서·시험만 더했다. D10(계약 밖 `resolveForRecipientIn`·`readSnapshotIn`, 제출 3 열람 경로용)은 그대로다. 계약 문서 변경은 Unit 변경에 넣지 않고 통합 브랜치 대상 PR로 내며(레포 컨벤션 §2.1), 2026-11-05 PR #474로 올렸다(리뷰어 ljm0850·leechaeah, 리뷰 대기).
+
+| 반영 | 파일 | 내용 |
+|---|---|---|
+| 계약(코드 주석) | `api/src/publications/publication-access.ts` | `resolveForRecipient`에 판정 뒤 중지·만료 허용·다음 요청 차단, `readSnapshot`에 상태 판정 없음·삭제 `NotFound`·받은 사람 경로 404 매핑(외래 키 거부는 SQLSTATE 23503이고 거부한 제약이 `publication`을 참조하는 것일 때만. 다른 제약의 23503은 500)·그 밖의 DB 오류 500, `NotFound` 설명. 소유 회원 비활성 허용은 팀장 결정 문구(중지·만료)에 없어 계약 규칙에 넣지 않았다 |
+| 계약 문서 | `aidlc/.../inception/contract-design/contract-summary.md` 「C-10」 | yaml 블록에 `resolveForRecipient`·`readSnapshot` 주석과 `post-judgment-rule`·`deletion-rule` 두 줄 추가. 블록 밖 설명·다른 계약은 그대로 |
+| 안내 문서 | `api/docs/publications.md` 「C-10 PublicationAccess」 | `readSnapshot` 행, 「판정 뒤 상태 변경」 문단, 가짜 구현 문단(중지·만료 사본 그대로, 소유 회원 상태 없음), 「시험」 두 항목 |
+| 구현 주석 | `api/src/publications/db-publication-access.ts`·`in-memory-publication-access.ts` | `readSnapshotIn`·`readSnapshot` 주석을 "계약의 NotFound·상태 판정 없음"으로. 코드 변경 없음 |
+| 경계 시험 | `api/test/publications/publication-access-db.test.cjs` | 머리 주석 블록과 시험 3개: (a) 판정 뒤 중지(비밀번호 없음·비밀번호 링크)·만료 경과·소유자 비활성 → 같은 요청 `readSnapshot` 사본 그대로, 다음 `resolveForRecipient` `LinkUnavailable`, 재활성 뒤 열림 (b) 판정 뒤 삭제 → `readSnapshot` `NotFound`(`LinkUnavailable` 아님, 토큰·SQL 비노출), 발행본 참조 INSERT는 `23503`, 다음 판정 `LinkUnavailable` (c) 대조: 같은 REPEATABLE READ 트랜잭션의 `resolveForRecipientIn`·`readSnapshotIn`은 그사이 커밋된 중지·삭제를 보지 않고(판정 시점 제목·항목), 밖의 새 판정·별도 `readSnapshot`은 바로 막힘 |
+| 경계 시험(가짜) | `api/test/publications/in-memory-publication-access.test.cjs` | 판정 뒤 `put`(중지·만료)에도 `readSnapshot` 사본 그대로·다음 판정 `LinkUnavailable`, `remove` 뒤 `readSnapshot` `NotFound`(`LinkUnavailable` 아님) |
+
+**의도적으로 고치지 않은 것**
+
+- 승인된 계획 `code-generation-plan.md`의 미결 표 OQ-U4-NFR-5 행("U5·U10 실제 연결 전 / U4 열람 경로만 한 트랜잭션, C-10 계약은 바꾸지 않는다"): 본문을 고치지 않았다. "계약을 바꾸지 않는다"는 함수 모양 기준이라 이번 문구 추가와 어긋나지 않으며, 결정 기록은 이 문서로 갈음한다. 승인 뒤 계획 변경 알림이 이미 열려 있어(아래 「AI-DLC 기록」) 더 겹치지 않게 했다.
+- 보안 설계 `nfr-design/security-design.md`(「판정과 읽기의 시점」 미결 표·OQ-U4-NFR-5 행): 승인본을 소급 수정하지 않는다. 미결 해소는 이 절로 기록하고, 제출 3 PR 「리뷰 요청」에 같은 내용을 옮긴다.
+- U10 자기 경로의 404 매핑·시험(U10 담당), U5(변경 불필요), 제출 3 Step 19~25, 가짜 구현의 소유 회원 상태(없음, 문서에 명시).
+
+**검증(2026-11-05, 테스트 DB `catchu-db-test-u4` 127.0.0.1:5443, 마이그레이션 22개 적용, 합성 자료만)**
+
+| 확인 | 명령 | 결과 |
+|---|---|---|
+| 새 경계 시험 + 같은 파일의 기존 시험 | `cd api && TEST_DB_PORT=5443 npm test -- test/publications/in-memory-publication-access.test.cjs test/publications/publication-access-db.test.cjs` | **16개 통과, 실패 0**(가짜 7, DB 9; 새 시험 4) |
+| 제출 2 api 회귀(제출 1·공통 오류 포함) | `cd api && TEST_DB_PORT=5443 npm test -- test/catches/author-description-api.test.cjs test/materials/text-materials-api.test.cjs test/publications/in-memory-publication-access.test.cjs test/publications/publication-access-db.test.cjs test/publications/publish-api.test.cjs test/publications/publications-manage-api.test.cjs test/publications/publications-logging.test.cjs test/publications/publications-module.test.cjs test/errors.test.cjs` | **69개 통과, 실패 0** |
+| api 타입·lint | `npx tsc --noEmit`, 바꾼 파일 5개 `npx eslint` | 오류 없음 |
+| api 전체 | `cd api && TEST_DB_PORT=5443 npm test` | 1,747개 = 통과 1,707 + 실패 4 + 건너뜀 36. 실패 4는 이 작업 폴더의 환경 요인이다: `test/integration/u7-analysis-chain.test.cjs` I4·I6·I8("worker 잠금 의존성과 CATCHU_TEST_WORKER_PYTHON 실행 파일 필요"), `test/u2/file-storage.test.cjs` S22(Windows `EPERM: operation not permitted, symlink`) |
+| 기준 커밋 대조 | `0dfe9fb`를 임시 작업 트리로 받아 같은 DB에서 위 두 파일만 실행 | 16개 = 통과 11 + 실패 4 + 건너뜀 1. 실패 4건과 메시지가 HEAD와 같다(이번 변경과 무관). 임시 작업 트리는 확인 뒤 지웠다 |
+
+- 실행하지 않은 것: U5·U10의 실제 C-10 연결, U10 경로의 삭제 404 매핑·롤백(U10 담당, 미구현·미검증), 진짜 동시 요청 재현(시험은 한 요청의 두 호출 사이에 다른 연결의 커밋을 순차로 넣어 "사이" 상태를 만든 것), 커버리지 재측정(주석·시험만 더해 `dist/publications` 비율은 11/3 측정값 그대로), web 시험.
+- 소비 Unit 알림(계약 더하는 변경): 2026-11-05 #416 댓글 6647902634로 U10(leechaeah)·U5(ljm0850)에 계약 문구 반영과 PR #474를 알렸다. U10은 접수 중 삭제의 404 매핑을 자기 경로에서 구현·시험한다. U9는 담당이 정해지면 같은 문구를 따른다.
+
+**이 반영 뒤 남은 미결·확인 요청**
+
+| 미결 | 결정 시점 | 상대 | 내용 |
+|---|---|---|---|
+| 제출 3 착수 전 계획 재승인 | **해소**(2026-11-05) | 담당자(U4) | 승인된 계획(2026-11-02) 뒤 Step 16·17·20·22·23과 미결 표 두 행이 바뀐 상태에서 담당자가 계획 검토를 요청했고, 변경 요청 2회(미결 표 OQ-U4-NFR-5 행 "결정됨(#416 팀장 2026-11-04 A안, 계약 문구·경계 시험은 PR #474)", 제출 3 시작 조건에 #474 병합·`api/u4-recipient` 분기·OQ-U4-NFR-6 답 추가)를 반영한 현재 계획을 Approve Plan으로 승인했다. Guard Policy가 relaxed라 계획 변경 재승인을 자동으로 막는 확인은 없다. 담당자 요청에 따라 계획이 바뀌면 승인 질문을 다시 띄운다 |
+| 판정 뒤 소유 회원 비활성의 허용 여부 | OQ-U4-NFR-6 답과 함께 | 팀장 | 팀장 결정 문구는 중지·만료만 허용한다. 소유 회원 비활성은 `readSnapshot`이 상태를 보지 않아 지금은 같은 per-call 동작이지만(경계 시험 (a)에 기록), 계약 규칙에는 넣지 않았다. NFR-6 결정 때 함께 적는다 |
+
+**AI-DLC 기록(2026-11-05)**: Code Generation `u4-publication-link`가 열린 상태(UNIT_RESUMED 2026-11-03T08:04:38Z)로 이어서 진행했다. 개발자 persona dispatch(Task)가 두 번 거부돼(Claude Code auto mode가 규칙 전달 훅이 바꾼 입력을 검토하지 못함) conductor가 같은 brief 범위를 직접 수행했고 감사 기록에 `Error: developer agent dispatch blocked`(2026-11-05T01:18:54Z) 노트를 남겼다. 승인된 계획(지문 `95b59991…`, 2026-11-02 승인) 대비 현재 계획의 차이는 Step 16·17(11/3, #416 [링크 열기]·Q1 B·검증 범위 결정)과 Step 20·22·23(11/4, `9bb64ec` unlock 공급자 전환·`copy-text.ts` 이동·시험 단언 반전)과 미결 표 OQ-U4-NFR-1·2 행이며, 모두 이미 결정된 사항의 메모이고 이번 작업(C-10 문구·경계 시험)과 무관하다. 담당자가 2026-11-05 "지금 계획대로"로 답해 승인본을 복원하지 않았고(임의 간주·일괄 복원 없음), 같은 날 계획 검토(Review the plan)를 요청해 수정 2건을 반영한 현재 계획을 Approve Plan으로 승인했다(위 미결 표 「제출 3 착수 전 계획 재승인」 해소). Plan Approval 설정은 이번 작업에서 on(set by you)으로 고정했다. 승인 뒤 구현(Step 19~)은 시작하지 않았다: 착수 조건(#474 병합, OQ-U4-NFR-6 답)이 아직 없다.
+
 ### 실행하지 않은 시험 (제출 2)
 
 - 받은 사람 판정(비밀번호·중지·만료·삭제)의 브라우저 확인 — 제출 3(#416 결정 3).
@@ -123,8 +395,8 @@
 
 ### 제출 2 미결·확인 요청
 
-1. D5 `ErrorDetails.catchIds`가 계약 수정인지 팀장 확인(병합 전 해결).
-2. D12·D13(web 세부 동작) 팀장 확인.
+1. D5 `ErrorDetails.catchIds`가 계약 수정인지 팀장 확인(병합 전 해결). → 해소(2026-11-04): 팀장 수용, 공통 오류 규약은 팀장 PR #472로 반영.
+2. D12·D13(web 세부 동작) 팀장 확인. → 해소(2026-11-04): 팀장 수용. 코드 변경 없음.
 3. 해소(2026-11-03 보완): `api/CONVENTIONS.md` 문구를 고쳤다.
 4. 상세 응답에 `stoppedAt`이 없어 다시 열면 중지 시각이 안 보임. 필요하면 더하는 변경으로 요청.
 5. 단계 일지(`construction/code-generation/memory.md`)는 이 체크아웃이 U4 범위로 제한돼 쓰기가 거부됐다. 관찰은 이 문서에 적는다.
@@ -136,7 +408,14 @@
 **2026-11-04 상태**
 
 - #468 `5e8a173`(제출 2 `717f49b` + CI 수정 `9bb64ec` + #416 11/3 추가 요청 반영): CI 통과, Codex 미해결 스레드 0. leechaeah가 B 범위를 확인하고 수정 요청 없음(11/4 리뷰). D5·D12·D13의 팀장 답은 없다. Draft 유지.
-- #416 후속: U6의 Catch 설명 상한 확인은 끝났고 U4 조치가 없다(yeongyeon1802, 11/4). U10(#452)이 C-10·C-11 제공 판본을 물어 11/4에 답했다(C-10은 `5e8a173`으로 사전 연결 가능, C-11은 제출 3). OQ-U4-NFR-5·6의 팀장 답은 아직 없다.
+- #416 후속: U6의 Catch 설명 상한 확인은 끝났고 U4 조치가 없다(yeongyeon1802, 11/4). U10(#452)이 C-10·C-11 제공 판본을 물어 11/4에 답했다(C-10은 `5e8a173`으로 사전 연결 가능, C-11은 제출 3). OQ-U4-NFR-5는 11/4 팀장이 A안으로 결정했고 11/5에 반영했다(위 「2026-11-05 #416 OQ-U4-NFR-5 결정 반영」). OQ-U4-NFR-6의 팀장 답은 아직 없다.
+
+**2026-11-05 상태** (위 11/4 상태는 당시 기록으로 남긴다)
+
+- #468: 팀장이 D5·D12·D13을 수용한 뒤(11/4 08:14 UTC, 댓글 6626005142) 승인해(08:38 UTC) 통합 브랜치에 병합됐다(08:40 UTC, `32ab046`). 제출 3의 선행 조건(#468 병합)은 충족됐다.
+- #472(팀장): `api/CONVENTIONS.md` 공통 오류 규약에 발행 거부 409의 `details.catchIds` 예외를 적었다(11/4 23:48 UTC 병합, `0dfe9fb`). D5의 공통 계약 반영이 이것으로 끝났다.
+- PR #474(U4, 리뷰 대기): OQ-U4-NFR-5 결정의 C-10 계약 문구와 경계 시험. 통합 브랜치 `0dfe9fb` 기준. U10 경로의 삭제 404 매핑·롤백은 이 PR에 없고 U10 담당이다.
+- 남은 미결: OQ-U4-NFR-6(팀장 답 대기), 제출 3 착수 전 계획 재승인(위 「이 반영 뒤 남은 미결·확인 요청」). 제출 3은 착수하지 않았다. (이후: 계획은 11/5 재승인, #474는 11/5 병합 `a11ad96`, 제출 3은 Step 19까지 진행 — 위 「제출 3」 절)
 
 **계획과 달라진 점(제출 3에 반영)**
 
@@ -149,15 +428,15 @@
 
 | 미결 | 결정 시점 | 상대 | 영향 |
 |---|---|---|---|
-| D5 `details.catchIds`를 공통 계약에 더할지 | 제출 2 검토·병합(#468 병합 전 해결) | 팀장 | 거절이면 409 Catch 목록 전달 방식을 다시 정해 제출 2의 api 예외 필터·web 안내·시험을 고친다 |
-| D12(안내는 CATCH 항목이 있을 때만)·D13(실패 뒤 단계) | 제출 2 검토·병합 | 팀장 | 제출 2 web 수정 여부 |
-| OQ-U4-NFR-5 C-10을 따로 부를 때 `resolveForRecipient`와 `readSnapshot` 사이의 중지·삭제 | U5·U10 실제 연결 전 합의 | 팀장·U5·U10 | 현재 계획의 U4 열람 경로는 판정·읽기를 한 읽기 전용 REPEATABLE READ 트랜잭션으로 처리한다(D10, Step 20). 소비 Unit 연결이나 계약 변경(묶음 호출 추가 등)의 영향은 합의 결과에 따라 확인한다 |
-| OQ-U4-NFR-6 소유 회원 비활성 404·회원 없음 500 | 받은 사람 경로 구현·시험 전 확인(Step 20·23 전) | 팀장 | 확인 전에는 합의 전 처리(10월 동작)대로 구현하고, 바뀌면 그 단계만 고친다 |
+| D5 `details.catchIds`를 공통 계약에 더할지 | **결정됨**(2026-11-04 팀장 수용, #468 병합 전) | 팀장 | 수정 없음. 공통 오류 규약 반영은 #472 |
+| D12(안내는 CATCH 항목이 있을 때만)·D13(실패 뒤 단계) | **결정됨**(2026-11-04 팀장 수용) | 팀장 | 제출 2 web 수정 없음 |
+| OQ-U4-NFR-5 C-10을 따로 부를 때 `resolveForRecipient`와 `readSnapshot` 사이의 중지·삭제 | **결정됨**(#416 팀장, 2026-11-04, A안) | 팀장·U5·U10 | 계약 문구·경계 시험을 PR #474로 제출(리뷰 대기, 위 「2026-11-05 #416 OQ-U4-NFR-5 결정 반영」). U4 열람 경로(Step 20)는 계획대로 한 트랜잭션. 계약 함수 모양 변경 없음. U10 자기 경로 404 매핑은 U10 담당 |
+| OQ-U4-NFR-6 소유 회원 비활성 404·회원 없음 500 | **결정됨**(#416 팀장 2026-11-05, 1번 A·2번 예) | 팀장 | 10월 동작과 같아 코드 변경 없음. C-10 문구 반영은 `api/u4-c10-nfr6-decision` PR(위 「제출 3」 절) |
 | U4 고정 안내(BR7.1) 축소 문구 | 제출 3에서 작성하고 PR 「리뷰 요청」으로 검토 | 팀장(G5·G6) | Step 22·24 |
 
 **착수 순서(#468 병합 뒤)**
 
-1. 통합 브랜치의 merge commit을 확인하고 그 판본에서 새 브랜치를 낸다. 제출 3은 W4·W6를 한 PR로 낸다.
+1. 착수 조건(2026-11-05 계획 승인본): 제출 2 #468(2026-11-04 `32ab046`)에 더해 C-10 계약 문구 PR #474가 통합 브랜치에 merge commit으로 합쳐진 뒤, 그 merge commit(`34acd03`·`32ab046`을 조상으로 가짐)에서 `api/u4-recipient` 브랜치를 낸다. Step 20·23 구현·시험 전에 OQ-U4-NFR-6 팀장 답이 있어야 하며, 답이 늦으면 Step 19(시나리오 확정)까지만 진행한다. 제출 3은 W4·W6를 한 PR로 낸다. 이 승인 기록 커밋(로컬 브랜치 `docs/u4-plan-approval-1105`, #474에는 넣지 않음)은 `api/u4-recipient`를 낸 뒤 cherry-pick해 제출 3의 첫 커밋으로 쓴다.
 2. Step 19(시나리오·기대 결과) → Step 20·21(받은 사람 컨트롤러·unlock 공급자 등록·10월 경로 해제를 한 커밋으로) → Step 22(받은 사람 화면, `copy-text` 이동 뒤 share-links 제거) → Step 23(시험, 10월 unlock·client-address 사례 이전 포함) → Step 24(문서) → Step 25(전체 확인, S15 미실행 기록).
 3. 받은 사람 판정(비밀번호·중지·만료·삭제)의 브라우저 확인은 이 제출에서 한다(#416 결정 3).
 

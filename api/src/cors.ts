@@ -36,7 +36,7 @@ export function applyCors(app: INestApplication, env: NodeJS.ProcessEnv = proces
   if (origins.length === 0) return;
   app.enableCors({
     origin: origins,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: [...CORS_ALLOWED_HEADERS],
     exposedHeaders: [...CORS_EXPOSED_HEADERS],
     credentials: true,

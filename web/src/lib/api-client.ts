@@ -27,10 +27,15 @@ export function parseRetryAfterSeconds(value: string | null): number | undefined
 }
 
 export type MemberRequest = {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   /** 생성 POST의 재전송 키. createIdempotencyKeyHolder()로 붙잡아 같은 요청에 같은 값을 쓴다. */
   idempotencyKey?: string;
+  /**
+   * 공유 링크 안에서 로그인 회원이 쓰는 API(JD 요약 등)의 비밀번호 링크 열람 증표(#150).
+   * 회원 토큰과 함께 `X-Link-Grant`로 보낸다. 링크 401(`LINK_PASSWORD_*`)은 회원 인증 실패가 아니라 토큰을 지우지 않는다.
+   */
+  linkGrant?: string;
   signal?: AbortSignal;
 };
 
@@ -129,6 +134,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         }
         headers["Idempotency-Key"] = request.idempotencyKey;
       }
+      if (request.linkGrant !== undefined) headers["X-Link-Grant"] = request.linkGrant;
       const result = await send(path, request.method ?? "GET", headers, request.body, request.signal);
       // 응답을 기다리는 동안 다시 로그인했다면 새 토큰은 지우지 않는다.
       if (result.kind === "api-error" && result.status === 401 && MEMBER_AUTH_FAILURES.has(result.code)

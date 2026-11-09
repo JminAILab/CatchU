@@ -126,7 +126,7 @@ Step 17 뒤 다시 돌린 intent 검증 명령(2026-11-05T08:04~08:16Z, Unit 첫
 
 - **나누기용 필수 조회:** 나누기용 필수 조회(`worker/app/collection/relations.py` 1276~1286행, `worker/docs/relation-collection.md` 71행 ③)가 남아 있다. 쓰지 않는 호출이고 상한에 걸리면 확인 중단이 될 수 있다. CR1 PR이 통합 브랜치에 들어간 뒤 따로 지운다.
 - **web `test:coverage` 종료 코드 1:** CR1 이전부터 있던 실패였다(`web/test/auth-session-member-guard.test.mjs`). CR1에서 고쳤고 CR1 PR로 통합 브랜치에 들어간다(「계획과 다른 점」 6).
-- **받은 사람 목록 2줄 줄임 시험:** 그리지 않고 원문·CSS 글자로 단언한다(R-03). 실제 모양은 「로컬 실제 연결 확인」 5번에서 화면으로 봤다.
+- **받은 사람 화면에 넣지 않은 규칙 둘(2026-11-08 팀장 결정, CR1 PR 때 반영):** U4 제출 3(#482)이 받은 사람 화면을 발행본 열람(`web/src/features/publications/snapshot-view.tsx`)으로 새로 짜고 10월 공유 링크 화면을 지웠다. 통합 브랜치를 합칠 때 받은 사람 화면 5개 파일(`web/src/features/recipient/` 4개, `web/test/recipient.test.mjs`)은 U4 쪽을 그대로 두었다. 그래서 CR1의 두 절 자동 생성 안내 문장(BR6.2)과 목록 제목 2줄 자르기는 받은 사람 화면에 없다(새 화면에는 자동 생성 안내도 목록 카드도 없다). 구직자 화면(`web/src/features/assets/`)의 「설명 초안」 안내 문구(BR6.3)와 제목 2줄 자르기는 그대로다. 옛 화면에 대한 CR1 시험(R-03의 2줄 줄임 단언 포함)은 함께 빠졌다.
 
 ## 돌리지 않은 것
 

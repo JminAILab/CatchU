@@ -8,17 +8,28 @@ export function isProfile(value: unknown): value is Profile {
   return typeof p.displayName === 'string' && typeof p.introduction === 'string'
     && typeof p.desiredRole === 'string' && Array.isArray(p.skills) && p.skills.every(s => typeof s === 'string');
 }
+/** 기술 입력 제한(#135, api `PROFILE_LIMITS`의 skills·skill). 저장 전 검사와 기술 칩 입력(#469)이 함께 쓴다. 길이는 유니코드 코드 포인트 기준이다. */
+export const PROFILE_SKILL_LIMITS = Object.freeze({ count: 20, length: 50 });
+export const SKILL_COUNT_MESSAGE = `기술은 최대 ${PROFILE_SKILL_LIMITS.count}개까지 입력할 수 있습니다.`;
+export function overLength(value: string, max: number): boolean {
+  return Array.from(value).length > max;
+}
+/** NUL·고립 서로게이트. 서버가 거부하는 문자다. */
+export function hasUnsavableChars(value: string): boolean {
+  return value.includes('\u0000') || /[\uD800-\uDFFF]/u.test(value);
+}
 export function profileErrors(profile: Profile): string[] {
   const errors: string[] = [];
   const fields: [string, string, number][] = [
     ['표시 이름', profile.displayName.trim(), 50], ['한 줄 소개', profile.introduction, 200],
-    ['희망 직무', profile.desiredRole, 100], ...profile.skills.map((s, i): [string, string, number] => [`기술 ${i + 1}`, s, 50]),
+    ['희망 직무', profile.desiredRole, 100],
+    ...profile.skills.map((s, i): [string, string, number] => [`기술 ${i + 1}`, s, PROFILE_SKILL_LIMITS.length]),
   ];
   if (!profile.displayName.trim()) errors.push('표시 이름을 입력해 주세요.');
-  if (profile.skills.length > 20) errors.push('기술은 최대 20개까지 입력할 수 있습니다.');
+  if (profile.skills.length > PROFILE_SKILL_LIMITS.count) errors.push(SKILL_COUNT_MESSAGE);
   for (const [label, value, max] of fields) {
-    if (Array.from(value).length > max) errors.push(`${label}은 최대 ${max}자까지 입력할 수 있습니다.`);
-    if (value.includes('\u0000') || /[\uD800-\uDFFF]/u.test(value)) errors.push(`${label}에 저장할 수 없는 문자가 있습니다.`);
+    if (overLength(value, max)) errors.push(`${label}은 최대 ${max}자까지 입력할 수 있습니다.`);
+    if (hasUnsavableChars(value)) errors.push(`${label}에 저장할 수 없는 문자가 있습니다.`);
   }
   return errors;
 }

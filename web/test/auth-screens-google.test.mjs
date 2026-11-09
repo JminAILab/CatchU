@@ -146,12 +146,12 @@ test('콜백: 한 번만 해석해 결과를 보존한 뒤 query를 지우고, �
 });
 
 test('콜백: query를 지운 뒤에도 처음 해석 결과로 진행해 malformed·새 로그인 안내로 덮지 않는다', async () => {
-  const h = callbackHarness({ parse: completeParse('/links'), lookups: [{ state: 'loaded', displayName: '김캐치' }] });
+  const h = callbackHarness({ parse: completeParse('/publications'), lookups: [{ state: 'loaded', displayName: '김캐치' }] });
   h.begin();
   h.begin();
   h.completeGate.resolve({ kind: 'signed-in', suggestedDisplayName: '구글이름' });
   await tick(); await tick();
-  assert.deepEqual(h.control.getView(), { phase: 'redirect', to: '/links' });
+  assert.deepEqual(h.control.getView(), { phase: 'redirect', to: '/publications' });
   assert.ok(!h.log.includes('read:empty'));
 });
 
@@ -170,7 +170,7 @@ test('콜백 성공: #261 회원 조회 뒤 이름이 없으면 최초 입력, �
 
 test('콜백 성공 뒤 회원 조회 실패는 다시 불러오기만 하고 완료 요청을 다시 보내지 않는다', async () => {
   const h = callbackHarness({
-    parse: completeParse('/links'),
+    parse: completeParse('/publications'),
     completion: Promise.resolve({ kind: 'signed-in', suggestedDisplayName: null }),
     lookups: [{ state: 'failed' }, { state: 'loaded', displayName: '김캐치' }],
   });
@@ -180,19 +180,19 @@ test('콜백 성공 뒤 회원 조회 실패는 다시 불러오기만 하고 �
   h.control.retryMemberCheck();
   assert.deepEqual(h.control.getView(), { phase: 'member-check' });
   await tick(); await tick();
-  assert.deepEqual(h.control.getView(), { phase: 'redirect', to: '/links' });
+  assert.deepEqual(h.control.getView(), { phase: 'redirect', to: '/publications' });
   assert.equal(h.completeCalls.length, 1);
   assert.deepEqual(h.log.filter((l) => l === 'lookup').length, 2);
 });
 
 test('콜백 성공 뒤 보내지 않은 회원 조회(skipped)는 실패로 안내하지 않고 이동도 하지 않는다', async () => {
   const h = callbackHarness({
-    parse: completeParse('/links'),
+    parse: completeParse('/publications'),
     completion: Promise.resolve({ kind: 'signed-in', suggestedDisplayName: null }),
     lookups: [{ state: 'skipped' }],
   });
   await h.begin();
-  assert.deepEqual(h.control.getView(), { phase: 'ignored', loginHref: '/login?next=%2Flinks' });
+  assert.deepEqual(h.control.getView(), { phase: 'ignored', loginHref: '/login?next=%2Fpublications' });
   assert.equal(h.completeCalls.length, 1);
 });
 
