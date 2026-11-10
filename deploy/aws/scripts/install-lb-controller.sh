@@ -6,8 +6,8 @@
 # 차트는 helm repo를 더하지 않고 받아 해시를 본 뒤 그 파일로 설치한다. 해시는 2026-10-30 차트 목록(index.yaml)의 3.6.2 digest다.
 # 설정: Pod는 인스턴스 메타데이터에 닿지 못하므로(cluster.yaml disablePodIMDS) 리전과 VPC를 넘긴다. 서비스 계정 이름은 Pod Identity 연결과 같다.
 #   Service 생성을 가로채는 웹훅은 끈다. LoadBalancer 형식 Service를 쓰지 않는데, 켜 두면 컨트롤러가 멈춘 동안 클러스터 어디서도 Service를 만들지 못한다.
-# 쿠버네티스 권한(차트 기본, 2026-10-30 확인): Secret 읽기·nodes/proxy·exec는 없다. 모든 namespace의 ConfigMap을 이름으로 읽고 고치는 권한과
-#   Ingress·Service·Pod 상태를 고치는 권한은 있다. 상류 기본값이라 끄는 설정이 없고, 컨트롤러는 ALB 전체를 바꾸는 AWS 권한을 이미 가진 구성 요소로 본다.
+# 쿠버네티스 권한(차트 기본, 2026-11-10 확인): Secret 읽기·nodes/proxy·exec는 없다. 모든 namespace에서 ConfigMap을 만들고 이름으로 읽고 고치고 지우는 권한,
+#   Ingress·Service를 고치는 권한, Pod 상태를 고치는 권한은 있다. 상류 기본값이라 끄는 설정이 없고, 컨트롤러는 ALB 전체를 바꾸는 AWS 권한을 이미 가진 구성 요소로 본다.
 # 인자 없이 실행하면 확인만 한다(차트를 받아 해시까지 본다). --apply를 주면 설치하고 준비될 때까지(최대 5분) 기다린 뒤 확인 값을 찍는다.
 # 이미 설치돼 있으면 멈춘다. 설치가 실패했으면 helm uninstall aws-load-balancer-controller -n kube-system --kubeconfig ~/.kube/catchu 뒤 다시 실행한다.
 set -euo pipefail
