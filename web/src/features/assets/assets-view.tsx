@@ -20,6 +20,8 @@ type AssetsViewProps = {
   detailActions?: ReactNode;
   /** U4 작성자 설명 편집 영역. 근거와 AI 초안(「Catch 설명 초안」) 사이에 둔다(BR1.3). 없으면 그리지 않는다. */
   descriptionEditor?: ReactNode;
+  /** Catch 상세 머리말 아래 줄에 둘 안내(#467: 모달 안 재인증 안내). 모달 밖 [다시 로그인]은 inert라 닿지 않는다. 없으면 그리지 않는다. */
+  detailNotice?: ReactNode;
   listMessage?: string;
   detailMessage?: string;
   hasMore?: boolean;
@@ -202,17 +204,18 @@ export function AssetsView(props: AssetsViewProps) {
         <CatchDetail key={selectedId} item={selected} state={detailState}
           repositoryName={repositories.find((repo) => repo.repositoryId === selected?.repositoryId)?.name}
           onClose={props.onClose} onRetry={props.onRetryDetail} dataMode={props.dataMode} errorMessage={props.detailMessage} actions={props.detailActions}
-          descriptionEditor={props.descriptionEditor} />
+          descriptionEditor={props.descriptionEditor} notice={props.detailNotice} />
       )}
     </main>
   );
 }
 
-function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage, actions, descriptionEditor }: {
+function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage, actions, descriptionEditor, notice }: {
   dataMode?: "preview" | "api";
   errorMessage?: string;
   actions?: ReactNode;
   descriptionEditor?: ReactNode;
+  notice?: ReactNode;
   item?: CatchAsset;
   state: LoadState;
   repositoryName?: string;
@@ -230,9 +233,11 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
   return (
     <dialog ref={dialogRef} className={`${styles.dialog} ${styles.catchDialog}`} aria-labelledby="catch-detail-title"
       onCancel={(event) => { event.preventDefault(); onClose(); }}>
-      <div className={styles.dialogHeading}>
+      {/* 머리말은 스크롤해도 위에 붙으므로 안내도 그 안 둘째 줄에 둔다. 재인증 안내의 초점 여백은 이 머리말 전체 높이로 잡는다. */}
+      <div className={styles.dialogHeading} data-reauth-sticky-container="">
         <div><p className={styles.eyebrow}>CATCH DETAIL{dataMode === "preview" ? " · 임시 데이터" : ""}</p><h2 id="catch-detail-title">Catch 상세</h2></div>
         <button className={styles.secondaryButton} autoFocus onClick={onClose}>닫기</button>
+        {notice && <div className={styles.headingNotice}>{notice}</div>}
       </div>
       {state === "loading" ? <StateMessage title="상세 내용을 불러오고 있습니다">근거와 설명을 확인하고 있어요.</StateMessage>
         : state === "error" ? <StateMessage title="상세 내용을 불러오지 못했습니다" retry={onRetry}>{errorMessage ?? "현재는 결과를 확인할 수 없습니다. 다시 불러와 주세요."}</StateMessage>
