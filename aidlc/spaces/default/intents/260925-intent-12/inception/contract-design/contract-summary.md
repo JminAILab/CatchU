@@ -40,7 +40,7 @@
 | C-08 | u3-published-index | u4-publication-link | api 안 TS 인터페이스(`PublishedIndexWriter`), 발행 트랜잭션 참여 | U3 담당 |
 | C-09 | u3-published-index | u4-publication-link, u5-rag-answer, u10-jd | api 안 TS 인터페이스(`PublishedSearch`) | U3 담당 |
 | C-10 | u4-publication-link | u5-rag-answer, u10-jd, u9-recipient-claude | api 안 TS 인터페이스(`PublicationAccess`) | U4 담당 |
-| C-11 | u4-publication-link | u2-shared-foundation, u5-rag-answer, u10-jd | web 받은 사람 화면(`/s/[token]`)의 붙는 자리 + 받은 사람 API 경로 규칙 | U4 담당 |
+| C-11 | u4-publication-link | u2-shared-foundation, u5-rag-answer, u10-jd, u9-recipient-claude | web 받은 사람 화면(`/s/[token]`)의 붙는 자리 + 받은 사람 API 경로 규칙 | U4 담당 |
 | C-12 | u4-publication-link, u5-rag-answer, u10-jd | External: 받은 사람 브라우저 | HTTP REST·SSE(`/v1/public/links/{token}/...`) | 경로별 제공 Unit 담당 |
 | C-13 | u4-publication-link | u6-claude-mcp | 공유 DB 표(`text_material`) | U4 담당 |
 | C-14 | u4-publication-link | u6-claude-mcp | 공유 DB 칸(`catch_asset`의 작성자 설명) | U4 담당 |
@@ -389,7 +389,7 @@ deletion-rule: 판정 직후 발행본이 삭제된 것이 확인되면(readSnap
 
 ### C-11 받은 사람 화면의 붙는 자리
 
-U4가 받은 사람 화면(`web/src/app/s/[token]`)과 비밀번호 통과를 소유하고, U2·U5·U10은 정해진 자리에 자기 컴포넌트를 붙인다. grant 보관은 10월 그대로(`sessionStorage`의 링크별 키, `X-Link-Grant` 헤더, 401·404를 받으면 그 링크 grant만 지움)이며 U4의 `recipient-grants` 도구를 쓴다.
+U4가 받은 사람 화면(`web/src/app/s/[token]`)과 비밀번호 통과를 소유하고, U2·U5·U10·U9는 정해진 자리에 자기 컴포넌트를 붙인다. grant 보관은 10월 그대로(`sessionStorage`의 링크별 키, `X-Link-Grant` 헤더, 401·404를 받으면 그 링크 grant만 지움)이며 U4의 `recipient-grants` 도구를 쓴다.
 
 ```yaml
 # shared-schema: web 붙는 자리(React props)
@@ -400,12 +400,23 @@ RecipientSlotProps:
   isLoggedIn: boolean
 slots (화면 순서):
   0: RecipientGuide(U2)                # 화면 위쪽 시작 안내. 링크 판정을 통과한 자료 화면에만 둔다(비밀번호 입력·접근 불가 화면 안내는 U4). props는 showClaudeConnect: boolean 하나이고 RecipientSlotProps는 받지 않는다. 정적 안내라 API를 부르지 않는다
+  0.5: 받은 사람 Claude 패널(U9)        # 선택 사항임을 밝힌 작은 보조 영역과 "Claude에서 분석하기" 버튼(FR13.3: 요청 문장 복사와 연결 안내). 기존 번호는 그대로 두고 0번 바로 다음, U4 고정 안내(발행 시각)와 1번 앞에 둔다
+                                       # claude-connect-rule이 참일 때만 그린다. 요청 문장 복사·연결 안내만 하고 API를 부르지 않으므로 props는 RecipientSlotProps 중 token 하나이고 getGrant·onAccessLost는 받지 않는다
+                                       # 제목(h1)과 첫 초점을 갖지 않는다. 컴포넌트 이름·문구·눌렀을 때의 동작은 U9 기능 설계에서 정한다
   1: 발행본 자료(U4)
   2: BaseSummaryPanel(U5)
   3: QnaPanel(U5)                      # 입력란 옆 외부 AI 고지 한 줄 포함
   4: JdSummaryPanel(U10)               # 로그인 회원에게만, 비로그인은 로그인 안내
 rule: 붙는 컴포넌트는 401 LINK_PASSWORD_REQUIRED·404 LINK_UNAVAILABLE을 받으면 스스로 처리하지 않고 onAccessLost를 부른다
-guide-rule: RecipientGuide는 제목(h1)과 첫 초점을 갖지 않고, 다른 자리의 안내(질의응답 외부 AI 고지 U5, JD 로그인 안내 U10)를 되풀이하지 않는다. showClaudeConnect는 U9를 켜기 전까지 false이고, 켤 때의 링크별 조건(비밀번호 링크 포함)과 문구는 그때 U9·U4·U2가 정한다
+guide-rule: RecipientGuide는 제목(h1)과 첫 초점을 갖지 않고, 다른 자리의 안내(질의응답 외부 AI 고지 U5, JD 로그인 안내 U10)를 되풀이하지 않는다. showClaudeConnect는 claude-connect-rule의 값을 그대로 받는다(U9를 켜기 전까지 false). Claude 줄과 0.5번 패널의 문구는 #495에서 U9·U4·U2가 정했고(2026-11-10) U9 코드 PR에서 반영한다
+claude-connect-rule:                   # 0.5번 자리와 0번 showClaudeConnect를 켜는 조건(#495 U9·U4·U2 확인, 2026-11-10). Claude는 비밀번호 없는 링크만 읽는다(FR13.3)
+  U4가 판정 통과 상태에 값 하나를 둔다(web recipient-store의 readWithoutGrant, 읽는 함수 claudeConnectable). 참이면 0.5번 자리를 그리고 같은 값을 showClaudeConnect로 넘긴다. 두 자리가 따로 판단하지 않는다
+  참: 판정 통과 화면이고, 그 화면을 그린 발행본 열람(GET /v1/public/links/{token}) 200 응답의 요청이 X-Link-Grant 없이 나갔을 때
+    # 비밀번호 링크는 grant 없이 200을 받지 못하고(C-10), 비밀번호 유무는 발행 뒤 바뀌지 않는다(C-07 password_protection_reference)
+  그 요청에 X-Link-Grant를 실었는지를 화면 상태에 보관해 쓰고, 화면을 그릴 때 getGrant()를 다시 읽어 판단하지 않는다(sessionStorage 읽기가 나중에 실패하거나 비워져도 비밀번호 링크에서 참이 되지 않게)
+  거짓: 불러오는 중·비밀번호 입력·접근 불가·최초 조회 실패 화면, 그리고 grant를 실어 200을 받은 화면. 남은 grant 때문에 틀리면 보이지 않는 쪽으로 틀린다
+  다시 조회에 실패해 이전 화면을 유지하는 동안은 그 화면을 그린 응답의 값을 유지한다. 판정 뒤의 중지·만료·작성자 비활성은 다음 조회에서 반영한다(C-10 post-judgment-rule)
+  이 값은 웹 화면 표시만 정한다. Claude 쪽 접근은 C-15 read_shared_publication이 호출마다 C-10 판정(grant null)으로 정하며, grant·비밀번호·이 값을 Claude나 0.5번 컴포넌트에 넘기지 않는다
 auth-rule: 401 AUTH_REQUIRED·AUTH_INVALID(로그인 없음·만료)는 링크 접근 문제가 아니므로 받은 컴포넌트가 처리한다. JdSummaryPanel(U10)은 로그인 안내로 바꾼다
 evidence-highlight:                    # 근거 원문 강조(입력 §3 RAG 덩어리). AC6.3.5의 화면 부분을 U4·U5·U10이 나눠 맡는다
   provider: U4 — RecipientSlotProps에 showEvidence: (location: AiSource.location) -> void를 준다.
