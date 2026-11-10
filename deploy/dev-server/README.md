@@ -8,7 +8,7 @@
 
 | 위치 | 내용 |
 |---|---|
-| AWS | EC2 `t4g.large`(arm64, Amazon Linux 2023) 한 대, 탄력적 IP, 보안 그룹(들어옴 80·443만, SSH 없음), 서버 역할 `catchu-dev-server`(Session Manager·ECR 읽기. `/catchu/*` 파라미터 읽기는 거부 규칙 `catchu-dev-deny-parameter-read`로 막음), ECR 저장소 4개, Route 53의 도메인 A 기록 |
+| AWS | EC2 `t4g.large`(arm64, Amazon Linux 2023) 한 대, 탄력적 IP, 보안 그룹(들어옴 80·443만, SSH 없음), 서버 역할 `catchu-dev-server`(Session Manager·ECR 읽기·아래 버킷의 `members/` 아래 올리기·읽기·목록·삭제. `/catchu/*` 파라미터 읽기는 거부 규칙 `catchu-dev-deny-parameter-read`로 막음), S3 버킷 `catchu-dev-server-files`(회원 PDF 파일, [#389](https://github.com/JminAILab/CatchU/issues/389). 공개 차단·기본 암호화, 버전 관리 안 켬), ECR 저장소 4개, Route 53의 도메인 A 기록 |
 | 앱·DB·큐 | [`compose.single.yaml`](../compose.single.yaml) + [`compose.local-db.yaml`](../compose.local-db.yaml). Compose 이름 `catchu-dev`. DB는 내부 망에만 있고 worker는 그 망에 없다. 큐(Valkey 8.1.6)는 worker만 붙는 내부 망에 평문으로 연다. 이 겹침 파일 때문에 worker는 시험 모드(`NODE_ENV=test`)로 뜬다 |
 | 앞단 | [`compose.caddy.yaml`](compose.caddy.yaml) + [`Caddyfile`](Caddyfile). Compose 이름 `catchu-dev-edge`. 서버 망(host)에서 80·443을 받는다 |
 
@@ -26,7 +26,7 @@ Caddy가 하는 일:
 `/opt/catchu/env`(root만 읽기). 배치는 [`make-local-env.sh`](../scripts/make-local-env.sh)와 같고 다음이 다르다.
 
 - 서명 키(`AUTH_JWT_SECRET`·`LINK_GRANT_SECRET`)와 DB 앱·migration 계정 비밀번호는 SSM `/catchu/prod/*` 값을 서버 안에서 읽어 쓴다. 11월 EKS에서도 같은 값을 써서 로그인과 링크 증표가 이어진다. 값은 출력하지 않는다.
-  - 다 쓴 뒤에는 서버 역할의 거부 규칙(`catchu-dev-deny-parameter-read`, `/catchu/*` 읽기 거부)으로 서버가 이 값을 다시 읽지 못하게 한다. 환경 파일을 다시 만들 때만 이 규칙을 잠시 지웠다가 다시 건다. 서버 망을 쓰는 Caddy는 서버의 AWS 권한에 닿을 수 있기 때문이다(아래 「개발 단계라 받아들이는 한계」).
+  - 다 쓴 뒤에는 서버 역할의 거부 규칙(`catchu-dev-deny-parameter-read`, `/catchu/*` 읽기 거부)으로 서버가 이 값을 다시 읽지 못하게 한다. 환경 파일을 다시 만들 때만 이 규칙을 잠시 지웠다가 다시 건다. Caddy와 web·api·worker가 서버의 AWS 권한에 닿을 수 있기 때문이다(아래 「개발 단계라 받아들이는 한계」).
 - Postgres 관리자 비밀번호는 서버에서 만들어 `db.env`에만 둔다. DB용 사설 CA·서버 인증서(이름 `db`)는 120일짜리다.
 - `worker.env`: `CATCHU_QUEUE_REDIS_URL=redis://queue:6379`, `CATCHU_QUEUE_PREFIX=catchu`, `CATCHU_WORKER_CONCURRENCY=1`, **`CATCHU_WORKER_MOCK=false`**. 시험 모드에서는 이 값을 빼면 합성(MOCK) 처리가 켜지므로 꼭 적는다([worker 설정](../../worker/docs/queue-consumer.md)).
 - `compose.env`: `CATCHU_SINGLE_NAME=catchu-dev`, 이미지 네 개는 ECR digest(`…@sha256:…`), `CATCHU_DOMAIN=<도메인>`(Caddy용).
@@ -62,5 +62,5 @@ Caddy가 하는 일:
 - Google 로그인과 공통 인증 화면 연결(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`)은 켠다(2026-11-02 팀장 승인). 남은 통합 검증([#286](https://github.com/JminAILab/CatchU/issues/286))은 이 서버에서 이어 하며, 켰다고 검증이 끝난 것은 아니다. GitHub 로그인·GitHub 연결·LLM은 아직 켜지 않았다. GitHub 연결을 켜려면 OAuth 앱 등록·암호화 키와 함께 api가 쓸 수 있는 지속 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)가 필요하다. 이 구성의 api는 읽기 전용 루트와 임시 `/tmp`만 있어 그 폴더가 없으므로, 켤 때 함께 만든다([배포 안내 「#276에서 받을 값과 남은 일」](../README.md#276에서-받을-값과-남은-일)).
 - 앞단(Caddy)에 요청 빈도 제한이 없다. Google 로그인도 시작 경로(`POST /v1/auth/google/authorization`) 보호 없이 켠다(2026-10-26 팀장 결정). api는 로그인 시작 요청을 메모리에 10분 동안 최대 1,000건 보관하므로, 누가 시작 요청을 몰아 보내면 다른 사람은 로그인을 시작하지 못하고 `500`을 받는다([Google 로그인 안내](../../api/docs/google-login.md)). 10분은 요청 하나의 보관 시간이지 막히는 시간의 상한이 아니다. 만료로 빈 자리를 새 요청이 바로 채우므로, 요청이 계속 들어오면 로그인 시작 불가도 계속될 수 있다. api를 다시 띄우면 보관함이 비지만 잠시뿐이라 요청이 계속되면 다시 차고, 진행 중이던 로그인은 처음부터 다시 시작해야 한다. 자료가 새지는 않는다. 개발 서버는 팀 확인용이고 EKS로 옮길 때까지만 쓰므로 이 위험을 받아들인다. EKS에서는 WAF가 주소당 5분 20회를 넘는 시작 요청을 막는다([#276 10/19 결정](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6260130109)).
 - Claude MCP 연결([#440](https://github.com/JminAILab/CatchU/issues/440))의 회원별 도구 호출 빈도 제한(분당 60회)은 큐와 같은 Redis로 세는데, 이 서버의 api는 큐에 연결하지 않아 꺼진다. 기동 로그에 "MCP 빈도 제한 꺼짐"이 남는다. 인증 전 경로(등록·토큰·승인 시작)는 MCP SDK 기본 IP 제한으로 세며, 요청 주소는 `TRUST_PROXY_CIDRS`로 정한다. 개발 서버는 팀 확인용이므로 받아들인다. EKS에서는 api에 큐를 연결하면 같은 Redis로 켜진다.
-- Caddy는 서버 망(host)에서 돌아 서버의 AWS 권한(인스턴스 메타데이터)에 닿는다. 다른 컨테이너는 hop 제한으로 막힌다. Caddy가 뚫려도 비밀값 파라미터는 읽지 못하게 서버 역할에 거부 규칙을 둔다(위 「환경 폴더」). 11월 EKS에서는 ALB가 앞단을 맡아 이 예외가 없어진다.
+- 서버의 AWS 권한(인스턴스 메타데이터)에는 서버 망(host)의 Caddy뿐 아니라 앱 망(`default`)의 web·api·worker도 닿는다. api가 접근 키 없이 서버 역할로 S3를 쓰도록 메타데이터 응답 hop 제한을 2로 올렸기 때문이다(2026-11-10, [#389](https://github.com/JminAILab/CatchU/issues/389)). DB·큐는 내부 전용 망에만 있어 닿지 않는다. 그래서 Caddy·web·api·worker 가운데 하나가 뚫리면 버킷의 회원 파일을 읽고 지울 수 있다. 버킷 권한은 `members/` 아래로만 좁혔고, 비밀값 파라미터는 서버 역할의 거부 규칙으로 막는다(위 「환경 폴더」). 11월 EKS에서는 서비스별 역할로 나뉘어 이 예외가 없어진다.
 - 서버 접속은 SSH가 아니라 AWS Session Manager다. 비밀값은 환경변수로 들어가므로 서버에서 `docker inspect`를 쓸 수 있는 사람은 값을 볼 수 있다.
