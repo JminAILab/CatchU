@@ -39,6 +39,7 @@ GitHub 주소 판정 `isGithubSourceUrl`과 본문 나누기 `splitGithubLinks`�
 - 비공개 Catch를 고르면 "발행하면 이 Catch는 공개로 바뀝니다"를 보인다(BR4.4). 고르고 빼고 순서를 바꾸는 동안 서버에 아무것도 보내지 않는다.
 - 항목은 1~20개, 제목은 1~50자(앞뒤 공백 제외), 비밀번호는 쓸 때 8~64자(다듬지 않음)다. 넘거나 비면 [다음]에서 보내지 않고 안내한다(BR4.1·BR4.5). 서버 검증이 기준이다.
 - 확인 단계는 고른 항목을 순서대로, 비밀번호 여부, "발행 시각부터 90일 뒤 만료, 연장 없음"을 보인 뒤 [발행]을 둔다(BR4.6). 발행 전 미리보기 사본은 만들지 않는다.
+- 비밀번호를 끄면 비밀번호 체크 아래와 확인 단계의 비밀번호 행(비밀번호 없음)에 "비밀번호 없는 링크는 받은 사람이 Claude 같은 외부 AI 도구로 읽을 수 있습니다."를 보인다(12월 intent U9 BR7.1). 문구는 [`../recipient-claude/recipient-claude-text.ts`](../recipient-claude/recipient-claude-text.ts)의 `AUTHOR_AI_NOTICE` 하나를 두 곳이 같이 쓰고, 확인 단계의 `publish-confirm-password` 칸 글(설정됨·없음)은 그대로이며 링크별 허용 설정은 두지 않는다(시험: `test/u9-recipient-claude.test.mjs` S22).
 - [발행]은 응답까지 버튼을 막는다(BR4.9). 재전송 키는 보내지 않는다. 201과 응답 모양이 맞을 때만 완료 화면이며, 완료 화면은 실제 응답의 링크 주소·상태·발행·만료 시각·비밀번호 여부와 [URL 복사]·[링크 열기]·[발행본 상세 보기]를 보인다(BR5.6). 사본 자체는 상세에서 본다.
 - 403 `AI_CONSENT_REQUIRED`는 U2 공용 동의 창(`components/ai-consent`, `useAiConsent().run`)이 열고 [동의] 뒤 같은 요청을 한 번 다시 보낸다. [닫기]면 보내지 않고 입력을 남긴다.
 - 실패 안내(신뢰성 설계 「작성자 실패 안내」)는 `publishOutcome` → `publishFailureLines`가 맡는다. 어떤 경우든 고른 항목·순서·제목·비밀번호 입력은 그대로 두고 첫 줄은 "발행되지 않았습니다"다.

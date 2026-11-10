@@ -57,7 +57,7 @@ test('S20 합성 Claude 전체 흐름: 정상 호출에는 U6 로그가 없고, 
   const client = await sdkClient(server, accessToken);
   t.after(() => client.close());
   const { tools } = await client.listTools();
-  assert.deepEqual(tools.map((tool) => tool.name), ['list_my_catches', 'list_my_text_materials']);
+  assert.deepEqual(tools.map((tool) => tool.name), ['list_my_catches', 'list_my_text_materials', 'read_shared_publication']);
   const catches = await client.callTool({ name: 'list_my_catches', arguments: {} });
   assert.equal(JSON.parse(catches.content[0].text).catches[0].title, SYNTHETIC.catchTitle);
   const materials = await client.callTool({ name: 'list_my_text_materials', arguments: {} });

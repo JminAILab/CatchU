@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { AUTHOR_AI_NOTICE } from "@/features/recipient-claude/recipient-claude-text";
 import { publicationDetailPath, routes } from "@/lib/routes";
 import { CopyUrlButton, OpenLinkAnchor } from "./publication-link-actions";
 import { EXPIRY_NOTICE, PRIVATE_CATCH_NOTICE, PUBLICATION_STATE_LABELS, formatKst, passwordText } from "./publication-format";
@@ -188,6 +189,8 @@ export function PublishFormView(props: PublishFormViewProps) {
             onChange={(event) => props.onUsePassword(event.target.checked)} />
           비밀번호 사용
         </label>
+        {/* U9 BR7.1: 비밀번호를 끄면 받은 사람이 외부 AI 도구로 읽을 수 있다고 알린다. 링크별 허용 설정은 두지 않는다. */}
+        {!props.usePassword && <p className={styles.small} data-testid="publish-ai-notice">{AUTHOR_AI_NOTICE}</p>}
         {props.usePassword && (
           <label className={styles.field} htmlFor="publish-password-input">링크 비밀번호 ({PUBLISH_LIMITS.password.min}~{PUBLISH_LIMITS.password.max}자)
             <input id="publish-password-input" data-testid="publish-password-input" type="password" autoComplete="new-password"
@@ -240,6 +243,8 @@ export function PublishConfirmView(props: PublishConfirmViewProps) {
           </ol>
         </dd>
         <dt>비밀번호</dt><dd data-testid="publish-confirm-password">{passwordText(props.usePassword)}</dd>
+        {/* U9 BR7.1: 비밀번호 없음일 때 같은 행에 안내를 둔다. 위 칸의 글(설정됨·없음)은 그대로다. */}
+        {!props.usePassword && <dd className={styles.small} data-testid="publish-confirm-ai-notice">{AUTHOR_AI_NOTICE}</dd>}
         <dt>만료</dt><dd data-testid="publish-confirm-expiry">{EXPIRY_NOTICE}</dd>
       </dl>
       {privateCount > 0 && <p className={styles.notice} data-testid="publish-confirm-private-notice">비공개 Catch {privateCount}개가 발행과 함께 공개로 바뀝니다. 발행이 실패하면 바뀌지 않습니다.</p>}
