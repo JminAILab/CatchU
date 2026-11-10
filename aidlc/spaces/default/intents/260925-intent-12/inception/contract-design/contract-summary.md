@@ -402,7 +402,7 @@ slots (화면 순서):
   0: RecipientGuide(U2)                # 화면 위쪽 시작 안내. 링크 판정을 통과한 자료 화면에만 둔다(비밀번호 입력·접근 불가 화면 안내는 U4). props는 showClaudeConnect: boolean 하나이고 RecipientSlotProps는 받지 않는다. 정적 안내라 API를 부르지 않는다
   0.5: 받은 사람 Claude 패널(U9)        # 선택 사항임을 밝힌 작은 보조 영역과 "Claude에서 분석하기" 버튼(FR13.3: 요청 문장 복사와 연결 안내). 기존 번호는 그대로 두고 0번 바로 다음, U4 고정 안내(발행 시각)와 1번 앞에 둔다
                                        # claude-connect-rule이 참일 때만 그린다. 요청 문장 복사·연결 안내만 하고 API를 부르지 않으므로 props는 RecipientSlotProps 중 token 하나이고 getGrant·onAccessLost는 받지 않는다
-                                       # 제목(h1)과 첫 초점을 갖지 않는다. 컴포넌트 이름·문구·눌렀을 때의 동작은 U9 기능 설계에서 정한다
+                                       # 제목(h1)과 첫 초점을 갖지 않는다. 문구는 #495에서 정한 대로 U9 기능 설계에 적고, 컴포넌트 이름·눌렀을 때의 동작은 U9 기능 설계에서 정한다
   1: 발행본 자료(U4)
   2: BaseSummaryPanel(U5)
   3: QnaPanel(U5)                      # 입력란 옆 외부 AI 고지 한 줄 포함
