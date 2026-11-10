@@ -1,4 +1,4 @@
-/** U10 요약 7개 시나리오. 합성 C-11·transport/공용 동의 흐름·정적 렌더를 검사한다. */
+/** U10 요약 업무 시나리오. 합성 C-11·transport/공용 동의 흐름·정적 렌더를 검사한다. */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
@@ -123,6 +123,28 @@ test("4. 원문·세 칸·EMPTY·서버 안내·일부 실패를 구별하고 �
   for (const word of ["근거", "자료로 확인되지 않는 점", "면접 질문", "AI 해석", "서버 안내", "일부 요구사항을 처리하지 못했습니다.", "이번 자료에서 표시할 요약 내용이 없습니다."]) assert.ok(html.includes(word));
   assert.equal(isJdRun(run([row({ evidenceItems: [gated("UNCONFIRMED")] })])), false);
   assert.equal(isJdRun(run([row({ resultKind: "EMPTY", failureCode: "GENERATION_FAILED" })])), false);
+});
+
+test("BR3.5 고정 서버 안내는 원문 옆에 한 번만 표시하고 다른 안내·해석은 해당 칸에 보존한다", () => {
+  const fixedText = "이번에 찾은 자료가 없어 이 요구사항의 표기를 찾지 못했습니다.";
+  const fixedNotice = gated("UNCONFIRMED", "SERVER_NOTICE", fixedText);
+  const otherNotice = gated("UNCONFIRMED", "SERVER_NOTICE", "이번에 찾은 자료에서 'SQL' 표기를 찾지 못함");
+  const requirement = row({ jdLine: "  - 합성 요구사항  ", evidenceItems: [], interviewQuestions: [],
+    unconfirmedPoints: [fixedNotice, otherNotice, { ...fixedNotice }, gated("UNCONFIRMED", "AI_INTERPRETATION", "합성 확인 과제")] });
+  const original = structuredClone(requirement);
+  const html = render(run([requirement]));
+  assert.equal(html.split(fixedText).length - 1, 1, "고정 안내는 원문 옆과 결과 칸에 중복 표시하지 않는다");
+  assert.match(html, /<p[^>]*>  - 합성 요구사항  <\/p><p[^>]*><span[^>]*>서버 안내<\/span> 이번에 찾은 자료가 없어 이 요구사항의 표기를 찾지 못했습니다\.<\/p>/);
+  const unconfirmedColumn = html.slice(html.indexOf("<h5>자료로 확인되지 않는 점</h5>"), html.indexOf("<h5>면접 질문</h5>"));
+  assert.doesNotMatch(unconfirmedColumn, /이번에 찾은 자료가 없어/);
+  assert.match(unconfirmedColumn, /이번에 찾은 자료에서 &#x27;SQL&#x27; 표기를 찾지 못함/);
+  assert.match(unconfirmedColumn, /AI 해석/); assert.match(unconfirmedColumn, /합성 확인 과제/);
+  assert.deepEqual(requirement, original, "표시 위치 변경으로 받은 원문·결과를 변형하지 않는다");
+
+  const empty = render(run([row({ resultKind: "EMPTY", evidenceItems: [], interviewQuestions: [], unconfirmedPoints: [otherNotice] })]));
+  assert.ok(!empty.includes(fixedText), "EMPTY만으로 검색 조각 0개를 추정하지 않는다");
+  const sameTextInterpretation = render(run([row({ unconfirmedPoints: [gated("UNCONFIRMED", "AI_INTERPRETATION", fixedText)] })]));
+  assert.ok(sameTextInterpretation.indexOf(fixedText) > sameTextInterpretation.indexOf("<h5>자료로 확인되지 않는 점</h5>"), "같은 글의 AI 해석을 서버 안내로 바꾸지 않는다");
 });
 
 test("5. R-01 개별 생성 실패는 최초 조회와 재열람 모두 같은 문구이고 전체 시한만 구분한다", async () => {

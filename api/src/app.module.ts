@@ -49,7 +49,7 @@ import { RagAnswerModule } from './rag-answer/rag-answer.module';
     // 12월 intent U5: 질의응답(SSE)·AI 기본 요약 경로와 BASE_SUMMARY 처리기(기동 때 AiRun에 한 번 등록). C-10은 U4의 DB 구현을
     // 그 모듈이 내보낸 토큰으로 받는다. 메모리 가짜(in-memory-publication-access.ts)는 앱에 넣지 않는다(docs/rag-answer.md).
     RagAnswerModule.register({ imports: [PublicationsModule], publicationAccess: { useExisting: PUBLICATION_ACCESS } }),
-    // U10: #468 병합과 #416 OQ5·OQ6 결정에 따라 실제 C-10을 사용한다. C-11 화면 연결은 별도다.
+    // U10: #468 병합과 #416 OQ5·OQ6 결정에 따라 실제 C-10을 사용한다. C-11은 web의 JdRecipientPanel이 연결한다.
     JdSummaryModule.register({ publicationAccess: { useExisting: PUBLICATION_ACCESS }, imports: [PublicationsModule] }),
     // #232는 #252의 실제 선정 공급자(DatabaseRepositorySelectionSource)를 받는 WorkerContextModule.register로 별도 조립한다.
     // 기본 앱에 가짜 선정/동의 해석을 등록하지 않는다(docs/worker-context.md).

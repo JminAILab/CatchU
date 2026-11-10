@@ -16,7 +16,7 @@
 
 `JdSummaryPanel`은 C-11의 `token`, `getGrant`, `onAccessLost`, `isLoggedIn`, `showEvidence`와 U10 `client`를 받는다. 공용 세션 세대로 로그인된 계정끼리의 전환도 확인한다. 해당 링크의 본인 실행 목록·새 접수·단건 결과·수동 새로고침을 제공하며 자동 폴링과 재접수는 없다. 요약 접수만 U2 `useAiConsent`와 `AiNoticeLine`을 사용하고 동의 뒤 한 번 재요청한다. 요청 동안 계정·링크가 바뀌면 이전 동의 창도 해제하고 재요청을 보내지 않는다.
 
-원문 요구사항별 근거·자료로 확인되지 않는 점·면접 질문을 React 텍스트로 표시한다. `jdRole`, 서버 안내·AI 해석 구분, 출처 라벨·인용 원문을 보존한다. 근거 선택은 받은 `citation.location`을 그대로 `showEvidence`에 전달한다. 개별 생성 실패와 개별 호출 시간 초과는 `GENERATION_FAILED`의 “이 요구사항을 처리하지 못했습니다.”, 전체 시한은 `DEADLINE_EXCEEDED`의 “전체 처리 시한이 지나 완료하지 못했습니다.”로 최초 조회와 재열람에서 동일하게 표시한다. EMPTY와 일부 실패·기존 성공 결과는 함께 구분한다.
+원문 요구사항별 근거·자료로 확인되지 않는 점·면접 질문을 React 텍스트로 표시한다. `jdRole`, 서버 안내·AI 해석 구분, 출처 라벨·인용 원문을 보존한다. BR3.5의 검색 조각 없음 고정 `SERVER_NOTICE`는 원문 줄 옆에 한 번만 표시하고 세 칸에서 중복 표시하지 않는다. 다른 서버 안내는 원래 칸에 남기며, `EMPTY`만으로 검색 조각 없음을 추정하지 않는다. 근거 선택은 받은 `citation.location`을 그대로 `showEvidence`에 전달한다. 개별 생성 실패와 개별 호출 시간 초과는 `GENERATION_FAILED`의 “이 요구사항을 처리하지 못했습니다.”, 전체 시한은 `DEADLINE_EXCEEDED`의 “전체 처리 시한이 지나 완료하지 못했습니다.”로 최초 조회와 재열람에서 동일하게 표시한다. EMPTY와 일부 실패·기존 성공 결과는 함께 구분한다.
 
 [#482](https://github.com/JminAILab/CatchU/pull/482)의 실제 공유 화면 4번 자리에 `JdRecipientPanel`을 연결했다. wrapper는 `createMemberJdApi(api.member)`를 주입해 요약 접수·목록·상세에서 회원 Bearer와 요청 시점 `getGrant()`의 `X-Link-Grant`를 함께 전달한다. 수신자 전용 호출로 회원 인증을 생략하지 않는다. LINK 401은 회원 갱신을 하지 않고 `onAccessLost`로 전달하며, AUTH 401은 회원 인증 처리와 로그인 안내로 구분한다.
 
@@ -29,14 +29,12 @@ API의 실제 C-10 등록은 #468 병합과 #416 OQ5·OQ6 결정에 따라 AppMo
 `web/`에서 기존 Node 24.21.0과 잠금 의존성을 사용한다.
 
 ```sh
-node --test test/jd-management.test.mjs test/jd-summary.test.mjs test/member-navigation.test.mjs
+node --test test/jd-management.test.mjs test/jd-summary.test.mjs test/jd-member-binding.test.mjs test/jd-recipient-binding.test.mjs test/member-navigation.test.mjs
 node --test --experimental-test-coverage --test-coverage-include="src/features/jd/**" test/jd-management.test.mjs test/jd-summary.test.mjs
-npm run lint
-npm run typecheck
-npm run build
+npm run check
 ```
 
-관리 7개·요약 7개의 승인 업무 시나리오를 상태 모델·응답 해석·정적 렌더로 검사한다. 테스트는 합성 자료만 사용한다. JSX는 기존 TypeScript 변환 방식이므로 커버리지 줄 번호가 원본과 다를 수 있고 불러오지 않은 화면 조립·세션 파일은 별도 0%로 보고한다. 실제 브라우저 초점·레이아웃·공유 화면 연결, 760/1024/1536px 화면 확인은 제공자 합류 후 별도 확인한다. 결과와 실제 미실행 범위는 U10 코드 요약에 기록한다.
+승인 업무 시나리오와 BR3.5 표시 회귀를 상태 모델·응답 해석·정적 렌더로 검사한다. 테스트는 합성 자료만 사용한다. JSX는 기존 TypeScript 변환 방식이므로 커버리지 줄 번호가 원본과 다를 수 있고 불러오지 않은 화면 조립·세션 파일은 별도 0%로 보고한다. 자동 검사의 위치 전달·정적 강조·모델 선택 보존은 실제 브라우저의 펼침·초점·스크롤·레이아웃 확인을 대신하지 않는다. 아래 날짜별 검사는 당시 판본의 기록이며, [2026-11-10 PR 전 보완 검사](../../../../docs/verification/u10-pr-fixes-2026-11-10.md)에서 이번 판본의 결과와 최신 통합 이후 남은 확인을 구분한다.
 
 2026-11-05 #471 어댑터 연결의 좁은 검사 명령은 다음과 같다. 기존 Node 24.21.0·npm 11.19.0 Docker 판본과 설치된 잠금 의존성을 사용한다. 기존 75개 전체 검사나 U7 전체 검사를 반복하지 않는다.
 

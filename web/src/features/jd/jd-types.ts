@@ -33,6 +33,7 @@ export const JD_LIMITS = Object.freeze({ title: 200, body: 20000, requirements: 
 export const REQUIREMENT_FAILED_TEXT = "이 요구사항을 처리하지 못했습니다.";
 export const DEADLINE_TEXT = "전체 처리 시한이 지나 완료하지 못했습니다.";
 export const EMPTY_TEXT = "이번 자료에서 표시할 요약 내용이 없습니다.";
+export const NO_SOURCES_TEXT = "이번에 찾은 자료가 없어 이 요구사항의 표기를 찾지 못했습니다.";
 
 /** UTF-16 상한을 검사할 뿐 원문·공백·줄 경계를 바꾸지 않는다. */
 export function jdDraftErrors(draft: JdDraft): string[] {

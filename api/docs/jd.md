@@ -44,7 +44,7 @@ U10 경계 입력 오류는 `422 INVALID_INPUT / INPUT_TOO_LARGE`, 남의/없는
 
 `test/jd/jd-publication-access.test.cjs`는 실제 AppModule·인증 Guard·C-10·C-09 상태 조회·DB를 사용하는 영향 검사 9개다. 새 UUID·합성 identity로 만든 회원과 그 자식만 정리하며 전체 DB 초기화·마이그레이션을 하지 않는다. 정상 FK로 만들 수 없는 회원 행 부재만 `OwnerProfileReader` 대역을 사용한다. 판정 후 변경의 시점은 실제 C-09 상태 조회 뒤 시험용 hook으로 고정한다. 비밀번호 unlock·C-11·생성·실제 큐 실행은 대상이 아니다.
 
-읽기 전용 소스 환경에서는 `DB_NAME=catchu_u10_test`, `CATCHU_U10_SOURCE_TEST=true`를 해당 검사 프로세스에만 전달하고 `node --require ts-node/register --test --test-concurrency=1 test/jd/jd-publication-access.test.cjs`를 사용한다. 검사 파일은 source/dist를 명시적으로 선택하며, 자체 시험 프로세스에 임시 인증 키와 외부 AI·큐 차단 설정을 적용한다. 기존 3311 API 프로세스를 갱신하거나 운영 인증 설정을 바꾸지 않는다. 신규 결과는 실행 후 U10 코드 요약에 별도로 기록하며 기존 75개·17개 결과를 재실행한 것으로 처리하지 않는다.
+2026-11-06의 읽기 전용 소스 검사에서는 `DB_NAME=catchu_u10_test`, `CATCHU_U10_SOURCE_TEST=true`를 해당 검사 프로세스에만 전달하고 `node --require ts-node/register --test --test-concurrency=1 test/jd/jd-publication-access.test.cjs`를 사용했다. 검사 파일은 source/dist를 명시적으로 선택하며, 자체 시험 프로세스에 임시 인증 키와 외부 AI·큐 차단 설정을 적용한다. 이 방식은 기존 3311 API 프로세스나 운영 인증 설정을 바꾸지 않는다. 당시 결과는 U10 코드 요약에 보존하며, [2026-11-10 PR 전 보완 검사](../../docs/verification/u10-pr-fixes-2026-11-10.md)는 별도 격리 DB에서 빌드된 dist로 실행한다.
 
 ```powershell
 npm.cmd test -- test/jd/jd-management.test.cjs test/jd/jd-summary.test.cjs test/jd/jd-integration.test.cjs

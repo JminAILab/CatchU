@@ -17,7 +17,7 @@ const initial = (): JdSummaryState => ({ jds: [], jdCursor: null, runs: [], runC
 export type ConsentRunner = (request: () => Promise<ClientResult>) => Promise<ConsentRunResult>;
 let nextViewId = 0;
 
-/** C-11 실제 연결 없이 검사할 수 있는 상태. 자동 폴링·자동 재접수는 하지 않는다. */
+/** C-11 연결과 합성 검사에서 같은 상태 모델을 사용한다. 자동 폴링·자동 재접수는 하지 않는다. */
 export function createJdSummaryModel(api: JdApi, context: JdRecipientContext, deps: JdSessionDeps) {
   const store = createViewStore(initial());
   const session = deps.session();

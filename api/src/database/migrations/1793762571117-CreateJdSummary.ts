@@ -25,11 +25,11 @@ export class CreateJdSummary1793762571117 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE "jd_summary_run" DROP CONSTRAINT "fk_jd_summary_run_publication_id"`);
         await queryRunner.query(`ALTER TABLE "jd" DROP CONSTRAINT "fk_jd_member_id"`);
         await queryRunner.query(`DROP TABLE "jd_summary_result"`);
-        await queryRunner.query(`DROP INDEX "public"."ix_jd_summary_run_member_id_publication_id_created_at_run_id"`);
-        await queryRunner.query(`DROP INDEX "public"."ix_jd_summary_run_member_id_jd_id"`);
-        await queryRunner.query(`DROP INDEX "public"."ix_jd_summary_run_publication_id"`);
+        await queryRunner.query(`DROP INDEX "ix_jd_summary_run_member_id_publication_id_created_at_run_id"`);
+        await queryRunner.query(`DROP INDEX "ix_jd_summary_run_member_id_jd_id"`);
+        await queryRunner.query(`DROP INDEX "ix_jd_summary_run_publication_id"`);
         await queryRunner.query(`DROP TABLE "jd_summary_run"`);
-        await queryRunner.query(`DROP INDEX "public"."ix_jd_member_id_updated_at_jd_id"`);
+        await queryRunner.query(`DROP INDEX "ix_jd_member_id_updated_at_jd_id"`);
         await queryRunner.query(`DROP TABLE "jd"`);
     }
 

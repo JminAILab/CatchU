@@ -26,8 +26,8 @@ export class JdSummaryResult {
   @Column({ type: 'text' }) jdLine!: string;
   @Column({ type: 'varchar', default: 'PENDING' }) status: RunStatus = 'PENDING';
   @Column({ type: 'varchar', nullable: true }) resultKind: 'CONTENT' | 'EMPTY' | null = null;
-  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" }) evidenceItems: GatedItem[] = [];
-  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" }) unconfirmedPoints: GatedItem[] = [];
-  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" }) interviewQuestions: GatedItem[] = [];
+  @Column({ type: 'jsonb', default: () => "'[]'" }) evidenceItems: GatedItem[] = [];
+  @Column({ type: 'jsonb', default: () => "'[]'" }) unconfirmedPoints: GatedItem[] = [];
+  @Column({ type: 'jsonb', default: () => "'[]'" }) interviewQuestions: GatedItem[] = [];
   @Column({ type: 'varchar', nullable: true }) failureCode: RequirementFailure | null = null;
 }

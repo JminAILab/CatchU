@@ -1,4 +1,4 @@
-import { DEADLINE_TEXT, EMPTY_TEXT, REQUIREMENT_FAILED_TEXT, type JdGatedItem, type JdRequirement, type JdRun, type SourceLocation } from "./jd-types";
+import { DEADLINE_TEXT, EMPTY_TEXT, NO_SOURCES_TEXT, REQUIREMENT_FAILED_TEXT, type JdGatedItem, type JdRequirement, type JdRun, type SourceLocation } from "./jd-types";
 import styles from "./jd.module.css";
 
 export function JdItemView({ item, showEvidence }: { item: JdGatedItem; showEvidence: (location: SourceLocation) => void }) {
@@ -13,10 +13,16 @@ export function JdItemView({ item, showEvidence }: { item: JdGatedItem; showEvid
 }
 
 export function JdRequirementResult({ requirement: row, showEvidence }: { requirement: JdRequirement; showEvidence: (location: SourceLocation) => void }) {
-  const columns = [ ["근거", row.evidenceItems], ["자료로 확인되지 않는 점", row.unconfirmedPoints], ["면접 질문", row.interviewQuestions] ] as const;
+  // 검색 조각 0개의 고정 안내만 원문 옆으로 옮긴다. U2의 다른 서버 안내는 해당 칸에 보존한다.
+  const isNoSourcesNotice = (item: JdGatedItem) => item.kind === "SERVER_NOTICE" && item.jdRole === "UNCONFIRMED" && item.text === NO_SOURCES_TEXT;
+  const noSourcesNotice = row.unconfirmedPoints.find(isNoSourcesNotice);
+  const columns = [ ["근거", row.evidenceItems], ["자료로 확인되지 않는 점", row.unconfirmedPoints.filter((item) => !isNoSourcesNotice(item))], ["면접 질문", row.interviewQuestions] ] as const;
   return <section className={styles.requirement} aria-label={`요구사항 ${row.requirementIndex + 1}`}>
     <h4>요구사항 {row.requirementIndex + 1} · 원문 {row.sourceLineNumber}줄</h4>
-    <p className={styles.original}>{row.jdLine}</p>
+    <div className={styles.originalRow}>
+      <p className={styles.original}>{row.jdLine}</p>
+      {noSourcesNotice && <p className={styles.help}><span className={styles.label}>서버 안내</span> {noSourcesNotice.text}</p>}
+    </div>
     {row.status === "PENDING" && <p role="status">처리 중입니다.</p>}
     {row.status === "FAILED" && <p>{row.failureCode === "DEADLINE_EXCEEDED" ? DEADLINE_TEXT : REQUIREMENT_FAILED_TEXT}</p>}
     {row.status === "DONE" && row.resultKind === "EMPTY" && <p>{EMPTY_TEXT}</p>}

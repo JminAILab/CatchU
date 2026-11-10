@@ -29,13 +29,19 @@ test('JD 본인 HTTP CRUD는 원문을 보존하고 동의·검색·하루 횟�
   expectError(await server.call('GET', `/jds/${id}`, { token: member.token }), 404, 'RESOURCE_UNAVAILABLE');
 });
 
-test('다른 회원·없는 UUID·잘못된 UUID는 같은 404이고 소유자를 본문으로 바꿀 수 없다', async () => {
+test('다른 회원·없는 UUID·잘못된 UUID는 같은 404이고 수정·삭제 거부 직후 소유자의 원본이 보존된다', async () => {
   const own = await server.login(), other = await server.login();
-  const created = await server.call('POST', '/jds', { token: own.token, body: { title: '비공개', body: '본문' } });
+  const created = await server.call('POST', '/jds', { token: own.token, body: { title: ' 비공개 😀 ', body: '  본문\r\n- 원문 보존  ' } });
+  assert.equal(created.status, 201, created.text);
   for (const id of [created.body.jdId, randomUUID(), 'not-a-uuid']) {
     for (const method of ['GET', 'PATCH', 'DELETE']) {
       expectError(await server.call(method, `/jds/${id}`, { token: other.token,
         ...(method === 'PATCH' ? { body: { title: '탈취', body: '내용' } } : {}) }), 404, 'RESOURCE_UNAVAILABLE');
+      if (id === created.body.jdId && method !== 'GET') {
+        const preserved = await server.call('GET', `/jds/${id}`, { token: own.token });
+        assert.equal(preserved.status, 200, `${method} 거부 직후 소유자가 조회할 수 있어야 한다`);
+        assert.deepEqual(preserved.body, created.body, `${method} 거부가 제목·본문·생성/수정 시각을 바꾸지 않아야 한다`);
+      }
     }
   }
   expectError(await server.call('POST', '/jds', { token: own.token, body: { title: '제목', body: '내용', memberId: other.memberId } }), 422, 'INVALID_INPUT');
