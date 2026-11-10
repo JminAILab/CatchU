@@ -27,6 +27,8 @@
 
 <!-- Project-specific specialisation. -->
 
+- ALWAYS Unit 확인 명령은 --timeout-ms 3600000(60분)으로 돌린다. 시작 전에 pmset -g batt로 충전기 연결을, sysctl -n vm.loadavg로 부하(1분 평균 6 미만)를 보고, 끝나면 결과와 함께 api·web·worker 각각 걸린 시간을 알린다. 기본 상한 30분은 배터리로 돌 때 api 시험 도중에 걸려 멈췄다. (learned 2026-11-10) <!-- cid:261109-new-catch:delivery-planning:9c6d45282a5337181f1f3011840d1bd610328597830e0cede0b6abf544128e5b -->
+
 ## Deployment
 
 <!-- Project-specific specialisation. -->
