@@ -15,6 +15,8 @@
 <!-- This monorepo requires package-scoped branch names and a package owner -->
 <!-- review in addition to the team's normal merge policy. -->
 
+- ALWAYS AI-DLC 단계를 승인하면 바로 그 단계의 커밋을 하나 만든다. 커밋에는 그 단계 폴더 파일과 그 단계 승인까지의 작업 기록, 그 단계에서 더한 규칙을 넣고, 다음 단계 폴더 파일은 넣지 않는다. (learned 2026-11-10) <!-- cid:261109-new-catch:domain-design:10ccff94f4da77a0c332bc4f59ec11d78a33c0f0a18b163266982409c3deba72 -->
+
 ## Walking Skeleton
 
 <!-- Project-specific specialisation. Example: -->
