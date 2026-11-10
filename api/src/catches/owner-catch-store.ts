@@ -29,6 +29,10 @@ export class OwnerCatchStore {
         values.push(query.sourceRequestId);
         conditions.push(`c.source_request_id = $${values.length}`);
       }
+      // 조건 값은 SQL에 잇지 않고 고정 조각 둘 가운데 하나를 고른다. 빈 설명은 저장 때 null이 된다(C1, BR5.1).
+      if (query.authorDescription !== undefined) {
+        conditions.push(query.authorDescription === 'written' ? 'c.author_description IS NOT NULL' : 'c.author_description IS NULL');
+      }
       if (query.after !== undefined) {
         values.push(query.after);
         conditions.push(`c.catch_id > $${values.length}`);

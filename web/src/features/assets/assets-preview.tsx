@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { AssetsView, parseVisibilityFilter, type LoadState } from "./assets-view";
+import { AssetsView, parseAuthorDescriptionFilter, parseVisibilityFilter, type LoadState } from "./assets-view";
 import { previewCatches, previewRepositories } from "./fixtures";
 import styles from "./assets.module.css";
 
@@ -49,10 +49,12 @@ export function AssetsPreview() {
       </aside>
       <AssetsView items={scenario === "empty" ? [] : previewCatches} repositories={previewRepositories}
         repositoryId={params.get("repositoryId") ?? ""} visibility={parseVisibilityFilter(params.get("visibility"))}
+        authorDescription={parseAuthorDescriptionFilter(params.get("authorDescription"))}
         listState={loadState(scenario)} detailState={loadState(params.get("detailScenario"))}
         selectedId={params.get("catchId")}
         onRepositoryChange={(repositoryId) => changeQuery({ repositoryId: repositoryId || null, catchId: null })}
         onVisibilityChange={(visibility) => changeQuery({ visibility: visibility || null, catchId: null })}
+        onAuthorDescriptionChange={(next) => changeQuery({ authorDescription: next === "all" ? null : next, catchId: null })}
         onOpen={(catchId) => changeQuery({ catchId })} onClose={() => changeQuery({ catchId: null })}
         onRetryList={() => changeQuery({ scenario: "ready" })}
         onRetryDetail={() => changeQuery({ detailScenario: "ready" })}

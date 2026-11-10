@@ -17,6 +17,8 @@
 
 - ALWAYS AI-DLC 단계를 승인하면 바로 그 단계의 커밋을 하나 만든다. 커밋에는 그 단계 폴더 파일과 그 단계 승인까지의 작업 기록, 그 단계에서 더한 규칙을 넣고, 다음 단계 폴더 파일은 넣지 않는다. (learned 2026-11-10) <!-- cid:261109-new-catch:domain-design:10ccff94f4da77a0c332bc4f59ec11d78a33c0f0a18b163266982409c3deba72 -->
 
+- ALWAYS 승인 관문이 없는 Unit 단계(기능 설계·NFR 요구·NFR 설계·코드 생성 등)도 그 단계가 끝나면 바로 그 단계 커밋을 하나 만든다(Catch 개편 CR1 때처럼). 다음 단계 폴더 파일은 넣지 않는다. (learned 2026-11-10) <!-- cid:261109-new-catch:nfr-requirements:420ed285cf30adb0ebdec6be94bc9711aa77f0ebb181337a16b51092f9aa9d77 -->
+
 ## Walking Skeleton
 
 <!-- Project-specific specialisation. Example: -->
@@ -72,3 +74,4 @@
 - ALWAYS 문서에서 Catch를 받아 보는 쪽은 「면접관」으로 부르고, 「팀장」은 intent를 정하는 우리 팀장만 뜻하게 쓴다. 면접관을 「기술 팀장」으로 부르면 두 뜻이 섞인다. (learned 2026-11-09) <!-- cid:261109-new-catch:intent-capture:9344035d773b4a8fa5a3b31de73df7a612946e0898a6f34dc3841ca6d5703cf3 -->
 - ALWAYS 본인 기여를 말하는 표시는 근거의 기여 범위가 본인 커밋인 근거만 기준으로 삼는다. 병합 커밋·PR·이슈 근거의 판본이나 주소와 맞는다고 붙이지 않는다. (learned 2026-11-09) <!-- cid:261109-new-catch:requirements-analysis:71c5cc19bec041ef92062d1d8c923421dc5cc5614ac1a79937e20c47985f225b -->
 - ALWAYS 화면 초안·수락 기준·설계에 지금 화면의 표시를 적을 때는 지금 코드가 어떻게 그리는지 확인해 그대로 쓰고, 바꾸는 곳은 바꾼다고 적는다(화면에 보이는 글자인지 화면 낭독기에만 읽히는 글자인지, 링크 글자가 주소 전체인지 등). (learned 2026-11-10) <!-- cid:261109-new-catch:user-stories:66de5f7a4cafcf61e94e4ef7c7106183a0e36d1947dc088af1e5da7a1b65ff84 -->
+- ALWAYS 기능 설계에서 화면 요소(역할·키보드·Tab 순서)를 정할 때 승인된 다듬은 화면 interaction-spec과 대조하고, 다르면 다른 동작을 쓰지 말고 어긋남을 사람에게 올린다. NC1에서 링크 목록 항목을 링크로 적어 interaction-spec(글자, Tab 순서 밖)과 어긋났다. (learned 2026-11-10) <!-- cid:261109-new-catch:code-generation:c837a2dcbe457072b040ad4cd5080f7aec8c442bc63b3b5f92943dba14a0d6b3 -->

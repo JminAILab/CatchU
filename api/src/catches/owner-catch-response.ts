@@ -23,6 +23,8 @@ export interface OwnerCatchReadSource {
     readonly mismatch: boolean;
     readonly visibility: Visibility;
     readonly sourceMode: SourceMode;
+    /** 작성자 설명이 null이 아닌지. 목록 조건 `authorDescription=written`과 같은 판정이다(새 Catch C1, BR5.3). */
+    readonly hasAuthorDescription: boolean;
   };
   readonly sourceRequest: {
     readonly requestId: string;
@@ -75,6 +77,7 @@ export interface OwnerCatchResponse {
   visibility: Visibility;
   restriction: Restriction;
   sourceMode: SourceMode;
+  hasAuthorDescription: boolean;
 }
 
 /** 내부 자료 오류. HTTP 변환은 #88 연결에서 처리하며 입력값을 메시지에 넣지 않는다. */
@@ -198,6 +201,7 @@ export function toOwnerCatchResponse(
     visibility: choice<Visibility>(asset.visibility, ['PRIVATE', 'PUBLIC'], 'asset.visibility'),
     restriction: choice<Restriction>(protection.appliedRestriction, ['NONE', 'SOURCE_PRIVATE'], 'protection.appliedRestriction'),
     sourceMode: choice<SourceMode>(asset.sourceMode, ['MOCK', 'LIVE'], 'asset.sourceMode'),
+    hasAuthorDescription: flag(asset.hasAuthorDescription, 'asset.hasAuthorDescription'),
   };
 }
 

@@ -27,6 +27,7 @@ function fixture() {
       mismatch: true,
       visibility: 'PUBLIC',
       sourceMode: 'MOCK',
+      hasAuthorDescription: true,
     },
     sourceRequest: {
       requestId: 'request-1',
@@ -109,7 +110,32 @@ test('본인 응답은 common.yaml의 필드만 내보내고 저장소는 원 �
     visibility: 'PUBLIC',
     restriction: 'SOURCE_PRIVATE',
     sourceMode: 'MOCK',
+    hasAuthorDescription: true,
   });
+});
+
+// 새 Catch NC1 C1·BR5.3: 목록·상세 응답에 작성자 설명이 있는지를 싣고, 참/거짓이 아닌 읽기 값은 기본값으로 숨기지 않는다.
+test('AC5.2.3 작성자 설명 여부는 읽은 참/거짓 그대로 목록·상세 응답에 싣는다', () => {
+  for (const hasAuthorDescription of [true, false]) {
+    const source = fixture();
+    source.asset.hasAuthorDescription = hasAuthorDescription;
+    assert.equal(project(source).hasAuthorDescription, hasAuthorDescription);
+    assert.equal(toOwnerCatchPage('member-owner', [source], null).items[0].hasAuthorDescription, hasAuthorDescription);
+  }
+});
+
+test('작성자 설명 여부가 참/거짓이 아니거나 없으면 무결성 오류이고 설명 원문 칸은 응답에 없다', () => {
+  for (const value of [undefined, null, 'true', 1, 0]) {
+    const source = fixture();
+    source.asset.hasAuthorDescription = value;
+    assertIntegrityError(() => project(source));
+    assertIntegrityError(() => toOwnerCatchPage('member-owner', [fixture(), source], null));
+  }
+  const source = fixture();
+  source.asset.authorDescription = 'internal-author-description';
+  const response = project(source);
+  assert.equal(Object.hasOwn(response, 'authorDescription'), false);
+  assert.ok(!JSON.stringify(response).includes('internal-author-description'));
 });
 
 test('null 제목은 초안 생성 상태와 독립적이며 상세·혼합 목록에서 필드를 보존한다', () => {

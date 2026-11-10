@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import type { CatchAsset, RepositoryOption } from "./types";
+import type { AuthorDescriptionFilter, CatchAsset, RepositoryOption } from "./types";
 import styles from "./assets.module.css";
 
 export type LoadState = "ready" | "loading" | "error";
@@ -13,12 +13,22 @@ const emptyVisibilityTitles: Record<CatchAsset["visibility"], string> = { PUBLIC
 export function parseVisibilityFilter(value: string | null): VisibilityFilter {
   return value === "PUBLIC" || value === "PRIVATE" ? value : "";
 }
+// 작성자 설명 걸러 보기(새 Catch BR5.4). 저장소처럼 목록 요청 조건으로 서버에서 거르고, 주소 매개변수의 그 밖 값은 전체다.
+const authorDescriptionLabels: Record<AuthorDescriptionFilter, string> = { all: "전체", written: "씀", unwritten: "안 씀" };
+const emptyAuthorDescriptionTitles: Record<Exclude<AuthorDescriptionFilter, "all">, string> = {
+  written: "작성자 설명을 쓴 Catch가 없습니다", unwritten: "작성자 설명을 쓰지 않은 Catch가 없습니다",
+};
+export function parseAuthorDescriptionFilter(value: string | null): AuthorDescriptionFilter {
+  return value === "written" || value === "unwritten" ? value : "all";
+}
+const matchesAuthorDescription = (item: CatchAsset, filter: AuthorDescriptionFilter) =>
+  filter === "all" || item.hasAuthorDescription === (filter === "written");
 
 type AssetsViewProps = {
   dataMode?: "preview" | "api";
   detailItem?: CatchAsset;
   detailActions?: ReactNode;
-  /** U4 작성자 설명 편집 영역. 근거와 AI 초안(「Catch 설명 초안」) 사이에 둔다(BR1.3). 없으면 그리지 않는다. */
+  /** 작성자 설명 편집 영역. 「생각해 볼 질문」 아래, 현재 확인 상태 위에 둔다(새 Catch BR4.1). 없으면 그리지 않는다. */
   descriptionEditor?: ReactNode;
   listMessage?: string;
   detailMessage?: string;
@@ -30,6 +40,8 @@ type AssetsViewProps = {
   repositoryNotice?: ReactNode;
   repositoryId: string;
   visibility: VisibilityFilter;
+  /** 없으면 전체다. API 방식은 서버가 거른 목록을 받고, 미리보기 방식은 고정 자료를 화면 안에서 거른다. */
+  authorDescription?: AuthorDescriptionFilter;
   listState: LoadState;
   detailState: LoadState;
   selectedId: string | null;
@@ -37,6 +49,7 @@ type AssetsViewProps = {
   repositoryManagement: ReactNode;
   onRepositoryChange: (repositoryId: string) => void;
   onVisibilityChange: (visibility: VisibilityFilter) => void;
+  onAuthorDescriptionChange?: (authorDescription: AuthorDescriptionFilter) => void;
   onOpen: (catchId: string) => void;
   onClose: () => void;
   onRetryList: () => void;
@@ -98,6 +111,7 @@ function StateMessage({ title, children, retry }: {
 
 export function AssetsView(props: AssetsViewProps) {
   const { items, repositories, repositoryId, visibility, listState, selectedId, detailState } = props;
+  const authorDescription = props.authorDescription ?? "all";
   const returnFocusRef = useRef<HTMLButtonElement | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousSelectedRef = useRef<string | null>(null);
@@ -110,7 +124,9 @@ export function AssetsView(props: AssetsViewProps) {
     previousSelectedRef.current = selectedId;
   }, [selectedId]);
   const repositoryItems = items.filter((item) => !repositoryId || item.repositoryId === repositoryId);
-  const visibleItems = repositoryItems.filter((item) => !visibility || item.visibility === visibility);
+  // 서버가 준 목록에 해당한다. API 방식은 서버가 이미 걸렀으므로 다시 거르지 않는다. 설명을 저장해도 지금 쪽은 그대로다(BR5.6).
+  const filteredItems = props.dataMode === "api" ? repositoryItems : repositoryItems.filter((item) => matchesAuthorDescription(item, authorDescription));
+  const visibleItems = filteredItems.filter((item) => !visibility || item.visibility === visibility);
   const selected = props.dataMode === "api" ? props.detailItem : items.find((item) => item.catchId === selectedId);
   const selectedRepository = repositories.find((repo) => repo.repositoryId === repositoryId);
 
@@ -142,6 +158,12 @@ export function AssetsView(props: AssetsViewProps) {
                   <option value="PRIVATE">{visibilityLabels.PRIVATE}</option>
                 </select>
               </label>
+              <label className={styles.filter}>작성자 설명
+                <select value={authorDescription} data-testid="assets-author-description-filter"
+                  onChange={(event) => props.onAuthorDescriptionChange?.(parseAuthorDescriptionFilter(event.target.value))}>
+                  {(["all", "written", "unwritten"] as const).map((value) => <option key={value} value={value}>{authorDescriptionLabels[value]}</option>)}
+                </select>
+              </label>
             </div>
           </div>
 
@@ -156,6 +178,11 @@ export function AssetsView(props: AssetsViewProps) {
           </StateMessage>
         ) : props.dataMode !== "api" && repositoryId && !selectedRepository ? (
           <StateMessage title="저장소를 찾을 수 없습니다">필터에서 다른 저장소를 선택해 주세요.</StateMessage>
+        ) : authorDescription !== "all" && filteredItems.length === 0 ? (
+          // BR5.5: 작성자 설명 조건으로 거른 결과가 비면 「아직 표시할 Catch가 없습니다」보다 먼저 보이고 저장소 연결 문구는 붙이지 않는다.
+          <StateMessage title={`${repositoryId ? "이 저장소에 " : ""}${emptyAuthorDescriptionTitles[authorDescription]}`}>
+            작성자 설명을 전체로 바꾸면 다른 Catch를 볼 수 있습니다.
+          </StateMessage>
         ) : repositoryItems.length === 0 ? (
           <StateMessage title={repositoryId ? "이 저장소에서 표시할 Catch가 없습니다" : "아직 표시할 Catch가 없습니다"}>
             저장소 연결과 분석 상태는 위쪽 연결 관리에서 확인할 수 있습니다.
@@ -263,7 +290,7 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
               </article>
             ))}
           </section>
-          {descriptionEditor}
+          {/* 새 Catch BR4.1: 근거 → (다시 볼 곳, NC3) → Catch 설명 초안 → 생각해 볼 질문 → 작성자 설명 → 현재 확인 상태. 초안과 질문을 보고 아래 칸에 쓴다. */}
           {/* CR3 BR7.1: 설명 초안이 NOT_GENERATED면 칸(제목·안내 글)을 그리지 않는다. FAILED·GENERATED는 그대로다. */}
           {item.draft.status !== "NOT_GENERATED" && <section className={styles.detailSection}><h3>Catch 설명 초안</h3>
             {hasGeneratedDraft(item) ? <p className={styles.draft}>{item.draft.content}</p>
@@ -272,8 +299,9 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
           <section className={styles.detailSection}><h3>생각해 볼 질문 <span className={styles.small}>본인만 확인</span></h3>
             {item.reflection.status === "GENERATED" && item.reflection.questions.length > 0 ? <ul>{item.reflection.questions.map((question, index) => <li key={index}>{question}</li>)}</ul>
               : <p>{item.reflection.status === "FAILED" ? "질문을 생성하지 못했습니다." : "생성된 질문이 없습니다."}</p>}
-            <p className={styles.small}>질문에 대한 답변을 저장하는 기능은 제공하지 않습니다.</p>
+            <p className={styles.small}>질문을 보고 아래 칸에 자기 말로 적어 보세요.</p>
           </section>
+          {descriptionEditor}
           <section className={styles.detailSection}><h3>현재 확인 상태</h3>
             <dl className={styles.confirmations}>
               <div><dt>작업 사실</dt><dd>{item.confirmation.workFactsConfirmed ? "확인 완료" : "확인 전"}</dd></div>

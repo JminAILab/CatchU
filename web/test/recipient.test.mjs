@@ -833,3 +833,73 @@ test("#488 근거 접기 상태: 처음엔 접힘, 사람이 접고 편 상태�
   for (const fieldPath of ["subjectContribution", "evidence[0].representedFacts[0]"]) assert.equal(isInEvidenceDetails(at(fieldPath)), true, fieldPath);
   for (const fieldPath of ["workFacts[0]", "authorDescription", "aiDraft", "body"]) assert.equal(isInEvidenceDetails(at(fieldPath)), false, fieldPath);
 });
+
+// 새 Catch NC1 — 면접관 발행본의 작성자 설명 칸별 보기와 링크 이름(US1.4·US1.5·US2.2, BR7.1~BR7.3, BR2, NFR6.3).
+//   - 기대: 글이 있는 칸만 h5 칸 제목과 보이고, 「더 쓰기」는 다른 칸과 함께일 때 h5 「덧붙인 말」, 하나뿐이면(옛 글 포함) h5 없이 글만이다.
+//           작성자 설명 속 GitHub 링크는 이름으로 보이고 href·title은 원래 주소, 숨은 「(새 탭)」과 새 탭 속성이 있다. 칸 순서는 #488 그대로다.
+//   - 실패 조건: 빈 칸의 h5가 DOM에 있음(숨긴 요소 포함), 「더 쓰기」 h5가 보임, 옛 글에 h5가 생김, 이름이 원래 주소와 다른 곳을 가리킴.
+const sectionedDescription = "【맡은 부분】\n게시글 작성 화면 두 곳\n\n【더 쓰기】\n덧붙이는 말";
+const descriptionOf = (html, id = "c1") => {
+  const item = html.slice(html.indexOf(`id="published-item-${id}"`));
+  return item.slice(item.indexOf('data-testid="snapshot-catch-description"'), item.indexOf('data-testid="snapshot-catch-facts"'));
+};
+const h5s = (html) => [...html.matchAll(/<h5[^>]*>([^<]*)<\/h5>/g)].map((match) => match[1]);
+
+test("AC1.4.1 「맡은 부분」과 「더 쓰기」 두 칸이 저장된 발행본은 「맡은 부분」·「덧붙인 말」 두 칸만 보이고 다른 칸 제목은 없다", () => {
+  const description = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription: sectionedDescription })])));
+  assert.deepEqual(h5s(description), ["맡은 부분", "덧붙인 말"]);
+  assert.ok(description.includes("게시글 작성 화면 두 곳") && description.includes("덧붙이는 말"));
+  for (const title of ["이 작업에서 정한 것", "무엇이 문제였나", "고른 것과 버린 것", "어떻게 확인했나·결과", "짚어 볼 곳", "더 쓰기", "【"]) {
+    assert.ok(!description.includes(title), title);
+  }
+});
+
+test("AC1.4.2 작성자 설명이 통째로 없거나 빈 글인 발행본은 「작성자 설명이 없습니다.」다", () => {
+  for (const authorDescription of [null, ""]) {
+    const description = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription })])));
+    assert.ok(description.includes("작성자 설명이 없습니다."), String(authorDescription));
+    assert.equal(h5s(description).length, 0);
+  }
+});
+
+test("AC1.4.3 칸 제목별로 나뉜 발행본도 불일치 → AI 설명 초안 → 작성자 설명 → 기록 순서이고 「이 작업에서 정한 것」이 제목 바로 아래로 오지 않는다", () => {
+  const authorDescription = "【이 작업에서 정한 것】\n줄여 올리기로 했다.\n\n【짚어 볼 곳】\nhttps://github.com/o/r/pull/1";
+  const html = render(ready([catchItem("c1", 1, { mismatch: true, authorDescription })]));
+  const order = ["<h3", 'data-testid="snapshot-catch-mismatch"', 'data-testid="snapshot-catch-ai-draft"', 'data-testid="snapshot-catch-description"',
+    ">이 작업에서 정한 것</h5>", 'data-testid="snapshot-catch-facts"'].map((needle) => html.indexOf(needle, html.indexOf('id="published-item-c1"')));
+  assert.ok(order.every((position) => position >= 0), String(order));
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+});
+
+test("AC1.4.4 빈 칸의 칸 제목은 h5째 그리지 않고 숨긴 요소로도 남기지 않는다", () => {
+  const authorDescription = "【맡은 부분】\n맡음\n\n【무엇이 문제였나】\n   \n\n【짚어 볼 곳】\n링크";
+  const description = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription })])));
+  assert.deepEqual(h5s(description), ["맡은 부분", "짚어 볼 곳"]);
+  assert.equal(count(description, 'data-testid="snapshot-description-section"'), 2);
+  assert.doesNotMatch(description, /무엇이 문제였나|hidden|aria-hidden/);
+});
+
+test("AC1.5.1·AC1.5.2 칸 제목 줄이 없는 옛 글과 「더 쓰기」만 저장된 글은 h5 없이 글만 지금처럼 보인다", () => {
+  const old = "칸 제목 없이 쓴 옛 설명입니다.\n둘째 줄 https://github.com/o/r/pull/3";
+  for (const authorDescription of [old, "덧붙인 말만", "【더 쓰기】\n칸 제목 줄과 함께 저장된 더 쓰기"]) {
+    const description = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription })])));
+    assert.equal(h5s(description).length, 0, authorDescription);
+    assert.equal(count(description, "<p"), 1, authorDescription);
+    assert.doesNotMatch(description, /snapshot-description-section|덧붙인 말<\/h5>|【/);
+  }
+  const plain = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription: old })])));
+  assert.ok(plain.includes("칸 제목 없이 쓴 옛 설명입니다.\n둘째 줄 "));
+});
+
+test("AC2.2.1·AC2.2.7 작성자 설명 속 파일 줄 링크는 「파일 · L범위 · 판본」 이름이고 href·title은 원래 주소, 새 탭 속성과 숨은 「(새 탭)」이 있다", () => {
+  const url = "https://github.com/o/r/blob/ba6bba8c0123456789abcdef0123456789abcdef/src/CreateArticlePage.vue#L40-L58";
+  const html = render(ready([catchItem("c1", 1, { authorDescription: `【짚어 볼 곳】\n${url} 줄이는 부분` })]));
+  const description = descriptionOf(html);
+  const anchor = description.match(/<a [^>]*data-testid="github-link"[^>]*>[\s\S]*?<\/a>/)?.[0] ?? assert.fail("링크 이름 요소가 있어야 한다");
+  assert.equal(anchor.replace(/ class="githubLink"/, ""),
+    `<a href="${url}" target="_blank" rel="noopener noreferrer" title="${url}" data-testid="github-link">CreateArticlePage.vue · L40–58 · 판본 ba6bba8<span class="visually-hidden"> (새 탭)</span></a>`);
+  assert.ok(description.includes(" 줄이는 부분"));
+  // 근거 저장소(o/r)와 같아 앞붙임이 없고, 다른 저장소면 붙는다.
+  const other = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription: "관련 https://github.com/other/lib/commit/1a2b3c4d" })])));
+  assert.ok(other.includes(">other/lib · 커밋 1a2b3c4<span"));
+});

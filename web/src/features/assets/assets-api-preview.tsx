@@ -35,7 +35,10 @@ const api = createCatchApi(async (path, options) => {
     return readApiResponse(Response.json(updated));
   }
   if (url.pathname === "/catches") {
-    const filtered = [...records.values()].filter((item) => !url.searchParams.get("repositoryId") || item.repositoryId === url.searchParams.get("repositoryId"));
+    // 저장소·작성자 설명 조건은 api처럼 서버 쪽에서 거른다(새 Catch C1). 커서는 이 모의 응답에서만 쓰는 값이다.
+    const authorDescription = url.searchParams.get("authorDescription");
+    const filtered = [...records.values()].filter((item) => (!url.searchParams.get("repositoryId") || item.repositoryId === url.searchParams.get("repositoryId"))
+      && (authorDescription === null || item.hasAuthorDescription === (authorDescription === "written")));
     const offset = url.searchParams.get("cursor") === "mock-next-page" ? 2 : 0;
     return readApiResponse(Response.json({
       items: filtered.slice(offset, offset + 2),

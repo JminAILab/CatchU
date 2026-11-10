@@ -57,7 +57,7 @@ export function collectLinks(texts: readonly string[]): string[];               
 
 ### 2.3 링크 요소 `GithubLink`
 
-`snapshot-view.tsx`의 지금 링크 그리기를 부품 하나로 뺀다. 편집 화면 링크 목록과 사본 보기가 함께 쓴다.
+`snapshot-view.tsx`의 지금 링크 그리기를 부품 하나로 뺀다. 사본 보기가 쓴다(편집 화면 링크 목록은 이름 글자만 쓴다, 3.1).
 
 | 입력 | 뜻 |
 |---|---|
@@ -88,9 +88,9 @@ export function collectLinks(texts: readonly string[]): string[];               
 - 접근성 연결(BR4.5):
   - 칸마다 `<label htmlFor>`와 `<textarea rows={3}>`를 둔다.
   - 첫 글칸 `aria-describedby`는 공개 범위 안내 한 줄을 가리킨다.
-  - 「짚어 볼 곳」 글칸은 다섯 가지 안내 목록을 가리킨다.
+  - 「짚어 볼 곳」 글칸은 안내 목록(2026-11-10 다섯에서 넷으로 줄임, BR4.4)을 가리킨다.
   - [설명 저장]은 합계 글자 줄을 가리킨다.
-- 링크 목록(BR3.2, BR3.3): h4 아래 `<ul>`이고 `aria-live`는 두지 않는다. 항목은 `GithubLink`다.
+- 링크 목록(BR3.2, BR3.3): h4 아래 `<ul>`이고 `aria-live`는 두지 않는다. 항목은 `githubLinkName`으로 만든 이름 글자이고, 누를 수 없어 Tab 순서에 들지 않는다(다듬은 화면 interaction-spec 2절). (2026-11-10 코드 생성 때 고침: 처음에 「항목은 `GithubLink`다」로 적어 승인된 다듬은 화면과 어긋났다.)
 
 ### 3.2 AssetsView
 

@@ -1,7 +1,10 @@
 "use client";
 
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { splitSections, type Section } from "@/lib/author-description-sections";
+import { evidenceRepositoryOf } from "@/lib/github-link-name";
 import { isGithubSourceUrl, splitGithubLinks, type TextSegment } from "@/lib/github-source-url";
+import { GithubLink } from "./github-link";
 import { orderedItems, type CatchSnapshot, type PublishedItem, type PublishedSnapshot, type TextMaterialSnapshot } from "./publications-api";
 import styles from "./publications.module.css";
 
@@ -39,14 +42,18 @@ function PlainText({ text, range }: { text: string; range: Range }) {
   return <>{marked(text, range, 0, 0)}</>;
 }
 
-function linkedSegments(segments: TextSegment[], range: Range): ReactNode[] {
+/** 링크를 이름으로 그릴 때의 근거 저장소(새 Catch BR2.4). null이면 그대로 주소 전체를 보인다(텍스트 자료 본문, AC2.2.9). */
+type LinkNames = { evidenceRepository: string | null } | null;
+
+function linkedSegments(segments: TextSegment[], range: Range, names: LinkNames): ReactNode[] {
   let offset = 0;
   return segments.map((segment, index) => {
     const start = offset;
+    // 위치는 원래 주소 길이(UTF-16)로 센다. 이름이 짧아져도 뒤 글자의 위치는 바뀌지 않는다(BR2.6).
     const length = segment.kind === "text" ? segment.text.length : segment.url.length;
     offset += length;
     if (segment.kind === "text") return marked(segment.text, range, start, index);
-    const anchor = (
+    const anchor = names !== null ? <GithubLink url={segment.url} evidenceRepository={names.evidenceRepository} /> : (
       <a href={segment.url} target="_blank" rel="noopener noreferrer" data-testid="snapshot-github-link">
         {segment.url}<span className="visually-hidden"> (새 탭)</span></a>
     );
@@ -61,9 +68,47 @@ function linkedSegments(segments: TextSegment[], range: Range): ReactNode[] {
 /**
  * 자유 문장을 React 텍스트로 그리되 GitHub 주소만 새 탭 링크로 바꾼다(#416 Q1 B, NFR1.10·NFR1.11).
  * 텍스트 자료 본문과 Catch 작성자 설명에만 쓴다. AI 설명 초안·제목에는 쓰지 않는다(OQ-U4-NFR-3).
+ * `names`를 주면 링크 글자를 링크 이름으로 그린다(작성자 설명만, 새 Catch BR2.1). 주지 않으면 지금처럼 주소 전체다.
  */
-export function LinkedText({ text, testId, range = null }: { text: string; testId?: string; range?: Range }) {
-  return <p className={styles.freeText} data-testid={testId}>{linkedSegments(splitGithubLinks(text), range)}</p>;
+export function LinkedText({ text, testId, range = null, names = null }: { text: string; testId?: string; range?: Range; names?: LinkNames }) {
+  return <p className={styles.freeText} data-testid={testId}>{linkedSegments(splitGithubLinks(text), range, names)}</p>;
+}
+
+/**
+ * 저장된 글 전체의 강조 범위를 칸 안 범위로 바꾼다(BR7.5). 칸 글과 겹치는 부분만 남기고, 칸 제목 줄·칸 사이 빈 줄에만 걸치면 없다.
+ * 이은 칸은 저장된 글 안에서 한 덩어리가 아니므로 강조하지 않는다(FR1.6 한계).
+ */
+function sectionRange(range: Range, section: Section): Range {
+  if (range === null || section.joined) return null;
+  const start = Math.max(range.start, section.start);
+  const end = Math.min(range.end, section.start + section.text.length);
+  return start < end ? { start: start - section.start, end: end - section.start } : null;
+}
+
+/** 칸 제목 h5는 상수에서만 온다. 저장된 「더 쓰기」는 다른 칸과 함께일 때 「덧붙인 말」로 보인다(BR7.2). */
+const sectionHeading = (section: Section) => section.title === "더 쓰기" ? "덧붙인 말" : section.title;
+
+/**
+ * Catch 사본의 작성자 설명(새 Catch BR7.1~BR7.3). 글이 있는 칸만 h5 칸 제목과 그리고 빈 칸은 h5째 그리지 않는다.
+ * 「더 쓰기」 하나뿐이면(옛 자유 글 포함) h5 없이 지금처럼 글만 그린다. 글이 없으면 「작성자 설명이 없습니다.」다.
+ */
+function AuthorDescriptionView({ text, range, evidenceRepository }: { text: string | null; range: Range; evidenceRepository: string | null }) {
+  const sections = useMemo(() => splitSections(text), [text]);
+  if (sections.length === 0) return <p className={styles.muted}>작성자 설명이 없습니다.</p>;
+  const names = { evidenceRepository };
+  if (sections.length === 1 && sections[0].title === "더 쓰기") {
+    return <LinkedText text={sections[0].text} range={sectionRange(range, sections[0])} names={names} />;
+  }
+  return (
+    <>
+      {sections.map((section) => (
+        <div key={section.title} className={styles.descriptionSection} data-testid="snapshot-description-section">
+          <h5 className={styles.sectionTitle}>{sectionHeading(section)}</h5>
+          <LinkedText text={section.text} range={sectionRange(range, section)} names={names} />
+        </div>
+      ))}
+    </>
+  );
 }
 
 const EMPTY_FACTS = "기록에서 확인된 작업 사실이 없습니다.";
@@ -103,9 +148,8 @@ function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; h
       )}
       <section className={styles.snapshotSection} data-testid="snapshot-catch-description">
         <h4>작성자 설명</h4>
-        {snapshot.authorDescription === null || snapshot.authorDescription.length === 0
-          ? <p className={styles.muted}>작성자 설명이 없습니다.</p>
-          : <LinkedText text={snapshot.authorDescription} range={rangeFor(highlight, "authorDescription")} />}
+        <AuthorDescriptionView text={snapshot.authorDescription} range={rangeFor(highlight, "authorDescription")}
+          evidenceRepository={evidenceRepositoryOf(snapshot.evidence.map((evidence) => evidence.sourceUrl))} />
       </section>
       <section className={styles.snapshotSection} data-testid="snapshot-catch-facts">
         <h4>기록에서 확인한 내용</h4>
