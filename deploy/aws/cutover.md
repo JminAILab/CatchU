@@ -155,7 +155,7 @@ edge_check                                                         # EKS 칸. vi
 ```
 
 - 이 컴퓨터가 옛 주소를 붙들고 있으면 `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder`로 비운다.
-- 브라우저 새 비공개 창과 휴대전화 데이터망으로 첫 화면을 연다.
+- 브라우저 새 비공개 창과 휴대전화 데이터망으로 첫 화면을 연다. 비공개 창에서 Google 로그인으로 한 번 들어가 본다. 로그인은 catchu.dev로 돌아오므로 DNS를 바꾼 뒤에야 끝까지 볼 수 있다. EKS DB는 비어 있어 처음 가입처럼 진행된다.
 - 30분쯤 뒤 경보를 다시 본다(2의 마지막 명령).
 - #276 댓글에 시각(앱 정지·DNS 요청·INSYNC), 바뀐 ID, `edge_check` 결과를 남긴다. ALB 이름에는 계정 번호가 없지만 ARN에는 있으니 ARN은 남기지 않는다.
 
