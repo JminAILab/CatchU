@@ -9,8 +9,8 @@
   - 시험과 문서.
 - [계획](code-generation-plan.md) Step 1~17을 모두 마쳤고 체크 칸에 빈 칸이 없다.
   - U9·U6 시험은 모두 통과했다. U9 새 파일의 줄 커버리지는 api 99.70%, web 95.04%다.
-  - api 전체 회귀에서 U9와 무관한 실패 5개가 있다(아래 「실행하지 않은 시험과 무관한 실패」).
-- 코드 커밋, 푸시, PR은 하지 않았다. 계획에 코드 커밋 단계가 없고, 푸시와 PR은 담당이 요청할 때 한다.
+  - api 전체 회귀는 이 PC에서 U9와 무관한 실패 5개가 났다. PR #516 CI의 api 작업에서는 그 5개를 포함해 실패 0이다(아래 「시험 결과」·「실행하지 않은 시험과 무관한 실패」).
+- 코드 커밋은 계획에 없어 담당이 요청한 뒤 했다(`4179e172`). 브랜치 `api/u9-recipient-claude`로 올려 통합 브랜치 대상 [PR #516](https://github.com/JminAILab/CatchU/pull/516)을 열었고, 그 CI가 통과했다.
 
 ## 근거
 
@@ -217,15 +217,26 @@ api U9 시험은 모두 46개다(계획은 약 45개).
 | `(cd web && npm run check)`, `PORT=3119` | lint·typecheck·시험 913/0/0·build·smoke 통과 |
 | 커버리지 명령: api / web / U6+U9(`dist/claude-mcp/**`) | 46/0/0 / 12/0/0 / 165/0/0 |
 | 공백을 되돌린 뒤 `recipient`·`u9-recipient-claude` | 50/0/0 |
-| api 전체 회귀: `TEST_DB_PORT=55439 CATCHU_TEST_REDIS_URL=redis://127.0.0.1:56389 npm --prefix api test` | 종료 코드 1. 아래 세 묶음 |
+| api 전체 회귀: `TEST_DB_PORT=55439 CATCHU_TEST_REDIS_URL=redis://127.0.0.1:56389 npm --prefix api test` | 이 PC는 종료 코드 1, PR #516 CI는 통과. 아래 세 묶음 |
 
 api 전체 회귀의 세 묶음:
 
-| 묶음 | 결과 |
-|---|---|
-| 다시 빌드 시험 | 1/0/0 |
-| `catchu_lock_test` 5파일 | 30/0/0 |
-| `catchu_test` 149파일 1,755개 | 1,747/5/3. claude-mcp 시험은 모두 통과했다 |
+| 묶음 | 이 PC | PR #516 CI |
+|---|---|---|
+| 다시 빌드 시험 | 1/0/0 | 1/0/0 |
+| `catchu_lock_test` 5파일 | 30/0/0 | 30/0/0 |
+| `catchu_test` 149파일 1,755개 | 1,747/5/3 | 1,752/0/3 |
+
+- 이 PC의 실패 5개는 CI에서 모두 통과했다(아래 「이 PC 전체 회귀의 실패 5개」). 건너뛴 3개는 둘이 같다.
+- claude-mcp 시험은 이 PC와 CI 모두에서 다 통과했다.
+
+### PR #516 CI
+
+- [CI 실행](https://github.com/JminAILab/CatchU/actions/runs/42782158465)(커밋 `4179e172`): changes·api·web 작업이 통과했다.
+  - api 작업은 위 세 묶음을 돌렸다. 그 뒤 `test/analysis/shared-fixtures.check.cjs`도 돌려 16/0/0이다.
+  - web 작업은 lint·typecheck·시험 913/0/0·build·smoke가 통과했다.
+- worker·deps-audit 작업은 건너뛰었다. U9가 그 입력(`worker/`, 계약 YAML, CI 설정, 의존성 파일)을 고치지 않았기 때문이다. 그래서 CI 통과는 worker 검사 통과가 아니다.
+- 이 절과 위 표의 CI 열은 Code Generation 승인 뒤 더했다. 승인 때 담당이 정한 아키텍처 리뷰 R-01(요약의 실패 숫자를 CI 결과에 맞춘다)에 따른 것이다.
 
 ## 커버리지
 
@@ -256,7 +267,6 @@ api 전체 회귀의 세 묶음:
 
 - **S23 실제 Claude 확인:** U9가 `main`에 오른 뒤 개발 서버에서 담당이 한다(계획 「이번 계획에 넣지 않는 것」). 합성 클라이언트 시험의 통과는 실제 Claude 연결 성공이 아니다.
 - **브라우저 확인:** 배치, 초점, 실제 클립보드 복사는 브라우저에서 보는 것이라 돌리지 않았다.
-- **CI(`dev-ci`):** 아직 돌지 않았다. 푸시하지 않았기 때문이다. 코드 PR에서 같은 시험이 돈다.
 
 ### 전체 회귀에서 건너뛴 3개(U9 밖)
 
@@ -264,7 +274,7 @@ api 전체 회귀의 세 묶음:
 - S12 실제 Voyage 호출: 키가 없다.
 - U6 「표 없음」 탈퇴 경우: 표가 있어 그 경우를 만들 수 없다.
 
-### 전체 회귀의 실패 5개(U9와 무관, 고치지 않음)
+### 이 PC 전체 회귀의 실패 5개(U9와 무관, 고치지 않음, CI에서 통과)
 
 - **`api/test/integration/u7-analysis-chain.test.cjs` I4·I5·I6·I8:**
   - 65줄의 전제 확인 "worker 잠금 의존성과 CATCHU_TEST_WORKER_PYTHON 실행 파일 필요"에서 실패했다.
@@ -273,16 +283,19 @@ api 전체 회귀의 세 묶음:
   - 108줄의 심볼릭 링크 만들기가 `EPERM`으로 실패했다. 이 Windows 계정에 심볼릭 링크 권한이 없기 때문이다.
   - 시험이 만든 임시 폴더는 지워졌다.
 - 두 시험 파일 모두 `claude-mcp`를 불러오지 않는다. U9는 그 영역을 바꾸지 않았다.
+- PR #516 CI의 api 작업에서는 다섯 개 모두 통과했다. CI는 api 작업에 worker 잠금 환경을 준비하고 Linux에서 돌기 때문이다. 그래서 다섯 실패는 이 작업 사본의 환경 문제다.
 
 ## 커밋과 최신화
 
-### 설계 단계 커밋(Step 1, 푸시 안 함)
+### 설계 단계 커밋(Step 1)
 
 | 커밋 | 내용 |
 |---|---|
 | `c2ca74f4` | U9 기능 설계 승인 |
 | `b395ff52` | U9 비기능 요구사항 승인 |
 | `6af16da2` | U9 비기능 설계 승인, 감사 기록 두 파일 포함 |
+
+- 세 커밋은 따로 올리지 않았다. 코드 커밋 `4179e172`와 함께 `api/u9-recipient-claude`로 올라가 PR #516에 들어 있다.
 
 ### 최신화
 
@@ -312,6 +325,8 @@ api 전체 회귀의 세 묶음:
 - 다른 작업의 컨테이너와 `catchu-db`·`catchu-db-data`는 건드리지 않았다.
 
 ## 코드 PR에 넘길 것
+
+아래는 PR #516 본문의 「리뷰 요청」과 「관련 작업과 근거」에 넘겼다.
 
 - **리뷰 요청:**
   - U4 담당(csyg0616): U4 파일의 줄(`recipient-view.tsx`, `recipient-store.ts` 주석, recipient README, `recipient.test.mjs`, `publish-view.tsx`, publications README). #506에서 리뷰하겠다고 답했다.
