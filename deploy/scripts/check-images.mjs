@@ -366,6 +366,11 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
     expect(/^catchu_app:(t|true):TLSv1\.[23]$/.test(ssl), `pg_stat_ssl ${ssl}`);
     return `공개 링크 조회 404(LINK_UNAVAILABLE), DB 세션 ${ssl}`;
   });
+  await check("api", "GitHub 토큰 보관 볼륨에 api가 쓸 수 있다(UID 1000·0700)", () => {
+    const out = mustDocker(["exec", name("api"), "sh", "-c", 'd=/var/lib/catchu/github-credentials; stat -c "%u:%g %a" "$d"; f="$d/.write-probe"; : > "$f" && rm "$f" && echo writable']).stdout.trim().split("\n");
+    expect(out[0] === "1000:1000 700" && out[1] === "writable", out.join(" "));
+    return `볼륨 ${out[0]}, 쓰기·지우기 됨`;
+  });
   await check("worker", "health(합성 큐에 붙은 소비자 실행 중)", async () => {
     const res = await fetch(`http://127.0.0.1:${PORTS.worker}/health`);
     const body = await res.json();
