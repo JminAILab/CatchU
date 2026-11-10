@@ -7,6 +7,7 @@ import { LogoutStatus, useMemberLogout } from "./member-logout";
 import { ReauthNotice } from "./reauth-notice";
 import { SessionMemberGuard } from "./session-member-guard";
 import { useAuth } from "./use-auth";
+import { ModalSessionContext } from "./modal-session-actions";
 
 /**
  * 공통 인증으로 움직이는 회원 화면 묶음의 틀(통합 시험 전환이 켜졌을 때만 쓴다): 가드 → 로그인 헤더 → 로그아웃 안내 → 화면.
@@ -21,7 +22,7 @@ export function SessionMemberShell({ children }: { children: ReactNode }) {
     <SessionMemberGuard renderReauthNotice={(props) => <ReauthNotice {...props} />}>
       <MemberHeader onLogout={logout.onLogout} logoutPending={logout.pending} />
       <LogoutStatus notice={logout.notice} onRetry={logout.onLogout} />
-      {children}
+      <ModalSessionContext.Provider value={logout}>{children}</ModalSessionContext.Provider>
     </SessionMemberGuard>
   );
 }

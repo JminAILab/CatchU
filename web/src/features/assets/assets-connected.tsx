@@ -12,6 +12,7 @@ import { UNSAVED_MESSAGE } from "@/features/profile/use-unsaved-guard";
 import { confirmDiscardUnsaved, unsavedChanges, type ConfirmDialog, type UnsavedRegistry } from "@/lib/unsaved-changes";
 import type { RepositoryOption } from "./types";
 import styles from "./assets.module.css";
+import { ModalSessionActions } from "@/components/auth/modal-session-actions";
 
 export type RepositoryManagementBindings = {
   /** D 모달을 열기 직전에 호출: Catch 모달을 먼저 닫는다. */
@@ -85,6 +86,7 @@ export function AssetsConnected({ api, descriptionApi, repositories, repositoryN
   return (
     <div className={styles.preview}>
       <AssetsView dataMode="api" items={listMatches ? snapshot.items : []}
+        sessionActions={<ModalSessionActions />}
         repositories={repositories} repositoryNotice={repositoryNotice} repositoryId={repositoryId} visibility={visibility}
         listState={listMatches ? snapshot.listState : "loading"}
         listMessage={catchErrorText(snapshot.listError, "list")}

@@ -24,6 +24,8 @@ B 담당의 제품 `/assets`와 개발용 미리보기를 관리한다. 제품 �
 
 ## Catch 작성자 설명 편집 (12월 U4 W1)
 
+통합 인증 모드에서는 Catch 상세 모달 안에도 로그아웃과 재인증 안내를 표시한다(#467). 헤더와 같은 로그아웃 제어를 공유하고, 기존 공통 확인 로직으로 미저장 입력·미확정 분석 요청을 한 번에 묻는다. 취소하면 모달을 닫거나 입력·요청 정보를 초기화하지 않는다. 기본 인증 모드에서는 이 버튼을 추가하지 않는다.
+
 Catch 상세 모달의 근거 아래, 「Catch 설명 초안」(AI 초안) 위에 「작성자 설명」 영역을 둔다. 기록에서 확인한 내용·작성자 설명·AI 초안을 다른 제목으로 나누고, AI 초안은 입력칸에 넣지 않는다(U4 BR1.3).
 
 - `author-description-api.ts`: `GET`·`PUT /v1/catches/{catchId}/description` 호출, 응답 모양 확인, 4,000자(코드 포인트) 검사, 저장 결과 반영(`applyDescriptionSave`). `author-description-panel.tsx`는 그리기, `author-description-editor.tsx`는 상태·요청을 맡는다. `AssetsMemberPage`가 `createAuthorDescriptionApi(api.member)`를 `AssetsConnected`의 `descriptionApi`로 넘기며, 넘기지 않으면(미리보기) 영역을 그리지 않는다.

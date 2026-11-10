@@ -15,6 +15,7 @@ export function parseVisibilityFilter(value: string | null): VisibilityFilter {
 }
 
 type AssetsViewProps = {
+  sessionActions?: ReactNode;
   dataMode?: "preview" | "api";
   detailItem?: CatchAsset;
   detailActions?: ReactNode;
@@ -202,13 +203,14 @@ export function AssetsView(props: AssetsViewProps) {
         <CatchDetail key={selectedId} item={selected} state={detailState}
           repositoryName={repositories.find((repo) => repo.repositoryId === selected?.repositoryId)?.name}
           onClose={props.onClose} onRetry={props.onRetryDetail} dataMode={props.dataMode} errorMessage={props.detailMessage} actions={props.detailActions}
-          descriptionEditor={props.descriptionEditor} />
+          descriptionEditor={props.descriptionEditor} sessionActions={props.sessionActions} />
       )}
     </main>
   );
 }
 
-function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage, actions, descriptionEditor }: {
+function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage, actions, descriptionEditor, sessionActions }: {
+  sessionActions?: ReactNode;
   dataMode?: "preview" | "api";
   errorMessage?: string;
   actions?: ReactNode;
@@ -230,6 +232,7 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
   return (
     <dialog ref={dialogRef} className={`${styles.dialog} ${styles.catchDialog}`} aria-labelledby="catch-detail-title"
       onCancel={(event) => { event.preventDefault(); onClose(); }}>
+      {sessionActions}
       <div className={styles.dialogHeading}>
         <div><p className={styles.eyebrow}>CATCH DETAIL{dataMode === "preview" ? " · 임시 데이터" : ""}</p><h2 id="catch-detail-title">Catch 상세</h2></div>
         <button className={styles.secondaryButton} autoFocus onClick={onClose}>닫기</button>

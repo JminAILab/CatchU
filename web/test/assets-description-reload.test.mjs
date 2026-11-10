@@ -32,7 +32,7 @@ const hooks = registerHooks({
     return nextResolve(specifier, context);
   },
   load(url, context, nextLoad) {
-    if (url === NAVIGATION_STUB) return { format: "module", shortCircuit: true, source: "export const usePathname = () => '/'; export const useSearchParams = () => new URLSearchParams();" };
+    if (url === NAVIGATION_STUB) return { format: "module", shortCircuit: true, source: "export const usePathname = () => '/'; export const useSearchParams = () => new URLSearchParams(); export const useRouter = () => { throw new Error('이 시험은 라우터를 호출하지 않는다'); };" };
     if (url.endsWith(".module.css")) return { format: "module", shortCircuit: true, source: "export default {};" };
     if (url.endsWith(".tsx")) {
       return {
