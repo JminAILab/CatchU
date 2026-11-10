@@ -24,6 +24,8 @@ class ProviderRequest:
     data: str
     timeout_seconds: float
     max_output_bytes: int
+    # AI 쪽이 켜진 생성 호출(CR3 BR3.1·BR5.1). 응답에 제목 후보·설명 문장 칸을 받는다(설명 조각은 받지 않는다).
+    ai_side: bool = False
 
 
 class ProviderError(Exception):

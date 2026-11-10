@@ -1,7 +1,7 @@
 """생성 흐름(#120)의 상태·실패·호출 한도·시간·순서를 합성 제공자로 수집부터 결과 조합까지 돌린다.
 
 기대값은 #120 본문의 완료 기준과 2026-10-12 결정 댓글(결정 4·8·9·10·13·14), 계획의 「상태·실패 변환」
-표에서 정했다. 이슈가 구현에 맡긴 실패 코드 이름·회원용 문구·상한 수치만 이번 구현이 고른 값(45초·4,000 B,
+표에서 정했다. 이슈가 구현에 맡긴 실패 코드 이름·회원용 문구·상한 수치만 이번 구현이 고른 값(45초,
 「{원인} 설명 초안을 만들지 못했다」 등)을 기대값으로 따로 적는다. 생성 코드를 읽어 맞추지 않았다.
 
 후보는 열린 PR마다 본인 커밋 하나(또는 둘)를 둔 합성 저장소로 만든다. PR마다 고친 파일 이름이 달라서
@@ -11,10 +11,11 @@
 import json
 import logging
 import socket
+from collections import Counter
 from collections.abc import Callable, Mapping
 from copy import deepcopy
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
@@ -47,6 +48,7 @@ from generation_scenarios import (
     Late,
     Reply,
     ScriptedProvider,
+    ai_answer,
     answer,
     assert_generated_text,
     assert_preserved,
@@ -55,13 +57,17 @@ from generation_scenarios import (
     file_title,
     generation_case,
     line_fragment,
-    line_question,
     naive,
+    naive_ai,
     pick,
+    question,
     sent_files,
+    written,
 )
+from generation_scenarios import sent_lines as sent_lines_of
 from github_synthetic import (
     MEMBER,
+    OTHER,
     FakeClock,
     detail_path,
     sha,
@@ -80,6 +86,10 @@ from app.generation import (
     UnusableResponse,
     run_generation,
 )
+from app.generation.judged import CatchTrace
+from app.generation.request import QUESTION_RULES
+from app.judgement.provider import Question
+from app.judgement.synthetic import SyntheticJudge, default_answer
 from app.processing import (
     EligibleCandidate,
     ExecutionUnknown,
@@ -102,9 +112,9 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
 # 모든 시험을 네트워크를 막은 채 돌린다(첫 범위의 검사 12).
 pytestmark = pytest.mark.usefixtures("no_network")
 
-# 구현이 고른 상한(제안값): 생성 호출 시간 제한 45초, 응답 4,000 B.
+# 구현이 고른 상한(제안값): 생성 호출 시간 제한 45초. 응답 6,000 B는 2026-11-09 팀장 결정(#487).
 GENERATION_TIMEOUT_SECONDS = 45.0
-MAX_OUTPUT_BYTES = 4_000
+MAX_OUTPUT_BYTES = 6_000
 
 # 구현이 고른 실패 코드와 회원용 문구. 문구는 「{원인} 설명 초안을 만들지 못했다」·「{원인} 생각해볼 질문을
 # 만들지 못했다」이고, 한도 실패는 후보에 묶이지 않은 ANALYSIS 1건이다.
@@ -882,7 +892,7 @@ def unverified_title(request: ProviderRequest) -> str:
     return answer(
         fragments=[line_fragment(line, "alpha")],
         title=code_title("c9f9:L1", "alpha"),
-        questions=[line_question("BACKGROUND", line, "alpha")],
+        questions=[question("BACKGROUND")],
     )
 
 
@@ -892,7 +902,7 @@ def unclassified_title(request: ProviderRequest) -> str:
     return answer(
         fragments=[line_fragment(line, "blob")],
         title=file_title(file_id_of(request, "tools/blob")),
-        questions=[line_question("BACKGROUND", line, "blob")],
+        questions=[question("BACKGROUND")],
     )
 
 
@@ -942,7 +952,7 @@ def test_call_limits_are_passed_and_applied_per_call() -> None:
     case = generation_case(TWO, provider, limits=limits, clock=clock)
 
     assert_calls(provider, 2, timeout=12.5, max_output=1_500)
-    # 두 번째 응답은 기본 상한(4,000 B) 안이지만 이 요청의 상한(1,500 B)은 넘는다.
+    # 두 번째 응답은 기본 상한(6,000 B) 안이지만 이 요청의 상한(1,500 B)은 넘는다.
     assert len(padded(1_500)(provider.requests[1]).encode()) < MAX_OUTPUT_BYTES
     assert_failed_whole(case, 4)
     assert_failed_whole(case, 3)
@@ -1087,3 +1097,1005 @@ def test_huge_hunk_number_excludes_only_that_file() -> None:
     assert paths(provider.requests[0]) == {"app/alpha.py"}
     assert generated(case, 3).draft.status == "GENERATED"
     assert added_limits(case, 3)[commit_url(sha(31))] == (TRUNCATED,)
+
+
+# 제목 우선순위(CR1 BR3.1~BR3.3, S16, NFR1.1·NFR2.1)
+
+RECORD_TITLE = "로그인 오류 수정"
+RECORD_MESSAGE = "결제 실패 알림 메모"
+
+
+def titled(number: int, title: str, *commits: Commit) -> Pull:
+    """연동 계정이 연 열린 PR. 커밋 목록을 끝까지 받고 본인 커밋뿐이라 PR 제목이 기록의 글이다."""
+    return Pull(number, MEMBER, commits, state="open", created=number - 1, title=title)
+
+
+def own_message(
+    number: int, minute: int, message: str, *files: dict[str, Any]
+) -> Commit:
+    return commit(
+        sha(number),
+        MEMBER,
+        parents=(ROOT,),
+        minute=minute,
+        message=message,
+        files=files,
+    )
+
+
+def without_title(request: ProviderRequest) -> str:
+    """조각 제목만 빠진 응답(형식 위반 MISSING). 조각 제목이면 고쳐 쓰기 대상이다."""
+    value = json.loads(naive(request))
+    del value["title"]
+    return json.dumps(value)
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [ProviderError(), TimeoutError(), "{not json"],
+    ids=["call-failed", "timeout", "unreadable"],
+)
+def test_s16_failed_generation_keeps_the_record_text_title(reply: Reply) -> None:
+    """S16: 생성 호출이 실패해도 쓸 만한 기록의 글이 제목이다. 설명 초안은 실패, 고쳐 쓰기 호출은 없다."""
+    provider = ScriptedProvider(reply)
+
+    case = generation_case(
+        pulls(titled(3, RECORD_TITLE, own(31, 3, short("alpha")))), provider
+    )
+
+    each = generated(case, 3)
+    assert each.title == RECORD_TITLE
+    assert each.draft.status == "FAILED"
+    assert entry(case, 3)["title"] == RECORD_TITLE
+    assert entry(case, 3)["workFacts"] == [
+        "PR #3, 상태 열림",
+        f'PR 제목: "{RECORD_TITLE}"',
+    ]
+    assert provider.rewrite_requests() == []
+    assert case.run.report.rewrite_calls == 0
+
+
+def test_record_text_title_skips_rewriting_a_broken_fragment_title(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """BR3.3·NFR2.1: 조각 제목이 형식을 어겨도 기록의 글이 제목이면 고쳐 쓰기를 부르지 않는다. 생성 호출은
+    후보마다 한 번 그대로다. 「제목만 없음」은 최종 제목 기준이라 세지 않는다."""
+    provider = ScriptedProvider(without_title, repeat=False)
+
+    with caplog.at_level(logging.INFO, logger="app.generation"):
+        case = generation_case(
+            pulls(titled(3, RECORD_TITLE, own(31, 3, short("alpha")))), provider
+        )
+
+    assert_calls(provider, 1)
+    each = generated(case, 3)
+    assert each.title == RECORD_TITLE
+    assert each.draft.status == "GENERATED"
+    assert case.run.report.rewrite_calls == 0
+    assert case.run.report.title_only_null == 0
+    assert "rewriteCalls=0" in caplog.text
+    assert "titleOnlyNull=0" in caplog.text
+
+
+def test_weak_record_text_leaves_the_fragment_title_and_its_rewrite() -> None:
+    """BR3.2: 기록의 글이 부실하면(PR 제목 「WIP」) 조각 제목 경로다. 형식을 어긴 조각 제목은 고쳐 쓴다."""
+
+    def reply(request: ProviderRequest) -> str:
+        if request.purpose == "REWRITE_TITLE":
+            line = json.loads(request.data)["lines"][0]
+            return json.dumps({"title": code_title(line["id"], line["names"][0])})
+        return without_title(request)
+
+    provider = ScriptedProvider(reply)
+
+    case = generation_case(
+        pulls(titled(3, "WIP", own(31, 3, short("alpha")))), provider
+    )
+
+    each = generated(case, 3)
+    assert each.record_text is not None and each.record_text.weak
+    assert len(provider.rewrite_requests()) == 1
+    assert each.title == "alpha 코드 수정"
+    assert len(each.work_facts) == 1
+
+
+def test_record_text_title_is_counted_out_of_title_only_null() -> None:
+    """「제목만 없음」은 최종 제목이 없는 후보만 센다. 조각 제목이 null이어도 기록의 글이 제목이면 0이다."""
+
+    def unverified(request: ProviderRequest) -> str:
+        value = json.loads(naive(request))
+        value["title"] = code_title(pick(request), "notInTheLine")
+        return json.dumps(value)
+
+    provider = ScriptedProvider(unverified)
+
+    record_case = generation_case(
+        pulls(titled(3, RECORD_TITLE, own(31, 3, short("alpha")))), provider
+    )
+    weak_case = generation_case(
+        pulls(titled(3, "wip", own(31, 3, short("alpha")))),
+        ScriptedProvider(unverified),
+    )
+
+    assert generated(record_case, 3).title == RECORD_TITLE
+    assert record_case.run.report.title_only_null == 0
+    assert generated(weak_case, 3).title is None
+    assert weak_case.run.report.title_only_null == 1
+
+
+def test_record_text_never_reaches_the_generation_request() -> None:
+    """NFR1.1: 생성 요청에는 바뀐 줄만 보낸다. PR 제목·커밋 첫 줄(기록의 글)은 요청 본문에 없다."""
+    provider = ScriptedProvider(naive)
+    other_title = "다른 PR 제목 표식"
+
+    case = generation_case(
+        pulls(
+            titled(3, RECORD_TITLE, own_message(31, 3, RECORD_MESSAGE, short("alpha"))),
+            Pull(
+                4,
+                MEMBER,
+                (own_message(32, 9, RECORD_MESSAGE + " 둘째", short("beta")),),
+                state="open",
+                created=3,
+                title=other_title,
+            ),
+        ),
+        provider,
+    )
+
+    assert generated(case, 3).title == RECORD_TITLE
+    assert generated(case, 4).title == other_title
+    for request in provider.requests:
+        for text in (RECORD_TITLE, RECORD_MESSAGE, other_title):
+            assert text not in request.data
+            assert text not in request.instructions
+
+
+def test_budget_skipped_candidate_still_gets_the_record_text_title() -> None:
+    """마감이 가까워 생성 호출을 건너뛰어도(budget_skipped) 기록의 글 제목은 남는다(BR3.1, S16의 건너뜀 갈래)."""
+    provider = ScriptedProvider(naive)
+
+    case = generation_case(
+        pulls(titled(3, RECORD_TITLE, own(31, 3, short("alpha")))),
+        provider,
+        deadline=timedelta(seconds=GENERATION_TIMEOUT_SECONDS - 1),
+    )
+
+    assert provider.requests == []
+    assert case.run.report.budget_skipped == 1
+    each = generated(case, 3)
+    assert each.title == RECORD_TITLE
+    assert each.draft.status == "NOT_GENERATED"
+    assert entry(case, 3)["title"] == RECORD_TITLE
+    assert case.run.report.title_only_null == 0
+
+
+def test_candidate_without_material_still_gets_the_record_text_title() -> None:
+    """고를 줄이 없어 생성 호출을 건너뛰어도 기록의 글 제목은 남는다(BR3.1)."""
+    target = own(31, 3, change("assets/logo.png", with_patch=False))
+    provider = ScriptedProvider(naive)
+
+    case = generation_case(pulls(titled(3, RECORD_TITLE, target)), provider)
+
+    assert provider.requests == []
+    each = generated(case, 3)
+    assert each.title == RECORD_TITLE
+    assert each.draft.status == "NOT_GENERATED"
+    assert case.run.report.no_material == 1
+
+
+# CR3 AI 쪽: 판정 공급자를 넘긴 생성 흐름(기능 설계 functional-spec.md 3절 시나리오)
+#
+# 판정은 합성 판정 어댑터(`app.judgement.synthetic.SyntheticJudge`)가 질문 종류·대상마다 정해 둔 답을 돌려준다.
+# 기대값은 rules.md(BR2~BR6)와 시나리오 표에서 정했다. 실패 조건(unit-test-instructions.md): AI 쪽이 꺼졌는데
+# 판정 호출이 나감, 같은 후보에 판정 두 번, 판정 요청에 정해진 칸 밖 자료, 판정 없이 AI 글이 제목·설명이 됨,
+# 작업 사실에 생성 출력, 같은 기록의 글을 제목·둘째 줄이 다르게 판단, 원문이 로그에 남음.
+
+JUDGEMENT_TIMEOUT = "JUDGEMENT_TIMEOUT"
+MISSING = object()
+SECOND_LINE = f'PR 제목: "{RECORD_TITLE}"'
+
+
+def choose(option: str, probability: float) -> Callable[[Question], object]:
+    """고르기 답: 그 선택지에 probability, 나머지에 남은 확률을 고르게."""
+
+    def value(question: Question) -> object:
+        rest = (1 - probability) / max(len(question.options) - 1, 1)
+        return [probability if each == option else rest for each in question.options]
+
+    return value
+
+
+def answers(**values: object) -> Callable[[Question], object | None]:
+    """질문 종류(또는 `종류__대상`)마다의 답. 값이 MISSING이면 답하지 않는다. 없는 종류는 모두 통과하는 답."""
+
+    def answer(question: Question) -> object | None:
+        value = values.get(f"{question.kind}__{question.target}", MISSING)
+        if value is MISSING:
+            value = values.get(question.kind, default_answer(question))
+        if value is MISSING:
+            return None
+        return value(question) if callable(value) else value
+
+    return answer
+
+
+def ai_case(
+    scenario: Scenario,
+    reply: Reply = naive_ai,
+    *,
+    judge: SyntheticJudge | None = None,
+    **options: Any,
+) -> tuple[GenerationCase, SyntheticJudge]:
+    judge = judge or SyntheticJudge()
+    provider = ScriptedProvider(reply)
+    case = generation_case(scenario, provider, judge=judge, **options)
+    return case, judge
+
+
+def catch_questions(judge: SyntheticJudge, index: int = 0) -> dict[str, Question]:
+    return {
+        f"{each.kind}:{each.target}": each
+        for each in judge.catch_requests()[index].questions
+    }
+
+
+def record_pull(*files: dict[str, Any], number: int = 3) -> Scenario:
+    """쓸 만한 PR 제목(RECORD_TITLE)이 기록의 글인 열린 PR 하나."""
+    return pulls(titled(number, RECORD_TITLE, own(30 + number, 3, *files)))
+
+
+# Step 9: 생성 요청·응답의 AI 쪽(BR2.4·BR3.1·BR5.1)
+
+
+def test_s3_ai_generation_returns_title_candidates_citing_lines() -> None:
+    """S3: AI 쪽이 켜지면 기록의 글이 쓸 만해도 생성 응답에 제목 후보가 있고 후보마다 근거 줄이 있다. 생성
+    요청은 AI 지시문이고 자료에 PR 제목·커밋 메시지가 없다(BR2.4)."""
+    seen: list[ProviderRequest] = []
+
+    def reply(request: ProviderRequest) -> str:
+        seen.append(request)
+        return naive_ai(request)
+
+    case, judge = ai_case(
+        pulls(
+            titled(3, RECORD_TITLE, own_message(31, 3, RECORD_MESSAGE, short("alpha")))
+        ),
+        reply,
+    )
+
+    (request,) = seen
+    assert request.ai_side is True
+    assert "titleCandidates" in request.instructions
+    for text in (RECORD_TITLE, RECORD_MESSAGE):
+        assert text not in request.data and text not in request.instructions
+    questions = catch_questions(judge)
+    assert set(questions) == {
+        "RECORD_WHAT:record",
+        "TITLE_CHOICE:title",
+        "SENTENCE_TRUE:s1",
+    }
+    data = json.loads(judge.catch_requests()[0].data)
+    assert data["titles"] == [
+        {
+            "id": "t1",
+            "text": "alpha 값 변경",
+            "lines": [pick(request, change="added", contains="alpha").id],
+        }
+    ]
+    assert data["record"] == RECORD_TITLE
+    # 모두 통과하면 기록의 글이 제목이다(BR3.4의 1).
+    assert generated(case, 3).title == RECORD_TITLE
+
+
+def test_generation_request_without_judge_is_the_template_request() -> None:
+    """S1의 생성 쪽: 판정 공급자가 없으면 지금 지시문·응답 그대로이고 판정 호출은 0번이다(BR1.3)."""
+    provider = ScriptedProvider(naive)
+
+    case = generation_case(record_pull(short("alpha")), provider)
+
+    (request,) = provider.requests
+    assert request.ai_side is False
+    assert "titleCandidates" not in request.instructions
+    assert case.run.report.ai_side is False
+    assert case.run.report.catch_judgements == 0
+    assert case.run.report.judgement_provider == "-"
+
+
+WRITTEN = (
+    "알파 값을 바꾸게 된 배경은 무엇이었나요?",
+    "이 작업이 의도대로 동작하는지 확인했다면 어떻게 확인했나요?",
+)
+
+
+@pytest.mark.parametrize("ai_side", [False, True], ids=["ai-off", "ai-on"])
+def test_questions_are_the_model_text_on_both_sides(ai_side: bool) -> None:
+    """#487: AI 쪽을 끄든 켜든 같은 질문 지시를 보내고, 질문은 AI가 쓴 글 그대로다(틀 문장이 아니다).
+
+    질문은 판정·기계 대조를 거치지 않는다: 켰을 때 판정 요청에 질문 글이 없다.
+    """
+    seen: list[ProviderRequest] = []
+
+    def reply(request: ProviderRequest) -> str:
+        seen.append(request)
+        value = json.loads(naive_ai(request) if ai_side else naive(request))
+        value["questions"] = [
+            question("BACKGROUND", WRITTEN[0]),
+            question("VERIFICATION", WRITTEN[1]),
+        ]
+        return json.dumps(value, ensure_ascii=False)
+
+    scenario = pulls(opened(3, ALPHA))
+    if ai_side:
+        case, judge = ai_case(scenario, reply)
+        for each in judge.catch_requests():
+            for text in WRITTEN:
+                assert text not in each.data and text not in each.instructions
+    else:
+        case = generation_case(scenario, ScriptedProvider(reply))
+
+    (request,) = seen
+    assert request.ai_side is ai_side
+    assert QUESTION_RULES in request.instructions
+    made = generated(case, 3)
+    assert made.reflection.status == "GENERATED"
+    assert made.reflection.questions == WRITTEN
+    for text in made.reflection.questions:
+        assert "이름이 포함된 줄을" not in text
+
+
+def test_s18_title_candidate_over_40_chars_is_dropped_without_rewriting() -> None:
+    """S18: 41자 AI 후보는 버려지고 고쳐 쓰기 호출이 없다."""
+    long_text = "alpha " + "가" * 35
+
+    def reply(request: ProviderRequest) -> str:
+        line = pick(request, contains="alpha")
+        assert len(long_text) == 41
+        return ai_answer(
+            titles=[written(long_text, line)],
+            sentences=[written("alpha 줄을 바꿨습니다.", line)],
+            title={"target": "CODE_NAME", "line": line.id},
+            questions=[question("BACKGROUND")],
+        )
+
+    case, judge = ai_case(pulls(opened(3, ALPHA)), reply)
+
+    assert case.provider.rewrite_requests() == []
+    assert "TITLE_CHOICE:title" not in catch_questions(judge)
+    assert case.run.report.ai_notes["dropped:TOO_LONG"] == 1
+    # 조각 제목도 형식 위반이라 고쳐 쓰지 않아 제목이 없다(BR3.4의 4).
+    assert generated(case, 3).title is None
+
+
+def test_s30_response_without_sentences_is_an_unreadable_generation() -> None:
+    """S30: 생성 응답에 문장 칸이 없으면 읽을 수 없는 응답이다. 설명·질문 FAILED, 판정은 보내지 않는다."""
+
+    def reply(request: ProviderRequest) -> str:
+        value = json.loads(naive_ai(request))
+        del value["sentences"]
+        return json.dumps(value)
+
+    case, judge = ai_case(pulls(opened(3, ALPHA)), reply)
+
+    each = generated(case, 3)
+    assert each.draft.status == "FAILED"
+    assert each.draft.failure is not None
+    assert each.draft.failure.code == UNREADABLE
+    assert each.reflection.status == "FAILED"
+    assert judge.requests == []
+    assert new_failures(case) == whole_failures(
+        UNREADABLE, entry(case, 3)["candidateId"]
+    )
+
+
+def test_sentences_with_unknown_or_masked_lines_are_dropped() -> None:
+    """근거 줄이 없거나 보낸 자료에 없는 줄을 가리킨 문장은 버린다. 칸은 맞지만 모두 버려지면 판정할 문장이 없다."""
+
+    def reply(request: ProviderRequest) -> str:
+        line = pick(request, contains="alpha")
+        return ai_answer(
+            titles=[],
+            sentences=[
+                written("alpha 줄을 바꿨습니다.", "c9f9:L1"),
+                {"text": "alpha 줄을 바꿨습니다.", "lines": []},
+                {"text": "alpha", "lines": [line.id], "extra": 1},
+            ],
+            title=code_title(line, "alpha"),
+            questions=[question("BACKGROUND")],
+        )
+
+    case, judge = ai_case(pulls(opened(3, ALPHA)), reply)
+
+    assert judge.requests == []
+    assert generated(case, 3).draft.status == "NOT_GENERATED"
+    assert generated(case, 3).title == "alpha 코드 수정"
+    assert case.run.report.ai_notes == Counter(
+        {"dropped:UNKNOWN_LINE": 1, "dropped:ITEM_SHAPE": 2}
+    )
+
+
+@pytest.mark.parametrize("mark", ["\n", " ", " ", "\x85"])
+def test_written_items_with_a_line_break_are_dropped(mark: str) -> None:
+    """제목 후보·설명 문장은 한 줄이다. CR·LF뿐 아니라 유니코드 줄 구분 문자가 든 글도 모양 위반으로 버린다
+    (#504 자동 리뷰 지적)."""
+
+    def reply(request: ProviderRequest) -> str:
+        line = pick(request, contains="alpha")
+        return ai_answer(
+            titles=[written(f"alpha{mark}값 변경", line)],
+            sentences=[written(f"alpha 줄을{mark}바꿨습니다.", line)],
+            title=code_title(line, "alpha"),
+            questions=[question("BACKGROUND")],
+        )
+
+    case, judge = ai_case(pulls(opened(3, ALPHA)), reply)
+
+    assert judge.requests == []
+    assert generated(case, 3).draft.status == "NOT_GENERATED"
+    assert case.run.report.ai_notes == Counter({"dropped:ITEM_SHAPE": 2})
+
+
+# Step 10: 순서·시간 몫·상한(BR2.1·BR2.2·BR2.6·BR6.1, 비기능 설계 「호출 순서」·「마감 확인」)
+
+# 작은 자료 상한. 한 줄짜리 파일 후보는 작은 후보로, 파일 여덟 개 후보는 큰 후보로 담긴다.
+SMALL_DATA = GenerationLimits(max_data_bytes=700)
+
+
+def big(number: int, minute: int) -> Commit:
+    """`app/` 아래 한 줄 파일 여덟 개를 고친 본인 커밋. 작은 자료 상한에서 큰 후보다."""
+    return own(number, minute, *(short(f"delta{index}") for index in range(8)))
+
+
+def with_big() -> Scenario:
+    """S7: Catch 셋(PR #3 alpha, #4 beta, #6 큰 후보)."""
+    return pulls(opened(3, ALPHA), opened(4, BETA), opened(6, big(36, 12)))
+
+
+def purposes(judge: SyntheticJudge) -> list[str]:
+    return [request.purpose for request in judge.requests]
+
+
+def test_s7_one_judgement_per_catch_and_one_material_judgement_for_the_big_one() -> (
+    None
+):
+    """S7: Catch 3개(큰 후보 1개)면 Catch 판정 3번, 재료 판정 1번이다. 후보마다 재료 판정 → 생성 → 판정 순서다."""
+    order: list[str] = []
+    judge = SyntheticJudge(before=lambda request: order.append(request.purpose))
+
+    def reply(request: ProviderRequest) -> str:
+        order.append("GENERATE")
+        return naive_ai(request)
+
+    case, _ = ai_case(with_big(), reply, judge=judge, limits=SMALL_DATA)
+
+    assert purposes(judge).count("CATCH") == 3
+    assert purposes(judge).count("MATERIAL") == 1
+    assert len(judge.requests) <= 4
+    # 큰 후보(PR #6, 12분)가 가장 먼저 생성된다: 재료 판정 → 생성 → Catch 판정, 그다음 후보.
+    assert order == [
+        "MATERIAL",
+        "GENERATE",
+        "CATCH",
+        "GENERATE",
+        "CATCH",
+        "GENERATE",
+        "CATCH",
+    ]
+    assert case.run.report.catch_judgements == 3
+    assert case.run.report.material_judgements == 1
+    (material,) = judge.material_requests()
+    assert {question.kind for question in material.questions} == {"MATERIAL_SCORE"}
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["JUDGEMENT_TIMEOUT", "JUDGEMENT_CALL_FAILED", "JUDGEMENT_RESPONSE_UNREADABLE"],
+)
+def test_s7_failed_judgements_are_not_sent_again(failure: str) -> None:
+    """S7·NFR2.5: 판정이 실패해도 같은 후보에 다시 보내지 않는다(재료 1 + Catch 3 = 4번)."""
+    judge = SyntheticJudge(failure=failure)  # type: ignore[arg-type]
+
+    case, _ = ai_case(with_big(), judge=judge, limits=SMALL_DATA)
+
+    assert len(judge.requests) == 4
+    assert case.run.report.material_judgement_reasons == Counter({failure: 1})
+    assert case.run.report.catch_judgement_reasons == Counter({failure: 3})
+
+
+def test_s1_no_judge_means_no_judgement_calls() -> None:
+    """S1: AI 쪽이 꺼지면(판정 공급자 없음) 큰 후보가 있어도 판정 호출이 0번이고 재료는 CR1 규칙 순서다."""
+    provider = ScriptedProvider(naive)
+    case = generation_case(with_big(), provider, limits=SMALL_DATA)
+    assert case.run.report.catch_judgements == 0
+    assert case.run.report.material_judgements == 0
+    assert all(request.ai_side is False for request in provider.requests)
+
+
+@pytest.mark.parametrize(
+    ("files", "reply", "deadline", "draft"),
+    [
+        (
+            (change("assets/logo.png", with_patch=False),),
+            naive_ai,
+            None,
+            "NOT_GENERATED",
+        ),
+        # 생성 시간 제한 45초 + 판정 몫 20초가 남지 않아 생성을 건너뛴다.
+        ((short("alpha"),), naive_ai, 64, "NOT_GENERATED"),
+        ((short("alpha"),), ProviderError(), None, "FAILED"),
+    ],
+    ids=["no-material", "generation-skipped", "generation-failed"],
+)
+def test_s27_no_generation_response_means_no_judgement(
+    files: tuple[dict[str, Any], ...],
+    reply: Reply,
+    deadline: float | None,
+    draft: str,
+) -> None:
+    """S27: 생성 응답이 없는 Catch는 판정하지 않는다. 설명은 지금 상태, 제목·둘째 줄은 「판정 없음」(규칙 결과)."""
+    options: dict[str, Any] = {}
+    if deadline is not None:
+        options["deadline"] = timedelta(seconds=deadline)
+
+    case, judge = ai_case(record_pull(*files), reply, **options)
+
+    assert judge.requests == []
+    each = generated(case, 3)
+    assert each.draft.status == draft
+    assert each.title == RECORD_TITLE
+    assert entry(case, 3)["workFacts"] == ["PR #3, 상태 열림", SECOND_LINE]
+
+
+class DriftClock(FakeClock):
+    """drift를 켜면 읽을 때마다 1초씩 간다(생성 뒤 로컬 처리에 시간이 걸린 것을 흉내 낸다)."""
+
+    drift = False
+
+    def __call__(self) -> datetime:
+        if self.drift:
+            self.advance(1)
+        return self.now
+
+
+def test_s28_no_time_left_for_judgement_after_generation() -> None:
+    """S28: 생성 뒤 마감까지 판정 시간(20초)이 남지 않으면 판정하지 않는다. 설명 NOT_GENERATED, 요청 실패
+    GENERATION_BUDGET_EXHAUSTED 1건, 제목·둘째 줄은 판정 없음."""
+    clock = DriftClock()
+
+    def reply(request: ProviderRequest) -> str:
+        clock.advance(44)
+        clock.drift = True
+        return naive_ai(request)
+
+    case, judge = ai_case(
+        record_pull(short("alpha")),
+        reply,
+        clock=clock,
+        deadline=timedelta(seconds=65),
+    )
+
+    assert judge.requests == []
+    each = generated(case, 3)
+    assert each.draft.status == "NOT_GENERATED"
+    assert each.reflection.status == "GENERATED"
+    assert each.title == RECORD_TITLE
+    assert entry(case, 3)["workFacts"] == ["PR #3, 상태 열림", SECOND_LINE]
+    assert new_failures(case) == [BUDGET_FAILURE]
+    assert case.run.report.judgement_skipped == 1
+
+
+def test_judgement_cap_stops_judging_later_catches() -> None:
+    """NFR2.3: Catch 판정 상한(작게 둔 1번)에 닿은 뒤의 Catch는 판정하지 않는다. 요청 실패는 1건뿐이다."""
+    limits = GenerationLimits(max_catch_judgement_calls=1)
+
+    case, judge = ai_case(THREE, limits=limits)
+
+    assert len(judge.catch_requests()) == 1
+    statuses = [generated(case, number).draft.status for number in (3, 4, 5)]
+    assert statuses.count("GENERATED") == 1
+    assert statuses.count("NOT_GENERATED") == 2
+    assert new_failures(case) == [BUDGET_FAILURE]
+    assert case.run.report.judgement_skipped == 2
+
+
+def test_material_judgement_needs_time_for_generation_and_judgement() -> None:
+    """재료 판정은 「남은 시간 ≥ 20 + 45 + 20초」일 때만 한다. 모자라면 재료 판정 없이 규칙 순서로 담고 생성한다."""
+    case, judge = ai_case(
+        pulls(opened(6, big(36, 12))),
+        limits=SMALL_DATA,
+        deadline=timedelta(seconds=84),
+    )
+
+    assert judge.material_requests() == []
+    assert len(judge.catch_requests()) == 1
+    assert case.run.report.material_skipped == 1
+    assert generated(case, 6).draft.status == "GENERATED"
+
+
+def test_small_candidate_gets_no_material_judgement() -> None:
+    """작은 후보에는 재료 판정을 보내지 않는다(BR6.1)."""
+    case, judge = ai_case(pulls(opened(3, ALPHA)), limits=SMALL_DATA)
+    assert judge.material_requests() == []
+    assert case.run.report.material_judgements == 0
+
+
+# Step 11: 판정 답 적용 — 제목·둘째 줄·설명(BR3.4·BR3.5·BR4.1·BR4.2·BR5.2~BR5.4)
+
+
+def three_sentences(request: ProviderRequest) -> str:
+    """후보 둘(alpha 값 변경·alpha 줄 수정)과 문장 셋(모두 기계 대조 통과)."""
+    line = pick(request, change="added", contains="alpha")
+    return ai_answer(
+        titles=[written("alpha 값 변경", line), written("alpha 줄 수정", line)],
+        sentences=[
+            written("alpha 값을 2로 바꿨습니다.", line),
+            written("app/alpha.py의 한 줄이 바뀌었습니다.", line),
+            written("alpha 줄이 더해졌습니다.", line),
+        ],
+        title=code_title(line, "alpha"),
+        questions=[question("BACKGROUND")],
+    )
+
+
+def test_s5_weak_record_by_judgement_takes_the_ai_title_and_drops_the_second_line() -> (
+    None
+):
+    """S5: RECORD_WHAT 0.4, 후보 A 고르기 0.93이면 제목은 A이고 작업 사실 둘째 줄을 지운다."""
+    judge = SyntheticJudge(answers(RECORD_WHAT=0.4, TITLE_CHOICE=choose("t1", 0.93)))
+
+    case, _ = ai_case(record_pull(short("alpha")), three_sentences, judge=judge)
+
+    each = generated(case, 3)
+    assert each.title == "alpha 값 변경"
+    assert entry(case, 3)["workFacts"] == ["PR #3, 상태 열림"]
+    assert entry(case, 3)["title"] == "alpha 값 변경"
+    assert case.run.report.second_lines_removed == 1
+    assert case.run.report.title_sources == Counter({"AI": 1})
+
+
+def whole_scenario() -> Scenario:
+    """본인 커밋 둘과 다른 계정 커밋 하나가 든 열린 PR #3: 기록의 글은 본인 커밋 첫 줄이고 RECORD_WHOLE도 묻는다."""
+    first = own_message(41, 2, "alpha 값을 2로 바꿈", short("alpha"))
+    second = commit(
+        sha(42), MEMBER, parents=(first.sha,), minute=3, files=[short("beta")]
+    )
+    other = commit(
+        sha(43), OTHER, parents=(second.sha,), minute=4, files=[short("gamma")]
+    )
+    return pulls(Pull(3, MEMBER, (first, second, other), state="open", created=1))
+
+
+def test_s6_record_failing_only_the_whole_check_stays_the_title() -> None:
+    """S6: 기록의 글이 RECORD_WHOLE만 0.4이고 후보가 모두 0.9 미만이면 제목은 그 기록의 글, 둘째 줄은 남는다."""
+    judge = SyntheticJudge(
+        answers(RECORD_WHAT=0.8, RECORD_WHOLE=0.4, TITLE_CHOICE=choose("t1", 0.6))
+    )
+
+    case, _ = ai_case(whole_scenario(), three_sentences, judge=judge)
+
+    record = case.before.output.candidates[0].record_text
+    assert record is not None and record.source == "COMMIT_FIRST_LINE"
+    assert "RECORD_WHOLE:record" in catch_questions(judge)
+    each = case.output.candidates[0]
+    assert each.title == "alpha 값을 2로 바꿈"
+    assert each.work_facts == case.before.output.candidates[0].work_facts
+    assert len(each.work_facts) == 2
+    assert case.run.report.title_sources == Counter({"RECORD_WHOLE_MISS": 1})
+    assert case.run.report.below_threshold_titles == 2
+
+
+def test_record_failing_the_whole_check_yields_to_a_chosen_ai_title() -> None:
+    """BR3.4: 전체 미달 기록의 글보다 0.9 이상인 AI 후보가 앞선다. 둘째 줄은 전체 미달만으로 지우지 않는다."""
+    judge = SyntheticJudge(
+        answers(RECORD_WHAT=0.8, RECORD_WHOLE=0.4, TITLE_CHOICE=choose("t2", 0.95))
+    )
+
+    case, _ = ai_case(whole_scenario(), three_sentences, judge=judge)
+
+    each = case.output.candidates[0]
+    assert each.title == "alpha 줄 수정"
+    assert len(each.work_facts) == 2
+
+
+def test_s9_only_sentences_at_or_above_0_9_are_kept() -> None:
+    """S9: 문장 셋 가운데 하나가 0.85면 설명은 나머지 두 문장을 응답 순서대로 이은 글이다."""
+    judge = SyntheticJudge(answers(SENTENCE_TRUE__s2=0.85, SENTENCE_TRUE=0.9))
+
+    case, _ = ai_case(pulls(opened(3, ALPHA)), three_sentences, judge=judge)
+
+    each = generated(case, 3)
+    assert each.draft.status == "GENERATED"
+    assert each.draft.content == "alpha 값을 2로 바꿨습니다. alpha 줄이 더해졌습니다."
+    assert case.run.report.below_threshold_sentences == 1
+
+
+def test_s10_no_sentence_reaches_0_9_means_not_generated_without_failure() -> None:
+    """S10: 모든 문장이 0.9 미만이면 설명은 NOT_GENERATED이고 실패 항목이 없다."""
+    judge = SyntheticJudge(answers(SENTENCE_TRUE=0.5))
+
+    case, _ = ai_case(pulls(opened(3, ALPHA)), three_sentences, judge=judge)
+
+    each = generated(case, 3)
+    assert each.draft.status == "NOT_GENERATED"
+    assert entry(case, 3)["draft"]["status"] == "NOT_GENERATED"
+    assert new_failures(case) == []
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["JUDGEMENT_CALL_FAILED", "JUDGEMENT_TIMEOUT", "JUDGEMENT_RESPONSE_UNREADABLE"],
+)
+def test_s11_failed_catch_judgement(failure: str) -> None:
+    """S11: Catch 판정 호출 오류면 설명 FAILED(실패 항목 DRAFT), 제목은 판정 없이(기록의 글), 둘째 줄 남음.
+    질문은 판정과 관계없어 그대로다."""
+    judge = SyntheticJudge(failure=failure)  # type: ignore[arg-type]
+
+    case, _ = ai_case(record_pull(short("alpha")), three_sentences, judge=judge)
+
+    each = generated(case, 3)
+    assert each.draft.status == "FAILED"
+    assert each.draft.failure is not None and each.draft.failure.code == failure
+    assert each.reflection.status == "GENERATED"
+    assert each.title == RECORD_TITLE
+    assert entry(case, 3)["workFacts"] == ["PR #3, 상태 열림", SECOND_LINE]
+    cause = {
+        "JUDGEMENT_CALL_FAILED": "설명 확인 중 오류가 나",
+        "JUDGEMENT_TIMEOUT": "설명 확인 시간이 초과되어",
+        "JUDGEMENT_RESPONSE_UNREADABLE": "설명 확인 결과를 읽을 수 없어",
+    }[failure]
+    assert new_failures(case) == [
+        {
+            "stage": "DRAFT",
+            "code": failure,
+            "message": f"{cause} 설명 초안을 만들지 못했다",
+            "candidateId": entry(case, 3)["candidateId"],
+        }
+    ]
+
+
+def test_failed_judgement_never_uses_an_ai_title() -> None:
+    """BR3.5: 판정이 실패하면 기록의 글이 없는 Catch도 AI 후보를 쓰지 않고 조각 제목이다."""
+    judge = SyntheticJudge(failure="JUDGEMENT_CALL_FAILED")
+
+    case, _ = ai_case(pulls(opened(3, ALPHA)), three_sentences, judge=judge)
+
+    assert generated(case, 3).title == "alpha 코드 수정"
+    assert case.run.report.title_sources == Counter({"FRAGMENT": 1})
+
+
+def test_s19_everything_dropped_and_long_fragment_title_means_no_title() -> None:
+    """S19: 후보가 모두 떨어지고 기록의 글이 판정 부실이며 조각 제목이 40자를 넘으면 제목이 없다. 고쳐 쓰기 없음."""
+    name = "averyveryverylongidentifiername_used_for_titles"
+
+    def reply(request: ProviderRequest) -> str:
+        line = pick(request, change="added", contains=name)
+        return ai_answer(
+            titles=[written("sessionStore 값 변경", line)],
+            sentences=[written(f"{name} 값을 바꿨습니다.", line)],
+            title=code_title(line, name),
+            questions=[question("BACKGROUND")],
+        )
+
+    judge = SyntheticJudge(answers(RECORD_WHAT=0.2))
+    case, _ = ai_case(record_pull(short(name)), reply, judge=judge)
+
+    each = generated(case, 3)
+    assert each.title is None
+    assert case.provider.rewrite_requests() == []
+    # 기계 대조에서 떨어진 후보는 판정에 오르지 않는다.
+    assert "TITLE_CHOICE:title" not in catch_questions(judge)
+    assert case.run.report.factcheck_dropped_titles == 1
+    assert case.run.report.title_sources == Counter({"NONE": 1})
+
+
+def test_s20_work_facts_never_carry_generated_text() -> None:
+    """S20: 작업 사실의 어느 줄도 생성 응답에서 오지 않는다. CR3은 둘째 줄을 지우기만 한다."""
+    judge = SyntheticJudge(answers(RECORD_WHAT=0.1))
+
+    case, _ = ai_case(record_pull(short("alpha")), three_sentences, judge=judge)
+
+    facts = entry(case, 3)["workFacts"]
+    assert facts == ["PR #3, 상태 열림"]
+    for fact in facts:
+        for text in ("alpha 값 변경", "alpha 값을 2로", "alpha 줄"):
+            assert text not in fact
+
+
+def test_s26_missing_record_answer_keeps_the_record_for_title_and_second_line() -> None:
+    """S26: 판정 응답에 RECORD_WHAT 답이 없으면 제목은 규칙 결과의 기록의 글이고 둘째 줄도 남는다(같은 판단)."""
+    judge = SyntheticJudge(
+        answers(RECORD_WHAT=MISSING, TITLE_CHOICE=choose("t1", 0.99))
+    )
+
+    case, _ = ai_case(record_pull(short("alpha")), three_sentences, judge=judge)
+
+    each = generated(case, 3)
+    assert each.title == RECORD_TITLE
+    assert entry(case, 3)["workFacts"] == ["PR #3, 상태 열림", SECOND_LINE]
+    assert each.draft.status == "GENERATED"
+
+
+def test_missing_whole_answer_also_means_no_record_judgement() -> None:
+    """BR2.5: 물은 RECORD_WHOLE 답이 빠져도 기록의 글은 판정 없음이다: RECORD_WHAT이 0.1이어도 둘째 줄을 남긴다."""
+    judge = SyntheticJudge(
+        answers(RECORD_WHAT=0.1, RECORD_WHOLE=MISSING, TITLE_CHOICE=choose("t1", 0.99))
+    )
+
+    case, _ = ai_case(whole_scenario(), three_sentences, judge=judge)
+
+    each = case.output.candidates[0]
+    assert each.title == "alpha 값을 2로 바꿈"
+    assert len(each.work_facts) == 2
+
+
+def test_s31_none_choice_keeps_ai_titles_out() -> None:
+    """S31: TITLE_CHOICE에서 NONE이 0.92면 AI 후보를 쓰지 않는다(기록의 글이 없으면 조각 제목)."""
+    judge = SyntheticJudge(answers(TITLE_CHOICE=choose("NONE", 0.92)))
+
+    case, _ = ai_case(pulls(opened(3, ALPHA)), three_sentences, judge=judge)
+
+    assert generated(case, 3).title == "alpha 코드 수정"
+    assert case.run.report.below_threshold_titles == 2
+
+
+def test_record_without_judgement_question_is_not_used_by_weak_rule() -> None:
+    """규칙으로 부실한 기록의 글(WIP)은 판정에 올리지 않고, AI 후보가 0.9 이상이면 그 후보가 제목이다."""
+    judge = SyntheticJudge(answers(TITLE_CHOICE=choose("t1", 0.97)))
+
+    case, _ = ai_case(pulls(opened(3, ALPHA)), three_sentences, judge=judge)
+
+    assert "RECORD_WHAT:record" not in catch_questions(judge)
+    assert generated(case, 3).title == "alpha 값 변경"
+    assert entry(case, 3)["workFacts"] == ["PR #3, 상태 열림"]
+
+
+def test_s8_catch_judgement_carries_the_generation_lines_and_no_other_data() -> None:
+    """S8: 판정 요청의 줄은 그 Catch의 생성 요청에 담은 고를 수 있는 줄 그대로다. SHA·작성자·날짜·이슈 글·다른
+    Catch의 자료는 없다."""
+    judge = SyntheticJudge()
+
+    case, _ = ai_case(TWO, naive_ai, judge=judge)
+
+    for request in judge.catch_requests():
+        data = json.loads(request.data)
+        sent = next(
+            each
+            for each in case.provider.generate_requests()
+            if {line["id"] for line in data["lines"]}
+            <= {line.id for line in sent_lines_of(each)}
+        )
+        assert [line["id"] for line in data["lines"]] == [
+            line.id for line in sent_lines_of(sent) if line.selectable
+        ]
+        paths = {file["path"] for file in data["files"]}
+        assert len(paths) == 1
+        for commit_sha in (ALPHA.sha, BETA.sha):
+            assert commit_sha not in request.data
+        assert MEMBER.login not in request.data
+        assert "합성 PR 본문" not in request.data
+        assert "2026-" not in request.data
+
+
+# Step 12: 운영 로그 건수(NFR2.6·NFR3.2, 비기능 설계 관측)
+
+
+def test_log_line_counts_judgements_and_results_without_text(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """생성 로그 한 줄에 판정·결과 건수와 켜짐 여부·공급자 이름이 있고, 기록의 글·후보·문장 원문은 없다."""
+    texts = {
+        "t1": "alpha 값 변경",
+        "t2": "sessionStore 변경",
+        "s1": "alpha 값을 2로 바꿨습니다.",
+        "s2": "alpha 줄이 바뀌었습니다.",
+        "s3": "betaValue를 더했습니다.",
+    }
+
+    def reply(request: ProviderRequest) -> str:
+        line = pick(request, change="added", contains="alpha")
+        return ai_answer(
+            titles=[written(texts["t1"], line), written(texts["t2"], line)],
+            sentences=[written(texts[key], line) for key in ("s1", "s2", "s3")],
+            title=code_title(line, "alpha"),
+            questions=[question("BACKGROUND")],
+            extra=[],
+        )
+
+    judge = SyntheticJudge(
+        answers(
+            RECORD_WHAT=0.3,
+            TITLE_CHOICE=choose("t1", 0.95),
+            SENTENCE_TRUE__s2=0.5,
+        )
+    )
+
+    with caplog.at_level(logging.INFO, logger="app.generation"):
+        case, _ = ai_case(record_pull(short("alpha")), reply, judge=judge)
+
+    (line,) = [
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("생성 종료:")
+    ]
+    assert (
+        "aiSide=on judgementProvider=synthetic catchJudgements=1 materialJudgements=0 "
+        "judgementSkipped=0 materialSkipped=0 catchJudgementReasons=- "
+        "materialJudgementReasons=- factcheckDroppedTitles=1 factcheckDroppedSentences=1 "
+        "belowThresholdTitles=0 belowThresholdSentences=1 secondLinesRemoved=1 "
+        "titleFromRecord=0 titleFromAi=1 titleFromRecordWholeMiss=0 "
+        "titleFromFragment=0 titleNone=0 aiDropReasons=-"
+    ) in line
+    assert "unknownResponseKeys=1" in line
+    assert generated(case, 3).title == texts["t1"]
+    assert generated(case, 3).draft.content == texts["s1"]
+    for text in (
+        RECORD_TITLE,
+        SECOND_LINE,
+        "sessionStore",
+        "betaValue",
+        *texts.values(),
+    ):
+        assert text not in caplog.text
+
+
+def test_log_line_when_the_ai_side_is_off(caplog: pytest.LogCaptureFixture) -> None:
+    """AI 쪽이 꺼지면 같은 칸이 꺼짐·0건으로 남는다."""
+    with caplog.at_level(logging.INFO, logger="app.generation"):
+        generation_case(pulls(opened(3, ALPHA)), ScriptedProvider(naive))
+
+    assert "aiSide=off judgementProvider=- catchJudgements=0" in caplog.text
+    assert "titleFromRecord=0 titleFromAi=0" in caplog.text
+
+
+def test_judgement_failure_codes_are_counted(caplog: pytest.LogCaptureFixture) -> None:
+    judge = SyntheticJudge(failure="JUDGEMENT_TIMEOUT")
+
+    with caplog.at_level(logging.INFO, logger="app.generation"):
+        ai_case(with_big(), judge=judge, limits=SMALL_DATA)
+
+    assert "catchJudgementReasons=JUDGEMENT_TIMEOUT:3" in caplog.text
+    assert "materialJudgementReasons=JUDGEMENT_TIMEOUT:1" in caplog.text
+
+
+def test_secret_only_candidate_is_masked_to_empty_without_judgement() -> None:
+    """비밀 파일만 고친 후보는 AI 쪽에서도 재료가 없어 생성·판정하지 않는다(가리기 뒤 0개로 센다)."""
+    target = own(
+        31, 3, change(".env", patch="@@ -0,0 +1 @@\n+LOG_LEVEL=debug", status="added")
+    )
+
+    case, judge = ai_case(pulls(opened(3, target)))
+
+    assert case.provider.requests == [] and judge.requests == []
+    assert case.run.report.masked_to_empty == 1
+    assert generated(case, 3).draft.status == "NOT_GENERATED"
+
+
+def test_missing_title_choice_answer_counts_candidates_below_threshold() -> None:
+    """TITLE_CHOICE 답이 빠지면 AI 후보를 쓰지 않고, 통과한 후보는 문턱 미만으로 센다(BR2.5)."""
+    judge = SyntheticJudge(answers(TITLE_CHOICE=MISSING))
+
+    case, _ = ai_case(pulls(opened(3, ALPHA)), three_sentences, judge=judge)
+
+    assert generated(case, 3).title == "alpha 코드 수정"
+    assert case.run.report.below_threshold_titles == 2
+
+
+def test_observer_gets_a_trace_even_without_questions() -> None:
+    """질문이 없어 판정을 보내지 않은 Catch도 확인 명령 관찰자에 경과(NO_QUESTIONS)가 간다."""
+    traces: list[CatchTrace] = []
+
+    def reply(request: ProviderRequest) -> str:
+        line = pick(request, change="added", contains="alpha")
+        return ai_answer(
+            titles=[],
+            sentences=[],
+            title=code_title(line, "alpha"),
+            questions=[question("BACKGROUND")],
+        )
+
+    ai_case(pulls(opened(3, ALPHA)), reply, observe=traces.append)
+
+    (trace,) = traces
+    assert trace.judgement == "NO_QUESTIONS"
+    assert trace.answers == {}
+    assert trace.title == "alpha 코드 수정" and trace.title_source == "FRAGMENT"

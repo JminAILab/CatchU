@@ -82,7 +82,7 @@ from github_synthetic import (
 
 from app.candidates import Membership
 from app.candidates import group as group_outcome
-from app.candidates.identity import CommitsUnit, IssueUnit, MergeUnit, Part
+from app.candidates.identity import CommitsUnit, IssueUnit, MergeUnit
 from app.collection import (
     PROPOSED_LIMITS,
     CollectionLimits,
@@ -236,37 +236,30 @@ def c7_scenario() -> Scenario:
     )
 
 
-def test_c7_pull_request_with_separately_shown_works_is_split_by_commits() -> None:
+def test_c7_pull_request_with_separately_shown_works_stays_one_candidate() -> None:
+    """CR1 FR2.1(S1, AC1.4.1): 본인 커밋이 서로 다른 이슈(#5·#8)를 가리키고 이슈 조회가 허용돼도
+    이슈 번호로 나누지 않는다. PR 전체가 후보 하나이고 나누기 한계 글이 없다. 이슈 근거는 그 PR의
+    본인 커밋이 가리킨 이슈 모두다."""
     run = run_case(c7_scenario())
 
-    login, install = pull_identity(20, C, D), pull_identity(20, E)
-    assert sorted(identities(run.result)) == sorted([login, install])
-    assert pull_identity(20) not in identities(run.result)
-    # 부분은 커밋 경계로 나눈 것이다. 같은 PR의 두 부분은 PR 근거를 함께 갖는다.
-    for value in (login, install):
-        assert pull_url(20) in evidence_urls(candidate(run.result, value))
-    # 이슈 근거는 그 부분의 본인 커밋이 가리킨 이슈만이다.
-    for value, number in ((login, 5), (install, 8)):
-        assert [url for url, _, _ in issue_evidence(candidate(run.result, value))] == [
-            f"{WEB}/issues/{number}"
-        ]
+    assert identities(run.result) == [pull_identity(20)]
+    entry = run.result["candidates"][0]
+    assert entry["groupingLimitations"] == []
+    assert pull_url(20) in evidence_urls(entry)
+    assert [url for url, _, _ in issue_evidence(entry)] == [
+        f"{WEB}/issues/5",
+        f"{WEB}/issues/8",
+    ]
     assert_succeeded_without_holds(run)
 
 
-AUTHOR_BOUNDARY_PR = (
-    "본인 커밋이 서로 다른 번호 2개를 가리키지만, 작성자가 한 PR로 묶은 경계를 따라 한 "
-    "작업으로 두었다"
-)
-
-
 def test_c7_without_issue_permission_keeps_one_whole_pull_request() -> None:
-    """2026-10-08 팀장 결정 「한 PR·병합 안의 서로 다른 번호」: 이슈 조회가 허용되지 않은 요청에서는
-    본인 커밋이 서로 다른 번호(#5·#8)를 가리킨다는 것만으로 나누지 않고 작성자가 묶은 PR 경계를
-    따른다(C7 10월 기대값 Catch 1개). 그 사실은 groupingLimitations에만 남기고 세지 않는다."""
+    """이슈 조회가 허용되지 않은 요청도 PR 전체가 후보 하나다(C7 10월 기대값 Catch 1개). 서로 다른
+    번호를 가리켰다는 작성자 경계 한계 글은 CR1이 대체해 남기지 않는다(BR1.2)."""
     run = run_case(c7_scenario(), request=live_request("COMMIT", "PULL_REQUEST"))
 
     assert identities(run.result) == [pull_identity(20)]
-    assert run.result["candidates"][0]["groupingLimitations"] == [AUTHOR_BOUNDARY_PR]
+    assert run.result["candidates"][0]["groupingLimitations"] == []
     # 이슈 조회가 허용되지 않았으므로 이슈 근거도 없다.
     assert issue_evidence(run.result["candidates"][0]) == []
     assert_succeeded_without_holds(run)
@@ -281,11 +274,11 @@ def test_c7_without_issue_permission_keeps_one_whole_pull_request() -> None:
         ("other-pull", "RATE_LIMITED"),
     ],
 )
-def test_c7_split_is_kept_when_an_unrelated_check_stops(
+def test_c7_whole_pull_request_is_kept_when_an_unrelated_check_stops(
     override: str, code: str
 ) -> None:
-    """나누기 근거를 모두 받았으면 무관한 조회가 멈춰도 두 부분과 같은
-    workIdentity를 그대로 낸다. 멈춘 쪽 커밋은 변경 내용을 받지 못해 후보가 아니다."""
+    """무관한 조회가 멈춰도 PR #20은 같은 workIdentity의 후보 하나로 그대로다. 멈춘 쪽 커밋은 변경
+    내용을 받지 못해 후보가 아니다."""
     base = c7_scenario()
     if override == "direct":
         extra = commit(
@@ -312,8 +305,7 @@ def test_c7_split_is_kept_when_an_unrelated_check_stops(
 
     run = run_case(scenario)
 
-    login, install = pull_identity(20, C, D), pull_identity(20, E)
-    assert sorted(identities(run.result)) == sorted([login, install])
+    assert identities(run.result) == [pull_identity(20)]
     assert run.result["notProvided"] == []
     assert failure_codes(run.result) == [("COLLECTION", code)]
     assert run.result["outcome"] == "PARTIAL_FAILED"
@@ -1063,22 +1055,22 @@ def c15_scenario() -> Scenario:
     )
 
 
-def test_c15_indistinguishable_works_stay_one_candidate_with_limitation() -> None:
+def test_c15_indistinguishable_works_stay_one_candidate() -> None:
+    """구별 불가: 나누지 않고 한 후보이고 notProvided에 세지 않는다. 나누지 않은 이유의 한계 글은
+    CR1에서 만들지 않는다(BR1.2)."""
     run = run_case(c15_scenario())
 
     assert identities(run.result) == [pull_identity(20)]
-    # 구별 불가: 나누지 않고 한 후보, 한계는 groupingLimitations에. notProvided에 세지 않는다.
-    assert run.result["candidates"][0]["groupingLimitations"]
+    assert run.result["candidates"][0]["groupingLimitations"] == []
     assert_succeeded_without_holds(run)
 
 
-def test_c15_without_issue_permission_keeps_the_author_boundary() -> None:
-    """2026-10-08 팀장 결정 「한 PR·병합 안의 서로 다른 번호」: 이슈 조회가 없으면 C15도 C7과 같은
-    한계 문장 하나로 한 후보다."""
+def test_c15_without_issue_permission_stays_one_candidate() -> None:
+    """이슈 조회가 없어도 C15는 한계 글 없이 한 후보다(BR1.2)."""
     run = run_case(c15_scenario(), request=live_request("COMMIT", "PULL_REQUEST"))
 
     assert identities(run.result) == [pull_identity(20)]
-    assert run.result["candidates"][0]["groupingLimitations"] == [AUTHOR_BOUNDARY_PR]
+    assert run.result["candidates"][0]["groupingLimitations"] == []
     assert_succeeded_without_holds(run)
 
 
@@ -1110,9 +1102,8 @@ def test_c16_without_other_candidate_is_empty() -> None:
     [
         lambda: CommitsUnit(("aaaaaaa",)),
         lambda: MergeUnit("aaaaaaa"),
-        lambda: identity(CommitsUnit((F,)), [Part("aaaaaaa")]),
     ],
-    ids=["commits", "merge", "part"],
+    ids=["commits", "merge"],
 )
 def test_c17_short_sha_cannot_become_an_identity(unit: Callable[[], object]) -> None:
     # 값 생성 함수만 보는 순수 단위 시험이다(수집을 거치지 않는다). 짧은 SHA는 값에 쓰지 않는다.

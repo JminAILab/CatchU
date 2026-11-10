@@ -16,7 +16,7 @@ type AiConsentDialogProps = {
 
 /**
  * 외부 AI 전송 첫 이용 동의 창(12월 intent U2 기능 설계 W2·BR2.4, 계약 C-04 web 공용 동의 창).
- * 받는 곳 둘, 보내는 기능, 올린 자료를 그대로 보낸다는 사실, 문의 경로 한 줄을 보인다. [닫기]·Esc는 실행하지 않는다.
+ * 받는 곳(`AI_RECIPIENTS`), 보내는 기능, 올린 자료를 그대로 보낸다는 사실, 문의 경로 한 줄을 보인다. [닫기]·Esc는 실행하지 않는다.
  * 문구는 React 텍스트로만 그린다(보안 점검 「화면 출력」).
  */
 export function AiConsentDialog({ open, busy, error, onAgree, onClose }: AiConsentDialogProps) {

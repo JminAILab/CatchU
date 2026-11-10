@@ -1,10 +1,20 @@
 # 분석 고지·접수·실패 재요청 — #138
 
-## 현행 U7 직접 등록·재분석과 고지 v2 — #424
+## 현행 U7 직접 등록·재분석과 고지 v2·v3 — #424·CR3
 
 실제 회원의 새 경로는 [U7 등록·분석](repository-analysis-u7.md)을 따른다. 아래 #323의 전역 선정 목록·네 칸 DB 동의와 실패 한정 재요청 설명은 10월 구현 기록이다. 현행은 본인 등록과 서버 확인 좌표를 포함한 여섯 칸 불변 사본, 요청별 C-03 소비 경계를 사용한다. [#424의 2026-10-30 팀장 결정](https://github.com/JminAILab/CatchU/issues/424)에 따라 최신 분석이 끝나고 진행·반영·복구가 남지 않았으면 결과와 관계없이 새 동의·하루 1회 한도로 재분석한다. 기존 Catch와 작성한 설명은 보존하고 새 작업만 더한다. 기존 멱등 처리와 자동 재시도 없음은 유지한다.
 
-`REAL_NOTICE`는 같은 결정의 확정 고지 `catchu-real-analysis-notice-v2`다. v1에서 직접 등록 안내, 새 Catch의 공개·발행·Claude 접근 안내, Catch 삭제 없음 안내, 기존 Catch를 유지하는 재분석 안내의 네 줄만 바꿨다. 나머지 문구와 30줄·빈 줄 6개는 유지하고 시험 SHA-256을 함께 갱신했다. U4 화면은 상태를 “숨김”으로 부르지 않으므로 확정 원문의 “비공개”를 사용했다. 고지의 승인 기록은 [PR #433](https://github.com/JminAILab/CatchU/pull/433)의 팀장 승인으로 남긴다. 과거 승인 원본은 소급 수정하지 않는다.
+같은 결정의 확정 고지는 `catchu-real-analysis-notice-v2`였다. v1에서 직접 등록 안내, 새 Catch의 공개·발행·Claude 접근 안내, Catch 삭제 없음 안내, 기존 Catch를 유지하는 재분석 안내의 네 줄만 바꿨다. 나머지 문구와 30줄·빈 줄 6개는 유지하고 시험 SHA-256을 함께 갱신했다. U4 화면은 상태를 “숨김”으로 부르지 않으므로 확정 원문의 “비공개”를 사용했다. v2의 승인 기록은 [PR #433](https://github.com/JminAILab/CatchU/pull/433)의 팀장 승인으로 남긴다. 과거 승인 원본은 소급 수정하지 않는다.
+
+### 고지 v3 — Catch 개편 CR3
+
+현재 `REAL_NOTICE`는 `catchu-real-analysis-notice-v3`다. CR3(AI 쪽 판정)가 FR10 확인을 넘어 v2의 2·3·4절만 바꿨다(기능 설계 `aidlc/spaces/default/intents/261103-catch-redesign/construction/cr3-ai-drafts/functional-design/rules.md`의 BR8.2). 1·5절과 머리 문단은 v2 그대로이고 빈 줄 6개는 유지, 줄 수는 35줄이다.
+
+- 2절: 「설명과 질문은 정해진 문장으로 만든다」를 「AI가 바뀐 줄만 보고 쓰고, 다른 AI 서비스가 그 글과 본인 PR 제목·커밋 메시지 첫 줄이 실제 변경과 맞는지 확인해 남긴다」로 바꿨다. CR3 판에 남았던 「질문은 정해진 문장으로 만듭니다」는 [#487](https://github.com/JminAILab/CatchU/issues/487)에서 질문을 AI가 쓰게 되면서 뺐다. v3가 배포되기 전이라 판본은 올리지 않았다(2026-11-09 팀장 결정). 3절은 이미 질문에 Anthropic을 쓴다고 적는다.
+- 3절: 확인에 쓰는 OpenAI OpCo, LLC(미국)와 보내는 것(바뀐 줄·경로, 기록의 글 하나, AI가 쓴 후보·문장, 큰 작업의 파일별 경로·상태·줄 수·앞 5줄), 확인을 Anthropic에 맡길 때의 경우, OpenAI 처리 위치(미국 지역 주소)·보관(남용 감시 기록 최대 30일, 요청마다 끄는 설정 없음)·연락처를 더했다. v2의 「보내지 않는 것: 커밋 메시지, PR과 이슈의 글」은 PR 본문·이슈 글·커밋 메시지 둘째 줄부터로 좁혔다.
+- 4절: Catch의 제목과 작업 사실에 기록의 글이 들어갈 수 있다는 줄을 더했다.
+- OpenAI 사실의 출처는 [서비스 약관 v.010126](https://cdn.openai.com/osa/openai-services-agreement.pdf)(계약 당사자), [DPA](https://cdn.openai.com/pdf/openai-data-processing-addendum.pdf)(연락처), [API 데이터 관리 안내](https://developers.openai.com/api/docs/guides/your-data)(학습·보관·미국 지역 처리)다(2026-11-06 확인).
+- 문구는 CR3 PR에서 팀장이 승인한다. 그 승인이 v3의 승인 기록이다. 운영 서버에는 v3가 배포된 뒤에만 판정 키나 `CATCHU_JUDGEMENT_PROVIDER=claude`를 넣는다([worker 판정 「켜고 끄기」](../../worker/docs/generation-judgement.md#켜고-끄기)).
 
 ## 기준과 검증 범위
 
@@ -24,7 +34,7 @@
 
 ## 실제 자료용 고지와 고지 선택 — #322
 
-[#322](https://github.com/JminAILab/CatchU/issues/322)의 2026-10-17 팀장 확정 원문에서 #424의 확정 네 줄을 바꾼 문구를 `src/analysis-intake/analysis-notice.ts`의 `REAL_NOTICE`에 판본 `catchu-real-analysis-notice-v2`로 싣는다. 합성 판본 `catchu-synthetic-analysis-notice-v1`과 다른 값이다. 문구는 12월 공개판 기준이며 설명하는 기능의 현재 구현 여부에 맞춰 고치지 않는다. 배열 한 원소가 한 줄, 빈 원소가 문단 사이 빈 줄이고 응답 `text`는 이를 LF(`\n`)로 이은 일반 텍스트다(HTML·마크다운 아님). 화면 표시는 [#154](https://github.com/JminAILab/CatchU/issues/154)가 맡아 이 문단·줄바꿈에 맞춘다.
+[#322](https://github.com/JminAILab/CatchU/issues/322)의 2026-10-17 팀장 확정 원문에서 #424의 확정 네 줄을 바꾸고(v2) CR3가 2·3·4절을 바꾼(v3, 위 「고지 v3」) 문구를 `src/analysis-intake/analysis-notice.ts`의 `REAL_NOTICE`에 판본 `catchu-real-analysis-notice-v3`로 싣는다. 합성 판본 `catchu-synthetic-analysis-notice-v1`과 다른 값이다. 문구는 12월 공개판 기준이며 설명하는 기능의 현재 구현 여부에 맞춰 고치지 않는다. 배열 한 원소가 한 줄, 빈 원소가 문단 사이 빈 줄이고 응답 `text`는 이를 LF(`\n`)로 이은 일반 텍스트다(HTML·마크다운 아님). 화면 표시는 [#154](https://github.com/JminAILab/CatchU/issues/154)가 맡아 이 문단·줄바꿈에 맞춘다.
 
 `GET /v1/analysis-notice`는 [공통 회원 구분](member-analysis.md#실제개발-회원-구분--322)으로 고지를 고르며 GitHub 연결 상태·공급 방식은 보지 않는다. 응답 두 필드·no-store·인증 조건은 그대로다.
 

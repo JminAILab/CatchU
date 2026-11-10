@@ -1,6 +1,6 @@
 # 생성 호출 한도와 운영 로그 — #120
 
-> [설명 초안·생각해볼 질문·Catch 제목 생성](generation.md)의 「호출 한도와 시간」·「운영 로그」 절을 문서 크기 상한(36 KB) 때문에 따로 옮겼다. 말뜻(생성 호출·고쳐 쓰기·재료 등)은 그 문서를 따른다. 코드는 `app/generation/limits.py`(상한)와 `app/generation/flow.py`(운영 로그)에 있다.
+> [설명 초안·생각해볼 질문·Catch 제목 생성](generation.md)의 「호출 한도와 시간」·「운영 로그」 절을 문서 크기 상한(36 KB) 때문에 따로 옮겼다. 말뜻(생성 호출·고쳐 쓰기·재료 등)은 그 문서를 따른다. 코드는 `app/generation/limits.py`(상한)와 `app/generation/flow.py`(운영 로그)에 있다. CR3 판정 호출의 상한과 로그 칸도 여기 적고, 규칙은 [판정](generation-judgement.md)에 있다.
 
 ## 호출 한도와 시간
 
@@ -10,11 +10,13 @@
 | 고쳐 쓰기 호출 | 제목당 3회(팀장 결정, 설정으로 늘릴 수 없음), 요청당 20회. 생성 호출 상한과 따로 센다 |
 | 호출마다 시간 제한 | 생성 45초, 고쳐 쓰기 20초. 마감까지 남은 시간이 이보다 적으면 새 호출을 시작하지 않는다(생성 호출은 크기 선별 전과 호출 직전에 두 번 본다) |
 | 입력 | 자료(직렬화한 UTF-8) 24,000 B, 지시문 포함 32,000 B |
-| 출력 | 4,000 B. 넘으면 해석하지 않는다 |
+| 출력 | 6,000 B. 넘으면 해석하지 않는다. 질문 글이 응답에 더해져 #487에서 4,000 B에서 올렸다(2026-11-09 팀장 결정) |
 | 고쳐 쓰기 입력 | 첫 호출에서 보낸 고를 수 있는 줄 최대 20줄 |
-| 설명 조각·질문 | 각 1~3개. 넘으면 확인되고 문장을 만들 수 있는 항목을 앞에서부터 3개까지 쓴다(질문은 종류마다 하나) |
+| 설명 조각·질문 | 각 1~3개. 넘으면 맞는 항목을 앞에서부터 3개까지 쓴다(질문은 종류마다 하나) |
 | 제목·질문·코드 이름 | 40자·150자·64자 |
 | 줄마다 싣는 고를 수 있는 이름(`names`) | 최대 12개, 나온 순서대로 |
+| 판정 호출(CR3, AI 쪽이 켜졌을 때만) | Catch 판정 Catch당 1회·요청당 300회, 재료 판정 큰 후보당 1회·요청당 300회. 둘 다 시간 제한 20초이고 생성 호출과 따로 센다. 생성은 「남은 시간 ≥ 생성 45초 + 판정 20초」, 재료 판정은 「≥ 20 + 45 + 20초」일 때만 시작한다. 자세한 것은 [판정 「호출 순서와 상한」](generation-judgement.md#호출-순서와-상한) |
+| 판정 질문·출력 | 요청당 질문 400개, 재료 판정은 파일당 바뀐 줄 앞 5줄. 출력 상한은 Claude 판정만 Catch 2,000·재료 8,000토큰(OpenAI Decisions는 출력 상한 인자가 없다) |
 
 제목당 고쳐 쓰기 3회와 요청당 생성 호출 300회는 팀장 결정이다. 나머지 이 표의 상한은 기존 제안값을 유지한다. 생성 호출을 못 한 후보도 결과에 남으며 `NOT_GENERATED`와 요청의 `ANALYSIS` 실패 1건으로 표시한다. 생성 300회는 후보·Result 개수 상한이 아니다. worker 생성 마감은 큐에서 꺼낸 시각 + 3,600초 − 결과 조합·전송 여유 60초다.
 
@@ -59,11 +61,30 @@
 | `ITEM_SHAPE` | `GENERATION_RULE_VIOLATION` | 항목 모양·종류 값·키 위반 |
 | `NAME_SHAPE` | `GENERATION_RULE_VIOLATION` | 코드 이름이 식별자 하나의 모양이 아님 |
 | `DUPLICATE_TYPE` | 없음(버린 항목 칸에만) | 앞에 같은 종류 질문이 있음 |
-| `TOO_LONG` | `GENERATION_RULE_VIOLATION` | 파일 이름으로 줄여도 질문이 글자 상한을 넘음 |
-| `UNKNOWN_LINE`·`UNKNOWN_FILE` | `GENERATION_UNVERIFIED` | 그 호출에서 보낸 자료에 없는 줄·파일 id |
+| `TOO_LONG` | `GENERATION_RULE_VIOLATION` | 질문 글이 150자를 넘음 |
+| `MASKED_TEXT` | `GENERATION_RULE_VIOLATION` | 질문 글이 가리기 검사에 걸림(#487) |
+| `UNKNOWN_LINE`·`UNKNOWN_FILE` | `GENERATION_UNVERIFIED` | 그 호출에서 보낸 자료에 없는 줄·파일 id. 아래 줄·이름 원인은 설명 조각에만 있다(질문은 줄을 가리키지 않는다, #487) |
 | `MASKED_LINE` | `GENERATION_UNVERIFIED` | 가린 줄을 지목 |
 | `NAME_MISSING` | `GENERATION_UNVERIFIED` | 이름이 그 줄에 없음 |
 | `NAME_JOINED_ASCII` | `GENERATION_UNVERIFIED` | 이름이 그 줄에 영문자·숫자·밑줄·`$`와 붙어서만 있음(`loginRateLimit` 줄의 `limit`) |
 | `NAME_JOINED_NON_ASCII` | `GENERATION_UNVERIFIED` | 이름이 한글 등 ASCII 밖 글자와 붙어서만 있음(「limit을」) |
 | `KIND_MISMATCH` | 없음(고친 항목 칸에만) | 추가 줄 조각으로 삭제 줄을 지목(또는 반대). 실제 줄 종류로 고쳐 쓴다 |
 | `NO_TEMPLATE` | `GENERATION_UNVERIFIED` | 지목한 파일 상태에 맞는 문장 틀이 없음 |
+
+### AI 쪽 칸(CR3)
+
+같은 「생성 종료」 줄에 AI 쪽 건수를 더한다(새 로그 줄·경보는 만들지 않는다). AI 쪽이 꺼지면 `aiSide=off judgementProvider=-`이고 건수는 0이다.
+
+| 칸 | 뜻 |
+|---|---|
+| `aiSide`·`judgementProvider` | 켜짐 여부(`on`·`off`)와 판정 공급자 이름(`openai`·`claude`·`synthetic`). 키 값이 아니다 |
+| `catchJudgements`·`materialJudgements` | 보낸 Catch 판정·재료 판정 요청 수 |
+| `catchJudgementReasons`·`materialJudgementReasons` | 판정 실패 코드별 건수(`JUDGEMENT_TIMEOUT`·`JUDGEMENT_CALL_FAILED`·`JUDGEMENT_RESPONSE_UNREADABLE`). 재료 판정 실패는 실패 항목을 남기지 않고 여기에만 센다 |
+| `judgementSkipped`·`materialSkipped` | 생성은 됐지만 시간·Catch 판정 상한으로 판정하지 않은 Catch, 시간·상한으로 재료 판정을 건너뛴 큰 후보 |
+| `factcheckDroppedTitles`·`factcheckDroppedSentences` | 기계 대조로 버린 후보·문장 |
+| `belowThresholdTitles`·`belowThresholdSentences` | 기계 대조는 통과했지만 판정이 0.9 미만이라 쓰지 않은 후보·문장 |
+| `secondLinesRemoved` | 판정 부실로 작업 사실 둘째 줄을 지운 Catch |
+| `titleFromRecord`·`titleFromAi`·`titleFromRecordWholeMiss`·`titleFromFragment`·`titleNone` | 제목 출처별 Catch 수(기록의 글·AI 후보·전체 미달 기록의 글·조각 제목·없음) |
+| `aiDropReasons` | AI 응답에서 모양·근거 줄·글자 수로 버린 후보·문장(`dropped:TOO_LONG` 등, 위 원인 코드와 같은 꼴) |
+
+기록의 글·AI 후보·문장·판정 답·키는 남기지 않는다. 시간 부족·상한으로 판정하지 않은 Catch가 있으면 경고 수준이다.

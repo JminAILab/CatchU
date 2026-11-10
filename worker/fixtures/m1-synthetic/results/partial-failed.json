@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2",
+  "schemaVersion": "3",
   "messageId": "message-{{caseId}}-{{attemptId}}-result",
   "resultId": "result-{{caseId}}-{{attemptId}}",
   "requestId": "{{requestId}}",
@@ -51,7 +51,10 @@
         "questions": [
           "합성 질문: 어떤 입력을 먼저 검사하기로 했나요?"
         ]
-      }
+      },
+      "ownCommitShas": [
+        "0000000000000000000000000000000000000021"
+      ]
     }
   ],
   "notProvided": [],

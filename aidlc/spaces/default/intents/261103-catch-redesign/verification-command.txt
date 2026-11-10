@@ -1,0 +1,1 @@
+npm --prefix api run lint && npm --prefix api run typecheck && npm --prefix api run test:coverage && npm --prefix web run lint && npm --prefix web run typecheck && npm --prefix web run test:coverage && (cd worker && uv run --locked ruff check . && uv run --locked mypy && uv run --locked pytest --cov --cov-report=term-missing)

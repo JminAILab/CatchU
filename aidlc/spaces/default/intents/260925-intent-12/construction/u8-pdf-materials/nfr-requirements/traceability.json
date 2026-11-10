@@ -1,0 +1,14 @@
+{
+  "stage": "nfr-requirements",
+  "unit": "u8-pdf-materials",
+  "upstream_ids": ["NFR1", "NFR2", "NFR3", "NFR4", "NFR5", "NFR6", "NFR7"],
+  "coverage": [
+    { "id": "NFR1", "status": "OK", "target": "NFR1.1, NFR1.2, NFR1.3, NFR1.4, NFR1.5, NFR1.6, NFR1.7, NFR1.8, NFR1.9, NFR1.10" },
+    { "id": "NFR2", "status": "OK", "target": "NFR2.1, NFR2.2, NFR2.3, NFR2.4" },
+    { "id": "NFR3", "status": "N/A", "target": "근거 품질 평가의 대상은 질의응답(u5-rag-answer)이다. U8은 PDF 글을 저장·고정만 하고 AI 생성·검색을 하지 않는다" },
+    { "id": "NFR4", "status": "OK", "target": "NFR4.1, NFR4.2, NFR4.3, NFR4.4, NFR4.5, NFR4.6, NFR4.7, NFR4.8, NFR4.9, NFR4.10, NFR4.11, NFR4.12, NFR4.13, NFR4.14, NFR4.15, NFR4.16, NFR4.17, NFR4.18, NFR4.19, NFR4.20" },
+    { "id": "NFR5", "status": "OK", "target": "NFR5.1, NFR5.2, NFR5.3, NFR5.4" },
+    { "id": "NFR6", "status": "OK", "target": "NFR6.1, NFR6.2, NFR6.3, NFR6.4, NFR6.5" },
+    { "id": "NFR7", "status": "OK", "target": "NFR7.1, NFR7.2, NFR7.3" }
+  ]
+}

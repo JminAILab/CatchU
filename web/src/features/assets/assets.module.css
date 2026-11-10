@@ -45,6 +45,8 @@
 .card h3 { margin-bottom: 12px; line-height: 1.55; font-size: 19px; letter-spacing: -0.3px; }
 .cardTitle, .cardDetails { border: 0; background: none; padding: 0; text-align: left; color: inherit; }
 .cardTitle { max-width: 100%; overflow-wrap: anywhere; font-weight: 700; }
+/* 목록 카드 제목은 2줄까지 보이고 넘치면 말줄임이다. 글은 그대로라 버튼의 접근 이름은 전체 제목이다(CR1 BR6.1). */
+.titleClamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .cardTitle::after, .cardDetails::after { content: ""; position: absolute; inset: 0; border-radius: 16px; }
 .cardTitle:focus-visible, .cardDetails:focus-visible { outline: none; }
 .cardTitle:focus-visible::after, .cardDetails:focus-visible::after { outline: 3px solid var(--color-focus); outline-offset: 4px; }

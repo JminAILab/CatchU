@@ -33,7 +33,9 @@ class ContextApiSettings:
     allow_cluster_http: bool = False
     connect_timeout: float = 5.0
     read_timeout: float = 5.0
-    max_response_bytes: int = 64 * 1024
+    # 소속 커밋 목록(CR2)이 분석마다 쌓이므로 1 MiB(SHA 약 24,000개)까지 받는다. 넘으면
+    # CONTEXT_RESPONSE_TOO_LARGE로 그 시도를 끝낸다(CR2 NFR6.3).
+    max_response_bytes: int = 1024 * 1024
     scheme: str = field(init=False)
     authority: str = field(init=False)
 

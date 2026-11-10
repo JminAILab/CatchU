@@ -55,10 +55,11 @@ INFERENCE_GEO: Final = "us"
 # (generation-limits.md 「모델」).
 GENERATE_MODEL: Final = "claude-haiku-5-5"
 REWRITE_MODEL: Final = "claude-haiku-5-5"
-# 최대 출력 바이트(4,000)보다 적게 잡지 않는다. 토큰 수와 응답 글 길이는 일대일이 아니어서 이 값으로 최대 출력
-# 안의 응답이 잘리지 않는다고 보장하지는 못한다. 잘리면 `max_tokens` 멈춤으로 와 전체 응답을 쓰지 않는다.
+# max_tokens의 하한. max_tokens는 최대 출력 바이트(6,000)와 이 값 가운데 큰 값이다. 토큰 수와 응답 글 길이는
+# 일대일이 아니어서 최대 출력 안의 응답이 잘리지 않는다고 보장하지는 못한다. 잘리면 `max_tokens` 멈춤으로 와
+# 전체 응답을 쓰지 않는다.
 MIN_MAX_TOKENS: Final = 4_000
-# 받는 HTTP 응답 본문 상한(바이트, 압축하지 않은 크기). 최대 출력 4,000 B 응답의 JSON 본문보다 넉넉히 크다.
+# 받는 HTTP 응답 본문 상한(바이트, 압축하지 않은 크기). 최대 출력 6,000 B 응답의 JSON 본문보다 넉넉히 크다.
 MAX_RESPONSE_BYTES: Final = 256 * 1024
 
 # 받는 모델과 그 모델에서 생각을 끄는 설정. 표에 없는 모델은 받지 않는다(30일 보관이 필수인 모델이나 단가가
@@ -92,6 +93,11 @@ _QUESTION_TYPE: Final = {
     "type": "string",
     "enum": ["BACKGROUND", "ALTERNATIVES", "VERIFICATION"],
 }
+# 생각해 볼 질문은 AI가 쓴 글이다(#487). 줄·파일을 가리키지 않고, AI 쪽 켜짐과 관계없이 같은 모양이다.
+_QUESTIONS: Final = {
+    "type": "array",
+    "items": _object({"type": _QUESTION_TYPE, "text": _STR}),
+}
 # 호출 종류별 응답 모양(구조화된 출력). 생성 흐름이 받는 키·종류 값과 같다(response 모듈, 지시문). 배열 개수
 # 제약은 구조화된 출력이 받지 않아 넣지 않고, 개수·지목한 줄·이름이 맞는지는 생성 흐름이 확인한다. 스키마가
 # 고정이라 처음 컴파일한 뒤에는 API 쪽 캐시(24시간)를 쓴다.
@@ -121,18 +127,28 @@ OUTPUT_SCHEMAS: Final[Mapping[Purpose, dict[str, object]]] = {
                 },
             },
             "title": _TITLE,
-            "questions": {
-                "type": "array",
-                "items": {
-                    "anyOf": [
-                        _object({"type": _QUESTION_TYPE, **_LINE_PICK}),
-                        _object({"type": _QUESTION_TYPE, "file": _STR}),
-                    ]
-                },
-            },
+            "questions": _QUESTIONS,
         }
     ),
     "REWRITE_TITLE": _object({"title": _TITLE}),
+}
+# AI 쪽이 켜졌을 때의 생성 응답 모양(CR3 BR3.1·BR5.1). 설명 조각(fragments) 대신 AI가 쓴 제목 후보와 설명
+# 문장을 받고, 조각 제목 대상(title)과 질문은 AI 쪽이 꺼졌을 때와 같은 모양으로 받는다. 후보·문장마다 근거 줄
+# id 목록을 가리킨다. 고쳐 쓰기는 AI 쪽에서 부르지 않지만 모양은 같은 표에 둔다.
+_WRITTEN: Final = {
+    "type": "array",
+    "items": _object({"text": _STR, "lines": {"type": "array", "items": _STR}}),
+}
+AI_OUTPUT_SCHEMAS: Final[Mapping[Purpose, dict[str, object]]] = {
+    "GENERATE": _object(
+        {
+            "title": _TITLE,
+            "questions": _QUESTIONS,
+            "titleCandidates": _WRITTEN,
+            "sentences": _WRITTEN,
+        }
+    ),
+    "REWRITE_TITLE": OUTPUT_SCHEMAS["REWRITE_TITLE"],
 }
 
 # 지출 상한·크레딧 소진을 운영 로그에서 가르는 공식 문서 문구(2026-10-14 확인). 원문은 로그에 남기지 않는다.
@@ -234,7 +250,6 @@ class ClaudeProvider:
             )
         _quiet_library_logs()
         self._models = models if models is not None else ClaudeModels()
-        inner = transport if transport is not None else _http_transport()
         self._client = Anthropic(
             api_key=api_key.reveal(),
             base_url=BASE_URL,
@@ -242,7 +257,7 @@ class ClaudeProvider:
             # 압축된 응답은 풀린 크기를 미리 셀 수 없어 압축하지 않은 응답만 받는다.
             default_headers={"Accept-Encoding": "identity"},
             http_client=DefaultHttpxClient(
-                transport=_CappedTransport(inner),
+                transport=guarded_transport(transport),
                 follow_redirects=False,
                 trust_env=False,
             ),
@@ -250,6 +265,35 @@ class ClaudeProvider:
 
     def complete(self, request: ProviderRequest) -> str:
         model = self._models.for_purpose(request.purpose)
+        schemas = AI_OUTPUT_SCHEMAS if request.ai_side else OUTPUT_SCHEMAS
+        return self.structured(
+            label=request.purpose,
+            model=model,
+            system=request.instructions,
+            user=request.data,
+            schema=schemas[request.purpose],
+            max_tokens=max(request.max_output_bytes, MIN_MAX_TOKENS),
+            timeout_seconds=request.timeout_seconds,
+        )
+
+    def structured(
+        self,
+        *,
+        label: str,
+        model: str,
+        system: str,
+        user: str,
+        schema: dict[str, object],
+        max_tokens: int,
+        timeout_seconds: float,
+    ) -> str:
+        """구조화된 출력 호출 한 번. 생성 호출과 판정 호출(`app.judgement.claude`)이 같은 규칙으로 쓴다.
+
+        label은 운영 로그의 호출 종류(GENERATE·REWRITE_TITLE·JUDGE_CATCH·JUDGE_MATERIAL)다. 모델은 받는 모델
+        표(`THINKING_OFF`)에 있어야 한다. 실패는 TimeoutError·ProviderError·UnusableResponse로 낸다.
+        """
+        if model not in THINKING_OFF:
+            raise ValueError("생성 제공자가 받지 않는 모델이다")
         started = _monotonic()
         # 실패 예외는 except 밖에서 낸다. SDK 예외는 응답 원문·요청 본문·키 머리글을 담고 있어, 새 예외의
         # 원인(__cause__)으로도 문맥(__context__)으로도 이어지지 않게 한다.
@@ -257,18 +301,13 @@ class ClaudeProvider:
         try:
             message = self._client.messages.create(
                 model=model,
-                max_tokens=max(request.max_output_bytes, MIN_MAX_TOKENS),
-                system=request.instructions,
-                messages=[{"role": "user", "content": request.data}],
+                max_tokens=max_tokens,
+                system=system,
+                messages=[{"role": "user", "content": user}],
                 thinking=THINKING_OFF[model],
-                output_config={
-                    "format": {
-                        "type": "json_schema",
-                        "schema": OUTPUT_SCHEMAS[request.purpose],
-                    }
-                },
+                output_config={"format": {"type": "json_schema", "schema": schema}},
                 inference_geo=INFERENCE_GEO,
-                timeout=request.timeout_seconds,
+                timeout=timeout_seconds,
             )
         except anthropic.APITimeoutError:
             failure = _Failure("TIMEOUT")
@@ -287,8 +326,8 @@ class ClaudeProvider:
             # 온다. 이 try에는 SDK 호출만 있다.
             failure = _Failure("INVALID_RESPONSE")
         else:
-            return _text(request.purpose, model, message, started)
-        _log_failure(request.purpose, model, failure, started)
+            return _text(label, model, message, started)
+        _log_failure(label, model, failure, started)
         raise failure.exception()
 
 
@@ -321,7 +360,7 @@ class _Reply:
     request_id: str | None
 
 
-def _text(purpose: Purpose, model: str, message: object, started: float) -> str:
+def _text(purpose: str, model: str, message: object, started: float) -> str:
     """정상으로 끝난 응답의 글만 돌려준다. 거절·출력 상한·그 밖의 멈춤은 응답 전체를 쓰지 않는다."""
     reply = _read(message)
     if reply is None:
@@ -422,9 +461,7 @@ def _connection_failure(error: anthropic.APIConnectionError) -> _Failure:
     return _Failure("CONNECTION")
 
 
-def _log_failure(
-    purpose: Purpose, model: str, failure: _Failure, started: float
-) -> None:
+def _log_failure(purpose: str, model: str, failure: _Failure, started: float) -> None:
     logger.warning(
         "생성 제공자 실패: purpose=%s model=%s cause=%s status=%s errorType=%s "
         "elapsedMs=%d requestId=%s",
@@ -664,6 +701,25 @@ class _DeadlineBackend(httpcore2.NetworkBackend):
         self._inner.sleep(seconds)
 
 
+def guarded_transport(
+    transport: httpx2.BaseTransport | None = None,
+) -> httpx2.BaseTransport:
+    """응답 본문 상한(`MAX_RESPONSE_BYTES`)·압축 거부·호출 마감을 씌운 HTTP 전송.
+
+    transport를 주지 않으면 운영 전송(`_http_transport`, 프록시·인증서 환경변수를 읽지 않음)이다. 판정 OpenAI
+    어댑터(`app.judgement.openai_judge`)도 같은 보호로 쓴다. 상한을 넘은 응답은 `is_capped_failure`로 가른다.
+    """
+    return _CappedTransport(transport if transport is not None else _http_transport())
+
+
+def is_capped_failure(error: BaseException) -> bool:
+    """예외(또는 SDK가 감싼 예외의 원인)가 응답 본문 상한 초과·압축된 응답인가(읽을 수 없는 응답으로 다룬다).
+
+    SDK마다 본문을 읽다 난 예외를 연결 오류로 감싸기도 하고(Anthropic) 그대로 올리기도 한다(OpenAI)."""
+    capped = (_ResponseTooLarge, _UnexpectedEncoding)
+    return isinstance(error, capped) or isinstance(error.__cause__, capped)
+
+
 def _http_transport(
     backend: httpcore2.NetworkBackend | None = None,
 ) -> httpx2.HTTPTransport:
@@ -704,11 +760,27 @@ _LOG_FLOORS: Final = (
 )
 
 
-def _quiet_library_logs() -> None:
-    """지금 있는 SDK·HTTP 라이브러리 로거 모두에 필터를 단다. 이 모듈들은 불러올 때 로거를 만든다."""
+def _quiet_library_logs(
+    floors: Iterable[tuple[str, logging.Filter]] = _LOG_FLOORS,
+) -> None:
+    """지금 있는 SDK·HTTP 라이브러리 로거 모두에 필터를 단다. 이 모듈들은 불러올 때 로거를 만든다.
+
+    판정 OpenAI 어댑터는 `openai` 로거 바닥을 더해 부른다(`quiet_library_logs`)."""
     for name in list(logging.Logger.manager.loggerDict):
-        for prefix, floor in _LOG_FLOORS:
+        for prefix, floor in floors:
             if name == prefix or name.startswith(prefix + "."):
                 each = logging.getLogger(name)
                 if floor not in each.filters:
                     each.addFilter(floor)
+
+
+# 다른 SDK 로거의 바닥(접두사 → 필터). 같은 접두사는 같은 필터를 다시 쓴다.
+_EXTRA_FLOORS: dict[str, logging.Filter] = {}
+
+
+def quiet_library_logs(prefix: str, level: int) -> logging.Filter:
+    """HTTP 라이브러리 바닥(`_LOG_FLOORS`)과 함께, 다른 SDK 로거(prefix와 그 하위)에 level 아래 기록을 버리는
+    필터를 단다. 단 필터를 돌려준다."""
+    floor = _EXTRA_FLOORS.setdefault(prefix, _DropBelow(level))
+    _quiet_library_logs((*_LOG_FLOORS, (prefix, floor)))
+    return floor

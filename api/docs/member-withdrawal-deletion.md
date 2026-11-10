@@ -19,6 +19,7 @@
 | `catch_asset` | 회원, 분석 요청 |
 | `catch_evidence` | Catch |
 | `candidate_registration` | 결과 수신 기록, Catch |
+| `commit_assignment` | Catch(복합 외래 키 `(catch_id, member_id)`. Catch 개편 CR2, 마이그레이션 `1794054790720-CreateCommitAssignment`) |
 | `published_item` | 발행본 |
 | `daily_execution_count`, `ai_consent` | 회원(12월 intent U2, 계약 C-03·C-04·C-06. 마이그레이션 `1793161114211-CreateU2UsageAndConsent`) |
 | `publication_index` | 발행본(12월 intent U3, 계약 C-06·C-08. 마이그레이션 `1793257382741-CreatePublishedIndexTables`) |
@@ -29,6 +30,9 @@
 | `jd` | 회원(12월 intent U10) |
 | `jd_summary_run` | 실행 회원, 본인 JD(복합 외래 키 `(member_id, jd_id)`), 발행본. 발행본 소유자는 실행 회원과 달라도 됨 |
 | `jd_summary_result` | JD 요약 실행. 입력 사본은 실행의 `input_copy`에 있어 실행과 함께 삭제 |
+| `pdf_material` | 회원(12월 intent U8, 계약 C-06. 마이그레이션 `1793977402870-CreatePdfMaterialTables`) |
+| `pdf_page_text` | PDF 자료(12월 intent U8, 같은 마이그레이션) |
+| `published_pdf_page` | 발행 항목(12월 intent U8, 계약 C-06·C-07. 같은 마이그레이션. 원본 PDF와는 외래 키가 없어 원본을 지워도 사본은 발행본 수명을 따른다) |
 
 `text_material`·`publication`·`published_item`은 12월 범위 U4가 만든 표다(계약 C-06·C-07·C-13). 발행 사본(`published_item`)은 원본 Catch·자료와 외래 키가 없어, 원본을 지워도 사본은 발행본 수명을 따른다.
 

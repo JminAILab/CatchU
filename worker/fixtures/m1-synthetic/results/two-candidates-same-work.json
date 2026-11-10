@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2",
+  "schemaVersion": "3",
   "messageId": "message-{{caseId}}-{{attemptId}}-result",
   "resultId": "result-{{caseId}}-{{attemptId}}",
   "requestId": "{{requestId}}",
@@ -51,7 +51,11 @@
         "questions": [
           "합성 질문: 한 페이지 크기는 어떻게 정했나요?"
         ]
-      }
+      },
+      "ownCommitShas": [
+        "0000000000000000000000000000000000000032",
+        "0000000000000000000000000000000000000031"
+      ]
     },
     {
       "candidateId": "candidate-{{caseId}}-{{attemptId}}-2",
@@ -91,7 +95,10 @@
       "reflection": {
         "status": "NOT_GENERATED",
         "questions": []
-      }
+      },
+      "ownCommitShas": [
+        "0000000000000000000000000000000000000033"
+      ]
     }
   ],
   "notProvided": [],

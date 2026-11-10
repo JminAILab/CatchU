@@ -38,7 +38,7 @@
 | C-06 | u2-shared-foundation | 모든 Unit(새 표) | 공유 DB 규칙(외래 키 삭제 규칙) + 탈퇴 순서 | U2 담당(팀장) |
 | C-07 | u4-publication-link | u3-published-index, u5-rag-answer, u10-jd, u8-pdf-materials, u9-recipient-claude | 공유 DB 표(발행본·항목·PDF 쪽 사본) | U4 담당 |
 | C-08 | u3-published-index | u4-publication-link | api 안 TS 인터페이스(`PublishedIndexWriter`), 발행 트랜잭션 참여 | U3 담당 |
-| C-09 | u3-published-index | u5-rag-answer, u10-jd | api 안 TS 인터페이스(`PublishedSearch`) | U3 담당 |
+| C-09 | u3-published-index | u4-publication-link, u5-rag-answer, u10-jd | api 안 TS 인터페이스(`PublishedSearch`) | U3 담당 |
 | C-10 | u4-publication-link | u5-rag-answer, u10-jd, u9-recipient-claude | api 안 TS 인터페이스(`PublicationAccess`) | U4 담당 |
 | C-11 | u4-publication-link | u2-shared-foundation, u5-rag-answer, u10-jd | web 받은 사람 화면(`/s/[token]`)의 붙는 자리 + 받은 사람 API 경로 규칙 | U4 담당 |
 | C-12 | u4-publication-link, u5-rag-answer, u10-jd | External: 받은 사람 브라우저 | HTTP REST·SSE(`/v1/public/links/{token}/...`) | 경로별 제공 Unit 담당 |
@@ -302,7 +302,7 @@ table published_pdf_page:         # U8이 만든다(후순위). U3은 이 모양
   published_pdf_page_id: uuid PK
   published_item_id: uuid NOT NULL  FK published_item ON DELETE CASCADE
   page_number: integer NOT NULL CHECK (page_number >= 1)
-  text: text NOT NULL             # 읽을 수 없는 쪽은 빈 문자열
+  text: text NOT NULL             # 읽을 수 없는 쪽은 빈 문자열. 읽을 수 있는 쪽은 빈 문자열이 아니다
   readable: boolean NOT NULL
   unique: (published_item_id, page_number)
 ```

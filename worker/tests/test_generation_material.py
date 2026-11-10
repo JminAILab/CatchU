@@ -2,7 +2,7 @@
 
 재료는 후보 근거가 가리키는 연동 계정 커밋의 바뀐 줄이다(#120 본문 「근거와 설명·질문」). 그래서
 근거 주소가 커밋 화면 주소가 아닌 근거(PR·PR 없는 병합의 병합 커밋), 다른 계정 커밋, 근거 20건 상한 밖
-커밋, 나눈 부분 밖 경로는 재료가 아니다. 재료가 없으면 원인과 관계없이 제공자를 부르지 않고 설명·질문
+커밋은 재료가 아니다. 재료가 없으면 원인과 관계없이 제공자를 부르지 않고 설명·질문
 NOT_GENERATED, 제목 null, 새 실패 없음이며 기존 수집 실패·근거 한계·미제공 집계·다른 후보 결과는
 그대로다(2026-10-12 결정 4·7·8, 완료 기준 09·10). 생성 순서는 근거에 든 본인 커밋의 가장 최근 작성
 시각 → 그 SHA → 결과 순서다(결정 9·14, 완료 기준 15).
@@ -49,6 +49,7 @@ from generation_scenarios import (
     assert_preserved,
     generation_case,
     naive,
+    naive_ai,
     sent_files,
 )
 from github_synthetic import (
@@ -62,17 +63,24 @@ from github_synthetic import (
     status_only,
 )
 
-import app.candidates.build as build_module
 import app.generation.material as material_module
 from app.candidates import build_candidates
 from app.candidates.grouping import Grouping
 from app.candidates.grouping import group as real_group
-from app.candidates.identity import Part, PullRequestUnit
+from app.candidates.identity import PullRequestUnit
 from app.collection import CollectionOutcome, RepositoryCoordinates
 from app.contract import Verdict, check_message
-from app.generation import GenerationRun, ProviderError, ProviderRequest, run_generation
+from app.generation import (
+    GenerationLimits,
+    GenerationRun,
+    ProviderError,
+    ProviderRequest,
+    run_generation,
+)
 from app.generation.material import CandidateMaterial, gather
 from app.generation.request import prepare
+from app.judgement.provider import JudgementRequest, Question
+from app.judgement.synthetic import SyntheticJudge, default_answer
 from app.processing import (
     CheckedRequest,
     DraftOutcome,
@@ -445,18 +453,11 @@ def test_own_commit_beyond_the_evidence_cap_is_not_material() -> None:
     assert "app/f00.py" not in call.data
 
 
-# 경로로 나눈 부분
+# 나눈 부분 없음(CR1 BR1.1·BR7.2)
 
 
-def test_path_part_limits_material_to_its_paths(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """경로로 나눈 부분(Part(커밋, 경로))의 후보는 그 커밋에서 그 경로 파일만 재료로 쓴다(계획 「어댑터
-    규칙」, 완료 기준 08의 허용 파일).
-
-    지금 #118은 경로로 나누지 않으므로(한계 L8) 묶음 결과를 직접 고쳐 PR #3 단위를 `app/a.py` 부분으로
-    나눈다. 후보 판정과 어댑터가 같은 묶음 결과를 본다.
-    """
+def test_every_file_of_a_material_commit_is_material_without_path_parts() -> None:
+    """이슈 번호 나누기와 함께 경로 허용 목록을 지웠다. 재료 커밋의 파일은 모두 재료 후보다."""
     mine = commit(
         sha(451),
         MEMBER,
@@ -464,32 +465,16 @@ def test_path_part_limits_material_to_its_paths(
         minute=3,
         files=[change("app/a.py"), change("app/b.py")],
     )
-    part = Part(mine.sha, "app/a.py")
-
-    def split(outcome: CollectionOutcome) -> Grouping:
-        grouping = real_group(outcome)
-        return replace(
-            grouping,
-            units=tuple(
-                replace(unit, parts=(part,))
-                if unit.unit == PullRequestUnit(3)
-                else unit
-                for unit in grouping.units
-            ),
-        )
-
-    monkeypatch.setattr(build_module, "group", split)
-    monkeypatch.setattr(material_module, "group", split)
     provider = ScriptedProvider(naive)
 
     case = generation_case(open_pulls(mine), provider)
 
-    assert identities(case.result) == [identity(PullRequestUnit(3), [part])]
+    assert identities(case.result) == [identity(PullRequestUnit(3))]
     (material,) = gather(case.before.request, case.before.outcome, case.before.output)
     assert material_shas(material) == [mine.sha]
+    assert not hasattr(material, "paths")
     (call,) = provider.generate_requests()
-    assert sent_paths(call) == {"app/a.py"}
-    assert "app/b.py" not in call.data
+    assert sent_paths(call) == {"app/a.py", "app/b.py"}
 
 
 # 재료 없음
@@ -841,8 +826,10 @@ def test_units_sharing_a_work_identity_join_their_own_commits(
         pulls=(Pull(3, MEMBER, (first, second), created=2),),
     )
 
-    def doubled(outcome: CollectionOutcome) -> Grouping:
-        grouping = real_group(outcome)
+    def doubled(
+        outcome: CollectionOutcome, assigned: frozenset[str] = frozenset()
+    ) -> Grouping:
+        grouping = real_group(outcome, assigned)
         (unit,) = grouping.units
         halves = tuple(replace(unit, changes=(change,)) for change in unit.changes)
         return replace(grouping, units=halves)
@@ -880,3 +867,183 @@ def test_unencodable_path_is_not_sent_and_counts_as_incomplete() -> None:
 
     assert [file.path for file in prepared.files] == ["app/b.py"]
     assert prepared.truncated == frozenset({record.sha})
+
+
+# 재료 순서와 변경 묶음(CR1 BR5.2~BR5.6, S10·S12)
+
+
+def sent_file_order(request: ProviderRequest) -> list[str]:
+    """보낸 자료의 파일 경로를 자료 순서대로."""
+    data = json.loads(request.data)
+    return [file["path"] for commit in data["commits"] for file in commit["files"]]
+
+
+def big_patch(stem: str, lines: int) -> str:
+    body = [f"+{stem}_{index} = '{'y' * 80}'" for index in range(lines)]
+    return f"@@ -0,0 +1,{lines} @@\n" + "\n".join(body)
+
+
+def test_s10_code_lines_come_before_document_lines() -> None:
+    """S10(AC3.2.1): 문서 파일이 앞, 코드 파일이 뒤인 PR에서도 코드 줄이 먼저 담긴다."""
+    mine = commit(
+        sha(461),
+        MEMBER,
+        parents=(ROOT,),
+        minute=3,
+        files=[
+            change("docs/guide.md"),
+            change("README.md"),
+            change("tests/test_login.py"),
+            change("app/login.py"),
+        ],
+    )
+    provider = ScriptedProvider(naive)
+
+    generation_case(open_pulls(mine), provider)
+
+    (call,) = provider.generate_requests()
+    assert sent_file_order(call) == [
+        "app/login.py",
+        "tests/test_login.py",
+        "docs/guide.md",
+        "README.md",
+    ]
+
+
+def test_s12_large_pull_request_keeps_both_folders_within_limits() -> None:
+    """S12(AC3.2.3): 서로 다른 폴더 두 곳을 크게 고친 PR은 큰 후보다. 두 묶음 줄이 모두 재료에 들고, 한
+    파일은 머리글을 포함해 6,000 B 이하, 전체는 자료 상한 안이다."""
+    api = [
+        change(
+            f"api/module{index}.py", patch=big_patch(f"api{index}", 80), status="added"
+        )
+        for index in range(3)
+    ]
+    web = [
+        change(
+            f"web/page{index}.ts", patch=big_patch(f"web{index}", 80), status="added"
+        )
+        for index in range(3)
+    ]
+    mine = commit(sha(471), MEMBER, parents=(ROOT,), minute=3, files=[*api, *web])
+    provider = ScriptedProvider(naive)
+
+    case = generation_case(open_pulls(mine), provider)
+
+    (call,) = provider.generate_requests()
+    data = json.loads(call.data)
+    files = [file for commit in data["commits"] for file in commit["files"]]
+    folders = {file["path"].split("/")[0] for file in files}
+    assert folders == {"api", "web"}
+    for file in files:
+        size = len(
+            json.dumps(file, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        )
+        assert size <= 6_000
+    assert len(call.data.encode("utf-8")) <= 24_000
+    # 크기로 뺀 줄이 있는 커밋에는 지금처럼 크기 제외 문구가 붙는다.
+    assert case.run.report.size_limited_commits == 1
+
+
+# CR3 재료 판정을 거친 생성(BR6.1·BR6.3·BR6.4, 시나리오 S13·S15·S29)
+
+SMALL_DATA = GenerationLimits(max_data_bytes=700)
+# 가리기 검사가 잡는 GitHub 토큰 꼴. 실행 중에 이어 붙여 만든다.
+TOKEN = "".join(("gh", "p_", "Synthetic", "Leak", "0" * 30))
+
+
+def big_pull() -> Scenario:
+    """`web/`의 코드 파일 넷과 `api/schema.lock`(그 밖)을 고친 본인 커밋 하나의 열린 PR #6. 작은 자료 상한에서
+    큰 후보다. schema.lock 앞 줄에 토큰 꼴 값이 있다."""
+    files = [
+        change(
+            f"web/page{index}.ts",
+            patch=f"@@ -1 +1 @@\n-page{index} = 1\n+page{index} = 2",
+        )
+        for index in range(4)
+    ]
+    files.append(
+        change(
+            "api/schema.lock",
+            patch="@@ -0,0 +1,3 @@\n"
+            f'+token = "{TOKEN}"\n+lockVersion = 3\n+lockHash = abc',
+            status="added",
+        )
+    )
+    own = commit(sha(61), MEMBER, parents=(ROOT,), minute=6, files=files)
+    return Scenario(
+        default_branch=(root_commit(),),
+        pulls=(Pull(6, MEMBER, (own,), state="open", created=5),),
+    )
+
+
+def generated_paths(provider: ScriptedProvider) -> set[str]:
+    (request,) = provider.generate_requests()
+    return sent_paths(request)
+
+
+def test_s13_generated_material_answer_leaves_the_file_out_of_generation() -> None:
+    """S13: 합성 재료 판정이 schema.lock을 GENERATED로 답하면 그 파일의 줄은 생성 요청에 없다."""
+
+    def answer(question: Question) -> object | None:
+        if question.kind == "MATERIAL_KIND":
+            return [0.0, 0.0, 1.0]
+        return default_answer(question)
+
+    without = ScriptedProvider(naive)
+    generation_case(big_pull(), without, limits=SMALL_DATA)
+    assert "api/schema.lock" in generated_paths(without)
+
+    provider = ScriptedProvider(naive_ai)
+    judge = SyntheticJudge(answer)
+    generation_case(big_pull(), provider, limits=SMALL_DATA, judge=judge)
+
+    assert "api/schema.lock" not in generated_paths(provider)
+    (material,) = judge.material_requests()
+    kinds = {(q.target, q.kind) for q in material.questions}
+    assert ("api/schema.lock", "MATERIAL_KIND") in kinds
+
+
+def test_s15_failed_material_judgement_keeps_the_rule_order() -> None:
+    """S15: 재료 판정이 실패하면 재료는 CR1 규칙 순서이고 Catch 판정은 그대로 나간다. 실패 항목은 남지 않는다."""
+    rule = ScriptedProvider(naive)
+    generation_case(big_pull(), rule, limits=SMALL_DATA)
+    calls = 0
+
+    def fail_material(request: JudgementRequest) -> None:
+        nonlocal calls
+        calls += 1
+        if request.purpose == "MATERIAL":
+            raise TimeoutError("합성 재료 판정 시간 초과")
+
+    provider = ScriptedProvider(naive_ai)
+    judge = SyntheticJudge(before=fail_material)
+    case = generation_case(big_pull(), provider, limits=SMALL_DATA, judge=judge)
+
+    assert provider.generate_requests()[0].data == rule.generate_requests()[0].data
+    assert calls == 2
+    assert len(judge.catch_requests()) == 1
+    assert case.run.report.material_judgement_reasons == {"JUDGEMENT_TIMEOUT": 1}
+    assert failure_codes(case.result) == failure_codes(case.before.result)
+
+
+def test_s29_masked_front_lines_are_not_in_the_material_judgement() -> None:
+    """S29: 큰 후보 파일의 앞 5줄에 토큰 꼴 글이 있으면 그 줄은 재료 판정 요청에 없다(다음 줄은 그대로)."""
+    judge = SyntheticJudge()
+    generation_case(
+        big_pull(), ScriptedProvider(naive_ai), limits=SMALL_DATA, judge=judge
+    )
+
+    (material,) = judge.material_requests()
+    assert TOKEN not in material.data
+    files = {entry["path"]: entry for entry in json.loads(material.data)["files"]}
+    assert files["api/schema.lock"]["lines"] == ["+lockVersion = 3", "+lockHash = abc"]
+    assert files["api/schema.lock"]["changedLines"] == 3
+    assert set(json.loads(material.data)) == {"groups", "files"}
+    assert set(files["api/schema.lock"]) == {
+        "id",
+        "path",
+        "status",
+        "changedLines",
+        "lines",
+    }

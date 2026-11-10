@@ -25,6 +25,7 @@ export type CatchRegistrationInputField =
   | 'evidence.representedFacts'
   | 'evidence.contributionScope'
   | 'evidence.coverageLimits'
+  | 'ownCommitShas'
   | 'sourceMode';
 
 /** B 내부의 명시적인 입력 거부다. 저장 실패나 공개 API 오류 코드를 뜻하지 않는다. */
