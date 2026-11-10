@@ -39,7 +39,22 @@ export type PublicationSnapshot =
     readonly refreshing: boolean;
     /** 다시 조회에 실패해 이전 화면을 유지하고 있음 */
     readonly refreshFailed: boolean;
+    /**
+     * 이 화면을 그린 발행본 조회(200)의 요청에 `X-Link-Grant`를 싣지 않았는지(C-11 claude-connect-rule).
+     * 요청을 보낼 때 쓴 grant로 정하고, 응답·렌더링 때 grant 저장소를 다시 읽지 않는다. 다시 조회 중·실패 동안은 마지막 성공 요청의 값을 유지한다.
+     * 화면 표시용이며 접근 판정이 아니다(Claude 쪽은 C-15 도구가 호출마다 C-10을 grant 없이 다시 판정한다).
+     */
+    readonly readWithoutGrant: boolean;
   };
+
+/**
+ * U9 Claude 자리(C-11 slots 0.5)와 `RecipientGuide`의 `showClaudeConnect`에 함께 쓰는 값(C-11 claude-connect-rule).
+ * 판정 통과 화면이고 그 화면을 그린 조회가 grant 없이 성공했을 때만 true다. 불러오는 중·비밀번호 입력·접근 불가·최초 조회 실패는 false.
+ * 두 자리가 따로 판단하지 않도록 이 함수 하나로 정한다. U9를 켜기 전까지 화면(`recipient-view.tsx`)은 이 값을 쓰지 않고 false를 넘긴다.
+ */
+export function claudeConnectable(snapshot: PublicationSnapshot): boolean {
+  return snapshot.view === "ready" && snapshot.readWithoutGrant;
+}
 
 type Denial = "unavailable" | "password" | "failed";
 
@@ -201,7 +216,8 @@ export function createRecipientPublicationStore(options: RecipientStoreOptions) 
     const result = await access.safely(() => options.api.publication(options.token, grant, read.signal));
     if (!read.current()) return;
     if (result.kind === "success") {
-      access.set({ view: "ready", snapshot: result.data, refreshing: false, refreshFailed: false });
+      // 이 요청에 실제로 실은 grant로 정한다(응답을 받은 뒤 저장소를 다시 읽지 않는다).
+      access.set({ view: "ready", snapshot: result.data, refreshing: false, refreshFailed: false, readWithoutGrant: grant === null });
       return;
     }
     const denial = classifyReadFailure(result);
