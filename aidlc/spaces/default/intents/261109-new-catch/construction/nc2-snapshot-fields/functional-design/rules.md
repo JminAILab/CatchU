@@ -38,13 +38,14 @@ rules:
     violation: worker 문장이 바뀌어 대조가 어긋나면 한계가 조용히 빠지므로 BR1.6 시험이 막는다.
     source: FR9.3, FR9.4
   - id: BR1.4
-    statement: 사본 근거마다 본인 커밋 근거인지를 ownCommit에 담는다.
+    statement: 사본 근거마다 이 Catch에 속한 본인 커밋을 가리키는 근거인지를 ownCommit에 담는다.
     category: calculation
     applies_to: Publications
     trigger: 발행할 때
-    logic: IF catch_evidence.contribution_scope가 api 상수 본인 커밋 기여 범위 두 문장(worker _OWN_COMMIT_SCOPE·_OWN_COMMIT_ELSEWHERE_SCOPE)과 글자까지 같다 THEN ownCommit = true. ELSE false. 새 사본은 모든 근거에 이 칸을 담는다. 병합 커밋 근거(「PR 없이 병합한 병합 커밋…」)·PR 근거·이슈 근거는 false다.
+    logic: 발행 트랜잭션 안에서 고른 Catch의 소속 기록(commit_assignment, 회원·저장소·catch_id가 같은 행)의 commit_sha 목록을 읽는다. 이 목록은 등록 때 그 Catch의 ownCommitShas로 쓴 본인 커밋이다. IF 근거 sourceUrl의 경로가 `/<소유자>/<저장소>/commit/<16진수 40자>`이고 그 식별값(소문자)이 목록에 있다 THEN ownCommit = true. ELSE false. 새 사본은 모든 근거에 이 칸을 담는다. 병합 커밋은 이 목록에 없고 PR·이슈 근거는 커밋 주소가 아니므로 false다(FR10.1과 같은 결과).
     violation: 해당 없음
     source: FR10.1, FR10.2
+    note: "2026-11-10 NFR 요구 때 팀장 결정으로 고침(같은 ID에 덧붙임). 처음에는 catch_evidence.contribution_scope를 api 상수 본인 커밋 기여 범위 두 문장과 대조했다. 까닭: 문장을 베끼지 않으므로 worker 문구가 바뀌어도 표지가 조용히 사라지지 않고, 표지 이름 「이 작업의 본인 커밋」과 판단 근거(이 Catch에 속한 본인 커밋)가 그대로 맞는다. 그래서 api의 본인 커밋 기여 범위 상수 둘과 그 대조는 뺀다."
   - id: BR1.5
     statement: 새 사본 칸 넷은 AI 재료와 글자 수 합산에 넣지 않는다.
     category: constraint
@@ -54,13 +55,14 @@ rules:
     violation: 해당 없음
     source: FR9.5
   - id: BR1.6
-    statement: api 상수 여섯이 worker 원본 문장과 글자까지 같은지 api 시험 하나가 본다.
+    statement: api 한계 문장 상수 넷이 worker 원본 문장과 글자까지 같은지 api 시험 하나가 본다.
     category: constraint
     applies_to: Publications
     trigger: api 시험을 돌릴 때
-    logic: api 시험이 worker/app/candidates/build.py 파일 글자를 읽어, 상수 여섯(한계 문장 둘, 같은 작업 경고 앞부분 둘, 본인 커밋 기여 범위 둘)이 각각 그 글자 그대로 들어 있는지 찾는다. 지금 CI는 worker/app/* 가 바뀌어도 api 시험을 돌리므로 CI를 고치지 않는다(Q6 A).
+    logic: api 시험이 worker/app/candidates/build.py 파일 글자를 읽어, 상수 넷(한계 문장 둘 _LISTS_INCOMPLETE·_EARLIER_LIST_INCOMPLETE, 같은 작업 경고 앞부분 둘)이 따옴표 경계째 들어 있는지 찾는다. 한계 문장 둘은 큰따옴표째(`"…"`), 같은 작업 경고 앞부분 둘은 f-string 시작째(`f"같은 작업을 다시 낸 것일 수 있다(`·`f"cherry-pick으로 옮긴 같은 변경일 수 있다(`) 찾는다. 다른 문장 안에 같은 글자가 들어 있어도 통과하지 않도록, 원본의 한 문장만 바꾼 글자로는 실패하는 반례를 시험에 넣는다. 지금 CI는 worker/app/* 가 바뀌어도 api 시험을 돌리므로 CI를 고치지 않는다(Q6 A).
     violation: 하나라도 없으면 시험이 실패하고 어느 상수인지 알린다. worker 문장이 줄 바꿈으로 나뉘게 고쳐져도 실패하며, 그때는 시험이 알려 주는 대로 맞춘다.
-    source: FR9.3, FR10.1
+    source: FR9.3
+    note: "2026-11-10 NFR 요구 때 고침(같은 ID에 덧붙임). 따옴표 경계는 NFR 요구 Q2 A(기능 설계 검토의 지적: 부분 문자열로만 찾으면 첫 문장만 바뀌어도 통과). 대조 대상이 여섯에서 넷으로 준 것은 BR1.4를 소속 기록으로 바꾼 팀장 결정 때문이다."
 
   # BR2 사본 읽어 옮기기 (RecipientScreen, 작성자 발행본 web)
   - id: BR2.1
@@ -120,7 +122,7 @@ rules:
     category: calculation
     applies_to: GithubLinkName
     trigger: Catch 사본의 작성자 설명을 그릴 때
-    logic: IF 근거의 ownCommit === true이고 sourceUrl이 GitHub 주소(지금 판별 규칙)이며 sourceRevision이 16진수 40자다 THEN (sourceUrl의 「소유자/저장소」, 소문자로 바꾼 sourceRevision)을 목록에 넣는다. ownCommit이 없거나 false인 근거, 다른 꼴의 근거는 넣지 않는다. 같은 (저장소, 식별값)은 하나로 둔다. 사본 근거는 본인 커밋 최근 20건까지라 그보다 오래된 커밋은 목록에 없다.
+    logic: IF 근거의 ownCommit === true이고 sourceUrl이 GitHub 커밋 주소(지금 판별 규칙을 지나고 경로가 `/<소유자>/<저장소>/commit/<16진수 40자>`)다 THEN (그 주소의 「소유자/저장소」, 주소의 식별값을 소문자로 바꾼 것)을 목록에 넣는다(BR1.4와 같은 식별값). ownCommit이 없거나 false인 근거, 다른 꼴의 근거는 넣지 않는다. 같은 (저장소, 식별값)은 하나로 둔다. 사본 근거는 본인 커밋 최근 20건까지라 그보다 오래된 커밋은 목록에 없다.
     violation: 해당 없음
     source: FR10.1, FR10.3
   - id: BR4.2
@@ -195,7 +197,7 @@ rules:
 
 | 묶음 | 규칙 | 구성 요소 | 요구사항 |
 |---|---|---|---|
-| BR1 | 저장소 이름, 작성 시점, 작업 전체 한계 고르기, 근거별 본인 커밋, AI 재료에서 빼기, 문장 대조 시험 | Publications | FR9.1~FR9.5, FR10.1·FR10.2 |
+| BR1 | 저장소 이름, 작성 시점, 작업 전체 한계 고르기, 근거별 본인 커밋(소속 기록), AI 재료에서 빼기, 한계 문장 대조 시험 | Publications | FR9.1~FR9.5, FR10.1·FR10.2 |
 | BR2 | web 사본 모양 검사, 받은 사람 칸 옮기기 | RecipientScreen, PublishScreen | FR9.6·FR9.7, FR10.2 |
 | BR3 | 저장소 줄, 작성 시점, 이 기록으로 알 수 없는 것, 옛 사본 | SnapshotView | FR9.1·FR9.2·FR9.4·FR9.6, NFR7 |
 | BR4 | 본인 커밋 목록, 판정하는 링크, 하나와만 맞음, 링크 밖 자리, 모양, 뜻, 쓰는 곳 | GithubLinkName, SnapshotView | FR10, NFR5·NFR6 |
@@ -216,4 +218,5 @@ rules:
 - `inception/refined-mockups/mockups.md` 4절, `inception/refined-mockups/interaction-spec.md` 4절·9절
 - `construction/nc1-sections-and-links/functional-design/rules.md` BR2, `frontend-components.md` 2.2·2.3
 - `construction/nc2-snapshot-fields/functional-design/functional-design-questions.md` Q1~Q6
-- 지금 코드: `api/src/publications/publish.service.ts`, `api/src/publications/snapshot-builder.ts`, `api/src/published-index/chunker.ts`, `api/src/rag-answer/summary-sources.ts`, `api/src/rag-answer/rag-answer-config.ts`, `api/src/jd-summary/jd-generation-request.ts`, `worker/app/candidates/build.py`, `.github/workflows/ci.yml`, `web/src/lib/github-link-name.ts`, `web/src/features/publications/github-link.tsx`, `web/src/features/publications/snapshot-view.tsx`, `web/src/features/publications/publications-api.ts`, `web/src/features/recipient/recipient-api.ts`, `web/src/features/publications/publications.module.css`
+- `construction/nc2-snapshot-fields/nfr-requirements/nfr-requirements-questions.md` Q2와 덧붙임(BR1.4·BR1.6 고침)
+- 지금 코드: `api/src/catches/entities/commit-assignment.entity.ts`, `api/src/catches/registration-batch.ts`(ownCommitShas), `api/src/publications/publish.service.ts`, `api/src/publications/snapshot-builder.ts`, `api/src/published-index/chunker.ts`, `api/src/rag-answer/summary-sources.ts`, `api/src/rag-answer/rag-answer-config.ts`, `api/src/jd-summary/jd-generation-request.ts`, `worker/app/candidates/build.py`, `.github/workflows/ci.yml`, `web/src/lib/github-link-name.ts`, `web/src/features/publications/github-link.tsx`, `web/src/features/publications/snapshot-view.tsx`, `web/src/features/publications/publications-api.ts`, `web/src/features/recipient/recipient-api.ts`, `web/src/features/publications/publications.module.css`

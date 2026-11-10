@@ -21,6 +21,7 @@ erDiagram
   PUBLICATION ||--o{ CATCH_SNAPSHOT : "items"
   CATCH_SNAPSHOT ||--o{ SNAPSHOT_EVIDENCE : "evidence"
   CATCH_ASSET ||--o{ CATCH_EVIDENCE : "has"
+  CATCH_ASSET ||--o{ COMMIT_ASSIGNMENT : "owns commits"
   ANALYSIS_REQUEST ||--o{ CATCH_ASSET : "source_request_id"
   REPOSITORY_REGISTRATION ||--o{ ANALYSIS_REQUEST : "registration_id"
   CATCH_SNAPSHOT {
@@ -33,7 +34,7 @@ erDiagram
   }
 ```
 
-Text fallback: 발행본(Publication)은 Catch 사본(CatchSnapshot)을 여럿 가지고, 사본은 근거 항목(SnapshotEvidence)을 여럿 가진다. 사본에 저장소 이름·작성 시점·작업 전체 한계 선택 칸이, 근거 항목에 본인 커밋 여부 선택 칸이 새로 붙는다. 발행할 때 읽는 원본은 Catch(catch_asset)와 그 근거(catch_evidence)이고, Catch는 분석 요청(analysis_request)을, 분석 요청은 저장소 등록(repository_registration)을 가리킨다.
+Text fallback: 발행본(Publication)은 Catch 사본(CatchSnapshot)을 여럿 가지고, 사본은 근거 항목(SnapshotEvidence)을 여럿 가진다. 사본에 저장소 이름·작성 시점·작업 전체 한계 선택 칸이, 근거 항목에 본인 커밋 여부 선택 칸이 새로 붙는다. 발행할 때 읽는 원본은 Catch(catch_asset), 그 근거(catch_evidence), 그 Catch에 속한 본인 커밋 소속 기록(commit_assignment)이고, Catch는 분석 요청(analysis_request)을, 분석 요청은 저장소 등록(repository_registration)을 가리킨다.
 
 ## 2. 흐름
 
@@ -41,7 +42,7 @@ Text fallback: 발행본(Publication)은 Catch 사본(CatchSnapshot)을 여럿 �
 
 1. 지원자가 지금처럼 [발행]을 누른다. 발행 트랜잭션 안에서 고른 Catch를 잠그고 읽는다.
 2. 잠금 조회는 지금 칸에 더해 `author_description_updated_at`과, 분석 요청의 `registration_id`로 이은 저장소 등록의 `owner`·`name`을 읽는다(BR1.1).
-3. 근거 조회는 지금 칸에 더해 `contribution_scope`·`coverage_limits`를 읽는다.
+3. 근거 조회는 지금 칸에 더해 `coverage_limits`를 읽는다. 고른 Catch의 소속 기록(`commit_assignment`)에서 본인 커밋 식별값 목록을 함께 읽는다(BR1.4).
 4. 지금 발행 조건 검사(확인 여부, 분석 요청 주인, 보호 관측)는 그대로 먼저 한다.
 5. Catch마다 지금 사본을 만들고 새 칸을 더한다.
    - `repositoryName`(BR1.1). 등록 행이 없으면 칸을 넣지 않는다(안전망).
@@ -122,7 +123,7 @@ export function isOwnCommitLink(url: string, ownCommits: readonly OwnCommit[]): 
 
 - api:
   - `publications/published-snapshot.ts`(형), `publications/snapshot-builder.ts`(사본 칸 담기, 상수 대조), `publications/publish.service.ts`(잠금·근거 조회 칸)
-  - 문장 상수 여섯을 둘 곳 하나(코드 생성에서 정함)와 대조 시험(BR1.6)
+  - 한계 문장 상수 넷을 둘 곳 하나(코드 생성에서 정함)와 대조 시험(BR1.6). 본인 커밋 기여 범위 상수는 두지 않는다(BR1.4는 소속 기록으로 정함)
   - `rag-answer/rag-answer-config.ts`(지시 둘), `jd-summary/jd-generation-request.ts`(JD 요약 지시, U10 담당 확인)
   - 시험: 사본 칸 넷, 안전망 하나(BR1.1), 조각·요약 근거에 새 칸 0건(BR1.5), 지시 문장
 - web:
@@ -139,9 +140,9 @@ export function isOwnCommitLink(url: string, ownCommits: readonly OwnCommit[]): 
   - 등록 행이 없을 때 `repositoryName`만 빠지고 발행은 됨(안전망, 시험 하나)
   - 작성 시점: 11월 고침 → "2026-11", 2026-11-30T16:00Z → "2026-12", 설명 없음 → 칸 없음
   - 한계: 두 근거에 같은 문장 → 한 번. 같은 작업 경고와 근거별 조회 상태가 섞임 → 경고만. 해당 없음 → 칸 없음
-  - `ownCommit`: 기여 범위 두 문장 → true, 병합 커밋·PR·이슈 근거 → false
+  - `ownCommit`: 이 Catch 소속 기록에 있는 커밋 주소 근거 → true. 병합 커밋 근거, PR·이슈 근거, 다른 Catch에 속한 커밋 주소 → false
   - 조각과 요약 근거에 새 칸 글자 0건
-  - 문장 대조: 상수 여섯이 `build.py` 글자에 있음(하나를 틀리게 바꾸면 실패하는지도 본다)
+  - 문장 대조: 한계 상수 넷이 `build.py` 글자에 따옴표 경계째 있음. 원본 한 문장만 바꾼 글자로는 실패하는 반례
   - 지시 문장이 세 지시 끝에 붙음
 - web:
   - 옛 사본(칸 없음)이 지금 그대로 보임
@@ -158,7 +159,7 @@ export function isOwnCommitLink(url: string, ownCommits: readonly OwnCommit[]): 
 
 | 묶음 | 규칙 | 구성 요소 | 요구사항 |
 |---|---|---|---|
-| BR1 | 저장소 이름·작성 시점·한계 고르기·본인 커밋 여부·AI 재료에서 빼기·문장 대조 시험 | Publications | FR9.1~FR9.5, FR10.1·FR10.2 |
+| BR1 | 저장소 이름·작성 시점·한계 고르기·본인 커밋 여부(소속 기록)·AI 재료에서 빼기·한계 문장 대조 시험 | Publications | FR9.1~FR9.5, FR10.1·FR10.2 |
 | BR2 | web 사본 모양 검사·받은 사람 칸 옮기기 | RecipientScreen, PublishScreen | FR9.6·FR9.7, FR10.2 |
 | BR3 | 저장소 줄·작성 시점·이 기록으로 알 수 없는 것·옛 사본 | SnapshotView | FR9.1·FR9.2·FR9.4·FR9.6, NFR7 |
 | BR4 | 본인 커밋 목록·판정하는 링크·하나와만 맞음·링크 밖 자리·모양·뜻·쓰는 곳 | GithubLinkName, SnapshotView | FR10, NFR5·NFR6 |
@@ -187,4 +188,5 @@ export function isOwnCommitLink(url: string, ownCommits: readonly OwnCommit[]): 
 - `inception/refined-mockups/mockups.md` 4절, `inception/refined-mockups/interaction-spec.md` 4절·9절
 - `construction/nc1-sections-and-links/functional-design/rules.md`, `frontend-components.md`
 - `construction/nc2-snapshot-fields/functional-design/functional-design-questions.md` Q1~Q6
-- 지금 코드: `api/src/publications/publish.service.ts`, `api/src/publications/snapshot-builder.ts`, `api/src/publications/published-snapshot.ts`, `api/src/rag-answer/rag-answer-config.ts`, `api/src/jd-summary/jd-generation-request.ts`, `web/src/lib/github-link-name.ts`, `web/src/features/publications/github-link.tsx`, `web/src/features/publications/snapshot-view.tsx`, `web/src/features/publications/publications-api.ts`, `web/src/features/recipient/recipient-api.ts`
+- `construction/nc2-snapshot-fields/nfr-requirements/nfr-requirements-questions.md` Q2와 덧붙임(2026-11-10 BR1.4·BR1.6 고침)
+- 지금 코드: `api/src/catches/entities/commit-assignment.entity.ts`, `api/src/publications/publish.service.ts`, `api/src/publications/snapshot-builder.ts`, `api/src/publications/published-snapshot.ts`, `api/src/rag-answer/rag-answer-config.ts`, `api/src/jd-summary/jd-generation-request.ts`, `web/src/lib/github-link-name.ts`, `web/src/features/publications/github-link.tsx`, `web/src/features/publications/snapshot-view.tsx`, `web/src/features/publications/publications-api.ts`, `web/src/features/recipient/recipient-api.ts`

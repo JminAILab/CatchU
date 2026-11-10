@@ -61,22 +61,33 @@ entities:
         type: boolean
         required: false
         new: true
-        source: catch_evidence.contribution_scope가 본인 커밋 기여 범위 문장 둘 가운데 하나와 글자까지 같으면 true, 아니면 false (BR1.4)
+        source: 근거 sourceUrl이 `/<소유자>/<저장소>/commit/<16진수 40자>`이고 그 식별값이 이 Catch의 소속 기록(commit_assignment)에 있으면 true, 아니면 false (BR1.4, 2026-11-10 NFR 요구 때 기여 범위 문장 대조에서 바꿈)
         default_when_absent: false로 읽는다(이 변경 전 사본, BR2.2)
     relationships:
       - {to: CatchSnapshot, cardinality: "many-to-one", direction: "SnapshotEvidence -> CatchSnapshot"}
 
   - name: CatchEvidence
     owner: Catches
-    description: Catch의 근거 한 행(catch_evidence). NC2는 바꾸지 않고 발행 때 두 칸을 더 읽는다.
+    description: Catch의 근거 한 행(catch_evidence). NC2는 바꾸지 않고 발행 때 한 칸을 더 읽는다.
     attributes:
-      - {name: sourceUrl, type: text, required: true}
+      - {name: sourceUrl, type: text, required: true, note: ownCommit 판정에도 쓴다(BR1.4)}
       - {name: sourceRevision, type: text, required: true}
       - {name: representedFacts, type: list<text>, required: true}
-      - {name: contributionScope, type: text, required: true, note: 발행 때 새로 읽는다(ownCommit 판정)}
+      - {name: contributionScope, type: text, required: true, note: NC2는 읽지 않는다(2026-11-10 BR1.4 바꿈)}
       - {name: coverageLimits, type: list<text>, required: true, note: 발행 때 새로 읽는다(workLimits 고르기)}
     relationships:
       - {to: CatchAsset, cardinality: "many-to-one", direction: "CatchEvidence -> CatchAsset"}
+
+  - name: CommitAssignment
+    owner: Catches
+    description: 소속 기록(commit_assignment). 한 회원·한 저장소 안에서 커밋 하나가 어느 Catch에 속하는지 적는다. 등록 때 그 Catch의 ownCommitShas로 한 번 쓰고 바꾸지 않는다. NC2는 바꾸지 않고 발행 때 읽기만 한다.
+    attributes:
+      - {name: memberId, type: uuid, required: true, note: 기본 키}
+      - {name: githubRepositoryId, type: text, required: true, note: 기본 키, analysis_request.repository_id 그대로}
+      - {name: commitSha, type: text, required: true, constraints: ["^[0-9a-f]{40}$"], note: 기본 키}
+      - {name: catchId, type: uuid, required: true, note: "(catch_id, member_id)로 Catch를 가리키는 외래 키, 색인 있음"}
+    relationships:
+      - {to: CatchAsset, cardinality: "many-to-one", direction: "CommitAssignment -> CatchAsset"}
 
   - name: CatchAsset
     owner: Catches
@@ -110,9 +121,9 @@ entities:
     description: 사본 근거 가운데 본인 커밋 근거 하나를 표지 판정에 쓰려고 화면에서 만든 값. 저장하지 않는다.
     attributes:
       - {name: repository, type: text, required: true, note: 근거 sourceUrl의 「소유자/저장소」}
-      - {name: commitId, type: text, required: true, constraints: ["^[0-9a-f]{40}$(소문자로 바꾼 sourceRevision)"]}
+      - {name: commitId, type: text, required: true, constraints: ["^[0-9a-f]{40}$(근거 커밋 주소의 식별값을 소문자로)"]}
     entity_constraints:
-      - ownCommit이 true이고, sourceUrl이 GitHub 주소이며, sourceRevision이 16진수 40자인 근거에서만 만든다(BR4.1).
+      - ownCommit이 true이고 sourceUrl이 GitHub 커밋 주소(`/commit/<16진수 40자>`)인 근거에서만 만든다(BR4.1).
       - 같은 (repository, commitId)는 하나로 센다(BR4.3).
 ```
 
@@ -122,7 +133,8 @@ entities:
 |---|---|---|
 | CatchSnapshot | Publications | 선택 칸 셋(`repositoryName`·`authorDescriptionEditedMonth`·`workLimits`)을 더한다 |
 | SnapshotEvidence | Publications | 선택 칸 `ownCommit`을 더한다. 없으면 false로 읽는다 |
-| CatchEvidence | Catches | 바꾸지 않음. 발행 때 `contributionScope`·`coverageLimits`를 더 읽는다 |
+| CatchEvidence | Catches | 바꾸지 않음. 발행 때 `coverageLimits`를 더 읽는다 |
+| CommitAssignment | Catches | 바꾸지 않음. 발행 때 고른 Catch의 `commitSha` 목록을 읽는다(ownCommit 판정) |
 | CatchAsset | Catches | 바꾸지 않음. 발행 때 `authorDescriptionUpdatedAt`을 더 읽는다 |
 | RepositoryRegistration | member-repositories | 바꾸지 않음. 발행 때 `owner`·`name`을 읽는다 |
 | OwnCommitReference | GithubLinkName | 화면에서만 만드는 계산값. 저장하지 않는다 |
@@ -134,4 +146,5 @@ entities:
 - `inception/contract-design/contract-summary.md` C3·C6
 - `inception/requirements-analysis/requirements.md` FR9.1~FR9.7, FR10.1~FR10.3, 가정 A1·A7
 - `construction/nc2-snapshot-fields/functional-design/functional-design-questions.md` Q1·Q2
-- 지금 코드: `api/src/publications/published-snapshot.ts`, `api/src/publications/snapshot-builder.ts`, `api/src/publications/publish.service.ts`(`CATCH_LOCK_SQL`·`EVIDENCE_SQL`), `api/src/catches/entities/catch-evidence.entity.ts`, `api/src/member-repositories/repository-registration.entity.ts`, `api/src/database/migrations/1793162230852-AddCatchAuthorDescription.ts`, `api/src/database/migrations/1793245460352-AddRepositoryRegistration.ts`
+- `construction/nc2-snapshot-fields/nfr-requirements/nfr-requirements-questions.md` Q2 덧붙임(ownCommit을 소속 기록으로)
+- 지금 코드: `api/src/catches/entities/commit-assignment.entity.ts`, `api/src/publications/published-snapshot.ts`, `api/src/publications/snapshot-builder.ts`, `api/src/publications/publish.service.ts`(`CATCH_LOCK_SQL`·`EVIDENCE_SQL`), `api/src/catches/entities/catch-evidence.entity.ts`, `api/src/member-repositories/repository-registration.entity.ts`, `api/src/database/migrations/1793162230852-AddCatchAuthorDescription.ts`, `api/src/database/migrations/1793245460352-AddRepositoryRegistration.ts`
