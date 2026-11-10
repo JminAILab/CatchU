@@ -16268,3 +16268,537 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
 
 ---
+
+## Unit Started
+**Timestamp**: 2026-11-10T14:10:17Z
+**Event**: UNIT_STARTED
+**Stage**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T14:10:31Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > nfr-design-questions.md
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T14:10:43Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a0033186b96685e80
+**Message**: Q1: A, Q2: A done
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T14:13:46Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: af502007ba570caa8
+**Message**: 새 Catch NC2 작업 중이고, 기능 설계와 NFR 요구는 마쳐서 커밋했습니다. 지금은 NFR 설계 단계로, 안전망 경고 시점(Q1)과 소속 기록 읽는 범위(Q2)에 답을 주시면 이어 갑니다.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T23:08:27Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: typed
+**Message Id**: a7a13a3e
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:08:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/delivery-planning/bolt-plan.md
+**Context**: inception > delivery-planning > bolt-plan.md
+**Summary Authorization Id**: 55827e7052b19a4eaddd77c7a4f8a19dbb95e03a2619f9243667ff7bdca4415e
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:08:35Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > nfr-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:08:40Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > nfr-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-10T23:08:44Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Unit**: nc2-snapshot-fields
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T23:10:24Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: 6bc4e93a
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T23:10:25Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: 정한 내용입니다.\n- Q1 A: 발행 처리 도중에는 저장소 이름 칸을 뺀 Catch가 있었는지만 기억하고, 발행이 성공한 뒤 publishSucceeded 옆에서 경고 한 줄(발행본 ID·회원 ID)을 남긴다. 취소되면 남기지 않는다.\n- Q2 A: 근거의 커밋 주소 식별값만 모아 소속 기록에서 그 식별값만 한 번에 읽는다. 읽는 행 수가 근거 수를 넘지 않는다.\n- 덧붙임: bolt-plan.md B2 「확인하는 가설」에 본인 커밋 표지는 소속 기록으로 정한다는 줄을 덧붙였고, FR10.2는 그대로 둔다.\n- 바로 적는 것: 다른 Catch에 이미 배정된 커밋은 표지가 없는 한계(까닭과 함께), 문장 대조 시험은 새로 만드는 시험이 build.py를 읽는다는 것과 경로 기준.\n\n문서를 만들기 전에, 이 내용이 맞나요?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:10:27Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > nfr-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-10T23:10:28Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: nfr-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Questions SHA-256**: 7a9d4a2b1b406e88e23a01cb65701a69ab823e587b80aa80c026a3c30c25061d
+**Hash Scope**: confirmed-content-v2
+**Unit**: nc2-snapshot-fields
+**Message Id**: 6bc4e93a
+**Message Ids**: a7a13a3e,6bc4e93a
+**Person Reply**: <pasted_content id="9097">\nQ1: A\nQ2: A\n덧붙임(앞 단계에서 물은 것): bolt-plan.md B2 「확인하는 가설」에 같은 ID 덧붙임으로 「본인 커밋 표지는 소속 기록(commit_assignment)으로 정한다(2026-11-10 NC2 NFR 요구 때 결정)」를 더한다. 요구사항 FR10.2는 「정할 수 있다」는 가능한 방법을 적은 문장이라 고치지 않는다.\ndone\n</pasted_content id="9097">\nLooks correct
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:11:01Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/performance-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > performance-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:11:24Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > security-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:11:32Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/scalability-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > scalability-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:11:52Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/reliability-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > reliability-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:12:00Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/observability-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > observability-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:12:12Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/logical-components.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > logical-components.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:12:20Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > security-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:12:33Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/traceability.json
+**Context**: construction > nc2-snapshot-fields > nfr-design > traceability.json
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:12:41Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nfr-design/memory.md
+**Context**: construction > nfr-design > memory.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: 061c24e1
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: 061c24e1
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/performance-design.md
+**Duration ms**: 77
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: 17fa5980
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: 17fa5980
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: bf8de661
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/scalability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: bf8de661
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/scalability-design.md
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0a743aa3
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/reliability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0a743aa3
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/reliability-design.md
+**Duration ms**: 79
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: d56d348d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/observability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: d56d348d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/observability-design.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: c81c979d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/logical-components.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: c81c979d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/logical-components.md
+**Duration ms**: 71
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: b91947fd
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: b91947fd
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/traceability.json
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: e2cc351c
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: e2cc351c
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/performance-design.md
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: e5d2a8ae
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: e5d2a8ae
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/traceability.json
+**Duration ms**: 76
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: REVIEW_REQUESTED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:a14db84983d2d43d614a98b8fe8e8773e4d3ed117e6bb294f1ab5d781719c75e
+**Request Id**: review:aa51eacbf1a07f08f16b4e34f87c2e8a
+**Review File**: .aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.aa51eacbf1a07f08f16b4e34f87c2e8a.review.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:12:48Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nfr-design/memory.md
+**Context**: construction > nfr-design > memory.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:12:53Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-10T23:13:08Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T23:13:36Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: nfr-design
+**Tool**: Bash
+**Details**: <project-dir> (unit nc2-snapshot-fields)
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:14:12Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.aa51eacbf1a07f08f16b4e34f87c2e8a.review.md
+**Context**: .aidlc-engine > reviews > nfr-design > units > nc2-snapshot-fields > 7332c702b7dcc515 > 1.aa51eacbf1a07f08f16b4e34f87c2e8a.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-10T23:14:18Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T23:14:18Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: ac7a433edd5bef9de
+**Review File Digest**: .aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.aa51eacbf1a07f08f16b4e34f87c2e8a.review.md=565f1c13c9e37464c68b01f0daefc79d773ecb263ca03bfa965fc68a5ed899c8
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-10T23:14:21Z
+**Event**: REVIEW_COMPLETED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:a14db84983d2d43d614a98b8fe8e8773e4d3ed117e6bb294f1ab5d781719c75e
+**Artifact Fingerprint**: sha256:a14db84983d2d43d614a98b8fe8e8773e4d3ed117e6bb294f1ab5d781719c75e
+**Request Id**: review:aa51eacbf1a07f08f16b4e34f87c2e8a
+**Review Record**: .aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json
+**Review Record Digest**: sha256:5cedb64aeae0bfacaf2c9bd8c757dcfbb4fe0c9ffcc5e1d80ab47501bb47ef4b
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-10T23:14:23Z
+**Event**: UNIT_COMPLETED
+**Stage**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
