@@ -41,7 +41,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRecipientApi, readPublishedSnapshot } from "../src/features/recipient/recipient-api.ts";
 import { createGrantStore, GRANT_KEY_PREFIX, GRANT_MAX_LENGTH } from "../src/features/recipient/recipient-grants.ts";
-import { createRecipientPublicationStore } from "../src/features/recipient/recipient-store.ts";
+import { claudeConnectable, createRecipientPublicationStore } from "../src/features/recipient/recipient-store.ts";
 import { fieldText, resolveEvidenceTarget } from "../src/features/recipient/recipient-slots.ts";
 import {
   isGithubSourceUrl, LINK_UNAVAILABLE_TEXT, PASSWORD_REQUIRED_TITLE, PUBLISHED_AT_LABEL, publishedAtText, unlockMessage,
@@ -607,6 +607,151 @@ test("붙는 컴포넌트의 onAccessLost(C-11 rule): 401이면 비밀번호 입
   assert.equal(grants.get(TOKEN), null);
 });
 
+// ── Claude 안내 표시 값(C-11 claude-connect-rule, #495) ─────────────
+// 기대: 발행본 조회 200의 요청에 grant를 싣지 않았을 때만 readWithoutGrant·claudeConnectable이 true. 값은 요청을 보낼 때 쓴 grant로 정하고
+//       응답 뒤 저장소 값이 바뀌거나 읽기가 실패해도 바뀌지 않는다. 다시 조회 중·실패 동안은 마지막 성공 요청의 값을 유지한다.
+//       불러오는 중·비밀번호 입력·접근 불가·최초 조회 실패·onAccessLost 뒤에는 false. 늦은 응답은 현재 값을 덮지 않는다.
+// 실패 조건: 비밀번호 링크(grant를 실어 연 화면)에서 true, 렌더링·응답 시점의 저장소 값으로 바뀜, 재조회 실패에서 값이 바뀜.
+
+/** 요청이 나간 뒤 값을 바꾸거나 접근 실패를 켜고 끌 수 있는 Storage 대역. */
+function controllableStorage() {
+  const map = new Map();
+  const state = { broken: false };
+  return {
+    map, state,
+    getItem(key) { if (state.broken) throw new Error("blocked"); return map.has(key) ? map.get(key) : null; },
+    setItem(key, value) { if (state.broken) throw new Error("blocked"); map.set(key, String(value)); },
+    removeItem(key) { if (state.broken) throw new Error("blocked"); map.delete(key); },
+  };
+}
+
+test("Claude 안내 값: grant 없이 연 화면만 true이고, grant를 실어 연 화면(저장된 grant·비밀번호 확인 직후)은 false다", async () => {
+  const { queue, calls, grants, publicationStore } = setup();
+  queue.push(ok(publication()));
+  const open = publicationStore();
+  await open.load();
+  assert.equal(calls[0].request.linkGrant, undefined);
+  assert.equal(open.getSnapshot().readWithoutGrant, true);
+  assert.equal(claudeConnectable(open.getSnapshot()), true);
+
+  grants.set(TOKEN, "g-A");
+  queue.push(ok(publication()));
+  const saved = publicationStore();
+  await saved.load();
+  assert.equal(calls[1].request.linkGrant, "g-A");
+  assert.equal(claudeConnectable(saved.getSnapshot()), false, "저장된 grant를 실어 연 화면");
+
+  queue.push(passwordRequired, ok({ grant: "g-B" }), ok(publication()));
+  const unlocked = publicationStore(OTHER);
+  await unlocked.load();
+  assert.equal(claudeConnectable(unlocked.getSnapshot()), false, "비밀번호 입력 화면");
+  await unlocked.unlock(PASSWORD);
+  assert.equal(unlocked.getSnapshot().view, "ready");
+  assert.equal(claudeConnectable(unlocked.getSnapshot()), false, "비밀번호를 통과한 화면");
+});
+
+test("Claude 안내 값: 요청 뒤 저장소 값이 바뀌거나 읽기가 실패해도 요청에 실은 grant로 정한 값을 유지한다", async () => {
+  const storage = controllableStorage();
+  const { queue, calls, publicationStore } = setup({ storage });
+  storage.map.set(`${GRANT_KEY_PREFIX}${TOKEN}`, "g-stored");
+  const sent = deferred();
+  queue.push(() => sent.promise);
+  const withGrant = publicationStore();
+  const loading = withGrant.load();
+  assert.equal(calls[0].request.linkGrant, "g-stored");
+  storage.state.broken = true;
+  sent.resolve(ok(publication()));
+  await loading;
+  assert.equal(claudeConnectable(withGrant.getSnapshot()), false, "응답 뒤 저장소 읽기가 실패해도 grant를 실은 요청이므로 false");
+  storage.map.clear();
+  storage.state.broken = false;
+  assert.equal(claudeConnectable(withGrant.getSnapshot()), false, "저장소가 비워져도 다시 읽지 않는다");
+
+  const other = deferred();
+  queue.push(() => other.promise);
+  const withoutGrant = publicationStore(OTHER);
+  const loadingOther = withoutGrant.load();
+  assert.equal(calls[1].request.linkGrant, undefined);
+  storage.map.set(`${GRANT_KEY_PREFIX}${OTHER}`, "g-later");
+  other.resolve(ok(publication()));
+  await loadingOther;
+  assert.equal(claudeConnectable(withoutGrant.getSnapshot()), true, "요청 뒤 저장소에 grant가 생겨도 grant 없이 보낸 요청이므로 true");
+});
+
+test("Claude 안내 값: 다시 조회 중·실패 동안 마지막 성공 요청의 값을 유지하고, 다음 성공 요청의 값으로 바뀐다", async () => {
+  const { queue, grants, publicationStore } = setup();
+  queue.push(ok(publication()));
+  const store = publicationStore();
+  await store.load();
+  assert.equal(claudeConnectable(store.getSnapshot()), true);
+  const pending = deferred();
+  queue.push(() => pending.promise);
+  grants.set(TOKEN, "g-A");
+  const refreshing = store.load();
+  assert.equal(store.getSnapshot().refreshing, true);
+  assert.equal(claudeConnectable(store.getSnapshot()), true, "다시 조회 중에는 이전 값");
+  pending.resolve(lookupFailed);
+  await refreshing;
+  assert.equal(store.getSnapshot().refreshFailed, true);
+  assert.equal(claudeConnectable(store.getSnapshot()), true, "다시 조회 실패는 마지막 성공 요청(grant 없음)의 값");
+
+  queue.push(ok(publication()));
+  await store.load();
+  assert.equal(claudeConnectable(store.getSnapshot()), false, "grant를 실은 다음 성공 요청의 값");
+  queue.push(serverError);
+  await store.load();
+  assert.equal(store.getSnapshot().refreshFailed, true);
+  assert.equal(claudeConnectable(store.getSnapshot()), false, "실패해도 false를 유지");
+});
+
+test("Claude 안내 값: 불러오는 중·비밀번호 입력·접근 불가·최초 조회 실패·onAccessLost 뒤에는 false이고, 늦은 응답·다른 링크가 값을 덮지 않는다", async () => {
+  const { queue, grants, publicationStore } = setup();
+  const first = deferred();
+  queue.push(() => first.promise);
+  const loading = publicationStore();
+  const pending = loading.load();
+  assert.equal(claudeConnectable(loading.getSnapshot()), false, "불러오는 중");
+  first.resolve(serverError);
+  await pending;
+  assert.equal(loading.getSnapshot().view, "failed");
+  assert.equal(claudeConnectable(loading.getSnapshot()), false, "최초 조회 실패");
+
+  for (const [denial, view] of [[unavailable, "unavailable"], [passwordRequired, "password"]]) {
+    queue.push(denial);
+    const denied = publicationStore();
+    await denied.load();
+    assert.equal(denied.getSnapshot().view, view);
+    assert.equal(claudeConnectable(denied.getSnapshot()), false, view);
+  }
+
+  queue.push(ok(publication()));
+  const lost = publicationStore();
+  await lost.load();
+  assert.equal(claudeConnectable(lost.getSnapshot()), true);
+  lost.accessLost("LINK_UNAVAILABLE");
+  assert.equal(claudeConnectable(lost.getSnapshot()), false, "onAccessLost 뒤");
+
+  // 늦은 응답: grant 없이 보낸 이전 조회가 grant를 실은 다음 조회보다 늦게 도착해도 현재 값(false)을 덮지 않는다.
+  const old = deferred();
+  queue.push(() => old.promise);
+  const raced = publicationStore();
+  const stale = raced.load();
+  grants.set(TOKEN, "g-A");
+  queue.push(ok(publication()));
+  await raced.load();
+  old.resolve(ok(publication()));
+  await stale;
+  assert.equal(claudeConnectable(raced.getSnapshot()), false, "늦은 grant 없는 응답이 덮지 않는다");
+
+  // 다른 링크: OTHER의 grant는 TOKEN 화면의 값에 쓰이지 않는다.
+  grants.remove(TOKEN);
+  grants.set(OTHER, "g-B");
+  queue.push(ok(publication()));
+  const mine = publicationStore(TOKEN);
+  await mine.load();
+  assert.equal(claudeConnectable(mine.getSnapshot()), true, "다른 링크의 grant와 무관");
+});
+
 // ── 근거 위치(C-11 evidence-highlight) ───────────────────────────
 
 test("showEvidence 위치 대조: 항목이 없으면 옮기지 않고, fieldPath 문자열 안의 범위만 강조하며, 사본에 없는 위치면 강조 없이 항목만 보인다", () => {
@@ -664,7 +809,8 @@ function render(snapshot, extra = {}) {
   }));
 }
 const count = (html, needle) => html.split(needle).length - 1;
-const ready = (items = [catchItem("c1", 2), textItem("m1", 1)], extra = {}) => ({ view: "ready", snapshot: readPublishedSnapshot(publication(items)), refreshing: false, refreshFailed: false, ...extra });
+// readWithoutGrant: true(grant 없이 연 화면)로 두어도 U9를 켜기 전에는 RecipientGuide에 showClaudeConnect=false가 가는지 G2에서 함께 본다.
+const ready = (items = [catchItem("c1", 2), textItem("m1", 1)], extra = {}) => ({ view: "ready", snapshot: readPublishedSnapshot(publication(items)), refreshing: false, refreshFailed: false, readWithoutGrant: true, ...extra });
 
 test("G1·G2·G3: 판정 통과 화면에만 RecipientGuide가 정확히 1개(showClaudeConnect=false), 비밀번호·불가·실패 화면에는 0개. 모든 상태의 h1은 U4 것 하나이고 tabIndex=-1", () => {
   const passed = render(ready());
@@ -699,14 +845,16 @@ test("판정 통과 화면 순서: h1 → 0 RecipientGuide → U4 고정 안내(
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, "위에서부터 정한 순서");
   assert.ok(html.includes('data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in="true"'));
   assert.ok(render(ready()).includes('data-logged-in="false"'));
-  // 2·3번 자리에 U5 패널이 하나씩 있다(U5 README 「붙이는 방법」). 4번은 U10 제공 전 빈 자리다
+  // 2·3번 자리에 U5 패널이 하나씩 있다. U10 연결 뒤 4번은 서버의 미복원 세션에서 로그인 안내를 그린다.
   const slot2 = html.slice(html.indexOf('data-testid="recipient-slot-2"'), html.indexOf('data-testid="recipient-slot-3"'));
   const slot3 = html.slice(html.indexOf('data-testid="recipient-slot-3"'), html.indexOf('data-testid="recipient-slot-4"'));
   assert.equal(count(slot2, 'data-testid="base-summary-panel"'), 1);
   assert.equal(count(slot3, 'data-testid="qna-panel"'), 1);
   assert.equal(count(slot3, 'data-testid="ai-notice-line"'), 1, "외부 AI 고지는 U5 질의응답 패널 안의 U2 한 줄뿐");
   assert.equal(count(html, 'data-testid="base-summary-panel"') + count(html, 'data-testid="qna-panel"'), 2);
-  assert.match(html, /data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in="true"><\/div>/);
+  const slot4 = html.slice(html.indexOf('data-testid="recipient-slot-4"'));
+  assert.equal(count(slot4, 'data-testid="jd-summary-login"'), 1);
+  assert.equal(count(slot4, 'data-testid="jd-summary-start"'), 0);
 });
 
 test("G5·G6: U4 고정 안내는 발행 시각(KST)뿐이고, U4 영역에 U2 안내 문장(고정 사본 설명·링크 조건 등)을 되풀이하지 않으며 만료 시각 원문도 보이지 않는다", () => {

@@ -11,7 +11,7 @@
 | `src/app/s/[token]/page.tsx` | 페이지. 수신자 전용 헤더는 `src/app/s/layout.tsx`가 붙인다 |
 | `recipient-screen.tsx` | 상태 연결(`createRecipientPublicationStore`), 단계별 h1 초점, `isLoggedIn`, `showEvidence`, 붙는 자리 props |
 | `recipient-view.tsx` | 상태별 그리기(발행본·비밀번호 입력·접근 불가·조회 실패)와 0~4번 자리 배치, 비밀번호 입력 |
-| `recipient-store.ts` | 발행본 상태. 응답 코드 분기·비밀번호 확인·시도 제한 대기·늦은 응답 버리기·`accessLost` |
+| `recipient-store.ts` | 발행본 상태. 응답 코드 분기·비밀번호 확인·시도 제한 대기·늦은 응답 버리기·`accessLost`, Claude 안내 표시 값(`readWithoutGrant`·`claudeConnectable`) |
 | `recipient-api.ts` | `api.recipient` 위의 호출(`publication`·`unlock`)과 응답 모양 검사. 사본 검사는 `publications-api.ts`의 `isPublishedSnapshot`을 쓰고 계약 밖 칸은 넘기지 않는다 |
 | `recipient-grants.ts` | 링크별 grant 보관(`sessionStorage`), 10월 그대로 |
 | `recipient-slots.ts` | C-11 `RecipientSlotProps`·`LinkAccessCode`·`EvidenceLocation`(화면 안 형, OQ-U4-7)과 근거 위치 대조 `resolveEvidenceTarget` |
@@ -30,6 +30,7 @@
 
 - 각 상태의 h1은 U4 것 하나뿐이고 안내 묶음 안에는 h1이 없다(G3). 단계가 정해질 때마다(처음 연 화면 포함) 그 h1로 초점을 옮기며 비밀번호 입력칸에 `autoFocus`를 두지 않는다(G4). 불러오는 중과 같은 단계 안의 갱신에는 옮기지 않는다.
 - U4 고정 안내(BR7.1)는 발행 시각 한 줄이다. 고정 사본 설명은 U2 `fixed-copy`, 링크 기간·중지는 U2 `link-conditions`, 외부 AI 고지는 U5, JD 로그인 안내는 U10이 맡으므로 같은 뜻의 문장을 두지 않는다(G5·G6).
+- 0.5번 자리(U9 받은 사람 Claude 패널, C-11)는 0번 바로 다음, 발행 시각 안내 앞에 둔다. U9 코드가 들어오기 전에는 그리지 않는다(아래 「Claude 안내 표시 값」).
 - 2·3번 자리는 [U5 README 「붙이는 방법」](../rag-answer/README.md)대로 `RecipientSlotProps`(`token`·`getGrant`·`onAccessLost`·`isLoggedIn`·`showEvidence`)를 그대로 넘기고 `key={token}`이다. `isLoggedIn`은 이 탭의 회원 토큰 유무이며 받은 사람 요청에는 그 토큰을 붙이지 않는다.
 
 ## 동작
@@ -51,12 +52,14 @@
 - **근거 강조(C-11 evidence-highlight):** 패널이 `showEvidence(location)`를 부르면 사본에 대조한다(`resolveEvidenceTarget`). 항목(`publishedItemId`)이 없으면 옮기지 않고, `fieldPath`(`workFacts[i]`·`subjectContribution`·`evidence[i].representedFacts[j]`·`authorDescription`·`body`)가 가리키는 문자열 안의 `[charStart, charEnd)`만 `<mark>`로 강조하며, 범위 밖·없는 경로(`aiDraft`·`pages[n]`)면 항목으로 옮기기만 한다. 강조가 접힌 「근거 자세히 보기」 안(`subjectContribution`·`evidence[i]…`)을 가리키면 같은 그리기 차례에 그 칸을 펼쳐 스크롤할 때 `<mark>`가 보인다. 사람이 다시 접을 수 있고, 같은 근거를 다시 누르면 다시 펼친다(#488). 옮길 때 강조 범위가 있으면 그 항목 안의 첫 `<mark>`가 화면에 보이도록(`block: "center"`) 스크롤하고, 범위가 없거나 강조 요소를 못 찾으면 그 항목(`id="published-item-<id>"`) 시작으로 스크롤한다. 초점은 두 경우 모두 항목에 두며(`preventScroll`), 같은 근거를 다시 눌러도 다시 옮긴다.
 - **다시 조회:** 확정 거부(404·401)는 표시하던 사본을 지우고 해당 화면으로 바꾼다. 조회 실패는 같은 링크의 이미 표시한 화면만 유지하고 「최신 자료를 불러오지 못해 이전에 불러온 내용을 보여 주고 있습니다.」를 알린다. 열린 화면을 실시간으로 회수하지 않으며 자동 조회·전송을 하지 않는다. 늦게 도착한 응답(다시 조회·화면 해제 뒤)은 버린다.
 - **노출:** 토큰은 경로에만, 비밀번호는 본문으로만, grant는 `X-Link-Grant` 머리글로만 둔다. 404 사유를 드러내지 않는다.
+- **Claude 안내 표시 값(C-11 claude-connect-rule, #495):** 발행본 조회가 200으로 성공하면 그 요청에 grant를 실었는지를 판정 통과 상태의 `readWithoutGrant`에 둔다. 요청을 보낼 때 쓴 값으로 정하고 응답·렌더링 때 grant 저장소를 다시 읽지 않으므로, 그 뒤 저장소 값이 바뀌거나 읽기가 실패해도 이 값은 그대로다. 다시 조회 중·실패 동안은 마지막 성공 요청의 값을 유지하고, 확정 거부(404·401·`onAccessLost`)·불러오는 중·최초 조회 실패에서는 판정 통과 상태가 아니므로 쓰이지 않는다. `claudeConnectable(snapshot)`이 판정 통과이면서 `readWithoutGrant`일 때만 true를 돌려준다. 비밀번호 링크는 grant 없이 200을 받지 못하고(C-10) 비밀번호 유무는 발행 뒤 바뀌지 않으므로(C-07) true는 비밀번호 없는 링크다. 화면 표시용이며, Claude 쪽 접근은 C-15 `read_shared_publication`이 호출마다 C-10을 grant 없이 다시 판정한다. 지금 화면은 이 값을 쓰지 않고 `showClaudeConnect={false}`를 넘긴다.
 
 ## 시험
 
-`node --test test/recipient.test.mjs`(34개): 응답 모양·grant 보관(10월 유지 묶음)·판정 응답 처리·`onAccessLost`·근거 위치 대조·G1~G3 구조·자리 순서·G5·G6 기계 검사·사본 표지·근거 강조·Catch 칸 순서와 근거 접기(#488). 초점 이동(G4)과 실제 api·DB 연결은 브라우저로 확인했다(U4 코드 요약 Step 22·23).
+`node --test test/recipient.test.mjs`(38개): 응답 모양·grant 보관(10월 유지 묶음)·판정 응답 처리·`onAccessLost`·Claude 안내 표시 값(#495)·근거 위치 대조·G1~G3 구조·자리 순서·G5·G6 기계 검사·사본 표지·근거 강조·Catch 칸 순서와 근거 접기(#488). 초점 이동(G4)과 실제 api·DB 연결은 브라우저로 확인했다(U4 코드 요약 Step 22·23).
 
 ## 범위 밖·남은 것
 
 - 4번 자리(U10 `JdSummaryPanel`)는 U10이 제공한 뒤 단다. PDF 항목(U8)은 자리만 보인다.
+- 0.5번 자리(U9)는 U9 코드 PR에서 단다. U9는 `recipient-view.tsx`의 판정 통과 분기에서 `claudeConnectable(snapshot)`을 한 번 읽어 그 값을 `RecipientGuide`의 `showClaudeConnect`와 0.5번 패널 표시에 함께 쓰고, 패널에는 `slotProps.token`만 넘긴다(grant·비밀번호·`getGrant`·`onAccessLost`는 넘기지 않음). 같은 PR에서 위 시험의 G2(`showClaudeConnect=false` 고정)와 이 문서의 화면 순서 표를 그 값 기준으로 고친다.
 - `indexState`·[검색 다시 준비]는 C-09 합의 뒤(OQ-U4-5). 실제 색인·LLM이 있는 환경의 요약·질의응답 동작은 U5 몫이다.
