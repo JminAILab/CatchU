@@ -109,7 +109,7 @@
      # 열: 연결된 서브넷, 0.0.0.0/0의 NAT, 0.0.0.0/0의 인터넷 게이트웨이
      aws ec2 describe-route-tables --profile catchu --region ap-northeast-2 --filters "Name=vpc-id,Values=${vpc}" --query 'RouteTables[].[join(`,`, Associations[].SubnetId || `[]`), Routes[?DestinationCidrBlock==`0.0.0.0/0`].NatGatewayId | [0], Routes[?DestinationCidrBlock==`0.0.0.0/0`].GatewayId | [0]]' --output text
      ```
-   - 노드에 실제로 붙은 보안 그룹. RDS 5432·큐 6379·EFS 2049는 이 보안 그룹에서 오는 연결만 받는다. 하나면 스크립트가 알아서 쓰고, 둘 이상이면 스크립트가 멈추므로 쓸 것을 정해 여기에 적고 `CATCHU_NODE_SG=sg-…`로 넘긴다(노드에 실제로 붙은 것이 아니면 스크립트가 멈춘다): `aws ec2 describe-instances --profile catchu --region ap-northeast-2 --filters Name=tag:eks:nodegroup-name,Values=app Name=instance-state-name,Values=running --query 'Reservations[].Instances[].NetworkInterfaces[].Groups'`
+   - 노드에 실제로 붙은 보안 그룹. RDS 5432·큐 6379·EFS 2049는 이 보안 그룹에서 오는 연결만 받는다. 하나면 스크립트가 알아서 쓰고, 둘 이상이면 스크립트가 멈추므로 쓸 것을 정해 여기에 적고 `CATCHU_NODE_SG=sg-…`로 넘긴다: `aws ec2 describe-instances --profile catchu --region ap-northeast-2 --filters Name=tag:eks:nodegroup-name,Values=app Name=instance-state-name,Values=running --query 'Reservations[].Instances[].NetworkInterfaces[].Groups'`
    - EFS 드라이버 Pod가 AWS 권한 없이 Running인지: `kubectl --kubeconfig ~/.kube/catchu -n kube-system get pod -l app.kubernetes.io/name=aws-efs-csi-driver`. 실제 마운트 시험은 GitHub 연결을 켤 때 한다. 그때 접근점을 거친 TLS 마운트가 되는지와, 접근점 없이 마운트하거나 TLS 없이 마운트하면 거부되는지를 함께 본다. 드라이버 권한이 모자라 안 되면 `cluster.yaml`에 적은 대로 컨트롤러 서비스 계정에만 권한을 더한다. 접근점을 거친 마운트까지 거부되면 파일 시스템 정책의 접근점 조건이 IAM 없는 마운트에 맞지 않는 것이므로(문서로 확인하지 못한 부분) 그 조건을 어떻게 할지 팀장과 정한다.
 5. **DB·큐·EFS·WAF:** 각각 확인 모드로 먼저 돌려 찾은 VPC·서브넷·노드 보안 그룹을 보고, 그다음 `--apply`로 만든다. 끝에 찍히는 확인 값을 증거로 남긴다.
    ```bash
@@ -157,9 +157,9 @@
    ```
    그 ID로 `aws ec2 terminate-instances --instance-ids <ID> …` → `aws ec2 wait instance-terminated --instance-ids <ID> …`. 루트 볼륨은 함께 지워진다.
 4. 개발 서버의 탄력적 IP(`aws ec2 describe-addresses … --filters Name=tag:Name,Values=catchu-dev-server --query 'Addresses[].AllocationId' --output text`)를 `aws ec2 release-address --allocation-id <ID> …`로 해제하고, 3에서 적은 보안 그룹을 지운다. 종료가 끝나기 전에는 의존이 남아 실패한다.
-5. IAM: 인스턴스 프로필에서 역할 `catchu-dev-server`를 빼고 → 관리형 정책 분리 → 인라인 정책(`catchu-prod-parameters-read`·`catchu-dev-deny-parameter-read`) 삭제 → 역할·인스턴스 프로필 삭제.
+5. IAM: 인스턴스 프로필에서 역할 `catchu-dev-server`를 빼고 → 관리형 정책 분리 → 인라인 정책 3개(`list-role-policies`로 확인) 삭제 → 역할·인스턴스 프로필 삭제. 버킷: `aws s3 rb s3://catchu-dev-server-files --force …`.
 6. SSM 문서 `catchu-dev-deploy`, 개발 서버 배포 역할 `catchu-github-deploy`, GitHub environment `dev-server`, ECR `catchu-deploy-files`(EKS 배포가 쓰지 않으면)를 지운다(#342 결정에 따름).
-7. 확인(개발 서버 자원만): 이름 태그 `catchu-dev-server` 인스턴스가 terminated뿐, 그 이름의 탄력적 IP 0, 3에서 적은 보안 그룹 없음, `aws iam get-role --role-name catchu-dev-server --profile catchu`가 NoSuchEntity, 상태 available인 볼륨 0, 자기 소유 스냅샷 0. EKS 노드와 NAT의 공인 IP는 B까지 남는 것이 정상이다. #276 완료 기준(개발 서버 삭제)의 증거다.
+7. 확인(개발 서버 자원만): 이름 태그 `catchu-dev-server` 인스턴스가 terminated뿐, 그 이름의 탄력적 IP 0, 3에서 적은 보안 그룹 없음, 역할 `catchu-dev-server` 없음(`aws iam get-role`이 NoSuchEntity), 버킷 `catchu-dev-server-files` 없음, 상태 available인 볼륨 0, 자기 소유 스냅샷 0. EKS 노드와 NAT의 공인 IP는 B까지 남는 것이 정상이다. #276 완료 기준(개발 서버 삭제)의 증거다.
 
 **B. EKS 기간 자원(제출을 확인한 뒤 지원 기한 전)**
 
