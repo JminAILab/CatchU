@@ -67,8 +67,8 @@ change=$(jq -cn --arg n "$name" --arg v "$value" '{Comment: "ACM DNS validation 
 aws_catchu route53 change-resource-record-sets --hosted-zone-id "$zone" --change-batch "$change" > /dev/null
 catchu_info "검증 기록(CNAME): 넣음"
 
-# acm 대기 명령은 60초 간격으로 40번(40분) 본다.
-catchu_wait 1 acm wait certificate-validated --certificate-arn "$arn" ||
+# acm 대기 명령은 한 번에 60초 간격으로 5번(5분)만 본다(aws CLI 2.28.11). 8번 이어서 불러 최대 40분 기다린다.
+catchu_wait 8 acm wait certificate-validated --certificate-arn "$arn" ||
   catchu_die "발급되지 않았다(40분이 지났거나 검증이 실패함). 다시 실행하지 말고 aws acm list-certificates --profile catchu --region ap-northeast-2로 상태를 본다"
 
 catchu_info "확인 값:"

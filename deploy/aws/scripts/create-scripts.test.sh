@@ -2,12 +2,14 @@
 # deploy/aws 생성 스크립트·공통 확인 회귀 시험(#276). aws·kubectl·helm·shasum·sleep을 합성 명령으로 바꿔 스크립트를 실제로 실행한다.
 # 조회는 정해 둔 값을 돌려준다. 만드는 호출은 순서와 필수 옵션을 확인하고, 만들기 시험에서는 진짜 AWS CLI를 합성 키·닫힌 로컬 주소
 # (--endpoint-url http://127.0.0.1:9)로 실행해 CLI가 요청을 보내기 직전까지 가는지(옵션 이름·형식·JSON 읽기)도 본다.
+# helm 호출은 쓰는 옵션이 진짜 helm의 그 명령 도움말에 있는지 본다(helm 4는 list --all처럼 3의 옵션 일부를 없앴다).
 # 실제 AWS에는 닿지 않는다. 서버 쪽 검사(옵션 조합·이름 규칙·권한·할당량)와 실제로 만들어진 자원의 설정은 확인하지 못한다.
-# 필요한 것: bash·jq·aws CLI v2. 사용: bash deploy/aws/scripts/create-scripts.test.sh   (실패가 하나라도 있으면 종료 코드 1)
+# 필요한 것: bash·jq·aws CLI v2·helm. 사용: bash deploy/aws/scripts/create-scripts.test.sh   (실패가 하나라도 있으면 종료 코드 1)
 set -uo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 REAL_AWS=$(command -v aws) || { echo "aws CLI가 없어 시험할 수 없다" >&2; exit 1; }
+REAL_HELM=$(command -v helm) || { echo "helm이 없어 시험할 수 없다" >&2; exit 1; }
 command -v jq > /dev/null || { echo "jq가 없어 시험할 수 없다" >&2; exit 1; }
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
@@ -175,8 +177,19 @@ EOF
 cat > "$BIN/helm" <<'EOF'
 #!/usr/bin/env bash
 # 합성 helm. 설치·받기는 calls에 남기고, 받기는 빈 차트 파일을 만든다.
+# 먼저 쓰는 옵션(--이름)이 진짜 helm의 그 명령 도움말에 있는지 본다. 없으면 invalid에 남기고 helm처럼 실패한다.
 S=${STUB_STATE:?}
 printf 'helm %s\n' "$1" >> "$S/seen"
+if [ "$1" != version ]; then
+  usage=$(HOME=/nonexistent "${STUB_REAL_HELM:?}" "$1" --help 2>&1)
+  for a in "$@"; do
+    case "$a" in
+      --*)
+        printf '%s\n' "$usage" | grep -qE -- "(^|[ ,])${a%%=*}([ =]|\$)" ||
+          { echo "helm $1: 진짜 helm에 없는 옵션 ${a%%=*}" >> "$S/invalid"; echo "Error: unknown flag: ${a%%=*}" >&2; exit 1; } ;;
+    esac
+  done
+fi
 case "$1" in
   version) echo v4.3.0+gsynthetic ;;
   list) printf '%s' "${STUB_HELM_RELEASES:-}" ;;
@@ -215,7 +228,7 @@ run_sut() { # 스크립트 [인자…]. 합성 값을 바꿀 STUB_*·환경변�
   reset_state
   env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN -u AWS_SECURITY_TOKEN -u AWS_PROFILE -u AWS_REGION \
     -u AWS_DEFAULT_REGION -u KUBECONFIG -u CATCHU_NODE_SG \
-    PATH="$BIN:$PATH" HOME="$WORK/home" TMPDIR="$WORK/tmp" STUB_STATE="$S" STUB_REAL_AWS="$REAL_AWS" STUB_LBC_SHA="$LBC_SHA" \
+    PATH="$BIN:$PATH" HOME="$WORK/home" TMPDIR="$WORK/tmp" STUB_STATE="$S" STUB_REAL_AWS="$REAL_AWS" STUB_REAL_HELM="$REAL_HELM" STUB_LBC_SHA="$LBC_SHA" \
     CATCHU_EXPECTED_ACCOUNT=123456789012 "$@" > "$OUT" 2>&1
   rc=$?
 }
@@ -475,16 +488,23 @@ check "인증서 조회 실패면 '없음'으로 넘기지 않고 멈춤" "$(ok 
 run_sut env STUB_NO_RECORD=1 bash "$P/create-certificate.sh" --apply
 check "인증서: ACM이 검증 기록을 주지 않으면 10번 본 뒤 DNS를 바꾸지 않고 멈춤" \
   "$(ok test "$rc" = 1 -a "$(ops | tr '\n' ',')" = "acm request-certificate," -a "$(wc -l < "$S/sleeps" | tr -d ' ')" = 10)"
-run_sut env STUB_WAIT_FAILS=1 bash "$P/create-certificate.sh" --apply
-check "인증서: 40분 안에 발급되지 않으면 다시 실행하지 말라고 하고 멈춤" "$(ok test "$rc" = 1 -a "$(grep -c '다시 실행하지 말고' "$OUT")" = 1)"
+run_sut env STUB_WAIT_FAILS=7 bash "$P/create-certificate.sh" --apply
+check "인증서 대기가 7번 시간이 다 돼도 이어서 기다려 발급으로 끝남(5분씩 최대 8번)" "$(ok test "$rc" = 0 -a "$(wc -l < "$S/waits" | tr -d ' ')" = 8)"
+run_sut env STUB_WAIT_FAILS=8 bash "$P/create-certificate.sh" --apply
+check "인증서: 40분(8번) 안에 발급되지 않으면 다시 실행하지 말라고 하고 멈춤" \
+  "$(ok test "$rc" = 1 -a "$(wc -l < "$S/waits" | tr -d ' ')" = 8 -a "$(grep -c '다시 실행하지 말고' "$OUT")" = 1)"
 
 # ---------- Load Balancer Controller(install-lb-controller.sh) ----------
+reset_state
+STUB_STATE="$S" STUB_REAL_HELM="$REAL_HELM" "$BIN/helm" list --namespace kube-system --all > "$OUT" 2>&1
+rc=$?
+check "합성 helm: 진짜 helm에 없는 옵션(helm 4에서 없어진 list --all)은 실패로 남김" "$(ok test "$rc" = 1 -a -s "$S/invalid")"
 run_sut bash "$P/install-lb-controller.sh"
 check "컨트롤러 확인 모드: 종료 0, 차트를 받아 해시를 보고 설치하지 않음, 임시 파일 0" \
   "$( { test "$rc" = 0 -a -z "$(ops)" && grep -q '해시 일치' "$OUT" && grep -q -- '--apply로 다시 실행' "$OUT" && clean; } > /dev/null 2>&1; echo $?)"
 run_sut bash "$P/install-lb-controller.sh" --apply
 inst=$(call_of 'helm install')
-check "컨트롤러 설치: helm 설치 1건, 받은 3.6.2 차트로 kube-system에 준비될 때까지 기다림, 확인 값 통과, 임시 파일 0" \
+check "컨트롤러 설치: helm 설치 1건, 받은 3.6.2 차트로 kube-system에 준비될 때까지 기다림, 확인 값 통과, helm 옵션이 진짜 helm에 있음, 임시 파일 0" \
   "$( { test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "helm install," && printf '%s' "$inst" | grep -qE ' install aws-load-balancer-controller [^ ]*/aws-load-balancer-controller-3\.6\.2\.tgz ' && has_all "$inst" --namespace kube-system --wait --timeout 5m && grep -q '"canListSecrets": "no"' "$OUT" && clean; } > /dev/null 2>&1; echo $?)"
 check "컨트롤러 설정: 클러스터·리전·VPC·Pod Identity 서비스 계정, Service 가로채기 웹훅 끔" \
   "$(ok has_all "$inst" clusterName=catchu region=ap-northeast-2 vpcId=vpc-0123456789abcdef0 serviceAccount.name=aws-load-balancer-controller enableServiceMutatorWebhook=false)"

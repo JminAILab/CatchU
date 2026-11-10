@@ -209,7 +209,7 @@ bash deploy/aws/scripts/db-roles.test.sh   # Docker가 돌고 있어야 한다
 bash deploy/aws/scripts/logs.test.sh       # 위와 같음
 ```
 
-**생성 스크립트(`create-scripts.test.sh`).** bash·jq·aws CLI v2가 필요하고 30초쯤 걸린다. aws·kubectl·helm·shasum·sleep을 합성 명령으로 바꿔 생성·설치 스크립트와 공통 확인을 실제로 실행한다.
+**생성 스크립트(`create-scripts.test.sh`).** bash·jq·aws CLI v2·helm이 필요하고 30초쯤 걸린다. aws·kubectl·helm·shasum·sleep을 합성 명령으로 바꿔 생성·설치 스크립트와 공통 확인을 실제로 실행한다.
 
 - 확인하는 것: 인자 없이 실행하면 만드는 호출이 없음, `--apply`의 호출 순서와 각 스크립트 머리말에 적은 필수 옵션, 계정·리전·키 환경변수·kubeconfig가 다르면 멈춤, 노드 보안 그룹 검증, 조회 실패 때 멈춤, 만들 자원이 하나라도 이미 있으면(일부만 남은 경우 포함) 아무것도 만들지 않고 멈춤, 기다리기가 한도에 닿으면 정한 횟수만큼 이어서 기다리고 그래도 안 되면 멈춤, 차트 해시가 다르면 설치하지 않음, 비밀값이 출력과 임시 파일에 남지 않음.
 - 만들기 시험에서는 진짜 AWS CLI를 합성 키와 닫힌 로컬 주소(`127.0.0.1:9`)로 실행해, 옵션 이름·값 형식·입력 파일을 CLI가 받아들이는지도 본다.

@@ -38,7 +38,8 @@ vpc=$(aws_catchu eks describe-cluster --name "$CATCHU_CLUSTER" --query cluster.r
   catchu_die "클러스터의 VPC를 조회하지 못했다"
 [[ $vpc =~ ^vpc-[0-9a-f]+$ ]] || catchu_die "클러스터의 VPC ID가 아니다(${vpc})"
 
-installed=$(helm list --namespace "$namespace" --all --filter "^${release}\$" --short) || catchu_die "helm 설치 목록을 읽지 못했다"
+# helm 4는 상태와 관계없이 모든 설치를 보여 준다(helm 3의 --all은 없어졌다).
+installed=$(helm list --namespace "$namespace" --filter "^${release}\$" --short) || catchu_die "helm 설치 목록을 읽지 못했다"
 found=()
 [ -z "$installed" ] || found+=("helm 설치 ${release}(${namespace})")
 catchu_require_clean ${found[@]+"${found[@]}"}
