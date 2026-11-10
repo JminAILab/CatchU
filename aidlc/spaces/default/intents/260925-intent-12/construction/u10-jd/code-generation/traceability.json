@@ -99,7 +99,7 @@
     {
       "id": "AC6.1.8",
       "status": "OK",
-      "target": "code-summary.md의 2026-11-06 C-11 실제 브라우저 결과 — 유효한 보호 링크에서 본인 합성 저장 DONE 결과 재열람, 발행본 중지 후 U4 접근 불가·자료/패널 제거를 확인했다. 만료·중지의 요청별 차단은 기존 실제 C-10 9개 결과를 재사용한다."
+      "target": "web/src/features/jd/jd-summary-model.ts"
     },
     {
       "id": "AC6.1.9",
@@ -114,7 +114,7 @@
     {
       "id": "AC6.5.1",
       "status": "OK",
-      "target": "code-summary.md의 2026-11-06 JD 관리 실제 브라우저 9개 시나리오 — 합성 회원의 실제 web↔api 저장·PATCH 수정·재조회·삭제 및 실패 입력 보존을 확인했다. 이전 합성 어댑터 검사 결과도 유지한다."
+      "target": "web/src/features/jd/jd-management-model.ts"
     },
     {
       "id": "AC6.5.2",
@@ -159,7 +159,7 @@
     {
       "id": "NFR1.3",
       "status": "OK",
-      "target": "web/src/features/jd/jd-summary-model.ts, jd-recipient-panel.tsx — C-11 실제 브라우저에서 회원 로그아웃은 U10만 초기화하고 링크 중지는 U4로 위임해 자료·패널을 제거했다. 늦은 응답·콜백 교체·링크별 grant 격리는 신규 연결 7개로 확인한다."
+      "target": "web/test/jd-recipient-binding.test.mjs"
     },
     {
       "id": "NFR1.4",
