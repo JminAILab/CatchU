@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# deploy/aws 생성 스크립트·공통 확인 회귀 시험(#276). aws·kubectl·sleep을 합성 명령으로 바꿔 스크립트를 실제로 실행한다.
+# deploy/aws 생성 스크립트·공통 확인 회귀 시험(#276). aws·kubectl·helm·shasum·sleep을 합성 명령으로 바꿔 스크립트를 실제로 실행한다.
 # 조회는 정해 둔 값을 돌려준다. 만드는 호출은 순서와 필수 옵션을 확인하고, 만들기 시험에서는 진짜 AWS CLI를 합성 키·닫힌 로컬 주소
 # (--endpoint-url http://127.0.0.1:9)로 실행해 CLI가 요청을 보내기 직전까지 가는지(옵션 이름·형식·JSON 읽기)도 본다.
+# helm 호출은 쓰는 옵션이 진짜 helm의 그 명령 도움말에 있는지 본다(helm 4는 list --all처럼 3의 옵션 일부를 없앴다).
 # 실제 AWS에는 닿지 않는다. 서버 쪽 검사(옵션 조합·이름 규칙·권한·할당량)와 실제로 만들어진 자원의 설정은 확인하지 못한다.
-# 필요한 것: bash·jq·aws CLI v2. 사용: bash deploy/aws/scripts/create-scripts.test.sh   (실패가 하나라도 있으면 종료 코드 1)
+# 필요한 것: bash·jq·aws CLI v2·helm. 사용: bash deploy/aws/scripts/create-scripts.test.sh   (실패가 하나라도 있으면 종료 코드 1)
 set -uo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 REAL_AWS=$(command -v aws) || { echo "aws CLI가 없어 시험할 수 없다" >&2; exit 1; }
+REAL_HELM=$(command -v helm) || { echo "helm이 없어 시험할 수 없다" >&2; exit 1; }
 command -v jq > /dev/null || { echo "jq가 없어 시험할 수 없다" >&2; exit 1; }
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
@@ -48,7 +50,7 @@ if [ "$svc $op" = "${STUB_FAIL:-}" ]; then
   exit 254
 fi
 mutating=0
-case "$op" in create-* | modify-* | put-* | authorize-* | check-capacity | subscribe | publish | set-topic-attributes) mutating=1 ;; esac
+case "$op" in create-* | modify-* | put-* | authorize-* | check-capacity | subscribe | publish | set-topic-attributes | request-certificate | change-resource-record-sets) mutating=1 ;; esac
 if [ "$mutating" = 1 ]; then
   printf '%s\n' "$all" >> "$S/calls"
   # 비밀값을 넘긴 입력 파일이 있으면 값을 기록해 둔다(출력에 새지 않았는지 보려고).
@@ -88,7 +90,7 @@ case "$svc $op" in
     printf 'log_error_verbosity\t%s\n' "${STUB_VERBOSITY:-terse}"
     printf '%s\n' log_min_error_statement=panic log_parameter_max_length_on_error=0 log_statement=none log_min_duration_statement=-1 \
       log_connections=0 rds.force_ssl=1 ssl_min_protocol_version=TLSv1.2 rds.log_retention_period=1440 | tr '=' '\t' ;;
-  "rds wait" | "elasticache wait")
+  "rds wait" | "elasticache wait" | "acm wait")
     # STUB_WAIT_FAILS번째까지의 대기는 시간이 다 된 것처럼 실패시킨다.
     printf 'wait %s\n' "$all" >> "$S/waits"
     if [ "$(wc -l < "$S/waits" | tr -d ' ')" -le "${STUB_WAIT_FAILS:-0}" ]; then
@@ -118,6 +120,19 @@ case "$svc $op" in
       i=$((i + 1))
     done ;;
   "cloudwatch describe-alarms") case "$all" in *length*) echo "${STUB_ALARM_COUNT:-0}" ;; *) echo '{"MetricAlarms":[]}' ;; esac ;;
+  "route53 list-hosted-zones-by-name") echo "${STUB_ZONE-/hostedzone/Z0123456789ABCDEFGHIJ}" ;;
+  "route53 change-resource-record-sets") echo /change/C0123456789ABCDEFGHIJ ;;
+  "acm list-certificates") echo "${STUB_CERT_COUNT:-0}" ;;
+  "acm request-certificate") echo arn:aws:acm:ap-northeast-2:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef ;;
+  "acm describe-certificate")
+    case "$all" in
+      *ResourceRecord*)
+        if [ -n "${STUB_NO_RECORD:-}" ]; then echo null; else
+          echo '{"Name":"_0123456789abcdef0123456789abcdef.catchu.dev.","Type":"CNAME","Value":"_fedcba9876543210fedcba9876543210.synthetic.acm-validations.aws."}'
+        fi ;;
+      *) echo '{"Certificate":{"CertificateArn":"arn:aws:acm:ap-northeast-2:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef","DomainName":"catchu.dev","Status":"ISSUED","Type":"AMAZON_ISSUED","KeyAlgorithm":"RSA-2048","NotAfter":"2027-05-15T23:59:59Z","RenewalEligibility":"INELIGIBLE","DomainValidationOptions":[{"DomainName":"catchu.dev","ValidationMethod":"DNS","ValidationStatus":"SUCCESS"}]}}' ;;
+    esac ;;
+  "eks list-pod-identity-associations") echo "${STUB_PIA_COUNT:-1}" ;;
   "logs describe-log-groups") case "$all" in *length*) echo "${STUB_LOG_GROUP_COUNT:-0}" ;; *) echo '{"logGroups":[{"logGroupName":"/catchu/eks/app","retentionInDays":14}]}' ;; esac ;;
   "elbv2 describe-target-groups") echo "${STUB_LB_ARNS:-arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/k8s-catchu-0123456789/0123456789abcdef${tab}arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/k8s-catchu-0123456789/0123456789abcdef}" ;;
   "efs describe-file-systems")
@@ -153,13 +168,54 @@ case "$*" in
     jq -cn --arg a "$tg/k8s-catchu-api-0123456789/0123456789abcdef" --arg w "$tg/k8s-catchu-web-0123456789/fedcba9876543210" \
       '{items: [{spec: {serviceRef: {name: "api"}, targetGroupARN: $a}}, {spec: {serviceRef: {name: "web"}, targetGroupARN: $w}}]}' ;;
   "version --client -o json") echo '{"clientVersion":{"gitVersion":"v1.37.1"}}' ;;
+  "--namespace kube-system get deployment aws-load-balancer-controller "*) echo "${STUB_LBC_READY:-2/2}" ;;
+  "get ingressclass alb "*) echo ingress.k8s.aws/alb ;;
+  "get mutatingwebhookconfiguration aws-load-balancer-webhook "*) echo "${STUB_LBC_WEBHOOKS:-mpod.elbv2.k8s.aws mtargetgroupbinding.elbv2.k8s.aws}" ;;
+  "auth can-i list secrets --all-namespaces "*) echo "${STUB_LBC_SECRETS:-no}"; [ "${STUB_LBC_SECRETS:-no}" = yes ] ;;
 esac
+EOF
+cat > "$BIN/helm" <<'EOF'
+#!/usr/bin/env bash
+# 합성 helm. 설치·받기는 calls에 남기고, 받기는 빈 차트 파일을 만든다.
+# 먼저 쓰는 옵션(--이름)이 진짜 helm의 그 명령 도움말에 있는지 본다. 없으면 invalid에 남기고 helm처럼 실패한다.
+S=${STUB_STATE:?}
+printf 'helm %s\n' "$1" >> "$S/seen"
+if [ "$1" != version ]; then
+  usage=$(HOME=/nonexistent "${STUB_REAL_HELM:?}" "$1" --help 2>&1)
+  for a in "$@"; do
+    case "$a" in
+      --*)
+        printf '%s\n' "$usage" | grep -qE -- "(^|[ ,])${a%%=*}([ =]|\$)" ||
+          { echo "helm $1: 진짜 helm에 없는 옵션 ${a%%=*}" >> "$S/invalid"; echo "Error: unknown flag: ${a%%=*}" >&2; exit 1; } ;;
+    esac
+  done
+fi
+case "$1" in
+  version) echo v4.3.0+gsynthetic ;;
+  list) printf '%s' "${STUB_HELM_RELEASES:-}" ;;
+  pull)
+    [ -n "${STUB_PULL_FAIL:-}" ] && { echo "Error: synthetic pull failure" >&2; exit 1; }
+    dest='' version=''
+    while [ "$#" -gt 0 ]; do
+      case "$1" in --destination) dest=$2; shift ;; --version) version=$2; shift ;; esac
+      shift
+    done
+    : > "$dest/aws-load-balancer-controller-${version}.tgz" ;;
+  install) printf 'helm %s\n' "$*" >> "$S/calls" ;;
+  *) echo "합성 helm: 정해 두지 않은 호출 $*" >&2; echo "helm $1" >> "$S/unknown"; exit 1 ;;
+esac
+EOF
+cat > "$BIN/shasum" <<'EOF'
+#!/usr/bin/env bash
+# 합성 shasum. 마지막 인자(파일)에 STUB_SHA를, 없으면 install-lb-controller.sh에 적은 해시를 돌려준다.
+for f in "$@"; do :; done
+printf '%s  %s\n' "${STUB_SHA:-$STUB_LBC_SHA}" "$f"
 EOF
 cat > "$BIN/sleep" <<'EOF'
 #!/usr/bin/env bash
 printf 'sleep %s\n' "$*" >> "${STUB_STATE:?}/sleeps"
 EOF
-chmod +x "$BIN/aws" "$BIN/kubectl" "$BIN/sleep"
+chmod +x "$BIN/aws" "$BIN/kubectl" "$BIN/sleep" "$BIN/helm" "$BIN/shasum"
 
 # ---------- 실행 도우미 ----------
 reset_state() {
@@ -172,7 +228,7 @@ run_sut() { # 스크립트 [인자…]. 합성 값을 바꿀 STUB_*·환경변�
   reset_state
   env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN -u AWS_SECURITY_TOKEN -u AWS_PROFILE -u AWS_REGION \
     -u AWS_DEFAULT_REGION -u KUBECONFIG -u CATCHU_NODE_SG \
-    PATH="$BIN:$PATH" HOME="$WORK/home" TMPDIR="$WORK/tmp" STUB_STATE="$S" STUB_REAL_AWS="$REAL_AWS" \
+    PATH="$BIN:$PATH" HOME="$WORK/home" TMPDIR="$WORK/tmp" STUB_STATE="$S" STUB_REAL_AWS="$REAL_AWS" STUB_REAL_HELM="$REAL_HELM" STUB_LBC_SHA="$LBC_SHA" \
     CATCHU_EXPECTED_ACCOUNT=123456789012 "$@" > "$OUT" 2>&1
   rc=$?
 }
@@ -196,6 +252,7 @@ clean() { # 비밀값이 출력에 없고, 알 수 없는 호출·인자 검사 
   [ ! -s "$S/unknown" ] && [ ! -s "$S/invalid" ] && [ -z "$(ls -A "$WORK/tmp")" ] && ! grep -qF -f "$S/secrets" "$OUT" 2> /dev/null
 }
 P=$HERE
+LBC_SHA=$(sed -n 's/^chart_sha256=//p' "$P/install-lb-controller.sh")
 
 # ---------- 확인 모드: 만드는 호출이 없다 ----------
 for s in rds queue efs waf; do
@@ -247,7 +304,7 @@ run_sut env AWS_REGION=us-east-1 bash "$P/create-waf.sh"
 check "AWS_REGION이 다르면 멈춤" "$(ok test "$rc" = 1 -a ! -s "$S/seen")"
 run_sut env CATCHU_EXPECTED_ACCOUNT= bash "$P/create-waf.sh"
 check "기대 계정 번호가 없으면 멈춤" "$(ok test "$rc" = 1 -a "$(grep -c '기대 계정 번호가 없다' "$OUT")" = 1)"
-for s in rds queue efs waf alert-topic alarms log-group; do
+for s in rds queue efs waf alert-topic alarms log-group certificate; do
   run_sut env CATCHU_EXPECTED_ACCOUNT=999999999999 CATCHU_ALERT_EMAIL=alerts.synthetic@example.com bash "$P/create-$s.sh" --apply
   check "계정이 다르면 $s: 계정 조회 말고는 AWS를 부르지 않고 멈추며 번호를 찍지 않음" \
     "$( { test "$rc" = 1 -a "$(sort -u "$S/seen")" = 'sts get-caller-identity' && test "$(grep -c -E '123456789012|999999999999' "$OUT")" = 0; } > /dev/null 2>&1; echo $?)"
@@ -405,6 +462,71 @@ run_sut env STUB_LOG_GROUP_COUNT=1 bash "$P/create-log-group.sh"
 check "로그 그룹이 이미 있으면 확인 모드에서도 멈춤" "$(ok stopped '로그 그룹 /catchu/eks/app')"
 run_sut env STUB_FAIL='logs describe-log-groups' bash "$P/create-log-group.sh" --apply
 check "로그 그룹 조회 실패면 '없음'으로 넘기지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+
+# ---------- 인증서(create-certificate.sh) ----------
+CERT_ARN=arn:aws:acm:ap-northeast-2:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef
+run_sut bash "$P/create-certificate.sh"
+check "인증서 확인 모드: 종료 0, 만드는 호출 0, --apply 안내" "$(ok test "$rc" = 0 -a -z "$(ops)" -a "$(grep -c -- '--apply로 다시 실행' "$OUT")" = 1)"
+run_sut env STUB_VALIDATE=1 bash "$P/create-certificate.sh" --apply
+check "인증서 만들기: 요청 → 검증 기록 순서, CLI 인자 검사 2건 통과, 발급을 기다림, 계정 번호·ARN을 찍지 않음" \
+  "$( { test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "acm request-certificate,route53 change-resource-record-sets," -a "$(wc -l < "$S/valid" | tr -d ' ')" = 2 -a -s "$S/waits" && grep -q '"Status": "ISSUED"' "$OUT" && ! grep -q 123456789012 "$OUT" && clean; } > /dev/null 2>&1; echo $?)"
+check "인증서: catchu.dev·DNS 검증·RSA 2048·태그" \
+  "$(ok has_all "$(call_of 'acm request-certificate')" --domain-name catchu.dev --validation-method DNS --key-algorithm RSA_2048 Key=project,Value=catchu Key=issue,Value=276)"
+batch=$(call_of 'route53 change-resource-record-sets' | sed 's/.*--change-batch //')
+want='["UPSERT","CNAME","_0123456789abcdef0123456789abcdef.catchu.dev.","_fedcba9876543210fedcba9876543210.synthetic.acm-validations.aws."]'
+check "인증서: ACM이 준 CNAME 하나를 catchu.dev 공개 영역에 UPSERT(A 기록은 건드리지 않음)" \
+  "$( { has_all "$(call_of 'route53 change-resource-record-sets')" --hosted-zone-id /hostedzone/Z0123456789ABCDEFGHIJ && test "$(printf '%s' "$batch" | jq -c '[.Changes[0] | .Action, .ResourceRecordSet.Type, .ResourceRecordSet.Name, .ResourceRecordSet.ResourceRecords[0].Value]')" = "$want" && test "$(printf '%s' "$batch" | jq '.Changes | length')" = 1; } > /dev/null 2>&1; echo $?)"
+check "인증서: 발급 대기는 이 인증서 하나" "$(ok grep -q -- "--certificate-arn $CERT_ARN" "$S/waits")"
+run_sut env STUB_CERT_COUNT=1 bash "$P/create-certificate.sh"
+check "catchu.dev 인증서가 이미 있으면 확인 모드에서도 멈춤" "$(ok stopped '인증서 catchu.dev(1개)')"
+run_sut env STUB_ZONE= bash "$P/create-certificate.sh" --apply
+check "인증서: 공개 호스팅 영역이 없으면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_ZONE="/hostedzone/ZAAAAAAAAAAAAAAAAAAAA$(printf '\t')/hostedzone/ZBBBBBBBBBBBBBBBBBBBB" bash "$P/create-certificate.sh" --apply
+check "인증서: 같은 이름의 공개 호스팅 영역이 둘이면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_FAIL='acm list-certificates' bash "$P/create-certificate.sh" --apply
+check "인증서 조회 실패면 '없음'으로 넘기지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_NO_RECORD=1 bash "$P/create-certificate.sh" --apply
+check "인증서: ACM이 검증 기록을 주지 않으면 10번 본 뒤 DNS를 바꾸지 않고 멈춤" \
+  "$(ok test "$rc" = 1 -a "$(ops | tr '\n' ',')" = "acm request-certificate," -a "$(wc -l < "$S/sleeps" | tr -d ' ')" = 10)"
+run_sut env STUB_WAIT_FAILS=7 bash "$P/create-certificate.sh" --apply
+check "인증서 대기가 7번 시간이 다 돼도 이어서 기다려 발급으로 끝남(5분씩 최대 8번)" "$(ok test "$rc" = 0 -a "$(wc -l < "$S/waits" | tr -d ' ')" = 8)"
+run_sut env STUB_WAIT_FAILS=8 bash "$P/create-certificate.sh" --apply
+check "인증서: 40분(8번) 안에 발급되지 않으면 다시 실행하지 말라고 하고 멈춤" \
+  "$(ok test "$rc" = 1 -a "$(wc -l < "$S/waits" | tr -d ' ')" = 8 -a "$(grep -c '다시 실행하지 말고' "$OUT")" = 1)"
+
+# ---------- Load Balancer Controller(install-lb-controller.sh) ----------
+reset_state
+STUB_STATE="$S" STUB_REAL_HELM="$REAL_HELM" "$BIN/helm" list --namespace kube-system --all > "$OUT" 2>&1
+rc=$?
+check "합성 helm: 진짜 helm에 없는 옵션(helm 4에서 없어진 list --all)은 실패로 남김" "$(ok test "$rc" = 1 -a -s "$S/invalid")"
+run_sut bash "$P/install-lb-controller.sh"
+check "컨트롤러 확인 모드: 종료 0, 차트를 받아 해시를 보고 설치하지 않음, 임시 파일 0" \
+  "$( { test "$rc" = 0 -a -z "$(ops)" && grep -q '해시 일치' "$OUT" && grep -q -- '--apply로 다시 실행' "$OUT" && clean; } > /dev/null 2>&1; echo $?)"
+run_sut bash "$P/install-lb-controller.sh" --apply
+inst=$(call_of 'helm install')
+check "컨트롤러 설치: helm 설치 1건, 받은 3.6.2 차트로 kube-system에 준비될 때까지 기다림, 확인 값 통과, helm 옵션이 진짜 helm에 있음, 임시 파일 0" \
+  "$( { test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "helm install," && printf '%s' "$inst" | grep -qE ' install aws-load-balancer-controller [^ ]*/aws-load-balancer-controller-3\.6\.2\.tgz ' && has_all "$inst" --namespace kube-system --wait --timeout 5m && grep -q '"canListSecrets": "no"' "$OUT" && clean; } > /dev/null 2>&1; echo $?)"
+check "컨트롤러 설정: 클러스터·리전·VPC·Pod Identity 서비스 계정, Service 가로채기 웹훅 끔" \
+  "$(ok has_all "$inst" clusterName=catchu region=ap-northeast-2 vpcId=vpc-0123456789abcdef0 serviceAccount.name=aws-load-balancer-controller enableServiceMutatorWebhook=false)"
+run_sut env STUB_SHA=0000000000000000000000000000000000000000000000000000000000000000 bash "$P/install-lb-controller.sh" --apply
+check "컨트롤러: 차트 해시가 다르면 설치하지 않고 멈춤, 임시 파일 0" "$( { test "$rc" = 1 -a -z "$(ops)" && grep -q '해시가 기록과 다르다' "$OUT" && clean; } > /dev/null 2>&1; echo $?)"
+run_sut env STUB_PULL_FAIL=1 bash "$P/install-lb-controller.sh" --apply
+check "컨트롤러: 차트를 받지 못하면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_HELM_RELEASES=aws-load-balancer-controller bash "$P/install-lb-controller.sh"
+check "컨트롤러가 이미 설치돼 있으면 확인 모드에서도 멈춤" "$(ok stopped 'helm 설치 aws-load-balancer-controller(kube-system)')"
+run_sut env STUB_PIA_COUNT=0 bash "$P/install-lb-controller.sh" --apply
+check "컨트롤러: Pod Identity 연결이 없으면 설치하지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_SERVER=https://OTHER.example bash "$P/install-lb-controller.sh" --apply
+check "컨트롤러: kubectl이 다른 클러스터를 가리키면 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_LBC_READY=1/2 bash "$P/install-lb-controller.sh" --apply
+check "컨트롤러: 설치 뒤 Pod 2개가 준비되지 않으면 실패로 끝남" "$(ok test "$rc" = 1)"
+run_sut env STUB_LBC_WEBHOOKS='mpod.elbv2.k8s.aws mservice.elbv2.k8s.aws' bash "$P/install-lb-controller.sh" --apply
+check "컨트롤러: Service 가로채기 웹훅이 남아 있으면 실패로 끝남" "$(ok test "$rc" = 1)"
+run_sut env STUB_LBC_SECRETS=yes bash "$P/install-lb-controller.sh" --apply
+check "컨트롤러: Secret 목록을 읽을 수 있으면 실패로 끝남" "$(ok test "$rc" = 1)"
+run_sut env CATCHU_EXPECTED_ACCOUNT=999999999999 bash "$P/install-lb-controller.sh" --apply
+check "컨트롤러: 계정이 다르면 계정 조회 말고는 AWS·helm을 부르지 않고 멈춤" \
+  "$(ok test "$rc" = 1 -a "$(grep -v '^helm version' "$S/seen" | sort -u)" = 'sts get-caller-identity')"
 
 echo
 echo "통과 $pass, 실패 $fail"
