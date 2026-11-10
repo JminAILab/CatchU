@@ -46,6 +46,8 @@ U10 경계 입력 오류는 `422 INVALID_INPUT / INPUT_TOO_LARGE`, 남의/없는
 
 2026-11-06의 읽기 전용 소스 검사에서는 `DB_NAME=catchu_u10_test`, `CATCHU_U10_SOURCE_TEST=true`를 해당 검사 프로세스에만 전달하고 `node --require ts-node/register --test --test-concurrency=1 test/jd/jd-publication-access.test.cjs`를 사용했다. 검사 파일은 source/dist를 명시적으로 선택하며, 자체 시험 프로세스에 임시 인증 키와 외부 AI·큐 차단 설정을 적용한다. 이 방식은 기존 3311 API 프로세스나 운영 인증 설정을 바꾸지 않는다. 당시 결과는 U10 코드 요약에 보존하며, [2026-11-10 PR 전 보완 검사](../../docs/verification/u10-pr-fixes-2026-11-10.md)는 별도 격리 DB에서 빌드된 dist로 실행한다.
 
+최신 통합을 merge한 판본의 API 영향 검사와 마이그레이션 25개·38표 대조는 [2026-11-10 전체 통합 최종 검사](../../docs/verification/u10-merge-final-2026-11-10.md)에 별도로 기록한다. 이전의 79개 실행·관련 25개 재검사와 구분하며 원격 CI는 미실행이다.
+
 ```powershell
 npm.cmd test -- test/jd/jd-management.test.cjs test/jd/jd-summary.test.cjs test/jd/jd-integration.test.cjs
 $env:TEST_COVERAGE_INCLUDE='dist/{jd,jd-summary}/**'
