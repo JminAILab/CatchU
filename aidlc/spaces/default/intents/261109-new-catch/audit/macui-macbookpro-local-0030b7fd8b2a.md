@@ -10222,3 +10222,459 @@
 **Summary Authorization Id**: bff0110a37978894d358a62bca8d418ed05d4932e8db9a1f56f3088d7e030aa9
 
 ---
+
+## Stage Output Amended
+**Timestamp**: 2026-11-10T02:33:03Z
+**Event**: STAGE_OUTPUT_AMENDED
+**Stage**: units-generation
+**Validation Basis**: {"graphContract":"sha256:baf39a0a351356930786ca985bbb7c5893e8db3e93715525a8e909b629765ee7","inputs":[{"artifact":"components","contentHash":"sha256:86dee5c9d20e2b0529a734c9ea9b0004a2eb6b66f0b02f6adea6a72fea8ce8c6","instanceCount":1,"presentCount":1,"producer":"domain-design","required":true,"structureHash":"sha256:197324c61cc9043d078e760386c5e646852af28271eaafc0e190984691452825"},{"artifact":"decisions","contentHash":"sha256:c1a82d947ec8a1148696ead7bb943ea8dee8b3465fbd50baa91f6c5f0b7f7dfd","instanceCount":1,"presentCount":1,"producer":"domain-design","required":false,"structureHash":"sha256:55fcd77acbf9aaf40c1a512e5262edf14a22d7532948525199234dd5de4efe31"},{"artifact":"requirements","contentHash":"sha256:72f4df9b709f5972a541ca366872179f6e0bf803a2609eb900f421aea3610ce9","instanceCount":1,"presentCount":1,"producer":"requirements-analysis","required":true,"structureHash":"sha256:b526cf0d7a7ba356a61034335be2db340c8bcbc78dd7e17db94ecedab61a7809"},{"artifact":"stories","contentHash":"sha256:375b790720183c97b2a1699b01d7504d3148fd39a2bc776778e04e899f60702f","instanceCount":1,"presentCount":1,"producer":"user-stories","required":false,"structureHash":"sha256:6052c987f2ddc4fb6b7a357dd899921b28ce00b404d8beacbfb7ed2ee0db00fb"}],"outputs":[{"artifact":"traceability","contentHash":"sha256:fcdbff0213364be8e5858403d4bbf06aecc9effcd831e7bade5eb47857cf73ea","instanceCount":1,"presentCount":1,"producer":"units-generation","required":true,"structureHash":"sha256:65495ed2276a27cc1785092baaf35fef2a9f48c5847c9c51fcfe19beeb7c3c83"},{"artifact":"unit-of-work-dependency","contentHash":"sha256:70278a526636a1ea2b17b6f4a20d67150afa3a6b331f817d8cc3dee330216116","instanceCount":1,"presentCount":1,"producer":"units-generation","required":true,"structureHash":"sha256:4859d1bbdf0d5c8077771af118637f67d7f801b0b48ae91f83a79ce80b16d5d2"},{"artifact":"unit-of-work-story-map","contentHash":"sha256:9487f4ce0cb58d5759389743a9a007f5ff3425d1ce29c4cbc6003e13d1079409","instanceCount":1,"presentCount":1,"producer":"units-generation","required":true,"structureHash":"sha256:50be62020c943978c5819f336a9575f4900f5ef0ac60fa72b2f9c2361c988fdc"},{"artifact":"unit-of-work","contentHash":"sha256:2ccc50c59f0fb0a7ca08c7985f598d0289fc503d5a855ae33687c68683d1f4f5","instanceCount":1,"presentCount":1,"producer":"units-generation","required":true,"structureHash":"sha256:bd2713274d43b211ece99d76cd1be9a4f9b65afe5f96177fda8c8a5ee87fbf8e"}],"projectType":"brownfield","schema":3}
+**Message Id**: d31f7526
+**Details**: changed before the person's next message after d31f7526; receipt renewed
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T02:34:34Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-design-questions.md
+**Context**: inception > contract-design > contract-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-10T02:34:36Z
+**Event**: DECISION_RECORDED
+**Stage**: contract-design
+**Decision**: Q1 작업 전체 한계 골라내기, Q2 고지 판본 이름, Q3 다시 볼 곳 사실 모양, Q4 사본 근거 본인 커밋 칸
+**Options**: |Q1 A api 고정 문장 대조|Q1 B worker 종류 칸|Q2 A v3 그대로|Q2 B v4로 올림|Q3 A 종류·경로·식별값만|Q3 B worker 문장까지|Q4 A 참·거짓 칸|Q4 B 기여 범위 문장|Other
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T02:35:03Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a250663fb0b4f78c4
+**Message**: Q1 A, Q2 A, Q3 A, Q4 A. done
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T02:38:02Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: aaf030cf396290c16
+**Message**: 새 Catch 작업의 계약 설계 단계에 있고, 앞 단계들은 모두 승인·커밋했습니다. 계약 설계 질문 Q1~Q4에 답해 주시면 바로 계약 요약을 쓰겠습니다.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T02:39:32Z
+**Event**: HUMAN_TURN
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Origin**: person
+**Source**: typed
+**Message Id**: e2e22ed4
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-10T02:39:39Z
+**Event**: QUESTION_ANSWERED
+**Stage**: contract-design
+**Details**: Q1: A; Q2: A; Q3: A; Q4: A(덧붙임 있음)
+**Person Reply**: <pasted_content id="696f">\nQ1: A\n\nQ2: A\n\nQ3: A\n\nQ4: A. 덧붙임: api에는 지금 본인 커밋 기여 범위 문장이 없다. 판정에 쓸 두 문장(build.py의 _OWN_COMMIT_SCOPE·_OWN_COMMIT_ELSEWHERE_SCOPE)을 api 상수로 두고, Q1의 worker·api 문장 대조 시험에 함께 넣는다. 문구가 어긋나면 표지가 조용히 사라지기 때문이다.\n\ndone\n</pasted_content id="696f">
+**Message Id**: e2e22ed4
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:39:52Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-design-questions.md
+**Context**: inception > contract-design > contract-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:39:54Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-design-questions.md
+**Context**: inception > contract-design > contract-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:39:56Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-design-questions.md
+**Context**: inception > contract-design > contract-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:40:00Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-design-questions.md
+**Context**: inception > contract-design > contract-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-10T02:40:02Z
+**Event**: DECISION_RECORDED
+**Stage**: contract-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-design-questions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T02:41:28Z
+**Event**: HUMAN_TURN
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: d9a57828
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T02:41:29Z
+**Event**: QUESTION_REPLIED
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Question**: 답 정리:\n- Q1 A: 작업 전체 한계는 발행 때 api가 고정 문장(목록 한계 둘)과 고정 앞부분(같은 작업 경고 둘)으로 대조해 골라냅니다. worker와 결과 메시지는 이 일로 바뀌지 않고, NC2는 web·api만 고칩니다.\n- Q2 A: 고지 판본 이름 `catchu-real-analysis-notice-v3`는 그대로 두고 4절 글만 바꿉니다.\n- Q3 A: 다시 볼 곳 사실은 종류·파일 경로·관련 커밋 식별값만 담고, 문장과 링크는 web이 만듭니다.\n- Q4 A: 사본 근거마다 참·거짓 칸 `ownCommit`을 더합니다.\n  - 발행 때 api가 기여 범위로 정하고, 옛 사본은 거짓으로 읽습니다.\n  - 판정에 쓸 본인 커밋 기여 범위 두 문장(`_OWN_COMMIT_SCOPE`·`_OWN_COMMIT_ELSEWHERE_SCOPE`)을 api 상수로 둡니다.\n- 문장 대조 시험 하나가 worker 문장 상수와 api 상수(한계 넷, 기여 범위 둘)가 같은지 봅니다. 문구가 어긋나면 한계와 표지가 조용히 사라지기 때문입니다.\n\n이 내용대로 계약 요약을 만들까요?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:41:34Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-design-questions.md
+**Context**: inception > contract-design > contract-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-10T02:41:35Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: contract-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-design-questions.md
+**Questions SHA-256**: 62d4415ff5854d5ab8b479464773a3131e486ea4375480eb2ee54db1b1b78b8f
+**Hash Scope**: confirmed-content-v2
+**Message Id**: d9a57828
+**Person Reply**: Looks correct
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T02:43:31Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:43:52Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/memory.md
+**Context**: inception > contract-design > memory.md
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T02:43:53Z
+**Event**: SENSOR_FIRED
+**Fire id**: b4413a7b
+**Sensor ID**: required-sections
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T02:43:53Z
+**Event**: SENSOR_PASSED
+**Fire id**: b4413a7b
+**Sensor ID**: required-sections
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Duration ms**: 77
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T02:43:53Z
+**Event**: SENSOR_FIRED
+**Fire id**: ace4f169
+**Sensor ID**: upstream-coverage
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T02:43:53Z
+**Event**: SENSOR_PASSED
+**Fire id**: ace4f169
+**Sensor ID**: upstream-coverage
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Duration ms**: 76
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-10T02:43:53Z
+**Event**: REVIEW_REQUESTED
+**Stage**: contract-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:00e5ba7ed4e585ecc6197c104c3763a656d527130dea03a46f803509ca86387e
+**Request Id**: review:cb97d694d2c17d7c7b96f1a77d361bb7
+**Review File**: .aidlc-engine/reviews/contract-design/stage/e09da229de3cdc95/1.cb97d694d2c17d7c7b96f1a77d361bb7.review.md
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-10T02:44:15Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T02:45:38Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviews/contract-design/stage/e09da229de3cdc95/1.cb97d694d2c17d7c7b96f1a77d361bb7.review.md
+**Context**: .aidlc-engine > reviews > contract-design > stage > e09da229de3cdc95 > 1.cb97d694d2c17d7c7b96f1a77d361bb7.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-10T02:45:46Z
+**Event**: HOST_TURN
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T02:45:46Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: a22b04c812196b2ba
+**Review File Digest**: .aidlc-engine/reviews/contract-design/stage/e09da229de3cdc95/1.cb97d694d2c17d7c7b96f1a77d361bb7.review.md=ba6b59c402aa15c5743bf9bd3827421f1c322de692a3b269ccbf69c673ee4c96
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-10T02:45:51Z
+**Event**: REVIEW_COMPLETED
+**Stage**: contract-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:00e5ba7ed4e585ecc6197c104c3763a656d527130dea03a46f803509ca86387e
+**Artifact Fingerprint**: sha256:00e5ba7ed4e585ecc6197c104c3763a656d527130dea03a46f803509ca86387e
+**Request Id**: review:cb97d694d2c17d7c7b96f1a77d361bb7
+**Review Record**: .aidlc-engine/reviews/contract-design/stage/e09da229de3cdc95/1.json
+**Review Record Digest**: sha256:e0566bb5d88992859013cc3351703094019794eed6d7af690190a3714ff59ddf
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T02:45:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: d7283ba9
+**Sensor ID**: required-sections
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T02:45:57Z
+**Event**: SENSOR_PASSED
+**Fire id**: d7283ba9
+**Sensor ID**: required-sections
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T02:45:57Z
+**Event**: SENSOR_FIRED
+**Fire id**: 7d3ad35f
+**Sensor ID**: upstream-coverage
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T02:45:57Z
+**Event**: SENSOR_PASSED
+**Fire id**: 7d3ad35f
+**Sensor ID**: upstream-coverage
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Duration ms**: 72
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-10T02:45:57Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: contract-design
+**Next Stage**: delivery-planning
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md=passed; upstream-coverage@aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md=passed
+**Open Decisions**: 0
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T02:50:18Z
+**Event**: HUMAN_TURN
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve. 다만 이 단계 커밋 전에 아래를 고친다.\r- R-01: 제안대로 C2에 적는다. 같은 시각 안과 시각 없는 Catch 안은 지금처럼 catch_id 오름차순이고, 커서 비교도 (마지막 작업 시각 내림차순, 없음은 맨 뒤, catch_id 오름차순) 순서를 따른다.\r- R-02: 상한은 지금 정하지 않고 NC2 기능 설계 Open questions에 넣는다. 시연 저장소의 실제 개수를 보고 정한다.\r- R-03: 저장소 식별값이 없으면 지금도 발행 자체가 거부된다(publish.service.ts의 PublishIntegrityError('sourceRequest')). C3 Open questions의 「repositoryName을 어디서 읽을지」를 정할 때, 그 길로 이름을 못 읽는 경우의 처리도 함께 정한다고 적는다.\r- R-04: 제안대로 C6 Open questions에 더한다. 지금 CI(ci.yml)는 api 시험을 api 경로가 바뀔 때만 돌리므로, worker 문장만 바뀐 PR에서도 대조 시험이 돌게 하는 방법을 기능 설계에서 정한다.\r- R-05: C4 배포에 한 줄 더한다. 배포는 진행 중인 분석이 없을 때 하고, 남은 판본 \"3\" 결과는 api가 거부한다. 출시 전·DB 초기화 전이라 그때 끝나지 못한 분석은 다시 하면 된다.\r- 덧붙여 C5의 「결과 문장을 Catch에 남긴다」를 Q3 A에 맞게 「다시 볼 곳 사실(종류·파일 경로·커밋 식별값)을 Catch에 남기고 본인만 본다」로 고친다. 문장은 남기지 않기 때문이다. 첫·마지막 작업 시각도 Catch에 남는데, 고지에 함께 적을지는 문구 PR에서 팀장이 정한다."]
+**Message Id**: ba016623
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T02:50:18Z
+**Event**: QUESTION_REPLIED
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Question**: 계약 설계를 마쳤습니다. 어떻게 할까요?
+**Reply**: Approve. 다만 이 단계 커밋 전에 아래를 고친다.\n- R-01: 제안대로 C2에 적는다. 같은 시각 안과 시각 없는 Catch 안은 지금처럼 catch_id 오름차순이고, 커서 비교도 (마지막 작업 시각 내림차순, 없음은 맨 뒤, catch_id 오름차순) 순서를 따른다.\n- R-02: 상한은 지금 정하지 않고 NC2 기능 설계 Open questions에 넣는다. 시연 저장소의 실제 개수를 보고 정한다.\n- R-03: 저장소 식별값이 없으면 지금도 발행 자체가 거부된다(publish.service.ts의 PublishIntegrityError('sourceRequest')). C3 Open questions의 「repositoryName을 어디서 읽을지」를 정할 때, 그 길로 이름을 못 읽는 경우의 처리도 함께 정한다고 적는다.\n- R-04: 제안대로 C6 Open questions에 더한다. 지금 CI(ci.yml)는 api 시험을 api 경로가 바뀔 때만 돌리므로, worker 문장만 바뀐 PR에서도 대조 시험이 돌게 하는 방법을 기능 설계에서 정한다.\n- R-05: C4 배포에 한 줄 더한다. 배포는 진행 중인 분석이 없을 때 하고, 남은 판본 "3" 결과는 api가 거부한다. 출시 전·DB 초기화 전이라 그때 끝나지 못한 분석은 다시 하면 된다.\n- 덧붙여 C5의 「결과 문장을 Catch에 남긴다」를 Q3 A에 맞게 「다시 볼 곳 사실(종류·파일 경로·커밋 식별값)을 Catch에 남기고 본인만 본다」로 고친다. 문장은 남기지 않기 때문이다. 첫·마지막 작업 시각도 Catch에 남는데, 고지에 함께 적을지는 문구 PR에서 팀장이 정한다.
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-10T02:50:24Z
+**Event**: GATE_APPROVED
+**Stage**: contract-design
+**User Input**: Approve
+**Person Reply**: Approve. 다만 이 단계 커밋 전에 아래를 고친다.\n- R-01: 제안대로 C2에 적는다. 같은 시각 안과 시각 없는 Catch 안은 지금처럼 catch_id 오름차순이고, 커서 비교도 (마지막 작업 시각 내림차순, 없음은 맨 뒤, catch_id 오름차순) 순서를 따른다.\n- R-02: 상한은 지금 정하지 않고 NC2 기능 설계 Open questions에 넣는다. 시연 저장소의 실제 개수를 보고 정한다.\n- R-03: 저장소 식별값이 없으면 지금도 발행 자체가 거부된다(publish.service.ts의 PublishIntegrityError('sourceRequest')). C3 Open questions의 「repositoryName을 어디서 읽을지」를 정할 때, 그 길로 이름을 못 읽는 경우의 처리도 함께 정한다고 적는다.\n- R-04: 제안대로 C6 Open questions에 더한다. 지금 CI(ci.yml)는 api 시험을 api 경로가 바뀔 때만 돌리므로, worker 문장만 바뀐 PR에서도 대조 시험이 돌게 하는 방법을 기능 설계에서 정한다.\n- R-05: C4 배포에 한 줄 더한다. 배포는 진행 중인 분석이 없을 때 하고, 남은 판본 "3" 결과는 api가 거부한다. 출시 전·DB 초기화 전이라 그때 끝나지 못한 분석은 다시 하면 된다.\n- 덧붙여 C5의 「결과 문장을 Catch에 남긴다」를 Q3 A에 맞게 「다시 볼 곳 사실(종류·파일 경로·커밋 식별값)을 Catch에 남기고 본인만 본다」로 고친다. 문장은 남기지 않기 때문이다. 첫·마지막 작업 시각도 Catch에 남는데, 고지에 함께 적을지는 문구 PR에서 팀장이 정한다.
+**Message Id**: ba016623
+**Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md","id":"R-01","fingerprint":"sha256:ebad760eaf99788ebd1545312c424147ce9fecdd01e42cc90669b4b2adecf4bf","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/contract-design/stage/e09da229de3cdc95/1.json","digest":"sha256:e0566bb5d88992859013cc3351703094019794eed6d7af690190a3714ff59ddf"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md","id":"R-02","fingerprint":"sha256:00d691ebf6b2050689d2b84269be5bfbb073131b403f6f93dfca1d69a586c73a","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/contract-design/stage/e09da229de3cdc95/1.json","digest":"sha256:e0566bb5d88992859013cc3351703094019794eed6d7af690190a3714ff59ddf"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md","id":"R-03","fingerprint":"sha256:1c7e7baedd4894cdb0e5cf8519f57ec2217def1ff355c7336f9234e652a85d7b","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/contract-design/stage/e09da229de3cdc95/1.json","digest":"sha256:e0566bb5d88992859013cc3351703094019794eed6d7af690190a3714ff59ddf"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md","id":"R-04","fingerprint":"sha256:e91708d45cd3c7ae5c2239fb3d1fc8d04e21532cbd3f7c39187443d8cf4bf7bb","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/contract-design/stage/e09da229de3cdc95/1.json","digest":"sha256:e0566bb5d88992859013cc3351703094019794eed6d7af690190a3714ff59ddf"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md","id":"R-05","fingerprint":"sha256:685f70fb7289853a5acf347961a5950553138d0eb9ecafc2ca8260ba68569879","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/contract-design/stage/e09da229de3cdc95/1.json","digest":"sha256:e0566bb5d88992859013cc3351703094019794eed6d7af690190a3714ff59ddf"}}]}
+**Brief Digest**: sha256:88e657dd9b263d98785edaef428783227095d84a8228a94e493a3283f2206e5e
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-10T02:50:24Z
+**Event**: STAGE_COMPLETED
+**Stage**: contract-design
+**Validation Basis**: {"graphContract":"sha256:ad5599bf4da38de3dec2bfb4bf705de33d27113e18b6a160549a97c4b694fea3","inputs":[{"artifact":"components","contentHash":"sha256:86dee5c9d20e2b0529a734c9ea9b0004a2eb6b66f0b02f6adea6a72fea8ce8c6","instanceCount":1,"presentCount":1,"producer":"domain-design","required":false,"structureHash":"sha256:197324c61cc9043d078e760386c5e646852af28271eaafc0e190984691452825"},{"artifact":"requirements","contentHash":"sha256:72f4df9b709f5972a541ca366872179f6e0bf803a2609eb900f421aea3610ce9","instanceCount":1,"presentCount":1,"producer":"requirements-analysis","required":false,"structureHash":"sha256:b526cf0d7a7ba356a61034335be2db340c8bcbc78dd7e17db94ecedab61a7809"},{"artifact":"unit-of-work-dependency","contentHash":"sha256:70278a526636a1ea2b17b6f4a20d67150afa3a6b331f817d8cc3dee330216116","instanceCount":1,"presentCount":1,"producer":"units-generation","required":true,"structureHash":"sha256:4859d1bbdf0d5c8077771af118637f67d7f801b0b48ae91f83a79ce80b16d5d2"},{"artifact":"unit-of-work","contentHash":"sha256:2ccc50c59f0fb0a7ca08c7985f598d0289fc503d5a855ae33687c68683d1f4f5","instanceCount":1,"presentCount":1,"producer":"units-generation","required":true,"structureHash":"sha256:bd2713274d43b211ece99d76cd1be9a4f9b65afe5f96177fda8c8a5ee87fbf8e"}],"outputs":[{"artifact":"contract-summary","contentHash":"sha256:77e9e2bfc2739dbe2f05ce516e56aec96024656275574cf1fb2ad5090df277f6","instanceCount":1,"presentCount":1,"producer":"contract-design","required":true,"structureHash":"sha256:16f6081103247da6c09c77efec52f639607484d9a286d156eec9224521c7b0f3"}],"projectType":"brownfield","schema":3}
+**Details**: Stage Contract Design approved by gate
+**Tokens In**: 82
+**Tokens Out**: 45701
+**Cache Read**: 26188844
+**Cache Write**: 220013
+**Cost USD**: 7.00
+**By Model**: opus-5-5=6.30; sonnet-5-5=0.70
+**By Agent**: main=6.30; aidlc-architecture-reviewer-agent=0.70
+**Tokens By Model**: opus-5-5=62/34.5k/25.1M/73.9k; sonnet-5-5=20/11.2k/1.1M/146.1k
+**Tokens By Agent**: main=62/34.5k/25.1M/73.9k; aidlc-architecture-reviewer-agent=20/11.2k/1.1M/146.1k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-10T02:50:24Z
+**Event**: STAGE_STARTED
+**Stage**: delivery-planning
+**Agent**: aidlc-delivery-agent
+**Answer Mode**: chat (reused from intent-capture)
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:50:31Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:50:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:50:37Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:50:40Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:50:43Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T02:50:45Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
