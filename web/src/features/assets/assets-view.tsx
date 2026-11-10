@@ -69,10 +69,11 @@ function hasGeneratedDraft(item: CatchAsset) {
   return item.draft.status === "GENERATED" && item.draft.content !== null && item.draft.content.trim().length > 0;
 }
 
+/** 자동 생성 안내. 목록과 상세가 같은 컴포넌트를 써서 「설명」을 「설명 초안」으로 함께 바꾼다(CR1 BR6.3). */
 function GeneratedContentNotice({ item }: { item?: CatchAsset }) {
   const hasTitle = !item || item.title !== null;
   const hasDraft = !item || hasGeneratedDraft(item);
-  const subject = hasTitle ? (hasDraft ? "제목과 설명" : "제목") : hasDraft ? "설명" : null;
+  const subject = hasTitle ? (hasDraft ? "제목과 설명 초안" : "제목") : hasDraft ? "설명 초안" : null;
   return (
     <p className={styles.readOnlyNotice}>
       {subject && <>{subject}은 CatchU가 GitHub 기록에서 자동으로 만들었습니다<br /></>}
@@ -177,7 +178,7 @@ export function AssetsView(props: AssetsViewProps) {
                   {item.title !== null && <h3><button className={styles.cardTitle} onClick={(event) => {
                     returnFocusRef.current = event.currentTarget;
                     props.onOpen(item.catchId);
-                  }}>{item.title}</button></h3>}
+                  }}><span className={styles.titleClamp}>{item.title}</span></button></h3>}
                   <p className={styles.summary}>{item.workFacts[0] || "상세에서 근거를 확인해 주세요."}</p>
                   <div className={styles.cardFooter}><span>근거 {item.evidence.length}개</span>
                     {item.title === null ? <button className={styles.cardDetails} onClick={(event) => {
@@ -263,10 +264,11 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
             ))}
           </section>
           {descriptionEditor}
-          <section className={styles.detailSection}><h3>Catch 설명 초안</h3>
+          {/* CR3 BR7.1: 설명 초안이 NOT_GENERATED면 칸(제목·안내 글)을 그리지 않는다. FAILED·GENERATED는 그대로다. */}
+          {item.draft.status !== "NOT_GENERATED" && <section className={styles.detailSection}><h3>Catch 설명 초안</h3>
             {hasGeneratedDraft(item) ? <p className={styles.draft}>{item.draft.content}</p>
               : <p>{item.draft.status === "FAILED" ? "설명 초안을 생성하지 못했습니다. 위의 사실과 근거는 확인할 수 있습니다." : "생성된 설명 초안이 없습니다."}</p>}
-          </section>
+          </section>}
           <section className={styles.detailSection}><h3>생각해 볼 질문 <span className={styles.small}>본인만 확인</span></h3>
             {item.reflection.status === "GENERATED" && item.reflection.questions.length > 0 ? <ul>{item.reflection.questions.map((question, index) => <li key={index}>{question}</li>)}</ul>
               : <p>{item.reflection.status === "FAILED" ? "질문을 생성하지 못했습니다." : "생성된 질문이 없습니다."}</p>}

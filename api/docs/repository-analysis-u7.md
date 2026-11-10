@@ -28,13 +28,13 @@ GitHub 연결 권한으로는 404 응답의 비공개 저장소와 없는 저장
 
 [2026-10-30 #424 팀장 결정](https://github.com/JminAILab/CatchU/issues/424)에 따라 승인 요구사항 FR1.3·U7 설계 BR4.3의 정상 완료 재분석 금지를 대체한다. 과거 승인 원본은 보존한다. 같은 저장소의 최신 요청이 `CLOSED`이고 반영이 `APPLIED` 또는 `APPLY_FAILED`로 끝났으면 결과·기존 Catch 유무와 무관하게 재분석할 수 있다. 진행·반영·복구 중이거나 반영 완료를 확인하지 못한 요청에는 허용하지 않는다. 접수 때 최신 본인 요청의 `retryOfRequestId`, 새 키·현재 고지/범위에 대한 새 동의·하루 제한을 다시 확인한다. 동일 키 재전송과 같은 ACTIVE 재응답은 새 요청·동의·소비를 만들지 않는다. 자동 재시도는 없다.
 
-기존 Catch 등록의 회원+`workIdentity` 중복 판정을 재사용한다. 같은 작업은 기존 Catch ID·최초 내용·작성자 설명·공개 상태·근거를 유지하고 새 작업만 비공개 Catch로 추가한다. 진행·실패에도 기존 Catch를 삭제하지 않으며 이미 발행한 발행본을 변경하지 않는다. 상태의 `retry.allowed`는 최신 종료 요청에서 참이며 일반 종료 허용 이유는 `ANALYSIS_FINISHED`, 기존 결과 없는 확정 실패 이유는 `FAILURE_WITHOUT_RESULTS`다. 옛 요청은 후속 요청이 있으면 허용하지 않는다.
+기존 Catch 등록의 회원+`workIdentity` 중복 판정을 재사용한다. 같은 작업은 기존 Catch ID·최초 내용·작성자 설명·공개 상태·근거를 유지하고 새 작업만 비공개 Catch로 추가한다. Catch 개편 CR2부터 등록은 커밋마다 소속 Catch를 기록하고(`commit_assignment`), worker는 재분석 때 이미 소속된 커밋의 변경을 빼고 남은 새 변경으로만 후보를 만든다. 같은 PR에 더해진 새 커밋은 기존 Catch에 소속만 더하고, 다른 작업에 다시 담긴 옛 커밋은 원래 Catch 소속 그대로다([Catch 등록 규칙 「소속 기록」](catch-registration-rules.md#소속-기록-cr2), [worker 소속 커밋 빼기](../../worker/docs/commit-assignment.md)). 진행·실패에도 기존 Catch를 삭제하지 않으며 이미 발행한 발행본을 변경하지 않는다. 상태의 `retry.allowed`는 최신 종료 요청에서 참이며 일반 종료 허용 이유는 `ANALYSIS_FINISHED`, 기존 결과 없는 확정 실패 이유는 `FAILURE_WITHOUT_RESULTS`다. 옛 요청은 후속 요청이 있으면 허용하지 않는다.
 
-실제 고지는 #424 본문에서 확정한 네 줄과 판본 `catchu-real-analysis-notice-v2`를 적용한다. [PR #433](https://github.com/JminAILab/CatchU/pull/433)의 팀장 승인이 고지 승인 기록이며, 문구 확정과 실제 실행 완료는 구분한다.
+실제 고지는 #424 본문에서 확정한 네 줄(v2, [PR #433](https://github.com/JminAILab/CatchU/pull/433)의 팀장 승인)에 Catch 개편 CR3가 2·3·4절을 바꾼 판본 `catchu-real-analysis-notice-v3`를 적용한다([분석 고지 「고지 v3」](analysis-intake.md#고지-v3--catch-개편-cr3)). v3의 승인 기록은 CR3 PR의 팀장 승인이며, 문구 확정과 실제 실행 완료는 구분한다.
 
 ## 메시지와 결과
 
-현행 정본은 `api/contracts/repository-analysis/{common,worker-messages}.yaml`이다. 원본은 `260914-catchu-october-mvp/inception/contract-design`의 두 YAML이며 그 승인 파일은 보존했다. Request·ProcessingEvent·Result·ResultReceipt 모두 `schemaVersion: '2'`이고 v1은 거부한다. DB 동의의 여섯 칸과 큐의 네 칸 범위는 별도 검사한다. 큐 `selectionReference`·`credentialContextReference`는 `attemptId`이고 토큰·좌표 사본은 넣지 않는다.
+현행 정본은 `api/contracts/repository-analysis/{common,worker-messages}.yaml`이다. 원본은 `260914-catchu-october-mvp/inception/contract-design`의 두 YAML이며 그 승인 파일은 보존했다. Request·ProcessingEvent·ResultReceipt는 `schemaVersion: '2'`, Result는 Catch 개편 CR2부터 `'3'`(후보마다 본인 커밋 목록 `ownCommitShas`)이며 그 밖의 판본은 거부한다. 옛 판본을 함께 받는 처리는 없어 api·worker를 같은 배포로 넣는다. DB 동의의 여섯 칸과 큐의 네 칸 범위는 별도 검사한다. 큐 `selectionReference`·`credentialContextReference`는 `attemptId`이고 토큰·좌표 사본은 넣지 않는다.
 
 Result와 회원 상태에 `ownCommitObservation`, `observedOwnCommitCount`, `collectionLimitNotes`가 있다. `NONE/0/[]`은 완전 조회에서 본인 커밋 0개로 결과·실패·Catch가 없는 EMPTY다. `FOUND`는 양수 관측 수이며 후보 수와 다르다. `UNKNOWN/null`은 조회 불명·한계 또는 관측 전 상태다. FOUND에도 수집 한계가 있을 수 있다. 수신·처리·반영·lifecycle·ownerResultsReady는 각각 보존하며 Receipt ACCEPTED만으로 Catch 열람 준비를 뜻하지 않는다.
 

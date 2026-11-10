@@ -337,6 +337,8 @@ def _candidate(outcome: CollectionOutcome) -> EligibleCandidate:
         evidence=(basis.to_evidence_item("커밋 1건"),),
         draft=DraftOutcome.not_generated(),
         reflection=ReflectionOutcome.not_generated(),
+        # Result v3(CR2)는 후보마다 본인 커밋 목록이 1개 이상이다.
+        own_commit_shas=(outcome.commits[0].sha,),
     )
 
 

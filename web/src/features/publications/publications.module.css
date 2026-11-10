@@ -56,6 +56,9 @@
 .snapshotBody { display: grid; gap: 12px; }
 .snapshotSection { border-top: 1px solid var(--color-line); padding-top: 10px; }
 .evidenceList { padding-left: 18px; }
+.evidenceDetails { margin-top: 8px; }
+.evidenceDetails > summary { display: inline-flex; align-items: center; min-height: 44px; color: #254e93; font-size: 14px; font-weight: 700; cursor: pointer; }
+.evidenceDetails > summary:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
 .freeText { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 .primaryButton, .secondaryButton, .dangerButton { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 18px; border-radius: 9px; border: 1px solid #c9d2df; background: var(--color-surface); color: #34465e; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; }
 .primaryButton { background: #254e93; border-color: #254e93; color: white; }

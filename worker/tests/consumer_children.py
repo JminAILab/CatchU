@@ -148,6 +148,134 @@ def live_synthetic(conn: Connection, child_input: ChildInput) -> None:
     child_main(conn, child_input)
 
 
+# 기록의 글 원문 비노출 시험(CR1 보안 확인 사항)의 PR 제목·커밋 첫 줄. 로그에 나오면 안 되는 표식이다.
+RECORD_PULL_TITLE = "기록제목표식 로그인 오류 수정"
+RECORD_COMMIT_LINE = "기록커밋표식 알림 정리"
+
+
+def live_synthetic_record_text(conn: Connection, child_input: ChildInput) -> None:
+    """`live_synthetic`과 같되, 열린 PR의 제목이 쓸 만한 기록의 글인 합성 저장소로 처리한다.
+
+    PR 제목이 제목과 작업 사실 둘째 줄(`workFacts[1]`)이 된다. 커밋 첫 줄은 단위 밖 시험에 쓰지 않지만
+    로그에 나오지 않는지 함께 본다.
+    """
+    from dataclasses import replace
+
+    from candidate_scenarios import ROOT, Pull, Scenario, change, commit, root_commit
+    from github_synthetic import MEMBER, sha
+    from live_synthetic import Parts
+
+    from app.consumer import child
+
+    own = commit(
+        sha(31),
+        MEMBER,
+        parents=(ROOT,),
+        minute=3,
+        message=RECORD_COMMIT_LINE,
+        files=[change("app/alpha.py", patch="@@ -1 +1 @@\n-alpha = 1\n+alpha = 2")],
+    )
+    scenario = Scenario(
+        default_branch=(root_commit(),),
+        pulls=(
+            Pull(3, MEMBER, (own,), state="open", created=2, title=RECORD_PULL_TITLE),
+        ),
+    )
+    original = child.live_assembly
+
+    def assembly(settings: Any) -> Any:
+        built = original(settings)
+        assert built is not None, "LIVE 설정 없이 띄웠다"
+        parts = Parts(scenario)
+        return replace(
+            built,
+            open_transport=parts.open_transport,
+            provider_factory=parts.make_provider,
+        )
+
+    setattr(child, "live_assembly", assembly)  # noqa: B010
+    child_main(conn, child_input)
+
+
+# AI 쪽(CR3) 로그 시험의 AI 제목 후보·설명 문장. 로그에 나오면 안 되는 표식이다(한글 표식은 기계 대조가 보지 않는다).
+AI_TITLE = "후보표식 alpha 값 변경"
+AI_SENTENCE = "문장표식 alpha 값을 2로 바꿨습니다."
+
+
+def live_synthetic_ai_side(conn: Connection, child_input: ChildInput) -> None:
+    """`live_synthetic_record_text`와 같은 저장소를 AI 쪽이 켜진 채로 처리한다.
+
+    판정 공급자는 합성 판정 어댑터다. 기록의 글은 판정 부실(RECORD_WHAT 0.2)이고 후보 t1을 0.95로 골라, 제목은
+    AI 후보가 되고 작업 사실 둘째 줄은 지워진다. 자식이 받은 설정의 판정 키는 쓰지 않는다.
+    """
+    from dataclasses import replace
+
+    from candidate_scenarios import ROOT, Pull, Scenario, change, commit, root_commit
+    from generation_scenarios import (
+        ScriptedProvider,
+        ai_answer,
+        code_title,
+        pick,
+        question,
+        written,
+    )
+    from github_synthetic import MEMBER, sha
+    from live_synthetic import Parts
+
+    from app.consumer import child
+    from app.generation import ProviderRequest
+    from app.judgement.provider import Question
+    from app.judgement.synthetic import SyntheticJudge, default_answer
+
+    own = commit(
+        sha(31),
+        MEMBER,
+        parents=(ROOT,),
+        minute=3,
+        message=RECORD_COMMIT_LINE,
+        files=[change("app/alpha.py", patch="@@ -1 +1 @@\n-alpha = 1\n+alpha = 2")],
+    )
+    scenario = Scenario(
+        default_branch=(root_commit(),),
+        pulls=(
+            Pull(3, MEMBER, (own,), state="open", created=2, title=RECORD_PULL_TITLE),
+        ),
+    )
+
+    def reply(request: ProviderRequest) -> str:
+        line = pick(request, change="added", contains="alpha")
+        return ai_answer(
+            titles=[written(AI_TITLE, line)],
+            sentences=[written(AI_SENTENCE, line)],
+            title=code_title(line, "alpha"),
+            questions=[question("BACKGROUND")],
+        )
+
+    def answer(question: Question) -> object | None:
+        if question.kind == "RECORD_WHAT":
+            return 0.2
+        if question.kind == "TITLE_CHOICE":
+            return [0.95, 0.05]
+        return default_answer(question)
+
+    original = child.live_assembly
+
+    def assembly(settings: Any) -> Any:
+        built = original(settings)
+        assert built is not None, "LIVE 설정 없이 띄웠다"
+        assert built.judge_factory is not None, "AI 쪽이 꺼진 설정으로 띄웠다"
+        parts = Parts(scenario, provider=ScriptedProvider(reply))
+        return replace(
+            built,
+            open_transport=parts.open_transport,
+            provider_factory=parts.make_provider,
+            judge_factory=lambda: SyntheticJudge(answer),
+        )
+
+    setattr(child, "live_assembly", assembly)  # noqa: B010
+    child_main(conn, child_input)
+
+
 def report_modules(conn: Connection, child_input: ChildInput) -> None:
     """자식에 불러온 모듈 중 BullMQ·Redis·FastAPI가 있는지 결함 프레임 이름으로 알린다."""
     import sys

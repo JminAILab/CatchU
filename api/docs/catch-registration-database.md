@@ -12,6 +12,7 @@
 | 3 | CatchEvidence | B: 근거 사본 |
 | 4 | CandidateRegistration | B 작성, E 연결 관점 검토 |
 | 5 | RepositoryProtection | B: 회원·저장소별 명시적 보호 판단 저장 공간 |
+| 6 | CommitAssignment | B(Catch 개편 CR2): 커밋마다 소속 Catch 기록 |
 
 B 엔티티는 [`src/catches/entities`](../src/catches/entities), 마이그레이션은
 [`CreateCatchAssets1790600000000`](../src/database/migrations/1790600000000-CreateCatchAssets.ts)와
@@ -22,6 +23,8 @@ enum varchar+CHECK를 사용한다. 공통 DB 규약과 동일한 TypeORM 1.1.1�
 제목 `null` 허용은 [`AllowNullCatchTitle1791784385918`](../src/database/migrations/1791784385918-AllowNullCatchTitle.ts)을 추가 적용한다. 기존 제목과 빈 문자열 거부 CHECK는 보존한다. `down`은 NOT NULL을 복원하므로 `null` 행이 있으면 실패하며, 제목을 임의로 채우거나 자료를 지우지 않는다. 해당 자료의 처리 방침을 정하기 전에는 되돌리지 않는다.
 
 근거 표시 순서는 [`AddCatchEvidencePosition1792029036359`](../src/database/migrations/1792029036359-AddCatchEvidencePosition.ts)으로 저장한다. 기존 근거는 Catch마다 종전 UUID 오름차순으로 1부터 채워 ID·본문과 당시 표시 순서를 보존한다. `down`은 위치 칼럼만 제거하므로 이후 새로 저장한 입력 순서는 잃으며, 재적용 때는 UUID 순서로 다시 채운다.
+
+소속 기록은 [`CreateCommitAssignment1794054790720`](../src/database/migrations/1794054790720-CreateCommitAssignment.ts)이 만든다. 먼저 `catch_asset`에 `(catch_id, owner_id)` 유일 조건을 더하고, `commit_assignment`(member_id uuid, github_repository_id text, commit_sha char(40), catch_id uuid, assigned_at timestamptz 기본 now())를 만든다. 기본 키 (member_id, github_repository_id, commit_sha)가 회원·저장소·SHA마다 하나를 보장한다. 외래 키 (catch_id, member_id) → catch_asset(catch_id, owner_id)는 연쇄 삭제이고, 회원·분석 요청을 직접 가리키는 외래 키는 두지 않는다(Catch를 따라서만 지워짐). Catch 삭제 연쇄가 표를 훑지 않게 (catch_id, member_id) 색인을 둔다. CHECK는 SHA 소문자 16진수 40자, 저장소 ID 빈 문자열 아님이다. `down`은 외래 키 → 색인 → 표 → 유일 조건 순서로 지운다.
 
 B 마이그레이션은 E 수신 테이블을 포함한 선행 테이블이 없으면 실패한다.
 가짜 제품 테이블을 만들거나 FK를 생략하지 않는다.

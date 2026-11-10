@@ -19,5 +19,13 @@
     "dirName": "260925-intent-12",
     "scope": "mvp",
     "status": "in-flight"
+  },
+  {
+    "uuid": "01a19f76-ea16-7b17-8940-374e976c8da2",
+    "slug": "catch-redesign",
+    "dirName": "261103-catch-redesign",
+    "scope": "mvp",
+    "status": "complete",
+    "request": "6157757d"
   }
 ]

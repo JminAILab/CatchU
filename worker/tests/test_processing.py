@@ -27,6 +27,7 @@ from app.processing import (
     StageFailure,
     Uncertain,
     check_request,
+    compose_result,
     outcome_for,
     process_request,
     synthetic_accepted_context,
@@ -182,6 +183,31 @@ def test_fake_result_matches_shared_synthetic_case(scenario: str) -> None:
     assert result == fill_template(template, {**CONTEXT, "caseId": scenario})
     expected = CASE_BY_ID[scenario]["messages"][0]["expected"]["processingAfter"]
     assert result["outcome"] == expected
+
+
+@pytest.mark.parametrize("scenario", FINISHING_SCENARIOS)
+def test_synthetic_result_is_version_three_with_own_commits(scenario: str) -> None:
+    """합성(MOCK) 결과도 같은 규칙: 판본 "3", 후보마다 합성 수집 결과의 본인 커밋 SHA(CR2 BR2.1·BR2.2)."""
+    result = _finish(scenario)
+
+    assert result["schemaVersion"] == "3"
+    for candidate in result["candidates"]:
+        assert candidate["ownCommitShas"]
+
+
+def test_composed_candidate_carries_own_commit_shas_in_order() -> None:
+    template = _read_json(FIXTURE_DIR / "results" / "succeeded-one-candidate.json")
+    shas = ("c" * 40, "a" * 40, "b" * 40)
+    request = CHECKED
+    assert isinstance(request, CheckedRequest)
+    output = FakeGenerator("succeeded-one-candidate").generate(request)
+    changed = replace(
+        output, candidates=(replace(output.candidates[0], own_commit_shas=shas),)
+    )
+    result = compose_result(request, changed, finished_at=FINISHED_AT, id_label="x")
+    assert result["candidates"][0]["ownCommitShas"] == list(shas)
+    assert check_message("Result", result).verdict is Verdict.VALID
+    assert template["candidates"][0]["ownCommitShas"] != list(shas)
 
 
 # 종결값 · notProvided와 failures

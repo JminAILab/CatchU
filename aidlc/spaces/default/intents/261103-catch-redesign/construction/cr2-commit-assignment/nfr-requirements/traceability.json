@@ -1,0 +1,22 @@
+{
+  "stage": "nfr-requirements",
+  "unit": "cr2-commit-assignment",
+  "upstream_ids": [
+    "NFR1",
+    "NFR2",
+    "NFR3",
+    "NFR4",
+    "NFR5",
+    "NFR6",
+    "NFR7"
+  ],
+  "coverage": [
+    { "id": "NFR1", "status": "N/A", "target": "외부 AI 처리 — cr3-ai-drafts가 맡는다. CR2는 외부 AI를 부르지 않는다" },
+    { "id": "NFR2", "status": "N/A", "target": "판정 호출 횟수 — cr3-ai-drafts가 맡는다" },
+    { "id": "NFR3", "status": "N/A", "target": "판정 품질 — cr3-ai-drafts가 맡는다" },
+    { "id": "NFR4", "status": "OK", "target": "NFR4.1, NFR4.2, NFR4.3, NFR4.4, NFR4.5, NFR4.6, NFR4.7, NFR4.8, NFR4.9, NFR4.10, NFR4.11, NFR4.12" },
+    { "id": "NFR5", "status": "N/A", "target": "OpenAI 키 보관 — cr3-ai-drafts가 맡는다. CR2에는 새 비밀값이 없다" },
+    { "id": "NFR6", "status": "OK", "target": "NFR6.1, NFR6.2, NFR6.3, NFR6.4, NFR6.5, NFR6.6" },
+    { "id": "NFR7", "status": "OK", "target": "NFR7.1" }
+  ]
+}

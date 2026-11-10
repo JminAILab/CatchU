@@ -10,7 +10,7 @@ import { ApiError } from '../common/errors';
  * 현재 고지 판본. 동의 창 문구(web `src/components/ai-consent/ai-consent-notice.ts`의 같은 이름 상수)를 바꾸면
  * 두 값을 함께 올린다. 올리면 모든 회원이 다시 동의한다(BR2.1).
  */
-export const AI_NOTICE_VERSION = '2026-11-v1';
+export const AI_NOTICE_VERSION = '2026-11-v2'; // v2: 받는 곳에 OpenAI(Catch 개편 CR3 BR8.3)
 
 /** 동의 없음(C-04 AiConsentRequired). 그대로 던지면 공통 필터가 403 AI_CONSENT_REQUIRED로 응답한다. */
 export class AiConsentRequired extends ApiError {

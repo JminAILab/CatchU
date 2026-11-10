@@ -289,11 +289,15 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
       'CascadeResultApplicationOnDelete1792817978012', 'CascadeAuthSessionsOnDelete1792817978013', 'CascadeCatchAssetsOnDelete1792817978014',
       'CreateU2UsageAndConsent1793161114211', 'CreatePublicationTables1793162230851', 'AddCatchAuthorDescription1793162230852',
       'AddRepositoryRegistration1793245460352', 'CreatePublishedIndexTables1793257382741', 'CreateBaseSummaryTable1793348947970',
-      'ExpandRepositoryAnalysisScope1793585769819', 'CreateMcpTables1793588083309', 'CreatePdfMaterialTables1793977402870']);
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 34);
+      'ExpandRepositoryAnalysisScope1793585769819', 'CreateMcpTables1793588083309', 'CreatePdfMaterialTables1793977402870', 'CreateCommitAssignment1794054790720']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 35);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
+    await isolated.undoLastMigration(); // CR2 소속 기록 표와 catch_asset (catch_id, owner_id) 유일 조건
+    assert.equal(await regclass('commit_assignment'), null);
+    assert.equal(await regclass('uq_catch_asset_catch_id_owner_id'), null);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 34);
     await isolated.undoLastMigration(); // U8 PDF 원본·쪽별 글·발행 PDF 쪽 사본 표 셋(C-06·C-07)
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 31);
     for (const table of ['pdf_material', 'pdf_page_text', 'published_pdf_page']) assert.equal(await regclass(table), null);

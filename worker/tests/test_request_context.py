@@ -278,6 +278,58 @@ def test_missing_accepted_field_is_damage(context_api: ApiReply, key: str) -> No
     assert failed(context_api) == "CONTEXT_RESPONSE_INVALID"
 
 
+def test_assigned_commits_are_read_as_a_set(context_api: ApiReply) -> None:
+    """소속 커밋 목록(CR2 BR2.3): 빈 배열은 빈 집합, 값은 순서 없이 집합으로 받는다."""
+    with found(context_api) as context:
+        assert context.assigned_commits == frozenset()
+    shas = ["b" * 40, "a" * 40]
+    context_api.payload = {**context_api.payload, "assignedCommitShas": shas}
+    with found(context_api) as context:
+        assert context.assigned_commits == frozenset(shas)
+    # 닫은 뒤에도 소속 집합은 남는다(비밀값이 아니다). 자격정보만 놓는다.
+    assert context.assigned_commits == frozenset(shas)
+
+
+def test_three_thousand_assigned_commits_fit_the_default_limit(
+    context_api: ApiReply,
+) -> None:
+    """3,000개(요청 하나가 모으는 커밋 상한)의 소속 목록은 기본 상한 1 MiB 안에서 해석한다(CR2 NFR6.3)."""
+    shas = [f"{number:040x}" for number in range(3000)]
+    context_api.payload = {**context_api.payload, "assignedCommitShas": shas}
+    context_api.client = RequestContextClient(
+        ContextApiSettings(context_api.base_url, AccessToken(KEY), "test")
+    )
+    with found(context_api) as context:
+        assert len(context.assigned_commits) == 3000
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "a" * 40,
+        None,
+        ["A" * 40],
+        ["a" * 39],
+        ["a" * 41],
+        ["g" * 40],
+        [1],
+        ["a" * 40, "a" * 40],
+    ],
+)
+def test_wrong_assigned_commits_are_damage(context_api: ApiReply, value: Any) -> None:
+    """모양이 틀리거나(배열 아님·대문자·길이·글자) 중복이면 받지 않는다. 원문은 실패에 싣지 않는다."""
+    context_api.payload = {**context_api.payload, "assignedCommitShas": value}
+
+    assert failed(context_api) == "CONTEXT_RESPONSE_INVALID"
+
+
+def test_missing_assigned_commits_is_damage(context_api: ApiReply) -> None:
+    """옛 api(칸 없음)의 응답은 받지 않는다. 판본이 어긋난 배포의 그 분석은 실패한다(CR2 BR4.1)."""
+    del context_api.payload["assignedCommitShas"]
+
+    assert failed(context_api) == "CONTEXT_RESPONSE_INVALID"
+
+
 @pytest.mark.parametrize(
     "body",
     [

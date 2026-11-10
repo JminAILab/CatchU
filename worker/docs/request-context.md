@@ -24,7 +24,7 @@ LIVE 요청마다 `attemptId`로 내부 api에 한 번 묻는다. 응답의 접�
 
 | 객체 | 필드 |
 |---|---|
-| 최상위 | `requestId`, `attemptId`, `consentId`, `noticeRevision`, `allowedResourceTypes`, `sourceMode`, `credential`, `selection` |
+| 최상위 | `requestId`, `attemptId`, `consentId`, `noticeRevision`, `allowedResourceTypes`, `sourceMode`, `credential`, `selection`, `assignedCommitShas` |
 | `credential` | `memberId`, `repositoryId`, `scopeRevision`, `repository`, `linkedAccount`, `accessToken`, `expiresAt` |
 | `credential.repository` | `owner`, `name` |
 | `credential.linkedAccount` | `login`, `externalAccountId` |
@@ -32,6 +32,7 @@ LIVE 요청마다 `attemptId`로 내부 api에 한 번 묻는다. 응답의 접�
 
 - 접수 기록: 요청·시도 ID, `credential`의 회원·저장소·허용 범위 판본, 최상위의 동의 ID·고지 판본·허용 자료 종류(계약의 `COMMIT`·`PULL_REQUEST`·`ISSUE`만)·`sourceMode`(`LIVE`·`MOCK`). 선정 참조의 기대값은 시도 ID다. 요청 메시지의 열 개 항목을 이 값과 대조한다. 응답의 `requestId`가 요청과 달라도 손상으로 보지 않고 대조에서 거부한다(진행 알림·결과 없음).
 - `externalAccountId`는 양의 십진 **문자열**이어야 하며 Python 정수로 바꾼다. JavaScript 안전 정수 범위 밖의 값도 반올림하지 않는다. `expiresAt`은 UTC ISO 시각(`Z` 또는 `+00:00`)이어야 한다. 저장소 좌표·계정·토큰 형식은 기존 수집 타입으로 검사한다.
+- `assignedCommitShas`(Catch 개편 CR2)는 그 회원·저장소에서 이미 Catch에 속한 커밋 SHA다. 소문자 16진수 40자의 중복 없는 배열이어야 하고 빈 배열은 정상이다. 칸이 없거나(옛 api) 모양이 틀리면 `CONTEXT_RESPONSE_INVALID`다. `ContextFound.assigned_commits`(frozenset)로 실어 후보 판정과 생성 재료 찾기에 같은 값으로 넘긴다([소속 커밋 빼기](commit-assignment.md)).
 - 수집 종료까지의 만료 여유는 기존 `check_credential`이, 선택 저장소가 요청과 같고 `wholeRepository`가 true인지는 `check_selection`이 본다. 어긋나면 GitHub 호출 없이 수집 실패 결과다. 선택 범위를 넓혀 보정하지 않는다.
 
 404 본문은 `{code, message}` 또는 `{code, message, details}`이고 `code`가 `RESOURCE_UNAVAILABLE`이어야 한다. 이유는 `details.violations`가 한 칸이고 그 칸이 `{field: "attemptId", reason}`일 때만 읽으며, 허용 목록 밖의 값이나 다른 모양은 `REQUEST_CONTEXT_UNRESOLVED`다. api의 조회 경로가 아직 등록되지 않았을 때도 같은 404라 이 이유가 된다.
@@ -71,7 +72,7 @@ LIVE 요청마다 `attemptId`로 내부 api에 한 번 묻는다. 응답의 접�
 
 노드·망을 엿볼 수 있는 쪽에는 토큰이 보인다. 노드를 다른 서비스와 같이 쓰게 되거나 구간이 VPC 밖으로 나가거나 외부 점검이 내부 암호화를 요구하면 다시 본다.
 
-클라이언트 기본 상한은 연결 5초, 응답 전체 5초, 응답 본문 64 KiB다. 조금씩 계속 오는 응답도 응답 마감으로 끊고, Content-Length 유무와 관계없이 크기 상한을 적용한다. HTTPS 인증서·호스트 검사를 끄지 않는다. 연결마다 소켓을 닫는다. 이 값은 GitHub 수집 상한과 별개다. api 안의 GitHub 확인 시간이 이 안에 드는지는 실제 연결 확인에서 잰다.
+클라이언트 기본 상한은 연결 5초, 응답 전체 5초, 응답 본문 1 MiB다(소속 커밋 목록이 분석마다 쌓여 CR2에서 64 KiB에서 올렸다. SHA 약 24,000개까지이고, 넘으면 `CONTEXT_RESPONSE_TOO_LARGE`로 그 시도가 끝난다). 조금씩 계속 오는 응답도 응답 마감으로 끊고, Content-Length 유무와 관계없이 크기 상한을 적용한다. HTTPS 인증서·호스트 검사를 끄지 않는다. 연결마다 소켓을 닫는다. 이 값은 GitHub 수집 상한과 별개다. api 안의 GitHub 확인 시간이 이 안에 드는지는 실제 연결 확인에서 잰다.
 
 ## 요청 수명
 

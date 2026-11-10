@@ -207,7 +207,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: '0.12.18' # worker README 「도구와 버전」의 기준. 저장소 설정에는 uv 판본 고정이 없다.
           checksum: '89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16' # uv 0.12.18 x86_64-unknown-linux-gnu. version을 바꾸면 변경 불가 릴리스 자산의 sha256으로 함께 바꾼다.
@@ -244,7 +244,7 @@ jobs:
         with:
           node-version-file: web/.node-version
       - if: contains(needs.changes.outputs.deps, 'worker')
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: '0.12.18' # worker job과 같은 판본
           checksum: '89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16' # worker job과 같은 값

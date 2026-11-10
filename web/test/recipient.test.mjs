@@ -41,7 +41,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRecipientApi, readPublishedSnapshot } from "../src/features/recipient/recipient-api.ts";
 import { createGrantStore, GRANT_KEY_PREFIX, GRANT_MAX_LENGTH } from "../src/features/recipient/recipient-grants.ts";
-import { createRecipientPublicationStore } from "../src/features/recipient/recipient-store.ts";
+import { claudeConnectable, createRecipientPublicationStore } from "../src/features/recipient/recipient-store.ts";
 import { fieldText, resolveEvidenceTarget } from "../src/features/recipient/recipient-slots.ts";
 import {
   isGithubSourceUrl, LINK_UNAVAILABLE_TEXT, PASSWORD_REQUIRED_TITLE, PUBLISHED_AT_LABEL, publishedAtText, unlockMessage,
@@ -54,6 +54,7 @@ process.env.NEXT_PUBLIC_API_BASE_URL ??= "http://127.0.0.1:3001";
 
 const { RecipientPublicationView } = await load("features/recipient/recipient-view.tsx");
 const { RECIPIENT_GUIDE_ITEMS } = await load("components/recipient-guide/recipient-guide-items.ts");
+const { INITIAL_EVIDENCE_TOGGLE, evidenceDetailsOpen, isInEvidenceDetails } = await load("features/publications/snapshot-view.tsx");
 
 const TOKEN = "tok_A";
 const OTHER = "tok_B";
@@ -606,6 +607,151 @@ test("붙는 컴포넌트의 onAccessLost(C-11 rule): 401이면 비밀번호 입
   assert.equal(grants.get(TOKEN), null);
 });
 
+// ── Claude 안내 표시 값(C-11 claude-connect-rule, #495) ─────────────
+// 기대: 발행본 조회 200의 요청에 grant를 싣지 않았을 때만 readWithoutGrant·claudeConnectable이 true. 값은 요청을 보낼 때 쓴 grant로 정하고
+//       응답 뒤 저장소 값이 바뀌거나 읽기가 실패해도 바뀌지 않는다. 다시 조회 중·실패 동안은 마지막 성공 요청의 값을 유지한다.
+//       불러오는 중·비밀번호 입력·접근 불가·최초 조회 실패·onAccessLost 뒤에는 false. 늦은 응답은 현재 값을 덮지 않는다.
+// 실패 조건: 비밀번호 링크(grant를 실어 연 화면)에서 true, 렌더링·응답 시점의 저장소 값으로 바뀜, 재조회 실패에서 값이 바뀜.
+
+/** 요청이 나간 뒤 값을 바꾸거나 접근 실패를 켜고 끌 수 있는 Storage 대역. */
+function controllableStorage() {
+  const map = new Map();
+  const state = { broken: false };
+  return {
+    map, state,
+    getItem(key) { if (state.broken) throw new Error("blocked"); return map.has(key) ? map.get(key) : null; },
+    setItem(key, value) { if (state.broken) throw new Error("blocked"); map.set(key, String(value)); },
+    removeItem(key) { if (state.broken) throw new Error("blocked"); map.delete(key); },
+  };
+}
+
+test("Claude 안내 값: grant 없이 연 화면만 true이고, grant를 실어 연 화면(저장된 grant·비밀번호 확인 직후)은 false다", async () => {
+  const { queue, calls, grants, publicationStore } = setup();
+  queue.push(ok(publication()));
+  const open = publicationStore();
+  await open.load();
+  assert.equal(calls[0].request.linkGrant, undefined);
+  assert.equal(open.getSnapshot().readWithoutGrant, true);
+  assert.equal(claudeConnectable(open.getSnapshot()), true);
+
+  grants.set(TOKEN, "g-A");
+  queue.push(ok(publication()));
+  const saved = publicationStore();
+  await saved.load();
+  assert.equal(calls[1].request.linkGrant, "g-A");
+  assert.equal(claudeConnectable(saved.getSnapshot()), false, "저장된 grant를 실어 연 화면");
+
+  queue.push(passwordRequired, ok({ grant: "g-B" }), ok(publication()));
+  const unlocked = publicationStore(OTHER);
+  await unlocked.load();
+  assert.equal(claudeConnectable(unlocked.getSnapshot()), false, "비밀번호 입력 화면");
+  await unlocked.unlock(PASSWORD);
+  assert.equal(unlocked.getSnapshot().view, "ready");
+  assert.equal(claudeConnectable(unlocked.getSnapshot()), false, "비밀번호를 통과한 화면");
+});
+
+test("Claude 안내 값: 요청 뒤 저장소 값이 바뀌거나 읽기가 실패해도 요청에 실은 grant로 정한 값을 유지한다", async () => {
+  const storage = controllableStorage();
+  const { queue, calls, publicationStore } = setup({ storage });
+  storage.map.set(`${GRANT_KEY_PREFIX}${TOKEN}`, "g-stored");
+  const sent = deferred();
+  queue.push(() => sent.promise);
+  const withGrant = publicationStore();
+  const loading = withGrant.load();
+  assert.equal(calls[0].request.linkGrant, "g-stored");
+  storage.state.broken = true;
+  sent.resolve(ok(publication()));
+  await loading;
+  assert.equal(claudeConnectable(withGrant.getSnapshot()), false, "응답 뒤 저장소 읽기가 실패해도 grant를 실은 요청이므로 false");
+  storage.map.clear();
+  storage.state.broken = false;
+  assert.equal(claudeConnectable(withGrant.getSnapshot()), false, "저장소가 비워져도 다시 읽지 않는다");
+
+  const other = deferred();
+  queue.push(() => other.promise);
+  const withoutGrant = publicationStore(OTHER);
+  const loadingOther = withoutGrant.load();
+  assert.equal(calls[1].request.linkGrant, undefined);
+  storage.map.set(`${GRANT_KEY_PREFIX}${OTHER}`, "g-later");
+  other.resolve(ok(publication()));
+  await loadingOther;
+  assert.equal(claudeConnectable(withoutGrant.getSnapshot()), true, "요청 뒤 저장소에 grant가 생겨도 grant 없이 보낸 요청이므로 true");
+});
+
+test("Claude 안내 값: 다시 조회 중·실패 동안 마지막 성공 요청의 값을 유지하고, 다음 성공 요청의 값으로 바뀐다", async () => {
+  const { queue, grants, publicationStore } = setup();
+  queue.push(ok(publication()));
+  const store = publicationStore();
+  await store.load();
+  assert.equal(claudeConnectable(store.getSnapshot()), true);
+  const pending = deferred();
+  queue.push(() => pending.promise);
+  grants.set(TOKEN, "g-A");
+  const refreshing = store.load();
+  assert.equal(store.getSnapshot().refreshing, true);
+  assert.equal(claudeConnectable(store.getSnapshot()), true, "다시 조회 중에는 이전 값");
+  pending.resolve(lookupFailed);
+  await refreshing;
+  assert.equal(store.getSnapshot().refreshFailed, true);
+  assert.equal(claudeConnectable(store.getSnapshot()), true, "다시 조회 실패는 마지막 성공 요청(grant 없음)의 값");
+
+  queue.push(ok(publication()));
+  await store.load();
+  assert.equal(claudeConnectable(store.getSnapshot()), false, "grant를 실은 다음 성공 요청의 값");
+  queue.push(serverError);
+  await store.load();
+  assert.equal(store.getSnapshot().refreshFailed, true);
+  assert.equal(claudeConnectable(store.getSnapshot()), false, "실패해도 false를 유지");
+});
+
+test("Claude 안내 값: 불러오는 중·비밀번호 입력·접근 불가·최초 조회 실패·onAccessLost 뒤에는 false이고, 늦은 응답·다른 링크가 값을 덮지 않는다", async () => {
+  const { queue, grants, publicationStore } = setup();
+  const first = deferred();
+  queue.push(() => first.promise);
+  const loading = publicationStore();
+  const pending = loading.load();
+  assert.equal(claudeConnectable(loading.getSnapshot()), false, "불러오는 중");
+  first.resolve(serverError);
+  await pending;
+  assert.equal(loading.getSnapshot().view, "failed");
+  assert.equal(claudeConnectable(loading.getSnapshot()), false, "최초 조회 실패");
+
+  for (const [denial, view] of [[unavailable, "unavailable"], [passwordRequired, "password"]]) {
+    queue.push(denial);
+    const denied = publicationStore();
+    await denied.load();
+    assert.equal(denied.getSnapshot().view, view);
+    assert.equal(claudeConnectable(denied.getSnapshot()), false, view);
+  }
+
+  queue.push(ok(publication()));
+  const lost = publicationStore();
+  await lost.load();
+  assert.equal(claudeConnectable(lost.getSnapshot()), true);
+  lost.accessLost("LINK_UNAVAILABLE");
+  assert.equal(claudeConnectable(lost.getSnapshot()), false, "onAccessLost 뒤");
+
+  // 늦은 응답: grant 없이 보낸 이전 조회가 grant를 실은 다음 조회보다 늦게 도착해도 현재 값(false)을 덮지 않는다.
+  const old = deferred();
+  queue.push(() => old.promise);
+  const raced = publicationStore();
+  const stale = raced.load();
+  grants.set(TOKEN, "g-A");
+  queue.push(ok(publication()));
+  await raced.load();
+  old.resolve(ok(publication()));
+  await stale;
+  assert.equal(claudeConnectable(raced.getSnapshot()), false, "늦은 grant 없는 응답이 덮지 않는다");
+
+  // 다른 링크: OTHER의 grant는 TOKEN 화면의 값에 쓰이지 않는다.
+  grants.remove(TOKEN);
+  grants.set(OTHER, "g-B");
+  queue.push(ok(publication()));
+  const mine = publicationStore(TOKEN);
+  await mine.load();
+  assert.equal(claudeConnectable(mine.getSnapshot()), true, "다른 링크의 grant와 무관");
+});
+
 // ── 근거 위치(C-11 evidence-highlight) ───────────────────────────
 
 test("showEvidence 위치 대조: 항목이 없으면 옮기지 않고, fieldPath 문자열 안의 범위만 강조하며, 사본에 없는 위치면 강조 없이 항목만 보인다", () => {
@@ -663,7 +809,8 @@ function render(snapshot, extra = {}) {
   }));
 }
 const count = (html, needle) => html.split(needle).length - 1;
-const ready = (items = [catchItem("c1", 2), textItem("m1", 1)], extra = {}) => ({ view: "ready", snapshot: readPublishedSnapshot(publication(items)), refreshing: false, refreshFailed: false, ...extra });
+// readWithoutGrant: true(grant 없이 연 화면)로 두어도 U9를 켜기 전에는 RecipientGuide에 showClaudeConnect=false가 가는지 G2에서 함께 본다.
+const ready = (items = [catchItem("c1", 2), textItem("m1", 1)], extra = {}) => ({ view: "ready", snapshot: readPublishedSnapshot(publication(items)), refreshing: false, refreshFailed: false, readWithoutGrant: true, ...extra });
 
 test("G1·G2·G3: 판정 통과 화면에만 RecipientGuide가 정확히 1개(showClaudeConnect=false), 비밀번호·불가·실패 화면에는 0개. 모든 상태의 h1은 U4 것 하나이고 tabIndex=-1", () => {
   const passed = render(ready());
@@ -738,11 +885,12 @@ test("1번 자리 사본: position 순서로 그리고, Catch는 기록·작성�
   assert.equal(count(html, 'data-testid="snapshot-catch-mismatch"'), 1, "불일치 표지는 c1에만");
   assert.equal(count(html, 'data-testid="snapshot-catch-facts"'), 2);
   assert.equal(count(html, 'data-testid="snapshot-catch-description"'), 2);
-  assert.equal(count(html, 'data-testid="snapshot-catch-ai-draft"'), 2);
+  // c2는 AI 초안이 없어 칸을 그리지 않는다(Catch 개편 CR3 BR7.1, 2026-11-08 팀장 결정).
+  assert.equal(count(html, 'data-testid="snapshot-catch-ai-draft"'), 1);
   // AI 초안은 자기 표지 안에만 있고 작성자 설명 표지 안에는 없다
   const c1 = html.slice(html.indexOf('id="published-item-c1"'), html.indexOf('id="published-item-c2"'));
-  const description = c1.slice(c1.indexOf('data-testid="snapshot-catch-description"'), c1.indexOf('data-testid="snapshot-catch-ai-draft"'));
-  const aiDraft = c1.slice(c1.indexOf('data-testid="snapshot-catch-ai-draft"'));
+  const aiDraft = c1.slice(c1.indexOf('data-testid="snapshot-catch-ai-draft"'), c1.indexOf('data-testid="snapshot-catch-description"'));
+  const description = c1.slice(c1.indexOf('data-testid="snapshot-catch-description"'), c1.indexOf('data-testid="snapshot-catch-facts"'));
   assert.ok(description.includes("작성자 설명") && !description.includes("AI 초안 글"));
   assert.ok(aiDraft.includes("AI 초안 글") && !aiDraft.includes("<a "), "AI 초안에는 링크를 만들지 않는다(OQ-U4-NFR-3)");
   assert.ok(description.includes('href="https://github.com/o/r/pull/1" target="_blank" rel="noopener noreferrer"'), "작성자 설명 안 GitHub 주소만 링크");
@@ -755,9 +903,9 @@ test("1번 자리 사본: position 순서로 그리고, Catch는 기록·작성�
   assert.ok(m1.includes("&lt;b&gt;본문&lt;/b&gt;") && !m1.includes("<b>본문</b>"), "본문은 텍스트로만(NFR1.10)");
   assert.ok(m1.includes('href="https://github.com/o/r/blob/main/a.md"') && !m1.includes('href="https://evil.example/x"'));
   assert.ok(!html.includes("설명 초안을 생성하지 못했습니다") && !html.includes("자동으로 만들었습니다"), "10월 Catch 문구 없음");
-  // c2: 작성자 설명·AI 초안 없음 표시
+  // c2: 작성자 설명은 없음 표시, AI 초안은 칸을 그리지 않음(Catch 개편 CR3 BR7.1, 2026-11-08 팀장 결정)
   const c2 = html.slice(html.indexOf('id="published-item-c2"'));
-  assert.ok(c2.includes("작성자 설명이 없습니다.") && c2.includes("AI 설명 초안이 없습니다."));
+  assert.ok(c2.includes("작성자 설명이 없습니다.") && !c2.includes("AI 설명 초안"));
 });
 
 test("근거 강조: highlight가 가리킨 항목만 data-highlighted이고 그 fieldPath의 [charStart, charEnd)만 <mark>다. 범위가 없으면 항목만 표시한다", () => {
@@ -775,4 +923,59 @@ test("근거 강조: highlight가 가리킨 항목만 data-highlighted이고 그
   const itemOnly = render(ready(items), { highlight: null });
   assert.equal(count(itemOnly, "<mark"), 0);
   assert.equal(count(itemOnly, 'data-highlighted="true"'), 0);
+});
+
+// #488: 면접관이 한 일(AI 설명 초안)과 이유(작성자 설명)를 먼저 보고, 근거 세부(본인 기여·근거 목록)는 필요할 때 펼친다.
+//   - 기대: Catch 항목 안은 불일치 표지 → AI 설명 초안 → 작성자 설명 → 기록에서 확인한 내용 순서. 작업 사실은 펼친 채로, 본인 기여·근거 목록은
+//           「근거 자세히 보기」(<details>) 안에 처음엔 접혀 있다. 강조가 그 안(subjectContribution·evidence[i]…)을 가리키면 펼친 채로 그려 <mark>가 보인다.
+//           작업 사실·작성자 설명을 가리키면 펼치지 않는다. 근거 목록 안 순서는 사본 그대로다.
+//   - 실패 조건: 기록이 AI 초안·작성자 설명보다 위, 작업 사실이 접힘, 처음부터 근거 목록이 펼쳐짐, 강조가 접힌 칸 안에 숨음.
+test("#488 Catch 칸 순서와 근거 접기: 불일치 → AI 초안 → 작성자 설명 → 기록. 작업 사실은 펼치고 본인 기여·근거 목록은 「근거 자세히 보기」에 접는다", () => {
+  const evidence = [
+    { sourceUrl: "https://github.com/o/r/pull/7", sourceRevision: "rev-pr", representedFacts: ["PR 사실"] },
+    { sourceUrl: "https://github.com/o/r/commit/2", sourceRevision: "rev-2", representedFacts: ["커밋 사실"] },
+  ];
+  const items = [catchItem("c1", 1, { mismatch: true, evidence })];
+  const html = render(ready(items));
+  const order = ['data-testid="snapshot-catch-mismatch"', 'data-testid="snapshot-catch-ai-draft"', 'data-testid="snapshot-catch-description"',
+    'data-testid="snapshot-catch-facts"', "사실 c1", 'data-testid="snapshot-catch-evidence-details"', "<summary>근거 자세히 보기</summary>", "본인 커밋",
+    'data-testid="snapshot-catch-evidence"'];
+  const positions = order.map((needle) => html.indexOf(needle));
+  assert.ok(positions.every((position) => position >= 0), String(positions));
+  assert.deepEqual([...positions].sort((a, b) => a - b), positions, "위에서부터 정한 순서");
+  // 작업 사실은 <details> 밖(펼침), 본인 기여·근거 목록은 <details> 안이고 처음엔 접혀 있다(open 속성 없음).
+  const details = html.slice(html.indexOf("<details"), html.indexOf("</details>"));
+  assert.match(details, /^<details[^>]*>/);
+  assert.doesNotMatch(details.match(/^<details[^>]*>/)[0], /\sopen/);
+  assert.ok(!details.includes("사실 c1") && details.includes("본인 커밋") && details.includes("rev-pr"));
+  // 근거 목록 안 순서는 사본 그대로(2026-10-08 팀장 결정)
+  assert.ok(details.indexOf("rev-pr") < details.indexOf("rev-2"));
+
+  // 강조가 접힌 칸 안을 가리키면 펼친 채로 그리고 <mark>가 그 안에 있다.
+  for (const fieldPath of ["subjectContribution", "evidence[1].representedFacts[0]"]) {
+    const marked = render(ready(items), { highlight: { publishedItemId: "c1", fieldPath, charStart: 0, charEnd: 2 } });
+    const openDetails = marked.slice(marked.indexOf("<details"), marked.indexOf("</details>"));
+    assert.match(openDetails.match(/^<details[^>]*>/)[0], /\sopen=""/, fieldPath);
+    assert.equal(count(openDetails, 'data-testid="snapshot-highlight"'), 1, fieldPath);
+  }
+  // 작업 사실·작성자 설명을 가리키면 펼치지 않는다.
+  for (const fieldPath of ["workFacts[0]", "authorDescription"]) {
+    const marked = render(ready(items), { highlight: { publishedItemId: "c1", fieldPath, charStart: 0, charEnd: 2 } });
+    assert.doesNotMatch(marked.match(/<details[^>]*>/)[0], /\sopen/, fieldPath);
+  }
+});
+
+test("#488 근거 접기 상태: 처음엔 접힘, 사람이 접고 편 상태를 따르되 그 뒤 새 강조가 안을 가리키면 펼친다(같은 근거를 다시 눌러도)", () => {
+  const at = (fieldPath) => ({ publishedItemId: "c1", fieldPath, charStart: 0, charEnd: 1 });
+  assert.equal(evidenceDetailsOpen(INITIAL_EVIDENCE_TOGGLE, null), false);
+  assert.equal(evidenceDetailsOpen({ open: true, at: null }, null), true, "사람이 펼침");
+  assert.equal(evidenceDetailsOpen(INITIAL_EVIDENCE_TOGGLE, at("workFacts[0]")), false, "작업 사실은 펼친 칸이라 열 필요 없음");
+  const first = at("subjectContribution");
+  assert.equal(evidenceDetailsOpen(INITIAL_EVIDENCE_TOGGLE, first), true, "안을 가리키면 펼침");
+  assert.equal(evidenceDetailsOpen({ open: false, at: first }, first), false, "그 강조 뒤에 사람이 접으면 접힌 채");
+  const again = at("subjectContribution");
+  assert.equal(evidenceDetailsOpen({ open: false, at: first }, again), true, "같은 근거를 다시 누르면(새 강조) 다시 펼침");
+  assert.equal(evidenceDetailsOpen({ open: false, at: first }, at("evidence[0].representedFacts[0]")), true);
+  for (const fieldPath of ["subjectContribution", "evidence[0].representedFacts[0]"]) assert.equal(isInEvidenceDetails(at(fieldPath)), true, fieldPath);
+  for (const fieldPath of ["workFacts[0]", "authorDescription", "aiDraft", "body"]) assert.equal(isInEvidenceDetails(at(fieldPath)), false, fieldPath);
 });

@@ -121,6 +121,8 @@ def _candidate(item: Mapping[str, Any]) -> EligibleCandidate:
         ),
         draft=_draft(item["draft"]),
         reflection=_reflection(item["reflection"]),
+        # 합성 수집 결과의 본인 커밋 SHA. 실제 방식과 같은 규칙으로 싣는다(CR2 BR2.1).
+        own_commit_shas=tuple(item["ownCommitShas"]),
     )
 
 

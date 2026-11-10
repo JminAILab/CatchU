@@ -23,8 +23,13 @@ class GenerationFailureCode(StrEnum):
     # 부분 실패: 그 부분(설명 또는 질문)만 FAILED.
     RULE_VIOLATION = "GENERATION_RULE_VIOLATION"
     UNVERIFIED = "GENERATION_UNVERIFIED"
-    # 요청 단위: 호출 수·시간 한도로 새 생성 호출을 시작하지 못한 후보가 있다(ANALYSIS 1건).
+    # 요청 단위: 호출 수·시간 한도로 새 생성 호출을 시작하지 못한 후보가 있다(ANALYSIS 1건). AI 쪽이 켜졌을
+    # 때 생성 뒤 판정 호출을 시작하지 못한 후보도 같은 1건에 든다(CR3 BR2.6).
     BUDGET_EXHAUSTED = "GENERATION_BUDGET_EXHAUSTED"
+    # Catch 판정 호출 실패(CR3 BR5.4): 설명만 FAILED(DRAFT 1건). 질문은 판정과 관계없어 그대로다.
+    JUDGEMENT_CALL_FAILED = "JUDGEMENT_CALL_FAILED"
+    JUDGEMENT_TIMEOUT = "JUDGEMENT_TIMEOUT"
+    JUDGEMENT_RESPONSE_UNREADABLE = "JUDGEMENT_RESPONSE_UNREADABLE"
 
 
 _CAUSE = {
@@ -34,6 +39,10 @@ _CAUSE = {
     GenerationFailureCode.RESPONSE_TOO_LARGE: "생성 결과가 허용 크기를 넘어",
     GenerationFailureCode.RULE_VIOLATION: "생성 결과가 정해진 형식을 지키지 않아",
     GenerationFailureCode.UNVERIFIED: "생성 결과를 변경 내용과 대조해 확인하지 못해",
+    # 판정은 회원에게 낯선 말이라 「설명 확인」으로 쓴다(지금 생성 실패 문구 꼴).
+    GenerationFailureCode.JUDGEMENT_CALL_FAILED: "설명 확인 중 오류가 나",
+    GenerationFailureCode.JUDGEMENT_TIMEOUT: "설명 확인 시간이 초과되어",
+    GenerationFailureCode.JUDGEMENT_RESPONSE_UNREADABLE: "설명 확인 결과를 읽을 수 없어",
 }
 _PART = {
     "DRAFT": "설명 초안을 만들지 못했다",

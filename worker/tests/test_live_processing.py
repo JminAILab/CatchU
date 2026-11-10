@@ -27,6 +27,7 @@ from live_synthetic import (
     no_github_assembly,
 )
 
+from app.candidates import build_candidates
 from app.collection.credentials import CredentialLookupError
 from app.collection.transport import HttpsTransport
 from app.consumer import child
@@ -173,6 +174,56 @@ def test_no_candidate_keeps_provider_unmade_and_relations_are_collected(
     assert result["candidates"] == [] and result["failures"] == []
     assert parts.providers_made == 0
     assert [event["state"] for event in ran.events] == ["RECEIVED", "RUNNING"]
+
+
+# CR2. 소속 커밋 집합 전달 -----------------------------------------------------------------------
+
+
+def test_assigned_commits_reach_judgement_and_material_lookup_as_one_value(
+    context_api: ApiReply, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """맥락 조회의 소속 집합을 후보 판정과 생성 재료 찾기에 같은 값으로 넘긴다(BR1.6)."""
+    unrelated = "e" * 40
+    context_api.payload = live_payload(assigned=(unrelated,))
+    seen: dict[str, frozenset[str]] = {}
+    build, generate = build_candidates, run_generation
+
+    def judged(*args: Any, **kwargs: Any) -> Any:
+        seen["build"] = args[2]
+        return build(*args, **kwargs)
+
+    def generated(*args: Any, **kwargs: Any) -> Any:
+        seen["generation"] = kwargs["assigned"]
+        return generate(*args, **kwargs)
+
+    monkeypatch.setattr(live_module, "build_candidates", judged)
+    monkeypatch.setattr(live_module, "run_generation", generated)
+    parts = Parts(ONE_PULL)
+
+    result = result_of(run_live(live_message(), parts.assembly(context_api.base_url)))
+
+    assert seen == {
+        "build": frozenset({unrelated}),
+        "generation": frozenset({unrelated}),
+    }
+    assert result["schemaVersion"] == "3"
+    (candidate,) = result["candidates"]
+    assert candidate["ownCommitShas"] == [ONE_PULL.pulls[0].commits[0].sha]
+
+
+def test_reanalysis_with_everything_assigned_is_empty_without_provider(
+    context_api: ApiReply,
+) -> None:
+    """바뀐 것이 없는 재분석(W6): 후보·미제공·실패 0, 결과 EMPTY, 생성 제공자를 만들지 않는다."""
+    context_api.payload = live_payload(assigned=(ONE_PULL.pulls[0].commits[0].sha,))
+    parts = Parts(ONE_PULL)
+
+    result = result_of(run_live(live_message(), parts.assembly(context_api.base_url)))
+
+    assert result["outcome"] == "EMPTY"
+    assert result["candidates"] == [] and result["notProvided"] == []
+    assert result["failures"] == []
+    assert parts.providers_made == 0
 
 
 # 2·3·5. 조회 모름·실패 ----------------------------------------------------------------------------
