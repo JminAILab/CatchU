@@ -1,18 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { ReauthNotice } from "@/components/auth/reauth-notice";
-import { useAuth } from "@/components/auth/use-auth";
+import { ModalReauthNotice } from "@/components/auth/modal-reauth-notice";
 import { createAnalysisRequestApi, type AnalysisRequestApi } from "@/features/analysis-request/analysis-request-api";
 import { AnalysisRequestSection, RetryRequest } from "@/features/analysis-request/analysis-request-section";
 import { createAnalysisRequestStore } from "@/features/analysis-request/analysis-request-store";
 import type { RepositoryManagementBindings } from "@/features/assets/assets-connected";
 import { api as client } from "@/lib/api";
-import { decideAuthGate } from "@/lib/auth-gate";
-import { authSessionIntegrationEnabled } from "@/lib/auth-integration";
-import { safeNextPath } from "@/lib/member-navigation";
 import { routes } from "@/lib/routes";
 import { unsavedChanges } from "@/lib/unsaved-changes";
 import { loadConnectedRepositories, type GitHubState, type RepositoryApi } from "./repository-api";
@@ -294,7 +289,7 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
               <h2 id={`${titleId}-dialog`}>GitHub 저장소 연결 관리</h2>
               <button type="button" className={styles.closeIcon} aria-label="닫기" onClick={closeModal}>×</button>
             </header>
-            {authSessionIntegrationEnabled && <ModalReauthNotice />}
+            <ModalReauthNotice />
 
             <section className={styles.block} aria-labelledby={`${titleId}-connected`}>
               <div className={styles.blockHeading}>
@@ -325,20 +320,6 @@ export function RepositoryManagement({ api, bindings, requestApi, connectSection
       </dialog>
     </section>
   );
-}
-
-/**
- * 모달 안 재인증 안내(O-4). 모달(`showModal()`)이 열리면 바깥 내용은 조작할 수 없어, 가드가 그린 바깥 [다시 로그인]에 닿지 못한다.
- * CatchU 회원 세션의 재인증 필요(#286 `decideAuthGate`)일 때만 #287 `ReauthNotice`를 그대로 그린다(GitHub 재연동과 다른 판정).
- * 확인은 같은 `confirmReauthLeave`, 이동은 같은 `loginPath`를 지나며 로그아웃·갱신 요청을 보내지 않는다.
- * 공통 인증 상태는 통합 시험 전환이 켜졌을 때만 쓰므로 전환을 끄면 그리지 않는다. 다른 탭 새 로그인(`relogin-only`)은 가드가 화면을 정리한다.
- */
-function ModalReauthNotice() {
-  const auth = useAuth();
-  const pathname = usePathname();
-  const gate = decideAuthGate(auth, null);
-  if (gate.action !== "show" || !gate.reauth) return null;
-  return <ReauthNotice returnTo={safeNextPath(pathname)} />;
 }
 
 function AreaMessage({ github }: { github: Load<GitHubState> }) {

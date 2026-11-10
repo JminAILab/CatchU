@@ -111,3 +111,27 @@ test("고른 공개 상태에 맞는 Catch가 없으면 조건 안내를 보이�
   assert.ok(emptyRepository.includes("<h3>이 저장소에서 표시할 Catch가 없습니다</h3>"));
   assert.doesNotMatch(emptyRepository, /미공개 Catch가 없습니다/);
 });
+
+test("Catch 상세 머리말 안에 detailNotice(모달 안 재인증 안내 자리)를 닫기 다음 줄로 그리고, 없으면 자리도 만들지 않는다 (#467)", () => {
+  const item = previewCatches[0];
+  const render = (detailNotice) => renderToStaticMarkup(createElement(AssetsView, {
+    dataMode: "api", items: [item], detailItem: item, selectedId: item.catchId,
+    repositories: [], repositoryId: "", listState: "ready", detailState: "ready",
+    repositoryManagement: null, detailNotice,
+  })).match(/<dialog\b[\s\S]*?<\/dialog>/)?.[0] ?? assert.fail("Catch 상세가 렌더링되어야 한다");
+  const heading = (html) => html.match(/<div[^>]*data-reauth-sticky-container=""[^>]*>[\s\S]*?<h2 id="catch-detail-title">/)?.[0] ?? assert.fail("머리말에 표시가 있어야 한다");
+
+  const withNotice = render(createElement("aside", { "data-test": "modal-reauth" }, "다시 로그인해 주세요."));
+  heading(withNotice);
+  const closeAt = withNotice.indexOf(">닫기</button>");
+  const noticeAt = withNotice.indexOf('data-test="modal-reauth"');
+  const contentAt = withNotice.indexOf("작성자 설명") === -1 ? withNotice.indexOf("</dialog>") : withNotice.indexOf("작성자 설명");
+  assert.ok(closeAt > 0 && noticeAt > closeAt, "안내는 닫기 다음에 온다");
+  assert.ok(noticeAt < contentAt, "안내는 상세 본문보다 앞(머리말 안)에 온다");
+  assert.equal((withNotice.match(/data-test="modal-reauth"/g) ?? []).length, 1);
+
+  const without = render(undefined);
+  heading(without);
+  assert.doesNotMatch(without, /modal-reauth/);
+  assert.match(without, />닫기<\/button><\/div>/, "안내가 없으면 닫기 뒤에 빈 자리를 두지 않는다");
+});

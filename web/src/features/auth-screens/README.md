@@ -32,6 +32,7 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 | `src/components/auth/google-login-button.tsx` | Google 버튼 |
 | `src/components/auth/google-callback-screen.tsx` | 콜백 화면 |
 | `src/components/auth/reauth-notice.tsx` | 재인증 안내(가드의 `renderReauthNotice` 자리) |
+| `src/components/auth/modal-reauth-notice.tsx` | 모달 안 재인증 안내(`ModalReauthNotice`). 전환이 켜져 있고 공통 인증이 재인증 필요일 때만 `ReauthNotice`를 그린다. 분석 요청 모달과 Catch 상세가 같이 쓴다 |
 | `src/components/auth/member-logout.tsx` | 셸의 `useMemberLogout`·`LogoutStatus` |
 | `src/components/auth/use-unsaved-changes.ts` | 화면이 미저장 입력을 알리는 hook |
 | `src/components/header/` | `logoutPending`을 주면 [로그아웃]을 막고 "로그아웃하는 중"을 보인다. 주지 않으면 기존과 같다. [로그아웃]을 누르면 프로필 메뉴를 닫고 초점을 [프로필]로 돌린다 |
@@ -121,7 +122,7 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 | `/google/callback`(`src/app/(guest)/google/callback/page.tsx`) | `session-google-callback.tsx`가 `GoogleCallbackScreen`에 `readGoogleCallback`·`completeGoogleLogin`·`lookupMemberWithAuth(api.member)`를 넘긴다. 전환을 끄면 `notFound()`(404) |
 | 회원 셸(`session-member-shell.tsx`) | `useMemberLogout`(`useAuth()`·`session.logout()`)과 헤더 `logoutPending`, 헤더 아래 `LogoutStatus`, 가드의 `renderReauthNotice`에 `ReauthNotice` |
 | 이동 전 확인 | 로그아웃·재인증 [다시 로그인]은 누른 시점에 #286 등록 수단(`unsavedChanges`)의 `activeReasons()`를 읽는다. 미저장 입력은 `useUnsavedChanges(dirty)`(사유 생략 = `unsaved-input`)로 등록되며, 최초 입력·프로필 수정은 #286에서 기존 `dirty`를 함께 등록했다. 미확정 분석 요청은 내 자산(`/assets`)의 저장소 연결 관리가 결과를 확인하지 못한 요청을 `unconfirmed-analysis-request`로 등록한다([PR #417](https://github.com/JminAILab/CatchU/pull/417), [저장소 연결 관리 「표시 규칙」](../repository-management/README.md#표시-규칙)). 등록은 전환과 상관없이 하지만 꺼짐 화면은 이 사유를 읽지 않는다. 등록한 화면이 없으면 묻지 않는다 |
-| 분석 요청 모달 안 재인증 안내 | 내 자산의 분석 요청 모달이 열려 바깥 [다시 로그인]에 닿을 수 없으면 모달 머리말 아래에 `ReauthNotice`를 그린다(PR #417, 같은 「표시 규칙」). 확인·이동은 바깥 안내와 같다 |
+| 모달 안 재인증 안내 | 모달(`showModal()`)이 열리면 바깥 [다시 로그인]에 닿을 수 없으므로, 모달 안에 `ModalReauthNotice`를 그린다. 확인·이동은 바깥 안내와 같고, 모달 차단은 풀지 않는다(모달이 열린 동안 헤더 [로그아웃]에는 닿지 않는다). 그리는 곳: 내 자산의 분석 요청 모달 머리말 아래(PR #417, 같은 「표시 규칙」), Catch 상세 머리말 안 둘째 줄(#467). Catch 상세 머리말은 스크롤해도 위에 붙으므로 안내를 그 안에 두고, 초점이 가리지 않게 두는 위쪽 여백을 머리말 전체 높이로 잡는다(`data-reauth-sticky-container`). 모달이 안내를 그리는 동안 바깥 안내는 숨긴다 |
 
 - 확인 사유 등록은 #286 공통 수단(`unsavedChanges`·`useUnsavedChanges`)만 쓰고 이 화면에서 새로 만들지 않는다. 화면 안의 링크 이동·새로고침·창 닫기 확인(`useUnsavedGuard`, [PR #300](https://github.com/JminAILab/CatchU/pull/300))은 역할이 달라 그대로 둔다.
 
@@ -135,4 +136,5 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 
 - `test/auth-screens-google.test.mjs`·`test/auth-screens-session.test.mjs`: 화면 제어를 함수 대역으로 확인한다. 이동 전 확인은 사유 조합(없음·입력만·분석 요청만·둘 다)과 누를 때마다 다시 읽는지를 본다. [다시 로그인]은 계속한 뒤 다시 눌러도 묻거나 이동하지 않는지와 머무른 뒤 다시 묻는지를 제어와 `ReauthNotice` 양쪽에서 본다. `ReauthNotice`는 서버 렌더링으로 그린 버튼의 클릭 함수를 연달아 부른다. 안내 문구는 #251 기록의 합의 문구와 글자까지 같은지, 시작·콜백 화면별 선택과 확인 창의 줄 순서를 본다.
 - `test/auth-screens-connected.test.mjs`: 화면 제어에 #286 공통 함수(시도 보관·콜백 해석·완료, 세션·보호 API, 가드 판정)를 연결 코드와 같은 방식으로 붙이고, 서버와 `sessionStorage`·`localStorage`만 대역으로 바꿔 확인한다. query가 지워진 주소를 탭 복제·새로고침으로 다시 연 콜백도 여기서 본다.
+- `test/modal-reauth-notice.test.mjs`: `ModalReauthNotice`가 전환을 끄면 공통 인증 상태를 읽지 않고 그리지 않는지, 켜면 재인증 필요일 때만 지금 회원 화면 주소를 돌아올 곳으로 넘겨 그리는지 대역으로 본다. Catch 상세의 안내 자리(머리말 안·닫기 다음)는 `test/assets-view.test.mjs`가 본다.
 - 실제 브라우저 조작(확인 창·초점·화면 이동)과 `ReauthNotice` 밖의 React 렌더링은 이 시험에 들지 않는다.

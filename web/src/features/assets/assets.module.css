@@ -68,6 +68,10 @@
 .dialogHeading { position: sticky; top: 0; z-index: 1; background: var(--color-surface); display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); margin: 0 -32px 24px; padding: 22px 32px 18px; }
 .dialogHeading h2 { font-size: 18px; margin-bottom: 0; }
 .dialogHeading > button { flex-shrink: 0; }
+/* 머리말 둘째 줄의 안내(#467 모달 안 재인증 안내). 안내가 없으면 줄을 만들지 않는다. */
+.dialogHeading:has(> .headingNotice:not(:empty)) { flex-wrap: wrap; row-gap: 12px; }
+.headingNotice { flex: 1 0 100%; min-width: 0; }
+.headingNotice:empty { display: none; }
 .detailTitle { font-size: 26px; line-height: 1.5; letter-spacing: -0.5px; margin-bottom: 16px; }
 .readOnlyNotice { font-size: 13px; line-height: 1.8; padding: 16px 18px; background: #f1f5fc; color: #496185; margin: 20px 0; border: 1px solid var(--line); border-radius: 10px; }
 .listOverview > .readOnlyNotice { margin: 20px 0 0; }
