@@ -67,3 +67,4 @@
 - ALWAYS 코드 계획에서 규칙을 바꿀 때는 같은 규칙을 적은 다른 문서를 모두 찾아 계획의 함께 고칠 파일 목록에 넣는다. 한 문서만 고치면 문서끼리 어긋난다. (learned 2026-11-05) <!-- cid:261103-catch-redesign:code-generation:3d0736d971c0bef67a689474e0e24d3436f111846ebc1f946f7349d5add61ace -->
 - ALWAYS 문서에서 Catch를 받아 보는 쪽은 「면접관」으로 부르고, 「팀장」은 intent를 정하는 우리 팀장만 뜻하게 쓴다. 면접관을 「기술 팀장」으로 부르면 두 뜻이 섞인다. (learned 2026-11-09) <!-- cid:261109-new-catch:intent-capture:9344035d773b4a8fa5a3b31de73df7a612946e0898a6f34dc3841ca6d5703cf3 -->
 - ALWAYS 본인 기여를 말하는 표시는 근거의 기여 범위가 본인 커밋인 근거만 기준으로 삼는다. 병합 커밋·PR·이슈 근거의 판본이나 주소와 맞는다고 붙이지 않는다. (learned 2026-11-09) <!-- cid:261109-new-catch:requirements-analysis:71c5cc19bec041ef92062d1d8c923421dc5cc5614ac1a79937e20c47985f225b -->
+- ALWAYS 화면 초안·수락 기준·설계에 지금 화면의 표시를 적을 때는 지금 코드가 어떻게 그리는지 확인해 그대로 쓰고, 바꾸는 곳은 바꾼다고 적는다(화면에 보이는 글자인지 화면 낭독기에만 읽히는 글자인지, 링크 글자가 주소 전체인지 등). (learned 2026-11-10) <!-- cid:261109-new-catch:user-stories:66de5f7a4cafcf61e94e4ef7c7106183a0e36d1947dc088af1e5da7a1b65ff84 -->
