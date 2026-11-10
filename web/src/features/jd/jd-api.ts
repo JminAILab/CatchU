@@ -1,5 +1,6 @@
 import type { ApiClient, ClientResult } from "../../lib/api-client.ts";
 import { memberAuthRejected, memberMutationOutcome, type MemberMutationOutcome } from "../../lib/auth-api.ts";
+import { U2_ERROR_MESSAGES } from "../../lib/u2-error-messages.ts";
 import { isAccepted, isJd, isJdItem, isJdRun, isJdRunItem, isPage } from "./jd-parsers.ts";
 import type { Jd, JdDraft, JdItem, JdRecipientContext, JdRun, JdRunItem, Page } from "./jd-types.ts";
 
@@ -71,7 +72,8 @@ export function jdErrorText(failure: JdFailure): string {
     INDEX_NOT_READY: "자료 검색이 아직 준비되지 않았습니다. 준비된 뒤 다시 실행해 주세요.",
     INPUT_TOO_LARGE: "입력 상한을 넘었습니다. JD 관리에서 내용을 수정해 주세요.",
     INVALID_INPUT: "입력을 확인해 주세요. 실행은 접수되지 않았습니다.",
-    DAILY_LIMIT_REACHED: "오늘의 JD 요약 실행 한도에 도달했습니다.",
+    // 하루 횟수는 분석·기본 요약·JD 요약이 함께 쓰는 하나라 U2 공용 문구를 그대로 쓴다(FR6.6).
+    DAILY_LIMIT_REACHED: U2_ERROR_MESSAGES.DAILY_LIMIT_REACHED,
   };
   return messages[failure.code] ?? "요청 결과를 확인하지 못했습니다. 잠시 뒤 목록을 다시 확인해 주세요.";
 }

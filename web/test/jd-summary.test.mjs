@@ -10,6 +10,7 @@ import { createJdApi, jdErrorText } from "../src/features/jd/jd-api.ts";
 import { createJdSummaryModel } from "../src/features/jd/jd-summary-model.ts";
 import { isJdRun } from "../src/features/jd/jd-parsers.ts";
 import { runWithConsent } from "../src/components/ai-consent/ai-consent-flow.ts";
+import { U2_ERROR_MESSAGES } from "../src/lib/u2-error-messages.ts";
 import { load } from "./u2-render.mjs";
 
 const hooks = registerHooks({
@@ -86,6 +87,9 @@ test("2. 접수 오류를 구별하고 공용 동의 후 딱 한 번 재요청�
   for (const [code, pattern] of [["INDEX_NOT_READY", /검색/], ["INPUT_TOO_LARGE", /상한/], ["INVALID_INPUT", /접수되지/], ["DAILY_LIMIT_REACHED", /오늘/]]) {
     assert.match(jdErrorText({ kind: "failed", code, status: 422, outcome: "other" }), pattern);
   }
+  // 하루 횟수는 기능끼리 함께 쓰므로 JD 전용 표현 없이 U2 공용 문구와 같아야 한다(FR6.6).
+  assert.equal(jdErrorText({ kind: "failed", code: "DAILY_LIMIT_REACHED", status: 429, outcome: "other" }), U2_ERROR_MESSAGES.DAILY_LIMIT_REACHED);
+  assert.equal(U2_ERROR_MESSAGES.DAILY_LIMIT_REACHED, "오늘 한도에 도달했습니다");
 });
 
 test("3. 새 접수 runId를 선택하고 재열람·목록·수동 새로고침만 수행한다", async () => {
