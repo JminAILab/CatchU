@@ -130,7 +130,12 @@ case "$svc $op" in
         if [ -n "${STUB_NO_RECORD:-}" ]; then echo null; else
           echo '{"Name":"_0123456789abcdef0123456789abcdef.catchu.dev.","Type":"CNAME","Value":"_fedcba9876543210fedcba9876543210.synthetic.acm-validations.aws."}'
         fi ;;
-      *) echo '{"Certificate":{"CertificateArn":"arn:aws:acm:ap-northeast-2:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef","DomainName":"catchu.dev","Status":"ISSUED","Type":"AMAZON_ISSUED","KeyAlgorithm":"RSA-2048","NotAfter":"2027-05-15T23:59:59Z","RenewalEligibility":"INELIGIBLE","DomainValidationOptions":[{"DomainName":"catchu.dev","ValidationMethod":"DNS","ValidationStatus":"SUCCESS"}]}}' ;;
+      # 도메인 확인은 SUCCESS로 두고 인증서 상태만 STUB_CERT_STATUS(기본 ISSUED)·STUB_CERT_FAILURE로 바꾼다(CAA가 막은 경우 흉내).
+      *) jq -cn --arg s "${STUB_CERT_STATUS:-ISSUED}" --arg f "${STUB_CERT_FAILURE:-}" \
+           '{Certificate: ({CertificateArn: "arn:aws:acm:ap-northeast-2:123456789012:certificate/01234567-89ab-cdef-0123-456789abcdef",
+             DomainName: "catchu.dev", Status: $s, Type: "AMAZON_ISSUED", KeyAlgorithm: "RSA-2048", NotAfter: "2027-05-15T23:59:59Z",
+             RenewalEligibility: "INELIGIBLE", DomainValidationOptions: [{DomainName: "catchu.dev", ValidationMethod: "DNS", ValidationStatus: "SUCCESS"}]}
+             + (if $f == "" then {} else {FailureReason: $f} end))}' ;;
     esac ;;
   "eks list-pod-identity-associations") echo "${STUB_PIA_COUNT:-1}" ;;
   "logs describe-log-groups") case "$all" in *length*) echo "${STUB_LOG_GROUP_COUNT:-0}" ;; *) echo '{"logGroups":[{"logGroupName":"/catchu/eks/app","retentionInDays":14}]}' ;; esac ;;
@@ -493,6 +498,12 @@ check "인증서 대기가 7번 시간이 다 돼도 이어서 기다려 발급�
 run_sut env STUB_WAIT_FAILS=8 bash "$P/create-certificate.sh" --apply
 check "인증서: 40분(8번) 안에 발급되지 않으면 다시 실행하지 말라고 하고 멈춤" \
   "$(ok test "$rc" = 1 -a "$(wc -l < "$S/waits" | tr -d ' ')" = 8 -a "$(grep -c '다시 실행하지 말고' "$OUT")" = 1)"
+run_sut env STUB_CERT_STATUS=FAILED STUB_CERT_FAILURE=CAA_ERROR bash "$P/create-certificate.sh" --apply
+check "인증서: 도메인 확인 대기는 통과해도 상태가 FAILED(CAA가 막음)면 상태·이유를 찍고 실패로 끝남" \
+  "$( { test "$rc" = 1 && grep -q '"FailureReason": "CAA_ERROR"' "$OUT" && grep -q 'ISSUED가 아니다(FAILED)' "$OUT"; } > /dev/null 2>&1; echo $?)"
+run_sut env STUB_CERT_STATUS=PENDING_VALIDATION bash "$P/create-certificate.sh" --apply
+check "인증서: FAILED가 아니어도 ISSUED가 아니면(PENDING_VALIDATION) 실패로 끝남" \
+  "$(ok test "$rc" = 1 -a "$(grep -c 'ISSUED가 아니다(PENDING_VALIDATION)' "$OUT")" = 1)"
 
 # ---------- Load Balancer Controller(install-lb-controller.sh) ----------
 reset_state

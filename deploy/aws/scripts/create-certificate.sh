@@ -2,7 +2,8 @@
 # catchu.dev의 ACM 공개 인증서를 DNS 검증으로 받는다(#276 0단계, 비용 0). ALB(k8s/ingress.yaml)가 https에 쓴다.
 # ALB에 붙여 쓰는 공개 인증서는 요금이 없고, 검증 기록이 남아 있는 동안 ACM이 만료 전에 갱신한다. 비밀 키는 ACM 밖으로 꺼낼 수 없다.
 # Ingress는 ARN 대신 이름(catchu.dev)으로 인증서를 찾는다. ALB와 같은 서울 리전에 받는다.
-# 순서: 인증서 요청 → ACM이 준 검증용 CNAME을 Route 53 공개 호스팅 영역 catchu.dev에 넣음 → 발급될 때까지 기다림(보통 몇 분, 최대 40분).
+# 순서: 인증서 요청 → ACM이 준 검증용 CNAME을 Route 53 공개 호스팅 영역 catchu.dev에 넣음 → 도메인 확인을 기다림(보통 몇 분, 최대 40분)
+#   → 인증서 상태가 ISSUED인지 봄.
 # 검증 기록은 UPSERT로 넣는다. 이름·값은 ACM이 계정과 도메인으로 정하므로, 앞선 시도에서 남은 같은 기록은 그대로 덮어 쓰면 된다.
 # 개발 서버로 가는 A 기록은 건드리지 않는다. catchu.dev를 ALB로 바꾸는 것은 3단계(전환)다.
 # 인자 없이 실행하면 확인만 한다. 깨끗할 때 한 번 만드는 용도라 catchu.dev 인증서가 상태와 관계없이 하나라도 있으면 멈춘다.
@@ -71,7 +72,12 @@ catchu_info "검증 기록(CNAME): 넣음"
 catchu_wait 8 acm wait certificate-validated --certificate-arn "$arn" ||
   catchu_die "발급되지 않았다(40분이 지났거나 검증이 실패함). 다시 실행하지 말고 aws acm list-certificates --profile catchu --region ap-northeast-2로 상태를 본다"
 
+# 대기 명령은 도메인 확인 상태만 본다. CAA 기록이 Amazon을 막으면 확인은 끝나도 발급이 실패(FAILED)하므로 인증서 상태를 따로 본다.
+cert=$(aws_catchu acm describe-certificate --certificate-arn "$arn" --output json) ||
+  catchu_die "발급 상태를 조회하지 못했다. 다시 실행하지 말고 aws acm list-certificates --profile catchu --region ap-northeast-2로 상태를 본다"
 catchu_info "확인 값:"
-aws_catchu acm describe-certificate --certificate-arn "$arn" --output json |
-  jq '.Certificate | {DomainName, Status, Type, KeyAlgorithm, NotAfter, RenewalEligibility,
-    Validation: [.DomainValidationOptions[] | {ValidationMethod, ValidationStatus}]}'
+printf '%s\n' "$cert" | jq '.Certificate | {DomainName, Status, FailureReason, Type, KeyAlgorithm, NotAfter, RenewalEligibility,
+  Validation: [.DomainValidationOptions[] | {ValidationMethod, ValidationStatus}]}'
+status=$(printf '%s' "$cert" | jq -r '.Certificate.Status')
+[ "$status" = ISSUED ] ||
+  catchu_die "인증서 상태가 ISSUED가 아니다(${status}). FAILED면 위 FailureReason을 보고 머리말대로 지운 뒤 다시 실행하고, 그 밖의 상태면 다시 실행하지 말고 aws acm list-certificates --profile catchu --region ap-northeast-2로 상태를 본다"
