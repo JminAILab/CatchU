@@ -49,10 +49,14 @@ async function bootApp(t, env) {
   return { ...server, registered, markClosed: () => { closed = true; } };
 }
 
-test('기본 앱 기동 때 BASE_SUMMARY 처리기가 한 번 등록되고, U5 C-10 자리에는 U4의 DB 구현이 들어간다(메모리 가짜 아님)', async (t) => {
+test('기본 앱은 BASE_SUMMARY·EMBED_PUBLICATION·JD_SUMMARY를 한 번씩 등록하고 JD 중복 등록을 거부하며 U5에 실제 C-10을 연결한다', async (t) => {
   const { app, registered } = await bootApp(t, {});
-  assert.deepEqual(registered.filter((kind) => kind === 'BASE_SUMMARY'), ['BASE_SUMMARY']);
-  assert.deepEqual(app.get(AiRun).registeredKinds().sort(), ['BASE_SUMMARY', 'EMBED_PUBLICATION']);
+  const expected = ['BASE_SUMMARY', 'EMBED_PUBLICATION', 'JD_SUMMARY'];
+  const aiRun = app.get(AiRun);
+  assert.deepEqual(registered.sort(), expected, '앱 초기화에서 각 처리기를 정확히 한 번 등록한다');
+  assert.deepEqual(aiRun.registeredKinds().sort(), expected);
+  assert.throws(() => aiRun.registerHandler('JD_SUMMARY', async () => {}), /이미 등록됐습니다\(JD_SUMMARY\)/);
+  assert.deepEqual(aiRun.registeredKinds().sort(), expected, '중복 등록 거부 뒤에도 등록 목록을 유지한다');
   const access = app.get(U5_PUBLICATION_ACCESS, { strict: false });
   assert.ok(access instanceof DbPublicationAccess, 'C-10 DB 구현');
   assert.ok(!(access instanceof InMemoryPublicationAccess), '메모리 가짜는 앱에 넣지 않는다');

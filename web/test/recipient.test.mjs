@@ -845,14 +845,16 @@ test("판정 통과 화면 순서: h1 → 0 RecipientGuide → U4 고정 안내(
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, "위에서부터 정한 순서");
   assert.ok(html.includes('data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in="true"'));
   assert.ok(render(ready()).includes('data-logged-in="false"'));
-  // 2·3번 자리에 U5 패널이 하나씩 있다(U5 README 「붙이는 방법」). 4번은 U10 제공 전 빈 자리다
+  // 2·3번 자리에 U5 패널이 하나씩 있다. U10 연결 뒤 4번은 서버의 미복원 세션에서 로그인 안내를 그린다.
   const slot2 = html.slice(html.indexOf('data-testid="recipient-slot-2"'), html.indexOf('data-testid="recipient-slot-3"'));
   const slot3 = html.slice(html.indexOf('data-testid="recipient-slot-3"'), html.indexOf('data-testid="recipient-slot-4"'));
   assert.equal(count(slot2, 'data-testid="base-summary-panel"'), 1);
   assert.equal(count(slot3, 'data-testid="qna-panel"'), 1);
   assert.equal(count(slot3, 'data-testid="ai-notice-line"'), 1, "외부 AI 고지는 U5 질의응답 패널 안의 U2 한 줄뿐");
   assert.equal(count(html, 'data-testid="base-summary-panel"') + count(html, 'data-testid="qna-panel"'), 2);
-  assert.match(html, /data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in="true"><\/div>/);
+  const slot4 = html.slice(html.indexOf('data-testid="recipient-slot-4"'));
+  assert.equal(count(slot4, 'data-testid="jd-summary-login"'), 1);
+  assert.equal(count(slot4, 'data-testid="jd-summary-start"'), 0);
 });
 
 test("G5·G6: U4 고정 안내는 발행 시각(KST)뿐이고, U4 영역에 U2 안내 문장(고정 사본 설명·링크 조건 등)을 되풀이하지 않으며 만료 시각 원문도 보이지 않는다", () => {
