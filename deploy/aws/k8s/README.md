@@ -27,11 +27,11 @@ Deployment 파일은 이미지·실행 수·커밋 자리를 비워 둔 틀이�
 | 이름 | 종류 | 키 ← 원본 | 쓰는 곳 |
 |---|---|---|---|
 | `catchu-db` | ConfigMap | `DB_HOST` ← RDS `catchu-db` 주소, `ca.pem` ← 저장소의 RDS 루트 인증서 | api·migration |
-| `catchu-api` | Secret | `AUTH_JWT_SECRET` ← `/catchu/prod/api/AUTH_JWT_SECRET`, `LINK_GRANT_SECRET` ← `/catchu/prod/api/LINK_GRANT_SECRET`, `DB_PASSWORD` ← `/catchu/prod/db/catchu_app-password`(앱 계정 `catchu_app`), `CATCHU_GENERATION_API_KEY` ← `/catchu/prod/api/CATCHU_GENERATION_API_KEY`(Claude API), `CATCHU_EMBEDDING_API_KEY` ← `/catchu/prod/api/CATCHU_EMBEDDING_API_KEY`(Voyage AI) | api |
+| `catchu-api` | Secret | `AUTH_JWT_SECRET` ← `/catchu/prod/api/AUTH_JWT_SECRET`, `LINK_GRANT_SECRET` ← `/catchu/prod/api/LINK_GRANT_SECRET`, `DB_PASSWORD` ← `/catchu/prod/db/catchu_app-password`(앱 계정 `catchu_app`), `CATCHU_GENERATION_API_KEY` ← `/catchu/prod/api/CATCHU_GENERATION_API_KEY`(Claude API), `CATCHU_EMBEDDING_API_KEY` ← `/catchu/prod/api/CATCHU_EMBEDDING_API_KEY`(Voyage AI), `GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET` ← `/catchu/prod/api/GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`(Google 로그인, 개발 서버와 같은 클라이언트) | api |
 | `catchu-migration` | Secret | `DB_PASSWORD` ← `/catchu/prod/db/catchu_migrator-password`(migration 계정 `catchu_migrator`) | migration |
 | `catchu-worker` | Secret | `CATCHU_QUEUE_REDIS_URL` ← `rediss://:`큐 비밀번호(`/catchu/prod/queue/auth-token`)`@`큐 주 엔드포인트`:6379`, `WORKER_CONTEXT_API_KEY` ← `/catchu/prod/worker/WORKER_CONTEXT_API_KEY`, `CATCHU_GENERATION_API_KEY` ← `/catchu/prod/worker/CATCHU_GENERATION_API_KEY` | worker |
 
-api의 AI 키 둘(11월 생성·임베딩, #389)은 켜고 끄는 기능이 아니라 11월 기능이 늘 쓰는 값이라 미리 넣는다. SSM에는 2026-10-27에 넣었다. 꺼 둔 기능(Google 로그인·GitHub 연결·worker 요청 정보 조회·api 큐 연결)은 켤 때 그 값을 api 실행 파일과 Secret에 더하는 PR을 낸다([../README.md](../README.md) 5단계). GitHub 연결은 EFS 보관 폴더도 함께 붙인다.
+api의 AI 키 둘(11월 생성·임베딩, #389)은 켜고 끄는 기능이 아니라 11월 기능이 늘 쓰는 값이라 미리 넣는다. SSM에는 2026-10-27에 넣었다. 꺼 둔 기능(GitHub 연결·worker 요청 정보 조회·api 큐 연결)은 켤 때 그 값을 api 실행 파일과 Secret에 더하는 PR을 낸다([../README.md](../README.md) 5단계). GitHub 연결은 EFS 보관 폴더도 함께 붙인다. Google 로그인은 개발 서버에서 켜 둔 것을 전환 뒤에도 이어 가려고 처음부터 켠다(2026-11-10 팀장 결정). 돌아올 주소는 `https://catchu.dev/google/callback`으로 Google OAuth 클라이언트에 등록한 개발 서버 값과 같고, 클라이언트 ID·비밀값은 개발 서버가 쓰는 SSM 값이다.
 
 **SSM에 없는 두 값.** `/catchu/prod/worker/` 두 값은 아직 SSM에 없다(2026-10-19 확인. 있는 것은 서명 키 둘·DB 계정 둘·큐 하나). 운영 모드 worker는 둘 다 없으면 뜨지 않으므로 2단계 전에 넣는다. [`put-parameter.sh`](../scripts/put-parameter.sh)는 이미 있는 이름이면 멈추고, 값을 화면·명령 인자·셸 기록에 남기지 않는다.
 
@@ -42,7 +42,7 @@ bash deploy/aws/scripts/put-parameter.sh --stdin /catchu/prod/worker/CATCHU_GENE
 
 **만들기.** `bash deploy/aws/scripts/make-secrets.sh`(순서는 아래 「적용(2단계)」).
 
-- 시작 전에 계정·클러스터, namespace `catchu`, RDS(available, CA `rds-ca-rsa2048-g1`), 큐(available, TLS와 비밀번호 켬), SSM 이름 아홉 개가 모두 SecureString인지 본다. 값도 앱이 시작할 때 거부하는 형식인지(서명 키·조회 키는 64자리 hex, 큐 비밀번호는 주소에 그대로 넣을 수 있는 영문·숫자. 형식은 값 전체에 맞추므로 끝에 줄바꿈이 붙어도 멈춘다), 서로 달라야 하는 값(서명 키 둘과 조회 키, 두 계정 비밀번호)이 다른지 본다. 하나라도 어긋나면 아무것도 바꾸지 않고 멈춘다(종료 코드 1).
+- 시작 전에 계정·클러스터, namespace `catchu`, RDS(available, CA `rds-ca-rsa2048-g1`), 큐(available, TLS와 비밀번호 켬), SSM 이름 열한 개가 모두 SecureString인지 본다. 값도 앱이 시작할 때 거부하는 형식인지(서명 키·조회 키는 64자리 hex, 큐 비밀번호는 주소에 그대로 넣을 수 있는 영문·숫자, Google 클라이언트 ID는 `….apps.googleusercontent.com`. 형식은 값 전체에 맞추므로 끝에 줄바꿈이 붙어도 멈춘다), 서로 달라야 하는 값(서명 키 둘과 조회 키, 두 계정 비밀번호)이 다른지 본다. 하나라도 어긋나면 아무것도 바꾸지 않고 멈춘다(종료 코드 1).
 - 값은 SSM에서 파이프로만 jq를 거쳐 `kubectl apply --server-side`의 표준 입력으로 넘긴다. 그래서 화면·명령 인자·임시 파일·`last-applied` 주석에 값이 남지 않는다. 화면에는 Secret 이름과 `키=SSM 판 번호`만 찍히고, 같은 판 번호가 Secret 주석 `catchu.io/ssm-versions`에 남는다.
 - 적용 뒤 Secret의 키 목록, `last-applied` 주석이 없음, ConfigMap의 주소와 인증서를 다시 읽어 확인한다. 적용이 실패했거나 확인이 어긋나면 2(일부만 바뀌었을 수 있다)다. 원인을 고쳐 다시 실행하면 SSM의 지금 값으로 다시 맞춘다.
 - 값을 보지 않고 확인하기: `k get secret -o json | jq '.items[] | {name: .metadata.name, keys: (.data | keys), annotations: .metadata.annotations}'`

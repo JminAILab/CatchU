@@ -482,6 +482,11 @@ check "api: 운영 모드·DB TLS 검증·Access 15분·같은 출처, 개발 �
       | .NODE_ENV == "production" and .PGSSLMODE == "verify-full" and .NODE_TLS_REJECT_UNAUTHORIZED == "1"
       and .AUTH_ACCESS_TOKEN_TTL_SECONDS == "900" and .AUTH_WEB_ORIGIN == "https://catchu.dev" and .DB_USER == "catchu_app"
       and .CORS_ALLOWED_ORIGINS == null and .DEV_LOGIN_ENABLED == null')"
+check "api: Google 로그인 켬, 돌아올 주소는 https://catchu.dev/google/callback, 클라이언트 ID·비밀값은 Secret catchu-api" \
+  "$(ok q "$WORK/applied-api.yaml" '.[0].spec.template.spec.containers[0].env
+      | map({(.name): (.value // "secret \(.valueFrom.secretKeyRef.name) \(.valueFrom.secretKeyRef.key)")}) | add
+      | .GOOGLE_LOGIN_ENABLED == "true" and .GOOGLE_REDIRECT_URI == "https://catchu.dev/google/callback"
+      and .GOOGLE_CLIENT_ID == "secret catchu-api GOOGLE_CLIENT_ID" and .GOOGLE_CLIENT_SECRET == "secret catchu-api GOOGLE_CLIENT_SECRET"')"
 check "worker: 운영 모드, DB 값 없음, 클러스터 안 api 주소, 종료 유예 30초 이상, 생존 확인 없음" \
   "$(ok q "$WORK/applied-worker.yaml" '.[0].spec.template.spec | .terminationGracePeriodSeconds >= 30 and .containers[0].livenessProbe == null
       and (.containers[0].env | map({(.name): (.value // "ref")}) | add | .NODE_ENV == "production"
