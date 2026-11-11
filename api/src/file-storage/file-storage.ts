@@ -1,5 +1,5 @@
 // 파일 저장 인터페이스·키·오류(계약 C-05, U2 기능 설계 W6·BR6.2·BR6.3, 비기능 NFR1.3).
-// 로컬 구현은 local-file-storage.ts, S3 구현은 U8이 더한다. presigned URL은 없고 호출자가 권한을 확인한 뒤 읽어 내려 준다.
+// 로컬 구현은 local-file-storage.ts, S3 구현은 s3-file-storage.ts(U8)다. presigned URL은 없고 호출자가 권한을 확인한 뒤 읽어 내려 준다.
 import type { Readable } from 'node:stream';
 
 export const FILE_STORAGE = Symbol('FILE_STORAGE');
