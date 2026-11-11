@@ -47,7 +47,7 @@ function buildRepositoryRecord(summary) {
   if (summary.jd === null) {
     lines.push('- JD 없음');
   } else {
-    lines.push(`- 요구사항 나누기·지시문: ${summary.jd.splitter === 'U10' ? 'U10' : '스크립트'}`, '',
+    lines.push(`- 요구사항 나누기: ${summary.jd.splitter === 'U10' ? 'U10' : '스크립트'} / 지시문: U10 운영 상수`, '',
       '| 요구사항 | 검색 기반 항목 | 검색 기반 버림 | 전체 넣기 항목 | 전체 넣기 버림 |', '|---|---|---|---|---|');
     for (const row of summary.jd.rows) {
       const full = row.fullInput === 'INPUT_TOO_LARGE' ? ['INPUT_TOO_LARGE', '-'] : [row.fullInput.items, row.fullInput.dropped];
