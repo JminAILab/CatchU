@@ -11,6 +11,8 @@ test('배포용 빌드: 개발용 eval 없이 HSTS를 붙이고 API 기준 주�
   assert.equal(directive(csp, 'script-src'), "script-src 'self' 'unsafe-inline'");
   assert.equal(directive(csp, 'connect-src'), "connect-src 'self' https://api.catchu.example");
   assert.equal(directive(csp, 'frame-ancestors'), "frame-ancestors 'none'");
+  // 화면 안 PDF 뷰어(U8)는 Blob URL을 iframe에 넣는다. 같은 출처와 blob:만 허용하고 다른 출처의 문서는 넣지 못한다.
+  assert.equal(directive(csp, 'frame-src'), "frame-src 'self' blob:");
   assert.equal(directive(csp, 'object-src'), "object-src 'none'");
   assert.equal(headers['X-Content-Type-Options'], 'nosniff');
   assert.equal(headers['Referrer-Policy'], 'strict-origin-when-cross-origin');

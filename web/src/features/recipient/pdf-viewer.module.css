@@ -1,0 +1,18 @@
+/* U8 PDF 열람 도우미(화면 안 뷰어·단추·안내)와 발행본의 PDF 쪽 목록. 색은 globals.css의 공통 변수를 쓴다. */
+.viewer { display: grid; gap: 10px; margin-top: 10px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; border-radius: 9px; border: 1px solid #c9d2df; background: var(--color-surface); color: #34465e; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.button:disabled { opacity: .55; cursor: not-allowed; }
+.button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.status { margin: 0; padding: 10px 14px; border-radius: 10px; background: #eef5ff; font-size: 14px; }
+.error { margin: 0; padding: 10px 14px; border-radius: 10px; background: #fff1dc; font-size: 14px; }
+.frame { width: 100%; height: min(78vh, 900px); min-height: 420px; border: 1px solid var(--color-line); border-radius: 10px; background: #f4f6fa; }
+
+.meta { margin: 0 0 4px; font-size: 14px; color: var(--color-muted); }
+.pages { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 12px; }
+.page { border-top: 1px solid var(--color-line); padding-top: 10px; }
+.pageHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.pageNumber { font-size: 14px; font-weight: 700; margin: 0; }
+.pageText { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.unreadable { display: inline-block; margin: 0; padding: 2px 10px; border-radius: 999px; background: #eef2f7; color: #34465e; font-size: 13px; font-weight: 700; }
+.highlight { background: #ffe58a; color: inherit; padding: 0 1px; border-radius: 2px; }

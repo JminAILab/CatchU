@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
+import { pdfHttp } from "@/features/materials/pdf-clients";
 import { accessTokenStore } from "@/lib/access-token";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
@@ -12,6 +13,7 @@ import {
   createPublicationsApi, deleteErrorText, publicationOpenErrorText, stopErrorText, type PublicationDetail, type PublicationsApi,
 } from "./publications-api";
 import { PublicationDetailView } from "./publication-detail-view";
+import type { PdfCopySource } from "./published-pdf-item";
 import styles from "./publications.module.css";
 
 // api.member가 기준 주소·Bearer·401을 맡는다. 렌더마다 호출 객체를 새로 만들지 않는다.
@@ -91,12 +93,19 @@ export function createPublicationDetailModel(client: PublicationsApi, publicatio
   return { store, load, stop, remove, retry: () => { void load(); }, dispose: () => loadRequest?.abort() };
 }
 
+/** 작성자 사본 요청(U8 W4, `GET /publications/{id}/items/{itemId}/pdf`). 회원 토큰으로 열고 링크 접근 상실 처리는 없다. */
+const ownerPdfSource = (publicationId: string) => (publishedItemId: string): PdfCopySource => ({
+  fetchPdf: (signal) => pdfHttp.ownerCopy(publicationId, publishedItemId, signal),
+});
+
 /** 회원 가드((member) 레이아웃) 안의 발행본 상세 화면(U4 W5). */
 export function PublicationDetailPage({ publicationId }: { publicationId: string }) {
-  return <PublicationDetailScreen api={publications} publicationId={publicationId} />;
+  return <PublicationDetailScreen api={publications} publicationId={publicationId} pdfSource={ownerPdfSource(publicationId)} />;
 }
 
-export function PublicationDetailScreen({ api: client, publicationId, deps }: { api: PublicationsApi; publicationId: string; deps?: DetailDeps }) {
+export function PublicationDetailScreen({ api: client, publicationId, deps, pdfSource }: {
+  api: PublicationsApi; publicationId: string; deps?: DetailDeps; pdfSource?: (publishedItemId: string) => PdfCopySource;
+}) {
   const router = useRouter();
   const [model] = useState(() => createPublicationDetailModel(client, publicationId, deps));
   const view = useSyncExternalStore(model.store.subscribe, model.store.get, model.store.get);
@@ -114,7 +123,7 @@ export function PublicationDetailScreen({ api: client, publicationId, deps }: { 
           </div>
         ) : view.detail && (
           <PublicationDetailView detail={view.detail} stoppedAt={view.stoppedAt} stopState={view.stopState} deleteState={view.deleteState}
-            onStop={() => { void model.stop(); }} onDelete={() => { void model.remove(); }} />
+            onStop={() => { void model.stop(); }} onDelete={() => { void model.remove(); }} pdfSource={pdfSource} />
         )}
     </main>
   );

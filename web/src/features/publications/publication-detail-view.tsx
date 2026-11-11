@@ -5,6 +5,7 @@ import { routes } from "@/lib/routes";
 import { CopyUrlButton, OpenLinkAnchor } from "./publication-link-actions";
 import { FIXED_COPY_NOTICE, PUBLICATION_STATE_LABELS, SOURCE_PRIVATE_NOTICE, formatKst, passwordText } from "./publication-format";
 import type { PublicationDetail, PublicationState } from "./publications-api";
+import type { PdfCopySource } from "./published-pdf-item";
 import { PublishedSnapshotView } from "./snapshot-view";
 import styles from "./publications.module.css";
 
@@ -16,6 +17,8 @@ export type PublicationDetailViewProps = {
   deleteState: "idle" | "deleting" | "deleted" | { error: string };
   onStop: () => void;
   onDelete: () => void;
+  /** PDF 항목의 작성자 사본 요청(U8 W4). 중지·만료 뒤에도 열린다. */
+  pdfSource?: (publishedItemId: string) => PdfCopySource;
 };
 
 function stateText(state: PublicationState, stoppedAt: string | null): string {
@@ -72,7 +75,7 @@ export function PublicationDetailView(props: PublicationDetailViewProps) {
       </section>
       {/* 기본 요약 패널(U5 작성자 모드)이 붙을 자리. U5 제공 전이라 컴포넌트를 두지 않는다. */}
       <div data-testid="publication-summary-slot" />
-      <PublishedSnapshotView snapshot={detail.snapshot} />
+      <PublishedSnapshotView snapshot={detail.snapshot} pdfSource={props.pdfSource} />
     </article>
   );
 }

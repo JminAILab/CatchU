@@ -25,7 +25,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 import { U2_ERROR_MESSAGES } from "../src/lib/u2-error-messages.ts";
 import {
-  CATCH_REJECTION_TEXT, PUBLISH_FAILED_TEXT, SOURCE_UNAVAILABLE_TEXT, TOTAL_TEXT_LIMIT_TEXT, createPublicationsApi, publishDraftErrors,
+  CATCH_REJECTION_TEXT, PUBLISH_FAILED_TEXT, PUBLISH_LIMITS, SOURCE_UNAVAILABLE_TEXT, TOTAL_TEXT_LIMIT_TEXT, createPublicationsApi,
+  publishDraftErrors,
   publishFailureLines, publishOutcome, rateLimitedText,
 } from "../src/features/publications/publications-api.ts";
 import { INELIGIBLE_REASONS, catchSourceOf } from "../src/features/publications/publish-sources.ts";
@@ -179,6 +180,12 @@ test("발행 실패 구분: 작성자 실패 안내 표의 각 응답을 구분�
     ["제목은 1~50자(앞뒤 공백 제외)로 입력해 주세요.", "비밀번호는 8~64자로 입력해 주세요.", "항목은 1~20개이며 같은 항목을 두 번 고를 수 없습니다."]);
   assert.match(publishFailureLines({ kind: "validation", violations: [{ field: "snapshotText", reason: "max" }] })[1], /전체 글/);
   assert.match(publishFailureLines({ kind: "consent-required" })[1], /동의/);
+});
+
+test("400 items·maxTotalLength 안내는 PDF 글이 합계에 들어감과 PDF를 고치는 방법을 함께 알린다(팀장 결정 2026-11-10, #420 issuecomment-6759834176)", () => {
+  assert.match(TOTAL_TEXT_LIMIT_TEXT, /전체 글\(PDF 글 포함\)이 60,000자를 넘었습니다/);
+  assert.match(TOTAL_TEXT_LIMIT_TEXT, /PDF는 필요한 쪽만 남긴 파일을 새로 올려 대신 고를 수 있습니다/);
+  assert.equal(PUBLISH_LIMITS.totalText, 60_000);
 });
 
 test("400 items·maxTotalLength는 전체 글 60,000자 상한과 자료 빼기·원문 줄이기 안내이고, 항목 개수·중복 안내와 구분된다(Codex P2)", () => {
@@ -491,4 +498,253 @@ test("확인·입력·고르기 화면: 항목 순서·비밀번호 여부·90�
   assert.match(screen, /<h1>발행<\/h1>/);
   assert.ok(screen.includes('data-testid="publish-sources"'));
   assert.doesNotMatch(screen, /publish-done/);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// U8 계획 10.5 — 발행 화면에서 PDF 선택·발행(2026-11-11 보완). 근거: US4.1 AC4.1.1의 PDF 부분, U8 규칙 BR4.1, 관측 요구사항 NFR7.3.
+//
+// 먼저 정한 시나리오·기대 결과·실패 조건(세부 시험 코드는 구현 뒤 썼다).
+// - 기대: 글 추출이 완료(DONE)된 PDF만 고를 수 있다. 추출 중·실패 PDF는 상태와 고를 수 없는 이유를 보인 채 비활성이다.
+//         Catch·텍스트 자료·PDF를 섞어 고르면 사용자가 정한 순서 그대로 발행 요청의 items에 들어간다.
+//         서버가 400 extractionIncomplete로 거부하면 "발행되지 않았습니다"와 PDF 추출 안내를 보이고, 고른 항목·입력을 남긴 채 편집 단계로 돌아가며
+//         PDF 목록을 다시 읽어 지금 상태를 보인다. PDF 호출을 넘기지 않은 화면은 Catch·텍스트만 고르는 기존 화면 그대로다.
+// - 실패로 보는 것: 추출 중·실패 PDF가 골라짐, 이유 표시 없음, 섞은 순서가 바뀜, extractionIncomplete가 항목 개수 안내로 보임, 기존 흐름이 달라짐.
+// 서버는 계약 모양 대역이며 실제 브라우저·api 검증이 아니다(그 확인은 code-summary §16.8).
+import { PDF_EXTRACTION_INCOMPLETE_TEXT } from "../src/features/publications/publications-api.ts";
+import { ITEM_KIND_LABELS, PDF_INELIGIBLE_REASONS, pdfSourceOf } from "../src/features/publications/publish-sources.ts";
+import { PDF_FAILURE_TEXT } from "../src/features/materials/pdf-materials-api.ts";
+
+const P_DONE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
+const P_PENDING = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2";
+const P_FAILED = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3";
+const P_DONE2 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4";
+const pdf = (pdfMaterialId, extractionState = "DONE", patch = {}) => ({
+  pdfMaterialId, title: `PDF ${extractionState}`, fileSizeBytes: 2048, pageCount: extractionState === "DONE" ? 3 : null,
+  extractionState, failureCode: extractionState === "FAILED" ? "TEXT_LIMIT_EXCEEDED" : null, ...patch,
+});
+const pdfPage = (items, nextCursor = null) => ({ kind: "ok", value: { items, page: { nextCursor } } });
+const defaultPdfs = () => [pdfPage([pdf(P_DONE), pdf(P_PENDING, "PENDING"), pdf(P_FAILED, "FAILED"), pdf(P_DONE2, "DONE", { title: "둘째 PDF", pageCount: 1 })])];
+
+/** `fakeClients`에 PDF 목록 호출을 더한 대역. `pdfs`에 넣은 응답을 차례로 돌려준다. */
+function fakeClientsWithPdfs(responses = {}) {
+  const api = fakeClients(responses);
+  const queue = [...(responses.pdfs ?? [])];
+  api.pdfs = { list: (cursor, signal) => {
+    api.calls.push({ name: "pdfs", cursor, signal });
+    const value = queue.shift();
+    if (value === undefined) throw new Error("no response for pdfs");
+    return Promise.resolve(value);
+  } };
+  return api;
+}
+const option = (html, id) => new RegExp(`<button[^>]*data-source-id="${id}"[^>]*>.*?</button>`, "s").exec(html)?.[0] ?? "";
+
+test("PDF 선택(10.5): 글 추출이 완료된 PDF만 고를 수 있고, 추출 중·실패 PDF는 상태와 고를 수 없는 이유를 보인 채 골라지지 않는다", async () => {
+  // 목록 항목 → 발행 화면 값.
+  assert.deepEqual(pdfSourceOf(pdf(P_DONE)), { pdfMaterialId: P_DONE, title: "PDF DONE", state: "DONE", stateLabel: "완료 3쪽", eligible: true, reason: null });
+  assert.deepEqual(pdfSourceOf(pdf(P_PENDING, "PENDING")),
+    { pdfMaterialId: P_PENDING, title: "PDF PENDING", state: "PENDING", stateLabel: "글 추출 중", eligible: false, reason: PDF_INELIGIBLE_REASONS.pending });
+  for (const [code, text] of Object.entries(PDF_FAILURE_TEXT)) {
+    const source = pdfSourceOf(pdf(P_FAILED, "FAILED", { failureCode: code }));
+    assert.equal(source.eligible, false, code);
+    assert.equal(source.stateLabel, "실패");
+    assert.equal(source.reason, `${PDF_INELIGIBLE_REASONS.failed}. ${text}`, "실패 사유별 안내를 이유에 붙인다");
+  }
+  assert.equal(pdfSourceOf(pdf(P_FAILED, "FAILED", { failureCode: null })).reason, `${PDF_INELIGIBLE_REASONS.failed}. 글을 뽑지 못했습니다. 다시 올려 주세요.`);
+
+  const api = fakeClientsWithPdfs({ ...defaultSources(), pdfs: defaultPdfs() });
+  const model = createPublishModel(api, passthroughConsent, deps());
+  await model.loadSources();
+  assert.deepEqual(model.store.get().pdfs.items.map((item) => [item.pdfMaterialId, item.eligible]),
+    [[P_DONE, true], [P_PENDING, false], [P_FAILED, false], [P_DONE2, true]]);
+
+  // 추출 중·실패 PDF와 목록에 없는 ID는 골라지지 않는다. 완료 PDF만 고르고, 다시 누르면 뺀다.
+  model.togglePdf(P_PENDING);
+  model.togglePdf(P_FAILED);
+  model.togglePdf("not-in-list");
+  assert.deepEqual(model.store.get().selected, []);
+  model.togglePdf(P_DONE);
+  assert.deepEqual(model.store.get().selected, [{ kind: "PDF_MATERIAL", sourceId: P_DONE, title: "PDF DONE", visibility: null }]);
+  model.togglePdf(P_DONE);
+  assert.deepEqual(model.store.get().selected, []);
+  model.togglePdf(P_DONE);
+  assert.equal(api.calls.filter((call) => call.name === "publish").length, 0, "고르는 동안 서버에 아무것도 보내지 않는다");
+
+  // 화면: 상태 표시·이유·비활성. 조작 요소에 data-testid가 있다.
+  const state = model.store.get();
+  const html = renderToStaticMarkup(createElement(SourcePickerView, {
+    catches: state.catches, materials: state.materials, pdfs: state.pdfs, selected: state.selected, flagged: null, disabled: false,
+    onRetry() {}, onMoreCatches() {}, onMoreMaterials() {}, onMorePdfs() {}, onToggleCatch() {}, onToggleMaterial() {}, onTogglePdf() {},
+  }));
+  assert.match(html, /<h3>내 PDF 자료<\/h3>/);
+  assert.equal((html.match(/data-testid="publish-pdf-option"/g) ?? []).length, 4);
+  const done = option(html, P_DONE);
+  assert.match(done, /aria-pressed="true"/);
+  assert.doesNotMatch(done, /disabled=""/);
+  assert.match(done, /data-testid="publish-pdf-state">완료 3쪽</);
+  assert.doesNotMatch(done, /publish-pdf-reason/);
+  const pending = option(html, P_PENDING);
+  assert.match(pending, /disabled=""/);
+  assert.match(pending, /data-state="PENDING"/);
+  assert.match(pending, /data-testid="publish-pdf-state">글 추출 중</);
+  assert.ok(pending.includes(PDF_INELIGIBLE_REASONS.pending));
+  const failedOption = option(html, P_FAILED);
+  assert.match(failedOption, /disabled=""/);
+  assert.match(failedOption, /data-testid="publish-pdf-state">실패</);
+  assert.match(failedOption, /data-testid="publish-pdf-reason"/);
+  assert.ok(failedOption.includes(PDF_INELIGIBLE_REASONS.failed) && failedOption.includes(PDF_FAILURE_TEXT.TEXT_LIMIT_EXCEEDED));
+  assert.doesNotMatch(option(html, P_DONE2), /disabled=""/);
+
+  // 목록 조회 실패는 0건이 아니라 실패로 보이고, 빈 목록은 올리는 곳을 안내한다.
+  const base = { catches: state.catches, materials: state.materials, selected: [], flagged: null, disabled: false,
+    onRetry() {}, onMoreCatches() {}, onMoreMaterials() {}, onToggleCatch() {}, onToggleMaterial() {} };
+  const failedList = renderToStaticMarkup(createElement(SourcePickerView, { ...base,
+    pdfs: { state: "error", items: [], nextCursor: null, moreState: "idle", errorText: "PDF 자료 목록을 불러오지 못했습니다." } }));
+  assert.match(failedList, /role="alert"[^>]*>.*PDF 자료 목록을 불러오지 못했습니다/s);
+  assert.doesNotMatch(failedList, /publish-pdfs-empty/);
+  const empty = renderToStaticMarkup(createElement(SourcePickerView, { ...base, pdfs: { state: "ready", items: [], nextCursor: null, moreState: "idle" } }));
+  assert.match(empty, /data-testid="publish-pdfs-empty"/);
+});
+
+test("PDF 발행 순서(10.5): Catch·텍스트 자료·PDF를 섞어 고르고 순서를 바꾸면 그 순서 그대로 발행 요청에 들어간다", async () => {
+  const api = fakeClientsWithPdfs({ ...defaultSources(), pdfs: defaultPdfs(), publish: [success(published())] });
+  const model = createPublishModel(api, passthroughConsent, deps());
+  await model.loadSources();
+  // 고른 순서: 텍스트 → PDF → Catch → 둘째 PDF. 그 뒤 둘째 PDF를 맨 위로, Catch를 한 칸 위로 옮긴다.
+  model.toggleMaterial(M1);
+  model.togglePdf(P_DONE);
+  model.toggleCatch(C1);
+  model.togglePdf(P_DONE2);
+  model.moveUp(3); model.moveUp(2); model.moveUp(1);   // [둘째 PDF, 텍스트, PDF, Catch]
+  model.moveUp(3);                                       // [둘째 PDF, 텍스트, Catch, PDF]
+  const order = [["PDF_MATERIAL", P_DONE2], ["TEXT_MATERIAL", M1], ["CATCH", C1], ["PDF_MATERIAL", P_DONE]];
+  assert.deepEqual(model.store.get().selected.map((item) => [item.kind, item.sourceId]), order);
+  model.setTitle("섞은 발행본");
+  assert.equal(model.toConfirm(), true);
+
+  // 확인 단계와 고른 목록은 같은 순서와 종류 표지를 보인다.
+  assert.deepEqual(ITEM_KIND_LABELS, { CATCH: "Catch", TEXT_MATERIAL: "텍스트 자료", PDF_MATERIAL: "PDF 자료" });
+  const confirm = renderToStaticMarkup(createElement(PublishConfirmView, {
+    items: model.store.get().selected, title: "섞은 발행본", usePassword: false, submitting: false, lockSeconds: 0, statusLines: null, onBack() {}, onSubmit() {},
+  }));
+  const list = /data-testid="publish-confirm-items">(.*?)<\/ol>/s.exec(confirm)[1];
+  assert.deepEqual([...list.matchAll(/<span[^>]*>(Catch|텍스트 자료|PDF 자료)<\/span> ([^<]+)/g)].map((match) => [match[1], match[2].trim()]),
+    [["PDF 자료", "둘째 PDF"], ["텍스트 자료", "자기소개"], ["Catch", "공개 Catch"], ["PDF 자료", "PDF DONE"]]);
+  const chosen = renderToStaticMarkup(createElement(SelectedListView, {
+    items: model.store.get().selected, flagged: null, disabled: false, onMoveUp() {}, onMoveDown() {}, onRemove() {},
+  }));
+  assert.deepEqual([...chosen.matchAll(/data-testid="publish-selected-item" data-source-id="([^"]+)"/g)].map((match) => match[1]), order.map(([, id]) => id));
+
+  await model.submit();
+  assert.equal(model.store.get().step, "done");
+  assert.deepEqual(api.calls.filter((call) => call.name === "publish").map((call) => call.body), [{
+    title: "섞은 발행본",
+    items: order.map(([kind, sourceId]) => ({ kind, sourceId })),
+  }], "발행 요청의 items는 사용자가 정한 순서 그대로다");
+});
+
+test("PDF 거부 안내(10.5): 서버가 extractionIncomplete로 거부하면 PDF 추출 안내를 보이고 입력을 남긴 채 편집 단계로 돌아가며 PDF 목록을 다시 읽는다", async () => {
+  // 안내 문구: 항목 개수·중복 안내나 전체 글 상한 안내와 구분된다.
+  const incomplete = { kind: "validation", violations: [{ field: "items[1].sourceId", reason: "extractionIncomplete" }] };
+  assert.deepEqual(publishFailureLines(incomplete), [PUBLISH_FAILED_TEXT, PDF_EXTRACTION_INCOMPLETE_TEXT]);
+  assert.match(PDF_EXTRACTION_INCOMPLETE_TEXT, /글 추출이 끝나지 않았거나 실패/);
+  assert.notEqual(PDF_EXTRACTION_INCOMPLETE_TEXT, TOTAL_TEXT_LIMIT_TEXT);
+  assert.ok(!publishFailureLines(incomplete).some((line) => line.includes("같은 항목을 두 번")), "항목 개수·중복 안내로 보이지 않는다");
+  // 여러 PDF가 걸려도 같은 안내는 한 번만 보인다.
+  assert.deepEqual(publishFailureLines({ kind: "validation", violations: [
+    { field: "items[0].sourceId", reason: "extractionIncomplete" }, { field: "items[2].sourceId", reason: "extractionIncomplete" }] }),
+  [PUBLISH_FAILED_TEXT, PDF_EXTRACTION_INCOMPLETE_TEXT]);
+  assert.equal(publishOutcome(apiError(400, "VALIDATION_FAILED", { details: { violations: incomplete.violations } })).failure.kind, "validation");
+
+  // 고를 때는 완료였지만 발행할 때 서버가 거부한 경우(목록이 오래됨): 다시 읽은 목록은 그 PDF를 추출 중으로 보인다.
+  const api = fakeClientsWithPdfs({
+    ...defaultSources(),
+    pdfs: [pdfPage([pdf(P_DONE)]), pdfPage([pdf(P_DONE, "PENDING")])],
+    publish: [apiError(400, "VALIDATION_FAILED", { details: { violations: incomplete.violations } })],
+  });
+  const model = createPublishModel(api, passthroughConsent, deps());
+  await model.loadSources();
+  model.toggleCatch(C1);
+  model.togglePdf(P_DONE);
+  model.setTitle("거부될 발행본");
+  model.setUsePassword(true);
+  model.setPassword("secret-pass-1");
+  assert.equal(model.toConfirm(), true);
+  await model.submit();
+  await new Promise((resolve) => setImmediate(resolve));
+  const state = model.store.get();
+  assert.equal(state.step, "edit", "입력을 고쳐야 하므로 편집 단계로 돌아간다");
+  assert.deepEqual(publishStatusLines(state.status), { tone: "alert", lines: [PUBLISH_FAILED_TEXT, PDF_EXTRACTION_INCOMPLETE_TEXT] });
+  assert.deepEqual(state.selected.map((item) => [item.kind, item.sourceId]), [["CATCH", C1], ["PDF_MATERIAL", P_DONE]], "고른 항목과 순서는 그대로다");
+  assert.equal(state.title, "거부될 발행본");
+  assert.equal(state.password, "secret-pass-1");
+  assert.equal(api.calls.filter((call) => call.name === "pdfs").length, 2, "PDF 목록을 다시 읽는다");
+  assert.equal(api.calls.filter((call) => call.name === "publish").length, 1, "자동으로 다시 발행하지 않는다");
+  assert.deepEqual(state.pdfs.items.map((item) => [item.state, item.eligible]), [["PENDING", false]]);
+
+  // 이미 고른 PDF는 고를 수 없는 상태가 됐어도 뺄 수 있다(단추가 막히지 않는다).
+  const html = renderToStaticMarkup(createElement(SourcePickerView, {
+    catches: state.catches, materials: state.materials, pdfs: state.pdfs, selected: state.selected, flagged: null, disabled: false,
+    onRetry() {}, onMoreCatches() {}, onMoreMaterials() {}, onMorePdfs() {}, onToggleCatch() {}, onToggleMaterial() {}, onTogglePdf() {},
+  }));
+  const picked = option(html, P_DONE);
+  assert.match(picked, /aria-pressed="true"/);
+  assert.doesNotMatch(picked, /disabled=""/);
+  assert.ok(picked.includes(PDF_INELIGIBLE_REASONS.pending));
+  model.togglePdf(P_DONE);
+  assert.deepEqual(model.store.get().selected.map((item) => item.kind), ["CATCH"]);
+  // 다른 400(전체 글 상한 등)은 PDF 목록을 다시 읽지 않는다.
+  const other = fakeClientsWithPdfs({ ...defaultSources(), pdfs: defaultPdfs(),
+    publish: [apiError(400, "VALIDATION_FAILED", { details: { violations: [{ field: "items", reason: "maxTotalLength" }] } })] });
+  const second = createPublishModel(other, passthroughConsent, deps());
+  await second.loadSources();
+  second.togglePdf(P_DONE);
+  second.setTitle("긴 발행본");
+  second.toConfirm();
+  await second.submit();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(other.calls.filter((call) => call.name === "pdfs").length, 1);
+  assert.deepEqual(publishStatusLines(second.store.get().status).lines, [PUBLISH_FAILED_TEXT, TOTAL_TEXT_LIMIT_TEXT]);
+});
+
+test("기존 흐름(10.5): PDF 호출을 넘기지 않은 화면은 Catch·텍스트만 고르는 기존 화면 그대로이고, 넘긴 화면도 Catch·텍스트만 발행하면 요청이 같다", async () => {
+  // PDF 호출 없음: PDF 상태·자리·요청이 없다.
+  const plain = fakeClients({ ...defaultSources(), publish: [success(published())] });
+  const model = createPublishModel(plain, passthroughConsent, deps());
+  await model.loadSources();
+  assert.equal(model.store.get().pdfs, null);
+  model.togglePdf(P_DONE);
+  assert.deepEqual(model.store.get().selected, [], "PDF 목록이 없으면 PDF를 고를 수 없다");
+  await model.loadMorePdfs();
+  const state = model.store.get();
+  const picker = renderToStaticMarkup(createElement(SourcePickerView, {
+    catches: state.catches, materials: state.materials, selected: [], flagged: null, disabled: false,
+    onRetry() {}, onMoreCatches() {}, onMoreMaterials() {}, onToggleCatch() {}, onToggleMaterial() {},
+  }));
+  assert.doesNotMatch(picker, /PDF/);
+  assert.equal((picker.match(/data-testid="publish-catch-option"/g) ?? []).length, 3);
+  assert.equal((picker.match(/data-testid="publish-material-option"/g) ?? []).length, 1);
+  assert.doesNotMatch(renderToStaticMarkup(createElement(PublishScreen, { api: fakeClients(), deps: deps(), consent: passthroughConsent })), /PDF 자료/);
+  model.toggleCatch(C1);
+  model.toggleMaterial(M1);
+  model.setTitle("기존 발행본");
+  model.toConfirm();
+  await model.submit();
+  const expected = [{ title: "기존 발행본", items: [{ kind: "CATCH", sourceId: C1 }, { kind: "TEXT_MATERIAL", sourceId: M1 }] }];
+  assert.deepEqual(plain.calls.filter((call) => call.name === "publish").map((call) => call.body), expected);
+  assert.deepEqual(plain.calls.map((call) => call.name), ["catches", "materials", "publish"]);
+
+  // PDF 호출 있음: 화면 안내에 PDF가 들어가고, PDF를 고르지 않으면 발행 요청은 위와 같다.
+  const withPdf = fakeClientsWithPdfs({ ...defaultSources(), pdfs: defaultPdfs(), publish: [success(published())] });
+  assert.match(renderToStaticMarkup(createElement(PublishScreen, { api: fakeClientsWithPdfs(), deps: deps(), consent: passthroughConsent })),
+    /본인 Catch와 텍스트 자료·PDF 자료를 골라/);
+  const second = createPublishModel(withPdf, passthroughConsent, deps());
+  await second.loadSources();
+  second.toggleCatch(C1);
+  second.toggleMaterial(M1);
+  second.setTitle("기존 발행본");
+  second.toConfirm();
+  await second.submit();
+  assert.deepEqual(withPdf.calls.filter((call) => call.name === "publish").map((call) => call.body), expected);
+  assert.equal(second.store.get().step, "done");
 });

@@ -17,6 +17,23 @@ export type MaterialsListViewProps = {
   onNew: () => void;
 };
 
+export type MaterialsTab = "text" | "pdf";
+
+const TABS: readonly { id: MaterialsTab; label: string }[] = [{ id: "text", label: "텍스트 자료" }, { id: "pdf", label: "PDF 자료" }];
+
+/** 자료 화면의 탭(U8 계획 10.1). 텍스트 자료(U4 W2)와 PDF 자료(U8 W1)를 오간다. */
+export function MaterialsTabs({ active, onChange }: { active: MaterialsTab; onChange: (tab: MaterialsTab) => void }) {
+  return (
+    <div role="tablist" aria-label="자료 종류" className={styles.tabs}>
+      {TABS.map((tab) => (
+        <button key={tab.id} type="button" role="tab" id={`materials-tab-${tab.id}`} aria-selected={active === tab.id}
+          aria-controls={`materials-panel-${tab.id}`} className={active === tab.id ? styles.tabActive : styles.tab}
+          data-testid={`materials-tab-${tab.id}`} onClick={() => onChange(tab.id)}>{tab.label}</button>
+      ))}
+    </div>
+  );
+}
+
 const dateText = (value: string) => new Date(value).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" });
 
 /** 텍스트 자료 목록(U4 W2). 조회 실패를 0건으로 보이지 않는다. 제목은 React 텍스트로만 그린다(NFR1.10). */

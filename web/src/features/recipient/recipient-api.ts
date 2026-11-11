@@ -45,8 +45,12 @@ function pickItem(item: PublishedItem): PublishedItem {
     case "TEXT_MATERIAL":
       return { ...base, itemKind: "TEXT_MATERIAL", snapshot: { body: item.snapshot.body } };
     default:
-      // PDF 자료(U8 몫). 자리만 보이므로 쪽 수 외의 칸은 넘기지 않는다.
-      return { ...base, itemKind: "PDF_MATERIAL", snapshot: typeof item.snapshot.pageCount === "number" ? { pageCount: item.snapshot.pageCount } : {} };
+      // PDF 자료(U8). 쪽 수와 쪽별 사본(쪽 번호·글·읽을 수 있음)만 넘긴다.
+      return {
+        ...base, itemKind: "PDF_MATERIAL",
+        snapshot: typeof item.snapshot.pageCount === "number" ? { pageCount: item.snapshot.pageCount } : {},
+        pdfPages: (item.pdfPages ?? []).map(({ pageNumber, text, readable }) => ({ pageNumber, text, readable })),
+      };
   }
 }
 
