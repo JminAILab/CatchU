@@ -20356,3 +20356,262 @@
 **Context**: construction > code-generation > memory.md
 
 ---
+
+## Plan Approval Blocked
+**Timestamp**: 2026-11-11T07:49:01Z
+**Event**: PLAN_APPROVAL_BLOCKED
+**Guard**: plan-approval-guard
+**Reason**: rules-arriving
+**Tool**: Bash
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Stage**: code-generation
+**Unit**: (missing marker)
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-11-11T07:49:25Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: functional-design
+**Unit**: nc3-revisit-facts
+**Checkpoint**: review-receipt
+**Changed**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md, aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/rules.md
+**Recorded**: sha256:ba4ac7194d04b5c8d268a2c6a8db9a245885feb733c39d0084e908dd7bb726b8
+**Current**: sha256:6dac2b748597b504e822660eda7a1543cfe6d077cec8ae714049c013f28cc09b
+**Details**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md, aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/rules.md changed after the nc3 revisit facts Unit was reviewed; carrying on.
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-11-11T07:49:25Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: nfr-requirements
+**Unit**: nc3-revisit-facts
+**Checkpoint**: review-receipt
+**Changed**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-requirements/performance-requirements.md
+**Recorded**: sha256:365e7bc1d5213c41274195d78170c41a137ad1f2411b6caf2af329d58b4b7ed9
+**Current**: sha256:0f29c68e049ffa63318b2b5d9ec9ab55949c3cc22d242b366ad6aa6ef04b5f68
+**Details**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-requirements/performance-requirements.md changed after the nc3 revisit facts Unit was reviewed; carrying on.
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T07:49:44Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: afb681c1d5ce4aca4
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T07:52:44Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a733673e05a390879
+**Message**: 새 Catch NC3(다시 볼 곳 사실·작업 시각)는 코드 작성과 점검을 마쳤고, 지금 Unit 확인 명령(최대 60분)이 돌고 있습니다. 끝나면 결과와 서비스별 시간을 알려 드리고 NC3 승인을 여쭙겠습니다.
+
+---
+
+## Checkpoint Verification Recorded
+**Timestamp**: 2026-11-11T07:59:33Z
+**Event**: CHECKPOINT_VERIFICATION_RECORDED
+**Unit**: nc3-revisit-facts
+**Kind**: unit
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Verification Id**: 248d9553-73f0-4417-97d5-6cda02597f81
+**Fingerprint**: sha256:36538cd6c7c640a2581ac9b2efc43295818d107e59dd05f22be58b286b3ce520
+**Command SHA-256**: dc0c9c449a685becf2741e484ff978989d3ad90c5e12b107d00c5d3397cb4273
+**Exit Code**: 0
+**Verified**: true
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T07:59:33Z
+**Event**: HOST_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T08:00:03Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/answer-text/correction-1.txt
+**Context**: .aidlc-engine > answer-text > correction-1.txt
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T08:00:09Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/answer-text/correction-2.txt
+**Context**: .aidlc-engine > answer-text > correction-2.txt
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T08:00:15Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/answer-text/question-1.txt
+**Context**: .aidlc-engine > answer-text > question-1.txt
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T08:00:16Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: You asked me to 커밋 식별값처럼 끝 글자에 따라 받침이 달라지는 값 바로 뒤에는 이/가·을/를을 붙이지 않고, 받침과 상관없는 「에서」「의」 같은 조사로 화면 문장을 쓰기. Keep that for next time?
+**Options**: |Yes, for this project|Yes, for the team|No
+**Question Kind**: learnings-note
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T08:00:21Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/answer-text/question-2.txt
+**Context**: .aidlc-engine > answer-text > question-2.txt
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T08:00:22Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: You asked me to 한 계산의 예외만 그 자리에서 잡아 비우는 예외 갈래를 둘 때, 그 계산의 결과가 뒤 단계 검사(보내기 전 계약 검사·api 등록 검사)의 규격을 어겨 전체가 실패하는 길도 함께 막도록, 계산이 끝에서 자기 결과를 같은 규칙으로 확인해 어기면 같은 예외로 잡히게 하기. Keep that for next time?
+**Options**: |Yes, for this project|Yes, for the team|No
+**Question Kind**: learnings-note
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T08:04:10Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Yes, for this project","No"]
+**Message Id**: da7e1951
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T08:04:10Z
+**Event**: QUESTION_REPLIED
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Question**: You asked me to 커밋 식별값처럼 끝 글자에 따라 받침이 달라지는 값 바로 뒤에는 이/가·을/를을 붙이지 않고, 받침과 상관없는 「에서」「의」 같은 조사로 화면 문장을 쓰기. Keep that for next time?
+**Reply**: Yes, for this project
+**Options**: ["Yes, for this project","Yes, for the team","No"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T08:04:10Z
+**Event**: QUESTION_REPLIED
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Question**: You asked me to 한 계산의 예외만 그 자리에서 잡아 비우는 예외 갈래를 둘 때, 그 계산의 결과가 뒤 단계 검사(보내기 전 계약 검사·api 등록 검사)의 규격을 어겨 전체가 실패하는 길도 함께 막도록, 계산이 끝에서 자기 결과를 같은 규칙으로 확인해 어기면 같은 예외로 잡히게 하기. Keep that for next time?
+**Reply**: No
+**Options**: ["Yes, for this project","Yes, for the team","No"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-11T08:04:12Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: Q1: Yes, for this project; Q2: No
+**Person Reply**: 3번으로 한다. NC1·NC2 확인 때 쓴 cr1 환경(~/catchu-local-live/cr1, catchu-cr1-db·catchu-cr1-valkey, api 3001, web은 127.0.0.1 말고 localhost:3000)을 쓴다.\n- 켜기 전에 cr1 DB를 ~/catchu-local-live/cr1/backup/cr1-before-nc3-20261111.dump로 백업한다.\n- 새 마이그레이션이 이미 있는 Catch 행에 오류 없이 붙는지 먼저 본다.\n- 합성(MOCK)은 이번 실행에서만 켜고 cr1 환경 파일은 고치지 않는다. 비밀값 파일은 열거나 출력하지 않는다. Google 로그인은 내가 브라우저에서 한다.\n- 볼 것: (1) 합성 분석으로 생긴 Catch 상세에서 「다시 볼 곳」이 근거 아래·Catch 설명 초안 위에 있고, 문장 다섯 꼴과 조사(「에서」「의」)가 맞는지(MOCK이라 커밋은 글자). (2) 옛 Catch에는 그 칸이 없는지. (3) 본인 목록에서 작업 시각이 있는 새 Catch가 위, 시각 없는 옛 Catch가 아래이고 「더 보기」가 빠짐·겹침 없이 이어지는지.\n- 이것은 합성 연결 확인이고 실제 분석 성공으로 보고하지 않는다.\n- 끝나면 api·worker·web과 cr1 컨테이너를 끈다. 시험 DB는 Unit 확인을 마친 뒤 끈다.\n개발 로그인 + Google 둘로 나눠 봄\n<pasted_content id="0fc9">\nStep 16에서 개발 회원으로 합성 분석을 돌렸다. worker는 처리 SUCCEEDED·후보 1이었고 api도 판본 4 결과를 받아들였다(WORKER_RESULT_RECEIVED ACCEPTED·OK). 그러나 등록이 APPLY_FAILED·CATCH_NOT_READY로 끝났다. NC3 결함이 아니라 원래 설계다(application.module.ts 주석, api/docs/selected-repository-coordinates.md 38~41행: 큐 조립의 좌표 공급자는 LIVE 전용이라 후보가 있는 MOCK 결과는 등록되지 않음). 그래서 MOCK으로는 새 Catch 화면을 볼 수 없다.\n대신 이렇게 한다.\n1. Google 회원의 TheMe Catch 둘을 고른다. 하나에는 그 Catch의 소속 기록(commit_assignment) 커밋만 써서 다섯 종류 사실을 하나씩 넣고 첫·마지막 작업 시각을 넣는다. 등록 검사와 같은 규칙(종류별 경로·커밋 개수, 본인 커밋 안, 상한, 겹침 없음)을 지킨다. 다른 하나에는 사실 없이 시각만 넣는다. 넣은 Catch 식별값을 알려 준다.\n2. 내가 Google로 들어가 그 Catch 상세의 「다시 볼 곳」 칸·문장·조사·커밋 링크(github.com, 새 탭)와, 목록에서 시각 있는 두 Catch가 위·나머지 51개가 아래인지, 「더 보기」를 본다.\n3. 끝나면 넣은 두 Catch의 값만 빈 사실·빈 시각으로 되돌린다. 개발 회원과 합성 요청 기록은 그대로 둬도 된다.\n이것은 직접 넣은 자료로 화면을 본 것이고 실제 분석 성공으로 보고하지 않는다. worker→api 판본 4 연결은 위 MOCK 실행으로, 등록 저장은 api 시험으로 갈음한다.\n</pasted_content id="0fc9">\n<pasted_content id="0fc9">\n화면 확인을 마쳤다(직접 넣은 자료로 본 화면 확인이고 실제 분석 성공이 아니다).\n1. 목록: 「README.md 문서 수정」(2025-06-03)이 맨 위, 「fix : 테마 등록시…」(2025-04-10)가 둘째, 나머지 51개가 그 아래 원래 순서다. 「더 보기」 두 번으로 53개(20·20·13)가 DB 순서와 같고 빠짐·겹침이 없다. 제목이 NULL인 Catch 하나는 원래처럼 제목 줄 없이 나온다.\n2. 「README.md 문서 수정」 상세: 「다시 볼 곳」(h3 + 「본인만 확인」, ul 다섯 줄)이 근거 바로 아래·생각해 볼 질문 위에 있다(이 Catch는 초안이 없어 초안 칸이 없고, 초안 있는 「fix : 테마 등록시…」에서 근거→초안→질문 순서를 확인했다). 문장 다섯과 조사(「에서」「의」)가 기대와 같다.\n3. 커밋은 링크 없이 글자로 나왔다. 이 Google 회원은 로컬 GitHub 연결이 없어 /v1/me/repositories가 403 GITHUB_CONNECTION_REQUIRED였고, 저장소 이름을 못 불러와 Q4 A대로 글자로 떨어졌다(Tab 0개). 실제 링크는 web 시험으로 갈음하고 Build & Test의 TheMe 실측 때 본다. web/src/features/assets/README.md의 링크 조건에 「GitHub 연결이 없어 저장소 이름을 못 불러오면 커밋은 글자로만 보인다」를 한 줄 적는다.\n4. 옛 Catch(「fix : 테마 등록시…」, 「feat: 이미지 업로드시 url 반환…」, 제목 없는 Catch)에는 「다시 볼 곳」 칸이 없다.\n참고: 직접 넣은 사실의 커밋 앞뒤가 실제 작성 시각과 반대다(442e1a4는 2023-04-30, 7707ae8은 2022-12-21, 되돌린 8f83790이 되돌려진 cd9f5d2보다 앞). 화면 확인에는 상관없다.\n이제 두 Catch 값을 빈 사실·빈 시각으로 되돌리고 api·worker·web과 cr1 컨테이너를 끈다. 시험 DB는 Unit 확인을 마친 뒤 끈다. code-summary의 Step 16에는 「합성 분석은 등록 단계에서 설계상 멈춤(판본 4 결과 왕복은 확인), 화면은 직접 넣은 자료로 확인, 커밋 링크는 GitHub 연결이 없어 화면에서는 미확인」으로 적는다.\n</pasted_content id="0fc9">\nYes, for this project\nNo
+**Message Id**: da7e1951
+**Message Ids**: 25101320,d02a8199,6ea93b38,66dd4588,da7e1951
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T08:04:19Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/learnings/functional-design-selections.json
+**Context**: .aidlc-engine > learnings > functional-design-selections.json
+
+---
+
+## Rule Learned
+**Timestamp**: 2026-11-11T08:04:20Z
+**Event**: RULE_LEARNED
+**Stage**: functional-design
+**Candidate-ID**: c1
+**Content-Hash**: 86d5490faf771bf4f6e492de9dd4c710dc2f4e05eab0c3d9e9766a7f496d48bb
+**Destination**: <project-dir>/aidlc/spaces/default/memory/project.md
+**Heading**: ## Corrections
+**Source**: user_addition
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T08:04:26Z
+**Event**: DECISION_RECORDED
+**Checkpoint**: Construction Unit Approval
+**Unit**: nc3-revisit-facts
+**Kind**: unit
+**Stage**: code-generation
+**Fingerprint**: sha256:36538cd6c7c640a2581ac9b2efc43295818d107e59dd05f22be58b286b3ce520
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Options**: Approve,Request Changes
+**Asked Evidence**: {"functional-design":["sha256:ba4ac7194d04b5c8d268a2c6a8db9a245885feb733c39d0084e908dd7bb726b8",null],"nfr-requirements":["sha256:365e7bc1d5213c41274195d78170c41a137ad1f2411b6caf2af329d58b4b7ed9",null],"nfr-design":["sha256:211362cec28b3f8ca1b36d633019f2a77c81d27839486f7b43c8e4a55215c2cc",null],"code-generation":["sha256:19d39adc036cd67c50e632be03371f0ccbc001bb9f305b076defae3377cace37","sha256:91a43e132e31f3e33cc1a07e11f1732c167e7a7cf9307e6caefc67f2e6702952"]}
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","code-generation":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1"}
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T08:08:47Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: 264c2098
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T08:08:48Z
+**Event**: QUESTION_REPLIED
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Question**: Approve this completed nc3-revisit-facts?
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-11T08:08:51Z
+**Event**: GATE_APPROVED
+**Unit**: nc3-revisit-facts
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Stages**: functional-design, nfr-requirements, nfr-design, code-generation
+**Gate Scope**: unit-end
+**Checkpoint**: construction-unit
+**Fingerprint**: sha256:36538cd6c7c640a2581ac9b2efc43295818d107e59dd05f22be58b286b3ce520
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","code-generation":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1"}
+**Verification Command SHA-256**: dc0c9c449a685becf2741e484ff978989d3ad90c5e12b107d00c5d3397cb4273
+**Verification Id**: 248d9553-73f0-4417-97d5-6cda02597f81
+**Approved Evidence**: {"functional-design":["sha256:ba4ac7194d04b5c8d268a2c6a8db9a245885feb733c39d0084e908dd7bb726b8",null],"nfr-requirements":["sha256:365e7bc1d5213c41274195d78170c41a137ad1f2411b6caf2af329d58b4b7ed9",null],"nfr-design":["sha256:211362cec28b3f8ca1b36d633019f2a77c81d27839486f7b43c8e4a55215c2cc",null],"code-generation":["sha256:19d39adc036cd67c50e632be03371f0ccbc001bb9f305b076defae3377cace37","sha256:91a43e132e31f3e33cc1a07e11f1732c167e7a7cf9307e6caefc67f2e6702952"]}
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**User Input**: Approve
+**Person Reply**: Approve
+**Message Id**: 264c2098
+**Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:733dcbc9c2f9b7bb715607e342c9e8e55363c51f6776b7636f53e0d5f907c838","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc3-revisit-facts/7332c702b7dcc515/1.json","digest":"sha256:22d19450ae20e9e4a9f6f728843cccb68cfca741a1611e569cdd6b1d39744d83"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:9ae80f78eff52d39e488c6dea488dc20fbecc339075f4e6a6f710f18da02f11d","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc3-revisit-facts/7332c702b7dcc515/1.json","digest":"sha256:22d19450ae20e9e4a9f6f728843cccb68cfca741a1611e569cdd6b1d39744d83"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md","id":"R-03","fingerprint":"sha256:b85f30a8960a4a8b54fe0eed459c24528114dfd94c859febaedea0329da91211","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc3-revisit-facts/7332c702b7dcc515/1.json","digest":"sha256:22d19450ae20e9e4a9f6f728843cccb68cfca741a1611e569cdd6b1d39744d83"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/security-design.md","id":"R-01","fingerprint":"sha256:25d8d31f2f653891c2099eb2fd4f603c025c4bd943b5e6876e26119549334d70","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc3-revisit-facts/7332c702b7dcc515/1.json","digest":"sha256:b2e18de91efcd995d59d5e97fbb87aaa993fbeb39ae582a02f7474bb4bfddd2c"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/security-design.md","id":"R-02","fingerprint":"sha256:038723167e41cca6e07a5fb270c796430cae517254ff5c960acd9505d739bb96","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc3-revisit-facts/7332c702b7dcc515/1.json","digest":"sha256:b2e18de91efcd995d59d5e97fbb87aaa993fbeb39ae582a02f7474bb4bfddd2c"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/security-design.md","id":"R-03","fingerprint":"sha256:cb1babee9e607a35ee9c8d3567f3bbf0a7569ea79b941965a7540fc5ddc4a658","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc3-revisit-facts/7332c702b7dcc515/1.json","digest":"sha256:b2e18de91efcd995d59d5e97fbb87aaa993fbeb39ae582a02f7474bb4bfddd2c"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-requirements/security-requirements.md","id":"R-01","fingerprint":"sha256:8931802d08194363e1a54eab07af9e3d1d2c90aa49b6b1b43711d4f4489c0ed6","status":"Changed after review","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc3-revisit-facts/7332c702b7dcc515/1.json","digest":"sha256:841786698b21e002891c2bbfd82a20e828324c097c8102b2b2f2f7407517a42d"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-requirements/security-requirements.md","id":"R-02","fingerprint":"sha256:c6e9700a5e9bf85a4a1c9d3c338ac732e0c6499b9983e4bb4502bd1c11bd093f","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc3-revisit-facts/7332c702b7dcc515/1.json","digest":"sha256:841786698b21e002891c2bbfd82a20e828324c097c8102b2b2f2f7407517a42d"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-requirements/security-requirements.md","id":"R-03","fingerprint":"sha256:afdf7bd4c0dd0507b109392d6272647f836de1641cfb65027cbce0164f2aab03","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc3-revisit-facts/7332c702b7dcc515/1.json","digest":"sha256:841786698b21e002891c2bbfd82a20e828324c097c8102b2b2f2f7407517a42d"}}]}
+
+---
