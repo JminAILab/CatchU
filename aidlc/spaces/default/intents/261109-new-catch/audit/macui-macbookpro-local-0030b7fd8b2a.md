@@ -18892,3 +18892,508 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
 
 ---
+
+## Unit Started
+**Timestamp**: 2026-11-11T05:23:46Z
+**Event**: UNIT_STARTED
+**Stage**: nfr-design
+**Unit**: nc3-revisit-facts
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:24:14Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/nfr-design-questions.md
+**Context**: construction > nc3-revisit-facts > nfr-design > nfr-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T05:24:15Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-design
+**Decision**: NC3 NFR 설계 질문 Q1(RevisitFacts 1초 확인 방법)
+**Options**: A,B,X
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T05:27:31Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a98e2adbeea9778a4
+**Message**: NC3(다시 볼 곳 사실과 작업 시각)를 설계하는 중이며, 기능 설계와 NFR 요구를 마치고 커밋했고 지금은 NFR 설계 단계입니다. 다음은 Q1 「1초 이하」 확인 방법을 A(시간 기록만)와 B(시험에서 1초 단정) 가운데서 골라 주시는 것입니다.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T05:32:02Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: typed
+**Message Id**: ccdf4acf
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-11T05:32:11Z
+**Event**: QUESTION_ANSWERED
+**Stage**: nfr-design
+**Details**: Q1: X(A보다 더 단순하게 한다. 「RevisitFacts 1초 이하」 숫자는 요구사항에 근거가 없으니 뺀다. 분석 하나의 처리 시한이 60분이라 1초 단위 숫자는 판단에 쓸 데가 없다. 느려지지 않게 하는 것은 NFR1.3의 구조 요구(후보의 커밋 기록을 한 번만 훑고 (경로, 줄 글자) 사전을 써서 커밋 쌍마다 다시 훑지 않음)로 하고, 코드 검토 때 그 구조를 본다. 빌드와 시험에서는 분석 전체 시간(elapsedSeconds) 바꾸기 전·후 기록만 남기고, RevisitFacts만 따로 재거나 시험에서 시간을 단정하지 않는다. performance-requirements.md NFR1.3의 이 부분도 코드 생성 계획의 함께 고칠 문서에 넣는다. Major 덧붙임: 어긋나는 문장은 functional-spec.md 49행 하나뿐이다. rules.md BR2.1의 「순수 계산」은 GitHub를 부르지 않는다는 뜻이라 고치지 않고, BR4.1은 계산 순서 정리대로 그대로 둔다)
+**Person Reply**: <pasted_content id="0fc9">\nQ1은 A보다 더 단순하게 한다. 「RevisitFacts 1초 이하」 숫자는 요구사항에 근거가 없으니 뺀다. 분석 하나의 처리 시한이 60분이라 1초 단위 숫자는 판단에 쓸 데가 없다. 느려지지 않게 하는 것은 NFR1.3의 구조 요구(후보의 커밋 기록을 한 번만 훑고 (경로, 줄 글자) 사전을 써서 커밋 쌍마다 다시 훑지 않음)로 하고, 코드 검토 때 그 구조를 본다. 빌드와 시험에서는 이미 적기로 한 분석 전체 시간(elapsedSeconds) 바꾸기 전·후 기록만 남기고, RevisitFacts만 따로 재거나 시험에서 시간을 단정하지 않는다. performance-requirements.md NFR1.3의 이 부분도 코드 생성 계획의 함께 고칠 문서에 넣는다.\n\nMajor 처리 덧붙임: 기능 설계에서 Q1 B와 어긋나는 문장은 functional-spec.md 49행 하나뿐이다. rules.md BR2.1의 「순수 계산」은 GitHub를 부르지 않는다는 뜻이라 고치지 않고, BR4.1(작업 시각 기록 없음은 worker 결함)은 계산 순서 정리대로 그대로 둔다.\n\ndone\n</pasted_content id="0fc9">
+**Message Id**: ccdf4acf
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T05:32:16Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/nfr-design-questions.md
+**Context**: construction > nc3-revisit-facts > nfr-design > nfr-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T05:32:19Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/nfr-design-questions.md
+**Unit**: nc3-revisit-facts
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T05:35:55Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: d8a79365
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T05:35:55Z
+**Event**: QUESTION_REPLIED
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Question**: 이대로 NC3 NFR 설계 문서를 만들어도 될까요?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T05:35:59Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/nfr-design-questions.md
+**Context**: construction > nc3-revisit-facts > nfr-design > nfr-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-11T05:36:00Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: nfr-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/nfr-design-questions.md
+**Questions SHA-256**: 271ac595f899134c0ff09feae031b5a527eca2c44ff97559ffa20cfe7649cbb4
+**Hash Scope**: confirmed-content-v2
+**Unit**: nc3-revisit-facts
+**Message Id**: d8a79365
+**Person Reply**: Looks correct
+**Summary Authorization Id**: f80f3853620995c10c4bb593e76a5845dd472594c32bf515e73db920437f3a46
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:36:42Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/security-design.md
+**Context**: construction > nc3-revisit-facts > nfr-design > security-design.md
+**Summary Authorization Id**: f80f3853620995c10c4bb593e76a5845dd472594c32bf515e73db920437f3a46
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:37:15Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/reliability-design.md
+**Context**: construction > nc3-revisit-facts > nfr-design > reliability-design.md
+**Summary Authorization Id**: f80f3853620995c10c4bb593e76a5845dd472594c32bf515e73db920437f3a46
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:37:32Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/performance-design.md
+**Context**: construction > nc3-revisit-facts > nfr-design > performance-design.md
+**Summary Authorization Id**: f80f3853620995c10c4bb593e76a5845dd472594c32bf515e73db920437f3a46
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:37:42Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/scalability-design.md
+**Context**: construction > nc3-revisit-facts > nfr-design > scalability-design.md
+**Summary Authorization Id**: f80f3853620995c10c4bb593e76a5845dd472594c32bf515e73db920437f3a46
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:37:54Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/observability-design.md
+**Context**: construction > nc3-revisit-facts > nfr-design > observability-design.md
+**Summary Authorization Id**: f80f3853620995c10c4bb593e76a5845dd472594c32bf515e73db920437f3a46
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:38:10Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/logical-components.md
+**Context**: construction > nc3-revisit-facts > nfr-design > logical-components.md
+**Summary Authorization Id**: f80f3853620995c10c4bb593e76a5845dd472594c32bf515e73db920437f3a46
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:38:25Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/traceability.json
+**Context**: construction > nc3-revisit-facts > nfr-design > traceability.json
+**Summary Authorization Id**: f80f3853620995c10c4bb593e76a5845dd472594c32bf515e73db920437f3a46
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T05:38:37Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nfr-design/memory.md
+**Context**: construction > nfr-design > memory.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T05:38:38Z
+**Event**: SENSOR_FIRED
+**Fire id**: b9d31e6d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T05:38:38Z
+**Event**: SENSOR_PASSED
+**Fire id**: b9d31e6d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/performance-design.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T05:38:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: e9a06921
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/security-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T05:38:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: e9a06921
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/security-design.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T05:38:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: 828e17ba
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/scalability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T05:38:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: 828e17ba
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/scalability-design.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T05:38:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: 5f2d9739
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/reliability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T05:38:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: 5f2d9739
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/reliability-design.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T05:38:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: 7cbf9d56
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/observability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T05:38:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: 7cbf9d56
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/observability-design.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T05:38:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: 6f3da6be
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/logical-components.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T05:38:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: 6f3da6be
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/logical-components.md
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T05:38:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: 90bfe07c
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T05:38:40Z
+**Event**: SENSOR_PASSED
+**Fire id**: 90bfe07c
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/traceability.json
+**Duration ms**: 84
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T05:38:40Z
+**Event**: SENSOR_FIRED
+**Fire id**: ee3195bc
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T05:38:40Z
+**Event**: SENSOR_PASSED
+**Fire id**: ee3195bc
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/performance-design.md
+**Duration ms**: 79
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T05:38:40Z
+**Event**: SENSOR_FIRED
+**Fire id**: 2c2c55eb
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T05:38:40Z
+**Event**: SENSOR_PASSED
+**Fire id**: 2c2c55eb
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-design/traceability.json
+**Duration ms**: 92
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-11T05:38:40Z
+**Event**: REVIEW_REQUESTED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc3-revisit-facts
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:211362cec28b3f8ca1b36d633019f2a77c81d27839486f7b43c8e4a55215c2cc
+**Request Id**: review:91ef58bebb8b05540ad4532be6a58acb
+**Review File**: .aidlc-engine/reviews/nfr-design/units/nc3-revisit-facts/7332c702b7dcc515/1.91ef58bebb8b05540ad4532be6a58acb.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:38:47Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-11T05:39:02Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T05:39:39Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: nfr-design
+**Tool**: Bash
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch (unit nc3-revisit-facts)
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:41:50Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviews/nfr-design/units/nc3-revisit-facts/7332c702b7dcc515/1.91ef58bebb8b05540ad4532be6a58acb.review.md
+**Context**: .aidlc-engine > reviews > nfr-design > units > nc3-revisit-facts > 7332c702b7dcc515 > 1.91ef58bebb8b05540ad4532be6a58acb.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T05:42:01Z
+**Event**: HOST_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T05:42:01Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: acad0a6e3e78ed256
+**Review File Digest**: .aidlc-engine/reviews/nfr-design/units/nc3-revisit-facts/7332c702b7dcc515/1.91ef58bebb8b05540ad4532be6a58acb.review.md=74edabe32939a275dc9b6117f77b682deac8e82fdcbb1a085626d4cd0386b6cd
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-11T05:42:05Z
+**Event**: REVIEW_COMPLETED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc3-revisit-facts
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:211362cec28b3f8ca1b36d633019f2a77c81d27839486f7b43c8e4a55215c2cc
+**Artifact Fingerprint**: sha256:211362cec28b3f8ca1b36d633019f2a77c81d27839486f7b43c8e4a55215c2cc
+**Request Id**: review:91ef58bebb8b05540ad4532be6a58acb
+**Review Record**: .aidlc-engine/reviews/nfr-design/units/nc3-revisit-facts/7332c702b7dcc515/1.json
+**Review Record Digest**: sha256:b2e18de91efcd995d59d5e97fbb87aaa993fbeb39ae582a02f7474bb4bfddd2c
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-11T05:42:10Z
+**Event**: UNIT_COMPLETED
+**Stage**: nfr-design
+**Unit**: nc3-revisit-facts
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
