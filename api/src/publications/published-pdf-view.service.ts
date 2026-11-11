@@ -8,7 +8,7 @@ import { pipeline } from 'node:stream/promises';
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { errorName } from '../ai-run/ai-run-spec';
-import { FILE_STORAGE, FileNotFound, type FileStorage } from '../file-storage/file-storage';
+import { FILE_STORAGE, FileNotFound, type FileStorage, storageFailureFields } from '../file-storage/file-storage';
 import { isLinkTokenFormat } from '../share-links/link-token';
 import { DbPublicationAccess } from './db-publication-access';
 import { LinkPasswordRequired, LinkUnavailable, NotFound, type RecipientAccess } from './publication-access';
@@ -129,7 +129,7 @@ export class PublishedPdfViewService {
       stream = await this.files.get(copy.pdfCopyKey);
     } catch (error) {
       this.logger.error({ event: 'PDF_VIEW_FAILED', stage: 'before-headers', status: 500, reason: error instanceof FileNotFound ? 'file-missing' : 'storage',
-        publicationId: copy.publicationId, publishedItemId: copy.publishedItemId, error: errorName(error) });
+        publicationId: copy.publicationId, publishedItemId: copy.publishedItemId, error: errorName(error), ...storageFailureFields(error) });
       throw error;
     }
     for (const [name, value] of Object.entries(PDF_COPY_HEADERS)) response.setHeader(name, value);
@@ -140,7 +140,7 @@ export class PublishedPdfViewService {
       // pipeline이 두 스트림을 이미 끊었다. 받는 쪽이 먼저 끊은 경우(premature close)는 우리 실패가 아니라 기록하지 않는다.
       if ((error as { code?: unknown }).code === 'ERR_STREAM_PREMATURE_CLOSE') return;
       this.logger.error({ event: 'PDF_VIEW_FAILED', stage: 'streaming', status: 'aborted', reason: 'storage',
-        publicationId: copy.publicationId, publishedItemId: copy.publishedItemId, error: errorName(error) });
+        publicationId: copy.publicationId, publishedItemId: copy.publishedItemId, error: errorName(error), ...storageFailureFields(error) });
       if (!response.destroyed) response.destroy();
     }
   }

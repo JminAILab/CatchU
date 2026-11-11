@@ -296,6 +296,25 @@ test('U-5: 저장소가 설정되지 않았거나 put이 실패하면 500이고 
   assert.deepEqual(await storedFiles(), []);
   assert.ok(logsContain('PDF_UPLOAD_STORE_FAILED'));
   assertNoSecretsInLogs([SECRET_TITLE, SECRET_FILE_NAME, 'members/']);
+
+  // #521 리뷰: 저장 실패 로그는 저장소 사유와 원인 오류 이름으로 설정 누락·권한·파일 시스템 오류를 가린다.
+  // 원인의 문구에는 버킷·키·경로가 들어갈 수 있어 이름(또는 Node 오류 코드)만 남긴다.
+  const storeFailures = () => allLogs().filter((log) => log.args?.[0]?.event === 'PDF_UPLOAD_STORE_FAILED')
+    .map((log) => [log.args[0].stage, log.args[0].error, log.args[0].storageReason, log.args[0].cause]);
+  assert.deepEqual(storeFailures(), [['put', 'StorageUnavailable', 'NOT_CONFIGURED', null], ['put', 'StorageUnavailable', 'IO_FAILED', null]],
+    '미설정은 NOT_CONFIGURED, 원인 없는 실패는 사유만');
+  const BUCKET = 'synthetic-upload-bucket';
+  const sdkError = Object.assign(new Error(`AccessDenied on s3://${BUCKET}/members/secret-upload-key.pdf`), { name: 'AccessDenied' });
+  const fsError = Object.assign(new Error(`EACCES: permission denied, open 'C:\\secret-root\\members\\secret-upload-key.pdf'`), { code: 'EACCES' });
+  const oddName = Object.assign(new Error('x'), { name: `bad name s3://${BUCKET}` });
+  for (const [cause, expected] of [[sdkError, 'AccessDenied'], [fsError, 'EACCES'], [oddName, null]]) {
+    server.logs.length = 0;
+    plain.logs.length = 0;
+    storage.put = async () => { throw new StorageUnavailable('IO_FAILED', { cause }); };
+    expectError(await upload(server, member.token, { title: SECRET_TITLE, fileName: SECRET_FILE_NAME }), 500, 'INTERNAL_ERROR');
+    assert.deepEqual(storeFailures(), [['put', 'StorageUnavailable', 'IO_FAILED', expected]]);
+    assertNoSecretsInLogs([BUCKET, 'secret-upload-key', 'secret-root', 'permission denied', 'members/', SECRET_TITLE, SECRET_FILE_NAME]);
+  }
 });
 
 test('U-6: put 뒤 DB 쓰기가 실패하면 파일을 한 번 지우고 500이며, 그 삭제가 실패하면 PDF_UPLOAD_STORE_FAILED 로그만 남는다(키·제목·파일 이름 없음)', async (t) => {

@@ -35,6 +35,23 @@ export class StorageUnavailable extends Error {
   }
 }
 
+const SAFE_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+
+/**
+ * 저장 실패를 로그에 남길 때 쓰는 두 칸(#521 리뷰). `StorageUnavailable`이라는 이름만으로는 설정 누락·권한·네트워크를
+ * 가릴 수 없어, 저장소 사유(`reason`)와 원인 오류의 이름을 함께 남긴다.
+ * 원인은 **이름만** 싣는다. 오류 문구·경로·요청 정보에는 키·버킷·로컬 경로가 들어갈 수 있어 읽지 않는다.
+ * 이름이 그냥 `Error`이면 Node 파일 오류의 `code`(예: `EACCES`)를 쓴다. 이름이 글자·숫자·밑줄이 아니면 버린다.
+ */
+export function storageFailureFields(error: unknown): { storageReason: StorageUnavailableReason | null; cause: string | null } {
+  if (!(error instanceof StorageUnavailable)) return { storageReason: null, cause: null };
+  const cause: unknown = error.cause;
+  if (cause === undefined || cause === null || typeof cause !== 'object') return { storageReason: error.reason, cause: null };
+  const { name, code } = cause as { name?: unknown; code?: unknown };
+  const picked = typeof name === 'string' && name !== 'Error' ? name : code;
+  return { storageReason: error.reason, cause: typeof picked === 'string' && SAFE_NAME.test(picked) ? picked : null };
+}
+
 /** 계약의 키 배치가 아닌 키·접두어(호출자 버그, BR6.2). 파일을 건드리지 않는다. */
 export class InvalidStorageKey extends Error {
   override readonly name = 'InvalidStorageKey';

@@ -7,7 +7,7 @@ import { AiConsentGate } from '../ai-consent/ai-consent.gate';
 import { errorName } from '../ai-run/ai-run-spec';
 import { CurrentMemberId } from '../auth/auth.decorators';
 import { ApiError } from '../common/errors';
-import { FILE_STORAGE, FileNotFound, type FileStorage, materialKey } from '../file-storage/file-storage';
+import { FILE_STORAGE, FileNotFound, type FileStorage, materialKey, storageFailureFields } from '../file-storage/file-storage';
 import { PDF_EXTRACT_DISPATCHER, type PdfExtractDispatchResult, type PdfExtractDispatcher } from '../pdf-extraction/pdf-extract.dispatcher';
 import { pdfExtractMessage } from '../pdf-extraction/pdf-extraction-spec';
 import { readPdfUpload } from './pdf-material-input';
@@ -29,6 +29,7 @@ const PDF_FILE_HEADERS = Object.freeze({
  * 업로드 순서(BR1.3·BR1.6·BR2.4, 성능 설계): 인증 → 동의(본문을 읽기 전) → multipart 검사 → FileStorage.put → 트랜잭션(잠금·COUNT·INSERT)
  * → 커밋 → 추출 요청 발송(실패는 로그만) → 201. put 뒤 DB 실패·벌 수 초과는 파일을 한 번 지운다.
  * 로그에는 pdfMaterialId·memberId·사건 이름·단계·오류 이름만 남긴다. 키·제목·파일 이름·글은 넣지 않는다(관측 설계 §1, NFR1.4).
+ * 저장소 실패에는 저장소 사유(storageReason)와 원인 오류 이름(cause)을 더해 설정 누락·권한·네트워크를 가린다(#521 리뷰).
  */
 @Controller('pdf-materials')
 export class PdfMaterialsController {
@@ -114,7 +115,7 @@ export class PdfMaterialsController {
       stream = await this.files.get(owned.storageKey);
     } catch (error) {
       this.logger.error({ event: 'PDF_VIEW_FAILED', stage: 'before-headers', status: 500, reason: error instanceof FileNotFound ? 'file-missing' : 'storage',
-        pdfMaterialId: owned.pdfMaterialId, memberId: memberId.toLowerCase(), error: errorName(error) });
+        pdfMaterialId: owned.pdfMaterialId, memberId: memberId.toLowerCase(), error: errorName(error), ...storageFailureFields(error) });
       throw error;
     }
     for (const [name, value] of Object.entries(PDF_FILE_HEADERS)) response.setHeader(name, value);
@@ -125,7 +126,7 @@ export class PdfMaterialsController {
       // pipeline이 두 스트림을 이미 끊었다. 받는 쪽이 먼저 끊은 경우(premature close)는 우리 실패가 아니라 기록하지 않는다.
       if ((error as { code?: unknown }).code === 'ERR_STREAM_PREMATURE_CLOSE') return;
       this.logger.error({ event: 'PDF_VIEW_FAILED', stage: 'streaming', status: 'aborted', reason: 'storage',
-        pdfMaterialId: owned.pdfMaterialId, memberId: memberId.toLowerCase(), error: errorName(error) });
+        pdfMaterialId: owned.pdfMaterialId, memberId: memberId.toLowerCase(), error: errorName(error), ...storageFailureFields(error) });
       if (!response.destroyed) response.destroy();
     }
   }
@@ -139,14 +140,14 @@ export class PdfMaterialsController {
     try {
       await this.files.delete(owned.storageKey);
     } catch (error) {
-      this.logger.error({ event: 'PDF_DELETE_STORAGE_FAILED', pdfMaterialId: owned.pdfMaterialId, memberId: memberId.toLowerCase(), error: errorName(error) });
+      this.logger.error({ event: 'PDF_DELETE_STORAGE_FAILED', pdfMaterialId: owned.pdfMaterialId, memberId: memberId.toLowerCase(), error: errorName(error), ...storageFailureFields(error) });
       throw error;
     }
     await this.materials.remove(memberId, id);
   }
 
   private storeFailed(stage: 'put' | 'db' | 'compensate-delete', pdfMaterialId: string, memberId: string, error: unknown): void {
-    this.logger.error({ event: 'PDF_UPLOAD_STORE_FAILED', stage, pdfMaterialId, memberId, error: errorName(error) });
+    this.logger.error({ event: 'PDF_UPLOAD_STORE_FAILED', stage, pdfMaterialId, memberId, error: errorName(error), ...storageFailureFields(error) });
   }
 
   /** put 뒤 DB 쓰기 실패·벌 수 초과의 보상: 파일을 한 번 지운다. 그 삭제도 실패하면 로그만 남긴다(남은 파일은 탈퇴 때 memberPrefix로 지워진다). */

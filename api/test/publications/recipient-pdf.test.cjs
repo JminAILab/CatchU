@@ -342,7 +342,7 @@ test('V-4: 사본 행은 있는데 파일이 없거나 저장소가 실패하면
   }
   assert.deepEqual(viewLogs().map((log) => [log.level, log.entry]), Array.from({ length: 2 }, () => ['error', {
     event: 'PDF_VIEW_FAILED', stage: 'before-headers', status: 500, reason: 'file-missing',
-    publicationId: published.publicationId, publishedItemId: itemId, error: 'FileNotFound',
+    publicationId: published.publicationId, publishedItemId: itemId, error: 'FileNotFound', storageReason: null, cause: null,
   }]));
 
   // 저장소 장애(대역): 이유가 storage로 나뉜다.
@@ -351,7 +351,24 @@ test('V-4: 사본 행은 있는데 파일이 없거나 저장소가 실패하면
   refused(await asRecipient(published.token, itemId), 500, 'INTERNAL_ERROR', '저장소 장애');
   assert.deepEqual(viewLogs().map((log) => [log.entry.stage, log.entry.status, log.entry.reason, log.entry.error]),
     [['before-headers', 500, 'storage', 'StorageUnavailable']]);
+  assert.deepEqual(viewLogs().map((log) => [log.entry.storageReason, log.entry.cause]), [['IO_FAILED', null]], '원인 오류가 없으면 사유만 남는다');
   assertNoSecrets(server.logs);
+
+  // #521 리뷰: 원인 오류가 있으면 그 이름만 더 남긴다. 원인의 문구(버킷·키·경로가 들어갈 수 있다)는 싣지 않는다.
+  const BUCKET = 'synthetic-view-bucket';
+  const denied = Object.assign(new Error(`Access Denied: s3://${BUCKET}/members/${a.memberId}/secret-view-key.pdf`), { name: 'AccessDenied' });
+  const unconfigured = new StorageUnavailable('NOT_CONFIGURED');
+  for (const [failure, expected] of [
+    [new StorageUnavailable('IO_FAILED', { cause: denied }), ['IO_FAILED', 'AccessDenied']],
+    [unconfigured, ['NOT_CONFIGURED', null]],
+  ]) {
+    server.logs.length = 0;
+    swapStorage({ get: async () => { throw failure; } });
+    refused(await asOwner(a, published.publicationId, itemId), 500, 'INTERNAL_ERROR', `저장소 사유 ${expected[0]}`);
+    assert.deepEqual(viewLogs().map((log) => [log.entry.error, log.entry.storageReason, log.entry.cause]), [['StorageUnavailable', ...expected]]);
+    const text = JSON.stringify(server.logs);
+    for (const secret of [BUCKET, 'secret-view-key', 'Access Denied', 'members/']) assert.ok(!text.includes(secret), `로그에 ${secret}이 없다`);
+  }
 });
 
 test('V-6: 작성자는 자기 발행본의 PDF 사본을 중지·만료 뒤에도 열고, 남의 발행본·그 발행본에 없는 항목·PDF가 아닌 항목은 같은 404이며 토큰이 없으면 401이다', async () => {
@@ -461,8 +478,8 @@ test('V-7: 전송 도중 스트림이 실패하면 연결을 끊어 본문 수�
     for (let waited = 0; viewLogs().length === 0 && waited < 2000; waited += 20) await new Promise((done) => setTimeout(done, 20));
     assert.deepEqual(viewLogs().map((log) => [log.level, log.entry]), [['error', {
       event: 'PDF_VIEW_FAILED', stage: 'streaming', status: 'aborted', reason: 'storage',
-      publicationId: published.publicationId, publishedItemId: itemId, error: 'StorageUnavailable',
-    }]], label);
+      publicationId: published.publicationId, publishedItemId: itemId, error: 'StorageUnavailable', storageReason: null, cause: null,
+    }]], label); // 이 대역 오류는 이름만 같은 일반 오류라 저장소 사유가 없다
     assertNoSecrets(server.logs);
   }
 

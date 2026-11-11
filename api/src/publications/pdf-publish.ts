@@ -5,7 +5,7 @@
 import { Logger, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { ApiError } from '../common/errors';
-import { type FileStorage, materialKey, publicationPrefix, publishedPdfKey } from '../file-storage/file-storage';
+import { type FileStorage, materialKey, publicationPrefix, publishedPdfKey, storageFailureFields } from '../file-storage/file-storage';
 import { readPdfStatesForPublish } from '../materials/pdf-material-store';
 import type { PublishItemInput } from './publish-input';
 
@@ -80,7 +80,7 @@ export async function copyPdfs(
     try {
       await files.copy(materialKey(owner, item.sourceId), publishedPdfKey(owner, publicationId, item.publishedItemId));
     } catch (error) {
-      logger.warn({ event: 'PDF_COPY_FAILED', publicationId, errorType: errorType(error) });
+      logger.warn({ event: 'PDF_COPY_FAILED', publicationId, errorType: errorType(error), ...storageFailureFields(error) });
       await cleanupPrefix(files, owner, publicationId, 3);
       throw new PdfCopyFailedError();
     }
@@ -92,7 +92,7 @@ export async function cleanupPrefix(files: FileStorage, owner: string, publicati
   try {
     await files.deletePrefix(publicationPrefix(owner, publicationId));
   } catch (error) {
-    logger.error({ event: 'PREFIX_CLEANUP_FAILED', publicationId, stage, errorType: errorType(error) });
+    logger.error({ event: 'PREFIX_CLEANUP_FAILED', publicationId, stage, errorType: errorType(error), ...storageFailureFields(error) });
   }
 }
 
