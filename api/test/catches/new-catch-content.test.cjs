@@ -30,6 +30,10 @@ function candidate() {
       contributionScope: '[합성] 해당 분기 구현',
       coverageLimits: ['[합성] 외부 호출은 검증하지 않았다.'],
     }],
+    // Result v4(NC3): 다시 볼 곳 사실과 작업 시각.
+    revisitFacts: [],
+    firstWorkAt: '2026-09-28T01:00:00Z',
+    lastWorkAt: '2026-09-28T02:00:00Z',
   };
 }
 

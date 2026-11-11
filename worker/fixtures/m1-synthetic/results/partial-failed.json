@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "3",
+  "schemaVersion": "4",
   "messageId": "message-{{caseId}}-{{attemptId}}-result",
   "resultId": "result-{{caseId}}-{{attemptId}}",
   "requestId": "{{requestId}}",
@@ -54,7 +54,10 @@
       },
       "ownCommitShas": [
         "0000000000000000000000000000000000000021"
-      ]
+      ],
+      "revisitFacts": [],
+      "firstWorkAt": "2026-09-30T11:00:00Z",
+      "lastWorkAt": "2026-09-30T11:00:00Z"
     }
   ],
   "notProvided": [],

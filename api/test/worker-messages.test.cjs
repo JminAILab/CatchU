@@ -68,6 +68,47 @@ for (const spec of cases.negativeControls) {
   });
 }
 
+// NC3 결과 v4(C4)의 모양 경계. 종류별 개수·소속·시각 순서는 등록 입력 검사가 본다(registration-batch 시험).
+function resultWithFacts(revisitFacts) {
+  const message = fill('results/succeeded-one-candidate.json', 'succeeded-one-candidate');
+  message.candidates[0].revisitFacts = revisitFacts;
+  return message;
+}
+const fact = (overrides = {}) => ({ kind: 'TEST_FILES_PRESENT', paths: ['tests/a.test.ts'], commits: ['a'.repeat(40)], ...overrides });
+
+test('NC3 S19 결과 v4는 판본 "3"을 거부하고, 새 칸 셋 가운데 하나라도 빠지면 거부한다', () => {
+  const valid = fill('results/succeeded-one-candidate.json', 'succeeded-one-candidate');
+  assert.equal(checkMessage('Result', valid).verdict, Verdict.VALID);
+  assert.equal(checkMessage('Result', { ...valid, schemaVersion: '3' }).verdict, Verdict.SCHEMA_INVALID);
+  for (const field of ['revisitFacts', 'firstWorkAt', 'lastWorkAt']) {
+    const missing = structuredClone(valid);
+    delete missing.candidates[0][field];
+    assert.equal(checkMessage('Result', missing).verdict, Verdict.SCHEMA_INVALID, field);
+  }
+  const badTime = structuredClone(valid);
+  badTime.candidates[0].lastWorkAt = '2026-02-30T00:00:00Z';
+  assert.equal(checkMessage('Result', badTime).verdict, Verdict.SCHEMA_INVALID);
+});
+
+test('NC3 NFR1.4 RevisitFact는 모르는 칸·모르는 kind·31번째 사실·21개 경로·1,025자 경로·짧은 식별값을 거부한다', () => {
+  assert.equal(checkMessage('Result', resultWithFacts(Array.from({ length: 30 }, () => fact()))).verdict, Verdict.VALID);
+  assert.equal(checkMessage('Result', resultWithFacts([fact({ paths: ['가'.repeat(1024)] })])).verdict, Verdict.VALID);
+  const rejected = [
+    Array.from({ length: 31 }, () => fact()),
+    [{ ...fact(), line: '숨긴 줄 글자' }],
+    [fact({ kind: 'RENAMED' })],
+    [fact({ paths: Array.from({ length: 21 }, (_, index) => `tests/${index}.test.ts`) })],
+    [fact({ commits: Array.from({ length: 21 }, (_, index) => index.toString(16).padStart(40, '0')) })],
+    [fact({ paths: ['가'.repeat(1025)] })],
+    [fact({ paths: [''] })],
+    [fact({ commits: ['a'.repeat(7)] })],
+    [fact({ commits: ['A'.repeat(40)] })],
+  ];
+  for (const facts of rejected) {
+    assert.equal(checkMessage('Result', resultWithFacts(facts)).verdict, Verdict.SCHEMA_INVALID);
+  }
+});
+
 test('식별자는 비어 있지 않은 문자열일 때만 읽힌다', () => {
   assert.deepEqual(unidentifiedFields([]), ['resultId', 'requestId', 'attemptId']);
   assert.deepEqual(unidentifiedFields({ resultId: 'r', requestId: ' ', attemptId: null }), [

@@ -13,7 +13,13 @@ test('제목 nullable 마이그레이션은 기존 자료·빈 제목 제약을 
     const [registration] = await db.transaction(manager => registerCandidates(manager, input));
     const [original] = await db.query('SELECT * FROM catch_asset WHERE catch_id = $1', [registration.catchId]);
     // 제목 migration만 남긴 뒤에는 그보다 나중인 작성자 설명 칸(C-14)이 없다.
-    const withoutDescription = Object.fromEntries(Object.entries(original).filter(([column]) => !column.startsWith('author_description')));
+    // NC3 다시 볼 곳 칸 셋(revisit_facts·first_work_at·last_work_at)도 그보다 나중이라 없다.
+    const laterColumns = ['revisit_facts', 'first_work_at', 'last_work_at'];
+    const withoutDescription = Object.fromEntries(Object.entries(original).filter(([column]) =>
+      !column.startsWith('author_description') && !laterColumns.includes(column)));
+    // 되돌렸다 다시 올리면 NC3 칸은 옛 행의 기본값(빈 배열·NULL)이 된다(BR6.2).
+    const reapplied = { ...original, revisit_facts: [], first_work_at: null, last_work_at: null };
+    await db.undoLastMigration(); // NC3 다시 볼 곳 칸 셋을 먼저 되돌린다.
     await db.undoLastMigration(); // CR2 소속 기록 표를 먼저 되돌린다.
     await db.undoLastMigration(); // U4 작성자 설명 칸(C-14)을 먼저 되돌린다.
     await db.undoLastMigration(); // #387 B 연쇄 삭제를 먼저 되돌린다.
@@ -24,9 +30,10 @@ test('제목 nullable 마이그레이션은 기존 자료·빈 제목 제약을 
       error => error.driverError?.code === '23502');
     await db.runMigrations();
     assert.equal(await nullable(), 'YES');
-    assert.deepEqual((await db.query('SELECT * FROM catch_asset WHERE catch_id = $1', [registration.catchId]))[0], original);
+    assert.deepEqual((await db.query('SELECT * FROM catch_asset WHERE catch_id = $1', [registration.catchId]))[0], reapplied);
     await assert.rejects(db.query('UPDATE catch_asset SET title = $1 WHERE catch_id = $2', ['', registration.catchId]),
       error => error.driverError?.code === '23514');
+    await db.undoLastMigration(); // NC3 다시 볼 곳 칸 셋을 먼저 되돌린다.
     await db.undoLastMigration(); // CR2 소속 기록 표를 먼저 되돌린다.
     await db.undoLastMigration(); // U4 작성자 설명 칸(C-14)을 먼저 되돌린다.
     await db.undoLastMigration(); // #387 B 연쇄 삭제

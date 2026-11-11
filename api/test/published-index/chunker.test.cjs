@@ -182,3 +182,28 @@ test('NC2 AC6.5.1·AC6.5.2 새 칸 넷과 본인 커밋 표지 글자는 조각�
   assert.ok(drafts.at(-1).text.includes('https://github.com/synthetic-owner/synthetic-repo/blob/ba6bba8/a.ts#L3'), '링크는 원래 주소 글자 그대로');
   assertExactSlices([catchItem(value)], drafts);
 });
+
+// 새 Catch NC3 — 다시 볼 곳 사실과 작업 시각은 사본·조각 재료가 아니다(BR6.3, S8·AC9.4.1·AC11.1.4).
+// 먼저 정한 실패 조건: 원본 행에 사실·시각이 있을 때 사본이나 조각 글에 사실 경로·커밋 식별값·시각 글자가 나옴.
+test('NC3 S8 원본 행에 다시 볼 곳 사실·작업 시각이 있어도 사본과 조각에 그 글자가 0건이다', () => {
+  const { buildCatchSnapshot } = require('../../dist/publications/snapshot-builder');
+  const commit = (letter) => letter.repeat(40);
+  const row = {
+    catchId: CATCH_ID, title: 't', workFacts: ['[합성] 사실'], subjectContribution: '[합성] 기여', draftStatus: 'NOT_GENERATED',
+    draftContent: null, authorDescription: '[합성] 설명', authorDescriptionUpdatedAt: new Date('2026-11-10T00:00:00Z'), mismatch: false,
+    visibility: 'PRIVATE', workFactsConfirmed: true, contributionConfirmed: true, requestMemberId: CATCH_ID, repositoryId: 'r',
+    repositoryOwner: 'o', repositoryName: 'n',
+    // 발행 질의가 이 칸을 읽지 않지만, 잘못 읽혀 넘어와도 사본에 옮기지 않는지 본다.
+    revisitFacts: [{ kind: 'REWORKED_LINES', paths: ['src/REVISITMARKER/a.ts'], commits: [commit('7'), commit('8')] }],
+    firstWorkAt: new Date('2025-03-02T10:00:00Z'), lastWorkAt: new Date('2025-04-10T09:30:00Z'),
+  };
+  const evidence = [{ catchId: CATCH_ID, sourceUrl: 'https://github.com/o/n/pull/1', sourceRevision: 'v', representedFacts: ['[합성] 근거'],
+    coverageLimits: [], ownCommit: false }];
+  const snapshot = buildCatchSnapshot(row, evidence);
+  const drafts = buildChunkDrafts([catchItem(snapshot)]);
+  const text = JSON.stringify([snapshot, drafts]);
+  for (const marker of ['REVISITMARKER', commit('7'), commit('8'), '2025-03-02', '2025-04-10', 'revisitFacts', 'WorkAt', 'REWORKED_LINES']) {
+    assert.equal(text.includes(marker), false, marker);
+  }
+  assert.ok(drafts.length > 0);
+});

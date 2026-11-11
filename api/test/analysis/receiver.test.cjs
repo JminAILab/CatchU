@@ -116,7 +116,7 @@ test('식별 가능한 형식/의미 오류는 REJECTED/SCHEMA_INVALID이고 입
   assert.equal(store.commits, 0);
 });
 
-test('CR2 결과 v3: "3"과 본인 커밋 목록은 받고, "2" 결과와 본인 커밋 목록 빠짐·형식 오류는 SCHEMA_INVALID다', async () => {
+test('CR2 본인 커밋 목록: 결과 판본 안의 본인 커밋 목록은 받고, "2" 결과와 본인 커밋 목록 빠짐·형식 오류는 SCHEMA_INVALID다', async () => {
   const sha = (letter) => letter.repeat(40);
   const accepted = harness();
   const valid = result({ candidates: [{ ...candidate(), ownCommitShas: [sha('c'), sha('a')] }] });
@@ -140,6 +140,30 @@ test('CR2 결과 v3: "3"과 본인 커밋 목록은 받고, "2" 결과와 본인
   assert.equal(store.commits, 0);
   // 상한 3,000개는 받는다.
   assert.equal(validator.result(withShas(many.slice(0, 3000))), true);
+});
+
+test('NC3 S19 결과 v4: 다시 볼 곳 사실과 작업 시각이 든 "4"는 받고, "3" 결과와 새 칸 빠짐은 SCHEMA_INVALID다', async () => {
+  const sha = (letter) => letter.repeat(40);
+  const accepted = harness();
+  const facts = [{ kind: 'REWORKED_LINES', paths: ['src/a.ts'], commits: [sha('a'), sha('b')] }];
+  const output = await accepted.receiver.receiveResult(result({
+    candidates: [{ ...candidate(), ownCommitShas: [sha('b'), sha('a')], revisitFacts: facts }],
+  }));
+  assert.equal(output.receipt.disposition, 'ACCEPTED');
+  assert.deepEqual(output.accepted.result.candidates[0].revisitFacts, facts);
+  assert.equal(output.accepted.result.candidates[0].firstWorkAt, '2026-09-28T01:00:00Z');
+
+  const { receiver, store } = harness();
+  const invalids = [result({ schemaVersion: '3' })];
+  for (const field of ['revisitFacts', 'firstWorkAt', 'lastWorkAt']) {
+    const missing = result(); delete missing.candidates[0][field]; invalids.push(missing);
+  }
+  for (const input of invalids) {
+    const rejected = await receiver.receiveResult(input);
+    assert.equal(rejected.receipt.disposition, 'REJECTED');
+    assert.equal(rejected.receipt.code, 'SCHEMA_INVALID');
+  }
+  assert.equal(store.commits, 0);
 });
 
 test('회원/저장소/동의/범위/자료 모드/요청과 현재 시도를 접수 정본과 대조한다', async () => {

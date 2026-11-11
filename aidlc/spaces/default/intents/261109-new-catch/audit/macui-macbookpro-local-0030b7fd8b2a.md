@@ -19397,3 +19397,962 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
 
 ---
+
+## Unit Skipped
+**Timestamp**: 2026-11-11T05:43:37Z
+**Event**: UNIT_SKIPPED
+**Stage**: infrastructure-design
+**Unit**: nc3-revisit-facts
+**Reason**: NC3는 인프라 변경이 없다: 새 AWS 자원·배포 단위·환경변수가 없다. catch_asset 칸 셋 마이그레이션은 지금처럼 api 기동 때 돈다. api·worker 함께 배포는 기존 개발 서버 자동 배포(deploy-dev-server.yml)가 같은 커밋 태그의 api·worker 이미지를 함께 바꾸므로 그대로 된다. CI는 결과 계약(api/contracts/repository-analysis/) 변경에 api·worker 시험을 이미 돌린다(NFR 설계 logical-components·reliability-design 3절).
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Stage Skip
+**Timestamp**: 2026-11-11T05:43:37Z
+**Event**: STAGE_SKIPPED
+**Stage**: infrastructure-design
+**Reason**: No unit needs this stage; the last, "nc3-revisit-facts", was skipped: NC3는 인프라 변경이 없다: 새 AWS 자원·배포 단위·환경변수가 없다. catch_asset 칸 셋 마이그레이션은 지금처럼 api 기동 때 돈다. api·worker 함께 배포는 기존 개발 서버 자동 배포(deploy-dev-server.yml)가 같은 커밋 태그의 api·worker 이미지를 함께 바꾸므로 그대로 된다. CI는 결과 계약(api/contracts/repository-analysis/) 변경에 api·worker 시험을 이미 돌린다(NFR 설계 logical-components·reliability-design 3절).
+**Skip Kind**: conditional-runtime
+
+---
+
+## Plan Approval Blocked
+**Timestamp**: 2026-11-11T05:44:22Z
+**Event**: PLAN_APPROVAL_BLOCKED
+**Guard**: plan-approval-guard
+**Reason**: plan-approval
+**Tool**: Bash
+**Target**: aidlc engine state unit start --stage code-generation --unit nc3-revisit-facts; D=aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Stage**: code-generation
+**Unit**: nc3-revisit-facts
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:46:55Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T05:47:26Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/unit-test-instructions.md
+**Context**: construction > nc3-revisit-facts > code-generation > unit-test-instructions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T06:02:13Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Request Changes"]
+**Message Id**: 9a5e12d4
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-11T06:02:14Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: Request Changes
+**Checkpoint**: plan-approval
+**Plan Target**: unit:nc3-revisit-facts
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Asked By**: engine
+**Person Reply**: Request Changes
+**Message Id**: 9a5e12d4
+**Unit**: nc3-revisit-facts
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T06:02:14Z
+**Event**: QUESTION_REPLIED
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Question**: Approve the code plan for nc3-revisit-facts?
+**Reply**: Request Changes
+**Options**: ["Approve Plan","Request Changes","I'll edit the files"]
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T06:02:42Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: picker
+**Picked**: ["\"계획은 그대로 좋다. 하나만 더한다. NFR 요구 Q1 B(판정 실패는 그 후보 사실만 비움)의 빈틈이다.\\r지금 계획은 RevisitFacts 안에서 난 예외만 잡는다. 그런데 결과가 규격을 어기면 예외 없이 지나가 분석 전체가 실패한다. 상한(사실 30개, 경로·커밋 20개, 경로 1,024자)을 어기면 worker가 보내기 전 계약 검사(consumer/parent.py `_valid_result`)에서 WORKER_DEFECT가 되고, 종류별 개수·소속·겹침을 어기면 api 등록 검사가 결과 전체를 거부해 Catch가 0개가 된다. 같은 입력이면 다시 분석해도 똑같다.\\r- Step 5: RevisitFacts가 끝에서 자기 결과를 api 등록 검사와 같은 규칙(전체 30개, 사실마다 경로·커밋 20개, 경로 1,024자, 종류별 경로·커밋 개수, 커밋이 그 후보 본인 커밋 안, 한 사실 안 겹침 없음)으로 확인하고, 어기면 기록 없는 식별값과 같은 정해진 예외를 낸다. 그러면 Step 8의 감싸기가 함께 잡는다.\\r- Step 6·Step 8 시험과 unit-test-instructions.md 「실패 조건」의 판정 실패 묶음에 한 줄을 더한다: 판정 결과가 규격을 어기면 그 후보 사실만 비고 로그 한 줄이 남으며, 다른 후보 사실과 결과 전송은 그대로다.\\r- api·web 검사는 바깥 경계로 그대로 둔다.\""]
+**Message Id**: b55370e1
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T06:02:43Z
+**Event**: QUESTION_REPLIED
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Question**: 코드 계획에서 무엇을 바꿀까요?
+**Reply**: "계획은 그대로 좋다. 하나만 더한다. NFR 요구 Q1 B(판정 실패는 그 후보 사실만 비움)의 빈틈이다.\r지금 계획은 RevisitFacts 안에서 난 예외만 잡는다. 그런데 결과가 규격을 어기면 예외 없이 지나가 분석 전체가 실패한다. 상한(사실 30개, 경로·커밋 20개, 경로 1,024자)을 어기면 worker가 보내기 전 계약 검사(consumer/parent.py `_valid_result`)에서 WORKER_DEFECT가 되고, 종류별 개수·소속·겹침을 어기면 api 등록 검사가 결과 전체를 거부해 Catch가 0개가 된다. 같은 입력이면 다시 분석해도 똑같다.\r- Step 5: RevisitFacts가 끝에서 자기 결과를 api 등록 검사와 같은 규칙(전체 30개, 사실마다 경로·커밋 20개, 경로 1,024자, 종류별 경로·커밋 개수, 커밋이 그 후보 본인 커밋 안, 한 사실 안 겹침 없음)으로 확인하고, 어기면 기록 없는 식별값과 같은 정해진 예외를 낸다. 그러면 Step 8의 감싸기가 함께 잡는다.\r- Step 6·Step 8 시험과 unit-test-instructions.md 「실패 조건」의 판정 실패 묶음에 한 줄을 더한다: 판정 결과가 규격을 어기면 그 후보 사실만 비고 로그 한 줄이 남으며, 다른 후보 사실과 결과 전송은 그대로다.\r- api·web 검사는 바깥 경계로 그대로 둔다."
+**Options**: ["단계 나누기·순서","고칠 문서 목록","시험 범위·명령","최소 연결·고지 단계"]
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T06:02:51Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/answer-text/answer.txt
+**Context**: .aidlc-engine > answer-text > answer.txt
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:03:23Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:03:27Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:03:30Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:03:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/unit-test-instructions.md
+**Context**: construction > nc3-revisit-facts > code-generation > unit-test-instructions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T06:05:55Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve Plan"]
+**Message Id**: 58dcdc44
+
+---
+
+## Plan Approval Recorded
+**Timestamp**: 2026-11-11T06:05:55Z
+**Event**: PLAN_APPROVAL_RECORDED
+**Stage**: code-generation
+**Details**: Approve Plan
+**Checkpoint**: plan-approval
+**Plan Target**: unit:nc3-revisit-facts
+**Intent**: 01a1bde5-4f0a-722b-a5da-2cd6e564757e
+**Directive Epoch**: sha256:b0b5c85a7847a054b1bbfec1b9abf21f515c1bb3a326db72b8d825645de25370
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+**Approval Fingerprint**: sha256:v3:4d8e9da00f6c70621ecd1dd2fcf26928df0f79f6be9207925f9e858de38a8047
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-questions.md
+**Questions SHA-256**: e200771f536199d6c47fe84e605062002fd453617bebb5a5c88b09b050d97eb6
+**Prompt SHA-256**: 4b81c31141d65f7c7b824f6316ca061dd12523c001eb9c339c44e8a584f6cb7e
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Asked By**: engine
+**Person Reply**: Approve Plan
+**Message Id**: 58dcdc44
+**Unit**: nc3-revisit-facts
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T06:05:56Z
+**Event**: QUESTION_REPLIED
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Question**: Approve the code plan for nc3-revisit-facts?
+**Reply**: Approve Plan
+**Options**: ["Approve Plan","Request Changes","I'll edit the files"]
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-11T06:06:36Z
+**Event**: UNIT_STARTED
+**Stage**: code-generation
+**Unit**: nc3-revisit-facts
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-11T06:07:45Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-developer-agent
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T06:07:47Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: plan-approval
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: code-generation
+**Tool**: Agent
+**Details**: dispatch of aidlc-developer-agent
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:10:39Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:10:40Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:17:32Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:19:04Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:30:04Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:30:05Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:30:07Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:30:08Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:30:10Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:37:04Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:37:06Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:42:00Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:44:31Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:52:00Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T06:55:15Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:55:15Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md
+**Context**: construction > nc3-revisit-facts > functional-design > functional-spec.md
+**Summary Authorization Id**: 54a735154438ac01e9c8d8961fb6d64c066ecf1a5dcbfd07f851a9bc93c42f78
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T06:55:17Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:55:18Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md
+**Context**: construction > nc3-revisit-facts > functional-design > functional-spec.md
+**Summary Authorization Id**: 54a735154438ac01e9c8d8961fb6d64c066ecf1a5dcbfd07f851a9bc93c42f78
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T06:55:23Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/rules.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:55:23Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/rules.md
+**Context**: construction > nc3-revisit-facts > functional-design > rules.md
+**Summary Authorization Id**: 54a735154438ac01e9c8d8961fb6d64c066ecf1a5dcbfd07f851a9bc93c42f78
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T06:55:28Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: nfr-requirements
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-requirements/performance-requirements.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:55:29Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/nfr-requirements/performance-requirements.md
+**Context**: construction > nc3-revisit-facts > nfr-requirements > performance-requirements.md
+**Summary Authorization Id**: b375328d9fad7b93d919ac119022e88d38a9ed40d434ebdb042e1ec732639c68
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T06:55:49Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T06:56:17Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: state-transition
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Tool**: Bash
+**Details**: dynamic executable beyond guard inspection
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T06:56:24Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: state-transition
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Tool**: Bash
+**Details**: dynamic executable beyond guard inspection
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T06:56:54Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: state-transition
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Tool**: Bash
+**Details**: dynamic executable beyond guard inspection
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T06:57:00Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: state-transition
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Tool**: Bash
+**Details**: dynamic executable beyond guard inspection
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T06:57:31Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: aa884905e4dda331b
+**Message**: Full api suite is running in the background; I'll continue when it finishes.
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T06:57:36Z
+**Event**: HOST_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T06:57:43Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a07ba95cb79ebfbd9
+**Message**: 지금 어디까지 했는지 알려 줘
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T07:03:21Z
+**Event**: HOST_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T07:03:21Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: aa884905e4dda331b
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T07:09:04Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: picker
+**Picked**: ["3번으로 한다. NC1·NC2 확인 때 쓴 cr1 환경(~/catchu-local-live/cr1, catchu-cr1-db·catchu-cr1-valkey, api 3001, web은 127.0.0.1 말고 localhost:3000)을 쓴다.\r- 켜기 전에 cr1 DB를 ~/catchu-local-live/cr1/backup/cr1-before-nc3-20261111.dump로 백업한다.\r- 새 마이그레이션이 이미 있는 Catch 행에 오류 없이 붙는지 먼저 본다.\r- 합성(MOCK)은 이번 실행에서만 켜고 cr1 환경 파일은 고치지 않는다. 비밀값 파일은 열거나 출력하지 않는다. Google 로그인은 내가 브라우저에서 한다.\r- 볼 것: (1) 합성 분석으로 생긴 Catch 상세에서 「다시 볼 곳」이 근거 아래·Catch 설명 초안 위에 있고, 문장 다섯 꼴과 조사(「에서」「의」)가 맞는지(MOCK이라 커밋은 글자). (2) 옛 Catch에는 그 칸이 없는지. (3) 본인 목록에서 작업 시각이 있는 새 Catch가 위, 시각 없는 옛 Catch가 아래이고 「더 보기」가 빠짐·겹침 없이 이어지는지.\r- 이것은 합성 연결 확인이고 실제 분석 성공으로 보고하지 않는다.\r- 끝나면 api·worker·web과 cr1 컨테이너를 끈다. 시험 DB는 Unit 확인을 마친 뒤 끈다."]
+**Message Id**: 25101320
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T07:09:05Z
+**Event**: QUESTION_REPLIED
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Question**: Step 16 「최소 연결 첫 결과」(로컬에 api·web을 띄워 합성 분석 하나로 화면 확인)를 어떻게 할까요?
+**Reply**: 3번으로 한다. NC1·NC2 확인 때 쓴 cr1 환경(~/catchu-local-live/cr1, catchu-cr1-db·catchu-cr1-valkey, api 3001, web은 127.0.0.1 말고 localhost:3000)을 쓴다.\n- 켜기 전에 cr1 DB를 ~/catchu-local-live/cr1/backup/cr1-before-nc3-20261111.dump로 백업한다.\n- 새 마이그레이션이 이미 있는 Catch 행에 오류 없이 붙는지 먼저 본다.\n- 합성(MOCK)은 이번 실행에서만 켜고 cr1 환경 파일은 고치지 않는다. 비밀값 파일은 열거나 출력하지 않는다. Google 로그인은 내가 브라우저에서 한다.\n- 볼 것: (1) 합성 분석으로 생긴 Catch 상세에서 「다시 볼 곳」이 근거 아래·Catch 설명 초안 위에 있고, 문장 다섯 꼴과 조사(「에서」「의」)가 맞는지(MOCK이라 커밋은 글자). (2) 옛 Catch에는 그 칸이 없는지. (3) 본인 목록에서 작업 시각이 있는 새 Catch가 위, 시각 없는 옛 Catch가 아래이고 「더 보기」가 빠짐·겹침 없이 이어지는지.\n- 이것은 합성 연결 확인이고 실제 분석 성공으로 보고하지 않는다.\n- 끝나면 api·worker·web과 cr1 컨테이너를 끈다. 시험 DB는 Unit 확인을 마친 뒤 끈다.
+**Options**: ["빌드와 시험으로 넘김","지금 개발 DB를 만들어 확인","기존 컨테이너 재사용"]
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T07:13:10Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: picker
+**Picked**: ["개발 로그인 + Google 둘로 나눠 봄"]
+**Message Id**: d02a8199
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T07:13:10Z
+**Event**: QUESTION_REPLIED
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Question**: 합성 분석은 개발 로그인 회원만 됩니다. 최소 연결 확인을 어떻게 할까요?
+**Reply**: 개발 로그인 + Google 둘로 나눠 봄
+**Options**: ["개발 로그인 + Google 둘로 나눠 봄","개발 로그인만","마이그레이션·옛 Catch만 보고 나머지는 넘김"]
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T07:13:55Z
+**Event**: HOST_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T07:13:55Z
+**Event**: HOST_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T07:18:01Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a3e4796a6600719df
+**Message**: NC3 코드 생성의 마지막 단계로, 로컬 cr1 환경에서 「다시 볼 곳」을 직접 확인하는 중입니다. 서버들은 다 떠 있으니, localhost:3000에서 개발 로그인으로 합성 분석을 하나 돌려 새 Catch 상세를 봐 주세요.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T07:26:53Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: typed
+**Message Id**: 6ea93b38
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T07:30:42Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: abb49f5d78460a618
+**Message**: NC3 코드를 만든 뒤, 「다시 볼 곳」 화면을 직접 넣은 자료로 확인하는 단계입니다. localhost:3000에 Google로 들어가 「README.md 문서 수정」 상세와 목록 순서를 보시고 결과를 알려 주세요.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T07:41:37Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: typed
+**Message Id**: 66dd4588
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T07:42:21Z
+**Event**: HOST_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T07:42:21Z
+**Event**: HOST_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T07:42:21Z
+**Event**: HOST_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T07:42:42Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T07:43:12Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/traceability.json
+**Context**: construction > nc3-revisit-facts > code-generation > traceability.json
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T07:43:57Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/source-manifest.json
+**Context**: construction > nc3-revisit-facts > code-generation > source-manifest.json
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T07:44:45Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-summary.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-summary.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T07:44:54Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-summary.md
+**Context**: construction > nc3-revisit-facts > code-generation > code-summary.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T07:44:55Z
+**Event**: SENSOR_FIRED
+**Fire id**: 1ce7a133
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T07:44:55Z
+**Event**: SENSOR_PASSED
+**Fire id**: 1ce7a133
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-generation-plan.md
+**Duration ms**: 76
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T07:44:55Z
+**Event**: SENSOR_FIRED
+**Fire id**: cd207e79
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/unit-test-instructions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T07:44:55Z
+**Event**: SENSOR_PASSED
+**Fire id**: cd207e79
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/unit-test-instructions.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T07:44:55Z
+**Event**: SENSOR_FIRED
+**Fire id**: 8efbdc63
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T07:44:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: 8efbdc63
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/code-summary.md
+**Duration ms**: 79
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T07:44:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: eee25d3e
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T07:44:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: eee25d3e
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/traceability.json
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T07:44:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: cf76c232
+**Sensor ID**: traceability
+**Stage slug**: code-generation
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T07:44:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: cf76c232
+**Sensor ID**: traceability
+**Stage slug**: code-generation
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/code-generation/traceability.json
+**Duration ms**: 78
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-11-11T07:44:56Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: code-generation
+**Unit**: nc2-snapshot-fields
+**Checkpoint**: review-receipt
+**Changed**: api/docs/catch-registration-rules.md, api/test/publications/publish-api.test.cjs, api/test/published-index/chunker.test.cjs, web/src/features/publications/README.md, web/src/features/recipient/README.md, web/test/recipient.test.mjs
+**Recorded**: sha256:1709ff6d4e78f51418e40b2d4e418641feea0539f440c7472348bd3cdca660bf
+**Current**: sha256:f31a3371eb0740ee2916ad40bd177d10435997bb267b84a6126f4d05a6c1123c
+**Details**: api/docs/catch-registration-rules.md, api/test/publications/publish-api.test.cjs, api/test/published-index/chunker.test.cjs, web/src/features/publications/README.md, web/src/features/recipient/README.md, web/test/recipient.test.mjs changed after the nc2 snapshot fields Unit was reviewed; carrying on.
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-11-11T07:44:56Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: code-generation
+**Unit**: nc1-sections-and-links
+**Checkpoint**: review-receipt
+**Changed**: api/docs/catch-owner-read-preparation.md, api/src/catches/catch-reader.ts, api/src/catches/owner-catch-input.ts, api/src/catches/owner-catch-response.ts, api/src/catches/owner-catch-store.ts, api/test/catches/owner-catch-http.test.cjs, api/test/catches/owner-catch-response.test.cjs, web/src/features/assets/README.md, web/src/features/assets/assets-view.tsx, web/src/features/assets/catch-api.ts (and 5 more)
+**Recorded**: sha256:5542c2564b8b11c9de1126b7f25e6867bb2b5961a8065edff1cc567d560e1844
+**Current**: sha256:dffddaaad8215a77207b15363a6af2fe71417b3e437982926fc9689890f5c515
+**Details**: api/docs/catch-owner-read-preparation.md, api/src/catches/catch-reader.ts, api/src/catches/owner-catch-input.ts, api/src/catches/owner-catch-response.ts, api/src/catches/owner-catch-store.ts, api/test/catches/owner-catch-http.test.cjs, api/test/catches/owner-catch-response.test.cjs, web/src/features/assets/README.md, web/src/features/assets/assets-view.tsx, web/src/features/assets/catch-api.ts (and 5 more) changed after the nc1 sections and links Unit was reviewed; carrying on.
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-11T07:44:56Z
+**Event**: REVIEW_REQUESTED
+**Stage**: code-generation
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc3-revisit-facts
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:19d39adc036cd67c50e632be03371f0ccbc001bb9f305b076defae3377cace37
+**Request Id**: review:b15d1e8c810a8558cdc49951e66b373e
+**Source Fingerprint**: d5879826a0ef79c9202672756e98bd244f2cd20926515d05b6fe5a3a7909259c
+**Unit Source Fingerprint**: sha256:91a43e132e31f3e33cc1a07e11f1732c167e7a7cf9307e6caefc67f2e6702952
+**Review File**: .aidlc-engine/reviews/code-generation/units/nc3-revisit-facts/7332c702b7dcc515/1.b15d1e8c810a8558cdc49951e66b373e.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T07:45:05Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-11T07:45:26Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T07:47:30Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviews/code-generation/units/nc3-revisit-facts/7332c702b7dcc515/1.b15d1e8c810a8558cdc49951e66b373e.review.md
+**Context**: .aidlc-engine > reviews > code-generation > units > nc3-revisit-facts > 7332c702b7dcc515 > 1.b15d1e8c810a8558cdc49951e66b373e.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T07:47:37Z
+**Event**: HOST_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T07:47:37Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: ae14fd16d636baeb7
+**Review File Digest**: .aidlc-engine/reviews/code-generation/units/nc3-revisit-facts/7332c702b7dcc515/1.b15d1e8c810a8558cdc49951e66b373e.review.md=3b989936ac97ecdff4f9122479372161b7f478e6f9958a029e518e619e546ae9
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-11T07:47:41Z
+**Event**: REVIEW_COMPLETED
+**Stage**: code-generation
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc3-revisit-facts
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:19d39adc036cd67c50e632be03371f0ccbc001bb9f305b076defae3377cace37
+**Artifact Fingerprint**: sha256:19d39adc036cd67c50e632be03371f0ccbc001bb9f305b076defae3377cace37
+**Request Id**: review:b15d1e8c810a8558cdc49951e66b373e
+**Request Source Fingerprint**: d5879826a0ef79c9202672756e98bd244f2cd20926515d05b6fe5a3a7909259c
+**Source Fingerprint**: d5879826a0ef79c9202672756e98bd244f2cd20926515d05b6fe5a3a7909259c
+**Source Listing**: sha256:41af7465d07cd00013f994269a6fea21bd95eea4560446dba01ac1b7ea5c9f10
+**Unit Source Fingerprint**: sha256:91a43e132e31f3e33cc1a07e11f1732c167e7a7cf9307e6caefc67f2e6702952
+**Review Record**: .aidlc-engine/reviews/code-generation/units/nc3-revisit-facts/7332c702b7dcc515/1.json
+**Review Record Digest**: sha256:4c6631908f282a2f5ccb4b2acc338c8ef3fe73dd6523c43b20cb4600a6611e2f
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-11T07:47:47Z
+**Event**: UNIT_COMPLETED
+**Stage**: code-generation
+**Unit**: nc3-revisit-facts
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T07:48:19Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/code-generation/memory.md
+**Context**: construction > code-generation > memory.md
+
+---

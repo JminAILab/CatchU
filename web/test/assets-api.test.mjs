@@ -595,3 +595,48 @@ test("AC4.2.1 「안 씀」 목록에서 설명을 저장해도 같은 걸러 �
   assert.deepEqual(store.getSnapshot().items.map((v) => v.catchId), ["b"]);
 });
 
+// 새 Catch NC3 BR8.1·보안 설계 2절: revisitFacts 응답 검사. 종류별 개수 표는 api 등록 검사와 같은 경계(초과·부족 각 하나)를 본다.
+const sha40 = (letter) => letter.repeat(40);
+const withFacts = (revisitFacts) => ({ ...item("c"), revisitFacts });
+const reworked = { kind: "REWORKED_LINES", paths: ["src/a.ts"], commits: [sha40("a"), sha40("b")] };
+const accepted = async (value) => (await createCatchApi(async () => success(value)).detail("c")).kind === "success";
+
+test("NC3 BR8.1 다섯 종류의 맞는 사실과 빈 배열은 받고, 경계 값(시험 파일 20개·경로 1,024자·사실 30개)도 받는다", async () => {
+  const tests = (count) => Array.from({ length: count }, (_, index) => `tests/${index}.test.ts`);
+  for (const facts of [
+    [],
+    [reworked, { kind: "MOVED_FILE", paths: ["a.js", "b.js"], commits: [sha40("a")] },
+      { kind: "EXTENSION_CHANGED", paths: ["u.js", "u.ts"], commits: [sha40("a"), sha40("b")] },
+      { kind: "REVERTED", paths: [], commits: [sha40("b"), sha40("a")] },
+      { kind: "TEST_FILES_PRESENT", paths: tests(20), commits: [sha40("a")] }],
+    [{ ...reworked, paths: ["가".repeat(1024)] }],
+    Array.from({ length: 30 }, () => reworked),
+  ]) assert.equal(await accepted(withFacts(facts)), true, JSON.stringify(facts).slice(0, 60));
+});
+
+test("NC3 BR8.1 종류별 개수 초과·부족, 모르는 kind, 모르는 칸, 짧은 식별값, 긴 경로, 31개, 빠진 칸은 받지 못한 응답이다", async () => {
+  const missing = item("c");
+  delete missing.revisitFacts;
+  const bad = [
+    missing,
+    withFacts(null), withFacts({}),
+    withFacts([{ ...reworked, paths: [] }]), withFacts([{ ...reworked, paths: ["a.ts", "b.ts"] }]),
+    withFacts([{ ...reworked, commits: [sha40("a")] }]),
+    withFacts([{ kind: "MOVED_FILE", paths: ["a.js"], commits: [sha40("a")] }]),
+    withFacts([{ kind: "REVERTED", paths: ["a.ts"], commits: [sha40("a"), sha40("b")] }]),
+    withFacts([{ kind: "TEST_FILES_PRESENT", paths: Array.from({ length: 21 }, (_, i) => `t/${i}.test.ts`), commits: [sha40("a")] }]),
+    withFacts([{ ...reworked, kind: "RENAMED" }]),
+    withFacts([{ ...reworked, line: "secret" }]),
+    withFacts([{ ...reworked, commits: ["abc1234", sha40("b")] }]),
+    withFacts([{ ...reworked, commits: [sha40("A"), sha40("b")] }]),
+    withFacts([{ ...reworked, paths: ["가".repeat(1025)] }]),
+    withFacts([{ kind: "MOVED_FILE", paths: ["a.js", "a.js"], commits: [sha40("a")] }]),
+    withFacts(Array.from({ length: 31 }, () => reworked)),
+  ];
+  for (const value of bad) {
+    const api = createCatchApi(async () => success(value));
+    assert.deepEqual(await api.detail("c"), { kind: "lookup-failed", status: 200, code: "LOOKUP_FAILED" });
+    assert.equal((await createCatchApi(async () => page([value])).list(f(), null)).kind, "lookup-failed");
+  }
+});
+

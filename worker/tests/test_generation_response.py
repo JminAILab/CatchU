@@ -115,6 +115,10 @@ CANDIDATE_KEYS = {
     "reflection",
     # Result v3(CR2): 후보의 본인 커밋 목록 전체.
     "ownCommitShas",
+    # Result v4(NC3): 다시 볼 곳 사실과 작업 시각.
+    "revisitFacts",
+    "firstWorkAt",
+    "lastWorkAt",
 }
 
 

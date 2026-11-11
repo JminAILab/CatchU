@@ -5,9 +5,14 @@
 """
 
 from dataclasses import dataclass
-from typing import Literal, Protocol, Self
+from datetime import datetime
+from typing import TYPE_CHECKING, Literal, Protocol, Self
 
 from app.processing.request_check import CheckedRequest, SourceMode
+
+if TYPE_CHECKING:
+    # app.candidates가 이 모듈을 불러오므로 형 검사 때만 불러온다(서로 불러오는 고리를 피한다).
+    from app.candidates.revisit import RevisitFact
 
 GenerationStatus = Literal["GENERATED", "FAILED", "NOT_GENERATED"]
 NotProvidedReason = Literal["INSUFFICIENT_EVIDENCE", "BELOW_CRITERIA", "UNDETERMINED"]
@@ -149,6 +154,13 @@ class EligibleCandidate:
     # 없음. 결과 메시지의 ownCommitShas가 되고 api가 그 Catch의 소속으로 쓴다. 후보 판정과 합성 생성기가
     # 채운다. 비어 있으면 결과 계약(1개 이상)이 거부한다.
     own_commit_shas: tuple[str, ...] = ()
+    # 같은 작업 안 본인 커밋끼리 본 「다시 볼 곳」 사실(NC3 BR5.1). 처리(live.py)가 후보 판정 뒤에 채우고,
+    # 합성 생성기는 템플릿 값을 쓴다. 생성 단계(replace)는 바꾸지 않는다.
+    revisit_facts: "tuple[RevisitFact, ...]" = ()
+    # 합친 뒤 본인 커밋 작성 시각의 최소·최대(NC3 BR4.1). 후보 판정과 합성 생성기가 채운다. 비어 있으면
+    # 결과 조합이 결과를 만들지 않는다(worker 결함).
+    first_work_at: datetime | None = None
+    last_work_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if not _has_text(self.work_identity):
@@ -161,6 +173,13 @@ class EligibleCandidate:
             raise ValueError("후보에는 묶음 이유가 있어야 한다")
         if not self.evidence:
             raise ValueError("후보에는 근거가 하나 이상 있어야 한다")
+        first, last = self.first_work_at, self.last_work_at
+        if (first is None) != (last is None) or (
+            first is not None and last is not None and first > last
+        ):
+            raise ValueError(
+                "작업 시각은 둘 다 있고 첫 시각이 마지막 시각보다 늦지 않아야 한다"
+            )
 
 
 @dataclass(frozen=True)

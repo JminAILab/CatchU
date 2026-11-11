@@ -794,9 +794,59 @@ describe('Catch 등록 PostgreSQL', {
     assert.deepEqual(await assignments(), []);
   });
 
+  // NC3 다시 볼 곳 사실과 작업 시각(BR6.1, S19, S20). 경로·SHA는 합성 값이다.
+  const withFacts = (revisitFacts, overrides = {}) => ({ ...withShas([sha(1), sha(2)]), revisitFacts,
+    firstWorkAt: '2025-03-02T10:00:00Z', lastWorkAt: '2025-04-10T09:30:00Z', ...overrides });
+  const reworkedFact = { kind: 'REWORKED_LINES', paths: ['src/a.ts'], commits: [sha(1), sha(2)] };
+  const workColumns = async () => db.query(`SELECT catch_id, revisit_facts, first_work_at, last_work_at
+    FROM catch_asset ORDER BY catch_id`);
+
+  test('NC3 BR6.1 새 Catch에 같은 작업 첫 후보의 다시 볼 곳 사실과 작업 시각을 한 번 쓴다', async () => {
+    const input = await fixture.receipt({ candidates: [withFacts([reworkedFact]),
+      { ...withFacts([], { lastWorkAt: '2025-05-01T00:00:00Z' }), candidateId: 'synthetic-candidate-2' }] });
+    const [first, second] = await apply(input);
+    assert.equal(first.catchId, second.catchId);
+    const [row] = await workColumns();
+    assert.deepEqual(row.revisit_facts, [reworkedFact]);
+    assert.equal(row.first_work_at.toISOString(), '2025-03-02T10:00:00.000Z');
+    assert.equal(row.last_work_at.toISOString(), '2025-04-10T09:30:00.000Z');
+  });
+
+  test('NC3 S20 같은 작업 식별값의 재분석은 기존 Catch의 사실·시각을 바꾸지 않는다', async () => {
+    const first = await fixture.receipt({ candidates: [withFacts([reworkedFact])] });
+    const [created] = await apply(first);
+    await completeApplication(first);
+    const before = await workColumns();
+    const second = await fixture.receipt({ ownerId: first.ownerId, candidates: [{
+      ...withFacts([{ kind: 'TEST_FILES_PRESENT', paths: ['tests/a.test.ts'], commits: [sha(3)] }],
+        { firstWorkAt: '2026-01-01T00:00:00Z', lastWorkAt: '2026-02-01T00:00:00Z' }),
+      candidateId: 'synthetic-candidate-2', ownCommitShas: [sha(3)] }] });
+    const [joined] = await apply(second);
+    assert.equal(joined.catchId, created.catchId);
+    assert.equal(joined.disposition, 'EXISTING');
+    assert.deepEqual(await workColumns(), before);
+  });
+
+  test('NC3 S19 소속 밖 커밋·시각 뒤바뀜 결과는 그 결과의 Catch를 하나도 등록하지 않는다', async () => {
+    const outside = withFacts([{ ...reworkedFact, commits: [sha(1), sha(9)] }]);
+    const reversed = withFacts([], { firstWorkAt: '2025-05-01T00:00:00Z' });
+    for (const bad of [outside, reversed]) {
+      const valid = withShas([sha(5)], 'synthetic-candidate-0', 'synthetic-work-0');
+      const input = await fixture.receipt({ candidates: [valid, { ...bad, candidateId: 'synthetic-candidate-1' }] });
+      await assert.rejects(apply(input), (error) => {
+        assert.equal(error.name, 'CatchRegistrationInputError');
+        assert.equal(error.reason, 'INVALID_INPUT');
+        assert.equal(error.message.includes(sha(9)), false);
+        return true;
+      });
+      await empty();
+    }
+  });
+
   test('B 마이그레이션 되돌리기는 선행 A/E 테이블·행을 보존하고 다시 적용된다', async () => {
     const input = await fixture.receipt();
     await apply(input);
+    await db.undoLastMigration(); // NC3 다시 볼 곳 칸 셋
     await db.undoLastMigration(); // CR2 소속 기록 표
     await db.undoLastMigration(); // U4 작성자 설명 칸(C-14)
     await db.undoLastMigration(); // #387 B 연쇄 삭제

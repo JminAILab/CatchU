@@ -44,6 +44,17 @@ export interface CatchAsset {
   readonly sourceMode: "MOCK" | "LIVE";
   /** 작성자 설명이 있는지(새 Catch C1). 목록 조건 `authorDescription=written`과 같은 판정이다. 설명 원문은 따로 읽는다. */
   readonly hasAuthorDescription: boolean;
+  /** 같은 작업 안 본인 커밋끼리 본 「다시 볼 곳」 사실(새 Catch NC3 C2). 본인 응답에만 있다. 작업 시각은 응답에 없다. */
+  readonly revisitFacts: readonly RevisitFact[];
+}
+
+/** 다시 볼 곳 사실의 종류(NC3 계약 C4). 문장과 링크는 화면이 만든다. */
+export type RevisitFactKind = "REWORKED_LINES" | "MOVED_FILE" | "EXTENSION_CHANGED" | "REVERTED" | "TEST_FILES_PRESENT";
+
+export interface RevisitFact {
+  readonly kind: RevisitFactKind;
+  readonly paths: readonly string[];
+  readonly commits: readonly string[];
 }
 
 /** 본인 목록의 작성자 설명 걸러 보기(새 Catch BR5.4). `all`이면 조건을 보내지 않는다. */

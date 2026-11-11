@@ -7,14 +7,18 @@
 `app.processing.request_check`를 불러오므로 서로 불러오는 고리가 생긴다).
 """
 
+import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 
 from app.candidates import build_candidates
+from app.candidates.revisit import RevisitFact, revisit_facts
 from app.collection import (
     PROPOSED_LIMITS,
     CollectionLimits,
+    CollectionOutcome,
+    CommitRecord,
     RelationOptions,
     Transport,
     collect,
@@ -30,6 +34,8 @@ from app.processing.generation import GenerationOutput
 from app.processing.pipeline import Clock
 from app.processing.request_check import CheckedRequest, SourceMode
 from app.request_context import ContextFound, RequestContextClient
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -90,7 +96,9 @@ class LiveGenerator:
         )
         # 맥락 조회로 받은 소속 커밋 집합을 후보 판정과 생성 재료 찾기에 같은 값으로 넘긴다(CR2 BR1.6).
         assigned = self._found.assigned_commits
-        built = build_candidates(request, outcome, assigned)
+        built = with_revisit_facts(
+            request, outcome, build_candidates(request, outcome, assigned)
+        )
         if not built.candidates:
             # 생성할 후보가 없으면 제공자를 만들지 않는다. 생성 흐름도 이때는 후보·미제공·실패를 그대로 둔다.
             return built
@@ -107,3 +115,50 @@ class LiveGenerator:
             assigned=assigned,
         )
         return run.output
+
+
+def with_revisit_facts(
+    request: CheckedRequest, outcome: CollectionOutcome, built: GenerationOutput
+) -> GenerationOutput:
+    """후보마다 다시 볼 곳 사실을 붙인다(NC3 BR5.1). 후보 판정 뒤, 생성 앞에서 부른다.
+
+    기록 묶음은 후보 판정(grouping.py)과 같은 (기본 브랜치 창 커밋, 관계 조회 커밋)이다. 그래서 작업 시각이
+    정해진 후보는 모든 본인 커밋의 기록이 이 사전에 있다.
+    """
+    if not built.candidates:
+        return built
+    relations = outcome.relations
+    records: dict[str, CommitRecord] = {}
+    for record in (*outcome.commits, *(() if relations is None else relations.commits)):
+        records.setdefault(record.sha, record)
+    return replace(
+        built,
+        candidates=tuple(
+            replace(
+                candidate,
+                revisit_facts=_facts(request, candidate.own_commit_shas, records),
+            )
+            for candidate in built.candidates
+        ),
+    )
+
+
+def _facts(
+    request: CheckedRequest,
+    own_commit_shas: tuple[str, ...],
+    records: dict[str, CommitRecord],
+) -> tuple[RevisitFact, ...]:
+    try:
+        return revisit_facts(own_commit_shas, records)
+    except Exception as error:
+        # 팀 규칙 「예외를 삼키지 않는다」의 예외 한 곳이다(NC3 NFR 요구 Q1 B, NFR8.3). 다시 볼 곳은 본인만
+        # 보는 덧붙임이라, 판정 결함 하나로 분석 전체를 실패시키지 않고 그 후보 사실만 비운다. 대신 실패
+        # 로그 한 줄을 남긴다. 예외 메시지에는 경로·줄 글자가 섞일 수 있어 종류 이름만 싣는다(NFR4.3).
+        # BaseException(중단 신호 등)은 잡지 않는다.
+        logger.error(
+            "다시 볼 곳 계산 실패: requestId=%s attemptId=%s error=%s",
+            request.request_id,
+            request.attempt_id,
+            type(error).__name__,
+        )
+        return ()

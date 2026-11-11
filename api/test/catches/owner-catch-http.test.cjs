@@ -280,6 +280,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
       draft: source.draft, reflection: source.reflection,
       confirmation: { workFactsConfirmed: false, contributionConfirmed: false },
       mismatch: false, visibility: 'PRIVATE', restriction: 'NONE', sourceMode: 'MOCK', hasAuthorDescription: false,
+      revisitFacts: [],
     });
     const list = success(await request(own.ownerId));
     assert.deepEqual(list, { items: [detail], page: { nextCursor: null } });
@@ -435,13 +436,14 @@ describe('본인 Catch HTTP·PostgreSQL', {
       { items: [], page: { nextCursor: null } });
   });
 
-  test('AC4.1.2 written 조건으로 받은 v2 커서는 unwritten·조건 없음·다른 회원으로 보내면 400이다', async () => {
+  test('AC4.1.2 written 조건으로 받은 커서는 unwritten·조건 없음·다른 회원으로 보내면 400이다', async () => {
     const own = await seed({ count: 3 });
     for (const catchId of own.catchIds) await writeDescription(catchId);
     const first = success(await request(own.ownerId, queryPath({ authorDescription: 'written', limit: '1' })));
     const cursor = first.page.nextCursor;
     assert.equal(typeof cursor, 'string');
-    assert.equal(cursorOf(cursor).v, 2);
+    // NC3(C2)에서 본인 목록 커서는 판본 3이 됐다.
+    assert.equal(cursorOf(cursor).v, 3);
     assert.equal(success(await request(own.ownerId, queryPath({ authorDescription: 'written', limit: '1', cursor }))).items.length, 1);
     const foreign = await seed();
     await writeDescription(foreign.catchId);
@@ -481,19 +483,154 @@ describe('본인 Catch HTTP·PostgreSQL', {
     assert.deepEqual(await snapshot(), beforeState);
   });
 
-  test('NFR7.2 배포 전에 받은 v1 커서는 같은 회원·조건이어도 400이다', async () => {
+  test('NFR7.2 S18 배포 전에 받은 v1·v2 커서는 같은 회원·조건이어도 400이다', async () => {
     const own = await seed({ count: 2 });
     const { createHash } = require('node:crypto');
     const after = [...own.catchIds].sort()[0];
     for (const scopeParts of [[own.ownerId, null, null], [own.ownerId, null, null, null]]) {
       const scope = createHash('sha256').update(JSON.stringify(scopeParts)).digest('hex');
-      const legacy = Buffer.from(JSON.stringify({ v: 1, scope, after })).toString('base64url');
-      failure(await request(own.ownerId, queryPath({ cursor: legacy })), 400, 'INVALID_REQUEST');
+      for (const v of [1, 2]) {
+        const legacy = Buffer.from(JSON.stringify({ v, scope, after })).toString('base64url');
+        failure(await request(own.ownerId, queryPath({ cursor: legacy })), 400, 'INVALID_REQUEST');
+      }
     }
-    // 같은 범위 해시라도 v가 2일 때만 받는다.
+    // 같은 범위 해시라도 v가 3이고 위치가 (마지막 작업 시각, ID) 한 쌍일 때만 받는다(NC3 C2).
     const scope = createHash('sha256').update(JSON.stringify([own.ownerId, null, null, null])).digest('hex');
-    const current = Buffer.from(JSON.stringify({ v: 2, scope, after })).toString('base64url');
+    const lastWorkAt = (await asset(after)).last_work_at.toISOString();
+    const current = Buffer.from(JSON.stringify({ v: 3, scope, after: { lastWorkAt, catchId: after } })).toString('base64url');
     assert.deepEqual(ids(success(await request(own.ownerId, queryPath({ cursor: current }))).items), [[...own.catchIds].sort()[1]]);
+  });
+
+  // NC3 C2 본인 목록 작업 시각순(BR7.1~BR7.3, BR8.1). 먼저 정한 실패 조건: B·A·C 순서가 아님, 같은 시각 순서가 흔들림,
+  // 45개 세 쪽에서 빠짐·겹침, v1·v2나 꼴 틀린 lastWorkAt 커서가 200, 공개 목록 순서·커서가 바뀜, 응답에 작업 시각이 있음.
+  async function setWorkTime(catchId, lastWorkAt, firstWorkAt = lastWorkAt) {
+    await db.query('UPDATE catch_asset SET first_work_at = $2, last_work_at = $3 WHERE catch_id = $1',
+      [catchId, firstWorkAt, lastWorkAt]);
+  }
+  async function clearWorkTime(catchId) {
+    await db.query('UPDATE catch_asset SET first_work_at = NULL, last_work_at = NULL WHERE catch_id = $1', [catchId]);
+  }
+  async function collectPages(ownerId, query = {}) {
+    const collected = [];
+    const pages = [];
+    let cursor = null;
+    do {
+      const page = success(await request(ownerId, queryPath({ ...query, ...(cursor ? { cursor } : {}) })));
+      pages.push(page.items.map((item) => item.catchId));
+      collected.push(...page.items);
+      cursor = page.page.nextCursor;
+      assert.ok(pages.length <= 50, '커서가 같은 쪽을 반복하지 않는다');
+    } while (cursor !== null);
+    return { collected, pages };
+  }
+
+  test('NC3 S13·S14 AC11.1.1 마지막 작업 시각이 최근인 B, A, 시각 없는 C 순서다', async () => {
+    const own = await seed({ count: 4 });
+    const [a, b, c, d] = own.catchIds;
+    await setWorkTime(a, '2025-04-20T00:00:00Z', '2025-03-02T00:00:00Z');
+    await setWorkTime(b, '2025-06-01T00:00:00Z');
+    await clearWorkTime(c);
+    // 첫 작업 시각이 더 이르더라도 마지막 작업 시각으로 정렬한다(S14).
+    await setWorkTime(d, '2025-04-10T00:00:00Z', '2025-01-01T00:00:00Z');
+    const list = success(await request(own.ownerId));
+    assert.deepEqual(list.items.map((item) => item.catchId), [b, a, d, c]);
+  });
+
+  test('NC3 S15 AC11.1.3 같은 마지막 작업 시각은 여러 번 불러도 Catch ID 순서다', async () => {
+    const own = await seed({ count: 5 });
+    for (const catchId of own.catchIds) await setWorkTime(catchId, '2025-05-05T05:05:05Z');
+    const sorted = [...own.catchIds].sort();
+    for (let round = 0; round < 3; round++) {
+      assert.deepEqual(success(await request(own.ownerId)).items.map((item) => item.catchId), sorted);
+      const { pages } = await collectPages(own.ownerId, { limit: '2' });
+      assert.deepEqual(pages.flat(), sorted);
+    }
+  });
+
+  test('NC3 S17 AC11.2.1 시각 있는 Catch와 없는 Catch가 섞인 45개를 20개씩 세 쪽으로 빠짐·겹침 없이 읽는다', async () => {
+    const own = await seed({ count: 45 });
+    const timed = own.catchIds.slice(0, 30);
+    for (const [index, catchId] of timed.entries()) {
+      // 같은 시각 묶음이 쪽 경계를 넘도록 셋씩 같은 시각을 준다.
+      await setWorkTime(catchId, new Date(Date.UTC(2025, 0, 1 + Math.floor(index / 3))).toISOString());
+    }
+    for (const catchId of own.catchIds.slice(30)) await clearWorkTime(catchId);
+    const { collected, pages } = await collectPages(own.ownerId);
+    assert.deepEqual(pages.map((page) => page.length), [20, 20, 5]);
+    assert.equal(new Set(collected.map((item) => item.catchId)).size, 45);
+    const rows = await db.query(`SELECT catch_id FROM catch_asset WHERE owner_id = $1
+      ORDER BY last_work_at DESC NULLS LAST, catch_id ASC`, [own.ownerId]);
+    assert.deepEqual(pages.flat(), rows.map((row) => row.catch_id));
+    // 시각 없는 Catch로 넘어간 뒤의 커서는 lastWorkAt이 null이다.
+    const second = success(await request(own.ownerId, queryPath({ limit: '40' })));
+    assert.equal(cursorOf(second.page.nextCursor).after.lastWorkAt, null);
+    assert.equal(cursorOf(second.page.nextCursor).v, 3);
+  });
+
+  test('NC3 S18 꼴이 틀린 v3 커서·다른 조건 커서는 400이고 받은 값을 응답에 싣지 않는다', async () => {
+    const own = await seed({ count: 3 });
+    const first = success(await request(own.ownerId, queryPath({ limit: '1' })));
+    const valid = cursorOf(first.page.nextCursor);
+    const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const broken = [
+      { ...valid, after: { ...valid.after, lastWorkAt: '2025-04-10T00:00:00Z' } },
+      { ...valid, after: { ...valid.after, lastWorkAt: '2025-04-10' } },
+      { ...valid, after: { ...valid.after, lastWorkAt: 'synthetic-not-a-time' } },
+      { ...valid, after: { ...valid.after, lastWorkAt: 1744243200000 } },
+      { ...valid, after: { catchId: valid.after.catchId } },
+      { ...valid, after: { ...valid.after, catchId: 'synthetic-not-uuid' } },
+      { ...valid, after: { ...valid.after, extra: true } },
+      { ...valid, after: valid.after.catchId },
+      { ...valid, v: 4 },
+    ];
+    for (const cursor of broken) {
+      const response = await request(own.ownerId, queryPath({ limit: '1', cursor: encode(cursor) }));
+      failure(response, 400, 'INVALID_REQUEST');
+      assert.ok(!response.text.includes('synthetic-not'));
+    }
+    failure(await request(own.ownerId, queryPath({ limit: '1', authorDescription: 'written', cursor: first.page.nextCursor })),
+      400, 'INVALID_REQUEST');
+    assert.equal(success(await request(own.ownerId, queryPath({ limit: '1', cursor: first.page.nextCursor }))).items.length, 1);
+  });
+
+  test('NC3 BR8.1 응답에 다시 볼 곳 사실이 있고 작업 시각은 어디에도 없으며 다른 회원 사실은 나오지 않는다', async () => {
+    const sha = (letter) => letter.repeat(40);
+    const facts = [{ kind: 'REWORKED_LINES', paths: ['src/synthetic-a.ts'], commits: [sha('a'), sha('b')] }];
+    const source = { ...candidate('synthetic-candidate-facts', 'synthetic-work-facts'), ownCommitShas: [sha('a'), sha('b')],
+      revisitFacts: facts, firstWorkAt: '2025-03-02T10:00:00Z', lastWorkAt: '2025-04-10T09:30:00Z' };
+    const own = await seed({ source });
+    const otherFacts = [{ kind: 'TEST_FILES_PRESENT', paths: ['tests/synthetic-other.test.ts'], commits: [sha('c')] }];
+    const other = await seed({ source: { ...candidate('synthetic-candidate-other', 'synthetic-work-other'),
+      ownCommitShas: [sha('c')], revisitFacts: otherFacts } });
+    const detail = success(await request(own.ownerId, detailPath(own.catchId)));
+    const list = success(await request(own.ownerId));
+    assert.deepEqual(detail.revisitFacts, facts);
+    assert.deepEqual(list.items.map((item) => item.revisitFacts), [facts]);
+    for (const text of [JSON.stringify(detail), JSON.stringify(list)]) {
+      for (const hidden of ['WorkAt', '2025-03-02', '2025-04-10', 'synthetic-other']) assert.ok(!text.includes(hidden), hidden);
+    }
+    failure(await request(own.ownerId, detailPath(other.catchId)), 404, 'RESOURCE_UNAVAILABLE');
+  });
+
+  test('NC3 BR7.3 공개 목록은 작업 시각과 무관하게 Catch ID 순서·v2 커서 그대로이고 사실·시각을 싣지 않는다', async () => {
+    const own = await seed({ count: 3 });
+    for (const catchId of own.catchIds) await publish({ ...own, catchId });
+    const sorted = [...own.catchIds].sort();
+    await setWorkTime(sorted[0], '2020-01-01T00:00:00Z');
+    await setWorkTime(sorted[2], '2030-01-01T00:00:00Z');
+    const first = await publicCatches.list(own.ownerId, { limit: '2' });
+    assert.deepEqual(ids(first.catches), sorted.slice(0, 2));
+    assert.deepEqual(first.catches.map((item) => item.catchId), sorted.slice(0, 2));
+    const cursor = cursorOf(first.page.nextCursor);
+    assert.equal(cursor.v, 2);
+    assert.equal(cursor.after, sorted[1]);
+    const rest = await publicCatches.list(own.ownerId, { cursor: first.page.nextCursor });
+    assert.deepEqual(rest.catches.map((item) => item.catchId), [sorted[2]]);
+    assert.ok(!JSON.stringify([first, rest]).includes('revisitFacts'));
+    assert.ok(!JSON.stringify([first, rest]).includes('2030-01-01'));
+    // 본인 목록 커서와 공개 목록 커서는 섞이지 않는다.
+    const owner = success(await request(own.ownerId, queryPath({ limit: '1' })));
+    await assert.rejects(publicCatches.list(own.ownerId, { cursor: owner.page.nextCursor }), { status: 400 });
   });
 
   test('AC5.2.3 목록·상세의 hasAuthorDescription은 written 판정과 같고 설명을 지우면 거짓으로 돌아온다', async () => {

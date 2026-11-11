@@ -480,3 +480,34 @@ test('NC2 안전망(NFR7.3): 저장소 등록 이름을 읽지 못하면 reposit
     restoreNames();
   }
 });
+
+// 새 Catch NC3 — 다시 볼 곳 사실과 작업 시각은 본인만 본다(BR6.3, 보안 설계 1절, S8·AC9.4.1·AC11.1.4).
+// 먼저 정한 실패 조건: 사실이 든 Catch를 발행한 사본에 사실 경로·커밋 식별값·작업 시각 글자가 하나라도 나옴.
+const NC3_PATH_MARKER = 'src/REVISITMARKER/firebase.ts';
+const NC3_FIRST = '2025-03-02T10:00:00.000Z';
+const NC3_LAST = '2025-04-10T09:30:00.000Z';
+async function catchWithRevisitFacts(memberId) {
+  const catchId = await eligibleCatch(db, memberId);
+  const facts = [
+    { kind: 'REWORKED_LINES', paths: [NC3_PATH_MARKER], commits: [sha('7'), sha('8')] },
+    { kind: 'REVERTED', paths: [], commits: [sha('8'), sha('7')] },
+  ];
+  await db.query('UPDATE catch_asset SET revisit_facts = $2::jsonb, first_work_at = $3, last_work_at = $4 WHERE catch_id = $1',
+    [catchId, JSON.stringify(facts), NC3_FIRST, NC3_LAST]);
+  return catchId;
+}
+
+test('NC3 S8·AC9.4.1·AC11.1.4: 사실·시각이 든 Catch를 발행한 사본에 사실 경로·커밋 식별값·작업 시각 글자가 없다', async () => {
+  const a = await author();
+  const catchId = await catchWithRevisitFacts(a.memberId);
+  const [snapshot] = await publishCatches(a, [catchId]);
+  assert.deepEqual(snapshot.workFacts, ['[합성] 사실'], '사본의 다른 칸은 그대로다');
+  const text = JSON.stringify(snapshot);
+  for (const marker of ['REVISITMARKER', sha('7'), sha('8'), sha('7').slice(0, 7), '2025-03-02', '2025-04-10',
+    'revisitFacts', 'WorkAt', 'REWORKED_LINES', 'REVERTED']) {
+    assert.equal(text.includes(marker), false, marker);
+  }
+  // 읽은 원본에는 값이 남아 있다(발행이 사실을 지운 것이 아니다).
+  const [stored] = await db.query('SELECT revisit_facts FROM catch_asset WHERE catch_id = $1', [catchId]);
+  assert.equal(stored.revisit_facts[0].paths[0], NC3_PATH_MARKER);
+});

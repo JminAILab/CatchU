@@ -1,4 +1,4 @@
-"""생성 결과를 메시지 계약 v1의 종결 결과(Result)로 조합한다."""
+"""생성 결과를 메시지 계약의 종결 결과(Result)로 조합한다."""
 
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -7,6 +7,9 @@ from app.processing.generation import EligibleCandidate, GenerationOutput
 from app.processing.request_check import CheckedRequest, UnverifiedRequest
 
 Outcome = Literal["SUCCEEDED", "EMPTY", "PARTIAL_FAILED", "FAILED"]
+
+# 종결 결과의 판본(NC3 계약 C4). 진행 상태·요청·수신 응답 메시지는 "2" 그대로다.
+RESULT_SCHEMA_VERSION = "4"
 
 
 def outcome_for(candidate_count: int, failure_count: int) -> Outcome:
@@ -69,7 +72,25 @@ def _candidate(
         },
         # 본인 커밋 목록 전체(Result v3, CR2 BR2.1). api가 그 Catch의 소속으로 쓴다.
         "ownCommitShas": list(candidate.own_commit_shas),
+        # 다시 볼 곳 사실과 작업 시각(Result v4, NC3 BR5.1). 시각은 UTC 초 단위 `Z` 글이다.
+        "revisitFacts": [
+            {
+                "kind": fact.kind,
+                "paths": list(fact.paths),
+                "commits": list(fact.commits),
+            }
+            for fact in candidate.revisit_facts
+        ],
+        "firstWorkAt": _work_time(candidate.first_work_at),
+        "lastWorkAt": _work_time(candidate.last_work_at),
     }
+
+
+def _work_time(moment: datetime | None) -> str:
+    """작업 시각이 없는 후보는 결과로 만들지 않는다(후보 판정·합성 생성기의 결함, NC3 BR4.1)."""
+    if moment is None:
+        raise ValueError("후보에 작업 시각이 없다")
+    return rfc3339(moment)
 
 
 def _envelope(
@@ -77,11 +98,12 @@ def _envelope(
 ) -> dict[str, Any]:
     """식별자와 요청 맥락. ID는 `<종류>-<id_label>-<attemptId>` 모양으로 결정적으로 만든다.
 
-    Result 판본은 "3"이다(CR2, 후보에 ownCommitShas). 진행 상태·요청 메시지는 "2" 그대로다(BR2.2).
+    Result 판본은 "4"다(NC3 C4, 후보에 revisitFacts·firstWorkAt·lastWorkAt). 진행 상태·요청 메시지는 "2"
+    그대로다(BR2.2).
     """
     prefix = f"{id_label}-{request.attempt_id}"
     return {
-        "schemaVersion": "3",
+        "schemaVersion": RESULT_SCHEMA_VERSION,
         "messageId": f"message-{prefix}-result",
         "resultId": f"result-{prefix}",
         "requestId": request.request_id,

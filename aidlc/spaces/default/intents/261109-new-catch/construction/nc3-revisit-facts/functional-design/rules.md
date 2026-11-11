@@ -120,7 +120,7 @@ rules:
     applies_to: RevisitFacts
     trigger: TEST_FILES_PRESENT 규칙이 켜져 있을 때
     logic: >-
-      쓰는 커밋(BR2.2)의 파일 가운데 BR2.3으로 빠지지 않은 파일을 본다. IF 폴더 이름 하나가 (소문자로) test, tests, __tests__, spec, e2e, androidtest이거나, 파일 이름이 (소문자로) test_*.py, *_test.*, *.test.*, *.spec.* 꼴이다 THEN 시험 파일이다.
+      쓰는 커밋(BR2.2)의 파일 가운데 BR2.3으로 빠지지 않은 파일을 본다. 상태가 removed인 파일(지운 시험 파일)은 치지 않는다(NFR 요구 Q2 B, NFR8.4). 그래서 지운 시험 파일만 있는 후보에는 사실이 없고, 지운 것과 고친 것이 섞이면 고친 경로만 담긴다. IF 폴더 이름 하나가 (소문자로) test, tests, __tests__, spec, e2e, androidtest이거나, 파일 이름이 (소문자로) test_*.py, *_test.*, *.test.*, *.spec.* 꼴이다 THEN 시험 파일이다.
       지금 재료 분류(title.py _is_test)의 대소문자 꼴 둘(이름이 Test·Tests로 끝남, 폴더가 Tests로 끝남)은 쓰지 않는다. 재료 분류는 바꾸지 않는다.
       시험 파일이 하나라도 있으면 후보마다 사실 하나. paths = 시험 파일 경로(처음 나온 커밋 순서, 같은 커밋 안에서는 파일 순서, 겹침 없음), commits = 그 파일을 바꾼 커밋(커밋 순서, 겹침 없음). 상한은 BR2.5.
     violation: 해당 없음

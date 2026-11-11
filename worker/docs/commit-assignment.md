@@ -7,7 +7,7 @@
 1. 맥락 조회 응답의 `assignedCommitShas`를 필수로 읽는다([요청 정보 조회](request-context.md#응답-모양)). 칸이 없거나 모양이 틀리면 `CONTEXT_RESPONSE_INVALID`다.
 2. `LiveGenerator`가 그 집합(`ContextFound.assigned_commits`)을 `build_candidates(request, outcome, assigned)`와 `run_generation(..., assigned=)`에 **같은 값**으로 넘긴다.
 3. `group(outcome, assigned)`가 단위를 지금 규칙대로 다 정한 뒤(병합·관계·묶기·보류는 소속 커밋을 그대로 본다) 각 단위에서 소속 변경을 뺀다.
-4. 후보마다 본인 커밋 목록 전체를 결과 v3의 `ownCommitShas`에 싣는다(최근 것부터, 중복 없음). api는 등록 트랜잭션에서 그 목록을 그 Catch의 소속으로 쓰고, 이미 있는 SHA는 건너뛴다.
+4. 후보마다 본인 커밋 목록 전체를 결과(v3부터, 지금 v4)의 `ownCommitShas`에 싣는다(최근 것부터, 중복 없음). api는 등록 트랜잭션에서 그 목록을 그 Catch의 소속으로 쓰고, 이미 있는 SHA는 건너뛴다.
 
 합성(MOCK) 요청과 FR10 확인 명령은 맥락 조회를 부르지 않아 빈 집합이다. 빈 집합이면 단위·후보·열쇠·미제공 수가 CR2 전과 같다. 합성 결과도 합성 수집 결과의 본인 커밋 SHA를 `ownCommitShas`로 싣는다.
 

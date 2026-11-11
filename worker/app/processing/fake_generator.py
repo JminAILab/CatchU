@@ -8,6 +8,7 @@ workIdentity는 합성 템플릿의 값을 그대로 쓰고, 템플릿의 종결
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
+from datetime import datetime
 from typing import Any
 
 from app.contract import FIXTURE_DIR, fill_template
@@ -102,6 +103,9 @@ def _reflection(item: Mapping[str, Any]) -> ReflectionOutcome:
 
 
 def _candidate(item: Mapping[str, Any]) -> EligibleCandidate:
+    # app.candidates가 app.processing을 거쳐 수집 모듈을 불러오므로 모듈 맨 위에서 불러오면 고리가 생긴다.
+    from app.candidates.revisit import RevisitFact
+
     return EligibleCandidate(
         work_identity=item["workIdentity"],
         title=item["title"],
@@ -123,6 +127,13 @@ def _candidate(item: Mapping[str, Any]) -> EligibleCandidate:
         reflection=_reflection(item["reflection"]),
         # 합성 수집 결과의 본인 커밋 SHA. 실제 방식과 같은 규칙으로 싣는다(CR2 BR2.1).
         own_commit_shas=tuple(item["ownCommitShas"]),
+        # 합성 템플릿의 다시 볼 곳 사실과 작업 시각(NC3 BR5.3). RevisitFacts는 부르지 않는다.
+        revisit_facts=tuple(
+            RevisitFact(fact["kind"], tuple(fact["paths"]), tuple(fact["commits"]))
+            for fact in item["revisitFacts"]
+        ),
+        first_work_at=datetime.fromisoformat(item["firstWorkAt"]),
+        last_work_at=datetime.fromisoformat(item["lastWorkAt"]),
     )
 
 
