@@ -17719,3 +17719,66 @@
 **Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:b7ad85ee546e12aad22afc4aff60f2aa97d70217d955742632e1502d49560cd5","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:381e04572bee3000803bab8731d170a13e2d59187d8d86590290071333b64cab"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md","id":"R-02","fingerprint":"sha256:95d611dfa0d24b083dca575739cba9286d9b5d33428195f92a3f1178e4c4a33e","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:381e04572bee3000803bab8731d170a13e2d59187d8d86590290071333b64cab"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md","id":"R-03","fingerprint":"sha256:f067302c139aa18cd1f509c5e5f8ae2c266f42d0a7e27ebb6dfe1baf77b8e137","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:381e04572bee3000803bab8731d170a13e2d59187d8d86590290071333b64cab"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:05d9d46e9e17cae780d40ad1c6326b3ef02d7daa5d544059fc36f2b8004fc5bc","status":"Changed after review","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:639c8167db24e4a54210d680aa5c978cfc44c69dcbae25862ad7c228f6cbf343"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:0f560cefd86ab9c628ff347541f34f83123a1d44bf5c2908968f14bb65947f5f","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:639c8167db24e4a54210d680aa5c978cfc44c69dcbae25862ad7c228f6cbf343"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md","id":"R-03","fingerprint":"sha256:b2e7a1391b925a0e69dc098add6c7479242427b8f38c7332c3372afb3694c6c2","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:639c8167db24e4a54210d680aa5c978cfc44c69dcbae25862ad7c228f6cbf343"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md","id":"R-01","fingerprint":"sha256:08e31553fa73c5b026bf130d05338f02858b9e6cb9c1770612c3ff35305c21f0","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:5cedb64aeae0bfacaf2c9bd8c757dcfbb4fe0c9ffcc5e1d80ab47501bb47ef4b"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md","id":"R-02","fingerprint":"sha256:4004c0a151446388652d110f2d341d927c693a7e6610ca05ca31b23841f8197f","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:5cedb64aeae0bfacaf2c9bd8c757dcfbb4fe0c9ffcc5e1d80ab47501bb47ef4b"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md","id":"R-03","fingerprint":"sha256:38181f9f75517e1d6756070610f5f974586f1b3142ccf49f8cb7c0781193b135","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:5cedb64aeae0bfacaf2c9bd8c757dcfbb4fe0c9ffcc5e1d80ab47501bb47ef4b"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-01","fingerprint":"sha256:fb98c4b5187d6c1307641e197d54937d9c1dbad36af0fd8538d81a68fa946bfc","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-02","fingerprint":"sha256:4f9b1ed18b6f33fdd36ca087d06a637afe35d039ac71941f0f78bbbc660d1af9","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-03","fingerprint":"sha256:b207003490660be5531fa0306ffa448c1a098fef895177d462289a1c0abe3308","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-04","fingerprint":"sha256:1000648f27e1c81d6d271bb70126d88dad84c4ff45c2b94d2fbdcedaa48fef25","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}}]}
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T01:37:12Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: NC2 승인 뒤: bolt-plan B2대로 NC2 PR을 지금 열지, 로컬 api·web·DB를 내릴지, NC3 기능 설계로 바로 갈지
+**Options**: |NC2 PR을 먼저 연다|NC3로 바로 간다|서버를 내리고 NC3로 간다
+**Unit**: nc3-revisit-facts
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T02:03:41Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["1번(NC2 PR을 먼저 연다)으로 가되, 아래처럼 해 줘.\r1. #517(NC1)·#516(U9)·#519가 통합 브랜치에 들어갔다(a30112a2). 통합 브랜치를 작업 브랜치에 merge commit으로 들인다. 미리 합쳐 봤을 때 충돌은 없었다.\r2. 9d4c74eb에 실수로 들어간 api/aidlc/.aidlc-sessions/1729f1fa-467d-42c0-835d-f754927cf476.binding.json을 api/aidlc/ 폴더째 지우는 커밋을 하나 만든다.\r3. NC2가 「작성자 설명」 h4 안에 작성 달을 넣어서, U9의 S5 시험(api/test/claude-mcp/mcp-shared-text.test.cjs)이 web 원문에서 찾는 '<h4>작성자 설명</h4>'가 없어졌다. 그 표지 하나를 '<h4>작성자 설명'으로 바꾸고, api를 빌드한 뒤 그 시험 파일을 돌려 S5 통과를 확인한다.\r4. project.md에 더한 「본인 커밋 같은 판정」 규칙 끝에 \"저장된 기록이 없어 문장 대조를 쓸 때는 두 쪽 문장을 맞춰 보는 시험으로 묶는다\"를 덧붙인다.\r5. PR 본문에는 다음을 적는다: AC8.1.3(남의 기여를 지원자 것으로 쓴 답 0건)은 실제 AI로 아직 재지 않았다는 것, 서비스별 시간 중 api·web은 코드 생성 때 잰 값이라는 것, 2·3번은 NC2 승인 뒤 AI-DLC 밖에서 직접 고쳤다는 것. 리뷰 요청에는 U10 담당(rag-eval·JD_SUMMARY_INSTRUCTION 내보내기)과 U9 담당(S5 표지 한 줄)을 넣는다. 본문 초안은 열기 전에 보여 줘.\r6. PR을 연 뒤 로컬 api·web을 멈추고 DB 컨테이너를 내린다."]
+**Message Id**: 71f6f973
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T02:03:42Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: 다음에 무엇을 할까요?
+**Reply**: 1번(NC2 PR을 먼저 연다)으로 가되, 아래처럼 해 줘.\n1. #517(NC1)·#516(U9)·#519가 통합 브랜치에 들어갔다(a30112a2). 통합 브랜치를 작업 브랜치에 merge commit으로 들인다. 미리 합쳐 봤을 때 충돌은 없었다.\n2. 9d4c74eb에 실수로 들어간 api/aidlc/.aidlc-sessions/1729f1fa-467d-42c0-835d-f754927cf476.binding.json을 api/aidlc/ 폴더째 지우는 커밋을 하나 만든다.\n3. NC2가 「작성자 설명」 h4 안에 작성 달을 넣어서, U9의 S5 시험(api/test/claude-mcp/mcp-shared-text.test.cjs)이 web 원문에서 찾는 '<h4>작성자 설명</h4>'가 없어졌다. 그 표지 하나를 '<h4>작성자 설명'으로 바꾸고, api를 빌드한 뒤 그 시험 파일을 돌려 S5 통과를 확인한다.\n4. project.md에 더한 「본인 커밋 같은 판정」 규칙 끝에 "저장된 기록이 없어 문장 대조를 쓸 때는 두 쪽 문장을 맞춰 보는 시험으로 묶는다"를 덧붙인다.\n5. PR 본문에는 다음을 적는다: AC8.1.3(남의 기여를 지원자 것으로 쓴 답 0건)은 실제 AI로 아직 재지 않았다는 것, 서비스별 시간 중 api·web은 코드 생성 때 잰 값이라는 것, 2·3번은 NC2 승인 뒤 AI-DLC 밖에서 직접 고쳤다는 것. 리뷰 요청에는 U10 담당(rag-eval·JD_SUMMARY_INSTRUCTION 내보내기)과 U9 담당(S5 표지 한 줄)을 넣는다. 본문 초안은 열기 전에 보여 줘.\n6. PR을 연 뒤 로컬 api·web을 멈추고 DB 컨테이너를 내린다.
+**Options**: ["NC2 PR을 먼저 연다","NC3로 바로 간다","서버를 내리고 NC3로 간다"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-11T02:04:12Z
+**Event**: QUESTION_ANSWERED
+**Stage**: functional-design
+**Details**: NC2 PR을 먼저 연다(통합 브랜치 merge, binding 파일 지우는 커밋, S5 시험 표지 수정, project.md 규칙 덧붙임, PR 본문 초안 먼저 보여 주기, PR 뒤 서버 내리기)
+**Unit**: nc3-revisit-facts
+**Person Reply**: 1번(NC2 PR을 먼저 연다)으로 가되, 아래처럼 해 줘.\n1. #517(NC1)·#516(U9)·#519가 통합 브랜치에 들어갔다(a30112a2). 통합 브랜치를 작업 브랜치에 merge commit으로 들인다. 미리 합쳐 봤을 때 충돌은 없었다.\n2. 9d4c74eb에 실수로 들어간 api/aidlc/.aidlc-sessions/1729f1fa-467d-42c0-835d-f754927cf476.binding.json을 api/aidlc/ 폴더째 지우는 커밋을 하나 만든다.\n3. NC2가 「작성자 설명」 h4 안에 작성 달을 넣어서, U9의 S5 시험(api/test/claude-mcp/mcp-shared-text.test.cjs)이 web 원문에서 찾는 '<h4>작성자 설명</h4>'가 없어졌다. 그 표지 하나를 '<h4>작성자 설명'으로 바꾸고, api를 빌드한 뒤 그 시험 파일을 돌려 S5 통과를 확인한다.\n4. project.md에 더한 「본인 커밋 같은 판정」 규칙 끝에 "저장된 기록이 없어 문장 대조를 쓸 때는 두 쪽 문장을 맞춰 보는 시험으로 묶는다"를 덧붙인다.\n5. PR 본문에는 다음을 적는다: AC8.1.3(남의 기여를 지원자 것으로 쓴 답 0건)은 실제 AI로 아직 재지 않았다는 것, 서비스별 시간 중 api·web은 코드 생성 때 잰 값이라는 것, 2·3번은 NC2 승인 뒤 AI-DLC 밖에서 직접 고쳤다는 것. 리뷰 요청에는 U10 담당(rag-eval·JD_SUMMARY_INSTRUCTION 내보내기)과 U9 담당(S5 표지 한 줄)을 넣는다. 본문 초안은 열기 전에 보여 줘.\n6. PR을 연 뒤 로컬 api·web을 멈추고 DB 컨테이너를 내린다.
+**Message Id**: 71f6f973
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T02:06:33Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/learnings/functional-design-selections.json
+**Context**: .aidlc-engine > learnings > functional-design-selections.json
+
+---
+
+## Rule Learned
+**Timestamp**: 2026-11-11T02:06:34Z
+**Event**: RULE_LEARNED
+**Stage**: functional-design
+**Candidate-ID**: n1
+**Content-Hash**: 6210c594285c4d1174cd35497c262c2464b5d083ba99d061673ec8a6f9f8f940
+**Destination**: <project-dir>/aidlc/spaces/default/memory/project.md
+**Heading**: ## Corrections
+**Source**: user_addition
+
+---
