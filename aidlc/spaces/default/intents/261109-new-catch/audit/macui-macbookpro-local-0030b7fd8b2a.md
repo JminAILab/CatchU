@@ -17530,3 +17530,192 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
 
 ---
+
+## Change Accepted
+**Timestamp**: 2026-11-11T00:55:57Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: functional-design
+**Unit**: nc2-snapshot-fields
+**Checkpoint**: review-receipt
+**Changed**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md, aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md, aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Recorded**: sha256:7238b3bdffaa680c9efbd1831cc9edf99c70de90beba9fe8e8127775467ecf43
+**Current**: sha256:b3bc5f7d664ce7576c76f9b0908ecdf8f7939fc12f274cddbb0a33c0f0f7be98
+**Details**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md, aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md, aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md changed after the nc2 snapshot fields Unit was reviewed; carrying on.
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:56:08Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a0afbf2c6ed7c4d0e
+**Message**: ! git rm -q --cached api/aidlc/.aidlc-sessions/1729f1fa-467d-42c0-835d-f754927cf476.binding.json && rm -r api/aidlc && git commit -q --amend --no-edit
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T01:00:02Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a349af08860e13ad8
+**Message**: 새 Catch의 NC2(면접관 사본 칸과 표지) 코드를 다 만들었고 검토도 통과했습니다. 지금 Unit 확인 명령(최대 60분)이 돌고 있고, 끝나면 결과를 보여 드린 뒤 NC2 승인을 여쭤보겠습니다.
+
+---
+
+## Checkpoint Verification Recorded
+**Timestamp**: 2026-11-11T01:06:08Z
+**Event**: CHECKPOINT_VERIFICATION_RECORDED
+**Unit**: nc2-snapshot-fields
+**Kind**: unit
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Verification Id**: 509fc6f6-0872-42ba-a02b-b99ab080fb68
+**Fingerprint**: sha256:9e584d5701421f6aea8ddfffddbed76733108bb146665e35dad1a30c37a77872
+**Command SHA-256**: dc0c9c449a685becf2741e484ff978989d3ad90c5e12b107d00c5d3397cb4273
+**Exit Code**: 0
+**Verified**: true
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T01:06:09Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T01:08:19Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: You asked me to 본인 커밋 여부 같은 판정은 worker 문장을 api에 베껴 대조하지 말고, DB에 이미 저장된 기록(소속 기록 commit_assignment 등)으로 정한다. Keep that for next time? / You asked me to 로컬 실제 연결 확인은 앞 Unit의 code-summary에 적힌 로컬 환경(~/catchu-local-live/cr1, catchu-cr1-db 55460, pgvector)을 먼저 확인해 쓰고, 띄우기 전에 DB를 백업한다. Keep that for next time?
+**Options**: |Yes, for this project|Yes, for the team|No
+**Question Kind**: learnings-note
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T01:22:13Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["Yes, for this project","No"]
+**Message Id**: f783f267
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T01:22:14Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: 본인 커밋 여부 같은 판정은 worker 문장을 api에 베껴 대조하지 말고, DB에 이미 저장된 기록(소속 기록 commit_assignment 등)으로 정하라고 바로잡아 주셨습니다. 다음에도 지킬까요?
+**Reply**: Yes, for this project
+**Options**: ["Yes, for this project","Yes, for the team","No"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T01:22:14Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: 로컬 실제 연결 확인은 앞 Unit의 code-summary에 적힌 로컬 환경(~/catchu-local-live/cr1, catchu-cr1-db 55460, pgvector)을 먼저 확인해 쓰고, 띄우기 전에 DB를 백업하라고 바로잡아 주셨습니다. 다음에도 지킬까요?
+**Reply**: No
+**Options**: ["Yes, for this project","Yes, for the team","No"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-11T01:22:20Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: Q1: Yes, for this project; Q2: No
+**Person Reply**: <pasted_content id="9097">\n로컬 실제 연결 확인 결과를 알려 드립니다. 11/11 09:31(KST)에 「SET_TOKEN 코드 수정」을 새로 발행하고 받은 사람 링크를 열어 확인했습니다.\n\n- 작성자 설명은 고치지 않았습니다. 「짚어 볼 곳」에 두 커밋 링크(0874001 본인 커밋, 947dc99 병합 커밋)가 11/10부터 이미 들어 있었습니다.\n- ① 제목 아래 작은 줄에 ljm0850/TheMe가 보였습니다.\n- ② 「작성자 설명」 제목 안에 「2026년 11월에 마지막으로 고침」이 보였습니다.\n- ③ 「커밋 0874001」 링크 바로 뒤에 「이 작업의 본인 커밋」 표지가 하나 보였습니다. 표지는 링크와 강조 밖의 형제 요소였고 tabindex·role이 없었으며, Catch 종류 표지와 모양이 같았습니다. Tab 키를 누르면 0874001 링크에서 947dc99 링크로 바로 넘어갔습니다.\n- ④ 「커밋 947dc99」 뒤에는 표지가 없었습니다. 근거 목록의 「GitHub 근거 열기」 링크에도 표지가 없었습니다.\n- 공개 응답에서는 repositoryName이 "ljm0850/TheMe", authorDescriptionEditedMonth가 "2026-11"이었습니다. workLimits 키는 없었고, ownCommit은 0874001이 true, 947dc99가 false였습니다.\n- 작성자 쪽 발행 상세 화면에서도 ①~④가 같게 보였습니다.\n\n화면으로 보지 못하고 시험으로만 확인한 것:\n- 「이 기록으로 알 수 없는 것」: 이 Catch 근거에는 작업 전체 한계 문장이 없어서 칸이 나오지 않았습니다. 947dc99에는 커밋 하나에만 해당하는 한계 문장만 있었습니다.\n- 작성자 말로 옮기라는 AI 지시 문장: 로컬에 Claude 키가 없어서 실제 답으로는 확인하지 못했습니다.\n\n결과를 기록하고 코드 요약과 검토로 넘어가 주세요.\n</pasted_content id="9097">\nYes, for this project\nNo
+**Message Id**: f783f267
+**Message Ids**: 23a65cd5,f783f267
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T01:22:28Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/learnings/nfr-requirements-selections.json
+**Context**: .aidlc-engine > learnings > nfr-requirements-selections.json
+
+---
+
+## Rule Learned
+**Timestamp**: 2026-11-11T01:22:29Z
+**Event**: RULE_LEARNED
+**Stage**: nfr-requirements
+**Candidate-ID**: c1
+**Content-Hash**: e3e3e8569334a22213a106b72c10b4eb7a3cccf43aaa8aa4cebacea3d036a853
+**Destination**: <project-dir>/aidlc/spaces/default/memory/project.md
+**Heading**: ## Corrections
+**Source**: user_addition
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T01:22:42Z
+**Event**: DECISION_RECORDED
+**Checkpoint**: Construction Unit Approval
+**Unit**: nc2-snapshot-fields
+**Kind**: unit
+**Stage**: code-generation
+**Fingerprint**: sha256:9e584d5701421f6aea8ddfffddbed76733108bb146665e35dad1a30c37a77872
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Options**: Approve,Request Changes
+**Asked Evidence**: {"functional-design":["sha256:7238b3bdffaa680c9efbd1831cc9edf99c70de90beba9fe8e8127775467ecf43",null],"nfr-requirements":["sha256:f1112e1c526e7de30319564d30023f98fe388a09cca88579389564ce7d8b20a7",null],"nfr-design":["sha256:a14db84983d2d43d614a98b8fe8e8773e4d3ed117e6bb294f1ab5d781719c75e",null],"code-generation":["sha256:75469ab9d64a7f26badde4779db45776fee9066e31a95bebd8a6a6621ba115ab","sha256:1709ff6d4e78f51418e40b2d4e418641feea0539f440c7472348bd3cdca660bf",{"\u0000api/docs/catch-registration-rules.md":"100644 5f1802ff1742d6f09ed7ad31275b850e60fee59121ec78f7a909941fd1c9b27c","\u0000api/docs/publications.md":"100644 e0287879d6f1a5c1beba9d6208e1e1fa11eebe68e6c7dac626550a34cf7cb597","\u0000api/docs/published-index.md":"100644 d25ee9723bb31fba840e9b2ec5af19c50eb1598bc960a33589ed6a63897e7a2c","\u0000api/scripts/rag-eval/rag-eval.cjs":"100644 e72a2357c735599e398ca4a840557707c4d36400b7aa273f79776e7e21569feb","\u0000api/src/catches/entities/commit-assignment.entity.ts":"100644 03fc89d6e8956091bca9ebbacac4e8c019d228df221ff9b12aaf720ca120fc58","\u0000api/src/jd-summary/jd-generation-request.ts":"100644 1c0a0ccf01612016254d54cbb9ab21def5347419336c0db750075930ebeacfe1","\u0000api/src/publications/publications-log.ts":"100644 225acdf917fe308e72d0e03a296454bd6d3e6cb59ef2e5a8f447849cdc48b2b1","\u0000api/src/publications/publish.service.ts":"100644 322930f64e365ab1da643da60b91a656f799fed5048739bfbc96247713cc38c1","\u0000api/src/publications/published-snapshot.ts":"100644 170d01dc188be395046c86846e75c5e45dd9de647a38a00032cfa3c4b9e38e1e","\u0000api/src/publications/snapshot-builder.ts":"100644 1f0a87c5d78ab709586fac64c044b20499fc2d5b9e279a3b30cc3d38f8d03853","\u0000api/src/publications/work-limit-sentences.ts":"100644 bdfbd1865b982595d6504e31e90890c3e7aea1e37849a4d3a9b0015387e455d6","\u0000api/src/rag-answer/rag-answer-config.ts":"100644 32e7ac8505d37f52a094c8fc5d853735f5b0bcd37a58e489b535dc6bb3042903","\u0000api/test/jd/jd-summary.test.cjs":"100644 a0c23152f6b3750f356cc20ee871222f74f4648154044dcf52c28bd07b03d4e9","\u0000api/test/publications/publications-logging.test.cjs":"100644 c5c1fd44dd96723e83e78f8f9446e0fbbfecfa3acf98c6bb02f2546819c071cb","\u0000api/test/publications/publish-api.test.cjs":"100644 8c573d76cf5be1ab8ae13915dbfa18fc35fe5027e1a9d901f4bfac981cf2bc60","\u0000api/test/publications/support.cjs":"100644 3d31404d63018b00cb1e9a024b9942ed30e45612500bbdf5e500dd0d71fb695b","\u0000api/test/publications/work-limit-sentences.test.cjs":"100644 096881273443cca99d621af8237388a00b5d7e130f66830d4e7da747652f13ea","\u0000api/test/published-index/chunker.test.cjs":"100644 e2c7d96c50740241eb0a49ee2784afa81f5b584cb8a07a985961d803d2ba627c","\u0000api/test/rag-answer/base-summary-handler.test.cjs":"100644 53782e0093cfa922f814356698e42110e1b7541a0fde20e240faf823d30ec3d5","\u0000api/test/rag-answer/qna-controller.test.cjs":"100644 8e8fb7cd80f7d1546c928f97bb5c6d9c34ed439aa871e629aba55118e850cf49","\u0000api/test/rag-answer/summary-sources.test.cjs":"100644 eb4477bf6689866d9bf8caec50f014c4c8997d87d96869951bbdf0f026d4b6bb","\u0000web/src/features/publications/README.md":"100644 e6959319e5126edd25078bd2b6b2aa64ff135f6dafb42bea318ea4c063c7a03c","\u0000web/src/features/publications/publications-api.ts":"100644 7b34a11c922598b33f24087d8bda2d89ea271c9a35981a36e1c3481697e84585","\u0000web/src/features/publications/publications.module.css":"100644 61c1df8c2f3e29d5e8368f11eb73ef55c42ac209b24568deda9b1881f3bb8dd4","\u0000web/src/features/publications/snapshot-view.tsx":"100644 a2394ab733d56046b637056d4c084d3b873b9ea9258013882b527e5165532e85","\u0000web/src/features/recipient/README.md":"100644 5f5cb0624e9717479684560a9d1eb0f5a58878d3c088fafaa7e110921a19291d","\u0000web/src/features/recipient/recipient-api.ts":"100644 f10ccedf69089e880f25d421781bd2569eea274692d163397b34e9998a370685","\u0000web/src/lib/github-link-name.ts":"100644 28cd59408598d2a3e604c28fd3b9e813035e41b8df01f35ec3726b3913c2f4de","\u0000web/test/github-link-name.test.mjs":"100644 51eafaa063f67ab903cf424c259542a1a5624cfe63680d38a25a0d82a720daa6","\u0000web/test/publications-owner.test.mjs":"100644 7c47f545b922c683a04b3bdc0697b8b9394df674341b1c9bb6ef956f5ccbb432","\u0000web/test/recipient.test.mjs":"100644 a1d0a2fbf11c44e63a9ebd59f9a800bd7fc61514db0a36c94830361e431eb4c7"}]}
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","code-generation":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1"}
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T01:36:19Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: 3f2890e2
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T01:36:20Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: Approve this completed nc2-snapshot-fields?
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-11T01:36:28Z
+**Event**: GATE_APPROVED
+**Unit**: nc2-snapshot-fields
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Scope**: unit-end
+**Checkpoint**: construction-unit
+**Fingerprint**: sha256:9e584d5701421f6aea8ddfffddbed76733108bb146665e35dad1a30c37a77872
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","code-generation":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1"}
+**Verification Command SHA-256**: dc0c9c449a685becf2741e484ff978989d3ad90c5e12b107d00c5d3397cb4273
+**Verification Id**: 509fc6f6-0872-42ba-a02b-b99ab080fb68
+**Approved Evidence**: {"functional-design":["sha256:7238b3bdffaa680c9efbd1831cc9edf99c70de90beba9fe8e8127775467ecf43",null],"nfr-requirements":["sha256:f1112e1c526e7de30319564d30023f98fe388a09cca88579389564ce7d8b20a7",null],"nfr-design":["sha256:a14db84983d2d43d614a98b8fe8e8773e4d3ed117e6bb294f1ab5d781719c75e",null],"code-generation":["sha256:75469ab9d64a7f26badde4779db45776fee9066e31a95bebd8a6a6621ba115ab","sha256:1709ff6d4e78f51418e40b2d4e418641feea0539f440c7472348bd3cdca660bf",{"\u0000api/docs/catch-registration-rules.md":"100644 5f1802ff1742d6f09ed7ad31275b850e60fee59121ec78f7a909941fd1c9b27c","\u0000api/docs/publications.md":"100644 e0287879d6f1a5c1beba9d6208e1e1fa11eebe68e6c7dac626550a34cf7cb597","\u0000api/docs/published-index.md":"100644 d25ee9723bb31fba840e9b2ec5af19c50eb1598bc960a33589ed6a63897e7a2c","\u0000api/scripts/rag-eval/rag-eval.cjs":"100644 e72a2357c735599e398ca4a840557707c4d36400b7aa273f79776e7e21569feb","\u0000api/src/catches/entities/commit-assignment.entity.ts":"100644 03fc89d6e8956091bca9ebbacac4e8c019d228df221ff9b12aaf720ca120fc58","\u0000api/src/jd-summary/jd-generation-request.ts":"100644 1c0a0ccf01612016254d54cbb9ab21def5347419336c0db750075930ebeacfe1","\u0000api/src/publications/publications-log.ts":"100644 225acdf917fe308e72d0e03a296454bd6d3e6cb59ef2e5a8f447849cdc48b2b1","\u0000api/src/publications/publish.service.ts":"100644 322930f64e365ab1da643da60b91a656f799fed5048739bfbc96247713cc38c1","\u0000api/src/publications/published-snapshot.ts":"100644 170d01dc188be395046c86846e75c5e45dd9de647a38a00032cfa3c4b9e38e1e","\u0000api/src/publications/snapshot-builder.ts":"100644 1f0a87c5d78ab709586fac64c044b20499fc2d5b9e279a3b30cc3d38f8d03853","\u0000api/src/publications/work-limit-sentences.ts":"100644 bdfbd1865b982595d6504e31e90890c3e7aea1e37849a4d3a9b0015387e455d6","\u0000api/src/rag-answer/rag-answer-config.ts":"100644 32e7ac8505d37f52a094c8fc5d853735f5b0bcd37a58e489b535dc6bb3042903","\u0000api/test/jd/jd-summary.test.cjs":"100644 a0c23152f6b3750f356cc20ee871222f74f4648154044dcf52c28bd07b03d4e9","\u0000api/test/publications/publications-logging.test.cjs":"100644 c5c1fd44dd96723e83e78f8f9446e0fbbfecfa3acf98c6bb02f2546819c071cb","\u0000api/test/publications/publish-api.test.cjs":"100644 8c573d76cf5be1ab8ae13915dbfa18fc35fe5027e1a9d901f4bfac981cf2bc60","\u0000api/test/publications/support.cjs":"100644 3d31404d63018b00cb1e9a024b9942ed30e45612500bbdf5e500dd0d71fb695b","\u0000api/test/publications/work-limit-sentences.test.cjs":"100644 096881273443cca99d621af8237388a00b5d7e130f66830d4e7da747652f13ea","\u0000api/test/published-index/chunker.test.cjs":"100644 e2c7d96c50740241eb0a49ee2784afa81f5b584cb8a07a985961d803d2ba627c","\u0000api/test/rag-answer/base-summary-handler.test.cjs":"100644 53782e0093cfa922f814356698e42110e1b7541a0fde20e240faf823d30ec3d5","\u0000api/test/rag-answer/qna-controller.test.cjs":"100644 8e8fb7cd80f7d1546c928f97bb5c6d9c34ed439aa871e629aba55118e850cf49","\u0000api/test/rag-answer/summary-sources.test.cjs":"100644 eb4477bf6689866d9bf8caec50f014c4c8997d87d96869951bbdf0f026d4b6bb","\u0000web/src/features/publications/README.md":"100644 e6959319e5126edd25078bd2b6b2aa64ff135f6dafb42bea318ea4c063c7a03c","\u0000web/src/features/publications/publications-api.ts":"100644 7b34a11c922598b33f24087d8bda2d89ea271c9a35981a36e1c3481697e84585","\u0000web/src/features/publications/publications.module.css":"100644 61c1df8c2f3e29d5e8368f11eb73ef55c42ac209b24568deda9b1881f3bb8dd4","\u0000web/src/features/publications/snapshot-view.tsx":"100644 a2394ab733d56046b637056d4c084d3b873b9ea9258013882b527e5165532e85","\u0000web/src/features/recipient/README.md":"100644 5f5cb0624e9717479684560a9d1eb0f5a58878d3c088fafaa7e110921a19291d","\u0000web/src/features/recipient/recipient-api.ts":"100644 f10ccedf69089e880f25d421781bd2569eea274692d163397b34e9998a370685","\u0000web/src/lib/github-link-name.ts":"100644 28cd59408598d2a3e604c28fd3b9e813035e41b8df01f35ec3726b3913c2f4de","\u0000web/test/github-link-name.test.mjs":"100644 51eafaa063f67ab903cf424c259542a1a5624cfe63680d38a25a0d82a720daa6","\u0000web/test/publications-owner.test.mjs":"100644 7c47f545b922c683a04b3bdc0697b8b9394df674341b1c9bb6ef956f5ccbb432","\u0000web/test/recipient.test.mjs":"100644 a1d0a2fbf11c44e63a9ebd59f9a800bd7fc61514db0a36c94830361e431eb4c7"}]}
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**User Input**: Approve
+**Person Reply**: Approve
+**Message Id**: 3f2890e2
+**Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:b7ad85ee546e12aad22afc4aff60f2aa97d70217d955742632e1502d49560cd5","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:381e04572bee3000803bab8731d170a13e2d59187d8d86590290071333b64cab"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md","id":"R-02","fingerprint":"sha256:95d611dfa0d24b083dca575739cba9286d9b5d33428195f92a3f1178e4c4a33e","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:381e04572bee3000803bab8731d170a13e2d59187d8d86590290071333b64cab"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md","id":"R-03","fingerprint":"sha256:f067302c139aa18cd1f509c5e5f8ae2c266f42d0a7e27ebb6dfe1baf77b8e137","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:381e04572bee3000803bab8731d170a13e2d59187d8d86590290071333b64cab"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:05d9d46e9e17cae780d40ad1c6326b3ef02d7daa5d544059fc36f2b8004fc5bc","status":"Changed after review","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:639c8167db24e4a54210d680aa5c978cfc44c69dcbae25862ad7c228f6cbf343"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:0f560cefd86ab9c628ff347541f34f83123a1d44bf5c2908968f14bb65947f5f","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:639c8167db24e4a54210d680aa5c978cfc44c69dcbae25862ad7c228f6cbf343"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md","id":"R-03","fingerprint":"sha256:b2e7a1391b925a0e69dc098add6c7479242427b8f38c7332c3372afb3694c6c2","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:639c8167db24e4a54210d680aa5c978cfc44c69dcbae25862ad7c228f6cbf343"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md","id":"R-01","fingerprint":"sha256:08e31553fa73c5b026bf130d05338f02858b9e6cb9c1770612c3ff35305c21f0","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:5cedb64aeae0bfacaf2c9bd8c757dcfbb4fe0c9ffcc5e1d80ab47501bb47ef4b"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md","id":"R-02","fingerprint":"sha256:4004c0a151446388652d110f2d341d927c693a7e6610ca05ca31b23841f8197f","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:5cedb64aeae0bfacaf2c9bd8c757dcfbb4fe0c9ffcc5e1d80ab47501bb47ef4b"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md","id":"R-03","fingerprint":"sha256:38181f9f75517e1d6756070610f5f974586f1b3142ccf49f8cb7c0781193b135","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:5cedb64aeae0bfacaf2c9bd8c757dcfbb4fe0c9ffcc5e1d80ab47501bb47ef4b"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-01","fingerprint":"sha256:fb98c4b5187d6c1307641e197d54937d9c1dbad36af0fd8538d81a68fa946bfc","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-02","fingerprint":"sha256:4f9b1ed18b6f33fdd36ca087d06a637afe35d039ac71941f0f78bbbc660d1af9","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-03","fingerprint":"sha256:b207003490660be5531fa0306ffa448c1a098fef895177d462289a1c0abe3308","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-04","fingerprint":"sha256:1000648f27e1c81d6d271bb70126d88dad84c4ff45c2b94d2fbdcedaa48fef25","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}}]}
+
+---
