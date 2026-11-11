@@ -177,48 +177,37 @@ uv run --locked python -m app.processing succeeded-one-candidate
 
 ## PDF 글 추출 소비자
 
-12월 U8. 작성 회원이 올린 PDF에서 쪽별 글을 뽑아 api로 돌려준다. 분석 요청 큐 소비자와 **같은 프로세스**(`python -m app.consumer`)에서 둘째 Worker로 돌며, 아래 설정이 없으면 띄우지 않는다. api 쪽 규격과 수신 판정은 [api PDF 자료 문서](../api/docs/pdf-materials.md#추출-요청과-결과-수신-c-16)에 있다.
+12월 U8. 작성 회원이 올린 PDF에서 쪽별 글을 뽑아 api로 돌려준다. 분석 요청 큐 소비자와 **같은 프로세스**(`python -m app.consumer`)에서 둘째 Worker로 돌며, 아래 읽기 경로 설정이 없으면 띄우지 않는다. 큐·메시지 규격, 수신 판정, 확인 범위(실제 S3·Compose 전체 스택은 미검증)는 [api PDF 자료 문서](../api/docs/pdf-materials.md)에 있다.
 
-### 처리
-
-1. 큐 `pdf-extraction-requests`의 작업 `PdfExtract`를 받는다. 봉투(`schemaVersion "2"`·`messageId`·`pdfMaterialId`·`memberId`·`storageKey` 다섯 필드, 작업 ID = `pdfMaterialId`, 저장 키가 두 ID에서 나온 값과 같음)를 검사하고, 틀리면 결과 없이 작업을 실패로 끝낸다(`PDF_REQUEST_INVALID`).
-2. 작업마다 자식 프로세스 하나를 띄운다. 자식은 읽기 경로와 제한값만 받고 큐 접속 정보·LIVE 키는 받지 않는다.
-3. 자식이 원본을 읽고(읽기만, 쓰기·삭제 호출 없음) pypdf로 쪽마다 글을 뽑는다. 글에서는 NUL만 빼고 가공하지 않으며, 공백·제어 문자뿐인 쪽은 `readable: false`·빈 글이다. OCR은 하지 않는다.
-4. 결과를 큐 `worker-messages`에 작업 `PdfExtractionResult`(작업 ID `message-pdf-{pdfMaterialId}-result`)로 한 번 넣고, api의 수신 확인은 기록만 한다. 거부되거나 확인을 못 봐도 다시 보내거나 다시 추출하지 않는다.
+작업마다 자식 프로세스 하나가 원본을 읽기만 하고 pypdf로 쪽 글을 뽑는다(OCR 없음, 글 없는 쪽은 `readable: false`). 결과는 한 번만 보내고, 거부되거나 수신 확인을 못 봐도 다시 보내거나 다시 추출하지 않는다.
 
 | 경우 | 결과 |
 |---|---|
-| 파싱 실패, 쪽 수 0, 어느 한 쪽의 읽기·글 추출 예외 | `FAILED`/`UNREADABLE_FILE` |
+| 요청 봉투 모양 오류 | 결과 없이 작업 실패(`PDF_REQUEST_INVALID`) |
+| 파싱 실패, 쪽 수 0, 어느 한 쪽의 추출 예외 | `FAILED`/`UNREADABLE_FILE` |
 | 암호화된 PDF | `FAILED`/`ENCRYPTED` |
-| 51쪽 이상(글을 뽑기 전에 판정) | `FAILED`/`PAGE_LIMIT_EXCEEDED` |
-| 쪽 글 합계가 60,000자(코드 포인트)를 넘음(그 쪽에서 멈춤, 부분 결과 없음) | `FAILED`/`TEXT_LIMIT_EXCEEDED` |
-| 자식의 시간·메모리 제한 초과, 원인 모를 자식 종료 | `FAILED`/`UNREADABLE_FILE`(10분 시한보다 일찍 확정) |
-| 저장소 장애, 자식 코드 결함, 내부 결과 메시지 손상 | 결과 없이 작업 실패. 자료는 api의 10분 시한으로 `FAILED`(`DEADLINE_EXCEEDED`)가 된다 |
+| 51쪽 이상 | `FAILED`/`PAGE_LIMIT_EXCEEDED` |
+| 쪽 글 합계 60,000자 초과 | `FAILED`/`TEXT_LIMIT_EXCEEDED` |
+| 자식의 시간·메모리 제한 초과, 원인 모를 자식 종료 | `FAILED`/`UNREADABLE_FILE` |
+| 저장소 장애, 자식 코드 결함, 내부 결과 손상 | 결과 없이 작업 실패. 자료는 api의 10분 시한으로 실패가 된다 |
 
-상한 값(20 MB·50쪽·60,000자)은 api와 같은 값이며 `app/pdf_extraction/settings.py`에 있다. 한쪽만 바꾸지 않는다.
+상한 값은 api와 같은 값이며 `app/pdf_extraction/settings.py`에 있다. 한쪽만 바꾸지 않는다.
 
 ### 설정
 
-이름과 설명은 `.env.example`에 있다. 큐 주소·접두사는 분석 소비자 설정을 함께 쓴다([docs/queue-consumer.md](docs/queue-consumer.md) 「설정」).
+설명은 `.env.example`에 있다. 큐 주소·접두사는 분석 소비자 설정을 함께 쓴다([docs/queue-consumer.md](docs/queue-consumer.md) 「설정」).
 
 | 이름 | 기본 | 내용 |
 |---|---|---|
-| `PDF_FILE_ROOT` | 없음 | 로컬·시험용 읽기 경로. api의 `FILE_STORAGE_LOCAL_ROOT`와 같은 폴더(읽기 전용으로 붙임)의 절대 경로 |
-| `FILE_STORAGE_S3_BUCKET` | 없음 | 배포용 읽기 경로. api와 같은 버킷 이름. 접근 키는 넣지 않고 AWS 기본 자격 체인(역할)을 쓰며, 지역은 boto3가 읽는 `AWS_DEFAULT_REGION`으로 준다 |
+| `PDF_FILE_ROOT` | 없음 | 로컬·시험용 읽기 경로. api의 `FILE_STORAGE_LOCAL_ROOT`와 같은 폴더의 절대 경로 |
+| `FILE_STORAGE_S3_BUCKET` | 없음 | 배포용 읽기 경로. api와 같은 버킷 이름. 접근 키 없이 역할을 쓰고 지역은 `AWS_DEFAULT_REGION` |
 | `CATCHU_WORKER_PDF_CONCURRENCY` | 1 | 동시 추출 수. 지금은 1만 받는다 |
 | `CATCHU_WORKER_PDF_CHILD_TIMEOUT_SECONDS` | 120 | 자식의 총 시간(1~600) |
-| `CATCHU_WORKER_PDF_CHILD_MEMORY_MB` | 512 | 자식 메모리 제한(64~16384). Linux에서만 적용되고 그 밖에서는 시간 제한이 주 수단이다 |
+| `CATCHU_WORKER_PDF_CHILD_MEMORY_MB` | 512 | 자식 메모리 제한(64~16384, Linux에서만 적용) |
 
-- 두 읽기 경로를 모두 비우면 PDF 소비자를 띄우지 않는다(분석 소비자는 그대로 뜬다). 둘 다 넣으면 기동하지 않는다. 읽기 경로 없이 나머지 값만 넣어도 기동하지 않는다.
-- 기동 로그의 `pdf=enabled(concurrency=1)`로 떴는지 확인한다.
-- 로컬 합성 구성(`deploy/compose.local-db.yaml`)은 볼륨 `files`를 api에 쓰기, worker에 읽기 전용으로 붙여 둔다. 쓰려면 환경 파일에 위 `PDF_FILE_ROOT`와 api의 로컬 저장 설정을 넣는다.
-- 로그에는 `pdfMaterialId`·결과·쪽 수만 남기고 저장 키·경로·쪽 글은 남기지 않는다.
-
-### 확인 범위
-
-- 자동 시험: `tests/test_pdf_extraction.py`(32, 추출·원본 읽기·설정), `tests/test_pdf_consumer.py`(19, 처리 함수와 실제 자식 프로세스, 가짜 출력 큐), `tests/test_pdf_service.py`(10, 서비스 연결·기동·종료. 뒤 절은 실제 Redis가 있어야 돌고 없으면 건너뛴다). 시험 도구는 `tests/pdf_synthetic.py`(합성 PDF)·`tests/pdf_children.py`(시험용 자식)다.
-- 로컬 파일 읽기 경로 + 실제 큐 + 현재 작업본으로 빌드한 worker 컨테이너에서 api 업로드부터 `DONE`까지 **확인됨**(2026-11-11). 20·30·40·50·50쪽 합성 PDF 5건(마지막 파일은 쪽마다 그림 포함) 연속 업로드가 약 2.2~2.5초에 모두 `DONE`으로 관측됐고, 건당 추출은 약 0.3~0.6초였다. 실제 사용자 문서·스캔본으로는 재지 않았다([U8 코드 요약 §17.5](../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/code-generation/code-summary.md)).
-- **미검증**: 실제 S3 읽기, Compose 전체 스택 기동 안에서의 추출. Windows에서는 소비자 서비스가 뜨지 않아(신호 처리기) Linux 컨테이너로 확인했다.
+- 두 읽기 경로 가운데 하나만 넣는다. 둘 다 넣거나, 읽기 경로 없이 나머지 값만 넣으면 기동하지 않는다.
+- 떴는지는 기동 로그의 `pdf=enabled(concurrency=1)`로 확인한다.
+- 시험: `uv run --locked pytest tests/test_pdf_extraction.py tests/test_pdf_consumer.py tests/test_pdf_service.py`. 로컬 합성 구성의 파일 볼륨 쓰는 법은 [deploy/compose.local-db.yaml](../deploy/compose.local-db.yaml)의 주석에 있다.
 
 ## 변경 후 검사
 
