@@ -46,3 +46,36 @@
 - `node --test test/materials.test.mjs`: API 경로·성공 판정, 실패 구분, 길이 검사, 저장 결과 반영(입력 유지·dirty), 편집 화면의 민감 정보 안내·`data-testid`·실패 안내, 목록의 실패·0건 구분. 합성 응답만 쓴다.
 - `node --test test/materials-screen.test.mjs`: 화면 모델의 상태 전이. 첫 저장 회귀, 저장 중 추가 입력, 늦은 불러오기 응답, 저장 실패 입력 유지, 로그인 변경 뒤 응답 무시, 삭제 확인·실패, 목록·더 보기, 이탈 확인, 삭제·저장 경합(A 삭제 중 B 편집, 저장 중 다른 자료로 이동한 뒤 늦은 저장 성공, 목록 조회 중 끝난 저장·삭제, 자동 재조회 실패, [더 보기] 지연 중 변경·재조회). 합성 응답만 쓴다.
 - `node --test test/unsaved-traverse-guard.test.mjs`: 뒤로·앞으로 가기 확인 판정(머무르면 취소, 계속하면 이동, 미저장 없음·다른 문서·취소할 수 없는 이동·같은 주소·기록 추가는 묻지 않음). 이벤트 대역만 쓴다.
+
+## PDF 자료 탭 (U8)
+
+12월 intent U8(PDF 자료, #420)이 같은 주소 `/materials`에 탭을 더했다. [텍스트 자료]·[PDF 자료] 두 탭이며 텍스트 자료 탭의 동작은 위 그대로다. 기준: [U8 기능 명세](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/functional-spec.md) W1·W4, [화면 컴포넌트](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/frontend-components.md), [보안 설계](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/nfr-design/security-design.md) §2. api는 [PDF 자료 문서](../../../../api/docs/pdf-materials.md)에 있다.
+
+### 파일
+
+| 파일 | 역할 |
+| --- | --- |
+| `pdf-materials-api.ts` | 목록·상세·삭제(`api.member`), multipart 업로드와 PDF 본문 요청(직접 `fetch`), 보내기 전 검사, 상태 배지·실패 사유 안내 문구. 화면과 분리해 시험한다 |
+| `pdf-clients.ts` | 화면이 함께 쓰는 PDF 호출 객체(자료 화면·작성자 발행본 화면·받은 사람 화면) |
+| `pdf-materials-tab.tsx` | 탭의 상태 전이(목록·올리기·삭제·동의 창 연결) |
+| `pdf-upload-form.tsx` | 올리기 폼 |
+| `pdf-material-list.tsx` | 내 PDF 목록과 [원본 보기] |
+| `../recipient/pdf-viewer-launcher.tsx` | PDF 열람 공용 도우미([받은 사람 화면 README](../recipient/README.md#pdf-항목과-사본-열람-u8)) |
+
+### 동작
+
+- 올리기 폼에는 텍스트 자료와 같은 민감 정보 안내와 외부 AI 한 줄 고지를 늘 보인다.
+- 보내기 전 검사: 파일 1개, PDF(`application/pdf`, 브라우저가 종류를 비우면 `.pdf` 이름), 20 MB 이하, 제목 1~100자(비우면 확장자를 뺀 파일 이름). 서버 검증이 기준이다. 이미 20벌이면 올리기를 막는다.
+- 403 `AI_CONSENT_REQUIRED`면 동의 창을 열고, 동의가 기록되면 같은 요청을 한 번만 다시 보낸다.
+- 201이고 응답 모양이 맞을 때만 목록 맨 위에 "글 추출 중"으로 더한다. 실패하면 "올리지 못했습니다"와 이유를 보이고 고른 파일·제목을 그대로 둔다. 올리는 중에는 다시 보내지 않는다.
+- 목록은 20개씩 읽고 [더 보기]로 잇는다. 줄마다 제목·크기·상태 배지(글 추출 중 / 완료 n쪽 / 실패 + 사유별 안내)를 보인다. 조회 실패를 0건으로 보이지 않는다.
+- **추출 상태는 자동으로 다시 읽지 않는다.** [새로고침]을 눌러야 바뀐다(폴링 없음). 실패한 PDF를 다시 추출하는 단추는 없고 새로 올린다.
+- [원본 보기]는 공용 PDF 뷰어로 화면 안에 연다. 삭제는 확인 뒤 204일 때만 목록에서 빼고, 실패하면 "삭제되지 않았습니다"와 이유를 그 줄에 보인다. 이미 발행한 사본은 남는다.
+- 회원 요청에는 메모리 토큰을 `Authorization`으로 붙이고 토큰을 주소 쿼리에 넣지 않는다. 제목은 React 텍스트로만 그린다.
+- 추출이 끝난 PDF를 발행본에 넣는 것은 [발행 화면](../publications/README.md)에서 한다.
+
+### 시험과 확인 범위
+
+- `node --test test/pdf-materials-api.test.mjs`(7개): API 경로·성공 판정, 보내기 전 검사, 상태 배지·실패 안내, 탭의 상태 전이(올리기·동의 재시도·삭제·로그인 변경 뒤 응답 무시). 합성 응답만 쓴다.
+- 실제 로컬 api와 브라우저로 올리기 → "글 추출 중" → [새로고침] 뒤 "완료 n쪽", [원본 보기], 삭제를 확인했다(2026-11-11). 추출은 로컬 파일 저장소에서 실제 큐와 worker를 거쳤다([U8 코드 요약](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/code-generation/code-summary.md) §16.4·§17.6).
+- 실제 S3를 쓰는 환경의 화면 확인은 하지 않았다.

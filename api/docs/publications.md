@@ -16,6 +16,7 @@
 - DB 제약은 계약 그대로다. 제목·본문·설명 길이, 발행 항목 수 같은 상한은 DB가 아니라 U4 API 검증이라 여기에 없다.
 - 모두 회원을 따라 지워진다([탈퇴 연쇄 삭제](member-withdrawal-deletion.md)). `published_item`은 발행본을 따라 지워지고 원본 Catch·자료와 외래 키가 없다.
 - `published_pdf_page`(U8)·`publication_index`·`published_chunk`(U3)는 각 제공 Unit이 만든다.
+- PDF 자료(업로드·추출·발행의 PDF 부분·PDF 사본 열람 경로)는 [PDF 자료 문서](pdf-materials.md)에 있다(U8).
 - 발행본 상태(ACTIVE·STOPPED·EXPIRED)는 저장하지 않고 `publication-state.ts`의 `publicationState`로 구한다. 중지가 만료보다 우선한다.
 
 ## Catch 작성자 설명 API (C-14, 제출 1)
