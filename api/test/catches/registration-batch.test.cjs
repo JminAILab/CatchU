@@ -14,9 +14,13 @@ function inputError(reason, field) {
   };
 }
 
+// 합성 커밋 SHA(16진수 한 글자 40개).
+const sha = (letter) => letter.repeat(40);
+
 // B의 저장 전 검사 전용 합성 값이다. 공용 #103 자료나 실제 작업 동일성 판정이 아니다.
-function candidate(candidateId = 'candidate-1', workIdentity = 'synthetic-work-1') {
+function candidate(candidateId = 'candidate-1', workIdentity = 'synthetic-work-1', ownCommitShas = [sha('a')]) {
   return {
+    ownCommitShas,
     candidateId, workIdentity,
     title: '[합성] 오류 응답 처리',
     workFacts: ['[합성] 오류 응답을 구분했다.'],
@@ -236,6 +240,36 @@ test('입력 거부 오류의 메시지·필드·원인에 후보 본문·ID·UR
       return true;
     });
   }
+});
+
+test('CR2: 같은 열쇠 후보들의 본인 커밋은 앞 후보 목록 뒤에 새 SHA를 처음 나온 순서로 잇는다', () => {
+  const groups = prepareRegistrationBatch([
+    candidate('candidate-1', 'synthetic-work-1', [sha('c'), sha('a')]),
+    candidate('candidate-2', 'synthetic-work-2', [sha('f')]),
+    candidate('candidate-3', 'synthetic-work-1', [sha('a'), sha('d'), sha('b')]),
+  ], 'LIVE');
+  assert.deepEqual(groups.map((group) => group.workIdentity), ['synthetic-work-1', 'synthetic-work-2']);
+  assert.deepEqual(groups[0].ownCommitShas, [sha('c'), sha('a'), sha('d'), sha('b')]);
+  assert.deepEqual(groups[1].ownCommitShas, [sha('f')]);
+});
+
+test('CR2: 본인 커밋 목록이 비거나 3,000개를 넘거나 형식·중복이 틀리면 값을 싣지 않고 거부한다', () => {
+  const many = Array.from({ length: 3001 }, (_, index) => index.toString(16).padStart(40, '0'));
+  const missing = candidate();
+  delete missing.ownCommitShas;
+  const inputs = [[], 'not-an-array', [sha('A')], ['abc'], [sha('a'), sha('a')], [null], many]
+    .map((ownCommitShas) => candidate('candidate-1', 'synthetic-work-1', ownCommitShas));
+  for (const input of [missing, ...inputs]) {
+    assert.throws(() => prepareRegistrationBatch([input], 'MOCK'),
+      (error) => {
+        inputError('INVALID_INPUT', 'ownCommitShas')(error);
+        assert.equal(error.message.includes(sha('a')), false);
+        return true;
+      });
+  }
+  // 상한 3,000개는 받는다.
+  const groups = prepareRegistrationBatch([candidate('candidate-1', 'synthetic-work-1', many.slice(0, 3000))], 'MOCK');
+  assert.equal(groups[0].ownCommitShas.length, 3000);
 });
 
 test('검사 중 뜻밖의 Error와 TypeError를 입력 거부로 감싸지 않는다', () => {

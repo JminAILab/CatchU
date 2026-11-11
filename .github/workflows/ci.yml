@@ -60,7 +60,8 @@ jobs:
               case "$file" in web/*) web=true ;; esac
               # api 테스트는 worker 합성 자료와 계약 YAML도 읽고, web 통합 시험(공유 링크 #149·화면 통합 #123)은 web의 기능·lib 코드를 직접 불러온다.
               # 큐 판본 시험은 api의 BullMQ·ioredis가 큐 검증 키트에 고정한 판본과 같은지 본다.
-              case "$file" in api/* | worker/fixtures/* | "$contract"* | web/src/features/share-links/* | web/src/features/assets/* | web/src/features/recipient/* | web/src/features/repository-management/* | web/src/lib/* | docs/queue-verification/package.json | docs/queue-verification/package-lock.json) api=true ;; esac
+              # U9 받은 링크 글 시험(S5)은 web 사본 보기 파일 하나의 원문을 읽어 문구를 대조하므로 그 파일만 더한다(발행 폴더 전체는 넣지 않는다).
+              case "$file" in api/* | worker/fixtures/* | "$contract"* | web/src/features/share-links/* | web/src/features/assets/* | web/src/features/recipient/* | web/src/features/repository-management/* | web/src/features/publications/snapshot-view.tsx | web/src/lib/* | docs/queue-verification/package.json | docs/queue-verification/package-lock.json) api=true ;; esac
               # U7의 API 연결 시험은 worker 제품 코드·시험 도우미를 Python으로 직접 실행한다.
               # 실행 코드나 Python 환경이 바뀌어도 API 쪽 연결 검사를 건너뛰지 않는다(#389).
               case "$file" in worker/app/* | worker/tests/* | worker/.python-version | worker/pyproject.toml | worker/uv.lock) api=true ;; esac
@@ -207,7 +208,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: '0.12.18' # worker README 「도구와 버전」의 기준. 저장소 설정에는 uv 판본 고정이 없다.
           checksum: '89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16' # uv 0.12.18 x86_64-unknown-linux-gnu. version을 바꾸면 변경 불가 릴리스 자산의 sha256으로 함께 바꾼다.
@@ -244,7 +245,7 @@ jobs:
         with:
           node-version-file: web/.node-version
       - if: contains(needs.changes.outputs.deps, 'worker')
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: '0.12.18' # worker job과 같은 판본
           checksum: '89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16' # worker job과 같은 값

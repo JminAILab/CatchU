@@ -6,7 +6,7 @@
 
 | API | 입력과 결과 |
 |---|---|
-| GET /v1/catches | 본인 목록. repositoryId·sourceRequestId AND 필터, limit 기본20/1~100, cursor. `{items, page:{nextCursor}}` 반환 |
+| GET /v1/catches | 본인 목록. repositoryId·sourceRequestId·authorDescription(`written`·`unwritten`, 새 Catch C1) AND 필터, limit 기본20/1~100, cursor. `{items, page:{nextCursor}}` 반환 |
 | GET /v1/catches/{catchId} | 본인 Catch·근거·생성 상태·현재 보호 판단 반환 |
 | PUT /v1/catches/{catchId}/confirmation | workFactsConfirmed:true·contributionConfirmed:true 두 필드만 받아 함께 저장 |
 | PUT /v1/catches/{catchId}/mismatch | mismatch:boolean 한 필드만 저장. true/false 반복 요청 가능 |
@@ -18,7 +18,9 @@ AppModule에 CatchesModule을 등록했다. /v1, 공통 오류 응답, 성공/�
 ## 목록과 응답
 
 - Catch의 repositoryId는 원 AnalysisRequest에서 읽는다. CatchAsset에 저장소 칼럼을 추가하지 않는다.
-- 커서는 catchId UUID 오름차순의 다음 위치다. 내부 ownerId와 필터 문맥의 해시를 포함하고 매 요청 같은 범위를 확인한다. 커서를 권한 증명으로 쓰지 않으며 SQL은 항상 본인으로 다시 제한한다. limit 변경은 허용한다.
+- 커서는 catchId UUID 오름차순의 다음 위치다. 판본은 `v: 2`이고 내부 ownerId와 필터 문맥(repositoryId·sourceRequestId·authorDescription)의 해시를 포함해 매 요청 같은 범위를 확인한다. 다른 조건으로 만든 커서와 이전 판본(`v: 1`) 커서는 400이다. 커서를 권한 증명으로 쓰지 않으며 SQL은 항상 본인으로 다시 제한한다. limit 변경은 허용한다.
+- `authorDescription=written`은 작성자 설명이 있는 Catch(`author_description IS NOT NULL`), `unwritten`은 없는 Catch다. 빈 설명은 저장 때 null이 되므로 이 판정과 같다. 값은 SQL에 잇지 않고 고정 조건 둘 가운데 하나를 고른다. 빈 값·같은 키 두 번·대소문자가 다른 값·그 밖 값은 400이고 받은 값을 오류에 싣지 않는다. 색인은 더하지 않았다.
+- 목록·상세의 Catch마다 `hasAuthorDescription`(참·거짓)을 싣는다. `written` 조건과 같은 판정이고 설명 원문은 이 조회에서 읽지 않는다. 수신자용 PublicCatch는 허용 필드만 골라 담아 이 칸을 내보내지 않는다.
 - 다른 회원의 Catch·없는 Catch는 똑같은 `404 RESOURCE_UNAVAILABLE`다. 계약상 ID는 비어 있지 않은 문자열이므로 저장 UUID에 해당하지 않는 Catch ID도 같은 404이며 SQL cast 오류로 노출하지 않는다.
 - 잘못된 커서·중복/추가 쿼리·허용 범위 밖 limit·잘못된 PUT 본문은 400이다. 인증이 없거나 서명이 잘못되면 공통 Guard가 401로 거부한다. 서명이 유효해도 회원 ID가 UUID가 아니거나 같은 트랜잭션에서 회원 행을 찾지 못하면 `401 AUTH_INVALID`다. 회원 조회 자체의 DB 오류는 500으로 구분하며 빈 목록·자원 404로 바꾸지 않는다.
 - 본인 응답은 제목·사실·기여·근거·최소 질문과 원 결과/후보·생성 상태·MOCK/LIVE를 보존한다. 내부 ownerId·작업 키·등록 판단은 응답하지 않는다.

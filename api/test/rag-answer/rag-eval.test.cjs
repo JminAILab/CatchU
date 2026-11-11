@@ -7,7 +7,7 @@ const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
 const { test } = require('node:test');
 const {
-  RagEvalInputError, createMeasureDeps, createSyntheticDeps, parseArgs, parseInput, runRagEval, sampleInput, splitJdRequirements,
+  RagEvalInputError, createMeasureDeps, createSyntheticDeps, dbPublicationAccess, ownedSnapshotReader, parseArgs, parseInput, runRagEval, sampleInput, splitJdRequirements,
 } = require('../../scripts/rag-eval/rag-eval.cjs');
 const { GoldQuoteNotFound, evidencePassRate, findGoldLocations, hitRate, isHitAt } = require('../../scripts/rag-eval/gold-locations.cjs');
 const { buildRepositoryRecord, writeEvaluation } = require('../../scripts/rag-eval/rag-eval-report.cjs');
@@ -122,7 +122,11 @@ test('입력·인자 검사: measure는 질문 10개·--input·두 키·테스�
   assert.throws(() => parseArgs(['measure']), /--input/);
   assert.throws(() => parseArgs(['synthetic', '--unknown', 'x']), RagEvalInputError);
   assert.deepEqual(parseArgs(['synthetic', '--out', 'x']), { mode: 'synthetic', out: 'x' });
-  assert.throws(() => parseInput(structuredClone(INPUT), 'measure'), /10개/);
+  const MEMBER = '33333333-3333-4333-8333-333333333333';
+  assert.throws(() => parseInput(structuredClone(INPUT), 'measure'), /memberId/);
+  assert.throws(() => parseInput({ ...structuredClone(INPUT), memberId: 'x' }, 'measure'), /memberId/);
+  assert.throws(() => parseInput({ ...structuredClone(INPUT), memberId: MEMBER }, 'measure'), /10개/);
+  assert.equal(parseInput(sampleInput(), 'synthetic').memberId, null);
   assert.throws(() => parseInput({ ...structuredClone(INPUT), publicationId: 'x' }, 'synthetic'), /uuid/);
   assert.throws(() => parseInput({ ...structuredClone(INPUT), questions: [{ question: ' ' }] }, 'synthetic'), /1번 질문/);
   assert.throws(() => parseInput([], 'synthetic'), RagEvalInputError);
@@ -131,5 +135,69 @@ test('입력·인자 검사: measure는 질문 10개·--input·두 키·테스�
   await assert.rejects(createMeasureDeps({ env: { ...env, CATCHU_GENERATION_API_KEY: ' ' }, publicationAccess: () => ({}) }), /GENERATION/);
   await assert.rejects(createMeasureDeps({ env: { ...env, CATCHU_EMBEDDING_API_KEY: '' }, publicationAccess: () => ({}) }), /EMBEDDING/);
   await assert.rejects(createMeasureDeps({ env: { ...env, DB_NAME: 'catchu_test' }, publicationAccess: () => ({}) }), /테스트 DB/);
-  await assert.rejects(createMeasureDeps({ env: { ...env, DB_NAME: 'catchu' }, publicationAccess: null }), /PublicationAccess/);
+  await assert.rejects(createMeasureDeps({ env: { ...env, DB_NAME: 'catchu' }, publicationAccess: null, memberId: MEMBER }), /PublicationAccess/);
+  await assert.rejects(createMeasureDeps({ env: { ...env, DB_NAME: 'catchu' }, publicationAccess: () => ({}) }), /memberId/);
+});
+
+test('measure의 사본 읽기는 U4 DB 구현으로 읽기 전용 트랜잭션에서 published_item을 순서대로 읽고, 없는 발행본은 빈 사본 없이 실패한다(BR10.1, C-10)', async () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  const calls = [];
+  const item = { publishedItemId: '22222222-2222-4222-8222-222222222222', position: 1, itemKind: 'TEXT_MATERIAL', title: '머리글', snapshot: { body: '본문' } };
+  const dataSource = (publicationRows) => ({
+    async transaction(isolation, run) {
+      calls.push(isolation);
+      return run({
+        async query(sql, params) {
+          calls.push(sql.replace(/\s+/g, ' ').trim().slice(0, 40));
+          if (/^SET TRANSACTION READ ONLY/.test(sql)) return [];
+          assert.deepEqual(params, [id]);
+          if (/FROM publication WHERE/.test(sql)) return publicationRows;
+          if (/FROM published_item WHERE/.test(sql)) return [item];
+          throw new Error(`예상 밖 질의: ${sql}`);
+        },
+      });
+    },
+  });
+  const snapshot = await dbPublicationAccess(dataSource([{ title: '시연', publishedAt: '2026-11-09T00:00:00Z', expiresAt: '2027-02-07T00:00:00Z' }]))
+    .readSnapshot(id);
+  assert.equal(snapshot.title, '시연');
+  assert.deepEqual(snapshot.items, [{ ...item, pdfPages: null }]);
+  assert.equal(calls[0], 'REPEATABLE READ');
+  assert.equal(calls[1], 'SET TRANSACTION READ ONLY');
+  await assert.rejects(dbPublicationAccess(dataSource([])).readSnapshot(id), (error) => error.name === 'NotFound');
+});
+
+test('measure는 실행자 본인의 발행본일 때만 사본을 읽고, 남의 것·없는 것이면 외부 호출 전에 멈춘다(#493 리뷰)', async () => {
+  const MEMBER = '33333333-3333-4333-8333-333333333333';
+  const OWN = '11111111-1111-4111-8111-111111111111';
+  const OTHER = '44444444-4444-4444-8444-444444444444';
+  const calls = [];
+  class NotFound extends Error { constructor() { super('publication not found'); this.name = 'NotFound'; } }
+  const access = {
+    async resolveForOwner(memberId, publicationId) {
+      calls.push(['owner', memberId, publicationId]);
+      if (memberId !== MEMBER || publicationId !== OWN) throw new NotFound();
+      return { publicationId, state: 'ACTIVE' };
+    },
+    async readSnapshot(publicationId) { calls.push(['snapshot', publicationId]); return { title: '시연', items: [] }; },
+  };
+  const read = ownedSnapshotReader(access, MEMBER);
+  assert.deepEqual(await read(OWN), { title: '시연', items: [] });
+  assert.deepEqual(calls, [['owner', MEMBER, OWN], ['snapshot', OWN]]);
+
+  calls.length = 0;
+  await assert.rejects(read(OTHER), (error) => error instanceof RagEvalInputError && /외부 호출 없이 멈춥니다/.test(error.message));
+  assert.deepEqual(calls, [['owner', MEMBER, OTHER]], '주인이 아니면 사본을 읽지 않는다');
+
+  // 실행 전체에서도 사본 읽기에서 멈추면 검색·생성(외부 호출)을 부르지 않는다.
+  let external = 0;
+  const deps = { readSnapshot: read, search: { async search() { external += 1; return { hits: [], publicationText: '' }; } },
+    gate: { async generate() { external += 1; return { items: [], droppedCount: 0 }; } }, async readAllChunks() { external += 1; return []; } };
+  const input = { ...parseInput({ ...structuredClone(INPUT), publicationId: OTHER }, 'synthetic'), memberId: MEMBER };
+  await assert.rejects(runRagEval({ mode: 'measure', input, deps, outDir: tmpdir(), docsDir: tmpdir(), clock: CLOCK }), RagEvalInputError);
+  assert.equal(external, 0);
+
+  // 주인 판정이 다른 이유로 실패하면 그 오류를 그대로 낸다(삼키지 않는다).
+  const broken = ownedSnapshotReader({ async resolveForOwner() { throw new Error('connection lost'); }, async readSnapshot() { throw new Error('not reached'); } }, MEMBER);
+  await assert.rejects(broken(OWN), /connection lost/);
 });

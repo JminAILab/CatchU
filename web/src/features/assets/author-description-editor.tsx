@@ -7,8 +7,9 @@ import { accessTokenStore } from "@/lib/access-token";
 import { saveFailureReason } from "@/lib/save-outcome";
 import { useUnsavedTraverseGuard } from "@/lib/unsaved-traverse-guard";
 import { createViewStore } from "@/lib/view-store";
+import { joinSections, sectionTexts, type SectionTitle } from "@/lib/author-description-sections";
 import {
-  applyDescriptionSave, authorDescriptionInputError, isDescriptionDirty,
+  applyDescriptionSave, authorDescriptionInputError, isDescriptionDirty, sameSectionTexts,
   type AuthorDescriptionApi, type DescriptionEditState,
 } from "./author-description-api";
 import { AuthorDescriptionPanel } from "./author-description-panel";
@@ -24,14 +25,16 @@ export type DescriptionEditorState = {
 };
 
 /**
- * 작성자 설명 편집 상태 전이(U4 W1, BR1.1·BR1.2·BR2.1~BR2.3).
+ * 작성자 설명 편집 상태 전이(U4 W1, BR1.1·BR1.2·BR2.1~BR2.3, 새 Catch W1·BR1.4~BR1.6).
  *
- * - 열 때 현재 설명을 읽는다. 읽지 못하면 빈 설명으로 추정하지 않고 다시 불러오기를 보인다. 늦게 온 응답은 버린다.
+ * - 열 때 현재 설명을 읽어 8칸으로 나눈다. 읽지 못하면 빈 설명으로 추정하지 않고 다시 불러오기를 보인다. 늦게 온 응답은 버린다.
+ * - 저장은 8칸을 합친 글 하나를 지금 경로로 보낸다. 합친 글이 4,000자를 넘으면 보내지 않는다.
  * - 성공 응답 뒤에만 "저장됨"을 보인다. 실패하면 입력을 남기고 "저장되지 않았습니다"와 이유를 보인다.
  * - 저장 중에 더 쓴 입력은 서버 값으로 덮지 않는다. 로그인이 바뀐 뒤 도착한 응답은 반영하지 않는다.
  */
 export function createDescriptionEditorModel(catchId: string, api: AuthorDescriptionApi, deps: DescriptionEditorDeps = browserDeps) {
-  const store = createViewStore<DescriptionEditorState>({ load: "loading", edit: { value: "", saved: "", status: { kind: "idle" } } });
+  const empty = sectionTexts(null);
+  const store = createViewStore<DescriptionEditorState>({ load: "loading", edit: { texts: empty, savedTexts: empty, status: { kind: "idle" } } });
   let loadRequest: AbortController | null = null;
   let saveRequest: AbortController | null = null;
   let generation = 0;
@@ -52,15 +55,16 @@ export function createDescriptionEditorModel(catchId: string, api: AuthorDescrip
       }));
       return;
     }
-    const saved = result.value.authorDescription ?? "";
-    store.set({ load: "ready", edit: { value: saved, saved, status: { kind: "idle" } } });
+    const saved = sectionTexts(result.value.authorDescription);
+    store.set({ load: "ready", edit: { texts: saved, savedTexts: saved, status: { kind: "idle" } } });
   }
 
-  function change(value: string) {
+  /** 칸 하나를 바꾼다. 저장 중에는 화면이 8칸을 모두 막는다(BR4.5). */
+  function change(title: SectionTitle, value: string) {
     store.set((prev) => ({
       ...prev,
       edit: {
-        ...prev.edit, value,
+        ...prev.edit, texts: { ...prev.edit.texts, [title]: value },
         // 저장됨·검사 거부 안내는 입력을 바꾸면 지운다. 서버 실패 안내는 다시 저장할 때까지 남긴다.
         status: prev.edit.status.kind === "saved" || prev.edit.status.kind === "invalid" ? { kind: "idle" } : prev.edit.status,
       },
@@ -70,18 +74,19 @@ export function createDescriptionEditorModel(catchId: string, api: AuthorDescrip
   async function save() {
     const { load: loadState, edit } = store.get();
     if (loadState !== "ready" || edit.status.kind === "saving") return;
-    const invalid = authorDescriptionInputError(edit.value);
+    const joined = joinSections(edit.texts);
+    const invalid = authorDescriptionInputError(joined);
     if (invalid) { store.set((prev) => ({ ...prev, edit: { ...prev.edit, status: { kind: "invalid", message: invalid } } })); return; }
     const abort = new AbortController();
     saveRequest = abort;
     const session = deps.session();
-    const sent = edit.value;
+    const sent = edit.texts;
     store.set((prev) => ({ ...prev, edit: { ...prev.edit, status: { kind: "saving" } } }));
-    const result = await api.save(catchId, sent, abort.signal);
+    const result = await api.save(catchId, joined, abort.signal);
     if (abort.signal.aborted || deps.session() !== session) return;
     store.set((prev) => {
       const next = applyDescriptionSave(prev.edit, result);
-      return { ...prev, edit: result.kind === "saved" && prev.edit.value !== sent ? { ...next, value: prev.edit.value } : next };
+      return { ...prev, edit: result.kind === "saved" && !sameSectionTexts(prev.edit.texts, sent) ? { ...next, texts: prev.edit.texts } : next };
     });
   }
 
@@ -92,8 +97,13 @@ export function createDescriptionEditorModel(catchId: string, api: AuthorDescrip
   };
 }
 
-/** Catch 상세의 작성자 설명 편집(U4 W1). 상세 모달 안에서 Catch마다 새로 마운트한다(key=catchId). */
-export function AuthorDescriptionEditor({ catchId, api, deps }: { catchId: string; api: AuthorDescriptionApi; deps?: DescriptionEditorDeps }) {
+/**
+ * Catch 상세의 작성자 설명 편집(U4 W1). 상세 모달 안에서 Catch마다 새로 마운트한다(key=catchId).
+ * `evidenceUrls`는 이 Catch 근거 주소이고, 「발행하면 면접관에게 열릴 링크」의 다른 저장소 앞붙임을 정할 때만 쓴다(BR2.4).
+ */
+export function AuthorDescriptionEditor({ catchId, api, deps, evidenceUrls = [] }: {
+  catchId: string; api: AuthorDescriptionApi; deps?: DescriptionEditorDeps; evidenceUrls?: readonly string[];
+}) {
   const [model] = useState(() => createDescriptionEditorModel(catchId, api, deps));
   const view = useSyncExternalStore(model.store.subscribe, model.store.get, model.store.get);
   const dirty = view.load === "ready" && isDescriptionDirty(view.edit);
@@ -103,8 +113,8 @@ export function AuthorDescriptionEditor({ catchId, api, deps }: { catchId: strin
   useUnsavedTraverseGuard(dirty, UNSAVED_MESSAGE);
   useUnsavedChanges(dirty);
 
-  return <AuthorDescriptionPanel loadState={view.load} value={view.edit.value} status={view.edit.status} dirty={dirty}
-    loadFailureText={view.loadFailureText}
+  return <AuthorDescriptionPanel loadState={view.load} texts={view.edit.texts} status={view.edit.status} dirty={dirty}
+    evidenceUrls={evidenceUrls} loadFailureText={view.loadFailureText}
     onChange={model.change}
     onSave={() => { void model.save(); }}
     onRetry={model.retry} />;

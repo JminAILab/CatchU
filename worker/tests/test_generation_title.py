@@ -21,6 +21,7 @@ from typing import Any, Literal
 
 import pytest
 from candidate_scenarios import (
+    DEFAULT_MESSAGE,
     LIVE,
     ROOT,
     Commit,
@@ -48,12 +49,11 @@ from generation_scenarios import (
     code_title,
     file_fragment,
     file_id_of,
-    file_question,
     file_title,
     generation_case,
     line_fragment,
-    line_question,
     pick,
+    question,
     sent_files,
     sent_lines,
 )
@@ -71,6 +71,8 @@ from github_synthetic import (
 
 from app.collection import GitHubAccount
 from app.generation import ProviderRequest, run_generation
+from app.generation.request import PreparedFile, PreparedLine
+from app.generation.response import Sent, ai_parts, written
 from app.generation.title import classify
 from app.processing import CheckedRequest
 
@@ -108,13 +110,13 @@ def target_reply(target: Target) -> Callable[[ProviderRequest], str]:
             return answer(
                 fragments=[file_fragment(file_id)],
                 title=file_title(file_id),
-                questions=[file_question("BACKGROUND", file_id)],
+                questions=[question("BACKGROUND")],
             )
         line = pick(request, contains=target.name, path=target.path)
         return answer(
             fragments=[line_fragment(line, target.name)],
             title=code_title(line, target.name),
-            questions=[line_question("BACKGROUND", line, target.name)],
+            questions=[question("BACKGROUND")],
         )
 
     return reply
@@ -180,7 +182,8 @@ def build_history(
     for number, step in enumerate(steps, start=1):
         apply_step(repo, step)
         minute = None if minutes is None else minutes[number - 1]
-        made.append(repo.commit(f"작업 {number}", minute=minute))
+        # 부실 목록의 메시지라 기록의 글이 제목이 되지 않고 조각 제목을 본다(CR1 BR3.2).
+        made.append(repo.commit(DEFAULT_MESSAGE, minute=minute))
     repo.checkout("main")
     merged = repo.merge("work", "작업 병합", minute=None if minutes is None else 300)
     return History(root, tuple(made), merged)
@@ -361,6 +364,45 @@ def test_overlapping_location_rules_take_the_earlier_kind(path: str, kind: str) 
 
 
 @pytest.mark.parametrize(
+    ("path", "kind"),
+    [
+        # S11(AC3.2.2): 파일 이름(확장자 앞)이 Test·Tests로 끝나는 꼴(대문자 T)은 시험이다.
+        ("src/main/java/com/app/FooTest.java", "시험"),
+        ("Sources/AppTests/LoginTests.swift", "시험"),
+        ("app/src/main/kotlin/UserServiceTest.kt", "시험"),
+        ("Test.java", "시험"),
+        # 소문자 test로 끝나는 이름은 시험 꼴이 아니다(Contest·latest).
+        ("src/Contest.java", "코드"),
+        ("src/latest.py", "코드"),
+        # Android androidTest 폴더, 이름이 Tests로 끝나는 폴더(iOS 앱Tests·앱UITests).
+        ("app/src/androidTest/java/LoginScreen.kt", "시험"),
+        ("MyAppTests/LoginViewModelSpecHelper.swift", "시험"),
+        ("MyAppUITests/Launch.swift", "시험"),
+        # 대문자 T가 아닌 폴더 이름은 그대로다.
+        ("src/contests/Board.java", "코드"),
+        # 모바일 설정 파일.
+        ("app/src/main/AndroidManifest.xml", "설정"),
+        ("build.gradle", "설정"),
+        ("app/build.gradle.kts", "설정"),
+        ("settings.gradle.kts", "설정"),
+        ("MyApp/Info.plist", "설정"),
+        ("Configs/Debug.xcconfig", "설정"),
+        ("Podfile", "설정"),
+        ("MyApp.xcodeproj/project.pbxproj", "설정"),
+        # .kts만이면 코드다(Kotlin 스크립트).
+        ("scripts/release.kts", "코드"),
+        # 노트북은 코드다.
+        ("notebooks/analysis.ipynb", "코드"),
+        # 폴더 test·tests의 대소문자 무시는 그대로다.
+        ("Test/helper.py", "시험"),
+    ],
+)
+def test_cr1_mobile_test_and_notebook_kinds(path: str, kind: str) -> None:
+    """CR1 BR5.1: 시험 → 문서 → 설정 → 코드 순서로 판정하고 모바일·노트북 꼴을 더했다."""
+    assert classify(path) == kind
+
+
+@pytest.mark.parametrize(
     "path",
     [
         "assets/logo.png",
@@ -384,7 +426,7 @@ def test_paths_outside_the_location_rules_have_no_kind(path: str) -> None:
 # 2. 파일 상태 대응과 제목 표기: 커밋 하나의 커밋 묶음
 
 
-def single_commit(*files: dict[str, Any], message: str = "합성 커밋") -> Unit:
+def single_commit(*files: dict[str, Any], message: str = DEFAULT_MESSAGE) -> Unit:
     """기본 브랜치에 바로 올린 본인 커밋 하나(PR 조회를 허용하지 않은 요청의 커밋 묶음)."""
     one = commit(
         sha(4001), MEMBER, parents=(ROOT,), minute=2, message=message, files=files
@@ -437,6 +479,10 @@ def test_file_status_gives_the_action(
         ("uv.lock", None),
         ("package-lock.json", None),
         ("assets/logo.svg", None),
+        # CR1 BR5.1: 판정이 바뀐 파일은 조각 제목의 종류도 바뀐다(기능 설계 8절 한계).
+        ("app/build.gradle.kts", "build.gradle.kts 설정 수정"),
+        ("src/test/java/FooTest.java", "FooTest.java 시험 수정"),
+        ("notebooks/analysis.ipynb", "analysis.ipynb 코드 수정"),
     ],
 )
 def test_file_title_is_target_kind_action(path: str, expected: str | None) -> None:
@@ -552,7 +598,7 @@ def test_failed_description_keeps_a_verified_title(fragments: str, code: str) ->
         return answer(
             fragments=chosen,
             title=code_title(line, "loginRateLimit"),
-            questions=[line_question("BACKGROUND", line, "loginRateLimit")],
+            questions=[question("BACKGROUND")],
         )
 
     provider = ScriptedProvider(reply, repeat=False)
@@ -598,14 +644,14 @@ def test_title_pointing_at_a_context_line_is_null(pointer: str) -> None:
         return answer(
             fragments=[line_fragment(added, "loginRateLimit")],
             title=title,
-            questions=[line_question("BACKGROUND", added, "loginRateLimit")],
+            questions=[question("BACKGROUND")],
         )
 
     assert generated_title(unit, reply) is None
 
 
 def pull_with_other_account(
-    *, message: str = "합성 커밋", title: str | None = None, body: str | None = None
+    *, message: str = DEFAULT_MESSAGE, title: str | None = None, body: str | None = None
 ) -> Unit:
     """회원 커밋 하나와 다른 계정 커밋 하나가 든 병합된 PR #5."""
     own = commit(
@@ -663,25 +709,32 @@ def test_title_pointing_at_another_accounts_commit_is_null(pointer: str) -> None
         return answer(
             fragments=[line_fragment(own, "loginRateLimit")],
             title=title,
-            questions=[line_question("BACKGROUND", own, "loginRateLimit")],
+            questions=[question("BACKGROUND")],
         )
 
     assert generated_title(unit, reply) is None
 
 
 @pytest.mark.parametrize(
-    ("unit", "name"),
+    ("unit", "name", "expected"),
     [
-        (pull_with_other_account(message="sessionCache 연결"), "sessionCache"),
-        (pull_with_other_account(title="cacheWarmup 정리"), "cacheWarmup"),
-        (pull_with_other_account(body="warmupQueue를 쓴다"), "warmupQueue"),
+        # 커밋 메시지 첫 줄은 쓸 만한 기록의 글이라 그 글이 그대로 제목이다(CR1 BR3.1). 생성 요청에는
+        # 들어가지 않고(NFR1.1), 모델이 지목한 조각 제목은 쓰이지 않는다.
+        (
+            pull_with_other_account(message="sessionCache 연결"),
+            "sessionCache",
+            "sessionCache 연결",
+        ),
+        # 다른 계정 커밋이 섞인 PR이라 PR 제목은 기록의 글이 아니다(BR2.1). 본인 커밋 첫 줄은 부실이다.
+        (pull_with_other_account(title="cacheWarmup 정리"), "cacheWarmup", None),
+        (pull_with_other_account(body="warmupQueue를 쓴다"), "warmupQueue", None),
     ],
     ids=["commit-message", "pull-request-title", "pull-request-body"],
 )
 def test_title_naming_only_message_or_pull_request_text_is_null(
-    unit: Unit, name: str
+    unit: Unit, name: str, expected: str | None
 ) -> None:
-    """커밋 메시지·PR 제목·본문에만 있는 이름을 지목한 제목은 null이다(완료 기준 17)."""
+    """커밋 메시지·PR 제목·본문에만 있는 이름을 지목한 조각 제목은 null이다(완료 기준 17)."""
 
     def reply(request: ProviderRequest) -> str:
         assert name not in request.data
@@ -689,10 +742,10 @@ def test_title_naming_only_message_or_pull_request_text_is_null(
         return answer(
             fragments=[line_fragment(own, "loginRateLimit")],
             title=code_title(own, name),
-            questions=[line_question("BACKGROUND", own, "loginRateLimit")],
+            questions=[question("BACKGROUND")],
         )
 
-    assert generated_title(unit, reply) is None
+    assert generated_title(unit, reply) == expected
 
 
 # 5. 동작이 갈릴 때 시작 전·끝 비교(결정 11·17): PR·PR 없는 병합·커밋 묶음 각각
@@ -884,6 +937,11 @@ def test_unprovable_before_and_after_makes_no_new_github_call(repo: GitRepo) -> 
         "clock",
         "deadline",
         "limits",
+        # CR3: 판정 공급자와 FR10 확인 명령의 관찰자. 둘 다 GitHub 연결이 아니다.
+        "judge",
+        "observe",
+        # CR2: 맥락 조회로 받은 소속 커밋 집합. GitHub 연결이 아니다.
+        "assigned",
     }
     assert run.output.candidates[0].title is None
     assert before.transport.paths == calls
@@ -997,7 +1055,8 @@ def child_with_sha_order(
     """
     for attempt in range(256):
         apply_step(repo, step)
-        child = repo.commit(f"작업 2-{attempt}", minute=minute)
+        # 끝 문장 부호만 바꿔 SHA를 바꾼다. 앞뒤 문장 부호를 빼면 부실 목록의 낱말이다(BR2.5).
+        child = repo.commit(f"{DEFAULT_MESSAGE}{'.' * attempt}", minute=minute)
         if (child < parent) == smaller:
             return child
         repo.git("reset", "-q", "--hard", parent)
@@ -1028,7 +1087,7 @@ def test_application_order_follows_parents_not_time_sha_or_evidence(
     repo.checkout("work")
     parent_minute, child_minute = (60, 30) if child_earlier else (30, 60)
     apply_step(repo, {DOC: DOC_V1, CODE: python_module("limit = 5")})
-    parent = repo.commit("작업 1", minute=parent_minute)
+    parent = repo.commit(DEFAULT_MESSAGE, minute=parent_minute)
     child = child_with_sha_order(
         repo,
         {DOC: DOC_V2, CODE: python_module("limit = 10")},
@@ -1091,11 +1150,12 @@ def picked_bundle(repo: GitRepo) -> Unit:
     apply_step(repo, {CODE: python_module("limit = 5", *MIDDLE)})
     root = repo.commit("기준")
     apply_step(repo, {CODE: python_module("limit = 5", *MIDDLE, "limit = 5")})
-    first = repo.commit("아래 한도 줄 추가")
+    # 메시지는 부실 목록의 낱말이다(기록의 글이 제목이 되지 않게, CR1 BR3.2).
+    first = repo.commit(DEFAULT_MESSAGE)
     reverted = repo.revert(first)
     picked = repo.cherry_pick_x(first)
     apply_step(repo, {CODE: python_module(*MIDDLE, "limit = 5")})
-    last = repo.commit("위 한도 줄 삭제")
+    last = repo.commit(DEFAULT_MESSAGE)
     assert repo.parents(picked) == (reverted,)
     default_branch = (
         git_commit(repo, last, MEMBER),
@@ -1387,3 +1447,76 @@ def test_zero_context_restore_after_the_line_before_is_removed_is_null() -> None
     )
 
     assert generated_title(unit, Target(CODE, "limit")) is None
+
+
+# CR3 AI 쪽 제목 후보·설명 문장 읽기(BR3.1·BR5.1, 시나리오 S18·S30)
+
+
+def _ai_sent() -> Sent:
+    shown = PreparedLine(
+        "c1f1:L2", "a" * 40, "c1f1", "+", "const loginRateLimit = 5;", False, 2
+    )
+    hidden = PreparedLine("c1f1:L3", "a" * 40, "c1f1", "+", "token = [MASKED]", True, 3)
+    file = PreparedFile(
+        "c1f1", "a" * 40, "src/auth.ts", "modified", None, (shown, hidden)
+    )
+    return Sent({shown.id: shown, hidden.id: hidden}, {file.id: file})
+
+
+def test_s18_ai_title_candidates_over_40_chars_are_dropped() -> None:
+    """S18: 40자를 넘는 후보는 버린다(고쳐 쓰지 않는다). 41자는 버리고 40자는 남는다. 3개까지 쓴다."""
+    exact = "loginRateLimit " + "가" * 25
+    over = exact + "나"
+    assert (len(exact), len(over)) == (40, 41)
+    part = written(
+        [
+            {"text": over, "lines": ["c1f1:L2"]},
+            {"text": exact, "lines": ["c1f1:L2"]},
+            {"text": "  둘째 후보  ", "lines": ["c1f1:L2", "c1f1:L2"]},
+            {"text": "셋째", "lines": ["c1f1:L2"]},
+            {"text": "넷째", "lines": ["c1f1:L2"]},
+        ],
+        _ai_sent(),
+        prefix="t",
+        high=3,
+        max_chars=40,
+    )
+    assert part is not None
+    assert [(item.id, item.text) for item in part.items] == [
+        ("t1", exact),
+        ("t2", "둘째 후보"),
+        ("t3", "셋째"),
+    ]
+    assert [line.id for line in part.items[1].lines] == ["c1f1:L2"]
+    assert part.notes == ("dropped:TOO_LONG", "over:COUNT")
+
+
+@pytest.mark.parametrize(
+    ("item", "note"),
+    [
+        ({"text": "근거 없음", "lines": []}, "dropped:ITEM_SHAPE"),
+        ({"text": "가린 줄", "lines": ["c1f1:L3"]}, "dropped:MASKED_LINE"),
+        ({"text": "없는 줄", "lines": ["c9f9:L1"]}, "dropped:UNKNOWN_LINE"),
+        ({"text": "두\n줄", "lines": ["c1f1:L2"]}, "dropped:ITEM_SHAPE"),
+        ({"text": "", "lines": ["c1f1:L2"]}, "dropped:ITEM_SHAPE"),
+        ({"text": "키 더함", "lines": ["c1f1:L2"], "why": "x"}, "dropped:ITEM_SHAPE"),
+        ("문장", "dropped:ITEM_SHAPE"),
+    ],
+)
+def test_ai_items_without_valid_lines_are_dropped(item: object, note: str) -> None:
+    """근거 줄이 없거나 가린 줄·보낸 자료에 없는 줄을 가리킨 글, 모양이 틀린 글은 버린다(BR3.1·BR5.1)."""
+    part = written([item], _ai_sent(), prefix="s", high=3, max_chars=None)
+    assert part is not None
+    assert part.items == ()
+    assert part.notes == (note,)
+
+
+def test_s30_missing_sentences_make_the_response_unreadable() -> None:
+    """S30: 문장 칸이 없거나 목록이 아니면 읽을 수 없는 응답(None)이다. 제목 후보 칸이 없으면 후보 0개다."""
+    sent = _ai_sent()
+    assert ai_parts({"titleCandidates": []}, sent, max_title_chars=40) is None
+    assert ai_parts({"sentences": "문장"}, sent, max_title_chars=40) is None
+    parts = ai_parts({"sentences": []}, sent, max_title_chars=40)
+    assert parts is not None
+    assert parts.titles.items == () and parts.titles.notes == ("dropped:SHAPE",)
+    assert parts.sentences.items == ()

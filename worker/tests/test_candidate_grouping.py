@@ -26,7 +26,6 @@ from app.candidates.grouping import HoldReason, MembershipSource
 from app.candidates.identity import (
     CommitsUnit,
     MergeUnit,
-    Part,
     PullRequestUnit,
     WorkUnit,
     work_identity,
@@ -227,8 +226,8 @@ def outcome(
     )
 
 
-def identity(unit: WorkUnit, parts: Iterable[Part] = ()) -> str:
-    return work_identity("LIVE", REQ.repository_id, unit, parts)
+def identity(unit: WorkUnit) -> str:
+    return work_identity("LIVE", REQ.repository_id, unit)
 
 
 def identities(output: GenerationOutput) -> list[str]:
@@ -247,18 +246,16 @@ def result(output: GenerationOutput) -> dict[str, Any]:
 
 ROOT = commit(1, author=OTHER)
 
-# 다른 계정 커밋 섞임의 세 상태(2026-10-08 팀장 결정 「수신자에게 나가는 숫자와 근거 순서」).
-_NOT_RECORDED = "연동 계정이 작성자로 기록되지 않은 커밋"
-PULL_OTHERS = {
-    "PRESENT": f"이 PR 커밋 목록에 {_NOT_RECORDED}이 있다",
-    "ABSENT": f"이 PR 커밋 목록에 {_NOT_RECORDED}이 없다",
-    "UNKNOWN": f"이 PR 커밋 목록에 {_NOT_RECORDED}이 있는지 알 수 없다"
-    "(목록을 끝까지 확인하지 못함)",
-}
-MERGE_OTHERS = {
-    "PRESENT": f"이 병합이 들인 커밋에 {_NOT_RECORDED}이 있다",
-    "ABSENT": f"이 병합이 들인 커밋에 {_NOT_RECORDED}이 없다",
-    "UNKNOWN": f"이 병합이 들인 커밋에 {_NOT_RECORDED}이 있는지 알 수 없다",
+# 작업 사실 둘째 항목(기록의 글 줄, CR1 BR4.2). 합성 PR 제목과 합성 커밋 메시지의 기본값이다. 본인이
+# 연 PR이고 그 PR 커밋 목록을 끝까지 받아 다른 계정 커밋이 없으면 PR 제목, 아니면 단위 안 가장 이른
+# 본인 커밋의 첫 줄이다(BR2.1·BR2.2). 다른 계정 커밋 섞임 문장은 쓰지 않는다(BR4.4).
+PR_TITLE_FACT = 'PR 제목: "합성 PR"'
+COMMIT_LINE_FACT = '본인 커밋 메시지 첫 줄: "합성 커밋"'
+# PR 제목 조건(BR2.1)이 다른 계정 커밋 섞임 값에 따라 갈린다.
+PULL_RECORD = {
+    "ABSENT": PR_TITLE_FACT,
+    "PRESENT": COMMIT_LINE_FACT,
+    "UNKNOWN": COMMIT_LINE_FACT,
 }
 
 
@@ -294,7 +291,7 @@ def test_shared_change_goes_to_merged_first_then_smallest_number(
 
 
 def test_stacked_pull_requests_keep_only_their_own_commits() -> None:
-    """제목은 비우고 첫 작업 사실이 단위 이름이다(2026-10-08 팀장 결정 「Catch 제목」)."""
+    """제목은 비우고 첫 작업 사실은 단위 종류, 둘째는 본인 PR의 제목이다(CR1 BR4.1·BR4.2)."""
     extra = [commit(101), commit(102), commit(103, paths=("b.py",))]
     output = build_candidates(
         REQ,
@@ -307,10 +304,10 @@ def test_stacked_pull_requests_keep_only_their_own_commits() -> None:
     first, second = output.candidates
     assert first.work_identity == identity(PullRequestUnit(1))
     assert first.title is None
-    assert first.work_facts == ("PR #1, 상태 병합됨", PULL_OTHERS["ABSENT"])
+    assert first.work_facts == ("PR #1, 상태 병합됨", PR_TITLE_FACT)
     assert second.work_identity == identity(PullRequestUnit(2))
     assert second.title is None
-    assert second.work_facts == ("PR #2, 상태 병합됨", PULL_OTHERS["ABSENT"])
+    assert second.work_facts == ("PR #2, 상태 병합됨", PR_TITLE_FACT)
     assert "다른 PR에도 담겨" in second.grouping_basis
     assert [item.source_revision for item in second.evidence[1:]] == [sha(103)]
 
@@ -351,8 +348,9 @@ def test_merged_pull_request_squash_and_rebase_commits_are_normal() -> None:
     assert output.not_provided == ()
     candidate = output.candidates[0]
     assert candidate.title is None
-    # 다른 계정 커밋 20은 목록 밖 squash·rebase 커밋이라 섞임은 목록(11·12)으로만 본다.
-    assert candidate.work_facts == ("PR #7, 상태 병합됨", PULL_OTHERS["ABSENT"])
+    # 다른 계정이 연 PR이라 PR 제목을 쓰지 않고 단위 안 가장 이른 본인 커밋(11)의 첫 줄이다(BR2.1·
+    # BR2.2, S19). 다른 계정 섞임 문장은 쓰지 않는다(BR4.4).
+    assert candidate.work_facts == ("PR #7, 상태 병합됨", COMMIT_LINE_FACT)
     assert candidate.subject_contribution == (
         "연동 GitHub 계정이 작성자로 기록된 커밋(다른 계정이 연 PR에 담긴 본인 커밋)"
     )
@@ -389,7 +387,8 @@ def test_open_pull_request_lookup_contradicting_full_list_is_undetermined() -> N
 
 
 def test_open_pull_request_with_incomplete_list_takes_looked_up_commit() -> None:
-    """다른 계정 커밋 섞임은 목록을 끝까지 받지 못했으므로 알 수 없다(2026-10-08 팀장 결정)."""
+    """목록을 끝까지 받지 못해 다른 계정 커밋이 있는지 모르므로 PR 제목 대신 본인 커밋 첫 줄을 쓴다
+    (CR1 BR2.1, S4)."""
     data = outcome(
         window=[commit(60, [1], paths=("b.py",)), ROOT],
         extra=[commit(31)],
@@ -400,10 +399,9 @@ def test_open_pull_request_with_incomplete_list_takes_looked_up_commit() -> None
     output = build_candidates(REQ, data)
 
     assert identities(output) == [identity(PullRequestUnit(3))]
-    assert output.candidates[0].work_facts == (
-        "PR #3, 상태 열림",
-        PULL_OTHERS["UNKNOWN"],
-    )
+    assert output.candidates[0].work_facts == ("PR #3, 상태 열림", COMMIT_LINE_FACT)
+    assert output.candidates[0].record_text is not None
+    assert output.candidates[0].record_text.source == "COMMIT_FIRST_LINE"
     assert output.not_provided == ()
 
 
@@ -464,7 +462,7 @@ def test_lookup_empty_and_limited(
 
 
 def test_merge_without_pull_request_is_a_unit() -> None:
-    """작업 사실은 단위 이름과 다른 계정 커밋 섞임만 쓴다(2026-10-08 팀장 결정, 센 숫자 없음)."""
+    """작업 사실은 종류 줄과 기록의 글 줄이다(CR1 BR4.1·BR4.2, SHA·센 숫자 없음)."""
     window = [
         commit(20, [1, 12]),
         commit(12, [11]),
@@ -475,10 +473,7 @@ def test_merge_without_pull_request_is_a_unit() -> None:
 
     candidate = output.candidates[0]
     assert identities(output) == [identity(MergeUnit(sha(20)))]
-    assert candidate.work_facts == (
-        f"PR 없이 병합한 병합 커밋 {sha(20)[:12]}",
-        MERGE_OTHERS["ABSENT"],
-    )
+    assert candidate.work_facts == ("PR 없이 합친 병합", COMMIT_LINE_FACT)
     assert candidate.subject_contribution == "연동 GitHub 계정이 작성자로 기록된 커밋"
     assert candidate.evidence[0].source_revision == sha(20)
     assert candidate.evidence[0].contribution_scope.startswith(
@@ -783,7 +778,7 @@ def _chain() -> list[CommitRecord]:
 
 
 def test_commit_bundles_follow_overlapping_parent_and_ignore_input_order() -> None:
-    """첫 작업 사실은 센 수 대신 가장 최근 커밋으로 묶음을 가리킨다(2026-10-08 팀장 결정)."""
+    """첫 작업 사실은 SHA 없이 종류만 쓴다(CR1 BR4.1, S8). 입력 순서와 관계없이 같다."""
     expected = [
         identity(CommitsUnit((sha(11), sha(12)))),
         identity(CommitsUnit((sha(13), sha(14)))),
@@ -796,7 +791,8 @@ def test_commit_bundles_follow_overlapping_parent_and_ignore_input_order() -> No
         output = build_candidates(REQ, outcome(window=window, lookups=lookups))
         assert identities(output) == expected
     assert output.candidates[0].work_facts == (
-        f"PR·병합에 속하지 않은 본인 커밋 묶음(가장 최근 커밋 {sha(12)[:12]})",
+        "PR·병합 없이 들어간 본인 커밋 묶음",
+        COMMIT_LINE_FACT,
     )
     assert output.candidates[0].grouping_limitations == ()
 
@@ -966,7 +962,8 @@ def test_outside_commit_notes_unseen_pull_request_lists_on_evidence(
     assert "heldByIncompleteLists=0" in caplog.records[-1].getMessage()
 
 
-# 단위 나누기
+# 이슈 번호로 나누지 않기(CR1 FR2.1, BR1.1·BR1.2): 예전에 나누기를 시도하던 모양도 단위 전체가 후보
+# 하나이고, 나누기 글·나누지 않은 이유의 한계 글이 없다.
 
 
 def _split_case(
@@ -1019,24 +1016,18 @@ def _split_case(
     return build_candidates(REQ, data)
 
 
-def test_unit_with_separate_issues_and_files_is_split() -> None:
-    """나눈 부분은 가리키는 이슈로 서로 다른 첫 작업 사실을 갖고, 다른 계정 커밋 섞임은 PR 전체
-    기준이다(2026-10-08 팀장 결정 「수신자에게 나가는 숫자와 근거 순서」)."""
+def test_unit_with_separate_issues_and_files_stays_whole() -> None:
+    """S1(AC1.4.1): 본인 커밋이 서로 다른 이슈 둘(#5·#6)을 가리키고 파일도 겹치지 않으며 이슈 조회가
+    허용돼도 PR 전체가 후보 하나다. 나누기 글과 나누지 않은 이유의 한계가 없다."""
     output = _split_case()
 
-    assert identities(output) == [
-        identity(PullRequestUnit(20), (Part(sha(21)), Part(sha(22)))),
-        identity(PullRequestUnit(20), (Part(sha(23)),)),
-    ]
-    first, second = output.candidates
-    assert first.work_facts == (
-        "PR #20에서 나눈 부분(가리키는 이슈 #5)",
-        "PR #20, 상태 병합됨",
-        PULL_OTHERS["ABSENT"],
-    )
-    assert second.work_facts[0] == "PR #20에서 나눈 부분(가리키는 이슈 #6)"
-    assert second.work_facts[1:] == first.work_facts[1:]
-    assert first.evidence[0].source_url == second.evidence[0].source_url
+    assert identities(output) == [identity(PullRequestUnit(20))]
+    (candidate,) = output.candidates
+    assert candidate.work_facts == ("PR #20, 상태 병합됨", PR_TITLE_FACT)
+    assert candidate.grouping_limitations == ()
+    assert candidate.grouping_basis.startswith("PR #20 전체를 한 작업으로 묶었다.")
+    assert "나눴다" not in candidate.grouping_basis
+    assert output.not_provided == ()
 
 
 def test_unit_without_split_signal_has_no_limitation() -> None:
@@ -1047,60 +1038,43 @@ def test_unit_without_split_signal_has_no_limitation() -> None:
 
 
 @pytest.mark.parametrize(
-    ("changes", "reason"),
+    "changes",
     [
         # C15: 두 작업이 같은 파일을 번갈아 고쳤다.
-        ({"paths": ("login.py", "login.py", "login.py")}, "같은 파일을 함께 고쳐"),
-        # 수집이 멈춘 것만으로가 아니라 이 단위에 걸린 확인이 멈췄을 때다. 목록
-        # 단계에서 멈췄으면 이슈 목록도 다 받지 못했을 수 있다.
-        ({"failures": (failure(),), "stopped_during": "LISTS"}, "수집이 멈춰"),
-        # 병합된 PR #20은 본인 커밋 60의 연결 PR 조회로 squash·rebase 커밋을 배정받을 수 있다.
-        (
-            {
-                "failures": (failure(),),
-                "window": (commit(60, [1], paths=("z.py",)), ROOT),
-                "lookups": (lookup(60, Lookup.NOT_REACHED),),
-            },
-            "수집이 멈춰",
-        ),
-        (
-            {"messages": ("로그인 #5", "로그인 #6", "설치 #6")},
-            "이슈가 비었거나 서로 겹쳐",
-        ),
-        # 파일이 겹치지 않는 부분 하나(docs.md)에는 다른 계정 커밋만 있다(Q7 조건 1).
-        (
-            {
-                "messages": ("로그인 #5", "로그인 정리 #6", "설치 안내 #7"),
-                "authors": (MEMBER, MEMBER, OTHER),
-                "issues": (5, 6, 7),
-            },
-            "본인 변경이 없는 부분이 있어",
-        ),
+        {"paths": ("login.py", "login.py", "login.py")},
+        # 목록 단계에서 수집이 멈췄다.
+        {"failures": (failure(),), "stopped_during": "LISTS"},
+        # 병합된 PR #20에 걸린 연결 PR 조회가 멈췄다.
+        {
+            "failures": (failure(),),
+            "window": (commit(60, [1], paths=("z.py",)), ROOT),
+            "lookups": (lookup(60, Lookup.NOT_REACHED),),
+        },
+        {"messages": ("로그인 #5", "로그인 #6", "설치 #6")},
+        # 파일이 겹치지 않는 부분 하나(docs.md)에는 다른 계정 커밋만 있다.
+        {
+            "messages": ("로그인 #5", "로그인 정리 #6", "설치 안내 #7"),
+            "authors": (MEMBER, MEMBER, OTHER),
+            "issues": (5, 6, 7),
+        },
         # 한 커밋의 변경 파일을 받지 못했다.
-        (
-            {"statuses": (FETCHED, FETCHED, DetailStatus.OVERSIZED)},
-            "변경 파일을 모두 확인하지 못해",
-        ),
+        {"statuses": (FETCHED, FETCHED, DetailStatus.OVERSIZED)},
     ],
+    ids=["same-file", "stopped-lists", "stopped-lookup", "issues", "no-own", "details"],
 )
-def test_split_signal_without_conditions_stays_whole_with_reason(
-    changes: dict[str, Any], reason: str
+def test_former_split_shapes_add_no_not_split_limitation(
+    changes: dict[str, Any],
 ) -> None:
+    """BR1.2: 예전에 「…나누지 않고 한 작업으로 두었다」 한계를 붙이던 모양도 그 글을 만들지 않는다."""
     output = _split_case(**changes)
 
     assert identities(output) == [identity(PullRequestUnit(20))]
-    (limitation,) = output.candidates[0].grouping_limitations
-    assert limitation.startswith("본인 커밋이 서로 다른 이슈 2개를 가리키지만")
-    assert reason in limitation
+    assert output.candidates[0].grouping_limitations == ()
     assert output.not_provided == ()
 
 
-def test_unrelated_stop_does_not_change_the_split() -> None:
-    """나누기는 요청 전체의 완료 여부가 아니라 그 단위에 걸린 확인으로 판단한다.
-
-    PR 밖 커밋 60의 연결 PR 조회는 마쳤고 그 변경 내용 조회만 멈췄다. PR #20의 나누기 근거와는
-    무관하다.
-    """
+def test_unrelated_stop_keeps_one_whole_candidate() -> None:
+    """PR 밖 커밋 60의 변경 내용 조회만 멈췄다. PR #20은 그대로 후보 하나다."""
     output = _split_case(
         failures=(failure(FailureCode.RATE_LIMITED),),
         window=(
@@ -1111,7 +1085,7 @@ def test_unrelated_stop_does_not_change_the_split() -> None:
     )
 
     assert identities(output) == identities(_split_case())
-    assert len(output.candidates) == 2
+    assert len(output.candidates) == 1
     assert output.not_provided == ()
     assert result(output)["outcome"] == "PARTIAL_FAILED"
 
@@ -1138,40 +1112,48 @@ def test_unrelated_stop_does_not_change_the_split() -> None:
     ],
     ids=["two", "own-pr-number", "one", "address", "three"],
 )
-def test_split_needs_issue_scope(
+def test_numbers_without_issue_scope_add_no_limitation(
     messages: tuple[str, str, str], expected: int | None
 ) -> None:
-    """2026-10-08 팀장 결정 「한 PR·병합 안의 서로 다른 번호」: 이슈 조회가 없으면 번호만으로 나누지
-    않고 작성자가 묶은 PR 경계를 따른다. 서로 다른 번호(PR 번호 제외)가 둘 이상이면 그 사실을
-    groupingLimitations에 남기고 notProvided에는 세지 않는다."""
+    """이슈 조회가 허용되지 않은 요청도 서로 다른 번호 수와 관계없이 작성자 경계 한계를 남기지 않는다
+    (BR1.2, 2026-10-08 결정의 그 문장은 CR1이 대체한다). expected는 예전에 세던 번호 수다."""
     output = _split_case(messages=messages, allowed=("COMMIT", "PULL_REQUEST"))
 
     assert identities(output) == [identity(PullRequestUnit(20))]
-    limitations = output.candidates[0].grouping_limitations
-    if expected is None:
-        assert limitations == ()
-    else:
-        assert limitations == (
-            f"본인 커밋이 서로 다른 번호 {expected}개를 가리키지만, 작성자가 한 PR로 묶은 "
-            "경계를 따라 한 작업으로 두었다",
-        )
+    assert output.candidates[0].grouping_limitations == ()
     assert output.not_provided == ()
 
 
-def test_merge_without_issue_scope_keeps_the_author_boundary() -> None:
-    """2026-10-08 팀장 결정: PR 없이 합친 병합도 같다. 문장은 '한 병합으로'다."""
+@pytest.mark.parametrize(
+    "allowed",
+    [("COMMIT", "PULL_REQUEST"), ("COMMIT", "PULL_REQUEST", "ISSUE")],
+    ids=["no-issue-scope", "issue-scope"],
+)
+def test_merge_with_separate_issues_stays_whole(allowed: tuple[str, ...]) -> None:
+    """S2(AC1.4.2): 커밋이 서로 다른 이슈를 가리키는 PR 없는 병합은 후보 하나이고 한계 글이 없다."""
     window = [
         commit(20, [1, 12], author=OTHER),
         commit(12, [11], message="설치 안내 #6", paths=("docs.md",)),
         commit(11, [1], message="로그인 오류 #5", paths=("login.py",)),
         ROOT,
     ]
-    output = build_candidates(REQ, outcome(window=window, lookups=empty(11, 12, 20)))
+    output = build_candidates(
+        REQ,
+        outcome(
+            window=window,
+            lookups=empty(11, 12, 20),
+            issues=[issue(5), issue(6)],
+            allowed=allowed,
+        ),
+    )
 
     assert identities(output) == [identity(MergeUnit(sha(20)))]
-    assert output.candidates[0].grouping_limitations == (
-        "본인 커밋이 서로 다른 번호 2개를 가리키지만, 작성자가 한 병합으로 묶은 경계를 "
-        "따라 한 작업으로 두었다",
+    (candidate,) = output.candidates
+    assert candidate.grouping_limitations == ()
+    # 단위 안 가장 이른 본인 커밋(11)의 첫 줄이다. 숫자가 있어도 원문 그대로다(BR4.6).
+    assert candidate.work_facts == (
+        "PR 없이 합친 병합",
+        '본인 커밋 메시지 첫 줄: "로그인 오류 #5"',
     )
     assert output.not_provided == ()
     # 커밋 묶음에는 붙이지 않는다.
@@ -1220,16 +1202,15 @@ def _pull_request_list_not_whole(kind: str) -> CollectionOutcome:
 
 
 @pytest.mark.parametrize("kind", ["lookup-only", "oversized", "incomplete"])
-def test_split_needs_the_whole_pull_request_list(kind: str) -> None:
-    """Q7: 단위에 배정된 모든 변경이 한 부분에 속해야 한다. 보지 못한 커밋이 부분들을 이을 수 있다."""
+def test_incomplete_pull_request_list_adds_no_split_limitation(kind: str) -> None:
+    """PR 커밋 목록을 다 보지 못한 PR도 후보 하나이고 나누기 한계 글이 없다(BR1.2). 목록을 끝까지
+    받지 못했으므로 PR 제목 대신 단위 안 가장 이른 본인 커밋 첫 줄을 쓴다(BR2.1)."""
     output = build_candidates(REQ, _pull_request_list_not_whole(kind))
 
     assert identities(output) == [identity(PullRequestUnit(20))]
-    (limitation,) = output.candidates[0].grouping_limitations
-    assert limitation == (
-        "본인 커밋이 서로 다른 이슈 2개를 가리키지만 PR 커밋 목록을 모두 확인하지 못해 "
-        "나누지 않고 한 작업으로 두었다"
-    )
+    (candidate,) = output.candidates
+    assert candidate.grouping_limitations == ()
+    assert candidate.work_facts[1] == '본인 커밋 메시지 첫 줄: "로그인 #5"'
     assert output.not_provided == ()
 
 
@@ -2318,7 +2299,8 @@ def test_stop_while_listing_holds_changes_at_the_window_edge(cut: bool) -> None:
 
 
 def test_pull_requests_not_allowed_groups_without_holds() -> None:
-    """커밋 묶음의 첫 작업 사실에는 커밋 수를 쓰지 않는다(2026-10-08 팀장 결정)."""
+    """PR 조회가 허용되지 않은 요청의 커밋 묶음 첫 작업 사실은 「병합 없이 들어간 본인 커밋 묶음」이다
+    (CR1 BR4.1 예외, S23). 커밋 수·SHA를 쓰지 않는다."""
     window = [
         commit(20, [1, 12]),
         commit(12, [1], paths=("m.py",)),
@@ -2334,15 +2316,21 @@ def test_pull_requests_not_allowed_groups_without_holds() -> None:
     assert candidate.grouping_limitations == (
         "PR 조회가 허용되지 않아 PR 소속은 확인하지 않았다",
     )
-    assert candidate.work_facts == (
-        f"병합에 속하지 않은 본인 커밋 묶음(가장 최근 커밋 {sha(72)[:12]})",
-    )
+    assert candidate.work_facts == ("병합 없이 들어간 본인 커밋 묶음", COMMIT_LINE_FACT)
 
     merged = build_candidates(
         REQ, outcome(window=window[:2] + [ROOT], allowed=("COMMIT",))
     )
     assert identities(merged) == [identity(MergeUnit(sha(20)))]
     assert "PR 조회가 허용되지 않아" in merged.candidates[0].grouping_basis
+    assert merged.candidates[0].work_facts[0] == "PR 없이 합친 병합"
+    single = build_candidates(
+        REQ, outcome(window=[commit(60, [1]), ROOT], allowed=("COMMIT",))
+    )
+    assert single.candidates[0].work_facts == (
+        "병합 없이 들어간 본인 커밋",
+        COMMIT_LINE_FACT,
+    )
 
 
 # 같은 값의 후보
@@ -2352,7 +2340,8 @@ def test_candidates_with_equal_identity_are_merged_before_output(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     """합친 근거는 단위 근거 먼저, 본인 커밋은 최근 것부터 다시 놓는다(2026-10-08
-    팀장 결정 「수신자에게 나가는 숫자와 근거 순서」)."""
+    팀장 결정 「수신자에게 나가는 숫자와 근거 순서」). 작업 사실과 기록의 글은 첫 후보의 것을 그대로
+    두고 둘째 후보의 줄을 더하지 않는다(CR1 BR4.5, S28)."""
     monkeypatch.setattr(
         "app.candidates.build.work_identity", lambda *args: "wi1:" + "0" * 64
     )
@@ -2361,16 +2350,20 @@ def test_candidates_with_equal_identity_are_merged_before_output(
         REQ,
         outcome(
             extra=[commit(31), commit(41, paths=("b.py",))],
-            pulls=[pull(3, [31], merged=10), pull(4, [41], merged=20)],
+            pulls=[
+                pull(3, [31], merged=10, title="로그인 오류 수정"),
+                pull(4, [41], merged=20, title="설치 안내 추가"),
+            ],
         ),
     )
 
     (candidate,) = output.candidates
     assert candidate.work_facts == (
         "PR #3, 상태 병합됨",
-        PULL_OTHERS["ABSENT"],
-        "PR #4, 상태 병합됨",
+        'PR 제목: "로그인 오류 수정"',
     )
+    assert candidate.record_text is not None
+    assert candidate.record_text.text == "로그인 오류 수정"
     assert [item.source_revision for item in candidate.evidence] == [
         sha(90003),
         sha(90004),
@@ -2387,7 +2380,8 @@ def test_candidates_with_equal_identity_are_merged_before_output(
 
 def test_candidate_text_holds_structure_only() -> None:
     """구조 값만 쓰고 센 숫자(커밋 수·파일·줄 수 합계)는 쓰지 않는다(2026-10-08 팀장 결정 「수신자에게
-    나가는 숫자와 근거 순서」). 커밋별 파일·줄 수는 근거의 관측 사실에 남는다."""
+    나가는 숫자와 근거 순서」). 커밋별 파일·줄 수는 근거의 관측 사실에 남는다. 작성자 원문은 기록의 글
+    줄(작업 사실 둘째 항목)에만 나간다(CR1 BR4.2). PR 본문·다른 커밋 메시지·경로·브랜치는 나가지 않는다."""
     marker = "XYZ"
     extra = [
         commit(31, message=f"메시지{marker} #1", paths=(f"src/secret{marker}.py",)),
@@ -2405,11 +2399,14 @@ def test_candidate_text_holds_structure_only() -> None:
         ),
     )
 
-    text = json.dumps(result(output)["candidates"], ensure_ascii=False)
+    composed = result(output)["candidates"]
+    assert composed[0]["workFacts"][1] == f'PR 제목: "제목{marker}"'
+    composed[0]["workFacts"] = composed[0]["workFacts"][:1]
+    text = json.dumps(composed, ensure_ascii=False)
     assert marker not in text
     assert "secret-branch" not in text
     candidate = output.candidates[0]
-    assert candidate.work_facts == ("PR #3, 상태 병합됨", PULL_OTHERS["ABSENT"])
+    assert candidate.work_facts == ("PR #3, 상태 병합됨", f'PR 제목: "제목{marker}"')
     assert (
         candidate.subject_contribution
         == "연동 GitHub 계정이 작성자로 기록된 커밋(연동 계정이 연 PR)"
@@ -2733,7 +2730,7 @@ def test_same_change_commits_in_one_pull_request_keep_both_commits_as_evidence()
     )
 
     (candidate,) = output.candidates
-    assert candidate.work_facts == ("PR #30, 상태 병합됨", PULL_OTHERS["ABSENT"])
+    assert candidate.work_facts == ("PR #30, 상태 병합됨", PR_TITLE_FACT)
     assert candidate.subject_contribution == (
         "연동 GitHub 계정이 작성자로 기록된 커밋(연동 계정이 연 PR)"
     )
@@ -2998,16 +2995,15 @@ def test_merge_commit_only_changes_are_not_counted() -> None:
 # 결정성과 회원용 문장
 
 
-def test_split_does_not_depend_on_input_order() -> None:
+def test_whole_unit_and_its_texts_do_not_depend_on_input_order() -> None:
+    """NFR4.1: 같은 수집 결과면 입력 순서와 관계없이 후보 하나와 같은 작업 사실·기록의 글이다. 다른
+    계정 커밋 섞임이 있어 PR 제목 대신 단위 안 가장 이른 본인 커밋(21)의 첫 줄을 고른다(S20)."""
     records = {
         21: commit(21, message="로그인 오류 #5", paths=("login.py",)),
-        22: commit(22, message="로그인 오류 #5", paths=("login.py",)),
+        22: commit(22, message="로그인 오류 #5", paths=("login.py",), author=OTHER),
         23: commit(23, message="설치 안내 #6", paths=("docs.md",)),
     }
-    expected = [
-        identity(PullRequestUnit(20), (Part(sha(21)), Part(sha(22)))),
-        identity(PullRequestUnit(20), (Part(sha(23)),)),
-    ]
+    expected = [identity(PullRequestUnit(20))]
     for order in itertools.permutations(records):
         output = build_candidates(
             REQ,
@@ -3019,11 +3015,18 @@ def test_split_does_not_depend_on_input_order() -> None:
             ),
         )
         assert identities(output) == expected
+        (candidate,) = output.candidates
+        assert candidate.work_facts == (
+            "PR #20, 상태 병합됨",
+            '본인 커밋 메시지 첫 줄: "로그인 오류 #5"',
+        )
+        assert not any("기록되지 않은" in fact for fact in candidate.work_facts)
+        assert candidate.grouping_limitations == ()
 
 
 def test_titles_are_left_empty_and_texts_avoid_counts_and_query_jargon() -> None:
-    """#118은 제목을 만들지 않아 결과의 제목이 null이고, 작업 사실 첫 항목은 센 숫자 없는 단위
-    이름이다. 문장에는 센 숫자·'작성한'·조회 방식의 말이 없다(2026-10-08 팀장 결정 「Catch 제목」·
+    """후보 판정은 제목을 만들지 않아 결과의 제목이 null이고, 작업 사실 첫 항목은 SHA·센 숫자 없는
+    종류 줄이다(CR1 BR4.1, S8). 문장에는 센 숫자·'작성한'·조회 방식의 말이 없다(2026-10-08 팀장 결정
     「수신자에게 나가는 숫자와 근거 순서」·「본인 기여의 뜻」, 결정 문서 「담당과 순서」 ③)."""
     merge_window = [
         commit(20, [1, 12]),
@@ -3050,14 +3053,20 @@ def test_titles_are_left_empty_and_texts_avoid_counts_and_query_jargon() -> None
 
     single = outputs[2].candidates[0]
     assert single.title is None
-    assert single.work_facts == (f"PR·병합에 속하지 않은 본인 커밋 {sha(60)[:12]}",)
+    assert single.work_facts == ("PR·병합 없이 들어간 본인 커밋", COMMIT_LINE_FACT)
     assert result(outputs[2])["candidates"][0]["title"] is None
+    sha_like = re.compile(r"\b[0-9a-f]{7,64}\b")
+    date_like = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
     for output in outputs:
         assert output.candidates
         assert_member_text(output)
+        for candidate in output.candidates:
+            assert not sha_like.search(candidate.work_facts[0])
+            assert not date_like.search(candidate.work_facts[0])
 
 
-# 후보 문장: 다른 계정 커밋 섞임(2026-10-08 팀장 결정 「수신자에게 나가는 숫자와 근거 순서」)
+# 다른 계정 커밋 섞임: 값(other_authors)은 그대로 계산하고 기록의 글 고르기(BR2.1)에 쓰지만, 작업
+# 사실에는 그 문장을 쓰지 않는다(CR1 BR4.4, 2026-10-08 결정의 문장을 대체).
 
 
 @pytest.mark.parametrize(
@@ -3083,13 +3092,13 @@ def test_other_authors_follow_the_whole_pull_request_list(
         commit(31, author=authors[0]),
         commit(32, author=authors[1], paths=("b.py",)),
     ]
-    output = build_candidates(
-        REQ,
-        outcome(extra=extra, pulls=[pull(3, [31, 32], merged=10, complete=complete)]),
-    )
+    data = outcome(extra=extra, pulls=[pull(3, [31, 32], merged=10, complete=complete)])
+    output = build_candidates(REQ, data)
 
+    assert group(data).units[0].other_authors == expected
     (candidate,) = output.candidates
-    assert candidate.work_facts == ("PR #3, 상태 병합됨", PULL_OTHERS[expected])
+    # 다른 계정 커밋이 없다고 확인했을 때만 PR 제목이다(S3·S20).
+    assert candidate.work_facts == ("PR #3, 상태 병합됨", PULL_RECORD[expected])
     assert result(output)["candidates"][0]["title"] is None
 
 
@@ -3103,12 +3112,12 @@ def test_merge_commit_in_the_pull_request_list_counts_for_other_authors(
 ) -> None:
     """PR 커밋 목록에 든 병합 커밋(작업 브랜치에 기본 브랜치를 받아온 커밋)도 범위에 든다."""
     extra = [commit(31), commit(32, [31, 1], author=merge_author)]
-    output = build_candidates(
-        REQ, outcome(extra=extra, pulls=[pull(3, [31, 32], merged=10)])
-    )
+    data = outcome(extra=extra, pulls=[pull(3, [31, 32], merged=10)])
+    output = build_candidates(REQ, data)
 
+    assert group(data).units[0].other_authors == expected
     (candidate,) = output.candidates
-    assert candidate.work_facts == ("PR #3, 상태 병합됨", PULL_OTHERS[expected])
+    assert candidate.work_facts == ("PR #3, 상태 병합됨", PULL_RECORD[expected])
 
 
 @pytest.mark.parametrize("kind", ["oversized", "revision-mismatch", "lookup-only"])
@@ -3139,8 +3148,9 @@ def test_other_authors_are_unknown_without_the_pull_request_list(kind: str) -> N
 
     output = build_candidates(REQ, data)
 
+    assert group(data).units[0].other_authors == "UNKNOWN"
     (candidate,) = output.candidates
-    assert candidate.work_facts == (f"PR #3, 상태 {state}", PULL_OTHERS["UNKNOWN"])
+    assert candidate.work_facts == (f"PR #3, 상태 {state}", COMMIT_LINE_FACT)
     assert result(output)["outcome"] == "SUCCEEDED"
 
 
@@ -3169,22 +3179,26 @@ def test_merge_other_authors_look_at_every_brought_commit(
     output = build_candidates(REQ, outcome(window=window, lookups=empty(*looked_up)))
 
     assert identities(output) == [identity(MergeUnit(sha(20)))]
-    (candidate,) = output.candidates
-    assert candidate.work_facts == (
-        f"PR 없이 병합한 병합 커밋 {sha(20)[:12]}",
-        MERGE_OTHERS[expected],
+    assert (
+        group(outcome(window=window, lookups=empty(*looked_up))).units[0].other_authors
+        == expected
     )
+    (candidate,) = output.candidates
+    assert candidate.work_facts == ("PR 없이 합친 병합", COMMIT_LINE_FACT)
 
 
 def test_commit_bundles_have_no_other_authors_sentence() -> None:
-    """커밋 묶음은 본인 커밋만 묶으므로 섞임 문장을 두지 않는다."""
+    """커밋 묶음은 본인 커밋만 묶으므로 섞임 값이 없고, 작업 사실은 종류 줄과 기록의 글 줄뿐이다."""
     data = outcome(window=_chain(), lookups=empty(11, 12, 13, 14))
 
     output = build_candidates(REQ, data)
 
     for candidate in output.candidates:
-        assert len(candidate.work_facts) == 1
-        assert "기록되지 않은" not in candidate.work_facts[0]
+        assert candidate.work_facts == (
+            "PR·병합 없이 들어간 본인 커밋 묶음",
+            COMMIT_LINE_FACT,
+        )
+        assert not any("기록되지 않은" in fact for fact in candidate.work_facts)
     assert {unit.other_authors for unit in group(data).units} == {None}
 
 
@@ -3234,7 +3248,13 @@ def test_contribution_assigned_from_another_pull_request_says_so_without_counts(
     )
     if mixed:
         assert scopes[sha(302)] == "연동 계정이 작성자로 기록된 커밋"
-    assert candidate.work_facts == ("PR #30, 상태 병합됨", PULL_OTHERS["PRESENT"])
+    # 기록의 글은 단위 안 본인 커밋에서만 고른다. 같은 변경으로 다른 곳에서 배정한 311은 고르지 않는다
+    # (BR2.2, S29). 단위 안 본인 커밋이 없으면 작업 사실은 종류 줄 하나다.
+    if mixed:
+        assert candidate.work_facts == ("PR #30, 상태 병합됨", COMMIT_LINE_FACT)
+    else:
+        assert candidate.work_facts == ("PR #30, 상태 병합됨",)
+        assert candidate.record_text is None
     assert output.not_provided == ()
     assert_member_text(output)
 
@@ -3303,10 +3323,7 @@ def test_bundle_basis_names_only_the_links_it_used(
     assert (_SAME_CHANGE_LINK in basis) == ("same" in links)
     assert basis.count(_NOT_LOOKED_AT) == 1
     assert "커밋 메시지는 보지 않았다" not in basis
-    newest = max(bundle)
-    assert candidate.work_facts == (
-        f"PR·병합에 속하지 않은 본인 커밋 묶음(가장 최근 커밋 {sha(newest)[:12]})",
-    )
+    assert candidate.work_facts[0] == "PR·병합 없이 들어간 본인 커밋 묶음"
 
 
 # 근거 순서와 같은 값 합치기

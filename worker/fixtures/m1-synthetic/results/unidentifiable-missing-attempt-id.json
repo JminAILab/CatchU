@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2",
+  "schemaVersion": "3",
   "messageId": "message-{{caseId}}-{{attemptId}}-result",
   "resultId": "result-{{caseId}}-{{attemptId}}",
   "requestId": "{{requestId}}",
@@ -51,7 +51,11 @@
         "questions": [
           "합성 질문: 문구를 바꾸게 된 계기는 무엇이었나요?"
         ]
-      }
+      },
+      "ownCommitShas": [
+        "0000000000000000000000000000000000000012",
+        "0000000000000000000000000000000000000011"
+      ]
     }
   ],
   "notProvided": [],

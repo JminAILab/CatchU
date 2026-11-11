@@ -519,9 +519,14 @@ check "NetworkPolicy: 기본 차단(들어오고 나감)과 DNS, worker·web은 
 check "NetworkPolicy: worker 바깥 443은 GitHub API 대역 24개와 Anthropic 대역만" \
   "$(ok q "$K8S/network-policy.yaml" '[.[] | select(.metadata.name == "worker") | .spec.egress[] | select(.ports[0].port == 443) | .to[].ipBlock.cidr]
       | length == 25 and index("160.79.104.0/23") != null and all(.[]; test("^[0-9.]+/[0-9]+$") and . != "0.0.0.0/0")')"
-check "Ingress: /v1/internal 404가 /v1·/보다 먼저, 공개 ALB·TLS 1.2·1.3 정책·WAF 이름·HSTS 300초" \
-  "$(ok q "$K8S/ingress.yaml" '.[0] | (.spec.rules[0].http.paths | map(.path)) == ["/v1/internal", "/v1", "/"]
-      and .spec.rules[0].http.paths[0].backend.service.name == "internal-not-found"
+check "Ingress: /v1/internal 404, /v1·MCP OAuth 주소 5개는 api 3001, 그 밖은 web 3000, 공개 ALB·TLS 1.2·1.3 정책·WAF 이름·HSTS 300초" \
+  "$(ok q "$K8S/ingress.yaml" '.[0] | (.spec.rules[0].http.paths | map([.path, .pathType, .backend.service.name])) == [
+        ["/v1/internal", "Prefix", "internal-not-found"], ["/v1", "Prefix", "api"],
+        ["/authorize", "Exact", "api"], ["/token", "Exact", "api"], ["/register", "Exact", "api"],
+        ["/.well-known/oauth-protected-resource", "Prefix", "api"], ["/.well-known/oauth-authorization-server", "Prefix", "api"],
+        ["/", "Prefix", "web"]]
+      and all(.spec.rules[0].http.paths[] | select(.backend.service.name != "internal-not-found");
+        .backend.service.port.number == ({"api": 3001, "web": 3000}[.backend.service.name]))
       and (.metadata.annotations | .["alb.ingress.kubernetes.io/scheme"] == "internet-facing"
       and .["alb.ingress.kubernetes.io/ssl-policy"] == "ELBSecurityPolicy-TLS13-1-2-Res-PQ-2025-09"
       and .["alb.ingress.kubernetes.io/wafv2-acl-name"] == "catchu-edge"

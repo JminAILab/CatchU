@@ -210,6 +210,7 @@ export class ExamplePublicController {
 | 미인증·수신자 비밀번호 | 401 | AUTH_REQUIRED, AUTH_INVALID, LINK_PASSWORD_REQUIRED, LINK_PASSWORD_INVALID |
 | 권한·선행 조건·요청 출처 | 403 | GITHUB_CONNECTION_REQUIRED, REPOSITORY_NOT_ALLOWED, CONSENT_REQUIRED, AUTH_ORIGIN_FORBIDDEN, AI_CONSENT_REQUIRED(12월 U2, 외부 AI 첫 이용 동의 없음) |
 | 없음·열람 불가 | 404 | RESOURCE_UNAVAILABLE, LINK_UNAVAILABLE |
+| JD 입력 검증(12월 U10) | 422 | INVALID_INPUT, INPUT_TOO_LARGE ([docs/jd.md](docs/jd.md)). U10 경계의 직접 검사이며 전역 ValidationPipe의 400은 유지 |
 | 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED, INDEX_NOT_READY(12월 U5 질의응답·U10 JD 요약, 계약 C-09·C-12, 문구 "아직 쓸 수 없습니다". 화면 문구는 각 기능의 web 문구 표가 정함), MCP_CONSENT_REQUIRED(12월 U6 첫 연결 동의 없음, [docs/claude-mcp.md](docs/claude-mcp.md)) |
 | 수신자 비밀번호 시도 제한 | 429 | LINK_UNLOCK_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds })`) |
 | 회원 링크 발급 빈도 제한 | 429 | RATE_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('RATE_LIMITED', { retryAfterSeconds })`) |

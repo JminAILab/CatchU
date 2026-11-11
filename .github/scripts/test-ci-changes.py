@@ -78,6 +78,8 @@ class ChangesTest(unittest.TestCase):
             ("api/src/rag-answer/question-counter.ts", ("api",), ""),
             ("api/package-lock.json", ("api",), "api"),
             ("web/src/features/repository-management/repository-api.ts", ("web", "api"), ""),
+            ("web/src/features/publications/snapshot-view.tsx", ("web", "api"), ""),
+            ("web/src/features/publications/publish-view.tsx", ("web",), ""),
             ("web/src/app/page.tsx", ("web",), ""),
             ("web/package-lock.json", ("web",), "web"),
             ("docs/README.md", (), ""),

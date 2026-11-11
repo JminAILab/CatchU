@@ -128,8 +128,9 @@ test("동의 기록은 POST /ai-consent에 지금 고지의 판본을 보내고,
   assert.equal(apiSource.match(/AI_NOTICE_VERSION = '([^']+)'/)?.[1], AI_NOTICE_VERSION, "web·api 판본이 다르면 동의가 400으로 거부된다");
 });
 
-test("동의 창은 받는 곳 둘·보내는 기능·자료를 그대로 보낸다는 사실·문의 경로 한 줄과 [동의]·[닫기]를 보이고, 한 줄 안내도 받는 곳을 적는다", () => {
+test("동의 창은 받는 곳 셋(OpenAI 포함, CR3 BR8.3)·보내는 기능·자료를 그대로 보낸다는 사실·문의 경로 한 줄과 [동의]·[닫기]를 보이고, 한 줄 안내도 받는 곳을 적는다", () => {
   const html = renderToStaticMarkup(createElement(AiConsentDialog, { open: true, busy: false, error: null, onAgree() {}, onClose() {} }));
+  assert.ok(AI_RECIPIENTS.some((name) => name.includes("OpenAI")), "저장소 분석 확인에 쓰는 OpenAI를 받는 곳에 적는다");
   for (const text of [...AI_RECIPIENTS, AI_CONSENT_TEXT.features, AI_CONSENT_TEXT.rawData, AI_CONSENT_TEXT.contact]) {
     assert.ok(html.includes(text.replaceAll("&", "&amp;")), text);
   }

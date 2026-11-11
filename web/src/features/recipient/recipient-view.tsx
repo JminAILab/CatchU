@@ -6,10 +6,12 @@ import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { BaseSummaryPanel } from "@/features/rag-answer/base-summary-panel";
 import { QnaPanel } from "@/features/rag-answer/qna-panel";
 import type { PdfCopySource } from "@/features/publications/published-pdf-item";
+import { JdRecipientPanel } from "@/features/jd/jd-recipient-panel";
 import { PublishedSnapshotView, type SnapshotHighlight } from "@/features/publications/snapshot-view";
+import { ClaudeAnalyzePanel } from "@/features/recipient-claude/claude-analyze-panel";
 import { LINK_UNAVAILABLE_TEXT, LOOKUP_FAILED_TITLE, PASSWORD_REQUIRED_TITLE, publishedAtText, unlockMessage } from "./recipient-format";
 import type { RecipientSlotProps } from "./recipient-slots";
-import type { PublicationSnapshot, UnlockResult, UnlockSnapshot } from "./recipient-store";
+import { claudeConnectable, type PublicationSnapshot, type UnlockResult, type UnlockSnapshot } from "./recipient-store";
 import styles from "./recipient.module.css";
 
 export type HeadingRef = RefObject<HTMLHeadingElement | null>;
@@ -34,10 +36,12 @@ export type RecipientPublicationViewProps = {
  *
  * | 상태 | 위에서부터 |
  * |---|---|
- * | 판정 통과 | U4 h1(발행본 제목) → 0 `RecipientGuide`(U2, `showClaudeConnect={false}`) → U4 고정 안내(발행 시각) → 1 발행본 자료 → 2 `BaseSummaryPanel`(U5) → 3 `QnaPanel`(U5) → 4 자리(U10) |
+ * | 판정 통과 | U4 h1(발행본 제목) → 0 `RecipientGuide`(U2, `showClaudeConnect={claudeConnectable(snapshot)}`) → 0.5 `ClaudeAnalyzePanel`(U9, 같은 값이 참일 때만) → U4 고정 안내(발행 시각) → 1 발행본 자료 → 2 `BaseSummaryPanel`(U5) → 3 `QnaPanel`(U5) → 4 자리(U10) |
  * | 비밀번호 입력 | U4 h1 → 비밀번호 안내·입력. `RecipientGuide` 없음 |
  * | 접근 불가 | U4 h1 「이 링크는 열람할 수 없습니다」. `RecipientGuide` 없음 |
  *
+ * 판정 통과 분기는 `claudeConnectable(snapshot)`을 한 번 읽어 0번의 Claude 줄과 0.5번 패널에 함께 쓴다(C-11 claude-connect-rule, U9 BR6.1).
+ * 0.5번 패널에는 `slotProps.token`만 넘기고 grant·비밀번호·`getGrant`·`onAccessLost`는 넘기지 않는다.
  * 사본·설명·본문은 React 텍스트로만 그리고(NFR1.10) GitHub 근거 주소만 링크다(NFR1.11, `snapshot-view.tsx`).
  */
 export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlock, waitSeconds, highlight, slotProps, pdfSource }: RecipientPublicationViewProps) {
@@ -61,7 +65,8 @@ export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlo
           </LookupFailedState>
         </section>
       );
-    case "ready":
+    case "ready": {
+      const connectable = claudeConnectable(snapshot);
       return (
         <>
           {snapshot.refreshFailed && (
@@ -73,19 +78,21 @@ export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlo
           <section className={styles.panel} aria-labelledby="recipient-title" aria-busy={snapshot.refreshing || undefined} data-testid="recipient-ready">
             <h1 id="recipient-title" ref={headingRef} tabIndex={-1} className={styles.title}>{snapshot.snapshot.title}</h1>
           </section>
-          <RecipientGuide showClaudeConnect={false} />
+          <RecipientGuide showClaudeConnect={connectable} />
+          {connectable && <ClaudeAnalyzePanel token={slotProps.token} />}
           <p className={styles.notice} data-testid="recipient-published-at">{publishedAtText(snapshot.snapshot.publishedAt)}</p>
           <PublishedSnapshotView snapshot={snapshot.snapshot} highlight={highlight} pdfSource={pdfSource} />
           <RecipientSlots {...slotProps} />
         </>
       );
+    }
   }
 }
 
 /**
  * 2·3·4번 자리(C-11 slots). 2·3번은 U5 `BaseSummaryPanel`·`QnaPanel`(`features/rag-answer` README 「붙이는 방법」대로 `RecipientSlotProps`를
  * 그대로 넘기고 `key={token}`). 두 패널은 401·404를 스스로 처리하지 않고 `onAccessLost`를 부르며(C-11 rule), 근거 단추는 `showEvidence`를 부른다.
- * 4번 U10 `JdSummaryPanel`은 제공 뒤 단다(지금은 빈 자리, 로그인 여부만 표시). U4 영역에 안내 문장을 두지 않는다(G6).
+ * 4번은 U10 `JdRecipientPanel`이 회원 호출을 연결하고 JD 로그인 안내·요약을 소유한다. U4 영역에 안내 문장을 두지 않는다(G6).
  */
 function RecipientSlots(props: RecipientSlotProps) {
   return (
@@ -98,7 +105,9 @@ function RecipientSlots(props: RecipientSlotProps) {
         <QnaPanel key={props.token} token={props.token} getGrant={props.getGrant} onAccessLost={props.onAccessLost}
           isLoggedIn={props.isLoggedIn} showEvidence={props.showEvidence} />
       </div>
-      <div data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in={props.isLoggedIn} />
+      <div data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in={props.isLoggedIn}>
+        <JdRecipientPanel key={props.token} {...props} />
+      </div>
     </>
   );
 }

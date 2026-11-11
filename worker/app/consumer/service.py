@@ -268,13 +268,18 @@ class ConsumerService:
         server_task = asyncio.create_task(self.server.serve(), name="health-server")
         if self._settings.consumer_enabled:
             self._start_consumer()
+        live = self._settings.live
         pdf = self._settings.pdf
+        # 판정은 공급자 이름과 AI 쪽 켜짐 여부만 남긴다(키 값은 남기지 않는다, CR3 NFR5.2).
         logger.info(
-            "분석 소비자 기동: consumer=%s prefix=%s concurrency=%s mock=%s pdf=%s",
+            "분석 소비자 기동: consumer=%s prefix=%s concurrency=%s mock=%s "
+            "judgementProvider=%s aiSide=%s pdf=%s",
             "enabled" if self._settings.consumer_enabled else "disabled",
             self._settings.prefix,
             self._settings.concurrency,
             self._settings.mock_enabled,
+            "-" if live is None else live.judgement_provider,
+            "on" if live is not None and live.ai_side else "off",
             f"enabled(concurrency={pdf.concurrency})"
             if pdf is not None
             else "disabled",

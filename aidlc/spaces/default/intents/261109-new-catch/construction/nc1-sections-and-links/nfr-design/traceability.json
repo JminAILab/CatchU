@@ -1,0 +1,20 @@
+{
+  "stage": "nfr-design",
+  "unit": "nc1-sections-and-links",
+  "upstream_ids": ["NFR1.1", "NFR1.2", "NFR6.1", "NFR6.2", "NFR6.3", "NFR7.1", "NFR7.2", "NFR8.1", "NFR2.1", "NFR5.1", "NFR5.2", "NFR5.3", "NFR5.4"],
+  "coverage": [
+    { "id": "NFR1.1", "status": "OK", "target": "performance-design.md 1절: GitHub·AI 모듈 무변경, 링크 이름은 글자만으로 계산, PR 문장" },
+    { "id": "NFR1.2", "status": "OK", "target": "performance-design.md 1절: publish-screen.tsx가 createRepositoryOptionsStore를 열 때 한 번 refresh, 체크 칸은 Catch 목록만 다시 부름" },
+    { "id": "NFR6.1", "status": "OK", "target": "performance-design.md 4절: useId로 label·textarea·aria-describedby 연결, 링크 목록 h4에 aria-live 없음" },
+    { "id": "NFR6.2", "status": "OK", "target": "performance-design.md 4절: label+select·label+checkbox, aria-live polite 개수 줄 하나" },
+    { "id": "NFR6.3", "status": "OK", "target": "performance-design.md 4절: 돌려받은 칸만 그려 빈 h5 없음, GithubLink가 숨은 (새 탭)을 늘 붙임" },
+    { "id": "NFR7.1", "status": "OK", "target": "performance-design.md 4절: 옛 글은 더 쓰기 하나로 왕복, 공통 함수 시험" },
+    { "id": "NFR7.2", "status": "OK", "target": "performance-design.md 4절, security-design.md 2절: v가 2가 아닌 커서 400, web은 지금 더 보기 실패 상태" },
+    { "id": "NFR8.1", "status": "OK", "target": "performance-design.md 4절: 시험 자리(web 공통 함수 시험 둘·화면 시험, api owner-catch 시험)와 60분 확인 명령" },
+    { "id": "NFR2.1", "status": "OK", "target": "security-design.md 1.4절: 이름·h5는 web 안에서만, 저장·사본·AI 재료는 원문" },
+    { "id": "NFR5.1", "status": "OK", "target": "security-design.md 1.1절: 그리기 경로 하나, React 텍스트만, h5는 상수에서" },
+    { "id": "NFR5.2", "status": "OK", "target": "security-design.md 1.3절: 마디별 디코딩 실패는 원문, \\p{Cc}\\p{Cf} 지우기" },
+    { "id": "NFR5.3", "status": "OK", "target": "security-design.md 1.2·1.3절: 판별 규칙 유지, href·title 원래 주소, rel noopener noreferrer, 포트 든 주소는 주소 전체" },
+    { "id": "NFR5.4", "status": "OK", "target": "security-design.md 1.3절: 표에 맞지 않는 꼴은 주소 전체, 다른 저장소 앞붙임도 같은 지우기" }
+  ]
+}

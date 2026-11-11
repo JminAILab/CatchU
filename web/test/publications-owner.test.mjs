@@ -346,9 +346,18 @@ test("사본 화면: 항목 순서대로 보이고 Catch는 기록·작성자 �
   const hrefs = links.map((anchor) => anchor.match(/href="([^"]+)"/)[1]);
   assert.deepEqual(hrefs, [
     "https://github.com/o/r/blob/main/README.md", // 텍스트 자료 본문(position 1)
-    "https://github.com/o/r/pull/1", // 근거
     "https://github.com/o/r/issues/2", // 작성자 설명(끝의 마침표 제외)
+    "https://github.com/o/r/pull/1", // 근거(#488: 기록은 작성자 설명 아래, 「근거 자세히 보기」 안)
   ]); // aiDraft의 pull/3은 링크가 없다
+  // #488: 작성자 발행본 상세도 같은 부품이라 불일치 → AI 초안 → 작성자 설명 → 기록 순서이고 근거 목록은 처음에 접혀 있다.
+  const catchHtml = items[1];
+  const order = ["snapshot-catch-mismatch", "snapshot-catch-ai-draft", "snapshot-catch-description", "snapshot-catch-facts", "snapshot-catch-evidence-details"]
+    .map((id) => catchHtml.indexOf(`data-testid="${id}"`));
+  assert.ok(order.every((position) => position >= 0), String(order));
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  assert.equal(catchHtml.split("<details").length - 1, 1);
+  assert.doesNotMatch(catchHtml.match(/<details[^>]*>/)[0], /\sopen/);
+  assert.ok(catchHtml.includes("<summary>근거 자세히 보기</summary>"));
   assert.ok(html.includes("초안 https://github.com/o/r/pull/3"));
   assert.ok(html.includes("http://github.com/o/r") && !hrefs.includes("http://github.com/o/r"));
   assert.ok(html.includes("https://example.com/x") && !hrefs.includes("https://example.com/x"));
@@ -358,7 +367,9 @@ test("사본 화면: 항목 순서대로 보이고 Catch는 기록·작성자 �
 
   // 빈 설명·초안은 다른 값으로 채우지 않고, 본문은 React 텍스트로만 그린다.
   const empty = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: snapshot([catchItem({ authorDescription: null, aiDraft: null, mismatch: false, evidence: [] }), textItem("<script>alert(1)</script>")]) }));
-  assert.ok(empty.includes("작성자 설명이 없습니다.") && empty.includes("AI 설명 초안이 없습니다."));
+  assert.ok(empty.includes("작성자 설명이 없습니다."));
+  // AI 설명 초안이 없으면 칸을 그리지 않는다(Catch 개편 CR3 BR7.1, 2026-11-08 팀장 결정).
+  assert.ok(!empty.includes("snapshot-catch-ai-draft") && !empty.includes("AI 설명 초안"));
   assert.doesNotMatch(empty, /snapshot-catch-mismatch/);
   assert.ok(empty.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
   const pdf = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: snapshot([{ publishedItemId: "p", position: 1, itemKind: "PDF_MATERIAL", title: "PDF", snapshot: {} }]) }));
@@ -394,9 +405,9 @@ test("GitHub 주소 판정: 받은 사람 화면의 isGithubSourceUrl과 같은 
   assert.match(html, /<a href="https:\/\/github\.com\/o\/r" target="_blank" rel="noopener noreferrer" data-testid="snapshot-github-link">https:\/\/github\.com\/o\/r<span class="visually-hidden"> \(새 탭\)<\/span><\/a>/);
 });
 
-test("상세 화면: 주소·상태·만료·[URL 복사]와 고정 안내·비공개 전환 안내를 보이고, [링크 열기]·[링크 중지]는 ACTIVE에만 있으며, 요약 패널 자리는 비어 있고 실패 안내가 보인다", () => {
+test("상세 화면: 주소·상태·만료·[URL 복사]와 고정 안내·비공개 전환 안내를 보이고, [링크 열기]·[링크 중지]는 ACTIVE에만 있으며, 요약 패널 자리에 U5 작성자 요약 패널이 있고 실패 안내가 보인다", () => {
   const view = (props) => renderToStaticMarkup(createElement(PublicationDetailView, {
-    detail: detail(), stoppedAt: null, stopState: "idle", deleteState: "idle", onStop() {}, onDelete() {}, ...props,
+    detail: detail(), stoppedAt: null, stopState: "idle", deleteState: "idle", onStop() {}, onDelete() {}, highlight: null, showEvidence() {}, ...props,
   }));
   const active = view({});
   assert.match(active, new RegExp(`<a[^>]*href="${url(1)}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*data-testid="publication-open-link"`));
@@ -407,7 +418,13 @@ test("상세 화면: 주소·상태·만료·[URL 복사]와 고정 안내·비�
   assert.ok(active.includes(FIXED_COPY_NOTICE) && active.includes('data-testid="publication-fixed-notice"'));
   assert.ok(active.includes(SOURCE_PRIVATE_NOTICE) && active.includes('data-testid="publication-private-notice"'));
   assert.ok(active.includes('data-testid="publication-stop-button"') && active.includes('data-testid="publication-delete-button"'));
-  assert.match(active, /<div data-testid="publication-summary-slot"><\/div>/);
+  // U5 작성자 모드 패널(C-11 owner-summary)이 자리 안에 있다. 서버 렌더에서는 아직 읽기 전이라 불러오는 중이다.
+  assert.match(active, /<div data-testid="publication-summary-slot"><section[^>]*data-testid="base-summary-panel"/);
+  assert.doesNotMatch(active, /snapshot-highlight/);
+  // 요약 근거 단추로 받은 강조 범위는 사본에 <mark>로 그린다(C-11 evidence-highlight).
+  const highlighted = view({ highlight: { publishedItemId: "i1", fieldPath: "subjectContribution", charStart: 0, charEnd: 2 } });
+  assert.match(highlighted, /<mark[^>]*data-testid="snapshot-highlight">기여<\/mark>/);
+  assert.match(highlighted.match(/<details[^>]*>/)[0], /\sopen=""/, "강조가 본인 기여를 가리키면 근거 칸을 펼친다(#488)");
   assert.ok(active.includes('data-testid="publication-snapshot"'));
   assert.doesNotMatch(active, /indexState|검색 다시 준비/);
 
@@ -438,4 +455,91 @@ test("[URL 복사]: 클립보드 쓰기가 실제로 성공했을 때만 완료�
   assert.equal(await copyUrl(undefined, url(1)), false);
   assert.equal(await copyUrl({}, url(1)), false);
   assert.equal(await copyUrl({ writeText: async () => { throw new Error("denied"); } }, url(1)), false);
+});
+
+// 새 Catch NC1 — 사본의 작성자 설명 칸별 보기·링크 이름·강조 맞추기(US1.4·US2.2, BR7.1~BR7.5, BR2.6·BR2.7, NFR2.1·NFR5.1).
+//   - 기대: 작성자 발행본 상세도 받은 사람 화면과 같은 칸별 보기다. 작성자 설명 속 링크만 이름이고 텍스트 자료 본문은 주소 전체다.
+//           AI 답의 근거 범위(저장된 글 전체의 UTF-16 위치)를 칸 안 범위로 바꿔, 링크가 이름으로 바뀐 뒤에도 같은 문장 범위를 강조한다.
+//   - 실패 조건: 강조가 다른 글자에 걸림, 칸 제목 줄·칸 사이 빈 줄·이은 칸이 강조됨, 텍스트 자료 본문 링크가 이름으로 바뀜, 사본 글이 바뀜, 태그 꼴 글이 HTML로 해석됨.
+const descriptionHtml = (authorDescription, highlight = null) => {
+  const html = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: snapshot([catchItem({ authorDescription })]), highlight }));
+  return html.slice(html.indexOf('data-testid="snapshot-catch-description"'), html.indexOf('data-testid="snapshot-catch-facts"'));
+};
+const at = (authorDescription, needle, length = needle.length) => {
+  const charStart = authorDescription.indexOf(needle);
+  assert.ok(charStart >= 0, needle);
+  return { publishedItemId: "i1", fieldPath: "authorDescription", charStart, charEnd: charStart + length };
+};
+const marks = (html) => [...html.matchAll(/<mark[^>]*>([\s\S]*?)<\/mark>/g)].map((match) => match[1]);
+
+test("AC1.4.5 작성자 발행본 상세는 받은 사람 화면과 같은 칸 제목별 보기를 쓴다", () => {
+  const authorDescription = "【이 작업에서 정한 것】\n줄여 올리기로 했다.\n\n【맡은 부분】\n게시글 작성 화면\n\n【더 쓰기】\n덧붙임";
+  const value = snapshot([catchItem({ authorDescription })]);
+  const owner = renderToStaticMarkup(createElement(PublicationDetailView, {
+    detail: detail({ snapshot: value }), stoppedAt: null, stopState: "idle", deleteState: "idle", onStop() {}, onDelete() {}, highlight: null, showEvidence() {},
+  }));
+  const direct = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: value }));
+  const section = (html) => html.slice(html.indexOf('data-testid="snapshot-catch-description"'), html.indexOf('data-testid="snapshot-catch-facts"'));
+  assert.equal(section(owner), section(direct));
+  assert.deepEqual([...section(owner).matchAll(/<h5[^>]*>([^<]*)<\/h5>/g)].map((m) => m[1]), ["이 작업에서 정한 것", "맡은 부분", "덧붙인 말"]);
+});
+
+test("AC2.2.9 같은 GitHub 링크라도 텍스트 자료 본문은 지금처럼 주소 전체이고 작성자 설명에서만 이름이다", () => {
+  const link = "https://github.com/o/r/blob/ba6bba8/a.ts#L3";
+  const html = renderToStaticMarkup(createElement(PublishedSnapshotView, {
+    snapshot: snapshot([catchItem({ authorDescription: `설명 ${link}` }), textItem(`본문 ${link}`)]),
+  }));
+  const body = html.slice(html.indexOf('data-testid="snapshot-text-body"'));
+  assert.ok(body.includes(`data-testid="snapshot-github-link">${link}<span`));
+  assert.doesNotMatch(body.slice(0, body.indexOf("</p>")), /data-testid="github-link"/);
+  const description = html.slice(html.indexOf('data-testid="snapshot-catch-description"'), html.indexOf('data-testid="snapshot-catch-facts"'));
+  assert.ok(description.includes('data-testid="github-link">a.ts · L3 · 판본 ba6bba8<span'));
+});
+
+test("AC2.2.10 링크가 든 문장을 가리키는 근거는 링크가 이름으로 바뀐 뒤에도 같은 문장 범위를 강조하고 사본 글은 바뀌지 않는다", () => {
+  const link = "https://github.com/o/r/pull/1";
+  const authorDescription = `【맡은 부분】\n앞 문장. 링크 ${link} 가 든 문장. 뒤 문장.\n\n【짚어 볼 곳】\n둘째 칸 글`;
+  const value = snapshot([catchItem({ authorDescription })]);
+  const before = structuredClone(value);
+  const sentence = `링크 ${link} 가 든 문장.`;
+  const html = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: value, highlight: at(authorDescription, sentence) }));
+  const description = html.slice(html.indexOf('data-testid="snapshot-catch-description"'), html.indexOf('data-testid="snapshot-catch-facts"'));
+  const marked = marks(description);
+  assert.equal(marked.length, 3);
+  assert.equal(marked[0], "링크 ");
+  assert.match(marked[1], /^<a href="https:\/\/github\.com\/o\/r\/pull\/1"[^>]*data-testid="github-link">PR #1<span/);
+  assert.equal(marked[2], " 가 든 문장.");
+  assert.ok(description.includes("앞 문장. <mark") && description.includes("</mark> 뒤 문장."));
+  assert.deepEqual(value, before, "이름 계산과 칸 나누기는 사본 글을 바꾸지 않는다(NFR2.1)");
+  // 둘째 칸 안의 범위도 그 칸 안 위치로 바뀐다.
+  assert.deepEqual(marks(descriptionHtml(authorDescription, at(authorDescription, "둘째 칸"))), ["둘째 칸"]);
+});
+
+test("BR7.5 칸 제목 줄·칸 사이 빈 줄에만 걸친 강조는 없고, 걸쳐 있으면 칸 글과 겹치는 부분만 강조하며, 이은 칸은 강조하지 않는다", () => {
+  const authorDescription = "【맡은 부분】\n첫 칸 글\n\n【짚어 볼 곳】\n둘째 칸 글";
+  assert.deepEqual(marks(descriptionHtml(authorDescription, at(authorDescription, "【맡은 부분】"))), []);
+  assert.deepEqual(marks(descriptionHtml(authorDescription, at(authorDescription, "\n\n【짚어 볼 곳】\n"))), []);
+  assert.deepEqual(marks(descriptionHtml(authorDescription, at(authorDescription, "글\n\n【짚어 볼 곳】\n둘째"))), ["글", "둘째"]);
+  const joined = "【맡은 부분】\n첫 조각\n\n【짚어 볼 곳】\n링크 칸\n\n【맡은 부분】\n둘째 조각";
+  assert.deepEqual(marks(descriptionHtml(joined, at(joined, "첫 조각"))), []);
+  assert.deepEqual(marks(descriptionHtml(joined, at(joined, "링크 칸"))), ["링크 칸"]);
+  // 옛 자유 글은 지금처럼 같은 위치를 강조한다.
+  const old = "옛 글 앞 강조할 곳 뒤";
+  assert.deepEqual(marks(descriptionHtml(old, at(old, "강조할 곳"))), ["강조할 곳"]);
+});
+
+test("AC2.2.11 아주 긴 경로의 링크 이름은 자르지 않고, 링크 이름·칸 글은 overflow-wrap: anywhere로 줄을 바꾼다", () => {
+  const leaf = "VeryLongComponentFileNameThatKeepsGoingWithoutAnyBreakOpportunity".repeat(3) + ".vue";
+  const html = descriptionHtml(`https://github.com/o/r/blob/ba6bba8/src/${"deep/".repeat(20)}${leaf}#L1-L2`);
+  assert.ok(html.includes(`>${leaf} · L1–2 · 판본 ba6bba8<span`));
+  const css = readFileSync(new URL("../src/features/publications/publications.module.css", import.meta.url), "utf8");
+  assert.match(css, /\.githubLink\s*\{[^}]*overflow-wrap:\s*anywhere/);
+  assert.match(css, /\.freeText\s*\{[^}]*overflow-wrap:\s*anywhere/);
+});
+
+test("NFR5.1 칸 글의 태그 꼴 글은 HTML로 해석하지 않고 글자로 보이며 h5 칸 제목은 상수에서만 온다", () => {
+  const html = descriptionHtml("【맡은 부분】\n<script>alert(1)</script><b>굵게</b>\n\n【짚어 볼 곳】\n<img src=x onerror=alert(1)>");
+  assert.doesNotMatch(html, /<script>|<b>굵게|<img/);
+  assert.ok(html.includes("&lt;script&gt;alert(1)&lt;/script&gt;&lt;b&gt;굵게&lt;/b&gt;"));
+  assert.deepEqual([...html.matchAll(/<h5[^>]*>([^<]*)<\/h5>/g)].map((m) => m[1]), ["맡은 부분", "짚어 볼 곳"]);
 });

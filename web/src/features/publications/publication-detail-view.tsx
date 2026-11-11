@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { BaseSummaryPanel } from "@/features/rag-answer/base-summary-panel";
+import type { EvidenceLocation } from "@/features/recipient/recipient-slots";
 import { routes } from "@/lib/routes";
 import { CopyUrlButton, OpenLinkAnchor } from "./publication-link-actions";
 import { FIXED_COPY_NOTICE, PUBLICATION_STATE_LABELS, SOURCE_PRIVATE_NOTICE, formatKst, passwordText } from "./publication-format";
 import type { PublicationDetail, PublicationState } from "./publications-api";
 import type { PdfCopySource } from "./published-pdf-item";
-import { PublishedSnapshotView } from "./snapshot-view";
+import { PublishedSnapshotView, type SnapshotHighlight } from "./snapshot-view";
 import styles from "./publications.module.css";
 
 export type PublicationDetailViewProps = {
@@ -17,6 +19,10 @@ export type PublicationDetailViewProps = {
   deleteState: "idle" | "deleting" | "deleted" | { error: string };
   onStop: () => void;
   onDelete: () => void;
+  /** `showEvidence`로 대조한 강조 범위(C-11 evidence-highlight). */
+  highlight: SnapshotHighlight | null;
+  /** 요약 패널의 근거 단추가 부른다. 사본을 그 위치로 옮기고 범위를 강조한다. */
+  showEvidence: (location: EvidenceLocation) => void;
   /** PDF 항목의 작성자 사본 요청(U8 W4). 중지·만료 뒤에도 열린다. */
   pdfSource?: (publishedItemId: string) => PdfCopySource;
 };
@@ -28,7 +34,7 @@ function stateText(state: PublicationState, stoppedAt: string | null): string {
 
 /**
  * 발행본 상세(U4 W5-2, BR7.2·BR7.3·BR8.1~BR8.4). 사본·상태·만료·링크 주소, 고정 안내, 비공개 전환 안내, 중지·삭제.
- * [URL 복사]는 늘, [링크 열기]는 `ACTIVE`에만 보인다(#416). 기본 요약 패널(U5) 자리는 비워 둔다.
+ * [URL 복사]는 늘, [링크 열기]는 `ACTIVE`에만 보인다(#416). 요약 패널 자리에는 U5 `BaseSummaryPanel` 작성자 모드(C-11 owner-summary)를 단다.
  */
 export function PublicationDetailView(props: PublicationDetailViewProps) {
   const { detail, stoppedAt } = props;
@@ -73,9 +79,11 @@ export function PublicationDetailView(props: PublicationDetailViewProps) {
           </button>
         </div>
       </section>
-      {/* 기본 요약 패널(U5 작성자 모드)이 붙을 자리. U5 제공 전이라 컴포넌트를 두지 않는다. */}
-      <div data-testid="publication-summary-slot" />
-      <PublishedSnapshotView snapshot={detail.snapshot} pdfSource={props.pdfSource} />
+      {/* 기본 요약 패널(U5 작성자 모드). 발행본마다 한 번 읽고, 근거 단추는 아래 사본으로 옮긴다. */}
+      <div data-testid="publication-summary-slot">
+        <BaseSummaryPanel key={detail.publicationId} publicationId={detail.publicationId} showEvidence={props.showEvidence} />
+      </div>
+      <PublishedSnapshotView snapshot={detail.snapshot} highlight={props.highlight} pdfSource={props.pdfSource} />
     </article>
   );
 }
