@@ -1,6 +1,7 @@
 """pypdf로 쪽별 글을 뽑는다(BR3.1·BR3.2). 자식 프로세스에서 불린다.
 
-판정 순서: 파싱 실패 → UNREADABLE_FILE, 암호화 → ENCRYPTED, 쪽 수 0 → UNREADABLE_FILE, 쪽 수 > 50 →
+판정 순서: 파싱 실패 → UNREADABLE_FILE, 암호화 → ENCRYPTED(AES로 잠겨 여는 단계에서 pypdf가 암호 라이브러리를
+찾다 DependencyError를 내는 경우 포함), 쪽 수 0 → UNREADABLE_FILE, 쪽 수 > 50 →
 PAGE_LIMIT_EXCEEDED(쪽 글을 뽑기 전에), 아니면 쪽마다 extract_text. 뽑은 글은 NUL만 빼고 가공하지
 않으며, 공백·제어 문자만이면 그 쪽만 readable=false·text=''다. 어느 한 쪽이라도 쪽 읽기·글 추출에서 예외가
 나면 BR3.2의 "파싱 예외"로 보아 파일 전체를 UNREADABLE_FILE로 끝낸다(D25, 담당자 결정 2026-11-10).
@@ -16,6 +17,7 @@ import unicodedata
 from typing import Any, Final
 
 from pypdf import PdfReader
+from pypdf.errors import DependencyError
 
 from app.pdf_extraction.settings import PAGE_LIMIT, TEXT_LIMIT
 
@@ -53,6 +55,12 @@ def extract_pages(
         encrypted = bool(reader.is_encrypted)
     except MemoryError:
         raise
+    except DependencyError:
+        # AES로 잠긴 PDF(256비트 등)는 pypdf가 여는 단계에서 빈 비밀번호를 확인하려고 암호 라이브러리를 찾는다.
+        # worker는 그 라이브러리를 두지 않으므로 여기서 DependencyError가 난다. 파일이 깨진 것이 아니라 잠긴 것이다
+        # (#521 리뷰). pypdf가 여는 단계에서 이 예외를 내는 경우는 암호 해제뿐이다.
+        logger.info("PDF 암호화(여는 단계에서 암호 라이브러리 필요): ENCRYPTED")
+        return _failed("ENCRYPTED")
     except Exception as error:
         logger.info("PDF 파싱 실패: error=%s", type(error).__name__)
         return _failed("UNREADABLE_FILE")

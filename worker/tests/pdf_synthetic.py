@@ -11,7 +11,14 @@ from pathlib import Path
 from typing import Any
 
 from pypdf import PdfWriter
-from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+from pypdf.generic import (
+    ArrayObject,
+    ByteStringObject,
+    DecodedStreamObject,
+    DictionaryObject,
+    NameObject,
+    NumberObject,
+)
 
 from app.consumer import queues
 from app.pdf_extraction.envelope import SCHEMA_VERSION, storage_key
@@ -46,6 +53,46 @@ def pdf_bytes(pages: list[str | None], *, password: str | None = None) -> bytes:
         page[NameObject("/Contents")] = writer._add_object(stream)
     if password is not None:
         writer.encrypt(user_password=password, algorithm="RC4-128")
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
+def aes256_pdf_bytes() -> bytes:
+    """AES-256(/V 5 /R 6, AESV3) 암호화 사전이 붙은 한 쪽 PDF.
+
+    시험 환경에는 암호 라이브러리가 없어 실제로 암호화하지는 못한다. pypdf가 여는 단계에서 보는 것은 암호화
+    사전뿐이므로(빈 비밀번호 확인을 시도하다 `DependencyError`), 사전만 손으로 붙여도 같은 경로를 탄다.
+    """
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    crypt_filter = DictionaryObject(
+        {
+            NameObject("/CFM"): NameObject("/AESV3"),
+            NameObject("/AuthEvent"): NameObject("/DocOpen"),
+            NameObject("/Length"): NumberObject(32),
+        }
+    )
+    encrypt = DictionaryObject(
+        {
+            NameObject("/Filter"): NameObject("/Standard"),
+            NameObject("/V"): NumberObject(5),
+            NameObject("/R"): NumberObject(6),
+            NameObject("/Length"): NumberObject(256),
+            NameObject("/P"): NumberObject(-1),
+            NameObject("/O"): ByteStringObject(bytes(range(48))),
+            NameObject("/U"): ByteStringObject(bytes(range(48, 96))),
+            NameObject("/OE"): ByteStringObject(bytes(32)),
+            NameObject("/UE"): ByteStringObject(bytes(32)),
+            NameObject("/Perms"): ByteStringObject(bytes(16)),
+            NameObject("/CF"): DictionaryObject({NameObject("/StdCF"): crypt_filter}),
+            NameObject("/StmF"): NameObject("/StdCF"),
+            NameObject("/StrF"): NameObject("/StdCF"),
+        }
+    )
+    writer._add_object(encrypt)
+    writer._encrypt_entry = encrypt
+    writer._ID = ArrayObject([ByteStringObject(b"0" * 16), ByteStringObject(b"1" * 16)])
     buffer = io.BytesIO()
     writer.write(buffer)
     return buffer.getvalue()
