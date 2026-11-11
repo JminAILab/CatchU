@@ -15,16 +15,17 @@ import { LinkPasswordRequired, LinkUnavailable, NotFound } from './publication-a
 import { Clock, PUBLICATIONS_CLOCK } from './publications-config';
 import { PublishedSnapshot } from './published-snapshot';
 
-/** 없음·삭제·중지·만료·작성자 비활성을 구분하지 않는다. 문구는 공통 기본값, details 없음. */
-function unavailable(): ApiError {
+/** 없음·삭제·중지·만료·작성자 비활성을 구분하지 않는다. 문구는 공통 기본값, details 없음. PDF 사본 열람(U8)도 같은 응답을 쓴다. */
+export function unavailable(): ApiError {
   return new ApiError('LINK_UNAVAILABLE');
 }
 
 /**
  * C-10 판정 실패를 받은 사람 응답으로 바꾼다. 판정 뒤 만난 `NotFound`(발행본 삭제)는 BR6.1대로 404다(#416 OQ-U4-NFR-5 결정 A).
  * `PublicationOwnerMissing`(회원 행 없음)과 그 밖의 오류는 그대로 두어 공통 필터가 500 INTERNAL_ERROR로 끝낸다.
+ * 받은 사람 PDF 사본 열람(U8, published-pdf-view.service.ts)이 같은 변환을 쓰도록 내보낸다.
  */
-function toApiError(error: unknown): unknown {
+export function toApiError(error: unknown): unknown {
   if (error instanceof LinkUnavailable || error instanceof NotFound) return unavailable();
   if (error instanceof LinkPasswordRequired) return new ApiError('LINK_PASSWORD_REQUIRED');
   return error;

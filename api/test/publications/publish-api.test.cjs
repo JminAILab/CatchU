@@ -5,7 +5,7 @@
 //
 // 판정 순서(BR4.8·BR4.1·BR4.5·BR4.7·BR5.1): 인증(401) → 회원별 발행 빈도 1분 10회 임시값(429 RATE_LIMITED + Retry-After) →
 //   입력 검사(400 VALIDATION_FAILED: 제목 1~50자 코드 포인트·앞뒤 공백 제거, 비밀번호 8~64자 그대로, 항목 1~20개, (kind, sourceId) 중복,
-//   kind는 CATCH·TEXT_MATERIAL만, 정의 밖 필드) → 동의(403 AI_CONSENT_REQUIRED) → 트랜잭션 밖 토큰·scrypt →
+//   kind는 CATCH·TEXT_MATERIAL·PDF_MATERIAL(U8 계획 8.1, PDF 경로는 publish-pdf.test.cjs), 정의 밖 필드) → 동의(403 AI_CONSENT_REQUIRED) → 트랜잭션 밖 토큰·scrypt →
 //   트랜잭션(하루 횟수 consume → 원본 잠금·재읽기(404) → 자격(409) → 전체 글 60,000자 임시값(400) → 쓰기 → PRIVATE→PUBLIC →
 //   chunkInTransaction → 커밋) → 커밋 뒤 EMBED_PUBLICATION·BASE_SUMMARY 등록(실패는 로그만) → 201.
 //
@@ -175,7 +175,8 @@ test('입력 400: 제목·비밀번호·항목 규칙 위반은 칸별 이유를
     [{ title: 't', items: [] }, [{ field: 'items', reason: 'arrayMinSize' }]],
     [{ title: 't', items: Array.from({ length: 21 }, () => textItem(randomUUID())) }, [{ field: 'items', reason: 'arrayMaxSize' }]],
     [{ title: 't', items: [textItem(materialId), textItem(materialId.toUpperCase())] }, [{ field: 'items[1]', reason: 'arrayUnique' }]],
-    [{ title: 't', items: [{ kind: 'PDF_MATERIAL', sourceId: materialId }] }, [{ field: 'items[0].kind', reason: 'isIn' }]],
+    // PDF_MATERIAL은 U8 계획 8.1로 허용 종류가 됐다. 허용 밖 종류 거부는 다른 값으로 확인한다.
+    [{ title: 't', items: [{ kind: 'IMAGE', sourceId: materialId }] }, [{ field: 'items[0].kind', reason: 'isIn' }]],
     [{ title: 't', items: [{ kind: 'CATCH', sourceId: 'not-a-uuid' }] }, [{ field: 'items[0].sourceId', reason: 'isUuid' }]],
     [{ title: 't', items: [{ kind: 'CATCH', sourceId: materialId, extra: 1 }] }, [{ field: 'items[0]', reason: 'isObject' }]],
     [{ title: 't', items: ok, extra: true }, [{ field: 'body', reason: 'whitelistValidation' }]],

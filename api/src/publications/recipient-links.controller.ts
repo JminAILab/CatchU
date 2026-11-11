@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
+import type { ServerResponse } from 'node:http';
+import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, Res } from '@nestjs/common';
 import { Public } from '../auth/auth.decorators';
 import { clientAddressKey } from '../share-links/client-address';
 import { emptyPublicationQuery } from './publish-input';
+import { PublishedPdfViewService } from './published-pdf-view.service';
 import { PublishedSnapshot } from './published-snapshot';
 import { RecipientAccessService } from './recipient-access.service';
 
@@ -18,7 +20,7 @@ interface ClientRequest {
  */
 @Controller('public/links')
 export class RecipientLinksController {
-  constructor(private readonly recipient: RecipientAccessService) {}
+  constructor(private readonly recipient: RecipientAccessService, private readonly pdfs: PublishedPdfViewService) {}
 
   /** 발행본 열람. 200 PublishedSnapshot, 401 LINK_PASSWORD_REQUIRED, 404 LINK_UNAVAILABLE. 정의 밖 쿼리는 400. */
   @Public()
@@ -37,5 +39,19 @@ export class RecipientLinksController {
   unlock(@Param('token') token: string, @Body() body: unknown, @Req() request: ClientRequest): Promise<{ grant: string }> {
     // 신뢰 프록시를 설정하지 않으면 request.ip는 직접 연결 주소다.
     return this.recipient.unlock(token, body, clientAddressKey(request.ip));
+  }
+
+  /**
+   * 발행 PDF 사본 열람(U8 W4, C-12 더하는 변경, BR6.1·BR6.2·BR6.5·BR6.7). 200 application/pdf 스트림, 401 LINK_PASSWORD_REQUIRED,
+   * 404 LINK_UNAVAILABLE(링크 불가와 항목 불가를 구분하지 않음), 파일 없음·저장소 실패 500. 정의 밖 쿼리는 400. 시도 제한은 없다.
+   */
+  @Public()
+  @Get(':token/items/:publishedItemId/pdf')
+  async pdf(
+    @Param('token') token: string, @Param('publishedItemId') publishedItemId: string,
+    @Headers('x-link-grant') grant: string | undefined, @Query() query: unknown, @Res() response: ServerResponse,
+  ): Promise<void> {
+    emptyPublicationQuery(query);
+    await this.pdfs.send(response, await this.pdfs.findForRecipient(token, grant, publishedItemId));
   }
 }

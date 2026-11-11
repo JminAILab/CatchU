@@ -5,8 +5,8 @@ import { createHash } from 'node:crypto';
 import { ApiError } from '../common/errors';
 import { PUBLICATION_LIMITS, PUBLICATION_PAGE } from './publications-config';
 
-/** U4가 발행하는 항목 종류. PDF_MATERIAL은 U8이 더한다(C-17). */
-export const PUBLISH_ITEM_KINDS = ['CATCH', 'TEXT_MATERIAL'] as const;
+/** 발행 항목 종류. PDF_MATERIAL은 U8이 더했다(C-17, U8 기능 명세 W3 1, 계획 8.1). 항목 수·중복 규칙은 U4 그대로다. */
+export const PUBLISH_ITEM_KINDS = ['CATCH', 'TEXT_MATERIAL', 'PDF_MATERIAL'] as const;
 export type PublishItemKind = (typeof PUBLISH_ITEM_KINDS)[number];
 
 export interface PublishItemInput {

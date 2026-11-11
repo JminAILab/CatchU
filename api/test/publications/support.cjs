@@ -8,6 +8,7 @@ const { AI_NOTICE_VERSION, AiConsentGate } = require('../../dist/ai-consent/ai-c
 const { DbPublicationAccess } = require('../../dist/publications/db-publication-access');
 const { PublicationManageService } = require('../../dist/publications/publication-manage.service');
 const { PublishService } = require('../../dist/publications/publish.service');
+const { PublishedPdfViewService } = require('../../dist/publications/published-pdf-view.service');
 const { RecipientAccessService } = require('../../dist/publications/recipient-access.service');
 const { ensureRegistration } = require('../support/registered-analysis.cjs');
 const { APP_SETTINGS, setEnv, collectingLogger, startApp, insertMember, expectError } = require('../u2/support.cjs');
@@ -120,9 +121,10 @@ function bindFakes(app, { aiRun, indexWriter }) {
   return () => Object.assign(publisher, saved);
 }
 
-/** PUBLICATIONS_CLOCK 자리를 시험 시계로 바꾼다(발행·관리·C-10·받은 사람 경로 모두). 되돌리는 함수를 돌려준다. */
+/** PUBLICATIONS_CLOCK 자리를 시험 시계로 바꾼다(발행·관리·C-10·받은 사람 경로·PDF 사본 열람 모두). 되돌리는 함수를 돌려준다. */
 function setClock(app, clock) {
-  const targets = [app.get(PublishService), app.get(PublicationManageService), app.get(DbPublicationAccess), app.get(RecipientAccessService)];
+  const targets = [app.get(PublishService), app.get(PublicationManageService), app.get(DbPublicationAccess), app.get(RecipientAccessService),
+    app.get(PublishedPdfViewService)];
   const saved = targets.map((target) => target.clock);
   for (const target of targets) target.clock = clock;
   return () => targets.forEach((target, index) => { target.clock = saved[index]; });
