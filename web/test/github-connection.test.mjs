@@ -190,7 +190,7 @@ test('공통 API 호출 함수로: 완료가 401이면 토큰을 지우고(공�
 
 /* ---------- 연결 시작 가능 여부·상태 표시 ---------- */
 
-// 통합 시험 전환을 켰을 때(시작 가능)와 끈 제품 기본값(시작 막음)의 판정 입력.
+// 통합 시험 전환을 켰을 때(시작 가능)와 껐을 때(시작 막음)의 판정 입력.
 const ON = { startBlockedReason: githubStartBlockedReason(true) };
 const OFF = { startBlockedReason: githubStartBlockedReason(false) };
 const DISCONNECTED = { state: 'DISCONNECTED', accountLogin: null };

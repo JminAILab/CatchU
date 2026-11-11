@@ -20,7 +20,7 @@ const startBlockedReason = githubStartBlockedReason(authSessionIntegrationEnable
 /**
  * GitHub 연동 화면(W02-G, #253). `/profile/github`와 콜백 화면(`/github/callback`)이 함께 쓴다.
  * - 연결 상태는 GET /v1/me를 세션·재조회별로 읽는다. 이전 세션(다른 회원)의 응답은 쓰지 않는다. 조회 실패는 미연결로 바꾸지 않는다.
- * - [GitHub 연결]·[다시 연결]은 시작 API 뒤 GitHub로 전체 이동한다. 통합 시험 전환을 끈 제품 기본값에서는 누를 수 없게 두고 이유를 보인다.
+ * - [GitHub 연결]·[다시 연결]은 시작 API 뒤 GitHub로 전체 이동한다. 통합 시험 전환을 끄면 누를 수 없게 두고 이유를 보인다.
  *   연결 해제·다른 계정 교체는 10월 화면에 없다.
  * - [돌아가기]는 진입 출처를 보존하지 않으므로 홈으로 간다(W02-G 「출처 불명은 홈」).
  */
