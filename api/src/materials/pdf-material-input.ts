@@ -2,6 +2,11 @@
 // multipart 해석은 multer 2.5.0 메모리 저장으로 한다: 선언 종류(fileFilter, 스트림을 받기 전) → 파일 스트림의 누적 바이트가 20 MB를
 // 넘는 즉시 저장을 멈추고 거부(limits.fileSize; 요청 헤더·multipart 메타의 선언 크기는 믿지 않음) → 머리 바이트 `%PDF-` → 제목.
 // 오류 응답에는 파일 이름·제목 값을 넣지 않는다. 호출자는 동의 확인(C-04) 뒤에만 이 함수를 불러 본문을 읽는다(BR1.3).
+// multer 타입 선언(multer.d.ts)을 이 파일이 직접 가리킨다. 빌드(tsc)는 tsconfig의 include로 선언 파일을 읽지만,
+// 개발 소스 실행(ts-node)은 실제로 불러온 파일만 컴파일해 선언 파일을 빠뜨리고 TS7016으로 기동하지 못한다(#521).
+// 전역 선언 파일(declare module)은 import로 가리킬 수 없어 이 한 줄만 참조 지시문 규칙의 예외로 둔다.
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
+/// <reference path="./multer.d.ts" />
 import { createHash } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import multer from 'multer';
