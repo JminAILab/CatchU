@@ -211,7 +211,7 @@ export function PublishFormView(props: PublishFormViewProps) {
           <input id="publish-title-input" data-testid="publish-title-input" value={props.title} disabled={props.disabled}
             aria-describedby="publish-title-count" onChange={(event) => props.onTitle(event.target.value)} />
         </label>
-        <p id="publish-title-count" className={styles.small}>{titleLength} / {PUBLISH_LIMITS.title}자 · 나에게만 보이며 발행 뒤 바꿀 수 없습니다.</p>
+        <p id="publish-title-count" className={styles.small}>{titleLength} / {PUBLISH_LIMITS.title}자 · 받은 사람에게도 보이며 발행 뒤 바꿀 수 없습니다.</p>
         <label className={styles.check}>
           <input type="checkbox" data-testid="publish-use-password" checked={props.usePassword} disabled={props.disabled}
             onChange={(event) => props.onUsePassword(event.target.checked)} />

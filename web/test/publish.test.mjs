@@ -468,6 +468,7 @@ test("확인·입력·고르기 화면: 항목 순서·비밀번호 여부·90�
   assert.match(form, /type="password"/);
   assert.doesNotMatch(form, />secret-pass-1</); // 비밀번호 원문은 안내에 넣지 않는다(입력값으로만 있다)
   assert.ok(form.includes(SOURCE_UNAVAILABLE_TEXT));
+  assert.ok(form.includes("받은 사람에게도 보이며 발행 뒤 바꿀 수 없습니다.")); // 발행 제목은 받은 사람 화면 맨 위 제목(h1)으로 보인다
 
   const catches = { state: "ready", moreState: "idle", nextCursor: "c", items: [catchSourceOf(catchAsset(C1, { title: "공개 Catch" })), catchSourceOf(catchAsset(C2, { title: "비공개 Catch", visibility: "PRIVATE" })), catchSourceOf(catchAsset(C3, { title: "미확인 Catch", confirmed: false }))] };
   const materials = { state: "ready", moreState: "idle", nextCursor: null, items: [material(M1, "자기소개")] };
