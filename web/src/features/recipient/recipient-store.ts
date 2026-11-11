@@ -50,7 +50,7 @@ export type PublicationSnapshot =
 /**
  * U9 Claude 자리(C-11 slots 0.5)와 `RecipientGuide`의 `showClaudeConnect`에 함께 쓰는 값(C-11 claude-connect-rule).
  * 판정 통과 화면이고 그 화면을 그린 조회가 grant 없이 성공했을 때만 true다. 불러오는 중·비밀번호 입력·접근 불가·최초 조회 실패는 false.
- * 두 자리가 따로 판단하지 않도록 이 함수 하나로 정한다. U9를 켜기 전까지 화면(`recipient-view.tsx`)은 이 값을 쓰지 않고 false를 넘긴다.
+ * 두 자리가 따로 판단하지 않도록 이 함수 하나로 정한다. 화면(`recipient-view.tsx`)의 판정 통과 분기가 이 값을 한 번 읽어 0.5번 패널과 `showClaudeConnect`를 함께 켠다.
  */
 export function claudeConnectable(snapshot: PublicationSnapshot): boolean {
   return snapshot.view === "ready" && snapshot.readWithoutGrant;

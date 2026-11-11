@@ -8,7 +8,9 @@ const {
   DB_FAILURE_MARKER, WEB_ORIGIN, assertNoSecrets, connectMember, events, failingConnection, insertClient, insertConnection, insertToken, rpc, startMcpApp, swapConnection,
 } = require('./support.cjs');
 
-const ALLOWED_TOOLS = ['list_my_catches', 'list_my_text_materials'];
+const ALLOWED_TOOLS = ['list_my_catches', 'list_my_text_materials', 'read_shared_publication'];
+/** 입력이 cursor 하나뿐인 U6 도구. U9 read_shared_publication의 입력은 U9 시험(mcp-shared-publication S1)이 본다. */
+const CURSOR_ONLY_TOOLS = ['list_my_catches', 'list_my_text_materials'];
 let server;
 let db;
 let metadataUrl;
@@ -106,7 +108,7 @@ test('NFR1.2 회원 Access 토큰은 /v1/mcp에서 401이고 MCP 토큰은 회�
   assert.equal(memberApi.body.code, 'AUTH_INVALID');
 });
 
-test('S13 tools/list는 도구 둘뿐이고 title·readOnlyHint가 있으며 입력은 cursor뿐이다', async () => {
+test('S13 tools/list는 도구 셋뿐이고 title·readOnlyHint가 있으며 U6 두 도구의 입력은 cursor뿐이다', async () => {
   const member = await server.login();
   const { token } = await connectMember(db, member.memberId);
   const response = await list(token);
@@ -119,10 +121,11 @@ test('S13 tools/list는 도구 둘뿐이고 title·readOnlyHint가 있으며 입
   for (const tool of tools) {
     assert.ok(tool.title);
     assert.equal(tool.annotations.readOnlyHint, true);
+    assert.equal(tool.outputSchema, undefined);
+    if (!CURSOR_ONLY_TOOLS.includes(tool.name)) continue;
     assert.deepEqual(Object.keys(tool.inputSchema.properties), ['cursor']);
     assert.equal(tool.inputSchema.additionalProperties, false);
     assert.deepEqual(tool.inputSchema.required ?? [], []);
-    assert.equal(tool.outputSchema, undefined);
   }
 });
 

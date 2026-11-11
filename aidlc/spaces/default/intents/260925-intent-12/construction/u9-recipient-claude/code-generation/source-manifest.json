@@ -1,0 +1,32 @@
+{
+  "stage": "code-generation",
+  "unit": "u9-recipient-claude",
+  "version": 1,
+  "writes": [
+    { "path": "api/src/claude-mcp/mcp-shared-link.ts" },
+    { "path": "api/src/claude-mcp/mcp-shared-text.ts" },
+    { "path": "api/src/claude-mcp/mcp-shared-page.ts" },
+    { "path": "api/src/claude-mcp/mcp-shared-publication-reader.ts" },
+    { "path": "api/src/claude-mcp/mcp-tools.ts" },
+    { "path": "api/src/claude-mcp/claude-mcp.module.ts" },
+    { "path": "api/src/claude-mcp/mcp-page.ts" },
+    { "path": "api/src/claude-mcp/mcp-log.ts" },
+    { "path": "api/test/claude-mcp/mcp-shared-text.test.cjs" },
+    { "path": "api/test/claude-mcp/mcp-shared-reader.test.cjs" },
+    { "path": "api/test/claude-mcp/mcp-shared-publication.test.cjs" },
+    { "path": "api/test/claude-mcp/mcp-endpoint.test.cjs" },
+    { "path": "api/test/claude-mcp/mcp-logs.test.cjs" },
+    { "path": "api/test/claude-mcp/mcp-rate-limit.test.cjs" },
+    { "path": "api/test/claude-mcp/mcp-tools.test.cjs" },
+    { "path": "api/docs/claude-mcp.md" },
+    { "path": "web/src/features/recipient-claude/" },
+    { "path": "web/src/features/recipient/recipient-view.tsx" },
+    { "path": "web/src/features/recipient/recipient-store.ts" },
+    { "path": "web/src/features/recipient/README.md" },
+    { "path": "web/src/components/recipient-guide/recipient-guide-items.ts" },
+    { "path": "web/src/features/publications/publish-view.tsx" },
+    { "path": "web/src/features/publications/README.md" },
+    { "path": "web/test/u9-recipient-claude.test.mjs" },
+    { "path": "web/test/recipient.test.mjs" }
+  ]
+}
