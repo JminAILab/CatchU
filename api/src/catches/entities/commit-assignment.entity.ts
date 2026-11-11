@@ -8,6 +8,8 @@ import { CatchAssetEntity } from './catch-asset.entity';
  * 열쇠 세 칸이 곧 기본 키다(따로 둔 내부 ID 없음). Catch는 (catch_id, member_id) 한 쌍으로 가리켜, 회원이
  * Catch 주인과 다르면 DB가 거부한다(ADR-002). 회원·분석 요청을 직접 가리키는 외래 키는 두지 않고 Catch를 따라서만
  * 지워진다(회원 탈퇴·분석 요청 삭제 → Catch → 소속 기록, docs/member-withdrawal-deletion.md).
+ * 새 Catch NC2부터 발행이 이 표를 읽어 사본 근거의 본인 커밋 표지(`ownCommit`)를 정한다(publications/publish.service.ts). 소속의 뜻이나 쓰는 규칙을 바꾸면
+ * 면접관 화면의 표지도 바뀐다. worker에 새 작업 전체 한계 문장을 더하면 publications/work-limit-sentences.ts의 상수 목록에도 더해야 면접관 화면에 보인다.
  */
 @Entity('commit_assignment')
 @ForeignKey(() => CatchAssetEntity, ['catchId', 'memberId'], ['catchId', 'ownerId'], deleteWithParent)

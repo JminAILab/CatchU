@@ -22,11 +22,20 @@ export type PublishedLink = {
 export type PublicationListItem = PublishedLink & { title: string };
 export type PublicationPage = { items: PublicationListItem[]; page: { nextCursor: string | null } };
 
-/** C-07 사본 모양. Catch는 기록 확인 내용·작성자 설명·AI 초안·불일치 표지를 나눠 보인다(BR1.3·BR7.5). */
-export type SnapshotEvidence = { sourceUrl: string; sourceRevision: string; representedFacts: string[] };
+/**
+ * C-07 사본 모양. Catch는 기록 확인 내용·작성자 설명·AI 초안·불일치 표지를 나눠 보인다(BR1.3·BR7.5).
+ * 새 Catch NC2(계약 C3)가 선택 칸 넷을 더했다. 칸이 없는 사본(이 변경 전 사본)도 올바르고, `ownCommit`이 없으면 false로 읽는다(BR2.1·BR2.2).
+ */
+export type SnapshotEvidence = { sourceUrl: string; sourceRevision: string; representedFacts: string[]; ownCommit?: boolean };
 export type CatchSnapshot = {
   workFacts: string[]; subjectContribution: string; evidence: SnapshotEvidence[];
   authorDescription: string | null; aiDraft: string | null; mismatch: boolean;
+  /** 「소유자/저장소」. 제목 아래 작은 글자 줄(BR3.1) */
+  repositoryName?: string;
+  /** 작성자 설명을 마지막으로 고친 한국 시간 "YYYY-MM"(BR3.2) */
+  authorDescriptionEditedMonth?: string;
+  /** 「이 기록으로 알 수 없는 것」 항목, 사본 순서 그대로(BR3.3) */
+  workLimits?: string[];
 };
 export type TextMaterialSnapshot = { body: string };
 export type PublishedItem =
@@ -59,12 +68,20 @@ export function isPublicationPage(value: unknown): value is PublicationPage {
     && record(value.page) && (value.page.nextCursor === null || text(value.page.nextCursor));
 }
 
+/** 작성 달 "YYYY-MM"(01~12월, NC2 BR2.1). */
+const EDITED_MONTH = /^[0-9]{4}-(0[1-9]|1[0-2])$/;
+/** 선택 칸: 없으면(`undefined`) 통과, 있으면 모양을 본다(옛 사본, NC2 BR2.1). */
+const optional = (v: unknown, check: (v: unknown) => boolean) => v === undefined || check(v);
+const editedMonth = (v: unknown) => typeof v === "string" && EDITED_MONTH.test(v);
+const workLimits = (v: unknown) => Array.isArray(v) && v.length > 0 && v.every(text);
+
 function isCatchSnapshot(value: unknown): value is CatchSnapshot {
   return record(value) && strings(value.workFacts) && typeof value.subjectContribution === "string"
     && Array.isArray(value.evidence) && value.evidence.every((e) => record(e) && typeof e.sourceUrl === "string"
-      && typeof e.sourceRevision === "string" && strings(e.representedFacts))
+      && typeof e.sourceRevision === "string" && strings(e.representedFacts) && optional(e.ownCommit, (v) => typeof v === "boolean"))
     && (value.authorDescription === null || typeof value.authorDescription === "string")
-    && (value.aiDraft === null || typeof value.aiDraft === "string") && typeof value.mismatch === "boolean";
+    && (value.aiDraft === null || typeof value.aiDraft === "string") && typeof value.mismatch === "boolean"
+    && optional(value.repositoryName, text) && optional(value.authorDescriptionEditedMonth, editedMonth) && optional(value.workLimits, workLimits);
 }
 
 function isPublishedItem(value: unknown): value is PublishedItem {

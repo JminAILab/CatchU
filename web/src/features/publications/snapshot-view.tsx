@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { splitSections, type Section } from "@/lib/author-description-sections";
-import { evidenceRepositoryOf } from "@/lib/github-link-name";
+import { evidenceRepositoryOf, isOwnCommitLink, ownCommitsOf, type OwnCommit } from "@/lib/github-link-name";
 import { isGithubSourceUrl, splitGithubLinks, type TextSegment } from "@/lib/github-source-url";
 import { GithubLink } from "./github-link";
 import { orderedItems, type CatchSnapshot, type PublishedItem, type PublishedSnapshot, type TextMaterialSnapshot } from "./publications-api";
@@ -42,8 +42,21 @@ function PlainText({ text, range }: { text: string; range: Range }) {
   return <>{marked(text, range, 0, 0)}</>;
 }
 
-/** 링크를 이름으로 그릴 때의 근거 저장소(새 Catch BR2.4). null이면 그대로 주소 전체를 보인다(텍스트 자료 본문, AC2.2.9). */
-type LinkNames = { evidenceRepository: string | null } | null;
+/**
+ * 링크를 이름으로 그릴 때의 근거 저장소(새 Catch BR2.4)와 표지 판정에 쓰는 본인 커밋 목록(NC2 BR4.1).
+ * null이면 그대로 주소 전체를 보이고 표지도 없다(텍스트 자료 본문, AC2.2.9·NC2 BR4.7).
+ */
+type LinkNames = { evidenceRepository: string | null; ownCommits: readonly OwnCommit[] } | null;
+
+const OWN_COMMIT_MARK = "이 작업의 본인 커밋";
+
+/**
+ * 「이 작업의 본인 커밋」 표지(NC2 BR4.4·BR4.5). 링크 요소가 닫힌 바로 뒤의 형제 글자 요소이고 누르는 것이 아니다.
+ * tabIndex·role·aria-hidden을 두지 않아 글자로 읽히고 초점을 받지 않는다(NFR6.1). 저장된 글에 없는 글자라 강조 위치 세기에 들지 않는다.
+ */
+const ownCommitMark = (url: string, names: LinkNames): ReactNode =>
+  names !== null && names.ownCommits.length > 0 && isOwnCommitLink(url, names.ownCommits)
+    ? <span className={styles.ownCommitMark} data-testid="own-commit-mark">{OWN_COMMIT_MARK}</span> : null;
 
 function linkedSegments(segments: TextSegment[], range: Range, names: LinkNames): ReactNode[] {
   let offset = 0;
@@ -57,11 +70,14 @@ function linkedSegments(segments: TextSegment[], range: Range, names: LinkNames)
       <a href={segment.url} target="_blank" rel="noopener noreferrer" data-testid="snapshot-github-link">
         {segment.url}<span className="visually-hidden"> (새 탭)</span></a>
     );
-    // 링크 글자와 겹치는 강조는 주소를 쪼개지 않고 링크 전체를 감싼다.
+    // 링크 글자와 겹치는 강조는 주소를 쪼개지 않고 링크 전체를 감싼다. 표지는 강조 밖, 링크 바로 뒤다(NC2 BR4.4).
     const overlaps = range !== null && range.start < start + length && range.end > start;
-    return overlaps
-      ? <mark key={index} className={styles.highlight} data-testid="snapshot-highlight">{anchor}</mark>
-      : <Fragment key={index}>{anchor}</Fragment>;
+    return (
+      <Fragment key={index}>
+        {overlaps ? <mark className={styles.highlight} data-testid="snapshot-highlight">{anchor}</mark> : anchor}
+        {ownCommitMark(segment.url, names)}
+      </Fragment>
+    );
   });
 }
 
@@ -92,10 +108,12 @@ const sectionHeading = (section: Section) => section.title === "더 쓰기" ? "�
  * Catch 사본의 작성자 설명(새 Catch BR7.1~BR7.3). 글이 있는 칸만 h5 칸 제목과 그리고 빈 칸은 h5째 그리지 않는다.
  * 「더 쓰기」 하나뿐이면(옛 자유 글 포함) h5 없이 지금처럼 글만 그린다. 글이 없으면 「작성자 설명이 없습니다.」다.
  */
-function AuthorDescriptionView({ text, range, evidenceRepository }: { text: string | null; range: Range; evidenceRepository: string | null }) {
+function AuthorDescriptionView({ text, range, evidenceRepository, ownCommits }: {
+  text: string | null; range: Range; evidenceRepository: string | null; ownCommits: readonly OwnCommit[];
+}) {
   const sections = useMemo(() => splitSections(text), [text]);
   if (sections.length === 0) return <p className={styles.muted}>작성자 설명이 없습니다.</p>;
-  const names = { evidenceRepository };
+  const names = { evidenceRepository, ownCommits };
   if (sections.length === 1 && sections[0].title === "더 쓰기") {
     return <LinkedText text={sections[0].text} range={sectionRange(range, sections[0])} names={names} />;
   }
@@ -112,6 +130,12 @@ function AuthorDescriptionView({ text, range, evidenceRepository }: { text: stri
 }
 
 const EMPTY_FACTS = "기록에서 확인된 작업 사실이 없습니다.";
+
+/**
+ * 작성 시점 글(새 Catch NC2 BR3.2). 사본의 "YYYY-MM"은 이미 한국 시간이라 시간대를 다시 계산하지 않고, 달의 앞 0을 뺀다.
+ * "2026-11" → 「2026년 11월에 마지막으로 고침」, "2027-01" → 「2027년 1월에 마지막으로 고침」.
+ */
+export const editedMonthText = (month: string): string => `${month.slice(0, 4)}년 ${Number(month.slice(5, 7))}월에 마지막으로 고침`;
 
 /** 강조가 「근거 자세히 보기」 안(본인 기여·근거 목록)을 가리키는지. 그 안을 가리키면 접힌 칸을 펼친다(#488). */
 export const isInEvidenceDetails = (highlight: SnapshotHighlight | null): boolean =>
@@ -130,14 +154,21 @@ export const evidenceDetailsOpen = (toggle: EvidenceToggle, highlight: SnapshotH
   isInEvidenceDetails(highlight) && toggle.at !== highlight ? true : toggle.open;
 
 /**
- * Catch 사본. 위에서부터 불일치 표지 → AI 설명 초안 → 작성자 설명 → 기록에서 확인한 내용이다(#488, 면접관이 한 일과 그 이유를 먼저 본다).
+ * Catch 사본. 위에서부터 (저장소 줄) → 불일치 표지 → AI 설명 초안 → 작성자 설명 → 기록에서 확인한 내용이다(#488, 면접관이 한 일과 그 이유를 먼저 본다).
  * 세 칸은 다른 표지로 나눈다(BR1.3·BR4.3·BR7.5). 기록 가운데 작업 사실은 펼쳐 두고, 본인 기여와 근거 목록은 「근거 자세히 보기」에 접는다.
+ * 새 Catch NC2 선택 칸 셋(BR3.1~BR3.4)은 칸마다 따로 있는지 보고, 없으면(옛 사본) 그리지 않는다. 모두 React 텍스트로만 그린다(NFR5.1).
+ * 저장소 줄은 이 부품 맨 위에 두어 제목(h3, `PublishedSnapshotView`) 바로 아래·불일치 표지 위에 온다.
  */
 function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; highlight: SnapshotHighlight | null }) {
   const [toggle, setToggle] = useState<EvidenceToggle>(INITIAL_EVIDENCE_TOGGLE);
   const open = evidenceDetailsOpen(toggle, highlight);
+  // 본인 커밋 목록은 사본을 받을 때 한 번 만들고 링크마다 견준다(NC2 성능 설계 「화면 계산」).
+  const ownCommits = useMemo(() => ownCommitsOf(snapshot.evidence), [snapshot.evidence]);
   return (
     <div className={styles.snapshotBody}>
+      {snapshot.repositoryName !== undefined && (
+        <p className={styles.small} data-testid="snapshot-catch-repository">{snapshot.repositoryName}</p>
+      )}
       {snapshot.mismatch && <p className={styles.warningBadge} data-testid="snapshot-catch-mismatch">불일치 표시됨</p>}
       {/* Catch 개편 CR3 BR7.1(2026-11-08 팀장 결정): AI 설명 초안이 없으면(null) 칸을 그리지 않는다. 사본에는 만든 초안만 담기므로 없음과 실패를 가르지 않는다. */}
       {snapshot.aiDraft !== null && (
@@ -147,15 +178,25 @@ function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; h
         </section>
       )}
       <section className={styles.snapshotSection} data-testid="snapshot-catch-description">
-        <h4>작성자 설명</h4>
+        {/* NC2 BR3.2: 작성 시점은 h4 안에 두어 화면 낭독기가 제목과 함께 읽는다. */}
+        <h4>작성자 설명{snapshot.authorDescriptionEditedMonth !== undefined && (
+          <>{" "}<span className={styles.small} data-testid="snapshot-catch-description-edited">{editedMonthText(snapshot.authorDescriptionEditedMonth)}</span></>
+        )}</h4>
         <AuthorDescriptionView text={snapshot.authorDescription} range={rangeFor(highlight, "authorDescription")}
-          evidenceRepository={evidenceRepositoryOf(snapshot.evidence.map((evidence) => evidence.sourceUrl))} />
+          evidenceRepository={evidenceRepositoryOf(snapshot.evidence.map((evidence) => evidence.sourceUrl))} ownCommits={ownCommits} />
       </section>
       <section className={styles.snapshotSection} data-testid="snapshot-catch-facts">
         <h4>기록에서 확인한 내용</h4>
         {snapshot.workFacts.length > 0
           ? <ul>{snapshot.workFacts.map((fact, index) => <li key={index}><PlainText text={fact} range={rangeFor(highlight, `workFacts[${index}]`)} /></li>)}</ul>
           : <p className={styles.muted}>{EMPTY_FACTS}</p>}
+        {/* NC2 BR3.3: 작업 사실 바로 아래, 접힘 밖에 펼친 채 둔다. 항목은 사본 순서 그대로이고 PR 번호·식별값을 링크로 만들지 않는다. */}
+        {snapshot.workLimits !== undefined && (
+          <div data-testid="snapshot-catch-work-limits">
+            <strong>이 기록으로 알 수 없는 것</strong>
+            <ul>{snapshot.workLimits.map((limit, index) => <li key={index}>{limit}</li>)}</ul>
+          </div>
+        )}
         <details className={styles.evidenceDetails} data-testid="snapshot-catch-evidence-details" open={open}
           onToggle={(event) => {
             const next = event.currentTarget.open;

@@ -16802,3 +16802,731 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
 
 ---
+
+## Unit Skipped
+**Timestamp**: 2026-11-10T23:14:49Z
+**Event**: UNIT_SKIPPED
+**Stage**: infrastructure-design
+**Unit**: nc2-snapshot-fields
+**Reason**: NC2는 인프라 변경이 없다: 새 AWS 자원·배포 단위·환경변수·마이그레이션이 없고 CI도 고치지 않는다(ci.yml이 이미 worker/app 변경에 api 시험을 돌림). 기존 web·api 배포에 함께 들어간다(unit-of-work NC2, NFR 설계 logical-components).
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Plan Approval Blocked
+**Timestamp**: 2026-11-10T23:15:29Z
+**Event**: PLAN_APPROVAL_BLOCKED
+**Guard**: plan-approval-guard
+**Reason**: plan-approval
+**Tool**: Bash
+**Target**: sed -n 15,30p api/src/jd-summary/jd-generation-request.ts; grep -n "INSTRUCTION\|instruction" api/test/jd/jd-summary.test.cjs api/test/rag-answer/qna-controller
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Stage**: code-generation
+**Unit**: nc2-snapshot-fields
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:17:16Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:17:37Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/unit-test-instructions.md
+**Context**: construction > nc2-snapshot-fields > code-generation > unit-test-instructions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T23:33:16Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve. 다만 두 가지를 계획에 더한다.\r- Step 5: 문장 대조 시험이 실패할 때 메시지에 바뀐 상수 이름과 「worker/app/candidates/build.py의 이 문장이 바뀌었다면 api/src/publications/work-limit-sentences.ts의 같은 상수도 함께 고친다」를 적는다. worker만 고친 사람이 api 시험 실패를 보고 바로 고칠 수 있게 하기 위해서다.\r- Step 10: 소속 기록(commit_assignment)이 이제 발행 표지(ownCommit)의 근거로도 쓰인다는 것을, 소속 기록을 설명하는 api 문서나 엔티티 주석에 한 줄 적는다. 소속 기록의 뜻이나 쓰는 규칙을 바꾸면 표지도 바뀌기 때문이다. 같은 자리에 worker에 새 작업 전체 한계 문장을 더하면 api 상수 목록에도 더해야 면접관 화면에 보인다는 것도 적는다."]
+**Message Id**: b2f3e333
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T23:33:17Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: Approve the code plan for nc2-snapshot-fields?
+**Reply**: Approve. 다만 두 가지를 계획에 더한다.\n- Step 5: 문장 대조 시험이 실패할 때 메시지에 바뀐 상수 이름과 「worker/app/candidates/build.py의 이 문장이 바뀌었다면 api/src/publications/work-limit-sentences.ts의 같은 상수도 함께 고친다」를 적는다. worker만 고친 사람이 api 시험 실패를 보고 바로 고칠 수 있게 하기 위해서다.\n- Step 10: 소속 기록(commit_assignment)이 이제 발행 표지(ownCommit)의 근거로도 쓰인다는 것을, 소속 기록을 설명하는 api 문서나 엔티티 주석에 한 줄 적는다. 소속 기록의 뜻이나 쓰는 규칙을 바꾸면 표지도 바뀌기 때문이다. 같은 자리에 worker에 새 작업 전체 한계 문장을 더하면 api 상수 목록에도 더해야 면접관 화면에 보인다는 것도 적는다.
+**Options**: ["Approve Plan","Request Changes","I'll edit the files"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:33:26Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:33:32Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:33:34Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:33:36Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/unit-test-instructions.md
+**Context**: construction > nc2-snapshot-fields > code-generation > unit-test-instructions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:33:38Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Plan Approval Recorded
+**Timestamp**: 2026-11-10T23:33:40Z
+**Event**: PLAN_APPROVAL_RECORDED
+**Stage**: code-generation
+**Details**: Approve Plan
+**Checkpoint**: plan-approval
+**Plan Target**: unit:nc2-snapshot-fields
+**Intent**: 01a1bde5-4f0a-722b-a5da-2cd6e564757e
+**Directive Epoch**: sha256:7600c50888db5c4f0e94afd362c99925b89467fa1934feaa8057199b015e748f
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+**Approval Fingerprint**: sha256:v3:05ac0edbcb05e3113aefbf867ae623e4ee74210da7523f88f7135ececc7b1ddd
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-questions.md
+**Questions SHA-256**: 8c5a507cab8c86df2d9b750811a3457911673daae191dd6a84dc95d31ef48c2e
+**Prompt SHA-256**: 78f5b3edfb247985be758c099d5a97f283cf4ff6a224a2744222674ee373cd51
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Asked By**: engine
+**Person Reply**: Approve. 다만 두 가지를 계획에 더한다.\n- Step 5: 문장 대조 시험이 실패할 때 메시지에 바뀐 상수 이름과 「worker/app/candidates/build.py의 이 문장이 바뀌었다면 api/src/publications/work-limit-sentences.ts의 같은 상수도 함께 고친다」를 적는다. worker만 고친 사람이 api 시험 실패를 보고 바로 고칠 수 있게 하기 위해서다.\n- Step 10: 소속 기록(commit_assignment)이 이제 발행 표지(ownCommit)의 근거로도 쓰인다는 것을, 소속 기록을 설명하는 api 문서나 엔티티 주석에 한 줄 적는다. 소속 기록의 뜻이나 쓰는 규칙을 바꾸면 표지도 바뀌기 때문이다. 같은 자리에 worker에 새 작업 전체 한계 문장을 더하면 api 상수 목록에도 더해야 면접관 화면에 보인다는 것도 적는다.
+**Message Id**: b2f3e333
+**Unit**: nc2-snapshot-fields
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-10T23:34:05Z
+**Event**: UNIT_STARTED
+**Stage**: code-generation
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-10T23:36:15Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-developer-agent
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:38:08Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-10T23:38:37Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T23:38:37Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: a4254da62c0f16f84
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-10T23:38:42Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: Step 2 api 시험 DB(127.0.0.1:5433)가 꺼져 있다. catchu-db-test(12시간 전 멈춤)를 띄울까?
+**Options**: catchu-db-test를 띄운다,내가 직접 띄운다,다른 컨테이너
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T23:41:47Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["catchu-db-test를 띄운다"]
+**Message Id**: 4435a3b4
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T23:41:47Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: api 시험 DB로 어느 컨테이너를 띄울까요?
+**Reply**: catchu-db-test를 띄운다
+**Options**: ["catchu-db-test를 띄운다","내가 직접 띄운다","catchu-db-test-86을 띄운다"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-10T23:41:49Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: catchu-db-test를 띄운다
+**Person Reply**: catchu-db-test를 띄운다
+**Message Id**: 4435a3b4
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:43:27Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:45:35Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:51:32Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:51:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:53:09Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:54:26Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:55:42Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:58:12Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T00:00:34Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:01:21Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: a4254da62c0f16f84
+**Message**: I'm waiting for the load to drop before starting the 60-minute verification run. The background check will notify me.
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T00:01:23Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:01:54Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: a4254da62c0f16f84
+**Message**: I'm waiting for the load to settle under 5.5, which leaves some margin below the 6 limit.
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:03:28Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: a4254da62c0f16f84
+**Message**: The verification is running (api, then web, then worker). I'll report when it finishes.
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:06:36Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: adfe01efef41ab5c8
+**Message**: NC2(면접관 사본 칸과 본인 커밋 표지)를 만들고 있고, 코드 계획이 승인돼 개발자 에이전트가 구현 후 검증 명령을 돌리는 중입니다. 결과가 오면 정리해 보여 드린 뒤 로컬 서버 확인(Step 12)을 여쭤보겠습니다.
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T00:14:32Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T00:15:07Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:15:07Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: a4254da62c0f16f84
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T00:15:34Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: Step 12 로컬 실제 연결 확인: 로컬 DB(catchu-db, 5432)·api·web을 띄워 소속 기록이 있는 Catch를 발행해 볼까?
+**Options**: 내가 띄워 확인한다,사람이 직접 띄운다,Step 12는 뒤로 미룬다
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T00:19:38Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["1번(내가 띄워 확인)으로 하되 다음처럼 한다.\r- DB는 「catchu-db(5432)」가 아니라 NC1 Step 15에서 쓴 catchu-cr1-db(55460, pgvector)를 쓴다. 5432를 쓰는 컨테이너는 5주 전에 비정상 종료된 옛 catchu-db-86(postgres:16, pgvector 없음)뿐이다. 띄우기 전에 백업을 받는다.\r- TheMe의 「SET_TOKEN 코드 수정」 Catch를 쓴다(작성자 설명에 커밋 링크가 이미 있고 근거에 PR 없이 합친 병합이 있다). 그 Catch에 소속 기록(commit_assignment)이 있는지 먼저 본다. 없으면 새로 분석하지 말고, 그 Catch의 본인 커밋 근거 식별값으로 시험용 소속 기록을 넣고 code-summary에 「합성 소속 기록」이라고 적는다.\r- 그 Catch 근거 가운데 본인 커밋과 병합 커밋의 주소를 알려 주면, 로그인·작성자 설명 고치기·발행은 내가 브라우저에서 한다. 본인 커밋 링크에는 표지가 있고 병합 커밋 링크에는 없는 것을 한 번에 본다.\r- rag-eval.cjs의 JD 지시는 스크립트 전용 문장 대신 운영 상수 JD_SUMMARY_INSTRUCTION을 불러 쓰게 바꾼다(재는 것과 실제를 같게). JD 결과를 판정에 쓰지 않는다는 앞 결정은 그대로다."]
+**Message Id**: 0c388bf0
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T00:19:38Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: Step 12 로컬 확인을 어떻게 할까요?
+**Reply**: 1번(내가 띄워 확인)으로 하되 다음처럼 한다.\n- DB는 「catchu-db(5432)」가 아니라 NC1 Step 15에서 쓴 catchu-cr1-db(55460, pgvector)를 쓴다. 5432를 쓰는 컨테이너는 5주 전에 비정상 종료된 옛 catchu-db-86(postgres:16, pgvector 없음)뿐이다. 띄우기 전에 백업을 받는다.\n- TheMe의 「SET_TOKEN 코드 수정」 Catch를 쓴다(작성자 설명에 커밋 링크가 이미 있고 근거에 PR 없이 합친 병합이 있다). 그 Catch에 소속 기록(commit_assignment)이 있는지 먼저 본다. 없으면 새로 분석하지 말고, 그 Catch의 본인 커밋 근거 식별값으로 시험용 소속 기록을 넣고 code-summary에 「합성 소속 기록」이라고 적는다.\n- 그 Catch 근거 가운데 본인 커밋과 병합 커밋의 주소를 알려 주면, 로그인·작성자 설명 고치기·발행은 내가 브라우저에서 한다. 본인 커밋 링크에는 표지가 있고 병합 커밋 링크에는 없는 것을 한 번에 본다.\n- rag-eval.cjs의 JD 지시는 스크립트 전용 문장 대신 운영 상수 JD_SUMMARY_INSTRUCTION을 불러 쓰게 바꾼다(재는 것과 실제를 같게). JD 결과를 판정에 쓰지 않는다는 앞 결정은 그대로다.
+**Options**: ["내가 띄워 확인한다","사람이 직접 띄운다","Step 12는 뒤로 미룬다"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-11T00:19:47Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: 1번(내가 띄워 확인). DB는 catchu-cr1-db(55460) 백업 뒤 사용, TheMe 「SET_TOKEN 코드 수정」 Catch, 소속 기록 없으면 합성 소속 기록, 주소를 알려 주면 로그인·설명·발행은 사람이 브라우저에서, rag-eval.cjs JD 지시는 JD_SUMMARY_INSTRUCTION을 불러 쓰게 바꾼다
+**Person Reply**: 1번(내가 띄워 확인)으로 하되 다음처럼 한다.\n- DB는 「catchu-db(5432)」가 아니라 NC1 Step 15에서 쓴 catchu-cr1-db(55460, pgvector)를 쓴다. 5432를 쓰는 컨테이너는 5주 전에 비정상 종료된 옛 catchu-db-86(postgres:16, pgvector 없음)뿐이다. 띄우기 전에 백업을 받는다.\n- TheMe의 「SET_TOKEN 코드 수정」 Catch를 쓴다(작성자 설명에 커밋 링크가 이미 있고 근거에 PR 없이 합친 병합이 있다). 그 Catch에 소속 기록(commit_assignment)이 있는지 먼저 본다. 없으면 새로 분석하지 말고, 그 Catch의 본인 커밋 근거 식별값으로 시험용 소속 기록을 넣고 code-summary에 「합성 소속 기록」이라고 적는다.\n- 그 Catch 근거 가운데 본인 커밋과 병합 커밋의 주소를 알려 주면, 로그인·작성자 설명 고치기·발행은 내가 브라우저에서 한다. 본인 커밋 링크에는 표지가 있고 병합 커밋 링크에는 없는 것을 한 번에 본다.\n- rag-eval.cjs의 JD 지시는 스크립트 전용 문장 대신 운영 상수 JD_SUMMARY_INSTRUCTION을 불러 쓰게 바꾼다(재는 것과 실제를 같게). JD 결과를 판정에 쓰지 않는다는 앞 결정은 그대로다.
+**Message Id**: 0c388bf0
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T00:21:47Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:25:41Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: aa3670f3f1e0ea10f
+**Message**: NC2 코드를 다 만들었고 전체 검증도 통과해서, 지금은 마지막 단계인 로컬 화면 확인을 기다리고 있습니다. localhost:3000에서 「SET_TOKEN 코드 수정」 Catch에 병합 커밋 링크를 더해 발행한 뒤, 표지가 붙는지 보고 결과를 알려 주세요.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T00:50:43Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: typed
+**Message Id**: 23a65cd5
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T00:50:58Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T00:51:04Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/source-manifest.json
+**Context**: construction > nc2-snapshot-fields > code-generation > source-manifest.json
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T00:51:47Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-summary.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-summary.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T00:52:26Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/traceability.json
+**Context**: construction > nc2-snapshot-fields > code-generation > traceability.json
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T00:52:37Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/code-generation/memory.md
+**Context**: construction > code-generation > memory.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: ca9a0bf7
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: ca9a0bf7
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Duration ms**: 74
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0b595344
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/unit-test-instructions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0b595344
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/unit-test-instructions.md
+**Duration ms**: 71
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: ef76695e
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: ef76695e
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-summary.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: e6123e7b
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: e6123e7b
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/traceability.json
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: 75c9c040
+**Sensor ID**: traceability
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T00:52:40Z
+**Event**: SENSOR_PASSED
+**Fire id**: 75c9c040
+**Sensor ID**: traceability
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/traceability.json
+**Duration ms**: 77
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-11-11T00:52:40Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: code-generation
+**Unit**: nc1-sections-and-links
+**Checkpoint**: review-receipt
+**Changed**: web/src/features/publications/README.md, web/src/features/publications/publications.module.css, web/src/features/publications/snapshot-view.tsx, web/src/features/recipient/README.md, web/src/lib/github-link-name.ts, web/test/github-link-name.test.mjs, web/test/publications-owner.test.mjs, web/test/recipient.test.mjs
+**Recorded**: sha256:5542c2564b8b11c9de1126b7f25e6867bb2b5961a8065edff1cc567d560e1844
+**Current**: sha256:4049bbf33da0f532480490e84e6ee7203f62fc84a343c42b827a4b5266bc0f9d
+**Details**: web/src/features/publications/README.md, web/src/features/publications/publications.module.css, web/src/features/publications/snapshot-view.tsx, web/src/features/recipient/README.md, web/src/lib/github-link-name.ts, web/test/github-link-name.test.mjs, web/test/publications-owner.test.mjs, web/test/recipient.test.mjs changed after the nc1 sections and links Unit was reviewed; carrying on.
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-11T00:52:40Z
+**Event**: REVIEW_REQUESTED
+**Stage**: code-generation
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:75469ab9d64a7f26badde4779db45776fee9066e31a95bebd8a6a6621ba115ab
+**Request Id**: review:d2a784f0ad416872860861bd158c633c
+**Source Fingerprint**: b16053cc642ba0366e6d34aa543b1ccb22e08a5721b145e9e4f679b0f5331a55
+**Unit Source Fingerprint**: sha256:1709ff6d4e78f51418e40b2d4e418641feea0539f440c7472348bd3cdca660bf
+**Review File**: .aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.d2a784f0ad416872860861bd158c633c.review.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T00:52:46Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/code-generation/memory.md
+**Context**: construction > code-generation > memory.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T00:52:50Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-11T00:53:13Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:53:30Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: ab701547e505564d4
+**Message**: 로컬 서버는 검토 끝나면 내려 줘
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T00:53:50Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: code-generation
+**Tool**: Bash
+**Details**: aidlc/spaces/default/intents/261109-new-catch (unit nc2-snapshot-fields)
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T00:54:39Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.d2a784f0ad416872860861bd158c633c.review.md
+**Context**: .aidlc-engine > reviews > code-generation > units > nc2-snapshot-fields > 7332c702b7dcc515 > 1.d2a784f0ad416872860861bd158c633c.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T00:54:47Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:54:47Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: aa796c3c7e1e4addf
+**Review File Digest**: .aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.d2a784f0ad416872860861bd158c633c.review.md=7ab2830b5fb8ca44d28b883e589211cd8dcd9c177cd8e81719aa2c5ba891063e
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-11T00:54:51Z
+**Event**: REVIEW_COMPLETED
+**Stage**: code-generation
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:75469ab9d64a7f26badde4779db45776fee9066e31a95bebd8a6a6621ba115ab
+**Artifact Fingerprint**: sha256:75469ab9d64a7f26badde4779db45776fee9066e31a95bebd8a6a6621ba115ab
+**Request Id**: review:d2a784f0ad416872860861bd158c633c
+**Request Source Fingerprint**: b16053cc642ba0366e6d34aa543b1ccb22e08a5721b145e9e4f679b0f5331a55
+**Source Fingerprint**: b16053cc642ba0366e6d34aa543b1ccb22e08a5721b145e9e4f679b0f5331a55
+**Source Listing**: sha256:863e7e6636cfdf63b6e729638da1fdbace6b747889118f5a9c287f33e9060aff
+**Unit Source Fingerprint**: sha256:1709ff6d4e78f51418e40b2d4e418641feea0539f440c7472348bd3cdca660bf
+**Review Record**: .aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.json
+**Review Record Digest**: sha256:381e04572bee3000803bab8731d170a13e2d59187d8d86590290071333b64cab
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-11T00:55:01Z
+**Event**: UNIT_COMPLETED
+**Stage**: code-generation
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---

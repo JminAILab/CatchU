@@ -4,7 +4,8 @@ const { randomUUID } = require('node:crypto');
 const { before, after, beforeEach, test } = require('node:test');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { createJdSummaryHandler } = require('../../dist/jd-summary/jd-summary-processor');
-const { jdGenerationRequest, JdContractInvalid } = require('../../dist/jd-summary/jd-generation-request');
+const { jdGenerationRequest, JdContractInvalid, JD_SUMMARY_INSTRUCTION } = require('../../dist/jd-summary/jd-generation-request');
+const { AUTHOR_MATERIAL_VOICE_INSTRUCTION, BASE_SUMMARY_INSTRUCTION, QNA_INSTRUCTION } = require('../../dist/rag-answer/rag-answer-config');
 const { AiInputTooLarge, AiProviderError } = require('../../dist/ai-generation/ai-generation.types');
 const { inputLength, assertGenerationRequest } = require('../../dist/ai-generation/gate-policy');
 const { LinkPasswordRequired, LinkUnavailable } = require('../../dist/publications/publication-access');
@@ -153,4 +154,17 @@ test('재열람은 매번 C10·회원·발행본으로 제한하고 목록은 �
   await assert.rejects(detail(h, runId), codeIs('RESOURCE_UNAVAILABLE'));
   h.access.resolveForRecipient = async () => { throw new LinkUnavailable(); };
   await assert.rejects(detail(h, runId), codeIs('LINK_UNAVAILABLE'));
+});
+
+// 새 Catch NC2 — JD 요약 지시 끝의 작성자 말 옮기기 문장(BR5.1, 효과는 따로 재지 않음 BR5.2). U10 영역이라 NC2 PR에서 U10 담당 확인을 받는다.
+// 먼저 정한 시나리오: JD 요약 생성 요청의 지시를 본다.
+// - 기대: 지시는 지금 문장 뒤에 AUTHOR_MATERIAL_VOICE_INSTRUCTION으로 끝난다(질의응답·기본 요약과 같은 상수).
+// - 실패 조건: 문장이 없음, 다른 글자의 문장.
+
+test('NC2 BR5.1 JD 요약 지시는 질의응답·기본 요약과 같은 작성자 말 옮기기 문장으로 끝난다', () => {
+  const request = jdGenerationRequest({ hits: [hit()], publicationText: '전체 사본' }, '요구사항 한 줄');
+  assert.equal(request.instruction, JD_SUMMARY_INSTRUCTION);
+  assert.ok(request.instruction.startsWith('JD 요구사항 한 줄에 대해 근거, 자료로 확인되지 않는 점, 면접 질문을'), '지금 지시가 앞에 그대로 있다');
+  assert.ok(request.instruction.endsWith(` ${AUTHOR_MATERIAL_VOICE_INSTRUCTION}`));
+  assert.ok(QNA_INSTRUCTION.endsWith(AUTHOR_MATERIAL_VOICE_INSTRUCTION) && BASE_SUMMARY_INSTRUCTION.endsWith(AUTHOR_MATERIAL_VOICE_INSTRUCTION), '세 지시가 같은 상수');
 });

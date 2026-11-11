@@ -1051,3 +1051,148 @@ test("AC2.2.1·AC2.2.7 작성자 설명 속 파일 줄 링크는 「파일 · L�
   const other = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription: "관련 https://github.com/other/lib/commit/1a2b3c4d" })])));
   assert.ok(other.includes(">other/lib · 커밋 1a2b3c4<span"));
 });
+
+// 새 Catch NC2 — 면접관 발행본의 사본 세 칸과 「이 작업의 본인 커밋」 표지(US6.1~US6.4·US7.1·US7.2, BR2.1·BR2.2·BR3.1~BR3.4·BR4.1~BR4.7,
+//   NFR5.1·NFR5.2·NFR6.1~NFR6.3). 먼저 정한 시나리오·기대 결과·실패 조건. 세부 시험 코드는 구현 뒤 쓴다.
+//   - 기대: 받은 사람 응답의 새 칸 넷은 있을 때만 옮기고(AC6.4.2) 옛 사본은 칸 없이 그대로 받는다. 모양 틀린 새 칸은 손상된 응답이다.
+//           저장소 이름은 제목(h3) 바로 아래 작은 글자 줄이고 불일치 표지보다 앞이다(AC6.1.1). h4 「작성자 설명」 안에 「YYYY년 M월에 마지막으로 고침」
+//           (앞 0 없음, AC6.2.1·AC6.2.2), 설명이 없으면 없다(AC6.2.3). 「이 기록으로 알 수 없는 것」은 작업 사실 다음·「근거 자세히 보기」 앞의
+//           펼친 목록이고 항목은 사본 순서 그대로 한 번씩이며(AC6.3.1·AC6.3.4), 칸이 없으면 없다(AC6.3.3). 옛 사본은 세 칸 없이 그대로다(AC6.4.1).
+//           본인 커밋 링크 바로 뒤, 링크 요소 밖에 글자 「이 작업의 본인 커밋」 표지가 있고 tabindex·role·aria-hidden이 없다(AC7.1.1·AC7.1.3·AC7.1.4).
+//           바뀐 줄 링크도 이름을 나누지 않고 링크 전체 뒤에 붙는다. 맞지 않는 링크에는 아무 표지가 없다(AC7.2.4). 작성자가 쓴 「[이 작업의 본인 커밋]」은
+//           표지 요소가 아니다(AC7.2.6). 표지 화면에 뜻 안내 문장이 없다(AC7.1.4). 태그 꼴 한계 항목은 글자로 보인다.
+//   - 실패 조건: 새 칸이 받은 사람 화면에서 빠짐, 옛 사본 오류, 표지가 링크 안이거나 초점을 받음, 맞지 않는 링크에 표지, 흉내 글이 표지 모양,
+//           한계 목록이 접힘 안, 태그 꼴 글이 HTML로 해석됨.
+const OWN = "ba6bba8c0123456789abcdef0123456789abcdef";
+const LIMITS = ["커밋 목록을 다 받지 못한 기본 브랜치 대상 PR이 있어, 그 PR에도 담긴 커밋일 수 있다", "같은 작업을 다시 낸 것일 수 있다(PR #3·#5, …)"];
+/** 새 칸 넷이 든 Catch 항목. 근거 둘째가 본인 커밋이다. */
+const nc2Item = (id = "c1", patch = {}) => catchItem(id, 1, {
+  evidence: [
+    { sourceUrl: "https://github.com/o/r/pull/7", sourceRevision: "rev-pr", representedFacts: ["PR 사실"], ownCommit: false },
+    { sourceUrl: `https://github.com/o/r/commit/${OWN}`, sourceRevision: OWN, representedFacts: ["커밋 사실"], ownCommit: true },
+  ],
+  repositoryName: "o/r", authorDescriptionEditedMonth: "2026-11", workLimits: LIMITS, ...patch,
+});
+
+test("NC2 AC6.4.2·BR2.2 받은 사람 응답의 새 칸 넷은 있을 때만 옮기고 계약 밖 칸은 옮기지 않으며, 옛 사본은 칸 없이 받는다", () => {
+  const read = readPublishedSnapshot(publication([nc2Item("c1", { extra: "계약 밖" })]));
+  const { snapshot } = read.items[0];
+  assert.equal(snapshot.repositoryName, "o/r");
+  assert.equal(snapshot.authorDescriptionEditedMonth, "2026-11");
+  assert.deepEqual(snapshot.workLimits, LIMITS);
+  assert.deepEqual(snapshot.evidence.map((e) => e.ownCommit), [false, true]);
+  assert.equal("extra" in snapshot, false);
+  const legacy = readPublishedSnapshot(publication([catchItem("c1", 1)])).items[0].snapshot;
+  for (const key of ["repositoryName", "authorDescriptionEditedMonth", "workLimits"]) assert.equal(key in legacy, false, key);
+  assert.equal("ownCommit" in legacy.evidence[0], false, "없던 ownCommit을 만들지 않는다");
+});
+
+test("NC2 BR2.1 모양 틀린 새 칸이 하나라도 있으면 사본 전체가 손상된 응답이다(빈 저장소 이름·틀린 달·빈 한계 배열·글자 ownCommit)", async () => {
+  const bad = [
+    { repositoryName: "" }, { repositoryName: 7 }, { authorDescriptionEditedMonth: "2026-13" }, { authorDescriptionEditedMonth: "2026-1" },
+    { authorDescriptionEditedMonth: "2026-11-01" }, { workLimits: [] }, { workLimits: [""] }, { workLimits: "한 줄" },
+    { evidence: [{ sourceUrl: "https://github.com/o/r/pull/7", sourceRevision: "r", representedFacts: [], ownCommit: "true" }] },
+  ];
+  for (const patch of bad) assert.equal(readPublishedSnapshot(publication([nc2Item("c1", patch)])), null, JSON.stringify(patch));
+  const { api, queue } = setup();
+  queue.push(ok(publication([nc2Item("c1", { workLimits: [] })])));
+  assert.deepEqual(await api.publication(TOKEN, null), { kind: "lookup-failed", status: 200, code: "LOOKUP_FAILED" });
+  assert.notEqual(readPublishedSnapshot(publication([nc2Item("c1", { authorDescriptionEditedMonth: "2027-01" })])), null, "1월도 올바른 달");
+});
+
+const itemHtml = (html, id = "c1") => html.slice(html.indexOf(`id="published-item-${id}"`));
+
+test("NC2 AC6.1.1 저장소 이름은 제목(h3) 바로 아래 작은 글자 줄이고 불일치 표지보다 앞이다", () => {
+  const html = itemHtml(render(ready([nc2Item("c1", { mismatch: true })])));
+  const order = ["<h3", "</h3>", 'data-testid="snapshot-catch-repository"', 'data-testid="snapshot-catch-mismatch"', 'data-testid="snapshot-catch-ai-draft"']
+    .map((needle) => html.indexOf(needle));
+  assert.ok(order.every((position) => position >= 0), String(order));
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  assert.ok(html.includes('<p class="small" data-testid="snapshot-catch-repository">o/r</p>'));
+  // h3 닫힘과 저장소 줄 사이에는 사본 몸통 여는 태그뿐이다.
+  assert.match(html, /<\/h3><div class="snapshotBody"><p class="small" data-testid="snapshot-catch-repository">/);
+});
+
+test("NC2 AC6.2.1·AC6.2.2·AC6.2.3 h4 「작성자 설명」 안에 「YYYY년 M월에 마지막으로 고침」(앞 0 없음)이 작은 글자로 있고, 칸이 없으면 없다", () => {
+  const heading = (month) => {
+    const html = render(ready([nc2Item("c1", month === undefined ? { authorDescriptionEditedMonth: undefined } : { authorDescriptionEditedMonth: month })]));
+    return html.match(/<h4>작성자 설명[\s\S]*?<\/h4>/)[0];
+  };
+  assert.equal(heading("2026-11"), '<h4>작성자 설명 <span class="small" data-testid="snapshot-catch-description-edited">2026년 11월에 마지막으로 고침</span></h4>');
+  assert.ok(heading("2026-12").includes(">2026년 12월에 마지막으로 고침<"));
+  assert.ok(heading("2027-01").includes(">2027년 1월에 마지막으로 고침<"), "앞의 0을 뺀다");
+  assert.equal(heading(undefined), "<h4>작성자 설명</h4>");
+});
+
+test("NC2 AC6.3.1·AC6.3.4 「이 기록으로 알 수 없는 것」은 작업 사실 바로 다음, 「근거 자세히 보기」 앞의 펼친 목록이고 항목은 사본 순서 그대로 한 번씩이다", () => {
+  const html = itemHtml(render(ready([nc2Item()])));
+  const order = ['data-testid="snapshot-catch-facts"', "둘째 사실", 'data-testid="snapshot-catch-work-limits"', "<strong>이 기록으로 알 수 없는 것</strong>",
+    LIMITS[0], LIMITS[1], "<details"].map((needle) => html.indexOf(needle));
+  assert.ok(order.every((position) => position >= 0), String(order));
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  const details = html.slice(html.indexOf("<details"), html.indexOf("</details>"));
+  assert.ok(!details.includes("이 기록으로 알 수 없는 것"), "접힘 안에 없다");
+  const limits = html.slice(html.indexOf('data-testid="snapshot-catch-work-limits"'), html.indexOf("<details"));
+  assert.equal(count(limits, "<li>"), 2);
+  for (const limit of LIMITS) assert.equal(count(html, limit), 1, limit);
+  assert.ok(!limits.includes("<a "), "한계 속 PR 번호·식별값은 링크가 아니다");
+});
+
+test("NC2 AC6.3.3·AC6.4.1 한계 칸이 없으면 목록을 그리지 않고, 옛 사본은 세 칸 없이 지금 그대로 보인다", () => {
+  const noLimits = render(ready([nc2Item("c1", { workLimits: undefined })]));
+  assert.doesNotMatch(noLimits, /snapshot-catch-work-limits|이 기록으로 알 수 없는 것/);
+  const legacy = render(ready([catchItem("c1", 1, { mismatch: true })]));
+  assert.doesNotMatch(legacy, /snapshot-catch-repository|snapshot-catch-description-edited|snapshot-catch-work-limits|own-commit-mark/);
+  assert.ok(legacy.includes("<h4>작성자 설명</h4>"));
+  assert.match(legacy, /<\/h3><div class="snapshotBody"><p class="warningBadge" data-testid="snapshot-catch-mismatch">/, "제목 바로 아래가 지금처럼 불일치 표지");
+});
+
+test("NC2 NFR5.1 태그 꼴 저장소 이름·한계 항목은 HTML로 해석하지 않고 글자로 보인다", () => {
+  const html = render(ready([nc2Item("c1", { repositoryName: "<b>o</b>/r", workLimits: ["<script>alert(1)</script> 한계", "<img src=x onerror=alert(1)>"] })]));
+  assert.doesNotMatch(html, /<script>|<img|<b>o<\/b>/);
+  assert.ok(html.includes("&lt;b&gt;o&lt;/b&gt;/r") && html.includes("&lt;script&gt;alert(1)&lt;/script&gt; 한계"));
+});
+
+const MARK = '<span class="ownCommitMark" data-testid="own-commit-mark">이 작업의 본인 커밋</span>';
+const NEW_TAB = '<span class="visually-hidden"> (새 탭)</span></a>';
+const described = (authorDescription, patch = {}, extra = {}) => descriptionOf(render(ready([nc2Item("c1", { authorDescription, ...patch })]), extra));
+
+test("NC2 AC7.1.1·AC7.1.3·AC7.1.4 본인 커밋 파일 줄 링크 바로 뒤, 링크 요소 밖에 글자 「이 작업의 본인 커밋」 표지가 있고 초점을 받지 않으며 뜻 안내 문장이 없다", () => {
+  const description = described("【짚어 볼 곳】\nhttps://github.com/o/r/blob/ba6bba8/a.ts#L3 저장 순서");
+  assert.ok(description.includes(`>a.ts · L3 · 판본 ba6bba8${NEW_TAB}${MARK} 저장 순서`), "표지는 </a> 바로 뒤 형제");
+  const anchor = description.match(/<a [^>]*data-testid="github-link"[^>]*>[\s\S]*?<\/a>/)[0];
+  assert.ok(!anchor.includes("own-commit-mark"), "표지는 링크 안에 없다");
+  assert.doesNotMatch(MARK, /tabindex|role=|aria-hidden/);
+  const html = render(ready([nc2Item("c1", { authorDescription: "https://github.com/o/r/blob/ba6bba8/a.ts#L3" })]));
+  assert.equal(count(html, "이 작업의 본인 커밋"), 1, "표지 글자는 표지 안에만 있다");
+  assert.doesNotMatch(html, /본인이 썼|표지는|뜻입니다/, "표지의 뜻을 푸는 안내 문장이 없다(FR10.5)");
+});
+
+test("NC2 BR4.4 커밋 화면 바뀐 줄 링크는 이름을 나누지 않고 링크 전체 뒤에 표지가 붙으며, 대문자 40자 커밋 링크도 붙는다(AC7.1.2)", () => {
+  const diff = `https://github.com/o/r/commit/${OWN}#diff-${"a".repeat(64)}R16-R23`;
+  assert.ok(described(diff).includes(`>커밋 ba6bba8 · 바뀐 줄 16–23${NEW_TAB}${MARK}`));
+  assert.ok(described(`https://github.com/o/r/commit/${OWN.toUpperCase()}`).includes(`>커밋 ba6bba8${NEW_TAB}${MARK}`));
+});
+
+test("NC2 AC7.2.4·AC7.2.6 맞지 않는 링크에는 어떤 표지도 없고, 작성자가 쓴 「[이 작업의 본인 커밋]」은 표지 요소가 아니라 대괄호가 보이는 글자다", () => {
+  const text = "[이 작업의 본인 커밋] https://github.com/o/r/pull/7 와 https://github.com/other/lib/blob/ba6bba8/a.ts#L3 그리고 https://github.com/o/r/blob/main/a.ts";
+  const description = described(text);
+  assert.equal(count(description, 'data-testid="own-commit-mark"'), 0);
+  assert.ok(description.includes("[이 작업의 본인 커밋] <a "), "흉내 글은 글자 그대로");
+  assert.doesNotMatch(description, /확인하지 않은|ownCommitMark/);
+  const mixed = described(`[이 작업의 본인 커밋] https://github.com/o/r/blob/ba6bba8/a.ts`);
+  assert.equal(count(mixed, 'data-testid="own-commit-mark"'), 1, "표지 요소는 진짜 표지 수와 같다");
+});
+
+test("NC2 BR4.4 강조가 표지 있는 링크와 겹치면 링크만 <mark>로 감싸고 표지는 강조 밖이다. 옛 사본(ownCommit 없음)과 텍스트 자료 본문에는 표지가 없다", () => {
+  const authorDescription = "앞 https://github.com/o/r/blob/ba6bba8/a.ts#L3 뒤";
+  const highlight = { publishedItemId: "c1", fieldPath: "authorDescription", charStart: 0, charEnd: authorDescription.length };
+  const marked = described(authorDescription, {}, { highlight });
+  assert.ok(marked.includes(`${NEW_TAB}</mark>${MARK}<mark`), "표지는 <mark> 밖, 링크 바로 뒤");
+  const legacy = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription,
+    evidence: [{ sourceUrl: `https://github.com/o/r/commit/${OWN}`, sourceRevision: OWN, representedFacts: [] }] })])));
+  assert.equal(count(legacy, "own-commit-mark"), 0, "ownCommit이 없으면 false로 읽는다");
+  const body = render(ready([nc2Item("c1"), textItem("m1", 2, authorDescription)]));
+  const m1 = body.slice(body.indexOf('id="published-item-m1"'));
+  assert.equal(count(m1, "own-commit-mark"), 0, "텍스트 자료 본문에는 쓰지 않는다(BR4.7)");
+});

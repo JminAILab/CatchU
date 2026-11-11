@@ -48,8 +48,11 @@ const { verifyLinkPassword } = require('../../dist/share-links/link-password');
 const { PUBLICATION_TTL_HOURS } = require('../../dist/publications/publication.entity');
 const { SNAPSHOT_TEXT_TOTAL_MAX, PUBLISH_RATE_LIMIT } = require('../../dist/publications/publications-config');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
+const { buildCatchSnapshot } = require('../../dist/publications/snapshot-builder');
+const { WORK_LIMIT_PREFIXES, WORK_LIMIT_SENTENCES } = require('../../dist/publications/work-limit-sentences');
 const {
   PUBLISH_SETTINGS, WEB_BASE_URL, HOUR, setEnv, startApp, expectError, eligibleCatch, insertAnalysisRequest, insertCatch, insertTextMaterial,
+  insertEvidence, insertCommitAssignment, insertProtection, hideRegistrationNames,
   consent, fakeAiRun, fakeIndexWriter, bindFakes, setClock, body, catchItem, textItem, tokenOf,
 } = require('./support.cjs');
 
@@ -84,6 +87,8 @@ const items = (publicationId) => db.query(
   'SELECT position, item_kind, source_id, title, snapshot, pdf_copy_key FROM published_item WHERE publication_id = $1 ORDER BY position', [publicationId]);
 const visibility = async (catchId) => (await db.query('SELECT visibility FROM catch_asset WHERE catch_id = $1', [catchId]))[0].visibility;
 const dailyCount = async (memberId) => (await db.query('SELECT count FROM daily_execution_count WHERE member_id = $1', [memberId]))[0]?.count ?? null;
+/** 시험 쪽에서 따로 계산한 한국 시간 해·달(구현의 koreanMonth를 쓰지 않는다). */
+const kstMonth = (at) => new Date(new Date(at).getTime() + 9 * HOUR).toISOString().slice(0, 7);
 
 test('S4: 공개 Catch·비공개 Catch·텍스트 자료를 순서대로 사본에 담고, 비공개 Catch를 공개로 바꾸며, 커밋 뒤 두 작업을 등록한다', async () => {
   const a = await author();
@@ -121,17 +126,20 @@ test('S4: 공개 Catch·비공개 Catch·텍스트 자료를 순서대로 사본
     [2, 'CATCH', privateCatch, '[합성] 비공개 Catch', null],
     [3, 'TEXT_MATERIAL', materialId, '[합성] 자료', null],
   ]);
+  // NC2(계약 C3): 저장소 이름·작성 달·근거별 ownCommit이 더해진다. PR 근거라 ownCommit은 거짓이고 한계가 없어 workLimits 칸은 없다.
+  const [{ edited }] = await db.query('SELECT author_description_updated_at AS edited FROM catch_asset WHERE catch_id = $1', [publicCatch]);
   assert.deepEqual(stored[0].snapshot, {
     workFacts: ['[합성] 사실 1', '[합성] 사실 2'], subjectContribution: '[합성] 기여',
     evidence: [
-      { sourceUrl: 'https://github.com/synthetic-owner/synthetic-repo/pull/1', sourceRevision: 'synthetic-revision-1', representedFacts: ['[합성] 근거 사실 1'] },
-      { sourceUrl: 'https://github.com/synthetic-owner/synthetic-repo/pull/2', sourceRevision: 'synthetic-revision-2', representedFacts: ['[합성] 근거 사실 2'] },
+      { sourceUrl: 'https://github.com/synthetic-owner/synthetic-repo/pull/1', sourceRevision: 'synthetic-revision-1', representedFacts: ['[합성] 근거 사실 1'], ownCommit: false },
+      { sourceUrl: 'https://github.com/synthetic-owner/synthetic-repo/pull/2', sourceRevision: 'synthetic-revision-2', representedFacts: ['[합성] 근거 사실 2'], ownCommit: false },
     ],
     authorDescription: '[합성] 작성자 설명', aiDraft: '[합성] AI 초안', mismatch: true,
+    repositoryName: 'synthetic-owner/synthetic-repository', authorDescriptionEditedMonth: kstMonth(edited),
   });
   assert.deepEqual(stored[1].snapshot, { workFacts: ['[합성] 사실'], subjectContribution: '[합성] 기여',
-    evidence: [{ sourceUrl: 'https://github.com/synthetic-owner/synthetic-repo/pull/1', sourceRevision: 'synthetic-revision-1', representedFacts: ['[합성] 근거 사실 1'] }],
-    authorDescription: null, aiDraft: null, mismatch: false }, '초안이 없으면 aiDraft null');
+    evidence: [{ sourceUrl: 'https://github.com/synthetic-owner/synthetic-repo/pull/1', sourceRevision: 'synthetic-revision-1', representedFacts: ['[합성] 근거 사실 1'], ownCommit: false }],
+    authorDescription: null, aiDraft: null, mismatch: false, repositoryName: 'synthetic-owner/synthetic-repository' }, '초안이 없으면 aiDraft null');
   assert.deepEqual(stored[2].snapshot, { body: '  [합성] 본문\n둘째 줄  ' }, '본문은 가공 없이 그대로');
   assert.equal(await visibility(publicCatch), 'PUBLIC');
   assert.equal(await visibility(privateCatch), 'PUBLIC', '고른 비공개 Catch는 PUBLIC으로');
@@ -332,4 +340,143 @@ test('전체 글 60,000자(임시값)는 발행되고 60,001자는 400이며 되
   const almost = await insertTextMaterial(db, a.memberId, { body: '나'.repeat(SNAPSHOT_TEXT_TOTAL_MAX - 2) });
   assert.equal((await publish(a.token, body([textItem(almost), catchItem(draftOnly)]))).status, 201);
   assert.equal((await publications()).length, 2);
+});
+
+// 새 Catch NC2 — 발행 사본의 선택 칸 넷(repositoryName·authorDescriptionEditedMonth·workLimits·evidence[].ownCommit, 계약 C3).
+//
+// 먼저 정한 시나리오·기대 결과·실패 조건(US6.1~US6.3·US7.2 수락 기준, 기능 설계 BR1.1~BR1.5, NFR 설계 성능·보안·신뢰성, Unit 시험 안내
+// 「실패 조건」). 세부 시험 코드는 구현 뒤 쓴다.
+//
+// - 기대: 새 사본의 repositoryName은 분석 요청이 가리키는 저장소 등록의 「소유자/저장소」다(AC6.1.1). 작성 달은 작성자 설명을 마지막으로 고친
+//         시각의 한국 시간 해·달이고(AC6.2.1, 2026-11-30T16:00Z → "2026-12" AC6.2.2), 설명이 없으면 칸이 없다(AC6.2.3). 발행 뒤 설명을
+//         고쳐도 사본은 그대로다(AC6.2.4). workLimits는 근거 순서대로 작업 전체 한계 두 가지만 고르고 같은 글자는 한 번이며(AC6.3.1),
+//         근거별 조회 상태 문장은 담지 않고(AC6.3.2) 고른 것이 없으면 칸이 없다(AC6.3.3). ownCommit은 근거 주소가 커밋 주소이고 그 식별값이
+//         이 Catch의 소속 기록(같은 회원·같은 저장소 ID)에 있을 때만 참이다. 병합 커밋·PR·이슈 근거는 거짓(AC7.2.2).
+//         등록 이름을 읽지 못하면(안전망) repositoryName만 빠지고 발행은 된다. 새 칸은 발행 글자 수 합산에 들지 않는다.
+// - 실패 조건: 저장소 이름이 없거나 등록과 다름, 작성 달이 UTC로 정해짐, 설명 없는 Catch에 작성 달, 같은 한계 두 번, 근거별 조회 상태가 담김,
+//         빈 workLimits, 다른 Catch·다른 회원에 속한 커밋이나 다른 저장소 ID의 같은 식별값에 ownCommit 참, 안전망에서 발행 실패.
+
+/** 고른 Catch들을 발행하고 저장된 사본을 요청 순서대로 돌려준다. */
+async function publishCatches(member, catchIds) {
+  const response = await publish(member.token, body(catchIds.map(catchItem)));
+  assert.equal(response.status, 201, response.text);
+  return (await items(response.body.publicationId)).map((item) => item.snapshot);
+}
+/** 근거를 직접 넣을 Catch(확인됨·보호 NONE, 근거 없음). 같은 회원·저장소 ID면 등록·보호 관측을 함께 쓴다. */
+async function bareCatch(memberId, repositoryId, overrides = {}, repository = undefined) {
+  const request = await insertAnalysisRequest(db, memberId, repositoryId, repository);
+  await insertProtection(db, memberId, repositoryId, 'NONE');
+  return insertCatch(db, memberId, request.requestId, overrides);
+}
+const sha = (character) => character.repeat(40);
+const commitUrl = (value, repository = 'nc2-owner/nc2-repo') => `https://github.com/${repository}/commit/${value}`;
+
+test('NC2 AC6.1.1·AC6.2.1·AC6.2.3: 사본 repositoryName은 저장소 등록의 「소유자/저장소」이고, 작성 달은 설명이 있을 때만 한국 시간 해·달이다', async () => {
+  const a = await author();
+  const repository = { owner: 'nc2-owner', name: 'nc2-repo' };
+  const described = await eligibleCatch(db, a.memberId, { authorDescription: '[합성] 11월 설명', authorDescriptionUpdatedAt: new Date('2026-11-10T03:00:00Z') },
+    { repositoryId: 'nc2-repository-1', repository });
+  const silent = await eligibleCatch(db, a.memberId, { authorDescription: null }, { repositoryId: 'nc2-repository-2', repository: { owner: 'Other-Owner', name: 'lib.js' } });
+  const [first, second] = await publishCatches(a, [described, silent]);
+  assert.equal(first.repositoryName, 'nc2-owner/nc2-repo');
+  assert.equal(first.authorDescriptionEditedMonth, '2026-11');
+  assert.equal(second.repositoryName, 'Other-Owner/lib.js', '등록 표기 그대로(대소문자·점 유지)');
+  assert.equal('authorDescriptionEditedMonth' in second, false, '설명이 없으면 작성 달 칸이 없다');
+  assert.equal('workLimits' in first || 'workLimits' in second, false, '한계가 없으면 칸이 없다');
+});
+
+test('NC2 AC6.2.2: 작성 달은 UTC가 아니라 한국 시간으로 정한다(2026-11-30T16:00Z → "2026-12", 14:59Z → "2026-11")', async () => {
+  const a = await author();
+  const december = await eligibleCatch(db, a.memberId, { authorDescription: '[합성] 설명', authorDescriptionUpdatedAt: new Date('2026-11-30T16:00:00Z') });
+  const november = await eligibleCatch(db, a.memberId, { authorDescription: '[합성] 설명', authorDescriptionUpdatedAt: new Date('2026-11-30T14:59:59Z') },
+    { repositoryId: 'nc2-repository-kst' });
+  const [first, second] = await publishCatches(a, [december, november]);
+  assert.equal(first.authorDescriptionEditedMonth, '2026-12');
+  assert.equal(second.authorDescriptionEditedMonth, '2026-11');
+});
+
+test('NC2 AC6.2.4: 발행 뒤 작성자 설명을 고쳐도 저장된 사본의 설명과 작성 달은 발행 때 그대로다', async () => {
+  const a = await author();
+  const catchId = await eligibleCatch(db, a.memberId, { authorDescription: '[합성] 발행 때 설명', authorDescriptionUpdatedAt: new Date('2026-11-02T00:00:00Z') });
+  const response = await publish(a.token, body([catchItem(catchId)]));
+  assert.equal(response.status, 201, response.text);
+  await db.query(`UPDATE catch_asset SET author_description = '[합성] 고친 설명', author_description_updated_at = '2027-01-05T00:00:00Z' WHERE catch_id = $1`, [catchId]);
+  const [stored] = await items(response.body.publicationId);
+  assert.equal(stored.snapshot.authorDescription, '[합성] 발행 때 설명');
+  assert.equal(stored.snapshot.authorDescriptionEditedMonth, '2026-11');
+});
+
+test('NC2 AC6.3.1·AC6.3.2·AC6.3.3: workLimits는 작업 전체 한계만 근거 순서대로 한 번씩 고르고, 근거별 조회 상태는 빼며, 없으면 칸이 없다', async () => {
+  const a = await author();
+  const resubmission = `${WORK_LIMIT_PREFIXES.RESUBMISSION_UNCONFIRMED}PR #3·#5, 공백을 무시한 변경 비교로 같은 변경을 확정하지 못함)`;
+  const cherryPick = `${WORK_LIMIT_PREFIXES.CHERRY_PICK_UNCONFIRMED}커밋 aaaaaaaaaaaa·bbbbbbbbbbbb, 공백을 무시한 변경 비교로 같은 변경을 확정하지 못함)`;
+  const perEvidence = '병합 커밋이라 변경 내용을 조회하지 않았다';
+  const limited = await bareCatch(a.memberId, 'nc2-repository-limits');
+  await insertEvidence(db, limited, 1, { coverageLimits: [WORK_LIMIT_SENTENCES._LISTS_INCOMPLETE, perEvidence] });
+  await insertEvidence(db, limited, 2, { coverageLimits: [resubmission, WORK_LIMIT_SENTENCES._LISTS_INCOMPLETE, cherryPick] });
+  await insertEvidence(db, limited, 3, { coverageLimits: [WORK_LIMIT_SENTENCES._EARLIER_LIST_INCOMPLETE, resubmission] });
+  const plain = await bareCatch(a.memberId, 'nc2-repository-plain');
+  await insertEvidence(db, plain, 1, { coverageLimits: [perEvidence, '본인 커밋이 20건을 넘어 최근 20건만 근거로 담았다'] });
+  const [first, second] = await publishCatches(a, [limited, plain]);
+  assert.deepEqual(first.workLimits, [WORK_LIMIT_SENTENCES._LISTS_INCOMPLETE, resubmission, cherryPick, WORK_LIMIT_SENTENCES._EARLIER_LIST_INCOMPLETE],
+    '두 근거의 같은 문장은 한 번, 근거별 조회 상태는 없음');
+  assert.equal('workLimits' in second, false, '고른 문장이 없으면 빈 배열이 아니라 칸이 없다');
+});
+
+test('NC2 AC7.2.2·NFR5.3: ownCommit은 이 Catch·같은 회원·같은 저장소 ID의 소속 기록에 있는 커밋 주소 근거만 참이다', async () => {
+  const a = await author();
+  const b = await author();
+  const repositoryId = 'nc2-repository-own';
+  const mine = await bareCatch(a.memberId, repositoryId);
+  const sibling = await bareCatch(a.memberId, repositoryId);
+  const stranger = await bareCatch(b.memberId, repositoryId);
+  const cases = [
+    [commitUrl(sha('A')), true, '이 Catch에 속한 본인 커밋(주소 대문자도 소문자로 대조)'],
+    [commitUrl(sha('b')), false, '소속 기록에 없는 병합 커밋'],
+    ['https://github.com/nc2-owner/nc2-repo/pull/9', false, 'PR 근거'],
+    ['https://github.com/nc2-owner/nc2-repo/issues/4', false, '이슈 근거'],
+    [`https://github.com/nc2-owner/nc2-repo/blob/${sha('a')}/a.ts`, false, '커밋 주소가 아닌 파일 주소'],
+    [commitUrl(sha('c')), false, '같은 회원의 다른 Catch에 속한 커밋'],
+    [commitUrl(sha('d')), false, '같은 식별값이지만 다른 저장소 ID의 소속 기록'],
+    [commitUrl(sha('e')), false, '다른 회원의 Catch에 속한 커밋'],
+  ];
+  for (const [index, [sourceUrl]] of cases.entries()) await insertEvidence(db, mine, index + 1, { sourceUrl });
+  await insertEvidence(db, sibling, 1, { sourceUrl: commitUrl(sha('c')) });
+  await insertCommitAssignment(db, { memberId: a.memberId, repositoryId, commitSha: sha('a'), catchId: mine });
+  await insertCommitAssignment(db, { memberId: a.memberId, repositoryId, commitSha: sha('c'), catchId: sibling });
+  await insertCommitAssignment(db, { memberId: a.memberId, repositoryId: 'nc2-repository-elsewhere', commitSha: sha('d'), catchId: mine });
+  await insertCommitAssignment(db, { memberId: b.memberId, repositoryId, commitSha: sha('e'), catchId: stranger });
+
+  const [first, second] = await publishCatches(a, [mine, sibling]);
+  assert.deepEqual(first.evidence.map((item) => item.ownCommit), cases.map(([, expected]) => expected), cases.map(([, , label]) => label).join(' / '));
+  assert.deepEqual(second.evidence.map((item) => item.ownCommit), [true], '같은 발행의 다른 Catch는 자기 소속 기록으로 참');
+  assert.equal(first.evidence[0].sourceUrl, commitUrl(sha('A')), '근거 주소는 바꾸지 않는다');
+});
+
+test('NC2 안전망(NFR7.3): 저장소 등록 이름을 읽지 못하면 repositoryName만 빠지고 나머지 사본은 같으며 발행은 된다', async () => {
+  // 순수 함수: 등록 이름이 null인 행.
+  const row = { catchId: randomUUID(), title: 't', workFacts: ['사실'], subjectContribution: '기여', draftStatus: 'NOT_GENERATED', draftContent: null,
+    authorDescription: '설명', authorDescriptionUpdatedAt: new Date('2026-11-10T00:00:00Z'), mismatch: false, visibility: 'PRIVATE',
+    workFactsConfirmed: true, contributionConfirmed: true, requestMemberId: randomUUID(), repositoryId: 'r', repositoryOwner: 'o', repositoryName: 'n' };
+  const evidence = [{ catchId: row.catchId, sourceUrl: commitUrl(sha('a')), sourceRevision: 'v', representedFacts: ['f'],
+    coverageLimits: [WORK_LIMIT_SENTENCES._LISTS_INCOMPLETE], ownCommit: true }];
+  const named = buildCatchSnapshot(row, evidence);
+  const unnamed = buildCatchSnapshot({ ...row, repositoryOwner: null, repositoryName: null }, evidence);
+  assert.equal(named.repositoryName, 'o/n');
+  assert.equal('repositoryName' in unnamed, false);
+  const rest = { ...named };
+  delete rest.repositoryName;
+  assert.deepEqual(unnamed, rest);
+
+  // 발행 경로: 잠금 조회 결과에서 이름만 지워도 201이고 사본에 칸이 없다.
+  const a = await author();
+  const catchId = await eligibleCatch(db, a.memberId);
+  const restoreNames = hideRegistrationNames(server.app);
+  try {
+    const [snapshot] = await publishCatches(a, [catchId]);
+    assert.equal('repositoryName' in snapshot, false);
+    assert.deepEqual(snapshot.workFacts, ['[합성] 사실']);
+  } finally {
+    restoreNames();
+  }
 });

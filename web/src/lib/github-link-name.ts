@@ -3,7 +3,7 @@ import { isGithubSourceUrl, splitGithubLinks } from "./github-source-url.ts";
 /**
  * 작성자 설명 속 GitHub 링크의 이름(새 Catch NC1 GithubLinkName, BR2.1~BR2.8, 계약 C7).
  * 링크 찾기는 `splitGithubLinks` 그대로이고, 이름은 원래 주소 글자만으로 화면에서 계산한다. 네트워크를 쓰지 않고 저장된 글·API 응답을 바꾸지 않는다(BR2.8).
- * React·화면 모듈을 불러오지 않는 순수 함수다. NC2는 이 파일에 본인 커밋 표지 판정을 더한다.
+ * React·화면 모듈을 불러오지 않는 순수 함수다. NC2가 이 파일에 본인 커밋 표지 판정(`ownCommitsOf`·`isOwnCommitLink`, BR4.1~BR4.3)을 더했다.
  */
 
 /** 이름에서 지울 글자: 제어(Cc)와 보이지 않는 서식(Cf). 줄바꿈·탭·영폭 공백·방향 바꿈·BOM을 포함한다(보안 설계 1.3, NFR5.2). */
@@ -57,7 +57,7 @@ function commitLinesTail(hash: string): string | null {
 /** 표의 꼴과 정확히 맞는 주소의 이름 본체(BR2.2). 질의는 보지 않는다. 맞지 않으면 null. */
 function nameBody({ kind, rest, hash }: Parsed): string | null {
   if (kind === "commit") {
-    // NC2의 본인 커밋 표지는 「커밋 xxxxxxx」 바로 뒤, 줄 꼬리 앞에 붙는다.
+    // NC2의 본인 커밋 표지는 이름을 나누지 않고 링크 요소 밖, 링크 전체 뒤에 붙는다(바뀐 줄 꼬리가 있어도 같다, NC2 기능 설계 Q3 B·BR4.4).
     const tail = rest.length === 1 ? commitLinesTail(hash) : null;
     return tail === null ? null : `${revisionLabel(rest[0], "커밋")}${tail}`;
   }
@@ -95,6 +95,43 @@ export function evidenceRepositoryOf(sourceUrls: readonly string[]): string | nu
   if (first === undefined) return null;
   const [owner, repository] = new URL(first).pathname.slice(1).split("/");
   return owner && repository ? `${owner}/${repository}` : null;
+}
+
+/** 표지 판정에 쓰는 본인 커밋 하나(새 Catch NC2 OwnCommitReference). 화면에서만 만들고 저장하지 않는다. */
+export type OwnCommit = { repository: string; commitId: string };
+
+const FULL_COMMIT_ID = /^[0-9a-f]{40}$/i;
+
+/**
+ * 본인 커밋 목록(NC2 BR4.1). 사본 근거 가운데 `ownCommit === true`이고 주소가 GitHub 커밋 주소(`/<소유자>/<저장소>/commit/<16진수 40자>`)인 근거만
+ * (「소유자/저장소」, 소문자 40자 식별값)으로 담는다. 같은 (저장소, 식별값)은 대소문자 무시로 하나만 둔다. ownCommit이 없는 옛 사본 근거는 담지 않는다.
+ */
+export function ownCommitsOf(evidence: readonly { sourceUrl: string; ownCommit?: boolean }[]): OwnCommit[] {
+  const commits = new Map<string, OwnCommit>();
+  for (const item of evidence) {
+    if (item.ownCommit !== true) continue;
+    const parsed = parse(item.sourceUrl);
+    if (parsed === null || parsed.kind !== "commit" || parsed.rest.length !== 1 || !FULL_COMMIT_ID.test(parsed.rest[0])) continue;
+    const commit = { repository: `${parsed.owner}/${parsed.repository}`, commitId: parsed.rest[0].toLowerCase() };
+    const key = `${commit.repository.toLowerCase()} ${commit.commitId}`;
+    if (!commits.has(key)) commits.set(key, commit);
+  }
+  return [...commits.values()];
+}
+
+/**
+ * 작성자 설명 속 링크에 「이 작업의 본인 커밋」 표지를 붙일지(NC2 BR4.2·BR4.3).
+ * 링크 이름 표의 판본·커밋 꼴(파일 줄·파일·폴더·커밋·커밋 화면 바뀐 줄)이고 판본이 16진수 7~40자일 때만 본다. PR 링크·브랜치 판본·표 밖 꼴은 거짓이다.
+ * 저장소가 대소문자 무시로 같고 식별값이 링크 판본(소문자)으로 시작하는 본인 커밋이 정확히 하나일 때만 참이다. 줄 범위는 보지 않는다.
+ */
+export function isOwnCommitLink(url: string, ownCommits: readonly OwnCommit[]): boolean {
+  const parsed = parse(url);
+  if (parsed === null || !["blob", "tree", "commit"].includes(parsed.kind) || nameBody(parsed) === null) return false;
+  const revision = parsed.rest[0];
+  if (!COMMIT_ID.test(revision)) return false;
+  const repository = `${parsed.owner}/${parsed.repository}`.toLowerCase();
+  const prefix = revision.toLowerCase();
+  return ownCommits.filter((commit) => commit.repository.toLowerCase() === repository && commit.commitId.startsWith(prefix)).length === 1;
 }
 
 /** 글 여러 개에서 GitHub 링크를 글 순서대로 모은다. 주소 글자가 같은 링크는 처음 것 하나만 둔다(BR3.1). */
