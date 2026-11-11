@@ -695,7 +695,7 @@ R-MEM 반영(2026-11-10)으로 더한 시험: `test_pdf_extraction.py`에 S3 본
 | `u2/file-storage` S22 | 실패 | (Step 4 §9.4에서 확인) | Windows에서 심볼릭 링크 생성 권한 없음(EPERM). 기존 환경 문제 |
 | `claude-mcp/mcp-connection` S6 "코드는 5분이다" | 1회 실패 뒤 3회 통과, 전체 실행에서 다시 실패 | 3회 통과 | 간헐. api(호스트 시계)가 적은 만료 시각을 DB 컨테이너 `now()`와 비교해 남은 시간 ≤ 300초를 요구한다. 측정한 시계 차이 −0.06~+0.26초로도 뒤집힌다 |
 | `claude-mcp/mcp-endpoint` S9 "만료 시각이 지나면 거부" | 2회 실패 | 1회 통과·1회 실패 | 간헐. 만료 시각을 DB `now() − 1ms`로 두고 api의 호스트 시계로 판정한다. DB 시계가 1ms만 앞서도 실패 |
-| `runtime/bootstrap` "개발 소스 main: env 파일의 인증 설정으로 기동·발급·종료" | 2회 실패 | 2회 실패 | 변경 전에도 실패. 이 PC 환경 문제로 보이며 원인은 이번에 더 파지 않았다 |
+| `runtime/bootstrap` "개발 소스 main: env 파일의 인증 설정으로 기동·발급·종료" | 2회 실패 | 2회 실패 | 변경 전에도 실패. 이 PC 환경 문제로 보이며 원인은 이번에 더 파지 않았다 **(2026-11-11 정정: 이 원인 판단은 틀렸다 — §13.7)** |
 
 위 MCP 시험 2건·기동 시험 1건은 U8이 손대지 않은 파일이라 고치지 않았다(후속 후보: 시계가 다른 DB와 호스트를 비교하는 단언의 여유, 개발 소스 기동 시험의 Windows 원인).
 
@@ -748,12 +748,45 @@ P-b는 복사 실패 종류 둘(`StorageUnavailable`·`FileNotFound` = DONE인�
 
 **전체 회귀 실패 4건 재검토**(§13.3 표, 근거 로그는 Step 8 세션 스크래치패드의 `api-full-single.txt`·`base-*.txt`·`cur-*.txt`): 넷 모두 U8 변경 밖으로 판단을 유지한다. U8 변경은 `api/src/claude-mcp`·`api/test/claude-mcp`·MCP 표를 건드리지 않는다.
 
-- `u2/file-storage` S22(심볼릭 링크 `EPERM`), `runtime/bootstrap` 개발 소스 기동(변경 전 판본도 2회 실패), `claude-mcp/mcp-endpoint` S9(변경 전 판본도 같은 단언 `200 !== 401`로 1회 실패): 기존 기록으로 판단된다.
+- `u2/file-storage` S22(심볼릭 링크 `EPERM`), `runtime/bootstrap` 개발 소스 기동(변경 전 판본도 2회 실패) **(2026-11-11 정정: 이 원인 판단은 틀렸다 — §13.7)**, `claude-mcp/mcp-endpoint` S9(변경 전 판본도 같은 단언 `200 !== 401`로 1회 실패): 기존 기록으로 판단된다.
 - `claude-mcp/mcp-connection` S6 "코드는 5분이다": **원인은 호스트와 DB 컨테이너의 시계 차이로 추정한다(확정 아님).** 변경 전 판본에서 실패한 기록은 없다(3회 통과). 추정 근거는 셋이다 — 같은 현재 판본이 코드 변경 없이 실패(2026-11-10 16:25, 전체 실행)와 통과(16:30 3회)를 오갔고, api가 호스트 시각 + 300초로 적은 만료를 시험이 DB `now()`로 재어 남은 시간 ≤ 300초를 요구하며(DB 시계가 뒤지면 실패), 2026-11-11에 잰 차이(DB − 호스트)가 −4~+88ms 사이에서 수 초 안에 부호가 바뀌었다. 2026-11-11 재확인(`catchu-db-test` 127.0.0.1:5433, 현재 판본, `mcp-connection.test.cjs` 3회·`mcp-endpoint.test.cjs` 2회, 각 120초 제한)은 모두 통과해 실패를 재현하지 못했고, 변경 전 판본은 사본이 지워져 다시 돌리지 못했다.
 
 **X-1(PDF 사본이 있는 발행본 삭제)은 Step 9.3의 후속 시험으로 둔다**(담당자 결정). 지금은 두 삭제가 따로 검증돼 있다 — 저장소 접두어 삭제는 `publications-manage-api.test.cjs` S11(실제 로컬 드라이버, 텍스트 발행본에 합성 파일을 넣음), 쪽 사본 연쇄 삭제는 `db/pdf-tables.test.cjs`(`publication` 행을 SQL로 직접 삭제). PDF를 실제로 발행한 발행본을 삭제 API로 지워 사본 파일 없음·`published_pdf_page` 0행·원본과 다른 발행본 유지를 한 흐름으로 보는 시험은 아직 없다. 9.3이 만드는 "로컬 드라이버에 실제 PDF 사본이 있는 발행본"을 같이 쓴다(계획 9.3에 보완 항목으로 적음).
 
 **미검증으로 남는 것**(§13.4 그대로): 실제 S3 복사·접두어 삭제(**미검증**, §14 — 드라이버 배포 후 확인 대기), 실제 U3 조각 나누기와의 연결, Linux에서 Step 8 시험.
+
+### 13.7 정정 — `runtime/bootstrap` 개발 소스 기동 실패의 원인 (2026-11-11, PR #521 CI 실패 조사 뒤)
+
+§13.3·§13.6·§15.3이 이 시험의 실패를 "기존·환경 실패, U8 변경 밖"으로 적은 것은 **틀렸다.** 당시의 실행 수치(전체 건수, 실패 건수, 실행 횟수)는 그대로 두고 원인 판단만 정정한다.
+
+**확인된 원인.** U8 Step 5가 더한 `api/src/materials/multer.d.ts`(multer 타입 선언)를 개발 소스 실행(`node -r ts-node/register src/main.ts`)이 읽지 못한다. 빌드(`tsc`)는 `tsconfig.json`의 `include`로 선언 파일을 읽지만 ts-node는 실제로 불러온 파일만 컴파일한다. 그래서 `pdf-material-input.ts`의 `import multer from 'multer'`가 `TS7016`(선언 파일을 찾지 못함)으로 컴파일에 실패하고 프로세스가 종료 코드 1로 끝난다. 빌드·typecheck·"빌드 main" 시험은 통과하고 "개발 소스 main" 시험만 실패하는 이유다.
+
+**판본별 근거.**
+
+| 판본 | 환경 | 결과 |
+|---|---|---|
+| PR 판본 `bbf02753` | CI(Linux) | api 전체 1,833건 중 1,829 통과, **1 실패**(이 시험), 3 건너뜀. 로그에는 "main 진입점이 정상 기동 전에 종료됨"만 있고 자식 프로세스의 오류 출력·종료 코드는 없다(시험이 실패 메시지에 싣지 않음) |
+| 통합 브랜치 `a30112a2` | CI(Linux) | 같은 시험 **통과**(10.4초). 병합 기준 `f679a428`의 CI는 api 작업을 건너뛰었고(web만 바뀐 커밋), `a30112a2`와 `f679a428` 사이에 `api/` 변경은 없다 |
+| PR 판본 `bbf02753` | 이 PC, 직접 실행 | 종료 코드 1, `TSError … pdf-material-input.ts(7,20): error TS7016: Could not find a declaration file for module 'multer'` 외 5건 |
+| 기준 `f679a428`(격리 사본) | 이 PC, 테스트 DB 지정 | `test/runtime/bootstrap.test.cjs` 22건: 21 통과, 1 건너뜀, **실패 0**. 이 시험 통과(12.4초) |
+| 수정 판본(아래) | 이 PC, 테스트 DB 지정 | 같은 파일 22건: 21 통과, 1 건너뜀, **실패 0**. 이 시험 통과(17.2초) |
+
+**"변경 전 판본도 2회 실패"라는 기록에 대해.** 기준 판본은 오늘 정식 조건(테스트 DB 지정)에서 통과했다. 2026-11-10의 "변경 전 판본" 실행이 어떤 파일 구성과 조건이었는지는 지금 확인할 수 없다(그때 작업 폴더에는 커밋하지 않은 Step 4~7 파일이 있었다). 따라서 그 기록을 "U8 변경 전에도 실패한다"는 근거로 쓰지 않는다. 이 PC에서 U8 변경과 무관하게 이 시험이 실패한다는 증거는 없다.
+
+**조사 중의 잘못된 관찰 하나.** 2026-11-11 조사 도중 "이 PC에서는 기준 판본도 같은 증상으로 실패한다"고 본 실행은 테스트 DB 환경을 주지 않고 시험 파일만 돌린 것이었다(그 조건에서는 "빌드 main"을 포함해 14건이 함께 실패한다). 무효로 한다.
+
+**수정(미커밋, 담당자 지시 2026-11-11).** `api/src/materials/pdf-material-input.ts` 머리에 `/// <reference path="./multer.d.ts" />` 한 줄을 더해 이 파일이 선언 파일을 직접 가리키게 했다. 저장소 lint가 참조 지시문을 막으므로(`@typescript-eslint/triple-slash-reference`) 그 한 줄에만 `eslint-disable-next-line`을 두고 이유를 주석으로 적었다. `api/src`의 첫 lint 예외이며 담당자 수용 여부 확인이 필요하다. `tsconfig.json`은 바꾸지 않았다.
+
+| 확인 | 결과 |
+|---|---|
+| 컴파일 | `node -r ts-node/register src/main.ts` 직접 실행에서 `TSError`·`TS7016` 0건 |
+| 실제 기동 | 환경 없이 직접 실행하면 Nest 기동을 시작한 뒤 설정 검사(`AUTH_JWT_SECRET`)에서 종료 코드 1로 끝난다(의도된 동작). 시험이 주는 환경에서는 기동해 `/health`와 개발 로그인에 응답한다 |
+| 시험 | `npm test -- test/runtime/bootstrap.test.cjs`(테스트 DB 지정) 22건: 21 통과, 1 건너뜀, 실패 0 |
+| 정적 검사 | api `typecheck`·`lint`·`build` 통과 |
+
+**그대로 두는 판단.** `u2/file-storage` S22는 Windows 심볼릭 링크 권한(`EPERM`)이라는 기존 판단을 유지한다(CI에서는 건너뛰거나 통과). `claude-mcp` S6·S9의 시계 차이 추정도 그대로다.
+
+**남은 것.** 수정 커밋의 CI 결과는 푸시 뒤에 확인한다. 시험이 실패할 때 자식 프로세스의 출력과 종료 코드를 보여 주지 않는 점은 U8 범위 밖이라 고치지 않았다.
 
 ## 14. 개발 서버 S3 조건 대조와 배포 후 확인 항목 (2026-11-10)
 
@@ -843,7 +876,7 @@ P-b는 복사 실패 종류 둘(`StorageUnavailable`·`FileNotFound` = DONE인�
 | `npm test -- test/publications/*.test.cjs test/materials/*.test.cjs test/security-events.test.cjs test/rag-answer/qna-controller.test.cjs`(16개 파일) | **186 passed**, 실패·건너뜀 0 |
 | api 전체 `npm test`(최종 판본, 11:24:35~11:37:06, 제한 45분) | 첫째 줄 146개 파일 **1723건: 1684 passed, 3 failed, 36 skipped**(713.0초), 둘째 줄(대기) 5개 파일 30 passed, 빌드 시험 1 passed. `recipient-pdf.test.cjs` 8건 모두 통과 |
 
-전체 실행의 실패 3건은 §13.3·§13.6에서 U8 변경 밖으로 정리한 것과 같은 시험이다: `u2/file-storage` S22(심볼릭 링크 `EPERM`), `claude-mcp/mcp-endpoint` S9(시계 차이), `runtime/bootstrap` 개발 소스 기동. `claude-mcp/mcp-connection` S6는 이번에는 통과했다. Step 9가 만든 실패는 없다.
+(2026-11-11 정정: 아래 셋 가운데 `runtime/bootstrap`은 U8 변경 밖이 아니다 — §13.7) 전체 실행의 실패 3건은 §13.3·§13.6에서 U8 변경 밖으로 정리한 것과 같은 시험이다: `u2/file-storage` S22(심볼릭 링크 `EPERM`), `claude-mcp/mcp-endpoint` S9(시계 차이), `runtime/bootstrap` 개발 소스 기동. `claude-mcp/mcp-connection` S6는 이번에는 통과했다. Step 9가 만든 실패는 없다.
 
 | 시나리오 | 시험이 본 것 | 결과 |
 |---|---|---|
@@ -1423,3 +1456,110 @@ FR19 확인 표의 U8 행에 넣을 입력이다. 대상 판본은 브랜치 `ap
 - 계획 문서의 체크박스는 이제 모두 `[x]`다. 남은 것은 실제 S3 확인, Compose 전체 스택 기동, 별도 계약 수정 PR(C-16·C-12), C-15 주석 문구 확인이다(§18.5).
 
 **커밋·PR 준비에서 확인한 것(같은 날, 커밋·푸시·PR 생성은 하지 않음).** 이 작업본의 기준은 `7ef0dd69`이고 PR 대상인 통합 브랜치 `intent/260925-intent-12`는 그보다 123커밋 앞에 있다. 작업본을 지금의 통합 브랜치와 미리 합쳐 보면 12개 파일이 충돌한다(api 통합 시험 1, web 발행·받은 사람 화면과 발행 시험 7, worker 소비자 연결·의존성 4). §10~§17의 시험 결과는 모두 기준 `7ef0dd69` 위의 판본에 대한 것이므로, 통합 브랜치를 합쳐 충돌을 푼 뒤 관련 시험과 전체 회귀를 다시 돌려야 한다.
+
+## 19. PR #521 팀장 리뷰 반영 — 2~4번 (2026-11-11 실행, 담당자 지시 뒤 — 미커밋)
+
+팀장 리뷰(#521, 변경 요청)의 2~4번을 반영했다. 1번(개발 소스 실행의 `multer` 선언 오류)은 §13.7에 있다. 커밋·푸시·리뷰 답글은 하지 않았다. 리뷰가 함께 요청한 계약 수정 PR, PR 본문의 C-15 항목 삭제, audit 파일 커밋은 이 절의 범위가 아니다.
+
+### 19.1 2번 — AES로 잠긴 PDF의 분류
+
+- **확인한 현재 동작**: pypdf 7.0.0에서도 리뷰가 6.21.2로 본 것과 같다. AES-256(`/V 5 /R 6`, `AESV3`) 암호화 사전이 있는 PDF를 열면 여는 단계에서 `DependencyError: cryptography>=3.1 is required for AES algorithm`이 나고, 수정 전 `extract.py`는 이를 `UNREADABLE_FILE`로 바꿨다.
+- **변경**: `worker/app/pdf_extraction/extract.py`가 여는 단계의 `DependencyError`만 `ENCRYPTED`로 처리한다. 그 밖의 여는 단계 예외는 그대로 `UNREADABLE_FILE`이다.
+- **시험**(`worker/tests/test_pdf_extraction.py`, 도우미 `tests/pdf_synthetic.py`의 `aes256_pdf_bytes`): AES-256 합성 PDF → `ENCRYPTED`, 여는 단계의 `PdfReadError` → `UNREADABLE_FILE`, `DependencyError` → `ENCRYPTED`. 수정 전 구현에서는 새 시험 2건이 실패했다. 기존 손상 PDF 3종과 RC4-128 암호화 시험은 그대로 통과한다.
+- **검증 범위의 한계**: 시험 환경에 암호 라이브러리가 없어 **실제로 AES 암호화한 파일은 쓰지 않았다.** 암호화 사전만 붙인 합성 PDF이며, 그 파일이 pypdf에서 같은 `DependencyError`를 낸다는 것을 시험 안에서 전제로 확인한다.
+
+### 19.2 3번 — S3 읽기의 시간 제한과 저장 실패 로그
+
+**worker: 두 겹의 시간 제한**(`reader.py`, `settings.py`, `child.py`)
+
+| 겹 | 값 | 묶는 범위 |
+|---|---|---|
+| 요청 단계 | 연결 5초, 읽기 15초, 시도 2회(표준 재시도, 대기 최대 1초) | 연결해서 응답 머리를 받기까지. 응답이 아예 오지 않으면 최대 2 × (5 + 15) + 1 = 41초에 포기한다(`S3_REQUEST_GIVE_UP_SECONDS`) |
+| 읽기 전체 | 자식 시간 제한의 60%(기본 120초에서 72초, `s3_total_budget`) | 클라이언트 준비·요청·재시도·본문 내려받기 전부. 넘으면 `SourceUnavailable("TotalTimeout")` |
+
+- **정정**: 처음 반영에서는 41초를 "최악의 경우"로 적고 상수 이름도 `S3_WORST_CASE_SECONDS`였다. 41초는 **요청 단계**의 상한일 뿐이다. 읽기 15초는 조각 사이의 간격만 재므로, 본문이 그보다 짧은 간격으로 조금씩 계속 오면 요청 단계의 값만으로는 내려받기가 끝나지 않는다. 수정 전 구현으로 재현했다: 개별 읽기 제한 1초, 0.2초마다 1 KB를 보내는 로컬 서버에서 8초 뒤에도 읽는 중이었다. 주석·상수 이름·시험 단언을 바로잡고 읽기 전체에 시간 예산을 더했다.
+- **값의 근거**: 연결 5초는 같은 지역 S3의 보통 연결 시간(1초 미만)에 여유를 둔 값이고, 읽기 15초는 조각 하나를 기다리는 상한, 시도 2회는 순간 오류 한 번을 넘기는 값이다. 전체 예산을 자식 제한의 비율로 둔 것은 설정으로 자식 제한을 바꿔도 언제나 그보다 먼저 끝나게 하려는 것이다. 60%면 기본값에서 48초가 추출과 결과 전송에 남고(대표 합성 PDF 추출은 1초 미만, §17.5), 72초 안에 20 MB를 받으려면 평균 약 0.28 MB/s면 된다.
+- **구현**: S3 읽기를 별도 스레드에서 돌리고 부른 쪽은 예산만큼만 기다린다. 넘으면 버림 표시를 남기고 기다리지 않고 저장소 장애로 끝낸다.
+  - 진행 중인 블로킹 읽기: 밖에서 멈출 수 없다. 처음에는 본문을 urllib3 응답의 `read1`로 직접 읽게 했으나, 그 방식은 SDK의 길이·체크섬 검사를 건너뛴다는 지적을 받아 SDK의 공개 읽기로 되돌렸다. **지금 방식과 근거는 §19.5다.**
+  - 응답 스트림 정리: 읽는 스레드가 스스로 닫는다. 처음에는 부른 쪽에서 닫게 했는데, 진행 중인 읽기가 쥔 버퍼 잠금을 기다리느라 닫는 호출이 막혀 예산 1.5초 시험이 20초 걸렸다(시험으로 발견). 스레드는 데몬이라 정리가 끝나기 전이라도 자식이 결과를 보내고 끝나는 것을 막지 않는다.
+  - (2026-11-11 정정) 내부 이름(`_raw_stream`·`read1`)은 더 쓰지 않는다 — §19.5.
+- **분류**: 예산 초과·시간 초과·연결 실패·권한 오류는 `SourceUnavailable` → 자식이 결과를 만들지 않음 → 부모가 작업 실패로 끝냄 → 자료는 api의 10분 시한으로 실패(시한 대기). 없는 키는 파일 실패, `MemoryError`는 자식의 메모리 분류 그대로다.
+
+**api: 저장 실패 로그**(`file-storage.ts`의 `storageFailureFields`, `pdf-materials.controller.ts`, `pdf-publish.ts`, `published-pdf-view.service.ts`)
+
+- `PDF_UPLOAD_STORE_FAILED`·`PDF_DELETE_STORAGE_FAILED`·`PDF_COPY_FAILED`·`PREFIX_CLEANUP_FAILED`·`PDF_VIEW_FAILED`(500·전송 중 끊김)에 `storageReason`(`NOT_CONFIGURED`·`IO_FAILED`·`OUTSIDE_ROOT`)과 `cause`(원인 오류의 이름)를 더했다. 칸 이름이 `reason`이 아닌 것은 `PDF_VIEW_FAILED`에 다른 뜻의 `reason`이 이미 있어서다.
+- `cause`에는 이름만 싣는다. 이름이 그냥 `Error`이면 Node 오류 코드(예: `EACCES`)를 쓰고, 글자·숫자·밑줄이 아닌 이름은 버린다. 원인 오류의 문구는 읽지 않는다(버킷·키·경로가 들어갈 수 있다).
+
+**시험과 실제 검증 범위**
+
+| 확인 | 방법 | 결과 |
+|---|---|---|
+| 조금씩 계속 오는 본문 | 실제 boto3·실제 소켓, 로컬 서버가 0.2초마다 1 KB(개별 읽기 제한 1초보다 짧음), 전체 예산 1.5초 | 예산 직후 `SourceUnavailable("TotalTimeout")`. 파일 실패나 끝없는 읽기가 아님. 읽는 스레드가 남지 않고 서버가 연결 끊김을 봄 |
+| 정상 내려받기 | 같은 클라이언트, 약 2 MB 본문, 예산 5초 | 받은 바이트가 보낸 것과 같음 |
+| 응답 없는 저장소 | 연결만 받고 답하지 않는 로컬 서버, 제한 1초·시도 2회 | 2회 시도 뒤 `SourceUnavailable("ReadTimeoutError")` |
+| 닫힌 포트 | 실제 소켓 | 저장소 장애로 분류 |
+| 예산 안의 다른 실패 | 가짜 클라이언트 | 없는 키 → 파일 실패, 권한 → 저장소 장애, `MemoryError` → 그대로 올라감 |
+| 자식 경로의 메모리 분류 | 시험용 자식이 예산을 건 경로로 `MemoryError` | `UNREADABLE_FILE` 1회(Linux에서 실행) |
+| 실제 설정값 한 번(보완 전 판본) | 응답 없는 로컬 서버, 연결 5초·읽기 15초·2회 | 30.2초에 `SourceUnavailable`. 전체 예산을 더한 뒤에는 실제 값(72초)으로 다시 재지 않았다 |
+| api 저장 실패 로그 | 가짜 저장소 오류에 버킷·키·경로가 든 문구를 넣음 | 사유와 원인 이름만 남고 그 값들은 로그에 없음 |
+
+- (아래 수치는 §19.5 보완 전 판본의 것이다. 최종 판본의 결과는 §19.5.) worker: Windows에서 PDF 시험 세 파일 110 통과·6 건너뜀. **Linux 컨테이너(실제 Redis 포함)에서 worker 전체 2,709 통과, ruff·mypy 통과.** 새 소켓 시험은 Linux에서 3회 반복해 모두 통과했다. Linux 전체 실행에서 시험용 자식 도우미(`tests/pdf_children.py`)가 새 인자를 받지 못해 1건이 실패한 것을 발견해 고쳤다(구현 결함이 아니라 도우미의 인자 누락).
+- api: 관련 일곱 파일 89건 중 88 통과·1 건너뜀, lint·typecheck 통과. 로그 모양을 통째로 비교하던 기존 단언 2곳은 새 칸에 맞췄다.
+- **미검증**: 실제 S3(느린 응답·권한 오류에서의 실제 동작과 `cause` 값). 로컬 서버는 S3가 아니다. 실제 값으로 자식 프로세스 전체를 돌려 "예산 → 작업 실패 → 10분 시한"까지 이어 보지는 않았다(분류의 각 단계는 따로 시험했다).
+
+### 19.3 4번 — [원본 n쪽 열기]의 화면 이동
+
+- **변경**: `web/src/features/publications/published-pdf-item.tsx`(`openPdfPageAtViewer`), `pdf-viewer.module.css`. 누르면 뷰어 자리로 화면을 옮긴 뒤 그 쪽을 연다. 움직임 줄이기 설정이면 부드러운 스크롤을 쓰지 않는다.
+- **시험**: `web/test/recipient-pdf.test.mjs` 1건 추가(순서·인자·움직임 줄이기·자리 없음·화면 구조).
+- **브라우저에서 직접 본 것**(받은 사람 화면, 30쪽 PDF, 1024×768, 문서 높이 약 10,000px, Claude 내장 브라우저):
+
+| 경우 | 누르기 전 | 누른 뒤 |
+|---|---|---|
+| 뷰어를 처음 여는 경우([원본 28쪽 열기]) | 뷰어 자리가 화면 위로 7,216px 벗어남 | 뷰어 자리가 화면 위에서 16px, 뷰어 599px가 화면에 보임, 뷰어의 쪽 표시 28 |
+| 이미 열린 경우(맨 아래에서 [원본 30쪽 열기]) | 뷰어 자리가 8,381px 벗어남 | 같은 자리로 돌아옴, 쪽 표시 30, PDF 요청은 늘지 않음(1회 그대로) |
+
+- **미검증**: 뷰어 안에 요청한 쪽이 실제로 그려진 모습(주소의 `#page=n`은 확인했지만 화면 캡처에서 PDF 내용이 빈 칸으로 나왔다). 브라우저 확인의 발행본은 추출 결과를 DB에 직접 넣어 만들었다(worker 미사용). 작성자 발행본 상세 화면은 같은 컴포넌트라 따로 보지 않았다.
+
+### 19.4 변경 파일과 실행한 검사
+
+- worker: `app/pdf_extraction/extract.py`·`reader.py`·`settings.py`·`child.py`, `tests/test_pdf_extraction.py`·`pdf_synthetic.py`·`pdf_children.py`
+- api: `src/file-storage/file-storage.ts`, `src/materials/pdf-materials.controller.ts`, `src/publications/pdf-publish.ts`·`published-pdf-view.service.ts`, `test/materials/pdf-materials-api.test.cjs`, `test/publications/recipient-pdf.test.cjs`(1번의 `src/materials/pdf-material-input.ts`는 그대로 보존)
+- web: `src/features/publications/published-pdf-item.tsx`, `src/features/recipient/pdf-viewer.module.css`, `test/recipient-pdf.test.mjs`
+- web 전체 1,021건 통과, lint·typecheck·build 통과. api lint 예외는 `multer.d.ts` 참조 한 줄뿐이다(`api/src` 전체에 1건).
+- **다시 돌리지 않은 것**: api 전체 회귀. 기능 문서(`api/docs/pdf-materials.md`의 로그 표, `worker/README.md`)는 이번에 고치지 않았다 — 새 로그 칸과 S3 시간 제한이 아직 문서에 없다.
+
+### 19.5 3번 재보완 — SDK의 무결성 검사 보존과 두 시점 (2026-11-11, 푸시 전)
+
+**문제.** §19.2의 첫 구현은 본문을 `body._raw_stream.read1`(botocore 내부의 urllib3 응답)로 직접 읽었다. 이 경로는 botocore `StreamingBody.read`가 끝에서 하는 길이 검사와 `StreamingChecksumBody.read`가 하는 체크섬 검사를 건너뛴다. 실제 소켓 시험으로 확인했다: 그 구현에서 체크섬이 틀린 응답과 선언한 길이보다 짧게 끊긴 응답이 **정상 바이트로 반환됐다**(새 시험 3건 실패).
+
+**수정**(`worker/app/pdf_extraction/reader.py`)
+
+- 본문은 SDK의 공개 읽기 `StreamingBody.read(n)`로만 읽는다. 내부 이름(`_raw_stream`·`read1`)은 쓰지 않는다. 길이·체크섬이 틀리면 SDK가 예외를 올리고 저장소 장애(`SourceUnavailable`)가 된다.
+- `read(n)`은 n바이트가 찰 때까지 돌아오지 않으므로 한 번에 읽는 크기를 64 KiB로 줄여 버림 표시를 자주 확인한다.
+- 전체 시간 예산에서 부른 쪽이 바로 돌아오는 동작은 그대로다(읽기는 별도 스레드, 부른 쪽은 예산만큼만 기다림).
+- 버릴 때 SDK의 공개 메서드 `StreamingBody.set_socket_timeout`으로 소켓 시간 제한을 0.05초로 줄인다. 이 호출은 읽기가 쥔 잠금을 잡지 않아 막히지 않는다. 응답 본문을 닫는 것은 여전히 읽는 스레드가 스스로 한다(§19.2의 20초 관찰).
+
+**두 시점의 구분**
+
+| 시점 | 언제 | 무엇에 달렸나 |
+|---|---|---|
+| 부른 쪽(자식의 주 흐름)이 `SourceUnavailable("TotalTimeout")`으로 돌아옴 | 전체 시간 예산이 지나는 즉시 | 예산 값뿐. 읽는 스레드나 응답의 정리를 기다리지 않는다 |
+| 읽는 스레드가 끝나고 응답이 닫힘 | 그 뒤 | 진행 중이던 소켓 읽기 한 번이 끝나야 한다(다음 조각이 오거나, 원래의 개별 읽기 시간 제한이 지날 때). 그다음 읽기는 줄어든 0.05초 제한으로 곧 끝나고 스레드가 응답을 닫는다 |
+
+- 측정(시험값: 개별 읽기 제한 1초, 조각 간격 0.2초, 예산 1.5초): 부른 쪽 반환 Windows 1.52초·Linux 1.50초, 그 뒤 정리까지 Windows 0.16~0.17초·Linux 0.16초(각 3회). 부른 쪽이 돌아온 순간에는 읽는 스레드가 아직 살아 있었다(시험이 단언한다).
+- 정리가 늦어지는 경우: 조각이 전혀 오지 않으면 진행 중인 소켓 읽기는 원래의 개별 읽기 제한(운영값 15초)까지 간다. 조각이 0.05초보다 촘촘히 계속 오면 64 KiB를 다 받은 뒤에 멈춘다. 요청 단계에서 막혀 있었다면 요청이 끝난 뒤(늦어도 요청 단계 상한 41초)에 정리된다. 어느 경우든 부른 쪽이 돌아오는 시점은 바뀌지 않는다.
+- 읽는 스레드는 데몬이다. 자식 프로세스는 정리를 기다리지 않고 결과(저장소 장애)를 보낸 뒤 끝나며, 그때 남은 스레드와 연결도 함께 끝난다. 운영값에서 정리가 실제로 얼마나 걸리는지는 재지 않았다.
+
+**시험**(`worker/tests/test_pdf_extraction.py`, 실제 boto3·실제 소켓의 로컬 서버)
+
+| 시험 | 결과 |
+|---|---|
+| 체크섬이 틀린 응답(예산 없음·예산 있음 두 경우) | `SourceUnavailable("FlexibleChecksumError")`. 정상 PDF 바이트로 반환하지 않는다. 읽는 스레드가 남지 않는다 |
+| 선언한 길이보다 짧게 끊긴 응답 | `SourceUnavailable`(SDK의 길이 검사) |
+| 체크섬이 맞는 응답 | 받은 바이트가 보낸 것과 같다 |
+| 조금씩 계속 오는 본문 | 예산 직후 `TotalTimeout`, 그 뒤 읽는 스레드가 스스로 끝나고 서버가 연결 끊김을 본다(위 측정) |
+| 정상 내려받기(약 2 MB) | 성공 |
+
+- 수정 전 구현(`read1` 직접 사용)에서는 체크섬 2건과 길이 1건이 실패했다(`DID NOT RAISE`).
+- 최종 판본: Windows PDF 시험 세 파일 114 통과·6 건너뜀. **Linux 컨테이너(실제 Redis 포함) worker 전체 2,713 통과, ruff·mypy 통과.** 새 소켓 시험은 Linux에서 3회 반복해 모두 통과.
+- **미검증**: 실제 S3. 체크섬 시험은 로컬 서버가 `x-amz-checksum-crc32` 머리를 붙여 만든 응답이며, 실제 S3가 어떤 체크섬 머리를 주는지와 그때의 동작은 확인하지 못했다. 체크섬 검사는 SDK의 기본 설정을 따른다(코드에서 따로 켜지 않았다).
