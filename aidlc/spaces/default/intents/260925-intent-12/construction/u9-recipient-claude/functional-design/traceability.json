@@ -1,0 +1,21 @@
+{
+  "stage": "functional-design",
+  "unit": "u9-recipient-claude",
+  "upstream_ids": [
+    "AC13.3.1", "AC13.3.2", "AC13.3.3", "AC13.3.4", "AC13.3.5"
+  ],
+  "coverage": [
+    { "id": "AC13.3.1", "status": "OK", "target": "BR1.1, BR1.3, BR2.1, BR2.4, BR3.1, BR3.2, BR3.3, BR3.4, BR4.1, BR4.2, BR4.3, BR4.4" },
+    { "id": "AC13.3.2", "status": "OK", "target": "BR1.2, BR2.2, BR2.3" },
+    { "id": "AC13.3.3", "status": "OK", "target": "BR2.1, BR2.2, BR2.5, BR5.2" },
+    { "id": "AC13.3.4", "status": "OK", "target": "BR6.1, BR6.2, BR6.3, BR6.4, BR6.5, BR6.6" },
+    { "id": "AC13.3.5", "status": "OK", "target": "BR7.1" }
+  ],
+  "reverse": [
+    { "id": "BR3.5", "status": "N/A", "target": "Q4(cursor 자리가 쪽 사이에 유효한 근거), C-07 고정 사본" },
+    { "id": "BR4.5", "status": "N/A", "target": "C-15 common-errors INVALID_CURSOR, U6 cursor 규칙, Q4" },
+    { "id": "BR5.1", "status": "N/A", "target": "C-15 common-errors RATE_LIMITED, U6 빈도 제한 규칙(FR13.6)" },
+    { "id": "BR5.3", "status": "N/A", "target": "C-15 common-errors INTERNAL_ERROR, U6 로그 규칙, 보안 점검" },
+    { "id": "BR5.4", "status": "N/A", "target": "C-15 consent, 요약 확인" }
+  ]
+}

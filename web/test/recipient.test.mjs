@@ -10,10 +10,13 @@
 //      공통 화면이고 따로 구분하지 않는다. 작성자 회원 행 없음 500은 조회 실패(링크 불가 아님). 화면은 api 응답 코드만 따른다.
 //
 // 화면 자리 G1~G4 (C-11 slot 0·guide-rule; 세 상태를 그려 확인)
-//   - 기대: 판정 통과 화면 = U4 h1(tabIndex={-1}, 첫 초점) → 0번 RecipientGuide(U2, showClaudeConnect={false}) 정확히 1개 → U4 고정 안내(발행 시각) → 1번 발행본 자료
-//           → 2 BaseSummaryPanel(U5) → 3 QnaPanel(U5) → 4번 자리(U10 제공 전 빈 자리). 비밀번호 입력 화면과 접근 불가 화면 = U4 h1(첫 초점)과 U4 안내만, RecipientGuide 0개(G1·G2).
-//           각 상태의 h1은 U4 것 하나뿐이고 RecipientGuide 안에 h1이 없다(G3). 상태가 바뀔 때 첫 초점은 U4 h1로 가고 RecipientGuide 안 요소로 가지 않는다(G4).
-//   - 실패 조건: RecipientGuide가 2개이거나 비밀번호·불가 화면에 있음, showClaudeConnect 생략, h1 2개, 첫 초점이 안내 안으로 감.
+//   - 기대: 판정 통과 화면 = U4 h1(tabIndex={-1}, 첫 초점) → 0번 RecipientGuide(U2, showClaudeConnect={claudeConnectable(snapshot)}) 정확히 1개 → 0.5번 U9 패널
+//           (같은 값이 참일 때만, U9 #495·#506) → U4 고정 안내(발행 시각) → 1번 발행본 자료 → 2 BaseSummaryPanel(U5) → 3 QnaPanel(U5) → 4번 자리(U10).
+//           grant 없이 연 판정 통과 화면(readWithoutGrant true)은 Claude 줄과 U9 패널이 하나씩, grant를 실어 연 판정 통과 화면(false)은 둘 다 0개다.
+//           비밀번호 입력 화면과 접근 불가 화면 = U4 h1(첫 초점)과 U4 안내만, RecipientGuide·U9 패널 0개(G1·G2).
+//           각 상태의 h1은 U4 것 하나뿐이고 RecipientGuide·U9 패널 안에 h1이 없다(G3). 상태가 바뀔 때 첫 초점은 U4 h1로 가고 RecipientGuide 안 요소로 가지 않는다(G4).
+//   - 실패 조건: RecipientGuide가 2개이거나 비밀번호·불가 화면에 있음, showClaudeConnect 생략, grant를 실어 연 화면이나 비밀번호·불가 화면에 Claude 줄·U9 패널이 있음,
+//           h1 2개, 첫 초점이 안내 안으로 감.
 //   - G4의 초점 이동 자체는 DOM이 필요해 여기서는 h1의 tabIndex와 비밀번호 입력에 autoFocus가 없음만 보고, 실제 이동(첫 진입 포함)은 브라우저에서 확인한다.
 // G5~G7 (web 시험이 아니라 문구 검토): G5·G6은 U4 고정 안내 문구(발행 시각만)를 PR 「리뷰 요청」 체크리스트로 본다. 여기서는 U4 영역에 U2 안내 문장이
 //   그대로 들어 있지 않은지만 기계적으로 본다. G7은 #423 병합 뒤 U2 base-summary·link-conditions 문구를 #416 결정 문장과 대조하고, 다르면 U4는 고치지 않고 U2 담당에게 알린다.
@@ -809,22 +812,30 @@ function render(snapshot, extra = {}) {
   }));
 }
 const count = (html, needle) => html.split(needle).length - 1;
-// readWithoutGrant: true(grant 없이 연 화면)로 두어도 U9를 켜기 전에는 RecipientGuide에 showClaudeConnect=false가 가는지 G2에서 함께 본다.
+// ready는 readWithoutGrant: true(grant 없이 연 화면)가 기본이라 0번의 Claude 줄과 0.5번 U9 패널이 함께 켜진다. false(grant를 실어 연 화면)는 G1·G2·G3에서 따로 본다.
 const ready = (items = [catchItem("c1", 2), textItem("m1", 1)], extra = {}) => ({ view: "ready", snapshot: readPublishedSnapshot(publication(items)), refreshing: false, refreshFailed: false, readWithoutGrant: true, ...extra });
 
-test("G1·G2·G3: 판정 통과 화면에만 RecipientGuide가 정확히 1개(showClaudeConnect=false), 비밀번호·불가·실패 화면에는 0개. 모든 상태의 h1은 U4 것 하나이고 tabIndex=-1", () => {
+test("G1·G2·G3: 판정 통과 화면에만 RecipientGuide가 정확히 1개이고, grant 없이 연 화면은 Claude 줄과 U9 패널이 하나씩, grant를 실어 연 화면은 둘 다 0개다. 비밀번호·불가·실패 화면에는 안내 0개. 모든 상태의 h1은 U4 것 하나이고 tabIndex=-1", () => {
   const passed = render(ready());
   assert.equal(count(passed, 'data-testid="recipient-guide"'), 1);
-  assert.equal(count(passed, "recipient-guide-claude-connect"), 0, "showClaudeConnect는 false");
+  assert.equal(count(passed, "recipient-guide-claude-connect"), 1, "grant 없이 연 화면은 Claude 줄이 있다(showClaudeConnect=true)");
+  assert.equal(count(passed, 'data-testid="claude-analyze-panel"'), 1, "grant 없이 연 화면은 0.5번 U9 패널이 있다");
   assert.equal(count(passed, "<h1"), 1);
   assert.ok(passed.includes('<h1 id="recipient-title" tabindex="-1"'));
   assert.ok(passed.includes("발행본 제목"));
+
+  const withGrant = render(ready(undefined, { readWithoutGrant: false }));
+  assert.equal(count(withGrant, 'data-testid="recipient-guide"'), 1);
+  assert.equal(count(withGrant, "recipient-guide-claude-connect"), 0, "grant를 실어 연 화면은 Claude 줄이 없다(showClaudeConnect=false)");
+  assert.equal(count(withGrant, 'data-testid="claude-analyze-panel"'), 0, "grant를 실어 연 화면은 U9 패널이 없다");
+  assert.equal(count(withGrant, "<h1"), 1);
 
   const password = render({ view: "password", unlock: idle });
   const blocked = render({ view: "unavailable" });
   const failed = render({ view: "failed" });
   for (const [name, html] of [["password", password], ["unavailable", blocked], ["failed", failed]]) {
     assert.equal(count(html, 'data-testid="recipient-guide"'), 0, `${name}: 안내 없음(G1)`);
+    assert.equal(count(html, 'data-testid="claude-analyze-panel"'), 0, `${name}: U9 패널 없음`);
     assert.equal(count(html, "<h1"), 1, `${name}: h1 하나(G3)`);
     assert.ok(html.includes('tabindex="-1"'), `${name}: 초점 대상 h1(G4)`);
     assert.equal(count(html, 'data-testid="publication-snapshot"'), 0, `${name}: 사본 없음`);
@@ -836,9 +847,9 @@ test("G1·G2·G3: 판정 통과 화면에만 RecipientGuide가 정확히 1개(sh
   assert.ok(failed.includes("다시 불러오기"));
 });
 
-test("판정 통과 화면 순서: h1 → 0 RecipientGuide → U4 고정 안내(발행 시각) → 1 발행본 자료 → 2 BaseSummaryPanel → 3 QnaPanel → 4 자리. 4번 자리는 isLoggedIn을 받는다", () => {
+test("판정 통과 화면 순서: h1 → 0 RecipientGuide → 0.5 U9 패널 → U4 고정 안내(발행 시각) → 1 발행본 자료 → 2 BaseSummaryPanel → 3 QnaPanel → 4 자리. 4번 자리는 isLoggedIn을 받는다", () => {
   const html = render(ready(), { slotProps: slotProps({ isLoggedIn: true }) });
-  const order = ["<h1", 'data-testid="recipient-guide"', 'data-testid="recipient-published-at"', 'data-testid="publication-snapshot"',
+  const order = ["<h1", 'data-testid="recipient-guide"', 'data-testid="claude-analyze-panel"', 'data-testid="recipient-published-at"', 'data-testid="publication-snapshot"',
     'data-testid="recipient-slot-2"', 'data-testid="recipient-slot-3"', 'data-testid="recipient-slot-4"'];
   const positions = order.map((needle) => html.indexOf(needle));
   assert.ok(positions.every((position) => position >= 0), String(positions));
