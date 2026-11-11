@@ -289,11 +289,18 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
       'CascadeResultApplicationOnDelete1792817978012', 'CascadeAuthSessionsOnDelete1792817978013', 'CascadeCatchAssetsOnDelete1792817978014',
       'CreateU2UsageAndConsent1793161114211', 'CreatePublicationTables1793162230851', 'AddCatchAuthorDescription1793162230852',
       'AddRepositoryRegistration1793245460352', 'CreatePublishedIndexTables1793257382741', 'CreateBaseSummaryTable1793348947970',
-      'ExpandRepositoryAnalysisScope1793585769819', 'CreateMcpTables1793588083309', 'CreatePdfMaterialTables1793977402870']);
+      'ExpandRepositoryAnalysisScope1793585769819', 'CreateMcpTables1793588083309', 'CreatePdfMaterialTables1793977402870',
+      'AddPdfTextLimitFailureCode1794289608328']);
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 34);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
+    const failureCodeCheck = async () => (await isolated.query(`SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+      WHERE connamespace = $1::regnamespace AND conname LIKE 'ck_pdf_material_extraction_failure_code_%'`, [schema]))[0].def;
+    assert.match(await failureCodeCheck(), /TEXT_LIMIT_EXCEEDED/);
+    await isolated.undoLastMigration(); // U8 pdf_material 실패 사유 CHECK에 TEXT_LIMIT_EXCEEDED 추가(#420 팀장 결정 2026-11-10). 표 수는 그대로다
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 34);
+    assert.doesNotMatch(await failureCodeCheck(), /TEXT_LIMIT_EXCEEDED/);
     await isolated.undoLastMigration(); // U8 PDF 원본·쪽별 글·발행 PDF 쪽 사본 표 셋(C-06·C-07)
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 31);
     for (const table of ['pdf_material', 'pdf_page_text', 'published_pdf_page']) assert.equal(await regclass(table), null);

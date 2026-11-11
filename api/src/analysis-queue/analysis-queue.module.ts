@@ -7,6 +7,7 @@ import { DatabaseModule } from '../database/database.module';
 import { AnalysisReceiverModule, ObservationProvider } from '../analysis-receiver/analysis-receiver.module';
 import { AnalysisRegistrationService } from '../analysis-receiver/analysis-registration.service';
 import { WorkerMessageValidator } from '../analysis-receiver/worker-message.validator';
+import { PdfExtractionReceiver } from '../pdf-extraction/pdf-extraction.receiver';
 import { AnalysisQueueConfig } from './analysis-queue.config';
 import { AnalysisRequestDispatcher, DispatchLog, DispatchSummary, errorName } from './analysis-request.dispatcher';
 import {
@@ -94,7 +95,9 @@ export class AnalysisQueueRunner implements OnModuleDestroy {
       add: (name, data, jobOptions) => queue.add(name, data, jobOptions),
     }, this.options.validator, this.dispatchLog(), this.options.clock, this.limits.commandTimeoutMs);
 
-    const consumer = new WorkerMessageConsumer(this.options.registration, this.consumerLog());
+    // U8 PDF 추출 결과(`PdfExtractionResult`)는 같은 큐의 다른 작업 이름이다. 수신기는 같은 DB·같은 로거를 쓴다.
+    const consumer = new WorkerMessageConsumer(this.options.registration, this.consumerLog(),
+      new PdfExtractionReceiver(this.options.dataSource, { logger: this.logger }));
     const worker = new Worker(WORKER_MESSAGE_QUEUE, (job: Job) => consumer.process(job), {
       connection: this.consumerConnection, prefix, autorun: false, ...CONSUMER_OPTIONS,
     });

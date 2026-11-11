@@ -63,7 +63,9 @@ test('PDF 자료는 제목 1자 이상·크기 양수·정한 추출 상태·정
   await assert.rejects(pdfMaterial(memberId, { fileSize: 0 }), CHECK_VIOLATION);
   await assert.rejects(pdfMaterial(memberId, { state: 'RUNNING' }), CHECK_VIOLATION);
   await assert.rejects(pdfMaterial(memberId, { state: 'FAILED', failureCode: 'OTHER' }), CHECK_VIOLATION);
-  assert.equal(await count('pdf_material'), 1);
+  // TEXT_LIMIT_EXCEEDED는 마이그레이션 1794289608328이 더한 사유다(팀장 결정 2026-11-10, #420 issuecomment-6759834176).
+  await pdfMaterial(memberId, { state: 'FAILED', failureCode: 'TEXT_LIMIT_EXCEEDED' });
+  assert.equal(await count('pdf_material'), 2);
 });
 
 test('추출 상태와 딸린 칸은 함께 있거나 함께 없다: DONE은 쪽 수, FAILED는 실패 사유', async () => {
