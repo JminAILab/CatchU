@@ -17782,3 +17782,525 @@
 **Source**: user_addition
 
 ---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T02:10:56Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a1eb458aba7e81d9b
+**Message**: 새 Catch NC2를 승인받고 PR 준비를 마쳤습니다. 통합 브랜치 반영, 세션 파일 삭제, S5 시험 수정, 규칙 덧붙임까지 끝났습니다. 위 PR 본문 초안과 브랜치 이름 `worker/새-catch-nc2`를 확인해 주시면 올리고 PR을 열겠습니다.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T02:14:56Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: typed
+**Message Id**: d96527bc
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T02:16:04Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T02:16:04Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T02:19:16Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a418fd76eb5a0ea85
+**Message**: 새 Catch 작업에서 NC2가 승인됐고, PR #520(리뷰어 셋)으로 올렸으며 로컬 서버와 DB도 내렸습니다. 다음 할 일은 NC3(다시 볼 곳 사실과 작업 시각)의 기능 설계를 시작하는 것입니다.
+
+---
+
+## Session End
+**Timestamp**: 2026-11-11T02:24:05Z
+**Event**: SESSION_ENDED
+**Reason**: prompt_input_exit
+
+---
+
+## Session Start
+**Timestamp**: 2026-11-11T02:24:59Z
+**Event**: SESSION_STARTED
+**Source**: startup
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T02:25:04Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: typed
+**Reply**: command
+**Message Id**: f49a08dc
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-11T02:26:56Z
+**Event**: UNIT_STARTED
+**Stage**: functional-design
+**Unit**: nc3-revisit-facts
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T02:34:22Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-design-questions.md
+**Context**: construction > nc3-revisit-facts > functional-design > functional-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T02:34:30Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: NC3 기능 설계 질문 Q1~Q5(사실 수 상한, 지시 파일 블록, AI 하네스 폴더, 커밋 링크 저장소 주소, 항목 문장)
+**Options**: Q1 A|B|X,Q2 A|B|X,Q3 A|B|X,Q4 A|B|X,Q5 A|B|X
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T02:38:10Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a30727f97417e7df0
+**Message**: NC3(다시 볼 곳 사실과 작업 시각) 기능 설계를 하고 있고, 질문 다섯 개(상한, 지시 파일, AI 폴더, 링크 주소, 문장)를 올려 두었습니다. 각각 A·B로 답하시거나 모두 A라고 해 주시면 정리해서 확인받겠습니다.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T04:13:45Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: typed
+**Message Id**: 8fecbb2f
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-11T04:14:00Z
+**Event**: QUESTION_ANSWERED
+**Stage**: functional-design
+**Details**: Q1: A; Q2: A; Q3: A; Q4: A; Q5: A(커밋 식별값 뒤에 이/가·을/를을 붙이지 않고 「에서」「의」로 쓴다. 다시 고침: 「커밋 ba6bba8에서 넣은 줄을 커밋 d42d9a3에서 다시 고침: Front/theme/src/store/firebase/firebase.ts」, 되돌림: 「커밋 1a2b3c4의 변경을 커밋 5d6e7f8에서 되돌림」, 옮김·확장자 바꿈·시험 파일은 제안 그대로); 질문으로 올리지 않고 정한 다섯 가지 그대로
+**Person Reply**: <pasted_content id="0fc9">\nQ1 A, Q2 A, Q3 A, Q4 A, Q5 A로 한다. 질문으로 올리지 않고 정한 다섯 가지도 그대로 둔다.\n\nQ5에서 하나만 고친다. 커밋 식별값 바로 뒤에는 이/가·을/를을 붙이지 않는다. 식별값 끝 글자(0-9, a-f)마다 받침이 달라서, 조사를 하나로 정해 두면 「커밋 1a2b3c4이」처럼 틀린다. 받침과 상관없는 「에서」「의」로 쓴다.\n- 다시 고침: 「커밋 ba6bba8에서 넣은 줄을 커밋 d42d9a3에서 다시 고침: Front/theme/src/store/firebase/firebase.ts」\n- 되돌림: 「커밋 1a2b3c4의 변경을 커밋 5d6e7f8에서 되돌림」\n- 옮김·확장자 바꿈·시험 파일 문장은 제안 그대로다.\n\ndone\n</pasted_content id="0fc9">
+**Message Id**: 8fecbb2f
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T04:14:09Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-design-questions.md
+**Context**: construction > nc3-revisit-facts > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T04:14:11Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-design-questions.md
+**Context**: construction > nc3-revisit-facts > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T04:14:13Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-design-questions.md
+**Context**: construction > nc3-revisit-facts > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T04:14:15Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-design-questions.md
+**Context**: construction > nc3-revisit-facts > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T04:14:22Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-design-questions.md
+**Context**: construction > nc3-revisit-facts > functional-design > functional-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T04:14:30Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-design-questions.md
+**Unit**: nc3-revisit-facts
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T04:19:16Z
+**Event**: HUMAN_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: 74365471
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T04:19:17Z
+**Event**: QUESTION_REPLIED
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Question**: 이대로 NC3 기능 설계 문서를 만들어도 될까요?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T04:19:21Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-design-questions.md
+**Context**: construction > nc3-revisit-facts > functional-design > functional-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-11T04:19:22Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: functional-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-design-questions.md
+**Questions SHA-256**: 75978d7cdd4e70b547463a88e42a2217b1cb6a283b19b30890fcb431bf6050bb
+**Hash Scope**: confirmed-content-v2
+**Unit**: nc3-revisit-facts
+**Message Id**: 74365471
+**Person Reply**: Looks correct
+**Summary Authorization Id**: 54a735154438ac01e9c8d8961fb6d64c066ecf1a5dcbfd07f851a9bc93c42f78
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T04:21:16Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/entities.md
+**Context**: construction > nc3-revisit-facts > functional-design > entities.md
+**Summary Authorization Id**: 54a735154438ac01e9c8d8961fb6d64c066ecf1a5dcbfd07f851a9bc93c42f78
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T04:23:30Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/rules.md
+**Context**: construction > nc3-revisit-facts > functional-design > rules.md
+**Summary Authorization Id**: 54a735154438ac01e9c8d8961fb6d64c066ecf1a5dcbfd07f851a9bc93c42f78
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T04:24:54Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md
+**Context**: construction > nc3-revisit-facts > functional-design > functional-spec.md
+**Summary Authorization Id**: 54a735154438ac01e9c8d8961fb6d64c066ecf1a5dcbfd07f851a9bc93c42f78
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T04:25:00Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md
+**Context**: construction > nc3-revisit-facts > functional-design > functional-spec.md
+**Summary Authorization Id**: 54a735154438ac01e9c8d8961fb6d64c066ecf1a5dcbfd07f851a9bc93c42f78
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T04:25:12Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/traceability.json
+**Context**: construction > nc3-revisit-facts > functional-design > traceability.json
+**Summary Authorization Id**: 54a735154438ac01e9c8d8961fb6d64c066ecf1a5dcbfd07f851a9bc93c42f78
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T04:25:27Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/functional-design/memory.md
+**Context**: construction > functional-design > memory.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T04:25:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/functional-design/memory.md
+**Context**: construction > functional-design > memory.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T04:25:37Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0bdfe347
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/entities.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T04:25:37Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0bdfe347
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/entities.md
+**Duration ms**: 86
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T04:25:37Z
+**Event**: SENSOR_FIRED
+**Fire id**: 92e593a3
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/rules.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T04:25:37Z
+**Event**: SENSOR_PASSED
+**Fire id**: 92e593a3
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/rules.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T04:25:37Z
+**Event**: SENSOR_FIRED
+**Fire id**: 9ad85db3
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T04:25:37Z
+**Event**: SENSOR_PASSED
+**Fire id**: 9ad85db3
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/functional-spec.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T04:25:37Z
+**Event**: SENSOR_FIRED
+**Fire id**: 308662b8
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T04:25:37Z
+**Event**: SENSOR_PASSED
+**Fire id**: 308662b8
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/traceability.json
+**Duration ms**: 86
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T04:25:38Z
+**Event**: SENSOR_FIRED
+**Fire id**: 70c2a751
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/entities.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T04:25:38Z
+**Event**: SENSOR_PASSED
+**Fire id**: 70c2a751
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/entities.md
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T04:25:38Z
+**Event**: SENSOR_FIRED
+**Fire id**: bea39cc1
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T04:25:38Z
+**Event**: SENSOR_PASSED
+**Fire id**: bea39cc1
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: nc3-revisit-facts
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc3-revisit-facts/functional-design/traceability.json
+**Duration ms**: 91
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-11T04:25:38Z
+**Event**: REVIEW_REQUESTED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc3-revisit-facts
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:ba4ac7194d04b5c8d268a2c6a8db9a245885feb733c39d0084e908dd7bb726b8
+**Request Id**: review:163e046074475cc0d3150045ec286755
+**Review File**: .aidlc-engine/reviews/functional-design/units/nc3-revisit-facts/7332c702b7dcc515/1.163e046074475cc0d3150045ec286755.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T04:25:44Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-11T04:26:07Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T04:27:48Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviews/functional-design/units/nc3-revisit-facts/7332c702b7dcc515/1.163e046074475cc0d3150045ec286755.review.md
+**Context**: .aidlc-engine > reviews > functional-design > units > nc3-revisit-facts > 7332c702b7dcc515 > 1.163e046074475cc0d3150045ec286755.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T04:27:56Z
+**Event**: HOST_TURN
+**Session**: a859c535-18d0-48e9-a5f2-aca64bb564f2
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T04:27:56Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: adc625f84a437bb66
+**Review File Digest**: .aidlc-engine/reviews/functional-design/units/nc3-revisit-facts/7332c702b7dcc515/1.163e046074475cc0d3150045ec286755.review.md=d5385586c4c8e5adb65a0159cbe0729104e952b0aaf8fe3ec61eea7ef1f4819d
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-11T04:28:04Z
+**Event**: REVIEW_COMPLETED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc3-revisit-facts
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:ba4ac7194d04b5c8d268a2c6a8db9a245885feb733c39d0084e908dd7bb726b8
+**Artifact Fingerprint**: sha256:ba4ac7194d04b5c8d268a2c6a8db9a245885feb733c39d0084e908dd7bb726b8
+**Request Id**: review:163e046074475cc0d3150045ec286755
+**Review Record**: .aidlc-engine/reviews/functional-design/units/nc3-revisit-facts/7332c702b7dcc515/1.json
+**Review Record Digest**: sha256:22d19450ae20e9e4a9f6f728843cccb68cfca741a1611e569cdd6b1d39744d83
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-11T04:28:07Z
+**Event**: UNIT_COMPLETED
+**Stage**: functional-design
+**Unit**: nc3-revisit-facts
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
