@@ -23,7 +23,7 @@ from app.consumer.settings import ChildSettings
 from app.pdf_extraction.envelope import check_request
 from app.pdf_extraction.extract import extract_pages
 from app.pdf_extraction.reader import FileUnreadable, SourceUnavailable, read_pdf
-from app.pdf_extraction.settings import PdfChildSettings
+from app.pdf_extraction.settings import PdfChildSettings, s3_total_budget
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,13 @@ def _outcome(child_input: PdfChildInput) -> Frame:
         return Frame("defect", error_type="PdfRequestInvalid")
     pdf = child_input.pdf
     try:
-        data = read_pdf(pdf.source, request.storage_key, pdf.limits.max_file_bytes)
+        data = read_pdf(
+            pdf.source,
+            request.storage_key,
+            pdf.limits.max_file_bytes,
+            # 느리게 흘러오는 저장소 응답이 자식 시간 제한(→ UNREADABLE_FILE)에 먼저 걸리지 않게 한다(#521 리뷰).
+            total_timeout=s3_total_budget(pdf.limits.child_timeout),
+        )
     except FileUnreadable as error:
         logger.info("원본을 읽을 수 없음: reason=%s", error.reason)
         return Frame(

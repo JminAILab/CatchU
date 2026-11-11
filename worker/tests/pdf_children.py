@@ -66,9 +66,16 @@ class _MemoryS3:
 def s3_body_memory_error(conn: Connection, child_input: ChildInput) -> None:
     """실제 `read_pdf`의 S3 경로를 타되 본문 읽기에서 MemoryError가 난다(R-MEM, 합성)."""
 
-    def read(source: object, key: str, max_bytes: int) -> bytes:
+    def read(
+        source: object, key: str, max_bytes: int, *, total_timeout: float | None = None
+    ) -> bytes:
+        # 자식이 넘기는 전체 시간 예산을 그대로 넘겨, 예산을 거는 경로에서도 MemoryError 분류가 유지되는지 본다.
         return read_pdf(
-            S3Source("catchu-test"), key, max_bytes, s3_client_factory=_MemoryS3
+            S3Source("catchu-test"),
+            key,
+            max_bytes,
+            s3_client_factory=_MemoryS3,
+            total_timeout=total_timeout,
         )
 
     setattr(pdf_child, "read_pdf", read)  # noqa: B010

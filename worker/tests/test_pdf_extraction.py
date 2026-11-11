@@ -1,29 +1,53 @@
 """PDF 글 추출(extract)·원본 읽기(reader)·설정(settings) 단위 시험. 합성 PDF 바이트만 쓴다(계획 7.3)."""
 
+import base64
 import io
 import json
+import logging
+import socket
+import threading
+import time
+import zlib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
-from pdf_synthetic import new_id, pdf_bytes, pdf_request, place, text_pages
-from pypdf import PageObject
+from pdf_synthetic import (
+    aes256_pdf_bytes,
+    new_id,
+    pdf_bytes,
+    pdf_request,
+    place,
+    text_pages,
+)
+from pypdf import PageObject, PdfReader
+from pypdf.errors import DependencyError, PdfReadError
 
 from app.consumer.settings import SettingsError
 from app.pdf_extraction.envelope import storage_key
 from app.pdf_extraction.extract import extract_pages, normalize_page_text
 from app.pdf_extraction.reader import (
+    S3_READ_THREAD_NAME,
     FileUnreadable,
     S3Client,
     SourceUnavailable,
+    default_s3_client,
     read_pdf,
+    s3_client_config,
 )
 from app.pdf_extraction.settings import (
+    DEFAULT_CHILD_TIMEOUT,
+    S3_CONNECT_TIMEOUT,
+    S3_MAX_ATTEMPTS,
+    S3_READ_TIMEOUT,
+    S3_REQUEST_GIVE_UP_SECONDS,
+    S3_TOTAL_BUDGET_RATIO,
     LocalSource,
     S3Source,
     pdf_settings_from_environment,
+    s3_total_budget,
 )
 
 MB = 1024 * 1024
@@ -53,6 +77,47 @@ def test_encrypted_pdf_fails_as_encrypted() -> None:
     data = pdf_bytes(["Secret"], password="pw")
 
     assert extract_pages(data) == {"outcome": "FAILED", "failureCode": "ENCRYPTED"}
+
+
+def test_aes256_pdf_fails_as_encrypted_not_unreadable(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """#521 리뷰: AES-256으로 잠긴 PDF는 여는 단계에서 pypdf가 DependencyError를 낸다. 잠긴 파일로 안내한다."""
+    data = aes256_pdf_bytes()
+    # 전제: 이 PDF는 pypdf가 여는 단계에서 DependencyError를 낸다(암호 라이브러리가 없는 worker와 같은 조건).
+    with pytest.raises(DependencyError):
+        PdfReader(io.BytesIO(data), strict=False)
+
+    with caplog.at_level(logging.INFO, logger="app.pdf_extraction.extract"):
+        result = extract_pages(data)
+
+    assert result == {"outcome": "FAILED", "failureCode": "ENCRYPTED"}
+    assert "pages" not in result
+    assert "PDF 파싱 실패" not in caplog.text
+
+
+def test_open_stage_errors_other_than_dependency_stay_unreadable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """여는 단계의 다른 예외(손상 등)는 ENCRYPTED로 바뀌지 않는다. DependencyError만 잠긴 파일로 본다."""
+
+    def broken(*_args: object, **_kwargs: object) -> None:
+        raise PdfReadError("synthetic damage")
+
+    monkeypatch.setattr("app.pdf_extraction.extract.PdfReader", broken)
+    assert extract_pages(pdf_bytes(["Text"])) == {
+        "outcome": "FAILED",
+        "failureCode": "UNREADABLE_FILE",
+    }
+
+    def needs_library(*_args: object, **_kwargs: object) -> None:
+        raise DependencyError("cryptography>=3.1 is required for AES algorithm")
+
+    monkeypatch.setattr("app.pdf_extraction.extract.PdfReader", needs_library)
+    assert extract_pages(pdf_bytes(["Text"])) == {
+        "outcome": "FAILED",
+        "failureCode": "ENCRYPTED",
+    }
 
 
 @pytest.mark.parametrize(
@@ -273,6 +338,414 @@ def test_s3_storage_failure_is_source_unavailable(
     with pytest.raises(SourceUnavailable) as caught:
         _read_s3(FakeS3(error=error))
     assert caught.value.error_type == error_type
+
+
+# reader: S3 시간 제한(#521 리뷰 3) -----------------------------------------------------------
+# 먼저 정한 기대: S3가 막혀도 자식 시간 제한(120초)보다 먼저 포기하고, 그 포기는 파일 실패가 아니라 저장소 장애
+# (SourceUnavailable → 자식 defect → 결과 없이 작업 실패 → 10분 시한 대기)로 분류된다.
+# 실패 조건: boto3 기본값(60초·5회)이 남음, 시간 초과가 FileUnreadable로 분류됨, 재시도가 정한 횟수를 넘음.
+# 보완(2026-11-11): 연결·읽기 시간 제한과 시도 횟수는 요청 단계만 묶는다. 본문이 읽기 시간 제한보다 짧은 간격으로
+# 조금씩 계속 오면 그 셋으로는 끝나지 않으므로, 읽기 전체에 시간 예산을 두고 넘으면 저장소 장애로 끝낸다.
+
+
+def test_default_s3_client_gives_up_before_child_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "ap-northeast-2")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "synthetic")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "synthetic")
+
+    config = default_s3_client().meta.config  # type: ignore[attr-defined]
+
+    assert config.connect_timeout == S3_CONNECT_TIMEOUT == 5
+    assert config.read_timeout == S3_READ_TIMEOUT == 15
+    assert config.retries == {"mode": "standard", "total_max_attempts": S3_MAX_ATTEMPTS}
+    assert S3_MAX_ATTEMPTS == 2
+    # 응답이 아예 오지 않을 때 요청을 포기하기까지의 상한이다(시도마다 연결·읽기 상한을 다 쓰고 재시도 대기까지).
+    # 본문 내려받기 전체의 상한이 아니다. 그것은 아래 전체 시간 예산이 묶는다.
+    assert S3_REQUEST_GIVE_UP_SECONDS == 41
+    # 전체 시간 예산은 자식 제한의 60%라 설정으로 자식 제한을 바꿔도 언제나 그보다 먼저 끝난다.
+    assert s3_total_budget(DEFAULT_CHILD_TIMEOUT) == 72
+    assert S3_REQUEST_GIVE_UP_SECONDS < s3_total_budget(DEFAULT_CHILD_TIMEOUT)
+    for child_timeout in (1, 30, 120, 600):
+        assert s3_total_budget(child_timeout) < child_timeout
+    assert 0 < S3_TOTAL_BUDGET_RATIO < 1
+
+
+class _SilentServer:
+    """연결은 받지만 한 바이트도 답하지 않는 로컬 서버(S3가 응답하지 않는 상황의 대역)."""
+
+    def __init__(self) -> None:
+        self._listener = socket.socket()
+        self._listener.bind(("127.0.0.1", 0))
+        self._listener.listen(8)
+        self._listener.settimeout(0.2)
+        self.port = self._listener.getsockname()[1]
+        self.accepted = 0
+        self._held: list[socket.socket] = []
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._serve, daemon=True)
+        self._thread.start()
+
+    def _serve(self) -> None:
+        while not self._stop.is_set():
+            try:
+                connection, _ = self._listener.accept()
+            except OSError:
+                continue
+            self.accepted += 1
+            self._held.append(connection)
+
+    def close(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=2)
+        for connection in self._held:
+            connection.close()
+        self._listener.close()
+
+
+def _real_s3_client(endpoint: str, *, timeout: float, attempts: int) -> S3Client:
+    import boto3
+
+    client: S3Client = boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        region_name="ap-northeast-2",
+        aws_access_key_id="synthetic",
+        aws_secret_access_key="synthetic",
+        config=s3_client_config(timeout, timeout, attempts),
+    )
+    return client
+
+
+def test_unresponsive_s3_times_out_as_storage_failure_within_bound() -> None:
+    """실제 boto3·실제 소켓: 응답 없는 저장소는 정한 횟수만 시도한 뒤 저장소 장애로 끝난다(시간 값만 줄인다)."""
+    server = _SilentServer()
+    timeout, attempts = 1.0, 2
+    try:
+        client = _real_s3_client(
+            f"http://127.0.0.1:{server.port}", timeout=timeout, attempts=attempts
+        )
+        started = time.monotonic()
+        with pytest.raises(SourceUnavailable) as caught:
+            read_pdf(
+                S3Source("catchu-test"),
+                storage_key(new_id(), new_id()),
+                20 * MB,
+                s3_client_factory=lambda: client,
+            )
+        elapsed = time.monotonic() - started
+    finally:
+        server.close()
+
+    assert caught.value.error_type == "ReadTimeoutError"
+    assert server.accepted == attempts, "정한 시도 횟수만큼만 연결한다"
+    # 시도 2회 × 읽기 1초 + 재시도 대기 최대 1초. 여유 2초를 더해도 기본값(60초·5회)과는 구분된다.
+    assert attempts * timeout <= elapsed < attempts * (timeout + timeout) + 1 + 2
+
+
+def test_unreachable_s3_is_storage_failure_not_file_failure() -> None:
+    """연결 자체가 안 되는 저장소(닫힌 포트)도 파일 실패가 아니라 저장소 장애다."""
+    probe = socket.socket()
+    probe.bind(("127.0.0.1", 0))
+    port = probe.getsockname()[1]
+    probe.close()
+    client = _real_s3_client(f"http://127.0.0.1:{port}", timeout=1.0, attempts=2)
+
+    with pytest.raises(SourceUnavailable) as caught:
+        read_pdf(
+            S3Source("catchu-test"),
+            storage_key(new_id(), new_id()),
+            20 * MB,
+            s3_client_factory=lambda: client,
+        )
+
+    assert caught.value.error_type in {"EndpointConnectionError", "ConnectTimeoutError"}
+    assert "catchu-test" not in str(caught.value)
+
+
+class _BodyServer:
+    """S3 GetObject 응답을 흉내 내는 로컬 서버. 본문을 한꺼번에 주거나 정한 간격으로 조금씩 계속 준다."""
+
+    def __init__(
+        self,
+        body: bytes,
+        *,
+        piece: int | None = None,
+        interval: float = 0.0,
+        headers: Mapping[str, str] | None = None,
+    ) -> None:
+        self._headers = dict(headers or {})
+        self._body = body
+        self._piece = piece
+        self._interval = interval
+        self._listener = socket.socket()
+        self._listener.bind(("127.0.0.1", 0))
+        self._listener.listen(8)
+        self._listener.settimeout(0.2)
+        self.port = self._listener.getsockname()[1]
+        self.sent = 0
+        self.peer_closed = threading.Event()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._serve, daemon=True)
+        self._thread.start()
+
+    def _serve(self) -> None:
+        while not self._stop.is_set():
+            try:
+                connection, _ = self._listener.accept()
+            except OSError:
+                continue
+            threading.Thread(
+                target=self._answer, args=(connection,), daemon=True
+            ).start()
+
+    def _answer(self, connection: socket.socket) -> None:
+        try:
+            connection.recv(65536)
+            head = (
+                "HTTP/1.1 200 OK\r\nContent-Type: application/pdf\r\n"
+                + "".join(
+                    f"{name}: {value}\r\n" for name, value in self._headers.items()
+                )
+                + f"Content-Length: {len(self._body)}\r\n\r\n"
+            )
+            connection.sendall(head.encode("ascii"))
+            if self._piece is None:
+                connection.sendall(self._body)
+                self.sent = len(self._body)
+                return
+            for start in range(0, len(self._body), self._piece):
+                if self._stop.is_set():
+                    return
+                connection.sendall(self._body[start : start + self._piece])
+                self.sent = start + self._piece
+                time.sleep(self._interval)
+        except OSError:
+            # 받는 쪽이 연결을 놓았다(시간 예산을 넘겨 응답 본문을 닫은 경우).
+            self.peer_closed.set()
+        finally:
+            connection.close()
+
+    def close(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=2)
+        self._listener.close()
+
+
+def _s3_read_threads() -> list[threading.Thread]:
+    return [t for t in threading.enumerate() if t.name == S3_READ_THREAD_NAME]
+
+
+def test_trickling_s3_body_ends_as_storage_failure_at_total_budget() -> None:
+    """#521 리뷰 보완: 본문이 개별 읽기 시간 제한보다 짧은 간격으로 조금씩 계속 와도 전체 시간 예산에서 끝난다.
+
+    개별 읽기 제한 1초, 조각 간격 0.2초(제한에 걸리지 않음), 전체 예산 1.5초. 다 받으려면 20초가 넘게 걸린다.
+    기대: 예산 직후 SourceUnavailable("TotalTimeout") — 파일 실패(FileUnreadable)도, 끝없는 읽기도 아니다.
+
+    두 시점을 따로 잰다.
+    - 부른 쪽이 돌아온 시점: 예산 직후. 정리를 기다리지 않는다.
+    - 읽는 스레드와 응답이 정리된 시점: 그 뒤. 진행 중인 소켓 읽기 한 번이 끝나면(다음 조각, 0.2초 안) 줄어든 소켓
+      시간 제한으로 곧 끝나고 스레드가 응답을 닫는다. 서버는 그때 연결 끊김을 본다.
+    """
+    read_timeout, interval, budget = 1.0, 0.2, 1.5
+    body = b"0" * (100 * 1024)
+    server = _BodyServer(body, piece=1024, interval=interval)
+    try:
+        client = _real_s3_client(
+            f"http://127.0.0.1:{server.port}", timeout=read_timeout, attempts=1
+        )
+        started = time.monotonic()
+        with pytest.raises(SourceUnavailable) as caught:
+            read_pdf(
+                S3Source("catchu-test"),
+                storage_key(new_id(), new_id()),
+                20 * MB,
+                s3_client_factory=lambda: client,
+                total_timeout=budget,
+            )
+        returned = time.monotonic()
+        elapsed = returned - started
+        alive_at_return = len(_s3_read_threads())
+        # 정리는 부른 쪽이 돌아온 뒤에 읽는 스레드가 한다.
+        deadline = returned + read_timeout + 2
+        while _s3_read_threads() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        cleanup = time.monotonic() - returned
+        leftover = _s3_read_threads()
+        peer_closed = server.peer_closed.wait(timeout=read_timeout + 2)
+        sent = server.sent
+    finally:
+        server.close()
+
+    assert caught.value.error_type == "TotalTimeout"
+    assert budget <= elapsed < budget + 1.0, (
+        "예산 직후에 끝난다(조각을 다 기다리지 않는다)"
+    )
+    assert interval < read_timeout, (
+        "전제: 조각 간격이 개별 읽기 제한보다 짧아 그 제한에는 걸리지 않는다"
+    )
+    assert 0 < sent < len(body), "본문을 받는 도중에 끊었다"
+    assert alive_at_return == 1, (
+        "부른 쪽이 돌아온 순간에는 읽는 스레드가 아직 살아 있다(정리를 기다리지 않았다)"
+    )
+    assert leftover == [], "그 뒤 읽는 스레드가 스스로 끝난다"
+    assert cleanup < read_timeout, (
+        "정리는 진행 중인 소켓 읽기 한 번(다음 조각까지)과 줄어든 소켓 시간 제한 안에 끝난다"
+    )
+    assert peer_closed, "스레드가 응답 본문을 닫아 서버가 연결 끊김을 본다"
+    print(
+        f"[시점] 부른 쪽 반환 {elapsed:.2f}초(예산 {budget}초), 그 뒤 정리까지 {cleanup:.2f}초"
+    )
+
+
+def test_normal_s3_download_succeeds_within_total_budget() -> None:
+    """같은 예산·같은 클라이언트로 정상 응답은 그대로 받는다(예산이 정상 내려받기를 막지 않는다)."""
+    data = pdf_bytes(["Real socket download"]) + b"0" * (2 * MB)
+    server = _BodyServer(data)
+    try:
+        client = _real_s3_client(
+            f"http://127.0.0.1:{server.port}", timeout=1.0, attempts=1
+        )
+        result = read_pdf(
+            S3Source("catchu-test"),
+            storage_key(new_id(), new_id()),
+            20 * MB,
+            s3_client_factory=lambda: client,
+            total_timeout=5.0,
+        )
+    finally:
+        server.close()
+
+    assert result == data
+    assert _s3_read_threads() == []
+
+
+def _crc32_header(data: bytes) -> str:
+    """S3가 응답에 싣는 CRC32 체크섬 머리 값(4바이트 big-endian의 base64)."""
+    return base64.b64encode(zlib.crc32(data).to_bytes(4, "big")).decode("ascii")
+
+
+@pytest.mark.parametrize("total_timeout", [None, 5.0], ids=["no-budget", "with-budget"])
+def test_s3_body_with_wrong_checksum_is_storage_failure_not_pdf_bytes(
+    total_timeout: float | None,
+) -> None:
+    """#521 리뷰 보완: 응답 체크섬이 본문과 다르면 그 바이트를 정상 PDF로 돌려주지 않고 저장소 장애로 끝낸다.
+
+    SDK의 공개 본문 읽기(`StreamingBody.read`)가 하는 무결성 검사를 건너뛰지 않는지 본다. 내려받는 동안 바뀐 본문을
+    파일 문제(UNREADABLE_FILE)로 확정하거나 그대로 추출하면 안 된다.
+    """
+    sent = pdf_bytes(["Tampered in transit"])
+    declared = pdf_bytes(["What S3 says it stored"])
+    assert sent != declared
+    server = _BodyServer(
+        sent, headers={"x-amz-checksum-crc32": _crc32_header(declared)}
+    )
+    try:
+        client = _real_s3_client(
+            f"http://127.0.0.1:{server.port}", timeout=1.0, attempts=1
+        )
+        with pytest.raises(SourceUnavailable) as caught:
+            read_pdf(
+                S3Source("catchu-test"),
+                storage_key(new_id(), new_id()),
+                20 * MB,
+                s3_client_factory=lambda: client,
+                total_timeout=total_timeout,
+            )
+    finally:
+        server.close()
+
+    assert caught.value.error_type == "FlexibleChecksumError"
+    assert _s3_read_threads() == []
+
+
+def test_s3_body_with_matching_checksum_is_returned() -> None:
+    """체크섬이 맞는 응답은 그대로 받는다(검사가 정상 내려받기를 막지 않는다)."""
+    data = pdf_bytes(["Checksum matches"]) + b"0" * (300 * 1024)
+    server = _BodyServer(data, headers={"x-amz-checksum-crc32": _crc32_header(data)})
+    try:
+        client = _real_s3_client(
+            f"http://127.0.0.1:{server.port}", timeout=1.0, attempts=1
+        )
+        result = read_pdf(
+            S3Source("catchu-test"),
+            storage_key(new_id(), new_id()),
+            20 * MB,
+            s3_client_factory=lambda: client,
+            total_timeout=5.0,
+        )
+    finally:
+        server.close()
+
+    assert result == data
+
+
+def test_s3_body_shorter_than_declared_length_is_storage_failure() -> None:
+    """선언한 길이보다 짧게 끊긴 응답도 받은 만큼을 PDF로 돌려주지 않는다(SDK의 길이 검사)."""
+
+    class _ShortServer(_BodyServer):
+        def _answer(self, connection: socket.socket) -> None:
+            try:
+                connection.recv(65536)
+                head = f"HTTP/1.1 200 OK\r\nContent-Length: {len(self._body) + 4096}\r\n\r\n"
+                connection.sendall(head.encode("ascii") + self._body)
+            finally:
+                connection.close()
+
+    server = _ShortServer(pdf_bytes(["Cut short"]))
+    try:
+        client = _real_s3_client(
+            f"http://127.0.0.1:{server.port}", timeout=1.0, attempts=1
+        )
+        with pytest.raises(SourceUnavailable) as caught:
+            read_pdf(
+                S3Source("catchu-test"),
+                storage_key(new_id(), new_id()),
+                20 * MB,
+                s3_client_factory=lambda: client,
+                total_timeout=5.0,
+            )
+    finally:
+        server.close()
+
+    assert caught.value.error_type in {"IncompleteReadError", "ResponseStreamingError"}
+
+
+def test_total_budget_keeps_original_classification_of_other_failures() -> None:
+    """예산 안에서 난 실패는 원래 분류 그대로다: 없는 키는 파일 실패, 권한·메모리는 각자의 분류."""
+    with pytest.raises(FileUnreadable) as missing:
+        read_pdf(
+            S3Source("catchu-test"),
+            storage_key(new_id(), new_id()),
+            20 * MB,
+            s3_client_factory=lambda: FakeS3(error=_client_error("NoSuchKey")),
+            total_timeout=5.0,
+        )
+    assert missing.value.reason == "missing"
+
+    with pytest.raises(SourceUnavailable) as denied:
+        read_pdf(
+            S3Source("catchu-test"),
+            storage_key(new_id(), new_id()),
+            20 * MB,
+            s3_client_factory=lambda: FakeS3(error=_client_error("AccessDenied")),
+            total_timeout=5.0,
+        )
+    assert denied.value.error_type == "ClientError:AccessDenied"
+
+    class _OutOfMemory:
+        def get_object(self, *, Bucket: str, Key: str) -> Mapping[str, Any]:
+            raise MemoryError
+
+    with pytest.raises(MemoryError):
+        read_pdf(
+            S3Source("catchu-test"),
+            storage_key(new_id(), new_id()),
+            20 * MB,
+            s3_client_factory=lambda: _OutOfMemory(),
+            total_timeout=5.0,
+        )
 
 
 def test_s3_body_over_limit_is_too_large() -> None:

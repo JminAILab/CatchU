@@ -40,6 +40,37 @@ MAX_CHILD_TIMEOUT: Final = 600
 DEFAULT_CHILD_MEMORY_MB: Final = 512
 MIN_CHILD_MEMORY_MB: Final = 64
 MAX_CHILD_MEMORY_MB: Final = 16384
+# S3 읽기의 시간 제한과 시도 횟수(#521 리뷰). boto3 기본값(연결 60초·읽기 60초·최대 5회 시도)이면 S3 연결이 막혔을 때
+# 자식 시간 제한(120초)에 먼저 걸려 "파일을 읽을 수 없음"(UNREADABLE_FILE)으로 확정된다. 저장소 장애는 파일 탓이 아니므로
+# 자식 제한 안에서 먼저 포기해 "결과 없이 작업 실패 → 10분 시한 대기"가 되게 한다(오류별 확정 표, 팀장 결정 2026-11-10).
+# - 연결 5초: 같은 지역의 S3 연결은 보통 1초 안에 끝난다. 5초면 일시 지연은 넘기고 막힌 연결은 일찍 포기한다.
+# - 읽기 15초: 응답 조각 하나를 기다리는 상한이다(전체 내려받기 시간이 아니다). 20 MB 원본의 조각이 15초 동안 한 번도
+#   오지 않으면 장애로 본다.
+# - 시도 2회(재시도 1회): 순간 오류 한 번은 넘긴다. 재시도 대기는 표준 방식에서 첫 재시도 최대 1초다.
+# 이 셋이 묶는 것은 **요청 단계**(연결해서 응답 머리를 받기까지)뿐이다. 응답이 아예 오지 않을 때 요청을 포기하기까지의
+# 상한이 2 × (5 + 15) + 1 = 41초다(S3_REQUEST_GIVE_UP_SECONDS). **본문 내려받기 전체의 상한이 아니다.** 읽기 15초는 조각
+# 사이의 간격만 재므로, 본문이 15초보다 짧은 간격으로 조금씩 계속 오면 이 셋만으로는 내려받기가 끝없이 이어질 수 있다.
+S3_CONNECT_TIMEOUT: Final = 5
+S3_READ_TIMEOUT: Final = 15
+S3_MAX_ATTEMPTS: Final = 2
+S3_RETRY_BACKOFF_MAX: Final = 1
+S3_REQUEST_GIVE_UP_SECONDS: Final = (
+    S3_MAX_ATTEMPTS * (S3_CONNECT_TIMEOUT + S3_READ_TIMEOUT)
+    + (S3_MAX_ATTEMPTS - 1) * S3_RETRY_BACKOFF_MAX
+)
+# S3 읽기 **전체**(클라이언트 준비·요청·재시도·본문 내려받기)의 시간 예산(초). 넘으면 내려받기를 버리고 저장소 장애로 끝낸다
+# (reader.py). 느리게 흘러오는 응답도 이 예산으로 끊는다. 자식 시간 제한보다 먼저 끝나야 하므로 자식 제한의 60%를 넘지 않게
+# 한다: 기본 제한 120초에서 72초이고, 남는 48초가 추출과 결과 전송 몫이다(대표 합성 PDF 추출은 1초 미만이었다).
+# 72초 안에 20 MB를 받으려면 평균 약 0.28 MB/s면 된다. 요청 단계가 41초를 다 써도 31초가 남는다.
+# 자식 제한을 설정으로 줄이면 예산도 같은 비율로 줄어 언제나 자식 제한보다 먼저 끝난다.
+S3_TOTAL_BUDGET_RATIO: Final = 0.6
+
+
+def s3_total_budget(child_timeout: float) -> float:
+    """S3 읽기 전체에 쓸 수 있는 시간(초). 자식 시간 제한의 60%."""
+    return child_timeout * S3_TOTAL_BUDGET_RATIO
+
+
 # 자식 자기 마감 여유(초): picked_at + child_timeout + child_grace에 자식이 스스로 끝난다.
 CHILD_GRACE: Final = 15
 # api PDF_MATERIAL_LIMITS.fileSizeBytes·PDF_PAGE_LIMIT와 같은 값(BR1.2).
