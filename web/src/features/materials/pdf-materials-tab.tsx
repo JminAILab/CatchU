@@ -37,6 +37,7 @@ export type PdfTabState = {
  * - 올리기는 보내기 전 검사(파일 1개·PDF·20 MB·제목 100자)를 지난 뒤에만 요청한다. 403 `AI_CONSENT_REQUIRED`면 동의 창을 열고
  *   동의가 기록되면 같은 요청을 한 번만 다시 보낸다. 201일 때만 목록 맨 위에 "글 추출 중"으로 더한다.
  * - 삭제는 확인 뒤 204일 때만 목록에서 뺀다. 실패하면 "삭제되지 않았습니다"와 이유를 그 줄에 보인다.
+ * - 올리기·삭제가 성공한 순간 목록을 읽는 중이었다면 그 요청을 버리고 다시 읽는다. 변경 전에 읽은 응답이 방금 반영한 내용을 덮지 않게 한다.
  * - 로그인이 바뀐 뒤 도착한 응답은 반영하지 않는다.
  */
 export function createPdfTabModel(client: PdfMaterialsApi, consent: PdfConsentRunner, deps: PdfTabDeps) {
@@ -45,6 +46,14 @@ export function createPdfTabModel(client: PdfMaterialsApi, consent: PdfConsentRu
   });
   let listRequest: AbortController | null = null;
   let listGeneration = 0;
+
+  /**
+   * 목록을 읽는 중에 올리기·삭제가 성공했다면 그 응답은 변경 전에 읽은 것이다. 취소하고 변경 뒤의 목록을 다시 읽는다
+   * (텍스트 자료 화면의 `reloadIfLoading`과 같은 처리). 읽는 중이 아니면 아무것도 하지 않는다.
+   */
+  function reloadIfLoading() {
+    if (listRequest && !listRequest.signal.aborted) void load();
+  }
 
   async function load() {
     listRequest?.abort();
@@ -106,8 +115,7 @@ export function createPdfTabModel(client: PdfMaterialsApi, consent: PdfConsentRu
       list: prev.list.state !== "ready" ? prev.list
         : { ...prev.list, items: [result.value, ...prev.list.items.filter((item) => item.pdfMaterialId !== result.value.pdfMaterialId)] },
     }));
-    // 목록을 아직 읽는 중이었다면 올리기 전에 읽은 응답이 새 자료를 덮지 않게 다시 읽는다.
-    if (listRequest && !listRequest.signal.aborted) void load();
+    reloadIfLoading();
     return true;
   }
 
@@ -126,6 +134,8 @@ export function createPdfTabModel(client: PdfMaterialsApi, consent: PdfConsentRu
       ...prev, deletingId: null,
       list: { ...prev.list, items: prev.list.items.filter((item) => item.pdfMaterialId !== pdfMaterialId) },
     }));
+    // 삭제를 기다리는 동안 [새로고침]을 눌렀다면 그 응답에는 지운 PDF가 들어 있다. 되살아나지 않게 다시 읽는다.
+    reloadIfLoading();
   }
 
   return { store, load, loadMore, upload, remove, dispose: () => listRequest?.abort() };

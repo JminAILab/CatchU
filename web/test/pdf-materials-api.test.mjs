@@ -339,6 +339,52 @@ test("삭제: 확인 창에서 머무르면 요청하지 않고, 204일 때만 �
   assert.equal(other.store.get().list.state, "loading", "다른 로그인의 목록 응답으로 화면을 채우지 않는다");
 });
 
+// #521 리뷰(2026-11-11): 삭제를 기다리는 동안에도 [새로고침]은 눌린다. 삭제 전에 읽기 시작한 목록 응답이 삭제 성공보다 늦게 오면
+// 지운 PDF가 목록에 되살아나고, 20벌을 채웠던 회원은 올리기까지 계속 막힌다.
+// 먼저 정한 순서: PDF 20개 → 삭제 요청 → 새로고침 요청 → 삭제 성공 → 삭제 전 목록 응답 도착.
+// 기대: 지운 PDF가 없는 19개 목록이 남고 다시 올릴 수 있다. 실패 조건: 지운 PDF가 다시 보임, 20개로 남아 올리기가 막힘.
+test("삭제 뒤 늦은 목록 응답(#521): 삭제 전에 읽은 새로고침 응답이 삭제 성공 뒤에 와도 지운 PDF가 되살아나지 않고 19개로 남아 다시 올릴 수 있다", async () => {
+  const pending = () => { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; };
+  const ids = Array.from({ length: PDF_LIMITS.perMember }, (_, index) => `33333333-3333-4333-8333-${String(index).padStart(12, "0")}`);
+  const twenty = ok({ items: ids.map((id) => item(id, { extractionState: "DONE", pageCount: 1 })), page: { nextCursor: null } });
+  const nineteen = ok({ items: twenty.value.items.slice(1), page: { nextCursor: null } });
+  const removal = pending();
+  const staleRefresh = pending();
+  const api = fakeApi({ list: [twenty, () => staleRefresh.promise, nineteen], remove: [() => removal.promise] });
+  const model = createPdfTabModel(api, passthroughPdfConsent, deps());
+  await model.load();
+  assert.equal(model.store.get().list.items.length, 20);
+  assert.equal(pdfLimitReached(model.store.get().list), true, "20벌이면 올리기가 막힌 상태에서 시작한다");
+
+  const removing = model.remove(ids[0]);          // 1. 삭제 요청
+  assert.equal(model.store.get().deletingId, ids[0]);
+  const refreshing = model.load();                // 2. 새로고침 요청(삭제 전 목록을 읽는다)
+  assert.deepEqual(api.calls.map((call) => call.name), ["list", "remove", "list"]);
+  removal.resolve(ok(true));                      // 3. 삭제 성공
+  await removing;
+  staleRefresh.resolve(twenty);                   // 4. 삭제 전 목록 응답이 늦게 도착
+  await refreshing;
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const { list, deletingId } = model.store.get();
+  assert.equal(deletingId, null);
+  assert.equal(list.state, "ready");
+  assert.ok(!list.items.some((entry) => entry.pdfMaterialId === ids[0]), "지운 PDF가 목록에 다시 나타나지 않는다");
+  assert.deepEqual(list.items.map((entry) => entry.pdfMaterialId), ids.slice(1));
+  assert.equal(list.items.length, 19);
+  assert.equal(pdfLimitReached(list), false, "19벌이라 다시 올릴 수 있다");
+  assert.equal(api.count("list"), 3, "삭제 전 응답을 버리고 목록을 한 번 다시 읽는다");
+  assert.equal(api.calls[2].args[1].aborted, true, "삭제 전에 보낸 목록 요청은 취소한다");
+
+  // 목록을 읽는 중이 아닐 때의 삭제는 다시 읽지 않고 그 줄만 뺀다(기존 동작).
+  const quiet = fakeApi({ list: [twenty] });
+  const settled = createPdfTabModel(quiet, passthroughPdfConsent, deps());
+  await settled.load();
+  await settled.remove(ids[0]);
+  assert.equal(quiet.count("list"), 1);
+  assert.equal(settled.store.get().list.items.length, 19);
+});
+
 test("요청: 업로드는 회원 토큰과 multipart(파일 종류 application/pdf·제목)로 보내고, 받은 사람 사본은 회원 토큰 없이 grant를 머리로만 싣는다", async () => {
   const requests = [];
   const responses = [];
