@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useRef, type ReactNode } from "react";
 import { PdfViewerPanel, usePdfViewer, type PdfFetch, type PdfViewerDeps } from "../recipient/pdf-viewer-launcher.tsx";
 import type { LinkAccessCode } from "../recipient/recipient-slots.ts";
 import type { PublishedPdfPage } from "./publications-api.ts";
@@ -14,6 +14,7 @@ import styles from "../recipient/pdf-viewer.module.css";
  *   (추출한 글은 신뢰할 수 없는 자료라 마크업으로 해석하지 않는다, NFR1.8).
  * - 근거 위치(`pages[n]`, `[charStart, charEnd)`)가 오면 그 쪽 글의 범위만 `<mark>`로 감싼다.
  * - [PDF 보기]·[새 탭에서 열기]·[원본 n쪽 열기]는 공용 PDF 뷰어를 쓴다. 뷰어가 열려 있으면 쪽만 옮기고, 닫혀 있으면 다시 요청한다.
+ * - 뷰어는 쪽 목록 위에 있다. 아래쪽 쪽에서 [원본 n쪽 열기]를 누르면 뷰어 자리로 화면을 옮겨 연 쪽이 보이게 한다(#521 리뷰).
  */
 
 /** 그 항목의 사본을 받는 방법. `onAccessLost`는 받은 사람 화면에서만 넘긴다(401·404면 화면을 바꾸고 grant를 지운다). */
@@ -62,14 +63,38 @@ export function PublishedPdfItem({ title, pageCount, pages, highlight = null, so
   );
 }
 
+/** 화면을 옮길 자리. 브라우저 요소의 필요한 칸만 본다(시험은 같은 모양의 객체를 넘긴다). */
+export type ViewerAnchor = { scrollIntoView(options: { block: "start"; behavior: "auto" | "smooth" }): void };
+
+/** 움직임을 줄이도록 설정한 사용자에게는 부드러운 스크롤을 쓰지 않는다. 판정할 수 없는 환경(서버 렌더링 등)은 줄이지 않은 것으로 본다. */
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * [원본 n쪽 열기]: 뷰어 자리로 화면을 옮긴 뒤 그 쪽을 연다(#521 리뷰).
+ * 뷰어는 쪽 목록 위에 있어, 옮기지 않으면 아래쪽 쪽에서 눌렀을 때 화면에 변화가 보이지 않는다.
+ * 뷰어 자리(단추 줄과 "불러오는 중" 안내)는 뷰어를 열기 전에도 있으므로 요청을 기다리지 않고 바로 옮긴다.
+ * 처음 여는 경우에는 그 자리 바로 아래에 PDF가 그려지고, 이미 열린 경우에는 같은 자리에서 쪽만 바뀐다.
+ */
+export function openPdfPageAtViewer(
+  model: { openInline(page?: number): unknown }, anchor: ViewerAnchor | null, page: number, reduceMotion: boolean = prefersReducedMotion(),
+): void {
+  anchor?.scrollIntoView({ block: "start", behavior: reduceMotion ? "auto" : "smooth" });
+  void model.openInline(page);
+}
+
 function PdfPagesWithViewer({ title, pages, highlight, source }: {
   title: string; pages: readonly PublishedPdfPage[]; highlight: PdfHighlight; source: PdfCopySource;
 }) {
   const { model, state } = usePdfViewer(source.fetchPdf, source.onAccessLost, source.viewerDeps);
+  const anchor = useRef<HTMLDivElement>(null);
   return (
     <>
-      <PdfViewerPanel model={model} state={state} title={title} testId="snapshot-pdf-viewer" />
-      <PdfPages pages={pages} highlight={highlight} onOpenPage={state.loading !== null ? "busy" : (page) => { void model.openInline(page); }} />
+      <div ref={anchor} className={styles.anchor} data-testid="snapshot-pdf-viewer-anchor">
+        <PdfViewerPanel model={model} state={state} title={title} testId="snapshot-pdf-viewer" />
+      </div>
+      <PdfPages pages={pages} highlight={highlight}
+        onOpenPage={state.loading !== null ? "busy" : (page) => { openPdfPageAtViewer(model, anchor.current, page); }} />
     </>
   );
 }

@@ -21,7 +21,7 @@ import { load } from "./u2-render.mjs";
 process.env.NEXT_PUBLIC_API_BASE_URL ??= "http://127.0.0.1:3001";
 
 const { PublishedSnapshotView } = await load("features/publications/snapshot-view.tsx");
-const { PublishedPdfItem, UNREADABLE_PAGE_TEXT, pdfPagePath } = await load("features/publications/published-pdf-item.tsx");
+const { PublishedPdfItem, UNREADABLE_PAGE_TEXT, openPdfPageAtViewer, pdfPagePath } = await load("features/publications/published-pdf-item.tsx");
 const { RecipientPublicationView } = await load("features/recipient/recipient-view.tsx");
 const { PublicationDetailView } = await load("features/publications/publication-detail-view.tsx");
 
@@ -189,4 +189,33 @@ test("화면 연결: 받은 사람 화면과 작성자 발행본 화면의 PDF �
   assert.match(owner, /data-testid="publication-detail"[^>]*data-state="STOPPED"/);
   assert.match(owner, /data-testid="snapshot-pdf-viewer-open"/);
   assert.match(owner, /data-testid="snapshot-pdf-page-count">3쪽</);
+});
+
+// #521 리뷰 4: 뷰어는 쪽 목록 위에 있어, 아래쪽 쪽에서 [원본 n쪽 열기]를 눌러도 화면이 그대로면 아무 일도 없어 보인다.
+// 기대: 누르면 뷰어 자리로 화면을 옮기고 그 쪽을 연다(처음 여는 경우와 이미 열린 경우 모두). 실패 조건: 화면을 옮기지 않음, 다른 쪽을 엶.
+test("원본 n쪽 열기(#521): 뷰어 자리로 화면을 옮긴 뒤 요청한 쪽을 열고, 움직임 줄이기 설정이면 부드러운 스크롤을 쓰지 않는다", () => {
+  const events = [];
+  const anchor = { scrollIntoView: (options) => events.push(["scroll", options]) };
+  const model = { openInline: (page) => { events.push(["open", page]); return Promise.resolve(); } };
+
+  openPdfPageAtViewer(model, anchor, 48, false);
+  assert.deepEqual(events, [["scroll", { block: "start", behavior: "smooth" }], ["open", 48]], "화면을 먼저 옮기고 48쪽을 연다");
+
+  events.length = 0;
+  openPdfPageAtViewer(model, anchor, 2, true);
+  assert.deepEqual(events, [["scroll", { block: "start", behavior: "auto" }], ["open", 2]]);
+
+  // 자리를 아직 잡지 못했어도(요소 없음) 쪽은 연다.
+  events.length = 0;
+  openPdfPageAtViewer(model, null, 7, false);
+  assert.deepEqual(events, [["open", 7]]);
+
+  // 화면: 뷰어는 옮길 자리(anchor) 안에 있고 그 자리는 쪽 목록보다 앞에 온다.
+  const html = renderToStaticMarkup(createElement(PublishedPdfItem, {
+    title: "합성", pageCount: 2, pages: [{ pageNumber: 1, text: "one", readable: true }, { pageNumber: 2, text: "two", readable: true }],
+    source: { fetchPdf: async () => new Response(null, { status: 500 }) },
+  }));
+  const anchorAt = html.indexOf('data-testid="snapshot-pdf-viewer-anchor"');
+  assert.ok(anchorAt >= 0 && anchorAt < html.indexOf('data-testid="snapshot-pdf-viewer"'));
+  assert.ok(html.indexOf('data-testid="snapshot-pdf-viewer"') < html.indexOf("원본 1쪽 열기"));
 });
