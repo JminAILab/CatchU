@@ -279,7 +279,7 @@ describe('본인 Catch HTTP·PostgreSQL', {
       }],
       draft: source.draft, reflection: source.reflection,
       confirmation: { workFactsConfirmed: false, contributionConfirmed: false },
-      mismatch: false, visibility: 'PRIVATE', restriction: 'NONE', sourceMode: 'MOCK',
+      mismatch: false, visibility: 'PRIVATE', restriction: 'NONE', sourceMode: 'MOCK', hasAuthorDescription: false,
     });
     const list = success(await request(own.ownerId));
     assert.deepEqual(list, { items: [detail], page: { nextCursor: null } });
@@ -401,6 +401,130 @@ describe('본인 Catch HTTP·PostgreSQL', {
     }
     assert.equal(new Set(collected.map((item) => item.catchId)).size, 23);
     assert.deepEqual(ids(collected), own.catchIds.sort());
+  });
+
+  // 새 Catch NC1 C1(BR5.1~BR5.3, 보안 설계 2·3, NFR7.2). 먼저 정한 실패 조건: 「씀」 조건에 설명 없는 Catch가 나옴, 다른 회원의 Catch가 나옴,
+  // 다른 조건의 커서나 v1 커서가 받아들여짐, 공개 Catch 응답·공개 목록에 hasAuthorDescription이 나옴. 설명은 DB 제약대로 시각과 함께 넣는다.
+  async function writeDescription(catchId, text = '[합성] 작성자 설명') {
+    await db.query('UPDATE catch_asset SET author_description = $2, author_description_updated_at = now() WHERE catch_id = $1', [catchId, text]);
+  }
+  const cursorOf = (cursor) => JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+
+  test('AC4.1.1 작성자 설명 조건 셋: 없으면 전체, written은 설명 있음, unwritten은 없음이고 25번째에만 쓴 Catch가 첫 쪽에 보인다', async () => {
+    const own = await seed({ count: 25 });
+    const sorted = [...own.catchIds].sort();
+    const written = sorted[24];
+    await writeDescription(written);
+    const writtenPage = success(await request(own.ownerId, queryPath({ authorDescription: 'written' })));
+    assert.deepEqual(ids(writtenPage.items), [written]);
+    assert.equal(writtenPage.page.nextCursor, null);
+    assert.equal(writtenPage.items[0].hasAuthorDescription, true);
+
+    const unwritten = success(await request(own.ownerId, queryPath({ authorDescription: 'unwritten' })));
+    assert.equal(unwritten.items.length, 20, '걸러 본 결과도 지금 limit으로 자른다');
+    assert.ok(unwritten.items.every((item) => item.hasAuthorDescription === false && item.catchId !== written));
+    const rest = success(await request(own.ownerId, queryPath({ authorDescription: 'unwritten', cursor: unwritten.page.nextCursor })));
+    assert.deepEqual(ids([...unwritten.items, ...rest.items]), sorted.slice(0, 24));
+    assert.equal(rest.page.nextCursor, null);
+
+    const all = success(await request(own.ownerId, queryPath({ limit: '100' })));
+    assert.deepEqual(ids(all.items), sorted);
+    // 다른 조건과 AND로 쓴다.
+    assert.deepEqual(ids(success(await request(own.ownerId, queryPath({ authorDescription: 'written', repositoryId: own.repositoryId }))).items), [written]);
+    assert.deepEqual(success(await request(own.ownerId, queryPath({ authorDescription: 'written', repositoryId: 'synthetic-other-repository' }))),
+      { items: [], page: { nextCursor: null } });
+  });
+
+  test('AC4.1.2 written 조건으로 받은 v2 커서는 unwritten·조건 없음·다른 회원으로 보내면 400이다', async () => {
+    const own = await seed({ count: 3 });
+    for (const catchId of own.catchIds) await writeDescription(catchId);
+    const first = success(await request(own.ownerId, queryPath({ authorDescription: 'written', limit: '1' })));
+    const cursor = first.page.nextCursor;
+    assert.equal(typeof cursor, 'string');
+    assert.equal(cursorOf(cursor).v, 2);
+    assert.equal(success(await request(own.ownerId, queryPath({ authorDescription: 'written', limit: '1', cursor }))).items.length, 1);
+    const foreign = await seed();
+    await writeDescription(foreign.catchId);
+    for (const [ownerId, query] of [
+      [own.ownerId, { authorDescription: 'unwritten', limit: '1', cursor }],
+      [own.ownerId, { limit: '1', cursor }],
+      [foreign.ownerId, { authorDescription: 'written', limit: '1', cursor }],
+    ]) failure(await request(ownerId, queryPath(query)), 400, 'INVALID_REQUEST');
+  });
+
+  test('회원 두 명: written 목록과 커서로 다른 회원의 Catch가 나오지 않는다', async () => {
+    const memberA = await seed({ count: 2 });
+    const memberB = await seed({ count: 2 });
+    for (const catchId of [...memberA.catchIds, ...memberB.catchIds]) await writeDescription(catchId);
+    const collected = [];
+    let cursor = null;
+    do {
+      const page = success(await request(memberA.ownerId, queryPath({ authorDescription: 'written', limit: '1', ...(cursor ? { cursor } : {}) })));
+      collected.push(...page.items);
+      cursor = page.page.nextCursor;
+    } while (cursor !== null);
+    assert.deepEqual(ids(collected), [...memberA.catchIds].sort());
+    assert.ok(!collected.some((item) => memberB.catchIds.includes(item.catchId)));
+  });
+
+  test('authorDescription의 빈 값·같은 키 두 번·대소문자 다른 값·모르는 값은 400이고 받은 값을 응답에 싣지 않는다', async () => {
+    const own = await seed();
+    const beforeState = await snapshot();
+    for (const query of [
+      'authorDescription=', 'authorDescription=written&authorDescription=written', 'authorDescription=WRITTEN',
+      'authorDescription=Unwritten', 'authorDescription=all', 'authorDescription=synthetic-filter-value',
+    ]) {
+      const response = await request(own.ownerId, '/v1/catches?' + query);
+      failure(response, 400, 'INVALID_REQUEST');
+      assert.ok(!response.text.includes('synthetic-filter-value') && !response.text.includes('WRITTEN'), query);
+    }
+    assert.deepEqual(await snapshot(), beforeState);
+  });
+
+  test('NFR7.2 배포 전에 받은 v1 커서는 같은 회원·조건이어도 400이다', async () => {
+    const own = await seed({ count: 2 });
+    const { createHash } = require('node:crypto');
+    const after = [...own.catchIds].sort()[0];
+    for (const scopeParts of [[own.ownerId, null, null], [own.ownerId, null, null, null]]) {
+      const scope = createHash('sha256').update(JSON.stringify(scopeParts)).digest('hex');
+      const legacy = Buffer.from(JSON.stringify({ v: 1, scope, after })).toString('base64url');
+      failure(await request(own.ownerId, queryPath({ cursor: legacy })), 400, 'INVALID_REQUEST');
+    }
+    // 같은 범위 해시라도 v가 2일 때만 받는다.
+    const scope = createHash('sha256').update(JSON.stringify([own.ownerId, null, null, null])).digest('hex');
+    const current = Buffer.from(JSON.stringify({ v: 2, scope, after })).toString('base64url');
+    assert.deepEqual(ids(success(await request(own.ownerId, queryPath({ cursor: current }))).items), [[...own.catchIds].sort()[1]]);
+  });
+
+  test('AC5.2.3 목록·상세의 hasAuthorDescription은 written 판정과 같고 설명을 지우면 거짓으로 돌아온다', async () => {
+    const own = await seed({ count: 2 });
+    const [described, plain] = own.catchIds;
+    await writeDescription(described);
+    const list = success(await request(own.ownerId)).items;
+    const writtenIds = ids(success(await request(own.ownerId, queryPath({ authorDescription: 'written' }))).items);
+    for (const item of list) {
+      assert.equal(item.hasAuthorDescription, writtenIds.includes(item.catchId), item.catchId);
+      assert.equal(success(await request(own.ownerId, detailPath(item.catchId))).hasAuthorDescription, item.hasAuthorDescription);
+      assert.equal(Object.hasOwn(item, 'authorDescription'), false, '설명 원문은 목록에 싣지 않는다');
+    }
+    assert.deepEqual(writtenIds, [described]);
+    assert.equal(success(await request(own.ownerId, detailPath(plain))).hasAuthorDescription, false);
+    await db.query('UPDATE catch_asset SET author_description = NULL, author_description_updated_at = NULL WHERE catch_id = $1', [described]);
+    assert.equal(success(await request(own.ownerId, detailPath(described))).hasAuthorDescription, false);
+  });
+
+  test('공개 Catch 응답·공개 목록의 키 집합은 그대로이고 설명이 있어도 hasAuthorDescription이 없다', async () => {
+    const own = await seed();
+    await writeDescription(own.catchId);
+    await publish(own);
+    const publicKeys = ['catchId', 'draft', 'evidence', 'subjectContribution', 'title', 'workFacts'];
+    const detail = await publicCatches.get(own.ownerId, own.catchId);
+    assert.deepEqual(Object.keys(detail).sort(), publicKeys);
+    const list = await publicCatches.list(own.ownerId, {});
+    assert.deepEqual(Object.keys(list).sort(), ['catches', 'page']);
+    assert.deepEqual(list.catches.map((item) => Object.keys(item).sort()), [publicKeys]);
+    assert.ok(!JSON.stringify([detail, list]).includes('hasAuthorDescription'));
+    await assert.rejects(publicCatches.list(own.ownerId, { authorDescription: 'written' }), { status: 400 });
   });
 
   test('토큰 없는 목록·상세·변경 요청은 공통 401이고 /v1 밖에는 기능 경로가 없다', async () => {

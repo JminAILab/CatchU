@@ -27,5 +27,13 @@
     "scope": "mvp",
     "status": "complete",
     "request": "6157757d"
+  },
+  {
+    "uuid": "01a1bde5-4f0a-722b-a5da-2cd6e564757e",
+    "slug": "new-catch",
+    "dirName": "261109-new-catch",
+    "scope": "mvp",
+    "status": "in-flight",
+    "request": "4ffd30e6"
   }
 ]

@@ -78,9 +78,10 @@ const C3 = "33333333-3333-4333-8333-333333333333";
 const M1 = "44444444-4444-4444-8444-444444444444";
 const URL_OK = "https://web.example/s/synthetic-token-0000000000000000000000000000";
 
-/** 10월 `GET /catches` 응답 항목 중 발행 화면이 읽는 칸만 둔 합성 Catch. */
-const catchAsset = (catchId, { title = "Catch 제목", visibility = "PUBLIC", confirmed = true, restriction = "NONE", mismatch = false } = {}) => ({
-  catchId, title, visibility, mismatch, restriction,
+/** 10월 `GET /catches` 응답 항목 중 발행 화면이 읽는 칸만 둔 합성 Catch. 새 Catch NC1에서 저장소·작성자 설명 여부를 더했다. */
+const catchAsset = (catchId, { title = "Catch 제목", visibility = "PUBLIC", confirmed = true, restriction = "NONE", mismatch = false,
+  repositoryId = "repo-1", hasAuthorDescription = true } = {}) => ({
+  catchId, title, visibility, mismatch, restriction, repositoryId, hasAuthorDescription,
   confirmation: { workFactsConfirmed: confirmed, contributionConfirmed: confirmed },
 });
 const published = (overrides = {}) => ({ publicationId: PUB, url: URL_OK, state: "ACTIVE", publishedAt: AT, expiresAt: EXPIRES, passwordProtected: false, ...overrides });
@@ -103,9 +104,11 @@ function fakeClients(responses = {}) {
   };
   return {
     calls,
-    catches: { list: (repositoryId, cursor, signal) => { calls.push({ name: "catches", repositoryId, cursor, signal }); return next("catches"); } },
+    catches: { list: (filter, cursor, signal) => { calls.push({ name: "catches", filter, cursor, signal }); return next("catches"); } },
     materials: { list: (cursor, signal) => { calls.push({ name: "materials", cursor, signal }); return next("materials"); } },
     publications: { publishRaw: (body) => { calls.push({ name: "publish", body: structuredClone(body) }); return next("publish"); } },
+    // 저장소 목록(`RepositoryApi.repositories`): 응답을 정하지 않으면 실패로 돌려 이름만 빠지게 한다. 부른 횟수를 센다.
+    repositories: { repositories: (signal) => { calls.push({ name: "repositories", signal }); return queue.repositories?.length ? next("repositories") : Promise.resolve(LOOKUP_FAILED); } },
   };
 }
 
@@ -231,7 +234,7 @@ test("모델: 목록을 읽어 고르고 순서를 바꾼다. 고를 수 없는 
   // 빼고, 순서를 바꾸고, 같은 항목을 다시 누르면 빠진다.
   model.remove(0);
   model.toggleMaterial(M1);
-  assert.deepEqual(model.store.get().selected.at(-1), { kind: "TEXT_MATERIAL", sourceId: M1, title: "자료 제목", visibility: null });
+  assert.deepEqual(model.store.get().selected.at(-1), { kind: "TEXT_MATERIAL", sourceId: M1, title: "자료 제목", visibility: null, hasAuthorDescription: null });
   model.moveUp(19);
   assert.equal(model.store.get().selected[18].sourceId, M1);
   model.moveDown(18);
@@ -491,4 +494,181 @@ test("확인·입력·고르기 화면: 항목 순서·비밀번호 여부·90�
   assert.match(screen, /<h1>발행<\/h1>/);
   assert.ok(screen.includes('data-testid="publish-sources"'));
   assert.doesNotMatch(screen, /publish-done/);
+});
+
+// 새 Catch NC1 — 발행 화면 권장 안내·작은 줄·걸러 보기·확인 안내(US5.1~US5.4, BR6.1~BR6.7, NFR1.2·NFR6.2).
+// 먼저 정한 실패 조건: 걸러 보기를 켜면 고른 자료가 빠짐, 체크 칸을 바꿀 때 저장소 목록을 다시 부름, 저장소 목록 실패로 고르기·발행이 막힘,
+// 설명 없는 Catch 수 안내가 [발행]을 막음, 저장소별 개수 경고·추천·순위가 보임. 저장소 목록·Catch 목록은 합성 응답이다.
+const repositoryList = { kind: "success", data: [{ repositoryId: "repo-1", name: "TheMe", ownerLogin: "synthetic-owner", url: "https://github.com/synthetic-owner/TheMe" }] };
+const pickerOf = (items, props = {}) => renderToStaticMarkup(createElement(SourcePickerView, {
+  catches: { state: "ready", moreState: "idle", nextCursor: null, items: items.map(catchSourceOf) },
+  materials: { state: "ready", moreState: "idle", nextCursor: null, items: [] }, selected: [], flagged: null, disabled: false,
+  repositories: [{ repositoryId: "repo-1", name: "synthetic-owner/TheMe" }],
+  onRetry() {}, onMoreCatches() {}, onMoreMaterials() {}, onToggleCatch() {}, onToggleMaterial() {}, ...props,
+}));
+const sublines = (html) => [...html.matchAll(/data-testid="publish-catch-subline">([^<]*)</g)].map((match) => match[1]);
+const confirmOf = (items) => renderToStaticMarkup(createElement(PublishConfirmView, {
+  items, title: "지원용", usePassword: false, submitting: false, lockSeconds: 0, statusLines: null, onBack() {}, onSubmit() {},
+}));
+const picked = (catchId, hasAuthorDescription, visibility = "PUBLIC") => ({ kind: "CATCH", sourceId: catchId, title: `Catch ${catchId}`, visibility, hasAuthorDescription });
+
+test("AC5.1.1 「발행할 자료 고르기」 기존 안내 아래에 「저장소마다 3~5개를 권합니다.」 한 줄이 있다", () => {
+  const html = pickerOf([catchAsset(C1)]);
+  const limit = html.indexOf("고른 순서대로 발행본에 들어갑니다.");
+  const recommendation = html.indexOf('data-testid="publish-sources-recommendation">저장소마다 3~5개를 권합니다.</p>');
+  assert.ok(limit >= 0 && recommendation > limit && recommendation < html.indexOf("<h3>내 Catch</h3>"));
+});
+
+test("AC5.1.2 한 저장소의 Catch 7개를 골라 확인 단계까지 가도 저장소별 개수 경고·추천·순위가 없다", () => {
+  const seven = Array.from({ length: 7 }, (_, index) => picked(`c${index}`, true));
+  const html = confirmOf(seven) + pickerOf(Array.from({ length: 7 }, (_, index) => catchAsset(`c${index}`)), { selected: seven });
+  assert.doesNotMatch(html, /너무 많|개를 넘|추천|순위|경고/);
+  assert.equal((html.match(/저장소마다 3~5개를 권합니다/g) ?? []).length, 1, "권장 안내는 고르기의 한 줄뿐");
+  assert.match(confirmOf(seven), /data-testid="publish-submit"(?![^>]*disabled)/);
+});
+
+test("AC5.2.1 「내 Catch」 항목 작은 줄은 저장소 이름 · 공개 상태 · 설명 안 씀 · 불일치 표시됨 순서이고 「설명 안 씀」은 설명이 없는 Catch에만 있다", () => {
+  const html = pickerOf([
+    catchAsset(C1, { hasAuthorDescription: true }),
+    catchAsset(C2, { hasAuthorDescription: false, visibility: "PRIVATE", mismatch: true }),
+    catchAsset(C3, { hasAuthorDescription: false, repositoryId: "repo-unknown" }),
+  ]);
+  assert.deepEqual(sublines(html), [
+    "synthetic-owner/TheMe · 공개", "synthetic-owner/TheMe · 비공개 · 설명 안 씀 · 불일치 표시됨", "공개 · 설명 안 씀",
+  ]);
+  assert.ok(html.includes('data-testid="publish-catch-private-notice"'), "비공개 안내 줄은 지금처럼 따로 붙는다");
+});
+
+test("AC5.2.2 상세에서 설명을 막 저장한 Catch는 발행 화면을 새로 열면 「설명 안 씀」이 없다(열 때마다 새로 불러옴)", async () => {
+  const before = fakeClients({ catches: [catchPage([catchAsset(C1, { hasAuthorDescription: false })])], materials: [materialPage([])] });
+  const first = createPublishModel(before, passthroughConsent, deps());
+  await first.open();
+  assert.deepEqual(sublines(pickerOf([], { catches: first.store.get().catches })), ["synthetic-owner/TheMe · 공개 · 설명 안 씀"]);
+  first.dispose();
+  const after = fakeClients({ catches: [catchPage([catchAsset(C1, { hasAuthorDescription: true })])], materials: [materialPage([])] });
+  const reopened = createPublishModel(after, passthroughConsent, deps());
+  await reopened.open();
+  assert.equal(after.calls.filter((c) => c.name === "catches").length, 1);
+  assert.deepEqual(sublines(pickerOf([], { catches: reopened.store.get().catches })), ["synthetic-owner/TheMe · 공개"]);
+});
+
+test("AC5.2.3 「설명 안 씀」은 본인 목록 응답의 hasAuthorDescription(「씀」 걸러 보기와 같은 판정)에서만 온다", () => {
+  for (const hasAuthorDescription of [true, false]) {
+    const source = catchSourceOf(catchAsset(C1, { hasAuthorDescription }));
+    assert.equal(source.hasAuthorDescription, hasAuthorDescription);
+    assert.equal(sublines(pickerOf([catchAsset(C1, { hasAuthorDescription })]))[0].includes("설명 안 씀"), !hasAuthorDescription);
+  }
+});
+
+test("AC5.3.2·AC5.3.4 체크 칸은 처음 꺼져 있고 보이는 label이 감싸며, 켜면 written 조건으로 첫 쪽부터 다시 불러오고 개수 줄은 aria-live=polite다", async () => {
+  const api = fakeClients({
+    catches: [catchPage([catchAsset(C1, { hasAuthorDescription: false }), catchAsset(C2)], "cursor-all"), catchPage([catchAsset(C2)])],
+    materials: [materialPage([])],
+  });
+  const model = createPublishModel(api, passthroughConsent, deps());
+  await model.open();
+  assert.equal(model.store.get().writtenOnly, false);
+  const toggling = model.setWrittenOnly(true);
+  assert.equal(model.store.get().catches.state, "loading");
+  await toggling;
+  assert.deepEqual(api.calls.filter((c) => c.name === "catches").map((c) => [c.filter, c.cursor]), [
+    [{ repositoryId: "", authorDescription: "all" }, null], [{ repositoryId: "", authorDescription: "written" }, null],
+  ]);
+  assert.deepEqual(model.store.get().catches.items.map((item) => item.catchId), [C2]);
+  const html = pickerOf([], { catches: model.store.get().catches, writtenOnly: true });
+  assert.match(html, /<label[^>]*><input type="checkbox" data-testid="publish-written-only" checked=""\/>작성자 설명을 쓴 Catch만 보기<\/label>/);
+  assert.ok(html.indexOf('data-testid="publish-written-only"') < html.indexOf('data-testid="publish-catch-option"'));
+  assert.match(html, /<p[^>]*aria-live="polite"[^>]*>불러온 1개의 Catch<\/p>/);
+  assert.doesNotMatch(pickerOf([catchAsset(C1)]), /data-testid="publish-written-only" checked/);
+});
+
+test("AC5.3.1 설명 없는 Catch A를 골라 둔 뒤 걸러 보기를 켜면 목록에서 A는 사라지지만 고른 항목과 순서에는 A가 남는다", async () => {
+  const api = fakeClients({
+    catches: [catchPage([catchAsset(C1, { hasAuthorDescription: false }), catchAsset(C2)]), catchPage([catchAsset(C2)])],
+    materials: [materialPage([material(M1)])],
+  });
+  const model = createPublishModel(api, passthroughConsent, deps());
+  await model.open();
+  model.toggleCatch(C1);
+  model.toggleMaterial(M1);
+  await model.setWrittenOnly(true);
+  assert.ok(!model.store.get().catches.items.some((item) => item.catchId === C1));
+  assert.deepEqual(model.store.get().selected.map((item) => [item.sourceId, item.hasAuthorDescription]), [[C1, false], [M1, null]]);
+  model.toggleCatch(C2);
+  assert.deepEqual(model.store.get().selected.map((item) => item.sourceId), [C1, M1, C2]);
+  // 목록에 없어도 고른 A는 다시 눌러(고른 항목에서) 뺄 수 있다.
+  model.toggleCatch(C1);
+  assert.deepEqual(model.store.get().selected.map((item) => item.sourceId), [M1, C2]);
+});
+
+test("AC5.3.3 최대 개수만큼 고른 상태(설명 없는 Catch 포함)에서 칸을 켜도 고른 수는 그대로 최대라 더 고를 수 없다", async () => {
+  const many = Array.from({ length: 20 }, (_, i) => catchAsset(`b${String(i).padStart(7, "0")}-0000-4000-8000-000000000000`, { hasAuthorDescription: i % 2 === 0 }));
+  const extra = catchAsset("c9999999-0000-4000-8000-000000000000");
+  const api = fakeClients({ catches: [catchPage(many), catchPage([extra])], materials: [materialPage([])] });
+  const model = createPublishModel(api, passthroughConsent, deps());
+  await model.open();
+  for (const item of many) model.toggleCatch(item.catchId);
+  await model.setWrittenOnly(true);
+  assert.equal(model.store.get().selected.length, 20);
+  model.toggleCatch(extra.catchId);
+  assert.equal(model.store.get().selected.length, 20);
+  const html = pickerOf([], { catches: model.store.get().catches, selected: model.store.get().selected, writtenOnly: true });
+  assert.match(html, new RegExp(`data-source-id="${extra.catchId}"[^>]*aria-pressed="false"[^>]*disabled=""`));
+});
+
+test("BR6.4 켰는데 맞는 Catch가 없으면 목록 자리에 「작성자 설명을 쓴 Catch가 없습니다」이고, 체크 칸은 발행 중에만 막히며 목록 실패에도 쓸 수 있다", async () => {
+  const empty = pickerOf([], { writtenOnly: true });
+  assert.ok(empty.includes('data-testid="publish-catches-written-empty">작성자 설명을 쓴 Catch가 없습니다<'));
+  assert.doesNotMatch(empty, /publish-catches-empty"/);
+  assert.match(pickerOf([], { disabled: true }), /data-testid="publish-written-only"[^>]*disabled=""/);
+  const failed = pickerOf([], { catches: { state: "error", items: [], nextCursor: null, moreState: "idle", errorText: "실패" } });
+  assert.ok(failed.includes('data-testid="publish-sources-retry"'));
+  assert.doesNotMatch(failed, /data-testid="publish-written-only"[^>]*disabled/);
+  // 발행 중에는 모델도 바꾸지 않는다.
+  const pending = deferred();
+  const { api, model } = await readyModel({ publish: [pending] });
+  const submitting = model.submit();
+  await model.setWrittenOnly(true);
+  assert.equal(model.store.get().writtenOnly, false);
+  assert.equal(api.calls.filter((c) => c.name === "catches").length, 1);
+  pending.resolve(success(published()));
+  await submitting;
+});
+
+test("AC5.4.1·AC5.4.2 확인 단계는 고른 자료 가운데 설명 없는 Catch 수를 비공개 안내와 같은 꼴로 알리고 [발행]을 막지 않으며, 0개면 그리지 않는다", () => {
+  const two = confirmOf([picked(C1, false, "PRIVATE"), picked(C2, false), picked(C3, true), { kind: "TEXT_MATERIAL", sourceId: M1, title: "자료", visibility: null, hasAuthorDescription: null }]);
+  assert.ok(two.includes('data-testid="publish-confirm-description-notice">작성자 설명이 없는 Catch가 2개 있습니다. 면접관에게는 「작성자 설명이 없습니다.」로 보입니다.</p>'));
+  assert.ok(two.indexOf('data-testid="publish-confirm-private-notice"') < two.indexOf('data-testid="publish-confirm-description-notice"'));
+  assert.match(two, /data-testid="publish-submit"(?![^>]*disabled)/);
+  const none = confirmOf([picked(C1, true), picked(C2, true), { kind: "TEXT_MATERIAL", sourceId: M1, title: "자료", visibility: null, hasAuthorDescription: null }]);
+  assert.doesNotMatch(none, /publish-confirm-description-notice|작성자 설명이 없는 Catch/);
+});
+
+test("NFR1.2 저장소 목록은 화면을 열 때 한 번만 부르고, 체크 칸을 켜고 끄거나 목록을 다시 불러와도 다시 부르지 않는다", async () => {
+  const api = fakeClients({
+    catches: [catchPage([catchAsset(C1)]), catchPage([catchAsset(C1)]), catchPage([catchAsset(C1)]), catchPage([catchAsset(C1)])],
+    materials: [materialPage([]), materialPage([])], repositories: [repositoryList],
+  });
+  const model = createPublishModel(api, passthroughConsent, deps());
+  await model.open();
+  assert.deepEqual(model.repositoryOptions.getSnapshot(), { state: "ready", repositories: [{ repositoryId: "repo-1", name: "synthetic-owner/TheMe" }] });
+  await model.setWrittenOnly(true);
+  await model.setWrittenOnly(false);
+  await model.loadSources();
+  assert.equal(api.calls.filter((c) => c.name === "repositories").length, 1);
+  assert.equal(api.calls.filter((c) => c.name === "catches").length, 4);
+});
+
+test("BR6.2 저장소 목록을 못 불러오면 작은 줄에서 저장소 이름만 빠지고 고르기·발행은 막히지 않는다", async () => {
+  const api = fakeClients({ ...defaultSources(), publish: [success(published())] });
+  const model = createPublishModel(api, passthroughConsent, deps());
+  await model.open();
+  assert.equal(model.repositoryOptions.getSnapshot().state, "error");
+  const html = pickerOf([], { catches: model.store.get().catches, repositories: model.repositoryOptions.getSnapshot().repositories });
+  assert.deepEqual(sublines(html), ["공개", "비공개", "공개"]);
+  model.toggleCatch(C1);
+  model.setTitle("지원용");
+  assert.equal(model.toConfirm(), true);
+  await model.submit();
+  assert.equal(model.store.get().step, "done");
 });

@@ -1,6 +1,11 @@
 import { memberMutationOutcome } from "../../lib/auth-api.ts";
-import type { CatchApi, CatchChange, CatchFailure, CatchResult } from "./catch-api";
+import { ALL_CATCHES, type CatchApi, type CatchChange, type CatchFailure, type CatchListFilter, type CatchResult } from "./catch-api.ts";
 import type { CatchAsset } from "./types";
+
+/** 목록 열쇠가 같은지. 열쇠는 저장소와 작성자 설명 걸러 보기다(새 Catch BR5.2·BR5.4). */
+export function sameFilter(current: CatchListFilter | null, next: CatchListFilter): boolean {
+  return current !== null && current.repositoryId === next.repositoryId && current.authorDescription === next.authorDescription;
+}
 
 export type QueryState = "loading" | "ready" | "error";
 /**
@@ -19,7 +24,8 @@ export type CatchMutation = {
 export type AssetsSnapshot = {
   mutation: CatchMutation | null;
   managementOpen: boolean;
-  repositoryId: string | null;
+  /** 지금 목록의 걸러 보기. 화면을 처음 열거나 해제한 뒤에는 null이다. */
+  filter: CatchListFilter | null;
   items: readonly CatchAsset[];
   listState: QueryState;
   listError: CatchFailure | null;
@@ -35,7 +41,7 @@ const networkFailure: CatchFailure = { kind: "lookup-failed", status: null, code
 /** URL·표시와 분리하여 이전 응답과 중복 D 콜백을 한 곳에서 제어한다. */
 export function createAssetsStore(api: CatchApi) {
   let state: AssetsSnapshot = {
-    mutation: null, managementOpen: false, repositoryId: null, items: [], listState: "loading", listError: null, nextCursor: null, moreState: "idle",
+    mutation: null, managementOpen: false, filter: null, items: [], listState: "loading", listError: null, nextCursor: null, moreState: "idle",
     selectedId: null, detailState: "loading", detailError: null,
   };
   const listeners = new Set<() => void>();
@@ -57,8 +63,9 @@ export function createAssetsStore(api: CatchApi) {
   async function safely<T>(call: () => Promise<CatchResult<T>>): Promise<CatchResult<T>> {
     try { return await call(); } catch { return networkFailure; }
   }
-  function refresh(repositoryId = state.repositoryId ?? ""): Promise<void> {
-    if (listTask && state.repositoryId === repositoryId) return listTask;
+  /** 걸러 보기의 첫 쪽부터 읽는다. 열쇠가 바뀌면 커서와 이전 요청을 버린다. */
+  function refresh(filter: CatchListFilter = state.filter ?? ALL_CATCHES): Promise<void> {
+    if (listTask && sameFilter(state.filter, filter)) return listTask;
     const version = ++listVersion;
     pendingRefresh = undefined;
     listAbort?.abort();
@@ -66,8 +73,8 @@ export function createAssetsStore(api: CatchApi) {
     listAbort = abort;
     moreTask = undefined;
     seenCursors.clear();
-    emit({ repositoryId, items: [], listState: "loading", listError: null, moreState: "idle", nextCursor: null });
-    const task = safely(() => api.list(repositoryId, null, abort.signal)).then((result) => {
+    emit({ filter, items: [], listState: "loading", listError: null, moreState: "idle", nextCursor: null });
+    const task = safely(() => api.list(filter, null, abort.signal)).then((result) => {
       if (version !== listVersion) return;
       if (result.kind === "success") {
         const items = [...new Map(result.data.items.map((item) => [item.catchId, item])).values()];
@@ -78,19 +85,20 @@ export function createAssetsStore(api: CatchApi) {
     return task;
   }
   /** D 활동 전에 시작한 조회가 있으면 완료 후 새 조회를 한 번 예약한다. */
-  function invalidateList(repositoryId = state.repositoryId ?? ""): Promise<void> {
-    if (!listTask || state.repositoryId !== repositoryId) return refresh(repositoryId);
+  function invalidateList(filter: CatchListFilter = state.filter ?? ALL_CATCHES): Promise<void> {
+    if (!listTask || !sameFilter(state.filter, filter)) return refresh(filter);
     const version = listVersion;
     if (pendingRefresh?.version === version) return pendingRefresh.task;
     const task = listTask.then(() => {
       if (version !== listVersion) return;
-      return refresh(repositoryId);
+      return refresh(filter);
     }).finally(() => { if (pendingRefresh?.task === task) pendingRefresh = undefined; });
     pendingRefresh = { version, task };
     return task;
   }
-  function selectRepository(repositoryId: string) {
-    return state.repositoryId === repositoryId ? (listTask ?? Promise.resolve()) : refresh(repositoryId);
+  /** 화면의 걸러 보기(주소 매개변수)와 맞춘다. 같은 열쇠면 다시 읽지 않는다(설명을 저장한 뒤에도 지금 쪽을 유지, BR5.6). */
+  function selectFilter(filter: CatchListFilter) {
+    return sameFilter(state.filter, filter) ? (listTask ?? Promise.resolve()) : refresh(filter);
   }
   function loadMore(): Promise<void> {
     if (moreTask) return moreTask;
@@ -98,7 +106,7 @@ export function createAssetsStore(api: CatchApi) {
     const version = listVersion;
     const cursor = state.nextCursor;
     emit({ moreState: "loading" });
-    const task = safely(() => api.list(state.repositoryId ?? "", cursor, listAbort?.signal)).then((result) => {
+    const task = safely(() => api.list(state.filter ?? ALL_CATCHES, cursor, listAbort?.signal)).then((result) => {
       if (version !== listVersion) return;
       if (result.kind !== "success") {
         emit({ moreState: "error", listError: result });
@@ -191,13 +199,13 @@ export function createAssetsStore(api: CatchApi) {
     listTask = moreTask = detailTask = undefined;
     pendingRefresh = undefined;
     // StrictMode의 effect 재시작 시에도 첫 조회를 다시 실행한다.
-    emit({ repositoryId: null, selectedId: null, items: [], detail: undefined, listState: "loading" });
+    emit({ filter: null, selectedId: null, items: [], detail: undefined, listState: "loading" });
   }
   return {
     getSnapshot: () => state,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     setManagementOpen(open: boolean) { if (open) void openDetail(null); emit({ managementOpen: open }); },
-    selectRepository, refresh, invalidateList, loadMore, openDetail, update, dispose,
+    selectFilter, refresh, invalidateList, loadMore, openDetail, update, dispose,
   };
 }
 export type AssetsStore = ReturnType<typeof createAssetsStore>;

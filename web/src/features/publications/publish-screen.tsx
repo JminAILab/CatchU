@@ -11,7 +11,9 @@ import type { ClientResult } from "@/lib/api-client";
 import { useUnsavedTraverseGuard } from "@/lib/unsaved-traverse-guard";
 import { createViewStore } from "@/lib/view-store";
 import { createCatchApi, type CatchApi } from "@/features/assets/catch-api";
+import { createRepositoryOptionsStore } from "@/features/assets/repository-options-store";
 import { createMaterialsApi, type MaterialsApi } from "@/features/materials/materials-api";
+import { createRepositoryApi, type RepositoryApi } from "@/features/repository-management/repository-api";
 import {
   createPublicationsApi, publishDraftErrors, publishFailureLines, publishOutcome, PUBLISH_LIMITS,
   type PublicationsApi, type PublishedLink, type PublishFailure, type PublishRequest,
@@ -20,9 +22,15 @@ import { catchSourceOf, emptySourceList, type CatchSource, type MaterialSource, 
 import { PublishConfirmView, PublishDoneView, PublishFormView, SelectedListView, SourcePickerView, type FlaggedCatches, type StatusLines } from "./publish-view";
 import styles from "./publications.module.css";
 
-export type PublishClients = { catches: CatchApi; materials: MaterialsApi; publications: PublicationsApi };
+/** `repositories`는 내 자산 화면과 같은 저장소 목록이고, 항목 작은 줄의 저장소 이름에만 쓴다(새 Catch BR6.2). API·계약은 그대로다. */
+export type PublishClients = {
+  catches: CatchApi; materials: MaterialsApi; publications: PublicationsApi; repositories: Pick<RepositoryApi, "repositories">;
+};
 // api.member가 기준 주소·Bearer·401을 맡는다. 렌더마다 호출 객체를 새로 만들지 않는다.
-const clients: PublishClients = { catches: createCatchApi(api.member), materials: createMaterialsApi(api.member), publications: createPublicationsApi(api.member) };
+const clients: PublishClients = {
+  catches: createCatchApi(api.member), materials: createMaterialsApi(api.member), publications: createPublicationsApi(api.member),
+  repositories: createRepositoryApi(api.member),
+};
 
 /** 화면 밖 의존. 시험은 로그인 식별과 시계를 바꿔 끼운다. */
 export type PublishDeps = { session: () => unknown; now: () => number };
@@ -46,6 +54,8 @@ export type PublishStatus =
 export type PublishScreenState = {
   catches: SourceList<CatchSource>;
   materials: SourceList<MaterialSource>;
+  /** 「작성자 설명을 쓴 Catch만 보기」(새 Catch BR6.4). 처음에는 꺼져 있고, 켜면 본인 목록 `authorDescription=written`으로 부른다. */
+  writtenOnly: boolean;
   selected: SelectedItem[];
   title: string;
   usePassword: boolean;
@@ -112,13 +122,17 @@ function createSourceLoader<T>(fetchPage: PageFetch<T>, read: () => SourceList<T
  */
 export function createPublishModel(client: PublishClients, consent: ConsentRunner, deps: PublishDeps = browserDeps) {
   const store = createViewStore<PublishScreenState>({
-    catches: emptySourceList(), materials: emptySourceList(), selected: [], title: "", usePassword: false, password: "",
+    catches: emptySourceList(), materials: emptySourceList(), writtenOnly: false, selected: [], title: "", usePassword: false, password: "",
     step: "edit", status: { kind: "idle" }, flagged: null, retryAt: null, result: null,
   });
   const patch = (next: Partial<PublishScreenState>) => store.set((prev) => ({ ...prev, ...next }));
+  // 저장소 이름은 화면을 열 때 한 번 끝 쪽까지 읽는다(성능 설계 1, NFR1.2). 걸러 보기·목록 다시 불러오기는 이 목록을 다시 부르지 않는다.
+  // 실패하면 작은 줄에서 저장소 이름만 빠지고 고르기·발행은 막지 않는다(BR6.2).
+  const repositoryOptions = createRepositoryOptionsStore(client.repositories);
 
   const catches = createSourceLoader<CatchSource>(async (cursor, signal) => {
-    const result = await client.catches.list("", cursor, signal);
+    const authorDescription = store.get().writtenOnly ? "written" : "all";
+    const result = await client.catches.list({ repositoryId: "", authorDescription }, cursor, signal);
     return result.kind === "success"
       ? { kind: "ok", items: result.data.items.map(catchSourceOf), nextCursor: result.data.page.nextCursor }
       : { kind: "failed" };
@@ -164,7 +178,15 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
     if (index >= 0) { remove(index); return; }
     const source = list.items.find((item) => item.catchId === catchId);
     if (!source || !source.eligible) return;
-    add({ kind: "CATCH", sourceId: catchId, title: source.title, visibility: source.visibility });
+    add({ kind: "CATCH", sourceId: catchId, title: source.title, visibility: source.visibility, hasAuthorDescription: source.hasAuthorDescription });
+  }
+
+  /** 걸러 보기를 켜고 끈다. Catch 목록만 첫 쪽부터 다시 부르고 고른 자료·순서는 그대로다(BR6.4·BR6.5). 발행 중에는 바꾸지 않는다. */
+  function setWrittenOnly(writtenOnly: boolean) {
+    const s = store.get();
+    if (s.status.kind === "submitting" || s.writtenOnly === writtenOnly) return Promise.resolve();
+    patch({ writtenOnly });
+    return catches.load();
   }
 
   function toggleMaterial(textMaterialId: string) {
@@ -173,7 +195,7 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
     if (index >= 0) { remove(index); return; }
     const source = list.items.find((item) => item.textMaterialId === textMaterialId);
     if (!source) return;
-    add({ kind: "TEXT_MATERIAL", sourceId: textMaterialId, title: source.title, visibility: null });
+    add({ kind: "TEXT_MATERIAL", sourceId: textMaterialId, title: source.title, visibility: null, hasAuthorDescription: null });
   }
 
   function setField(next: Partial<Pick<PublishScreenState, "title" | "usePassword" | "password">>) {
@@ -242,11 +264,18 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
     patch({ selected: [], title: "", usePassword: false, password: "", step: "edit", status: { kind: "idle" }, flagged: null, result: null });
   }
 
+  const loadSources = () => Promise.all([catches.load(), materials.load()]).then(() => undefined);
+
   return {
     store,
-    loadSources: () => Promise.all([catches.load(), materials.load()]).then(() => undefined),
+    /** 화면 이름 줄에 쓰는 저장소 목록(`RepositoryOptionsSnapshot`). */
+    repositoryOptions,
+    /** 화면을 열 때 한 번: 고르기 목록과 저장소 목록을 함께 부른다(BR6.2·BR6.7). */
+    open: () => Promise.all([loadSources(), repositoryOptions.refresh()]).then(() => undefined),
+    loadSources,
     loadMoreCatches: catches.loadMore,
     loadMoreMaterials: materials.loadMore,
+    setWrittenOnly,
     toggleCatch, toggleMaterial, remove,
     moveUp: (index: number) => move(index, -1),
     moveDown: (index: number) => move(index, 1),
@@ -256,7 +285,7 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
     toConfirm, backToEdit, submit, reset, retryWaitSeconds, canSubmit,
     /** 저장하지 않은 입력(이탈 확인 대상). 완료 뒤에는 없다. */
     isDirty: () => { const s = store.get(); return s.step !== "done" && (s.selected.length > 0 || s.title !== "" || s.password !== ""); },
-    dispose: () => { catches.dispose(); materials.dispose(); },
+    dispose: () => { catches.dispose(); materials.dispose(); repositoryOptions.dispose(); },
   };
 }
 
@@ -281,7 +310,9 @@ export function PublishScreen({ api: client, deps, consent }: { api: PublishClie
   const consentHook = useAiConsent();
   const [model] = useState(() => createPublishModel(client, consent ?? consentHook.run, deps));
   const view = useSyncExternalStore(model.store.subscribe, model.store.get, model.store.get);
-  useEffect(() => { void model.loadSources(); return () => model.dispose(); }, [model]);
+  const options = useSyncExternalStore(model.repositoryOptions.subscribe, model.repositoryOptions.getSnapshot, model.repositoryOptions.getSnapshot);
+  // 열 때마다 목록을 새로 불러온다(BR6.7). 「설명 안 씀」은 그때까지 저장된 결과대로 보인다.
+  useEffect(() => { void model.open(); return () => model.dispose(); }, [model]);
 
   const dirty = model.isDirty();
   useUnsavedGuard(dirty);
@@ -312,6 +343,8 @@ export function PublishScreen({ api: client, deps, consent }: { api: PublishClie
         ) : (
           <div className={styles.layout}>
             <SourcePickerView catches={view.catches} materials={view.materials} selected={view.selected} flagged={view.flagged} disabled={submitting}
+              writtenOnly={view.writtenOnly} repositories={options.repositories}
+              onWrittenOnly={(writtenOnly) => { void model.setWrittenOnly(writtenOnly); }}
               onRetry={() => { void model.loadSources(); }}
               onMoreCatches={() => { void model.loadMoreCatches(); }}
               onMoreMaterials={() => { void model.loadMoreMaterials(); }}

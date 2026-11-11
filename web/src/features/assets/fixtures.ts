@@ -55,6 +55,8 @@ export const previewCatches: readonly CatchAsset[] = [
     visibility: "PRIVATE",
     restriction: "NONE",
     sourceMode: "MOCK",
+    // 작성자 설명 걸러 보기(새 Catch BR5.4)를 미리보기에서 볼 수 있게 쓴 것과 안 쓴 것을 섞는다.
+    hasAuthorDescription: false,
   },
   {
     catchId: "synthetic-catch-api-pagination",
@@ -89,6 +91,7 @@ export const previewCatches: readonly CatchAsset[] = [
     visibility: "PUBLIC",
     restriction: "NONE",
     sourceMode: "MOCK",
+    hasAuthorDescription: true,
   },
   {
     catchId: "synthetic-catch-web-loading",
@@ -121,6 +124,7 @@ export const previewCatches: readonly CatchAsset[] = [
     visibility: "PRIVATE",
     restriction: "NONE",
     sourceMode: "MOCK",
+    hasAuthorDescription: true,
   },
   {
     catchId: "synthetic-catch-web-form",
@@ -150,5 +154,6 @@ export const previewCatches: readonly CatchAsset[] = [
     // 공개 선택과 원본 보호 제한은 별도 값이며 수신자 열람 가능성을 뜻하지 않는다.
     restriction: "SOURCE_PRIVATE",
     sourceMode: "MOCK",
+    hasAuthorDescription: false,
   },
 ];

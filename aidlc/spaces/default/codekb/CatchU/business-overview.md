@@ -1,57 +1,53 @@
 # 업무 개요 — CatchU
 
-> 범위: 2026-11-03 집중 스캔(`kind: partial`), 기준 커밋 `9923226c`. Catch 개편 intent(`261103-catch-redesign`)가 건드리는 분석·Catch·고지·받은 사람 화면을 깊게 읽었고, 통합 브랜치를 합친 뒤 U4 #461의 Catch 작성자 설명과 텍스트 자료를 더해 읽었다. 그 밖의 기능(로그인, 공유 링크, 발행 화면, JD 요약, PDF, MCP 등)은 이 문서에서 다루지 않는다.
+> 기준: 2026-11-09 전체 다시 스캔, 커밋 `a1d0fbb4`. 구성 요소 이름(`api.catches` 등)은 `component-inventory.md`의 제목이다.
 
 ## 무엇을 하는 서비스인가
 
-CatchU는 구직자가 연결한 GitHub 공개 저장소에서 **본인이 작성자로 기록된 커밋**을 찾아, 작업 하나하나를 근거 링크가 붙은 **Catch**로 만들어 주는 서비스다. 구직자는 Catch를 확인하고, 직접 **작성자 설명**을 덧붙이고, 공개해 발행본으로 묶어 링크로 보낸다. Catch와 따로 **텍스트 자료**(포트폴리오·자기소개·이력 같은 글)도 저장해 두고 발행 때 고를 수 있다. 링크를 받은 사람(면접관 등)은 Catch의 작업 사실·본인 기여·근거를 보고, 12월 범위의 AI 요약·질의응답도 발행한 내용만 근거로 쓴다.
+CatchU는 개발자 구직자의 GitHub 활동에서 작업 단위의 기록 카드(**Catch**)를 만들어, 구직자에게는 면접 준비 자료로, 면접관에게는 서류·면접 판단 자료로 주는 서비스다(루트 `README.md`). 인공지능사관학교 기업연계 파이널 프로젝트이며 12월 10일 제출을 목표로 한다.
 
-## 이 스캔이 본 업무 흐름
+쓰는 사람은 둘이다.
 
-| 흐름 | 주체 | 핵심 규칙 |
+| 사람 | 화면 | 로그인 |
 |---|---|---|
-| 분석 접수 | 구직자 → api | 실제 회원은 실제 자료용 고지(현재 v2)에 그때마다 동의해야 접수된다. 하루 실행 한도도 본다(첫 이용 AI 동의를 분석 접수에서 보는지는 이 스캔에서 확인하지 않았다) |
-| 수집 | worker | 기본 브랜치 최근 커밋, 최근 PR과 PR 커밋 목록, 최근 이슈를 GitHub API로 읽는다. 상한은 커밋 3,000·PR 600·호출 2,500·30분 |
-| 후보 묶음 | worker | 작성자가 낸 PR 하나가 Catch 하나다. PR이 없으면 PR 없이 합친 병합, 그것도 없으면 본인 커밋 묶음이 하나다. 이슈 조회가 허용된 요청은 본인 커밋이 서로 다른 이슈를 가리키면 한 PR을 이슈로 나눌 수 있다(이 intent가 끈다) |
-| 작업 동일성 | worker | 묶음마다 `wi1:` 열쇠를 만든다. 방식·저장소·단위·나눈 부분만 넣는다. 회원·제목·내용은 넣지 않는다 |
-| 글 만들기 | worker | 설명 초안·생각해볼 질문은 Claude가 변경 줄에서 근거 조각을 고르고 코드가 틀 문장으로 만든다. 제목은 「{대상} {종류} {동작}」 조각 제목이다. 커밋 메시지·PR 글은 쓰지 않고 보내지도 않는다 |
-| 등록 | api | (회원, `workIdentity`)가 같은 Catch가 있으면 새로 만들지 않고 기존 Catch를 그대로 둔다. 새 Catch는 미공개, 작성자 설명 없이 시작한다 |
-| 작성자 설명 쓰기 | 구직자 → api | Catch 상세에서 0~4,000자 설명을 쓴다. Catch 행의 두 칸(`author_description`·`author_description_updated_at`)에 덮어쓰기로 저장하고, 비우고 저장하면 지운다. AI 초안·확인·공개 상태는 건드리지 않는다 |
-| 재분석 | 구직자 → api → worker | 같은 저장소를 다시 분석할 수 있다. 같은 작업(같은 `wi1`)은 기존 Catch를 참조만 하므로 처음 내용·작성자 설명·공개 상태가 그대로이고, 새 작업만 더한다(2026-10-30 결정, 시험 S2가 확인) |
-| 텍스트 자료 | 구직자 → api | 제목 1~100자·본문 1~20,000자의 글을 만들고·고치고·지운다. Catch와 연결되지 않는 회원 단위 자료다. 서비스가 내용을 찾아 가리지 않고 민감 정보 안내만 보인다 |
-| 받은 사람 화면 | web | 목록에는 제목과 작업 사실 첫 줄, 상세에는 작업 사실·본인 기여·근거·설명 초안을 보인다. 「제목과 설명은 CatchU가 GitHub 기록에서 자동으로 만들었습니다」 안내를 붙인다. 작성자 설명은 아직 받은 사람 화면에 나오지 않는다(발행 제출 2 이후) |
-| 탈퇴 | api | 회원 행을 지우면 회원 자료가 DB 연쇄 삭제로 함께 지워진다. 작성자 설명은 Catch 행의 칸이라 Catch와 함께, 텍스트 자료는 회원을 따라 지워진다 |
+| 구직자(작성자) | 홈, 내 자산(Catch 목록·상세), 텍스트 자료, 발행·발행본, 프로필·GitHub 연결·Claude 연결 | Google 로그인 |
+| 면접관(받은 사람) | 발행본 링크 화면 `/s/[token]` — 사본, AI 기본 요약, 질의응답 | 없음(비밀번호 링크면 비밀번호) |
 
-## 업무 용어
+## 주요 흐름
 
-| 용어 | 뜻 | 코드에서 |
-|---|---|---|
-| Catch | 작업 하나의 증거 카드 | `catch_asset` 표, `CatchAssetEntity` |
-| 후보 | worker가 결과에 담아 보내는, 아직 등록되지 않은 Catch | 계약 `Candidate`, worker `EligibleCandidate` |
-| 작업 단위 | PR·PR 없는 병합·커밋 묶음(그리고 계약에만 남은 이슈) | worker `PullRequestUnit`·`MergeUnit`·`CommitsUnit` |
-| 작업 동일성(`wi1`) | 같은 작업을 알아보는 불투명 열쇠 | worker `work_identity`, api `work_identity` 칸 |
-| 작업 사실 | 단위 이름과 다른 계정 커밋 섞임을 적은 문장 목록 | `workFacts` |
-| 나의 기여 | 「연동 GitHub 계정이 작성자로 기록된 커밋」과 문맥 | `subjectContribution` |
-| 근거 | GitHub 화면 주소·판본·관측 사실·귀속 범위·한계 | `evidence`, `catch_evidence` 표 |
-| 설명 초안·생각해볼 질문 | AI가 고른 조각으로 만든 틀 문장(화면 제목 「Catch 설명 초안」) | `draft`, `reflection` |
-| 작성자 설명 | 구직자가 Catch마다 직접 쓰는 설명(계약 C-14, U4 소유). 재분석에도 유지 | `catch_asset.author_description`, 화면 제목 「작성자 설명」 |
-| 텍스트 자료 | 구직자가 따로 저장하는 글 한 벌(계약 C-13, U4 소유) | `text_material` 표 |
-| 분석 고지 | 저장소 분석 동의 문구와 판본 | `REAL_NOTICE`(`catchu-real-analysis-notice-v2`) |
-| 첫 이용 AI 고지 | 외부 AI 전송 첫 동의 창의 판본 | `AI_NOTICE_VERSION`(`2026-11-v1`) |
+1. **가입과 연결**: Google로 로그인하고(`api.google-login`, `api.auth`), 프로필을 쓰고(`api.member-profile`), GitHub 계정을 연결한다(`api.github-connection`, 추가 권한 없는 OAuth App, 토큰은 암호화 파일로 보관).
+2. **저장소 등록과 분석 요청**: 공개 저장소 주소를 직접 등록하고(`api.member-repositories`), 분석 고지(`catchu-real-analysis-notice-v3`)에 동의해 분석을 요청한다(`api.analysis-intake`). 하루 실행 횟수에 제한이 있다(`api.daily-run-limit`).
+3. **분석**: api가 요청을 큐에 넣고(`api.analysis-queue`), worker가 받아 GitHub 커밋·PR·이슈를 모으고(`worker.collection`), 작업 단위를 정하고(`worker.candidates`), Claude로 설명 초안·생각해 볼 질문·제목 후보를 만들고 OpenAI·Claude 판정으로 거른다(`worker.generation`, `worker.judgement`). 결과는 큐로 돌아온다.
+4. **Catch 등록**: api가 결과를 검사·저장하고(`api.analysis-receiver`) 한 트랜잭션에서 Catch로 등록한다(`api.result-application`, `api.catches`). 같은 작업 열쇠(`wi1`)면 새로 만들지 않고 기존 Catch를 참조한다. 이미 Catch에 속한 커밋은 소속 기록(`commit_assignment`)에 남아 재분석 때 빠진다.
+5. **확인과 작성자 설명**: 구직자는 상세에서 작업 사실·나의 기여를 확인하고, 불일치를 표시하고, 작성자 설명(4,000자 한 칸)을 쓴다(`api.catches`, `web.assets`).
+6. **발행**: Catch와 텍스트 자료를 골라 순서·제목·비밀번호를 정해 고정 발행본을 만든다(`api.publications`, `web.publications`). 링크 수명은 90일이며 중지·삭제할 수 있다. 발행하면 고른 비공개 Catch가 공개로 바뀌고, 사본을 검색 조각으로 나누고(`api.published-index`), 임베딩과 AI 기본 요약을 백그라운드로 만든다(`api.ai-run`, `api.rag-answer`).
+7. **면접관 열람**: 면접관은 링크로 사본을 보고, AI 기본 요약과 질의응답(SSE, 링크당 하루 질문 수 제한)을 쓴다(`web.recipient`, `api.rag-answer`). 답의 근거를 누르면 사본의 해당 칸이 강조된다.
+8. **Claude 연결**: 구직자 본인이 Claude 웹·Desktop에 자기 Catch·텍스트 자료를 읽는 MCP 도구 둘을 연결한다(`api.claude-mcp`).
+9. **탈퇴**: 세션 폐기·발행 링크 중지·MCP 행 삭제 → 파일 삭제 → 자격정보 파일 삭제 → 회원 행 연쇄 삭제의 4단계(`api.withdrawal`).
 
-## 작성자 설명이 Catch와 묶이는 방식(이번 스캔으로 확인)
+## 업무 규칙 가운데 코드가 지키는 것
 
-- **어디에 있나**: 따로 된 표가 아니라 Catch 행(`catch_asset`)의 두 칸이다. 설명 본문(`author_description`, text)과 저장 시각(`author_description_updated_at`)이 함께 채워지거나 함께 비도록 DB가 막는다. 그래서 설명은 Catch ID 하나, 곧 (회원, `wi1`) 하나에 묶인다.
-- **누가 쓰나**: 작성자 설명 API(`GET`·`PUT /v1/catches/{catchId}/description`)만 이 두 칸을 바꾼다. 결과 반영(등록)은 새 Catch를 만들 때 이 칸을 넣지 않아 NULL이 되고, 기존 Catch는 참조만 해서 바꾸지 않는다.
-- **재분석 때**: 같은 `wi1`이 다시 오면 `EXISTING`으로 이어지므로 설명과 저장 시각이 그대로 남는다(시험 S2). 다만 `wi1`이 달라지면(나누기 변화, 새 커밋이 묶음을 바꿈 등) 새 Catch가 설명 없이 생기고, 설명은 옛 Catch에 남는다. 설명을 새 Catch로 옮기는 단계는 없다.
-- **탈퇴 때**: 회원 행 삭제의 연쇄 삭제로 Catch 행이 지워지며 설명도 함께 지워진다. 설명을 저장하는 동안에는 회원 행을 `FOR KEY SHARE`로 잡아 탈퇴 삭제가 끝날 때까지 기다리게 한다.
+- **본인 기여의 뜻**: 연동 계정이 커밋 **작성자**로 기록된 커밋만 본인 기여다. PR을 연 것, 이슈를 쓴 것은 기여가 아니다(`worker/app/candidates/build.py` 모듈 설명).
+- **AI 글과 사람 글을 나눈다**: 면접관 화면은 「AI 설명 초안」·「작성자 설명」·「기록에서 확인한 내용」을 다른 칸으로 보인다(`web/src/features/publications/snapshot-view.tsx`). 받은 사람 AI 근거 종류는 `GITHUB_RECORD`·`AUTHOR_MATERIAL` 둘이고, AI 초안·제목은 근거에 넣지 않는다(`api/src/published-index/chunker.ts`, `api/src/rag-answer/summary-sources.ts`).
+- **작업 사실에는 CatchU가 센 숫자를 쓰지 않는다**: 작업 사실은 1~2줄(단위 종류와, 쓸 만하면 PR 제목이나 본인 커밋 첫 줄)이다. 파일·줄 수 같은 원본 숫자는 근거의 관측 사실에만 있다(`build.py` 27~36행, `worker/app/collection/evidence.py`).
+- **공개 조건**: 작업 사실과 나의 기여를 둘 다 확인해야 하고, 원본 저장소가 비공개로 관측되면(`SOURCE_PRIVATE`) 공개·발행할 수 없다(`owner-catch-store.ts`, `publish.service.ts`).
+- **발행본은 고정 사본이다**: 발행 뒤 원본 Catch를 고쳐도 사본은 바뀌지 않는다. 받은 사람 경로는 사본만 읽는다(`db-publication-access.ts` `readSnapshotIn`).
+- **원자료를 남기지 않는다**: worker는 GitHub 원자료를 메모리에만 두고 결과만 보낸다. 비밀값과 사용자 글은 로그에 남기지 않는다(팀 규칙 「Code Style」, 각 모듈 주석).
 
-## Catch 개편이 바꾸려는 곳(이 스캔으로 확인한 지금 모양)
+## 지금 진행 중인 일과 이 intent
 
-- 재분석 때 이미 Catch에 속한 커밋을 기억하는 곳이 없다. 같은 작업인지는 매번 `wi1` 열쇠를 다시 계산해 맞춘다. 그래서 수집 범위가 밀리거나 새 커밋이 묶음에 붙으면 다른 열쇠가 되어 중복 Catch가 생길 수 있다. 이때 작성자가 쓴 설명은 옛 Catch에만 남고 새 Catch는 빈 설명이 된다.
-- 제목은 「CreateArticlePage.vue 코드 수정」 같은 조각 제목이고, 작업 사실 첫 줄은 「PR 없이 병합한 병합 커밋 f0b728b28882」처럼 SHA가 든다. 수집 기록에 PR 제목·커밋 메시지·PR을 연 계정이 있지만 쓰지 않는다.
-- 설명 초안 재료는 커밋 → GitHub 파일 순서 → 줄 순서로 24,000 B까지 담아, 큰 PR에서는 앞쪽 파일만 재료가 된다.
-- 분석 고지 v2는 「커밋 메시지·PR 글은 외부 AI에 보내지 않는다」, 「정해진 문장으로 만든다」고 적는다. 첫 이용 고지의 받는 곳은 Claude·Voyage 둘이다.
-- 받은 사람 화면 안내는 제목이 늘 자동 생성이라고 말한다. 구직자 Catch 상세에는 이제 사람이 쓴 「작성자 설명」과 AI의 「Catch 설명 초안」이 나란히 있어, 안내 문장의 「설명」이 어느 쪽인지 화면 글만으로는 헷갈릴 수 있다.
+- 12월 intent(`260925-intent-12`)의 Unit들이 통합 브랜치 `intent/260925-intent-12`에 합쳐지는 중이고, Catch 개편 intent(`261103-catch-redesign`)의 CR1~CR3도 들어와 있다(커밋 `a1d0fbb4`가 통합 브랜치를 이 작업 브랜치에 들였다).
+- 이 intent(`261109-new-catch`, 「새 Catch」)는 Catch를 「지원자가 골라 면접관에게 보내는 한 장」으로 다시 정의한다(`docs/ai-dlc-input-catch/CatchU_새_Catch_입력.md` §4-1). 바꿀 자리는 작성자 설명 쓰기·보기, 본인 Catch 목록, 발행 화면, 발행 사본과 받은 사람 화면, worker의 규칙 사실(다시 고친 줄, 옮긴 파일, 시험 파일, 작업 시각)이다. 지금 코드의 해당 자리는 `architecture.md` 「Key Design Decisions」와 `code-quality-assessment.md` 「이 intent가 닿는 자리」에 적었다.
 
-자세한 위치는 [architecture.md](architecture.md)와 [code-quality-assessment.md](code-quality-assessment.md)에 있다.
+## 용어
+
+| 말 | 뜻 |
+|---|---|
+| Catch | 작업 하나(PR, PR 없는 병합, 본인 커밋 묶음)에 대한 카드. 표 `catch_asset` |
+| 작업 열쇠(`workIdentity`, `wi1`) | 같은 작업인지 가르는 값. 회원마다 유일 |
+| 근거(evidence) | Catch를 받치는 GitHub 기록(커밋·PR·이슈) 하나의 주소·판본·관측 사실 |
+| 기록의 글 | 작성자가 GitHub에 남긴 원문 한 줄(PR 제목 또는 본인 커밋 첫 줄) |
+| 소속 기록 | 커밋 SHA가 어느 Catch에 속하는지. 표 `commit_assignment` |
+| 발행본 | 고른 항목의 고정 사본과 링크 하나. 표 `publication`·`published_item` |
+| 면접관 | Catch 링크를 받아 보는 사람. 코드에서는 recipient(받은 사람) |
+| 팀장 | 이 프로젝트의 intent를 정하는 우리 팀장 |

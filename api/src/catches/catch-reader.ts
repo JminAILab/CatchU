@@ -1,6 +1,7 @@
 import { EntityManager } from 'typeorm';
 import { OwnerCatchReadSource } from './owner-catch-response';
 
+// 설명 원문은 목록·상세 질의에서 읽지 않고 있는지만 읽는다(`hasAuthorDescription`, 새 Catch C1). 공개 응답은 칸을 골라 담아 이 값을 내보내지 않는다.
 export type ReadRow = OwnerCatchReadSource['asset'] & {
   requestId: string | null;
   requestMemberId: string | null;
@@ -21,7 +22,7 @@ export const READ_COLUMNS = `
   c.draft_content AS "draftContent", c.reflection_status AS "reflectionStatus",
   c.reflection_questions AS "reflectionQuestions", c.work_facts_confirmed AS "workFactsConfirmed",
   c.contribution_confirmed AS "contributionConfirmed", c.mismatch, c.visibility,
-  c.source_mode AS "sourceMode", r.request_id AS "requestId", r.member_id AS "requestMemberId",
+  c.source_mode AS "sourceMode", c.author_description IS NOT NULL AS "hasAuthorDescription", r.request_id AS "requestId", r.member_id AS "requestMemberId",
   r.repository_id AS "repositoryId", p.owner_id AS "protectionOwnerId",
   p.repository_id AS "protectionRepositoryId", p.applied_restriction AS "appliedRestriction", p.confirmed_source_state AS "confirmedSourceState", p.observation_provenance AS "observationProvenance", p.observed_at AS "observedAt"`;
 

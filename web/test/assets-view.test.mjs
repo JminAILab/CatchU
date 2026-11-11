@@ -83,9 +83,9 @@ for (const [name, content] of [["null", null], ["빈 문자열", ""], ["공백",
 }
 
 // #454 완료 기준: 공개 상태 걸러 보기, 저장소와 함께 쓰기, 맞는 Catch가 없을 때 안내.
-function listMarkup({ repositoryId = "", visibility = "", items = previewCatches, hasMore = false } = {}) {
+function listMarkup({ repositoryId = "", visibility = "", items = previewCatches, hasMore = false, authorDescription, dataMode } = {}) {
   return renderToStaticMarkup(createElement(AssetsView, {
-    items, repositories: previewRepositories, repositoryId, visibility, hasMore,
+    items, repositories: previewRepositories, repositoryId, visibility, hasMore, authorDescription, dataMode,
     listState: "ready", detailState: "ready", selectedId: null, repositoryManagement: null,
   }));
 }
@@ -168,4 +168,89 @@ test("태그 꼴 제목·작업 사실 둘째 줄은 HTML로 해석하지 않고
     assert.doesNotMatch(html, /<script>|<b>굵게/);
     assert.ok(html.includes("&lt;script&gt;alert(1)&lt;/script&gt;&lt;b&gt;굵게&lt;/b&gt;"));
   }
+});
+
+// 새 Catch NC1 — 내 Catch 목록 「작성자 설명」 선택 칸과 빈 결과(US4.1·US4.2, BR5.4~BR5.6), 상세 순서와 질문 아래 문구(US3.1, BR4.1·BR4.2).
+// 먼저 정한 실패 조건: 선택 칸에 보이는 label이 없음, 「씀」 빈 결과가 「아직 표시할 Catch가 없습니다」로 보임, 카드에 설명 여부가 보임,
+// API 방식에서 저장 뒤 바뀐 항목을 화면이 다시 걸러 지금 쪽이 바뀜, 설명 초안·질문이 작성자 설명 편집보다 아래에 있음.
+const writtenIds = previewCatches.filter((item) => item.hasAuthorDescription).map((item) => item.catchId);
+
+test("AC4.1.4 선택 칸은 저장소·공개 상태 다음에 보이는 label 「작성자 설명」과 전체·씀·안 씀이고, 걸러 본 개수는 aria-live=polite다", () => {
+  assert.ok(writtenIds.length > 0 && writtenIds.length < previewCatches.length, "고정 자료에 쓴 것과 안 쓴 것이 섞여 있다");
+  const html = listMarkup({ authorDescription: "written" });
+  const labels = [...html.matchAll(/<label[^>]*>([^<]+)<select/g)].map((match) => match[1]);
+  assert.deepEqual(labels, ["저장소", "공개 상태", "작성자 설명"]);
+  const select = html.match(/작성자 설명<select[\s\S]*?<\/select>/)?.[0] ?? assert.fail("작성자 설명 선택이 있어야 한다");
+  assert.deepEqual([...select.matchAll(/<option value="([^"]*)"[^>]*>([^<]*)</g)].map((match) => [match[1], match[2]]),
+    [["all", "전체"], ["written", "씀"], ["unwritten", "안 씀"]]);
+  assert.match(select, /<option value="written" selected="">/);
+  assert.match(html, new RegExp(`<p[^>]*aria-live="polite"[^>]*>${writtenIds.length}개의 Catch</p>`));
+});
+
+test("미리보기 방식은 hasAuthorDescription으로 화면 안에서 거르고, 주소 매개변수의 모르는 값은 전체다", async () => {
+  assert.deepEqual(shownCatchIds(listMarkup({ authorDescription: "written" })), writtenIds);
+  assert.deepEqual(shownCatchIds(listMarkup({ authorDescription: "unwritten" })), previewCatches.filter((item) => !item.hasAuthorDescription).map((item) => item.catchId));
+  assert.equal(shownCatchIds(listMarkup({})).length, previewCatches.length);
+  const { parseAuthorDescriptionFilter } = await import(viewUrl.href);
+  assert.deepEqual(["written", "unwritten", "all", "WRITTEN", "", null].map(parseAuthorDescriptionFilter),
+    ["written", "unwritten", "all", "all", "all", "all"]);
+});
+
+test("AC4.1.3 「씀」인데 서버가 빈 목록을 주면 그 조건의 안내가 먼저 보이고 저장소를 골랐으면 「이 저장소에 」가 붙으며 저장소 연결 문구는 없다", () => {
+  const empty = listMarkup({ dataMode: "api", items: [], authorDescription: "written" });
+  assert.ok(empty.includes("<h3>작성자 설명을 쓴 Catch가 없습니다</h3>"));
+  assert.ok(empty.includes("작성자 설명을 전체로 바꾸면 다른 Catch를 볼 수 있습니다."));
+  assert.doesNotMatch(empty, /아직 표시할 Catch가 없습니다|저장소 연결과 분석 상태|개의 Catch</);
+  const inRepository = listMarkup({ dataMode: "api", items: [], authorDescription: "written", repositoryId: "demo-api" });
+  assert.ok(inRepository.includes("<h3>이 저장소에 작성자 설명을 쓴 Catch가 없습니다</h3>"));
+  // 공개 상태 칸이 함께 켜져 있어도 서버 빈 목록이면 작성자 설명 안내가 먼저다.
+  assert.ok(listMarkup({ dataMode: "api", items: [], authorDescription: "written", visibility: "PUBLIC" }).includes("<h3>작성자 설명을 쓴 Catch가 없습니다</h3>"));
+});
+
+test("「안 씀」 빈 결과는 같은 꼴의 안내이고, 걸러 보기가 모두 전체인 빈 목록과 공개 상태 빈 결과는 지금 분기 그대로다", () => {
+  const unwritten = listMarkup({ dataMode: "api", items: [], authorDescription: "unwritten" });
+  assert.ok(unwritten.includes("<h3>작성자 설명을 쓰지 않은 Catch가 없습니다</h3>"));
+  assert.ok(unwritten.includes("작성자 설명을 전체로 바꾸면 다른 Catch를 볼 수 있습니다."));
+  const allEmpty = listMarkup({ dataMode: "api", items: [], authorDescription: "all" });
+  assert.ok(allEmpty.includes("<h3>아직 표시할 Catch가 없습니다</h3>"));
+  const privateOnly = previewCatches.filter((item) => item.visibility === "PRIVATE");
+  assert.ok(listMarkup({ dataMode: "api", items: privateOnly, authorDescription: "unwritten", visibility: "PUBLIC" }).includes("<h3>공개 설정한 Catch가 없습니다</h3>"));
+});
+
+test("AC4.1.5 걸러 본 목록의 카드에는 설명 여부 표시·추천·순위가 없다", () => {
+  for (const authorDescription of ["all", "written", "unwritten"]) {
+    const html = listMarkup({ authorDescription });
+    const cards = html.slice(html.indexOf("<ul"), html.lastIndexOf("</ul>"));
+    assert.ok(cards.length > 0, authorDescription);
+    assert.doesNotMatch(cards, /작성자 설명|설명 안 씀|씀|추천|순위/, authorDescription);
+  }
+});
+
+test("AC4.2.1 API 방식에서 저장 뒤 설명이 생긴 항목도 지금 쪽에서 빠지지 않는다(화면이 다시 거르지 않음)", () => {
+  const [a, b] = previewCatches.filter((item) => !item.hasAuthorDescription);
+  const html = listMarkup({ dataMode: "api", items: [{ ...a, hasAuthorDescription: true }, b], authorDescription: "unwritten" });
+  assert.ok(html.includes(">불러온 2개의 Catch</p>"));
+});
+
+test("AC3.1.1·AC3.1.2 상세 순서는 작업 사실·나의 기여 → 근거 → Catch 설명 초안 → 생각해 볼 질문 → 작성자 설명 → 현재 확인 상태이고 다시 볼 곳은 아직 없다", () => {
+  const item = previewCatches[0];
+  const html = renderToStaticMarkup(createElement(AssetsView, {
+    dataMode: "api", items: [item], detailItem: item, selectedId: item.catchId, repositories: [], repositoryId: "",
+    listState: "ready", detailState: "ready", repositoryManagement: null,
+    descriptionEditor: createElement("section", { "data-testid": "catch-author-description" }, "편집 자리"),
+  }));
+  const dialog = html.match(/<dialog\b[\s\S]*?<\/dialog>/)[0];
+  const order = ["<h3>작업에서 확인된 사실</h3>", "<h3>나의 기여</h3>", "<h3>근거</h3>", "<h3>Catch 설명 초안</h3>", "<h3>생각해 볼 질문",
+    'data-testid="catch-author-description"', "<h3>현재 확인 상태</h3>"].map((needle) => dialog.indexOf(needle));
+  assert.ok(order.every((position) => position >= 0), String(order));
+  assert.deepEqual([...order].sort((x, y) => x - y), order);
+  assert.doesNotMatch(dialog, /다시 볼 곳/);
+});
+
+test("AC3.1.3 질문 아래 문구는 「질문을 보고 아래 칸에 자기 말로 적어 보세요.」이고 답 저장 안내와 질문별 답 칸은 없다", () => {
+  const html = detailMarkup(previewCatches[0]);
+  const questions = html.slice(html.indexOf("<h3>생각해 볼 질문"), html.indexOf("<h3>현재 확인 상태</h3>"));
+  assert.ok(questions.includes("질문을 보고 아래 칸에 자기 말로 적어 보세요."));
+  assert.doesNotMatch(html, /질문에 대한 답변을 저장하는 기능은 제공하지 않습니다/);
+  assert.doesNotMatch(questions, /<textarea|<input/);
 });

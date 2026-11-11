@@ -1,5 +1,5 @@
 import type { ApiResult } from "../../lib/api-response";
-import type { CatchAsset } from "./types";
+import type { AuthorDescriptionFilter, CatchAsset } from "./types";
 
 /** #106이 인증·base URL·/v1·공통 오류 처리를 담당한다. 이 경계는 토큰을 받거나 저장하지 않는다. */
 export type MemberRequest = {
@@ -12,6 +12,9 @@ export type MemberTransport = (path: string, request: MemberRequest) => Promise<
 export type CatchFailure = Exclude<ApiResult, { kind: "success" }>;
 export type CatchResult<T> = { kind: "success"; data: T } | CatchFailure;
 export type CatchPage = { items: readonly CatchAsset[]; page: { nextCursor: string | null } };
+/** 본인 목록 걸러 보기. 빈 `repositoryId`와 `all`은 조건을 보내지 않는다. 커서는 이 걸러 보기에 묶인다(새 Catch C1). */
+export type CatchListFilter = { readonly repositoryId: string; readonly authorDescription: AuthorDescriptionFilter };
+export const ALL_CATCHES: CatchListFilter = Object.freeze({ repositoryId: "", authorDescription: "all" });
 
 const record = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string");
@@ -31,7 +34,16 @@ export function isCatch(value: unknown): value is CatchAsset {
     && record(value.reflection) && generation(value.reflection.status) && strings(value.reflection.questions)
     && record(value.confirmation) && typeof value.confirmation.workFactsConfirmed === "boolean" && typeof value.confirmation.contributionConfirmed === "boolean"
     && typeof value.mismatch === "boolean" && ["PRIVATE", "PUBLIC"].includes(value.visibility as string)
-    && ["NONE", "SOURCE_PRIVATE"].includes(value.restriction as string) && ["MOCK", "LIVE"].includes(value.sourceMode as string);
+    && ["NONE", "SOURCE_PRIVATE"].includes(value.restriction as string) && ["MOCK", "LIVE"].includes(value.sourceMode as string)
+    && typeof value.hasAuthorDescription === "boolean";
+}
+
+/** 걸러 보기와 맞지 않는 항목이 든 200은 성공으로 보지 않는다(`written`이면 모두 참, `unwritten`이면 모두 거짓). */
+function matchesFilter(item: CatchAsset, filter: CatchListFilter): boolean {
+  if (filter.repositoryId && item.repositoryId !== filter.repositoryId) return false;
+  if (filter.authorDescription === "written") return item.hasAuthorDescription;
+  if (filter.authorDescription === "unwritten") return !item.hasAuthorDescription;
+  return true;
 }
 
 export function catchErrorText(error: CatchFailure | null, context: "catch" | "list" = "catch"): string {
@@ -59,13 +71,14 @@ export function createCatchApi(transport: MemberTransport) {
     }
   }
   return {
-    list(repositoryId: string, cursor: string | null, signal?: AbortSignal) {
+    list(filter: CatchListFilter, cursor: string | null, signal?: AbortSignal) {
       const query = new URLSearchParams({ limit: "20" });
-      if (repositoryId) query.set("repositoryId", repositoryId);
+      if (filter.repositoryId) query.set("repositoryId", filter.repositoryId);
+      if (filter.authorDescription !== "all") query.set("authorDescription", filter.authorDescription);
       if (cursor !== null) query.set("cursor", cursor);
       return request<CatchPage>(`/catches?${query}`, { method: "GET", cache: "no-store", signal },
         (v): v is CatchPage => record(v) && Array.isArray(v.items) && v.items.every(isCatch)
-          && v.items.every((item) => !repositoryId || item.repositoryId === repositoryId)
+          && v.items.every((item) => matchesFilter(item, filter))
           && record(v.page) && (v.page.nextCursor === null || nonempty(v.page.nextCursor)));
     },
     update(catchId: string, change: CatchChange) {
