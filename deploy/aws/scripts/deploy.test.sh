@@ -487,6 +487,9 @@ check "api: Google 로그인 켬, 돌아올 주소는 https://catchu.dev/google/
       | map({(.name): (.value // "secret \(.valueFrom.secretKeyRef.name) \(.valueFrom.secretKeyRef.key)")}) | add
       | .GOOGLE_LOGIN_ENABLED == "true" and .GOOGLE_REDIRECT_URI == "https://catchu.dev/google/callback"
       and .GOOGLE_CLIENT_ID == "secret catchu-api GOOGLE_CLIENT_ID" and .GOOGLE_CLIENT_SECRET == "secret catchu-api GOOGLE_CLIENT_SECRET"')"
+check "api: 파일 저장은 local, 뿌리는 /tmp 빈 볼륨(없으면 탈퇴·발행본 삭제가 500)" \
+  "$(ok q "$WORK/applied-api.yaml" '.[0].spec.template.spec.containers[0].env | map({(.name): .value}) | add
+      | .FILE_STORAGE_DRIVER == "local" and .FILE_STORAGE_LOCAL_ROOT == "/tmp"')"
 check "worker: 운영 모드, DB 값 없음, 클러스터 안 api 주소, 종료 유예 30초 이상, 생존 확인 없음" \
   "$(ok q "$WORK/applied-worker.yaml" '.[0].spec.template.spec | .terminationGracePeriodSeconds >= 30 and .containers[0].livenessProbe == null
       and (.containers[0].env | map({(.name): (.value // "ref")}) | add | .NODE_ENV == "production"

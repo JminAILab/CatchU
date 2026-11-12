@@ -118,6 +118,12 @@ spec:
                 secretKeyRef:
                   name: catchu-api
                   key: GOOGLE_CLIENT_SECRET
+            # 파일 저장(탈퇴·발행본 삭제가 회원 파일을 지운다). 값이 없으면 api는 뜨지만 두 기능이 500으로 끝난다.
+            # U8 전 판본은 파일을 만들지 않아 개발 서버와 같은 /tmp(빈 볼륨)로 둔다. U8이 S3를 넣으면 s3로 바꾼다.
+            - name: FILE_STORAGE_DRIVER
+              value: local
+            - name: FILE_STORAGE_LOCAL_ROOT
+              value: /tmp
           resources:
             requests:
               cpu: 100m
