@@ -4,7 +4,7 @@
 
 ## 근거
 
-- 글·주소: [#496 팀장 결정](https://github.com/JminAILab/CatchU/issues/496#issuecomment-6788199337)(2026-11-11). 「개인정보 처리방침 확정 문구」 접힌 칸을 그대로 싣고, 표는 표로·제목 단계도 그대로 둔다. 주소는 `/privacy`다.
+- 글·주소: [#496 팀장 결정](https://github.com/JminAILab/CatchU/issues/496#issuecomment-6788199337)(2026-11-11)과 [고친 확정 문구](https://github.com/JminAILab/CatchU/issues/496#issuecomment-6810581294)(2026-11-12). 고친 댓글의 「개인정보 처리방침 확정 문구(2026-11-12 수정)」 접힌 칸을 그대로 싣고, 표는 표로·제목 단계도 그대로 둔다. 주소는 `/privacy`다. 앞 결정 댓글의 확정 문구는 기록으로 남아 있다.
 - 같은 폴더의 `privacy-policy.md`가 그 접힌 칸을 글자 그대로 옮긴 원문 사본이다.
 
 ## 구성

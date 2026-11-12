@@ -8,14 +8,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { load } from "./u2-render.mjs";
 
 // #496 개인정보 처리방침(`/privacy`)과 첫 화면 바닥글 링크.
-// 원문: 팀장 확정 문구(https://github.com/JminAILab/CatchU/issues/496#issuecomment-6788199337, 댓글 updated_at 2026-11-11T05:47:52Z)의
+// 원문: 팀장 확정 문구(2026-11-12 수정, https://github.com/JminAILab/CatchU/issues/496#issuecomment-6810581294, 댓글 updated_at 2026-11-12T00:22:09Z)의
 //   접힌 칸. src/features/privacy/privacy-policy.md가 그 칸을 글자 그대로(줄 끝 LF) 옮긴 사본이고, SHA-256이 아래 값이다.
 // 기대: 화면이 사본과 같은 순서·글자로 제목 단계(# → h1, ## → h2)·문단·목록 항목·표(첫 줄은 th, 나머지는 td)·코드 표시를 그리고,
 //   표 칸 안의 <br>은 줄바꿈으로 그린다. 원문에 없는 글·링크·강조를 더하지 않는다. 첫 화면 바닥글은 /privacy로 링크한다.
 // 실패 조건: 글자·순서·제목 단계가 하나라도 다름, 표 칸이 빠지거나 줄이 합쳐짐, <br>이 글자로 보임, a·strong·em 같은 태그가 끼어듦,
 //   사본이 원문과 다름, 바닥글 링크가 없거나 다른 주소로 감.
 // 글을 바꿀 때(예: 시행일)는 팀장이 확정한 글로 사본과 privacy-policy.tsx를 함께 고치고, 위 출처와 아래 SHA-256도 고친다.
-const SOURCE_SHA256 = "83775d32edf33b4638671998155775f7ca6644f5f621c3785740a390a42669a1";
+const SOURCE_SHA256 = "83f9a28efb41f79b67c6b234490d93d26b6d7c3c737fdcd99474817727686c5d";
 
 // next/image는 Next 앱 밖에서 불러올 수 없다. 이 시험은 바닥글의 글·링크만 보므로 아무것도 그리지 않는 대역으로 바꾼다.
 registerHooks({
