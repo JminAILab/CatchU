@@ -2,6 +2,8 @@ import {
   CatchContentSource,
   NewCatchContent,
   SourceMode,
+  isRevisitFactList,
+  parseWorkTimes,
   prepareNewCatchContent,
 } from './new-catch-content';
 import { CatchRegistrationInputError, CatchRegistrationInputField } from './registration-input-error';
@@ -93,6 +95,21 @@ function validateCandidate(candidate: RegistrationCandidate): void {
     evidenceIds.add(evidence.evidenceId);
   }
   validateOwnCommitShas(candidate.ownCommitShas);
+  validateRevisitFacts(candidate.revisitFacts, candidate.ownCommitShas);
+  parseWorkTimes(candidate.firstWorkAt, candidate.lastWorkAt);
+}
+
+/**
+ * 다시 볼 곳 사실의 등록 입력 검사(NC3 BR5.2, 보안 설계 2절). 계약 검사(Ajv)가 모양을 먼저 보고, 여기서는 종류별 경로·커밋
+ * 수, 같은 사실 안 겹침, 사실의 커밋이 그 후보 ownCommitShas 안인지를 더 본다. 어기면 그 결과의 Catch를 하나도 등록하지
+ * 않는다. 값은 오류에 싣지 않는다.
+ */
+function validateRevisitFacts(value: unknown, ownCommitShas: readonly string[]): void {
+  if (!isRevisitFactList(value)) throw new CatchRegistrationInputError('INVALID_INPUT', 'revisitFacts');
+  const own = new Set(ownCommitShas);
+  if (!value.every((fact) => fact.commits.every((sha) => own.has(sha)))) {
+    throw new CatchRegistrationInputError('INVALID_INPUT', 'revisitFacts');
+  }
 }
 
 const COMMIT_SHA = /^[0-9a-f]{40}$/;

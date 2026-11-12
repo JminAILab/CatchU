@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import type { AuthorDescriptionFilter, CatchAsset, RepositoryOption } from "./types";
+import { RevisitFacts } from "./revisit-facts";
 import styles from "./assets.module.css";
 
 export type LoadState = "ready" | "loading" | "error";
@@ -290,7 +291,9 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
               </article>
             ))}
           </section>
-          {/* 새 Catch BR4.1: 근거 → (다시 볼 곳, NC3) → Catch 설명 초안 → 생각해 볼 질문 → 작성자 설명 → 현재 확인 상태. 초안과 질문을 보고 아래 칸에 쓴다. */}
+          {/* 새 Catch BR4.1: 근거 → 다시 볼 곳(NC3) → Catch 설명 초안 → 생각해 볼 질문 → 작성자 설명 → 현재 확인 상태. 초안과 질문을 보고 아래 칸에 쓴다. */}
+          {/* NC3 BR9.1: 사실이 없으면 칸을 그리지 않는다. 저장소 이름은 이 상세가 이미 불러온 값이다(새 요청 없음). */}
+          <RevisitFacts item={item} dataMode={dataMode} repositoryName={repositoryName} />
           {/* CR3 BR7.1: 설명 초안이 NOT_GENERATED면 칸(제목·안내 글)을 그리지 않는다. FAILED·GENERATED는 그대로다. */}
           {item.draft.status !== "NOT_GENERATED" && <section className={styles.detailSection}><h3>Catch 설명 초안</h3>
             {hasGeneratedDraft(item) ? <p className={styles.draft}>{item.draft.content}</p>

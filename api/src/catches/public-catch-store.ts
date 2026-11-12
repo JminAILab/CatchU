@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { catchIdInput, isUuid, nextOwnerCatchCursor, ownerCatchQuery } from './owner-catch-input';
+import { catchIdInput, isUuid, nextPublicCatchCursor, publicCatchQuery } from './owner-catch-input';
 import { CatchReadIntegrityError, OwnerCatchReadSource, OwnerCatchResponse, toOwnerCatchResponse } from './owner-catch-response';
 import { READ_COLUMNS, READ_FROM, ReadRow, readCatchSources } from './catch-reader';
 
@@ -55,7 +55,8 @@ export class PublicCatchStore {
       || Object.keys(input).some((key) => key !== 'cursor' && key !== 'limit')) throw new BadRequestException();
     // 같은 UUID 페이지 구현을 재사용하되 본인용 커서와 수신자용 커서는 섞이지 않는다.
     const cursorScope = 'public:' + ownerId;
-    const query = ownerCatchQuery(cursorScope, input);
+    // 공개 목록은 본인 목록의 작업 시각 정렬·커서 판본 3을 쓰지 않는다(NC3 BR7.3).
+    const query = publicCatchQuery(cursorScope, input);
     return this.dataSource.transaction('REPEATABLE READ', async (manager) => {
       const values: unknown[] = [ownerId];
       let conditions = PUBLIC_CONDITIONS;
@@ -71,7 +72,7 @@ export class PublicCatchStore {
       return {
         catches: sources.map((source) => publicResponse(ownerId, source)),
         page: { nextCursor: rows.length > query.limit
-          ? nextOwnerCatchCursor(cursorScope, query, pageRows[pageRows.length - 1].catchId) : null },
+          ? nextPublicCatchCursor(cursorScope, query, pageRows[pageRows.length - 1].catchId) : null },
       };
     });
   }

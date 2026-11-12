@@ -74,7 +74,7 @@ DB 실패를 무시하고 다음 후보를 처리하지 않는다.
 
 ## 소속 기록 (CR2)
 
-Catch 개편 CR2부터 결과 v3의 후보마다 본인 커밋 목록(`ownCommitShas`, 1~3,000개, 소문자 40자, 중복 없음)이 온다. 등록은 이 목록을 검사(필드 `ownCommitShas`)하고 다음처럼 쓴다.
+Catch 개편 CR2부터 결과(v3부터, 지금 v4)의 후보마다 본인 커밋 목록(`ownCommitShas`, 1~3,000개, 소문자 40자, 중복 없음)이 온다. 등록은 이 목록을 검사(필드 `ownCommitShas`)하고 다음처럼 쓴다.
 
 - 위 4·6단계에서 Catch를 만들거나 기존 Catch를 찾고 보호 판단까지 확인한 뒤, 같은 트랜잭션에서 그 작업 키 후보들의 목록 합집합(앞 후보 목록 뒤에 새 SHA를 처음 나온 순서로)을 `commit_assignment`에 쓴다. 회원은 입력의 ownerId, 저장소는 수신 기록이 가리키는 분석 요청의 저장소 ID다.
 - 1,000행씩 `insert().values([...]).orIgnore()`로 쓴다. 이미 있는 (회원, 저장소, SHA)는 같은 Catch든 다른 Catch든 건너뛰고 저장된 소속을 바꾸지 않는다(갱신 없음).
@@ -84,6 +84,16 @@ Catch 개편 CR2부터 결과 v3의 후보마다 본인 커밋 목록(`ownCommit
 - 소속은 worker 맥락 조회가 `assignedCommitShas`로 돌려주고, worker는 재분석 때 그 커밋을 뺀다([worker 소속 커밋 빼기](../../worker/docs/commit-assignment.md)). 표 모양은 [DB 적용과 검사](catch-registration-database.md)에 있다.
 - 새 Catch NC2부터 소속은 발행 사본의 본인 커밋 표지 근거(`evidence[].ownCommit`)로도 쓰인다. 발행이 고른 Catch의 소속을 읽어 근거 커밋 주소마다 참·거짓을 정한다([발행 사본 선택 칸](publications.md#사본-선택-칸-넷-새-catch-nc2-계약-c3)). 소속의 뜻이나 쓰는 규칙을 바꾸면 면접관 화면의 「이 작업의 본인 커밋」 표지도 바뀐다.
 - worker가 근거 한계에 새 작업 전체 한계 문장을 더하면 `src/publications/work-limit-sentences.ts`의 상수 목록에도 더해야 면접관 화면의 「이 기록으로 알 수 없는 것」에 보인다.
+
+## 다시 볼 곳 사실과 작업 시각 (새 Catch NC3)
+
+새 Catch NC3부터 결과 v4의 후보마다 다시 볼 곳 사실(`revisitFacts`, 0~30개)과 첫·마지막 작업 시각(`firstWorkAt`·`lastWorkAt`)이 온다. 계약 검사(Ajv)가 모양을 먼저 보고(SCHEMA_INVALID), 등록 입력 검사(1단계 `prepareRegistrationBatch`)가 뜻을 더 본다.
+
+- **등록 입력 검사:** 사실마다 종류별 경로·커밋 수(REWORKED_LINES 경로 1·커밋 2, MOVED_FILE·EXTENSION_CHANGED 경로 2·커밋 1~2, REVERTED 경로 0·커밋 2, TEST_FILES_PRESENT 경로 1~20·커밋 1~20), 경로 1~1,024자(코드 포인트), 식별값 소문자 16진수 40자, 같은 사실 안 경로·커밋 겹침 없음, 사실의 커밋이 그 후보 `ownCommitShas` 안인지 본다. 어기면 `INVALID_INPUT`(필드 `revisitFacts`)이다. 두 시각은 `Date`로 해석해 `firstWorkAt ≤ lastWorkAt`을 본다(오프셋·소수 초 글도 받음). 해석하지 못하면 `firstWorkAt`·`lastWorkAt`, 뒤바뀌면 `lastWorkAt` 필드의 `INVALID_INPUT`이다. 한 후보라도 어기면 그 결과의 Catch를 하나도 등록하지 않는다. 받은 값은 오류에 싣지 않는다.
+- 종류별 개수 표는 worker `revisit.py`의 자기 결과 확인, web `catch-api.ts` 응답 검사와 같은 값이다. 바꾸면 세 곳을 함께 고친다.
+- **새 Catch에만 한 번 쓴다:** 4단계에서 새 Catch를 만들 때 첫 후보의 사실과 두 시각을 `catch_asset.revisit_facts`(jsonb)·`first_work_at`·`last_work_at`(timestamptz)에 함께 쓴다. 6단계 기존 Catch 참조와 7단계 재호출은 새 칸을 쓰지 않는다(재분석 때 기존 Catch의 사실·시각 그대로). 등록 뒤 새 칸을 고치는 경로는 없다.
+- **DB 검사:** `revisit_facts`는 jsonb 배열이고, 두 시각은 둘 다 NULL이거나 둘 다 있고 앞이 뒤보다 늦지 않다. 어기면 등록 트랜잭션 전체가 롤백된다. 마이그레이션 전 Catch는 빈 배열·NULL이다.
+- 사실·시각은 본인 목록·상세 응답과 정렬에만 쓴다([본인 Catch 조회](catch-owner-read-preparation.md)). 발행 사본·공개 Catch 응답·Claude 연결 읽기는 이 칸을 읽지 않는다.
 
 저장소·MOCK/LIVE 대조는 잘못된 기존 Catch 연결을 막는 검사다.
 `workIdentity`는 불투명한 문자열이며 B가 형식을 강제하거나 다시 계산하지 않는다.

@@ -53,6 +53,10 @@ class ChangedFile:
     # 없어 같은 변경을 비교할 커밋만 diff 형식으로 따로 받아 채운다. None이면 관측하지 않았고, 빈
     # 값이면 모드 바꿈이 없음을 확인했다.
     mode_lines: tuple[str, ...] | None = None
+    # 커밋 상세 응답 파일 항목의 `sha`(파일 내용 식별값, 소문자 16진수 40자). removed면 지우기 전 내용,
+    # 그 밖에는 바뀐 뒤 내용의 식별값이다. 꼴이 아니거나 없으면 None이다. 옮긴 곳 판정(NC3 BR3.2)에만
+    # 쓰고 결과 메시지·DB에 담지 않는다. 새 호출 없이 이미 받는 응답에서 남긴다(NC3 BR1.1).
+    blob_sha: str | None = None
 
 
 @dataclass(frozen=True)

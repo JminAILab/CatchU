@@ -180,6 +180,8 @@ export async function registerCandidates(
     let createdCandidateId: string | null = null;
     if (!asset) {
       // 전달 순서의 첫 적합 후보를 저장하고 이후 같은 작업은 참조한다. 내용을 합치지 않는다.
+      // 다시 볼 곳 사실과 첫·마지막 작업 시각(content.asset의 revisitFacts·firstWorkAt·lastWorkAt)도 이 INSERT에서
+      // 한 번만 쓴다. 기존 Catch에는 쓰지 않는다(NC3 BR6.1, 아래 소속만 더하는 갈래).
       const first = group.candidates[0];
       const catchId = randomUUID();
       const insertion = await assets.createQueryBuilder().insert().values({

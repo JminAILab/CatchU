@@ -521,3 +521,86 @@ def test_mock_path_keeps_the_known_synthetic_results(scenario: str) -> None:
     )
     for entry in outcome.result["candidates"]:
         assert entry["workIdentity"].startswith(f"synthetic-work-{scenario}-")
+
+
+# NC3 작업 시각(BR4.1)
+
+
+def _rebased(outcome: CollectionOutcome, days: int) -> CollectionOutcome:
+    """작성 시각은 두고 커밋 시각만 뒤로 민 수집 결과(리베이스 흉내)."""
+
+    def shift(record: CommitRecord) -> CommitRecord:
+        return replace(record, committed_at=record.committed_at + timedelta(days=days))
+
+    relations = outcome.relations
+    assert relations is not None
+    return replace(
+        outcome,
+        commits=tuple(map(shift, outcome.commits)),
+        relations=replace(relations, commits=tuple(map(shift, relations.commits))),
+    )
+
+
+def test_nc3_s14_work_times_are_authored_min_and_max_not_committed_time() -> None:
+    outcome, _ = collect_case(succeeded_scenario())
+    rebased = _rebased(outcome, 40)
+
+    output = candidates.build_candidates(LIVE, rebased)
+
+    commits, _ = observed_records(rebased)
+    assert output.candidates
+    for candidate in output.candidates:
+        authored = [commits[sha].authored_at for sha in candidate.own_commit_shas]
+        committed = [commits[sha].committed_at for sha in candidate.own_commit_shas]
+        assert candidate.first_work_at == min(authored)
+        assert candidate.last_work_at == max(authored)
+        # 커밋 시각(리베이스로 40일 뒤)을 썼다면 마지막 작업 시각이 이보다 늦다.
+        assert candidate.last_work_at < min(committed)
+    result = compose_result(LIVE, output, finished_at=FINISHED_AT, id_label="nc3")
+    for entry, candidate in zip(result["candidates"], output.candidates, strict=True):
+        assert candidate.first_work_at is not None
+        assert candidate.last_work_at is not None
+        assert entry["firstWorkAt"] == candidate.first_work_at.strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        assert entry["lastWorkAt"] == candidate.last_work_at.strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+
+
+def test_nc3_br4_1_merged_candidate_times_cover_all_merged_own_commits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    outcome, _ = collect_case(succeeded_scenario())
+    separate = candidates.build_candidates(LIVE, outcome)
+    assert len(separate.candidates) >= 2
+    # 정상 경로에서는 값이 같은 후보가 생기지 않으므로 작업 식별값을 하나로 바꿔 합치기를 일으킨다.
+    monkeypatch.setattr(
+        "app.candidates.build.work_identity", lambda *args: "wi1:" + "0" * 64
+    )
+
+    merged = candidates.build_candidates(LIVE, outcome)
+
+    (candidate,) = merged.candidates
+    starts = [each.first_work_at for each in separate.candidates]
+    ends = [each.last_work_at for each in separate.candidates]
+    assert all(each is not None for each in (*starts, *ends))
+    assert candidate.first_work_at == min(each for each in starts if each is not None)
+    assert candidate.last_work_at == max(each for each in ends if each is not None)
+    assert set(candidate.own_commit_shas) == {
+        sha for each in separate.candidates for sha in each.own_commit_shas
+    }
+
+
+def test_nc3_br4_1_missing_own_commit_record_is_a_defect() -> None:
+    from app.candidates.build import _with_work_times
+
+    outcome, _ = collect_case(succeeded_scenario())
+    (first, *_rest) = candidates.build_candidates(LIVE, outcome).candidates
+    commits, _ = observed_records(outcome)
+    without = {key: value for key, value in commits.items() if key != DIRECT}
+
+    with pytest.raises(ValueError):
+        _with_work_times(replace(first, own_commit_shas=(DIRECT,)), without)
+    with pytest.raises(ValueError):
+        _with_work_times(replace(first, own_commit_shas=()), commits)

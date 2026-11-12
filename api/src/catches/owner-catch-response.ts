@@ -1,3 +1,5 @@
+import { RevisitFact, isRevisitFactList } from './new-catch-content';
+
 type GenerationStatus = 'GENERATED' | 'FAILED' | 'NOT_GENERATED';
 type Visibility = 'PRIVATE' | 'PUBLIC';
 type Restriction = 'NONE' | 'SOURCE_PRIVATE';
@@ -25,6 +27,8 @@ export interface OwnerCatchReadSource {
     readonly sourceMode: SourceMode;
     /** 작성자 설명이 null이 아닌지. 목록 조건 `authorDescription=written`과 같은 판정이다(새 Catch C1, BR5.3). */
     readonly hasAuthorDescription: boolean;
+    /** catch_asset.revisit_facts(jsonb). 모양을 믿지 않고 응답 매핑에서 검사한다(NC3 BR8.1). */
+    readonly revisitFacts: unknown;
   };
   readonly sourceRequest: {
     readonly requestId: string;
@@ -78,6 +82,8 @@ export interface OwnerCatchResponse {
   restriction: Restriction;
   sourceMode: SourceMode;
   hasAuthorDescription: boolean;
+  /** 다시 볼 곳 사실(NC3 계약 C2). 사실 없는 Catch와 3단계 전 Catch는 빈 배열이다. 작업 시각은 응답에 없다(FR14.3). */
+  revisitFacts: { kind: RevisitFact['kind']; paths: string[]; commits: string[] }[];
 }
 
 /** 내부 자료 오류. HTTP 변환은 #88 연결에서 처리하며 입력값을 메시지에 넣지 않는다. */
@@ -114,6 +120,12 @@ function uri(value: string, field: string): string {
 function choice<T extends string>(value: T, allowed: readonly T[], field: string): T {
   if (!allowed.includes(value)) throw new CatchReadIntegrityError(field);
   return value;
+}
+
+/** 저장된 사실을 등록 검사와 같은 모양 규칙으로 보고 복사한다. 틀리면 응답 무결성 오류다(NC3 BR8.1). */
+function revisitFacts(value: unknown): OwnerCatchResponse['revisitFacts'] {
+  if (!isRevisitFactList(value)) throw new CatchReadIntegrityError('asset.revisitFacts');
+  return value.map((fact) => ({ kind: fact.kind, paths: [...fact.paths], commits: [...fact.commits] }));
 }
 
 /**
@@ -202,6 +214,7 @@ export function toOwnerCatchResponse(
     restriction: choice<Restriction>(protection.appliedRestriction, ['NONE', 'SOURCE_PRIVATE'], 'protection.appliedRestriction'),
     sourceMode: choice<SourceMode>(asset.sourceMode, ['MOCK', 'LIVE'], 'asset.sourceMode'),
     hasAuthorDescription: flag(asset.hasAuthorDescription, 'asset.hasAuthorDescription'),
+    revisitFacts: revisitFacts(asset.revisitFacts),
   };
 }
 

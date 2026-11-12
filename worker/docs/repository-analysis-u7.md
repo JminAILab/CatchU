@@ -1,6 +1,6 @@
 # U7 본인 커밋 관측과 측정
 
-현행 메시지는 `api/contracts/repository-analysis`의 v2이고, Result만 Catch 개편 CR2부터 v3(후보마다 `ownCommitShas`)다. Result는 `app/processing/result.py` 한 곳에서 "3"을 쓴다. 과거 10월 승인 YAML은 보존하며 런타임은 새 정본만 읽는다. 네 메시지 종류의 v1 혼입·추가 필드·필수 관측 누락·잘못된 조합은 거부한다. [API 등록·배포 조건](../../api/docs/repository-analysis-u7.md)을 함께 따른다.
+현행 메시지는 `api/contracts/repository-analysis`의 v2이고, Result만 Catch 개편 CR2에서 v3(후보마다 `ownCommitShas`), 새 Catch NC3에서 v4(후보마다 `revisitFacts`·`firstWorkAt`·`lastWorkAt`)로 올렸다. Result는 `app/processing/result.py` 한 곳(`RESULT_SCHEMA_VERSION`)에서 "4"를 쓴다. 과거 10월 승인 YAML은 보존하며 런타임은 새 정본만 읽는다. 네 메시지 종류의 v1 혼입·추가 필드·필수 관측 누락·잘못된 조합은 거부한다. [API 등록·배포 조건](../../api/docs/repository-analysis-u7.md)을 함께 따른다.
 
 수집은 연결 GitHub 숫자 ID로 본인 커밋 SHA를 중복 제거해 센다. 기본 목록·관계·기준 브랜치에서 하나라도 확인하면 FOUND다. GitHub 계정에 연결되지 않은 작성자의 커밋(`author=None`)은 이 ID 기준에서 본인 커밋이 아니며, 그 자체로 UNKNOWN이나 수집 한계의 사유가 되지 않는다. 필요한 조회를 마쳤고 판정을 막는 수집 한계가 없으며 본인 커밋이 0개일 때만 NONE이다. 이 경우 PR/이슈 후보도 Catch로 만들지 않는다. 그 밖에는 UNKNOWN이다. 후보 0개는 본인 커밋 0개의 증거가 아니다.
 

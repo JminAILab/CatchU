@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "3",
+  "schemaVersion": "4",
   "messageId": "message-{{caseId}}-{{attemptId}}-result",
   "resultId": "result-{{caseId}}-{{attemptId}}",
   "requestId": "{{requestId}}",
@@ -55,7 +55,10 @@
       "ownCommitShas": [
         "0000000000000000000000000000000000000032",
         "0000000000000000000000000000000000000031"
-      ]
+      ],
+      "revisitFacts": [],
+      "firstWorkAt": "2026-09-30T09:00:00Z",
+      "lastWorkAt": "2026-09-30T10:00:00Z"
     },
     {
       "candidateId": "candidate-{{caseId}}-{{attemptId}}-2",
@@ -98,7 +101,10 @@
       },
       "ownCommitShas": [
         "0000000000000000000000000000000000000033"
-      ]
+      ],
+      "revisitFacts": [],
+      "firstWorkAt": "2026-09-30T11:00:00Z",
+      "lastWorkAt": "2026-09-30T11:00:00Z"
     }
   ],
   "notProvided": [],

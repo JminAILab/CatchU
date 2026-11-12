@@ -24,7 +24,9 @@ B 담당의 제품 `/assets`와 개발용 미리보기를 관리한다. 제품 �
 
 ## Catch 작성자 설명 편집 (12월 U4 W1)
 
-Catch 상세 모달은 위에서부터 작업 사실·나의 기여 → 근거 → Catch 설명 초안 → 생각해 볼 질문 → 「작성자 설명」 → 현재 확인 상태 순서다(새 Catch BR4.1). 질문 아래 문구는 「질문을 보고 아래 칸에 자기 말로 적어 보세요.」이고 질문별 답 칸은 없다. 기록에서 확인한 내용·작성자 설명·AI 초안을 다른 제목으로 나누고, AI 초안은 입력칸에 넣지 않는다(U4 BR1.3).
+Catch 상세 모달은 위에서부터 작업 사실·나의 기여 → 근거 → 「다시 볼 곳」(사실이 있을 때만, 새 Catch NC3) → Catch 설명 초안 → 생각해 볼 질문 → 「작성자 설명」 → 현재 확인 상태 순서다(새 Catch BR4.1).
+
+「다시 볼 곳」(`revisit-facts.tsx`, NC3 BR9.1~BR9.3)은 응답의 `revisitFacts`를 h3 「다시 볼 곳」 + 작은 글자 「본인만 확인」과 `ul`로 그린다. 사실이 없으면 제목도 칸도 없다. 문장은 종류마다 정한 꼴이고 커밋 식별값 바로 뒤에는 「에서」「의」만 붙인다. 경로는 글자 그대로다. 커밋 식별값 7자는 실제 자료 화면(`dataMode` api)·LIVE Catch이고 상세가 불러온 저장소 이름이 `소유자/저장소` GitHub 꼴일 때만 `https://github.com/<이름>/commit/<40자>` 새 탭 링크(숨은 「 (새 탭)」, `rel="noopener noreferrer"`)이고, 예시·합성(MOCK)·이름을 불러오지 못한 경우는 글자다. GitHub 연결이 없어 저장소 이름을 못 불러오면(`/v1/me/repositories` 403 `GITHUB_CONNECTION_REQUIRED`) 커밋은 글자로만 보이고 Tab 순서에도 들지 않는다(2026-11-11 로컬 확인). 본인 화면에만 있고 목록 카드·발행 화면·면접관 화면에는 없다. 응답 검사(`catch-api.ts`)는 배열(최대 30개)·종류별 경로·커밋 수(api 등록 검사와 같은 표)·식별값 꼴을 보고, 어긋나면 그 응답을 받지 못한 것으로 본다. 작업 시각은 응답에 없고 목록은 서버가 마지막 작업 시각순으로 준다. 질문 아래 문구는 「질문을 보고 아래 칸에 자기 말로 적어 보세요.」이고 질문별 답 칸은 없다. 기록에서 확인한 내용·작성자 설명·AI 초안을 다른 제목으로 나누고, AI 초안은 입력칸에 넣지 않는다(U4 BR1.3).
 
 - `author-description-api.ts`: `GET`·`PUT /v1/catches/{catchId}/description` 호출, 응답 모양 확인, 칸 제목 포함 합친 글의 4,000자(코드 포인트) 검사, 저장 결과 반영(`applyDescriptionSave`). `author-description-panel.tsx`는 그리기, `author-description-editor.tsx`는 상태·요청을 맡는다. `AssetsMemberPage`가 `createAuthorDescriptionApi(api.member)`를 `AssetsConnected`의 `descriptionApi`로 넘기며, 넘기지 않으면(미리보기) 영역을 그리지 않는다.
 - 편집은 칸 제목 8개(「이 작업에서 정한 것」~「더 쓰기」)가 각 글칸의 보이는 `label`인 3줄 글칸이다(새 Catch NC1). 저장 칸은 지금처럼 글 하나이고, 칸 나누기·합치기는 `src/lib/author-description-sections.ts`가 맡는다. 쓴 칸만 `【칸 제목】` 줄과 함께 합치고 칸 사이에 빈 줄 하나를 둔다. 「더 쓰기」만 쓰면 칸 제목 없이 그 글 그대로이고, 칸 제목 줄이 없는 옛 글은 「더 쓰기」 칸에 열려 그대로 저장하면 바뀌지 않는다. 「저장하지 않은 변경」은 칸 글이 처음 나눈 칸 글과 다를 때만이다. 합계 줄은 「N / 4,000자 (칸 제목 포함)」 하나다.
@@ -72,7 +74,7 @@ Catch 상세 모달은 위에서부터 작업 사실·나의 기여 → 근거 �
 | 실제 페이지 주소 | 제품 `/assets`를 위 「제품 페이지 연결」 구성으로 조립한다. |
 | 저장소 필터 | B의 제안은 `repositoryId`. 비어 있으면 전체, 값은 저장소 식별자다. 미리보기에서 이 이름으로 구현한다. |
 | 공개 상태 필터 | `visibility`. 비어 있으면 전체, 값은 Catch 응답의 `PUBLIC`·`PRIVATE`다. API 목록 조회에 보내지 않고 불러온 목록 안에서 거른다([#454](https://github.com/JminAILab/CatchU/issues/454)). |
-| 작성자 설명 필터 | `authorDescription`. 비어 있거나 모르는 값이면 전체, 값은 `written`·`unwritten`이다. 저장소처럼 목록 조회 조건으로 보내 서버에서 거르고(api C1), 커서도 이 조건에 묶인다(`v: 2`). 응답의 `hasAuthorDescription`이 조건과 맞지 않으면 조회 실패로 본다. 상세에서 설명을 저장해도 지금 쪽은 다시 부르지 않는다(BR5.6). [이 저장소 Catch 보기]는 공개 상태처럼 전체로 되돌린다(막 분석한 Catch는 설명이 없어 「씀」에 가려진다). |
+| 작성자 설명 필터 | `authorDescription`. 비어 있거나 모르는 값이면 전체, 값은 `written`·`unwritten`이다. 저장소처럼 목록 조회 조건으로 보내 서버에서 거르고(api C1), 커서도 이 조건에 묶인다(새 Catch NC3부터 `v: 3`, 화면은 커서를 읽지 않고 받은 글을 그대로 보낸다). 응답의 `hasAuthorDescription`이 조건과 맞지 않으면 조회 실패로 본다. 상세에서 설명을 저장해도 지금 쪽은 다시 부르지 않는다(BR5.6). [이 저장소 Catch 보기]는 공개 상태처럼 전체로 되돌린다(막 분석한 Catch는 설명이 없어 「씀」에 가려진다). |
 | 상세 팝업 | B의 제안은 `catchId`. 닫으면 해당 파라미터만 제거하며 필터를 유지한다. |
 | 자산 종류 탭 | 두지 않는다(#416 팀장 요청, 2026-11-03). 예전 주소의 `tab`은 무시한다. 텍스트 자료는 `/materials`다. |
 | 저장소 연결 관리 | 제품 페이지는 `AssetsConnected.repositoryManagement`에 [#153](https://github.com/JminAILab/CatchU/issues/153)의 D 모달을 넣는다. 독립 미리보기의 자리 안내와 구분한다. |

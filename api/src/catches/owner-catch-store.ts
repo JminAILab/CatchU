@@ -33,17 +33,28 @@ export class OwnerCatchStore {
       if (query.authorDescription !== undefined) {
         conditions.push(query.authorDescription === 'written' ? 'c.author_description IS NOT NULL' : 'c.author_description IS NULL');
       }
+      // 다음 쪽 조건은 정렬(BR7.1)과 같은 순서의 고정 조각 둘 가운데 하나다. 값은 $n으로만 넘긴다(NC3 BR7.2).
       if (query.after !== undefined) {
-        values.push(query.after);
-        conditions.push(`c.catch_id > $${values.length}`);
+        if (query.after.lastWorkAt === null) {
+          values.push(query.after.catchId);
+          conditions.push(`(c.last_work_at IS NULL AND c.catch_id > $${values.length})`);
+        } else {
+          values.push(query.after.lastWorkAt, query.after.catchId);
+          const time = `$${values.length - 1}`;
+          const id = `$${values.length}`;
+          conditions.push(`(c.last_work_at < ${time} OR (c.last_work_at = ${time} AND c.catch_id > ${id})`
+            + ' OR c.last_work_at IS NULL)');
+        }
       }
       values.push(query.limit + 1);
+      // 마지막 작업 시각이 최근인 것부터, 시각 없는 Catch는 맨 아래, 같으면 Catch ID 순서(NC3 BR7.1). 새 인덱스는 두지 않는다(NFR1.6).
       const rows: ReadRow[] = await manager.query(`SELECT ${READ_COLUMNS} ${READ_FROM}
-        WHERE ${conditions.join(' AND ')} ORDER BY c.catch_id ASC LIMIT $${values.length}`, values);
+        WHERE ${conditions.join(' AND ')} ORDER BY c.last_work_at DESC NULLS LAST, c.catch_id ASC
+        LIMIT $${values.length}`, values);
       const pageRows = rows.slice(0, query.limit);
       const sources = await readCatchSources(manager, memberId, pageRows);
       const nextCursor = rows.length > query.limit
-        ? nextOwnerCatchCursor(memberId, query, pageRows[pageRows.length - 1].catchId) : null;
+        ? nextOwnerCatchCursor(memberId, query, pageRows[pageRows.length - 1]) : null;
       return toOwnerCatchPage(memberId, sources, nextCursor);
     });
   }

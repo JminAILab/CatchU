@@ -18,7 +18,10 @@ AppModule에 CatchesModule을 등록했다. /v1, 공통 오류 응답, 성공/�
 ## 목록과 응답
 
 - Catch의 repositoryId는 원 AnalysisRequest에서 읽는다. CatchAsset에 저장소 칼럼을 추가하지 않는다.
-- 커서는 catchId UUID 오름차순의 다음 위치다. 판본은 `v: 2`이고 내부 ownerId와 필터 문맥(repositoryId·sourceRequestId·authorDescription)의 해시를 포함해 매 요청 같은 범위를 확인한다. 다른 조건으로 만든 커서와 이전 판본(`v: 1`) 커서는 400이다. 커서를 권한 증명으로 쓰지 않으며 SQL은 항상 본인으로 다시 제한한다. limit 변경은 허용한다.
+- 목록 순서는 마지막 작업 시각(`catch_asset.last_work_at`)이 최근인 것부터이고, 시각 없는 Catch(3단계 전 Catch)는 맨 아래, 같으면 catchId UUID 오름차순이다(`ORDER BY last_work_at DESC NULLS LAST, catch_id ASC`, 새 Catch NC3 C2·BR7.1). 정렬 선택 칸은 없고 색인은 더하지 않았다.
+- 커서 판본은 `v: 3`이고 위치는 마지막 항목의 `after: {lastWorkAt, catchId}`다. `lastWorkAt`은 DB 값을 `toISOString()`으로 옮긴 밀리초 ISO 글이거나, 시각 없는 Catch까지 갔으면 null이다. 다시 `toISOString()`했을 때 같은 글이 아니면 400이다. 다음 쪽 조건은 정렬과 같은 순서의 고정 SQL 조각 둘(시각 있음·없음) 가운데 하나이고 값은 `$n`으로만 넘긴다. 범위 값은 내부 ownerId와 필터 문맥(repositoryId·sourceRequestId·authorDescription)의 해시로 매 요청 같은 범위를 확인한다. 다른 조건으로 만든 커서와 이전 판본(`v: 1`·`v: 2`) 커서는 400이다(NFR7.2). 커서를 권한 증명으로 쓰지 않으며 SQL은 항상 본인으로 다시 제한한다. limit 변경은 허용한다.
+- 수신자용 공개 Catch 목록(`PublicCatchStore`)은 이 정렬·커서를 쓰지 않는다. 지금처럼 catchId 오름차순이고 커서도 `v: 2`, `after`는 catchId 글이다(`publicCatchQuery`·`nextPublicCatchCursor`, NC3 BR7.3). 범위 값 앞에 `public:`을 붙여 본인 커서와 섞이지 않는다.
+- 목록·상세의 Catch마다 `revisitFacts`(다시 볼 곳 사실 배열, 새 Catch NC3 C2)를 싣는다. 3단계 전 Catch와 사실 없는 Catch는 빈 배열이다. 저장된 값을 등록 검사와 같은 모양 규칙(종류·종류별 경로·커밋 수·경로 1~1,024자·식별값 40자·한 사실 안 겹침 없음, 최대 30개)으로 다시 보고, 틀리면 응답 무결성 오류(500)다. 첫·마지막 작업 시각은 응답에 싣지 않는다(FR14.3). 마지막 작업 시각은 정렬과 커서에만 쓴다. 수신자용 PublicCatch는 허용 필드만 골라 담아 사실도 시각도 내보내지 않는다.
 - `authorDescription=written`은 작성자 설명이 있는 Catch(`author_description IS NOT NULL`), `unwritten`은 없는 Catch다. 빈 설명은 저장 때 null이 되므로 이 판정과 같다. 값은 SQL에 잇지 않고 고정 조건 둘 가운데 하나를 고른다. 빈 값·같은 키 두 번·대소문자가 다른 값·그 밖 값은 400이고 받은 값을 오류에 싣지 않는다. 색인은 더하지 않았다.
 - 목록·상세의 Catch마다 `hasAuthorDescription`(참·거짓)을 싣는다. `written` 조건과 같은 판정이고 설명 원문은 이 조회에서 읽지 않는다. 수신자용 PublicCatch는 허용 필드만 골라 담아 이 칸을 내보내지 않는다.
 - 다른 회원의 Catch·없는 Catch는 똑같은 `404 RESOURCE_UNAVAILABLE`다. 계약상 ID는 비어 있지 않은 문자열이므로 저장 UUID에 해당하지 않는 Catch ID도 같은 404이며 SQL cast 오류로 노출하지 않는다.

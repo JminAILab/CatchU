@@ -13,7 +13,7 @@ require('reflect-metadata');
 const { randomBytes } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
-const { AiInputTooLarge, SOURCE_LABELS } = require('../../dist/ai-generation/ai-generation.types');
+const { AiInputTooLarge, AiProviderError, SOURCE_LABELS } = require('../../dist/ai-generation/ai-generation.types');
 const { assertGenerationRequest } = require('../../dist/ai-generation/gate-policy');
 const { koreanUsageDate } = require('../../dist/daily-run-limit/daily-run-limit');
 const { buildChunkDrafts } = require('../../dist/published-index/chunker');
@@ -180,17 +180,31 @@ async function runRagEval({ mode, input, deps, outDir = DEFAULT_OUT_DIR, docsDir
   for (const [index, entry] of input.questions.entries()) {
     const result = await deps.search.search(input.publicationId, entry.question, EVAL_SEARCH_LIMIT);
     const top = result.hits.slice(0, QNA_SEARCH_LIMIT);
-    const output = top.length === 0 ? { items: [], droppedCount: 0 }
-      : await deps.gate.generate(qnaRequest(top, result.publicationText, entry.question));
+    const questionNo = index + 1;
+    let output = { items: [], droppedCount: 0 };
+    let answerFailed = null;
+    try {
+      if (top.length > 0) output = await deps.gate.generate(qnaRequest(top, result.publicationText, entry.question));
+    } catch (error) {
+      // 답 0개(NO_ITEMS)는 앱에서도 「답 실패」로 끝나는 결과라 그 질문만 실패로 남기고 다음 질문으로 간다(새 Catch NC3 Build and Test, 팀장 결정 2026-11-12).
+      // 그 밖의 실패는 지금까지처럼 멈춘다. 로그에는 질문 번호와 실패 이름만 낸다(질문·글귀를 넣지 않는다).
+      if (!(error instanceof AiProviderError && error.reason === 'NO_ITEMS')) {
+        console.error(`${questionNo}번 질문에서 멈춤: ${error.name}`);
+        throw error;
+      }
+      answerFailed = 'NO_ITEMS';
+      console.error(`${questionNo}번 질문: 답 실패(NO_ITEMS)`);
+    }
     passedItems += output.items.length;
     droppedItems += output.droppedCount;
-    perQuestion.push({ questionNo: index + 1, entry, hits: result.hits, goldLocations: gold[index], output });
+    perQuestion.push({ questionNo, entry, hits: result.hits, goldLocations: gold[index], output, answerFailed });
   }
   const jd = input.jd === null ? null : await compareJd(deps, input);
   const summary = {
     date: koreanUsageDate(clock()), targetVersion: input.targetVersion, mode, questionCount: input.questions.length,
     hitRateAt5: hitRate(perQuestion, 5), hitRateAt8: hitRate(perQuestion, 8), hitRateAt12: hitRate(perQuestion, 12),
     passedItems, droppedItems, evidencePassRate: evidencePassRate(passedItems, droppedItems),
+    answerFailedQuestions: perQuestion.filter((entry) => entry.answerFailed !== null).map((entry) => entry.questionNo),
     missedHitLocations: perQuestion.filter((entry) => !isHitAt(entry.hits, entry.goldLocations, 8))
       .map((entry) => ({ questionNo: entry.questionNo, locations: entry.hits.slice(0, 8).map(locationOf) })),
     jd: jd === null ? null : jd.summary,
@@ -199,7 +213,7 @@ async function runRagEval({ mode, input, deps, outDir = DEFAULT_OUT_DIR, docsDir
     date: summary.date, targetVersion: input.targetVersion, publicationId: input.publicationId,
     questions: perQuestion.map((entry) => ({ questionNo: entry.questionNo, question: entry.entry.question, goldQuotes: entry.entry.goldQuotes,
       goldLocations: entry.goldLocations, hitLocations: entry.hits.map(locationOf), items: entry.output.items,
-      droppedCount: entry.output.droppedCount })),
+      droppedCount: entry.output.droppedCount, answerFailed: entry.answerFailed })),
     jd: jd === null ? null : jd.raw,
   };
   return { summary, ...writeEvaluation({ mode, outDir, docsDir, summary, raw }) };

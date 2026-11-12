@@ -1,6 +1,9 @@
 # U7 현행 정본. 원본: aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/worker-messages.yaml
 # 10월 승인 원본을 보존하고 U7 메시지 v2/본인 커밋 관측을 추가한다.
 # CR2(261103-catch-redesign 계약 C2): Result만 "3"으로 올리고 Candidate에 ownCommitShas를 더한다.
+# NC3(261109-new-catch 계약 C4): Result를 "4"로 올리고 Candidate에 revisitFacts·firstWorkAt·lastWorkAt을 더한다.
+# 종류별 경로·커밋 개수, 같은 사실 안 겹침, 커밋이 그 후보 ownCommitShas 안인지, firstWorkAt ≤ lastWorkAt은
+# 모양이 아니라 뜻이라 api 등록 입력 검사(registration-batch.ts)가 본다.
 # Request·ProcessingEvent·ResultReceipt는 "2" 그대로다. 옛 판본을 함께 받는 처리는 두지 않는다.
 openapi: "3.0.3"
 info: {"title":"CatchU api–worker 메시지 스키마 v2","version":"2.0.0","description":"형식 전용. paths가 비어 있으며 HTTP/큐/저장소를 선택하지 않는다. 전송은 #77 이후."}
@@ -85,6 +88,9 @@ components:
         - "draft"
         - "reflection"
         - "ownCommitShas"
+        - "revisitFacts"
+        - "firstWorkAt"
+        - "lastWorkAt"
       properties:
         candidateId: {"type":"string","minLength":1}
         title: {"type":"string","minLength":1,"nullable":true}
@@ -110,6 +116,35 @@ components:
           minItems: 1
           maxItems: 3000
           uniqueItems: true
+          items: {"type":"string","pattern":"^[0-9a-f]{40}$"}
+        revisitFacts:
+          description: 같은 작업 안 본인 커밋끼리 본 「다시 볼 곳」 사실. 없으면 빈 배열이다. 본인 화면에만 보인다.
+          type: "array"
+          maxItems: 30
+          items: {"$ref":"#/components/schemas/RevisitFact"}
+        firstWorkAt:
+          description: 같은 작업 식별값의 후보를 합친 뒤 본인 커밋 작성 시각 가운데 가장 이른 값. UTC 초 단위로 보낸다.
+          type: "string"
+          format: "date-time"
+        lastWorkAt:
+          description: 같은 목록의 가장 늦은 작성 시각. 본인 목록 정렬에만 쓰고 응답에 싣지 않는다.
+          type: "string"
+          format: "date-time"
+    RevisitFact:
+      type: "object"
+      additionalProperties: false
+      required: ["kind","paths","commits"]
+      properties:
+        kind: {"type":"string","enum":["REWORKED_LINES","MOVED_FILE","EXTENSION_CHANGED","REVERTED","TEST_FILES_PRESENT"]}
+        paths:
+          description: "REWORKED_LINES 하나, MOVED_FILE·EXTENSION_CHANGED 둘(앞, 뒤), REVERTED 없음, TEST_FILES_PRESENT 1~20개"
+          type: "array"
+          maxItems: 20
+          items: {"type":"string","minLength":1,"maxLength":1024}
+        commits:
+          description: "REWORKED_LINES 둘(앞, 뒤), REVERTED 둘(되돌린 커밋, 되돌려진 커밋), MOVED_FILE·EXTENSION_CHANGED 1~2개, TEST_FILES_PRESENT 1~20개. 모두 그 후보의 본인 커밋"
+          type: "array"
+          maxItems: 20
           items: {"type":"string","pattern":"^[0-9a-f]{40}$"}
     RejectedSummary:
       type: "object"
@@ -139,7 +174,7 @@ components:
         - "observedOwnCommitCount"
         - "collectionLimitNotes"
       properties:
-        schemaVersion: {"type":"string","enum":["3"]}
+        schemaVersion: {"type":"string","enum":["4"]}
         messageId: {"type":"string","minLength":1}
         resultId: {"type":"string","minLength":1}
         requestId: {"type":"string","minLength":1}

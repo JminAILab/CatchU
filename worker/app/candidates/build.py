@@ -258,7 +258,11 @@ def build_candidates(
     for held in grouping.held:
         if held.own:
             tally.held(held.membership, held.reason)
-    candidates, merged = _merge_same_identity(built, grouping.commits)
+    merged_candidates, merged = _merge_same_identity(built, grouping.commits)
+    # 작업 시각은 합친 뒤의 본인 커밋 목록으로 정한다(NC3 BR4.1). 기록이 없으면 ValueError(결함)다.
+    candidates = tuple(
+        _with_work_times(candidate, grouping.commits) for candidate in merged_candidates
+    )
     counts: tuple[tuple[NotProvidedReason, int], ...] = (
         ("INSUFFICIENT_EVIDENCE", tally.insufficient),
         ("BELOW_CRITERIA", tally.below_criteria),
@@ -737,6 +741,24 @@ def _merge_same_identity(
             ),
         )
     return tuple(merged.values()), count
+
+
+def _with_work_times(
+    candidate: EligibleCandidate, commits: Mapping[str, CommitRecord]
+) -> EligibleCandidate:
+    """합친 본인 커밋의 작성 시각(authored_at) 최소·최대를 싣는다(NC3 BR4.1). 커밋 시각은 쓰지 않는다.
+
+    본인 커밋이 없거나 그 기록이 판정에 쓴 커밋 묶음에 없으면 후보 판정의 결함이라 ValueError를 낸다.
+    """
+    if not candidate.own_commit_shas:
+        raise ValueError("작업 시각을 정할 본인 커밋이 없다")
+    authored = []
+    for sha in candidate.own_commit_shas:
+        record = commits.get(sha)
+        if record is None:
+            raise ValueError("작업 시각을 정할 본인 커밋 기록이 없다")
+        authored.append(record.authored_at)
+    return replace(candidate, first_work_at=min(authored), last_work_at=max(authored))
 
 
 def _merge_evidence(kept: EvidenceItem, other: EvidenceItem) -> EvidenceItem:

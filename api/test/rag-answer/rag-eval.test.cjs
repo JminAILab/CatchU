@@ -11,6 +11,7 @@ const {
 } = require('../../scripts/rag-eval/rag-eval.cjs');
 const { GoldQuoteNotFound, evidencePassRate, findGoldLocations, hitRate, isHitAt } = require('../../scripts/rag-eval/gold-locations.cjs');
 const { buildRepositoryRecord, writeEvaluation } = require('../../scripts/rag-eval/rag-eval-report.cjs');
+const { AiProviderError } = require('../../dist/ai-generation/ai-generation.types');
 
 const INPUT = JSON.parse(readFileSync(resolve(__dirname, 'rag-eval-input.json'), 'utf8'));
 const REPOSITORY_DOCS = resolve(__dirname, '..', '..', 'docs', 'rag-evaluation');
@@ -63,6 +64,35 @@ test('정답 글귀가 발행본에 없으면 질문 번호를 알리고 멈추�
   assert.throws(() => findGoldLocations(raw.snapshot, raw.questions), GoldQuoteNotFound);
 });
 
+test('답 0개(NO_ITEMS) 질문은 그 질문 번호로 「답 실패」를 남기고 다음 질문으로 가며, 다른 생성 실패는 질문 번호를 알리고 멈춘다(새 Catch NC3 Build and Test)', async (t) => {
+  const { outDir, docsDir } = tempDirs(t);
+  const logs = t.mock.method(console, 'error', () => {});
+  const { input, deps } = synthetic();
+  const generate = deps.gate.generate.bind(deps.gate);
+  let qnaCalls = 0;
+  deps.gate.generate = async (request) => {
+    if (request.feature === 'QNA' && ++qnaCalls === 2) throw new AiProviderError('NO_ITEMS');
+    return generate(request);
+  };
+  const result = await runRagEval({ mode: 'synthetic', input, deps, outDir, docsDir, clock: CLOCK });
+  assert.deepEqual(result.summary.answerFailedQuestions, [2]);
+  const raw = JSON.parse(readFileSync(result.rawPath, 'utf8'));
+  assert.deepEqual(raw.questions.map((question) => question.answerFailed), [null, 'NO_ITEMS', null], '3번 질문까지 돌았다');
+  assert.deepEqual(raw.questions[1].items, []);
+  assert.match(readFileSync(result.recordPath, 'utf8'), /- 답 실패 질문\(답 0개, NO_ITEMS\): 2번\n/);
+  assert.deepEqual(logs.mock.calls.map((call) => call.arguments[0]), ['2번 질문: 답 실패(NO_ITEMS)']);
+
+  qnaCalls = 0;
+  deps.gate.generate = async (request) => {
+    if (request.feature === 'QNA' && ++qnaCalls === 3) throw new AiProviderError('CALL_FAILED');
+    return generate(request);
+  };
+  await assert.rejects(runRagEval({ mode: 'synthetic', input, deps, outDir: join(outDir, 'second'), docsDir, clock: CLOCK }),
+    (error) => error instanceof AiProviderError && error.reason === 'CALL_FAILED');
+  assert.equal(logs.mock.calls.at(-1).arguments[0], '3번 질문에서 멈춤: AiProviderError');
+  assert.equal(existsSync(join(outDir, 'second')), false, '멈추면 파일을 쓰지 않는다');
+});
+
 test('정답 위치는 글귀가 나오는 모든 곳이고, 적중은 같은 항목·fieldPath에서 범위가 겹칠 때다. 적중률 5·8·12를 따로 센다(BR10.3)', () => {
   const [, , third] = findGoldLocations(INPUT.snapshot, INPUT.questions);
   assert.deepEqual(third.map((l) => [l.fieldPath, l.charStart, l.charEnd]), [['body', 24, 31], ['body', 40, 47]]);
@@ -99,7 +129,7 @@ test('JD 두 방식: 빈 줄을 뺀 줄마다 검색 기반과 전체 넣기를 
 test('measure 기록 쓰기는 docs 폴더에 날짜 이름으로 건수·위치·빈 판정 칸만 쓰고, 원문은 로컬 결과에만 쓴다(BR10.5)', (t) => {
   const { outDir, docsDir } = tempDirs(t);
   const summary = { date: '2026-12-01', targetVersion: 'abc1234', mode: 'measure', questionCount: 10, hitRateAt5: 0.6, hitRateAt8: 0.8,
-    hitRateAt12: 0.9, passedItems: 18, droppedItems: 2, evidencePassRate: 0.9,
+    hitRateAt12: 0.9, passedItems: 18, droppedItems: 2, evidencePassRate: 0.9, answerFailedQuestions: [],
     missedHitLocations: [{ questionNo: 4, locations: [{ publishedItemId: 'item-1', fieldPath: 'body', charStart: 0, charEnd: 120 }] }],
     jd: { splitter: 'U10', rows: [{ requirementNo: 1, searchBased: { items: 3, dropped: 1 }, fullInput: { items: 4, dropped: 0 } }] } };
   const raw = { questions: [{ question: 'SYNTHETIC-QUESTION 원문', items: [{ text: 'SYNTHETIC-ANSWER 원문' }] }] };

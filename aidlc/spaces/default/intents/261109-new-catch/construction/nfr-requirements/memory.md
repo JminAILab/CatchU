@@ -9,6 +9,8 @@
 ## Deviations
 <!-- example: 2026-05-29T10:14:32Z — skipped the optional caching layer the stage prose suggested; the dataset is small enough that it adds risk -->
 - 2026-11-10T13:55:00Z [unit nc2-snapshot-fields] 사람이 Q2 덧붙임으로 설계를 바꿨다: ownCommit을 기여 범위 문장 대조 대신 이 Catch의 commit_assignment로 정한다. NC2 기능 설계(BR1.4·BR1.6·BR4.1, entities, functional-spec)와 계약 요약 C3·C6을 같은 ID 덧붙임으로 고쳤다. 기능 설계의 검토는 고치기 전 판본에 대한 것이다.
+- 2026-11-11T05:30:00Z [unit nc3-revisit-facts] 사람이 Q1 B로 팀 규칙 「예외를 삼키지 않는다」의 예외를 한 곳 정했다: RevisitFacts 판정 예외(본인 커밋 기록 없음 포함)는 그 후보 사실만 비우고 예외 종류 이름만 든 오류 로그를 남긴다. 측정 분석에서 그 로그 0줄을 확인한다.
+- 2026-11-11T05:30:00Z [unit nc3-revisit-facts] 사람이 Q2 B로 기능 설계 BR3.5를 좁혔다(removed 시험 파일은 치지 않음). NC2 때와 달리 점검을 마친 기능 설계 문서는 이 단계에서 고치지 않고, 코드 생성 계획의 함께 고칠 파일에 rules.md BR3.5와 functional-spec S10을 넣기로 적었다(reliability NFR8.4).
 
 ## Tradeoffs
 <!-- example: 2026-05-29T10:14:32Z — picked TDD over BDD this run; the team is unit-first and the domain is well-understood -->

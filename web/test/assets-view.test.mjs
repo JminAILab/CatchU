@@ -8,16 +8,22 @@ import ts from "typescript";
 import { previewCatches, previewRepositories } from "../src/features/assets/fixtures.ts";
 
 const viewUrl = new URL("../src/features/assets/assets-view.tsx", import.meta.url);
+const revisitUrl = new URL("../src/features/assets/revisit-facts.tsx", import.meta.url);
 const cssUrl = new URL("../src/features/assets/assets.module.css", import.meta.url);
 // 기존 TypeScript로 화면을 렌더링한다. 이 검사는 문구를 보며 CSS 배치는 브라우저에서 확인한다.
 // 목록 카드 제목의 2줄 말줄임 클래스(CR1 BR6.1)만 이름을 돌려줘 붙었는지 본다. 다른 클래스는 비워 둔다.
+// 상세가 부르는 「다시 볼 곳」 칸(NC3 revisit-facts.tsx)도 같은 방식으로 변환한다.
 const hooks = registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier === "./revisit-facts" && context.parentURL === viewUrl.href) return { url: revisitUrl.href, shortCircuit: true };
+    return nextResolve(specifier, context);
+  },
   load(url, context, nextLoad) {
     if (url === cssUrl.href) return { format: "module", shortCircuit: true, source: 'export default { titleClamp: "titleClamp" };' };
-    if (url !== viewUrl.href) return nextLoad(url, context);
+    if (url !== viewUrl.href && url !== revisitUrl.href) return nextLoad(url, context);
     return {
       format: "module", shortCircuit: true,
-      source: ts.transpileModule(readFileSync(viewUrl, "utf8"), {
+      source: ts.transpileModule(readFileSync(new URL(url), "utf8"), {
         compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext },
       }).outputText,
     };
@@ -232,8 +238,9 @@ test("AC4.2.1 API 방식에서 저장 뒤 설명이 생긴 항목도 지금 쪽�
   assert.ok(html.includes(">불러온 2개의 Catch</p>"));
 });
 
-test("AC3.1.1·AC3.1.2 상세 순서는 작업 사실·나의 기여 → 근거 → Catch 설명 초안 → 생각해 볼 질문 → 작성자 설명 → 현재 확인 상태이고 다시 볼 곳은 아직 없다", () => {
+test("AC3.1.1·AC3.1.2 NC3 S3 상세 순서는 작업 사실·나의 기여 → 근거 → Catch 설명 초안 → 생각해 볼 질문 → 작성자 설명 → 현재 확인 상태이고 사실이 없으면 다시 볼 곳 제목·칸이 없다", () => {
   const item = previewCatches[0];
+  assert.deepEqual(item.revisitFacts, []);
   const html = renderToStaticMarkup(createElement(AssetsView, {
     dataMode: "api", items: [item], detailItem: item, selectedId: item.catchId, repositories: [], repositoryId: "",
     listState: "ready", detailState: "ready", repositoryManagement: null,
@@ -244,7 +251,42 @@ test("AC3.1.1·AC3.1.2 상세 순서는 작업 사실·나의 기여 → 근거 
     'data-testid="catch-author-description"', "<h3>현재 확인 상태</h3>"].map((needle) => dialog.indexOf(needle));
   assert.ok(order.every((position) => position >= 0), String(order));
   assert.deepEqual([...order].sort((x, y) => x - y), order);
-  assert.doesNotMatch(dialog, /다시 볼 곳/);
+  assert.doesNotMatch(dialog, /다시 볼 곳|revisit-facts/);
+});
+
+// 새 Catch NC3 BR9.1(S3): 「다시 볼 곳」은 근거 바로 아래, Catch 설명 초안 위다. 사실이 없으면 그리지 않는다.
+const sha40 = (letter) => letter.repeat(40);
+const withFacts = { ...previewCatches[0], sourceMode: "LIVE",
+  revisitFacts: [{ kind: "REWORKED_LINES", paths: ["src/a.ts"], commits: [sha40("a"), sha40("b")] }] };
+
+test("NC3 BR9.1 다시 볼 곳 칸은 근거 아래·Catch 설명 초안 위에 h3와 「본인만 확인」으로 있고 목록 카드에는 없다", () => {
+  const dialog = detailMarkup(withFacts);
+  const order = ["<h3>근거</h3>", 'data-testid="revisit-facts"', "<h3>다시 볼 곳 <span", "<h3>Catch 설명 초안</h3>"]
+    .map((needle) => dialog.indexOf(needle));
+  assert.ok(order.every((position) => position >= 0), String(order));
+  assert.deepEqual([...order].sort((x, y) => x - y), order);
+  assert.ok(dialog.includes("<h3>다시 볼 곳 <span>본인만 확인</span></h3>"));
+  assert.equal((dialog.match(/data-testid="revisit-facts-item"/g) ?? []).length, 1);
+  const html = renderToStaticMarkup(createElement(AssetsView, {
+    dataMode: "api", items: [withFacts], selectedId: null, repositories: [], repositoryId: "",
+    listState: "ready", detailState: "ready", repositoryManagement: null,
+  }));
+  assert.doesNotMatch(html, /다시 볼 곳|src\/a\.ts|aaaaaaa/, "목록 카드에는 사실이 보이지 않는다");
+});
+
+test("NC3 BR9.3 상세의 저장소 이름이 불러와졌을 때만 커밋 링크이고, 예시 자료(preview)는 글자다", () => {
+  const props = (dataMode, repositories) => ({
+    dataMode, items: [withFacts], detailItem: withFacts, selectedId: withFacts.catchId, repositoryId: "",
+    repositories, listState: "ready", detailState: "ready", repositoryManagement: null,
+  });
+  const repository = [{ repositoryId: withFacts.repositoryId, name: "synthetic-owner/synthetic-repo" }];
+  const linked = renderToStaticMarkup(createElement(AssetsView, props("api", repository)));
+  assert.ok(linked.includes(`href="https://github.com/synthetic-owner/synthetic-repo/commit/${sha40("a")}"`));
+  for (const html of [renderToStaticMarkup(createElement(AssetsView, props("api", []))),
+    renderToStaticMarkup(createElement(AssetsView, props("preview", repository)))]) {
+    assert.doesNotMatch(html, /revisit-facts-commit-link|synthetic-repo\/commit\//);
+    assert.ok(html.includes("커밋 aaaaaaa에서 넣은 줄을 커밋 bbbbbbb에서 다시 고침: src/a.ts"));
+  }
 });
 
 test("AC3.1.3 질문 아래 문구는 「질문을 보고 아래 칸에 자기 말로 적어 보세요.」이고 답 저장 안내와 질문별 답 칸은 없다", () => {

@@ -34,7 +34,7 @@ GitHub 연결 권한으로는 404 응답의 비공개 저장소와 없는 저장
 
 ## 메시지와 결과
 
-현행 정본은 `api/contracts/repository-analysis/{common,worker-messages}.yaml`이다. 원본은 `260914-catchu-october-mvp/inception/contract-design`의 두 YAML이며 그 승인 파일은 보존했다. Request·ProcessingEvent·ResultReceipt는 `schemaVersion: '2'`, Result는 Catch 개편 CR2부터 `'3'`(후보마다 본인 커밋 목록 `ownCommitShas`)이며 그 밖의 판본은 거부한다. 옛 판본을 함께 받는 처리는 없어 api·worker를 같은 배포로 넣는다. DB 동의의 여섯 칸과 큐의 네 칸 범위는 별도 검사한다. 큐 `selectionReference`·`credentialContextReference`는 `attemptId`이고 토큰·좌표 사본은 넣지 않는다.
+현행 정본은 `api/contracts/repository-analysis/{common,worker-messages}.yaml`이다. 원본은 `260914-catchu-october-mvp/inception/contract-design`의 두 YAML이며 그 승인 파일은 보존했다. Request·ProcessingEvent·ResultReceipt는 `schemaVersion: '2'`, Result는 Catch 개편 CR2에서 `'3'`(후보마다 본인 커밋 목록 `ownCommitShas`), 새 Catch NC3에서 `'4'`(후보마다 다시 볼 곳 사실 `revisitFacts`와 첫·마지막 작업 시각 `firstWorkAt`·`lastWorkAt`)로 올렸고 그 밖의 판본은 거부한다. 옛 판본을 함께 받는 처리는 없어 api·worker를 같은 배포로 넣는다. DB 동의의 여섯 칸과 큐의 네 칸 범위는 별도 검사한다. 큐 `selectionReference`·`credentialContextReference`는 `attemptId`이고 토큰·좌표 사본은 넣지 않는다.
 
 Result와 회원 상태에 `ownCommitObservation`, `observedOwnCommitCount`, `collectionLimitNotes`가 있다. `NONE/0/[]`은 완전 조회에서 본인 커밋 0개로 결과·실패·Catch가 없는 EMPTY다. `FOUND`는 양수 관측 수이며 후보 수와 다르다. `UNKNOWN/null`은 조회 불명·한계 또는 관측 전 상태다. FOUND에도 수집 한계가 있을 수 있다. 수신·처리·반영·lifecycle·ownerResultsReady는 각각 보존하며 Receipt ACCEPTED만으로 Catch 열람 준비를 뜻하지 않는다.
 

@@ -57,6 +57,8 @@ export const previewCatches: readonly CatchAsset[] = [
     sourceMode: "MOCK",
     // 작성자 설명 걸러 보기(새 Catch BR5.4)를 미리보기에서 볼 수 있게 쓴 것과 안 쓴 것을 섞는다.
     hasAuthorDescription: false,
+    // 다시 볼 곳 사실(새 Catch NC3). 예시 자료는 사실이 없어 칸이 그려지지 않는다.
+    revisitFacts: [],
   },
   {
     catchId: "synthetic-catch-api-pagination",
@@ -92,6 +94,7 @@ export const previewCatches: readonly CatchAsset[] = [
     restriction: "NONE",
     sourceMode: "MOCK",
     hasAuthorDescription: true,
+    revisitFacts: [],
   },
   {
     catchId: "synthetic-catch-web-loading",
@@ -125,6 +128,7 @@ export const previewCatches: readonly CatchAsset[] = [
     restriction: "NONE",
     sourceMode: "MOCK",
     hasAuthorDescription: true,
+    revisitFacts: [],
   },
   {
     catchId: "synthetic-catch-web-form",
@@ -155,5 +159,6 @@ export const previewCatches: readonly CatchAsset[] = [
     restriction: "SOURCE_PRIVATE",
     sourceMode: "MOCK",
     hasAuthorDescription: false,
+    revisitFacts: [],
   },
 ];

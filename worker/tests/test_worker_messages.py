@@ -171,8 +171,9 @@ def test_expected_results_follow_outcome_and_receipt_rules() -> None:
                 assert expected["receipt"] is not None
 
 
-def test_only_results_are_version_three_with_own_commit_shas() -> None:
-    """Result만 "3"이고 후보마다 본인 커밋 목록(소문자 40자, 중복 없음)이 있다. 진행 알림은 "2"다(CR2 BR2.2)."""
+def test_only_results_are_version_four_with_own_commit_shas() -> None:
+    """Result만 "4"이고(NC3 C4) 후보마다 본인 커밋 목록(소문자 40자, 중복 없음)이 있다. 진행 알림은
+    "2"다(CR2 BR2.2)."""
     for case in CASES["cases"]:
         for spec, message in zip(
             case["messages"], _filled_messages(case["caseId"]), strict=True
@@ -180,7 +181,7 @@ def test_only_results_are_version_three_with_own_commit_shas() -> None:
             if spec["schema"] == "ProcessingEvent":
                 assert message["schemaVersion"] == "2"
                 continue
-            assert message["schemaVersion"] == "3"
+            assert message["schemaVersion"] == "4"
             for candidate in message["candidates"]:
                 shas = candidate["ownCommitShas"]
                 assert shas and len(set(shas)) == len(shas)
