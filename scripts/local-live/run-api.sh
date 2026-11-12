@@ -3,6 +3,8 @@
 # 임베딩 키는 넣지 않는다(개발 모드의 합성 제공자로 뜨며 Voyage로 자료를 보내지 않는다).
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
+# 셸에 남아 있던 임베딩 키는 버린다. 임베딩 키는 api.env에 넣은 경우에만 쓴다.
+unset CATCHU_EMBEDDING_API_KEY
 load_env "${LIVE_DIR}/api.env"
 load_keys "${LIVE_DIR}/secrets.env" GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GITHUB_OAUTH_CLIENT_ID GITHUB_OAUTH_CLIENT_SECRET CATCHU_GENERATION_API_KEY
 docker start "${LIVE_DB}" "${LIVE_QUEUE}" >/dev/null

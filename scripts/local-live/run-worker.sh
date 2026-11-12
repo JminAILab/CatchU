@@ -3,6 +3,8 @@
 # 로그는 환경 폴더의 logs/에 쌓이고 화면에는 나오지 않는다.
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
+# 셸에 남아 있던 판정 설정은 버린다. 판정은 worker.env에서 켠 경우에만 돈다.
+unset CATCHU_JUDGEMENT_PROVIDER CATCHU_JUDGEMENT_API_KEY
 load_env "${LIVE_DIR}/worker.env"
 load_keys "${LIVE_DIR}/secrets.env" CATCHU_GENERATION_API_KEY
 cd "${REPO_ROOT}/worker"
