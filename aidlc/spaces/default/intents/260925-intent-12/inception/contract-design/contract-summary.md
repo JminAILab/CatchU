@@ -233,12 +233,15 @@ rule:
   - 새 표를 만드는 PR은 같은 PR에서 member-withdrawal-deletion.md 표에 "표 | 따라 지워지는 부모" 행을 더한다
   - 회원 자료를 가리키지만 외래 키를 걸지 않는 칸은 "사본"일 때만 허용(published_item.source_id). 원본이 지워져도 사본은 그 발행본 수명을 따른다
   - Redis 키(질문 횟수·MCP 빈도)는 지우지 않고 만료에 맡긴다
+  - 회원 폴더(memberPrefix)에 파일을 쓰는 곳은 파일을 먼저 쓰고 회원을 참조하는 DB 쓰기로 확정하며, 그 쓰기가 실패하면 쓴 파일을 지운다
 withdrawal-order:            # U2 탈퇴 API, 어느 단계든 실패하면 성공으로 응답하지 않고 오류
   1: 한 트랜잭션으로 커밋 — 세션 무효화, 그 회원의 모든 발행 링크 중지(stopped_at), MCP 접근 토큰·승인 코드·연결 삭제
   2: FileStorage.deletePrefix(memberPrefix)
   3: GitHub 자격정보 파일 삭제
-  4: member_account 행 삭제(연쇄 삭제)
+  4: 한 트랜잭션 — member_account 행 삭제(연쇄 삭제) → FileStorage.deletePrefix(memberPrefix) 한 번 더 → 커밋. 다시 지우기가 실패하면 행 삭제도 되돌린다
   note: 2~4가 실패해도 링크·MCP는 1에서 이미 막혀 있고, 중지된 링크는 되살리지 않는다(FR14.1)
+  late-write: 2와 4 사이에 확정된 파일 쓰기는 4의 다시 지우기가 지운다. 4가 회원 행을 지운 뒤의 확정은 4가 끝날 때까지 기다렸다가 회원이 없어 실패하고 쓴 파일을 지운다
+  retry: 4의 다시 지우기가 실패하면 계정이 남으므로 2·3 실패와 같이 회원이 다시 로그인해 탈퇴를 다시 요청한다. 자동 재시도는 두지 않는다(FR14.1)
 check: test/db/member-cascade-delete.test.cjs가 회원 참조 외래 키의 연쇄 삭제를 확인한다
 ```
 

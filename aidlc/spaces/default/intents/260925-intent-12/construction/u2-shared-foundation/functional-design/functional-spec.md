@@ -69,7 +69,7 @@
 2. 1단계 트랜잭션: 그 회원의 모든 세션 폐기 + 중지되지 않은 발행본 `publication.stopped_at` = now(C-07) + `mcp_access_token`·`mcp_authorization_code`·`mcp_connection`의 그 회원 행 삭제(U6) → 커밋(BR7.2).
 3. 2단계 `FileStorage.deletePrefix(members/{memberId}/)`.
 4. 3단계 GitHub 자격정보 파일 삭제(없으면 성공).
-5. 4단계 member_account 행 삭제 → 연쇄 삭제(BR7.3·BR7.7).
+5. 4단계 한 트랜잭션: member_account 행 삭제 → 연쇄 삭제(BR7.3·BR7.7) → `FileStorage.deletePrefix(members/{memberId}/)` 한 번 더 → 커밋. 다시 지우기가 실패하면 행 삭제도 되돌린다(계약 C-06, 2단계 뒤에 끝난 파일 쓰기를 지우기 위해).
 6. 성공: 204 + Refresh 쿠키 제거 → web은 로그인 상태를 지우고 비로그인 홈에 "탈퇴했습니다"(BR7.5).
 7. 실패(어느 단계든, 교착 포함): 500 `WITHDRAWAL_FAILED`, "탈퇴를 끝내지 못했습니다. 팀에 알려 주세요". 실패 단계 번호와 오류 종류만 로그. 1단계 효과는 남는다(BR7.4).
 
