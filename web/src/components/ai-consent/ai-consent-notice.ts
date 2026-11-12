@@ -3,7 +3,7 @@
  *
  * - `AI_NOTICE_VERSION`은 api `src/ai-consent/ai-consent.gate.ts`의 같은 이름 상수와 같아야 한다.
  *   고지 문구를 바꾸면 두 값을 함께 올린다. 다르면 api가 동의 기록을 400으로 거부한다(옛 판본 화면의 동의를 받지 않음).
- * - 문의 경로는 저장소 이슈 주소 한 줄이다. 접수·회신 약속은 쓰지 않는다(FR20.2).
+ * - 문의 경로는 개인정보 처리방침과 같은 팀 연락 이메일 한 줄이다. 접수·회신 약속은 쓰지 않는다(FR20.2).
  */
 export const AI_NOTICE_VERSION = "2026-11-v2";
 
@@ -16,14 +16,14 @@ export const AI_RECIPIENTS = ["Claude API(Anthropic)", "Voyage AI(운영사 Mong
 /** 자료를 보내는 기능(BR2.4). */
 export const AI_FEATURES = ["저장소 분석", "기본 요약", "질의응답", "JD 요약", "PDF 처리"] as const;
 
-export const AI_CONTACT_URL = "https://github.com/JminAILab/CatchU/issues";
+export const AI_CONTACT = "catchu@googlegroups.com";
 
 export const AI_CONSENT_TEXT = {
   title: "외부 AI로 자료를 보내기 전에 확인해 주세요",
   recipients: `받는 곳: ${AI_RECIPIENTS.join(", ")}`,
   features: `보내는 기능: ${AI_FEATURES.join(", ")}`,
   rawData: "올린 자료는 이름·연락처를 가리지 않고 그대로 보냅니다. 보내기 전에 민감한 정보를 지워 주세요.",
-  contact: `문의: ${AI_CONTACT_URL}`,
+  contact: `문의: ${AI_CONTACT}`,
   agree: "동의",
   close: "닫기",
 } as const;
