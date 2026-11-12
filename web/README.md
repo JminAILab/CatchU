@@ -153,6 +153,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/` | 서비스 소개 | D | 불필요 | 제안 | 로그아웃 성공 후 비로그인 홈 이동은 확정(#55) |
 | `/login` | 로그인 진입 | A / 틀 D | 불필요 | 제안 | 회원 경로 가드의 이동 목적지. Google 로그인은 통합 시험 전환(아래 「공통 인증」)을 켰을 때만 연결되고 끄면 연결 전 표시(A, #287), 개발용 로그인은 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`일 때만 |
 | `/google/callback` | Google 로그인 콜백 | A | 불필요 | 확정 | api `GOOGLE_REDIRECT_URI`와 같은 주소(로컬 `http://localhost:3000/google/callback`). 통합 시험 전환을 켰을 때만 열고 끄면 404. 주소의 `code`·`state`·`error`는 해석 뒤 지운다([인증 화면](src/features/auth-screens/README.md)) |
+| `/privacy` | 개인정보 처리방침 | A | 불필요 | 확정 | [#496 팀장 결정](https://github.com/JminAILab/CatchU/issues/496#issuecomment-6788199337). 첫 화면 바닥글 링크의 목적지이며 Google 로그인 앱 Branding에 적는 방침 주소. 글은 팀장 확정 문구 그대로다([개인정보 처리방침](src/features/privacy/README.md)) |
 | `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 내 자산의 저장소 연결 관리로 이동(확정). GitHub 미연동·재연동 필요는 연동 화면(`/profile/github`)으로 이동하되, 공통 인증 통합 시험 전환을 끄면 비활성과 이유를 보인다([홈](src/features/home/README.md)) |
 | `/profile/setup` | 최초 프로필 입력 (W02) | A | 필요 | 제안 | 저장 성공 후 회원 정보를 다시 불러온 뒤 `/home` |
 | `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지. 수정(`/profile/edit`)·GitHub 연동(`/profile/github`)·Claude 연결(`/profile/claude`)로 진입하는 링크를 둔다 |

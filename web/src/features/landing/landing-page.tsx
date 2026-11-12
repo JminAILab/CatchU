@@ -506,6 +506,10 @@ export function LandingPage() {
         </Link>
       </section>
     </main>
-    <footer className={styles["site-footer"]}><p>화면의 작업·계정은 설명을 위한 가상 예시이며 실제 분석 결과가 아닙니다.</p></footer>
+    <footer className={styles["site-footer"]}>
+      {/* #496: Google 로그인 앱의 홈페이지는 개인정보 처리방침에 링크해야 한다. */}
+      <p><Link href={routes.privacy}>개인정보 처리방침</Link></p>
+      <p>화면의 작업·계정은 설명을 위한 가상 예시이며 실제 분석 결과가 아닙니다.</p>
+    </footer>
     </div>;
 }

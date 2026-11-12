@@ -9,6 +9,8 @@ export const routes = {
   login: "/login",
   /** Google 로그인 콜백(#287). api `GOOGLE_REDIRECT_URI`와 같아야 한다. 통합 시험 전환을 끄면 404. */
   googleCallback: "/google/callback",
+  /** 개인정보 처리방침(#496). 로그인 없이 연다. 첫 화면 바닥글 링크의 목적지이며 Google 로그인 앱 Branding에 적는 방침 주소다. */
+  privacy: "/privacy",
   /** 로그인 후 홈. 회원 헤더의 로고 목적지. */
   home: "/home",
   /** 최초 프로필 입력(W02). */

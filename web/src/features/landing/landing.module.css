@@ -3154,6 +3154,8 @@
 /* 제품 페이지 전용 보정. 시안의 디자인은 이 범위 밖에 적용하지 않는다. */
 .page { line-height: normal; }
 .page a { text-decoration: none; }
+/* #496: 바닥글의 개인정보 처리방침 링크는 밑줄로 링크임을 보인다. */
+.site-footer a { text-decoration: underline; text-underline-offset: 2px; }
 .page .primary-button { color: white; }
 .story-scene { scroll-margin-top: 64px; }
 .reveal { --enter: 1; --exit: 0; --drift: 0.5; --settle: 1; }
