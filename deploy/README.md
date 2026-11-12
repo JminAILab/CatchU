@@ -54,7 +54,7 @@ docker build -f worker/Dockerfile --build-arg SOURCE_REVISION=$(git rev-parse HE
 
 **worker 이미지는 `/app/worker`에서 실행한다.** 계약 YAML(위와 같은 경로)과 합성 자료(`/app/worker/fixtures/m1-synthetic`)를 저장소와 같은 상대 위치에 둔다. 개발 그룹(ruff·mypy·pytest 등)은 넣지 않는다. 기본 명령은 분석 요청 큐 소비자(`python -m app.consumer`, [#121](https://github.com/JminAILab/CatchU/issues/121))다. 운영 모드에서 큐 설정이 없거나 틀리면 기동하지 않는다(종료 코드 2). SIGTERM을 받으면 새 작업을 멈추고 분석 중인 작업을 실패로 남긴 뒤 끝난다. 25초를 넘기면 스스로 강제 종료하며 종료 코드가 137이라 교체 절차는 7로 멈춘다([worker 큐 소비자](../worker/docs/queue-consumer.md)). 합성 처리는 `docker run --rm <worker 이미지> .venv/bin/python -m app.processing <시나리오>`로 실행한다.
 
-세 이미지 모두 숫자 UID 1000으로 실행하고 앱 파일은 쓰기 권한이 없다. 읽기 전용 루트 파일시스템과 권한 제거(`cap_drop: ALL`)에서 동작하며, 쓰기 경로는 `/tmp`뿐이다.
+세 이미지 모두 숫자 UID 1000으로 실행하고 앱 파일은 쓰기 권한이 없다. 읽기 전용 루트 파일시스템과 권한 제거(`cap_drop: ALL`)에서 동작하며, 쓰기 경로는 `/tmp`와 api의 GitHub 토큰 보관 볼륨(`/var/lib/catchu/github-credentials`)뿐이다.
 
 ## 실행 환경 값
 
@@ -202,7 +202,7 @@ GitHub Actions의 `images` 워크플로가 같은 명령을 x86_64 러너에서 
 | DB 주소·판본, 앱·migration 계정과 비밀값 참조, CA 파일과 주입 방식 | `api.env`·`migration.env`·CA 파일 |
 | 큐 주소·비밀번호 참조(ElastiCache Valkey 8.1, TLS) | `worker.env`의 `CATCHU_QUEUE_REDIS_URL`(`rediss://`), api 실행 값(#233) |
 | worker의 요청 정보 조회 주소·키 참조, 생성 키(Claude API) 참조 | `worker.env`의 `WORKER_CONTEXT_API_URL`·`WORKER_CONTEXT_API_KEY`(api와 같은 값)·`CATCHU_GENERATION_API_KEY`, 클러스터 안 http면 `WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP=true` |
-| GitHub 연결의 자격정보 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)용 지속 volume·UID/GID·권한, 암호화 키·OAuth 값 참조, #232 내부 자격정보 경로·인증키 참조 | GitHub 연결 코드(PR #254)는 dev에 있고 기본은 꺼짐이다(`GITHUB_CONNECTION_ENABLED`, 값은 [api 환경변수](../api/docs/environment.md)). 켜려면 api에 쓰기 가능한 지속 volume을 더해야 한다(지금 구성은 읽기 전용 루트라 `/tmp` 말고 쓸 곳이 없고, `/tmp`는 재시작하면 지워진다). #232 내부 경로는 공개 `/v1/*` 분배에서 제외한다 |
+| GitHub 연결의 자격정보 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)용 지속 volume·UID/GID·권한, 암호화 키·OAuth 값 참조, #232 내부 자격정보 경로·인증키 참조 | GitHub 연결 코드(PR #254)는 dev에 있고 기본은 꺼짐이다(`GITHUB_CONNECTION_ENABLED`, 값은 [api 환경변수](../api/docs/environment.md)). 서버 한 대 실행은 위 볼륨을 `GITHUB_CREDENTIAL_DIRECTORY`로 쓴다(#276). #232 내부 경로는 공개 `/v1/*` 분배에서 제외한다 |
 
 EKS 실행 파일을 쓸 때 지킬 조건: api·worker `replicas: 1`과 업데이트 방식 `Recreate`, 자동 확장(HPA) 없음, `runAsNonRoot`·`runAsUser: 1000`·`readOnlyRootFilesystem`과 `/tmp` 빈 볼륨, api·migration의 `PGSSLMODE=verify-full`·DB CA 파일 읽기 전용 mount·`NODE_EXTRA_CA_CERTS`, web의 `HOSTNAME=0.0.0.0` 명시, worker에서 DB로의 접근 차단, api·worker·DB·큐를 외부에 여는 Service 없음, worker health는 내부용(큐에 처음 붙기 전에는 503이므로 시작 확인 시간을 넉넉히 둔다), worker 종료 유예는 30초 이상(앱 안 종료 예산 25초), migration은 위 일회 Pod. worker가 api를 클러스터 안 http로 부르면 10/15 결정의 조건(NetworkPolicy 기본 차단과 worker 나가는 연결 제한, 호스트 망 금지·권한 전부 제거·네임스페이스 Pod Security `restricted`)을 함께 둔다([요청 정보 조회 「설정」](../worker/docs/request-context.md#설정)). `Recreate`는 업데이트 순서일 뿐 장애 때 대체 실행과의 중복을 막지 않는다. Google 로그인은 시작 경로의 앞단 보호를 #277에서 확인하기 전에는 켜지 않는다.
 

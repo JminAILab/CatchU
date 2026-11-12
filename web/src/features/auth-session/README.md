@@ -4,7 +4,7 @@ web README에서 옮긴 공통 인증 안내다. 코드는 `web/src/lib/auth-*.t
 
 회원 인증 상태·세션 갱신·로그아웃·로그인 완료를 한 곳(`web/src/lib/auth-*.ts`)에서 다룬다. 합의 원문은 [#251](https://github.com/JminAILab/CatchU/issues/251)의 설계 접점 댓글과 [#286](https://github.com/JminAILab/CatchU/issues/286)이다.
 
-**제품 경로 연결은 보류 중이다.** 공통 인증으로 화면을 움직이면 아직 확인하지 않은 동작(기능 화면이 받는 보내지 않은 요청의 결과, #287 화면 연결)이 함께 들어오므로, 화면 연결은 통합 시험 전환 `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`일 때만 쓴다(`web/src/lib/auth-integration.ts`). 기본(꺼짐)은 [web README 「API 호출」](../../../README.md#api-호출-106-pr)의 기존 동작이다. 켜면 회원 셸·가드·로그인 화면·`api.member`·`api.devLogin`이 `web/src/lib/auth-runtime.ts`의 탭별 인스턴스와 `web/src/components/auth/use-auth.ts`의 훅을 쓴다. 아래 설명은 켰을 때의 동작이다.
+**제품 기본은 켜짐이다**([2026-11-11 팀장 승인](https://github.com/JminAILab/CatchU/issues/467#issuecomment-6784442435)). 화면 연결은 통합 시험 전환 `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`일 때만 쓰며(`web/src/lib/auth-integration.ts`), `web/Dockerfile`·`web/.env.example`의 기본값이 `true`다. 값이 없거나 다른 값이면 꺼지고, 그때는 [web README 「API 호출」](../../../README.md#api-호출-106-pr)의 기존 동작이다. 켜면 회원 셸·가드·로그인 화면·`api.member`·`api.devLogin`이 `web/src/lib/auth-runtime.ts`의 탭별 인스턴스와 `web/src/components/auth/use-auth.ts`의 훅을 쓴다. 아래 설명은 켰을 때의 동작이다.
 
 | 파일 | 맡는 일 |
 |---|---|

@@ -4,7 +4,7 @@
 # 값은 `docker compose --env-file <실행 묶음 파일>`로 받는다. 비밀값은 저장소 밖 환경 폴더의 파일로만 주입한다.
 name: ${CATCHU_SINGLE_NAME:-catchu-single}
 
-# 쓰기 경로는 /tmp(tmpfs)뿐이다. 세 이미지가 읽기 전용 파일시스템·권한 제거 상태에서 동작하는 것을 검사로 확인했다.
+# 쓰기 경로는 /tmp(tmpfs)와 api의 GitHub 토큰 보관 볼륨뿐이다. 세 이미지가 읽기 전용 파일시스템·권한 제거 상태에서 동작하는 것을 검사로 확인했다.
 x-hardening: &hardening
   read_only: true
   tmpfs:
@@ -46,6 +46,9 @@ services:
       PORT: "3001"
     volumes:
       - *db-ca
+      # GitHub 연결 토큰 암호문 보관(#276). 이미지가 이 경로를 UID 1000·0700으로 만들어 두므로 처음 붙을 때 그 소유자를 따른다.
+      # 연결을 켜지 않으면 비어 있다. 켤 때는 api.env의 GITHUB_CREDENTIAL_DIRECTORY에 이 경로를 넣는다.
+      - github-credentials:/var/lib/catchu/github-credentials
     ports:
       - "127.0.0.1:${CATCHU_API_PORT:-3001}:3001"
     restart: unless-stopped
@@ -111,3 +114,6 @@ services:
     volumes:
       - *db-ca
     restart: "no"
+
+volumes:
+  github-credentials:

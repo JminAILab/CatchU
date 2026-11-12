@@ -4,6 +4,7 @@
 # 배포 도구(deploy/dev-server/cd/)는 늘 그 실행의 main 판본을 쓰고, 이미지·compose·교체 스크립트만 배포할 커밋에서 가져온다.
 # job은 셋이다. plan·deploy만 AWS 권한(OIDC)을 받고, 배포할 커밋의 코드를 러너에서 실행하는 이미지 검사(check)는 권한 없는 별도 러너에서 돈다.
 # AWS 역할은 environment dev-server(배포 브랜치 main만)에서 돈 job만 믿으며, 저장소에 AWS 키를 두지 않는다.
+# 역할 주소·서버 ID는 environment 비밀값으로 읽는다. 키는 아니지만 계정 번호와 서버 ID가 실행 로그에 그대로 찍히지 않게 하려는 것이다.
 # 배포는 한 번에 하나만 돈다. 진행 중에 main push가 여러 번 오면 기다리는 실행은 가장 나중 것 하나만 남는다.
 # 절차·끄는 법·되돌리기는 deploy/dev-server/cd/README.md.
 # 외부 action은 ci.yml과 같은 전체 커밋 SHA로 고정한다(#215). checkout 뒤 git 인증을 쓰지 않으므로 토큰을 남기지 않는다.
@@ -50,16 +51,16 @@ jobs:
           INPUT_COMMIT: ${{ inputs.commit }}
           REF: ${{ github.ref }}
           SHA: ${{ github.sha }}
-          ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           DEV_SERVER_DOMAIN: ${{ vars.DEV_SERVER_DOMAIN }}
-          DEV_SERVER_INSTANCE_ID: ${{ vars.DEV_SERVER_INSTANCE_ID }}
+          DEV_SERVER_INSTANCE_ID: ${{ secrets.DEV_SERVER_INSTANCE_ID }}
         run: |
           [ "$REF" = refs/heads/main ] || { echo "::error::main에서만 배포한다(지금 ${REF})"; exit 1; }
           commit=${INPUT_COMMIT:-$SHA}
           [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::커밋은 40자리 소문자 16진수로 넣는다"; exit 1; }
           [[ "$DEV_SERVER_DOMAIN" =~ ^[a-z0-9.-]+$ ]] || { echo "::error::environment 변수 DEV_SERVER_DOMAIN이 비었거나 형식이 틀렸다"; exit 1; }
-          [[ "$DEV_SERVER_INSTANCE_ID" =~ ^i-[0-9a-f]{8,17}$ ]] || { echo "::error::environment 변수 DEV_SERVER_INSTANCE_ID가 비었거나 형식이 틀렸다"; exit 1; }
-          [ -n "$ROLE_ARN" ] || { echo "::error::environment 변수 AWS_DEPLOY_ROLE_ARN이 비었다"; exit 1; }
+          [[ "$DEV_SERVER_INSTANCE_ID" =~ ^i-[0-9a-f]{8,17}$ ]] || { echo "::error::environment 비밀값 DEV_SERVER_INSTANCE_ID가 비었거나 형식이 틀렸다"; exit 1; }
+          [ -n "$ROLE_ARN" ] || { echo "::error::environment 비밀값 AWS_DEPLOY_ROLE_ARN이 비었다"; exit 1; }
           printf 'commit=%s\ntag=main-%s\n' "$commit" "${commit:0:12}" >> "$GITHUB_OUTPUT"
           printf '### 배포 대상\n\n- 커밋: `%s`\n- 이미지 태그: `main-%s`\n' "$commit" "${commit:0:12}" >> "$GITHUB_STEP_SUMMARY"
 
@@ -77,7 +78,7 @@ jobs:
       - name: AWS 권한 받기
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           role-session-name: catchu-plan-${{ github.run_id }}
           aws-region: ap-northeast-2
           mask-aws-account-id: true
@@ -131,7 +132,7 @@ jobs:
     env:
       AWS_REGION: ap-northeast-2
       DEV_SERVER_DOMAIN: ${{ vars.DEV_SERVER_DOMAIN }}
-      DEV_SERVER_INSTANCE_ID: ${{ vars.DEV_SERVER_INSTANCE_ID }}
+      DEV_SERVER_INSTANCE_ID: ${{ secrets.DEV_SERVER_INSTANCE_ID }}
     steps:
       # 작업 폴더는 plan과 같은 main 판본(배포 도구). 배포할 커밋은 따로 꺼낸다.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -149,7 +150,7 @@ jobs:
       - name: AWS 권한 받기
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           role-session-name: catchu-deploy-${{ github.run_id }}
           aws-region: ap-northeast-2
           mask-aws-account-id: true

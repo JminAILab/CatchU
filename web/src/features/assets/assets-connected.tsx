@@ -8,6 +8,7 @@ import { createAssetsStore, sameFilter, type AssetsStore } from "./assets-store"
 import { catchErrorText, type CatchApi, type CatchListFilter } from "./catch-api";
 import type { AuthorDescriptionApi } from "./author-description-api";
 import { AuthorDescriptionEditor } from "./author-description-editor";
+import { ModalReauthNotice } from "@/components/auth/modal-reauth-notice";
 import { UNSAVED_MESSAGE } from "@/features/profile/use-unsaved-guard";
 import { confirmDiscardUnsaved, unsavedChanges, type ConfirmDialog, type UnsavedRegistry } from "@/lib/unsaved-changes";
 import type { RepositoryOption } from "./types";
@@ -102,6 +103,7 @@ export function AssetsConnected({ api, descriptionApi, repositories, repositoryN
         descriptionEditor={detailMatches && snapshot.detail && descriptionApi
           ? <AuthorDescriptionEditor key={snapshot.detail.catchId} catchId={snapshot.detail.catchId} api={descriptionApi}
             evidenceUrls={snapshot.detail.evidence.map((evidence) => evidence.sourceUrl)} /> : null}
+        detailNotice={<ModalReauthNotice />}
         selectedId={visibleCatchId}
         hasMore={listMatches && snapshot.nextCursor !== null} moreState={snapshot.moreState}
         onLoadMore={() => { void store.loadMore(); }}

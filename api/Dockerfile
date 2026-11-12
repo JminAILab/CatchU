@@ -56,6 +56,8 @@ COPY ${CONTRACT_DIR}/common.yaml ${CONTRACT_DIR}/worker-messages.yaml /app/${CON
 # 로컬 파일 저장 드라이버(FILE_STORAGE_DRIVER=local)의 기본 볼륨 자리(U8). 실행 사용자 소유로 만들어 두어, 여기에 붙인 새 볼륨에 쓸 수 있게 한다.
 # 볼륨을 붙이지 않으면 읽기 전용 파일시스템이라 쓸 수 없고, s3 드라이버는 이 폴더를 쓰지 않는다.
 RUN mkdir -p /var/lib/catchu/files && chown 1000:1000 /var/lib/catchu/files
+# GitHub 연결 토큰 보관 폴더(#276). 서버 한 대 실행은 이 경로에 이름 붙은 볼륨을 붙이고, 볼륨은 처음 붙을 때 이 소유자·권한을 따른다.
+RUN install -d -o 1000 -g 1000 -m 700 /var/lib/catchu/github-credentials
 USER 1000:1000
 EXPOSE 3001
 # npm을 거치지 않고 node를 직접 실행해 SIGTERM이 앱의 종료 처리(enableShutdownHooks)에 닿게 한다. .env 파일은 읽지 않는다.
