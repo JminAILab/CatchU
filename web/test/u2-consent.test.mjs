@@ -134,6 +134,7 @@ test("동의 창은 받는 곳 셋(OpenAI 포함, CR3 BR8.3)·보내는 기능·
   for (const text of [...AI_RECIPIENTS, AI_CONSENT_TEXT.features, AI_CONSENT_TEXT.rawData, AI_CONSENT_TEXT.contact]) {
     assert.ok(html.includes(text.replaceAll("&", "&amp;")), text);
   }
+  assert.ok(html.includes("문의: catchu@googlegroups.com"), "문의처는 개인정보 처리방침과 같은 팀 연락 이메일이다");
   for (const id of ["ai-consent-dialog", "ai-consent-dialog-agree", "ai-consent-dialog-close"]) assert.ok(html.includes(`data-testid="${id}"`), id);
   assert.ok(!html.includes("회신"), "문의 접수·회신 약속을 쓰지 않는다");
   const failed = renderToStaticMarkup(createElement(AiConsentDialog, { open: true, busy: true, error: "동의를 저장하지 못했습니다.", onAgree() {}, onClose() {} }));
