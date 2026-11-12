@@ -137,6 +137,22 @@ imports: `OwnerProfileReaderModule`(소유 회원 상태), U2 `AiRunModule`·`Da
 - 재전송·두 번 누르기 방지는 없다(BR4.9). web이 응답까지 버튼을 막는다.
 - 409의 `details.catchIds`를 위해 공통 오류 `ErrorDetails`(`src/common/errors/api-error.ts`)에 `catchIds?: string[]`(UUID만)을 더했다. 공통 필터가 UUID 형식이 아닌 값은 버린다. 계약 common.yaml의 `details` 허용 키(두 개) 바깥에 추가한 항목이다. 팀장 확인(#468).
 
+### 사본 선택 칸 넷 (새 Catch NC2, 계약 C3)
+
+새 Catch intent NC2([기능 설계](../../aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md) BR1.1~BR1.6)가 Catch 사본에 선택 칸 넷을 더했다. 발행 트랜잭션 안에서 위 5단계의 잠금·근거 읽기와 함께 정하고, 발행 뒤에는 바뀌지 않는다. 칸이 없는 사본(이 변경 전 사본)도 올바른 사본이다.
+
+| 칸 | 값 | 없을 때 |
+| --- | --- | --- |
+| `repositoryName` | 분석 요청의 외래 키와 같은 세 칸(회원, 등록, 저장소)으로 잇는 `repository_registration`의 `owner + "/" + name` | 등록 이름을 읽지 못함(안전망, 아래) |
+| `authorDescriptionEditedMonth` | `author_description_updated_at`에 9시간을 더한 해·달 `"YYYY-MM"`(2026-11-30T16:00Z → `"2026-12"`) | 작성자 설명이 없음 |
+| `workLimits` | 모든 근거의 `coverage_limits`를 근거 순서대로 읽어 작업 전체 한계만 고른 문장. 같은 글자는 한 번, 상한 없음 | 고른 문장이 없음(빈 배열을 넣지 않음) |
+| `evidence[].ownCommit` | 근거 주소가 `https://github.com/<소유자>/<저장소>/commit/<16진수 40자>`이고, 그 식별값(소문자)이 소속 기록(`commit_assignment`)에 「근거의 Catch, 그 Catch 분석 요청의 저장소 ID, 같은 회원」으로 있으면 true, 아니면 false | 새 사본은 모든 근거에 담는다. 옛 사본은 없음(web이 false로 읽음) |
+
+- 작업 전체 한계는 `src/publications/work-limit-sentences.ts`의 상수 넷이다. 한계 문장 둘(worker `_LISTS_INCOMPLETE`·`_EARLIER_LIST_INCOMPLETE`)은 글자까지 같아야 하고, 같은 작업 경고 앞부분 둘(「같은 작업을 다시 낸 것일 수 있다(」·「cherry-pick으로 옮긴 같은 변경일 수 있다(」)은 그 글자로 시작해야 고른다. 근거별 조회 상태·「본인 커밋이 20건을 넘어…」 같은 다른 한계는 담지 않는다. 상수는 `worker/app/candidates/build.py` 원본을 베꼈으므로 worker 문장을 바꾸면 함께 고친다. `test/publications/work-limit-sentences.test.cjs`가 원본 글자에서 따옴표 경계째(`"…"`·`f"…`) 찾고, 어긋나면 상수 이름과 고칠 두 파일을 알리며 실패한다. worker에 새 작업 전체 한계 문장을 더하면 이 상수 목록에도 더해야 면접관 화면에 보인다.
+- 본인 커밋 여부는 근거 커밋 식별값만 모아 `member_id = 발행 회원 AND catch_id = ANY(고른 Catch) AND commit_sha = ANY(식별값)`으로 한 번 읽는다(커밋 주소 근거가 없으면 읽지 않음). 다른 Catch·다른 회원·다른 저장소 ID의 같은 식별값은 참이 아니다. 병합 커밋은 소속 기록에 없고 PR·이슈 근거는 커밋 주소가 아니라 false다. 소속 기록 마이그레이션(`1794054790720-CreateCommitAssignment`) 전에 등록된 Catch와, 다른 Catch에 먼저 배정된 커밋은 false다.
+- 넷은 화면 표시용이다. 전체 글 합산(`snapshotTextLength`)·조각 나누기·요약 근거에 넣지 않는다(BR1.5, [published-index.md](published-index.md)).
+- 안전망: 저장소 등록은 LEFT JOIN이라 행이 없으면 그 Catch 사본에 `repositoryName`만 빼고 발행은 이어 간다(DB 외래 키가 막으므로 평소에는 생기지 않음). 그런 Catch가 있던 발행이 커밋되면 `PUBLISH_SUCCEEDED` 바로 뒤에 아래 「로그」의 경고 한 줄을 발행본마다 남기고, 롤백되면 남기지 않는다.
+
 ## 작성자 발행본 관리 API (제출 2)
 
 `src/publications/publication-manage.service.ts`. C-09 합의 전이라 `indexState` 칸과 `POST .../reindex`는 없다(OQ-U4-5, 미완성 상태).
@@ -168,6 +184,7 @@ Nest `Logger('Publications')`(`src/publications/publications-log.ts`)로 사건�
 | `PUBLISH_FAILED` | warn | `memberId`, `errorCode`(응답 코드. 발행본 ID는 롤백돼 없음) |
 | `ENQUEUE_RESULT` | ENQUEUED log, ENQUEUE_FAILED warn | `publicationId`, `jobKind`(`EMBED_PUBLICATION`·`BASE_SUMMARY`), `enqueue` |
 | `PREFIX_DELETE_FAILED` | error | `publicationId`, `memberId`, `errorCode: INTERNAL_ERROR` |
+| `SNAPSHOT_REPOSITORY_NAME_MISSING`(NC2) | warn | `publicationId`, `memberId`(Catch ID·저장소 이름·제목은 싣지 않음). 커밋된 발행에서만 |
 
 항목 수·처리 시간·받은 사람 판정 결과는 남기지 않는다. 비밀번호 실패·unlock 제한·인증 실패는 10월 `security-events`가 남긴다(U4는 새 기록 종류를 더하지 않는다).
 
@@ -179,9 +196,10 @@ Nest `Logger('Publications')`(`src/publications/publications-log.ts`)로 사건�
 - `test/catches/author-description-api.test.cjs`(제출 1): S1(저장·두 번 저장·공백·4,000/4,001자·형식 거부·남의 Catch 404·로그 비노출)·S2(재분석 뒤 설명 유지, 새 Catch는 NULL). 격리 스키마(`catch-db-fixture`)와 실제 Catch 등록 코드를 쓴다
 - `test/materials/text-materials-api.test.cjs`(제출 1): S3(CRUD·경계값·회원 두 명 교차 접근 404·cursor·로그 비노출). 실제 `AppModule`과 개발 로그인 합성 회원을 쓴다
 - `test/publications/publication-access-db.test.cjs`(제출 2): C-10 DB 구현의 판정 순서(형식 오류 토큰·없음·중지·만료·삭제 404, grant 없음·위조·다른 발행본·만료 401, 중지가 grant보다 먼저, 비활성 소유자 404와 재활성, 회원 없음 500 대역), `resolveForOwner` 상태 우선순위·NotFound, `readSnapshot`, 판정 뒤 중지·만료·삭제·소유자 비활성과 다음 요청 재판정·같은 트랜잭션 변형(OQ-U4-NFR-5 경계)
-- `test/publications/publish-api.test.cjs`(제출 2): S4~S7, 빈도 429·`Retry-After`, 입력 400 칸별 이유, 동의 403, 404, 자격 409 `details.catchIds`·보호 관측 없음 500, 하루 한도 429·롤백, 조각 예외 500·롤백, 등록 실패 201, 전체 글 60,000/60,001자
+- `test/publications/publish-api.test.cjs`(제출 2): S4~S7, 빈도 429·`Retry-After`, 입력 400 칸별 이유, 동의 403, 404, 자격 409 `details.catchIds`·보호 관측 없음 500, 하루 한도 429·롤백, 조각 예외 500·롤백, 등록 실패 201, 전체 글 60,000/60,001자. NC2: 사본 선택 칸 넷(저장소 이름·한국 시간 작성 달·한계 고르기·소속 기록 `ownCommit`)과 안전망
+- `test/publications/work-limit-sentences.test.cjs`(NC2): 한계 고르기와 worker 원본 문장 대조·반례
 - `test/publications/publications-manage-api.test.cjs`(제출 2): 목록 cursor·`indexState` 없음, 상세 모양, S9(작성자 쪽)·S10~S13(접두어 삭제는 시험 전용 임시 폴더의 로컬 저장소, 실패는 가짜 `FileStorage`)
-- `test/publications/publications-logging.test.cjs`(제출 2): 결과 분류별 줄·칸, 등록 실패와 접두어 삭제 실패 구분, 합성 비밀값·본문 비노출
+- `test/publications/publications-logging.test.cjs`(제출 2): 결과 분류별 줄·칸, 등록 실패와 접두어 삭제 실패 구분, 합성 비밀값·본문 비노출. NC2: 안전망 경고 줄(커밋 뒤에만, 발행본마다 한 줄)
 - `test/publications/publications-module.test.cjs`(제출 2·3): 공급자 선언(unlock 제어는 이 모듈에만)·`PUBLICATION_ACCESS` 주입, 기본 앱 경로 중복 없음·받은 사람 경로 포함·10월 경로 없음, 운영 설정 기동 실패, 의존 방향
 - 제출 3 받은 사람 시험은 [받은 사람 API 문서 「받은 사람 시험 (제출 3)」](recipient-publication.md#받은-사람-시험-제출-3)
 

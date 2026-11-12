@@ -82,6 +82,8 @@ Catch 개편 CR2부터 결과 v3의 후보마다 본인 커밋 목록(`ownCommit
 - 7단계 재호출(저장된 등록 재응답)은 소속을 다시 쓰지 않는다.
 - 소속 쓰기 DB 오류는 바꾸지 않고 올려 Catch·근거·후보 연결과 함께 롤백한다. 소속 행의 (catch_id, member_id)가 Catch의 (catch_id, owner_id)와 맞지 않으면 외래 키가 거부한다.
 - 소속은 worker 맥락 조회가 `assignedCommitShas`로 돌려주고, worker는 재분석 때 그 커밋을 뺀다([worker 소속 커밋 빼기](../../worker/docs/commit-assignment.md)). 표 모양은 [DB 적용과 검사](catch-registration-database.md)에 있다.
+- 새 Catch NC2부터 소속은 발행 사본의 본인 커밋 표지 근거(`evidence[].ownCommit`)로도 쓰인다. 발행이 고른 Catch의 소속을 읽어 근거 커밋 주소마다 참·거짓을 정한다([발행 사본 선택 칸](publications.md#사본-선택-칸-넷-새-catch-nc2-계약-c3)). 소속의 뜻이나 쓰는 규칙을 바꾸면 면접관 화면의 「이 작업의 본인 커밋」 표지도 바뀐다.
+- worker가 근거 한계에 새 작업 전체 한계 문장을 더하면 `src/publications/work-limit-sentences.ts`의 상수 목록에도 더해야 면접관 화면의 「이 기록으로 알 수 없는 것」에 보인다.
 
 저장소·MOCK/LIVE 대조는 잘못된 기존 Catch 연결을 막는 검사다.
 `workIdentity`는 불투명한 문자열이며 B가 형식을 강제하거나 다시 계산하지 않는다.

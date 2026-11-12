@@ -25,7 +25,7 @@ const { PublicationManageService } = require('../../dist/publications/publicatio
 const { PUBLICATION_ACCESS, PublicationsModule } = require('../../dist/publications/publications.module');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
-  PUBLISH_SETTINGS, setEnv, startApp, expectError, eligibleCatch, insertTextMaterial, consent,
+  PUBLISH_SETTINGS, setEnv, startApp, expectError, eligibleCatch, insertTextMaterial, consent, hideRegistrationNames,
   fakeAiRun, fakeIndexWriter, bindFakes, body, catchItem, textItem, tokenOf,
 } = require('./support.cjs');
 
@@ -148,4 +148,58 @@ test('토큰·grant·비밀번호·제목·본문·설명은 어떤 로그 줄�
   for (const [name, value] of Object.entries({ ...SECRETS, token, grant })) {
     assert.equal(text.includes(value), false, `${name}이(가) 로그에 있다`);
   }
+});
+
+// 새 Catch NC2 — 사본 저장소 이름 안전망 경고 줄(관측 설계 「안전망 경고 줄」, 신뢰성 설계 2절, NFR7.3).
+//
+// 먼저 정한 시나리오·기대 결과·실패 조건. 세부 시험 코드는 구현 뒤 쓴다.
+// - 기대: 저장소 등록 이름을 읽지 못해 repositoryName을 뺀 Catch가 있는 발행이 성공하면 PUBLISH_SUCCEEDED 바로 뒤에 warn 수준
+//         SNAPSHOT_REPOSITORY_NAME_MISSING 한 줄(발행본 ID·회원 ID만, 나머지 null)이 남는다. 발행본마다 한 줄이다. 이름을 모두 읽은 발행에는 없다.
+//         실제 DB는 외래 키 때문에 이 경우를 만들 수 없으므로, 발행 트랜잭션 manager의 잠금 조회 결과에서 등록 이름만 null로 바꿔 만든다.
+// - 실패 조건: 롤백된 발행에 경고 줄이 남음, 경고 줄에 저장소 이름·제목·작성자 글이 실림, Catch마다 줄이 남음.
+
+const REPOSITORY = { owner: 'nc2-log-owner-7d1e', name: 'nc2-log-repo-9a4c' };
+
+test('NC2 안전망: 등록 이름을 뺀 Catch가 있는 발행이 성공하면 PUBLISH_SUCCEEDED 뒤에 경고 한 줄(발행본 ID·회원 ID만)이 남는다', async () => {
+  const a = await author();
+  const first = await eligibleCatch(db, a.memberId, { title: SECRETS.title, authorDescription: SECRETS.description }, { repository: REPOSITORY });
+  const second = await eligibleCatch(db, a.memberId, {}, { repositoryId: 'nc2-log-repository-2' });
+  const restoreNames = hideRegistrationNames(server.app);
+  let response;
+  try {
+    response = await publish(a.token, body([catchItem(first), catchItem(second)]));
+  } finally {
+    restoreNames();
+  }
+  assert.equal(response.status, 201, response.text);
+  const id = response.body.publicationId;
+  const lines = publicationLogs();
+  assert.deepEqual(lines.slice(0, 2), [
+    { level: 'log', entry: { event: 'PUBLISH_SUCCEEDED', publicationId: id, memberId: a.memberId, errorCode: null, jobKind: null, enqueue: null } },
+    { level: 'warn', entry: { event: 'SNAPSHOT_REPOSITORY_NAME_MISSING', publicationId: id, memberId: a.memberId, errorCode: null, jobKind: null, enqueue: null } },
+  ]);
+  assert.equal(lines.filter(({ entry }) => entry.event === 'SNAPSHOT_REPOSITORY_NAME_MISSING').length, 1, 'Catch 둘이어도 발행본마다 한 줄');
+  for (const { entry } of lines) assert.deepEqual(Object.keys(entry).sort(), FIELDS);
+  const text = allText();
+  for (const value of [REPOSITORY.owner, REPOSITORY.name, SECRETS.title, SECRETS.description, first, second]) {
+    assert.equal(text.includes(value), false, `${value}이(가) 로그에 있다`);
+  }
+});
+
+test('NC2 안전망: 롤백된 발행에는 경고 줄이 없고, 이름을 모두 읽은 발행에도 없다', async () => {
+  const a = await author();
+  const catchId = await eligibleCatch(db, a.memberId, {}, { repository: REPOSITORY });
+  writer.fail = true;
+  const restoreNames = hideRegistrationNames(server.app);
+  try {
+    expectError(await publish(a.token, body([catchItem(catchId)])), 500, 'INTERNAL_ERROR');
+  } finally {
+    restoreNames();
+  }
+  assert.deepEqual(publicationLogs().map(({ entry }) => entry.event), ['PUBLISH_FAILED']);
+
+  server.logs.length = 0;
+  writer.fail = false;
+  assert.equal((await publish(a.token, body([catchItem(catchId)]))).status, 201);
+  assert.deepEqual(publicationLogs().map(({ entry }) => entry.event), ['PUBLISH_SUCCEEDED', 'ENQUEUE_RESULT', 'ENQUEUE_RESULT']);
 });

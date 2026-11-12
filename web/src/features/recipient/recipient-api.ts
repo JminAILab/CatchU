@@ -28,17 +28,24 @@ function pickItem(item: PublishedItem): PublishedItem {
   const base = { publishedItemId: item.publishedItemId, position: item.position, title: item.title };
   switch (item.itemKind) {
     case "CATCH": {
-      const { workFacts, subjectContribution, evidence, authorDescription, aiDraft, mismatch } = item.snapshot;
+      const { workFacts, subjectContribution, evidence, authorDescription, aiDraft, mismatch, repositoryName, authorDescriptionEditedMonth, workLimits } = item.snapshot;
       return {
         ...base,
         itemKind: "CATCH",
         snapshot: {
           workFacts: [...workFacts],
           subjectContribution,
-          evidence: evidence.map(({ sourceUrl, sourceRevision, representedFacts }) => ({ sourceUrl, sourceRevision, representedFacts: [...representedFacts] })),
+          // 새 Catch NC2(BR2.2): ownCommit은 있을 때만 옮긴다. 없으면 화면이 false로 읽는다.
+          evidence: evidence.map(({ sourceUrl, sourceRevision, representedFacts, ownCommit }) => ({
+            sourceUrl, sourceRevision, representedFacts: [...representedFacts], ...(ownCommit === undefined ? {} : { ownCommit }),
+          })),
           authorDescription,
           aiDraft,
           mismatch,
+          // 새 Catch NC2 선택 칸 셋(BR2.2): 있을 때만 옮기고 없으면 칸을 만들지 않는다.
+          ...(repositoryName === undefined ? {} : { repositoryName }),
+          ...(authorDescriptionEditedMonth === undefined ? {} : { authorDescriptionEditedMonth }),
+          ...(workLimits === undefined ? {} : { workLimits: [...workLimits] }),
         },
       };
     }

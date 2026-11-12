@@ -7,7 +7,8 @@ const { after, before, beforeEach, test } = require('node:test');
 const { IndexNotReady } = require('../../dist/published-index/published-search');
 const { InMemoryQuestionCounter, RedisQuestionCounter } = require('../../dist/rag-answer/question-counter');
 const { QuestionRewriteFailed } = require('../../dist/rag-answer/question-rewriter');
-const { QNA_INSTRUCTION } = require('../../dist/rag-answer/rag-answer-config');
+const { AUTHOR_MATERIAL_VOICE_INSTRUCTION, QNA_INSTRUCTION } = require('../../dist/rag-answer/rag-answer-config');
+const { SOURCE_LABELS } = require('../../dist/ai-generation/ai-generation.types');
 const { APP_SETTINGS, setEnv } = require('../u2/support.cjs');
 const { ask, chunkHit, citedItem, counterSlot, putPublication, startRagAnswerApp, waitFor } = require('./support.cjs');
 
@@ -285,4 +286,22 @@ test('확인 단계 중에 연결이 끊기면 다시 쓰기·검색·생성을 
   assert.equal(fakes.search.calls.length, 0, '검색을 부르지 않는다');
   assert.equal(fakes.gate.streamRequests.length, 0, '생성을 부르지 않는다');
   assert.equal(countOf(publication.publicationId), 1, '이미 센 횟수는 돌려주지 않는다');
+});
+
+// 새 Catch NC2 — 질의응답 지시 끝의 작성자 말 옮기기 문장(BR5.1, AC6.5.3·AC8.1.1).
+// 먼저 정한 시나리오: 질의응답 생성 요청의 지시를 본다. 답의 말투(AC8.1.1·AC8.1.3)는 빌드와 시험의 질의응답 10개 다시 재기(FR11.2)가 판정하고,
+// 이 시험은 지시 끝에 문장이 붙었는지와 근거 딱지가 둘뿐인지까지만 본다.
+// - 기대: 지시는 지금 문장 뒤에 AUTHOR_MATERIAL_VOICE_INSTRUCTION으로 끝나고, 딱지 상수 SOURCE_LABELS는 'GitHub 기록 원문'·'작성자 자료 원문' 둘이다.
+// - 실패 조건: 문장이 없거나 앞에 붙음, 딱지가 셋 이상이거나 바뀜.
+
+test('NC2 AC8.1.1·AC6.5.3 질의응답 지시는 작성자 말 옮기기 문장으로 끝나고 근거 딱지는 둘뿐이다(BR5.1)', async () => {
+  const response = await ask(app.server.url, publication.token, { question: QUESTION, history: [] });
+  assert.equal(response.status, 200);
+  const { instruction } = app.fakes.gate.streamRequests[0];
+  assert.equal(AUTHOR_MATERIAL_VOICE_INSTRUCTION,
+    "자료 종류가 작성자 자료 원문인 내용은 '작성자는 …라고 적었다'처럼 작성자의 말로 옮기고, 확인된 사실처럼 쓰지 않는다.");
+  assert.ok(instruction.startsWith('발행본 자료만으로 질문에 답하고'), '지금 지시가 앞에 그대로 있다');
+  assert.ok(instruction.endsWith(` ${AUTHOR_MATERIAL_VOICE_INSTRUCTION}`));
+  assert.equal(instruction.split(AUTHOR_MATERIAL_VOICE_INSTRUCTION).length, 2, '한 번만 붙는다');
+  assert.deepEqual(SOURCE_LABELS, { GITHUB_RECORD: 'GitHub 기록 원문', AUTHOR_MATERIAL: '작성자 자료 원문' });
 });

@@ -79,3 +79,24 @@ test('사본 모양이 틀리면 TypeError로 멈춘다(처리기가 FAILED로 �
   }
   assert.throws(() => buildSummarySources({ items: null }), TypeError);
 });
+
+// 새 Catch NC2 — 사본 선택 칸 넷은 요약 근거가 아니다(BR1.5, AC6.5.1·AC6.5.2).
+// 먼저 정한 시나리오: 세 칸과 ownCommit이 든 사본으로 요약 근거를 만든다.
+// - 기대: 근거는 지금과 같은 필드에서만 오고, 근거 글에 새 칸 값과 「이 작업의 본인 커밋」이 0건이다.
+// - 실패 조건: 새 칸 값이 근거에 나옴, 근거 수·순서가 바뀜.
+
+test('NC2 AC6.5.1·AC6.5.2 새 칸 넷과 표지 글자는 요약 근거에 0건이고 근거 필드·순서는 지금과 같다(BR1.5)', () => {
+  const value = catchSnapshot();
+  const fresh = {
+    evidence: value.evidence.map((item) => ({ ...item, ownCommit: true })),
+    authorDescription: '본인 커밋 https://github.com/o/r/commit/ba6bba8c0123456789abcdef0123456789abcdef 를 보라.',
+    repositoryName: 'REPOMARKER-owner/repo', authorDescriptionEditedMonth: '2026-11', workLimits: ['LIMITMARKER 한계'],
+  };
+  const sources = buildSummarySources(snapshot([catchItem(fresh)]));
+  const legacy = buildSummarySources(snapshot([catchItem({ authorDescription: fresh.authorDescription })]));
+  assert.deepEqual(sources, legacy, '새 칸이 있든 없든 근거는 같다');
+  assert.deepEqual(sources.map((s) => s.location.fieldPath), [
+    'workFacts[0]', 'workFacts[1]', 'subjectContribution', 'evidence[0].representedFacts[0]', 'evidence[0].representedFacts[1]', 'authorDescription']);
+  const text = JSON.stringify(sources);
+  for (const marker of ['REPOMARKER', 'LIMITMARKER', '2026-11', '이 작업의 본인 커밋', 'ownCommit']) assert.equal(text.includes(marker), false, marker);
+});
