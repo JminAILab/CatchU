@@ -2,15 +2,331 @@
   "stage": "code-generation",
   "unit": "u8-pdf-materials",
   "version": 1,
-  "note": "Step 1~3까지의 경로. Step 4 이후 진행 시 이어 쓴다.",
+  "note": "Step 1~12까지 이 Unit이 만들거나 바꾼 경로(2026-11-11). 앞쪽은 Step 1~6에서 적은 순서 그대로이고 뒤쪽은 Step 7~12의 변경이다. 계약 문서는 고치지 않았다(변경안은 code-summary.md §18.2).",
   "writes": [
-    { "path": "api/src/database/migrations/1793977402870-CreatePdfMaterialTables.ts" },
-    { "path": "api/src/materials/pdf-material.entity.ts" },
-    { "path": "api/src/materials/pdf-page-text.entity.ts" },
-    { "path": "api/src/publications/published-pdf-page.entity.ts" },
-    { "path": "api/docs/member-withdrawal-deletion.md" },
-    { "path": "api/test/db/pdf-tables.test.cjs" },
-    { "path": "api/test/db/member-cascade-delete.test.cjs" },
-    { "path": "api/test/integration/result-application-b.test.cjs" }
+    {
+      "path": "api/src/database/migrations/1793977402870-CreatePdfMaterialTables.ts"
+    },
+    {
+      "path": "api/src/materials/pdf-material.entity.ts"
+    },
+    {
+      "path": "api/src/materials/pdf-page-text.entity.ts"
+    },
+    {
+      "path": "api/src/publications/published-pdf-page.entity.ts"
+    },
+    {
+      "path": "api/docs/member-withdrawal-deletion.md"
+    },
+    {
+      "path": "api/test/db/pdf-tables.test.cjs"
+    },
+    {
+      "path": "api/test/db/member-cascade-delete.test.cjs"
+    },
+    {
+      "path": "api/test/integration/result-application-b.test.cjs"
+    },
+    {
+      "path": "api/src/file-storage/s3-file-storage.ts"
+    },
+    {
+      "path": "api/src/file-storage/file-storage.config.ts"
+    },
+    {
+      "path": "api/src/file-storage/file-storage.module.ts"
+    },
+    {
+      "path": "api/src/file-storage/file-storage.ts"
+    },
+    {
+      "path": "api/package.json"
+    },
+    {
+      "path": "api/package-lock.json"
+    },
+    {
+      "path": "api/test/file-storage/storage-contract.cjs"
+    },
+    {
+      "path": "api/test/file-storage/s3-file-storage.test.cjs"
+    },
+    {
+      "path": "api/test/u2/file-storage.test.cjs"
+    },
+    {
+      "path": "api/docs/file-storage.md"
+    },
+    {
+      "path": "api/docs/environment.md"
+    },
+    {
+      "path": "api/src/materials/pdf-material-store.ts"
+    },
+    {
+      "path": "api/src/materials/pdf-material-input.ts"
+    },
+    {
+      "path": "api/src/materials/pdf-materials.controller.ts"
+    },
+    {
+      "path": "api/src/materials/multer.d.ts"
+    },
+    {
+      "path": "api/src/materials/materials.module.ts"
+    },
+    {
+      "path": "api/src/pdf-extraction/pdf-extraction-spec.ts"
+    },
+    {
+      "path": "api/src/pdf-extraction/pdf-extract.dispatcher.ts"
+    },
+    {
+      "path": "api/test/materials/pdf-materials-api.test.cjs"
+    },
+    {
+      "path": "api/src/pdf-extraction/pdf-extraction.receiver.ts"
+    },
+    {
+      "path": "api/src/analysis-receiver/worker-message.validator.ts"
+    },
+    {
+      "path": "api/src/analysis-queue/worker-message.consumer.ts"
+    },
+    {
+      "path": "api/src/analysis-queue/queue-spec.ts"
+    },
+    {
+      "path": "api/src/analysis-queue/analysis-queue.module.ts"
+    },
+    {
+      "path": "api/test/materials/pdf-extraction-receiver.test.cjs"
+    },
+    {
+      "path": "api/.env.example"
+    },
+    {
+      "path": "api/Dockerfile"
+    },
+    {
+      "path": "api/docs/publications.md"
+    },
+    {
+      "path": "api/src/publications/publications-config.ts"
+    },
+    {
+      "path": "api/src/publications/publications.controller.ts"
+    },
+    {
+      "path": "api/src/publications/publications.module.ts"
+    },
+    {
+      "path": "api/src/publications/publish-input.ts"
+    },
+    {
+      "path": "api/src/publications/publish.service.ts"
+    },
+    {
+      "path": "api/src/publications/recipient-access.service.ts"
+    },
+    {
+      "path": "api/src/publications/recipient-links.controller.ts"
+    },
+    {
+      "path": "api/src/publications/snapshot-builder.ts"
+    },
+    {
+      "path": "api/test/publications/app-routes.test.cjs"
+    },
+    {
+      "path": "api/test/publications/publish-api.test.cjs"
+    },
+    {
+      "path": "api/test/publications/support.cjs"
+    },
+    {
+      "path": "deploy/README.md"
+    },
+    {
+      "path": "deploy/compose.local-db.yaml"
+    },
+    {
+      "path": "web/next.config.ts"
+    },
+    {
+      "path": "web/src/features/materials/README.md"
+    },
+    {
+      "path": "web/src/features/materials/materials-screen.tsx"
+    },
+    {
+      "path": "web/src/features/materials/materials-view.tsx"
+    },
+    {
+      "path": "web/src/features/materials/materials.module.css"
+    },
+    {
+      "path": "web/src/features/publications/README.md"
+    },
+    {
+      "path": "web/src/features/publications/publication-detail-screen.tsx"
+    },
+    {
+      "path": "web/src/features/publications/publication-detail-view.tsx"
+    },
+    {
+      "path": "web/src/features/publications/publications-api.ts"
+    },
+    {
+      "path": "web/src/features/publications/publish-screen.tsx"
+    },
+    {
+      "path": "web/src/features/publications/publish-sources.ts"
+    },
+    {
+      "path": "web/src/features/publications/publish-view.tsx"
+    },
+    {
+      "path": "web/src/features/publications/snapshot-view.tsx"
+    },
+    {
+      "path": "web/src/features/recipient/README.md"
+    },
+    {
+      "path": "web/src/features/recipient/recipient-api.ts"
+    },
+    {
+      "path": "web/src/features/recipient/recipient-screen.tsx"
+    },
+    {
+      "path": "web/src/features/recipient/recipient-slots.ts"
+    },
+    {
+      "path": "web/src/features/recipient/recipient-view.tsx"
+    },
+    {
+      "path": "web/test/publications-owner.test.mjs"
+    },
+    {
+      "path": "web/test/publish.test.mjs"
+    },
+    {
+      "path": "web/test/security-headers.test.mjs"
+    },
+    {
+      "path": "worker/.env.example"
+    },
+    {
+      "path": "worker/README.md"
+    },
+    {
+      "path": "worker/app/consumer/children.py"
+    },
+    {
+      "path": "worker/app/consumer/queues.py"
+    },
+    {
+      "path": "worker/app/consumer/receipts.py"
+    },
+    {
+      "path": "worker/app/consumer/service.py"
+    },
+    {
+      "path": "worker/app/consumer/settings.py"
+    },
+    {
+      "path": "worker/pyproject.toml"
+    },
+    {
+      "path": "worker/uv.lock"
+    },
+    {
+      "path": "api/docs/pdf-materials.md"
+    },
+    {
+      "path": "api/src/database/migrations/1794289608328-AddPdfTextLimitFailureCode.ts"
+    },
+    {
+      "path": "api/src/publications/pdf-publish.ts"
+    },
+    {
+      "path": "api/src/publications/published-pdf-view.service.ts"
+    },
+    {
+      "path": "api/test/publications/publish-pdf.test.cjs"
+    },
+    {
+      "path": "api/test/publications/recipient-pdf.test.cjs"
+    },
+    {
+      "path": "web/src/features/materials/pdf-clients.ts"
+    },
+    {
+      "path": "web/src/features/materials/pdf-material-list.tsx"
+    },
+    {
+      "path": "web/src/features/materials/pdf-materials-api.ts"
+    },
+    {
+      "path": "web/src/features/materials/pdf-materials-tab.tsx"
+    },
+    {
+      "path": "web/src/features/materials/pdf-upload-form.tsx"
+    },
+    {
+      "path": "web/src/features/publications/published-pdf-item.tsx"
+    },
+    {
+      "path": "web/src/features/recipient/pdf-viewer-launcher.tsx"
+    },
+    {
+      "path": "web/src/features/recipient/pdf-viewer.module.css"
+    },
+    {
+      "path": "web/test/pdf-materials-api.test.mjs"
+    },
+    {
+      "path": "web/test/pdf-viewer.test.mjs"
+    },
+    {
+      "path": "web/test/recipient-pdf.test.mjs"
+    },
+    {
+      "path": "worker/app/pdf_extraction/__init__.py"
+    },
+    {
+      "path": "worker/app/pdf_extraction/child.py"
+    },
+    {
+      "path": "worker/app/pdf_extraction/envelope.py"
+    },
+    {
+      "path": "worker/app/pdf_extraction/extract.py"
+    },
+    {
+      "path": "worker/app/pdf_extraction/reader.py"
+    },
+    {
+      "path": "worker/app/pdf_extraction/settings.py"
+    },
+    {
+      "path": "worker/app/pdf_extraction/worker.py"
+    },
+    {
+      "path": "worker/tests/pdf_children.py"
+    },
+    {
+      "path": "worker/tests/pdf_synthetic.py"
+    },
+    {
+      "path": "worker/tests/test_pdf_consumer.py"
+    },
+    {
+      "path": "worker/tests/test_pdf_extraction.py"
+    },
+    {
+      "path": "worker/tests/test_pdf_service.py"
+    }
   ]
 }

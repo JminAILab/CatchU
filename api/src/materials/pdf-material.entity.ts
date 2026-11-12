@@ -8,8 +8,13 @@ import { MemberAccount } from '../member-analysis/member-analysis.entity';
 export const PDF_EXTRACTION_STATES = ['PENDING', 'DONE', 'FAILED'] as const;
 export type PdfExtractionState = (typeof PDF_EXTRACTION_STATES)[number];
 
-/** FAILED 사유(U8 Q5). DEADLINE_EXCEEDED는 worker 결과가 아니라 시한 판정(BR2.2)이 넣는다. */
-export const PDF_EXTRACTION_FAILURE_CODES = ['ENCRYPTED', 'UNREADABLE_FILE', 'PAGE_LIMIT_EXCEEDED', 'DEADLINE_EXCEEDED'] as const;
+/**
+ * FAILED 사유(U8 Q5). DEADLINE_EXCEEDED는 worker 결과가 아니라 시한 판정(BR2.2)이 넣는다.
+ * TEXT_LIMIT_EXCEEDED(쪽 글 합계 60,000자 초과)는 팀장 결정 2026-11-10(#420 issuecomment-6759834176)으로 더했다.
+ */
+export const PDF_EXTRACTION_FAILURE_CODES = [
+  'ENCRYPTED', 'UNREADABLE_FILE', 'PAGE_LIMIT_EXCEEDED', 'TEXT_LIMIT_EXCEEDED', 'DEADLINE_EXCEEDED',
+] as const;
 export type PdfExtractionFailureCode = (typeof PDF_EXTRACTION_FAILURE_CODES)[number];
 
 /** PDF 쪽 수 상한(U8 BR1.2, Q1). 판정은 worker가 하고 DB는 DONE 자료의 쪽 수 범위만 막는다. */

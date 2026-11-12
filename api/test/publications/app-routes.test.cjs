@@ -3,13 +3,14 @@
 // Step 19(2026-11-05)에서 확정했고, 세부 시험 코드는 Step 20·21 구현 뒤 Step 23에서 썼다.
 //
 // 경로 (W6 뒤 AppModule을 띄워 등록된 (메서드, 경로)를 읽는다)
-//   - 기대: 등록된 (메서드, 경로)에 중복이 없다. 받은 사람 두 경로 GET /v1/public/links/:token·POST /v1/public/links/:token/unlock은 PublicationsModule의
+//   - 기대: 등록된 (메서드, 경로)에 중복이 없다. 받은 사람 세 경로 GET /v1/public/links/:token·POST /v1/public/links/:token/unlock·
+//           GET /v1/public/links/:token/items/:publishedItemId/pdf(U8 계획 9.1, C-12 더하는 변경으로 2026-11-11에 더함)는 PublicationsModule의
 //           새 컨트롤러 하나에만 연결된다. 다음 경로는 없다: GET /v1/public/links/:token/catches/:catchId(10월 Catch 상세), GET·POST /v1/share-links와
 //           PUT /v1/share-links/:linkId/stop(10월 발급·목록·중지). 발행·작성자 관리 경로(/v1/publications...)·설명·자료 경로는 그대로다.
 //   - 실패 조건: 같은 (메서드, 경로)가 두 컨트롤러에 있음(10월 RecipientController·PublicLinksController가 남음), 옛 경로가 404가 아닌 응답을 함.
 // 인증 예외 (NFR1.1, 보안 점검)
-//   - 기대: @Public()은 받은 사람 두 메서드에만 붙고 클래스에는 없다. 같은 컨트롤러에 더해질 미지정 메서드는 회원 인증 예외를 상속하지 않는다.
-//           받은 사람 두 경로는 회원 토큰 없이 Guard를 통과하고, 작성자 경로(/v1/publications...)는 회원 토큰 없이 401이다.
+//   - 기대: @Public()은 받은 사람 세 메서드에만 붙고 클래스에는 없다. 같은 컨트롤러에 더해질 미지정 메서드는 회원 인증 예외를 상속하지 않는다.
+//           받은 사람 세 경로는 회원 토큰 없이 Guard를 통과하고, 작성자 경로(/v1/publications..., PDF 사본 열람 포함)는 회원 토큰 없이 401이다.
 //   - 실패 조건: 클래스 단위 @Public(), 미지정 경로가 인증 없이 통과.
 // 모듈 구성 (R-01·R-02, OQ-U4-3)
 //   - 기대: AppModule 모듈 목록에 ShareLinksModule·RecipientModule이 없고 PublicationsModule이 한 번 등록된다. grant 키·web 주소 설정·unlock 정책·제어
@@ -60,11 +61,12 @@ function registeredRoutes(app) {
 }
 const moduleNames = (module, key) => (Reflect.getMetadata(key, module) ?? []).map((entry) => entry.name ?? String(entry));
 
-test('등록된 (메서드, 경로)에 중복이 없고, 받은 사람 두 경로는 PublicationsModule의 RecipientLinksController 하나에만 있으며, 10월 Catch 상세·발급·목록·중지 경로는 없다', async () => {
+test('등록된 (메서드, 경로)에 중복이 없고, 받은 사람 세 경로(열람·unlock·PDF 사본)는 PublicationsModule의 RecipientLinksController 하나에만 있으며, 10월 Catch 상세·발급·목록·중지 경로는 없다', async () => {
   const routes = registeredRoutes(server.app);
   assert.ok(routes.length > 0, '경로를 읽었다');
   assert.deepEqual(routes.filter((route, index) => routes.indexOf(route) !== index), [], '중복 없음');
-  for (const route of ['GET /v1/public/links/:token', 'POST /v1/public/links/:token/unlock', 'POST /v1/publications', 'GET /v1/publications',
+  for (const route of ['GET /v1/public/links/:token', 'POST /v1/public/links/:token/unlock', 'GET /v1/public/links/:token/items/:publishedItemId/pdf',
+    'GET /v1/publications/:publicationId/items/:publishedItemId/pdf', 'POST /v1/publications', 'GET /v1/publications',
     'GET /v1/publications/:publicationId', 'PUT /v1/publications/:publicationId/stop', 'DELETE /v1/publications/:publicationId',
     'GET /v1/catches/:catchId/description', 'GET /v1/text-materials']) {
     assert.ok(routes.includes(route), route);
@@ -83,7 +85,9 @@ test('등록된 (메서드, 경로)에 중복이 없고, 받은 사람 두 경�
   }
   const prototypeRoutes = Object.getOwnPropertyNames(RecipientLinksController.prototype).filter((name) => name !== 'constructor')
     .map((name) => [Reflect.getMetadata('method', RecipientLinksController.prototype[name]), Reflect.getMetadata('path', RecipientLinksController.prototype[name])]);
-  assert.deepEqual(prototypeRoutes.sort(), [[0, ':token'], [1, ':token/unlock']].sort(), 'GET :token, POST :token/unlock 두 메서드만');
+  // U8 계획 9.1(C-12 더하는 변경)로 PDF 사본 열람 GET 하나가 더해져 세 메서드다.
+  assert.deepEqual(prototypeRoutes.sort(), [[0, ':token'], [1, ':token/unlock'], [0, ':token/items/:publishedItemId/pdf']].sort(),
+    'GET :token, POST :token/unlock, GET :token/items/:publishedItemId/pdf 세 메서드만');
 
   // 옛 경로는 Nest 밖 404(RESOURCE_UNAVAILABLE)이고 링크 판정(LINK_UNAVAILABLE)에 닿지 않는다.
   const token = 'A'.repeat(43);
@@ -93,10 +97,11 @@ test('등록된 (메서드, 경로)에 중복이 없고, 받은 사람 두 경�
   expectError(await server.call('PUT', '/share-links/00000000-0000-4000-8000-000000000000/stop'), 404, 'RESOURCE_UNAVAILABLE');
 });
 
-test('@Public()은 받은 사람 두 메서드에만 붙고 클래스에는 없으며, 미지정 메서드는 예외를 상속하지 않고, 작성자 경로는 회원 토큰 없이 401이다', async () => {
+test('@Public()은 받은 사람 세 메서드(열람·unlock·PDF 사본)에만 붙고 클래스에는 없으며, 미지정 메서드는 예외를 상속하지 않고, 작성자 경로는 회원 토큰 없이 401이다', async () => {
   assert.equal(Reflect.getMetadata(PUBLIC_ROUTE, RecipientLinksController), undefined, '클래스 단위 @Public() 없음');
   assert.equal(Reflect.getMetadata(PUBLIC_ROUTE, RecipientLinksController.prototype.read), true);
   assert.equal(Reflect.getMetadata(PUBLIC_ROUTE, RecipientLinksController.prototype.unlock), true);
+  assert.equal(Reflect.getMetadata(PUBLIC_ROUTE, RecipientLinksController.prototype.pdf), true, 'PDF 사본 열람(U8 계획 9.1)도 받은 사람 경로다');
   class Extended extends RecipientLinksController {
     extra() { return 'synthetic'; }
   }
@@ -107,8 +112,10 @@ test('@Public()은 받은 사람 두 메서드에만 붙고 클래스에는 없�
   // 받은 사람 경로는 회원 토큰 없이 Guard를 지나 링크 판정까지 간다(없는 토큰이라 404). 작성자 경로는 401.
   expectError(await server.call('GET', `/public/links/${'B'.repeat(43)}`), 404, 'LINK_UNAVAILABLE');
   expectError(await server.call('POST', `/public/links/${'B'.repeat(43)}/unlock`, { body: { password: 'synthetic' } }), 404, 'LINK_UNAVAILABLE');
+  expectError(await server.call('GET', `/public/links/${'B'.repeat(43)}/items/00000000-0000-4000-8000-000000000000/pdf`), 404, 'LINK_UNAVAILABLE');
   expectError(await server.call('GET', '/publications'), 401, 'AUTH_REQUIRED');
   expectError(await server.call('POST', '/publications', { body: {} }), 401, 'AUTH_REQUIRED');
+  expectError(await server.call('GET', '/publications/00000000-0000-4000-8000-000000000000/items/00000000-0000-4000-8000-000000000000/pdf'), 401, 'AUTH_REQUIRED');
 });
 
 test('AppModule에 ShareLinksModule·RecipientModule이 없고 PublicationsModule이 한 번 등록되며, unlock 제어는 PublicationsModule에만 하나고 받은 사람 서비스가 그것을 쓴다', () => {

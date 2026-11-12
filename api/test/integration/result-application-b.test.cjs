@@ -296,12 +296,18 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
       'CreateU2UsageAndConsent1793161114211', 'CreatePublicationTables1793162230851', 'AddCatchAuthorDescription1793162230852',
       'AddRepositoryRegistration1793245460352', 'CreatePublishedIndexTables1793257382741', 'CreateBaseSummaryTable1793348947970',
       'ExpandRepositoryAnalysisScope1793585769819', 'CreateMcpTables1793588083309', 'CreateJdSummary1793762571117',
-      'CreatePdfMaterialTables1793977402870', 'CreateCommitAssignment1794054790720']);
+      'CreatePdfMaterialTables1793977402870', 'CreateCommitAssignment1794054790720', 'AddPdfTextLimitFailureCode1794289608328']);
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 38);
     assert.equal((await indexesIn(schema)).length, 4);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
+    const failureCodeCheck = async () => (await isolated.query(`SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+      WHERE connamespace = $1::regnamespace AND conname LIKE 'ck_pdf_material_extraction_failure_code_%'`, [schema]))[0].def;
+    assert.match(await failureCodeCheck(), /TEXT_LIMIT_EXCEEDED/);
+    await isolated.undoLastMigration(); // U8 pdf_material 실패 사유 CHECK에 TEXT_LIMIT_EXCEEDED 추가(#420 팀장 결정 2026-11-10). 표 수는 그대로다
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 38);
+    assert.doesNotMatch(await failureCodeCheck(), /TEXT_LIMIT_EXCEEDED/);
     await isolated.undoLastMigration(); // CR2 소속 기록 표와 catch_asset (catch_id, owner_id) 유일 조건
     assert.equal(await regclass('commit_assignment'), null);
     assert.equal(await regclass('uq_catch_asset_catch_id_owner_id'), null);

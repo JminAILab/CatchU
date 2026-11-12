@@ -27,3 +27,19 @@
 .dangerButton { color: var(--color-danger); border-color: var(--color-danger); }
 .page button:disabled { opacity: .55; cursor: not-allowed; }
 .page button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+
+/* U8 PDF 자료 탭(계획 10.1). */
+/* PDF 탭은 목록 줄 안에 화면 안 뷰어가 열리므로 목록을 넓게 둔다. */
+.pdfLayout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .pdfLayout { grid-template-columns: minmax(0, 1fr); } }
+.tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--color-line); }
+.tab, .tabActive { min-height: 44px; padding: 10px 18px; border: 1px solid transparent; border-bottom: none; border-radius: 9px 9px 0 0; background: transparent; color: #34465e; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.tabActive { border-color: var(--color-line); background: var(--color-surface); color: var(--color-ink); }
+.pdfRow { padding: 14px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-surface); }
+.pdfRowHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.pdfFailure { font-size: 13px; color: var(--color-danger); margin: 4px 0 0; }
+.badgePending, .badgeDone, .badgeFailed { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+.badgePending { background: #eef2f7; color: #34465e; }
+.badgeDone { background: #e4f3ea; color: #1f6b3a; }
+.badgeFailed { background: #fff1dc; color: #8a4b00; }
+.field input[type="file"] { padding: 8px; }

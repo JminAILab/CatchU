@@ -5,7 +5,8 @@ import { splitSections, type Section } from "@/lib/author-description-sections";
 import { evidenceRepositoryOf, isOwnCommitLink, ownCommitsOf, type OwnCommit } from "@/lib/github-link-name";
 import { isGithubSourceUrl, splitGithubLinks, type TextSegment } from "@/lib/github-source-url";
 import { GithubLink } from "./github-link";
-import { orderedItems, type CatchSnapshot, type PublishedItem, type PublishedSnapshot, type TextMaterialSnapshot } from "./publications-api";
+import { orderedItems, pdfPageCount, type CatchSnapshot, type PublishedItem, type PublishedSnapshot, type TextMaterialSnapshot } from "./publications-api";
+import { PublishedPdfItem, type PdfCopySource } from "./published-pdf-item";
 import styles from "./publications.module.css";
 
 /**
@@ -243,8 +244,14 @@ const KIND_LABELS: Record<PublishedItem["itemKind"], string> = { CATCH: "Catch",
 /**
  * 발행본 사본(C-10 `readSnapshot` 결과)을 항목 순서대로 보인다. 제목은 글자로만 그린다. 작성자 발행본 상세(W5)와 받은 사람 화면(W4)이 같은 표시를 쓴다.
  * `highlight`가 가리키는 항목만 강조 범위를 받고(`<mark>`), 항목마다 `id`·`tabIndex={-1}`을 두어 근거 위치로 옮길 수 있게 한다.
+ * PDF 항목(U8)은 쪽 수·쪽 글을 보이고, `pdfSource`가 있으면 그 항목의 사본을 여는 단추를 둔다(받은 사람·작성자가 서로 다른 요청을 넘긴다).
  */
-export function PublishedSnapshotView({ snapshot, highlight = null }: { snapshot: PublishedSnapshot; highlight?: SnapshotHighlight | null }) {
+export function PublishedSnapshotView({ snapshot, highlight = null, pdfSource }: {
+  snapshot: PublishedSnapshot;
+  highlight?: SnapshotHighlight | null;
+  /** PDF 항목의 사본을 받는 방법. 항목 ID로 요청을 만든다. */
+  pdfSource?: (publishedItemId: string) => PdfCopySource;
+}) {
   const items = orderedItems(snapshot);
   return (
     <section className={styles.snapshot} aria-labelledby="publication-snapshot-title" data-testid="publication-snapshot">
@@ -259,7 +266,8 @@ export function PublishedSnapshotView({ snapshot, highlight = null }: { snapshot
                 <h3 className={styles.snapshotTitle}><span className={styles.kindBadge}>{KIND_LABELS[item.itemKind]}</span> {item.title}</h3>
                 {item.itemKind === "CATCH" ? <CatchSnapshotView snapshot={item.snapshot} highlight={own} />
                   : item.itemKind === "TEXT_MATERIAL" ? <TextMaterialSnapshotView snapshot={item.snapshot} highlight={own} />
-                  : <p className={styles.muted}>PDF 자료 표시는 준비 중입니다(U8).</p>}
+                  : <PublishedPdfItem title={item.title} pageCount={pdfPageCount(item)} pages={item.pdfPages ?? []} highlight={own}
+                    source={pdfSource?.(item.publishedItemId)} />}
               </li>
             );
           })}

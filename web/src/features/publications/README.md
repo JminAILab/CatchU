@@ -8,7 +8,7 @@
 | --- | --- |
 | `publications-api.ts` | 「작성자 API」 호출(`createPublicationsApi(api.member)`), 응답 모양 확인, 보내기 전 길이 검사, 발행 실패 구분(`publishOutcome`)과 안내 문구. 화면과 분리해 시험한다 |
 | `publication-format.ts` | 상태·비밀번호·시각 표기와 고정 안내 문구 |
-| `publish-sources.ts` | 발행 화면이 고를 수 있는 Catch·텍스트 자료 모양과 고를 수 없는 이유 판정 |
+| `publish-sources.ts` | 발행 화면이 고를 수 있는 Catch·텍스트 자료·PDF 자료(U8) 모양과 고를 수 없는 이유 판정 |
 | `publish-view.tsx` | 고르기·순서·입력·확인·완료 화면 그리기 |
 | `publish-screen.tsx` | 발행 화면 상태 전이(`createPublishModel`)와 페이지(`PublishPage`). 동의 창은 `useAiConsent`로 연다 |
 | `publications-list-view.tsx` / `publications-list-screen.tsx` | 발행본 목록 그리기와 상태 전이(`createPublicationsListModel`) |
@@ -36,6 +36,7 @@ GitHub 주소 판정 `isGithubSourceUrl`과 본문 나누기 `splitGithubLinks`�
 ### 발행 (W3)
 
 - 본인 Catch·텍스트 자료를 첫 쪽부터 20개씩 읽고 [더 보기]로 이어 읽는다. 조회 실패는 0건으로 보이지 않고 [목록 다시 불러오기]를 보인다.
+- **PDF 자료(U8, 계획 10.5):** "내 PDF 자료" 목록에서 추출이 완료(`DONE`)된 PDF만 고를 수 있다. 추출 중·실패 PDF는 이유와 함께 비활성으로 보인다. Catch·텍스트·PDF를 섞어 고른 순서 그대로 발행 요청 `items`(`kind: PDF_MATERIAL`)에 넣는다. 서버가 400 `extractionIncomplete`로 거부하면 "발행되지 않았습니다"와 PDF 추출 안내를 보이고 편집 단계로 돌아가며, 고른 항목·제목·비밀번호를 유지하고 PDF 목록을 한 번 다시 읽는다(자동 재발행 없음). 발행본 상세의 PDF 항목은 [받은 사람 화면 README 「PDF 항목과 사본 열람 (U8)」](../recipient/README.md#pdf-항목과-사본-열람-u8)의 컴포넌트를 쓰고 작성자 사본 경로로 연다. 시험은 `test/publish.test.mjs`(16개 가운데 PDF 4개).
 - 확인(작업 사실·나의 기여)이 끝나지 않았거나 원본 저장소가 보호된(`restriction = SOURCE_PRIVATE`) Catch는 이유와 함께 고를 수 없다(BR4.2, 화면 표시는 10월 확인·보호 상태). 최종 판정은 발행 트랜잭션이 한다.
 - 비공개 Catch를 고르면 "발행하면 이 Catch는 공개로 바뀝니다"를 보인다(BR4.4). 고르고 빼고 순서를 바꾸는 동안 서버에 아무것도 보내지 않는다.
 - 새 Catch NC1(BR6.1~BR6.7): 기존 안내 아래에 「저장소마다 3~5개를 권합니다.」 한 줄이 있고, 저장소별로 세거나 경고·추천·순위를 내지 않는다. 「내 Catch」 항목 단추 안 작은 줄은 「저장소 이름 · 공개 상태 · 설명 안 씀 · 불일치 표시됨」 순서다(「설명 안 씀」은 작성자 설명이 없을 때만). 저장소 이름은 화면을 열 때 내 자산 화면과 같은 저장소 목록(`createRepositoryOptionsStore`)을 한 번 끝 쪽까지 읽어 `repositoryId`로 찾고, 못 불러오거나 못 찾으면 이름만 뺀다(고르기·발행은 막지 않는다).

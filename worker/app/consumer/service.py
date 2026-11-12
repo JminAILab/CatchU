@@ -4,6 +4,10 @@
 받으며, 종료는 새 작업 멈춤 → 자식 끝내기·회수 → 실패 기록 → 결과 전송 마무리 → 수신 확인 조회
 취소 → 정상 close() → 상태 확인 서버 종료 순서로 25초 안에 한다. 넘으면 남은 자식을 SIGKILL하고
 프로세스를 끝낸다. `close(force=True)`는 실패 기록을 건너뛰므로 쓰지 않는다.
+
+PDF 설정(`ConsumerSettings.pdf`, U8)이 있으면 `pdf-extraction-requests`를 소비하는 둘째 Worker를 같은
+이벤트 루프에 띄운다. 분석 Worker와 다른 큐·다른 인스턴스·다른 동시성 설정이라 서로 기다리지 않고(BR3.7),
+같은 종료 순서에 들어간다. PDF 설정이 없으면 기존 동작 그대로다.
 """
 
 import asyncio
@@ -25,8 +29,14 @@ from app.consumer.health import ConsumerState, create_health_app
 from app.consumer.parent import OutputQueue, ProcessingAborted, RequestProcessor
 from app.consumer.receipts import ReceiptWatcher, ResultJobView
 from app.consumer.settings import ConsumerSettings
+from app.pdf_extraction.child import pdf_child_main, pdf_child_settings
+from app.pdf_extraction.envelope import PDF_IDENTIFYING_FIELDS, classify_receipt
+from app.pdf_extraction.worker import PdfExtractionProcessor, PdfProcessingAborted
 
 logger = logging.getLogger(__name__)
+
+# 종료 순서를 함께 밟는 처리 함수의 공통 면(분석·PDF).
+Processor = RequestProcessor | PdfExtractionProcessor
 
 
 class _HealthServer(uvicorn.Server):
@@ -79,12 +89,14 @@ class ConsumerService:
         install_signals: bool = True,
         hard_exit: Callable[[int], NoReturn] | None = None,
         worker_options: Mapping[str, Any] | None = None,
+        pdf_child_target: ChildTarget = pdf_child_main,
     ) -> None:
         self._settings = settings
         self._limits = settings.limits
         self._host = host
         self.port = port
         self._child_target = child_target
+        self._pdf_child_target = pdf_child_target
         self._output_wrapper = output_wrapper
         self._install_signals = install_signals
         self._hard_exit = hard_exit or _kill_self
@@ -96,23 +108,54 @@ class ConsumerService:
         self.worker: Worker | None = None
         self.processor: RequestProcessor | None = None
         self.receipts: ReceiptWatcher | None = None
+        # PDF 추출(둘째 Worker). PDF 설정이 없으면 모두 None으로 남는다.
+        self.pdf_worker: Worker | None = None
+        self.pdf_processor: PdfExtractionProcessor | None = None
+        self.pdf_receipts: ReceiptWatcher | None = None
+        self._pdf_run_task: asyncio.Task[Any] | None = None
         self._output_queue: Queue | None = None
         self._run_task: asyncio.Task[Any] | None = None
         self.server: _HealthServer | None = None
+
+    def _running_pairs(self) -> list[tuple[Worker, asyncio.Task[Any]]] | None:
+        """띄워야 할 Worker와 실행 작업의 쌍. 하나라도 아직 없으면 None(starting)."""
+        pairs: list[tuple[Worker | None, asyncio.Task[Any] | None]] = [
+            (self.worker, self._run_task)
+        ]
+        if self._settings.pdf is not None:
+            pairs.append((self.pdf_worker, self._pdf_run_task))
+        ready: list[tuple[Worker, asyncio.Task[Any]]] = []
+        for worker, task in pairs:
+            if worker is None or task is None:
+                return None
+            ready.append((worker, task))
+        return ready
+
+    def _processors(self) -> list[tuple[Worker, Processor]]:
+        """종료 순서를 함께 밟는 (Worker, 처리 함수) 쌍. 띄우지 않은 쪽은 빠진다."""
+        pairs: list[tuple[Worker, Processor]] = []
+        if self.worker is not None and self.processor is not None:
+            pairs.append((self.worker, self.processor))
+        if self.pdf_worker is not None and self.pdf_processor is not None:
+            pairs.append((self.pdf_worker, self.pdf_processor))
+        return pairs
 
     def state(self) -> ConsumerState:
         if self._stopping:
             return "stopping"
         if not self._settings.consumer_enabled:
             return "disabled"
-        worker, task = self.worker, self._run_task
-        if worker is None or task is None:
+        pairs = self._running_pairs()
+        if pairs is None:
             return "starting"
-        if task.done() or worker.closing or worker.closed or worker.paused:
+        if any(
+            task.done() or worker.closing or worker.closed or worker.paused
+            for worker, task in pairs
+        ):
             return "stopped"
         # running은 첫 연결(클라이언트 이름 설정)에 성공한 뒤에 켜진다. 그 뒤 큐 서버에 잠시 못
         # 붙어 다시 시도하는 동안에도 켜져 있으므로 정상으로 답한다.
-        if not worker.running:
+        if not all(worker.running for worker, _ in pairs):
             return "starting"
         return "running"
 
@@ -151,6 +194,48 @@ class ConsumerService:
         self.worker.on("failed", _log_job_failed)
         self._run_task = asyncio.create_task(self.worker.run(), name="request-worker")
         self._run_task.add_done_callback(self._run_finished)
+        if self._settings.pdf is not None:
+            self._start_pdf_worker(connection)
+
+    def _start_pdf_worker(self, connection: Mapping[str, Any]) -> None:
+        """PDF 추출 Worker(BR3.7): 다른 큐·다른 인스턴스·다른 동시성, 같은 출력 큐·같은 종료 순서."""
+        pdf = self._settings.pdf
+        assert pdf is not None and self._output_queue is not None
+        self.pdf_receipts = ReceiptWatcher(
+            BullResultJobs(self._output_queue),
+            self._limits,
+            classifier=classify_receipt,
+            identifying_fields=PDF_IDENTIFYING_FIELDS,
+        )
+        child = pdf.for_child()
+        self.pdf_processor = PdfExtractionProcessor(
+            pdf_child_settings(self._settings.for_child(), child),
+            child,
+            self._output_wrapper(BullOutput(self._output_queue)),
+            self.pdf_receipts,
+            child_target=self._pdf_child_target,
+        )
+        self.pdf_worker = Worker(
+            queues.PDF_REQUEST_QUEUE,
+            self.pdf_processor,
+            {
+                **connection,
+                "autorun": False,
+                "concurrency": pdf.concurrency,
+                "lockDuration": self._limits.lock_duration_ms,
+                "stalledInterval": self._limits.stalled_interval_ms,
+                "maxStalledCount": 0,
+                "removeOnComplete": dict(queues.PDF_REQUEST_KEEP),
+                "removeOnFail": dict(queues.PDF_REQUEST_KEEP),
+                **self._worker_options,
+            },
+        )
+        self.pdf_worker.on("error", _log_worker_error)
+        self.pdf_worker.on("failed", _log_job_failed)
+        self._pdf_run_task = asyncio.create_task(
+            self.pdf_worker.run(), name="pdf-extraction-worker"
+        )
+        self._pdf_run_task.add_done_callback(self._run_finished)
 
     def _run_finished(self, task: "asyncio.Task[Any]") -> None:
         if self._stopping:
@@ -184,16 +269,20 @@ class ConsumerService:
         if self._settings.consumer_enabled:
             self._start_consumer()
         live = self._settings.live
+        pdf = self._settings.pdf
         # 판정은 공급자 이름과 AI 쪽 켜짐 여부만 남긴다(키 값은 남기지 않는다, CR3 NFR5.2).
         logger.info(
             "분석 소비자 기동: consumer=%s prefix=%s concurrency=%s mock=%s "
-            "judgementProvider=%s aiSide=%s",
+            "judgementProvider=%s aiSide=%s pdf=%s",
             "enabled" if self._settings.consumer_enabled else "disabled",
             self._settings.prefix,
             self._settings.concurrency,
             self._settings.mock_enabled,
             "-" if live is None else live.judgement_provider,
             "on" if live is not None and live.ai_side else "off",
+            f"enabled(concurrency={pdf.concurrency})"
+            if pdf is not None
+            else "disabled",
         )
         stop_wait = asyncio.create_task(self._stop_requested.wait())
         done, _ = await asyncio.wait(
@@ -215,28 +304,41 @@ class ConsumerService:
 
         self._stopping = True
         logger.info("종료 시작")
-        worker, processor = self.worker, self.processor
-        if worker is not None and processor is not None:
-            processor.begin_stop()
+        pairs = self._processors()
+        if pairs:
+            for _, processor in pairs:
+                processor.begin_stop()
             await _bounded(
-                worker.pause(do_not_wait_active=True),
+                asyncio.gather(
+                    *(worker.pause(do_not_wait_active=True) for worker, _ in pairs)
+                ),
                 min(self._limits.pause, remaining()),
             )
-            processor.abort_active()
-            if not await _until(lambda: processor.active == 0, remaining()):
+            for _, processor in pairs:
+                processor.abort_active()
+            if not await _until(
+                lambda: all(processor.active == 0 for _, processor in pairs),
+                remaining(),
+            ):
                 return self._hard_stop()
             # close()는 부른 순간의 처리 작업만 기다린다. 멈추기 직전에 꺼낸 작업의 처리와 실패 기록
             # (WORKER_STOPPING)이 끝나기 전에 연결을 닫지 않도록, BullMQ의 진행 작업이 비기를 먼저 기다린다.
-            if not await _until(lambda: _bullmq_idle(worker), remaining()):
+            if not await _until(
+                lambda: all(_bullmq_idle(worker) for worker, _ in pairs), remaining()
+            ):
                 return self._hard_stop()
-            if self.receipts is not None:
-                await self.receipts.cancel_all()
-            close = asyncio.create_task(worker.close())
+            for watcher in (self.receipts, self.pdf_receipts):
+                if watcher is not None:
+                    await watcher.cancel_all()
+            close = asyncio.ensure_future(
+                asyncio.gather(*(worker.close() for worker, _ in pairs))
+            )
             done, _ = await asyncio.wait({close}, timeout=remaining())
             if not done:
                 return self._hard_stop()
-            if self._run_task is not None:
-                await asyncio.wait({self._run_task}, timeout=remaining())
+            for task in (self._run_task, self._pdf_run_task):
+                if task is not None:
+                    await asyncio.wait({task}, timeout=remaining())
             if self._output_queue is not None:
                 await _bounded(self._output_queue.close(), remaining())
         if self.server is not None:
@@ -252,8 +354,8 @@ class ConsumerService:
             "종료 상한(%s초)을 넘겨 남은 자식을 강제 종료하고 끝냄",
             self._limits.shutdown,
         )
-        if self.processor is not None:
-            self.processor.kill_all()
+        for _, processor in self._processors():
+            processor.kill_all()
         for handler in logging.getLogger().handlers:
             handler.flush()
         self._hard_exit(1)
@@ -296,6 +398,10 @@ def _log_worker_error(error: BaseException, *_: Any) -> None:
 
 
 def _log_job_failed(job: Any, error: BaseException) -> None:
-    code = error.code if isinstance(error, ProcessingAborted) else type(error).__name__
+    code = (
+        error.code
+        if isinstance(error, ProcessingAborted | PdfProcessingAborted)
+        else type(error).__name__
+    )
     job_id = job.id if queues.is_uuid(getattr(job, "id", None)) else "<형식 오류>"
     logger.info("요청 작업 실패 기록: jobId=%s code=%s", job_id, code)

@@ -5,12 +5,14 @@ description = "CatchU 수집·분석 worker 실행 기반"
 requires-python = "==3.12.10"
 dependencies = [
     "anthropic==1.13.0",
+    "boto3==1.43.126",
     "bullmq==3.3.0",
     "fastapi==0.141.1",
     "httpcore2==2.13.0",
     "httpx2==2.13.0",
     "jsonschema==4.26.0",
     "openai==3.46.0",
+    "pypdf==7.0.0",
     "pyyaml==6.0.3",
     "redis==7.4.1",
     "referencing==0.37.0",
@@ -46,6 +48,11 @@ strict = true
 # bullmq(Python)는 형식 정보(py.typed)를 싣지 않는다. 소비자 서비스(app/consumer/service.py)만 쓴다.
 [[tool.mypy.overrides]]
 module = ["bullmq", "bullmq.*"]
+ignore_missing_imports = true
+
+# boto3·botocore도 형식 정보를 싣지 않는다. PDF 원본 읽기(app/pdf_extraction/reader.py)만 쓴다(types-boto3류는 들이지 않음).
+[[tool.mypy.overrides]]
+module = ["boto3", "boto3.*", "botocore", "botocore.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
