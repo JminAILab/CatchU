@@ -51,10 +51,9 @@
    - `iam-trust.json`의 `ACCOUNT_ID`를 바꿔 `aws iam create-role --role-name catchu-github-deploy --assume-role-policy-document file://…`로 만든다. 역할 설명은 영문만 받는다.
    - `iam-deploy.json`의 `ACCOUNT_ID`·`INSTANCE_ID`를 바꿔 `aws iam put-role-policy --role-name catchu-github-deploy --policy-name catchu-github-deploy --policy-document file://…`로 붙인다.
 4. SSM 문서: `aws ssm create-document --name catchu-dev-deploy --document-type Command --document-format YAML --content file://deploy/dev-server/cd/ssm-document.yaml`
-5. GitHub environment `dev-server`: 배포 브랜치를 `main`으로 제한하고 변수 세 개를 넣는다. 비밀값이 아니므로 secrets가 아니라 variables에 둔다.
-   - `AWS_DEPLOY_ROLE_ARN`
-   - `DEV_SERVER_DOMAIN`
-   - `DEV_SERVER_INSTANCE_ID`
+5. GitHub environment `dev-server`: 배포 브랜치를 `main`으로 제한하고 값 세 개를 넣는다. 역할 주소와 서버 ID는 키가 아니지만 secrets에 둔다. variables에 두면 계정 번호와 서버 ID가 실행 로그에 그대로 찍히기 때문이다. 도메인은 공개 주소라 variables에 둔다.
+   - secrets: `AWS_DEPLOY_ROLE_ARN`, `DEV_SERVER_INSTANCE_ID`
+   - variables: `DEV_SERVER_DOMAIN`
 
 `ssm-document.yaml`을 바꾸면 AWS 문서도 갱신한다. `aws ssm update-document --name catchu-dev-deploy --document-version '$LATEST' --document-format YAML --content file://…`로 올린 뒤, `aws ssm update-document-default-version --name catchu-dev-deploy --document-version <새 판>`으로 기본 판을 바꾼다. `server-deploy.sh`·`redact.py`는 묶음에 들어가므로 따로 올리지 않는다.
 
