@@ -61,7 +61,7 @@ rules:
     category: policy
     applies_to: RevisitFacts
     trigger: 판정을 시작할 때
-    logic: 켜진 종류의 상수 목록(기본은 다섯 모두)에 든 규칙만 돈다. FR15.4 측정으로 버리는 규칙은 이 목록에서 빼는 코드 변경으로 끈다. 환경 변수나 화면 설정은 두지 않는다.
+    logic: 켜진 종류의 상수 목록에 든 규칙만 돈다. FR15.4 측정으로 버리는 규칙은 이 목록에서 빼는 코드 변경으로 끈다. 환경 변수나 화면 설정은 두지 않는다. (2026-11-11 Build and Test 덧붙임) TheMe 측정(분모 Catch 46)으로 5% 미만인 EXTENSION_CHANGED(1개, 2.2%)·REVERTED(0)·TEST_FILES_PRESENT(0)를 껐다. 켜진 것은 REWORKED_LINES(19개, 41.3%)·MOVED_FILE(4개, 8.7%)이다. 꺼진 규칙의 판정 함수·계약 kind 값·web 문장은 남긴다.
     violation: 해당 없음
     source: FR15.4
   - id: BR2.5
@@ -83,7 +83,7 @@ rules:
       쓰는 커밋(BR2.2)을 커밋 순서대로 읽는다. 파일마다 patch의 '+' 줄 글자를, '-' 줄 글자를 앞뒤 공백을 떼고 본다. 글자나 숫자가 하나도 없는 줄(빈 줄, 괄호·쉼표만 있는 줄)은 보지 않는다.
       앞 커밋이 넣은 줄은 (경로, 줄 글자)마다 그 줄을 넣은 가장 늦은 앞 커밋으로 기억한다. 커밋이 파일 이름을 바꾸면(renamed, previous_path) 옛 경로의 기억을 새 경로로 잇는다.
       IF 뒤 커밋 L의 modified·renamed 파일 F의 '-' 줄 글자가 F의 경로(또는 previous_path)에서 앞 커밋 E가 넣은 줄로 기억돼 있다 THEN (E, L, F의 경로)마다 사실 하나를 만든다. paths = [F의 경로], commits = [E, L].
-      지운 파일(removed)은 이 규칙에서 보지 않는다. IF L이 E를 되돌린 커밋이다(BR3.4) THEN 그 쌍은 만들지 않는다. 줄 글자는 맞춰 보기에만 쓰고 결과에 담지 않는다.
+      지운 파일(removed)은 이 규칙에서 보지 않는다. IF 되돌림 규칙(BR3.4)이 켜져 있고 L이 E를 되돌린 커밋이다 THEN 그 쌍은 만들지 않는다. 되돌림이 꺼져 있으면 그 쌍도 손으로 되돌린 것처럼 다시 고친 곳으로 만든다(가정 A2, 2026-11-11 Build and Test 덧붙임: FR15.4로 되돌림을 끈 뒤 git revert 쌍이 아무 사실도 남기지 않던 빈틈). 줄 글자는 맞춰 보기에만 쓰고 결과에 담지 않는다.
     violation: 해당 없음
     source: FR12.1 (a)
   - id: BR3.2

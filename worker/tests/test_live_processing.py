@@ -210,6 +210,29 @@ def assert_one_failure_line(caplog: pytest.LogCaptureFixture, error: str) -> Non
     assert "tests/test_beta.py" not in line and BETA_TEST.sha not in line
 
 
+@pytest.fixture
+def all_revisit_rules(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 아래 연결 시험의 합성 PR은 시험 파일 사실을 만든다. 운영에서는 FR15.4로 그 규칙을 껐으므로
+    # 연결(부르기·실패 갈래·생성 뒤 유지)을 보려고 다섯 규칙을 모두 켠다.
+    monkeypatch.setattr(revisit, "ENABLED_KINDS", frozenset(revisit.KIND_ORDER))
+
+
+def test_nc3_fr15_4_disabled_test_file_rule_makes_no_fact_in_live_path(
+    context_api: ApiReply, caplog: pytest.LogCaptureFixture
+) -> None:
+    context_api.payload = live_payload()
+    parts = Parts(TWO_PULLS)
+
+    result = result_of(run_live(live_message(), parts.assembly(context_api.base_url)))
+
+    assert result["outcome"] == "SUCCEEDED"
+    for entry in by_own_commit(result).values():
+        assert entry["revisitFacts"] == []
+        assert entry["firstWorkAt"]
+    assert revisit_failure_lines(caplog) == []
+
+
+@pytest.mark.usefixtures("all_revisit_rules")
 def test_nc3_facts_and_work_times_survive_generation(
     context_api: ApiReply, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -235,6 +258,7 @@ def test_nc3_facts_and_work_times_survive_generation(
     assert revisit_failure_lines(caplog) == []
 
 
+@pytest.mark.usefixtures("all_revisit_rules")
 def test_nc3_nfr8_3_rule_exception_empties_only_that_candidate(
     context_api: ApiReply,
     caplog: pytest.LogCaptureFixture,
@@ -263,6 +287,7 @@ def test_nc3_nfr8_3_rule_exception_empties_only_that_candidate(
     assert_one_failure_line(caplog, "RuntimeError")
 
 
+@pytest.mark.usefixtures("all_revisit_rules")
 def test_nc3_nfr8_3_missing_record_empties_only_that_candidate(
     context_api: ApiReply,
     caplog: pytest.LogCaptureFixture,
@@ -295,6 +320,7 @@ def test_nc3_nfr8_3_missing_record_empties_only_that_candidate(
     assert_one_failure_line(caplog, "RevisitFactsDefect")
 
 
+@pytest.mark.usefixtures("all_revisit_rules")
 def test_nc3_nfr8_3_spec_breaking_result_empties_only_that_candidate(
     context_api: ApiReply,
     caplog: pytest.LogCaptureFixture,

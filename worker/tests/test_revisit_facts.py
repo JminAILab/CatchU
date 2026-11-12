@@ -103,9 +103,10 @@ def facts_of(
 ) -> tuple[RevisitFact, ...]:
     records = {record.sha: record for record in commits}
     shas = list(records) if own is None else list(own)
-    if enabled is None:
-        return revisit_facts(shas, records)
-    return revisit_facts(shas, records, enabled=frozenset(enabled))
+    # 규칙마다의 동작을 보는 시험이라 따로 정하지 않으면 다섯 규칙을 모두 켠다. 운영의 켜진 종류(FR15.4로
+    # 둘만 남김)는 test_fr15_4_only_rework_and_move_are_enabled_by_default가 본다.
+    kinds_on = revisit.KIND_ORDER if enabled is None else enabled
+    return revisit_facts(shas, records, enabled=frozenset(kinds_on))
 
 
 def kinds(facts: Iterable[RevisitFact]) -> list[str]:
@@ -321,6 +322,21 @@ def test_s7_ac9_3_1_revert_of_same_candidate_commit_without_rework_pair() -> Non
     assert facts == (RevisitFact("REVERTED", (), (sha(2), sha(1))),)
 
 
+def test_a2_revert_pair_is_rework_when_revert_rule_is_off() -> None:
+    # 되돌림이 꺼지면(FR15.4) git revert로 되돌린 쌍도 손으로 되돌린 것처럼 다시 고친 곳으로 남는다.
+    target = commit(1, [changed("a.py", "added", added=["value = 1"])])
+    reverting = commit(
+        2,
+        [changed("a.py", removed=["value = 1"])],
+        message=f'Revert "합성"\n\nThis reverts commit {sha(1)}.',
+    )
+    without_revert = [kind for kind in revisit.KIND_ORDER if kind != "REVERTED"]
+
+    facts = facts_of([target, reverting], enabled=without_revert)
+
+    assert facts == (RevisitFact("REWORKED_LINES", ("a.py",), (sha(1), sha(2))),)
+
+
 def test_s7_revert_of_other_candidate_or_short_or_issue_reference_is_ignored() -> None:
     other_target = sha(77)
     messages = [
@@ -466,7 +482,29 @@ def test_br2_4_disabled_rules_make_no_facts() -> None:
     assert kinds(facts_of(commits, enabled=without_rework)) == ["EXTENSION_CHANGED"]
     # 확장자 바꿈이 꺼져도 그 쌍이 옮긴 곳으로 바뀌지 않는다.
     assert kinds(facts_of(commits, enabled=without_extension)) == ["REWORKED_LINES"]
-    assert revisit.ENABLED_KINDS == frozenset(revisit.KIND_ORDER)
+
+
+def test_fr15_4_only_rework_and_move_are_enabled_by_default() -> None:
+    # 2026-11-11 TheMe 측정(분모 46): 확장자 바꿈 2.2%·되돌림 0·시험 파일 있음 0이 5% 미만이라 껐다.
+    assert revisit.ENABLED_KINDS == frozenset({"REWORKED_LINES", "MOVED_FILE"})
+    first = commit(1, [changed("a.py", "added", added=["value = 1"])])
+    second = commit(
+        2,
+        [
+            changed("a.py", removed=["value = 1"]),
+            changed("src/u.ts", "renamed", previous="src/u.js"),
+            changed("src/old/b.py", "renamed", previous="src/b.py"),
+            changed("src/__tests__/a.test.ts", added=["it()"]),
+        ],
+    )
+    third = commit(3, message=f"This reverts commit {sha(2)}.")
+    records = {record.sha: record for record in (first, second, third)}
+
+    # enabled를 주지 않으면 운영 상수를 따른다.
+    assert kinds(revisit_facts(list(records), records)) == [
+        "REWORKED_LINES",
+        "MOVED_FILE",
+    ]
 
 
 def test_result_holds_only_kind_paths_and_commits() -> None:

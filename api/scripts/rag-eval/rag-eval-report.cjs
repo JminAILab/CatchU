@@ -13,7 +13,7 @@ const locationText = (location) => `${location.publishedItemId} ${location.field
 /**
  * 저장소 기록(Markdown) 본문. 받은 결과에서 건수·비율·위치만 꺼내 쓰고 글 칸은 읽지 않는다.
  * summary: { date, targetVersion, mode, questionCount, hitRateAt5, hitRateAt8, hitRateAt12, passedItems, droppedItems,
- *   evidencePassRate, missedHitLocations: [{ questionNo, locations }], jd: { splitter, rows: [{ requirementNo, searchBased, fullInput }] } | null }
+ *   evidencePassRate, answerFailedQuestions: [questionNo], missedHitLocations: [{ questionNo, locations }], jd: { splitter, rows: [{ requirementNo, searchBased, fullInput }] } | null }
  */
 function buildRepositoryRecord(summary) {
   const lines = [
@@ -34,6 +34,7 @@ function buildRepositoryRecord(summary) {
     `- 통과 항목: ${summary.passedItems}`,
     `- 버린 항목: ${summary.droppedItems}("맞는데 버려진 항목"의 상한값)`,
     `- 근거 통과율: ${percent(summary.evidencePassRate)}`,
+    `- 답 실패 질문(답 0개, NO_ITEMS): ${summary.answerFailedQuestions.length === 0 ? '없음' : summary.answerFailedQuestions.map((no) => `${no}번`).join(', ')}`,
     '',
     '## 8개 기준 비적중 질문의 조각 위치',
     '',

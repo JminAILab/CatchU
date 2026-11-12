@@ -9,6 +9,7 @@ BR2.1~BR2.5·BR3.1~BR3.5를 따른다.
   좁은 산출물 목록(잠금 파일·빌드 폴더·.min.js·AI 하네스·지시 파일·비밀 경로)은 판정에서만 뺀다(BR2.3).
 - 규칙 다섯: 다시 고친 곳(BR3.1), 옮긴 곳(BR3.2), 확장자 바꿈(BR3.3), 되돌림(BR3.4), 시험 파일 있음(BR3.5).
   켜진 종류는 `ENABLED_KINDS` 상수로 정한다(BR2.4). 측정으로 버리는 규칙은 이 상수에서 빼는 코드 변경으로 끈다.
+  2026-11-11 FR15.4 측정으로 확장자 바꿈·되돌림·시험 파일 있음을 껐다. 규칙 함수는 남아 있고 시험이 따로 본다.
 - 상한: 종류 순서·커밋 순서로 늘어놓고 앞의 30개, 사실마다 경로·커밋 20개, 경로 1,024자(BR2.5).
 - 계산 구조(NFR1.3): 쓰는 커밋을 커밋 순서로 한 번 훑고, 다시 고친 곳은 (경로, 줄 글자) 사전을, 옮긴 곳은
   내용 식별값 사전을 쓴다. 커밋 쌍마다 다시 훑지 않는다. 줄 글자는 맞춰 보기에만 쓰고 결과에 담지 않는다.
@@ -41,8 +42,9 @@ KIND_ORDER: tuple[RevisitKind, ...] = (
     "REVERTED",
     "TEST_FILES_PRESENT",
 )
-# 켜진 종류(BR2.4). 기본은 다섯 모두다. 환경 변수나 화면 설정은 두지 않는다.
-ENABLED_KINDS: frozenset[RevisitKind] = frozenset(KIND_ORDER)
+# 켜진 종류(BR2.4). 환경 변수나 화면 설정은 두지 않는다. 2026-11-11 TheMe 측정(FR15.4, 분모 Catch 46)에서
+# 확장자 바꿈 1개(2.2%)·되돌림 0·시험 파일 있음 0이 5% 미만이라 셋을 껐다. 다시 고침 19개(41.3%)·옮김 4개(8.7%)만 남는다.
+ENABLED_KINDS: frozenset[RevisitKind] = frozenset({"REWORKED_LINES", "MOVED_FILE"})
 
 MAX_FACTS = 30
 MAX_ITEMS = 20
@@ -198,8 +200,13 @@ def reworked_lines(
     """BR3.1 다시 고친 곳: 뒤 커밋이 앞 커밋이 넣은 줄과 글자가 같은 줄을 같은 파일에서 지웠다."""
     if "REWORKED_LINES" not in enabled:
         return []
-    # 되돌린 쌍(앞 = 되돌려진 커밋, 뒤 = 되돌린 커밋)은 다시 고친 곳으로 만들지 않는다.
-    revert_pairs = frozenset((target, source) for source, target in material.reverts)
+    # 되돌린 쌍(앞 = 되돌려진 커밋, 뒤 = 되돌린 커밋)은 되돌림이 켜져 있을 때만 다시 고친 곳에서 뺀다.
+    # 되돌림이 꺼지면 손으로 되돌린 것처럼 다시 고친 곳으로 보인다(가정 A2, FR15.4로 되돌림을 끈 뒤).
+    revert_pairs = (
+        frozenset((target, source) for source, target in material.reverts)
+        if "REVERTED" in enabled
+        else frozenset()
+    )
     # 경로 → 줄 글자 → 그 줄을 넣은 가장 늦은 앞 커밋. 후보 하나가 끝나면 버린다.
     memory: dict[str, dict[str, str]] = {}
     found: dict[tuple[str, str, str], None] = {}
@@ -409,7 +416,7 @@ def revisit_facts(
     own_commit_shas: Sequence[str],
     records: Mapping[str, CommitRecord],
     *,
-    enabled: Collection[RevisitKind] = ENABLED_KINDS,
+    enabled: Collection[RevisitKind] | None = None,
 ) -> tuple[RevisitFact, ...]:
     """후보 하나의 다시 볼 곳 사실(0~30개, 종류 순서·커밋 순서).
 
@@ -417,7 +424,8 @@ def revisit_facts(
     결과가 규격을 어기면 RevisitFactsDefect를 낸다.
     """
     material = _material(own_commit_shas, records)
-    kinds = frozenset(enabled)
+    # 부를 때 상수를 읽는다(정의할 때 묶지 않음). 시험이 켜진 종류를 바꿔 끼워 연결을 본다.
+    kinds = frozenset(ENABLED_KINDS if enabled is None else enabled)
     facts = [
         fact for rule in RULES for fact in rule(material, kinds) if fact.kind in kinds
     ]
