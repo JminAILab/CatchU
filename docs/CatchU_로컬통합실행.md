@@ -172,7 +172,7 @@ docker stop catchu-db
 
 위 1~5단계는 개발용 로그인과 합성 자료까지다. 이 절은 내 컴퓨터에서 실제 Google 로그인 → GitHub 연결 → 공개 저장소 분석 → Catch 확인까지 간다. 큐(Valkey)와 DB는 컨테이너 두 개로 띄우고, 파일은 내 컴퓨터 폴더에 저장한다. AWS(S3 등)는 쓰지 않는다. 실행 도구는 `scripts/local-live/`에 있다.
 
-**확인 상태(2026-11-12).** macOS에서 가짜 키로 환경 만들기·이주·세 서비스 기동·큐 연결까지 확인했다. 같은 구성의 실제 분석은 2026-11-03에 팀장 컴퓨터(macOS)에서 한 번 끝까지 갔다([#450 기록][c450]). 이 도구로 실제 키를 넣어 끝까지 가는 것과 Windows(WSL2)에서의 실행, 아래 키 발급 화면 순서는 아직 확인 전이다.
+**확인 상태(2026-11-12).** macOS에서 가짜 키로 환경 만들기·이주·세 서비스 기동·큐 연결까지 확인했다. 같은 구성의 실제 분석은 2026-11-03에 팀장 컴퓨터(macOS)에서 한 번 끝까지 갔다([#450 기록][c450]). 같은 날 팀장이 Windows 노트북(WSL2 Ubuntu)에서 키 세 가지를 새로 발급해 이 순서대로 공개 저장소 분석까지 끝냈다. 도구는 고치지 않고 돌았다. 다만 세 서비스를 터미널 세 개가 아니라 AI 도구의 백그라운드로 띄워서 `Ctrl+C` 종료와 「정리」의 삭제 명령, 판정을 켠 분석, 다시 켠 뒤 컨테이너가 스스로 뜨는지는 Windows에서 확인하지 않았다.
 
 ### 알고 시작할 것
 
@@ -187,10 +187,12 @@ docker stop catchu-db
 Windows에서는 **WSL2(Ubuntu) 안에서** 아래를 모두 실행한다. worker의 큐 소비자가 종료 신호를 Windows에서 지원되지 않는 방식으로 받아(`worker/app/consumer/service.py`의 `add_signal_handler`) PowerShell에서는 뜨지 않기 때문이다.
 
 1. 관리자 PowerShell에서 `wsl --install`로 WSL2와 Ubuntu를 설치하고 다시 시작한다.
-2. Docker Desktop의 설정에서 WSL 연동(Resources → WSL integration)에 Ubuntu를 켠다. Ubuntu 터미널에서 `docker ps`가 되면 된다.
-3. Ubuntu 안에 Node.js·npm과 uv를 「준비물」의 버전으로 설치한다.
+2. Docker Desktop의 설정에서 WSL 연동(Settings → Resources → WSL integration)에 Ubuntu를 켜고 Apply를 누른다. Ubuntu 터미널을 새로 열어 `docker ps`가 표 머리줄이라도 내면 된다.
+3. Ubuntu 안에 Node.js·npm과 uv를 「준비물」의 버전으로 설치한다. Node.js는 nvm으로 설치한다. `which npm`이 `/mnt/c/`로 시작하면 Windows의 npm이 잡힌 것이라 쓰지 못한다. uv는 설치한 뒤 터미널을 새로 열어야 잡힌다.
 4. 저장소를 Ubuntu의 홈 폴더 아래에 받는다. `/mnt/c/` 아래는 느려서 쓰지 않는다.
 5. 브라우저는 Windows에서 그대로 `http://localhost:3000`을 연다.
+
+`sudo`가 묻는 비밀번호는 Ubuntu를 처음 설치할 때 정한 Ubuntu 계정의 비밀번호다. 잊었으면 PowerShell에서 `wsl -u root passwd <Ubuntu 사용자 이름>`으로 다시 정한다.
 
 ### 내 키 세 가지
 
@@ -198,7 +200,7 @@ Windows에서는 **WSL2(Ubuntu) 안에서** 아래를 모두 실행한다. worke
 
 | 키 | 발급하는 곳 | 넣을 값 |
 |---|---|---|
-| Claude API 키 | Claude 개발자 콘솔에서 결제 수단을 등록하고 API 키를 만든다 | `CATCHU_GENERATION_API_KEY` |
+| Claude API 키 | Claude 개발자 콘솔에서 결제 수단을 등록하고 API 키를 만든다. 키 문자열만 있으면 되고, 콘솔이 권하는 CLI 로그인은 하지 않아도 된다 | `CATCHU_GENERATION_API_KEY` |
 | GitHub OAuth App | GitHub → Settings → Developer settings → **OAuth Apps** → New OAuth App. Homepage URL `http://localhost:3000`, Authorization callback URL `http://localhost:3000/github/callback`. 만든 뒤 client secret을 새로 만든다 | `GITHUB_OAUTH_CLIENT_ID` · `GITHUB_OAUTH_CLIENT_SECRET` |
 | Google OAuth 클라이언트 | Google Cloud 콘솔에서 프로젝트를 만들고, OAuth 동의 화면을 외부·테스트 상태로 두고 테스트 사용자에 내 Google 계정을 넣는다. 사용자 인증 정보에서 「웹 애플리케이션」 OAuth 클라이언트를 만들고 승인된 리디렉션 URI에 `http://localhost:3000/google/callback`을 넣는다 | `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` |
 
@@ -214,6 +216,8 @@ GitHub는 「GitHub Apps」가 아니라 「OAuth Apps」에서 만든다. GitHu
 (cd worker && uv sync --locked)
 ```
 
+`npm ci`가 내는 `allowScripts` 경고는 넘어가도 된다. 기동과 분석에 영향이 없었다.
+
 **1. 환경 만들기(처음 한 번).** 환경 폴더 `~/catchu-local-live/`와 컨테이너 `catchu-live-db`(127.0.0.1:55432)·`catchu-live-queue`(127.0.0.1:56379)를 만든다. 다시 실행해도 이미 있는 것은 건드리지 않는다. 위 1~5단계의 `catchu-db`·`api/.env`와는 따로다.
 
 ```sh
@@ -228,7 +232,7 @@ bash scripts/local-live/setup.sh
 bash scripts/local-live/migrate.sh
 ```
 
-**4. 띄우기.** 터미널 세 개에서 하나씩 띄운다. 로그는 화면에 나오지 않고 `~/catchu-local-live/logs/`에 쌓인다.
+**4. 띄우기.** 터미널 세 개에서 하나씩 띄운다. Claude Code 같은 AI 도구에 맡겨 백그라운드로 띄워도 되는데, 그 세션이 끝나면 서비스도 꺼질 수 있다. 로그는 화면에 나오지 않고 `~/catchu-local-live/logs/`에 쌓인다.
 
 ```sh
 bash scripts/local-live/run-api.sh
