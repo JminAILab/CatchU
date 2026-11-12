@@ -42,7 +42,7 @@ const { PdfMaterialStore } = require('../../dist/materials/pdf-material-store');
 const { PDF_EXTRACT_DISPATCHER } = require('../../dist/pdf-extraction/pdf-extract.dispatcher');
 const { PDF_EXTRACT_SCHEMA_VERSION, PDF_EXTRACTION_DEADLINE_MINUTES, pdfExtractMessageId } = require('../../dist/pdf-extraction/pdf-extraction-spec');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
-const { APP_SETTINGS, setEnv, startApp, expectError } = require('../u2/support.cjs');
+const { APP_SETTINGS, WEB_ORIGIN, setEnv, startApp, expectError } = require('../u2/support.cjs');
 
 // 로그 비노출 확인용 합성 문자열. 실제 사용자 자료가 아니다.
 const SECRET_TITLE = '[합성-PDF-제목-노출확인-7f3a]';
@@ -532,4 +532,113 @@ test('U-12: 추출 요청 발송이 실패하거나 예외를 던져도 201 PEND
   assertNoSecretsInLogs([SECRET_TITLE, SECRET_FILE_NAME, 'members/']);
   assert.equal((await rows()).length, 2);
   assert.ok(existsSync(filePath(member.memberId, again.body.pdfMaterialId)));
+});
+
+// #521 리뷰(Codex 지적 → 2026-11-12 팀장 결정): 탈퇴는 차단 → 회원 파일 삭제 → 자격정보 삭제 → 회원 행 삭제 순서라, 파일 삭제(2단계)와
+// 회원 행 삭제(4단계) 사이에 끝난 파일 쓰기는 행만 연쇄 삭제되고 원본이 남았다. 4단계가 한 트랜잭션에서 회원 행을 지운 뒤 회원 파일을
+// 한 번 더 지우고 커밋하도록 고쳤다(src/withdrawal/withdrawal.service.ts, 계약 C-06).
+// 아래 두 시험은 실제 시험 DB와 로컬 파일 저장소를 쓰고, 순서는 저장소 호출의 동기화 지점으로 고정한다(기다리는 시간으로 맞추지 않는다).
+const gate = () => { let open; const reached = new Promise((resolve) => { open = resolve; }); return { reached, open }; };
+const within = (promise, label) => Promise.race([promise,
+  new Promise((_, reject) => { const timer = setTimeout(() => reject(new Error(`동기화 지점에 닿지 못함: ${label}`)), 20000); timer.unref(); })]);
+/** 탈퇴의 2단계(그 회원 접두어의 첫 deletePrefix)가 끝난 자리에서 탈퇴를 멈춘다. 4단계 안의 두 번째 호출은 그대로 지나간다. */
+function pauseAfterFirstSweep(t, memberId) {
+  const swept = gate();
+  const release = gate();
+  let calls = 0;
+  const original = swap(t, storage, 'deletePrefix', async (...args) => {
+    const result = await original(...args);
+    if (String(args[0]) !== `members/${memberId}/`) return result;
+    calls += 1;
+    if (calls === 1) { swept.open(); await release.reached; }
+    return result;
+  });
+  return { swept, release, calls: () => calls };
+}
+async function filesUnder(memberId) {
+  const dir = join(fileRoot, 'members', memberId);
+  return existsSync(dir) ? (await readdir(dir, { recursive: true, withFileTypes: true })).filter((entry) => entry.isFile()).length : 0;
+}
+
+// 순서: 탈퇴가 세션 폐기·회원 파일 삭제(2단계)를 마치고 멈춤 → 같은 회원이 실제 로그인 경로(POST /v1/auth/dev-login)로 다시 로그인
+//   → 새 토큰으로 PDF를 올려 201(파일·행이 모두 생김) → 탈퇴가 이어져 4단계를 마침.
+// 기대: 탈퇴 204. 탈퇴 회원의 회원 행·PDF 행·세션 행과 원본 파일이 모두 없고, 다른 회원의 PDF 행과 파일은 그대로다.
+// 수정 전 결과: 업로드 201, 탈퇴 204, 원본 파일 1개가 남았다(U8 코드 요약 §20.2).
+test('#521: 탈퇴의 2단계 직후 다시 로그인해 올린 PDF의 파일과 행이 탈퇴가 끝난 뒤 남지 않고, 다른 회원의 PDF는 그대로다', async (t) => {
+  const other = await consentedMember();
+  const kept = await upload(server, other.token, { title: '다른 회원의 PDF' });
+  assert.equal(kept.status, 201);
+  const identity = `u8-member-${randomUUID()}`;
+  const leaving = await server.login(identity);
+  await server.app.get(AiConsentGate).record(leaving.memberId, AI_NOTICE_VERSION, new Date());
+  const before = await upload(server, leaving.token, { title: '탈퇴 전에 올린 PDF' });
+  assert.equal(before.status, 201);
+
+  const sweep = pauseAfterFirstSweep(t, leaving.memberId);
+  const withdrawing = send(server, leaving.token, { method: 'DELETE', path: '/me', headers: { Origin: WEB_ORIGIN } });
+  await within(sweep.swept.reached, '탈퇴가 2단계(회원 파일 삭제)를 마침');
+  assert.equal(await filesUnder(leaving.memberId), 0, '2단계가 그때까지의 원본을 지웠다');
+  expectError(await list(leaving.token), 401, 'AUTH_INVALID');
+
+  // 회원 행이 아직 있는 동안 다시 로그인해 새 PDF를 올린다. 파일과 행이 모두 생긴다.
+  const relogin = await within(send(server, null, { method: 'POST', path: '/auth/dev-login',
+    body: JSON.stringify({ memberId: identity }), headers: { 'Content-Type': 'application/json' } }), '재로그인 응답');
+  assert.equal(relogin.status, 200, relogin.text);
+  const late = await within(upload(server, relogin.body.accessToken, { title: '탈퇴 도중 올린 PDF' }), '탈퇴 도중 업로드 응답');
+  assert.equal(late.status, 201, late.text);
+  assert.equal(existsSync(filePath(leaving.memberId, late.body.pdfMaterialId)), true, '2단계 뒤에 쓴 원본이 저장소에 있다');
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM pdf_material WHERE member_id = $1', [leaving.memberId]))[0].n, 2);
+
+  sweep.release.open();
+  const withdrawn = await within(withdrawing, '탈퇴 응답');
+  assert.equal(withdrawn.status, 204, `탈퇴는 끝까지 간다: ${withdrawn.text}`);
+  assert.equal(sweep.calls(), 2, '회원 파일 삭제는 2단계와 4단계 안에서 한 번씩 불린다');
+
+  assert.deepEqual(await db.query('SELECT 1 FROM member_account WHERE member_id = $1', [leaving.memberId]), [], '탈퇴 회원 행이 없다');
+  assert.deepEqual(await db.query('SELECT 1 FROM pdf_material WHERE member_id = $1', [leaving.memberId]), [], '탈퇴 회원의 PDF 행이 없다');
+  assert.deepEqual(await db.query('SELECT 1 FROM auth_session WHERE member_id = $1', [leaving.memberId]), [], '탈퇴 회원의 세션 행이 없다');
+  assert.equal(await filesUnder(leaving.memberId), 0, '탈퇴 회원의 원본 파일이 저장소에 남지 않는다');
+  assert.deepEqual((await db.query('SELECT pdf_material_id AS id FROM pdf_material WHERE member_id = $1', [other.memberId])).map((row) => row.id),
+    [kept.body.pdfMaterialId], '다른 회원의 PDF 행은 그대로다');
+  assert.equal(existsSync(filePath(other.memberId, kept.body.pdfMaterialId)), true, '다른 회원의 원본 파일은 그대로다');
+  assertNoSecretsInLogs(['members/']);
+});
+
+// 순서: 업로드가 인증·검사를 지나 원본 저장 직전에 멈춤 → 탈퇴가 2단계를 마치고 멈춤 → 업로드가 원본을 저장하고 행까지 넣어 끝남
+//   → 탈퇴가 이어져 4단계를 마침. 재로그인 없이, 탈퇴 전에 이미 인증된 요청이 늦게 끝나는 경우다.
+// 기대: 업로드는 회원 행이 아직 있어 201로 끝나고, 탈퇴 204 뒤에는 그 파일과 행이 모두 없다. 다른 회원의 자료는 그대로다.
+test('#521: 탈퇴 전에 시작해 2단계 뒤에 끝난 업로드의 파일과 행도 탈퇴가 끝난 뒤 남지 않는다', async (t) => {
+  const other = await consentedMember();
+  const kept = await upload(server, other.token, { title: '다른 회원의 PDF' });
+  assert.equal(kept.status, 201);
+  const leaving = await consentedMember();
+
+  const uploadAtPut = gate();
+  const releasePut = gate();
+  const originalPut = swap(t, storage, 'put', async (...args) => {
+    if (!String(args[0]).startsWith(`members/${leaving.memberId}/`)) return originalPut(...args);
+    uploadAtPut.open();
+    await releasePut.reached;
+    return originalPut(...args);
+  });
+  const sweep = pauseAfterFirstSweep(t, leaving.memberId);
+
+  const uploading = upload(server, leaving.token, { title: '탈퇴 직전에 올린 PDF' });
+  await within(uploadAtPut.reached, '업로드가 저장 직전');
+  const withdrawing = send(server, leaving.token, { method: 'DELETE', path: '/me', headers: { Origin: WEB_ORIGIN } });
+  await within(sweep.swept.reached, '탈퇴가 2단계(회원 파일 삭제)를 마침');
+  releasePut.open();
+  const uploaded = await within(uploading, '업로드 응답');
+  assert.equal(uploaded.status, 201, uploaded.text);
+  assert.equal(await filesUnder(leaving.memberId), 1, '2단계 뒤에 쓴 원본이 저장소에 있다');
+  sweep.release.open();
+  const withdrawn = await within(withdrawing, '탈퇴 응답');
+  assert.equal(withdrawn.status, 204, `탈퇴는 끝까지 간다: ${withdrawn.text}`);
+
+  assert.deepEqual(await db.query('SELECT 1 FROM member_account WHERE member_id = $1', [leaving.memberId]), [], '탈퇴 회원 행이 없다');
+  assert.deepEqual(await db.query('SELECT 1 FROM pdf_material WHERE member_id = $1', [leaving.memberId]), [], '탈퇴 회원의 PDF 행이 없다');
+  assert.equal(await filesUnder(leaving.memberId), 0, '탈퇴 회원의 원본 파일이 저장소에 남지 않는다');
+  assert.deepEqual((await db.query('SELECT pdf_material_id AS id FROM pdf_material WHERE member_id = $1', [other.memberId])).map((row) => row.id),
+    [kept.body.pdfMaterialId], '다른 회원의 PDF 행은 그대로다');
+  assert.equal(existsSync(filePath(other.memberId, kept.body.pdfMaterialId)), true, '다른 회원의 원본 파일은 그대로다');
 });
