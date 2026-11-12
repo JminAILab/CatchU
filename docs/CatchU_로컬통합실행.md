@@ -6,7 +6,7 @@
 
 - 켜는 순서는 **PostgreSQL → api → worker → web**, 끄는 순서는 그 반대다.
 - 포트: PostgreSQL `5432`, api `3001`, worker `8000`, web `3000`. api 테스트용 DB는 `5433`이다.
-- api ↔ PostgreSQL과 web의 개발용 로그인·공통 API 호출을 연결한다. worker는 아직 api와 연결 설정이 없고(큐는 [#77][i77]), 실제 기능 API와의 연결은 각 기능 작업에서 확인한다.
+- api ↔ PostgreSQL과 web의 개발용 로그인·공통 API 호출을 연결한다. 1~5단계의 worker는 상태 확인만 뜨고 api와 연결하지 않는다. 큐를 붙여 실제 분석까지 가는 순서는 「실제 분석까지 띄우기」에 따로 있다.
 - 비밀값은 api의 `AUTH_JWT_SECRET` 하나다. 각자 만들어 `api/.env`에만 두고 화면·로그·PR에 남기지 않는다.
 
 ## 준비물
@@ -168,9 +168,123 @@ docker stop catchu-db
 | 새 브랜치를 받은 뒤 API가 테이블 관련 오류를 낸다 | 마이그레이션을 적용하지 않았을 수 있다. api를 끄고 `npm run migration:run`을 한 뒤 다시 켠다 |
 | web 화면에서 api 호출이 CORS 오류로 막힌다 | `CORS_ALLOWED_ORIGINS`가 web을 여는 출처와 정확히 같은지 확인하고 api를 다시 켠다. web의 `NEXT_PUBLIC_API_BASE_URL`도 api 주소와 맞춘다 |
 
+## 실제 분석까지 띄우기
+
+위 1~5단계는 개발용 로그인과 합성 자료까지다. 이 절은 내 컴퓨터에서 실제 Google 로그인 → GitHub 연결 → 공개 저장소 분석 → Catch 확인까지 간다. 큐(Valkey)와 DB는 컨테이너 두 개로 띄우고, 파일은 내 컴퓨터 폴더에 저장한다. AWS(S3 등)는 쓰지 않는다. 실행 도구는 `scripts/local-live/`에 있다.
+
+**확인 상태(2026-11-12).** macOS에서 가짜 키로 환경 만들기·이주·세 서비스 기동·큐 연결까지 확인했다. 같은 구성의 실제 분석은 2026-11-03에 팀장 컴퓨터(macOS)에서 한 번 끝까지 갔다([#450 기록][c450]). 이 도구로 실제 키를 넣어 끝까지 가는 것과 Windows(WSL2)에서의 실행, 아래 키 발급 화면 순서는 아직 확인 전이다.
+
+### 알고 시작할 것
+
+- 팀원이 **본인 키로 공개 저장소를 분석하는 것은 팀장 허가 없이 한다**(2026-11-12 팀장 결정). 비용은 본인 Claude 계정에서 나간다. 2026-11-03에 작은 저장소 하나가 2분 26초, 약 0.04달러였다(Catch 46개). 큰 저장소의 시간과 비용은 아직 재지 않았다.
+- 분석하면 그 저장소의 바뀐 줄이 내 Claude 계정(Anthropic)으로 전송된다. 임베딩은 합성 제공자로 떠서 Voyage로는 아무것도 보내지 않는다.
+- 비공개 저장소는 접수에서 거부된다(`403`). 공개 저장소만 분석한다.
+- 로그(`~/catchu-local-live/logs/`)에는 실제 자료가 남는다. 로그와 키를 이슈·PR·대화·AI 도구에 붙이지 않는다. 오류를 물을 때는 오류 문구 한 줄만 옮긴다.
+- 개발용 로그인으로는 실제 분석을 할 수 없다. 개발용 로그인은 합성 고지와 합성 저장소만 받는다. 그래서 Google 로그인이 필요하다.
+
+### Windows 준비
+
+Windows에서는 **WSL2(Ubuntu) 안에서** 아래를 모두 실행한다. worker의 큐 소비자가 종료 신호를 Windows에서 지원되지 않는 방식으로 받아(`worker/app/consumer/service.py`의 `add_signal_handler`) PowerShell에서는 뜨지 않기 때문이다.
+
+1. 관리자 PowerShell에서 `wsl --install`로 WSL2와 Ubuntu를 설치하고 다시 시작한다.
+2. Docker Desktop의 설정에서 WSL 연동(Resources → WSL integration)에 Ubuntu를 켠다. Ubuntu 터미널에서 `docker ps`가 되면 된다.
+3. Ubuntu 안에 Node.js·npm과 uv를 「준비물」의 버전으로 설치한다.
+4. 저장소를 Ubuntu의 홈 폴더 아래에 받는다. `/mnt/c/` 아래는 느려서 쓰지 않는다.
+5. 브라우저는 Windows에서 그대로 `http://localhost:3000`을 연다.
+
+### 내 키 세 가지
+
+각자 발급한다. 다른 사람의 키를 받아 쓰지 않는다. 화면 이름은 발급 사이트가 바꿀 수 있다.
+
+| 키 | 발급하는 곳 | 넣을 값 |
+|---|---|---|
+| Claude API 키 | Claude 개발자 콘솔에서 결제 수단을 등록하고 API 키를 만든다 | `CATCHU_GENERATION_API_KEY` |
+| GitHub OAuth App | GitHub → Settings → Developer settings → **OAuth Apps** → New OAuth App. Homepage URL `http://localhost:3000`, Authorization callback URL `http://localhost:3000/github/callback`. 만든 뒤 client secret을 새로 만든다 | `GITHUB_OAUTH_CLIENT_ID` · `GITHUB_OAUTH_CLIENT_SECRET` |
+| Google OAuth 클라이언트 | Google Cloud 콘솔에서 프로젝트를 만들고, OAuth 동의 화면을 외부·테스트 상태로 두고 테스트 사용자에 내 Google 계정을 넣는다. 사용자 인증 정보에서 「웹 애플리케이션」 OAuth 클라이언트를 만들고 승인된 리디렉션 URI에 `http://localhost:3000/google/callback`을 넣는다 | `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` |
+
+GitHub는 「GitHub Apps」가 아니라 「OAuth Apps」에서 만든다. GitHub App의 client ID처럼 점(`.`)이 든 값을 넣으면 api가 `GitHub 연동 키 설정 형식이 잘못되었습니다`로 뜨지 않는다. Voyage 키와 OpenAI 판정 키는 필요 없다.
+
+### 순서
+
+모든 명령은 저장소 루트에서 한다. 처음이면 의존성을 먼저 설치한다.
+
+```sh
+(cd api && npm ci)
+(cd web && npm ci)
+(cd worker && uv sync --locked)
+```
+
+**1. 환경 만들기(처음 한 번).** 환경 폴더 `~/catchu-local-live/`와 컨테이너 `catchu-live-db`(127.0.0.1:55432)·`catchu-live-queue`(127.0.0.1:56379)를 만든다. 다시 실행해도 이미 있는 것은 건드리지 않는다. 위 1~5단계의 `catchu-db`·`api/.env`와는 따로다.
+
+```sh
+bash scripts/local-live/setup.sh
+```
+
+**2. 키 적기.** `~/catchu-local-live/secrets.env`를 편집기로 열어 다섯 값을 `이름=값` 꼴로 적는다. 따옴표와 빈칸을 넣지 않는다.
+
+**3. 이주(처음, 그리고 새 이주가 든 브랜치를 받았을 때).**
+
+```sh
+bash scripts/local-live/migrate.sh
+```
+
+**4. 띄우기.** 터미널 세 개에서 하나씩 띄운다. 로그는 화면에 나오지 않고 `~/catchu-local-live/logs/`에 쌓인다.
+
+```sh
+bash scripts/local-live/run-api.sh
+```
+
+```sh
+bash scripts/local-live/run-worker.sh
+```
+
+```sh
+bash scripts/local-live/run-web.sh
+```
+
+정상 확인(네 번째 터미널). 둘 다 `200`이고, worker 본문에 `"consumer":"running"`이 있으면 된다.
+
+```sh
+curl -i http://127.0.0.1:3001/health
+curl -i http://127.0.0.1:8000/health
+```
+
+**5. 분석하기.** 브라우저에서 `http://localhost:3000/login`을 연다(`127.0.0.1:3000`으로 열지 않는다). Google로 로그인 → GitHub 연결 → 공개 저장소 주소 등록 → 고지에 동의하고 분석 요청 → 끝나면 내 화면에서 Catch와 근거를 본다.
+
+### 판정을 켤지
+
+기본은 꺼짐이다. 켤지는 각자 정한다. 켜려면 `~/catchu-local-live/worker.env`의 `# CATCHU_JUDGEMENT_PROVIDER=claude` 줄에서 맨 앞의 `#`과 빈칸을 지우고 worker를 다시 띄운다. 상세는 [worker 「판정」](../worker/docs/generation-judgement.md).
+
+| | 꺼짐(기본) | 켬(`claude`) |
+|---|---|---|
+| 제목·설명 | 정해진 틀의 설명 문장과 규칙으로 만든 제목 | Claude가 바뀐 줄을 보고 제목 후보와 설명 문장을 쓰고, 판정이 틀려 보이는 것을 거른다 |
+| Claude로 가는 자료 | 바뀐 줄 | 바뀐 줄에 더해 PR 제목과 커밋 메시지 첫 줄 |
+| 호출 수 | Catch마다 생성 1번 | Catch마다 판정 1번이 더 붙는다(큰 작업은 2번). 시간과 비용이 그만큼 는다 |
+
+### 막히는 곳
+
+| 증상 | 할 일 |
+|---|---|
+| `... 값이 비어 있다` | `secrets.env`에 그 값을 적는다 |
+| api가 `GitHub 연동 키 설정 형식이 잘못되었습니다`로 종료 | OAuth App의 client ID인지 본다(위 「내 키 세 가지」) |
+| GitHub 연결을 마치고 돌아오면 로그인이 풀린다 | 브라우저를 `http://localhost:3000`으로 열었는지, `web.env`의 api 주소가 `http://localhost:3001`인지 본다. `127.0.0.1`이면 로그인 유지 쿠키가 실리지 않는다 |
+| 분석 요청이 `403`으로 거부된다 | 비공개 저장소다. 공개 저장소만 된다 |
+| 포트가 이미 쓰이고 있다 | 3000·3001·8000을 쓰는 이전 서버를 끈다. 컨테이너 포트는 `setup.sh`를 처음 돌리기 전에 `CATCHU_LOCAL_LIVE_DB_PORT`·`CATCHU_LOCAL_LIVE_QUEUE_PORT`로 바꾼다 |
+| 컴퓨터를 다시 켠 뒤 api가 DB에 붙지 못한다 | Docker를 켠다. 컨테이너는 Docker가 켜지면 스스로 다시 뜬다 |
+| worker가 Windows PowerShell에서 뜨지 않는다 | WSL2 안에서 실행한다(위 「Windows 준비」) |
+
+### 정리
+
+세 터미널에서 `Ctrl+C`로 끈다. 환경을 지우려면 아래를 한다. 둘째 줄은 내 키 파일, 저장해 둔 GitHub 접근 정보, 로그까지 지운다. GitHub에 남은 앱 승인은 GitHub 설정에서 따로 취소한다.
+
+```sh
+docker rm -f catchu-live-db catchu-live-queue
+rm -rf ~/catchu-local-live
+```
+
 ## 다루지 않는 것
 
-Dockerfile·Compose, AWS 배포·복구([#24][i24]), 실제 큐 연결([#77][i77]), CI는 이 안내의 범위가 아니다. 로컬에서 네 구성요소가 켜지는 것은 배포 검증이나 서비스 간 기능 연결 확인을 뜻하지 않는다.
+Dockerfile·Compose, AWS 배포·복구([#24][i24]), CI는 이 안내의 범위가 아니다. 로컬에서 네 구성요소가 켜지는 것은 배포 검증이나 서비스 간 기능 연결 확인을 뜻하지 않는다.
 
 [i24]: https://github.com/JminAILab/CatchU/issues/24
 [i77]: https://github.com/JminAILab/CatchU/issues/77
@@ -178,5 +292,6 @@ Dockerfile·Compose, AWS 배포·복구([#24][i24]), 실제 큐 연결([#77][i77
 [i147]: https://github.com/JminAILab/CatchU/issues/147
 [i150]: https://github.com/JminAILab/CatchU/issues/150
 [i107]: https://github.com/JminAILab/CatchU/issues/107
+[c450]: https://github.com/JminAILab/CatchU/issues/450#issuecomment-6594697237
 [r174]: https://github.com/JminAILab/CatchU/pull/174#pullrequestreview-5349715690
 [p185]: https://github.com/JminAILab/CatchU/pull/185
