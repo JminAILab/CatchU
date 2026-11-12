@@ -12,7 +12,7 @@
 | `recipient-screen.tsx` | 상태 연결(`createRecipientPublicationStore`), 단계별 h1 초점, `isLoggedIn`, `showEvidence`, 붙는 자리 props |
 | `recipient-view.tsx` | 상태별 그리기(발행본·비밀번호 입력·접근 불가·조회 실패)와 0~4번 자리 배치, 비밀번호 입력 |
 | `recipient-store.ts` | 발행본 상태. 응답 코드 분기·비밀번호 확인·시도 제한 대기·늦은 응답 버리기·`accessLost`, Claude 안내 표시 값(`readWithoutGrant`·`claudeConnectable`) |
-| `recipient-api.ts` | `api.recipient` 위의 호출(`publication`·`unlock`)과 응답 모양 검사. 사본 검사는 `publications-api.ts`의 `isPublishedSnapshot`을 쓰고 계약 밖 칸은 넘기지 않는다 |
+| `recipient-api.ts` | `api.recipient` 위의 호출(`publication`·`unlock`)과 응답 모양 검사. 사본 검사는 `publications-api.ts`의 `isPublishedSnapshot`을 쓰고 계약 밖 칸은 넘기지 않는다. 새 Catch NC2의 사본 칸 넷(`repositoryName`·`authorDescriptionEditedMonth`·`workLimits`·근거별 `ownCommit`)은 있을 때만 그대로 옮기고 없으면 칸을 만들지 않는다 |
 | `recipient-grants.ts` | 링크별 grant 보관(`sessionStorage`), 10월 그대로 |
 | `recipient-slots.ts` | C-11 `RecipientSlotProps`·`LinkAccessCode`·`EvidenceLocation`(화면 안 형, OQ-U4-7)과 근거 위치 대조 `resolveEvidenceTarget` |
 | `recipient-format.ts` | 공통 문구(링크 불가·비밀번호 제목·발행 시각), 비밀번호 단계 안내, `isGithubSourceUrl` 재수출 |

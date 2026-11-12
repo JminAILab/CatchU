@@ -8,7 +8,8 @@ const { setTimeout: delay } = require('node:timers/promises');
 const { AiInputTooLarge, AiProviderError } = require('../../dist/ai-generation/ai-generation.types');
 const { InMemoryPublicationAccess } = require('../../dist/publications/in-memory-publication-access');
 const { createBaseSummaryHandler } = require('../../dist/rag-answer/base-summary-handler');
-const { BASE_SUMMARY_INSTRUCTION } = require('../../dist/rag-answer/rag-answer-config');
+const { AUTHOR_MATERIAL_VOICE_INSTRUCTION, BASE_SUMMARY_INSTRUCTION } = require('../../dist/rag-answer/rag-answer-config');
+const { SOURCE_LABELS } = require('../../dist/ai-generation/ai-generation.types');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { AI_DRAFT_MARKER, insertMember, recordingLogger } = require('../published-index/support.cjs');
 const { citedItem, fakeGate, putPublication } = require('./support.cjs');
@@ -220,4 +221,19 @@ test('저장 때 행 잠금을 기다리는 사이 마감이 지나면 DONE을 �
   assert.equal(saved.status, 'PENDING', '마감 뒤 결과는 쓰지 않는다(읽을 때 FAILED로 판정)');
   assert.deepEqual(saved.items, []);
   assert.equal(handled().at(-1).outcome, 'DISCARDED');
+});
+
+// 새 Catch NC2 — 기본 요약 지시 끝의 작성자 말 옮기기 문장(BR5.1, AC6.5.3·AC8.1.2).
+// 먼저 정한 시나리오: 기본 요약 생성 요청의 지시를 본다. 요약 말투는 빌드와 시험의 다시 재기가 판정하고, 이 시험은 문장이 붙었는지까지만 본다.
+// - 기대: 지시는 지금 문장 뒤에 AUTHOR_MATERIAL_VOICE_INSTRUCTION으로 끝나고, 근거 딱지는 둘뿐이다.
+// - 실패 조건: 문장이 없음, 딱지가 바뀜.
+
+test('NC2 AC8.1.2·AC6.5.3 기본 요약 지시는 작성자 말 옮기기 문장으로 끝나고 근거 딱지는 둘뿐이다(BR5.1)', async () => {
+  const value = await publication();
+  await run(value.publicationId);
+  const { instruction } = gate.requests[0];
+  assert.equal(instruction, BASE_SUMMARY_INSTRUCTION);
+  assert.ok(instruction.startsWith('자료를 다 읽기 전에 발행본 전체를 파악하도록'), '지금 지시가 앞에 그대로 있다');
+  assert.ok(instruction.endsWith(` ${AUTHOR_MATERIAL_VOICE_INSTRUCTION}`));
+  assert.deepEqual(Object.values(SOURCE_LABELS), ['GitHub 기록 원문', '작성자 자료 원문']);
 });

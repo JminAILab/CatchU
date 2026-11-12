@@ -18,7 +18,10 @@
 .itemTitle { font-weight: 700; overflow-wrap: anywhere; }
 .selectedItems, .confirmItems { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
 .selectedItem { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.kindBadge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #eef2f7; font-size: 12px; font-weight: 700; color: #34465e; }
+/* 「이 작업의 본인 커밋」 표지(새 Catch NC2 BR4.5)는 Catch 종류 표지와 같은 선언을 함께 쓰고 새 색을 더하지 않는다. */
+.kindBadge, .ownCommitMark { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #eef2f7; font-size: 12px; font-weight: 700; color: #34465e; }
+/* 링크 바로 뒤 같은 줄에 붙고, 줄이 모자라면 상자째 다음 줄로 간다. */
+.ownCommitMark { margin-left: 6px; }
 .small { font-size: 12px; color: var(--color-muted); }
 .muted { color: var(--color-muted); }
 .flagged { color: var(--color-danger); font-size: 13px; font-weight: 700; }

@@ -232,7 +232,8 @@ test('S5 머리말 넷과 빈 값 문구 셋은 web snapshot-view.tsx 원문에 
     ['contribution', 'description', 'emptyContribution', 'emptyDescription', 'emptyFacts', 'facts', 'mismatch']);
   for (const [name, label] of Object.entries(CATCH_TEXT_LABELS)) assert.ok(web.includes(label), `${name} 문구가 web 원문에 있다`);
   // 웹 표지의 자리까지 본다: 불일치 표지, 두 머리말(h4), 본인 기여 강조, 세 빈 값 문구.
-  for (const markup of ['>불일치 표시됨<', '<h4>기록에서 확인한 내용</h4>', '<strong>본인 기여:</strong>', '<h4>작성자 설명</h4>',
+  // 「작성자 설명」 h4 안에는 새 Catch NC2가 작성 달을 함께 그리므로 여는 쪽만 본다.
+  for (const markup of ['>불일치 표시됨<', '<h4>기록에서 확인한 내용</h4>', '<strong>본인 기여:</strong>', '<h4>작성자 설명',
     '"기록에서 확인된 작업 사실이 없습니다."', '"제공된 기여 설명이 없습니다."', '>작성자 설명이 없습니다.<']) {
     assert.ok(web.includes(markup), `${markup} 자리가 web 원문에 있다`);
   }

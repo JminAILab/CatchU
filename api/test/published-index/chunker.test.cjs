@@ -141,3 +141,44 @@ test('사본 모양이 C-07과 다르면 ChunkSourceError를 던지고 메시지
       error instanceof ChunkSourceError && !error.message.includes('비밀글') && !error.message.includes('작업 사실'));
   }
 });
+
+// 새 Catch NC2 — 사본 선택 칸 넷은 조각 재료가 아니다(BR1.5, 보안 설계 4절, AC6.5.1·AC6.5.2).
+// 먼저 정한 시나리오: 세 칸과 ownCommit, 표지가 붙을 본인 커밋 링크가 든 사본으로 조각을 만든다.
+// - 기대: 조각은 지금과 같은 필드에서만 오고, 조각 글에 저장소 이름·작성 달·한계 문장·「이 작업의 본인 커밋」이 0건이다. 링크는 원래 주소 글자 그대로다.
+// - 실패 조건: 새 칸 값이나 표지 글자가 조각에 나옴, 조각 수·필드가 바뀜.
+
+const OWN_COMMIT = 'ba6bba8c0123456789abcdef0123456789abcdef';
+/** 새 칸 넷이 든 사본. 작성자 설명에는 표지가 붙을 본인 커밋 링크가 있다. 새 칸 값은 찾기 쉬운 표식이다. */
+const nc2Snapshot = () => {
+  const base = catchSnapshot();
+  return {
+    ...base,
+    evidence: [{ ...base.evidence[0], ownCommit: false }, {
+      sourceUrl: `https://github.com/synthetic-owner/synthetic-repo/commit/${OWN_COMMIT}`, sourceRevision: OWN_COMMIT,
+      representedFacts: ['본인 커밋에서 문구 파일을 고쳤다.'], ownCommit: true,
+    }],
+    authorDescription: `맡은 부분 https://github.com/synthetic-owner/synthetic-repo/blob/ba6bba8/a.ts#L3 를 고쳤다.`,
+    repositoryName: 'REPOMARKER-owner/REPOMARKER-repo', authorDescriptionEditedMonth: '2026-11',
+    workLimits: ['LIMITMARKER 커밋 목록을 다 받지 못한 기본 브랜치 대상 PR이 있어, 그 PR에도 담긴 커밋일 수 있다'],
+  };
+};
+
+test('NC2 AC6.5.1·AC6.5.2 새 칸 넷과 본인 커밋 표지 글자는 조각에 0건이고 조각 필드는 지금과 같다(BR1.5)', () => {
+  const value = nc2Snapshot();
+  const drafts = buildChunkDrafts([catchItem(value)]);
+  const legacy = {
+    workFacts: value.workFacts, subjectContribution: value.subjectContribution, authorDescription: value.authorDescription,
+    aiDraft: value.aiDraft, mismatch: value.mismatch,
+    evidence: value.evidence.map(({ sourceUrl, sourceRevision, representedFacts }) => ({ sourceUrl, sourceRevision, representedFacts })),
+  };
+  const withoutNewFields = buildChunkDrafts([catchItem(legacy)]);
+  assert.deepEqual(drafts.map((d) => d.text), withoutNewFields.map((d) => d.text), '새 칸이 있든 없든 조각 글은 같다');
+  assert.deepEqual(drafts.map((d) => d.fieldPath), ['workFacts[0]', 'workFacts[1]', 'subjectContribution', 'evidence[0].representedFacts[0]',
+    'evidence[0].representedFacts[1]', 'evidence[1].representedFacts[0]', 'authorDescription']);
+  const text = JSON.stringify(drafts);
+  for (const marker of ['REPOMARKER', 'LIMITMARKER', '2026-11', '이 작업의 본인 커밋', 'ownCommit', '판본 ba6bba8']) {
+    assert.equal(text.includes(marker), false, marker);
+  }
+  assert.ok(drafts.at(-1).text.includes('https://github.com/synthetic-owner/synthetic-repo/blob/ba6bba8/a.ts#L3'), '링크는 원래 주소 글자 그대로');
+  assertExactSlices([catchItem(value)], drafts);
+});

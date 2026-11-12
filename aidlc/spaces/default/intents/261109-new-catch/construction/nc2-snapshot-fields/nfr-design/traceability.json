@@ -1,0 +1,22 @@
+{
+  "stage": "nfr-design",
+  "unit": "nc2-snapshot-fields",
+  "upstream_ids": ["NFR1.1", "NFR1.2", "NFR6.1", "NFR6.2", "NFR6.3", "NFR2.1", "NFR2.2", "NFR5.1", "NFR5.2", "NFR5.3", "NFR8.2", "NFR7.1", "NFR7.2", "NFR7.3", "NFR8.1"],
+  "coverage": [
+    { "id": "NFR1.1", "status": "OK", "target": "performance-design 「호출 수」: GitHub 호출 없음, worker 변경 없음, PR 본문 확인" },
+    { "id": "NFR1.2", "status": "OK", "target": "performance-design 「호출 수」: 지시 상수 셋에 문장 하나, 호출 경로·횟수 그대로" },
+    { "id": "NFR6.1", "status": "OK", "target": "performance-design 「접근성」: 링크 밖 형제 span, tabIndex·role·aria-hidden 없음" },
+    { "id": "NFR6.2", "status": "OK", "target": "performance-design 「접근성」: h4 안 작은 글자, h4 이름으로 찾는 기존 시험을 코드 계획 목록에" },
+    { "id": "NFR6.3", "status": "OK", "target": "performance-design 「접근성」: strong + ul을 details 앞, 접힘 밖" },
+    { "id": "NFR2.1", "status": "OK", "target": "security-design 4절: chunker·summary-sources 그대로, 새 칸·표지 0건 시험" },
+    { "id": "NFR2.2", "status": "OK", "target": "security-design 4절: 지시 문장 상수 하나를 세 지시 끝에, SOURCE_LABELS 둘 그대로" },
+    { "id": "NFR5.1", "status": "OK", "target": "security-design 3절: JSX 글자 자식으로만, 한계 속 번호·식별값은 링크로 만들지 않음" },
+    { "id": "NFR5.2", "status": "OK", "target": "security-design 3절: kindBadge와 같은 모양의 표지 span, 흉내 글 구별 시험, 낭독기 한계" },
+    { "id": "NFR5.3", "status": "OK", "target": "security-design 1절: 회원·고른 Catch 범위의 소속 기록 질의로만 ownCommit 판정" },
+    { "id": "NFR8.2", "status": "OK", "target": "reliability-design 3절: 상수 파일, 새 api 시험이 build.py를 따옴표 경계째 찾음, 반례, CI 그대로" },
+    { "id": "NFR7.1", "status": "OK", "target": "reliability-design 1절: 칸마다 따로 그리기, ownCommit === true만 참, 옛 사본 고정 자료" },
+    { "id": "NFR7.2", "status": "OK", "target": "reliability-design 1절: isCatchSnapshot 선택 칸 검사, pickItem 있을 때만 옮김" },
+    { "id": "NFR7.3", "status": "OK", "target": "reliability-design 2절·observability-design: LEFT JOIN null이면 칸 없음, 성공 뒤 경고 한 줄" },
+    { "id": "NFR8.1", "status": "OK", "target": "reliability-design 1~3절 시험 목록과 Unit 확인 명령(60분 상한), 팀 시험 방식" }
+  ]
+}

@@ -14674,3 +14674,3111 @@
 **Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc1-sections-and-links/functional-design/functional-spec.md","id":"R-06","fingerprint":"sha256:8c39013737750238dbcf6bb78f13233cfd972a2518fe2ee91dc5ed2f818f9d81","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc1-sections-and-links/7332c702b7dcc515/2.json","digest":"sha256:d7709ef823eef49fa0c672f5dc7c05b311ab11960a81e73eef0154a43cf887dc"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc1-sections-and-links/nfr-requirements/security-requirements.md","id":"R-03","fingerprint":"sha256:46804d1b25f12f0aec21eebff0c291e7d18d3093ae14439606bba04dc8a5305b","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc1-sections-and-links/7332c702b7dcc515/2.json","digest":"sha256:5544079e9898f180acac38662b2f7795c5912986e4eccbbd05f36f2434cb6a04"}}]}
 
 ---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T08:30:08Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: plan-approval
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: code-generation
+**Tool**: Bash
+**Details**: aidlc engine orchestrate next | python3 -c "import json,sys;d=json.load(sys.stdin);[d.pop(k,None) for k in ('lead_persona','conductor_persona','inline_context_p
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T08:49:09Z
+**Event**: HUMAN_TURN
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Origin**: person
+**Source**: picker
+**Picked**: ["Review each checkpoint","지금 올림(1번)으로 하되 아래 순서로 한다.\r1. 통합 브랜치(origin/intent/260925-intent-12, 지금 e669cf3d)가 작업 브랜치보다 29커밋 앞서 있다(U10 #510, U9 문서 #506·#507). 작업 브랜치에 merge commit으로 들여온다(rebase 금지). 겹치는 파일은 web/src/features/recipient/README.md와 web/test/recipient.test.mjs이고 미리 합쳐 본 결과 충돌은 없다. 합친 뒤 NC1 Unit 시험(web·api)을 다시 돌려 통과를 확인한다.\r2. 그 커밋에서 NC1 전용 PR 브랜치(예: worker/새-catch-nc1)를 만들어 올리고, 그 브랜치에서 통합 브랜치로 PR을 연다. 작업 브랜치(worker/새-catch)는 올리지 않는다. NC2 커밋이 열린 NC1 PR에 섞이지 않게 하기 위해서다(Catch 개편 CR PR과 같은 방식).\r3. PR 본문은 양식을 채운 초안을 먼저 보여 주고, 게시는 확인 뒤에 한다. 본문에 건드린 영역과 확인을 청할 담당(U3·U4·U5·U6·U10 가운데, 12월 intent 납품 계획 담당표 기준)을 적고, 리뷰어 지정은 게시 뒤 조회해 실제로 들어갔는지 확인한다."]
+**Message Id**: f581fceb
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T08:49:10Z
+**Event**: QUESTION_REPLIED
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Question**: How should I continue building the remaining work?
+**Reply**: Review each checkpoint
+**Options**: ["Continue automatically","Review each checkpoint"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T08:49:10Z
+**Event**: QUESTION_REPLIED
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Question**: bolt-plan(B1)은 NC1 확인을 마치면 바로 통합 브랜치(intent/260925-intent-12)로 PR을 올리기로 했습니다. NC1 PR을 어떻게 할까요?
+**Reply**: 지금 올림(1번)으로 하되 아래 순서로 한다.\n1. 통합 브랜치(origin/intent/260925-intent-12, 지금 e669cf3d)가 작업 브랜치보다 29커밋 앞서 있다(U10 #510, U9 문서 #506·#507). 작업 브랜치에 merge commit으로 들여온다(rebase 금지). 겹치는 파일은 web/src/features/recipient/README.md와 web/test/recipient.test.mjs이고 미리 합쳐 본 결과 충돌은 없다. 합친 뒤 NC1 Unit 시험(web·api)을 다시 돌려 통과를 확인한다.\n2. 그 커밋에서 NC1 전용 PR 브랜치(예: worker/새-catch-nc1)를 만들어 올리고, 그 브랜치에서 통합 브랜치로 PR을 연다. 작업 브랜치(worker/새-catch)는 올리지 않는다. NC2 커밋이 열린 NC1 PR에 섞이지 않게 하기 위해서다(Catch 개편 CR PR과 같은 방식).\n3. PR 본문은 양식을 채운 초안을 먼저 보여 주고, 게시는 확인 뒤에 한다. 본문에 건드린 영역과 확인을 청할 담당(U3·U4·U5·U6·U10 가운데, 12월 intent 납품 계획 담당표 기준)을 적고, 리뷰어 지정은 게시 뒤 조회해 실제로 들어갔는지 확인한다.
+**Options**: ["지금 올림 (Recommended)","나중에"]
+
+---
+
+## Autonomy Mode Set
+**Timestamp**: 2026-11-10T08:49:13Z
+**Event**: AUTONOMY_MODE_SET
+**Mode**: gated
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T08:51:42Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a76c68a4fe99855fc
+**Message**: 게시해 줘. 서버와 DB 컨테이너는 꺼 줘
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T08:54:47Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a369f973f3947297a
+**Message**: NC1을 승인받아 커밋했고 통합 브랜치도 합쳤습니다. 지금은 NC1 PR 초안을 확인받는 중입니다. 초안대로 브랜치를 올리고 PR을 열어 팀원 3을 리뷰어로 지정할지 정해 주세요.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T11:17:46Z
+**Event**: HUMAN_TURN
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Origin**: person
+**Source**: typed
+**Message Id**: c27f8b61
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-10T11:18:27Z
+**Event**: HOST_TURN
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-10T11:18:27Z
+**Event**: HOST_TURN
+**Session**: 5a2cba16-e7cb-4a78-8938-81c4f26d38fd
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T11:21:53Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: af5aa9229fe287fc2
+**Message**: 새 Catch intent의 첫 Unit NC1을 끝내고 PR #517을 올렸습니다. 리뷰어로 팀원 3이 지정된 것까지 확인했습니다. 이어서 NC2 기능 설계를 하려면 `/aidlc`를 입력해 주세요.
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T11:25:16Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a464684f77ea14524
+**Message**: 새 Catch intent를 Unit별로 만들고 있고, NC1은 승인과 커밋을 마친 뒤 PR #517로 올렸습니다(리뷰어 팀원 3 지정 확인). 다음은 `/aidlc`로 NC2 기능 설계를 시작하는 것입니다.
+
+---
+
+## Session End
+**Timestamp**: 2026-11-10T11:25:18Z
+**Event**: SESSION_ENDED
+**Reason**: other
+
+---
+
+## Session Start
+**Timestamp**: 2026-11-10T11:27:34Z
+**Event**: SESSION_STARTED
+**Source**: startup
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T11:27:53Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: typed
+**Reply**: command
+**Message Id**: 230552c2
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-10T11:31:46Z
+**Event**: UNIT_STARTED
+**Stage**: functional-design
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T11:32:26Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-design-questions.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-design-questions.md
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T11:32:54Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a5a17585aedfdb27a
+**Message**: 모두 A
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T11:35:52Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a0d5efb51aa30027b
+**Message**: 새 Catch NC2(면접관 사본 칸과 표지)의 기능 설계를 하는 중이고, 정하실 질문 여섯 개(Q1~Q6)를 올려 두었습니다. 다음에 할 일은 답을 받는 것이니, 모두 A로 해도 되는지 아니면 바꿀 질문이 있는지 말씀해 주세요.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T13:33:07Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: typed
+**Message Id**: b7635320
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:33:24Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-design-questions.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:33:27Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-design-questions.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:33:32Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-design-questions.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:33:36Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-design-questions.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:33:41Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-design-questions.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:33:45Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-design-questions.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-10T13:33:52Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-design-questions.md
+**Unit**: nc2-snapshot-fields
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T13:35:07Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: ae603fe4
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T13:35:08Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: 정한 내용입니다.\n- Q1 A: 발행 잠금 조회에서 analysis_request.registration_id로 저장소 등록 표를 이어 owner/name을 읽는다. 등록 행이 없으면 칸을 빼는 갈래는 안전망으로만 두고 시험은 하나다(NOT NULL과 외래 키는 마이그레이션에서 확인함).\n- Q2 A: 「이 기록으로 알 수 없는 것」에 개수 상한을 두지 않는다. 모든 근거의 한계를 근거 순서대로 읽고, 같은 문장은 한 번만 담는다.\n- Q3 B: 표지는 늘 링크 밖, 링크 바로 뒤에 둔다. 바뀐 줄 링크도 이름을 나누지 않는다. FR10.3을 어떻게 읽었는지(파일·커밋 링크는 이름 끝이 판본 이름, 바뀐 줄 링크는 본인 커밋의 바뀐 줄)를 기능 설계에 적는다.\n- Q4 A: 지금 종류 표지와 같은 테두리 상자로 그리고 대괄호를 쓰지 않는다. 화면 낭독기에서 구별되지 않는 것은 한계로 적는다(숨은 글자도 흉내 낼 수 있음).\n- Q5 A와 덧붙임: 기본 요약·질의응답 지시에 「작성자는 …라고 적었다」 문장을 더하고, JD 요약 지시(jd-generation-request.ts)에도 같은 문장을 더한다. U10 담당 확인을 받고, JD 요약 효과는 따로 재지 않는다고 기록한다.\n- Q6 A: api 시험이 build.py 파일 글자에서 상수 여섯을 찾는다. CI는 고치지 않는다.\n\n문서를 만들기 전에, 이 내용이 맞나요?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:35:11Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-design-questions.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-10T13:35:12Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: functional-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-design-questions.md
+**Questions SHA-256**: 5d55ec525865925b8aea542acea70a94d245424f51a9880c767e3b6e199838a6
+**Hash Scope**: confirmed-content-v2
+**Unit**: nc2-snapshot-fields
+**Message Id**: ae603fe4
+**Message Ids**: b7635320,ae603fe4
+**Person Reply**: <pasted_content id="9097">\nQ1: A. 덧붙임: 등록 행이 없는 경우는 DB가 막는다. analysis_request.registration_id는 NOT NULL이고 (member_id, registration_id, repository_id)로 repository_registration을 가리키는 외래 키가 있다. 칸을 빼는 갈래는 안전망으로만 두고 시험은 하나면 된다.\nQ2: A\nQ3: B. 표지는 늘 링크 밖, 링크 바로 뒤에 둔다(interaction-spec 4절 「표지는 누르는 것이 아님」). 바뀐 줄 링크도 이름을 나누지 않고 링크 전체 뒤에 붙인다. 파일·커밋 링크는 이름 끝이 판본·커밋 이름이라 FR10.3 자리와 같고, 바뀐 줄 링크는 본인 커밋의 바뀐 줄을 가리키므로 링크 뒤 표지도 뜻이 같다. 이 읽기를 기능 설계에 적는다.\nQ4: A. 덧붙임: B의 숨은 「CatchU 표시:」는 작성자가 같은 글자를 쳐 넣으면 낭독기에서 똑같이 들려 구별이 되지 않으므로, A와 한계 기록으로 한다.\nQ5: A. 덧붙임: JD 요약 지시(api/src/jd-summary/jd-generation-request.ts)에도 같은 문장을 붙인다. JD 요약도 작성자 자료를 근거로 쓰므로, 면접관 화면의 세 AI(기본 요약·질의응답·JD 요약)가 같은 말투를 쓰게 하기 위해서다. U10 영역이라 NC2 PR에서 U10 담당 확인을 받는다. JD 요약은 질의응답 10개 다시 재기 대상이 아니므로 효과는 따로 재지 않는다고 기록한다.\nQ6: A\ndone\n</pasted_content id="9097">\nLooks correct
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T13:36:37Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+**Context**: construction > nc2-snapshot-fields > functional-design > entities.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T13:37:46Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+**Context**: construction > nc2-snapshot-fields > functional-design > rules.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T13:38:46Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-spec.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T13:39:06Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/traceability.json
+**Context**: construction > nc2-snapshot-fields > functional-design > traceability.json
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:39:08Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-spec.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:39:18Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/functional-design/memory.md
+**Context**: construction > functional-design > memory.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:39:22Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/functional-design/memory.md
+**Context**: construction > functional-design > memory.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T13:39:25Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0b86e963
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T13:39:25Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0b86e963
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T13:39:25Z
+**Event**: SENSOR_FIRED
+**Fire id**: 3e942d45
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T13:39:25Z
+**Event**: SENSOR_PASSED
+**Fire id**: 3e942d45
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T13:39:25Z
+**Event**: SENSOR_FIRED
+**Fire id**: f3bdc111
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T13:39:26Z
+**Event**: SENSOR_PASSED
+**Fire id**: f3bdc111
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T13:39:26Z
+**Event**: SENSOR_FIRED
+**Fire id**: 1d7d5f71
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T13:39:26Z
+**Event**: SENSOR_PASSED
+**Fire id**: 1d7d5f71
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/traceability.json
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T13:39:26Z
+**Event**: SENSOR_FIRED
+**Fire id**: 394f7692
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T13:39:26Z
+**Event**: SENSOR_PASSED
+**Fire id**: 394f7692
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T13:39:26Z
+**Event**: SENSOR_FIRED
+**Fire id**: 7b5b3fad
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/traceability.json
+
+---
+
+## Sensor Failed
+**Timestamp**: 2026-11-10T13:39:26Z
+**Event**: SENSOR_FAILED
+**Fire id**: 7b5b3fad
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/traceability.json
+**Detail path**: aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/sensors/functional-design/traceability-7b5b3fad.md
+**Findings count**: 1
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:39:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+**Context**: construction > nc2-snapshot-fields > functional-design > rules.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:39:35Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+**Context**: construction > nc2-snapshot-fields > functional-design > rules.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-10T13:39:39Z
+**Event**: REVIEW_REQUESTED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:7238b3bdffaa680c9efbd1831cc9edf99c70de90beba9fe8e8127775467ecf43
+**Request Id**: review:2e039fcf2b0c334018b795eaddfad9e3
+**Review File**: .aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.2e039fcf2b0c334018b795eaddfad9e3.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T13:39:45Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-10T13:40:06Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T13:40:13Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a0913136ec452e36a
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T13:43:03Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.2e039fcf2b0c334018b795eaddfad9e3.review.md
+**Context**: .aidlc-engine > reviews > functional-design > units > nc2-snapshot-fields > 7332c702b7dcc515 > 1.2e039fcf2b0c334018b795eaddfad9e3.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-10T13:43:11Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T13:43:11Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: a8d5e60e1b64c14e2
+**Review File Digest**: .aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.2e039fcf2b0c334018b795eaddfad9e3.review.md=d78f2ebb4310129b9aa9f75d7c593bcd5b2c73fb2877cca3c852b6c49fa08061
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-10T13:43:13Z
+**Event**: REVIEW_COMPLETED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:7238b3bdffaa680c9efbd1831cc9edf99c70de90beba9fe8e8127775467ecf43
+**Artifact Fingerprint**: sha256:7238b3bdffaa680c9efbd1831cc9edf99c70de90beba9fe8e8127775467ecf43
+**Request Id**: review:2e039fcf2b0c334018b795eaddfad9e3
+**Review Record**: .aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json
+**Review Record Digest**: sha256:639c8167db24e4a54210d680aa5c978cfc44c69dcbae25862ad7c228f6cbf343
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-10T13:43:18Z
+**Event**: UNIT_COMPLETED
+**Stage**: functional-design
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T13:44:26Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/nfr-requirements-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > nfr-requirements-questions.md
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-10T13:44:29Z
+**Event**: UNIT_STARTED
+**Stage**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T13:47:45Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a89648c4daed8e413
+**Message**: 새 Catch NC2를 진행 중이고, 기능 설계는 마쳐 커밋했으며 지금은 NFR 요구 단계입니다. 다음은 두 질문에 답해 주시는 것입니다: Q1 안전망 경고 로그를 남길지, Q2 문장 대조 시험이 따옴표 경계까지 볼지입니다.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T13:57:42Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: typed
+**Message Id**: e5efada5
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:05Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:06Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+**Context**: construction > nc2-snapshot-fields > functional-design > rules.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:17Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:17Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+**Context**: construction > nc2-snapshot-fields > functional-design > rules.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:19Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:20Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+**Context**: construction > nc2-snapshot-fields > functional-design > rules.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:22Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:22Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+**Context**: construction > nc2-snapshot-fields > functional-design > rules.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:29Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:29Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md
+**Context**: construction > nc2-snapshot-fields > functional-design > rules.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:34Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:34Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+**Context**: construction > nc2-snapshot-fields > functional-design > entities.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:42Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:42Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+**Context**: construction > nc2-snapshot-fields > functional-design > entities.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:45Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:45Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+**Context**: construction > nc2-snapshot-fields > functional-design > entities.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:47Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:47Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+**Context**: construction > nc2-snapshot-fields > functional-design > entities.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:49Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:49Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md
+**Context**: construction > nc2-snapshot-fields > functional-design > entities.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:54Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:54Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-spec.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:56Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:56Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-spec.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:58:58Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:58:58Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-spec.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:59:00Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:59:00Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-spec.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:59:04Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:59:04Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-spec.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:59:06Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:59:06Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-spec.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T13:59:09Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: review-freeze
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: functional-design
+**Tool**: Edit
+**Details**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:59:09Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Context**: construction > nc2-snapshot-fields > functional-design > functional-spec.md
+**Summary Authorization Id**: 6d6168e77a8034b92081a763717e3e5fef8840036c8f5496f84e08f5f43bcf10
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:59:17Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:59:22Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:59:25Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 93191d88f1cb07d4649589130d6ed63e4d470dbc6dc5b3100db4697212d1a71c
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:59:31Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/nfr-requirements-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > nfr-requirements-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T13:59:39Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/nfr-requirements-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > nfr-requirements-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-10T14:00:07Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-requirements
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/nfr-requirements-questions.md
+**Unit**: nc2-snapshot-fields
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T14:02:04Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: 1eaeefa5
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T14:02:04Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: 정한 내용입니다.\n- Q1 A: 저장소 이름을 못 읽어 칸을 뺀 경우(안전망)에 경고 한 줄을 남긴다. 새 사건 이름 하나에 발행본 ID·회원 ID만 싣는다.\n- Q2 A: 문장 대조 시험은 build.py 파일 글자에서 따옴표 경계째 찾고, 한 문장만 바꾼 글자로는 실패하는 반례를 넣는다. 대조 대상은 한계 문장 넷이다.\n- 설계 바꿈: 사본의 ownCommit은 근거 주소가 /commit/<40자>이고 그 식별값이 이 Catch의 commit_assignment에 있을 때 참이다. 본인 커밋 기여 범위 상수 둘과 그 대조는 뺍니다. NC2 기능 설계(BR1.4·BR1.6·BR4.1, 엔티티, 기능 명세)와 계약 요약 C3·C6에 같은 ID로 덧붙여 반영했다.\n- 그대로 적는 것: 기술 스택은 지금 그대로, NFR1은 NC1과 같이 코드로 확인(측정은 NC3), NFR3는 빌드와 시험.\n\n문서를 만들기 전에, 이 내용이 맞나요?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T14:02:10Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/nfr-requirements-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > nfr-requirements-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-10T14:02:11Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: nfr-requirements
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/nfr-requirements-questions.md
+**Questions SHA-256**: 5b6201382ff2166032705501898eb67f3befa4a93883ab4ec817a58be8b112a4
+**Hash Scope**: confirmed-content-v2
+**Unit**: nc2-snapshot-fields
+**Message Id**: 1eaeefa5
+**Message Ids**: e5efada5,1eaeefa5
+**Person Reply**: <pasted_content id="9097">\nQ1: A\nQ2: A. 다만 아래 설계 바꿈으로 문장 대조 대상은 한계 문장 넷(_LISTS_INCOMPLETE, _EARLIER_LIST_INCOMPLETE, 같은 작업 경고 앞부분 둘)만 남는다.\n덧붙임(설계 바꿈): 사본의 ownCommit은 기여 범위 문장 대조 대신 DB의 commit_assignment(등록 때 그 Catch의 ownCommitShas로 쓰는 본인 커밋 목록)로 정한다. 근거 주소가 /commit/<40자>이고 그 식별값이 이 Catch의 commit_assignment(회원·저장소·catch_id)에 있으면 참, 아니면 거짓이다. 병합 커밋은 이 목록에 없고 PR·이슈 근거는 커밋 주소가 아니므로 FR10.1과 같은 결과다. 그래서 api의 본인 커밋 기여 범위 상수 둘과 그 대조는 뺀다. 까닭: 문장을 베끼지 않으므로 worker 문구가 바뀌어도 표지가 조용히 사라지지 않고, 표지 이름 「이 작업의 본인 커밋」과 판단 근거(이 Catch에 속한 본인 커밋)가 그대로 맞는다. NC2 기능 설계(표지 규칙)와 계약 요약 C3·C6의 해당 줄을 이 까닭과 함께 고친다(같은 ID에 덧붙임).\ndone\n</pasted_content id="9097">\nLooks correct
+**Summary Authorization Id**: 33aa22b92208c1c617cb4fe2b97772b1a2c8ed254c1bb5e8cc519bf03541e563
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T14:03:47Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/performance-requirements.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > performance-requirements.md
+**Summary Authorization Id**: 33aa22b92208c1c617cb4fe2b97772b1a2c8ed254c1bb5e8cc519bf03541e563
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T14:04:17Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > security-requirements.md
+**Summary Authorization Id**: 33aa22b92208c1c617cb4fe2b97772b1a2c8ed254c1bb5e8cc519bf03541e563
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T14:04:27Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/scalability-requirements.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > scalability-requirements.md
+**Summary Authorization Id**: 33aa22b92208c1c617cb4fe2b97772b1a2c8ed254c1bb5e8cc519bf03541e563
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T14:04:46Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/reliability-requirements.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > reliability-requirements.md
+**Summary Authorization Id**: 33aa22b92208c1c617cb4fe2b97772b1a2c8ed254c1bb5e8cc519bf03541e563
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T14:04:55Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/observability-requirements.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > observability-requirements.md
+**Summary Authorization Id**: 33aa22b92208c1c617cb4fe2b97772b1a2c8ed254c1bb5e8cc519bf03541e563
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T14:05:09Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/tech-stack-decisions.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > tech-stack-decisions.md
+**Summary Authorization Id**: 33aa22b92208c1c617cb4fe2b97772b1a2c8ed254c1bb5e8cc519bf03541e563
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T14:05:19Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/observability-requirements.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > observability-requirements.md
+**Summary Authorization Id**: 33aa22b92208c1c617cb4fe2b97772b1a2c8ed254c1bb5e8cc519bf03541e563
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T14:05:21Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/reliability-requirements.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > reliability-requirements.md
+**Summary Authorization Id**: 33aa22b92208c1c617cb4fe2b97772b1a2c8ed254c1bb5e8cc519bf03541e563
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T14:05:22Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/observability-requirements.md
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > observability-requirements.md
+**Summary Authorization Id**: 33aa22b92208c1c617cb4fe2b97772b1a2c8ed254c1bb5e8cc519bf03541e563
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T14:05:29Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/traceability.json
+**Context**: construction > nc2-snapshot-fields > nfr-requirements > traceability.json
+**Summary Authorization Id**: 33aa22b92208c1c617cb4fe2b97772b1a2c8ed254c1bb5e8cc519bf03541e563
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T14:05:43Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nfr-requirements/memory.md
+**Context**: construction > nfr-requirements > memory.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T14:05:48Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nfr-requirements/memory.md
+**Context**: construction > nfr-requirements > memory.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T14:05:51Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nfr-requirements/memory.md
+**Context**: construction > nfr-requirements > memory.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T14:05:57Z
+**Event**: SENSOR_FIRED
+**Fire id**: 1a79ae35
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/performance-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T14:05:57Z
+**Event**: SENSOR_PASSED
+**Fire id**: 1a79ae35
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/performance-requirements.md
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T14:05:57Z
+**Event**: SENSOR_FIRED
+**Fire id**: 471bd1db
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T14:05:57Z
+**Event**: SENSOR_PASSED
+**Fire id**: 471bd1db
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_FIRED
+**Fire id**: 5c58d3f2
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/scalability-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_PASSED
+**Fire id**: 5c58d3f2
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/scalability-requirements.md
+**Duration ms**: 71
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0f36dd86
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/reliability-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0f36dd86
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/reliability-requirements.md
+**Duration ms**: 74
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_FIRED
+**Fire id**: fae5b6c9
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/observability-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_PASSED
+**Fire id**: fae5b6c9
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/observability-requirements.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_FIRED
+**Fire id**: e675a0c4
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/tech-stack-decisions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_PASSED
+**Fire id**: e675a0c4
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/tech-stack-decisions.md
+**Duration ms**: 71
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_FIRED
+**Fire id**: a25c6e57
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_PASSED
+**Fire id**: a25c6e57
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/traceability.json
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_FIRED
+**Fire id**: 04bfc8a9
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/performance-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T14:05:58Z
+**Event**: SENSOR_PASSED
+**Fire id**: 04bfc8a9
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/performance-requirements.md
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T14:05:59Z
+**Event**: SENSOR_FIRED
+**Fire id**: 61315a22
+**Sensor ID**: traceability
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T14:05:59Z
+**Event**: SENSOR_PASSED
+**Fire id**: 61315a22
+**Sensor ID**: traceability
+**Stage slug**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/traceability.json
+**Duration ms**: 76
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-10T14:05:59Z
+**Event**: REVIEW_REQUESTED
+**Stage**: nfr-requirements
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:f1112e1c526e7de30319564d30023f98fe388a09cca88579389564ce7d8b20a7
+**Request Id**: review:3f3b61b5c878c26dd9be9ced5639877a
+**Review File**: .aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.3f3b61b5c878c26dd9be9ced5639877a.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T14:06:04Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-10T14:06:38Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T14:06:52Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a18b1f97d6f370828
+**Message**: bolt-plan B2와 FR10.2도 같은 ID에 덧붙여 고쳐
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T14:06:59Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: nfr-requirements
+**Tool**: Bash
+**Details**: <project-dir> (unit nc2-snapshot-fields)
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T14:08:55Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.3f3b61b5c878c26dd9be9ced5639877a.review.md
+**Context**: .aidlc-engine > reviews > nfr-requirements > units > nc2-snapshot-fields > 7332c702b7dcc515 > 1.3f3b61b5c878c26dd9be9ced5639877a.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-10T14:09:03Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T14:09:03Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: a55712a6639c4c56e
+**Review File Digest**: .aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.3f3b61b5c878c26dd9be9ced5639877a.review.md=c232329ef954a26d031dd39d786f82c41e233ac590f6bb823ba99e16d32b5106
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-10T14:09:26Z
+**Event**: REVIEW_COMPLETED
+**Stage**: nfr-requirements
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:f1112e1c526e7de30319564d30023f98fe388a09cca88579389564ce7d8b20a7
+**Artifact Fingerprint**: sha256:f1112e1c526e7de30319564d30023f98fe388a09cca88579389564ce7d8b20a7
+**Request Id**: review:3f3b61b5c878c26dd9be9ced5639877a
+**Review Record**: .aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json
+**Review Record Digest**: sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-10T14:09:30Z
+**Event**: UNIT_COMPLETED
+**Stage**: nfr-requirements
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-10T14:10:17Z
+**Event**: UNIT_STARTED
+**Stage**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T14:10:31Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > nfr-design-questions.md
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T14:10:43Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a0033186b96685e80
+**Message**: Q1: A, Q2: A done
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T14:13:46Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: af502007ba570caa8
+**Message**: 새 Catch NC2 작업 중이고, 기능 설계와 NFR 요구는 마쳐서 커밋했습니다. 지금은 NFR 설계 단계로, 안전망 경고 시점(Q1)과 소속 기록 읽는 범위(Q2)에 답을 주시면 이어 갑니다.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T23:08:27Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: typed
+**Message Id**: a7a13a3e
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:08:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/inception/delivery-planning/bolt-plan.md
+**Context**: inception > delivery-planning > bolt-plan.md
+**Summary Authorization Id**: 55827e7052b19a4eaddd77c7a4f8a19dbb95e03a2619f9243667ff7bdca4415e
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:08:35Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > nfr-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:08:40Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > nfr-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-10T23:08:44Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Unit**: nc2-snapshot-fields
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T23:10:24Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: 6bc4e93a
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T23:10:25Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: 정한 내용입니다.\n- Q1 A: 발행 처리 도중에는 저장소 이름 칸을 뺀 Catch가 있었는지만 기억하고, 발행이 성공한 뒤 publishSucceeded 옆에서 경고 한 줄(발행본 ID·회원 ID)을 남긴다. 취소되면 남기지 않는다.\n- Q2 A: 근거의 커밋 주소 식별값만 모아 소속 기록에서 그 식별값만 한 번에 읽는다. 읽는 행 수가 근거 수를 넘지 않는다.\n- 덧붙임: bolt-plan.md B2 「확인하는 가설」에 본인 커밋 표지는 소속 기록으로 정한다는 줄을 덧붙였고, FR10.2는 그대로 둔다.\n- 바로 적는 것: 다른 Catch에 이미 배정된 커밋은 표지가 없는 한계(까닭과 함께), 문장 대조 시험은 새로 만드는 시험이 build.py를 읽는다는 것과 경로 기준.\n\n문서를 만들기 전에, 이 내용이 맞나요?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:10:27Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > nfr-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-10T23:10:28Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: nfr-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/nfr-design-questions.md
+**Questions SHA-256**: 7a9d4a2b1b406e88e23a01cb65701a69ab823e587b80aa80c026a3c30c25061d
+**Hash Scope**: confirmed-content-v2
+**Unit**: nc2-snapshot-fields
+**Message Id**: 6bc4e93a
+**Message Ids**: a7a13a3e,6bc4e93a
+**Person Reply**: <pasted_content id="9097">\nQ1: A\nQ2: A\n덧붙임(앞 단계에서 물은 것): bolt-plan.md B2 「확인하는 가설」에 같은 ID 덧붙임으로 「본인 커밋 표지는 소속 기록(commit_assignment)으로 정한다(2026-11-10 NC2 NFR 요구 때 결정)」를 더한다. 요구사항 FR10.2는 「정할 수 있다」는 가능한 방법을 적은 문장이라 고치지 않는다.\ndone\n</pasted_content id="9097">\nLooks correct
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:11:01Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/performance-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > performance-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:11:24Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > security-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:11:32Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/scalability-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > scalability-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:11:52Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/reliability-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > reliability-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:12:00Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/observability-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > observability-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:12:12Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/logical-components.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > logical-components.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:12:20Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md
+**Context**: construction > nc2-snapshot-fields > nfr-design > security-design.md
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:12:33Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/traceability.json
+**Context**: construction > nc2-snapshot-fields > nfr-design > traceability.json
+**Summary Authorization Id**: bcffcb62b3947c95ba765963b29147a19d27361d18418e4f561db064c32e8897
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:12:41Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nfr-design/memory.md
+**Context**: construction > nfr-design > memory.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: 061c24e1
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: 061c24e1
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/performance-design.md
+**Duration ms**: 77
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: 17fa5980
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: 17fa5980
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: bf8de661
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/scalability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: bf8de661
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/scalability-design.md
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0a743aa3
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/reliability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0a743aa3
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/reliability-design.md
+**Duration ms**: 79
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: d56d348d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/observability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: d56d348d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/observability-design.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: c81c979d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/logical-components.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: c81c979d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/logical-components.md
+**Duration ms**: 71
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: b91947fd
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: b91947fd
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/traceability.json
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: e2cc351c
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: e2cc351c
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/performance-design.md
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: e5d2a8ae
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: e5d2a8ae
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/traceability.json
+**Duration ms**: 76
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-10T23:12:44Z
+**Event**: REVIEW_REQUESTED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:a14db84983d2d43d614a98b8fe8e8773e4d3ed117e6bb294f1ab5d781719c75e
+**Request Id**: review:aa51eacbf1a07f08f16b4e34f87c2e8a
+**Review File**: .aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.aa51eacbf1a07f08f16b4e34f87c2e8a.review.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:12:48Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nfr-design/memory.md
+**Context**: construction > nfr-design > memory.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:12:53Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-10T23:13:08Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-10T23:13:36Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: nfr-design
+**Tool**: Bash
+**Details**: <project-dir> (unit nc2-snapshot-fields)
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:14:12Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.aa51eacbf1a07f08f16b4e34f87c2e8a.review.md
+**Context**: .aidlc-engine > reviews > nfr-design > units > nc2-snapshot-fields > 7332c702b7dcc515 > 1.aa51eacbf1a07f08f16b4e34f87c2e8a.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-10T23:14:18Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T23:14:18Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: ac7a433edd5bef9de
+**Review File Digest**: .aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.aa51eacbf1a07f08f16b4e34f87c2e8a.review.md=565f1c13c9e37464c68b01f0daefc79d773ecb263ca03bfa965fc68a5ed899c8
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-10T23:14:21Z
+**Event**: REVIEW_COMPLETED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:a14db84983d2d43d614a98b8fe8e8773e4d3ed117e6bb294f1ab5d781719c75e
+**Artifact Fingerprint**: sha256:a14db84983d2d43d614a98b8fe8e8773e4d3ed117e6bb294f1ab5d781719c75e
+**Request Id**: review:aa51eacbf1a07f08f16b4e34f87c2e8a
+**Review Record**: .aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json
+**Review Record Digest**: sha256:5cedb64aeae0bfacaf2c9bd8c757dcfbb4fe0c9ffcc5e1d80ab47501bb47ef4b
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-10T23:14:23Z
+**Event**: UNIT_COMPLETED
+**Stage**: nfr-design
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Unit Skipped
+**Timestamp**: 2026-11-10T23:14:49Z
+**Event**: UNIT_SKIPPED
+**Stage**: infrastructure-design
+**Unit**: nc2-snapshot-fields
+**Reason**: NC2는 인프라 변경이 없다: 새 AWS 자원·배포 단위·환경변수·마이그레이션이 없고 CI도 고치지 않는다(ci.yml이 이미 worker/app 변경에 api 시험을 돌림). 기존 web·api 배포에 함께 들어간다(unit-of-work NC2, NFR 설계 logical-components).
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Plan Approval Blocked
+**Timestamp**: 2026-11-10T23:15:29Z
+**Event**: PLAN_APPROVAL_BLOCKED
+**Guard**: plan-approval-guard
+**Reason**: plan-approval
+**Tool**: Bash
+**Target**: sed -n 15,30p api/src/jd-summary/jd-generation-request.ts; grep -n "INSTRUCTION\|instruction" api/test/jd/jd-summary.test.cjs api/test/rag-answer/qna-controller
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Stage**: code-generation
+**Unit**: nc2-snapshot-fields
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:17:16Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-10T23:17:37Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/unit-test-instructions.md
+**Context**: construction > nc2-snapshot-fields > code-generation > unit-test-instructions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T23:33:16Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve. 다만 두 가지를 계획에 더한다.\r- Step 5: 문장 대조 시험이 실패할 때 메시지에 바뀐 상수 이름과 「worker/app/candidates/build.py의 이 문장이 바뀌었다면 api/src/publications/work-limit-sentences.ts의 같은 상수도 함께 고친다」를 적는다. worker만 고친 사람이 api 시험 실패를 보고 바로 고칠 수 있게 하기 위해서다.\r- Step 10: 소속 기록(commit_assignment)이 이제 발행 표지(ownCommit)의 근거로도 쓰인다는 것을, 소속 기록을 설명하는 api 문서나 엔티티 주석에 한 줄 적는다. 소속 기록의 뜻이나 쓰는 규칙을 바꾸면 표지도 바뀌기 때문이다. 같은 자리에 worker에 새 작업 전체 한계 문장을 더하면 api 상수 목록에도 더해야 면접관 화면에 보인다는 것도 적는다."]
+**Message Id**: b2f3e333
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T23:33:17Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: Approve the code plan for nc2-snapshot-fields?
+**Reply**: Approve. 다만 두 가지를 계획에 더한다.\n- Step 5: 문장 대조 시험이 실패할 때 메시지에 바뀐 상수 이름과 「worker/app/candidates/build.py의 이 문장이 바뀌었다면 api/src/publications/work-limit-sentences.ts의 같은 상수도 함께 고친다」를 적는다. worker만 고친 사람이 api 시험 실패를 보고 바로 고칠 수 있게 하기 위해서다.\n- Step 10: 소속 기록(commit_assignment)이 이제 발행 표지(ownCommit)의 근거로도 쓰인다는 것을, 소속 기록을 설명하는 api 문서나 엔티티 주석에 한 줄 적는다. 소속 기록의 뜻이나 쓰는 규칙을 바꾸면 표지도 바뀌기 때문이다. 같은 자리에 worker에 새 작업 전체 한계 문장을 더하면 api 상수 목록에도 더해야 면접관 화면에 보인다는 것도 적는다.
+**Options**: ["Approve Plan","Request Changes","I'll edit the files"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:33:26Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:33:32Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:33:34Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:33:36Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/unit-test-instructions.md
+**Context**: construction > nc2-snapshot-fields > code-generation > unit-test-instructions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:33:38Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Plan Approval Recorded
+**Timestamp**: 2026-11-10T23:33:40Z
+**Event**: PLAN_APPROVAL_RECORDED
+**Stage**: code-generation
+**Details**: Approve Plan
+**Checkpoint**: plan-approval
+**Plan Target**: unit:nc2-snapshot-fields
+**Intent**: 01a1bde5-4f0a-722b-a5da-2cd6e564757e
+**Directive Epoch**: sha256:7600c50888db5c4f0e94afd362c99925b89467fa1934feaa8057199b015e748f
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+**Approval Fingerprint**: sha256:v3:05ac0edbcb05e3113aefbf867ae623e4ee74210da7523f88f7135ececc7b1ddd
+**Questions File**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-questions.md
+**Questions SHA-256**: 8c5a507cab8c86df2d9b750811a3457911673daae191dd6a84dc95d31ef48c2e
+**Prompt SHA-256**: 78f5b3edfb247985be758c099d5a97f283cf4ff6a224a2744222674ee373cd51
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Asked By**: engine
+**Person Reply**: Approve. 다만 두 가지를 계획에 더한다.\n- Step 5: 문장 대조 시험이 실패할 때 메시지에 바뀐 상수 이름과 「worker/app/candidates/build.py의 이 문장이 바뀌었다면 api/src/publications/work-limit-sentences.ts의 같은 상수도 함께 고친다」를 적는다. worker만 고친 사람이 api 시험 실패를 보고 바로 고칠 수 있게 하기 위해서다.\n- Step 10: 소속 기록(commit_assignment)이 이제 발행 표지(ownCommit)의 근거로도 쓰인다는 것을, 소속 기록을 설명하는 api 문서나 엔티티 주석에 한 줄 적는다. 소속 기록의 뜻이나 쓰는 규칙을 바꾸면 표지도 바뀌기 때문이다. 같은 자리에 worker에 새 작업 전체 한계 문장을 더하면 api 상수 목록에도 더해야 면접관 화면에 보인다는 것도 적는다.
+**Message Id**: b2f3e333
+**Unit**: nc2-snapshot-fields
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-10T23:34:05Z
+**Event**: UNIT_STARTED
+**Stage**: code-generation
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-10T23:36:15Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-developer-agent
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:38:08Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-10T23:38:37Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-10T23:38:37Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: a4254da62c0f16f84
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-10T23:38:42Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: Step 2 api 시험 DB(127.0.0.1:5433)가 꺼져 있다. catchu-db-test(12시간 전 멈춤)를 띄울까?
+**Options**: catchu-db-test를 띄운다,내가 직접 띄운다,다른 컨테이너
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-10T23:41:47Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["catchu-db-test를 띄운다"]
+**Message Id**: 4435a3b4
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-10T23:41:47Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: api 시험 DB로 어느 컨테이너를 띄울까요?
+**Reply**: catchu-db-test를 띄운다
+**Options**: ["catchu-db-test를 띄운다","내가 직접 띄운다","catchu-db-test-86을 띄운다"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-10T23:41:49Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: catchu-db-test를 띄운다
+**Person Reply**: catchu-db-test를 띄운다
+**Message Id**: 4435a3b4
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:43:27Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:45:35Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:51:32Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:51:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:53:09Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:54:26Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:55:42Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-10T23:58:12Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T00:00:34Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:01:21Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: a4254da62c0f16f84
+**Message**: I'm waiting for the load to drop before starting the 60-minute verification run. The background check will notify me.
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T00:01:23Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:01:54Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: a4254da62c0f16f84
+**Message**: I'm waiting for the load to settle under 5.5, which leaves some margin below the 6 limit.
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:03:28Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: a4254da62c0f16f84
+**Message**: The verification is running (api, then web, then worker). I'll report when it finishes.
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:06:36Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: adfe01efef41ab5c8
+**Message**: NC2(면접관 사본 칸과 본인 커밋 표지)를 만들고 있고, 코드 계획이 승인돼 개발자 에이전트가 구현 후 검증 명령을 돌리는 중입니다. 결과가 오면 정리해 보여 드린 뒤 로컬 서버 확인(Step 12)을 여쭤보겠습니다.
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T00:14:32Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T00:15:07Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:15:07Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: a4254da62c0f16f84
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T00:15:34Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: Step 12 로컬 실제 연결 확인: 로컬 DB(catchu-db, 5432)·api·web을 띄워 소속 기록이 있는 Catch를 발행해 볼까?
+**Options**: 내가 띄워 확인한다,사람이 직접 띄운다,Step 12는 뒤로 미룬다
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T00:19:38Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["1번(내가 띄워 확인)으로 하되 다음처럼 한다.\r- DB는 「catchu-db(5432)」가 아니라 NC1 Step 15에서 쓴 catchu-cr1-db(55460, pgvector)를 쓴다. 5432를 쓰는 컨테이너는 5주 전에 비정상 종료된 옛 catchu-db-86(postgres:16, pgvector 없음)뿐이다. 띄우기 전에 백업을 받는다.\r- TheMe의 「SET_TOKEN 코드 수정」 Catch를 쓴다(작성자 설명에 커밋 링크가 이미 있고 근거에 PR 없이 합친 병합이 있다). 그 Catch에 소속 기록(commit_assignment)이 있는지 먼저 본다. 없으면 새로 분석하지 말고, 그 Catch의 본인 커밋 근거 식별값으로 시험용 소속 기록을 넣고 code-summary에 「합성 소속 기록」이라고 적는다.\r- 그 Catch 근거 가운데 본인 커밋과 병합 커밋의 주소를 알려 주면, 로그인·작성자 설명 고치기·발행은 내가 브라우저에서 한다. 본인 커밋 링크에는 표지가 있고 병합 커밋 링크에는 없는 것을 한 번에 본다.\r- rag-eval.cjs의 JD 지시는 스크립트 전용 문장 대신 운영 상수 JD_SUMMARY_INSTRUCTION을 불러 쓰게 바꾼다(재는 것과 실제를 같게). JD 결과를 판정에 쓰지 않는다는 앞 결정은 그대로다."]
+**Message Id**: 0c388bf0
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T00:19:38Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: Step 12 로컬 확인을 어떻게 할까요?
+**Reply**: 1번(내가 띄워 확인)으로 하되 다음처럼 한다.\n- DB는 「catchu-db(5432)」가 아니라 NC1 Step 15에서 쓴 catchu-cr1-db(55460, pgvector)를 쓴다. 5432를 쓰는 컨테이너는 5주 전에 비정상 종료된 옛 catchu-db-86(postgres:16, pgvector 없음)뿐이다. 띄우기 전에 백업을 받는다.\n- TheMe의 「SET_TOKEN 코드 수정」 Catch를 쓴다(작성자 설명에 커밋 링크가 이미 있고 근거에 PR 없이 합친 병합이 있다). 그 Catch에 소속 기록(commit_assignment)이 있는지 먼저 본다. 없으면 새로 분석하지 말고, 그 Catch의 본인 커밋 근거 식별값으로 시험용 소속 기록을 넣고 code-summary에 「합성 소속 기록」이라고 적는다.\n- 그 Catch 근거 가운데 본인 커밋과 병합 커밋의 주소를 알려 주면, 로그인·작성자 설명 고치기·발행은 내가 브라우저에서 한다. 본인 커밋 링크에는 표지가 있고 병합 커밋 링크에는 없는 것을 한 번에 본다.\n- rag-eval.cjs의 JD 지시는 스크립트 전용 문장 대신 운영 상수 JD_SUMMARY_INSTRUCTION을 불러 쓰게 바꾼다(재는 것과 실제를 같게). JD 결과를 판정에 쓰지 않는다는 앞 결정은 그대로다.
+**Options**: ["내가 띄워 확인한다","사람이 직접 띄운다","Step 12는 뒤로 미룬다"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-11T00:19:47Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: 1번(내가 띄워 확인). DB는 catchu-cr1-db(55460) 백업 뒤 사용, TheMe 「SET_TOKEN 코드 수정」 Catch, 소속 기록 없으면 합성 소속 기록, 주소를 알려 주면 로그인·설명·발행은 사람이 브라우저에서, rag-eval.cjs JD 지시는 JD_SUMMARY_INSTRUCTION을 불러 쓰게 바꾼다
+**Person Reply**: 1번(내가 띄워 확인)으로 하되 다음처럼 한다.\n- DB는 「catchu-db(5432)」가 아니라 NC1 Step 15에서 쓴 catchu-cr1-db(55460, pgvector)를 쓴다. 5432를 쓰는 컨테이너는 5주 전에 비정상 종료된 옛 catchu-db-86(postgres:16, pgvector 없음)뿐이다. 띄우기 전에 백업을 받는다.\n- TheMe의 「SET_TOKEN 코드 수정」 Catch를 쓴다(작성자 설명에 커밋 링크가 이미 있고 근거에 PR 없이 합친 병합이 있다). 그 Catch에 소속 기록(commit_assignment)이 있는지 먼저 본다. 없으면 새로 분석하지 말고, 그 Catch의 본인 커밋 근거 식별값으로 시험용 소속 기록을 넣고 code-summary에 「합성 소속 기록」이라고 적는다.\n- 그 Catch 근거 가운데 본인 커밋과 병합 커밋의 주소를 알려 주면, 로그인·작성자 설명 고치기·발행은 내가 브라우저에서 한다. 본인 커밋 링크에는 표지가 있고 병합 커밋 링크에는 없는 것을 한 번에 본다.\n- rag-eval.cjs의 JD 지시는 스크립트 전용 문장 대신 운영 상수 JD_SUMMARY_INSTRUCTION을 불러 쓰게 바꾼다(재는 것과 실제를 같게). JD 결과를 판정에 쓰지 않는다는 앞 결정은 그대로다.
+**Message Id**: 0c388bf0
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T00:21:47Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:25:41Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: aa3670f3f1e0ea10f
+**Message**: NC2 코드를 다 만들었고 전체 검증도 통과해서, 지금은 마지막 단계인 로컬 화면 확인을 기다리고 있습니다. localhost:3000에서 「SET_TOKEN 코드 수정」 Catch에 병합 커밋 링크를 더해 발행한 뒤, 표지가 붙는지 보고 결과를 알려 주세요.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T00:50:43Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: typed
+**Message Id**: 23a65cd5
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T00:50:58Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T00:51:04Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/source-manifest.json
+**Context**: construction > nc2-snapshot-fields > code-generation > source-manifest.json
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T00:51:47Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-summary.md
+**Context**: construction > nc2-snapshot-fields > code-generation > code-summary.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T00:52:26Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/traceability.json
+**Context**: construction > nc2-snapshot-fields > code-generation > traceability.json
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T00:52:37Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/code-generation/memory.md
+**Context**: construction > code-generation > memory.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: ca9a0bf7
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: ca9a0bf7
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md
+**Duration ms**: 74
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0b595344
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/unit-test-instructions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0b595344
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/unit-test-instructions.md
+**Duration ms**: 71
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: ef76695e
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: ef76695e
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-summary.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: e6123e7b
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: e6123e7b
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/traceability.json
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-11T00:52:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: 75c9c040
+**Sensor ID**: traceability
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-11T00:52:40Z
+**Event**: SENSOR_PASSED
+**Fire id**: 75c9c040
+**Sensor ID**: traceability
+**Stage slug**: code-generation
+**Unit**: nc2-snapshot-fields
+**Output path**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/traceability.json
+**Duration ms**: 77
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-11-11T00:52:40Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: code-generation
+**Unit**: nc1-sections-and-links
+**Checkpoint**: review-receipt
+**Changed**: web/src/features/publications/README.md, web/src/features/publications/publications.module.css, web/src/features/publications/snapshot-view.tsx, web/src/features/recipient/README.md, web/src/lib/github-link-name.ts, web/test/github-link-name.test.mjs, web/test/publications-owner.test.mjs, web/test/recipient.test.mjs
+**Recorded**: sha256:5542c2564b8b11c9de1126b7f25e6867bb2b5961a8065edff1cc567d560e1844
+**Current**: sha256:4049bbf33da0f532480490e84e6ee7203f62fc84a343c42b827a4b5266bc0f9d
+**Details**: web/src/features/publications/README.md, web/src/features/publications/publications.module.css, web/src/features/publications/snapshot-view.tsx, web/src/features/recipient/README.md, web/src/lib/github-link-name.ts, web/test/github-link-name.test.mjs, web/test/publications-owner.test.mjs, web/test/recipient.test.mjs changed after the nc1 sections and links Unit was reviewed; carrying on.
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-11T00:52:40Z
+**Event**: REVIEW_REQUESTED
+**Stage**: code-generation
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:75469ab9d64a7f26badde4779db45776fee9066e31a95bebd8a6a6621ba115ab
+**Request Id**: review:d2a784f0ad416872860861bd158c633c
+**Source Fingerprint**: b16053cc642ba0366e6d34aa543b1ccb22e08a5721b145e9e4f679b0f5331a55
+**Unit Source Fingerprint**: sha256:1709ff6d4e78f51418e40b2d4e418641feea0539f440c7472348bd3cdca660bf
+**Review File**: .aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.d2a784f0ad416872860861bd158c633c.review.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-11T00:52:46Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/construction/code-generation/memory.md
+**Context**: construction > code-generation > memory.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T00:52:50Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-11T00:53:13Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:53:30Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: ab701547e505564d4
+**Message**: 로컬 서버는 검토 끝나면 내려 줘
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-11T00:53:50Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: code-generation
+**Tool**: Bash
+**Details**: aidlc/spaces/default/intents/261109-new-catch (unit nc2-snapshot-fields)
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T00:54:39Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.d2a784f0ad416872860861bd158c633c.review.md
+**Context**: .aidlc-engine > reviews > code-generation > units > nc2-snapshot-fields > 7332c702b7dcc515 > 1.d2a784f0ad416872860861bd158c633c.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T00:54:47Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:54:47Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: aa796c3c7e1e4addf
+**Review File Digest**: .aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.d2a784f0ad416872860861bd158c633c.review.md=7ab2830b5fb8ca44d28b883e589211cd8dcd9c177cd8e81719aa2c5ba891063e
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-11T00:54:51Z
+**Event**: REVIEW_COMPLETED
+**Stage**: code-generation
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: nc2-snapshot-fields
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:75469ab9d64a7f26badde4779db45776fee9066e31a95bebd8a6a6621ba115ab
+**Artifact Fingerprint**: sha256:75469ab9d64a7f26badde4779db45776fee9066e31a95bebd8a6a6621ba115ab
+**Request Id**: review:d2a784f0ad416872860861bd158c633c
+**Request Source Fingerprint**: b16053cc642ba0366e6d34aa543b1ccb22e08a5721b145e9e4f679b0f5331a55
+**Source Fingerprint**: b16053cc642ba0366e6d34aa543b1ccb22e08a5721b145e9e4f679b0f5331a55
+**Source Listing**: sha256:863e7e6636cfdf63b6e729638da1fdbace6b747889118f5a9c287f33e9060aff
+**Unit Source Fingerprint**: sha256:1709ff6d4e78f51418e40b2d4e418641feea0539f440c7472348bd3cdca660bf
+**Review Record**: .aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.json
+**Review Record Digest**: sha256:381e04572bee3000803bab8731d170a13e2d59187d8d86590290071333b64cab
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-11T00:55:01Z
+**Event**: UNIT_COMPLETED
+**Stage**: code-generation
+**Unit**: nc2-snapshot-fields
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-11-11T00:55:57Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: functional-design
+**Unit**: nc2-snapshot-fields
+**Checkpoint**: review-receipt
+**Changed**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md, aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md, aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md
+**Recorded**: sha256:7238b3bdffaa680c9efbd1831cc9edf99c70de90beba9fe8e8127775467ecf43
+**Current**: sha256:b3bc5f7d664ce7576c76f9b0908ecdf8f7939fc12f274cddbb0a33c0f0f7be98
+**Details**: aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md, aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/entities.md, aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md changed after the nc2 snapshot fields Unit was reviewed; carrying on.
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T00:56:08Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a0afbf2c6ed7c4d0e
+**Message**: ! git rm -q --cached api/aidlc/.aidlc-sessions/1729f1fa-467d-42c0-835d-f754927cf476.binding.json && rm -r api/aidlc && git commit -q --amend --no-edit
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-11T01:00:02Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a349af08860e13ad8
+**Message**: 새 Catch의 NC2(면접관 사본 칸과 표지) 코드를 다 만들었고 검토도 통과했습니다. 지금 Unit 확인 명령(최대 60분)이 돌고 있고, 끝나면 결과를 보여 드린 뒤 NC2 승인을 여쭤보겠습니다.
+
+---
+
+## Checkpoint Verification Recorded
+**Timestamp**: 2026-11-11T01:06:08Z
+**Event**: CHECKPOINT_VERIFICATION_RECORDED
+**Unit**: nc2-snapshot-fields
+**Kind**: unit
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Verification Id**: 509fc6f6-0872-42ba-a02b-b99ab080fb68
+**Fingerprint**: sha256:9e584d5701421f6aea8ddfffddbed76733108bb146665e35dad1a30c37a77872
+**Command SHA-256**: dc0c9c449a685becf2741e484ff978989d3ad90c5e12b107d00c5d3397cb4273
+**Exit Code**: 0
+**Verified**: true
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-11T01:06:09Z
+**Event**: HOST_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T01:08:19Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: You asked me to 본인 커밋 여부 같은 판정은 worker 문장을 api에 베껴 대조하지 말고, DB에 이미 저장된 기록(소속 기록 commit_assignment 등)으로 정한다. Keep that for next time? / You asked me to 로컬 실제 연결 확인은 앞 Unit의 code-summary에 적힌 로컬 환경(~/catchu-local-live/cr1, catchu-cr1-db 55460, pgvector)을 먼저 확인해 쓰고, 띄우기 전에 DB를 백업한다. Keep that for next time?
+**Options**: |Yes, for this project|Yes, for the team|No
+**Question Kind**: learnings-note
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T01:22:13Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["Yes, for this project","No"]
+**Message Id**: f783f267
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T01:22:14Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: 본인 커밋 여부 같은 판정은 worker 문장을 api에 베껴 대조하지 말고, DB에 이미 저장된 기록(소속 기록 commit_assignment 등)으로 정하라고 바로잡아 주셨습니다. 다음에도 지킬까요?
+**Reply**: Yes, for this project
+**Options**: ["Yes, for this project","Yes, for the team","No"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T01:22:14Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: 로컬 실제 연결 확인은 앞 Unit의 code-summary에 적힌 로컬 환경(~/catchu-local-live/cr1, catchu-cr1-db 55460, pgvector)을 먼저 확인해 쓰고, 띄우기 전에 DB를 백업하라고 바로잡아 주셨습니다. 다음에도 지킬까요?
+**Reply**: No
+**Options**: ["Yes, for this project","Yes, for the team","No"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-11T01:22:20Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: Q1: Yes, for this project; Q2: No
+**Person Reply**: <pasted_content id="9097">\n로컬 실제 연결 확인 결과를 알려 드립니다. 11/11 09:31(KST)에 「SET_TOKEN 코드 수정」을 새로 발행하고 받은 사람 링크를 열어 확인했습니다.\n\n- 작성자 설명은 고치지 않았습니다. 「짚어 볼 곳」에 두 커밋 링크(0874001 본인 커밋, 947dc99 병합 커밋)가 11/10부터 이미 들어 있었습니다.\n- ① 제목 아래 작은 줄에 ljm0850/TheMe가 보였습니다.\n- ② 「작성자 설명」 제목 안에 「2026년 11월에 마지막으로 고침」이 보였습니다.\n- ③ 「커밋 0874001」 링크 바로 뒤에 「이 작업의 본인 커밋」 표지가 하나 보였습니다. 표지는 링크와 강조 밖의 형제 요소였고 tabindex·role이 없었으며, Catch 종류 표지와 모양이 같았습니다. Tab 키를 누르면 0874001 링크에서 947dc99 링크로 바로 넘어갔습니다.\n- ④ 「커밋 947dc99」 뒤에는 표지가 없었습니다. 근거 목록의 「GitHub 근거 열기」 링크에도 표지가 없었습니다.\n- 공개 응답에서는 repositoryName이 "ljm0850/TheMe", authorDescriptionEditedMonth가 "2026-11"이었습니다. workLimits 키는 없었고, ownCommit은 0874001이 true, 947dc99가 false였습니다.\n- 작성자 쪽 발행 상세 화면에서도 ①~④가 같게 보였습니다.\n\n화면으로 보지 못하고 시험으로만 확인한 것:\n- 「이 기록으로 알 수 없는 것」: 이 Catch 근거에는 작업 전체 한계 문장이 없어서 칸이 나오지 않았습니다. 947dc99에는 커밋 하나에만 해당하는 한계 문장만 있었습니다.\n- 작성자 말로 옮기라는 AI 지시 문장: 로컬에 Claude 키가 없어서 실제 답으로는 확인하지 못했습니다.\n\n결과를 기록하고 코드 요약과 검토로 넘어가 주세요.\n</pasted_content id="9097">\nYes, for this project\nNo
+**Message Id**: f783f267
+**Message Ids**: 23a65cd5,f783f267
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T01:22:28Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/learnings/nfr-requirements-selections.json
+**Context**: .aidlc-engine > learnings > nfr-requirements-selections.json
+
+---
+
+## Rule Learned
+**Timestamp**: 2026-11-11T01:22:29Z
+**Event**: RULE_LEARNED
+**Stage**: nfr-requirements
+**Candidate-ID**: c1
+**Content-Hash**: e3e3e8569334a22213a106b72c10b4eb7a3cccf43aaa8aa4cebacea3d036a853
+**Destination**: <project-dir>/aidlc/spaces/default/memory/project.md
+**Heading**: ## Corrections
+**Source**: user_addition
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T01:22:42Z
+**Event**: DECISION_RECORDED
+**Checkpoint**: Construction Unit Approval
+**Unit**: nc2-snapshot-fields
+**Kind**: unit
+**Stage**: code-generation
+**Fingerprint**: sha256:9e584d5701421f6aea8ddfffddbed76733108bb146665e35dad1a30c37a77872
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Options**: Approve,Request Changes
+**Asked Evidence**: {"functional-design":["sha256:7238b3bdffaa680c9efbd1831cc9edf99c70de90beba9fe8e8127775467ecf43",null],"nfr-requirements":["sha256:f1112e1c526e7de30319564d30023f98fe388a09cca88579389564ce7d8b20a7",null],"nfr-design":["sha256:a14db84983d2d43d614a98b8fe8e8773e4d3ed117e6bb294f1ab5d781719c75e",null],"code-generation":["sha256:75469ab9d64a7f26badde4779db45776fee9066e31a95bebd8a6a6621ba115ab","sha256:1709ff6d4e78f51418e40b2d4e418641feea0539f440c7472348bd3cdca660bf",{"\u0000api/docs/catch-registration-rules.md":"100644 5f1802ff1742d6f09ed7ad31275b850e60fee59121ec78f7a909941fd1c9b27c","\u0000api/docs/publications.md":"100644 e0287879d6f1a5c1beba9d6208e1e1fa11eebe68e6c7dac626550a34cf7cb597","\u0000api/docs/published-index.md":"100644 d25ee9723bb31fba840e9b2ec5af19c50eb1598bc960a33589ed6a63897e7a2c","\u0000api/scripts/rag-eval/rag-eval.cjs":"100644 e72a2357c735599e398ca4a840557707c4d36400b7aa273f79776e7e21569feb","\u0000api/src/catches/entities/commit-assignment.entity.ts":"100644 03fc89d6e8956091bca9ebbacac4e8c019d228df221ff9b12aaf720ca120fc58","\u0000api/src/jd-summary/jd-generation-request.ts":"100644 1c0a0ccf01612016254d54cbb9ab21def5347419336c0db750075930ebeacfe1","\u0000api/src/publications/publications-log.ts":"100644 225acdf917fe308e72d0e03a296454bd6d3e6cb59ef2e5a8f447849cdc48b2b1","\u0000api/src/publications/publish.service.ts":"100644 322930f64e365ab1da643da60b91a656f799fed5048739bfbc96247713cc38c1","\u0000api/src/publications/published-snapshot.ts":"100644 170d01dc188be395046c86846e75c5e45dd9de647a38a00032cfa3c4b9e38e1e","\u0000api/src/publications/snapshot-builder.ts":"100644 1f0a87c5d78ab709586fac64c044b20499fc2d5b9e279a3b30cc3d38f8d03853","\u0000api/src/publications/work-limit-sentences.ts":"100644 bdfbd1865b982595d6504e31e90890c3e7aea1e37849a4d3a9b0015387e455d6","\u0000api/src/rag-answer/rag-answer-config.ts":"100644 32e7ac8505d37f52a094c8fc5d853735f5b0bcd37a58e489b535dc6bb3042903","\u0000api/test/jd/jd-summary.test.cjs":"100644 a0c23152f6b3750f356cc20ee871222f74f4648154044dcf52c28bd07b03d4e9","\u0000api/test/publications/publications-logging.test.cjs":"100644 c5c1fd44dd96723e83e78f8f9446e0fbbfecfa3acf98c6bb02f2546819c071cb","\u0000api/test/publications/publish-api.test.cjs":"100644 8c573d76cf5be1ab8ae13915dbfa18fc35fe5027e1a9d901f4bfac981cf2bc60","\u0000api/test/publications/support.cjs":"100644 3d31404d63018b00cb1e9a024b9942ed30e45612500bbdf5e500dd0d71fb695b","\u0000api/test/publications/work-limit-sentences.test.cjs":"100644 096881273443cca99d621af8237388a00b5d7e130f66830d4e7da747652f13ea","\u0000api/test/published-index/chunker.test.cjs":"100644 e2c7d96c50740241eb0a49ee2784afa81f5b584cb8a07a985961d803d2ba627c","\u0000api/test/rag-answer/base-summary-handler.test.cjs":"100644 53782e0093cfa922f814356698e42110e1b7541a0fde20e240faf823d30ec3d5","\u0000api/test/rag-answer/qna-controller.test.cjs":"100644 8e8fb7cd80f7d1546c928f97bb5c6d9c34ed439aa871e629aba55118e850cf49","\u0000api/test/rag-answer/summary-sources.test.cjs":"100644 eb4477bf6689866d9bf8caec50f014c4c8997d87d96869951bbdf0f026d4b6bb","\u0000web/src/features/publications/README.md":"100644 e6959319e5126edd25078bd2b6b2aa64ff135f6dafb42bea318ea4c063c7a03c","\u0000web/src/features/publications/publications-api.ts":"100644 7b34a11c922598b33f24087d8bda2d89ea271c9a35981a36e1c3481697e84585","\u0000web/src/features/publications/publications.module.css":"100644 61c1df8c2f3e29d5e8368f11eb73ef55c42ac209b24568deda9b1881f3bb8dd4","\u0000web/src/features/publications/snapshot-view.tsx":"100644 a2394ab733d56046b637056d4c084d3b873b9ea9258013882b527e5165532e85","\u0000web/src/features/recipient/README.md":"100644 5f5cb0624e9717479684560a9d1eb0f5a58878d3c088fafaa7e110921a19291d","\u0000web/src/features/recipient/recipient-api.ts":"100644 f10ccedf69089e880f25d421781bd2569eea274692d163397b34e9998a370685","\u0000web/src/lib/github-link-name.ts":"100644 28cd59408598d2a3e604c28fd3b9e813035e41b8df01f35ec3726b3913c2f4de","\u0000web/test/github-link-name.test.mjs":"100644 51eafaa063f67ab903cf424c259542a1a5624cfe63680d38a25a0d82a720daa6","\u0000web/test/publications-owner.test.mjs":"100644 7c47f545b922c683a04b3bdc0697b8b9394df674341b1c9bb6ef956f5ccbb432","\u0000web/test/recipient.test.mjs":"100644 a1d0a2fbf11c44e63a9ebd59f9a800bd7fc61514db0a36c94830361e431eb4c7"}]}
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","code-generation":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1"}
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T01:36:19Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: 3f2890e2
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T01:36:20Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: Approve this completed nc2-snapshot-fields?
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-11T01:36:28Z
+**Event**: GATE_APPROVED
+**Unit**: nc2-snapshot-fields
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Scope**: unit-end
+**Checkpoint**: construction-unit
+**Fingerprint**: sha256:9e584d5701421f6aea8ddfffddbed76733108bb146665e35dad1a30c37a77872
+**Run floor**: WORKFLOW_STARTED:2026-11-09T01:21:24Z#1
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1","code-generation":"WORKFLOW_STARTED:2026-11-09T01:21:24Z#1"}
+**Verification Command SHA-256**: dc0c9c449a685becf2741e484ff978989d3ad90c5e12b107d00c5d3397cb4273
+**Verification Id**: 509fc6f6-0872-42ba-a02b-b99ab080fb68
+**Approved Evidence**: {"functional-design":["sha256:7238b3bdffaa680c9efbd1831cc9edf99c70de90beba9fe8e8127775467ecf43",null],"nfr-requirements":["sha256:f1112e1c526e7de30319564d30023f98fe388a09cca88579389564ce7d8b20a7",null],"nfr-design":["sha256:a14db84983d2d43d614a98b8fe8e8773e4d3ed117e6bb294f1ab5d781719c75e",null],"code-generation":["sha256:75469ab9d64a7f26badde4779db45776fee9066e31a95bebd8a6a6621ba115ab","sha256:1709ff6d4e78f51418e40b2d4e418641feea0539f440c7472348bd3cdca660bf",{"\u0000api/docs/catch-registration-rules.md":"100644 5f1802ff1742d6f09ed7ad31275b850e60fee59121ec78f7a909941fd1c9b27c","\u0000api/docs/publications.md":"100644 e0287879d6f1a5c1beba9d6208e1e1fa11eebe68e6c7dac626550a34cf7cb597","\u0000api/docs/published-index.md":"100644 d25ee9723bb31fba840e9b2ec5af19c50eb1598bc960a33589ed6a63897e7a2c","\u0000api/scripts/rag-eval/rag-eval.cjs":"100644 e72a2357c735599e398ca4a840557707c4d36400b7aa273f79776e7e21569feb","\u0000api/src/catches/entities/commit-assignment.entity.ts":"100644 03fc89d6e8956091bca9ebbacac4e8c019d228df221ff9b12aaf720ca120fc58","\u0000api/src/jd-summary/jd-generation-request.ts":"100644 1c0a0ccf01612016254d54cbb9ab21def5347419336c0db750075930ebeacfe1","\u0000api/src/publications/publications-log.ts":"100644 225acdf917fe308e72d0e03a296454bd6d3e6cb59ef2e5a8f447849cdc48b2b1","\u0000api/src/publications/publish.service.ts":"100644 322930f64e365ab1da643da60b91a656f799fed5048739bfbc96247713cc38c1","\u0000api/src/publications/published-snapshot.ts":"100644 170d01dc188be395046c86846e75c5e45dd9de647a38a00032cfa3c4b9e38e1e","\u0000api/src/publications/snapshot-builder.ts":"100644 1f0a87c5d78ab709586fac64c044b20499fc2d5b9e279a3b30cc3d38f8d03853","\u0000api/src/publications/work-limit-sentences.ts":"100644 bdfbd1865b982595d6504e31e90890c3e7aea1e37849a4d3a9b0015387e455d6","\u0000api/src/rag-answer/rag-answer-config.ts":"100644 32e7ac8505d37f52a094c8fc5d853735f5b0bcd37a58e489b535dc6bb3042903","\u0000api/test/jd/jd-summary.test.cjs":"100644 a0c23152f6b3750f356cc20ee871222f74f4648154044dcf52c28bd07b03d4e9","\u0000api/test/publications/publications-logging.test.cjs":"100644 c5c1fd44dd96723e83e78f8f9446e0fbbfecfa3acf98c6bb02f2546819c071cb","\u0000api/test/publications/publish-api.test.cjs":"100644 8c573d76cf5be1ab8ae13915dbfa18fc35fe5027e1a9d901f4bfac981cf2bc60","\u0000api/test/publications/support.cjs":"100644 3d31404d63018b00cb1e9a024b9942ed30e45612500bbdf5e500dd0d71fb695b","\u0000api/test/publications/work-limit-sentences.test.cjs":"100644 096881273443cca99d621af8237388a00b5d7e130f66830d4e7da747652f13ea","\u0000api/test/published-index/chunker.test.cjs":"100644 e2c7d96c50740241eb0a49ee2784afa81f5b584cb8a07a985961d803d2ba627c","\u0000api/test/rag-answer/base-summary-handler.test.cjs":"100644 53782e0093cfa922f814356698e42110e1b7541a0fde20e240faf823d30ec3d5","\u0000api/test/rag-answer/qna-controller.test.cjs":"100644 8e8fb7cd80f7d1546c928f97bb5c6d9c34ed439aa871e629aba55118e850cf49","\u0000api/test/rag-answer/summary-sources.test.cjs":"100644 eb4477bf6689866d9bf8caec50f014c4c8997d87d96869951bbdf0f026d4b6bb","\u0000web/src/features/publications/README.md":"100644 e6959319e5126edd25078bd2b6b2aa64ff135f6dafb42bea318ea4c063c7a03c","\u0000web/src/features/publications/publications-api.ts":"100644 7b34a11c922598b33f24087d8bda2d89ea271c9a35981a36e1c3481697e84585","\u0000web/src/features/publications/publications.module.css":"100644 61c1df8c2f3e29d5e8368f11eb73ef55c42ac209b24568deda9b1881f3bb8dd4","\u0000web/src/features/publications/snapshot-view.tsx":"100644 a2394ab733d56046b637056d4c084d3b873b9ea9258013882b527e5165532e85","\u0000web/src/features/recipient/README.md":"100644 5f5cb0624e9717479684560a9d1eb0f5a58878d3c088fafaa7e110921a19291d","\u0000web/src/features/recipient/recipient-api.ts":"100644 f10ccedf69089e880f25d421781bd2569eea274692d163397b34e9998a370685","\u0000web/src/lib/github-link-name.ts":"100644 28cd59408598d2a3e604c28fd3b9e813035e41b8df01f35ec3726b3913c2f4de","\u0000web/test/github-link-name.test.mjs":"100644 51eafaa063f67ab903cf424c259542a1a5624cfe63680d38a25a0d82a720daa6","\u0000web/test/publications-owner.test.mjs":"100644 7c47f545b922c683a04b3bdc0697b8b9394df674341b1c9bb6ef956f5ccbb432","\u0000web/test/recipient.test.mjs":"100644 a1d0a2fbf11c44e63a9ebd59f9a800bd7fc61514db0a36c94830361e431eb4c7"}]}
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**User Input**: Approve
+**Person Reply**: Approve
+**Message Id**: 3f2890e2
+**Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:b7ad85ee546e12aad22afc4aff60f2aa97d70217d955742632e1502d49560cd5","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:381e04572bee3000803bab8731d170a13e2d59187d8d86590290071333b64cab"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md","id":"R-02","fingerprint":"sha256:95d611dfa0d24b083dca575739cba9286d9b5d33428195f92a3f1178e4c4a33e","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:381e04572bee3000803bab8731d170a13e2d59187d8d86590290071333b64cab"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/code-generation/code-generation-plan.md","id":"R-03","fingerprint":"sha256:f067302c139aa18cd1f509c5e5f8ae2c266f42d0a7e27ebb6dfe1baf77b8e137","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:381e04572bee3000803bab8731d170a13e2d59187d8d86590290071333b64cab"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:05d9d46e9e17cae780d40ad1c6326b3ef02d7daa5d544059fc36f2b8004fc5bc","status":"Changed after review","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:639c8167db24e4a54210d680aa5c978cfc44c69dcbae25862ad7c228f6cbf343"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:0f560cefd86ab9c628ff347541f34f83123a1d44bf5c2908968f14bb65947f5f","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:639c8167db24e4a54210d680aa5c978cfc44c69dcbae25862ad7c228f6cbf343"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/functional-spec.md","id":"R-03","fingerprint":"sha256:b2e7a1391b925a0e69dc098add6c7479242427b8f38c7332c3372afb3694c6c2","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:639c8167db24e4a54210d680aa5c978cfc44c69dcbae25862ad7c228f6cbf343"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md","id":"R-01","fingerprint":"sha256:08e31553fa73c5b026bf130d05338f02858b9e6cb9c1770612c3ff35305c21f0","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:5cedb64aeae0bfacaf2c9bd8c757dcfbb4fe0c9ffcc5e1d80ab47501bb47ef4b"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md","id":"R-02","fingerprint":"sha256:4004c0a151446388652d110f2d341d927c693a7e6610ca05ca31b23841f8197f","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:5cedb64aeae0bfacaf2c9bd8c757dcfbb4fe0c9ffcc5e1d80ab47501bb47ef4b"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-design/security-design.md","id":"R-03","fingerprint":"sha256:38181f9f75517e1d6756070610f5f974586f1b3142ccf49f8cb7c0781193b135","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:5cedb64aeae0bfacaf2c9bd8c757dcfbb4fe0c9ffcc5e1d80ab47501bb47ef4b"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-01","fingerprint":"sha256:fb98c4b5187d6c1307641e197d54937d9c1dbad36af0fd8538d81a68fa946bfc","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-02","fingerprint":"sha256:4f9b1ed18b6f33fdd36ca087d06a637afe35d039ac71941f0f78bbbc660d1af9","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-03","fingerprint":"sha256:b207003490660be5531fa0306ffa448c1a098fef895177d462289a1c0abe3308","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}},{"artifact":"aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/nfr-requirements/security-requirements.md","id":"R-04","fingerprint":"sha256:1000648f27e1c81d6d271bb70126d88dad84c4ff45c2b94d2fbdcedaa48fef25","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/nc2-snapshot-fields/7332c702b7dcc515/1.json","digest":"sha256:86845b5b4c683f04c7b062d4a21176a2ca6d4160f3c0d2b30b56aba8a3260f2d"}}]}
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-11T01:37:12Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: NC2 승인 뒤: bolt-plan B2대로 NC2 PR을 지금 열지, 로컬 api·web·DB를 내릴지, NC3 기능 설계로 바로 갈지
+**Options**: |NC2 PR을 먼저 연다|NC3로 바로 간다|서버를 내리고 NC3로 간다
+**Unit**: nc3-revisit-facts
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-11T02:03:41Z
+**Event**: HUMAN_TURN
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Origin**: person
+**Source**: picker
+**Picked**: ["1번(NC2 PR을 먼저 연다)으로 가되, 아래처럼 해 줘.\r1. #517(NC1)·#516(U9)·#519가 통합 브랜치에 들어갔다(a30112a2). 통합 브랜치를 작업 브랜치에 merge commit으로 들인다. 미리 합쳐 봤을 때 충돌은 없었다.\r2. 9d4c74eb에 실수로 들어간 api/aidlc/.aidlc-sessions/1729f1fa-467d-42c0-835d-f754927cf476.binding.json을 api/aidlc/ 폴더째 지우는 커밋을 하나 만든다.\r3. NC2가 「작성자 설명」 h4 안에 작성 달을 넣어서, U9의 S5 시험(api/test/claude-mcp/mcp-shared-text.test.cjs)이 web 원문에서 찾는 '<h4>작성자 설명</h4>'가 없어졌다. 그 표지 하나를 '<h4>작성자 설명'으로 바꾸고, api를 빌드한 뒤 그 시험 파일을 돌려 S5 통과를 확인한다.\r4. project.md에 더한 「본인 커밋 같은 판정」 규칙 끝에 \"저장된 기록이 없어 문장 대조를 쓸 때는 두 쪽 문장을 맞춰 보는 시험으로 묶는다\"를 덧붙인다.\r5. PR 본문에는 다음을 적는다: AC8.1.3(남의 기여를 지원자 것으로 쓴 답 0건)은 실제 AI로 아직 재지 않았다는 것, 서비스별 시간 중 api·web은 코드 생성 때 잰 값이라는 것, 2·3번은 NC2 승인 뒤 AI-DLC 밖에서 직접 고쳤다는 것. 리뷰 요청에는 U10 담당(rag-eval·JD_SUMMARY_INSTRUCTION 내보내기)과 U9 담당(S5 표지 한 줄)을 넣는다. 본문 초안은 열기 전에 보여 줘.\r6. PR을 연 뒤 로컬 api·web을 멈추고 DB 컨테이너를 내린다."]
+**Message Id**: 71f6f973
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-11T02:03:42Z
+**Event**: QUESTION_REPLIED
+**Session**: 1729f1fa-467d-42c0-835d-f754927cf476
+**Question**: 다음에 무엇을 할까요?
+**Reply**: 1번(NC2 PR을 먼저 연다)으로 가되, 아래처럼 해 줘.\n1. #517(NC1)·#516(U9)·#519가 통합 브랜치에 들어갔다(a30112a2). 통합 브랜치를 작업 브랜치에 merge commit으로 들인다. 미리 합쳐 봤을 때 충돌은 없었다.\n2. 9d4c74eb에 실수로 들어간 api/aidlc/.aidlc-sessions/1729f1fa-467d-42c0-835d-f754927cf476.binding.json을 api/aidlc/ 폴더째 지우는 커밋을 하나 만든다.\n3. NC2가 「작성자 설명」 h4 안에 작성 달을 넣어서, U9의 S5 시험(api/test/claude-mcp/mcp-shared-text.test.cjs)이 web 원문에서 찾는 '<h4>작성자 설명</h4>'가 없어졌다. 그 표지 하나를 '<h4>작성자 설명'으로 바꾸고, api를 빌드한 뒤 그 시험 파일을 돌려 S5 통과를 확인한다.\n4. project.md에 더한 「본인 커밋 같은 판정」 규칙 끝에 "저장된 기록이 없어 문장 대조를 쓸 때는 두 쪽 문장을 맞춰 보는 시험으로 묶는다"를 덧붙인다.\n5. PR 본문에는 다음을 적는다: AC8.1.3(남의 기여를 지원자 것으로 쓴 답 0건)은 실제 AI로 아직 재지 않았다는 것, 서비스별 시간 중 api·web은 코드 생성 때 잰 값이라는 것, 2·3번은 NC2 승인 뒤 AI-DLC 밖에서 직접 고쳤다는 것. 리뷰 요청에는 U10 담당(rag-eval·JD_SUMMARY_INSTRUCTION 내보내기)과 U9 담당(S5 표지 한 줄)을 넣는다. 본문 초안은 열기 전에 보여 줘.\n6. PR을 연 뒤 로컬 api·web을 멈추고 DB 컨테이너를 내린다.
+**Options**: ["NC2 PR을 먼저 연다","NC3로 바로 간다","서버를 내리고 NC3로 간다"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-11T02:04:12Z
+**Event**: QUESTION_ANSWERED
+**Stage**: functional-design
+**Details**: NC2 PR을 먼저 연다(통합 브랜치 merge, binding 파일 지우는 커밋, S5 시험 표지 수정, project.md 규칙 덧붙임, PR 본문 초안 먼저 보여 주기, PR 뒤 서버 내리기)
+**Unit**: nc3-revisit-facts
+**Person Reply**: 1번(NC2 PR을 먼저 연다)으로 가되, 아래처럼 해 줘.\n1. #517(NC1)·#516(U9)·#519가 통합 브랜치에 들어갔다(a30112a2). 통합 브랜치를 작업 브랜치에 merge commit으로 들인다. 미리 합쳐 봤을 때 충돌은 없었다.\n2. 9d4c74eb에 실수로 들어간 api/aidlc/.aidlc-sessions/1729f1fa-467d-42c0-835d-f754927cf476.binding.json을 api/aidlc/ 폴더째 지우는 커밋을 하나 만든다.\n3. NC2가 「작성자 설명」 h4 안에 작성 달을 넣어서, U9의 S5 시험(api/test/claude-mcp/mcp-shared-text.test.cjs)이 web 원문에서 찾는 '<h4>작성자 설명</h4>'가 없어졌다. 그 표지 하나를 '<h4>작성자 설명'으로 바꾸고, api를 빌드한 뒤 그 시험 파일을 돌려 S5 통과를 확인한다.\n4. project.md에 더한 「본인 커밋 같은 판정」 규칙 끝에 "저장된 기록이 없어 문장 대조를 쓸 때는 두 쪽 문장을 맞춰 보는 시험으로 묶는다"를 덧붙인다.\n5. PR 본문에는 다음을 적는다: AC8.1.3(남의 기여를 지원자 것으로 쓴 답 0건)은 실제 AI로 아직 재지 않았다는 것, 서비스별 시간 중 api·web은 코드 생성 때 잰 값이라는 것, 2·3번은 NC2 승인 뒤 AI-DLC 밖에서 직접 고쳤다는 것. 리뷰 요청에는 U10 담당(rag-eval·JD_SUMMARY_INSTRUCTION 내보내기)과 U9 담당(S5 표지 한 줄)을 넣는다. 본문 초안은 열기 전에 보여 줘.\n6. PR을 연 뒤 로컬 api·web을 멈추고 DB 컨테이너를 내린다.
+**Message Id**: 71f6f973
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-11T02:06:33Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261109-new-catch/.aidlc-engine/learnings/functional-design-selections.json
+**Context**: .aidlc-engine > learnings > functional-design-selections.json
+
+---
+
+## Rule Learned
+**Timestamp**: 2026-11-11T02:06:34Z
+**Event**: RULE_LEARNED
+**Stage**: functional-design
+**Candidate-ID**: n1
+**Content-Hash**: 6210c594285c4d1174cd35497c262c2464b5d083ba99d061673ec8a6f9f8f940
+**Destination**: <project-dir>/aidlc/spaces/default/memory/project.md
+**Heading**: ## Corrections
+**Source**: user_addition
+
+---

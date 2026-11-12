@@ -17,7 +17,7 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
-import { collectLinks, evidenceRepositoryOf, githubLinkName } from "../src/lib/github-link-name.ts";
+import { collectLinks, evidenceRepositoryOf, githubLinkName, isOwnCommitLink, ownCommitsOf } from "../src/lib/github-link-name.ts";
 
 const srcUrl = new URL("../src/", import.meta.url);
 const hooks = registerHooks({
@@ -178,4 +178,65 @@ test("링크 요소: 이름 글자 뒤에 숨은 「(새 탭)」이 붙고 새 �
   assert.equal(html, `<a href="${url}" target="_blank" rel="noopener noreferrer" title="${url}" data-testid="github-link">PR #7<span class="visually-hidden"> (새 탭)</span></a>`);
   const custom = renderToStaticMarkup(createElement(GithubLink, { url, evidenceRepository: null }, "다른 글"));
   assert.ok(custom.includes(">다른 글<span"));
+});
+
+// 새 Catch NC2 — 본인 커밋 표지 판정(`ownCommitsOf`·`isOwnCommitLink`, BR4.1~BR4.3, US7.1·US7.2).
+//   먼저 정한 시나리오·기대 결과·실패 조건. 세부 시험 코드는 구현 뒤 쓴다.
+//   - 기대: 본인 커밋 목록은 ownCommit이 true이고 커밋 주소(`/commit/<16진수 40자>`)인 근거만의 (저장소, 소문자 40자)이고 중복이 없다.
+//           판정은 파일 줄·파일·폴더·커밋·커밋 화면 바뀐 줄 링크이고 판본이 16진수 7~40자일 때만 하며, 저장소가 대소문자 무시로 같고 식별값 앞부분이
+//           맞는 본인 커밋이 정확히 하나면 참이다. 짧은 식별값 파일 줄(AC7.1.1), 대문자 40자 커밋(AC7.1.2), 저장소 대소문자 다름(AC7.1.5),
+//           줄 범위 없는 파일(AC7.1.6)은 참. 다른 저장소의 같은 식별값(AC7.2.1), ownCommit 거짓 근거만 맞음(AC7.2.2), 7자 앞부분이 둘과 맞음(AC7.2.3),
+//           사본 근거 밖 식별값(AC7.2.5), PR 링크·브랜치 판본·표 밖 꼴은 거짓.
+//   - 실패 조건: 위의 거짓 사례가 참, 판정이 입력을 바꿈.
+const OWN = FULL; // ba6bba8c…(40자)
+const evidenceOf = (sourceUrl, ownCommit = true) => ({ sourceUrl, sourceRevision: "r", representedFacts: [], ownCommit });
+const own = ownCommitsOf([evidenceOf(`https://github.com/o/r/commit/${OWN}`)]);
+
+test("NC2 BR4.1 본인 커밋 목록은 ownCommit이 true이고 커밋 주소(40자)인 근거만의 (저장소, 소문자 식별값)이며 같은 것은 하나다", () => {
+  const evidence = [
+    evidenceOf(`https://github.com/o/r/commit/${OWN.toUpperCase()}`),
+    evidenceOf(`https://github.com/O/R/commit/${OWN}`), // 대소문자만 다른 같은 저장소·식별값
+    evidenceOf(`https://github.com/o/r/commit/${"c".repeat(40)}`, false),
+    { sourceUrl: `https://github.com/o/r/commit/${"d".repeat(40)}`, sourceRevision: "r", representedFacts: [] }, // 옛 사본
+    evidenceOf("https://github.com/o/r/pull/7"),
+    evidenceOf(`https://github.com/o/r/blob/${"e".repeat(40)}/a.ts`),
+    evidenceOf("https://github.com/o/r/commit/ba6bba8"),
+    evidenceOf("http://github.com/o/r/commit/" + "f".repeat(40)),
+  ];
+  const frozen = Object.freeze(evidence.map((item) => Object.freeze({ ...item })));
+  assert.deepEqual(ownCommitsOf(frozen), [{ repository: "o/r", commitId: OWN }]);
+  assert.deepEqual(ownCommitsOf([]), []);
+});
+
+test("NC2 AC7.1.1·AC7.1.2·AC7.1.5·AC7.1.6 짧은 식별값 파일 줄, 대문자 40자 커밋, 저장소 대소문자 다름, 줄 범위 없는 파일, 바뀐 줄·폴더 링크는 표지가 붙는다", () => {
+  for (const url of [
+    "https://github.com/o/r/blob/ba6bba8/a.ts#L3",
+    `https://github.com/o/r/commit/${OWN.toUpperCase()}`,
+    "https://github.com/O/R/blob/ba6bba8/a.ts#L3",
+    "https://github.com/o/r/blob/ba6bba8/a.ts",
+    `https://github.com/o/r/commit/ba6bba8c${"#diff-" + "a".repeat(64)}R16-R23`,
+    "https://github.com/o/r/tree/ba6bba8c01/src",
+    "https://github.com/o/r/blob/ba6bba8/a.ts?plain=1#L3-L9",
+  ]) assert.equal(isOwnCommitLink(url, own), true, url);
+});
+
+test("NC2 AC7.2.1·AC7.2.2·AC7.2.3·AC7.2.5 다른 저장소의 같은 식별값, ownCommit 거짓 근거만 맞음, 7자가 둘과 맞음, 근거 밖 식별값, PR·브랜치·표 밖 꼴은 거짓이다", () => {
+  const twins = ownCommitsOf([evidenceOf(`https://github.com/o/r/commit/ba6bba8${"1".repeat(33)}`), evidenceOf(`https://github.com/o/r/commit/ba6bba8${"2".repeat(33)}`)]);
+  assert.equal(twins.length, 2);
+  const onlyFalse = ownCommitsOf([evidenceOf(`https://github.com/o/r/commit/${OWN}`, false)]);
+  const cases = [
+    ["https://github.com/other/lib/blob/ba6bba8/a.ts#L3", own, "AC7.2.1 다른 저장소"],
+    ["https://github.com/o/r/blob/ba6bba8/a.ts#L3", onlyFalse, "AC7.2.2 ownCommit 거짓 근거만 맞음"],
+    ["https://github.com/o/r/blob/ba6bba8/a.ts#L3", twins, "AC7.2.3 7자 앞부분이 둘과 맞음"],
+    ["https://github.com/o/r/commit/1a2b3c4d5e6f", own, "AC7.2.5 사본 근거 밖 식별값"],
+    ["https://github.com/o/r/pull/12", own, "PR 링크"],
+    ["https://github.com/o/r/blob/main/a.ts", own, "브랜치 판본"],
+    ["https://github.com/o/r/blob/ba6bba/a.ts", own, "6자 판본"],
+    ["https://github.com/o/r/blob/ba6bba8/a.ts#L10C2", own, "표 밖 꼴(주소 전체로 보임)"],
+    ["https://github.com/o/r/commit/ba6bba8/x", own, "커밋 뒤 경로"],
+    ["https://github.com:8443/o/r/blob/ba6bba8/a.ts", own, "포트"],
+    ["https://github.com/o/r/blob/ba6bba8/a.ts#L3", [], "본인 커밋 없음(옛 사본)"],
+  ];
+  for (const [url, commits, label] of cases) assert.equal(isOwnCommitLink(url, commits), false, label);
+  assert.equal(isOwnCommitLink(`https://github.com/o/r/blob/ba6bba8${"1".repeat(33)}/a.ts`, twins), true, "더 길게 쓰면 하나와만 맞는다");
 });

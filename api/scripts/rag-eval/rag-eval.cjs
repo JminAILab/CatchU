@@ -20,6 +20,7 @@ const { buildChunkDrafts } = require('../../dist/published-index/chunker');
 const { syntheticEmbedding } = require('../../dist/published-index/synthetic-embedding-provider');
 const { chunkToSource } = require('../../dist/rag-answer/qna-service');
 const { QNA_INSTRUCTION, QNA_MODEL, QNA_SEARCH_LIMIT } = require('../../dist/rag-answer/rag-answer-config');
+const { JD_SUMMARY_INSTRUCTION } = require('../../dist/jd-summary/jd-generation-request');
 const { evidencePassRate, findGoldLocations, hitRate, isHitAt, locationOf } = require('./gold-locations.cjs');
 const { writeEvaluation } = require('./rag-eval-report.cjs');
 
@@ -29,8 +30,6 @@ const DEFAULT_DOCS_DIR = resolve(API_DIR, 'docs', 'rag-evaluation');
 /** 질문마다 검색을 12개로 한 번 부른다(BR10.3). */
 const EVAL_SEARCH_LIMIT = 12;
 const MEASURE_QUESTION_COUNT = 10;
-/** 스크립트 JD 지시문(BR10.7). U10이 합쳐지면 그 지시문·요구사항 나누기를 쓴다. */
-const SCRIPT_JD_INSTRUCTION = 'JD 요구사항 한 줄에 대해 발행본 자료에서 근거를 찾아 인용하고, 자료로 확인되지 않는 점과 면접 질문을 쓴다.';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 class RagEvalInputError extends Error {
@@ -148,7 +147,8 @@ async function compareJd(deps, input) {
   const rows = [];
   const raw = [];
   for (const [index, requirement] of requirements.entries()) {
-    const request = (sources, publicationText) => ({ feature: 'JD_SUMMARY', instruction: SCRIPT_JD_INSTRUCTION, sources, userText: requirement,
+    // 재는 지시와 운영 지시를 같게 하려고 JD 요약의 운영 상수를 그대로 쓴다(새 Catch NC2, 팀장 결정 2026-11-11). 요구사항 나누기는 스크립트 것 그대로다.
+    const request = (sources, publicationText) => ({ feature: 'JD_SUMMARY', instruction: JD_SUMMARY_INSTRUCTION, sources, userText: requirement,
       publicationText, model: 'HAIKU' });
     const searched = await deps.search.search(input.publicationId, requirement, QNA_SEARCH_LIMIT);
     const searchOutput = await deps.gate.generate(request(searched.hits.map(chunkToSource), searched.publicationText));
@@ -164,7 +164,7 @@ async function compareJd(deps, input) {
       fullInput: fullOutput === 'INPUT_TOO_LARGE' ? fullOutput : counts(fullOutput) });
     raw.push({ requirementNo: index + 1, requirement, searchBased: searchOutput, fullInput: fullOutput });
   }
-  return { summary: { splitter: 'SCRIPT', rows }, raw: { splitter: 'SCRIPT', instruction: SCRIPT_JD_INSTRUCTION, requirements: raw } };
+  return { summary: { splitter: 'SCRIPT', rows }, raw: { splitter: 'SCRIPT', instruction: JD_SUMMARY_INSTRUCTION, requirements: raw } };
 }
 
 /**

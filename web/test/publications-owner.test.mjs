@@ -543,3 +543,58 @@ test("NFR5.1 칸 글의 태그 꼴 글은 HTML로 해석하지 않고 글자로 
   assert.ok(html.includes("&lt;script&gt;alert(1)&lt;/script&gt;&lt;b&gt;굵게&lt;/b&gt;"));
   assert.deepEqual([...html.matchAll(/<h5[^>]*>([^<]*)<\/h5>/g)].map((m) => m[1]), ["맡은 부분", "짚어 볼 곳"]);
 });
+
+// 새 Catch NC2 — 작성자 발행본 상세의 사본 세 칸과 본인 커밋 표지(US6.1·US6.4·US7.1·US7.2, BR2.1·BR3.1~BR3.4·BR4.4~BR4.7).
+//   먼저 정한 시나리오·기대 결과·실패 조건. 세부 시험 코드는 구현 뒤 쓴다.
+//   - 기대: 작성자 발행본 상세도 받은 사람 화면과 같은 부품이라 저장소 줄이 제목(h3) 바로 아래·불일치 표지 위에 있다(AC6.1.2). 작성 시점·한계 목록도 같다.
+//           옛 사본(새 칸 없음)은 지금 그대로다(AC6.4.1). 모양 틀린 새 칸(빈 저장소 이름·"2026-13"·빈 한계 배열·글자 ownCommit)은 올바르지 않은 응답이다.
+//           본인 커밋 링크 뒤 표지는 링크 요소 밖이고, 강조가 링크와 겹쳐도 표지는 <mark> 밖이다. 텍스트 자료 본문 링크에는 표지가 없다(BR4.7).
+//   - 실패 조건: 작성자 상세와 받은 사람 화면이 다름, 옛 사본이 오류·모양 바뀜, 모양 틀린 칸이 받아들여짐, 표지가 링크·강조 안에 있음, 본문에 표지.
+const OWN = "ba6bba8c0123456789abcdef0123456789abcdef";
+const nc2Catch = (overrides = {}) => catchItem({
+  evidence: [{ sourceUrl: `https://github.com/o/r/commit/${OWN}`, sourceRevision: OWN, representedFacts: ["커밋 사실"], ownCommit: true }],
+  repositoryName: "o/r", authorDescriptionEditedMonth: "2026-11", workLimits: ["같은 작업을 다시 낸 것일 수 있다(PR #3·#5, …)"],
+  ...overrides,
+});
+
+test("NC2 BR2.1 작성자 상세 API: 새 칸 넷이 든 사본과 옛 사본은 받고, 모양 틀린 새 칸이 든 사본은 실패다", async () => {
+  const good = await createPublicationsApi(fakeMember(success(detail({ snapshot: snapshot([nc2Catch(), textItem()]) }))).member).get(P1);
+  assert.equal(good.kind, "ok");
+  assert.equal(good.value.snapshot.items[0].snapshot.repositoryName, "o/r");
+  for (const patch of [{ repositoryName: "" }, { authorDescriptionEditedMonth: "2026-00" }, { workLimits: [] },
+    { evidence: [{ sourceUrl: "https://github.com/o/r/pull/1", sourceRevision: "a", representedFacts: [], ownCommit: 1 }] }]) {
+    const response = await createPublicationsApi(fakeMember(success(detail({ snapshot: snapshot([nc2Catch(patch)]) }))).member).get(P1);
+    assert.deepEqual(response, failed("unknown"), JSON.stringify(patch));
+  }
+});
+
+const ownerView = (value) => renderToStaticMarkup(createElement(PublicationDetailView, {
+  detail: detail({ snapshot: value }), stoppedAt: null, stopState: "idle", deleteState: "idle", onStop() {}, onDelete() {}, highlight: null, showEvidence() {},
+}));
+const catchPart = (html) => html.slice(html.indexOf('data-kind="CATCH"'), html.indexOf("</li>", html.indexOf("</details>")));
+
+test("NC2 AC6.1.2 작성자 발행본 상세도 제목 바로 아래 같은 저장소 줄이고 작성 시점·한계 목록까지 받은 사람 화면과 같은 표시다", () => {
+  const value = snapshot([nc2Catch(), textItem()]);
+  const owner = catchPart(ownerView(value));
+  assert.equal(owner, catchPart(renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: value }))));
+  const order = ["</h3>", 'data-testid="snapshot-catch-repository">o/r</p>', 'data-testid="snapshot-catch-mismatch"', 'data-testid="snapshot-catch-description-edited"',
+    'data-testid="snapshot-catch-work-limits"'].map((needle) => owner.indexOf(needle));
+  assert.ok(order.every((position) => position >= 0), String(order));
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  assert.ok(owner.includes(">2026년 11월에 마지막으로 고침</span></h4>"));
+});
+
+test("NC2 AC6.4.1 작성자 발행본 상세의 옛 사본은 세 칸 없이 지금 그대로다", () => {
+  const legacy = ownerView(snapshot());
+  assert.doesNotMatch(legacy, /snapshot-catch-repository|snapshot-catch-description-edited|snapshot-catch-work-limits|own-commit-mark/);
+  assert.ok(legacy.includes("<h4>작성자 설명</h4>"));
+});
+
+test("NC2 AC7.1.1·BR4.7 작성자 발행본 상세도 본인 커밋 링크 뒤 링크 밖에 표지를 두고, 텍스트 자료 본문의 같은 링크에는 두지 않는다", () => {
+  const link = "https://github.com/o/r/blob/ba6bba8/a.ts#L3";
+  const html = ownerView(snapshot([nc2Catch({ authorDescription: `설명 ${link}` }), textItem(`본문 ${link}`)]));
+  const description = html.slice(html.indexOf('data-testid="snapshot-catch-description"'), html.indexOf('data-testid="snapshot-catch-facts"'));
+  assert.ok(description.includes('>a.ts · L3 · 판본 ba6bba8<span class="visually-hidden"> (새 탭)</span></a><span data-testid="own-commit-mark">이 작업의 본인 커밋</span>'));
+  const body = html.slice(html.indexOf('data-testid="snapshot-text-body"'));
+  assert.doesNotMatch(body.slice(0, body.indexOf("</p>")), /own-commit-mark/);
+});
