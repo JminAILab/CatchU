@@ -54,11 +54,36 @@
 - **노출:** 토큰은 경로에만, 비밀번호는 본문으로만, grant는 `X-Link-Grant` 머리글로만 둔다. 404 사유를 드러내지 않는다.
 - **Claude 안내 표시 값(C-11 claude-connect-rule, #495):** 발행본 조회가 200으로 성공하면 그 요청에 grant를 실었는지를 판정 통과 상태의 `readWithoutGrant`에 둔다. 요청을 보낼 때 쓴 값으로 정하고 응답·렌더링 때 grant 저장소를 다시 읽지 않으므로, 그 뒤 저장소 값이 바뀌거나 읽기가 실패해도 이 값은 그대로다. 다시 조회 중·실패 동안은 마지막 성공 요청의 값을 유지하고, 확정 거부(404·401·`onAccessLost`)·불러오는 중·최초 조회 실패에서는 판정 통과 상태가 아니므로 쓰이지 않는다. `claudeConnectable(snapshot)`이 판정 통과이면서 `readWithoutGrant`일 때만 true를 돌려준다. 비밀번호 링크는 grant 없이 200을 받지 못하고(C-10) 비밀번호 유무는 발행 뒤 바뀌지 않으므로(C-07) true는 비밀번호 없는 링크다. 화면 표시용이며, Claude 쪽 접근은 C-15 `read_shared_publication`이 호출마다 C-10을 grant 없이 다시 판정한다. 화면은 판정 통과 분기에서 이 값을 한 번 읽어 0번의 Claude 줄(`showClaudeConnect`)과 0.5번 U9 패널을 함께 켠다(위 「화면 순서」).
 
+## PDF 항목과 사본 열람 (U8)
+
+12월 intent U8(PDF 자료, #420)이 1번 자리의 PDF 항목과 PDF 열람 공용 도우미를 더했다. 기준: [U8 기능 명세](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/functional-spec.md) W4, [업무 규칙](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/rules.md) BR6, [보안 설계](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/nfr-design/security-design.md) §2·§6. api는 [PDF 자료 문서](../../../../api/docs/pdf-materials.md#pdf-사본-열람-c-12-추가-경로)에 있다.
+
+| 파일 | 역할 |
+|---|---|
+| `pdf-viewer-launcher.tsx` | 열람 공용 도우미. 요청 결과 판정(`loadPdf`), 뷰어 상태 전이(`createPdfViewerModel`), 화면 수명 연결(`usePdfViewer`), 그리기(`PdfViewerPanel`·`PdfViewerLauncher`). 받은 사람 사본·작성자 사본·작성자 원본이 함께 쓰고 사본을 받는 요청만 다르다 |
+| `pdf-viewer.module.css` | 뷰어 모양 |
+| `../publications/published-pdf-item.tsx` | 발행본의 PDF 항목. 받은 사람 화면과 작성자 발행본 화면이 같은 컴포넌트를 쓴다 |
+| `test/pdf-viewer.test.mjs`·`test/recipient-pdf.test.mjs` | 뷰어 상태 전이와 PDF 항목 그리기 시험 |
+
+- **쪽 표시:** PDF 항목은 쪽 수와 쪽 목록을 보인다. 쪽마다 "n쪽", 읽을 수 없는 쪽은 "읽을 수 없음" 표지, 읽을 수 있는 쪽은 사본의 글을 React 텍스트로만 그린다(추출한 글은 신뢰하지 않는 자료다). 데이터는 사본의 `pdfPages`로 이미 온다.
+- **근거 강조:** `showEvidence`의 `fieldPath`가 `pages[n]`이면 그 쪽 글의 `[charStart, charEnd)`만 `<mark>`로 감싼다.
+- **열기:** [PDF 보기]·[새 탭에서 열기]·[원본 n쪽 열기]는 `GET /v1/public/links/{token}/items/{publishedItemId}/pdf`를 `fetch`로 받아(grant는 `X-Link-Grant` 머리로만, 회원 토큰은 붙이지 않음) Blob URL을 만든 뒤 화면 안 iframe(`#page=n`)이나 미리 연 새 창에 넣는다. Blob URL은 응답 200과 본문 수신 성공 뒤에만 만든다.
+- **다시 요청:** 뷰어가 열려 있는 동안의 쪽 이동은 같은 URL을 다시 쓴다. 처음 열기·닫았다가 다시 열기·[새 탭에서 열기]는 서버 판정을 다시 받는다. 그래서 링크가 중지된 뒤에는 다음 열기부터 막히고, 이미 열어 둔 PDF는 그 탭에서 계속 보인다(수용한 위험).
+- **접근 상실:** 401 `LINK_PASSWORD_REQUIRED`·404 `LINK_UNAVAILABLE`은 `onAccessLost(code)`로 넘겨 화면이 직접 받은 것과 같은 전환·grant 삭제를 한다. 500·전송 중단·통신 오류는 일반 열람 실패로 안내하고 grant를 유지한다.
+- **해제:** Blob URL은 뷰어를 닫을 때, 화면을 떠날 때, 접근 상실 때 해제한다. 해제된 새 탭의 PDF는 그 탭을 새로고침하면 실패하며 원래 화면에서 다시 연다(수용한 위험).
+- **팝업이 막힌 경우:** 같은 요청의 PDF를 화면 안 뷰어에 보이고 안내한다.
+- **iframe과 CSP:** iframe에 `sandbox`를 두지 않는다(브라우저 내장 PDF 뷰어가 sandbox 아래에서 동작하지 않는 경우가 있다). Blob URL을 iframe으로 그리기 위해 `next.config.ts`의 CSP에 `frame-src 'self' blob:`이 있다.
+- **개발 모드:** React StrictMode가 효과를 정리한 뒤 다시 실행하므로 뷰어 모델은 `activate()`로 다시 살아난다(`usePdfViewer`).
+
+시험: `node --test test/pdf-viewer.test.mjs`(5개) — 요청 결과 판정, 열기·쪽 이동·닫기·해제, 새 탭과 팝업 차단, 접근 상실, 정리 뒤 재활성. `node --test test/recipient-pdf.test.mjs`(4개) — 쪽 표시·읽을 수 없음 표지·근거 강조·작성자 화면의 같은 컴포넌트. 합성 응답과 서버 렌더링이다.
+
+확인 범위: 실제 로컬 api와 브라우저로 받은 사람 화면에서 쪽 글 표시와 [PDF 보기]의 화면 안 렌더링을 확인했다(2026-11-11). 그 사본은 로컬 파일 저장소에서 실제 큐와 worker가 추출한 PDF를 발행 화면에서 골라 발행한 것이다([U8 코드 요약](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/code-generation/code-summary.md) §17.6). 브라우저로 확인하지 않은 것: 팝업이 허용된 새 탭 열기(내장 브라우저가 팝업을 막음), Blob URL 해제, 근거 강조의 실제 패널 연결. 실제 S3를 쓰는 환경의 열람은 미검증이다.
+
 ## 시험
 
 `node --test test/recipient.test.mjs`(38개): 응답 모양·grant 보관(10월 유지 묶음)·판정 응답 처리·`onAccessLost`·Claude 안내 표시 값(#495)·근거 위치 대조·G1~G3 구조·자리 순서·G5·G6 기계 검사·사본 표지·근거 강조·Catch 칸 순서와 근거 접기(#488). 초점 이동(G4)과 실제 api·DB 연결은 브라우저로 확인했다(U4 코드 요약 Step 22·23).
 
 ## 범위 밖·남은 것
 
-- 4번 자리(U10 `JdSummaryPanel`)는 U10이 제공한 뒤 단다. PDF 항목(U8)은 자리만 보인다.
+- 4번 자리(U10 `JdSummaryPanel`)는 U10이 제공한 뒤 단다. PDF 항목은 U8이 채웠다(위 「PDF 항목과 사본 열람 (U8)」).
 - `indexState`·[검색 다시 준비]는 C-09 합의 뒤(OQ-U4-5). 실제 색인·LLM이 있는 환경의 요약·질의응답 동작은 U5 몫이다.

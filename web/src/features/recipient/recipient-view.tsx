@@ -5,6 +5,7 @@ import { RecipientGuide } from "@/components/recipient-guide/recipient-guide";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { BaseSummaryPanel } from "@/features/rag-answer/base-summary-panel";
 import { QnaPanel } from "@/features/rag-answer/qna-panel";
+import type { PdfCopySource } from "@/features/publications/published-pdf-item";
 import { JdRecipientPanel } from "@/features/jd/jd-recipient-panel";
 import { PublishedSnapshotView, type SnapshotHighlight } from "@/features/publications/snapshot-view";
 import { ClaudeAnalyzePanel } from "@/features/recipient-claude/claude-analyze-panel";
@@ -26,6 +27,8 @@ export type RecipientPublicationViewProps = {
   highlight: SnapshotHighlight | null;
   /** 2·3·4번 자리에 넘길 props(C-11). */
   slotProps: RecipientSlotProps;
+  /** 1번 자리 PDF 항목의 사본을 받는 방법(U8). 받은 사람 사본 경로에 grant를 머리로 싣고, 401·404는 `onAccessLost`로 넘긴다. */
+  pdfSource?: (publishedItemId: string) => PdfCopySource;
 };
 
 /**
@@ -41,7 +44,7 @@ export type RecipientPublicationViewProps = {
  * 0.5번 패널에는 `slotProps.token`만 넘기고 grant·비밀번호·`getGrant`·`onAccessLost`는 넘기지 않는다.
  * 사본·설명·본문은 React 텍스트로만 그리고(NFR1.10) GitHub 근거 주소만 링크다(NFR1.11, `snapshot-view.tsx`).
  */
-export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlock, waitSeconds, highlight, slotProps }: RecipientPublicationViewProps) {
+export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlock, waitSeconds, highlight, slotProps, pdfSource }: RecipientPublicationViewProps) {
   switch (snapshot.view) {
     case "loading":
       return <LoadingState>발행본을 확인하고 있습니다.</LoadingState>;
@@ -78,7 +81,7 @@ export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlo
           <RecipientGuide showClaudeConnect={connectable} />
           {connectable && <ClaudeAnalyzePanel token={slotProps.token} />}
           <p className={styles.notice} data-testid="recipient-published-at">{publishedAtText(snapshot.snapshot.publishedAt)}</p>
-          <PublishedSnapshotView snapshot={snapshot.snapshot} highlight={highlight} />
+          <PublishedSnapshotView snapshot={snapshot.snapshot} highlight={highlight} pdfSource={pdfSource} />
           <RecipientSlots {...slotProps} />
         </>
       );

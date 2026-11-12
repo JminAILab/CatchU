@@ -18,6 +18,7 @@ import { PUBLICATION_ACCESS, PUBLICATIONS_CLOCK, PUBLISH_RATE_LIMIT, PUBLISH_RAT
 import { PublicationsController } from './publications.controller';
 import { PublicationsLog } from './publications-log';
 import { PublishService } from './publish.service';
+import { PublishedPdfViewService } from './published-pdf-view.service';
 import { RecipientAccessService } from './recipient-access.service';
 import { RecipientLinksController } from './recipient-links.controller';
 
@@ -51,6 +52,7 @@ export { PUBLICATION_ACCESS, PUBLICATIONS_CLOCK, PUBLISH_RATE_LIMITER } from './
     PublishService,
     PublicationManageService,
     RecipientAccessService,
+    PublishedPdfViewService,
   ],
   exports: [PUBLICATION_ACCESS],
 })

@@ -22,8 +22,11 @@ export const PUBLISH_RATE_LIMITER = Symbol('PUBLISH_RATE_LIMITER');
 export const PUBLISH_RATE_LIMIT: RateLimitOptions = Object.freeze({ maxRequests: 10, windowMs: 60 * 1000, maxKeys: 10_000 });
 
 /**
- * 발행본 전체 글(SnapshotTextTotal, 조각 나누기 대상 필드의 코드 포인트 합) 상한 60,000자 — **임시값**(BR4.5, OQ-U4-4).
- * AI 입력 한도(U2·U5)에 맞춰 조정한다. 검증된 값이 아니다.
+ * 발행본 전체 글(SnapshotTextTotal, 조각 나누기 대상 필드의 코드 포인트 합) 상한 60,000자(BR4.5).
+ * OQ-U4-4는 팀장 결정 2026-11-10(#420 issuecomment-6759834176)으로 이 값 그대로 닫혔고, PDF 쪽 글도 이 합계에 넣는다
+ * (`publish.service.ts`가 PDF 항목의 `pdf_page_text` 글을 합계에 더한다, U8 계획 Step 8.2). 같은 값을 쓰는 곳 — 한쪽만 바꾸지 않는다:
+ * api `src/pdf-extraction/pdf-extraction-spec.ts`의 PDF_TEXT_TOTAL_MAX(의존 방향 때문에 따로 둔 같은 값, 발행 시험이 같음을 확인),
+ * worker `app/pdf_extraction/settings.py`의 TEXT_LIMIT, web `src/features/publications/publications-api.ts`의 PUBLISH_LIMITS.totalText.
  */
 export const SNAPSHOT_TEXT_TOTAL_MAX = 60_000;
 

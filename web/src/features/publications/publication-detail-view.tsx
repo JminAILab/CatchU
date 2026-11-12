@@ -7,6 +7,7 @@ import { routes } from "@/lib/routes";
 import { CopyUrlButton, OpenLinkAnchor } from "./publication-link-actions";
 import { FIXED_COPY_NOTICE, PUBLICATION_STATE_LABELS, SOURCE_PRIVATE_NOTICE, formatKst, passwordText } from "./publication-format";
 import type { PublicationDetail, PublicationState } from "./publications-api";
+import type { PdfCopySource } from "./published-pdf-item";
 import { PublishedSnapshotView, type SnapshotHighlight } from "./snapshot-view";
 import styles from "./publications.module.css";
 
@@ -22,6 +23,8 @@ export type PublicationDetailViewProps = {
   highlight: SnapshotHighlight | null;
   /** 요약 패널의 근거 단추가 부른다. 사본을 그 위치로 옮기고 범위를 강조한다. */
   showEvidence: (location: EvidenceLocation) => void;
+  /** PDF 항목의 작성자 사본 요청(U8 W4). 중지·만료 뒤에도 열린다. */
+  pdfSource?: (publishedItemId: string) => PdfCopySource;
 };
 
 function stateText(state: PublicationState, stoppedAt: string | null): string {
@@ -80,7 +83,7 @@ export function PublicationDetailView(props: PublicationDetailViewProps) {
       <div data-testid="publication-summary-slot">
         <BaseSummaryPanel key={detail.publicationId} publicationId={detail.publicationId} showEvidence={props.showEvidence} />
       </div>
-      <PublishedSnapshotView snapshot={detail.snapshot} highlight={props.highlight} />
+      <PublishedSnapshotView snapshot={detail.snapshot} highlight={props.highlight} pdfSource={props.pdfSource} />
     </article>
   );
 }

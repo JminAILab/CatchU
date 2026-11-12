@@ -86,7 +86,9 @@ export function buildTextMaterialSnapshot(body: string): TextMaterialSnapshot {
 /**
  * SnapshotTextTotal(엔티티 문서): 조각 나누기 대상 필드(C-07 fieldPath)의 코드 포인트 합.
  * CATCH는 workFacts[i]·subjectContribution·evidence[i].representedFacts[j]·authorDescription, TEXT_MATERIAL은 body.
- * 제목·aiDraft·sourceUrl·sourceRevision·mismatch는 넣지 않는다(C-09 publicationText와 같은 범위). PDF 쪽은 U8이 정한다.
+ * 제목·aiDraft·sourceUrl·sourceRevision·mismatch는 넣지 않는다(C-09 publicationText와 같은 범위). PDF_MATERIAL 사본({ pageCount })은
+ * 여기서 0이고, 쪽 글은 발행 트랜잭션이 잠근 `pdf_page_text`에서 같은 코드 포인트 셈으로 따로 더한다(`pdf-publish.ts` lockPdfsForPublish,
+ * 팀장 결정 2026-11-10 https://github.com/JminAILab/CatchU/issues/420#issuecomment-6759834176).
  * NC2 선택 칸 넷(repositoryName·authorDescriptionEditedMonth·workLimits·ownCommit)도 넣지 않는다(BR1.5).
  */
 export function snapshotTextLength(snapshot: ItemSnapshot): number {

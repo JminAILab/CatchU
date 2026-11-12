@@ -6,7 +6,9 @@ import { publicationDetailPath, routes } from "@/lib/routes";
 import { CopyUrlButton, OpenLinkAnchor } from "./publication-link-actions";
 import { EXPIRY_NOTICE, PRIVATE_CATCH_NOTICE, PUBLICATION_STATE_LABELS, formatKst, passwordText } from "./publication-format";
 import { CATCH_REJECTION_TEXT, PUBLISH_LIMITS, type PublishedLink } from "./publications-api";
-import { selectedKeys, selectionKey, type CatchSource, type MaterialSource, type SelectedItem, type SourceList } from "./publish-sources";
+import {
+  ITEM_KIND_LABELS, selectedKeys, selectionKey, type CatchSource, type MaterialSource, type PdfSource, type SelectedItem, type SourceList,
+} from "./publish-sources";
 import type { RepositoryOption } from "../assets/types";
 import styles from "./publications.module.css";
 
@@ -31,6 +33,8 @@ function flaggedText(flagged: FlaggedCatches, catchId: string): string | null {
 export type SourcePickerViewProps = {
   catches: SourceList<CatchSource>;
   materials: SourceList<MaterialSource>;
+  /** PDF 자료 목록(U8 계획 10.5). 없거나 null이면 PDF 자리를 그리지 않는다. */
+  pdfs?: SourceList<PdfSource> | null;
   selected: readonly SelectedItem[];
   flagged: FlaggedCatches;
   disabled: boolean;
@@ -42,8 +46,10 @@ export type SourcePickerViewProps = {
   onRetry: () => void;
   onMoreCatches: () => void;
   onMoreMaterials: () => void;
+  onMorePdfs?: () => void;
   onToggleCatch: (catchId: string) => void;
   onToggleMaterial: (textMaterialId: string) => void;
+  onTogglePdf?: (pdfMaterialId: string) => void;
 };
 
 /**
@@ -71,11 +77,13 @@ function MoreButton({ list, testId, onMore, disabled }: { list: SourceList<unkno
 /**
  * 발행 항목 고르기(U4 W3-1). 본인 Catch·텍스트 자료 목록에서 고른다. 고를 수 없는 Catch는 이유와 함께 비활성이고(BR4.2),
  * 비공개 Catch에는 공개 전환 안내를 둔다(BR4.4). 고르고 빼는 동안 서버에 아무것도 쓰지 않는다.
+ * PDF 자료(U8 계획 10.5)는 글 추출이 완료된 것만 고를 수 있고, 추출 중·실패 PDF는 상태와 고를 수 없는 이유를 보인 채 비활성이다(U8 BR4.1, NFR7.3).
  */
 export function SourcePickerView(props: SourcePickerViewProps) {
   const keys = selectedKeys(props.selected);
   const limitReached = props.selected.length >= PUBLISH_LIMITS.items;
-  const sourcesFailed = props.catches.state === "error" || props.materials.state === "error";
+  const pdfs = props.pdfs ?? null;
+  const sourcesFailed = props.catches.state === "error" || props.materials.state === "error" || pdfs?.state === "error";
   const writtenOnly = props.writtenOnly ?? false;
   const repositories = props.repositories ?? [];
   return (
@@ -85,7 +93,7 @@ export function SourcePickerView(props: SourcePickerViewProps) {
       <p className={styles.small} data-testid="publish-sources-recommendation">저장소마다 3~5개를 권합니다.</p>
       {sourcesFailed && (
         <div role="alert" className={styles.error}>
-          <p>{props.catches.errorText ?? props.materials.errorText ?? "목록을 불러오지 못했습니다."}</p>
+          <p>{props.catches.errorText ?? props.materials.errorText ?? pdfs?.errorText ?? "목록을 불러오지 못했습니다."}</p>
           <button type="button" className={styles.secondaryButton} data-testid="publish-sources-retry" onClick={props.onRetry}>목록 다시 불러오기</button>
         </div>
       )}
@@ -142,6 +150,34 @@ export function SourcePickerView(props: SourcePickerViewProps) {
           </ul>
         )}
       <MoreButton list={props.materials} testId="publish-materials-more" onMore={props.onMoreMaterials} disabled={props.disabled} />
+      {pdfs !== null && (
+        <>
+          <h3>내 PDF 자료</h3>
+          <p className={styles.small}>글 추출이 완료된 PDF만 고를 수 있습니다.</p>
+          {pdfs.state === "loading" ? <p role="status">PDF 자료 목록을 불러오고 있습니다.</p>
+            : pdfs.state === "ready" && pdfs.items.length === 0 ? <p data-testid="publish-pdfs-empty">고를 수 있는 PDF 자료가 없습니다. <Link href={routes.materials}>자료 화면</Link>의 PDF 자료 탭에서 올릴 수 있습니다.</p>
+            : pdfs.state === "ready" && (
+              <ul className={styles.options}>
+                {pdfs.items.map((item) => {
+                  const picked = keys.has(selectionKey("PDF_MATERIAL", item.pdfMaterialId));
+                  return (
+                    <li key={item.pdfMaterialId}>
+                      {/* 이미 고른 PDF는 상태가 바뀌었어도 뺄 수 있게 둔다. */}
+                      <button type="button" className={picked ? styles.optionActive : styles.option} data-testid="publish-pdf-option" data-source-id={item.pdfMaterialId}
+                        data-state={item.state} aria-pressed={picked} disabled={props.disabled || (!picked && (!item.eligible || limitReached))}
+                        onClick={() => props.onTogglePdf?.(item.pdfMaterialId)}>
+                        <span className={styles.itemTitle}>{item.title}</span>
+                        <span className={styles.small} data-testid="publish-pdf-state">{item.stateLabel}</span>
+                        {!item.eligible && item.reason && <span className={styles.small} data-testid="publish-pdf-reason">{item.reason}</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          <MoreButton list={pdfs} testId="publish-pdfs-more" onMore={() => props.onMorePdfs?.()} disabled={props.disabled} />
+        </>
+      )}
     </section>
   );
 }
@@ -167,7 +203,7 @@ export function SelectedListView(props: SelectedListViewProps) {
             return (
               <li key={selectionKey(item.kind, item.sourceId)} className={styles.selectedItem} data-testid="publish-selected-item" data-source-id={item.sourceId}>
                 <div>
-                  <span className={styles.kindBadge}>{item.kind === "CATCH" ? "Catch" : "텍스트 자료"}</span> <span className={styles.itemTitle}>{item.title}</span>
+                  <span className={styles.kindBadge}>{ITEM_KIND_LABELS[item.kind]}</span> <span className={styles.itemTitle}>{item.title}</span>
                   {item.visibility === "PRIVATE" && <p className={styles.small} data-testid="publish-selected-private-notice">{PRIVATE_CATCH_NOTICE}</p>}
                   {flaggedLine && <p className={styles.flagged} data-testid="publish-selected-flagged">{flaggedLine}</p>}
                 </div>
@@ -211,7 +247,7 @@ export function PublishFormView(props: PublishFormViewProps) {
           <input id="publish-title-input" data-testid="publish-title-input" value={props.title} disabled={props.disabled}
             aria-describedby="publish-title-count" onChange={(event) => props.onTitle(event.target.value)} />
         </label>
-        <p id="publish-title-count" className={styles.small}>{titleLength} / {PUBLISH_LIMITS.title}자 · 나에게만 보이며 발행 뒤 바꿀 수 없습니다.</p>
+        <p id="publish-title-count" className={styles.small}>{titleLength} / {PUBLISH_LIMITS.title}자 · 받은 사람에게도 보이며 발행 뒤 바꿀 수 없습니다.</p>
         <label className={styles.check}>
           <input type="checkbox" data-testid="publish-use-password" checked={props.usePassword} disabled={props.disabled}
             onChange={(event) => props.onUsePassword(event.target.checked)} />
@@ -266,7 +302,7 @@ export function PublishConfirmView(props: PublishConfirmViewProps) {
           <ol className={styles.confirmItems} data-testid="publish-confirm-items">
             {props.items.map((item) => (
               <li key={selectionKey(item.kind, item.sourceId)}>
-                <span className={styles.kindBadge}>{item.kind === "CATCH" ? "Catch" : "텍스트 자료"}</span> {item.title}
+                <span className={styles.kindBadge}>{ITEM_KIND_LABELS[item.kind]}</span> {item.title}
                 {item.visibility === "PRIVATE" && <span className={styles.small}> · {PRIVATE_CATCH_NOTICE}</span>}
               </li>
             ))}

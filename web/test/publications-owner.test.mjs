@@ -373,7 +373,12 @@ test("사본 화면: 항목 순서대로 보이고 Catch는 기록·작성자 �
   assert.doesNotMatch(empty, /snapshot-catch-mismatch/);
   assert.ok(empty.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
   const pdf = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: snapshot([{ publishedItemId: "p", position: 1, itemKind: "PDF_MATERIAL", title: "PDF", snapshot: {} }]) }));
-  assert.ok(pdf.includes("PDF 자료 표시는 준비 중입니다"));
+  // U8 계획 10.3으로 "준비 중" 자리가 PDF 항목 표시로 바뀌었다. 쪽 사본이 없는 응답은 0쪽으로 보이고, 요청 방법을 넘기지 않으면 열기 단추가 없다
+  // (세부 표시는 recipient-pdf.test.mjs).
+  assert.ok(!pdf.includes("준비 중"));
+  assert.match(pdf, /data-testid="snapshot-pdf"/);
+  assert.match(pdf, /data-testid="snapshot-pdf-page-count">0쪽</);
+  assert.doesNotMatch(pdf, /snapshot-pdf-viewer/);
 });
 
 test("GitHub 주소 판정: 받은 사람 화면의 isGithubSourceUrl과 같은 함수이고, 본문 나누기는 https://github.com/… 만 링크로, 끝 문장 부호·비GitHub·http·계정 정보가 든 주소는 글자로 둔다", () => {

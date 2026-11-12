@@ -49,10 +49,15 @@ services:
       start_period: 10s
       start_interval: 1s
 
+  # PDF 자료(U8)의 로컬 파일 저장 폴더. api가 쓰고 worker는 읽기 전용으로 붙인다(worker는 PDF를 읽기만 한다).
+  # 이 볼륨은 붙이기만 한다. 쓰려면 환경 파일에 api.env `FILE_STORAGE_DRIVER=local`·`FILE_STORAGE_LOCAL_ROOT=/var/lib/catchu/files`,
+  # worker.env `PDF_FILE_ROOT=/var/lib/catchu/files`를 넣는다. S3를 쓰는 환경(개발 서버 등)은 넣지 않으며 볼륨은 비어 있는 채로 둔다.
   api:
     networks:
       - default
       - db
+    volumes:
+      - files:/var/lib/catchu/files
 
   # 운영 compose는 worker를 운영 모드로 고정한다. 이 겹침 파일만 합성 큐의 평문 주소를 받도록 시험 모드로 바꾼다.
   worker:
@@ -61,6 +66,8 @@ services:
     networks:
       - default
       - queue
+    volumes:
+      - files:/var/lib/catchu/files:ro
 
   migration:
     networks:
@@ -74,3 +81,5 @@ networks:
 
 volumes:
   db-data:
+  # api 이미지가 이 경로를 실행 사용자(1000) 소유로 만들어 두므로 새 볼륨도 api가 쓸 수 있다(api/Dockerfile).
+  files:

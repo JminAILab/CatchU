@@ -10,11 +10,14 @@ import os
 import re
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
-from typing import Final, Literal, NoReturn
+from typing import TYPE_CHECKING, Final, Literal, NoReturn
 from urllib.parse import urlsplit
 
 from app.collection.credentials import AccessToken
 from app.request_context.settings import ContextApiSettings
+
+if TYPE_CHECKING:
+    from app.pdf_extraction.settings import PdfSettings
 
 Environment = Literal["production", "development", "test"]
 
@@ -136,6 +139,8 @@ class ConsumerSettings:
     mock_scenario: str = DEFAULT_MOCK_SCENARIO
     limits: Limits = field(default_factory=Limits)
     live: LiveSettings | None = None
+    # PDF 글 추출 소비자(U8). 없으면 둘째 Worker를 띄우지 않는다. 설정 모듈은 app/pdf_extraction/settings.py.
+    pdf: "PdfSettings | None" = None
 
     @property
     def consumer_enabled(self) -> bool:
@@ -158,6 +163,9 @@ class ConsumerSettings:
         limits: Limits | None = None,
         mock_scenario: str = DEFAULT_MOCK_SCENARIO,
     ) -> "ConsumerSettings":
+        # 순환 참조(PDF 설정 모듈이 SettingsError를 가져옴)를 피해 여기서 불러온다.
+        from app.pdf_extraction.settings import pdf_settings_from_environment
+
         values = os.environ if environment is None else environment
         env = _environment(values.get("NODE_ENV"))
         development = env in ("development", "test")
@@ -172,6 +180,7 @@ class ConsumerSettings:
             mock_scenario=mock_scenario,
             limits=limits or Limits(),
             live=_live(values, development, provider),
+            pdf=pdf_settings_from_environment(values),
         )
 
 

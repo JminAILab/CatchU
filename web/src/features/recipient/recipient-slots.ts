@@ -52,13 +52,20 @@ export function resolveEvidenceTarget(snapshot: PublishedSnapshot, location: Evi
 
 const WORK_FACT = /^workFacts\[(\d+)\]$/;
 const REPRESENTED_FACT = /^evidence\[(\d+)\]\.representedFacts\[(\d+)\]$/;
+const PDF_PAGE = /^pages\[(\d+)\]$/;
 
 /**
  * C-07 fieldPath가 가리키는 사본 문자열. Catch: `workFacts[i]`·`subjectContribution`·`evidence[i].representedFacts[j]`·`authorDescription`,
- * 텍스트 자료: `body`. PDF 쪽(`pages[n]`)은 U8 몫이라 null이다. AI 설명 초안은 조각 나누기 대상이 아니므로(FR6.4) 위치가 오지 않는다.
+ * 텍스트 자료: `body`, PDF 자료(U8): `pages[n]`은 n쪽(1부터)의 글 `pdfPages[n-1].text`다(쪽 번호로 찾는다).
+ * AI 설명 초안은 조각 나누기 대상이 아니므로(FR6.4) 위치가 오지 않는다.
  */
 export function fieldText(item: PublishedItem, fieldPath: string): string | null {
   if (item.itemKind === "TEXT_MATERIAL") return fieldPath === "body" ? item.snapshot.body : null;
+  if (item.itemKind === "PDF_MATERIAL") {
+    const page = PDF_PAGE.exec(fieldPath);
+    if (!page) return null;
+    return (item.pdfPages ?? []).find((candidate) => candidate.pageNumber === Number(page[1]))?.text ?? null;
+  }
   if (item.itemKind !== "CATCH") return null;
   const snapshot = item.snapshot;
   if (fieldPath === "subjectContribution") return snapshot.subjectContribution;

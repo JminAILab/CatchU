@@ -1,119 +1,785 @@
 {
   "stage": "code-generation",
   "unit": "u8-pdf-materials",
-  "note": "Step 1~3까지의 상태(담당자 결정 2026-11-06). OK는 DB 표·엔티티·DB 시험으로 구현·검증된 항목, GAP의 note는 그 항목을 구현·시험할 계획 Step. Step 4 이후 진행 시 이어 쓴다. NFR6.x·NFR7.x는 센서 상류 목록에 없어 nfr-design/traceability.json과 같이 손으로 더했다.",
-  "upstream_ids": ["AC3.1.1", "AC3.1.2", "AC3.1.3", "AC3.1.4", "AC3.1.5", "AC3.2.1", "AC3.2.2", "AC3.2.3", "AC3.2.4", "AC3.2.5", "AC4.1.1", "AC4.1.2", "AC4.1.3", "AC4.1.4", "AC4.1.5", "AC4.1.6", "AC4.1.7", "AC4.1.8", "AC4.1.9", "AC5.2.1", "AC5.2.2", "AC5.2.3", "AC5.2.4", "AC5.2.5", "NFR4.1", "NFR4.2", "NFR4.3", "NFR4.4", "NFR4.5", "NFR4.6", "NFR4.7", "NFR4.8", "NFR1.1", "NFR1.2", "NFR1.3", "NFR1.4", "NFR1.5", "NFR1.6", "NFR1.7", "NFR1.8", "NFR1.9", "NFR1.10", "NFR2.1", "NFR2.2", "NFR2.3", "NFR2.4", "NFR4.9", "NFR4.10", "NFR4.11", "NFR4.12", "NFR4.13", "NFR5.1", "NFR5.2", "NFR5.3", "NFR5.4", "NFR4.14", "NFR4.15", "NFR4.16", "NFR4.17", "NFR4.18", "NFR4.19", "NFR4.20", "NFR6.1", "NFR6.2", "NFR6.3", "NFR6.4", "NFR6.5", "NFR7.1", "NFR7.2", "NFR7.3", "BR1.1", "BR1.2", "BR1.3", "BR1.4", "BR1.5", "BR1.6", "BR1.7", "BR1.8", "BR2.1", "BR2.2", "BR2.3", "BR2.4", "BR3.1", "BR3.2", "BR3.3", "BR4.5", "BR3.4", "BR3.5", "BR3.6", "BR3.7", "BR4.1", "BR4.2", "BR5.1", "BR4.3", "BR4.4", "BR5.2", "BR5.3", "BR5.4", "BR5.5", "BR5.6", "BR6.1", "BR6.2", "BR6.3", "BR6.4", "BR6.5", "BR6.6", "BR6.7", "BR7.1", "BR7.2", "BR7.3", "BR7.4"],
+  "note": "Step 1~12까지의 상태(2026-11-11). OK의 target은 구현 파일과 시험 파일(괄호는 시험 수)이며 계획의 「단계 → 스토리·요구사항 대응」 표를 따라 Step 단위로 적었다. 실제 연결은 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름만 확인됐고, 실제 S3와 Compose 전체 스택 기동은 미검증이다. GAP는 NFR5.4(S3 실제 삭제 확인 미실행) 하나다. NFR6.x·NFR7.x는 센서 상류 목록에 없어 nfr-design/traceability.json과 같이 손으로 더했다. 센서 규칙에 따라 OK 행의 target은 실제로 있는 대표 파일 하나이고, 나머지 구현·시험 파일과 확인 범위는 그 행의 note에 적었다.",
+  "upstream_ids": [
+    "AC3.1.1",
+    "AC3.1.2",
+    "AC3.1.3",
+    "AC3.1.4",
+    "AC3.1.5",
+    "AC3.2.1",
+    "AC3.2.2",
+    "AC3.2.3",
+    "AC3.2.4",
+    "AC3.2.5",
+    "AC4.1.1",
+    "AC4.1.2",
+    "AC4.1.3",
+    "AC4.1.4",
+    "AC4.1.5",
+    "AC4.1.6",
+    "AC4.1.7",
+    "AC4.1.8",
+    "AC4.1.9",
+    "AC5.2.1",
+    "AC5.2.2",
+    "AC5.2.3",
+    "AC5.2.4",
+    "AC5.2.5",
+    "NFR4.1",
+    "NFR4.2",
+    "NFR4.3",
+    "NFR4.4",
+    "NFR4.5",
+    "NFR4.6",
+    "NFR4.7",
+    "NFR4.8",
+    "NFR1.1",
+    "NFR1.2",
+    "NFR1.3",
+    "NFR1.4",
+    "NFR1.5",
+    "NFR1.6",
+    "NFR1.7",
+    "NFR1.8",
+    "NFR1.9",
+    "NFR1.10",
+    "NFR2.1",
+    "NFR2.2",
+    "NFR2.3",
+    "NFR2.4",
+    "NFR4.9",
+    "NFR4.10",
+    "NFR4.11",
+    "NFR4.12",
+    "NFR4.13",
+    "NFR5.1",
+    "NFR5.2",
+    "NFR5.3",
+    "NFR5.4",
+    "NFR4.14",
+    "NFR4.15",
+    "NFR4.16",
+    "NFR4.17",
+    "NFR4.18",
+    "NFR4.19",
+    "NFR4.20",
+    "NFR6.1",
+    "NFR6.2",
+    "NFR6.3",
+    "NFR6.4",
+    "NFR6.5",
+    "NFR7.1",
+    "NFR7.2",
+    "NFR7.3",
+    "BR1.1",
+    "BR1.2",
+    "BR1.3",
+    "BR1.4",
+    "BR1.5",
+    "BR1.6",
+    "BR1.7",
+    "BR1.8",
+    "BR2.1",
+    "BR2.2",
+    "BR2.3",
+    "BR2.4",
+    "BR3.1",
+    "BR3.2",
+    "BR3.3",
+    "BR4.5",
+    "BR3.4",
+    "BR3.5",
+    "BR3.6",
+    "BR3.7",
+    "BR4.1",
+    "BR4.2",
+    "BR5.1",
+    "BR4.3",
+    "BR4.4",
+    "BR5.2",
+    "BR5.3",
+    "BR5.4",
+    "BR5.5",
+    "BR5.6",
+    "BR6.1",
+    "BR6.2",
+    "BR6.3",
+    "BR6.4",
+    "BR6.5",
+    "BR6.6",
+    "BR6.7",
+    "BR7.1",
+    "BR7.2",
+    "BR7.3",
+    "BR7.4"
+  ],
   "coverage": [
-    { "id": "AC3.1.1", "status": "GAP", "note": "Step 5·10(업로드 API·화면)" },
-    { "id": "AC3.1.2", "status": "GAP", "note": "Step 5·10" },
-    { "id": "AC3.1.3", "status": "GAP", "note": "Step 5·10" },
-    { "id": "AC3.1.4", "status": "GAP", "note": "Step 10(화면 안내 문구)" },
-    { "id": "AC3.1.5", "status": "OK", "target": "api/src/publications/published-pdf-page.entity.ts(원본 FK 없음), api/test/db/pdf-tables.test.cjs 9·10번(원본 삭제·변경에도 사본 유지). 발행 시 복사는 Step 8" },
-    { "id": "AC3.2.1", "status": "GAP", "note": "Step 9·10(사본 열람·쪽 표시)" },
-    { "id": "AC3.2.2", "status": "GAP", "note": "Step 6·7(추출·수신). DB 바닥: pdf-page-text.entity.ts, pdf-tables.test.cjs 4번" },
-    { "id": "AC3.2.3", "status": "GAP", "note": "Step 6·7·10. DB 바닥: readable/text CHECK(pdf-tables.test.cjs 4·5번)" },
-    { "id": "AC3.2.4", "status": "GAP", "note": "Step 5·10(실패 사유 표시). DB 바닥: 실패 사유 IN CHECK(pdf-tables.test.cjs 1·2번)" },
-    { "id": "AC3.2.5", "status": "GAP", "note": "Step 7(worker 실패 판정)" },
-    { "id": "AC4.1.1", "status": "GAP", "note": "Step 8(발행 PDF 항목)" },
-    { "id": "AC4.1.2", "status": "GAP", "note": "U4 현행·Step 8" },
-    { "id": "AC4.1.3", "status": "GAP", "note": "U4 현행·Step 8" },
-    { "id": "AC4.1.4", "status": "GAP", "note": "U4 현행·Step 8" },
-    { "id": "AC4.1.5", "status": "GAP", "note": "U4 현행·Step 8" },
-    { "id": "AC4.1.6", "status": "GAP", "note": "U4 현행·Step 8" },
-    { "id": "AC4.1.7", "status": "GAP", "note": "U4 현행·Step 8" },
-    { "id": "AC4.1.8", "status": "GAP", "note": "Step 8(복사 실패 정리)" },
-    { "id": "AC4.1.9", "status": "GAP", "note": "Step 8(extractionIncomplete 400)" },
-    { "id": "AC5.2.1", "status": "GAP", "note": "U4 현행" },
-    { "id": "AC5.2.2", "status": "OK", "target": "1793977402870-CreatePdfMaterialTables.ts(published_pdf_page FK ON DELETE CASCADE), pdf-tables.test.cjs 10·11번, member-cascade-delete.test.cjs. 파일 접두어 삭제는 Step 4·8" },
-    { "id": "AC5.2.3", "status": "GAP", "note": "U4 현행" },
-    { "id": "AC5.2.4", "status": "GAP", "note": "Step 8·9(사본 열람 404). DB 바닥: 쪽 사본 연쇄 삭제(pdf-tables.test.cjs 10번)" },
-    { "id": "AC5.2.5", "status": "GAP", "note": "U4 현행" },
-    { "id": "NFR4.1", "status": "GAP", "note": "Step 5(업로드 처리 순서)" },
-    { "id": "NFR4.2", "status": "GAP", "note": "Step 5·6(시한 판정). DB 바닥: extraction_deadline_at NOT NULL" },
-    { "id": "NFR4.3", "status": "GAP", "note": "Step 7" },
-    { "id": "NFR4.4", "status": "GAP", "note": "Step 7·11" },
-    { "id": "NFR4.5", "status": "GAP", "note": "Step 9·10" },
-    { "id": "NFR4.6", "status": "GAP", "note": "Step 8" },
-    { "id": "NFR4.7", "status": "GAP", "note": "Step 6" },
-    { "id": "NFR4.8", "status": "GAP", "note": "Step 4" },
-    { "id": "NFR1.1", "status": "GAP", "note": "Step 5·9" },
-    { "id": "NFR1.2", "status": "GAP", "note": "Step 9" },
-    { "id": "NFR1.3", "status": "GAP", "note": "Step 9·10" },
-    { "id": "NFR1.4", "status": "GAP", "note": "Step 5·6·8·9(로그 위생)" },
-    { "id": "NFR1.5", "status": "GAP", "note": "Step 5·9" },
-    { "id": "NFR1.6", "status": "GAP", "note": "Step 5·6" },
-    { "id": "NFR1.7", "status": "GAP", "note": "Step 4·7·11" },
-    { "id": "NFR1.8", "status": "GAP", "note": "Step 7·10" },
-    { "id": "NFR1.9", "status": "GAP", "note": "Step 7" },
-    { "id": "NFR1.10", "status": "GAP", "note": "Step 5·9" },
-    { "id": "NFR2.1", "status": "GAP", "note": "Step 5·10" },
-    { "id": "NFR2.2", "status": "GAP", "note": "Step 5(외부 AI 직접 호출 없음 확인)" },
-    { "id": "NFR2.3", "status": "GAP", "note": "Step 10" },
-    { "id": "NFR2.4", "status": "GAP", "note": "Step 12(문서 확인)" },
-    { "id": "NFR4.9", "status": "GAP", "note": "Step 5. DB 바닥: 쪽 수 1~50 CHECK(pdf-tables.test.cjs 3번)" },
-    { "id": "NFR4.10", "status": "GAP", "note": "Step 7" },
-    { "id": "NFR4.11", "status": "GAP", "note": "Step 4" },
-    { "id": "NFR4.12", "status": "GAP", "note": "Step 5" },
-    { "id": "NFR4.13", "status": "GAP", "note": "Step 11(두지 않는 것 확인)" },
-    { "id": "NFR5.1", "status": "GAP", "note": "Step 5(저장소 먼저 삭제). DB 바닥: 연쇄 삭제·외래 키 전수 조사(pdf-tables.test.cjs 8·9·11번, member-cascade-delete.test.cjs)" },
-    { "id": "NFR5.2", "status": "OK", "target": "published-pdf-page.entity.ts(원본과 외래 키 없음), pdf-tables.test.cjs 9·10번(원본 삭제·다른 발행본 삭제에도 사본 유지), api/docs/member-withdrawal-deletion.md 행" },
-    { "id": "NFR5.3", "status": "GAP", "note": "Step 6" },
-    { "id": "NFR5.4", "status": "GAP", "note": "S3 실제 확인(버킷 준비 뒤, 미실행으로 기록)" },
-    { "id": "NFR4.14", "status": "GAP", "note": "Step 5·6(조건부 UPDATE)" },
-    { "id": "NFR4.15", "status": "GAP", "note": "Step 4·7" },
-    { "id": "NFR4.16", "status": "GAP", "note": "Step 6. DB 바닥: 쪽 행 제약(pdf-tables.test.cjs 4·6번)" },
-    { "id": "NFR4.17", "status": "GAP", "note": "Step 8" },
-    { "id": "NFR4.18", "status": "GAP", "note": "Step 7" },
-    { "id": "NFR4.19", "status": "GAP", "note": "Step 5·9" },
-    { "id": "NFR4.20", "status": "GAP", "note": "Step 5" },
-    { "id": "NFR6.1", "status": "GAP", "note": "Step 5·6·7·8·9(로그 사건)" },
-    { "id": "NFR6.2", "status": "GAP", "note": "Step 5·6·8·9" },
-    { "id": "NFR6.3", "status": "GAP", "note": "Step 7" },
-    { "id": "NFR6.4", "status": "GAP", "note": "Step 12(확인 표 입력)" },
-    { "id": "NFR6.5", "status": "GAP", "note": "Step 12(두지 않는 것 확인)" },
-    { "id": "NFR7.1", "status": "GAP", "note": "Step 10" },
-    { "id": "NFR7.2", "status": "GAP", "note": "Step 10" },
-    { "id": "NFR7.3", "status": "GAP", "note": "Step 8·10" },
-    { "id": "BR1.1", "status": "GAP", "note": "Step 5·10" },
-    { "id": "BR1.2", "status": "GAP", "note": "Step 5·7·10(20 MB·20벌·제목 100자는 API 검증). DB 바닥: 쪽 수 50 CHECK(pdf-tables.test.cjs 3번)" },
-    { "id": "BR1.3", "status": "GAP", "note": "Step 5·10" },
-    { "id": "BR1.4", "status": "GAP", "note": "Step 5(제목 기본값)" },
-    { "id": "BR1.5", "status": "GAP", "note": "Step 10" },
-    { "id": "BR1.6", "status": "GAP", "note": "Step 5" },
-    { "id": "BR1.7", "status": "OK", "target": "1793977402870-CreatePdfMaterialTables.ts(pdf_page_text FK ON DELETE CASCADE), pdf-tables.test.cjs 9번(PDF 삭제 시 쪽 글 연쇄·사본 유지). 저장소 먼저 삭제 순서는 Step 5" },
-    { "id": "BR1.8", "status": "GAP", "note": "Step 5" },
-    { "id": "BR2.1", "status": "GAP", "note": "Step 6. DB 바닥: 상태 IN·상태와 딸린 칸 동반 CHECK(pdf-tables.test.cjs 1·2번)" },
-    { "id": "BR2.2", "status": "GAP", "note": "Step 5·6. DB 바닥: DEADLINE_EXCEEDED 사유 IN·extraction_deadline_at NOT NULL" },
-    { "id": "BR2.3", "status": "GAP", "note": "Step 10" },
-    { "id": "BR2.4", "status": "GAP", "note": "Step 5" },
-    { "id": "BR3.1", "status": "GAP", "note": "Step 7. DB 바닥: readable = (text <> '') CHECK(pdf-tables.test.cjs 4번)" },
-    { "id": "BR3.2", "status": "GAP", "note": "Step 7. DB 바닥: 실패 사유 IN CHECK" },
-    { "id": "BR3.3", "status": "GAP", "note": "Step 6. DB 바닥: UNIQUE·readable/text CHECK(pdf-tables.test.cjs 4·6번)" },
-    { "id": "BR4.5", "status": "GAP", "note": "Step 8" },
-    { "id": "BR3.4", "status": "GAP", "note": "Step 6" },
-    { "id": "BR3.5", "status": "GAP", "note": "Step 6·7. DB 바닥: 글 무가공 저장 확인(pdf-tables.test.cjs 4번)" },
-    { "id": "BR3.6", "status": "GAP", "note": "Step 4·7" },
-    { "id": "BR3.7", "status": "GAP", "note": "Step 7" },
-    { "id": "BR4.1", "status": "GAP", "note": "Step 8" },
-    { "id": "BR4.2", "status": "GAP", "note": "Step 8" },
-    { "id": "BR5.1", "status": "GAP", "note": "Step 8" },
-    { "id": "BR4.3", "status": "OK", "target": "published-pdf-page.entity.ts(C-07 열·UNIQUE·readable/text CHECK), pdf-tables.test.cjs 5·7·11번. INSERT ... SELECT 복사는 Step 8" },
-    { "id": "BR4.4", "status": "OK", "target": "published-pdf-page.entity.ts(원본 FK 없음), pdf-tables.test.cjs 9번(원본 삭제에도 사본 유지)" },
-    { "id": "BR5.2", "status": "GAP", "note": "Step 8" },
-    { "id": "BR5.3", "status": "GAP", "note": "Step 8" },
-    { "id": "BR5.4", "status": "GAP", "note": "Step 8" },
-    { "id": "BR5.5", "status": "GAP", "note": "Step 8" },
-    { "id": "BR5.6", "status": "GAP", "note": "Step 8" },
-    { "id": "BR6.1", "status": "GAP", "note": "Step 9" },
-    { "id": "BR6.2", "status": "GAP", "note": "Step 9" },
-    { "id": "BR6.3", "status": "GAP", "note": "Step 10" },
-    { "id": "BR6.4", "status": "GAP", "note": "Step 10" },
-    { "id": "BR6.5", "status": "GAP", "note": "Step 9" },
-    { "id": "BR6.6", "status": "GAP", "note": "Step 5·9" },
-    { "id": "BR6.7", "status": "GAP", "note": "Step 9" },
-    { "id": "BR7.1", "status": "OK", "target": "1793977402870-CreatePdfMaterialTables.ts(published_pdf_page → published_item ON DELETE CASCADE), pdf-tables.test.cjs 10·11번, member-withdrawal-deletion.md 행. 파일 접두어 삭제는 Step 4·8" },
-    { "id": "BR7.2", "status": "GAP", "note": "Step 4·5(회원 접두어 삭제). DB 바닥: 회원 → pdf_material → pdf_page_text 연쇄(pdf-tables.test.cjs 8번, member-cascade-delete.test.cjs)" },
-    { "id": "BR7.3", "status": "GAP", "note": "Step 4" },
-    { "id": "BR7.4", "status": "GAP", "note": "Step 4·7·11" }
+    {
+      "id": "AC3.1.1",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC3.1.2",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC3.1.3",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC3.1.4",
+      "status": "OK",
+      "target": "web/src/features/materials/pdf-materials-api.ts",
+      "note": "Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC3.1.5",
+      "status": "OK",
+      "target": "api/src/publications/published-pdf-page.entity.ts",
+      "note": "api/src/publications/published-pdf-page.entity.ts(원본 FK 없음), api/test/db/pdf-tables.test.cjs 9·10번(원본 삭제·변경에도 사본 유지). 발행 시 복사는 Step 8 → 이후 반영: Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15)"
+    },
+    {
+      "id": "AC3.2.1",
+      "status": "OK",
+      "target": "api/src/publications/published-pdf-view.service.ts",
+      "note": "Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC3.2.2",
+      "status": "OK",
+      "target": "api/src/pdf-extraction/pdf-extraction.receiver.ts",
+      "note": "Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / DB 바닥: pdf-page-text.entity.ts, pdf-tables.test.cjs 4번 / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC3.2.3",
+      "status": "OK",
+      "target": "api/src/pdf-extraction/pdf-extraction.receiver.ts",
+      "note": "Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / DB 바닥: readable/text CHECK(pdf-tables.test.cjs 4·5번) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC3.2.4",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / DB 바닥: 실패 사유 IN CHECK(pdf-tables.test.cjs 1·2번) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC3.2.5",
+      "status": "OK",
+      "target": "worker/app/consumer/service.py",
+      "note": "Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC4.1.1",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증 / Step 10.5 발행 화면에서 PDF 선택·발행: web/src/features/publications/publish-screen.tsx·publish-view.tsx·publish-sources.ts·publications-api.ts; 시험 web/test/publish.test.mjs(16, PDF 4건: 상태별 선택 가능 여부·혼합 순서·extractionIncomplete 안내·기존 흐름); 브라우저 확인 기록 code-summary.md §16.8(추출 상태는 DB로 준비한 시험 데이터)·§17.6(실제 worker가 만든 DONE을 화면에서 선택·발행)"
+    },
+    {
+      "id": "AC4.1.2",
+      "status": "OK",
+      "target": "api/src/publications/publish.service.ts",
+      "note": "U4 현행 흐름 유지: api/src/publications/publish.service.ts; 시험 api/test/publications/publish-api.test.cjs(10, 2026-11-11 재실행 통과)·publish-pdf.test.cjs P-a(PDF 없는 발행은 저장소를 부르지 않음) / Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC4.1.3",
+      "status": "OK",
+      "target": "api/src/publications/publish.service.ts",
+      "note": "U4 현행 흐름 유지: api/src/publications/publish.service.ts; 시험 api/test/publications/publish-api.test.cjs(10, 2026-11-11 재실행 통과)·publish-pdf.test.cjs P-a(PDF 없는 발행은 저장소를 부르지 않음) / Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC4.1.4",
+      "status": "OK",
+      "target": "api/src/publications/publish.service.ts",
+      "note": "U4 현행 흐름 유지: api/src/publications/publish.service.ts; 시험 api/test/publications/publish-api.test.cjs(10, 2026-11-11 재실행 통과)·publish-pdf.test.cjs P-a(PDF 없는 발행은 저장소를 부르지 않음) / Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC4.1.5",
+      "status": "OK",
+      "target": "api/src/publications/publish.service.ts",
+      "note": "U4 현행 흐름 유지: api/src/publications/publish.service.ts; 시험 api/test/publications/publish-api.test.cjs(10, 2026-11-11 재실행 통과)·publish-pdf.test.cjs P-a(PDF 없는 발행은 저장소를 부르지 않음) / Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC4.1.6",
+      "status": "OK",
+      "target": "api/src/publications/publish.service.ts",
+      "note": "U4 현행 흐름 유지: api/src/publications/publish.service.ts; 시험 api/test/publications/publish-api.test.cjs(10, 2026-11-11 재실행 통과)·publish-pdf.test.cjs P-a(PDF 없는 발행은 저장소를 부르지 않음) / Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC4.1.7",
+      "status": "OK",
+      "target": "api/src/publications/publish.service.ts",
+      "note": "U4 현행 흐름 유지: api/src/publications/publish.service.ts; 시험 api/test/publications/publish-api.test.cjs(10, 2026-11-11 재실행 통과)·publish-pdf.test.cjs P-a(PDF 없는 발행은 저장소를 부르지 않음) / Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC4.1.8",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC4.1.9",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC5.2.1",
+      "status": "OK",
+      "target": "api/test/publications/publications-manage-api.test.cjs",
+      "note": "U4 현행(U8이 바꾸지 않음): api/src/publications 작성자 발행본 관리; 시험 api/test/publications/publications-manage-api.test.cjs"
+    },
+    {
+      "id": "AC5.2.2",
+      "status": "OK",
+      "target": "api/src/file-storage/s3-file-storage.ts",
+      "note": "1793977402870-CreatePdfMaterialTables.ts(published_pdf_page FK ON DELETE CASCADE), pdf-tables.test.cjs 10·11번, member-cascade-delete.test.cjs. 파일 접두어 삭제는 Step 4·8 → 이후 반영: Step 4 S3 드라이버: api/src/file-storage/s3-file-storage.ts·file-storage.config.ts·file-storage.module.ts; 시험 api/test/file-storage/s3-file-storage.test.cjs(9, 가짜 S3 클라이언트)·storage-contract.cjs / Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15)"
+    },
+    {
+      "id": "AC5.2.3",
+      "status": "OK",
+      "target": "api/test/publications/publications-manage-api.test.cjs",
+      "note": "U4 현행(U8이 바꾸지 않음): api/src/publications 작성자 발행본 관리; 시험 api/test/publications/publications-manage-api.test.cjs"
+    },
+    {
+      "id": "AC5.2.4",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / DB 바닥: 쪽 사본 연쇄 삭제(pdf-tables.test.cjs 10번) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "AC5.2.5",
+      "status": "OK",
+      "target": "api/test/publications/publications-manage-api.test.cjs",
+      "note": "U4 현행(U8이 바꾸지 않음): api/src/publications 작성자 발행본 관리; 시험 api/test/publications/publications-manage-api.test.cjs"
+    },
+    {
+      "id": "NFR4.1",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.2",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / DB 바닥: extraction_deadline_at NOT NULL / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.3",
+      "status": "OK",
+      "target": "worker/app/consumer/service.py",
+      "note": "Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.4",
+      "status": "OK",
+      "target": "worker/app/consumer/service.py",
+      "note": "Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10)(test_pdf_service.py W-10: 분석 작업이 도는 동안 PDF 추출이 기다리지 않음). 측정: code-summary.md §17.5(20·30·40·50·50쪽 합성 PDF 5건, DONE 최초 관측 2,471 ms·2,217 ms, 동시성 1·10분 시한 변경 없음)"
+    },
+    {
+      "id": "NFR4.5",
+      "status": "OK",
+      "target": "api/src/publications/published-pdf-view.service.ts",
+      "note": "Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.6",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.7",
+      "status": "OK",
+      "target": "api/src/pdf-extraction/pdf-extraction.receiver.ts",
+      "note": "Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.8",
+      "status": "OK",
+      "target": "api/src/file-storage/s3-file-storage.ts",
+      "note": "Step 4 S3 드라이버: api/src/file-storage/s3-file-storage.ts·file-storage.config.ts·file-storage.module.ts; 시험 api/test/file-storage/s3-file-storage.test.cjs(9, 가짜 S3 클라이언트)·storage-contract.cjs"
+    },
+    {
+      "id": "NFR1.1",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR1.2",
+      "status": "OK",
+      "target": "api/src/publications/published-pdf-view.service.ts",
+      "note": "Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR1.3",
+      "status": "OK",
+      "target": "api/src/publications/published-pdf-view.service.ts",
+      "note": "Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR1.4",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR1.5",
+      "status": "OK",
+      "target": "api/src/publications/recipient-links.controller.ts",
+      "note": "시험용 권한 우회 없음(@Public은 받은 사람 사본 경로 하나뿐, api/src/publications/recipient-links.controller.ts). 허용·거부를 함께 보는 시험: pdf-materials-api.test.cjs(남의 것 404·동의 없음 403), recipient-pdf.test.cjs(grant 없음 401·다른 발행본 항목 404·작성자 아님 404), publish-pdf.test.cjs P-f(404)"
+    },
+    {
+      "id": "NFR1.6",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR1.7",
+      "status": "OK",
+      "target": "api/src/file-storage/s3-file-storage.ts",
+      "note": "Step 4 S3 드라이버: api/src/file-storage/s3-file-storage.ts·file-storage.config.ts·file-storage.module.ts; 시험 api/test/file-storage/s3-file-storage.test.cjs(9, 가짜 S3 클라이언트)·storage-contract.cjs / Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / Step 11 설정·측정: api/.env.example, worker/.env.example, deploy/compose.local-db.yaml, api/Dockerfile; 기록 code-summary.md §17 / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR1.8",
+      "status": "OK",
+      "target": "worker/app/consumer/service.py",
+      "note": "Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR1.9",
+      "status": "OK",
+      "target": "worker/app/consumer/service.py",
+      "note": "Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR1.10",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR2.1",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR2.2",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "U8 코드에 외부 AI 호출 없음: api/src/materials/pdf-*·api/src/pdf-extraction·api/src/publications/pdf-publish.ts·published-pdf-view.service.ts·worker/app/pdf_extraction에서 제공자 SDK·키 이름 검색 0건(2026-11-11, code-summary.md §18.4)"
+    },
+    {
+      "id": "NFR2.3",
+      "status": "OK",
+      "target": "web/src/features/materials/pdf-materials-api.ts",
+      "note": "Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR2.4",
+      "status": "OK",
+      "target": "api/src/claude-mcp/mcp-material-reader.ts",
+      "note": "U8은 PDF 표를 읽는 MCP 경로를 만들지 않음: api/src/claude-mcp/mcp-material-reader.ts의 SQL에 PDF 표 없음(2026-11-11 검색, code-summary.md §18.4). api/docs/pdf-materials.md 「수용한 위험」 한계 문단. 계약 C-15 주석의 \"PDF는 쪽별 글 포함\" 문구는 확인 필요 항목으로 넘김(§18.5)"
+    },
+    {
+      "id": "NFR4.9",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / DB 바닥: 쪽 수 1~50 CHECK(pdf-tables.test.cjs 3번) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.10",
+      "status": "OK",
+      "target": "worker/app/consumer/service.py",
+      "note": "Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.11",
+      "status": "OK",
+      "target": "api/src/file-storage/s3-file-storage.ts",
+      "note": "Step 4 S3 드라이버: api/src/file-storage/s3-file-storage.ts·file-storage.config.ts·file-storage.module.ts; 시험 api/test/file-storage/s3-file-storage.test.cjs(9, 가짜 S3 클라이언트)·storage-contract.cjs"
+    },
+    {
+      "id": "NFR4.12",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.13",
+      "status": "OK",
+      "target": "aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/code-generation/code-summary.md",
+      "note": "두지 않는 것 확인: 확장 기준·용량 계획·부하 시험을 더하지 않음(code-summary.md §17.5는 1회 측정 기록이며 부하 시험이 아님)"
+    },
+    {
+      "id": "NFR5.1",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / DB 바닥: 연쇄 삭제·외래 키 전수 조사(pdf-tables.test.cjs 8·9·11번, member-cascade-delete.test.cjs) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR5.2",
+      "status": "OK",
+      "target": "api/docs/member-withdrawal-deletion.md",
+      "note": "published-pdf-page.entity.ts(원본과 외래 키 없음), pdf-tables.test.cjs 9·10번(원본 삭제·다른 발행본 삭제에도 사본 유지), api/docs/member-withdrawal-deletion.md 행"
+    },
+    {
+      "id": "NFR5.3",
+      "status": "OK",
+      "target": "api/src/pdf-extraction/pdf-extraction.receiver.ts",
+      "note": "Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR5.4",
+      "status": "GAP",
+      "note": "S3 실제 삭제 확인(탈퇴·발행본 삭제) 미실행 — \"S3 실제 확인 미완\". 로컬 드라이버와 가짜 S3 클라이언트 시험만 있음(api/test/file-storage/s3-file-storage.test.cjs, recipient-pdf.test.cjs X-1). 확인 표 입력은 code-summary.md §18.4에 \"미실행\"으로 적음"
+    },
+    {
+      "id": "NFR4.14",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.15",
+      "status": "OK",
+      "target": "api/src/file-storage/s3-file-storage.ts",
+      "note": "Step 4 S3 드라이버: api/src/file-storage/s3-file-storage.ts·file-storage.config.ts·file-storage.module.ts; 시험 api/test/file-storage/s3-file-storage.test.cjs(9, 가짜 S3 클라이언트)·storage-contract.cjs / Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.16",
+      "status": "OK",
+      "target": "api/src/pdf-extraction/pdf-extraction.receiver.ts",
+      "note": "Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / DB 바닥: 쪽 행 제약(pdf-tables.test.cjs 4·6번) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.17",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.18",
+      "status": "OK",
+      "target": "worker/app/consumer/service.py",
+      "note": "Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.19",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR4.20",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "두지 않는 것 확인: PDF 파일 백업·자동 파기 코드 없음. 보존은 삭제·탈퇴까지 — api/src/materials/pdf-materials.controller.ts(삭제), api/test/publications/publish-pdf.test.cjs·recipient-pdf.test.cjs X-1(발행본 삭제), api/test/db/member-cascade-delete.test.cjs"
+    },
+    {
+      "id": "NFR6.1",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR6.2",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR6.3",
+      "status": "OK",
+      "target": "worker/app/consumer/service.py",
+      "note": "Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR6.4",
+      "status": "OK",
+      "target": "aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/code-generation/code-summary.md",
+      "note": "FR19 확인 표 입력(U8 행): code-summary.md §18.4 — 업로드 → 추출 완료 → 발행 → 받은 사람 열람은 로컬 파일 저장소에서 확인됨(2026-11-11), 발행본 삭제 뒤 파일 삭제는 자동 시험, S3 실제 확인·Compose 전체 스택은 \"미실행\""
+    },
+    {
+      "id": "NFR6.5",
+      "status": "OK",
+      "target": "api/docs/pdf-materials.md",
+      "note": "두지 않는 것 확인: 지표·대시보드·경보·분산 추적 코드 없음. 관측은 구조 로그뿐(api/docs/pdf-materials.md 「로그」)"
+    },
+    {
+      "id": "NFR7.1",
+      "status": "OK",
+      "target": "web/src/features/materials/pdf-materials-api.ts",
+      "note": "Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR7.2",
+      "status": "OK",
+      "target": "web/src/features/materials/pdf-materials-api.ts",
+      "note": "Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "NFR7.3",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR1.1",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR1.2",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / DB 바닥: 쪽 수 50 CHECK(pdf-tables.test.cjs 3번) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR1.3",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR1.4",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR1.5",
+      "status": "OK",
+      "target": "web/src/features/materials/pdf-materials-api.ts",
+      "note": "Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR1.6",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR1.7",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "1793977402870-CreatePdfMaterialTables.ts(pdf_page_text FK ON DELETE CASCADE), pdf-tables.test.cjs 9번(PDF 삭제 시 쪽 글 연쇄·사본 유지). 저장소 먼저 삭제 순서는 Step 5 → 이후 반영: Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12)"
+    },
+    {
+      "id": "BR1.8",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR2.1",
+      "status": "OK",
+      "target": "api/src/pdf-extraction/pdf-extraction.receiver.ts",
+      "note": "Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / DB 바닥: 상태 IN·상태와 딸린 칸 동반 CHECK(pdf-tables.test.cjs 1·2번) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR2.2",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / DB 바닥: DEADLINE_EXCEEDED 사유 IN·extraction_deadline_at NOT NULL / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR2.3",
+      "status": "OK",
+      "target": "web/src/features/materials/pdf-materials-api.ts",
+      "note": "Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR2.4",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR3.1",
+      "status": "OK",
+      "target": "worker/app/consumer/service.py",
+      "note": "Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / DB 바닥: readable = (text <> '') CHECK(pdf-tables.test.cjs 4번) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR3.2",
+      "status": "OK",
+      "target": "worker/app/consumer/service.py",
+      "note": "Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / DB 바닥: 실패 사유 IN CHECK / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR3.3",
+      "status": "OK",
+      "target": "api/src/pdf-extraction/pdf-extraction.receiver.ts",
+      "note": "Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / DB 바닥: UNIQUE·readable/text CHECK(pdf-tables.test.cjs 4·6번) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR4.5",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR3.4",
+      "status": "OK",
+      "target": "api/src/pdf-extraction/pdf-extraction.receiver.ts",
+      "note": "Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR3.5",
+      "status": "OK",
+      "target": "api/src/pdf-extraction/pdf-extraction.receiver.ts",
+      "note": "Step 6 결과 수신: api/src/pdf-extraction/pdf-extraction.receiver.ts·pdf-extraction-spec.ts, api/src/analysis-queue/worker-message.consumer.ts; 시험 api/test/materials/pdf-extraction-receiver.test.cjs(13) / Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / DB 바닥: 글 무가공 저장 확인(pdf-tables.test.cjs 4번) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR3.6",
+      "status": "OK",
+      "target": "api/src/file-storage/s3-file-storage.ts",
+      "note": "Step 4 S3 드라이버: api/src/file-storage/s3-file-storage.ts·file-storage.config.ts·file-storage.module.ts; 시험 api/test/file-storage/s3-file-storage.test.cjs(9, 가짜 S3 클라이언트)·storage-contract.cjs / Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR3.7",
+      "status": "OK",
+      "target": "worker/app/consumer/service.py",
+      "note": "Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR4.1",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증 / Step 10.5 발행 화면에서 PDF 선택·발행: web/src/features/publications/publish-screen.tsx·publish-view.tsx·publish-sources.ts·publications-api.ts; 시험 web/test/publish.test.mjs(16, PDF 4건: 상태별 선택 가능 여부·혼합 순서·extractionIncomplete 안내·기존 흐름); 브라우저 확인 기록 code-summary.md §16.8(추출 상태는 DB로 준비한 시험 데이터)·§17.6(실제 worker가 만든 DONE을 화면에서 선택·발행)"
+    },
+    {
+      "id": "BR4.2",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR5.1",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR4.3",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "published-pdf-page.entity.ts(C-07 열·UNIQUE·readable/text CHECK), pdf-tables.test.cjs 5·7·11번. INSERT ... SELECT 복사는 Step 8 → 이후 반영: Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15)"
+    },
+    {
+      "id": "BR4.4",
+      "status": "OK",
+      "target": "api/src/publications/published-pdf-page.entity.ts",
+      "note": "published-pdf-page.entity.ts(원본 FK 없음), pdf-tables.test.cjs 9번(원본 삭제에도 사본 유지)"
+    },
+    {
+      "id": "BR5.2",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR5.3",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR5.4",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR5.5",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR5.6",
+      "status": "OK",
+      "target": "api/src/publications/pdf-publish.ts",
+      "note": "Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR6.1",
+      "status": "OK",
+      "target": "api/src/publications/published-pdf-view.service.ts",
+      "note": "Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR6.2",
+      "status": "OK",
+      "target": "api/src/publications/published-pdf-view.service.ts",
+      "note": "Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR6.3",
+      "status": "OK",
+      "target": "web/src/features/materials/pdf-materials-api.ts",
+      "note": "Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR6.4",
+      "status": "OK",
+      "target": "web/src/features/materials/pdf-materials-api.ts",
+      "note": "Step 10 web: web/src/features/materials/pdf-materials-api.ts·pdf-materials-tab.tsx·pdf-upload-form.tsx·pdf-material-list.tsx, web/src/features/recipient/pdf-viewer-launcher.tsx, web/src/features/publications/published-pdf-item.tsx·publish-sources.ts·publish-screen.tsx·publish-view.tsx; 시험 web/test/pdf-materials-api.test.mjs(7)·pdf-viewer.test.mjs(5)·recipient-pdf.test.mjs(4)·publish.test.mjs(16) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR6.5",
+      "status": "OK",
+      "target": "api/src/publications/published-pdf-view.service.ts",
+      "note": "Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR6.6",
+      "status": "OK",
+      "target": "api/src/materials/pdf-materials.controller.ts",
+      "note": "Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR6.7",
+      "status": "OK",
+      "target": "api/src/publications/published-pdf-view.service.ts",
+      "note": "Step 9 사본 열람: api/src/publications/published-pdf-view.service.ts·recipient-links.controller.ts·publications.controller.ts; 시험 api/test/publications/recipient-pdf.test.cjs(8)·app-routes.test.cjs / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR7.1",
+      "status": "OK",
+      "target": "api/src/file-storage/s3-file-storage.ts",
+      "note": "1793977402870-CreatePdfMaterialTables.ts(published_pdf_page → published_item ON DELETE CASCADE), pdf-tables.test.cjs 10·11번, member-withdrawal-deletion.md 행. 파일 접두어 삭제는 Step 4·8 → 이후 반영: Step 4 S3 드라이버: api/src/file-storage/s3-file-storage.ts·file-storage.config.ts·file-storage.module.ts; 시험 api/test/file-storage/s3-file-storage.test.cjs(9, 가짜 S3 클라이언트)·storage-contract.cjs / Step 8 발행 PDF 부분: api/src/publications/pdf-publish.ts·publish.service.ts·publish-input.ts·snapshot-builder.ts; 시험 api/test/publications/publish-pdf.test.cjs(15)"
+    },
+    {
+      "id": "BR7.2",
+      "status": "OK",
+      "target": "api/src/file-storage/s3-file-storage.ts",
+      "note": "Step 4 S3 드라이버: api/src/file-storage/s3-file-storage.ts·file-storage.config.ts·file-storage.module.ts; 시험 api/test/file-storage/s3-file-storage.test.cjs(9, 가짜 S3 클라이언트)·storage-contract.cjs / Step 5 PDF 자료 API: api/src/materials/pdf-materials.controller.ts·pdf-material-input.ts·pdf-material-store.ts, api/src/pdf-extraction/pdf-extract.dispatcher.ts; 시험 api/test/materials/pdf-materials-api.test.cjs(12) / DB 바닥: 회원 → pdf_material → pdf_page_text 연쇄(pdf-tables.test.cjs 8번, member-cascade-delete.test.cjs) / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    },
+    {
+      "id": "BR7.3",
+      "status": "OK",
+      "target": "api/src/file-storage/s3-file-storage.ts",
+      "note": "Step 4 S3 드라이버: api/src/file-storage/s3-file-storage.ts·file-storage.config.ts·file-storage.module.ts; 시험 api/test/file-storage/s3-file-storage.test.cjs(9, 가짜 S3 클라이언트)·storage-contract.cjs"
+    },
+    {
+      "id": "BR7.4",
+      "status": "OK",
+      "target": "api/src/file-storage/s3-file-storage.ts",
+      "note": "Step 4 S3 드라이버: api/src/file-storage/s3-file-storage.ts·file-storage.config.ts·file-storage.module.ts; 시험 api/test/file-storage/s3-file-storage.test.cjs(9, 가짜 S3 클라이언트)·storage-contract.cjs / Step 7 worker: worker/app/pdf_extraction/(settings·envelope·reader·extract·child·worker).py, worker/app/consumer/service.py; 시험 worker/tests/test_pdf_extraction.py(32)·test_pdf_consumer.py(19)·test_pdf_service.py(10) / Step 11 설정·측정: api/.env.example, worker/.env.example, deploy/compose.local-db.yaml, api/Dockerfile; 기록 code-summary.md §17 / 실제 연결: 로컬 파일 저장소 + 실제 큐 + 실제 worker 전체 흐름 확인(code-summary.md §17.6). 실제 S3·Compose 전체 스택 기동은 미검증"
+    }
   ]
 }

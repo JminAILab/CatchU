@@ -140,7 +140,8 @@ test('measure 기록 쓰기는 docs 폴더에 날짜 이름으로 건수·위치
   assert.match(record, /모드: MEASUREMENT\n/);
   assert.match(record, /\| 60\.0% \| 80\.0% \| 90\.0% \|/);
   assert.match(record, /4번 질문\n {2}- item-1 body \[0, 120\)/);
-  assert.match(record, /요구사항 나누기·지시문: U10/);
+  assert.match(record, /- 요구사항 나누기: U10 \/ 지시문: U10 운영 상수\n/);
+  assert.match(buildRepositoryRecord({ ...summary, jd: { ...summary.jd, splitter: 'SCRIPT' } }), /- 요구사항 나누기: 스크립트 \/ 지시문: U10 운영 상수\n/);
   assert.match(record, /- 남의 기여 오귀속 건수: \n/);
   assert.ok(!record.includes('SYNTHETIC-'), '저장소 기록에 질문·답 원문이 없다');
   assert.match(readFileSync(rawPath, 'utf8'), /SYNTHETIC-ANSWER/);

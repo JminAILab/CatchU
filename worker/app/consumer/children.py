@@ -23,10 +23,21 @@ _SPAWN = multiprocessing.get_context("spawn")
 
 
 class Signal(Enum):
-    """읽기 스레드가 넘기는 표지. EOF는 자식 쪽 끝이 닫힘, CORRUPT는 통신 손상."""
+    """읽기 스레드가 넘기는 표지.
+
+    EOF는 프레임 사이(또는 길이 머리 직후)에 자식 쪽 끝이 닫힘, TRUNCATED는 프레임 본문을 받는 도중 끝남,
+    CORRUPT는 완전히 받은 프레임을 해석할 수 없거나 상한(16 MiB)을 넘음·그 밖의 읽기 오류다. 분석 처리 함수는
+    셋을 모두 CHILD_EXITED로 다루고(`parent.py`), PDF 처리 함수는 TRUNCATED·EOF와 CORRUPT를 나눠 다룬다(U8).
+    """
 
     EOF = "EOF"
     CORRUPT = "CORRUPT"
+    TRUNCATED = "TRUNCATED"
+
+
+# CPython `multiprocessing.connection.Connection._recv`가 프레임 본문 도중 끝날 때 내는 OSError 문구(Unix).
+# Windows 파이프는 같은 상황을 EOFError로 올린다. 이 문구가 바뀌면 시험(test_pdf_consumer)이 알린다.
+TRUNCATED_MESSAGE = "got end of file during message"
 
 
 Item = Frame | Signal
@@ -163,11 +174,14 @@ class ChildRun:
                     return
                 self._post(frame)
         except EOFError:
-            # 길이 머리만 받고 본문이 끊긴 경우도 EOFError다. 받은 완전한 프레임만 쓴다.
+            # 길이 머리만 받고 본문이 하나도 오지 않은 경우(Unix)와 본문 도중 끊긴 경우(Windows)도 EOFError다.
+            # 받은 완전한 프레임만 쓴다.
             self._post(Signal.EOF)
-        except OSError:
-            # 상한(16 MiB)을 넘는 프레임이나 읽기 오류. 그 뒤로는 읽을 수 없다.
-            self._post(Signal.CORRUPT)
+        except OSError as error:
+            # 본문 도중 끝남(Unix)은 TRUNCATED, 상한(16 MiB)을 넘는 프레임이나 그 밖의 읽기 오류는 CORRUPT.
+            # 어느 쪽이든 그 뒤로는 읽을 수 없다.
+            truncated = str(error) == TRUNCATED_MESSAGE
+            self._post(Signal.TRUNCATED if truncated else Signal.CORRUPT)
         finally:
             self._reader.close()
 

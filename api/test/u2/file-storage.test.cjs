@@ -114,7 +114,7 @@ test('S22 ..·역슬래시·절대 경로·계약 밖 키는 거부하고 뿌리
 });
 
 test('설정이 없으면 api는 기동하고 FileStorage의 모든 호출이 StorageUnavailable(NOT_CONFIGURED)이다', async (t) => {
-  const restore = setEnv({ FILE_STORAGE_DRIVER: undefined, FILE_STORAGE_LOCAL_ROOT: undefined });
+  const restore = setEnv({ FILE_STORAGE_DRIVER: undefined, FILE_STORAGE_LOCAL_ROOT: undefined, FILE_STORAGE_S3_BUCKET: undefined });
   t.after(restore);
   assert.equal(readFileStorageConfig(), null);
   const app = await NestFactory.createApplicationContext(FileStorageModule, { logger: false, abortOnError: false });
@@ -148,17 +148,17 @@ test('상대 경로·없는 폴더는 기동 실패이고 오류에 경로 값�
   await writeFile(filePath, 'x');
   assert.throws(() => readFileStorageConfig({ FILE_STORAGE_DRIVER: 'local', FILE_STORAGE_LOCAL_ROOT: filePath }), /폴더가 없습니다/);
   // 실제 모듈 조립도 멈춘다(기동 실패).
-  const restore = setEnv({ FILE_STORAGE_DRIVER: 'local', FILE_STORAGE_LOCAL_ROOT: 'relative/files' });
+  const restore = setEnv({ FILE_STORAGE_DRIVER: 'local', FILE_STORAGE_LOCAL_ROOT: 'relative/files', FILE_STORAGE_S3_BUCKET: undefined });
   t.after(restore);
   await assert.rejects(NestFactory.createApplicationContext(FileStorageModule, { logger: false, abortOnError: false }), /절대 경로/);
 });
 
-test('모르는 드라이버(U8 전의 s3 포함)는 기동 실패다', async (t) => {
+test('모르는 드라이버(local·s3 밖의 값, 대문자 포함)는 기동 실패다', async (t) => {
   const root = await tempRoot(t);
-  for (const driver of ['s3', 'LOCAL', 'disk']) {
-    assert.throws(() => readFileStorageConfig({ FILE_STORAGE_DRIVER: driver, FILE_STORAGE_LOCAL_ROOT: root }), /local이어야/);
+  for (const driver of ['LOCAL', 'S3', 'disk']) {
+    assert.throws(() => readFileStorageConfig({ FILE_STORAGE_DRIVER: driver, FILE_STORAGE_LOCAL_ROOT: root }), /local 또는 s3여야/);
   }
-  const restore = setEnv({ FILE_STORAGE_DRIVER: 's3', FILE_STORAGE_LOCAL_ROOT: root });
+  const restore = setEnv({ FILE_STORAGE_DRIVER: 'disk', FILE_STORAGE_LOCAL_ROOT: root, FILE_STORAGE_S3_BUCKET: undefined });
   t.after(restore);
-  await assert.rejects(NestFactory.createApplicationContext(FileStorageModule, { logger: false, abortOnError: false }), /local이어야/);
+  await assert.rejects(NestFactory.createApplicationContext(FileStorageModule, { logger: false, abortOnError: false }), /local 또는 s3여야/);
 });
