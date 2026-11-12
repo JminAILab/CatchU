@@ -28,7 +28,7 @@
 - 회원 전환·로그아웃·화면 이탈·재조회 뒤 늦게 온 응답은 반영하지 않고, 현재 세션·현재 재조회 번호의 결과만 그린다. 연결 상태를 읽는 사이 중단되면 접수 이력 조회를 보내지 않는다.
 - 접수 이력 유무는 GitHub 연결됨일 때만 읽고 쓴다(#155 합의). 연결된 레포 = 분석 요청이 접수된 저장소 1개 이상이며 진행 중·실패와 무관하다(초안 §7.1). 이력 있음은 분석이 끝났거나 지금 분석할 수 있다는 뜻이 아니므로 그렇게 안내하지 않는다.
 - 준비 완료 화면은 초안 §5.5의 두 상자 구성이 [제안·미채택]이라 같은 안내 틀에 내 자산 이동 하나만 둔다. 공유 링크 상자 등 구성은 #155 검토로 정한다.
-- 미연동·재연동 필요의 목적지는 GitHub 연동 화면(`/profile/github`, [#253](../github-connection/README.md))이다. 공통 인증 통합 시험 전환(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION`)을 끈 제품 기본값에서는 GitHub에 다녀오면 로그인이 사라져 연결을 마칠 수 없으므로, 두 버튼을 비활성(`unavailable`)으로 두고 연동 화면과 같은 이유를 버튼 아래에 보인다(`aria-describedby`). 기준과 문구는 #253의 `githubStartBlockedReason`이며 `use-home-readiness.ts`가 `homeView()`에 넘긴다. 전환을 켜면 연동 화면으로 이동한다.
+- 미연동·재연동 필요의 목적지는 GitHub 연동 화면(`/profile/github`, [#253](../github-connection/README.md))이다. 공통 인증 통합 시험 전환(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION`)을 끄면 GitHub에 다녀오면 로그인이 사라져 연결을 마칠 수 없으므로, 두 버튼을 비활성(`unavailable`)으로 두고 연동 화면과 같은 이유를 버튼 아래에 보인다(`aria-describedby`). 기준과 문구는 #253의 `githubStartBlockedReason`이며 `use-home-readiness.ts`가 `homeView()`에 넘긴다. 전환을 켜면 연동 화면으로 이동한다.
 - 재연동 필요의 안내 방식은 초안 §6.2에서 [미정]이다. 지금은 미연동과 상태 이름·문구·버튼 이름을 구분하고 같은 연동 화면을 가리킨다.
 - `/me` 조회는 회원 가드의 조회와 별도로 한 번 더 보낸다(`/assets`의 저장소 연결 관리와 같은 방식). 연결됨이면 이어서 `/me/analysis-summary`를 보낸다.
 
