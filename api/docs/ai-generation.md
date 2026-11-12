@@ -39,7 +39,7 @@
 2. 줄이 있는 근거만 근거 순서대로 인용이 켜진 사용자 정의 내용 문서(줄마다 글 블록 하나, `context`는 `자료 종류: GitHub 기록 원문` / `자료 종류: 작성자 자료 원문`)로 만들고 문서 번호 → 근거 위치 대응표를 함께 만든다. 근거가 없거나 남은 문서가 없으면 부르지 않고 `{ items: [], droppedCount: 0 }`.
 3. 시스템 지시 = 항목 형식 지시 + `instruction`. 사용자 메시지 = 문서들, 그 뒤 `userText`(있을 때). `publicationText`는 보내지 않는다.
 4. Claude를 한 번 부른다: 주소 `https://api.anthropic.com` 고정(`ANTHROPIC_BASE_URL` 무시), 재시도 0, 모델 `HAIKU` → `claude-haiku-5-5`·`SONNET` → `claude-sonnet-5-5`, 처리 위치 `inference_geo: "us"`, 생각 끔. 생각 끔은 모델마다 값이 다르다: Haiku 5.5는 `{ type: "disabled" }`, Sonnet 5.5는 `disabled`에 400을 내므로 가장 낮은 설정인 `{ type: "between_tools" }`(도구가 없는 이 호출에서는 생각 없이 답함). 구조화된 출력은 쓰지 않는다(인용과 함께 쓸 수 없음).
-5. 응답 처리(W2): 거절은 `REFUSED`, 정상 끝·출력 상한 밖의 중단 이유는 `UNEXPECTED_STOP`. 글 조각을 이어 줄로 나누고 조각의 인용을 그 조각의 첫 줄바꿈 아닌 글자가 놓인 줄에 붙인다. `'- '`로 시작하고 뒤에 글자가 있는 줄만 항목이다. 출력 상한에서 끝났으면 마지막 줄바꿈 뒤의 줄은 끝나지 않은 줄이라 그 줄이 항목이면 버리고 센다. 인용은 대응표로 근거를 찾아 블록 범위 [시작, 끝)의 첫 줄 시작~마지막 줄 끝을 `location.charStart`에 더한 위치, 그 범위의 원문(`quote`), 출처 이름으로 바꾼다. 연결되지 않는 인용이 하나라도 있으면 그 항목을 버리고 센다. 인용이 있으면 `CITED`, 없으면 `AI_INTERPRETATION`. 남은 항목이 0개면 `NO_ITEMS`.
+5. 응답 처리(W2): 거절은 `REFUSED`, 정상 끝·출력 상한 밖의 중단 이유는 `UNEXPECTED_STOP`. 글 조각을 이어 줄로 나누고 조각의 인용을 그 조각의 첫 줄바꿈 아닌 글자가 놓인 줄에 붙인다. `'- '`로 시작하고 뒤에 글자가 있는 줄만 항목이다. 출력 상한에서 끝났으면 마지막 줄바꿈 뒤의 줄은 끝나지 않은 줄이라 그 줄이 항목이면 버리고 센다. 인용은 대응표로 근거를 찾아 블록 범위 [시작, 끝)의 첫 줄 시작~마지막 줄 끝을 `location.charStart`에 더한 위치, 그 범위의 원문(`quote`), 출처 이름으로 바꾼다. 연결되지 않는 인용이 하나라도 있으면 그 항목을 버리고 센다. 인용이 있으면 `CITED`, 없으면 `AI_INTERPRETATION`(기본 요약·질의응답은 그 전에 따옴표 글로 인용을 찾는다, 아래 「따옴표 인용 — #528」). 남은 항목이 0개면 `NO_ITEMS`.
 
 ### 실패
 
@@ -117,7 +117,7 @@ U1 파일에는 U1 동작을 바꾸지 않는 자리만 더했다: `buildCitatio
 
 ### 로그
 
-호출마다 한 줄. 성공 `ai_gate_result`: feature, mode(`GENERATE`·`STREAM`), itemCount, droppedCount, dropReasons(`truncated`·`location`·`fact`·`role`·`outside_heading`), nonItemLineCount, stopReason, inputTokens, outputTokens, durationMs, requestId. 실패 `ai_gate_failed`: feature, mode, failure(`INPUT_TOO_LARGE`·`INVALID_REQUEST`·`CALL_FAILED/…` 등), itemCount, droppedCount, requestId, durationMs. 항목 글·근거 글·질문·JD 줄·키는 남기지 않는다(NFR3.1·NFR6.9).
+호출마다 한 줄. 성공 `ai_gate_result`: feature, mode(`GENERATE`·`STREAM`), itemCount, droppedCount, dropReasons(`truncated`·`location`·`fact`·`role`·`outside_heading`), nonItemLineCount, quoteCitedCount(따옴표 인용을 붙인 항목 수, #528), stopReason, inputTokens, outputTokens, durationMs, requestId. 실패 `ai_gate_failed`: feature, mode, failure(`INPUT_TOO_LARGE`·`INVALID_REQUEST`·`CALL_FAILED/…` 등), itemCount, droppedCount, requestId, durationMs. 항목 글·근거 글·질문·JD 줄·키는 남기지 않는다(NFR3.1·NFR6.9).
 
 ### 시험
 
@@ -135,13 +135,34 @@ npm test -- test/u2/ai-gate-checks.test.cjs test/u2/ai-gate-jd.test.cjs test/u2/
 - 스트림은 끝난 조각을 응답 끝까지 메모리에 둔다(응답 상한 4,000토큰 안). 내보낸 항목은 쥐고 있지 않는다.
 - 파일 이름(`main.ts`, `Node.js`)은 대소문자를 가리지 않고 대조한다.
 
+## 따옴표 인용 — #528
+
+받은 사람 AI가 작성자 글을 옮긴 항목에 '작성자 자료 원문' 딱지가 붙게 한다(새 Catch FR11.1·AC8.1.1·AC8.1.2). 2026-11-12 재측정에서 질의응답 두 답이 작성자 글을 따옴표로 글자 그대로 옮겼지만 Claude 인용이 없어 AI 해석 항목이 됐다. `quote-citations.ts`의 `quoteCitations`를 `readResponseLine`이 부르므로 `generate`·`generateStream` 모두 같다.
+
+1. 대상: 기본 요약·질의응답에서 Claude 인용이 없는 항목. JD 요약은 붙이지 않는다(FR11.1은 기본 요약·질의응답만 말한다). Claude 인용이 있는 항목은 그 인용 그대로다.
+2. 따옴표 글: `''` `""` `‘’` `“”` `「」` `『』`. 여는 글자 뒤의 첫 닫는 글자까지이고, 따옴표 안의 따옴표는 따로 보지 않는다.
+3. 비교: 따옴표 글과 문서 줄 모두 공백 문자 묶음을 공백 하나로 줄이고 앞뒤 공백을 뗀다. 문서 줄은 공백 하나로 이어 보므로 줄을 넘는 글도 찾는다. 그 밖의 글자(문장 부호 포함)는 글자 그대로 같아야 한다.
+4. 짧은 글: 줄인 글이 10자(`QUOTE_MIN_LENGTH`) 미만이면 찾지 않는다. 낱말 한두 개는 다른 글과 우연히 겹치기 쉽다.
+5. 한 곳: 넘긴 문서 전체(GitHub 기록 원문 포함)에서 정확히 한 곳에 있고, 그 문서가 작성자 자료 원문일 때만 그 자리다. 없거나 두 곳 이상이거나 GitHub 기록 원문에 있으면 붙이지 않는다.
+6. 항목 안의 10자 이상 따옴표 글이 모두 5를 만족할 때만 나온 순서대로 붙인다. 같은 줄은 한 번만 붙인다.
+7. 붙인 항목이 인용 항목 대조(U2 BR3.4, 숫자·PR 번호·파일 이름·영어 표기가 인용 원문에 있어야 함)를 통과할 때만 붙인다. 붙여서 버려지는 항목을 새로 만들지 않는다. 그래서 따옴표 글에 든 숫자도 인용 줄에 있으면 남는다(전에는 AI 해석이라 버렸다).
+8. 위치: 찾은 글이 걸친 줄 범위를 Claude 인용과 같은 블록 범위로 보고 `locateCitation`(BR4)으로 원문 위치·인용문(걸친 줄 전체, 가운데 빈 줄 포함)·출처 이름을 만든다.
+
+못 붙이면 지금처럼 `AI_INTERPRETATION`이고 AI 해석 대조를 받는다. 결과 모양(C-01 `GatedItem`)은 바뀌지 않는다.
+
+한계:
+
+- 글자 그대로만 찾는다. 바꿔 쓴 글, 따옴표 안을 줄임표(…)로 줄인 글, 따옴표 없이 옮긴 글은 붙지 않는다. 그래서 기본 요약 지시에 작성자 글을 바꾸지 않고 따옴표로 옮기라는 문장을 더했다([질의응답·기본 요약](rag-answer.md) 「작성자 자료 딱지 — #528」).
+- 질의응답은 검색 조각 8개만 넘기므로 「한 곳」은 그 안에서만 본다. 넘기지 않은 GitHub 기록에 같은 글이 있어도 알 수 없다.
+- 영어 낱말 안의 아포스트로피(`'`)가 따옴표 짝으로 읽힐 수 있다. 그 글이 10자 이상이고 작성자 자료 한 곳에 글자 그대로 있을 때만 붙으므로 따로 막지 않는다.
+
 ## 시험
 
 `api/`에서 돌린다. 실행기가 시작할 때 테스트 DB에 마이그레이션을 적용하므로 테스트 DB가 떠 있어야 한다(README 「DB 테스트」). U1 시험 자체는 DB를 쓰지 않는다.
 
 ```bash
-npm test -- test/ai-generation/citation-lines.test.cjs test/ai-generation/citation-request.test.cjs test/ai-generation/guarded-fetch.test.cjs test/ai-generation/response-items.test.cjs test/ai-generation/ai-generation-gate.test.cjs test/ai-generation/live-citation.test.cjs
-TEST_COVERAGE_INCLUDE='dist/ai-generation/**' npm run test:coverage -- test/ai-generation/citation-lines.test.cjs test/ai-generation/citation-request.test.cjs test/ai-generation/guarded-fetch.test.cjs test/ai-generation/response-items.test.cjs test/ai-generation/ai-generation-gate.test.cjs
+npm test -- test/ai-generation/citation-lines.test.cjs test/ai-generation/citation-request.test.cjs test/ai-generation/guarded-fetch.test.cjs test/ai-generation/response-items.test.cjs test/ai-generation/quote-citations.test.cjs test/ai-generation/ai-generation-gate.test.cjs test/ai-generation/live-citation.test.cjs
+TEST_COVERAGE_INCLUDE='dist/ai-generation/**' npm run test:coverage -- test/ai-generation/citation-lines.test.cjs test/ai-generation/citation-request.test.cjs test/ai-generation/guarded-fetch.test.cjs test/ai-generation/response-items.test.cjs test/ai-generation/quote-citations.test.cjs test/ai-generation/ai-generation-gate.test.cjs
 ```
 
 - 기록한 응답 시험(S1~S7·S9와 보안·신뢰성 항목)은 Claude Messages API 응답 모양의 JSON을 시험 파일 안에서 만들고, `createAiGenerationGate`에 시험용 fetch를 넘겨 돌린다. 전역 fetch를 바꾸지 않고 키는 가짜 값만 쓴다. 시험 자료 도우미는 `test/ai-generation/fixtures.cjs`다.

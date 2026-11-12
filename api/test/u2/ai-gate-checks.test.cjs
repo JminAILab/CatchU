@@ -123,6 +123,27 @@ test('S17 대조 뒤 남은 항목이 0개면 오류가 아니라 정상 빈 결
   await assert.rejects(none.gate.generate(request()), (error) => error instanceof AiProviderError && error.reason === 'NO_ITEMS');
 });
 
+// #528 — 기본 요약에서 Claude 인용 없이 따옴표로 옮긴 작성자 글(새 Catch AC8.1.2). 기대: 작성자 자료 원문 한 곳에 글자 그대로 있으면
+// '작성자 자료 원문' 딱지가 붙은 인용 항목으로 남고 인용 원문 대조를 받는다(숫자도 인용 줄에 있으면 남는다). 못 찾으면 지금처럼 AI 해석 대조다.
+test('#528 기본 요약에서 따옴표로 옮긴 작성자 글은 인용 항목으로 남고, 못 찾은 글은 AI 해석 대조를 받으며, 로그에 따옴표 인용 수가 있다', async (t) => {
+  const logs = captureLogs(t);
+  const authorText = '로그인 시험 12개를 새로 더했다.\n서버 쪽 일정이 빠듯해 화면에서 했다.';
+  const { gate } = gateWith([jsonResponse(messageBody([fragment([
+    "- 작성자는 '로그인 시험 12개를 새로 더했다.'라고 적었다",
+    "- 작성자는 '서버 쪽 일정이 빠듯해 화면에서 했다.'라고 적었다",
+    "- 작성자는 '로그인 시험 30개를 새로 더했다.'라고 적었다",
+  ].join('\n'))]))]);
+  const output = await gate.generate(request({ sources: [source({ text: '배포 스크립트를 정리했다' }),
+    source({ sourceId: 'mat-1', sourceKind: 'AUTHOR_MATERIAL', text: authorText })] }));
+  assert.deepEqual(output.items.map((item) => [item.kind, item.citations.map((citation) => [citation.sourceLabel, citation.quote])]), [
+    ['CITED', [['작성자 자료 원문', '로그인 시험 12개를 새로 더했다.']]],
+    ['CITED', [['작성자 자료 원문', '서버 쪽 일정이 빠듯해 화면에서 했다.']]],
+  ]);
+  assert.equal(output.droppedCount, 1, '글자 그대로가 아닌 셋째 항목은 AI 해석이라 숫자 때문에 버린다');
+  const fields = resultLog(logs);
+  assert.deepEqual([fields.quoteCitedCount, fields.dropReasons.fact], [2, 1]);
+});
+
 test('키가 없으면 api 기동을 막지 않고, 근거가 없는 요청은 빈 결과이며 부를 일이 생기면 CALL_FAILED/NOT_CONFIGURED다. Nest 모듈로 주입된다', async (t) => {
   captureLogs(t);
   const restore = setEnv({ CATCHU_GENERATION_API_KEY: undefined });
