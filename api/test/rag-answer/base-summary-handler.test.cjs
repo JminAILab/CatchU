@@ -237,3 +237,13 @@ test('NC2 AC8.1.2·AC6.5.3 기본 요약 지시는 작성자 말 옮기기 문�
   assert.ok(instruction.endsWith(` ${AUTHOR_MATERIAL_VOICE_INSTRUCTION}`));
   assert.deepEqual(Object.values(SOURCE_LABELS), ['GitHub 기록 원문', '작성자 자료 원문']);
 });
+
+// #528 — 기본 요약 지시 가운데 두 문장(AC8.1.2, 완료 기준 「GitHub 기록을 작성자 주장처럼 쓰지 않는다」).
+// 먼저 정한 시나리오: 지시문 상수를 본다. 실제 요약의 꼴·딱지는 다시 잰 평가 기록이 판정하고, 이 시험은 문장이 들어갔는지까지만 본다.
+// - 기대: 지금 지시와 끝 문장 사이에, 작성자 자료 원문을 바꾸지 않고 따옴표로 옮겨 인용하라는 문장과 커밋 메시지·PR 제목을 작성자의 말로 옮기지 말라는 문장이 있다.
+test('#528 기본 요약 지시는 작성자 글을 따옴표로 그대로 옮겨 인용하게 하고, 커밋 메시지·PR 제목은 작성자의 말로 옮기지 않게 한다', () => {
+  const middle = BASE_SUMMARY_INSTRUCTION.slice(0, -AUTHOR_MATERIAL_VOICE_INSTRUCTION.length);
+  for (const phrase of ['바꿔 쓰지 않은 채 따옴표 안에 옮기고 그 줄을 인용한다', '커밋 메시지·PR 제목', "'작성자는 …라고 적었다'로 옮기지 않는다"]) {
+    assert.ok(middle.includes(phrase), phrase);
+  }
+});

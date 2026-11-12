@@ -44,6 +44,12 @@ export const AUTHOR_MATERIAL_VOICE_INSTRUCTION =
 export const QNA_INSTRUCTION = '발행본 자료만으로 질문에 답하고, 근거가 되는 줄을 인용하며, 자료에 없는 일은 없다고 말한다. '
   + AUTHOR_MATERIAL_VOICE_INSTRUCTION;
 
-/** 기본 요약 지시문(BR5.2, NC2 BR5.1). 항목 수를 서버에서 자르지 않는다(기능 명세 「미결」). */
+/**
+ * 기본 요약 지시문(BR5.2, NC2 BR5.1). 항목 수를 서버에서 자르지 않는다(기능 명세 「미결」).
+ * 가운데 두 문장(#528): 작성자 자료 원문은 다른 자료와 섞지 않은 항목에 글을 바꾸지 않고 따옴표로 옮겨 인용하게 한다(인용이 빠져도
+ * 따옴표 글로 '작성자 자료 원문' 딱지가 붙는다, ai-generation/quote-citations.ts). 커밋 메시지·PR 제목은 작성자의 말로 옮기지 않게 한다.
+ */
 export const BASE_SUMMARY_INSTRUCTION = '자료를 다 읽기 전에 발행본 전체를 파악하도록 핵심을 7개 이하 항목으로 요약하고 근거 줄을 인용한다. '
+  + '작성자 자료 원문에서 온 내용은 다른 자료와 한 항목에 섞지 않고, 작성자의 글에서 핵심 문장을 바꿔 쓰지 않은 채 따옴표 안에 옮기고 그 줄을 인용한다. '
+  + "작성자 자료 원문이 아닌 자료(커밋 메시지·PR 제목 등)는 '작성자는 …라고 적었다'로 옮기지 않는다. "
   + AUTHOR_MATERIAL_VOICE_INSTRUCTION;
