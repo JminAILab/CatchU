@@ -41,18 +41,18 @@ vpc:
     privateAccess: true
 
 # 판본을 고정한다. 정하지 않으면 만들 때의 기본판이 깔려 10/15 NetworkPolicy 시험과 다른 판이 될 수 있다.
-# 값은 2026-10-19 aws eks describe-addon-versions --kubernetes-version 1.37 조회 결과다. 만들기 직전에 다시 보고 바뀌었으면 이 파일을 고친다.
+# 값은 2026-11-13 aws eks describe-addon-versions --kubernetes-version 1.37 조회 결과다. 만들기 직전에 다시 보고 바뀌었으면 이 파일을 고친다.
 addons:
   - name: vpc-cni
     # 10/15 시험은 판본을 적지 않아 그때 기본판(1.22.4 계열)이 깔렸다. 더 새 판을 쓰려면 NetworkPolicy 시험을 다시 한다.
-    version: v1.22.4-eksbuild.3
+    version: v1.22.4-eksbuild.14
     # NetworkPolicy로 worker의 DB 접근과 허용 목록 밖 바깥 연결을 막는다(t 계열 노드는 Pod 보안 그룹을 쓸 수 없다).
     # 기본(standard) 모드라 새 Pod는 정책이 걸리기 전 몇 초 동안 막히지 않는다. #276 계획에서 받아들인 한계다.
     # strict 모드는 kube-system을 포함한 모든 Pod에 정책이 있어야 해서 쓰지 않는다. 만든 뒤에도 애드온 설정으로 바꿀 수 있다.
     configurationValues: |-
       enableNetworkPolicy: "true"
   - name: coredns
-    version: v1.14.7-eksbuild.11
+    version: v1.14.7-eksbuild.35
     # 두 CoreDNS를 가용 영역마다 하나씩 둔다. 기본 설정은 같은 노드를 피하기를 '선호'만 해서 10/15에 두 개가 한 노드에 몰렸다.
     # 노드가 하나만 남은 때(장애·패치)에도 둘째 Pod가 대기하지 않도록 ScheduleAnyway로 둔다.
     configurationValues: |-
@@ -64,18 +64,18 @@ addons:
             matchLabels:
               k8s-app: kube-dns
   - name: kube-proxy
-    version: v1.37.0-eksbuild.22
+    version: v1.37.0-eksbuild.39
   # Load Balancer Controller 등의 AWS 권한을 Pod Identity로 준다.
   - name: eks-pod-identity-agent
-    version: v1.3.10-eksbuild.3
+    version: v1.4.1-eksbuild.3
   # 목록에 없어도 eksctl이 넣는다. 판본을 고정하려고 적는다. Pod 사용량 측정(kubectl top)에 쓴다.
   - name: metrics-server
-    version: v0.9.0-eksbuild.13
+    version: v0.9.1-eksbuild.1
   # GitHub 토큰 보관 폴더(EFS)를 api에 붙이는 드라이버. 접근점을 미리 만드는 정적 방식이라 먼저 AWS 권한 없이 설치해
   # 마운트가 되는지 실측한다. 안 되면 efs-csi-controller-sa에만 AmazonEFSCSIDriverPolicy를 Pod Identity로 더한다.
   # 애드온 기본 권한 묶음(useDefaultPodIdentityAssociations)은 S3 읽기 권한까지 붙어 쓰지 않는다.
   - name: aws-efs-csi-driver
-    version: v3.5.1-eksbuild.1
+    version: v3.5.4-eksbuild.1
 
 iam:
   podIdentityAssociations:
@@ -111,7 +111,7 @@ managedNodeGroups:
     instanceType: t4g.large
     # 노드 이미지 판본. 만들기 직전 공개 파라미터
     # /aws/service/eks/optimized-ami/1.37/amazon-linux-2023/arm64/standard/recommended/release_version 값으로 다시 맞춘다.
-    releaseVersion: "1.37.0-20261012"
+    releaseVersion: "1.37.1-20261107"
     # 2대 고정. 자동 확장은 두지 않는다. 비상 때 3대째는 README.md 「노드 작업」 순서로 손으로 늘린다.
     desiredCapacity: 2
     minSize: 2
