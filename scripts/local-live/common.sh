@@ -34,3 +34,16 @@ load_keys() {
     export "${key}=${line#*=}"
   done
 }
+
+# 파일에서 지정한 키를 읽어, 값이 있을 때만 내보낸다(값은 출력하지 않는다).
+load_optional_keys() {
+  local file="$1" key line
+  shift
+  [ -f "${file}" ] || { echo "파일이 없다: ${file} (먼저 setup.sh를 실행한다)" >&2; return 1; }
+  for key in "$@"; do
+    line="$(grep -E "^${key}=" "${file}" | tail -n 1 || true)"
+    line="${line%$'\r'}"
+    [ -n "${line#*=}" ] && export "${key}=${line#*=}"
+  done
+  return 0
+}

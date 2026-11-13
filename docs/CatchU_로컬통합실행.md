@@ -172,12 +172,12 @@ docker stop catchu-db
 
 위 1~5단계는 개발용 로그인과 합성 자료까지다. 이 절은 내 컴퓨터에서 실제 Google 로그인 → GitHub 연결 → 공개 저장소 분석 → Catch 확인까지 간다. 큐(Valkey)와 DB는 컨테이너 두 개로 띄우고, 파일은 내 컴퓨터 폴더에 저장한다. AWS(S3 등)는 쓰지 않는다. 실행 도구는 `scripts/local-live/`에 있다.
 
-**확인 상태(2026-11-12).** macOS에서 가짜 키로 환경 만들기·이주·세 서비스 기동·큐 연결까지 확인했다. 같은 구성의 실제 분석은 2026-11-03에 팀장 컴퓨터(macOS)에서 한 번 끝까지 갔다([#450 기록][c450]). 같은 날 팀장이 Windows 노트북(WSL2 Ubuntu)에서 키 세 가지를 새로 발급해 이 순서대로 공개 저장소 분석까지 끝냈다. 도구는 고치지 않고 돌았고, 끌 때는 `Ctrl+C`와 같은 신호로 세 서비스가 바로 끝났다. 5단계의 버튼 이름은 그 뒤 web 코드에서 옮겨 적은 것이다. 「정리」의 삭제 명령, 판정을 켠 분석, 다시 켠 뒤 컨테이너가 스스로 뜨는지는 Windows에서 확인하지 않았다.
+**확인 상태(2026-11-12).** macOS에서 가짜 키로 환경 만들기·이주·세 서비스 기동·큐 연결까지 확인했다. 같은 구성의 실제 분석은 2026-11-03에 팀장 컴퓨터(macOS)에서 한 번 끝까지 갔다([#450 기록][c450]). 같은 날 팀장이 Windows 노트북(WSL2 Ubuntu)에서 키 세 가지를 새로 발급해 이 순서대로 공개 저장소 분석까지 끝냈다. 도구는 고치지 않고 돌았고, 끌 때는 `Ctrl+C`와 같은 신호로 세 서비스가 바로 끝났다. 5단계의 버튼 이름은 그 뒤 web 코드에서 옮겨 적은 것이다. 그 분석은 판정을 끈 채였다. 2026-11-13에 판정을 OpenAI로 켜고 키를 일곱 줄로 늘렸는데, 이 구성은 가짜 키로 기동까지만 확인했고 실제 OpenAI 판정과 Voyage 임베딩은 이 도구로 아직 돌려 보지 않았다. 「정리」의 삭제 명령, 다시 켠 뒤 컨테이너가 스스로 뜨는지는 Windows에서 확인하지 않았다.
 
 ### 알고 시작할 것
 
-- 팀원이 **본인 키로 공개 저장소를 분석하는 것은 팀장 허가 없이 한다**(2026-11-12 팀장 결정). 비용은 본인 Claude 계정에서 나간다. 작은 저장소 하나(Catch 46개)가 2026-11-03에 2분 26초, 약 0.04달러였고, 2026-11-12 Windows 노트북에서는 접수부터 2분 54초였다(판정 꺼짐, 비용은 재지 않음). 큰 저장소의 시간과 비용은 아직 재지 않았다.
-- 분석하면 그 저장소의 바뀐 줄이 내 Claude 계정(Anthropic)으로 전송된다. 임베딩은 합성 제공자로 떠서 Voyage로는 아무것도 보내지 않는다.
+- 팀원이 **본인 키로 공개 저장소를 분석하는 것은 팀장 허가 없이 한다**(2026-11-12 팀장 결정). 비용은 본인 Claude·OpenAI·Voyage 계정에서 나간다. 판정을 끈 채로 작은 저장소 하나(Catch 46개)가 2026-11-03에 2분 26초, 약 0.04달러였고, 2026-11-12 Windows 노트북에서는 접수부터 2분 54초였다. 판정을 켠 분석과 큰 저장소의 시간·비용은 아직 재지 않았다.
+- 분석하면 그 저장소의 바뀐 줄이 내 Claude 계정(Anthropic)으로, 바뀐 줄과 PR 제목·커밋 메시지 첫 줄이 내 OpenAI 계정으로 전송된다(판정). Voyage 키를 넣었으면 발행한 글이 내 Voyage 계정으로 전송된다. 계정의 자료 학습·공유 설정은 각자 확인한다.
 - 비공개 저장소는 접수에서 거부된다(`403`). 공개 저장소만 분석한다.
 - 로그(`~/catchu-local-live/logs/`)에는 실제 자료가 남는다. 로그와 키를 이슈·PR·대화·AI 도구에 붙이지 않는다. 오류를 물을 때는 오류 문구 한 줄만 옮긴다.
 - 개발용 로그인으로는 실제 분석을 할 수 없다. 개발용 로그인은 합성 고지와 합성 저장소만 받는다. 그래서 Google 로그인이 필요하다.
@@ -194,17 +194,24 @@ Windows에서는 **WSL2(Ubuntu) 안에서** 아래를 모두 실행한다. worke
 
 `sudo`가 묻는 비밀번호는 Ubuntu를 처음 설치할 때 정한 Ubuntu 계정의 비밀번호다. 잊었으면 PowerShell에서 `wsl -u root passwd <Ubuntu 사용자 이름>`으로 다시 정한다.
 
-### 내 키 세 가지
+### 키
 
-각자 발급한다. 다른 사람의 키를 받아 쓰지 않는다. 화면 이름은 발급 사이트가 바꿀 수 있다.
+값은 일곱 개다(2026-11-13 팀장 결정). 받은 값과 발급한 키를 다른 사람에게 넘기지 않는다. 화면 이름은 발급 사이트가 바꿀 수 있다.
 
-| 키 | 발급하는 곳 | 넣을 값 |
-|---|---|---|
-| Claude API 키 | Claude 개발자 콘솔에서 결제 수단을 등록하고 API 키를 만든다. 키 문자열만 있으면 되고, 콘솔이 권하는 CLI 로그인은 하지 않아도 된다 | `CATCHU_GENERATION_API_KEY` |
-| GitHub OAuth App | GitHub → Settings → Developer settings → **OAuth Apps** → New OAuth App. Homepage URL `http://localhost:3000`, Authorization callback URL `http://localhost:3000/github/callback`. 만든 뒤 client secret을 새로 만든다 | `GITHUB_OAUTH_CLIENT_ID` · `GITHUB_OAUTH_CLIENT_SECRET` |
-| Google OAuth 클라이언트 | Google Cloud 콘솔에서 프로젝트를 만들고, OAuth 동의 화면을 외부·테스트 상태로 두고 테스트 사용자에 내 Google 계정을 넣는다. 사용자 인증 정보에서 「웹 애플리케이션」 OAuth 클라이언트를 만들고 승인된 리디렉션 URI에 `http://localhost:3000/google/callback`을 넣는다 | `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` |
+**팀장에게 받는 값 네 개.** 로그인과 GitHub 연결에 쓰는 팀 공용 앱의 값이다(콜백이 `localhost`인 로컬 전용). `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` · `GITHUB_OAUTH_CLIENT_ID` · `GITHUB_OAUTH_CLIENT_SECRET`. 로그인할 Google 계정은 그 앱의 테스트 사용자에 들어 있어야 한다.
 
-GitHub는 「GitHub Apps」가 아니라 「OAuth Apps」에서 만든다. GitHub App의 client ID처럼 점(`.`)이 든 값을 넣으면 api가 `GitHub 연동 키 설정 형식이 잘못되었습니다`로 뜨지 않는다. Voyage 키와 OpenAI 판정 키는 필요 없다.
+**각자 발급하는 값 세 개.**
+
+| 키 | 쓰는 곳 | 발급 | 넣을 값 |
+|---|---|---|---|
+| Claude API 키 | Catch의 제목 후보·설명·질문, 질의응답의 답 | Claude 개발자 콘솔에서 결제 수단을 등록하고 API 키를 만든다. 키 문자열만 있으면 되고, 콘솔이 권하는 CLI 로그인은 하지 않아도 된다 | `CATCHU_GENERATION_API_KEY` |
+| OpenAI 키 | 판정(AI가 쓴 제목·설명 가운데 틀린 것을 거른다) | OpenAI 개발자 화면에서 결제 수단을 등록하고 API 키를 만든다. 호출은 미국 지역 주소(`us.api.openai.com`)로만 간다 | `CATCHU_JUDGEMENT_API_KEY` |
+| Voyage 키 | 발행한 Catch를 검색할 수 있게 만든다(발행 링크의 질의응답·기본 요약) | Voyage AI에서 API 키를 만든다 | `CATCHU_EMBEDDING_API_KEY` |
+
+- OpenAI 키가 그 주소에서 받아들여지지 않으면 분석은 끝나지만 Catch마다 설명이 실패로 남는다. 그때는 「판정」의 Claude 판정으로 바꾼다.
+- Voyage 키를 비우면 api가 합성 제공자로 뜬다. 분석과 Catch 확인은 되지만 발행 링크의 질의응답은 관련 없는 Catch를 찾아 결과를 믿을 수 없다. 키 없이 발행한 것은 키를 넣은 뒤 다시 발행한다.
+
+팀 공용 앱을 쓰지 않고 직접 만들려면: GitHub는 Settings → Developer settings → **OAuth Apps**(「GitHub Apps」가 아니다) → New OAuth App에서 Homepage URL `http://localhost:3000`, Authorization callback URL `http://localhost:3000/github/callback`으로 만들고 client secret을 새로 만든다. Google은 Google Cloud 콘솔에서 OAuth 동의 화면을 외부·테스트 상태로 두고 테스트 사용자에 내 계정을 넣은 뒤, 「웹 애플리케이션」 OAuth 클라이언트를 만들고 승인된 리디렉션 URI에 `http://localhost:3000/google/callback`을 넣는다. GitHub App의 client ID처럼 점(`.`)이 든 값을 넣으면 api가 `GitHub 연동 키 설정 형식이 잘못되었습니다`로 뜨지 않는다.
 
 ### 순서
 
@@ -224,7 +231,13 @@ GitHub는 「GitHub Apps」가 아니라 「OAuth Apps」에서 만든다. GitHu
 bash scripts/local-live/setup.sh
 ```
 
-**2. 키 적기.** `~/catchu-local-live/secrets.env`를 편집기로 열어 다섯 값을 `이름=값` 꼴로 적는다. 따옴표와 빈칸을 넣지 않는다.
+**2. 키 적기.** `~/catchu-local-live/secrets.env`를 연다. 이름 일곱 개가 미리 적혀 있으니 `=` 바로 뒤에 값만 붙인다. 따옴표와 빈칸을 넣지 않는다.
+
+```sh
+nano ~/catchu-local-live/secrets.env
+```
+
+`nano`에서 저장은 `Ctrl+O` → `Enter`, 닫기는 `Ctrl+X`다. 서비스를 띄운 뒤에 고쳤으면 api와 worker를 껐다 다시 띄워야 반영된다. 2026-11-13 전에 만든 환경은 「판정」 끝의 안내대로 줄을 더한다.
 
 **3. 이주(처음, 그리고 새 이주가 든 브랜치를 받았을 때).**
 
@@ -246,6 +259,8 @@ bash scripts/local-live/run-worker.sh
 bash scripts/local-live/run-web.sh
 ```
 
+`run-worker.sh`는 띄울 때 `판정: openai`를, `run-api.sh`는 `임베딩: Voyage`(키가 없으면 합성 제공자)를 화면에 낸다.
+
 정상 확인(네 번째 터미널). 둘 다 `200`이고, worker 본문에 `"consumer":"running"`이 있으면 된다.
 
 ```sh
@@ -262,22 +277,27 @@ curl -i http://127.0.0.1:8000/health
 5. 같은 창의 「연결된 저장소」에서 상태를 본다. 「상태 새로고침」을 눌러야 바뀐 상태가 보인다. 「성공」이 되면 「이 저장소 Catch 보기」를 누른다.
 6. 「내 Catch」의 카드에서 「상세 보기」를 눌러 「근거」와 「원본 근거 열기」를 확인한다.
 
-### 판정을 켤지
+### 판정
 
-기본은 꺼짐이다. 켤지는 각자 정한다. 켜려면 `~/catchu-local-live/worker.env`의 `# CATCHU_JUDGEMENT_PROVIDER=claude` 줄에서 맨 앞의 `#`과 빈칸을 지우고 worker를 다시 띄운다. 상세는 [worker 「판정」](../worker/docs/generation-judgement.md).
+판정은 **OpenAI로 켠 채** 만든다(2026-11-13 팀장 결정). 배포 환경과 같은 방식으로 걸러야 서비스에서 볼 화면과 같은 Catch가 나오기 때문이다. 상세는 [worker 「판정」](../worker/docs/generation-judgement.md).
 
-| | 꺼짐(기본) | 켬(`claude`) |
-|---|---|---|
-| 제목·설명 | 정해진 틀의 설명 문장과 규칙으로 만든 제목 | Claude가 바뀐 줄을 보고 제목 후보와 설명 문장을 쓰고, 판정이 틀려 보이는 것을 거른다 |
-| Claude로 가는 자료 | 바뀐 줄 | 바뀐 줄에 더해 PR 제목과 커밋 메시지 첫 줄 |
-| 호출 수 | Catch마다 생성 1번 | Catch마다 판정 1번이 더 붙는다(큰 작업은 2번). 시간과 비용이 그만큼 는다 |
+| `worker.env`의 `CATCHU_JUDGEMENT_PROVIDER` | 제목·설명 | 나가는 자료 | 호출 |
+|---|---|---|---|
+| `openai`(기본) | Claude가 바뀐 줄을 보고 제목 후보와 설명 문장을 쓰고, OpenAI가 틀려 보이는 것을 거른다 | Claude로 바뀐 줄, OpenAI로 바뀐 줄과 PR 제목·커밋 메시지 첫 줄 | Catch마다 생성 1번에 판정 1번(큰 작업은 2번) |
+| `claude` | 위와 같되 Claude가 거른다. OpenAI 키가 필요 없다. 거르는 결과가 배포 환경과 다를 수 있다 | 모두 Claude로 | 위와 같다 |
+| 줄을 지우거나 `#`으로 막음 | 정해진 틀의 설명 문장, PR 제목·커밋 메시지나 규칙으로 만든 제목. 서비스 화면과 다르다 | Claude로 바뀐 줄 | Catch마다 생성 1번 |
+
+값을 바꾸면 worker를 다시 띄운다. 이미 분석한 저장소는 다시 분석해야 바뀐 결과가 보인다.
+
+**2026-11-13 전에 만든 환경.** `setup.sh`는 이미 있는 파일을 건드리지 않는다. `worker.env`의 `# CATCHU_JUDGEMENT_PROVIDER=claude` 줄을 `CATCHU_JUDGEMENT_PROVIDER=openai`로 고치고, `secrets.env`에 `CATCHU_JUDGEMENT_API_KEY=`와 `CATCHU_EMBEDDING_API_KEY=` 두 줄을 더해 값을 적는다.
 
 ### 막히는 곳
 
 | 증상 | 할 일 |
 |---|---|
 | `... 값이 비어 있다` | `secrets.env`에 그 값을 적는다 |
-| api가 `GitHub 연동 키 설정 형식이 잘못되었습니다`로 종료 | OAuth App의 client ID인지 본다(위 「내 키 세 가지」) |
+| api가 `GitHub 연동 키 설정 형식이 잘못되었습니다`로 종료 | OAuth App의 client ID인지 본다(위 「키」) |
+| Catch마다 설명이 실패로 나온다 | 판정 호출이 실패한 것이다. OpenAI 키와 결제 상태를 보고, 안 되면 「판정」의 `claude`로 바꿔 다시 분석한다 |
 | GitHub 연결을 마치고 돌아오면 로그인이 풀린다 | 브라우저를 `http://localhost:3000`으로 열었는지, `web.env`의 api 주소가 `http://localhost:3001`인지 본다. `127.0.0.1`이면 로그인 유지 쿠키가 실리지 않는다 |
 | 분석 요청이 `403`으로 거부된다 | 비공개 저장소다. 공개 저장소만 된다 |
 | 포트가 이미 쓰이고 있다 | 3000·3001·8000을 쓰는 이전 서버를 끈다. 컨테이너 포트는 `setup.sh`를 처음 돌리기 전에 `CATCHU_LOCAL_LIVE_DB_PORT`·`CATCHU_LOCAL_LIVE_QUEUE_PORT`로 바꾼다 |
