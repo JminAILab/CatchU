@@ -12,8 +12,8 @@ import { type CheckTokens, passesFactCheck, publicationTokens } from './fact-che
 import { assertGenerationRequest, COMMON_GUARD_INSTRUCTION } from './gate-policy';
 import { checkJdItems, JD_FORMAT_INSTRUCTION, JD_HEADINGS, serverNotices } from './jd-checks';
 import {
-  addReading, assertUsableStop, collectResponseItems, ensureItems, joinResponseLines, type LineReading, readResponseLine,
-  type ResponseItems,
+  addReading, assertUsableStop, collectResponseItems, emptyResponseItems, ensureItems, joinResponseLines, type LineReading,
+  readResponseLine, type ResponseItems,
 } from './response-items';
 
 /** 버린 이유별 수(관측 설계 ai_gate_result). truncated·location은 U1 묶기, 나머지는 U2 검사. */
@@ -33,6 +33,8 @@ interface GateLog {
   droppedCount: number;
   dropReasons: DropReasons;
   nonItemLineCount: number;
+  /** Claude 인용 대신 따옴표 인용을 붙인 항목 수(#528). 대조 전 수이고, 붙일 때 인용 대조를 미리 통과시켜 대조에서 버려지지 않는다. */
+  quoteCitedCount: number;
   stopReason: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -175,7 +177,7 @@ class ItemChecker {
 class StreamItems {
   private readonly fragments: ResponseFragment[] = [];
   private readonly checker: ItemChecker;
-  private readonly counts: ResponseItems = { items: [], droppedCount: 0, nonItemLineCount: 0, truncatedCount: 0, unlocatedCount: 0 };
+  private readonly counts: ResponseItems = emptyResponseItems();
   private judgedLines = 0;
   private modelItems = 0;
   private endResponse: Omit<ProviderResponse, 'fragments'> | null = null;
@@ -245,7 +247,7 @@ function emptyLog(feature: AiGenerationRequest['feature'], mode: GateLog['mode']
   return {
     feature, mode, itemCount: 0, droppedCount: 0,
     dropReasons: { truncated: 0, location: 0, fact: 0, role: 0, outside_heading: 0 },
-    nonItemLineCount: 0, stopReason: null, inputTokens: null, outputTokens: null, durationMs: 0, requestId: null,
+    nonItemLineCount: 0, quoteCitedCount: 0, stopReason: null, inputTokens: null, outputTokens: null, durationMs: 0, requestId: null,
   };
 }
 
@@ -255,6 +257,7 @@ function responseFields(response: ProviderResponse): Partial<GateLog> {
 
 function recordCollected(log: GateLog, collected: ResponseItems): void {
   log.nonItemLineCount = collected.nonItemLineCount;
+  log.quoteCitedCount = collected.quoteCitedCount;
   log.dropReasons.truncated = collected.truncatedCount;
   log.dropReasons.location = collected.unlocatedCount;
   log.droppedCount = collected.droppedCount + log.dropReasons.fact + log.dropReasons.role + log.dropReasons.outside_heading;

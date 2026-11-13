@@ -29,7 +29,11 @@ from app.generation import (
     ProviderRequest,
     run_generation,
 )
+from app.generation.judged import CatchTrace
+from app.judgement.provider import JudgementProvider
 from app.processing import CheckedRequest, GenerationOutput, compose_result
+from app.processing.generation import EligibleCandidate
+from app.redact import mask_text
 
 # 생성 몫의 기본 마감(합성 시계 기준). 호출 수·시간 한도 시험은 따로 정한다.
 DEFAULT_DEADLINE = timedelta(minutes=20)
@@ -222,13 +226,17 @@ def file_title(file_id: str) -> dict[str, str]:
     return {"target": "FILE_NAME", "file": file_id}
 
 
-def line_question(kind: str, line: SentLine | str, name: str) -> dict[str, str]:
-    line_id = line if isinstance(line, str) else line.id
-    return {"type": kind, "line": line_id, "name": name}
+# AI가 쓴 질문의 합성 글(#487). 줄·파일을 가리키지 않고 작업 전체를 묻는다.
+QUESTION_TEXTS = {
+    "BACKGROUND": "이 작업을 하게 된 배경은 무엇이었나요?",
+    "ALTERNATIVES": "이 작업에서 다른 방법도 고려했다면 무엇이었나요?",
+    "VERIFICATION": "이 작업이 의도대로 동작하는지 확인했다면 어떻게 확인했나요?",
+}
 
 
-def file_question(kind: str, file_id: str) -> dict[str, str]:
-    return {"type": kind, "file": file_id}
+def question(kind: str, text: str | None = None) -> dict[str, str]:
+    """생성 응답의 질문 하나. 글을 주지 않으면 종류의 합성 글을 쓴다."""
+    return {"type": kind, "text": QUESTION_TEXTS[kind] if text is None else text}
 
 
 _UNSET: Any = object()
@@ -263,7 +271,52 @@ def naive(request: ProviderRequest) -> str:
     return answer(
         fragments=[line_fragment(line, name)],
         title=code_title(line, name),
-        questions=[line_question("BACKGROUND", line, name)],
+        questions=[question("BACKGROUND")],
+    )
+
+
+def written(text: str, *lines: SentLine | str) -> dict[str, Any]:
+    """AI 쪽 응답의 제목 후보·설명 문장 하나(CR3 BR3.1·BR5.1)."""
+    return {
+        "text": text,
+        "lines": [line if isinstance(line, str) else line.id for line in lines],
+    }
+
+
+def ai_answer(
+    *,
+    titles: Any = _UNSET,
+    sentences: Any = _UNSET,
+    title: Any = _UNSET,
+    questions: Any = _UNSET,
+    **extra: Any,
+) -> str:
+    """AI 쪽 응답 JSON. 주지 않은 칸은 넣지 않는다."""
+    value: dict[str, Any] = {}
+    if titles is not _UNSET:
+        value["titleCandidates"] = titles
+    if sentences is not _UNSET:
+        value["sentences"] = sentences
+    if title is not _UNSET:
+        value["title"] = title
+    if questions is not _UNSET:
+        value["questions"] = questions
+    value.update(extra)
+    return json.dumps(value, ensure_ascii=False)
+
+
+def naive_ai(request: ProviderRequest) -> str:
+    """AI 쪽 정상 합성 모델: 고를 수 있는 첫 이름 줄로 제목 후보 하나·설명 문장 하나·조각 제목·질문 하나.
+
+    후보와 문장은 그 줄의 이름·경로만 써서 기계 대조를 통과한다."""
+    assert request.ai_side, "AI 쪽 생성 요청이 아니다"
+    line = _first_named(request)
+    name = identifiers(line.text)[0]
+    return ai_answer(
+        titles=[written(f"{name} 값 변경", line)],
+        sentences=[written(f"{line.path}에서 {name} 줄을 바꿨습니다.", line)],
+        title=code_title(line, name),
+        questions=[question("BACKGROUND")],
     )
 
 
@@ -300,8 +353,14 @@ def generation_case(
     limits: GenerationLimits = PROPOSED_GENERATION_LIMITS,
     clock: FakeClock | None = None,
     deadline: timedelta = DEFAULT_DEADLINE,
+    judge: JudgementProvider | None = None,
+    observe: Callable[[CatchTrace], None] | None = None,
 ) -> GenerationCase:
-    """수집 → 후보 판정 → 생성 → 결과 조합. 결과는 메시지 계약 v1을 통과하고 후보 내용은 보존된다."""
+    """수집 → 후보 판정 → 생성 → 결과 조합. 결과는 메시지 계약 v1을 통과하고 후보 내용은 보존된다.
+
+    judge를 주면 AI 쪽이 켜진다(CR3). 그때는 작업 사실 둘째 줄을 지우는 것만 더 허용하고, 설명·제목은 AI가 쓴
+    글이라 틀 문장 검사 대신 AI 쪽 검사(`assert_ai_text`)를 한다.
+    """
     before = run_case(scenario, request=request)
     clock = clock or FakeClock()
     run = run_generation(
@@ -312,22 +371,30 @@ def generation_case(
         clock=clock,
         deadline=clock() + deadline,
         limits=limits,
+        judge=judge,
+        observe=observe,
     )
     result = compose_result(
         before.request, run.output, finished_at=FINISHED_AT, id_label="case"
     )
     checked = check_message("Result", result)
     assert checked.verdict is Verdict.VALID, checked.errors
-    assert_preserved(before.output, run.output)
-    assert_generated_text(run.output)
+    assert_preserved(before.output, run.output, ai_side=judge is not None)
+    if judge is None:
+        assert_generated_text(run.output)
+    else:
+        assert_ai_text(before.output, run.output)
     return GenerationCase(before, run, result, provider, clock)
 
 
-def assert_preserved(before: GenerationOutput, after: GenerationOutput) -> None:
+def assert_preserved(
+    before: GenerationOutput, after: GenerationOutput, *, ai_side: bool = False
+) -> None:
     """생성은 후보의 생성 칸(title·draft·reflection)과, 본인 커밋 근거의 한계 끝 고정 문구만 바꾼다.
 
     후보 순서·작업 사실·기여·묶음 설명·근거의 주소·판본·관측 사실·귀속 범위·기존 한계와 그 순서,
     미제공 집계, 기존 실패는 그대로다. 실패는 끝에 요청 단위 ANALYSIS 1건만 더해질 수 있다.
+    AI 쪽이 켜졌으면 작업 사실의 둘째 항목을 위치로 지운 것만 더 허용한다(CR3 BR4.1·BR4.2).
     """
     assert [each.work_identity for each in after.candidates] == [
         each.work_identity for each in before.candidates
@@ -349,9 +416,13 @@ def assert_preserved(before: GenerationOutput, after: GenerationOutput) -> None:
                 )
                 assert new_item.contribution_scope.startswith(OWN_COMMIT_SCOPE)
             evidence.append(replace(new_item, coverage_limits=kept))
+        if new.work_facts != old.work_facts:
+            assert ai_side, "AI 쪽이 꺼졌는데 작업 사실이 바뀌었다"
+            assert new.work_facts == (old.work_facts[0], *old.work_facts[2:])
         restored = replace(
             new,
             title=old.title,
+            work_facts=old.work_facts,
             draft=old.draft,
             reflection=old.reflection,
             evidence=tuple(evidence),
@@ -371,21 +442,30 @@ _SENTENCE = re.compile(
     r"|(?P<file>[^ ]+) 파일이 (추가|삭제|수정)되었습니다\."
     r"|(?P<old>[^ ]+) 파일의 이름이 바뀌어 (?P<new>[^ ]+) 파일이 되었습니다\."
 )
-_QUESTION = re.compile(
-    r"(?:[^ ]+에서 [A-Za-z_$][A-Za-z0-9_$]* 이름이 포함된 줄을|[^ ]+ 파일을|[^ ]+ 파일의 이름을) "
-    r"(?:(?:추가한|삭제한|수정한|바꾼) 배경은 무엇인가요\?"
-    r"|(?:추가할|삭제할|수정할|바꿀) 때 다른 방법도 고려했다면 무엇이었나요\?"
-    r"|(?:추가한|삭제한|수정한|바꾼) 뒤 의도대로 동작하는지 확인했다면 어떻게 확인했나요\?)"
-)
+
+
+def assert_written_questions(candidate: EligibleCandidate) -> None:
+    """질문은 AI가 쓴 글이다(#487): 150자 이하 한 줄이고 가리기 검사에 걸리지 않는다. 틀·판정은 없다."""
+    for text in candidate.reflection.questions:
+        assert text and text == text.strip(), text
+        assert len(text) <= 150, text
+        assert "\n" not in text and "\r" not in text, text
+        assert mask_text(text).count == 0, text
 
 
 def assert_generated_text(output: GenerationOutput) -> None:
-    """생성 글은 정해 둔 틀로만 이루어지고, 틀 밖에 숫자·효과·동기·전체성 표현이 없다.
+    """설명·제목은 정해 둔 틀로만 이루어지고, 틀 밖에 숫자·효과·동기·전체성 표현이 없다. 질문은 AI가 쓴 글이라
+    틀 대신 글자 상한·가리기 검사만 본다(#487).
 
-    설명에 든 숫자는 확인한 경로·이름 안에만 있다(CatchU가 센 활동량은 들어가지 않는다).
+    설명에 든 숫자는 확인한 경로·이름 안에만 있다(CatchU가 센 활동량은 들어가지 않는다). 쓸 만한 기록의
+    글이 있는 후보는 그 글이 그대로 제목이다(CR1 BR3.1). 기록의 글 제목에는 40자 상한과 조각 틀을 대지
+    않는다(BR3.3). 그 밖의 제목은 조각 제목 틀이다.
     """
     for candidate in output.candidates:
-        if candidate.title is not None:
+        record = candidate.record_text
+        if record is not None and record.usable:
+            assert candidate.title == record.text, candidate.title
+        elif candidate.title is not None:
             assert len(candidate.title) <= 40
             assert _TITLE.fullmatch(candidate.title), candidate.title
         content = candidate.draft.content
@@ -401,18 +481,30 @@ def assert_generated_text(output: GenerationOutput) -> None:
                     if value:
                         outside = outside.replace(value, "")
                 assert not re.search(r"[0-9]", outside), sentence
-        for question in candidate.reflection.questions:
-            assert len(question) <= 150
-            assert _QUESTION.fullmatch(question), question
-        for text in (
-            candidate.title or "",
-            content or "",
-            *candidate.reflection.questions,
-        ):
+        assert_written_questions(candidate)
+        generated_title = (
+            "" if record is not None and record.usable else candidate.title or ""
+        )
+        for text in (generated_title, content or ""):
             assert "`" not in text
             for word in FORBIDDEN_WORDS:
                 stripped = re.sub(r"[^ ]+(에서|파일)", "", text)
                 assert word not in stripped, text
+
+
+def assert_ai_text(before: GenerationOutput, after: GenerationOutput) -> None:
+    """AI 쪽이 켜진 결과: 질문은 AI가 쓴 글(꺼졌을 때와 같은 검사), 제목은 40자 이하이거나 기록의 글이다. 작업 사실에는 생성
+    출력의 글이 없다(작업 사실은 생성 전 후보의 것에서 둘째 줄만 빠질 수 있다, BR4.2)."""
+    previous = {each.work_identity: each for each in before.candidates}
+    for candidate in after.candidates:
+        old = previous[candidate.work_identity]
+        assert set(candidate.work_facts) <= set(old.work_facts)
+        record = candidate.record_text
+        if candidate.title is not None and not (
+            record is not None and candidate.title == record.text
+        ):
+            assert len(candidate.title) <= 40, candidate.title
+        assert_written_questions(candidate)
 
 
 def _split_sentences(content: str) -> list[str]:

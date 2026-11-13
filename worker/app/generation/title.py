@@ -33,11 +33,31 @@ _STATUS_ACTION: dict[str, Action] = {
     "modified": "수정",
     "renamed": "이름 변경",
 }
-_TEST_DIRS = frozenset({"test", "tests", "__tests__", "spec", "e2e"})
+# 폴더 이름(소문자)의 시험 꼴. Android의 androidTest도 든다(CR1 BR5.1).
+_TEST_DIRS = frozenset({"test", "tests", "__tests__", "spec", "e2e", "androidtest"})
 # 파일 이름(소문자)의 시험 꼴. 문서의 분류표와 같은 글자로 둔다.
 _TEST_NAMES = ("test_*.py", "*_test.*", "*.test.*", "*.spec.*")
+# 대소문자를 가리는 시험 꼴(CR1 BR5.1): 파일 이름(확장자 앞)이 Test·Tests로 끝나는 꼴(FooTest.java·
+# FooTests.swift)과, 이름이 Tests로 끝나는 폴더(iOS 앱Tests·앱UITests).
+_TEST_STEM_SUFFIXES = ("Test", "Tests")
+_TEST_DIR_SUFFIX = "Tests"
 _DOC_SUFFIXES = frozenset({".md", ".mdx", ".rst", ".adoc"})
-_CONFIG_SUFFIXES = frozenset({".toml", ".yaml", ".yml", ".ini", ".cfg"})
+_CONFIG_SUFFIXES = frozenset(
+    {
+        ".toml",
+        ".yaml",
+        ".yml",
+        ".ini",
+        ".cfg",
+        ".gradle",
+        ".plist",
+        ".xcconfig",
+        ".pbxproj",
+    }
+)
+# 모바일 설정 파일(CR1 BR5.1). 이름(소문자)으로 본다. .gradle.kts는 확장자 .kts가 코드라 따로 본다.
+_CONFIG_NAMES = frozenset({"androidmanifest.xml", "podfile"})
+_CONFIG_DOUBLE_SUFFIX = ".gradle.kts"
 _CONFIG_JSON = frozenset(
     {
         "package.json",
@@ -102,21 +122,25 @@ _CODE_SUFFIXES = frozenset(
         ".scss",
         ".sass",
         ".less",
+        # 노트북은 코드다(CR1 BR5.1).
+        ".ipynb",
     }
 )
 
 
 def classify(path: str) -> Kind | None:
-    """파일 위치로 종류를 정한다. 여럿에 해당하면 시험 → 문서 → 설정 → 코드 순서의 앞이 이긴다."""
+    """파일 위치로 종류를 정한다. 여럿에 해당하면 시험 → 문서 → 설정 → 코드 순서의 앞이 이긴다.
+
+    재료 순서(groups.py)와 조각 제목의 종류가 같은 판정을 쓴다.
+    """
     pure = PurePosixPath(path)
     name = pure.name
     lowered = name.lower()
-    directories = [part.lower() for part in pure.parts[:-1]]
+    folders = pure.parts[:-1]
+    directories = [part.lower() for part in folders]
     suffix = pure.suffix.lower()
     stem_parts = lowered.split(".")
-    if _TEST_DIRS.intersection(directories) or any(
-        fnmatchcase(lowered, pattern) for pattern in _TEST_NAMES
-    ):
+    if _is_test(pure, lowered, folders, directories):
         return "시험"
     if (
         suffix in _DOC_SUFFIXES
@@ -126,6 +150,8 @@ def classify(path: str) -> Kind | None:
         return "문서"
     if (
         suffix in _CONFIG_SUFFIXES
+        or lowered in _CONFIG_NAMES
+        or lowered.endswith(_CONFIG_DOUBLE_SUFFIX)
         or lowered in _CONFIG_JSON
         or (lowered.startswith("tsconfig.") and suffix == ".json")
         or lowered == "dockerfile"
@@ -141,6 +167,21 @@ def classify(path: str) -> Kind | None:
     if suffix in _CODE_SUFFIXES:
         return "코드"
     return None
+
+
+def _is_test(
+    pure: PurePosixPath,
+    lowered: str,
+    folders: tuple[str, ...],
+    directories: list[str],
+) -> bool:
+    if _TEST_DIRS.intersection(directories) or any(
+        fnmatchcase(lowered, pattern) for pattern in _TEST_NAMES
+    ):
+        return True
+    if any(folder.endswith(_TEST_DIR_SUFFIX) for folder in folders):
+        return True
+    return pure.stem.endswith(_TEST_STEM_SUFFIXES)
 
 
 def decide(ref: Ref, prepared: PreparedCandidate) -> str | None:
@@ -217,13 +258,13 @@ def _own_commits_unclear(prepared: PreparedCandidate, paths: set[str]) -> bool:
 
 def _touching(prepared: PreparedCandidate, paths: set[str]) -> list[FileState] | None:
     """대상 파일을 건드린 재료 커밋의 파일 상태(근거 순서). 그 가운데 patch가 없거나 온전하지 않거나,
-    비밀 파일이거나, 나눈 부분 밖이면 대상의 patch를 다 확인할 수 없어 None."""
+    비밀 파일이면 대상의 patch를 다 확인할 수 없어 None."""
     found: list[FileState] = []
     for record in prepared.material.commits:
         for state in prepared.states.get(record.sha, ()):
             if not _touches(state, paths):
                 continue
-            if state.patch is None or state.secret or not state.allowed:
+            if state.patch is None or state.secret:
                 return None
             found.append(state)
     return found

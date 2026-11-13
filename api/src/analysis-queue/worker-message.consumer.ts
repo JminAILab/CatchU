@@ -1,6 +1,8 @@
 import { ReceiverStorageError } from '../analysis-receiver/analysis-receiver.service';
 import { AnalysisRegistrationService } from '../analysis-receiver/analysis-registration.service';
 import { ProgressDecision, ResultReceipt } from '../analysis-receiver/receiver.types';
+import { PDF_EXTRACTION_RESULT_JOB_NAME, type PdfExtractionReceipt } from '../pdf-extraction/pdf-extraction-spec';
+import { PdfExtractionReceiver, PdfExtractionStorageError } from '../pdf-extraction/pdf-extraction.receiver';
 import { WORKER_JOB_NAMES } from './queue-spec';
 
 export type ConsumerFailureCode = 'UNKNOWN_JOB_NAME' | 'JOB_ID_MISMATCH' | 'RECEIVER_STORAGE_UNAVAILABLE' |
@@ -35,8 +37,8 @@ export interface ConsumerLog {
 }
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-// worker/docs/queue-consumer.md 「큐 규격」의 진행 알림 ID·결과 메시지 ID.
-const WORKER_JOB_ID = new RegExp(`^(?:event-(?:mock|live)-${UUID}-(?:received|running|uncertain)|message-(?:mock|live)-${UUID}-result)$`);
+// worker/docs/queue-consumer.md 「큐 규격」의 진행 알림 ID·결과 메시지 ID, 그리고 U8 PDF 추출 결과 ID(`message-pdf-{pdfMaterialId}-result`).
+const WORKER_JOB_ID = new RegExp(`^(?:event-(?:mock|live)-${UUID}-(?:received|running|uncertain)|message-(?:mock|live|pdf)-${UUID}-result)$`);
 
 /** 기록에 남겨도 되는 작업 ID. worker 형식이 아니면 null. */
 export function loggableJobId(id: unknown): string | null {
@@ -56,20 +58,24 @@ export function loggableJobName(name: unknown): string {
  *   DB에 남고 시한 판정이 요청을 닫는다). 식별 불가는 null. 수신 저장이 실패해 수신 확인이 없으면 실패로 끝낸다.
  * - 진행 알림: 판정(관측·변경 없음·거부)과 관계없이 완료. 저장이 실패하면 실패로 끝낸다.
  * - 모르는 작업 이름, 작업 ID와 메시지 ID가 다른 작업은 수신 경로에 넘기지 않고 실패로 끝낸다.
+ * - PDF 추출 결과(U8, `PdfExtractionResult`): PdfExtractionReceiver가 판정·저장하고 수신 확인(PdfExtractionReceipt)을 돌려준다(완료).
+ *   저장 실패는 수신 확인 없이 실패로 끝낸다(BR3.4). 수신기를 주입하지 않은 조립에서는 모르는 작업 이름과 같이 실패한다.
  */
 export class WorkerMessageConsumer {
   constructor(
     private readonly registration: Pick<AnalysisRegistrationService, 'receiveResult' | 'receiveProgress'>,
     private readonly log: ConsumerLog,
+    private readonly pdfExtraction: Pick<PdfExtractionReceiver, 'receive'> | null = null,
   ) {}
 
-  async process(job: WorkerMessageJob): Promise<ResultReceipt | null> {
+  async process(job: WorkerMessageJob): Promise<ResultReceipt | PdfExtractionReceipt | null> {
     if (!WORKER_JOB_NAMES.includes(job.name)) throw new AnalysisQueueError('UNKNOWN_JOB_NAME');
     const data = job.data;
     // worker는 작업 ID = 메시지 ID로 넣는다. 다르면 같은 결과가 다른 작업으로 다시 들어온 것일 수 있다.
     if (data !== null && typeof data === 'object' && typeof (data as { messageId?: unknown }).messageId === 'string' &&
         (data as { messageId: string }).messageId !== job.id) throw new AnalysisQueueError('JOB_ID_MISMATCH');
     const jobId = loggableJobId(job.id);
+    if (job.name === PDF_EXTRACTION_RESULT_JOB_NAME) return this.processPdfExtraction(data);
     if (job.name === 'ProcessingEvent') {
       let decision: ProgressDecision;
       try {
@@ -97,5 +103,15 @@ export class WorkerMessageConsumer {
     if (applicationFailed) this.log.applicationFailed(jobId);
     // 객체 그대로 돌려준다. 문자열로 바꾸면 worker가 수신 확인 형식이 아니라고 판정한다.
     return receipt;
+  }
+
+  /** PDF 추출 결과. 수신기가 로그(`PDF_EXTRACTION_RECEIVED`)를 남기므로 여기서는 따로 기록하지 않는다. */
+  private async processPdfExtraction(data: unknown): Promise<PdfExtractionReceipt | null> {
+    if (this.pdfExtraction === null) throw new AnalysisQueueError('UNKNOWN_JOB_NAME');
+    try {
+      return await this.pdfExtraction.receive(data);
+    } catch (error) {
+      throw new AnalysisQueueError(error instanceof PdfExtractionStorageError ? 'RECEIVER_STORAGE_UNAVAILABLE' : 'RESULT_HANDLING_FAILED');
+    }
   }
 }

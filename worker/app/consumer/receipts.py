@@ -70,8 +70,15 @@ def classify(view: ResultJobView, sent: Mapping[str, Any]) -> ReceiptRecord:
     )
 
 
+Classifier = Callable[[ResultJobView, Mapping[str, Any]], ReceiptRecord]
+
+
 class ReceiptWatcher:
-    """결과마다 조회 작업을 하나 띄우고, 종료할 때 남은 조회를 취소한다(미관측으로 기록)."""
+    """결과마다 조회 작업을 하나 띄우고, 종료할 때 남은 조회를 취소한다(미관측으로 기록).
+
+    기본은 10월 결과 수신 확인(`classify`, 식별 필드 resultId·requestId·attemptId)이고, 다른 결과 종류
+    (PDF 추출 결과)는 분류 함수와 식별 필드를 바꿔 같은 조회·기록 절차를 쓴다.
+    """
 
     def __init__(
         self,
@@ -80,15 +87,19 @@ class ReceiptWatcher:
         *,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         clock: Callable[[], float] = time.monotonic,
+        classifier: Classifier = classify,
+        identifying_fields: tuple[str, ...] = IDENTIFYING_FIELDS,
     ) -> None:
         self._jobs = jobs
         self._limits = limits
         self._sleep = sleep
         self._clock = clock
+        self._classify = classifier
+        self._fields = identifying_fields
         self._tasks: set[asyncio.Task[ReceiptRecord]] = set()
 
     def watch(self, result: Mapping[str, Any]) -> "asyncio.Task[ReceiptRecord]":
-        sent = {field: result[field] for field in ("messageId", *IDENTIFYING_FIELDS)}
+        sent = {field: result[field] for field in ("messageId", *self._fields)}
         task = asyncio.create_task(self._watch(sent), name="receipt-watch")
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
@@ -135,7 +146,7 @@ class ReceiptWatcher:
                 await self._sleep(self._limits.receipt_interval)
                 view = await self._load(message_id)
                 if isinstance(view, ResultJobView) and view.finished:
-                    record = classify(view, sent)
+                    record = self._classify(view, sent)
                     self._log(sent, record)
                     observed = True
                     await self._remove(message_id)
@@ -161,26 +172,27 @@ class ReceiptWatcher:
         self._log(sent, record)
         return record
 
-    @staticmethod
-    def _log(sent: Mapping[str, str], record: ReceiptRecord) -> None:
-        ids = (sent["messageId"], sent["attemptId"])
+    def _log(self, sent: Mapping[str, str], record: ReceiptRecord) -> None:
+        # 마지막 식별 필드(10월 attemptId, PDF pdfMaterialId)를 이름과 함께 남긴다.
+        label = self._fields[-1]
+        ids = (sent["messageId"], label, sent[label])
         if record.kind is ReceiptKind.RECEIVED:
             # ACCEPTED는 E 수신이지 반영 완료가 아니다. 반영은 E/B가 판단한다.
             logger.info(
-                "수신 확인: messageId=%s attemptId=%s disposition=%s code=%s",
+                "수신 확인: messageId=%s %s=%s disposition=%s code=%s",
                 *ids,
                 record.disposition,
                 record.code,
             )
         elif record.kind is ReceiptKind.UNOBSERVED:
             logger.warning(
-                "수신 확인 미관측(재전송·재분석하지 않음): messageId=%s attemptId=%s last=%s",
+                "수신 확인 미관측(재전송·재분석하지 않음): messageId=%s %s=%s last=%s",
                 *ids,
                 record.last_seen,
             )
         else:
             logger.warning(
-                "수신 확인 이상(재전송하지 않음): messageId=%s attemptId=%s kind=%s",
+                "수신 확인 이상(재전송하지 않음): messageId=%s %s=%s kind=%s",
                 *ids,
                 record.kind,
             )

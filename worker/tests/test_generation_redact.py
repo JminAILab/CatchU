@@ -29,7 +29,7 @@ from generation_scenarios import (
 )
 from github_synthetic import MEMBER, sha
 
-from app.generation.redact import (
+from app.redact import (
     MASK,
     MAX_LINE_CHARS,
     MaskBook,
@@ -889,3 +889,26 @@ def test_many_shared_values_keep_masking_time_linear() -> None:
 
     assert time.perf_counter() - started < 2.0
     assert all("Secret" not in result.text for result in results)
+
+
+def test_mask_check_is_one_module_shared_without_worker_imports() -> None:
+    """CR1 BR2.4·비기능 설계 Q2 A: 가리기 검사는 `app/redact.py` 한 곳에 있고 옛 위치는 없다. 후보 판정과
+    생성이 함께 불러도 순환이 생기지 않게 다른 worker 모듈(`app.`)을 불러오지 않는다."""
+    import ast
+    import importlib.util
+    from pathlib import Path
+
+    import app.redact as shared
+
+    assert importlib.util.find_spec("app.generation.redact") is None
+    tree = ast.parse(Path(shared.__file__).read_text(encoding="utf-8"))
+    imported = [
+        node.module or "" for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+    ] + [
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    ]
+    assert imported
+    assert not any(name == "app" or name.startswith("app.") for name in imported)

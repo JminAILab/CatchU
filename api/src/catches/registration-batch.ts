@@ -2,6 +2,8 @@ import {
   CatchContentSource,
   NewCatchContent,
   SourceMode,
+  isRevisitFactList,
+  parseWorkTimes,
   prepareNewCatchContent,
 } from './new-catch-content';
 import { CatchRegistrationInputError, CatchRegistrationInputField } from './registration-input-error';
@@ -16,10 +18,14 @@ export interface RegistrationCandidate extends CatchContentSource {
     readonly contributionVerified: boolean;
     readonly independentOfFailures: boolean;
   };
+  // 후보의 본인 커밋 목록 전체(Result v3, CR2). 등록이 그 Catch의 소속으로 쓴다.
+  readonly ownCommitShas: readonly string[];
 }
 
 export interface PreparedWorkGroup {
   workIdentity: string;
+  // 같은 열쇠 후보들의 본인 커밋 합집합(후보 순서대로 처음 나온 순서, 중복 없음). 그 Catch의 소속으로 쓴다(CR2 BR3.2).
+  ownCommitShas: string[];
   candidates: {
     candidateId: string;
     content: NewCatchContent;
@@ -88,6 +94,35 @@ function validateCandidate(candidate: RegistrationCandidate): void {
     }
     evidenceIds.add(evidence.evidenceId);
   }
+  validateOwnCommitShas(candidate.ownCommitShas);
+  validateRevisitFacts(candidate.revisitFacts, candidate.ownCommitShas);
+  parseWorkTimes(candidate.firstWorkAt, candidate.lastWorkAt);
+}
+
+/**
+ * 다시 볼 곳 사실의 등록 입력 검사(NC3 BR5.2, 보안 설계 2절). 계약 검사(Ajv)가 모양을 먼저 보고, 여기서는 종류별 경로·커밋
+ * 수, 같은 사실 안 겹침, 사실의 커밋이 그 후보 ownCommitShas 안인지를 더 본다. 어기면 그 결과의 Catch를 하나도 등록하지
+ * 않는다. 값은 오류에 싣지 않는다.
+ */
+function validateRevisitFacts(value: unknown, ownCommitShas: readonly string[]): void {
+  if (!isRevisitFactList(value)) throw new CatchRegistrationInputError('INVALID_INPUT', 'revisitFacts');
+  const own = new Set(ownCommitShas);
+  if (!value.every((fact) => fact.commits.every((sha) => own.has(sha)))) {
+    throw new CatchRegistrationInputError('INVALID_INPUT', 'revisitFacts');
+  }
+}
+
+const COMMIT_SHA = /^[0-9a-f]{40}$/;
+// 계약 C2의 상한(요청 하나가 모으는 커밋 수). 결과 검사가 먼저 막지만 등록도 같은 경계를 지킨다.
+const MAX_OWN_COMMIT_SHAS = 3000;
+
+/** 결과 계약(C2)과 같은 경계: 1~3,000개, 소문자 16진수 40자, 중복 없음. 값은 오류에 싣지 않는다. */
+function validateOwnCommitShas(value: unknown): void {
+  assertStrings(value, 'ownCommitShas', true);
+  if (value.length > MAX_OWN_COMMIT_SHAS || !value.every((sha) => COMMIT_SHA.test(sha))
+    || new Set(value).size !== value.length) {
+    throw new CatchRegistrationInputError('INVALID_INPUT', 'ownCommitShas');
+  }
 }
 
 /**
@@ -123,9 +158,18 @@ export function prepareRegistrationBatch(
     if (group) {
       // 후보별 내용은 보존한다. 본문 합치기·대표 후보 선택·기존 카드 수정은 하지 않는다.
       group.candidates.push(prepared);
+      // 소속은 같은 Catch에 모이므로 SHA만 합친다. 앞 후보 목록 뒤에 새 SHA를 처음 나온 순서로 잇는다.
+      const known = new Set(group.ownCommitShas);
+      for (const sha of candidate.ownCommitShas) {
+        if (!known.has(sha)) {
+          known.add(sha);
+          group.ownCommitShas.push(sha);
+        }
+      }
     } else {
       groups.set(candidate.workIdentity, {
         workIdentity: candidate.workIdentity,
+        ownCommitShas: [...candidate.ownCommitShas],
         candidates: [prepared],
       });
     }

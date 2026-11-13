@@ -9,6 +9,8 @@ export const routes = {
   login: "/login",
   /** Google 로그인 콜백(#287). api `GOOGLE_REDIRECT_URI`와 같아야 한다. 통합 시험 전환을 끄면 404. */
   googleCallback: "/google/callback",
+  /** 개인정보 처리방침(#496). 로그인 없이 연다. 첫 화면 바닥글 링크의 목적지이며 Google 로그인 앱 Branding에 적는 방침 주소다. */
+  privacy: "/privacy",
   /** 로그인 후 홈. 회원 헤더의 로고 목적지. */
   home: "/home",
   /** 최초 프로필 입력(W02). */
@@ -29,6 +31,8 @@ export const routes = {
   assets: "/assets",
   /** 텍스트 자료 목록·편집(U4 W2). */
   materials: "/materials",
+  /** 본인 JD 목록·편집(U10). */
+  jds: "/jds",
   /** 발행본 목록(U4 W5). */
   publications: "/publications",
   /** 발행(U4 W3). 본인 Catch·텍스트 자료를 골라 고정 발행본과 링크를 만든다. 10월 `/links`(공유 링크 발급·관리)는 U4 제출 3(W6)에서 이 화면으로 대체했다. */

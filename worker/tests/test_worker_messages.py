@@ -171,6 +171,42 @@ def test_expected_results_follow_outcome_and_receipt_rules() -> None:
                 assert expected["receipt"] is not None
 
 
+def test_only_results_are_version_four_with_own_commit_shas() -> None:
+    """Result만 "4"이고(NC3 C4) 후보마다 본인 커밋 목록(소문자 40자, 중복 없음)이 있다. 진행 알림은
+    "2"다(CR2 BR2.2)."""
+    for case in CASES["cases"]:
+        for spec, message in zip(
+            case["messages"], _filled_messages(case["caseId"]), strict=True
+        ):
+            if spec["schema"] == "ProcessingEvent":
+                assert message["schemaVersion"] == "2"
+                continue
+            assert message["schemaVersion"] == "4"
+            for candidate in message["candidates"]:
+                shas = candidate["ownCommitShas"]
+                assert shas and len(set(shas)) == len(shas)
+                assert all(re.fullmatch(r"[0-9a-f]{40}", each) for each in shas)
+
+
+def test_version_two_result_and_missing_own_commits_are_schema_invalid() -> None:
+    (message,) = _filled_messages("succeeded-one-candidate")
+    assert check_message("Result", message).verdict is Verdict.VALID
+    old = {**message, "schemaVersion": "2"}
+    assert check_message("Result", old).verdict is Verdict.SCHEMA_INVALID
+    missing = copy.deepcopy(message)
+    del missing["candidates"][0]["ownCommitShas"]
+    assert check_message("Result", missing).verdict is Verdict.SCHEMA_INVALID
+    for shas in (
+        [],
+        ["A" * 40],
+        ["a" * 40, "a" * 40],
+        [f"{n:040x}" for n in range(3001)],
+    ):
+        changed = copy.deepcopy(message)
+        changed["candidates"][0]["ownCommitShas"] = shas
+        assert check_message("Result", changed).verdict is Verdict.SCHEMA_INVALID
+
+
 def test_redelivery_sends_identical_message() -> None:
     first, second = _filled_messages("redelivery")
     assert first == second

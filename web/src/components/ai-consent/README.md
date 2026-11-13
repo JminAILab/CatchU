@@ -11,7 +11,7 @@ return <>{dialog}{/* 화면 */}</>;
 
 - 403 `AI_CONSENT_REQUIRED` → 창 열기 → [동의] → `POST /v1/ai-consent { noticeVersion }` 성공 → 같은 요청을 **한 번만** 다시 보낸다. 또 403이어도 창을 다시 열지 않는다. [닫기]·Esc면 실행하지 않는다.
 - 생성 POST라면 다시 보낼 때 같은 재전송 키를 쓰도록 `request` 함수 안에서 같은 키를 넘긴다(「API 호출」).
-- 창은 받는 곳 둘(Claude API(Anthropic)·Voyage AI(운영사 MongoDB)), 보내는 기능, 올린 자료를 그대로 보낸다는 사실, 문의 경로 한 줄(저장소 이슈 주소)을 보인다. 접수·회신 약속은 쓰지 않는다.
+- 창은 받는 곳 셋(Claude API(Anthropic)·Voyage AI(운영사 MongoDB)·OpenAI API(OpenAI)), 보내는 기능, 올린 자료를 그대로 보낸다는 사실, 문의 경로 한 줄(개인정보 처리방침과 같은 팀 연락 이메일 `catchu@googlegroups.com`)을 보인다. 접수·회신 약속은 쓰지 않는다.
 - 동의 뒤 AI 화면마다 `<AiNoticeLine />` 한 줄을 둔다. 비로그인 질의응답(U5)은 입력란 옆에 같은 한 줄을 둔다.
-- `AI_NOTICE_VERSION`(`ai-consent-notice.ts`)은 api의 같은 상수와 같아야 한다. 문구를 바꾸면 두 값을 함께 올린다(`test/u2-consent.test.mjs`가 대조).
+- `AI_NOTICE_VERSION`(`ai-consent-notice.ts`)은 api의 같은 상수와 같아야 한다. 문구를 바꾸면 두 값을 함께 올린다(`test/u2-consent.test.mjs`가 대조). 현재 `2026-11-v2`는 Catch 개편 CR3(기능 설계 BR8.3)가 받는 곳에 OpenAI(저장소 분석에서 AI가 쓴 글과 기록을 확인)를 더하며 올린 판본이다. 동의 창 문의처를 저장소 이슈 주소에서 팀 연락 이메일로 바꾼 것은 v2가 `dev`에 들어가기 전(배포 전)이라 판본을 올리지 않고 v2에 넣었다(다시 동의받는 일을 한 번으로 끝내려는 2026-11-12 팀장 결정, [#496 댓글](https://github.com/JminAILab/CatchU/issues/496#issuecomment-6810581294)).
 - 한도·동의·탈퇴 실패 코드의 안내 문구는 `src/lib/u2-error-messages.ts`에 있다(한도 안내에 남은 횟수를 넣지 않는다).

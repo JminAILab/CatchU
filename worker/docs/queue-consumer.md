@@ -1,6 +1,6 @@
 # 분석 요청 큐 소비자
 
-현행 네 메시지 종류는 [U7 v2](repository-analysis-u7.md)이며 v1 혼입을 거부한다. 수신 확인과 Catch 반영 완료는 별개이고, 결과에는 본인 커밋 관측과 수집 한계를 필수로 보낸다. 기존 큐 이름·동시 실행 1·재시도 정책은 유지한다.
+현행 네 메시지 종류는 [U7 v2](repository-analysis-u7.md)(Result만 Catch 개편 CR2부터 v3)이며 다른 판본 혼입을 거부한다. 수신 확인과 Catch 반영 완료는 별개이고, 결과에는 본인 커밋 관측과 수집 한계를 필수로 보낸다. 기존 큐 이름·동시 실행 1·재시도 정책은 유지한다.
 
 [#121](https://github.com/JminAILab/CatchU/issues/121)의 큐 연결이다. api가 넣은 분석 요청을 큐에서 꺼내 처리하고, 진행 알림과 결과를 api로 가는 큐에 넣는다. LIVE 요청은 요청 정보 조회([요청 정보 조회](request-context.md)) 뒤 실제 수집·후보·생성으로, MOCK 요청은 개발·시험 설정에서만 가짜 생성기로 처리한다. LIVE는 합성 GitHub·합성 제공자·합성 조회 API로만 검사했고 실제 api·GitHub·Claude 연결 확인은 남았다. api 쪽 큐 연결은 [#233](https://github.com/JminAILab/CatchU/issues/233)이다. 보장하지 않는 범위는 [worker README](../README.md#보장하지-않는-범위)에 있다.
 
@@ -46,8 +46,10 @@ NODE_ENV=development CATCHU_QUEUE_REDIS_URL=redis://127.0.0.1:6379 uv run --lock
 | `WORKER_CONTEXT_API_URL`·`WORKER_CONTEXT_API_KEY` | 운영 필수 | 요청 정보 조회의 api 주소와 worker 전용 키([요청 정보 조회 「설정」](request-context.md#설정)) |
 | `WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP` | 선택 | `true`면 클러스터 안 서비스 이름(`*.svc.cluster.local`)에 한해 운영에서도 http 조회 주소를 받는다. 그 밖의 http는 거부한다 |
 | `CATCHU_GENERATION_API_KEY` | 운영 필수 | 생성 제공자(Claude API) 키. SDK 환경변수(`ANTHROPIC_API_KEY`)는 쓰지 않는다([생성의 실제 제공자](generation-provider.md#만들-때-넘길-것)) |
+| `CATCHU_JUDGEMENT_PROVIDER` | 선택(기본 `openai`) | 판정 공급자(CR3) `openai`·`claude`. 그 밖의 값이면 개발·시험에서도 기동하지 않는다. `claude`면 생성 키로 AI 쪽이 켜진다. 고지 v3가 배포된 뒤에만 `claude`를 넣는다([판정 「켜고 끄기」](generation-judgement.md#켜고-끄기)) |
+| `CATCHU_JUDGEMENT_API_KEY` | 선택 | OpenAI 판정 키(CR3). 공급자가 `openai`이고 이 키가 있을 때만 AI 쪽이 켜진다. 운영 필수 셋에 들지 않아 없으면 AI 쪽이 꺼진 채 기동한다. SDK 환경변수(`OPENAI_API_KEY`)는 쓰지 않는다. 고지 v3가 배포된 뒤에만 넣는다 |
 
-운영에서 큐 주소나 LIVE 설정(조회 주소·키, 생성 키)이 없거나 위 값이 틀리면 설정 이름만 로그에 남기고 종료 코드 2로 끝난다. 개발·시험에서는 LIVE 설정 셋을 모두 비우면 LIVE를 끄고, 일부만 넣으면 기동하지 않는다. 실행 명령은 설정을 읽은 뒤 비밀값(큐 주소, 조회 키, 생성 키)을 환경변수에서 지운다. 분석 자식(spawn)은 부모의 환경변수를 물려받으므로, 큐 비밀번호는 자식에 넘어가지 않고 LIVE 키는 자식용 설정 객체로만 넘어가게 하기 위해서다. 운영 큐 TLS는 시스템 CA로 검증한다. 시간 상한은 환경변수로 열지 않는다(아래 「시간 상한」).
+운영에서 큐 주소나 LIVE 설정(조회 주소·키, 생성 키)이 없거나 위 값이 틀리면 설정 이름만 로그에 남기고 종료 코드 2로 끝난다. 개발·시험에서는 LIVE 설정 셋을 모두 비우면 LIVE를 끄고(판정 키만 있어도 같다), 일부만 넣으면 기동하지 않는다. 기동 로그에는 판정 공급자 이름과 AI 쪽 켜짐 여부(`judgementProvider=`·`aiSide=`)만 남긴다. 실행 명령은 설정을 읽은 뒤 비밀값(큐 주소, 조회 키, 생성 키, 판정 키)을 환경변수에서 지운다. 분석 자식(spawn)은 부모의 환경변수를 물려받으므로, 큐 비밀번호는 자식에 넘어가지 않고 LIVE 키는 자식용 설정 객체로만 넘어가게 하기 위해서다. 운영 큐 TLS는 시스템 CA로 검증한다. 시간 상한은 환경변수로 열지 않는다(아래 「시간 상한」).
 
 ## 상태 확인
 

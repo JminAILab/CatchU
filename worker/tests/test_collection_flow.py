@@ -50,6 +50,7 @@ from app.collection import (
     GitHubAccount,
     collect,
 )
+from app.collection.normalize import commit_changes
 from app.contract import Verdict, check_message
 from app.processing import (
     CheckedRequest,
@@ -129,6 +130,77 @@ def test_commit_changes_keep_files_and_mark_missing_patches() -> None:
     assert changes.files[1].patch is None
     assert (changes.additions, changes.deletions) == (3, 1)
     assert not changes.files_truncated
+
+
+def _detail_with_blob_shas(entries: list[tuple[str, str, object]]) -> dict[str, Any]:
+    """파일 항목마다 (경로, 상태, sha 값)을 넣은 합성 커밋 상세 응답. sha가 ...이면 칸을 두지 않는다."""
+    files = []
+    for path, status, blob in entries:
+        entry = file_json(path, 1, 0, status=status)
+        if blob is not ...:
+            entry["sha"] = blob
+        files.append(entry)
+    return commit_detail_json(1, MEMBER, files)
+
+
+def test_nc3_br1_1_commit_changes_keep_blob_sha_of_removed_renamed_and_added() -> None:
+    removed, renamed, added = "a" * 40, "b" * 40, "c" * 40
+    detail = _detail_with_blob_shas(
+        [
+            ("src/a.js", "removed", removed),
+            ("lib/b.js", "renamed", renamed),
+            ("lib/c.js", "added", added.upper()),
+        ]
+    )
+
+    changes = commit_changes(detail, sha(1), files_truncated=False)
+
+    # 지운 파일은 지우기 전 내용, 나머지는 바뀐 뒤 내용의 식별값이다. 대문자는 소문자로 옮긴다.
+    assert [file.blob_sha for file in changes.files] == [removed, renamed, added]
+
+
+def test_nc3_br1_1_malformed_or_missing_blob_sha_becomes_none_without_failing() -> None:
+    detail = _detail_with_blob_shas(
+        [
+            ("a.js", "modified", "abc1234"),
+            ("b.js", "modified", "g" * 40),
+            ("c.js", "modified", 12345),
+            ("d.js", "modified", None),
+            ("e.js", "modified", ...),
+            ("f.js", "modified", "a" * 64),
+        ]
+    )
+
+    changes = commit_changes(detail, sha(1), files_truncated=False)
+
+    assert [file.blob_sha for file in changes.files] == [None] * 6
+    assert [file.path for file in changes.files] == [
+        "a.js",
+        "b.js",
+        "c.js",
+        "d.js",
+        "e.js",
+        "f.js",
+    ]
+
+
+def test_nc3_nfr1_1_collection_keeps_blob_sha_without_extra_calls() -> None:
+    routes = standard_routes()
+    blob = "d" * 40
+    files = [
+        {**file_json("app/login.py", 3, 1), "sha": blob},
+        file_json("assets/logo.png", 0, 0, None),
+    ]
+    routes[f"{BASE}/commits/{sha(1)}"] = respond(commit_detail_json(1, MEMBER, files))
+
+    outcome, transport = _run(routes)
+
+    changes = outcome.commits[0].changes
+    assert changes is not None
+    assert [file.blob_sha for file in changes.files] == [blob, None]
+    # 이미 받는 커밋 상세에서 옮길 뿐이라 호출 경로와 순서가 그대로다.
+    assert transport.paths == STANDARD_ORDER
+    assert outcome.calls == len(STANDARD_ORDER)
 
 
 def test_bot_authors_are_kept_as_observed_accounts() -> None:
@@ -337,6 +409,11 @@ def _candidate(outcome: CollectionOutcome) -> EligibleCandidate:
         evidence=(basis.to_evidence_item("커밋 1건"),),
         draft=DraftOutcome.not_generated(),
         reflection=ReflectionOutcome.not_generated(),
+        # Result v3(CR2)는 후보마다 본인 커밋 목록이 1개 이상이다.
+        own_commit_shas=(outcome.commits[0].sha,),
+        # Result v4(NC3)는 후보마다 작업 시각 둘이 있다.
+        first_work_at=outcome.commits[0].authored_at,
+        last_work_at=outcome.commits[0].authored_at,
     )
 
 

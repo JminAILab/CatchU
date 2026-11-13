@@ -52,7 +52,7 @@ export const githubNotices = {
 /**
  * GitHub 연결 시작을 막는 이유. 막지 않으면 null이다. 연동 화면과 홈 안내(#155)가 같은 기준·문구를 쓴다.
  * 같은 탭에서 GitHub에 다녀오면 기존 메모리 토큰(#106)이 사라져 콜백에서 연결을 마칠 수 없다. 그래서 세션 복원(#286)을 쓰는
- * 통합 시험 전환(`auth-integration.ts`)이 켜졌을 때만 시작하고, 제품 기본값(꺼짐)에서는 막는다.
+ * 통합 시험 전환(`auth-integration.ts`)이 켜졌을 때만 시작하고, 꺼졌을 때는 막는다.
  * 막아도 연결 상태 조회와 내 자산 이동은 그대로 둔다.
  */
 export function githubStartBlockedReason(sessionIntegrationEnabled: boolean): string | null {

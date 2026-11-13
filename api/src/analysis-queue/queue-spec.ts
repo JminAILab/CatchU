@@ -2,10 +2,13 @@
  * worker와 함께 정한 큐 규격(worker/docs/queue-consumer.md 「큐 규격 (#233과 공동)」).
  * 이름·작업 ID·옵션은 worker가 같은 값을 전제하므로 한쪽만 바꾸지 않는다.
  */
+import { PDF_EXTRACTION_RESULT_JOB_NAME } from '../pdf-extraction/pdf-extraction-spec';
+
 export const ANALYSIS_REQUEST_QUEUE = 'analysis-requests';
 export const WORKER_MESSAGE_QUEUE = 'worker-messages';
 export const REQUEST_JOB_NAME = 'Request';
-export const WORKER_JOB_NAMES: readonly string[] = ['ProcessingEvent', 'Result'];
+/** 받는 작업 이름. `PdfExtractionResult`는 U8이 같은 큐에 더한 PDF 추출 결과(pdf-extraction/pdf-extraction-spec.ts, 계약 C-16)다. */
+export const WORKER_JOB_NAMES: readonly string[] = ['ProcessingEvent', 'Result', PDF_EXTRACTION_RESULT_JOB_NAME];
 
 /** 요청 작업 보관(초). 처리 시한 60분보다 길어, 그동안 같은 시도를 다시 넣어도 같은 작업 ID라 무시된다. */
 export const REQUEST_JOB_RETENTION_SECONDS = 2 * 60 * 60;

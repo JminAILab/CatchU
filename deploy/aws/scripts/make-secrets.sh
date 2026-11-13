@@ -23,6 +23,8 @@ catchu-api LINK_GRANT_SECRET /catchu/prod/api/LINK_GRANT_SECRET
 catchu-api DB_PASSWORD /catchu/prod/db/catchu_app-password
 catchu-api CATCHU_GENERATION_API_KEY /catchu/prod/api/CATCHU_GENERATION_API_KEY
 catchu-api CATCHU_EMBEDDING_API_KEY /catchu/prod/api/CATCHU_EMBEDDING_API_KEY
+catchu-api GOOGLE_CLIENT_ID /catchu/prod/api/GOOGLE_CLIENT_ID
+catchu-api GOOGLE_CLIENT_SECRET /catchu/prod/api/GOOGLE_CLIENT_SECRET
 catchu-migration DB_PASSWORD /catchu/prod/db/catchu_migrator-password
 catchu-worker CATCHU_QUEUE_REDIS_URL /catchu/prod/queue/auth-token
 catchu-worker WORKER_CONTEXT_API_KEY /catchu/prod/worker/WORKER_CONTEXT_API_KEY
@@ -35,7 +37,8 @@ program='
 def fail($msg): error("확인 실패: " + $msg);
 def rule($key):
   {AUTH_JWT_SECRET: "[0-9a-fA-F]{64}", LINK_GRANT_SECRET: "[0-9a-fA-F]{64}", WORKER_CONTEXT_API_KEY: "[0-9a-fA-F]{64}",
-   DB_PASSWORD: "[!-~]{16,}", CATCHU_QUEUE_REDIS_URL: "[A-Za-z0-9]{16,128}", CATCHU_GENERATION_API_KEY: "[!-~]+", CATCHU_EMBEDDING_API_KEY: "[!-~]+"}[$key]
+   DB_PASSWORD: "[!-~]{16,}", CATCHU_QUEUE_REDIS_URL: "[A-Za-z0-9]{16,128}", CATCHU_GENERATION_API_KEY: "[!-~]+", CATCHU_EMBEDDING_API_KEY: "[!-~]+",
+   GOOGLE_CLIENT_ID: "[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com", GOOGLE_CLIENT_SECRET: "[!-~]+"}[$key]
   // fail("검사 규칙이 없는 키 " + $key);
 def labels: {"app.kubernetes.io/part-of": "catchu", "app.kubernetes.io/managed-by": "make-secrets"};
 (if (.InvalidParameters // []) == [] then . else fail("SSM에 없는 이름이 있다(" + (.InvalidParameters | join(", ")) + ")") end)
@@ -107,8 +110,15 @@ done
 [ -z "$missing" ] || catchu_die "SSM에 없거나 SecureString이 아닌 이름이 있다:${missing}. 새 값은 deploy/aws/scripts/put-parameter.sh로 넣는다"
 
 # ---------- 2. 읽어서 적용(값은 파이프로만 지난다) ----------
+# get-parameters는 한 번에 이름 10개까지만 받는다. 10개씩 나눠 읽고 응답 하나로 합친다. 한 번이라도 실패하면 0이 아니다(pipefail).
+read_ssm() {
+  local i
+  for ((i = 0; i < ${#names[@]}; i += 10)); do
+    aws_catchu ssm get-parameters --names "${names[@]:i:10}" --with-decryption --output json || return 1
+  done | jq -cs '{Parameters: [.[].Parameters[]], InvalidParameters: [.[] | (.InvalidParameters // [])[]]}'
+}
 set +e
-aws_catchu ssm get-parameters --names "${names[@]}" --with-decryption --output json 2> "${tmp}/ssm.err" |
+read_ssm 2> "${tmp}/ssm.err" |
   jq -c --arg sources "$sources" --arg namespace "$namespace" --arg db_host "$db_host" --rawfile ca "$CATCHU_DB_CA_FILE" \
     --arg queue_host "$queue_host" --arg queue_port "$queue_port" "$program" 2> "${tmp}/jq.err" |
   k apply --server-side --field-manager="$manager" -f - -o name > "${tmp}/apply.out" 2> "${tmp}/apply.err"

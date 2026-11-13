@@ -15,6 +15,16 @@ test('C3 네 메시지는 v2만 받고 v1 혼입을 거부한다', () => {
     assert.equal(check(value), true); assert.equal(check({ ...value, schemaVersion: '1' }), false);
   }
 });
+test('NC3 C4: 결과만 v4이고 요청·진행·수신 응답은 v2 그대로다', () => {
+  const request = buildRequestMessage(pending(), validator).message;
+  const receipt = { schemaVersion: '2', messageId: 'receipt', resultId: 'r', requestId: 'q', attemptId: 'a', disposition: 'ACCEPTED', code: 'OK' };
+  assert.equal(validator.result(result()), true);
+  assert.equal(validator.result(result({ schemaVersion: '2' })), false);
+  assert.equal(validator.result(result({ schemaVersion: '3' })), false);
+  assert.equal(validator.request({ ...request, schemaVersion: '3' }), false);
+  assert.equal(validator.progress(event({ schemaVersion: '3' })), false);
+  assert.equal(checkMessage('ResultReceipt', { ...receipt, schemaVersion: '3' }).verdict, 'SCHEMA_INVALID');
+});
 test('C3 필수 관측 누락·추가 필드·잘못된 조합을 거부한다', () => {
   for (const field of ['ownCommitObservation','observedOwnCommitCount','collectionLimitNotes']) { const value = result(); delete value[field]; assert.equal(validator.result(value), false); }
   for (const change of [{ unknown: true }, { ownCommitObservation: 'FOUND', observedOwnCommitCount: null }, { ownCommitObservation: 'NONE', observedOwnCommitCount: 0 }, { observedOwnCommitCount: 0 }]) assert.equal(validator.result(result(change)), false);

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "2",
+  "schemaVersion": "4",
   "messageId": "message-{{caseId}}-{{attemptId}}-result",
   "resultId": "result-{{caseId}}-{{attemptId}}",
   "requestId": "{{requestId}}",
@@ -52,7 +52,46 @@
         "questions": [
           "합성 질문: 문구를 바꾸게 된 계기는 무엇이었나요?"
         ]
-      }
+      },
+      "ownCommitShas": [
+        "0000000000000000000000000000000000000012",
+        "0000000000000000000000000000000000000011"
+      ],
+      "revisitFacts": [
+        {
+          "kind": "REWORKED_LINES",
+          "paths": ["src/login/error-message.ts"],
+          "commits": [
+            "0000000000000000000000000000000000000011",
+            "0000000000000000000000000000000000000012"
+          ]
+        },
+        {
+          "kind": "MOVED_FILE",
+          "paths": ["src/login/messages.ts", "src/auth/messages.ts"],
+          "commits": ["0000000000000000000000000000000000000011"]
+        },
+        {
+          "kind": "EXTENSION_CHANGED",
+          "paths": ["src/login/format.js", "src/login/format.ts"],
+          "commits": ["0000000000000000000000000000000000000012"]
+        },
+        {
+          "kind": "REVERTED",
+          "paths": [],
+          "commits": [
+            "0000000000000000000000000000000000000012",
+            "0000000000000000000000000000000000000011"
+          ]
+        },
+        {
+          "kind": "TEST_FILES_PRESENT",
+          "paths": ["src/login/__tests__/error-message.test.ts"],
+          "commits": ["0000000000000000000000000000000000000012"]
+        }
+      ],
+      "firstWorkAt": "2026-09-30T10:00:00Z",
+      "lastWorkAt": "2026-09-30T12:00:00Z"
     }
   ],
   "notProvided": [],

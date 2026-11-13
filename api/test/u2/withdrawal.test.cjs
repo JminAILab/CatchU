@@ -207,6 +207,50 @@ test('3단계 실패 뒤 다시 로그인해 탈퇴를 다시 요청하면, 이�
   assert.equal(await count('member_account', member.memberId), 0);
 });
 
+// #521 리뷰(2026-11-12 팀장 결정): 4단계는 한 트랜잭션에서 회원 행 삭제 → 회원 파일 다시 삭제 → 커밋이다. 다시 지우기가 실패하면
+// 회원 행 삭제(연쇄 삭제 포함)를 되돌려 계정이 남고, 2·3단계 실패와 똑같이 회원이 다시 로그인해 탈퇴를 다시 요청할 수 있다.
+// 2단계 뒤에 회원 폴더에 파일이 하나 생긴 상태(늦게 끝난 쓰기)에서 4단계의 다시 지우기만 실패하게 한다. 실제 시험 DB와 로컬 파일 저장소를 쓴다.
+test('4단계의 회원 파일 다시 지우기가 실패하면 500이고 회원 행 삭제가 되돌려지며, 다시 로그인해 탈퇴하면 파일까지 지워진다', async () => {
+  const identity = `u2-step4-${randomUUID()}`;
+  const member = await memberWithData(identity);
+  const staying = await memberWithData();
+  const stayingBefore = await rowsOf(staying.memberId);
+  const lateKey = materialKey(member.memberId, randomUUID());
+  let sweeps = 0;
+  service.files = {
+    deletePrefix: async (prefix) => {
+      sweeps += 1;
+      if (sweeps === 1) {
+        await storage.deletePrefix(prefix);
+        await storage.put(lateKey, Buffer.from('%PDF-1.4 synthetic late write'), 'application/pdf'); // 2단계 뒤에 끝난 파일 쓰기
+        return;
+      }
+      throw new StorageUnavailable('IO_FAILED');
+    },
+  };
+  const response = await withdraw(member.tokens[0]);
+  expectError(response, 500, 'WITHDRAWAL_FAILED');
+  assert.equal(response.headers.get('set-cookie'), null);
+  assert.equal(sweeps, 2, '2단계와 4단계 안에서 한 번씩 불렸다');
+  assert.deepEqual(failures().map((log) => [log.step, log.error]), [[4, 'StorageUnavailable']]);
+  const rows = await rowsOf(member.memberId);
+  assert.equal(rows.member_account, 1, '회원 행 삭제가 되돌려졌다');
+  assert.equal(rows.text_material, 1, '연쇄 삭제도 함께 되돌려졌다');
+  assert.equal(existsSync(member.credentialFile), false, '3단계는 끝났다');
+  assert.equal(existsSync(join(fileRoot, 'members', member.memberId)), true, '늦게 쓴 파일은 아직 남아 있다');
+  assert.ok(!server.logs.some((log) => log.text.includes(member.memberId) || log.text.includes(fileRoot)), '로그에 회원 ID·파일 경로가 없다');
+
+  // 저장소가 돌아온 뒤 다시 로그인해 탈퇴를 다시 요청한다.
+  service.files = storage;
+  const again = await server.login(identity);
+  assert.equal(again.memberId, member.memberId);
+  assert.equal((await withdraw(again.token)).status, 204);
+  assert.deepEqual(Object.values(await rowsOf(member.memberId)), MEMBER_TABLES.map(() => 0));
+  assert.equal(existsSync(join(fileRoot, 'members', member.memberId)), false, '늦게 쓴 파일까지 지워졌다');
+  assert.deepEqual(await rowsOf(staying.memberId), stayingBefore);
+  assert.equal(existsSync(join(fileRoot, 'members', staying.memberId)), true);
+});
+
 test('S26 탈퇴 뒤 그 회원의 Access 토큰은 모든 기기에서 401이다', async () => {
   const member = await memberWithData();
   assert.equal((await withdraw(member.tokens[1])).status, 204);

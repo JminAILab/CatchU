@@ -1,7 +1,8 @@
 """분석 소비자 기동 설정: 환경변수 읽기와 검사, 비밀값 숨김, 시간 상한.
 
 큐 주소에는 비밀번호가 들어가므로 주소 전체를 비밀값으로 다룬다. LIVE 처리 설정(요청 정보 조회 목적지·키, 생성
-제공자 키)은 운영에서 필수다. 검사에 실패하면 입력 값을 오류 문구에 싣지 않는다. 시간 상한은 환경변수로 열지 않고
+제공자 키)은 운영에서 필수다. 판정 공급자(`CATCHU_JUDGEMENT_PROVIDER`)·판정 키(`CATCHU_JUDGEMENT_API_KEY`)는
+선택이며 AI 쪽이 켜졌는지만 정한다(CR3 BR1.1). 검사에 실패하면 입력 값을 오류 문구에 싣지 않는다. 시간 상한은 환경변수로 열지 않고
 코드 상수로 둔다(시험은 생성자 인자로 바꾼다).
 """
 
@@ -9,11 +10,14 @@ import os
 import re
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
-from typing import Final, Literal, NoReturn
+from typing import TYPE_CHECKING, Final, Literal, NoReturn
 from urllib.parse import urlsplit
 
 from app.collection.credentials import AccessToken
 from app.request_context.settings import ContextApiSettings
+
+if TYPE_CHECKING:
+    from app.pdf_extraction.settings import PdfSettings
 
 Environment = Literal["production", "development", "test"]
 
@@ -29,12 +33,17 @@ SECRET_ENV: Final = (
     "CATCHU_QUEUE_REDIS_URL",
     "WORKER_CONTEXT_API_KEY",
     "CATCHU_GENERATION_API_KEY",
+    "CATCHU_JUDGEMENT_API_KEY",
 )
+# 운영 필수 LIVE 설정. 판정 키(CR3)는 넣지 않는다: 없으면 AI 쪽이 꺼진 채 기동한다(오류 아님).
 LIVE_ENV: Final = (
     "WORKER_CONTEXT_API_URL",
     "WORKER_CONTEXT_API_KEY",
     "CATCHU_GENERATION_API_KEY",
 )
+# 판정 공급자(CR3 BR1.1). 값이 없으면 openai다. 이 밖의 값이면 기동하지 않는다.
+JudgementProviderName = Literal["openai", "claude"]
+DEFAULT_JUDGEMENT_PROVIDER: Final[JudgementProviderName] = "openai"
 
 _HOST = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?")
 _PREFIX = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
@@ -93,10 +102,19 @@ class Limits:
 
 @dataclass(frozen=True)
 class LiveSettings:
-    """LIVE 처리 설정: 요청 정보 조회 목적지·전용 키와 생성 제공자(Claude API) 키. 값은 repr에 드러내지 않는다."""
+    """LIVE 처리 설정: 요청 정보 조회 목적지·전용 키와 생성 제공자(Claude API) 키, 판정 공급자와 판정 키(CR3).
+    값은 repr에 드러내지 않는다."""
 
     context_api: ContextApiSettings = field(repr=False)
     generation_key: AccessToken = field(repr=False)
+    judgement_provider: JudgementProviderName = DEFAULT_JUDGEMENT_PROVIDER
+    # OpenAI 판정 키(`CATCHU_JUDGEMENT_API_KEY`). 없을 수 있다.
+    judgement_key: AccessToken | None = field(default=None, repr=False)
+
+    @property
+    def ai_side(self) -> bool:
+        """AI 쪽이 켜졌는가(BR1.1). openai면 판정 키가 있을 때, claude면 생성 키로 늘 켜진다."""
+        return self.judgement_provider == "claude" or self.judgement_key is not None
 
 
 @dataclass(frozen=True)
@@ -121,6 +139,8 @@ class ConsumerSettings:
     mock_scenario: str = DEFAULT_MOCK_SCENARIO
     limits: Limits = field(default_factory=Limits)
     live: LiveSettings | None = None
+    # PDF 글 추출 소비자(U8). 없으면 둘째 Worker를 띄우지 않는다. 설정 모듈은 app/pdf_extraction/settings.py.
+    pdf: "PdfSettings | None" = None
 
     @property
     def consumer_enabled(self) -> bool:
@@ -143,9 +163,14 @@ class ConsumerSettings:
         limits: Limits | None = None,
         mock_scenario: str = DEFAULT_MOCK_SCENARIO,
     ) -> "ConsumerSettings":
+        # 순환 참조(PDF 설정 모듈이 SettingsError를 가져옴)를 피해 여기서 불러온다.
+        from app.pdf_extraction.settings import pdf_settings_from_environment
+
         values = os.environ if environment is None else environment
         env = _environment(values.get("NODE_ENV"))
         development = env in ("development", "test")
+        # 판정 공급자 값은 LIVE 설정이 없는 개발·시험에서도 검사한다(잘못된 값이면 기동하지 않는다).
+        provider = _judgement_provider(values.get("CATCHU_JUDGEMENT_PROVIDER"))
         return cls(
             environment=env,
             queue_url=_queue_url(values.get("CATCHU_QUEUE_REDIS_URL"), development),
@@ -154,7 +179,8 @@ class ConsumerSettings:
             mock_enabled=_mock(values.get("CATCHU_WORKER_MOCK"), development),
             mock_scenario=mock_scenario,
             limits=limits or Limits(),
-            live=_live(values, development),
+            live=_live(values, development, provider),
+            pdf=pdf_settings_from_environment(values),
         )
 
 
@@ -237,7 +263,31 @@ def _mock(value: str | None, development: bool) -> bool:
     return value == "true"
 
 
-def _live(values: Mapping[str, str], development: bool) -> LiveSettings | None:
+def _judgement_provider(value: str | None) -> JudgementProviderName:
+    if value is None or value == "":
+        return DEFAULT_JUDGEMENT_PROVIDER
+    if value == "openai":
+        return "openai"
+    if value == "claude":
+        return "claude"
+    raise SettingsError("CATCHU_JUDGEMENT_PROVIDER는 openai 또는 claude여야 한다")
+
+
+def _judgement_key(value: str | None) -> AccessToken | None:
+    if value is None or value == "":
+        return None
+    try:
+        return AccessToken(value)
+    except ValueError:
+        pass
+    raise SettingsError("CATCHU_JUDGEMENT_API_KEY가 유효하지 않다")
+
+
+def _live(
+    values: Mapping[str, str],
+    development: bool,
+    provider: JudgementProviderName = DEFAULT_JUDGEMENT_PROVIDER,
+) -> LiveSettings | None:
     if not any(values.get(name) for name in LIVE_ENV):
         if development:
             return None
@@ -262,7 +312,17 @@ def _live(values: Mapping[str, str], development: bool) -> LiveSettings | None:
         pass
     if generation_key is None:
         raise SettingsError("CATCHU_GENERATION_API_KEY가 없거나 유효하지 않다")
-    return LiveSettings(context_api=context_api, generation_key=generation_key)
+    return LiveSettings(
+        context_api=context_api,
+        generation_key=generation_key,
+        judgement_provider=provider,
+        # 공급자가 claude면 판정 키를 보지 않는다(생성 키로 켜진다).
+        judgement_key=(
+            _judgement_key(values.get("CATCHU_JUDGEMENT_API_KEY"))
+            if provider == "openai"
+            else None
+        ),
+    )
 
 
 def drop_secret_env(environment: MutableMapping[str, str] | None = None) -> None:

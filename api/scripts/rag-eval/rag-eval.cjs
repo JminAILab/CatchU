@@ -7,18 +7,20 @@
 //   결과 원문과 기록 모두 로컬 폴더(api/.rag-eval/)에만 쓴다. NFR3 측정이 아니다.
 // - measure: 실제 게이트(Claude)·실제 검색(Voyage)과 테스트가 아닌 DB의 시연 발행본으로 한 번 잰다(U4 합류 뒤, BR10.1).
 //   원문은 api/.rag-eval/에, 건수·위치·빈 판정 칸 기록은 api/docs/rag-evaluation/<날짜>.md에 쓴다.
-// 입력 파일 모양: { publicationId, questions: [{ question, goldQuotes: [글귀] }](measure는 10개), jd?: 문자열, targetVersion?,
+// 입력 파일 모양: { publicationId, memberId(measure만, 실행자 본인), questions: [{ question, goldQuotes: [글귀] }](measure는 10개), jd?: 문자열, targetVersion?,
 //   snapshot?: { title, publishedAt, expiresAt, items }(synthetic만, 없으면 내장 합성 발행본) }
 require('reflect-metadata');
+const { randomBytes } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
-const { AiInputTooLarge, SOURCE_LABELS } = require('../../dist/ai-generation/ai-generation.types');
+const { AiInputTooLarge, AiProviderError, SOURCE_LABELS } = require('../../dist/ai-generation/ai-generation.types');
 const { assertGenerationRequest } = require('../../dist/ai-generation/gate-policy');
 const { koreanUsageDate } = require('../../dist/daily-run-limit/daily-run-limit');
 const { buildChunkDrafts } = require('../../dist/published-index/chunker');
 const { syntheticEmbedding } = require('../../dist/published-index/synthetic-embedding-provider');
 const { chunkToSource } = require('../../dist/rag-answer/qna-service');
 const { QNA_INSTRUCTION, QNA_MODEL, QNA_SEARCH_LIMIT } = require('../../dist/rag-answer/rag-answer-config');
+const { JD_SUMMARY_INSTRUCTION } = require('../../dist/jd-summary/jd-generation-request');
 const { evidencePassRate, findGoldLocations, hitRate, isHitAt, locationOf } = require('./gold-locations.cjs');
 const { writeEvaluation } = require('./rag-eval-report.cjs');
 
@@ -28,8 +30,6 @@ const DEFAULT_DOCS_DIR = resolve(API_DIR, 'docs', 'rag-evaluation');
 /** 질문마다 검색을 12개로 한 번 부른다(BR10.3). */
 const EVAL_SEARCH_LIMIT = 12;
 const MEASURE_QUESTION_COUNT = 10;
-/** 스크립트 JD 지시문(BR10.7). U10이 합쳐지면 그 지시문·요구사항 나누기를 쓴다. */
-const SCRIPT_JD_INSTRUCTION = 'JD 요구사항 한 줄에 대해 발행본 자료에서 근거를 찾아 인용하고, 자료로 확인되지 않는 점과 면접 질문을 쓴다.';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 class RagEvalInputError extends Error {
@@ -41,6 +41,9 @@ function parseInput(raw, mode) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new RagEvalInputError('입력은 객체여야 합니다.');
   if (typeof raw.publicationId !== 'string' || !UUID.test(raw.publicationId)) throw new RagEvalInputError('publicationId는 uuid여야 합니다.');
   if (!Array.isArray(raw.questions) || raw.questions.length === 0) throw new RagEvalInputError('questions가 비어 있습니다.');
+  if (mode === 'measure' && (typeof raw.memberId !== 'string' || !UUID.test(raw.memberId))) {
+    throw new RagEvalInputError('measure 모드는 실행자 본인의 회원 번호(memberId, uuid)가 필요합니다.');
+  }
   if (mode === 'measure' && raw.questions.length !== MEASURE_QUESTION_COUNT) {
     throw new RagEvalInputError(`measure 모드는 질문 ${MEASURE_QUESTION_COUNT}개가 필요합니다.`);
   }
@@ -52,6 +55,7 @@ function parseInput(raw, mode) {
   if (raw.jd !== undefined && raw.jd !== null && typeof raw.jd !== 'string') throw new RagEvalInputError('jd는 문자열이어야 합니다.');
   return {
     publicationId: raw.publicationId,
+    memberId: mode === 'measure' ? raw.memberId : null,
     questions: raw.questions.map((entry) => ({ question: entry.question.trim(), goldQuotes: entry.goldQuotes })),
     jd: typeof raw.jd === 'string' && raw.jd.trim() !== '' ? raw.jd : null,
     targetVersion: typeof raw.targetVersion === 'string' && raw.targetVersion !== '' ? raw.targetVersion : 'unknown',
@@ -143,7 +147,8 @@ async function compareJd(deps, input) {
   const rows = [];
   const raw = [];
   for (const [index, requirement] of requirements.entries()) {
-    const request = (sources, publicationText) => ({ feature: 'JD_SUMMARY', instruction: SCRIPT_JD_INSTRUCTION, sources, userText: requirement,
+    // 재는 지시와 운영 지시를 같게 하려고 JD 요약의 운영 상수를 그대로 쓴다(새 Catch NC2, 팀장 결정 2026-11-11). 요구사항 나누기는 스크립트 것 그대로다.
+    const request = (sources, publicationText) => ({ feature: 'JD_SUMMARY', instruction: JD_SUMMARY_INSTRUCTION, sources, userText: requirement,
       publicationText, model: 'HAIKU' });
     const searched = await deps.search.search(input.publicationId, requirement, QNA_SEARCH_LIMIT);
     const searchOutput = await deps.gate.generate(request(searched.hits.map(chunkToSource), searched.publicationText));
@@ -159,7 +164,7 @@ async function compareJd(deps, input) {
       fullInput: fullOutput === 'INPUT_TOO_LARGE' ? fullOutput : counts(fullOutput) });
     raw.push({ requirementNo: index + 1, requirement, searchBased: searchOutput, fullInput: fullOutput });
   }
-  return { summary: { splitter: 'SCRIPT', rows }, raw: { splitter: 'SCRIPT', instruction: SCRIPT_JD_INSTRUCTION, requirements: raw } };
+  return { summary: { splitter: 'SCRIPT', rows }, raw: { splitter: 'SCRIPT', instruction: JD_SUMMARY_INSTRUCTION, requirements: raw } };
 }
 
 /**
@@ -175,17 +180,31 @@ async function runRagEval({ mode, input, deps, outDir = DEFAULT_OUT_DIR, docsDir
   for (const [index, entry] of input.questions.entries()) {
     const result = await deps.search.search(input.publicationId, entry.question, EVAL_SEARCH_LIMIT);
     const top = result.hits.slice(0, QNA_SEARCH_LIMIT);
-    const output = top.length === 0 ? { items: [], droppedCount: 0 }
-      : await deps.gate.generate(qnaRequest(top, result.publicationText, entry.question));
+    const questionNo = index + 1;
+    let output = { items: [], droppedCount: 0 };
+    let answerFailed = null;
+    try {
+      if (top.length > 0) output = await deps.gate.generate(qnaRequest(top, result.publicationText, entry.question));
+    } catch (error) {
+      // 답 0개(NO_ITEMS)는 앱에서도 「답 실패」로 끝나는 결과라 그 질문만 실패로 남기고 다음 질문으로 간다(새 Catch NC3 Build and Test, 팀장 결정 2026-11-12).
+      // 그 밖의 실패는 지금까지처럼 멈춘다. 로그에는 질문 번호와 실패 이름만 낸다(질문·글귀를 넣지 않는다).
+      if (!(error instanceof AiProviderError && error.reason === 'NO_ITEMS')) {
+        console.error(`${questionNo}번 질문에서 멈춤: ${error.name}`);
+        throw error;
+      }
+      answerFailed = 'NO_ITEMS';
+      console.error(`${questionNo}번 질문: 답 실패(NO_ITEMS)`);
+    }
     passedItems += output.items.length;
     droppedItems += output.droppedCount;
-    perQuestion.push({ questionNo: index + 1, entry, hits: result.hits, goldLocations: gold[index], output });
+    perQuestion.push({ questionNo, entry, hits: result.hits, goldLocations: gold[index], output, answerFailed });
   }
   const jd = input.jd === null ? null : await compareJd(deps, input);
   const summary = {
     date: koreanUsageDate(clock()), targetVersion: input.targetVersion, mode, questionCount: input.questions.length,
     hitRateAt5: hitRate(perQuestion, 5), hitRateAt8: hitRate(perQuestion, 8), hitRateAt12: hitRate(perQuestion, 12),
     passedItems, droppedItems, evidencePassRate: evidencePassRate(passedItems, droppedItems),
+    answerFailedQuestions: perQuestion.filter((entry) => entry.answerFailed !== null).map((entry) => entry.questionNo),
     missedHitLocations: perQuestion.filter((entry) => !isHitAt(entry.hits, entry.goldLocations, 8))
       .map((entry) => ({ questionNo: entry.questionNo, locations: entry.hits.slice(0, 8).map(locationOf) })),
     jd: jd === null ? null : jd.summary,
@@ -194,7 +213,7 @@ async function runRagEval({ mode, input, deps, outDir = DEFAULT_OUT_DIR, docsDir
     date: summary.date, targetVersion: input.targetVersion, publicationId: input.publicationId,
     questions: perQuestion.map((entry) => ({ questionNo: entry.questionNo, question: entry.entry.question, goldQuotes: entry.entry.goldQuotes,
       goldLocations: entry.goldLocations, hitLocations: entry.hits.map(locationOf), items: entry.output.items,
-      droppedCount: entry.output.droppedCount })),
+      droppedCount: entry.output.droppedCount, answerFailed: entry.answerFailed })),
     jd: jd === null ? null : jd.raw,
   };
   return { summary, ...writeEvaluation({ mode, outDir, docsDir, summary, raw }) };
@@ -216,13 +235,14 @@ function createSyntheticDeps(input) {
  * measure 모드의 실제 연결. 키 둘이 있어야 하고 테스트 DB에서는 돌지 않는다(BR10.1, NFR3.1).
  * publicationAccess는 U4의 DB PublicationAccess다(C-10 readSnapshot). published_chunk 직접 읽기는 JD 전체 넣기의 읽기 전용 사용뿐이다.
  */
-async function createMeasureDeps({ env = process.env, publicationAccess }) {
+async function createMeasureDeps({ env = process.env, publicationAccess, memberId }) {
   if (!env.CATCHU_GENERATION_API_KEY?.trim()) throw new RagEvalInputError('measure 모드는 CATCHU_GENERATION_API_KEY가 있어야 합니다.');
   if (!env.CATCHU_EMBEDDING_API_KEY?.trim()) throw new RagEvalInputError('measure 모드는 CATCHU_EMBEDDING_API_KEY가 있어야 합니다.');
   const { buildDataSourceOptions, readDatabaseConfig } = require('../../dist/database/database.config');
   const config = readDatabaseConfig(env);
   if (config.database.endsWith('_test')) throw new RagEvalInputError('measure 모드는 테스트 DB에서 돌지 않습니다.');
   if (!publicationAccess) throw new RagEvalInputError('measure 모드는 U4의 DB PublicationAccess가 필요합니다.');
+  if (typeof memberId !== 'string' || !UUID.test(memberId)) throw new RagEvalInputError('measure 모드는 실행자 본인의 memberId가 필요합니다.');
   const { DataSource } = require('typeorm');
   const { createCheckedAiGenerationGate } = require('../../dist/ai-generation/checked-gate');
   const { readEmbeddingConfig } = require('../../dist/published-index/embedding-config');
@@ -230,7 +250,7 @@ async function createMeasureDeps({ env = process.env, publicationAccess }) {
   const { createPublishedSearch } = require('../../dist/published-index/published-search');
   const dataSource = await new DataSource(buildDataSourceOptions(config)).initialize();
   return {
-    readSnapshot: (publicationId) => publicationAccess(dataSource).readSnapshot(publicationId),
+    readSnapshot: ownedSnapshotReader(publicationAccess(dataSource), memberId),
     search: createPublishedSearch({ dataSource, provider: createEmbeddingProvider(readEmbeddingConfig(env), env) }),
     gate: createCheckedAiGenerationGate({ apiKey: env.CATCHU_GENERATION_API_KEY }),
     readAllChunks: (publicationId) => dataSource.transaction(async (manager) => {
@@ -243,6 +263,34 @@ async function createMeasureDeps({ env = process.env, publicationAccess }) {
     }),
     close: () => dataSource.destroy(),
   };
+}
+
+/**
+ * 발행본 주인 확인 뒤 사본 읽기(#493 리뷰). runRagEval은 사본을 가장 먼저 읽으므로, 주인이 아니면 검색·생성 같은 외부 호출 전에 멈춘다.
+ * 주인 판정은 작성자 화면과 같은 C-10 resolveForOwner다. 없는 발행본과 남의 발행본은 같은 NotFound라 구분하지 않는다.
+ * 실행자 본인의 다른 발행본은 통과한다(시연용 여부는 확인하지 않는다).
+ */
+function ownedSnapshotReader(access, memberId) {
+  return async (publicationId) => {
+    try {
+      await access.resolveForOwner(memberId, publicationId);
+    } catch (error) {
+      if (error?.name === 'NotFound') throw new RagEvalInputError('memberId 회원의 발행본이 아니거나 없는 발행본입니다. 외부 호출 없이 멈춥니다.');
+      throw error;
+    }
+    return access.readSnapshot(publicationId);
+  };
+}
+
+/**
+ * measure 모드의 사본 읽기. 앱과 같은 U4 C-10 DB 구현(`DbPublicationAccess`)을 평가 스크립트의 DataSource로 만든다.
+ * 평가는 `resolveForOwner`와 `readSnapshot`만 부른다. 두 경로는 grant 키를 쓰지 않으므로 grant 키는 이 실행에서만 쓰는 무작위 값으로 둔다
+ * (앱의 링크 grant와 섞이지 않고, 받은 사람 판정에 쓰여도 어떤 grant도 통과하지 않는다).
+ */
+function dbPublicationAccess(dataSource) {
+  const { DbPublicationAccess } = require('../../dist/publications/db-publication-access');
+  const { OwnerProfileReader } = require('../../dist/member-profile/owner-profile-reader');
+  return new DbPublicationAccess(dataSource, randomBytes(32), new OwnerProfileReader(dataSource), () => new Date());
 }
 
 function parseArgs(argv) {
@@ -270,9 +318,8 @@ async function main(argv) {
     if (input.snapshot === null) input.snapshot = sampleInput().snapshot;
     deps = createSyntheticDeps(input);
   } else {
-    // TODO(U4 합류): U4의 DB PublicationAccess 만들기 함수를 여기서 넘긴다. 이 브랜치에는 그 구현이 없어(code-summary 「Step 1」)
-    // measure는 아래에서 멈춘다. 측정은 U4 합류 뒤 실제 발행 경로로 만든 시연 발행본으로만 한다(BR10.1).
-    deps = await createMeasureDeps({ publicationAccess: null });
+    // 측정은 실제 발행 경로로 만든 시연 발행본으로만 한다(BR10.1).
+    deps = await createMeasureDeps({ publicationAccess: dbPublicationAccess, memberId: input.memberId });
   }
   try {
     const { summary, rawPath, recordPath } = await runRagEval({ mode: options.mode, input, deps, outDir });
@@ -291,6 +338,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  EVAL_SEARCH_LIMIT, RagEvalInputError, createMeasureDeps, createSyntheticDeps, main, parseArgs, parseInput, runRagEval, sampleInput,
+  EVAL_SEARCH_LIMIT, RagEvalInputError, createMeasureDeps, createSyntheticDeps, dbPublicationAccess, main, ownedSnapshotReader, parseArgs, parseInput,
+  runRagEval, sampleInput,
   splitJdRequirements,
 };

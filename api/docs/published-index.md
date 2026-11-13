@@ -28,7 +28,7 @@
 
 ## 조각 나누기 (BR1)
 
-- 고르는 필드(C-07): CATCH는 `workFacts[i]` → `subjectContribution` → `evidence[i].representedFacts[j]` → `authorDescription`(null 아닐 때), TEXT_MATERIAL은 `body`, PDF_MATERIAL은 읽을 수 있는 쪽 `pages[n]`. `aiDraft`·제목·`mismatch`·`sourceUrl`·`sourceRevision`은 조각이 아니다.
+- 고르는 필드(C-07): CATCH는 `workFacts[i]` → `subjectContribution` → `evidence[i].representedFacts[j]` → `authorDescription`(null 아닐 때), TEXT_MATERIAL은 `body`, PDF_MATERIAL은 읽을 수 있는 쪽 `pages[n]`. `aiDraft`·제목·`mismatch`·`sourceUrl`·`sourceRevision`은 조각이 아니다. 새 Catch NC2가 더한 사본 칸 넷(`repositoryName`·`authorDescriptionEditedMonth`·`workLimits`·`evidence[].ownCommit`, [publications.md](publications.md))도 조각이 되지 않는다.
 - 필드 하나가 1,000자(UTF-16) 이하면 조각 하나. 넘으면 빈 줄 문단 → 줄 → 1,000자 자리(대리쌍 가운데면 한 칸 앞) 순으로 이어 붙일 수 있을 때까지 모은다. 앞뒤 공백은 범위에서 빼고 빈 범위는 버린다. 조각 글은 필드의 `[charStart, charEnd)` 그대로다.
 - 출처 종류: CATCH의 작업 사실·기여·근거는 `GITHUB_RECORD`, 작성자 설명·텍스트·PDF는 `AUTHOR_MATERIAL`. CATCH 조각은 그 항목 사본의 `evidence[].sourceUrl` 목록을 `catch_evidence_urls`에 함께 저장한다(검색은 이 칸만 읽는다).
 - 사본 모양이 C-07과 다르면 `ChunkSourceError`(메시지에 사본 글 없음).

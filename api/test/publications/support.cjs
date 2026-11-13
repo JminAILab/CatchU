@@ -8,6 +8,7 @@ const { AI_NOTICE_VERSION, AiConsentGate } = require('../../dist/ai-consent/ai-c
 const { DbPublicationAccess } = require('../../dist/publications/db-publication-access');
 const { PublicationManageService } = require('../../dist/publications/publication-manage.service');
 const { PublishService } = require('../../dist/publications/publish.service');
+const { PublishedPdfViewService } = require('../../dist/publications/published-pdf-view.service');
 const { RecipientAccessService } = require('../../dist/publications/recipient-access.service');
 const { ensureRegistration } = require('../support/registered-analysis.cjs');
 const { APP_SETTINGS, setEnv, collectingLogger, startApp, insertMember, expectError } = require('../u2/support.cjs');
@@ -21,10 +22,12 @@ const HOUR = 60 * 60 * 1000;
  * 회원의 Catch가 매달릴 합성 분석 요청. Catch 표의 외래 키와 공개 자격 판정의 원 요청(회원·저장소)을 채운다.
  * 회원당 ACTIVE 요청은 하나뿐이라(부분 유일 인덱스) 끝난 요청(CLOSED)으로 넣어 저장소마다 여러 개를 만들 수 있게 한다.
  */
-async function insertAnalysisRequest(db, memberId, repositoryId = 'synthetic-repository') {
+async function insertAnalysisRequest(db, memberId, repositoryId = 'synthetic-repository', repository = undefined) {
+  // repository({ owner, name })를 주면 저장소 등록을 그 이름으로 만든다(NC2 사본 repositoryName). 같은 회원·저장소 ID의 등록이 이미 있으면 그것을 쓴다.
   const context = { requestId: randomUUID(), attemptId: randomUUID(), consentId: randomUUID(), memberId, repositoryId, scopeRevision: 'synthetic-scope' };
+  const registration = repository ? { ...context, consentedScope: { repository } } : context;
   await db.transaction(async (manager) => {
-    await manager.insert(AnalysisRequest, { ...context, registrationId: await ensureRegistration(manager, context),
+    await manager.insert(AnalysisRequest, { ...context, registrationId: await ensureRegistration(manager, registration),
       currentAttemptId: context.attemptId, submittedAt: new Date(), updatedAt: new Date(), lifecycle: 'CLOSED' });
     await manager.insert(AnalysisConsent, { ...context, accepted: true, noticeRevision: 'fixture', consentedScope: { synthetic: true }, consentedAt: new Date() });
     await manager.insert(AnalysisAttempt, { attemptId: context.attemptId, requestId: context.requestId, sourceMode: 'MOCK' });
@@ -42,27 +45,60 @@ async function insertProtection(db, memberId, repositoryId, restriction = 'NONE'
 }
 
 async function insertCatch(db, ownerId, requestId, { catchId = randomUUID(), title = '[합성] Catch', visibility = 'PRIVATE', workFacts = ['[합성] 사실'],
-  subjectContribution = '[합성] 기여', authorDescription = null, draftContent = null, mismatch = false, confirmed = true } = {}) {
+  subjectContribution = '[합성] 기여', authorDescription = null, draftContent = null, mismatch = false, confirmed = true,
+  authorDescriptionUpdatedAt = authorDescription === null ? null : new Date() } = {}) {
   await db.query(`INSERT INTO catch_asset (catch_id, title, owner_id, source_request_id, source_result_id, source_candidate_id, work_identity, work_facts, subject_contribution,
       draft_status, draft_content, reflection_status, reflection_questions, registration_assessment, work_facts_confirmed, contribution_confirmed, mismatch, visibility, source_mode,
       author_description, author_description_updated_at)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'NOT_GENERATED', ARRAY[]::text[], '{}'::jsonb, $12, $12, $13, $14, 'MOCK', $15, $16)`,
   [catchId, title, ownerId, requestId, `result-${catchId}`, `candidate-${catchId}`, `identity-${catchId}`, workFacts, subjectContribution,
     draftContent === null ? 'NOT_GENERATED' : 'GENERATED', draftContent, confirmed, mismatch, visibility, authorDescription,
-    authorDescription === null ? null : new Date()]);
+    authorDescriptionUpdatedAt]);
   return catchId;
 }
 
 async function insertEvidence(db, catchId, position, { sourceUrl = `https://github.com/synthetic-owner/synthetic-repo/pull/${position}`,
-  sourceRevision = `synthetic-revision-${position}`, representedFacts = [`[합성] 근거 사실 ${position}`] } = {}) {
+  sourceRevision = `synthetic-revision-${position}`, representedFacts = [`[합성] 근거 사실 ${position}`], coverageLimits = [] } = {}) {
   await db.query(`INSERT INTO catch_evidence (catch_evidence_id, catch_id, position, source_evidence_id, source_url, source_revision, represented_facts, contribution_scope, coverage_limits)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, '[합성] 범위', ARRAY[]::text[])`,
-  [randomUUID(), catchId, position, `evidence-${position}`, sourceUrl, sourceRevision, representedFacts]);
+    VALUES ($1, $2, $3, $4, $5, $6, $7, '[합성] 범위', $8::text[])`,
+  [randomUUID(), catchId, position, `evidence-${position}`, sourceUrl, sourceRevision, representedFacts, coverageLimits]);
 }
 
-/** 발행 자격을 갖춘 Catch(확인됨·보호 NONE·근거 있음)를 만든다. 원 요청·보호 관측은 저장소마다 한 번 만든다. */
-async function eligibleCatch(db, memberId, overrides = {}, { repositoryId = 'synthetic-repository', protection = 'NONE', evidence = 1 } = {}) {
-  const request = await insertAnalysisRequest(db, memberId, repositoryId);
+/** 소속 기록 한 행(NC2 ownCommit). Catch는 (catch_id, member_id)로 가리키므로 memberId는 그 Catch의 주인이어야 한다. */
+async function insertCommitAssignment(db, { memberId, repositoryId, commitSha, catchId }) {
+  await db.query('INSERT INTO commit_assignment (member_id, github_repository_id, commit_sha, catch_id) VALUES ($1, $2, $3, $4)',
+    [memberId, repositoryId, commitSha, catchId]);
+}
+
+/**
+ * 발행 트랜잭션의 잠금 조회 결과에서 저장소 등록 이름만 null로 바꾼다(NC2 안전망 시험). 실제 DB는 외래 키 때문에 이 경우를 만들 수 없다.
+ * 되돌리는 함수를 돌려준다. 그 밖의 질의·manager 동작은 그대로다.
+ */
+function hideRegistrationNames(app) {
+  const publisher = app.get(PublishService);
+  const real = publisher.dataSource;
+  const pass = (target, key) => { const value = Reflect.get(target, key); return typeof value === 'function' ? value.bind(target) : value; };
+  const wrap = (manager) => new Proxy(manager, {
+    get(target, key) {
+      if (key !== 'query') return pass(target, key);
+      return async (sql, params) => {
+        const rows = await target.query(sql, params);
+        return /FOR NO KEY UPDATE OF c/.test(sql) ? rows.map((row) => ({ ...row, repositoryOwner: null, repositoryName: null })) : rows;
+      };
+    },
+  });
+  publisher.dataSource = new Proxy(real, {
+    get(target, key) {
+      if (key !== 'transaction') return pass(target, key);
+      return (level, work) => target.transaction(level, (manager) => work(wrap(manager)));
+    },
+  });
+  return () => { publisher.dataSource = real; };
+}
+
+/** 발행 자격을 갖춘 Catch(확인됨·보호 NONE·근거 있음)를 만든다. 원 요청·보호 관측은 저장소마다 한 번 만든다. repository를 주면 등록 이름이 된다. */
+async function eligibleCatch(db, memberId, overrides = {}, { repositoryId = 'synthetic-repository', protection = 'NONE', evidence = 1, repository } = {}) {
+  const request = await insertAnalysisRequest(db, memberId, repositoryId, repository);
   if (protection !== null) await insertProtection(db, memberId, repositoryId, protection);
   const catchId = await insertCatch(db, memberId, request.requestId, overrides);
   for (let position = 1; position <= evidence; position += 1) await insertEvidence(db, catchId, position);
@@ -120,9 +156,10 @@ function bindFakes(app, { aiRun, indexWriter }) {
   return () => Object.assign(publisher, saved);
 }
 
-/** PUBLICATIONS_CLOCK 자리를 시험 시계로 바꾼다(발행·관리·C-10·받은 사람 경로 모두). 되돌리는 함수를 돌려준다. */
+/** PUBLICATIONS_CLOCK 자리를 시험 시계로 바꾼다(발행·관리·C-10·받은 사람 경로·PDF 사본 열람 모두). 되돌리는 함수를 돌려준다. */
 function setClock(app, clock) {
-  const targets = [app.get(PublishService), app.get(PublicationManageService), app.get(DbPublicationAccess), app.get(RecipientAccessService)];
+  const targets = [app.get(PublishService), app.get(PublicationManageService), app.get(DbPublicationAccess), app.get(RecipientAccessService),
+    app.get(PublishedPdfViewService)];
   const saved = targets.map((target) => target.clock);
   for (const target of targets) target.clock = clock;
   return () => targets.forEach((target, index) => { target.clock = saved[index]; });
@@ -172,7 +209,7 @@ const unlockRaw = (server, token, payload, headers = {}) => recipientCall(server
 
 module.exports = {
   APP_SETTINGS, PUBLISH_SETTINGS, WEB_BASE_URL, HOUR, setEnv, collectingLogger, startApp, insertMember, expectError,
-  insertAnalysisRequest, insertProtection, insertCatch, insertEvidence, eligibleCatch, insertTextMaterial, consent,
+  insertAnalysisRequest, insertProtection, insertCatch, insertEvidence, insertCommitAssignment, hideRegistrationNames, eligibleCatch, insertTextMaterial, consent,
   fakeAiRun, fakeIndexWriter, bindFakes, setClock, body, catchItem, textItem, tokenOf,
   publishLink, recipientCall, recipientGet, unlockRaw,
 };

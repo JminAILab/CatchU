@@ -3,6 +3,7 @@ import { EntityManager } from 'typeorm';
 import { CatchAssetEntity } from './entities/catch-asset.entity';
 import { CatchEvidenceEntity } from './entities/catch-evidence.entity';
 import { CandidateRegistrationEntity } from './entities/candidate-registration.entity';
+import { CommitAssignmentEntity } from './entities/commit-assignment.entity';
 import { SourceMode } from './new-catch-content';
 import { RegistrationCandidate, prepareRegistrationBatch } from './registration-batch';
 
@@ -91,6 +92,25 @@ async function assertReady(
   if (evidenceCount === 0) throw new CatchRegistrationContextError('CATCH_NOT_READY');
 }
 
+// 한 묶음 = 쿼리 하나. 값 5개×1,000행 = 매개변수 5,000개로 PostgreSQL 한도(65,535) 안이다(CR2 NFR4.4).
+const ASSIGNMENT_BATCH_ROWS = 1000;
+
+/**
+ * 그 Catch의 소속 기록을 쓴다(CR2 BR3.2·BR3.3·BR3.6). 이미 있는 (회원, 저장소, SHA)는 같은 Catch든 다른 Catch든
+ * 충돌 무시로 건너뛰고 저장된 소속을 바꾸지 않는다. 회원은 등록 입력의 주인이고, Catch 주인과 다르면 DB 외래 키가
+ * 거부한다. DB 오류는 바꾸지 않고 올려 결과 반영 전체가 롤백되게 한다. 로그는 남기지 않는다(SHA를 싣지 않음).
+ */
+async function writeAssignments(
+  manager: EntityManager, assignment: { memberId: string; githubRepositoryId: string; catchId: string },
+  commitShas: readonly string[],
+): Promise<void> {
+  for (let start = 0; start < commitShas.length; start += ASSIGNMENT_BATCH_ROWS) {
+    const rows = commitShas.slice(start, start + ASSIGNMENT_BATCH_ROWS)
+      .map((commitSha) => ({ ...assignment, commitSha }));
+    await manager.createQueryBuilder().insert().into(CommitAssignmentEntity).values(rows).orIgnore().execute();
+  }
+}
+
 /**
  * E가 연 트랜잭션의 manager만 사용한다. 반환값은 커밋 전 내부 결과다.
  * E는 후보 원문 fingerprint·동의·범위를 먼저 검증하고, 이 함수 뒤 완료 상태까지
@@ -134,6 +154,7 @@ export async function registerCandidates(
   const saved = await registrations.findBy({ applicationRecordId: input.applicationRecordId });
   if (saved.length > 0) {
     // 원자적으로 저장된 기존 묶음만 재응답한다. 다른/일부 후보로 덮어쓰지 않는다.
+    // 소속은 처음 등록한 트랜잭션에서 이미 써졌으므로 다시 쓰지 않는다(CR2 BR3.5).
     const candidates = new Map(input.candidates.map((candidate) => [candidate.candidateId, candidate]));
     if (saved.length !== candidates.size) throw new CatchRegistrationContextError('REGISTRATION_MISMATCH');
     const results: CatchRegistrationResult[] = [];
@@ -159,6 +180,8 @@ export async function registerCandidates(
     let createdCandidateId: string | null = null;
     if (!asset) {
       // 전달 순서의 첫 적합 후보를 저장하고 이후 같은 작업은 참조한다. 내용을 합치지 않는다.
+      // 다시 볼 곳 사실과 첫·마지막 작업 시각(content.asset의 revisitFacts·firstWorkAt·lastWorkAt)도 이 INSERT에서
+      // 한 번만 쓴다. 기존 Catch에는 쓰지 않는다(NC3 BR6.1, 아래 소속만 더하는 갈래).
       const first = group.candidates[0];
       const catchId = randomUUID();
       const insertion = await assets.createQueryBuilder().insert().values({
@@ -182,6 +205,11 @@ export async function registerCandidates(
       if (!asset) throw new CatchRegistrationContextError('REGISTRATION_MISMATCH');
     }
     await assertReady(manager, asset, context);
+    // 새 Catch든 기존 Catch든 같은 트랜잭션에서 소속만 더한다. 기존 Catch의 내용·작성자 설명은 쓰지 않는다(BR3.4).
+    // 저장소는 수신 기록의 분석 요청 저장소 ID다(입력 값으로 받지 않는다).
+    await writeAssignments(manager,
+      { memberId: input.ownerId, githubRepositoryId: context.repository_id, catchId: asset.catchId },
+      group.ownCommitShas);
     for (const candidate of group.candidates) {
       const disposition = candidate.candidateId === createdCandidateId ? 'CREATED' : 'EXISTING';
       await registrations.insert({

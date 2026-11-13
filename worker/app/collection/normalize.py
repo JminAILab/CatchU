@@ -160,6 +160,19 @@ def commit(item: object, status: DetailStatus) -> CommitRecord:
     )
 
 
+_BLOB_SHA = re.compile(r"[0-9a-fA-F]{40}")
+
+
+def _blob_sha(value: object) -> str | None:
+    """파일 항목의 내용 식별값. 16진수 40자일 때만 소문자로 남기고, 그 밖에는 None이다(NC3 BR1.1).
+
+    없거나 꼴이 다른 값은 수집 실패로 보지 않는다. 그 파일이 옮긴 곳 판정에서 빠질 뿐이다.
+    """
+    if isinstance(value, str) and _BLOB_SHA.fullmatch(value):
+        return value.lower()
+    return None
+
+
 def commit_changes(
     detail: object, expected_sha: str, *, files_truncated: bool
 ) -> CommitChanges:
@@ -179,6 +192,7 @@ def commit_changes(
                 deletions=_count(entry, "deletions"),
                 previous_path=_optional_text(entry, "previous_filename"),
                 patch=_optional_text(entry, "patch"),
+                blob_sha=_blob_sha(entry.get("sha")),
             )
         )
     return CommitChanges(

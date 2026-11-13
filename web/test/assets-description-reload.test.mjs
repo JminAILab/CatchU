@@ -32,7 +32,7 @@ const hooks = registerHooks({
     return nextResolve(specifier, context);
   },
   load(url, context, nextLoad) {
-    if (url === NAVIGATION_STUB) return { format: "module", shortCircuit: true, source: "export const usePathname = () => '/'; export const useSearchParams = () => new URLSearchParams();" };
+    if (url === NAVIGATION_STUB) return { format: "module", shortCircuit: true, source: "export const usePathname = () => '/'; export const useSearchParams = () => new URLSearchParams(); export const useRouter = () => ({ push() {} });" };
     if (url.endsWith(".module.css")) return { format: "module", shortCircuit: true, source: "export default {};" };
     if (url.endsWith(".tsx")) {
       return {
@@ -49,6 +49,7 @@ const { reloadDetail } = await import(new URL("../src/features/assets/assets-con
 const { createAssetsStore } = await import(new URL("../src/features/assets/assets-store.ts", import.meta.url).href);
 const { createDescriptionEditorModel } = await import(new URL("../src/features/assets/author-description-editor.tsx", import.meta.url).href);
 const { UNSAVED_MESSAGE } = await import(new URL("../src/features/profile/use-unsaved-guard.ts", import.meta.url).href);
+const { isDescriptionDirty } = await import(new URL("../src/features/assets/author-description-api.ts", import.meta.url).href);
 hooks.deregister();
 
 const item = previewCatches[0];
@@ -76,9 +77,10 @@ async function failedDetailWithEditor(typed) {
   };
   const editor = createDescriptionEditorModel(item.catchId, descriptions, { session: () => "session-a" });
   await editor.load();
-  if (typed !== undefined) editor.change(typed);
+  // 새 Catch NC1: 편집은 8칸이다. 옛 글은 「더 쓰기」 칸에 열린다.
+  if (typed !== undefined) editor.change("더 쓰기", typed);
   const registry = createUnsavedRegistry();
-  registry.register(() => { const { edit } = editor.store.get(); return edit.value !== edit.saved; });
+  registry.register(() => isDescriptionDirty(editor.store.get().edit));
   await store.update({ kind: "mismatch", mismatch: true });
   assert.equal(store.getSnapshot().mutation.status, "error");
   return { api, store, editor, registry };
@@ -95,7 +97,7 @@ test("다시 불러오기: 저장하지 않은 설명이 있을 때 머무르면
   const snapshot = store.getSnapshot();
   assert.equal(snapshot.detail?.catchId, item.catchId);
   assert.equal(snapshot.mutation.status, "error"); // [현재 상태 다시 불러오기]가 남는다
-  assert.equal(editor.store.get().edit.value, "미저장 입력");
+  assert.equal(editor.store.get().edit.texts["더 쓰기"], "미저장 입력");
   assert.equal(registry.hasUnsaved(), true);
 });
 

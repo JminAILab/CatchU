@@ -19,6 +19,7 @@
 | `catch_asset` | 회원, 분석 요청 |
 | `catch_evidence` | Catch |
 | `candidate_registration` | 결과 수신 기록, Catch |
+| `commit_assignment` | Catch(복합 외래 키 `(catch_id, member_id)`. Catch 개편 CR2, 마이그레이션 `1794054790720-CreateCommitAssignment`) |
 | `published_item` | 발행본 |
 | `daily_execution_count`, `ai_consent` | 회원(12월 intent U2, 계약 C-03·C-04·C-06. 마이그레이션 `1793161114211-CreateU2UsageAndConsent`) |
 | `publication_index` | 발행본(12월 intent U3, 계약 C-06·C-08. 마이그레이션 `1793257382741-CreatePublishedIndexTables`) |
@@ -26,6 +27,9 @@
 | `base_summary` | 발행본(12월 intent U5, 계약 C-06·C-02. 마이그레이션 `1793348947970-CreateBaseSummaryTable`) |
 | `mcp_connection`, `mcp_authorization_code` | 회원, 클라이언트 등록(12월 intent U6, 계약 C-06·C-15. 마이그레이션 `1793588083309-CreateMcpTables`) |
 | `mcp_access_token` | 회원, 연결(복합 외래 키 `(member_id, mcp_client_id)`. 12월 intent U6, 같은 마이그레이션) |
+| `jd` | 회원(12월 intent U10) |
+| `jd_summary_run` | 실행 회원, 본인 JD(복합 외래 키 `(member_id, jd_id)`), 발행본. 발행본 소유자는 실행 회원과 달라도 됨 |
+| `jd_summary_result` | JD 요약 실행. 입력 사본은 실행의 `input_copy`에 있어 실행과 함께 삭제 |
 | `pdf_material` | 회원(12월 intent U8, 계약 C-06. 마이그레이션 `1793977402870-CreatePdfMaterialTables`) |
 | `pdf_page_text` | PDF 자료(12월 intent U8, 같은 마이그레이션) |
 | `published_pdf_page` | 발행 항목(12월 intent U8, 계약 C-06·C-07. 같은 마이그레이션. 원본 PDF와는 외래 키가 없어 원본을 지워도 사본은 발행본 수명을 따른다) |
@@ -33,6 +37,8 @@
 `text_material`·`publication`·`published_item`은 12월 범위 U4가 만든 표다(계약 C-06·C-07·C-13). 발행 사본(`published_item`)은 원본 Catch·자료와 외래 키가 없어, 원본을 지워도 사본은 발행본 수명을 따른다.
 
 클라이언트 등록(`mcp_client`)은 회원을 가리키지 않아 회원 행을 지워도 남고, 승인에 쓰인 등록은 정리 대상도 아니다([Claude 연결](claude-mcp.md)의 받아들인 한계).
+
+U10의 발행본 작성자가 탈퇴하거나 발행본을 삭제하면 그 발행본에 대한 다른 회원의 요약 실행도 지워진다. 다른 회원이 저장한 JD 원본은 남는다. JD 요약은 외부 호출 뒤 기존 PENDING 결과만 갱신하므로 삭제된 행을 다시 만들지 않는다([JD 관리·요약](jd.md)). U10 격리 DB 검사는 `test/jd/jd-integration.test.cjs`에 있다.
 
 공유 링크를 지우면 그 링크를 가리키는 중복 요청 방지 기록도 함께 지워진다. 전에는 이 기록이 링크 삭제를 막았다(#147). 어느 쪽이든 없는 링크를 가리키는 기록은 생기지 않는다.
 

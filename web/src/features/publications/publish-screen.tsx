@@ -11,18 +11,34 @@ import type { ClientResult } from "@/lib/api-client";
 import { useUnsavedTraverseGuard } from "@/lib/unsaved-traverse-guard";
 import { createViewStore } from "@/lib/view-store";
 import { createCatchApi, type CatchApi } from "@/features/assets/catch-api";
+import { createRepositoryOptionsStore } from "@/features/assets/repository-options-store";
 import { createMaterialsApi, type MaterialsApi } from "@/features/materials/materials-api";
+import { pdfMaterialsApi } from "@/features/materials/pdf-clients";
+import type { PdfMaterialsApi } from "@/features/materials/pdf-materials-api";
+import { createRepositoryApi, type RepositoryApi } from "@/features/repository-management/repository-api";
 import {
   createPublicationsApi, publishDraftErrors, publishFailureLines, publishOutcome, PUBLISH_LIMITS,
   type PublicationsApi, type PublishedLink, type PublishFailure, type PublishRequest,
 } from "./publications-api";
-import { catchSourceOf, emptySourceList, type CatchSource, type MaterialSource, type SelectedItem, type SourceList } from "./publish-sources";
+import {
+  catchSourceOf, emptySourceList, pdfSourceOf, type CatchSource, type MaterialSource, type PdfSource, type SelectedItem, type SourceList,
+} from "./publish-sources";
 import { PublishConfirmView, PublishDoneView, PublishFormView, SelectedListView, SourcePickerView, type FlaggedCatches, type StatusLines } from "./publish-view";
 import styles from "./publications.module.css";
 
-export type PublishClients = { catches: CatchApi; materials: MaterialsApi; publications: PublicationsApi };
+/**
+ * `repositories`는 내 자산 화면과 같은 저장소 목록이고, 항목 작은 줄의 저장소 이름에만 쓴다(새 Catch BR6.2). API·계약은 그대로다.
+ * `pdfs`(U8 계획 10.5)를 넘기면 PDF 자료도 고를 수 있다. 없으면 Catch·텍스트 자료만 고르는 화면 그대로다.
+ */
+export type PublishClients = {
+  catches: CatchApi; materials: MaterialsApi; publications: PublicationsApi; repositories: Pick<RepositoryApi, "repositories">;
+  pdfs?: Pick<PdfMaterialsApi, "list">;
+};
 // api.member가 기준 주소·Bearer·401을 맡는다. 렌더마다 호출 객체를 새로 만들지 않는다.
-const clients: PublishClients = { catches: createCatchApi(api.member), materials: createMaterialsApi(api.member), publications: createPublicationsApi(api.member) };
+const clients: PublishClients = {
+  catches: createCatchApi(api.member), materials: createMaterialsApi(api.member), publications: createPublicationsApi(api.member),
+  repositories: createRepositoryApi(api.member), pdfs: pdfMaterialsApi,
+};
 
 /** 화면 밖 의존. 시험은 로그인 식별과 시계를 바꿔 끼운다. */
 export type PublishDeps = { session: () => unknown; now: () => number };
@@ -46,6 +62,10 @@ export type PublishStatus =
 export type PublishScreenState = {
   catches: SourceList<CatchSource>;
   materials: SourceList<MaterialSource>;
+  /** PDF 자료 목록(U8). PDF 호출을 넘기지 않은 화면에서는 null이고 PDF 자리를 그리지 않는다. */
+  pdfs: SourceList<PdfSource> | null;
+  /** 「작성자 설명을 쓴 Catch만 보기」(새 Catch BR6.4). 처음에는 꺼져 있고, 켜면 본인 목록 `authorDescription=written`으로 부른다. */
+  writtenOnly: boolean;
   selected: SelectedItem[];
   title: string;
   usePassword: boolean;
@@ -64,6 +84,7 @@ const BACK_TO_EDIT: ReadonlySet<PublishFailure["kind"]> = new Set(["confirmation
 
 const CATCH_LIST_ERROR = "Catch 목록을 불러오지 못했습니다. Catch가 없다는 뜻은 아닙니다. 다시 불러와 주세요.";
 const MATERIAL_LIST_ERROR = "텍스트 자료 목록을 불러오지 못했습니다. 자료가 없다는 뜻은 아닙니다. 다시 불러와 주세요.";
+const PDF_LIST_ERROR = "PDF 자료 목록을 불러오지 못했습니다. 자료가 없다는 뜻은 아닙니다. 다시 불러와 주세요.";
 
 type PageFetch<T> = (cursor: string | null, signal?: AbortSignal) => Promise<{ kind: "ok"; items: T[]; nextCursor: string | null } | { kind: "failed" }>;
 
@@ -109,16 +130,23 @@ function createSourceLoader<T>(fetchPage: PageFetch<T>, read: () => SourceList<T
  * - 201과 응답 모양이 맞을 때만 완료 화면이다. 실패하면 고른 항목·순서·제목·비밀번호 입력을 그대로 두고 안내만 바꾼다.
  * - 409는 `details.catchIds`의 Catch를 표시하고 편집 단계로 돌아간다. 빈도 초과는 `Retry-After` 동안 [발행]을 막고 자동으로 다시 보내지 않는다.
  * - 로그인이 바뀐 뒤 도착한 응답은 반영하지 않는다.
+ * - PDF 자료(U8 계획 10.5)는 글 추출이 완료(DONE)된 것만 고를 수 있다(BR4.1). Catch·텍스트·PDF를 섞어 고른 순서가 그대로 발행 순서다.
+ *   서버가 `extractionIncomplete`로 거부하면 PDF 목록을 다시 읽어 바뀐 상태를 보인다.
  */
 export function createPublishModel(client: PublishClients, consent: ConsentRunner, deps: PublishDeps = browserDeps) {
   const store = createViewStore<PublishScreenState>({
-    catches: emptySourceList(), materials: emptySourceList(), selected: [], title: "", usePassword: false, password: "",
+    catches: emptySourceList(), materials: emptySourceList(), pdfs: client.pdfs ? emptySourceList() : null, writtenOnly: false,
+    selected: [], title: "", usePassword: false, password: "",
     step: "edit", status: { kind: "idle" }, flagged: null, retryAt: null, result: null,
   });
   const patch = (next: Partial<PublishScreenState>) => store.set((prev) => ({ ...prev, ...next }));
+  // 저장소 이름은 화면을 열 때 한 번 끝 쪽까지 읽는다(성능 설계 1, NFR1.2). 걸러 보기·목록 다시 불러오기는 이 목록을 다시 부르지 않는다.
+  // 실패하면 작은 줄에서 저장소 이름만 빠지고 고르기·발행은 막지 않는다(BR6.2).
+  const repositoryOptions = createRepositoryOptionsStore(client.repositories);
 
   const catches = createSourceLoader<CatchSource>(async (cursor, signal) => {
-    const result = await client.catches.list("", cursor, signal);
+    const authorDescription = store.get().writtenOnly ? "written" : "all";
+    const result = await client.catches.list({ repositoryId: "", authorDescription }, cursor, signal);
     return result.kind === "success"
       ? { kind: "ok", items: result.data.items.map(catchSourceOf), nextCursor: result.data.page.nextCursor }
       : { kind: "failed" };
@@ -128,6 +156,12 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
     const result = await client.materials.list(cursor, signal);
     return result.kind === "ok" ? { kind: "ok", items: result.value.items, nextCursor: result.value.page.nextCursor } : { kind: "failed" };
   }, () => store.get().materials, (list) => patch({ materials: list }), MATERIAL_LIST_ERROR, deps);
+
+  const pdfClient = client.pdfs;
+  const pdfs = pdfClient ? createSourceLoader<PdfSource>(async (cursor, signal) => {
+    const result = await pdfClient.list(cursor, signal);
+    return result.kind === "ok" ? { kind: "ok", items: result.value.items.map(pdfSourceOf), nextCursor: result.value.page.nextCursor } : { kind: "failed" };
+  }, () => store.get().pdfs ?? emptySourceList<PdfSource>(), (list) => patch({ pdfs: list }), PDF_LIST_ERROR, deps) : null;
 
   const editable = () => { const s = store.get(); return s.step === "edit" && s.status.kind !== "submitting"; };
   /** 입력을 바꾸면 검사 거부 안내는 지운다. 서버 실패 안내와 409 표시는 다음 발행 요청까지 남긴다. */
@@ -164,7 +198,15 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
     if (index >= 0) { remove(index); return; }
     const source = list.items.find((item) => item.catchId === catchId);
     if (!source || !source.eligible) return;
-    add({ kind: "CATCH", sourceId: catchId, title: source.title, visibility: source.visibility });
+    add({ kind: "CATCH", sourceId: catchId, title: source.title, visibility: source.visibility, hasAuthorDescription: source.hasAuthorDescription });
+  }
+
+  /** 걸러 보기를 켜고 끈다. Catch 목록만 첫 쪽부터 다시 부르고 고른 자료·순서는 그대로다(BR6.4·BR6.5). 발행 중에는 바꾸지 않는다. */
+  function setWrittenOnly(writtenOnly: boolean) {
+    const s = store.get();
+    if (s.status.kind === "submitting" || s.writtenOnly === writtenOnly) return Promise.resolve();
+    patch({ writtenOnly });
+    return catches.load();
   }
 
   function toggleMaterial(textMaterialId: string) {
@@ -173,7 +215,17 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
     if (index >= 0) { remove(index); return; }
     const source = list.items.find((item) => item.textMaterialId === textMaterialId);
     if (!source) return;
-    add({ kind: "TEXT_MATERIAL", sourceId: textMaterialId, title: source.title, visibility: null });
+    add({ kind: "TEXT_MATERIAL", sourceId: textMaterialId, title: source.title, visibility: null, hasAuthorDescription: null });
+  }
+
+  /** PDF 고르기·빼기. 추출이 완료된 PDF만 고를 수 있고, 이미 고른 PDF는 상태와 관계없이 뺄 수 있다. */
+  function togglePdf(pdfMaterialId: string) {
+    const { selected, pdfs: list } = store.get();
+    const index = selected.findIndex((entry) => entry.kind === "PDF_MATERIAL" && entry.sourceId === pdfMaterialId);
+    if (index >= 0) { remove(index); return; }
+    const source = list?.items.find((item) => item.pdfMaterialId === pdfMaterialId);
+    if (!source || !source.eligible) return;
+    add({ kind: "PDF_MATERIAL", sourceId: pdfMaterialId, title: source.title, visibility: null, hasAuthorDescription: null });
   }
 
   function setField(next: Partial<Pick<PublishScreenState, "title" | "usePassword" | "password">>) {
@@ -234,6 +286,8 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
       ? { catchIds: failure.catchIds, reason: failure.kind } : null;
     const retryAt = failure.kind === "rate-limited" && failure.retryAfterSeconds !== undefined ? deps.now() + failure.retryAfterSeconds * 1000 : null;
     patch({ status: { kind: "failed", failure }, flagged, retryAt, step: BACK_TO_EDIT.has(failure.kind) ? "edit" : "confirm" });
+    // 고른 PDF의 추출 상태가 달라져 거부됐으면 목록을 다시 읽어 지금 상태(추출 중·실패)를 보인다. 고른 항목은 그대로 둔다.
+    if (pdfs && failure.kind === "validation" && failure.violations.some((violation) => violation.reason === "extractionIncomplete")) void pdfs.load();
   }
 
   /** 완료 뒤 [새로 발행]. 목록은 그대로 두고 입력만 비운다. */
@@ -242,12 +296,20 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
     patch({ selected: [], title: "", usePassword: false, password: "", step: "edit", status: { kind: "idle" }, flagged: null, result: null });
   }
 
+  const loadSources = () => Promise.all([catches.load(), materials.load(), pdfs?.load()]).then(() => undefined);
+
   return {
     store,
-    loadSources: () => Promise.all([catches.load(), materials.load()]).then(() => undefined),
+    /** 화면 이름 줄에 쓰는 저장소 목록(`RepositoryOptionsSnapshot`). */
+    repositoryOptions,
+    /** 화면을 열 때 한 번: 고르기 목록과 저장소 목록을 함께 부른다(BR6.2·BR6.7). */
+    open: () => Promise.all([loadSources(), repositoryOptions.refresh()]).then(() => undefined),
+    loadSources,
     loadMoreCatches: catches.loadMore,
     loadMoreMaterials: materials.loadMore,
-    toggleCatch, toggleMaterial, remove,
+    loadMorePdfs: async () => { await pdfs?.loadMore(); },
+    setWrittenOnly,
+    toggleCatch, toggleMaterial, togglePdf, remove,
     moveUp: (index: number) => move(index, -1),
     moveDown: (index: number) => move(index, 1),
     setTitle: (title: string) => setField({ title }),
@@ -256,7 +318,7 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
     toConfirm, backToEdit, submit, reset, retryWaitSeconds, canSubmit,
     /** 저장하지 않은 입력(이탈 확인 대상). 완료 뒤에는 없다. */
     isDirty: () => { const s = store.get(); return s.step !== "done" && (s.selected.length > 0 || s.title !== "" || s.password !== ""); },
-    dispose: () => { catches.dispose(); materials.dispose(); },
+    dispose: () => { catches.dispose(); materials.dispose(); pdfs?.dispose(); repositoryOptions.dispose(); },
   };
 }
 
@@ -281,7 +343,9 @@ export function PublishScreen({ api: client, deps, consent }: { api: PublishClie
   const consentHook = useAiConsent();
   const [model] = useState(() => createPublishModel(client, consent ?? consentHook.run, deps));
   const view = useSyncExternalStore(model.store.subscribe, model.store.get, model.store.get);
-  useEffect(() => { void model.loadSources(); return () => model.dispose(); }, [model]);
+  const options = useSyncExternalStore(model.repositoryOptions.subscribe, model.repositoryOptions.getSnapshot, model.repositoryOptions.getSnapshot);
+  // 열 때마다 목록을 새로 불러온다(BR6.7). 「설명 안 씀」은 그때까지 저장된 결과대로 보인다.
+  useEffect(() => { void model.open(); return () => model.dispose(); }, [model]);
 
   const dirty = model.isDirty();
   useUnsavedGuard(dirty);
@@ -303,7 +367,7 @@ export function PublishScreen({ api: client, deps, consent }: { api: PublishClie
   return (
     <main className={styles.page}>
       <h1>발행</h1>
-      <p className={styles.lead}>본인 Catch와 텍스트 자료를 골라 발행 시각의 내용을 고정한 발행본과 링크를 만듭니다.</p>
+      <p className={styles.lead}>본인 Catch와 텍스트 자료{view.pdfs !== null && "·PDF 자료"}를 골라 발행 시각의 내용을 고정한 발행본과 링크를 만듭니다.</p>
       {consentHook.dialog}
       {view.step === "done" && view.result ? <PublishDoneView result={view.result} onNew={model.reset} />
         : view.step === "confirm" ? (
@@ -311,7 +375,10 @@ export function PublishScreen({ api: client, deps, consent }: { api: PublishClie
             lockSeconds={lockSeconds} statusLines={statusLines} onBack={model.backToEdit} onSubmit={() => { void model.submit(); }} />
         ) : (
           <div className={styles.layout}>
-            <SourcePickerView catches={view.catches} materials={view.materials} selected={view.selected} flagged={view.flagged} disabled={submitting}
+            <SourcePickerView catches={view.catches} materials={view.materials} pdfs={view.pdfs} selected={view.selected} flagged={view.flagged} disabled={submitting}
+              writtenOnly={view.writtenOnly} repositories={options.repositories}
+              onWrittenOnly={(writtenOnly) => { void model.setWrittenOnly(writtenOnly); }}
+              onMorePdfs={() => { void model.loadMorePdfs(); }} onTogglePdf={model.togglePdf}
               onRetry={() => { void model.loadSources(); }}
               onMoreCatches={() => { void model.loadMoreCatches(); }}
               onMoreMaterials={() => { void model.loadMoreMaterials(); }}

@@ -28,25 +28,36 @@ function pickItem(item: PublishedItem): PublishedItem {
   const base = { publishedItemId: item.publishedItemId, position: item.position, title: item.title };
   switch (item.itemKind) {
     case "CATCH": {
-      const { workFacts, subjectContribution, evidence, authorDescription, aiDraft, mismatch } = item.snapshot;
+      const { workFacts, subjectContribution, evidence, authorDescription, aiDraft, mismatch, repositoryName, authorDescriptionEditedMonth, workLimits } = item.snapshot;
       return {
         ...base,
         itemKind: "CATCH",
         snapshot: {
           workFacts: [...workFacts],
           subjectContribution,
-          evidence: evidence.map(({ sourceUrl, sourceRevision, representedFacts }) => ({ sourceUrl, sourceRevision, representedFacts: [...representedFacts] })),
+          // 새 Catch NC2(BR2.2): ownCommit은 있을 때만 옮긴다. 없으면 화면이 false로 읽는다.
+          evidence: evidence.map(({ sourceUrl, sourceRevision, representedFacts, ownCommit }) => ({
+            sourceUrl, sourceRevision, representedFacts: [...representedFacts], ...(ownCommit === undefined ? {} : { ownCommit }),
+          })),
           authorDescription,
           aiDraft,
           mismatch,
+          // 새 Catch NC2 선택 칸 셋(BR2.2): 있을 때만 옮기고 없으면 칸을 만들지 않는다.
+          ...(repositoryName === undefined ? {} : { repositoryName }),
+          ...(authorDescriptionEditedMonth === undefined ? {} : { authorDescriptionEditedMonth }),
+          ...(workLimits === undefined ? {} : { workLimits: [...workLimits] }),
         },
       };
     }
     case "TEXT_MATERIAL":
       return { ...base, itemKind: "TEXT_MATERIAL", snapshot: { body: item.snapshot.body } };
     default:
-      // PDF 자료(U8 몫). 자리만 보이므로 쪽 수 외의 칸은 넘기지 않는다.
-      return { ...base, itemKind: "PDF_MATERIAL", snapshot: typeof item.snapshot.pageCount === "number" ? { pageCount: item.snapshot.pageCount } : {} };
+      // PDF 자료(U8). 쪽 수와 쪽별 사본(쪽 번호·글·읽을 수 있음)만 넘긴다.
+      return {
+        ...base, itemKind: "PDF_MATERIAL",
+        snapshot: typeof item.snapshot.pageCount === "number" ? { pageCount: item.snapshot.pageCount } : {},
+        pdfPages: (item.pdfPages ?? []).map(({ pageNumber, text, readable }) => ({ pageNumber, text, readable })),
+      };
   }
 }
 

@@ -1,0 +1,28 @@
+{
+  "stage": "nfr-design",
+  "unit": "nc3-revisit-facts",
+  "upstream_ids": ["NFR1.1", "NFR1.2", "NFR1.3", "NFR1.4", "NFR1.5", "NFR1.6", "NFR2.1", "NFR4.1", "NFR4.2", "NFR4.3", "NFR5.1", "NFR5.2", "NFR6.1", "NFR7.1", "NFR7.2", "NFR7.3", "NFR7.4", "NFR8.1", "NFR8.2", "NFR8.3", "NFR8.4"],
+  "coverage": [
+    { "id": "NFR1.1", "status": "OK", "target": "performance-design 2절: 이미 받는 응답의 sha를 blob_sha로 옮김, RevisitFacts 인자에 호출 객체 없음" },
+    { "id": "NFR1.2", "status": "OK", "target": "performance-design 2절: 등록 INSERT 한 곳에서만 씀" },
+    { "id": "NFR1.3", "status": "OK", "target": "performance-design 1절 계산 구조(한 번 훑기, (경로, 줄 글자) 사전), 시간 숫자는 빼고 reliability-design 2절에서 문서를 맞춤(Q1)" },
+    { "id": "NFR1.4", "status": "OK", "target": "scalability-design 1절 상한 자리 표(worker·계약·api)" },
+    { "id": "NFR1.5", "status": "OK", "target": "scalability-design 2절: 후보 하나 입력, 사전은 함수 안 지역 값" },
+    { "id": "NFR1.6", "status": "OK", "target": "performance-design 3절 질의 조각, scalability-design 3절 다시 판단할 조건" },
+    { "id": "NFR2.1", "status": "OK", "target": "security-design 1절: READ_COLUMNS·본인 응답만 옮김, 공개 응답 허용 칸, 발행·Claude 연결 자기 질의" },
+    { "id": "NFR4.1", "status": "OK", "target": "observability-design 2절: 화면 문장과 원문 30~50줄 대조 기록" },
+    { "id": "NFR4.2", "status": "OK", "target": "observability-design 2절: 종류별 Catch 수 DB 질의, BR2.4 상수로 끄기" },
+    { "id": "NFR4.3", "status": "OK", "target": "observability-design 1절: 고정 문구·요청 ID·시도 ID·예외 종류 이름 한 줄, 측정 분석 0줄 확인" },
+    { "id": "NFR5.1", "status": "OK", "target": "security-design 4절: React 글자 요소만, dangerouslySetInnerHTML 없음" },
+    { "id": "NFR5.2", "status": "OK", "target": "security-design 4절: revisitCommitHref 고정 호스트·이름·식별값 꼴, LIVE·api 조건, noopener noreferrer" },
+    { "id": "NFR6.1", "status": "OK", "target": "performance-design 5절: h3·작은 글자·ul·커밋만 a·숨은 (새 탭)" },
+    { "id": "NFR7.1", "status": "OK", "target": "reliability-design 3절: 마이그레이션 기본값·null, 정렬 맨 아래" },
+    { "id": "NFR7.2", "status": "OK", "target": "reliability-design 3절·security-design 3절: 판본 3 커서, 1·2 400, 공개 커서 그대로" },
+    { "id": "NFR7.3", "status": "OK", "target": "reliability-design 3절: Result 4 같은 PR, 고정 자료 함께, 함께 배포" },
+    { "id": "NFR7.4", "status": "OK", "target": "reliability-design 3절: 코드 할 일 없음, 병합 시점 팀장 확인" },
+    { "id": "NFR8.1", "status": "OK", "target": "reliability-design 4절 서비스별 시험 표, 시간 단정 없음" },
+    { "id": "NFR8.2", "status": "OK", "target": "reliability-design 3절: 배열 검사와 시각 둘 검사" },
+    { "id": "NFR8.3", "status": "OK", "target": "reliability-design 1절 계산 순서와 실패 갈래, security-design 6절 예외 한 곳" },
+    { "id": "NFR8.4", "status": "OK", "target": "reliability-design 2절 함께 고칠 문서(rules.md BR3.5, functional-spec S10)" }
+  ]
+}

@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { AssetsView, parseVisibilityFilter } from "./assets-view";
+import { AssetsView, parseAuthorDescriptionFilter, parseVisibilityFilter } from "./assets-view";
 import { CatchActions } from "./catch-actions";
-import { createAssetsStore, type AssetsStore } from "./assets-store";
-import { catchErrorText, type CatchApi } from "./catch-api";
+import { createAssetsStore, sameFilter, type AssetsStore } from "./assets-store";
+import { catchErrorText, type CatchApi, type CatchListFilter } from "./catch-api";
 import type { AuthorDescriptionApi } from "./author-description-api";
 import { AuthorDescriptionEditor } from "./author-description-editor";
+import { ModalReauthNotice } from "@/components/auth/modal-reauth-notice";
 import { UNSAVED_MESSAGE } from "@/features/profile/use-unsaved-guard";
 import { confirmDiscardUnsaved, unsavedChanges, type ConfirmDialog, type UnsavedRegistry } from "@/lib/unsaved-changes";
 import type { RepositoryOption } from "./types";
@@ -49,12 +50,15 @@ export function AssetsConnected({ api, descriptionApi, repositories, repositoryN
   const params = useSearchParams();
   const pathname = usePathname();
   const repositoryId = params.get("repositoryId") ?? "";
-  // API 목록은 저장소로만 거르고, 공개 상태는 불러온 목록 안에서 거른다.
+  // API 목록은 저장소·작성자 설명으로 서버에서 거르고, 공개 상태는 불러온 목록 안에서 거른다.
+  // 작성자 설명은 주소 매개변수라 상세를 닫아도 남고 뒤로·앞으로 가기·새로고침으로 되살아난다(BR5.4).
+  const authorDescription = parseAuthorDescriptionFilter(params.get("authorDescription"));
+  const filter = useMemo<CatchListFilter>(() => ({ repositoryId, authorDescription }), [repositoryId, authorDescription]);
   const visibility = parseVisibilityFilter(params.get("visibility"));
   const catchId = params.get("catchId");
 
   useEffect(() => () => store.dispose(), [store]);
-  useEffect(() => { void store.selectRepository(repositoryId); }, [repositoryId, store]);
+  useEffect(() => { void store.selectFilter(filter); }, [filter, store]);
   useEffect(() => {
     // D 모달이 열려 있는 동안은 Catch 상세를 열지 않는다. 닫힐 때의 재조회는 onClosed가 맡는다.
     void store.openDetail(snapshot.managementOpen ? null : catchId);
@@ -70,22 +74,23 @@ export function AssetsConnected({ api, descriptionApi, repositories, repositoryN
   }
   const bindings: RepositoryManagementBindings = {
     onOpen() { store.setManagementOpen(true); changeQuery({ catchId: null }); },
-    onClosed() { store.setManagementOpen(false); void store.invalidateList(repositoryId); },
+    onClosed() { store.setManagementOpen(false); void store.invalidateList(filter); },
     onShowRepository(id) {
       store.setManagementOpen(false);
-      // 막 분석한 Catch는 미공개로 생기므로 공개 상태 걸러 보기를 풀어 저장소 전체를 보여 준다.
-      changeQuery({ repositoryId: id || null, visibility: null, catchId: null });
-      void store.invalidateList(id);
+      // 막 분석한 Catch는 미공개이고 작성자 설명도 없으므로 공개 상태·작성자 설명 걸러 보기를 풀어 저장소 전체를 보여 준다.
+      changeQuery({ repositoryId: id || null, visibility: null, authorDescription: null, catchId: null });
+      void store.invalidateList({ repositoryId: id, authorDescription: "all" });
     },
   };
-  // URL 변경 직후 effect가 실행되기 전에도 이전 저장소/상세를 잠깐 보여 주지 않는다.
-  const listMatches = snapshot.repositoryId === repositoryId;
+  // URL 변경 직후 effect가 실행되기 전에도 이전 걸러 보기/상세를 잠깐 보여 주지 않는다.
+  const listMatches = sameFilter(snapshot.filter, filter);
   const visibleCatchId = snapshot.managementOpen ? null : catchId;
   const detailMatches = snapshot.selectedId === visibleCatchId;
   return (
     <div className={styles.preview}>
       <AssetsView dataMode="api" items={listMatches ? snapshot.items : []}
         repositories={repositories} repositoryNotice={repositoryNotice} repositoryId={repositoryId} visibility={visibility}
+        authorDescription={authorDescription}
         listState={listMatches ? snapshot.listState : "loading"}
         listMessage={catchErrorText(snapshot.listError, "list")}
         detailState={detailMatches ? snapshot.detailState : "loading"}
@@ -96,19 +101,22 @@ export function AssetsConnected({ api, descriptionApi, repositories, repositoryN
           onChange={(change) => { void store.update(change); }}
           onReload={() => reloadDetail(store, catchId, (message) => window.confirm(message))} /> : null}
         descriptionEditor={detailMatches && snapshot.detail && descriptionApi
-          ? <AuthorDescriptionEditor key={snapshot.detail.catchId} catchId={snapshot.detail.catchId} api={descriptionApi} /> : null}
+          ? <AuthorDescriptionEditor key={snapshot.detail.catchId} catchId={snapshot.detail.catchId} api={descriptionApi}
+            evidenceUrls={snapshot.detail.evidence.map((evidence) => evidence.sourceUrl)} /> : null}
+        detailNotice={<ModalReauthNotice />}
         selectedId={visibleCatchId}
         hasMore={listMatches && snapshot.nextCursor !== null} moreState={snapshot.moreState}
         onLoadMore={() => { void store.loadMore(); }}
         onRepositoryChange={(id) => changeQuery({ repositoryId: id || null, catchId: null })}
         onVisibilityChange={(next) => changeQuery({ visibility: next || null, catchId: null })}
+        onAuthorDescriptionChange={(next) => changeQuery({ authorDescription: next === "all" ? null : next, catchId: null })}
         onOpen={(id) => changeQuery({ catchId: id })}
         onClose={() => {
           // 작성자 설명을 저장하지 않았으면 모달을 닫기 전에 묻는다(BR2.2). 머무르면 입력을 그대로 둔다.
           if (!confirmDiscardUnsaved(unsavedChanges, (message) => window.confirm(message), UNSAVED_MESSAGE)) return;
           changeQuery({ catchId: null });
         }}
-        onRetryList={() => { void store.refresh(repositoryId); }}
+        onRetryList={() => { void store.refresh(filter); }}
         onRetryDetail={() => { if (catchId) void store.openDetail(catchId, true); }}
         repositoryManagement={repositoryManagement(bindings)} />
     </div>

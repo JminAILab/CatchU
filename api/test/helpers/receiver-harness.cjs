@@ -22,12 +22,18 @@ function candidate() {
       representedFacts: ['합성 작업'], contributionScope: '합성 기여', coverageLimits: [] }],
     draft: { status: 'GENERATED', content: '합성 설명' },
     reflection: { status: 'NOT_GENERATED', questions: [] },
+    // Result v3(CR2): 합성 SHA만 쓴다.
+    ownCommitShas: ['a'.repeat(40)],
+    // Result v4(NC3 C4): 사실 없는 후보와 합성 작업 시각.
+    revisitFacts: [],
+    firstWorkAt: '2026-09-28T01:00:00Z',
+    lastWorkAt: '2026-09-28T02:00:00Z',
   };
 }
 
 function result(overrides = {}) {
   return {
-    ...context(), schemaVersion: '2', messageId: 'result-message', resultId: 'test-result',
+    ...context(), schemaVersion: '4', messageId: 'result-message', resultId: 'test-result',
     outcome: 'SUCCEEDED', candidates: [candidate()], notProvided: [], failures: [],
     ownCommitObservation: 'UNKNOWN', observedOwnCommitCount: null, collectionLimitNotes: [],
     finishedAt: '2026-09-29T01:00:00Z', ...overrides,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useAiConsent } from "@/components/ai-consent/use-ai-consent";
 import { useUnsavedChanges } from "@/components/auth/use-unsaved-changes";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { UNSAVED_MESSAGE, useUnsavedGuard } from "@/features/profile/use-unsaved-guard";
@@ -13,7 +14,11 @@ import {
   materialListErrorText, materialOpenErrorText, newMaterialState,
   type MaterialDraft, type MaterialEditState, type MaterialsApi, type TextMaterialItem,
 } from "./materials-api";
-import { MaterialEditorView, MaterialsListView } from "./materials-view";
+import { MaterialEditorView, MaterialsListView, MaterialsTabs, type MaterialsTab } from "./materials-view";
+import { pdfHttp, pdfMaterialsApi } from "./pdf-clients";
+import type { PdfMaterialsApi } from "./pdf-materials-api";
+import { PdfMaterialsTab, type PdfConsentRunner } from "./pdf-materials-tab";
+import type { PdfFetch, PdfViewerDeps } from "../recipient/pdf-viewer-launcher";
 import styles from "./materials.module.css";
 
 // api.member가 기준 주소·Bearer·401을 맡는다. 렌더마다 호출 객체를 새로 만들지 않는다.
@@ -237,23 +242,62 @@ export function createMaterialEditorModel(client: MaterialsApi, openId: string |
   };
 }
 
-/** 회원 가드((member) 레이아웃) 안의 텍스트 자료 화면(U4 W2). */
+/** PDF 탭(U8 계획 10.1)이 쓰는 호출. 시험은 합성 호출과 동의 대역을 바꿔 끼운다. */
+export type PdfTabClients = {
+  api: PdfMaterialsApi;
+  originalOf: (pdfMaterialId: string) => PdfFetch;
+  consent?: PdfConsentRunner;
+  viewerDeps?: PdfViewerDeps;
+};
+const pdfClients: PdfTabClients = {
+  api: pdfMaterialsApi,
+  originalOf: (pdfMaterialId) => (signal) => pdfHttp.originalFile(pdfMaterialId, signal),
+};
+
+/** 회원 가드((member) 레이아웃) 안의 자료 화면(U4 W2 텍스트 자료 + U8 W1 PDF 자료). */
 export function MaterialsPage() {
-  return <MaterialsScreen api={materials} />;
+  return <MaterialsScreen api={materials} pdf={pdfClients} />;
 }
 
-/** 목록과 편집을 한 화면에 둔다. 상태 전이는 `createMaterialsScreenModel`이 맡는다. */
-export function MaterialsScreen({ api: client, deps }: { api: MaterialsApi; deps?: ScreenDeps }) {
+/**
+ * 텍스트 자료 탭은 목록과 편집을 한 화면에 둔다(상태 전이는 `createMaterialsScreenModel`). PDF 탭은 `PdfMaterialsTab`(U8)이 맡는다.
+ * 저장하지 않은 텍스트 입력이 있으면 PDF 탭으로 옮기기 전에 묻는다(BR2.2와 같은 확인). `pdf`를 넘기지 않으면 탭 없이 텍스트 자료만 보인다.
+ */
+export function MaterialsScreen({ api: client, deps, pdf }: { api: MaterialsApi; deps?: ScreenDeps; pdf?: PdfTabClients }) {
   const [model] = useState(() => createMaterialsScreenModel(client, deps));
   const view = useSyncExternalStore(model.store.subscribe, model.store.get, model.store.get);
   useEffect(() => { void model.load(); return () => model.dispose(); }, [model]);
+  const [tab, setTab] = useState<MaterialsTab>("text");
+  const consentHook = useAiConsent();
+
+  function changeTab(next: MaterialsTab) {
+    if (next === tab) return;
+    // 텍스트 편집기를 닫고 옮긴다. 미저장 입력이 있는데 머무르기를 고르면 탭을 바꾸지 않는다.
+    if (next === "pdf" && !model.select(null)) return;
+    setTab(next);
+  }
 
   const { list, selection } = view;
   const selectedId = selection?.kind === "existing" ? selection.textMaterialId : null;
+  if (pdf && tab === "pdf") {
+    return (
+      <main className={styles.page}>
+        <h1>PDF 자료</h1>
+        <p className={styles.lead}>PDF를 올려 두면 쪽별 글을 추출하고, 발행할 때 고를 수 있습니다.</p>
+        <MaterialsTabs active={tab} onChange={changeTab} />
+        <div role="tabpanel" id="materials-panel-pdf" aria-labelledby="materials-tab-pdf">
+          <PdfMaterialsTab api={pdf.api} originalOf={pdf.originalOf} consent={pdf.consent ?? consentHook.run}
+            deps={deps ?? browserDeps} viewerDeps={pdf.viewerDeps} />
+        </div>
+        {consentHook.dialog}
+      </main>
+    );
+  }
   return (
     <main className={styles.page}>
       <h1>텍스트 자료</h1>
       <p className={styles.lead}>포트폴리오·자기소개·이력 같은 글을 자료로 저장해 두고, 발행할 때 고를 수 있습니다.</p>
+      {pdf && <MaterialsTabs active={tab} onChange={changeTab} />}
       <div className={styles.layout}>
         <MaterialsListView state={list.state} items={list.items} errorText={list.errorText}
           hasMore={list.nextCursor !== null} moreState={view.moreState} selectedId={selectedId}

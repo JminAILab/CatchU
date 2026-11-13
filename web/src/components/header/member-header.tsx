@@ -18,6 +18,7 @@ const navItems = [
   { href: routes.assets, label: "내 자산" },
   { href: routes.materials, label: "텍스트 자료" },
   { href: routes.publications, label: "발행본" },
+  { href: routes.jds, label: "JD 관리" },
 ] as const;
 
 /**
@@ -43,6 +44,7 @@ export function MemberHeader({ onLogout, logoutPending }: MemberHeaderProps) {
             <Link
               key={item.href}
               href={item.href}
+              data-testid={item.href === routes.jds ? "member-jds-link" : undefined}
               className={isActive(item.href) ? styles.menuItemActive : styles.menuItem}
               aria-current={isActive(item.href) ? "page" : undefined}
             >

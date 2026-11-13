@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { pdfHttp } from "@/features/materials/pdf-clients";
+import type { PdfCopySource } from "@/features/publications/published-pdf-item";
 import { publishedItemDomId } from "@/features/publications/snapshot-view";
 import { accessTokenStore } from "@/lib/access-token";
 import { api } from "@/lib/api";
@@ -80,9 +82,15 @@ function PublicationView({ token }: { token: string }) {
     showEvidence,
   };
 
+  // PDF 항목의 사본 요청(U8 W4). 호출마다 지금의 grant를 머리로 싣고 서버 판정을 다시 받는다. 401·404는 다른 패널과 같이 접근 상실이다.
+  const pdfSource = (publishedItemId: string): PdfCopySource => ({
+    fetchPdf: (signal) => pdfHttp.recipientCopy(token, publishedItemId, grants.get(token), signal),
+    onAccessLost: (code) => store.accessLost(code),
+  });
+
   return (
     <main className={styles.page}>
-      <RecipientPublicationView snapshot={snapshot} headingRef={headingRef} highlight={highlight} slotProps={slotProps}
+      <RecipientPublicationView snapshot={snapshot} headingRef={headingRef} highlight={highlight} slotProps={slotProps} pdfSource={pdfSource}
         onRetry={() => { void store.load(); }}
         onUnlock={(password) => store.unlock(password)}
         waitSeconds={() => store.retryWaitSeconds()} />

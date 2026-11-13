@@ -2,6 +2,8 @@
 
 현행 U7은 [v2 정본과 등록 소유/관측 저장](repository-analysis-u7.md#메시지와-결과)을 적용한다. 런타임 계약 디렉터리는 `api/contracts/repository-analysis`이며 아래 10월 경로의 YAML은 과거 승인 기록이다.
 
+결과(Result)는 새 Catch NC3부터 판본 `"4"`다(후보마다 다시 볼 곳 사실 `revisitFacts`와 첫·마지막 작업 시각 `firstWorkAt`·`lastWorkAt`). 판본 `"3"` 이하 결과는 `REJECTED/SCHEMA_INVALID`다. 옛 판본을 함께 받는 처리가 없으므로 api와 worker를 같은 배포로 넣고, 배포는 진행 중인 분석이 없을 때 한다(남은 분석은 다시 한다). 새 칸의 종류별 개수·본인 커밋 소속·시각 순서는 수신 스키마가 아니라 등록 입력 검사가 본다([등록 규칙 「다시 볼 곳 사실과 작업 시각」](catch-registration-rules.md#다시-볼-곳-사실과-작업-시각-새-catch-nc3)).
+
 이 구현은 [#139의 독립 준비 범위](https://github.com/JminAILab/CatchU/issues/139)다. 기준은 [현행 메시지 계약 v2](../contracts/repository-analysis/worker-messages.yaml), [수신 업무 흐름](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)·[상태 전이 정본](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본), [수신 기록 모델](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)이다. 실제 큐/worker 연결이나 HTTP 주입 API를 추가하지 않는다.
 
 ## 수신 결과와 저장 경계

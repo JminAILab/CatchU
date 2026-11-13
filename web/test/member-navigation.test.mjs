@@ -7,6 +7,7 @@ test('next는 서비스 안 회원 경로만 받는다', () => {
   for (const [value, expected] of [
     ['/home', '/home'],
     ['/assets?repositoryId=r1&catchId=c1', '/assets?repositoryId=r1&catchId=c1'],
+    ['/jds', '/jds'],
     ['/publications/new', '/publications/new'],
     ['/profile/edit', '/profile/edit'],
     ['/profile/setup', '/profile/setup'],
@@ -15,8 +16,8 @@ test('next는 서비스 안 회원 경로만 받는다', () => {
 
   for (const value of [
     null, undefined, '', 'home', '//evil.example/home', '/\\evil.example', 'https://evil.example/home',
-    '/login', '/login?next=/home', '/', '/s/token', '/links', '/homex', '/assetsx', '/preview/common',
-    '/home\nx', `/home?${'a'.repeat(2100)}`, '/%2F%2Fevil.example',
+    '/login', '/login?next=/home', '/', '/s/token', '/s/token/catches/c1', '/links', '/homex', '/assetsx', '/preview/common',
+    '/home\nx', `/home?${'a'.repeat(2100)}`, '/%2F%2Fevil.example', '/jdsx',
   ]) assert.equal(safeNextPath(value), null, String(value));
 });
 
