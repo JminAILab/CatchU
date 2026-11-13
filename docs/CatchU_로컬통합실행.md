@@ -189,7 +189,7 @@ Windows에서는 **WSL2(Ubuntu) 안에서** 아래를 모두 실행한다. worke
 1. 관리자 PowerShell에서 `wsl --install`로 WSL2와 Ubuntu를 설치하고 다시 시작한다.
 2. Docker Desktop의 설정에서 WSL 연동(Settings → Resources → WSL integration)에 Ubuntu를 켜고 Apply를 누른다. Ubuntu 터미널을 새로 열어 `docker ps`가 표 머리줄이라도 내면 된다.
 3. Ubuntu 안에 Node.js·npm과 uv를 「준비물」의 버전으로 설치한다. Node.js는 nvm으로 설치한다. `which npm`이 `/mnt/c/`로 시작하면 Windows의 npm이 잡힌 것이라 쓰지 못한다. uv는 설치한 뒤 터미널을 새로 열어야 잡힌다.
-4. 저장소를 Ubuntu의 홈 폴더 아래에 받는다. `/mnt/c/` 아래는 느려서 쓰지 않는다.
+4. 저장소를 Ubuntu의 홈 폴더 아래에 받는다. `/mnt/c/` 아래는 느려서 쓰지 않는다. 저장소가 비공개인 동안에는 Ubuntu 안에서 GitHub 인증을 먼저 해야 받아진다(예: `gh auth login`). Windows에서 해 둔 인증은 Ubuntu로 넘어오지 않는다.
 5. 브라우저는 Windows에서 그대로 `http://localhost:3000`을 연다.
 
 `sudo`가 묻는 비밀번호는 Ubuntu를 처음 설치할 때 정한 Ubuntu 계정의 비밀번호다. 잊었으면 PowerShell에서 `wsl -u root passwd <Ubuntu 사용자 이름>`으로 다시 정한다.
@@ -208,7 +208,7 @@ GitHub는 「GitHub Apps」가 아니라 「OAuth Apps」에서 만든다. GitHu
 
 ### 순서
 
-모든 명령은 저장소 루트에서 한다. 처음이면 의존성을 먼저 설치한다.
+모든 명령은 저장소 루트에서 한다. Windows에서는 여기부터 모든 명령을 PowerShell이 아니라 Ubuntu 터미널에서 한다(PowerShell에서 설치한 것은 쓰지 못한다). 처음이면 의존성을 먼저 설치한다.
 
 ```sh
 (cd api && npm ci)
