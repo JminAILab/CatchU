@@ -40,14 +40,12 @@ from app.collection.collect import CollectionOutcome
 from app.generation import render
 from app.generation.judged import (
     CatchTrace,
-    Checked,
     RecordVerdict,
     TitleSource,
     ai_title,
     answer_values,
     catch_ask,
     choose_title,
-    factchecked,
     kept_sentences,
     material_ask,
     record_verdict,
@@ -97,6 +95,7 @@ from app.generation.response import (
     SentenceMiss,
     TitleProblem,
     Unreadable,
+    WrittenItem,
     ai_parts,
     fragments,
     questions,
@@ -176,8 +175,6 @@ class GenerationReport:
     # 생성은 됐지만 시간·Catch 판정 상한으로 판정하지 않은 Catch, 시간·상한으로 재료 판정을 건너뛴 큰 후보.
     judgement_skipped: int = 0
     material_skipped: int = 0
-    factcheck_dropped_titles: int = 0
-    factcheck_dropped_sentences: int = 0
     below_threshold_titles: int = 0
     below_threshold_sentences: int = 0
     second_lines_removed: int = 0
@@ -199,8 +196,8 @@ JudgementState = Literal["SKIPPED", "FAILED", "ANSWERED", "NO_QUESTIONS"]
 class _Judged:
     """AI 쪽 생성 응답을 받은 후보의 판정 경과. 생성 응답이 없으면 만들지 않는다(「판정 없음」)."""
 
-    titles: tuple[Checked, ...]
-    sentences: tuple[Checked, ...]
+    titles: tuple[WrittenItem, ...]
+    sentences: tuple[WrittenItem, ...]
     state: JudgementState = "NO_QUESTIONS"
     ask: CatchAsk | None = None
     answers: Answers | None = None
@@ -460,9 +457,7 @@ def _generate_one_ai(
     result.reflection = _reflection(response, limits, report)
     result.title = _fragment_title(response, sent, item, limits)
     report.ai_notes.update((*parts.titles.notes, *parts.sentences.notes))
-    titles, sentences = factchecked(parts.titles), factchecked(parts.sentences)
-    report.factcheck_dropped_titles += sum(not each.passed for each in titles)
-    report.factcheck_dropped_sentences += sum(not each.passed for each in sentences)
+    titles, sentences = parts.titles.items, parts.sentences.items
     judged = _Judged(titles=titles, sentences=sentences)
     result.judged = judged
     judged.ask = catch_ask(
@@ -765,7 +760,7 @@ def _apply_judgement(
     chosen = ai_title(ask_, answers, titles)
     title, source = choose_title(record, verdict, chosen, result.title)
     facts = remove_record_fact(candidate.work_facts, record, verdict)
-    kept: tuple[Checked, ...] = ()
+    kept: tuple[WrittenItem, ...] = ()
     draft = result.draft
     if judged is not None:
         if judged.state == "FAILED":
@@ -774,7 +769,7 @@ def _apply_judgement(
         elif judged.state == "ANSWERED":
             kept = kept_sentences(ask_, answers, judged.sentences)
             draft = (
-                DraftOutcome.generated(" ".join(each.item.text for each in kept))
+                DraftOutcome.generated(" ".join(each.text for each in kept))
                 if kept
                 else DraftOutcome.not_generated()
             )
@@ -792,29 +787,25 @@ def _apply_judgement(
 
 
 def _count_below(
-    judged: _Judged, kept: tuple[Checked, ...], report: GenerationReport
+    judged: _Judged, kept: tuple[WrittenItem, ...], report: GenerationReport
 ) -> None:
-    """기계 대조는 통과했지만 판정이 0.9 미만이라 쓰지 않은 후보·문장을 센다."""
+    """판정이 0.9 미만이라 쓰지 않은 후보·문장을 센다."""
     ask_, answers = judged.ask, judged.answers
-    passed_titles = [each for each in judged.titles if each.passed]
     if ask_ is not None and answers is not None and ask_.title_choice is not None:
         probabilities = answers.choices.get(ask_.title_choice, {})
         report.below_threshold_titles += sum(
-            probabilities.get(each.item.id, 0.0) < TITLE_THRESHOLD
-            for each in passed_titles
+            probabilities.get(each.id, 0.0) < TITLE_THRESHOLD for each in judged.titles
         )
-    elif passed_titles:
-        report.below_threshold_titles += len(passed_titles)
-    report.below_threshold_sentences += sum(
-        each.passed for each in judged.sentences
-    ) - len(kept)
+    else:
+        report.below_threshold_titles += len(judged.titles)
+    report.below_threshold_sentences += len(judged.sentences) - len(kept)
 
 
 def _trace(
     item: PreparedCandidate,
     result: _Result,
     title: tuple[str | None, str | None, TitleSource],
-    kept: tuple[Checked, ...],
+    kept: tuple[WrittenItem, ...],
     facts: tuple[str, ...],
     verdict: RecordVerdict | None,
     draft: DraftOutcome,
@@ -836,7 +827,7 @@ def _trace(
         chosen_title=chosen,
         title=final,
         title_source=source,
-        kept=tuple(each.item.id for each in kept),
+        kept=tuple(each.id for each in kept),
         second_line_removed=facts != candidate.work_facts,
         material_judged=result.material_judged,
         material_seconds=result.material_seconds,
@@ -866,7 +857,7 @@ def _reasons(counts: Counter[str]) -> str:
 def _log(request: CheckedRequest, report: GenerationReport) -> None:
     """건수만 남긴다. SHA·경로·이름·제목·본문·응답 원문·가린 값은 남기지 않는다.
 
-    AI 쪽(CR3) 칸도 같은 한 줄에 둔다: 켜짐 여부·공급자 이름, 판정 요청·실패(코드별)·건너뜀, 기계 대조·문턱으로
+    AI 쪽(CR3) 칸도 같은 한 줄에 둔다: 켜짐 여부·공급자 이름, 판정 요청·실패(코드별)·건너뜀, 문턱으로
     버린 후보·문장, 둘째 줄을 지운 Catch, 제목 출처별 Catch 수. 기록의 글·후보·문장·판정 답·키는 남기지 않는다.
     """
     sources = report.title_sources
@@ -883,7 +874,7 @@ def _log(request: CheckedRequest, report: GenerationReport) -> None:
         "draftDropReasons=%s reflectionDropReasons=%s draftSalvaged=%d reflectionSalvaged=%d "
         "aiSide=%s judgementProvider=%s catchJudgements=%d materialJudgements=%d "
         "judgementSkipped=%d materialSkipped=%d catchJudgementReasons=%s "
-        "materialJudgementReasons=%s factcheckDroppedTitles=%d factcheckDroppedSentences=%d "
+        "materialJudgementReasons=%s "
         "belowThresholdTitles=%d belowThresholdSentences=%d secondLinesRemoved=%d "
         "titleFromRecord=%d titleFromAi=%d titleFromRecordWholeMiss=%d "
         "titleFromFragment=%d titleNone=%d aiDropReasons=%s",
@@ -921,8 +912,6 @@ def _log(request: CheckedRequest, report: GenerationReport) -> None:
         report.material_skipped,
         _reasons(report.catch_judgement_reasons),
         _reasons(report.material_judgement_reasons),
-        report.factcheck_dropped_titles,
-        report.factcheck_dropped_sentences,
         report.below_threshold_titles,
         report.below_threshold_sentences,
         report.second_lines_removed,

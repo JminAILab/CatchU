@@ -1,4 +1,4 @@
-"""생성 흐름의 AI 쪽(CR3): 재료 판정 질문, 기계 대조, Catch 판정 질문과 답 적용.
+"""생성 흐름의 AI 쪽(CR3): 재료 판정 질문, Catch 판정 질문과 답 적용.
 
 생성 흐름(`flow.py`)이 AI 쪽이 켜졌을 때만 부른다. 판정 공급자 호출은 판정 구성 요소(`app.judgement`)가 하고,
 여기는 생성 쪽 자료(보낸 줄·후보 자료)를 판정 요청의 단순한 값으로 옮기고 답을 제목·작업 사실·설명에 적용한다.
@@ -17,9 +17,8 @@ from typing import Literal
 
 from app.generation.groups import ChangeGroup, change_groups, file_kinds
 from app.generation.request import PreparedCandidate, Selection
-from app.generation.response import WrittenItem, WrittenPart
+from app.generation.response import WrittenItem
 from app.judgement.answers import Answers
-from app.judgement.factcheck import CitedLine, passes
 from app.judgement.questions import (
     NONE_OPTION,
     RECORD_THRESHOLD,
@@ -36,35 +35,6 @@ from app.judgement.questions import (
 from app.processing.generation import RecordText
 
 TitleSource = Literal["RECORD", "AI", "RECORD_WHOLE_MISS", "FRAGMENT", "NONE"]
-
-
-@dataclass(frozen=True)
-class Checked:
-    """AI가 쓴 글 하나와 기계 대조(BR3.3) 결과."""
-
-    item: WrittenItem
-    passed: bool
-
-
-def factchecked(part: WrittenPart) -> tuple[Checked, ...]:
-    """글마다 가리킨 줄(경로·글)과 기계 대조를 한다. 통과하지 못한 글은 판정에 올리지 않는다."""
-    return tuple(
-        Checked(
-            item,
-            passes(
-                item.text,
-                [
-                    CitedLine(_file_path(item, line.file_id), line.text)
-                    for line in item.lines
-                ],
-            ),
-        )
-        for item in part.items
-    )
-
-
-def _file_path(item: WrittenItem, file_id: str) -> str:
-    return next(file.path for file in item.files if file.id == file_id)
 
 
 # 재료 판정(BR6.1·BR6.2)
@@ -129,8 +99,8 @@ def _usable(record: RecordText | None) -> RecordText | None:
 def catch_ask(
     item: PreparedCandidate,
     selection: Selection,
-    titles: Sequence[Checked],
-    sentences: Sequence[Checked],
+    titles: Sequence[WrittenItem],
+    sentences: Sequence[WrittenItem],
     timeout_seconds: float,
 ) -> CatchAsk | None:
     """Catch 판정 요청. 바뀐 줄·경로는 생성 요청에 담은 고를 수 있는 줄 그대로다(가린 줄 제외)."""
@@ -156,18 +126,14 @@ def catch_ask(
         lines,
         record=None if record is None else record.text,
         ask_whole=ask_whole,
-        titles=[_written(each) for each in titles if each.passed],
-        sentences=[_written(each) for each in sentences if each.passed],
+        titles=[_written(each) for each in titles],
+        sentences=[_written(each) for each in sentences],
         timeout_seconds=timeout_seconds,
     )
 
 
-def _written(checked: Checked) -> Written:
-    return Written(
-        checked.item.id,
-        checked.item.text,
-        tuple(line.id for line in checked.item.lines),
-    )
+def _written(item: WrittenItem) -> Written:
+    return Written(item.id, item.text, tuple(line.id for line in item.lines))
 
 
 @dataclass(frozen=True)
@@ -199,7 +165,7 @@ def record_verdict(
 
 
 def ai_title(
-    ask: CatchAsk | None, answers: Answers | None, titles: Sequence[Checked]
+    ask: CatchAsk | None, answers: Answers | None, titles: Sequence[WrittenItem]
 ) -> str | None:
     """TITLE_CHOICE에서 0.9 이상인 후보의 글. NONE이 0.9 이상이거나 0.9 이상인 선택지가 없으면 None(BR3.4)."""
     if ask is None or answers is None or ask.title_choice is None:
@@ -207,10 +173,7 @@ def ai_title(
     chosen = answers.chosen(ask.title_choice, TITLE_THRESHOLD)
     if chosen is None or chosen == NONE_OPTION:
         return None
-    return next(
-        (each.item.text for each in titles if each.item.id == chosen and each.passed),
-        None,
-    )
+    return next((each.text for each in titles if each.id == chosen), None)
 
 
 def choose_title(
@@ -246,15 +209,15 @@ def remove_record_fact(
 
 
 def kept_sentences(
-    ask: CatchAsk | None, answers: Answers | None, sentences: Sequence[Checked]
-) -> tuple[Checked, ...]:
-    """기계 대조를 통과하고 SENTENCE_TRUE가 0.9 이상인 문장(응답 순서). 답이 없으면 0.9 미만으로 본다(BR5.2)."""
+    ask: CatchAsk | None, answers: Answers | None, sentences: Sequence[WrittenItem]
+) -> tuple[WrittenItem, ...]:
+    """SENTENCE_TRUE가 0.9 이상인 문장(응답 순서). 답이 없으면 0.9 미만으로 본다(BR5.2)."""
     if ask is None or answers is None:
         return ()
-    kept: list[Checked] = []
+    kept: list[WrittenItem] = []
     for each in sentences:
-        question = ask.sentences.get(each.item.id)
-        if not each.passed or question is None:
+        question = ask.sentences.get(each.id)
+        if question is None:
             continue
         probability = answers.probabilities.get(question)
         if probability is not None and probability >= SENTENCE_THRESHOLD:
@@ -272,8 +235,8 @@ class CatchTrace:
 
     work_identity: str
     record: RecordText | None
-    titles: tuple[Checked, ...]
-    sentences: tuple[Checked, ...]
+    titles: tuple[WrittenItem, ...]
+    sentences: tuple[WrittenItem, ...]
     # 질문 종류·대상 → 답 값(확률·선택지별 확률·점수). 판정하지 않았으면 비어 있다.
     answers: Mapping[str, object]
     judgement: Literal["NOT_SENT", "SKIPPED", "FAILED", "ANSWERED", "NO_QUESTIONS"]

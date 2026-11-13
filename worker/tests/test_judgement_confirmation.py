@@ -199,7 +199,7 @@ def test_unknown_collection_files_are_refused(text: str) -> None:
 def test_s25_confirmation_sheet_lists_candidates_values_and_empty_marks(
     tmp_path: Path,
 ) -> None:
-    """S25: 확인표에 Catch마다 기록의 글·AI 후보와 기계 대조 결과·문장·판정 값·고른 제목·빈 맞음/틀림 칸이 있다.
+    """S25: 확인표에 Catch마다 기록의 글·AI 후보·문장·판정 값·고른 제목·빈 맞음/틀림 칸이 있다.
     결과 메시지는 만들지 않는다.
 
     #487 다시 확인용으로 설명 초안 상태·AI가 쓴 질문과 빈 예/아니오 칸(설명만 보고 알겠나·첫 문장이 코드 세부만
@@ -234,7 +234,6 @@ def test_s25_confirmation_sheet_lists_candidates_values_and_empty_marks(
         "weakByRule": False,
     }
     assert titled["titleCandidates"][0]["text"] == "alpha 값 변경"
-    assert titled["titleCandidates"][0]["passedFactcheck"] is True
     assert titled["titleCandidates"][0]["judged"] == 1.0
     assert titled["sentences"][0]["judged"] == 0.95
     assert titled["judgement"] == "ANSWERED"

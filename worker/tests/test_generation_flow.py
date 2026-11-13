@@ -1412,7 +1412,7 @@ WRITTEN = (
 def test_questions_are_the_model_text_on_both_sides(ai_side: bool) -> None:
     """#487: AI 쪽을 끄든 켜든 같은 질문 지시를 보내고, 질문은 AI가 쓴 글 그대로다(틀 문장이 아니다).
 
-    질문은 판정·기계 대조를 거치지 않는다: 켰을 때 판정 요청에 질문 글이 없다.
+    질문은 판정을 거치지 않는다: 켰을 때 판정 요청에 질문 글이 없다.
     """
     seen: list[ProviderRequest] = []
 
@@ -1723,7 +1723,7 @@ def test_small_candidate_gets_no_material_judgement() -> None:
 
 
 def three_sentences(request: ProviderRequest) -> str:
-    """후보 둘(alpha 값 변경·alpha 줄 수정)과 문장 셋(모두 기계 대조 통과)."""
+    """후보 둘(alpha 값 변경·alpha 줄 수정)과 문장 셋."""
     line = pick(request, change="added", contains="alpha")
     return ai_answer(
         titles=[written("alpha 값 변경", line), written("alpha 줄 수정", line)],
@@ -1876,16 +1876,36 @@ def test_s19_everything_dropped_and_long_fragment_title_means_no_title() -> None
             questions=[question("BACKGROUND")],
         )
 
-    judge = SyntheticJudge(answers(RECORD_WHAT=0.2))
+    judge = SyntheticJudge(answers(RECORD_WHAT=0.2, TITLE_CHOICE=choose("NONE", 0.92)))
     case, _ = ai_case(record_pull(short(name)), reply, judge=judge)
 
     each = generated(case, 3)
     assert each.title is None
     assert case.provider.rewrite_requests() == []
-    # 기계 대조에서 떨어진 후보는 판정에 오르지 않는다.
-    assert "TITLE_CHOICE:title" not in catch_questions(judge)
-    assert case.run.report.factcheck_dropped_titles == 1
+    assert case.run.report.below_threshold_titles == 1
     assert case.run.report.title_sources == Counter({"NONE": 1})
+
+
+def test_text_naming_something_outside_its_lines_is_left_to_the_judgement() -> None:
+    """#485: 가리킨 줄에 없는 이름을 쓴 후보·문장도 버리지 않고 판정에 올린다. 판정이 0.9 이상이면 쓴다."""
+
+    def reply(request: ProviderRequest) -> str:
+        line = pick(request, change="added", contains="alpha")
+        return ai_answer(
+            titles=[written("sessionStore 값 변경", line)],
+            sentences=[written("betaValue를 더했습니다.", line)],
+            title=code_title(line, "alpha"),
+            questions=[question("BACKGROUND")],
+        )
+
+    case, judge = ai_case(pulls(opened(3, ALPHA)), reply)
+
+    asked = catch_questions(judge)
+    assert "TITLE_CHOICE:title" in asked
+    assert "SENTENCE_TRUE:s1" in asked
+    each = generated(case, 3)
+    assert each.title == "sessionStore 값 변경"
+    assert each.draft.content == "betaValue를 더했습니다."
 
 
 def test_s20_work_facts_never_carry_generated_text() -> None:
@@ -2006,6 +2026,7 @@ def test_log_line_counts_judgements_and_results_without_text(
             RECORD_WHAT=0.3,
             TITLE_CHOICE=choose("t1", 0.95),
             SENTENCE_TRUE__s2=0.5,
+            SENTENCE_TRUE__s3=0.4,
         )
     )
 
@@ -2020,8 +2041,8 @@ def test_log_line_counts_judgements_and_results_without_text(
     assert (
         "aiSide=on judgementProvider=synthetic catchJudgements=1 materialJudgements=0 "
         "judgementSkipped=0 materialSkipped=0 catchJudgementReasons=- "
-        "materialJudgementReasons=- factcheckDroppedTitles=1 factcheckDroppedSentences=1 "
-        "belowThresholdTitles=0 belowThresholdSentences=1 secondLinesRemoved=1 "
+        "materialJudgementReasons=- "
+        "belowThresholdTitles=1 belowThresholdSentences=2 secondLinesRemoved=1 "
         "titleFromRecord=0 titleFromAi=1 titleFromRecordWholeMiss=0 "
         "titleFromFragment=0 titleNone=0 aiDropReasons=-"
     ) in line

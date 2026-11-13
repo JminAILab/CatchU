@@ -103,7 +103,7 @@ class CatchLine:
 
 @dataclass(frozen=True)
 class Written:
-    """AI가 쓴 제목 후보(t1~t3) 또는 설명 문장(s1~s3). 기계 대조를 통과한 것만 넘긴다."""
+    """AI가 쓴 제목 후보(t1~t3) 또는 설명 문장(s1~s3)."""
 
     id: str
     text: str

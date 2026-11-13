@@ -81,8 +81,7 @@
 | `catchJudgements`·`materialJudgements` | 보낸 Catch 판정·재료 판정 요청 수 |
 | `catchJudgementReasons`·`materialJudgementReasons` | 판정 실패 코드별 건수(`JUDGEMENT_TIMEOUT`·`JUDGEMENT_CALL_FAILED`·`JUDGEMENT_RESPONSE_UNREADABLE`). 재료 판정 실패는 실패 항목을 남기지 않고 여기에만 센다 |
 | `judgementSkipped`·`materialSkipped` | 생성은 됐지만 시간·Catch 판정 상한으로 판정하지 않은 Catch, 시간·상한으로 재료 판정을 건너뛴 큰 후보 |
-| `factcheckDroppedTitles`·`factcheckDroppedSentences` | 기계 대조로 버린 후보·문장 |
-| `belowThresholdTitles`·`belowThresholdSentences` | 기계 대조는 통과했지만 판정이 0.9 미만이라 쓰지 않은 후보·문장 |
+| `belowThresholdTitles`·`belowThresholdSentences` | 판정이 0.9 미만이라 쓰지 않은 후보·문장 |
 | `secondLinesRemoved` | 판정 부실로 작업 사실 둘째 줄을 지운 Catch |
 | `titleFromRecord`·`titleFromAi`·`titleFromRecordWholeMiss`·`titleFromFragment`·`titleNone` | 제목 출처별 Catch 수(기록의 글·AI 후보·전체 미달 기록의 글·조각 제목·없음) |
 | `aiDropReasons` | AI 응답에서 모양·근거 줄·글자 수로 버린 후보·문장(`dropped:TOO_LONG` 등, 위 원인 코드와 같은 꼴) |
