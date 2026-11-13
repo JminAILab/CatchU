@@ -1,6 +1,9 @@
 import type { AccessTokenStore } from "../../lib/access-token.ts";
 import { API_VERSION_PATH, normalizeApiBaseUrl, type ApiClient, type ClientResult } from "../../lib/api-client.ts";
+import { memberCallBlock } from "../../lib/auth-api.ts";
 import { readApiResponse } from "../../lib/api-response.ts";
+import type { AuthSession } from "../../lib/auth-session.ts";
+import type { AuthStore } from "../../lib/auth-state.ts";
 import { codePointLength, saveFailureOf, type SaveFailure } from "../../lib/save-outcome.ts";
 import { SENSITIVE_INFO_NOTICE } from "./materials-api.ts";
 
@@ -9,8 +12,11 @@ import { SENSITIVE_INFO_NOTICE } from "./materials-api.ts";
  *
  * - 목록·상세·삭제는 공통 `api.member`(JSON)를 쓴다.
  * - 업로드(multipart)와 PDF 본문(바이너리)은 공통 클라이언트가 다루지 않아, 같은 기준 주소 규칙(`normalizeApiBaseUrl`·`/v1`,
- *   `credentials: "omit"`, `cache: "no-store"`)으로 직접 `fetch`한다(`features/rag-answer`의 SSE와 같은 방식). 회원 요청에는 메모리 토큰을
- *   `Authorization`으로 붙이고, 회원 인증 401(`AUTH_REQUIRED`·`AUTH_INVALID`)을 받으면 `api.member`와 같이 그 토큰을 지운다.
+ *   `credentials: "omit"`, `cache: "no-store"`)으로 직접 `fetch`한다(`features/rag-answer`의 SSE와 같은 방식). 회원 요청의 토큰과
+ *   회원 인증 401(`AUTH_REQUIRED`·`AUTH_INVALID`) 처리는 `api.member`와 같은 쪽을 따른다(`PdfMemberAuth`). 공통 인증을 켠 빌드는
+ *   공통 인증 상태의 실제 토큰을 붙이고 401이면 세션 갱신을 한 번 요청해 조회(GET)만 다시 보낸다(`sessionPdfAuth`). 끈 빌드는
+ *   메모리 토큰을 붙이고 401이면 그 토큰을 지운다(`legacyPdfAuth`). 공통 인증을 켜면 메모리 토큰 저장소에는 실제 토큰이 아니라
+ *   회원 화면 범위 표시값이 들어가므로(`auth-scope.ts`), 그 값을 `Authorization`에 싣지 않는다.
  * - 받은 사람 요청에는 회원 토큰을 붙이지 않고, grant는 `X-Link-Grant` 머리로만 싣는다(BR6.3). 토큰·grant를 URL 쿼리에 넣지 않는다.
  */
 
@@ -188,45 +194,114 @@ export function fileSizeText(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
+/**
+ * PDF 회원 요청 한 번의 계획. `send`면 `token`을 붙여 보낸다. `current()`는 보낸 세션(계정)이 아직 지금 세션인지다.
+ * `blocked`면 보내지 않는다(공통 인증의 보내지 않음과 같은 조건).
+ */
+export type PdfAuthPlan = { kind: "send"; token: string | null; current(): boolean } | { kind: "blocked" };
+
+/**
+ * PDF 회원 요청의 토큰과 회원 인증 401 처리. `api.member`가 쓰는 쪽(공통 인증을 켠 빌드인지)에 맞춰 고른다.
+ * - `token()`: 이번 요청의 계획.
+ * - `authFailed(sent)`: 그 계획으로 보낸 요청이 회원 인증 401을 받았을 때 부른다. `renewed`면 같은 세션의 토큰이 바뀌었다(조회만 다시 보낸다).
+ */
+export type PdfMemberAuth = {
+  token(): PdfAuthPlan;
+  authFailed(sent: Extract<PdfAuthPlan, { kind: "send" }>): Promise<"renewed" | "not-renewed">;
+};
+
+/** 공통 인증을 끈 빌드: 메모리 토큰을 붙이고, 401이면 그 토큰이 아직 현재 토큰일 때 지운다(기존 동작). */
+export function legacyPdfAuth(tokens: AccessTokenStore): PdfMemberAuth {
+  return {
+    token: () => ({ kind: "send", token: tokens.get().token, current: () => true }),
+    async authFailed(sent) {
+      // 응답을 기다리는 동안 다시 로그인했다면 새 토큰은 지우지 않는다.
+      if (tokens.get().token === sent.token) tokens.clear("auth-failed");
+      return "not-renewed";
+    },
+  };
+}
+
+/**
+ * 공통 인증을 켠 빌드: `auth-api.ts`의 `member`와 같은 기준으로 공통 인증 상태의 실제 토큰을 쓴다.
+ * 보내기 전 조건(`memberCallBlock`)을 확인하고 그때의 인증 세대를 기억한다. 401을 받았을 때와 갱신을 마쳤을 때 로그인 표식을
+ * 비교해 세대가 바뀌었으면(다른 계정 로그인·로그아웃·표식 불일치) 갱신하지 않고 다시 보내지 않는다. 같은 세션의 Access 갱신은
+ * 세대를 바꾸지 않는다. 세대가 그대로면 그 토큰이 아직 현재 토큰일 때 세션 갱신을 한 번 요청하고, 다른 호출이 이미 갱신했으면
+ * 갱신하지 않고 바뀐 토큰을 쓴다. 상태 변화(재인증 필요 등)는 공통 인증이 맡는다. 런타임은 요청할 때 얻는다(모듈을 읽을 때 만들지 않는다).
+ */
+export function sessionPdfAuth(runtime: () => { store: AuthStore; session: AuthSession }): PdfMemberAuth {
+  return {
+    token() {
+      const { store, session } = runtime();
+      session.checkLoginMarker();
+      if (memberCallBlock(store) !== null) return { kind: "blocked" };
+      const generation = store.getSnapshot().generation;
+      return {
+        kind: "send",
+        token: store.accessToken(),
+        current() {
+          session.checkLoginMarker();
+          return store.getSnapshot().generation === generation;
+        },
+      };
+    },
+    async authFailed(sent) {
+      // 응답을 기다리는 사이 계정이 바뀌었으면 그 요청은 이전 세션의 것이다. 새 세션의 토큰으로 다시 보내지 않는다.
+      if (!sent.current()) return "not-renewed";
+      const { store, session } = runtime();
+      const renewedByOther = store.accessToken() !== sent.token && store.accessToken() !== null;
+      const refreshed = renewedByOther ? null : await session.refresh();
+      // 갱신하는 사이 계정이 바뀌었어도 다시 보내지 않는다.
+      if (!sent.current()) return "not-renewed";
+      return memberCallBlock(store) === null && (renewedByOther || refreshed?.kind === "signed-in") ? "renewed" : "not-renewed";
+    },
+  };
+}
+
 export type PdfHttpOptions = {
   /** NEXT_PUBLIC_API_BASE_URL. `/v1`은 넣지 않는다. */
   baseUrl: string | undefined;
   nodeEnv?: string;
-  tokens: AccessTokenStore;
   fetch?: typeof fetch;
-};
+} & ({ auth: PdfMemberAuth; tokens?: never } | { tokens: AccessTokenStore; auth?: never });
 
 const MEMBER_AUTH_FAILURES = new Set(["AUTH_REQUIRED", "AUTH_INVALID"]);
 const NOT_SENT = (): Response => new Response(null, { status: 503 });
 
 /**
  * multipart 업로드와 PDF 본문 요청. 응답을 해석하지 않고 `Response`를 그대로 돌려준다(본문 수신 성공 여부는 부르는 쪽이 본다).
- * 주소 설정이 없거나 잘못되면 요청하지 않는다.
+ * 주소 설정이 없거나 잘못되면, 또는 공통 인증이 보내지 않는 상태면 요청하지 않는다.
+ * 회원 인증 401을 받아 토큰이 바뀌었으면 조회(GET)만 한 번 다시 보낸다. 업로드(POST)는 다시 보내지 않는다(#251 T2).
  */
 export function createPdfHttp(options: PdfHttpOptions) {
   const baseUrl = normalizeApiBaseUrl(options.baseUrl, options.nodeEnv);
   const fetchImpl = options.fetch ?? ((input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init));
+  const auth = options.auth ?? legacyPdfAuth(options.tokens as AccessTokenStore);
 
   async function member(path: string, init: { method: "GET" | "POST"; body?: FormData; accept: string; signal?: AbortSignal }): Promise<Response> {
-    if (!baseUrl) return NOT_SENT();
-    const token = options.tokens.get().token;
-    const response = await fetchImpl(`${baseUrl}${API_VERSION_PATH}${path}`, {
-      method: init.method,
-      // multipart 경계는 브라우저가 붙이므로 Content-Type을 직접 쓰지 않는다.
-      headers: { Accept: init.accept, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: init.body,
-      cache: "no-store",
-      credentials: "omit",
-      signal: init.signal,
-    });
-    if (response.status === 401) {
-      // 회원 인증 실패면 `api.member`와 같이 그 토큰을 지운다. 응답을 기다리는 동안 다시 로그인했다면 새 토큰은 지우지 않는다.
+    for (let resent = false; ; resent = true) {
+      if (!baseUrl) return NOT_SENT();
+      const plan = auth.token();
+      if (plan.kind === "blocked") return NOT_SENT();
+      const { token } = plan;
+      // 이 요청을 보낸 세션의 계획(plan)을 401 처리에 넘긴다. 다시 보낼지는 그 세션이 아직 지금 세션인지까지 보고 정한다.
+      const response = await fetchImpl(`${baseUrl}${API_VERSION_PATH}${path}`, {
+        method: init.method,
+        // multipart 경계는 브라우저가 붙이므로 Content-Type을 직접 쓰지 않는다.
+        headers: { Accept: init.accept, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: init.body,
+        cache: "no-store",
+        credentials: "omit",
+        signal: init.signal,
+      });
+      if (response.status !== 401) return response;
       const body: unknown = await response.clone().json().catch(() => null);
-      if (record(body) && typeof body.code === "string" && MEMBER_AUTH_FAILURES.has(body.code) && options.tokens.get().token === token) {
-        options.tokens.clear("auth-failed");
-      }
+      if (!(record(body) && typeof body.code === "string" && MEMBER_AUTH_FAILURES.has(body.code))) return response;
+      // 다시 보낸 조회도 401이면 더 갱신하지 않는다.
+      if (resent) return response;
+      const renewal = await auth.authFailed(plan);
+      if (renewal !== "renewed" || init.method !== "GET") return response;
     }
-    return response;
   }
 
   return {

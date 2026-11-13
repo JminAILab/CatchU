@@ -14,12 +14,15 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createAccessTokenStore } from "../src/lib/access-token.ts";
+import { bindLegacyTokenSignal, createSessionScope } from "../src/lib/auth-scope.ts";
+import { createAuthStore } from "../src/lib/auth-state.ts";
 import { AI_NOTICE_LINE } from "../src/components/ai-consent/ai-consent-notice.ts";
 import { CONSENT_RECORD_FAILED, runWithConsent } from "../src/components/ai-consent/ai-consent-flow.ts";
 import { SENSITIVE_INFO_NOTICE } from "../src/features/materials/materials-api.ts";
 import {
   PDF_COUNT_LIMIT_TEXT, PDF_DELETE_CONFIRM, PDF_FAILURE_TEXT, PDF_LIMITS, PDF_SENSITIVE_INFO_NOTICE, PDF_UPLOAD_FAILED_TEXT, createPdfHttp,
-  createPdfMaterialsApi, extractionBadge, fileSizeText, isPdfMaterialPage, pdfListErrorText, pdfUploadErrors, pdfUploadOutcome, uploadTitle,
+  createPdfMaterialsApi, extractionBadge, fileSizeText, isPdfMaterialPage, pdfListErrorText, pdfUploadErrors, pdfUploadOutcome, sessionPdfAuth,
+  uploadTitle,
 } from "../src/features/materials/pdf-materials-api.ts";
 import { load } from "./u2-render.mjs";
 
@@ -456,4 +459,118 @@ test("요청: 업로드는 회원 토큰과 multipart(파일 종류 application/
   assert.equal((await unset.recipientCopy("t", ID, null)).status, 503);
   assert.deepEqual(await unset.upload(new Blob(["x"]), "a.pdf", "t"), { kind: "lookup-failed", status: 503, code: "LOOKUP_FAILED" });
   assert.equal(requests.length, before);
+});
+
+test("공통 인증을 켠 빌드: 메모리 토큰 저장소의 회원 범위 표시값이 아니라 공통 인증의 실제 토큰을 붙이고, 401이면 한 번 갱신해 조회만 다시 보낸다(#536 리뷰)", async () => {
+  // 실제 공통 인증 저장소와 표시값 연결(auth-runtime.ts와 같은 연결). 세션은 갱신만 흉내 낸다(실제 서버·쿠키 검증이 아니다).
+  const store = createAuthStore();
+  const legacy = createAccessTokenStore();
+  bindLegacyTokenSignal(store, createSessionScope(store), legacy);
+  store.signedIn("access-1");
+  assert.match(legacy.get().token ?? "", /^member-scope-/, "켠 빌드의 메모리 토큰 저장소에는 표시값이 들어 있다");
+  let refreshes = 0;
+  let refreshTo = "access-2";
+  const session = {
+    checkLoginMarker() {},
+    async refresh() {
+      refreshes += 1;
+      const ticket = store.refreshStarted();
+      if (refreshTo === null) { store.refreshFailed(ticket, "session-ended"); return { kind: "reauth-required" }; }
+      store.refreshSucceeded(refreshTo, ticket);
+      return { kind: "signed-in" };
+    },
+  };
+  const requests = [];
+  const responses = [];
+  const fetchImpl = async (url, init) => { requests.push({ url, init }); return responses.shift() ?? new Response(null, { status: 500 }); };
+  const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+  const http = createPdfHttp({ baseUrl: "http://127.0.0.1:3001", nodeEnv: "test", auth: sessionPdfAuth(() => ({ store, session })), fetch: fetchImpl });
+
+  // 원본 보기: 실제 토큰을 붙인다. 표시값은 어떤 요청에도 실리지 않는다.
+  responses.push(new Response("pdf", { status: 200 }));
+  assert.equal((await http.originalFile(ID)).status, 200);
+  assert.equal(requests[0].init.headers.Authorization, "Bearer access-1");
+
+  // 조회가 회원 인증 401이면 세션을 한 번 갱신하고 새 토큰으로 한 번만 다시 보낸다.
+  responses.push(json(401, { code: "AUTH_INVALID", message: "만료" }), new Response("pdf", { status: 200 }));
+  assert.equal((await http.ownerCopy(ID, ID2)).status, 200);
+  assert.equal(refreshes, 1);
+  assert.deepEqual(requests.slice(1).map((r) => r.init.headers.Authorization), ["Bearer access-1", "Bearer access-2"]);
+
+  // 업로드(변경 요청)는 갱신 뒤에도 다시 보내지 않는다(#251 T2). 401을 그대로 돌려준다.
+  const before = requests.length;
+  responses.push(json(401, { code: "AUTH_INVALID", message: "만료" }));
+  refreshTo = "access-3";
+  const uploaded = await http.upload(new Blob(["%PDF-1.4"]), "a.pdf", "t");
+  assert.equal(uploaded.kind, "api-error");
+  assert.equal(uploaded.status, 401);
+  assert.equal(refreshes, 2);
+  assert.equal(requests.length, before + 1, "업로드는 한 번만 보낸다");
+  assert.equal(requests.at(-1).init.headers.Authorization, "Bearer access-2");
+
+  // 링크 401은 회원 인증 실패가 아니라 갱신하지 않는다.
+  responses.push(json(401, { code: "LINK_PASSWORD_REQUIRED", message: "비밀번호" }));
+  assert.equal((await http.originalFile(ID)).status, 401);
+  assert.equal(refreshes, 2);
+
+  // 갱신에 실패하면(재인증 필요) 다시 보내지 않고, 그 뒤 요청은 보내지 않는다(공통 인증의 보내지 않음 조건).
+  responses.push(json(401, { code: "AUTH_INVALID", message: "만료" }));
+  refreshTo = null;
+  const sentBefore = requests.length;
+  assert.equal((await http.originalFile(ID)).status, 401);
+  assert.equal(requests.length, sentBefore + 1);
+  assert.equal(store.getSnapshot().status, "reauth-required");
+  assert.equal((await http.originalFile(ID)).status, 503, "재인증이 필요한 동안은 요청하지 않는다");
+  assert.equal(requests.length, sentBefore + 1);
+  assert.ok(requests.every((r) => !String(r.init.headers.Authorization ?? "").includes("member-scope-")), "표시값을 Authorization에 싣지 않는다");
+});
+
+test("공통 인증을 켠 빌드: PDF 조회를 기다리는 사이나 갱신하는 사이 다른 계정으로 로그인하면 401 뒤 다시 보내지 않는다. 같은 세션의 갱신이면 다시 보낸다(#537 리뷰)", async () => {
+  // 실제 공통 인증 저장소에 세션은 갱신만 흉내 낸다. 새 로그인은 인증 세대를 바꾸고, 같은 세션의 Access 갱신은 바꾸지 않는다(auth-state.ts).
+  const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+  const expired = () => json(401, { code: "AUTH_INVALID", message: "만료" });
+  const setup = (refreshAction) => {
+    const store = createAuthStore();
+    store.signedIn("access-A");
+    let refreshes = 0;
+    const session = {
+      checkLoginMarker() {},
+      async refresh() {
+        refreshes += 1;
+        return refreshAction(store);
+      },
+    };
+    const requests = [];
+    const responses = [];
+    const fetchImpl = async (url, init) => {
+      requests.push(init.headers.Authorization);
+      const next = responses.shift();
+      return typeof next === "function" ? next(store) : next ?? new Response(null, { status: 500 });
+    };
+    const http = createPdfHttp({ baseUrl: "http://127.0.0.1:3001", nodeEnv: "test", auth: sessionPdfAuth(() => ({ store, session })), fetch: fetchImpl });
+    return { store, http, requests, responses, refreshes: () => refreshes };
+  };
+  const renewTo = (next) => (store) => { store.refreshSucceeded(next, store.refreshStarted()); return { kind: "signed-in" }; };
+
+  // ① A의 원본 조회를 기다리는 사이 B로 로그인했고, A의 요청이 401을 받았다: 갱신하지 않고 B의 토큰으로 다시 보내지 않는다.
+  const first = setup(renewTo("access-A2"));
+  first.responses.push((store) => { store.signedIn("access-B"); return expired(); });
+  assert.equal((await first.http.originalFile(ID)).status, 401, "A의 401을 그대로 돌려준다");
+  assert.deepEqual(first.requests, ["Bearer access-A"], "B의 토큰으로 다시 보내지 않는다");
+  assert.equal(first.refreshes(), 0, "계정이 바뀌었으면 갱신도 요청하지 않는다");
+
+  // ② A의 401 뒤 갱신하는 사이 B로 로그인했다: 갱신 결과와 상관없이 다시 보내지 않는다.
+  const second = setup((store) => { store.signedIn("access-B"); return { kind: "signed-in" }; });
+  second.responses.push(expired());
+  assert.equal((await second.http.ownerCopy(ID, ID2)).status, 401);
+  assert.deepEqual(second.requests, ["Bearer access-A"]);
+  assert.equal(second.refreshes(), 1);
+
+  // ③ 같은 세션에서 다른 호출이 A의 Access를 갱신했다(세대 그대로): 갱신을 다시 요청하지 않고 새 토큰으로 한 번 다시 보낸다.
+  const third = setup(renewTo("access-A3"));
+  third.responses.push((store) => { store.refreshSucceeded("access-A2", store.refreshStarted()); return expired(); },
+    new Response("pdf", { status: 200 }));
+  assert.equal((await third.http.originalFile(ID)).status, 200);
+  assert.deepEqual(third.requests, ["Bearer access-A", "Bearer access-A2"]);
+  assert.equal(third.refreshes(), 0);
 });
