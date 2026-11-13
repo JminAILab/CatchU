@@ -524,3 +524,53 @@ test("공통 인증을 켠 빌드: 메모리 토큰 저장소의 회원 범위 �
   assert.equal(requests.length, sentBefore + 1);
   assert.ok(requests.every((r) => !String(r.init.headers.Authorization ?? "").includes("member-scope-")), "표시값을 Authorization에 싣지 않는다");
 });
+
+test("공통 인증을 켠 빌드: PDF 조회를 기다리는 사이나 갱신하는 사이 다른 계정으로 로그인하면 401 뒤 다시 보내지 않는다. 같은 세션의 갱신이면 다시 보낸다(#537 리뷰)", async () => {
+  // 실제 공통 인증 저장소에 세션은 갱신만 흉내 낸다. 새 로그인은 인증 세대를 바꾸고, 같은 세션의 Access 갱신은 바꾸지 않는다(auth-state.ts).
+  const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+  const expired = () => json(401, { code: "AUTH_INVALID", message: "만료" });
+  const setup = (refreshAction) => {
+    const store = createAuthStore();
+    store.signedIn("access-A");
+    let refreshes = 0;
+    const session = {
+      checkLoginMarker() {},
+      async refresh() {
+        refreshes += 1;
+        return refreshAction(store);
+      },
+    };
+    const requests = [];
+    const responses = [];
+    const fetchImpl = async (url, init) => {
+      requests.push(init.headers.Authorization);
+      const next = responses.shift();
+      return typeof next === "function" ? next(store) : next ?? new Response(null, { status: 500 });
+    };
+    const http = createPdfHttp({ baseUrl: "http://127.0.0.1:3001", nodeEnv: "test", auth: sessionPdfAuth(() => ({ store, session })), fetch: fetchImpl });
+    return { store, http, requests, responses, refreshes: () => refreshes };
+  };
+  const renewTo = (next) => (store) => { store.refreshSucceeded(next, store.refreshStarted()); return { kind: "signed-in" }; };
+
+  // ① A의 원본 조회를 기다리는 사이 B로 로그인했고, A의 요청이 401을 받았다: 갱신하지 않고 B의 토큰으로 다시 보내지 않는다.
+  const first = setup(renewTo("access-A2"));
+  first.responses.push((store) => { store.signedIn("access-B"); return expired(); });
+  assert.equal((await first.http.originalFile(ID)).status, 401, "A의 401을 그대로 돌려준다");
+  assert.deepEqual(first.requests, ["Bearer access-A"], "B의 토큰으로 다시 보내지 않는다");
+  assert.equal(first.refreshes(), 0, "계정이 바뀌었으면 갱신도 요청하지 않는다");
+
+  // ② A의 401 뒤 갱신하는 사이 B로 로그인했다: 갱신 결과와 상관없이 다시 보내지 않는다.
+  const second = setup((store) => { store.signedIn("access-B"); return { kind: "signed-in" }; });
+  second.responses.push(expired());
+  assert.equal((await second.http.ownerCopy(ID, ID2)).status, 401);
+  assert.deepEqual(second.requests, ["Bearer access-A"]);
+  assert.equal(second.refreshes(), 1);
+
+  // ③ 같은 세션에서 다른 호출이 A의 Access를 갱신했다(세대 그대로): 갱신을 다시 요청하지 않고 새 토큰으로 한 번 다시 보낸다.
+  const third = setup(renewTo("access-A3"));
+  third.responses.push((store) => { store.refreshSucceeded("access-A2", store.refreshStarted()); return expired(); },
+    new Response("pdf", { status: 200 }));
+  assert.equal((await third.http.originalFile(ID)).status, 200);
+  assert.deepEqual(third.requests, ["Bearer access-A", "Bearer access-A2"]);
+  assert.equal(third.refreshes(), 0);
+});
