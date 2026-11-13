@@ -873,7 +873,7 @@ def test_lines_of_another_account_cannot_be_cited() -> None:
     assert drops(case) == (one("dropped:UNKNOWN_LINE"), Counter())
 
 
-# 생각해 볼 질문: AI가 작업 전체를 묻는 글을 직접 쓴다(#487, 2026-11-08 팀장 결정). 판정·기계 대조는 없고
+# 생각해 볼 질문: AI가 작업 전체를 묻는 글을 직접 쓴다(#487, 2026-11-08 팀장 결정). 판정은 없고
 # 모양·150자·가리기 검사만 본다. 같은 종류 겹침과 상한은 그대로다.
 
 WRITTEN_QUESTIONS = (

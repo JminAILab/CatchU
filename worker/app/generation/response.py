@@ -10,7 +10,7 @@
   틀린 문장은 나오지 않는다. 지목한 줄·파일이 보낸 자료에 있는지, 가린 줄이 아닌지, 이름이 그 줄에 식별자
   경계로 있는지(사실 검사)는 그대로 본다.
 - 질문(questions): AI가 작업 전체를 묻는 질문 글을 직접 쓴다(#487, 2026-11-08 팀장 결정). 본인만 보는 칸이라
-  판정·기계 대조는 붙이지 않는다. 모양이 틀리거나 글자 상한을 넘거나 가리기 검사(`app.redact.mask_text`)에
+  판정은 붙이지 않는다. 모양이 틀리거나 글자 상한을 넘거나 가리기 검사(`app.redact.mask_text`)에
   걸리는 질문은 버리고, 같은 종류 질문은 처음 것만, 상한까지 쓴다. 쓸 질문이 하나도 없으면 질문 부분 실패다.
 - 제목(title): 칸 누락·모양 위반·40자 초과는 형식 위반이라 고쳐 쓰기 대상이다. 확인 실패는 null이다.
 - 최상위의 모르는 키는 어느 부분에도 쓰지 않고 판정에서 무시한다(건수만 운영 로그에 남긴다). 모르는
@@ -400,7 +400,6 @@ class WrittenItem:
     id: str
     text: str
     lines: tuple[PreparedLine, ...]
-    files: tuple[PreparedFile, ...]
 
 
 @dataclass(frozen=True)
@@ -459,8 +458,7 @@ def written(
             notes.append("over:COUNT")
             continue
         text, lines = found
-        files = tuple(dict.fromkeys(sent.files[line.file_id] for line in lines))
-        items.append(WrittenItem(f"{prefix}{len(items) + 1}", text, lines, files))
+        items.append(WrittenItem(f"{prefix}{len(items) + 1}", text, lines))
     return WrittenPart(tuple(items), tuple(notes))
 
 

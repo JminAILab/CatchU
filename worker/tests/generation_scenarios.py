@@ -306,9 +306,7 @@ def ai_answer(
 
 
 def naive_ai(request: ProviderRequest) -> str:
-    """AI 쪽 정상 합성 모델: 고를 수 있는 첫 이름 줄로 제목 후보 하나·설명 문장 하나·조각 제목·질문 하나.
-
-    후보와 문장은 그 줄의 이름·경로만 써서 기계 대조를 통과한다."""
+    """AI 쪽 정상 합성 모델: 고를 수 있는 첫 이름 줄로 제목 후보 하나·설명 문장 하나·조각 제목·질문 하나."""
     assert request.ai_side, "AI 쪽 생성 요청이 아니다"
     line = _first_named(request)
     name = identifiers(line.text)[0]
