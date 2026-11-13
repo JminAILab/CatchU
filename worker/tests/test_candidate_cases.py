@@ -270,7 +270,7 @@ def test_c7_without_issue_permission_keeps_one_whole_pull_request() -> None:
     [
         # 연결 PR 조회는 마친 PR 밖 본인 커밋의 변경 내용 조회가 500이다.
         ("direct", "COLLECTION_FETCH_FAILED"),
-        # 다른 PR #99의 본인 커밋 변경 내용 조회가 429다.
+        # 다른 PR #99의 본인 커밋 변경 내용 조회가 429다. 그 커밋은 PR #20의 커밋보다 오래됐다.
         ("other-pull", "RATE_LIMITED"),
     ],
 )
@@ -278,7 +278,9 @@ def test_c7_whole_pull_request_is_kept_when_an_unrelated_check_stops(
     override: str, code: str
 ) -> None:
     """무관한 조회가 멈춰도 PR #20은 같은 workIdentity의 후보 하나로 그대로다. 멈춘 쪽 커밋은 변경
-    내용을 받지 못해 후보가 아니다."""
+    내용을 받지 못해 후보가 아니다. 선택 조회는 단위마다 첫 기여 커밋을 최근 것부터 부르므로, 멈추는
+    조회는 PR #20의 첫 기여 커밋(eeee)보다 오래된 커밋에 둔다. 더 최근 커밋에서 멈추면 PR #20의 변경
+    내용을 하나도 받지 못한다(이슈 번호로 나누는 필수 조회는 없다, #479)."""
     base = c7_scenario()
     if override == "direct":
         extra = commit(
@@ -292,13 +294,13 @@ def test_c7_whole_pull_request_is_kept_when_an_unrelated_check_stops(
         )
     else:
         other = commit(
-            sha(9901), MEMBER, parents=(B0,), minute=6, files=[change("app/other.py")]
+            sha(9901), MEMBER, parents=(B0,), minute=1, files=[change("app/other.py")]
         )
         scenario = replace(
             base,
             pulls=(
                 *base.pulls,
-                Pull(99, MEMBER, (other,), state="open", created=6),
+                Pull(99, MEMBER, (other,), state="open", created=1),
             ),
             overrides={detail_path(other.sha): status_only(429)},
         )

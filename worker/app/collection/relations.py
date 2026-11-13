@@ -32,7 +32,7 @@
    담은 커밋을 다 빼지 못하기 때문이다. 창이 저장소의 모든 이력을 담았으면 부르지 않는다. 결과는
    MergeBoundary로 남기고, 쪽수·응답 크기 상한이나 수가 맞지 않으면 다 읽지 못한 것(complete 거짓),
    수집이 멈춰 부르지 못했으면 NOT_REACHED다.
-5. DETAILS(커밋 허용 때): 변경 내용. 같은 변경 확인·단위 나누기에 꼭 필요한 것(필수 조회)은
+5. DETAILS(커밋 허용 때): 변경 내용. 같은 변경 확인에 꼭 필요한 것(필수 조회)은
    상한까지 부른다. 그다음 파일 모드를 확인한다. 커밋 상세(JSON)에는 파일 모드가 없어서, 관계
    근거(cherry-pick 표시·재제출)가 있고 모드를 빼고 계산한 diff 값(content_patch_id)이 같으며
    None이 아닌 쌍의 양쪽 커밋만 같은 커밋 경로를 diff 형식으로 커밋마다 한 번 부른다. 받은 본문은
@@ -215,7 +215,7 @@ class MergeBoundary:
 class DetailTiers:
     """변경 내용 조회 계획(커밋 SHA). 한 커밋은 한 단계에만 든다. 이 순서로 부른다."""
 
-    # 필수 조회: 같은 변경 확인·단위 나누기에 꼭 필요하다. 상한에 걸리면 확인 중단이다.
+    # 필수 조회: 같은 변경 확인에 꼭 필요하다. 상한에 걸리면 확인 중단이다.
     needed: tuple[str, ...] = ()
     # 단위의 첫 기여 커밋(선택): 받은 PR 커밋 목록마다 가장 최근 본인 병합 아닌 커밋, 그다음 연결 PR
     # 조회로 정해질 PR마다 가장 최근 본인 커밋(목록에서 이미 골랐거나 목록을 끝까지 받은 PR은 뺀다).
@@ -266,7 +266,7 @@ ResubmissionCheck = Callable[[PullRequestRecord, PullRequestRecord], bool]
 
 
 # 관계 근거의 정의. 변경 내용의 필수 조회 계획과 후보 처리의 판정이 같은 정의를 쓴다. 글자 규칙
-# (cherry-pick 표시·이슈 번호·PR 번호 읽기)과 diff 값 계산은 app/candidates/same_change.py에,
+# (cherry-pick 표시·PR 번호 읽기)과 diff 값 계산은 app/candidates/same_change.py에,
 # 재제출의 상태·순서 조건은 아래 resubmission_shape에 있다. app.candidates는 app.collection을 가져다
 # 쓰므로 이 모듈을 읽을 때 가져오면 순환 import가 된다. 그래서 글자 규칙과 diff 값은 쓸 때 가져온다.
 
@@ -275,12 +275,6 @@ def _cherry_pick_sources(message: str) -> frozenset[str]:
     from app.candidates.same_change import cherry_pick_sources
 
     return cherry_pick_sources(message)
-
-
-def _issue_references(text: str) -> frozenset[int]:
-    from app.candidates.same_change import issue_references
-
-    return issue_references(text)
 
 
 def _content_patch_id(record: CommitRecord) -> str | None:
@@ -1245,7 +1239,7 @@ class RelationCollector:
     def _needed_details(
         self, data: CollectedData, index: dict[str, CommitRecord]
     ) -> tuple[str, ...]:
-        """필수 조회: 관계 근거가 있는 쌍의 양쪽, 나눌 수 있어 보이는 단위의 커밋."""
+        """필수 조회: 관계 근거(재제출·cherry-pick 표시)가 있는 쌍의 양쪽 커밋."""
         needed: dict[str, None] = {}
 
         def add(shas: Iterable[str]) -> None:
@@ -1274,59 +1268,7 @@ class RelationCollector:
             for source in sorted(_cherry_pick_sources(record.message)):
                 if source != record.sha and source in index:
                     add((source, record.sha))
-        issue_numbers = {issue.number for issue in data.issues}
-        if "ISSUE" in self._allowed and issue_numbers:
-            for unit in (*lists.values(), *self._merge_units(data)):
-                referenced: set[int] = set()
-                for sha in unit:
-                    if sha in index and self._own(index[sha]):
-                        referenced |= _issue_references(index[sha].message)
-                # 단위 나누기는 단위의 모든 변경 파일이 있어야 하므로 다른 계정 커밋도 함께 본다.
-                if len(referenced & issue_numbers) >= 2:
-                    add(unit)
         return tuple(needed)
-
-    def _merge_units(self, data: CollectedData) -> list[tuple[str, ...]]:
-        """PR 없는 병합 후보마다, 들인 커밋 가운데 PR로 설명되지 않은 것.
-
-        들인 커밋은 후보 처리와 같은 정의(흡수 병합이 들인 커밋을 빼고, 경계 비교를 받았으면 그
-        결과)로 센다. 추가 기준 브랜치 사슬이 잘려 흡수 여부를 모르거나 첫 부모 쪽 경계를 확인하지
-        못한 병합은 후보 처리가 단위로 확정하지 않으므로 나누기에 쓸 변경 내용도 계획하지 않는다.
-        """
-        graph = WindowGraph.of(data.commits)
-        if graph.head is None:
-            return []
-        merges = pull_request_less_merges(
-            graph,
-            pull_request_commits=self._listed_commits(),
-            merge_commit_shas=self._merge_commit_shas(data),
-            base_lines=self._base_lines,
-        )
-        pulls_allowed = "PULL_REQUEST" in self._allowed
-        units: list[tuple[str, ...]] = []
-        for merge in merges.candidates:
-            lookup = self._associated.get(merge)
-            if pulls_allowed and (lookup is None or lookup.status is not Lookup.EMPTY):
-                continue
-            if merges.base_lines_cut and merge not in graph.mainline:
-                continue
-            seen = merges.brought_in(graph, merge, self._boundaries.get(merge))
-            if seen.first_side_open and not seen.complete:
-                continue
-            brought = seen.commits
-            units.append(
-                tuple(
-                    sha
-                    for sha in graph.order
-                    if sha in brought
-                    and sha not in merges.explained
-                    and (
-                        sha not in self._associated
-                        or self._associated[sha].status is Lookup.EMPTY
-                    )
-                )
-            )
-        return units
 
     def _relation_sides(
         self, data: CollectedData, index: Mapping[str, CommitRecord]
