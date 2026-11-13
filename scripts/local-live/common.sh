@@ -8,6 +8,22 @@ LIVE_DB_PORT="${CATCHU_LOCAL_LIVE_DB_PORT:-55432}"
 LIVE_QUEUE_PORT="${CATCHU_LOCAL_LIVE_QUEUE_PORT:-56379}"
 export REPO_ROOT LIVE_DIR LIVE_DB LIVE_QUEUE LIVE_DB_PORT LIVE_QUEUE_PORT
 
+# 컨테이너 두 개를 켜고, DB가 컨테이너 안과 내 컴퓨터의 포트 양쪽에서 받을 때까지 기다린다(최대 60초).
+# 컴퓨터를 켠 직후에는 컨테이너 안이 먼저 준비되고 포트 연결이 조금 늦게 열린다.
+start_containers() {
+  local port="$1" i
+  docker start "${LIVE_DB}" "${LIVE_QUEUE}" >/dev/null
+  for i in $(seq 1 60); do
+    if docker exec "${LIVE_DB}" pg_isready -U catchu -d catchu -q 2>/dev/null \
+      && (exec 3<>"/dev/tcp/127.0.0.1/${port}") 2>/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "DB가 60초 안에 준비되지 않았다(127.0.0.1:${port}): docker logs ${LIVE_DB}" >&2
+  return 1
+}
+
 # KEY=VALUE 줄만 읽어 내보낸다. 파일 내용을 셸 명령으로 실행하지 않는다.
 load_env() {
   local line
@@ -33,4 +49,17 @@ load_keys() {
     fi
     export "${key}=${line#*=}"
   done
+}
+
+# 파일에서 지정한 키를 읽어, 값이 있을 때만 내보낸다(값은 출력하지 않는다).
+load_optional_keys() {
+  local file="$1" key line
+  shift
+  [ -f "${file}" ] || { echo "파일이 없다: ${file} (먼저 setup.sh를 실행한다)" >&2; return 1; }
+  for key in "$@"; do
+    line="$(grep -E "^${key}=" "${file}" | tail -n 1 || true)"
+    line="${line%$'\r'}"
+    [ -n "${line#*=}" ] && export "${key}=${line#*=}"
+  done
+  return 0
 }
