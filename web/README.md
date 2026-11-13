@@ -93,6 +93,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/preview/common/` | 헤더·상태 표시 개발용 미리보기(`npm run dev`에서만) |
 | `src/app/(member)/home/` | 회원 가드 안의 로그인 후 홈. 연결 상태 안내와 다음 행동을 조립한다([기능 안내](src/features/home/README.md)) |
 | `src/app/(member)/assets/` | 회원 가드 안의 실제 내 자산 페이지. B 목록·상세와 D 저장소 모달을 조립한다([기능 안내](src/features/assets/README.md)) |
+| `src/app/(member)/jds/` | U10 본인 JD 관리([기능·연결 안내](src/features/jd/README.md)) |
 | `src/app/(member)/profile/github/`, `(member)/github/callback/` | 회원 가드 안의 GitHub 연동 화면과 GitHub 콜백 화면([기능 안내](src/features/github-connection/README.md)) |
 | `src/app/(member)/profile/claude/` | 12월 U6: 회원 가드 안의 Claude 연결 관리·승인 화면([기능 안내](src/features/claude-connection/README.md)) |
 | `src/app/s/[token]/` | 발행본 받은 사람 화면(U4 W4). 회원 로그인 없이 받은 사람 API에 연결한다([기능 안내](src/features/recipient/README.md)) |
@@ -166,6 +167,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/assets?repositoryId=…` | 저장소 필터 | B | 필요 | 제안 | PR #156의 B 제안. 값은 저장소 식별자 |
 | `/assets?catchId=…` | Catch 상세 모달 | B | 필요 | 제안 | PR #156 제안: 닫으면 `catchId`만 제거하고 필터 유지. 새로고침·뒤로 가기·재로그인 후 상태 유지는 확정 |
 | `/materials` | 텍스트 자료 목록·편집 | U4 | 필요 | 확정 | U4 담당 결정 D3(2026-10-29, [U4 코드 요약](../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/code-generation/code-summary.md) 「구현 결정과 설계 후속 변경 기록」). 목록과 편집을 한 화면에 둔다([텍스트 자료](src/features/materials/README.md)) |
+| `/jds` | 본인 JD 관리 | U10 | 필요 | 확정 | 승인된 U10 구현 계획 Step 4의 내부 주소. [기능·연결 안내](src/features/jd/README.md) |
 | `/publications` | 발행본 목록 | U4 | 필요 | 확정 | U4 담당 결정 D4(2026-11-03). 최신순 목록, [URL 복사], [링크 열기](`ACTIVE`만)([발행·발행본](src/features/publications/README.md)) |
 | `/publications/new` | 발행 | U4 | 필요 | 확정 | 본인 Catch·텍스트 자료 고르기·순서·제목·비밀번호 → 확인 → 발행 완료를 한 화면에 둔다 |
 | `/publications/[publicationId]` | 발행본 상세 | U4 | 필요 | 확정 | 사본·상태·만료·링크 주소, 링크 중지·삭제. 기본 요약 패널(U5) 자리는 비워 둠 |

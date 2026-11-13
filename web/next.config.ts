@@ -12,6 +12,9 @@ import type { NextConfig } from "next";
  *   적을 수 없어 쓸 수 없으므로, 형식과 관계없이 `next dev`·`next build`에서 오류로 멈춘다(요청이 조용히 막히지 않게).
  *   `next start`는 빌드 때 정해진 헤더를 쓰므로 API 주소를 바꾸려면 다시 빌드한다.
  * - 'unsafe-eval'은 `next dev`(development)에서만 더한다(React 개발용 오류 표시). HSTS는 development·test가 아닐 때(배포용 빌드) 붙인다.
+ * - frame-src에 blob:을 더한다(U8 PDF 열람). 화면 안 PDF 뷰어는 받은 PDF로 만든 Blob URL을 iframe에 넣는데, frame-src가 없으면
+ *   default-src 'self'가 적용돼 브라우저가 막는다(2026-11-11 브라우저 확인). Blob URL은 이 출처의 스크립트만 만들 수 있고 다른 출처의
+ *   문서는 여전히 넣을 수 없다. 이 화면이 다른 곳에 끼워지는 것(frame-ancestors 'none')은 그대로 막는다.
  * - 외부 스크립트·이미지·글꼴·연결을 새로 쓰면 해당 항목에 출처를 더한다.
  */
 export function securityHeaders(env: NodeJS.ProcessEnv): { key: string; value: string }[] {
@@ -24,6 +27,7 @@ export function securityHeaders(env: NodeJS.ProcessEnv): { key: string; value: s
     "img-src 'self' blob: data:",
     "font-src 'self'",
     `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ""}`,
+    "frame-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

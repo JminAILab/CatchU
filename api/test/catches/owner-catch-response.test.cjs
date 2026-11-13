@@ -27,6 +27,9 @@ function fixture() {
       mismatch: true,
       visibility: 'PUBLIC',
       sourceMode: 'MOCK',
+      hasAuthorDescription: true,
+      // NC3 C2: 다시 볼 곳 사실(없음). 작업 시각은 응답 매핑에 넘기지 않는다.
+      revisitFacts: [],
     },
     sourceRequest: {
       requestId: 'request-1',
@@ -109,7 +112,74 @@ test('본인 응답은 common.yaml의 필드만 내보내고 저장소는 원 �
     visibility: 'PUBLIC',
     restriction: 'SOURCE_PRIVATE',
     sourceMode: 'MOCK',
+    hasAuthorDescription: true,
+    revisitFacts: [],
   });
+});
+
+// NC3 C2·BR8.1: 저장된 다시 볼 곳 사실을 그대로 옮기고, 모양이 틀리면 응답 무결성 오류다. 작업 시각은 응답에 없다.
+const sha = (letter) => letter.repeat(40);
+const storedFacts = () => [
+  { kind: 'REWORKED_LINES', paths: ['src/a.ts'], commits: [sha('a'), sha('b')] },
+  { kind: 'REVERTED', paths: [], commits: [sha('b'), sha('a')] },
+  { kind: 'TEST_FILES_PRESENT', paths: ['tests/a.test.ts', 'tests/b.test.ts'], commits: [sha('a')] },
+];
+
+test('NC3 BR8.1 저장된 사실을 순서 그대로 복사해 싣고 작업 시각 칸은 응답에 없다', () => {
+  const source = fixture();
+  source.asset.revisitFacts = storedFacts();
+  source.asset.lastWorkAt = new Date('2025-04-10T00:00:00Z');
+  source.asset.firstWorkAt = new Date('2025-03-02T00:00:00Z');
+  const response = project(source);
+  assert.deepEqual(response.revisitFacts, storedFacts());
+  assert.equal(Object.hasOwn(response, 'lastWorkAt'), false);
+  assert.equal(Object.hasOwn(response, 'firstWorkAt'), false);
+  assert.ok(!JSON.stringify(response).includes('2025-04-10'));
+  response.revisitFacts[0].paths.push('changed.ts');
+  assert.deepEqual(source.asset.revisitFacts, storedFacts(), '응답을 고쳐도 읽은 자료는 바뀌지 않는다');
+  assert.deepEqual(toOwnerCatchPage('member-owner', [source], null).items[0].revisitFacts, storedFacts());
+});
+
+test('NC3 BR8.1 사실이 배열이 아니거나 원소 모양·종류별 개수·식별값 꼴이 틀리면 응답 무결성 오류다', () => {
+  const broken = [
+    undefined, null, {}, 'text',
+    [{ kind: 'UNKNOWN', paths: ['a.ts'], commits: [sha('a'), sha('b')] }],
+    [{ kind: 'REWORKED_LINES', paths: ['a.ts'], commits: [sha('a')] }],
+    [{ kind: 'REVERTED', paths: ['a.ts'], commits: [sha('a'), sha('b')] }],
+    [{ kind: 'MOVED_FILE', paths: ['a.ts', 'b.ts'], commits: ['abc1234'] }],
+    [{ kind: 'MOVED_FILE', paths: ['a.ts', 'b.ts'], commits: [sha('a')], line: 'secret' }],
+    Array.from({ length: 31 }, () => storedFacts()[0]),
+  ];
+  for (const value of broken) {
+    const source = fixture();
+    source.asset.revisitFacts = value;
+    assertIntegrityError(() => project(source));
+    assertIntegrityError(() => toOwnerCatchPage('member-owner', [fixture(), source], null));
+  }
+});
+
+// 새 Catch NC1 C1·BR5.3: 목록·상세 응답에 작성자 설명이 있는지를 싣고, 참/거짓이 아닌 읽기 값은 기본값으로 숨기지 않는다.
+test('AC5.2.3 작성자 설명 여부는 읽은 참/거짓 그대로 목록·상세 응답에 싣는다', () => {
+  for (const hasAuthorDescription of [true, false]) {
+    const source = fixture();
+    source.asset.hasAuthorDescription = hasAuthorDescription;
+    assert.equal(project(source).hasAuthorDescription, hasAuthorDescription);
+    assert.equal(toOwnerCatchPage('member-owner', [source], null).items[0].hasAuthorDescription, hasAuthorDescription);
+  }
+});
+
+test('작성자 설명 여부가 참/거짓이 아니거나 없으면 무결성 오류이고 설명 원문 칸은 응답에 없다', () => {
+  for (const value of [undefined, null, 'true', 1, 0]) {
+    const source = fixture();
+    source.asset.hasAuthorDescription = value;
+    assertIntegrityError(() => project(source));
+    assertIntegrityError(() => toOwnerCatchPage('member-owner', [fixture(), source], null));
+  }
+  const source = fixture();
+  source.asset.authorDescription = 'internal-author-description';
+  const response = project(source);
+  assert.equal(Object.hasOwn(response, 'authorDescription'), false);
+  assert.ok(!JSON.stringify(response).includes('internal-author-description'));
 });
 
 test('null 제목은 초안 생성 상태와 독립적이며 상세·혼합 목록에서 필드를 보존한다', () => {

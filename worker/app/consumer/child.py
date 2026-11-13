@@ -13,6 +13,7 @@ import signal
 import sys
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from multiprocessing.connection import Connection
@@ -20,8 +21,9 @@ from typing import Any, Final
 
 from app.collection.transport import HttpsTransport
 from app.consumer.frames import Frame, encode
-from app.consumer.settings import ChildSettings
+from app.consumer.settings import ChildSettings, LiveSettings
 from app.generation import GenerationProvider
+from app.judgement.provider import JudgementProvider
 from app.processing.live import LiveAssembly
 from app.processing.pipeline import Finished, Uncertain
 from app.processing.runner import Refused, run_request
@@ -99,8 +101,9 @@ def start_watchdog(child_input: ChildInput) -> None:
 def live_assembly(settings: ChildSettings) -> LiveAssembly | None:
     """기동 때 검사한 설정으로 LIVE 부품을 만든다. 설정이 없으면(개발·시험) None이다.
 
-    생성 제공자(Claude API)는 후보가 있을 때 한 번 만든다. SDK도 그때 불러와 MOCK·후보 없는 요청의 자식 기동을
-    늦추지 않는다. 키는 SDK 환경변수가 아니라 설정 객체로 넘긴다.
+    생성 제공자(Claude API)와 판정 공급자(CR3)는 후보가 있을 때 한 번 만든다. SDK도 그때 불러와 MOCK·후보 없는
+    요청의 자식 기동을 늦추지 않는다. 키는 SDK 환경변수가 아니라 설정 객체로 넘긴다. AI 쪽이 꺼졌으면(공급자
+    openai에 판정 키 없음) 판정 공급자를 넘기지 않는다(BR1.1).
     """
     live = settings.live
     if live is None:
@@ -119,7 +122,31 @@ def live_assembly(settings: ChildSettings) -> LiveAssembly | None:
         generation_budget=timedelta(
             seconds=settings.limits.total - settings.limits.generation_margin
         ),
+        judge_factory=_judge_factory(live),
     )
+
+
+def _judge_factory(live: LiveSettings) -> Callable[[], JudgementProvider] | None:
+    """공급자와 키로 판정 공급자 만들기를 정한다. claude면 생성 키로, openai면 판정 키가 있을 때만."""
+    if live.judgement_provider == "claude":
+        generation_key = live.generation_key
+
+        def claude_judge() -> JudgementProvider:
+            from app.judgement.claude import ClaudeJudge
+
+            return ClaudeJudge(generation_key)
+
+        return claude_judge
+    judgement_key = live.judgement_key
+    if judgement_key is None:
+        return None
+
+    def openai_judge() -> JudgementProvider:
+        from app.judgement.openai_judge import OpenAIJudge
+
+        return OpenAIJudge(judgement_key)
+
+    return openai_judge
 
 
 def _terminal(outcome: Refused | Finished | Uncertain) -> Frame:

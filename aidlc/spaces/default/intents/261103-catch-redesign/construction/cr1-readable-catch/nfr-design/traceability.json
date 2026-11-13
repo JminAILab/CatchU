@@ -1,0 +1,13 @@
+{
+  "stage": "nfr-design",
+  "unit": "cr1-readable-catch",
+  "upstream_ids": ["NFR2.1", "NFR2.2", "NFR1.1", "NFR1.2", "NFR4.1", "NFR4.2"],
+  "coverage": [
+    { "id": "NFR2.1", "status": "OK", "target": "제목 결정 때 기록의 글 칸을 먼저 보고 쓸 만하면 고쳐 쓰기 단계를 부르지 않음 (performance-design.md)" },
+    { "id": "NFR2.2", "status": "OK", "target": "CR1에 판정 공급자 자리가 없어 판정 호출 코드가 없음 (performance-design.md)" },
+    { "id": "NFR1.1", "status": "OK", "target": "생성 요청 직렬화가 기록의 글 칸을 읽지 않음, 요청 본문 시험 (security-design.md)" },
+    { "id": "NFR1.2", "status": "OK", "target": "코드 생성 단계에서 api/src/rag-answer·ai-generation의 근거 글 처리를 확인해 요약에 기록, 고칠 것은 담당에게 알림 (security-design.md)" },
+    { "id": "NFR4.1", "status": "OK", "target": "정렬 기준을 정해 둔 순수 계산, 두 번 돌려 비교하는 시험 (reliability-design.md)" },
+    { "id": "NFR4.2", "status": "OK", "target": "열쇠 계산에서 조각 값만 빼고 지금 기대 열쇠 값으로 시험 (reliability-design.md)" }
+  ]
+}

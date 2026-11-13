@@ -27,6 +27,7 @@ from app.processing import (
     StageFailure,
     Uncertain,
     check_request,
+    compose_result,
     outcome_for,
     process_request,
     synthetic_accepted_context,
@@ -182,6 +183,81 @@ def test_fake_result_matches_shared_synthetic_case(scenario: str) -> None:
     assert result == fill_template(template, {**CONTEXT, "caseId": scenario})
     expected = CASE_BY_ID[scenario]["messages"][0]["expected"]["processingAfter"]
     assert result["outcome"] == expected
+
+
+@pytest.mark.parametrize("scenario", FINISHING_SCENARIOS)
+def test_synthetic_result_is_version_four_with_own_commits_and_work_times(
+    scenario: str,
+) -> None:
+    """합성(MOCK) 결과도 같은 규칙: 판본 "4", 후보마다 본인 커밋 SHA(CR2 BR2.1·BR2.2)와 다시 볼 곳 사실·
+    작업 시각(NC3 BR5.3). 사실의 커밋은 그 후보 본인 커밋 안이다."""
+    result = _finish(scenario)
+
+    assert result["schemaVersion"] == "4"
+    assert check_message("Result", result).verdict is Verdict.VALID
+    for candidate in result["candidates"]:
+        assert candidate["ownCommitShas"]
+        assert candidate["firstWorkAt"] <= candidate["lastWorkAt"]
+        for fact in candidate["revisitFacts"]:
+            assert set(fact["commits"]) <= set(candidate["ownCommitShas"])
+
+
+def test_nc3_br5_3_one_candidate_scenario_has_one_fact_of_each_kind() -> None:
+    result = _finish("succeeded-one-candidate")
+
+    (candidate,) = result["candidates"]
+    assert [fact["kind"] for fact in candidate["revisitFacts"]] == [
+        "REWORKED_LINES",
+        "MOVED_FILE",
+        "EXTENSION_CHANGED",
+        "REVERTED",
+        "TEST_FILES_PRESENT",
+    ]
+    assert (candidate["firstWorkAt"], candidate["lastWorkAt"]) == (
+        "2026-09-30T10:00:00Z",
+        "2026-09-30T12:00:00Z",
+    )
+    # 나머지 시나리오는 빈 배열이다.
+    for scenario in ("partial-failed", "two-candidates-same-work"):
+        for other in _finish(scenario)["candidates"]:
+            assert other["revisitFacts"] == []
+
+
+def test_nc3_result_without_work_times_is_not_composed() -> None:
+    request = CHECKED
+    assert isinstance(request, CheckedRequest)
+    output = FakeGenerator("succeeded-one-candidate").generate(request)
+    broken = replace(output.candidates[0], first_work_at=None, last_work_at=None)
+
+    with pytest.raises(ValueError):
+        compose_result(
+            request,
+            replace(output, candidates=(broken,)),
+            finished_at=FINISHED_AT,
+            id_label="nc3",
+        )
+    # 시각 하나만 있거나 순서가 뒤바뀐 후보는 만들 수 없다.
+    first = output.candidates[0].first_work_at
+    assert first is not None
+    with pytest.raises(ValueError):
+        replace(output.candidates[0], last_work_at=None)
+    with pytest.raises(ValueError):
+        replace(output.candidates[0], last_work_at=first.replace(year=2000))
+
+
+def test_composed_candidate_carries_own_commit_shas_in_order() -> None:
+    template = _read_json(FIXTURE_DIR / "results" / "succeeded-one-candidate.json")
+    shas = ("c" * 40, "a" * 40, "b" * 40)
+    request = CHECKED
+    assert isinstance(request, CheckedRequest)
+    output = FakeGenerator("succeeded-one-candidate").generate(request)
+    changed = replace(
+        output, candidates=(replace(output.candidates[0], own_commit_shas=shas),)
+    )
+    result = compose_result(request, changed, finished_at=FINISHED_AT, id_label="x")
+    assert result["candidates"][0]["ownCommitShas"] == list(shas)
+    assert check_message("Result", result).verdict is Verdict.VALID
+    assert template["candidates"][0]["ownCommitShas"] != list(shas)
 
 
 # 종결값 · notProvided와 failures

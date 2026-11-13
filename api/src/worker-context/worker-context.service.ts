@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { isUUID } from 'class-validator';
 import { DataSource, EntityManager } from 'typeorm';
 import { ApiError } from '../common/errors';
+import { CommitAssignmentEntity } from '../catches/entities/commit-assignment.entity';
 import { GitHubConnectionService } from '../github-connection/github-connection.service';
 import { AnalysisAttempt, AnalysisConsent, AnalysisRequest, GitHubConnection, MemberAccount } from '../member-analysis/member-analysis.entity';
 import { AcceptedWorkerContext, WORKER_REPOSITORY_SELECTION_SOURCE, WorkerContextUnavailableReason,
@@ -106,6 +107,19 @@ export class WorkerContextService {
     return selection;
   }
 
+  /**
+   * 그 시도의 회원·분석 요청 저장소 ID의 소속 SHA 전체(CR2 계약 C1, BR3.1). 순서·상한을 두지 않는다. 회원·저장소는
+   * 접수 기록에서 읽은 값만 쓰고 요청 값으로 받지 않는다. 조회 오류는 바꾸지 않고 올려 지금처럼 500이다.
+   */
+  private async assignedCommitShas(manager: EntityManager, memberId: string, repositoryId: string): Promise<string[]> {
+    const rows = await manager.createQueryBuilder(CommitAssignmentEntity, 'assignment')
+      .select('assignment.commit_sha', 'commitSha')
+      .where('assignment.member_id = :memberId', { memberId })
+      .andWhere('assignment.github_repository_id = :repositoryId', { repositoryId })
+      .getRawMany<{ commitSha: string }>();
+    return rows.map((row) => row.commitSha);
+  }
+
   private async credential(memberId: string) {
     try {
       return await this.github.resolveCredential(memberId);
@@ -155,6 +169,7 @@ export class WorkerContextService {
       if (!/^[1-9][0-9]*$/.test(credential.externalAccountReference)) throw new ApiError('INTERNAL_ERROR');
       const types = allowedResourceTypes(current);
       if (!types) return unavailable('SCOPE_UNVERIFIED');
+      const assignedCommitShas = await this.assignedCommitShas(manager, current.memberId, current.repositoryId);
       return {
         attemptId: current.attemptId,
         requestId: current.requestId,
@@ -174,6 +189,8 @@ export class WorkerContextService {
           expiresAt: credential.expiresAt.toISOString(),
         },
         selection: { repositoryId: current.repositoryId, wholeRepository: true as const },
+        // 이미 Catch에 속한 커밋. worker가 재분석 때 빼는 데 쓴다(CR2). 없으면 빈 배열이다.
+        assignedCommitShas,
       };
     });
   }

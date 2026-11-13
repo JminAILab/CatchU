@@ -13,11 +13,13 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
+from candidate_scenarios import ROOT, Pull, Scenario, change, commit, root_commit
 from context_synthetic import KEY, ApiReply, context_api
 from generation_scenarios import ScriptedProvider, naive
-from github_synthetic import START, TOKEN, FakeClock
+from github_synthetic import MEMBER, START, TOKEN, FakeClock, sha
 from live_synthetic import (
     ATTEMPT,
+    LIVE_ACCEPTED,
     NOTHING_OWN,
     ONE_PULL,
     Parts,
@@ -27,6 +29,7 @@ from live_synthetic import (
     no_github_assembly,
 )
 
+from app.candidates import build_candidates, revisit
 from app.collection.credentials import CredentialLookupError
 from app.collection.transport import HttpsTransport
 from app.consumer import child
@@ -156,6 +159,195 @@ def test_live_request_runs_collection_candidates_and_generation_once(
     assert deadlines == [START + timedelta(minutes=60) - timedelta(seconds=60)]
 
 
+# NC3. 다시 볼 곳 사실과 판정 실패 갈래(NFR8.3, NFR4.3) ------------------------------------------
+
+# 열린 PR 둘에 본인 커밋이 하나씩(시험 파일 하나씩): 후보 둘, 후보마다 「시험 파일 있음」 하나.
+ALPHA_TEST = commit(
+    sha(41),
+    MEMBER,
+    parents=(ROOT,),
+    minute=3,
+    files=[change("tests/test_alpha.py", patch="@@ -1 +1 @@\n-a = 1\n+a = 2")],
+)
+BETA_TEST = commit(
+    sha(42),
+    MEMBER,
+    parents=(ROOT,),
+    minute=4,
+    files=[change("tests/test_beta.py", patch="@@ -1 +1 @@\n-b = 1\n+b = 2")],
+)
+TWO_PULLS = Scenario(
+    default_branch=(root_commit(),),
+    pulls=(
+        Pull(3, MEMBER, (ALPHA_TEST,), state="open", created=2),
+        Pull(4, MEMBER, (BETA_TEST,), state="open", created=3),
+    ),
+)
+# 예외 메시지에 넣는 글자. 로그에 실리면 안 된다.
+LEAK = "비밀-경로표식/tests/test_beta.py"
+
+
+def by_own_commit(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {entry["ownCommitShas"][0]: entry for entry in result["candidates"]}
+
+
+def revisit_failure_lines(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("다시 볼 곳 계산 실패")
+    ]
+
+
+def assert_one_failure_line(caplog: pytest.LogCaptureFixture, error: str) -> None:
+    (line,) = revisit_failure_lines(caplog)
+    # 칸은 고정 문구, 요청 ID, 시도 ID, 예외 종류 이름 넷뿐이다.
+    assert line == (
+        f"다시 볼 곳 계산 실패: requestId={LIVE_ACCEPTED.request_id}"
+        f" attemptId={ATTEMPT} error={error}"
+    )
+    assert LEAK not in caplog.text
+    assert "tests/test_beta.py" not in line and BETA_TEST.sha not in line
+
+
+@pytest.fixture
+def all_revisit_rules(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 아래 연결 시험의 합성 PR은 시험 파일 사실을 만든다. 운영에서는 FR15.4로 그 규칙을 껐으므로
+    # 연결(부르기·실패 갈래·생성 뒤 유지)을 보려고 다섯 규칙을 모두 켠다.
+    monkeypatch.setattr(revisit, "ENABLED_KINDS", frozenset(revisit.KIND_ORDER))
+
+
+def test_nc3_fr15_4_disabled_test_file_rule_makes_no_fact_in_live_path(
+    context_api: ApiReply, caplog: pytest.LogCaptureFixture
+) -> None:
+    context_api.payload = live_payload()
+    parts = Parts(TWO_PULLS)
+
+    result = result_of(run_live(live_message(), parts.assembly(context_api.base_url)))
+
+    assert result["outcome"] == "SUCCEEDED"
+    for entry in by_own_commit(result).values():
+        assert entry["revisitFacts"] == []
+        assert entry["firstWorkAt"]
+    assert revisit_failure_lines(caplog) == []
+
+
+@pytest.mark.usefixtures("all_revisit_rules")
+def test_nc3_facts_and_work_times_survive_generation(
+    context_api: ApiReply, caplog: pytest.LogCaptureFixture
+) -> None:
+    context_api.payload = live_payload()
+    parts = Parts(TWO_PULLS)
+
+    result = result_of(run_live(live_message(), parts.assembly(context_api.base_url)))
+
+    assert result["schemaVersion"] == "4" and result["outcome"] == "SUCCEEDED"
+    entries = by_own_commit(result)
+    for own, path in (
+        (ALPHA_TEST.sha, "tests/test_alpha.py"),
+        (BETA_TEST.sha, "tests/test_beta.py"),
+    ):
+        entry = entries[own]
+        # 생성(제목·초안)을 거친 뒤에도 새 칸 셋이 그대로다.
+        assert entry["draft"]["status"] == "GENERATED"
+        assert entry["revisitFacts"] == [
+            {"kind": "TEST_FILES_PRESENT", "paths": [path], "commits": [own]}
+        ]
+        assert entry["firstWorkAt"] == entry["lastWorkAt"]
+        assert entry["firstWorkAt"].endswith("Z")
+    assert revisit_failure_lines(caplog) == []
+
+
+@pytest.mark.usefixtures("all_revisit_rules")
+def test_nc3_nfr8_3_rule_exception_empties_only_that_candidate(
+    context_api: ApiReply,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context_api.payload = live_payload()
+
+    def failing(material: revisit.Material, enabled: Any) -> list[revisit.RevisitFact]:
+        if material.commits[0].sha == BETA_TEST.sha:
+            raise RuntimeError(LEAK)
+        return []
+
+    monkeypatch.setattr(revisit, "RULES", (*revisit.RULES, failing))
+    parts = Parts(TWO_PULLS)
+
+    result = result_of(run_live(live_message(), parts.assembly(context_api.base_url)))
+
+    # 분석 전체는 실패하지 않고 결과도 보낸다. 그 후보 사실만 비고 작업 시각·다른 후보는 그대로다.
+    assert result["outcome"] == "SUCCEEDED"
+    entries = by_own_commit(result)
+    assert entries[BETA_TEST.sha]["revisitFacts"] == []
+    assert entries[BETA_TEST.sha]["firstWorkAt"]
+    assert [fact["kind"] for fact in entries[ALPHA_TEST.sha]["revisitFacts"]] == [
+        "TEST_FILES_PRESENT"
+    ]
+    assert_one_failure_line(caplog, "RuntimeError")
+
+
+@pytest.mark.usefixtures("all_revisit_rules")
+def test_nc3_nfr8_3_missing_record_empties_only_that_candidate(
+    context_api: ApiReply,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context_api.payload = live_payload()
+    unknown = "f" * 40
+    original = build_candidates
+
+    def with_unknown(*args: Any, **kwargs: Any) -> Any:
+        built = original(*args, **kwargs)
+        return replace(
+            built,
+            candidates=tuple(
+                replace(each, own_commit_shas=(*each.own_commit_shas, unknown))
+                if BETA_TEST.sha in each.own_commit_shas
+                else each
+                for each in built.candidates
+            ),
+        )
+
+    monkeypatch.setattr(live_module, "build_candidates", with_unknown)
+    parts = Parts(TWO_PULLS)
+
+    result = result_of(run_live(live_message(), parts.assembly(context_api.base_url)))
+
+    entries = by_own_commit(result)
+    assert entries[BETA_TEST.sha]["revisitFacts"] == []
+    assert entries[ALPHA_TEST.sha]["revisitFacts"] != []
+    assert_one_failure_line(caplog, "RevisitFactsDefect")
+
+
+@pytest.mark.usefixtures("all_revisit_rules")
+def test_nc3_nfr8_3_spec_breaking_result_empties_only_that_candidate(
+    context_api: ApiReply,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """판정 결과가 api 등록 검사 규칙을 어기면 worker 계약 검사(WORKER_DEFECT)나 api 거부로 가지 않고 그
+    후보 사실만 빈다(플랜 승인 때 팀장 덧붙임)."""
+    context_api.payload = live_payload()
+
+    def outside(material: revisit.Material, enabled: Any) -> list[revisit.RevisitFact]:
+        if material.commits[0].sha != BETA_TEST.sha:
+            return []
+        # 다른 후보의 커밋을 가리키는 사실(소속 밖)이다.
+        return [revisit.RevisitFact("REVERTED", (), (BETA_TEST.sha, ALPHA_TEST.sha))]
+
+    monkeypatch.setattr(revisit, "RULES", (*revisit.RULES, outside))
+    parts = Parts(TWO_PULLS)
+
+    ran = run_live(live_message(), parts.assembly(context_api.base_url))
+
+    result = result_of(ran)
+    entries = by_own_commit(result)
+    assert entries[BETA_TEST.sha]["revisitFacts"] == []
+    assert len(entries[ALPHA_TEST.sha]["revisitFacts"]) == 1
+    assert_one_failure_line(caplog, "RevisitFactsDefect")
+
+
 # 6. 관계 조회와 후보 없음 ------------------------------------------------------------------------
 
 
@@ -173,6 +365,56 @@ def test_no_candidate_keeps_provider_unmade_and_relations_are_collected(
     assert result["candidates"] == [] and result["failures"] == []
     assert parts.providers_made == 0
     assert [event["state"] for event in ran.events] == ["RECEIVED", "RUNNING"]
+
+
+# CR2. 소속 커밋 집합 전달 -----------------------------------------------------------------------
+
+
+def test_assigned_commits_reach_judgement_and_material_lookup_as_one_value(
+    context_api: ApiReply, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """맥락 조회의 소속 집합을 후보 판정과 생성 재료 찾기에 같은 값으로 넘긴다(BR1.6)."""
+    unrelated = "e" * 40
+    context_api.payload = live_payload(assigned=(unrelated,))
+    seen: dict[str, frozenset[str]] = {}
+    build, generate = build_candidates, run_generation
+
+    def judged(*args: Any, **kwargs: Any) -> Any:
+        seen["build"] = args[2]
+        return build(*args, **kwargs)
+
+    def generated(*args: Any, **kwargs: Any) -> Any:
+        seen["generation"] = kwargs["assigned"]
+        return generate(*args, **kwargs)
+
+    monkeypatch.setattr(live_module, "build_candidates", judged)
+    monkeypatch.setattr(live_module, "run_generation", generated)
+    parts = Parts(ONE_PULL)
+
+    result = result_of(run_live(live_message(), parts.assembly(context_api.base_url)))
+
+    assert seen == {
+        "build": frozenset({unrelated}),
+        "generation": frozenset({unrelated}),
+    }
+    assert result["schemaVersion"] == "4"
+    (candidate,) = result["candidates"]
+    assert candidate["ownCommitShas"] == [ONE_PULL.pulls[0].commits[0].sha]
+
+
+def test_reanalysis_with_everything_assigned_is_empty_without_provider(
+    context_api: ApiReply,
+) -> None:
+    """바뀐 것이 없는 재분석(W6): 후보·미제공·실패 0, 결과 EMPTY, 생성 제공자를 만들지 않는다."""
+    context_api.payload = live_payload(assigned=(ONE_PULL.pulls[0].commits[0].sha,))
+    parts = Parts(ONE_PULL)
+
+    result = result_of(run_live(live_message(), parts.assembly(context_api.base_url)))
+
+    assert result["outcome"] == "EMPTY"
+    assert result["candidates"] == [] and result["notProvided"] == []
+    assert result["failures"] == []
+    assert parts.providers_made == 0
 
 
 # 2·3·5. 조회 모름·실패 ----------------------------------------------------------------------------

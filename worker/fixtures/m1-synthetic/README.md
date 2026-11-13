@@ -83,6 +83,7 @@ api와 worker는 같은 메시지에 같은 판정을 내야 한다(`cases.json`
 - 모든 값은 합성 값이다. URL은 예약 도메인 `example.invalid`만 쓰고, 실제 저장소 자료·과거 실험 자료를 쓰지 않는다([#37](https://github.com/JminAILab/CatchU/issues/37)).
 - `sourceMode`는 항상 `MOCK`이다. 합성 연결의 통과는 실제 분석 성공, 실제 자료 검증, Catch 저장·열람 준비 완료를 뜻하지 않는다.
 - 제목·기여 문구는 2026-10-08 팀장 결정([결정 문서](../../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md))의 모양을 따른 합성 값이다. 제목은 대상·종류·동작 조각으로 만든 모양(예: `loginErrorMessage 코드 수정`)이고 정확한 글자 모양은 [#120](https://github.com/JminAILab/CatchU/issues/120)에서 정한다. 제목 null 결과는 개발용 실행의 `title-failed` 시나리오가 보인다([worker README 「요청 검사와 합성 결과 생성」](../../README.md#요청-검사와-합성-결과-생성)). 나의 기여와 커밋 근거의 귀속 범위는 '작성자로 기록된 커밋', PR 근거는 'PR을 연 계정(본인 기여는 이 PR의 본인 커밋에 한정)'으로 적고 센 숫자를 쓰지 않는다.
+- 결과 템플릿은 Result 판본 `"4"`다(새 Catch NC3 계약 C4). 후보마다 본인 커밋 목록(`ownCommitShas`)과 다시 볼 곳 사실(`revisitFacts`)·첫·마지막 작업 시각(`firstWorkAt`·`lastWorkAt`, UTC 초 단위)을 둔다. 「후보 하나 성공」(`succeeded-one-candidate.json`)에는 로컬에서 「다시 볼 곳」 칸을 볼 수 있게 종류마다 사실 하나를 두고, 사실의 커밋은 그 후보 `ownCommitShas` 안의 합성 SHA다. 나머지 템플릿은 빈 배열이다. 경로는 합성 값이다.
 
 ## 검사
 

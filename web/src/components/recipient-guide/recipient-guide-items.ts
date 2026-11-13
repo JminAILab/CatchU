@@ -20,7 +20,7 @@ export const RECIPIENT_GUIDE_ITEMS: readonly RecipientGuideItem[] = [
 
 export const CLAUDE_CONNECT_ITEM: RecipientGuideItem = {
   id: "claude-connect",
-  text: "본인 Claude에 이 링크를 연결하면 Claude가 이 자료를 읽을 수 있습니다.",
+  text: "CatchU에 가입해 내 Claude를 연결하면, 이 링크 주소로 Claude가 이 자료를 읽을 수 있습니다.",
 };
 
 /** 화면에 보일 항목. showClaudeConnect가 true일 때만 Claude 연결 줄을 더한다. */

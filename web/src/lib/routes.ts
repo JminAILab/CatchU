@@ -31,6 +31,8 @@ export const routes = {
   assets: "/assets",
   /** 텍스트 자료 목록·편집(U4 W2). */
   materials: "/materials",
+  /** 본인 JD 목록·편집(U10). */
+  jds: "/jds",
   /** 발행본 목록(U4 W5). */
   publications: "/publications",
   /** 발행(U4 W3). 본인 Catch·텍스트 자료를 골라 고정 발행본과 링크를 만든다. 10월 `/links`(공유 링크 발급·관리)는 U4 제출 3(W6)에서 이 화면으로 대체했다. */

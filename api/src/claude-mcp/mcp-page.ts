@@ -1,5 +1,6 @@
 // 쪽 만들기와 cursor(U6 기능 설계 BR5.3~BR5.5·BR6.5, 비기능 설계 performance-design 「쪽 만들기」·「cursor」, 계약 C-15). DB가 없는 순수 함수다.
 // cursor는 위치만 담은 불투명 문자열이고 회원에 묶지 않는다. 회원 조건은 언제나 토큰에서 온다(BR5.2).
+// encodeCursor·decodeCursor는 U9 받은 링크 읽기(mcp-shared-page.ts)도 같은 모양으로 쓴다(U9 기능 설계 BR4.4·BR4.5).
 import { isUuid } from '../catches/owner-catch-input';
 import { MCP_CURSOR_MAX_LENGTH, MCP_PAGE_CHARS, MCP_PAGE_RESERVE, MCP_PAGE_ROWS } from './mcp-limits';
 
@@ -42,12 +43,12 @@ interface PageRules<Row> {
   cursorOf(row: Row): string;
 }
 
-function encodeCursor(position: object): string {
+export function encodeCursor(position: object): string {
   return Buffer.from(JSON.stringify({ v: 1, ...position })).toString('base64url');
 }
 
 /** 칸이 정확히 keys와 v뿐인 객체만 받는다. 길이·문자·base64url 왕복이 어긋나면 모두 같은 오류다. */
-function decodeCursor(cursor: string, keys: readonly string[]): Record<string, unknown> {
+export function decodeCursor(cursor: string, keys: readonly string[]): Record<string, unknown> {
   if (cursor.length === 0 || cursor.length > MCP_CURSOR_MAX_LENGTH || !/^[A-Za-z0-9_-]+$/.test(cursor)) throw new InvalidCursorError();
   const bytes = Buffer.from(cursor, 'base64url');
   if (bytes.toString('base64url') !== cursor) throw new InvalidCursorError();

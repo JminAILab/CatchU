@@ -74,6 +74,18 @@ test('S12c 기본 요약·질의응답은 머리줄을 쓰지 않고 역할 칸�
   assert.ok(logs.filter((log) => log.args[0]?.event === 'ai_gate_result').every((log) => log.args[0].nonItemLineCount === 1));
 });
 
+// #528 — 따옴표 인용 붙이기는 기본 요약·질의응답만이다(FR11.1). 기대: JD 요약은 지금 동작 그대로라, 작성자 글을 따옴표로 옮긴
+// 인용 없는 근거는 역할 모양으로 버리고, 확인되지 않는 점은 AI 해석 항목으로 남는다.
+test('#528 JD 요약은 따옴표 인용을 붙이지 않는다', async (t) => {
+  const logs = captureLogs(t);
+  const authorQuote = "작성자는 '서버 쪽 일정이 빠듯해 화면에서 했다.'라고 적었다";
+  const { gate } = gateWith(messageBody([fragment(`근거:\n- ${authorQuote}\n자료로 확인되지 않는 점:\n- ${authorQuote}\n`)]));
+  const output = await gate.generate(jd({ sources: [source({ text: EVIDENCE_TEXT }),
+    source({ sourceId: 'mat-1', sourceKind: 'AUTHOR_MATERIAL', text: '서버 쪽 일정이 빠듯해 화면에서 했다.' })] }));
+  assert.deepEqual(view(output.items), [['UNCONFIRMED', 'AI_INTERPRETATION', authorQuote]]);
+  assert.deepEqual([resultLog(logs).dropReasons.role, resultLog(logs).quoteCitedCount], [1, 0]);
+});
+
 test('S13 면접 질문의 숫자가 남은 근거 항목의 인용 원문에 없으면 버린다. 질문 자신의 인용은 허용 범위를 넓히지 않는다', async (t) => {
   captureLogs(t);
   const { gate } = gateWith(messageBody([

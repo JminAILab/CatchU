@@ -3,8 +3,9 @@
 모든 경우 다시 부르지 않고, 멈춘 것을 정상 0건으로 바꾸지 않으며, 그때까지 모은 자료를 남긴다.
 """
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import timedelta
+from typing import Any, cast
 
 import pytest
 from github_synthetic import (
@@ -42,6 +43,7 @@ from github_synthetic import (
     standard_routes,
     status_only,
 )
+from live_synthetic import GENERATION_BUDGET, context_settings, refuse_provider
 
 from app.collection import (
     PROPOSED_LIMITS,
@@ -60,7 +62,11 @@ from app.collection.budget import CollectionBudget
 from app.collection.failures import CollectionStopped
 from app.collection.gateway import GitHubGateway, GraphQLUsage, has_next_page
 from app.collection.graphql import associated_pulls_request
+from app.collection.selection import SelectedRange
 from app.collection.transport import HttpResponse, TransportError, TransportTimeout
+from app.processing import live as live_module
+from app.processing.live import LiveAssembly, LiveGenerator
+from app.request_context import ContextFound, RequestContextClient
 
 COMMITS = f"{BASE}/commits?per_page=100&page=1"
 PULLS = f"{BASE}/pulls?state=all&sort=created&direction=desc&per_page=100&page=1"
@@ -74,6 +80,7 @@ def _run(
     clock: FakeClock | None = None,
     seconds_per_call: float = 0.0,
     relations: RelationOptions | None = None,
+    allow_private_repository: bool = False,
 ) -> tuple[CollectionOutcome, FakeTransport]:
     clock = clock or FakeClock()
     transport = FakeTransport(routes, clock=clock, seconds_per_call=seconds_per_call)
@@ -85,6 +92,7 @@ def _run(
         clock=clock,
         limits=limits,
         relations=relations,
+        allow_private_repository=allow_private_repository,
     )
     return outcome, transport
 
@@ -392,6 +400,136 @@ def test_repository_not_confirmed_public_stops_before_any_listing(
     # 저장소 확인 뒤 커밋·PR·이슈의 목록·상세를 부르지 않았다.
     assert transport.paths == [BASE]
     assert (outcome.commits, outcome.pull_requests, outcome.issues) == ((), (), ())
+
+
+# 비공개 저장소 예외(CR3 Step 20): FR10 확인 명령만 allow_private_repository를 켠다.
+
+PRIVATE = repository_json(private=True, visibility="private")
+
+
+def test_private_repository_is_collected_only_when_allowed() -> None:
+    """기본값은 지금과 같이 멈추고, 허용하면 공개 여부만 건너뛰고 끝까지 모은다."""
+    routes = standard_routes()
+    routes[BASE] = respond(PRIVATE)
+
+    refused, refused_transport = _run(routes)
+    allowed, allowed_transport = _run(routes, allow_private_repository=True)
+
+    assert _codes(refused) == [FailureCode.REPOSITORY_UNREACHABLE]
+    assert refused_transport.paths == [BASE]
+    assert allowed.completed
+    assert allowed_transport.paths == STANDARD_ORDER
+    assert len(allowed.commits) == 3 and len(allowed.pull_requests) == 2
+
+
+def _oversized_metadata() -> dict[str, Reply]:
+    routes = standard_routes()
+    routes[BASE] = oversized()
+    return routes
+
+
+def _private_routes(metadata: dict[str, object]) -> dict[str, Reply]:
+    routes = standard_routes()
+    routes[BASE] = respond(metadata)
+    return routes
+
+
+@pytest.mark.parametrize(
+    ("routes", "code"),
+    [
+        # 같은 이름 확인
+        (
+            _private_routes(repository_json("someone-else/other-repo", private=True)),
+            FailureCode.SCOPE_INCONSISTENT,
+        ),
+        # 공개 여부 칸의 모양 확인(빠짐·참거짓 아님)
+        (
+            _private_routes(_metadata_without("private")),
+            FailureCode.COLLECTION_FETCH_FAILED,
+        ),
+        (
+            _private_routes(repository_json(private="true")),
+            FailureCode.COLLECTION_FETCH_FAILED,
+        ),
+        # 크기 상한
+        (_oversized_metadata(), FailureCode.COLLECTION_FETCH_FAILED),
+    ],
+)
+def test_allowing_private_keeps_the_other_repository_checks(
+    routes: dict[str, Reply], code: FailureCode
+) -> None:
+    outcome, transport = _run(routes, allow_private_repository=True)
+
+    assert _codes(outcome) == [code]
+    assert transport.paths == [BASE]
+
+
+def test_allowing_private_keeps_the_registered_repository_id_check() -> None:
+    """LIVE 요청의 숫자 저장소 ID가 응답 ID와 다르면 비공개 허용이어도 멈춘다."""
+    request = replace(REQUEST, source_mode="LIVE", repository_id="999")
+    transport = FakeTransport(_private_routes(PRIVATE))
+
+    outcome = collect(
+        request,
+        credentials=StaticCredentials(credential_context(repository_id="999")),
+        selections=StaticSelections(SelectedRange("999", True)),
+        open_transport=lambda: transport,
+        clock=FakeClock(),
+        allow_private_repository=True,
+    )
+
+    # 합성 저장소 응답의 ID는 424242다.
+    assert _codes(outcome) == [FailureCode.SCOPE_INCONSISTENT]
+    assert "저장소 ID" in outcome.failures[0].message
+    assert transport.paths == [BASE]
+
+
+@dataclass(frozen=True)
+class _Found:
+    """LiveGenerator가 쓰는 조회 결과의 두 resolver와 소속 커밋 집합(CR2)만 가진 대역."""
+
+    credentials: StaticCredentials
+    selections: StaticSelections
+    assigned_commits: frozenset[str] = frozenset()
+
+
+def test_live_processing_does_not_pass_the_private_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """운영 LIVE 처리(큐 소비자 자식이 쓰는 LiveGenerator)는 allow_private_repository를 넘기지 않는다.
+
+    실제 collect를 감싼 기록기로 호출 인자를 보고, 같은 호출이 비공개 저장소에서
+    REPOSITORY_UNREACHABLE로 멈추는지도 본다(인자를 거짓으로 넘겨도, 빼도 같은 동작이다).
+    """
+    calls: list[dict[str, object]] = []
+
+    def recording(*args: Any, **kwargs: Any) -> CollectionOutcome:
+        calls.append(dict(kwargs))
+        return collect(*args, **kwargs)
+
+    monkeypatch.setattr(live_module, "collect", recording)
+    routes = _relation_routes()
+    routes[BASE] = respond(relation_repository_json(private=True, visibility="private"))
+    clock = FakeClock()
+    transport = FakeTransport(routes, clock=clock)
+    assembly = LiveAssembly(
+        context_client=RequestContextClient(context_settings("http://127.0.0.1:9")),
+        open_transport=lambda: transport,
+        provider_factory=refuse_provider,
+        generation_budget=GENERATION_BUDGET,
+    )
+    found = cast(ContextFound, _Found(StaticCredentials(), StaticSelections()))
+    generator = LiveGenerator(found, assembly, picked_at=START, clock=clock)
+
+    output = generator.generate(replace(REQUEST, source_mode="LIVE"))
+
+    assert len(calls) == 1
+    assert "allow_private_repository" not in calls[0]
+    assert [failure.code for failure in output.failures] == [
+        FailureCode.REPOSITORY_UNREACHABLE.value
+    ]
+    assert output.candidates == ()
+    assert transport.paths == [BASE]
 
 
 def test_stop_on_a_later_page_keeps_the_pages_already_received() -> None:

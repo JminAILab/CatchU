@@ -5,9 +5,14 @@
 """
 
 from dataclasses import dataclass
-from typing import Literal, Protocol, Self
+from datetime import datetime
+from typing import TYPE_CHECKING, Literal, Protocol, Self
 
 from app.processing.request_check import CheckedRequest, SourceMode
+
+if TYPE_CHECKING:
+    # app.candidates가 이 모듈을 불러오므로 형 검사 때만 불러온다(서로 불러오는 고리를 피한다).
+    from app.candidates.revisit import RevisitFact
 
 GenerationStatus = Literal["GENERATED", "FAILED", "NOT_GENERATED"]
 NotProvidedReason = Literal["INSUFFICIENT_EVIDENCE", "BELOW_CRITERIA", "UNDETERMINED"]
@@ -95,13 +100,43 @@ class EvidenceItem:
     coverage_limits: tuple[str, ...]
 
 
+RecordTextSource = Literal["PR_TITLE", "COMMIT_FIRST_LINE"]
+
+
+@dataclass(frozen=True)
+class RecordText:
+    """기록의 글(CR1 BR2.1~BR2.7). 작성자가 GitHub에 남긴 원문 한 줄이다.
+
+    후보 판정(`app.candidates.record_text`)이 한 번 계산해 후보 자료의 한 칸에 싣고, 작업 사실
+    둘째 줄과 제목은 이 칸만 본다. 가리기 검사에 걸린 글은 이 값이 되지 않는다. 결과 메시지에는
+    싣지 않는다(계약 C5 그대로). 글은 자르지 않는다.
+    """
+
+    source: RecordTextSource
+    text: str
+    # 부실 판단(BR2.5) 결과. 참이면 작업 사실 둘째 줄과 제목에 쓰지 않는다.
+    weak: bool
+
+    def __post_init__(self) -> None:
+        if not _has_text(self.text) or self.text != self.text.strip():
+            raise ValueError("기록의 글은 앞뒤 공백을 뺀, 비어 있지 않은 글이어야 한다")
+        if len(self.text.splitlines()) != 1:
+            raise ValueError("기록의 글은 한 줄이어야 한다")
+
+    @property
+    def usable(self) -> bool:
+        """작업 사실 둘째 줄과 제목에 쓸 수 있다(부실이 아니다)."""
+        return not self.weak
+
+
 @dataclass(frozen=True)
 class EligibleCandidate:
     """근거·본인 기여를 실패 영향과 분리해 확인한 후보.
 
-    확인하지 못한 작업은 후보로 만들지 않고 NotProvided로 센다. #118은 제목을 만들지 않아
-    title이 None이고, 생성이 확인한 제목만 채운다. title이 None이거나 비어 있으면 결과 조합이
-    제목 null로 보낸다(2026-10-08 결정 문서 「담당과 순서」 ③).
+    확인하지 못한 작업은 후보로 만들지 않고 NotProvided로 센다. 후보 판정은 제목을 만들지 않아
+    title이 None이고, 생성 단계가 쓸 만한 기록의 글(record_text) 또는 확인한 조각 제목으로 채운다.
+    title이 None이거나 비어 있으면 결과 조합이 제목 null로 보낸다(2026-10-08 결정 문서 「담당과
+    순서」 ③). record_text는 worker 안에서만 쓰고 결과 메시지에 싣지 않는다.
     """
 
     work_identity: str
@@ -113,6 +148,19 @@ class EligibleCandidate:
     evidence: tuple[EvidenceItem, ...]
     draft: DraftOutcome
     reflection: ReflectionOutcome
+    # 기록의 글 칸. 없거나 하나다(BR2.7). 값이 같은 후보를 합치면 첫 후보의 칸이 남는다(BR4.5).
+    record_text: RecordText | None = None
+    # 본인 커밋 목록 전체(CR2 BR2.1): 근거 20건을 고르던 본인 기여 근거 커밋 SHA, 최근 것부터, 중복
+    # 없음. 결과 메시지의 ownCommitShas가 되고 api가 그 Catch의 소속으로 쓴다. 후보 판정과 합성 생성기가
+    # 채운다. 비어 있으면 결과 계약(1개 이상)이 거부한다.
+    own_commit_shas: tuple[str, ...] = ()
+    # 같은 작업 안 본인 커밋끼리 본 「다시 볼 곳」 사실(NC3 BR5.1). 처리(live.py)가 후보 판정 뒤에 채우고,
+    # 합성 생성기는 템플릿 값을 쓴다. 생성 단계(replace)는 바꾸지 않는다.
+    revisit_facts: "tuple[RevisitFact, ...]" = ()
+    # 합친 뒤 본인 커밋 작성 시각의 최소·최대(NC3 BR4.1). 후보 판정과 합성 생성기가 채운다. 비어 있으면
+    # 결과 조합이 결과를 만들지 않는다(worker 결함).
+    first_work_at: datetime | None = None
+    last_work_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if not _has_text(self.work_identity):
@@ -125,6 +173,13 @@ class EligibleCandidate:
             raise ValueError("후보에는 묶음 이유가 있어야 한다")
         if not self.evidence:
             raise ValueError("후보에는 근거가 하나 이상 있어야 한다")
+        first, last = self.first_work_at, self.last_work_at
+        if (first is None) != (last is None) or (
+            first is not None and last is not None and first > last
+        ):
+            raise ValueError(
+                "작업 시각은 둘 다 있고 첫 시각이 마지막 시각보다 늦지 않아야 한다"
+            )
 
 
 @dataclass(frozen=True)

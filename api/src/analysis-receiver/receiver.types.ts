@@ -1,4 +1,4 @@
-// worker-messages.yaml v2의 전송 자료와 수신 내부 자료. HTTP 계약이 아니다.
+// worker-messages.yaml(요청·진행·수신 응답 v2, 결과 v4)의 전송 자료와 수신 내부 자료. HTTP 계약이 아니다.
 export type ProcessingState = 'QUEUED' | 'RUNNING' | 'UNCERTAIN' |
   'SUCCEEDED' | 'EMPTY' | 'PARTIAL_FAILED' | 'FAILED';
 export type ApplicationState = 'NOT_READY' | 'PENDING' | 'APPLYING' |
@@ -47,6 +47,17 @@ export interface Candidate {
   }[];
   draft: { status: 'GENERATED' | 'FAILED' | 'NOT_GENERATED'; content: string | null };
   reflection: { status: 'GENERATED' | 'FAILED' | 'NOT_GENERATED'; questions: string[] };
+  // 본인 커밋 목록 전체(Result v3, CR2 계약 C2). 1~3,000개, 중복 없음, 소문자 40자. 등록이 그 Catch의 소속으로 쓴다.
+  ownCommitShas: string[];
+  // 같은 작업 안 본인 커밋끼리 본 「다시 볼 곳」 사실 0~30개(Result v4, NC3 계약 C4). 종류별 개수·소속은 등록 입력 검사가 본다.
+  revisitFacts: {
+    kind: 'REWORKED_LINES' | 'MOVED_FILE' | 'EXTENSION_CHANGED' | 'REVERTED' | 'TEST_FILES_PRESENT';
+    paths: string[];
+    commits: string[];
+  }[];
+  // 합친 뒤 본인 커밋 작성 시각의 최소·최대(date-time 글). 새 Catch에만 쓰고 응답에는 싣지 않는다.
+  firstWorkAt: string;
+  lastWorkAt: string;
 }
 
 export interface CommitObservation {
@@ -56,7 +67,8 @@ export interface CommitObservation {
 }
 
 export interface Result extends RequestContext, CommitObservation {
-  schemaVersion: '2';
+  // Result만 "4"다(NC3 계약 C4). 진행 상태·수신 응답·요청은 "2" 그대로다. "3" 이하 결과는 스키마 검사가 거부한다.
+  schemaVersion: '4';
   messageId: string;
   resultId: string;
   outcome: Outcome;

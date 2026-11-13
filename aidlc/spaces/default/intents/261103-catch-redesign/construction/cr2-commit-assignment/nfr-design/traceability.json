@@ -1,0 +1,36 @@
+{
+  "stage": "nfr-design",
+  "unit": "cr2-commit-assignment",
+  "upstream_ids": [
+    "NFR4.4",
+    "NFR4.8",
+    "NFR4.6",
+    "NFR4.7",
+    "NFR4.9",
+    "NFR4.10",
+    "NFR4.11",
+    "NFR6.3",
+    "NFR4.1",
+    "NFR4.2",
+    "NFR4.3",
+    "NFR4.12",
+    "NFR6.1",
+    "NFR6.2"
+  ],
+  "coverage": [
+    { "id": "NFR4.4", "status": "OK", "target": "performance-design.md: 1,000행 묶음 충돌 무시 삽입, 3,000행 시간은 참고 기록" },
+    { "id": "NFR4.8", "status": "OK", "target": "performance-design.md: (member_id, github_repository_id) 한 번 조회, 유일 조건 색인 앞부분" },
+    { "id": "NFR4.6", "status": "OK", "target": "security-design.md: 쓰기는 등록 함수 한 곳, 트랜잭션 안에서만" },
+    { "id": "NFR4.7", "status": "OK", "target": "security-design.md: catch_asset (catch_id, owner_id) 유일 조건과 한 쌍 외래 키 ON DELETE CASCADE" },
+    { "id": "NFR4.9", "status": "OK", "target": "security-design.md: 시도의 회원·저장소로만 읽기, 기존 worker 키 인증" },
+    { "id": "NFR4.10", "status": "OK", "target": "security-design.md·observability-design.md: 정수 칸 두 개만, SHA 없음" },
+    { "id": "NFR4.11", "status": "OK", "target": "security-design.md: Catch 연쇄 삭제, 삭제 목록 문서 행, 탈퇴 시험 단언" },
+    { "id": "NFR6.3", "status": "OK", "target": "scalability-design.md: max_response_bytes 1 MiB, 초과 시 CONTEXT_RESPONSE_TOO_LARGE" },
+    { "id": "NFR4.1", "status": "OK", "target": "reliability-design.md: group(outcome, assigned) 한 함수, 같은 frozenset 전달" },
+    { "id": "NFR4.2", "status": "OK", "target": "reliability-design.md: orIgnore 삽입, 갱신 없음" },
+    { "id": "NFR4.3", "status": "OK", "target": "reliability-design.md: 같은 트랜잭션 manager, 오류 삼키지 않음" },
+    { "id": "NFR4.12", "status": "OK", "target": "reliability-design.md: 남은 연결만, 소속 커밋 이음 고정 문장, 빈 집합 무변경" },
+    { "id": "NFR6.1", "status": "OK", "target": "reliability-design.md: 결과 판본 3을 YAML·api 타입·worker _envelope에, 나머지 2" },
+    { "id": "NFR6.2", "status": "OK", "target": "reliability-design.md: 코드 요약 배포 안내, 호환 코드 없음" }
+  ]
+}

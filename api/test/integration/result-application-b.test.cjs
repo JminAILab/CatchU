@@ -280,7 +280,13 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
   // 그래서 표가 있는지는 격리 스키마로 한정해 본다(public의 같은 이름 표를 찾지 않게).
   const isolated = await openTestDataSource({ schema, extra: { options: '-c search_path=' + schema + ',public' } });
   const regclass = async (name) => (await isolated.query('SELECT to_regclass($1)::text AS name', [`"${schema}".${name}`]))[0].name;
+  const jdIndexes = ['ix_jd_member_id_updated_at_jd_id', 'ix_jd_summary_run_publication_id',
+    'ix_jd_summary_run_member_id_jd_id', 'ix_jd_summary_run_member_id_publication_id_created_at_run_id'];
+  const indexesIn = (namespace) => isolated.query(`SELECT indexname, indexdef FROM pg_indexes
+    WHERE schemaname=$1 AND indexname=ANY($2::text[]) ORDER BY indexname`, [namespace, jdIndexes]);
   try {
+    const publicJdIndexes = await indexesIn('public');
+    assert.equal(publicJdIndexes.length, 4, '기본 시험 스키마의 JD 인덱스도 보존 여부를 비교한다');
     const migrations = await isolated.runMigrations();
     assert.deepEqual(migrations.map(m => m.name), ['CreateMemberAnalysisFoundation1790500000000',
       'CreateResultApplicationRecord1790550000000', 'CreateCatchAssets1790600000000', 'CreateRepositoryProtection1790601000000', 'CreateShareLink1790745895865',
@@ -289,14 +295,35 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
       'CascadeResultApplicationOnDelete1792817978012', 'CascadeAuthSessionsOnDelete1792817978013', 'CascadeCatchAssetsOnDelete1792817978014',
       'CreateU2UsageAndConsent1793161114211', 'CreatePublicationTables1793162230851', 'AddCatchAuthorDescription1793162230852',
       'AddRepositoryRegistration1793245460352', 'CreatePublishedIndexTables1793257382741', 'CreateBaseSummaryTable1793348947970',
-      'ExpandRepositoryAnalysisScope1793585769819', 'CreateMcpTables1793588083309', 'CreatePdfMaterialTables1793977402870']);
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 34);
+      'ExpandRepositoryAnalysisScope1793585769819', 'CreateMcpTables1793588083309', 'CreateJdSummary1793762571117',
+      'CreatePdfMaterialTables1793977402870', 'CreateCommitAssignment1794054790720', 'AddPdfTextLimitFailureCode1794289608328',
+      'AddCatchRevisitFacts1794378756644']);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 38);
+    assert.equal((await indexesIn(schema)).length, 4);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const memberId = randomUUID();
     await isolated.manager.insert(MemberAccount, { memberId, identityReference: 'preserve', accountState: 'ACTIVE' });
+    await isolated.undoLastMigration(); // NC3 catch_asset 다시 볼 곳 칸 셋(표 수는 그대로)
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 38);
+    const failureCodeCheck = async () => (await isolated.query(`SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
+      WHERE connamespace = $1::regnamespace AND conname LIKE 'ck_pdf_material_extraction_failure_code_%'`, [schema]))[0].def;
+    assert.match(await failureCodeCheck(), /TEXT_LIMIT_EXCEEDED/);
+    await isolated.undoLastMigration(); // U8 pdf_material 실패 사유 CHECK에 TEXT_LIMIT_EXCEEDED 추가(#420 팀장 결정 2026-11-10). 표 수는 그대로다
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 38);
+    assert.doesNotMatch(await failureCodeCheck(), /TEXT_LIMIT_EXCEEDED/);
+    await isolated.undoLastMigration(); // CR2 소속 기록 표와 catch_asset (catch_id, owner_id) 유일 조건
+    assert.equal(await regclass('commit_assignment'), null);
+    assert.equal(await regclass('uq_catch_asset_catch_id_owner_id'), null);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 37);
     await isolated.undoLastMigration(); // U8 PDF 원본·쪽별 글·발행 PDF 쪽 사본 표 셋(C-06·C-07)
-    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 31);
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 34);
     for (const table of ['pdf_material', 'pdf_page_text', 'published_pdf_page']) assert.equal(await regclass(table), null);
+    await isolated.undoLastMigration(); // U10 JD·요약 실행·요구사항 결과를 U6보다 먼저 되돌린다.
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 31);
+    for (const table of ['jd', 'jd_summary_run', 'jd_summary_result']) assert.equal(await regclass(table), null);
+    assert.deepEqual(await indexesIn(schema), []);
+    assert.deepEqual(await indexesIn('public'), publicJdIndexes, '격리 스키마 down은 public의 동명 인덱스를 지우지 않는다');
+    assert.equal(await isolated.manager.count(MemberAccount), 1);
     await isolated.undoLastMigration(); // U6 Claude 연결 표 넷(C-15·C-06)
     assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 27);
     for (const table of ['mcp_client', 'mcp_connection', 'mcp_authorization_code', 'mcp_access_token']) assert.equal(await regclass(table), null);
@@ -344,7 +371,10 @@ test('#104→E→B 실제 마이그레이션 적용·역순 되돌리기에서 �
     assert.equal(await regclass('result_application_record'), null);
     await isolated.undoLastMigration(); // 회원·분석 기반
     assert.deepEqual((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1',[schema])).map(r=>r.tablename),['migrations']);
-    await isolated.runMigrations();
+    assert.deepEqual((await isolated.runMigrations()).map(m => m.name), migrations.map(m => m.name));
+    assert.equal((await isolated.query('SELECT tablename FROM pg_tables WHERE schemaname=$1', [schema])).length, 38);
+    assert.equal((await indexesIn(schema)).length, 4);
+    assert.deepEqual(await indexesIn('public'), publicJdIndexes);
     assert.deepEqual((await isolated.driver.createSchemaBuilder().log()).upQueries.map(q => q.query), []);
     const fk = await isolated.query(`SELECT confrelid::regclass::text AS target FROM pg_constraint
       WHERE conrelid='candidate_registration'::regclass AND conname='fk_candidate_registration_application_record_id'`);

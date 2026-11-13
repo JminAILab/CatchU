@@ -192,8 +192,10 @@ test('활성 분석의 서비스 인증 HTTP는 실제 DB 동의와 #254 자격�
     await db.manager.update(AnalysisAttempt, { attemptId: r.currentAttemptId }, { processing });
     const result = await context(r.currentAttemptId);
     assert.equal(result.status, 200, JSON.stringify(result.body));
-    assert.deepEqual(Object.keys(result.body).sort(), ['allowedResourceTypes', 'attemptId', 'consentId', 'credential',
-      'noticeRevision', 'requestId', 'selection', 'sourceMode']);
+    assert.deepEqual(Object.keys(result.body).sort(), ['allowedResourceTypes', 'assignedCommitShas', 'attemptId', 'consentId',
+      'credential', 'noticeRevision', 'requestId', 'selection', 'sourceMode']);
+    // 소속 기록이 없으면 빈 배열이다(CR2 계약 C1).
+    assert.deepEqual(result.body.assignedCommitShas, []);
     assert.equal(result.body.attemptId, r.currentAttemptId); assert.equal(result.body.requestId, r.requestId);
     // 요청 메시지와 대조할 접수 기록: 동의 행·동의 범위 JSON·시도 행의 값.
     assert.equal(result.body.consentId, r.consentId); assert.equal(result.body.noticeRevision, 'synthetic-notice');
@@ -416,6 +418,46 @@ for (const [state, reason] of Object.entries(changedDuringGitHub)) {
     unavailable(await context(r.currentAttemptId), reason);
   });
 }
+
+// CR2: 소속 기록을 직접 넣는다. 외래 키가 Catch (catch_id, owner_id)를 요구하므로 그 회원의 합성 Catch를 먼저 둔다.
+async function assignedCatch(memberId, requestId, repositoryId, shas) {
+  const catchId = randomUUID();
+  await db.query(`INSERT INTO catch_asset (catch_id, title, owner_id, source_request_id, source_result_id,
+    source_candidate_id, work_identity, work_facts, subject_contribution, draft_status, draft_content, reflection_status,
+    reflection_questions, registration_assessment, source_mode) VALUES ($1, NULL, $2, $3, 'synthetic-result', $4, $5,
+    ARRAY['합성 작업'], '합성 기여', 'NOT_GENERATED', NULL, 'NOT_GENERATED', ARRAY[]::text[], '{}'::jsonb, 'LIVE')`,
+  [catchId, memberId, requestId, `synthetic-candidate-${catchId}`, `synthetic-work-${catchId}`]);
+  for (const sha of shas) {
+    await db.query(`INSERT INTO commit_assignment (member_id, github_repository_id, commit_sha, catch_id)
+      VALUES ($1, $2, $3, $4)`, [memberId, repositoryId, sha, catchId]);
+  }
+}
+
+test('CR2 소속 커밋 목록은 그 시도의 회원·분석 요청 저장소 것만 담고 다른 회원·저장소는 뺀다', async () => {
+  const user = await member(); await connect(user); const r = await analysis(user);
+  const other = await member(); const otherRequest = await analysis(other);
+  const sha = (letter) => letter.repeat(40);
+  await assignedCatch(user.memberId, r.requestId, r.repositoryId, [sha('a'), sha('b')]);
+  await assignedCatch(user.memberId, r.requestId, r.repositoryId, [sha('c')]);
+  await assignedCatch(user.memberId, r.requestId, 'synthetic-other-repository', [sha('d')]);
+  await assignedCatch(other.memberId, otherRequest.requestId, r.repositoryId, [sha('e')]);
+  const result = await context(r.currentAttemptId);
+  assert.equal(result.status, 200);
+  assert.deepEqual([...result.body.assignedCommitShas].sort(), [sha('a'), sha('b'), sha('c')]);
+  assert.equal(logs.join(' ').includes(sha('a')), false, '소속 SHA를 로그에 남기지 않는다');
+});
+
+test('CR2 소속 기록 조회가 실패하면 안전한 500이고 SQL·내부 메시지를 싣지 않는다', async () => {
+  const user = await member(); await connect(user); const r = await analysis(user);
+  await db.query('ALTER TABLE commit_assignment RENAME TO commit_assignment_hidden_for_test');
+  try {
+    const result = await context(r.currentAttemptId);
+    assert.equal(result.status, 500); assert.equal(result.body.code, 'INTERNAL_ERROR');
+    assert.equal(JSON.stringify(result.body).includes('commit_assignment'), false);
+  } finally {
+    await db.query('ALTER TABLE commit_assignment_hidden_for_test RENAME TO commit_assignment');
+  }
+});
 
 test('외부/선정 장애는 안전한 500이며 없음으로 숨기지 않는다', async () => {
   const user = await member(); await connect(user); const r = await analysis(user);

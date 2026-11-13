@@ -42,6 +42,12 @@ function candidate(candidateId = 'synthetic-candidate-1', workIdentity = 'synthe
       sourceRevision: 'synthetic-revision-1', representedFacts: ['[합성] 응답 변경'],
       contributionScope: '[합성] 응답 구현', coverageLimits: [],
     }],
+    // Result v3(CR2)의 본인 커밋 목록. 합성 SHA다.
+    ownCommitShas: ['b'.repeat(40)],
+    // Result v4(NC3)의 다시 볼 곳 사실(없음)과 합성 작업 시각.
+    revisitFacts: [],
+    firstWorkAt: '2026-09-28T01:00:00Z',
+    lastWorkAt: '2026-09-28T02:00:00Z',
   };
 }
 
@@ -103,7 +109,10 @@ async function createCatchDbFixture(config) {
     const { AddCatchEvidencePosition1792029036359 } = require('../../dist/database/migrations/1792029036359-AddCatchEvidencePosition');
     const { CascadeCatchAssetsOnDelete1792817978014 } = require('../../dist/database/migrations/1792817978014-CascadeCatchAssetsOnDelete');
     const { AddCatchAuthorDescription1793162230852 } = require('../../dist/database/migrations/1793162230852-AddCatchAuthorDescription');
+    const { CreateCommitAssignment1794054790720 } = require('../../dist/database/migrations/1794054790720-CreateCommitAssignment');
+    const { AddCatchRevisitFacts1794378756644 } = require('../../dist/database/migrations/1794378756644-AddCatchRevisitFacts');
     const { CatchAssetEntity } = require('../../dist/catches/entities/catch-asset.entity');
+    const { CommitAssignmentEntity } = require('../../dist/catches/entities/commit-assignment.entity');
     const { CatchEvidenceEntity } = require('../../dist/catches/entities/catch-evidence.entity');
     const { CandidateRegistrationEntity } = require('../../dist/catches/entities/candidate-registration.entity');
     const { RepositoryProtectionEntity } = require('../../dist/catches/entities/repository-protection.entity');
@@ -117,10 +126,11 @@ async function createCatchDbFixture(config) {
       ...config, schema, namingStrategy: new SnakeNamingStrategy(),
       entities: [MemberAccount, MemberProfile, GitHubConnection, RepositoryRegistration, AnalysisRequest, AnalysisConsent,
         AnalysisAttempt, IdempotencyRecord, ShareLink, ResultApplicationRecord, CatchAssetEntity, CatchEvidenceEntity,
-        CandidateRegistrationEntity, RepositoryProtectionEntity, AuthSession, SessionRefreshToken],
+        CandidateRegistrationEntity, RepositoryProtectionEntity, AuthSession, SessionRefreshToken, CommitAssignmentEntity],
       // 되돌리기 검사는 B 마이그레이션만 취소하여 실제 선행 테이블의 보존을 확인한다.
       migrations: [CreateCatchAssets1790600000000, CreateRepositoryProtection1790601000000, AllowNullCatchTitle1791784385918, AddCatchEvidencePosition1792029036359,
-        CascadeCatchAssetsOnDelete1792817978014, AddCatchAuthorDescription1793162230852],
+        CascadeCatchAssetsOnDelete1792817978014, AddCatchAuthorDescription1793162230852, CreateCommitAssignment1794054790720,
+        AddCatchRevisitFacts1794378756644],
       extra: { options: `-c TimeZone=UTC -c search_path=${schema}` },
     });
     await dataSource.initialize();

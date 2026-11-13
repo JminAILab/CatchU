@@ -673,9 +673,181 @@ describe('Catch 등록 PostgreSQL', {
     });
   }
 
+  // CR2 소속 기록. SHA는 합성 값(16진수 40자)만 쓴다.
+  const sha = (index) => index.toString(16).padStart(40, '0');
+  const shas = (from, count) => Array.from({ length: count }, (_, offset) => sha(from + offset));
+  const withShas = (ownCommitShas, candidateId = 'synthetic-candidate-1', workIdentity = 'synthetic-work-1') =>
+    ({ ...candidate(candidateId, workIdentity), ownCommitShas });
+  const assignments = async () => db.query(`SELECT member_id, github_repository_id, commit_sha, catch_id, assigned_at
+    FROM commit_assignment ORDER BY commit_sha`);
+
+  test('CR2 새 Catch는 후보의 본인 커밋을 모두 그 회원·분석 요청 저장소의 소속으로 같은 트랜잭션에서 쓴다', async () => {
+    const input = await fixture.receipt({ candidates: [withShas(shas(1, 30))] });
+    const [result] = await apply(input);
+    const rows = await assignments();
+    assert.equal(rows.length, 30);
+    assert.deepEqual(rows.map((row) => row.commit_sha), shas(1, 30));
+    for (const row of rows) {
+      assert.equal(row.member_id, input.ownerId.toLowerCase());
+      assert.equal(row.github_repository_id, 'synthetic-repository');
+      assert.equal(row.catch_id, result.catchId);
+      assert.ok(row.assigned_at instanceof Date);
+    }
+  });
+
+  test('CR2 기존 Catch에 이으면 새 SHA만 소속으로 더하고 Catch 내용·작성자 설명·저장 시각은 그대로다', async () => {
+    const first = await fixture.receipt({ candidates: [withShas(shas(1, 2))] });
+    const [created] = await apply(first);
+    await db.query(`UPDATE catch_asset SET author_description = '[합성] 작성자 설명',
+      author_description_updated_at = '2026-10-02T00:00:00Z' WHERE catch_id = $1`, [created.catchId]);
+    await completeApplication(first);
+    const assetBefore = await db.query('SELECT * FROM catch_asset');
+    const evidenceBefore = await db.query('SELECT * FROM catch_evidence');
+    const assignedBefore = await assignments();
+    // 같은 PR에 커밋이 더해진 재분석(기능 명세 W3): worker는 새 커밋만 싣지만, 이미 있는 SHA가 와도 건너뛴다.
+    const second = await fixture.receipt({ ownerId: first.ownerId, candidates: [withShas([sha(2), sha(3)], 'synthetic-candidate-2')] });
+    const [joined] = await apply(second);
+    assert.equal(joined.catchId, created.catchId);
+    assert.equal(joined.disposition, 'EXISTING');
+    assert.deepEqual(await db.query('SELECT * FROM catch_asset'), assetBefore);
+    assert.deepEqual(await db.query('SELECT * FROM catch_evidence'), evidenceBefore);
+    const after = await assignments();
+    assert.deepEqual(after.slice(0, 2), assignedBefore, '처음 쓴 소속과 그 시각은 바뀌지 않는다');
+    assert.deepEqual(after.map((row) => [row.commit_sha, row.catch_id]),
+      [[sha(1), created.catchId], [sha(2), created.catchId], [sha(3), created.catchId]]);
+  });
+
+  test('CR2 이미 다른 Catch에 속한 SHA는 건너뛰고 반영은 성공하며 저장된 소속을 옮기지 않는다', async () => {
+    const first = await fixture.receipt({ candidates: [withShas([sha(1), sha(2)])] });
+    const [unitCatch] = await apply(first);
+    await completeApplication(first);
+    // 통합 PR이 Unit PR 커밋을 다시 담는 경우(기능 명세 W4)처럼 다른 작업 후보에 같은 SHA가 온다.
+    const second = await fixture.receipt({ ownerId: first.ownerId,
+      candidates: [withShas([sha(1), sha(2), sha(9)], 'synthetic-candidate-2', 'synthetic-work-2')] });
+    const [integration] = await apply(second);
+    assert.notEqual(integration.catchId, unitCatch.catchId);
+    assert.deepEqual((await assignments()).map((row) => [row.commit_sha, row.catch_id]),
+      [[sha(1), unitCatch.catchId], [sha(2), unitCatch.catchId], [sha(9), integration.catchId]]);
+  });
+
+  test('CR2 같은 열쇠의 후보 둘은 본인 커밋 합집합을 한 Catch의 소속으로 쓴다', async () => {
+    const input = await fixture.receipt({ candidates: [withShas([sha(1), sha(2)]),
+      withShas([sha(2), sha(3)], 'synthetic-candidate-2')] });
+    const [left, right] = await apply(input);
+    assert.equal(left.catchId, right.catchId);
+    assert.deepEqual((await assignments()).map((row) => [row.commit_sha, row.catch_id]),
+      [[sha(1), left.catchId], [sha(2), left.catchId], [sha(3), left.catchId]]);
+  });
+
+  test('CR2 같은 수신 기록 재응답은 소속을 다시 쓰지 않는다', async () => {
+    const input = await fixture.receipt({ candidates: [withShas([sha(1)])] });
+    const first = await apply(input);
+    await db.query('DELETE FROM commit_assignment');
+    assert.deepEqual(await apply(input), first);
+    assert.deepEqual(await assignments(), []);
+  });
+
+  test('CR2 본인 커밋 3,000개는 1,000행 묶음으로 모두 쓴다(더해진 시간은 참고 기록)', async (t) => {
+    const timed = async (ownCommitShas, workIdentity) => {
+      const input = await fixture.receipt({ candidates: [withShas(ownCommitShas, 'synthetic-candidate-1', workIdentity)] });
+      const started = process.hrtime.bigint();
+      await apply(input);
+      return Number(process.hrtime.bigint() - started) / 1e6;
+    };
+    const one = await timed([sha(1)], 'synthetic-work-one');
+    await fixture.reset();
+    const many = await timed(shas(1, 3000), 'synthetic-work-many');
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM commit_assignment'))[0].n, 3000);
+    // 통과 조건이 아니다(비기능 설계 NFR4.4). 코드 요약에 옮겨 적는다.
+    t.diagnostic(`CR2 등록 시간: SHA 1개 ${one.toFixed(1)}ms, 3,000개 ${many.toFixed(1)}ms, 더해진 시간 ${(many - one).toFixed(1)}ms`);
+  });
+
+  test('CR2 다른 회원의 Catch를 가리키는 소속 행은 외래 키가 거부한다', async () => {
+    const input = await fixture.receipt({ candidates: [withShas([sha(1)])] });
+    const [result] = await apply(input);
+    const other = await fixture.receipt();
+    await assert.rejects(db.query(`INSERT INTO commit_assignment (member_id, github_repository_id, commit_sha, catch_id)
+      VALUES ($1, 'synthetic-repository', $2, $3)`, [other.ownerId, sha(5), result.catchId]), databaseError('23503'));
+    for (const [repository, commitSha] of [['', sha(6)], ['synthetic-repository', 'A'.repeat(40)], ['synthetic-repository', 'abc']]) {
+      await assert.rejects(db.query(`INSERT INTO commit_assignment (member_id, github_repository_id, commit_sha, catch_id)
+        VALUES ($1, $2, $3, $4)`, [input.ownerId, repository, commitSha, result.catchId]), databaseError('23514'));
+    }
+    assert.equal((await assignments()).length, 1);
+  });
+
+  test('CR2 소속 쓰기가 DB 오류면 Catch·근거·후보 연결·소속이 모두 롤백된다', async () => {
+    const input = await fixture.receipt({ candidates: [withShas([sha(1), sha(2)])] });
+    await db.query(`ALTER TABLE commit_assignment ADD CONSTRAINT fixture_assignment_failure CHECK (commit_sha <> '${sha(2)}')`);
+    try {
+      await assert.rejects(apply(input), databaseError('23514'));
+      await empty();
+      assert.deepEqual(await assignments(), []);
+    } finally {
+      await db.query('ALTER TABLE commit_assignment DROP CONSTRAINT fixture_assignment_failure');
+    }
+  });
+
+  test('CR2 Catch가 지워지면 그 소속 기록도 함께 지워진다', async () => {
+    const input = await fixture.receipt({ candidates: [withShas([sha(1), sha(2)])] });
+    await apply(input);
+    await db.query('DELETE FROM member_account WHERE member_id = $1', [input.ownerId]);
+    assert.deepEqual(await assignments(), []);
+  });
+
+  // NC3 다시 볼 곳 사실과 작업 시각(BR6.1, S19, S20). 경로·SHA는 합성 값이다.
+  const withFacts = (revisitFacts, overrides = {}) => ({ ...withShas([sha(1), sha(2)]), revisitFacts,
+    firstWorkAt: '2025-03-02T10:00:00Z', lastWorkAt: '2025-04-10T09:30:00Z', ...overrides });
+  const reworkedFact = { kind: 'REWORKED_LINES', paths: ['src/a.ts'], commits: [sha(1), sha(2)] };
+  const workColumns = async () => db.query(`SELECT catch_id, revisit_facts, first_work_at, last_work_at
+    FROM catch_asset ORDER BY catch_id`);
+
+  test('NC3 BR6.1 새 Catch에 같은 작업 첫 후보의 다시 볼 곳 사실과 작업 시각을 한 번 쓴다', async () => {
+    const input = await fixture.receipt({ candidates: [withFacts([reworkedFact]),
+      { ...withFacts([], { lastWorkAt: '2025-05-01T00:00:00Z' }), candidateId: 'synthetic-candidate-2' }] });
+    const [first, second] = await apply(input);
+    assert.equal(first.catchId, second.catchId);
+    const [row] = await workColumns();
+    assert.deepEqual(row.revisit_facts, [reworkedFact]);
+    assert.equal(row.first_work_at.toISOString(), '2025-03-02T10:00:00.000Z');
+    assert.equal(row.last_work_at.toISOString(), '2025-04-10T09:30:00.000Z');
+  });
+
+  test('NC3 S20 같은 작업 식별값의 재분석은 기존 Catch의 사실·시각을 바꾸지 않는다', async () => {
+    const first = await fixture.receipt({ candidates: [withFacts([reworkedFact])] });
+    const [created] = await apply(first);
+    await completeApplication(first);
+    const before = await workColumns();
+    const second = await fixture.receipt({ ownerId: first.ownerId, candidates: [{
+      ...withFacts([{ kind: 'TEST_FILES_PRESENT', paths: ['tests/a.test.ts'], commits: [sha(3)] }],
+        { firstWorkAt: '2026-01-01T00:00:00Z', lastWorkAt: '2026-02-01T00:00:00Z' }),
+      candidateId: 'synthetic-candidate-2', ownCommitShas: [sha(3)] }] });
+    const [joined] = await apply(second);
+    assert.equal(joined.catchId, created.catchId);
+    assert.equal(joined.disposition, 'EXISTING');
+    assert.deepEqual(await workColumns(), before);
+  });
+
+  test('NC3 S19 소속 밖 커밋·시각 뒤바뀜 결과는 그 결과의 Catch를 하나도 등록하지 않는다', async () => {
+    const outside = withFacts([{ ...reworkedFact, commits: [sha(1), sha(9)] }]);
+    const reversed = withFacts([], { firstWorkAt: '2025-05-01T00:00:00Z' });
+    for (const bad of [outside, reversed]) {
+      const valid = withShas([sha(5)], 'synthetic-candidate-0', 'synthetic-work-0');
+      const input = await fixture.receipt({ candidates: [valid, { ...bad, candidateId: 'synthetic-candidate-1' }] });
+      await assert.rejects(apply(input), (error) => {
+        assert.equal(error.name, 'CatchRegistrationInputError');
+        assert.equal(error.reason, 'INVALID_INPUT');
+        assert.equal(error.message.includes(sha(9)), false);
+        return true;
+      });
+      await empty();
+    }
+  });
+
   test('B 마이그레이션 되돌리기는 선행 A/E 테이블·행을 보존하고 다시 적용된다', async () => {
     const input = await fixture.receipt();
     await apply(input);
+    await db.undoLastMigration(); // NC3 다시 볼 곳 칸 셋
+    await db.undoLastMigration(); // CR2 소속 기록 표
     await db.undoLastMigration(); // U4 작성자 설명 칸(C-14)
     await db.undoLastMigration(); // #387 B 연쇄 삭제
     await db.undoLastMigration(); // 근거 position

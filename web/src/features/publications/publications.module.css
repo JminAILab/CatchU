@@ -18,7 +18,10 @@
 .itemTitle { font-weight: 700; overflow-wrap: anywhere; }
 .selectedItems, .confirmItems { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
 .selectedItem { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-.kindBadge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #eef2f7; font-size: 12px; font-weight: 700; color: #34465e; }
+/* 「이 작업의 본인 커밋」 표지(새 Catch NC2 BR4.5)는 Catch 종류 표지와 같은 선언을 함께 쓰고 새 색을 더하지 않는다. */
+.kindBadge, .ownCommitMark { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #eef2f7; font-size: 12px; font-weight: 700; color: #34465e; }
+/* 링크 바로 뒤 같은 줄에 붙고, 줄이 모자라면 상자째 다음 줄로 간다. */
+.ownCommitMark { margin-left: 6px; }
 .small { font-size: 12px; color: var(--color-muted); }
 .muted { color: var(--color-muted); }
 .flagged { color: var(--color-danger); font-size: 13px; font-weight: 700; }
@@ -56,7 +59,16 @@
 .snapshotBody { display: grid; gap: 12px; }
 .snapshotSection { border-top: 1px solid var(--color-line); padding-top: 10px; }
 .evidenceList { padding-left: 18px; }
+.evidenceDetails { margin-top: 8px; }
+.evidenceDetails > summary { display: inline-flex; align-items: center; min-height: 44px; color: #254e93; font-size: 14px; font-weight: 700; cursor: pointer; }
+.evidenceDetails > summary:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
 .freeText { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+/* 새 Catch NC1 작성자 설명 칸별 보기(BR7.6): h5는 h4보다 한 단계 작고 굵으며 새 색이 없다. 링크 이름은 자르지 않고 줄을 바꾼다(BR2.7). */
+.descriptionSection + .descriptionSection { margin-top: 10px; }
+.sectionTitle { font-size: 13px; font-weight: 700; margin: 0 0 4px; }
+.githubLink { overflow-wrap: anywhere; }
+/* 발행 화면 항목 단추 안 작은 줄(BR6.3). .small과 같은 글 모양이고 긴 저장소 이름은 줄을 바꾼다. */
+.subline { font-size: 12px; color: var(--color-muted); overflow-wrap: anywhere; }
 .primaryButton, .secondaryButton, .dangerButton { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 18px; border-radius: 9px; border: 1px solid #c9d2df; background: var(--color-surface); color: #34465e; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; }
 .primaryButton { background: #254e93; border-color: #254e93; color: white; }
 .dangerButton { color: var(--color-danger); border-color: var(--color-danger); }

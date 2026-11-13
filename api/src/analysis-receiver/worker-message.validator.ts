@@ -4,6 +4,7 @@ import Ajv, { ValidateFunction } from 'ajv';
 import addFormats from 'ajv-formats';
 import { fullFormats } from 'ajv-formats/dist/formats';
 import { parse } from 'yaml';
+import { isValidPdfExtractionResult, type PdfExtractionResult } from '../pdf-extraction/pdf-extraction-spec';
 import { ProcessingEvent, ReceiptIds, Result } from './receiver.types';
 
 const BASE_URI = 'https://contract.catchu.invalid/contract-design/';
@@ -44,6 +45,14 @@ export class WorkerMessageValidator {
   /** api가 큐로 보내는 요청 메시지(#233)를 같은 계약·같은 Ajv 설정으로 검사한다. */
   request(value: unknown): boolean {
     return this.requestValidator(value);
+  }
+
+  /**
+   * U8 PDF 추출 결과(`PdfExtractionResult`, 기능 명세 W2·BR3.3)는 계약 YAML에 아직 없으므로 코드 규칙으로 검사한다
+   * (C-16 더하는 변경은 별도 계약 PR). 규칙은 pdf-extraction-spec.ts 한곳에 둔다.
+   */
+  pdfExtractionResult(value: unknown): value is PdfExtractionResult {
+    return isValidPdfExtractionResult(value);
   }
 }
 

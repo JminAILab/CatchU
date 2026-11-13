@@ -45,6 +45,8 @@
 .card h3 { margin-bottom: 12px; line-height: 1.55; font-size: 19px; letter-spacing: -0.3px; }
 .cardTitle, .cardDetails { border: 0; background: none; padding: 0; text-align: left; color: inherit; }
 .cardTitle { max-width: 100%; overflow-wrap: anywhere; font-weight: 700; }
+/* 목록 카드 제목은 2줄까지 보이고 넘치면 말줄임이다. 글은 그대로라 버튼의 접근 이름은 전체 제목이다(CR1 BR6.1). */
+.titleClamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .cardTitle::after, .cardDetails::after { content: ""; position: absolute; inset: 0; border-radius: 16px; }
 .cardTitle:focus-visible, .cardDetails:focus-visible { outline: none; }
 .cardTitle:focus-visible::after, .cardDetails:focus-visible::after { outline: 3px solid var(--color-focus); outline-offset: 4px; }
@@ -113,6 +115,17 @@
 /* U4 작성자 설명 입력칸. AI 초안(.draft)과 다른 모양으로 둔다(BR1.3). */
 .descriptionInput { display: block; width: 100%; box-sizing: border-box; margin: 10px 0 4px; padding: 12px 14px; border: 1px solid #c9d2df; border-radius: 9px; font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; }
 .descriptionInput:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+/* 새 Catch NC1 8칸 편집(BR4.5): 칸 제목은 글칸 위의 보이는 label이고 글칸은 한 줄 전체를 쓴다. 3줄로 시작해 세로로 늘린다(.descriptionInput). */
+.descriptionField { margin-top: 18px; }
+.descriptionField .descriptionInput { margin-top: 6px; }
+.descriptionLabel { display: block; font-size: 14px; font-weight: 700; }
+.descriptionHints { margin: 6px 0 0; padding-left: 20px; }
+.detailSection .descriptionHints li { font-size: 12px; line-height: 1.7; color: var(--muted); }
+.detailSection .descriptionHints li + li { margin-top: 4px; }
+/* 「발행하면 면접관에게 열릴 링크」(BR3.2). 긴 이름은 자르지 않고 줄을 바꾼다. */
+.linkPreview { margin: 22px 0 12px; padding: 14px 16px; border: 1px solid var(--color-line, #dbe2ec); border-radius: 10px; }
+.linkPreview h4 { font-size: 14px; margin: 0 0 8px; }
+.linkList { margin: 0 0 8px; overflow-wrap: anywhere; }
 
 @media (prefers-reduced-motion: reduce) {
   .card { transition: none; }

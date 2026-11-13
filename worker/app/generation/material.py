@@ -1,8 +1,10 @@
 """후보 입력 어댑터(#120): 후보마다 생성에 쓸 수 있는 본인 커밋 기록을 찾는다.
 
-후보에는 커밋 메시지·PR 글·변경 내용을 넣지 않았으므로(#118), 같은 수집 결과로 `group(outcome)`을 다시
-불러 단위와 커밋 기록을 얻는다. 단위와 후보는 순서가 아니라 `work_identity` 값으로 맞춘다(후보가 되지
-않은 단위가 있고, 값이 같은 후보는 첫 후보에 합쳐졌다). 후보 판정·근거·순서는 바꾸지 않는다.
+후보에는 커밋 메시지·PR 글·변경 내용을 넣지 않았으므로(#118), 같은 수집 결과와 후보 판정에 넘긴 같은 소속
+커밋 집합으로 `group(outcome, assigned)`를 다시 불러 단위와 커밋 기록을 얻는다(CR2 BR1.6, 집합이 다르면
+커밋 묶음의 열쇠가 달라져 후보에 맞는 단위를 찾지 못한다). 단위와 후보는 순서가 아니라 `work_identity` 값으로
+맞춘다(후보가 되지 않은 단위가 있고, 값이 같은 후보는 첫 후보에 합쳐졌다). 후보 판정·근거·순서는 바꾸지
+않는다.
 
 재료 커밋은 다음을 모두 지키는 근거의 커밋이다(순서대로 확인한다).
 1. 근거 주소 전체가 그 판본의 커밋 화면 주소와 같다. PR 없는 병합의 단위 근거도 `/commit/{병합 SHA}`이고,
@@ -41,8 +43,6 @@ class CandidateMaterial:
     evidence_index: Mapping[str, int]
     # 후보에 맞는 단위들의 본인 기여 근거 커밋 전체(근거 20건 상한 밖 포함).
     own_commits: frozenset[str]
-    # 나눈 부분이 경로로만 든 커밋 → 그 커밋에서 쓸 경로. 없는 커밋은 전체를 쓴다.
-    paths: Mapping[str, frozenset[str]]
     # 같은 단위에 연동 계정이 작성자로 기록되지 않은 커밋이 있는가(PR은 커밋 목록 전체, 병합은 들인
     # 커밋 전체, 커밋 묶음은 묶인 커밋).
     other_authors: OtherAuthors
@@ -59,9 +59,14 @@ class CandidateMaterial:
 
 
 def gather(
-    request: CheckedRequest, outcome: CollectionOutcome, built: GenerationOutput
+    request: CheckedRequest,
+    outcome: CollectionOutcome,
+    built: GenerationOutput,
+    assigned: frozenset[str] = frozenset(),
 ) -> tuple[CandidateMaterial, ...]:
     """후보마다 재료를 찾는다. 후보가 없으면 묶음을 다시 부르지 않는다.
+
+    assigned는 built를 만들 때 넘긴 소속 커밋 집합이다(같은 값이어야 한다).
 
     후보가 있는데 저장소·연동 계정이나 관계 조회 결과가 없거나, 후보에 맞는 단위가 없으면 부른 쪽이나
     후보 판정의 결함이라 ValueError를 낸다(근거 부족이나 0건으로 숨기지 않는다).
@@ -71,12 +76,10 @@ def gather(
     repository, account = outcome.repository, outcome.linked_account
     if repository is None or account is None:
         raise ValueError("후보가 있는데 수집 결과에 저장소·연동 계정이 없다")
-    grouping = group(outcome)
+    grouping = group(outcome, assigned)
     units: dict[str, list[GroupedUnit]] = {}
     for unit in grouping.units:
-        key = work_identity(
-            request.source_mode, request.repository_id, unit.unit, unit.parts
-        )
+        key = work_identity(request.source_mode, request.repository_id, unit.unit)
         units.setdefault(key, []).append(unit)
     materials: list[CandidateMaterial] = []
     for position, candidate in enumerate(built.candidates):
@@ -118,31 +121,11 @@ def gather(
                 ),
                 evidence_index=evidence_index,
                 own_commits=own,
-                paths=_paths(matched),
                 other_authors=_other_authors(matched, grouping.commits, account),
                 records=grouping.commits,
             )
         )
     return tuple(materials)
-
-
-def _paths(units: list[GroupedUnit]) -> dict[str, frozenset[str]]:
-    """경로로 나눈 부분에 든 커밋만 그 경로로 좁힌다. 단위 밖에서 같은 변경으로 배정한 커밋과, 어느
-    단위에서든 커밋 전체로 든 커밋은 좁히지 않는다. 지금 #118은 경로로 나누지 않는다(한계 L8)."""
-    restricted: dict[str, set[str]] = {}
-    whole: set[str] = set()
-    for unit in units:
-        if not unit.parts:
-            whole.update(sha for change in unit.changes for sha in change.commits)
-            continue
-        for part in unit.parts:
-            if part.path is None:
-                whole.add(part.commit)
-            else:
-                restricted.setdefault(part.commit, set()).add(part.path)
-    return {
-        sha: frozenset(paths) for sha, paths in restricted.items() if sha not in whole
-    }
 
 
 def _other_authors(

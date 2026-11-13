@@ -101,6 +101,20 @@ def test_environment_factory_uses_explicit_values_only() -> None:
     assert settings.authority == "127.0.0.1:3001"
 
 
+def test_default_response_limit_is_one_mebibyte() -> None:
+    """소속 커밋 목록(CR2)이 쌓이므로 응답 본문 기본 상한은 1 MiB다(NFR6.3). 환경 설정으로 바꾸는 길은 없다."""
+    settings = ContextApiSettings("https://api.internal", AccessToken(KEY))
+    assert settings.max_response_bytes == 1024 * 1024
+    from_environment = ContextApiSettings.from_environment(
+        {
+            "WORKER_CONTEXT_API_URL": "http://127.0.0.1:3001",
+            "WORKER_CONTEXT_API_KEY": KEY,
+            "NODE_ENV": "test",
+        }
+    )
+    assert from_environment.max_response_bytes == 1024 * 1024
+
+
 @pytest.mark.parametrize(
     "options",
     [

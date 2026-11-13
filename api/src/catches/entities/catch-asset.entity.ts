@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Check, Column, Entity, ForeignKey, PrimaryColumn, Unique } from 'typeorm';
 import { deleteWithParent } from '../../database/foreign-keys';
 import { AnalysisRequest, MemberAccount } from '../../member-analysis/member-analysis.entity';
+import type { RevisitFact } from '../new-catch-content';
 
 export type CatchGenerationStatus = 'GENERATED' | 'FAILED' | 'NOT_GENERATED';
 export type CatchSourceMode = 'MOCK' | 'LIVE';
@@ -19,6 +20,8 @@ export interface RegistrationAssessment {
 @Entity('catch_asset')
 @Unique(['ownerId', 'workIdentity'])
 @Unique(['sourceRequestId', 'sourceResultId', 'sourceCandidateId'])
+// 소속 기록(commit_assignment)의 (catch_id, member_id) 한 쌍 외래 키가 가리킬 대상(CR2 ADR-002).
+@Unique(['catchId', 'ownerId'])
 @ForeignKey(() => MemberAccount, ['ownerId'], ['memberId'], { name: 'fk_catch_asset_owner_id', ...deleteWithParent })
 @ForeignKey(() => AnalysisRequest, ['sourceRequestId'], ['requestId'], { name: 'fk_catch_asset_source_request_id', ...deleteWithParent })
 @Check('char_length("title") >= 1')
@@ -36,6 +39,8 @@ export interface RegistrationAssessment {
 @Check('"visibility" IN (\'PRIVATE\', \'PUBLIC\')')
 @Check('"source_mode" IN (\'MOCK\', \'LIVE\')')
 @Check('("author_description" IS NULL) = ("author_description_updated_at" IS NULL)')
+@Check('jsonb_typeof("revisit_facts") = \'array\'')
+@Check('("first_work_at" IS NULL) = ("last_work_at" IS NULL) AND ("first_work_at" IS NULL OR "first_work_at" <= "last_work_at")')
 export class CatchAssetEntity {
   @PrimaryColumn({ name: 'catch_id', type: 'uuid' })
   catchId: string = randomUUID();
@@ -103,4 +108,20 @@ export class CatchAssetEntity {
 
   @Column({ name: 'author_description_updated_at', type: 'timestamptz', nullable: true })
   authorDescriptionUpdatedAt!: Date | null;
+
+  /**
+   * 같은 작업 안 본인 커밋끼리 본 「다시 볼 곳」 사실(NC3 계약 C4·C2). 새 Catch 등록 때 첫 후보의 값을 한 번 쓰고 바꾸지 않는다.
+   * 원소 모양은 등록 입력 검사와 본인 응답 검사가 보고, DB는 배열인지만 본다. 사본·공개 응답·Claude 연결은 읽지 않는다(BR6.3).
+   * 초기값을 두지 않는다: 기존 저장 코드가 이 칸을 모른 채 행을 저장해도 값을 덮어쓰지 않게 한다(DB 기본값은 빈 배열).
+   */
+  @Column({ name: 'revisit_facts', type: 'jsonb', default: () => "'[]'" })
+  revisitFacts!: RevisitFact[];
+
+  /** 합친 뒤 본인 커밋 작성 시각의 최소(NC3 BR4.1). 마이그레이션 전 행은 NULL이다. 응답에 싣지 않는다. */
+  @Column({ name: 'first_work_at', type: 'timestamptz', nullable: true })
+  firstWorkAt!: Date | null;
+
+  /** 같은 목록의 최대 작성 시각. 본인 목록 정렬·커서에만 쓰고 응답에 싣지 않는다(FR14.3). */
+  @Column({ name: 'last_work_at', type: 'timestamptz', nullable: true })
+  lastWorkAt!: Date | null;
 }

@@ -90,6 +90,24 @@ test('거절은 이미 낸 항목 뒤에 REFUSED, 항목이 하나도 없으면 
   assert.equal(broken.requests.length, 1);
 });
 
+// #528 — 질의응답 스트림에서 Claude 인용 없이 따옴표로 옮긴 작성자 글(새 Catch AC8.1.1, 11/12 재측정 3·8번).
+// 기대: 그 항목을 '작성자 자료 원문' 딱지가 붙은 인용 항목으로 내보내고, 따옴표 없는 항목은 지금처럼 AI 해석이다.
+test('#528 스트림도 따옴표로 옮긴 작성자 글에 인용을 붙여 CITED로 내보낸다', async (t) => {
+  const logs = captureLogs(t);
+  const authorText = '화면은 다시 만들지 않았다.\n서버 쪽 일정이 빠듯해 화면에서 했다.';
+  const { gate } = gateWith([sseResponse(messageEvents([
+    ["- 작성자는 '서버 쪽 일정이 빠듯해 화면에서 했다.'라고 적었다", []],
+    ['\n- 꾸준히 협업했다\n', []],
+  ]))]);
+  const items = await collect(gate.generateStream(qna({ sources: [source({ text: SOURCE_TEXT }),
+    source({ sourceId: 'mat-1', sourceKind: 'AUTHOR_MATERIAL', text: authorText })] })));
+  assert.deepEqual(items.map((item) => [item.kind, item.jdRole, item.citations.map((citation) => citation.sourceLabel)]),
+    [['CITED', null, ['작성자 자료 원문']], ['AI_INTERPRETATION', null, []]]);
+  assert.equal(items[0].citations[0].location.charStart, 100 + authorText.indexOf('서버'));
+  const result = logs.find((log) => log.args[0]?.event === 'ai_gate_result').args[0];
+  assert.deepEqual([result.itemCount, result.quoteCitedCount, result.droppedCount], [2, 1, 0]);
+});
+
 test('JD_SUMMARY는 스트림으로 부르지 않고, 입력 상한을 넘으면 부르기 전에 AiInputTooLarge, 근거가 없으면 아무것도 내보내지 않는다', async (t) => {
   captureLogs(t);
   const { gate, requests } = gateWith([]);

@@ -29,7 +29,8 @@ const STUBS = {
   './use-auth': 'export const useAuth = () => globalThis.__guard.auth; export const useEnsureRestored = () => {}; export const useLastScopeGeneration = () => 1;',
   './use-session-member-lookup': 'export const useSessionMemberLookup = () => ({ sessionScope: 1, me: globalThis.__guard.me, retry: () => {} });',
 };
-const stubUrl = (name) => new URL(encodeURIComponent(name) + '.mjs', stubBase).href;
+// 커버리지 보고가 주소 속 %2F를 거부하므로, 영문·숫자·`-` 밖의 글자는 `_`+16진 코드로 바꿔 파일 이름 글자만 쓴다.
+const stubUrl = (name) => new URL(name.replace(/[^A-Za-z0-9-]/g, (c) => `_${c.charCodeAt(0).toString(16)}`) + '.mjs', stubBase).href;
 const stubSources = new Map(Object.entries(STUBS).map(([name, source]) => [stubUrl(name), source]));
 
 const hooks = registerHooks({

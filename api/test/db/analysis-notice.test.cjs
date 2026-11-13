@@ -15,8 +15,10 @@ const { DEV_LOGIN_IDENTITY_PREFIX, GOOGLE_IDENTITY_PREFIX, MemberKindService, me
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { bindSyntheticDailyLimit } = require('../support/synthetic-daily-limit.cjs');
 
-// #424 본문 확정 v2(2026-10-30 팀장, #322에서 네 줄만 변경)의 SHA-256. 반영 PR에서 팀장 승인을 받는다.
-const CONFIRMED_NOTICE_SHA256 = '08a53bb637cb54845626546cd8d90e11a2ae351434f3cf5408ef63df717e1e28';
+// 고지 v3(Catch 개편 CR3 BR8.2: #424 확정 v2에서 2·3·4절만 변경, OpenAI 판정)의 SHA-256. 반영 PR(CR3)에서 팀장 승인을 받는다.
+// #487에서 2절의 「질문은 정해진 문장으로 만듭니다」를 빼고 판본은 v3 그대로 둔다(2026-11-09 팀장 결정, 아직 배포 전).
+// 새 Catch NC3(BR10.1·C5)에서 4절 셋째 줄 뒤에 「다시 볼 곳」 한 줄 초안을 더했다. 판본은 v3 그대로이고, 문구는 3단계 PR에서 팀장 승인을 받는다.
+const CONFIRMED_NOTICE_SHA256 = 'f0044da40c3dac689fbbc7e8d04e956292914f570b66ed3367af96b664d49914';
 const GOOGLE = { GOOGLE_LOGIN_ENABLED: 'true', GOOGLE_CLIENT_ID: 'synthetic.apps.googleusercontent.com',
   GOOGLE_CLIENT_SECRET: 'synthetic-google-secret', GOOGLE_REDIRECT_URI: 'http://localhost:3000/google/callback' };
 const UNSUPPORTED = ['catchu:github:1234567', 'test:unsupported-origin', 'CATCHU:GOOGLE:upper-case', GOOGLE_IDENTITY_PREFIX, DEV_LOGIN_IDENTITY_PREFIX];
@@ -94,13 +96,26 @@ async function counts() {
   return row;
 }
 
-test('실제 고지는 #424 확정 v2 문구·문단·줄바꿈 그대로이고 합성 판본과 구분된다', () => {
+test('실제 고지는 v3 문구·문단·줄바꿈 그대로이고 합성 판본과 구분된다', () => {
   assert.equal(createHash('sha256').update(REAL_NOTICE.text, 'utf8').digest('hex'), CONFIRMED_NOTICE_SHA256);
   const lines = REAL_NOTICE.text.split('\n');
-  // v1의 네 줄만 교체하므로 전체 줄 수와 문단 구분 수는 유지한다.
-  assert.equal(lines.length, 30); assert.equal(lines.filter(line => line === '').length, 6);
+  // v2의 2·3·4절만 바꾸므로 문단 구분 수는 유지한다. 3절에 OpenAI 줄 다섯, 4절에 기록의 글 줄 하나와 다시 볼 곳 줄 하나(NC3)가 늘었다.
+  assert.equal(lines.length, 36); assert.equal(lines.filter(line => line === '').length, 6);
+  const section4 = lines.slice(lines.indexOf('4. CatchU에 남는 것'), lines.indexOf('5. GitHub 연결 해제'));
+  assert.equal(section4.filter(line => line.includes('「다시 볼 곳」 사실(종류·파일 경로·커밋 식별값)')).length, 1);
+  assert.ok(section4[4].startsWith('- 같은 작업 안 본인 커밋끼리 본'), '4절 셋째 줄 뒤에 둔다');
   assert.equal(lines[0], '[CatchU 저장소 분석 안내]'); assert.ok(!REAL_NOTICE.text.includes('\r'));
-  assert.equal(REAL_NOTICE.noticeRevision, 'catchu-real-analysis-notice-v2');
+  assert.equal(REAL_NOTICE.noticeRevision, 'catchu-real-analysis-notice-v3');
+  // 3절은 실제 판정 공급자(OpenAI)의 회사 이름·보관·연락처와, 판정을 Anthropic에 맡길 때의 경우를 적는다(BR8.2, NFR1.5).
+  for (const text of ['OpenAI OpCo, LLC(미국)', 'OpenAI에 보내는 것:', '확인을 Anthropic에 맡기도록 설정하면:',
+    'OpenAI 처리 위치와 보관:', '요청마다 보관을 끄는 설정이 없어', 'OpenAI 연락처: privacy@openai.com']) {
+    assert.equal(lines.filter(line => line.includes(text)).length, 1, text);
+  }
+  // v2가 보내지 않는다고 적은 커밋 메시지·PR 글을 v3에서는 보내므로 그 문장을 남기지 않는다.
+  assert.ok(!REAL_NOTICE.text.includes('보내지 않는 것: 커밋 메시지, PR과 이슈의 글'));
+  assert.ok(!REAL_NOTICE.text.includes('설명과 질문은 확인한 변경만 넣은 정해진 문장으로 만듭니다.'));
+  // 질문은 AI가 쓴 글이다(#487). 3절이 질문에 Anthropic을 쓴다고 적는다.
+  assert.ok(!REAL_NOTICE.text.includes('질문은 정해진 문장으로 만듭니다.'));
   assert.notEqual(REAL_NOTICE.noticeRevision, SYNTHETIC_NOTICE.noticeRevision);
   assert.ok(Object.isFrozen(REAL_NOTICE));
 });

@@ -233,7 +233,7 @@ test('S16 HTTP: 61번째 tools/call은 DB를 읽지 않고 RATE_LIMITED이며 �
   const before61 = await inspect.get(key);
   const listed = await server.mcp(rpc('tools/list'), { token });
   assert.equal(listed.status, 200, listed.text);
-  assert.equal(listed.body.result.tools.length, 2);
+  assert.equal(listed.body.result.tools.length, 3);
   assert.equal(await inspect.get(key), before61, 'tools/list는 세지 않는다');
   assert.equal(toolErrorOf(await server.callTool(other.token, 'list_my_catches')).error, 'INTERNAL_ERROR', '다른 회원은 빈도를 통과해 읽기까지 간다');
   assert.ok(!JSON.stringify(events(server, 'mcp_rate_limited')).includes('60'), '횟수를 로그에 남기지 않는다');

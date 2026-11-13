@@ -14,9 +14,13 @@ function inputError(reason, field) {
   };
 }
 
+// 합성 커밋 SHA(16진수 한 글자 40개).
+const sha = (letter) => letter.repeat(40);
+
 // B의 저장 전 검사 전용 합성 값이다. 공용 #103 자료나 실제 작업 동일성 판정이 아니다.
-function candidate(candidateId = 'candidate-1', workIdentity = 'synthetic-work-1') {
+function candidate(candidateId = 'candidate-1', workIdentity = 'synthetic-work-1', ownCommitShas = [sha('a')]) {
   return {
+    ownCommitShas,
     candidateId, workIdentity,
     title: '[합성] 오류 응답 처리',
     workFacts: ['[합성] 오류 응답을 구분했다.'],
@@ -33,6 +37,10 @@ function candidate(candidateId = 'candidate-1', workIdentity = 'synthetic-work-1
       sourceRevision: 'synthetic-revision-1', representedFacts: ['[합성] 응답 변경'],
       contributionScope: '[합성] 응답 구현', coverageLimits: [],
     }],
+    // Result v4(NC3): 다시 볼 곳 사실과 작업 시각.
+    revisitFacts: [],
+    firstWorkAt: '2026-09-28T01:00:00Z',
+    lastWorkAt: '2026-09-28T02:00:00Z',
   };
 }
 
@@ -236,6 +244,115 @@ test('입력 거부 오류의 메시지·필드·원인에 후보 본문·ID·UR
       return true;
     });
   }
+});
+
+test('CR2: 같은 열쇠 후보들의 본인 커밋은 앞 후보 목록 뒤에 새 SHA를 처음 나온 순서로 잇는다', () => {
+  const groups = prepareRegistrationBatch([
+    candidate('candidate-1', 'synthetic-work-1', [sha('c'), sha('a')]),
+    candidate('candidate-2', 'synthetic-work-2', [sha('f')]),
+    candidate('candidate-3', 'synthetic-work-1', [sha('a'), sha('d'), sha('b')]),
+  ], 'LIVE');
+  assert.deepEqual(groups.map((group) => group.workIdentity), ['synthetic-work-1', 'synthetic-work-2']);
+  assert.deepEqual(groups[0].ownCommitShas, [sha('c'), sha('a'), sha('d'), sha('b')]);
+  assert.deepEqual(groups[1].ownCommitShas, [sha('f')]);
+});
+
+test('CR2: 본인 커밋 목록이 비거나 3,000개를 넘거나 형식·중복이 틀리면 값을 싣지 않고 거부한다', () => {
+  const many = Array.from({ length: 3001 }, (_, index) => index.toString(16).padStart(40, '0'));
+  const missing = candidate();
+  delete missing.ownCommitShas;
+  const inputs = [[], 'not-an-array', [sha('A')], ['abc'], [sha('a'), sha('a')], [null], many]
+    .map((ownCommitShas) => candidate('candidate-1', 'synthetic-work-1', ownCommitShas));
+  for (const input of [missing, ...inputs]) {
+    assert.throws(() => prepareRegistrationBatch([input], 'MOCK'),
+      (error) => {
+        inputError('INVALID_INPUT', 'ownCommitShas')(error);
+        assert.equal(error.message.includes(sha('a')), false);
+        return true;
+      });
+  }
+  // 상한 3,000개는 받는다.
+  const groups = prepareRegistrationBatch([candidate('candidate-1', 'synthetic-work-1', many.slice(0, 3000))], 'MOCK');
+  assert.equal(groups[0].ownCommitShas.length, 3000);
+});
+
+// NC3 결과 v4의 다시 볼 곳 사실·작업 시각 등록 입력 검사(BR5.2, 보안 설계 2절).
+const withFacts = (revisitFacts, ownCommitShas = [sha('a'), sha('b')]) =>
+  ({ ...candidate('candidate-1', 'synthetic-work-1', ownCommitShas), revisitFacts });
+const reworked = (overrides = {}) => ({ kind: 'REWORKED_LINES', paths: ['src/a.ts'], commits: [sha('a'), sha('b')], ...overrides });
+
+test('NC3 BR6.1 새 Catch 저장값에 첫 후보의 사실과 작업 시각을 Date로 싣는다', () => {
+  const facts = [
+    reworked(),
+    { kind: 'MOVED_FILE', paths: ['src/a.js', 'lib/a.js'], commits: [sha('a')] },
+    { kind: 'EXTENSION_CHANGED', paths: ['src/u.js', 'src/u.ts'], commits: [sha('a'), sha('b')] },
+    { kind: 'REVERTED', paths: [], commits: [sha('b'), sha('a')] },
+    { kind: 'TEST_FILES_PRESENT', paths: ['tests/a.test.ts'], commits: [sha('b')] },
+  ];
+  const input = { ...withFacts(facts), firstWorkAt: '2025-03-02T10:00:00+09:00', lastWorkAt: '2025-04-10T00:00:00.500Z' };
+  const [group] = prepareRegistrationBatch([input], 'LIVE');
+  const { asset } = group.candidates[0].content;
+  assert.deepEqual(asset.revisitFacts, facts);
+  assert.notEqual(asset.revisitFacts, input.revisitFacts, '입력 배열을 그대로 쥐지 않는다');
+  // 오프셋·소수 초가 있는 계약 date-time도 Date로 해석해 비교한다(검토 Minor 2).
+  assert.equal(asset.firstWorkAt.toISOString(), '2025-03-02T01:00:00.000Z');
+  assert.equal(asset.lastWorkAt.toISOString(), '2025-04-10T00:00:00.500Z');
+});
+
+test('NC3 S19 종류별 경로·커밋 수가 넘치거나 모자라면 값을 싣지 않고 거부한다', () => {
+  const tests = (count) => Array.from({ length: count }, (_, index) => `tests/${index}.test.ts`);
+  const invalid = [
+    reworked({ paths: [] }), reworked({ paths: ['a.ts', 'b.ts'] }), reworked({ commits: [sha('a')] }),
+    { kind: 'MOVED_FILE', paths: ['src/a.js'], commits: [sha('a')] },
+    { kind: 'MOVED_FILE', paths: ['src/a.js', 'lib/a.js'], commits: [] },
+    { kind: 'REVERTED', paths: ['a.ts'], commits: [sha('a'), sha('b')] },
+    { kind: 'REVERTED', paths: [], commits: [sha('a')] },
+    { kind: 'TEST_FILES_PRESENT', paths: [], commits: [sha('a')] },
+    { kind: 'TEST_FILES_PRESENT', paths: tests(21), commits: [sha('a')] },
+    { kind: 'RENAMED', paths: ['a.ts'], commits: [sha('a'), sha('b')] },
+    { ...reworked(), line: 'secret-line-text' },
+    reworked({ paths: ['a'.repeat(1025)] }),
+  ];
+  for (const fact of invalid) {
+    assert.throws(() => prepareRegistrationBatch([withFacts([fact])], 'LIVE'), (error) => {
+      inputError('INVALID_INPUT', 'revisitFacts')(error);
+      assert.equal(error.message.includes('src/a.ts') || error.message.includes(sha('a')), false);
+      return true;
+    });
+  }
+  // 경계 값(TEST_FILES_PRESENT 20개, 경로 1,024자)은 받는다.
+  assert.doesNotThrow(() => prepareRegistrationBatch([withFacts([
+    { kind: 'TEST_FILES_PRESENT', paths: tests(20), commits: [sha('a')] }, reworked({ paths: ['가'.repeat(1024)] }),
+  ])], 'LIVE'));
+  assert.throws(() => prepareRegistrationBatch([withFacts(Array.from({ length: 31 }, () => reworked()))], 'LIVE'),
+    inputError('INVALID_INPUT', 'revisitFacts'));
+});
+
+test('NC3 S19 사실의 커밋이 그 후보 본인 커밋 밖이거나 한 사실 안에서 겹치면 거부한다', () => {
+  const outside = withFacts([reworked({ commits: [sha('a'), sha('c')] })]);
+  const overlapCommits = withFacts([{ kind: 'MOVED_FILE', paths: ['a.js', 'b.js'], commits: [sha('a'), sha('a')] }]);
+  const overlapPaths = withFacts([{ kind: 'MOVED_FILE', paths: ['a.js', 'a.js'], commits: [sha('a')] }]);
+  const shortSha = withFacts([reworked({ commits: [sha('a').slice(0, 7), sha('b')] })]);
+  for (const input of [outside, overlapCommits, overlapPaths, shortSha, withFacts('not-an-array')]) {
+    assert.throws(() => prepareRegistrationBatch([input], 'LIVE'), inputError('INVALID_INPUT', 'revisitFacts'));
+  }
+  // 다른 후보의 본인 커밋이어도 이 후보 목록 밖이면 거부한다(같은 작업으로 합쳐지더라도 후보마다 본다).
+  const other = { ...candidate('candidate-2', 'synthetic-work-1', [sha('c')]), revisitFacts: [] };
+  assert.throws(() => prepareRegistrationBatch([outside, other], 'LIVE'), inputError('INVALID_INPUT', 'revisitFacts'));
+});
+
+test('NC3 S19 작업 시각이 빠지거나 꼴이 틀리거나 뒤바뀌면 거부한다', () => {
+  const timed = (firstWorkAt, lastWorkAt) => ({ ...candidate(), firstWorkAt, lastWorkAt });
+  assert.throws(() => prepareRegistrationBatch([timed(undefined, '2025-04-10T00:00:00Z')], 'LIVE'),
+    inputError('INVALID_INPUT', 'firstWorkAt'));
+  assert.throws(() => prepareRegistrationBatch([timed('not-a-time', '2025-04-10T00:00:00Z')], 'LIVE'),
+    inputError('INVALID_INPUT', 'firstWorkAt'));
+  assert.throws(() => prepareRegistrationBatch([timed('2025-04-10T00:00:00Z', null)], 'LIVE'),
+    inputError('INVALID_INPUT', 'lastWorkAt'));
+  assert.throws(() => prepareRegistrationBatch([timed('2025-04-10T00:00:01Z', '2025-04-10T00:00:00Z')], 'LIVE'),
+    inputError('INVALID_INPUT', 'lastWorkAt'));
+  // 같은 시각은 받는다.
+  assert.doesNotThrow(() => prepareRegistrationBatch([timed('2025-04-10T00:00:00Z', '2025-04-10T09:00:00+09:00')], 'LIVE'));
 });
 
 test('검사 중 뜻밖의 Error와 TypeError를 입력 거부로 감싸지 않는다', () => {

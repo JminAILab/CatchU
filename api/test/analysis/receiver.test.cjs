@@ -116,6 +116,56 @@ test('식별 가능한 형식/의미 오류는 REJECTED/SCHEMA_INVALID이고 입
   assert.equal(store.commits, 0);
 });
 
+test('CR2 본인 커밋 목록: 결과 판본 안의 본인 커밋 목록은 받고, "2" 결과와 본인 커밋 목록 빠짐·형식 오류는 SCHEMA_INVALID다', async () => {
+  const sha = (letter) => letter.repeat(40);
+  const accepted = harness();
+  const valid = result({ candidates: [{ ...candidate(), ownCommitShas: [sha('c'), sha('a')] }] });
+  const output = await accepted.receiver.receiveResult(valid);
+  assert.equal(output.receipt.disposition, 'ACCEPTED');
+  assert.equal(output.receipt.schemaVersion, '2', '수신 응답 판본은 "2" 그대로다');
+  assert.deepEqual(output.accepted.result.candidates[0].ownCommitShas, [sha('c'), sha('a')]);
+
+  const { receiver, store } = harness();
+  const withShas = (ownCommitShas) => result({ candidates: [{ ...candidate(), ownCommitShas }] });
+  const missing = result(); delete missing.candidates[0].ownCommitShas;
+  const many = Array.from({ length: 3001 }, (_, index) => index.toString(16).padStart(40, '0'));
+  const invalids = [result({ schemaVersion: '2' }), missing, withShas([]), withShas([sha('A')]), withShas(['abc']),
+    withShas([sha('a'), sha('a')]), withShas([1]), withShas(many)];
+  for (const input of invalids) {
+    const output = await receiver.receiveResult(input);
+    assert.equal(output.receipt.disposition, 'REJECTED');
+    assert.equal(output.receipt.code, 'SCHEMA_INVALID');
+    assert.equal(output.accepted, undefined);
+  }
+  assert.equal(store.commits, 0);
+  // 상한 3,000개는 받는다.
+  assert.equal(validator.result(withShas(many.slice(0, 3000))), true);
+});
+
+test('NC3 S19 결과 v4: 다시 볼 곳 사실과 작업 시각이 든 "4"는 받고, "3" 결과와 새 칸 빠짐은 SCHEMA_INVALID다', async () => {
+  const sha = (letter) => letter.repeat(40);
+  const accepted = harness();
+  const facts = [{ kind: 'REWORKED_LINES', paths: ['src/a.ts'], commits: [sha('a'), sha('b')] }];
+  const output = await accepted.receiver.receiveResult(result({
+    candidates: [{ ...candidate(), ownCommitShas: [sha('b'), sha('a')], revisitFacts: facts }],
+  }));
+  assert.equal(output.receipt.disposition, 'ACCEPTED');
+  assert.deepEqual(output.accepted.result.candidates[0].revisitFacts, facts);
+  assert.equal(output.accepted.result.candidates[0].firstWorkAt, '2026-09-28T01:00:00Z');
+
+  const { receiver, store } = harness();
+  const invalids = [result({ schemaVersion: '3' })];
+  for (const field of ['revisitFacts', 'firstWorkAt', 'lastWorkAt']) {
+    const missing = result(); delete missing.candidates[0][field]; invalids.push(missing);
+  }
+  for (const input of invalids) {
+    const rejected = await receiver.receiveResult(input);
+    assert.equal(rejected.receipt.disposition, 'REJECTED');
+    assert.equal(rejected.receipt.code, 'SCHEMA_INVALID');
+  }
+  assert.equal(store.commits, 0);
+});
+
 test('회원/저장소/동의/범위/자료 모드/요청과 현재 시도를 접수 정본과 대조한다', async () => {
   for (const key of ['requestId', 'memberId', 'repositoryId', 'consentId', 'scopeRevision', 'sourceMode', 'attemptId']) {
     const { receiver, store } = harness();

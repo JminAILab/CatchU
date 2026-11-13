@@ -335,3 +335,128 @@ def test_bullmq_and_redis_versions_match_queue_kit() -> None:
     for name in ("bullmq", "redis"):
         assert worker[name] == kit[name], name
         assert f"{name}=={worker[name]}" in dependencies, name
+
+
+# CR3 판정 공급자·AI 쪽 켜기(BR1.1·BR1.4, NFR5) -----------------------------------------------
+
+JUDGEMENT_KEY = "sk-proj-synthetic-judgement-key-must-not-leak"
+
+
+def test_s1_openai_without_judgement_key_keeps_the_ai_side_off() -> None:
+    """S1: 공급자 OpenAI(기본)이고 판정 키가 없으면 AI 쪽이 꺼지고 판정 공급자를 만들지 않는다."""
+    from app.consumer import child
+
+    settings = production(CATCHU_QUEUE_REDIS_URL=QUEUE)
+    assert settings.live is not None
+    assert settings.live.judgement_provider == "openai"
+    assert settings.live.judgement_key is None
+    assert settings.live.ai_side is False
+    assembly = child.live_assembly(settings.for_child())
+    assert assembly is not None and assembly.judge_factory is None
+
+
+def test_openai_with_judgement_key_turns_the_ai_side_on() -> None:
+    from app.consumer import child
+    from app.judgement.openai_judge import OpenAIJudge
+
+    settings = production(
+        CATCHU_QUEUE_REDIS_URL=QUEUE,
+        CATCHU_JUDGEMENT_PROVIDER="openai",
+        CATCHU_JUDGEMENT_API_KEY=JUDGEMENT_KEY,
+    )
+    assert settings.live is not None and settings.live.ai_side is True
+    assembly = child.live_assembly(settings.for_child())
+    assert assembly is not None and assembly.judge_factory is not None
+    judge = assembly.judge_factory()
+    assert isinstance(judge, OpenAIJudge) and judge.name == "openai"
+
+
+def test_s2_claude_turns_the_ai_side_on_with_the_generation_key() -> None:
+    """S2: 공급자 Claude는 판정 키 없이 기존 생성 키로 켜진다. 판정 키가 있어도 보지 않는다."""
+    from app.consumer import child
+    from app.judgement.claude import ClaudeJudge
+
+    settings = production(
+        CATCHU_QUEUE_REDIS_URL=QUEUE,
+        CATCHU_JUDGEMENT_PROVIDER="claude",
+        CATCHU_JUDGEMENT_API_KEY=JUDGEMENT_KEY,
+    )
+    assert settings.live is not None
+    assert settings.live.judgement_provider == "claude"
+    assert settings.live.judgement_key is None
+    assert settings.live.ai_side is True
+    assembly = child.live_assembly(settings.for_child())
+    assert assembly is not None and assembly.judge_factory is not None
+    judge = assembly.judge_factory()
+    assert isinstance(judge, ClaudeJudge) and judge.name == "claude"
+
+
+@pytest.mark.parametrize("value", ["OpenAI", "anthropic", "synthetic", " openai"])
+@pytest.mark.parametrize("node_env", [None, "test"])
+def test_unknown_judgement_provider_stops_startup(
+    value: str, node_env: str | None
+) -> None:
+    """공급자 값이 openai·claude 밖이면 개발·시험에서도 기동하지 않는다. 합성 공급자는 설정으로 만들 수 없다."""
+    values = {"CATCHU_JUDGEMENT_PROVIDER": value}
+    if node_env is None:
+        values = {**LIVE, "CATCHU_QUEUE_REDIS_URL": QUEUE, **values}
+    else:
+        values["NODE_ENV"] = node_env
+    with pytest.raises(SettingsError) as raised:
+        ConsumerSettings.from_environment(values)
+    assert "CATCHU_JUDGEMENT_PROVIDER" in str(raised.value)
+    assert value.strip() not in str(raised.value).replace(
+        "CATCHU_JUDGEMENT_PROVIDER", ""
+    ).replace("openai 또는 claude", "")
+
+
+def test_invalid_judgement_key_stops_startup_without_echoing_it() -> None:
+    with pytest.raises(SettingsError) as raised:
+        production(
+            CATCHU_QUEUE_REDIS_URL=QUEUE, CATCHU_JUDGEMENT_API_KEY="has space key"
+        )
+    assert "CATCHU_JUDGEMENT_API_KEY" in str(raised.value)
+    assert "has space key" not in str(raised.value)
+
+
+def test_judgement_key_is_not_required_and_alone_does_not_open_live() -> None:
+    """판정 키는 운영 필수 셋이 아니다. 개발에서 판정 키만 있으면 지금처럼 LIVE가 꺼진다."""
+    assert load(NODE_ENV="test", CATCHU_JUDGEMENT_API_KEY=JUDGEMENT_KEY).live is None
+    with pytest.raises(SettingsError):
+        load(CATCHU_QUEUE_REDIS_URL=QUEUE, CATCHU_JUDGEMENT_API_KEY=JUDGEMENT_KEY)
+
+
+def test_judgement_key_reaches_the_child_but_not_repr_or_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """판정 키는 설정 객체로만 자식에 가고, repr·환경에 남지 않는다(BR1.4)."""
+    import app.consumer.service as service_module
+
+    seen: dict[str, object] = {}
+
+    class FakeService:
+        def __init__(self, settings: ConsumerSettings, **_: object) -> None:
+            seen["settings"] = settings
+
+        async def run(self) -> int:
+            import os
+
+            seen["left"] = os.environ.get("CATCHU_JUDGEMENT_API_KEY", "absent")
+            return 0
+
+    monkeypatch.setattr(service_module, "ConsumerService", FakeService)
+    monkeypatch.setenv("NODE_ENV", "test")
+    for name, value in LIVE.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("CATCHU_JUDGEMENT_API_KEY", JUDGEMENT_KEY)
+
+    assert main([]) == 0
+    assert seen["left"] == "absent"
+    settings = seen["settings"]
+    assert isinstance(settings, ConsumerSettings)
+    child = settings.for_child()
+    for rendered in (repr(settings), repr(child), str(child.live)):
+        assert JUDGEMENT_KEY not in rendered
+    restored = pickle.loads(pickle.dumps(child))
+    assert restored.live is not None and restored.live.judgement_key is not None
+    assert restored.live.judgement_key.reveal() == JUDGEMENT_KEY

@@ -1,0 +1,53 @@
+{
+  "stage": "functional-design",
+  "unit": "nc3-revisit-facts",
+  "upstream_ids": [
+    "AC9.1.1",
+    "AC9.1.2",
+    "AC9.1.3",
+    "AC9.1.4",
+    "AC9.2.1",
+    "AC9.2.2",
+    "AC9.3.1",
+    "AC9.4.1",
+    "AC10.1.1",
+    "AC10.1.2",
+    "AC10.2.1",
+    "AC10.2.2",
+    "AC11.1.1",
+    "AC11.1.2",
+    "AC11.1.3",
+    "AC11.1.4",
+    "AC11.2.1"
+  ],
+  "coverage": [
+    { "id": "AC9.1.1", "status": "OK", "target": "BR3.1, BR2.1, BR9.1, BR9.2, BR9.3" },
+    { "id": "AC9.1.2", "status": "OK", "target": "BR2.1, BR3.1" },
+    { "id": "AC9.1.3", "status": "OK", "target": "BR9.1, BR6.2" },
+    { "id": "AC9.1.4", "status": "OK", "target": "BR9.3" },
+    { "id": "AC9.2.1", "status": "OK", "target": "BR1.1, BR3.2" },
+    { "id": "AC9.2.2", "status": "OK", "target": "BR3.3" },
+    { "id": "AC9.3.1", "status": "OK", "target": "BR3.4, BR3.1" },
+    { "id": "AC9.4.1", "status": "OK", "target": "BR6.3, BR8.1" },
+    { "id": "AC10.1.1", "status": "OK", "target": "BR3.5, BR2.3" },
+    { "id": "AC10.1.2", "status": "OK", "target": "BR3.5" },
+    { "id": "AC10.2.1", "status": "OK", "target": "BR2.3, BR3.1" },
+    { "id": "AC10.2.2", "status": "OK", "target": "BR2.3" },
+    { "id": "AC11.1.1", "status": "OK", "target": "BR7.1, BR4.1" },
+    { "id": "AC11.1.2", "status": "OK", "target": "BR4.1, BR7.1" },
+    { "id": "AC11.1.3", "status": "OK", "target": "BR7.1" },
+    { "id": "AC11.1.4", "status": "OK", "target": "BR8.1, BR6.3" },
+    { "id": "AC11.2.1", "status": "OK", "target": "BR7.2" }
+  ],
+  "reverse": [
+    { "id": "BR2.2", "status": "N/A", "target": "자료 경계 규칙: 못 받거나 잘린 자료로 추측하지 않는다(unit-of-work NC3 구현 메모, FR12.4)" },
+    { "id": "BR2.4", "status": "N/A", "target": "규칙 끄기 수단(FR15.4). 이야기로 만들지 않은 요구라 수락 기준이 없다" },
+    { "id": "BR2.5", "status": "N/A", "target": "계약 C4 열린 질문(수 상한)에 대한 기능 설계 답(Q1 A)" },
+    { "id": "BR5.1", "status": "N/A", "target": "결과 메시지 판본과 함께 배포(FR15.1). 이야기로 만들지 않은 요구" },
+    { "id": "BR5.2", "status": "N/A", "target": "결과 검사(FR15.1, 계약 C4). 이야기로 만들지 않은 요구" },
+    { "id": "BR5.3", "status": "N/A", "target": "합성 경로도 새 칸을 채운다(계약 C4 배포)" },
+    { "id": "BR6.1", "status": "N/A", "target": "등록 때 한 번 쓰기(ADR-004, FR12.1·FR14.1 저장)" },
+    { "id": "BR7.3", "status": "N/A", "target": "공개 목록을 바꾸지 않는 경계(계약 C2 바뀌지 않는 것)" },
+    { "id": "BR10.1", "status": "N/A", "target": "고지 4절 한 줄과 팀장 승인(FR15.2). 이야기로 만들지 않은 요구" }
+  ]
+}
