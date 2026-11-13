@@ -9,7 +9,7 @@ load_env "${LIVE_DIR}/api.env"
 load_keys "${LIVE_DIR}/secrets.env" GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GITHUB_OAUTH_CLIENT_ID GITHUB_OAUTH_CLIENT_SECRET CATCHU_GENERATION_API_KEY
 load_optional_keys "${LIVE_DIR}/secrets.env" CATCHU_EMBEDDING_API_KEY
 if [ -n "${CATCHU_EMBEDDING_API_KEY:-}" ]; then echo "임베딩: Voyage"; else echo "임베딩: 합성 제공자(발행 링크의 질의응답 결과는 믿을 수 없다)"; fi
-docker start "${LIVE_DB}" "${LIVE_QUEUE}" >/dev/null
+start_containers "${DB_PORT}"
 cd "${REPO_ROOT}/api"
 npm run build --silent
 log="${LIVE_DIR}/logs/api-$(date +%Y%m%d-%H%M%S).log"
