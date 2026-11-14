@@ -155,8 +155,10 @@ Per unit: [TBD]
 - **Lifecycle Phase**: CONSTRUCTION
 - **Current Stage**: functional-design
 - **Next Stage**: nfr-requirements
-- **Status**: Running
-- **Last Updated**: 2026-10-27T04:22:26Z
+- **Status**: Archived
+- **Last Updated**: 2026-11-14T13:26:19Z
+
+- **Archived From**: Running
 
 ## Session Resume Point
 - **Last Completed Stage**: delivery-planning
