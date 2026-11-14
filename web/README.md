@@ -2,7 +2,7 @@
 
 > 기능별 동작·연결 안내는 이 README에 덧붙이지 않고 `web/src/features/<기능>/README.md`로 쓴다.
 
-Next.js로 만드는 10월 MVP의 사용자 화면이다. 로그인·프로필·GitHub 연동, 홈·분석 상태, 본인 자산 확인·공개/숨김, 공유 링크·수신자 열람 흐름을 다룬다. 적용 범위는 10월 작업이면 [MVP 범위 문서](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)와 담당 이슈의 완료 기준, 11월 Unit이면 12월 intent 요구사항과 그 Unit 기능 설계로 확인한다.
+Next.js로 만드는 10월 MVP의 사용자 화면이다. 로그인·프로필·GitHub 연동, 홈·분석 상태, 본인 자산 확인·공개/숨김, 공유 링크·수신자 열람 흐름을 다룬다. 적용 범위는 작업의 이슈와 승인 요구사항·기능 설계로 확인한다(위치는 [문서 안내](../docs/README.md#ai-dlc-산출물과의-관계)).
 
 이 README는 [#82 web 최소 실행 골격](https://github.com/JminAILab/CatchU/issues/82)과 [#106 공통 기반](https://github.com/JminAILab/CatchU/issues/106) PR①(레이아웃·헤더·주소·공통 표시)과 PR②(API 호출·토큰·로그인 진입·회원 경로 가드) 기준이다. 각 화면은 기능 이슈에서 추가한다.
 
@@ -147,7 +147,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 
 ## 페이지 주소
 
-**정본은 이 표이며, `src/lib/routes.ts`와 함께 고친다.** A~D 담당과 '제안' 구분은 10월 기준이다. 11월 Unit은 주소를 그 Unit 기능 설계(받은 사람 링크 화면은 계약 C-11·C-12)에 따라 정하고, 이 표와 `routes.ts`를 함께 고치며 담당 칸에는 Unit 번호를 적는다. 구분: **확정** 결정 문서에 있음 / **제안** 담당자 확인 전 안 / **미정** 담당자가 정함. `[token]`·`[catchId]`·`…`는 자리표시자다. 근거: [9/24 팀장 결정](../docs/ai-dlc-input-mvp/2026-09-14_followup.md), [web 기능 설계 「내 자산 화면 구조」](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md), #55 「10월 헤더 합의」, [#106 주소 표 초안](https://github.com/JminAILab/CatchU/issues/106#issuecomment-5865962875).
+**정본은 이 표이며, `src/lib/routes.ts`와 함께 고친다.** A~D 담당과 '제안' 구분은 10월 기준이다. 새 주소는 작업의 이슈와 해당 기능 설계(받은 사람 링크 화면은 계약 C-11·C-12)에 따라 정하고, 이 표와 `routes.ts`를 함께 고친다. 구분: **확정** 결정 문서에 있음 / **제안** 담당자 확인 전 안 / **미정** 담당자가 정함. `[token]`·`[catchId]`·`…`는 자리표시자다. 근거: [9/24 팀장 결정](../docs/ai-dlc-input-mvp/2026-09-14_followup.md), [web 기능 설계 「내 자산 화면 구조」](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u1-web/functional-design/functional-spec.md), #55 「10월 헤더 합의」, [#106 주소 표 초안](https://github.com/JminAILab/CatchU/issues/106#issuecomment-5865962875).
 
 | 주소 | 화면 | 담당 | 로그인 | 구분 | 비고 |
 |---|---|---|---|---|---|
@@ -259,6 +259,6 @@ if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLi
 
 - 착수·브랜치·기록·검토 기준은 [공통 작업관리](../docs/CatchU_작업관리.md)를 따른다.
 - Next.js 16은 이전 판과 API·파일 규칙이 달라진 부분이 있다. 사람이든 AI든 Next.js 코드를 쓰기 전에 설치된 판본의 문서 `node_modules/next/dist/docs/`를 확인한다.
-- 화면 문구·상태는 승인 요구사항과 근거 화면 설계(10월은 `docs/ai-dlc-input-mvp/`의 흐름 초안, 11월은 Unit 기능 설계의 화면 구성)를 근거로 하고, 요청 중·저장 중을 성공으로, 조회 실패를 데이터 없음으로 표시하지 않는다.
+- 화면 문구·상태는 작업의 이슈와 승인 요구사항·기능 설계의 화면 구성을 근거로 하고, 요청 중·저장 중을 성공으로, 조회 실패를 데이터 없음으로 표시하지 않는다.
 - 브라우저 로그에는 민감정보를 출력하지 않는다.
 - 로컬 실행 확인과 AWS 배포 검증은 각각 기록한다.

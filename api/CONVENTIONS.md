@@ -74,11 +74,11 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 
 - 엔티티: `src/<기능>/<이름>.entity.ts`. 이름이 `.entity.ts`로 끝나면 앱과 마이그레이션 명령이 자동으로 찾는다. 서비스에서 Repository를 주입받으려면 기능 모듈의 `imports`에 `TypeOrmModule.forFeature([엔티티])`를 넣는다.
 - 마이그레이션: `src/database/migrations/` 한 곳. 파일은 생성 명령으로 만든다.
-- 테이블은 승인된 ERD의 속성·필수 값·enum·유일성을 따른다(11월 Unit은 계약 설계의 공유 표와 그 Unit 기능 설계의 entities). 바꿀 때 계약 수정인지는 [코딩 운영](../docs/CatchU_coding_procedures.md#코딩-운영)의 계약 수정 규칙을 따른다.
+- 테이블은 승인된 ERD의 속성·필수 값·enum·유일성을 따른다(승인된 공유 표와 해당 기능 설계의 entities 포함). 바꿀 때 계약 수정인지는 [코딩 운영](../docs/CatchU_coding_procedures.md#코딩-운영)의 계약 수정 규칙을 따른다.
 
 순서:
 
-1. `git fetch origin` 뒤 작업 브랜치를 합칠 대상 브랜치(보통 `origin/dev`, 11월 팀 방식은 통합 브랜치 `intent/260925-intent-12`) 기준으로 최신화한다([레포 컨벤션 §3](../docs/CatchU_레포_컨벤션.md)).
+1. `git fetch origin` 뒤 작업 브랜치를 합칠 대상 브랜치(보통 `origin/dev`) 기준으로 최신화한다([레포 컨벤션 §3](../docs/CatchU_레포_컨벤션.md)).
 2. `npm run migration:run`: 다른 사람이 병합한 마이그레이션까지 개발 DB에 적용한다. 빼먹으면 다음 단계가 남의 테이블까지 다시 만드는 마이그레이션을 생성한다.
 3. 엔티티를 추가하거나 고친다(「DB 물리 규약」).
 4. `npm run migration:generate -- src/database/migrations/<변경이름>`: 개발 DB와 엔티티의 차이로 `<시각>-<변경이름>.ts`가 생긴다. 예: `CreateMemberAccount`.
@@ -86,7 +86,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 6. `npm run migration:run`으로 적용하고, `npm run migration:revert`로 되돌린 뒤 다시 적용해 `down`도 확인한다.
 7. 엔티티와 마이그레이션을 같은 PR에 넣는다. `npm test`가 테스트 DB에 새 마이그레이션을 적용해 함께 검사한다.
 
-- **dev나 통합 브랜치에 합쳐진 마이그레이션은 고치지 않는다.** 이미 적용한 DB에는 고친 파일이 다시 실행되지 않으므로, 바꿀 것은 새 마이그레이션으로 추가한다.
+- **dev에 합쳐진 마이그레이션은 고치지 않는다.** 이미 적용한 DB에는 고친 파일이 다시 실행되지 않으므로, 바꿀 것은 새 마이그레이션으로 추가한다.
 - 두 작업이 각각 마이그레이션을 추가하면 나중에 합쳐지는 쪽이 최신화 뒤 2~6단계를 다시 한다. 실행 순서는 파일 이름의 시각이다.
 - PostgreSQL 확장(pgvector의 `vector`)은 마이그레이션에서 `CREATE EXTENSION IF NOT EXISTS vector`로만 부르고, `down`에서 지우지 않는다. 이 확장은 슈퍼유저만 만들 수 있어 합성 DB·개발 서버·운영 DB에서는 관리자가 미리 만들어 두고(#389), 슈퍼유저 `catchu`로 마이그레이션하는 개발·테스트 DB에서는 그 자리에서 만들어진다.
 - 다른 브랜치에서 적용한 마이그레이션이 개발 DB에 남아 있으면 4단계 결과에 그 테이블의 `DROP`이 섞인다. 그 브랜치에서 `migration:revert`로 되돌리거나 「로컬 DB 준비」의 볼륨 삭제 뒤 다시 적용한다.
