@@ -148,7 +148,7 @@ PR 소속 판정은 PR 응답의 `merge_commit_sha`에 기댄다. 호출 통제(
 
 ## 상한(제안값)
 
-관계 조회는 목록과 같은 요청당 상한(호출 2,500회·총량 50MB·수집 시간 1,800초·단일 호출 대기·단일 응답 10MB)을 함께 쓴다. 현행 값은 [#424 후속 결정](repository-analysis-u7.md)을 따른다. 호출 수는 실제 HTTP 요청 수(REST 1회, GraphQL 묶음 요청 1회)다. 연결 PR 묶음 크기(`max_lookup_batch`, 100)와 이전 비교 근거는 [연결 PR 묶음 조회](associated-pr-lookup.md#제안-상한과-근거)에 있다. 비교 쪽 수와 추가 기준 브랜치 범위는 기존 제안값을 유지한다. 요청 전체 처리 3,600초는 [큐 소비자](queue-consumer.md)가 잰다.
+관계 조회는 목록과 같은 요청당 상한(호출 2,500회·총량 128MB·수집 시간 1,800초·단일 호출 대기·단일 응답 10MB)을 함께 쓴다. 현행 값은 [#424 후속 결정](repository-analysis-u7.md)을 따른다. 호출 수는 실제 HTTP 요청 수(REST 1회, GraphQL 묶음 요청 1회)다. 연결 PR 묶음 크기(`max_lookup_batch`, 100)와 이전 비교 근거는 [연결 PR 묶음 조회](associated-pr-lookup.md#제안-상한과-근거)에 있다. 비교 쪽 수와 추가 기준 브랜치 범위는 기존 제안값을 유지한다. 요청 전체 처리 3,600초는 [큐 소비자](queue-consumer.md)가 잰다.
 
 | 상한(`CollectionLimits`) | 제안값 | 넘으면 |
 |---|---|---|

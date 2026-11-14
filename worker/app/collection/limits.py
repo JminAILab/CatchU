@@ -23,7 +23,9 @@ from app.collection.graphql import MAX_BATCH
 class CollectionLimits:
     # 요청 전체 상한. 넘으면 수집 실패다(BUDGET_EXCEEDED·TIME_LIMIT_EXCEEDED).
     max_calls: int = 2500
-    max_total_bytes: int = 50 * 1024 * 1024
+    # 2026-11-14 #450 실측: CatchU에서 50MB로는 목록·관계 조회 뒤 여유가 단일 응답 상한(10MB) 아래로
+    # 떨어져 본인 커밋 659건의 변경 내용을 받지 못했다(호출 496회·299초). 팀장 결정으로 128MB.
+    max_total_bytes: int = 128 * 1024 * 1024
     max_collection_time: timedelta = timedelta(seconds=1800)
     # 조회 개수 범위와 단일 응답 크기. 넘은 부분은 실패가 아니라 한계로 기록한다.
     max_commits: int = 3000
