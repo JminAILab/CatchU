@@ -11,8 +11,8 @@
 | [AI-DLC 2.11.2 설치·운영 안내](ai-dlc/AI_DLC_2.11.2_GUIDE.md) | 정확한 런타임 설치·선택, Codex·Claude Code 진단과 hook 신뢰, 개인 설정·기존 기록 보존 및 복귀 | **안내** (10-13, 10-23 2.11.1 갱신, 11-02 2.11.2 갱신) · 2.11.2 하네스를 받은 팀원용 현행 절차, 개인 환경의 적용·검증 완료를 뜻하지 않음 · 09-09 준비 문서와 2.10.0 적용 기록은 당시 기록으로 보존 |
 | [web 모의 시연 팀원 착수 안내](web-mock-demo/README.md) | 9/30 합성 시연의 승인 계획·검사 지침 공유본과 팀원별 첫 작업 | **기록** · 중단 (09-24 팀장 결정) · 09-21 승인 판본의 공유용 사본, 소급 수정하지 않음 |
 | [`CatchU_그라운드룰_2026-08-04.md`](CatchU_그라운드룰_2026-08-04.md) | 회의 운영·소통·작업 방식 등 팀이 합의한 운영 규칙 | 확정 (08-04) |
-| [`CatchU_레포_컨벤션.md`](CatchU_레포_컨벤션.md) | 레포 구조·브랜치·머지·커밋 메시지 규칙과 그렇게 정한 근거 | 확정 (08-24) · §2 임시 통합 브랜치 운영안은 **검토용** (09-20) · §2.1 12월 intent 통합 브랜치는 **확정** (10-25 팀장 결정) |
-| [`CatchU_작업관리.md`](CatchU_작업관리.md) | Codex·Claude Code의 공통 작업 절차와 개발 준비 확인. 코드 수정·검사·PR 절차는 [코딩 절차](CatchU_coding_procedures.md) | **적용 준비안** (09-20 보완) · 코딩 운영(코딩 절차)은 10-24 팀장 결정(11월 개발 기준) · 담당·일정·환경 준비 완료를 뜻하지 않음 |
+| [`CatchU_레포_컨벤션.md`](CatchU_레포_컨벤션.md) | 레포 구조·브랜치·머지·커밋 메시지 규칙과 그렇게 정한 근거 | 확정 (08-24) · §2 임시 통합 브랜치 운영안은 **검토용** (09-20) |
+| [`CatchU_작업관리.md`](CatchU_작업관리.md) | Codex·Claude Code의 공통 작업 절차와 개발 준비 확인. 코드 수정·검사·PR 절차는 [코딩 절차](CatchU_coding_procedures.md) | **적용 준비안** (09-20 보완) · 코딩 운영(코딩 절차)은 11-14 팀장 결정(각자 작업 브랜치 → `dev` PR) · 담당·일정·환경 준비 완료를 뜻하지 않음 |
 | [`CatchU_coding_procedures.md`](CatchU_coding_procedures.md) | 코드 수정·검사·자료와 실행 로그·PR 작성 절차와 코딩 운영(작업관리에서 옮김) | 작업관리와 같음 · 2026-10-01 분리 |
 | [`CatchU_security_checks.md`](CatchU_security_checks.md) | 권한·입력·출력·인증·설정·외부 호출·의존성·LLM 코드를 고칠 때 지킬 보안 기준(OWASP 웹·LLM Top 10 중 CatchU 해당분) | **적용** (10-03 팀장 결정) · 코딩 절차의 보충, 계약·서비스 README와 어긋나면 그쪽이 이김 |
 | [`CatchU_work_management_history.md`](CatchU_work_management_history.md) | 작업관리·코딩 절차의 결정 이력 | 기록 · 2026-10-01 분리 |
@@ -75,7 +75,7 @@ PR 본문에, 판본은 git 이력에 남는다.
 - 초기 제품 정의의 승인 요구사항: [첫 intent 요구사항](../aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md) (2026-09-11 승인). 이후 10월 MVP와 12월 범위의 적용 기준은 각각의 후속 승인 문서에서 확인한다. 과거 승인 원본은 보존한다.
 - 아래 10월·12월 산출물의 적용 관계는 위 「개발 목표와 마일스톤」을 전제로 읽는다.
 - 10월 MVP 구현 기준: [10월 요구사항](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/requirements-analysis/requirements.md)와 해당 intent의 승인된 설계·계약 및 후속 결정을 사용한다.
-- 12월 확장 기준: [12월 요구사항](../aidlc/spaces/default/intents/260925-intent-12/inception/requirements-analysis/requirements.md)과 [사용자 스토리](../aidlc/spaces/default/intents/260925-intent-12/inception/user-stories/stories.md)는 2026-09-28 승인 뒤 [11월 개발 범위 결정](CatchU_11월_범위_결정.md)을 반영해 2026-10-24 재승인됐다. 같은 intent에서 도메인 설계·Unit 나누기·계약 설계·납품 계획까지 2026-10-26 승인했고, 11월 기능 구현은 이 기준으로 AI-DLC 팀 방식으로 한다. 읽기 순서·마감 구분·적용 경계는 [12월 승인 문서 안내](CatchU_12월_승인문서_안내.md)를 따른다. 12월 계약은 10월 계약 파일을 고치지 않으며, 대체는 해당 Unit을 구현할 때 적용한다. 9월 승인판은 git 이력에 보존한다.
+- 12월 확장 기준: [12월 요구사항](../aidlc/spaces/default/intents/260925-intent-12/inception/requirements-analysis/requirements.md)과 [사용자 스토리](../aidlc/spaces/default/intents/260925-intent-12/inception/user-stories/stories.md)는 2026-09-28 승인 뒤 [11월 개발 범위 결정](CatchU_11월_범위_결정.md)을 반영해 2026-10-24 재승인됐다. 같은 intent에서 도메인 설계·Unit 나누기·계약 설계·납품 계획까지 2026-10-26 승인했고, 11월 기능 구현은 이 기준으로 AI-DLC 팀 방식으로 했고, 이 intent는 2026-11-14에 보관했다. 읽기 순서·마감 구분·적용 경계는 [12월 승인 문서 안내](CatchU_12월_승인문서_안내.md)를 따른다. 12월 계약은 10월 계약 파일을 고치지 않으며, 대체는 해당 Unit을 구현할 때 적용한다. 9월 승인판은 git 이력에 보존한다.
 - 10월 MVP에 적용하는 범위·순서·착수 조건은 후속 intent의 [scope-document.md](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/scope-document.md)·[intent-backlog.md](../aidlc/spaces/default/intents/260914-catchu-october-mvp/ideation/scope-definition/intent-backlog.md)와 연결된 후속 결정을 확인한다. 산출물에 남은 작성 당시 지위와 현재 승인 여부를 구분하고, 승인 여부는 해당 intent의 `aidlc-state.md`·`audit/` 기록에서 확인한다.
 - 승인된 AI-DLC 산출물이 `docs/`의 기존 기준을 대체하는 경우, 대체 대상·범위·적용 시점·승인 근거를 해당 `docs/` 문서의 본문이나 「결정 이력」에 명시한다. 명시되지 않은 충돌에는 자동 우선순위를 적용하지 않고 미결로 표시해 Slack에 올린다.
 - 현재 명시된 항목: 레포 컨벤션 §1의 Next.js·NestJS·FastAPI는 2026-09-13 확정이고, 배포 대상은 2026-10-06 NCP에서 AWS로 바꿨다(해당 문서 결정 이력 및 [MVP 입력](ai-dlc-input-mvp/CatchU_mvp_input.md) 참조). 승인된 AI-DLC 기록에 남은 배포 대상 NCP는 이 결정이 대체하며, 기록은 소급 수정하지 않는다. KPI v4.1의 초안 지위는 그대로다. AI-DLC의 후속 intent에서 검토 자료로 쓰려면 입력 문서에 필요한 내용·지위·출처·기준 커밋을 옮겨 적는다. 링크만으로는 AI-DLC가 원문을 읽지 않는다.
@@ -97,6 +97,8 @@ PR 본문에, 판본은 git 이력에 남는다.
 - **2026-10-26** — 12월 intent 재승인(10-24 요구사항·사용자 스토리, 10-26 납품 계획까지)을 문서 목록과 「AI-DLC 산출물과의 관계」의 12월 확장 기준에 반영했다. 9월 승인 기록은 고치지 않았다.
 
 - **2026-10-26** — 11월 개발을 AI-DLC 팀 방식으로 바꾼 지침 PR에 맞춰 문서 목록의 지위 칸 둘을 고쳤다. 레포 컨벤션 §2.1의 12월 intent 통합 브랜치는 확정(10-25 팀장 결정)이고 §2 임시 통합 브랜치 운영안만 검토용이다. 코딩 운영은 10-24 팀장 결정(11월 개발 기준)이다.
+
+- **2026-11-14** — 11월 방식(통합 브랜치, Unit 맡기)을 끝내는 팀장 결정([문서 개편 입력](ai-dlc-input-reorg/CatchU_문서개편_입력.md) §3 「정한 것」, [#551](https://github.com/JminAILab/CatchU/issues/551))에 맞춰 문서 목록의 지위 칸 둘과 「AI-DLC 산출물과의 관계」의 12월 줄을 고쳤다. 레포 컨벤션 §2.1의 12월 intent 통합 브랜치 운영은 지웠고, 코딩 운영은 11-14 팀장 결정(각자 작업 브랜치 → `dev` PR, AI-DLC 스킬은 AI가 권하고 담당이 고름)이다. 12월 intent는 보관했다([#550](https://github.com/JminAILab/CatchU/issues/550)). 승인 기록은 고치지 않았다.
 
 ## 규칙
 
