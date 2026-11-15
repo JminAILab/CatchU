@@ -19,6 +19,8 @@ Catch는 지원자가 분석된 작업 가운데 골라 면접관에게 보내�
 | Catch를 받는 면접관 화면 | 발행본 링크 화면, AI 기본 요약·질의응답, JD 관리·요약(면접관이 JD를 등록하고 받은 링크에서 JD 기준 요약을 받음), 받은 링크를 Claude로 분석하기 | 병합됨 | 확인됨(2026-11-09): 로그인하지 않은 창에서 발행본 열람 · 미실행(AI 기본 요약·질의응답은 작업 큐 미연결, JD 요약과 받은 링크의 Claude 분석은 그때 통합 전) |
 | Claude 연결 | 회원 본인의 Claude에 CatchU 도구 연결. 지원자는 자기 Catch·자료를 읽고, 면접관은 받은 링크를 분석하는 데 쓴다 | 병합됨 | 확인됨(2026-11-09): Claude 웹 연결·해제, Claude Desktop 연결 · 미실행(연결 만료 뒤 재승인은 토큰 수명을 줄여 다시 띄워야 해서 하지 않음) |
 
+실제 저장소 분석은 개발 서버가 아니라 로컬 환경에서 확인했다([#450](https://github.com/JminAILab/CatchU/issues/450), 2026-11-14).
+
 무엇을 기준으로 만들었는지는 AI-DLC로 승인한 요구사항에 있다. 승인 원본은 고치지 않고, 뒤에 승인한 요구사항이 앞의 것을 바꾼 곳을 적어 둔다.
 
 1. [첫 intent 요구사항](aidlc/spaces/default/intents/260909-catchu-definition-review/inception/requirements-analysis/requirements.md)(2026-09-11): 처음 제품 정의
@@ -29,7 +31,7 @@ Catch는 지원자가 분석된 작업 가운데 골라 면접관에게 보내�
 
 ## 내 컴퓨터에서 띄우기
 
-PostgreSQL·api·worker·web을 한 컴퓨터에서 켜는 순서, 정상 확인, 끄는 법은 [로컬 통합 실행](docs/CatchU_로컬통합실행.md)에 있다. 각 서비스의 설치·검사는 [web](web/README.md)·[api](api/README.md)·[worker](worker/README.md) README에 있다.
+PostgreSQL·api·worker·web을 한 컴퓨터에서 켜는 순서, 정상 확인, 끄는 법은 [로컬 통합 실행](docs/CatchU_로컬통합실행.md)에 있다. 이 순서는 합성 자료까지 띄운다. 실제 GitHub 저장소를 분석해 Catch를 만들어 보려면 같은 문서의 [실제 분석까지 띄우기](docs/CatchU_로컬통합실행.md#실제-분석까지-띄우기)를 따른다(외부 서비스 키가 필요하다). 각 서비스의 설치·검사는 [web](web/README.md)·[api](api/README.md)·[worker](worker/README.md) README에 있다.
 
 ## 구조
 
@@ -57,7 +59,7 @@ web은 Next.js, api는 NestJS, worker는 FastAPI(Python)다(2026-09-13 확정). 
 
 ## AI-DLC로 만든 방식
 
-이 저장소는 AI-DLC(AI-Driven Development Life Cycle) 방식으로 만들었다. 의도 정리부터 요구사항·설계·코드 생성까지 단계마다 팀장이 승인했고, 단계별 질문·답·승인 기록을 [`aidlc/`](aidlc)에 남겼다.
+이 저장소는 AI-DLC(AI-Driven Development Life Cycle) 방식으로 만들었다. 의도 정리부터 요구사항·설계·코드 생성까지 단계마다 팀장이나 담당 팀원이 승인했고, 단계별 질문·답·승인 기록을 [`aidlc/`](aidlc)에 남겼다.
 
 ## 문서
 
