@@ -35,5 +35,13 @@
     "scope": "mvp",
     "status": "complete",
     "request": "4ffd30e6"
+  },
+  {
+    "uuid": "01a1dd61-d6e7-723a-aaae-bf9b715161ab",
+    "slug": "docs-first-screen",
+    "dirName": "261115-docs-first-screen",
+    "scope": "bugfix",
+    "status": "in-flight",
+    "request": "0ea67250"
   }
 ]
