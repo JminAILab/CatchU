@@ -12,7 +12,7 @@ api가 읽는 환경변수 목록이다. 설치, `.env` 준비, 값의 우선순
 | 선택 | `BIND_HOST` | `127.0.0.1` | HTTP 바인딩 주소. IP 주소만 허용하고 `localhost` 같은 이름은 기동 실패. `0.0.0.0`은 같은 네트워크의 다른 기기에서도 접속되므로 컨테이너 등 필요할 때만 쓴다 |
 | 필수 | `AUTH_JWT_SECRET` | 없음 | 안전한 난수 32바이트를 64자리 hex로 표현한 서명 키. 환경별로 별도 준비 |
 | 필수 | `AUTH_ACCESS_TOKEN_TTL_SECONDS` | 없음 | Access JWT 수명(초). #250 팀장 결정에 따라 정확히 `900`이어야 하며 다른 값은 기동 실패 |
-| 운영 필수 | `AUTH_WEB_ORIGIN` | 개발·test만 `http://localhost:3000` | 갱신·로그아웃에서 허용할 정확한 단일 Origin. 운영은 HTTPS·web/API 동일 출처. 개발·test만 loopback HTTP 허용(이때만 쿠키 Secure 생략). wildcard·경로·끝 슬래시·계정 정보는 기동 실패. Domain 생략·Strict 고정([세션 안내](auth-sessions.md)) |
+| 운영 필수 | `AUTH_WEB_ORIGIN` | 개발·test만 `http://localhost:3000` | 갱신·로그아웃·Google 로그인 시작·완료처럼 요청 출처를 확인하는 경로에서 허용할 정확한 단일 Origin. 값이 web 출처와 다르면 이 요청들이 모두 `403`으로 막힌다. 운영은 HTTPS·web/API 동일 출처. 개발·test만 loopback HTTP 허용(이때만 쿠키 Secure 생략). wildcard·경로·끝 슬래시·계정 정보는 기동 실패. Domain 생략·Strict 고정([세션 안내](auth-sessions.md)) |
 | 선택 | `DEV_LOGIN_ENABLED` | 비활성 | 정확히 `true`이고 `NODE_ENV`가 `development` 또는 `test`일 때만 개발 로그인 허용 |
 | 선택 | `GOOGLE_LOGIN_ENABLED` | 비활성 | 정확히 `true`일 때 Google 로그인 활성화. 미지정·공란·`false`는 비활성이며 다른 값은 기동 실패. 아래 세 설정은 활성화할 때 필수([Google 로그인 안내](google-login.md)) |
 | 활성화 시 필수 | `GOOGLE_CLIENT_ID` | 없음 | 등록한 웹 OAuth 클라이언트 ID. `.apps.googleusercontent.com` 형식을 검사하며 누락·잘못된 값이면 기동 실패 |

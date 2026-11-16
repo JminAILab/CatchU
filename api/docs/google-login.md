@@ -77,7 +77,7 @@ README대로 DB 마이그레이션을 적용하고 API를 실행한다. 다른 �
 
 ```powershell
 $apiBase = 'http://127.0.0.1:3001'
-$webOrigin = 'http://localhost:3000'
+$webOrigin = 'http://localhost:3000' # api/.env의 AUTH_WEB_ORIGIN과 정확히 같게
 $started = Invoke-RestMethod -Method Post -Uri "$apiBase/v1/auth/google/authorization" -Headers @{ Origin = $webOrigin } -ContentType 'application/json' -Body '{}'
 # 시작 응답을 출력하지 않고 본인 브라우저에서 승인한다.
 Start-Process $started.authorizationUrl
