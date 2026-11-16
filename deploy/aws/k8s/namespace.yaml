@@ -21,3 +21,20 @@ metadata:
   name: default
   namespace: catchu
 automountServiceAccountToken: false
+---
+# api·worker의 서비스 계정. 회원 파일 버킷(S3)의 서비스별 AWS 역할을 이 이름에 붙인다(cluster.yaml의 Pod Identity 연결).
+# 쿠버네티스 API 토큰은 여기서도 탑재하지 않는다. 역할을 받는 데 쓰는 토큰은 EKS가 Pod에 따로 넣으며 쿠버네티스 API에는 쓸 수 없다.
+# web·migration·일회 Pod는 default 서비스 계정을 써서 AWS 권한이 없다.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api
+  namespace: catchu
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: worker
+  namespace: catchu
+automountServiceAccountToken: false
