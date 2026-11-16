@@ -38,7 +38,7 @@ CatchU는 GitHub 기록에서 증거카드를 뽑는다. 그 대상이 될 수 �
 CatchU/
 ├─ web/      Next.js — 사용자 화면
 ├─ api/      NestJS — API 서버
-├─ worker/   FastAPI — 수집·카드 추출
+├─ worker/   Python 큐 소비자(상태 확인만 FastAPI) — GitHub 기록 수집·Catch 초안 만들기
 └─ docs/     문서 정본
 ```
 
@@ -293,3 +293,4 @@ chore: worker 의존성에 httpx 추가
 - **2026-10-25** — 11월 개발(12월 intent)을 AI-DLC 팀 방식으로 하는 팀장 결정(2026-10-24, [11월 개발 범위 결정](CatchU_11월_범위_결정.md))에 맞춰 §2의 10월 문장을 고치고, §2.1에 통합 브랜치 `intent/260925-intent-12`의 운영(만들기·U1·Unit 브랜치와 제출·Unit 합치기와 push·경계·계약 PR·`dev` 반영·최신화·CI·고정 메시지 커밋 예외·삭제)을 적었다([#381](https://github.com/JminAILab/CatchU/issues/381), 이름과 운영은 10-25·10-26 팀장 결정). 맨 위 지위 줄과 결정 이력 머리말에서 §2.1을 확정으로 나눠 적고, §3의 rebase·강제 푸시 예외가 §2.1 통합 브랜치에도 적용됨을 밝혔다. 9/21 web 모의 시연 안내는 바꾸지 않고 제목만 붙였다.
 - **2026-10-28** — §2.1의 Unit 제출·합치기를 AI-DLC 명령 대신 통합 브랜치 대상 PR로 바꾸고, Unit 폴더에서 `aidlc-state.md`를 커밋하지 않기로 했다(팀장 결정). AI-DLC 2.11.1의 고정(`pin`)은 Unit이 실어 보내는 기록 파일의 모든 줄을 허용 목록과 대조하는데, 맡은 폴더에서는 사람 입력·세션 시작·결정 기록 같은 목록 밖 줄이 같은 파일에 반드시 쌓여 실제 Unit은 고정되지 않는다(격리 저장소에서 확인, 상류 [awslabs/aidlc-workflows#1287](https://github.com/awslabs/aidlc-workflows/issues/1287)이 2026-09-21부터 열려 있음). 그래서 Unit의 단계 진행·승인은 AI-DLC로 하고 합치기만 PR로 한다. 상태 파일은 엔진이 폴더마다 고쳐 써서 올리면 합칠 때마다 충돌하므로 올리지 않는다(올리지 않으면 합치기·가져오기 충돌이 없음을 격리 저장소에서 확인). 이 때문에 통합 쪽 AI-DLC 상태에는 Unit 완료가 찍히지 않고 AI-DLC의 통합 시험 단계는 쓰지 않으며, Unit 진행은 이슈·Project로 본다. 구현만 이슈 → `dev` PR로 바꾸는 대안(11월 범위 결정)은 개발을 AI-DLC로 하려고, PR을 `dev`로 바로 올리는 안은 통합 브랜치에만 있는 U1을 먼저 옮겨야 하고 경계·계약 PR 대상까지 바뀌어서, 기록 파일을 손으로 걸러 고정을 통과시키는 안은 도구만 쓰게 한 기록을 사람이 고치게 되어 택하지 않았다.
 - **2026-11-14** — 11월 방식(12월 intent 통합 브랜치와 Unit 맡기)을 끝냈다(팀장 결정, [문서 개편 입력](ai-dlc-input-reorg/CatchU_문서개편_입력.md) §3 「정한 것」, [#551](https://github.com/JminAILab/CatchU/issues/551)). Unit은 2026-11-09 [#494](https://github.com/JminAILab/CatchU/pull/494)와 2026-11-13 [#533](https://github.com/JminAILab/CatchU/pull/533)으로 `dev`에 들어갔고, 12월 intent는 보관했으며 통합 브랜치와 Unit 브랜치는 지웠다([#550](https://github.com/JminAILab/CatchU/issues/550)). 앞으로는 §2의 기본 규칙대로 각자 작업 브랜치에서 `dev`로 PR을 보내고, AI-DLC가 Construction 작업 폴더를 만들 때만 §2.1의 예외를 따른다. 그래서 맨 위 지위 줄과 §2의 11월 문장, §2.1의 12월 intent 소절을 지웠다. 그 소절의 「커밋」 줄에서 이유 쓰는 법과 AI-DLC 고정 메시지 커밋의 예외만 §4로 옮겼다. 단계 승인마다 커밋하는 규칙은 `aidlc/spaces/default/memory/project.md`에 있다. 지운 소절은 `git show bfb43cf5:docs/CatchU_레포_컨벤션.md`의 §2.1에서 읽는다.
+- **2026-11-16** — §1 트리의 worker 줄을 실제 쓰임에 맞게 고쳤다(팀장 결정). worker의 실제 실행은 큐 소비자이고 FastAPI로는 상태 확인 경로 하나만 연다([worker README](../worker/README.md)). 「수집·카드 추출」은 8\~9월 설계 때의 말이라 지금 말(GitHub 기록 수집·Catch 초안 만들기)로 바꿨다. 스택 결정(2026-09-13)과 디렉터리 구조는 바뀌지 않았다. 결정의 이유를 모은 안내는 [결정과 근거](CatchU_결정과_근거.md)다.
