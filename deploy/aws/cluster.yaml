@@ -41,7 +41,7 @@ vpc:
     privateAccess: true
 
 # 판본을 고정한다. 정하지 않으면 만들 때의 기본판이 깔려 10/15 NetworkPolicy 시험과 다른 판이 될 수 있다.
-# 값은 2026-11-13 aws eks describe-addon-versions --kubernetes-version 1.37 조회 결과다. 만들기 직전에 다시 보고 바뀌었으면 이 파일을 고친다.
+# 값은 2026-11-16 aws eks describe-addon-versions --kubernetes-version 1.37 조회 결과다. 만들기 직전에 다시 보고 바뀌었으면 이 파일을 고친다.
 addons:
   - name: vpc-cni
     # 10/15 시험은 판본을 적지 않아 그때 기본판(1.22.4 계열)이 깔렸다. 더 새 판을 쓰려면 NetworkPolicy 시험을 다시 한다.
@@ -70,7 +70,7 @@ addons:
     version: v1.4.1-eksbuild.3
   # 목록에 없어도 eksctl이 넣는다. 판본을 고정하려고 적는다. Pod 사용량 측정(kubectl top)에 쓴다.
   - name: metrics-server
-    version: v0.9.1-eksbuild.1
+    version: v0.9.1-eksbuild.2
   # GitHub 토큰 보관 폴더(EFS)를 api에 붙이는 드라이버. 접근점을 미리 만드는 정적 방식이라 먼저 AWS 권한 없이 설치해
   # 마운트가 되는지 실측한다. 안 되면 efs-csi-controller-sa에만 AmazonEFSCSIDriverPolicy를 Pod Identity로 더한다.
   # 애드온 기본 권한 묶음(useDefaultPodIdentityAssociations)은 S3 읽기 권한까지 붙어 쓰지 않는다.
@@ -111,7 +111,7 @@ managedNodeGroups:
     instanceType: t4g.large
     # 노드 이미지 판본. 만들기 직전 공개 파라미터
     # /aws/service/eks/optimized-ami/1.37/amazon-linux-2023/arm64/standard/recommended/release_version 값으로 다시 맞춘다.
-    releaseVersion: "1.37.1-20261107"
+    releaseVersion: "1.37.1-20261112"
     # 2대 고정. 자동 확장은 두지 않는다. 비상 때 3대째는 README.md 「노드 작업」 순서로 손으로 늘린다.
     desiredCapacity: 2
     minSize: 2
