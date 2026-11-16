@@ -12,6 +12,7 @@ import { PDF_EXTRACT_DISPATCHER, type PdfExtractDispatchResult, type PdfExtractD
 import { pdfExtractMessage } from '../pdf-extraction/pdf-extraction-spec';
 import { readPdfUpload } from './pdf-material-input';
 import { type OwnedPdfMaterial, PdfMaterialCreated, PdfMaterialStore } from './pdf-material-store';
+import { PdfUploadGate } from './pdf-upload-gate';
 import { emptyQuery, isUuid } from './text-material-input';
 
 /** 원본 열람 응답 헤더 4종(BR6.6, NFR1.10). 제목은 넣지 않는다. */
@@ -26,8 +27,9 @@ const PDF_FILE_HEADERS = Object.freeze({
  * PDF 자료 API(U8 기능 명세 W1, 계약 C-04·C-05·C-16). 인증은 전역 Guard, /v1·오류 형식·no-store는 공통 bootstrap을 쓴다.
  * 클래스·메서드에 `@Public()`을 붙이지 않는다(NFR1.1).
  *
- * 업로드 순서(BR1.3·BR1.6·BR2.4, 성능 설계): 인증 → 동의(본문을 읽기 전) → multipart 검사 → FileStorage.put → 트랜잭션(잠금·COUNT·INSERT)
- * → 커밋 → 추출 요청 발송(실패는 로그만) → 201. put 뒤 DB 실패·벌 수 초과는 파일을 한 번 지운다.
+ * 업로드 순서(BR1.3·BR1.6·BR2.4, 성능 설계, #574): 인증 → 동의 → 벌 수 사전 확인 → 업로드 관문(진행 중 수·횟수) → 여기까지 본문을 읽지 않는다
+ * → multipart 검사 → FileStorage.put → 트랜잭션(잠금·COUNT·INSERT) → 커밋 → 추출 요청 발송(실패는 로그만) → 201.
+ * put 뒤 DB 실패·벌 수 초과는 파일을 한 번 지운다. 관문에서 잡은 자리는 요청 처리가 끝날 때 돌려준다.
  * 로그에는 pdfMaterialId·memberId·사건 이름·단계·오류 이름만 남긴다. 키·제목·파일 이름·글은 넣지 않는다(관측 설계 §1, NFR1.4).
  * 저장소 실패에는 저장소 사유(storageReason)와 원인 오류 이름(cause)을 더해 설정 누락·권한·네트워크를 가린다(#521 리뷰).
  */
@@ -38,6 +40,7 @@ export class PdfMaterialsController {
   constructor(
     private readonly materials: PdfMaterialStore,
     private readonly consent: AiConsentGate,
+    private readonly gate: PdfUploadGate,
     @Inject(FILE_STORAGE) private readonly files: FileStorage,
     @Inject(PDF_EXTRACT_DISPATCHER) private readonly dispatcher: PdfExtractDispatcher,
   ) {}
@@ -52,26 +55,33 @@ export class PdfMaterialsController {
     emptyQuery(query);
     const owner = memberId.toLowerCase();
     await this.consent.require(owner);
-    const upload = await readPdfUpload(request, response);
-    const pdfMaterialId = randomUUID();
-    const storageKey = materialKey(owner, pdfMaterialId);
+    // 동의가 없거나 이미 20벌인 요청은 여기서 끝나 횟수와 자리를 쓰지 않는다(#574).
+    await this.materials.assertBelowLimit(owner);
+    const leave = this.gate.enter(owner);
     try {
-      await this.files.put(storageKey, upload.buffer, 'application/pdf');
-    } catch (error) {
-      this.storeFailed('put', pdfMaterialId, owner, error);
-      throw error;
+      const upload = await readPdfUpload(request, response);
+      const pdfMaterialId = randomUUID();
+      const storageKey = materialKey(owner, pdfMaterialId);
+      try {
+        await this.files.put(storageKey, upload.buffer, 'application/pdf');
+      } catch (error) {
+        this.storeFailed('put', pdfMaterialId, owner, error);
+        throw error;
+      }
+      let created: PdfMaterialCreated;
+      try {
+        created = await this.materials.create(owner, { pdfMaterialId, title: upload.title, storageKey, fileSizeBytes: upload.fileSizeBytes });
+      } catch (error) {
+        // 벌 수 초과(400)는 업무 거부라 기록하지 않고, 그 밖의 DB 실패만 남긴다. 둘 다 파일을 한 번 지운다(BR1.6).
+        if (!(error instanceof ApiError)) this.storeFailed('db', pdfMaterialId, owner, error);
+        await this.compensate(storageKey, pdfMaterialId, owner);
+        throw error;
+      }
+      await this.dispatch(pdfMaterialId, owner);
+      return created;
+    } finally {
+      leave();
     }
-    let created: PdfMaterialCreated;
-    try {
-      created = await this.materials.create(owner, { pdfMaterialId, title: upload.title, storageKey, fileSizeBytes: upload.fileSizeBytes });
-    } catch (error) {
-      // 벌 수 초과(400)는 업무 거부라 기록하지 않고, 그 밖의 DB 실패만 남긴다. 둘 다 파일을 한 번 지운다(BR1.6).
-      if (!(error instanceof ApiError)) this.storeFailed('db', pdfMaterialId, owner, error);
-      await this.compensate(storageKey, pdfMaterialId, owner);
-      throw error;
-    }
-    await this.dispatch(pdfMaterialId, owner);
-    return created;
   }
 
   @Get()
