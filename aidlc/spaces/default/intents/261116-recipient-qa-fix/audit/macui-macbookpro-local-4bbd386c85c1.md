@@ -2091,3 +2091,1093 @@
 **Context**: inception > requirements-analysis > requirements.md
 
 ---
+
+## Stage Output Amended
+**Timestamp**: 2026-11-16T04:17:37Z
+**Event**: STAGE_OUTPUT_AMENDED
+**Stage**: requirements-analysis
+**Validation Basis**: {"graphContract":"sha256:c4154af90e3deb2f1925e8045adcb8169a200644fd7a00c088cf7736290a667f","inputs":[{"artifact":"architecture","contentHash":"sha256:f854e91e37272ee62b9ef4e9f98e879ef44b888fac03a761ff4cb919fcd1d795","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":false,"structureHash":"sha256:4f9b26f0b7a11760913f6b266aa2064039ea534198dc4bf30b67cf742f068e8c"},{"artifact":"business-overview","contentHash":"sha256:b73a93e5d8a2dd5251d0af4616e1d7c3a6fe7c7debf887bcbaa8be89fae27d97","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":false,"structureHash":"sha256:887abf9b4bba795be6f89bc5add55ed1928e90d8866253339109c9f3c22513d4"},{"artifact":"code-structure","contentHash":"sha256:1e15bbf313398cbe42056d9b2f923822994c651a41562edad0b07bc478c1a0af","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":false,"structureHash":"sha256:99eeb8749ba5fa30e99d6c666d35aba5fbc3c301e47a641fadbe13df7ceecb20"}],"outputs":[{"artifact":"requirements-analysis-questions","contentHash":"sha256:736efef1199986820894b4c35743a965bbeae9b0caae1d82a38c682d127f0532","instanceCount":1,"presentCount":1,"producer":"requirements-analysis","required":true,"structureHash":"sha256:d06c17e00ffee706e1fadeb0b158ab8621a001f74ccaa3554c3044348d4ef7a4"},{"artifact":"requirements","contentHash":"sha256:70ff87b4a7d8144ecb247562d0d5a94fe388708d59b9d2b8c990dc1c18af9f92","instanceCount":1,"presentCount":1,"producer":"requirements-analysis","required":true,"structureHash":"sha256:228abee939f8ab0cfea90dfc65c4829ff8057925173cd20e4ede3c02c16cc181"},{"artifact":"traceability","contentHash":"sha256:45595980995fe901875d702930e7a6d41c4454e6aff018bba6fd9d9e612d3352","instanceCount":1,"presentCount":1,"producer":"requirements-analysis","required":false,"structureHash":"sha256:21d72b12c7ff1e2663701e377bdd4145e910b8dc3fb3bfff291ca1780ff9c28f"}],"projectType":"brownfield","schema":3}
+**Message Id**: 77558701
+**Details**: changed before the person's next message after 77558701; receipt renewed
+
+---
+
+## Plan Approval Blocked
+**Timestamp**: 2026-11-16T04:18:32Z
+**Event**: PLAN_APPROVAL_BLOCKED
+**Guard**: plan-approval-guard
+**Reason**: plan-approval
+**Tool**: Bash
+**Target**: sed -n 80,140p api/src/rag-answer/summary-sources.ts; grep -n 'export' api/src/rag-answer/summary-sources.ts; grep -n -A12 'interface PublishedSnapshot\b\|inter
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Stage**: code-generation
+**Unit**: stage-level
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-16T04:22:00Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-16T04:22:19Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/unit-test-instructions.md
+**Context**: construction > code-generation > unit-test-instructions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-16T04:45:05Z
+**Event**: HUMAN_TURN
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Origin**: person
+**Source**: picker
+**Picked**: ["Request Changes"]
+**Message Id**: 001985ec
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-16T04:45:06Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: Request Changes
+**Checkpoint**: plan-approval
+**Plan Target**: stage:code-generation
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Asked By**: engine
+**Person Reply**: Request Changes
+**Message Id**: 001985ec
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-16T04:45:07Z
+**Event**: QUESTION_REPLIED
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Question**: Approve the code plan?
+**Reply**: Request Changes
+**Options**: ["Approve Plan","Request Changes","I'll edit the files"]
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-16T04:45:29Z
+**Event**: HUMAN_TURN
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Origin**: person
+**Source**: picker
+**Picked**: ["\"고칠 점 세 가지야.\\r1. 머리글(설계 결정 6)에 「N번」 같은 숫자를 넣지 않는다. 답 검사는 답의 숫자가 인용한 줄에 있어야 통과시키는데 머리글은 인용할 수 없어서, 모델이 「발행 항목 2번」을 따라 쓰면 그 항목이 버려진다. 항목 구분은 작업 사실 둘째 줄로 하고, 둘째 줄이 없는 Catch와 텍스트·PDF 자료를 어떻게 구분할지는 숫자와 영문자 없이 되는 방법으로 제안해 줘. 모델이 머리글 글자를 답에 옮겨 써도 버려지지 않는지 시험 장면도 하나 더해 줘.\\r2. 머리글의 낱말이 다른 줄을 인용한 답에 섞여 버려질 수 있다. 막지는 않되, 기준선과 다시 재기의 버린 항목 수(dropReasons.fact)를 평가 기록에 나란히 적어 머리글 때문에 늘었는지 볼 수 있게 해 줘.\\r3. 머리글 값은 작성자가 쓴 글이다. 줄바꿈과 제어 문자를 빼고, S7에 그 확인을 더해 줘.\""]
+**Message Id**: dd1008b2
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-16T04:45:30Z
+**Event**: QUESTION_REPLIED
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Question**: 계획에서 무엇을 고칠까요? (여러 개 고를 수 있습니다)
+**Reply**: "고칠 점 세 가지야.\r1. 머리글(설계 결정 6)에 「N번」 같은 숫자를 넣지 않는다. 답 검사는 답의 숫자가 인용한 줄에 있어야 통과시키는데 머리글은 인용할 수 없어서, 모델이 「발행 항목 2번」을 따라 쓰면 그 항목이 버려진다. 항목 구분은 작업 사실 둘째 줄로 하고, 둘째 줄이 없는 Catch와 텍스트·PDF 자료를 어떻게 구분할지는 숫자와 영문자 없이 되는 방법으로 제안해 줘. 모델이 머리글 글자를 답에 옮겨 써도 버려지지 않는지 시험 장면도 하나 더해 줘.\r2. 머리글의 낱말이 다른 줄을 인용한 답에 섞여 버려질 수 있다. 막지는 않되, 기준선과 다시 재기의 버린 항목 수(dropReasons.fact)를 평가 기록에 나란히 적어 머리글 때문에 늘었는지 볼 수 있게 해 줘.\r3. 머리글 값은 작성자가 쓴 글이다. 줄바꿈과 제어 문자를 빼고, S7에 그 확인을 더해 줘."
+**Options**: ["중간 멈춤·기준선 순서","사본 읽기 위치·방식","지시문 문구","화면·계약 문서 쪽"]
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-16T04:46:34Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/.aidlc-engine/answer-text/answer.txt
+**Context**: .aidlc-engine > answer-text > answer.txt
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:47:37Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:47:45Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:47:50Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:47:55Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:48:00Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:48:03Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:48:06Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:48:10Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:48:13Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:48:14Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:48:16Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:48:19Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:48:28Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:48:32Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/unit-test-instructions.md
+**Context**: construction > code-generation > unit-test-instructions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:48:36Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/unit-test-instructions.md
+**Context**: construction > code-generation > unit-test-instructions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-16T04:50:30Z
+**Event**: HUMAN_TURN
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve Plan"]
+**Message Id**: 87923a11
+
+---
+
+## Plan Approval Recorded
+**Timestamp**: 2026-11-16T04:50:30Z
+**Event**: PLAN_APPROVAL_RECORDED
+**Stage**: code-generation
+**Details**: Approve Plan
+**Checkpoint**: plan-approval
+**Plan Target**: stage:code-generation
+**Intent**: 01a1e1c4-f972-7486-850c-a7700c8a2703
+**Directive Epoch**: sha256:6a0e20d379a4ded71eb1163fbe4a8fec406ceff44778ef5e97411eb9af0bb694
+**Run floor**: STAGE_STARTED:2026-11-16T04:16:41Z#1
+**Approval Fingerprint**: sha256:v3:525350ce07a3a3c95b319ca2d723e4cae85df901600f4b18170fdc6c51f82841
+**Questions File**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-questions.md
+**Questions SHA-256**: e437715ca4e3d933b1d97a3e1a3c484c88ad18a7981036b318534ca01bd322c0
+**Prompt SHA-256**: dd671a6989b5f97aaf431a55d3f1dae99d615fe16cfec5d4a0134657993c3529
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Asked By**: engine
+**Person Reply**: Approve Plan
+**Message Id**: 87923a11
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-16T04:50:31Z
+**Event**: QUESTION_REPLIED
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Question**: Approve the code plan?
+**Reply**: Approve Plan
+**Options**: ["Approve Plan","Request Changes","I'll edit the files"]
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-16T04:52:43Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-developer-agent
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-16T04:52:45Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: plan-approval
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: code-generation
+**Tool**: Agent
+**Details**: dispatch of aidlc-developer-agent
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:56:05Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:56:06Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:56:15Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T04:57:53Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T05:14:09Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T05:14:28Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-16T05:14:55Z
+**Event**: HOST_TURN
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-16T05:14:56Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: ab12ecca40e387ffc
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-16T05:15:24Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: Baseline run and test DB before phase B
+**Options**: Q1: 팀장이 직접 실행,Q1: 이 폴더에서 실행 허락,Q1: 미룸,Q2: 지금 켜서 확인,Q2: 빌드와 시험 단계로,Q2: 범위 명령에서 뺌
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-16T05:57:48Z
+**Event**: HUMAN_TURN
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Origin**: person
+**Source**: picker
+**Picked**: ["이 폴더에서 제가 실행","지금 켜서 확인"]
+**Message Id**: c3df3ad7
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-16T05:57:49Z
+**Event**: QUESTION_REPLIED
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Question**: [개발자] 기준선(11/12 발행본에 measure 10개 한 번, 실제 Claude·Voyage 호출)을 어떻게 돌릴까요? 로컬 DB·.env·평가 입력 파일은 메인 폴더에 있습니다.
+**Reply**: 이 폴더에서 제가 실행
+**Options**: ["팀장이 직접 실행","이 폴더에서 제가 실행","나중에"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-16T05:57:49Z
+**Event**: QUESTION_REPLIED
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Question**: [개발자] DB가 필요한 범위 시험(qna-controller.test.cjs, 단계 B의 S10·S11 포함)은 어떻게 할까요?
+**Reply**: 지금 켜서 확인
+**Options**: ["지금 켜서 확인","빌드와 시험 단계로","범위 명령에서 뺀다고 적기"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-16T05:58:00Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: Q1: 이 폴더에서 제가 실행; Q2: 지금 켜서 확인
+**Person Reply**: 이 폴더에서 제가 실행\n지금 켜서 확인
+**Message Id**: c3df3ad7
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-16T06:00:10Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: Where to get API keys and which DB holds the 11/12 publication for the baseline run
+**Options**: 팀장이 이 폴더 api/.env를 직접 만듦,키 위치를 알려 주면 복사,기타
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-16T06:05:16Z
+**Event**: HUMAN_TURN
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Origin**: person
+**Source**: typed
+**Message Id**: 510c3232
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-16T06:06:03Z
+**Event**: HUMAN_TURN
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Origin**: person
+**Source**: typed
+**Message Id**: 66384fc4
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-16T06:06:27Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: 키는 ~/catchu-local-live/secrets.env와 ~/catchu-local-live/nc3-measure/db.env를 셸에 불러와 씀(복사·새 파일 없음, 값 출력 금지), DB는 catchu-nc3-measure-db, 큐 주소로 멈추면 catchu-nc3-measure-valkey도 켬, 입력은 nc3-bt-input.json(--input로 읽기만 가능), 실제 호출은 measure 한 번뿐·실패해도 다시 돌리지 않고 돌아옴, 켠 컨테이너는 그대로 둠, 5번 재현 안 되거나 키 거부면 돌아옴
+**Message Id**: 66384fc4
+**Person Reply**: <pasted_content id="5a14">\n1. 키: 복사하지도 새로 적지도 않는다. ~/catchu-local-live/secrets.env(CATCHU_GENERATION_API_KEY·CATCHU_EMBEDDING_API_KEY)와 ~/catchu-local-live/nc3-measure/db.env(측정 DB 접속 값과 큐 주소)를 셸에 불러와 쓴다. 값은 화면이나 로그에 찍지 않고, 이 폴더에 api/.env를 만들지 않는다. 11/12에도 이렇게 쟀다.\n2. DB: catchu-nc3-measure-db가 맞다. 켜고 measure를 한 번 돌려 줘. 스크립트가 큐 주소 때문에 멈추면 같은 환경의 catchu-nc3-measure-valkey도 켠다.\n3. 평가 입력: 그 파일이 맞다(발행본 ID와 질문 10개가 11/12 측정과 같다). 복사해도 되고, --input에 메인 폴더 경로를 줘서 읽기만 해도 된다.\n\n제약\n- catchu-db-test-sec3(5441)은 다른 세션이 쓰는 것이니 건드리지 않는다. api·web·worker는 띄우지 않는다.\n- 실제 호출은 measure 한 번(질문 10개)뿐이다. 실패해도 다시 돌리지 말고 돌아온다.\n- 끝나면 켠 컨테이너는 그대로 두고 무엇을 켰는지 알려 준다. 다시 재기 때 또 쓴다.\n- 5번이 재현되지 않거나 키가 거부되면 돌아온다.\n</pasted_content id="5a14">
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-16T06:07:48Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: Q5 not reproduced at baseline: how to proceed
+**Options**: 재현되지 않음으로 적고 단계 B 진행,멈추고 팀장이 정함
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-16T06:15:21Z
+**Event**: HUMAN_TURN
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Origin**: person
+**Source**: picker
+**Picked**: ["1번대로 진행해 줘. 세 가지를 더한다. 첫째, 평가 기록과 다시 재기 판정에서 답 실패는 NO_ITEMS뿐 아니라 통과한 항목이 0개인 질문(이번 8번)도 센다. 둘째, 5번은 같은 조건에서 11/12에는 두 번 실패하고 오늘은 답이 나왔으니 될 때와 안 될 때가 있다는 점과, 질문당 항목 한 개쯤은 실행마다 달라진다는 점을 기준선 기록의 한계로 적는다. 셋째, 줄을 더 붙이면 숫자 줄이 늘어 대조 버림이 늘 수 있으니, 다시 재기 기록에서 질문별 대조 버림 수를 기준선과 나란히 보고 늘었으면 그 사실을 적는다."]
+**Message Id**: 9bcf4045
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-16T06:15:22Z
+**Event**: QUESTION_REPLIED
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Question**: [개발자] 5번이 기준선에서 재현되지 않았습니다. 어떻게 할까요?
+**Reply**: 1번대로 진행해 줘. 세 가지를 더한다. 첫째, 평가 기록과 다시 재기 판정에서 답 실패는 NO_ITEMS뿐 아니라 통과한 항목이 0개인 질문(이번 8번)도 센다. 둘째, 5번은 같은 조건에서 11/12에는 두 번 실패하고 오늘은 답이 나왔으니 될 때와 안 될 때가 있다는 점과, 질문당 항목 한 개쯤은 실행마다 달라진다는 점을 기준선 기록의 한계로 적는다. 셋째, 줄을 더 붙이면 숫자 줄이 늘어 대조 버림이 늘 수 있으니, 다시 재기 기록에서 질문별 대조 버림 수를 기준선과 나란히 보고 늘었으면 그 사실을 적는다.
+**Options**: ["재현 안 됨으로 적고 단계 B","멈추고 팀장이 정함"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-16T06:15:44Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: 재현 안 됨으로 적고 단계 B 진행. 더할 것: 답 실패는 NO_ITEMS뿐 아니라 통과 항목 0개 질문(8번)도 셈, 5번은 될 때와 안 될 때가 있고 질문당 항목 한 개쯤은 실행마다 달라진다는 한계를 기준선 기록에 적음, 다시 재기 기록에서 질문별 대조 버림 수를 기준선과 나란히 보고 늘었으면 적음
+**Message Id**: 9bcf4045
+**Person Reply**: 1번대로 진행해 줘. 세 가지를 더한다. 첫째, 평가 기록과 다시 재기 판정에서 답 실패는 NO_ITEMS뿐 아니라 통과한 항목이 0개인 질문(이번 8번)도 센다. 둘째, 5번은 같은 조건에서 11/12에는 두 번 실패하고 오늘은 답이 나왔으니 될 때와 안 될 때가 있다는 점과, 질문당 항목 한 개쯤은 실행마다 달라진다는 점을 기준선 기록의 한계로 적는다. 셋째, 줄을 더 붙이면 숫자 줄이 늘어 대조 버림이 늘 수 있으니, 다시 재기 기록에서 질문별 대조 버림 수를 기준선과 나란히 보고 늘었으면 그 사실을 적는다.
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:16:04Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-16T06:17:57Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-developer-agent
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-16T06:17:58Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: plan-approval
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: code-generation
+**Tool**: Agent
+**Details**: dispatch of aidlc-developer-agent
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:18:55Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:19:06Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:21:31Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:23:50Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:24:29Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:30:15Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:33:11Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:33:12Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:36:19Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:37:31Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Context**: construction > code-generation > code-generation-plan.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-16T06:38:35Z
+**Event**: HOST_TURN
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-16T06:38:35Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: a92c7daa4f6e4861a
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-16T06:39:08Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/traceability.json
+**Context**: construction > code-generation > traceability.json
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-16T06:39:41Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-summary.md
+**Context**: construction > code-generation > code-summary.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:39:45Z
+**Event**: SENSOR_FIRED
+**Fire id**: 774ef789
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:39:45Z
+**Event**: SENSOR_PASSED
+**Fire id**: 774ef789
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:39:45Z
+**Event**: SENSOR_FIRED
+**Fire id**: fa7a82da
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/unit-test-instructions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:39:45Z
+**Event**: SENSOR_PASSED
+**Fire id**: fa7a82da
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/unit-test-instructions.md
+**Duration ms**: 88
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:39:45Z
+**Event**: SENSOR_FIRED
+**Fire id**: 309eada9
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:39:45Z
+**Event**: SENSOR_PASSED
+**Fire id**: 309eada9
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-summary.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:39:45Z
+**Event**: SENSOR_FIRED
+**Fire id**: 64bca99a
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:39:46Z
+**Event**: SENSOR_PASSED
+**Fire id**: 64bca99a
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/traceability.json
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:39:46Z
+**Event**: SENSOR_FIRED
+**Fire id**: a8010909
+**Sensor ID**: traceability
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:39:46Z
+**Event**: SENSOR_PASSED
+**Fire id**: a8010909
+**Sensor ID**: traceability
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/traceability.json
+**Duration ms**: 87
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-16T06:39:46Z
+**Event**: REVIEW_REQUESTED
+**Stage**: code-generation
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:aa5cbb0050f081673c7387508c8536fd7a985fc79b06aa01613fc26994269a38
+**Request Id**: review:deec41483ca09853fee721eb474479bc
+**Source Fingerprint**: d45373f08cb5f6c335358bc2fa6f5228028629d2b73c18d393259dcb9831d371
+**Review File**: .aidlc-engine/reviews/code-generation/stage/87fb764b0d70a49c/1.deec41483ca09853fee721eb474479bc.review.md
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-16T06:40:11Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-16T06:43:34Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/.aidlc-engine/reviews/code-generation/stage/87fb764b0d70a49c/1.deec41483ca09853fee721eb474479bc.review.md
+**Context**: .aidlc-engine > reviews > code-generation > stage > 87fb764b0d70a49c > 1.deec41483ca09853fee721eb474479bc.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-16T06:43:45Z
+**Event**: HOST_TURN
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-16T06:43:45Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: a5d006e9521edf8c7
+**Review File Digest**: .aidlc-engine/reviews/code-generation/stage/87fb764b0d70a49c/1.deec41483ca09853fee721eb474479bc.review.md=06fbf46d2d8dc34a40ae6740a0fbef0f2780d75cfaa0090af07278b775f7ce68
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-16T06:43:49Z
+**Event**: REVIEW_COMPLETED
+**Stage**: code-generation
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:aa5cbb0050f081673c7387508c8536fd7a985fc79b06aa01613fc26994269a38
+**Artifact Fingerprint**: sha256:aa5cbb0050f081673c7387508c8536fd7a985fc79b06aa01613fc26994269a38
+**Request Id**: review:deec41483ca09853fee721eb474479bc
+**Request Source Fingerprint**: d45373f08cb5f6c335358bc2fa6f5228028629d2b73c18d393259dcb9831d371
+**Source Fingerprint**: d45373f08cb5f6c335358bc2fa6f5228028629d2b73c18d393259dcb9831d371
+**Source Listing**: sha256:8fa767c1d57b865e63125db20ad4878946ee19c51c9ed1d2374a7a83df8daa5e
+**Review Record**: .aidlc-engine/reviews/code-generation/stage/87fb764b0d70a49c/1.json
+**Review Record Digest**: sha256:e99dee3590bbd6f929512f6ef92429083c17cda57de6ef0c08f7d3ac3c4b075a
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:43:57Z
+**Event**: SENSOR_FIRED
+**Fire id**: 5a25355d
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:43:57Z
+**Event**: SENSOR_PASSED
+**Fire id**: 5a25355d
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md
+**Duration ms**: 85
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:43:57Z
+**Event**: SENSOR_FIRED
+**Fire id**: 063a03a1
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/unit-test-instructions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:43:57Z
+**Event**: SENSOR_PASSED
+**Fire id**: 063a03a1
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/unit-test-instructions.md
+**Duration ms**: 93
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:43:57Z
+**Event**: SENSOR_FIRED
+**Fire id**: 8b64b0c6
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:43:57Z
+**Event**: SENSOR_PASSED
+**Fire id**: 8b64b0c6
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-summary.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:43:57Z
+**Event**: SENSOR_FIRED
+**Fire id**: b3d0d3f2
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:43:57Z
+**Event**: SENSOR_PASSED
+**Fire id**: b3d0d3f2
+**Sensor ID**: required-sections
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/traceability.json
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:43:58Z
+**Event**: SENSOR_FIRED
+**Fire id**: c60059a2
+**Sensor ID**: traceability
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:43:58Z
+**Event**: SENSOR_PASSED
+**Fire id**: c60059a2
+**Sensor ID**: traceability
+**Stage slug**: code-generation
+**Output path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/traceability.json
+**Duration ms**: 87
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-16T06:43:58Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: code-generation
+**Next Stage**: build-and-test
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md=passed; required-sections@aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/unit-test-instructions.md=passed; required-sections@aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-summary.md=passed; required-sections@aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/traceability.json=passed; traceability@aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/traceability.json=passed
+**Open Decisions**: 0
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-16T06:50:30Z
+**Event**: HUMAN_TURN
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve. 함께 반영해 줘: R-01은 제안대로 탭 계열은 빈칸으로 바꾸고 서식 문자와 태그 문자를 지우며 시험 사례를 더한다. R-02는 제안대로 한계 문장에 「상한 때문에 붙지 못하면 인용할 수 없다」를 더하고 다시 잴 때 본다. R-03은 그대로 두고 code-summary의 실패 처리에 위험으로 적는다(검색 조각만으로 조용히 답하게 하지 않는다). R-04는 빌드와 시험 단계 첫 줄에 테스트 DB가 필요하다고 옮긴다. R-05는 계약 문서 C-11 두 줄에서 「팀원 3과 PR 리뷰에서 맞춤」을 빼고 더한 내용만 남긴다."]
+**Message Id**: c522c4f9
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-16T06:50:30Z
+**Event**: QUESTION_REPLIED
+**Session**: 506c77d6-b0cb-4fe2-9338-ec72e360a4da
+**Question**: 코드 생성이 끝났습니다. 어떻게 진행할까요?
+**Reply**: Approve. 함께 반영해 줘: R-01은 제안대로 탭 계열은 빈칸으로 바꾸고 서식 문자와 태그 문자를 지우며 시험 사례를 더한다. R-02는 제안대로 한계 문장에 「상한 때문에 붙지 못하면 인용할 수 없다」를 더하고 다시 잴 때 본다. R-03은 그대로 두고 code-summary의 실패 처리에 위험으로 적는다(검색 조각만으로 조용히 답하게 하지 않는다). R-04는 빌드와 시험 단계 첫 줄에 테스트 DB가 필요하다고 옮긴다. R-05는 계약 문서 C-11 두 줄에서 「팀원 3과 PR 리뷰에서 맞춤」을 빼고 더한 내용만 남긴다.
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-16T06:50:39Z
+**Event**: GATE_APPROVED
+**Stage**: code-generation
+**User Input**: Approve
+**Person Reply**: <pasted_content id="5a14">\n두 질문 모두 답할 수 있습니다. Docker 컨테이너 목록과 설정 파일의 변수 이름을 확인했습니다. 값은 읽지 않았습니다.\n\n## 확인한 사실\n\n- **DB는 `catchu-nc3-measure-db`가 맞습니다.** 멈춘 상태로 남아 있고, 11/12 기록의 측정 환경 이름·포트(55470)와 일치합니다. 같은 환경의 큐 컨테이너 `catchu-nc3-measure-valkey`도 멈춘 채 있습니다.\n- **키는 복사하거나 새로 적을 필요가 없습니다.** `~/catchu-local-live/secrets.env`에 `CATCHU_GENERATION_API_KEY`와 `CATCHU_EMBEDDING_API_KEY`가 있고, `~/catchu-local-live/nc3-measure/db.env`에 측정 DB 접속 값(`DB_HOST`·`DB_PORT` 등)과 큐 주소가 있습니다. 11/12에도 이 두 파일을 셸에 불러와 쟀습니다.\n- **입력 파일도 맞습니다.** `nc3-bt-input.json`의 발행본 ID와 질문 10개가 11/12 측정 원문과 같습니다.\n- **건드리면 안 되는 컨테이너가 하나 있습니다.** `catchu-db-test-sec3`(5441 포트)가 한 시간쯤 전부터 떠 있습니다. 다른 세션이 쓰는 것으로 보입니다.\n\n시험 안내를 고치지 않고 코드 요약에 적겠다는 것은 그대로 두셔도 됩니다.\n\n## 세션에 보낼 글\n\n```\n1. 키: 복사하지도 새로 적지도 않는다. ~/catchu-local-live/secrets.env(CATCHU_GENERATION_API_KEY·CATCHU_EMBEDDING_API_KEY)와 ~/catchu-local-live/nc3-measure/db.env(측정 DB 접속 값과 큐 주소)를 셸에 불러와 쓴다. 값은 화면이나 로그에 찍지 않고, 이 폴더에 api/.env를 만들지 않는다. 11/12에도 이렇게 쟀다.\n2. DB: catchu-nc3-measure-db가 맞다. 켜고 measure를 한 번 돌려 줘. 스크립트가 큐 주소 때문에 멈추면 같은 환경의 catchu-nc3-measure-valkey도 켠다.\n3. 평가 입력: 그 파일이 맞다(발행본 ID와 질문 10개가 11/12 측정과 같다). 복사해도 되고, --input에 메인 폴더 경로를 줘서 읽기만 해도 된다.\n\n제약\n- catchu-db-test-sec3(5441)은 다른 세션이 쓰는 것이니 건드리지 않는다. api·web·worker는 띄우지 않는다.\n- 실제 호출은 measure 한 번(질문 10개)뿐이다. 실패해도 다시 돌리지 말고 돌아온다.\n- 끝나면 켠 컨테이너는 그대로 두고 무엇을 켰는지 알려 준다. 다시 재기 때 또 쓴다.\n- 5번이 재현되지 않거나 키가 거부되면 돌아온다.\n```\n</pasted_content id="5a14">\nApprove. 함께 반영해 줘: R-01은 제안대로 탭 계열은 빈칸으로 바꾸고 서식 문자와 태그 문자를 지우며 시험 사례를 더한다. R-02는 제안대로 한계 문장에 「상한 때문에 붙지 못하면 인용할 수 없다」를 더하고 다시 잴 때 본다. R-03은 그대로 두고 code-summary의 실패 처리에 위험으로 적는다(검색 조각만으로 조용히 답하게 하지 않는다). R-04는 빌드와 시험 단계 첫 줄에 테스트 DB가 필요하다고 옮긴다. R-05는 계약 문서 C-11 두 줄에서 「팀원 3과 PR 리뷰에서 맞춤」을 빼고 더한 내용만 남긴다.
+**Message Id**: c522c4f9
+**Message Ids**: 510c3232,c522c4f9
+**Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:40e31822dd15743ecae4cfff6a8a6a3e6f160542de0bddc1848c24811c66b0f9","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/stage/87fb764b0d70a49c/1.json","digest":"sha256:e99dee3590bbd6f929512f6ef92429083c17cda57de6ef0c08f7d3ac3c4b075a"}},{"artifact":"aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md","id":"R-02","fingerprint":"sha256:faaa57f2a5ef9acda38f86b0ad4b084742e04e6f388d288cc0fea2fb67a816cb","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/stage/87fb764b0d70a49c/1.json","digest":"sha256:e99dee3590bbd6f929512f6ef92429083c17cda57de6ef0c08f7d3ac3c4b075a"}},{"artifact":"aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md","id":"R-03","fingerprint":"sha256:dde132cbcf28ce6914de5d34f93965d78570ee8d5e472f07093684606044a5cf","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/stage/87fb764b0d70a49c/1.json","digest":"sha256:e99dee3590bbd6f929512f6ef92429083c17cda57de6ef0c08f7d3ac3c4b075a"}},{"artifact":"aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md","id":"R-04","fingerprint":"sha256:27cccf8189541369c5d82cdc7f2c4393dc982cfa4f508f472b146a3954e4be06","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/stage/87fb764b0d70a49c/1.json","digest":"sha256:e99dee3590bbd6f929512f6ef92429083c17cda57de6ef0c08f7d3ac3c4b075a"}},{"artifact":"aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-generation-plan.md","id":"R-05","fingerprint":"sha256:a5e62cf9f45768fb1b2d60544a91a4cba823f25522ba9aa4b3be814c964a723a","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/stage/87fb764b0d70a49c/1.json","digest":"sha256:e99dee3590bbd6f929512f6ef92429083c17cda57de6ef0c08f7d3ac3c4b075a"}}]}
+**Brief Digest**: sha256:928a05a1077df34cc74da0d4deaaa1baa8f80d7bfa298bcceb0c5ae1eefb6c00
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-16T06:50:39Z
+**Event**: STAGE_COMPLETED
+**Stage**: code-generation
+**Validation Basis**: {"graphContract":"sha256:ac0ef7ae03ae2fcfab9e2a94500d84c4fe00d00384d1f8dcff92c96b2e1f50de","inputs":[{"artifact":"requirements","contentHash":"sha256:70ff87b4a7d8144ecb247562d0d5a94fe388708d59b9d2b8c990dc1c18af9f92","instanceCount":1,"presentCount":1,"producer":"requirements-analysis","required":true,"structureHash":"sha256:228abee939f8ab0cfea90dfc65c4829ff8057925173cd20e4ede3c02c16cc181"},{"artifact":"unit-of-work","contentHash":"sha256:0c4a881d514f5b573d4c21a95f0da36c92108f5323aa9deeb913c505d52cc673","instanceCount":1,"presentCount":0,"producer":"units-generation","required":true,"structureHash":"sha256:ba515ab20599b68c518abac7fad7fa5324b140a5a858bde0b7302bff38f33a2a"}],"outputs":[{"artifact":"code-generation-plan","contentHash":"sha256:37d881785dc1dd81b20e4784bf5e28edfb7db97bbd6924ee51995d87788d342f","instanceCount":1,"presentCount":1,"producer":"code-generation","required":true,"structureHash":"sha256:4c93985f6a43911ae37eba447394ead45ed70d9e1e3a993b7571181525d86374"},{"artifact":"code-summary","contentHash":"sha256:b027c5d224c773217fb85882ee1ba761fef6b0898ac263df9f2dbaa47c1f3dd4","instanceCount":1,"presentCount":1,"producer":"code-generation","required":true,"structureHash":"sha256:dfdd4c828ba71a771bfeb0f492cfe826c2f1c202672386c614379d5e1e6ed13b"},{"artifact":"traceability","contentHash":"sha256:fe4be785eedc08430c8c24645c90e83c6e38e1f2a267e139f5e4241cadb17b9f","instanceCount":1,"presentCount":1,"producer":"code-generation","required":true,"structureHash":"sha256:d3fb07df3913f78928cc5b2b47a36309e01c82c6a767318d75df6afcc2818f28"},{"artifact":"unit-test-instructions","contentHash":"sha256:42cfb3df26fc1f2e3d41ed0dc9fe00259e0f600e2a1a10a0edf09d84a7522b05","instanceCount":1,"presentCount":1,"producer":"code-generation","required":true,"structureHash":"sha256:fdc32f16f50342619e289fa0219ae14077940b0bd8b6c20d1ea5ade34bda2ef0"}],"projectType":"brownfield","schema":3}
+**Details**: Stage Code Generation approved by gate
+**Tokens In**: 480
+**Tokens Out**: 295381
+**Cache Read**: 85921854
+**Cache Write**: 1845786
+**Cost USD**: 33.72
+**By Model**: opus-5-5=32.39; sonnet-5-5=1.33
+**By Agent**: main=17.32; aidlc-developer-agent=15.08; aidlc-architecture-reviewer-agent=1.33
+**Tokens By Model**: opus-5-5=440/272.6k/83M/1.6M; sonnet-5-5=40/22.8k/2.9M/204.3k
+**Tokens By Agent**: main=158/116.1k/46.5M/712.3k; aidlc-developer-agent=282/156.5k/36.5M/929.2k; aidlc-architecture-reviewer-agent=40/22.8k/2.9M/204.3k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-16T06:50:39Z
+**Event**: STAGE_STARTED
+**Stage**: build-and-test
+**Agent**: aidlc-quality-agent
+**Answer Mode**: guide (reused from requirements-analysis)
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:51:08Z
+**Event**: SENSOR_FIRED
+**Fire id**: 4831b6ea
+**Sensor ID**: type-check
+**Stage slug**: build-and-test
+**Output path**: api/src/rag-answer/qna-sources.ts
+
+---
+
+## Sensor Failed
+**Timestamp**: 2026-11-16T06:51:14Z
+**Event**: SENSOR_FAILED
+**Fire id**: 4831b6ea
+**Sensor ID**: type-check
+**Stage slug**: build-and-test
+**Output path**: api/src/rag-answer/qna-sources.ts
+**Detail path**: aidlc/spaces/default/intents/261116-recipient-qa-fix/.aidlc-engine/sensors/build-and-test/type-check-4831b6ea.md
+**Findings count**: 1
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:51:15Z
+**Event**: SENSOR_FIRED
+**Fire id**: b531f23f
+**Sensor ID**: type-check
+**Stage slug**: build-and-test
+**Output path**: api/src/rag-answer/qna-sources.ts
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:51:16Z
+**Event**: SENSOR_PASSED
+**Fire id**: b531f23f
+**Sensor ID**: type-check
+**Stage slug**: build-and-test
+**Output path**: api/src/rag-answer/qna-sources.ts
+**Duration ms**: 1452
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:53:20Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-summary.md
+**Context**: construction > code-generation > code-summary.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-16T06:53:25Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261116-recipient-qa-fix/construction/code-generation/code-summary.md
+**Context**: construction > code-generation > code-summary.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-16T06:54:07Z
+**Event**: SENSOR_FIRED
+**Fire id**: 3e0cf865
+**Sensor ID**: type-check
+**Stage slug**: build-and-test
+**Output path**: api/src/rag-answer/qna-sources.ts
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-16T06:54:09Z
+**Event**: SENSOR_PASSED
+**Fire id**: 3e0cf865
+**Sensor ID**: type-check
+**Stage slug**: build-and-test
+**Output path**: api/src/rag-answer/qna-sources.ts
+**Duration ms**: 1637
+
+---
