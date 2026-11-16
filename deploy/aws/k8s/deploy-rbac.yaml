@@ -1,0 +1,51 @@
+# 자동 배포(#342)의 쿠버네티스 권한. GitHub Actions의 EKS 배포 역할이 namespace catchu에서 deploy.sh를 돌리는 데 필요한 것만 준다.
+# 손으로 적용한다(deploy/aws/cd/README.md 「처음 준비」). 배포 역할 자신은 이 파일을 바꿀 권한이 없다.
+# 역할은 EKS 접근 항목으로 쿠버네티스 그룹 catchu-deploy에 넣는다. 접근 정책(AmazonEKS…Policy)은 붙이지 않으므로 권한은 이 파일이 전부다.
+# 주지 않는 것: Secret 읽기, Pod 안 명령 실행(exec)·붙기(attach)·포트 연결, Pod·Deployment 지우기, 다른 namespace(catchu-ops 포함).
+# 한계: 이 권한으로 catchu에 Pod를 만들 수 있으므로, 같은 namespace의 Secret을 붙인 Pod를 만들어 읽는 길은 남는다.
+#   그래서 RDS 관리자 비밀번호는 catchu-ops에만 둔다(ops/namespace.yaml).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: catchu-deploy
+  namespace: catchu
+rules:
+  # 지금 상태 조회와 비교(kubectl diff는 서버에 시험 적용을 보낸다), 실행 파일 적용, 준비될 때까지 지켜보기.
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, watch, create, patch]
+  # api·worker를 0으로 줄이기(kubectl scale).
+  - apiGroups: [apps]
+    resources: [deployments/scale]
+    verbs: [get, patch, update]
+  # 옛 Pod의 종료 지켜보기, migration·동의 기록 확인 일회 Pod 만들기와 상태 조회.
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, create]
+  # 일회 Pod의 결과 줄 읽기.
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  # 시작 전 확인: 기본 차단 정책과 DB 주소·CA가 있는지. 이름을 정해 그것만 읽는다.
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    resourceNames: [default-deny]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [catchu-db]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: catchu-deploy
+  namespace: catchu
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: catchu-deploy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: catchu-deploy
