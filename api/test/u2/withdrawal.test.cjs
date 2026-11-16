@@ -94,12 +94,12 @@ async function fakeGoogle() {
     return new Response(JSON.stringify({ id_token: token, access_token: 'synthetic-google-access' }));
   });
   return async (sub) => {
-    const start = await server.call('POST', '/auth/google/authorization', { body: {} });
+    const start = await server.call('POST', '/auth/google/authorization', { body: {}, origin: WEB_ORIGIN });
     const address = new URL(start.body.authorizationUrl);
     const code = randomBytes(20).toString('hex');
     exchanges.set(code, { sub, nonce: address.searchParams.get('nonce') });
     const done = await server.call('POST', '/auth/google/login', { body: { state: address.searchParams.get('state'),
-      loginAttemptToken: start.body.loginAttemptToken, code } });
+      loginAttemptToken: start.body.loginAttemptToken, code }, origin: WEB_ORIGIN });
     assert.equal(done.status, 200, done.text);
     return done.body.accessToken;
   };
