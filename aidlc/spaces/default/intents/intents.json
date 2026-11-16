@@ -49,7 +49,7 @@
     "slug": "recipient-qa-fix",
     "dirName": "261116-recipient-qa-fix",
     "scope": "bugfix",
-    "status": "in-flight",
+    "status": "complete",
     "request": "614fdd47"
   }
 ]
