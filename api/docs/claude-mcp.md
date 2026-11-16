@@ -113,7 +113,7 @@ Nest `Logger`(`ClaudeMcp`)에 객체 하나로 남긴다. 사건마다 아래 �
 | `mcp_link_denied` | log | `tool`, `error`(`LINK_UNAVAILABLE`, `LINK_PASSWORD_REQUIRED`) | U9 받은 링크 도구가 링크 거부를 돌려줄 때. 토큰을 꺼내지 못한 때도 든다. 거부는 중지·만료 같은 정상 결과라 U5 `qna.rejected`처럼 log 수준이다 |
 | `mcp_token_check_failed` | error | `error` | 토큰 확인 중 DB 실패 |
 | `mcp_origin_rejected` | warn | 없음 | `/v1/mcp`의 `Origin` 거부 |
-| `mcp_token_exchange_refused` | warn | `reason`(`code_missing`, `code_expired`, `code_used`, `redirect_uri`, `client`, `resource`) | U6 코드가 내는 토큰 교환 거부. 응답은 모두 `invalid_grant`다 |
+| `mcp_token_exchange_refused` | warn | `reason`(`code_missing`, `code_expired`, `code_used`, `redirect_uri`, `client`, `resource`) | U6 코드가 내는 토큰 교환 거부. 응답은 모두 `invalid_grant`다. `code_missing`에는 만료된 뒤 그 회원의 다음 승인이나 토큰 교환으로 지워진 코드도 든다 |
 | `mcp_oauth_failed` | error | `step`(`register`, `client`, `token`), `error` | SDK에 넘긴 저장 단계의 DB 실패 |
 | `mcp_transport_close_failed` | error | `error` | 요청이 끝난 뒤 전송을 닫다 실패함 |
 
