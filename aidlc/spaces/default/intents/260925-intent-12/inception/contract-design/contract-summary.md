@@ -65,6 +65,7 @@ AiSource:
   location: { publishedItemId: uuid, fieldPath: string, charStart: int, charEnd: int, pdfPage: int|null }
     # charStart·charEnd는 snapshot 필드 문자열의 UTF-16 코드 단위 [start,end). C-01·C-07·C-09·web이 같게 쓴다
   catchEvidenceUrls: string[] # 그 근거 글의 항목이 Catch면 snapshot evidence[].sourceUrl 목록, 아니면 빈 배열(C-09 ChunkHit 그대로)
+  itemContext?: string        # 선택(#559 더하는 변경, 제공 팀장). 그 줄이 속한 발행 항목을 알리는 머리글. 게이트가 인용 문서 context를 "자료 종류: …" + (있으면 " · " + 값)으로 만들고, 인용할 수 없으며 입력 길이 검사에 센다. 지금은 질의응답만 채우고 기본 요약·JD 요약은 넣지 않는다
 AiGenerationRequest:
   feature: BASE_SUMMARY | QNA | JD_SUMMARY
   instruction: string         # 기능별 지시문. 숨긴 지시 방어·역량 평가 표현 금지 공통 문구는 게이트가 붙인다
@@ -407,7 +408,7 @@ slots (화면 순서):
                                        # claude-connect-rule이 참일 때만 그린다. 요청 문장 복사·연결 안내만 하고 API를 부르지 않으므로 props는 RecipientSlotProps 중 token 하나이고 getGrant·onAccessLost는 받지 않는다
                                        # 제목(h1)과 첫 초점을 갖지 않는다. 문구는 #495에서 정한 대로 U9 기능 설계에 적고, 컴포넌트 이름·눌렀을 때의 동작은 U9 기능 설계에서 정한다
   1: 발행본 자료(U4)
-  2: BaseSummaryPanel(U5)
+  2: BaseSummaryPanel(U5)              # 2·3번은 RecipientSlotProps 밖의 선택 prop itemTitleOf: (publishedItemId) -> string|null도 받는다(#559 더하는 변경, 팀원 3과 PR 리뷰에서 맞춤). U4가 이 화면의 사본으로 만들어 넘기면 출처 딱지 옆에 항목 제목을 보이고, 넘기지 않으면 딱지만 보인다. 4번에는 넘기지 않는다
   3: QnaPanel(U5)                      # 입력란 옆 외부 AI 고지 한 줄 포함
   4: JdSummaryPanel(U10)               # 로그인 회원에게만, 비로그인은 로그인 안내
 rule: 붙는 컴포넌트는 401 LINK_PASSWORD_REQUIRED·404 LINK_UNAVAILABLE을 받으면 스스로 처리하지 않고 onAccessLost를 부른다
@@ -427,7 +428,7 @@ evidence-highlight:                    # 근거 원문 강조(입력 §3 RAG 덩
   consumers: BaseSummaryPanel·QnaPanel(U5), JdSummaryPanel(U10)은 근거를 누르면 showEvidence(citation.location)를 부른다
 owner-summary:                         # 작성자 쪽 기본 요약
   U4의 작성자 발행본 화면에 BaseSummaryPanel(U5)을 작성자 모드로 붙인다. 중지·만료 뒤에도 보이고 [다시 만들기]가 있다(AC4.2.3·AC4.2.5)
-  작성자 모드에서는 U4가 publicationId와 showEvidence를 넘긴다(token·grant 없음). U5의 작성자 경로는 C-10 resolveForOwner를 먼저 불러,
+  작성자 모드에서는 U4가 publicationId와 showEvidence를 넘긴다(token·grant 없음. 선택 itemTitleOf는 2·3번과 같다, #559). U5의 작성자 경로는 C-10 resolveForOwner를 먼저 불러,
     남의 발행본이거나 없으면 NotFound로 끝낸다
   작성자 경로 세부는 U5 기능 설계에서 정한다
 api-path-rule: 받은 사람 쪽 API는 /v1/public/links/{token}/... 아래에 두고 X-Link-Grant를 받아 C-10 resolveForRecipient로 확인한다

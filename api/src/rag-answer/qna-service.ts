@@ -1,9 +1,13 @@
 // 질의응답 처리기(기능 설계 W1 7~10단계·W2, BR1.3·BR4.1~BR4.8, security-design NFR2.5, observability-design NFR6.1).
 // 다시 쓰기 → 검색 → 생성 순서를 이 함수 하나에 고정하고 각 단계를 한 번만 부른다. 예외를 던지지 않고 결과 종류로 돌려준다.
 // 질문·앞 대화·답 글은 결과에 담지 않는다(로그는 이 결과의 칸만 쓴다, BR1.4).
-import { type AiGenerationGate, type AiSource, type GatedItem } from '../ai-generation/ai-generation.types';
+// 검색 조각을 그대로 근거로 옮기던 일(C-09 note)은 #559부터 qna-sources.ts buildQnaSources가 한다. 검색으로 맞은 줄은 그대로 옮기고,
+// 맞은 Catch의 GitHub 기록 줄을 사본에서 더 붙인 뒤 근거마다 머리글(itemContext)을 단다.
+import { type AiGenerationGate, type GatedItem } from '../ai-generation/ai-generation.types';
 import { errorName } from '../ai-run/ai-run-spec';
+import type { PublishedSnapshot } from '../publications/publication-access';
 import { type ChunkHit, IndexNotReady, type PublishedSearch } from '../published-index/published-search';
+import { buildQnaSources } from './qna-sources';
 import type { HistoryMessage } from './question-input';
 import type { QuestionRewriter } from './question-rewriter';
 import { QNA_INSTRUCTION, QNA_MODEL, QNA_SEARCH_LIMIT } from './rag-answer-config';
@@ -17,6 +21,8 @@ export interface QnaDeps {
 
 export interface QnaRunInput {
   publicationId: string;
+  /** 그 발행본의 사본(C-10 readSnapshot). 검색으로 맞은 Catch의 기록 줄과 머리글을 여기서 만든다(#559 설계 결정 1·2). */
+  snapshot: PublishedSnapshot;
   question: string;
   history: HistoryMessage[];
   /** 받은 사람이 연결을 끊었으면 true(BR4.8). 단계 사이와 항목마다 본다. */
@@ -42,24 +48,15 @@ export interface QnaRunResult {
   chunkCount: number | null;
   generateMs: number | null;
   itemCount: number;
-}
-
-/** 검색 조각을 그대로 근거로 옮긴다(C-09 note, BR4.3). */
-export function chunkToSource(hit: ChunkHit): AiSource {
-  return {
-    sourceId: hit.chunkId,
-    sourceKind: hit.sourceKind,
-    text: hit.text,
-    location: { publishedItemId: hit.publishedItemId, fieldPath: hit.fieldPath, charStart: hit.charStart, charEnd: hit.charEnd,
-      pdfPage: hit.pdfPage },
-    catchEvidenceUrls: [...hit.catchEvidenceUrls],
-  };
+  /** 상한 때문에 모델에 붙이지 못한 같은 Catch 기록 줄 수(#559 FR1.6). 생성 단계 전에 끝났으면 null. */
+  unattachedLineCount: number | null;
 }
 
 function emptyResult(): QnaRunResult {
   return {
     stage: 'REWRITE', outcome: 'OK', errorCode: null, failure: null, rewritten: false, rewriteMs: null,
     rewriteInputTokens: null, rewriteOutputTokens: null, searchMs: null, chunkCount: null, generateMs: null, itemCount: 0,
+    unattachedLineCount: null,
   };
 }
 
@@ -115,9 +112,12 @@ export async function answerQuestion(deps: QnaDeps, input: QnaRunInput): Promise
   result.stage = 'GENERATE';
   const generateStartedAt = performance.now();
   try {
+    // 검색 8개에 맞은 Catch의 기록 줄을 붙이고 머리글을 단다(#559 FR1·FR2). 평가 스크립트도 같은 함수로 요청을 만든다(FR7).
+    // 사본 모양이 틀려 여기서 던지면 생성 실패로 끝난다.
+    const { sources, unattachedLineCount } = buildQnaSources(hits, input.snapshot);
+    result.unattachedLineCount = unattachedLineCount;
     const stream = deps.gate.generateStream({
-      feature: 'QNA', instruction: QNA_INSTRUCTION, sources: hits.map(chunkToSource), userText: searchQuestion, publicationText,
-      model: QNA_MODEL,
+      feature: 'QNA', instruction: QNA_INSTRUCTION, sources, userText: searchQuestion, publicationText, model: QNA_MODEL,
     });
     for await (const item of stream) {
       // 끊겼으면 break로 게이트 스트림의 return을 부른다(게이트가 그 finally에서 Claude 스트림을 닫는다).

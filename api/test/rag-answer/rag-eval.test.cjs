@@ -14,6 +14,8 @@ const { buildRepositoryRecord, writeEvaluation } = require('../../scripts/rag-ev
 const { Logger } = require('@nestjs/common');
 const { AiProviderError } = require('../../dist/ai-generation/ai-generation.types');
 const { createCheckedAiGenerationGate } = require('../../dist/ai-generation/checked-gate');
+const { buildQnaSources } = require('../../dist/rag-answer/qna-sources');
+const { QNA_INSTRUCTION } = require('../../dist/rag-answer/rag-answer-config');
 const { FAKE_KEY, blockCitation, fragment, jsonResponse, messageBody, recordingFetch } = require('../u2/gate-fixtures.cjs');
 
 const INPUT = JSON.parse(readFileSync(resolve(__dirname, 'rag-eval-input.json'), 'utf8'));
@@ -172,6 +174,53 @@ test('S17 게이트 로그 받기는 수와 이름 칸만 꺼내고 글이 든 �
   assert.equal(capture.take().failure, 'CALL_FAILED/API_STATUS:529');
   capture.restore();
   assert.equal(Logger.staticInstanceRef, undefined, '받기 전 로거(여기서는 꺼 둔 상태)로 되돌린다');
+});
+
+// #559 FR7.1~FR7.3(계획 S12) — 평가 스크립트의 질의응답 요청은 앱과 같은 buildQnaSources로 만든다.
+// 기대: synthetic 모드에서 모델 요청의 근거 목록이 같은 검색 상위 8개·사본의 buildQnaSources 결과와 같고, 질문별 붙이지 못한 줄 수가
+// 원문 결과·기록에 숫자로 있다. 검색 적중률은 12개로 그대로 잰다. 실패: 스크립트가 따로 요청을 만듦, 수가 빠짐.
+test('S12 평가 스크립트는 앱과 같은 buildQnaSources로 질의응답 근거를 만들고, 질문별 붙이지 못한 줄 수를 숫자로 남긴다(FR7.1~FR7.3)', async (t) => {
+  const { outDir, docsDir } = tempDirs(t);
+  const { input, deps } = synthetic();
+  const qnaRequests = [];
+  const searches = [];
+  const search = deps.search.search.bind(deps.search);
+  deps.search.search = async (publicationId, query, limit) => {
+    const result = await search(publicationId, query, limit);
+    searches.push({ query, limit, hits: result.hits });
+    return result;
+  };
+  const generate = deps.gate.generate.bind(deps.gate);
+  deps.gate.generate = async (request) => {
+    if (request.feature === 'QNA') qnaRequests.push(request);
+    return generate(request);
+  };
+  const result = await runRagEval({ mode: 'synthetic', input, deps, outDir, docsDir, clock: CLOCK });
+  const questionSearches = searches.filter((entry) => input.questions.some((question) => question.question === entry.query));
+  assert.deepEqual(questionSearches.map((entry) => entry.limit), [12, 12, 12], '적중률용 검색은 12개 그대로다');
+  assert.equal(qnaRequests.length, 3);
+  const expected = questionSearches.map((entry) => buildQnaSources(entry.hits.slice(0, 8), input.snapshot));
+  qnaRequests.forEach((request, index) => {
+    assert.deepEqual(request.sources, expected[index].sources, `${index + 1}번 질문의 근거가 앱 함수 결과와 같다`);
+    assert.equal(request.instruction, QNA_INSTRUCTION);
+  });
+  assert.ok(qnaRequests[0].sources.some((source) => source.itemContext !== undefined), '머리글이 붙은 요청을 잰다');
+  assert.ok(qnaRequests[0].sources.length > 0);
+  const counts = expected.map((entry) => entry.unattachedLineCount);
+  const raw = JSON.parse(readFileSync(result.rawPath, 'utf8'));
+  assert.deepEqual(raw.questions.map((question) => question.unattachedLineCount), counts);
+  assert.deepEqual(result.summary.unattachedLines, counts.map((unattachedLineCount, index) => ({ questionNo: index + 1, unattachedLineCount })));
+  const record = readFileSync(result.recordPath, 'utf8');
+  assert.match(record, /## 질문별 붙이지 못한 같은 Catch 기록 줄 수\n\n\| 질문 \| 붙이지 못한 줄 \|\n\|---\|---\|\n\| 1 \| \d+ \|\n\| 2 \| \d+ \|\n\| 3 \| \d+ \|\n/);
+});
+
+test('S12 붙이지 못한 줄 수 표는 숫자만 쓰고, 모델을 부르지 않은 질문(null)·모양이 다른 값은 「-」다', () => {
+  const summary = { date: '2026-12-01', targetVersion: 'x', mode: 'measure', questionCount: 3, hitRateAt5: null, hitRateAt8: null, hitRateAt12: null,
+    passedItems: 0, droppedItems: 0, evidencePassRate: null, answerFailedQuestions: [], missedHitLocations: [], jd: null,
+    unattachedLines: [{ questionNo: 1, unattachedLineCount: 7 }, { questionNo: 2, unattachedLineCount: null }, { questionNo: 3, unattachedLineCount: '비밀' }] };
+  const record = buildRepositoryRecord(summary);
+  assert.match(record, /\| 1 \| 7 \|\n\| 2 \| - \|\n\| 3 \| - \|\n/);
+  assert.ok(!record.includes('비밀'));
 });
 
 test('정답 위치는 글귀가 나오는 모든 곳이고, 적중은 같은 항목·fieldPath에서 범위가 겹칠 때다. 적중률 5·8·12를 따로 센다(BR10.3)', () => {

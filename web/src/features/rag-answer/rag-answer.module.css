@@ -47,6 +47,14 @@
   color: var(--color-muted);
 }
 
+/* 출처 단추 뒤의 발행 항목 제목(#559 FR4). 보이는 글자이고 Tab 순서 밖이다. */
+.itemTitle {
+  margin-left: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
 .question {
   margin: 0 0 0.5rem;
   font-weight: 600;
