@@ -14,7 +14,12 @@ export class LoginAttempts {
 
   create() {
     for (const [key, value] of this.entries) if (value.expiresAt <= this.now()) this.entries.delete(key);
-    if (this.entries.size >= CAPACITY) throw new ApiError('INTERNAL_ERROR');
+    // 가득 차면 새 시작을 거부하지 않고 가장 오래된 시도 하나를 버린다. 수명이 모두 같아 Map의 첫 항목이 가장 오래됐다.
+    // 버려진 시도의 완료는 없는 시도와 같이 AUTH_INVALID이고, 그 사람은 로그인을 다시 시작한다.
+    if (this.entries.size >= CAPACITY) {
+      const oldest = this.entries.keys().next();
+      if (!oldest.done) this.entries.delete(oldest.value);
+    }
     const state = randomBytes(32).toString('base64url');
     const loginAttemptToken = randomBytes(32).toString('base64url');
     const verifier = randomBytes(32).toString('base64url');

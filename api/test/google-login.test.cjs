@@ -41,11 +41,22 @@ test('state·nonce·PKCE의 난수·일회용·시작자·만료 경계', () => 
   assert.throws(() => store.consume(b.state, b.loginAttemptToken), isCode('AUTH_INVALID'));
   assert.throws(() => new LoginAttempts().consume(a.state, a.loginAttemptToken), isCode('AUTH_INVALID'));
 });
-test('시작 대기 보관 상한과 만료된 항목 회수', () => {
+test('시작 대기 보관 상한: 가득 차도 새 시작을 받고 가장 오래된 시도 하나만 버린다', () => {
   let clock = 0; const store = new LoginAttempts(() => clock);
-  for (let i = 0; i < 1000; i++) store.create();
-  assert.throws(() => store.create(), isCode('INTERNAL_ERROR'));
-  clock = 600000; assert.ok(store.create());
+  const kept = []; for (let i = 0; i < 1000; i++) { kept.push(store.create()); clock += 1; }
+  const extra = store.create(); // 1,001번째: 거부(500) 없이 받는다.
+  assert.throws(() => store.consume(kept[0].state, kept[0].loginAttemptToken), isCode('AUTH_INVALID')); // 가장 오래된 시도만 버려졌다.
+  assert.equal(store.consume(kept[1].state, kept[1].loginAttemptToken).nonce, kept[1].nonce);
+  assert.equal(store.consume(kept[999].state, kept[999].loginAttemptToken).nonce, kept[999].nonce);
+  assert.equal(store.consume(extra.state, extra.loginAttemptToken).nonce, extra.nonce);
+});
+test('시작 대기 보관 상한: 만료된 항목을 먼저 회수해 살아 있는 시도를 버리지 않는다', () => {
+  let clock = 0; const store = new LoginAttempts(() => clock);
+  for (let i = 0; i < 999; i++) store.create();
+  clock = 599999; const live = store.create(); // 1,000번째, 앞의 999건은 1ms 뒤 만료.
+  clock = 600000; const next = store.create(); // 만료분 회수로 자리가 생겨 live는 남는다.
+  assert.equal(store.consume(live.state, live.loginAttemptToken).nonce, live.nonce);
+  assert.equal(store.consume(next.state, next.loginAttemptToken).nonce, next.nonce);
 });
 const input = { state: 'a'.repeat(43), loginAttemptToken: 'b'.repeat(43), code: 'synthetic-code' };
 test('시작·완료의 엄격한 입력과 취소 분기', () => {
