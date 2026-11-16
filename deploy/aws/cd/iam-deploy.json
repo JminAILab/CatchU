@@ -1,0 +1,38 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EcrLogin",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "EcrPushFourAppRepositories",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
+        "ecr:CompleteLayerUpload",
+        "ecr:DescribeImages",
+        "ecr:DescribeRepositories",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:InitiateLayerUpload",
+        "ecr:PutImage",
+        "ecr:UploadLayerPart"
+      ],
+      "Resource": [
+        "arn:aws:ecr:ap-northeast-2:ACCOUNT_ID:repository/catchu-web",
+        "arn:aws:ecr:ap-northeast-2:ACCOUNT_ID:repository/catchu-api",
+        "arn:aws:ecr:ap-northeast-2:ACCOUNT_ID:repository/catchu-api-migration",
+        "arn:aws:ecr:ap-northeast-2:ACCOUNT_ID:repository/catchu-worker"
+      ]
+    },
+    {
+      "Sid": "DescribeCatchuClusterOnly",
+      "Effect": "Allow",
+      "Action": "eks:DescribeCluster",
+      "Resource": "arn:aws:eks:ap-northeast-2:ACCOUNT_ID:cluster/catchu"
+    }
+  ]
+}

@@ -82,7 +82,7 @@ API 경로·응답·새 오류 코드는 [API 명세의 회원 API](../../aidlc/
 
 | 요청 | 입력 | 성공 | 거부·실패 |
 |---|---|---|---|
-| 기존 Google·개발 로그인 | 기존 입력 유지 | `{accessToken, tokenType: "Bearer", expiresIn: 900}`, Google은 기존 이름 제안도 유지. `Set-Cookie`로만 Refresh 전달 | 기존 인증·입력·실행 제한 유지. DB/커밋 실패는 500 |
+| 기존 Google·개발 로그인 | 기존 입력 유지. Google 시작·완료는 정확한 `Origin`도 필요([Google 로그인 안내](google-login.md) 「API 연결안」) | `{accessToken, tokenType: "Bearer", expiresIn: 900}`, Google은 기존 이름 제안도 유지. `Set-Cookie`로만 Refresh 전달 | 기존 인증·입력·실행 제한 유지. Google 시작·완료의 Origin 거부는 `403 AUTH_ORIGIN_FORBIDDEN`. DB/커밋 실패는 500 |
 | `POST /v1/auth/refresh` | 정확한 `Origin`, Refresh 쿠키, 빈 본문/`{}`. Access 불필요 | 기존 Access 응답 + 교체 쿠키 | 자격정보 없음·변조·만료·폐기·재사용은 `401 AUTH_INVALID`와 쿠키 제거. Origin 거부는 `403 AUTH_ORIGIN_FORBIDDEN`이며 쿠키 미변경. DB 실패는 500 |
 | `POST /v1/auth/logout` | 정확한 `Origin`, 현재 또는 사용된 Refresh 쿠키. Access 불필요 | 폐기 커밋 후 `204`, 빈 본문, 쿠키 제거 | Origin 거부는 전용 403. DB 실패는 500, 쿠키 미변경 |
 

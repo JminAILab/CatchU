@@ -1,12 +1,15 @@
-# 개발 서버 자동 배포(#313). main에 반영된 판본을 arm64로 빌드·검사해 ECR에 올리고 개발 서버(#304)에서 교체한다.
+# main 자동 배포(#313). main에 반영된 판본을 arm64로 빌드·검사해 ECR에 올리고 개발 서버(#304)나 EKS(#276)에서 교체한다.
+# 어디까지 할지는 저장소 변수 DEPLOY_TARGET으로 고른다(#342). dev-server면 개발 서버 교체, eks면 EKS 교체, none이면 ECR에 올리기까지만 한다.
+# 값이 없거나 다른 값이면 plan에서 실패로 끝나고 아무것도 올리거나 바꾸지 않는다(deploy/dev-server/cd/ci-target.sh).
 # 수동 실행(Run workflow)은 main에서만 되고, 커밋을 넣으면 그 main 커밋을 다시 배포한다(되돌리기). 이미 올린 판본이면 빌드·검사를 건너뛴다.
 # 되돌릴 수 있는 커밋은 main의 first-parent 커밋(main에 반영된 판본)뿐이다. 반영된 PR 안의 중간 커밋은 승인된 최종 판본이 아니므로 받지 않는다.
 # 배포 도구(deploy/dev-server/cd/)는 늘 그 실행의 main 판본을 쓰고, 이미지·compose·교체 스크립트만 배포할 커밋에서 가져온다.
 # job은 셋이다. plan·deploy만 AWS 권한(OIDC)을 받고, 배포할 커밋의 코드를 러너에서 실행하는 이미지 검사(check)는 권한 없는 별도 러너에서 돈다.
-# AWS 역할은 environment dev-server(배포 브랜치 main만)에서 돈 job만 믿으며, 저장소에 AWS 키를 두지 않는다.
+# AWS 역할은 배포 대상마다 따로다. eks면 environment eks, 그 밖에는 environment dev-server에서 돈 job만 믿는다(둘 다 배포 브랜치 main만).
+# 저장소에 AWS 키를 두지 않는다. EKS 배포 역할은 앱 이미지 올리기와 클러스터 조회만 하고, 클러스터 안 권한은 deploy/aws/k8s/deploy-rbac.yaml이 전부다.
 # 역할 주소·서버 ID는 environment 비밀값으로 읽는다. 키는 아니지만 계정 번호와 서버 ID가 실행 로그에 그대로 찍히지 않게 하려는 것이다.
 # 배포는 한 번에 하나만 돈다. 진행 중에 main push가 여러 번 오면 기다리는 실행은 가장 나중 것 하나만 남는다.
-# 절차·끄는 법·되돌리기는 deploy/dev-server/cd/README.md.
+# 절차·끄는 법·되돌리기는 deploy/dev-server/cd/README.md, EKS 쪽은 deploy/aws/cd/README.md.
 # 외부 action은 ci.yml과 같은 전체 커밋 SHA로 고정한다(#215). checkout 뒤 git 인증을 쓰지 않으므로 토큰을 남기지 않는다.
 name: deploy-dev-server
 
@@ -33,7 +36,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     environment:
-      name: dev-server
+      name: ${{ vars.DEPLOY_TARGET == 'eks' && 'eks' || 'dev-server' }}
     permissions:
       contents: read
       id-token: write
@@ -41,6 +44,7 @@ jobs:
       commit: ${{ steps.target.outputs.commit }}
       tag: ${{ steps.target.outputs.tag }}
       tools: ${{ steps.src.outputs.tools }}
+      target: ${{ steps.deploy_target.outputs.target }}
       build_apps: ${{ steps.plan.outputs.build_apps }}
     env:
       AWS_REGION: ap-northeast-2
@@ -53,13 +57,11 @@ jobs:
           SHA: ${{ github.sha }}
           ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           DEV_SERVER_DOMAIN: ${{ vars.DEV_SERVER_DOMAIN }}
-          DEV_SERVER_INSTANCE_ID: ${{ secrets.DEV_SERVER_INSTANCE_ID }}
         run: |
           [ "$REF" = refs/heads/main ] || { echo "::error::main에서만 배포한다(지금 ${REF})"; exit 1; }
           commit=${INPUT_COMMIT:-$SHA}
           [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::커밋은 40자리 소문자 16진수로 넣는다"; exit 1; }
           [[ "$DEV_SERVER_DOMAIN" =~ ^[a-z0-9.-]+$ ]] || { echo "::error::environment 변수 DEV_SERVER_DOMAIN이 비었거나 형식이 틀렸다"; exit 1; }
-          [[ "$DEV_SERVER_INSTANCE_ID" =~ ^i-[0-9a-f]{8,17}$ ]] || { echo "::error::environment 비밀값 DEV_SERVER_INSTANCE_ID가 비었거나 형식이 틀렸다"; exit 1; }
           [ -n "$ROLE_ARN" ] || { echo "::error::environment 비밀값 AWS_DEPLOY_ROLE_ARN이 비었다"; exit 1; }
           printf 'commit=%s\ntag=main-%s\n' "$commit" "${commit:0:12}" >> "$GITHUB_OUTPUT"
           printf '### 배포 대상\n\n- 커밋: `%s`\n- 이미지 태그: `main-%s`\n' "$commit" "${commit:0:12}" >> "$GITHUB_STEP_SUMMARY"
@@ -68,6 +70,13 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+
+      - name: 배포 대상 확인
+        id: deploy_target
+        env:
+          DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
+          DEV_SERVER_INSTANCE_ID: ${{ secrets.DEV_SERVER_INSTANCE_ID }}
+        run: bash deploy/dev-server/cd/ci-target.sh
 
       - name: main에 반영된 판본인지 확인
         id: src
@@ -88,6 +97,7 @@ jobs:
         env:
           TAG: ${{ steps.target.outputs.tag }}
           TOOLS_COMMIT: ${{ steps.src.outputs.tools }}
+          DEPLOY_TARGET: ${{ steps.deploy_target.outputs.target }}
         run: bash deploy/dev-server/cd/ci-images.sh plan
 
   # 배포할 커밋의 검사 스크립트를 실행하므로 AWS 권한·OIDC 토큰 요청 권한이 없는 별도 job(별도 러너)으로 둔다.
@@ -120,11 +130,13 @@ jobs:
     name: deploy
     needs: [plan, check]
     # 검사가 필요 없어 건너뛴 경우(이미 올린 판본)에도 배포한다. 검사가 실패·취소되면 배포하지 않는다.
+    # 빌드·ECR 올리기는 배포 대상과 관계없이 돈다. 개발 서버 교체와 바깥 확인은 dev-server일 때만, kubectl 받기와 EKS 교체는 eks일 때만 돈다.
+    # environment는 plan이 정한 대상을 따른다(plan 뒤에 저장소 변수가 바뀌어도 한 실행 안에서 대상과 역할이 어긋나지 않는다).
     if: ${{ !cancelled() && needs.plan.result == 'success' && (needs.check.result == 'success' || needs.check.result == 'skipped') }}
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
     environment:
-      name: dev-server
+      name: ${{ needs.plan.outputs.target == 'eks' && 'eks' || 'dev-server' }}
       url: https://${{ vars.DEV_SERVER_DOMAIN }}
     permissions:
       contents: read
@@ -147,6 +159,20 @@ jobs:
           COMMIT: ${{ needs.plan.outputs.commit }}
         run: bash deploy/dev-server/cd/ci-source.sh checkout
 
+      # deploy.sh의 옛 실행 종료 확인은 kubectl 1.37.1의 감시 출력에 맞춰 있다(deploy/aws/scripts/lib/guard.sh의 기준 판본).
+      # 러너에 깔린 판본 대신 그 판본을 받아 해시를 확인하고 쓴다. AWS 권한을 받기 전에 받는다.
+      - name: kubectl 받기
+        if: needs.plan.outputs.target == 'eks'
+        env:
+          KUBECTL_VERSION: v1.37.1
+          KUBECTL_SHA256: ff749f4b78d9c4f1ec87307df9b50119ed819e2094aa9810cb9acffc3286c8c7
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/bin/kubectl" "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/arm64/kubectl"
+          echo "${KUBECTL_SHA256}  $RUNNER_TEMP/bin/kubectl" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/bin/kubectl"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
       - name: AWS 권한 받기
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
@@ -162,9 +188,11 @@ jobs:
           COMMIT: ${{ needs.plan.outputs.commit }}
           TOOLS_COMMIT: ${{ needs.plan.outputs.tools }}
           SRC_DIR: ${{ steps.src.outputs.dir }}
+          DEPLOY_TARGET: ${{ needs.plan.outputs.target }}
         run: bash deploy/dev-server/cd/ci-images.sh push
 
       - name: 개발 서버 교체
+        if: needs.plan.outputs.target == 'dev-server'
         env:
           COMMIT: ${{ needs.plan.outputs.commit }}
           WEB_DIGEST: ${{ steps.images.outputs.web }}
@@ -175,4 +203,13 @@ jobs:
         run: bash deploy/dev-server/cd/ci-deploy.sh
 
       - name: 바깥 확인
+        if: needs.plan.outputs.target == 'dev-server'
         run: bash deploy/dev-server/cd/ci-check.sh
+
+      # 역할 주소는 계정 번호를 읽는 데만 쓴다(deploy.sh가 기대 계정과 실제 계정을 대조한다).
+      - name: EKS 교체
+        if: needs.plan.outputs.target == 'eks'
+        env:
+          COMMIT: ${{ needs.plan.outputs.commit }}
+          DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+        run: bash deploy/aws/cd/ci-deploy.sh

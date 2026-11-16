@@ -17,7 +17,7 @@
 - 설명·질문·재료·실패·제목 동작·한계 문구는 2026-10-12 팀장 결정 1~17을 따른다: [설명 결정 1·2](https://github.com/JminAILab/CatchU/issues/120#issuecomment-6118569221), [생성 규칙 결정 3~16](https://github.com/JminAILab/CatchU/issues/120#issuecomment-6125259129), [결정 17과 커밋 순서·같은 문자열 보완](https://github.com/JminAILab/CatchU/issues/120#issuecomment-6125925482). 범위·완료 기준은 [#120 본문](https://github.com/JminAILab/CatchU/issues/120)이다. 확인할 수 없는 본인 커밋이 섞인 후보의 제목은 [2026-10-13 팀장 결정 18](https://github.com/JminAILab/CatchU/issues/120#issuecomment-6142728696)을 따른다.
 - 제목의 조각 방식·확인 기준·40자·고쳐 쓰기 3회·제목만 null은 [결정 문서 「Catch 제목」](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#catch-제목), 허용하는 재호출이 제목 고쳐 쓰기뿐인 것은 같은 문서 「[한 분석 안의 LLM 재호출](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md#한-분석-안의-llm-재호출)」이다.
 - 설명·질문에서 틀린 항목만 버리고 맞는 항목을 쓰는 것, 상한 뒤 항목·같은 종류 질문·조각 종류의 처리는 2026-10-19 팀장 결정이다([#120 본문 「응답과 실패 판정」](https://github.com/JminAILab/CatchU/issues/120)). 모양 검사만 풀고 지목한 줄·이름의 대조는 그대로이며, 다시 부르지 않는다.
-- 생각해볼 질문은 [#487](https://github.com/JminAILab/CatchU/issues/487)의 2026-11-08 팀장 결정(작업 전체를 묻고 AI가 직접 쓰며 판정·기계 대조 없음)을 따른다. #120 결정의 질문 틀과 Catch 개편 FR7.4의 「틀 그대로」를 대체한다.
+- 생각해볼 질문은 [#487](https://github.com/JminAILab/CatchU/issues/487)의 2026-11-08 팀장 결정(작업 전체를 묻고 AI가 직접 쓰며 판정 없음)을 따른다. #120 결정의 질문 틀과 Catch 개편 FR7.4의 「틀 그대로」를 대체한다.
 - 아래의 응답 모양·문장 틀·위치 분류·실패 코드는 이슈가 구현에 맡긴 부분에서 고른 것이다. 수치의 현행 결정과 기존 제안값은 [호출 한도](generation-limits.md#호출-한도와-시간)에서 구분한다.
 
 ## 경계

@@ -2177,14 +2177,15 @@ def test_pull_request_precedence_puts_earliest_merged_first() -> None:
     assert [p.number for p in pull_request_precedence(pulls)] == [2, 1, 4, 3, 5]
 
 
-# 같은 변경 확인·단위 나누기에 꼭 필요한 상세(필수 조회)
+# 같은 변경 확인에 꼭 필요한 상세(필수 조회)
 
-NEEDED = [31, 33, 21, 8, 9, 19]
+NEEDED = [31, 33, 21, 8]
 
 
 def needed_routes() -> dict[str, Reply]:
-    # c8은 c21의 cherry-pick, PR #32는 병합 없이 닫힌 #30을 가리키는 재제출,
-    # PR #10의 본인 커밋은 서로 다른 이슈 두 개를 가리킨다.
+    # c8은 c21의 cherry-pick, PR #32는 병합 없이 닫힌 #30을 가리키는 재제출이다.
+    # PR #10의 본인 커밋 c9는 서로 다른 이슈 두 개를 가리키지만 이슈 번호로 나누지 않으므로(FR2.1)
+    # 필수 조회가 아니다. 다른 계정 커밋 c19의 상세 경로는 두지 않는다(부르면 실패한다).
     routes: dict[str, Reply] = {
         BASE: respond(relation_repository_json()),
         LISTED_COMMITS: respond(
@@ -2229,7 +2230,7 @@ def needed_routes() -> dict[str, Reply]:
         pull_commits_path(30): respond([graph_commit_json(31, OTHER, parents=(2,))]),
         associated_key(8): respond([]),
     }
-    for number in NEEDED:
+    for number in (*NEEDED, 9):
         routes[detail_path(number)] = detail_reply(number, MEMBER)
     return routes
 
@@ -2238,19 +2239,24 @@ def needed_routes() -> dict[str, Reply]:
 NEEDED_CALLS_BEFORE_DETAILS = 4 + 4 + 1
 
 
-def test_relation_pairs_and_split_units_are_needed_details() -> None:
+def test_relation_pairs_are_needed_details_and_issue_units_are_not() -> None:
     outcome, transport = _run(needed_routes())
     relations = _relations(outcome)
 
     assert outcome.completed
     assert relations.detail_tiers.needed == tuple(sha(n) for n in NEEDED)
+    # 이슈 두 개를 가리키는 PR #10의 본인 커밋은 다른 단위처럼 선택 조회(첫 기여 커밋)로 받는다.
+    assert relations.detail_tiers.unit_first == (sha(9),)
     assert relations.detail_tiers.outside_pull_requests == ()
     assert relations.detail_tiers.evidence == ()
     assert transport.paths[NEEDED_CALLS_BEFORE_DETAILS:] == [
-        detail_path(n) for n in NEEDED
+        *(detail_path(n) for n in NEEDED),
+        detail_path(9),
     ]
-    # 단위 나누기를 보려고 다른 계정 커밋(c19·c31)의 변경 내용도 받는다.
-    assert _commit_status(outcome, 19) is DetailStatus.FETCHED
+    assert _commit_status(outcome, 9) is DetailStatus.FETCHED
+    # 재제출 쌍의 다른 계정 커밋(c31)은 받지만, 그 PR의 다른 계정 커밋(c19)은 부르지 않는다.
+    assert _commit_status(outcome, 31) is DetailStatus.FETCHED
+    assert _commit_status(outcome, 19) is DetailStatus.NOT_REQUESTED
     assert _commit_status(outcome, 2) is DetailStatus.NOT_REQUESTED
 
 
@@ -2267,8 +2273,9 @@ def test_needed_details_ignore_the_soft_guard_and_stop_at_the_hard_cap() -> None
         detail_path(33),
     ]
     assert _commit_status(outcome, 31) is DetailStatus.FETCHED
-    for number in (21, 8, 9, 19):
+    for number in (21, 8):
         assert _commit_status(outcome, number) is DetailStatus.NOT_REACHED
+    assert _commit_status(outcome, 19) is DetailStatus.NOT_REQUESTED
     assert _commit_status(outcome, 2) is DetailStatus.NOT_REQUESTED
 
 

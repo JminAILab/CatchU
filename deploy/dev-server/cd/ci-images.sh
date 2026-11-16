@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # 자동 배포(#313)의 이미지 단계. GitHub Actions arm64 러너에서 deploy-dev-server 워크플로가 부른다.
-#   plan: ECR에 이 판본의 태그가 다섯 저장소에 모두 있는지 본다.
+#   plan: ECR에 이 판본의 태그가 대상 저장소에 모두 있는지 본다.
 #         앱 이미지가 하나라도 없으면 build_apps=true(이미지 검사가 돈다), 배포 파일 묶음까지 하나라도 없으면 build=true.
 #   push: 없는 이미지만 빌드해 올린다. 태그는 덮어쓸 수 없으므로(IMMUTABLE) 이미 있는 것은 그대로 쓴다.
-#         올린 뒤 태그가 실행 이미지(출처 증명 문서가 아님)를 가리키는지 확인하고, 다섯 digest를 출력한다.
-# 다섯 저장소: 앱 이미지 네 개와, 서버에 둘 배포 파일 묶음(catchu-deploy-files).
+#         올린 뒤 태그가 실행 이미지(출처 증명 문서가 아님)를 가리키는지 확인하고, 저장소마다 digest를 출력한다.
+# 대상 저장소: 앱 이미지 네 개. 배포 대상(DEPLOY_TARGET)이 dev-server면 서버에 둘 배포 파일 묶음(catchu-deploy-files)까지 다섯 개다.
+#   묶음은 개발 서버만 쓴다. eks·none에서는 조회하지도 올리지도 않는다(EKS 배포 역할은 앱 저장소 네 개에만 닿는다, #342).
 #   앱 이미지 태그는 main-<배포할 커밋 12자>. 앱 이미지·compose·교체 스크립트는 배포할 커밋(SRC_DIR)에서 만든다.
 #   묶음은 배포할 커밋의 배포 파일 위에 배포 도구(deploy/dev-server/cd/)만 지금 main 판본(TOOLS_COMMIT)으로 덮는다.
 #   그래서 묶음 태그는 main-<배포할 커밋 12자>-tools-<도구 커밋 12자>다. 되돌리기에서도 서버 쪽 절차는 지금 판본으로 돈다.
-# 필요한 환경: TAG·TOOLS_COMMIT, (push) COMMIT·SRC_DIR·DEV_SERVER_DOMAIN, AWS 자격(워크플로가 OIDC로 받음), GITHUB_OUTPUT·GITHUB_STEP_SUMMARY.
+# 필요한 환경: TAG·TOOLS_COMMIT·DEPLOY_TARGET, (push) COMMIT·SRC_DIR·DEV_SERVER_DOMAIN, AWS 자격(워크플로가 OIDC로 받음), GITHUB_OUTPUT·GITHUB_STEP_SUMMARY.
 # 이 스크립트는 배포 도구 쪽 작업 폴더(지금 main 판본)의 루트에서 실행한다.
 set -euo pipefail
 
@@ -22,6 +23,11 @@ TOOLS_PATH=deploy/dev-server/cd
 [[ "$TAG" =~ ^main-[0-9a-f]{12}$ ]] || { echo "::error::태그 형식이 틀렸다: ${TAG}"; exit 2; }
 [[ "$TOOLS_COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::TOOLS_COMMIT 형식이 틀렸다"; exit 2; }
 FILES_TAG="${TAG}-tools-${TOOLS_COMMIT:0:12}"
+case "${DEPLOY_TARGET:-}" in
+  dev-server) REPOS=("${APP_REPOS[@]}" "$FILES_REPO") ;;
+  eks | none) REPOS=("${APP_REPOS[@]}") ;;
+  *) echo "::error::DEPLOY_TARGET이 dev-server·eks·none이 아니다"; exit 2 ;;
+esac
 
 tag_of() { if [ "$1" = "$FILES_REPO" ]; then echo "$FILES_TAG"; else echo "$TAG"; fi; }
 
@@ -40,7 +46,7 @@ tag_exists() {
 
 plan() {
   local build_apps=false build=false r
-  for r in "${APP_REPOS[@]}" "$FILES_REPO"; do
+  for r in "${REPOS[@]}"; do
     if tag_exists "$r"; then
       echo "${r}: $(tag_of "$r") 있음"
     else
@@ -121,7 +127,7 @@ push() {
   aws ecr get-login-password | docker login --username AWS --password-stdin "$reg" > /dev/null
   trap 'docker logout "$reg" > /dev/null 2>&1 || true' EXIT
   printf '### 이미지\n\n| 저장소 | 태그 | 상태 | digest |\n|---|---|---|---|\n' >> "$GITHUB_STEP_SUMMARY"
-  for r in "${APP_REPOS[@]}" "$FILES_REPO"; do
+  for r in "${REPOS[@]}"; do
     ref="${reg}/${r}:$(tag_of "$r")"
     if tag_exists "$r"; then
       state="이미 있음"

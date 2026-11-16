@@ -17,6 +17,8 @@ const settings = { NODE_ENV: 'test', DEV_LOGIN_ENABLED: 'true', AUTH_JWT_SECRET:
   GOOGLE_CLIENT_ID: 'synthetic.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'google-secret-marker',
   GOOGLE_REDIRECT_URI: 'http://localhost:3000/google/callback' };
 const saved = {}, logs = [], exchanges = new Map();
+// 시작·완료는 web 출처의 요청만 받는다. 정상 호출은 모두 이 Origin을 붙인다.
+const WEB = process.env.AUTH_WEB_ORIGIN ?? 'http://localhost:3000';
 let app, db, url, service, config, key, jwk, calls, originalProvider;
 before(async () => {
   for (const [k, v] of Object.entries(settings)) { saved[k] = process.env[k]; process.env[k] = v; }
@@ -51,7 +53,7 @@ beforeEach(async () => {
   });
 });
 async function call(path, body, token, method = 'POST') {
-  const response = await fetch(url + path, { method, headers: { ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+  const response = await fetch(url + path, { method, headers: { Origin: WEB, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(10000) });
   assert.equal(response.headers.get('cache-control'), 'no-store');
   return { status: response.status, body: await response.json() };
@@ -76,7 +78,7 @@ async function empty() {
 }
 
 test('Google 로그인 성공은 같은 회원 세션·Refresh 쿠키를 커밋하고 갱신에 연결', async () => {
-  const response = await fetch(url + '/v1/auth/google/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+  const response = await fetch(url + '/v1/auth/google/login', { method: 'POST', headers: { Origin: WEB, 'Content-Type': 'application/json' },
     body: JSON.stringify(await attempt()), signal: AbortSignal.timeout(10000) });
   assert.equal(response.status, 200);
   const issued = await response.json(), claims = decodeJwt(issued.accessToken);
@@ -85,7 +87,7 @@ test('Google 로그인 성공은 같은 회원 세션·Refresh 쿠키를 커밋�
   assert.equal((await db.manager.findOneByOrFail(AuthSession, { sessionId: claims.sid })).memberId, claims.sub);
   assert.equal(await db.manager.countBy(SessionRefreshToken, { sessionId: claims.sid }), 1);
   const renewed = await fetch(url + '/v1/auth/refresh', { method: 'POST', headers: {
-    Origin: process.env.AUTH_WEB_ORIGIN ?? 'http://localhost:3000', Cookie: cookie.split(';')[0],
+    Origin: WEB, Cookie: cookie.split(';')[0],
   }, signal: AbortSignal.timeout(10000) });
   assert.equal(renewed.status, 200);
   const result = await renewed.json();
@@ -169,6 +171,24 @@ test('기존 비활성 회원·누락 프로필은 토큰 발급이나 자동 �
   error(await finish(await attempt()), 401, 'AUTH_INVALID');
   await db.manager.update(MemberAccount, { memberId: id }, { accountState: 'ACTIVE' }); await db.manager.delete(MemberProfile, { memberId: id });
   error(await finish(await attempt()), 500, 'INTERNAL_ERROR'); assert.equal(await db.getRepository(MemberProfile).count(), 0);
+});
+test('다른 출처·출처 없는 시작·완료 요청은 403, 쿠키·회원·시도 소비 없음(폼 본문 포함)', async () => {
+  const raw = (path, headers, body) => fetch(url + path, { method: 'POST', headers, body, signal: AbortSignal.timeout(10000) });
+  const forbidden = async response => {
+    assert.equal(response.status, 403); assert.equal((await response.json()).code, 'AUTH_ORIGIN_FORBIDDEN');
+    assert.equal(response.headers.get('set-cookie'), null); assert.equal(response.headers.get('cache-control'), 'no-store');
+  };
+  const input = await attempt(), json = JSON.stringify(input), form = new URLSearchParams(input).toString();
+  // 다른 사이트의 HTML 폼은 사전 요청 없이 폼 본문을 보낼 수 있다. 본문 형식과 관계없이 출처로 거부한다.
+  await forbidden(await raw('/v1/auth/google/login', { Origin: 'https://other.invalid', 'Content-Type': 'application/x-www-form-urlencoded' }, form));
+  await forbidden(await raw('/v1/auth/google/login', { Origin: 'https://other.invalid', 'Content-Type': 'application/json' }, json));
+  await forbidden(await raw('/v1/auth/google/login', { Origin: 'null', 'Content-Type': 'application/x-www-form-urlencoded' }, form));
+  await forbidden(await raw('/v1/auth/google/login', { 'Content-Type': 'application/json' }, json));
+  await forbidden(await raw('/v1/auth/google/authorization', { Origin: 'https://other.invalid', 'Content-Type': 'application/json' }, '{}'));
+  await forbidden(await raw('/v1/auth/google/authorization', {}, undefined));
+  assert.equal(calls, 0); await empty();
+  // 거부된 요청은 시도를 소비하지 않는다. 같은 값을 web 출처에서 보내면 그대로 로그인된다.
+  assert.equal((await finish(input)).status, 200); assert.equal(calls, 1);
 });
 test('비활성 설정과 입력 오류·추가 필드의 공통 오류, health 인증 제외 유지', async () => {
   config.enabled = false; error(await call('/v1/auth/google/authorization', {}), 404, 'RESOURCE_UNAVAILABLE'); config.enabled = true;

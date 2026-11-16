@@ -254,8 +254,8 @@ Ruff는 정적 오류와 코드 서식을 검사한다. 서식 수정이 필요�
 | `tests/candidate_scenarios.py` | 후보 판별 사례 시험용 선언형 합성 저장소와, 수집부터 결과 조합까지 돌리는 실행 도구 |
 | `tests/test_candidate_*.py` | wi1 값(`identity`), 공백을 무시한 diff 값·관계 근거(`same_change`), 수집 관측을 직접 만든 묶음·집계·근거(`grouping`), 판별 기준 문서의 합성 사례(`cases`), 수집·판별·결과 조합 연결(`flow`) |
 | `app/generation/` | 설명 초안·질문·제목 생성(#120). 입구(`flow.py`), 재료 찾기(`material.py`), patch 확인(`patch.py`), 입력 만들기·크기 선별(`request.py`), 재료 순서·변경 묶음(`groups.py`), 응답 판정(`response.py`), 문장 틀(`render.py`), 제목(`title.py`), 실패 코드·한계 문구(`outcome.py`), 상한(`limits.py`), 제공자 경계(`provider.py`), 실제 제공자 어댑터(`claude.py`), AI 쪽 판정 질문·적용(`judged.py`, CR3) |
-| `app/judgement/` | 판정 공급자 자리(CR3). 규약(`provider.py`), 요청 조립·재료 판정 답 정리(`questions.py`), 호출 한 번과 답 읽기(`answers.py`), 기계 대조(`factcheck.py`), 합성·OpenAI·Claude 어댑터(`synthetic.py`·`openai_judge.py`·`claude.py`) |
-| `tests/test_judgement*.py` | 판정 요청·답·어댑터(`judgement`), 기계 대조(`factcheck`), FR10 확인 명령(`confirmation`) |
+| `app/judgement/` | 판정 공급자 자리(CR3). 규약(`provider.py`), 요청 조립·재료 판정 답 정리(`questions.py`), 호출 한 번과 답 읽기(`answers.py`), 합성·OpenAI·Claude 어댑터(`synthetic.py`·`openai_judge.py`·`claude.py`) |
+| `tests/test_judgement*.py` | 판정 요청·답·어댑터(`judgement`), FR10 확인 명령(`confirmation`) |
 | `tests/generation_scenarios.py` | 생성 시험용 합성 제공자(받은 요청 기록, 정해 둔 응답·예외·늦은 응답)와, 수집부터 생성·결과 조합까지 돌리고 후보 보존을 확인하는 실행 도구 |
 | `tests/test_generation_*.py` | patch 확인(`patch`), 가리기(`redact`), 재료 찾기(`material`), 변경 묶음(`groups`), 응답 판정·문장 틀(`response`), 제목(`title`), 상태·실패·호출 한도(`flow`), 고쳐 쓰기·근거 한계·가리기 끝까지(`rewrite_coverage`), 실제 제공자 어댑터(`claude`) |
 | `pyproject.toml` | 프로젝트 의존성·개발 도구·검사 설정 |

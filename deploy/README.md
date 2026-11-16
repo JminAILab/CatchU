@@ -13,7 +13,7 @@ web·api·worker 운영 이미지를 만들고, 한 호스트에서 API 한 프�
 | [`web/Dockerfile`](../web/Dockerfile) | web 이미지. Next standalone 서버(`node server.js`), 포트 3000 |
 | [`api/Dockerfile`](../api/Dockerfile) | api 이미지(기본 단계, `node dist/main.js`, 포트 3001)와 migration 이미지(`--target migration`) |
 | [`worker/Dockerfile`](../worker/Dockerfile) | worker 이미지. 분석 요청 큐 소비자(`/health` 포트 8000)와 합성(MOCK) 처리 명령 |
-| [`.dockerignore`](../.dockerignore) | 빌드 맥락에 Dockerfile이 복사하는 경로(잠금 파일·설정·`src`·`app`·합성 자료·계약 YAML 두 개)만 넣는다 |
+| [`.dockerignore`](../.dockerignore) | 빌드 맥락에 Dockerfile이 복사하는 경로(잠금 파일·설정·`src`·web `public`·`app`·합성 자료·계약 YAML 두 개)만 넣는다 |
 | [`compose.single.yaml`](compose.single.yaml) | 한 호스트 실행. api·worker·web 각 1개, migration은 따로 실행 |
 | [`compose.local-db.yaml`](compose.local-db.yaml), [`local-db/`](local-db) | 로컬 합성 DB·큐(검증·재현 전용). DB는 TLS와 앱·migration 계정 분리를 운영과 같은 방식으로 재현한다. 큐는 내부 망의 평문 Valkey 8.1.6이고 worker를 시험 모드로 띄운다(운영 큐의 TLS·비밀번호는 재현하지 않는다) |
 | [`env/`](env) | 실행 값 예시(이름만). 실제 파일은 저장소 밖에 둔다 |
@@ -43,7 +43,7 @@ docker build -f api/Dockerfile --target migration --build-arg SOURCE_REVISION=$(
 docker build -f worker/Dockerfile --build-arg SOURCE_REVISION=$(git rev-parse HEAD) -t <레지스트리>/catchu-worker:<판본> .
 ```
 
-- 빌드 맥락은 저장소 루트(`.`)다. `.dockerignore`가 전부 막고 Dockerfile이 복사하는 경로(잠금 파일·설정·`src`·`app`·합성 자료·계약 YAML 두 개)만 연다. 서비스 폴더의 테스트·문서·다른 자료, `.git`, 하네스, 로컬 인계 파일은 들어가지 않고, 연 경로 안의 `.env*`·키·인증서·`node_modules`도 다시 뺀다. Dockerfile에서 새 경로를 복사하면 `.dockerignore`와 검사 스크립트의 허용 목록을 함께 고친다.
+- 빌드 맥락은 저장소 루트(`.`)다. `.dockerignore`가 전부 막고 Dockerfile이 복사하는 경로(잠금 파일·설정·`src`·web `public`·`app`·합성 자료·계약 YAML 두 개)만 연다. 서비스 폴더의 테스트·문서·다른 자료, `.git`, 하네스, 로컬 인계 파일은 들어가지 않고, 연 경로 안의 `.env*`·키·인증서·`node_modules`도 다시 뺀다. Dockerfile에서 새 경로를 복사하면 `.dockerignore`와 검사 스크립트의 허용 목록을 함께 고친다.
 - 빌드하는 컴퓨터의 아키텍처로 만들어진다. 운영 노드 아키텍처는 #276에서 받고, 그 아키텍처에서 빌드·기동을 다시 확인한다. 다른 아키텍처 이미지나 에뮬레이션 결과로 대신하지 않는다.
 - `docker buildx`의 기본 빌더가 `docker-container` 방식이면 `--load`를 붙여야 이미지가 로컬 목록에 들어온다.
 - 빌드 입력(`--build-arg`)은 이미지 기록에 남으므로 공개 값만 넣는다. 비밀값은 실행할 때 주입한다.
@@ -177,8 +177,8 @@ node deploy/scripts/check-images.mjs [--keep] [--report <저장소 밖 JSON 경�
 이 컴퓨터의 아키텍처로 네 이미지를 만들고, 저장소 밖 임시 폴더의 합성 환경(합성 비밀값·합성 DB·시험용 사설 CA)에서 확인한다. 실제 GitHub·LLM·AWS·운영 DB에는 연결하지 않는다. 포트 23000·23001·28000을 쓰고, 실행마다 다른 이름(`catchu-check-<무작위>`)으로 컨테이너·망·볼륨·이미지 태그를 만든다. 셸에 남은 `COMPOSE_*`·`CATCHU_*` 값은 넘기지 않는다. 다른 검사가 남긴 `catchu-check-*` 자원이 있거나 그 조회가 실패하면 건드리지 않고 멈춘다. 끝나면 만든 컨테이너·망·DB 볼륨·임시 폴더·미끼 파일과(`--keep`이 아니면) 검사 이미지를 지우고 남은 것이 없는지 조회한다. 자원이 남았거나 Docker 조회가 실패해 확인하지 못하면 실패로 끝내고, 프로젝트 이름·남은 이름·확인하지 못한 조회와 직접 확인할 명령을 알려 준다. 임시 폴더는 합성 비밀값이 있어 이때도 지운다(남은 자원은 프로젝트 이름만으로 찾을 수 있다). `--keep`이면 검사 이미지만 남긴다.
 
 - 빌드 맥락: 허용 목록 밖 파일이 하나도 없는지, 허용한 폴더 안의 `.env*`·키 미끼와 서비스 폴더의 다른 자료 미끼가 빠지는지
-- 이미지: UID 1000, `/app`·`/opt`·`/usr/local`에 쓰기 가능한 파일 없음과 넣은 경로(`/app`, worker `/opt/uv-python`)의 root 소유(세 이미지), web 정적 자산·환경 파일 없음, api 개발 도구 부재와 운영 모듈, 실제 검증기의 계약 YAML 읽기, worker Python 3.12.10·개발 그룹 부재·운영 의존성(BullMQ·redis 포함)·기본 TLS 문맥의 시스템 CA 디렉터리·`WEB_CONCURRENCY`와 관계없이 프로세스 1개·MOCK 시나리오 9개, web 빌드 입력 거부(외부 http·`/v1`·경로·빈 값·개발 로그인), Dockerfile에 비밀값 이름의 빌드 입력·환경변수 없음
-- 실행: 처음 설치 순서(컨테이너가 없는 상태를 조회 실패와 구분해 진행), web 화면·JS·CSS·보안 헤더, api health와 앱 계정의 TLS DB 조회, worker health(합성 큐에 붙은 소비자), 서비스별 프로세스 1개, 합성 큐의 MOCK 요청 1건을 자식 프로세스로 처리(읽기 전용·권한 제거 상태), migration 이력·소유자·앱 계정 권한, 순차 재실행
+- 이미지: UID 1000, `/app`·`/opt`·`/usr/local`에 쓰기 가능한 파일 없음과 넣은 경로(`/app`, worker `/opt/uv-python`)의 root 소유(세 이미지), web 정적 자산 폴더와 `public` 파일 목록(저장소 `web/public`과 같음)·환경 파일 없음, api 개발 도구 부재와 운영 모듈, 실제 검증기의 계약 YAML 읽기, worker Python 3.12.10·개발 그룹 부재·운영 의존성(BullMQ·redis 포함)·기본 TLS 문맥의 시스템 CA 디렉터리·`WEB_CONCURRENCY`와 관계없이 프로세스 1개·MOCK 시나리오 9개, web 빌드 입력 거부(외부 http·`/v1`·경로·빈 값·개발 로그인), Dockerfile에 비밀값 이름의 빌드 입력·환경변수 없음
+- 실행: 처음 설치 순서(컨테이너가 없는 상태를 조회 실패와 구분해 진행), web 화면·JS·CSS·`public` 파일(소개 화면 로고·글꼴)·탭 아이콘·보안 헤더, api health와 앱 계정의 TLS DB 조회, worker health(합성 큐에 붙은 소비자), 서비스별 프로세스 1개, 합성 큐의 MOCK 요청 1건을 자식 프로세스로 처리(읽기 전용·권한 제거 상태), migration 이력·소유자·앱 계정 권한, 순차 재실행
 - 거부: DB TLS(틀린 CA, 인증서에 없는 호스트, 평문, `PGSSLMODE`를 빠뜨린 실행)를 api·migration 각각, env 파일로 인증서 검증 끄기, 운영 키 누락·형식 오류·두 키 같음, http CORS·공유 링크 주소, 로그인 출처(`AUTH_WEB_ORIGIN`) 누락·http, production 개발 로그인, worker의 DB 접근, 운영 모드 worker의 큐 설정 오류(주소 없음·평문 주소·질의 문자열·MOCK 켜기, 출력에 큐 비밀번호 없음)
 - 교체: 새 api 판본 교체에서 이전 종료 뒤 새 시작, 멈춤 조건 다섯 가지(같은 표식의 실행이 남음 3, migration 실패 4, 실패한 migration 실행이 남음 5, 새 실행 health 실패 6, 대기 상한 초과 강제 종료 7)와 각각 서비스가 멈춘 상태로 남는지, SIGTERM 종료 코드·시간. 가짜 docker로 해당 호출만 실패시켜 다음도 본다: web 중지 명령만 실패하면 api·worker는 멈추고 web만 남은 채 3, 새 실행 실패 뒤 상태 조회가 실패하면 3(종료 확인 기록 없음), 새 실행 실패 뒤 api 중지만 실패하면 api만 남은 채 3, 교체를 시작할 때 상태 조회가 실패하면 아무것도 멈추지 않은 채 3, 중지 뒤 종료 코드 조회가 실패하면 migration·새 실행 없이 3, web 강제 종료(137)와 api 조회 실패가 겹치면 3이고 출력에 web 137과 교체 전 실행 중 서비스가 함께 적히는지, migration 성공 뒤 실행 컨테이너 삭제가 실패하면 성공 기록과 컨테이너를 남긴 채 8이고 그대로 다시 실행하면 5, 지운 뒤 다시 실행하면 이어서 시작, 세 서비스를 멈춘 뒤 migration 이미지 조회가 실패하면 migration을 시작하지 않고 2. 또 web을 띄운 직후 api를 실제로 다시 시작시켜(health starting) 완료로 보지 않고 세 서비스를 다시 멈춘 채 6인지 본다
 - 정리: 자원 조회가 실패하거나(조회별·docker 없음·시간 초과) 실제로 자원(`--keep`이 아니면 검사 이미지 포함)이 남으면 정리 통과로 보지 않는지, 시작 전 다른 검사 자원 확인도 조회 실패를 자원 없음으로 보지 않는지

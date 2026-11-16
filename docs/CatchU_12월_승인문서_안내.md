@@ -13,9 +13,9 @@
 | 요구사항과 스토리 연결 | [추적표](../aidlc/spaces/default/intents/260925-intent-12/inception/user-stories/traceability.json) | 해당 요구사항의 연결 스토리 |
 | 결정 이유와 9월 기준에서 바뀐 것 | [질문·답변](../aidlc/spaces/default/intents/260925-intent-12/inception/requirements-analysis/requirements-analysis-questions.md) · 요구사항 「입력 추적」 | 요구사항이 인용한 질문, 「9월 요구사항 → 현행」 |
 | 기능이 놓이는 곳과 설계 결정 | [컴포넌트 목록](../aidlc/spaces/default/intents/260925-intent-12/inception/domain-design/components.md) · [설계 결정 기록](../aidlc/spaces/default/intents/260925-intent-12/inception/domain-design/decisions.md) | 「Component Summary」·「Entity Ownership」, 관련 결정 |
-| Unit과 연결 순서 | [Unit 정의](../aidlc/spaces/default/intents/260925-intent-12/inception/units-generation/unit-of-work.md) · [Unit 의존](../aidlc/spaces/default/intents/260925-intent-12/inception/units-generation/unit-of-work-dependency.md) | 「공통 전제」 → 맡은 Unit 절, 「계약 의존 (DAG 밖)」 |
-| Unit 사이 약속 | [계약 요약](../aidlc/spaces/default/intents/260925-intent-12/inception/contract-design/contract-summary.md) | 「공통 전제」 → 「Contracts」 → 맡은 Unit이 주거나 받는 계약 |
-| 착수 순서·담당·합치기 | [Bolt 계획](../aidlc/spaces/default/intents/260925-intent-12/inception/delivery-planning/bolt-plan.md) · [담당 배정](../aidlc/spaces/default/intents/260925-intent-12/inception/delivery-planning/team-allocation.md) · [순서 근거](../aidlc/spaces/default/intents/260925-intent-12/inception/delivery-planning/risk-and-sequencing-rationale.md) · [외부 의존](../aidlc/spaces/default/intents/260925-intent-12/inception/delivery-planning/external-dependency-map.md) | 「착수 규칙」 → 「합치기와 dev 반영」, 담당 배정 「팀 방식 준비」 |
+| Unit과 연결 순서 | [Unit 정의](../aidlc/spaces/default/intents/260925-intent-12/inception/units-generation/unit-of-work.md) · [Unit 의존](../aidlc/spaces/default/intents/260925-intent-12/inception/units-generation/unit-of-work-dependency.md) | 「공통 전제」 → 해당 Unit 절, 「계약 의존 (DAG 밖)」 |
+| Unit 사이 약속 | [계약 요약](../aidlc/spaces/default/intents/260925-intent-12/inception/contract-design/contract-summary.md) | 「공통 전제」 → 「Contracts」 → 해당 Unit이 주거나 받는 계약 |
+| 착수 순서·담당·합치기(11월 당시 운영 기록, 지금은 적용하지 않음) | [Bolt 계획](../aidlc/spaces/default/intents/260925-intent-12/inception/delivery-planning/bolt-plan.md) · [담당 배정](../aidlc/spaces/default/intents/260925-intent-12/inception/delivery-planning/team-allocation.md) · [순서 근거](../aidlc/spaces/default/intents/260925-intent-12/inception/delivery-planning/risk-and-sequencing-rationale.md) · [외부 의존](../aidlc/spaces/default/intents/260925-intent-12/inception/delivery-planning/external-dependency-map.md) | 「착수 규칙」 → 「합치기와 dev 반영」, 담당 배정 「팀 방식 준비」 |
 | Unit마다 돌릴 검사 | [검사 명령](../aidlc/spaces/default/intents/260925-intent-12/verification-command.txt) | 전체 |
 | 승인과 정지 | [상태 파일](../aidlc/spaces/default/intents/260925-intent-12/aidlc-state.md) · [재승인 감사 기록](../aidlc/spaces/default/intents/260925-intent-12/audit/macui-macbookpro-local-abc1112aa5fb.md) | 단계별 체크와 「Parked」, 단계마다 마지막 `Gate Approved` |
 
@@ -32,7 +32,7 @@
 
 산출물 본문의 ‘요약 확인은 최종 승인이 아니다’ 같은 문장은 작성 당시의 경계를 적은 것이다. 단계 승인과 정지 여부는 위 상태 파일과 감사 기록에서 확인한다. 9월 승인의 감사 기록은 [`macui-macbookpro-local-09cc8fc17dfe.md`](../aidlc/spaces/default/intents/260925-intent-12/audit/macui-macbookpro-local-09cc8fc17dfe.md)이고, `verification/`의 요구사항·사용자 스토리 승인·정지·검증 기록 네 개는 9월 승인판에 대한 기록이다. 모두 고치지 않고 보존한다.
 
-다음은 기능 설계부터 시작하는 Construction이며 AI-DLC 팀 방식으로 진행한다. 시작 절차는 Bolt 계획 「착수 규칙」과 담당 배정 「팀 방식 준비」를 따른다. 이 문서 수정이나 재승인 기록 공유만으로 park 상태를 풀거나 Construction을 시작하지 않는다.
+기능 설계부터 시작한 Construction은 AI-DLC 팀 방식으로 진행해 끝났다. Unit은 [#494](https://github.com/JminAILab/CatchU/pull/494)와 [#533](https://github.com/JminAILab/CatchU/pull/533)으로 `dev`에 들어갔고, 12월 intent는 2026-11-14에 보관했다([#550](https://github.com/JminAILab/CatchU/issues/550)). 보관한 intent는 AI-DLC로 더 이어 가지 않는다. 마무리 검증은 [2차 통합 확인](CatchU_통합확인.md)으로 한다.
 
 재승인 입력은 [12월 재승인 입력](ai-dlc-input-december/CatchU_12월_재승인_입력.md)이다. 기존 [12월 입력](ai-dlc-input-december/CatchU_12월_범위_보완.md)은 9월 결정의 출처로 보존한다.
 
@@ -54,3 +54,5 @@
 - **2026-10-23** — 11월 개발 범위 결정의 2026-10-22·23 변경(PDF 포함·외부 URL 자료 제외, AI-DLC 2.11.1로 올린 뒤 재승인, 구현은 AI-DLC 팀 방식)에 맞춰 제외 목록 문장과 재개 방식을 고쳤다. 같은 날 자동 리뷰 지적에 따라 제외 범위를 그 문서의 제외 목록으로 한정하는 문장으로 고쳤다. 승인 원본·감사·정지 기록은 고치지 않았다.
 
 - **2026-10-26** — 2026-10-24~26 재승인(요구사항부터 납품 계획까지)을 반영해 읽는 순서를 재승인판과 설계·Unit·계약·납품 계획 문서로 바꾸고, 9월 승인판을 읽는 위치와 일정을 고쳤다. 9월 승인 원본·감사·정지 기록은 고치지 않았다.
+
+- **2026-11-14** — 11월 개발이 끝나 12월 intent를 보관한 것([#550](https://github.com/JminAILab/CatchU/issues/550))에 맞춰 후속 작업 문장을 고치고, 읽는 순서 표의 착수·합치기 줄을 당시 운영 기록으로 표시했다([#551](https://github.com/JminAILab/CatchU/issues/551)). 승인 원본·감사 기록은 고치지 않았다.

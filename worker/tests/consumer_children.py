@@ -197,7 +197,7 @@ def live_synthetic_record_text(conn: Connection, child_input: ChildInput) -> Non
     child_main(conn, child_input)
 
 
-# AI 쪽(CR3) 로그 시험의 AI 제목 후보·설명 문장. 로그에 나오면 안 되는 표식이다(한글 표식은 기계 대조가 보지 않는다).
+# AI 쪽(CR3) 로그 시험의 AI 제목 후보·설명 문장. 로그에 나오면 안 되는 표식이다.
 AI_TITLE = "후보표식 alpha 값 변경"
 AI_SENTENCE = "문장표식 alpha 값을 2로 바꿨습니다."
 

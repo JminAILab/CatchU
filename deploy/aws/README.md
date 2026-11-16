@@ -21,7 +21,7 @@
 | [`logging/`](logging/README.md)·[`scripts/create-log-group.sh`](scripts/create-log-group.sh) | 로그 그룹(14일)·수집기 |
 | [`scripts/create-certificate.sh`](scripts/create-certificate.sh)·[`install-lb-controller.sh`](scripts/install-lb-controller.sh) | ACM 인증서·Load Balancer Controller |
 | [`k8s/`](k8s) | 쿠버네티스 실행 파일. namespace·NetworkPolicy·Service·Ingress(ALB)는 손으로 적용하고, Deployment(web·api·worker)와 migration·동의 기록 확인 Pod 틀은 `deploy.sh`만 쓴다([k8s/README.md](k8s/README.md)) |
-| [`scripts/deploy.sh`](scripts/deploy.sh) | 앱 교체. 옛 api·worker 종료 확인 → migration 일회 Pod → 동의 기록 삭제 권한 확인·회수 → 새 api·worker·web 시작과 확인([k8s/README.md](k8s/README.md) 「앱 교체(deploy.sh)」) |
+| [`scripts/deploy.sh`](scripts/deploy.sh) | 앱 교체. 옛 api·worker 종료 확인 → migration 일회 Pod → 동의 기록 삭제 권한 확인·회수 → 새 api·worker·web 시작과 확인([k8s/README.md](k8s/README.md) 「앱 교체(deploy.sh)」). 자동 배포는 [cd/](cd/README.md) |
 | [`scripts/deploy.test.sh`](scripts/deploy.test.sh) | `deploy.sh` 회귀 시험과 실행 파일 조건 검사(AWS·클러스터에 닿지 않음, [k8s/README.md](k8s/README.md) 「시험」) |
 | [`scripts/make-secrets.sh`](scripts/make-secrets.sh)·[`put-parameter.sh`](scripts/put-parameter.sh) | 앱 Secret·ConfigMap 만들기와 SSM에 새 비밀값 넣기([k8s/README.md](k8s/README.md) 「Secret과 ConfigMap」) |
 | [`scripts/db-admin.sh`](scripts/db-admin.sh)·[`db/`](db)·[`k8s/ops/`](k8s/ops) | DB 관리용 psql 일회 Pod(namespace `catchu-ops`)와 RDS 계정 SQL·루트 인증서([k8s/README.md](k8s/README.md) 「DB 관리 Pod」). 공통 RDS 조회는 [`scripts/lib/rds.sh`](scripts/lib/rds.sh) |
@@ -159,7 +159,7 @@
    그 ID로 `aws ec2 terminate-instances --instance-ids <ID> …` → `aws ec2 wait instance-terminated --instance-ids <ID> …`. 루트 볼륨은 함께 지워진다.
 4. 개발 서버의 탄력적 IP(`aws ec2 describe-addresses … --filters Name=tag:Name,Values=catchu-dev-server --query 'Addresses[].AllocationId' --output text`)를 `aws ec2 release-address --allocation-id <ID> …`로 해제하고, 3에서 적은 보안 그룹을 지운다. 종료가 끝나기 전에는 의존이 남아 실패한다.
 5. IAM: 인스턴스 프로필에서 역할 `catchu-dev-server`를 빼고 → 관리형 정책 분리 → 인라인 정책 3개(`list-role-policies`로 확인) 삭제 → 역할·인스턴스 프로필 삭제. 버킷: `aws s3 rb s3://catchu-dev-server-files --force …`.
-6. SSM 문서 `catchu-dev-deploy`, 개발 서버 배포 역할 `catchu-github-deploy`, GitHub environment `dev-server`, ECR `catchu-deploy-files`(EKS 배포가 쓰지 않으면)를 지운다(#342 결정에 따름).
+6. SSM 문서 `catchu-dev-deploy`를 지운다. 배포 역할 `catchu-github-deploy`, GitHub environment `dev-server`, ECR `catchu-deploy-files`는 자동 배포의 이미지 올리기가 쓰는 동안 남긴다(#342).
 7. 확인(개발 서버 자원만): 이름 태그 `catchu-dev-server` 인스턴스가 terminated뿐, 그 이름의 탄력적 IP 0, 3에서 적은 보안 그룹 없음, 역할 `catchu-dev-server` 없음(`aws iam get-role`이 NoSuchEntity), 버킷 `catchu-dev-server-files` 없음, 상태 available인 볼륨 0, 자기 소유 스냅샷 0. EKS 노드와 NAT의 공인 IP는 B까지 남는 것이 정상이다. #276 완료 기준(개발 서버 삭제)의 증거다.
 
 **B. EKS 기간 자원(제출을 확인한 뒤 지원 기한 전)**

@@ -9,7 +9,7 @@
 - 생성 키·판정 키·판정 공급자는 운영과 같은 이름(`CATCHU_GENERATION_API_KEY`·`CATCHU_JUDGEMENT_API_KEY`·
   `CATCHU_JUDGEMENT_PROVIDER`)의 셸 환경변수에서 읽는다. AI 쪽이 꺼진 설정이면 확인할 것이 없어 멈춘다.
 - 결과 메시지를 만들거나 보내지 않는다. 출력은 로컬 확인표(`<owner>__<name>.sheet.json`)뿐이고, Catch마다 기록의
-  글·AI 후보와 기계 대조 결과·문장·판정 값·고른 제목·남긴 문장과 빈 맞음/틀림 칸을 적는다.
+  글·AI 후보·문장·판정 값·고른 제목·남긴 문장과 빈 맞음/틀림 칸을 적는다.
 - 출력 폴더(기본 `~/catchu-local-live/cr3-fr10/`)와 수집 결과 파일은 실제 경로를 풀어 이 저장소 작업 폴더 안이면
   거부한다. 확인표·수집 결과에는 비공개 코드 줄이 들어 있다. 확인이 끝나면 팀장이 지운다.
 - 토큰·키는 파일·로그·확인표에 쓰지 않는다. 읽은 뒤 이 프로세스의 환경에서 지운다.
@@ -36,7 +36,8 @@ from app.collection.identifiers import GitHubAccount, RepositoryCoordinates
 from app.collection.selection import SelectedRange
 from app.collection.transport import HttpsTransport
 from app.generation import GenerationProvider, run_generation
-from app.generation.judged import CatchTrace, Checked
+from app.generation.judged import CatchTrace
+from app.generation.response import WrittenItem
 from app.judgement.provider import JudgementProvider
 from app.processing import collection_file
 from app.processing.request_check import CheckedRequest
@@ -153,16 +154,15 @@ def collect_live(
 
 
 def _written(
-    items: Sequence[Checked], judged: Callable[[str], object]
+    items: Sequence[WrittenItem], judged: Callable[[str], object]
 ) -> list[dict[str, object]]:
-    """AI가 쓴 글마다 기계 대조 결과와 판정 값(고르기 확률·참일 확률, 묻지 않았으면 None)."""
+    """AI가 쓴 글마다 판정 값(고르기 확률·참일 확률, 묻지 않았으면 None)."""
     return [
         {
-            "id": each.item.id,
-            "text": each.item.text,
-            "lines": [line.id for line in each.item.lines],
-            "passedFactcheck": each.passed,
-            "judged": judged(each.item.id),
+            "id": each.id,
+            "text": each.text,
+            "lines": [line.id for line in each.lines],
+            "judged": judged(each.id),
         }
         for each in items
     ]
@@ -214,7 +214,7 @@ def sheet_entry(trace: CatchTrace) -> dict[str, object]:
         "marks": {
             "title": None,
             "chosenAiTitle": None,
-            "sentences": {each.item.id: None for each in trace.sentences},
+            "sentences": {each.id: None for each in trace.sentences},
             "descriptionClear": None,
             "firstSentenceCodeDetail": None,
             "questionsWholeWork": None,

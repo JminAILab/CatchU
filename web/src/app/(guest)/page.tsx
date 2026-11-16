@@ -4,8 +4,8 @@ import { isWithdrawnNotice, WITHDRAWN_QUERY } from "@/features/withdrawal/withdr
 import { WithdrawnNotice } from "@/features/withdrawal/withdrawal-view";
 
 export const metadata: Metadata = {
-  title: "CatchU — GitHub 기록을 경험의 근거로",
-  description: "GitHub 작업 기록을 Catch로 정리하고, 확인한 Catch를 골라 공개하고 링크로 공유합니다.",
+  title: "CatchU — GitHub 작업을 Catch로 골라 면접관에게",
+  description: "GitHub 작업을 분석해 Catch를 만들고, 고른 Catch를 링크로 면접관에게 보냅니다.",
 };
 
 /**

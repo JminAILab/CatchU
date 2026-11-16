@@ -212,12 +212,12 @@ test('개발 로그인: 짧게 쥔 신원 잠금과 같은 신원의 동시 로�
 
 /** Google 로그인 시작 → 완료. 제공자 교환만 합성 대역이고 신원 잠금·회원·세션 저장은 실제 경로다. */
 async function googleAttempt() {
-  const started = await call('/v1/auth/google/authorization', { body: {} });
+  const started = await call('/v1/auth/google/authorization', { body: {}, origin: WEB });
   assert.equal(started.status, 200, JSON.stringify(started.body));
   return { state: new URL(started.body.authorizationUrl).searchParams.get('state'),
     loginAttemptToken: started.body.loginAttemptToken, code: 'synthetic-code' };
 }
-const googleLogin = input => call('/v1/auth/google/login', { body: input });
+const googleLogin = input => call('/v1/auth/google/login', { body: input, origin: WEB });
 function stubGoogle(t, subject) {
   const service = app.get(GoogleLoginService);
   const original = service.provider;

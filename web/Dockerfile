@@ -35,6 +35,8 @@ ENV NODE_ENV=production \
 WORKDIR /app/web
 COPY --from=build /app/web/.next/standalone ./
 COPY --from=build /app/web/.next/static ./.next/static
+# standalone 출력은 public 폴더를 담지 않는다. 소개 화면 로고·글꼴(public/landing)이 빠지면 404가 되므로 따로 싣는다(#560).
+COPY web/public ./public
 # 파일은 root 소유(읽기 전용)로 두고 숫자 UID로 실행한다(Kubernetes runAsNonRoot 확인용).
 USER 1000:1000
 EXPOSE 3000
