@@ -43,5 +43,13 @@
     "scope": "bugfix",
     "status": "complete",
     "request": "0ea67250"
+  },
+  {
+    "uuid": "01a1e1c4-f972-7486-850c-a7700c8a2703",
+    "slug": "recipient-qa-fix",
+    "dirName": "261116-recipient-qa-fix",
+    "scope": "bugfix",
+    "status": "in-flight",
+    "request": "614fdd47"
   }
 ]
