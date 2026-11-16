@@ -39,7 +39,7 @@ PostgreSQL·api·worker·web을 한 컴퓨터에서 켜는 순서, 정상 확인
 |---|---|---|
 | [`web/`](web) | 사용자 화면 | Next.js |
 | [`api/`](api) | API 서버 | NestJS |
-| [`worker/`](worker) | 분석 워커 — GitHub 기록 수집과 Catch 초안 만들기 | FastAPI |
+| [`worker/`](worker) | 분석 워커 — GitHub 기록 수집과 Catch 초안 만들기 | Python 큐 소비자(상태 확인만 FastAPI) |
 | [`docs/`](docs) | 문서 정본 | — |
 | [`docs/ai-dlc-input/`](docs/ai-dlc-input) | AI-DLC 시작 시점(2026-09-09) 입력 문서 스냅샷 | — |
 | [`docs/ai-dlc-input-mvp/`](docs/ai-dlc-input-mvp) | 두 번째 intent(10월 MVP) 입력 — 팀장 결정·제안 (2026-09-13) | — |
@@ -55,7 +55,7 @@ PostgreSQL·api·worker·web을 한 컴퓨터에서 켜는 순서, 정상 확인
 
 ## 기술 구성과 배포
 
-web은 Next.js, api는 NestJS, worker는 FastAPI(Python)다(2026-09-13 확정). 배포 대상은 AWS다(2026-10-06 NCP에서 변경, 레포 컨벤션 §1 결정 이력 참조). 지금은 개발 서버(EC2)에 올리고, 12월 최종 환경인 EKS는 예정이다.
+web은 Next.js, api는 NestJS, worker는 FastAPI(Python)로 정했다(2026-09-13 확정). 실제 쓰임은 이렇다. web은 화면만 그리고 브라우저가 api를 직접 부른다(Next.js의 서버 쪽 기능은 쓰지 않는다). worker는 큐에서 분석 요청을 꺼내 처리하는 Python 프로그램이고, FastAPI로는 상태 확인 경로 하나만 연다. api와 worker 사이의 큐는 BullMQ이고 큐 서버는 Redis와 통신 규약이 같은 Valkey다. 배포 대상은 AWS다(2026-10-06 NCP에서 변경, 레포 컨벤션 §1 결정 이력 참조). 지금은 개발 서버(EC2)에 올리고, 12월 최종 환경인 EKS는 예정이다.
 
 ## AI-DLC로 만든 방식
 
