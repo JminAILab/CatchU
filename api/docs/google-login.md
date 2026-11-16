@@ -26,7 +26,7 @@ Google 기준은 [서버 인증 코드 흐름](https://developers.google.com/ide
 
 ## API 연결안
 
-두 경로는 로그인 시작을 위해 메서드 단위로 인증 제외한다. 성공·오류에 기존 `Cache-Control: no-store`를 적용한다. 추가 본문·query 필드는 기존 공통 입력 오류로 거부한다.
+두 경로는 로그인 시작을 위해 메서드 단위로 인증 제외한다. 대신 두 경로 모두 요청의 `Origin`이 `AUTH_WEB_ORIGIN`과 정확히 같아야 한다(갱신·로그아웃과 같은 검사이며 입력 해석·시도 소비보다 먼저 한다, 2026-11-16 #496). 성공·오류에 기존 `Cache-Control: no-store`를 적용한다. 추가 본문·query 필드는 기존 공통 입력 오류로 거부한다.
 
 | 동작 | 요청 | 응답 |
 |---|---|---|
@@ -34,7 +34,7 @@ Google 기준은 [서버 인증 코드 흐름](https://developers.google.com/ide
 | 완료 | `POST /v1/auth/google/login`, `{state, loginAttemptToken, code}` | `{accessToken, tokenType, expiresIn: 900}` + `suggestedDisplayName: string 또는 null`, #250 Refresh 쿠키 |
 | Google 승인 취소 | 완료 경로에 `{state, loginAttemptToken, error: "access_denied"}` (code와 동시 지정 불가) | `{cancelled: true}`, 회원·토큰 생성 없음 |
 
-`authorizationUrl`에는 `openid profile`만 요청한다. 이메일을 회원 연결 기준으로 사용하지 않아 email scope는 요청하지 않는다. `loginAttemptToken`은 인증을 시작한 브라우저가 보관했다가 완료 요청에 보내는 별도 비밀 확인값이며 Google URL·콜백 query에 넣지 않는다. 시작 응답·콜백 URL·code·state·확인값·토큰은 로그나 대화에 공유하지 않는다.
+`authorizationUrl`에는 `openid profile`만 요청한다. 이메일을 회원 연결 기준으로 사용하지 않아 email scope는 요청하지 않는다. `loginAttemptToken`은 인증을 시작한 브라우저가 보관했다가 완료 요청에 보내는 별도 비밀 확인값이며 Google URL·콜백 query에 넣지 않는다. 이 값은 남이 시작한 콜백 주소를 다른 사람이 여는 경우를 막는다. 다른 사이트가 자기 state·확인값·code를 직접 보내는 경우는 막지 못하므로(api는 사전 요청 없이 보낼 수 있는 폼 본문도 해석한다) `Origin` 검사로 막는다. 시작 응답·콜백 URL·code·state·확인값·토큰은 로그나 대화에 공유하지 않는다.
 
 state의 보관 시간 600초는 **인증 요청의 시간 제한**이며 CatchU 로그인·세션 수명이 아니다. 서버 메모리에 최대 1,000건을 보관하며 만료된 항목은 회수한다. 입력 검증을 통과하고 시작자 확인값이 일치하는 요청은 교환 전에 소비하고 취소·교환 실패·DB 실패 뒤에도 재사용할 수 없다. API 재시작·다른 인스턴스·만료·성공 뒤 재전달은 새 인증을 시작해야 한다. 다중 인스턴스의 공유 보관소·시작 경로의 배포 단계 남용 제어는 후속 연결 검토 대상이다. 시작자 확인값은 state와 별도로 저장하며 비교 실패만으로 정상 요청을 소비하지 않는다.
 
@@ -42,6 +42,7 @@ state의 보관 시간 600초는 **인증 요청의 시간 제한**이며 CatchU
 |---|---|
 | 형식 오류·추가 필드·code와 취소 동시 지정·지원하지 않는 error | `400 VALIDATION_FAILED`, `details.violations` |
 | 없는·만료·소비한 state, 시작자 불일치, 잘못된 코드·서명·claim | `401 AUTH_INVALID` |
+| `Origin`이 없거나 web 출처와 다름 | `403 AUTH_ORIGIN_FORBIDDEN`. 쿠키를 쓰지 않고 시도를 소비하지 않는다 |
 | Google 로그인 비활성 | `404 RESOURCE_UNAVAILABLE` |
 | 외부 통신·공개키 조회·설정 문제·DB·커밋·서명 발급 실패 | `500 INTERNAL_ERROR` |
 
@@ -72,11 +73,12 @@ state의 보관 시간 600초는 **인증 요청의 시간 제한**이며 CatchU
 
 등록 완료 후 이 작업의 `api/.env`만 준비한다. `git ls-files -- .env`의 결과가 없어야 하고 `git check-ignore .env`가 무시됨을 확인해야 한다. 기존 설정이 있으면 값을 보존하고 필요한 Google 세 항목과 `GOOGLE_LOGIN_ENABLED=true`만 본인이 추가한다. `NODE_ENV=development`, 기존 인증 키·수명·DB 설정도 유지한다. 설정 전체나 비밀값을 출력하지 않는다. 로컬 설정은 소스·자동 검사와 별도로 관리하며 Git에 포함하지 않는다.
 
-README대로 DB 마이그레이션을 적용하고 API를 실행한다. 다른 작업 서버·포트를 재사용하거나 종료하지 않는다. 아래는 **사용자가 자신의 로컬 터미널에서 수행하는 절차**이며 이번 자동 검사의 수행 기록이 아니다. Google에 등록한 콜백과 설정의 주소가 같아야 한다. API 주소는 본인이 실행한 포트로 맞춘다.
+README대로 DB 마이그레이션을 적용하고 API를 실행한다. 다른 작업 서버·포트를 재사용하거나 종료하지 않는다. 아래는 **사용자가 자신의 로컬 터미널에서 수행하는 절차**이며 이번 자동 검사의 수행 기록이 아니다. Google에 등록한 콜백과 설정의 주소가 같아야 한다. API 주소는 본인이 실행한 포트로 맞추고, `$webOrigin`은 실행한 api의 `AUTH_WEB_ORIGIN`과 같게 둔다(브라우저 밖에서 부르므로 `Origin`을 직접 붙인다).
 
 ```powershell
 $apiBase = 'http://127.0.0.1:3001'
-$started = Invoke-RestMethod -Method Post -Uri "$apiBase/v1/auth/google/authorization" -ContentType 'application/json' -Body '{}'
+$webOrigin = 'http://localhost:3000'
+$started = Invoke-RestMethod -Method Post -Uri "$apiBase/v1/auth/google/authorization" -Headers @{ Origin = $webOrigin } -ContentType 'application/json' -Body '{}'
 # 시작 응답을 출력하지 않고 본인 브라우저에서 승인한다.
 Start-Process $started.authorizationUrl
 # 브라우저 콜백 주소 전체는 로컬에서만 복사하고, 아래 입력도 화면에 표시하지 않는다.
@@ -92,7 +94,7 @@ try {
     }
     $completion.error = 'access_denied'
   } else { $completion.code = $callbackQuery['code'] }
-  $login = Invoke-RestMethod -Method Post -Uri "$apiBase/v1/auth/google/login" -ContentType 'application/json' -Body ($completion | ConvertTo-Json -Compress)
+  $login = Invoke-RestMethod -Method Post -Uri "$apiBase/v1/auth/google/login" -Headers @{ Origin = $webOrigin } -ContentType 'application/json' -Body ($completion | ConvertTo-Json -Compress)
   if ($login.cancelled) { [pscustomobject]@{ Cancelled = $true } }
   else {
     $me = Invoke-RestMethod -Uri "$apiBase/v1/me" -Headers @{ Authorization = "Bearer $($login.accessToken)" }
@@ -108,13 +110,13 @@ finally { $completion = $null; $callbackQuery = $null; $localAddress = $null; $c
 ### 구현 파일·자동 검사
 
 - `src/google-login/google.config.ts`: 활성화·필수 설정·콜백 주소 검사.
-- `google-input.ts`, `google-login.controller.ts`: 공개 시작·완료 입력과 기존 오류/앱 설정 재사용.
+- `google-input.ts`, `google-login.controller.ts`: 공개 시작·완료의 출처 검사·입력과 기존 오류/앱 설정 재사용.
 - `login-attempts.ts`: 일회용 요청·시작자 확인·PKCE·만료·보관 상한.
 - `google-provider.ts`: 고정 외부 교환·공개키 검증과 안전한 오류 분류.
 - `google-login.service.ts`: 검증된 Google 주체의 회원·프로필 조회/생성과 기존 Access JWT 발급.
 - `google-login.module.ts`: 설정·제공자 의존성 연결. `AuthModule`의 기존 발급기를 공유한다.
 - `test/google-login.test.cjs`: 합성 서명된 Google ID token으로 설정·claim·요청·외부 오류 검사. 고정 시각에서 iat +1초·+5초 허용, +6초·+300초 거부와 만료 시각의 엄격한 거부를 확인한다. +300초 사례는 exp를 iat 이후로 설정해 미래 발급 시각 검사를 분리한다.
-- `test/db/google-login-api.test.cjs`: 실제 로컬 API·전용 PostgreSQL에서 중복·경쟁·실패·최종 커밋 롤백·프로필 보존·비밀 비노출 검사. 외부 Google HTTP와 공개키만 대역이며 실제 Google 연결 완료로 세지 않는다.
+- `test/db/google-login-api.test.cjs`: 실제 로컬 API·전용 PostgreSQL에서 중복·경쟁·실패·최종 커밋 롤백·프로필 보존·비밀 비노출과 다른 출처 요청(폼 본문 포함) 거부 검사. 외부 Google HTTP와 공개키만 대역이며 실제 Google 연결 완료로 세지 않는다.
 
 API 폴더에서 `npm run lint`, `npm run typecheck`, `npm run build` 후 README대로 전용 `TEST_DB_*`를 지정해 `npm test -- test/google-login.test.cjs test/db/google-login-api.test.cjs`, 전체는 `npm test`를 실행한다. 기존 DB를 초기화하지 않는다. 자동 검사와 실제 Google 재현은 별도 근거이며, 관련 검사는 전체 검사의 일부이므로 건수를 합산하지 않는다.
 
