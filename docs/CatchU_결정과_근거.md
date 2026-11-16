@@ -54,7 +54,7 @@
 ## 3. 구조와 자료 흐름
 
 ```mermaid
-flowchart LR
+flowchart TB
   B["브라우저 web Next.js"]
   CD["Claude 웹 Desktop"]
   subgraph API["api NestJS"]
