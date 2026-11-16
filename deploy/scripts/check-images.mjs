@@ -11,7 +11,7 @@
 // 못하면 정리 실패로 기록하고 종료 코드 1로 끝낸다.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -24,9 +24,16 @@ const PROJECT = `catchu-check-${randomBytes(3).toString("hex")}`;
 const PORTS = { web: 23000, api: 23001, worker: 28000 };
 // web 첫 화면(서비스 소개)이 그려졌는지 보는 표식. web/scripts/smoke.mjs의 LANDING_MARKER와 함께 고친다.
 const WEB_LANDING_MARKER = 'id="landing-title"';
+// web/public의 파일 목록. Next standalone 출력은 public을 담지 않아 Dockerfile이 따로 싣는다. 소개 화면 로고·글꼴이 여기 있어,
+// 빠지면 첫 화면은 200이어도 로고와 글꼴이 404가 된다(#560). 이미지 안 목록과 실행 중인 web의 응답을 이 목록과 맞춰 본다.
+const WEB_PUBLIC_DIR = path.join(ROOT, "web/public");
+const WEB_PUBLIC_FILES = readdirSync(WEB_PUBLIC_DIR, { recursive: true, withFileTypes: true })
+  .filter((entry) => entry.isFile())
+  .map((entry) => path.relative(WEB_PUBLIC_DIR, path.join(entry.parentPath, entry.name)).split(path.sep).join("/"))
+  .sort();
 // .dockerignore가 여는 경로(그 밖의 파일이 맥락에 있으면 실패). 둘을 함께 고친다.
 const CONTEXT_ALLOWED = [
-  "web/package.json", "web/package-lock.json", "web/.npmrc", "web/next.config.ts", "web/tsconfig.json", "web/src/",
+  "web/package.json", "web/package-lock.json", "web/.npmrc", "web/next.config.ts", "web/tsconfig.json", "web/src/", "web/public/",
   "web/scripts/check-image-build-env.mjs",
   "api/package.json", "api/package-lock.json", "api/tsconfig.json", "api/tsconfig.build.json", "api/scripts/clean-dist.cjs", "api/src/",
   "worker/.python-version", "worker/pyproject.toml", "worker/uv.lock", "worker/app/", "worker/fixtures/m1-synthetic/",
@@ -198,9 +205,12 @@ async function main() {
   // ---------- 3. 이미지 내용(망 없음) ----------
   const inImage = (img, script, options) => docker(["run", "--rm", "--network", "none", "--read-only", "--cap-drop", "ALL", "--entrypoint", "sh", img, "-c", script], options);
   await check("web", "실행 파일·환경 파일, 세 이미지의 앱 파일 쓰기 권한", () => {
-    const out = inImage(image.web, "test -f server.js && test -d .next/static && test ! -e public && find / -xdev -name '.env*' 2>/dev/null | wc -l");
+    const out = inImage(image.web, "test -f server.js && test -d .next/static && find / -xdev -name '.env*' 2>/dev/null | wc -l");
     const envCount = Number(out.stdout.trim());
     expect(out.code === 0 && envCount === 0, `code=${out.code} env=${envCount}`);
+    const publicInImage = inImage(image.web, "cd public && find . -type f").stdout.trim().split("\n").filter(Boolean).map((file) => file.slice(2)).sort();
+    expect(WEB_PUBLIC_FILES.length > 0 && publicInImage.join("\n") === WEB_PUBLIC_FILES.join("\n"),
+      `public 파일 목록이 저장소(web/public ${WEB_PUBLIC_FILES.length}개)와 다름: 이미지 ${publicInImage.length}개 ${publicInImage.slice(0, 5).join(", ")}`);
     // 읽기 전용 파일시스템에서는 쓰기 가능 여부를 가릴 수 없으므로 이 확인만 쓰기 가능한 상태로 실행한다.
     for (const img of [image.web, image.api, image.worker]) {
       const probe = docker(["run", "--rm", "--network", "none", "--cap-drop", "ALL", "--entrypoint", "sh", img, "-c", "find /app /opt /usr/local -xdev -writable ! -type l 2>/dev/null | wc -l; find /app $(test -d /opt/uv-python && echo /opt/uv-python) ! -user 0 2>/dev/null | wc -l"]);
@@ -352,7 +362,21 @@ console.log(JSON.stringify({r,e,empty:v.result({})}))});`;
       const assetRes = await fetch(`http://127.0.0.1:${PORTS.web}${asset}`);
       expect(assetRes.status === 200 && (assetRes.headers.get("content-type") ?? "").includes(type), `${asset} ${assetRes.status}`);
     }
-    return `CSP connect-src에 ${apiBase}, JS·CSS 200`;
+    // public 파일(소개 화면 로고·글꼴)이 같은 주소에서 저장소와 같은 크기로 열리는지 본다(#560).
+    for (const file of WEB_PUBLIC_FILES) {
+      const fileRes = await fetch(`http://127.0.0.1:${PORTS.web}/${encodeURI(file)}`);
+      const size = (await fileRes.arrayBuffer()).byteLength;
+      const expected = statSync(path.join(WEB_PUBLIC_DIR, file)).size;
+      expect(fileRes.status === 200 && size === expected, `/${file} status=${fileRes.status} ${size}B(저장소 ${expected}B)`);
+    }
+    // 탭 아이콘(src/app/favicon.ico·icon.png): 첫 화면 HTML이 가리키는 아이콘 주소가 모두 그림으로 열린다.
+    const icons = [...html.matchAll(/<link rel="icon" href="([^"]+)"/g)].map((match) => match[1]);
+    expect(icons.length > 0, "첫 화면 HTML에 탭 아이콘 링크 없음");
+    for (const icon of icons) {
+      const iconRes = await fetch(`http://127.0.0.1:${PORTS.web}${icon}`);
+      expect(iconRes.status === 200 && (iconRes.headers.get("content-type") ?? "").startsWith("image/"), `${icon} status=${iconRes.status} ${iconRes.headers.get("content-type")}`);
+    }
+    return `CSP connect-src에 ${apiBase}, JS·CSS 200, public 파일 ${WEB_PUBLIC_FILES.length}개·탭 아이콘 ${icons.length}개 200`;
   });
   await check("api", "health와 앱 계정의 TLS DB 조회", async () => {
     const health = await fetch(`http://127.0.0.1:${PORTS.api}/health`);

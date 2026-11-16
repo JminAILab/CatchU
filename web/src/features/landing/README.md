@@ -49,4 +49,5 @@
 ## 검사
 
 - `npm run check`의 `check:run`이 `/` 본문의 `id="landing-title"`로 이 화면이 그려졌는지 확인한다.
+- 운영 이미지는 `public` 폴더를 따로 싣는다(Next standalone 출력에는 들어가지 않는다). 이미지 검사(`deploy/scripts/check-images.mjs`)가 `web/public`의 파일이 이미지에 모두 있고 같은 주소로 열리는지 본다. 빠지면 화면은 200이어도 로고와 글꼴이 404가 된다(#560).
 - 문구·배치 변경은 낮은 창(높이 420px 안팎)과 320~1440px 폭에서 가로 넘침과 겹침, 키보드 Tab으로 [Google로 시작하기]에 닿고 Enter로 `/login`에 가는지 브라우저로 확인한다.
