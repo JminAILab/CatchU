@@ -9,14 +9,15 @@
 | 값 | 하는 일 |
 |---|---|
 | `dev-server` | 이미지 검사·ECR 올리기 뒤 개발 서버를 교체하고 바깥 확인을 한다(아래 「흐름」 전체) |
+| `eks` | 이미지 검사·ECR 올리기 뒤 EKS에서 교체한다([EKS 자동 배포](../../aws/cd/README.md)). AWS 역할도 environment `eks`의 것을 쓴다 |
 | `none` | 이미지 검사·ECR 올리기까지만 한다. 서버는 바꾸지 않는다. 전환하거나 손으로 교체하는 동안 둔다 |
 | 없음, 그 밖의 값 | 실행이 실패로 끝난다. 이미지도 올리지 않는다 |
 
 - 보기·바꾸기: `gh variable get DEPLOY_TARGET`, `gh variable set DEPLOY_TARGET --body none`. 저장소 Settings의 Actions 변수 화면에서도 된다.
 - 값이 없을 때 배포를 건너뛰고 성공으로 끝내지 않는 것은, 값을 넣기 전에 `main`에 반영되거나 값을 지웠을 때 배포가 빠진 것을 실행 기록에서 바로 알 수 있게 하려는 것이다. 값을 고친 뒤 Actions에서 `main`으로 수동 실행하면 그 판본이 배포된다.
 - 값은 실행마다 `plan`에서 한 번 읽는다. 이미 `plan`을 지난 실행은 바꾼 값을 따르지 않는다. 서버 교체를 멈추려고 `none`으로 바꿨으면 진행 중인 실행이 끝났는지 본다.
-- `none`에서 올린 이미지의 태그는 `dev-server`일 때와 같다(`main-<커밋 12자>`). EKS 교체 스크립트(`deploy/aws/scripts/deploy.sh`)가 이 태그를 찾는다.
-- `eks`는 아직 받지 않는다. `main` 병합이 EKS 교체까지 가는 단계는 #342의 다음 PR에서 더한다.
+- 앱 이미지의 태그는 세 값에서 같다(`main-<커밋 12자>`). EKS 교체 스크립트(`deploy/aws/scripts/deploy.sh`)가 이 태그를 찾는다. 배포 파일 묶음은 개발 서버만 쓰므로 `dev-server`에서만 올린다.
+- `none`은 environment `dev-server`의 역할로 이미지를 올린다. 개발 서버를 지운 뒤에도 `none`을 쓰려면 이 역할과 environment를 남긴다.
 
 ## 흐름
 
@@ -24,9 +25,9 @@
 
 | job | 하는 일 | AWS 권한 |
 |---|---|---|
-| `plan` | 배포할 커밋·배포 대상 확인, 이미 올린 판본인지 조회 | 있음(environment `dev-server`) |
+| `plan` | 배포할 커밋·배포 대상 확인, 이미 올린 판본인지 조회 | 있음(environment `dev-server`. 배포 대상이 `eks`면 `eks`) |
 | `check` | 배포할 커밋의 이미지 검사. 이미 올린 판본이면 건너뜀 | 없음. OIDC 토큰도 요청할 수 없는 별도 러너 |
-| `deploy` | 빌드·ECR 올리기. 배포 대상이 `dev-server`면 이어서 서버 교체, 바깥 확인 | 있음(environment `dev-server`) |
+| `deploy` | 빌드·ECR 올리기. 배포 대상이 `dev-server`면 이어서 서버 교체, 바깥 확인 | 있음(`plan`과 같은 environment) |
 
 이미지 검사는 배포할 커밋의 스크립트를 러너에서 그대로 실행한다. 그래서 AWS 권한을 받는 job과 러너를 나눴다. 권한이 있는 job은 배포할 커밋의 코드를 러너에서 실행하지 않는다. 이미지 빌드는 Docker 안에서만 돌아 러너의 권한에 닿지 않는다.
 
@@ -97,18 +98,18 @@ Actions 화면에서 `deploy-dev-server`를 `main`으로 Run workflow하고, 되
 
 ## 검사
 
-`ci-images.sh`(이미지 단계)나 `ci-target.sh`(배포 대상 정하기), 워크플로의 배포 대상 조건을 바꾸면 회귀 시험을 돌린다.
+`ci-images.sh`(이미지 단계)나 `ci-target.sh`(배포 대상 정하기), 워크플로의 배포 대상 조건을 바꾸면 회귀 시험을 돌린다. EKS 교체 단계의 시험은 [EKS 자동 배포 「검사」](../../aws/cd/README.md#검사)에 있다.
 
 ```bash
 bash deploy/dev-server/cd/ci-images.test.sh
 bash deploy/dev-server/cd/ci-target.test.sh
 ```
 
-- `ci-target.test.sh`는 `ci-target.sh`를 값마다 실행해 `dev-server`·`none`만 받고 없는 값·다른 값은 실패로 끝나는지 본다. 워크플로 파일에서는 이미지 올리기에 조건이 없고 서버 교체·바깥 확인만 `dev-server` 조건을 다는지 글자로 본다. 워크플로를 실제로 돌리지는 않는다.
+- `ci-target.test.sh`는 `ci-target.sh`를 값마다 실행해 `dev-server`·`eks`·`none`만 받고 없는 값·다른 값은 실패로 끝나는지 본다. 워크플로 파일에서는 이미지 올리기에 조건이 없는지, 서버 교체·바깥 확인은 `dev-server`, kubectl 받기·EKS 교체는 `eks` 조건을 다는지, environment가 배포 대상을 따르는지 글자로 본다. 워크플로를 실제로 돌리지는 않는다.
 - `ci-images.test.sh`는 aws·docker를 합성 응답으로 바꾸고, 합성 git 저장소에서 plan·push를 실제로 실행한다. 확인하는 것은 판본 조회, 이미 올린 태그 다시 쓰기와 새로 빌드해 올리기, manifest 판정, 묶음의 판본 나누기다.
   - manifest 판정: 실행 이미지는 받고, in-toto 증명 문서·층이 모자란 것·이미지 설정이 아닌 문서는 거부한다. 최소 층 수는 앱 2, 묶음 1이다.
 - 실제 ECR·SSM·서버·Docker에는 닿지 않는다. 그래서 OIDC 권한 받기, arm64 빌드, 실제 manifest 응답, 서버 교체는 확인하지 못한다. 이것들은 첫 실제 배포에서 확인한다.
-- GitHub Actions `images` 워크플로의 `cd-scripts` job이 두 명령을 그대로 쓴다. `main`으로 가는 배포 PR과 수동 실행에서 돈다. `deploy/`를 바꾼 dev PR은 병합 전에 그 브랜치로 수동 실행한다([배포 안내 「검사」](../../README.md#검사)).
+- GitHub Actions `images` 워크플로의 `cd-scripts` job이 이 두 명령과 EKS 교체 단계 시험을 그대로 쓴다. `main`으로 가는 배포 PR과 수동 실행에서 돈다. `deploy/`를 바꾼 dev PR은 병합 전에 그 브랜치로 수동 실행한다([배포 안내 「검사」](../../README.md#검사)).
 - 셸 정적 검사(`bash -n`·shellcheck)는 셸 안의 Python 코드를 검사하지 못한다. 그래서 이 시험이 판정 코드를 실제로 실행한다.
 
 ## 끄는 법과 수동 절차와의 관계
@@ -116,4 +117,4 @@ bash deploy/dev-server/cd/ci-target.test.sh
 - 서버 교체만 멈추기: 배포 대상을 `none`으로 둔다(위 「배포 대상」). 이미지는 계속 올라간다. `dev-server`로 되돌리면 그다음 `main` push부터 교체한다.
 - 전부 끄기: Actions 화면에서 `deploy-dev-server` 워크플로를 Disable한다(`gh workflow disable deploy-dev-server`). 이미지도 올라가지 않는다. 다시 켜면 그다음 `main` push부터 돈다.
 - 수동 절차(개발 서버 README 「순서」)는 그대로 쓸 수 있다. 다만 수동 교체는 서버 잠금을 잡지 않으므로, 손으로 교체하는 동안은 배포 대상을 `none`으로 둔다. 손으로 다른 판본을 올렸다면 서버는 `main`과 다른 상태이니, 다음 자동 배포가 그 위를 덮는다.
-- EKS로 옮긴 뒤의 자동 배포는 [#342](https://github.com/JminAILab/CatchU/issues/342)에서 한다. 전환 날의 순서는 [전환 절차](../../aws/cutover.md)에 있다.
+- EKS로 옮긴 뒤의 자동 배포는 [EKS 자동 배포](../../aws/cd/README.md)에 있다. 전환 날의 순서는 [전환 절차](../../aws/cutover.md)를 따른다.

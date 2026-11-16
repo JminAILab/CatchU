@@ -141,9 +141,9 @@ seed() {
     python3 -I -c 'import hashlib, sys; print("sha256:" + hashlib.sha256(sys.argv[1].encode()).hexdigest())' "seed-$r" > "$S/ecr/$r/$t"
   done
 }
-run_sut() { # 단계(plan|push). 합성 응답을 바꿀 값(STUB_*)은 호출 앞에 붙인다.
+run_sut() { # 단계(plan|push). 합성 응답을 바꿀 값(STUB_*)과 배포 대상(DEPLOY_TARGET, 기본 dev-server)은 호출 앞에 붙인다.
   (cd "$REPO" && env PATH="$BIN:$PATH" STUB_STATE="$S" TAG="$TAG" TOOLS_COMMIT="$TOOLS" COMMIT="$TARGET" SRC_DIR="$SRC" \
-    DEV_SERVER_DOMAIN=catchu.dev AWS_REGION=ap-northeast-2 GITHUB_OUTPUT="$S/output" GITHUB_STEP_SUMMARY="$S/summary" \
+    DEV_SERVER_DOMAIN=catchu.dev DEPLOY_TARGET="${DEPLOY_TARGET-dev-server}" AWS_REGION=ap-northeast-2 GITHUB_OUTPUT="$S/output" GITHUB_STEP_SUMMARY="$S/summary" \
     bash "$SUT" "$1") > "$OUT" 2>&1
   echo $?
 }
@@ -228,6 +228,24 @@ reset_state; rc=$(STUB_WEB_LABEL=http://127.0.0.1:3001 run_sut push)
 check "push 새로: web 공개 주소가 다르면 올리지 않고 멈춤(4)" "$(ok test "$rc" = 4 -a "$(grep -c '^docker push' "$S/calls")" = 0)"
 reset_state; seed; touch "$SRC/untracked-file"; rc=$(run_sut push); rm -f "$SRC/untracked-file"
 check "push: 소스 작업 폴더에 바뀐 파일이 있으면 멈춤(2)" "$(ok test "$rc" = 2)"
+
+# ---------- 배포 대상이 dev-server가 아니면 묶음을 다루지 않음(#342) ----------
+APPS="catchu-web catchu-api catchu-api-migration catchu-worker"
+files_untouched() { ! grep -q 'catchu-deploy-files' "$S/calls" && ! grep -q '^files=' "$S/output"; }
+for target in eks none; do
+  # shellcheck disable=SC2086 # 저장소 이름 목록을 낱말로 나눈다
+  reset_state; seed $APPS; rc=$(DEPLOY_TARGET=$target run_sut plan)
+  check "plan(${target}): 앱 태그 네 개가 있으면 빌드하지 않고 묶음은 조회하지 않음" "$( [ "$rc" = 0 ] && [ "$(cat "$S/output")" = "$(printf 'build_apps=false\nbuild=false')" ] && files_untouched; echo $?)"
+  reset_state; rc=$(DEPLOY_TARGET=$target run_sut push)
+  check "push(${target}): 앱 이미지 네 개만 빌드·올리기" "$(ok test "$rc" = 0 -a "$(wc -l < "$S/built" | tr -d ' ')" = 4 -a "$(grep -c '^docker push' "$S/calls")" = 4)"
+  all=0
+  for r in $APPS; do output_has "$(key_of "$r")=$(digest_of "$r" "$TAG")" || all=1; done
+  check "push(${target}): 앱 digest 네 개를 출력하고 묶음에는 닿지 않음" "$( [ "$all" = 0 ] && files_untouched; echo $?)"
+done
+reset_state; rc=$(DEPLOY_TARGET='' run_sut plan)
+check "배포 대상이 없으면 조회 전에 멈춤(2)" "$(ok test "$rc" = 2 -a ! -s "$S/calls")"
+reset_state; rc=$(DEPLOY_TARGET=prod run_sut push)
+check "모르는 배포 대상이면 조회 전에 멈춤(2)" "$(ok test "$rc" = 2 -a ! -s "$S/calls")"
 
 echo "합계 통과 ${pass} / 실패 ${fail}"
 [ "$fail" = 0 ]
