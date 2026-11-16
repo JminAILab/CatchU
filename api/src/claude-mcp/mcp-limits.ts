@@ -21,5 +21,12 @@ export const MCP_RATE_COMMAND_TIMEOUT_MS = 1_000;
 
 /** 승인 코드 수명(밀리초, BR4.1). */
 export const MCP_CODE_TTL_MS = 5 * 60 * 1000;
+/**
+ * 승인 요청이 받는 code_challenge의 꼴(RFC 7636 4.2절: 43~128자, 영문·숫자·`-._~`). S256 값은 43자다(#575).
+ * SDK의 /authorize는 길이를 보지 않으므로 코드 행에 저장하기 전에 여기서 묶는다.
+ */
+export const MCP_CODE_CHALLENGE_PATTERN = /^[A-Za-z0-9\-._~]{43,128}$/;
+/** 승인 요청이 받는 resource 길이 상한(String.length, #575). 정상 값은 MCP 주소 하나다. */
+export const MCP_RESOURCE_MAX_LENGTH = 2_048;
 /** 클라이언트 이름 길이 상한(BR2.3). */
 export const MCP_CLIENT_NAME_MAX_LENGTH = 200;

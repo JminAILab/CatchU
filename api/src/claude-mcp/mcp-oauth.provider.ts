@@ -27,11 +27,14 @@ const REDIRECT_REJECTED = 'redirect_uris must match the allowed list exactly';
 const CLIENT_NAME_REJECTED = 'client_name is too long or contains a NUL character';
 const RESOURCE_REJECTED = 'resource must be this MCP server';
 
+/** 그 회원의 만료된 승인 코드 삭제. 토큰 교환(BR4.4)과 코드 발급(#575)이 같은 조건으로 쓴다. */
+export const DELETE_EXPIRED_CODES = 'DELETE FROM mcp_authorization_code WHERE member_id = $1 AND expires_at < $2';
+
 /** 토큰 교환 때 그 회원의 만료된 행을 함께 지운다. 타이머를 두지 않고 다른 회원의 행은 건드리지 않는다(BR4.4). */
 const DELETE_EXPIRED_ROWS = [
   'DELETE FROM mcp_access_token WHERE member_id = $1 AND expires_at < $2',
   'DELETE FROM mcp_connection WHERE member_id = $1 AND expires_at < $2',
-  'DELETE FROM mcp_authorization_code WHERE member_id = $1 AND expires_at < $2',
+  DELETE_EXPIRED_CODES,
 ] as const;
 
 /** 코드·토큰 원문의 SHA-256. 표에는 이 값만 저장한다(NFR1.4). */
