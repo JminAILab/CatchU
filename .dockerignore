@@ -8,6 +8,7 @@
 !web/next.config.ts
 !web/tsconfig.json
 !web/src/
+!web/public/
 !web/scripts/check-image-build-env.mjs
 !api/package.json
 !api/package-lock.json
