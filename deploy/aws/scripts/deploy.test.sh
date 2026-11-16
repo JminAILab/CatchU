@@ -494,6 +494,10 @@ check "worker: 운영 모드, DB 값 없음, 클러스터 안 api 주소, 종료
   "$(ok q "$WORK/applied-worker.yaml" '.[0].spec.template.spec | .terminationGracePeriodSeconds >= 30 and .containers[0].livenessProbe == null
       and (.containers[0].env | map({(.name): (.value // "ref")}) | add | .NODE_ENV == "production"
       and .WORKER_CONTEXT_API_URL == "http://api.catchu.svc.cluster.local:3001" and (keys | map(select(startswith("DB_"))) | length) == 0)')"
+check "worker: 판정은 OpenAI로 켬(공급자 openai, 판정 키는 Secret catchu-worker에서)" \
+  "$(ok q "$WORK/applied-worker.yaml" '.[0].spec.template.spec.containers[0].env | map({(.name): .}) | add
+      | .CATCHU_JUDGEMENT_PROVIDER.value == "openai"
+      and .CATCHU_JUDGEMENT_API_KEY.valueFrom.secretKeyRef == {name: "catchu-worker", key: "CATCHU_JUDGEMENT_API_KEY"}')"
 check "migration Pod: controller 없음·다시 띄우지 않음·시간 한도, migration 계정" \
   "$(ok q "$WORK/created.yaml" '.[0] | .kind == "Pod" and .metadata.ownerReferences == null and .spec.restartPolicy == "Never"
       and .spec.activeDeadlineSeconds > 0 and .metadata.labels["app.kubernetes.io/name"] == "migration"
@@ -524,9 +528,10 @@ check "NetworkPolicy: 기본 차단(들어오고 나감)과 DNS, worker·web은 
       and ($p.web.spec.policyTypes == ["Ingress"])
       and ([$p.migration.spec.egress[].ports[].port] | unique) == [5432]
       and all(.[]; .metadata.namespace == "catchu")')"
-check "NetworkPolicy: worker 바깥 443은 GitHub API 대역 24개와 Anthropic 대역만" \
+check "NetworkPolicy: worker 바깥 443은 GitHub API 대역 24개·Anthropic 대역·Cloudflare 대역 15개만(OpenAI 판정 주소가 Cloudflare 주소)" \
   "$(ok q "$K8S/network-policy.yaml" '[.[] | select(.metadata.name == "worker") | .spec.egress[] | select(.ports[0].port == 443) | .to[].ipBlock.cidr]
-      | length == 25 and index("160.79.104.0/23") != null and all(.[]; test("^[0-9.]+/[0-9]+$") and . != "0.0.0.0/0")')"
+      | length == 40 and (unique | length) == 40 and index("160.79.104.0/23") != null
+      and index("162.158.0.0/15") != null and index("172.64.0.0/13") != null and all(.[]; test("^[0-9.]+/[0-9]+$") and . != "0.0.0.0/0")')"
 check "Ingress: /v1/internal 404, /v1·MCP OAuth 주소 5개는 api 3001, 그 밖은 web 3000, 공개 ALB·TLS 1.2·1.3 정책·WAF 이름·HSTS 300초" \
   "$(ok q "$K8S/ingress.yaml" '.[0] | (.spec.rules[0].http.paths | map([.path, .pathType, .backend.service.name])) == [
         ["/v1/internal", "Prefix", "internal-not-found"], ["/v1", "Prefix", "api"],

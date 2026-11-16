@@ -28,7 +28,8 @@ catchu-api GOOGLE_CLIENT_SECRET /catchu/prod/api/GOOGLE_CLIENT_SECRET
 catchu-migration DB_PASSWORD /catchu/prod/db/catchu_migrator-password
 catchu-worker CATCHU_QUEUE_REDIS_URL /catchu/prod/queue/auth-token
 catchu-worker WORKER_CONTEXT_API_KEY /catchu/prod/worker/WORKER_CONTEXT_API_KEY
-catchu-worker CATCHU_GENERATION_API_KEY /catchu/prod/worker/CATCHU_GENERATION_API_KEY'
+catchu-worker CATCHU_GENERATION_API_KEY /catchu/prod/worker/CATCHU_GENERATION_API_KEY
+catchu-worker CATCHU_JUDGEMENT_API_KEY /catchu/prod/worker/CATCHU_JUDGEMENT_API_KEY'
 
 # SSM 응답 → 적용할 List. 값 형식(앱이 기동 때 거부하는 형식)과 서로 달라야 하는 값을 여기서 본다. 형식은 값 전체에 맞춘다
 # (jq의 $는 마지막 줄바꿈 앞에서도 맞으므로 \A·\z로 감싼다). 멈출 때는 "확인 실패:"로 시작하는 문구만 낸다(값은 넣지 않는다).
@@ -38,6 +39,7 @@ def fail($msg): error("확인 실패: " + $msg);
 def rule($key):
   {AUTH_JWT_SECRET: "[0-9a-fA-F]{64}", LINK_GRANT_SECRET: "[0-9a-fA-F]{64}", WORKER_CONTEXT_API_KEY: "[0-9a-fA-F]{64}",
    DB_PASSWORD: "[!-~]{16,}", CATCHU_QUEUE_REDIS_URL: "[A-Za-z0-9]{16,128}", CATCHU_GENERATION_API_KEY: "[!-~]+", CATCHU_EMBEDDING_API_KEY: "[!-~]+",
+   CATCHU_JUDGEMENT_API_KEY: "[!-~]+",
    GOOGLE_CLIENT_ID: "[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com", GOOGLE_CLIENT_SECRET: "[!-~]+"}[$key]
   // fail("검사 규칙이 없는 키 " + $key);
 def labels: {"app.kubernetes.io/part-of": "catchu", "app.kubernetes.io/managed-by": "make-secrets"};

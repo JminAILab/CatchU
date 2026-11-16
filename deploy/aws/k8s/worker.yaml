@@ -68,6 +68,16 @@ spec:
                 secretKeyRef:
                   name: catchu-worker
                   key: CATCHU_GENERATION_API_KEY
+            # 판정(AI가 쓴 제목·설명 가운데 틀려 보이는 것을 거른다)은 OpenAI로 켠 채 띄운다(2026-11-13 팀장 결정).
+            # 공급자가 openai이고 판정 키가 있을 때만 켜진다. 키가 없으면 꺼진 채 뜨므로 Secret이 키를 반드시 갖게 한다
+            # (make-secrets.sh가 SSM에 없으면 멈춘다). 켜고 끄기는 worker/docs/generation-judgement.md 「켜고 끄기」.
+            - name: CATCHU_JUDGEMENT_PROVIDER
+              value: openai
+            - name: CATCHU_JUDGEMENT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: catchu-worker
+                  key: CATCHU_JUDGEMENT_API_KEY
           resources:
             requests:
               cpu: 250m

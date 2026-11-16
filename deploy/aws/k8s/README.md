@@ -9,7 +9,7 @@ EKS(#276)에서 web·api·worker를 띄우는 쿠버네티스 실행 파일과 �
 | 파일 | 적용 | 내용 |
 |---|---|---|
 | [`namespace.yaml`](namespace.yaml) | 손으로 | Pod 보안 검사 `restricted`(호스트 망·특권·root로 도는 Pod 거부), ALB 상태 확인을 통과해야 web·api Pod가 준비되는 연동, 기본 서비스 계정의 쿠버네티스 API 토큰 자동 탑재 끔 |
-| [`network-policy.yaml`](network-policy.yaml) | 손으로 | 기본은 모두 막고 필요한 것만 연다. web은 ALB에서 3000만 받는다. api는 ALB·worker에서 3001을 받고 DB·큐와 바깥 443으로 나간다. worker는 api 3001·큐·GitHub API·Anthropic API 대역으로만 나간다(DB 없음). migration은 DB로만 나간다. 모두 DNS는 연다 |
+| [`network-policy.yaml`](network-policy.yaml) | 손으로 | 기본은 모두 막고 필요한 것만 연다. web은 ALB에서 3000만 받는다. api는 ALB·worker에서 3001을 받고 DB·큐와 바깥 443으로 나간다. worker는 api 3001·큐·GitHub API·Anthropic API·Cloudflare 대역(OpenAI 판정)으로만 나간다(DB 없음). migration은 DB로만 나간다. 모두 DNS는 연다 |
 | [`services.yaml`](services.yaml) | 손으로 | web·api의 클러스터 안 주소. 바깥으로 여는 Service는 두지 않는다 |
 | [`ingress.yaml`](ingress.yaml) | 손으로 | 공개 ALB. 80은 443으로 이동(301), TLS 1.2·1.3만, `/v1/internal`은 404, `/v1`과 Claude MCP OAuth 주소(`/authorize`·`/token`·`/register`·`/.well-known/oauth-*` 둘, 개발 서버 Caddy와 같은 목록)는 api, 그 밖은 web, HSTS 300초, 유휴 60초, 삭제 보호, WAF `catchu-edge` |
 | [`api.yaml`](api.yaml)·[`worker.yaml`](worker.yaml)·[`web.yaml`](web.yaml) | `deploy.sh`만 | api·worker는 한 개씩 `Recreate`, web은 새 Pod를 먼저 띄우고 옛 Pod를 내린다. 모두 UID 1000·읽기 전용 루트·권한 전부 제거·`/tmp` 크기 상한, 자원 요청과 메모리 상한(worker는 실제 분석을 재기 전의 임시값) |
@@ -30,20 +30,21 @@ Deployment 파일은 이미지·실행 수·커밋 자리를 비워 둔 틀이�
 | `catchu-db` | ConfigMap | `DB_HOST` ← RDS `catchu-db` 주소, `ca.pem` ← 저장소의 RDS 루트 인증서 | api·migration |
 | `catchu-api` | Secret | `AUTH_JWT_SECRET` ← `/catchu/prod/api/AUTH_JWT_SECRET`, `LINK_GRANT_SECRET` ← `/catchu/prod/api/LINK_GRANT_SECRET`, `DB_PASSWORD` ← `/catchu/prod/db/catchu_app-password`(앱 계정 `catchu_app`), `CATCHU_GENERATION_API_KEY` ← `/catchu/prod/api/CATCHU_GENERATION_API_KEY`(Claude API), `CATCHU_EMBEDDING_API_KEY` ← `/catchu/prod/api/CATCHU_EMBEDDING_API_KEY`(Voyage AI), `GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET` ← `/catchu/prod/api/GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`(Google 로그인, 개발 서버와 같은 클라이언트) | api |
 | `catchu-migration` | Secret | `DB_PASSWORD` ← `/catchu/prod/db/catchu_migrator-password`(migration 계정 `catchu_migrator`) | migration |
-| `catchu-worker` | Secret | `CATCHU_QUEUE_REDIS_URL` ← `rediss://:`큐 비밀번호(`/catchu/prod/queue/auth-token`)`@`큐 주 엔드포인트`:6379`, `WORKER_CONTEXT_API_KEY` ← `/catchu/prod/worker/WORKER_CONTEXT_API_KEY`, `CATCHU_GENERATION_API_KEY` ← `/catchu/prod/worker/CATCHU_GENERATION_API_KEY` | worker |
+| `catchu-worker` | Secret | `CATCHU_QUEUE_REDIS_URL` ← `rediss://:`큐 비밀번호(`/catchu/prod/queue/auth-token`)`@`큐 주 엔드포인트`:6379`, `WORKER_CONTEXT_API_KEY` ← `/catchu/prod/worker/WORKER_CONTEXT_API_KEY`, `CATCHU_GENERATION_API_KEY` ← `/catchu/prod/worker/CATCHU_GENERATION_API_KEY`(Claude API), `CATCHU_JUDGEMENT_API_KEY` ← `/catchu/prod/worker/CATCHU_JUDGEMENT_API_KEY`(OpenAI 판정) | worker |
 
 api의 AI 키 둘(11월 생성·임베딩, #389)은 켜고 끄는 기능이 아니라 11월 기능이 늘 쓰는 값이라 미리 넣는다. SSM에는 2026-10-27에 넣었다. 꺼 둔 기능(GitHub 연결·worker 요청 정보 조회·api 큐 연결)은 켤 때 그 값을 api 실행 파일과 Secret에 더하는 PR을 낸다([../README.md](../README.md) 5단계). GitHub 연결은 EFS 보관 폴더도 함께 붙인다. Google 로그인은 개발 서버에서 켜 둔 것을 전환 뒤에도 이어 가려고 처음부터 켠다(2026-11-10 팀장 결정). 돌아올 주소는 `https://catchu.dev/google/callback`으로 Google OAuth 클라이언트에 등록한 개발 서버 값과 같고, 클라이언트 ID·비밀값은 개발 서버가 쓰는 SSM 값이다. 파일 저장은 개발 서버와 같은 `FILE_STORAGE_DRIVER=local`·`FILE_STORAGE_LOCAL_ROOT=/tmp`로 둔다([#416 결정](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6593877292)). 값이 없으면 api는 뜨지만 탈퇴와 발행본 삭제가 500으로 끝난다. 지금 판본은 회원 파일을 만들지 않아 Pod를 다시 띄워 `/tmp`가 비어도 잃는 것이 없다. PDF 자료(U8)가 S3 드라이버를 넣으면 `s3`로 바꾼다(#389).
 
-**SSM에 없는 두 값.** `/catchu/prod/worker/` 두 값은 아직 SSM에 없다(2026-10-19 확인. 있는 것은 서명 키 둘·DB 계정 둘·큐 하나). 운영 모드 worker는 둘 다 없으면 뜨지 않으므로 2단계 전에 넣는다. [`put-parameter.sh`](../scripts/put-parameter.sh)는 이미 있는 이름이면 멈추고, 값을 화면·명령 인자·셸 기록에 남기지 않는다.
+**SSM에 없는 세 값.** `/catchu/prod/worker/` 세 값은 아직 SSM에 없다(조회·생성 키는 2026-10-19 확인, 판정 키는 2026-11-16에 더한 이름. 있는 것은 서명 키 둘·DB 계정 둘·큐 하나). 운영 모드 worker는 조회·생성 키가 없으면 뜨지 않고, 판정 키가 없으면 판정이 꺼진 채 떠서 서비스 화면의 제목·설명이 달라진다(2026-11-13 팀장 결정: 배포 환경은 OpenAI 판정을 켠 채 만든다). 그래서 `make-secrets.sh`는 셋 가운데 하나라도 없으면 멈춘다. 2단계 전에 넣는다. [`put-parameter.sh`](../scripts/put-parameter.sh)는 이미 있는 이름이면 멈추고, 값을 화면·명령 인자·셸 기록에 남기지 않는다.
 
 ```bash
 bash deploy/aws/scripts/put-parameter.sh --random /catchu/prod/worker/WORKER_CONTEXT_API_KEY
 bash deploy/aws/scripts/put-parameter.sh --stdin /catchu/prod/worker/CATCHU_GENERATION_API_KEY   # 생성 제공자(Claude API) 콘솔에서 발급한 키를 붙여 넣는다. 화면에 찍히지 않는다
+bash deploy/aws/scripts/put-parameter.sh --stdin /catchu/prod/worker/CATCHU_JUDGEMENT_API_KEY   # OpenAI 개발자 화면에서 발급한 판정 키. 같은 방식이다
 ```
 
 **만들기.** `bash deploy/aws/scripts/make-secrets.sh`(순서는 아래 「적용(2단계)」).
 
-- 시작 전에 계정·클러스터, namespace `catchu`, RDS(available, CA `rds-ca-rsa2048-g1`), 큐(available, TLS와 비밀번호 켬), SSM 이름 열한 개가 모두 SecureString인지 본다. 값도 앱이 시작할 때 거부하는 형식인지(서명 키·조회 키는 64자리 hex, 큐 비밀번호는 주소에 그대로 넣을 수 있는 영문·숫자, Google 클라이언트 ID는 `….apps.googleusercontent.com`. 형식은 값 전체에 맞추므로 끝에 줄바꿈이 붙어도 멈춘다), 서로 달라야 하는 값(서명 키 둘과 조회 키, 두 계정 비밀번호)이 다른지 본다. 하나라도 어긋나면 아무것도 바꾸지 않고 멈춘다(종료 코드 1).
+- 시작 전에 계정·클러스터, namespace `catchu`, RDS(available, CA `rds-ca-rsa2048-g1`), 큐(available, TLS와 비밀번호 켬), SSM 이름 열두 개가 모두 SecureString인지 본다. 값도 앱이 시작할 때 거부하는 형식인지(서명 키·조회 키는 64자리 hex, 큐 비밀번호는 주소에 그대로 넣을 수 있는 영문·숫자, Google 클라이언트 ID는 `….apps.googleusercontent.com`. 형식은 값 전체에 맞추므로 끝에 줄바꿈이 붙어도 멈춘다), 서로 달라야 하는 값(서명 키 둘과 조회 키, 두 계정 비밀번호)이 다른지 본다. 하나라도 어긋나면 아무것도 바꾸지 않고 멈춘다(종료 코드 1).
 - 값은 SSM에서 파이프로만 jq를 거쳐 `kubectl apply --server-side`의 표준 입력으로 넘긴다. 그래서 화면·명령 인자·임시 파일·`last-applied` 주석에 값이 남지 않는다. 화면에는 Secret 이름과 `키=SSM 판 번호`만 찍히고, 같은 판 번호가 Secret 주석 `catchu.io/ssm-versions`에 남는다.
 - 적용 뒤 Secret의 키 목록, `last-applied` 주석이 없음, ConfigMap의 주소와 인증서를 다시 읽어 확인한다. 적용이 실패했거나 확인이 어긋나면 2(일부만 바뀌었을 수 있다)다. 원인을 고쳐 다시 실행하면 SSM의 지금 값으로 다시 맞춘다.
 - 값을 보지 않고 확인하기: `k get secret -o json | jq '.items[] | {name: .metadata.name, keys: (.data | keys), annotations: .metadata.annotations}'`
@@ -119,7 +120,14 @@ GitHub API 대역은 GitHub가 바꿀 수 있다. worker 수집이 시간 초과
 curl -fsS https://api.github.com/meta | jq -r '.api[] | select(contains(":") | not)' | sort -u
 ```
 
-다르면 목록을 고치는 PR을 내고, 병합 뒤 그 파일만 다시 적용한 다음 worker Pod에서 api.github.com 443 연결을 확인한다.
+OpenAI 판정 주소(`us.api.openai.com`)는 OpenAI 전용 주소가 아니라 Cloudflare 주소로 풀린다(2026-11-16 조회: `162.159.140.245`·`172.66.0.243`). OpenAI는 API로 들어가는 쪽의 고정 대역을 공개하지 않으므로([IP egress ranges](https://developers.openai.com/api/docs/guides/ip-addresses)는 OpenAI 제품이 바깥으로 보내는 요청용이다) Cloudflare가 공개한 IPv4 대역 15개를 연다. 이 대역은 Cloudflare를 쓰는 다른 사이트도 함께 연다(받아들인 한계, 2026-11-16 팀장 결정). 판정이 시간 초과로 막히면(worker 로그 「판정 공급자 실패」) 다시 받아 비교한다.
+
+```bash
+curl -fsS https://www.cloudflare.com/ips-v4 | sort -u
+dig +short us.api.openai.com   # 받은 주소가 위 대역 안에 드는지 본다
+```
+
+다르면 목록을 고치는 PR을 내고, 병합 뒤 그 파일만 다시 적용한 다음 worker Pod에서 api.github.com 443(판정 쪽을 고쳤으면 us.api.openai.com 443) 연결을 확인한다.
 
 ## 앱 교체(deploy.sh)
 
