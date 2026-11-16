@@ -7,7 +7,7 @@ catchu.dev를 개발 서버(EC2 한 대, 앞단 Caddy)에서 EKS의 ALB로 옮�
 | 때 | 할 일 | 여기서 멈추면 |
 |---|---|---|
 | 전날 | 정비 예정 조회 → A 기록 TTL 60초 → 팀에 알림 | 할 것 없음. TTL은 60초로 둬도 된다 |
-| 당일 1·2 | 자동 배포 끄기 → 마지막 확인 | 자동 배포를 다시 켠다(「되돌리기」 ③) |
+| 당일 1·2 | 자동 배포의 서버 교체 멈추기 → 마지막 확인 | 배포 대상을 되돌린다(「되돌리기」 ③) |
 | 당일 3 | 개발 서버 앱 정지 | 「되돌리기」 ①·③ |
 | 당일 4·5 | 승인 ③ → DNS를 ALB로 → 확인 | 「되돌리기」 ①·②·③ |
 | 그 뒤 48시간 | 되돌릴 일이 없으면 4단계 | 위와 같다. 4단계에서 개발 서버를 지우면 되돌릴 수 없다 |
@@ -75,16 +75,20 @@ edge_check() {
 
 ## 당일
 
-### 1. 자동 배포 끄기
+### 1. 자동 배포의 서버 교체 멈추기
+
+배포 대상 값을 `none`으로 둔다([../dev-server/cd/README.md](../dev-server/cd/README.md) 「배포 대상」). 그 뒤 `main`에 반영되는 판본은 이미지만 ECR에 올라가고 개발 서버는 바뀌지 않는다.
 
 ```bash
-gh workflow disable deploy-dev-server
-gh api repos/JminAILab/CatchU/actions/workflows/deploy-dev-server.yml --jq .state   # disabled_manually
+git fetch origin main && git grep -c DEPLOY_TARGET origin/main -- .github/workflows/deploy-dev-server.yml   # 1 이상
+gh variable set DEPLOY_TARGET --body none
+gh variable get DEPLOY_TARGET   # none
 gh run list --workflow deploy-dev-server.yml --limit 20 --json databaseId,status,headSha --jq '.[] | select(.status != "completed")'   # 빈 출력
 a ssm list-commands --filters key=DocumentName,value=catchu-dev-deploy key=Status,value=InProgress --query 'Commands[].CommandId' --output text   # 빈 출력
 ```
 
-끄기는 이미 시작한 실행을 멈추지 않는다. 남은 실행이 있으면 취소하지 말고 끝날 때까지 기다린 뒤 결과를 본다(교체 중에 끊으면 앱이 멈춘 채 남을 수 있다). GitHub 쪽 실행이 시간 초과로 끝나도 서버에서는 계속 돌 수 있어 SSM 명령도 본다. [#342](https://github.com/JminAILab/CatchU/issues/342)의 배포 대상 값이 생겼으면 끄는 대신 그 값을 `none`으로 둔다.
+- 첫 줄은 `main`의 워크플로가 배포 대상 값을 읽는 판본인지 본다. 찾지 못하면(출력 없이 실패) 값을 바꿔도 개발 서버 배포가 멈추지 않는다. 그때는 `gh workflow disable deploy-dev-server`로 끄고 `gh api repos/JminAILab/CatchU/actions/workflows/deploy-dev-server.yml --jq .state`가 `disabled_manually`인지 본다. 이 경우 끈 동안 `main`에 반영된 판본은 이미지가 올라가지 않는다.
+- 값을 바꿔도 이미 시작한 실행은 멈추지 않는다. 남은 실행이 있으면 취소하지 말고 끝날 때까지 기다린 뒤 결과를 본다(교체 중에 끊으면 앱이 멈춘 채 남을 수 있다). GitHub 쪽 실행이 시간 초과로 끝나도 서버에서는 계속 돌 수 있어 SSM 명령도 본다.
 
 ### 2. 마지막 확인
 
@@ -116,7 +120,7 @@ a cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmNa
 - 개발 서버에서 `true`인 기능이 EKS api에도 `true`다. 값이 없으면 꺼진 것이다. EKS에서 꺼진 기능은 전환 뒤 catchu.dev에서 멈춘다. 예를 들어 Google 로그인이 꺼져 있으면 로그인할 방법이 없다. 그대로 갈지 여기서 정하고, 가면 팀에 알린다.
 - `edge_check "$alb"`가 위 표의 EKS 칸과 같다. WAF는 `catchu-edge`, 울리는 경보는 없다.
 
-하나라도 어긋나면 고친 뒤 이 확인을 다시 하거나, 그날은 멈추고 자동 배포를 다시 켠다.
+하나라도 어긋나면 고친 뒤 이 확인을 다시 하거나, 그날은 멈추고 배포 대상을 되돌린다(「되돌리기」 ③).
 
 ### 3. 개발 서버 앱 정지
 
@@ -163,8 +167,9 @@ edge_check                                                         # EKS 칸. vi
 
 ## 전환 뒤
 
-- 개발 서버 자동 배포는 다시 켜지 않는다. 켜면 main 반영 때 개발 서버에 배포하고, 바깥 확인은 EKS를 보게 된다.
-- 끈 동안 main에 반영된 판본은 ECR에 이미지가 올라가지 않아 그대로는 EKS에도 배포할 수 없다(`deploy.sh`는 자동 배포가 올린 이미지를 쓴다). EKS 자동 배포는 #342다.
+- 배포 대상은 `none`으로 둔다. `dev-server`로 되돌리면 main 반영 때 개발 서버에 배포하고, 바깥 확인은 EKS를 보게 된다.
+- `none`인 동안에도 main에 반영된 판본의 이미지는 ECR에 올라간다. EKS에는 `git fetch origin main` 뒤 `bash deploy/aws/scripts/deploy.sh --commit <그 커밋>`으로 손으로 배포한다([k8s/README.md](k8s/README.md) 「앱 교체(deploy.sh)」). main 병합이 EKS 교체까지 가는 단계는 [#342](https://github.com/JminAILab/CatchU/issues/342)의 다음 PR이다.
+- `none`에서도 이미지 올리기는 개발 서버 배포 역할 `catchu-github-deploy`와 GitHub environment `dev-server`로 돈다. 4단계에서 개발 서버를 지울 때 이 둘과 ECR `catchu-deploy-files`는 EKS 배포 역할로 바꾼 뒤에 지운다(README 「삭제 순서」 A의 6).
 - 48시간 동안 되돌릴 일이 없으면 4단계로 간다(README 「삭제 순서」 A).
 
 ## 되돌리기
@@ -197,6 +202,6 @@ dns_send "$b"
 edge_check                                    # 1분쯤 뒤 개발 서버 칸
 ```
 
-**③ 자동 배포 다시 켜기:** `gh workflow enable deploy-dev-server`. 그다음 main push부터 돈다. 끈 사이 main에 반영된 판본이 있으면 Actions에서 `deploy-dev-server`를 main으로 수동 실행한다([../dev-server/cd/README.md](../dev-server/cd/README.md) 「되돌리기」).
+**③ 배포 대상 되돌리기:** `gh variable set DEPLOY_TARGET --body dev-server`(당일 1에서 워크플로를 껐으면 `gh workflow enable deploy-dev-server`). 그다음 main push부터 개발 서버를 교체한다. 그 사이 main에 반영된 판본이 있으면 Actions에서 `deploy-dev-server`를 main으로 수동 실행한다([../dev-server/cd/README.md](../dev-server/cd/README.md) 「되돌리기」).
 
 EKS는 그대로 둔다. 다시 전환할 때는 당일 1부터 한다(TTL은 60초 그대로다).
