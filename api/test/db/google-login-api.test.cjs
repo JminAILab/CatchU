@@ -190,6 +190,16 @@ test('다른 출처·출처 없는 시작·완료 요청은 403, 쿠키·회원�
   // 거부된 요청은 시도를 소비하지 않는다. 같은 값을 web 출처에서 보내면 그대로 로그인된다.
   assert.equal((await finish(input)).status, 200); assert.equal(calls, 1);
 });
+test('시작 요청이 보관 상한(1,000건)을 넘게 몰려도 새 시작은 200이고, 밀려난 시도의 완료만 401', async () => {
+  const pushedOut = await attempt('google-pushed-out');
+  for (let sent = 0; sent < 1000; sent += 50) {
+    const starts = await Promise.all(Array.from({ length: 50 }, () => call('/v1/auth/google/authorization', {})));
+    assert.deepEqual([...new Set(starts.map(start => start.status))], [200]);
+  }
+  error(await finish(pushedOut), 401, 'AUTH_INVALID'); assert.equal(calls, 0); await empty();
+  const login = await finish(await attempt('google-after-full')); // 가득 찬 뒤에 시작한 사람은 끝까지 로그인된다.
+  assert.equal(login.status, 200); assert.ok(login.body.accessToken);
+});
 test('비활성 설정과 입력 오류·추가 필드의 공통 오류, health 인증 제외 유지', async () => {
   config.enabled = false; error(await call('/v1/auth/google/authorization', {}), 404, 'RESOURCE_UNAVAILABLE'); config.enabled = true;
   for (const path of ['/v1/auth/google/authorization', '/v1/auth/google/login']) {
