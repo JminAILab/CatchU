@@ -306,10 +306,10 @@ test("올리기 결과 해석: 201이고 모양이 맞을 때만 성공이며, �
   assert.match(reasons({ kind: "lookup-failed", status: null, code: "LOOKUP_FAILED" })[1], /결과를 확인하지 못했습니다/);
   // 업로드 상한 초과(api #574): 결과를 모른다는 안내가 아니라 잠시 뒤 다시 올리라는 안내다. 남은 시간은 Retry-After가 있을 때만 분으로 적는다.
   assert.deepEqual(reasons({ ...apiError(429, "RATE_LIMITED"), retryAfterSeconds: 541 }), [PDF_UPLOAD_FAILED_TEXT, pdfRateLimitedText(541)]);
-  assert.match(pdfRateLimitedText(541), /약 10분 뒤/);
+  assert.equal(pdfRateLimitedText(541), "PDF는 10분에 5개까지 올릴 수 있습니다. 약 10분 뒤에 다시 올려 주세요.");
   assert.match(pdfRateLimitedText(60), /약 1분 뒤/);
   assert.deepEqual(reasons(apiError(429, "RATE_LIMITED")), [PDF_UPLOAD_FAILED_TEXT, pdfRateLimitedText()]);
-  assert.doesNotMatch(pdfRateLimitedText(), /\d+분/, "Retry-After가 없으면 시간을 추정하지 않는다");
+  assert.doesNotMatch(pdfRateLimitedText(), /\d/, "Retry-After가 없으면(진행 중 업로드 수 초과) 횟수 기준과 시간을 적지 않는다");
   for (const result of [apiError(400, "VALIDATION_FAILED"), apiError(500, "INTERNAL_ERROR"), apiError(429, "RATE_LIMITED"), consentRequired]) {
     const lines = reasons(result);
     assert.equal(lines[0], PDF_UPLOAD_FAILED_TEXT);

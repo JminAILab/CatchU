@@ -23,6 +23,9 @@ import { SENSITIVE_INFO_NOTICE } from "./materials-api.ts";
 /** PDF 자료 상한(api `PDF_MATERIAL_LIMITS`, BR1.2). 제목은 앞뒤 공백을 지운 뒤 코드 포인트로 센다. 쪽 50은 worker가 판정한다. */
 export const PDF_LIMITS = Object.freeze({ title: 100, fileSizeBytes: 20 * 1024 * 1024, perMember: 20 });
 
+/** 회원별 업로드 횟수 상한(api `PDF_UPLOAD_RATE_LIMIT`, #574). 안내 문구에만 쓴다. api와 같은 값이며 한쪽만 바꾸지 않는다. */
+export const PDF_UPLOAD_RATE = Object.freeze({ maxUploads: 5, windowMinutes: 10 });
+
 /** 올리는 화면에 늘 보이는 민감 정보 안내. 텍스트 자료와 같은 문구다(BR1.5). */
 export const PDF_SENSITIVE_INFO_NOTICE = SENSITIVE_INFO_NOTICE;
 
@@ -129,13 +132,13 @@ export const PDF_COUNT_LIMIT_TEXT = `PDF 자료는 ${PDF_LIMITS.perMember}벌까
 export const PDF_UPLOAD_FAILED_TEXT = "올리지 못했습니다";
 
 /**
- * 업로드 상한 초과(429 `RATE_LIMITED`, api #574) 안내. 회원별 횟수(10분 5건)를 넘으면 `Retry-After`가 오므로 남은 시간을 분으로 올려 적고,
- * 진행 중 업로드 수를 넘은 경우는 그 값이 없어 시간을 추정하지 않는다.
+ * 업로드 상한 초과(429 `RATE_LIMITED`, api #574) 안내. 회원별 횟수를 넘으면 `Retry-After`가 오므로 기준(10분에 5개)과 남은 시간(분으로 올림)을 적고,
+ * 진행 중 업로드 수를 넘은 경우는 그 값이 없어 기준과 시간을 적지 않는다.
  */
 export function pdfRateLimitedText(retryAfterSeconds?: number): string {
   return retryAfterSeconds === undefined
     ? "지금은 올리는 요청이 많아 받을 수 없습니다. 잠시 뒤 다시 올려 주세요."
-    : `짧은 시간에 여러 번 올려 잠시 받을 수 없습니다. 약 ${Math.ceil(retryAfterSeconds / 60)}분 뒤에 다시 올려 주세요.`;
+    : `PDF는 ${PDF_UPLOAD_RATE.windowMinutes}분에 ${PDF_UPLOAD_RATE.maxUploads}개까지 올릴 수 있습니다. 약 ${Math.ceil(retryAfterSeconds / 60)}분 뒤에 다시 올려 주세요.`;
 }
 
 /** 서버 400의 첫 위반을 안내 문장으로 바꾼다(입력값·서버 문구를 그대로 싣지 않는다). */
