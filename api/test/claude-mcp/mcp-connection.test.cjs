@@ -38,6 +38,8 @@ function expectError(response, status, code) {
 const disconnect = (who = member, origin = WEB_ORIGIN) => server.call('DELETE', CONNECTION_PATH, { token: who.token, origin });
 const status = (who = member) => server.call('GET', CONNECTION_PATH, { token: who.token });
 const codes = (memberId = member.memberId) => db.query('SELECT code_hash AS "codeHash", consented_at AS "consentedAt", redirect_uri AS "redirectUri", code_challenge AS "codeChallenge", resource FROM mcp_authorization_code WHERE member_id = $1', [memberId]);
+/** MCP 주소에 fragment를 붙여 길이를 맞춘 resource. 확인은 fragment를 빼고 하므로 길이만 다르다. */
+const resourceOfLength = (length) => `${server.mcpUrl}#${'a'.repeat(length - server.mcpUrl.length - 1)}`;
 const approvedAt = async (id = clientId) => (await db.query('SELECT approved_at AS "approvedAt" FROM mcp_client WHERE mcp_client_id = $1', [id]))[0].approvedAt;
 
 test('S6 연결 행이 없고 consent가 없으면 409 MCP_CONSENT_REQUIRED이고 코드를 만들지 않는다', async () => {
@@ -151,6 +153,13 @@ test('S6 두 회원 거부: 정의하지 않은 필드와 틀린 형식은 400 V
     { extra: { clientId: '합성\u0000클라이언트' } },
     { extra: { codeChallenge: '합성\u0000챌린지' } },
     { extra: { resource: `${server.mcpUrl}#합성\u0000` } },
+    // 코드 행에 저장하는 두 값의 상한(#575). resource는 fragment를 빼고 비교하므로 길이를 묶지 않으면 저장까지 간다.
+    { extra: { codeChallenge: 'a'.repeat(42) } },
+    { extra: { codeChallenge: 'a'.repeat(129) } },
+    { extra: { codeChallenge: `${'a'.repeat(42)}+` } },
+    { extra: { codeChallenge: `${'a'.repeat(42)}=` } },
+    { extra: { codeChallenge: `${'a'.repeat(43)}\n` } },
+    { extra: { resource: resourceOfLength(2049) } },
   ];
   for (const request of invalid) {
     expectError(await approve(server, member, { clientId, consent: true, ...request }), 400, 'VALIDATION_FAILED');
@@ -159,6 +168,40 @@ test('S6 두 회원 거부: 정의하지 않은 필드와 틀린 형식은 400 V
     body: { clientId, redirectUri: CLAUDE_REDIRECT_URI, codeChallenge: 'x', decision: 'APPROVE', consent: true } }), 400, 'VALIDATION_FAILED');
   assert.deepEqual(await codes(), []);
   assert.deepEqual(await codes(other.memberId), []);
+});
+
+test('#575 상한 안의 값은 그대로 승인된다: codeChallenge 43·128자와 resource 2,048자', async () => {
+  const accepted = [
+    { challenge: 'a'.repeat(43) },
+    { challenge: 'aZ09-._~'.repeat(16) },
+    { resource: resourceOfLength(2048) },
+  ];
+  for (const request of accepted) {
+    const response = await approve(server, member, { clientId, consent: true, ...request });
+    assert.equal(response.status, 200, `응답 코드 ${response.body?.code}`);
+  }
+  const rows = await codes();
+  assert.deepEqual(rows.map((row) => row.codeChallenge.length).filter((length) => length !== 43).sort(), [128]);
+  assert.equal(rows.filter((row) => row.resource !== null)[0].resource.length, 2048);
+});
+
+test('#575 승인으로 코드를 만들면 그 회원의 만료된 코드만 지우고 만료 전 코드와 다른 회원의 코드는 그대로다', async () => {
+  const other = await server.login();
+  const expired = new Date(Date.now() - 1000);
+  await insertCode(db, member.memberId, clientId, { expiresAt: expired });
+  await insertCode(db, member.memberId, clientId, { expiresAt: expired, usedAt: new Date(Date.now() - 2000) });
+  const live = await insertCode(db, member.memberId, clientId);
+  const othersExpired = await insertCode(db, other.memberId, clientId, { expiresAt: expired });
+
+  const issued = await issueCode(server, member, clientId);
+  assert.deepEqual((await codes()).map((row) => row.codeHash).sort(), [sha256Hex(live), sha256Hex(issued.code)].sort());
+  assert.deepEqual((await codes(other.memberId)).map((row) => row.codeHash), [sha256Hex(othersExpired)]);
+
+  // 거절과 실패한 승인은 표를 바꾸지 않는다(BR3.6).
+  await insertCode(db, member.memberId, clientId, { expiresAt: expired });
+  assert.equal((await approve(server, member, { clientId, decision: 'DENY' })).status, 200);
+  expectError(await approve(server, member, { clientId: randomUUID(), consent: true }), 400, 'MCP_AUTHORIZATION_INVALID');
+  assert.equal((await codes()).length, 3);
 });
 
 test('BR3.7 확인 뒤 정리로 등록 행이 지워졌으면 MCP_AUTHORIZATION_INVALID이고 코드가 남지 않는다', async (t) => {

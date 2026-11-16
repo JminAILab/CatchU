@@ -6,7 +6,7 @@ import { ApiError } from '../common/errors';
 import { McpAuthorizationDto } from './mcp-authorization.dto';
 import { isSameResource, MCP_CONFIG, McpConfig } from './mcp-config';
 import { MCP_CODE_TTL_MS } from './mcp-limits';
-import { newOAuthSecret, sha256Hex } from './mcp-oauth.provider';
+import { DELETE_EXPIRED_CODES, newOAuthSecret, sha256Hex } from './mcp-oauth.provider';
 
 export type McpConnectionState = 'NONE' | 'ACTIVE' | 'EXPIRED';
 
@@ -76,10 +76,14 @@ export class McpConnectionService {
     return earliest;
   }
 
-  /** 등록 행이 없을 때만(정리로 지워짐) 거부한다. 이미 승인에 쓰인 등록도 갱신되어 처음 값이 그대로 남는다(BR3.7, BR2.4). */
+  /**
+   * 등록 행이 없을 때만(정리로 지워짐) 거부한다. 이미 승인에 쓰인 등록도 갱신되어 처음 값이 그대로 남는다(BR3.7, BR2.4).
+   * 토큰 교환까지 가지 않은 승인이 되풀이돼도 행이 남지 않게 그 회원의 만료된 코드를 여기서도 지운다(#575).
+   */
   private async issueCode(manager: EntityManager, memberId: string, request: McpAuthorizationDto, codeHash: string, consentedAt: Date, now: Date): Promise<void> {
     const [, updated] = await manager.query('UPDATE mcp_client SET approved_at = COALESCE(approved_at, $2) WHERE mcp_client_id = $1', [request.clientId, now]) as [unknown, number];
     if (updated === 0) throw new ApiError('MCP_AUTHORIZATION_INVALID');
+    await manager.query(DELETE_EXPIRED_CODES, [memberId, now]);
     await manager.query(`INSERT INTO mcp_authorization_code (code_hash, member_id, mcp_client_id, code_challenge, redirect_uri, resource, consented_at, expires_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [codeHash, memberId, request.clientId, request.codeChallenge, request.redirectUri, request.resource ?? null, consentedAt, new Date(now.getTime() + MCP_CODE_TTL_MS)]);
