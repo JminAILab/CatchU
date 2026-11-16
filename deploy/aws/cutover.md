@@ -53,7 +53,7 @@ edge_check() {
 
 ## 전날
 
-1. **시작 조건:** README 3단계의 ①~③. ①은 #276 댓글에 남긴 2단계 증거로 본다.
+1. **시작 조건:** README 3단계의 ①~③. ①은 #276 댓글에 남긴 2단계 증거로 본다. 회원 파일 버킷 확인([s3.md](s3.md) 「확인(2단계)」)도 그 증거에 들어 있어야 한다. 없으면 전환 뒤 올린 PDF가 api Pod가 바뀔 때 없어지거나 올리기가 500으로 끝난다.
 2. **정비 예정 작업:** 전환 시각은 README 「단계와 시작 조건」의 정비 시간대(모두 새벽)와 겹치지 않게 잡는다. 그 밖에 AWS가 잡아 둔 작업을 본다. 빈 목록이거나 시각이 전환과 겹치지 않으면 된다. 겹치면 전환 날을 옮긴다. 콘솔 AWS Health Dashboard의 예정된 변경도 본다.
    ```bash
    a rds describe-pending-maintenance-actions --query 'PendingMaintenanceActions[].[ResourceIdentifier, PendingMaintenanceActionDetails[].[Action, CurrentApplyDate]]'
@@ -109,7 +109,7 @@ albzone=$(a elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='${al
 to_alb=$(jq -cn --arg z "$albzone" --arg n "$alb" '{Name: "catchu.dev.", Type: "A", AliasTarget: {HostedZoneId: $z, DNSName: $n, EvaluateTargetHealth: false}}')
 k get deploy -o custom-columns='NAME:.metadata.name,READY:.status.readyReplicas,WANT:.spec.replicas,COMMIT:.spec.template.metadata.annotations.catchu\.io/source-revision'
 k get pod
-k get deploy api -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{"\n"}{end}' | grep _ENABLED
+k get deploy api -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{"\n"}{end}' | grep -E '_ENABLED|FILE_STORAGE'
 edge_check "$alb"
 a wafv2 get-web-acl-for-resource --resource-arn "$albarn" --query WebACL.Name --output text   # catchu-edge
 a cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --output text   # 빈 출력
@@ -118,6 +118,7 @@ a cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmNa
 - 세 Deployment의 READY가 WANT와 같고 COMMIT이 개발 서버의 마지막 배포 커밋과 같다. 다르면 `git fetch origin main` 뒤 `bash deploy/aws/scripts/deploy.sh --commit <그 커밋>`으로 맞추고 이 확인을 다시 한다. 그 판본의 이미지는 개발 서버 자동 배포가 ECR에 올려 두었다.
 - Pod가 모두 Running이고 RESTARTS가 늘지 않는다.
 - 개발 서버에서 `true`인 기능이 EKS api에도 `true`다. 값이 없으면 꺼진 것이다. EKS에서 꺼진 기능은 전환 뒤 catchu.dev에서 멈춘다. 예를 들어 Google 로그인이 꺼져 있으면 로그인할 방법이 없다. 그대로 갈지 여기서 정하고, 가면 팀에 알린다.
+- EKS api의 파일 저장이 `FILE_STORAGE_DRIVER=s3`와 버킷 이름이다. `local`이면 그날은 멈춘다(회원 파일이 Pod와 함께 없어진다).
 - `edge_check "$alb"`가 위 표의 EKS 칸과 같다. WAF는 `catchu-edge`, 울리는 경보는 없다.
 
 하나라도 어긋나면 고친 뒤 이 확인을 다시 하거나, 그날은 멈추고 배포 대상을 되돌린다(「되돌리기」 ③).

@@ -8,13 +8,14 @@
 
 | 파일 | 하는 일 |
 |---|---|
-| [`cluster.yaml`](cluster.yaml) | eksctl 설정. VPC·서브넷, 가용 영역마다 NAT 하나(2a·2c), EKS 1.37, 노드 `t4g.large` 2대(자동 복구 켬), 애드온 판본 고정, 노드 역할의 비밀값 읽기 거부, Load Balancer Controller·로그 수집기 권한 |
+| [`cluster.yaml`](cluster.yaml) | eksctl 설정. VPC·서브넷, 가용 영역마다 NAT 하나(2a·2c), EKS 1.37, 노드 `t4g.large` 2대(자동 복구 켬), 애드온 판본 고정, 노드 역할의 비밀값 읽기 거부, Load Balancer Controller·로그 수집기·api·worker 권한 |
 | [`scripts/lib/guard.sh`](scripts/lib/guard.sh) | 모든 스크립트가 맨 앞에서 읽는 공통 확인. 계정·리전·클러스터가 다르면 멈춘다 |
 | [`scripts/check-target.sh`](scripts/check-target.sh) | 손으로 치는 생성·변경·삭제 명령 앞에 돌리는 같은 확인(`--cluster`면 kubeconfig까지) |
 | [`scripts/lib/network.sh`](scripts/lib/network.sh) | eksctl이 만든 VPC·프라이빗 서브넷·노드 보안 그룹을 찾고, 노드에서 오는 한 포트만 받는 보안 그룹을 만든다 |
 | [`scripts/create-rds.sh`](scripts/create-rds.sh) | RDS PostgreSQL 16(Multi-AZ, 저장 암호화, 백업 7일, 삭제 보호)과 로그에 값이 남지 않게 한 파라미터 그룹 |
 | [`scripts/create-queue.sh`](scripts/create-queue.sh) | ElastiCache Valkey 8.1 큐(주 2a·복제본 2c, 자동 장애 조치, TLS·비밀번호, `noeviction`, 스냅샷 없음) |
 | [`scripts/create-efs.sh`](scripts/create-efs.sh) | GitHub 토큰 보관 폴더용 EFS(암호화, 백업 끔, TLS 강제, 사용자 번호 1000 접근점)와 짝이 되는 암호화 키 |
+| [`scripts/create-s3.sh`](scripts/create-s3.sh) | 회원 파일 버킷·S3 게이트웨이 엔드포인트([s3.md](s3.md)) |
 | [`scripts/create-scripts.test.sh`](scripts/create-scripts.test.sh) | 위 스크립트들의 회귀 시험(AWS에 닿지 않음, 「시험」) |
 | [`scripts/create-waf.sh`](scripts/create-waf.sh), [`waf/`](waf) | ALB 앞 WAF. `/v1/internal`로 시작하는 주소(대소문자·인코딩 변형 포함)는 404, Google 로그인 시작은 주소당 5분 20회를 넘으면 429 |
 | [`scripts/create-alert-topic.sh`](scripts/create-alert-topic.sh)·[`create-alarms.sh`](scripts/create-alarms.sh) | 경보(10/29 MVP 결정): SNS 주제 `catchu-alerts`·팀장 이메일 구독과 경보 4개 |
@@ -27,7 +28,7 @@
 | [`scripts/db-admin.sh`](scripts/db-admin.sh)·[`db/`](db)·[`k8s/ops/`](k8s/ops) | DB 관리용 psql 일회 Pod(namespace `catchu-ops`)와 RDS 계정 SQL·루트 인증서([k8s/README.md](k8s/README.md) 「DB 관리 Pod」). 공통 RDS 조회는 [`scripts/lib/rds.sh`](scripts/lib/rds.sh) |
 | [`scripts/secrets.test.sh`](scripts/secrets.test.sh)·[`db-roles.test.sh`](scripts/db-roles.test.sh) | 위 스크립트 회귀 시험과 계정 SQL의 실제 PostgreSQL 시험(Docker) |
 
-생성 스크립트는 **깨끗할 때 한 번 만드는 용도**다. 인자 없이 실행하면 확인만 하고 아무것도 만들지 않으며(무엇을 만들지 보여 준다), `--apply`를 줄 때만 만든다. 그 스크립트가 만들 자원(이름은 각 파일 머리말) 가운데 하나라도 이미 있으면, 확인 모드에서도 `--apply`에서도 아무것도 만들지 않고 그 목록을 보여 준 뒤 멈춘다(「생성이 중간에 멈췄을 때」). 이미 있는 자원의 상태를 맞추거나 점검하지는 않는다. 조회가 실패해도 '있음'이나 '없음'으로 넘기지 않고 멈춘다. 모두 저장소 루트에서 실행하고, [`scripts/create-scripts.test.sh`](scripts/create-scripts.test.sh)로 AWS에 닿지 않고 시험한다(「시험」).
+생성 스크립트는 **깨끗할 때 한 번 만드는 용도**다. 인자 없이 실행하면 확인만 하고 아무것도 만들지 않으며(무엇을 만들지 보여 준다), `--apply`를 줄 때만 만든다. 그 스크립트가 만들 자원(이름은 각 파일 머리말) 가운데 하나라도 이미 있으면, 확인 모드에서도 `--apply`에서도 아무것도 만들지 않고 그 목록을 보여 준 뒤 멈춘다(「생성이 중간에 멈췄을 때」). 이미 있는 자원의 상태를 맞추거나 점검하지는 않는다. 조회가 실패해도 '있음'이나 '없음'으로 넘기지 않고 멈춘다. 모두 저장소 루트에서 실행한다.
 
 다음 PR로 남긴 것: Secret 값이 바뀌었을 때 api·worker를 다시 띄우는 일(`deploy.sh`에 잇는다), 노드 패치 절차.
 
@@ -112,13 +113,14 @@
      ```
    - 노드에 실제로 붙은 보안 그룹. RDS 5432·큐 6379·EFS 2049는 이 보안 그룹에서 오는 연결만 받는다. 하나면 스크립트가 알아서 쓰고, 둘 이상이면 스크립트가 멈추므로 쓸 것을 정해 여기에 적고 `CATCHU_NODE_SG=sg-…`로 넘긴다: `aws ec2 describe-instances --profile catchu --region ap-northeast-2 --filters Name=tag:eks:nodegroup-name,Values=app Name=instance-state-name,Values=running --query 'Reservations[].Instances[].NetworkInterfaces[].Groups'`
    - EFS 드라이버 Pod가 AWS 권한 없이 Running인지: `kubectl --kubeconfig ~/.kube/catchu -n kube-system get pod -l app.kubernetes.io/name=aws-efs-csi-driver`. 실제 마운트 시험은 GitHub 연결을 켤 때 한다. 그때 접근점을 거친 TLS 마운트가 되는지와, 접근점 없이 마운트하거나 TLS 없이 마운트하면 거부되는지를 함께 본다. 드라이버 권한이 모자라 안 되면 `cluster.yaml`에 적은 대로 컨트롤러 서비스 계정에만 권한을 더한다. 접근점을 거친 마운트까지 거부되면 파일 시스템 정책의 접근점 조건이 IAM 없는 마운트에 맞지 않는 것이므로(문서로 확인하지 못한 부분) 그 조건을 어떻게 할지 팀장과 정한다.
-5. **DB·큐·EFS·WAF:** 각각 확인 모드로 먼저 돌려 찾은 VPC·서브넷·노드 보안 그룹을 보고, 그다음 `--apply`로 만든다. 끝에 찍히는 확인 값을 증거로 남긴다.
+5. **DB·큐·EFS·WAF·S3:** 각각 확인 모드로 먼저 돌려 찾은 VPC·서브넷·노드 보안 그룹을 보고, 그다음 `--apply`로 만든다. 끝에 찍히는 확인 값을 증거로 남긴다.
    ```bash
    bash deploy/aws/scripts/create-rds.sh            # 확인만
    bash deploy/aws/scripts/create-rds.sh --apply    # 만듦(파라미터 반영 5분, DB는 최대 60분 기다림)
    bash deploy/aws/scripts/create-queue.sh --apply  # 큐 비밀번호는 SSM /catchu/prod/queue/auth-token(개발 서버와 같은 값)
    bash deploy/aws/scripts/create-efs.sh --apply    # 암호화 키 SSM은 있으면 그대로 쓰고, 없으면 만든다
    bash deploy/aws/scripts/create-waf.sh --apply    # ALB에는 Ingress 주석(이름 catchu-edge)으로 붙인다(k8s/ingress.yaml)
+   bash deploy/aws/scripts/create-s3.sh --apply     # s3.md
    ```
    큐는 장애 조치 같은 이벤트를 0단계에서 만든 SNS 주제 `catchu-alerts`로 보낸다.
 6. **Load Balancer Controller:** `install-lb-controller.sh --apply`. Secret·ConfigMap, DB 계정(앱 계정 `lock_timeout` 3초, `idle_in_transaction_session_timeout`은 #220에서 정할 값), 앱 실행 파일과 교체는 2단계에서 [k8s/README.md](k8s/README.md)대로 한다.
@@ -136,7 +138,7 @@
 
 ## 쿠버네티스 실행 파일과 앱 교체
 
-2단계부터 쓰는 쿠버네티스 실행 파일(namespace·NetworkPolicy·Service·Ingress·Deployment·migration 일회 Pod)과 교체 스크립트 `deploy.sh`의 내용·적용 순서·확인·종료 코드는 [k8s/README.md](k8s/README.md)에 있다. 실행 파일이 읽는 Secret·ConfigMap의 이름과 키도 거기 정했다.
+2단계부터 쓰는 쿠버네티스 실행 파일과 교체 스크립트 `deploy.sh`의 내용·적용 순서·확인·종료 코드, Secret·ConfigMap의 이름과 키는 [k8s/README.md](k8s/README.md)에 있다.
 
 ## 노드 작업
 
@@ -173,7 +175,7 @@
 5. EFS: 마운트 지점 2개를 지우고 `aws efs describe-mount-targets --file-system-id <fs> …`가 빈 목록이 될 때까지 기다린다 → 접근점 → 파일 시스템.
 6. RDS: `aws rds modify-db-instance --db-instance-identifier catchu-db --no-deletion-protection --apply-immediately …` → `aws rds delete-db-instance --db-instance-identifier catchu-db --skip-final-snapshot --delete-automated-backups …` → **`aws rds wait db-instance-deleted --db-instance-identifier catchu-db …`**(30분까지만 기다리므로, 시간이 다 됐다고 나오면 같은 명령을 다시 실행한다) → 서브넷 그룹 `catchu-db`·파라미터 그룹 `catchu-pg16`. 마지막 스냅샷을 남길지는 그때 팀장이 정한다(남기면 그만큼 요금이 계속 나간다). RDS가 관리하는 관리자 비밀번호는 인스턴스와 함께 지워진다.
 7. 큐: `aws elasticache delete-replication-group --replication-group-id catchu-queue …`(마지막 스냅샷 없이) → **`aws elasticache wait replication-group-deleted --replication-group-id catchu-queue …`**(10분까지만 기다리므로, 시간이 다 됐다고 나오면 같은 명령을 다시 실행한다) → 서브넷 그룹 `catchu-queue`·파라미터 그룹 `catchu-valkey8-noeviction`.
-8. 직접 만든 보안 그룹 `catchu-db`·`catchu-queue`·`catchu-efs`.
+8. 직접 만든 보안 그룹 `catchu-db`·`catchu-queue`·`catchu-efs`. S3는 [s3.md](s3.md) 「지우기」.
 9. `helm uninstall aws-load-balancer-controller -n kube-system --kubeconfig ~/.kube/catchu`
 10. `eksctl delete cluster -f deploy/aws/cluster.yaml --wait --profile catchu`(노드 그룹·애드온·Pod Identity 역할·NAT와 그 공인 IP·VPC).
 11. 로그 그룹, SNS 주제 `catchu-alerts`.
@@ -187,7 +189,7 @@
     a wafv2 list-web-acls --scope REGIONAL
     a rds describe-db-instances; a rds describe-db-snapshots; a rds describe-db-instance-automated-backups
     a elasticache describe-replication-groups; a elasticache describe-snapshots
-    a efs describe-file-systems
+    a efs describe-file-systems; a s3api list-buckets
     a ec2 describe-nat-gateways --filter Name=state,Values=available; a ec2 describe-addresses
     a ec2 describe-volumes --filters Name=status,Values=available; a ec2 describe-snapshots --owner-ids self
     a ec2 describe-security-groups --query "SecurityGroups[?starts_with(GroupName, 'catchu') || starts_with(GroupName, 'k8s-') || starts_with(GroupName, 'eks')].GroupName"
