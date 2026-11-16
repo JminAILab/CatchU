@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { NoticeDialog } from "@/components/notice-dialog/notice-dialog";
 import { routes } from "@/lib/routes";
 import { ProfileMenu } from "./profile-menu";
 import styles from "./header.module.css";
@@ -23,13 +21,12 @@ const navItems = [
 
 /**
  * 로그인 일반 서비스·발행자 헤더(#55 10월 합의).
- * 왼쪽: 로고(→ 로그인 홈) · 내 자산 · 텍스트 자료 · 발행본 · 채용공고(비활성, 클릭 시 안내창). 10월 [공유 링크]는 U4 제출 3(W6)에서 [발행본]으로 대체했다.
- * 오른쪽: 알림(비활성, 클릭 시 안내창) · 프로필
- * 대표 구성 진입점은 10월에 두지 않는다.
+ * 왼쪽: 로고(→ 로그인 홈) · 내 자산 · 텍스트 자료 · 발행본 · JD 관리. 10월 [공유 링크]는 U4 제출 3(W6)에서 [발행본]으로 대체했다.
+ * 오른쪽: 프로필
+ * 10월의 채용공고·알림 비활성 표시는 뺐다(#565). 두 기능을 12월 요구사항에서 뺐기 때문이다. 대표 구성 진입점은 두지 않는다.
  */
 export function MemberHeader({ onLogout, logoutPending }: MemberHeaderProps) {
   const pathname = usePathname();
-  const [noticeOpen, setNoticeOpen] = useState(false);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -51,18 +48,11 @@ export function MemberHeader({ onLogout, logoutPending }: MemberHeaderProps) {
               {item.label}
             </Link>
           ))}
-          <button type="button" className={styles.inactiveItem} aria-haspopup="dialog" onClick={() => setNoticeOpen(true)}>
-            채용공고<span className="visually-hidden"> (개발 중)</span>
-          </button>
         </nav>
         <div className={styles.group}>
-          <button type="button" className={styles.inactiveItem} aria-haspopup="dialog" onClick={() => setNoticeOpen(true)}>
-            알림<span className="visually-hidden"> (개발 중)</span>
-          </button>
           <ProfileMenu onLogout={onLogout} logoutPending={logoutPending} />
         </div>
       </div>
-      <NoticeDialog open={noticeOpen} onClose={() => setNoticeOpen(false)} />
     </header>
   );
 }

@@ -60,7 +60,7 @@ export function CatchActions({ item, mutation, onChange, onReload }: {
       <h3>공개 선택</h3>
       {restricted && <p>원본 저장소가 보호되어 외부에서 열람할 수 없습니다.</p>}
       {item.visibility === "PUBLIC" ? <>
-        <p>숨기면 이후 조회부터 기존 공유 링크에서도 이 Catch가 제외됩니다.</p>
+        <p>숨겨도 이미 발행한 발행본에는 그대로 남습니다. 제공을 끝내려면 발행본에서 링크를 중지하세요.</p>
         <button className={styles.secondaryButton} disabled={disabled}
           onClick={() => onChange({ kind: "visibility", visibility: "PRIVATE" })}>숨기기</button>
       </> : <>

@@ -40,8 +40,7 @@
 }
 
 .menuItem,
-.menuItemActive,
-.inactiveItem {
+.menuItemActive {
   padding: 8px 12px;
   border: 0;
   border-radius: 6px;
@@ -52,19 +51,13 @@
   cursor: pointer;
 }
 
-.menuItem:hover,
-.inactiveItem:hover {
+.menuItem:hover {
   background: #f0f3f7;
 }
 
 .menuItemActive {
   color: var(--color-accent);
   font-weight: 700;
-}
-
-/* 10월 미제공 메뉴: 흐리게 표시하되 클릭하면 안내창을 연다. */
-.inactiveItem {
-  color: #9aa6b5;
 }
 
 .startButton {
