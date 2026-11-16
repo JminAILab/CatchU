@@ -223,17 +223,17 @@ test('S7 머리글은 항목 종류마다 정한 꼴이고, 고정 글자에 숫
   assert.equal(contexts.get(itemId(23)), '이 줄이 속한 작업: 「다」 같은 둘째 줄', '둘째 줄이 같은 Catch는 표 글자로 가른다');
   assert.equal(contexts.get(itemId(24)), '이 줄이 속한 작업: 「라」 같은 둘째 줄');
   assert.equal(contexts.get(itemId(25)), `이 줄이 속한 작업: ${'긴'.repeat(QNA_ITEM_CONTEXT_MAX_LENGTH)}`, '둘째 줄은 앞 200자까지');
-  assert.equal(contexts.get(itemId(26)), '이 줄이 속한 작업: 줄바꿈 있는 제목끝뒤집기', '줄바꿈은 빈칸, 제어·글 방향 문자는 지운다');
+  assert.equal(contexts.get(itemId(26)), '이 줄이 속한 작업: 줄바꿈 있는 제목 끝뒤집기', '줄바꿈·탭은 빈칸, 그 밖의 제어·글 방향 문자는 지운다');
   assert.equal(contexts.get(itemId(27)), '이 줄이 속한 작업: 「사」 작업(기록 제목 없음)', '다듬어 빈 둘째 줄은 없는 것으로 본다');
   assert.equal(contexts.get(itemId(28)), '이 줄이 속한 자료: 「아」 텍스트 자료');
   assert.equal(contexts.get(itemId(29)), '이 줄이 속한 자료: 「자」 올린 문서');
 
-  const seconds = new Map([[21, 'PR 제목 하나'], [23, '같은 둘째 줄'], [24, '같은 둘째 줄'], [25, '긴'.repeat(200)], [26, '줄바꿈 있는 제목끝뒤집기']]);
+  const seconds = new Map([[21, 'PR 제목 하나'], [23, '같은 둘째 줄'], [24, '같은 둘째 줄'], [25, '긴'.repeat(200)], [26, '줄바꿈 있는 제목 끝뒤집기']]);
   for (const [n, context] of [...contexts.entries()].map(([id, value]) => [Number(id.slice(-2)), value])) {
     const fixed = seconds.has(n) ? context.replace(seconds.get(n), '') : context;
     assert.ok(!ASCII_LETTER_OR_DIGIT.test(fixed), `${n}번 머리글의 고정 글자에 숫자·영문자가 없다`);
     for (const secret of ['TITLE-SECRET', 'AIDRAFT-SECRET', SECRET_REPO]) assert.ok(!context.includes(secret), `${n}번 머리글에 ${secret}가 없다`);
-    assert.ok(!/[\p{Cc}\u{2028}\u{2029}\u{200E}\u{200F}\u{202A}-\u{202E}\u{2066}-\u{2069}]/u.test(context), `${n}번 머리글에 제어 문자가 없다`);
+    assert.ok(!/[\p{Cc}\p{Cf}\u{2028}\u{2029}]/u.test(context), `${n}번 머리글에 제어·서식 문자가 없다`);
   }
   assert.equal(QNA_ITEM_TAGS.length, 20);
   assert.ok(QNA_ITEM_TAGS.every((tag) => !ASCII_LETTER_OR_DIGIT.test(tag)));
@@ -251,6 +251,19 @@ test('S7 둘째 줄 다듬기는 200자(UTF-16)까지 자르되 서로게이트 
   assert.ok(fits.endsWith(emoji));
   assert.equal(sanitizeItemContextLine('  여러   칸  '), '여러 칸');
   assert.equal(sanitizeItemContextLine(` \r\n${RLO} `), null);
+});
+
+test('S7 둘째 줄 다듬기는 탭 계열을 빈칸으로 바꾸고, 서식 문자(폭 없는 공백·BOM·태그 문자 등)를 지운다(코드 생성 리뷰 R-01)', () => {
+  const at = (code) => String.fromCodePoint(code);
+  // 탭·세로 탭·쪽바꿈·다음 줄은 지우지 않고 빈칸으로 바꿔 낱말이 붙지 않게 한다.
+  assert.equal(sanitizeItemContextLine(`fix:${at(0x09)}login${at(0x0b)}page${at(0x0c)}form${at(0x85)}end`), 'fix: login page form end');
+  // 폭 없는 공백·이음·BOM·단어 이음·보이지 않는 연산자·아랍 글자 표지·태그 문자는 모두 지운다.
+  const hidden = [0x200b, 0x200c, 0x200d, 0xfeff, 0x2060, 0x2062, 0x2064, 0x061c, 0xe0001, 0xe0041, 0xe007f].map(at).join('');
+  assert.equal(sanitizeItemContextLine(`알림${hidden}화면`), '알림화면');
+  const tagged = `제목${[0xe0049, 0xe0047, 0xe004e, 0xe004f, 0xe0052, 0xe0045].map(at).join('')}고치기`;
+  assert.equal(sanitizeItemContextLine(tagged), '제목고치기', '태그 문자로 숨긴 글이 남지 않는다');
+  // 서식 문자만 있던 줄은 빈 글로 보아 둘째 줄이 없는 것으로 친다.
+  assert.equal(sanitizeItemContextLine(`${at(0x200b)}${at(0xfeff)}${at(0xe0020)}`), null);
 });
 
 test('S7 근거마다 그 항목의 머리글을 단다. 같은 Catch의 작성자 설명 줄에도 같은 머리글이다(FR2.1·FR2.2)', () => {

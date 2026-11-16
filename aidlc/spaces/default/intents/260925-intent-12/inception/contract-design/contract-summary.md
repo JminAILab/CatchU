@@ -408,7 +408,7 @@ slots (화면 순서):
                                        # claude-connect-rule이 참일 때만 그린다. 요청 문장 복사·연결 안내만 하고 API를 부르지 않으므로 props는 RecipientSlotProps 중 token 하나이고 getGrant·onAccessLost는 받지 않는다
                                        # 제목(h1)과 첫 초점을 갖지 않는다. 문구는 #495에서 정한 대로 U9 기능 설계에 적고, 컴포넌트 이름·눌렀을 때의 동작은 U9 기능 설계에서 정한다
   1: 발행본 자료(U4)
-  2: BaseSummaryPanel(U5)              # 2·3번은 RecipientSlotProps 밖의 선택 prop itemTitleOf: (publishedItemId) -> string|null도 받는다(#559 더하는 변경, 팀원 3과 PR 리뷰에서 맞춤). U4가 이 화면의 사본으로 만들어 넘기면 출처 딱지 옆에 항목 제목을 보이고, 넘기지 않으면 딱지만 보인다. 4번에는 넘기지 않는다
+  2: BaseSummaryPanel(U5)              # 2·3번은 RecipientSlotProps 밖의 선택 prop itemTitleOf: (publishedItemId) -> string|null도 받는다(#559 더하는 변경). U4가 이 화면의 사본으로 만들어 넘기면 출처 딱지 옆에 항목 제목을 보이고, 넘기지 않으면 딱지만 보인다. 4번에는 넘기지 않는다
   3: QnaPanel(U5)                      # 입력란 옆 외부 AI 고지 한 줄 포함
   4: JdSummaryPanel(U10)               # 로그인 회원에게만, 비로그인은 로그인 안내
 rule: 붙는 컴포넌트는 401 LINK_PASSWORD_REQUIRED·404 LINK_UNAVAILABLE을 받으면 스스로 처리하지 않고 onAccessLost를 부른다

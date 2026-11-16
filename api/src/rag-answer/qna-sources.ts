@@ -25,10 +25,16 @@ export const QNA_ITEM_TAGS = ['가', '나', '다', '라', '마', '바', '사', '
 // 이스케이프는 중괄호 꼴(\u{…})로 쓴다. 줄바꿈 문자와 글 방향 제어 문자가 소스에 그대로 들어가지 않게 하려는 것이다.
 /** 줄바꿈: \r\n, \r, \n, U+2028(줄 구분), U+2029(문단 구분). */
 const LINE_BREAKS = /\r\n|[\r\n\u{2028}\u{2029}]/gu;
-/** 줄바꿈을 바꾼 뒤 남은 유니코드 제어 문자(Cc). */
+/** 빈칸 구실을 하는 제어 문자: 탭(U+0009)·세로 탭(U+000B)·쪽바꿈(U+000C)·다음 줄(U+0085). 지우지 않고 빈칸으로 바꿔 낱말이 붙지 않게 한다. */
+// 제어 문자(Cc)이면서 빈칸인 글자(탭·세로 탭·쪽바꿈)와 U+0085. 제어 문자를 직접 적지 않아 no-control-regex에 걸리지 않는다.
+const SPACE_CONTROLS = /(?=\p{Cc})\s|\u{0085}/gu;
+/** 줄바꿈·빈칸 구실 문자를 바꾼 뒤 남은 유니코드 제어 문자(Cc). */
 const CONTROL_CHARS = /\p{Cc}/gu;
-/** 글 방향 제어 문자: U+200E·U+200F·U+202A~U+202E·U+2066~U+2069. */
-const BIDI_CONTROLS = /[\u{200E}\u{200F}\u{202A}-\u{202E}\u{2066}-\u{2069}]/gu;
+/**
+ * 서식 문자(Cf) 전체. 글 방향 제어 문자(U+200E·U+200F·U+202A~U+202E·U+2066~U+2069), 폭 없는 공백·이음(U+200B~U+200D),
+ * U+FEFF, U+2060~U+2064, U+061C, 태그 문자(U+E0001·U+E0020~U+E007F)가 모두 여기에 든다. 눈에 안 보이는 글자로 머리글에 지시를 숨기지 못하게 지운다.
+ */
+const FORMAT_CHARS = /\p{Cf}/gu;
 const SPACES = /\s+/gu;
 
 /** 검색 결과 한 칸을 근거로 옮긴다(sourceId = chunkId, 위치는 조각 범위 그대로, C-09 note). */
@@ -51,12 +57,13 @@ export function itemTag(index: number): string {
 }
 
 /**
- * 작업 사실 둘째 줄 다듬기(작성자가 쓴 글이라서). 줄바꿈은 빈칸 하나, 그 밖의 제어 문자와 글 방향 제어 문자는 지운다.
+ * 작업 사실 둘째 줄 다듬기(작성자가 쓴 글이라서). 줄바꿈과 빈칸 구실 제어 문자(탭 등)는 빈칸 하나로 바꾸고,
+ * 그 밖의 제어 문자(Cc)와 서식 문자(Cf: 글 방향 제어·폭 없는 공백·태그 문자 등)는 지운다(코드 생성 리뷰 R-01).
  * 겹친 빈칸을 줄이고 앞뒤 빈칸을 뗀 뒤 앞 maxLength자(UTF-16)까지 자르되 서로게이트 쌍을 가운데서 자르지 않는다. 빈 글이면 null.
  */
 export function sanitizeItemContextLine(text: string, maxLength: number = QNA_ITEM_CONTEXT_MAX_LENGTH): string | null {
-  const cleaned = text.replace(LINE_BREAKS, ' ').replace(CONTROL_CHARS, '').replace(BIDI_CONTROLS, '')
-    .replace(SPACES, ' ').trim();
+  const cleaned = text.replace(LINE_BREAKS, ' ').replace(SPACE_CONTROLS, ' ').replace(CONTROL_CHARS, '')
+    .replace(FORMAT_CHARS, '').replace(SPACES, ' ').trim();
   if (cleaned === '') return null;
   if (cleaned.length <= maxLength) return cleaned;
   const last = cleaned.charCodeAt(maxLength - 1);
