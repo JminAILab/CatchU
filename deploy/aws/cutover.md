@@ -168,8 +168,9 @@ edge_check                                                         # EKS 칸. vi
 ## 전환 뒤
 
 - 배포 대상은 `none`으로 둔다. `dev-server`로 되돌리면 main 반영 때 개발 서버에 배포하고, 바깥 확인은 EKS를 보게 된다.
-- `none`인 동안에도 main에 반영된 판본의 이미지는 ECR에 올라간다. EKS에는 `git fetch origin main` 뒤 `bash deploy/aws/scripts/deploy.sh --commit <그 커밋>`으로 손으로 배포한다([k8s/README.md](k8s/README.md) 「앱 교체(deploy.sh)」). main 병합이 EKS 교체까지 가는 단계는 [#342](https://github.com/JminAILab/CatchU/issues/342)의 다음 PR이다.
-- `none`에서도 이미지 올리기는 개발 서버 배포 역할 `catchu-github-deploy`와 GitHub environment `dev-server`로 돈다. 4단계에서 개발 서버를 지울 때 이 둘과 ECR `catchu-deploy-files`는 EKS 배포 역할로 바꾼 뒤에 지운다(README 「삭제 순서」 A의 6).
+- `none`인 동안에도 main에 반영된 판본의 이미지는 ECR에 올라간다. EKS에는 `git fetch origin main` 뒤 `bash deploy/aws/scripts/deploy.sh --commit <그 커밋>`으로 손으로 배포한다([k8s/README.md](k8s/README.md) 「앱 교체(deploy.sh)」).
+- main 병합이 EKS 교체까지 가게 하려면 배포 대상을 `eks`로 바꾼다([cd/README.md](cd/README.md) 「켜기와 멈추기」). 그 문서의 「아직 못 본 것」을 실제 클러스터에서 확인한 뒤에만 바꾼다.
+- `none`에서는 이미지 올리기가 개발 서버 배포 역할 `catchu-github-deploy`와 GitHub environment `dev-server`로 돈다. 4단계에서 개발 서버를 지울 때 배포 대상이 아직 `none`이면 이 둘은 남긴다(README 「삭제 순서」 A의 6).
 - 48시간 동안 되돌릴 일이 없으면 4단계로 간다(README 「삭제 순서」 A).
 
 ## 되돌리기

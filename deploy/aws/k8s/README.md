@@ -13,6 +13,7 @@ EKS(#276)에서 web·api·worker를 띄우는 쿠버네티스 실행 파일과 �
 | [`services.yaml`](services.yaml) | 손으로 | web·api의 클러스터 안 주소. 바깥으로 여는 Service는 두지 않는다 |
 | [`ingress.yaml`](ingress.yaml) | 손으로 | 공개 ALB. 80은 443으로 이동(301), TLS 1.2·1.3만, `/v1/internal`은 404, `/v1`과 Claude MCP OAuth 주소(`/authorize`·`/token`·`/register`·`/.well-known/oauth-*` 둘, 개발 서버 Caddy와 같은 목록)는 api, 그 밖은 web, HSTS 300초, 유휴 60초, 삭제 보호, WAF `catchu-edge` |
 | [`api.yaml`](api.yaml)·[`worker.yaml`](worker.yaml)·[`web.yaml`](web.yaml) | `deploy.sh`만 | api·worker는 한 개씩 `Recreate`, web은 새 Pod를 먼저 띄우고 옛 Pod를 내린다. 모두 UID 1000·읽기 전용 루트·권한 전부 제거·`/tmp` 크기 상한, 자원 요청과 메모리 상한(worker는 실제 분석을 재기 전의 임시값) |
+| [`deploy-rbac.yaml`](deploy-rbac.yaml) | 손으로 | 자동 배포 역할의 쿠버네티스 권한. namespace `catchu`에서 `deploy.sh`가 쓰는 조회·적용·일회 Pod 만들기·로그 읽기만 준다. Secret 읽기·exec·지우기는 없다([../cd/README.md](../cd/README.md) 「처음 준비」) |
 | [`migration-pod.yaml`](migration-pod.yaml) | `deploy.sh`만 | migration 일회 Pod 틀. controller 없이 한 번 실행하고 다시 띄우지 않으며 10분 한도가 있다 |
 | [`consent-guard-pod.yaml`](consent-guard-pod.yaml) | `deploy.sh`만 | 동의 기록 삭제 권한 확인 일회 Pod 틀. migration 계정으로 붙어 앱 계정의 동의 기록 DELETE·TRUNCATE 권한을 확인·회수·재확인한다(postgres 16.15, 사용자 999·읽기 전용 루트·권한 전부 제거, TLS `verify-full`, 5분 한도). 연결 허용은 migration과 같다 |
 | [`ops/namespace.yaml`](ops/namespace.yaml)·[`ops/network-policy.yaml`](ops/network-policy.yaml) | 손으로 | 관리 작업 namespace `catchu-ops`(Pod 보안 검사 `restricted`, 토큰 자동 탑재 끔)와 그 연결 허용 목록(기본 차단, DNS, psql Pod는 DB 5432만) |
@@ -147,7 +148,7 @@ bash deploy/aws/scripts/deploy.sh --commit <main 커밋 40자>
 
 3~8로 멈추면 api·worker는 0으로 멈춘 채다. 다음 실행은 이 상태를 보고 2로 멈추므로, 원인을 확인한 뒤 `--resume`을 붙여 다시 실행한다. 다만 처음 설치에서 8로 멈췄으면 Deployment가 아직 없어 다음 실행은 `--resume` 없이도 migration을 건너뛰고 확인부터 다시 한다. 그때도 원인을 먼저 확인한 뒤 다시 실행한다. 자동 배포(#342)의 다음 실행도 결과를 확인하기 전에는 덮어쓰지 않는다.
 
-- **자동 배포(#342)에서 쓸 때 맞출 것:** 이 스크립트는 프로필 `catchu`, kubeconfig `~/.kube/catchu`, 기대 계정 번호를 전제로 한다([../README.md](../README.md) 「처음 준비」). 배포 역할에 필요한 권한은 ECR 네 저장소 조회, `eks:DescribeCluster`, namespace `catchu`의 Deployment 조회·적용과 실행 수 바꾸기, Pod 조회·감시·만들기와 로그 읽기(migration·동의 기록 확인 Pod 포함), NetworkPolicy·ConfigMap 조회다. Secret 읽기와 exec는 필요 없다. 동의 기록 확인은 표 소유자인 migration 계정으로 하므로 RDS 관리자 비밀번호와 `catchu-ops`에도 닿지 않는다.
+- **자동 배포(#342)에서 쓸 때:** 이 스크립트는 프로필 `catchu`, kubeconfig `~/.kube/catchu`, 기대 계정 번호를 전제로 한다([../README.md](../README.md) 「처음 준비」). 러너에서는 [`../cd/ci-deploy.sh`](../cd/ci-deploy.sh)가 이 전제를 맞춘 뒤 부르고, 권한은 [`deploy-rbac.yaml`](deploy-rbac.yaml)과 [../cd/README.md](../cd/README.md) 「권한」에 있다. 배포 역할에 필요한 권한은 ECR 네 저장소 조회, `eks:DescribeCluster`, namespace `catchu`의 Deployment 조회·적용과 실행 수 바꾸기, Pod 조회·감시·만들기와 로그 읽기(migration·동의 기록 확인 Pod 포함), NetworkPolicy·ConfigMap 조회다. Secret 읽기와 exec는 필요 없다. 동의 기록 확인은 표 소유자인 migration 계정으로 하므로 RDS 관리자 비밀번호와 `catchu-ops`에도 닿지 않는다.
 - **확인하지 못한 것(2단계에서 본다):** 실제 API 서버의 스키마와 Pod 보안 검사 통과, 실제 노드에서 끝난 옛 실행의 종료 코드가 감시 출력에 오는지(출력 모양은 kubectl 1.37.1을 이 컴퓨터의 가짜 API에 붙여 확인했다), 실제 준비·중단 시간, 동의 기록 확인 Pod가 실제 RDS에서 migration이 만든 표의 권한을 회수하는지와 그 출력.
 
 ## 시험

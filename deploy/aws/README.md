@@ -21,7 +21,7 @@
 | [`logging/`](logging/README.md)·[`scripts/create-log-group.sh`](scripts/create-log-group.sh) | 로그 그룹(14일)·수집기 |
 | [`scripts/create-certificate.sh`](scripts/create-certificate.sh)·[`install-lb-controller.sh`](scripts/install-lb-controller.sh) | ACM 인증서·Load Balancer Controller |
 | [`k8s/`](k8s) | 쿠버네티스 실행 파일. namespace·NetworkPolicy·Service·Ingress(ALB)는 손으로 적용하고, Deployment(web·api·worker)와 migration·동의 기록 확인 Pod 틀은 `deploy.sh`만 쓴다([k8s/README.md](k8s/README.md)) |
-| [`scripts/deploy.sh`](scripts/deploy.sh) | 앱 교체. 옛 api·worker 종료 확인 → migration 일회 Pod → 동의 기록 삭제 권한 확인·회수 → 새 api·worker·web 시작과 확인([k8s/README.md](k8s/README.md) 「앱 교체(deploy.sh)」) |
+| [`scripts/deploy.sh`](scripts/deploy.sh) | 앱 교체. 옛 api·worker 종료 확인 → migration 일회 Pod → 동의 기록 삭제 권한 확인·회수 → 새 api·worker·web 시작과 확인([k8s/README.md](k8s/README.md) 「앱 교체(deploy.sh)」). 자동 배포는 [cd/](cd/README.md) |
 | [`scripts/deploy.test.sh`](scripts/deploy.test.sh) | `deploy.sh` 회귀 시험과 실행 파일 조건 검사(AWS·클러스터에 닿지 않음, [k8s/README.md](k8s/README.md) 「시험」) |
 | [`scripts/make-secrets.sh`](scripts/make-secrets.sh)·[`put-parameter.sh`](scripts/put-parameter.sh) | 앱 Secret·ConfigMap 만들기와 SSM에 새 비밀값 넣기([k8s/README.md](k8s/README.md) 「Secret과 ConfigMap」) |
 | [`scripts/db-admin.sh`](scripts/db-admin.sh)·[`db/`](db)·[`k8s/ops/`](k8s/ops) | DB 관리용 psql 일회 Pod(namespace `catchu-ops`)와 RDS 계정 SQL·루트 인증서([k8s/README.md](k8s/README.md) 「DB 관리 Pod」). 공통 RDS 조회는 [`scripts/lib/rds.sh`](scripts/lib/rds.sh) |
