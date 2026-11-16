@@ -407,7 +407,7 @@ export function LandingPage() {
               <p className={styles["chapter-kicker"]}><span>04</span>SELECT. COMPOSE. SHARE.</p>
               <h2>공개한 Catch를, <em>링크로.</em></h2>
               <p>
-                공유 링크를 발행해 공개한 Catch를 보여 줍니다. 다시 숨긴 Catch는 이미 보낸 링크에서도 보이지 않습니다.
+                보낼 Catch를 골라 발행하면 링크가 만들어집니다. 링크에는 발행할 때의 내용이 그대로 남고, 그만 보이려면 링크를 중지합니다.
               </p>
             </div>
             <Reveal className={[styles["scene-visual"], styles["sharing-visual"]].join(" ")}>
@@ -474,7 +474,7 @@ export function LandingPage() {
                     <span className={[styles["shared-item-icon"], styles["muted"]].join(" ")}
                       ><svg className={styles["icon"]} aria-hidden="true"><use href="#icon-file" /></svg
                     ></span>
-                    <div><small>공개 범위</small><strong>숨긴 Catch는 보이지 않습니다.</strong></div>
+                    <div><small>발행 시점 고정</small><strong>발행할 때의 내용 그대로 보입니다.</strong></div>
                     <svg className={[styles["icon"], styles["item-arrow"]].join(" ")} aria-hidden="true"><use href="#icon-arrow" /></svg>
                   </div>
                 </div>

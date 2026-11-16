@@ -98,7 +98,6 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/(member)/profile/claude/` | 12월 U6: 회원 가드 안의 Claude 연결 관리·승인 화면([기능 안내](src/features/claude-connection/README.md)) |
 | `src/app/s/[token]/` | 발행본 받은 사람 화면(U4 W4). 회원 로그인 없이 받은 사람 API에 연결한다([기능 안내](src/features/recipient/README.md)) |
 | `src/components/header/` | 로그인·비로그인·수신자 헤더와 프로필 메뉴 |
-| `src/components/notice-dialog/` | 채용공고·알림 안내창 |
 | `src/components/status/` | 불러오는 중·조회 실패·정상 0건 공통 표시 |
 | `src/components/ai-consent/` | 12월 U2: 외부 AI 첫 이용 동의 창·한 줄 안내([안내](src/components/ai-consent/README.md)) |
 | `src/components/recipient-guide/` | 12월 U2: 받은 사람 안내 묶음(U4가 받은 사람 화면 위쪽에 닮, [시작 안내](src/features/start-guide/README.md)) |
@@ -129,19 +128,19 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | 묶음 폴더 | 헤더 | 구성 (#55 10월 헤더 합의) |
 |---|---|---|
 | `src/app/(guest)/` | 비로그인 일반 | 왼쪽 로고(→ `/`) / 오른쪽 [Google로 시작하기](→ 로그인 진입). 내 자산·공유 링크·프로필은 없음 |
-| `src/app/(member)/` | 로그인 일반·발행자 | 왼쪽 로고(→ `/home`)·내 자산·텍스트 자료(U4)·발행본(U4)·공유 링크·채용공고 / 오른쪽 알림·프로필. 대표 구성 진입점은 10월에 없음 |
+| `src/app/(member)/` | 로그인 일반·발행자 | 왼쪽 로고(→ `/home`)·내 자산·텍스트 자료(U4)·발행본(U4)·JD 관리(U10) / 오른쪽 프로필. 10월의 [공유 링크]는 [발행본]으로 바뀌었고, 채용공고·알림은 뺐다(아래). 대표 구성 진입점은 없음 |
 | `src/app/s/` | 공유 링크 수신자 | 이동 없는 CatchU 브랜드만. 로그인 여부와 무관하며 로그인·프로필 버튼 없음 |
 
 - **탭 아이콘:** `src/app/favicon.ico`(48px)와 `src/app/icon.png`를 Next가 모든 화면의 아이콘 링크로 내려 준다(#560). 바꾸려면 두 파일을 함께 바꾼다.
 
 - **회원 화면 폭:** 창 폭 760px부터 지원한다. `(member)/layout.tsx`의 전용 CSS는 760px 미만에서만 헤더·본문 폭을 760px로 유지하고 문서 가로 스크롤을 허용한다. 760px 이상에서는 세로 스크롤바를 뺀 가용 폭에 맞추며, 헤더 메뉴는 글자 단위로 줄바꿈하지 않는다. 회원 화면 검증 폭은 760·1024·1536px이다. 비로그인·공유 링크 수신자 레이아웃에는 이 최소 폭을 적용하지 않는다([#412 회원 화면 범위](https://github.com/JminAILab/CatchU/issues/412)).
-- **채용공고·알림:** 흐리게 표시하되 누를 수 있다(`disabled`를 쓰지 않는다). 누르면 현재 화면 위 안내창에 '개발 중인 기능입니다'와 [확인]을 띄운다. 열리면 [확인]에 초점이 가고, Tab은 안내창 밖으로 나가지 않는다.
+- **채용공고·알림:** 두지 않는다. 10월에는 흐린 메뉴와 '개발 중인 기능입니다' 안내창을 두었는데(#55), 두 기능을 12월 요구사항에서 빼서 2026-11-16 팀장 결정으로 메뉴와 안내창(`src/components/notice-dialog/`)을 지웠다(#565).
+- **보낸 링크의 미리보기·검색 제외:** `src/app/s/layout.tsx`가 `/s/` 아래 모든 주소에 같은 탭 제목·미리보기 문구와 검색 제외 표시를 내려 준다([받은 사람 화면](src/features/recipient/README.md) 「동작」, #565).
 - **프로필:** 누르면 근처에 [프로필 보기](→ `/profile`)·[로그아웃] 메뉴가 열린다(#51). [로그아웃]은 메모리 토큰을 지우고 비로그인 홈(`/`)으로 보낸다. 서버 세션·Refresh Token은 아직 없다(OQ-A1). `MemberHeader`에 `onLogout`을 주지 않으면 [로그아웃]이 '연결 전' 표시와 함께 누를 수 없는 상태(`aria-disabled`)로 보인다.
 - **닫기 조작:** #51·#55의 미결을 [#171 A 담당 검토](https://github.com/JminAILab/CatchU/pull/171#pullrequestreview-5349302819)(9/29)로 정했다. 어느 방법으로 닫아도 창·메뉴만 닫고 현재 페이지·입력·필터·상세 상태는 그대로 둔다.
 
 | 대상 | 닫는 방법 | 초점 | 닫히지 않는 경우 |
 |---|---|---|---|
-| 안내창 | [확인]·X·Esc·바깥 클릭 | 어느 방법이든 연 메뉴로 돌아감 | 창 안 클릭, 창 안에서 누르기 시작해 바깥에서 뗀 경우 |
 | 프로필 메뉴 | [프로필] 버튼·Esc·바깥 클릭. [로그아웃]을 누르면 메뉴를 먼저 닫고 로그아웃을 요청한다(#287) | Esc·[로그아웃]으로 닫으면 [프로필] 버튼으로 돌아감. 바깥 클릭은 누른 요소의 동작·초점을 막지 않음 | 메뉴 안 클릭([로그아웃] 제외) |
 - **조회 상태:** `src/components/status/status.tsx`의 세 컴포넌트를 쓴다. 불러오는 중은 `LoadingState`, `readApiResponse`가 `lookup-failed`를 돌려주면 `LookupFailedState`, 성공 응답의 빈 목록일 때만 `EmptyState`다. 조회 실패를 0건으로, 요청 중을 성공으로 표시하지 않는다.
 - **스타일:** 컴포넌트 옆 CSS Modules(`*.module.css`)를 쓴다. 공통 색·폭은 `globals.css`의 `--color-*`·`--content-width` 변수를 쓴다. `globals.css`가 `body` 기본 여백을 없애므로 화면에서 여백을 되돌리는 음수 여백은 필요 없다.
