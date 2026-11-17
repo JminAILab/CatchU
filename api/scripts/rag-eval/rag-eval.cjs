@@ -7,9 +7,13 @@
 //   결과 원문과 기록 모두 로컬 폴더(api/.rag-eval/)에만 쓴다. NFR3 측정이 아니다.
 // - measure: 실제 게이트(Claude)·실제 검색(Voyage)과 테스트가 아닌 DB의 시연 발행본으로 한 번 잰다(U4 합류 뒤, BR10.1).
 //   원문은 api/.rag-eval/에, 건수·위치·빈 판정 칸 기록은 api/docs/rag-evaluation/<날짜>.md에 쓴다.
+// - 두 모드 모두 질문마다 게이트 로그(ai_gate_result·ai_gate_failed)의 수와 이름 칸을 원문 결과와 기록에 남긴다(#559). 글은 받지 않는다.
+// - 질의응답 요청은 앱과 같은 buildQnaSources(api/src/rag-answer/qna-sources.ts)로 만들고, 질문별 붙이지 못한 줄 수를 숫자로 남긴다(#559 FR7).
+//   검색 적중률은 지금처럼 검색 12개로 잰다. JD 두 방식 비교는 JD 요약처럼 검색 조각을 그대로 근거로 옮긴다(chunkToSource).
 // 입력 파일 모양: { publicationId, memberId(measure만, 실행자 본인), questions: [{ question, goldQuotes: [글귀] }](measure는 10개), jd?: 문자열, targetVersion?,
 //   snapshot?: { title, publishedAt, expiresAt, items }(synthetic만, 없으면 내장 합성 발행본) }
 require('reflect-metadata');
+const { Logger } = require('@nestjs/common');
 const { randomBytes } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
@@ -18,7 +22,7 @@ const { assertGenerationRequest } = require('../../dist/ai-generation/gate-polic
 const { koreanUsageDate } = require('../../dist/daily-run-limit/daily-run-limit');
 const { buildChunkDrafts } = require('../../dist/published-index/chunker');
 const { syntheticEmbedding } = require('../../dist/published-index/synthetic-embedding-provider');
-const { chunkToSource } = require('../../dist/rag-answer/qna-service');
+const { buildQnaSources, chunkToSource } = require('../../dist/rag-answer/qna-sources');
 const { QNA_INSTRUCTION, QNA_MODEL, QNA_SEARCH_LIMIT } = require('../../dist/rag-answer/rag-answer-config');
 const { JD_SUMMARY_INSTRUCTION } = require('../../dist/jd-summary/jd-generation-request');
 const { evidencePassRate, findGoldLocations, hitRate, isHitAt, locationOf } = require('./gold-locations.cjs');
@@ -135,8 +139,57 @@ function sampleInput() {
   };
 }
 
-function qnaRequest(hits, publicationText, question) {
-  return { feature: 'QNA', instruction: QNA_INSTRUCTION, sources: hits.map(chunkToSource), userText: question, publicationText, model: QNA_MODEL };
+const GATE_LOG_EVENTS = new Set(['ai_gate_result', 'ai_gate_failed']);
+const LOG_LEVELS = ['log', 'warn', 'error', 'debug', 'verbose', 'fatal'];
+const countOrNull = (value) => (Number.isInteger(value) && value >= 0 ? value : null);
+const nameOrNull = (value, pattern) => (typeof value === 'string' && pattern.test(value) ? value : null);
+
+/** 게이트 로그 한 줄에서 수와 이름만 꺼낸다. 글 칸은 읽지 않고, 모양이 다른 값은 null로 둔다(#559 NFR3). */
+function gateLogCounts(entry) {
+  const reasons = entry.dropReasons ?? {};
+  return {
+    event: entry.event, itemCount: countOrNull(entry.itemCount), droppedCount: countOrNull(entry.droppedCount),
+    dropReasons: { fact: countOrNull(reasons.fact), location: countOrNull(reasons.location), truncated: countOrNull(reasons.truncated) },
+    nonItemLineCount: countOrNull(entry.nonItemLineCount),
+    stopReason: nameOrNull(entry.stopReason, /^[a-z_]{1,40}$/),
+    failure: entry.event === 'ai_gate_failed' ? nameOrNull(entry.failure, /^[A-Z_]{1,40}(\/[A-Z_]{1,40}(:\d{3})?)?$/) : null,
+  };
+}
+
+/**
+ * 질문마다 게이트 로그(ai_gate_result·ai_gate_failed)의 수 칸을 받는다(#559 설계 결정 9, FR5.4).
+ * 게이트는 Nest Logger 인스턴스로 로그를 내고, 인스턴스는 정적 로거가 바뀌어 있으면 그쪽으로 넘긴다(@nestjs/common 12 Logger.localInstance).
+ * 그래서 평가 실행 동안만 Logger.overrideLogger로 정적 로거를 바꿔 끼운다. 받은 로그는 원래 로거로 그대로 넘기므로 콘솔 출력은 지금과 같다.
+ * 게이트와 계약 모양(C-01 GatedOutput)은 바꾸지 않는다. take()는 지난 take() 뒤에 나온 게이트 로그 가운데 마지막 것의 수 칸(없으면 null)이다.
+ */
+function captureGateLogs() {
+  const previous = Logger.staticInstanceRef;
+  let pending = [];
+  const forward = (level) => (message, ...params) => {
+    if (message && typeof message === 'object' && GATE_LOG_EVENTS.has(message.event)) pending.push(gateLogCounts(message));
+    previous?.[level]?.(message, ...params);
+  };
+  Logger.overrideLogger(Object.fromEntries(LOG_LEVELS.map((level) => [level, forward(level)])));
+  return {
+    take() {
+      const last = pending.at(-1) ?? null;
+      pending = [];
+      return last;
+    },
+    restore() { Logger.overrideLogger(previous ?? false); },
+  };
+}
+
+/**
+ * 질의응답 요청. 근거 목록은 앱(qna-service.ts)과 같은 buildQnaSources로 검색 상위 8개와 사본에서 만든다(#559 FR7.1).
+ * 그래서 다시 재기가 앱이 보내는 근거(같은 Catch 줄 붙이기·머리글)를 그대로 잰다. 붙이지 못한 줄 수도 함께 돌려준다.
+ */
+function qnaRequest(hits, snapshot, publicationText, question) {
+  const { sources, unattachedLineCount } = buildQnaSources(hits, snapshot);
+  return {
+    request: { feature: 'QNA', instruction: QNA_INSTRUCTION, sources, userText: question, publicationText, model: QNA_MODEL },
+    unattachedLineCount,
+  };
 }
 
 /** JD 두 방식(BR10.7): 검색 기반(조각 8개)과 전체 넣기(published_chunk 전부, seq 순서). 80,000자 초과는 INPUT_TOO_LARGE. */
@@ -177,27 +230,40 @@ async function runRagEval({ mode, input, deps, outDir = DEFAULT_OUT_DIR, docsDir
   const perQuestion = [];
   let passedItems = 0;
   let droppedItems = 0;
-  for (const [index, entry] of input.questions.entries()) {
-    const result = await deps.search.search(input.publicationId, entry.question, EVAL_SEARCH_LIMIT);
-    const top = result.hits.slice(0, QNA_SEARCH_LIMIT);
-    const questionNo = index + 1;
-    let output = { items: [], droppedCount: 0 };
-    let answerFailed = null;
-    try {
-      if (top.length > 0) output = await deps.gate.generate(qnaRequest(top, result.publicationText, entry.question));
-    } catch (error) {
-      // 답 0개(NO_ITEMS)는 앱에서도 「답 실패」로 끝나는 결과라 그 질문만 실패로 남기고 다음 질문으로 간다(새 Catch NC3 Build and Test, 팀장 결정 2026-11-12).
-      // 그 밖의 실패는 지금까지처럼 멈춘다. 로그에는 질문 번호와 실패 이름만 낸다(질문·글귀를 넣지 않는다).
-      if (!(error instanceof AiProviderError && error.reason === 'NO_ITEMS')) {
-        console.error(`${questionNo}번 질문에서 멈춤: ${error.name}`);
-        throw error;
+  const gateLogs = captureGateLogs();
+  try {
+    for (const [index, entry] of input.questions.entries()) {
+      const result = await deps.search.search(input.publicationId, entry.question, EVAL_SEARCH_LIMIT);
+      const top = result.hits.slice(0, QNA_SEARCH_LIMIT);
+      const questionNo = index + 1;
+      let output = { items: [], droppedCount: 0 };
+      let answerFailed = null;
+      // 검색 조각이 0개면 앱처럼 모델을 부르지 않으므로 붙이기도 하지 않는다(null).
+      let unattachedLineCount = null;
+      gateLogs.take(); // 앞 질문 뒤에 나온 로그가 이 질문에 묶이지 않게 비운다.
+      try {
+        if (top.length > 0) {
+          const qna = qnaRequest(top, snapshot, result.publicationText, entry.question);
+          unattachedLineCount = qna.unattachedLineCount;
+          output = await deps.gate.generate(qna.request);
+        }
+      } catch (error) {
+        // 답 0개(NO_ITEMS)는 앱에서도 「답 실패」로 끝나는 결과라 그 질문만 실패로 남기고 다음 질문으로 간다(새 Catch NC3 Build and Test, 팀장 결정 2026-11-12).
+        // 그 밖의 실패는 지금까지처럼 멈춘다. 로그에는 질문 번호와 실패 이름만 낸다(질문·글귀를 넣지 않는다).
+        if (!(error instanceof AiProviderError && error.reason === 'NO_ITEMS')) {
+          console.error(`${questionNo}번 질문에서 멈춤: ${error.name}`);
+          throw error;
+        }
+        answerFailed = 'NO_ITEMS';
+        console.error(`${questionNo}번 질문: 답 실패(NO_ITEMS)`);
       }
-      answerFailed = 'NO_ITEMS';
-      console.error(`${questionNo}번 질문: 답 실패(NO_ITEMS)`);
+      passedItems += output.items.length;
+      droppedItems += output.droppedCount;
+      perQuestion.push({ questionNo, entry, hits: result.hits, goldLocations: gold[index], output, answerFailed, gateLog: gateLogs.take(),
+        unattachedLineCount });
     }
-    passedItems += output.items.length;
-    droppedItems += output.droppedCount;
-    perQuestion.push({ questionNo, entry, hits: result.hits, goldLocations: gold[index], output, answerFailed });
+  } finally {
+    gateLogs.restore();
   }
   const jd = input.jd === null ? null : await compareJd(deps, input);
   const summary = {
@@ -207,13 +273,16 @@ async function runRagEval({ mode, input, deps, outDir = DEFAULT_OUT_DIR, docsDir
     answerFailedQuestions: perQuestion.filter((entry) => entry.answerFailed !== null).map((entry) => entry.questionNo),
     missedHitLocations: perQuestion.filter((entry) => !isHitAt(entry.hits, entry.goldLocations, 8))
       .map((entry) => ({ questionNo: entry.questionNo, locations: entry.hits.slice(0, 8).map(locationOf) })),
+    gateLogs: perQuestion.map((entry) => ({ questionNo: entry.questionNo, gateLog: entry.gateLog })),
+    unattachedLines: perQuestion.map((entry) => ({ questionNo: entry.questionNo, unattachedLineCount: entry.unattachedLineCount })),
     jd: jd === null ? null : jd.summary,
   };
   const raw = {
     date: summary.date, targetVersion: input.targetVersion, publicationId: input.publicationId,
     questions: perQuestion.map((entry) => ({ questionNo: entry.questionNo, question: entry.entry.question, goldQuotes: entry.entry.goldQuotes,
       goldLocations: entry.goldLocations, hitLocations: entry.hits.map(locationOf), items: entry.output.items,
-      droppedCount: entry.output.droppedCount, answerFailed: entry.answerFailed })),
+      droppedCount: entry.output.droppedCount, answerFailed: entry.answerFailed, gateLog: entry.gateLog,
+      unattachedLineCount: entry.unattachedLineCount })),
     jd: jd === null ? null : jd.raw,
   };
   return { summary, ...writeEvaluation({ mode, outDir, docsDir, summary, raw }) };
@@ -338,7 +407,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  EVAL_SEARCH_LIMIT, RagEvalInputError, createMeasureDeps, createSyntheticDeps, dbPublicationAccess, main, ownedSnapshotReader, parseArgs, parseInput,
+  EVAL_SEARCH_LIMIT, RagEvalInputError, captureGateLogs, createMeasureDeps, createSyntheticDeps, dbPublicationAccess, main, ownedSnapshotReader, parseArgs, parseInput,
   runRagEval, sampleInput,
   splitJdRequirements,
 };

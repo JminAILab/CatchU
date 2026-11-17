@@ -2,96 +2,55 @@
 
 ## Run Record
 
-- Date: 2026-11-09
-- Commit: a1d0fbb4ef70f57e690823ae8aa13fdd2df9eeff
+- Date: 2026-11-16
+- Commit: eb0d5a6cf1aa236ef8520946ea66a87c1c632a37
 
 ## 이번 실행
 
-- intent: `261109-new-catch`(새 Catch)
-- 방식: 전체 다시 스캔. 앞 저장소(`261103-catch-redesign`이 만든 `kind: partial` 저장소)는 낡은 것으로 보고 아홉 문서를 모두 이번 실행 내용으로 바꿨다. 앞 문서는 방향을 잡는 데만 읽었고, 적은 내용은 모두 지금 코드에서 다시 확인했다.
-- 깊이: Standard. 개발자 한 명이 스캔과 아홉 문서 작성을 함께 했다(협업자 꺼짐).
-- 왜 다시 했나: 작업 브랜치에 통합 브랜치가 다시 합쳐졌다(merge commit `a1d0fbb4`). Catch 개편 CR1~CR3, #487·#488, U4 제출 2·3, U5·U6·U3, CR2 소속 기록(`commit_assignment`)이 들어와 앞 저장소의 코드 기준(`9923226c`)과 크게 달라졌다.
-- 깊게 읽은 곳: 개발자 스캔 기록(`inception/reverse-engineering/developer-scan.md`) 「Analyzed deeply」. 중심은 api의 `catches`·`publications`·사본을 읽는 곳(`published-index` 조각 나누기, `rag-answer` 요약 근거, `claude-mcp` 자료 읽기), worker의 수집 기록·근거·기록의 글·작업 사실 규칙·파일 종류 분류, web의 내 자산·발행·사본·받은 사람 화면, 계약 YAML, 앱 조립, 마이그레이션 표 목록이다.
-- 훑은 곳: 아래 `shallow.paths`. 파일 목록·머리 설명·데코레이터·내보낸 이름까지 보았고 본문 전체를 읽지는 않았다. `kind: full`과 `./`는 이번 실행이 저장소 전체를 대상으로 했고 모든 폴더를 열어 분류했다는 뜻이며, 훑은 곳의 세부 동작은 해당 기능을 고칠 때 다시 읽어야 한다.
-- 훑은 폴더 가운데 아래 다섯은 안에 깊게 읽은 파일이 있다. 이 폴더들은 **깊게 읽은 파일을 뺀 나머지만** 훑었다(깊게 읽은 파일은 개발자 스캔 기록 「Analyzed deeply」에서 옮겼다).
-  - `api/docs/`: `environment.md` 밖
-  - `worker/app/collection/`: `records.py`·`evidence.py` 밖
-  - `web/src/lib/`: `routes.ts`·`github-source-url.ts` 밖
-  - `web/src/features/`: `assets/`의 `assets-view.tsx`·`types.ts`·`catch-api.ts`·`author-description-panel.tsx`, `publications/`의 `snapshot-view.tsx`·`publish-sources.ts`·`publish-view.tsx`(앞 150줄까지), `recipient/`의 `recipient-view.tsx`·`recipient-api.ts`(사본 칸 고르기) 밖
-  - `docs/`: `ai-dlc-input-catch/CatchU_새_Catch_입력.md` §4~§9 밖
-- 열지 않은 곳: `node_modules/`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, `dist/`, `.next/`, `coverage/`, 잠금 파일(`package-lock.json`, `uv.lock`), 이진 파일(글꼴·이미지), `.local-handoffs/`, `handoff/`, AI-DLC 설치와 작업 공간(`.claude/`, `.codex/`, `.agents/`, `aidlc/`, `aidlc.settings.local.json`, `AGENTS.md`·`.gitignore`의 AI-DLC 관리 블록, `.mcp.json`의 AI-DLC MCP 서버).
+- intent: `261116-recipient-qa-fix`(#559 받은 사람 질의응답이 틀리게 답한 자리 고치기, 범위 bugfix)
+- 방식: 집중 스캔 + 앞 저장소에 합치기. 앞 저장소(`261109-new-catch`가 2026-11-09 커밋 `a1d0fbb4`에서 만든 `kind: full`)는 그 뒤 코드가 바뀌어 낡은 것(STALE)으로 판정됐다. 그래서 이번에 다시 읽은 네 폴더의 내용만 고쳐 쓰거나 더했고, 그 밖의 글은 앞 저장소 글을 그대로 두었다. 그대로 둔 글은 2026-11-09 기준이며 이번에 다시 확인하지 않았다.
+- 깊이: Minimal. 개발자 한 명이 스캔과 아홉 문서 작성을 함께 했다(협업자 꺼짐).
+- 깊게 읽은 곳: 아래 `analyzed.paths` 네 폴더(개발자 스캔 기록 `inception/reverse-engineering/developer-scan.md` 「Analyzed deeply」).
+- 훑은 곳: 이번에 훑은 이웃(받은 사람·작성자 발행본 화면이 패널을 다는 곳, JD 요약의 검색·요청, 사본 칸 이름, 관련 `api/docs`·시험 이름)과, 앞 저장소에서 깊게 읽었으나 이번에 다시 확인하지 못한 저장소 전체(`./`, 앞 `analyzed.paths`를 내린 것), 앞 저장소의 훑은 곳. `api/src/ai-generation/`은 앞 저장소에서 훑은 곳이었고 이번에 깊게 읽어 `shallow.paths`에서 뺐다.
+- 열지 않은 곳: `api/dist/`, `node_modules/`, `.next/`, AI-DLC 설치와 작업 공간(`.claude/`, `.codex/`, `.agents/`, `aidlc/`. 계약 원본 `contract-summary.md`도 그 안이라 열지 않음).
 - 실행하지 않은 것: 프로젝트의 시험·빌드·프로그램.
 
 ## Scope of Analysis
 
 ```yaml
 scope_version: 1
-kind: full
-intent: 261109-new-catch
-fingerprint: 55a5f12ff84d8a743e20e9189f7bd2c07c68a4ae
+kind: partial
+intent: 261116-recipient-qa-fix
+fingerprint: 88e8e6e4b9a9ac2c13af49ea3ccf7a798b783675
 analyzed:
   paths:
-    - ./
-  components:
-    - worker.collection
-    - worker.candidates
-    - worker.generation
-    - worker.judgement
-    - worker.processing
-    - worker.contract
-    - worker.consumer
-    - worker.request_context
-    - worker.redact
-    - api.common
-    - api.auth
-    - api.database
-    - api.member-analysis
-    - api.member-profile
-    - api.google-login
-    - api.github-connection
-    - api.member-repositories
-    - api.analysis-intake
-    - api.analysis-queue
-    - api.analysis-receiver
-    - api.result-application
-    - api.analysis-deadline
-    - api.worker-context
-    - api.catches
-    - api.materials
-    - api.publications
-    - api.share-links
-    - api.published-index
-    - api.rag-answer
-    - api.ai-generation
-    - api.ai-run
-    - api.ai-consent
-    - api.daily-run-limit
-    - api.file-storage
-    - api.withdrawal
-    - api.claude-mcp
-    - api.health
-    - contract.repository-analysis
-    - web.app-routes
-    - web.lib
-    - web.components
-    - web.assets
-    - web.publications
-    - web.recipient
-    - web.rag-answer
-    - web.materials
-    - web.repository-management
-    - web.member-account
-    - deploy.images-compose
-    - deploy.dev-server
-    - deploy.aws
-    - ci.github-actions
-    - docs.team
-    - tools.queue-verification
-shallow:
-  # 「깊게 읽은 파일 밖」이라고 적은 폴더는 그 파일을 뺀 나머지만 훑었다(위 「이번 실행」).
-  paths:
-    - api/src/ai-consent/
+    - api/src/published-index/
     - api/src/ai-generation/
+    - api/src/rag-answer/
+    - web/src/features/rag-answer/
+  components:
+    - api.published-index
+    - api.ai-generation
+    - api.rag-answer
+    - web.rag-answer
+shallow:
+  # ./ 는 앞 저장소(261109-new-catch, 2026-11-09)의 analyzed.paths를 내린 것이다. 이번에 다시 확인하지 않았다.
+  paths:
+    - ./
+    - api/src/jd-summary/
+    - api/src/publications/published-snapshot.ts
+    - web/src/features/recipient/
+    - web/src/features/publications/
+    - web/src/features/jd/
+    - api/docs/published-index.md
+    - api/docs/rag-answer.md
+    - api/docs/ai-generation.md
+    - api/docs/rag-evaluation/
+    - api/test/published-index/
+    - api/test/ai-generation/
+    - api/test/rag-answer/
+    - api/test/u2/
+    - api/src/ai-consent/
     - api/src/ai-run/
     - api/src/analysis-deadline/
     - api/src/auth/
@@ -107,10 +66,10 @@ shallow:
     - api/src/share-links/
     - api/src/withdrawal/
     - api/contracts/repository-analysis/common.yaml
-    - api/docs/  # environment.md 밖
+    - api/docs/
     - api/scripts/
     - api/test/
-    - worker/app/collection/  # records.py·evidence.py 밖
+    - worker/app/collection/
     - worker/app/consumer/
     - worker/app/contract/
     - worker/app/judgement/
@@ -121,12 +80,12 @@ shallow:
     - worker/fixtures/
     - web/src/app/
     - web/src/components/
-    - web/src/lib/  # routes.ts·github-source-url.ts 밖
-    - web/src/features/  # assets·publications·recipient의 깊게 읽은 파일 밖
+    - web/src/lib/
+    - web/src/features/
     - web/test/
     - web/scripts/
     - deploy/
     - .github/
-    - docs/  # ai-dlc-input-catch/CatchU_새_Catch_입력.md §4~§9 밖
+    - docs/
     - scripts/
 ```

@@ -37,6 +37,8 @@ export interface QnaCompleted {
   generateMs: number | null;
   /** U5가 직접 센 보낸 항목 수. */
   itemCount: number;
+  /** 상한 때문에 모델에 붙이지 못한 같은 Catch 기록 줄 수(#559 FR1.6, qna-sources.ts). 생성 단계 전에 끝났으면 null. 글은 없다. */
+  unattachedLineCount: number | null;
 }
 
 /** 스트림을 열기 전 거부. publicationId는 링크 판정을 통과한 뒤에만 있다. */

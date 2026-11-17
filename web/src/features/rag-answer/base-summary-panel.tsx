@@ -3,24 +3,30 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import { api } from "@/lib/api";
 import { GatedItemView } from "./gated-item-view";
+import type { ItemTitleOf } from "./item-title";
 import { createRagAnswerApi, type LinkAccessCode, type SourceLocation, type SummaryView } from "./rag-answer-api";
 import { RAG_ANSWER_MESSAGES } from "./rag-answer-messages";
 import { afterRegenerate, summaryDisplay, summaryPanelState, type SummaryPanelState } from "./rag-answer-state";
 import styles from "./rag-answer.module.css";
 
-/** 받은 사람 모드(C-11 자리 2). U4가 RecipientSlotProps와 showEvidence를 넘긴다. */
+/**
+ * 받은 사람 모드(C-11 자리 2). U4가 RecipientSlotProps와 showEvidence를 넘긴다.
+ * 선택 itemTitleOf(#559 FR4.2)를 넘기면 출처 딱지 옆에 항목 제목을 보인다. 넘기지 않으면 지금처럼 딱지만 보인다.
+ */
 export type RecipientSummaryProps = {
   token: string;
   getGrant: () => string | null;
   onAccessLost: (code: LinkAccessCode) => void;
   isLoggedIn: boolean;
   showEvidence: (location: SourceLocation) => void;
+  itemTitleOf?: ItemTitleOf;
 };
 
-/** 작성자 모드(C-11 owner-summary). U4의 작성자 발행본 화면이 publicationId와 showEvidence를 넘긴다. */
+/** 작성자 모드(C-11 owner-summary). U4의 작성자 발행본 화면이 publicationId와 showEvidence(선택 itemTitleOf)를 넘긴다. */
 export type OwnerSummaryProps = {
   publicationId: string;
   showEvidence: (location: SourceLocation) => void;
+  itemTitleOf?: ItemTitleOf;
 };
 
 export type BaseSummaryPanelProps = RecipientSummaryProps | OwnerSummaryProps;
@@ -81,7 +87,9 @@ export function BaseSummaryPanel(props: BaseSummaryPanelProps) {
       {state.kind === "ready" && display && (
         <>
           {display.message && <p className={styles.notice} data-testid="base-summary-message">{display.message}</p>}
-          {display.showItems && <GatedItemView items={state.view.items} showEvidence={props.showEvidence} testId="base-summary-items" />}
+          {display.showItems && (
+            <GatedItemView items={state.view.items} showEvidence={props.showEvidence} itemTitleOf={props.itemTitleOf} testId="base-summary-items" />
+          )}
           {display.showRegenerate && (
             <button type="button" disabled={regenerating} data-testid="base-summary-regenerate-button"
               onClick={() => regenerate(state.view)}>

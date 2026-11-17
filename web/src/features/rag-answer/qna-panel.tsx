@@ -4,18 +4,23 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { AiNoticeLine } from "@/components/ai-consent/ai-notice-line";
 import { api } from "@/lib/api";
 import { GatedItemView } from "./gated-item-view";
+import type { ItemTitleOf } from "./item-title";
 import { createRagAnswerApi, type GatedItem, type LinkAccessCode, type SourceLocation } from "./rag-answer-api";
 import { RAG_ANSWER_MESSAGES } from "./rag-answer-messages";
 import { askDisplay, canSendQuestion, type ConversationTurn, historyForRequest, QUESTION_MAX_LENGTH } from "./rag-answer-state";
 import styles from "./rag-answer.module.css";
 
-/** C-11 자리 3. U4가 RecipientSlotProps와 showEvidence를 넘긴다. */
+/**
+ * C-11 자리 3. U4가 RecipientSlotProps와 showEvidence를 넘긴다.
+ * 선택 itemTitleOf(#559 FR4.2)를 넘기면 출처 딱지 옆에 항목 제목을 보인다. 넘기지 않으면 지금처럼 딱지만 보인다.
+ */
 export type QnaPanelProps = {
   token: string;
   getGrant: () => string | null;
   onAccessLost: (code: LinkAccessCode) => void;
   isLoggedIn: boolean;
   showEvidence: (location: SourceLocation) => void;
+  itemTitleOf?: ItemTitleOf;
 };
 
 const ragAnswerApi = createRagAnswerApi({ client: api, baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL, nodeEnv: process.env.NODE_ENV });
@@ -75,7 +80,9 @@ export function QnaPanel(props: QnaPanelProps) {
           ? <p key={index} className={styles.question} data-testid="qna-question">{turn.text}</p>
           : (
             <div key={index} data-testid="qna-answer">
-              {turn.items.length > 0 && <GatedItemView items={turn.items} showEvidence={props.showEvidence} testId="qna-answer-items" />}
+              {turn.items.length > 0 && (
+                <GatedItemView items={turn.items} showEvidence={props.showEvidence} itemTitleOf={props.itemTitleOf} testId="qna-answer-items" />
+              )}
               {turn.notice && <p className={styles.notice} data-testid="qna-answer-notice">{turn.notice}</p>}
             </div>
           )))}

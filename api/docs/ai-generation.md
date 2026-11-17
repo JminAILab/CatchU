@@ -36,7 +36,7 @@
 ### generate() 한 번(기능 설계 W1)
 
 1. 근거마다 글을 `\n`에서만 나누고 줄바꿈 바로 앞 `\r`을 뺀다. 비었거나 공백뿐인 줄은 블록 번호 없이 건너뛰고, 넘기는 줄마다 근거 글 안 UTF-16 [시작, 끝)을 기록한다.
-2. 줄이 있는 근거만 근거 순서대로 인용이 켜진 사용자 정의 내용 문서(줄마다 글 블록 하나, `context`는 `자료 종류: GitHub 기록 원문` / `자료 종류: 작성자 자료 원문`)로 만들고 문서 번호 → 근거 위치 대응표를 함께 만든다. 근거가 없거나 남은 문서가 없으면 부르지 않고 `{ items: [], droppedCount: 0 }`.
+2. 줄이 있는 근거만 근거 순서대로 인용이 켜진 사용자 정의 내용 문서(줄마다 글 블록 하나, `context`는 `자료 종류: GitHub 기록 원문` / `자료 종류: 작성자 자료 원문`, 근거에 `itemContext`가 있으면 그 뒤에 ` · 머리글` — 아래 「인용 문서 머리글 — #559」)로 만들고 문서 번호 → 근거 위치 대응표를 함께 만든다. 근거가 없거나 남은 문서가 없으면 부르지 않고 `{ items: [], droppedCount: 0 }`.
 3. 시스템 지시 = 항목 형식 지시 + `instruction`. 사용자 메시지 = 문서들, 그 뒤 `userText`(있을 때). `publicationText`는 보내지 않는다.
 4. Claude를 한 번 부른다: 주소 `https://api.anthropic.com` 고정(`ANTHROPIC_BASE_URL` 무시), 재시도 0, 모델 `HAIKU` → `claude-haiku-5-5`·`SONNET` → `claude-sonnet-5-5`, 처리 위치 `inference_geo: "us"`, 생각 끔. 생각 끔은 모델마다 값이 다르다: Haiku 5.5는 `{ type: "disabled" }`, Sonnet 5.5는 `disabled`에 400을 내므로 가장 낮은 설정인 `{ type: "between_tools" }`(도구가 없는 이 호출에서는 생각 없이 답함). 구조화된 출력은 쓰지 않는다(인용과 함께 쓸 수 없음).
 5. 응답 처리(W2): 거절은 `REFUSED`, 정상 끝·출력 상한 밖의 중단 이유는 `UNEXPECTED_STOP`. 글 조각을 이어 줄로 나누고 조각의 인용을 그 조각의 첫 줄바꿈 아닌 글자가 놓인 줄에 붙인다. `'- '`로 시작하고 뒤에 글자가 있는 줄만 항목이다. 출력 상한에서 끝났으면 마지막 줄바꿈 뒤의 줄은 끝나지 않은 줄이라 그 줄이 항목이면 버리고 센다. 인용은 대응표로 근거를 찾아 블록 범위 [시작, 끝)의 첫 줄 시작~마지막 줄 끝을 `location.charStart`에 더한 위치, 그 범위의 원문(`quote`), 출처 이름으로 바꾼다. 연결되지 않는 인용이 하나라도 있으면 그 항목을 버리고 센다. 인용이 있으면 `CITED`, 없으면 `AI_INTERPRETATION`(기본 요약·질의응답은 그 전에 따옴표 글로 인용을 찾는다, 아래 「따옴표 인용 — #528」). 남은 항목이 0개면 `NO_ITEMS`.
@@ -103,7 +103,7 @@ U1 파일에는 U1 동작을 바꾸지 않는 자리만 더했다: `buildCitatio
 
 ### generate (W3)
 
-1. 입구: 근거 글 길이 합 + `userText` 길이(UTF-16) > 80,000이면 부르지 않고 `AiInputTooLarge`(호출 Unit은 422 `INPUT_TOO_LARGE` 등). `publicationText`·지시문은 세지 않는다. `SONNET`은 `QNA`에만 쓰고 그 밖이면 `TypeError`.
+1. 입구: 근거 글 길이 합 + 근거 머리글(`itemContext`, #559) 길이 합 + `userText` 길이(UTF-16) > 80,000이면 부르지 않고 `AiInputTooLarge`(호출 Unit은 422 `INPUT_TOO_LARGE` 등). `publicationText`·지시문은 세지 않는다. `SONNET`은 `QNA`에만 쓰고 그 밖이면 `TypeError`.
 2. 시스템 지시 = 형식 지시 + 기능 지시 + 공통 문구. 형식 지시는 `JD_SUMMARY`만 JD용(`JD_FORMAT_INSTRUCTION`, 머리줄 "근거:"·"자료로 확인되지 않는 점:"·"면접 질문:", 면접 질문은 물음표로 끝나는 의문문)이고 나머지는 U1 그대로다.
 3. U1 호출·묶기·위치. `JD_SUMMARY`는 '- '가 아닌 줄을 버리기 전에 머리줄인지 보고 지금 칸을 바꿔 항목에 `jdRole`을 붙인다(머리줄 자체는 항목도 항목 아닌 줄도 아님). 모델이 낸 항목이 0개면 U1처럼 `NO_ITEMS`.
 4. 대조: 인용 항목은 인용 원문(+ 그 근거의 Catch PR 번호 `/pull/n`)에 숫자·PR 번호·파일 이름·영어 표기가 모두 있어야 남는다. AI 해석은 숫자·PR 번호가 있으면 버리고, 영어 표기·파일 이름이 발행본 글(없으면 근거 글 전체)에 있어야 남는다.
@@ -117,7 +117,14 @@ U1 파일에는 U1 동작을 바꾸지 않는 자리만 더했다: `buildCitatio
 
 ### 로그
 
-호출마다 한 줄. 성공 `ai_gate_result`: feature, mode(`GENERATE`·`STREAM`), itemCount, droppedCount, dropReasons(`truncated`·`location`·`fact`·`role`·`outside_heading`), nonItemLineCount, quoteCitedCount(따옴표 인용을 붙인 항목 수, #528), stopReason, inputTokens, outputTokens, durationMs, requestId. 실패 `ai_gate_failed`: feature, mode, failure(`INPUT_TOO_LARGE`·`INVALID_REQUEST`·`CALL_FAILED/…` 등), itemCount, droppedCount, requestId, durationMs. 항목 글·근거 글·질문·JD 줄·키는 남기지 않는다(NFR3.1·NFR6.9).
+호출마다 한 줄. 성공 `ai_gate_result`: feature, mode(`GENERATE`·`STREAM`), itemCount, droppedCount, dropReasons(`truncated`·`location`·`fact`·`role`·`outside_heading`), nonItemLineCount, quoteCitedCount(따옴표 인용을 붙인 항목 수, #528), stopReason, inputTokens, outputTokens, durationMs, requestId. 실패 `ai_gate_failed`: feature, mode, failure(`INPUT_TOO_LARGE`·`INVALID_REQUEST`·`CALL_FAILED/…`·`NO_ITEMS` 등), itemCount, droppedCount, dropReasons(성공과 같은 다섯 칸), nonItemLineCount, stopReason, requestId, durationMs. 실패 칸 셋(`nonItemLineCount`·`stopReason`·`dropReasons.location`)은 #559 FR5.1에서 더했고 칸 이름은 `ai_gate_result`와 같다. 한 번 호출과 스트리밍이 같은 실패 기록을 거친다. `NO_ITEMS`가 모델이 '- ' 항목을 아예 쓰지 않아서인지(`nonItemLineCount`만 있음), 쓴 항목이 모두 위치를 못 찾았거나 잘려서인지(`dropReasons.location`·`truncated`) 이 칸으로 가른다. 응답을 받기 전에 실패하면 수는 0, `stopReason`은 null이다. 항목 글·근거 글·질문·JD 줄·키는 남기지 않는다(NFR3.1·NFR6.9).
+
+### 인용 문서 머리글 — #559
+
+근거(`AiSource`)에 선택 칸 `itemContext`(C-01 더하는 변경, 제공 담당 팀장)가 있으면 인용 문서 `context`는 `자료 종류: GitHub 기록 원문` / `자료 종류: 작성자 자료 원문` 뒤에 ` · ` + 그 값을 붙인 글이다(`citation-request.ts` `sourceContext`). 없거나 빈 글이면 지금 글자 그대로다. 지금은 질의응답만 채우고(`rag-answer/qna-sources.ts`, 규칙은 [질의응답·AI 기본 요약](rag-answer.md) 「질의응답 근거 — #559」), 기본 요약·JD 요약 요청은 바뀌지 않는다.
+
+- 머리글은 문서 줄(인용할 수 있는 글)이 아니다. 기계 대조는 지금처럼 그 항목이 인용한 줄만 보므로, 머리글의 숫자·영문자는 대조에서 허용되지 않는다. 그래서 질의응답 머리글의 고정 글자는 한글만 쓴다.
+- 입력 길이 검사(80,000자)에는 머리글 길이도 센다. 상한 값은 그대로다.
 
 ### 시험
 

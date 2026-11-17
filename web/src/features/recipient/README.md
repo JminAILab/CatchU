@@ -31,7 +31,7 @@
 - 각 상태의 h1은 U4 것 하나뿐이고 안내 묶음 안에는 h1이 없다(G3). 단계가 정해질 때마다(처음 연 화면 포함) 그 h1로 초점을 옮기며 비밀번호 입력칸에 `autoFocus`를 두지 않는다(G4). 불러오는 중과 같은 단계 안의 갱신에는 옮기지 않는다.
 - U4 고정 안내(BR7.1)는 발행 시각 한 줄이다. 고정 사본 설명은 U2 `fixed-copy`, 링크 기간·중지는 U2 `link-conditions`, 외부 AI 고지는 U5, JD 로그인 안내는 U10이 맡으므로 같은 뜻의 문장을 두지 않는다(G5·G6).
 - 0.5번 자리(U9 받은 사람 Claude 패널, C-11)는 0번 바로 다음, 발행 시각 안내 앞에 둔다. 판정 통과 분기가 `claudeConnectable(snapshot)`을 한 번 읽어 그 값을 `RecipientGuide`의 `showClaudeConnect`와 0.5번 패널 표시에 함께 쓰고, 패널에는 `slotProps.token`만 넘긴다(grant·비밀번호·`getGrant`·`onAccessLost`는 넘기지 않음, 아래 「Claude 안내 표시 값」). 패널은 [`../recipient-claude/claude-analyze-panel.tsx`](../recipient-claude/claude-analyze-panel.tsx)이고 화면 연결은 `test/u9-recipient-claude.test.mjs`가 본다.
-- 2·3번 자리는 [U5 README 「붙이는 방법」](../rag-answer/README.md)대로 `RecipientSlotProps`(`token`·`getGrant`·`onAccessLost`·`isLoggedIn`·`showEvidence`)를 그대로 넘기고 `key={token}`이다. `isLoggedIn`은 이 탭의 회원 토큰 유무이며 받은 사람 요청에는 그 토큰을 붙이지 않는다.
+- 2·3번 자리는 [U5 README 「붙이는 방법」](../rag-answer/README.md)대로 `RecipientSlotProps`(`token`·`getGrant`·`onAccessLost`·`isLoggedIn`·`showEvidence`)를 그대로 넘기고 `key={token}`이다. 여기에 이 화면의 사본으로 만든 선택 `itemTitleOf`(`itemTitleFinder(snapshot.items)`, #559)를 더 넘겨 출처 딱지 옆에 항목 제목을 보인다. `RecipientSlotProps` 모양은 그대로이고 4번 자리에는 넘기지 않는다. `isLoggedIn`은 이 탭의 회원 토큰 유무이며 받은 사람 요청에는 그 토큰을 붙이지 않는다.
 
 ## 동작
 
