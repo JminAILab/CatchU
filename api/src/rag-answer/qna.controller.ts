@@ -9,7 +9,7 @@ import type { AiGenerationGate, GatedItem } from '../ai-generation/ai-generation
 import { errorName } from '../ai-run/ai-run-spec';
 import { Public } from '../auth/auth.decorators';
 import { ApiError } from '../common/errors';
-import type { PublicationAccess } from '../publications/publication-access';
+import type { PublicationAccess, PublishedSnapshot } from '../publications/publication-access';
 import { PUBLISHED_SEARCH } from '../published-index/published-index.module';
 import type { PublishedSearch } from '../published-index/published-search';
 import { recipientAccessCode, rethrowAccessError } from './link-access-errors';
@@ -41,8 +41,15 @@ function completedEntry(publicationId: string, result: QnaRunResult): QnaComplet
     event: 'qna.completed', publicationId, stage: result.stage, outcome: result.outcome, failure: result.failure,
     rewritten: result.rewritten, rewriteMs: result.rewriteMs, rewriteInputTokens: result.rewriteInputTokens,
     rewriteOutputTokens: result.rewriteOutputTokens, searchMs: result.searchMs, chunkCount: result.chunkCount,
-    generateMs: result.generateMs, itemCount: result.itemCount,
+    generateMs: result.generateMs, itemCount: result.itemCount, unattachedLineCount: result.unattachedLineCount,
   };
+}
+
+/** 스트림 전 확인을 모두 통과한 질문 하나. */
+interface Admitted {
+  input: QuestionInput;
+  publicationId: string;
+  snapshot: PublishedSnapshot;
 }
 
 @Controller('public/links')
@@ -64,15 +71,15 @@ export class QnaController {
     @Body() body: unknown,
     @Res() response: ServerResponse,
   ): Promise<void> {
-    const { input, publicationId } = await this.admit(token, grant, body);
-    await this.stream(response, publicationId, input);
+    await this.stream(response, await this.admit(token, grant, body));
   }
 
   /**
-   * 스트림 전 확인 넷(BR1.1·BR1.2 → BR2.1 → BR2.2 → BR3.1). 하나라도 거부면 ApiError를 던지고 횟수는 마지막에만 센다.
+   * 스트림 전 확인 넷(BR1.1·BR1.2 → BR2.1 → BR2.2 → BR3.1)과 그 사이의 사본 읽기(#559, 색인 확인 다음).
+   * 하나라도 거부면 ApiError를 던지고 횟수는 마지막에만 센다.
    * 횟수는 링크당 한도와 그 링크 주인의 하루 합계 한도(#585) 둘이고, 어느 쪽에 걸려도 같은 429다(로그의 limit으로만 구분).
    */
-  private async admit(token: string, grant: string | undefined, body: unknown): Promise<{ input: QuestionInput; publicationId: string }> {
+  private async admit(token: string, grant: string | undefined, body: unknown): Promise<Admitted> {
     let input: QuestionInput;
     try {
       input = parseQuestionInput(body);
@@ -94,19 +101,34 @@ export class QnaController {
       this.rejected('INDEX_NOT_READY', publicationId);
       throw new ApiError('INDEX_NOT_READY');
     }
+    const snapshot = await this.readSnapshot(publicationId);
     const counted = await this.counter.count(publicationId, ownerMemberId, now);
     if (counted.decision === 'LIMIT_REACHED') {
       writeRagAnswerLog(this.options.logger, { event: 'qna.rejected', outcome: 'QUESTION_LIMIT_REACHED', publicationId, limit: counted.limit });
       throw new ApiError('QUESTION_LIMIT_REACHED');
     }
-    return { input, publicationId };
+    return { input, publicationId, snapshot };
+  }
+
+  /**
+   * 질의응답 근거를 붙일 사본(#559 설계 결정 2). 스트림을 열기 전, 횟수를 세기 전에 읽는다.
+   * 판정 뒤 발행본이 지워졌으면(NotFound) C-10 deletion-rule대로 404 LINK_UNAVAILABLE이고, 세기 전이라 되돌릴 차감이 없다.
+   * 그 밖의 오류는 삼키지 않고 그대로 던진다(500).
+   */
+  private async readSnapshot(publicationId: string): Promise<PublishedSnapshot> {
+    try {
+      return await this.access.readSnapshot(publicationId);
+    } catch (error) {
+      if (recipientAccessCode(error) === 'LINK_UNAVAILABLE') this.rejected('LINK_UNAVAILABLE', publicationId);
+      rethrowAccessError(error, recipientAccessCode);
+    }
   }
 
   /**
    * 200 text/event-stream을 열고 항목마다 바로 쓴다(NFR4.1). keep-alive 타이머는 응답 close와 finally 두 곳에서 지운다.
    * 응답 close가 끝나기 전에 오면 받은 사람이 끊은 것이라 끊김 깃발을 세운다(BR4.8). 이미 센 횟수는 돌려주지 않는다.
    */
-  private async stream(response: ServerResponse, publicationId: string, input: QuestionInput): Promise<void> {
+  private async stream(response: ServerResponse, { input, publicationId, snapshot }: Admitted): Promise<void> {
     let aborted = false;
     const write = (chunk: string): void => {
       if (!aborted && !response.writableEnded && !response.destroyed) response.write(chunk);
@@ -121,7 +143,7 @@ export class QnaController {
     let result: QnaRunResult | null = null;
     try {
       result = await answerQuestion({ rewriter: this.rewriter, search: this.search, gate: this.gate }, {
-        publicationId, question: input.question, history: input.history,
+        publicationId, snapshot, question: input.question, history: input.history,
         // 확인 단계(admit)를 기다리는 사이 이미 끊겼으면 close 이벤트가 지나가 다시 오지 않으므로 응답의 현재 상태도 본다.
         isAborted: () => aborted || response.destroyed,
         onItem: (item: GatedItem) => write(sseEvent('item', item)),

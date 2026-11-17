@@ -90,6 +90,32 @@ test('거절은 이미 낸 항목 뒤에 REFUSED, 항목이 하나도 없으면 
   assert.equal(broken.requests.length, 1);
 });
 
+// #559 FR5.1·NFR3(계획 S9) — 스트림 길(StreamItems.end()의 NO_ITEMS)도 실패 로그에 같은 칸이 있다. 기대: 항목 아닌 줄 수·끝난 이유·
+// 버린 이유별 수가 ai_gate_result와 같은 이름으로 있고 응답 글은 없다. 실패: 칸이 빠지거나 글이 들어감.
+test('S9 스트림: 항목을 안 쓴 NO_ITEMS와 모든 항목이 위치를 못 찾은 NO_ITEMS를 실패 로그의 칸으로 가르고, 로그에 글은 없다', async (t) => {
+  const failedLog = (logs) => logs.find((log) => log.args[0]?.event === 'ai_gate_failed')?.args[0];
+  const fields = (log) => [log.mode, log.failure, log.nonItemLineCount, log.stopReason, log.dropReasons.location, log.dropReasons.truncated];
+  const noItems = captureLogs(t);
+  const none = gateWith([sseResponse(messageEvents([['SECRET_LINE 항목 없이 쓴 글\n둘째 SECRET_LINE 줄', []]]))]);
+  await assert.rejects(collect(none.gate.generateStream(qna())), (error) => error instanceof AiProviderError && error.reason === 'NO_ITEMS');
+  assert.deepEqual(fields(failedLog(noItems)), ['STREAM', 'NO_ITEMS', 2, 'end_turn', 0, 0]);
+
+  const unlocated = captureLogs(t);
+  // 근거 글은 두 줄이라 블록 0~9와 없는 문서 3은 위치로 연결되지 않는다.
+  const lost = gateWith([sseResponse(messageEvents([
+    ['- SECRET_ITEM 첫 항목', [blockCitation(0, 0, 9)]],
+    ['\n- SECRET_ITEM 둘째 항목\n', [blockCitation(3, 0, 1)]],
+  ]))]);
+  await assert.rejects(collect(lost.gate.generateStream(qna())), (error) => error instanceof AiProviderError && error.reason === 'NO_ITEMS');
+  assert.deepEqual(fields(failedLog(unlocated)), ['STREAM', 'NO_ITEMS', 0, 'end_turn', 2, 0]);
+  assert.deepEqual([failedLog(unlocated).itemCount, failedLog(unlocated).droppedCount], [0, 2]);
+
+  for (const logs of [noItems, unlocated]) {
+    const text = JSON.stringify(logs);
+    assert.ok(!text.includes('SECRET_LINE') && !text.includes('SECRET_ITEM') && !text.includes('배포 스크립트'), '로그에 응답·근거 글이 없다');
+  }
+});
+
 // #528 — 질의응답 스트림에서 Claude 인용 없이 따옴표로 옮긴 작성자 글(새 Catch AC8.1.1, 11/12 재측정 3·8번).
 // 기대: 그 항목을 '작성자 자료 원문' 딱지가 붙은 인용 항목으로 내보내고, 따옴표 없는 항목은 지금처럼 AI 해석이다.
 test('#528 스트림도 따옴표로 옮긴 작성자 글에 인용을 붙여 CITED로 내보낸다', async (t) => {

@@ -1,7 +1,7 @@
 // 요청 만들개: 인용 문서와 문서 번호 → 근거 대응표, 시스템 지시, 사용자 메시지를 만든다
 // (U1 기능 설계 BR1.4·BR2.1·BR2.3, 비기능 NFR2.3).
 import type { ContentBlockParam, DocumentBlockParam } from '@anthropic-ai/sdk/resources/messages';
-import type { AiGenerationRequest, AiSourceKind } from './ai-generation.types';
+import type { AiGenerationRequest, AiSource, AiSourceKind } from './ai-generation.types';
 import { type CitationLine, splitCitationLines } from './citation-lines';
 
 /** 대응표의 한 행. 문서 번호(documentIndex)와 근거 위치(sourceIndex)를 같은 값으로 보지 않는다. */
@@ -19,11 +19,23 @@ export type CitationRequestPlan =
 export const ITEM_FORMAT_INSTRUCTION =
   "한 줄에 항목 하나만 쓴다. 줄 맨 앞은 '- '로 시작한다. 항목마다 사실 하나만 쓴다. 머리말과 맺음말은 쓰지 않는다.";
 
-/** 인용 문서의 context에 두는 자료 종류 설명(BR1.4). */
+/**
+ * 인용 문서의 context에 두는 자료 종류 설명(BR1.4).
+ * 근거에 머리글(itemContext, 질의응답만)이 있으면 그 뒤에 ` · 머리글`을 붙인다(#559). 없으면 이 글자 그대로다.
+ */
 export const SOURCE_KIND_CONTEXT: Record<AiSourceKind, string> = {
   GITHUB_RECORD: '자료 종류: GitHub 기록 원문',
   AUTHOR_MATERIAL: '자료 종류: 작성자 자료 원문',
 };
+
+/** 자료 종류와 머리글 사이의 구분 글자(#559). */
+export const ITEM_CONTEXT_SEPARATOR = ' · ';
+
+/** 인용 문서 하나의 context. 머리글이 없거나 빈 글이면 자료 종류 설명만 둔다. */
+export function sourceContext(source: Pick<AiSource, 'sourceKind' | 'itemContext'>): string {
+  const kind = SOURCE_KIND_CONTEXT[source.sourceKind];
+  return source.itemContext ? `${kind}${ITEM_CONTEXT_SEPARATOR}${source.itemContext}` : kind;
+}
 
 /** U2가 시스템 지시를 바꾸는 자리. 주지 않으면 U1 그대로(항목 형식 지시 + 기능 지시). */
 export interface CitationRequestOptions {
@@ -49,7 +61,7 @@ export function buildCitationRequest(request: AiGenerationRequest, options: Cita
       type: 'document',
       source: { type: 'content', content: lines.map((line) => ({ type: 'text', text: line.text })) },
       citations: { enabled: true },
-      context: SOURCE_KIND_CONTEXT[source.sourceKind],
+      context: sourceContext(source),
     });
   });
   if (documents.length === 0) return { kind: 'SKIP' };

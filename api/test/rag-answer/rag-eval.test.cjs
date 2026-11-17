@@ -7,11 +7,16 @@ const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
 const { test } = require('node:test');
 const {
-  RagEvalInputError, createMeasureDeps, createSyntheticDeps, dbPublicationAccess, ownedSnapshotReader, parseArgs, parseInput, runRagEval, sampleInput, splitJdRequirements,
+  RagEvalInputError, captureGateLogs, createMeasureDeps, createSyntheticDeps, dbPublicationAccess, ownedSnapshotReader, parseArgs, parseInput, runRagEval, sampleInput, splitJdRequirements,
 } = require('../../scripts/rag-eval/rag-eval.cjs');
 const { GoldQuoteNotFound, evidencePassRate, findGoldLocations, hitRate, isHitAt } = require('../../scripts/rag-eval/gold-locations.cjs');
 const { buildRepositoryRecord, writeEvaluation } = require('../../scripts/rag-eval/rag-eval-report.cjs');
+const { Logger } = require('@nestjs/common');
 const { AiProviderError } = require('../../dist/ai-generation/ai-generation.types');
+const { createCheckedAiGenerationGate } = require('../../dist/ai-generation/checked-gate');
+const { buildQnaSources } = require('../../dist/rag-answer/qna-sources');
+const { QNA_INSTRUCTION } = require('../../dist/rag-answer/rag-answer-config');
+const { FAKE_KEY, blockCitation, fragment, jsonResponse, messageBody, recordingFetch } = require('../u2/gate-fixtures.cjs');
 
 const INPUT = JSON.parse(readFileSync(resolve(__dirname, 'rag-eval-input.json'), 'utf8'));
 const REPOSITORY_DOCS = resolve(__dirname, '..', '..', 'docs', 'rag-evaluation');
@@ -91,6 +96,131 @@ test('답 0개(NO_ITEMS) 질문은 그 질문 번호로 「답 실패」를 남�
     (error) => error instanceof AiProviderError && error.reason === 'CALL_FAILED');
   assert.equal(logs.mock.calls.at(-1).arguments[0], '3번 질문에서 멈춤: AiProviderError');
   assert.equal(existsSync(join(outDir, 'second')), false, '멈추면 파일을 쓰지 않는다');
+});
+
+// #559 설계 결정 9·FR5.4(계획 S17) — 평가 스크립트가 질문마다 게이트 로그의 수 칸을 받는다. 실제 게이트(CheckedAiGenerationGate)에 기록한 응답을
+// 시험용 fetch로 넘기고(실제 Claude를 부르지 않는다), JD 쪽은 합성 게이트 그대로다.
+// 기대: 원문 결과와 기록에 질문별 dropReasons·nonItemLineCount·stopReason·failure가 수와 이름으로 남고 글은 없다. 실패: 칸이 빠지거나 다른 질문의 값이 묶임.
+test('S17 질문마다 게이트 로그의 수 칸을 원문 결과와 기록에 남기고(항목 0개 실패 질문 포함), 글은 없으며 다른 질문의 값이 섞이지 않는다', async (t) => {
+  const { outDir, docsDir } = tempDirs(t);
+  t.mock.method(console, 'error', () => {});
+  const original = [];
+  const originalLogger = Object.fromEntries(['log', 'warn', 'error', 'debug', 'verbose', 'fatal'].map((level) => [level, (...args) => original.push(args)]));
+  Logger.overrideLogger(originalLogger);
+  t.after(() => Logger.overrideLogger(false));
+  const recorder = recordingFetch([
+    jsonResponse(messageBody([fragment('합성비밀 앞말 줄\n- 합성비밀 해석 항목\n- 합성비밀 3개를 고쳤다')])),
+    jsonResponse(messageBody([fragment('- 합성비밀 위치 없는 항목', [blockCitation(0, 0, 99)])])),
+    jsonResponse(messageBody([fragment('- 합성비밀 해석 항목\n- 합성비밀 끝나지 않')], 'max_tokens')),
+  ]);
+  const gate = createCheckedAiGenerationGate({ apiKey: FAKE_KEY, fetch: recorder.fetch });
+  const { input, deps } = synthetic();
+  const syntheticGate = deps.gate;
+  deps.gate = { generate: (request) => (request.feature === 'QNA' ? gate.generate(request) : syntheticGate.generate(request)) };
+
+  const result = await runRagEval({ mode: 'synthetic', input, deps, outDir, docsDir, clock: CLOCK });
+  assert.equal(recorder.requests.length, 3);
+  const expected = [
+    { event: 'ai_gate_result', itemCount: 1, droppedCount: 1, dropReasons: { fact: 1, location: 0, truncated: 0 }, nonItemLineCount: 1,
+      stopReason: 'end_turn', failure: null },
+    { event: 'ai_gate_failed', itemCount: 0, droppedCount: 1, dropReasons: { fact: 0, location: 1, truncated: 0 }, nonItemLineCount: 0,
+      stopReason: 'end_turn', failure: 'NO_ITEMS' },
+    { event: 'ai_gate_result', itemCount: 1, droppedCount: 1, dropReasons: { fact: 0, location: 0, truncated: 1 }, nonItemLineCount: 0,
+      stopReason: 'max_tokens', failure: null },
+  ];
+  const raw = JSON.parse(readFileSync(result.rawPath, 'utf8'));
+  assert.deepEqual(raw.questions.map((question) => question.gateLog), expected);
+  assert.deepEqual(raw.questions.map((question) => question.answerFailed), [null, 'NO_ITEMS', null]);
+  assert.deepEqual(result.summary.gateLogs, expected.map((gateLog, index) => ({ questionNo: index + 1, gateLog })));
+  const record = readFileSync(result.recordPath, 'utf8');
+  assert.match(record, /- 게이트 로그를 받은 질문: 3\/3\n/);
+  assert.match(record, /\| 1 \| ai_gate_result \| 1 \| 1 \| 1 \| 0 \| 0 \| 1 \| end_turn \| - \|\n/);
+  assert.match(record, /\| 2 \| ai_gate_failed \| 0 \| 1 \| 0 \| 1 \| 0 \| 0 \| end_turn \| NO_ITEMS \|\n/);
+  assert.match(record, /\| 3 \| ai_gate_result \| 1 \| 1 \| 0 \| 0 \| 1 \| 0 \| max_tokens \| - \|\n/);
+  assert.ok(!record.includes('합성비밀'), '기록에 답 글이 없다');
+  assert.ok(!JSON.stringify(raw.questions.map((question) => question.gateLog)).includes('합성비밀'), '원문 결과의 로그 칸에도 글이 없다');
+  // 받은 로그는 원래 로거로 그대로 넘기고(콘솔 출력은 지금과 같다), 실행이 끝나면 원래 로거로 되돌린다.
+  assert.equal(original.filter(([entry]) => entry?.event === 'ai_gate_result' || entry?.event === 'ai_gate_failed').length, 3);
+  assert.equal(Logger.staticInstanceRef, originalLogger);
+
+  // 로그를 내지 않는 합성 게이트만 쓰면 질문마다 「로그 없음」이다.
+  const plain = synthetic();
+  const plainResult = await runRagEval({ mode: 'synthetic', input: plain.input, deps: plain.deps, outDir: join(outDir, 'plain'), docsDir, clock: CLOCK });
+  assert.deepEqual(plainResult.summary.gateLogs.map((entry) => entry.gateLog), [null, null, null]);
+  const plainRecord = readFileSync(plainResult.recordPath, 'utf8');
+  assert.match(plainRecord, /- 게이트 로그를 받은 질문: 0\/3\n/);
+  assert.match(plainRecord, /\| 1 \| 로그 없음 \| - \| - \| - \| - \| - \| - \| - \| - \|\n/);
+});
+
+test('S17 게이트 로그 받기는 수와 이름 칸만 꺼내고 글이 든 칸·모양이 다른 값은 버리며, 질문 사이 로그는 take()로 비운다', (t) => {
+  t.after(() => Logger.overrideLogger(false));
+  Logger.overrideLogger(false);
+  const capture = captureGateLogs();
+  const gateLogger = new Logger('AiGenerationGate');
+  gateLogger.log({ event: 'ai_gate_result', itemCount: 2, droppedCount: 0, dropReasons: { fact: 0, location: 0, truncated: 0 },
+    nonItemLineCount: 0, stopReason: 'end_turn' });
+  assert.equal(capture.take().itemCount, 2);
+  assert.equal(capture.take(), null, '한 번 꺼낸 로그는 다음 질문에 묶이지 않는다');
+  gateLogger.log({ event: 'other_event', itemCount: 9 });
+  assert.equal(capture.take(), null, '게이트 로그가 아닌 줄은 받지 않는다');
+  gateLogger.warn({ event: 'ai_gate_failed', failure: '비밀 글이 든 실패', stopReason: 'Free Text 비밀', itemCount: -1, droppedCount: 1.5,
+    dropReasons: { fact: '비밀' }, nonItemLineCount: 3, question: '비밀 질문', text: '비밀 답' });
+  const counts = capture.take();
+  assert.deepEqual(counts, { event: 'ai_gate_failed', itemCount: null, droppedCount: null, dropReasons: { fact: null, location: null, truncated: null },
+    nonItemLineCount: 3, stopReason: null, failure: null });
+  assert.ok(!JSON.stringify(counts).includes('비밀'));
+  gateLogger.warn({ event: 'ai_gate_failed', failure: 'CALL_FAILED/API_STATUS:529', stopReason: null, itemCount: 0, droppedCount: 0,
+    dropReasons: { fact: 0, location: 0, truncated: 0 }, nonItemLineCount: 0 });
+  assert.equal(capture.take().failure, 'CALL_FAILED/API_STATUS:529');
+  capture.restore();
+  assert.equal(Logger.staticInstanceRef, undefined, '받기 전 로거(여기서는 꺼 둔 상태)로 되돌린다');
+});
+
+// #559 FR7.1~FR7.3(계획 S12) — 평가 스크립트의 질의응답 요청은 앱과 같은 buildQnaSources로 만든다.
+// 기대: synthetic 모드에서 모델 요청의 근거 목록이 같은 검색 상위 8개·사본의 buildQnaSources 결과와 같고, 질문별 붙이지 못한 줄 수가
+// 원문 결과·기록에 숫자로 있다. 검색 적중률은 12개로 그대로 잰다. 실패: 스크립트가 따로 요청을 만듦, 수가 빠짐.
+test('S12 평가 스크립트는 앱과 같은 buildQnaSources로 질의응답 근거를 만들고, 질문별 붙이지 못한 줄 수를 숫자로 남긴다(FR7.1~FR7.3)', async (t) => {
+  const { outDir, docsDir } = tempDirs(t);
+  const { input, deps } = synthetic();
+  const qnaRequests = [];
+  const searches = [];
+  const search = deps.search.search.bind(deps.search);
+  deps.search.search = async (publicationId, query, limit) => {
+    const result = await search(publicationId, query, limit);
+    searches.push({ query, limit, hits: result.hits });
+    return result;
+  };
+  const generate = deps.gate.generate.bind(deps.gate);
+  deps.gate.generate = async (request) => {
+    if (request.feature === 'QNA') qnaRequests.push(request);
+    return generate(request);
+  };
+  const result = await runRagEval({ mode: 'synthetic', input, deps, outDir, docsDir, clock: CLOCK });
+  const questionSearches = searches.filter((entry) => input.questions.some((question) => question.question === entry.query));
+  assert.deepEqual(questionSearches.map((entry) => entry.limit), [12, 12, 12], '적중률용 검색은 12개 그대로다');
+  assert.equal(qnaRequests.length, 3);
+  const expected = questionSearches.map((entry) => buildQnaSources(entry.hits.slice(0, 8), input.snapshot));
+  qnaRequests.forEach((request, index) => {
+    assert.deepEqual(request.sources, expected[index].sources, `${index + 1}번 질문의 근거가 앱 함수 결과와 같다`);
+    assert.equal(request.instruction, QNA_INSTRUCTION);
+  });
+  assert.ok(qnaRequests[0].sources.some((source) => source.itemContext !== undefined), '머리글이 붙은 요청을 잰다');
+  assert.ok(qnaRequests[0].sources.length > 0);
+  const counts = expected.map((entry) => entry.unattachedLineCount);
+  const raw = JSON.parse(readFileSync(result.rawPath, 'utf8'));
+  assert.deepEqual(raw.questions.map((question) => question.unattachedLineCount), counts);
+  assert.deepEqual(result.summary.unattachedLines, counts.map((unattachedLineCount, index) => ({ questionNo: index + 1, unattachedLineCount })));
+  const record = readFileSync(result.recordPath, 'utf8');
+  assert.match(record, /## 질문별 붙이지 못한 같은 Catch 기록 줄 수\n\n\| 질문 \| 붙이지 못한 줄 \|\n\|---\|---\|\n\| 1 \| \d+ \|\n\| 2 \| \d+ \|\n\| 3 \| \d+ \|\n/);
+});
+
+test('S12 붙이지 못한 줄 수 표는 숫자만 쓰고, 모델을 부르지 않은 질문(null)·모양이 다른 값은 「-」다', () => {
+  const summary = { date: '2026-12-01', targetVersion: 'x', mode: 'measure', questionCount: 3, hitRateAt5: null, hitRateAt8: null, hitRateAt12: null,
+    passedItems: 0, droppedItems: 0, evidencePassRate: null, answerFailedQuestions: [], missedHitLocations: [], jd: null,
+    unattachedLines: [{ questionNo: 1, unattachedLineCount: 7 }, { questionNo: 2, unattachedLineCount: null }, { questionNo: 3, unattachedLineCount: '비밀' }] };
+  const record = buildRepositoryRecord(summary);
+  assert.match(record, /\| 1 \| 7 \|\n\| 2 \| - \|\n\| 3 \| - \|\n/);
+  assert.ok(!record.includes('비밀'));
 });
 
 test('정답 위치는 글귀가 나오는 모든 곳이고, 적중은 같은 항목·fieldPath에서 범위가 겹칠 때다. 적중률 5·8·12를 따로 센다(BR10.3)', () => {

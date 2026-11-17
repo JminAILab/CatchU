@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { BaseSummaryPanel } from "@/features/rag-answer/base-summary-panel";
+import { itemTitleFinder } from "@/features/rag-answer/item-title";
 import type { EvidenceLocation } from "@/features/recipient/recipient-slots";
 import { routes } from "@/lib/routes";
 import { CopyUrlButton, OpenLinkAnchor } from "./publication-link-actions";
@@ -79,9 +80,10 @@ export function PublicationDetailView(props: PublicationDetailViewProps) {
           </button>
         </div>
       </section>
-      {/* 기본 요약 패널(U5 작성자 모드). 발행본마다 한 번 읽고, 근거 단추는 아래 사본으로 옮긴다. */}
+      {/* 기본 요약 패널(U5 작성자 모드). 발행본마다 한 번 읽고, 근거 단추는 아래 사본으로 옮긴다. 출처 딱지 옆 항목 제목은 이 사본에서 찾는다(#559 FR4.2). */}
       <div data-testid="publication-summary-slot">
-        <BaseSummaryPanel key={detail.publicationId} publicationId={detail.publicationId} showEvidence={props.showEvidence} />
+        <BaseSummaryPanel key={detail.publicationId} publicationId={detail.publicationId} showEvidence={props.showEvidence}
+          itemTitleOf={itemTitleFinder(detail.snapshot.items)} />
       </div>
       <PublishedSnapshotView snapshot={detail.snapshot} highlight={props.highlight} pdfSource={props.pdfSource} />
     </article>

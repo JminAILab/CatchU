@@ -24,6 +24,11 @@ export interface AiSource {
   location: SourceLocation;
   /** U1은 쓰지 않는다(PR 번호 허용은 U2 검사). */
   catchEvidenceUrls: string[];
+  /**
+   * 이 줄이 어느 작업·자료의 줄인지 알려 주는 머리글(질의응답만 채움, #559 C-01 더하는 변경).
+   * 인용 문서 context 끝에 ` · ` 뒤로 붙고, 인용할 수 없는 글이다. 기본 요약·JD 요약은 넣지 않는다.
+   */
+  itemContext?: string;
 }
 
 export interface AiGenerationRequest {

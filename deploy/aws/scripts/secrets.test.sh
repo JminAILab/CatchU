@@ -38,13 +38,14 @@ MIGRATOR_PW=$(openssl rand -hex 32)
 QUEUE_TOKEN=$(openssl rand -hex 32)
 CONTEXT_KEY=$(openssl rand -hex 32)
 GENERATION_KEY="sk-ant-synthetic-$(openssl rand -hex 24)"
+JUDGEMENT_KEY="sk-judge-synthetic-$(openssl rand -hex 24)"
 API_GENERATION_KEY="sk-ant-api-synthetic-$(openssl rand -hex 24)"
 EMBEDDING_KEY="pa-synthetic-$(openssl rand -hex 24)"
 GOOGLE_ID="987654321098-$(openssl rand -hex 16).apps.googleusercontent.com"
 GOOGLE_SECRET="GOCSPX-synthetic-$(openssl rand -hex 16)"
 ADMIN_PW="Adm1n-$(openssl rand -hex 20)"
 INPUT_KEY="sk-ant-input-$(openssl rand -hex 24)"
-SECRETS="$JWT $LINK $APP_PW $MIGRATOR_PW $QUEUE_TOKEN $CONTEXT_KEY $GENERATION_KEY $API_GENERATION_KEY $EMBEDDING_KEY $GOOGLE_ID $GOOGLE_SECRET $ADMIN_PW $INPUT_KEY"
+SECRETS="$JWT $LINK $APP_PW $MIGRATOR_PW $QUEUE_TOKEN $CONTEXT_KEY $GENERATION_KEY $JUDGEMENT_KEY $API_GENERATION_KEY $EMBEDDING_KEY $GOOGLE_ID $GOOGLE_SECRET $ADMIN_PW $INPUT_KEY"
 DB_HOST=catchu-db.abcdefghijkl.ap-northeast-2.rds.amazonaws.com
 QUEUE_HOST=master.catchu-queue.abc123.apn2.cache.amazonaws.com
 store_default() { # 이름 Type Value 줄 → SSM 합성 저장소(JSON)
@@ -59,7 +60,8 @@ store_default() { # 이름 Type Value 줄 → SSM 합성 저장소(JSON)
     "/catchu/prod/db/catchu_migrator-password SecureString $MIGRATOR_PW" \
     "/catchu/prod/queue/auth-token SecureString $QUEUE_TOKEN" \
     "/catchu/prod/worker/WORKER_CONTEXT_API_KEY SecureString $CONTEXT_KEY" \
-    "/catchu/prod/worker/CATCHU_GENERATION_API_KEY SecureString $GENERATION_KEY"
+    "/catchu/prod/worker/CATCHU_GENERATION_API_KEY SecureString $GENERATION_KEY" \
+    "/catchu/prod/worker/CATCHU_JUDGEMENT_API_KEY SecureString $JUDGEMENT_KEY"
 }
 
 # ---------- 합성 aws·kubectl·jq·sleep ----------
@@ -344,26 +346,27 @@ check "make-secrets: Secret 키는 계약(k8s/README.md)과 같고 worker에는 
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | {name: .metadata.name, keys: (.data | keys), ns: .metadata.namespace, type}]
     == [{name: "catchu-api", keys: ["AUTH_JWT_SECRET", "CATCHU_EMBEDDING_API_KEY", "CATCHU_GENERATION_API_KEY", "DB_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "LINK_GRANT_SECRET"], ns: "catchu", type: "Opaque"},
         {name: "catchu-migration", keys: ["DB_PASSWORD"], ns: "catchu", type: "Opaque"},
-        {name: "catchu-worker", keys: ["CATCHU_GENERATION_API_KEY", "CATCHU_QUEUE_REDIS_URL", "WORKER_CONTEXT_API_KEY"], ns: "catchu", type: "Opaque"}]' "$S/applied.json")"
+        {name: "catchu-worker", keys: ["CATCHU_GENERATION_API_KEY", "CATCHU_JUDGEMENT_API_KEY", "CATCHU_QUEUE_REDIS_URL", "WORKER_CONTEXT_API_KEY"], ns: "catchu", type: "Opaque"}]' "$S/applied.json")"
 check "make-secrets: 값은 SSM 원본 그대로(앱·migration 계정 비밀번호가 바뀌지 않음)" \
   "$( { test "$(decoded catchu-api AUTH_JWT_SECRET)" = "$JWT" && test "$(decoded catchu-api LINK_GRANT_SECRET)" = "$LINK" \
     && test "$(decoded catchu-api DB_PASSWORD)" = "$APP_PW" && test "$(decoded catchu-migration DB_PASSWORD)" = "$MIGRATOR_PW" \
     && test "$(decoded catchu-worker WORKER_CONTEXT_API_KEY)" = "$CONTEXT_KEY" && test "$(decoded catchu-worker CATCHU_GENERATION_API_KEY)" = "$GENERATION_KEY" \
+    && test "$(decoded catchu-worker CATCHU_JUDGEMENT_API_KEY)" = "$JUDGEMENT_KEY" \
     && test "$(decoded catchu-api CATCHU_GENERATION_API_KEY)" = "$API_GENERATION_KEY" && test "$(decoded catchu-api CATCHU_EMBEDDING_API_KEY)" = "$EMBEDDING_KEY" \
     && test "$(decoded catchu-api GOOGLE_CLIENT_ID)" = "$GOOGLE_ID" && test "$(decoded catchu-api GOOGLE_CLIENT_SECRET)" = "$GOOGLE_SECRET"; } > /dev/null 2>&1; echo $?)"
-check "make-secrets: SSM 값은 한 번에 10개까지 나눠 읽음(이름 11개 → 10개·1개)" \
-  "$(ok test "$(tr '\n' ' ' < "$S/get-parameters-sizes")" = "10 1 ")"
+check "make-secrets: SSM 값은 한 번에 10개까지 나눠 읽음(이름 12개 → 10개·2개)" \
+  "$(ok test "$(tr '\n' ' ' < "$S/get-parameters-sizes")" = "10 2 ")"
 check "make-secrets: 큐 주소는 rediss://, 큐 비밀번호와 큐 주 엔드포인트 6379" \
   "$(ok test "$(decoded catchu-worker CATCHU_QUEUE_REDIS_URL)" = "rediss://:${QUEUE_TOKEN}@${QUEUE_HOST}:6379")"
 check "make-secrets: Secret마다 키=SSM 판 번호 주석(값 없음)" \
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | .metadata.annotations["catchu.io/ssm-versions"]]
-    == ["AUTH_JWT_SECRET=1,CATCHU_EMBEDDING_API_KEY=1,CATCHU_GENERATION_API_KEY=1,DB_PASSWORD=1,GOOGLE_CLIENT_ID=1,GOOGLE_CLIENT_SECRET=1,LINK_GRANT_SECRET=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
+    == ["AUTH_JWT_SECRET=1,CATCHU_EMBEDDING_API_KEY=1,CATCHU_GENERATION_API_KEY=1,DB_PASSWORD=1,GOOGLE_CLIENT_ID=1,GOOGLE_CLIENT_SECRET=1,LINK_GRANT_SECRET=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_JUDGEMENT_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
 check "make-secrets: ConfigMap catchu-db는 RDS 주소와 저장소의 루트 인증서 그대로" \
   "$( { "$REAL_JQ" -e --arg h "$DB_HOST" '.items[0] | .kind == "ConfigMap" and .metadata.name == "catchu-db" and .data.DB_HOST == $h
       and (.data | keys) == ["DB_HOST", "ca.pem"]' "$S/applied.json" \
     && test "$("$REAL_JQ" -j '.items[0].data["ca.pem"]' "$S/applied.json" | shasum -a 256 | cut -d' ' -f1)" = "$CA_SUM"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: 출력은 이름·키=판 번호와 다시 띄울 안내" \
-  "$( { says 'Secret catchu-worker: CATCHU_GENERATION_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1' && says '다시 띄워야'; } > /dev/null 2>&1; echo $?)"
+  "$( { says 'Secret catchu-worker: CATCHU_GENERATION_API_KEY=1,CATCHU_JUDGEMENT_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1' && says '다시 띄워야'; } > /dev/null 2>&1; echo $?)"
 cp "$S/applied.json" "$WORK/first-applied.json"
 
 untouched() { test "$rc" = 1 -a -z "$(calls)" -a ! -f "$S/applied.json"; }
@@ -414,7 +417,7 @@ check "make-secrets: Google 클라이언트 비밀값에 공백이 있으면 멈
 reset_state
 run STUB_FAIL_SECOND_READ=1 make-secrets.sh
 check "make-secrets: 나눠 읽다 두 번째 읽기가 실패하면 적용하지 않고 멈춤(1)" "$( { untouched && says 'SSM 값을 읽지 못했다' && secret_free; } > /dev/null 2>&1; echo $?)"
-# jq의 $는 마지막 줄바꿈 앞에서도 맞는다. 열한 값 모두 끝에 줄바꿈 하나를 붙여 본다(복사·파일 입력으로 섞이는 경우).
+# jq의 $는 마지막 줄바꿈 앞에서도 맞는다. 열두 값 모두 끝에 줄바꿈 하나를 붙여 본다(복사·파일 입력으로 섞이는 경우).
 while read -r n t v <&3; do
   reset_state
   ssm_set "$n" "$t" "${v}"$'\n'

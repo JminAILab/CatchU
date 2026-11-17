@@ -4,6 +4,7 @@ import type { PublishedItem, PublishedSnapshot } from "./recipient-api.ts";
 /**
  * 받은 사람 화면의 붙는 자리(계약 C-11 `RecipientSlotProps`)에 넘기는 형. 공용 형으로 내보낼지는 OQ-U4-7 결정 뒤 따르므로(코드 생성 계획
  * 「보류 범위」) 지금은 U4 화면 안의 형이다. U5(`features/rag-answer`)·U10은 같은 모양을 각자 선언해 받는다.
+ * 2·3번 자리(U5)의 선택 prop `itemTitleOf`(#559, 출처 딱지 옆 항목 제목)는 이 형에 넣지 않고 `recipient-view.tsx`가 사본으로 만들어 따로 넘긴다.
  */
 
 /** 붙는 컴포넌트가 스스로 처리하지 않고 `onAccessLost`로 넘기는 링크 접근 오류(C-11 rule). */

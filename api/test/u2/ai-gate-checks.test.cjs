@@ -123,6 +123,43 @@ test('S17 대조 뒤 남은 항목이 0개면 오류가 아니라 정상 빈 결
   await assert.rejects(none.gate.generate(request()), (error) => error instanceof AiProviderError && error.reason === 'NO_ITEMS');
 });
 
+// #559 FR5.1·NFR3(계획 S9) — NO_ITEMS가 어느 경우인지 실패 로그로 가른다. 기대: ai_gate_failed에 항목 아닌 줄 수·끝난 이유·버린 이유별 수가
+// ai_gate_result와 같은 이름으로 있고, 응답 글은 없다. 실패: 칸이 빠지거나 글이 들어감.
+const failedLog = (logs) => logs.find((log) => log.args[0]?.event === 'ai_gate_failed')?.args[0];
+const failureFields = (fields) => ({ failure: fields.failure, nonItemLineCount: fields.nonItemLineCount, stopReason: fields.stopReason,
+  location: fields.dropReasons.location, truncated: fields.dropReasons.truncated, fact: fields.dropReasons.fact });
+
+test('S9 한 번 호출: 항목을 안 쓴 NO_ITEMS와 모든 항목이 위치를 못 찾은 NO_ITEMS를 실패 로그의 칸으로 가르고, 로그에 글은 없다', async (t) => {
+  const noItems = captureLogs(t);
+  const none = gateWith([jsonResponse(messageBody([fragment('SECRET_LINE 항목 없이 쓴 글\n둘째 SECRET_LINE 줄\n')]))]);
+  await assert.rejects(none.gate.generate(request()), (error) => error instanceof AiProviderError && error.reason === 'NO_ITEMS');
+  assert.deepEqual(failureFields(failedLog(noItems)),
+    { failure: 'NO_ITEMS', nonItemLineCount: 2, stopReason: 'end_turn', location: 0, truncated: 0, fact: 0 });
+  assert.equal(failedLog(noItems).mode, 'GENERATE');
+
+  const unlocated = captureLogs(t);
+  // 근거 글은 두 줄이라 블록 0~9와 없는 문서 3은 위치로 연결되지 않는다.
+  const lost = gateWith([jsonResponse(messageBody([
+    fragment('- SECRET_ITEM 첫 항목', [blockCitation(0, 0, 9)]),
+    fragment('\n- SECRET_ITEM 둘째 항목', [blockCitation(3, 0, 1)]),
+  ]))]);
+  await assert.rejects(lost.gate.generate(request()), (error) => error instanceof AiProviderError && error.reason === 'NO_ITEMS');
+  assert.deepEqual(failureFields(failedLog(unlocated)),
+    { failure: 'NO_ITEMS', nonItemLineCount: 0, stopReason: 'end_turn', location: 2, truncated: 0, fact: 0 });
+  assert.equal(failedLog(unlocated).droppedCount, 2);
+
+  const cut = captureLogs(t);
+  const truncated = gateWith([jsonResponse(messageBody([fragment('- SECRET_ITEM 끝나지 않은')], 'max_tokens'))]);
+  await assert.rejects(truncated.gate.generate(request()), (error) => error instanceof AiProviderError && error.reason === 'NO_ITEMS');
+  assert.deepEqual(failureFields(failedLog(cut)),
+    { failure: 'NO_ITEMS', nonItemLineCount: 0, stopReason: 'max_tokens', location: 0, truncated: 1, fact: 0 });
+
+  for (const logs of [noItems, unlocated, cut]) {
+    const text = JSON.stringify(logs);
+    assert.ok(!text.includes('SECRET_LINE') && !text.includes('SECRET_ITEM') && !text.includes('셋째 줄'), '로그에 응답·근거 글이 없다');
+  }
+});
+
 // #528 — 기본 요약에서 Claude 인용 없이 따옴표로 옮긴 작성자 글(새 Catch AC8.1.2). 기대: 작성자 자료 원문 한 곳에 글자 그대로 있으면
 // '작성자 자료 원문' 딱지가 붙은 인용 항목으로 남고 인용 원문 대조를 받는다(숫자도 인용 줄에 있으면 남는다). 못 찾으면 지금처럼 AI 해석 대조다.
 test('#528 기본 요약에서 따옴표로 옮긴 작성자 글은 인용 항목으로 남고, 못 찾은 글은 AI 해석 대조를 받으며, 로그에 따옴표 인용 수가 있다', async (t) => {

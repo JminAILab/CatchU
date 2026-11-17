@@ -45,7 +45,7 @@
 
 ## 단계 순서
 
-질의응답(W1): 본문 검증 → `resolveForRecipient(token, grant, now)` → `getIndexState`가 DONE이 아니면 409 → 질문 횟수(링크당 100 또는 작성자 합계 300 초과면 429, Redis 장애면 통과) → SSE 열기 → (앞 대화가 있을 때만) 다시 쓰기 → `search(publicationId, 검색 질문, 8)` → (조각이 있을 때만) `generateStream({ feature: 'QNA', model: QNA_MODEL, userText: 검색 질문, publicationText })` → `done`. 각 단계는 한 번만 부르고 다시 시도하지 않는다. 앞 대화는 다시 쓰기에만 자료로 넣고 검색·생성에는 넣지 않는다.
+질의응답(W1): 본문 검증 → `resolveForRecipient(token, grant, now)` → `getIndexState`가 DONE이 아니면 409 → 사본 읽기(`readSnapshot`, #559. 판정 뒤 지워져 `NotFound`면 404 `LINK_UNAVAILABLE`이고 세기 전이라 차감이 없다. 그 밖의 오류는 500) → 질문 횟수(링크당 100 또는 작성자 합계 300 초과면 429, Redis 장애면 통과) → SSE 열기 → (앞 대화가 있을 때만) 다시 쓰기 → `search(publicationId, 검색 질문, 8)` → (조각이 있을 때만) 근거 목록 만들기(`buildQnaSources(hits, 사본)`, 아래 「질의응답 근거 — #559」) → `generateStream({ feature: 'QNA', model: QNA_MODEL, userText: 검색 질문, publicationText })` → `done`. 각 단계는 한 번만 부르고 다시 시도하지 않는다. 앞 대화는 다시 쓰기에만 자료로 넣고 검색·생성에는 넣지 않는다. 받은 사람 질문 한 번에 사본 읽기(DB 읽기) 하나가 든다.
 
 기본 요약 처리기(W3, `BASE_SUMMARY`): `base_summary` 행만 보고 판정한다. 행 없음이고 `published_at + 10분` 전이면 `INSERT … ON CONFLICT (publication_id) DO NOTHING`으로 PENDING을 만들고 다시 읽는다. PENDING이고 마감 전이면 생성한다. 그 밖(DONE·FAILED·마감 지남·시한 지난 행 없음·발행본 없음)은 끝낸다. 사본 필드 하나를 근거 하나로(`aiDraft`·`mismatch`·제목 제외) `generate({ feature: 'BASE_SUMMARY', model: 'HAIKU', userText: null, publicationText: null })`. 결과는 짧은 트랜잭션에서 행을 잠근 뒤(`FOR UPDATE`) 시각을 읽고 조건부 UPDATE 하나로 쓴다(잠금을 기다리는 사이 마감이 지나면 버리기 위해): 항목 1개 이상은 `status <> 'FAILED' AND deadline_at > now`일 때 DONE, 0개·생성 실패는 `status = 'PENDING' AND deadline_at > now`일 때 FAILED. 바뀐 행이 없으면(발행본 삭제·FAILED·마감 지남) 버린다. 생성 실패(사본 읽기·사본 모양·`AiProviderError`·`AiInputTooLarge`)는 FAILED로 쓰고 정상 반환하며, DB 오류는 로그 뒤 다시 던진다(AiRun이 실패로 기록, 상태는 시한으로 FAILED). 하루 횟수를 세지 않는다.
 
@@ -62,6 +62,9 @@
 | 질문 길이 | 500(UTF-16) |
 | 앞 대화 | 최근 6개, 메시지마다 2,000자 |
 | 질의응답 검색 조각 | 8 |
+| 검색으로 맞은 Catch 하나에 더 붙이는 GitHub 기록 줄 `QNA_ATTACH_PER_CATCH_LIMIT` | 12(#559 시작 값, 아래 참고) |
+| 모델에 보내는 질의응답 근거 줄 전체 `QNA_SOURCE_TOTAL_LIMIT` | 40(검색 8개 포함, #559 시작 값) |
+| 머리글에 쓰는 작업 사실 둘째 줄 `QNA_ITEM_CONTEXT_MAX_LENGTH` | 200(UTF-16, #559 시작 값) |
 | 링크당 하루 질문 | 100(한국 시간 날짜) |
 | 작성자 하루 질문 합계 | 300(한 작성자의 모든 링크를 합침, 한국 시간 날짜) |
 | 기본 요약 처리 시한 | 10분 |
@@ -89,8 +92,33 @@
 받은 사람 AI가 작성자 글을 옮긴 항목에 '작성자 자료 원문' 딱지가 붙게 하는 두 장치다(새 Catch FR11.1·AC8.1.1·AC8.1.2).
 
 - 질의응답·기본 요약 항목에 Claude 인용이 없어도, 따옴표로 옮긴 글이 작성자 자료 원문 한 곳에 글자 그대로 있으면 게이트가 그 줄을 인용으로 붙인다. 규칙과 한계는 [AI 생성 관문](ai-generation.md) 「따옴표 인용 — #528」이다.
-- 기본 요약 지시(`BASE_SUMMARY_INSTRUCTION`)는 지금 지시와 끝의 작성자 말 옮기기 문장 사이에 두 문장을 둔다. 작성자 자료 원문에서 온 내용은 다른 자료와 섞지 않은 항목에 핵심 문장을 바꾸지 않고 따옴표로 옮겨 그 줄을 인용한다. 커밋 메시지·PR 제목은 「작성자는 …라고 적었다」로 옮기지 않는다. 질의응답 지시는 그대로다.
+- 기본 요약 지시(`BASE_SUMMARY_INSTRUCTION`)는 지금 지시와 끝의 작성자 말 옮기기 문장 사이에 두 문장을 둔다. 작성자 자료 원문에서 온 내용은 다른 자료와 섞지 않은 항목에 핵심 문장을 바꾸지 않고 따옴표로 옮겨 그 줄을 인용한다. 커밋 메시지·PR 제목은 「작성자는 …라고 적었다」로 옮기지 않는다. 질의응답 지시는 #528에서 바꾸지 않았다(#559에서 바꾼 앞 문장은 아래 「질의응답 근거 — #559」).
 - 다시 잰 결과는 [평가 기록 2026-11-12(#528 재측정)](rag-evaluation/2026-11-12-528.md)에 있다. 기본 요약은 같은 지시로도 부를 때마다 꼴·항목 수가 달라 세 번 쟀고, 한 번 더 고쳐 보고 접은 지시도 그 기록에 있다.
+
+## 질의응답 근거 — #559
+
+면접관 질문에 카드에 보이는 기록을 두고 「자료에 없다」고 하거나 다른 Catch의 작성자 설명을 끌어다 답한 것을 고치려고 바꾼 규칙이다(이슈 #559, 2026-11-12 측정). 근거 목록은 `src/rag-answer/qna-sources.ts` `buildQnaSources(hits, snapshot)` 한 함수가 만들고, 앱(`qna-service.ts`)과 평가 스크립트(`scripts/rag-eval/rag-eval.cjs`)가 같이 부른다. 조각 나누기·임베딩·검색 계약(C-09)은 바꾸지 않으므로 이미 발행한 발행본에도 그대로 적용된다. 기본 요약·JD 요약의 근거는 바뀌지 않는다.
+
+- **검색으로 맞은 8개는 늘 보낸다.** 맞은 조각은 지금처럼 조각 범위 그대로 근거 하나가 된다(`sourceId = chunkId`).
+- **맞은 조각이 Catch 항목의 것이면 그 Catch의 GitHub 기록 줄을 더 붙인다.** 붙이는 줄은 작업 사실(`workFacts[i]`)·나의 기여(`subjectContribution`)·근거 기록 줄(`evidence[i].representedFacts[j]`) 가운데 아직 보내지 않은 칸이다. 작성자 설명(`authorDescription`)과 텍스트·PDF 자료는 붙이지 않고 검색으로 맞은 것만 보낸다. 사본 → 근거 바꾸기는 기본 요약과 같은 `buildSummarySources`이고, 붙인 줄의 위치는 그 칸 하나의 전체 범위(`[0, 길이)`)라 인용 위치 규칙(C-01)·출처 단추 강조·기계 대조는 그대로다. 같은 항목·칸 이름이 검색 결과에 있으면 다시 붙이지 않는다(맞은 조각이 남는다).
+- **붙이는 순서.** Catch는 그 Catch 조각의 가장 높은 검색 순위 순이다. Catch 하나 안에서는 ① 맞은 줄과 같은 근거(`evidence[i]`)의 다른 줄 ② 작업 사실·나의 기여 ③ 남은 근거를 사본 순서(`evidence[0]`부터)대로 붙인다. 모델에는 Catch마다 맞은 줄(순위 순) → 붙인 줄이 이어서 가고, Catch가 아닌 항목의 맞은 줄은 자기 순위 자리에 간다.
+- **상한.** Catch 하나에 더 붙이는 줄은 12줄, 모델에 보내는 줄 전체는 검색 8개를 포함해 40줄이다. 한 근거의 줄이 남은 상한에 다 들어가지 않으면 자르지 않고 그 근거를 건너뛰고 다음 근거를 본다. ②는 줄 단위로 상한까지만 붙인다. 상한 때문에 붙이지 못한 줄 수(건너뛴 근거의 줄 포함)를 `qna.completed`의 `unattachedLineCount`에 수로 남긴다. **12·40·200은 2026-11-12 측정의 조각 위치에 맞춘 시작 값이고, 다시 잰 뒤에도 고치지 않는다**(요구사항 [Q4]). 입력 상한 80,000자(`AI_INPUT_MAX_CHARS`)와 출력 상한은 그대로다.
+- **머리글.** 근거마다 그 줄이 속한 발행 항목을 알리는 머리글(`AiSource.itemContext`, C-01 더하는 칸)을 단다. 게이트는 인용 문서 `context`를 「자료 종류: …」 뒤에 ` · 머리글`을 붙여 만들고, 머리글은 인용할 수 없는 설명이다(입력 길이 검사에는 센다, [AI 생성 관문](ai-generation.md) 「인용 문서 머리글 — #559」). 머리글은 항목 종류마다 다음과 같다.
+
+  | 항목 | 머리글 |
+  |---|---|
+  | 작업 사실 둘째 줄(`workFacts[1]`)이 있는 Catch | `이 줄이 속한 작업: {둘째 줄}` |
+  | 둘째 줄이 같은 Catch가 둘 이상 | `이 줄이 속한 작업: 「{표}」 {둘째 줄}` |
+  | 둘째 줄이 없는 Catch | `이 줄이 속한 작업: 「{표}」 작업(기록 제목 없음)` |
+  | 텍스트 자료 | `이 줄이 속한 자료: 「{표}」 텍스트 자료` |
+  | PDF 자료 | `이 줄이 속한 자료: 「{표}」 올린 문서` |
+
+  - `{표}`는 발행 순서(position)대로 매기는 한글 한 글자(가·나·다·라·마·바·사·아·자·차·카·타·파·하·거·너·더·러·머·버)다. 고정 글자에는 숫자·영문자를 쓰지 않는다. 답 검사는 답 속 숫자·영어 표기가 그 항목이 인용한 줄에 있어야 통과시키는데 머리글은 인용할 수 없어서, 「발행 항목 2번」·「Catch」 같은 글을 모델이 답에 옮기면 그 항목이 버려지기 때문이다. 그래서 요구사항 FR2.2의 「발행 항목 순번」은 숫자 대신 이 표 글자로 쓴다.
+  - 둘째 줄은 칸 위치로만 고르고 worker 문장을 글자로 대조하지 않는다. 작성자가 쓴 글이라 줄바꿈(`\r`·`\n`·U+2028·U+2029)과 빈칸 구실 제어 문자(탭·세로 탭·쪽바꿈·U+0085)는 빈칸 하나로 바꾸고, 그 밖의 제어 문자(Cc)와 서식 문자(Cf: 글 방향 제어 문자, 폭 없는 공백·이음, U+FEFF, 태그 문자 등)는 지우고, 겹친 빈칸을 줄이고 앞뒤 빈칸을 뗀 뒤 앞 200자(UTF-16, 서로게이트 쌍은 가르지 않음)까지 쓴다. 다듬어 빈 글이면 둘째 줄이 없는 것으로 본다.
+  - Catch 제목·AI 설명 초안(`aiDraft`)·저장소 이름·작업 한계·본인 커밋 표지는 넣지 않는다(12월 FR6.4). 같은 Catch의 작성자 설명 줄에도 같은 머리글이다.
+- **지시(한 번 수정, FR3).** `QNA_INSTRUCTION`의 앞 문장을 「발행본 자료만으로 질문에 답하고 근거가 되는 줄을 인용한다. 첫 항목에는 질문에 대한 답을 쓴다. 찾은 자료로 답할 수 없으면 첫 항목에 「찾은 자료에서는 확인되지 않는다」고 쓰고, 발행본에 없다고 단정하지 않는다.」로 바꿨다. 끝의 `AUTHOR_MATERIAL_VOICE_INSTRUCTION`, 기본 요약·JD 요약 지시, 항목 형식 지시, 공통 방어 문구는 그대로다. 다시 잰 뒤 못 맞춘 기준은 평가 기록에 한계로 적고 지시를 더 고치지 않는다(12월 NFR3).
+- **12월 FR6.2 「질문에 넘길 자료는 의미 검색으로만 고른다」는 이렇게 읽는다.** 의미 검색은 근거가 될 Catch와 줄을 고르는 데 쓰고, 고른 Catch의 나머지 GitHub 기록 줄은 정해진 순서와 상한으로 붙인다. 키워드 검색이나 다른 검색 방식은 더하지 않는다.
+- **평가 스크립트도 같은 함수로 요청을 만든다(FR7).** 그래서 다시 재기는 앱이 보내는 근거(붙인 줄·머리글)를 그대로 잰다. 검색 적중률(12개)은 지금처럼 따로 잰다.
 
 ## 질문 다시 쓰기 키 판정
 
@@ -113,7 +141,7 @@ Nest `Logger('RagAnswer')`로 사건마다 객체 한 줄을 남긴다(`rag-answ
 
 | 사건 | 수준 | 칸 |
 |---|---|---|
-| `qna.completed` | 성공·끊김 log, 실패 warn | `publicationId`, `stage`, `outcome`(`OK`·`REWRITE_FAILED`·`SEARCH_FAILED`·`INDEX_NOT_READY`·`GENERATION_FAILED`·`CLIENT_CLOSED`), `failure`(오류 이름), `rewritten`, `rewriteMs`, `rewriteInputTokens`, `rewriteOutputTokens`, `searchMs`, `chunkCount`, `generateMs`, `itemCount`. 버린 항목 수는 게이트 로그 `ai_gate_result`에서 본다 |
+| `qna.completed` | 성공·끊김 log, 실패 warn | `publicationId`, `stage`, `outcome`(`OK`·`REWRITE_FAILED`·`SEARCH_FAILED`·`INDEX_NOT_READY`·`GENERATION_FAILED`·`CLIENT_CLOSED`), `failure`(오류 이름), `rewritten`, `rewriteMs`, `rewriteInputTokens`, `rewriteOutputTokens`, `searchMs`, `chunkCount`(검색 조각 수, 붙인 줄은 세지 않음), `generateMs`, `itemCount`, `unattachedLineCount`(상한 때문에 붙이지 못한 같은 Catch 기록 줄 수, #559. 생성 단계 전에 끝났으면 `null`). 버린 항목 수는 게이트 로그 `ai_gate_result`, 실패 원인 칸은 `ai_gate_failed`에서 본다([AI 생성 관문](ai-generation.md)) |
 | `qna.rejected` | log | `outcome`(`VALIDATION_FAILED`·`LINK_UNAVAILABLE`·`LINK_PASSWORD_REQUIRED`·`INDEX_NOT_READY`·`QUESTION_LIMIT_REACHED`), `publicationId`(링크 판정 뒤만), `limit`(`QUESTION_LIMIT_REACHED`일 때만. `LINK`는 링크당 한도, `OWNER`는 작성자 합계 한도) |
 | `qna.stream-failed` | error | `publicationId`, `error`(오류 이름). SSE를 연 뒤 단계별 실패 처리 밖의 예상 밖 예외. 받은 사람에게는 `error ANSWER_FAILED`를 쓰고 닫는다 |
 | `qna.count-bypassed` | warn | `publicationId`, `reason`(`NO_REDIS`·`REDIS_ERROR`·`REDIS_TIMEOUT`) |
@@ -126,7 +154,7 @@ Nest `Logger('RagAnswer')`로 사건마다 객체 한 줄을 남긴다(`rag-answ
 저장소 맨 위 폴더에서 돌린다. 테스트 DB는 [README 「DB 테스트」](../README.md#db-테스트)대로 띄운다.
 
 ```bash
-npm --prefix api test -- test/rag-answer/question-input.test.cjs test/rag-answer/question-rewriter.test.cjs test/rag-answer/question-counter.test.cjs test/rag-answer/live-question-counter.test.cjs test/rag-answer/qna-controller.test.cjs test/rag-answer/summary-sources.test.cjs test/rag-answer/base-summary-handler.test.cjs test/rag-answer/summary-controller.test.cjs test/rag-answer/rag-answer-app.test.cjs test/rag-answer/rag-eval.test.cjs test/db/member-cascade-delete.test.cjs test/integration/result-application-b.test.cjs
+npm --prefix api test -- test/rag-answer/question-input.test.cjs test/rag-answer/question-rewriter.test.cjs test/rag-answer/question-counter.test.cjs test/rag-answer/live-question-counter.test.cjs test/rag-answer/qna-controller.test.cjs test/rag-answer/qna-sources.test.cjs test/rag-answer/summary-sources.test.cjs test/rag-answer/base-summary-handler.test.cjs test/rag-answer/summary-controller.test.cjs test/rag-answer/rag-answer-app.test.cjs test/rag-answer/rag-eval.test.cjs test/db/member-cascade-delete.test.cjs test/integration/result-application-b.test.cjs
 ```
 
 - 다른 Unit 자리(링크 판정·검색·게이트·AiRun·하루 제한·다시 쓰기)는 합성 대역이다(`test/rag-answer/support.cjs`). 합성으로 통과한 것은 실제 Claude·Voyage·U4 연결 성공이 아니다.
@@ -154,9 +182,9 @@ npm --prefix api run rag-eval -- measure --input <파일> [--target <대상 버�
 | `measure` | 실제 게이트·실제 검색과 테스트가 아닌 DB의 시연 발행본으로 한 번 잰다. 질문 10개, `CATCHU_GENERATION_API_KEY`·`CATCHU_EMBEDDING_API_KEY`가 있어야 한다 | 원문은 `api/.rag-eval/<날짜>-measure.json`, 저장소 기록은 `api/docs/rag-evaluation/<날짜>.md` |
 
 - 정답 글귀마다 사본 필드에서 글자 그대로 나오는 모든 위치를 정답 위치로 삼는다. 한 곳도 없으면 질문 번호를 알리고 멈춘다(파일을 쓰지 않음).
-- 질문마다 `search(…, 12)` 한 번으로 앞 5·8·12개 적중(같은 항목·같은 fieldPath에서 범위가 겹치면 적중)을 판정하고, 앞 8개로 질의응답과 같은 요청(지시문·모델)을 `generate`로 불러 통과·버린 항목 수를 모은다. 8개 기준 비적중 질문은 앞 8개 조각 위치를 기록에 남긴다. 답이 0개(`NO_ITEMS`)인 질문은 앱처럼 「답 실패」로 그 질문 번호를 결과·기록·로그에 남기고 다음 질문으로 간다. 다른 생성 실패는 질문 번호를 로그에 알리고 멈춘다(파일을 쓰지 않음).
+- 질문마다 `search(…, 12)` 한 번으로 앞 5·8·12개 적중(같은 항목·같은 fieldPath에서 범위가 겹치면 적중)을 판정하고, 앞 8개와 사본으로 앱과 같은 `buildQnaSources`(#559, 위 「질의응답 근거 — #559」)를 불러 질의응답과 같은 요청(근거·지시문·모델)을 만들어 `generate`로 부르고 통과·버린 항목 수를 모은다. 질문별 붙이지 못한 줄 수(`unattachedLineCount`, 숫자만)를 원문 결과와 기록에 남긴다. 3번·7번 같은 질문이 틀렸을 때 상한에 걸려서인지 가르는 데 쓴다. 8개 기준 비적중 질문은 앞 8개 조각 위치를 기록에 남긴다. 답이 0개(`NO_ITEMS`)인 질문은 앱처럼 「답 실패」로 그 질문 번호를 결과·기록·로그에 남기고 다음 질문으로 간다. 다른 생성 실패는 질문 번호를 로그에 알리고 멈춘다(파일을 쓰지 않음).
 - JD 비교: 빈 줄을 뺀 줄마다 검색 기반(조각 8개)과 전체 넣기(`published_chunk`를 `seq` 순으로 모두 읽기 전용으로 읽음) 두 번 `JD_SUMMARY`를 부른다. 전체 넣기가 80,000자를 넘으면 `INPUT_TOO_LARGE`로 적는다. U10은 아직 합쳐지지 않아 스크립트의 나누기·지시문을 쓰고 기록에 "스크립트"로 적는다. `published_chunk` 직접 읽기는 이 평가 스크립트의 읽기 전용 사용뿐이고 서비스 경로는 C-09만 쓴다.
-- 저장소 기록에는 실행 날짜·대상 버전·모드, 적중률(5·8·12), 통과·버린 항목 수, 답 실패 질문 번호, 비적중 질문의 조각 위치, 요구사항마다 두 방식의 항목·버린 수, 빈 사람 판정 칸(남의 기여 오귀속, 근거 비뒷받침, 다른 곳의 맞는 근거 n건, 통과 여부, 조정 내용)만 있다. 질문·글귀·답 원문은 없다.
+- 저장소 기록에는 실행 날짜·대상 버전·모드, 적중률(5·8·12), 통과·버린 항목 수, 답 실패 질문 번호, 비적중 질문의 조각 위치, 질문별 게이트 로그 수 칸(#559 Step 4a)과 붙이지 못한 줄 수(#559), 요구사항마다 두 방식의 항목·버린 수, 빈 사람 판정 칸(남의 기여 오귀속, 근거 비뒷받침, 다른 곳의 맞는 근거 n건, 통과 여부, 조정 내용)만 있다. 질문·글귀·답 원문은 없다.
 - **`measure`의 사본 읽기는 앱과 같은 U4 DB 구현(`DbPublicationAccess.readSnapshot`)이다.** 실제 발행 경로로 만든 시연 발행본으로 한 번 잰다(BR10.1). 읽은 내용이 Claude·Voyage로 나가므로, 입력의 `memberId`(실행자 본인)가 그 발행본의 주인인지 작성자 화면과 같은 판정(`resolveForOwner`)으로 먼저 확인하고, 아니면 외부 호출 없이 멈춘다. 시연용 여부는 확인하지 않으니 `publicationId`에는 본인의 시연 발행본을 넣는다. 아직 재지 않았다(#441). 판정·조정·재측정은 BR10.6을 따른다.
 
 ## 알려진 한계
@@ -171,3 +199,6 @@ npm --prefix api run rag-eval -- measure --input <파일> [--target <대상 버�
 - "맞는데 버려진 항목"은 버린 수를 상한값으로만 적는다.
 - U4의 발행 크기 상한이 기본 요약 근거 글 합 80,000자 안에 들어야 한다. 넘으면 큰 발행본의 기본 요약은 늘 FAILED다(통합 때 확인).
 - 읽을 때 지난 PENDING을 FAILED로 바꾸는 공용 도우미(`persistDeadlineFailure`)는 `updated_at`을 고치지 않는다(U3 `publication_index`와 같음).
+- (#559) 큰 Catch는 GitHub 기록의 일부만 모델에 간다(Catch 하나 12줄, 전체 40줄 상한). 그래서 개수나 전체 규모를 묻는 질문에 틀릴 수 있다. 붙이지 못한 줄 수는 `qna.completed`와 평가 기록에서 본다.
+- (#559) 작성자 설명은 검색 상위 8개에 들어야만 모델에 간다. 들지 못하면 그 Catch에 작성자 설명이 있어도 답에 쓰이지 않는다(요구사항 승인 때 팀장 결정). 다시 잴 때 실제로 이 경우에 걸리면 평가 기록에도 적는다.
+- (#559) 머리글의 작업 사실 둘째 줄(PR 제목·커밋 첫 줄)에는 숫자·영문자가 있을 수 있다. 그 줄은 붙인 줄로도 가므로 인용할 수 있지만, 상한(Catch 12줄·전체 40줄) 때문에 붙지 못하면 인용할 수 없다. 다른 줄을 인용한 답에 둘째 줄의 낱말을 섞으면 그 항목은 대조에서 버려질 수 있다. 막지 않고 버린 항목 수(`dropReasons.fact`)로 본다.
