@@ -81,6 +81,20 @@ case "$svc $op" in
   "ec2 describe-subnets") printf 'ap-northeast-2a\tsubnet-0aaaaaaaaaaaaaaaa\nap-northeast-2c\tsubnet-0cccccccccccccccc\n' ;;
   "ec2 describe-instances") echo "${STUB_NODE_SGS:-sg-0123456789abcdef0${tab}sg-0123456789abcdef0}" ;;
   "ec2 describe-security-groups") echo "${STUB_SG_ID:-None}" ;;
+  "ec2 describe-route-tables") echo "${STUB_ROUTE_TABLES-rtb-0aaaaaaaaaaaaaaaa${tab}rtb-0cccccccccccccccc}" ;;
+  "ec2 describe-vpc-endpoints")
+    case "$all" in
+      *length*) echo "${STUB_ENDPOINT_COUNT:-0}" ;;
+      *) printf 'vpce-0123456789abcdef0\tGateway\tavailable\trtb-0aaaaaaaaaaaaaaaa,rtb-0cccccccccccccccc\n' ;;
+    esac ;;
+  "ec2 create-vpc-endpoint") echo vpce-0123456789abcdef0 ;;
+  "ec2 describe-prefix-lists") echo "${STUB_S3_CIDRS:-52.219.56.0/22${tab}3.5.140.0/22}" ;;
+  "s3api list-buckets") echo "${STUB_BUCKET_COUNT:-0}" ;;
+  "s3api create-bucket") echo http://catchu-prod-files.s3.amazonaws.com/ ;;
+  "s3api get-public-access-block") echo '{"BlockPublicAcls": true, "IgnorePublicAcls": true, "BlockPublicPolicy": true, "RestrictPublicBuckets": true}' ;;
+  "s3api get-bucket-encryption") echo AES256 ;;
+  "s3api get-bucket-ownership-controls") echo BucketOwnerEnforced ;;
+  "s3api get-bucket-versioning") echo None ;;
   "ec2 create-security-group") echo sg-0fedcba9876543210 ;;
   "ec2 authorize-security-group-ingress") echo sgr-0123456789abcdef0 ;;
   "rds describe-db-instances") case "$all" in *--filters*) echo "${STUB_DB_COUNT:-0}" ;; *) echo '{"multiAZ": true}' ;; esac ;;
@@ -260,7 +274,7 @@ P=$HERE
 LBC_SHA=$(sed -n 's/^chart_sha256=//p' "$P/install-lb-controller.sh")
 
 # ---------- 확인 모드: 만드는 호출이 없다 ----------
-for s in rds queue efs waf; do
+for s in rds queue efs waf s3; do
   run_sut bash "$P/create-$s.sh"
   check "확인 모드 $s: 종료 0, 만드는 호출 0, --apply 안내" "$(ok test "$rc" = 0 -a -z "$(ops)" -a "$(grep -c -- '--apply로 다시 실행' "$OUT")" = 1)"
 done
@@ -300,6 +314,21 @@ run_sut env STUB_VALIDATE=1 bash "$P/create-waf.sh" --apply
 check "WAF 만들기: 종료 0, 웹 ACL 1건, 요청 표본 끔, 규칙 원문 형식, CLI 인자 검사 통과" \
   "$( { test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "wafv2 create-web-acl," && has_all "$(call_of 'wafv2 create-web-acl')" --cli-binary-format raw-in-base64-out SampledRequestsEnabled=false,CloudWatchMetricsEnabled=true,MetricName=catchu-edge && test "$(wc -l < "$S/valid" | tr -d ' ')" = 2 && clean; } > /dev/null 2>&1; echo $?)"
 
+run_sut env STUB_VALIDATE=1 bash "$P/create-s3.sh" --apply
+check "S3 만들기: 종료 0, 버킷을 먼저 만들고 엔드포인트는 마지막(순서대로 5건)" "$(ok test "$rc" = 0 -a "$(ops | tr '\n' ',')" = "s3api create-bucket,s3api put-public-access-block,s3api put-bucket-encryption,s3api put-bucket-tagging,ec2 create-vpc-endpoint,")"
+want='{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+check "S3 만들기: 서울·ACL 끔, 공개 차단 4개, 기본 암호화 AES256, 버전 관리·버킷 정책·CORS 호출 없음" \
+  "$( { has_all "$(call_of 's3api create-bucket')" catchu-prod-files LocationConstraint=ap-northeast-2 BucketOwnerEnforced &&
+    has_all "$(call_of 's3api put-public-access-block')" BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true &&
+    has_all "$(call_of 's3api put-bucket-encryption')" "$want" &&
+    test "$(grep -c -E 'put-bucket-(versioning|policy|cors|acl)' "$S/calls")" = 0; } > /dev/null 2>&1; echo $?)"
+check "S3 만들기: 게이트웨이 엔드포인트를 클러스터 VPC의 프라이빗 경로표 둘에 붙임" \
+  "$(ok has_all "$(call_of 'ec2 create-vpc-endpoint')" vpc-0123456789abcdef0 Gateway com.amazonaws.ap-northeast-2.s3 rtb-0aaaaaaaaaaaaaaaa rtb-0cccccccccccccccc)"
+check "S3 만들기: 엔드포인트가 쓰는 대역이 NetworkPolicy에 모두 있다고 알림, CLI 인자 검사 5건 통과, 정리" \
+  "$( { test "$(grep -c '모두 k8s/network-policy.yaml에 있다' "$OUT")" = 1 -a "$(wc -l < "$S/valid" | tr -d ' ')" = 5 && clean; } > /dev/null 2>&1; echo $?)"
+run_sut env STUB_S3_CIDRS="52.219.56.0/22$(printf '\t')198.51.100.0/24" bash "$P/create-s3.sh" --apply
+check "S3 만들기: 엔드포인트 대역이 NetworkPolicy에 없으면 그 대역을 알림(만들기는 끝남)" "$(ok test "$rc" = 0 -a "$(grep -c 'worker 목록에 없는 S3 대역: 198.51.100.0/24\.' "$OUT")" = 1)"
+
 # ---------- 공통 확인 ----------
 run_sut env AWS_ACCESS_KEY_ID=AKIASYNTHETIC bash "$P/create-waf.sh"
 check "키 환경변수가 있으면 AWS를 부르기 전에 멈춤" "$(ok test "$rc" = 1 -a ! -s "$S/seen")"
@@ -309,7 +338,7 @@ run_sut env AWS_REGION=us-east-1 bash "$P/create-waf.sh"
 check "AWS_REGION이 다르면 멈춤" "$(ok test "$rc" = 1 -a ! -s "$S/seen")"
 run_sut env CATCHU_EXPECTED_ACCOUNT= bash "$P/create-waf.sh"
 check "기대 계정 번호가 없으면 멈춤" "$(ok test "$rc" = 1 -a "$(grep -c '기대 계정 번호가 없다' "$OUT")" = 1)"
-for s in rds queue efs waf alert-topic alarms log-group certificate; do
+for s in rds queue efs waf s3 alert-topic alarms log-group certificate; do
   run_sut env CATCHU_EXPECTED_ACCOUNT=999999999999 CATCHU_ALERT_EMAIL=alerts.synthetic@example.com bash "$P/create-$s.sh" --apply
   check "계정이 다르면 $s: 계정 조회 말고는 AWS를 부르지 않고 멈추며 번호를 찍지 않음" \
     "$( { test "$rc" = 1 -a "$(sort -u "$S/seen")" = 'sts get-caller-identity' && test "$(grep -c -E '123456789012|999999999999' "$OUT")" = 0; } > /dev/null 2>&1; echo $?)"
@@ -343,6 +372,14 @@ run_sut env STUB_FAIL='ssm describe-parameters' bash "$P/create-efs.sh" --apply
 check "EFS 키 조회 실패면 '있음'·'없음'으로 넘기지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
 run_sut env STUB_FAIL='ec2 describe-security-groups' bash "$P/create-queue.sh" --apply
 check "보안 그룹 조회 실패면 큐를 만들지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_FAIL='s3api list-buckets' bash "$P/create-s3.sh" --apply
+check "버킷 조회 실패면 만들지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_FAIL='ec2 describe-vpc-endpoints' bash "$P/create-s3.sh" --apply
+check "S3 엔드포인트 조회 실패면 버킷도 만들지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_ROUTE_TABLES= bash "$P/create-s3.sh" --apply
+check "프라이빗 서브넷의 경로표를 찾지 못하면 만들지 않고 멈춤" "$(ok test "$rc" = 1 -a -z "$(ops)")"
+run_sut env STUB_FAIL='s3api create-bucket' bash "$P/create-s3.sh" --apply
+check "버킷 만들기가 실패하면(다른 계정이 쓰는 이름 등) 엔드포인트를 만들지 않고 멈춤" "$(ok test "$rc" != 0 -a -z "$(ops)")"
 run_sut env STUB_VERBOSITY=default bash "$P/create-rds.sh" --apply
 check "파라미터 값이 기대와 다르면 DB를 만들지 않음" "$(ok test "$rc" = 1 -a -z "$(call_of 'rds create-db-instance')")"
 
@@ -362,6 +399,10 @@ run_sut env STUB_SG_ID=sg-0fedcba9876543210 bash "$P/create-queue.sh" --apply
 check "보안 그룹만 남았어도 멈추고 그것을 알려 줌" "$(ok stopped '보안 그룹 catchu-queue(sg-0fedcba9876543210)')"
 run_sut env STUB_FS=fs-0123456789abcdef0 bash "$P/create-efs.sh" --apply
 check "EFS 파일 시스템이 이미 있으면 멈춤(키도 만들지 않음)" "$(ok stopped '파일 시스템 catchu-github-credentials(fs-0123456789abcdef0)')"
+run_sut env STUB_BUCKET_COUNT=1 bash "$P/create-s3.sh" --apply
+check "버킷이 이미 있으면 멈춤(엔드포인트도 만들지 않음)" "$(ok stopped '버킷 catchu-prod-files')"
+run_sut env STUB_ENDPOINT_COUNT=1 bash "$P/create-s3.sh"
+check "S3 엔드포인트가 이미 있으면 확인 모드에서도 멈춤" "$(ok stopped 'VPC vpc-0123456789abcdef0의 S3 엔드포인트')"
 run_sut env STUB_ACL=abc123 bash "$P/create-waf.sh"
 check "웹 ACL이 이미 있으면 멈춤" "$(ok stopped '웹 ACL catchu-edge(abc123)')"
 run_sut env STUB_KEY_COUNT=1 bash "$P/create-efs.sh" --apply
