@@ -213,7 +213,7 @@ export class ExamplePublicController {
 | JD 입력 검증(12월 U10) | 422 | INVALID_INPUT, INPUT_TOO_LARGE ([docs/jd.md](docs/jd.md)). U10 경계의 직접 검사이며 전역 ValidationPipe의 400은 유지 |
 | 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED, INDEX_NOT_READY(12월 U5 질의응답·U10 JD 요약, 계약 C-09·C-12, 문구 "아직 쓸 수 없습니다". 화면 문구는 각 기능의 web 문구 표가 정함), MCP_CONSENT_REQUIRED(12월 U6 첫 연결 동의 없음, [docs/claude-mcp.md](docs/claude-mcp.md)) |
 | 수신자 비밀번호 시도 제한 | 429 | LINK_UNLOCK_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds })`) |
-| 회원 링크 발급 빈도 제한 | 429 | RATE_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('RATE_LIMITED', { retryAfterSeconds })`) |
+| 회원 링크 발급 빈도 제한, PDF 업로드 상한 | 429 | RATE_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('RATE_LIMITED', { retryAfterSeconds })`). PDF 업로드의 진행 중 수 초과에는 `Retry-After`가 없다([docs/pdf-materials.md](docs/pdf-materials.md#업로드)) |
 | 계정당 하루 실행 한도(12월 U2) | 429 | DAILY_LIMIT_REACHED (문구 "오늘 한도에 도달했습니다", 남은 횟수·`Retry-After` 없음, [docs/daily-run-limit.md](docs/daily-run-limit.md)) |
 | 링크당 하루 질문 한도(12월 U5) | 429 | QUESTION_LIMIT_REACHED (계약 C-12, 문구 "오늘 한도에 도달했습니다", 남은 횟수·`Retry-After` 없음, [docs/rag-answer.md](docs/rag-answer.md)) |
 | 서버 오류 | 500 | INTERNAL_ERROR, WITHDRAWAL_FAILED(12월 U2 탈퇴 단계 실패, [docs/withdrawal.md](docs/withdrawal.md)) |

@@ -59,15 +59,23 @@ const SUMMARY_COLUMNS = `pdf_material_id AS "pdfMaterialId", title, file_size_by
 export class PdfMaterialStore {
   constructor(@Inject(DataSource) private readonly dataSource: DataSource) {}
 
+  /**
+   * 본문을 받기 전의 벌 수 확인(#574). 이미 20벌이면 400 maxCount다. 잠금 없이 세므로 동시 요청은 함께 지나갈 수 있고,
+   * 20벌을 넘지 않는 보장은 `create`의 잠금 안 확인이 그대로 한다.
+   */
+  async assertBelowLimit(memberId: string): Promise<void> {
+    const owner = ownerId(memberId);
+    const [{ n }] = await this.dataSource.query('SELECT count(*)::int AS n FROM pdf_material WHERE member_id = $1', [owner]) as [{ n: number }];
+    if (n >= PDF_MATERIAL_LIMITS.perMember) throw maxCountReached();
+  }
+
   /** 회원 행 잠금 → COUNT(20 이상이면 400 maxCount) → PENDING INSERT. 시한은 넣는 시각 + 10분이다(BR1.6). */
   async create(memberId: string, input: NewPdfMaterial): Promise<PdfMaterialCreated> {
     const owner = ownerId(memberId);
     return this.dataSource.transaction('READ COMMITTED', async (manager) => {
       await lockMember(manager, owner);
       const [{ n }] = await manager.query('SELECT count(*)::int AS n FROM pdf_material WHERE member_id = $1', [owner]) as [{ n: number }];
-      if (n >= PDF_MATERIAL_LIMITS.perMember) {
-        throw new ApiError('VALIDATION_FAILED', { details: { violations: [{ field: 'materials', reason: 'maxCount' }] } });
-      }
+      if (n >= PDF_MATERIAL_LIMITS.perMember) throw maxCountReached();
       const rows: PdfMaterialCreated[] = await manager.query(`
         INSERT INTO pdf_material (pdf_material_id, member_id, title, storage_key, file_size_bytes, page_count, extraction_state,
           extraction_deadline_at, extraction_failure_code, created_at, updated_at)
@@ -192,6 +200,10 @@ function pageValues(owner: string, query: PdfMaterialQuery): unknown[] {
   const values: unknown[] = [owner, query.limit + 1];
   if (query.after) values.push(query.after.createdAt, query.after.pdfMaterialId);
   return values;
+}
+
+function maxCountReached(): ApiError {
+  return new ApiError('VALIDATION_FAILED', { details: { violations: [{ field: 'materials', reason: 'maxCount' }] } });
 }
 
 function ownerId(memberId: string): string {

@@ -20,7 +20,7 @@
 
 | 경로 | 요청 | 성공 | 오류 |
 |---|---|---|---|
-| `POST /v1/pdf-materials` | `multipart/form-data`: 파일 `file` 하나, 선택 필드 `title` | 201 `{ pdfMaterialId, title, fileSizeBytes, extractionState: PENDING }` | 400 `VALIDATION_FAILED`·`INVALID_REQUEST`, 401, 403 `AI_CONSENT_REQUIRED`, 500 |
+| `POST /v1/pdf-materials` | `multipart/form-data`: 파일 `file` 하나, 선택 필드 `title` | 201 `{ pdfMaterialId, title, fileSizeBytes, extractionState: PENDING }` | 400 `VALIDATION_FAILED`·`INVALID_REQUEST`, 401, 403 `AI_CONSENT_REQUIRED`, 429 `RATE_LIMITED`, 500 |
 | `GET /v1/pdf-materials` | 쿼리 `cursor`·`limit`(1~100, 기본 20) | 200 `{ items: [{ pdfMaterialId, title, fileSizeBytes, pageCount, extractionState, failureCode }], page: { nextCursor } }` | 400, 401 |
 | `GET /v1/pdf-materials/{pdfMaterialId}` | — | 200 목록 항목 + `pages: [{ pageNumber, readable }]`(글 본문 없음) | 401, 404 |
 | `GET /v1/pdf-materials/{pdfMaterialId}/file` | — | 200 `application/pdf` 원본 스트림 | 401, 404, 500 |
@@ -28,10 +28,21 @@
 
 ### 업로드
 
-순서는 인증 → 동의 확인(본문을 읽기 전) → multipart 검사 → `FileStorage.put` → 트랜잭션(회원 행 잠금·벌 수 세기·`PENDING` 행 넣기) → 커밋 → 추출 요청 발송 → 201이다.
+순서는 인증 → 동의 확인 → 벌 수 사전 확인 → 업로드 상한(진행 중 수 → 횟수) → multipart 검사 → `FileStorage.put` → 트랜잭션(회원 행 잠금·벌 수 세기·`PENDING` 행 넣기) → 커밋 → 추출 요청 발송 → 201이다. 업로드 상한까지는 본문을 읽지 않는다.
 
 - 상한: 파일 20 MB, 제목 1~100자(코드 포인트, 앞뒤 공백 제외), 회원당 20벌. 쪽 50과 쪽 글 합계 60,000자는 worker가 판정한다.
-- 파일 검사는 선언 종류(`application/pdf`) → 받은 바이트 누적이 20 MB를 넘는 즉시 중단 → 머리 바이트 `%PDF-` 순서다. 요청 헤더의 선언 크기는 믿지 않는다.
+- 이미 20벌인 회원의 요청은 본문을 받기 전에 400(`materials`·`maxCount`)이고 저장소를 부르지 않는다. 이 사전 확인은 잠금 없이 세므로, 20벌을 넘지 않는 보장은 저장 직전 회원 행 잠금 안의 확인이 한다.
+- 업로드 상한([#574](https://github.com/JminAILab/CatchU/issues/574), `src/materials/pdf-upload-gate.ts`). 넘으면 본문을 받지 않고 429 `RATE_LIMITED`다.
+
+  | 상한 | 값 | 응답 |
+  |---|---|---|
+  | 진행 중 업로드 수 | 전체 8건, 회원당 2건 | 429, `Retry-After` 없음 |
+  | 회원별 횟수 | 10분에 5건(미끄러지는 창) | 429와 `Retry-After`(초) |
+
+  - 진행 중은 본문을 읽기 시작할 때부터 응답을 만들 때까지다. 검사 실패·저장 실패·연결 끊김으로 끝나도 자리를 돌려준다.
+  - 동의가 없거나(403) 이미 20벌이거나(400) 자리가 없어 거부된 요청은 횟수에 세지 않는다. 본문 검사에서 떨어진 요청은 센다.
+  - 기록은 api 프로세스 메모리다. 재시작하면 지워지고, api 프로세스가 둘 이상이면 프로세스마다 따로 센다.
+- 파일 검사는 선언 종류(`application/pdf`) → 받은 바이트 누적이 20 MB를 넘으면 더 쌓지 않고 거부 → 머리 바이트 `%PDF-` 순서다. 요청 헤더의 선언 크기는 믿지 않는다. 상한을 넘겨도 연결을 바로 끊지는 않는다. 받은 바이트(최대 20 MB)는 그 파일 부분이 끝날 때까지 메모리에 남고, 400 응답은 남은 본문을 받아 버린 뒤에 나간다.
 - `title`이 없으면 파일 이름에서 경로 마디와 마지막 확장자를 뺀 값을 쓴다.
 - `details.violations`의 `field`·`reason`: `body`(`isMultipart`·`whitelistValidation`), `file`(`isRequired`·`isPdf`·`maxSize`·`singleFile`), `title`(`isString`·`noNul`·`isWellFormed`·`isNotEmpty`·`maxLength`), `materials`(`maxCount`). 값(파일 이름·제목)은 담지 않는다. 해석할 수 없는 multipart는 400 `INVALID_REQUEST`다.
 - `put` 뒤에 DB 쓰기가 실패하거나 벌 수를 넘으면 올린 파일을 한 번 지운다. 그 삭제도 실패하면 로그만 남기고, 남은 파일은 탈퇴 때 회원 접두어 삭제로 지워진다.
@@ -113,7 +124,7 @@
 | `AWS_REGION` | S3 드라이버 | AWS SDK가 읽는 지역. 접근 키는 넣지 않고 기본 자격 체인(역할)을 쓴다 |
 | `CATCHU_QUEUE_REDIS_URL`·`CATCHU_QUEUE_PREFIX` | 추출 요청 발송·결과 수신 | 주소가 없으면 발송도 수신도 조립되지 않는다. 업로드는 201이지만 추출이 돌지 않아 10분 뒤 `FAILED`(`DEADLINE_EXCEEDED`)로 보인다. 접두사는 worker와 같아야 한다 |
 
-이름과 설명은 `api/.env.example`에 있다. 상한 값(20 MB·20벌·50쪽·60,000자·10분)은 설정이 아니라 코드 상수다.
+이름과 설명은 `api/.env.example`에 있다. 상한 값(20 MB·20벌·50쪽·60,000자·10분, 업로드 10분 5건·진행 중 전체 8건·회원당 2건)은 설정이 아니라 코드 상수다.
 
 ## 로그
 
@@ -133,14 +144,16 @@
 
 ## 수용한 위험
 
-[보안 설계 §10](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/nfr-design/security-design.md)의 내용이다.
+[보안 설계 §10](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/nfr-design/security-design.md)의 내용이다. 업로드 메모리 행은 2026-11-16 팀장 결정([#574](https://github.com/JminAILab/CatchU/issues/574))으로 바뀌었고, 그 아래 두 행을 더했다. 승인된 설계 기록은 고치지 않고 여기에 적는다.
 
 | 위험 | 상태 |
 |---|---|
 | PDF 내용(스크립트·외부 링크)의 악성 여부를 검사하지 않는다 | 수용. 브라우저 내장 뷰어의 격리와 `nosniff`에 맡긴다 |
 | 이미 전달된 PDF는 링크를 중지한 뒤에도 그 탭에서 보인다 | 수용. 다음 요청부터 막는다 |
 | 개인정보가 든 PDF를 그대로 저장·전송한다 | 요구사항대로. 업로드 화면의 안내 문구로 알린다 |
-| 동시 업로드 n건이면 api 메모리에 최대 n × 20 MB가 머문다 | 수용. 시연 규모 가정이며 규모가 커지면 다시 검토한다 |
+| 동시 업로드 n건이면 api 메모리에 최대 n × 20 MB가 머문다 | 진행 중 업로드 수로 묶는다(전체 8건이면 받는 버퍼 최대 160 MB, 받은 조각을 한 덩이로 합치는 순간에는 그 건만 잠깐 두 배). 임시 파일·스트리밍 업로드는 두지 않는다 |
+| 업로드 자리 8개가 모두 차 있는 동안에는 다른 회원의 업로드가 429다(여러 계정이 함께 자리를 오래 잡는 경우 포함) | 수용. api는 계속 동작하고, 자리는 요청이 끝나거나 Node의 요청 시간 제한(기본 300초)에 연결이 끊기면 돌아온다 |
+| 추출이 오래 걸리는 PDF(파일당 최대 120초)가 몰리면 다른 회원의 PDF가 추출 시한 10분을 넘길 수 있다. 한 회원의 10분 5건 안에서도, 여러 계정으로도 생길 수 있다 | 수용. 회원별 횟수 제한은 보통 PDF(추출 수 초)로 한 계정이 추출 줄을 채우는 것을 막는다. 규모가 커지면 회원별 추출 대기 수 상한을 검토한다 |
 | 해제된 새 탭 Blob URL은 그 탭을 새로고침하면 실패한다 | 수용. 원래 화면에서 다시 연다 |
 
 그 밖에 알아 둘 한계: OCR이 없어 스캔본의 쪽은 "읽을 수 없음"으로 남는다. 파일 교체와 다시 추출이 없다. PDF 글은 MCP 도구로 내보내지 않는다. PDF 뷰어가 Blob URL을 iframe으로 그리므로 web의 CSP에 `frame-src 'self' blob:`이 있다.
@@ -160,7 +173,7 @@
 |---|---|---|
 | `test/db/pdf-tables.test.cjs` | 11 | 세 표의 제약·연쇄 삭제 |
 | `test/file-storage/s3-file-storage.test.cjs` | 9 | S3 드라이버의 메서드별 S3 호출·오류 분류·접두어 삭제·키 검사·설정 거부(가짜 클라이언트) |
-| `test/materials/pdf-materials-api.test.cjs` | 12 | 업로드·목록·상세·원본 열람·삭제, 동의·상한·소유, 시한 판정, 로그 |
+| `test/materials/pdf-materials-api.test.cjs` | 19 | 업로드·목록·상세·원본 열람·삭제, 동의·상한·소유, 시한 판정, 로그, 업로드 상한(횟수·진행 중 수·20벌 사전 확인·자리 반환), 탈퇴와 겹친 업로드 |
 | `test/materials/pdf-extraction-receiver.test.cjs` | 13 | 수신 판정 5종, 저장 실패 되돌림, 글 합계 상한 |
 | `test/publications/publish-pdf.test.cjs` | 15 | 발행의 PDF 부분: 순서·사본, 추출 미완 400, 복사·트랜잭션 실패 정리, 발행 중 원본 변경, 동의 순서, 전체 글 상한 |
 | `test/publications/recipient-pdf.test.cjs` | 8 | 받은 사람·작성자 사본 열람, 판정·헤더·로그, 발행본 삭제 뒤 404 |
