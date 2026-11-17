@@ -1,5 +1,5 @@
 import type { AccessTokenStore } from "../../lib/access-token.ts";
-import { API_VERSION_PATH, normalizeApiBaseUrl, type ApiClient, type ClientResult } from "../../lib/api-client.ts";
+import { API_VERSION_PATH, normalizeApiBaseUrl, parseRetryAfterSeconds, type ApiClient, type ClientResult } from "../../lib/api-client.ts";
 import { memberCallBlock } from "../../lib/auth-api.ts";
 import { readApiResponse } from "../../lib/api-response.ts";
 import type { AuthSession } from "../../lib/auth-session.ts";
@@ -22,6 +22,9 @@ import { SENSITIVE_INFO_NOTICE } from "./materials-api.ts";
 
 /** PDF 자료 상한(api `PDF_MATERIAL_LIMITS`, BR1.2). 제목은 앞뒤 공백을 지운 뒤 코드 포인트로 센다. 쪽 50은 worker가 판정한다. */
 export const PDF_LIMITS = Object.freeze({ title: 100, fileSizeBytes: 20 * 1024 * 1024, perMember: 20 });
+
+/** 회원별 업로드 횟수 상한(api `PDF_UPLOAD_RATE_LIMIT`, #574). 안내 문구에만 쓴다. api와 같은 값이며 한쪽만 바꾸지 않는다. */
+export const PDF_UPLOAD_RATE = Object.freeze({ maxUploads: 5, windowMinutes: 10 });
 
 /** 올리는 화면에 늘 보이는 민감 정보 안내. 텍스트 자료와 같은 문구다(BR1.5). */
 export const PDF_SENSITIVE_INFO_NOTICE = SENSITIVE_INFO_NOTICE;
@@ -128,6 +131,16 @@ export function pdfUploadErrors(files: readonly ChosenFile[], title: string): st
 export const PDF_COUNT_LIMIT_TEXT = `PDF 자료는 ${PDF_LIMITS.perMember}벌까지 둘 수 있습니다. 쓰지 않는 PDF를 지운 뒤 올려 주세요.`;
 export const PDF_UPLOAD_FAILED_TEXT = "올리지 못했습니다";
 
+/**
+ * 업로드 상한 초과(429 `RATE_LIMITED`, api #574) 안내. 회원별 횟수를 넘으면 `Retry-After`가 오므로 기준(10분에 5개)과 남은 시간(분으로 올림)을 적고,
+ * 진행 중 업로드 수를 넘은 경우는 그 값이 없어 기준과 시간을 적지 않는다.
+ */
+export function pdfRateLimitedText(retryAfterSeconds?: number): string {
+  return retryAfterSeconds === undefined
+    ? "지금은 올리는 요청이 많아 받을 수 없습니다. 잠시 뒤 다시 올려 주세요."
+    : `PDF는 ${PDF_UPLOAD_RATE.windowMinutes}분에 ${PDF_UPLOAD_RATE.maxUploads}개까지 올릴 수 있습니다. 약 ${Math.ceil(retryAfterSeconds / 60)}분 뒤에 다시 올려 주세요.`;
+}
+
 /** 서버 400의 첫 위반을 안내 문장으로 바꾼다(입력값·서버 문구를 그대로 싣지 않는다). */
 function violationText(field: string, reason: string): string {
   if (field === "materials" && reason === "maxCount") return PDF_COUNT_LIMIT_TEXT;
@@ -162,6 +175,9 @@ export function pdfUploadOutcome(result: ClientResult): PdfUploadOutcome {
     if (result.status === 400 && result.code === "VALIDATION_FAILED") {
       const first = result.details?.violations?.[0];
       return { kind: "failed", lines: [PDF_UPLOAD_FAILED_TEXT, first ? violationText(first.field, first.reason) : "파일이나 제목을 확인해 주세요."] };
+    }
+    if (result.status === 429 && result.code === "RATE_LIMITED") {
+      return { kind: "failed", lines: [PDF_UPLOAD_FAILED_TEXT, pdfRateLimitedText(result.retryAfterSeconds)] };
     }
     if (result.status === 403 && result.code === "AI_CONSENT_REQUIRED") {
       return { kind: "failed", lines: [PDF_UPLOAD_FAILED_TEXT, "외부 AI 처리 동의가 필요합니다. 다시 올리면 동의 창이 열립니다."] };
@@ -311,7 +327,13 @@ export function createPdfHttp(options: PdfHttpOptions) {
       // 서버는 선언 종류가 application/pdf인 파일만 받는다. 브라우저가 종류를 비워 준 .pdf도 같은 종류로 보낸다.
       form.append("file", new Blob([file], { type: "application/pdf" }), fileName);
       form.append("title", title);
-      return readApiResponse(member("/pdf-materials", { method: "POST", body: form, accept: "application/json", signal }));
+      const pending = member("/pdf-materials", { method: "POST", body: form, accept: "application/json", signal });
+      // readApiResponse는 헤더를 돌려주지 않으므로 업로드 상한 초과(429)의 Retry-After만 따로 읽는다(공통 클라이언트와 같은 방식).
+      const retryAfter = pending.then((response) => response.headers.get("Retry-After"), () => null);
+      const result = await readApiResponse(pending);
+      if (result.kind !== "api-error") return result;
+      const seconds = parseRetryAfterSeconds(await retryAfter);
+      return seconds === undefined ? result : { ...result, retryAfterSeconds: seconds };
     },
     /** 작성자 원본 `GET /pdf-materials/{id}/file`. */
     originalFile(pdfMaterialId: string, signal?: AbortSignal): Promise<Response> {

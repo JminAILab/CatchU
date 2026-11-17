@@ -22,6 +22,21 @@
 // U-11 정상 삭제 (BR1.7·BR4.4, NFR5.1·NFR5.2) — 기대: 파일 먼저 삭제(없는 키 포함 성공) → 행 삭제·쪽 연쇄 → 204. 발행 사본은 그대로.
 // U-12 추출 요청 발송 실패 (BR2.4, NFR4.14·NFR6.1) — 기대: 로그 PDF_EXTRACT_ENQUEUE_FAILED, 201 유지. 실패 조건: 500 또는 롤백.
 //
+// 업로드 상한(#574 완료 기준, 팀장 결정 2026-11-16: 회원당 10분 5건, 진행 중 전체 8건·회원당 2건, 본문을 받기 전 20벌 확인).
+// L-1  한 회원이 5개를 차례로 올림 → 6번째 → 10분 뒤
+//   - 기대: 5건 모두 201, 6번째는 429 RATE_LIMITED + Retry-After(1~600초)이고 저장소 미호출·행 5개 그대로, 다른 회원은 201, 창이 지나면 201.
+//   - 실패 조건: 6번째가 저장됨, Retry-After 없음, 다른 회원까지 막힘.
+// L-2  동의 없는 요청(403)·이미 20벌(400)은 횟수에 세지 않음
+//   - 기대: 각 6번 거부된 뒤에도 동의·자리 확보 후 5건이 201. 20벌 거부는 저장소 미호출(본문을 받기 전).
+//   - 실패 조건: 거부된 요청 때문에 429, 20벌 거부가 파일을 저장했다 지움.
+// L-3  한 회원의 업로드 2건이 진행 중
+//   - 기대: 그 회원의 3번째는 429 RATE_LIMITED(Retry-After 없음)·횟수 미소모, 다른 회원은 받음, 2건이 끝나면 다시 201.
+//   - 실패 조건: 3번째가 받아들여짐, 끝난 뒤에도 429.
+// L-4  진행 중 업로드가 전체 8건(회원 4명 × 2건)
+//   - 기대: 다섯째 회원의 업로드는 429 RATE_LIMITED, 8건이 끝나면 201이고 진행 중 수는 0.
+// L-5  자리 반환: 본문 검사 실패(400)·저장 실패(500)·전송 도중 연결 끊김
+//   - 기대: 어느 경우든 진행 중 수가 0으로 돌아온다. 실패 조건: 자리가 남아 그 회원이 계속 429.
+//
 // 실제 AppModule(전역 인증 Guard·오류 형식·no-store)과 테스트 DB를 쓴다. 회원은 개발 로그인으로 만든 합성 회원이고, 파일 저장소는
 // 시험 전용 임시 폴더의 로컬 드라이버다(실제 S3 없음). 큐 주소는 비워 발송 실패 경로가 기본이고, 발송 1회는 기록용 가짜 발송기로 본다.
 // 저장소·DB·발송 실패 주입은 앱의 같은 인스턴스(app.get)의 메서드를 시험 동안 바꿔 넣는다(U4 발행 시험의 bindFakes와 같은 방식).
@@ -29,6 +44,7 @@
 require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
+const http = require('node:http');
 const { existsSync } = require('node:fs');
 const { mkdtemp, readdir, rm } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
@@ -39,6 +55,7 @@ const { AI_NOTICE_VERSION, AiConsentGate } = require('../../dist/ai-consent/ai-c
 const { FILE_STORAGE, StorageUnavailable, materialKey } = require('../../dist/file-storage/file-storage');
 const { PDF_MATERIAL_LIMITS } = require('../../dist/materials/pdf-material-input');
 const { PdfMaterialStore } = require('../../dist/materials/pdf-material-store');
+const { PDF_UPLOAD_RATE_LIMIT, PDF_UPLOAD_SLOTS, PdfUploadGate } = require('../../dist/materials/pdf-upload-gate');
 const { PDF_EXTRACT_DISPATCHER } = require('../../dist/pdf-extraction/pdf-extract.dispatcher');
 const { PDF_EXTRACT_SCHEMA_VERSION, PDF_EXTRACTION_DEADLINE_MINUTES, pdfExtractMessageId } = require('../../dist/pdf-extraction/pdf-extraction-spec');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
@@ -49,7 +66,7 @@ const SECRET_TITLE = '[합성-PDF-제목-노출확인-7f3a]';
 const SECRET_FILE_NAME = 'synthetic-secret-name-7f3a.pdf';
 const MAX_BYTES = PDF_MATERIAL_LIMITS.fileSizeBytes;
 
-let server, plain, db, restore, fileRoot, storage, store, dispatcher;
+let server, plain, db, restore, fileRoot, storage, store, dispatcher, uploadGate;
 before(async () => {
   fileRoot = await mkdtemp(join(tmpdir(), 'catchu-u8-pdf-materials-'));
   const common = { ...APP_SETTINGS, CATCHU_QUEUE_REDIS_URL: undefined, CATCHU_QUEUE_PREFIX: undefined, FILE_STORAGE_S3_BUCKET: undefined };
@@ -63,6 +80,7 @@ before(async () => {
   storage = server.app.get(FILE_STORAGE);
   store = server.app.get(PdfMaterialStore);
   dispatcher = server.app.get(PDF_EXTRACT_DISPATCHER);
+  uploadGate = server.app.get(PdfUploadGate);
 });
 after(async () => {
   await server?.app.close();
@@ -221,6 +239,9 @@ test('U-3: 선언 종류·머리 바이트·누적 20 MB 초과·제목 101자·
   const member = await consentedMember();
   let puts = 0;
   const callPut = swap(t, storage, 'put', async (...args) => { puts += 1; return callPut(...args); });
+  // 이 시험은 입력 검사를 본다. 한 회원이 11번 보내므로 횟수 창(10분 5건)을 요청마다 넘긴다. 횟수 상한은 L-1이 본다.
+  let calls = 0;
+  swap(t, uploadGate, 'now', () => new Date(Date.UTC(2026, 10, 16) + (calls += 1) * PDF_UPLOAD_RATE_LIMIT.windowMs));
   const title100 = '가'.repeat(98) + '😀😀';
   const cases = [
     ['선언 종류가 PDF 아님', { type: 'text/plain' }, [{ field: 'file', reason: 'isPdf' }]],
@@ -250,6 +271,7 @@ test('U-3: 선언 종류·머리 바이트·누적 20 MB 초과·제목 101자·
   assert.equal(exact.body.fileSizeBytes, MAX_BYTES);
   assert.equal(exact.body.title, title100);
   assert.equal(puts, 1);
+  assert.equal(uploadGate.active, 0, '검사에서 떨어진 요청도 자리를 돌려준다');
 });
 
 test('U-4: 19벌이 있는 회원이 동시에 2건 올리면 회원 행 잠금 안에서 1건만 통과하고, 나머지는 400 maxCount에 파일을 한 번 지운다', async (t) => {
@@ -257,6 +279,18 @@ test('U-4: 19벌이 있는 회원이 동시에 2건 올리면 회원 행 잠금 
   for (let index = 0; index < PDF_MATERIAL_LIMITS.perMember - 1; index += 1) await insertPdfRow(member.memberId);
   const deletes = [];
   const callDelete = swap(t, storage, 'delete', async (key) => { deletes.push(key); return callDelete(key); });
+  let puts = 0;
+  const callPut = swap(t, storage, 'put', async (...args) => { puts += 1; return callPut(...args); });
+  // 두 요청이 본문을 받기 전의 사전 확인(19벌)을 함께 지난 뒤에야 나아가게 해, 20벌 보장이 잠금 안 확인에서 나오는 것을 본다(#574).
+  let arrived = 0;
+  let open;
+  const both = new Promise((resolve) => { open = resolve; });
+  const callCheck = swap(t, store, 'assertBelowLimit', async (memberId) => {
+    await callCheck(memberId);
+    arrived += 1;
+    if (arrived >= 2) open();
+    await both;
+  });
 
   const [first, second] = await Promise.all([upload(server, member.token, { title: '동시 1' }), upload(server, member.token, { title: '동시 2' })]);
   const statuses = [first.status, second.status].sort();
@@ -271,12 +305,200 @@ test('U-4: 19벌이 있는 회원이 동시에 2건 올리면 회원 행 잠금 
   assert.equal(deletes.length, 1);
   assert.notEqual(deletes[0], materialKey(member.memberId, passed.body.pdfMaterialId));
 
-  // 20벌인 뒤 한 건 더는 동시가 아니어도 400이고 파일을 지운다.
+  assert.equal(puts, 2, '동시 2건은 둘 다 사전 확인을 지나 저장까지 갔다');
+
+  // 20벌인 뒤 한 건 더는 본문을 받기 전에 400이다. 저장소를 부르지 않아 지울 파일도 없다(#574).
   const third = await upload(server, member.token, { title: '21벌째' });
   rejected(third, 400, 'VALIDATION_FAILED');
+  assert.deepEqual(third.body.details, { violations: [{ field: 'materials', reason: 'maxCount' }] });
   assert.equal((await rows()).length, PDF_MATERIAL_LIMITS.perMember);
-  assert.equal(deletes.length, 2);
+  assert.equal(puts, 2);
+  assert.equal(deletes.length, 1);
   assert.deepEqual(await storedFiles(), [`${passed.body.pdfMaterialId}.pdf`]);
+});
+
+/** 횟수 창의 시계를 시험이 정한다. 돌려주는 함수로 시각을 옮긴다. */
+function fixedClock(t) {
+  let at = Date.UTC(2026, 10, 16, 0, 0, 0);
+  swap(t, uploadGate, 'now', () => new Date(at));
+  return (ms) => { at += ms; };
+}
+/**
+ * 지정한 회원들의 put을 처음 `count`건까지 붙잡아 업로드를 진행 중으로 둔다. `held()`는 붙잡힌 수, `release()`는 모두 놓는다.
+ * 그보다 많이 오면 붙잡지 않고 지나가게 해, 상한이 듣지 않을 때 시험이 멈추지 않고 201을 보고 실패하게 한다. 시험이 끝나면 놓는다.
+ */
+function holdPuts(t, memberIds, count) {
+  let held = 0;
+  let release;
+  const gateOpen = new Promise((resolve) => { release = resolve; });
+  const callPut = swap(t, storage, 'put', async (key, ...rest) => {
+    if (held < count && memberIds.some((id) => key.includes(id))) {
+      held += 1;
+      await gateOpen;
+    }
+    return callPut(key, ...rest);
+  });
+  t.after(() => release());
+  return { held: () => held, release };
+}
+async function until(condition, label) {
+  const deadline = Date.now() + 10000;
+  while (!condition()) {
+    assert.ok(Date.now() < deadline, `${label}: 10초 안에 조건이 차지 않았다`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+function rateLimited(response, { retryAfter }) {
+  expectError(response, 429, 'RATE_LIMITED');
+  const header = response.headers.get('retry-after');
+  if (!retryAfter) return assert.equal(header, null, '진행 중 수 초과에는 Retry-After가 없다');
+  assert.match(header ?? '', /^[1-9]\d*$/, 'Retry-After는 1 이상의 정수 초다');
+  assert.ok(Number(header) <= PDF_UPLOAD_RATE_LIMIT.windowMs / 1000);
+}
+
+test('L-1: 한 회원이 5개를 차례로 올리면 모두 201이고, 10분 안 6번째는 429 RATE_LIMITED(Retry-After)로 저장되지 않으며, 다른 회원은 그대로 올리고 창이 지나면 다시 받는다', async (t) => {
+  const advance = fixedClock(t);
+  const member = await consentedMember();
+  const other = await consentedMember();
+  let puts = 0;
+  const callPut = swap(t, storage, 'put', async (...args) => { puts += 1; return callPut(...args); });
+
+  assert.equal(PDF_UPLOAD_RATE_LIMIT.maxRequests, 5);
+  assert.equal(PDF_UPLOAD_RATE_LIMIT.windowMs, 10 * 60 * 1000);
+  for (let index = 0; index < PDF_UPLOAD_RATE_LIMIT.maxRequests; index += 1) {
+    const response = await upload(server, member.token, { title: `차례 ${index + 1}` });
+    assert.equal(response.status, 201, response.text);
+    advance(1000);
+  }
+  const sixth = await upload(server, member.token, { title: SECRET_TITLE, fileName: SECRET_FILE_NAME });
+  rateLimited(sixth, { retryAfter: true });
+  assert.deepEqual(sixth.body, { code: 'RATE_LIMITED', message: sixth.body.message }, '429 본문에 값이 실리지 않는다');
+  assert.equal(puts, 5, '거부된 요청은 저장소를 부르지 않는다');
+  assert.equal((await rows()).length, 5);
+  assert.equal((await storedFiles()).length, 5);
+
+  const others = await upload(server, other.token, { title: '다른 회원' });
+  assert.equal(others.status, 201, others.text);
+
+  // 첫 요청이 창을 벗어나기 직전까지는 429, 벗어나면 한 건을 다시 받는다.
+  advance(PDF_UPLOAD_RATE_LIMIT.windowMs - 5000 - 1);
+  rateLimited(await upload(server, member.token, { title: '아직 창 안' }), { retryAfter: true });
+  advance(1);
+  const afterWindow = await upload(server, member.token, { title: '창이 지난 뒤' });
+  assert.equal(afterWindow.status, 201, afterWindow.text);
+  assert.equal(uploadGate.active, 0);
+  assertNoSecretsInLogs([SECRET_TITLE, SECRET_FILE_NAME]);
+});
+
+test('L-2: 동의가 없어 거부된 요청(403)과 이미 20벌이라 거부된 요청(400)은 횟수에 세지 않고, 20벌 거부는 저장소를 부르지 않는다', async (t) => {
+  fixedClock(t);
+  let puts = 0;
+  const callPut = swap(t, storage, 'put', async (...args) => { puts += 1; return callPut(...args); });
+
+  const late = await server.login(`u8-late-consent-${randomUUID()}`);
+  for (let index = 0; index <= PDF_UPLOAD_RATE_LIMIT.maxRequests; index += 1) {
+    expectError(await upload(server, late.token, { title: '동의 전' }), 403, 'AI_CONSENT_REQUIRED');
+  }
+  await server.app.get(AiConsentGate).record(late.memberId, AI_NOTICE_VERSION, new Date());
+  for (let index = 0; index < PDF_UPLOAD_RATE_LIMIT.maxRequests; index += 1) {
+    const response = await upload(server, late.token, { title: `동의 뒤 ${index + 1}` });
+    assert.equal(response.status, 201, response.text);
+  }
+  assert.equal(puts, 5);
+
+  const full = await consentedMember();
+  const filler = [];
+  for (let index = 0; index < PDF_MATERIAL_LIMITS.perMember; index += 1) filler.push(await insertPdfRow(full.memberId));
+  for (let index = 0; index <= PDF_UPLOAD_RATE_LIMIT.maxRequests; index += 1) {
+    const response = await upload(server, full.token, { title: '21벌째' });
+    rejected(response, 400, 'VALIDATION_FAILED');
+    assert.deepEqual(response.body.details, { violations: [{ field: 'materials', reason: 'maxCount' }] });
+  }
+  assert.equal(puts, 5, '20벌 거부는 본문을 받기 전이라 저장소를 부르지 않는다');
+  // 6벌을 비워 5건을 올린 뒤에도 19벌이게 한다. 그래야 마지막 요청이 20벌 확인이 아니라 횟수 제한에 닿는다.
+  await db.query('DELETE FROM pdf_material WHERE pdf_material_id = ANY($1::uuid[])', [filler.slice(0, PDF_UPLOAD_RATE_LIMIT.maxRequests + 1)]);
+  for (let index = 0; index < PDF_UPLOAD_RATE_LIMIT.maxRequests; index += 1) {
+    const response = await upload(server, full.token, { title: `자리 난 뒤 ${index + 1}` });
+    assert.equal(response.status, 201, response.text);
+  }
+  rateLimited(await upload(server, full.token, { title: '6번째' }), { retryAfter: true });
+});
+
+test('L-3: 한 회원의 업로드 2건이 진행 중이면 그 회원의 다음 업로드는 429 RATE_LIMITED이고 횟수를 쓰지 않으며, 다른 회원은 받고, 2건이 끝나면 다시 받는다', async (t) => {
+  fixedClock(t);
+  const member = await consentedMember();
+  const other = await consentedMember();
+  const hold = holdPuts(t, [member.memberId], PDF_UPLOAD_SLOTS.perMember);
+
+  assert.equal(PDF_UPLOAD_SLOTS.perMember, 2);
+  const running = [upload(server, member.token, { title: '진행 1' }), upload(server, member.token, { title: '진행 2' })];
+  await until(() => hold.held() === 2, '업로드 2건이 저장 단계에 닿음');
+  assert.equal(uploadGate.active, 2);
+
+  for (let index = 0; index < 4; index += 1) rateLimited(await upload(server, member.token, { title: '세 번째' }), { retryAfter: false });
+  assert.equal(hold.held(), 2, '거부된 요청은 저장 단계에 가지 않는다');
+  const others = await upload(server, other.token, { title: '다른 회원' });
+  assert.equal(others.status, 201, others.text);
+
+  hold.release();
+  for (const response of await Promise.all(running)) assert.equal(response.status, 201, response.text);
+  assert.equal(uploadGate.active, 0);
+  // 자리가 없어 거부된 4건이 횟수를 썼다면 여기서 429다(진행 2건 + 아래 3건 = 5건).
+  for (let index = 0; index < 3; index += 1) {
+    const response = await upload(server, member.token, { title: `끝난 뒤 ${index + 1}` });
+    assert.equal(response.status, 201, response.text);
+  }
+  rateLimited(await upload(server, member.token, { title: '6번째' }), { retryAfter: true });
+});
+
+test('L-4: 진행 중 업로드가 전체 8건이면 다른 회원의 업로드도 429 RATE_LIMITED이고, 끝나면 다시 받는다', async (t) => {
+  fixedClock(t);
+  assert.equal(PDF_UPLOAD_SLOTS.total, 8);
+  const members = [];
+  for (let index = 0; index < PDF_UPLOAD_SLOTS.total / PDF_UPLOAD_SLOTS.perMember; index += 1) members.push(await consentedMember());
+  const fifth = await consentedMember();
+  const hold = holdPuts(t, members.map((member) => member.memberId), PDF_UPLOAD_SLOTS.total);
+
+  const running = members.flatMap((member) => [upload(server, member.token, { title: '진행 1' }), upload(server, member.token, { title: '진행 2' })]);
+  await until(() => hold.held() === PDF_UPLOAD_SLOTS.total, '업로드 8건이 저장 단계에 닿음');
+  assert.equal(uploadGate.active, PDF_UPLOAD_SLOTS.total);
+
+  rateLimited(await upload(server, fifth.token, { title: '아홉 번째' }), { retryAfter: false });
+  assert.equal((await rows()).length, 0);
+
+  hold.release();
+  for (const response of await Promise.all(running)) assert.equal(response.status, 201, response.text);
+  assert.equal(uploadGate.active, 0);
+  const afterwards = await upload(server, fifth.token, { title: '끝난 뒤' });
+  assert.equal(afterwards.status, 201, afterwards.text);
+});
+
+test('L-5: 본문 검사 실패·저장 실패·전송 도중 연결 끊김 뒤에도 업로드 자리가 남지 않는다', async (t) => {
+  fixedClock(t);
+  const member = await consentedMember();
+  rejected(await upload(server, member.token, { type: 'text/plain' }), 400, 'VALIDATION_FAILED');
+  assert.equal(uploadGate.active, 0);
+
+  const callPut = swap(t, storage, 'put', async () => { throw new StorageUnavailable('IO_FAILED'); });
+  expectError(await upload(server, member.token, { title: '저장 실패' }), 500, 'INTERNAL_ERROR');
+  assert.equal(uploadGate.active, 0);
+  storage.put = (...args) => callPut(...args);
+
+  // 본문을 다 보내지 않고 연결을 끊는다. 서버는 본문을 기다리는 동안 자리를 잡고 있다가 끊기면 돌려준다.
+  const boundary = `----catchu-${randomUUID()}`;
+  const target = new URL(`${server.url}/v1/pdf-materials`);
+  const request = http.request({ host: target.hostname, port: target.port, path: target.pathname, method: 'POST',
+    headers: { Authorization: `Bearer ${member.token}`, 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Transfer-Encoding': 'chunked' } });
+  request.on('error', () => {});
+  t.after(() => request.destroy());
+  request.write(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="synthetic.pdf"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.4\n`);
+  await until(() => uploadGate.active === 1, '끊기 전 업로드가 자리를 잡음');
+  request.destroy();
+  await until(() => uploadGate.active === 0, '연결이 끊긴 뒤 자리를 돌려줌');
+  assert.deepEqual(await rows(), []);
+
+  const afterwards = await upload(server, member.token, { title: '끊긴 뒤' });
+  assert.equal(afterwards.status, 201, afterwards.text);
 });
 
 test('U-5: 저장소가 설정되지 않았거나 put이 실패하면 500이고 행이 생기지 않는다', async (t) => {
