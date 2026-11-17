@@ -68,12 +68,28 @@ await this.files.put(materialKey(memberId, pdfMaterialId), body, 'application/pd
 
 - 없는 대상 판정은 `NoSuchKey`만이다: get·copy의 `NoSuchKey` → `FileNotFound`, delete의 `NoSuchKey` → 성공이고, `NoSuchBucket`을 포함한 그 밖의 404·오류(네트워크·권한·`DeleteObjects` 응답의 `Errors`)는 모두 `StorageUnavailable`(`IO_FAILED`) 한 번이며 원인은 `cause`에 둔다(저장소 오류를 성공·없음으로 보지 않음).
 - deletePrefix 방어 3건: 요청 접두어 밖 키가 목록에 오면 삭제 없이 `IO_FAILED`(다른 회원 파일 보호), `DeleteObjects` 응답 `Errors`는 `IO_FAILED`, `IsTruncated`인데 다음 토큰이 없으면 `IO_FAILED`(조용한 부분 성공 없음).
-- 재시도는 SDK 기본 재시도 모드(한 호출 안 최대 3회)에 맡기고 드라이버는 더하지 않는다. 최종 실패는 호출자가 실패로 처리한다(작업 단위 재시도는 사람이 한다).
+- 요청 시간 제한과 시도 횟수는 `S3_REQUEST_LIMITS`에 있고 `createS3Client()`가 클라이언트에 넣는다(아래 「S3 요청 시간 제한」). 다시 시도는 SDK가 그 횟수 안에서 하고 드라이버는 더하지 않는다. 최종 실패는 호출자가 실패로 처리한다(작업 단위 재시도는 사람이 한다).
 - 자격·지역은 AWS SDK 기본 체인(api 역할·환경)에서 온다. 코드에 자격·지역·버킷 이름 상수가 없고, 오류 메시지·예외에 버킷·키 값을 넣지 않으며 드라이버가 직접 로그를 남기지 않는다.
 - 실제 버킷 확인(복사·삭제)은 버킷·역할(#389) 준비 뒤 1회 수동으로 하고 통합 확인 표에 적는다(OQ-U8-2). 그 전까지는 가짜 클라이언트 시험만 있다.
 
+### S3 요청 시간 제한 — #420
+
+S3가 응답하지 않을 때 호출이 끝나지 않는 것을 막는다. 값은 팀장 결정([2026-11-17](https://github.com/JminAILab/CatchU/issues/420#issuecomment-6933552411))의 시작 값이고 환경변수로 바꾸지 않는다. 실제 S3에서 정상 업로드가 걸리면 값을 올린다.
+
+| 값 | 뜻 |
+|---|---|
+| 연결 5초(`connectionTimeoutMs`) | 연결이 이 시간 안에 맺어지지 않으면 그 시도를 끊는다 |
+| 응답 유휴 15초(`socketTimeoutMs`) | 연결된 소켓에 이 시간 동안 오가는 바이트가 없으면 그 시도를 끊는다. 요청 전체 시간이 아니다 |
+| 총 시도 2회(`maxAttempts`) | 첫 시도를 포함한 횟수다. 끊긴 시도(`TimeoutError`)는 SDK가 한 번 다시 시도한다 |
+
+- 끊긴 호출은 다른 저장소 오류와 같이 `StorageUnavailable`(`IO_FAILED`)이고 원인(`TimeoutError`)은 `cause`에 남는다. 다섯 메서드가 같은 클라이언트를 쓴다.
+- 응답이 전혀 없는 대역에서는 호출 하나가 유휴 제한 × 2회에 시도 사이 대기를 더한 시간 뒤에 실패한다. 실제 값으로 응답하지 않는 로컬 대역에서 잰 `put`은 약 36초였다(2026-11-17, 1회, 시도 2회). 유휴 15초 × 2회(30초)보다 길었고 차이의 원인은 따로 확인하지 않았다.
+- **요청 전체 시간의 상한은 아니다.** 바이트가 조금씩이라도 오가면 유휴 시간을 다시 세므로 느리게 이어지는 요청은 더 오래 걸릴 수 있다. 주소 찾기(DNS)와 자격 받기도 이 제한 밖이다. `deletePrefix`는 목록·삭제 호출마다 따로 센다.
+- 설치된 SDK(`@aws-sdk/client-s3` 3.1164.0, `@smithy/node-http-handler` 4.14.2)에서 확인한 것: `connectionTimeout`·`socketTimeout`은 요청을 끊고 `TimeoutError`로 거부한다. `requestTimeout`은 `throwOnRequestTimeout: true` 없이는 경고 로그만 남기고 끊지 않아 쓰지 않았다. SDK를 올리면 이 동작을 다시 확인한다.
+
 ## 시험
 
+- `test/file-storage/s3-request-limits.test.cjs`(3개, #420): 실제 SDK 클라이언트를 로컬 대역 서버(`s3-stub-server.cjs`)에 붙인다. 실행이 쓰는 클라이언트의 설정 값(T-1), 응답하지 않는 대역에서 다섯 메서드가 제한 시간 안에 `IO_FAILED`로 끝나고 시도가 총 2회인 것(T-2, 유휴 제한만 줄여 씀), 바로 응답하는 대역에서 요청 한 번으로 성공(T-3). 연결이 맺어지지 않는 경우는 설정 값만 본다. 실제 AWS에 접속하지 않는다.
 - `test/u2/file-storage.test.cjs`(8개): 로컬 드라이버 put·get·copy, 없는 키, 없는 접두어 삭제(S23), `..` 키·심볼릭 링크 거부(S22), 설정 없음·빈 문자열·한쪽만·상대 경로·없는 폴더·모르는 드라이버(`local`·`s3` 밖의 값).
 - `test/file-storage/s3-file-storage.test.cjs`(9개 + 계약 12개): 요청을 기록하는 가짜 S3 클라이언트로 다섯 메서드의 명령·키(S-1), `NoSuchKey` → `FileNotFound`·delete 성공(S-2), 회귀 `NoSuchBucket`·이름 없는 404 → `IO_FAILED`(delete 성공 아님, get·copy `FileNotFound` 아님), 네트워크 오류 → `IO_FAILED` 한 번(S-3), 1,001개 접두어 삭제의 2회 `DeleteObjects`·빈 접두어(S-4), deletePrefix 방어 3건, 키 모양 거부·S3 미호출(S-5), 설정·혼합 설정 거부·모듈 조립 거부(S-6), 드라이버 선택. 실제 AWS에 접속하지 않는다.
 - `test/file-storage/storage-contract.cjs`: 로컬·S3 드라이버가 함께 통과해야 하는 계약 시험 6개(`registerStorageContractTests(name, makeStorage)`). S3 쪽은 메모리 맵으로 객체를 흉내 내는 가짜 클라이언트로 돈다(S-7).

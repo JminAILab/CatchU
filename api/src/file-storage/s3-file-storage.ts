@@ -1,5 +1,5 @@
 // S3 파일 저장(계약 C-05 S3 구현, U8 기능 설계 BR7.3, 비기능 NFR1.7·NFR4.8·NFR4.11·NFR4.15, 기술 선택 「파일 저장(api)」).
-// 자격·지역·재시도는 AWS SDK 기본 설정(api 역할의 기본 자격 체인, 기본 재시도 모드)이며 코드에 상수·자격이 없다.
+// 자격·지역은 AWS SDK 기본 설정(api 역할의 기본 자격 체인)이며 코드에 자격이 없다. 요청 시간 제한과 시도 횟수만 아래 상수로 정한다(#420).
 // presigned URL은 만들지 않는다. 오류 메시지·예외에 버킷·키 값을 넣지 않고 직접 로그도 남기지 않는다(호출자가 처리).
 import { Readable } from 'node:stream';
 import {
@@ -10,11 +10,39 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  type S3ClientConfig,
 } from '@aws-sdk/client-s3';
 import { type FileStorage, FileNotFound, parseStorageKey, StorageUnavailable } from './file-storage';
 
 /** 시험에서 가짜 클라이언트를 넣을 수 있는 최소 모양. 실제로는 S3Client다. */
 export type S3ClientLike = Pick<S3Client, 'send'>;
+
+/**
+ * S3 요청 한 번의 시간 제한과 시도 횟수(#420, 팀장 결정 2026-11-17의 시작 값, worker의 S3 읽기와 같은 수준).
+ *
+ * - `connectionTimeoutMs`: 연결이 이 시간 안에 맺어지지 않으면 그 시도를 끊는다.
+ * - `socketTimeoutMs`: 연결된 소켓에 이 시간 동안 오가는 바이트가 없으면 그 시도를 끊는다. 유휴 시간이지 요청 전체 시간이 아니다.
+ *   바이트가 조금씩이라도 오가면 다시 세므로, 느리게 이어지는 요청은 이 값보다 오래 걸릴 수 있다.
+ * - `maxAttempts`: 첫 시도를 포함한 총 횟수다(다시 시도는 1회). 끊긴 시도(`TimeoutError`)는 SDK가 다시 시도할 오류로 본다.
+ *
+ * 응답이 없는 S3에서는 호출 하나가 대략 「유휴 제한 × 시도 횟수 + 시도 사이 대기」 뒤에 실패한다. 요청 전체 시간의 상한은 두지 않았다
+ * (SDK의 `requestTimeout`은 `throwOnRequestTimeout` 없이는 경고만 남긴다. `@smithy/node-http-handler` 4.14.2에서 확인).
+ * 주소 찾기(DNS)·자격 받기는 이 제한 밖이다.
+ */
+export const S3_REQUEST_LIMITS = Object.freeze({ connectionTimeoutMs: 5_000, socketTimeoutMs: 15_000, maxAttempts: 2 });
+export type S3RequestLimits = Readonly<{ connectionTimeoutMs: number; socketTimeoutMs: number; maxAttempts: number }>;
+
+/**
+ * 시간 제한과 시도 횟수를 넣은 S3 클라이언트를 만든다. 실제 실행은 인자 없이 부른다(자격·지역은 SDK 기본 설정).
+ * `config`·`limits`는 시험이 로컬 대역 주소와 짧은 제한을 넣는 자리다.
+ */
+export function createS3Client(config: S3ClientConfig = {}, limits: S3RequestLimits = S3_REQUEST_LIMITS): S3Client {
+  return new S3Client({
+    ...config,
+    maxAttempts: limits.maxAttempts,
+    requestHandler: { connectionTimeout: limits.connectionTimeoutMs, socketTimeout: limits.socketTimeoutMs },
+  });
+}
 
 /** DeleteObjects가 한 번에 받는 최대 키 수(S3 제한). */
 const DELETE_BATCH_SIZE = 1000;
@@ -35,9 +63,9 @@ const objectPrefix = (prefix: string): string => `${parseStorageKey(prefix, 'PRE
 export class S3FileStorage implements FileStorage {
   private readonly client: S3ClientLike;
 
-  /** bucket은 설정 검사(file-storage.config.ts)를 통과한 이름이다. client를 주지 않으면 SDK 기본 설정으로 만든다(네트워크 접속은 첫 호출 때). */
+  /** bucket은 설정 검사(file-storage.config.ts)를 통과한 이름이다. client를 주지 않으면 createS3Client()로 만든다(네트워크 접속은 첫 호출 때). */
   constructor(private readonly bucket: string, client?: S3ClientLike) {
-    this.client = client ?? new S3Client({});
+    this.client = client ?? createS3Client();
   }
 
   async put(key: string, body: Buffer, contentType: string): Promise<void> {
@@ -102,7 +130,7 @@ export class S3FileStorage implements FileStorage {
   }
 
   /**
-   * SDK 호출 하나를 감싼다. 재시도는 SDK 기본값에 맡기고 여기서는 더 하지 않는다(NFR4.8·NFR4.15).
+   * SDK 호출 하나를 감싼다. 다시 시도는 SDK가 S3_REQUEST_LIMITS의 횟수 안에서 하고 여기서는 더 하지 않는다(NFR4.8·NFR4.15).
    * 없는 객체(NoSuchKey)는 missingIsNotFound가 참일 때만 FileNotFound, 그 밖 오류(NoSuchBucket 등 404 포함)는 StorageUnavailable(IO_FAILED)이다.
    */
   private async call<T>(operation: () => Promise<T>, missingIsNotFound: boolean): Promise<T> {
