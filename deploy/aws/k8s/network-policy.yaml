@@ -123,7 +123,7 @@ spec:
           port: 80
 ---
 # worker: 들어오는 연결은 없다. kubelet의 상태 확인은 노드에서 오며, 쿠버네티스 규정상 NetworkPolicy가 막지 않는다(2단계에서 확인).
-# 나가는 것은 api 3001(요청 정보 조회), 큐 6379(프라이빗 서브넷), GitHub API·Anthropic API·서울 S3 대역 443,
+# 나가는 것은 api 3001(요청 정보 조회), 큐 6379(프라이빗 서브넷), GitHub API·Anthropic API·서울 S3·Cloudflare 대역 443,
 # Pod Identity 에이전트 주소의 80뿐이다. DB 5432는 열지 않는다.
 # GitHub API 대역은 https://api.github.com/meta 의 api 항목 IPv4 24개(2026-10-19 조회)다. GitHub는 이 대역을 바꿀 수 있고
 # 목록이 전부가 아니라고 밝힌다. 수집이 시간 초과로 막히면 deploy/aws/k8s/README.md 「worker 바깥 연결 대역 갱신」대로 다시 받아 고친다.
@@ -131,6 +131,9 @@ spec:
 # S3 대역은 https://ip-ranges.amazonaws.com/ip-ranges.json 의 서비스 S3·지역 ap-northeast-2 IPv4 14개(2026-11-16 조회)다.
 # PDF 원본 읽기(회원 파일 버킷)에 쓴다. 대역만으로는 버킷을 가리지 못하므로, worker가 읽을 수 있는 버킷은 worker 역할의 권한
 # (cluster.yaml: 회원 파일 버킷 읽기만)으로 정해진다. AWS가 대역을 바꾸면 위와 같은 README 절의 방법으로 다시 받아 고친다.
+# Cloudflare 대역은 https://www.cloudflare.com/ips-v4 의 IPv4 15개(2026-11-16 조회)다. OpenAI 판정 주소 us.api.openai.com이
+# OpenAI 전용 주소가 아니라 Cloudflare 주소로 풀리고, OpenAI는 API로 들어가는 쪽의 고정 대역을 공개하지 않는다. 그래서 이 대역은
+# OpenAI만이 아니라 Cloudflare를 쓰는 다른 사이트도 함께 연다(받아들인 한계). 판정이 시간 초과로 막히면 같은 절차로 다시 받아 고친다.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -238,6 +241,36 @@ spec:
             cidr: 52.219.202.0/23
         - ipBlock:
             cidr: 52.219.204.0/22
+        - ipBlock:
+            cidr: 103.21.244.0/22
+        - ipBlock:
+            cidr: 103.22.200.0/22
+        - ipBlock:
+            cidr: 103.31.4.0/22
+        - ipBlock:
+            cidr: 104.16.0.0/13
+        - ipBlock:
+            cidr: 104.24.0.0/14
+        - ipBlock:
+            cidr: 108.162.192.0/18
+        - ipBlock:
+            cidr: 131.0.72.0/22
+        - ipBlock:
+            cidr: 141.101.64.0/18
+        - ipBlock:
+            cidr: 162.158.0.0/15
+        - ipBlock:
+            cidr: 172.64.0.0/13
+        - ipBlock:
+            cidr: 173.245.48.0/20
+        - ipBlock:
+            cidr: 188.114.96.0/20
+        - ipBlock:
+            cidr: 190.93.240.0/20
+        - ipBlock:
+            cidr: 197.234.240.0/22
+        - ipBlock:
+            cidr: 198.41.128.0/17
       ports:
         - protocol: TCP
           port: 443
