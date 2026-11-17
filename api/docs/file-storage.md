@@ -89,7 +89,7 @@ S3가 응답하지 않을 때 호출이 끝나지 않는 것을 막는다. 값�
 
 ## 시험
 
-- `test/file-storage/s3-request-limits.test.cjs`(3개, #420): 실제 SDK 클라이언트를 로컬 대역 서버(`s3-stub-server.cjs`)에 붙인다. 실행이 쓰는 클라이언트의 설정 값(T-1), 응답하지 않는 대역에서 다섯 메서드가 제한 시간 안에 `IO_FAILED`로 끝나고 시도가 총 2회인 것(T-2, 유휴 제한만 줄여 씀), 바로 응답하는 대역에서 요청 한 번으로 성공(T-3). 연결이 맺어지지 않는 경우는 설정 값만 본다. 실제 AWS에 접속하지 않는다.
+- `test/file-storage/s3-request-limits.test.cjs`(3개, #420): 실제 SDK 클라이언트를 로컬 대역 서버(`s3-stub-server.cjs`)에 붙인다. 실행이 쓰는 클라이언트의 설정 값(T-1), 응답하지 않는 대역에서 다섯 메서드가 제한 시간 안에 `IO_FAILED`로 끝나고 시도가 총 2회인 것(T-2. 시험은 연결 제한 5초 → 1초, 유휴 제한 15초 → 300 ms로 줄이고 총 시도 2회는 그대로 둔다. 호출이 끝나지 않으면 시험이 8초 뒤 실패하고, 끝날 때 대역·클라이언트를 닫아 남은 요청을 끊는다), 바로 응답하는 대역에서 요청 한 번으로 성공(T-3). 연결이 맺어지지 않는 경우는 설정 값만 본다. 실제 AWS에 접속하지 않는다.
 - `test/u2/file-storage.test.cjs`(8개): 로컬 드라이버 put·get·copy, 없는 키, 없는 접두어 삭제(S23), `..` 키·심볼릭 링크 거부(S22), 설정 없음·빈 문자열·한쪽만·상대 경로·없는 폴더·모르는 드라이버(`local`·`s3` 밖의 값).
 - `test/file-storage/s3-file-storage.test.cjs`(9개 + 계약 12개): 요청을 기록하는 가짜 S3 클라이언트로 다섯 메서드의 명령·키(S-1), `NoSuchKey` → `FileNotFound`·delete 성공(S-2), 회귀 `NoSuchBucket`·이름 없는 404 → `IO_FAILED`(delete 성공 아님, get·copy `FileNotFound` 아님), 네트워크 오류 → `IO_FAILED` 한 번(S-3), 1,001개 접두어 삭제의 2회 `DeleteObjects`·빈 접두어(S-4), deletePrefix 방어 3건, 키 모양 거부·S3 미호출(S-5), 설정·혼합 설정 거부·모듈 조립 거부(S-6), 드라이버 선택. 실제 AWS에 접속하지 않는다.
 - `test/file-storage/storage-contract.cjs`: 로컬·S3 드라이버가 함께 통과해야 하는 계약 시험 6개(`registerStorageContractTests(name, makeStorage)`). S3 쪽은 메모리 맵으로 객체를 흉내 내는 가짜 클라이언트로 돈다(S-7).

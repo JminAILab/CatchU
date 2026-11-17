@@ -39,7 +39,10 @@
 // L-6  S3가 응답하지 않음(#420, 팀장 결정 2026-11-17: 연결 5초·응답 유휴 15초·총 시도 2회)
 //   - 기대: 업로드가 제한 시간 안에 500으로 끝나고 행이 없으며, S3 시도는 총 2회, 진행 중 수는 0, 다음 업로드는 201.
 //   - 실패 조건: 업로드가 끝나지 않아 자리를 계속 잡음, 시도가 2회를 넘음, 실패 뒤 행이 남음.
-//   - put만 실제 SDK 클라이언트의 S3 드라이버로 돌려 응답하지 않는 로컬 대역(test/file-storage/s3-stub-server.cjs)에 보낸다. 유휴 제한은 줄여 쓴다.
+//   - put만 실제 SDK 클라이언트의 S3 드라이버로 돌려 응답하지 않는 로컬 대역(test/file-storage/s3-stub-server.cjs)에 보낸다.
+//     연결 제한 5초 → 1초, 유휴 제한 15초 → 300 ms로 줄이고 총 시도 2회는 그대로 둔다(SHORT_LIMITS).
+//   - 시험 자체의 시간 제한: 업로드 응답이 SHORT_BOUND_MS 안에 오지 않으면 기다리지 않고 실패한다. 끝날 때 대역·클라이언트를 닫아
+//     남은 저장 요청을 끊고, 업로드 요청이 끝났는지와 자리가 0인지 본다.
 //
 // 실제 AppModule(전역 인증 Guard·오류 형식·no-store)과 테스트 DB를 쓴다. 회원은 개발 로그인으로 만든 합성 회원이고, 파일 저장소는
 // 시험 전용 임시 폴더의 로컬 드라이버다(실제 S3 없음). 큐 주소는 비워 발송 실패 경로가 기본이고, 발송 1회는 기록용 가짜 발송기로 본다.
@@ -63,7 +66,7 @@ const { PDF_UPLOAD_RATE_LIMIT, PDF_UPLOAD_SLOTS, PdfUploadGate } = require('../.
 const { PDF_EXTRACT_DISPATCHER } = require('../../dist/pdf-extraction/pdf-extract.dispatcher');
 const { PDF_EXTRACT_SCHEMA_VERSION, PDF_EXTRACTION_DEADLINE_MINUTES, pdfExtractMessageId } = require('../../dist/pdf-extraction/pdf-extraction-spec');
 const { S3_REQUEST_LIMITS, S3FileStorage } = require('../../dist/file-storage/s3-file-storage');
-const { startSilentServer, stubClient } = require('../file-storage/s3-stub-server.cjs');
+const { SHORT_BOUND_MS, SHORT_LIMITS, settleWithin, startSilentServer, stubClient } = require('../file-storage/s3-stub-server.cjs');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const { APP_SETTINGS, WEB_ORIGIN, setEnv, startApp, expectError } = require('../u2/support.cjs');
 
@@ -324,22 +327,32 @@ test('U-4: 19벌이 있는 회원이 동시에 2건 올리면 회원 행 잠금 
 });
 
 /** 횟수 창의 시계를 시험이 정한다. 돌려주는 함수로 시각을 옮긴다. */
-test('L-6: S3가 응답하지 않으면 업로드는 제한 시간 안에 500으로 끝나 행이 생기지 않고, 자리를 돌려줘 다음 업로드를 받는다(#420)', async (t) => {
+test('L-6: S3가 응답하지 않으면 업로드는 제한 시간 안에 500으로 끝나 행이 생기지 않고, 자리를 돌려줘 다음 업로드를 받는다(#420)', { timeout: 60_000 }, async (t) => {
   fixedClock(t);
   const member = await consentedMember();
   // 이 앱의 저장소는 로컬 드라이버다. put만 실제 SDK 클라이언트를 쓰는 S3 드라이버로 돌려, 응답하지 않는 로컬 대역에 보낸다.
-  // 시도 횟수는 실제 값(2회)이고, 시험이 15초씩 기다리지 않도록 유휴 제한만 줄인다. 실제 AWS에는 접속하지 않는다.
+  // 연결 제한 5초 → 1초, 유휴 제한 15초 → 300 ms로 줄이고 총 시도 2회는 그대로 둔다(SHORT_LIMITS). 실제 AWS에는 접속하지 않는다.
   const silent = await startSilentServer(t);
-  const limits = { connectionTimeoutMs: 1_000, socketTimeoutMs: 300, maxAttempts: S3_REQUEST_LIMITS.maxAttempts };
-  const s3 = new S3FileStorage('catchu-test-bucket', stubClient(t, silent.endpoint, limits));
+  const client = stubClient(t, silent.endpoint, SHORT_LIMITS);
+  const s3 = new S3FileStorage('catchu-test-bucket', client);
   const callPut = swap(t, storage, 'put', (...args) => s3.put(...args));
+  // 시험이 어떻게 끝나든 대역과 클라이언트를 닫아 남은 저장 요청을 끊고, 업로드 요청이 끝나 자리가 돌아왔는지 확인한다.
+  let pending = Promise.resolve();
+  t.after(async () => {
+    await silent.close();
+    client.destroy();
+    await settleWithin(pending.catch(() => {}), SHORT_BOUND_MS, 'L-6 정리: 업로드 요청이 끝남');
+    await until(() => uploadGate.active === 0, 'L-6 정리: 업로드 자리가 남지 않음');
+    assert.equal(silent.openSockets(), 0, 'L-6 정리: 대역에 열린 소켓이 없다');
+  });
 
   const startedAt = Date.now();
-  const pending = upload(server, member.token, { title: '응답 없는 저장소' });
+  pending = upload(server, member.token, { title: '응답 없는 저장소' });
   await until(() => uploadGate.active === 1, '저장을 기다리는 동안 업로드가 자리를 잡음');
-  expectError(await pending, 500, 'INTERNAL_ERROR');
+  // 업로드가 끝나지 않아도 여기서 SHORT_BOUND_MS 뒤에 실패한다(끝없이 기다리지 않는다).
+  expectError(await settleWithin(pending, SHORT_BOUND_MS, '응답하지 않는 저장소에서 업로드 응답이 옴'), 500, 'INTERNAL_ERROR');
   const elapsed = Date.now() - startedAt;
-  assert.ok(elapsed < 8_000, `제한 시간 안에 끝난다(${elapsed}ms)`);
+  assert.ok(elapsed < SHORT_BOUND_MS, `제한 시간 안에 끝난다(${elapsed}ms)`);
   assert.equal(silent.connections(), S3_REQUEST_LIMITS.maxAttempts, 'S3 시도는 총 2회');
   assert.equal(uploadGate.active, 0, '실패한 업로드가 자리를 돌려준다');
   assert.deepEqual(await rows(), []);
