@@ -561,11 +561,11 @@ check "Ingress: /v1/internal 404, /v1·MCP OAuth 주소 5개는 api 3001, 그 �
 check "클러스터 설정: namespace catchu의 AWS 역할은 api·worker 둘뿐, 관리형·기본 묶음 정책 없이 적어 둔 정책만" \
   "$(ok q "$HERE/../cluster.yaml" '[.[0].iam.podIdentityAssociations[] | select(.namespace == "catchu")]
       | (map(.serviceAccountName) | sort) == ["api", "worker"] and all(.[]; (keys | sort) == ["namespace", "permissionPolicy", "serviceAccountName"])')"
-check "클러스터 설정: api 역할은 버킷의 members/ 아래 올리기·읽기·삭제와 버킷 목록만" \
+check "클러스터 설정: api 역할은 버킷의 members/ 아래 올리기·읽기·삭제와 members/ 접두어 목록만" \
   "$(ok q "$HERE/../cluster.yaml" ".[0].iam.podIdentityAssociations[] | select(.namespace == \"catchu\" and .serviceAccountName == \"api\") | .permissionPolicy.Statement
       | map([.Effect, ([.Action] | flatten | sort), .Resource, .Condition]) == [
         [\"Allow\", [\"s3:DeleteObject\", \"s3:GetObject\", \"s3:PutObject\"], \"arn:aws:s3:::${BUCKET}/members/*\", null],
-        [\"Allow\", [\"s3:ListBucket\"], \"arn:aws:s3:::${BUCKET}\", null]]")"
+        [\"Allow\", [\"s3:ListBucket\"], \"arn:aws:s3:::${BUCKET}\", {\"StringLike\": {\"s3:prefix\": \"members/*\"}}]]")"
 check "클러스터 설정: worker 역할은 버킷의 members/ 아래 읽기만(쓰기·삭제·목록 없음)" \
   "$(ok q "$HERE/../cluster.yaml" ".[0].iam.podIdentityAssociations[] | select(.namespace == \"catchu\" and .serviceAccountName == \"worker\") | .permissionPolicy.Statement
       | map([.Effect, .Action, .Resource, .Condition]) == [[\"Allow\", \"s3:GetObject\", \"arn:aws:s3:::${BUCKET}/members/*\", null]]")"
