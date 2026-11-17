@@ -21,10 +21,11 @@ let app;
 let restore;
 let memory;
 let publication;
+let now;
 before(async () => {
   restore = setEnv({ ...APP_SETTINGS, CATCHU_QUEUE_REDIS_URL: undefined });
   memory = new InMemoryQuestionCounter('u5test');
-  app = await startRagAnswerApp({ clock: () => NOW, keepAliveMs: 20, counter: counterSlot(memory) });
+  app = await startRagAnswerApp({ clock: () => now, keepAliveMs: 20, counter: counterSlot(memory) });
 });
 after(async () => { await app?.server.app.close(); restore?.(); });
 beforeEach(() => {
@@ -35,6 +36,7 @@ beforeEach(() => {
   fakes.logger.entries.length = 0;
   app.logs.length = 0;
   memory.counts.clear();
+  now = NOW;
   fakes.counter.current = memory;
   publication = putPublication(fakes.access);
   fakes.search.hits = [chunkHit('개발 서버에 먼저 올린다.'), chunkHit('운영은 확인 뒤 올린다.', { sourceKind: 'GITHUB_RECORD',
@@ -138,13 +140,42 @@ test('스트림 전 거부는 HTTP 오류 본문이고, 검증·링크·색인 �
 });
 
 test('하루 101번째 질문은 429 QUESTION_LIMIT_REACHED이고 남은 횟수는 응답에 없다(BR3.1·BR3.3)', async () => {
-  for (let i = 0; i < 100; i += 1) await memory.count(publication.publicationId, NOW);
+  for (let i = 0; i < 99; i += 1) await memory.count(publication.publicationId, publication.ownerMemberId, NOW);
+  assert.equal((await ask(app.server.url, publication.token, { question: '질문', history: [] })).status, 200, '100번째까지는 답한다');
+  app.fakes.search.calls.length = 0;
   const response = await ask(app.server.url, publication.token, { question: '질문', history: [] });
   assert.equal(response.status, 429);
   assert.deepEqual(response.body, { code: 'QUESTION_LIMIT_REACHED', message: '오늘 한도에 도달했습니다' });
   assert.equal(response.headers.get('retry-after'), null);
   assert.equal(app.fakes.search.calls.length, 0);
   assert.equal(countOf(publication.publicationId), 101, '거부된 질문도 늘린 값을 되돌리지 않는다');
+  assert.equal(countOf(publication.ownerMemberId), 100, '링크 한도에 걸린 질문은 작성자 합계를 늘리지 않는다(#585)');
+  assert.deepEqual(rejected(), [{ event: 'qna.rejected', outcome: 'QUESTION_LIMIT_REACHED', publicationId: publication.publicationId, limit: 'LINK' }]);
+});
+
+test('작성자 하루 합계 301번째 질문은 그 작성자의 어느 링크에서도 같은 429이고, 다른 작성자와 자정 뒤는 받는다(#585)', async () => {
+  const { fakes } = app;
+  // 같은 작성자의 링크 셋에 100번씩(링크 한도 안) 미리 센다. 합계 300.
+  const owner = publication.ownerMemberId;
+  const used = [publication, putPublication(fakes.access, { ownerMemberId: owner }), putPublication(fakes.access, { ownerMemberId: owner })];
+  for (const link of used) for (let i = 0; i < 100; i += 1) await memory.count(link.publicationId, owner, NOW);
+  // 아직 한 번도 쓰지 않은 같은 작성자의 링크도 막힌다. 응답은 링크 한도와 같고 남은 횟수·Retry-After가 없다.
+  const fresh = putPublication(fakes.access, { ownerMemberId: owner });
+  const response = await ask(app.server.url, fresh.token, { question: '질문', history: [] });
+  assert.equal(response.status, 429);
+  assert.deepEqual(response.body, { code: 'QUESTION_LIMIT_REACHED', message: '오늘 한도에 도달했습니다' });
+  assert.equal(response.headers.get('retry-after'), null);
+  assert.equal(fakes.search.calls.length + fakes.rewriter.calls.length + fakes.gate.streamRequests.length, 0, 'AI·검색을 부르지 않는다');
+  assert.deepEqual(rejected(), [{ event: 'qna.rejected', outcome: 'QUESTION_LIMIT_REACHED', publicationId: fresh.publicationId, limit: 'OWNER' }]);
+  assert.equal(countOf(owner), 301, '거부된 질문도 늘린 값을 되돌리지 않는다');
+  // 다른 작성자의 링크는 그대로 답한다.
+  const other = putPublication(fakes.access);
+  assert.equal((await ask(app.server.url, other.token, { question: '질문', history: [] })).status, 200);
+  // 한국 시간 자정이 지나면 그 작성자의 링크가 다시 답한다.
+  now = new Date('2026-11-02T15:00:00.000Z');
+  const nextDay = await ask(app.server.url, fresh.token, { question: '질문', history: [] });
+  assert.equal(nextDay.status, 200);
+  assert.equal(nextDay.events.at(-1).event, 'done');
 });
 
 test('Redis 장애면 세지 않고 질문을 통과시키며 경고를 남긴다(BR3.2)', async () => {
@@ -267,7 +298,7 @@ test('확인 단계 중에 연결이 끊기면 다시 쓰기·검색·생성을 
   let release;
   const held = new Promise((resolve) => { release = resolve; });
   fakes.counter.current = {
-    async count(publicationId, now) { entered(); await held; return memory.count(publicationId, now); },
+    async count(...args) { entered(); await held; return memory.count(...args); },
     async close() {},
   };
   const controller = new AbortController();

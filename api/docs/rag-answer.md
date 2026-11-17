@@ -23,7 +23,7 @@
 | `GET /v1/publications/{publicationId}/summary` | 작성 회원(Bearer) | `{ status, items, canRegenerate }` | 401 `AUTH_*`, 404 `RESOURCE_UNAVAILABLE`(남의 것·없음·형식 틀린 ID 구분 없음) |
 | `POST /v1/publications/{publicationId}/summary/regenerate` | 작성 회원(Bearer) | `202 {}`(접수) | 401 `AUTH_*`, 404 `RESOURCE_UNAVAILABLE`, 429 `DAILY_LIMIT_REACHED` |
 
-오류 본문은 공통 `{ code, message }`다. `INDEX_NOT_READY`(409, 공용 문구 "아직 쓸 수 없습니다". U10 JD 요약도 같은 코드를 쓰므로 기능 이름을 넣지 않고, 질의응답 화면 문구는 web 문구 표가 정한다)와 `QUESTION_LIMIT_REACHED`(429, "오늘 한도에 도달했습니다")는 계약 C-12가 정한 코드로 `src/common/errors/error-codes.ts`에 있다. 남은 횟수·`Retry-After`는 보내지 않는다.
+오류 본문은 공통 `{ code, message }`다. `INDEX_NOT_READY`(409, 공용 문구 "아직 쓸 수 없습니다". U10 JD 요약도 같은 코드를 쓰므로 기능 이름을 넣지 않고, 질의응답 화면 문구는 web 문구 표가 정한다)와 `QUESTION_LIMIT_REACHED`(429, "오늘 한도에 도달했습니다")는 계약 C-12가 정한 코드로 `src/common/errors/error-codes.ts`에 있다. 남은 횟수·`Retry-After`는 보내지 않는다. 링크당 한도와 작성자 합계 한도([하루 질문 한도](#하루-질문-한도--585)) 어느 쪽에 걸려도 `QUESTION_LIMIT_REACHED` 하나다.
 
 ### 질의응답 본문
 
@@ -45,7 +45,7 @@
 
 ## 단계 순서
 
-질의응답(W1): 본문 검증 → `resolveForRecipient(token, grant, now)` → `getIndexState`가 DONE이 아니면 409 → 질문 횟수(100 초과면 429, Redis 장애면 통과) → SSE 열기 → (앞 대화가 있을 때만) 다시 쓰기 → `search(publicationId, 검색 질문, 8)` → (조각이 있을 때만) `generateStream({ feature: 'QNA', model: QNA_MODEL, userText: 검색 질문, publicationText })` → `done`. 각 단계는 한 번만 부르고 다시 시도하지 않는다. 앞 대화는 다시 쓰기에만 자료로 넣고 검색·생성에는 넣지 않는다.
+질의응답(W1): 본문 검증 → `resolveForRecipient(token, grant, now)` → `getIndexState`가 DONE이 아니면 409 → 질문 횟수(링크당 100 또는 작성자 합계 300 초과면 429, Redis 장애면 통과) → SSE 열기 → (앞 대화가 있을 때만) 다시 쓰기 → `search(publicationId, 검색 질문, 8)` → (조각이 있을 때만) `generateStream({ feature: 'QNA', model: QNA_MODEL, userText: 검색 질문, publicationText })` → `done`. 각 단계는 한 번만 부르고 다시 시도하지 않는다. 앞 대화는 다시 쓰기에만 자료로 넣고 검색·생성에는 넣지 않는다.
 
 기본 요약 처리기(W3, `BASE_SUMMARY`): `base_summary` 행만 보고 판정한다. 행 없음이고 `published_at + 10분` 전이면 `INSERT … ON CONFLICT (publication_id) DO NOTHING`으로 PENDING을 만들고 다시 읽는다. PENDING이고 마감 전이면 생성한다. 그 밖(DONE·FAILED·마감 지남·시한 지난 행 없음·발행본 없음)은 끝낸다. 사본 필드 하나를 근거 하나로(`aiDraft`·`mismatch`·제목 제외) `generate({ feature: 'BASE_SUMMARY', model: 'HAIKU', userText: null, publicationText: null })`. 결과는 짧은 트랜잭션에서 행을 잠근 뒤(`FOR UPDATE`) 시각을 읽고 조건부 UPDATE 하나로 쓴다(잠금을 기다리는 사이 마감이 지나면 버리기 위해): 항목 1개 이상은 `status <> 'FAILED' AND deadline_at > now`일 때 DONE, 0개·생성 실패는 `status = 'PENDING' AND deadline_at > now`일 때 FAILED. 바뀐 행이 없으면(발행본 삭제·FAILED·마감 지남) 버린다. 생성 실패(사본 읽기·사본 모양·`AiProviderError`·`AiInputTooLarge`)는 FAILED로 쓰고 정상 반환하며, DB 오류는 로그 뒤 다시 던진다(AiRun이 실패로 기록, 상태는 시한으로 FAILED). 하루 횟수를 세지 않는다.
 
@@ -63,11 +63,26 @@
 | 앞 대화 | 최근 6개, 메시지마다 2,000자 |
 | 질의응답 검색 조각 | 8 |
 | 링크당 하루 질문 | 100(한국 시간 날짜) |
+| 작성자 하루 질문 합계 | 300(한 작성자의 모든 링크를 합침, 한국 시간 날짜) |
 | 기본 요약 처리 시한 | 10분 |
 | 다시 쓰기 | 10초, 출력 200토큰 |
 | SSE keep-alive | 15초 |
 | 질문 횟수 Redis 명령 상한 | 1초 |
 | 질의응답 모델 `QNA_MODEL` | `HAIKU`(환경변수 없음. 평가 조정으로 Sonnet을 쓸 때 이 값을 코드 PR로 바꾼다) |
+
+## 하루 질문 한도 — #585
+
+질문 횟수 제한은 둘이다. 하나라도 넘으면 그 질문은 `429 QUESTION_LIMIT_REACHED`("오늘 한도에 도달했습니다")이고 한국 시간 자정에 풀린다.
+
+| 한도 | 세는 단위 | 값 | 넘으면 |
+|---|---|---|---|
+| 링크당 | 발행본 하나 | 하루 100 | 그 링크만 자정까지 질문을 받지 않는다 |
+| 작성자 합계 | 한 작성자(링크의 주인 회원)의 모든 링크 | 하루 300 | 그 작성자의 모든 링크가 자정까지 질문을 받지 않는다 |
+
+- 작성자 합계는 2026-11-17 팀장 결정으로 더했다. 회원당 살아 있는 링크 수에 상한이 없어 링크당 한도만으로는 하루 AI 호출량이 링크 수만큼 늘기 때문이다. 300은 하루 면접이 많아야 2~3번이라 질문이 들어오는 링크를 3개쯤으로 보고 링크당 한도의 3배로 잡은 값이다.
+- 세는 순서: 링크 횟수를 먼저 늘린다. 링크 한도를 넘으면 거기서 거부하고 작성자 합계는 늘리지 않는다. 그래서 링크 하나가 작성자 합계에서 쓰는 몫은 하루 100까지이고, 한 링크의 사용만으로는 그 작성자의 다른 링크가 막히지 않는다. 링크 한도 안이면 작성자 합계를 늘리고 300을 넘으면 거부한다. 거부된 질문의 늘린 값은 어느 쪽도 되돌리지 않는다.
+- 링크의 주인은 링크 판정(`resolveForRecipient`)이 돌려준 `ownerMemberId`다. 받은 사람이 누구인지와 접속 주소는 구분하지 않는다(접속 주소별 제한 없음은 그대로).
+- 승인 기록과의 관계: 12월 요구사항 FR6.6·사용자 스토리 AC6.2.8·[U5 업무 규칙](../../aidlc/spaces/default/intents/260925-intent-12/construction/u5-rag-answer/functional-design/rules.md) BR3.1·U5 비기능 요구사항 NFR2.5와 [11월 개발 범위 결정](../../docs/CatchU_11월_범위_결정.md)은 "질의응답 제한은 링크당 하루 질문 횟수 하나"로 적혀 있다. 그 문서들은 승인 기록·재승인 뒤 기록이라 고치지 않았고, 질문 횟수 제한의 현행 기준은 이 절이다. 오류 코드·화면 문구·남은 횟수를 보이지 않는 것·Redis 장애 때 통과(BR3.2·BR3.3)는 그대로다.
 
 ## 작성자 자료 딱지 — #528
 
@@ -89,7 +104,8 @@
 
 - 큐와 같은 설정 `CATCHU_QUEUE_REDIS_URL`·`CATCHU_QUEUE_PREFIX`를 `readAnalysisQueueConfig`로 읽는다(새 환경변수 없음, 틀리면 기동 실패). 주소가 없으면 늘 세지 않고 통과하는 계수기다.
 - 전용 ioredis 연결 하나. `lazyConnect` 없이 만들 때 연결을 시작하되 기동을 기다리게 하지 않는다. `enableOfflineQueue: false`·`commandTimeout: 1000`·`maxRetriesPerRequest: 0`. `error` 사건은 오류 이름만 한 번 경고로 남긴다(ready 뒤 다시). 앱 종료 때 `quit()` 뒤 `disconnect()`.
-- 키 `{prefix}:qna-question-count:{publicationId}:{YYYY-MM-DD}`(한국 시간 날짜). `MULTI`로 `INCR`과 `EXPIREAT 다음 한국 자정`을 함께 보낸다. 101번째부터 429. 명령 실패·1초 초과면 그 질문을 세지 않고 통과시키고 `qna.count-bypassed`를 남긴다. 거부된 질문도 늘린 값을 되돌리지 않는다. 키는 지우지 않고 만료에 맡긴다(발행본 삭제·탈퇴 때도).
+- 키 둘(한국 시간 날짜): 링크당 `{prefix}:qna-question-count:{publicationId}:{YYYY-MM-DD}`, 작성자 합계 `{prefix}:qna-owner-question-count:{ownerMemberId}:{YYYY-MM-DD}`. 키마다 `MULTI`로 `INCR`과 `EXPIREAT 다음 한국 자정`을 함께 보낸다. 링크 키를 먼저 보내고 101번째부터 429, 링크 한도 안일 때만 작성자 키를 보내고 301번째부터 429다([하루 질문 한도](#하루-질문-한도--585)).
+- 두 묶음을 합쳐 1초 안에 끝나지 않거나 명령이 실패하면 그 질문을 세지 않고 통과시키고 `qna.count-bypassed`를 남긴다(링크 횟수만 세고 작성자 합계를 못 센 경우도 통과다). 거부된 질문도 늘린 값을 되돌리지 않는다. 키는 지우지 않고 만료에 맡긴다(발행본 삭제·탈퇴 때도).
 
 ## 로그 사건
 
@@ -98,7 +114,7 @@ Nest `Logger('RagAnswer')`로 사건마다 객체 한 줄을 남긴다(`rag-answ
 | 사건 | 수준 | 칸 |
 |---|---|---|
 | `qna.completed` | 성공·끊김 log, 실패 warn | `publicationId`, `stage`, `outcome`(`OK`·`REWRITE_FAILED`·`SEARCH_FAILED`·`INDEX_NOT_READY`·`GENERATION_FAILED`·`CLIENT_CLOSED`), `failure`(오류 이름), `rewritten`, `rewriteMs`, `rewriteInputTokens`, `rewriteOutputTokens`, `searchMs`, `chunkCount`, `generateMs`, `itemCount`. 버린 항목 수는 게이트 로그 `ai_gate_result`에서 본다 |
-| `qna.rejected` | log | `outcome`(`VALIDATION_FAILED`·`LINK_UNAVAILABLE`·`LINK_PASSWORD_REQUIRED`·`INDEX_NOT_READY`·`QUESTION_LIMIT_REACHED`), `publicationId`(링크 판정 뒤만) |
+| `qna.rejected` | log | `outcome`(`VALIDATION_FAILED`·`LINK_UNAVAILABLE`·`LINK_PASSWORD_REQUIRED`·`INDEX_NOT_READY`·`QUESTION_LIMIT_REACHED`), `publicationId`(링크 판정 뒤만), `limit`(`QUESTION_LIMIT_REACHED`일 때만. `LINK`는 링크당 한도, `OWNER`는 작성자 합계 한도) |
 | `qna.stream-failed` | error | `publicationId`, `error`(오류 이름). SSE를 연 뒤 단계별 실패 처리 밖의 예상 밖 예외. 받은 사람에게는 `error ANSWER_FAILED`를 쓰고 닫는다 |
 | `qna.count-bypassed` | warn | `publicationId`, `reason`(`NO_REDIS`·`REDIS_ERROR`·`REDIS_TIMEOUT`) |
 | `qna.count-connection-error` | warn | `error`(오류 이름) |
@@ -149,7 +165,8 @@ npm --prefix api run rag-eval -- measure --input <파일> [--target <대상 버�
 - 자동 첫 요약과 [다시 만들기], 겹친 [다시 만들기]는 두 번 생성되고 하루 횟수도 두 번 쓴다. 늦은 DONE이 앞 DONE을 덮을 수 있다(고정 사본이라 같은 내용).
 - [다시 만들기]는 DONE 요약도 바로 PENDING(항목 비움)으로 바꾼다. 다시 만들기가 실패하면 기존 요약은 사라진다.
 - 앞 작업의 늦은 실패가 [다시 만들기]로 돌아간 PENDING 행을 FAILED로 바꿔, 뒤 작업의 새 결과가 버려질 수 있다(DONE 쓰기는 `status <> 'FAILED'`일 때만). 작성자가 [다시 만들기]를 다시 누르면 복구된다. 계약 C-02 「에러 대응 최소선 6」의 받아들인 한계이고, AiRun payload는 ID(`publicationId`) 하나뿐이라 작업 세대 값을 넘겨 가려내지 않는다.
-- Redis가 없거나 장애인 동안 질문 수 상한이 없다. 질문당 비용이 작아 받아들인 한계다(비기능 요구사항 수정 R-03).
+- Redis가 없거나 장애인 동안 질문 수 상한이 없다(링크당·작성자 합계 모두). 질문당 비용이 작아 받아들인 한계다(비기능 요구사항 수정 R-03).
+- 작성자 합계 한도에 닿은 날에는 늦게 온 받은 사람이 같은 작성자의 다른 링크 사용 때문에 질문하지 못한다. 한 작성자의 링크 여럿(각 100까지)에 질문이 몰려야 닿으며, 하루 호출량을 묶으려고 받아들인 한계다(2026-11-17 팀장 결정, #585).
 - 연결이 끊긴 뒤 게이트 스트림 닫힘이 게이트 시간 제한(45초)까지 늦을 수 있고, 이미 시작한 다시 쓰기는 끝까지 돈다.
 - "맞는데 버려진 항목"은 버린 수를 상한값으로만 적는다.
 - U4의 발행 크기 상한이 기본 요약 근거 글 합 80,000자 안에 들어야 한다. 넘으면 큰 발행본의 기본 요약은 늘 FAILED다(통합 때 확인).

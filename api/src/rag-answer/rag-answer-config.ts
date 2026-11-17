@@ -12,6 +12,11 @@ export const HISTORY_MESSAGE_MAX_LENGTH = 2_000;
 export const QNA_SEARCH_LIMIT = 8;
 /** 링크(발행본)당 한국 시간 하루 질문 수(BR3.1). 응답·화면에 이 값을 내보내지 않는다(BR3.3). */
 export const QUESTION_DAILY_LIMIT = 100;
+/**
+ * 작성자 한 명의 모든 링크에 들어온 질문을 합친 한국 시간 하루 수(#585, 2026-11-17 팀장 결정). 넘으면 그 작성자의 모든 링크가 자정까지 받지 않는다.
+ * 하루 면접이 많아야 2~3번이라 질문이 들어오는 링크를 3개쯤으로 보고 링크당 한도의 3배로 잡았다. 응답·화면에 이 값을 내보내지 않는다(BR3.3).
+ */
+export const OWNER_QUESTION_DAILY_LIMIT = 300;
 /** 기본 요약 처리 시한(밀리초). 처리기는 발행 시각부터, [다시 만들기]는 접수 시각부터 잰다(entities BaseSummary.deadlineAt). */
 export const BASE_SUMMARY_DEADLINE_MS = 10 * 60 * 1000;
 /** 질문 다시 쓰기 호출 시간 제한(밀리초, BR4.1·NFR2.2). */

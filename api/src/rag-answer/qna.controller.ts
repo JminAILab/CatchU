@@ -68,7 +68,10 @@ export class QnaController {
     await this.stream(response, publicationId, input);
   }
 
-  /** 스트림 전 확인 넷(BR1.1·BR1.2 → BR2.1 → BR2.2 → BR3.1). 하나라도 거부면 ApiError를 던지고 횟수는 마지막에만 센다. */
+  /**
+   * 스트림 전 확인 넷(BR1.1·BR1.2 → BR2.1 → BR2.2 → BR3.1). 하나라도 거부면 ApiError를 던지고 횟수는 마지막에만 센다.
+   * 횟수는 링크당 한도와 그 링크 주인의 하루 합계 한도(#585) 둘이고, 어느 쪽에 걸려도 같은 429다(로그의 limit으로만 구분).
+   */
   private async admit(token: string, grant: string | undefined, body: unknown): Promise<{ input: QuestionInput; publicationId: string }> {
     let input: QuestionInput;
     try {
@@ -79,8 +82,9 @@ export class QnaController {
     }
     const now = this.options.clock();
     let publicationId: string;
+    let ownerMemberId: string;
     try {
-      ({ publicationId } = await this.access.resolveForRecipient(token, typeof grant === 'string' && grant !== '' ? grant : null, now));
+      ({ publicationId, ownerMemberId } = await this.access.resolveForRecipient(token, typeof grant === 'string' && grant !== '' ? grant : null, now));
     } catch (error) {
       const code = recipientAccessCode(error);
       if (code === 'LINK_UNAVAILABLE' || code === 'LINK_PASSWORD_REQUIRED') this.rejected(code, null);
@@ -90,8 +94,9 @@ export class QnaController {
       this.rejected('INDEX_NOT_READY', publicationId);
       throw new ApiError('INDEX_NOT_READY');
     }
-    if ((await this.counter.count(publicationId, now)).decision === 'LIMIT_REACHED') {
-      this.rejected('QUESTION_LIMIT_REACHED', publicationId);
+    const counted = await this.counter.count(publicationId, ownerMemberId, now);
+    if (counted.decision === 'LIMIT_REACHED') {
+      writeRagAnswerLog(this.options.logger, { event: 'qna.rejected', outcome: 'QUESTION_LIMIT_REACHED', publicationId, limit: counted.limit });
       throw new ApiError('QUESTION_LIMIT_REACHED');
     }
     return { input, publicationId };
