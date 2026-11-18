@@ -3,7 +3,8 @@
 # 한 개만 띄우고(Recreate) 자동 확장은 두지 않는다. Recreate는 교체 때만 옛 Pod 종료 뒤 새 Pod를 띄우고, 노드 장애 때 생기는
 # 대체 실행과의 겹침은 막지 못한다. 그래서 교체는 deploy.sh가 옛 api·worker의 종료를 먼저 확인한 뒤 한다.
 # 값의 뜻은 api/docs/environment.md. 비밀값은 Secret catchu-api, DB 주소·CA는 ConfigMap catchu-db에서 받는다(deploy/aws/k8s/README.md 「Secret과 ConfigMap」).
-# 큐 연결과 worker 요청 정보 조회는 켰다. 꺼 둔 GitHub 연결은 켤 때 그 값과 함께 이 파일을 고친다(deploy/aws/README.md 「단계와 시작 조건」 5단계).
+# 큐 연결·worker 요청 정보 조회·GitHub 연결을 켰다(deploy/aws/README.md 「단계와 시작 조건」 5단계). 켠 판본을 띄우기 전에 Secret과
+# GitHub 토큰 보관 볼륨을 먼저 맞춘다(deploy/aws/features.md 「적용 순서」). 없으면 새 api가 뜨지 못한다.
 # Google 로그인은 개발 서버에서 켜 둔 것을 전환 뒤에도 이어 가려고 처음부터 켠다(2026-11-10 팀장 결정).
 # 회원 파일(PDF 원본·발행 사본)은 S3 버킷에 둔다. AWS 권한은 서비스 계정 api에 붙인 역할로 받고(cluster.yaml) 접근 키는 넣지 않는다.
 # 자원 값은 개발 서버 대기 상태 측정(api 약 70MiB) 기준의 시작값이다.
@@ -126,6 +127,33 @@ spec:
                 secretKeyRef:
                   name: catchu-api
                   key: WORKER_CONTEXT_API_KEY
+            # GitHub 연결(api/docs/github-connection.md). 회원이 GitHub 계정을 연결하면 api가 토큰을 암호화해 보관 폴더에 두고, worker 요청
+            # 정보 조회 때 꺼내 준다. 꺼져 있으면 실제 회원의 분석 접수가 403(GITHUB_CONNECTION_REQUIRED)이다. 따로 켜는 LIVE 분석 값은 없다.
+            # 돌아올 주소는 GitHub OAuth App에 등록한 값과 글자 하나까지 같아야 한다(web의 /github/callback 화면).
+            # 보관 폴더는 EFS 접근점을 붙인 볼륨이다(github-credentials-volume.yaml). Pod가 바뀌어도 암호문이 남아야 연결이 유지된다.
+            # 암호화 키는 서명 키 둘·조회 키와 달라야 하고, 바꾸면 보관된 토큰을 풀지 못해 회원이 다시 연결해야 한다.
+            # 시작·완료 사이의 state는 api 메모리에만 있다. api가 한 개라 문제없고, 다시 뜨면 진행 중이던 연결만 처음부터 한다.
+            - name: GITHUB_CONNECTION_ENABLED
+              value: "true"
+            - name: GITHUB_OAUTH_CALLBACK_URL
+              value: https://catchu.dev/github/callback
+            - name: GITHUB_CREDENTIAL_DIRECTORY
+              value: /var/lib/catchu/github-credentials
+            - name: GITHUB_OAUTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: catchu-api
+                  key: GITHUB_OAUTH_CLIENT_ID
+            - name: GITHUB_OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: catchu-api
+                  key: GITHUB_OAUTH_CLIENT_SECRET
+            - name: GITHUB_CREDENTIAL_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: catchu-api
+                  key: GITHUB_CREDENTIAL_ENCRYPTION_KEY
             # Google 로그인. 돌아올 주소는 Google OAuth 클라이언트에 등록한 값과 글자 하나까지 같아야 한다(개발 서버와 같은 클라이언트·주소).
             # 클라이언트 ID는 비밀값이 아니지만 원본을 SSM 한 곳에 두려고 비밀값과 함께 Secret으로 받는다.
             - name: GOOGLE_LOGIN_ENABLED
@@ -191,6 +219,9 @@ spec:
             - name: db-ca
               mountPath: /run/catchu
               readOnly: true
+            # GitHub 토큰 암호문만 둔다. 루트 파일시스템은 읽기 전용 그대로이고, 쓰는 곳은 /tmp와 이 폴더뿐이다.
+            - name: github-credentials
+              mountPath: /var/lib/catchu/github-credentials
       volumes:
         - name: tmp
           emptyDir:
@@ -201,3 +232,6 @@ spec:
             items:
               - key: ca.pem
                 path: db-ca.pem
+        - name: github-credentials
+          persistentVolumeClaim:
+            claimName: github-credentials

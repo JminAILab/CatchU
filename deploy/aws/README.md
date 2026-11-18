@@ -21,9 +21,9 @@
 | [`scripts/create-alert-topic.sh`](scripts/create-alert-topic.sh)·[`create-alarms.sh`](scripts/create-alarms.sh) | 경보(10/29 MVP 결정): SNS 주제 `catchu-alerts`·팀장 이메일 구독과 경보 4개 |
 | [`logging/`](logging/README.md)·[`scripts/create-log-group.sh`](scripts/create-log-group.sh) | 로그 그룹(14일)·수집기 |
 | [`scripts/create-certificate.sh`](scripts/create-certificate.sh)·[`install-lb-controller.sh`](scripts/install-lb-controller.sh) | ACM 인증서·Load Balancer Controller |
-| [`k8s/`](k8s) | 쿠버네티스 실행 파일. namespace·NetworkPolicy·Service·Ingress(ALB)는 손으로 적용하고, Deployment(web·api·worker)와 migration·동의 기록 확인 Pod 틀은 `deploy.sh`만 쓴다([k8s/README.md](k8s/README.md)) |
+| [`k8s/`](k8s) | 쿠버네티스 실행 파일. namespace·NetworkPolicy·Service·Ingress(ALB)·GitHub 토큰 보관 볼륨은 손으로 적용하고, Deployment(web·api·worker)와 migration·동의 기록 확인 Pod 틀은 `deploy.sh`만 쓴다([k8s/README.md](k8s/README.md)) |
 | [`scripts/deploy.sh`](scripts/deploy.sh) | 앱 교체. 옛 api·worker 종료 확인 → migration 일회 Pod → 동의 기록 삭제 권한 확인·회수 → 새 api·worker·web 시작과 확인([k8s/README.md](k8s/README.md) 「앱 교체(deploy.sh)」). 자동 배포는 [cd/](cd/README.md) |
-| [`features.md`](features.md) | 5단계 기능 켜기. api에서 켠 기능과 값, 그 판본을 띄우는 순서, 켠 뒤 확인 |
+| [`features.md`](features.md) | 5단계 기능 켜기. api에서 켠 기능과 값, 그 판본을 띄우는 순서, 켠 뒤 확인, GitHub 토큰 보관 볼륨과 EFS 마운트 시험 |
 | [`scripts/deploy.test.sh`](scripts/deploy.test.sh) | `deploy.sh` 회귀 시험과 실행 파일 조건 검사(AWS·클러스터에 닿지 않음, [k8s/README.md](k8s/README.md) 「시험」) |
 | [`scripts/make-secrets.sh`](scripts/make-secrets.sh)·[`put-parameter.sh`](scripts/put-parameter.sh) | 앱 Secret·ConfigMap 만들기와 SSM에 새 비밀값 넣기([k8s/README.md](k8s/README.md) 「Secret과 ConfigMap」) |
 | [`scripts/db-admin.sh`](scripts/db-admin.sh)·[`db/`](db)·[`k8s/ops/`](k8s/ops) | DB 관리용 psql 일회 Pod(namespace `catchu-ops`)와 RDS 계정 SQL·루트 인증서([k8s/README.md](k8s/README.md) 「DB 관리 Pod」). 공통 RDS 조회는 [`scripts/lib/rds.sh`](scripts/lib/rds.sh) |
@@ -76,7 +76,7 @@
 | 2 확인 | 1단계 다음 날 | 빈 DB로 지금 main 판본을 띄운다([k8s/README.md](k8s/README.md)). DNS는 그대로 두고 `curl --resolve`로 확인한다. `create-alarms.sh --apply` 뒤 경보 하나를 `set-alarm-state`로 울려 메일을 확인한다. #276 완료 기준 증거(「완료 기준 대응」)를 남기고 EKS 배포를 1회 돌린다 | ② 전환 실행 |
 | 3 전환 | ① 2단계 확인이 모두 통과했다 ② 그 시각에 main 병합을 멈출 수 있다 ③ 팀장이 오전에 1~2시간을 낼 수 있다. 1단계 뒤 2~4일 안이 기본이다 | [cutover.md](cutover.md): 전날 A 기록 TTL 60초·정비 예정 조회, 당일 자동 배포 끄기 → 마지막 확인 → 개발 서버 앱 정지 → DNS를 ALB로 → 확인 | ③ DNS 직전 |
 | 4 개발 서버 삭제 | 전환 뒤 48시간 동안 되돌릴 일이 없었다 | 「삭제 순서」의 A | ④ 삭제 |
-| 5 기능 켜기 | 기능 판본이 main에 반영될 때마다 | 큐 연결 → 내부 조회 → GitHub 연결 → 결과 수신 → LIVE 분석 순서로 하나씩 켠다(#277, Google 로그인은 처음부터). 켤 때마다 그 값을 실행 파일·Secret에 더하는 PR을 내고, 병합 뒤 [features.md](features.md)의 순서로 적용·확인한다. 큐 연결과 내부 조회는 실행 파일·Secret에 넣었다. 결과 수신은 큐 연결 안에 있어 따로 켜는 값이 없다. worker의 판정(OpenAI) 공급자·판정 키와 바깥 연결 대역은 실행 파일·Secret·NetworkPolicy에 이미 들어 있다(2026-11-16). GitHub 연결을 켤 때 EFS 마운트 시험(1단계 4번)도 한다 | 기능별 |
+| 5 기능 켜기 | 기능 판본이 main에 반영될 때마다 | 큐 연결 → 내부 조회 → GitHub 연결 → 결과 수신 → LIVE 분석 순서로 하나씩 켠다(#277, Google 로그인은 처음부터). 켤 때마다 그 값을 실행 파일·Secret에 더하는 PR을 내고, 병합 뒤 [features.md](features.md)의 순서로 적용·확인한다. 큐 연결·내부 조회·GitHub 연결은 실행 파일·Secret에 넣었다. 결과 수신은 큐 연결 안에 있고 LIVE 분석은 실제 회원의 접수가 만드는 것이라, 둘 다 따로 켜는 값이 없다. worker의 판정(OpenAI) 공급자·판정 키와 바깥 연결 대역은 실행 파일·Secret·NetworkPolicy에 이미 들어 있다(2026-11-16). GitHub 연결을 켤 때 EFS 마운트 시험(1단계 4번, 방법은 [features.md](features.md) 「GitHub 토큰 보관 볼륨」)도 한다 | 기능별 |
 | 6 검증 | #278·#279 판본이 나왔다(#280). 복원 시험은 12월 아무 날 | 두 API 검증, 백업 복원 시험(다른 이름으로 복원해 대조만 하고 바로 지움). 12/8까지 끝내고 증거를 내보낸다 | ⑤ |
 
 판단 지점: 12/1이 되어도 전환하지 못했으면, 남은 검증(#277 최종·#280·복원 시험)을 12/8까지 끝낼 수 있는지 보고 전환을 계속할지 팀장이 정한다.

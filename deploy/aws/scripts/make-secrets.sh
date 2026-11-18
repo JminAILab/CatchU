@@ -28,6 +28,9 @@ catchu-api GOOGLE_CLIENT_ID /catchu/prod/api/GOOGLE_CLIENT_ID
 catchu-api GOOGLE_CLIENT_SECRET /catchu/prod/api/GOOGLE_CLIENT_SECRET
 catchu-api CATCHU_QUEUE_REDIS_URL /catchu/prod/queue/auth-token
 catchu-api WORKER_CONTEXT_API_KEY /catchu/prod/worker/WORKER_CONTEXT_API_KEY
+catchu-api GITHUB_OAUTH_CLIENT_ID /catchu/prod/api/GITHUB_OAUTH_CLIENT_ID
+catchu-api GITHUB_OAUTH_CLIENT_SECRET /catchu/prod/api/GITHUB_OAUTH_CLIENT_SECRET
+catchu-api GITHUB_CREDENTIAL_ENCRYPTION_KEY /catchu/prod/api/GITHUB_CREDENTIAL_ENCRYPTION_KEY
 catchu-migration DB_PASSWORD /catchu/prod/db/catchu_migrator-password
 catchu-worker CATCHU_QUEUE_REDIS_URL /catchu/prod/queue/auth-token
 catchu-worker WORKER_CONTEXT_API_KEY /catchu/prod/worker/WORKER_CONTEXT_API_KEY
@@ -43,7 +46,9 @@ def rule($key):
   {AUTH_JWT_SECRET: "[0-9a-fA-F]{64}", LINK_GRANT_SECRET: "[0-9a-fA-F]{64}", WORKER_CONTEXT_API_KEY: "[0-9a-fA-F]{64}",
    DB_PASSWORD: "[!-~]{16,}", CATCHU_QUEUE_REDIS_URL: "[A-Za-z0-9]{16,128}", CATCHU_GENERATION_API_KEY: "[!-~]+", CATCHU_EMBEDDING_API_KEY: "[!-~]+",
    CATCHU_JUDGEMENT_API_KEY: "[!-~]+",
-   GOOGLE_CLIENT_ID: "[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com", GOOGLE_CLIENT_SECRET: "[!-~]+"}[$key]
+   GOOGLE_CLIENT_ID: "[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com", GOOGLE_CLIENT_SECRET: "[!-~]+",
+   GITHUB_OAUTH_CLIENT_ID: "[A-Za-z0-9_-]{1,128}", GITHUB_OAUTH_CLIENT_SECRET: "[!-~]{1,512}",
+   GITHUB_CREDENTIAL_ENCRYPTION_KEY: "[0-9a-fA-F]{64}"}[$key]
   // fail("검사 규칙이 없는 키 " + $key);
 def labels: {"app.kubernetes.io/part-of": "catchu", "app.kubernetes.io/managed-by": "make-secrets"};
 (if (.InvalidParameters // []) == [] then . else fail("SSM에 없는 이름이 있다(" + (.InvalidParameters | join(", ")) + ")") end)
@@ -55,8 +60,9 @@ def labels: {"app.kubernetes.io/part-of": "catchu", "app.kubernetes.io/managed-b
     | if ($p.Value | test("\\A(?:" + rule($row.key) + ")\\z")) | not then fail("SSM " + $row.ssm + " 값이 " + $row.key + " 형식에 맞지 않는다") else . end
     | . + {version: $p.Version, value: (if $row.key == "CATCHU_QUEUE_REDIS_URL"
         then "rediss://:" + $p.Value + "@" + $queue_host + ":" + $queue_port else $p.Value end)})
-| if ([.[] | select(.key | IN("AUTH_JWT_SECRET", "LINK_GRANT_SECRET", "WORKER_CONTEXT_API_KEY")) | .value | ascii_downcase] | unique | length) != 3
-  then fail("AUTH_JWT_SECRET·LINK_GRANT_SECRET·WORKER_CONTEXT_API_KEY 가운데 같은 값이 있다") else . end
+| if ([.[] | select(.key | IN("AUTH_JWT_SECRET", "LINK_GRANT_SECRET", "WORKER_CONTEXT_API_KEY", "GITHUB_CREDENTIAL_ENCRYPTION_KEY"))
+      | .value | ascii_downcase] | unique | length) != 4
+  then fail("AUTH_JWT_SECRET·LINK_GRANT_SECRET·WORKER_CONTEXT_API_KEY·GITHUB_CREDENTIAL_ENCRYPTION_KEY 가운데 같은 값이 있다") else . end
 | if ([.[] | select(.key == "DB_PASSWORD") | .value] | unique | length) != 2
   then fail("앱 계정과 migration 계정의 DB 비밀번호가 같다") else . end
 | {apiVersion: "v1", kind: "List", items: (
