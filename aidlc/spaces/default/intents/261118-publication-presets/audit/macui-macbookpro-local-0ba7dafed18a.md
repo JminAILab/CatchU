@@ -2447,3 +2447,744 @@
 **Answer Mode**: guide (reused from intent-capture)
 
 ---
+
+## Artifact Created
+**Timestamp**: 2026-11-18T07:49:04Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-18T07:49:06Z
+**Event**: DECISION_RECORDED
+**Stage**: scope-definition
+**Decision**: Q1, Q2, Q3, Q4
+**Options**: Q1: A 모두 Must,B 알림 넷은 Should,C 돌아가는 단추는 Should,D Not yet defined; Q2: A 의존 순서,B 위험 먼저,C 가치 먼저,D Not yet defined; Q3: A 계약 변경 PR 먼저,B 한 PR로,C Not yet defined; Q4: A 프리셋·발행 먼저·받은 사람 화면은 팀원 3 뒤,B 동시에 고치고 충돌 해결,C Not yet defined
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-18T08:27:02Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["A 모두 Must","A 의존 순서","A 계약 변경 PR 먼저","X. 기다리지 않는다. 팀장은 Q2의 순서대로 진행한다. 받은 사람 화면을 시작할 때 팀원 3의 정리가 dev에 들어와 있으면 그 위에서 시작하고, 없으면 그대로 진행한다. dev에 먼저 들어간 쪽이 기준이 되고 뒤에 들어오는 쪽이 거기에 맞춘다."]
+**Message Id**: c1f1d44d
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-18T08:27:03Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [제품] Q1. 무엇이 꼭 있어야 하나요(Must)?
+**Reply**: A 모두 Must
+**Options**: ["A 모두 Must","B 알림 넷은 Should","C 돌아가는 단추 Should","D Not yet defined"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-18T08:27:03Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [제품] Q2. 만드는 순서는요?
+**Reply**: A 의존 순서
+**Options**: ["A 의존 순서","B 위험 먼저","C 가치 먼저","D Not yet defined"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-18T08:27:03Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [제품] Q3. 11월 안 dev 반영을 어떻게 나눠 올릴까요? (타당성 평가는 계약 변경 PR의 리뷰 대기를 위험으로 적었습니다)
+**Reply**: A 계약 변경 PR 먼저
+**Options**: ["A 계약 변경 PR 먼저","B 한 PR로","C Not yet defined"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-18T08:27:03Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [제품] Q4. 팀원 3의 지금 화면 정리(안내 접기·박스 크기)와는 어떤 순서로 갈까요?
+**Reply**: X. 기다리지 않는다. 팀장은 Q2의 순서대로 진행한다. 받은 사람 화면을 시작할 때 팀원 3의 정리가 dev에 들어와 있으면 그 위에서 시작하고, 없으면 그대로 진행한다. dev에 먼저 들어간 쪽이 기준이 되고 뒤에 들어오는 쪽이 거기에 맞춘다.
+**Options**: ["A 받은 사람 화면은 뒤에","B 동시에","C Not yet defined"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-18T08:27:07Z
+**Event**: QUESTION_ANSWERED
+**Stage**: scope-definition
+**Details**: Q1: A 모두 Must; Q2: A 의존 순서; Q3: A 계약 변경 PR 먼저; Q4: X. 기다리지 않는다. 팀장은 Q2의 순서대로 진행한다. 받은 사람 화면을 시작할 때 팀원 3의 정리가 dev에 들어와 있으면 그 위에서 시작하고, 없으면 그대로 진행한다. dev에 먼저 들어간 쪽이 기준이 되고 뒤에 들어오는 쪽이 거기에 맞춘다.
+**Person Reply**: A 모두 Must\nA 의존 순서\nA 계약 변경 PR 먼저\nX. 기다리지 않는다. 팀장은 Q2의 순서대로 진행한다. 받은 사람 화면을 시작할 때 팀원 3의 정리가 dev에 들어와 있으면 그 위에서 시작하고, 없으면 그대로 진행한다. dev에 먼저 들어간 쪽이 기준이 되고 뒤에 들어오는 쪽이 거기에 맞춘다.
+**Message Id**: c1f1d44d
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-18T08:27:09Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-18T08:27:10Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-18T08:27:12Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-18T08:27:15Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-18T08:27:16Z
+**Event**: DECISION_RECORDED
+**Stage**: scope-definition
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-18T08:29:06Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: c31a2be9
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-18T08:29:06Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: 이대로 맞으면 이 답으로 문서를 만들까요?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-18T08:29:08Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+**Context**: ideation > scope-definition > scope-definition-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-18T08:29:09Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: scope-definition
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+**Questions SHA-256**: c6e16f4c299ba6a22a368d6fb5d2ea482c0bc6223c48323e2cbf60a4be278914
+**Hash Scope**: confirmed-content-v2
+**Message Id**: c31a2be9
+**Person Reply**: Looks correct
+**Summary Authorization Id**: 6245213416f70da488828b11d069f306cec07a09774ef59fdf0747f99bbb9af4
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-18T08:29:36Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+**Context**: ideation > scope-definition > scope-document.md
+**Summary Authorization Id**: 6245213416f70da488828b11d069f306cec07a09774ef59fdf0747f99bbb9af4
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-18T08:29:45Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md
+**Context**: ideation > scope-definition > intent-backlog.md
+**Summary Authorization Id**: 6245213416f70da488828b11d069f306cec07a09774ef59fdf0747f99bbb9af4
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-18T08:29:51Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/memory.md
+**Context**: ideation > scope-definition > memory.md
+**Summary Authorization Id**: 6245213416f70da488828b11d069f306cec07a09774ef59fdf0747f99bbb9af4
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:29:52Z
+**Event**: SENSOR_FIRED
+**Fire id**: 3091d5ef
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:29:52Z
+**Event**: SENSOR_PASSED
+**Fire id**: 3091d5ef
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:29:52Z
+**Event**: SENSOR_FIRED
+**Fire id**: df05840f
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:29:52Z
+**Event**: SENSOR_PASSED
+**Fire id**: df05840f
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:29:52Z
+**Event**: SENSOR_FIRED
+**Fire id**: 26fd4d76
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:29:52Z
+**Event**: SENSOR_PASSED
+**Fire id**: 26fd4d76
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:29:52Z
+**Event**: SENSOR_FIRED
+**Fire id**: 31178a47
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:29:52Z
+**Event**: SENSOR_PASSED
+**Fire id**: 31178a47
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:29:53Z
+**Event**: SENSOR_FIRED
+**Fire id**: 65b14a4e
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:29:53Z
+**Event**: SENSOR_PASSED
+**Fire id**: 65b14a4e
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:29:53Z
+**Event**: SENSOR_FIRED
+**Fire id**: 17101b1e
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:29:53Z
+**Event**: SENSOR_PASSED
+**Fire id**: 17101b1e
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:29:53Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0859f640
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:29:53Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0859f640
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:29:53Z
+**Event**: SENSOR_FIRED
+**Fire id**: bd20ccbf
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:29:53Z
+**Event**: SENSOR_PASSED
+**Fire id**: bd20ccbf
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+**Duration ms**: 82
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-18T08:29:53Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: scope-definition
+**Next Stage**: rough-mockups
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md=passed
+**Open Decisions**: 0
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-18T08:32:14Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Request Changes"]
+**Message Id**: 841130ee
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-18T08:32:15Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: Scope Definition 단계가 끝났습니다. 어떻게 할까요?
+**Reply**: Request Changes
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Rejected
+**Timestamp**: 2026-11-18T08:32:17Z
+**Event**: GATE_REJECTED
+**Stage**: scope-definition
+**Feedback**: Request Changes
+**Message Id**: 841130ee
+
+---
+
+## Stage Revising
+**Timestamp**: 2026-11-18T08:32:17Z
+**Event**: STAGE_REVISING
+**Stage**: scope-definition
+**Revision count**: 3
+**Feedback**: Request Changes
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-18T08:32:31Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["\"백로그에서 IB-8(기존 발행본 버리기)을 IB-1과 함께 하도록 고쳐 주세요. 사본에 프리셋 구분을 더하는 DB 변경을 넣을 때 기존 발행본 행이 남아 있으면 그 변경이 프리셋 없는 행까지 받아 줘야 해서, 버리기로 한 이점이 사라집니다. 「IB-7·IB-8은 IB-1 뒤 어느 때나 할 수 있다」는 문장은 IB-7만 남겨 주세요.\""]
+**Message Id**: 45f81927
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-18T08:32:32Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: 무엇을 바꿀까요? (여러 개 고를 수 있습니다)
+**Reply**: "백로그에서 IB-8(기존 발행본 버리기)을 IB-1과 함께 하도록 고쳐 주세요. 사본에 프리셋 구분을 더하는 DB 변경을 넣을 때 기존 발행본 행이 남아 있으면 그 변경이 프리셋 없는 행까지 받아 줘야 해서, 버리기로 한 이점이 사라집니다. 「IB-7·IB-8은 IB-1 뒤 어느 때나 할 수 있다」는 문장은 IB-7만 남겨 주세요."
+**Options**: ["범위 안 묶음 S1~S9","범위 밖 항목","백로그 IB-1~IB-8","미정 사항 넘김"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-18T08:32:47Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md
+**Context**: ideation > scope-definition > intent-backlog.md
+**Summary Authorization Id**: 6245213416f70da488828b11d069f306cec07a09774ef59fdf0747f99bbb9af4
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-18T08:32:50Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+**Context**: ideation > scope-definition > scope-document.md
+**Summary Authorization Id**: 6245213416f70da488828b11d069f306cec07a09774ef59fdf0747f99bbb9af4
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-18T08:32:54Z
+**Event**: DECISION_RECORDED
+**Stage**: scope-definition
+**Decision**: You asked me to 기존 자료를 버리는 작업은 그 자료의 저장 구조를 바꾸는 변경과 같은 순서에 묶어, 바뀐 구조가 옛 자료까지 받아 주지 않아도 되게 해 달라. Keep that for next time?
+**Options**: |Yes, for this project|Yes, for the team|No
+**Question Kind**: learnings-note
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-18T08:34:13Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["No"]
+**Message Id**: 235adec4
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-18T08:34:13Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: 기존 자료를 버리는 작업은 그 자료의 저장 구조를 바꾸는 변경과 같은 순서에 묶어, 바뀐 구조가 옛 자료까지 받아 주지 않아도 되게 해 달라고 하셨습니다. 다음에도 이렇게 할까요?
+**Reply**: No
+**Options**: ["Yes, for this project","Yes, for the team","No"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-18T08:34:15Z
+**Event**: QUESTION_ANSWERED
+**Stage**: scope-definition
+**Details**: No
+**Person Reply**: "백로그에서 IB-8(기존 발행본 버리기)을 IB-1과 함께 하도록 고쳐 주세요. 사본에 프리셋 구분을 더하는 DB 변경을 넣을 때 기존 발행본 행이 남아 있으면 그 변경이 프리셋 없는 행까지 받아 줘야 해서, 버리기로 한 이점이 사라집니다. 「IB-7·IB-8은 IB-1 뒤 어느 때나 할 수 있다」는 문장은 IB-7만 남겨 주세요."\nNo
+**Message Id**: 235adec4
+**Message Ids**: 45f81927,235adec4
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:34:16Z
+**Event**: SENSOR_FIRED
+**Fire id**: 23f27bf3
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:34:16Z
+**Event**: SENSOR_PASSED
+**Fire id**: 23f27bf3
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:34:16Z
+**Event**: SENSOR_FIRED
+**Fire id**: 46b7885a
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:34:16Z
+**Event**: SENSOR_PASSED
+**Fire id**: 46b7885a
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md
+**Duration ms**: 87
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:34:16Z
+**Event**: SENSOR_FIRED
+**Fire id**: c690dacb
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:34:16Z
+**Event**: SENSOR_PASSED
+**Fire id**: c690dacb
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:34:17Z
+**Event**: SENSOR_FIRED
+**Fire id**: 5e0e46b6
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:34:17Z
+**Event**: SENSOR_PASSED
+**Fire id**: 5e0e46b6
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:34:17Z
+**Event**: SENSOR_FIRED
+**Fire id**: 136e0111
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:34:17Z
+**Event**: SENSOR_PASSED
+**Fire id**: 136e0111
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+**Duration ms**: 127
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:34:17Z
+**Event**: SENSOR_FIRED
+**Fire id**: 7e81c93e
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:34:17Z
+**Event**: SENSOR_PASSED
+**Fire id**: 7e81c93e
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md
+**Duration ms**: 90
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:34:17Z
+**Event**: SENSOR_FIRED
+**Fire id**: 64e93e93
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:34:17Z
+**Event**: SENSOR_PASSED
+**Fire id**: 64e93e93
+**Sensor ID**: required-sections
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-18T08:34:18Z
+**Event**: SENSOR_FIRED
+**Fire id**: 64be4245
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-18T08:34:18Z
+**Event**: SENSOR_PASSED
+**Fire id**: 64be4245
+**Sensor ID**: upstream-coverage
+**Stage slug**: scope-definition
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md
+**Duration ms**: 78
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-18T08:34:18Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: scope-definition
+**Details**: Re-entering gate after revision
+**Next Stage**: rough-mockups
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/intent-backlog.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-definition-questions.md=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/ideation/scope-definition/scope-document.md=passed
+**Open Decisions**: 0
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-18T08:44:41Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: 9b5546ec
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-18T08:44:41Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: Scope Definition 단계를 고쳤습니다. 어떻게 할까요?
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-18T08:44:44Z
+**Event**: GATE_APPROVED
+**Stage**: scope-definition
+**User Input**: Approve
+**Person Reply**: Approve
+**Message Id**: 9b5546ec
+**Brief Digest**: none
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-18T08:44:44Z
+**Event**: STAGE_COMPLETED
+**Stage**: scope-definition
+**Validation Basis**: {"graphContract":"sha256:f507bca6811bab5a3fbe73663d1debe5d0de707829c0a8a0d3c77b97f91a29c7","inputs":[{"artifact":"constraint-register","contentHash":"sha256:f1eabc52c898facd791b3ef68ef7dcaadbaf60feb1fb7144732a3e24814fb055","instanceCount":1,"presentCount":1,"producer":"feasibility","required":false,"structureHash":"sha256:026a92b9ea5ad9afd54635f655381bfed5b06597bbb764dcd20ac0f3514b6c69"},{"artifact":"feasibility-assessment","contentHash":"sha256:6f28c3d36edce6b2ce579d2651cc0e0c8caf98b6017197854e4346e93cb3b217","instanceCount":1,"presentCount":1,"producer":"feasibility","required":false,"structureHash":"sha256:69349a63d7a668d3d8ae03d4fbcf3d56b50754e2febceb1c058bc4b098c84815"},{"artifact":"intent-statement","contentHash":"sha256:7eacdc881ff776948a76a18b22df8a0fba7cabebe2f6892af74145083d8a0f21","instanceCount":1,"presentCount":1,"producer":"intent-capture","required":true,"structureHash":"sha256:a40fffd2e31cd6d80fdcca03ec2b943186e7ae52ebe0ddcabc7ed0766b13a4e7"}],"outputs":[{"artifact":"intent-backlog","contentHash":"sha256:c39f070a8f329aa3de58ba3b271d06b31609476584a26c1e53cb37d7f4854f33","instanceCount":1,"presentCount":1,"producer":"scope-definition","required":true,"structureHash":"sha256:d438a09b2530a4904225a74d2dcd8cc03b4a88a04218bf2df72f4b6572336b43"},{"artifact":"scope-definition-questions","contentHash":"sha256:8d0b11a1435bd609c9b5e65637720be57a2bbe87c29f7f55c8a99a3581c9a1c2","instanceCount":1,"presentCount":1,"producer":"scope-definition","required":true,"structureHash":"sha256:de26875bc943ddd024ee1813c913f6321b49028959fee5786a5b956c02bbac5a"},{"artifact":"scope-document","contentHash":"sha256:e7fa84ad7999b896ceb6f1975ba43d42cbd7e13f276c7702b79ab019446793fc","instanceCount":1,"presentCount":1,"producer":"scope-definition","required":true,"structureHash":"sha256:8e27fefdf65bb6a702d0036548eaba43e7d5b09428f9be1f87ae3dc3178395a5"}],"projectType":"brownfield","schema":3}
+**Details**: Stage Scope Definition approved by gate
+**Tokens In**: 44
+**Tokens Out**: 22032
+**Cache Read**: 8396664
+**Cache Write**: 44318
+**Cost USD**: 2.47
+**By Model**: opus-5-5=2.47
+**By Agent**: main=2.47
+**Tokens By Model**: opus-5-5=44/22k/8.4M/44.3k
+**Tokens By Agent**: main=44/22k/8.4M/44.3k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-18T08:44:44Z
+**Event**: STAGE_STARTED
+**Stage**: rough-mockups
+**Agent**: aidlc-design-agent
+**Answer Mode**: guide (reused from intent-capture)
+
+---
