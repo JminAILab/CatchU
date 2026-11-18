@@ -152,7 +152,7 @@
 | 이미 전달된 PDF는 링크를 중지한 뒤에도 그 탭에서 보인다 | 수용. 다음 요청부터 막는다 |
 | 개인정보가 든 PDF를 그대로 저장·전송한다 | 요구사항대로. 업로드 화면의 안내 문구로 알린다 |
 | 동시 업로드 n건이면 api 메모리에 최대 n × 20 MB가 머문다 | 진행 중 업로드 수로 묶는다(전체 8건이면 받는 버퍼 최대 160 MB, 받은 조각을 한 덩이로 합치는 순간에는 그 건만 잠깐 두 배). 임시 파일·스트리밍 업로드는 두지 않는다 |
-| 업로드 자리 8개가 모두 차 있는 동안에는 다른 회원의 업로드가 429다(여러 계정이 함께 자리를 오래 잡는 경우 포함) | 수용. api는 계속 동작하고, 자리는 요청이 끝나거나 Node의 요청 시간 제한(기본 300초)에 연결이 끊기면 돌아온다 |
+| 업로드 자리 8개가 모두 차 있는 동안에는 다른 회원의 업로드가 429다(여러 계정이 함께 자리를 오래 잡는 경우 포함) | 수용. api는 계속 동작하고, 자리는 요청이 끝나거나 Node의 요청 시간 제한(기본 300초)에 연결이 끊기면 돌아온다. S3가 응답하지 않아 저장이 멈춘 업로드는 S3 요청 시간 제한(연결 5초·응답 유휴 15초·총 시도 2회, [파일 저장 문서](file-storage.md#s3-요청-시간-제한--420))에 걸려 500으로 끝나며 자리를 돌려준다([#420](https://github.com/JminAILab/CatchU/issues/420)). 그 제한은 요청 전체 시간의 상한이 아니다 |
 | 추출이 오래 걸리는 PDF(파일당 최대 120초)가 몰리면 다른 회원의 PDF가 추출 시한 10분을 넘길 수 있다. 한 회원의 10분 5건 안에서도, 여러 계정으로도 생길 수 있다 | 수용. 회원별 횟수 제한은 보통 PDF(추출 수 초)로 한 계정이 추출 줄을 채우는 것을 막는다. 규모가 커지면 회원별 추출 대기 수 상한을 검토한다 |
 | 해제된 새 탭 Blob URL은 그 탭을 새로고침하면 실패한다 | 수용. 원래 화면에서 다시 연다 |
 
@@ -162,9 +162,9 @@
 
 | 범위 | 상태 |
 |---|---|
-| 자동 시험(아래 「시험」) | 통과. S3는 요청을 기록하는 가짜 클라이언트, 발행의 저장소 실패는 가짜 `FileStorage` |
+| 자동 시험(아래 「시험」) | 통과. S3는 요청을 기록하는 가짜 클라이언트, 발행의 저장소 실패는 가짜 `FileStorage`. S3 요청 시간 제한만 실제 SDK 클라이언트를 응답하지 않는 로컬 대역에 붙여 본다 |
 | 로컬 파일 저장소 + 실제 큐 + 실제 worker를 거친 전체 흐름(화면 업로드 → 추출 `DONE` → 발행 화면 선택·발행 → 받은 사람 화면에서 사본 열람) | **확인됨**(2026-11-11 로컬, 코드 요약 §17.4~§17.6) |
-| 실제 S3(업로드·추출 읽기·사본 복사·열람·접두어 삭제) | **미검증** |
+| 실제 S3(업로드·추출 읽기·사본 복사·열람·접두어 삭제, 정상 업로드가 S3 요청 시간 제한에 걸리지 않는지) | **미검증** |
 | Compose 전체 스택 기동(`compose.single` + `compose.local-db`) 안에서의 업로드·추출 | **미검증**. `files` 볼륨은 이미지 단위 쓰기·읽기 전용 확인과 `docker compose config`까지만 했다 |
 
 ## 시험
@@ -173,7 +173,8 @@
 |---|---|---|
 | `test/db/pdf-tables.test.cjs` | 11 | 세 표의 제약·연쇄 삭제 |
 | `test/file-storage/s3-file-storage.test.cjs` | 9 | S3 드라이버의 메서드별 S3 호출·오류 분류·접두어 삭제·키 검사·설정 거부(가짜 클라이언트) |
-| `test/materials/pdf-materials-api.test.cjs` | 19 | 업로드·목록·상세·원본 열람·삭제, 동의·상한·소유, 시한 판정, 로그, 업로드 상한(횟수·진행 중 수·20벌 사전 확인·자리 반환), 탈퇴와 겹친 업로드 |
+| `test/file-storage/s3-request-limits.test.cjs` | 3 | S3 요청 시간 제한·시도 횟수 설정, 응답하지 않는 대역에서 제한 시간 안 실패, 정상 응답 회귀(실제 SDK 클라이언트 + 로컬 대역) |
+| `test/materials/pdf-materials-api.test.cjs` | 20 | 업로드·목록·상세·원본 열람·삭제, 동의·상한·소유, 시한 판정, 로그, 업로드 상한(횟수·진행 중 수·20벌 사전 확인·자리 반환), 응답하지 않는 S3에서 500과 자리 반환, 탈퇴와 겹친 업로드 |
 | `test/materials/pdf-extraction-receiver.test.cjs` | 13 | 수신 판정 5종, 저장 실패 되돌림, 글 합계 상한 |
 | `test/publications/publish-pdf.test.cjs` | 15 | 발행의 PDF 부분: 순서·사본, 추출 미완 400, 복사·트랜잭션 실패 정리, 발행 중 원본 변경, 동의 순서, 전체 글 상한 |
 | `test/publications/recipient-pdf.test.cjs` | 8 | 받은 사람·작성자 사본 열람, 판정·헤더·로그, 발행본 삭제 뒤 404 |
@@ -181,5 +182,5 @@
 실행(테스트 DB 필요, README 「DB 테스트」):
 
 ```bash
-npm test -- test/db/pdf-tables.test.cjs test/file-storage/s3-file-storage.test.cjs test/materials/pdf-materials-api.test.cjs test/materials/pdf-extraction-receiver.test.cjs test/publications/publish-pdf.test.cjs test/publications/recipient-pdf.test.cjs
+npm test -- test/db/pdf-tables.test.cjs test/file-storage/s3-file-storage.test.cjs test/file-storage/s3-request-limits.test.cjs test/materials/pdf-materials-api.test.cjs test/materials/pdf-extraction-receiver.test.cjs test/publications/publish-pdf.test.cjs test/publications/recipient-pdf.test.cjs
 ```
