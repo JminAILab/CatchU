@@ -18,7 +18,7 @@ namespace=catchu
 manager=catchu-secrets
 queue_group=catchu-queue
 # "Secret 키 SSM이름" 한 줄에 하나. CATCHU_QUEUE_REDIS_URL은 큐 비밀번호와 큐 주소로 rediss:// 주소를 만든다.
-# api와 worker는 같은 큐에 붙으므로 두 Secret의 큐 주소는 같은 SSM 값에서 나온다.
+# api와 worker는 같은 큐에 붙고 같은 조회 키를 쓰므로, 두 Secret의 큐 주소와 WORKER_CONTEXT_API_KEY는 같은 SSM 값에서 나온다.
 sources='catchu-api AUTH_JWT_SECRET /catchu/prod/api/AUTH_JWT_SECRET
 catchu-api LINK_GRANT_SECRET /catchu/prod/api/LINK_GRANT_SECRET
 catchu-api DB_PASSWORD /catchu/prod/db/catchu_app-password
@@ -27,6 +27,7 @@ catchu-api CATCHU_EMBEDDING_API_KEY /catchu/prod/api/CATCHU_EMBEDDING_API_KEY
 catchu-api GOOGLE_CLIENT_ID /catchu/prod/api/GOOGLE_CLIENT_ID
 catchu-api GOOGLE_CLIENT_SECRET /catchu/prod/api/GOOGLE_CLIENT_SECRET
 catchu-api CATCHU_QUEUE_REDIS_URL /catchu/prod/queue/auth-token
+catchu-api WORKER_CONTEXT_API_KEY /catchu/prod/worker/WORKER_CONTEXT_API_KEY
 catchu-migration DB_PASSWORD /catchu/prod/db/catchu_migrator-password
 catchu-worker CATCHU_QUEUE_REDIS_URL /catchu/prod/queue/auth-token
 catchu-worker WORKER_CONTEXT_API_KEY /catchu/prod/worker/WORKER_CONTEXT_API_KEY

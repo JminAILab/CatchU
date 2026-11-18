@@ -344,13 +344,13 @@ check "make-secrets: kubectl에는 표준 입력으로만 넘김(--server-side, 
     && "$REAL_JQ" -e 'all(.items[]; .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"] == null)' "$S/applied.json"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: Secret 키는 계약(k8s/README.md)과 같고 worker에는 DB 값이 없음, 모두 namespace catchu·Opaque" \
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | {name: .metadata.name, keys: (.data | keys), ns: .metadata.namespace, type}]
-    == [{name: "catchu-api", keys: ["AUTH_JWT_SECRET", "CATCHU_EMBEDDING_API_KEY", "CATCHU_GENERATION_API_KEY", "CATCHU_QUEUE_REDIS_URL", "DB_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "LINK_GRANT_SECRET"], ns: "catchu", type: "Opaque"},
+    == [{name: "catchu-api", keys: ["AUTH_JWT_SECRET", "CATCHU_EMBEDDING_API_KEY", "CATCHU_GENERATION_API_KEY", "CATCHU_QUEUE_REDIS_URL", "DB_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "LINK_GRANT_SECRET", "WORKER_CONTEXT_API_KEY"], ns: "catchu", type: "Opaque"},
         {name: "catchu-migration", keys: ["DB_PASSWORD"], ns: "catchu", type: "Opaque"},
         {name: "catchu-worker", keys: ["CATCHU_GENERATION_API_KEY", "CATCHU_JUDGEMENT_API_KEY", "CATCHU_QUEUE_REDIS_URL", "WORKER_CONTEXT_API_KEY"], ns: "catchu", type: "Opaque"}]' "$S/applied.json")"
 check "make-secrets: 값은 SSM 원본 그대로(앱·migration 계정 비밀번호가 바뀌지 않음)" \
   "$( { test "$(decoded catchu-api AUTH_JWT_SECRET)" = "$JWT" && test "$(decoded catchu-api LINK_GRANT_SECRET)" = "$LINK" \
     && test "$(decoded catchu-api DB_PASSWORD)" = "$APP_PW" && test "$(decoded catchu-migration DB_PASSWORD)" = "$MIGRATOR_PW" \
-    && test "$(decoded catchu-worker WORKER_CONTEXT_API_KEY)" = "$CONTEXT_KEY" && test "$(decoded catchu-worker CATCHU_GENERATION_API_KEY)" = "$GENERATION_KEY" \
+    && test "$(decoded catchu-worker WORKER_CONTEXT_API_KEY)" = "$CONTEXT_KEY" && test "$(decoded catchu-api WORKER_CONTEXT_API_KEY)" = "$CONTEXT_KEY" && test "$(decoded catchu-worker CATCHU_GENERATION_API_KEY)" = "$GENERATION_KEY" \
     && test "$(decoded catchu-worker CATCHU_JUDGEMENT_API_KEY)" = "$JUDGEMENT_KEY" \
     && test "$(decoded catchu-api CATCHU_GENERATION_API_KEY)" = "$API_GENERATION_KEY" && test "$(decoded catchu-api CATCHU_EMBEDDING_API_KEY)" = "$EMBEDDING_KEY" \
     && test "$(decoded catchu-api GOOGLE_CLIENT_ID)" = "$GOOGLE_ID" && test "$(decoded catchu-api GOOGLE_CLIENT_SECRET)" = "$GOOGLE_SECRET"; } > /dev/null 2>&1; echo $?)"
@@ -361,7 +361,7 @@ check "make-secrets: 큐 주소는 rediss://, 큐 비밀번호와 큐 주 엔드
     && test "$(decoded catchu-api CATCHU_QUEUE_REDIS_URL)" = "rediss://:${QUEUE_TOKEN}@${QUEUE_HOST}:6379"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: Secret마다 키=SSM 판 번호 주석(값 없음)" \
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | .metadata.annotations["catchu.io/ssm-versions"]]
-    == ["AUTH_JWT_SECRET=1,CATCHU_EMBEDDING_API_KEY=1,CATCHU_GENERATION_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,DB_PASSWORD=1,GOOGLE_CLIENT_ID=1,GOOGLE_CLIENT_SECRET=1,LINK_GRANT_SECRET=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_JUDGEMENT_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
+    == ["AUTH_JWT_SECRET=1,CATCHU_EMBEDDING_API_KEY=1,CATCHU_GENERATION_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,DB_PASSWORD=1,GOOGLE_CLIENT_ID=1,GOOGLE_CLIENT_SECRET=1,LINK_GRANT_SECRET=1,WORKER_CONTEXT_API_KEY=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_JUDGEMENT_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
 check "make-secrets: ConfigMap catchu-db는 RDS 주소와 저장소의 루트 인증서 그대로" \
   "$( { "$REAL_JQ" -e --arg h "$DB_HOST" '.items[0] | .kind == "ConfigMap" and .metadata.name == "catchu-db" and .data.DB_HOST == $h
       and (.data | keys) == ["DB_HOST", "ca.pem"]' "$S/applied.json" \
@@ -390,6 +390,10 @@ reset_state
 ssm_set /catchu/prod/api/LINK_GRANT_SECRET SecureString "$(printf '%s' "$JWT" | tr 'a-f' 'A-F')"
 run make-secrets.sh
 check "make-secrets: 서명 키 둘이 같으면(대소문자만 달라도) 멈춤" "$( { untouched && says '같은 값'; } > /dev/null 2>&1; echo $?)"
+reset_state
+ssm_set /catchu/prod/worker/WORKER_CONTEXT_API_KEY SecureString "$LINK"
+run make-secrets.sh
+check "make-secrets: 조회 키가 서명 키와 같으면 멈춤(api가 뜨지 않는 값)" "$( { untouched && says '같은 값' && secret_free; } > /dev/null 2>&1; echo $?)"
 reset_state
 ssm_set /catchu/prod/db/catchu_migrator-password SecureString "$APP_PW"
 run make-secrets.sh

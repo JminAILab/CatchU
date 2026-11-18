@@ -491,6 +491,14 @@ API_ENV='.[0].spec.template.spec.containers[0].env | map({(.name): (.value // "s
 check "api: 큐 연결 켬(주소는 Secret catchu-api에서 받고, 접두사는 worker와 같음)" \
   "$( { q "$WORK/applied-api.yaml" "${API_ENV} | .CATCHU_QUEUE_REDIS_URL == \"secret catchu-api CATCHU_QUEUE_REDIS_URL\" and .CATCHU_QUEUE_PREFIX == \"catchu\"" \
     && q "$WORK/applied-worker.yaml" "${API_ENV} | .CATCHU_QUEUE_REDIS_URL == \"secret catchu-worker CATCHU_QUEUE_REDIS_URL\" and .CATCHU_QUEUE_PREFIX == \"catchu\""; } > /dev/null 2>&1; echo $?)"
+check "api: worker 요청 정보 조회 켬(키는 Secret catchu-api에서), worker는 같은 이름의 키를 Secret catchu-worker에서 받음" \
+  "$( { q "$WORK/applied-api.yaml" "${API_ENV} | .WORKER_CONTEXT_ENABLED == \"true\" and .WORKER_CONTEXT_API_KEY == \"secret catchu-api WORKER_CONTEXT_API_KEY\"" \
+    && q "$WORK/applied-worker.yaml" "${API_ENV} | .WORKER_CONTEXT_API_KEY == \"secret catchu-worker WORKER_CONTEXT_API_KEY\""; } > /dev/null 2>&1; echo $?)"
+check "내부 조회 경로: api 3001은 ALB 대역과 worker Pod에서만 받고, worker는 api 3001로 나갈 수 있음" \
+  "$(ok q "$K8S/network-policy.yaml" '(map({(.metadata.name): .}) | add) as $p
+      | ([$p.api.spec.ingress[] | {from: [.from[] | (.ipBlock.cidr // .podSelector.matchLabels["app.kubernetes.io/name"])], ports: [.ports[].port]}]
+        == [{from: ["192.168.0.0/19", "192.168.32.0/19"], ports: [3001]}, {from: ["worker"], ports: [3001]}])
+      and any($p.worker.spec.egress[]; .to == [{podSelector: {matchLabels: {"app.kubernetes.io/name": "api"}}}] and [.ports[].port] == [3001])')"
 # 회원 파일(PDF 원본·발행 사본)은 Pod의 빈 볼륨이 아니라 S3 버킷에 둔다. 버킷 이름은 네 곳(생성 스크립트·역할 정책·api·worker)이 같아야 한다.
 BUCKET=$(sed -n 's/^bucket=//p' "$HERE/create-s3.sh")
 check "api: 파일 저장은 s3(Pod 빈 볼륨 아님), 버킷은 create-s3.sh가 만드는 것, 지역 서울, 접근 키 값 없음" \
