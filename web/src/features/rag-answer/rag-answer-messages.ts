@@ -15,6 +15,9 @@ export const RAG_ANSWER_MESSAGES = {
   questionTooLong: "질문은 500자까지 쓸 수 있습니다",
   noEvidence: "발행본에서 이 질문의 근거를 찾지 못했습니다",
   answerFailed: "답을 만들지 못했습니다. 다시 질문해 주세요",
+  /** 낭독 전용 알림 자리에만 넣는다. 화면에는 보이지 않는다(#543, 2026-11-16 팀장 결정). */
+  answerPending: "답변을 만들고 있습니다",
+  answerReady: "답변이 준비됐습니다",
   ask: "질문하기",
   questionLabel: "질문",
   aiInterpretation: "AI 해석",
