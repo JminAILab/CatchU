@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { RAG_ANSWER_MESSAGES } from "../src/features/rag-answer/rag-answer-messages.ts";
 import {
-  afterRegenerate, askDisplay, canSendQuestion, historyForRequest, httpErrorMessage, summaryDisplay, summaryPanelState,
+  afterRegenerate, askAnnouncement, askDisplay,canSendQuestion, historyForRequest, httpErrorMessage, summaryDisplay, summaryPanelState,
 } from "../src/features/rag-answer/rag-answer-state.ts";
 
 // 12월 intent U5 화면 판단(기능 설계 「화면」·BR8.2·BR8.4·BR8.5·BR8.6, 비기능 설계 NFR7.2).
@@ -65,6 +65,23 @@ test("질문 끝 안내: 항목 0개 done은 근거 없음, error 이벤트는 �
   assert.equal(askDisplay({ kind: "aborted", itemCount: 1 }).keepTurn, true);
   assert.deepEqual(askDisplay({ kind: "http-error", status: 409, code: "INDEX_NOT_READY" }),
     { answerNotice: null, formNotice: "질의응답을 아직 쓸 수 없습니다", keepTurn: false });
+});
+
+// #543 완료 기준과 2026-11-16 팀장 결정(수정안 「2. 상태 안내」 표)에서 가져온 기대 결과.
+test("낭독 전용 알림: 답 항목이 왔을 때만 준비 안내, 0건은 근거 없음, 도중 실패는 답 실패, 스트림 전 거부·중단·접근 상실은 비운다(#543)", () => {
+  assert.equal(askAnnouncement({ kind: "done", itemCount: 2 }), "답변이 준비됐습니다");
+  assert.equal(askAnnouncement({ kind: "done", itemCount: 1 }), "답변이 준비됐습니다");
+  assert.equal(askAnnouncement({ kind: "done", itemCount: 0 }), "발행본에서 이 질문의 근거를 찾지 못했습니다", "근거 없음은 완료로 알리지 않는다");
+  assert.equal(askAnnouncement({ kind: "stream-error", itemCount: 1, code: "ANSWER_FAILED" }), "답을 만들지 못했습니다. 다시 질문해 주세요",
+    "일부 줄이 왔어도 완료로 알리지 않는다");
+  assert.equal(askAnnouncement({ kind: "stream-error", itemCount: 0, code: null }), "답을 만들지 못했습니다. 다시 질문해 주세요");
+  for (const status of [409, 429, 400, 500, null]) {
+    assert.equal(askAnnouncement({ kind: "http-error", status, code: "X" }), null, "입력란 아래 role=alert 안내가 읽는다");
+  }
+  assert.equal(askAnnouncement({ kind: "aborted", itemCount: 0 }), null);
+  assert.equal(askAnnouncement({ kind: "aborted", itemCount: 1 }), null);
+  assert.equal(askAnnouncement({ kind: "access-lost", code: "LINK_PASSWORD_REQUIRED" }), null);
+  assert.equal(RAG_ANSWER_MESSAGES.answerPending, "답변을 만들고 있습니다");
 });
 
 test("HTTP 오류 문구: 409 아직 못 씀, 429 한도, 400 500자, 그 밖·통신 실패는 답 실패(BR8.6)", () => {

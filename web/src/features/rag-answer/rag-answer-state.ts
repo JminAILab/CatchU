@@ -87,6 +87,17 @@ export function askDisplay(outcome: AskOutcome): AskDisplay {
   }
 }
 
+/**
+ * 질문 하나가 끝났을 때 낭독 전용 알림 자리(`role="status"`)에 넣는 말(#543). null이면 자리를 비운다.
+ * 완료 안내는 답 항목이 하나라도 왔을 때만 한다. 근거 없음과 도중 실패는 화면의 안내와 같은 문장을 넣는다.
+ * 스트림 전 거부는 입력란 아래 `role="alert"` 안내가 읽으므로 비우고, 화면을 떠나 끊겼거나 링크 접근을 잃었으면 알리지 않는다.
+ */
+export function askAnnouncement(outcome: AskOutcome): string | null {
+  if (outcome.kind === "done") return outcome.itemCount > 0 ? RAG_ANSWER_MESSAGES.answerReady : RAG_ANSWER_MESSAGES.noEvidence;
+  if (outcome.kind === "stream-error") return RAG_ANSWER_MESSAGES.answerFailed;
+  return null;
+}
+
 /** 스트림 전 거부의 안내(BR8.6). 409·429·400 밖(통신 실패·500)은 답 실패 안내로 둔다. */
 export function httpErrorMessage(status: number | null): string {
   if (status === 409) return RAG_ANSWER_MESSAGES.qnaNotReady;
