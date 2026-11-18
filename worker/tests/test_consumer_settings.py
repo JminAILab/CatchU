@@ -4,8 +4,11 @@ import logging
 import pickle
 import tomllib
 from pathlib import Path
+from typing import Any
 
 import pytest
+import redis.asyncio as redis_asyncio
+from bullmq.worker import default_maximum_block_timeout
 from consumer_support import env
 
 from app.consumer import queues
@@ -13,8 +16,10 @@ from app.consumer.__main__ import main
 from app.consumer.settings import (
     DEFAULT_PREFIX,
     ConsumerSettings,
+    Limits,
     QueueUrl,
     SettingsError,
+    queue_connection,
 )
 
 SECRET = "s3cr3t-queue-password"
@@ -460,3 +465,47 @@ def test_judgement_key_reaches_the_child_but_not_repr_or_environment(
     restored = pickle.loads(pickle.dumps(child))
     assert restored.live is not None and restored.live.judgement_key is not None
     assert restored.live.judgement_key.reveal() == JUDGEMENT_KEY
+
+
+# 21. 큐 접속 옵션(#603) -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("url", "user", "password"),
+    [
+        ("rediss://default:p%40ss%3Aw@queue.internal:6380/2", "default", "p@ss:w"),
+        ("rediss://:pw@queue.internal", None, "pw"),
+        ("redis://127.0.0.1:6379", None, None),
+        ("redis://user@127.0.0.1:1/0", "user", None),
+    ],
+)
+def test_queue_connection_equals_url_connection_plus_socket_limits(
+    url: str, user: str | None, password: str | None
+) -> None:
+    """주소를 풀어 넘겨도 주소 문자열로 만든 접속과 같고(주소·계정·DB 번호·TLS 검증), 소켓 상한만 더한다."""
+    options = queue_connection(QueueUrl(url), Limits(queue_socket=7, queue_connect=3))
+    # redis-py의 make_connection에는 형식 정보가 없어 Any로 받은 풀에서 부른다.
+    url_pool: Any = redis_asyncio.from_url(url).connection_pool
+    built_pool: Any = redis_asyncio.Redis(**options).connection_pool
+    by_url, built = url_pool.make_connection(), built_pool.make_connection()
+
+    assert type(built) is type(by_url)
+    for name in ("host", "port", "db", "username", "password"):
+        assert getattr(built, name) == getattr(by_url, name), name
+    assert (built.username, built.password) == (user, password)
+    if url.startswith("rediss://"):
+        assert type(built).__name__ == "SSLConnection"
+        for name in ("cert_reqs", "check_hostname", "ca_certs", "ca_data", "ca_path"):
+            assert getattr(built.ssl_context, name) == getattr(
+                by_url.ssl_context, name
+            ), name
+        assert built.ssl_context.check_hostname is True
+    # 주소 문자열로 만든 접속에는 소켓 상한이 없다. 큐 노드가 조용히 사라지면 응답을 끝없이 기다린다.
+    assert (by_url.socket_timeout, by_url.socket_connect_timeout) == (None, None)
+    assert (built.socket_timeout, built.socket_connect_timeout) == (7, 3)
+
+
+def test_queue_socket_limit_is_longer_than_the_blocking_wait() -> None:
+    """응답 대기 상한이 BullMQ의 기다리기 명령(서버 쪽 최대 10초)보다 짧으면 일이 없을 때마다 끊긴다."""
+    assert Limits().queue_socket > default_maximum_block_timeout
+    assert Limits().fetch_stall > 2 * Limits().queue_socket

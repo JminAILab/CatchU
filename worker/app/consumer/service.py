@@ -28,7 +28,8 @@ from app.consumer.children import ChildTarget
 from app.consumer.health import ConsumerState, create_health_app
 from app.consumer.parent import OutputQueue, ProcessingAborted, RequestProcessor
 from app.consumer.receipts import ReceiptWatcher, ResultJobView
-from app.consumer.settings import ConsumerSettings
+from app.consumer.settings import ConsumerSettings, queue_connection
+from app.consumer.watch import FetchWatch
 from app.pdf_extraction.child import pdf_child_main, pdf_child_settings
 from app.pdf_extraction.envelope import PDF_IDENTIFYING_FIELDS, classify_receipt
 from app.pdf_extraction.worker import PdfExtractionProcessor, PdfProcessingAborted
@@ -115,6 +116,8 @@ class ConsumerService:
         self._pdf_run_task: asyncio.Task[Any] | None = None
         self._output_queue: Queue | None = None
         self._run_task: asyncio.Task[Any] | None = None
+        self._fetch_watches: list[FetchWatch] = []
+        self._watch_task: asyncio.Task[None] | None = None
         self.server: _HealthServer | None = None
 
     def _running_pairs(self) -> list[tuple[Worker, asyncio.Task[Any]]] | None:
@@ -165,7 +168,12 @@ class ConsumerService:
     def _start_consumer(self) -> None:
         url = self._settings.queue_url
         assert url is not None
-        connection = {"connection": url.reveal(), "prefix": self._settings.prefix}
+        # 주소 문자열 대신 풀어 넘겨 소켓 상한을 준다. 없으면 큐 노드가 조용히 사라졌을 때 걸어 둔
+        # 기다리기 명령이 끝없이 응답을 기다려, 다시 붙지도 오류를 내지도 않는다(#603).
+        connection = {
+            "connection": queue_connection(url, self._limits),
+            "prefix": self._settings.prefix,
+        }
         self._output_queue = Queue(queues.OUTPUT_QUEUE, connection)
         self.receipts = ReceiptWatcher(BullResultJobs(self._output_queue), self._limits)
         self.processor = RequestProcessor(
@@ -192,10 +200,12 @@ class ConsumerService:
         )
         self.worker.on("error", _log_worker_error)
         self.worker.on("failed", _log_job_failed)
+        self._fetch_watches.append(FetchWatch(self.worker, self.processor))
         self._run_task = asyncio.create_task(self.worker.run(), name="request-worker")
         self._run_task.add_done_callback(self._run_finished)
         if self._settings.pdf is not None:
             self._start_pdf_worker(connection)
+        self._watch_task = asyncio.create_task(self._watch_fetch(), name="fetch-watch")
 
     def _start_pdf_worker(self, connection: Mapping[str, Any]) -> None:
         """PDF 추출 Worker(BR3.7): 다른 큐·다른 인스턴스·다른 동시성, 같은 출력 큐·같은 종료 순서."""
@@ -232,6 +242,7 @@ class ConsumerService:
         )
         self.pdf_worker.on("error", _log_worker_error)
         self.pdf_worker.on("failed", _log_job_failed)
+        self._fetch_watches.append(FetchWatch(self.pdf_worker, self.pdf_processor))
         self._pdf_run_task = asyncio.create_task(
             self.pdf_worker.run(), name="pdf-extraction-worker"
         )
@@ -250,6 +261,27 @@ class ConsumerService:
         logger.error("소비 실행 작업이 예상 밖으로 끝나 프로세스를 끝냄: %s", cause)
         self._consumer_failed = True
         self.request_stop()
+
+    async def _watch_fetch(self) -> None:
+        """실행 작업은 살아 있는데 큐에서 일을 가져오지 못하는 멈춤을 본다(#603).
+
+        `_run_finished`와 같은 이유로 상태 확인만 바꾸지 않고 프로세스를 끝낸다. 다시 띄우는 것은 실행
+        환경의 몫이다. 처리 중인 작업이 있으면 멈춤으로 세지 않으므로 분석 도중에 끝내지 않는다.
+        """
+        while not self._stopping:
+            await asyncio.sleep(self._limits.fetch_watch_interval)
+            for watch in self._fetch_watches:
+                quiet = watch.quiet_seconds()
+                if quiet < self._limits.fetch_stall or self._stopping:
+                    continue
+                logger.error(
+                    "큐에서 일을 가져오지 못한 지 %.0f초가 지나 프로세스를 끝냄: queue=%s",
+                    quiet,
+                    watch.queue_name,
+                )
+                self._consumer_failed = True
+                self.request_stop()
+                return
 
     async def run(self) -> int:
         loop = asyncio.get_running_loop()
@@ -304,6 +336,8 @@ class ConsumerService:
 
         self._stopping = True
         logger.info("종료 시작")
+        if self._watch_task is not None:
+            self._watch_task.cancel()
         pairs = self._processors()
         if pairs:
             for _, processor in pairs:

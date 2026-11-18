@@ -6,6 +6,7 @@ CATCHU_TEST_REDIS_URL이 있으면 반드시 돌고(CI), 없으면 건너뛴다.
 
 import asyncio
 import json
+import logging
 import os
 import shutil
 import signal
@@ -482,12 +483,18 @@ def test_events_removed_on_completion_and_result_kept_until_read(prefix: str) ->
 
 
 class _Proxy:
-    """Redis 앞의 TCP 중계. cut()이면 연결을 모두 끊고 새 연결도 받지 않는다."""
+    """Redis 앞의 TCP 중계.
+
+    cut()이면 연결을 모두 끊고 새 연결도 받지 않는다. freeze()이면 이미 맺은 연결을 끊지 않고 중계만
+    멈춘다(큐 노드가 조용히 사라진 경우: 클라이언트는 응답도 끊김도 받지 못한다). freeze 뒤의 새 연결은
+    그대로 중계한다(새 주 노드).
+    """
 
     def __init__(self, host: str, port: int) -> None:
         self.host, self.port = host, port
         self.blocked = False
         self.writers: set[asyncio.StreamWriter] = set()
+        self.links: list[dict[str, Any]] = []
         self.server: asyncio.base_events.Server | None = None
 
     async def start(self) -> int:
@@ -496,16 +503,22 @@ class _Proxy:
         return port
 
     async def _pipe(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+        self,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+        link: dict[str, Any],
     ) -> None:
         try:
             while data := await reader.read(65536):
+                if link["frozen"]:
+                    continue  # 받은 것은 버리고 아무것도 보내지 않는다
                 writer.write(data)
                 await writer.drain()
         except (ConnectionError, OSError):
             pass
         finally:
-            writer.close()
+            if not link["frozen"]:
+                writer.close()
 
     async def _handle(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -515,9 +528,17 @@ class _Proxy:
             return
         up_reader, up_writer = await asyncio.open_connection(self.host, self.port)
         self.writers |= {writer, up_writer}
+        link = {"frozen": False, "up_writer": up_writer}
+        self.links.append(link)
         await asyncio.gather(
-            self._pipe(reader, up_writer), self._pipe(up_reader, writer)
+            self._pipe(reader, up_writer, link), self._pipe(up_reader, writer, link)
         )
+
+    def freeze(self) -> None:
+        for link in self.links:
+            link["frozen"] = True
+            link["up_writer"].close()  # 큐 서버 쪽에서는 그 연결이 사라진다
+        self.links.clear()
 
     def cut(self) -> None:
         self.blocked = True
@@ -695,5 +716,138 @@ def test_failed_reason_is_fixed_code_without_stacktrace(prefix: str) -> None:
 
         assert reasons == ["REQUEST_JOB_INVALID", "TIME_LIMIT_EXCEEDED"]
         assert stacks == [[], []]
+
+    asyncio.run(go())
+
+
+# 18. 큐 노드가 조용히 사라진 뒤(#603) -----------------------------------------------------
+
+
+async def _proxied() -> tuple[_Proxy, str]:
+    from urllib.parse import urlsplit
+
+    target = urlsplit(REDIS_URL)
+    proxy = _Proxy(target.hostname or "127.0.0.1", target.port or 6379)
+    return proxy, f"redis://127.0.0.1:{await proxy.start()}"
+
+
+async def _wait_job_state(prefix: str, job_id: str, state: str, timeout: float) -> str:
+    end = time.monotonic() + timeout
+    while (seen := (await load(prefix, job_id))[0]) != state:
+        if time.monotonic() >= end:
+            break
+        await asyncio.sleep(0.1)
+    return seen
+
+
+def test_new_request_is_taken_after_queue_connections_die_silently(
+    prefix: str,
+) -> None:
+    """걸어 둔 기다리기 명령이 응답도 끊김도 받지 못해도, 소켓 상한으로 다시 붙어 새 요청을 처리한다."""
+
+    async def go() -> None:
+        proxy, url = await _proxied()
+        limits = replace(FAST, queue_socket=1.5, queue_connect=1)
+        service = ConsumerService(
+            settings_for(prefix, url=url, limits=limits),
+            port=free_port(),
+            install_signals=False,
+            worker_options={"drainDelay": 0.5, "runRetryDelay": 200},
+            hard_exit=_no_hard_exit,
+        )
+        task = asyncio.create_task(service.run())
+        await _wait_state(service, "running", 10)
+        await asyncio.sleep(1)  # 기다리기 명령이 걸려 있는 동안 끊는다
+        proxy.freeze()
+        message = mock_request(new_attempt())
+        await add_request(prefix, message)
+
+        state = await _wait_job_state(prefix, message["attemptId"], "completed", 20)
+        assert state == "completed"
+        # 프로세스를 다시 띄우지 않았다.
+        assert not task.done()
+        assert service.state() == "running"
+        service.request_stop()
+        assert await task == 0
+        await proxy.close()
+
+    asyncio.run(go())
+
+
+def test_process_ends_when_nothing_is_fetched_from_the_queue(
+    prefix: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """원인이 무엇이든 처리 중이 아닌데 큐에서 일을 가져오지 못하면 종료 코드 1로 끝난다.
+
+    소켓 상한을 길게 두어 #603의 멈춤(실행 작업은 살아 있고 /health는 200)을 그대로 만든다.
+    """
+
+    async def go() -> None:
+        proxy, url = await _proxied()
+        limits = replace(FAST, queue_socket=60, fetch_stall=3, fetch_watch_interval=0.2)
+        service = ConsumerService(
+            settings_for(prefix, url=url, limits=limits),
+            port=free_port(),
+            install_signals=False,
+            worker_options={"drainDelay": 0.5, "runRetryDelay": 200},
+            hard_exit=_no_hard_exit,
+        )
+        task = asyncio.create_task(service.run())
+        await _wait_state(service, "running", 10)
+        await asyncio.sleep(1)
+        proxy.freeze()
+        message = mock_request(new_attempt())
+        await add_request(prefix, message)
+        await asyncio.sleep(1.5)
+        # 멈춘 동안에도 실행 작업은 살아 있어 상태 확인은 정상으로 답한다.
+        assert not task.done()
+        assert await _get(service.port) == (
+            200,
+            {"status": "ok", "consumer": "running"},
+        )
+
+        assert await asyncio.wait_for(task, 15) == 1
+        assert (await load(prefix, message["attemptId"]))[0] == "waiting"
+        await proxy.close()
+
+    with caplog.at_level(logging.ERROR, logger="app.consumer.service"):
+        asyncio.run(go())
+    assert any(
+        "큐에서 일을 가져오지 못한 지" in record.getMessage()
+        and "queue=analysis-requests" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+def test_idle_and_long_processing_are_not_taken_for_a_stall(
+    prefix: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """일이 없어 기다리는 동안과, 감시 시간보다 긴 처리 동안에는 프로세스를 끝내지 않는다."""
+    monkeypatch.setenv("SLOW_CHILD_SECONDS", "4")
+
+    async def go() -> None:
+        limits = replace(FAST, fetch_stall=2, fetch_watch_interval=0.2)
+        service = ConsumerService(
+            settings_for(prefix, limits=limits),
+            port=free_port(),
+            install_signals=False,
+            child_target=consumer_children.work_for_seconds,
+            worker_options={"drainDelay": 0.5},
+            hard_exit=_no_hard_exit,
+        )
+        task = asyncio.create_task(service.run())
+        await _wait_state(service, "running", 10)
+        await asyncio.sleep(3)  # 일 없이 감시 시간보다 길게 기다림
+        assert not task.done()
+        message = mock_request(new_attempt())
+        await add_request(prefix, message)
+
+        state = await _wait_job_state(prefix, message["attemptId"], "completed", 20)
+        assert state == "completed"
+        await asyncio.sleep(1)
+        assert not task.done()
+        assert service.state() == "running"
+        service.request_stop()
+        assert await task == 0
 
     asyncio.run(go())
