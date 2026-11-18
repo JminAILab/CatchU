@@ -55,8 +55,10 @@
   overflow-wrap: anywhere;
 }
 
+/* 질문 글은 3단계 제목이다(#543). 보이는 모습은 문단일 때와 같게 둔다. */
 .question {
   margin: 0 0 0.5rem;
+  font-size: inherit;
   font-weight: 600;
 }
 
@@ -69,6 +71,23 @@
   width: 100%;
   min-height: 4.5rem;
   resize: vertical;
+}
+
+/*
+ * 보내는 동안의 입력란과 누를 수 없는 [질문하기] 버튼(#543). 초점이 풀리지 않게 `disabled` 대신 `readOnly`·`aria-disabled`로 막으므로,
+ * 브라우저가 `disabled`에 주던 흐린 모습을 여기서 같게 그린다(보이는 화면은 바꾸지 않는다).
+ */
+.input:read-only {
+  border-color: rgba(118, 118, 118, 0.3);
+  background-color: rgba(239, 239, 239, 0.3);
+  color: rgb(84, 84, 84);
+  cursor: default;
+}
+
+.submit[aria-disabled="true"] {
+  border-color: rgba(118, 118, 118, 0.3);
+  background-color: rgba(239, 239, 239, 0.3);
+  color: rgba(16, 16, 16, 0.3);
 }
 
 .error {
