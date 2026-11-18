@@ -344,7 +344,7 @@ check "make-secrets: kubectl에는 표준 입력으로만 넘김(--server-side, 
     && "$REAL_JQ" -e 'all(.items[]; .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"] == null)' "$S/applied.json"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: Secret 키는 계약(k8s/README.md)과 같고 worker에는 DB 값이 없음, 모두 namespace catchu·Opaque" \
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | {name: .metadata.name, keys: (.data | keys), ns: .metadata.namespace, type}]
-    == [{name: "catchu-api", keys: ["AUTH_JWT_SECRET", "CATCHU_EMBEDDING_API_KEY", "CATCHU_GENERATION_API_KEY", "DB_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "LINK_GRANT_SECRET"], ns: "catchu", type: "Opaque"},
+    == [{name: "catchu-api", keys: ["AUTH_JWT_SECRET", "CATCHU_EMBEDDING_API_KEY", "CATCHU_GENERATION_API_KEY", "CATCHU_QUEUE_REDIS_URL", "DB_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "LINK_GRANT_SECRET"], ns: "catchu", type: "Opaque"},
         {name: "catchu-migration", keys: ["DB_PASSWORD"], ns: "catchu", type: "Opaque"},
         {name: "catchu-worker", keys: ["CATCHU_GENERATION_API_KEY", "CATCHU_JUDGEMENT_API_KEY", "CATCHU_QUEUE_REDIS_URL", "WORKER_CONTEXT_API_KEY"], ns: "catchu", type: "Opaque"}]' "$S/applied.json")"
 check "make-secrets: 값은 SSM 원본 그대로(앱·migration 계정 비밀번호가 바뀌지 않음)" \
@@ -356,11 +356,12 @@ check "make-secrets: 값은 SSM 원본 그대로(앱·migration 계정 비밀번
     && test "$(decoded catchu-api GOOGLE_CLIENT_ID)" = "$GOOGLE_ID" && test "$(decoded catchu-api GOOGLE_CLIENT_SECRET)" = "$GOOGLE_SECRET"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: SSM 값은 한 번에 10개까지 나눠 읽음(이름 12개 → 10개·2개)" \
   "$(ok test "$(tr '\n' ' ' < "$S/get-parameters-sizes")" = "10 2 ")"
-check "make-secrets: 큐 주소는 rediss://, 큐 비밀번호와 큐 주 엔드포인트 6379" \
-  "$(ok test "$(decoded catchu-worker CATCHU_QUEUE_REDIS_URL)" = "rediss://:${QUEUE_TOKEN}@${QUEUE_HOST}:6379")"
+check "make-secrets: 큐 주소는 rediss://, 큐 비밀번호와 큐 주 엔드포인트 6379. api와 worker가 같은 주소를 받음" \
+  "$( { test "$(decoded catchu-worker CATCHU_QUEUE_REDIS_URL)" = "rediss://:${QUEUE_TOKEN}@${QUEUE_HOST}:6379" \
+    && test "$(decoded catchu-api CATCHU_QUEUE_REDIS_URL)" = "rediss://:${QUEUE_TOKEN}@${QUEUE_HOST}:6379"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: Secret마다 키=SSM 판 번호 주석(값 없음)" \
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | .metadata.annotations["catchu.io/ssm-versions"]]
-    == ["AUTH_JWT_SECRET=1,CATCHU_EMBEDDING_API_KEY=1,CATCHU_GENERATION_API_KEY=1,DB_PASSWORD=1,GOOGLE_CLIENT_ID=1,GOOGLE_CLIENT_SECRET=1,LINK_GRANT_SECRET=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_JUDGEMENT_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
+    == ["AUTH_JWT_SECRET=1,CATCHU_EMBEDDING_API_KEY=1,CATCHU_GENERATION_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,DB_PASSWORD=1,GOOGLE_CLIENT_ID=1,GOOGLE_CLIENT_SECRET=1,LINK_GRANT_SECRET=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_JUDGEMENT_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
 check "make-secrets: ConfigMap catchu-db는 RDS 주소와 저장소의 루트 인증서 그대로" \
   "$( { "$REAL_JQ" -e --arg h "$DB_HOST" '.items[0] | .kind == "ConfigMap" and .metadata.name == "catchu-db" and .data.DB_HOST == $h
       and (.data | keys) == ["DB_HOST", "ca.pem"]' "$S/applied.json" \

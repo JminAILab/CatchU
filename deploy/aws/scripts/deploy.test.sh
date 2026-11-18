@@ -487,6 +487,10 @@ check "api: Google 로그인 켬, 돌아올 주소는 https://catchu.dev/google/
       | map({(.name): (.value // "secret \(.valueFrom.secretKeyRef.name) \(.valueFrom.secretKeyRef.key)")}) | add
       | .GOOGLE_LOGIN_ENABLED == "true" and .GOOGLE_REDIRECT_URI == "https://catchu.dev/google/callback"
       and .GOOGLE_CLIENT_ID == "secret catchu-api GOOGLE_CLIENT_ID" and .GOOGLE_CLIENT_SECRET == "secret catchu-api GOOGLE_CLIENT_SECRET"')"
+API_ENV='.[0].spec.template.spec.containers[0].env | map({(.name): (.value // "secret \(.valueFrom.secretKeyRef.name) \(.valueFrom.secretKeyRef.key)")}) | add'
+check "api: 큐 연결 켬(주소는 Secret catchu-api에서 받고, 접두사는 worker와 같음)" \
+  "$( { q "$WORK/applied-api.yaml" "${API_ENV} | .CATCHU_QUEUE_REDIS_URL == \"secret catchu-api CATCHU_QUEUE_REDIS_URL\" and .CATCHU_QUEUE_PREFIX == \"catchu\"" \
+    && q "$WORK/applied-worker.yaml" "${API_ENV} | .CATCHU_QUEUE_REDIS_URL == \"secret catchu-worker CATCHU_QUEUE_REDIS_URL\" and .CATCHU_QUEUE_PREFIX == \"catchu\""; } > /dev/null 2>&1; echo $?)"
 # 회원 파일(PDF 원본·발행 사본)은 Pod의 빈 볼륨이 아니라 S3 버킷에 둔다. 버킷 이름은 네 곳(생성 스크립트·역할 정책·api·worker)이 같아야 한다.
 BUCKET=$(sed -n 's/^bucket=//p' "$HERE/create-s3.sh")
 check "api: 파일 저장은 s3(Pod 빈 볼륨 아님), 버킷은 create-s3.sh가 만드는 것, 지역 서울, 접근 키 값 없음" \

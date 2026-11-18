@@ -3,7 +3,7 @@
 # 한 개만 띄우고(Recreate) 자동 확장은 두지 않는다. Recreate는 교체 때만 옛 Pod 종료 뒤 새 Pod를 띄우고, 노드 장애 때 생기는
 # 대체 실행과의 겹침은 막지 못한다. 그래서 교체는 deploy.sh가 옛 api·worker의 종료를 먼저 확인한 뒤 한다.
 # 값의 뜻은 api/docs/environment.md. 비밀값은 Secret catchu-api, DB 주소·CA는 ConfigMap catchu-db에서 받는다(deploy/aws/k8s/README.md 「Secret과 ConfigMap」).
-# 꺼 둔 기능(GitHub 연결·worker 요청 정보 조회·큐 연결)은 켤 때 그 값과 함께 이 파일을 고친다(deploy/aws/README.md 「단계와 시작 조건」 5단계).
+# 큐 연결은 켰다. 꺼 둔 기능(GitHub 연결·worker 요청 정보 조회)은 켤 때 그 값과 함께 이 파일을 고친다(deploy/aws/README.md 「단계와 시작 조건」 5단계).
 # Google 로그인은 개발 서버에서 켜 둔 것을 전환 뒤에도 이어 가려고 처음부터 켠다(2026-11-10 팀장 결정).
 # 회원 파일(PDF 원본·발행 사본)은 S3 버킷에 둔다. AWS 권한은 서비스 계정 api에 붙인 역할로 받고(cluster.yaml) 접근 키는 넣지 않는다.
 # 자원 값은 개발 서버 대기 상태 측정(api 약 70MiB) 기준의 시작값이다.
@@ -104,6 +104,17 @@ spec:
                 secretKeyRef:
                   name: catchu-api
                   key: CATCHU_EMBEDDING_API_KEY
+            # 큐 연결(api/docs/analysis-queue.md). 주소가 있으면 api가 대기 중인 분석 시도를 큐로 보내고, worker가 보낸 진행 알림·결과를
+            # 받아 반영한다(결과 수신은 이 연결 안에 있어 따로 켜는 값이 없다). 11월 기능의 백그라운드 실행(AiRun, api/docs/ai-run.md)도
+            # 같은 주소를 쓴다. 주소에 큐 비밀번호가 들어 있어 주소 전체를 Secret으로 받는다. 접두사는 worker.yaml과 같아야 한다.
+            # 받기가 예상 밖으로 멈추면 api가 종료 코드 1로 끝나고 쿠버네티스가 다시 띄운다(/health는 큐를 보지 않는다).
+            - name: CATCHU_QUEUE_PREFIX
+              value: catchu
+            - name: CATCHU_QUEUE_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: catchu-api
+                  key: CATCHU_QUEUE_REDIS_URL
             # Google 로그인. 돌아올 주소는 Google OAuth 클라이언트에 등록한 값과 글자 하나까지 같아야 한다(개발 서버와 같은 클라이언트·주소).
             # 클라이언트 ID는 비밀값이 아니지만 원본을 SSM 한 곳에 두려고 비밀값과 함께 Secret으로 받는다.
             - name: GOOGLE_LOGIN_ENABLED
