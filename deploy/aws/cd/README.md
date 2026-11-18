@@ -29,7 +29,7 @@ EKS 교체 단계는 세 가지를 한다.
 - **AWS:** 역할 `catchu-github-eks-deploy`는 environment `eks`에서 돈 실행만 믿는다([`iam-trust.json`](iam-trust.json)). 그 environment의 배포 브랜치는 `main` 하나다. 권한([`iam-deploy.json`](iam-deploy.json))은 앱 이미지 저장소 네 개의 올리기·조회와 클러스터 `catchu` 조회뿐이다. SSM·Secrets Manager·배포 파일 묶음 저장소에는 닿지 않는다.
 - **쿠버네티스:** 역할은 EKS 접근 항목으로 그룹 `catchu-deploy`에 들어가고, 접근 정책은 붙이지 않는다. 그룹의 권한은 [`../k8s/deploy-rbac.yaml`](../k8s/deploy-rbac.yaml)이 전부다. namespace `catchu`에서 Deployment 조회·적용·실행 수 바꾸기, Pod 조회·지켜보기·만들기, Pod 로그 읽기, NetworkPolicy `default-deny`와 ConfigMap `catchu-db` 조회만 된다.
 - **주지 않는 것:** Secret 읽기, Pod 안 명령 실행(exec)·붙기·포트 연결, Pod·Deployment 지우기, 다른 namespace(`catchu-ops` 포함), 이 권한 자체를 고치기.
-- **한계:** `catchu`에 Pod를 만들 수 있으므로 같은 namespace의 Secret을 붙인 Pod를 만들어 읽는 길은 남는다. 그래서 RDS 관리자 비밀번호는 `catchu-ops`에만 둔다. 이 역할은 이미지를 올리고 그 이미지로 앱을 바꿀 수 있으므로, 막는 선은 「`main`에서만」과 `main` 반영 PR의 승인 1건이다.
+- **한계:** `catchu`에 Pod를 만들 수 있으므로 같은 namespace의 Secret을 붙인 Pod를 만들어 읽는 길은 남는다. 그래서 RDS 관리자 비밀번호는 `catchu-ops`에만 둔다. api의 GitHub 토큰 보관 볼륨도 같은 방법으로 Pod에 붙여 암호문을 읽을 수 있고, 암호문을 푸는 키는 Secret `catchu-api`에 있다. 이 역할은 이미지를 올리고 그 이미지로 앱을 바꿀 수 있으므로, 막는 선은 「`main`에서만」과 `main` 반영 PR의 승인 1건이다.
 
 ## 처음 준비
 

@@ -30,12 +30,16 @@ EKS([#276](https://github.com/JminAILab/CatchU/issues/276))의 api에서 큐 연
 ## 켠 뒤 확인
 
 - **큐 연결:** api 로그에 `AnalysisQueue` 문맥의 오류(`ANALYSIS_QUEUE_ERROR`·`ANALYSIS_DISPATCH_PAUSED`)가 이어지지 않는지 본다: `k logs deploy/api | grep -E 'ANALYSIS_QUEUE_ERROR|ANALYSIS_DISPATCH_PAUSED'`. 아무것도 나오지 않으면 정상이다. 처음부터 붙으면 연결을 알리는 줄도 없다(`ANALYSIS_QUEUE_CONNECTED`는 오류 뒤 다시 붙었을 때만 남는다). 큐 장애 조치([README.md](README.md) 「완료 기준 대응」의 `test-failover`) 뒤 api가 다시 뜨지 않고 `ANALYSIS_QUEUE_ERROR` → `ANALYSIS_QUEUE_CONNECTED` 순서로 남는지, worker도 준비 상태로 돌아오는지 본다. 2단계의 장애 조치 확인은 api에 큐 연결이 없을 때 한 것이라 api 쪽은 이때 처음 본다.
-- **내부 조회:** worker Pod에서 없는 시도 ID로 불러 경로가 등록됐고 키가 맞는지 본다. 아래 명령은 키를 화면에 찍지 않고 응답만 낸다. `404`와 본문의 이유 `ATTEMPT_NOT_ACTIVE`가 나오면 정상이다(경로가 없을 때의 404에는 이유가 없다). 401이면 두 Secret의 키가 다르고, 시간 초과면 NetworkPolicy를 본다. 바깥에서는 `curl -s -o /dev/null -w '%{http_code}\n' https://catchu.dev/v1/internal/analysis-attempts/x/context`가 404여야 한다(전환 전이면 `--resolve`로 ALB를 가리킨다).
+- **내부 조회:** worker Pod에서 없는 시도 ID로 불러 경로가 등록됐고 키가 맞는지 본다. 아래 명령은 키를 화면에 찍지 않고 응답만 낸다. `404`와 본문의 이유 `ATTEMPT_NOT_ACTIVE`가 나오면 정상이다(경로가 없을 때의 404에는 이유가 없다). 401이면 두 Secret의 키가 다르고, 시간 초과면 NetworkPolicy를 본다.
   ```bash
   k exec deploy/worker -- /app/worker/.venv/bin/python -c "import os,urllib.request,urllib.error
   r=urllib.request.Request('http://api.catchu.svc.cluster.local:3001/v1/internal/analysis-attempts/00000000-0000-4000-8000-000000000000/context',headers={'X-Worker-Key':os.environ['WORKER_CONTEXT_API_KEY']})
   try: print(urllib.request.urlopen(r,timeout=5).status)
   except urllib.error.HTTPError as e: print(e.code, e.read().decode()[:200])"
+  ```
+  바깥에서는 아래 여섯 주소가 모두 404여야 한다(전환 전이면 `--resolve`로 ALB를 가리킨다). 2단계에서도 404였지만 그때는 경로가 꺼져 있어 api에 닿아도 404였다. api는 경로의 대소문자를 가리지 않고 ALB 규칙은 가리므로, 대소문자 변형(`/v1/INTERNAL`·`/v1/Internal`)은 WAF만 막는다. 켠 뒤에는 키 없는 요청이 api에 닿으면 401이 나오므로, 이 둘이 404면 WAF가 막은 것이다. 401이 하나라도 나오면 WAF `catchu-edge`가 ALB에 붙어 있는지부터 본다.
+  ```bash
+  for p in /v1/internal /v1/INTERNAL /v1/Internal /V1/internal /v1//internal /v1/%69nternal; do curl -s -o /dev/null -w "%{http_code} $p\n" "https://catchu.dev$p/analysis-attempts/00000000-0000-4000-8000-000000000000/context"; done
   ```
 - **GitHub 연결:** 보관 폴더가 접근점 그대로 붙었는지 본다(`1000 1000 700`이어야 한다).
   ```bash
