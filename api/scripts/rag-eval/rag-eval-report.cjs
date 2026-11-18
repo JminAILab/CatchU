@@ -1,6 +1,6 @@
 // RAG 평가 결과 쓰기(U5 기능 설계 BR10.5·BR10.7, 비기능 설계 NFR3.3, 계획 1차 수정 요청 (4)).
 // 원문(질문·정답 글귀·답 항목·인용 원문·JD 결과)은 로컬 결과 파일(api/.rag-eval/, .gitignore)에만 쓴다.
-// 저장소에 남기는 기록은 건수·위치·빈 사람 판정 칸만 담고, measure 모드에서만 api/docs/rag-evaluation/에 쓴다.
+// 저장소에 남기는 기록은 건수·위치·질문별 게이트 로그 수 칸과 붙이지 못한 줄 수(#559)·빈 사람 판정 칸만 담고, measure 모드에서만 api/docs/rag-evaluation/에 쓴다.
 // synthetic 모드는 그 기록도 로컬 폴더에만 쓴다(저장소에 남는 파일을 만들지 않음).
 const { mkdirSync, writeFileSync } = require('node:fs');
 const { join } = require('node:path');
@@ -13,7 +13,9 @@ const locationText = (location) => `${location.publishedItemId} ${location.field
 /**
  * 저장소 기록(Markdown) 본문. 받은 결과에서 건수·비율·위치만 꺼내 쓰고 글 칸은 읽지 않는다.
  * summary: { date, targetVersion, mode, questionCount, hitRateAt5, hitRateAt8, hitRateAt12, passedItems, droppedItems,
- *   evidencePassRate, answerFailedQuestions: [questionNo], missedHitLocations: [{ questionNo, locations }], jd: { splitter, rows: [{ requirementNo, searchBased, fullInput }] } | null }
+ *   evidencePassRate, answerFailedQuestions: [questionNo], missedHitLocations: [{ questionNo, locations }], gateLogs?: [{ questionNo, gateLog }],
+ *   unattachedLines?: [{ questionNo, unattachedLineCount }],
+ *   jd: { splitter, rows: [{ requirementNo, searchBased, fullInput }] } | null }
  */
 function buildRepositoryRecord(summary) {
   const lines = [
@@ -44,6 +46,8 @@ function buildRepositoryRecord(summary) {
     lines.push(`- ${missed.questionNo}번 질문`);
     for (const location of missed.locations) lines.push(`  - ${locationText(location)}`);
   }
+  lines.push(...gateLogLines(summary.gateLogs ?? []));
+  lines.push(...unattachedLines(summary.unattachedLines ?? []));
   lines.push('', '## JD 두 방식 비교', '');
   if (summary.jd === null) {
     lines.push('- JD 없음');
@@ -63,6 +67,46 @@ function buildRepositoryRecord(summary) {
     '- 조정 내용(지시문 한 번 수정 또는 질의응답 모델만 SONNET 전환)과 재측정 여부: ',
     '');
   return lines.join('\n');
+}
+
+const cell = (value) => (value === null || value === undefined ? '-' : String(value));
+
+/**
+ * 질문별 게이트 로그 표(#559 설계 결정 9, FR5.4). 수와 이름만 쓴다. 로그가 없는 질문(검색 조각 0개, 로그를 내지 않는 합성 게이트)은 「로그 없음」이다.
+ * gateLogs: [{ questionNo, gateLog: { event, itemCount, droppedCount, dropReasons: { fact, location, truncated }, nonItemLineCount, stopReason, failure } | null }]
+ */
+function gateLogLines(gateLogs) {
+  const lines = ['', '## 질문별 게이트 로그(수와 이름만)', ''];
+  if (gateLogs.length === 0) return [...lines, '- 없음'];
+  const received = gateLogs.filter((entry) => entry.gateLog !== null).length;
+  lines.push(`- 게이트 로그를 받은 질문: ${received}/${gateLogs.length}`, '',
+    '| 질문 | 로그 | 낸 항목 | 버린 항목 | 대조 버림(fact) | 위치 버림(location) | 잘림(truncated) | 항목 아닌 줄 | 끝난 이유 | 실패 |',
+    '|---|---|---|---|---|---|---|---|---|---|');
+  for (const { questionNo, gateLog: log } of gateLogs) {
+    if (log === null) {
+      lines.push(`| ${questionNo} | 로그 없음 | - | - | - | - | - | - | - | - |`);
+      continue;
+    }
+    lines.push(`| ${[questionNo, log.event, log.itemCount, log.droppedCount, log.dropReasons.fact, log.dropReasons.location,
+      log.dropReasons.truncated, log.nonItemLineCount, log.stopReason, log.failure].map(cell).join(' | ')} |`);
+  }
+  return lines;
+}
+
+/**
+ * 질문별 붙이지 못한 같은 Catch 기록 줄 수(#559 FR7.1). 상한(Catch 하나 12줄·전체 40줄) 때문에 모델에 못 간 줄 수만 쓴다.
+ * 검색 조각이 0개라 모델을 부르지 않은 질문은 「-」이다. 3번·7번이 틀렸을 때 상한에 걸려서인지 가르는 데 쓴다.
+ * unattachedLines: [{ questionNo, unattachedLineCount: number | null }]
+ */
+function unattachedLines(entries) {
+  const lines = ['', '## 질문별 붙이지 못한 같은 Catch 기록 줄 수', ''];
+  if (entries.length === 0) return [...lines, '- 없음'];
+  lines.push('| 질문 | 붙이지 못한 줄 |', '|---|---|');
+  for (const { questionNo, unattachedLineCount } of entries) {
+    const count = Number.isInteger(unattachedLineCount) && unattachedLineCount >= 0 ? unattachedLineCount : null;
+    lines.push(`| ${questionNo} | ${cell(count)} |`);
+  }
+  return lines;
 }
 
 function writeFile(dir, name, text) {

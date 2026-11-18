@@ -28,7 +28,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/publications/`                     | 12월 U4 발행·링크: C-07 `publication`·`published_item` 엔티티와 사본 모양, C-10 `PublicationAccess` 인터페이스와 DB 구현(주입 토큰 `PUBLICATION_ACCESS`, 시험 전용 메모리 가짜는 시험만), 발행 `POST /v1/publications`와 작성자 발행본 목록·상세·중지·삭제([docs/publications.md](docs/publications.md)). 기본 앱에 등록. 받은 사람 경로 교체와 10월 `share-links` 해제는 제출 3 |
 | `src/published-index/`                  | 12월 U3 발행본 색인·검색: C-08 `PublishedIndexWriter`(발행 트랜잭션 안 조각 나누기·[검색 다시 준비]), `EMBED_PUBLICATION` 처리기, C-09 `PublishedSearch`(색인 상태·발행본 하나 안 의미 검색), Voyage·합성 임베딩 제공자, `publication_index`·`published_chunk` 엔티티([docs/published-index.md](docs/published-index.md)). 기본 앱에는 미등록 |
 | `src/materials/`                        | 12월 U4 텍스트 자료 표 C-13 `text_material` 엔티티([docs/publications.md](docs/publications.md)) |
-| `src/rag-answer/`                       | 12월 U5 받은 사람 질의응답(SSE·질문 다시 쓰기·링크당 하루 질문 횟수)과 AI 기본 요약(`BASE_SUMMARY` 처리기·받은 사람/작성자 읽기·[다시 만들기]), `base_summary` 엔티티. 평가 스크립트는 `scripts/rag-eval/`([docs/rag-answer.md](docs/rag-answer.md)). 기본 앱 등록은 U5 담당의 후속 PR(`RagAnswerModule.register({ publicationAccess: PUBLICATION_ACCESS, imports: [PublicationsModule] })`)에서 한다 |
+| `src/rag-answer/`                       | 12월 U5 받은 사람 질의응답(SSE·질문 다시 쓰기·링크당·작성자 합계 하루 질문 횟수)과 AI 기본 요약(`BASE_SUMMARY` 처리기·받은 사람/작성자 읽기·[다시 만들기]), `base_summary` 엔티티. 평가 스크립트는 `scripts/rag-eval/`([docs/rag-answer.md](docs/rag-answer.md)). 기본 앱 등록은 U5 담당의 후속 PR(`RagAnswerModule.register({ publicationAccess: PUBLICATION_ACCESS, imports: [PublicationsModule] })`)에서 한다 |
 | `src/claude-mcp/`                       | 12월 U6 Claude 본인 연결(C-15): 공식 SDK OAuth 라우터의 저장 단계, `/v1/mcp`와 조회 도구 둘, 회원 빈도 제한, 연결 상태·승인·전체 해제, `mcp_*` 표 넷([docs/claude-mcp.md](docs/claude-mcp.md)). 기본 앱에 등록 |
 | `src/recipient/`                        | 비로그인 수신자 조회(#151, [docs/recipient-read.md](docs/recipient-read.md)). #150 링크·소유 회원 판정·B 공개 Catch 조회·A `OwnerProfileReader`를 재사용. 기본 앱에 등록 |
 | `src/member-repositories/repository-selection.*.ts` | 현재 선정의 DB 정본(엔티티)과 목록·#323 접수 재확인·#232 worker 선정 공급(#252, [docs/repository-selection.md](docs/repository-selection.md)). 좌표는 같은 폴더의 #319 카탈로그에서 읽음 |
@@ -213,9 +213,9 @@ export class ExamplePublicController {
 | JD 입력 검증(12월 U10) | 422 | INVALID_INPUT, INPUT_TOO_LARGE ([docs/jd.md](docs/jd.md)). U10 경계의 직접 검사이며 전역 ValidationPipe의 400은 유지 |
 | 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED, INDEX_NOT_READY(12월 U5 질의응답·U10 JD 요약, 계약 C-09·C-12, 문구 "아직 쓸 수 없습니다". 화면 문구는 각 기능의 web 문구 표가 정함), MCP_CONSENT_REQUIRED(12월 U6 첫 연결 동의 없음, [docs/claude-mcp.md](docs/claude-mcp.md)) |
 | 수신자 비밀번호 시도 제한 | 429 | LINK_UNLOCK_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds })`) |
-| 회원 링크 발급 빈도 제한 | 429 | RATE_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('RATE_LIMITED', { retryAfterSeconds })`) |
+| 회원 링크 발급 빈도 제한, PDF 업로드 상한 | 429 | RATE_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('RATE_LIMITED', { retryAfterSeconds })`). PDF 업로드의 진행 중 수 초과에는 `Retry-After`가 없다([docs/pdf-materials.md](docs/pdf-materials.md#업로드)) |
 | 계정당 하루 실행 한도(12월 U2) | 429 | DAILY_LIMIT_REACHED (문구 "오늘 한도에 도달했습니다", 남은 횟수·`Retry-After` 없음, [docs/daily-run-limit.md](docs/daily-run-limit.md)) |
-| 링크당 하루 질문 한도(12월 U5) | 429 | QUESTION_LIMIT_REACHED (계약 C-12, 문구 "오늘 한도에 도달했습니다", 남은 횟수·`Retry-After` 없음, [docs/rag-answer.md](docs/rag-answer.md)) |
+| 하루 질문 한도(12월 U5, 링크당 100 또는 작성자 합계 300 #585) | 429 | QUESTION_LIMIT_REACHED (계약 C-12, 문구 "오늘 한도에 도달했습니다", 남은 횟수·`Retry-After` 없음, [docs/rag-answer.md](docs/rag-answer.md)) |
 | 서버 오류 | 500 | INTERNAL_ERROR, WITHDRAWAL_FAILED(12월 U2 탈퇴 단계 실패, [docs/withdrawal.md](docs/withdrawal.md)) |
 
 기능에서는 `src/common/errors`의 `ApiError`를 던진다. HTTP 상태는 코드에 따라 정해진다.

@@ -3,7 +3,7 @@
 # 역할은 EKS 접근 항목으로 쿠버네티스 그룹 catchu-deploy에 넣는다. 접근 정책(AmazonEKS…Policy)은 붙이지 않으므로 권한은 이 파일이 전부다.
 # 주지 않는 것: Secret 읽기, Pod 안 명령 실행(exec)·붙기(attach)·포트 연결, Pod·Deployment 지우기, 다른 namespace(catchu-ops 포함).
 # 한계: 이 권한으로 catchu에 Pod를 만들 수 있으므로, 같은 namespace의 Secret을 붙인 Pod를 만들어 읽는 길은 남는다.
-#   그래서 RDS 관리자 비밀번호는 catchu-ops에만 둔다(ops/namespace.yaml).
+#   그래서 RDS 관리자 비밀번호는 catchu-ops에만 둔다(ops/namespace.yaml). 서비스 계정 api·worker를 붙인 Pod로 회원 파일 버킷 권한을 쓰는 길도 같다.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

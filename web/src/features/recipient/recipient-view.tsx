@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type RefObject } fr
 import { RecipientGuide } from "@/components/recipient-guide/recipient-guide";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { BaseSummaryPanel } from "@/features/rag-answer/base-summary-panel";
+import { itemTitleFinder, type ItemTitleOf } from "@/features/rag-answer/item-title";
 import { QnaPanel } from "@/features/rag-answer/qna-panel";
 import type { PdfCopySource } from "@/features/publications/published-pdf-item";
 import { JdRecipientPanel } from "@/features/jd/jd-recipient-panel";
@@ -82,7 +83,7 @@ export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlo
           {connectable && <ClaudeAnalyzePanel token={slotProps.token} />}
           <p className={styles.notice} data-testid="recipient-published-at">{publishedAtText(snapshot.snapshot.publishedAt)}</p>
           <PublishedSnapshotView snapshot={snapshot.snapshot} highlight={highlight} pdfSource={pdfSource} />
-          <RecipientSlots {...slotProps} />
+          <RecipientSlots {...slotProps} itemTitleOf={itemTitleFinder(snapshot.snapshot.items)} />
         </>
       );
     }
@@ -92,18 +93,19 @@ export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlo
 /**
  * 2·3·4번 자리(C-11 slots). 2·3번은 U5 `BaseSummaryPanel`·`QnaPanel`(`features/rag-answer` README 「붙이는 방법」대로 `RecipientSlotProps`를
  * 그대로 넘기고 `key={token}`). 두 패널은 401·404를 스스로 처리하지 않고 `onAccessLost`를 부르며(C-11 rule), 근거 단추는 `showEvidence`를 부른다.
- * 4번은 U10 `JdRecipientPanel`이 회원 호출을 연결하고 JD 로그인 안내·요약을 소유한다. U4 영역에 안내 문장을 두지 않는다(G6).
+ * 2·3번에는 이 화면의 사본으로 만든 선택 `itemTitleOf`도 넘겨 출처 딱지 옆에 항목 제목을 보인다(#559 FR4.2). `RecipientSlotProps` 모양은 그대로다.
+ * 4번은 U10 `JdRecipientPanel`이 회원 호출을 연결하고 JD 로그인 안내·요약을 소유한다. U4 영역에 안내 문장을 두지 않는다(G6). 4번에는 제목 함수를 넘기지 않는다.
  */
-function RecipientSlots(props: RecipientSlotProps) {
+function RecipientSlots({ itemTitleOf, ...props }: RecipientSlotProps & { itemTitleOf: ItemTitleOf }) {
   return (
     <>
       <div data-testid="recipient-slot-2" data-slot="base-summary">
         <BaseSummaryPanel key={props.token} token={props.token} getGrant={props.getGrant} onAccessLost={props.onAccessLost}
-          isLoggedIn={props.isLoggedIn} showEvidence={props.showEvidence} />
+          isLoggedIn={props.isLoggedIn} showEvidence={props.showEvidence} itemTitleOf={itemTitleOf} />
       </div>
       <div data-testid="recipient-slot-3" data-slot="qna">
         <QnaPanel key={props.token} token={props.token} getGrant={props.getGrant} onAccessLost={props.onAccessLost}
-          isLoggedIn={props.isLoggedIn} showEvidence={props.showEvidence} />
+          isLoggedIn={props.isLoggedIn} showEvidence={props.showEvidence} itemTitleOf={itemTitleOf} />
       </div>
       <div data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in={props.isLoggedIn}>
         <JdRecipientPanel key={props.token} {...props} />

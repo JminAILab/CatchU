@@ -22,7 +22,7 @@
 - **배포 안내: 고지 v3(`catchu-real-analysis-notice-v3`, 첫 이용 고지 `2026-11-v2`)가 배포된 뒤에만 `CATCHU_JUDGEMENT_API_KEY`나 `CATCHU_JUDGEMENT_PROVIDER=claude`를 서버에 넣는다.** 고지 v2는 바뀐 줄만 보낸다고 적었는데, AI 쪽은 기록의 글(PR 제목·커밋 메시지 첫 줄)을 판정 공급자로 보낸다. `claude`만 넣어도 기존 생성 키로 켜져 기록의 글이 Anthropic으로 간다(비기능 요구 NFR5.3, 기능 설계 BR8.1).
 - AI 쪽은 FR10 확인 기준(틀린 제목 통과 0건, 틀린 문장 통과 1건 이하)을 넘었을 때만 운영에서 켠다. 못 넘으면 코드는 합치되 위 두 설정을 넣지 않는다(BR9.3).
 - 운영에서 끄려면 공급자를 `openai`로 두거나 지우고 판정 키를 비운 뒤 worker를 다시 띄운다. 생성 키는 기동에 필요하므로 지우지 않는다.
-- 판정 키는 SSM `/catchu/prod/worker/CATCHU_JUDGEMENT_API_KEY` → Secret `catchu-worker`로 넣는다(팀장 인프라). worker는 기동 때 읽고 환경에서 지운 뒤 자식에 설정 객체로만 넘긴다. worker 나가는 연결 허용에 OpenAI 미국 지역 주소(`us.api.openai.com`)를 더하는 것도 팀장 인프라다([요청 정보 조회](request-context.md)의 나가는 연결 대역).
+- 판정 키는 SSM `/catchu/prod/worker/CATCHU_JUDGEMENT_API_KEY` → Secret `catchu-worker`로 넣는다(팀장 인프라). worker는 기동 때 읽고 환경에서 지운 뒤 자식에 설정 객체로만 넘긴다. worker 나가는 연결 허용도 팀장 인프라다. OpenAI 미국 지역 주소(`us.api.openai.com`)는 Cloudflare 주소로 풀려서 EKS에서는 Cloudflare 공개 대역을 연다([EKS 실행 파일 안내 「worker 바깥 연결 대역 갱신」](../../deploy/aws/k8s/README.md#worker-바깥-연결-대역-갱신)).
 
 ## 호출 순서와 상한
 

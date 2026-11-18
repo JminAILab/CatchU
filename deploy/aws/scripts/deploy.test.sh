@@ -487,13 +487,26 @@ check "api: Google 로그인 켬, 돌아올 주소는 https://catchu.dev/google/
       | map({(.name): (.value // "secret \(.valueFrom.secretKeyRef.name) \(.valueFrom.secretKeyRef.key)")}) | add
       | .GOOGLE_LOGIN_ENABLED == "true" and .GOOGLE_REDIRECT_URI == "https://catchu.dev/google/callback"
       and .GOOGLE_CLIENT_ID == "secret catchu-api GOOGLE_CLIENT_ID" and .GOOGLE_CLIENT_SECRET == "secret catchu-api GOOGLE_CLIENT_SECRET"')"
-check "api: 파일 저장은 local, 뿌리는 /tmp 빈 볼륨(없으면 탈퇴·발행본 삭제가 500)" \
-  "$(ok q "$WORK/applied-api.yaml" '.[0].spec.template.spec.containers[0].env | map({(.name): .value}) | add
-      | .FILE_STORAGE_DRIVER == "local" and .FILE_STORAGE_LOCAL_ROOT == "/tmp"')"
+# 회원 파일(PDF 원본·발행 사본)은 Pod의 빈 볼륨이 아니라 S3 버킷에 둔다. 버킷 이름은 네 곳(생성 스크립트·역할 정책·api·worker)이 같아야 한다.
+BUCKET=$(sed -n 's/^bucket=//p' "$HERE/create-s3.sh")
+check "api: 파일 저장은 s3(Pod 빈 볼륨 아님), 버킷은 create-s3.sh가 만드는 것, 지역 서울, 접근 키 값 없음" \
+  "$(ok q "$WORK/applied-api.yaml" ".[0].spec.template.spec.containers[0].env | map({(.name): .value}) | add
+      | .FILE_STORAGE_DRIVER == \"s3\" and .FILE_STORAGE_S3_BUCKET == \"${BUCKET}\" and \"${BUCKET}\" != \"\" and .AWS_REGION == \"ap-northeast-2\"
+      and (has(\"FILE_STORAGE_LOCAL_ROOT\") | not) and (keys | map(select(test(\"^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)$\"))) | length) == 0")"
+check "worker: PDF 원본은 api와 같은 버킷에서 읽음, 지역 서울, 로컬 읽기 경로·접근 키 값 없음" \
+  "$(ok q "$WORK/applied-worker.yaml" ".[0].spec.template.spec.containers[0].env | map({(.name): .value}) | add
+      | .FILE_STORAGE_S3_BUCKET == \"${BUCKET}\" and .AWS_DEFAULT_REGION == \"ap-northeast-2\" and (has(\"PDF_FILE_ROOT\") | not)
+      and (keys | map(select(test(\"^AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN)$\"))) | length) == 0")"
+check "서비스 계정: api·worker만 자기 계정을 쓰고(AWS 역할이 붙는 이름), web·migration·동의 기록 확인 Pod는 기본 계정" \
+  "$(ok test "$(for f in applied-api applied-worker applied-web created guard; do json "$WORK/$f.yaml" | jq -r ".[0] | ${POD} | .serviceAccountName // \"default\""; done | tr '\n' ' ')" = 'api worker default default default ')"
 check "worker: 운영 모드, DB 값 없음, 클러스터 안 api 주소, 종료 유예 30초 이상, 생존 확인 없음" \
   "$(ok q "$WORK/applied-worker.yaml" '.[0].spec.template.spec | .terminationGracePeriodSeconds >= 30 and .containers[0].livenessProbe == null
       and (.containers[0].env | map({(.name): (.value // "ref")}) | add | .NODE_ENV == "production"
       and .WORKER_CONTEXT_API_URL == "http://api.catchu.svc.cluster.local:3001" and (keys | map(select(startswith("DB_"))) | length) == 0)')"
+check "worker: 판정은 OpenAI로 켬(공급자 openai, 판정 키는 Secret catchu-worker에서)" \
+  "$(ok q "$WORK/applied-worker.yaml" '.[0].spec.template.spec.containers[0].env | map({(.name): .}) | add
+      | .CATCHU_JUDGEMENT_PROVIDER.value == "openai"
+      and .CATCHU_JUDGEMENT_API_KEY.valueFrom.secretKeyRef == {name: "catchu-worker", key: "CATCHU_JUDGEMENT_API_KEY"}')"
 check "migration Pod: controller 없음·다시 띄우지 않음·시간 한도, migration 계정" \
   "$(ok q "$WORK/created.yaml" '.[0] | .kind == "Pod" and .metadata.ownerReferences == null and .spec.restartPolicy == "Never"
       and .spec.activeDeadlineSeconds > 0 and .metadata.labels["app.kubernetes.io/name"] == "migration"
@@ -511,8 +524,10 @@ check "동의 기록 확인 Pod: 한 트랜잭션·오류에서 멈춤·문장 �
       and all(.[]; (contains("$(") or contains("$$")) | not))')"
 check "Deployment 원본은 자리표시 그대로라 손으로 apply하면 거부됨(실행 수가 숫자가 아님)" \
   "$(ok test "$(cat "$K8S/api.yaml" "$K8S/worker.yaml" "$K8S/web.yaml" | grep -c '^  replicas: __REPLICAS__$')" = 3)"
-check "namespace: Pod 보안 검사 restricted, 기본 서비스 계정 토큰 자동 탑재 끔" \
-  "$(ok q "$K8S/namespace.yaml" '(.[0].metadata.labels["pod-security.kubernetes.io/enforce"] == "restricted") and (.[1].automountServiceAccountToken == false)')"
+check "namespace: Pod 보안 검사 restricted, 서비스 계정은 default·api·worker뿐이고 모두 쿠버네티스 API 토큰 자동 탑재 끔" \
+  "$(ok q "$K8S/namespace.yaml" '(.[0].metadata.labels["pod-security.kubernetes.io/enforce"] == "restricted")
+      and ([.[] | select(.kind == "ServiceAccount")] | (map(.metadata.name) | sort) == ["api", "default", "worker"]
+        and all(.[]; .metadata.namespace == "catchu" and .automountServiceAccountToken == false))')"
 check "Service: ClusterIP만, Service 포트와 컨테이너 포트가 같음" \
   "$(ok q "$K8S/services.yaml" 'all(.[]; .spec.type == "ClusterIP" and all(.spec.ports[]; .port == .targetPort))
       and (map({(.metadata.name): .spec.ports[0].port}) | add) == {"web": 3000, "api": 3001}')"
@@ -524,9 +539,16 @@ check "NetworkPolicy: 기본 차단(들어오고 나감)과 DNS, worker·web은 
       and ($p.web.spec.policyTypes == ["Ingress"])
       and ([$p.migration.spec.egress[].ports[].port] | unique) == [5432]
       and all(.[]; .metadata.namespace == "catchu")')"
-check "NetworkPolicy: worker 바깥 443은 GitHub API 대역 24개와 Anthropic 대역만" \
+check "NetworkPolicy: worker 바깥 443은 GitHub API 대역 24개·Anthropic 대역·서울 S3 대역 14개·Cloudflare 대역 15개만(OpenAI 판정 주소가 Cloudflare 주소)" \
   "$(ok q "$K8S/network-policy.yaml" '[.[] | select(.metadata.name == "worker") | .spec.egress[] | select(.ports[0].port == 443) | .to[].ipBlock.cidr]
-      | length == 25 and index("160.79.104.0/23") != null and all(.[]; test("^[0-9.]+/[0-9]+$") and . != "0.0.0.0/0")')"
+      | length == 54 and (unique | length) == 54 and index("160.79.104.0/23") != null and index("52.219.56.0/22") != null and index("3.5.140.0/22") != null
+      and index("162.158.0.0/15") != null and index("172.64.0.0/13") != null
+      and all(.[]; test("^[0-9.]+/[0-9]+$") and . != "0.0.0.0/0" and (startswith("169.254.") | not) and (startswith("192.168.") | not))')"
+check "NetworkPolicy: 80은 api·worker가 Pod Identity 에이전트 주소 하나로만 나가고, 노드 메타데이터 주소는 어디에도 열지 않음" \
+  "$(ok q "$K8S/network-policy.yaml" '[.[] | .metadata.name as $n | .spec.egress[]? | select(any(.ports[]; .port == 80)) | [$n, (.ports | length), [.to[].ipBlock.cidr]]]
+        == [["api", 1, ["169.254.170.23/32"]], ["worker", 1, ["169.254.170.23/32"]]]
+      and ([.[] | .spec.egress[]?.to[]?.ipBlock.cidr // empty | select(startswith("169.254."))] | unique) == ["169.254.170.23/32"]
+      and ([.[] | select(.metadata.name == "api") | .spec.egress[] | select(.ports[0].port == 443) | .to[0].ipBlock.except] == [["192.168.0.0/16", "169.254.0.0/16"]])')"
 check "Ingress: /v1/internal 404, /v1·MCP OAuth 주소 5개는 api 3001, 그 밖은 web 3000, 공개 ALB·TLS 1.2·1.3 정책·WAF 이름·HSTS 300초" \
   "$(ok q "$K8S/ingress.yaml" '.[0] | (.spec.rules[0].http.paths | map([.path, .pathType, .backend.service.name])) == [
         ["/v1/internal", "Prefix", "internal-not-found"], ["/v1", "Prefix", "api"],
@@ -540,6 +562,18 @@ check "Ingress: /v1/internal 404, /v1·MCP OAuth 주소 5개는 api 3001, 그 �
       and .["alb.ingress.kubernetes.io/wafv2-acl-name"] == "catchu-edge"
       and (.["alb.ingress.kubernetes.io/listener-attributes.HTTPS-443"] | endswith("header_value=max-age=300"))
       and (.["alb.ingress.kubernetes.io/actions.internal-not-found"] | fromjson | .fixedResponseConfig.statusCode == "404"))')"
+# 앱 Pod의 AWS 권한(cluster.yaml의 Pod Identity 연결). 서비스별 역할: api는 회원 파일 올리기·읽기·삭제·목록, worker는 읽기만(#389 결정).
+check "클러스터 설정: namespace catchu의 AWS 역할은 api·worker 둘뿐, 관리형·기본 묶음 정책 없이 적어 둔 정책만" \
+  "$(ok q "$HERE/../cluster.yaml" '[.[0].iam.podIdentityAssociations[] | select(.namespace == "catchu")]
+      | (map(.serviceAccountName) | sort) == ["api", "worker"] and all(.[]; (keys | sort) == ["namespace", "permissionPolicy", "serviceAccountName"])')"
+check "클러스터 설정: api 역할은 버킷의 members/ 아래 올리기·읽기·삭제와 members/ 접두어 목록만" \
+  "$(ok q "$HERE/../cluster.yaml" ".[0].iam.podIdentityAssociations[] | select(.namespace == \"catchu\" and .serviceAccountName == \"api\") | .permissionPolicy.Statement
+      | map([.Effect, ([.Action] | flatten | sort), .Resource, .Condition]) == [
+        [\"Allow\", [\"s3:DeleteObject\", \"s3:GetObject\", \"s3:PutObject\"], \"arn:aws:s3:::${BUCKET}/members/*\", null],
+        [\"Allow\", [\"s3:ListBucket\"], \"arn:aws:s3:::${BUCKET}\", {\"StringLike\": {\"s3:prefix\": \"members/*\"}}]]")"
+check "클러스터 설정: worker 역할은 버킷의 members/ 아래 읽기만(쓰기·삭제·목록 없음)" \
+  "$(ok q "$HERE/../cluster.yaml" ".[0].iam.podIdentityAssociations[] | select(.namespace == \"catchu\" and .serviceAccountName == \"worker\") | .permissionPolicy.Statement
+      | map([.Effect, .Action, .Resource, .Condition]) == [[\"Allow\", \"s3:GetObject\", \"arn:aws:s3:::${BUCKET}/members/*\", null]]")"
 check "실행 파일에 계정 번호(12자리 숫자)가 없음" "$(ok test "$(cat "$K8S"/*.yaml | grep -c -E '[0-9]{12}')" = 0)"
 
 echo

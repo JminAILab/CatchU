@@ -1,4 +1,4 @@
-// 한국 시간 날짜·다음 자정 계산과 질문 횟수 키(기능 설계 BR3.1, scalability-design NFR4.7). 순수 함수다.
+// 한국 시간 날짜·다음 자정 계산과 질문 횟수 키 둘(링크당: 기능 설계 BR3.1·scalability-design NFR4.7, 작성자 합계: #585). 순수 함수다.
 // 날짜 문자열은 하루 실행 제한(C-03)과 같은 함수(koreanUsageDate)를 쓴다.
 import { koreanUsageDate } from '../daily-run-limit/daily-run-limit';
 
@@ -19,4 +19,9 @@ export function nextKoreanMidnightSeconds(now: Date): number {
 /** 질문 횟수 Redis 키 `{prefix}:qna-question-count:{publicationId}:{YYYY-MM-DD}`(한국 시간 날짜, BR3.1·BR3.3). */
 export function questionCountKey(prefix: string, publicationId: string, now: Date): string {
   return `${prefix}:qna-question-count:${publicationId}:${koreanUsageDate(now)}`;
+}
+
+/** 작성자 하루 합계 Redis 키 `{prefix}:qna-owner-question-count:{ownerMemberId}:{YYYY-MM-DD}`(한국 시간 날짜, #585). */
+export function ownerQuestionCountKey(prefix: string, ownerMemberId: string, now: Date): string {
+  return `${prefix}:qna-owner-question-count:${ownerMemberId}:${koreanUsageDate(now)}`;
 }

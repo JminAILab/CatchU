@@ -137,11 +137,17 @@ export class CheckedAiGenerationGate implements AiGenerationGate {
     return output;
   }
 
+  /**
+   * 실패 로그. 항목 아닌 줄 수·끝난 이유·버린 이유별 수를 ai_gate_result와 같은 이름으로 함께 남긴다(#559 FR5.1).
+   * NO_ITEMS가 항목을 아예 안 쓴 것인지, 쓴 항목이 모두 위치를 못 찾았거나 잘린 것인지 가르려는 칸이다. 한 번 호출·스트림 모두 여기를 지난다.
+   * 수와 이름만 담고 글은 담지 않는다(#559 NFR3).
+   */
   private fail(log: GateLog, startedAt: number, error: unknown): void {
     log.durationMs = Date.now() - startedAt;
     if (log.requestId === null && error instanceof AiProviderError) log.requestId = error.requestId;
     this.logger.warn({ event: 'ai_gate_failed', feature: log.feature, mode: log.mode, failure: failureName(error),
-      itemCount: log.itemCount, droppedCount: log.droppedCount, requestId: log.requestId, durationMs: log.durationMs });
+      itemCount: log.itemCount, droppedCount: log.droppedCount, dropReasons: { ...log.dropReasons }, nonItemLineCount: log.nonItemLineCount,
+      stopReason: log.stopReason, requestId: log.requestId, durationMs: log.durationMs });
   }
 }
 

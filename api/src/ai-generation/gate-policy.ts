@@ -2,7 +2,8 @@
 import { type AiGenerationRequest, AiInputTooLarge } from './ai-generation.types';
 
 /**
- * 근거 글 길이 합 + userText 길이의 상한(UTF-16 길이). publicationText와 지시문은 세지 않는다(BR3.1).
+ * 근거 글 길이 합 + 근거 머리글(itemContext, #559) 길이 합 + userText 길이의 상한(UTF-16 길이).
+ * publicationText와 지시문은 세지 않는다(BR3.1).
  * JD 요약 "전체 넣기"에서 걸리면 팀장이 값을 조정하고 통합 확인 표 메모에 남긴다(비기능 성능 설계 NFR4.2).
  */
 export const AI_INPUT_MAX_CHARS = 80_000;
@@ -19,9 +20,13 @@ export const COMMON_GUARD_INSTRUCTION = [
 
 const FEATURES = ['BASE_SUMMARY', 'QNA', 'JD_SUMMARY'];
 
-/** 입력 글자 수(BR3.1). */
+/** 입력 글자 수(BR3.1). 모델에 보내는 머리글(itemContext)도 센다(#559). */
 export function inputLength(request: AiGenerationRequest): number {
-  return request.sources.reduce((sum, source) => sum + source.text.length, 0) + (request.userText?.length ?? 0);
+  const sourceChars = request.sources.reduce(
+    (sum, source) => sum + source.text.length + (source.itemContext?.length ?? 0),
+    0,
+  );
+  return sourceChars + (request.userText?.length ?? 0);
 }
 
 /**

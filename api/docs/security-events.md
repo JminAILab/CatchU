@@ -8,7 +8,7 @@
 
 `AUTH_REQUIRED`·`LINK_PASSWORD_REQUIRED`는 정상 진입에서도 발생하므로 제외한다. 발급 빈도 제한 `RATE_LIMITED`를 포함한 나머지 업무 4xx도 보안 사건으로 기록하지 않는다.
 
-기록 여부는 경로가 아니라 오류 코드로 정한다. 따라서 [Google 로그인](google-login.md) 완료 API가 `401 AUTH_INVALID`를 반환하는 경우도 현재 같은 형식으로 한 줄 기록된다. 여기에는 로그인 시도가 없거나(이미 사용된 시도 포함) 만료됐거나 시작자가 다른 경우, 인증 코드 교환에서 Google이 `invalid_grant`·`access_denied`로 응답한 경우, Google ID 토큰 검증 실패, 비활성 계정이 포함된다. 사용자가 Google 승인을 취소해 완료 API가 `{cancelled: true}`로 응답하는 경우는 오류가 아니므로 기록되지 않는다. 다만 취소 요청이라도 로그인 시도가 없거나 만료됐으면 `AUTH_INVALID`로 기록된다.
+기록 여부는 경로가 아니라 오류 코드로 정한다. 따라서 [Google 로그인](google-login.md) 완료 API가 `401 AUTH_INVALID`를 반환하는 경우도 현재 같은 형식으로 한 줄 기록된다. 여기에는 로그인 시도가 없거나(이미 사용된 시도, 보관 상한에 밀려 버려진 시도 포함) 만료됐거나 시작자가 다른 경우, 인증 코드 교환에서 Google이 `invalid_grant`·`access_denied`로 응답한 경우, Google ID 토큰 검증 실패, 비활성 계정이 포함된다. 사용자가 Google 승인을 취소해 완료 API가 `{cancelled: true}`로 응답하는 경우는 오류가 아니므로 기록되지 않는다. 다만 취소 요청이라도 로그인 시도가 없거나 만료됐으면 `AUTH_INVALID`로 기록된다.
 
 로그인 시도 만료와 이미 사용된 시도의 재요청도 기록하며, 원인은 구분하지 않는다. 10/4 결정의 인증 실패(401)에 해당하기 때문이다([2026-10-12 팀장 결정](https://github.com/JminAILab/CatchU/pull/259#issuecomment-6118177454)). web 콜백 연결 뒤 정상 로그인에서도 이 기록이 자주 남는 것이 확인되면 제외를 다시 검토한다.
 

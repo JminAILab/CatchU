@@ -66,7 +66,7 @@ LIVE 요청마다 `attemptId`로 내부 api에 한 번 묻는다. 응답의 접�
 
 **운영 http의 한계(10/15 팀장 결정 질문 4).** api는 평문 HTTP로 듣고 TLS는 바깥 ALB에서 끝난다. 그래서 운영에서 worker는 클러스터 안 주소로 api를 부르고, 응답의 GitHub 토큰이 클러스터 안 Pod 사이 망을 평문으로 지난다. 이 결정에는 조건이 셋 붙었다.
 
-1. NetworkPolicy가 실제로 동작한다: 기본 차단, api 3001은 ALB·worker에서만, worker의 나가는 연결은 api·큐·GitHub·Anthropic 대역만([#276](https://github.com/JminAILab/CatchU/issues/276), 시험 Pod로 확인).
+1. NetworkPolicy가 실제로 동작한다: 기본 차단, api 3001은 ALB·worker에서만, worker의 나가는 연결은 api·큐·GitHub·Anthropic·Cloudflare(OpenAI 판정) 대역만([#276](https://github.com/JminAILab/CatchU/issues/276), 시험 Pod로 확인).
 2. Pod를 특권 없이 띄운다: 호스트 망 금지, 권한 전부 제거, root 아님, 네임스페이스에 Pod Security `restricted`([#275](https://github.com/JminAILab/CatchU/issues/275) EKS 실행 파일).
 3. http 허용을 좁힌다: 위 설정을 켰고 주소가 클러스터 안 서비스 이름일 때만. 그 밖의 http 주소는 기동 때 거부한다(이 설정).
 

@@ -18,6 +18,9 @@ export type QnaRejectOutcome =
 
 export type CountBypassReason = 'NO_REDIS' | 'REDIS_ERROR' | 'REDIS_TIMEOUT';
 
+/** 어느 하루 한도에 걸렸나: 링크(발행본)당 한도 또는 작성자 합계 한도(#585). 응답은 둘 다 같은 429라 로그에서만 구분한다. */
+export type QuestionLimitScope = 'LINK' | 'OWNER';
+
 export type BaseSummaryOutcome = 'DONE' | 'FAILED' | 'DISCARDED' | 'SKIPPED';
 
 /** 질문 하나의 끝(성공·실패 모두). 버린 항목 수는 generateStream이 돌려주지 않아 게이트 로그(ai_gate_result)에서 본다(R-03). */
@@ -37,6 +40,8 @@ export interface QnaCompleted {
   generateMs: number | null;
   /** U5가 직접 센 보낸 항목 수. */
   itemCount: number;
+  /** 상한 때문에 모델에 붙이지 못한 같은 Catch 기록 줄 수(#559 FR1.6, qna-sources.ts). 생성 단계 전에 끝났으면 null. 글은 없다. */
+  unattachedLineCount: number | null;
 }
 
 /** 스트림을 열기 전 거부. publicationId는 링크 판정을 통과한 뒤에만 있다. */
@@ -44,6 +49,8 @@ export interface QnaRejected {
   event: 'qna.rejected';
   outcome: QnaRejectOutcome;
   publicationId: string | null;
+  /** outcome이 QUESTION_LIMIT_REACHED일 때만 있다. */
+  limit?: QuestionLimitScope;
 }
 
 export interface QnaCountBypassed {

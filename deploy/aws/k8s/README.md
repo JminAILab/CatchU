@@ -8,8 +8,8 @@ EKS(#276)에서 web·api·worker를 띄우는 쿠버네티스 실행 파일과 �
 
 | 파일 | 적용 | 내용 |
 |---|---|---|
-| [`namespace.yaml`](namespace.yaml) | 손으로 | Pod 보안 검사 `restricted`(호스트 망·특권·root로 도는 Pod 거부), ALB 상태 확인을 통과해야 web·api Pod가 준비되는 연동, 기본 서비스 계정의 쿠버네티스 API 토큰 자동 탑재 끔 |
-| [`network-policy.yaml`](network-policy.yaml) | 손으로 | 기본은 모두 막고 필요한 것만 연다. web은 ALB에서 3000만 받는다. api는 ALB·worker에서 3001을 받고 DB·큐와 바깥 443으로 나간다. worker는 api 3001·큐·GitHub API·Anthropic API 대역으로만 나간다(DB 없음). migration은 DB로만 나간다. 모두 DNS는 연다 |
+| [`namespace.yaml`](namespace.yaml) | 손으로 | Pod 보안 검사 `restricted`(호스트 망·특권·root로 도는 Pod 거부), ALB 상태 확인을 통과해야 web·api Pod가 준비되는 연동, 기본 서비스 계정의 쿠버네티스 API 토큰 자동 탑재 끔, api·worker의 서비스 계정(회원 파일 버킷 역할이 붙는 이름, [../s3.md](../s3.md)) |
+| [`network-policy.yaml`](network-policy.yaml) | 손으로 | 기본은 모두 막고 필요한 것만 연다. web은 ALB에서 3000만 받는다. api는 ALB·worker에서 3001을 받고 DB·큐와 바깥 443으로 나간다. worker는 api 3001·큐·GitHub API·Anthropic API·서울 S3·Cloudflare 대역(OpenAI 판정)으로만 나간다(DB 없음). api·worker는 AWS 역할의 임시 자격을 받는 노드 안 주소(169.254.170.23:80) 하나를 더 연다. migration은 DB로만 나간다. 모두 DNS는 연다 |
 | [`services.yaml`](services.yaml) | 손으로 | web·api의 클러스터 안 주소. 바깥으로 여는 Service는 두지 않는다 |
 | [`ingress.yaml`](ingress.yaml) | 손으로 | 공개 ALB. 80은 443으로 이동(301), TLS 1.2·1.3만, `/v1/internal`은 404, `/v1`과 Claude MCP OAuth 주소(`/authorize`·`/token`·`/register`·`/.well-known/oauth-*` 둘, 개발 서버 Caddy와 같은 목록)는 api, 그 밖은 web, HSTS 300초, 유휴 60초, 삭제 보호, WAF `catchu-edge` |
 | [`api.yaml`](api.yaml)·[`worker.yaml`](worker.yaml)·[`web.yaml`](web.yaml) | `deploy.sh`만 | api·worker는 한 개씩 `Recreate`, web은 새 Pod를 먼저 띄우고 옛 Pod를 내린다. 모두 UID 1000·읽기 전용 루트·권한 전부 제거·`/tmp` 크기 상한, 자원 요청과 메모리 상한(worker는 실제 분석을 재기 전의 임시값) |
@@ -30,20 +30,21 @@ Deployment 파일은 이미지·실행 수·커밋 자리를 비워 둔 틀이�
 | `catchu-db` | ConfigMap | `DB_HOST` ← RDS `catchu-db` 주소, `ca.pem` ← 저장소의 RDS 루트 인증서 | api·migration |
 | `catchu-api` | Secret | `AUTH_JWT_SECRET` ← `/catchu/prod/api/AUTH_JWT_SECRET`, `LINK_GRANT_SECRET` ← `/catchu/prod/api/LINK_GRANT_SECRET`, `DB_PASSWORD` ← `/catchu/prod/db/catchu_app-password`(앱 계정 `catchu_app`), `CATCHU_GENERATION_API_KEY` ← `/catchu/prod/api/CATCHU_GENERATION_API_KEY`(Claude API), `CATCHU_EMBEDDING_API_KEY` ← `/catchu/prod/api/CATCHU_EMBEDDING_API_KEY`(Voyage AI), `GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET` ← `/catchu/prod/api/GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`(Google 로그인, 개발 서버와 같은 클라이언트) | api |
 | `catchu-migration` | Secret | `DB_PASSWORD` ← `/catchu/prod/db/catchu_migrator-password`(migration 계정 `catchu_migrator`) | migration |
-| `catchu-worker` | Secret | `CATCHU_QUEUE_REDIS_URL` ← `rediss://:`큐 비밀번호(`/catchu/prod/queue/auth-token`)`@`큐 주 엔드포인트`:6379`, `WORKER_CONTEXT_API_KEY` ← `/catchu/prod/worker/WORKER_CONTEXT_API_KEY`, `CATCHU_GENERATION_API_KEY` ← `/catchu/prod/worker/CATCHU_GENERATION_API_KEY` | worker |
+| `catchu-worker` | Secret | `CATCHU_QUEUE_REDIS_URL` ← `rediss://:`큐 비밀번호(`/catchu/prod/queue/auth-token`)`@`큐 주 엔드포인트`:6379`, `WORKER_CONTEXT_API_KEY` ← `/catchu/prod/worker/WORKER_CONTEXT_API_KEY`, `CATCHU_GENERATION_API_KEY` ← `/catchu/prod/worker/CATCHU_GENERATION_API_KEY`(Claude API), `CATCHU_JUDGEMENT_API_KEY` ← `/catchu/prod/worker/CATCHU_JUDGEMENT_API_KEY`(OpenAI 판정) | worker |
 
-api의 AI 키 둘(11월 생성·임베딩, #389)은 켜고 끄는 기능이 아니라 11월 기능이 늘 쓰는 값이라 미리 넣는다. SSM에는 2026-10-27에 넣었다. 꺼 둔 기능(GitHub 연결·worker 요청 정보 조회·api 큐 연결)은 켤 때 그 값을 api 실행 파일과 Secret에 더하는 PR을 낸다([../README.md](../README.md) 5단계). GitHub 연결은 EFS 보관 폴더도 함께 붙인다. Google 로그인은 개발 서버에서 켜 둔 것을 전환 뒤에도 이어 가려고 처음부터 켠다(2026-11-10 팀장 결정). 돌아올 주소는 `https://catchu.dev/google/callback`으로 Google OAuth 클라이언트에 등록한 개발 서버 값과 같고, 클라이언트 ID·비밀값은 개발 서버가 쓰는 SSM 값이다. 파일 저장은 개발 서버와 같은 `FILE_STORAGE_DRIVER=local`·`FILE_STORAGE_LOCAL_ROOT=/tmp`로 둔다([#416 결정](https://github.com/JminAILab/CatchU/issues/416#issuecomment-6593877292)). 값이 없으면 api는 뜨지만 탈퇴와 발행본 삭제가 500으로 끝난다. 지금 판본은 회원 파일을 만들지 않아 Pod를 다시 띄워 `/tmp`가 비어도 잃는 것이 없다. PDF 자료(U8)가 S3 드라이버를 넣으면 `s3`로 바꾼다(#389).
+api의 AI 키 둘(11월 생성·임베딩, #389)은 켜고 끄는 기능이 아니라 11월 기능이 늘 쓰는 값이라 미리 넣는다. SSM에는 2026-10-27에 넣었다. 꺼 둔 기능(GitHub 연결·worker 요청 정보 조회·api 큐 연결)은 켤 때 그 값을 api 실행 파일과 Secret에 더하는 PR을 낸다([../README.md](../README.md) 5단계). GitHub 연결은 EFS 보관 폴더도 함께 붙인다. Google 로그인은 개발 서버에서 켜 둔 것을 전환 뒤에도 이어 가려고 처음부터 켠다(2026-11-10 팀장 결정). 돌아올 주소는 `https://catchu.dev/google/callback`으로 Google OAuth 클라이언트에 등록한 개발 서버 값과 같고, 클라이언트 ID·비밀값은 개발 서버가 쓰는 SSM 값이다. 파일 저장은 S3 버킷이다(`FILE_STORAGE_DRIVER=s3`, [../s3.md](../s3.md)). PDF 자료가 들어온 뒤로는 Pod의 `/tmp`에 두면 Pod가 바뀔 때 회원 파일이 없어진다. 값이 없으면 api는 뜨지만 PDF 올리기·탈퇴·발행본 삭제가 500으로 끝난다. 버킷 권한은 Secret이 아니라 서비스 계정 `api`·`worker`에 붙인 AWS 역할로 받는다.
 
-**SSM에 없는 두 값.** `/catchu/prod/worker/` 두 값은 아직 SSM에 없다(2026-10-19 확인. 있는 것은 서명 키 둘·DB 계정 둘·큐 하나). 운영 모드 worker는 둘 다 없으면 뜨지 않으므로 2단계 전에 넣는다. [`put-parameter.sh`](../scripts/put-parameter.sh)는 이미 있는 이름이면 멈추고, 값을 화면·명령 인자·셸 기록에 남기지 않는다.
+**SSM에 없는 세 값.** `/catchu/prod/worker/` 세 값은 아직 SSM에 없다(조회·생성 키는 2026-10-19 확인, 판정 키는 2026-11-16에 더한 이름. 있는 것은 서명 키 둘·DB 계정 둘·큐 하나). 운영 모드 worker는 조회·생성 키가 없으면 뜨지 않고, 판정 키가 없으면 판정이 꺼진 채 떠서 서비스 화면의 제목·설명이 달라진다(2026-11-13 팀장 결정: 배포 환경은 OpenAI 판정을 켠 채 만든다). 그래서 `make-secrets.sh`는 셋 가운데 하나라도 없으면 멈춘다. 2단계 전에 넣는다. [`put-parameter.sh`](../scripts/put-parameter.sh)는 이미 있는 이름이면 멈추고, 값을 화면·명령 인자·셸 기록에 남기지 않는다.
 
 ```bash
 bash deploy/aws/scripts/put-parameter.sh --random /catchu/prod/worker/WORKER_CONTEXT_API_KEY
 bash deploy/aws/scripts/put-parameter.sh --stdin /catchu/prod/worker/CATCHU_GENERATION_API_KEY   # 생성 제공자(Claude API) 콘솔에서 발급한 키를 붙여 넣는다. 화면에 찍히지 않는다
+bash deploy/aws/scripts/put-parameter.sh --stdin /catchu/prod/worker/CATCHU_JUDGEMENT_API_KEY   # OpenAI 개발자 화면에서 발급한 판정 키. 같은 방식이다
 ```
 
 **만들기.** `bash deploy/aws/scripts/make-secrets.sh`(순서는 아래 「적용(2단계)」).
 
-- 시작 전에 계정·클러스터, namespace `catchu`, RDS(available, CA `rds-ca-rsa2048-g1`), 큐(available, TLS와 비밀번호 켬), SSM 이름 열한 개가 모두 SecureString인지 본다. 값도 앱이 시작할 때 거부하는 형식인지(서명 키·조회 키는 64자리 hex, 큐 비밀번호는 주소에 그대로 넣을 수 있는 영문·숫자, Google 클라이언트 ID는 `….apps.googleusercontent.com`. 형식은 값 전체에 맞추므로 끝에 줄바꿈이 붙어도 멈춘다), 서로 달라야 하는 값(서명 키 둘과 조회 키, 두 계정 비밀번호)이 다른지 본다. 하나라도 어긋나면 아무것도 바꾸지 않고 멈춘다(종료 코드 1).
+- 시작 전에 계정·클러스터, namespace `catchu`, RDS(available, CA `rds-ca-rsa2048-g1`), 큐(available, TLS와 비밀번호 켬), SSM 이름 열두 개가 모두 SecureString인지 본다. 값도 앱이 시작할 때 거부하는 형식인지(서명 키·조회 키는 64자리 hex, 큐 비밀번호는 주소에 그대로 넣을 수 있는 영문·숫자, Google 클라이언트 ID는 `….apps.googleusercontent.com`. 형식은 값 전체에 맞추므로 끝에 줄바꿈이 붙어도 멈춘다), 서로 달라야 하는 값(서명 키 둘과 조회 키, 두 계정 비밀번호)이 다른지 본다. 하나라도 어긋나면 아무것도 바꾸지 않고 멈춘다(종료 코드 1).
 - 값은 SSM에서 파이프로만 jq를 거쳐 `kubectl apply --server-side`의 표준 입력으로 넘긴다. 그래서 화면·명령 인자·임시 파일·`last-applied` 주석에 값이 남지 않는다. 화면에는 Secret 이름과 `키=SSM 판 번호`만 찍히고, 같은 판 번호가 Secret 주석 `catchu.io/ssm-versions`에 남는다.
 - 적용 뒤 Secret의 키 목록, `last-applied` 주석이 없음, ConfigMap의 주소와 인증서를 다시 읽어 확인한다. 적용이 실패했거나 확인이 어긋나면 2(일부만 바뀌었을 수 있다)다. 원인을 고쳐 다시 실행하면 SSM의 지금 값으로 다시 맞춘다.
 - 값을 보지 않고 확인하기: `k get secret -o json | jq '.items[] | {name: .metadata.name, keys: (.data | keys), annotations: .metadata.annotations}'`
@@ -108,6 +109,7 @@ bash deploy/aws/scripts/deploy.sh --commit <main 커밋 40자>   # migration 뒤
 - web: RDS 5432·큐 6379가 막힌다.
 - Pod 보안 검사: 호스트 망 Pod가 거부된다. `k run psa-test --image=registry.k8s.io/pause:3.10 --dry-run=server --overrides='{"spec":{"hostNetwork":true}}'`
 - kubelet의 상태 확인이 NetworkPolicy에 막히지 않는다(세 Deployment가 준비 상태가 되면 된다).
+- 회원 파일 버킷: api는 올리기·읽기·복사·목록·삭제가 되고 worker는 읽기만 된다. [../s3.md](../s3.md) 「확인(2단계)」의 명령으로 보고, 전환 전에 끝낸다.
 
 **한계.** NetworkPolicy는 새 Pod가 뜬 직후 몇 초 동안 걸리지 않는다(VPC CNI 기본 모드, #276 계획에서 받아들인 한계). 노드·호스트 망 Pod·다른 namespace의 Pod는 이 정책 밖이다. 그래서 worker의 DB 차단은 세 겹으로 둔다: NetworkPolicy, worker에 DB 비밀번호를 주지 않음, DB의 TLS와 계정.
 
@@ -119,7 +121,20 @@ GitHub API 대역은 GitHub가 바꿀 수 있다. worker 수집이 시간 초과
 curl -fsS https://api.github.com/meta | jq -r '.api[] | select(contains(":") | not)' | sort -u
 ```
 
-다르면 목록을 고치는 PR을 내고, 병합 뒤 그 파일만 다시 적용한 다음 worker Pod에서 api.github.com 443 연결을 확인한다.
+OpenAI 판정 주소(`us.api.openai.com`)는 OpenAI 전용 주소가 아니라 Cloudflare 주소로 풀린다(2026-11-16 조회: `162.159.140.245`·`172.66.0.243`). OpenAI는 API로 들어가는 쪽의 고정 대역을 공개하지 않으므로([IP egress ranges](https://developers.openai.com/api/docs/guides/ip-addresses)는 OpenAI 제품이 바깥으로 보내는 요청용이다) Cloudflare가 공개한 IPv4 대역 15개를 연다. 이 대역은 Cloudflare를 쓰는 다른 사이트도 함께 연다(받아들인 한계, 2026-11-16 팀장 결정). 판정이 시간 초과로 막히면(worker 로그 「판정 공급자 실패」) 다시 받아 비교한다.
+
+```bash
+curl -fsS https://www.cloudflare.com/ips-v4 | sort -u
+dig +short us.api.openai.com   # 받은 주소가 위 대역 안에 드는지 본다
+```
+
+다르면 목록을 고치는 PR을 내고, 병합 뒤 그 파일만 다시 적용한 다음 worker Pod에서 api.github.com 443(판정 쪽을 고쳤으면 us.api.openai.com 443) 연결을 확인한다.
+
+서울 S3 대역도 AWS가 바꿀 수 있다. worker의 PDF 추출이 S3 연결 시간 초과로 실패하면 다시 받아 같은 목록의 S3 부분과 비교하고, 고친 뒤 [../s3.md](../s3.md) 「확인(2단계)」의 worker 줄을 다시 본다. [`deploy.test.sh`](../scripts/deploy.test.sh)의 대역 개수도 함께 고친다.
+
+```bash
+curl -fsS https://ip-ranges.amazonaws.com/ip-ranges.json | jq -r '.prefixes[] | select(.service == "S3" and .region == "ap-northeast-2") | .ip_prefix' | sort -u
+```
 
 ## 앱 교체(deploy.sh)
 
@@ -160,7 +175,7 @@ bash deploy/aws/scripts/deploy.test.sh
 bash·jq·git·ruby가 필요하고 30초쯤 걸린다. kubectl·aws·sleep을 합성 명령으로 바꾸고, 지금 작업 폴더의 `deploy.sh`·이 폴더로 만든 합성 git 저장소에서 `deploy.sh`를 실제로 실행한다. AWS·클러스터에는 닿지 않는다.
 
 - 확인하는 것: 처음 설치와 교체의 순서(옛 api·worker 멈춤 → migration → 동의 기록 확인 → api → worker → web), 같은 판본·구성이면 아무것도 바꾸지 않음, 멈춘 상태에서 `--resume` 없이는 멈춤, 시작 전 확인이 하나라도 어긋나면 아무것도 바꾸지 않고 2, 종료 확인 실패 3(늦게 오는 종료 코드는 기다림), 강제 종료 7, migration 실패 4·결과 불명 5·같은 이름 Pod 처리, 새 실행 실패 때 api·worker를 다시 멈추고 6, 동의 기록 확인(migration을 건너뛰어도 함, 실패·만들기 실패·시간 초과면 8이고 새 실행 없음, `--resume`이면 새 확인 Pod로 다시 함, 배포할 커밋에 확인 틀이 없으면 아무것도 바꾸지 않고 2), 출력에 계정 번호가 없음.
-- 실행 파일 조건: `deploy.sh`가 자리를 채운 Deployment·migration Pod·동의 기록 확인 Pod와 손으로 적용하는 파일을 Ruby(YAML→JSON)·jq로 읽는다. api·worker 한 개·`Recreate`, web 교체 방식, UID 1000·읽기 전용 루트·권한 제거·seccomp·토큰 자동 탑재 끔·호스트 망 없음, `/tmp` 크기 상한, 자원 요청과 메모리 상한(CPU 상한 없음), 이미지 digest, 비밀값은 Secret에서만, worker에 DB 값 없음, 동의 기록 확인 Pod는 migration 계정·migration 연결 허용 라벨·DB 관리 Pod와 같은 이미지이고 명령에 쿠버네티스가 바꾸는 `$(`·`$$`가 없음, Service 포트, NetworkPolicy·Ingress 규칙, 계정 번호 없음.
+- 실행 파일 조건: `deploy.sh`가 자리를 채운 Deployment·migration Pod·동의 기록 확인 Pod와 손으로 적용하는 파일을 Ruby(YAML→JSON)·jq로 읽는다. api·worker 한 개·`Recreate`, web 교체 방식, UID 1000·읽기 전용 루트·권한 제거·seccomp·토큰 자동 탑재 끔·호스트 망 없음, `/tmp` 크기 상한, 자원 요청과 메모리 상한(CPU 상한 없음), 이미지 digest, 비밀값은 Secret에서만, worker에 DB 값 없음, 파일 저장은 S3이고 버킷 이름이 생성 스크립트·역할 정책·api·worker에서 같음, 서비스 계정과 AWS 역할은 api·worker만(api는 올리기·읽기·삭제·목록, worker는 읽기만), 동의 기록 확인 Pod는 migration 계정·migration 연결 허용 라벨·DB 관리 Pod와 같은 이미지이고 명령에 쿠버네티스가 바꾸는 `$(`·`$$`가 없음, Service 포트, NetworkPolicy·Ingress 규칙, 계정 번호 없음.
 - 합성 kubectl의 감시 출력은 kubectl 1.37.1을 이 컴퓨터의 가짜 API에 붙여 확인한 모양을 흉내 낸다. 탭은 공백으로 바뀌고, `range` 안에서 없는 값을 만나면 첫 객체 뒤 오류로 끝난다. `deploy.sh`가 그 밖의 식을 쓰면 시험이 실패한다.
 - 확인하지 못하는 것: 실제 API 서버의 스키마·승인 검사(Pod 보안 검사 포함), 노드에서의 실제 종료 코드와 준비 시간, NetworkPolicy·ALB의 실제 동작. 이것은 2단계에서 본다(「적용(2단계)」의 확인).
 - CI에는 아직 넣지 않았다. 이 폴더나 `deploy.sh`를 바꾸면 손으로 돌린다.

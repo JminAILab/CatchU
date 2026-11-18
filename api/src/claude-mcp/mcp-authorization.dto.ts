@@ -1,4 +1,5 @@
-import { IsBoolean, IsIn, IsNotEmpty, IsString, Matches, ValidateIf } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { MCP_CODE_CHALLENGE_PATTERN, MCP_RESOURCE_MAX_LENGTH } from './mcp-limits';
 
 export const MCP_AUTHORIZATION_DECISIONS = ['APPROVE', 'DENY'] as const;
 export type McpAuthorizationDecision = (typeof MCP_AUTHORIZATION_DECISIONS)[number];
@@ -27,13 +28,15 @@ export class McpAuthorizationDto {
   @IsString()
   state?: string;
 
+  /** 코드 행에 그대로 저장한다. 꼴이 정해져 있어 NUL도 함께 걸린다. */
   @IsString()
-  @IsNotEmpty()
-  @Matches(WITHOUT_NUL)
+  @Matches(MCP_CODE_CHALLENGE_PATTERN)
   codeChallenge!: string;
 
+  /** 코드 행에 그대로 저장한다. MCP 주소와 같은지는 fragment를 빼고 비교하므로 길이는 여기서 묶는다. */
   @ValidateIf(whenPresent)
   @IsString()
+  @MaxLength(MCP_RESOURCE_MAX_LENGTH)
   @Matches(WITHOUT_NUL)
   resource?: string;
 

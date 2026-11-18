@@ -21,7 +21,8 @@ import { CONSENT_RECORD_FAILED, runWithConsent } from "../src/components/ai-cons
 import { SENSITIVE_INFO_NOTICE } from "../src/features/materials/materials-api.ts";
 import {
   PDF_COUNT_LIMIT_TEXT, PDF_DELETE_CONFIRM, PDF_FAILURE_TEXT, PDF_LIMITS, PDF_SENSITIVE_INFO_NOTICE, PDF_UPLOAD_FAILED_TEXT, createPdfHttp,
-  createPdfMaterialsApi, extractionBadge, fileSizeText, isPdfMaterialPage, pdfListErrorText, pdfUploadErrors, pdfUploadOutcome, sessionPdfAuth,
+  createPdfMaterialsApi, extractionBadge, fileSizeText, isPdfMaterialPage, pdfListErrorText, pdfRateLimitedText, pdfUploadErrors, pdfUploadOutcome,
+  sessionPdfAuth,
   uploadTitle,
 } from "../src/features/materials/pdf-materials-api.ts";
 import { load } from "./u2-render.mjs";
@@ -303,7 +304,13 @@ test("올리기 결과 해석: 201이고 모양이 맞을 때만 성공이며, �
   assert.match(reasons(apiError(401, "AUTH_INVALID"))[1], /로그인이 만료/);
   assert.match(reasons(apiError(500, "INTERNAL_ERROR"))[1], /서버에서 처리하지 못했습니다/);
   assert.match(reasons({ kind: "lookup-failed", status: null, code: "LOOKUP_FAILED" })[1], /결과를 확인하지 못했습니다/);
-  for (const result of [apiError(400, "VALIDATION_FAILED"), apiError(500, "INTERNAL_ERROR"), consentRequired]) {
+  // 업로드 상한 초과(api #574): 결과를 모른다는 안내가 아니라 잠시 뒤 다시 올리라는 안내다. 남은 시간은 Retry-After가 있을 때만 분으로 적는다.
+  assert.deepEqual(reasons({ ...apiError(429, "RATE_LIMITED"), retryAfterSeconds: 541 }), [PDF_UPLOAD_FAILED_TEXT, pdfRateLimitedText(541)]);
+  assert.equal(pdfRateLimitedText(541), "PDF는 10분에 5개까지 올릴 수 있습니다. 약 10분 뒤에 다시 올려 주세요.");
+  assert.match(pdfRateLimitedText(60), /약 1분 뒤/);
+  assert.deepEqual(reasons(apiError(429, "RATE_LIMITED")), [PDF_UPLOAD_FAILED_TEXT, pdfRateLimitedText()]);
+  assert.doesNotMatch(pdfRateLimitedText(), /\d/, "Retry-After가 없으면(진행 중 업로드 수 초과) 횟수 기준과 시간을 적지 않는다");
+  for (const result of [apiError(400, "VALIDATION_FAILED"), apiError(500, "INTERNAL_ERROR"), apiError(429, "RATE_LIMITED"), consentRequired]) {
     const lines = reasons(result);
     assert.equal(lines[0], PDF_UPLOAD_FAILED_TEXT);
     assert.ok(!lines.join(" ").includes("합성 메시지"), "서버 문구를 그대로 싣지 않는다");
@@ -441,6 +448,16 @@ test("요청: 업로드는 회원 토큰과 multipart(파일 종류 application/
   assert.equal(requests[4].init.headers["X-Link-Grant"], "grant-value-1");
   assert.equal(requests[4].init.headers.Authorization, undefined, "받은 사람 요청에 회원 토큰을 붙이지 않는다");
   assert.equal(requests[5].init.headers["X-Link-Grant"], undefined, "grant가 없으면 머리를 싣지 않는다");
+
+  // 업로드 상한 초과(api #574): Retry-After가 1 이상의 정수 초면 결과에 싣고, 없으면 싣지 않는다. 다시 보내지 않는다.
+  const sentBeforeLimit = requests.length;
+  responses.push(new Response(JSON.stringify({ code: "RATE_LIMITED", message: "요청이 많습니다." }),
+    { status: 429, headers: { "content-type": "application/json", "Retry-After": "541" } }));
+  assert.deepEqual(await http.upload(new Blob(["x"]), "a.pdf", "t"),
+    { kind: "api-error", status: 429, code: "RATE_LIMITED", message: "요청이 많습니다.", retryAfterSeconds: 541 });
+  responses.push(json(429, { code: "RATE_LIMITED", message: "요청이 많습니다." }));
+  assert.deepEqual(await http.upload(new Blob(["x"]), "a.pdf", "t"), { kind: "api-error", status: 429, code: "RATE_LIMITED", message: "요청이 많습니다." });
+  assert.equal(requests.length, sentBeforeLimit + 2);
 
   // 회원 인증 401이면 api.member와 같이 그 토큰을 지운다. 링크 401·다른 401은 지우지 않는다.
   responses.push(json(401, { code: "LINK_PASSWORD_REQUIRED", message: "비밀번호" }));

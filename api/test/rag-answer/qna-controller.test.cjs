@@ -5,6 +5,8 @@
 const assert = require('node:assert/strict');
 const { after, before, beforeEach, test } = require('node:test');
 const { IndexNotReady } = require('../../dist/published-index/published-search');
+const { NotFound } = require('../../dist/publications/publication-access');
+const { buildQnaSources } = require('../../dist/rag-answer/qna-sources');
 const { InMemoryQuestionCounter, RedisQuestionCounter } = require('../../dist/rag-answer/question-counter');
 const { QuestionRewriteFailed } = require('../../dist/rag-answer/question-rewriter');
 const { AUTHOR_MATERIAL_VOICE_INSTRUCTION, QNA_INSTRUCTION } = require('../../dist/rag-answer/rag-answer-config');
@@ -21,10 +23,11 @@ let app;
 let restore;
 let memory;
 let publication;
+let now;
 before(async () => {
   restore = setEnv({ ...APP_SETTINGS, CATCHU_QUEUE_REDIS_URL: undefined });
   memory = new InMemoryQuestionCounter('u5test');
-  app = await startRagAnswerApp({ clock: () => NOW, keepAliveMs: 20, counter: counterSlot(memory) });
+  app = await startRagAnswerApp({ clock: () => now, keepAliveMs: 20, counter: counterSlot(memory) });
 });
 after(async () => { await app?.server.app.close(); restore?.(); });
 beforeEach(() => {
@@ -35,6 +38,7 @@ beforeEach(() => {
   fakes.logger.entries.length = 0;
   app.logs.length = 0;
   memory.counts.clear();
+  now = NOW;
   fakes.counter.current = memory;
   publication = putPublication(fakes.access);
   fakes.search.hits = [chunkHit('개발 서버에 먼저 올린다.'), chunkHit('운영은 확인 뒤 올린다.', { sourceKind: 'GITHUB_RECORD',
@@ -74,7 +78,7 @@ test('첫 질문: 다시 쓰기 없이 검색 8개로 QNA 생성, 통과 항목�
   assert.equal(countOf(publication.publicationId), 1);
   assert.deepEqual(completed(), [{ event: 'qna.completed', publicationId: publication.publicationId, stage: 'GENERATE', outcome: 'OK',
     failure: null, rewritten: false, rewriteMs: null, rewriteInputTokens: null, rewriteOutputTokens: null, searchMs: completed()[0].searchMs,
-    chunkCount: 2, generateMs: completed()[0].generateMs, itemCount: 2 }]);
+    chunkCount: 2, generateMs: completed()[0].generateMs, itemCount: 2, unattachedLineCount: 0 }]);
 });
 
 test('앞 대화가 있는 질문: 최근 6개·2,000자로 다시 쓰기 1회, 다시 쓴 문장으로 검색·생성(BR1.2·BR1.3·BR4.1)', async () => {
@@ -138,13 +142,42 @@ test('스트림 전 거부는 HTTP 오류 본문이고, 검증·링크·색인 �
 });
 
 test('하루 101번째 질문은 429 QUESTION_LIMIT_REACHED이고 남은 횟수는 응답에 없다(BR3.1·BR3.3)', async () => {
-  for (let i = 0; i < 100; i += 1) await memory.count(publication.publicationId, NOW);
+  for (let i = 0; i < 99; i += 1) await memory.count(publication.publicationId, publication.ownerMemberId, NOW);
+  assert.equal((await ask(app.server.url, publication.token, { question: '질문', history: [] })).status, 200, '100번째까지는 답한다');
+  app.fakes.search.calls.length = 0;
   const response = await ask(app.server.url, publication.token, { question: '질문', history: [] });
   assert.equal(response.status, 429);
   assert.deepEqual(response.body, { code: 'QUESTION_LIMIT_REACHED', message: '오늘 한도에 도달했습니다' });
   assert.equal(response.headers.get('retry-after'), null);
   assert.equal(app.fakes.search.calls.length, 0);
   assert.equal(countOf(publication.publicationId), 101, '거부된 질문도 늘린 값을 되돌리지 않는다');
+  assert.equal(countOf(publication.ownerMemberId), 100, '링크 한도에 걸린 질문은 작성자 합계를 늘리지 않는다(#585)');
+  assert.deepEqual(rejected(), [{ event: 'qna.rejected', outcome: 'QUESTION_LIMIT_REACHED', publicationId: publication.publicationId, limit: 'LINK' }]);
+});
+
+test('작성자 하루 합계 301번째 질문은 그 작성자의 어느 링크에서도 같은 429이고, 다른 작성자와 자정 뒤는 받는다(#585)', async () => {
+  const { fakes } = app;
+  // 같은 작성자의 링크 셋에 100번씩(링크 한도 안) 미리 센다. 합계 300.
+  const owner = publication.ownerMemberId;
+  const used = [publication, putPublication(fakes.access, { ownerMemberId: owner }), putPublication(fakes.access, { ownerMemberId: owner })];
+  for (const link of used) for (let i = 0; i < 100; i += 1) await memory.count(link.publicationId, owner, NOW);
+  // 아직 한 번도 쓰지 않은 같은 작성자의 링크도 막힌다. 응답은 링크 한도와 같고 남은 횟수·Retry-After가 없다.
+  const fresh = putPublication(fakes.access, { ownerMemberId: owner });
+  const response = await ask(app.server.url, fresh.token, { question: '질문', history: [] });
+  assert.equal(response.status, 429);
+  assert.deepEqual(response.body, { code: 'QUESTION_LIMIT_REACHED', message: '오늘 한도에 도달했습니다' });
+  assert.equal(response.headers.get('retry-after'), null);
+  assert.equal(fakes.search.calls.length + fakes.rewriter.calls.length + fakes.gate.streamRequests.length, 0, 'AI·검색을 부르지 않는다');
+  assert.deepEqual(rejected(), [{ event: 'qna.rejected', outcome: 'QUESTION_LIMIT_REACHED', publicationId: fresh.publicationId, limit: 'OWNER' }]);
+  assert.equal(countOf(owner), 301, '거부된 질문도 늘린 값을 되돌리지 않는다');
+  // 다른 작성자의 링크는 그대로 답한다.
+  const other = putPublication(fakes.access);
+  assert.equal((await ask(app.server.url, other.token, { question: '질문', history: [] })).status, 200);
+  // 한국 시간 자정이 지나면 그 작성자의 링크가 다시 답한다.
+  now = new Date('2026-11-02T15:00:00.000Z');
+  const nextDay = await ask(app.server.url, fresh.token, { question: '질문', history: [] });
+  assert.equal(nextDay.status, 200);
+  assert.equal(nextDay.events.at(-1).event, 'done');
 });
 
 test('Redis 장애면 세지 않고 질문을 통과시키며 경고를 남긴다(BR3.2)', async () => {
@@ -267,7 +300,7 @@ test('확인 단계 중에 연결이 끊기면 다시 쓰기·검색·생성을 
   let release;
   const held = new Promise((resolve) => { release = resolve; });
   fakes.counter.current = {
-    async count(publicationId, now) { entered(); await held; return memory.count(publicationId, now); },
+    async count(...args) { entered(); await held; return memory.count(...args); },
     async close() {},
   };
   const controller = new AbortController();
@@ -286,6 +319,65 @@ test('확인 단계 중에 연결이 끊기면 다시 쓰기·검색·생성을 
   assert.equal(fakes.search.calls.length, 0, '검색을 부르지 않는다');
   assert.equal(fakes.gate.streamRequests.length, 0, '생성을 부르지 않는다');
   assert.equal(countOf(publication.publicationId), 1, '이미 센 횟수는 돌려주지 않는다');
+});
+
+// #559 — 사본 읽기와 같은 Catch 줄 붙이기(코드 계획 S10·S11, FR1.6·FR7.3, 설계 결정 2).
+// 먼저 정한 시나리오:
+// - S10: 판정 뒤 발행본이 지워져 사본 읽기가 NotFound면 404 LINK_UNAVAILABLE이고 질문 수를 세지 않는다. 실패 조건: 200 스트림을 열거나 500.
+//   사본 읽기가 다른 이유로 실패하면 삼키지 않고 500이다(세지 않음).
+// - S11: 질문 한 번이 끝나면 qna.completed에 unattachedLineCount(수)가 있다. 앱이 보내는 근거는 같은 검색 결과·사본의 buildQnaSources 결과와 같다.
+
+test('S10 판정 뒤 사본 읽기가 NotFound(발행본 삭제)면 404 LINK_UNAVAILABLE이고 횟수를 세지 않으며 스트림을 열지 않는다', async (t) => {
+  const { fakes } = app;
+  const readSnapshot = fakes.access.readSnapshot;
+  t.after(() => { fakes.access.readSnapshot = readSnapshot; });
+  fakes.access.readSnapshot = async () => { throw new NotFound(); };
+  const response = await ask(app.server.url, publication.token, { question: QUESTION, history: [] });
+  assert.equal(response.status, 404);
+  assert.deepEqual(response.body, { code: 'LINK_UNAVAILABLE', message: '이 링크는 열람할 수 없습니다.' });
+  assert.equal(countOf(publication.publicationId), 0, '세기 전이라 차감이 없다');
+  assert.equal(fakes.search.calls.length + fakes.rewriter.calls.length + fakes.gate.streamRequests.length, 0);
+  assert.deepEqual(rejected().map((e) => [e.outcome, e.publicationId]), [['LINK_UNAVAILABLE', publication.publicationId]]);
+  assert.equal(completed().length, 0);
+
+  fakes.access.readSnapshot = async () => { throw new Error('SYNTHETIC-DB-DOWN'); };
+  const failed = await ask(app.server.url, publication.token, { question: QUESTION, history: [] });
+  assert.equal(failed.status, 500, '삭제로 확인되지 않은 오류는 삼키지 않는다');
+  assert.equal(countOf(publication.publicationId), 0);
+  assert.equal(fakes.gate.streamRequests.length, 0);
+});
+
+test('S11 맞은 Catch의 기록 줄을 머리글과 함께 붙여 보내고, qna.completed에 붙이지 못한 줄 수가 있다. 근거는 buildQnaSources 결과와 같다(FR1.6·FR7.3)', async () => {
+  const { fakes } = app;
+  const [catchItem, textItem] = publication.items;
+  const fact = catchItem.snapshot.evidence[0].representedFacts[0];
+  fakes.search.hits = [
+    chunkHit(fact, { publishedItemId: catchItem.publishedItemId, fieldPath: 'evidence[0].representedFacts[0]', sourceKind: 'GITHUB_RECORD',
+      catchEvidenceUrls: catchItem.snapshot.evidence.map((entry) => entry.sourceUrl) }),
+    chunkHit(textItem.snapshot.body, { publishedItemId: textItem.publishedItemId }),
+  ];
+  const response = await ask(app.server.url, publication.token, { question: QUESTION, history: [] });
+  assert.equal(response.status, 200);
+  const request = fakes.gate.streamRequests[0];
+  const expected = buildQnaSources(fakes.search.hits, await fakes.access.readSnapshot(publication.publicationId));
+  assert.deepEqual(request.sources, expected.sources, '앱의 근거는 평가 스크립트와 같은 함수로 만든다');
+  assert.deepEqual(request.sources.map((source) => source.location.fieldPath), [
+    'evidence[0].representedFacts[0]', 'evidence[0].representedFacts[1]', 'workFacts[0]', 'workFacts[1]', 'subjectContribution', 'body']);
+  assert.ok(request.sources.slice(0, 5).every((source) => source.itemContext === `이 줄이 속한 작업: ${catchItem.snapshot.workFacts[1]}`));
+  assert.equal(request.sources[5].itemContext, '이 줄이 속한 자료: 「나」 텍스트 자료');
+  assert.ok(!JSON.stringify(request.sources).includes(catchItem.snapshot.aiDraft), 'AI 초안은 보내지 않는다');
+  assert.ok(!JSON.stringify(request.sources).includes(catchItem.title), 'Catch 제목은 보내지 않는다');
+  const entry = completed()[0];
+  assert.equal(entry.unattachedLineCount, 0);
+  assert.equal(entry.chunkCount, 2, '검색 조각 수는 붙인 줄과 따로 센다');
+  assert.ok(!JSON.stringify(fakes.logger.entries).includes(fact), '로그에 근거 글이 없다');
+});
+
+test('S11 생성 단계 전에 끝난 질문의 qna.completed는 unattachedLineCount가 null이다', async () => {
+  app.fakes.search.hits = [];
+  await ask(app.server.url, publication.token, { question: '질문', history: [] });
+  assert.equal(completed()[0].stage, 'SEARCH');
+  assert.equal(completed()[0].unattachedLineCount, null);
 });
 
 // 새 Catch NC2 — 질의응답 지시 끝의 작성자 말 옮기기 문장(BR5.1, AC6.5.3·AC8.1.1).
