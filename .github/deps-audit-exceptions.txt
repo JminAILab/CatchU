@@ -2,3 +2,4 @@
 # 고친 판본이 없는 취약점만 적는다. 고친 판본이 나오면 검사가 다시 실패하므로, 그때 의존성을 올리고 이 줄을 지운다.
 # 한 줄에 "서비스 취약점ID 이유". 서비스는 web·api·worker이고, 취약점 ID는 GitHub 취약점 ID(GHSA-)를 쓴다.
 web GHSA-fc5q-39xc-vjpf picomatch는 최신 4.0.7까지 고친 판본이 없다. web에서는 개발 의존성(micromatch·tinyglobby)만 끌어온다(2026-11-18, #588).
+api GHSA-fc5q-39xc-vjpf picomatch는 최신 4.0.7까지 고친 판본이 없다. api에서는 typeorm이 tinyglobby로 끌어오고, 넘기는 패턴은 database.config.ts의 고정 문자열뿐이다(2026-11-18, #588).
