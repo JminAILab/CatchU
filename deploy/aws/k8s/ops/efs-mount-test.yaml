@@ -1,0 +1,265 @@
+# EFS 마운트 시험(#276, deploy/aws/README.md 「1단계 만드는 순서」 4번이 GitHub 연결을 켤 때 하라고 한 것). 손으로 적용하고 본 뒤 지운다.
+# 밑줄 두 개로 감싼 자리(파일 시스템 ID·접근점 ID)를 채워서 쓴다. 순서와 판정은 deploy/aws/features.md 「GitHub 토큰 보관 볼륨」.
+# 세 경우를 함께 띄운다. Pod는 관리 namespace catchu-ops에서 돈다(자동 배포 역할이 닿지 않는 곳).
+#   efs-test-ok      접근점을 거친 TLS 마운트. 붙어야 하고, 시험 파일을 쓰고 읽고 지운 뒤 끝난다(Succeeded).
+#   efs-test-no-ap   접근점 없이 파일 시스템 맨 위를 마운트. 거부돼야 한다(Pod가 ContainerCreating에 머물고 FailedMount 사건이 남는다).
+#   efs-test-no-tls  같은 접근점을 TLS 없이 마운트. 거부돼야 한다(위와 같다).
+# 이미지는 DB 관리 Pod(db-admin-pod.yaml)와 같은 것이다(셸이 있다). 접근점이 사용자 번호를 1000으로 고정하므로 Pod의 번호와
+# 관계없이 파일은 1000의 것으로 써진다. 시험 Pod는 망을 쓰지 않는다(마운트는 노드의 드라이버가 한다).
+# 명령에는 쿠버네티스가 바꾸는 $(·$$를 쓰지 않는다.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: catchu-efs-test-ok
+  labels:
+    app.kubernetes.io/part-of: catchu
+    catchu.io/efs-mount-test: __EFS_FILE_SYSTEM__
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  claimRef:
+    namespace: catchu-ops
+    name: efs-test-ok
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: "__EFS_FILE_SYSTEM__::__EFS_ACCESS_POINT__"
+    volumeAttributes:
+      encryptInTransit: "true"
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: catchu-efs-test-no-ap
+  labels:
+    app.kubernetes.io/part-of: catchu
+    catchu.io/efs-mount-test: __EFS_FILE_SYSTEM__
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  claimRef:
+    namespace: catchu-ops
+    name: efs-test-no-ap
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: "__EFS_FILE_SYSTEM__"
+    volumeAttributes:
+      encryptInTransit: "true"
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: catchu-efs-test-no-tls
+  labels:
+    app.kubernetes.io/part-of: catchu
+    catchu.io/efs-mount-test: __EFS_FILE_SYSTEM__
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  claimRef:
+    namespace: catchu-ops
+    name: efs-test-no-tls
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: "__EFS_FILE_SYSTEM__::__EFS_ACCESS_POINT__"
+    volumeAttributes:
+      encryptInTransit: "false"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: efs-test-ok
+  namespace: catchu-ops
+  labels:
+    catchu.io/efs-mount-test: __EFS_FILE_SYSTEM__
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  volumeName: catchu-efs-test-ok
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: efs-test-no-ap
+  namespace: catchu-ops
+  labels:
+    catchu.io/efs-mount-test: __EFS_FILE_SYSTEM__
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  volumeName: catchu-efs-test-no-ap
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: efs-test-no-tls
+  namespace: catchu-ops
+  labels:
+    catchu.io/efs-mount-test: __EFS_FILE_SYSTEM__
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  volumeName: catchu-efs-test-no-tls
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: efs-test-ok
+  namespace: catchu-ops
+  labels:
+    catchu.io/efs-mount-test: __EFS_FILE_SYSTEM__
+spec:
+  restartPolicy: Never
+  activeDeadlineSeconds: 300
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: test
+      image: docker.io/pgvector/pgvector:0.8.7-pg16-trixie@sha256:40d828eda66737aaacb934387a337babf1455ebd56e9bdd13fc08e211257c972
+      # 폴더의 소유자·권한을 찍고, 시험 파일을 0600으로 만들어 읽고 지운다. 하나라도 안 되면 0이 아닌 코드로 끝난다.
+      # 마지막 줄은 지운 뒤 폴더에 남은 파일 수다(이름은 찍지 않는다).
+      command:
+        - sh
+        - -ec
+        - |
+          cd /mnt/efs
+          stat -c 'folder %u:%g %a' .
+          umask 077
+          echo ok > .mount-test
+          stat -c 'file %u:%g %a' .mount-test
+          cat .mount-test
+          rm .mount-test
+          ls -A | wc -l
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 64Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      volumeMounts:
+        - name: efs
+          mountPath: /mnt/efs
+  volumes:
+    - name: efs
+      persistentVolumeClaim:
+        claimName: efs-test-ok
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: efs-test-no-ap
+  namespace: catchu-ops
+  labels:
+    catchu.io/efs-mount-test: __EFS_FILE_SYSTEM__
+spec:
+  restartPolicy: Never
+  activeDeadlineSeconds: 300
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: test
+      image: docker.io/pgvector/pgvector:0.8.7-pg16-trixie@sha256:40d828eda66737aaacb934387a337babf1455ebd56e9bdd13fc08e211257c972
+      # 여기까지 오면 안 된다. 붙었다면 무엇이 보이는지 찍고 실패로 끝낸다.
+      command: ["sh", "-c", "echo '거부되지 않고 붙었다:'; ls -la /mnt/efs; exit 1"]
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 64Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      volumeMounts:
+        - name: efs
+          mountPath: /mnt/efs
+  volumes:
+    - name: efs
+      persistentVolumeClaim:
+        claimName: efs-test-no-ap
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: efs-test-no-tls
+  namespace: catchu-ops
+  labels:
+    catchu.io/efs-mount-test: __EFS_FILE_SYSTEM__
+spec:
+  restartPolicy: Never
+  activeDeadlineSeconds: 300
+  automountServiceAccountToken: false
+  enableServiceLinks: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: test
+      image: docker.io/pgvector/pgvector:0.8.7-pg16-trixie@sha256:40d828eda66737aaacb934387a337babf1455ebd56e9bdd13fc08e211257c972
+      command: ["sh", "-c", "echo '거부되지 않고 붙었다:'; ls -la /mnt/efs; exit 1"]
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 64Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      volumeMounts:
+        - name: efs
+          mountPath: /mnt/efs
+  volumes:
+    - name: efs
+      persistentVolumeClaim:
+        claimName: efs-test-no-tls

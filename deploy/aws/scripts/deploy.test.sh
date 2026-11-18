@@ -460,12 +460,13 @@ for f in api worker web created guard; do
     "$(ok q "$file" ".[0] | ${POD} | .securityContext.runAsNonRoot == true and .securityContext.runAsUser == ${uid}
       and .securityContext.seccompProfile.type == \"RuntimeDefault\" and .automountServiceAccountToken == false
       and .enableServiceLinks == false and (.hostNetwork // false) == false and (.hostPID // false) == false and (.hostIPC // false) == false")"
-  check "실행 파일 ${f}: 권한 상승 금지·읽기 전용 루트·권한 전부 제거, /tmp는 크기 상한 있는 빈 볼륨" \
+  check "실행 파일 ${f}: 권한 상승 금지·읽기 전용 루트·권한 전부 제거, /tmp는 크기 상한 있는 빈 볼륨, 그 밖의 볼륨은 ConfigMap뿐(api만 GitHub 토큰 보관 볼륨 하나)" \
     "$(ok q "$file" ".[0] | ${POD} | (.containers | length) == 1 and (.containers[0].securityContext
       | .allowPrivilegeEscalation == false and .readOnlyRootFilesystem == true and .capabilities.drop == [\"ALL\"])
       and ([.containers[0].volumeMounts[] | select(.mountPath == \"/tmp\") | .name] as \$t
         | any(.volumes[]; .name == \$t[0] and .emptyDir.sizeLimit != null))
-      and all(.volumes[]; has(\"emptyDir\") or has(\"configMap\"))")"
+      and ([.volumes[] | select((has(\"emptyDir\") or has(\"configMap\")) | not) | .persistentVolumeClaim.claimName // \"다른 종류\"]
+        == (if \"${f}\" == \"api\" then [\"github-credentials\"] else [] end))")"
   check "실행 파일 ${f}: CPU·메모리 요청과 메모리 상한이 있고 CPU 상한은 없음, 이미지는 digest" \
     "$(ok q "$file" ".[0] | ${POD} | .containers[0] | .resources.requests.cpu != null and .resources.requests.memory != null
       and .resources.limits.memory != null and .resources.limits.cpu == null and (.image | test(\"@sha256:[0-9a-f]{64}$\"))")"
@@ -487,6 +488,63 @@ check "api: Google 로그인 켬, 돌아올 주소는 https://catchu.dev/google/
       | map({(.name): (.value // "secret \(.valueFrom.secretKeyRef.name) \(.valueFrom.secretKeyRef.key)")}) | add
       | .GOOGLE_LOGIN_ENABLED == "true" and .GOOGLE_REDIRECT_URI == "https://catchu.dev/google/callback"
       and .GOOGLE_CLIENT_ID == "secret catchu-api GOOGLE_CLIENT_ID" and .GOOGLE_CLIENT_SECRET == "secret catchu-api GOOGLE_CLIENT_SECRET"')"
+API_ENV='.[0].spec.template.spec.containers[0].env | map({(.name): (.value // "secret \(.valueFrom.secretKeyRef.name) \(.valueFrom.secretKeyRef.key)")}) | add'
+check "api: 큐 연결 켬(주소는 Secret catchu-api에서 받고, 접두사는 worker와 같음)" \
+  "$( { q "$WORK/applied-api.yaml" "${API_ENV} | .CATCHU_QUEUE_REDIS_URL == \"secret catchu-api CATCHU_QUEUE_REDIS_URL\" and .CATCHU_QUEUE_PREFIX == \"catchu\"" \
+    && q "$WORK/applied-worker.yaml" "${API_ENV} | .CATCHU_QUEUE_REDIS_URL == \"secret catchu-worker CATCHU_QUEUE_REDIS_URL\" and .CATCHU_QUEUE_PREFIX == \"catchu\""; } > /dev/null 2>&1; echo $?)"
+check "api: worker 요청 정보 조회 켬(키는 Secret catchu-api에서), worker는 같은 이름의 키를 Secret catchu-worker에서 받음" \
+  "$( { q "$WORK/applied-api.yaml" "${API_ENV} | .WORKER_CONTEXT_ENABLED == \"true\" and .WORKER_CONTEXT_API_KEY == \"secret catchu-api WORKER_CONTEXT_API_KEY\"" \
+    && q "$WORK/applied-worker.yaml" "${API_ENV} | .WORKER_CONTEXT_API_KEY == \"secret catchu-worker WORKER_CONTEXT_API_KEY\""; } > /dev/null 2>&1; echo $?)"
+# GitHub 연결. 토큰 암호문은 EFS 접근점을 붙인 볼륨에 둔다. 볼륨 틀은 손으로 적용하는 파일이라 시험용 ID로 자리를 채워 읽는다.
+check "api: GitHub 연결 켬, 돌아올 주소는 https://catchu.dev/github/callback, Client ID·secret·암호화 키는 Secret catchu-api" \
+  "$(ok q "$WORK/applied-api.yaml" "${API_ENV} | .GITHUB_CONNECTION_ENABLED == \"true\" and .GITHUB_OAUTH_CALLBACK_URL == \"https://catchu.dev/github/callback\"
+      and .GITHUB_OAUTH_CLIENT_ID == \"secret catchu-api GITHUB_OAUTH_CLIENT_ID\" and .GITHUB_OAUTH_CLIENT_SECRET == \"secret catchu-api GITHUB_OAUTH_CLIENT_SECRET\"
+      and .GITHUB_CREDENTIAL_ENCRYPTION_KEY == \"secret catchu-api GITHUB_CREDENTIAL_ENCRYPTION_KEY\"")"
+check "api: GitHub 토큰 보관 폴더는 볼륨 요청 github-credentials를 붙인 곳이고 쓸 수 있음, Pod에 fsGroup 없음(접근점이 사용자 번호를 고정)" \
+  "$(ok q "$WORK/applied-api.yaml" '.[0].spec.template.spec | (.containers[0].env | map({(.name): .value}) | add | .GITHUB_CREDENTIAL_DIRECTORY) as $dir
+      | $dir == "/var/lib/catchu/github-credentials" and .securityContext.fsGroup == null
+      and ([.containers[0].volumeMounts[] | select(.name == "github-credentials")] == [{name: "github-credentials", mountPath: $dir}])')"
+fill() { sed -e 's/__EFS_FILE_SYSTEM__/fs-0123456789abcdef0/g' -e 's/__EFS_ACCESS_POINT__/fsap-0123456789abcdef0/g' "$1" > "$2"; }
+fill "$K8S/github-credentials-volume.yaml" "$WORK/volume.yaml"
+fill "$K8S/ops/efs-mount-test.yaml" "$WORK/mount-test.yaml"
+ADMIN_IMAGE=$(json "$K8S/ops/db-admin-pod.yaml" | jq -r '.[0].spec.containers[0].image')
+check "GitHub 토큰 보관 볼륨: EFS 드라이버·파일 시스템::접근점·TLS, 자동 생성 없음(요청의 storageClassName 빈 값)·지워도 파일 남김, 볼륨과 요청이 서로를 지정" \
+  "$(ok q "$WORK/volume.yaml" '(map({(.kind): .}) | add) as $o | length == 2
+      and ($o.PersistentVolume | .metadata.name == "catchu-github-credentials" and .metadata.namespace == null
+        and (.spec | .csi.driver == "efs.csi.aws.com" and .csi.volumeHandle == "fs-0123456789abcdef0::fsap-0123456789abcdef0"
+          and .csi.volumeAttributes == {encryptInTransit: "true"} and (.mountOptions // []) == []
+          and (.storageClassName // "") == "" and .persistentVolumeReclaimPolicy == "Retain" and .accessModes == ["ReadWriteOnce"]
+          and .claimRef == {namespace: "catchu", name: "github-credentials"}))
+      and ($o.PersistentVolumeClaim | .metadata.name == "github-credentials" and .metadata.namespace == "catchu"
+        and (.spec | .storageClassName == "" and .volumeName == "catchu-github-credentials" and .accessModes == ["ReadWriteOnce"]))')"
+check "볼륨 틀 원본은 자리표시 그대로라 손으로 apply하면 거부됨(모든 객체의 라벨 값이 형식에 맞지 않음), 채우면 남는 자리 없음" \
+  "$( { for f in "$K8S/github-credentials-volume.yaml" "$K8S/ops/efs-mount-test.yaml"; do
+      q "$f" 'all(.[]; [.metadata.labels[] | select(test("^__[A-Z_]+__$"))] | length >= 1)' || exit 1
+    done && ! grep -q '__[A-Z][A-Z_]*__' "$WORK/volume.yaml" "$WORK/mount-test.yaml"; } > /dev/null 2>&1; echo $?)"
+check "EFS 마운트 시험 틀: 세 경우(접근점+TLS, 접근점 없음, TLS 없음)의 볼륨·요청·Pod가 catchu-ops에서 짝이 맞음" \
+  "$(ok q "$WORK/mount-test.yaml" '(map(select(.kind == "PersistentVolume") | {(.metadata.name): .spec.claimRef.name}) | add) as $pv
+      | (([.[] | select(.kind == "PersistentVolume")
+        | {(.spec.claimRef.name): [.spec.csi.volumeHandle, .spec.csi.volumeAttributes.encryptInTransit, .spec.claimRef.namespace, (.spec.storageClassName // ""), .spec.persistentVolumeReclaimPolicy]}] | add)
+        == {"efs-test-ok": ["fs-0123456789abcdef0::fsap-0123456789abcdef0", "true", "catchu-ops", "", "Retain"],
+            "efs-test-no-ap": ["fs-0123456789abcdef0", "true", "catchu-ops", "", "Retain"],
+            "efs-test-no-tls": ["fs-0123456789abcdef0::fsap-0123456789abcdef0", "false", "catchu-ops", "", "Retain"]})
+      and ([.[] | select(.kind == "PersistentVolumeClaim") | .metadata.namespace == "catchu-ops" and .spec.storageClassName == ""
+          and $pv[.spec.volumeName] == .metadata.name] | length == 3 and all)
+      and ([.[] | select(.kind == "Pod") | .metadata.namespace == "catchu-ops"
+          and .spec.volumes == [{name: "efs", persistentVolumeClaim: {claimName: .metadata.name}}]] | length == 3 and all)')"
+check "EFS 마운트 시험 Pod: 다시 띄우지 않음·시간 한도, root 아님·seccomp·읽기 전용 루트·권한 전부 제거(Pod 보안 검사 restricted), DB 관리 Pod와 같은 이미지, 쿠버네티스가 바꾸는 \$(·\$\$가 명령에 없음" \
+  "$(ok q "$WORK/mount-test.yaml" "[.[] | select(.kind == \"Pod\") | .spec | .restartPolicy == \"Never\" and .activeDeadlineSeconds > 0
+        and .automountServiceAccountToken == false and .securityContext.runAsNonRoot == true and .securityContext.seccompProfile.type == \"RuntimeDefault\"
+        and (.hostNetwork // false) == false and (.containers | length) == 1 and (.containers[0] | .image == \"${ADMIN_IMAGE}\"
+          and (.securityContext | .allowPrivilegeEscalation == false and .readOnlyRootFilesystem == true and .capabilities.drop == [\"ALL\"])
+          and all(.command[]; (contains(\"\$(\") or contains(\"\$\$\")) | not))] | length == 3 and all")"
+check "NetworkPolicy: NFS 2049는 어디에도 열지 않음(EFS 마운트는 노드의 드라이버가 한다)" \
+  "$(ok q "$K8S/network-policy.yaml" '[.[] | (.spec.egress // [])[] | .ports[]?.port] | index(2049) == null')"
+check "내부 조회 경로: api 3001은 ALB 대역과 worker Pod에서만 받고, worker는 api 3001로 나갈 수 있음" \
+  "$(ok q "$K8S/network-policy.yaml" '(map({(.metadata.name): .}) | add) as $p
+      | ([$p.api.spec.ingress[] | {from: [.from[] | (.ipBlock.cidr // .podSelector.matchLabels["app.kubernetes.io/name"])], ports: [.ports[].port]}]
+        == [{from: ["192.168.0.0/19", "192.168.32.0/19"], ports: [3001]}, {from: ["worker"], ports: [3001]}])
+      and any($p.worker.spec.egress[]; .to == [{podSelector: {matchLabels: {"app.kubernetes.io/name": "api"}}}] and [.ports[].port] == [3001])')"
 # 회원 파일(PDF 원본·발행 사본)은 Pod의 빈 볼륨이 아니라 S3 버킷에 둔다. 버킷 이름은 네 곳(생성 스크립트·역할 정책·api·worker)이 같아야 한다.
 BUCKET=$(sed -n 's/^bucket=//p' "$HERE/create-s3.sh")
 check "api: 파일 저장은 s3(Pod 빈 볼륨 아님), 버킷은 create-s3.sh가 만드는 것, 지역 서울, 접근 키 값 없음" \
@@ -511,7 +569,6 @@ check "migration Pod: controller 없음·다시 띄우지 않음·시간 한도,
   "$(ok q "$WORK/created.yaml" '.[0] | .kind == "Pod" and .metadata.ownerReferences == null and .spec.restartPolicy == "Never"
       and .spec.activeDeadlineSeconds > 0 and .metadata.labels["app.kubernetes.io/name"] == "migration"
       and any(.spec.containers[0].env[]; .name == "DB_USER" and .value == "catchu_migrator")')"
-ADMIN_IMAGE=$(json "$K8S/ops/db-admin-pod.yaml" | jq -r '.[0].spec.containers[0].image')
 check "동의 기록 확인 Pod: controller 없음·다시 띄우지 않음·시간 한도, migration 계정·Secret·연결 허용 라벨, TLS 검증, DB 관리 Pod와 같은 이미지" \
   "$(ok q "$WORK/guard.yaml" ".[0] | .kind == \"Pod\" and .metadata.namespace == \"catchu\" and .metadata.ownerReferences == null
       and .spec.restartPolicy == \"Never\" and .spec.activeDeadlineSeconds > 0 and .metadata.labels[\"app.kubernetes.io/name\"] == \"migration\"
