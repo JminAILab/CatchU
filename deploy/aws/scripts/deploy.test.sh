@@ -521,13 +521,13 @@ check "볼륨 틀 원본은 자리표시 그대로라 손으로 apply하면 거�
   "$( { for f in "$K8S/github-credentials-volume.yaml" "$K8S/ops/efs-mount-test.yaml"; do
       q "$f" 'all(.[]; [.metadata.labels[] | select(test("^__[A-Z_]+__$"))] | length >= 1)' || exit 1
     done && ! grep -q '__[A-Z][A-Z_]*__' "$WORK/volume.yaml" "$WORK/mount-test.yaml"; } > /dev/null 2>&1; echo $?)"
-check "EFS 마운트 시험 틀: 세 경우(접근점+TLS, 접근점 없음, TLS 없음)의 볼륨·요청·Pod가 catchu-ops에서 짝이 맞음" \
+check "EFS 마운트 시험 틀: 세 경우(접근점+TLS, 접근점 없음, 접근점·TLS 없음)의 볼륨·요청·Pod가 catchu-ops에서 짝이 맞음" \
   "$(ok q "$WORK/mount-test.yaml" '(map(select(.kind == "PersistentVolume") | {(.metadata.name): .spec.claimRef.name}) | add) as $pv
       | (([.[] | select(.kind == "PersistentVolume")
         | {(.spec.claimRef.name): [.spec.csi.volumeHandle, .spec.csi.volumeAttributes.encryptInTransit, .spec.claimRef.namespace, (.spec.storageClassName // ""), .spec.persistentVolumeReclaimPolicy]}] | add)
         == {"efs-test-ok": ["fs-0123456789abcdef0::fsap-0123456789abcdef0", "true", "catchu-ops", "", "Retain"],
             "efs-test-no-ap": ["fs-0123456789abcdef0", "true", "catchu-ops", "", "Retain"],
-            "efs-test-no-tls": ["fs-0123456789abcdef0::fsap-0123456789abcdef0", "false", "catchu-ops", "", "Retain"]})
+            "efs-test-no-tls": ["fs-0123456789abcdef0", "false", "catchu-ops", "", "Retain"]})
       and ([.[] | select(.kind == "PersistentVolumeClaim") | .metadata.namespace == "catchu-ops" and .spec.storageClassName == ""
           and $pv[.spec.volumeName] == .metadata.name] | length == 3 and all)
       and ([.[] | select(.kind == "Pod") | .metadata.namespace == "catchu-ops"

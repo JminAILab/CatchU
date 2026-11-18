@@ -79,7 +79,9 @@ ko get events --field-selector reason=FailedMount -o custom-columns=POD:.involve
 |---|---|---|
 | `efs-test-ok`(접근점 + TLS) | `Completed`. 로그가 `folder 1000:1000 700`, `file 1000:1000 600`, `ok`, 남은 파일 수(처음에는 `0`) | 붙지 않으면 파일 시스템 정책의 접근점 조건이 IAM 없는 마운트에 맞지 않거나 드라이버 권한이 모자란 것이다. GitHub 연결 판본을 띄우지 않고 [README.md](README.md) 「1단계 만드는 순서」 4번대로 팀장과 정한다 |
 | `efs-test-no-ap`(접근점 없음) | `ContainerCreating`에 머물고 `FailedMount` 사건이 남는다 | 붙어서 `Error`로 끝나면(로그에 「거부되지 않고 붙었다」) 정책이 막지 못한 것이다. 띄우지 않고 팀장과 정한다 |
-| `efs-test-no-tls`(TLS 없음) | 위와 같다. 거부는 EFS 정책이 아니라 마운트 도구에서 날 수도 있다 | 위와 같다 |
+| `efs-test-no-tls`(접근점·TLS 없음) | 위와 같다 | 위와 같다 |
+
+TLS만 뺀 접근점 마운트는 시험하지 않는다. 드라이버가 접근점이 있으면 `encryptInTransit` 값과 관계없이 TLS를 붙여서, 그렇게 적어도 TLS로 붙는다(2026-11-18 첫 시험에서 확인).
 
 본 뒤에는 지운다. EFS의 파일은 남고, 시험 파일은 Pod가 스스로 지운다.
 
