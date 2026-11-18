@@ -1,25 +1,29 @@
-// 링크(발행본)당 한국 시간 하루 질문 횟수(기능 설계 BR3.1~BR3.3, performance-design NFR4.4, scalability-design NFR4.7, NFR6.4).
-// 전용 ioredis 연결 하나로 MULTI(INCR, EXPIREAT 다음 한국 자정)를 보낸다. 셀 수 없으면(주소 없음·명령 실패·1초 초과)
+// 한국 시간 하루 질문 횟수 둘: 링크(발행본)당(기능 설계 BR3.1~BR3.3, performance-design NFR4.4, scalability-design NFR4.7, NFR6.4)과
+// 작성자 한 명의 모든 링크 합계(#585, 2026-11-17 팀장 결정). 링크 수만큼 하루 호출량이 늘지 않게 합계를 하나 더 센다.
+// 전용 ioredis 연결 하나로 키마다 MULTI(INCR, EXPIREAT 다음 한국 자정)를 보낸다. 링크 횟수를 먼저 늘리고, 링크 한도 안일 때만
+// 작성자 합계를 늘린다(한 링크의 사용만으로 그 작성자의 다른 링크까지 막히지 않게). 셀 수 없으면(주소 없음·명령 실패·1초 초과)
 // 그 질문을 세지 않고 통과시키며 경고 로그만 남긴다(BR3.2). 거부된 질문도 늘린 값을 되돌리지 않는다(BR3.1).
 import IORedis from 'ioredis';
 import type { AnalysisQueueConfig } from '../analysis-queue/analysis-queue.config';
 import { errorName } from '../ai-run/ai-run-spec';
 import { watchRedisErrors } from '../common/redis-connection-errors';
-import { nextKoreanMidnightSeconds, questionCountKey } from './korean-date';
-import { QUESTION_COUNTER_TIMEOUT_MS, QUESTION_DAILY_LIMIT } from './rag-answer-config';
-import { type CountBypassReason, createRagAnswerLogger, type RagAnswerLogger, writeRagAnswerLog } from './rag-answer-log';
+import { nextKoreanMidnightSeconds, ownerQuestionCountKey, questionCountKey } from './korean-date';
+import { OWNER_QUESTION_DAILY_LIMIT, QUESTION_COUNTER_TIMEOUT_MS, QUESTION_DAILY_LIMIT } from './rag-answer-config';
+import {
+  type CountBypassReason, createRagAnswerLogger, type QuestionLimitScope, type RagAnswerLogger, writeRagAnswerLog,
+} from './rag-answer-log';
 
 /** Nest 주입 토큰. 시험은 메모리 구현을 넣는다. */
 export const QUESTION_COUNTER = Symbol('QUESTION_COUNTER');
 
 export type QuestionCountDecision =
   | { decision: 'ALLOWED' }
-  | { decision: 'LIMIT_REACHED' }
+  | { decision: 'LIMIT_REACHED'; limit: QuestionLimitScope }
   | { decision: 'BYPASSED'; reason: CountBypassReason };
 
 export interface QuestionCounter {
-  /** 그 발행본의 오늘 횟수를 1 늘리고 판정한다. 예외를 던지지 않는다(셀 수 없으면 BYPASSED). */
-  count(publicationId: string, now: Date): Promise<QuestionCountDecision>;
+  /** 그 발행본과 그 작성자의 오늘 횟수를 늘리고 판정한다. 예외를 던지지 않는다(셀 수 없으면 BYPASSED). */
+  count(publicationId: string, ownerMemberId: string, now: Date): Promise<QuestionCountDecision>;
   /** 앱 종료 훅에서 부른다. 여러 번 불러도 된다. */
   close(): Promise<void>;
 }
@@ -42,16 +46,23 @@ class CounterTimeout extends Error {
   override readonly name = 'CounterTimeout';
 }
 
-/** 한도 판정. 늘린 값이 100을 넘으면 거부한다(101번째부터, BR3.1). */
-function decide(count: number): QuestionCountDecision {
-  return count > QUESTION_DAILY_LIMIT ? { decision: 'LIMIT_REACHED' } : { decision: 'ALLOWED' };
+/**
+ * 두 한도의 세는 순서와 판정. 링크 횟수를 늘린 값이 100을 넘으면 거부하고(101번째부터, BR3.1) 작성자 합계는 건드리지 않는다.
+ * 링크 한도 안이면 작성자 합계를 늘리고 300을 넘으면 거부한다(301번째부터, #585). 늘린 값은 어느 쪽도 되돌리지 않는다.
+ */
+async function countInOrder(
+  increment: (key: string) => number | Promise<number>, linkKey: string, ownerKey: string,
+): Promise<QuestionCountDecision> {
+  if (await increment(linkKey) > QUESTION_DAILY_LIMIT) return { decision: 'LIMIT_REACHED', limit: 'LINK' };
+  if (await increment(ownerKey) > OWNER_QUESTION_DAILY_LIMIT) return { decision: 'LIMIT_REACHED', limit: 'OWNER' };
+  return { decision: 'ALLOWED' };
 }
 
 export interface RedisQuestionCounterOptions {
   redis: CounterRedis;
   prefix: string;
   logger?: RagAnswerLogger;
-  /** 명령 하나를 기다리는 상한(밀리초). 기본 1초. 시험만 짧게 넘긴다. */
+  /** 질문 하나의 횟수 세기(명령 묶음 둘)를 기다리는 상한(밀리초). 기본 1초. 시험만 짧게 넘긴다. */
   timeoutMs?: number;
 }
 
@@ -67,17 +78,23 @@ export class RedisQuestionCounter implements QuestionCounter {
     watchRedisErrors(options.redis, (error) => writeRagAnswerLog(this.logger, { event: 'qna.count-connection-error', error: errorName(error) }));
   }
 
-  async count(publicationId: string, now: Date): Promise<QuestionCountDecision> {
-    const key = questionCountKey(this.options.prefix, publicationId, now);
+  async count(publicationId: string, ownerMemberId: string, now: Date): Promise<QuestionCountDecision> {
+    const linkKey = questionCountKey(this.options.prefix, publicationId, now);
+    const ownerKey = ownerQuestionCountKey(this.options.prefix, ownerMemberId, now);
+    const expireAt = nextKoreanMidnightSeconds(now);
     try {
-      const results = await this.withinTimeout(
-        this.options.redis.multi().incr(key).expireat(key, nextKoreanMidnightSeconds(now)).exec());
-      const incremented = results?.[0];
-      if (!incremented || incremented[0] !== null || typeof incremented[1] !== 'number') throw new Error('INCR 결과가 없습니다.');
-      return decide(incremented[1]);
+      return await this.withinTimeout(countInOrder((key) => this.increment(key, expireAt), linkKey, ownerKey));
     } catch (error) {
       return this.bypass(publicationId, error instanceof CounterTimeout ? 'REDIS_TIMEOUT' : 'REDIS_ERROR');
     }
+  }
+
+  /** 키 하나를 MULTI(INCR, EXPIREAT)로 늘리고 늘린 값을 돌려준다. 결과 모양이 틀리면 던진다. */
+  private async increment(key: string, expireAt: number): Promise<number> {
+    const results = await this.options.redis.multi().incr(key).expireat(key, expireAt).exec();
+    const incremented = results?.[0];
+    if (!incremented || incremented[0] !== null || typeof incremented[1] !== 'number') throw new Error('INCR 결과가 없습니다.');
+    return incremented[1];
   }
 
   close(): Promise<void> {
@@ -96,7 +113,7 @@ export class RedisQuestionCounter implements QuestionCounter {
     }
   }
 
-  /** ioredis commandTimeout과 별도로 시계를 하나 더 둔다(MULTI·EXEC 묶음 전체를 1초 안에). 늦게 끝난 명령의 실패는 버린다. */
+  /** ioredis commandTimeout과 별도로 시계를 하나 더 둔다(두 키의 MULTI·EXEC 묶음 전체를 1초 안에). 늦게 끝난 명령의 실패는 버린다. */
   private async withinTimeout<T>(promise: Promise<T>): Promise<T> {
     let timer: NodeJS.Timeout | undefined;
     promise.catch(() => undefined);
@@ -131,19 +148,20 @@ export class NoRedisQuestionCounter implements QuestionCounter {
   async close(): Promise<void> {}
 }
 
-/** 시험 전용 메모리 계수기. 같은 키 규칙·한도로 센다. 앱 모듈에는 넣지 않는다. */
+/** 시험 전용 메모리 계수기. 같은 키 규칙·순서·한도로 센다. 앱 모듈에는 넣지 않는다. */
 export class InMemoryQuestionCounter implements QuestionCounter {
   readonly counts = new Map<string, number>();
   readonly expiries = new Map<string, number>();
 
   constructor(private readonly prefix = 'catchu') {}
 
-  async count(publicationId: string, now: Date): Promise<QuestionCountDecision> {
-    const key = questionCountKey(this.prefix, publicationId, now);
-    const next = (this.counts.get(key) ?? 0) + 1;
-    this.counts.set(key, next);
-    this.expiries.set(key, nextKoreanMidnightSeconds(now));
-    return decide(next);
+  async count(publicationId: string, ownerMemberId: string, now: Date): Promise<QuestionCountDecision> {
+    return countInOrder((key) => {
+      const next = (this.counts.get(key) ?? 0) + 1;
+      this.counts.set(key, next);
+      this.expiries.set(key, nextKoreanMidnightSeconds(now));
+      return next;
+    }, questionCountKey(this.prefix, publicationId, now), ownerQuestionCountKey(this.prefix, ownerMemberId, now));
   }
 
   async close(): Promise<void> {}
