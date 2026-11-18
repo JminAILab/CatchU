@@ -3,7 +3,9 @@
 # 세 경우를 함께 띄운다. Pod는 관리 namespace catchu-ops에서 돈다(자동 배포 역할이 닿지 않는 곳).
 #   efs-test-ok      접근점을 거친 TLS 마운트. 붙어야 하고, 시험 파일을 쓰고 읽고 지운 뒤 끝난다(Succeeded).
 #   efs-test-no-ap   접근점 없이 파일 시스템 맨 위를 마운트. 거부돼야 한다(Pod가 ContainerCreating에 머물고 FailedMount 사건이 남는다).
-#   efs-test-no-tls  같은 접근점을 TLS 없이 마운트. 거부돼야 한다(위와 같다).
+#   efs-test-no-tls  접근점도 TLS도 없이 마운트. 거부돼야 한다(위와 같다).
+# TLS만 뺀 접근점 마운트는 시험할 수 없다. 드라이버는 접근점이 있으면 encryptInTransit 값과 관계없이 TLS를 붙인다
+# (v3.5.4 pkg/driver/node.go: 접근점 마운트는 TLS 없이는 되지 않는다). 그래서 TLS 없는 경우는 접근점 없이 본다.
 # 이미지는 DB 관리 Pod(db-admin-pod.yaml)와 같은 것이다(셸이 있다). 접근점이 사용자 번호를 1000으로 고정하므로 Pod의 번호와
 # 관계없이 파일은 1000의 것으로 써진다. 시험 Pod는 망을 쓰지 않는다(마운트는 노드의 드라이버가 한다).
 # 명령에는 쿠버네티스가 바꾸는 $(·$$를 쓰지 않는다.
@@ -72,7 +74,7 @@ spec:
     name: efs-test-no-tls
   csi:
     driver: efs.csi.aws.com
-    volumeHandle: "__EFS_FILE_SYSTEM__::__EFS_ACCESS_POINT__"
+    volumeHandle: "__EFS_FILE_SYSTEM__"
     volumeAttributes:
       encryptInTransit: "false"
 ---
