@@ -5208,3 +5208,360 @@
 **Answer Mode**: guide (reused from intent-capture)
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-11-19T00:21:36Z
+**Event**: DECISION_RECORDED
+**Stage**: reverse-engineering
+**Decision**: A code knowledge base exists for CatchU but its analyzed paths have changed since it was built. How should the scan run?
+**Options**: Full rescan,Focused scan
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-19T00:36:49Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Focused scan으로 합니다. 살필 곳에 Catch 목록 조회(api/src/catches, 작성자 설명 걸러 보기와 확인 필요·비공개 표시), DB 변경 파일(api/src/database/migrations), 상단 메뉴(web/src/components/header), 개인정보처리방침 화면(web/src/features/privacy)을 더합니다."]
+**Message Id**: bca89d3b
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-19T00:36:50Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: CatchU의 코드 지식 기록이 있지만, 만든 뒤로 분석했던 코드(api의 published-index·ai-generation·rag-answer, web의 rag-answer)가 바뀌었습니다. 전체를 다시 살피면 기록을 통째로 바꾸고, 이번 작업 영역만 살피면 기존 기록에 합칩니다. 어떻게 할까요?
+**Reply**: Focused scan으로 합니다. 살필 곳에 Catch 목록 조회(api/src/catches, 작성자 설명 걸러 보기와 확인 필요·비공개 표시), DB 변경 파일(api/src/database/migrations), 상단 메뉴(web/src/components/header), 개인정보처리방침 화면(web/src/features/privacy)을 더합니다.
+**Options**: ["Full rescan","Focused scan"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-19T00:36:54Z
+**Event**: QUESTION_ANSWERED
+**Stage**: reverse-engineering
+**Details**: Focused scan으로 합니다. 살필 곳에 Catch 목록 조회(api/src/catches, 작성자 설명 걸러 보기와 확인 필요·비공개 표시), DB 변경 파일(api/src/database/migrations), 상단 메뉴(web/src/components/header), 개인정보처리방침 화면(web/src/features/privacy)을 더합니다.
+**Person Reply**: Focused scan으로 합니다. 살필 곳에 Catch 목록 조회(api/src/catches, 작성자 설명 걸러 보기와 확인 필요·비공개 표시), DB 변경 파일(api/src/database/migrations), 상단 메뉴(web/src/components/header), 개인정보처리방침 화면(web/src/features/privacy)을 더합니다.
+**Message Id**: bca89d3b
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-19T00:37:36Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-developer-agent
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T00:45:21Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/inception/reverse-engineering/developer-scan.md
+**Context**: inception > reverse-engineering > developer-scan.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T00:46:13Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/codekb-stage-CatchU/business-overview.md
+**Context**: .aidlc-engine > codekb-stage-CatchU > business-overview.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T00:48:02Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/codekb-stage-CatchU/architecture.md
+**Context**: .aidlc-engine > codekb-stage-CatchU > architecture.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T00:49:22Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/codekb-stage-CatchU/code-structure.md
+**Context**: .aidlc-engine > codekb-stage-CatchU > code-structure.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T00:50:53Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/codekb-stage-CatchU/api-documentation.md
+**Context**: .aidlc-engine > codekb-stage-CatchU > api-documentation.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T00:53:58Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/codekb-stage-CatchU/component-inventory.md
+**Context**: .aidlc-engine > codekb-stage-CatchU > component-inventory.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T00:54:49Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/codekb-stage-CatchU/technology-stack.md
+**Context**: .aidlc-engine > codekb-stage-CatchU > technology-stack.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T00:55:57Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/codekb-stage-CatchU/dependencies.md
+**Context**: .aidlc-engine > codekb-stage-CatchU > dependencies.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T00:58:12Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/codekb-stage-CatchU/code-quality-assessment.md
+**Context**: .aidlc-engine > codekb-stage-CatchU > code-quality-assessment.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-19T00:58:25Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/codekb-stage-CatchU/code-quality-assessment.md
+**Context**: .aidlc-engine > codekb-stage-CatchU > code-quality-assessment.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-19T00:58:27Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/codekb-stage-CatchU/code-quality-assessment.md
+**Context**: .aidlc-engine > codekb-stage-CatchU > code-quality-assessment.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T00:58:55Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/codekb-stage-CatchU/reverse-engineering-timestamp.md
+**Context**: .aidlc-engine > codekb-stage-CatchU > reverse-engineering-timestamp.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-19T00:59:39Z
+**Event**: HOST_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-19T00:59:39Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-developer-agent
+**Agent ID**: ac7d68c387b9a48f7
+
+---
+
+## Pipeline Link Completed
+**Timestamp**: 2026-11-19T00:59:58Z
+**Event**: PIPELINE_LINK_COMPLETED
+**Stage**: reverse-engineering
+**Link**: aidlc-developer-agent
+**Position**: 1/1
+**Artifact Path**: aidlc/spaces/default/intents/261118-publication-presets/inception/reverse-engineering/developer-scan.md
+**Artifact SHA256**: sha256:0bc330efce705c62ef7f5b06867566d7fcb8d559b3597586ef30769eb8ffc206
+**Artifact Mtime Ms**: 1795049121079.5542
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-19T01:00:38Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/inception/reverse-engineering/memory.md
+**Context**: inception > reverse-engineering > memory.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-19T01:00:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: 83f82113
+**Sensor ID**: required-sections
+**Stage slug**: reverse-engineering
+**Output path**: aidlc/spaces/default/codekb/CatchU/business-overview.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-19T01:00:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: 83f82113
+**Sensor ID**: required-sections
+**Stage slug**: reverse-engineering
+**Output path**: aidlc/spaces/default/codekb/CatchU/business-overview.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-19T01:00:39Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0236963b
+**Sensor ID**: upstream-coverage
+**Stage slug**: reverse-engineering
+**Output path**: aidlc/spaces/default/codekb/CatchU/business-overview.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-19T01:00:39Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0236963b
+**Sensor ID**: upstream-coverage
+**Stage slug**: reverse-engineering
+**Output path**: aidlc/spaces/default/codekb/CatchU/business-overview.md
+**Duration ms**: 79
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-19T01:00:40Z
+**Event**: SENSOR_FIRED
+**Fire id**: 56107811
+**Sensor ID**: required-sections
+**Stage slug**: reverse-engineering
+**Output path**: aidlc/spaces/default/codekb/CatchU/business-overview.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-19T01:00:40Z
+**Event**: SENSOR_PASSED
+**Fire id**: 56107811
+**Sensor ID**: required-sections
+**Stage slug**: reverse-engineering
+**Output path**: aidlc/spaces/default/codekb/CatchU/business-overview.md
+**Duration ms**: 90
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-19T01:00:40Z
+**Event**: SENSOR_FIRED
+**Fire id**: 23121c35
+**Sensor ID**: upstream-coverage
+**Stage slug**: reverse-engineering
+**Output path**: aidlc/spaces/default/codekb/CatchU/business-overview.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-19T01:00:40Z
+**Event**: SENSOR_PASSED
+**Fire id**: 23121c35
+**Sensor ID**: upstream-coverage
+**Stage slug**: reverse-engineering
+**Output path**: aidlc/spaces/default/codekb/CatchU/business-overview.md
+**Duration ms**: 82
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-19T01:00:40Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: reverse-engineering
+**Next Stage**: practices-discovery
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/codekb/CatchU/business-overview.md=passed; upstream-coverage@aidlc/spaces/default/codekb/CatchU/business-overview.md=passed
+**Open Decisions**: 0
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T01:00:54Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/inception/reverse-engineering/memory.md
+**Context**: inception > reverse-engineering > memory.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-19T01:35:04Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: 77d52311
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-19T01:35:05Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: Reverse Engineering 단계가 끝났습니다. 어떻게 할까요?
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-19T01:35:09Z
+**Event**: GATE_APPROVED
+**Stage**: reverse-engineering
+**User Input**: Approve
+**Person Reply**: Approve
+**Message Id**: 77d52311
+**Brief Digest**: none
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-19T01:35:09Z
+**Event**: STAGE_COMPLETED
+**Stage**: reverse-engineering
+**Validation Basis**: {"graphContract":"sha256:72cb0061cc2bfa02f78beef14e264730b8fd1cf497d7048086d7815c79c678d7","inputs":[],"outputs":[{"artifact":"api-documentation","contentHash":"sha256:28b131dc8194eaaaa1456d4b3b9b3bec07de9c40d5da0043bc92bc275ca50b03","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":true,"structureHash":"sha256:65016270b3dec9566de34a392feb9e7d1f3c9a0a923be3044db97b434491b2fc"},{"artifact":"architecture","contentHash":"sha256:d1630015fde97ec8e186d3ce2a9fc5df64cf74fb4bbab26b21599a929ef72d2c","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":true,"structureHash":"sha256:4f9b26f0b7a11760913f6b266aa2064039ea534198dc4bf30b67cf742f068e8c"},{"artifact":"business-overview","contentHash":"sha256:f782c288602c97581bbc894bde6fe49511d440e7bddc8df66cffff9311a63cfd","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":true,"structureHash":"sha256:887abf9b4bba795be6f89bc5add55ed1928e90d8866253339109c9f3c22513d4"},{"artifact":"code-quality-assessment","contentHash":"sha256:3deeee060bcf932d72a97036ac47e8b54e9658bd9bbac5af95d1e8b4a2aa59d5","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":true,"structureHash":"sha256:1c1c75628ef07d02a2663d243e5d23f4e8e7ad48e56904a827b61fa34d3116fc"},{"artifact":"code-structure","contentHash":"sha256:0cd8d41c98214b0e3dc794ec85bad21d5a9a88279caf556a700be18f04861586","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":true,"structureHash":"sha256:99eeb8749ba5fa30e99d6c666d35aba5fbc3c301e47a641fadbe13df7ceecb20"},{"artifact":"component-inventory","contentHash":"sha256:ea754fa80bab574e455d7b4fcf60a4f5453ead5b0f0d7d611c38de7d5d32a804","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":true,"structureHash":"sha256:5c0f28b0ec8aa4c1e89caa7f7823b0f72791fd03ce3a0c28e7e3bee8a6d9e977"},{"artifact":"dependencies","contentHash":"sha256:460e2abbc1ce3680530961ab07e7ed9e0cad8b8a129f377b0cdd4ec78a1784ae","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":true,"structureHash":"sha256:b1e3403314d365a26e0750b19c311f8dfb08bb1c4e9605daedbae54877d5cb11"},{"artifact":"reverse-engineering-timestamp","contentHash":"sha256:f48b9cbb2c533f27307cddb0041f99bbae2f4b02b80de4f19f36958efc6ba818","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":true,"structureHash":"sha256:9a74fc9d1a4dcf017412ffb2fba265c41a52193fe79044439016369fedd3c4a2"},{"artifact":"technology-stack","contentHash":"sha256:d437ca4d31cd51eec54e6465c5c251680023f083b6d1ad28edd140fca7cd32d1","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":true,"structureHash":"sha256:126a4772f448f1b70665dc171adf55a9fe9a9ccb82d43b87fddc0e185b6acc3f"}],"projectType":"brownfield","schema":3}
+**Details**: Stage Reverse Engineering approved by gate
+**Tokens In**: 216
+**Tokens Out**: 168216
+**Cache Read**: 43670402
+**Cache Write**: 652685
+**Cost USD**: 15.54
+**By Model**: opus-5-5=15.54
+**By Agent**: main=3.51; aidlc-developer-agent=12.03
+**Tokens By Model**: opus-5-5=216/168.2k/43.7M/652.7k
+**Tokens By Agent**: main=50/13.3k/13.9M/57.8k; aidlc-developer-agent=166/154.9k/29.8M/594.9k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-19T01:35:09Z
+**Event**: STAGE_STARTED
+**Stage**: practices-discovery
+**Agent**: aidlc-pipeline-deploy-agent
+**Answer Mode**: guide (reused from intent-capture)
+
+---
