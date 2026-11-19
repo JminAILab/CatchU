@@ -16,7 +16,7 @@ B 담당의 제품 `/assets`와 개발용 미리보기를 관리한다. 제품 �
 - `web/.env.example`에 따라 `NEXT_PUBLIC_API_BASE_URL`을 API 주소(`/v1` 제외)로 설정한다. 개발용 로그인은 web과 api 양쪽에서 허용할 때만 사용한다. 실행 안내는 [공통 web README](../../../README.md)를 따른다.
 - `/assets`에 들어가면 미인증 상태는 `/login?next=…`로 이동한다. 로그인 후 저장소 필터와 Catch 상세 주소로 돌아간다. 현재 메모리 토큰은 새로고침 시 다시 로그인이 필요하며 실제 Google OAuth 연결을 의미하지 않는다.
 - B 조회·저장은 `createCatchApi(api.member)`, D 모달은 `createRepositoryApi(api.member)`를 사용한다. 두 인스턴스와 `accessTokenStore`는 모듈 수준의 안정적인 객체다.
-- 저장소 이름은 별도로 조회한다. 로딩·실패는 필터 아래에 표시하며 Catch 목록·상세를 숨기지 않는다. 정상 0건과 실패를 구분하고, 이름을 몰라도 URL 필터와 조회된 Catch를 유지한다. 이름 다시 불러오기는 Catch의 필터·페이지·저장 결과를 초기화하지 않는다.
+- 저장소 이름은 별도로 조회한다. 로딩·실패는 필터 아래에 표시하며 Catch 목록·상세를 숨기지 않는다. 정상 0건과 실패를 구분하고, 이름을 몰라도 URL 필터와 조회된 Catch를 유지한다. GitHub 연결이 없거나 다시 연동해야 해서 `/v1/me/repositories`가 403 `GITHUB_CONNECTION_REQUIRED`이면 실패 안내를 보이지 않는다. 연동 안내는 위쪽 연결 관리가 맡는다. 다른 403·500·통신 오류에는 지금처럼 실패 안내와 [다시 불러오기]를 보인다(#613). 이름 다시 불러오기는 Catch의 필터·페이지·저장 결과를 초기화하지 않는다.
 - D 일반 닫기는 B 목록을 갱신하고 저장소 이름도 다시 조회한다. [이 저장소 Catch 보기]는 선택한 저장소의 목록과 이름을 갱신하며 일반 닫기 콜백을 추가 호출하지 않는다.
 - 새 저장소 선택·동의·분석 요청은 [#154](https://github.com/JminAILab/CatchU/issues/154)의 `connectSection`, GitHub 연동·복귀는 회원 담당 화면에서 연결한다. 제품 조립만으로 이 기능들이 구현된 것은 아니다.
 
