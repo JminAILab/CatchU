@@ -41,7 +41,7 @@ const inheritedEnv = () => Object.fromEntries(Object.entries(process.env).filter
 function readPort(name, fallback) {
   const value = process.env[name] ?? String(fallback);
   const port = Number(value);
-  if (!/^\d+$/.test(value) || port < 1 || port > 65535) throw new StopError(`${name}는 1~65535 사이의 정수여야 합니다.`);
+  if (!/^\d+$/.test(value) || port < 1 || port > 65535) throw new StopError(`${name} 값은 1~65535 사이의 정수여야 합니다.`);
   return port;
 }
 
@@ -124,7 +124,7 @@ async function waitForHttp(server, url, timeoutMs) {
   const deadline = performance.now() + timeoutMs;
   while (performance.now() < deadline) {
     if (server.child.exitCode !== null) {
-      throw new StopError(`${server.label}가 뜨기 전에 끝났습니다. 출력 끝부분(주소를 지움):\n${redact(server.tail.join('\n'))}`);
+      throw new StopError(`${server.label} 서버가 뜨기 전에 끝났습니다. 출력 끝부분(주소를 지움):\n${redact(server.tail.join('\n'))}`);
     }
     try {
       const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(2_000) });
@@ -135,7 +135,7 @@ async function waitForHttp(server, url, timeoutMs) {
     }
     await sleep(300);
   }
-  throw new StopError(`${server.label}가 ${timeoutMs / 1000}초 안에 응답하지 않았습니다. 출력 끝부분(주소를 지움):\n${redact(server.tail.join('\n'))}`);
+  throw new StopError(`${server.label} 서버가 ${timeoutMs / 1000}초 안에 응답하지 않았습니다. 출력 끝부분(주소를 지움):\n${redact(server.tail.join('\n'))}`);
 }
 
 /** 그 포트에 이미 누가 듣고 있는지 본다. localhost가 ::1로 먼저 갈 수 있어 두 주소를 다 본다. */
@@ -148,7 +148,7 @@ async function assertPortFree(port, name) {
       socket.once('connect', () => done(true));
       socket.once('error', () => done(false));
     });
-    if (listening) throw new StopError(`포트 ${port}(${host})를 이미 쓰고 있습니다. ${name}로 다른 포트를 정해 다시 실행하세요.`);
+    if (listening) throw new StopError(`이미 쓰고 있는 포트입니다: ${port}(${host}). ${name} 값으로 다른 포트를 정해 다시 실행하세요.`);
   }
 }
 
@@ -160,7 +160,7 @@ async function preflight({ container, ports }) {
   if (docker.code !== 0) throw new StopError('Docker에 연결하지 못했습니다. Docker Desktop(또는 Docker 엔진)을 켠 뒤 다시 실행하세요.');
   const existing = await exec('docker', ['container', 'inspect', container]);
   if (existing.code === 0) {
-    throw new StopError(`같은 이름의 컨테이너(${container})가 이미 있어 멈춥니다. 이 시험이 남긴 것이면 docker rm -f -v ${container}로 지운 뒤 다시 실행하세요.`);
+    throw new StopError(`같은 이름의 컨테이너(${container})가 이미 있어 멈춥니다. 이 시험이 남긴 것이면 지운 뒤 다시 실행하세요: docker rm -f -v ${container}`);
   }
   await assertPortFree(ports.web, 'CATCHU_E2E_WEB_PORT');
   await assertPortFree(ports.api, 'CATCHU_E2E_API_PORT');
@@ -199,7 +199,7 @@ async function main() {
       for (const server of [...servers].reverse()) await stopServer(server);
       if (containerCreated) {
         const removed = await exec('docker', ['rm', '-f', '-v', container]);
-        log(removed.code === 0 ? `DB 컨테이너를 지웠습니다: ${container}` : `DB 컨테이너를 지우지 못했습니다. docker rm -f -v ${container}로 지우세요.`);
+        log(removed.code === 0 ? `DB 컨테이너를 지웠습니다: ${container}` : `DB 컨테이너를 지우지 못했습니다. 직접 지우세요: docker rm -f -v ${container}`);
       }
     })();
     return cleaning;
@@ -290,16 +290,21 @@ async function main() {
     });
     times['시험'] = performance.now() - mark;
     return code;
+  } catch (error) {
+    // 멈춘 까닭을 정리·걸린 시간 줄보다 먼저 보인다.
+    console.error(`[e2e] ${error instanceof StopError ? error.message : redact(error?.stack ?? error)}`);
+    return 2;
   } finally {
     await cleanup();
-    const total = performance.now() - started;
-    log(`걸린 시간: ${Object.entries(times).map(([label, ms]) => `${label} ${seconds(ms)}`).join(' · ')} · 전체 ${seconds(total)}`);
+    const parts = [...Object.entries(times).map(([label, ms]) => `${label} ${seconds(ms)}`), `전체 ${seconds(performance.now() - started)}`];
+    log(`걸린 시간: ${parts.join(' · ')}`);
   }
 }
 
 main().then((code) => {
   process.exitCode = code;
 }).catch((error) => {
-  console.error(`[e2e] ${error instanceof StopError ? error.message : redact(error?.stack ?? error)}`);
+  // 정리 중에 난 오류처럼 위에서 받지 못한 것.
+  console.error(`[e2e] ${redact(error?.stack ?? error)}`);
   process.exitCode = 2;
 });

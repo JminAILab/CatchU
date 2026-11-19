@@ -31,7 +31,7 @@ export function toolText(result) {
 
 /** 정상 도구 응답의 JSON. 도구 오류면 응답 글을 싣지 않고 실패한다. */
 export function toolJson(result, toolName) {
-  if (result.isError === true) throw new Error(`${toolName}이 도구 오류로 돌아왔습니다.`);
+  if (result.isError === true) throw new Error(`${toolName} 호출이 도구 오류로 돌아왔습니다.`);
   return JSON.parse(toolText(result));
 }
 
