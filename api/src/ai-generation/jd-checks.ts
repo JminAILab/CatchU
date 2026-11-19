@@ -2,8 +2,7 @@
 // 전제: 한 호출은 JD 요구사항 한 줄(userText 한 줄)이다(FR6.1). 그래서 "같은 응답"은 "같은 요구사항"이다.
 import type { AiGenerationRequest, GatedItem, JdRole } from './ai-generation.types';
 import {
-  catchPrNumbers, type CheckTokens, citedTarget, englishTermsInOrder, extractCheckTokens, passesCitedCheck,
-  passesInterpretationCheck, publicationTokens,
+  catchPrNumbers, type CheckTokens, englishTermsInOrder, extractCheckTokens, passesInterpretationCheck, publicationTokens,
 } from './fact-check';
 
 /** JD 머리줄 셋(BR4.1). 이 순서로 쓰게 하고, 앞뒤 공백을 뗀 줄이 이 글과 같을 때만 머리줄로 본다(BR4.2). */
@@ -41,11 +40,13 @@ export function roleShapeProblem(item: GatedItem): JdDropReason | null {
   return null;
 }
 
-/** BR4.4·BR4.6: 근거는 인용 항목 대조, 확인되지 않는 점은 인용이 있으면 인용 대조·없으면 AI 해석 대조(JD 줄 허용 없음). */
-function passesEvidenceOrUnconfirmed(item: GatedItem, request: AiGenerationRequest, publication: CheckTokens): boolean {
-  const tokens = extractCheckTokens(item.text);
-  if (item.citations.length > 0) return passesCitedCheck(tokens, citedTarget(item, request));
-  return passesInterpretationCheck(tokens, publication);
+/**
+ * BR4.4·BR4.6: 근거와 확인되지 않는 점은 인용이 있으면 남기고(#581, 질의응답·기본 요약과 같음),
+ * 인용 없는 확인되지 않는 점은 AI 해석 대조를 받는다(JD 줄 허용 없음).
+ */
+function passesEvidenceOrUnconfirmed(item: GatedItem, publication: CheckTokens): boolean {
+  if (item.citations.length > 0) return true;
+  return passesInterpretationCheck(extractCheckTokens(item.text), publication);
 }
 
 /**
@@ -76,7 +77,7 @@ export function checkJdItems(items: readonly GatedItem[], request: AiGenerationR
   const verdicts = items.map((item): JdDropReason | null => {
     const problem = roleShapeProblem(item);
     if (problem !== null || item.jdRole === 'INTERVIEW_QUESTION') return problem;
-    return passesEvidenceOrUnconfirmed(item, request, publication) ? null : 'fact';
+    return passesEvidenceOrUnconfirmed(item, publication) ? null : 'fact';
   });
   const evidence = items.filter((item, index) => item.jdRole === 'EVIDENCE' && verdicts[index] === null);
   items.forEach((item, index) => {

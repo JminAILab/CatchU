@@ -21,23 +21,25 @@ async function collect(iterable) {
   return items;
 }
 
-test('스트림은 항목마다 대조를 통과한 것만 순서대로 내보내고, 인용은 원문 위치로 연결된다', async (t) => {
+test('스트림은 항목마다 판정을 통과한 것만 순서대로 내보내고(인용 항목은 대조 없이 남음, #581), 인용은 원문 위치로 연결된다', async (t) => {
   const logs = captureLogs(t);
   const { gate, requests } = gateWith([sseResponse(messageEvents([
     ['- 로그인 시험 12개를 추가했다', [blockCitation(0, 0, 1)]],
     ['\n- 로그인 시험 40개를 추가했다', [blockCitation(0, 0, 1)]],
     ['\n- 배포 스크립트를 정리했다', [blockCitation(0, 1, 2)]],
+    ['\n- 저장소 3개를 관리했다', []],
     ['\n- 꾸준히 협업했다\n', []],
   ]))]);
   const items = await collect(gate.generateStream(qna()));
   assert.equal(requests[0].body.stream, true);
   assert.deepEqual(items.map((item) => [item.kind, item.text]), [
-    ['CITED', '로그인 시험 12개를 추가했다'], ['CITED', '배포 스크립트를 정리했다'], ['AI_INTERPRETATION', '꾸준히 협업했다']]);
-  assert.equal(items[1].citations[0].quote, '배포 스크립트를 정리했다');
-  assert.equal(items[1].citations[0].location.charStart, 100 + SOURCE_TEXT.indexOf('배포'));
+    ['CITED', '로그인 시험 12개를 추가했다'], ['CITED', '로그인 시험 40개를 추가했다'], ['CITED', '배포 스크립트를 정리했다'],
+    ['AI_INTERPRETATION', '꾸준히 협업했다']]);
+  assert.equal(items[2].citations[0].quote, '배포 스크립트를 정리했다');
+  assert.equal(items[2].citations[0].location.charStart, 100 + SOURCE_TEXT.indexOf('배포'));
   const result = logs.find((log) => log.args[0]?.event === 'ai_gate_result').args[0];
   assert.deepEqual([result.mode, result.itemCount, result.droppedCount, result.dropReasons.fact, result.stopReason, result.requestId],
-    ['STREAM', 3, 1, 1, 'end_turn', 'req_stream_0001']);
+    ['STREAM', 4, 1, 1, 'end_turn', 'req_stream_0001']);
 });
 
 test('항목 줄이 끝나면 응답이 끝나기 전에 그 항목을 내보낸다', async (t) => {
