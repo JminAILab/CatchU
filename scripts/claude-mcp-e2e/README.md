@@ -46,6 +46,7 @@ npx playwright install --only-shell chromium
 | FFmpeg(headless shell과 함께 받아진다) | Playwright ffmpeg v1013 | 내려받기 1.4~2.2 MB. 풀면 Windows 3.9 MB | 위와 같은 캐시 |
 
 - 꾸러미에는 설치 스크립트가 없어 `npm ci`만으로는 브라우저를 받지 않는다. 브라우저는 위 `npx playwright install` 한 줄로만 받는다.
+- Linux에서는 Chromium이 쓰는 시스템 라이브러리가 없으면 브라우저가 뜨지 않는다. 처음 한 번 이 폴더에서 `npx playwright install-deps chromium-headless-shell`로 깐다. sudo 없이 실행하면 Playwright가 sudo 비밀번호를 묻고 apt 꾸러미를 깐다. 빠진 것만 깔려면 위 표의 캐시 아래 headless shell 실행 파일을 `ldd`로 보고, `not found`로 나온 라이브러리의 꾸러미만 깐다. 예를 들어 Ubuntu 26.04(WSL2)에서는 `libnspr4.so`·`libnss3.so`·`libnssutil3.so`·`libasound.so.2`가 없어 `libnspr4`·`libnss3`·`libasound2t64`를 깔았다(의존성까지 6개, `install-deps`로는 39개).
 - 이 폴더는 CI의 의존성 취약점 검사(`deps-audit`)가 보지 않는다. 꾸러미를 바꿀 때는 이 폴더에서 `npm audit --package-lock-only --include=dev`를 돌려 결과를 PR에 적는다.
 
 ## 실행
@@ -87,7 +88,7 @@ npm run e2e
 |---|---|
 | 같은 이름의 컨테이너가 있다 | 이 시험이 남긴 것이면 `docker rm -f -v catchu-mcp-e2e-db`로 지우고 다시 돌린다. 남의 컨테이너면 `CATCHU_E2E_DB_CONTAINER`로 이름을 바꾼다. |
 | 포트를 이미 쓴다 | 그 포트의 환경변수로 다른 포트를 준다. |
-| Chromium을 띄우지 못했다 | 이 폴더에서 `npx playwright install --only-shell chromium`. |
+| Chromium을 띄우지 못했다 | 이 폴더에서 `npx playwright install --only-shell chromium`. Linux에서 다시 받아도 같으면 「준비」의 Linux 줄대로 시스템 라이브러리를 깐다. |
 | Docker에 연결하지 못했다 | Docker Desktop(또는 Docker 엔진)을 켠다. |
 | 도중에 Ctrl+C | 서버와 DB 컨테이너 정리를 시도하고 끝난다. 「DB 컨테이너를 지웠습니다」 줄이 안 보이면 위 첫 줄대로 컨테이너를 지운다. |
 
