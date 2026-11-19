@@ -392,6 +392,48 @@ def test_pdf_extraction_does_not_wait_for_running_analysis(
 
 
 @requires_redis
+def test_stalled_pdf_queue_does_not_cut_running_analysis(
+    prefix: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # #603: 한 큐에서 일을 가져오지 못해 프로세스를 끝낼 때, 종료 순서는 모든 큐의 처리 중인 작업을 끊는다.
+    # 그래서 PDF 큐가 멈춰도 처리 중인 분석이 끝난 뒤에 끝낸다. 분석 자식은 7초 일한 뒤 MOCK 처리한다.
+    monkeypatch.setenv("SLOW_CHILD_SECONDS", "7")
+
+    async def never_answers(*_: Any) -> Any:
+        await asyncio.Event().wait()
+
+    async def go() -> None:
+        limits = replace(FAST, fetch_stall=3, fetch_watch_interval=0.2)
+        service = ConsumerService(
+            replace(_settings(prefix, _pdf_settings(tmp_path)), limits=limits),
+            port=_free_port(),
+            install_signals=False,
+            child_target=consumer_children.work_for_seconds,
+            worker_options={"drainDelay": 0.5},
+            hard_exit=_no_hard_exit,
+        )
+        async with _running(service) as task:
+            await _wait_state(service, "running", 20)
+            analysis = mock_request(new_attempt())
+            await _add_request(prefix, analysis)
+            await _until(
+                lambda: service.processor is not None and service.processor.spawned > 0,
+                20,
+                "분석 자식 시작",
+            )
+            # PDF 큐만 멈춘다: 다음 기다리기부터 응답이 오지 않는다(감시 시간 3초 < 분석 7초).
+            assert service.pdf_worker is not None
+            service.pdf_worker.backend.waitForJob = never_answers
+
+            assert await asyncio.wait_for(task, 30) == 1
+        state, job = await _job(prefix, queues.REQUEST_QUEUE, analysis["attemptId"])
+        assert state == "completed"
+        assert job.returnvalue == {"handled": "RESULT_SENT", "outcome": "SUCCEEDED"}
+
+    asyncio.run(go())
+
+
+@requires_redis
 def test_stop_while_pdf_child_hangs_fails_job_without_result(
     prefix: str, tmp_path: Path
 ) -> None:

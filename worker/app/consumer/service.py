@@ -29,7 +29,7 @@ from app.consumer.health import ConsumerState, create_health_app
 from app.consumer.parent import OutputQueue, ProcessingAborted, RequestProcessor
 from app.consumer.receipts import ReceiptWatcher, ResultJobView
 from app.consumer.settings import ConsumerSettings, queue_connection
-from app.consumer.watch import FetchWatch
+from app.consumer.watch import FetchWatch, stalled_watch
 from app.pdf_extraction.child import pdf_child_main, pdf_child_settings
 from app.pdf_extraction.envelope import PDF_IDENTIFYING_FIELDS, classify_receipt
 from app.pdf_extraction.worker import PdfExtractionProcessor, PdfProcessingAborted
@@ -266,22 +266,22 @@ class ConsumerService:
         """실행 작업은 살아 있는데 큐에서 일을 가져오지 못하는 멈춤을 본다(#603).
 
         `_run_finished`와 같은 이유로 상태 확인만 바꾸지 않고 프로세스를 끝낸다. 다시 띄우는 것은 실행
-        환경의 몫이다. 처리 중인 작업이 있으면 멈춤으로 세지 않으므로 분석 도중에 끝내지 않는다.
+        환경의 몫이다. 종료 순서는 모든 큐의 처리 중인 작업을 끊으므로, 어느 큐든(분석·PDF) 처리 중인
+        작업이 있으면 그 작업이 끝날 때까지 끝내지 않는다.
         """
         while not self._stopping:
             await asyncio.sleep(self._limits.fetch_watch_interval)
-            for watch in self._fetch_watches:
-                quiet = watch.quiet_seconds()
-                if quiet < self._limits.fetch_stall or self._stopping:
-                    continue
-                logger.error(
-                    "큐에서 일을 가져오지 못한 지 %.0f초가 지나 프로세스를 끝냄: queue=%s",
-                    quiet,
-                    watch.queue_name,
-                )
-                self._consumer_failed = True
-                self.request_stop()
-                return
+            watch = stalled_watch(self._fetch_watches, self._limits.fetch_stall)
+            if watch is None or self._stopping:
+                continue
+            logger.error(
+                "큐에서 일을 가져오지 못한 지 %.0f초가 지나 프로세스를 끝냄: queue=%s",
+                watch.quiet_seconds(),
+                watch.queue_name,
+            )
+            self._consumer_failed = True
+            self.request_stop()
+            return
 
     async def run(self) -> int:
         loop = asyncio.get_running_loop()

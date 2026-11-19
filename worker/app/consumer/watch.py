@@ -7,10 +7,13 @@ BullMQ Worker의 실행 작업은 살아 있는데 큐에서 일을 꺼내 가�
 
 가져오기는 일이 없어도 몇 초마다(기다리기 명령의 서버 쪽 상한, 최대 10초) 빈 응답으로 돌아온다.
 처리 중에는 가져오지 않으므로(동시 수 1) 처리 중인 시간은 멈춤으로 세지 않는다.
+
+멈춤을 보면 프로세스를 끝내는데, 종료 순서는 모든 큐의 처리 중인 작업을 끊는다. 그래서 한 큐가 멈췄어도
+다른 큐에 처리 중인 작업이 있으면 그 작업이 끝날 때까지 미룬다(`stalled_watch`).
 """
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 
 
@@ -43,9 +46,23 @@ class FetchWatch:
         # 실행 작업은 가져올 때마다 `self.getNextJob`을 부르므로 인스턴스에서 바꿔 끼운다.
         worker.getNextJob = tracked
 
+    @property
+    def busy(self) -> bool:
+        """이 큐에 처리 중인 작업이 있다."""
+        return self._processor.active > 0
+
     def quiet_seconds(self) -> float:
         """처리 중이 아닌 채로, 가져오기 시도가 응답을 받지 못한 시간."""
         now = self._clock()
-        if self._processor.active > 0:
+        if self.busy:
             self._alive_at = now
         return now - self._alive_at
+
+
+def stalled_watch(watches: Sequence[FetchWatch], limit: float) -> FetchWatch | None:
+    """프로세스를 끝낼 만큼 멈춘 큐의 감시. 어느 큐든 처리 중인 작업이 있으면 없다고 답한다."""
+    # 처리 중인 큐의 시각이 갱신되도록 모든 감시에 먼저 묻는다.
+    quiet = [(watch.quiet_seconds(), watch) for watch in watches]
+    if any(watch.busy for watch in watches):
+        return None
+    return next((watch for seconds, watch in quiet if seconds >= limit), None)

@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from app.consumer.watch import FetchWatch
+from app.consumer.watch import FetchWatch, stalled_watch
 
 
 class _Clock:
@@ -19,9 +19,8 @@ class _Clock:
 class _Worker:
     """BullMQ Worker의 가져오기 면만 흉내 낸다."""
 
-    name = "analysis-requests"
-
-    def __init__(self) -> None:
+    def __init__(self, name: str = "analysis-requests") -> None:
+        self.name = name
         self.fail = False
         self.calls: list[str] = []
 
@@ -75,3 +74,31 @@ def test_time_spent_processing_is_not_quiet_time() -> None:
     # 처리가 끝난 순간부터 다시 센다.
     clock.now += 12
     assert watch.quiet_seconds() == 12
+
+
+def test_stalled_queue_waits_for_work_in_progress_on_another_queue() -> None:
+    """프로세스를 끝내면 모든 큐의 처리 중인 작업이 끊기므로, 다른 큐의 작업이 끝날 때까지 미룬다."""
+    clock = _Clock()
+    analysis, pdf = _Processor(), _Processor()
+    watches = [
+        FetchWatch(_Worker(), analysis, clock),
+        FetchWatch(_Worker("pdf-extraction-requests"), pdf, clock),
+    ]
+
+    analysis.active = 1  # 분석은 처리 중이고, PDF 큐는 가져오기가 응답을 받지 못한다
+    clock.now += 400
+    assert stalled_watch(watches, 300) is None
+    analysis.active = 0  # 분석이 끝나면 멈춘 큐를 이유로 끝낸다
+    stalled = stalled_watch(watches, 300)
+    assert stalled is not None
+    assert stalled.queue_name == "pdf-extraction-requests"
+
+
+def test_no_queue_is_stalled_below_the_limit() -> None:
+    clock = _Clock()
+    watches = [FetchWatch(_Worker(), _Processor(), clock)]
+
+    clock.now += 299
+    assert stalled_watch(watches, 300) is None
+    clock.now += 1
+    assert stalled_watch(watches, 300) is watches[0]

@@ -740,6 +740,35 @@ async def _wait_job_state(prefix: str, job_id: str, state: str, timeout: float) 
     return seen
 
 
+async def _freeze_as(service: ConsumerService, proxy: _Proxy, command: str) -> None:
+    """worker가 큐에 `command`를 보내려는 순간에 얼린다(BullMQ 백엔드의 그 호출 직전).
+
+    - `waitForJob`: 기다리기 명령. 그 접속은 응답만 기다리고, 종료 때 기다리기를 취소할 수 있다.
+    - `moveToActive`: 기다리기가 끝난 뒤의 가져오기 명령. 종료 때 취소되지 않는다.
+    """
+    worker = service.worker
+    assert worker is not None
+    original = getattr(worker.backend, command)
+    frozen = asyncio.Event()
+
+    async def freeze_then_send(*args: Any, **kwargs: Any) -> Any:
+        setattr(worker.backend, command, original)
+        proxy.freeze()
+        frozen.set()
+        return await original(*args, **kwargs)
+
+    setattr(worker.backend, command, freeze_then_send)
+    await asyncio.wait_for(frozen.wait(), 10)
+
+
+class _HardExit(Exception):
+    """종료 상한을 넘겨 프로세스를 강제로 끝내는 자리(운영에서는 SIGKILL)."""
+
+
+def _record_hard_exit(code: int) -> NoReturn:
+    raise _HardExit(code)
+
+
 def test_new_request_is_taken_after_queue_connections_die_silently(
     prefix: str,
 ) -> None:
@@ -757,8 +786,7 @@ def test_new_request_is_taken_after_queue_connections_die_silently(
         )
         task = asyncio.create_task(service.run())
         await _wait_state(service, "running", 10)
-        await asyncio.sleep(1)  # 기다리기 명령이 걸려 있는 동안 끊는다
-        proxy.freeze()
+        await _freeze_as(service, proxy, "waitForJob")
         message = mock_request(new_attempt())
         await add_request(prefix, message)
 
@@ -784,7 +812,7 @@ def test_process_ends_when_nothing_is_fetched_from_the_queue(
 
     async def go() -> None:
         proxy, url = await _proxied()
-        limits = replace(FAST, queue_socket=60, fetch_stall=3, fetch_watch_interval=0.2)
+        limits = replace(FAST, queue_socket=60, fetch_stall=4, fetch_watch_interval=0.2)
         service = ConsumerService(
             settings_for(prefix, url=url, limits=limits),
             port=free_port(),
@@ -794,8 +822,8 @@ def test_process_ends_when_nothing_is_fetched_from_the_queue(
         )
         task = asyncio.create_task(service.run())
         await _wait_state(service, "running", 10)
-        await asyncio.sleep(1)
-        proxy.freeze()
+        # 얼리는 순간을 고른다. 가져오기 명령을 보내던 중이면 종료가 상한을 넘겨 강제 종료로 끝난다(아래 시험).
+        await _freeze_as(service, proxy, "waitForJob")
         message = mock_request(new_attempt())
         await add_request(prefix, message)
         await asyncio.sleep(1.5)
@@ -819,14 +847,53 @@ def test_process_ends_when_nothing_is_fetched_from_the_queue(
     )
 
 
+def test_process_still_ends_when_the_fetch_command_itself_hangs(
+    prefix: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """가져오기 명령을 보내던 중에 큐가 조용해지면 정상 종료가 그 명령을 기다리다 상한을 넘긴다.
+
+    그때도 프로세스는 끝난다: 종료 상한 뒤 강제 종료다(운영에서는 SIGKILL, 종료 코드 137).
+    """
+
+    async def go() -> None:
+        proxy, url = await _proxied()
+        limits = replace(
+            FAST, queue_socket=60, fetch_stall=2, fetch_watch_interval=0.2, shutdown=3
+        )
+        service = ConsumerService(
+            settings_for(prefix, url=url, limits=limits),
+            port=free_port(),
+            install_signals=False,
+            worker_options={"drainDelay": 0.5, "runRetryDelay": 200},
+            hard_exit=_record_hard_exit,
+        )
+        task = asyncio.create_task(service.run())
+        await _wait_state(service, "running", 10)
+        await _freeze_as(service, proxy, "moveToActive")
+
+        with pytest.raises(_HardExit) as raised:
+            await asyncio.wait_for(task, 15)
+        assert raised.value.args == (1,)
+        await proxy.close()
+
+    with caplog.at_level(logging.ERROR, logger="app.consumer.service"):
+        asyncio.run(go())
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("큐에서 일을 가져오지 못한 지" in message for message in messages)
+    assert any("종료 상한(3초)을 넘겨" in message for message in messages)
+
+
 def test_idle_and_long_processing_are_not_taken_for_a_stall(
     prefix: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """일이 없어 기다리는 동안과, 감시 시간보다 긴 처리 동안에는 프로세스를 끝내지 않는다."""
-    monkeypatch.setenv("SLOW_CHILD_SECONDS", "4")
+    """일이 없어 기다리는 동안과, 감시 시간보다 긴 처리 동안에는 프로세스를 끝내지 않는다.
+
+    감시 시간은 가져오기 주기(0.5초)의 여러 배로 둔다. 부하가 걸린 CI에서 잠깐 늦은 응답을 멈춤으로 보지 않게.
+    """
+    monkeypatch.setenv("SLOW_CHILD_SECONDS", "6")
 
     async def go() -> None:
-        limits = replace(FAST, fetch_stall=2, fetch_watch_interval=0.2)
+        limits = replace(FAST, fetch_stall=4, fetch_watch_interval=0.2)
         service = ConsumerService(
             settings_for(prefix, limits=limits),
             port=free_port(),
@@ -837,7 +904,7 @@ def test_idle_and_long_processing_are_not_taken_for_a_stall(
         )
         task = asyncio.create_task(service.run())
         await _wait_state(service, "running", 10)
-        await asyncio.sleep(3)  # 일 없이 감시 시간보다 길게 기다림
+        await asyncio.sleep(5)  # 일 없이 감시 시간보다 길게 기다림
         assert not task.done()
         message = mock_request(new_attempt())
         await add_request(prefix, message)
