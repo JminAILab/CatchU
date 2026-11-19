@@ -204,12 +204,16 @@ async function main() {
     })();
     return cleaning;
   };
-  for (const signal of ['SIGINT', 'SIGTERM']) {
-    process.once(signal, () => {
-      log('멈춤 신호를 받아 서버와 DB 컨테이너를 정리합니다.');
-      cleanup().finally(() => process.exit(130));
-    });
-  }
+  // npm은 받은 SIGINT를 바로 아래 자식에게 한 번 더 넘긴다. node가 npm 바로 아래에서 돌면(macOS의 /bin/sh) 같은 신호를 두 번 받으므로
+  // on으로 받아 첫 신호로 정리를 시작하고, 그 뒤에 오는 신호는 출력 없이 넘긴다. once로 받으면 두 번째 신호에 정리 도중 끝난다.
+  let stopping = false;
+  const onStopSignal = () => {
+    if (stopping) return;
+    stopping = true;
+    log('멈춤 신호를 받아 서버와 DB 컨테이너를 정리합니다.');
+    cleanup().finally(() => process.exit(130));
+  };
+  for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, onStopSignal);
 
   try {
     log(`판본 ${revision()} · 실행 ${runId}`);
