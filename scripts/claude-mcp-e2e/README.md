@@ -73,7 +73,7 @@ npm run e2e
   - web 개발 서버(`npm run dev`)는 `web/.next/dev`를 쓰고, 이 시험의 운영 빌드(`next build`)는 그 폴더를 건드리지 않는다. Next 16.4.5에서 개발 서버를 끈 채 돌려 `.next/dev`의 파일이 그대로인 것을, 켠 채 돌려 개발 서버가 시험 뒤에도 응답하고 새 화면도 컴파일하는 것을 확인했다.
   - api 개발 서버(`npm run start:dev`)는 `src`를 바로 읽어 `api/dist`를 쓰지 않는다.
 - 바뀌는 것은 `web/.next`의 이전 운영 빌드 결과와 `api/dist`다(둘 다 git에서 뺀 폴더). 시험 뒤 그 폴더에서 web을 `npm start`로 띄우려면 `npm run build`를 다시 한다. 시험 빌드에는 개발용 로그인이 켜져 있다.
-- api 시험(`npm test`)과 동시에 돌리지 않는다. 둘 다 `api/dist`를 지우고 새로 만든다.
+- api 시험(`npm test`)과 동시에 돌리지 않는다. 둘 다 `api/dist`를 지우고 새로 만든다. `api/dist`로 띄운 api(api의 `npm start`, `scripts/local-live/run-api.sh`)가 켜진 작업 폴더에서도 돌리지 않는다. 이 시험의 api 빌드가 `api/dist`를 지우고 다시 만들어, 켜져 있던 api가 쓰던 파일이 사라진다.
 
 ## 비밀값과 결과물
 
