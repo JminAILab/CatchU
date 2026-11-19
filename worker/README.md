@@ -137,7 +137,6 @@ uv run --locked python -m app.processing succeeded-one-candidate
 
 | 남은 실제 연결 | 이슈 |
 |---|---|
-| 허용 GitHub 자료 수집의 실제 연결(A 자격정보 제공·실제 환경 통제 검사). 수집 모듈은 합성 검사까지 | [#117](https://github.com/JminAILab/CatchU/issues/117) · [#133](https://github.com/JminAILab/CatchU/issues/133) · [#37](https://github.com/JminAILab/CatchU/issues/37) |
 | 후보 묶음·본인 기여 확인·작업 동일성 판별의 처리 순서 연결과 실제 자료 검수. 판별 모듈(`app/candidates/`)은 합성 검사까지 | [#118](https://github.com/JminAILab/CatchU/issues/118) · [#121](https://github.com/JminAILab/CatchU/issues/121) · [#122](https://github.com/JminAILab/CatchU/issues/122) |
 | 초안·질문·제목 생성의 실제 LLM 제공자 연결과 품질 확인. 생성 모듈(`app/generation/`)은 합성 제공자 검사까지 | [#119](https://github.com/JminAILab/CatchU/issues/119) · [#120](https://github.com/JminAILab/CatchU/issues/120) |
 | 큐 연결과 LIVE 처리 조립은 있음([분석 요청 큐 소비자](docs/queue-consumer.md), 합성 검사까지). 실제 api 조회·GitHub·Claude·E 수신과 이은 확인 | [#121](https://github.com/JminAILab/CatchU/issues/121) · [#233](https://github.com/JminAILab/CatchU/issues/233)(api 쪽) · [#252](https://github.com/JminAILab/CatchU/issues/252)(선정 공급자) · [#77](https://github.com/JminAILab/CatchU/issues/77) |
