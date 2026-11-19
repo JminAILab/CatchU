@@ -893,7 +893,8 @@ def test_idle_and_long_processing_are_not_taken_for_a_stall(
     monkeypatch.setenv("SLOW_CHILD_SECONDS", "6")
 
     async def go() -> None:
-        limits = replace(FAST, fetch_stall=4, fetch_watch_interval=0.2)
+        # 6초짜리 처리가 자식 띄우기가 느린 환경에서 기본 15초 총 상한에 걸리지 않게 넉넉히 둔다.
+        limits = replace(FAST, total=60, fetch_stall=4, fetch_watch_interval=0.2)
         service = ConsumerService(
             settings_for(prefix, limits=limits),
             port=free_port(),

@@ -403,7 +403,9 @@ def test_stalled_pdf_queue_does_not_cut_running_analysis(
         await asyncio.Event().wait()
 
     async def go() -> None:
-        limits = replace(FAST, fetch_stall=3, fetch_watch_interval=0.2)
+        # 분석의 총 상한은 넉넉히 둔다. 자식 띄우기가 느린 환경(Windows spawn)에서 7초짜리 분석이
+        # 기본 15초 상한에 걸리면 감시가 아니라 시간 상한 때문에 실패한다(PR #604 리뷰에서 관찰).
+        limits = replace(FAST, total=60, fetch_stall=3, fetch_watch_interval=0.2)
         service = ConsumerService(
             replace(_settings(prefix, _pdf_settings(tmp_path)), limits=limits),
             port=_free_port(),
