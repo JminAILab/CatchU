@@ -220,8 +220,11 @@ async function main() {
     // DB 컨테이너와 두 빌드를 함께 시작한다.
     mark = performance.now();
     const npm = npmCli();
+    // Next는 작업 폴더의 web/.env*를 스스로 읽지만, 이미 있는 환경값은 덮지 않는다(빈 값도 있는 값이다).
+    // web 코드가 읽는 값을 모두 여기서 주어 원래 작업 폴더의 web/.env가 시험 빌드에 섞이지 않게 한다.
+    // CATCHU_STANDALONE_BUILD는 운영 이미지 빌드 전용이라(web/next.config.ts) 빈 값으로 둔다.
     const webEnv = { ...inheritedEnv(), NEXT_TELEMETRY_DISABLED: '1', NEXT_PUBLIC_API_BASE_URL: `http://localhost:${ports.api}`,
-      NEXT_PUBLIC_DEV_LOGIN_ENABLED: 'true', NEXT_PUBLIC_AUTH_SESSION_INTEGRATION: 'true' };
+      NEXT_PUBLIC_DEV_LOGIN_ENABLED: 'true', NEXT_PUBLIC_AUTH_SESSION_INTEGRATION: 'true', CATCHU_STANDALONE_BUILD: '' };
     const database = (async () => {
       const at = performance.now();
       await mustExec('DB 컨테이너 시작', 'docker', ['run', '-d', '--name', container, '-p', `127.0.0.1:${ports.db}:5432`,
