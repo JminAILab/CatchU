@@ -21,7 +21,7 @@ Claude 연결이 지나가는 두 흐름을 화면에서 시작해 MCP 도구 �
 
 - 회원은 개발용 로그인(`auth/dev-login`)으로 만든 합성 회원이다. 실제 계정·키·회원 자료를 쓰지 않는다.
 - 흐름 가의 Catch·텍스트 자료는 DB에 직접 넣는다. Catch는 분석 결과로만 생겨 화면에서 만들 수 없다. 승인한 회원과 다른 회원의 것을 하나씩 넣고, 넣는 코드는 api 시험 도우미(`api/test/claude-mcp/support.cjs`)와 같다.
-- 합성 Claude도 그 도우미의 `connectWithSdk`다. 회원 승인 단계만 브라우저가 실제 승인 화면을 눌러 맡는다. 돌아갈 주소는 이 시험이 `127.0.0.1`에 여는 콜백 서버다.
+- 합성 Claude도 그 도우미(`startSdkAuthorization`·`connectWithSdk`·`sdkClient`)다. 회원 승인 단계만 브라우저가 실제 승인 화면을 눌러 맡는다. 돌아갈 주소는 이 시험이 `127.0.0.1`에 여는 콜백 서버다.
 - api·web은 큐·worker·AI 키 없이 띄운다.
 
 ## 준비 (처음 한 번)
@@ -64,20 +64,20 @@ npm run e2e
 5. 서버를 끄고 이 실행이 만든 DB 컨테이너만 지운다(`docker rm -f -v`).
 
 - 출력 끝의 「걸린 시간」 줄에 단계별 시간과 전체 시간이 나온다. 시험이 모두 통과하면 종료 코드 0, 시험이 실패하면 1, 준비 단계에서 멈추면 2다.
-- 시험 하나만: `npm run e2e -- --grep "흐름 나"`(뒤의 인자는 `playwright test`에 넘어간다).
+- 한 흐름만: `npm run e2e -- --grep "흐름 나"`(뒤의 인자는 `playwright test`에 넘어간다).
 - 포트·컨테이너 이름을 바꾸려면 환경변수 `CATCHU_E2E_WEB_PORT`(3400)·`CATCHU_E2E_API_PORT`(3401)·`CATCHU_E2E_CALLBACK_PORT`(6280)·`CATCHU_E2E_DB_PORT`(55434)·`CATCHU_E2E_DB_CONTAINER`(catchu-mcp-e2e-db)를 준다. 여러 작업 폴더에서 동시에 돌릴 때는 폴더마다 다르게 준다.
 
 ## 작업 폴더에 남는 것
 
 - 새 작업 폴더를 만들 필요 없이 원래 작업 폴더에서 돌려도 되고, 개발 서버를 켜 둔 채로도 된다(포트가 다르다).
-  - web 개발 서버(`npm run dev`)는 `web/.next/dev`를 쓰고, 이 시험의 운영 빌드(`next build`)는 그 폴더를 건드리지 않는다. Next 16.4.5에서 web 개발 서버를 켠 채 돌려 `.next/dev`의 파일이 그대로이고, 개발 서버가 시험 뒤에도 응답하며 새 화면도 컴파일하는 것을 확인했다.
+  - web 개발 서버(`npm run dev`)는 `web/.next/dev`를 쓰고, 이 시험의 운영 빌드(`next build`)는 그 폴더를 건드리지 않는다. Next 16.4.5에서 개발 서버를 끈 채 돌려 `.next/dev`의 파일이 그대로인 것을, 켠 채 돌려 개발 서버가 시험 뒤에도 응답하고 새 화면도 컴파일하는 것을 확인했다.
   - api 개발 서버(`npm run start:dev`)는 `src`를 바로 읽어 `api/dist`를 쓰지 않는다.
 - 바뀌는 것은 `web/.next`의 이전 운영 빌드 결과와 `api/dist`다(둘 다 git에서 뺀 폴더). 시험 뒤 그 폴더에서 web을 `npm start`로 띄우려면 `npm run build`를 다시 한다. 시험 빌드에는 개발용 로그인이 켜져 있다.
 - api 시험(`npm test`)과 동시에 돌리지 않는다. 둘 다 `api/dist`를 지우고 새로 만든다.
 
 ## 비밀값과 결과물
 
-- `api/.env`·`web/.env`를 쓰지 않는다. api는 `--env-file` 없이 띄우고, web이 읽는 `NEXT_PUBLIC_` 값은 모두 `run.mjs`가 준다. 두 서버와 빌드에는 셸 환경값 가운데 실행에 필요한 것(PATH 등)만 물려준다.
+- api는 `--env-file` 없이 띄워 `api/.env`를 읽지 않는다. web은 Next가 작업 폴더의 `web/.env*`를 스스로 읽지만 이미 있는 환경값은 덮지 않으므로, web 코드가 읽는 값(`NEXT_PUBLIC_` 셋과 `CATCHU_STANDALONE_BUILD`)은 모두 `run.mjs`가 준 값이 쓰인다(반대 값을 넣은 합성 `web/.env`로 확인했다). 두 서버와 빌드에는 셸 환경값 가운데 실행에 필요한 것(PATH 등)만 물려준다.
 - 토큰·승인 주소·`state`·받은 링크 주소를 출력하지 않는다. 시험은 이 값을 참·거짓으로만 비교하고, 오류 글에 실린 주소의 쿼리·링크 토큰·긴 무작위 값은 `…`로 지운다(`lib/redact.mjs`). 서버 출력은 화면에 내지 않고 서버가 뜨지 않을 때만 지운 끝부분을 보인다.
 - 화면 캡처·영상·trace를 끄고, 실패한 시험의 화면 글(aria 스냅샷)도 남기지 않는다. 결과 폴더는 OS 임시 폴더의 `catchu-claude-mcp-e2e-results`다. 거기 남은 파일은 git·이슈·PR·AI에 올리지 않는다.
 
