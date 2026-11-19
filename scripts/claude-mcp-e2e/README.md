@@ -69,9 +69,11 @@ npm run e2e
 
 ## 작업 폴더에 남는 것
 
-- 원래 작업 폴더에서 돌려도 되고, web·api 개발 서버를 켜 둔 채로도 된다(포트가 다르다). web 개발 서버(`next dev`)는 `web/.next/dev`를 쓰고, 이 시험의 `next build`는 그 폴더를 지우지 않는다(Next 16.4.5에서 개발 서버를 켠 채 돌려 확인했다).
+- 새 작업 폴더를 만들 필요 없이 원래 작업 폴더에서 돌려도 되고, 개발 서버를 켜 둔 채로도 된다(포트가 다르다).
+  - web 개발 서버(`npm run dev`)는 `web/.next/dev`를 쓰고, 이 시험의 운영 빌드(`next build`)는 그 폴더를 건드리지 않는다. Next 16.4.5에서 web 개발 서버를 켠 채 돌려 `.next/dev`의 파일이 그대로이고, 개발 서버가 시험 뒤에도 응답하며 새 화면도 컴파일하는 것을 확인했다.
+  - api 개발 서버(`npm run start:dev`)는 `src`를 바로 읽어 `api/dist`를 쓰지 않는다.
 - 바뀌는 것은 `web/.next`의 이전 운영 빌드 결과와 `api/dist`다(둘 다 git에서 뺀 폴더). 시험 뒤 그 폴더에서 web을 `npm start`로 띄우려면 `npm run build`를 다시 한다. 시험 빌드에는 개발용 로그인이 켜져 있다.
-- api 시험(`npm test`)과 동시에 돌리지 않는다. 둘 다 `api/dist`를 새로 만든다.
+- api 시험(`npm test`)과 동시에 돌리지 않는다. 둘 다 `api/dist`를 지우고 새로 만든다.
 
 ## 비밀값과 결과물
 
@@ -87,7 +89,7 @@ npm run e2e
 | 포트를 이미 쓴다 | 그 포트의 환경변수로 다른 포트를 준다. |
 | Chromium을 띄우지 못했다 | 이 폴더에서 `npx playwright install --only-shell chromium`. |
 | Docker에 연결하지 못했다 | Docker Desktop(또는 Docker 엔진)을 켠다. |
-| 도중에 Ctrl+C | 서버와 DB 컨테이너를 정리하고 끝난다. 정리 줄이 안 보이면 위 첫 줄대로 컨테이너를 지운다. |
+| 도중에 Ctrl+C | 서버와 DB 컨테이너 정리를 시도하고 끝난다. 「DB 컨테이너를 지웠습니다」 줄이 안 보이면 위 첫 줄대로 컨테이너를 지운다. |
 
 ## 고칠 때
 
