@@ -44,9 +44,8 @@
 
 ## 합성 검사와 실제 연결
 
-`tests/test_collection_*.py`는 합성 GitHub 응답(`tests/github_synthetic.py`)·자격정보 대역·가짜 시계로 네트워크 없이 돈다. 전송 코드는 가짜 연결과 이 컴퓨터 안(127.0.0.1)의 시험 서버로만 확인했다. **실제 GitHub·A 연결, TLS, 실제 환경의 나가는 방향 제한은 검증하지 않았다.** 실제 연결에서 확인할 것:
+`tests/test_collection_*.py`는 합성 GitHub 응답(`tests/github_synthetic.py`)·자격정보 대역·가짜 시계로 네트워크 없이 돈다. 합성 검사의 전송 코드는 가짜 연결과 이 컴퓨터 안(127.0.0.1)의 시험 서버로 확인한다. 2026-11-18~19 EKS의 실제 분석 3건이 실제 GitHub·A 연결(TLS 포함)로 끝까지 수집됐고, 나가는 방향 제한은 주소 단위로 확인했다(같은 대역의 다른 주소는 네트워크로 막히지 않음). 둘 다 2026-11-19 [#37 C05](https://github.com/JminAILab/CatchU/issues/37#issuecomment-7000321920)에서 확인했다. 대상 저장소 밖 호출이 없었는지는 로그에 호출 경로가 남지 않아 부분 충족이고, 429·5xx는 오지 않아 관측하지 못했다. 실제 연결에서 더 확인할 것:
 
-- A 자격정보 인계로 실제 요청 하나를 끝까지 수집하고, 대상 저장소 밖 호출이 거부되는지([#37](https://github.com/JminAILab/CatchU/issues/37) C05, 실제 환경)
 - 호출 한도 수치와 429·403 응답 머리글(머리글 없는 보조 한도 403은 본문의 "rate limit" 문구로 판별한다. GraphQL의 200·403 한도 오류 판별은 [연결 PR 묶음 조회](associated-pr-lookup.md#결과와-실패)), 큰 커밋의 파일 목록 나눔·변경 내용 생략 조건, 빈 저장소의 커밋 목록 응답 문구(합성 응답은 [Octokit 안내서](https://github.com/octokit/handbook#some-list-endpoint-respond-with-204-or-409-if-the-repository-is-empty)의 409 예시를 따랐다), 저장소 응답의 `private`·`visibility` 값
 - 현행 상한에서의 실측(호출 수·시간·총량·조회 개수·상세 조회 개수)
 

@@ -2,7 +2,6 @@
 
 `app.processing.Generator`는 요청 하나의 수집·후보·생성 전체를 감싸는 경계이고, 이 Protocol은 후보 하나의
 생성 호출(또는 제목 형식 고쳐 쓰기 호출) 한 번이다. 실제 제공자 어댑터는 `app.generation.claude`(#119 결정)다.
-실제 회원 자료를 보내는 것은 #37의 자료 처리 조건과 실제 자료용 고지(#138) 뒤다.
 """
 
 from dataclasses import dataclass
