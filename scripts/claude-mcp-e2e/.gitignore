@@ -1,0 +1,5 @@
+# 설치한 꾸러미와 Playwright가 만들 수 있는 결과 폴더. 이 시험은 결과 폴더를 저장소 밖 임시 폴더에 두지만, 직접 실행할 때를 막는다.
+node_modules/
+test-results/
+playwright-report/
+blob-report/
