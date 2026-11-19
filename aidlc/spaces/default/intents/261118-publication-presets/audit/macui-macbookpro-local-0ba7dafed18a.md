@@ -13433,3 +13433,392 @@
 **Answer Mode**: guide (reused from intent-capture)
 
 ---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T13:51:44Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-design-questions.md
+**Context**: inception > contract-design > contract-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-19T13:51:45Z
+**Event**: DECISION_RECORDED
+**Stage**: contract-design
+**Decision**: Q1, Q2, Q3
+**Options**: |Q1: A. 핵심만 고정|Q1: B. 모든 칸 고정|Q2: A. 기준 문서 줄에 한 줄|Q2: B. 고치지 않음|Q3: A. 지금 코드 + 비공개 코드 하나|Q3: B. 새 코드 하나로 모음
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-19T14:04:04Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["A. 핵심만 고정","B. 고치지 않음","A. 지금 코드 + 비공개 코드"]
+**Message Id**: 441a9700
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-19T14:04:04Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [설계] Q1. U1이 주고 U2·U3이 쓰는 경계(프리셋 경로, 발행 요청·막힘 응답, 사본의 프리셋 칸)를 이 단계에서 얼마나 자세히 정할까요?
+**Reply**: A. 핵심만 고정
+**Options**: ["A. 핵심만 고정","B. 모든 칸 고정"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-19T14:04:04Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [설계] Q2. 코딩 절차는 12월 계약 설계를 기준 문서로 가리킵니다. 이 작업이 사본·발행·받은 링크 읽기 계약을 바꾸면 12월 문서만 읽는 사람은 바뀐 것을 모릅니다. 팀 문서를 고칠까요?
+**Reply**: B. 고치지 않음
+**Options**: ["A. 기준 문서 줄에 한 줄","B. 고치지 않음"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-19T14:04:04Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [설계] Q3. 발행이 막혔을 때 응답 모양은 어떻게 할까요? 서버는 어느 프리셋의 어느 자료 때문인지 알려야 하고(FR2.8), 비공개 Catch도 이제 막힘 이유가 됩니다(FR2.9).
+**Reply**: A. 지금 코드 + 비공개 코드
+**Options**: ["A. 지금 코드 + 비공개 코드","B. 새 코드 하나로 모음"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-19T14:04:09Z
+**Event**: QUESTION_ANSWERED
+**Stage**: contract-design
+**Details**: Q1: A. 핵심만 고정; Q2: B. 고치지 않음; Q3: A. 지금 코드 + 비공개 코드
+**Person Reply**: A. 핵심만 고정\nB. 고치지 않음\nA. 지금 코드 + 비공개 코드
+**Message Id**: 441a9700
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-19T14:04:17Z
+**Event**: DECISION_RECORDED
+**Stage**: contract-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-design-questions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-19T14:06:02Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: 8187e3e1
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-19T14:06:02Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: Does this all look correct before I generate the artifact?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-19T14:06:08Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: contract-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-design-questions.md
+**Questions SHA-256**: 951d1b113a58263030aec36418ba47e6f4377ebed1bcdd48d09efe4e03ba29a3
+**Hash Scope**: confirmed-content-v2
+**Message Id**: 8187e3e1
+**Person Reply**: Looks correct
+**Summary Authorization Id**: 8addc4c81e6731e4e0370e1ed75a35f60625962ab820748813397e6c70fd05e7
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T14:07:36Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 8addc4c81e6731e4e0370e1ed75a35f60625962ab820748813397e6c70fd05e7
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-19T14:07:37Z
+**Event**: SENSOR_FIRED
+**Fire id**: 77fc6547
+**Sensor ID**: required-sections
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-19T14:07:38Z
+**Event**: SENSOR_PASSED
+**Fire id**: 77fc6547
+**Sensor ID**: required-sections
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-19T14:07:38Z
+**Event**: SENSOR_FIRED
+**Fire id**: 51f219bc
+**Sensor ID**: upstream-coverage
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-19T14:07:38Z
+**Event**: SENSOR_PASSED
+**Fire id**: 51f219bc
+**Sensor ID**: upstream-coverage
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+**Duration ms**: 78
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-19T14:07:38Z
+**Event**: REVIEW_REQUESTED
+**Stage**: contract-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:9bf6ccfe71427ffb7df54f4da60518cd164e49dd48fe3642a4197690e4e951de
+**Request Id**: review:24a2ad6182fd48ee5a60ca9899599510
+**Review File**: .aidlc-engine/reviews/contract-design/stage/05b6411a4dc85b73/1.24a2ad6182fd48ee5a60ca9899599510.review.md
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-19T14:07:50Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-19T14:08:00Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a4e0622212ba58938
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T14:08:52Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviews/contract-design/stage/05b6411a4dc85b73/1.24a2ad6182fd48ee5a60ca9899599510.review.md
+**Context**: .aidlc-engine > reviews > contract-design > stage > 05b6411a4dc85b73 > 1.24a2ad6182fd48ee5a60ca9899599510.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-19T14:08:58Z
+**Event**: HOST_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-19T14:08:58Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: ac14a72525d0c7493
+**Review File Digest**: .aidlc-engine/reviews/units-generation/stage/18dabf3da2f56bda/1.a5010d1a3dd0a8f252034f647bdd1f66.review.md=absent; .aidlc-engine/reviews/contract-design/stage/05b6411a4dc85b73/1.24a2ad6182fd48ee5a60ca9899599510.review.md=f14b7ea243b7d92d9bd6c121faa82c6af95765c2f840d2ca28941b9256ee1af3
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-19T14:09:01Z
+**Event**: REVIEW_COMPLETED
+**Stage**: contract-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:9bf6ccfe71427ffb7df54f4da60518cd164e49dd48fe3642a4197690e4e951de
+**Artifact Fingerprint**: sha256:9bf6ccfe71427ffb7df54f4da60518cd164e49dd48fe3642a4197690e4e951de
+**Request Id**: review:24a2ad6182fd48ee5a60ca9899599510
+**Review Record**: .aidlc-engine/reviews/contract-design/stage/05b6411a4dc85b73/1.json
+**Review Record Digest**: sha256:f6e1ee8ad050789e69a150c4151e411827846e4164d5746109eaaee5df5120cb
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-19T14:09:02Z
+**Event**: SENSOR_FIRED
+**Fire id**: 004f239e
+**Sensor ID**: required-sections
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-19T14:09:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: 004f239e
+**Sensor ID**: required-sections
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+**Duration ms**: 84
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-19T14:09:02Z
+**Event**: SENSOR_FIRED
+**Fire id**: 8e6d4a90
+**Sensor ID**: upstream-coverage
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-19T14:09:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: 8e6d4a90
+**Sensor ID**: upstream-coverage
+**Stage slug**: contract-design
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+**Duration ms**: 81
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-19T14:09:03Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: contract-design
+**Next Stage**: delivery-planning
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md=passed
+**Open Decisions**: 0
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-19T14:13:55Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve. R-02·R-03은 고쳐 주세요: 항목이 0개인 프리셋을 발행 요청에 넣으면 400 violations로 거부하고, 막힌 자료는 blockedSources 하나로만 알립니다(catchIds는 발행 거부만 쓰던 칸이라 빼고, 추출 미완료도 items[i] 경로 대신 blockedSources로 알림). R-01은 위험으로 받아들입니다(Q3는 발행 막힘 코드에 대한 답이었고, 51번째 프리셋은 LINK_LIMIT_REACHED처럼 따로 안내할 코드가 필요함). R-04는 해당하지 않습니다: 코딩 절차 「기술」 행대로 동시 요청은 남의 자료 노출이나 삭제 실패로 이어질 때만 막는데, 동시에 만들어 51개가 되는 것은 둘 다 아닙니다."]
+**Message Id**: af10434c
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-19T14:13:56Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: Contract Design 단계를 마쳤습니다. 어떻게 할까요?
+**Reply**: Approve. R-02·R-03은 고쳐 주세요: 항목이 0개인 프리셋을 발행 요청에 넣으면 400 violations로 거부하고, 막힌 자료는 blockedSources 하나로만 알립니다(catchIds는 발행 거부만 쓰던 칸이라 빼고, 추출 미완료도 items[i] 경로 대신 blockedSources로 알림). R-01은 위험으로 받아들입니다(Q3는 발행 막힘 코드에 대한 답이었고, 51번째 프리셋은 LINK_LIMIT_REACHED처럼 따로 안내할 코드가 필요함). R-04는 해당하지 않습니다: 코딩 절차 「기술」 행대로 동시 요청은 남의 자료 노출이나 삭제 실패로 이어질 때만 막는데, 동시에 만들어 51개가 되는 것은 둘 다 아닙니다.
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-19T14:14:04Z
+**Event**: GATE_APPROVED
+**Stage**: contract-design
+**User Input**: Approve
+**Person Reply**: Approve. R-02·R-03은 고쳐 주세요: 항목이 0개인 프리셋을 발행 요청에 넣으면 400 violations로 거부하고, 막힌 자료는 blockedSources 하나로만 알립니다(catchIds는 발행 거부만 쓰던 칸이라 빼고, 추출 미완료도 items[i] 경로 대신 blockedSources로 알림). R-01은 위험으로 받아들입니다(Q3는 발행 막힘 코드에 대한 답이었고, 51번째 프리셋은 LINK_LIMIT_REACHED처럼 따로 안내할 코드가 필요함). R-04는 해당하지 않습니다: 코딩 절차 「기술」 행대로 동시 요청은 남의 자료 노출이나 삭제 실패로 이어질 때만 막는데, 동시에 만들어 51개가 되는 것은 둘 다 아닙니다.
+**Message Id**: af10434c
+**Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md","id":"R-01","fingerprint":"sha256:d2efe7089661f5eaf51c5403fbcffcca0e53dfadc70d29f10d9b37a019ca6eea","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/contract-design/stage/05b6411a4dc85b73/1.json","digest":"sha256:f6e1ee8ad050789e69a150c4151e411827846e4164d5746109eaaee5df5120cb"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md","id":"R-02","fingerprint":"sha256:0a09f338f5e91277383e01367bddea6d737ac324ddf3fb7fc9ed37ea748e4846","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/contract-design/stage/05b6411a4dc85b73/1.json","digest":"sha256:f6e1ee8ad050789e69a150c4151e411827846e4164d5746109eaaee5df5120cb"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md","id":"R-03","fingerprint":"sha256:b363e695a515a4c11cf8e9535b9afe27230ebf005a7f6c2007a872edae101bef","status":"Fix requested","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/contract-design/stage/05b6411a4dc85b73/1.json","digest":"sha256:f6e1ee8ad050789e69a150c4151e411827846e4164d5746109eaaee5df5120cb"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md","id":"R-04","fingerprint":"sha256:23f1b6654694ede227edcf7ecba5c6060b2da743e34316cb4b8d6e9ecb2be77b","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/contract-design/stage/05b6411a4dc85b73/1.json","digest":"sha256:f6e1ee8ad050789e69a150c4151e411827846e4164d5746109eaaee5df5120cb"}}]}
+**Brief Digest**: sha256:8078b66a6aac29507e8acee19efab3065774bd92b34fc4b64828c1d2d3f91a51
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-19T14:14:04Z
+**Event**: STAGE_COMPLETED
+**Stage**: contract-design
+**Validation Basis**: {"graphContract":"sha256:ad5599bf4da38de3dec2bfb4bf705de33d27113e18b6a160549a97c4b694fea3","inputs":[{"artifact":"components","contentHash":"sha256:85587796d490840325cc381007f81b90b9daa2139cadd8a74d1397ffd9c740ff","instanceCount":1,"presentCount":1,"producer":"domain-design","required":false,"structureHash":"sha256:4724ea158b7058768f86c03581450cf489bc32adf3c0f94c7acac37e53d45751"},{"artifact":"requirements","contentHash":"sha256:327801dee9c42f4e6c99b583852178b69dbc4db730b8fa23532a1b738538e6f5","instanceCount":1,"presentCount":1,"producer":"requirements-analysis","required":false,"structureHash":"sha256:1187e4396781cefb07161dfaec11ff291a14d6cd5bb9fe6064bc74244d4e5af4"},{"artifact":"unit-of-work-dependency","contentHash":"sha256:4bef50030dc86a3fe6b4c9372928591061e68b9d9980b300bf7473e11fca0d51","instanceCount":1,"presentCount":1,"producer":"units-generation","required":true,"structureHash":"sha256:b6489b11b57bc7899daa40f3177aedf37970447fc2dae595b4e795323bdf0a8e"},{"artifact":"unit-of-work","contentHash":"sha256:e3e08909aab3f4aae7ebb80fafb497e1e70558cf93987723e90a60ae0fda4589","instanceCount":1,"presentCount":1,"producer":"units-generation","required":true,"structureHash":"sha256:73089697a6ea44278aef5f5486ffd13d31dbcae117bf0928c618846a17b1de2c"}],"outputs":[{"artifact":"contract-summary","contentHash":"sha256:c657f1d682be69080052a6d5bcbbda7c473daa386875c222fa023b067f9db3a8","instanceCount":1,"presentCount":1,"producer":"contract-design","required":true,"structureHash":"sha256:417a9c95cbf71c3420f351802644e09c4adbca869534fa6fd0f8dfec64c14478"}],"projectType":"brownfield","schema":3}
+**Details**: Stage Contract Design approved by gate
+**Tokens In**: 64
+**Tokens Out**: 37443
+**Cache Read**: 14298327
+**Cache Write**: 184004
+**Cost USD**: 4.33
+**By Model**: opus-5-5=3.82; sonnet-5-5=0.52
+**By Agent**: main=3.82; aidlc-architecture-reviewer-agent=0.52
+**Tokens By Model**: opus-5-5=50/28.7k/13.7M/64.1k; sonnet-5-5=14/8.8k/644.9k/119.9k
+**Tokens By Agent**: main=50/28.7k/13.7M/64.1k; aidlc-architecture-reviewer-agent=14/8.8k/644.9k/119.9k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-19T14:14:04Z
+**Event**: STAGE_STARTED
+**Stage**: delivery-planning
+**Agent**: aidlc-delivery-agent
+**Answer Mode**: guide (reused from intent-capture)
+
+---
+
+## Memory Empty
+**Timestamp**: 2026-11-19T14:14:05Z
+**Event**: MEMORY_EMPTY
+**Stage**: contract-design
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-19T14:14:10Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 8addc4c81e6731e4e0370e1ed75a35f60625962ab820748813397e6c70fd05e7
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-19T14:14:15Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 8addc4c81e6731e4e0370e1ed75a35f60625962ab820748813397e6c70fd05e7
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-19T14:14:18Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md
+**Context**: inception > contract-design > contract-summary.md
+**Summary Authorization Id**: 8addc4c81e6731e4e0370e1ed75a35f60625962ab820748813397e6c70fd05e7
+
+---
