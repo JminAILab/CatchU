@@ -117,6 +117,7 @@ class ConsumerService:
         self._output_queue: Queue | None = None
         self._run_task: asyncio.Task[Any] | None = None
         self._fetch_watches: list[FetchWatch] = []
+        self._stalled_stop = False
         self._watch_task: asyncio.Task[None] | None = None
         self.server: _HealthServer | None = None
 
@@ -200,7 +201,9 @@ class ConsumerService:
         )
         self.worker.on("error", _log_worker_error)
         self.worker.on("failed", _log_job_failed)
-        self._fetch_watches.append(FetchWatch(self.worker, self.processor))
+        self._fetch_watches.append(
+            FetchWatch(self.worker, self.processor, hold_fetch=self._stop_if_stalled)
+        )
         self._run_task = asyncio.create_task(self.worker.run(), name="request-worker")
         self._run_task.add_done_callback(self._run_finished)
         if self._settings.pdf is not None:
@@ -242,7 +245,11 @@ class ConsumerService:
         )
         self.pdf_worker.on("error", _log_worker_error)
         self.pdf_worker.on("failed", _log_job_failed)
-        self._fetch_watches.append(FetchWatch(self.pdf_worker, self.pdf_processor))
+        self._fetch_watches.append(
+            FetchWatch(
+                self.pdf_worker, self.pdf_processor, hold_fetch=self._stop_if_stalled
+            )
+        )
         self._pdf_run_task = asyncio.create_task(
             self.pdf_worker.run(), name="pdf-extraction-worker"
         )
@@ -271,17 +278,31 @@ class ConsumerService:
         """
         while not self._stopping:
             await asyncio.sleep(self._limits.fetch_watch_interval)
-            watch = stalled_watch(self._fetch_watches, self._limits.fetch_stall)
-            if watch is None or self._stopping:
-                continue
-            logger.error(
-                "큐에서 일을 가져오지 못한 지 %.0f초가 지나 프로세스를 끝냄: queue=%s",
-                watch.quiet_seconds(),
-                watch.queue_name,
-            )
-            self._consumer_failed = True
-            self.request_stop()
-            return
+            if self._stop_if_stalled():
+                return
+
+    def _stop_if_stalled(self) -> bool:
+        """멈춘 큐가 있고 어느 큐에도 처리 중인 작업이 없으면 종료를 시작한다. 그 종료 중이면 True.
+
+        주기 확인과, 각 Worker가 다음 일을 가져오기 직전(작업과 작업 사이)에 부른다. 뒤쪽이 없으면
+        다른 큐에 일이 밀려 있는 동안 주기 확인이 그 짧은 틈을 맞추지 못해 종료가 계속 미뤄진다.
+        """
+        if self._stalled_stop:
+            return True
+        if self._stopping:
+            return False
+        watch = stalled_watch(self._fetch_watches, self._limits.fetch_stall)
+        if watch is None:
+            return False
+        logger.error(
+            "큐에서 일을 가져오지 못한 지 %.0f초가 지나 프로세스를 끝냄: queue=%s",
+            watch.quiet_seconds(),
+            watch.queue_name,
+        )
+        self._stalled_stop = True
+        self._consumer_failed = True
+        self.request_stop()
+        return True
 
     async def run(self) -> int:
         loop = asyncio.get_running_loop()

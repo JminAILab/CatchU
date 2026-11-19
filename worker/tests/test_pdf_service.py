@@ -436,6 +436,51 @@ def test_stalled_pdf_queue_does_not_cut_running_analysis(
 
 
 @requires_redis
+def test_stalled_pdf_queue_ends_process_between_backlogged_analyses(
+    prefix: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # #603: 분석이 연달아 밀려 있어도, 하던 분석이 끝나고 다음을 가져오기 직전에 프로세스를 끝낸다.
+    # 주기 확인(여기서는 30초로 멀리 둠)에 기대지 않는다. 둘째 분석은 가져오지 않아 대기로 남는다.
+    monkeypatch.setenv("SLOW_CHILD_SECONDS", "5")
+
+    async def never_answers(*_: Any) -> Any:
+        await asyncio.Event().wait()
+
+    async def go() -> None:
+        limits = replace(FAST, total=60, fetch_stall=3, fetch_watch_interval=30)
+        service = ConsumerService(
+            replace(_settings(prefix, _pdf_settings(tmp_path)), limits=limits),
+            port=_free_port(),
+            install_signals=False,
+            child_target=consumer_children.work_for_seconds,
+            worker_options={"drainDelay": 0.5},
+            hard_exit=_no_hard_exit,
+        )
+        async with _running(service) as task:
+            await _wait_state(service, "running", 20)
+            first, second = mock_request(new_attempt()), mock_request(new_attempt())
+            await _add_request(prefix, first)
+            await _add_request(prefix, second)
+            await _until(
+                lambda: service.processor is not None and service.processor.spawned > 0,
+                20,
+                "분석 자식 시작",
+            )
+            assert service.pdf_worker is not None
+            service.pdf_worker.backend.waitForJob = never_answers
+
+            assert await asyncio.wait_for(task, 20) == 1
+        assert service.processor is not None and service.processor.spawned == 1
+        state, job = await _job(prefix, queues.REQUEST_QUEUE, first["attemptId"])
+        assert state == "completed"
+        assert job.returnvalue == {"handled": "RESULT_SENT", "outcome": "SUCCEEDED"}
+        state, _ = await _job(prefix, queues.REQUEST_QUEUE, second["attemptId"])
+        assert state == "waiting"
+
+    asyncio.run(go())
+
+
+@requires_redis
 def test_stop_while_pdf_child_hangs_fails_job_without_result(
     prefix: str, tmp_path: Path
 ) -> None:

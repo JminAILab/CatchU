@@ -94,6 +94,21 @@ def test_stalled_queue_waits_for_work_in_progress_on_another_queue() -> None:
     assert stalled.queue_name == "pdf-extraction-requests"
 
 
+def test_fetch_is_held_while_the_process_is_ending_for_a_stall() -> None:
+    """끝내는 중이라는 답이면 다음 일을 가져오지 않는다. 가져오면 종료 순서가 그 작업을 끊는다."""
+    worker, clock = _Worker(), _Clock()
+    answers = iter([False, True])
+    watch = FetchWatch(worker, _Processor(), clock, hold_fetch=lambda: next(answers))
+
+    assert asyncio.run(worker.getNextJob("token-1")) is None
+    assert worker.calls == ["token-1"]
+    clock.now += 7
+    # 붙잡힌 시도는 큐에 묻지 않으며, 응답을 받은 것으로 세지도 않는다.
+    assert asyncio.run(worker.getNextJob("token-2")) is None
+    assert worker.calls == ["token-1"]
+    assert watch.quiet_seconds() == 7
+
+
 def test_no_queue_is_stalled_below_the_limit() -> None:
     clock = _Clock()
     watches = [FetchWatch(_Worker(), _Processor(), clock)]

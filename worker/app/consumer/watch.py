@@ -10,11 +10,19 @@ BullMQ Worker의 실행 작업은 살아 있는데 큐에서 일을 꺼내 가�
 
 멈춤을 보면 프로세스를 끝내는데, 종료 순서는 모든 큐의 처리 중인 작업을 끊는다. 그래서 한 큐가 멈췄어도
 다른 큐에 처리 중인 작업이 있으면 그 작업이 끝날 때까지 미룬다(`stalled_watch`).
+
+미룬 종료는 그 작업이 끝난 직후에 해야 한다. 다른 큐에 일이 밀려 있으면 작업과 작업 사이의 틈이 아주
+짧아 주기 확인으로는 맞추지 못한다. 그래서 Worker가 다음 일을 가져오기 직전에 서비스에 한 번 더 묻고
+(`hold_fetch`), 끝내는 중이라는 답이면 가져오지 않는다.
 """
 
+import asyncio
 import time
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol
+
+# 가져오기를 붙잡는 동안 BullMQ의 실행 작업이 쉬지 않고 다시 묻지 않게 두는 짧은 쉼(초).
+HOLD_SECONDS = 0.1
 
 
 class _Processor(Protocol):
@@ -30,6 +38,7 @@ class FetchWatch:
         worker: Any,
         processor: _Processor,
         clock: Callable[[], float] = time.monotonic,
+        hold_fetch: Callable[[], bool] = lambda: False,
     ) -> None:
         self.queue_name: str = worker.name
         self._processor = processor
@@ -38,6 +47,11 @@ class FetchWatch:
         fetch = worker.getNextJob
 
         async def tracked(token: str) -> Any:
+            # 다음 일을 가져오기 직전은 작업과 작업 사이의 틈이다. 멈춘 큐 때문에 프로세스를 끝내는
+            # 중이면 새 일을 가져오지 않는다. 가져오면 종료 순서가 그 작업을 끊는다.
+            if hold_fetch():
+                await asyncio.sleep(HOLD_SECONDS)
+                return None
             # 예외로 끝난 시도(접속 오류·거부)는 응답으로 세지 않는다.
             job = await fetch(token)
             self._alive_at = self._clock()
