@@ -86,9 +86,9 @@ test('#528 JD 요약은 따옴표 인용을 붙이지 않는다', async (t) => {
   assert.deepEqual([resultLog(logs).dropReasons.role, resultLog(logs).quoteCitedCount], [1, 0]);
 });
 
-// #581 — 인용이 붙은 근거·확인되지 않는 점은 인용 원문에 없는 숫자가 있어도 남는다. 인용 없는 확인되지 않는 점과
-// 면접 질문(남은 근거의 인용 원문과 대조)은 그대로다. 실패: 인용 항목이 빠지거나, 바뀌지 않아야 할 두 대조가 느슨해짐.
-test('#581 인용 붙은 근거·확인되지 않는 점은 인용 원문에 없는 숫자가 있어도 남고, 인용 없는 항목과 면접 질문의 대조는 그대로다', async (t) => {
+// #581 — 인용이 붙은 근거·확인되지 않는 점은 인용 원문에 없는 숫자가 있어도 남는다. 인용 없는 확인되지 않는 점의 대조와
+// 면접 질문의 대조 규칙(남은 근거의 인용 원문과 대조)은 그대로다. 실패: 인용 항목이 빠지거나, 바뀌지 않아야 할 두 대조가 느슨해짐.
+test('#581 인용 붙은 근거·확인되지 않는 점은 인용 원문에 없는 숫자가 있어도 남고, 인용 없는 항목과 면접 질문의 대조 규칙은 그대로다', async (t) => {
   const logs = captureLogs(t);
   const { gate } = gateWith(messageBody([
     fragment('근거:\n- '), fragment('Docker 이미지 빌드를 3단계로 줄이고 시험 12개를 더했다', [blockCitation(0, 0, 1)]),
@@ -113,6 +113,20 @@ test('S13 면접 질문의 숫자가 남은 근거 항목의 인용 원문에 �
   ]));
   const output = await gate.generate(jd());
   assert.deepEqual(output.items.map((item) => item.text), ['Docker 이미지 빌드를 3단계로 줄였다', '빌드를 3단계로 줄인 이유는 무엇인가요?']);
+  assert.equal(output.droppedCount, 1);
+});
+
+// #581 리뷰 — S9가 인용 항목 판정을 더는 보지 않게 된 뒤, Catch PR 번호 허용(/pull/n)을 확인하는 시험이 없어져 면접 질문 경로로 옮겼다.
+test('S13b 면접 질문의 PR 번호는 남은 근거의 Catch PR 번호(/pull/n)면 남고, 아니면 버린다', async (t) => {
+  captureLogs(t);
+  const catchSource = source({ text: EVIDENCE_TEXT, catchEvidenceUrls: ['https://github.com/octo/app/pull/123'] });
+  const { gate } = gateWith(messageBody([
+    fragment('근거:\n- '), fragment('Docker 이미지 빌드를 3단계로 줄였다', [blockCitation(0, 0, 1)]),
+    fragment('\n면접 질문:\n- PR #123에서 빌드를 줄인 이유는 무엇인가요?\n- PR #124에서는 무엇을 바꿨나요?'),
+  ]));
+  const output = await gate.generate(jd({ sources: [catchSource] }));
+  const questions = output.items.filter((item) => item.jdRole === 'INTERVIEW_QUESTION').map((item) => item.text);
+  assert.deepEqual(questions, ['PR #123에서 빌드를 줄인 이유는 무엇인가요?']);
   assert.equal(output.droppedCount, 1);
 });
 

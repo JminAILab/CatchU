@@ -70,7 +70,10 @@ export interface JdCheckResult {
   dropped: Record<JdDropReason, number>;
 }
 
-/** JD 항목 판정. 근거·확인되지 않는 점을 먼저 대조한 뒤, 남은 근거로 면접 질문을 대조한다(BR4.5). 순서는 응답 순서 그대로. */
+/**
+ * JD 항목 판정. 근거·확인되지 않는 점을 먼저 판정한 뒤(인용 있으면 남김, #581), 남은 근거의 인용 원문으로 면접 질문을 대조한다(BR4.5).
+ * 순서는 응답 순서 그대로.
+ */
 export function checkJdItems(items: readonly GatedItem[], request: AiGenerationRequest): JdCheckResult {
   const dropped: Record<JdDropReason, number> = { outside_heading: 0, role: 0, fact: 0 };
   const publication = publicationTokens(request);
