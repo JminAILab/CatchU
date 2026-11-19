@@ -77,7 +77,7 @@ bash deploy/aws/scripts/db-admin.sh deploy/aws/db/roles.sql
 | 3 | SQL 실패 또는 결과 불명. 임시 자원은 표식으로 찾아 지웠다. 실패면 한 트랜잭션이라 DB는 바뀌지 않았다. 결과 불명(시간 초과·조회 실패, Pod 만들기 응답이 끊김)이면 DB에서 결과를 확인한다 |
 | 4 | 임시 자원을 지웠는지 확인하지 못했다(표식으로 조회하지 못했거나 지운 뒤에도 남았다). 관리자 비밀번호가 든 Secret이 남았을 수 있으니 출력의 명령(표식으로 지운다)으로 곧바로 지우고 없어졌는지 본다 |
 
-**계정 SQL([`roles.sql`](../db/roles.sql)).** 2단계에서 첫 `deploy.sh` 전에 한 번 실행한다. migration 계정이 DB와 public 스키마를 소유하고 앱 계정은 자료 읽기·쓰기만 한다. RDS 관리자는 슈퍼유저가 아니어서 로컬 [`init-roles.sh`](../../local-db/init-roles.sh)와 달리 만든 역할을 관리자 자신에게 SET으로 준 뒤 소유자를 넘긴다(PostgreSQL 16 조건). 앱 계정에는 `lock_timeout` 3초를 건다(#220). pgvector 확장(`vector`)도 여기서 만든다. 신뢰 확장이 아니어서 migration 계정은 만들지 못하고 이미 있을 때 통과하는 `CREATE EXTENSION IF NOT EXISTS vector`만 부른다(#389, `api/CONVENTIONS.md`). `idle_in_transaction_session_timeout`은 #220에서 값을 정하면 SQL 파일을 더해 같은 방법으로 실행한다(그때까지 RDS 기본값). 다시 실행하면 이미 있는 계정에서 실패하고 아무것도 바뀌지 않는다. 출력의 확인 표(역할 속성·`lock_timeout`·DB와 스키마 소유자·기본 권한)를 #276 완료 기준 증거로 남긴다.
+**계정 SQL([`roles.sql`](../db/roles.sql)).** 2단계에서 첫 `deploy.sh` 전에 한 번 실행한다. migration 계정이 DB와 public 스키마를 소유하고 앱 계정은 자료 읽기·쓰기만 한다. RDS 관리자는 슈퍼유저가 아니어서 로컬 [`init-roles.sh`](../../local-db/init-roles.sh)와 달리 만든 역할을 관리자 자신에게 SET으로 준 뒤 소유자를 넘긴다(PostgreSQL 16 조건). 앱 계정에는 `lock_timeout` 3초를 건다(#220). pgvector 확장(`vector`)도 여기서 만든다. 신뢰 확장이 아니어서 migration 계정은 만들지 못하고 이미 있을 때 통과하는 `CREATE EXTENSION IF NOT EXISTS vector`만 부른다(#389, `api/CONVENTIONS.md`). 앱 계정의 `idle_in_transaction_session_timeout` 5분은 [`idle-in-transaction.sql`](../db/idle-in-transaction.sql)을 이 파일 뒤에 같은 방법으로 실행해 건다(다시 실행해도 같은 값). 다시 실행하면 이미 있는 계정에서 실패하고 아무것도 바뀌지 않는다. 출력의 확인 표(역할 속성·`lock_timeout`·DB와 스키마 소유자·기본 권한)를 #276 완료 기준 증거로 남긴다.
 
 기본 권한은 migration이 새로 만드는 표마다 앱 계정에 DELETE를 준다. 그래서 `deploy.sh`가 migration 뒤마다 동의 기록(`analysis_consent`)의 직접 삭제 권한을 확인·회수·재확인한다(「앱 교체(deploy.sh)」).
 
@@ -99,6 +99,7 @@ k apply -f deploy/aws/k8s/network-policy.yaml -f deploy/aws/k8s/services.yaml
 kubectl --kubeconfig ~/.kube/catchu apply -f deploy/aws/k8s/ops/network-policy.yaml
 bash deploy/aws/scripts/make-secrets.sh                        # 「Secret과 ConfigMap」. worker 키 두 개를 SSM에 먼저 넣는다
 bash deploy/aws/scripts/db-admin.sh deploy/aws/db/roles.sql    # 「DB 관리 Pod」. 확인 표를 증거로 남긴다
+bash deploy/aws/scripts/db-admin.sh deploy/aws/db/idle-in-transaction.sql   # 앱 계정 트랜잭션 안 유휴 상한 5분
 k apply -f deploy/aws/k8s/ingress.yaml   # Load Balancer Controller·catchu.dev ACM 인증서(발급 완료)·WAF가 있은 뒤
 bash deploy/aws/scripts/deploy.sh --commit <main 커밋 40자>   # migration 뒤 동의 기록 삭제 권한 확인·회수까지 한다
 ```
@@ -190,5 +191,5 @@ bash deploy/aws/scripts/db-roles.test.sh   # 1분쯤. Docker가 돌고 있어야
 ```
 
 - `secrets.test.sh`: aws·kubectl을 합성 명령으로 바꾸고 이 폴더를 복사한 곳에서 `make-secrets.sh`·`put-parameter.sh`·`db-admin.sh`를 실제로 실행한다. 만드는 내용(Secret 키·값·판 번호 주석, 큐 주소, ConfigMap, 임시 Secret·Pod), 시작 전 확인이나 값 검사(값 끝의 줄바꿈 포함)가 하나라도 어긋나면 아무것도 바꾸지 않고 멈춤, 종료 코드, 임시 자원을 늘 지움(만들기 응답이 끊겨 서버에만 저장된 것 포함, 표식이 다른 같은 이름은 둠), 시험마다 새로 만든 합성 비밀값이 출력·aws·kubectl·jq의 명령 인자·임시 폴더에 없음, 계정 번호가 출력에 없음, `catchu-ops` 실행 파일 조건, 루트 인증서의 지문을 본다.
-- `db-roles.test.sh`: RDS처럼 슈퍼유저가 아닌 관리자를 둔 PostgreSQL 16.15 컨테이너에 psql Pod 틀의 이미지·명령·환경 그대로(사용자 999·읽기 전용 루트·TLS `verify-full`) `roles.sql`을 실행하고, 각 계정으로 붙어 권한(앱 계정의 읽기·쓰기와 `lock_timeout`, 스키마 변경 거부, 다른 계정의 접속·스키마 사용 거부, 두 계정에 특별 권한 없음, 다시 실행하거나 중간 문장이 실패하면 바뀌지 않음, 인증서와 다른 이름으로 붙으면 거부, 위치 오류 때도 문장 원문을 찍지 않음, 비밀번호가 출력·DB 로그에 없음)을 본다. 이어서 동의 기록 확인 Pod 틀의 이미지·명령·환경 그대로 migration 계정으로 실행해, 권한이 있으면 회수하고 0(앱 계정의 DELETE·TRUNCATE 거부, 읽기·쓰기는 그대로), 없으면 그대로 0, PUBLIC에 준 권한처럼 회수로 없어지지 않으면 0이 아니고 앞의 회수도 되돌림, 표가 없으면 0이 아님을 본다.
+- `db-roles.test.sh`: RDS처럼 슈퍼유저가 아닌 관리자를 둔 PostgreSQL 16.15 컨테이너에 psql Pod 틀의 이미지·명령·환경 그대로(사용자 999·읽기 전용 루트·TLS `verify-full`) `roles.sql`과 `idle-in-transaction.sql`을 실행하고, 각 계정으로 붙어 권한(앱 계정의 읽기·쓰기와 `lock_timeout`·트랜잭션 안 유휴 상한(migration 계정은 기본값, 상한을 넘기면 연결이 끊김), 스키마 변경 거부, 다른 계정의 접속·스키마 사용 거부, 두 계정에 특별 권한 없음, 다시 실행하거나 중간 문장이 실패하면 바뀌지 않음, 인증서와 다른 이름으로 붙으면 거부, 위치 오류 때도 문장 원문을 찍지 않음, 비밀번호가 출력·DB 로그에 없음)을 본다. 이어서 동의 기록 확인 Pod 틀의 이미지·명령·환경 그대로 migration 계정으로 실행해, 권한이 있으면 회수하고 0(앱 계정의 DELETE·TRUNCATE 거부, 읽기·쓰기는 그대로), 없으면 그대로 0, PUBLIC에 준 권한처럼 회수로 없어지지 않으면 0이 아니고 앞의 회수도 되돌림, 표가 없으면 0이 아님을 본다.
 - 확인하지 못하는 것: 실제 server-side apply와 Pod 보안 검사, 실제 RDS 관리자(`rds_superuser`)의 특성과 실제 Secrets Manager 응답, migration이 실제로 만든 동의 기록 표(시험은 같은 이름의 합성 표로 본다). 이것은 2단계에서 본다.

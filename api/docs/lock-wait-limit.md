@@ -9,7 +9,7 @@ api가 DB 잠금을 기다리는 최대 시간이다. 상한은 코드가 아니
 - 앱 계정(`catchu_app`)에만 `lock_timeout = '3s'`를 건다. 마이그레이션 계정과 공통 DB 연결 설정(`src/database/database.config.ts`의 `buildDataSourceOptions`, 앱과 마이그레이션 명령이 함께 쓴다)에는 넣지 않는다. 같은 앱 계정의 모든 잠금 대기에 걸린다.
 - 계정 설정은 새 연결부터 적용되므로 설정한 뒤 api를 다시 띄운다.
 - 3초는 부하 측정으로 정한 값이 아닌 초기값으로 정했다. 결과 반영은 잠금을 쥔 채 후보 등록까지 하므로 경쟁 검사에서 함께 봤고, 10/18 측정을 10/19 검토해 3초를 유지했다([#331 팀장 리뷰](https://github.com/JminAILab/CatchU/pull/331#pullrequestreview-5565830688), 아래 「측정」·「판단이 필요한 결과」).
-- `idle_in_transaction_session_timeout`은 이번에 정하지 않았다.
+- 트랜잭션 안 유휴 상한(`idle_in_transaction_session_timeout`)은 EKS 운영 DB의 앱 계정에만 5분으로 건다(2026-11-19 팀장 결정, [#276](https://github.com/JminAILab/CatchU/issues/276)). 트랜잭션을 연 채 DB에 문장을 보내지 않는 시간이 5분을 넘으면 PostgreSQL이 연결을 끊고 트랜잭션을 되돌린다. 멈춘 연결이 행 잠금을 오래 쥐지 못하게 하려는 것이다. 잠금을 기다리는 동안은 문장 실행 중이라 이 상한에 걸리지 않는다. 같은 날 api의 트랜잭션을 모두 따라가 보니 하나만 빼고 안에서 DB만 기다렸다. 그 하나는 탈퇴 마지막 단계다. 회원 행을 지운 뒤 트랜잭션 안에서 회원 파일을 S3에서 다시 지우는데, S3가 응답하지 않으면 호출마다 30~40초까지 걸려 1~2분이 될 수 있다. 5분은 이보다 넉넉한 값이고, 넘으면 그 탈퇴 요청은 실패하고 회원 행 삭제도 되돌려진다. 적용은 [`idle-in-transaction.sql`](../../deploy/aws/db/idle-in-transaction.sql)이고, 개발 서버와 로컬에는 걸지 않는다.
 
 개발 서버에는 [#310](https://github.com/JminAILab/CatchU/pull/310)이 적용했다. 설정 명령·새 연결의 적용값(앱 `3s`, 마이그레이션 계정 `0`) 확인·DB 초기화 뒤 다시 거는 방법은 [개발 서버 안내 「순서」](../../deploy/dev-server/README.md#순서) 3단계에 있고, 자동 배포의 서버 안 확인도 앱 계정 상한이 `3s`인지 본다([cd 안내](../../deploy/dev-server/cd/README.md)). 합의는 EKS 운영 DB(#276)에도 같은 값을 옮기기로 했다.
 
