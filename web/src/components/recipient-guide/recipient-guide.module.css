@@ -7,14 +7,49 @@
 }
 
 .title {
-  margin: 0 0 0.5rem;
+  margin: 0;
   font-size: 1rem;
 }
 
-.items {
+/* 제목 단추: 글자 모양은 제목 그대로 두고, 누를 수 있는 자리는 제목 줄 전체다. */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
   margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* 접힘은 오른쪽, 펼침은 아래를 가리킨다. 상태는 단추의 aria-expanded가 알리므로 낭독에서는 뺀다. */
+.marker {
+  flex: none;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.toggle[aria-expanded="true"] .marker {
+  transform: rotate(45deg);
+}
+
+.items {
+  margin: 0.5rem 0 0;
   padding-left: 1.25rem;
   display: grid;
   gap: 0.25rem;
   line-height: 1.6;
+}
+
+/* display: grid가 hidden 속성의 기본 숨김을 덮지 않게 한다. */
+.items[hidden] {
+  display: none;
 }
