@@ -21524,3 +21524,530 @@
 **Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:e498d709f9aaa3203adb86d316985b1ceb7e1e441b4ed612ed3e7630a5938a32","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u4-privacy-policy/aa555492f330bf5d/1.json","digest":"sha256:7ee78a158e5d4ed837a4ac359f3f01aa9b25fdf677d799feae43fa1c208e53e8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:a3f1019e0efbfe199177fa3ed27be02d63b96b24037316d79b574e3d902714b3","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u4-privacy-policy/aa555492f330bf5d/1.json","digest":"sha256:ec2e749a6086f51be62286e2ad5bf1dbb37bfabdf75d7339b0e383b2b44e9f54"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:c28a2ac2762fb5f2c552017e0332ce0f983da0a3c0fe25c86c3e74c0b2eb3789","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u4-privacy-policy/aa555492f330bf5d/1.json","digest":"sha256:ec2e749a6086f51be62286e2ad5bf1dbb37bfabdf75d7339b0e383b2b44e9f54"}}]}
 
 ---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T07:07:14Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-design-questions.md
+**Context**: construction > u2-applicant-screens > functional-design > functional-design-questions.md
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-20T07:07:17Z
+**Event**: UNIT_STARTED
+**Stage**: functional-design
+**Unit**: u2-applicant-screens
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T07:07:25Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Q1, Q2, Q3, Q4
+**Options**: Q1: A /presets·/presets/new·/presets/{id}, B 쿼리 편집, X; Q2: A publishable=true 쿼리, B 새 경로, X; Q3: A 쪽마다 measure로 미리 막기, B 누를 때 세기, C 세지 않음, X; Q4: A 첫 이름 외 N개, B 모두 쉼표, X
+**Unit**: u2-applicant-screens
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T07:17:26Z
+**Event**: HUMAN_TURN
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**Origin**: person
+**Source**: picker
+**Picked**: ["A. /presets 꼴 (권장)","A. publishable=true (권장)","A. 쪽마다 미리 세기","A. 첫 이름 외 N개 (권장)"]
+**Message Id**: d7d9089d
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T07:17:26Z
+**Event**: QUESTION_REPLIED
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**Question**: [개발자] Q1. 프리셋 화면 주소를 어떻게 둘까요? 다듬은 화면은 「발행본」 주소(/publications) 아래가 아니어야 한다고만 정했습니다.
+**Reply**: A. /presets 꼴 (권장)
+**Options**: ["A. /presets 꼴 (권장)","B. 쿼리로 편집"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T07:17:26Z
+**Event**: QUESTION_REPLIED
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**Question**: [개발자] Q2. 본인 Catch 목록(GET /v1/catches)에 더할 「담을 수 있는 Catch만」(공개·확인됨·보호 안 됨) 조건을 어떤 모양으로 둘까요?
+**Reply**: A. publishable=true (권장)
+**Options**: ["A. publishable=true (권장)","B. 프리셋 전용 새 경로"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T07:17:26Z
+**Event**: QUESTION_REPLIED
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**Question**: [제품 담당] Q3. 고르기 단추의 「전체 글이 60,000자를 넘습니다」 막힘을 언제 정할까요? 지금 목록 응답에는 글자 수가 없고, U1의 POST /v1/presets/measure(1~50개)로 셈 수 있습니다.
+**Reply**: A. 쪽마다 미리 세기
+**Options**: ["A. 쪽마다 미리 세기","B. 누를 때 세기","C. 세지 않기"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T07:17:26Z
+**Event**: QUESTION_REPLIED
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**Question**: [제품 담당] Q4. 발행 화면의 「발행할 수 없는 자료가 있습니다: (자료 이름)」에 자료가 여럿이면 어떻게 보일까요? M4는 이름 하나만 그렸습니다.
+**Reply**: A. 첫 이름 외 N개 (권장)
+**Options**: ["A. 첫 이름 외 N개 (권장)","B. 모두 쉼표로"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T07:17:30Z
+**Event**: QUESTION_ANSWERED
+**Stage**: functional-design
+**Details**: Q1: A; Q2: A; Q3: A; Q4: A
+**Unit**: u2-applicant-screens
+**Person Reply**: A. /presets 꼴 (권장)\nA. publishable=true (권장)\nA. 쪽마다 미리 세기\nA. 첫 이름 외 N개 (권장)
+**Message Id**: d7d9089d
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T07:17:44Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Q5, Q6
+**Options**: Q5: A 다시 불러와 이름 찾기, B 지금 목록에서만, X; Q6: A 저장 막지 않고 서버 거부 안내, B 넘으면 저장 막기, X
+**Unit**: u2-applicant-screens
+
+---
+
+## Session Start
+**Timestamp**: 2026-11-20T07:17:59Z
+**Event**: SESSION_STARTED
+**Source**: startup
+**Session**: 54ddab8d-a5fb-415f-ad62-f82792d4270d
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T07:19:10Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["A로 하되, 화면이 막힘 칸을 받도록 web/src/lib/api-response.ts가 details.blockedSources를 옮기게 고친다(#626 리뷰에서 팀원 3이 짚음: 지금은 violations·existingRequestId·catchIds만 옮기고 blockedSources를 버림). api가 더는 보내지 않는 catchIds 처리는 지운다.","A. 막지 않고 거부 안내 (권장)"]
+**Message Id**: 52d24ac9
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T07:19:11Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: [제품 담당] Q5. 발행이 서버에서 막혔을 때(blockedSources: 프리셋 ID·자료 ID만, 이름 없음) 화면은 어떻게 보일까요? 막힘은 고른 뒤 다른 창에서 Catch를 숨긴 경우처럼, 화면이 가진 목록이 낡았을 때 납니다.
+**Reply**: A로 하되, 화면이 막힘 칸을 받도록 web/src/lib/api-response.ts가 details.blockedSources를 옮기게 고친다(#626 리뷰에서 팀원 3이 짚음: 지금은 violations·existingRequestId·catchIds만 옮기고 blockedSources를 버림). api가 더는 보내지 않는 catchIds 처리는 지운다.
+**Options**: ["A. 다시 불러와 이름 (권장)","B. 지금 목록에서만"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T07:19:11Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: [제품 담당] Q6. 저장한 뒤 원본이 길어져 60,000자를 넘은 프리셋은 자료를 빼기 전에는 이름만 바꿔도 서버가 저장을 거부합니다. 편집 화면의 [저장]을 어떻게 할까요?
+**Reply**: A. 막지 않고 거부 안내 (권장)
+**Options**: ["A. 막지 않고 거부 안내 (권장)","B. 넘으면 [저장] 막기"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T07:19:18Z
+**Event**: QUESTION_ANSWERED
+**Stage**: functional-design
+**Details**: Q5: A로 하되, 화면이 막힘 칸을 받도록 web/src/lib/api-response.ts가 details.blockedSources를 옮기게 고친다(#626 리뷰에서 팀원 3이 짚음: 지금은 violations·existingRequestId·catchIds만 옮기고 blockedSources를 버림). api가 더는 보내지 않는 catchIds 처리는 지운다.; Q6: A
+**Unit**: u2-applicant-screens
+**Person Reply**: A로 하되, 화면이 막힘 칸을 받도록 web/src/lib/api-response.ts가 details.blockedSources를 옮기게 고친다(#626 리뷰에서 팀원 3이 짚음: 지금은 violations·existingRequestId·catchIds만 옮기고 blockedSources를 버림). api가 더는 보내지 않는 catchIds 처리는 지운다.\nA. 막지 않고 거부 안내 (권장)
+**Message Id**: 52d24ac9
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T07:19:33Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-design-questions.md
+**Context**: construction > u2-applicant-screens > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T07:19:36Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-design-questions.md
+**Context**: construction > u2-applicant-screens > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T07:19:56Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-design-questions.md
+**Context**: construction > u2-applicant-screens > functional-design > functional-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T07:20:01Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-design-questions.md
+**Unit**: u2-applicant-screens
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T07:26:17Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: cd8106bc
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T07:26:18Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: Does this all look correct before I generate the artifact?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T07:26:24Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-design-questions.md
+**Context**: construction > u2-applicant-screens > functional-design > functional-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-20T07:26:25Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: functional-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-design-questions.md
+**Questions SHA-256**: 172663ef1109f01f7df8f726f462e0e34cc324b948094090a47b0bd2b3bc5116
+**Hash Scope**: confirmed-content-v2
+**Unit**: u2-applicant-screens
+**Message Id**: cd8106bc
+**Person Reply**: Looks correct
+**Summary Authorization Id**: b47d48164b54ae8051edbe809ad457dbddd2c69d7eef4d226b63ffe23b46a087
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T07:28:21Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/rules.md
+**Context**: construction > u2-applicant-screens > functional-design > rules.md
+**Summary Authorization Id**: b47d48164b54ae8051edbe809ad457dbddd2c69d7eef4d226b63ffe23b46a087
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T07:30:03Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md
+**Context**: construction > u2-applicant-screens > functional-design > functional-spec.md
+**Summary Authorization Id**: b47d48164b54ae8051edbe809ad457dbddd2c69d7eef4d226b63ffe23b46a087
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T07:31:04Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/frontend-components.md
+**Context**: construction > u2-applicant-screens > functional-design > frontend-components.md
+**Summary Authorization Id**: b47d48164b54ae8051edbe809ad457dbddd2c69d7eef4d226b63ffe23b46a087
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T07:31:24Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/traceability.json
+**Context**: construction > u2-applicant-screens > functional-design > traceability.json
+**Summary Authorization Id**: b47d48164b54ae8051edbe809ad457dbddd2c69d7eef4d226b63ffe23b46a087
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T07:32:03Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/functional-design/memory.md
+**Context**: construction > functional-design > memory.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T07:32:05Z
+**Event**: SENSOR_FIRED
+**Fire id**: a67a44e7
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/rules.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T07:32:05Z
+**Event**: SENSOR_PASSED
+**Fire id**: a67a44e7
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/rules.md
+**Duration ms**: 84
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T07:32:06Z
+**Event**: SENSOR_FIRED
+**Fire id**: 7591ce53
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T07:32:06Z
+**Event**: SENSOR_PASSED
+**Fire id**: 7591ce53
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md
+**Duration ms**: 84
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T07:32:06Z
+**Event**: SENSOR_FIRED
+**Fire id**: 43ba7f66
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T07:32:06Z
+**Event**: SENSOR_PASSED
+**Fire id**: 43ba7f66
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/traceability.json
+**Duration ms**: 79
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T07:32:06Z
+**Event**: SENSOR_FIRED
+**Fire id**: 914c0556
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/frontend-components.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T07:32:06Z
+**Event**: SENSOR_PASSED
+**Fire id**: 914c0556
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/frontend-components.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T07:32:06Z
+**Event**: SENSOR_FIRED
+**Fire id**: a4282d59
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/rules.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T07:32:06Z
+**Event**: SENSOR_PASSED
+**Fire id**: a4282d59
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/rules.md
+**Duration ms**: 86
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T07:32:06Z
+**Event**: SENSOR_FIRED
+**Fire id**: f7f81116
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T07:32:06Z
+**Event**: SENSOR_PASSED
+**Fire id**: f7f81116
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/traceability.json
+**Duration ms**: 113
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-20T07:32:06Z
+**Event**: REVIEW_REQUESTED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u2-applicant-screens
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:334b5727f4158ecd4be6f9c055fda3a2cfbafc0d973e6d7ebe525efa1ab9240a
+**Request Id**: review:4f0f7253ebf1f761f9dc8af211b19519
+**Review File**: .aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.4f0f7253ebf1f761f9dc8af211b19519.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T07:32:26Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-20T07:32:34Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-20T07:34:35Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a6814f04db0163e8c
+**Message**: 발행 프리셋 작업은 U4 개인정보처리방침까지 승인을 마쳤고, 지금은 U2 지원자 화면의 기능 설계를 검토받는 중입니다. 검토 결과가 오면 기록하고, 확인 단계의 작성자 설명 안내를 남길지 정해 주시면 됩니다.
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-20T07:36:09Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: functional-design
+**Tool**: Bash
+**Details**: . (unit u2-applicant-screens)
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T07:38:18Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.4f0f7253ebf1f761f9dc8af211b19519.review.md
+**Context**: .aidlc-engine > reviews > functional-design > units > u2-applicant-screens > aa555492f330bf5d > 1.4f0f7253ebf1f761f9dc8af211b19519.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T07:38:28Z
+**Event**: HOST_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-20T07:38:28Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: a4cc3745102c5cf83
+**Review File Digest**: .aidlc-engine/reviews/units-generation/stage/18dabf3da2f56bda/1.a5010d1a3dd0a8f252034f647bdd1f66.review.md=absent; .aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.4f0f7253ebf1f761f9dc8af211b19519.review.md=a930561382beafb382145bf4483fab1b53c4fba0212d8f4ff4054c74936199c5
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-20T07:38:36Z
+**Event**: REVIEW_COMPLETED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u2-applicant-screens
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:334b5727f4158ecd4be6f9c055fda3a2cfbafc0d973e6d7ebe525efa1ab9240a
+**Artifact Fingerprint**: sha256:334b5727f4158ecd4be6f9c055fda3a2cfbafc0d973e6d7ebe525efa1ab9240a
+**Request Id**: review:4f0f7253ebf1f761f9dc8af211b19519
+**Review Record**: .aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json
+**Review Record Digest**: sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-20T07:38:40Z
+**Event**: UNIT_COMPLETED
+**Stage**: functional-design
+**Unit**: u2-applicant-screens
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
