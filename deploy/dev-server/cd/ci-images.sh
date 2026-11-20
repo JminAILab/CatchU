@@ -93,7 +93,7 @@ push() {
   [ "$(git rev-parse HEAD)" = "$TOOLS_COMMIT" ] || { echo "::error::배포 도구 작업 폴더가 ${TOOLS_COMMIT}가 아니다"; exit 2; }
   [ "$(git -C "$SRC_DIR" rev-parse HEAD)" = "$COMMIT" ] || { echo "::error::소스 작업 폴더가 ${COMMIT}가 아니다"; exit 2; }
   [ -z "$(git -C "$SRC_DIR" status --porcelain)" ] || { echo "::error::소스 작업 폴더에 바뀐 파일이 있다"; exit 2; }
-  local acct r ref digest min key state
+  local acct r ref digest key state
   acct=$(aws sts get-caller-identity --query Account --output text)
   reg="${acct}.dkr.ecr.${AWS_REGION}.amazonaws.com" # 함수가 끝난 뒤 EXIT trap에서도 쓰므로 전역
   aws ecr get-login-password | docker login --username AWS --password-stdin "$reg" > /dev/null

@@ -4,7 +4,7 @@
 # 개발 서버(#304)를 지우면서 개발 서버 교체 갈래와 dev-server 값을 뺐다(#342). 워크플로·폴더 이름은 그때 이름을 그대로 쓴다.
 # 수동 실행(Run workflow)은 main에서만 되고, 커밋을 넣으면 그 main 커밋을 다시 배포한다(되돌리기). 이미 올린 판본이면 빌드·검사를 건너뛴다.
 # 되돌릴 수 있는 커밋은 main의 first-parent 커밋(main에 반영된 판본)뿐이다. 반영된 PR 안의 중간 커밋은 승인된 최종 판본이 아니므로 받지 않는다.
-# 배포 도구(deploy/dev-server/cd/·deploy/aws/cd/)는 늘 그 실행의 main 판본을 쓰고, 이미지와 EKS 실행 파일만 배포할 커밋에서 가져온다.
+# 배포 도구(deploy/dev-server/cd/·deploy/aws/cd/·deploy/aws/scripts/)는 늘 그 실행의 main 판본을 쓰고, 이미지와 EKS 실행 파일만 배포할 커밋에서 가져온다.
 # job은 셋이다. plan·deploy만 AWS 권한(OIDC)을 받고, 배포할 커밋의 코드를 러너에서 실행하는 이미지 검사(check)는 권한 없는 별도 러너에서 돈다.
 # AWS 역할은 environment eks(배포 브랜치 main만)에서 돈 job만 믿는다. none도 같은 역할로 이미지를 올리고, EKS 교체 단계는 건너뛴다.
 # 저장소에 AWS 키를 두지 않는다. EKS 배포 역할은 앱 이미지 올리기와 클러스터 조회만 하고, 클러스터 안 권한은 deploy/aws/k8s/deploy-rbac.yaml이 전부다.

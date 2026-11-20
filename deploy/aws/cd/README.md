@@ -1,6 +1,6 @@
 # EKS 자동 배포
 
-`main`에 반영된 판본을 GitHub Actions가 EKS에 배포한다([#342](https://github.com/JminAILab/CatchU/issues/342)). 워크플로와 배포 대상·판본 확인·이미지 단계는 공통 단계를 쓴다([../../dev-server/cd/README.md](../../dev-server/cd/README.md)). 배포 대상 값이 `eks`일 때 AWS 역할과 교체 단계만 달라진다. 교체는 손으로 쓰는 [`deploy.sh`](../scripts/deploy.sh)를 그대로 부른다([../k8s/README.md](../k8s/README.md) 「앱 교체(deploy.sh)」).
+`main`에 반영된 판본을 GitHub Actions가 EKS에 배포한다([#342](https://github.com/JminAILab/CatchU/issues/342)). 워크플로와 배포 대상·판본 확인·이미지 단계는 공통 단계를 쓴다([../../dev-server/cd/README.md](../../dev-server/cd/README.md)). 배포 대상 값이 `eks`면 이어서 교체 단계가 돈다. AWS 역할은 `none`에서도 아래 「권한」의 역할을 쓴다. 교체는 손으로 쓰는 [`deploy.sh`](../scripts/deploy.sh)를 그대로 부른다([../k8s/README.md](../k8s/README.md) 「앱 교체(deploy.sh)」).
 
 **아직 실제 클러스터에서 돌려 보지 않았다.** 아래 「처음 준비」를 한 뒤 「아직 못 본 것」의 순서로 확인하고, 그 전에는 배포 대상을 `eks`로 두지 않는다.
 
@@ -10,7 +10,7 @@
 |---|---|
 | `plan` | 배포할 커밋·배포 대상 확인, 앱 이미지 네 개가 이미 올라가 있는지 조회. environment `eks`의 역할을 쓴다 |
 | `check` | 배포할 커밋의 이미지 검사(AWS 권한 없음). 이미 올린 판본이면 건너뜀 |
-| `deploy` | kubectl 받기 → 빌드·ECR 올리기(앱 이미지 네 개. 배포 파일 묶음은 올리지 않는다) → EKS 교체([`ci-deploy.sh`](ci-deploy.sh)) |
+| `deploy` | kubectl 받기 → 빌드·ECR 올리기(앱 이미지 네 개) → EKS 교체([`ci-deploy.sh`](ci-deploy.sh)) |
 
 EKS 교체 단계는 세 가지를 한다.
 
@@ -22,7 +22,7 @@ EKS 교체 단계는 세 가지를 한다.
 - **바깥 확인은 하지 않는다.** `deploy.sh`가 세 서비스의 준비(ALB 상태 확인 통과 포함)를 본 것으로 끝낸다. 개발 서버용 바깥 확인은 Caddy의 응답을 기대해 그대로 쓸 수 없다.
 - **중단:** api·worker는 옛 것을 내린 뒤 새 것을 띄우므로 교체하는 동안 로그인·분석이 멈춘다. 실제 시간은 처음 돌릴 때 잰다.
 - **시간:** 빌드·올리기는 약 5분이다(개발 서버 배포 실측). 교체는 각 단계의 대기 상한을 모두 채우면 약 36분이다. 임시 권한은 60분, `deploy` job의 상한도 60분이다.
-- 배포는 한 번에 하나만 돈다(개발 서버 배포와 같은 동시 실행 막기).
+- 배포는 한 번에 하나만 돈다(같은 워크플로의 동시 실행 막기).
 
 ## 권한
 
@@ -30,6 +30,7 @@ EKS 교체 단계는 세 가지를 한다.
 - **쿠버네티스:** 역할은 EKS 접근 항목으로 그룹 `catchu-deploy`에 들어가고, 접근 정책은 붙이지 않는다. 그룹의 권한은 [`../k8s/deploy-rbac.yaml`](../k8s/deploy-rbac.yaml)이 전부다. namespace `catchu`에서 Deployment 조회·적용·실행 수 바꾸기, Pod 조회·지켜보기·만들기, Pod 로그 읽기, NetworkPolicy `default-deny`와 ConfigMap `catchu-db` 조회만 된다.
 - **주지 않는 것:** Secret 읽기, Pod 안 명령 실행(exec)·붙기·포트 연결, Pod·Deployment 지우기, 다른 namespace(`catchu-ops` 포함), 이 권한 자체를 고치기.
 - **한계:** `catchu`에 Pod를 만들 수 있으므로 같은 namespace의 Secret을 붙인 Pod를 만들어 읽는 길은 남는다. 그래서 RDS 관리자 비밀번호는 `catchu-ops`에만 둔다. api의 GitHub 토큰 보관 볼륨도 같은 방법으로 Pod에 붙여 암호문을 읽을 수 있고, 암호문을 푸는 키는 Secret `catchu-api`에 있다. 이 역할은 이미지를 올리고 그 이미지로 앱을 바꿀 수 있으므로, 막는 선은 「`main`에서만」과 `main` 반영 PR의 승인 1건이다.
+- **`none`에서도:** 배포 대상이 `none`인 실행도 이 역할과 위 쿠버네티스 권한을 받는다. EKS를 바꾸지 않는 것은 EKS 교체 단계의 조건(배포 대상이 `eks`일 때만) 하나가 지킨다. 조건과 관계없이 막아야 할 때(동결·장애)는 워크플로를 끈다(`gh workflow disable deploy-dev-server`, [공통 단계 「끄는 법」](../../dev-server/cd/README.md#끄는-법)).
 
 ## 처음 준비
 
