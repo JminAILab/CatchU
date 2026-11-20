@@ -25729,3 +25729,430 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
 
 ---
+
+## Unit Started
+**Timestamp**: 2026-11-20T12:10:28Z
+**Event**: UNIT_STARTED
+**Stage**: nfr-design
+**Unit**: u3-reader-views
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T12:10:40Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/nfr-design-questions.md
+**Context**: construction > u3-reader-views > nfr-design > nfr-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T12:10:41Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-design
+**Decision**: Q1
+**Options**: A 화살표·누름마다 묻고 거절하면 탭·초점 그대로, B 입력이 있으면 화살표로는 안 옮기고 누름만 묻기, X
+**Unit**: u3-reader-views
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T12:11:51Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["A. 매번 묻고 그대로 (권장)"]
+**Message Id**: 00e6d6b3
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T12:11:51Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: [개발자] Q1. 텍스트 자료 화면에서 저장하지 않은 입력이 있을 때 화살표로 PDF 탭으로 옮기면 어떻게 할까요? 지금은 탭을 바꾸기 전에 「저장하지 않은 입력이 있습니다. 이동하시겠습니까?」를 묻고, 머무르면 탭을 바꾸지 않습니다. 그대로 두면 거절 뒤 초점이 열리지 않은 탭에 남고, 화살표마다 확인 창이 뜹니다.
+**Reply**: A. 매번 묻고 그대로 (권장)
+**Options**: ["A. 매번 묻고 그대로 (권장)","B. 화살표는 막기"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T12:11:53Z
+**Event**: QUESTION_ANSWERED
+**Stage**: nfr-design
+**Details**: Q1: A
+**Unit**: u3-reader-views
+**Person Reply**: A. 매번 묻고 그대로 (권장)
+**Message Id**: 00e6d6b3
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T12:11:55Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/nfr-design-questions.md
+**Context**: construction > u3-reader-views > nfr-design > nfr-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T12:11:57Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/nfr-design-questions.md
+**Unit**: u3-reader-views
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T12:18:34Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: 98e814ab
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T12:18:35Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: Does this all look correct before I generate the artifact?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T12:18:40Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/nfr-design-questions.md
+**Context**: construction > u3-reader-views > nfr-design > nfr-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-20T12:18:41Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: nfr-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/nfr-design-questions.md
+**Questions SHA-256**: b8f39a37edc121d3b72739eccc78f01cd09f0e25d6e6bf0defe46a55c6b6d202
+**Hash Scope**: confirmed-content-v2
+**Unit**: u3-reader-views
+**Message Id**: 98e814ab
+**Person Reply**: Looks correct
+**Summary Authorization Id**: 63335978d3b6d4a69bfe28e1e28f7f4d1d278870c7dcbbb27a4d8b6d34c00504
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T12:19:11Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/performance-design.md
+**Context**: construction > u3-reader-views > nfr-design > performance-design.md
+**Summary Authorization Id**: 63335978d3b6d4a69bfe28e1e28f7f4d1d278870c7dcbbb27a4d8b6d34c00504
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T12:19:29Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md
+**Context**: construction > u3-reader-views > nfr-design > security-design.md
+**Summary Authorization Id**: 63335978d3b6d4a69bfe28e1e28f7f4d1d278870c7dcbbb27a4d8b6d34c00504
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T12:19:39Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/logical-components.md
+**Context**: construction > u3-reader-views > nfr-design > logical-components.md
+**Summary Authorization Id**: 63335978d3b6d4a69bfe28e1e28f7f4d1d278870c7dcbbb27a4d8b6d34c00504
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T12:19:49Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/traceability.json
+**Context**: construction > u3-reader-views > nfr-design > traceability.json
+**Summary Authorization Id**: 63335978d3b6d4a69bfe28e1e28f7f4d1d278870c7dcbbb27a4d8b6d34c00504
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T12:19:51Z
+**Event**: SENSOR_FIRED
+**Fire id**: cd49b201
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T12:19:51Z
+**Event**: SENSOR_PASSED
+**Fire id**: cd49b201
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/performance-design.md
+**Duration ms**: 79
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T12:19:51Z
+**Event**: SENSOR_FIRED
+**Fire id**: fe3fb8b2
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T12:19:52Z
+**Event**: SENSOR_PASSED
+**Fire id**: fe3fb8b2
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md
+**Duration ms**: 71
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T12:19:52Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0bccd2d4
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/logical-components.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T12:19:52Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0bccd2d4
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/logical-components.md
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T12:19:52Z
+**Event**: SENSOR_FIRED
+**Fire id**: 744a50d6
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T12:19:52Z
+**Event**: SENSOR_PASSED
+**Fire id**: 744a50d6
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/traceability.json
+**Duration ms**: 79
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T12:19:52Z
+**Event**: SENSOR_FIRED
+**Fire id**: f79f7c23
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T12:19:52Z
+**Event**: SENSOR_PASSED
+**Fire id**: f79f7c23
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/performance-design.md
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T12:19:52Z
+**Event**: SENSOR_FIRED
+**Fire id**: 3e133548
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T12:19:52Z
+**Event**: SENSOR_PASSED
+**Fire id**: 3e133548
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/traceability.json
+**Duration ms**: 76
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-20T12:19:52Z
+**Event**: REVIEW_REQUESTED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u3-reader-views
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:61a85b5b2049ec7ca8477de6d89a2fef69851b437494692c0e6e6b427b441e7f
+**Request Id**: review:10fc326a728ed6cec465acc018fb24bb
+**Review File**: .aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.10fc326a728ed6cec465acc018fb24bb.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T12:19:56Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-20T12:20:11Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-20T12:20:22Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: nfr-design
+**Tool**: Bash
+**Details**: <project-dir> (unit u3-reader-views)
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-20T12:20:27Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: nfr-design
+**Tool**: Bash
+**Details**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets (unit u3-reader-views)
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-20T12:20:31Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: nfr-design
+**Tool**: Bash
+**Details**: <project-dir> (unit u3-reader-views)
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T12:21:13Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.10fc326a728ed6cec465acc018fb24bb.review.md
+**Context**: .aidlc-engine > reviews > nfr-design > units > u3-reader-views > aa555492f330bf5d > 1.10fc326a728ed6cec465acc018fb24bb.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T12:21:22Z
+**Event**: HOST_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-20T12:21:22Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: af5a64186a48b67cc
+**Review File Digest**: .aidlc-engine/reviews/units-generation/stage/18dabf3da2f56bda/1.a5010d1a3dd0a8f252034f647bdd1f66.review.md=absent; .aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.10fc326a728ed6cec465acc018fb24bb.review.md=5feb546b913eaadbae2968634d3a233097578bbf4c14b21bf62fa76f4386dede
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-20T12:21:24Z
+**Event**: REVIEW_COMPLETED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u3-reader-views
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:61a85b5b2049ec7ca8477de6d89a2fef69851b437494692c0e6e6b427b441e7f
+**Artifact Fingerprint**: sha256:61a85b5b2049ec7ca8477de6d89a2fef69851b437494692c0e6e6b427b441e7f
+**Request Id**: review:10fc326a728ed6cec465acc018fb24bb
+**Review Record**: .aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.json
+**Review Record Digest**: sha256:a380379891d1fb60cb3690dc94fcc0e7c11986ed2422bf230f94cb8f003c7fad
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-20T12:21:28Z
+**Event**: UNIT_COMPLETED
+**Stage**: nfr-design
+**Unit**: u3-reader-views
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
