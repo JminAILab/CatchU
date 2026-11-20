@@ -68,7 +68,7 @@ main   배포 브랜치
 
 **dev의 검증**: dev 대상 PR마다 [CI](../.github/workflows/ci.yml)가 web·api·worker README의 검사 명령, AI가 읽는 문서의 크기 검사, 의존성 취약점 검사를 실행하고, 이를 통과해야 머지할 수 있다(필수 상태 검사, §7). 관련 경로가 바뀌지 않은 서비스의 검사는 건너뛰며, 건너뛴 검사는 통과로 친다. 어떤 경로가 어느 검사를 돌리는지는 CI 파일에 있다. CI 통과가 사람 리뷰를 대신하지 않는다. PR과 승인 1건이 필요하며(§7), 검토자는 무엇을 확인했는지 설명할 수 있어야 한다([작업관리](CatchU_작업관리.md)). dev를 코드가 쌓이기 전에 둔 이유는 나중에 브랜치 정책을 바꾸는 비용이 더 크기 때문이다.
 
-**main의 검증**: main 대상 PR(dev→main 배포 PR)마다 [images 워크플로](../.github/workflows/images.yml)가 운영 이미지 검사(`images`)와 개발 서버 자동 배포 스크립트의 회귀 시험(`cd-scripts`)을 실행하고, 이를 통과해야 머지할 수 있다(필수 상태 검사, §7). dev의 CI는 main 대상 PR에서 돌지 않고, dev push 때는 마지막으로 병합된 PR이 바꾼 서비스만 검사한다. 그래서 배포 PR을 올리기 전에 dev 최신으로 CI를 수동 실행해 모든 서비스를 검사하고 결과를 PR에 남긴다. main 병합은 개발 서버 자동 배포를 시작한다([자동 배포 안내](../deploy/dev-server/cd/README.md)).
+**main의 검증**: main 대상 PR(dev→main 배포 PR)마다 [images 워크플로](../.github/workflows/images.yml)가 운영 이미지 검사(`images`)와 자동 배포 스크립트의 회귀 시험(`cd-scripts`)을 실행하고, 이를 통과해야 머지할 수 있다(필수 상태 검사, §7). dev의 CI는 main 대상 PR에서 돌지 않고, dev push 때는 마지막으로 병합된 PR이 바꾼 서비스만 검사한다. 그래서 배포 PR을 올리기 전에 dev 최신으로 CI를 수동 실행해 모든 서비스를 검사하고 결과를 PR에 남긴다. main 병합은 자동 배포를 시작한다. 어디까지 할지(EKS 교체 또는 이미지 올리기까지)는 저장소 변수 `DEPLOY_TARGET`이 정한다([자동 배포 안내](../deploy/dev-server/cd/README.md)).
 
 ### 임시 통합 브랜치 운영안
 
@@ -296,3 +296,4 @@ chore: worker 의존성에 httpx 추가
 - **2026-11-16** — §1 트리의 worker 줄을 실제 쓰임에 맞게 고쳤다(팀장 결정). worker의 실제 실행은 큐 소비자이고 FastAPI로는 상태 확인 경로 하나만 연다([worker README](../worker/README.md)). 「수집·카드 추출」은 8\~9월 설계 때의 말이라 지금 말(GitHub 기록 수집·Catch 초안 만들기)로 바꿨다. 스택 결정(2026-09-13)과 디렉터리 구조는 바뀌지 않았다. 결정의 이유를 모은 안내는 [결정과 근거](CatchU_결정과_근거.md)다.
 - **2026-11-18** — §6 11행을 고쳤다(팀장 결정, [#590](https://github.com/JminAILab/CatchU/issues/590)). 팀장 구독 플랜을 낮춰 Codex 보안 리뷰가 더 돌지 않는다. PR마다 저절로 도는 보안 리뷰는 없어지고, PR을 리뷰하는 사람이 Claude Code 에이전트 `catchu-security-reviewer`로 변경분을 [보안 점검](CatchU_security_checks.md)과 대조하는 길을 두었다. 에이전트에는 규칙을 옮겨 적지 않고 보안 점검 문서를 읽게 해, 문서를 고칠 때 두 곳이 어긋나지 않게 했다. Codex 코드 리뷰는 그대로 쓴다.
 - **2026-11-18** — 같은 날 §6 11행의 Codex 보안 리뷰 문장을 바로잡았다(팀장 결정, [#590](https://github.com/JminAILab/CatchU/issues/590)). 바로 위 항목과 11행은 보안 리뷰가 더 돌지 않는다고 적었지만 틀렸다. 2026-11-17·18 PR을 조회하니 팀장 PR에는 돌지 않았고 다른 작성자 두 곳의 PR에는 돌았다. 팀장 PR만 보고 적은 문장이었다. 보안 리뷰는 작성자에 따라 돌고, 돌았는지는 PR의 「Codex Review Summary」 댓글로 확인한다고 고쳤다.
+- **2026-11-20** — §2 「main의 검증」의 자동 배포 문장을 사실에 맞게 고쳤다([#342](https://github.com/JminAILab/CatchU/issues/342)). catchu.dev는 2026-11-18에 EKS로 옮겼고 2026-11-19부터 main 병합이 EKS를 교체하는데, 이 문장은 개발 서버 자동 배포로 적혀 있었다. 개발 서버 배포 경로를 지우는 PR에서 함께 고쳤다. 필수 검사 `images`·`cd-scripts`와 배포 PR 전 dev CI 수동 실행은 그대로다.

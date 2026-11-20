@@ -1,6 +1,6 @@
 # EKS 자동 배포
 
-`main`에 반영된 판본을 GitHub Actions가 EKS에 배포한다([#342](https://github.com/JminAILab/CatchU/issues/342)). 워크플로와 이미지 단계는 개발 서버 자동 배포와 같은 것을 쓴다([../../dev-server/cd/README.md](../../dev-server/cd/README.md)). 배포 대상 값이 `eks`일 때 AWS 역할과 교체 단계만 달라진다. 교체는 손으로 쓰는 [`deploy.sh`](../scripts/deploy.sh)를 그대로 부른다([../k8s/README.md](../k8s/README.md) 「앱 교체(deploy.sh)」).
+`main`에 반영된 판본을 GitHub Actions가 EKS에 배포한다([#342](https://github.com/JminAILab/CatchU/issues/342)). 워크플로와 배포 대상·판본 확인·이미지 단계는 공통 단계를 쓴다([../../dev-server/cd/README.md](../../dev-server/cd/README.md)). 배포 대상 값이 `eks`일 때 AWS 역할과 교체 단계만 달라진다. 교체는 손으로 쓰는 [`deploy.sh`](../scripts/deploy.sh)를 그대로 부른다([../k8s/README.md](../k8s/README.md) 「앱 교체(deploy.sh)」).
 
 **아직 실제 클러스터에서 돌려 보지 않았다.** 아래 「처음 준비」를 한 뒤 「아직 못 본 것」의 순서로 확인하고, 그 전에는 배포 대상을 `eks`로 두지 않는다.
 
@@ -61,7 +61,7 @@ EKS 교체 단계는 세 가지를 한다.
    마지막 목록에 `deployments.apps`·`deployments.apps/scale`·`pods`·`pods/log`와 이름을 정한 `configmaps`·`networkpolicies` 말고 다른 자원이 없어야 한다(자기 권한 조회와 API 목록 조회는 모든 사용자에게 있다). #342 완료 기준 「Secret 읽기와 exec가 거부된다」의 증거다.
 5. **GitHub environment `eks`:** 저장소 Settings의 Environments에서 만들고 배포 브랜치를 `main`으로 제한한다. 값 두 개를 넣는다. 역할 주소는 계정 번호가 실행 로그에 찍히지 않게 secrets에 둔다.
    - secrets: `AWS_DEPLOY_ROLE_ARN`(위 역할의 주소). `gh secret set AWS_DEPLOY_ROLE_ARN --env eks`를 치고 값을 붙여 넣는다.
-   - variables: `DEV_SERVER_DOMAIN`(`catchu.dev`). `gh variable set DEV_SERVER_DOMAIN --env eks --body catchu.dev`. web 이미지에 넣는 공개 주소다. 이름은 개발 서버 배포 경로를 지울 때 바꾼다.
+   - variables: `DEV_SERVER_DOMAIN`(`catchu.dev`). `gh variable set DEV_SERVER_DOMAIN --env eks --body catchu.dev`. web 이미지에 넣는 공개 주소다. 이름은 개발 서버 때 이름을 그대로 쓴다.
 
 ## 켜기와 멈추기
 
@@ -99,7 +99,7 @@ bash deploy/dev-server/cd/ci-images.test.sh
 ```
 
 - `ci-deploy.test.sh`는 aws·kubectl·`deploy.sh`를 합성 명령으로 바꾼 합성 저장소에서 `ci-deploy.sh`를 실제로 실행한다. 보는 것은 전제 맞추기(프로필·키 환경변수·기대 계정 번호·kubeconfig), 되돌리기 확인, `--resume`을 붙이지 않는 것, 종료 코드, 실행 요약과 계정 번호 가리기다. 끝에서 권한 파일 세 개에 범위 밖 권한이 들어오지 않았는지 글자로 본다.
-- 나머지 둘은 배포 대상별 단계 조건·environment와, `eks`·`none`에서 배포 파일 묶음을 다루지 않는 것을 본다. GitHub Actions `images` 워크플로의 `cd-scripts` job이 세 명령을 그대로 쓴다.
+- 나머지 둘은 배포 대상별 단계 조건·environment와, 지운 개발 서버 값(`dev-server`)·배포 파일 묶음을 받지 않는 것을 본다. GitHub Actions `images` 워크플로의 `cd-scripts` job이 세 명령을 그대로 쓴다.
 - 권한 파일은 클러스터 없이 두 가지로 한 번 확인했다(2026-11-16). `iam-deploy.json`은 AWS의 정책 모의 평가(`aws iam simulate-custom-policy`)로 허용·거부를 봤다. `deploy-rbac.yaml`은 이 컴퓨터의 Docker에 띄운 쿠버네티스 API 서버 1.37.1에 올려, 그룹 `catchu-deploy`로 `deploy.sh`가 쓰는 kubectl 호출이 허용되고 Secret 읽기·exec·지우기가 거부되는 것을 봤다. 권한 파일을 고치면 같은 방법이나 실제 클러스터의 「처음 준비」 4로 다시 본다.
 
 ## 아직 못 본 것

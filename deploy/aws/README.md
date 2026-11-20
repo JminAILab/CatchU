@@ -162,7 +162,11 @@
    그 ID로 `aws ec2 terminate-instances --instance-ids <ID> …` → `aws ec2 wait instance-terminated --instance-ids <ID> …`. 루트 볼륨은 함께 지워진다.
 4. 개발 서버의 탄력적 IP(`aws ec2 describe-addresses … --filters Name=tag:Name,Values=catchu-dev-server --query 'Addresses[].AllocationId' --output text`)를 `aws ec2 release-address --allocation-id <ID> …`로 해제하고, 3에서 적은 보안 그룹을 지운다. 종료가 끝나기 전에는 의존이 남아 실패한다.
 5. IAM: 인스턴스 프로필에서 역할 `catchu-dev-server`를 빼고 → 관리형 정책 분리 → 인라인 정책 3개(`list-role-policies`로 확인) 삭제 → 역할·인스턴스 프로필 삭제. 버킷: `aws s3 rb s3://catchu-dev-server-files --force …`.
-6. SSM 문서 `catchu-dev-deploy`를 지운다. 배포 역할 `catchu-github-deploy`, GitHub environment `dev-server`, ECR `catchu-deploy-files`는 자동 배포의 이미지 올리기가 쓰는 동안 남긴다(#342).
+6. SSM 문서 `catchu-dev-deploy`를 지운다(`aws ssm delete-document --name catchu-dev-deploy …`). 개발 서버 배포 경로의 나머지 셋은 그 경로를 뺀 워크플로가 `main`에 반영되고 진행 중인 실행이 없을 때 이 순서로 지운다(#342). 그 전에는 배포 대상 `none`이 아직 이 역할로 이미지를 올린다.
+   - 배포 역할 `catchu-github-deploy`: 인라인 정책 `catchu-github-deploy`를 지운 뒤 역할을 지우고, `aws iam get-role`이 NoSuchEntity인지 본다. environment보다 먼저 지운다. environment를 먼저 지우면 그 이름을 부르는 실행이 보호 규칙 없는 environment를 새로 만들어 이 역할을 받을 수 있다.
+   - GitHub environment `dev-server`: `gh api -X DELETE repos/JminAILab/CatchU/environments/dev-server`. 그 안의 secrets·variables도 함께 없어진다.
+   - ECR `catchu-deploy-files`(배포 파일 묶음): `aws ecr delete-repository --repository-name catchu-deploy-files --force …`.
+   - OIDC 공급자는 EKS 배포 역할도 쓰므로 B의 12까지 남긴다.
 7. 확인(개발 서버 자원만): 이름 태그 `catchu-dev-server` 인스턴스가 terminated뿐, 그 이름의 탄력적 IP 0, 3에서 적은 보안 그룹 없음, 역할 `catchu-dev-server` 없음(`aws iam get-role`이 NoSuchEntity), 버킷 `catchu-dev-server-files` 없음, 상태 available인 볼륨 0, 자기 소유 스냅샷 0. EKS 노드와 NAT의 공인 IP는 B까지 남는 것이 정상이다. #276 완료 기준(개발 서버 삭제)의 증거다.
 
 **B. EKS 기간 자원(제출을 확인한 뒤 지원 기한 전)**
