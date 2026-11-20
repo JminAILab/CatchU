@@ -158,8 +158,24 @@ def test_page_limit_is_fifty() -> None:
         ("\x01\x07\x1f\x7f \n", ("", False)),
         ("", ("", False)),
         ("  keep  spacing \n", ("  keep  spacing \n", True)),
+        # 줄바꿈·탭을 뺀 제어 문자(C0·DEL·C1)는 공백 한 글자로 바뀐다(#627).
+        ("a\x01b\x08c\x1fd", ("a b c d", True)),
+        ("a\x7fb\x85c\x9fd", ("a b c d", True)),
+        ("a\x00\x01b", ("a b", True)),
+        ("a\tb\nc\rd", ("a\tb\nc\rd", True)),
     ],
-    ids=["nul-removed", "nul-only", "whitespace-only", "control-only", "empty", "kept"],
+    ids=[
+        "nul-removed",
+        "nul-only",
+        "whitespace-only",
+        "control-only",
+        "empty",
+        "kept",
+        "c0-control-to-space",
+        "del-c1-control-to-space",
+        "nul-removed-control-to-space",
+        "tab-newline-kept",
+    ],
 )
 def test_normalize_page_text(raw: str, expected: tuple[str, bool]) -> None:
     assert normalize_page_text(raw) == expected
@@ -171,6 +187,27 @@ def test_nul_is_removed_from_extracted_page(monkeypatch: pytest.MonkeyPatch) -> 
     result = extract_pages(pdf_bytes(["ignored"]))
 
     assert result["pages"] == [{"pageNumber": 1, "readable": True, "text": "xy"}]
+
+
+@pytest.mark.parametrize(
+    ("space", "expected"),
+    [
+        ("\x01", "order lookup latency"),  # 맥 Chrome·Apple SD Gothic Neo 등
+        ("\x08", "order lookup latency"),  # 맥 Chrome·Didot Bold
+        ("\t", "order\tlookup\tlatency"),  # 맥 Chrome·AppleGothic 등. 탭은 그대로 둔다
+    ],
+    ids=["u0001", "u0008", "tab"],
+)
+def test_space_written_as_control_character_in_pdf(space: str, expected: str) -> None:
+    # PDF가 띄어쓰기를 제어 문자로 읽게 적혀 있어도 낱말 사이가 공백으로 남는다(#627).
+    data = pdf_bytes(["order lookup latency"], space_as=space)
+    assert PdfReader(io.BytesIO(data)).pages[0].extract_text() == space.join(
+        ["order", "lookup", "latency"]
+    )
+
+    result = extract_pages(data)
+
+    assert result["pages"] == [{"pageNumber": 1, "readable": True, "text": expected}]
 
 
 def _fail_on_call(
@@ -873,6 +910,9 @@ def _pages_returning(monkeypatch: pytest.MonkeyPatch, texts: list[str]) -> list[
         (["😀" * 60_001], "TEXT_LIMIT_EXCEEDED"),
         (["x" * 60_000, " \n\t", "\x00\x00"], "SUCCEEDED"),  # 읽을 수 없는 쪽은 0자
         (["x" * 59_999 + "\x00\x00y"], "SUCCEEDED"),  # NUL은 빼고 센다
+        # 공백으로 바꾼 제어 문자는 바꾸기 전처럼 1자로 센다(#627)
+        (["x" * 59_999 + "\x01"], "SUCCEEDED"),
+        (["x" * 60_000 + "\x01"], "TEXT_LIMIT_EXCEEDED"),
     ],
     ids=[
         "60000-one-page",
@@ -883,6 +923,8 @@ def _pages_returning(monkeypatch: pytest.MonkeyPatch, texts: list[str]) -> list[
         "emoji-60001",
         "blank-pages-count-zero",
         "nul-not-counted",
+        "control-as-space-60000",
+        "control-as-space-60001",
     ],
 )
 def test_text_limit_counts_code_points_across_pages(
