@@ -75,39 +75,71 @@ Nest `Logger('Presets')`(`src/presets/presets-log.ts`)로 저장·지우기마�
 
 ## 배포
 
-변경 전 발행본은 DB 행을 마이그레이션이, PDF 사본 파일을 팀장이 지운다(BR5.1·BR5.2). 버킷은 버전 관리를 켜지 않아 지운 파일을 되살릴 수 없다([S3 안내](../../deploy/aws/s3.md)). 원본 `members/*/materials/`와 `members/` 전체는 지우지 않는다. api를 먼저 멈춘 뒤 지우므로 남은 `publications` 파일은 모두 변경 전 발행본의 사본이고, 시각으로 고르지 않는다. 명령은 한 작업 폴더에서 차례로 돌리고, 끝에 「… 성공」이 찍히지 않으면 거기서 멈춘다. 결과는 파이프 없이 파일로 받으므로 조회가 실패하면 「성공」이 찍히지 않는다.
+변경 전 발행본은 DB 행을 마이그레이션이, PDF 사본 파일을 팀장이 지운다(BR5.1·BR5.2). 버킷은 버전 관리를 켜지 않아 지운 파일을 되살릴 수 없다([S3 안내](../../deploy/aws/s3.md)). 원본 `members/*/materials/`와 `members/` 전체는 지우지 않는다.
+
+사본은 api만 만든다. 그래서 api를 멈춘 채로 사본을 지우고, 멈춘 채로 마이그레이션과 새 api까지 이어 가야 지운 뒤에 옛 사본이 새로 생기지 않는다. 남은 `publications` 파일은 모두 옛 사본이라 시각으로 고르지 않는다. 자동 배포는 이 순서를 이어 가지 못한다. `deploy.sh`는 api나 worker의 실행 수가 0이면 `--resume` 없이는 아무것도 바꾸지 않고 종료 코드 2로 멈추고(멈춘 교체를 덮어쓰지 않는 안전장치), 자동 배포는 `--resume`을 붙이지 않는다([EKS 자동 배포 「실패했을 때」](../../deploy/aws/cd/README.md#실패했을-때)). 그래서 이번 main 반영만 자동 교체를 끄고(배포 대상 `none`, 이미지만 올림) 팀장이 손으로 교체한다. 손으로 멈춘 상태에서 이어 가는 것은 `--resume`이 받는 경우다(`deploy.sh` 머리 주석). 배포 스크립트는 바꾸지 않는다.
+
+명령은 모두 팀장이 자기 컴퓨터의 저장소 루트(zsh)에서 한 창으로 한 줄씩 친다. 프로필 `catchu`·kubeconfig `~/.kube/catchu`·기대 계정 번호가 있어야 한다([AWS 「처음 준비」](../../deploy/aws/README.md#처음-준비)). 끝에 「… 성공」이 찍히지 않으면 다음 줄로 가지 않고 10번을 본다. 결과는 파이프 없이 파일로 받으므로 조회가 실패하면 「성공」이 찍히지 않는다.
 
 1. **main에 올리는 조건**: 발행 화면을 새 요청 모양(`presetIds`)과 막힘 칸(`blockedSources`)에 맞춘 web PR이 dev에 들어가기 전에는 dev를 main에 올리지 않는다. 이 api만 main에 나가면 main 발행 화면이 발행에 실패한다. dev에서도 그 web PR이 들어올 때까지 발행 화면은 옛 요청 모양이라 발행에 실패한다(단위 Q2). web은 사본의 새 칸을 모르는 칸으로 무시한다.
-2. **api 멈추기**: 새 발행과 진행 중인 PDF 복사를 멈추려고 api만 0으로 줄인다. worker는 파일을 쓰지 않는다. 첫 줄이 찍는 원래 수를 적어 두고, 셋째 줄이 「No resources found」를 낼 때까지 다시 본다. 이때부터 배포가 끝날 때까지(최근 main 배포 10\~13분) 서비스가 멈춘다.
+2. **자동 교체 끄기**: 둘째 줄이 `none`을 찍어야 한다. 9번이 다시 켤 때까지 `none`으로 둔다.
 
    ```bash
-   kubectl -n catchu get deployment api -o jsonpath='{.spec.replicas}' && echo
-   kubectl -n catchu scale deployment/api --replicas=0 && echo 멈추기 요청 성공
-   kubectl -n catchu get pod -l app.kubernetes.io/name=api
+   gh variable set DEPLOY_TARGET --body none && echo 바꾸기 성공
+   gh variable get DEPLOY_TARGET
    ```
 
-3. **지우기 전 목록**: `aws s3 ls s3://catchu-prod-files/members/ --recursive --profile catchu > before.txt && echo 조회 성공`
-4. **지울 목록 확인(dry-run)**: 아무것도 지우지 않고 지울 목록만 받는다. 둘째 줄과 셋째 줄의 수가 같고, 넷째 줄이 아무것도 찍지 않아야(사본 키 모양 `members/<회원>/publications/<발행본>/<항목>.pdf`에 맞지 않는 줄이 없어야) 다음으로 간다.
+3. **main 반영과 이미지**: dev를 main에 병합한다. `deploy-dev-server` 실행이 이미지를 검사해 ECR에 올리고 EKS 교체는 건너뛴다. 그동안 옛 api는 그대로 돈다. 실행이 끝난 뒤 둘째 줄의 `headSha`가 첫 줄의 커밋과 같고 `conclusion`이 `success`여야 다음으로 간다. 첫 줄이 담은 `commit`을 9번이 쓴다(창을 새로 열었으면 첫 줄을 다시 친다).
 
    ```bash
-   aws s3 rm s3://catchu-prod-files/members/ --recursive --exclude '*' --include '*/publications/*' --dryrun --profile catchu > dry-run.txt && echo 조회 성공
+   git fetch origin main && commit=$(git rev-parse origin/main) && echo "$commit"
+   gh run list --workflow deploy-dev-server --branch main --limit 1 --json headSha,conclusion
+   ```
+
+4. **api 멈추기**: 새 발행과 진행 중인 PDF 복사를 멈추려고 api만 0으로 줄인다. worker는 파일을 쓰지 않아 9번까지 둔다. 첫 줄이 찍는 원래 수를 적어 두고, 셋째 줄이 「No resources found」를 낼 때까지 다시 본다. 둘째 줄은 계정·클러스터가 맞을 때만 api를 줄인다. 이때부터 9번이 끝날 때까지 api가 없어 `/v1` 요청은 503이다(화면은 뜬다). 빌드는 3번에서 끝났으므로 멈추는 동안은 지우기와 교체뿐이다.
+
+   ```bash
+   kubectl --kubeconfig ~/.kube/catchu -n catchu get deployment api -o jsonpath='{.spec.replicas}' && echo
+   bash deploy/aws/scripts/check-target.sh --cluster && kubectl --kubeconfig ~/.kube/catchu -n catchu scale deployment/api --replicas=0 && echo 멈추기 요청 성공
+   kubectl --kubeconfig ~/.kube/catchu -n catchu get pod -l app.kubernetes.io/name=api
+   ```
+
+5. **지우기 전 목록**: `aws s3 ls s3://catchu-prod-files/members/ --recursive --profile catchu --region ap-northeast-2 > before.txt && echo 조회 성공`
+6. **지울 목록 확인(dry-run)**: 아무것도 지우지 않고 지울 목록만 받는다. 둘째 줄과 셋째 줄의 수가 같고, 넷째 줄이 아무것도 찍지 않아야(사본 키 모양 `members/<회원>/publications/<발행본>/<항목>.pdf`에 맞지 않는 줄이 없어야) 다음으로 간다.
+
+   ```bash
+   aws s3 rm s3://catchu-prod-files/members/ --recursive --exclude '*' --include '*/publications/*' --dryrun --profile catchu --region ap-northeast-2 > dry-run.txt && echo 조회 성공
    grep -c '/publications/' before.txt
    grep -c . dry-run.txt
    grep -vE '^\(dryrun\) delete: s3://catchu-prod-files/members/[0-9a-f-]{36}/publications/[0-9a-f-]{36}/[0-9a-f-]{36}\.pdf$' dry-run.txt
    ```
 
-5. **지우기**: `aws s3 rm s3://catchu-prod-files/members/ --recursive --exclude '*' --include '*/publications/*' --profile catchu > deleted.txt && echo 지우기 성공`
-6. **지운 뒤 확인**: 둘째 줄이 0이고 셋째 줄이 「원본 그대로」를 찍어야 한다. api가 멈춰 있어 이용자가 원본을 지우는 일이 없으므로, 원본 키 목록이 다르면 원인을 확인하기 전에는 원본 보존을 확인했다고 적지 않는다.
+7. **지우기**: `aws s3 rm s3://catchu-prod-files/members/ --recursive --exclude '*' --include '*/publications/*' --profile catchu --region ap-northeast-2 > deleted.txt && echo 지우기 성공`
+8. **지운 뒤 확인**: 둘째 줄이 0이고 셋째 줄이 「원본 그대로」를 찍어야 한다. api가 멈춰 있어 이용자가 원본을 지우는 일이 없으므로, 원본 키 목록이 다르면 원인을 확인하기 전에는 원본 보존을 확인했다고 적지 않는다.
 
    ```bash
-   aws s3 ls s3://catchu-prod-files/members/ --recursive --profile catchu > after.txt && echo 조회 성공
+   aws s3 ls s3://catchu-prod-files/members/ --recursive --profile catchu --region ap-northeast-2 > after.txt && echo 조회 성공
    grep -c '/publications/' after.txt
    diff <(grep '/materials/' before.txt | awk '{print $4}') <(grep '/materials/' after.txt | awk '{print $4}') && echo 원본 그대로
    ```
 
-7. **배포**: dev를 main에 병합한다. 자동 배포가 api·worker를 멈추고(api는 이미 0) 종료를 확인한 뒤 마이그레이션 Pod를 돌리고, 그다음 새 api·worker·web을 띄운다([EKS 자동 배포](../../deploy/aws/cd/README.md)). 마이그레이션은 프리셋 표 둘을 만들고 `DELETE FROM publication`으로 변경 전 발행본을 모두 지운 뒤(항목·쪽 사본·조각·색인·요약·JD 요약 실행이 연쇄로 지워짐) 칸 둘을 더한다. 옛 링크는 지금의 접근 불가 화면(「이 링크는 열람할 수 없습니다.」)이 된다. `down`은 칸 둘과 표 둘을 지우고 지운 발행본은 되살리지 않는다.
-8. **배포가 멈추면**: 실행 기록에 「migration 성공」이 없으면(마이그레이션 전에 멈춤) `kubectl -n catchu scale deployment/api --replicas=<2의 원래 수>`로 옛 api를 다시 띄운다. 이미 지운 옛 사본 PDF는 열리지 않는다(버릴 발행본이라 받아들인다). 「migration 성공」 뒤에 멈췄으면 옛 api를 띄우지 않고 [EKS 자동 배포](../../deploy/aws/cd/README.md)의 실패 처리를 따른다. 옛 api는 새 칸이 생긴 DB에 발행할 수 없다.
-9. **팀원 로컬**: 로컬 폴더에 남은 옛 사본은 가리키는 행이 없어 열리지 않으므로 지우기는 선택이다.
+9. **교체 이어 가기**: api가 0인 채로 `--resume`을 붙여 교체한다. `deploy.sh`는 worker를 멈추고(api는 이미 0) 종료를 확인한 뒤 마이그레이션 Pod를 돌리고, 동의 기록 권한을 확인한 다음 새 api·worker·web을 띄운다([앱 교체](../../deploy/aws/k8s/README.md#앱-교체deploysh)). 첫 줄은 교체가 종료 코드 0으로 끝났을 때만 「교체 성공」을 찍고 자동 교체를 다시 켠다. 둘째 줄이 `eks`가 아니면 `gh variable set DEPLOY_TARGET --body eks`만 다시 친다.
+
+   ```bash
+   bash deploy/aws/scripts/deploy.sh --commit "$commit" --resume && echo 교체 성공 && gh variable set DEPLOY_TARGET --body eks && echo 바꾸기 성공
+   gh variable get DEPLOY_TARGET
+   ```
+
+   마이그레이션은 프리셋 표 둘을 만들고 `DELETE FROM publication`으로 변경 전 발행본을 모두 지운 뒤(항목·쪽 사본·조각·색인·요약·JD 요약 실행이 연쇄로 지워짐) 칸 둘을 더한다. 옛 링크는 지금의 접근 불가 화면(「이 링크는 열람할 수 없습니다.」)이 된다. `down`은 칸 둘과 표 둘을 지우고 지운 발행본은 되살리지 않는다.
+10. **멈추면**: 배포 대상은 9번이 「교체 성공」을 찍을 때까지 `none`으로 둔다. `eks`로 돌리면 다음 main 실행이 사본을 지우지 않은 채 마이그레이션까지 갈 수 있다.
+    - **3번(이미지)**: 아직 아무것도 멈추거나 지우지 않았다. 실행 기록을 보고 고친 뒤 Actions에서 `deploy-dev-server`를 `main`으로 수동 실행하고 3번을 다시 본다.
+    - **4\~8번**: api는 0이고 DB는 그대로다. 원인을 고친 뒤 멈춘 번호부터 다시 한다. 5번이 끝났으면 `before.txt`는 그대로 쓴다. 7번은 다시 쳐도 남은 사본만 지운다.
+    - **9번 첫 줄(종료 코드 2\~8)**: [앱 교체](../../deploy/aws/k8s/README.md#앱-교체deploysh)의 종료 코드 표대로 원인을 확인·처리한 뒤 9번을 그대로 다시 친다. api가 0으로 머문 동안에는 사본이 새로 생기지 않으므로 4\~8번(api 멈추기·목록·지우기·확인)은 다시 하지 않는다. 다시 치기 전에 4번 셋째 줄로 api Pod가 없는지만 본다.
+    - **옛 api를 다시 띄울 때**: 그날 원인을 고치지 못해 서비스를 되살려야 하고, 9번이 종료 코드 2나 3으로 멈췄을 때(마이그레이션을 시작하지 않음)만 한다. `kubectl --kubeconfig ~/.kube/catchu -n catchu scale deployment/api --replicas=<4번의 원래 수>`로 띄우고, 3이면 worker도 0이므로 같은 명령으로 `deployment/worker`를 1로 띄운다. 이미 지운 옛 사본 PDF는 열리지 않는다(버릴 발행본이라 받아들인다). 옛 api가 다시 사본을 만들 수 있으므로 다음 시도는 4번부터 다시 한다(`before.txt`도 새로 받는다).
+    - **종료 코드 4\~8**: 마이그레이션을 시작했거나 끝냈으므로 옛 api를 띄우지 않는다. 옛 api는 새 칸이 생긴 DB에 발행할 수 없다.
+11. **팀원 로컬**: 로컬 폴더에 남은 옛 사본은 가리키는 행이 없어 열리지 않으므로 지우기는 선택이다.
+
+**확인한 것**: 이 순서는 실제 클러스터·S3·GitHub 변수에서 돌려 보지 않았다(2026-11-20). `deploy.sh` 시험의 합성 kubectl로 api만 0이고 worker 1이 도는 상태를 만들어, `--resume` 없이는(자동 배포와 같음) 아무것도 바꾸지 않고 2로 멈추고, `--resume`이면 worker 멈춤 → 마이그레이션 → 동의 기록 확인 → api → worker → web 순서로 0까지 가는 것을 봤다. `--resume` 뒤 마이그레이션이 실패하면 4로 멈추고 새 api를 띄우지 않으며, 그 뒤 `--resume` 없는 실행은 2로 멈추고, 마이그레이션 뒤에 멈춘 것을 `--resume`으로 다시 하면 마이그레이션을 건너뛰고 0까지 간다. 배포 대상 `none`이 이미지만 올리고 EKS 교체를 건너뛰는 것은 `ci-target.test.sh`의 워크플로 조건 확인으로 봤다. 위 명령은 합성 명령으로 대화형 zsh에서 맞는 경우와 실패하는 경우를 돌려 봤다.
 
 ## 시험
 
