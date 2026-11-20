@@ -45,6 +45,23 @@
 //           두 자로 늘어남)이면 쪽 상한의 두 배 이하다. JSON.stringify는 이 시험 안에서만 감싸 잰다.
 //   - 실패 조건: 남은 글 전체를 직렬화함.
 //
+// #589에서 더한 것(이슈 「범위」·「완료 기준」에서 옮겼다). 새 Catch NC2 사본 칸 넷: repositoryName, authorDescriptionEditedMonth, workLimits, 근거별 ownCommit.
+// #589-1 네 칸이 모두 있는 사본
+//   - 기대: 맨 앞에 '저장소: {소유자/저장소}', 작업 사실 목록 바로 아래에 '이 기록으로 알 수 없는 것'과 사본 순서의 '- ' 목록, '작성자 설명' 머리말 줄 끝에
+//           ' · {해}년 {달}월에 마지막으로 고침'(웹 editedMonthText처럼 달의 앞 0을 뺀다)이 나온다. ownCommit이 참인 근거 줄만 끝에 ' · 이 작업의 본인 커밋'이 붙는다.
+//           aiDraft 글과 마크다운 기호가 없고, 같은 사본은 두 번 펴도 같은 글이다(BR3.5).
+//   - 실패 조건: 칸이 글에 없음, 다른 문구·자리, aiDraft 글.
+// #589-2 ownCommit이 거짓이거나 칸이 없는 근거
+//   - 기대: 근거 줄이 '- {주소} · 판본 {판본}'에서 끝나고 본인 커밋 표지도 '아님' 같은 부정 표시도 없다(새 Catch FR10.4).
+//   - 실패 조건: 표지가 붙음, 부정 표시.
+// #589-3 한 칸만 있는 사본 넷과 네 칸이 없는 사본
+//   - 기대: 그 칸의 줄만 더해지고 나머지는 네 칸이 없는 사본의 글 그대로다. 네 칸이 없는 사본은 이 변경 전과 글자까지 같다(새 Catch FR9.6). 위 S5 두 시험의
+//           기대 글은 이 변경 전 그대로 두었다.
+//   - 실패 조건: 다른 줄이 바뀜, 칸이 없는데 줄이 생김.
+// #589-4 웹과 같게 쓰는 세 문구('이 기록으로 알 수 없는 것', '이 작업의 본인 커밋', '마지막으로 고침')
+//   - 기대: web snapshot-view.tsx 원문의 그리는 자리(작업 한계 머리말 글자, 본인 커밋 표지 문자열, editedMonthText 템플릿의 끝)에 그대로 있다.
+//   - 실패 조건: 웹 문구가 바뀌었는데 시험이 지나감.
+//
 // 합성 글만 쓴다. 토큰·cursor는 시험 안에서 만들고 출력에 찍지 않는다.
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -55,7 +72,7 @@ const { MCP_CURSOR_MAX_LENGTH, MCP_PAGE_CHARS } = require('../../dist/claude-mcp
 const { InvalidCursorError, encodeCursor } = require('../../dist/claude-mcp/mcp-page');
 const { extractLinkToken } = require('../../dist/claude-mcp/mcp-shared-link');
 const { SHARED_PUBLICATION_NOTICE, buildSharedPage, parseSharedCursor } = require('../../dist/claude-mcp/mcp-shared-page');
-const { CATCH_TEXT_LABELS, flattenPublishedItem, sharedItemTexts } = require('../../dist/claude-mcp/mcp-shared-text');
+const { CATCH_NC2_LABELS, CATCH_TEXT_LABELS, flattenPublishedItem, sharedItemTexts } = require('../../dist/claude-mcp/mcp-shared-text');
 const { generateLinkToken } = require('../../dist/share-links/link-token');
 
 const WEB_SNAPSHOT_VIEW = join(__dirname, '..', '..', '..', 'web', 'src', 'features', 'publications', 'snapshot-view.tsx');
@@ -63,6 +80,7 @@ const PUBLISHED_AT = new Date('2026-11-01T09:00:00.000Z');
 const EXPIRES_AT = new Date(PUBLISHED_AT.getTime() + 2160 * 60 * 60 * 1000);
 const PAGE_KEYS = ['notice', 'title', 'publishedAt', 'expiresAt', 'items', 'nextCursor'];
 const DRAFT_MARKER = 'SYNTHETIC-DRAFT-MUST-NOT-LEAVE';
+const COMMIT_SHA = '0123456789abcdef0123456789abcdef01234567';
 const EMOJI = '\u{1F600}';
 const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const codePoints = (text) => [...text].length;
@@ -235,6 +253,89 @@ test('S5 머리말 넷과 빈 값 문구 셋은 web snapshot-view.tsx 원문에 
   // 「작성자 설명」 h4 안에는 새 Catch NC2가 작성 달을 함께 그리므로 여는 쪽만 본다.
   for (const markup of ['>불일치 표시됨<', '<h4>기록에서 확인한 내용</h4>', '<strong>본인 기여:</strong>', '<h4>작성자 설명',
     '"기록에서 확인된 작업 사실이 없습니다."', '"제공된 기여 설명이 없습니다."', '>작성자 설명이 없습니다.<']) {
+    assert.ok(web.includes(markup), `${markup} 자리가 web 원문에 있다`);
+  }
+});
+
+test('#589-1 네 칸이 모두 있는 사본은 저장소·이 기록으로 알 수 없는 것·작성 시점을 옮기고 ownCommit이 참인 근거 줄 끝에 이 작업의 본인 커밋을 붙인다', () => {
+  const entry = item('CATCH', catchSnapshot({
+    repositoryName: 'example/shop-api',
+    mismatch: true,
+    workFacts: ['[합성] 재시도 큐 워커를 더했다'],
+    workLimits: ['[합성] 같은 작업을 다시 낸 것일 수 있다(PR #41)', '[합성] 커밋 목록을 다 받지 못한 PR이 있다'],
+    subjectContribution: '[합성] 연동 계정이 작성자로 기록된 커밋 1건',
+    evidence: [
+      { sourceUrl: `https://github.com/example/shop-api/commit/${COMMIT_SHA}`, sourceRevision: COMMIT_SHA, representedFacts: ['[합성] 재시도 큐 워커를 더했다'], ownCommit: true },
+      { sourceUrl: 'https://github.com/example/shop-api/pull/42', sourceRevision: '9f8e7d6', representedFacts: [], ownCommit: false },
+    ],
+    authorDescription: '[합성] 내가 쓴 설명',
+    authorDescriptionEditedMonth: '2026-11',
+    aiDraft: DRAFT_MARKER,
+  }));
+  const text = flattenPublishedItem(entry);
+  assert.equal(text, [
+    '저장소: example/shop-api',
+    '불일치 표시됨',
+    '기록에서 확인한 내용',
+    '- [합성] 재시도 큐 워커를 더했다',
+    '이 기록으로 알 수 없는 것',
+    '- [합성] 같은 작업을 다시 낸 것일 수 있다(PR #41)',
+    '- [합성] 커밋 목록을 다 받지 못한 PR이 있다',
+    '본인 기여: [합성] 연동 계정이 작성자로 기록된 커밋 1건',
+    '근거',
+    `- https://github.com/example/shop-api/commit/${COMMIT_SHA} · 판본 ${COMMIT_SHA} · 이 작업의 본인 커밋`,
+    '  - [합성] 재시도 큐 워커를 더했다',
+    '- https://github.com/example/shop-api/pull/42 · 판본 9f8e7d6',
+    '작성자 설명 · 2026년 11월에 마지막으로 고침',
+    '[합성] 내가 쓴 설명',
+  ].join('\n'));
+  assert.equal(text.includes(DRAFT_MARKER), false, 'aiDraft 글이 없다');
+  assert.equal(/\*\*|^#/m.test(text), false, '마크다운 기호가 없다');
+  assert.equal(flattenPublishedItem(structuredClone(entry)), text, '같은 사본은 두 번 펴도 같은 글이다');
+});
+
+test('#589-1 작성 시점은 웹 editedMonthText와 같은 규칙으로 달의 앞 0을 뺀다', () => {
+  for (const [month, expected] of [['2026-11', '2026년 11월에 마지막으로 고침'], ['2027-01', '2027년 1월에 마지막으로 고침']]) {
+    const text = flattenPublishedItem(item('CATCH', catchSnapshot({ authorDescription: '[합성] 설명', authorDescriptionEditedMonth: month })));
+    assert.ok(text.endsWith(`\n작성자 설명 · ${expected}\n[합성] 설명`), month);
+  }
+});
+
+test('#589-2 ownCommit이 거짓이거나 칸이 없는 근거 줄에는 본인 커밋 표지도 부정 표시도 없다', () => {
+  const text = flattenPublishedItem(item('CATCH', catchSnapshot({
+    workFacts: ['[합성] 사실'],
+    evidence: [
+      { sourceUrl: `https://github.com/example/repo/commit/${COMMIT_SHA}`, sourceRevision: COMMIT_SHA, representedFacts: ['[합성] 사실'], ownCommit: false },
+      { sourceUrl: 'https://github.com/example/repo/pull/7', sourceRevision: 'abc1234', representedFacts: [] },
+    ],
+  })));
+  assert.ok(text.includes(`\n- https://github.com/example/repo/commit/${COMMIT_SHA} · 판본 ${COMMIT_SHA}\n  - [합성] 사실\n`), 'ownCommit이 거짓인 근거 줄은 판본에서 끝난다');
+  assert.ok(text.includes('\n- https://github.com/example/repo/pull/7 · 판본 abc1234\n'), 'ownCommit 칸이 없는 근거 줄은 판본에서 끝난다');
+  assert.equal(text.includes(CATCH_NC2_LABELS.ownCommit), false, '본인 커밋 표지가 없다');
+  assert.equal(/아님|아니다|남의/.test(text), false, '부정 표시가 없다');
+});
+
+test('#589-3 한 칸만 있으면 그 칸의 줄만 더해지고 네 칸이 없는 사본은 칸이 없을 때의 글 그대로다', () => {
+  const evidence = { sourceUrl: `https://github.com/example/repo/commit/${COMMIT_SHA}`, sourceRevision: COMMIT_SHA, representedFacts: [] };
+  const base = { workFacts: ['[합성] 사실'], subjectContribution: '[합성] 기여', authorDescription: '[합성] 설명', evidence: [evidence] };
+  const without = ['기록에서 확인한 내용', '- [합성] 사실', '본인 기여: [합성] 기여', '근거', `- ${evidence.sourceUrl} · 판본 ${COMMIT_SHA}`, '작성자 설명', '[합성] 설명'];
+  assert.equal(flattenPublishedItem(item('CATCH', catchSnapshot(base))), without.join('\n'), '네 칸이 없는 사본');
+  const cases = [
+    ['repositoryName', { repositoryName: 'example/repo' }, ['저장소: example/repo', ...without]],
+    ['workLimits', { workLimits: ['[합성] 한계'] }, [...without.slice(0, 2), '이 기록으로 알 수 없는 것', '- [합성] 한계', ...without.slice(2)]],
+    ['ownCommit', { evidence: [{ ...evidence, ownCommit: true }] }, [...without.slice(0, 4), `${without[4]} · 이 작업의 본인 커밋`, ...without.slice(5)]],
+    ['authorDescriptionEditedMonth', { authorDescriptionEditedMonth: '2026-11' }, [...without.slice(0, 5), '작성자 설명 · 2026년 11월에 마지막으로 고침', without[6]]],
+  ];
+  for (const [name, extra, expected] of cases) {
+    assert.equal(flattenPublishedItem(item('CATCH', catchSnapshot({ ...base, ...extra }))), expected.join('\n'), name);
+  }
+});
+
+test('#589-4 웹과 같게 쓰는 세 문구는 web snapshot-view.tsx 원문의 그리는 자리에 그대로 있다', () => {
+  assert.deepEqual(CATCH_NC2_LABELS, { workLimits: '이 기록으로 알 수 없는 것', ownCommit: '이 작업의 본인 커밋', edited: '마지막으로 고침' });
+  const web = readFileSync(WEB_SNAPSHOT_VIEW, 'utf8');
+  // 주석이 아니라 웹이 그리는 글자와 대조한다: 작업 한계 머리말(JSX 글자), 본인 커밋 표지 상수(문자열), 작성 시점 글(editedMonthText 템플릿의 끝).
+  for (const markup of [`>${CATCH_NC2_LABELS.workLimits}<`, `"${CATCH_NC2_LABELS.ownCommit}"`, `월에 ${CATCH_NC2_LABELS.edited}\``]) {
     assert.ok(web.includes(markup), `${markup} 자리가 web 원문에 있다`);
   }
 });

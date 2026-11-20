@@ -1,0 +1,17 @@
+{
+  "name": "@catchu/claude-mcp-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "#594 Claude 연결(MCP) 두 흐름의 합성 E2E 시험. 제품 코드가 아니며 CI에서 돌지 않는다.",
+  "type": "module",
+  "engines": {
+    "node": "24.21.0",
+    "npm": "11.19.0"
+  },
+  "scripts": {
+    "e2e": "node run.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0"
+  }
+}

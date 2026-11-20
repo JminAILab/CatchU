@@ -63,6 +63,13 @@
 // - PublicationAccess 대역은 정상 DB로 만들 수 없는 S9와, S3·S17의 "판정을 부르지 않는다"를 셀 때만 쓴다. 앱의 읽개에서 바꿔 끼우고 시험 끝에 되돌린다.
 //   S11(판정 뒤 중지·삭제)은 mcp-shared-reader 시험이 대역으로 본다. 나머지는 실제 DbPublicationAccess와 시험 DB다.
 //
+// #589에서 더한 것(이슈 「완료 기준」에서 옮겼다)
+// #589-5 새 Catch NC2 칸 넷(repositoryName·authorDescriptionEditedMonth·workLimits·근거별 ownCommit)이 있는 Catch 사본을 표에 넣고 B가 도구로 읽음
+//   - 기대: 쪽 칸 여섯과 조각 칸 넷은 그대로다(계약 C-15 응답 모양). content에 저장소 줄, '이 기록으로 알 수 없는 것' 목록, ownCommit이 참인 근거 줄 끝의
+//           '이 작업의 본인 커밋', '작성자 설명' 줄 끝의 작성 시점이 mcp-shared-text #589-1과 같은 모양으로 나온다. 거짓인 근거 줄에는 표지가 없고 aiDraft 글이 없다.
+//           칸이 없는 Catch(P1)의 글은 위 S4의 기대 글 그대로다.
+//   - 실패 조건: 표에서 읽은 사본의 칸이 글에 빠짐, 응답 칸이 늘어남.
+//
 // 합성 글만 쓴다. 토큰·cursor는 시험마다 만들고 출력에 찍지 않는다.
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -417,6 +424,38 @@ test('S4 B가 P1 첫 쪽을 읽으면 notice가 첫 칸이고 제목·ISO 시각
   for (const key of ['passwordProtected', 'publicationId', 'publishedItemId', 'sourceId', 'ownerMemberId', 'aiDraft', 'summary']) {
     assert.equal(text.includes(`"${key}"`), false, `${key} 칸이 없다`);
   }
+});
+
+test('#589-5 네 칸이 있는 Catch 사본을 도구로 읽으면 저장소·이 기록으로 알 수 없는 것·본인 커밋 표지·작성 시점이 글에 나오고 응답 칸은 그대로다', async () => {
+  const sha = '0123456789abcdef0123456789abcdef01234567';
+  const published = await insertPublished(memberA.memberId, [{ kind: 'CATCH', title: '[합성] 네 칸 Catch', snapshot: catchSnapshot({
+    repositoryName: 'example/repo', workFacts: ['[합성] 재시도 큐 워커를 더했다'], workLimits: ['[합성] 같은 작업을 다시 낸 것일 수 있다(PR #41)'],
+    subjectContribution: '[합성] 커밋 1건', authorDescription: '[합성] 내가 쓴 설명', authorDescriptionEditedMonth: '2026-11', aiDraft: DRAFT_MARKER,
+    evidence: [
+      { sourceUrl: `https://github.com/example/repo/commit/${sha}`, sourceRevision: sha, representedFacts: ['[합성] 재시도 큐 워커를 더했다'], ownCommit: true },
+      { sourceUrl: 'https://github.com/example/repo/pull/42', sourceRevision: 'def5678', representedFacts: [], ownCommit: false },
+    ],
+  }) }], { title: '[합성] 네 칸 발행본' });
+  const response = await read(tokenB, published.token);
+  const page = pageOf(response);
+  assert.deepEqual(Object.keys(page), PAGE_KEYS);
+  assert.deepEqual(Object.keys(page.items[0]), ['position', 'itemKind', 'title', 'content']);
+  assert.equal(page.items[0].content, [
+    '저장소: example/repo',
+    '기록에서 확인한 내용',
+    '- [합성] 재시도 큐 워커를 더했다',
+    '이 기록으로 알 수 없는 것',
+    '- [합성] 같은 작업을 다시 낸 것일 수 있다(PR #41)',
+    '본인 기여: [합성] 커밋 1건',
+    '근거',
+    `- https://github.com/example/repo/commit/${sha} · 판본 ${sha} · 이 작업의 본인 커밋`,
+    '  - [합성] 재시도 큐 워커를 더했다',
+    '- https://github.com/example/repo/pull/42 · 판본 def5678',
+    '작성자 설명 · 2026년 11월에 마지막으로 고침',
+    '[합성] 내가 쓴 설명',
+  ].join('\n'));
+  assert.equal(toolText(response).includes(DRAFT_MARKER), false, 'aiDraft 글이 없다');
+  assert.equal(page.nextCursor, null);
 });
 
 test('S6 P1의 PDF 항목(U8 쪽 사본 행)을 도구로 끝까지 읽으면 쪽 번호 순서의 [n쪽] 글과 [n쪽] 읽을 수 없음이 나온다', async () => {

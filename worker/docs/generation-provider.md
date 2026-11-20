@@ -1,6 +1,6 @@
 # 생성의 실제 제공자 — Anthropic Claude API (#120)와 판정 공급자 (CR3)
 
-> [설명 초안·생각해볼 질문·Catch 제목 생성](generation.md)의 제공자 경계(`GenerationProvider`)에 붙이는 실제 제공자 어댑터다. CR3의 판정 공급자(OpenAI Decisions·Claude) 호출 설정은 아래 [「판정 공급자 (CR3)」](#판정-공급자-cr3)에 있다. 제공자·시작 모델·처리 위치는 [#119 결정](https://github.com/JminAILab/CatchU/issues/119#issuecomment-6159097353)(2026-10-14)을 따른다. 코드는 `app/generation/claude.py`다. 큐 소비자의 LIVE 처리가 후보가 있을 때 자식 프로세스 안에서 한 번 만든다([#121](https://github.com/JminAILab/CatchU/issues/121), [큐 소비자 「구조」](queue-consumer.md#구조)). 실제 API는 2026-10-16~18 로컬 시험대에서 팀장 저장소 자료로만 불렀다(팀장 허가 범위, 결과는 [생성 호출 한도와 운영 로그 「모델」](generation-limits.md#모델)). 실제 회원 자료는 실제 자료용 고지([#138](https://github.com/JminAILab/CatchU/issues/138))와 [#37](https://github.com/JminAILab/CatchU/issues/37)의 조건을 갖춘 뒤에 보낸다.
+> [설명 초안·생각해볼 질문·Catch 제목 생성](generation.md)의 제공자 경계(`GenerationProvider`)에 붙이는 실제 제공자 어댑터다. CR3의 판정 공급자(OpenAI Decisions·Claude) 호출 설정은 아래 [「판정 공급자 (CR3)」](#판정-공급자-cr3)에 있다. 제공자·시작 모델·처리 위치는 [#119 결정](https://github.com/JminAILab/CatchU/issues/119#issuecomment-6159097353)(2026-10-14)을 따른다. 코드는 `app/generation/claude.py`다. 큐 소비자의 LIVE 처리가 후보가 있을 때 자식 프로세스 안에서 한 번 만든다([#121](https://github.com/JminAILab/CatchU/issues/121), [큐 소비자 「구조」](queue-consumer.md#구조)). 실제 API는 2026-10-16~18 로컬 시험대에서 팀장 저장소 자료로만 불렀다(팀장 허가 범위, 결과는 [생성 호출 한도와 운영 로그 「모델」](generation-limits.md#모델)).
 
 ## 요청 설정
 
@@ -107,5 +107,4 @@ CR3부터 생성 제공자 옆에 판정 공급자가 하나 더 붙는다. 판�
 | OpenAI 판정 실제 호출: 2026-11-06 FR10 확인에서 팀장이 불러 판정 실패 0, 가장 긴 재료 판정 2.4초였다(CR3 `code-summary.md` 「FR10 확인」). 기본 보관 기간은 공식 안내로 확인했다(위). 남은 것은 운영 서버의 실제 호출 | 고지 v3 배포 뒤 운영 켜기 |
 | 어댑터를 거친 실제 오류 응답(지출 상한·크레딧 소진·과부하)의 모양 확인. 응답 시간·토큰·설정 수용은 2026-10-16~18 로컬 실제 호출로 확인했다 | 팀장의 호출 허가(자료 범위·비용 한도) |
 | 운영 키 주입 | #276 |
-| 실제 회원 자료 전송 | #138 고지, #37 조건 |
 | Console 조직·작업 공간(미국 고정·지출 상한)·등급 확인 | 팀장(#119의 남은 조치) |

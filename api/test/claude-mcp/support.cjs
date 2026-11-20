@@ -234,15 +234,20 @@ function startAuthorize(server, { clientId, redirectUri = CLAUDE_REDIRECT_URI, s
   return server.raw(`/authorize?${query}`);
 }
 
-/** 합성 Claude: SDK 클라이언트 흐름으로 찾기·등록·승인 시작을 하고, 회원 승인(web과 같은 요청) 뒤 토큰 교환까지 한다. */
-async function connectWithSdk(server, member, { redirectUri = CLAUDE_REDIRECT_URI, state = randomBytes(16).toString('hex'), consent = true } = {}) {
-  const resourceMetadata = await auth.discoverOAuthProtectedResourceMetadata(server.mcpUrl);
+/** 합성 Claude의 앞부분: SDK 클라이언트 흐름으로 찾기·등록·승인 시작 주소 만들기까지 한다. 토큰 교환에 쓸 값도 돌려준다. */
+async function startSdkAuthorization(mcpUrl, { redirectUri = CLAUDE_REDIRECT_URI, state = randomBytes(16).toString('hex') } = {}) {
+  const resourceMetadata = await auth.discoverOAuthProtectedResourceMetadata(mcpUrl);
   const issuer = resourceMetadata.authorization_servers[0];
   const metadata = await auth.discoverAuthorizationServerMetadata(issuer);
   const client = await auth.registerClient(issuer, { metadata, clientMetadata: {
     client_name: '합성 Claude', redirect_uris: [redirectUri], token_endpoint_auth_method: 'none', grant_types: ['authorization_code'], response_types: ['code'],
   } });
-  const { authorizationUrl, codeVerifier } = await auth.startAuthorization(issuer, { metadata, clientInformation: client, redirectUrl: redirectUri, state, resource: new URL(server.mcpUrl) });
+  const { authorizationUrl, codeVerifier } = await auth.startAuthorization(issuer, { metadata, clientInformation: client, redirectUrl: redirectUri, state, resource: new URL(mcpUrl) });
+  return { issuer, metadata, client, authorizationUrl, codeVerifier, redirectUri, state };
+}
+
+/** 회원 승인의 기본 단계: 승인 시작 주소를 열어 화면 주소를 받고, 승인 화면과 같은 요청을 화면 없이 보낸다. 돌아갈 주소를 돌려준다. */
+async function approveWithoutScreen({ server, member, authorizationUrl, consent }) {
   const start = await fetch(authorizationUrl, { redirect: 'manual', signal: AbortSignal.timeout(15000) });
   await start.text();
   assert.equal(start.status, 302);
@@ -252,10 +257,21 @@ async function connectWithSdk(server, member, { redirectUri = CLAUDE_REDIRECT_UR
     resource: screen.get('resource'), decision: 'APPROVE', consent,
   } });
   assert.equal(decision.status, 200, decision.text);
-  const returned = new URL(decision.body.redirectTo).searchParams;
+  return { redirectTo: decision.body.redirectTo, codeChallenge: screen.get('code_challenge') };
+}
+
+/**
+ * 합성 Claude: 찾기·등록·승인 시작 → 회원 승인 → 토큰 교환까지 한다. 회원 승인은 authorize가 맡고, 기본값은 화면 없이 같은 요청을 보낸다.
+ * 브라우저 E2E(scripts/claude-mcp-e2e)는 authorize 자리에 실제 승인 화면을 누르는 단계를 넘긴다. 그 단계도 { redirectTo, codeChallenge }를 돌려준다.
+ */
+async function connectWithSdk(server, member, { redirectUri = CLAUDE_REDIRECT_URI, state = randomBytes(16).toString('hex'), consent = true, authorize = approveWithoutScreen } = {}) {
+  const started = await startSdkAuthorization(server.mcpUrl, { redirectUri, state });
+  const { redirectTo, codeChallenge } = await authorize({ server, member, authorizationUrl: started.authorizationUrl, consent });
+  const returned = new URL(redirectTo).searchParams;
   assert.equal(returned.get('state'), state);
-  const tokens = await auth.exchangeAuthorization(issuer, { metadata, clientInformation: client, authorizationCode: returned.get('code'), codeVerifier, redirectUri, resource: new URL(server.mcpUrl) });
-  return { client, tokens, state, code: returned.get('code'), codeVerifier, codeChallenge: screen.get('code_challenge') };
+  const tokens = await auth.exchangeAuthorization(started.issuer, { metadata: started.metadata, clientInformation: started.client, authorizationCode: returned.get('code'),
+    codeVerifier: started.codeVerifier, redirectUri, resource: new URL(server.mcpUrl) });
+  return { client: started.client, tokens, state, code: returned.get('code'), codeVerifier: started.codeVerifier, codeChallenge };
 }
 
 /** 합성 Claude의 도구 호출 쪽. SDK Client로 initialize부터 한다. */
@@ -320,5 +336,5 @@ function assertNoSecrets(texts, secrets) {
 module.exports = {
   WEB_ORIGIN, CLAUDE_REDIRECT_URI, DEV_REDIRECT_URI, DB_FAILURE_MARKER, AUTHORIZATIONS_PATH, inDays, unusedPort, startMcpApp, rpc, pageOf, toolErrorOf, events, mcpLogs,
   failingConnection, failingOn, swapConnection, pkcePair, sha256Hex, insertClient, insertConnection, insertToken, connectMember, insertCode, approve, issueCode, exchange, startAuthorize,
-  connectWithSdk, sdkClient, insertAnalysisRequest, insertCatch, insertEvidence, insertTextMaterial, count, mcpRows, assertNoSecrets,
+  startSdkAuthorization, approveWithoutScreen, connectWithSdk, sdkClient, insertAnalysisRequest, insertCatch, insertEvidence, insertTextMaterial, count, mcpRows, assertNoSecrets,
 };

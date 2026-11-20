@@ -64,7 +64,24 @@ test("정상 빈 목록은 ready이며 전에 표시하던 이름도 비운다",
   assert.deepEqual(store.getSnapshot(), { state: "ready", repositories: [] });
 });
 
-for (const result of [failure, { kind: "api-error", status: 403, code: "RESOURCE_UNAVAILABLE", message: "조회 불가" }]) {
+test("GitHub 연결 필요(403 GITHUB_CONNECTION_REQUIRED)는 조회 실패가 아니라 connection이고 마지막 이름을 유지한다", async () => {
+  const connectionRequired = { kind: "api-error", status: 403, code: "GITHUB_CONNECTION_REQUIRED", message: "GitHub 연결이 필요합니다." };
+  let next = connectionRequired;
+  const store = createRepositoryOptionsStore(createRepositoryApi(async () => next));
+  await store.refresh();
+  assert.deepEqual(store.getSnapshot(), { state: "connection", repositories: [] });
+  next = page([repository("repo-a")]);
+  await store.refresh();
+  next = connectionRequired;
+  await store.refresh();
+  assert.deepEqual(store.getSnapshot(), { state: "connection", repositories: [{ repositoryId: "repo-a", name: "member/repo-a" }] });
+});
+
+for (const result of [
+  failure,
+  { kind: "api-error", status: 403, code: "RESOURCE_UNAVAILABLE", message: "조회 불가" },
+  { kind: "api-error", status: 403, code: "INTERNAL_ERROR", message: "요청을 처리하지 못했습니다." },
+]) {
   test(`${result.kind}는 정상 빈 목록으로 처리하지 않고 error다`, async () => {
     const store = createRepositoryOptionsStore({ repositories: async () => result });
     await store.refresh();

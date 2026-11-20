@@ -43,9 +43,12 @@ API_GENERATION_KEY="sk-ant-api-synthetic-$(openssl rand -hex 24)"
 EMBEDDING_KEY="pa-synthetic-$(openssl rand -hex 24)"
 GOOGLE_ID="987654321098-$(openssl rand -hex 16).apps.googleusercontent.com"
 GOOGLE_SECRET="GOCSPX-synthetic-$(openssl rand -hex 16)"
+GITHUB_ID="Ov23li$(openssl rand -hex 7)"
+GITHUB_SECRET=$(openssl rand -hex 20)
+GITHUB_KEY=$(openssl rand -hex 32)
 ADMIN_PW="Adm1n-$(openssl rand -hex 20)"
 INPUT_KEY="sk-ant-input-$(openssl rand -hex 24)"
-SECRETS="$JWT $LINK $APP_PW $MIGRATOR_PW $QUEUE_TOKEN $CONTEXT_KEY $GENERATION_KEY $JUDGEMENT_KEY $API_GENERATION_KEY $EMBEDDING_KEY $GOOGLE_ID $GOOGLE_SECRET $ADMIN_PW $INPUT_KEY"
+SECRETS="$JWT $LINK $APP_PW $MIGRATOR_PW $QUEUE_TOKEN $CONTEXT_KEY $GENERATION_KEY $JUDGEMENT_KEY $API_GENERATION_KEY $EMBEDDING_KEY $GOOGLE_ID $GOOGLE_SECRET $GITHUB_ID $GITHUB_SECRET $GITHUB_KEY $ADMIN_PW $INPUT_KEY"
 DB_HOST=catchu-db.abcdefghijkl.ap-northeast-2.rds.amazonaws.com
 QUEUE_HOST=master.catchu-queue.abc123.apn2.cache.amazonaws.com
 store_default() { # 이름 Type Value 줄 → SSM 합성 저장소(JSON)
@@ -57,6 +60,9 @@ store_default() { # 이름 Type Value 줄 → SSM 합성 저장소(JSON)
     "/catchu/prod/api/CATCHU_EMBEDDING_API_KEY SecureString $EMBEDDING_KEY" \
     "/catchu/prod/api/GOOGLE_CLIENT_ID SecureString $GOOGLE_ID" \
     "/catchu/prod/api/GOOGLE_CLIENT_SECRET SecureString $GOOGLE_SECRET" \
+    "/catchu/prod/api/GITHUB_OAUTH_CLIENT_ID SecureString $GITHUB_ID" \
+    "/catchu/prod/api/GITHUB_OAUTH_CLIENT_SECRET SecureString $GITHUB_SECRET" \
+    "/catchu/prod/api/GITHUB_CREDENTIAL_ENCRYPTION_KEY SecureString $GITHUB_KEY" \
     "/catchu/prod/db/catchu_migrator-password SecureString $MIGRATOR_PW" \
     "/catchu/prod/queue/auth-token SecureString $QUEUE_TOKEN" \
     "/catchu/prod/worker/WORKER_CONTEXT_API_KEY SecureString $CONTEXT_KEY" \
@@ -344,23 +350,27 @@ check "make-secrets: kubectl에는 표준 입력으로만 넘김(--server-side, 
     && "$REAL_JQ" -e 'all(.items[]; .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"] == null)' "$S/applied.json"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: Secret 키는 계약(k8s/README.md)과 같고 worker에는 DB 값이 없음, 모두 namespace catchu·Opaque" \
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | {name: .metadata.name, keys: (.data | keys), ns: .metadata.namespace, type}]
-    == [{name: "catchu-api", keys: ["AUTH_JWT_SECRET", "CATCHU_EMBEDDING_API_KEY", "CATCHU_GENERATION_API_KEY", "DB_PASSWORD", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "LINK_GRANT_SECRET"], ns: "catchu", type: "Opaque"},
+    == [{name: "catchu-api", keys: ["AUTH_JWT_SECRET", "CATCHU_EMBEDDING_API_KEY", "CATCHU_GENERATION_API_KEY", "CATCHU_QUEUE_REDIS_URL", "DB_PASSWORD", "GITHUB_CREDENTIAL_ENCRYPTION_KEY", "GITHUB_OAUTH_CLIENT_ID", "GITHUB_OAUTH_CLIENT_SECRET",
+          "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "LINK_GRANT_SECRET", "WORKER_CONTEXT_API_KEY"], ns: "catchu", type: "Opaque"},
         {name: "catchu-migration", keys: ["DB_PASSWORD"], ns: "catchu", type: "Opaque"},
         {name: "catchu-worker", keys: ["CATCHU_GENERATION_API_KEY", "CATCHU_JUDGEMENT_API_KEY", "CATCHU_QUEUE_REDIS_URL", "WORKER_CONTEXT_API_KEY"], ns: "catchu", type: "Opaque"}]' "$S/applied.json")"
 check "make-secrets: 값은 SSM 원본 그대로(앱·migration 계정 비밀번호가 바뀌지 않음)" \
   "$( { test "$(decoded catchu-api AUTH_JWT_SECRET)" = "$JWT" && test "$(decoded catchu-api LINK_GRANT_SECRET)" = "$LINK" \
     && test "$(decoded catchu-api DB_PASSWORD)" = "$APP_PW" && test "$(decoded catchu-migration DB_PASSWORD)" = "$MIGRATOR_PW" \
-    && test "$(decoded catchu-worker WORKER_CONTEXT_API_KEY)" = "$CONTEXT_KEY" && test "$(decoded catchu-worker CATCHU_GENERATION_API_KEY)" = "$GENERATION_KEY" \
+    && test "$(decoded catchu-worker WORKER_CONTEXT_API_KEY)" = "$CONTEXT_KEY" && test "$(decoded catchu-api WORKER_CONTEXT_API_KEY)" = "$CONTEXT_KEY" && test "$(decoded catchu-worker CATCHU_GENERATION_API_KEY)" = "$GENERATION_KEY" \
     && test "$(decoded catchu-worker CATCHU_JUDGEMENT_API_KEY)" = "$JUDGEMENT_KEY" \
     && test "$(decoded catchu-api CATCHU_GENERATION_API_KEY)" = "$API_GENERATION_KEY" && test "$(decoded catchu-api CATCHU_EMBEDDING_API_KEY)" = "$EMBEDDING_KEY" \
-    && test "$(decoded catchu-api GOOGLE_CLIENT_ID)" = "$GOOGLE_ID" && test "$(decoded catchu-api GOOGLE_CLIENT_SECRET)" = "$GOOGLE_SECRET"; } > /dev/null 2>&1; echo $?)"
-check "make-secrets: SSM 값은 한 번에 10개까지 나눠 읽음(이름 12개 → 10개·2개)" \
-  "$(ok test "$(tr '\n' ' ' < "$S/get-parameters-sizes")" = "10 2 ")"
-check "make-secrets: 큐 주소는 rediss://, 큐 비밀번호와 큐 주 엔드포인트 6379" \
-  "$(ok test "$(decoded catchu-worker CATCHU_QUEUE_REDIS_URL)" = "rediss://:${QUEUE_TOKEN}@${QUEUE_HOST}:6379")"
+    && test "$(decoded catchu-api GOOGLE_CLIENT_ID)" = "$GOOGLE_ID" && test "$(decoded catchu-api GOOGLE_CLIENT_SECRET)" = "$GOOGLE_SECRET" \
+    && test "$(decoded catchu-api GITHUB_OAUTH_CLIENT_ID)" = "$GITHUB_ID" && test "$(decoded catchu-api GITHUB_OAUTH_CLIENT_SECRET)" = "$GITHUB_SECRET" \
+    && test "$(decoded catchu-api GITHUB_CREDENTIAL_ENCRYPTION_KEY)" = "$GITHUB_KEY"; } > /dev/null 2>&1; echo $?)"
+check "make-secrets: SSM 값은 한 번에 10개까지 나눠 읽음(이름 15개 → 10개·5개)" \
+  "$(ok test "$(tr '\n' ' ' < "$S/get-parameters-sizes")" = "10 5 ")"
+check "make-secrets: 큐 주소는 rediss://, 큐 비밀번호와 큐 주 엔드포인트 6379. api와 worker가 같은 주소를 받음" \
+  "$( { test "$(decoded catchu-worker CATCHU_QUEUE_REDIS_URL)" = "rediss://:${QUEUE_TOKEN}@${QUEUE_HOST}:6379" \
+    && test "$(decoded catchu-api CATCHU_QUEUE_REDIS_URL)" = "rediss://:${QUEUE_TOKEN}@${QUEUE_HOST}:6379"; } > /dev/null 2>&1; echo $?)"
 check "make-secrets: Secret마다 키=SSM 판 번호 주석(값 없음)" \
   "$(ok "$REAL_JQ" -e '[.items[] | select(.kind == "Secret") | .metadata.annotations["catchu.io/ssm-versions"]]
-    == ["AUTH_JWT_SECRET=1,CATCHU_EMBEDDING_API_KEY=1,CATCHU_GENERATION_API_KEY=1,DB_PASSWORD=1,GOOGLE_CLIENT_ID=1,GOOGLE_CLIENT_SECRET=1,LINK_GRANT_SECRET=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_JUDGEMENT_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
+    == ["AUTH_JWT_SECRET=1,CATCHU_EMBEDDING_API_KEY=1,CATCHU_GENERATION_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,DB_PASSWORD=1,GITHUB_CREDENTIAL_ENCRYPTION_KEY=1,GITHUB_OAUTH_CLIENT_ID=1,GITHUB_OAUTH_CLIENT_SECRET=1,GOOGLE_CLIENT_ID=1,GOOGLE_CLIENT_SECRET=1,LINK_GRANT_SECRET=1,WORKER_CONTEXT_API_KEY=1", "DB_PASSWORD=1", "CATCHU_GENERATION_API_KEY=1,CATCHU_JUDGEMENT_API_KEY=1,CATCHU_QUEUE_REDIS_URL=1,WORKER_CONTEXT_API_KEY=1"]' "$S/applied.json")"
 check "make-secrets: ConfigMap catchu-db는 RDS 주소와 저장소의 루트 인증서 그대로" \
   "$( { "$REAL_JQ" -e --arg h "$DB_HOST" '.items[0] | .kind == "ConfigMap" and .metadata.name == "catchu-db" and .data.DB_HOST == $h
       and (.data | keys) == ["DB_HOST", "ca.pem"]' "$S/applied.json" \
@@ -390,6 +400,29 @@ ssm_set /catchu/prod/api/LINK_GRANT_SECRET SecureString "$(printf '%s' "$JWT" | 
 run make-secrets.sh
 check "make-secrets: 서명 키 둘이 같으면(대소문자만 달라도) 멈춤" "$( { untouched && says '같은 값'; } > /dev/null 2>&1; echo $?)"
 reset_state
+ssm_set /catchu/prod/worker/WORKER_CONTEXT_API_KEY SecureString "$LINK"
+run make-secrets.sh
+check "make-secrets: 조회 키가 서명 키와 같으면 멈춤(api가 뜨지 않는 값)" "$( { untouched && says '같은 값' && secret_free; } > /dev/null 2>&1; echo $?)"
+for other in "$JWT" "$LINK" "$CONTEXT_KEY"; do
+  reset_state
+  ssm_set /catchu/prod/api/GITHUB_CREDENTIAL_ENCRYPTION_KEY SecureString "$other"
+  run make-secrets.sh
+  check "make-secrets: GitHub 보관 암호화 키가 서명 키·조회 키와 같으면 멈춤(api가 뜨지 않는 값)" "$( { untouched && says '같은 값' && secret_free; } > /dev/null 2>&1; echo $?)"
+done
+reset_state
+ssm_set /catchu/prod/api/GITHUB_CREDENTIAL_ENCRYPTION_KEY SecureString "${GITHUB_KEY:0:62}zz"
+run make-secrets.sh
+check "make-secrets: GitHub 보관 암호화 키가 64자리 hex가 아니면 멈춤(1, 값은 찍지 않음)" \
+  "$( { untouched && says 'GITHUB_CREDENTIAL_ENCRYPTION_KEY 형식' && secret_free; } > /dev/null 2>&1; echo $?)"
+reset_state
+ssm_set /catchu/prod/api/GITHUB_OAUTH_CLIENT_ID SecureString "Ov23li.with.dot"
+run make-secrets.sh
+check "make-secrets: GitHub Client ID에 영문·숫자·밑줄·하이픈 밖의 글자가 있으면 멈춤" "$( { untouched && says 'GITHUB_OAUTH_CLIENT_ID 형식'; } > /dev/null 2>&1; echo $?)"
+reset_state
+ssm_set /catchu/prod/api/GITHUB_OAUTH_CLIENT_SECRET SecureString "has space"
+run make-secrets.sh
+check "make-secrets: GitHub Client secret에 공백이 있으면 멈춤" "$( { untouched && says 'GITHUB_OAUTH_CLIENT_SECRET 형식'; } > /dev/null 2>&1; echo $?)"
+reset_state
 ssm_set /catchu/prod/db/catchu_migrator-password SecureString "$APP_PW"
 run make-secrets.sh
 check "make-secrets: 앱·migration 계정 비밀번호가 같으면 멈춤" "$( { untouched && says '비밀번호가 같다'; } > /dev/null 2>&1; echo $?)"
@@ -417,7 +450,7 @@ check "make-secrets: Google 클라이언트 비밀값에 공백이 있으면 멈
 reset_state
 run STUB_FAIL_SECOND_READ=1 make-secrets.sh
 check "make-secrets: 나눠 읽다 두 번째 읽기가 실패하면 적용하지 않고 멈춤(1)" "$( { untouched && says 'SSM 값을 읽지 못했다' && secret_free; } > /dev/null 2>&1; echo $?)"
-# jq의 $는 마지막 줄바꿈 앞에서도 맞는다. 열두 값 모두 끝에 줄바꿈 하나를 붙여 본다(복사·파일 입력으로 섞이는 경우).
+# jq의 $는 마지막 줄바꿈 앞에서도 맞는다. SSM 값 열다섯 개 모두 끝에 줄바꿈 하나를 붙여 본다(복사·파일 입력으로 섞이는 경우).
 while read -r n t v <&3; do
   reset_state
   ssm_set "$n" "$t" "${v}"$'\n'
@@ -666,7 +699,11 @@ check "루트 인증서: 파일 해시가 lib/rds.sh의 값과 같음" "$(ok gre
 check "roles.sql: 비밀번호는 환경변수에서만 읽고(\\getenv) SQL에 글자로 적지 않음, 잠금 대기 상한은 앱 계정에만" \
   "$( { grep -q '^\\getenv app_password CATCHU_APP_PASSWORD$' "$HERE/../db/roles.sql" && ! grep -q -i "password '" "$HERE/../db/roles.sql" \
     && test "$(grep -c 'lock_timeout' "$HERE/../db/roles.sql")" = 1 && grep -q "^ALTER ROLE catchu_app SET lock_timeout = '3s';$" "$HERE/../db/roles.sql"; } > /dev/null 2>&1; echo $?)"
-check "새 실행 파일·SQL에 계정 번호(12자리 숫자)가 없음" "$(ok test "$(cat "$OPS"/*.yaml "$HERE/../db/roles.sql" | grep -c -E '[0-9]{12}')" = 0)"
+check "idle-in-transaction.sql: 앱 계정의 트랜잭션 안 유휴 상한 5분 한 줄만 바꾸고 비밀번호를 다루지 않음" \
+  "$( { test "$(grep -c '^ALTER ROLE' "$HERE/../db/idle-in-transaction.sql")" = 1 \
+    && grep -q "^ALTER ROLE catchu_app SET idle_in_transaction_session_timeout = '5min';$" "$HERE/../db/idle-in-transaction.sql" \
+    && ! grep -q -i 'password' "$HERE/../db/idle-in-transaction.sql"; } > /dev/null 2>&1; echo $?)"
+check "새 실행 파일·SQL에 계정 번호(12자리 숫자)가 없음" "$(ok test "$(cat "$OPS"/*.yaml "$HERE/../db/roles.sql" "$HERE/../db/idle-in-transaction.sql" | grep -c -E '[0-9]{12}')" = 0)"
 
 echo
 echo "통과 $pass, 실패 $fail"

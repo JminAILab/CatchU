@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy/aws/db/roles.sql 시험(#276). RDS처럼 슈퍼유저가 아닌 관리자(CREATEROLE·CREATEDB, DB catchu의 소유자)를 둔 PostgreSQL 16 컨테이너에
+# deploy/aws/db/roles.sql·idle-in-transaction.sql 시험(#276). RDS처럼 슈퍼유저가 아닌 관리자(CREATEROLE·CREATEDB, DB catchu의 소유자)를 둔 PostgreSQL 16 컨테이너에
 # psql Pod 틀(k8s/ops/db-admin-pod.yaml)의 이미지·명령·환경 그대로 roles.sql을 실행하고, 각 계정으로 실제로 붙어 권한을 확인한다.
 # 이어서 deploy.sh가 migration 뒤마다 띄우는 동의 기록 삭제 권한 확인 Pod 틀(k8s/consent-guard-pod.yaml)의 명령을 migration 계정으로 실행해
 # 권한이 있을 때(회수 뒤 0)·없을 때(그대로 0)·회수로 없어지지 않을 때(0이 아니고 회수도 되돌림)를 본다.
@@ -141,6 +141,21 @@ sql_as catchu_app "$APP_PW" 'SHOW lock_timeout;'
 check "앱 계정: 새 연결의 lock_timeout이 3s" "$(ok test "$rc" = 0 -a "$(cat "$OUT")" = 3s)"
 sql_as catchu_migrator "$MIGRATOR_PW" 'SHOW lock_timeout;'
 check "migration 계정: lock_timeout은 기본값(0)" "$(ok test "$rc" = 0 -a "$(cat "$OUT")" = 0)"
+run_pod "$ROOT/deploy/aws/db/idle-in-transaction.sql"
+check "idle-in-transaction.sql: roles.sql 뒤에 Pod 틀 그대로 실행해 종료 0, 확인 출력에 앱 계정 설정 둘" \
+  "$( { test "$rc" = 0 && says '{lock_timeout=3s,idle_in_transaction_session_timeout=5min}'; } > /dev/null 2>&1; echo $?)"
+run_pod "$ROOT/deploy/aws/db/idle-in-transaction.sql"
+check "idle-in-transaction.sql: 다시 실행해도 종료 0이고 설정이 겹치지 않음" \
+  "$( { test "$rc" = 0 && says '{lock_timeout=3s,idle_in_transaction_session_timeout=5min}'; } > /dev/null 2>&1; echo $?)"
+sql_as catchu_app "$APP_PW" 'SHOW idle_in_transaction_session_timeout; SHOW lock_timeout;'
+check "앱 계정: 새 연결의 트랜잭션 안 유휴 상한이 5min이고 lock_timeout 3s는 그대로" \
+  "$(ok test "$rc" = 0 -a "$(tr '\n' ' ' < "$OUT")" = '5min 3s ')"
+sql_as catchu_migrator "$MIGRATOR_PW" 'SHOW idle_in_transaction_session_timeout;'
+check "migration 계정: 트랜잭션 안 유휴 상한은 기본값(0)" "$(ok test "$rc" = 0 -a "$(cat "$OUT")" = 0)"
+printf '%s\n' "SET idle_in_transaction_session_timeout = '1s';" 'BEGIN;' 'SELECT 1;' '\! sleep 2' 'SELECT 2;' > "$WORK/idle.sql"
+sql_as catchu_app "$APP_PW" "$(cat "$WORK/idle.sql")"
+check "앱 계정: 트랜잭션 안에서 상한보다 오래 쉬면 연결이 끊김(값을 1초로 줄여 확인)" \
+  "$( { test "$rc" != 0 && says 'idle-in-transaction timeout'; } > /dev/null 2>&1; echo $?)"
 sql_as catchu_migrator "$MIGRATOR_PW" 'CREATE TABLE t (id integer PRIMARY KEY, v text); CREATE SEQUENCE s;'
 check "migration 계정: public 스키마에 표·시퀀스를 만듦" "$(ok test "$rc" = 0)"
 sql_as catchu_app "$APP_PW" "INSERT INTO t VALUES (1, 'a'); UPDATE t SET v = 'b'; SELECT v FROM t; DELETE FROM t; SELECT nextval('s');"
