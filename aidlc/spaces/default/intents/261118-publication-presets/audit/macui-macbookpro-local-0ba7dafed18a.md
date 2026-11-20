@@ -27856,3 +27856,216 @@
 **Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:dc018593f8f8ca2b51dc476d5a47fd1cba552958888d7606c930493965a59349","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:d3ceca7502580f6a65df3b2e07ac1b2c0e2e9639bf866a855ebdf8b30d2f73fa"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/code-generation-plan.md","id":"R-02","fingerprint":"sha256:8ff07915d326562eb4ed476014f937d5993842903bb4860ac86f6dbdd6b547f1","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:d3ceca7502580f6a65df3b2e07ac1b2c0e2e9639bf866a855ebdf8b30d2f73fa"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:e600b3e2e6b29e2fd8aab9e97e75ea64a5ef8186094417a99318414f74e989a9","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:29c3c790113bc4c7300ffec365131909b60848d82dc2bdd475afc12792df1a1e"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:81b33cea0bf21bb7f7d3e44f6801c82d309fd55310d29db473ac8693d5407166","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:29c3c790113bc4c7300ffec365131909b60848d82dc2bdd475afc12792df1a1e"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md","id":"R-03","fingerprint":"sha256:3005b21c69a58ad162496fbb3a43c186791ebb9df01b6a16015c1ae1ffadb298","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:29c3c790113bc4c7300ffec365131909b60848d82dc2bdd475afc12792df1a1e"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md","id":"R-04","fingerprint":"sha256:057154d22595b9291f7133bade332d2b25a74fc64fd9a13a0b1a49ca1bbf0cd0","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:29c3c790113bc4c7300ffec365131909b60848d82dc2bdd475afc12792df1a1e"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md","id":"R-01","fingerprint":"sha256:90f116bae03c3c13161ca5a11d8c4a9aad8e479656a8eb18eed06dbc363558fd","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:a380379891d1fb60cb3690dc94fcc0e7c11986ed2422bf230f94cb8f003c7fad"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md","id":"R-02","fingerprint":"sha256:042d0bcd787c4a1f20b626ed0fca3df05a43818bd992540c0fc3390f52c22fee","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:a380379891d1fb60cb3690dc94fcc0e7c11986ed2422bf230f94cb8f003c7fad"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md","id":"R-03","fingerprint":"sha256:ac9b482eab86e42d18b6b2a1502e8084fea32cd762099f9250d4d75bae14c5fc","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:a380379891d1fb60cb3690dc94fcc0e7c11986ed2422bf230f94cb8f003c7fad"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md","id":"R-04","fingerprint":"sha256:814a6621d1d7c267ddec4f0dd57b061624ab9647233aadf6834f1aed65378f21","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:a380379891d1fb60cb3690dc94fcc0e7c11986ed2422bf230f94cb8f003c7fad"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/security-requirements.md","id":"R-01","fingerprint":"sha256:26391a842a4da26462ed0eaf5cccaac7e168d8a9b63c01ad6a47fcc4007559df","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:fbeb38912322188ebb6a769c19ccfb4b4e9bb062c17573283ca26073db867f29"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/security-requirements.md","id":"R-02","fingerprint":"sha256:cc447c7214cefe36da7ef6fc96155ecc659f7cca75c8cbca0a2b4c0b07e55687","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:fbeb38912322188ebb6a769c19ccfb4b4e9bb062c17573283ca26073db867f29"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/security-requirements.md","id":"R-03","fingerprint":"sha256:3a7cb5f9c2ba2d56faf0e1b47abc505ae211767099d17e2d09fe9dca5208ce66","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:fbeb38912322188ebb6a769c19ccfb4b4e9bb062c17573283ca26073db867f29"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/security-requirements.md","id":"R-04","fingerprint":"sha256:c696011e0887db7560cb4486351992d632bbe07610284f4fb122749b188bea8b","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:fbeb38912322188ebb6a769c19ccfb4b4e9bb062c17573283ca26073db867f29"}}]}
 
 ---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-20T14:25:47Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: functional-design
+**Next Stage**: nfr-requirements
+**Brief Digest**: none
+**Sensor State**: traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/traceability.json=failed(3) [detail: aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/sensors/functional-design/traceability-bade9708.md]; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/traceability.json=failed(2) [detail: aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/sensors/functional-design/traceability-d33afed4.md]; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/rules.md=not-run; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/frontend-components.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/rules.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/frontend-components.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/entities.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/rules.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/rules.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/frontend-components.md=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/rules.md=not-run; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/rules.md=passed; +4 more
+**Open Decisions**: 0
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-20T14:25:55Z
+**Event**: GATE_APPROVED
+**Stage**: functional-design
+**Brief Digest**: none
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-20T14:25:55Z
+**Event**: STAGE_COMPLETED
+**Stage**: functional-design
+**Validation Basis**: {"graphContract":"sha256:9bcda5bd8a06c0847db3e05cd9c841a992450b498f36fead53d3737b78517a4e","inputs":[{"artifact":"components","contentHash":"sha256:85587796d490840325cc381007f81b90b9daa2139cadd8a74d1397ffd9c740ff","instanceCount":1,"presentCount":1,"producer":"domain-design","required":true,"structureHash":"sha256:4724ea158b7058768f86c03581450cf489bc32adf3c0f94c7acac37e53d45751"},{"artifact":"contract-summary","contentHash":"sha256:969a055f823e5d5c3d201f29a5a029e47686220278021532e22184c6d7219ad5","instanceCount":1,"presentCount":1,"producer":"contract-design","required":false,"structureHash":"sha256:417a9c95cbf71c3420f351802644e09c4adbca869534fa6fd0f8dfec64c14478"},{"artifact":"requirements","contentHash":"sha256:327801dee9c42f4e6c99b583852178b69dbc4db730b8fa23532a1b738538e6f5","instanceCount":1,"presentCount":1,"producer":"requirements-analysis","required":true,"structureHash":"sha256:1187e4396781cefb07161dfaec11ff291a14d6cd5bb9fe6064bc74244d4e5af4"},{"artifact":"stories","contentHash":"sha256:cf0f32861d351525238d5977fb3e8ab88f4b594f68a894db7064d5a7e7ac9564","instanceCount":1,"presentCount":1,"producer":"user-stories","required":false,"structureHash":"sha256:21cb3365caea02b58a5b62c08d07a936ddab835434cfac4707fad4770662cf83"},{"artifact":"unit-of-work-story-map","contentHash":"sha256:d98672dc1a74f86db5235114001668481a7adaa865480d19d596be969c35699e","instanceCount":1,"presentCount":1,"producer":"units-generation","required":false,"structureHash":"sha256:50e25bacf398348a4d1f68fa709bed8df88fb71b7e5f48bedfcb5df8ae81e0b0"},{"artifact":"unit-of-work","contentHash":"sha256:e3e08909aab3f4aae7ebb80fafb497e1e70558cf93987723e90a60ae0fda4589","instanceCount":1,"presentCount":1,"producer":"units-generation","required":true,"structureHash":"sha256:73089697a6ea44278aef5f5486ffd13d31dbcae117bf0928c618846a17b1de2c"}],"outputs":[{"artifact":"entities","contentHash":"sha256:915fb51dfeb3cf79ab0848652447723b1f629d65feceb7ee4e07ab0959a72f43","instanceCount":1,"presentCount":1,"producer":"functional-design","required":true,"structureHash":"sha256:d1048d21e1c859ab0f21efe3c99d5a25912c0752211ca85d9dd4e2ffa9c27432"},{"artifact":"frontend-components","contentHash":"sha256:e27c8e3303712f348fbf0dc1d65f0e5a83b26fbe4e9c6d58afebe0b56cda833c","instanceCount":3,"presentCount":3,"producer":"functional-design","required":false,"structureHash":"sha256:c41a4c8d9abc279402b3aa1075c63c6829dffda3f2e42acf801a62f2a52d7b10"},{"artifact":"functional-spec","contentHash":"sha256:f1965ada3c6411b522fb7bf0be5a8e4c624d4a4f630908a1d780cff747bf7822","instanceCount":4,"presentCount":4,"producer":"functional-design","required":true,"structureHash":"sha256:aeff350d873c6b563a5f1c2ef127122b15b421f1dbb6d64cba14d8b0a5dc6172"},{"artifact":"rules","contentHash":"sha256:a021e5aa10ef964dd9cadf0dcdbb6e7d560b28c0f653a424e6987ba9a1170b1e","instanceCount":1,"presentCount":1,"producer":"functional-design","required":true,"structureHash":"sha256:15ef95621a5c7938500137c63cb8565e60fb7b5d8a146efcf3116faf3999a566"},{"artifact":"traceability","contentHash":"sha256:b9bcef78e98f8a8828b3af94a1ab757849e76a0d2c4fec6aacf7aaf2dcc222d7","instanceCount":4,"presentCount":4,"producer":"functional-design","required":true,"structureHash":"sha256:a427028ef6f73dc18fac7c6c9199b444205ee2fc3ed682101ff98c594a72b0a9"}],"projectType":"brownfield","schema":3}
+**Details**: Stage Functional Design approved by gate
+**Tokens In**: 730
+**Tokens Out**: 316530
+**Cache Read**: 154479611
+**Cache Write**: 3020709
+**Cost USD**: 56.47
+**By Model**: opus-5-5=51.82; sonnet-5-5=4.65
+**By Agent**: main=51.82; aidlc-architecture-reviewer-agent=4.65
+**Tokens By Model**: opus-5-5=604/249.4k/144.3M/2.2M; sonnet-5-5=126/67.1k/10.2M/773.5k
+**Tokens By Agent**: main=604/249.4k/144.3M/2.2M; aidlc-architecture-reviewer-agent=126/67.1k/10.2M/773.5k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-20T14:25:55Z
+**Event**: STAGE_STARTED
+**Stage**: nfr-requirements
+**Agent**: aidlc-architect-agent
+**Answer Mode**: guide (reused from intent-capture)
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-20T14:26:20Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: nfr-requirements
+**Next Stage**: nfr-design
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/performance-requirements.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/security-requirements.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/tech-stack-decisions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/performance-requirements.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/security-requirements.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/scalability-requirements.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/reliability-requirements.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/observability-requirements.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/tech-stack-decisions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/performance-requirements.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/security-requirements.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/tech-stack-decisions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/traceability.json=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/performance-requirements.md=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/performance-requirements.md=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/performance-requirements.md=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/traceability.json=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/traceability.json=passed; +1 more
+**Open Decisions**: 0
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-20T14:26:30Z
+**Event**: GATE_APPROVED
+**Stage**: nfr-requirements
+**Brief Digest**: none
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-20T14:26:30Z
+**Event**: STAGE_COMPLETED
+**Stage**: nfr-requirements
+**Validation Basis**: {"graphContract":"sha256:42740ba129331fd7be59c025acef08cda33aa1e1b365637b9662dd2b529d969c","inputs":[{"artifact":"contract-summary","contentHash":"sha256:969a055f823e5d5c3d201f29a5a029e47686220278021532e22184c6d7219ad5","instanceCount":1,"presentCount":1,"producer":"contract-design","required":false,"structureHash":"sha256:417a9c95cbf71c3420f351802644e09c4adbca869534fa6fd0f8dfec64c14478"},{"artifact":"functional-spec","contentHash":"sha256:f1965ada3c6411b522fb7bf0be5a8e4c624d4a4f630908a1d780cff747bf7822","instanceCount":4,"presentCount":4,"producer":"functional-design","required":true,"structureHash":"sha256:aeff350d873c6b563a5f1c2ef127122b15b421f1dbb6d64cba14d8b0a5dc6172"},{"artifact":"requirements","contentHash":"sha256:327801dee9c42f4e6c99b583852178b69dbc4db730b8fa23532a1b738538e6f5","instanceCount":1,"presentCount":1,"producer":"requirements-analysis","required":true,"structureHash":"sha256:1187e4396781cefb07161dfaec11ff291a14d6cd5bb9fe6064bc74244d4e5af4"},{"artifact":"rules","contentHash":"sha256:a021e5aa10ef964dd9cadf0dcdbb6e7d560b28c0f653a424e6987ba9a1170b1e","instanceCount":1,"presentCount":1,"producer":"functional-design","required":true,"structureHash":"sha256:15ef95621a5c7938500137c63cb8565e60fb7b5d8a146efcf3116faf3999a566"},{"artifact":"technology-stack","contentHash":"sha256:d437ca4d31cd51eec54e6465c5c251680023f083b6d1ad28edd140fca7cd32d1","instanceCount":1,"presentCount":1,"producer":"reverse-engineering","required":false,"structureHash":"sha256:126a4772f448f1b70665dc171adf55a9fe9a9ccb82d43b87fddc0e185b6acc3f"}],"outputs":[{"artifact":"observability-requirements","contentHash":"sha256:e28f420b1f946983ae90d24497efe79b60c44ffc32c8d28bbffd8461879ba274","instanceCount":1,"presentCount":1,"producer":"nfr-requirements","required":true,"structureHash":"sha256:03af5eeba611312f028bad1f6d536d873145beb5305eb13e60f58fc31f51e467"},{"artifact":"performance-requirements","contentHash":"sha256:7fe17ed3f7357be452b829ab83ee02694bdc413cc621d369a9b2bb467b35bcfb","instanceCount":4,"presentCount":3,"producer":"nfr-requirements","required":true,"structureHash":"sha256:12127970a0c254f85002796d48b17c9cab7a90eebba57d3ad23af164e1a82f3d"},{"artifact":"reliability-requirements","contentHash":"sha256:689f04bdb0cd718ce06169804177ec2f38e9ed747a212819b4bb425d5b1b9162","instanceCount":1,"presentCount":1,"producer":"nfr-requirements","required":true,"structureHash":"sha256:cd1926e0eb93b828443f2f1195070b72ba6e8dddd3b6e2f35027f97ea35ea428"},{"artifact":"scalability-requirements","contentHash":"sha256:cfce5ac787ff987d1e1faa7bc87505e46b451d026e24e947dc9fac484ae8d10e","instanceCount":1,"presentCount":1,"producer":"nfr-requirements","required":true,"structureHash":"sha256:0d3ffe402f16c9c3f907d9d5a8cc55249460d8724b60b5bb0ca37cbc39170161"},{"artifact":"security-requirements","contentHash":"sha256:65eeba9b566f06e56c50ed2579cf40eb1cb9800c10c12e5b9cc581381c199ec6","instanceCount":4,"presentCount":3,"producer":"nfr-requirements","required":true,"structureHash":"sha256:2f8697408afa15d208fea55e10b23248614ec0032af0800e8d2ecb7dc72f646b"},{"artifact":"tech-stack-decisions","contentHash":"sha256:9d8d368da955adf26e56be5f1698cb63ce150f524cf852ad7eea857c7a0015a8","instanceCount":4,"presentCount":3,"producer":"nfr-requirements","required":true,"structureHash":"sha256:5ebe0316473d8f669ffe7c13dfeff9c6c6dd5b6f560c28be1612f5e39f77aa99"},{"artifact":"traceability","contentHash":"sha256:d7668593799afe2bbf56ed6fe37102ef1318679c835e3ae2fcd535f8d57e7269","instanceCount":4,"presentCount":3,"producer":"nfr-requirements","required":true,"structureHash":"sha256:48791341115ff78e7c49d08cd98ec9ded10903d5c338d2a959d55dc10743137d"}],"projectType":"brownfield","schema":3}
+**Details**: Stage NFR Requirements approved by gate
+**Tokens In**: 158
+**Tokens Out**: 77291
+**Cache Read**: 42915614
+**Cache Write**: 530563
+**Cost USD**: 12.00
+**By Model**: opus-5-5=10.35; sonnet-5-5=1.65
+**By Agent**: main=10.35; aidlc-architecture-reviewer-agent=1.65
+**Tokens By Model**: opus-5-5=112/56.6k/40.6M/137k; sonnet-5-5=46/20.7k/2.3M/393.6k
+**Tokens By Agent**: main=112/56.6k/40.6M/137k; aidlc-architecture-reviewer-agent=46/20.7k/2.3M/393.6k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-20T14:26:30Z
+**Event**: STAGE_STARTED
+**Stage**: nfr-design
+**Agent**: aidlc-architect-agent
+**Answer Mode**: guide (reused from intent-capture)
+
+---
+
+## Memory Empty
+**Timestamp**: 2026-11-20T14:26:31Z
+**Event**: MEMORY_EMPTY
+**Stage**: nfr-requirements
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-20T14:26:52Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: nfr-design
+**Next Stage**: code-generation
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/performance-design.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/logical-components.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/performance-design.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/scalability-design.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/reliability-design.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/observability-design.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/logical-components.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/performance-design.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/logical-components.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/traceability.json=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/performance-design.md=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/performance-design.md=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/performance-design.md=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/traceability.json=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/traceability.json=passed; +1 more
+**Open Decisions**: 0
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-20T14:27:01Z
+**Event**: GATE_APPROVED
+**Stage**: nfr-design
+**Brief Digest**: none
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-20T14:27:01Z
+**Event**: STAGE_COMPLETED
+**Stage**: nfr-design
+**Validation Basis**: {"graphContract":"sha256:ef880741298a28ff1b153f7995686a9c571a06744a85ec1852b3998a0ee954fb","inputs":[{"artifact":"contract-summary","contentHash":"sha256:969a055f823e5d5c3d201f29a5a029e47686220278021532e22184c6d7219ad5","instanceCount":1,"presentCount":1,"producer":"contract-design","required":false,"structureHash":"sha256:417a9c95cbf71c3420f351802644e09c4adbca869534fa6fd0f8dfec64c14478"},{"artifact":"functional-spec","contentHash":"sha256:f1965ada3c6411b522fb7bf0be5a8e4c624d4a4f630908a1d780cff747bf7822","instanceCount":4,"presentCount":4,"producer":"functional-design","required":true,"structureHash":"sha256:aeff350d873c6b563a5f1c2ef127122b15b421f1dbb6d64cba14d8b0a5dc6172"},{"artifact":"observability-requirements","contentHash":"sha256:e28f420b1f946983ae90d24497efe79b60c44ffc32c8d28bbffd8461879ba274","instanceCount":1,"presentCount":1,"producer":"nfr-requirements","required":true,"structureHash":"sha256:03af5eeba611312f028bad1f6d536d873145beb5305eb13e60f58fc31f51e467"},{"artifact":"performance-requirements","contentHash":"sha256:7fe17ed3f7357be452b829ab83ee02694bdc413cc621d369a9b2bb467b35bcfb","instanceCount":4,"presentCount":3,"producer":"nfr-requirements","required":true,"structureHash":"sha256:12127970a0c254f85002796d48b17c9cab7a90eebba57d3ad23af164e1a82f3d"},{"artifact":"reliability-requirements","contentHash":"sha256:689f04bdb0cd718ce06169804177ec2f38e9ed747a212819b4bb425d5b1b9162","instanceCount":1,"presentCount":1,"producer":"nfr-requirements","required":true,"structureHash":"sha256:cd1926e0eb93b828443f2f1195070b72ba6e8dddd3b6e2f35027f97ea35ea428"},{"artifact":"scalability-requirements","contentHash":"sha256:cfce5ac787ff987d1e1faa7bc87505e46b451d026e24e947dc9fac484ae8d10e","instanceCount":1,"presentCount":1,"producer":"nfr-requirements","required":true,"structureHash":"sha256:0d3ffe402f16c9c3f907d9d5a8cc55249460d8724b60b5bb0ca37cbc39170161"},{"artifact":"security-requirements","contentHash":"sha256:65eeba9b566f06e56c50ed2579cf40eb1cb9800c10c12e5b9cc581381c199ec6","instanceCount":4,"presentCount":3,"producer":"nfr-requirements","required":true,"structureHash":"sha256:2f8697408afa15d208fea55e10b23248614ec0032af0800e8d2ecb7dc72f646b"},{"artifact":"tech-stack-decisions","contentHash":"sha256:9d8d368da955adf26e56be5f1698cb63ce150f524cf852ad7eea857c7a0015a8","instanceCount":4,"presentCount":3,"producer":"nfr-requirements","required":true,"structureHash":"sha256:5ebe0316473d8f669ffe7c13dfeff9c6c6dd5b6f560c28be1612f5e39f77aa99"}],"outputs":[{"artifact":"logical-components","contentHash":"sha256:03ef87b3111529b2a4f2d3ce0da07703408c16c2817bf7166e15d96e751b4d67","instanceCount":4,"presentCount":3,"producer":"nfr-design","required":true,"structureHash":"sha256:d221fd54b45898a187514de6488156d101b365785e3f09c090a4db9b3f6d002a"},{"artifact":"observability-design","contentHash":"sha256:d054f4cbdfc16d43dc801fc8d46f06f5787eee29a65236271ad85a82630c03ee","instanceCount":1,"presentCount":1,"producer":"nfr-design","required":true,"structureHash":"sha256:a03ed2f49add32854e45daecdb2e39f697e044b7f162ad784bb04dc4ddd7cddf"},{"artifact":"performance-design","contentHash":"sha256:8160a5725cdf4c6c0ea56f6764b04c3bbe81b132b62be7c9a496b895533635db","instanceCount":4,"presentCount":3,"producer":"nfr-design","required":true,"structureHash":"sha256:011fe3eb43d8346d286b9d5cfa8fd707ec639c9a59d9028874f6c8e97972f045"},{"artifact":"reliability-design","contentHash":"sha256:3258d5416163c2dbd2f53bee9c12cbe512c49be2a3f150a685889e70b9275e16","instanceCount":1,"presentCount":1,"producer":"nfr-design","required":true,"structureHash":"sha256:896aed5dec47617c1d100ed163d8eaf3478a9ca38cc17e5a7fbb91b305f460fd"},{"artifact":"scalability-design","contentHash":"sha256:5e76cc3c2f6a75afcf6025d9a3c1443efe73443895f5f177121b66694d0b97bc","instanceCount":1,"presentCount":1,"producer":"nfr-design","required":true,"structureHash":"sha256:d55875abe4ea09884e3f6ba5220696ddc57f9cc33b0504c7797256f44ca789c1"},{"artifact":"security-design","contentHash":"sha256:f954775019c3ee8656b120d074be62a81fb8fb222560ad194098217fb5921567","instanceCount":4,"presentCount":3,"producer":"nfr-design","required":true,"structureHash":"sha256:afb9a51ca30d30b2e7a18ccff0cfd95b363ed14c3acb415093835b931f47aa2e"},{"artifact":"traceability","contentHash":"sha256:f8046524fc6b9469fa3c0a603977c457d78b18f3aed769875a0f5216d23f627f","instanceCount":4,"presentCount":3,"producer":"nfr-design","required":true,"structureHash":"sha256:b3d9be7b5e05c04e85718a59a78bd717c43b6b8a3c9b825254f919bc093916a9"}],"projectType":"brownfield","schema":3}
+**Details**: Stage NFR Design approved by gate
+**Tokens In**: 179
+**Tokens Out**: 92675
+**Cache Read**: 45289836
+**Cache Write**: 551979
+**Cost USD**: 12.64
+**By Model**: opus-5-5=10.42; sonnet-5-5=2.22
+**By Agent**: main=10.42; aidlc-architecture-reviewer-agent=2.22
+**Tokens By Model**: opus-5-5=107/58.3k/41.2M/126.7k; sonnet-5-5=72/34.4k/4.1M/425.3k
+**Tokens By Agent**: main=107/58.3k/41.2M/126.7k; aidlc-architecture-reviewer-agent=72/34.4k/4.1M/425.3k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-20T14:27:02Z
+**Event**: STAGE_STARTED
+**Stage**: code-generation
+**Agent**: aidlc-developer-agent
+**Answer Mode**: guide (reused from intent-capture)
+**Source Baseline**: sha256:e544e340e89b8e826ff900515c5bd132df2b4f07033611f2f03a399434d8219b
+
+---
+
+## Memory Empty
+**Timestamp**: 2026-11-20T14:27:02Z
+**Event**: MEMORY_EMPTY
+**Stage**: nfr-design
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-11-20T14:27:15Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: code-generation
+**Checkpoint**: review-receipt
+**Changed**: api/docs/ai-generation.md, api/docs/file-storage.md, api/docs/google-login.md, api/docs/lock-wait-limit.md, api/docs/rag-evaluation/2026-11-19-581-remeasure.md, api/docs/withdrawal.md, api/src/ai-generation/checked-gate.ts, api/src/ai-generation/fact-check.ts, api/src/ai-generation/jd-checks.ts, api/src/ai-generation/quote-citations.ts
+**Recorded**: (outside the units)
+**Current**: sha256:ba7142be155bafef3a4da5b96308eea36f9e88a4db2ecb88de91a198e1ef33e2
+**Details**: These files changed outside any unit's work in Code Generation: api/docs/ai-generation.md, api/docs/file-storage.md, api/docs/google-login.md, api/docs/lock-wait-limit.md, api/docs/rag-evaluation/2026-11-19-581-remeasure.md, api/docs/withdrawal.md, api/src/ai-generation/checked-gate.ts, api/src/ai-generation/fact-check.ts, api/src/ai-generation/jd-checks.ts, api/src/ai-generation/quote-citations.ts and 60 more. Kept them.
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-20T14:27:21Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: code-generation
+**Next Stage**: build-and-test
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/code-generation-plan.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/unit-test-instructions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/code-summary.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/unit-test-instructions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-summary.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/code-generation-plan.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/unit-test-instructions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/code-summary.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/code-generation-plan.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/unit-test-instructions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/code-summary.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/traceability.json=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/traceability.json=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/traceability.json=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/traceability.json=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/traceability.json=passed
+**Open Decisions**: 0
+**Source Work**: found in a source change since the stage started
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-20T14:27:32Z
+**Event**: GATE_APPROVED
+**Stage**: code-generation
+**Brief Digest**: none
+**Source Work**: found in a source change since the stage started
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-20T14:27:32Z
+**Event**: STAGE_COMPLETED
+**Stage**: code-generation
+**Validation Basis**: {"graphContract":"sha256:ac0ef7ae03ae2fcfab9e2a94500d84c4fe00d00384d1f8dcff92c96b2e1f50de","inputs":[{"artifact":"contract-summary","contentHash":"sha256:969a055f823e5d5c3d201f29a5a029e47686220278021532e22184c6d7219ad5","instanceCount":1,"presentCount":1,"producer":"contract-design","required":false,"structureHash":"sha256:417a9c95cbf71c3420f351802644e09c4adbca869534fa6fd0f8dfec64c14478"},{"artifact":"entities","contentHash":"sha256:915fb51dfeb3cf79ab0848652447723b1f629d65feceb7ee4e07ab0959a72f43","instanceCount":1,"presentCount":1,"producer":"functional-design","required":false,"structureHash":"sha256:d1048d21e1c859ab0f21efe3c99d5a25912c0752211ca85d9dd4e2ffa9c27432"},{"artifact":"functional-spec","contentHash":"sha256:f1965ada3c6411b522fb7bf0be5a8e4c624d4a4f630908a1d780cff747bf7822","instanceCount":4,"presentCount":4,"producer":"functional-design","required":false,"structureHash":"sha256:aeff350d873c6b563a5f1c2ef127122b15b421f1dbb6d64cba14d8b0a5dc6172"},{"artifact":"performance-design","contentHash":"sha256:bee250cae2245b6e21b14bc71cdfaaef9c4926780bec4dd2b6e75605b491007e","instanceCount":3,"presentCount":3,"producer":"nfr-design","required":false,"structureHash":"sha256:994f30a9dbfd3f7d9495600c561b94e85dbadc23de83c327c5724a11082eb308"},{"artifact":"requirements","contentHash":"sha256:327801dee9c42f4e6c99b583852178b69dbc4db730b8fa23532a1b738538e6f5","instanceCount":1,"presentCount":1,"producer":"requirements-analysis","required":true,"structureHash":"sha256:1187e4396781cefb07161dfaec11ff291a14d6cd5bb9fe6064bc74244d4e5af4"},{"artifact":"rules","contentHash":"sha256:a021e5aa10ef964dd9cadf0dcdbb6e7d560b28c0f653a424e6987ba9a1170b1e","instanceCount":1,"presentCount":1,"producer":"functional-design","required":false,"structureHash":"sha256:15ef95621a5c7938500137c63cb8565e60fb7b5d8a146efcf3116faf3999a566"},{"artifact":"security-design","contentHash":"sha256:6508dded8a22c630ddb05d6868ed14a7555b049925ae9cc5991a6ede238a4ce9","instanceCount":3,"presentCount":3,"producer":"nfr-design","required":false,"structureHash":"sha256:8347e70dad4f1cd39065c2e4a121a5af4206bcdc7c805379446ae51eb0da5a6b"},{"artifact":"unit-of-work","contentHash":"sha256:e3e08909aab3f4aae7ebb80fafb497e1e70558cf93987723e90a60ae0fda4589","instanceCount":1,"presentCount":1,"producer":"units-generation","required":true,"structureHash":"sha256:73089697a6ea44278aef5f5486ffd13d31dbcae117bf0928c618846a17b1de2c"}],"outputs":[{"artifact":"code-generation-plan","contentHash":"sha256:c19f654e7b3ea0724f4acb974c91696042d014195e6fd5309f9d9cf12e1a7f46","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:71611cbbd03c2bbac4f448a64a8abb006d10ec1f132c5c8d584c6fb26e33a2ac"},{"artifact":"code-summary","contentHash":"sha256:5e1b0d9e17a169c0020512a6953735646247784f7a32f8f134987d68886cf212","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:bb3eb0b312134262fafeaf3689530211566399f73aa461d3114c86226f4404bd"},{"artifact":"traceability","contentHash":"sha256:6a772adecdda90568939649d7ef151ca98e2fbc7c9a56797f70e51f35f2e1ab9","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:bea5a200477f04e686e741ba7592394e6b5791d8833645f7e6b93fc889590776"},{"artifact":"unit-test-instructions","contentHash":"sha256:582a2b9cec6fd0db9f196d5803a4894d323c6194143f6b7721fcbf9accef756c","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:acbdf22ba54db633083fe0d7fbe40335ac3189da8aeff938739682e1c8dab382"}],"projectType":"brownfield","schema":3}
+**Details**: Stage Code Generation approved by gate
+**Tokens In**: 1646
+**Tokens Out**: 894413
+**Cache Read**: 321945255
+**Cache Write**: 5518937
+**Cost USD**: 114.49
+**By Model**: opus-5-5=112.11; sonnet-5-5=2.38; <synthetic>=null
+**By Agent**: main=48.10; aidlc-developer-agent=64.01; aidlc-architecture-reviewer-agent=2.38
+**Tokens By Model**: opus-5-5=1.6k/872.2k/318.1M/5M; sonnet-5-5=70/22.3k/3.8M/557.1k
+**Tokens By Agent**: main=672/258.5k/131.6M/2.1M; aidlc-developer-agent=904/613.6k/186.5M/2.9M; aidlc-architecture-reviewer-agent=70/22.3k/3.8M/557.1k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-20T14:27:32Z
+**Event**: STAGE_STARTED
+**Stage**: build-and-test
+**Agent**: aidlc-quality-agent
+**Answer Mode**: guide (reused from intent-capture)
+
+---
