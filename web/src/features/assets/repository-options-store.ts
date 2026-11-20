@@ -1,8 +1,9 @@
-import type { RepositoryApi } from "../repository-management/repository-api";
+import { needsConnection, type RepositoryApi } from "../repository-management/repository-api.ts";
 import type { RepositoryOption } from "./types";
 
 export type RepositoryOptionsSnapshot = {
-  state: "loading" | "ready" | "error";
+  /** `connection`: GitHub 연결이 없거나 다시 연동해야 한다(403 `GITHUB_CONNECTION_REQUIRED`). 조회 실패가 아니며 연동 안내는 위쪽 연결 관리가 맡는다. */
+  state: "loading" | "ready" | "error" | "connection";
   repositories: readonly RepositoryOption[];
 };
 
@@ -33,7 +34,7 @@ export function createRepositoryOptionsStore(api: Pick<RepositoryApi, "repositor
         }])).values()];
         emit({ state: "ready", repositories });
       } else {
-        emit({ state: "error", repositories: snapshot.repositories });
+        emit({ state: needsConnection(result) ? "connection" : "error", repositories: snapshot.repositories });
       }
     } catch {
       if (currentVersion === version) emit({ state: "error", repositories: snapshot.repositories });
