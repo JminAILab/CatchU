@@ -15741,3 +15741,430 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
 
 ---
+
+## Unit Started
+**Timestamp**: 2026-11-20T00:37:40Z
+**Event**: UNIT_STARTED
+**Stage**: nfr-design
+**Unit**: u1-preset-contract
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:38:16Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/nfr-design-questions.md
+**Context**: construction > u1-preset-contract > nfr-design > nfr-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T00:38:19Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/nfr-design-questions.md
+**Unit**: u1-preset-contract
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T00:40:13Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: 84b35436
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T00:40:14Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: Does this all look correct before I generate the artifact?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-20T00:40:20Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: nfr-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/nfr-design-questions.md
+**Questions SHA-256**: 6f3ae78d47d7b10dbc80a12925c2c1f9f9ca86d102e78b30747da88af53d2388
+**Hash Scope**: confirmed-content-v2
+**Unit**: u1-preset-contract
+**Message Id**: 84b35436
+**Person Reply**: Looks correct
+**Summary Authorization Id**: 93d28f7dac8457089be63b407b4e76b07969c5f8d8265f1f799f2aa33a8791cb
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T00:41:16Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/performance-design.md
+**Context**: construction > u1-preset-contract > nfr-design > performance-design.md
+**Summary Authorization Id**: 93d28f7dac8457089be63b407b4e76b07969c5f8d8265f1f799f2aa33a8791cb
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T00:41:18Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md
+**Context**: construction > u1-preset-contract > nfr-design > security-design.md
+**Summary Authorization Id**: 93d28f7dac8457089be63b407b4e76b07969c5f8d8265f1f799f2aa33a8791cb
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T00:41:19Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/scalability-design.md
+**Context**: construction > u1-preset-contract > nfr-design > scalability-design.md
+**Summary Authorization Id**: 93d28f7dac8457089be63b407b4e76b07969c5f8d8265f1f799f2aa33a8791cb
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T00:41:20Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/reliability-design.md
+**Context**: construction > u1-preset-contract > nfr-design > reliability-design.md
+**Summary Authorization Id**: 93d28f7dac8457089be63b407b4e76b07969c5f8d8265f1f799f2aa33a8791cb
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T00:41:21Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/observability-design.md
+**Context**: construction > u1-preset-contract > nfr-design > observability-design.md
+**Summary Authorization Id**: 93d28f7dac8457089be63b407b4e76b07969c5f8d8265f1f799f2aa33a8791cb
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T00:41:23Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/logical-components.md
+**Context**: construction > u1-preset-contract > nfr-design > logical-components.md
+**Summary Authorization Id**: 93d28f7dac8457089be63b407b4e76b07969c5f8d8265f1f799f2aa33a8791cb
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:41:42Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/traceability.json
+**Context**: construction > u1-preset-contract > nfr-design > traceability.json
+**Summary Authorization Id**: 93d28f7dac8457089be63b407b4e76b07969c5f8d8265f1f799f2aa33a8791cb
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:41:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: e519a688
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:41:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: e519a688
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/performance-design.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:41:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: 253842d1
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:41:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: 253842d1
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:41:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: fa129327
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/scalability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:41:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: fa129327
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/scalability-design.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:41:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: 21232d59
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/reliability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:41:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: 21232d59
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/reliability-design.md
+**Duration ms**: 85
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:41:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: 8e840862
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/observability-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:41:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: 8e840862
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/observability-design.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:41:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: f4354cf9
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/logical-components.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:41:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: f4354cf9
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/logical-components.md
+**Duration ms**: 77
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:41:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: 26ead417
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:41:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: 26ead417
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/traceability.json
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:41:44Z
+**Event**: SENSOR_FIRED
+**Fire id**: ee172dcd
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:41:44Z
+**Event**: SENSOR_PASSED
+**Fire id**: ee172dcd
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/performance-design.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:41:45Z
+**Event**: SENSOR_FIRED
+**Fire id**: 08316fd3
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:41:45Z
+**Event**: SENSOR_PASSED
+**Fire id**: 08316fd3
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/traceability.json
+**Duration ms**: 85
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-20T00:41:45Z
+**Event**: REVIEW_REQUESTED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u1-preset-contract
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:596da967b88d4cdf54b48ae099ecd24fb96c2e6c5c9a541f0bada821c1f7e6b5
+**Request Id**: review:1e6c13ac6d73d091666969d4313fb92a
+**Review File**: .aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.1e6c13ac6d73d091666969d4313fb92a.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:41:59Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-20T00:42:08Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:44:15Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.1e6c13ac6d73d091666969d4313fb92a.review.md
+**Context**: .aidlc-engine > reviews > nfr-design > units > u1-preset-contract > aa555492f330bf5d > 1.1e6c13ac6d73d091666969d4313fb92a.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T00:44:23Z
+**Event**: HOST_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-20T00:44:23Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: acb8024aa223f56ee
+**Review File Digest**: .aidlc-engine/reviews/units-generation/stage/18dabf3da2f56bda/1.a5010d1a3dd0a8f252034f647bdd1f66.review.md=absent; .aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.1e6c13ac6d73d091666969d4313fb92a.review.md=5ee46ad1380476635886617dec641769e26a1549e42221a5244b8e911de9b649
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-20T00:44:30Z
+**Event**: REVIEW_COMPLETED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u1-preset-contract
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:596da967b88d4cdf54b48ae099ecd24fb96c2e6c5c9a541f0bada821c1f7e6b5
+**Artifact Fingerprint**: sha256:596da967b88d4cdf54b48ae099ecd24fb96c2e6c5c9a541f0bada821c1f7e6b5
+**Request Id**: review:1e6c13ac6d73d091666969d4313fb92a
+**Review Record**: .aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json
+**Review Record Digest**: sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-20T00:44:31Z
+**Event**: UNIT_COMPLETED
+**Stage**: nfr-design
+**Unit**: u1-preset-contract
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
