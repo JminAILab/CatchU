@@ -75,9 +75,24 @@ Nest `Logger('Presets')`(`src/presets/presets-log.ts`)로 저장·지우기마�
 
 ## 배포
 
-1. **배포 전**: 팀장이 파일 저장소에서 `members/*/publications/`(변경 전 발행본의 PDF 사본)만 지운다. S3는 `aws s3 rm ... --recursive --dryrun`으로 지울 목록을 먼저 확인한 뒤 지운다. 원본 `members/*/materials/`와 `members/` 전체는 지우지 않는다. 팀원 로컬 폴더의 남은 사본은 가리키는 행이 없어 열리지 않으므로 지우기는 선택이다(BR5.2).
-2. **배포 때**: 마이그레이션이 프리셋 표 둘을 만들고 `DELETE FROM publication`으로 변경 전 발행본을 모두 지운 뒤(항목·쪽 사본·조각·색인·요약·JD 요약 실행이 연쇄로 지워짐) 칸 둘을 더한다(BR5.1). 옛 링크는 지금의 접근 불가 화면(「이 링크는 열람할 수 없습니다.」)이 된다. `down`은 칸 둘과 표 둘을 지우고 지운 발행본은 되살리지 않는다.
-3. 이 단위가 dev에 들어간 뒤 U2(발행 화면)가 들어올 때까지 dev 발행 화면은 옛 요청 모양이라 발행에 실패한다(단위 Q2). web은 사본의 새 칸을 모르는 칸으로 무시한다.
+변경 전 발행본은 DB 행을 마이그레이션이, PDF 사본 파일을 팀장이 지운다(BR5.1·BR5.2). 버킷은 버전 관리를 켜지 않아 지운 파일을 되살릴 수 없다([S3 안내](../../deploy/aws/s3.md)). 원본 `members/*/materials/`와 `members/` 전체는 지우지 않는다.
+
+1. **main에 올리는 조건**: 발행 화면을 새 요청 모양(`presetIds`)과 막힘 칸(`blockedSources`)에 맞춘 web PR이 dev에 들어가기 전에는 dev를 main에 올리지 않는다. 이 api만 main에 나가면 main 발행 화면이 발행에 실패한다. dev에서도 그 web PR이 들어올 때까지 발행 화면은 옛 요청 모양이라 발행에 실패한다(단위 Q2). web은 사본의 새 칸을 모르는 칸으로 무시한다.
+2. **올리기 전 원본 수 적기**: `aws s3 ls s3://catchu-prod-files/members/ --recursive --profile catchu | grep -c '/materials/'`
+3. **배포**: dev를 main에 병합하면 자동 배포가 옛 api·worker를 멈추고 종료를 확인한 뒤 마이그레이션 Pod를 돌리고, 그다음 새 api·worker·web을 띄운다([EKS 자동 배포](../../deploy/aws/cd/README.md)). 마이그레이션은 프리셋 표 둘을 만들고 `DELETE FROM publication`으로 변경 전 발행본을 모두 지운 뒤(항목·쪽 사본·조각·색인·요약·JD 요약 실행이 연쇄로 지워짐) 칸 둘을 더한다. 옛 링크는 지금의 접근 불가 화면(「이 링크는 열람할 수 없습니다.」)이 된다. `down`은 칸 둘과 표 둘을 지우고 지운 발행본은 되살리지 않는다.
+4. **가르는 시각 T 확인**: 옛 api는 마이그레이션 전에 멈추고 새 api는 그 뒤에 뜨므로, 변경 전 발행본의 PDF 사본은 모두 마이그레이션 시작 시각 T보다 먼저, 새 발행본의 사본은 T보다 뒤에 만들어진다. 그래서 배포가 끝난 뒤에 T 이전의 사본만 지운다. 배포 전에 지우면 그 뒤 배포까지 옛 api가 만든 사본이 남고, 배포 뒤 `publications` 전체를 지우면 새 사본도 지워진다. T는 배포 실행 기록의 「migration 성공: … 시작 …」 값이고, `kubectl -n catchu get pod catchu-migrate-<배포 커밋 앞 12자리> -o jsonpath='{.status.startTime}'`로도 본다.
+5. **지울 목록 만들기(dry-run)**: 아래로 목록 파일만 만들고 아무것도 지우지 않는다. 둘째 수가 0인지(목록에 `publications` 밖 파일이 없는지) 보고, 목록이 `members/<회원>/publications/<발행본>/` 아래 파일뿐인지 열어 본다.
+
+   ```bash
+   T='<4의 시각>'
+   aws s3api list-objects-v2 --bucket catchu-prod-files --prefix members/ --query 'Contents[].[LastModified,Key]' --output text --profile catchu | awk -v t="$T" '$2 ~ /\/publications\// && $1 < t {print $2}' > old-copies.txt
+   wc -l < old-copies.txt
+   grep -vc '/publications/' old-copies.txt
+   ```
+
+6. **지우기**: `while read -r key; do aws s3 rm "s3://catchu-prod-files/$key" --profile catchu; done < old-copies.txt`
+7. **사후 확인**: 5의 둘째 줄(목록 만들기)을 다시 돌려 `wc -l < old-copies.txt`가 0인지, 2의 원본 수가 그대로인지 본다.
+8. **팀원 로컬**: 로컬 폴더에 남은 옛 사본은 가리키는 행이 없어 열리지 않으므로 지우기는 선택이다.
 
 ## 시험
 
