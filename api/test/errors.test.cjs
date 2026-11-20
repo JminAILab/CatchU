@@ -19,6 +19,8 @@ delete process.env.DEV_LOGIN_ENABLED;
 // 오류를 일부러 내는 검증용 경로는 테스트 안에만 두고 제품 src/에 등록하지 않는다.
 // 전역 인증 Guard를 통과하도록 @Public()으로 표시한다. protectedRoute만 인증을 요구한다.
 const FAKE_SECRET = 'probe-fake-secret-7f3a';
+const BLOCKED_PRESET = '0b1d6a3e-1c2f-4e5a-9b8c-7d6e5f4a3b21';
+const BLOCKED_SOURCE = '9f8e7d6c-5b4a-4c3d-8e2f-1a0b9c8d7e6f';
 class ProbeController {
   apiError(code) { throw new ApiError(code); }
   inProgress() {
@@ -28,6 +30,19 @@ class ProbeController {
     throw new ApiError('VALIDATION_FAILED', { details: { violations: [{ field: 'title', reason: 'isNotEmpty', value: FAKE_SECRET }] } });
   }
   emptyDetails() { throw new ApiError('INVALID_REQUEST', { details: { other: 1 } }); }
+  // 발행 프리셋 U1(계약 P-2, NFR4.2): 막힌 자료 줄. 정해진 칸만 옮기고 모양이 틀린 줄과 옛 catchIds는 버린다.
+  blocked() {
+    throw new ApiError('CATCH_PRIVATE', { details: {
+      blockedSources: [
+        { presetId: BLOCKED_PRESET, kind: 'CATCH', sourceId: BLOCKED_SOURCE, title: FAKE_SECRET },
+        { presetId: 'not-a-uuid', kind: 'CATCH', sourceId: BLOCKED_SOURCE },
+        { presetId: BLOCKED_PRESET, kind: 'IMAGE', sourceId: BLOCKED_SOURCE },
+        { presetId: BLOCKED_PRESET, kind: 'PDF_MATERIAL', sourceId: FAKE_SECRET },
+        null,
+      ],
+      catchIds: [BLOCKED_SOURCE],
+    } });
+  }
   customMessage() { throw new ApiError('RETRY_NOT_ALLOWED', { message: '결과가 이미 있어 다시 요청할 수 없습니다.' }); }
   boom() { throw new Error(`SELECT * FROM members WHERE token='${FAKE_SECRET}'`); }
   apiBoom() { throw new ApiError('INTERNAL_ERROR'); }
@@ -82,6 +97,7 @@ Param('code')(ProbeController.prototype, 'apiError', 0);
 publicRoute(Get('in-progress'), 'inProgress');
 publicRoute(Get('violations'), 'violations');
 publicRoute(Get('empty-details'), 'emptyDetails');
+publicRoute(Get('blocked'), 'blocked');
 publicRoute(Get('custom-message'), 'customMessage');
 publicRoute(Get('boom'), 'boom');
 publicRoute(Get('api-boom'), 'apiBoom');
@@ -176,6 +192,17 @@ test('details는 명세의 두 키만 담고 나머지는 버린다', { timeout:
 
   const empty = assertErrorShape(await request('/v1/__test/empty-details'), 400, 'INVALID_REQUEST');
   assert.equal(empty.details, undefined, '허용 키가 없으면 details 자체를 생략한다');
+});
+
+test('발행 거부의 details.blockedSources는 UUID·정해진 kind인 줄의 세 칸만 옮기고, 옛 catchIds는 옮기지 않는다(발행 프리셋 P-2)', { timeout: 10000 }, async (t) => {
+  const { request } = await start(t);
+  const res = await request('/v1/__test/blocked');
+  const blocked = assertErrorShape(res, 409, 'CATCH_PRIVATE');
+  assert.equal(blocked.message, '비공개 Catch는 발행할 수 없습니다.');
+  assert.deepEqual(blocked.details, { blockedSources: [{ presetId: BLOCKED_PRESET, kind: 'CATCH', sourceId: BLOCKED_SOURCE }] });
+  assert.equal(res.text.includes(FAKE_SECRET), false, '줄의 다른 속성(이름 등)은 응답에 담지 않는다');
+  const limit = assertErrorShape(await request('/v1/__test/api-error/PRESET_LIMIT_REACHED'), 409, 'PRESET_LIMIT_REACHED');
+  assert.equal(limit.message, '프리셋은 50개까지 만들 수 있습니다.');
 });
 
 test('예상 밖 예외는 500 일반 안내만 응답하고 원인은 서버 로그에만 남긴다', { timeout: 10000 }, async (t) => {

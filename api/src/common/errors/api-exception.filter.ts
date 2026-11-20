@@ -24,7 +24,7 @@ import {
 } from '@nestjs/common';
 import { AbstractHttpAdapter, HttpAdapterHost } from '@nestjs/core';
 import { requestIdOf } from '../http/request-id';
-import { ApiError, ErrorBody, ErrorDetails } from './api-error';
+import { ApiError, BlockedSource, ErrorBody, ErrorDetails } from './api-error';
 import { DEFAULT_ERROR_MESSAGES, ErrorCode } from './error-codes';
 import { collectedFrames } from './stack-frames';
 
@@ -139,8 +139,22 @@ function base(code: ErrorCode): ErrorBody {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const BLOCKED_SOURCE_KINDS: readonly unknown[] = ['CATCH', 'TEXT_MATERIAL', 'PDF_MATERIAL'] satisfies BlockedSource['kind'][];
 
-/** details 는 명세의 두 키와 U4 발행 거부의 `catchIds`(UUID만)를 복사한다. 다른 키·항목의 추가 속성은 버린다. */
+const isUuidText = (value: unknown): value is string => typeof value === 'string' && UUID.test(value);
+
+/**
+ * 발행 거부의 막힌 자료 한 줄(발행 프리셋 계약 P-2, NFR4.2). presetId·sourceId는 UUID, kind는 정해진 세 값일 때만 옮기고
+ * 셋 가운데 하나라도 맞지 않는 줄은 버린다. 줄의 다른 속성(이름·내용 등)은 옮기지 않는다.
+ */
+function safeBlockedSource(value: unknown): BlockedSource | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { presetId, kind, sourceId } = value as Record<string, unknown>;
+  if (!isUuidText(presetId) || !isUuidText(sourceId) || !BLOCKED_SOURCE_KINDS.includes(kind)) return null;
+  return { presetId, kind: kind as BlockedSource['kind'], sourceId };
+}
+
+/** details 는 명세의 두 키와 발행 거부의 `blockedSources`(UUID·정해진 kind만)를 복사한다. 다른 키·항목의 추가 속성은 버린다. */
 function withDetails(body: ErrorBody, details: ErrorDetails | undefined): ErrorBody {
   if (!details) return body;
   const safe: ErrorDetails = {};
@@ -150,9 +164,9 @@ function withDetails(body: ErrorBody, details: ErrorDetails | undefined): ErrorB
   if (typeof details.existingRequestId === 'string' && details.existingRequestId.length > 0) {
     safe.existingRequestId = details.existingRequestId;
   }
-  if (Array.isArray(details.catchIds)) {
-    const catchIds = details.catchIds.filter((id): id is string => typeof id === 'string' && UUID.test(id));
-    if (catchIds.length > 0) safe.catchIds = catchIds;
+  if (Array.isArray(details.blockedSources)) {
+    const blockedSources = details.blockedSources.map(safeBlockedSource).filter((line): line is BlockedSource => line !== null);
+    if (blockedSources.length > 0) safe.blockedSources = blockedSources;
   }
   return Object.keys(safe).length > 0 ? { ...body, details: safe } : body;
 }

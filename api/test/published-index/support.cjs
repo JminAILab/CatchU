@@ -54,11 +54,13 @@ async function insertPublication(db, memberId) {
   return publicationId;
 }
 
-async function insertItem(db, publicationId, { position, kind, snapshot }) {
+/** 사본 항목 한 줄. 발행 프리셋 U1의 칸 둘(preset_ordinal·preset_name)은 기본 1번 프리셋이다. sourceId를 같게 주면 겹친 사본이 된다. */
+async function insertItem(db, publicationId, { position, kind, snapshot, sourceId = randomUUID(), presetOrdinal = 1 }) {
   const publishedItemId = randomUUID();
-  await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-  [publishedItemId, publicationId, position, kind, randomUUID(), `${TITLE_MARKER} 항목 ${position}`, JSON.stringify(snapshot)]);
+  await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, preset_ordinal, preset_name)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+  [publishedItemId, publicationId, position, kind, sourceId, `${TITLE_MARKER} 항목 ${position}`, JSON.stringify(snapshot), presetOrdinal,
+    `[합성] 프리셋 ${presetOrdinal}`]);
   return publishedItemId;
 }
 

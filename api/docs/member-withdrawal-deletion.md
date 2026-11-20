@@ -33,6 +33,8 @@
 | `pdf_material` | 회원(12월 intent U8, 계약 C-06. 마이그레이션 `1793977402870-CreatePdfMaterialTables`) |
 | `pdf_page_text` | PDF 자료(12월 intent U8, 같은 마이그레이션) |
 | `published_pdf_page` | 발행 항목(12월 intent U8, 계약 C-06·C-07. 같은 마이그레이션. 원본 PDF와는 외래 키가 없어 원본을 지워도 사본은 발행본 수명을 따른다) |
+| `preset` | 회원(발행 프리셋 intent U1, 계약 P-6. 마이그레이션 `1795140270696-AddPublicationPresets`) |
+| `preset_item` | 프리셋, Catch, 텍스트 자료, PDF 자료(발행 프리셋 intent U1, 같은 마이그레이션. 담긴 원본을 지우면 그 항목만 빠지고 남은 자리는 다시 매기지 않는다. 발행본 사본은 프리셋을 가리키지 않아 그대로다) |
 
 `text_material`·`publication`·`published_item`은 12월 범위 U4가 만든 표다(계약 C-06·C-07·C-13). 발행 사본(`published_item`)은 원본 Catch·자료와 외래 키가 없어, 원본을 지워도 사본은 발행본 수명을 따른다.
 

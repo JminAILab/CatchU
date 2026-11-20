@@ -43,8 +43,9 @@ async function publication(memberId) {
 /** 발행본에 고정한 PDF 항목(C-07 PDF_MATERIAL: snapshot { pageCount }, pdf_copy_key 필수). */
 async function pdfItem(publicationId, sourceId, { position = 1, pageCount = 1 } = {}) {
   const publishedItemId = randomUUID();
-  await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, pdf_copy_key)
-    VALUES ($1, $2, $3, 'PDF_MATERIAL', $4, '합성 PDF', $5, $6)`,
+  await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, pdf_copy_key,
+      preset_ordinal, preset_name)
+    VALUES ($1, $2, $3, 'PDF_MATERIAL', $4, '합성 PDF', $5, $6, 1, '합성 프리셋')`,
   [publishedItemId, publicationId, position, sourceId, JSON.stringify({ pageCount }), `members/m/publications/${publicationId}/${publishedItemId}.pdf`]);
   return publishedItemId;
 }

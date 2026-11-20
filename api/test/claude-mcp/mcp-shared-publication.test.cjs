@@ -152,8 +152,9 @@ async function insertPublication(memberId, { password = false, publishedAt = new
 async function insertItem(publicationId, position, { kind, title, snapshot, pdfPages = [] }) {
   const publishedItemId = randomUUID();
   const sourceId = randomUUID();
-  await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, pdf_copy_key)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+  await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, pdf_copy_key,
+      preset_ordinal, preset_name)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, '[합성] 프리셋')`,
   [publishedItemId, publicationId, position, kind, sourceId, title, JSON.stringify(snapshot), kind === 'PDF_MATERIAL' ? `synthetic/pdf/${publishedItemId}` : null]);
   for (const page of pdfPages) {
     await db.query('INSERT INTO published_pdf_page (published_pdf_page_id, published_item_id, page_number, text, readable) VALUES ($1, $2, $3, $4, $5)',
@@ -174,7 +175,7 @@ async function insertPublished(memberId, items, options = {}) {
 /** 넣은 항목의 기대 글. readSnapshot이 돌려주는 모양으로 편다(정확한 문구는 mcp-shared-text 시험이 본다). */
 const expectedContent = (entry) => flattenPublishedItem({
   publishedItemId: entry.publishedItemId, position: entry.position, itemKind: entry.kind, title: entry.title, snapshot: entry.snapshot,
-  pdfPages: entry.kind === 'PDF_MATERIAL' ? entry.pdfPages ?? [] : null,
+  pdfPages: entry.kind === 'PDF_MATERIAL' ? entry.pdfPages ?? [] : null, presetOrdinal: 1, presetName: '[합성] 프리셋', isFirstCopy: true,
 });
 
 /** P1: 비밀번호 없음·유효. Catch 둘(불일치·작업 사실 없음·근거 없음·작성자 설명 null, 근거 2개), 텍스트 자료, PDF(읽을 수 있는 쪽과 읽을 수 없는 쪽). */

@@ -4,7 +4,7 @@ import { Public } from '../auth/auth.decorators';
 import { clientAddressKey } from '../share-links/client-address';
 import { emptyPublicationQuery } from './publish-input';
 import { PublishedPdfViewService } from './published-pdf-view.service';
-import { PublishedSnapshot } from './published-snapshot';
+import { PublishedSnapshotResponse } from './published-snapshot';
 import { RecipientAccessService } from './recipient-access.service';
 
 interface ClientRequest {
@@ -22,12 +22,12 @@ interface ClientRequest {
 export class RecipientLinksController {
   constructor(private readonly recipient: RecipientAccessService, private readonly pdfs: PublishedPdfViewService) {}
 
-  /** 발행본 열람. 200 PublishedSnapshot, 401 LINK_PASSWORD_REQUIRED, 404 LINK_UNAVAILABLE. 정의 밖 쿼리는 400. */
+  /** 발행본 열람. 200 PublishedSnapshotResponse(isFirstCopy 없음), 401 LINK_PASSWORD_REQUIRED, 404 LINK_UNAVAILABLE. 정의 밖 쿼리는 400. */
   @Public()
   @Get(':token')
   read(
     @Param('token') token: string, @Headers('x-link-grant') grant: string | undefined, @Query() query: unknown,
-  ): Promise<PublishedSnapshot> {
+  ): Promise<PublishedSnapshotResponse> {
     emptyPublicationQuery(query);
     return this.recipient.read(token, grant);
   }
