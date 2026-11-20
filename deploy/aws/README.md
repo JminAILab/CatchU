@@ -124,7 +124,7 @@
    bash deploy/aws/scripts/create-s3.sh --apply     # s3.md
    ```
    큐는 장애 조치 같은 이벤트를 0단계에서 만든 SNS 주제 `catchu-alerts`로 보낸다.
-6. **Load Balancer Controller:** `install-lb-controller.sh --apply`. Secret·ConfigMap, DB 계정(앱 계정 `lock_timeout` 3초, `idle_in_transaction_session_timeout`은 #220에서 정할 값), 앱 실행 파일과 교체는 2단계에서 [k8s/README.md](k8s/README.md)대로 한다.
+6. **Load Balancer Controller:** `install-lb-controller.sh --apply`. Secret·ConfigMap, DB 계정(앱 계정 `lock_timeout` 3초, `idle_in_transaction_session_timeout` 5분), 앱 실행 파일과 교체는 2단계에서 [k8s/README.md](k8s/README.md)대로 한다.
 
 ## 생성이 중간에 멈췄을 때
 
@@ -230,7 +230,7 @@ bash deploy/aws/scripts/logs.test.sh       # 위와 같음
 | API·migration만 DB 접속, worker·외부는 직접 접속 불가 | RDS 공개 접근 끔·보안 그룹(노드에서 5432만), 실제 Deployment Pod에서 한 NetworkPolicy 접속 시험 | 1·2 | `create-rds.sh`, `k8s/network-policy.yaml`(worker에는 5432가 없다) |
 | worker 나가는 연결을 허용 대상·경로로 제한 | 실제 worker Pod의 허용·거부 시험 | 2 | `k8s/network-policy.yaml` |
 | 앱·migration 계정 분리, 암호화·신뢰 CA·인증서·호스트명 검증 | RDS 확인 값(저장 암호화, CA `rds-ca-rsa2048-g1`), 파라미터(`rds.force_ssl=1`, TLS 1.2 이상), 계정 SQL 결과, `PGSSLMODE=verify-full` 접속 | 1·2 | `create-rds.sh`, `k8s/`(api는 `catchu_app`, migration은 `catchu_migrator`, 둘 다 `verify-full`), `db/roles.sql`(계정 SQL 결과 표), `db/rds-ca-rsa2048-g1.pem` |
-| 앱 계정 `lock_timeout`·`idle_in_transaction_session_timeout` 적용, 동의 기록 직접 삭제 권한 없음 | 앱 계정 새 연결의 `SHOW` 결과, `deploy.sh` 교체 기록의 동의 기록 줄 | 2 | `db/roles.sql`(`lock_timeout` 3초). `idle_in_transaction_session_timeout`은 #220에서 정하면 더한다(RDS 기본값 24시간). 동의 기록은 `deploy.sh`·`k8s/consent-guard-pod.yaml` |
+| 앱 계정 `lock_timeout`·`idle_in_transaction_session_timeout` 적용, 동의 기록 직접 삭제 권한 없음 | 앱 계정 새 연결의 `SHOW` 결과, `deploy.sh` 교체 기록의 동의 기록 줄 | 2 | `db/roles.sql`(`lock_timeout` 3초), `db/idle-in-transaction.sql`(`idle_in_transaction_session_timeout` 5분, 2026-11-19). 동의 기록은 `deploy.sh`·`k8s/consent-guard-pod.yaml` |
 | 큐 `noeviction`, 키트 시나리오, 재시작·장애 조치 뒤 재접속 | 큐 확인 값(`maxmemory-policy noeviction`, TLS·비밀번호·스냅샷 0), #77 키트 결과 | 1·2 | `create-queue.sh` |
 | ALB TLS 종료·80→443·사설 서비스 접근 제한·신뢰 프록시 대역 | `curl -sI http://catchu.dev/`가 https로 이동, TLS 1.1 접속 거부(`openssl s_client -tls1_1`), 바깥 확인(`/v1/INTERNAL/x`, `/v1/Internal/…`, `/V1/internal/x`, `/v1//internal/x`, `/v1/%69nternal/x` 모두 404), ALB 규칙 우선순위, 퍼블릭 서브넷 대역 | 2 | `create-certificate.sh`, `create-waf.sh`·`waf/`, `k8s/ingress.yaml` |
 | 관리형 DB 자동 백업·보관 기간·암호화·열람 권한 제한 | RDS 확인 값(백업 7일, 저장 암호화, 삭제 보호, 태그 스냅샷 복사), 스냅샷이 공개·공유되지 않음(`aws rds describe-db-snapshot-attributes`), AWS 권한을 가진 IAM 사용자가 팀장 한 명뿐임(`aws iam list-users`) | 1 | `create-rds.sh` |
