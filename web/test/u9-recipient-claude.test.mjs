@@ -358,7 +358,8 @@ const formHtml = (usePassword) => renderToStaticMarkup(createElement(PublishForm
   title: "제목", usePassword, password: "", disabled: false, statusLines: null, onTitle() {}, onUsePassword() {}, onPassword() {}, onNext() {},
 }));
 const confirmHtml = (usePassword) => renderToStaticMarkup(createElement(PublishConfirmView, {
-  items: [{ kind: "TEXT_MATERIAL", sourceId: "44444444-4444-4444-8444-444444444444", title: "자기소개", visibility: null }],
+  // 발행 프리셋 U2(BR4.5): 확인 단계는 고른 자료 대신 고른 프리셋과 순서를 받는다.
+  presets: [{ presetId: "44444444-4444-4444-8444-444444444444", name: "자기소개" }],
   title: "지원용", usePassword, submitting: false, lockSeconds: 0, statusLines: null, onBack() {}, onSubmit() {},
 }));
 

@@ -35,9 +35,21 @@ export const routes = {
   jds: "/jds",
   /** 발행본 목록(U4 W5). */
   publications: "/publications",
-  /** 발행(U4 W3). 본인 Catch·텍스트 자료를 골라 고정 발행본과 링크를 만든다. 10월 `/links`(공유 링크 발급·관리)는 U4 제출 3(W6)에서 이 화면으로 대체했다. */
+  /**
+   * 발행(U4 W3). 프리셋을 골라 고정 발행본과 링크를 만든다(발행 프리셋 U2 BR4.1, 전에는 본인 Catch·텍스트 자료를 직접 골랐다).
+   * 10월 `/links`(공유 링크 발급·관리)는 U4 제출 3(W6)에서 이 화면으로 대체했다.
+   */
   publicationNew: "/publications/new",
+  /** 프리셋 목록(발행 프리셋 U2 M2). 「발행본」 주소 아래가 아니어서 메뉴의 「발행본」이 함께 켜지지 않는다(BR1.2). */
+  presets: "/presets",
+  /** 새 프리셋(발행 프리셋 U2 M3). 첫 저장 뒤에는 주소만 `presetEditPath`로 바꾼다. */
+  presetNew: "/presets/new",
 } as const;
+
+/** 프리셋 고치기(발행 프리셋 U2 M3). 이름은 주소에 넣지 않고 ID만 `encodeURIComponent`한다. */
+export function presetEditPath(presetId: string): string {
+  return `${routes.presets}/${encodeURIComponent(presetId)}`;
+}
 
 /** 발행본 상세(U4 W5). 사본·상태·링크 주소·중지·삭제. */
 export function publicationDetailPath(publicationId: string): string {

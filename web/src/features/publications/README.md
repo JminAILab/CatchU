@@ -6,10 +6,11 @@
 
 | 파일 | 역할 |
 | --- | --- |
-| `publications-api.ts` | 「작성자 API」 호출(`createPublicationsApi(api.member)`), 응답 모양 확인, 보내기 전 길이 검사, 발행 실패 구분(`publishOutcome`)과 안내 문구. 화면과 분리해 시험한다 |
+| `publications-api.ts` | 「작성자 API」 호출(`createPublicationsApi(api.member)`), 응답 모양 확인, 보내기 전 길이 검사, 발행 실패 구분(`publishOutcome`)과 안내 문구, 프리셋 고를 수 없는 이유(`presetBlockReason`)와 막힘 줄(`blockedSourceLines`). 화면과 분리해 시험한다 |
 | `publication-format.ts` | 상태·비밀번호·시각 표기와 고정 안내 문구 |
-| `publish-sources.ts` | 발행 화면이 고를 수 있는 Catch·텍스트 자료·PDF 자료(U8) 모양과 고를 수 없는 이유 판정 |
-| `publish-view.tsx` | 고르기·순서·입력·확인·완료 화면 그리기 |
+| `publish-sources.ts` | 자료 고르기 목록의 Catch·텍스트 자료·PDF 자료(U8) 모양과 고를 수 없는 이유 판정. 발행 프리셋 U2부터 프리셋 편집 화면(`../presets/`)이 쓴다 |
+| `pick-parts.tsx` | 발행 화면과 프리셋 편집 화면이 함께 쓰는 [더 보기]와 [위로][아래로][빼기] 순서 목록(`ReorderList`, 옮긴 뒤 초점 유지) |
+| `publish-view.tsx` | 프리셋 고르기(`PresetPickerView`)·고른 프리셋과 순서·입력·확인·완료 화면 그리기 |
 | `publish-screen.tsx` | 발행 화면 상태 전이(`createPublishModel`)와 페이지(`PublishPage`). 동의 창은 `useAiConsent`로 연다 |
 | `publications-list-view.tsx` / `publications-list-screen.tsx` | 발행본 목록 그리기와 상태 전이(`createPublicationsListModel`) |
 | `publication-detail-view.tsx` / `publication-detail-screen.tsx` | 발행본 상세 그리기와 상태 전이(`createPublicationDetailModel`, 중지·삭제) |
@@ -25,7 +26,7 @@ GitHub 주소 판정 `isGithubSourceUrl`과 본문 나누기 `splitGithubLinks`�
 
 | 화면 | 주소 | API |
 | --- | --- | --- |
-| 발행 | `/publications/new` | `GET /v1/catches`(본인 Catch 목록, 걸러 보기를 켜면 `authorDescription=written`), `GET /v1/me/repositories`(저장소 이름, 열 때 한 번), `GET /v1/text-materials`(제출 1), `POST /v1/publications` |
+| 발행 | `/publications/new` | `GET /v1/presets`(프리셋 목록, 열 때와 막힘·404·400 `presetIds` 뒤 한 번), `POST /v1/publications`(`{ title, password?, presetIds }`) |
 | 목록 | `/publications` | `GET /v1/publications?limit=20&cursor=` |
 | 상세 | `/publications/[publicationId]` | `GET /v1/publications/{id}`, `PUT /v1/publications/{id}/stop`, `DELETE /v1/publications/{id}` |
 
@@ -35,32 +36,35 @@ GitHub 주소 판정 `isGithubSourceUrl`과 본문 나누기 `splitGithubLinks`�
 
 ### 발행 (W3)
 
-- 본인 Catch·텍스트 자료를 첫 쪽부터 20개씩 읽고 [더 보기]로 이어 읽는다. 조회 실패는 0건으로 보이지 않고 [목록 다시 불러오기]를 보인다.
-- **PDF 자료(U8, 계획 10.5):** "내 PDF 자료" 목록에서 추출이 완료(`DONE`)된 PDF만 고를 수 있다. 추출 중·실패 PDF는 이유와 함께 비활성으로 보인다. Catch·텍스트·PDF를 섞어 고른 순서 그대로 발행 요청 `items`(`kind: PDF_MATERIAL`)에 넣는다. 서버가 400 `extractionIncomplete`로 거부하면 "발행되지 않았습니다"와 PDF 추출 안내를 보이고 편집 단계로 돌아가며, 고른 항목·제목·비밀번호를 유지하고 PDF 목록을 한 번 다시 읽는다(자동 재발행 없음). 발행본 상세의 PDF 항목은 [받은 사람 화면 README 「PDF 항목과 사본 열람 (U8)」](../recipient/README.md#pdf-항목과-사본-열람-u8)의 컴포넌트를 쓰고 작성자 사본 경로로 연다. 시험은 `test/publish.test.mjs`(16개 가운데 PDF 4개).
-- 확인(작업 사실·나의 기여)이 끝나지 않았거나 원본 저장소가 보호된(`restriction = SOURCE_PRIVATE`) Catch는 이유와 함께 고를 수 없다(BR4.2, 화면 표시는 10월 확인·보호 상태). 최종 판정은 발행 트랜잭션이 한다.
-- 비공개 Catch를 고르면 "발행하면 이 Catch는 공개로 바뀝니다"를 보인다(BR4.4). 고르고 빼고 순서를 바꾸는 동안 서버에 아무것도 보내지 않는다.
-- 새 Catch NC1(BR6.1~BR6.7): 기존 안내 아래에 「저장소마다 3~5개를 권합니다.」 한 줄이 있고, 저장소별로 세거나 경고·추천·순위를 내지 않는다. 「내 Catch」 항목 단추 안 작은 줄은 「저장소 이름 · 공개 상태 · 설명 안 씀 · 불일치 표시됨」 순서다(「설명 안 씀」은 작성자 설명이 없을 때만). 저장소 이름은 화면을 열 때 내 자산 화면과 같은 저장소 목록(`createRepositoryOptionsStore`)을 한 번 끝 쪽까지 읽어 `repositoryId`로 찾고, 못 불러오거나 못 찾으면 이름만 뺀다(고르기·발행은 막지 않는다).
-- 「내 Catch」 아래 체크 칸 「작성자 설명을 쓴 Catch만 보기」는 처음 꺼져 있고, 켜고 끄면 Catch 목록만 첫 쪽부터 다시 불러온다(저장소 목록은 다시 부르지 않는다). 개수 줄 「불러온 N개의 Catch」는 `aria-live="polite"`다. 켰는데 맞는 Catch가 없으면 「작성자 설명을 쓴 Catch가 없습니다」다. 발행 중에만 누를 수 없고 목록 불러오기가 실패해도 쓸 수 있다. 고른 항목은 고르기 목록과 따로 있어, 걸러 보기로 목록에서 사라진 항목도 고른 항목·순서·최대 개수에 남는다.
-- 확인 단계는 고른 자료 가운데 작성자 설명이 없는 Catch가 1개 이상이면 비공개 안내와 같은 꼴로 「작성자 설명이 없는 Catch가 N개 있습니다. 면접관에게는 「작성자 설명이 없습니다.」로 보입니다.」를 보인다. [발행]은 막지 않는다. 화면은 열 때마다 목록을 새로 불러오므로 「설명 안 씀」은 그때까지 저장된 결과대로 보인다.
-- 항목은 1~20개, 제목은 1~50자(앞뒤 공백 제외), 비밀번호는 쓸 때 8~64자(다듬지 않음)다. 넘거나 비면 [다음]에서 보내지 않고 안내한다(BR4.1·BR4.5). 서버 검증이 기준이다.
-- 확인 단계는 고른 항목을 순서대로, 비밀번호 여부, "발행 시각부터 90일 뒤 만료, 연장 없음"을 보인 뒤 [발행]을 둔다(BR4.6). 발행 전 미리보기 사본은 만들지 않는다.
+발행 프리셋 U2(다듬은 화면 M4, [기능 설계](../../../../aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md) 흐름 3, [규칙](../../../../aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/rules.md) BR4.1~BR4.7)부터 발행 화면은 자료 대신 프리셋을 고른다. 자료 고르기(Catch·텍스트 자료·PDF, 걸러 보기, 저장소 이름)는 [프리셋 편집 화면](../presets/README.md)으로 옮겼다.
+
+- 열 때 「프리셋 고르기」 자리에 「프리셋 목록을 불러오고 있습니다.」를 보이고 `GET /v1/presets`를 한 번 부른다(쪽 나눔 없음). 0개면 「아직 만든 프리셋이 없습니다.」와 <프리셋 만들러 가기>(`/presets`)만, 실패면 「프리셋 목록을 불러오지 못했습니다.」와 [다시 불러오기]다. 실패를 0개로 보이지 않는다(BR4.4).
+- 프리셋마다 누르는 단추 하나: 이름, 「항목 N개 · M자」, 막혔으면 이유 하나. 이유는 항목 0개(「담긴 자료가 없어 고를 수 없습니다」) → 발행할 수 없는 자료(「발행할 수 없는 자료가 있습니다: (첫 자료 제목)」, 둘 이상이면 「 외 N개」) → 고른 프리셋들과 더한 항목 수 20개 넘음(「고르면 항목이 20개를 넘습니다」) → 더한 글자 수 60,000자 넘음(「고르면 전체 글이 60,000자를 넘습니다」, 혼자 넘는 프리셋도) 순서로 처음 맞는 것이다. 같은 자료가 두 프리셋에 있으면 두 번 센다. 이미 고른 프리셋은 막지 않는다(BR4.2).
+- 고른 프리셋은 「고른 프리셋과 순서 (n/5)」 끝에 더해지고 다시 누르거나 [빼기]로 뺀다. [위로][아래로]로 순서를 정하고 읽히는 이름은 「(이름) 위로」 꼴이다(BR4.1). 다섯 개를 고르면 안 고른 단추를 모두 막고 「프리셋은 5개까지 고를 수 있습니다.」를 목록 위 `aria-live="polite"` 칸에 한 번만 보이며, 단추 안 이유는 항목 0개·발행할 수 없는 자료일 때만 보인다(BR4.3). 고르고 빼고 순서를 바꾸는 동안 서버에 아무것도 보내지 않는다.
+- 비공개 Catch를 공개로 바꾼다는 안내(`PRIVATE_CATCH_NOTICE`)는 그리지 않는다. 프리셋에는 공개한 Catch만 담기고 서버도 공개로 바꾸지 않는다(BR4.7).
+- 프리셋은 1~5개, 제목은 1~50자(앞뒤 공백 제외), 비밀번호는 쓸 때 8~64자(다듬지 않음)다. [다음]은 막지 않고, 눌렀을 때 넘거나 비면 보내지 않고 안내한다(0개는 「프리셋을 하나 이상 골라 주세요.」, 6개 이상은 「프리셋은 5개까지 고를 수 있습니다.」). 서버 검증이 기준이다.
+- 확인 단계는 제목, 「고른 프리셋과 순서」(프리셋 이름을 고른 순서대로), 비밀번호 여부, "발행 시각부터 90일 뒤 만료, 연장 없음"을 보인 뒤 [발행]을 둔다(BR4.5). 고른 자료 목록과 「작성자 설명이 없는 Catch N개」 안내는 그리지 않는다(프리셋 목록 응답에 그 값이 없어 화면이 모름, 기능 설계 열린 질문). 발행 전 미리보기 사본은 만들지 않는다.
+- 발행 요청은 `POST /v1/publications`에 `{ title, password?, presetIds }`(고른 순서)다. 옛 `items` 칸은 보내지 않는다.
 - 비밀번호를 끄면 비밀번호 체크 아래와 확인 단계의 비밀번호 행(비밀번호 없음)에 "비밀번호 없는 링크는 받은 사람이 Claude 같은 외부 AI 도구로 읽을 수 있습니다."를 보인다(12월 intent U9 BR7.1). 문구는 [`../recipient-claude/recipient-claude-text.ts`](../recipient-claude/recipient-claude-text.ts)의 `AUTHOR_AI_NOTICE` 하나를 두 곳이 같이 쓰고, 확인 단계의 `publish-confirm-password` 칸 글(설정됨·없음)은 그대로이며 링크별 허용 설정은 두지 않는다(시험: `test/u9-recipient-claude.test.mjs` S22).
 - [발행]은 응답까지 버튼을 막는다(BR4.9). 재전송 키는 보내지 않는다. 201과 응답 모양이 맞을 때만 완료 화면이며, 완료 화면은 실제 응답의 링크 주소·상태·발행·만료 시각·비밀번호 여부와 [URL 복사]·[링크 열기]·[발행본 상세 보기]를 보인다(BR5.6). 사본 자체는 상세에서 본다.
 - 403 `AI_CONSENT_REQUIRED`는 U2 공용 동의 창(`components/ai-consent`, `useAiConsent().run`)이 열고 [동의] 뒤 같은 요청을 한 번 다시 보낸다. [닫기]면 보내지 않고 입력을 남긴다.
-- 실패 안내(신뢰성 설계 「작성자 실패 안내」)는 `publishOutcome` → `publishFailureLines`가 맡는다. 어떤 경우든 고른 항목·순서·제목·비밀번호 입력은 그대로 두고 첫 줄은 "발행되지 않았습니다"다.
+- 실패 안내(신뢰성 설계 「작성자 실패 안내」)는 `publishOutcome` → `publishFailureLines`가 맡는다. 어떤 경우든 고른 프리셋·순서·제목·비밀번호 입력은 그대로 두고 첫 줄은 "발행되지 않았습니다"다.
+- **막힘 안내(BR4.6):** 막힘 응답의 `details.blockedSources`(줄마다 프리셋 ID·자료 종류·자료 ID, `src/lib/api-response.ts`가 세 칸만 옮김)를 받으면 코드별 첫 줄 아래에 줄마다 「‘(프리셋 이름)’ 프리셋의 ‘(자료 이름)’ 때문에 발행할 수 없습니다.」를 잇는다. 프리셋 목록을 한 번 다시 불러와 프리셋 이름은 프리셋 ID로, 자료 이름은 그 프리셋의 `unpublishableItems`에서 종류·자료 ID로 찾는다. 자료 이름을 못 찾으면 그 자리에 종류(Catch·텍스트 자료·PDF 자료)를, 프리셋 이름을 못 찾으면 「고른 프리셋」을 따옴표 없이 쓴다. 다시 불러오기가 실패하면 그 전 목록으로 찾는다. 새 목록으로 단추 막힘도 다시 정하고, 막힌 프리셋은 고른 목록에 남긴다(지원자가 직접 뺀다). 이름은 글자로만 잇는다.
 
 | 응답 | 안내 | 화면 |
 | --- | --- | --- |
-| 409 `CONFIRMATION_REQUIRED` / `SOURCE_RESTRICTED` | 10월 Catch 문구("작업 사실과 나의 기여를 먼저 확인해 주세요." / "원본 저장소가 보호되어 지금은 공개할 수 없습니다.") | `details.catchIds`의 Catch를 고르기·고른 목록에서 표시하고 편집 단계로 돌아간다. 다른 Catch는 그대로 |
-| 404 `RESOURCE_UNAVAILABLE` | "고른 자료 중 지금 발행할 수 없는 것이 있습니다. 목록을 다시 불러온 뒤 다시 골라 주세요." | 편집 단계로 돌아간다. [목록 다시 불러오기]는 고르기 패널에 있다 |
-| 400 `VALIDATION_FAILED` | `details.violations`의 칸(`title`·`password`·`items`)별 안내. `items`의 `maxTotalLength`(고른 자료의 전체 글 60,000자 초과)는 개수·중복 안내와 구분해 자료를 빼거나 수정할 수 있는 Catch 설명·텍스트 자료 원문을 줄이라고 안내한다. 모르는 칸은 전체 글 상한을 함께 적는다 | 편집 단계로 돌아간다 |
+| 409 `CONFIRMATION_REQUIRED` / `SOURCE_RESTRICTED` / `CATCH_PRIVATE` | 10월 Catch 문구("작업 사실과 나의 기여를 먼저 확인해 주세요." / "원본 저장소가 보호되어 지금은 공개할 수 없습니다.") / "비공개 Catch는 발행할 수 없습니다."(api 오류 문구와 같은 글) 아래에 `details.blockedSources`의 막힘 줄 | 프리셋 목록을 한 번 다시 불러오고 편집 단계로 돌아간다 |
+| 400 `VALIDATION_FAILED`, `presetIds`·`extractionIncomplete` | "고른 PDF 가운데 글 추출이 끝나지 않았거나 실패한 것이 있습니다." 아래에 막힘 줄 | 위와 같다 |
+| 400 `VALIDATION_FAILED`, `presetIds[i]`·`emptyPreset` / `presetIds`·`maxItems`·`maxTotalLength` | "고른 프리셋으로는 발행할 수 없습니다. 목록을 다시 확인해 주세요." | 프리셋 목록을 다시 불러오고 편집 단계로 돌아간다 |
+| 404 `RESOURCE_UNAVAILABLE` | "고른 프리셋이나 그 안의 자료를 찾을 수 없습니다." | 프리셋 목록을 다시 불러와 새 목록에 없는 프리셋을 고른 목록에서 빼고 편집 단계로 돌아간다(다시 불러오기가 실패하면 고른 목록을 그대로 둔다) |
+| 400 `VALIDATION_FAILED`, 그 밖 | `details.violations`의 칸(`title`·`password`·`presetIds`)별 안내 | 편집 단계로 돌아간다 |
 | 403 `AI_CONSENT_REQUIRED` | 동의 창. 창을 거친 뒤에도 403이면 "외부 AI 전송에 먼저 동의해 주세요." | 확인 단계에 남는다 |
 | 429 `DAILY_LIMIT_REACHED` | "오늘 한도에 도달했습니다" | 확인 단계에 남는다. 남은 횟수는 보이지 않는다 |
 | 429 `RATE_LIMITED` | "발행 요청이 잦아 잠시 발행할 수 없습니다. N초 뒤에 [발행]을 다시 누를 수 있습니다."(`Retry-After`가 있을 때) / "… 잠시 뒤 [발행]을 다시 눌러 주세요."(없을 때) | 남은 초 동안 [발행]을 막고 1초마다 남은 초를 보인다. 자동으로 다시 보내지 않는다. `Retry-After`가 없으면 시간을 추정하지 않고 막지 않는다 |
 | 401 `AUTH_*` | 로그인 만료 안내 | 입력은 남지만 공통 인증 모드에 따라 화면이 바뀔 수 있다(텍스트 자료 README 「한계」와 같다) |
 | 500·통신 실패·손상된 응답 | "서버에서 처리하지 못했거나 응답을 받지 못했습니다. 잠시 뒤 다시 시도해 주세요." | 확인 단계에 남아 [발행]을 다시 누른다 |
 
-- 저장하지 않은 입력(고른 항목·제목·비밀번호)이 있으면 새로고침·창 닫기·링크 이동(`useUnsavedGuard`), 뒤로·앞으로 가기(`useUnsavedTraverseGuard`), 로그아웃·다시 로그인(`useUnsavedChanges`) 전에 묻는다. 완료 뒤에는 묻지 않는다.
+- 저장하지 않은 입력(고른 프리셋·제목·비밀번호)이 있으면 새로고침·창 닫기·링크 이동(`useUnsavedGuard`), 뒤로·앞으로 가기(`useUnsavedTraverseGuard`), 로그아웃·다시 로그인(`useUnsavedChanges`) 전에 묻는다. 완료 뒤에는 묻지 않는다.
 
 ### 발행본 목록·상세 (W5)
 
@@ -68,6 +72,7 @@ GitHub 주소 판정 `isGithubSourceUrl`과 본문 나누기 `splitGithubLinks`�
 - [URL 복사]는 상태와 관계없이 있고 실제 클립보드 쓰기에 성공했을 때만 "URL을 복사했습니다."를 보인다. 실패하면 주소를 직접 복사하게 보여 준다.
 - [링크 열기](#416 2026-11-02·11-03)는 발행 완료·목록·상세 세 화면에 있고, [URL 복사]가 복사하는 것과 같은 서버 응답의 `url`을 `target="_blank"`·`rel="noopener noreferrer"`로 새 탭에서 연다. 서버가 돌려준 `state`가 `ACTIVE`일 때만 보인다. 새 API는 없고 작성자 로그인으로 받은 사람 접근 조건을 우회하지 않는다(새 탭의 받은 사람 화면이 비밀번호·중지·만료를 그대로 판정한다).
 - 상세는 `GET /publications/{id}`의 사본을 항목 순서대로 보인다. Catch는 「AI 설명 초안」·「작성자 설명」·「기록에서 확인한 내용」(작업 사실·본인 기여·근거)을 다른 표지로 나누고(AI 설명 초안이 없으면 그 칸을 그리지 않는다, Catch 개편 CR3 BR7.1) 불일치 표시를 단다(BR1.3·BR4.3·BR7.5). 순서와 근거 접기는 받은 사람 화면과 같은 부품이라 같다: 불일치 표지 → AI 설명 초안 → 작성자 설명 → 기록이고, 기록의 본인 기여·근거 목록은 「근거 자세히 보기」에 접혀 있다가 누르거나 요약 근거 단추가 그 안을 가리키면 펼친다(#488, [받은 사람 화면 README](../recipient/README.md) 「동작」). 텍스트 자료는 제목·본문이다. 빈 설명·초안은 다른 값으로 채우지 않는다.
+- 발행본 상세의 PDF 항목(U8)은 [받은 사람 화면 README 「PDF 항목과 사본 열람 (U8)」](../recipient/README.md#pdf-항목과-사본-열람-u8)의 컴포넌트를 쓰고 작성자 사본 경로로 연다.
 - 작성자 설명은 칸별로 보인다(새 Catch BR7.1~BR7.5). 저장된 글을 칸 제목 줄(`【칸 제목】`)로 나눠 글이 있는 칸만 h5 칸 제목과 그리고, 빈 칸은 h5째 그리지 않는다. 「더 쓰기」 하나뿐이면(칸 제목 줄이 없는 옛 글 포함) h5 없이 지금처럼 글만이고, 다른 칸과 함께면 h5는 「덧붙인 말」이다. 글이 없으면 「작성자 설명이 없습니다.」다. h5 칸 제목은 상수에서만 오고 h4보다 한 단계 작은 굵은 글이다.
 - 작성자 설명 속 GitHub 링크는 주소 전체 대신 이름으로 보인다: 파일 줄은 「파일 이름 · L40–58 · 판본 ba6bba8」, 줄 없는 파일·폴더는 「경로 끝 · 판본」, 커밋은 「커밋 ba6bba8」, 커밋 화면에서 줄 번호를 눌러 얻은 바뀐 줄 주소(`#diff-…R16-R23`)는 「커밋 ba6bba8 · 바뀐 줄 16–23」(L 쪽은 「이전 줄」, 파일 이름은 주소에 없다, NC1 로컬 확인 중 팀장 발견 2026-11-10), PR은 「PR #12」, 판본이 커밋 식별값이 아니면 「브랜치 main」이고, 근거 저장소와 다른 저장소면 앞에 「소유자/저장소 · 」가 붙는다. 표에 맞지 않는 꼴(다른 조각·뒤 경로·포트가 든 주소 등)은 지금처럼 주소 전체다. 질의는 이름에서만 무시하고, 경로는 마디마다 풀어 이름에만 쓰며(풀리지 않으면 원문), 제어·서식 문자는 이름에서 지운다. `href`·`title`은 원래 주소이고 긴 이름은 자르지 않고 줄을 바꾼다. 텍스트 자료 본문 링크는 주소 전체 그대로다.
 - AI 답의 근거 강조 범위는 저장된 글 전체의 UTF-16 위치로 오므로 칸마다 칸 안 위치로 바꿔 칸 글과 겹치는 부분만 강조한다. 칸 제목 줄·칸 사이 빈 줄에만 걸치면 강조하지 않고, 링크와 겹치면 지금처럼 링크 전체를 감싸며 위치는 원래 주소 길이로 센다. 같은 칸 제목 줄이 두 번 나와 이어 붙인 칸은 강조하지 않는다(FR1.6 한계).
@@ -94,8 +99,8 @@ GitHub 주소 판정 `isGithubSourceUrl`과 본문 나누기 `splitGithubLinks`�
 
 ## 시험
 
-- `node --test test/publish.test.mjs`: 발행 API 경로·201 판정, 작성자 실패 안내 표의 응답별 구분과 문구, 보내기 전 검사, 고르기·순서·고를 수 없는 Catch·20개 상한, 확인 단계와 요청 본문 순서, 실패마다 입력 유지와 409 Catch 표시·편집 단계 복귀, 빈도 초과 버튼 잠금과 자동 재전송 없음, 발행 중 잠금·동의 창 닫기·로그인 변경, 완료 화면의 [링크 열기] 주소·새 탭 속성·`ACTIVE`에만 표시, 화면 `data-testid`. 합성 응답만 쓴다.
+- `node --test test/publish.test.mjs`: 발행 API 경로·`{ title, password?, presetIds }` 몸통·201 판정, 작성자 실패 안내 표의 응답별 구분과 문구(막힘 셋·추출 미완료의 `blockedSources`, 400 `presetIds`, 404), 보내기 전 검사(프리셋 0개·6개), 프리셋 고를 수 없는 이유 순서·「외 N개」·5개 다 참과 안내 한 번, 목록 불러오는 중·없음·실패, 확인 단계의 고른 프리셋과 순서, 막힘 줄(이름 찾기·못 찾음·다시 불러오기 실패)과 목록 한 번 다시 불러오기, 404 때 없어진 프리셋 빼기, 실패마다 입력 유지와 편집 단계 복귀, 빈도 초과 버튼 잠금과 자동 재전송 없음, 발행 중 잠금·동의 창 닫기·로그인 변경, 완료 화면의 [링크 열기], 이름을 글자로만 그리기, 화면 `data-testid`. 합성 응답만 쓴다. 자료 고르기 시험은 `test/presets.test.mjs`로 옮겼다.
 - `node --test test/publications-owner.test.mjs`: 목록·상세·중지·삭제 API 경로와 성공 판정, 목록 모델(실패·더 보기·늦은 응답·로그인 변경), 목록 화면([링크 열기]는 `ACTIVE` 행에만), 상세 모델(중지 확인·취소·실패·성공·만료 응답, 삭제 확인·취소·실패 유지·204), 사본 화면(표지 구분·칸 순서·근거 접기(#488), GitHub 주소만 링크, `aiDraft`·제목·그 밖 주소는 글자), GitHub 주소 판정·본문 나누기, 상세 화면([링크 열기]·[링크 중지]는 `ACTIVE`에만, 안내·요약 자리·실패 안내), [URL 복사]의 클립보드 성공·실패. 합성 응답만 쓴다.
-- 새 Catch NC1: `publish.test.mjs`에 권장 안내·작은 줄·걸러 보기와 고른 자료 유지·최대 개수·확인 안내·저장소 목록 한 번 부르기·저장소 목록 실패를, `publications-owner.test.mjs`·`../../../test/recipient.test.mjs`에 작성자 설명 칸별 보기·링크 이름·텍스트 자료 본문 주소 전체·강조 맞추기를 더했다. 공통 함수는 `node --test test/author-description-sections.test.mjs test/github-link-name.test.mjs`다.
+- 새 Catch NC1: 발행 화면의 작은 줄·걸러 보기와 고른 자료 유지·저장소 목록 실패 시험은 발행 프리셋 U2에서 `presets.test.mjs`로 옮겼고(권장 안내 줄·확인 단계의 설명 없는 Catch 안내는 없앰), `publications-owner.test.mjs`·`../../../test/recipient.test.mjs`에 작성자 설명 칸별 보기·링크 이름·텍스트 자료 본문 주소 전체·강조 맞추기를 더했다. 공통 함수는 `node --test test/author-description-sections.test.mjs test/github-link-name.test.mjs`다.
 - 새 Catch NC2: `github-link-name.test.mjs`에 본인 커밋 목록·표지 판정을, `publications-owner.test.mjs`·`../../../test/recipient.test.mjs`에 새 칸 모양 검사·받은 사람 칸 옮기기·저장소 줄·작성 시점·한계 목록·옛 사본·표지 자리(링크·강조 밖)·흉내 글을 더했다.
 - 커버리지: `node --test --experimental-test-coverage --test-coverage-include="src/features/publications/**/*.{ts,tsx}" test/publish.test.mjs test/publications-owner.test.mjs`.
