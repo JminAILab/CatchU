@@ -27762,3 +27762,97 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
 
 ---
+
+## Subagent Completed
+**Timestamp**: 2026-11-20T14:16:59Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: af55f7e4c80673a5b
+**Message**: 발행 프리셋 작업은 U4·U2를 승인받았고, 지금 U3(읽는 쪽 화면 탭) 단위 확인 명령이 돌고 있습니다. 끝나면 결과를 알려 드리고 U3 승인을 여쭙겠습니다.
+
+---
+
+## Checkpoint Verification Recorded
+**Timestamp**: 2026-11-20T14:23:17Z
+**Event**: CHECKPOINT_VERIFICATION_RECORDED
+**Unit**: u3-reader-views
+**Kind**: unit
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Verification Id**: 8d2c977a-b038-4f3c-8555-e6155a53520f
+**Fingerprint**: sha256:ec2c51a65b1e5a257f6a5355de9a4aa56b6690a36a9b55961db64b663275bec6
+**Command SHA-256**: 04ae577da37582954a9661cb87bf7a597ae64f8de628f5de9ed95311c7f13ffe
+**Exit Code**: 0
+**Verified**: true
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T14:23:18Z
+**Event**: HOST_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T14:23:42Z
+**Event**: DECISION_RECORDED
+**Checkpoint**: Construction Unit Approval
+**Unit**: u3-reader-views
+**Kind**: unit
+**Stage**: code-generation
+**Fingerprint**: sha256:ec2c51a65b1e5a257f6a5355de9a4aa56b6690a36a9b55961db64b663275bec6
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Options**: Approve,Request Changes
+**Asked Evidence**: {"functional-design":["sha256:151efcde9aa7b234f52e611785f2ac18d0122be1ee3068cc98f7c9cd842e7c62",null],"nfr-requirements":["sha256:6f534432adce5846e15738c601857bd87841a3a0ec0bbc63ed5e791cceecd06b",null],"nfr-design":["sha256:61a85b5b2049ec7ca8477de6d89a2fef69851b437494692c0e6e6b427b441e7f",null],"code-generation":["sha256:3de1d24b8874ae1756e32e0b78534c83d83bd80824a999f3a38fed4fc2ccf7c4","sha256:538dd128aaf715e473ece2ca6f4126a60b20a56132a510e31e1b96ff52a035fa",{"\u0000web/src/components/tab-strip/tab-strip.module.css":"100644 e8a577ec550e96c8733d21b03f6c007bacfc011b595bf2e5c25314da639d414b","\u0000web/src/components/tab-strip/tab-strip.tsx":"100644 e4f88623f4d3051a2dd8c7d701504815e6689f85c0995ac16fbc57ea55ef3770","\u0000web/src/features/materials/README.md":"100644 a35996754a86367266f78a267ef2ce418573df437630432ca203af642ee6f1e8","\u0000web/src/features/materials/materials-screen.tsx":"100644 a7227648eb13b13d50950369064d385fd7521d2fdb1d386b8c84c7e189f96f4b","\u0000web/src/features/materials/materials-view.tsx":"100644 d3f0dfd9a36420d66aa1a5bc396c3efea4d4086a6083f5a71faaf380b6843290","\u0000web/src/features/materials/materials.module.css":"100644 e4ba2b184ad4e1b61940e0f59f74531368731822fcac57dcd82571bc1b4fbf31","\u0000web/src/features/materials/pdf-materials-api.ts":"100644 d3aead6f5f976ed7cd19bff6edcf9ad30bcec448561ac7f564f4a7689604eed5","\u0000web/src/features/publications/README.md":"100644 b1af0e43a025474cd7f7e4063fb4d54d5508a323c5b8817bb098bb55494d26d8","\u0000web/src/features/publications/publication-detail-screen.tsx":"100644 51c4a87577c16104ec694b3c9148284c45a63461f3a6ed145792156712fd36bb","\u0000web/src/features/publications/publication-detail-view.tsx":"100644 e1f077006c7de1f928557e082f599629289d4adc976b3323d88650dc8edd7c3f","\u0000web/src/features/publications/publications-api.ts":"100644 67e1042a1623829a03c009981136ea93ed6246fa000de944c63535298bd4c8e4","\u0000web/src/features/publications/publications.module.css":"100644 d5bf5e61862b8b20431840f50fa30f939fc45008dddf049c66673dcb593b0a12","\u0000web/src/features/publications/snapshot-jump.ts":"100644 ba787c73b205afbb987aa7e066ccdac138d91e18481825accdf4f384fb1a4b85","\u0000web/src/features/publications/snapshot-view.tsx":"100644 da42e6f2a6571821a6f5e9aa63da422a0f067ec2e3a064da71653b5089c99b88","\u0000web/src/features/recipient/README.md":"100644 40f5b0e7cefd7ecef80703da47b77a809a4e50c50c88eb34d4a3528399a5a93a","\u0000web/src/features/recipient/recipient-api.ts":"100644 d033474e5c0ba811becaa2048f02400924b6becbc9a461194af0d733b6eac476","\u0000web/src/features/recipient/recipient-screen.tsx":"100644 61235e60ca96b324b1787cdae6c90047376f6721c12e268b9c7c182dd6e1777c","\u0000web/src/features/recipient/recipient-view.tsx":"100644 c856e4b1159997f554569cc3760418196a954d52706944daea298e64028062d7","\u0000web/test/jd-recipient-binding.test.mjs":"100644 e30e216bd7f0f0634845fe4314e901d7a92f76e52e9fec31accf2993779d557f","\u0000web/test/materials-screen.test.mjs":"100644 42b53df700f7998ce6779231b99d1b8cb83632852e08aa4079b1461d1d099819","\u0000web/test/pdf-materials-api.test.mjs":"100644 9e3f4aad360cebd170d070e65f3cbbe2bc00ea798ef95e5b6614641b975bb599","\u0000web/test/publications-owner.test.mjs":"100644 dec86b1e209619e6c49aeed490aaaa039108b8596915b240342b3206f37f1069","\u0000web/test/reader-tabs.test.mjs":"100644 eb7f01cf2f7b5b76ece8b42b99932d73b6f4d202c2d161fe7643535d8f775abd","\u0000web/test/recipient-pdf.test.mjs":"100644 09dbadf7dab64bac56007e1a55d869bdcc176250cc3176b3285e5dc740cdf2ae","\u0000web/test/recipient.test.mjs":"100644 d93a0a6f0de35f01b5226bb44429665b15ea6d19b89a2d6070ad2119bc2ac50d","\u0000web/test/u9-recipient-claude.test.mjs":"100644 8e59f120161cfd4dea48c49deab5ea060e1bafe23764ca6c4757e017e2d646ff"}]}
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","code-generation":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1"}
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T14:25:19Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: 4575750a
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T14:25:20Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: Verified with `npm --prefix api run lint && npm --prefix api run typecheck && npm --prefix api run test:coverage && npm --prefix web run lint && npm --prefix web run typecheck && npm --prefix web run test:coverage && npm --prefix web run build` (exit 0). Approve this completed u3-reader-views?
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-20T14:25:25Z
+**Event**: GATE_APPROVED
+**Unit**: u3-reader-views
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Stages**: functional-design, nfr-requirements, nfr-design, code-generation
+**Gate Scope**: unit-end
+**Checkpoint**: construction-unit
+**Fingerprint**: sha256:ec2c51a65b1e5a257f6a5355de9a4aa56b6690a36a9b55961db64b663275bec6
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","code-generation":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1"}
+**Verification Command SHA-256**: 04ae577da37582954a9661cb87bf7a597ae64f8de628f5de9ed95311c7f13ffe
+**Verification Id**: 8d2c977a-b038-4f3c-8555-e6155a53520f
+**Approved Evidence**: {"functional-design":["sha256:151efcde9aa7b234f52e611785f2ac18d0122be1ee3068cc98f7c9cd842e7c62",null],"nfr-requirements":["sha256:6f534432adce5846e15738c601857bd87841a3a0ec0bbc63ed5e791cceecd06b",null],"nfr-design":["sha256:61a85b5b2049ec7ca8477de6d89a2fef69851b437494692c0e6e6b427b441e7f",null],"code-generation":["sha256:3de1d24b8874ae1756e32e0b78534c83d83bd80824a999f3a38fed4fc2ccf7c4","sha256:538dd128aaf715e473ece2ca6f4126a60b20a56132a510e31e1b96ff52a035fa",{"\u0000web/src/components/tab-strip/tab-strip.module.css":"100644 e8a577ec550e96c8733d21b03f6c007bacfc011b595bf2e5c25314da639d414b","\u0000web/src/components/tab-strip/tab-strip.tsx":"100644 e4f88623f4d3051a2dd8c7d701504815e6689f85c0995ac16fbc57ea55ef3770","\u0000web/src/features/materials/README.md":"100644 a35996754a86367266f78a267ef2ce418573df437630432ca203af642ee6f1e8","\u0000web/src/features/materials/materials-screen.tsx":"100644 a7227648eb13b13d50950369064d385fd7521d2fdb1d386b8c84c7e189f96f4b","\u0000web/src/features/materials/materials-view.tsx":"100644 d3f0dfd9a36420d66aa1a5bc396c3efea4d4086a6083f5a71faaf380b6843290","\u0000web/src/features/materials/materials.module.css":"100644 e4ba2b184ad4e1b61940e0f59f74531368731822fcac57dcd82571bc1b4fbf31","\u0000web/src/features/materials/pdf-materials-api.ts":"100644 d3aead6f5f976ed7cd19bff6edcf9ad30bcec448561ac7f564f4a7689604eed5","\u0000web/src/features/publications/README.md":"100644 b1af0e43a025474cd7f7e4063fb4d54d5508a323c5b8817bb098bb55494d26d8","\u0000web/src/features/publications/publication-detail-screen.tsx":"100644 51c4a87577c16104ec694b3c9148284c45a63461f3a6ed145792156712fd36bb","\u0000web/src/features/publications/publication-detail-view.tsx":"100644 e1f077006c7de1f928557e082f599629289d4adc976b3323d88650dc8edd7c3f","\u0000web/src/features/publications/publications-api.ts":"100644 67e1042a1623829a03c009981136ea93ed6246fa000de944c63535298bd4c8e4","\u0000web/src/features/publications/publications.module.css":"100644 d5bf5e61862b8b20431840f50fa30f939fc45008dddf049c66673dcb593b0a12","\u0000web/src/features/publications/snapshot-jump.ts":"100644 ba787c73b205afbb987aa7e066ccdac138d91e18481825accdf4f384fb1a4b85","\u0000web/src/features/publications/snapshot-view.tsx":"100644 da42e6f2a6571821a6f5e9aa63da422a0f067ec2e3a064da71653b5089c99b88","\u0000web/src/features/recipient/README.md":"100644 40f5b0e7cefd7ecef80703da47b77a809a4e50c50c88eb34d4a3528399a5a93a","\u0000web/src/features/recipient/recipient-api.ts":"100644 d033474e5c0ba811becaa2048f02400924b6becbc9a461194af0d733b6eac476","\u0000web/src/features/recipient/recipient-screen.tsx":"100644 61235e60ca96b324b1787cdae6c90047376f6721c12e268b9c7c182dd6e1777c","\u0000web/src/features/recipient/recipient-view.tsx":"100644 c856e4b1159997f554569cc3760418196a954d52706944daea298e64028062d7","\u0000web/test/jd-recipient-binding.test.mjs":"100644 e30e216bd7f0f0634845fe4314e901d7a92f76e52e9fec31accf2993779d557f","\u0000web/test/materials-screen.test.mjs":"100644 42b53df700f7998ce6779231b99d1b8cb83632852e08aa4079b1461d1d099819","\u0000web/test/pdf-materials-api.test.mjs":"100644 9e3f4aad360cebd170d070e65f3cbbe2bc00ea798ef95e5b6614641b975bb599","\u0000web/test/publications-owner.test.mjs":"100644 dec86b1e209619e6c49aeed490aaaa039108b8596915b240342b3206f37f1069","\u0000web/test/reader-tabs.test.mjs":"100644 eb7f01cf2f7b5b76ece8b42b99932d73b6f4d202c2d161fe7643535d8f775abd","\u0000web/test/recipient-pdf.test.mjs":"100644 09dbadf7dab64bac56007e1a55d869bdcc176250cc3176b3285e5dc740cdf2ae","\u0000web/test/recipient.test.mjs":"100644 d93a0a6f0de35f01b5226bb44429665b15ea6d19b89a2d6070ad2119bc2ac50d","\u0000web/test/u9-recipient-claude.test.mjs":"100644 8e59f120161cfd4dea48c49deab5ea060e1bafe23764ca6c4757e017e2d646ff"}]}
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**User Input**: Approve
+**Person Reply**: Approve
+**Message Id**: 4575750a
+**Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:dc018593f8f8ca2b51dc476d5a47fd1cba552958888d7606c930493965a59349","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:d3ceca7502580f6a65df3b2e07ac1b2c0e2e9639bf866a855ebdf8b30d2f73fa"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/code-generation-plan.md","id":"R-02","fingerprint":"sha256:8ff07915d326562eb4ed476014f937d5993842903bb4860ac86f6dbdd6b547f1","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:d3ceca7502580f6a65df3b2e07ac1b2c0e2e9639bf866a855ebdf8b30d2f73fa"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:e600b3e2e6b29e2fd8aab9e97e75ea64a5ef8186094417a99318414f74e989a9","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:29c3c790113bc4c7300ffec365131909b60848d82dc2bdd475afc12792df1a1e"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:81b33cea0bf21bb7f7d3e44f6801c82d309fd55310d29db473ac8693d5407166","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:29c3c790113bc4c7300ffec365131909b60848d82dc2bdd475afc12792df1a1e"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md","id":"R-03","fingerprint":"sha256:3005b21c69a58ad162496fbb3a43c186791ebb9df01b6a16015c1ae1ffadb298","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:29c3c790113bc4c7300ffec365131909b60848d82dc2bdd475afc12792df1a1e"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md","id":"R-04","fingerprint":"sha256:057154d22595b9291f7133bade332d2b25a74fc64fd9a13a0b1a49ca1bbf0cd0","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:29c3c790113bc4c7300ffec365131909b60848d82dc2bdd475afc12792df1a1e"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md","id":"R-01","fingerprint":"sha256:90f116bae03c3c13161ca5a11d8c4a9aad8e479656a8eb18eed06dbc363558fd","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:a380379891d1fb60cb3690dc94fcc0e7c11986ed2422bf230f94cb8f003c7fad"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md","id":"R-02","fingerprint":"sha256:042d0bcd787c4a1f20b626ed0fca3df05a43818bd992540c0fc3390f52c22fee","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:a380379891d1fb60cb3690dc94fcc0e7c11986ed2422bf230f94cb8f003c7fad"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md","id":"R-03","fingerprint":"sha256:ac9b482eab86e42d18b6b2a1502e8084fea32cd762099f9250d4d75bae14c5fc","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:a380379891d1fb60cb3690dc94fcc0e7c11986ed2422bf230f94cb8f003c7fad"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-design/security-design.md","id":"R-04","fingerprint":"sha256:814a6621d1d7c267ddec4f0dd57b061624ab9647233aadf6834f1aed65378f21","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:a380379891d1fb60cb3690dc94fcc0e7c11986ed2422bf230f94cb8f003c7fad"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/security-requirements.md","id":"R-01","fingerprint":"sha256:26391a842a4da26462ed0eaf5cccaac7e168d8a9b63c01ad6a47fcc4007559df","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:fbeb38912322188ebb6a769c19ccfb4b4e9bb062c17573283ca26073db867f29"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/security-requirements.md","id":"R-02","fingerprint":"sha256:cc447c7214cefe36da7ef6fc96155ecc659f7cca75c8cbca0a2b4c0b07e55687","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:fbeb38912322188ebb6a769c19ccfb4b4e9bb062c17573283ca26073db867f29"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/security-requirements.md","id":"R-03","fingerprint":"sha256:3a7cb5f9c2ba2d56faf0e1b47abc505ae211767099d17e2d09fe9dca5208ce66","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:fbeb38912322188ebb6a769c19ccfb4b4e9bb062c17573283ca26073db867f29"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/nfr-requirements/security-requirements.md","id":"R-04","fingerprint":"sha256:c696011e0887db7560cb4486351992d632bbe07610284f4fb122749b188bea8b","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u3-reader-views/aa555492f330bf5d/1.json","digest":"sha256:fbeb38912322188ebb6a769c19ccfb4b4e9bb062c17573283ca26073db867f29"}}]}
+
+---
