@@ -19761,3 +19761,177 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
 
 ---
+
+## Checkpoint Verification Recorded
+**Timestamp**: 2026-11-20T03:15:53Z
+**Event**: CHECKPOINT_VERIFICATION_RECORDED
+**Unit**: u1-preset-contract
+**Kind**: skeleton
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Verification Id**: 36f9b2fc-b83b-4afb-96b2-d1eddb7eafad
+**Fingerprint**: sha256:a8cd3e0e02e5a6723c89df6151560c766fb92c61eca38450bb1a0620fea20359
+**Command SHA-256**: 04ae577da37582954a9661cb87bf7a597ae64f8de628f5de9ed95311c7f13ffe
+**Exit Code**: 1
+**Verified**: false
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T03:15:54Z
+**Event**: HOST_TURN
+**Session**: 271712a4-224a-47c4-85c6-b6f02cb1844c
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T03:41:22Z
+**Event**: HUMAN_TURN
+**Session**: 271712a4-224a-47c4-85c6-b6f02cb1844c
+**Origin**: person
+**Source**: picker
+**Picked**: ["worker에 uv sync (권장)"]
+**Message Id**: 862f373f
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T03:41:22Z
+**Event**: QUESTION_REPLIED
+**Session**: 271712a4-224a-47c4-85c6-b6f02cb1844c
+**Question**: 단위 확인 명령이 실패했습니다(약 7분 30초, api 쪽에서 멈춤). 실패한 시험은 api/test/integration/u7-analysis-chain.test.cjs의 I4·I6·I8 세 건뿐이고, 이유는 「worker 잠금 의존성과 CATCHU_TEST_WORKER_PYTHON 실행 파일 필요」입니다. 이 worktree에 worker/.venv가 없어서입니다(uv.lock은 메인과 같음). 어떻게 할까요?
+**Reply**: worker에 uv sync (권장)
+**Options**: ["worker에 uv sync (권장)","메인 venv 파이썬 지정"]
+
+---
+
+## Session Start
+**Timestamp**: 2026-11-20T03:47:13Z
+**Event**: SESSION_STARTED
+**Source**: startup
+**Session**: bb8812d5-f435-4836-888d-914396aa41b9
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T03:47:31Z
+**Event**: HUMAN_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: person
+**Source**: typed
+**Message Id**: cfd075eb
+
+---
+
+## Checkpoint Verification Recorded
+**Timestamp**: 2026-11-20T03:49:55Z
+**Event**: CHECKPOINT_VERIFICATION_RECORDED
+**Unit**: u1-preset-contract
+**Kind**: skeleton
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Verification Id**: 06ad03df-6a3e-435e-8edb-79052accfa82
+**Fingerprint**: sha256:a8cd3e0e02e5a6723c89df6151560c766fb92c61eca38450bb1a0620fea20359
+**Command SHA-256**: 04ae577da37582954a9661cb87bf7a597ae64f8de628f5de9ed95311c7f13ffe
+**Exit Code**: 0
+**Verified**: true
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T03:49:56Z
+**Event**: HOST_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-20T03:50:01Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: plan-approval
+**Authority**: grant
+**Grant**: turn-marker
+**Actor**: main
+**Stage**: code-generation
+**Tool**: Bash
+**Details**: ps -p 24502 -o pid,etime 2>&1; aidlc engine bolt checkpoint --action status --unit u1-preset-contract --kind skeleton | python3 -I -c "import json,sys; d=json.l
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T03:50:02Z
+**Event**: HOST_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T03:50:29Z
+**Event**: DECISION_RECORDED
+**Checkpoint**: Construction Unit Approval
+**Unit**: u1-preset-contract
+**Kind**: skeleton
+**Stage**: code-generation
+**Fingerprint**: sha256:a8cd3e0e02e5a6723c89df6151560c766fb92c61eca38450bb1a0620fea20359
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Options**: Approve,Request Changes
+**Asked Evidence**: {"functional-design":["sha256:87b7fbd4c9f8fb9952fa22d38a3ad72832a230ff243079b3da16454c291a6830",null],"nfr-requirements":["sha256:d96e770c4db79833f91dfcf8eb81f9d6d044e96a8adc67869d4b0efeb1d1727b",null],"nfr-design":["sha256:596da967b88d4cdf54b48ae099ecd24fb96c2e6c5c9a541f0bada821c1f7e6b5",null],"code-generation":["sha256:e6cf2f34f20043e90aa9d7de320f7869bb069ca59b982713c4ece9696d9ee13f","sha256:0ba7ec023416c430210f2eb0e42bece3e6b6a147b2cb26a46b3942819c3e6c01"]}
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","code-generation":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1"}
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T03:55:26Z
+**Event**: HUMAN_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: 48fe416f
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T03:55:26Z
+**Event**: QUESTION_REPLIED
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Question**: `npm --prefix api run lint && npm --prefix api run typecheck && npm --prefix api run test:coverage && npm --prefix web run lint && npm --prefix web run typecheck && npm --prefix web run test:coverage && npm --prefix web run build`로 확인했습니다(exit 0). 완성된 u1-preset-contract를 승인할까요?
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-20T03:55:31Z
+**Event**: GATE_APPROVED
+**Unit**: u1-preset-contract
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Scope**: unit-end
+**Checkpoint**: walking-skeleton
+**Fingerprint**: sha256:a8cd3e0e02e5a6723c89df6151560c766fb92c61eca38450bb1a0620fea20359
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","code-generation":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1"}
+**Verification Command SHA-256**: 04ae577da37582954a9661cb87bf7a597ae64f8de628f5de9ed95311c7f13ffe
+**Verification Id**: 06ad03df-6a3e-435e-8edb-79052accfa82
+**Approved Evidence**: {"functional-design":["sha256:87b7fbd4c9f8fb9952fa22d38a3ad72832a230ff243079b3da16454c291a6830",null],"nfr-requirements":["sha256:d96e770c4db79833f91dfcf8eb81f9d6d044e96a8adc67869d4b0efeb1d1727b",null],"nfr-design":["sha256:596da967b88d4cdf54b48ae099ecd24fb96c2e6c5c9a541f0bada821c1f7e6b5",null],"code-generation":["sha256:e6cf2f34f20043e90aa9d7de320f7869bb069ca59b982713c4ece9696d9ee13f","sha256:0ba7ec023416c430210f2eb0e42bece3e6b6a147b2cb26a46b3942819c3e6c01"]}
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**User Input**: Approve
+**Person Reply**: 현재 작업이 진행중인건가?\nApprove
+**Message Id**: 48fe416f
+**Message Ids**: cfd075eb,48fe416f
+**Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:f7174f238bac1f9d70e4c93e29d8de1bb87b0924fcb4721d9d3489d81bbfc0d3","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:8d94cabc16da9f38414077beae61d8c82dec5d98235f682abc9bc13e0a758059"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/code-generation-plan.md","id":"R-02","fingerprint":"sha256:3f537edfd6fb37efc8555a2232bb314724eb6303a608ff84fd42a25430fba868","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:8d94cabc16da9f38414077beae61d8c82dec5d98235f682abc9bc13e0a758059"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/code-generation-plan.md","id":"R-03","fingerprint":"sha256:82656e2d9874a835327ea09d4252831667b79af6efc24e6e45a514ff90f71362","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:8d94cabc16da9f38414077beae61d8c82dec5d98235f682abc9bc13e0a758059"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:9e83c7987b94f947d32f457e0df59794e337e2ac5594e7c7ad25945d4659bf33","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:b60af9817497395f9920ca1096d2f5b441f3070ccddd58f084ff9acbcbf90011","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-03","fingerprint":"sha256:c3b1a23ae3d81f3c1d5297078b5d01309a382db6e2446447e53a9c641d49e8d0","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-04","fingerprint":"sha256:93cc64de5eb030492c1c98236dea127791700d0b0a96ea6b16ac4f0a2784adda","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-05","fingerprint":"sha256:70cac1c448b97bee8aa05466f400e90a5eef4da0a7f9593dfc8ec64fe4b686bb","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-06","fingerprint":"sha256:2b77760484d22e84ed15b08bdbb81e0a4df12aa52b56ce53275543c933266014","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-07","fingerprint":"sha256:2938e3c35b70f43bb11cc94ff1eb09574915abb61c9020995f6ca50c88f09e71","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-08","fingerprint":"sha256:99dc6ab66a7bd94bf56d7c3901cca1fbd92e76cbb66ec0f9051ebfd91b580245","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-01","fingerprint":"sha256:4c445bc64853fd3b54e503f501f12186709f7aeb66663332cfa41501bdb43698","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-02","fingerprint":"sha256:67b7327c6c37f0bb1ac5b84d3ef0316a36dde8652f316a75476f5f5a2d95ef98","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-03","fingerprint":"sha256:c178a7c5e2bf3807280204e923db301bad48a642d6d49b4136164c09f3f4fe5a","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-04","fingerprint":"sha256:42f43b9d4c4a472f2df20d1bca15c8192b6501d2ed641ef98a570d0d84b24447","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-05","fingerprint":"sha256:da2131ed31ade25fad007ee4e735bf3155884b2ef774c4a04933709393f497fb","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-06","fingerprint":"sha256:8717dae6f3dd36e0e5b55e2f063b7610dcff456acaeddeb6833d50526c6b11cf","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/security-requirements.md","id":"R-01","fingerprint":"sha256:97159d29dba1ea2a14a31d5a2fe264a36b014acd4641441be3dcaaccd46c4bf3","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:2467dd0c28c6e965ffde3f97293340f44db25de6c7b305985a6358d80299b41b"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/security-requirements.md","id":"R-02","fingerprint":"sha256:d38640987a83e93cf896d7b56d534878bd6469008ad099caf2628ffe69b0a775","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:2467dd0c28c6e965ffde3f97293340f44db25de6c7b305985a6358d80299b41b"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/security-requirements.md","id":"R-03","fingerprint":"sha256:7fc2908354822a627af94e20e07a3d6c5e5a4031b2656412512550debd35e3fe","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:2467dd0c28c6e965ffde3f97293340f44db25de6c7b305985a6358d80299b41b"}}]}
+
+---
