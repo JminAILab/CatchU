@@ -11,7 +11,7 @@ api가 DB 잠금을 기다리는 최대 시간이다. 상한은 코드가 아니
 - 3초는 부하 측정으로 정한 값이 아닌 초기값으로 정했다. 결과 반영은 잠금을 쥔 채 후보 등록까지 하므로 경쟁 검사에서 함께 봤고, 10/18 측정을 10/19 검토해 3초를 유지했다([#331 팀장 리뷰](https://github.com/JminAILab/CatchU/pull/331#pullrequestreview-5565830688), 아래 「측정」·「판단이 필요한 결과」).
 - 트랜잭션 안 유휴 상한(`idle_in_transaction_session_timeout`)은 EKS 운영 DB의 앱 계정에만 5분으로 건다(2026-11-19 팀장 결정, [#276](https://github.com/JminAILab/CatchU/issues/276)). 트랜잭션을 연 채 DB에 문장을 보내지 않는 시간이 5분을 넘으면 PostgreSQL이 연결을 끊고 트랜잭션을 되돌린다. 멈춘 연결이 행 잠금을 오래 쥐지 못하게 하려는 것이다. 잠금을 기다리는 동안은 문장 실행 중이라 이 상한에 걸리지 않는다. 같은 날 api의 트랜잭션을 모두 따라가 보니 안에서 DB가 아닌 것을 기다리는 곳은 탈퇴 마지막 단계 하나였다. 5분은 측정으로 정한 값이 아니라, 그 단계의 S3 호출 한 번(로컬 측정 약 36~50초)보다 넉넉하게 잡은 시작 값이다. 그 단계가 5분을 넘기면 생기는 일과 받아들인 한계는 아래 [「트랜잭션 안 유휴 상한을 넘으면」](#트랜잭션-안-유휴-상한을-넘으면)에 있다. 적용은 [`idle-in-transaction.sql`](../../deploy/aws/db/idle-in-transaction.sql)이고, 개발 서버와 로컬에는 걸지 않는다.
 
-개발 서버에는 [#310](https://github.com/JminAILab/CatchU/pull/310)이 적용했다. 설정 명령·새 연결의 적용값(앱 `3s`, 마이그레이션 계정 `0`) 확인·DB 초기화 뒤 다시 거는 방법은 [개발 서버 안내 「순서」](../../deploy/dev-server/README.md#순서) 3단계에 있고, 자동 배포의 서버 안 확인도 앱 계정 상한이 `3s`인지 본다([cd 안내](../../deploy/dev-server/cd/README.md)). 합의는 EKS 운영 DB(#276)에도 같은 값을 옮기기로 했다.
+개발 서버에는 [#310](https://github.com/JminAILab/CatchU/pull/310)이 적용했다. 설정 명령·새 연결의 적용값(앱 `3s`, 마이그레이션 계정 `0`) 확인·DB 초기화 뒤 다시 거는 방법은 [개발 서버 안내 「순서」](../../deploy/dev-server/README.md#순서) 3단계에 있다. 합의는 EKS 운영 DB(#276)에도 같은 값을 옮기기로 했다.
 
 로컬 개발 DB, `npm test`의 기본 연결, 배포 로컬 구성의 앱 계정([`deploy/local-db/init-roles.sh`](../../deploy/local-db/init-roles.sh))에는 상한이 없다. 그 환경의 api는 잠금을 끝까지 기다린다.
 
