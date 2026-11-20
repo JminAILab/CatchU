@@ -1,0 +1,11 @@
+{
+  "stage": "code-generation",
+  "unit": "u4-privacy-policy",
+  "version": 1,
+  "writes": [
+    { "path": "web/src/features/privacy/privacy-policy.md" },
+    { "path": "web/src/features/privacy/privacy-policy.tsx" },
+    { "path": "web/src/features/privacy/README.md" },
+    { "path": "web/test/privacy-policy.test.mjs" }
+  ]
+}

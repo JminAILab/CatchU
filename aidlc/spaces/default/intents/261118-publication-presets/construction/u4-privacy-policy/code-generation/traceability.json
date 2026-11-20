@@ -1,0 +1,50 @@
+{
+  "stage": "code-generation",
+  "unit": "u4-privacy-policy",
+  "upstream_ids": [
+    "AC4.3.1",
+    "AC4.3.2",
+    "BR1.1",
+    "BR1.2",
+    "BR1.3",
+    "BR1.4",
+    "BR1.5"
+  ],
+  "coverage": [
+    {
+      "id": "AC4.3.1",
+      "status": "OK",
+      "target": "web/src/features/privacy/privacy-policy.tsx"
+    },
+    {
+      "id": "AC4.3.2",
+      "status": "OK",
+      "target": "web/src/features/privacy/privacy-policy.tsx"
+    },
+    {
+      "id": "BR1.1",
+      "status": "OK",
+      "target": "web/src/features/privacy/privacy-policy.md"
+    },
+    {
+      "id": "BR1.2",
+      "status": "OK",
+      "target": "web/src/features/privacy/privacy-policy.md"
+    },
+    {
+      "id": "BR1.3",
+      "status": "OK",
+      "target": "web/src/features/privacy/privacy-policy.md"
+    },
+    {
+      "id": "BR1.4",
+      "status": "OK",
+      "target": "web/src/features/privacy/privacy-policy.md"
+    },
+    {
+      "id": "BR1.5",
+      "status": "OK",
+      "target": "web/test/privacy-policy.test.mjs"
+    }
+  ]
+}
