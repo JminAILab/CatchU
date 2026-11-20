@@ -21377,3 +21377,150 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
 
 ---
+
+## Checkpoint Verification Recorded
+**Timestamp**: 2026-11-20T06:59:16Z
+**Event**: CHECKPOINT_VERIFICATION_RECORDED
+**Unit**: u4-privacy-policy
+**Kind**: unit
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Verification Id**: 7a3c69c3-5586-4bc0-95e7-4e858e85f446
+**Fingerprint**: sha256:651c267fbba53d31279776fea12aaa797c80ac4721bccf52b1ac6194a860d621
+**Command SHA-256**: 04ae577da37582954a9661cb87bf7a597ae64f8de628f5de9ed95311c7f13ffe
+**Exit Code**: 0
+**Verified**: true
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T06:59:16Z
+**Event**: HOST_TURN
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T06:59:51Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: You asked me to 코드 계획을 쓸 때 그 단위 앞 단계 검토의 지적(예: 기능 설계 검토의 Major)을 찾아 계획 단계와 함께 고칠 파일에 넣기. Keep that for next time?
+**Options**: |Yes, for this project|Yes, for the team|No
+**Question Kind**: learnings-note
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T07:02:09Z
+**Event**: HUMAN_TURN
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**Origin**: person
+**Source**: picker
+**Picked**: ["Yes, for this project"]
+**Message Id**: 2bca922f
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T07:02:09Z
+**Event**: QUESTION_REPLIED
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**Question**: 코드 계획을 쓸 때, 그 단위의 앞 단계 검토에서 나온 지적(예: 기능 설계 검토의 Major)을 찾아 계획 단계와 함께 고칠 파일에 넣으라고 알려 주셨습니다. 다음에도 이렇게 할까요?
+**Reply**: Yes, for this project
+**Options**: ["Yes, for this project","Yes, for the team","No"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T07:02:12Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: Yes, for this project
+**Person Reply**: Yes, for this project
+**Message Id**: 2bca922f
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T07:02:18Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/learnings/code-generation-selections.json
+**Context**: .aidlc-engine > learnings > code-generation-selections.json
+
+---
+
+## Rule Learned
+**Timestamp**: 2026-11-20T07:02:19Z
+**Event**: RULE_LEARNED
+**Stage**: code-generation
+**Candidate-ID**: c1
+**Content-Hash**: 2460f3bb4f55266eff33e990dcbb36cca673d11c6a173c13734b94752a1e18db
+**Destination**: <project-dir>/aidlc/spaces/default/memory/project.md
+**Heading**: ## Corrections
+**Source**: user_addition
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T07:02:23Z
+**Event**: DECISION_RECORDED
+**Checkpoint**: Construction Unit Approval
+**Unit**: u4-privacy-policy
+**Kind**: unit
+**Stage**: code-generation
+**Fingerprint**: sha256:651c267fbba53d31279776fea12aaa797c80ac4721bccf52b1ac6194a860d621
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**Options**: Approve,Request Changes
+**Asked Evidence**: {"functional-design":["sha256:914d762552e445d3c716f508a776bbf4d31d75e35b82395145d7e242d6d45633",null],"code-generation":["sha256:b5750ba38d23009db56af31608682a903bdb255bd4063effb272cc9933b919f3","sha256:5bc31315c5f5c76f4292592dbaa7e9f34e612c5c38dad37699e8f8b1e61bbb6f",{"\u0000web/src/features/privacy/README.md":"100644 4ba76199e9997d40a9dbda674217d0be93a86cf09a10ebb9e232a3a3e974f827","\u0000web/src/features/privacy/privacy-policy.md":"100644 3224f6c899ea3a00506e920cb911c0beb7083c28f76afaa0af333c3b35eb9346","\u0000web/src/features/privacy/privacy-policy.tsx":"100644 e18e1ed8dae2f270db192961202cdc0aac41e4b07ce1871b84e5c2742644be54","\u0000web/test/privacy-policy.test.mjs":"100644 8a103eb5be2d38c7ef5b08cf67b7281be27b5dedd5bbe9f73276663834d55978"}]}
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","code-generation":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1"}
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T07:03:48Z
+**Event**: HUMAN_TURN
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: b94a9601
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T07:03:48Z
+**Event**: QUESTION_REPLIED
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**Question**: Verified with `npm --prefix api run lint && npm --prefix api run typecheck && npm --prefix api run test:coverage && npm --prefix web run lint && npm --prefix web run typecheck && npm --prefix web run test:coverage && npm --prefix web run build` (exit 0). Approve this completed u4-privacy-policy?
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-20T07:03:53Z
+**Event**: GATE_APPROVED
+**Unit**: u4-privacy-policy
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Scope**: unit-end
+**Checkpoint**: construction-unit
+**Fingerprint**: sha256:651c267fbba53d31279776fea12aaa797c80ac4721bccf52b1ac6194a860d621
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","code-generation":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1"}
+**Verification Command SHA-256**: 04ae577da37582954a9661cb87bf7a597ae64f8de628f5de9ed95311c7f13ffe
+**Verification Id**: 7a3c69c3-5586-4bc0-95e7-4e858e85f446
+**Approved Evidence**: {"functional-design":["sha256:914d762552e445d3c716f508a776bbf4d31d75e35b82395145d7e242d6d45633",null],"code-generation":["sha256:b5750ba38d23009db56af31608682a903bdb255bd4063effb272cc9933b919f3","sha256:5bc31315c5f5c76f4292592dbaa7e9f34e612c5c38dad37699e8f8b1e61bbb6f",{"\u0000web/src/features/privacy/README.md":"100644 4ba76199e9997d40a9dbda674217d0be93a86cf09a10ebb9e232a3a3e974f827","\u0000web/src/features/privacy/privacy-policy.md":"100644 3224f6c899ea3a00506e920cb911c0beb7083c28f76afaa0af333c3b35eb9346","\u0000web/src/features/privacy/privacy-policy.tsx":"100644 e18e1ed8dae2f270db192961202cdc0aac41e4b07ce1871b84e5c2742644be54","\u0000web/test/privacy-policy.test.mjs":"100644 8a103eb5be2d38c7ef5b08cf67b7281be27b5dedd5bbe9f73276663834d55978"}]}
+**Session**: 7fb458c3-47b7-4304-b4dd-a68b14c3bb3c
+**User Input**: Approve
+**Person Reply**: Approve
+**Message Id**: b94a9601
+**Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:e498d709f9aaa3203adb86d316985b1ceb7e1e441b4ed612ed3e7630a5938a32","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u4-privacy-policy/aa555492f330bf5d/1.json","digest":"sha256:7ee78a158e5d4ed837a4ac359f3f01aa9b25fdf677d799feae43fa1c208e53e8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:a3f1019e0efbfe199177fa3ed27be02d63b96b24037316d79b574e3d902714b3","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u4-privacy-policy/aa555492f330bf5d/1.json","digest":"sha256:ec2e749a6086f51be62286e2ad5bf1dbb37bfabdf75d7339b0e383b2b44e9f54"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:c28a2ac2762fb5f2c552017e0332ce0f983da0a3c0fe25c86c3e74c0b2eb3789","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u4-privacy-policy/aa555492f330bf5d/1.json","digest":"sha256:ec2e749a6086f51be62286e2ad5bf1dbb37bfabdf75d7339b0e383b2b44e9f54"}}]}
+
+---
