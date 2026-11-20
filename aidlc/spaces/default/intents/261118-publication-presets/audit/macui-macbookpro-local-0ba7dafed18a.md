@@ -22440,3 +22440,414 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
 
 ---
+
+## Unit Started
+**Timestamp**: 2026-11-20T08:09:18Z
+**Event**: UNIT_STARTED
+**Stage**: nfr-design
+**Unit**: u2-applicant-screens
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T08:09:29Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/nfr-design-questions.md
+**Context**: construction > u2-applicant-screens > nfr-design > nfr-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T08:09:30Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-design
+**Decision**: Q1
+**Options**: A history.replaceState로 주소만 바꿈, B router.replace와 saved 표시, C 주소 파일 하나로 합침, X
+**Unit**: u2-applicant-screens
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T08:18:54Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["A로 하되, 첫 저장(201) 뒤 화면은 받은 presetId로 고치기 상태가 된다: 다음 [저장]은 PUT /v1/presets/{presetId}, h1은 「프리셋 고치기」, [프리셋 지우기]가 보인다. 첫 저장 뒤 두 번째 저장이 PUT으로 나가고 프리셋이 늘지 않는지 시험으로 확인한다."]
+**Message Id**: 41062a96
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T08:18:55Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: [개발자] Q1. 새 프리셋을 처음 저장하면 주소가 /presets/new에서 /presets/{id}로 바뀝니다. 두 주소가 다른 파일이라 라우터로 옮기면 화면이 새로 그려져 「저장했습니다.」와 불러온 목록이 사라집니다. 어떻게 바꿀까요?
+**Reply**: A로 하되, 첫 저장(201) 뒤 화면은 받은 presetId로 고치기 상태가 된다: 다음 [저장]은 PUT /v1/presets/{presetId}, h1은 「프리셋 고치기」, [프리셋 지우기]가 보인다. 첫 저장 뒤 두 번째 저장이 PUT으로 나가고 프리셋이 늘지 않는지 시험으로 확인한다.
+**Options**: ["A. replaceState (권장)","B. router.replace + 표시","C. 주소 파일 하나로"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T08:18:59Z
+**Event**: QUESTION_ANSWERED
+**Stage**: nfr-design
+**Details**: Q1: A로 하되, 첫 저장(201) 뒤 화면은 받은 presetId로 고치기 상태가 된다: 다음 [저장]은 PUT /v1/presets/{presetId}, h1은 「프리셋 고치기」, [프리셋 지우기]가 보인다. 첫 저장 뒤 두 번째 저장이 PUT으로 나가고 프리셋이 늘지 않는지 시험으로 확인한다.
+**Unit**: u2-applicant-screens
+**Person Reply**: A로 하되, 첫 저장(201) 뒤 화면은 받은 presetId로 고치기 상태가 된다: 다음 [저장]은 PUT /v1/presets/{presetId}, h1은 「프리셋 고치기」, [프리셋 지우기]가 보인다. 첫 저장 뒤 두 번째 저장이 PUT으로 나가고 프리셋이 늘지 않는지 시험으로 확인한다.
+**Message Id**: 41062a96
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T08:19:02Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/nfr-design-questions.md
+**Context**: construction > u2-applicant-screens > nfr-design > nfr-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T08:19:06Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/nfr-design-questions.md
+**Unit**: u2-applicant-screens
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T08:20:36Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: ebe0a03e
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T08:20:36Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: Does this all look correct before I generate the artifact?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T08:20:39Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/nfr-design-questions.md
+**Context**: construction > u2-applicant-screens > nfr-design > nfr-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-20T08:20:40Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: nfr-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/nfr-design-questions.md
+**Questions SHA-256**: 3d32b11df21412efc168faa80a1be5cdec61fa34dec278d40c0e9e413d68facb
+**Hash Scope**: confirmed-content-v2
+**Unit**: u2-applicant-screens
+**Message Id**: ebe0a03e
+**Person Reply**: Looks correct
+**Summary Authorization Id**: ba800c8150e97a7a2f47d23e691c7501330765888f9194bb3d67d5c03072b06a
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T08:21:20Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/performance-design.md
+**Context**: construction > u2-applicant-screens > nfr-design > performance-design.md
+**Summary Authorization Id**: ba800c8150e97a7a2f47d23e691c7501330765888f9194bb3d67d5c03072b06a
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T08:21:55Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md
+**Context**: construction > u2-applicant-screens > nfr-design > security-design.md
+**Summary Authorization Id**: ba800c8150e97a7a2f47d23e691c7501330765888f9194bb3d67d5c03072b06a
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T08:22:03Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md
+**Context**: construction > u2-applicant-screens > nfr-design > security-design.md
+**Summary Authorization Id**: ba800c8150e97a7a2f47d23e691c7501330765888f9194bb3d67d5c03072b06a
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T08:22:17Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/logical-components.md
+**Context**: construction > u2-applicant-screens > nfr-design > logical-components.md
+**Summary Authorization Id**: ba800c8150e97a7a2f47d23e691c7501330765888f9194bb3d67d5c03072b06a
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T08:22:32Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/traceability.json
+**Context**: construction > u2-applicant-screens > nfr-design > traceability.json
+**Summary Authorization Id**: ba800c8150e97a7a2f47d23e691c7501330765888f9194bb3d67d5c03072b06a
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T08:22:34Z
+**Event**: SENSOR_FIRED
+**Fire id**: de22ee0e
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T08:22:34Z
+**Event**: SENSOR_PASSED
+**Fire id**: de22ee0e
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/performance-design.md
+**Duration ms**: 112
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T08:22:34Z
+**Event**: SENSOR_FIRED
+**Fire id**: db42cfd6
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T08:22:34Z
+**Event**: SENSOR_PASSED
+**Fire id**: db42cfd6
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md
+**Duration ms**: 92
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T08:22:34Z
+**Event**: SENSOR_FIRED
+**Fire id**: e51daa96
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/logical-components.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T08:22:34Z
+**Event**: SENSOR_PASSED
+**Fire id**: e51daa96
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/logical-components.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T08:22:34Z
+**Event**: SENSOR_FIRED
+**Fire id**: a06add1a
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T08:22:34Z
+**Event**: SENSOR_PASSED
+**Fire id**: a06add1a
+**Sensor ID**: required-sections
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/traceability.json
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T08:22:34Z
+**Event**: SENSOR_FIRED
+**Fire id**: bd6f81de
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/performance-design.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T08:22:34Z
+**Event**: SENSOR_PASSED
+**Fire id**: bd6f81de
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/performance-design.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T08:22:35Z
+**Event**: SENSOR_FIRED
+**Fire id**: 5e08127b
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T08:22:35Z
+**Event**: SENSOR_PASSED
+**Fire id**: 5e08127b
+**Sensor ID**: traceability
+**Stage slug**: nfr-design
+**Unit**: u2-applicant-screens
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/traceability.json
+**Duration ms**: 87
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-20T08:22:35Z
+**Event**: REVIEW_REQUESTED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u2-applicant-screens
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:412d2f10bc16a7f1e0d3e6f9ecfe2fa6ef518df4dfddab04d4c0bda28277636b
+**Request Id**: review:ad0e4f180e3586cce70aa889316802d7
+**Review File**: .aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.ad0e4f180e3586cce70aa889316802d7.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T08:22:39Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-20T08:22:55Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-20T08:23:37Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: nfr-design
+**Tool**: Bash
+**Details**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets (unit u2-applicant-screens)
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T08:24:10Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.ad0e4f180e3586cce70aa889316802d7.review.md
+**Context**: .aidlc-engine > reviews > nfr-design > units > u2-applicant-screens > aa555492f330bf5d > 1.ad0e4f180e3586cce70aa889316802d7.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T08:24:18Z
+**Event**: HOST_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-20T08:24:18Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: a8f795f9514e17e20
+**Review File Digest**: .aidlc-engine/reviews/units-generation/stage/18dabf3da2f56bda/1.a5010d1a3dd0a8f252034f647bdd1f66.review.md=absent; .aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.ad0e4f180e3586cce70aa889316802d7.review.md=c172ddc67989e475ac20acfaa48ef9171a66dcc879ac37ded2c2fe9c412504b0
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-20T08:24:21Z
+**Event**: REVIEW_COMPLETED
+**Stage**: nfr-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u2-applicant-screens
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:412d2f10bc16a7f1e0d3e6f9ecfe2fa6ef518df4dfddab04d4c0bda28277636b
+**Artifact Fingerprint**: sha256:412d2f10bc16a7f1e0d3e6f9ecfe2fa6ef518df4dfddab04d4c0bda28277636b
+**Request Id**: review:ad0e4f180e3586cce70aa889316802d7
+**Review Record**: .aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.json
+**Review Record Digest**: sha256:1cc6d7996981fce6cd0b772d1fbed9af14197e2233d864754abaddd466b093e8
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-20T08:24:24Z
+**Event**: UNIT_COMPLETED
+**Stage**: nfr-design
+**Unit**: u2-applicant-screens
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
