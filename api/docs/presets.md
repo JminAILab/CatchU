@@ -75,24 +75,39 @@ Nest `Logger('Presets')`(`src/presets/presets-log.ts`)로 저장·지우기마�
 
 ## 배포
 
-변경 전 발행본은 DB 행을 마이그레이션이, PDF 사본 파일을 팀장이 지운다(BR5.1·BR5.2). 버킷은 버전 관리를 켜지 않아 지운 파일을 되살릴 수 없다([S3 안내](../../deploy/aws/s3.md)). 원본 `members/*/materials/`와 `members/` 전체는 지우지 않는다.
+변경 전 발행본은 DB 행을 마이그레이션이, PDF 사본 파일을 팀장이 지운다(BR5.1·BR5.2). 버킷은 버전 관리를 켜지 않아 지운 파일을 되살릴 수 없다([S3 안내](../../deploy/aws/s3.md)). 원본 `members/*/materials/`와 `members/` 전체는 지우지 않는다. api를 먼저 멈춘 뒤 지우므로 남은 `publications` 파일은 모두 변경 전 발행본의 사본이고, 시각으로 고르지 않는다. 명령은 한 작업 폴더에서 차례로 돌리고, 끝에 「… 성공」이 찍히지 않으면 거기서 멈춘다. 결과는 파이프 없이 파일로 받으므로 조회가 실패하면 「성공」이 찍히지 않는다.
 
 1. **main에 올리는 조건**: 발행 화면을 새 요청 모양(`presetIds`)과 막힘 칸(`blockedSources`)에 맞춘 web PR이 dev에 들어가기 전에는 dev를 main에 올리지 않는다. 이 api만 main에 나가면 main 발행 화면이 발행에 실패한다. dev에서도 그 web PR이 들어올 때까지 발행 화면은 옛 요청 모양이라 발행에 실패한다(단위 Q2). web은 사본의 새 칸을 모르는 칸으로 무시한다.
-2. **올리기 전 원본 수 적기**: `aws s3 ls s3://catchu-prod-files/members/ --recursive --profile catchu | grep -c '/materials/'`
-3. **배포**: dev를 main에 병합하면 자동 배포가 옛 api·worker를 멈추고 종료를 확인한 뒤 마이그레이션 Pod를 돌리고, 그다음 새 api·worker·web을 띄운다([EKS 자동 배포](../../deploy/aws/cd/README.md)). 마이그레이션은 프리셋 표 둘을 만들고 `DELETE FROM publication`으로 변경 전 발행본을 모두 지운 뒤(항목·쪽 사본·조각·색인·요약·JD 요약 실행이 연쇄로 지워짐) 칸 둘을 더한다. 옛 링크는 지금의 접근 불가 화면(「이 링크는 열람할 수 없습니다.」)이 된다. `down`은 칸 둘과 표 둘을 지우고 지운 발행본은 되살리지 않는다.
-4. **가르는 시각 T 확인**: 옛 api는 마이그레이션 전에 멈추고 새 api는 그 뒤에 뜨므로, 변경 전 발행본의 PDF 사본은 모두 마이그레이션 시작 시각 T보다 먼저, 새 발행본의 사본은 T보다 뒤에 만들어진다. 그래서 배포가 끝난 뒤에 T 이전의 사본만 지운다. 배포 전에 지우면 그 뒤 배포까지 옛 api가 만든 사본이 남고, 배포 뒤 `publications` 전체를 지우면 새 사본도 지워진다. T는 배포 실행 기록의 「migration 성공: … 시작 …」 값이고, `kubectl -n catchu get pod catchu-migrate-<배포 커밋 앞 12자리> -o jsonpath='{.status.startTime}'`로도 본다.
-5. **지울 목록 만들기(dry-run)**: 아래로 목록 파일만 만들고 아무것도 지우지 않는다. 둘째 수가 0인지(목록에 `publications` 밖 파일이 없는지) 보고, 목록이 `members/<회원>/publications/<발행본>/` 아래 파일뿐인지 열어 본다.
+2. **api 멈추기**: 새 발행과 진행 중인 PDF 복사를 멈추려고 api만 0으로 줄인다. worker는 파일을 쓰지 않는다. 첫 줄이 찍는 원래 수를 적어 두고, 셋째 줄이 「No resources found」를 낼 때까지 다시 본다. 이때부터 배포가 끝날 때까지(최근 main 배포 10\~13분) 서비스가 멈춘다.
 
    ```bash
-   T='<4의 시각>'
-   aws s3api list-objects-v2 --bucket catchu-prod-files --prefix members/ --query 'Contents[].[LastModified,Key]' --output text --profile catchu | awk -v t="$T" '$2 ~ /\/publications\// && $1 < t {print $2}' > old-copies.txt
-   wc -l < old-copies.txt
-   grep -vc '/publications/' old-copies.txt
+   kubectl -n catchu get deployment api -o jsonpath='{.spec.replicas}' && echo
+   kubectl -n catchu scale deployment/api --replicas=0 && echo 멈추기 요청 성공
+   kubectl -n catchu get pod -l app.kubernetes.io/name=api
    ```
 
-6. **지우기**: `while read -r key; do aws s3 rm "s3://catchu-prod-files/$key" --profile catchu; done < old-copies.txt`
-7. **사후 확인**: 5의 둘째 줄(목록 만들기)을 다시 돌려 `wc -l < old-copies.txt`가 0인지, 2의 원본 수가 그대로인지 본다.
-8. **팀원 로컬**: 로컬 폴더에 남은 옛 사본은 가리키는 행이 없어 열리지 않으므로 지우기는 선택이다.
+3. **지우기 전 목록**: `aws s3 ls s3://catchu-prod-files/members/ --recursive --profile catchu > before.txt && echo 조회 성공`
+4. **지울 목록 확인(dry-run)**: 아무것도 지우지 않고 지울 목록만 받는다. 둘째 줄과 셋째 줄의 수가 같고, 넷째 줄이 아무것도 찍지 않아야(사본 키 모양 `members/<회원>/publications/<발행본>/<항목>.pdf`에 맞지 않는 줄이 없어야) 다음으로 간다.
+
+   ```bash
+   aws s3 rm s3://catchu-prod-files/members/ --recursive --exclude '*' --include '*/publications/*' --dryrun --profile catchu > dry-run.txt && echo 조회 성공
+   grep -c '/publications/' before.txt
+   grep -c . dry-run.txt
+   grep -vE '^\(dryrun\) delete: s3://catchu-prod-files/members/[0-9a-f-]{36}/publications/[0-9a-f-]{36}/[0-9a-f-]{36}\.pdf$' dry-run.txt
+   ```
+
+5. **지우기**: `aws s3 rm s3://catchu-prod-files/members/ --recursive --exclude '*' --include '*/publications/*' --profile catchu > deleted.txt && echo 지우기 성공`
+6. **지운 뒤 확인**: 둘째 줄이 0이고 셋째 줄이 「원본 그대로」를 찍어야 한다. api가 멈춰 있어 이용자가 원본을 지우는 일이 없으므로, 원본 키 목록이 다르면 원인을 확인하기 전에는 원본 보존을 확인했다고 적지 않는다.
+
+   ```bash
+   aws s3 ls s3://catchu-prod-files/members/ --recursive --profile catchu > after.txt && echo 조회 성공
+   grep -c '/publications/' after.txt
+   diff <(grep '/materials/' before.txt | awk '{print $4}') <(grep '/materials/' after.txt | awk '{print $4}') && echo 원본 그대로
+   ```
+
+7. **배포**: dev를 main에 병합한다. 자동 배포가 api·worker를 멈추고(api는 이미 0) 종료를 확인한 뒤 마이그레이션 Pod를 돌리고, 그다음 새 api·worker·web을 띄운다([EKS 자동 배포](../../deploy/aws/cd/README.md)). 마이그레이션은 프리셋 표 둘을 만들고 `DELETE FROM publication`으로 변경 전 발행본을 모두 지운 뒤(항목·쪽 사본·조각·색인·요약·JD 요약 실행이 연쇄로 지워짐) 칸 둘을 더한다. 옛 링크는 지금의 접근 불가 화면(「이 링크는 열람할 수 없습니다.」)이 된다. `down`은 칸 둘과 표 둘을 지우고 지운 발행본은 되살리지 않는다.
+8. **배포가 멈추면**: 실행 기록에 「migration 성공」이 없으면(마이그레이션 전에 멈춤) `kubectl -n catchu scale deployment/api --replicas=<2의 원래 수>`로 옛 api를 다시 띄운다. 이미 지운 옛 사본 PDF는 열리지 않는다(버릴 발행본이라 받아들인다). 「migration 성공」 뒤에 멈췄으면 옛 api를 띄우지 않고 [EKS 자동 배포](../../deploy/aws/cd/README.md)의 실패 처리를 따른다. 옛 api는 새 칸이 생긴 DB에 발행할 수 없다.
+9. **팀원 로컬**: 로컬 폴더에 남은 옛 사본은 가리키는 행이 없어 열리지 않으므로 지우기는 선택이다.
 
 ## 시험
 
