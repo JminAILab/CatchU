@@ -26156,3 +26156,22 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
 
 ---
+
+## Unit Skipped
+**Timestamp**: 2026-11-20T12:21:51Z
+**Event**: UNIT_SKIPPED
+**Stage**: infrastructure-design
+**Unit**: u3-reader-views
+**Reason**: U3는 web 화면(탭·출처 이동·자료 화면 탭·지우기 확인 문장)만 바꾸고 새 AWS 자원·배포 단위·CI 변경·api 호출이 없어(단위 정의 U3, NFR 설계 logical-components) 인프라 설계의 조건에 걸리는 것이 없다
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Stage Skip
+**Timestamp**: 2026-11-20T12:21:51Z
+**Event**: STAGE_SKIPPED
+**Stage**: infrastructure-design
+**Reason**: No unit needs this stage; the last, "u3-reader-views", was skipped: U3는 web 화면(탭·출처 이동·자료 화면 탭·지우기 확인 문장)만 바꾸고 새 AWS 자원·배포 단위·CI 변경·api 호출이 없어(단위 정의 U3, NFR 설계 logical-components) 인프라 설계의 조건에 걸리는 것이 없다
+**Skip Kind**: conditional-runtime
+
+---
