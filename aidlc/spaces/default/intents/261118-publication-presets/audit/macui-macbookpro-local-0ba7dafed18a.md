@@ -22851,3 +22851,13 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
 
 ---
+
+## Unit Skipped
+**Timestamp**: 2026-11-20T08:24:45Z
+**Event**: UNIT_SKIPPED
+**Stage**: infrastructure-design
+**Unit**: u2-applicant-screens
+**Reason**: U2는 web 화면과 api 본인 Catch 목록 조건 하나만 바꾸고 새 AWS 자원·배포 단위·CI 변경이 없어(단위 정의 U2, NFR 설계 logical-components) 인프라 설계의 조건에 걸리는 것이 없다
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
