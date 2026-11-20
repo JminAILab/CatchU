@@ -224,6 +224,8 @@ bash deploy/aws/scripts/logs.test.sh       # 위와 같음
 
 #276 완료 기준마다 어떤 증거를 어디서 남기는지다. 증거는 단계를 마칠 때 #276 댓글이나 해당 PR에 남기고 계정 번호는 가린다.
 
+표의 큐 「키트 시나리오」 확인은 [2026-11-18 팀장 결정과 실행 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553)에 따라 실제 api·worker 클라이언트의 연결·허용 명령 확인으로 갈음했다. 실제 분석·수신은 [5단계 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에 있고, 장애 조치 뒤 worker가 새 작업을 받는 문제는 [#603](https://github.com/JminAILab/CatchU/issues/603)에서 별도로 확인한다.
+
 | #276 완료 기준 | 남길 증거 | 단계 | 이 폴더의 근거 |
 |---|---|---|---|
 | 서비스·사양·권한·할당량·비용·사용 기간·종료 절차를 확인하고 합의한 구성으로 자원 준비 | vCPU 할당량 조회, 생성 스크립트의 확인 값, 예산 누적액, 이 문서의 삭제 순서 | 0·1 | `cluster.yaml`, `scripts/` 전체, 「삭제 순서」 |
