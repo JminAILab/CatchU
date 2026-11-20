@@ -14803,3 +14803,450 @@
 **Stage**: delivery-planning
 
 ---
+
+## Human Turn
+**Timestamp**: 2026-11-19T23:45:34Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Open Question**: construction-staffing
+**Picked**: ["Just me"]
+**Message Id**: aeb608d9
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-19T23:45:34Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: Inception이 끝났고 계획에는 단위가 4개 있습니다. 누가 만들까요?
+**Reply**: Just me
+**Options**: ["Just me","Several teams"]
+
+---
+
+## Unit Ownership Set
+**Timestamp**: 2026-11-19T23:45:38Z
+**Event**: UNIT_OWNERSHIP_SET
+**Mode**: solo
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-19T23:47:04Z
+**Event**: UNIT_STARTED
+**Stage**: functional-design
+**Unit**: u1-preset-contract
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-19T23:48:54Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-design-questions.md
+**Context**: construction > u1-preset-contract > functional-design > functional-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-19T23:48:56Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Q1, Q2, Q3, Q4
+**Options**: |Q1: A. 세기 경로 하나|Q1: B. 고르기 목록 셋에 글자 수|Q2: A. 소유와 존재만|Q2: B. 새로 담는 자료만 자격|Q3: A. 한 번 읽어 끝까지|Q3: B. 트랜잭션 안에서 다시 읽어 거부|Q4: A. 팀장이 저장소에서 직접|Q4: B. 한 번 쓰는 api 명령
+**Unit**: u1-preset-contract
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T00:00:03Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["A로 하되, 편집 화면은 담긴 자료뿐 아니라 고르기 목록에 불러온 자료(Catch 쪽, 텍스트 자료, PDF)도 이 경로로 물어, M3처럼 담으면 60,000자를 넘는 자료의 단추를 담기 전에 막는다. 한 번에 받는 자료 수 상한은 기능 설계에서 정한다.","A. 소유와 존재만","A. 한 번 읽어 끝까지","A로 하되, 배포 안내와 PR 본문에 지울 곳을 발행본 사본 폴더(members/*/publications/)로만 적고 원본(members/*/materials/)과 members/ 전체는 지우지 않는다고 적는다. S3는 먼저 --dryrun으로 지울 목록을 확인한 뒤 지우고, 팀원 로컬 폴더에 남은 사본은 가리키는 행이 없어 열리지 않으므로 지우기는 선택으로 적는다."]
+**Message Id**: 98eca70a
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T00:00:04Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [설계] Q1. 편집 화면은 자료마다의 글자 수를 어디서 얻을까요? 편집 중에 새로 고른 자료는 글자 수를 알 방법이 없고, 발행과 같은 방식으로 세어야 해서 화면이 직접 셈 수도 없습니다(FR1.7, M3).
+**Reply**: A로 하되, 편집 화면은 담긴 자료뿐 아니라 고르기 목록에 불러온 자료(Catch 쪽, 텍스트 자료, PDF)도 이 경로로 물어, M3처럼 담으면 60,000자를 넘는 자료의 단추를 담기 전에 막는다. 한 번에 받는 자료 수 상한은 기능 설계에서 정한다.
+**Options**: ["A. 세기 경로 하나","B. 고르기 목록 셋에 칸"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T00:00:04Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [설계] Q2. 프리셋을 저장할 때 자료가 발행 자격이 있는지도 볼까요? 담은 뒤에 숨긴 Catch는 목록에 남기고 이유를 보입니다(FR1.11).
+**Reply**: A. 소유와 존재만
+**Options**: ["A. 소유와 존재만","B. 새로 담는 것만 자격 확인"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T00:00:04Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [설계] Q3. 발행하는 동안 프리셋이 바뀌면 어떻게 할까요? PDF 사본을 트랜잭션 전에 복사해야 해서, 프리셋은 트랜잭션 밖에서 먼저 읽어 펴야 합니다. 그 사이에 프리셋을 고치거나 지울 수 있습니다.
+**Reply**: A. 한 번 읽어 끝까지
+**Options**: ["A. 한 번 읽어 끝까지","B. 다시 읽어 다르면 거부"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T00:00:04Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [설계] Q4. 변경 전 발행본의 PDF 사본 파일은 어떻게 지울까요? 마이그레이션은 DB 행만 지울 수 있습니다(FR5.1).
+**Reply**: A로 하되, 배포 안내와 PR 본문에 지울 곳을 발행본 사본 폴더(members/*/publications/)로만 적고 원본(members/*/materials/)과 members/ 전체는 지우지 않는다고 적는다. S3는 먼저 --dryrun으로 지울 목록을 확인한 뒤 지우고, 팀원 로컬 폴더에 남은 사본은 가리키는 행이 없어 열리지 않으므로 지우기는 선택으로 적는다.
+**Options**: ["A. 팀장이 직접 지움","B. 한 번 쓰는 api 명령"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T00:00:14Z
+**Event**: QUESTION_ANSWERED
+**Stage**: functional-design
+**Details**: Q1: A로 하되, 편집 화면은 담긴 자료뿐 아니라 고르기 목록에 불러온 자료(Catch 쪽, 텍스트 자료, PDF)도 이 경로로 물어, M3처럼 담으면 60,000자를 넘는 자료의 단추를 담기 전에 막는다. 한 번에 받는 자료 수 상한은 기능 설계에서 정한다.; Q2: A. 소유와 존재만; Q3: A. 한 번 읽어 끝까지; Q4: A로 하되, 배포 안내와 PR 본문에 지울 곳을 발행본 사본 폴더(members/*/publications/)로만 적고 원본(members/*/materials/)과 members/ 전체는 지우지 않는다고 적는다. S3는 먼저 --dryrun으로 지울 목록을 확인한 뒤 지우고, 팀원 로컬 폴더에 남은 사본은 가리키는 행이 없어 열리지 않으므로 지우기는 선택으로 적는다.
+**Unit**: u1-preset-contract
+**Person Reply**: A로 하되, 편집 화면은 담긴 자료뿐 아니라 고르기 목록에 불러온 자료(Catch 쪽, 텍스트 자료, PDF)도 이 경로로 물어, M3처럼 담으면 60,000자를 넘는 자료의 단추를 담기 전에 막는다. 한 번에 받는 자료 수 상한은 기능 설계에서 정한다.\nA. 소유와 존재만\nA. 한 번 읽어 끝까지\nA로 하되, 배포 안내와 PR 본문에 지울 곳을 발행본 사본 폴더(members/*/publications/)로만 적고 원본(members/*/materials/)과 members/ 전체는 지우지 않는다고 적는다. S3는 먼저 --dryrun으로 지울 목록을 확인한 뒤 지우고, 팀원 로컬 폴더에 남은 사본은 가리키는 행이 없어 열리지 않으므로 지우기는 선택으로 적는다.
+**Message Id**: 98eca70a
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T00:00:26Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-design-questions.md
+**Unit**: u1-preset-contract
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T00:02:26Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: f701c082
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T00:02:26Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: Does this all look correct before I generate the artifact?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-20T00:02:34Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: functional-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-design-questions.md
+**Questions SHA-256**: 0bab9951b4cc3107e5a08d58660245a86c1ea5b8e221e26e6e0457ff8d74325b
+**Hash Scope**: confirmed-content-v2
+**Unit**: u1-preset-contract
+**Message Id**: f701c082
+**Person Reply**: Looks correct
+**Summary Authorization Id**: 41ecfe52be2cbb48e4ee7996590bfd163aaf0c0e5d2f95577ee0dc99bc8a22fa
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:03:38Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/entities.md
+**Context**: construction > u1-preset-contract > functional-design > entities.md
+**Summary Authorization Id**: 41ecfe52be2cbb48e4ee7996590bfd163aaf0c0e5d2f95577ee0dc99bc8a22fa
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:04:43Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/rules.md
+**Context**: construction > u1-preset-contract > functional-design > rules.md
+**Summary Authorization Id**: 41ecfe52be2cbb48e4ee7996590bfd163aaf0c0e5d2f95577ee0dc99bc8a22fa
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:05:49Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md
+**Context**: construction > u1-preset-contract > functional-design > functional-spec.md
+**Summary Authorization Id**: 41ecfe52be2cbb48e4ee7996590bfd163aaf0c0e5d2f95577ee0dc99bc8a22fa
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:06:34Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/traceability.json
+**Context**: construction > u1-preset-contract > functional-design > traceability.json
+**Summary Authorization Id**: 41ecfe52be2cbb48e4ee7996590bfd163aaf0c0e5d2f95577ee0dc99bc8a22fa
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T00:06:55Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/functional-design/memory.md
+**Context**: construction > functional-design > memory.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T00:06:58Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/functional-design/memory.md
+**Context**: construction > functional-design > memory.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:06:59Z
+**Event**: SENSOR_FIRED
+**Fire id**: 2bc3bbc3
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/entities.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:07:00Z
+**Event**: SENSOR_PASSED
+**Fire id**: 2bc3bbc3
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/entities.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:07:00Z
+**Event**: SENSOR_FIRED
+**Fire id**: e082dce2
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/rules.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:07:00Z
+**Event**: SENSOR_PASSED
+**Fire id**: e082dce2
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/rules.md
+**Duration ms**: 90
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:07:00Z
+**Event**: SENSOR_FIRED
+**Fire id**: 90c72e80
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:07:00Z
+**Event**: SENSOR_PASSED
+**Fire id**: 90c72e80
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:07:00Z
+**Event**: SENSOR_FIRED
+**Fire id**: e3433148
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:07:00Z
+**Event**: SENSOR_PASSED
+**Fire id**: e3433148
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/traceability.json
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:07:00Z
+**Event**: SENSOR_FIRED
+**Fire id**: 3415fd54
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/entities.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:07:00Z
+**Event**: SENSOR_PASSED
+**Fire id**: 3415fd54
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/entities.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:07:00Z
+**Event**: SENSOR_FIRED
+**Fire id**: 3cb3af75
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:07:00Z
+**Event**: SENSOR_PASSED
+**Fire id**: 3cb3af75
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/traceability.json
+**Duration ms**: 90
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-20T00:07:01Z
+**Event**: REVIEW_REQUESTED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u1-preset-contract
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:87b7fbd4c9f8fb9952fa22d38a3ad72832a230ff243079b3da16454c291a6830
+**Request Id**: review:c82b2b917ffda407e10b9ea476e8a605
+**Review File**: .aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.c82b2b917ffda407e10b9ea476e8a605.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:07:09Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-20T00:07:20Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:10:27Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.c82b2b917ffda407e10b9ea476e8a605.review.md
+**Context**: .aidlc-engine > reviews > functional-design > units > u1-preset-contract > aa555492f330bf5d > 1.c82b2b917ffda407e10b9ea476e8a605.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T00:10:35Z
+**Event**: HOST_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-20T00:10:35Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: aebf6abf33fc0e7ad
+**Review File Digest**: .aidlc-engine/reviews/units-generation/stage/18dabf3da2f56bda/1.a5010d1a3dd0a8f252034f647bdd1f66.review.md=absent; .aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.c82b2b917ffda407e10b9ea476e8a605.review.md=4f16972488ba677546443e4579d56cfea35e923f11c8100008294557e72e7c6a
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-20T00:10:57Z
+**Event**: REVIEW_COMPLETED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u1-preset-contract
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:87b7fbd4c9f8fb9952fa22d38a3ad72832a230ff243079b3da16454c291a6830
+**Artifact Fingerprint**: sha256:87b7fbd4c9f8fb9952fa22d38a3ad72832a230ff243079b3da16454c291a6830
+**Request Id**: review:c82b2b917ffda407e10b9ea476e8a605
+**Review Record**: .aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json
+**Review Record Digest**: sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-20T00:10:57Z
+**Event**: UNIT_COMPLETED
+**Stage**: functional-design
+**Unit**: u1-preset-contract
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---

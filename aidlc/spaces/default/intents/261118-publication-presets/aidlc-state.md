@@ -46,6 +46,13 @@
 
 - **Construction Verification Command**: npm --prefix api run lint && npm --prefix api run typecheck && npm --prefix api run test:coverage && npm --prefix web run lint && npm --prefix web run typecheck && npm --prefix web run test:coverage && npm --prefix web run build
 
+- **Unit Ownership**: solo
+
+- **Skeleton Stance**: scope-dependent
+
+
+
+
 ## Phase Progress
 <!-- Status values: Pending, Active, Verified, Skipped -->
 
@@ -106,7 +113,7 @@
 - **Current Stage**: functional-design
 - **Next Stage**: nfr-requirements
 - **Status**: Running
-- **Last Updated**: 2026-11-19T23:44:42Z
+- **Last Updated**: 2026-11-20T00:10:57Z
 
 ## Session Resume Point
 - **Last Completed Stage**: delivery-planning
