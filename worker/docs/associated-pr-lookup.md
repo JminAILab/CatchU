@@ -121,14 +121,14 @@ HTTP 200도 `errors`가 있으면 성공이 아니다. `errors`와 일부 `data`
 - 단일 응답 크기를 넘으면 묶음의 모든 커밋이 `LIMITED`다(커밋마다 부를 때는 그 커밋만이었다).
 - 커밋 하나에 연결 PR이 여러 개면 GraphQL은 기본으로 만든 순서대로 준다. REST의 순서는 문서에 없어 PR 번호의 순서가 다를 수 있다. 판정은 번호의 순서를 쓰지 않는다.
 
-## 검사와 실제 연결 전 확인할 것
+## 검사와 실제 연결 확인 범위
 
 합성 검사(실제 GitHub 없음): `tests/test_collection_graphql.py`(쿼리 틀·변수, 응답 대응, 실패 분류, 점수 기록), `tests/test_collection_lookup_batches.py`(묶음 경계·순서, 앞 묶음 보존, 점수 소진), `tests/test_lookup_call_budget.py`(위 비교의 이번 판본 호출 수와 후보 판정 도달), `tests/test_collection_relations.py`·`test_candidate_cases.py`(기존 관계·후보 사례를 묶음 조회로). 시험용 전송 대역은 GraphQL 요청 본문을 수집 코드와 따로 검사하고, 사례가 정하지 않은 SHA를 빈 목록이 아니라 시험 실패로 둔다. 부르지 않았다는 확인은 요청 본문의 SHA로 한다. 실제 POST 전송(방식·본문·머리글 전달, 고정 호스트, 우회 이동, 크기, 대기, 비밀값)은 `tests/test_collection_transport.py`가 가짜 연결과 이 컴퓨터 안의 시험 서버로 확인한다(TLS·api.github.com 제외).
 
 실측으로 확인한 것과 아직 아닌 것:
 
 - **확인함(2026-10-12, TheMe PR 2건)**: 같은 PR을 REST PR 목록(`GET /repos/{owner}/{repo}/pulls`, 연결 PR API와 같은 PR 요약 모양)과 대조했다. 봇 작성자의 숫자 ID가 REST `user.id`와 같다. 머리·기준 커밋, 두 브랜치 이름, 열린 상태(`OPEN`→open), 만든 시각, 제목, 본문, 포크 여부가 같다. 두 PR 모두 열려 있어 닫은·병합 시각은 둘 다 null인 것만 확인했다. 로그인은 GraphQL `dependabot`, REST `dependabot[bot]`으로 다르다. 100개 묶음이 1점이고 없는 SHA는 null로 온다.
-- **확인하지 못함**: 사용자·Mannequin·조직·GitHub Enterprise 계정 작성자의 숫자 ID(두 PR 모두 봇. GitHub Enterprise 계정이 공개 저장소 PR의 작성자로 오는 조건은 문서에 없다), 삭제된 계정 작성자(REST ghost, GraphQL null), 닫히거나 병합된 PR의 상태(`CLOSED`·`MERGED`→closed)와 `closedAt`·`mergedAt` 값, 병합된 PR의 `mergeCommit.oid`와 `merge_commit_sha`, 저장소 접근이 막혔을 때의 응답 모양, PR이 많은 묶음의 처리 시간.
-- **[#121](https://github.com/JminAILab/CatchU/issues/121) 실제 연결에서 함께 대조할 것(제안)**: A가 줄 토큰으로 이 쿼리가 실행되는지와 그 한도, PR 번호와 함께 작성자 숫자 ID·병합 커밋 SHA·병합 시각이 REST와 같은지, 요청 하나의 실제 호출 수·점수·시간. #121의 완료 기준을 이 문서가 바꾸지는 않는다.
+- **확인함(2026-10-16)**: [#121 실제 연결](https://github.com/JminAILab/CatchU/issues/121#issuecomment-6217635496)에서 A가 보관한 토큰으로 catchu-live-test 커밋 15개와 algo-problem 최근 100개의 GraphQL·REST 연결 PR을 대조했다. PR 번호·작성자 숫자 ID·병합 커밋·병합 시각·상태가 같고, 묶음 하나가 1점이었다. 실제 요청의 호출 수·수집 시간도 그 기록에 있다. 병합·squash·rebase별 PR 대응은 [#118 결과](https://github.com/JminAILab/CatchU/issues/118#issuecomment-6217636060)를 따른다.
+- **위 기록만으로 확인되지 않는 것**: Mannequin·조직·GitHub Enterprise·삭제된 계정의 작성자 값, `closedAt`, 접근 거절 응답의 모든 형태, PR이 많은 묶음의 처리 시간. 정상 대조 결과를 다른 계정 종류·실패·성능 조건 전체로 확대하지 않는다.
 
 기준 판본 `e09a633`의 REST 연결 PR 조회 코드는 이번 판본에서 지웠고, 비교용 REST 경로를 운영 코드에 남기지 않았다. 다시 대조하려면 `e09a633`을 꺼낸 작업 폴더의 `worker/tests/`에 이 판본의 `tests/call_budget_shapes.py`를 복사하고, 모양마다 `build(shape).scenario`를 `run_case(..., limits=PROPOSED_LIMITS)`로 돌려 호출 경로를 종류별로 센다. 그 판본의 연결 PR 조회는 REST 경로 `/commits/{sha}/pulls?`이다.

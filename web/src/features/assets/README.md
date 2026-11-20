@@ -14,11 +14,11 @@ B 담당의 제품 `/assets`와 개발용 미리보기를 관리한다. 제품 �
 `src/app/(member)/assets/page.tsx`가 `AssetsMemberPage`를 연다. `(member)`의 `MemberShell`이 로그인·헤더를 담당하고 `AssetsMemberBoundary`가 회원 변경 시 저장소 이름·Catch 목록/상세·D 모달을 함께 초기화한다. 별도 로그인·토큰 저장소를 만들지 않는다.
 
 - `web/.env.example`에 따라 `NEXT_PUBLIC_API_BASE_URL`을 API 주소(`/v1` 제외)로 설정한다. 개발용 로그인은 web과 api 양쪽에서 허용할 때만 사용한다. 실행 안내는 [공통 web README](../../../README.md)를 따른다.
-- `/assets`에 들어가면 미인증 상태는 `/login?next=…`로 이동한다. 로그인 후 저장소 필터와 Catch 상세 주소로 돌아간다. 현재 메모리 토큰은 새로고침 시 다시 로그인이 필요하며 실제 Google OAuth 연결을 의미하지 않는다.
+- `/assets`에 들어가면 공통 회원 가드가 세션 복원을 먼저 시도하고, 미인증이 확정되면 `/login?next=…`로 이동한다. 로그인 후 저장소 필터와 Catch 상세 주소로 돌아간다. 제품 기본은 Refresh 쿠키로 새로고침 뒤 인증을 복원하며, 통합 시험 전환을 끈 빌드만 메모리 토큰이 사라져 다시 로그인이 필요하다([공통 인증](../auth-session/README.md)).
 - B 조회·저장은 `createCatchApi(api.member)`, D 모달은 `createRepositoryApi(api.member)`를 사용한다. 두 인스턴스와 `accessTokenStore`는 모듈 수준의 안정적인 객체다.
 - 저장소 이름은 별도로 조회한다. 로딩·실패는 필터 아래에 표시하며 Catch 목록·상세를 숨기지 않는다. 정상 0건과 실패를 구분하고, 이름을 몰라도 URL 필터와 조회된 Catch를 유지한다. GitHub 연결이 없거나 다시 연동해야 해서 `/v1/me/repositories`가 403 `GITHUB_CONNECTION_REQUIRED`이면 실패 안내를 보이지 않는다. 연동 안내는 위쪽 연결 관리가 맡는다. 다른 403·500·통신 오류에는 지금처럼 실패 안내와 [다시 불러오기]를 보인다(#613). 이름 다시 불러오기는 Catch의 필터·페이지·저장 결과를 초기화하지 않는다.
 - D 일반 닫기는 B 목록을 갱신하고 저장소 이름도 다시 조회한다. [이 저장소 Catch 보기]는 선택한 저장소의 목록과 이름을 갱신하며 일반 닫기 콜백을 추가 호출하지 않는다.
-- 새 저장소 선택·동의·분석 요청은 [#154](https://github.com/JminAILab/CatchU/issues/154)의 `connectSection`, GitHub 연동·복귀는 회원 담당 화면에서 연결한다. 제품 조립만으로 이 기능들이 구현된 것은 아니다.
+- 저장소 직접 등록·선택·동의·분석 요청은 `RepositoryManagement`의 제품 요청 영역에 연결돼 있다([분석 요청](../analysis-request/README.md)). `connectSection`은 미리보기·시험에서 영역을 바꾸는 자리이며, 제품은 기본 조립을 쓴다. GitHub 연동·복귀는 [회원 연동 화면](../github-connection/README.md)이 맡는다.
 
 연결 기반은 [#185 공통 인증](https://github.com/JminAILab/CatchU/pull/185)·[#187 저장소 관리](https://github.com/JminAILab/CatchU/pull/187)다. 실제 API에는 `/me`, `/me/repositories`, `/analysis-requests`와 B Catch 조회·저장 경로가 필요하다. 없는 API를 모의 성공 응답으로 바꾸지 않는다. 검증 시 실제 서버·DB와 합성 HTTP 대역을 구분한다.
 
@@ -65,9 +65,9 @@ Catch 상세 모달은 위에서부터 작업 사실·나의 기여 → 근거 �
 
 ## 연결 경계와 제안
 
-현재 `/preview/assets`는 개발용 주소다. 실제 내 자산 주소·회원 가드·헤더·공통 스타일은 [#106](https://github.com/JminAILab/CatchU/issues/106)에서 조율한다. 이번 CSS 모듈은 이 미리보기에만 적용하며 새 스타일 도구를 도입하지 않는다.
+`/preview/assets`는 개발용 주소이며 제품 `/assets`는 위 「제품 페이지 연결」의 회원 가드·헤더와 공통 스타일을 사용한다. 미리보기와 제품 모두 컴포넌트별 CSS Modules를 사용한다.
 
-미리보기 래퍼의 바깥 여백은 `0`이며 `body` 여백을 음수 값으로 상쇄하지 않는다. 독립 미리보기에서는 브라우저 기본 `body` 여백 8px을 허용하고, [공통 레이아웃 PR #171](https://github.com/JminAILab/CatchU/pull/171)의 `body { margin: 0; }`과 합치면 바깥 여백도 0이 된다. 연결할 때 좌우 잘림과 가로 스크롤이 없는지 확인한다.
+미리보기 래퍼의 바깥 여백은 `0`이며 `body` 여백을 음수 값으로 상쇄하지 않는다. 공통 `globals.css`의 `body { margin: 0; }`도 적용된다. 제품 회원 화면의 최소 폭과 가로 스크롤 규칙은 [공통 web README](../../../README.md)를 따른다.
 
 | 연결 | 이번 구현·제안 |
 |---|---|
@@ -78,7 +78,7 @@ Catch 상세 모달은 위에서부터 작업 사실·나의 기여 → 근거 �
 | 상세 팝업 | B의 제안은 `catchId`. 닫으면 해당 파라미터만 제거하며 필터를 유지한다. |
 | 자산 종류 탭 | 두지 않는다(#416 팀장 요청, 2026-11-03). 예전 주소의 `tab`은 무시한다. 텍스트 자료는 `/materials`다. |
 | 저장소 연결 관리 | 제품 페이지는 `AssetsConnected.repositoryManagement`에 [#153](https://github.com/JminAILab/CatchU/issues/153)의 D 모달을 넣는다. 독립 미리보기의 자리 안내와 구분한다. |
-| 목록·상세 데이터 | `AssetsView`가 받은 자료와 상태를 표시한다. [#130](https://github.com/JminAILab/CatchU/issues/130)의 본인 조회 API와 #106 인증을 연결하기 전에는 권한·실제 재조회·페이지네이션 검증 완료로 보지 않는다. |
+| 목록·상세 데이터 | `AssetsView`가 받은 자료와 상태를 표시한다. 제품은 `AssetsConnected`·`createCatchApi(api.member)`로 본인 조회 API에 연결하고, 미리보기는 합성 자료를 쓴다. |
 
 `scenario`, `detailScenario`는 개발용 예외 상태 선택기다. 제품 주소 규약에 포함하지 않는다. URL에는 합성 저장소·Catch 식별자와 예시 상태만 두며 토큰이나 본문을 넣지 않는다. API 연결 시 합성 자료로 오류를 대체하지 않고, 별도 조회 상태를 그대로 전달해야 한다.
 
@@ -88,7 +88,7 @@ Catch 상세 모달은 위에서부터 작업 사실·나의 기여 → 근거 �
 - [API v1 공통 스키마](../../../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml): Catch·Evidence·Draft·Reflection. 이 폴더의 타입은 계약 필드를 화면용 readonly로 표현한다.
 - [9/24 후속 결정](../../../../docs/ai-dlc-input-mvp/2026-09-14_followup.md): 불일치가 확인·공개를 자동 변경하지 않으며, 미공개와 숨김은 별도 값이 아니다.
 
-기준 판본은 `dev`의 `4de4118`이다. API 계약·공식 AI-DLC 기록은 변경하지 않았다.
+초기 미리보기 작업의 기준 판본은 `dev`의 `4de4118`이었다. 현재 제품 조립은 위 절과 코드가 기준이며, 당시 API 계약·공식 AI-DLC 기록을 바꾸지 않은 사실은 그대로다.
 
 ## 목록 API 연결 구성 (#168)
 
@@ -97,11 +97,11 @@ Catch 상세 모달은 위에서부터 작업 사실·나의 기여 → 근거 �
 - `createCatchApi(transport)`: transport는 `/catches` 상대 경로와 method/body/signal/cache를 받아 공통 `ApiResult`를 반환한다. #106이 API 기준 주소·`/v1`·Bearer·401 인증 만료를 처리하고, `readApiResponse`로 응답을 해석한다. PUT의 객체 body는 transport에서 JSON으로 직렬화한다.
 - `AssetsConnected`: `repositoryId`·`authorDescription`·`catchId`를 주소와 맞추며 필터 변경과 뒤로 가기 때 다시 조회한다. 목록에 아직 없는 Catch도 별도 상세 GET으로 연다. 저장소 이름은 Catch 데이터에 없으므로 `repositories`로 공급한다. 이름이 준비되지 않았다고 서버가 반환한 Catch를 숨기지 않는다.
 - `assets-store`: 목록 열쇠는 저장소·작성자 설명 걸러 보기(`CatchListFilter`)이고 열쇠별 cursor 초기화, 이전 응답 무시·요청 중단, 동시 재조회 합치기, 다음 페이지 실패 시 기존 목록 유지, 같은 Catch 중복 제거를 담당한다. 조회 실패를 합성 자료나 정상 0건으로 대체하지 않는다.
-- D 슬롯의 `onShowRepository(repositoryId)`는 필터 적용·상세 닫기·목록 재조회, `onClosed()`는 현재 필터 재조회다. 저장소 보기로 닫으면 `onClosed`를 추가 호출하지 않는다. 같은 저장소를 다시 골라도 재조회하며, 기존 조회가 진행 중이면 끝난 뒤 새 조회를 한 번 실행한다. 같은 조회 중 반복된 D 갱신은 하나로 합치고, 필터 변경·화면 해제 시 이전 갱신 예약을 버린다. 후속 조회도 실패하면 사용자 재조회를 기다린다. D가 모달을 열기 직전에 `onOpen()`을 호출해 Catch 상세를 먼저 닫는 경계를 추가 제안한다. D의 실제 모달 구현은 #153에 남아 있다.
+- D 슬롯의 `onShowRepository(repositoryId)`는 필터 적용·상세 닫기·목록 재조회, `onClosed()`는 현재 필터 재조회다. 저장소 보기로 닫으면 `onClosed`를 추가 호출하지 않는다. 같은 저장소를 다시 골라도 재조회하며, 기존 조회가 진행 중이면 끝난 뒤 새 조회를 한 번 실행한다. 같은 조회 중 반복된 D 갱신은 하나로 합치고, 필터 변경·화면 해제 시 이전 갱신 예약을 버린다. 후속 조회도 실패하면 사용자 재조회를 기다린다. 제품의 D 모달은 열기 직전 `onOpen()`을 호출해 Catch 상세를 먼저 닫는다.
 
 개발 모드의 `/preview/assets-connected`는 같은 연결 컴포넌트에 **모의 응답**을 주입한다. 더 보기, 저장소 관리 콜백, 상세 직접 진입을 확인할 수 있다. `failure=all` 또는 `failure=detail`을 주소에 넣으면 조회 오류를 재현한다. 이 주소도 프로덕션에서는 404이며 실제 인증·API·DB 검증 증거가 아니다.
 
-검사: `npm test`에서 응답 계약과 요청 순서 역전·필터/페이지·조회 실패를 검사한다. 전체 검사는 `web/README.md`의 `npm run check`를 따른다. #106의 실제 회원 화면 및 #153의 실제 모달 조립은 별도 연결 검증이 필요하다.
+검사: `npm test`에서 응답 계약과 요청 순서 역전·필터/페이지·조회 실패를 검사한다. 전체 검사는 `web/README.md`의 `npm run check`를 따른다. 실제 회원 화면·D 모달 조립은 [10/23 기록](https://github.com/JminAILab/CatchU/issues/168#issuecomment-6354620290)에서 실제 web·API·전용 DB와 합성 자료로 확인했다. 실제 OAuth/LIVE 검증과는 구분한다.
 
 실제 B HTTP 연결 검사는 `web/`에서 `node scripts/catches-api-smoke.mjs`로 실행한다. API를 먼저 빌드하고 `CATCH_API_ROOT`에 해당 `api/` 절대 경로를 지정한다(생략하면 `../api`). DB 설정은 API README의 테스트 DB 환경 변수를 사용하며 이름은 `_test`로 끝나야 한다. 검사기는 무작위 스키마에 실제 회원·동의·요청·시도 및 B 마이그레이션을 적용하고, 개발 로그인 HTTP로 받은 토큰을 사용한다. Catch 등록과 E 완료 상태를 같은 트랜잭션에서 준비해 회원별 활성 요청 제약을 지킨다. 종료 시 자기 스키마를 제거한다. 실데이터 DB에 실행하지 않는다. 이 검사는 개발 로그인 HTTP·B API·JWT·PostgreSQL 연결을 확인한다. 자료는 합성이며 E 수신 기록·완료 처리·보호 관찰은 시험 대역이다. #106 로그인 페이지·회원 클라이언트, D 모달, 실제 worker·C 수신자 HTTP는 이 스크립트의 범위가 아니다.
 
@@ -109,7 +109,7 @@ Catch 상세 모달은 위에서부터 작업 사실·나의 기여 → 근거 �
 
 ## 상세 저장 연결 (#169)
 
-CatchActions는 작업 사실·기여를 각각 체크한 뒤 confirmation을 한 번 호출한다. 확인이 성공해도 미공개 상태를 유지하고, [지금 공개]를 별도로 눌러야 visibility를 호출한다. 불일치는 별도 mismatch 호출이며 본문·확인·공개를 자동 변경하지 않는다. 질문 답변이나 설명 편집은 제공하지 않는다.
+CatchActions는 작업 사실·기여를 각각 체크한 뒤 confirmation을 한 번 호출한다. 확인이 성공해도 미공개 상태를 유지하고, [지금 공개]를 별도로 눌러야 visibility를 호출한다. 불일치는 별도 mismatch 호출이며 본문·확인·공개를 자동 변경하지 않는다. 이 컴포넌트는 질문 답변이나 설명을 편집하지 않으며, 작성자 설명은 위 U4 편집 영역이 맡는다.
 
 - 저장 중에는 중복 PUT을 보내지 않는다. 닫기·다른 Catch 이동은 허용하지만 이미 보낸 PUT을 취소했다고 표시하지 않는다.
 - 서버 성공 응답으로 상세와 현재 목록의 해당 Catch를 함께 갱신한다. 목록의 페이지·필터와 카드 포커스를 보존하며 저장 전에 시작된 GET 응답이 저장 결과를 덮어쓰지 않게 한다.
@@ -142,7 +142,7 @@ const catches = createCatchApi(api.member); // 모듈 수준의 안정적인 인
 `MemberAssets` 안에서 회원별 저장소 자료를 조회하고 `AssetsConnected`와 D 슬롯을 함께 조립한다. 회원별 자료를 경계 밖 부모에 저장해 이전 회원의 props를 다시 전달하면 안 된다. 외부 캐시를 쓰는 경우에도 회원 단위 분리·해제는 별도로 필요하다. 로그인 이동·401 토큰 제거는 공통 가드·API 클라이언트 책임이며 이 경계는 인증 권한을 판정하지 않는다.
 
 화면 해제는 이미 보낸 PUT의 서버 처리를 취소한다는 뜻이 아니다. 기존 `assets-store.dispose()`가 늦은 GET/PUT 응답을 버리며 새 화면은 새 store로 조회한다. 로그인 복귀만으로 확인·불일치·공개·숨김 요청을 다시 보내지 않는다.
-검사 범위: `npm test`의 회원 경계 8개 사례는 세대 변경·구독 해제와 store 생명주기를 검사한다. React 재마운트·공통 인증 연결은 별도로 PR #185 `6302c2f`의 토큰 저장소·API 클라이언트를 임시 페이지에 넣고 모의 HTTP로 확인했다. 이전 회원의 지연 GET/PUT 전달, 이전 회원의 늦은 401, 현재 회원 401의 화면 제거, 재로그인 후 PUT 횟수 유지가 통과했다. 검사 중 토큰·회원·Catch는 모두 합성이고 실제 Google 로그인·API·DB·D 모달 연결 증거는 아니다. 임시 페이지와 공통 인증 복사본은 커밋하지 않았다. 제품 조립 후 같은 시나리오를 실제 개발 로그인·B API와 다시 확인해야 한다.
+검사 범위: `npm test`의 회원 경계 8개 사례는 세대 변경·구독 해제와 store 생명주기를 검사한다. React 재마운트·공통 인증 연결은 별도로 PR #185 `6302c2f`의 토큰 저장소·API 클라이언트를 임시 페이지에 넣고 모의 HTTP로 확인했다. 이전 회원의 지연 GET/PUT 전달, 이전 회원의 늦은 401, 현재 회원 401의 화면 제거, 재로그인 후 PUT 횟수 유지가 통과했다. 검사 중 토큰·회원·Catch는 모두 합성이고 실제 Google 로그인·API·DB·D 모달 연결 증거는 아니다. 임시 페이지와 공통 인증 복사본은 커밋하지 않았다. 이 기록은 제품 조립 전의 합성 HTTP 확인이다. 제품 조립 후 실제 개발 로그인·API·전용 DB 확인은 아래 「실제 개발 로그인 연결 검사」와 위에 연결한 10/23 기록을 함께 따른다.
 
 ## 저장소 관리 창과 주소 이동 (#168·#169)
 

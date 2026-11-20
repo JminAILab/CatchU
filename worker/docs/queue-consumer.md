@@ -1,8 +1,8 @@
 # 분석 요청 큐 소비자
 
-현행 네 메시지 종류는 [U7 v2](repository-analysis-u7.md)(Result만 Catch 개편 CR2부터 v3)이며 다른 판본 혼입을 거부한다. 수신 확인과 Catch 반영 완료는 별개이고, 결과에는 본인 커밋 관측과 수집 한계를 필수로 보낸다. 기존 큐 이름·동시 실행 1·재시도 정책은 유지한다.
+현행 메시지는 Request·ProcessingEvent·ResultReceipt v2, Result v4이며 다른 판본 혼입을 거부한다([런타임 정본](../../api/contracts/repository-analysis/worker-messages.yaml), [U7 관측](repository-analysis-u7.md)). 수신 확인과 Catch 반영 완료는 별개이고, 결과에는 본인 커밋 관측과 수집 한계를 필수로 보낸다. 기존 큐 이름·동시 실행 1·재시도 정책은 유지한다.
 
-[#121](https://github.com/JminAILab/CatchU/issues/121)의 큐 연결이다. api가 넣은 분석 요청을 큐에서 꺼내 처리하고, 진행 알림과 결과를 api로 가는 큐에 넣는다. LIVE 요청은 요청 정보 조회([요청 정보 조회](request-context.md)) 뒤 실제 수집·후보·생성으로, MOCK 요청은 개발·시험 설정에서만 가짜 생성기로 처리한다. LIVE는 합성 GitHub·합성 제공자·합성 조회 API로만 검사했고 실제 api·GitHub·Claude 연결 확인은 남았다. api 쪽 큐 연결은 [#233](https://github.com/JminAILab/CatchU/issues/233)이다. 보장하지 않는 범위는 [worker README](../README.md#보장하지-않는-범위)에 있다.
+[#121](https://github.com/JminAILab/CatchU/issues/121)의 큐 연결이다. api가 넣은 분석 요청을 큐에서 꺼내 처리하고, 진행 알림과 결과를 api로 가는 큐에 넣는다. LIVE 요청은 요청 정보 조회([요청 정보 조회](request-context.md)) 뒤 실제 수집·후보·생성으로, MOCK 요청은 개발·시험 설정에서만 가짜 생성기로 처리한다. 실제 api·GitHub·Claude 연결은 로컬 시험대와 EKS에서 확인했다([확인 범위](../README.md#mock-범위와-실제-연결-확인)). api 쪽 큐 연결은 [#233](https://github.com/JminAILab/CatchU/issues/233)이다. 보장하지 않는 범위는 [worker README](../README.md#보장하지-않는-범위)에 있다.
 
 ## 구조
 
@@ -73,7 +73,7 @@ NODE_ENV=development CATCHU_QUEUE_REDIS_URL=redis://127.0.0.1:6379 uv run --lock
   - 처리 중에는 가져오지 않으므로(동시 수 1) 그 큐의 처리 시간은 세지 않는다. 종료 순서는 모든 큐의 처리 중인 작업을 끊으므로, 한 큐(예: PDF)가 멈췄어도 다른 큐(예: 분석)에 처리 중인 작업이 있으면 그 작업이 끝난 뒤에 끝낸다. 그동안 멈춘 큐의 요청은 대기한다(길어도 하던 작업 하나가 끝날 때까지). 다른 큐에 일이 밀려 있어도 더 늦어지지 않는다. 5초마다의 확인과 별도로, 각 Worker가 다음 일을 가져오기 직전에도 같은 판정을 하고 끝내야 하면 다음 일을 가져오지 않는다. 가져오지 않은 요청은 큐에 대기로 남아 다시 뜬 worker가 처리한다.
   - 큐가 끝내 답하지 않으면 종료 순서가 보내 둔 큐 명령을 기다리다 종료 상한 25초를 넘겨 강제 종료(종료 코드 137)로 끝날 수 있다. 어느 쪽이든 프로세스는 끝난다.
 
-큐 서버가 5분 넘게 내려가 있으면 worker는 다시 뜨기를 되풀이한다(처음 붙지 못하는 동안은 `starting`). 장애 중에 처리하던 요청을 복구하지 않는 것은 그대로다([worker README 「보장하지 않는 범위」](../README.md#보장하지-않는-범위)).
+큐 서버가 5분 넘게 내려가 있으면 worker는 다시 뜨기를 되풀이한다(처음 붙지 못하는 동안은 `starting`). 장애 중에 처리하던 요청을 복구하지 않는 것은 그대로다([worker README 「보장하지 않는 범위」](../README.md#보장하지-않는-범위)). 위 회복 동작은 로컬 장애 재현·합성 검사 범위이며, 수정 후 실제 EKS 장애 조치 재검증 완료를 뜻하지 않는다.
 
 ## 큐 규격 (#233과 공동)
 
@@ -152,6 +152,6 @@ Node가 넣은 요청 옵션 시험은 큐 검증 키트의 Node BullMQ를 쓰�
 
 ## 배포에서 지킬 것
 
-- 같은 큐에 소비자를 둘 이상 띄우면 전체 동시 분석 수가 1이 아니다. 교체할 때는 새 worker가 뜨기 전에 옛 worker가 내려가야 한다(EKS 실행 파일의 업데이트 방식은 [#275](https://github.com/JminAILab/CatchU/issues/275)에서 정한다).
+- 같은 큐에 소비자를 둘 이상 띄우면 전체 동시 분석 수가 1이 아니다. 교체할 때는 새 worker가 뜨기 전에 옛 worker가 내려가야 한다. [EKS worker 설정](../../deploy/aws/k8s/worker.yaml)은 `replicas: 1`·`strategy.type: Recreate`를 쓴다.
 - 컨테이너 PID 1이 부모 프로세스이고, 부모가 자식을 직접 회수한다. 첫 분석 뒤에는 spawn이 띄우는 자원 추적 프로세스가 하나 더 남는다.
 - 동시 수는 지금 1만 받는다(10/15 팀장 결정). 2 이상이면 멈추기 직전에 꺼낸 작업 하나가 실패 기록 없이 active로 남을 수 있고(BullMQ가 멈춘 동안 가져온 작업을 닫을 때에야 처리한다), 분석과 LLM 호출이 겹친다. 올릴 때는 상한(`MAX_CONCURRENCY`)과 함께 이 틈을 고치고 시험한다. 동시 수 1에서는 이 틈이 생기지 않는다(시험으로 확인).

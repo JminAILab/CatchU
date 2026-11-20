@@ -50,7 +50,7 @@ Result와 회원 상태에 `ownCommitObservation`, `observedOwnCommitCount`, `co
 2. 새 마이그레이션 `1793245460352-AddRepositoryRegistration.ts`는 기존 `analysis_request`가 있으면 명확히 거부한다. 과거 동의로 새 등록·좌표 사본을 추측하지 않는다. 기존 자료가 있는 환경은 보존/전환 결정을 별도로 검토해야 한다.
 3. 전용 시험 DB에서 up/down/up을 확인한다. down도 등록 자료가 남아 있으면 거부하며 자동 삭제하지 않는다. 운영 적용 전 백업·검증된 자료 준비와 별도 되돌리기 계획이 필요하다.
 4. API·worker 이미지를 함께 교체하고 이미지 안 두 YAML 해시와 네 메시지 동등 판정을 확인한다. `.dockerignore`, 두 Dockerfile, 기존 CI 변경 감지와 `deploy/scripts/check-images.mjs`는 새 정본 경로를 사용한다.
-5. C-03 실제 제공자, 확정 고지 v2 반영 PR의 팀장 승인, CatchU 공개 적용과 자료·외부 전송·비용 조건을 확인한 뒤 실제 분석을 검증한다. 조건 미충족 환경의 배포·실제 실행은 미실행이다.
+5. C-03 실제 제공자와 현행 고지 v3의 승인 근거, CatchU 공개 적용과 자료·외부 전송·비용 조건을 확인한 뒤 실제 분석을 검증한다. 조건 미충족 환경의 배포·실제 실행은 미실행이다.
 
 ## 실제 분석 준비와 실행 증거
 
@@ -59,13 +59,13 @@ Result와 회원 상태에 `ownCommitObservation`, `observedOwnCommitCount`, `co
 1. CatchU의 실제 공개 상태, 이번 실행 환경·배포 판본, 사용할 유료 계정·금액 상한과 자료 취급 조건을 확인한다. 비공개 저장소를 우회하지 않는다. 로컬 확인을 AWS 외부 통합 확인으로 기록하지 않는다. 준비 여부와 미결은 #424와 후속 PR에 기록한다.
 2. 실제 자료용 DB·큐·자격정보 보관 위치를 합성 시험과 분리한다. 기존 자료·진행 요청·큐와 마이그레이션 전제는 위 배포 조건을 확인하며 삭제해 맞추지 않는다. `_test` DB 초기화 실행기나 `verify-analysis-queue.cjs`는 실제 자료 환경에서 사용하지 않는다.
 3. API의 실제 Google 로그인·GitHub 연결·worker 컨텍스트·큐 설정과 worker의 LIVE 설정을 준비한다([GitHub 연결](github-connection.md), [분석 큐](analysis-queue.md), [worker 큐 소비자](../../worker/docs/queue-consumer.md)). worker는 `python -m app.consumer`로 하나만 실행한다. `app.main`의 health 성공은 분석 실행 증거가 아니며 worker는 `.env`를 자동으로 읽지 않는다. web의 통합 인증 설정과 OAuth 콜백·출처도 같은 환경에 맞춘다. 비밀값을 실행 증거에 넣지 않는다.
-4. 실제 Google 회원으로 로그인하고 `GET /v1/me`에서 GitHub 연결 계정이 팀장 `ljm0850`인지 확인한다. 개발 로그인은 합성 회원이므로 대신 쓰지 않는다. 만료 시각이 있는 GitHub 토큰은 worker 시작 시점에 30분보다 오래 유효해야 하며 정확히 30분인 경우도 수집 전에 거부된다. API는 발급된 만료 시각을 연장하지 않으므로 새 연결 뒤 이 조건의 충족 여부를 토큰 원문 없이 확인한다. 저장소 등록 후 현재 고지 v2와 등록의 범위 판본을 읽고 실행별 동의를 받아 새 키로 분석을 접수한다. 재측정도 새 동의·하루 제한을 적용하며 소비 기록을 지우거나 한도를 우회하지 않는다.
+4. 실제 Google 회원으로 로그인하고 `GET /v1/me`에서 GitHub 연결 계정이 팀장 `ljm0850`인지 확인한다. 개발 로그인은 합성 회원이므로 대신 쓰지 않는다. 만료 시각이 있는 GitHub 토큰은 worker 시작 시점에 30분보다 오래 유효해야 하며 정확히 30분인 경우도 수집 전에 거부된다. API는 발급된 만료 시각을 연장하지 않으므로 새 연결 뒤 이 조건의 충족 여부를 토큰 원문 없이 확인한다. 저장소 등록 후 현재 고지 v3와 등록의 범위 판본을 읽고 실행별 동의를 받아 새 키로 분석을 접수한다. 재측정도 새 동의·하루 제한을 적용하며 소비 기록을 지우거나 한도를 우회하지 않는다.
 5. 접수 식별자부터 큐·worker·수신·DB·본인 화면까지 같은 요청과 시도로 연결한다. `sourceMode: LIVE`만으로 실호출을 입증하지 않는다(합성 연결 시험도 LIVE 맥락을 쓴다). 실제 제공자 종류·안전한 호출 집계, 최종 처리/반영 상태와 `ownerResultsReady`, 본인 Catch 목록·상세의 근거를 대조한다. #410·#423·#429 등 대상 Unit PR의 근거 URL과 해당 Catch ID를 각각 기록하며, 다른 작업으로 잘못 합쳐지거나 빠진 항목은 성공으로 세지 않는다.
 6. 거부 사례는 허용된 대상 안에서 1~2종을 실행한다. 예를 들어 주소 형식 거부와 허용 저장소의 비공개 상태 거부를 구분해 요청·안내·미접수 결과를 남긴다. 합성 응답을 실제 거부 사례로 세지 않는다. 상한 때문에 빠진 항목이 있으면 해당 값만 조정하고 다시 측정한다. GitHub 시간당 5,000회 또는 전체 처리 시한 60분 안에 넣을 수 없으면 원인·실측·선택지를 팀장에게 요청한다.
 
 후속 PR의 실행 증거에는 날짜·시간대, 환경과 코드 판본, 저장소/분석 대상 리비전, 요청·시도 식별자, 목록·상세·관계·생성·Catch/근거 수, 소요 시간, 안전한 제공자 호출·토큰/비용 집계, 최종 결과와 수집 한계를 남긴다. 원자료·diff·토큰·모델 응답 전체는 첨부하지 않는다. 수집 한계와 생성 한도를 따로 기록하고, 실패·미실행은 그대로 남긴다. 실제 자료 정리와 로그 보호는 [자료와 실행 로그](../../docs/CatchU_coding_procedures.md#자료와-실행-로그), [임시 자료 규칙](../../docs/CatchU_collection_control_temp_data.md)을 따른다.
 
-## 검사와 현재 남은 증거
+## 검사와 실행 증거의 구분
 
 `npm.cmd test -- test/repository-registration.test.cjs test/db/repository-registration.test.cjs test/db/u7-analysis-intake.test.cjs test/u7-worker-context.test.cjs test/analysis/u7-receiver.test.cjs test/integration/u7-analysis-chain.test.cjs`는 전용 `_test` PostgreSQL에 실행한다. `CATCHU_TEST_REDIS_URL`은 전용 시험 Valkey로 지정한다. 미설정 skip은 통과가 아니다. 전체 명령·커버리지 대상은 [Unit 검사 지침](../../aidlc/spaces/default/intents/260925-intent-12/construction/u7-repository-analysis/code-generation/unit-test-instructions.md)을 따른다.
 
@@ -73,4 +73,4 @@ Result와 회원 상태에 `ownCommitObservation`, `observedOwnCommitCount`, `co
 
 `npm.cmd test -- test/integration/u7-c03-product.test.cjs`는 제품 `createApplicationModule()`·인증·HTTP 접수·U2 실제 C-03·PostgreSQL 연결을 확인한다. 회원/연결 자료와 GitHub 응답은 합성이며 큐·worker·외부 생성은 실행하지 않는다. 등록·조회·동의 거부의 미소비, 동시 접수·재응답의 1회 소비, 요약과 합산한 한도 거부, KST 자정, 접수 저장 실패의 전체 롤백, 확정 실패 뒤 재요청 소비를 검사한다. C-03 연결은 [팀장 결정](https://github.com/JminAILab/CatchU/issues/424#issuecomment-6491890788)에 따라 AI-DLC 승인 뒤 직접 수정했으며, [새 폴더에서 검사·PR을 진행하는 후속 결정](https://github.com/JminAILab/CatchU/issues/424#issuecomment-6511087844)을 따른다. 실행 결과는 제출 PR에 기록한다.
 
-실제 GitHub·LLM 분석, 실제 거부 1~2종과 팀장 Unit PR별 Catch 확인은 합성 외부 응답 검사와 별개다. 고지 v2 승인은 위 결정으로 확인하며, 실제 공개 상태·환경·계정·비용·실행별 동의는 실행할 때 확인한다. 새 상한의 합성 500개 연결 검사는 상세·후보·Result·Catch 500건과 생성 300건·미생성 200건을 구분한다. 수집 한계가 없어도 생성 한도로 부분 실패할 수 있으므로 전체 500개 분석 성공으로 기록하지 않는다. 실제 측정과 남은 한계는 후속 PR에 기록한다.
+실제 GitHub·LLM 분석, 실제 거부 사례와 Unit PR별 Catch 확인은 합성 외부 응답 검사와 별개다. 현행 고지 v3의 근거는 위 「기존 Catch를 보존하는 재분석」을 따르며 실제 공개 상태·환경·계정·비용·실행별 동의는 실행할 때 확인한다. 새 상한의 합성 500개 연결 검사는 상세·후보·Result·Catch 500건과 생성 300건·미생성 200건을 구분한다. 수집 한계가 없어도 생성 한도로 부분 실패할 수 있으므로 전체 500개 분석 성공으로 기록하지 않는다. 로컬 실측은 [#450](https://github.com/JminAILab/CatchU/issues/450), EKS 실제 분석과 결과 수신은 [#276](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)·[#37의 세 실행 기록](https://github.com/JminAILab/CatchU/issues/37#issuecomment-7000321920)에서 확인한다. 해당 실행의 부분 실패·화면 확인 범위를 그대로 적용하며 모든 거부·Unit별 결과가 확인됐다고 확대하지 않는다.

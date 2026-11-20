@@ -1,6 +1,6 @@
 # 생성의 실제 제공자 — Anthropic Claude API (#120)와 판정 공급자 (CR3)
 
-> [설명 초안·생각해볼 질문·Catch 제목 생성](generation.md)의 제공자 경계(`GenerationProvider`)에 붙이는 실제 제공자 어댑터다. CR3의 판정 공급자(OpenAI Decisions·Claude) 호출 설정은 아래 [「판정 공급자 (CR3)」](#판정-공급자-cr3)에 있다. 제공자·시작 모델·처리 위치는 [#119 결정](https://github.com/JminAILab/CatchU/issues/119#issuecomment-6159097353)(2026-10-14)을 따른다. 코드는 `app/generation/claude.py`다. 큐 소비자의 LIVE 처리가 후보가 있을 때 자식 프로세스 안에서 한 번 만든다([#121](https://github.com/JminAILab/CatchU/issues/121), [큐 소비자 「구조」](queue-consumer.md#구조)). 실제 API는 2026-10-16~18 로컬 시험대에서 팀장 저장소 자료로만 불렀다(팀장 허가 범위, 결과는 [생성 호출 한도와 운영 로그 「모델」](generation-limits.md#모델)).
+> [설명 초안·생각해볼 질문·Catch 제목 생성](generation.md)의 제공자 경계(`GenerationProvider`)에 붙이는 실제 제공자 어댑터다. CR3의 판정 공급자(OpenAI Decisions·Claude) 호출 설정은 아래 [「판정 공급자 (CR3)」](#판정-공급자-cr3)에 있다. 제공자·시작 모델·처리 위치는 [#119 결정](https://github.com/JminAILab/CatchU/issues/119#issuecomment-6159097353)(2026-10-14)을 따른다. 코드는 `app/generation/claude.py`다. 큐 소비자의 LIVE 처리가 후보가 있을 때 자식 프로세스 안에서 한 번 만든다([큐 소비자 「구조」](queue-consumer.md#구조)). 실제 Claude 호출은 로컬 시험대뿐 아니라 2026-11-18~19 EKS 실제 분석에서도 확인했다. 로컬 비교·실제 검수·EKS 수신과 화면 확인 범위는 [worker README](../README.md#mock-범위와-실제-연결-확인)에 구분했다.
 
 ## 요청 설정
 
@@ -56,7 +56,7 @@
 
 ## 만들 때 넘길 것
 
-`ClaudeProvider(api_key, models)`. `api_key`는 값을 문자열·repr에 드러내지 않는 `AccessToken`이다. 큐 소비자는 키를 `CATCHU_GENERATION_API_KEY`에서 읽는다(운영 필수, SDK 환경변수 이름 `ANTHROPIC_API_KEY`를 피한다). 기동 때 검사한 뒤 환경변수에서 지우고 자식에 설정 객체로 넘긴다([큐 소비자 「설정」](queue-consumer.md#설정)). 운영 비밀 주입은 [#276](https://github.com/JminAILab/CatchU/issues/276)이다. 운영 환경에 `ANTHROPIC_CUSTOM_HEADERS`를 두면 어댑터를 만들 때 실패한다(그 요청은 결함으로 끝난다). 프록시를 거쳐야 하는 운영 환경이면 이 어댑터와 GitHub 수집 전송 모두 바꿔야 한다.
+`ClaudeProvider(api_key, models)`. `api_key`는 값을 문자열·repr에 드러내지 않는 `AccessToken`이다. 큐 소비자는 키를 `CATCHU_GENERATION_API_KEY`에서 읽는다(운영 필수, SDK 환경변수 이름 `ANTHROPIC_API_KEY`를 피한다). 기동 때 검사한 뒤 환경변수에서 지우고 자식에 설정 객체로 넘긴다([큐 소비자 「설정」](queue-consumer.md#설정)). 운영 비밀 주입은 [EKS Secret 안내](../../deploy/aws/k8s/README.md#secret과-configmap)를 따른다. 운영 환경에 `ANTHROPIC_CUSTOM_HEADERS`를 두면 어댑터를 만들 때 실패한다(그 요청은 결함으로 끝난다). 프록시를 거쳐야 하는 운영 환경이면 이 어댑터와 GitHub 수집 전송 모두 바꿔야 한다.
 
 ## 의존성
 
@@ -98,13 +98,15 @@ CR3부터 생성 제공자 옆에 판정 공급자가 하나 더 붙는다. 판�
 
 의존성: `openai==3.46.0`(2026-11-05 게시, Python 3.9 이상, `httpx2>=2.12.0,<3`). 잠금 파일에는 `openai` 하나만 새로 들어갔다(나머지 의존성 `anyio`·`httpx2`·`jiter`·`pydantic`·`sniffio`·`typing-extensions`는 이미 있었다). 의존성 취약점 검사(`uv audit`)는 2026-11-06에 알려진 취약점 없음이었다.
 
-시험은 `tests/test_judgement.py`다. 두 어댑터 모두 진짜 SDK에 가짜 HTTP 전송을 넣어, 주소·키·환경변수 무시·다시 시도 없음·redirect·응답 상한·시간 초과·로그에 원문 없음과, 같은 요청이면 두 공급자의 질문 집합이 같다는 것(S2)을 본다. 실제 OpenAI API는 부르지 않았다(FR10 확인 때 처음 부른다).
+시험은 `tests/test_judgement.py`다. 두 어댑터 모두 진짜 SDK에 가짜 HTTP 전송을 넣어, 주소·키·환경변수 무시·다시 시도 없음·redirect·응답 상한·시간 초과·로그에 원문 없음과, 같은 요청이면 두 공급자의 질문 집합이 같다는 것(S2)을 본다. 이 시험은 실제 OpenAI API를 부르지 않는다. 별도 실제 호출은 CR3 FR10과 [11/14 로컬 실측](https://github.com/JminAILab/CatchU/issues/450#issuecomment-6858511860)에서 확인했다.
 
 ## 남은 확인
 
+2026-11-06 FR10 실제 OpenAI 호출은 판정 실패 0, 가장 긴 재료 판정 2.4초였다(CR3 `code-summary.md` 「FR10 확인」). 기본 보관 기간은 위 공식 안내로 확인했다. 이 로컬 결과와 운영 설정 적용, 아래의 개별 오류·Console 확인은 구분한다.
+
 | 남은 일 | 시작 조건 |
 |---|---|
-| OpenAI 판정 실제 호출: 2026-11-06 FR10 확인에서 팀장이 불러 판정 실패 0, 가장 긴 재료 판정 2.4초였다(CR3 `code-summary.md` 「FR10 확인」). 기본 보관 기간은 공식 안내로 확인했다(위). 남은 것은 운영 서버의 실제 호출 | 고지 v3 배포 뒤 운영 켜기 |
 | 어댑터를 거친 실제 오류 응답(지출 상한·크레딧 소진·과부하)의 모양 확인. 응답 시간·토큰·설정 수용은 2026-10-16~18 로컬 실제 호출로 확인했다 | 팀장의 호출 허가(자료 범위·비용 한도) |
-| 운영 키 주입 | #276 |
 | Console 조직·작업 공간(미국 고정·지출 상한)·등급 확인 | 팀장(#119의 남은 조치) |
+
+운영 키 주입은 EKS Secret 설정과 [11/18 실제 생성](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)으로 확인했다. OpenAI 판정 설정도 EKS worker에 적용돼 있으나, [C05 기록](https://github.com/JminAILab/CatchU/issues/37#issuecomment-7000321920)의 해당 주소 연결 성공을 판정 응답 품질·오류 검증으로 넓혀 읽지 않는다. 실제 호출의 일반 성공과 위 오류·Console 확인은 별개다.

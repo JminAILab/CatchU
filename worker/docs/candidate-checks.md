@@ -23,7 +23,7 @@
 
 ## 시험
 
-모두 합성 자료로 네트워크 없이 돈다. 실제 GitHub에서는 확인하지 않았다.
+아래 자동 시험은 합성 자료로 네트워크 없이 돈다. 별도 실제 GitHub 확인은 다음 절의 실행 기록과 구분한다.
 
 | 파일 | 보는 것 |
 |---|---|
@@ -32,7 +32,7 @@
 | `tests/test_candidate_grouping.py` | 수집 관측을 직접 만들어 배정·보류·같은 변경·커밋 묶음·집계·근거를 본다. squash로 합친 PR, 목록을 다 받지 못한 PR의 보류, 먼저 병합된 PR의 목록 한계, 같은 변경 미확정 경고가 묶음 한계와 첫 근거의 한계 두 곳에 같은 문장으로 있음, 연동 계정이 연 PR을 세지 않음, 단위별 확인 중단, 작업 사실 종류 줄·기록의 글 줄(다른 계정 섞임 문장 없음), 서로 다른 이슈를 가리켜도 나누지 않음, 근거 순서, 입력 순서를 바꾼 배정, 수집 결과끼리 맞지 않는 입력의 `ValueError`도 본다 |
 | `tests/test_candidate_record_text.py` | 기록의 글: PR 제목 조건, 단위 안 가장 이른 본인 커밋 첫 줄, 가리기, 부실 목록, 2,000/2,001자 경계(CR1 S3~S7·S17·S19~S22·S29) |
 | `tests/test_candidate_cases.py` | 기준 문서의 합성 사례(C1·C3·C6–C8·C10–C17·C20–C30)와 결정 사례(목록을 다 받지 못한 PR과 L13, 먼저 병합된 PR의 목록 한계)를 합성 GitHub 응답으로 수집부터 결과 조합까지 돌린다. C26과 cherry-pick 미확정 사례는 같은 작업 경고가 묶음 한계와 첫 근거의 한계에 모두 있는지 본다 |
-| `tests/test_candidate_flow.py` | 수집 → 후보 판정 → 결과 조합의 연결, 계약 v1 통과, 네 종결값에서 비밀값·저장소 글자 누출 없음 |
+| `tests/test_candidate_flow.py` | 수집 → 후보 판정 → 결과 조합의 연결, 현행 Result 스키마 통과, 네 종결값에서 비밀값·저장소 글자 누출 없음 |
 | `tests/candidate_scenarios.py` | 사례 시험용 선언형 합성 저장소와 실행 도구. 실행할 때마다 후보 제목이 비었고 조합 결과의 제목이 첫 작업 사실인지, 제목·작업 사실·나의 기여에 센 숫자가 없는지, 후보 문장에 조회 방식의 말이, 후보 문장과 근거에 '작성한'이 없는지 본다 |
 | `tests/git_synthetic.py`·`tests/conftest.py` | 실제 git 합성 저장소(시험마다 새로 만드는 `repo` 고정값). git이 없으면 그 시험을 건너뛴다 |
 
@@ -45,13 +45,12 @@
 - 기준 문서 사례(C1·C3·C6–C8·C10–C17·C20–C30)와 쌓아 올린 PR, PR 조회를 허용하지 않은 요청(PR 호출 0회)
 - 보류 건수를 조회 완료(단위 미확정)와 확인 중단으로 나눈 로그
 
-합성 검사 통과는 실제 확인이 아니다. 앞의 두 항목은 #118에서 확인하지 못한 항목으로, [#117](https://github.com/JminAILab/CatchU/issues/117) 실제 수집 결과에 후보 판정을 직접 돌려 확인한다. 나머지는 다른 이슈로 넘긴 항목이다.
+합성 검사와 별개로 다음 실제 결과를 확인했다.
 
-- 연결 PR 조회(GraphQL `associatedPullRequests`)와 `merge_commit_sha`(연결 PR 조회로만 안 PR은 `mergeCommit`)가 병합 커밋·squash·rebase마다 실제로 PR을 가리키는지(rebase로 합친 PR의 마지막이 아닌 커밋 포함), PR 번호가 저장소 안에서 다시 쓰이지 않는지, 보류 건수의 실제 빈도
-- GitHub의 `patch`와 diff 형식 응답(파일 모드 줄)으로 계산한 값이 실제 git의 `git patch-id --stable`과 같은지(합성 검사는 합성 git 저장소로만 대조했다), 64자 SHA 저장소
-- repositoryId가 이름 변경·이전 뒤에도 같은지: #133
-- 실제 요청을 회원 영역(A)이 주는 자격정보로 끝까지 수집해 후보까지 만들 때 관계 조회의 호출 수·시간이 상한 안에 드는지, 큰 diff의 diff 형식 조회가 시간 초과(5xx)로 끝나는지: 처리 순서 연결([#121](https://github.com/JminAILab/CatchU/issues/121))에서 잰다
-- 실제 자료에서 잘못 합침·잘못 나눔 검수: [#122](https://github.com/JminAILab/CatchU/issues/122)([#37](https://github.com/JminAILab/CatchU/issues/37)의 실제 자료 사용 조건 안에서)
-- B가 저장소·방식이 다른 값을 거부하는 것과 E 실패 기록을 잇는 통합 검증, 동시에 등록해도 한 Catch로 모이는지(PR #143의 시험 재사용): [#105](https://github.com/JminAILab/CatchU/issues/105)
+- [#118의 10/16 실제 자료](https://github.com/JminAILab/CatchU/issues/118#issuecomment-6217636060): 병합·squash·rebase(마지막 아닌 커밋 포함)의 PR 대응, 실제 GitHub 상세·diff에서 구한 값과 `git patch-id --stable` 12건 일치, 후보 6개의 PR 묶음·기여 근거.
+- [#122의 10/19 검수](../../docs/CatchU_F실제결과_검수기록.md): 저장소 5곳 분석 8건의 근거·귀속·묶음·실패 표시. `.DS_Store`로 서로 다른 작업이 이어진 규칙 한계는 그대로 남는다.
+- [#105의 10/20 로컬 왕복](https://github.com/JminAILab/CatchU/issues/105#issuecomment-6307902243): 실제 로그인·GitHub·Claude·API·DB·큐로 요청→Catch 저장→본인 API 조회. 당시 web·배포 환경 검사는 아니며, EKS 범위는 [worker README](../README.md#mock-범위와-실제-연결-확인)를 따른다.
+
+이 결과를 PR 번호 재사용 여부, 보류 빈도, 64자 SHA 저장소, 저장소 이름 변경·이전, 큰 diff 시간 초과 등 관측하지 않은 조건 전체로 확대하지 않는다. B의 잘못된 값 거부·동시 등록 경계도 정상 실제 왕복만으로 입증되지 않으며 #105의 해당 검사 근거와 구분한다.
 
 원본 비공개 관측 책임(기준 문서의 OQ-B3)은 #118의 범위가 아니다.

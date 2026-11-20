@@ -1,5 +1,13 @@
 # 실제 선정 저장소 좌표 연결 — #105·#252
 
+현행 U7의 `SelectedRepositoryRegistrationSource`는 `AnalysisRequest`·`AnalysisAttempt`·`AnalysisConsent`를 같은 DB 스냅샷으로 읽고, 여섯 칸 동의 사본의 등록 ID·저장소 ID·범위 판본을 대조한다. 활성 회원과 본인 `RepositoryRegistration`이 있어야 하며 좌표는 동의 당시 `repository.owner/name`에서 읽는다. 현재 이름으로 과거 좌표를 바꾸거나 결과 URL에서 추측하지 않는다(`src/analysis-receiver/selected-repository-registration.source.ts`).
+
+제품 `createApplicationModule()`은 큐 주소가 있으면 이 공급자를 `OctoberRepositoryObservationSource`에 넘겨 큐·DB 수신·Catch 반영을 조립한다. LIVE 전용이며 후보가 있는 MOCK 결과는 `CATCH_NOT_READY`로 끝난다. 현재 등록·고지는 [U7 안내](repository-analysis-u7.md), 조립·실행 근거는 [분석 큐](analysis-queue.md)를 따른다.
+
+## 10월 선정 카탈로그 연결 기록
+
+아래는 회원별 직접 등록 전 #252·#323의 선정 카탈로그·네 칸 동의 방식과 그 검사 범위다. 현행 제품의 새 등록·접수·좌표 공급 방식으로 사용하지 않는다.
+
 10/16 담당자 요청으로 아래 두 저장소를 **로그인한 모든 회원**의 선정 대상으로 등록한다.
 GitHub 연결과 유효한 분석 동의는 계속 필요하다. 이 문서는 좌표 보관과 Catch 등록 조회 접점이다.
 현재 선정과 실제 회원 목록 공급은 [#252 선정 공급](repository-selection.md)이 맡고, LIVE 분석 접수는 #323 범위다.

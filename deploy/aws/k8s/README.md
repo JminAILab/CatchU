@@ -2,7 +2,7 @@
 
 EKS(#276)에서 web·api·worker를 띄우는 쿠버네티스 실행 파일과 교체 스크립트 [`deploy.sh`](../scripts/deploy.sh), 앱 Secret 만들기와 DB 관리 Pod의 사용법이다. 단계·승인 지점·처음 준비(프로필·기대 계정 번호·kubeconfig)는 [../README.md](../README.md)를 따른다. 이미지와 migration·교체의 공통 규칙은 [../../README.md](../../README.md)에 있다.
 
-**AWS 자원이 없는 지금은 적용하지 않는다.** 처음 적용은 2단계(빈 DB로 지금 main 판본을 띄워 확인)다. 앱은 모두 namespace `catchu`에, DB 관리용 psql Pod는 `catchu-ops`에 들어가고, 그 뒤에는 바뀔 때만 다시 적용한다.
+EKS의 첫 적용과 실제 Pod 확인은 [11/18 2단계 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553)에 있다. 앱은 모두 namespace `catchu`에, DB 관리용 psql Pod는 `catchu-ops`에 들어간다. 운영 중인 환경에는 아래 최초 생성 절차를 반복하지 않고 바뀐 설정만 적용한다.
 
 ## 파일
 
@@ -16,10 +16,10 @@ EKS(#276)에서 web·api·worker를 띄우는 쿠버네티스 실행 파일과 �
 | [`github-credentials-volume.yaml`](github-credentials-volume.yaml) | 손으로(자리를 채워서) | api의 GitHub 토큰 보관 폴더. EFS 파일 시스템을 접근점·TLS로 붙이는 볼륨과 그 요청([../features.md](../features.md) 「GitHub 토큰 보관 볼륨」) |
 | [`deploy-rbac.yaml`](deploy-rbac.yaml) | 손으로 | 자동 배포 역할의 쿠버네티스 권한. namespace `catchu`에서 `deploy.sh`가 쓰는 조회·적용·일회 Pod 만들기·로그 읽기만 준다. Secret 읽기·exec·지우기는 없다([../cd/README.md](../cd/README.md) 「처음 준비」) |
 | [`migration-pod.yaml`](migration-pod.yaml) | `deploy.sh`만 | migration 일회 Pod 틀. controller 없이 한 번 실행하고 다시 띄우지 않으며 10분 한도가 있다 |
-| [`consent-guard-pod.yaml`](consent-guard-pod.yaml) | `deploy.sh`만 | 동의 기록 삭제 권한 확인 일회 Pod 틀. migration 계정으로 붙어 앱 계정의 동의 기록 DELETE·TRUNCATE 권한을 확인·회수·재확인한다(postgres 16.15, 사용자 999·읽기 전용 루트·권한 전부 제거, TLS `verify-full`, 5분 한도). 연결 허용은 migration과 같다 |
+| [`consent-guard-pod.yaml`](consent-guard-pod.yaml) | `deploy.sh`만 | 동의 기록 삭제 권한 확인 일회 Pod 틀. migration 계정으로 붙어 앱 계정의 동의 기록 DELETE·TRUNCATE 권한을 확인·회수·재확인한다(pgvector가 든 PostgreSQL 16 이미지, 사용자 999·읽기 전용 루트·권한 전부 제거, TLS `verify-full`, 5분 한도). 연결 허용은 migration과 같다 |
 | [`ops/namespace.yaml`](ops/namespace.yaml)·[`ops/network-policy.yaml`](ops/network-policy.yaml) | 손으로 | 관리 작업 namespace `catchu-ops`(Pod 보안 검사 `restricted`, 토큰 자동 탑재 끔)와 그 연결 허용 목록(기본 차단, DNS, psql Pod는 DB 5432만) |
 | [`ops/efs-mount-test.yaml`](ops/efs-mount-test.yaml) | 손으로(자리를 채워서, 본 뒤 지움) | EFS 마운트 시험. 접근점을 거친 TLS 마운트는 되고, 접근점 없는 마운트와 TLS 없는 마운트는 거부되는지 보는 볼륨·요청·Pod 세 벌([../features.md](../features.md) 「GitHub 토큰 보관 볼륨」) |
-| [`ops/db-admin-pod.yaml`](ops/db-admin-pod.yaml) | `db-admin.sh`만 | DB 관리용 psql 일회 Pod 틀(postgres 16.15, 사용자 999·읽기 전용 루트·권한 전부 제거, TLS `verify-full`, 5분 한도) |
+| [`ops/db-admin-pod.yaml`](ops/db-admin-pod.yaml) | `db-admin.sh`만 | DB 관리용 psql 일회 Pod 틀(pgvector가 든 PostgreSQL 16 이미지, 사용자 999·읽기 전용 루트·권한 전부 제거, TLS `verify-full`, 5분 한도) |
 
 Deployment 파일은 이미지·실행 수·커밋 자리를 비워 둔 틀이다. 그대로 `kubectl apply`하면 실행 수 자리가 숫자가 아니어서 거부된다. 운영 중인 판본을 덮지 않게 하려는 것이다. 이미지는 `deploy.sh`가 그때그때 넣으므로 저장소에는 digest를 적지 않는다.
 
@@ -36,7 +36,7 @@ Deployment 파일은 이미지·실행 수·커밋 자리를 비워 둔 틀이�
 
 api의 AI 키 둘(11월 생성·임베딩, #389)은 켜고 끄는 기능이 아니라 11월 기능이 늘 쓰는 값이라 미리 넣는다. SSM에는 2026-10-27에 넣었다. api의 큐 연결·worker 요청 정보 조회·GitHub 연결은 켰다([../README.md](../README.md) 5단계). 켠 값의 뜻과 그 판본을 띄우는 순서·켠 뒤 확인, GitHub 토큰 보관 볼륨은 [../features.md](../features.md)에 있다. Google 로그인은 개발 서버에서 켜 둔 것을 전환 뒤에도 이어 가려고 처음부터 켠다(2026-11-10 팀장 결정). 돌아올 주소는 `https://catchu.dev/google/callback`으로 Google OAuth 클라이언트에 등록한 개발 서버 값과 같고, 클라이언트 ID·비밀값은 개발 서버가 쓰는 SSM 값이다. 파일 저장은 S3 버킷이다(`FILE_STORAGE_DRIVER=s3`, [../s3.md](../s3.md)). PDF 자료가 들어온 뒤로는 Pod의 `/tmp`에 두면 Pod가 바뀔 때 회원 파일이 없어진다. 값이 없으면 api는 뜨지만 PDF 올리기·탈퇴·발행본 삭제가 500으로 끝난다. 버킷 권한은 Secret이 아니라 서비스 계정 `api`·`worker`에 붙인 AWS 역할로 받는다.
 
-**SSM에 없는 세 값.** `/catchu/prod/worker/` 세 값은 아직 SSM에 없다(조회·생성 키는 2026-10-19 확인, 판정 키는 2026-11-16에 더한 이름. 있는 것은 서명 키 둘·DB 계정 둘·큐 하나). 운영 모드 worker는 조회·생성 키가 없으면 뜨지 않고, 판정 키가 없으면 판정이 꺼진 채 떠서 서비스 화면의 제목·설명이 달라진다(2026-11-13 팀장 결정: 배포 환경은 OpenAI 판정을 켠 채 만든다). 그래서 `make-secrets.sh`는 셋 가운데 하나라도 없으면 멈춘다. 2단계 전에 넣는다. [`put-parameter.sh`](../scripts/put-parameter.sh)는 이미 있는 이름이면 멈추고, 값을 화면·명령 인자·셸 기록에 남기지 않는다.
+**worker에 필요한 세 값.** `/catchu/prod/worker/`의 조회·생성·판정 키를 쓴다. 운영 모드 worker는 조회·생성 키가 없으면 뜨지 않고, 판정 키가 없으면 판정이 꺼진 채 떠서 서비스 화면의 제목·설명이 달라진다(2026-11-13 팀장 결정: 배포 환경은 OpenAI 판정을 켠 채 만든다). 그래서 `make-secrets.sh`는 셋 가운데 하나라도 없으면 멈춘다. 아래 등록 명령은 새 환경을 준비할 때 없는 이름에만 쓴다. [`put-parameter.sh`](../scripts/put-parameter.sh)는 이미 있는 이름이면 멈추고, 값을 화면·명령 인자·셸 기록에 남기지 않는다.
 
 ```bash
 bash deploy/aws/scripts/put-parameter.sh --random /catchu/prod/worker/WORKER_CONTEXT_API_KEY
@@ -66,7 +66,7 @@ bash deploy/aws/scripts/db-admin.sh deploy/aws/db/roles.sql
 - **어디서:** `catchu-ops`에서만 돈다. 자동 배포 역할(#342)은 `catchu`에서 Pod를 만들 수 있어 같은 namespace의 Secret을 읽을 수 있으므로, 관리자 비밀번호는 그 역할이 닿지 않는 곳에 둔다. 배포 역할에는 `catchu-ops` 권한을 주지 않는다.
 - **비밀번호:** RDS 관리자 비밀번호는 RDS가 Secrets Manager에서 관리하며 7일마다 바꾸므로 실행할 때마다 읽는다. 계정 비밀번호 둘은 SSM에서 읽는다. 셋 다 Pod와 같은 이름의 임시 Secret으로만 넘기고, 값은 파이프로만 지난다.
 - **시작 전 확인(아무것도 만들지 않고 1로 멈춤):** 계정·클러스터, `catchu-ops`와 NetworkPolicy 셋, 지난 실행에서 남은 임시 자원이 없음, RDS(available, CA `rds-ca-rsa2048-g1`, 관리자 비밀번호 상태 active), 파라미터 그룹 `catchu-pg16`이 반영됐고(in-sync) `log_min_error_statement=panic`·`log_statement=none`인지(실패한 문장의 비밀번호가 DB 로그에 남지 않게), SSM 계정 비밀번호 둘.
-- **Pod:** postgres 16.15 이미지(로컬 합성 DB와 같은 digest. 앱 이미지에는 psql이 없다)를 사용자 999·읽기 전용 루트·권한 전부 제거로 띄운다. psql은 psqlrc 없이, 문장을 출력에 되풀이하지 않고, 오류에서 멈추며 한 트랜잭션으로 실행한다. 오류가 나도 문장 원문은 찍지 않는다(psql 기본값은 위치 오류 때 비밀번호가 든 문장 줄을 그대로 보여 준다). TLS는 `PGSSLMODE=verify-full`과 저장소의 루트 인증서로 검증한다.
+- **Pod:** `pgvector/pgvector:0.8.7-pg16-trixie` 이미지(로컬 합성 DB와 같은 digest. 앱 이미지에는 psql이 없다)를 사용자 999·읽기 전용 루트·권한 전부 제거로 띄운다. psql은 psqlrc 없이, 문장을 출력에 되풀이하지 않고, 오류에서 멈추며 한 트랜잭션으로 실행한다. 오류가 나도 문장 원문은 찍지 않는다(psql 기본값은 위치 오류 때 비밀번호가 든 문장 줄을 그대로 보여 준다). TLS는 `PGSSLMODE=verify-full`과 저장소의 루트 인증서로 검증한다.
 - **정리:** 세 임시 자원에 실행마다 새로 만든 표식 `catchu.io/db-admin-run`(16자리 난수)을 붙이고, 끝나면 그 표식으로 찾아 지운 뒤 없어졌는지 확인한다. 만들기 응답이 끊겨 결과를 모르는 것도 서버에 저장됐으면 지우고, 같은 이름이어도 표식이 다른 것(같은 초에 시작한 다른 실행의 것)은 건드리지 않는다. 정리한 뒤에 서버가 늦게 저장한 것은 다음 실행의 시작 전 확인이 남은 임시 자원으로 찾아 멈춘다.
 - **기록:** 출력 끝의 「DB 관리 기록」(Pod 이름, 이미지 digest, SQL 파일의 SHA-256, 종료 코드, 시각, 임시 자원 지움 확인)과 psql 출력을 남긴다. 출력에는 계정 번호가 들어가지 않는다.
 
@@ -97,7 +97,7 @@ k() { kubectl --kubeconfig ~/.kube/catchu --namespace catchu "$@"; }
 kubectl --kubeconfig ~/.kube/catchu apply -f deploy/aws/k8s/namespace.yaml -f deploy/aws/k8s/ops/namespace.yaml
 k apply -f deploy/aws/k8s/network-policy.yaml -f deploy/aws/k8s/services.yaml
 kubectl --kubeconfig ~/.kube/catchu apply -f deploy/aws/k8s/ops/network-policy.yaml
-bash deploy/aws/scripts/make-secrets.sh                        # 「Secret과 ConfigMap」. worker 키 두 개를 SSM에 먼저 넣는다
+bash deploy/aws/scripts/make-secrets.sh                        # 「Secret과 ConfigMap」. worker 키 세 개를 SSM에 먼저 넣는다
 bash deploy/aws/scripts/db-admin.sh deploy/aws/db/roles.sql    # 「DB 관리 Pod」. 확인 표를 증거로 남긴다
 k apply -f deploy/aws/k8s/ingress.yaml   # Load Balancer Controller·catchu.dev ACM 인증서(발급 완료)·WAF가 있은 뒤
 bash deploy/aws/scripts/deploy.sh --commit <main 커밋 40자>   # migration 뒤 동의 기록 삭제 권한 확인·회수까지 한다
@@ -166,7 +166,7 @@ bash deploy/aws/scripts/deploy.sh --commit <main 커밋 40자>
 3~8로 멈추면 api·worker는 0으로 멈춘 채다. 다음 실행은 이 상태를 보고 2로 멈추므로, 원인을 확인한 뒤 `--resume`을 붙여 다시 실행한다. 다만 처음 설치에서 8로 멈췄으면 Deployment가 아직 없어 다음 실행은 `--resume` 없이도 migration을 건너뛰고 확인부터 다시 한다. 그때도 원인을 먼저 확인한 뒤 다시 실행한다. 자동 배포(#342)의 다음 실행도 결과를 확인하기 전에는 덮어쓰지 않는다.
 
 - **자동 배포(#342)에서 쓸 때:** 이 스크립트는 프로필 `catchu`, kubeconfig `~/.kube/catchu`, 기대 계정 번호를 전제로 한다([../README.md](../README.md) 「처음 준비」). 러너에서는 [`../cd/ci-deploy.sh`](../cd/ci-deploy.sh)가 이 전제를 맞춘 뒤 부르고, 권한은 [`deploy-rbac.yaml`](deploy-rbac.yaml)과 [../cd/README.md](../cd/README.md) 「권한」에 있다. 배포 역할에 필요한 권한은 ECR 네 저장소 조회, `eks:DescribeCluster`, namespace `catchu`의 Deployment 조회·적용과 실행 수 바꾸기, Pod 조회·감시·만들기와 로그 읽기(migration·동의 기록 확인 Pod 포함), NetworkPolicy·ConfigMap 조회다. Secret 읽기와 exec는 필요 없다. 동의 기록 확인은 표 소유자인 migration 계정으로 하므로 RDS 관리자 비밀번호와 `catchu-ops`에도 닿지 않는다.
-- **확인하지 못한 것(2단계에서 본다):** 실제 API 서버의 스키마와 Pod 보안 검사 통과, 실제 노드에서 끝난 옛 실행의 종료 코드가 감시 출력에 오는지(출력 모양은 kubectl 1.37.1을 이 컴퓨터의 가짜 API에 붙여 확인했다), 실제 준비·중단 시간, 동의 기록 확인 Pod가 실제 RDS에서 migration이 만든 표의 권한을 회수하는지와 그 출력.
+- **실제 확인:** [11/18 2단계](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553)에서 실제 클러스터 적용·서비스 준비와 RDS의 migration 27개, 동의 기록 직접 삭제 권한 회수·재확인을 했다. [교체 기록](https://github.com/JminAILab/CatchU/issues/342#issuecomment-6970235011)에는 실제 되돌리기·새 교체와 중단 시간이 있고, [5단계 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에는 옛 api 종료 코드 0이 있다. 아래 합성 시험이 이 실제 실행을 대신하는 것은 아니다.
 
 ## 시험
 

@@ -2,9 +2,9 @@
 
 > 기능별 동작·연결 안내는 이 README에 덧붙이지 않고 `web/src/features/<기능>/README.md`로 쓴다.
 
-Next.js로 만드는 10월 MVP의 사용자 화면이다. 로그인·프로필·GitHub 연동, 홈·분석 상태, 본인 자산 확인·공개/숨김, 공유 링크·수신자 열람 흐름을 다룬다. 적용 범위는 작업의 이슈와 승인 요구사항·기능 설계로 확인한다(위치는 [문서 안내](../docs/README.md#ai-dlc-산출물과의-관계)).
+Next.js로 만드는 사용자 화면이다. 로그인·프로필·GitHub 연동, 저장소 등록·분석, Catch 확인·작성자 설명, 자료·발행본·받은 사람 열람, JD 요약·질의응답과 Claude 연결을 다룬다. 적용 범위는 작업의 이슈와 승인 요구사항·기능 설계로 확인한다(위치는 [문서 안내](../docs/README.md#ai-dlc-산출물과의-관계)).
 
-이 README는 [#82 web 최소 실행 골격](https://github.com/JminAILab/CatchU/issues/82)과 [#106 공통 기반](https://github.com/JminAILab/CatchU/issues/106) PR①(레이아웃·헤더·주소·공통 표시)과 PR②(API 호출·토큰·로그인 진입·회원 경로 가드) 기준이다. 각 화면은 기능 이슈에서 추가한다.
+공통 기반은 [#82 web 최소 실행 골격](https://github.com/JminAILab/CatchU/issues/82)과 [#106 공통 기반](https://github.com/JminAILab/CatchU/issues/106)에서 시작했다. 아래는 현재 실행·공통 연결 안내이며, 각 화면의 동작·한계는 기능별 README를 따른다.
 
 ## 요구 환경
 
@@ -75,11 +75,11 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 |---|---|---|---|
 | API 호출 시 필수 | `NEXT_PUBLIC_API_BASE_URL` | `http://127.0.0.1:3001` | api 기준 주소. `/v1`은 넣지 않는다(호출 함수가 붙인다). 없거나 잘못되면 호출하지 않고 조회 실패로 돌려준다. `npm run build`로 만든 운영 빌드처럼 `NODE_ENV`가 `development`·`test`가 아니면 https 주소나 로컬 주소(`localhost`·`127.0.0.1`)의 http만 받고, 그 밖의 http 주소도 잘못된 주소로 본다(#218). 이 주소의 출처를 CSP 연결 허용에도 넣는다(「보안 응답 헤더」). IPv6 주소(`[::1]` 등)는 CSP에 적을 수 없어 형식과 관계없이 `npm run dev`·`npm run build`가 오류로 멈추므로 `127.0.0.1`이나 `localhost`를 쓴다 |
 | 선택 | `NEXT_PUBLIC_DEV_LOGIN_ENABLED` | `false` | 기본 비활성. 정확히 `true`일 때만 `/login`에 개발용 로그인을 보인다. api도 `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development` 또는 `test`가 함께 지정돼야 허용하며, 그 밖에는 403이다 |
-| 선택 | `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION` | `true` | 공통 인증(#286) 화면 연결의 통합 시험 전환. 정확히 `true`일 때만 켜고, 값이 없거나 다른 값이면 꺼진다. 제품 기본은 켜짐이며 `.env.example`과 `Dockerfile`의 기본값이 `true`다([2026-11-11 팀장 승인](https://github.com/JminAILab/CatchU/issues/467#issuecomment-6784442435)). 끄면 Google 로그인과 GitHub 연결 시작이 열리지 않는다([공통 인증 안내](src/features/auth-session/README.md)). 팀 확인용 개발 서버는 2026-11-02 팀장 승인으로 켠다([개발 서버 안내](../deploy/dev-server/README.md)) |
+| 선택 | `NEXT_PUBLIC_AUTH_SESSION_INTEGRATION` | `true` | 공통 인증(#286) 화면 연결의 통합 시험 전환. 정확히 `true`일 때만 켜고, 값이 없거나 다른 값이면 꺼진다. 제품 기본은 켜짐이며 `.env.example`과 `Dockerfile`의 기본값이 `true`다([2026-11-11 팀장 승인](https://github.com/JminAILab/CatchU/issues/467#issuecomment-6784442435)). 끄면 Google 로그인과 GitHub 연결 시작이 열리지 않는다([공통 인증 안내](src/features/auth-session/README.md)). 운영은 [EKS 배포 안내](../deploy/aws/README.md)를 따른다 |
 
 - 이름이 `NEXT_PUBLIC_`으로 시작하는 변수만 브라우저에 노출된다. 비밀값·토큰은 이 이름으로 두지 않는다.
 - `NEXT_PUBLIC_` 값은 `npm run dev`·`npm run build`를 시작할 때 읽힌다. 바꾸면 다시 시작한다.
-- web과 api의 출처가 다르므로 api의 `CORS_ALLOWED_ORIGINS`에 web을 여는 주소(`http://localhost:3000`)를 둔다([api README 「환경변수」](../api/README.md)). `127.0.0.1:3000`처럼 다른 주소로 열면 브라우저가 요청을 막는다.
+- 로컬처럼 web과 api의 출처가 다르면 api의 `CORS_ALLOWED_ORIGINS`에 web을 여는 주소(`http://localhost:3000`)를 둔다([api README 「환경변수」](../api/README.md)). 허용하지 않은 `127.0.0.1:3000` 같은 주소로 열면 브라우저가 요청을 막는다. 운영 web·API는 `https://catchu.dev`의 같은 출처를 사용한다.
 - 그 밖의 변수는 서버(Node.js)에서만 읽힌다.
 
 ## 파일 역할
@@ -123,7 +123,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 
 ## 공통 레이아웃 (#106 PR①)
 
-헤더는 화면 묶음 폴더의 `layout.tsx`가 붙인다. 괄호 폴더는 주소에 나타나지 않는다. 화면 파일을 알맞은 묶음에 두면 헤더를 따로 넣지 않아도 된다. **폴더 배치는 인증 판정이 아니다.** `(member)`에 두어도 토큰 없는 접근을 막지 않으며, 토큰 없는 접근은 `(member)/layout.tsx`의 회원 경로 가드(`src/components/auth/member-guard.tsx`)가 막으며, 그동안 헤더와 화면을 그리지 않는다.
+헤더는 화면 묶음 폴더의 `layout.tsx`가 붙인다. 괄호 폴더는 주소에 나타나지 않는다. 화면 파일을 알맞은 묶음에 두면 헤더를 따로 넣지 않아도 된다. **폴더 배치는 인증 판정이 아니다.** `(member)/layout.tsx`의 `MemberShell`이 회원 경로를 보호한다. 제품 기본은 `SessionMemberGuard`가 세션 복원과 회원 조회를 마친 뒤 헤더·화면을 그리며, 통합 시험 전환을 끈 빌드만 기존 `MemberGuard`를 쓴다.
 
 | 묶음 폴더 | 헤더 | 구성 (#55 10월 헤더 합의) |
 |---|---|---|
@@ -136,7 +136,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 - **회원 화면 폭:** 창 폭 760px부터 지원한다. `(member)/layout.tsx`의 전용 CSS는 760px 미만에서만 헤더·본문 폭을 760px로 유지하고 문서 가로 스크롤을 허용한다. 760px 이상에서는 세로 스크롤바를 뺀 가용 폭에 맞추며, 헤더 메뉴는 글자 단위로 줄바꿈하지 않는다. 회원 화면 검증 폭은 760·1024·1536px이다. 비로그인·공유 링크 수신자 레이아웃에는 이 최소 폭을 적용하지 않는다([#412 회원 화면 범위](https://github.com/JminAILab/CatchU/issues/412)).
 - **채용공고·알림:** 두지 않는다. 10월에는 흐린 메뉴와 '개발 중인 기능입니다' 안내창을 두었는데(#55), 두 기능을 12월 요구사항에서 빼서 2026-11-16 팀장 결정으로 메뉴와 안내창(`src/components/notice-dialog/`)을 지웠다(#565).
 - **보낸 링크의 미리보기·검색 제외:** `src/app/s/layout.tsx`가 `/s/` 아래 모든 주소에 같은 탭 제목·미리보기 문구와 검색 제외 표시를 내려 준다([받은 사람 화면](src/features/recipient/README.md) 「동작」, #565).
-- **프로필:** 누르면 근처에 [프로필 보기](→ `/profile`)·[로그아웃] 메뉴가 열린다(#51). [로그아웃]은 메모리 토큰을 지우고 비로그인 홈(`/`)으로 보낸다. 서버 세션·Refresh Token은 아직 없다(OQ-A1). `MemberHeader`에 `onLogout`을 주지 않으면 [로그아웃]이 '연결 전' 표시와 함께 누를 수 없는 상태(`aria-disabled`)로 보인다.
+- **프로필:** 누르면 근처에 [프로필 보기](→ `/profile`)·[로그아웃] 메뉴가 열린다(#51). 제품 기본은 미저장 확인 뒤 서버 로그아웃을 요청하고, 성공이 확정되면 인증 상태를 정리해 비로그인 홈(`/`)으로 보낸다. 실패·결과 불명은 현재 화면에서 안내한다([인증 화면](src/features/auth-screens/README.md)). 통합 시험 전환을 끈 빌드만 메모리 토큰을 지우는 기존 방식을 쓴다. `MemberHeader`에 `onLogout`을 주지 않으면 [로그아웃]이 '연결 전' 표시와 함께 누를 수 없는 상태(`aria-disabled`)로 보인다.
 - **닫기 조작:** #51·#55의 미결을 [#171 A 담당 검토](https://github.com/JminAILab/CatchU/pull/171#pullrequestreview-5349302819)(9/29)로 정했다. 어느 방법으로 닫아도 창·메뉴만 닫고 현재 페이지·입력·필터·상세 상태는 그대로 둔다.
 
 | 대상 | 닫는 방법 | 초점 | 닫히지 않는 경우 |
@@ -160,7 +160,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/profile/setup` | 최초 프로필 입력 (W02) | A | 필요 | 제안 | 저장 성공 후 회원 정보를 다시 불러온 뒤 `/home` |
 | `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지. 수정(`/profile/edit`)·GitHub 연동(`/profile/github`)·Claude 연결(`/profile/claude`)로 진입하는 링크를 둔다 |
 | `/profile/edit` | 프로필 수정 (W02) | A | 필요 | 제안 | 저장 성공·취소 후 `/profile`로 복귀하고, 저장 실패 시 이 화면과 입력을 유지 |
-| `/profile/github` | GitHub 연동 (W02-G) | A | 필요 | 제안 | 성공 후 내 자산의 저장소 연결 관리(`/assets`)로 복귀(확정). 연결 시작은 공통 인증 통합 시험 전환을 켰을 때만 하고, 끄면 상태 조회와 `/assets` 이동만 한다. 모달 자동 열기는 #153에서 정한다([GitHub 연동](src/features/github-connection/README.md)) |
+| `/profile/github` | GitHub 연동 (W02-G) | A | 필요 | 제안 | 성공 후 쿼리 없는 `/assets`로 복귀하며 저장소 관리 모달을 자동으로 열지 않는다. 연결 시작은 공통 인증 통합 시험 전환을 켰을 때만 하고, 끄면 상태 조회와 `/assets` 이동만 한다([GitHub 연동](src/features/github-connection/README.md)) |
 | `/github/callback` | GitHub 연동 콜백 | A | 필요 | 제안 | api `GITHUB_OAUTH_CALLBACK_URL`의 목적지. 처리 뒤 주소의 `code`·`state`를 지운다. `next`에 싣지 않는다 |
 | `/profile/claude` | Claude 연결 관리 | U6 | 필요 | 확정 | 상태, MCP 주소 복사, 확인 뒤 전체 해제. 상세 프로필과 시작 안내에서 이어 준다([Claude 연결](src/features/claude-connection/README.md)) |
 | `/profile/claude/authorize` | Claude 연결 승인 | U6 | 필요 | 확정 | api `/authorize`가 쿼리(`client_id`·`redirect_uri`·`state`·`code_challenge`·`resource`)와 함께 보내는 주소. 로그인이 안 됐으면 로그인 화면을 거쳐 돌아온다 |
@@ -171,16 +171,16 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/jds` | 본인 JD 관리 | U10 | 필요 | 확정 | 승인된 U10 구현 계획 Step 4의 내부 주소. [기능·연결 안내](src/features/jd/README.md) |
 | `/publications` | 발행본 목록 | U4 | 필요 | 확정 | U4 담당 결정 D4(2026-11-03). 최신순 목록, [URL 복사], [링크 열기](`ACTIVE`만)([발행·발행본](src/features/publications/README.md)) |
 | `/publications/new` | 발행 | U4 | 필요 | 확정 | 본인 Catch·텍스트 자료 고르기·순서·제목·비밀번호 → 확인 → 발행 완료를 한 화면에 둔다 |
-| `/publications/[publicationId]` | 발행본 상세 | U4 | 필요 | 확정 | 사본·상태·만료·링크 주소, 링크 중지·삭제. 기본 요약 패널(U5) 자리는 비워 둠 |
+| `/publications/[publicationId]` | 발행본 상세 | U4 | 필요 | 확정 | 사본·상태·만료·링크 주소, 링크 중지·삭제. U5 기본 요약 패널의 작성자 모드와 근거 강조를 연결함 |
 | `/s/[token]` | 받은 사람 발행본 열람(U4 W4) | C | 불필요 | 제안 | 수신자 전용 헤더. 10월 `/links`·`/s/[token]/catches/[catchId]`는 U4 제출 3(W6)에서 없앴다 |
 
 **주소 원칙(제안):** 이름 조회·회원 가드·로그인 이동을 연결했다. 현재 범위와 최초 프로필 저장 연결은 [회원 진입 연결](src/features/member-entry/README.md), 프로필 상세·수정은 [프로필 화면](src/features/profile/README.md)을 따른다.
-- 토큰 없이 회원 경로에 들어오거나 회원 API가 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 `/login`으로 보낸다. 수신자 비밀번호 401은 수신자 화면에서 처리한다.
+- 제품 기본은 회원 경로 진입 시 세션 복원을 먼저 시도한다. 회원 API의 `AUTH_REQUIRED`·`AUTH_INVALID`는 공통 인증이 갱신을 시도하며, 복원·갱신 결과에 따라 로그인 이동 또는 현재 화면의 재인증 안내로 처리한다. 수신자 비밀번호 401은 수신자 화면에서 처리한다.
 - `GET /v1/me` 성공 시 `profile.displayName`이 빈 문자열이면 `/profile/setup`으로 보낸다. 조회 중에는 판단을 미루고, 조회 실패는 다시 불러오기로 처리한다. 이미 `/profile/setup`이면 다시 보내지 않는다. 이름이 저장된 회원이 `/profile/setup`에 들어오면 `/home`으로 보낸다. 이름이 저장된 회원은 상세(`/profile`)와 수정(`/profile/edit`)을 열고, 이름이 비면 두 화면 모두 `/profile/setup`으로 보낸다.
 - 복귀 주소는 `/login?next=<인코딩한 경로>`로 넘기고 서비스 안 회원 경로만 허용한다. 토큰·grant는 주소에 넣지 않는다.
 - 이름이 저장된 회원만 로그인 후 `next`로 복귀한다. 유효하지 않은 `next`는 `/home`으로 보내며, 최초 프로필 입력(`/profile/setup`)을 거친 경우에도 `/home`으로 이동한다.
 - 최초 프로필 입력은 저장에 성공하면 회원 정보(`GET /v1/me`)를 다시 불러온 뒤 `/home`으로 이동한다. 저장 전의 빈 이름 응답 때문에 `/profile/setup`으로 되돌아가지 않게 하기 위해서다([#171 A 담당 검토](https://github.com/JminAILab/CatchU/pull/171#pullrequestreview-5349302819)).
-- 저장소 연결 관리는 별도 주소 없이 `/assets` 안 모달이다. 모달 열림의 주소 반영과 연동 복귀 때 자동 열기는 #153에서 정한다.
+- 저장소 연결 관리는 별도 주소 없이 `/assets` 안 모달이다. 모달 열림을 주소에 기록하지 않으며 GitHub 연동 복귀 때 자동으로 열지 않는다.
 
 ## 공통 응답 해석 (#88)
 
@@ -212,9 +212,9 @@ import { createIdempotencyKeyHolder, isSettledResult } from '@/lib/idempotency';
 // 회원 API: 토큰이 있으면 Authorization: Bearer를 붙인다. 경로는 /v1 뒤부터 적는다.
 const me = await api.member('/me');
 
-// 생성 POST: 같은 요청을 다시 보낼 때 같은 키를 쓴다.
+// 분석 접수 POST: 같은 요청을 다시 보낼 때 같은 키를 쓴다.
 const key = createIdempotencyKeyHolder();            // 화면(폼)마다 하나
-const created = await api.member('/share-links', { method: 'POST', body, idempotencyKey: key.current() });
+const created = await api.member('/analysis-requests', { method: 'POST', body, idempotencyKey: key.current() });
 if (isSettledResult(created)) key.reset();          // 성공·4xx 업무 거부(401·429 제외)일 때만 새 키로
 
 // 수신자 API: 회원 토큰을 붙이지 않는다. 비밀번호 링크는 grant를 X-Link-Grant로 보낸다.
@@ -228,13 +228,13 @@ const unlock = await api.recipient(`/public/links/${encodeURIComponent(token)}/u
 if (unlock.kind === 'api-error' && unlock.code === 'LINK_UNLOCK_LIMITED') showLimited(unlock.retryAfterSeconds);
 ```
 
-- 요청은 `cache: 'no-store'`로 보내고 쿠키를 싣지 않는다(`credentials: 'omit'`).
+- 일반 회원·수신자 요청은 `cache: 'no-store'`, `credentials: 'omit'`이다. 세션 복원·로그아웃·개발 로그인 등 공통 인증 전용 요청은 Refresh 쿠키를 위해 `credentials: 'include'`를 쓴다.
 - 회원 API의 메서드는 GET·POST·PUT·PATCH·DELETE다. GET이 아닌 요청은 인증 갱신 뒤에도 자동으로 다시 보내지 않는다.
-- 회원 API가 401 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 그 토큰을 지운다. 회원 경로 가드가 `/login?next=<현재 경로>`로 보낸다. 링크 401(`LINK_PASSWORD_*`)은 수신자 호출이든 `linkGrant`를 실은 회원 호출이든 토큰을 지우지 않고 화면이 처리한다.
-- 자동 재시도하지 않는다. 서버가 저장했는지 알 수 없는 결과(조회 실패·5xx)면 키를 유지하고, 사용자가 다시 누르면 같은 키로 보낸다. 401도 앞선 같은 키 요청의 저장 여부를 알려 주지 않으므로 키를 유지한다. 429(빈도 제한)도 요청을 처리하지 않은 것이라 키를 유지하고, `Retry-After`가 지난 뒤 사용자가 다시 누르면 같은 키·본문으로 보낸다(#235 계약). 성공과 401·429를 뺀 4xx 업무 거부만 확정으로 본다(`isSettledResult`).
-- 로그인 복귀 후 키 보존은 아직 구현하지 않았다. 지금은 401이면 로그인 화면으로 이동하면서 화면이 다시 만들어져 키도 새로 생긴다. 후속 구현 조건: 로그인 뒤 키를 이어 쓰려면 실제 생성 화면에서 **같은 회원·같은 생성 요청일 때만** 이어 쓰고, 다른 계정으로 로그인했으면 키를 버린다. 로그인 뒤 이전 요청을 자동으로 다시 보내지 않는다.
+- 제품 기본에서 회원 API가 401 `AUTH_REQUIRED`·`AUTH_INVALID`를 돌려주면 공통 인증이 갱신을 시도하고, 성공한 GET만 한 번 다시 보낸다. 변경 요청은 갱신 결과를 화면에 돌려 사용자가 다시 누르게 한다. 링크 401(`LINK_PASSWORD_*`)은 수신자 호출이든 `linkGrant`를 실은 회원 호출이든 회원 토큰을 지우지 않고 화면이 처리한다. 통합 시험 전환을 끈 빌드만 회원 401에서 토큰을 지우고 로그인으로 이동한다.
+- 변경 요청은 자동 재시도하지 않는다. 공통 멱등 키 도구는 조회 실패·5xx·401·429에서 키를 유지하고 성공 및 그 밖의 4xx를 확정으로 본다(`isSettledResult`). 기능별 접수 규칙도 함께 적용한다. 분석 요청의 `DAILY_LIMIT_REACHED`·확정 401 처리와 `RATE_LIMITED` 대기는 [분석 요청 안내](src/features/analysis-request/README.md)를 따른다.
+- 같은 세션의 Access 갱신·재인증 안내 동안에는 회원 화면 범위와 입력·붙잡은 요청을 유지한다. 새 로그인·회원 전환·화면 이탈 뒤에는 이전 화면 상태를 이어 쓰지 않으며 이전 요청을 자동으로 다시 보내지 않는다. 기능별 보관 범위와 결과 불명 처리는 해당 README를 따른다.
 - 오류 응답에 `Retry-After`가 1 이상의 정수 초로 오면 `retryAfterSeconds`로 전달한다. 헤더가 없거나 다른 형식이면 붙이지 않으며, 남은 시간을 추정하지 않는다.
-- 토큰은 탭의 메모리(`src/lib/access-token.ts`)에만 둔다. localStorage·sessionStorage·쿠키·URL·로그에 쓰지 않으며, 새로고침하면 사라져 다시 로그인한다. 실제 유지 방식은 OQ-A1에서 정한다. 예외는 Google 로그인 시도 값 하나뿐이다([팀장 T1 결정](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6182257830), [공통 인증 안내](src/features/auth-session/README.md)).
+- Access 토큰은 탭 메모리에만 둔다. 제품 기본은 서버의 HttpOnly Refresh 쿠키로 새로고침 뒤 세션 복원을 시도한다. `accessTokenStore`에는 실제 토큰 대신 회원 화면 범위 신호를 연결하며, 통합 시험 전환을 끈 빌드만 기존 메모리 토큰을 써 새로고침 뒤 다시 로그인한다. 브라우저 저장소의 로그인 표식·Google 시도 값과 한계는 [공통 인증 안내](src/features/auth-session/README.md)를 따른다.
 - 개발용 로그인은 `api.devLogin(memberId, { signal })`다. `memberId`에는 개발용 식별 문자열을 넣으며, api가 해당 회원을 찾거나 만들어 그 회원의 토큰을 준다. 성공하면 토큰을 메모리에 넣고, 결과에는 토큰을 담지 않는다. 가장 늦게 시작한 로그인만 반영하며, 먼저 보낸 로그인이 늦게 오거나 로그인 화면을 떠나 취소되면 토큰을 바꾸지 않는다.
 
 ## 공통 인증 (#286)

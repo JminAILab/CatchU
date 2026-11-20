@@ -126,11 +126,11 @@ Google 로그인 버튼, Google 콜백 화면, 재인증 안내, 회원 셸의 �
 
 - 확인 사유 등록은 #286 공통 수단(`unsavedChanges`·`useUnsavedChanges`)만 쓰고 이 화면에서 새로 만들지 않는다. 화면 안의 링크 이동·새로고침·창 닫기 확인(`useUnsavedGuard`, [PR #300](https://github.com/JminAILab/CatchU/pull/300))은 역할이 달라 그대로 둔다.
 
-## 남은 일
+## 검증 근거와 한계
 
-1. 실제 Google 승인·콜백·쿠키·다중 탭 검증은 #286이 수행해 #251에 기록하고, 그 결과에서 나온 화면 보완은 #287에서 한다.
-2. 제품 전환은 각 화면 담당 확인·통합 검증 뒤 별도 승인으로 정한다(#286).
-3. 미확정 분석 요청 등록과 모달 안 [다시 로그인]은 [PR #417](https://github.com/JminAILab/CatchU/pull/417)로 연결됐다(「연결」). 그 PR에서 확인 창을 대역 함수로 둔 브라우저 검사로 취소 시 입력·요청 정보 보존, 계속 동작, 모달 초점 복귀, 중복 조작을 확인했다([사유 조회 접점](https://github.com/JminAILab/CatchU/issues/287#issuecomment-6313395220)의 후속 확인). 남은 것은 브라우저 기본 확인 창의 실제 표시·선택과 실제 Google 로그인을 합친 통합 검증이며, #286에서 이어진다.
+1. 제품 기본값 활성화는 [11/11 팀장 승인](https://github.com/JminAILab/CatchU/issues/467#issuecomment-6784442435)을 따르며, 실제 Google·쿠키·다중 탭 검증과 받아들인 한계는 #286·#251의 기록을 따른다.
+2. 미확정 분석 요청 등록과 모달 안 [다시 로그인]은 [PR #417](https://github.com/JminAILab/CatchU/pull/417)로 연결했다. 당시 확인 창 대역 검사와 별도로, [11/10 기록](https://github.com/JminAILab/CatchU/issues/467#issuecomment-6761418831)에서 실제 Chrome·로컬 API·DB로 확인 창 표시·선택과 입력·요청 정보 유지를 확인했다. 개발 로그인·합성 Catch를 사용했고 GitHub 상태·분석 실패는 합성 응답이었다.
+3. [11/15 개발 서버 기록](https://github.com/JminAILab/CatchU/issues/467#issuecomment-6890425529)은 실제 Google 로그인·자료 저장·로그아웃, [11/16 로컬 기록](https://github.com/JminAILab/CatchU/issues/467#issuecomment-6920059322)은 개발 로그인·합성 Catch의 설명 저장·로그아웃을 확인했다. 이 기록을 실제 분석·외부 연결 전체나 EKS 장애 검증 완료로 확대하지 않는다.
 
 ## 검사
 

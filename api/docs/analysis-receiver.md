@@ -1,10 +1,10 @@
 # 분석 메시지 수신과 개발용 주입 — #139
 
-현행 U7은 [v2 정본과 등록 소유/관측 저장](repository-analysis-u7.md#메시지와-결과)을 적용한다. 런타임 계약 디렉터리는 `api/contracts/repository-analysis`이며 아래 10월 경로의 YAML은 과거 승인 기록이다.
+현행 U7은 [메시지 정본과 등록 소유/관측 저장](repository-analysis-u7.md#메시지와-결과)을 적용한다. 런타임 계약 디렉터리는 `api/contracts/repository-analysis`이며 아래 10월 경로의 YAML은 과거 승인 기록이다.
 
 결과(Result)는 새 Catch NC3부터 판본 `"4"`다(후보마다 다시 볼 곳 사실 `revisitFacts`와 첫·마지막 작업 시각 `firstWorkAt`·`lastWorkAt`). 판본 `"3"` 이하 결과는 `REJECTED/SCHEMA_INVALID`다. 옛 판본을 함께 받는 처리가 없으므로 api와 worker를 같은 배포로 넣고, 배포는 진행 중인 분석이 없을 때 한다(남은 분석은 다시 한다). 새 칸의 종류별 개수·본인 커밋 소속·시각 순서는 수신 스키마가 아니라 등록 입력 검사가 본다([등록 규칙 「다시 볼 곳 사실과 작업 시각」](catch-registration-rules.md#다시-볼-곳-사실과-작업-시각-새-catch-nc3)).
 
-이 구현은 [#139의 독립 준비 범위](https://github.com/JminAILab/CatchU/issues/139)다. 기준은 [현행 메시지 계약 v2](../contracts/repository-analysis/worker-messages.yaml), [수신 업무 흐름](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)·[상태 전이 정본](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본), [수신 기록 모델](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)이다. 실제 큐/worker 연결이나 HTTP 주입 API를 추가하지 않는다.
+이 수신 경계는 [#139의 독립 준비 범위](https://github.com/JminAILab/CatchU/issues/139)에서 시작했다. 기준은 [현행 메시지 계약](../contracts/repository-analysis/worker-messages.yaml), [수신 업무 흐름](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)·[상태 전이 정본](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본), [수신 기록 모델](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)이다. 실제 큐/worker 연결은 [분석 큐](analysis-queue.md), 제품 수신·등록 조립은 [수신·등록 연결](receiver-registration.md)을 따른다.
 
 ## 수신 결과와 저장 경계
 
@@ -72,13 +72,13 @@ try {
 
 한계: 보호 관측은 접수 맥락에서 만든 합성 대역이고 실제 GitHub 조회가 아니다. 이 시험이 검증하지 않은 범위는 실제 worker·큐·전송 호출자, 실제 보호 관측 공급·조립([#105](https://github.com/JminAILab/CatchU/issues/105)에서 확인할 책임), 처리 시한 닫기와 수신의 경합이다. 처리 시한 닫기는 구현돼 있고 그 동작은 [처리 시한 닫기](analysis-deadline.md)의 시험이 검증하며, 이 시험은 호출하지 않는다. 이 검증은 수신 확인이 등록 완료가 아님과 접수 맥락 연결을 확인한 것이며 #105 전체 완료를 뜻하지 않는다. 실행: `api/`에서 전용 `_test` DB를 지정해 `npm test -- test/integration/analysis-intake-receiver.test.cjs`.
 
-## 실제 연결에 남은 작업
+## 실제 연결과 책임
 
 | 연결 | 필요한 결과 |
 | --- | --- |
 | [#104 요청·시도 모델](https://github.com/JminAILab/CatchU/issues/104) + [#105 수신 기록 테이블](https://github.com/JminAILab/CatchU/issues/105) | [DB 수신 어댑터](receiver-registration.md)에서 회원·등록을 먼저 보호하고 요청 → 시도 → 수신 기록을 잠금. 커밋 실패·동시 수신·부모 삭제를 전용 DB로 검사 |
 | [#138 분석 접수 API](https://github.com/JminAILab/CatchU/issues/138) | 위 「실제 접수 연결 검증」으로 재현했다. 접수 API가 저장한 행을 큐 보내기(#233)가 같은 맥락으로 보내는지도 [큐 연결 시험](analysis-queue.md#시험)이 확인한다 |
-| [#105 등록·반영](https://github.com/JminAILab/CatchU/issues/105) | 수신 커밋 후 실제 B/E 반영 조립은 제공됐다. 실제 보호 관측·저장소 주소의 공급 주체와 조립 책임은 #105에서 확인하며 #231·#232의 책임으로 배정하지 않는다. ACCEPTED는 APPLIED가 아님 |
-| [#233 전송 연결](https://github.com/JminAILab/CatchU/issues/233) | 큐 송수신 모듈이 있다([큐 연결](analysis-queue.md)). 결과 작업을 받아 `AnalysisRegistrationService`에 넘기고 수신 확인을 작업 반환값으로 돌려준다. 모듈은 `AppModule`에 아직 등록하지 않았고, 켜는 일은 #252 좌표 제공자와 #105 근거 보존 수정 뒤다(10월 정책 공급자는 #314). 결과 원문 보관·자동 재반영은 추가하지 않음 |
+| [#105 등록·반영](https://github.com/JminAILab/CatchU/issues/105) | 수신 커밋 후 실제 B/E 반영 조립에 ‘관측 안 함’ 정책과 동의에 저장된 좌표를 공급한다([수신 연결](receiver-registration.md)). 현재 GitHub 공개 관측과는 다르며 ACCEPTED는 APPLIED가 아님 |
+| [#233 전송 연결](https://github.com/JminAILab/CatchU/issues/233) | 제품 `createApplicationModule()`이 큐 주소가 있을 때 등록한다([큐 연결](analysis-queue.md)). 결과 작업을 받아 `AnalysisRegistrationService`에 넘기고 수신 확인을 작업 반환값으로 돌려준다. 정책 공급자와 실제 좌표 공급자를 명시하며 결과 원문 보관·자동 재반영은 추가하지 않음 |
 
 이미 구현된 것: [#237 처리 시한·실패 종료](https://github.com/JminAILab/CatchU/issues/237)는 [PR #295](https://github.com/JminAILab/CatchU/pull/295)로 dev에 있다. 10/4 교차 검토 의견([#139 댓글](https://github.com/JminAILab/CatchU/issues/139#issuecomment-5975854779))의 "실행 중에 멈춘 요청" 항목은 이 구현이 닫는다. 같은 의견의 보낸 쪽 확인·거부 기록의 요청 식별자·예상 밖 오류 분류는 코드에 반영되지 않았고 담당 작업이 정해지지 않았다.

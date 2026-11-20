@@ -11,7 +11,7 @@ api가 DB 잠금을 기다리는 최대 시간이다. 상한은 코드가 아니
 - 3초는 부하 측정으로 정한 값이 아닌 초기값으로 정했다. 결과 반영은 잠금을 쥔 채 후보 등록까지 하므로 경쟁 검사에서 함께 봤고, 10/18 측정을 10/19 검토해 3초를 유지했다([#331 팀장 리뷰](https://github.com/JminAILab/CatchU/pull/331#pullrequestreview-5565830688), 아래 「측정」·「판단이 필요한 결과」).
 - `idle_in_transaction_session_timeout`은 이번에 정하지 않았다.
 
-개발 서버에는 [#310](https://github.com/JminAILab/CatchU/pull/310)이 적용했다. 설정 명령·새 연결의 적용값(앱 `3s`, 마이그레이션 계정 `0`) 확인·DB 초기화 뒤 다시 거는 방법은 [개발 서버 안내 「순서」](../../deploy/dev-server/README.md#순서) 3단계에 있고, 자동 배포의 서버 안 확인도 앱 계정 상한이 `3s`인지 본다([cd 안내](../../deploy/dev-server/cd/README.md)). 합의는 EKS 운영 DB(#276)에도 같은 값을 옮기기로 했다.
+현행 EKS 운영 DB는 [`deploy/aws/db/roles.sql`](../../deploy/aws/db/roles.sql)에 앱 계정 `catchu_app`의 `lock_timeout = '3s'`를 설정한다. 준비·적용 근거는 [#276](https://github.com/JminAILab/CatchU/issues/276)을 따른다. 옛 개발 서버에는 [#310](https://github.com/JminAILab/CatchU/pull/310)이 같은 값을 적용했다. 아래 측정값은 당시 시험 결과이며 EKS 부하 실측으로 확대하지 않는다.
 
 로컬 개발 DB, `npm test`의 기본 연결, 배포 로컬 구성의 앱 계정([`deploy/local-db/init-roles.sh`](../../deploy/local-db/init-roles.sh))에는 상한이 없다. 그 환경의 api는 잠금을 끝까지 기다린다.
 
