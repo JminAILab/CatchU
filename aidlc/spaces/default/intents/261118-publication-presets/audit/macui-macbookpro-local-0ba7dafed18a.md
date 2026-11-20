@@ -24674,3 +24674,129 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
 
 ---
+
+## Checkpoint Verification Recorded
+**Timestamp**: 2026-11-20T09:15:10Z
+**Event**: CHECKPOINT_VERIFICATION_RECORDED
+**Unit**: u2-applicant-screens
+**Kind**: unit
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Verification Id**: 24c4f95f-88c0-47cf-aaad-65613d49c64f
+**Fingerprint**: sha256:c5f3fb19de37bf93b13cf7da434e022731c5c279a88a77f6486d2650c0dd33e0
+**Command SHA-256**: 04ae577da37582954a9661cb87bf7a597ae64f8de628f5de9ed95311c7f13ffe
+**Exit Code**: 0
+**Verified**: true
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T09:15:10Z
+**Event**: HOST_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T09:15:54Z
+**Event**: DECISION_RECORDED
+**Stage**: code-generation
+**Decision**: You asked me to 기능 설계에서 화면이 api의 새 오류 응답 칸을 쓰면 web 응답 해석(web/src/lib/api-response.ts)이 그 칸을 옮기는지 확인해 고칠 곳에 넣기. Keep that for next time?
+**Options**: |Yes, for this project|Yes, for the team|No
+**Question Kind**: learnings-note
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T09:18:43Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["No"]
+**Message Id**: 3433e392
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T09:18:43Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: 기능 설계에서 화면이 api의 새 오류 응답 칸을 쓰면, web 응답 해석(web/src/lib/api-response.ts)이 그 칸을 옮기는지 확인해 고칠 곳에 넣으라고 알려 주셨습니다. 다음에도 이렇게 할까요?
+**Reply**: No
+**Options**: ["Yes, for this project","Yes, for the team","No"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T09:18:45Z
+**Event**: QUESTION_ANSWERED
+**Stage**: code-generation
+**Details**: No
+**Person Reply**: No
+**Message Id**: 3433e392
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T09:18:47Z
+**Event**: DECISION_RECORDED
+**Checkpoint**: Construction Unit Approval
+**Unit**: u2-applicant-screens
+**Kind**: unit
+**Stage**: code-generation
+**Fingerprint**: sha256:c5f3fb19de37bf93b13cf7da434e022731c5c279a88a77f6486d2650c0dd33e0
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Options**: Approve,Request Changes
+**Asked Evidence**: {"functional-design":["sha256:334b5727f4158ecd4be6f9c055fda3a2cfbafc0d973e6d7ebe525efa1ab9240a",null],"nfr-requirements":["sha256:0284eaa08bbcff988f30b7bb81c2c71fc124ceb36d293556d2c35bfab97efe6e",null],"nfr-design":["sha256:412d2f10bc16a7f1e0d3e6f9ecfe2fa6ef518df4dfddab04d4c0bda28277636b",null],"code-generation":["sha256:95628193e670d5799f13fd164d0cf18ea6123d41ca79075e8d9a52f4a6579aa6","sha256:6b85d4cbbb20693c8921aa5697cf33608c940b2a131330383c4a362a4d940513",{"\u0000api/docs/catch-owner-read-preparation.md":"100644 e87771fee6a3a6110df2850d0d36b5e5b05a7d091fc158f83b9e712ac027e824","\u0000api/src/catches/owner-catch-input.ts":"100644 f338281f7ed5ee193c94deaa8c2fe325f6f538c9205414766179470977038eed","\u0000api/src/catches/owner-catch-store.ts":"100644 a6b9ddb8fbfb03782abc463eba61e39cca2cebb3e1a15c4139ce8edbcfa48063","\u0000api/test/catches/owner-catch-http.test.cjs":"100644 64edd07399b4dccfc7a2f00a32f49329626be63901240b7fcaedd75e1bff15cd","\u0000api/test/catches/publishable-filter.test.cjs":"100644 d44da71f4326f77213f81d5b6e3f662193d9bac02712623c12de3e8bd1667cb4","\u0000web/README.md":"100644 f95bc8f97eb6404e7ae31ed1d49e5f8ee405e6766df7d5f9422ab5d2b553ba85","\u0000web/src/app/(member)/presets/[presetId]/page.tsx":"100644 42732ce9c04eaa6860007784389c5918af1567ad82c4740f8c6d0549b971d406","\u0000web/src/app/(member)/presets/new/page.tsx":"100644 7c67e801f5355c99becc478df398b5c6a1a6ce888f202c18771950366d96ca42","\u0000web/src/app/(member)/presets/page.tsx":"100644 a21d2ef77aafd952c6504aece4d92da3ee7f5be7890b327fc4218e21c62420e5","\u0000web/src/components/header/member-header.tsx":"100644 68b8de5ea771ae8f1ecdad0b6449f06303a9826179f090951794c6b0549300f1","\u0000web/src/features/assets/README.md":"100644 c07907edc47b2808866b14cf94ab3f5c37f83a50285476dcd3df9c68f1f1def9","\u0000web/src/features/assets/catch-api.ts":"100644 5266c9927785aa0977dbdec1c14576c8264a4098f97e276a3257e4937f5533c5","\u0000web/src/features/presets/README.md":"100644 358b22658584bc0af18170d223d29654cd602eaf128dcbac1c7841edde14fa04","\u0000web/src/features/presets/preset-editor-screen.tsx":"100644 2356ddd0a477e6d8638c89d625c29ce858058db0e8de89072c342f9f1e8b67c2","\u0000web/src/features/presets/preset-editor-view.tsx":"100644 c8faa976e6115911af9ea9fe069188a05c9f1611d6d67c22a5d28011d3447c00","\u0000web/src/features/presets/presets-api.ts":"100644 ddaae09786095882922bfe2fdce8b4ba3c005d99cc4b920ff359d7022a3e97aa","\u0000web/src/features/presets/presets-list-screen.tsx":"100644 b0c4423839d8c2510470f114eafc05383bd7d05d02774c97abcc0fb74c6d55d1","\u0000web/src/features/presets/presets-list-view.tsx":"100644 a54f0c531d8fc7f2499f1834e0604e476bab5bd41d4ed2c78db25432eb90a490","\u0000web/src/features/presets/source-picker-view.tsx":"100644 bfbc6e0fad8a9516e79de95644cabe4c38847c8b1724c6440abc813390c61784","\u0000web/src/features/publications/README.md":"100644 d21c843d656751d16fad24403a328b7e20f48158a5cfcd5a67a425dd56efbd5f","\u0000web/src/features/publications/pick-parts.tsx":"100644 f1d1f5ff9e68e118c9b2f701a1b2a6b1b84c63ecdc4eecde3e36891ba0e1b746","\u0000web/src/features/publications/publications-api.ts":"100644 ca78fe9168fb9c767b23ce1dfe8706db0c0ece0b32815f57a9450966171c1081","\u0000web/src/features/publications/publish-screen.tsx":"100644 072ec7825f3cfc9d9defe2f2c5d8f2115e6c14985773636d70674c5182583d1d","\u0000web/src/features/publications/publish-sources.ts":"100644 e2b539d31e53dd35040b68cfff73bbfb6e733d0cf4987d9fdd2b8a0920e17fa2","\u0000web/src/features/publications/publish-view.tsx":"100644 0ec1465fa1260da5f4d68d82fa47631af3a95354b05f35b12534f71046e1bd4e","\u0000web/src/lib/api-response.ts":"100644 084c8f7cc8b244cd27da2d358e9c7b1521b9566552ceaa9e2d20752ddcdbecf5","\u0000web/src/lib/member-navigation.ts":"100644 b3b5c4c7689122631e9f667f2f04e63a4c855d4dc042677e1c81d11080de9081","\u0000web/src/lib/routes.ts":"100644 9c63e00a1f617ce7a4fead32ad39fdd699e055a78e302582c41c7d50160f1ac7","\u0000web/test/api-response.test.mjs":"100644 672b04946c187a3ff8c866c4a3d082e40694b76bfd8cc98cca523211b84232d8","\u0000web/test/presets.test.mjs":"100644 251ab129ae1eef8a74477e627e6b559d025d4a3685137ae83d8be00c272dd4db","\u0000web/test/publish.test.mjs":"100644 14a29bc38e1e8f10278f088adedb47fde5287865c5d86a2b8b55b2a83cb11ae0","\u0000web/test/u9-recipient-claude.test.mjs":"100644 2af2617adef4cc0d50ccecd1873dc1c0c57e76afe8deddba7b0d0acfd7ef0407"}]}
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","code-generation":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1"}
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T09:20:21Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: 242d4da9
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T09:20:21Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: Verified with `npm --prefix api run lint && npm --prefix api run typecheck && npm --prefix api run test:coverage && npm --prefix web run lint && npm --prefix web run typecheck && npm --prefix web run test:coverage && npm --prefix web run build` (exit 0). Approve this completed u2-applicant-screens?
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-20T09:20:28Z
+**Event**: GATE_APPROVED
+**Unit**: u2-applicant-screens
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Scope**: unit-end
+**Checkpoint**: construction-unit
+**Fingerprint**: sha256:c5f3fb19de37bf93b13cf7da434e022731c5c279a88a77f6486d2650c0dd33e0
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","code-generation":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1"}
+**Verification Command SHA-256**: 04ae577da37582954a9661cb87bf7a597ae64f8de628f5de9ed95311c7f13ffe
+**Verification Id**: 24c4f95f-88c0-47cf-aaad-65613d49c64f
+**Approved Evidence**: {"functional-design":["sha256:334b5727f4158ecd4be6f9c055fda3a2cfbafc0d973e6d7ebe525efa1ab9240a",null],"nfr-requirements":["sha256:0284eaa08bbcff988f30b7bb81c2c71fc124ceb36d293556d2c35bfab97efe6e",null],"nfr-design":["sha256:412d2f10bc16a7f1e0d3e6f9ecfe2fa6ef518df4dfddab04d4c0bda28277636b",null],"code-generation":["sha256:95628193e670d5799f13fd164d0cf18ea6123d41ca79075e8d9a52f4a6579aa6","sha256:6b85d4cbbb20693c8921aa5697cf33608c940b2a131330383c4a362a4d940513",{"\u0000api/docs/catch-owner-read-preparation.md":"100644 e87771fee6a3a6110df2850d0d36b5e5b05a7d091fc158f83b9e712ac027e824","\u0000api/src/catches/owner-catch-input.ts":"100644 f338281f7ed5ee193c94deaa8c2fe325f6f538c9205414766179470977038eed","\u0000api/src/catches/owner-catch-store.ts":"100644 a6b9ddb8fbfb03782abc463eba61e39cca2cebb3e1a15c4139ce8edbcfa48063","\u0000api/test/catches/owner-catch-http.test.cjs":"100644 64edd07399b4dccfc7a2f00a32f49329626be63901240b7fcaedd75e1bff15cd","\u0000api/test/catches/publishable-filter.test.cjs":"100644 d44da71f4326f77213f81d5b6e3f662193d9bac02712623c12de3e8bd1667cb4","\u0000web/README.md":"100644 f95bc8f97eb6404e7ae31ed1d49e5f8ee405e6766df7d5f9422ab5d2b553ba85","\u0000web/src/app/(member)/presets/[presetId]/page.tsx":"100644 42732ce9c04eaa6860007784389c5918af1567ad82c4740f8c6d0549b971d406","\u0000web/src/app/(member)/presets/new/page.tsx":"100644 7c67e801f5355c99becc478df398b5c6a1a6ce888f202c18771950366d96ca42","\u0000web/src/app/(member)/presets/page.tsx":"100644 a21d2ef77aafd952c6504aece4d92da3ee7f5be7890b327fc4218e21c62420e5","\u0000web/src/components/header/member-header.tsx":"100644 68b8de5ea771ae8f1ecdad0b6449f06303a9826179f090951794c6b0549300f1","\u0000web/src/features/assets/README.md":"100644 c07907edc47b2808866b14cf94ab3f5c37f83a50285476dcd3df9c68f1f1def9","\u0000web/src/features/assets/catch-api.ts":"100644 5266c9927785aa0977dbdec1c14576c8264a4098f97e276a3257e4937f5533c5","\u0000web/src/features/presets/README.md":"100644 358b22658584bc0af18170d223d29654cd602eaf128dcbac1c7841edde14fa04","\u0000web/src/features/presets/preset-editor-screen.tsx":"100644 2356ddd0a477e6d8638c89d625c29ce858058db0e8de89072c342f9f1e8b67c2","\u0000web/src/features/presets/preset-editor-view.tsx":"100644 c8faa976e6115911af9ea9fe069188a05c9f1611d6d67c22a5d28011d3447c00","\u0000web/src/features/presets/presets-api.ts":"100644 ddaae09786095882922bfe2fdce8b4ba3c005d99cc4b920ff359d7022a3e97aa","\u0000web/src/features/presets/presets-list-screen.tsx":"100644 b0c4423839d8c2510470f114eafc05383bd7d05d02774c97abcc0fb74c6d55d1","\u0000web/src/features/presets/presets-list-view.tsx":"100644 a54f0c531d8fc7f2499f1834e0604e476bab5bd41d4ed2c78db25432eb90a490","\u0000web/src/features/presets/source-picker-view.tsx":"100644 bfbc6e0fad8a9516e79de95644cabe4c38847c8b1724c6440abc813390c61784","\u0000web/src/features/publications/README.md":"100644 d21c843d656751d16fad24403a328b7e20f48158a5cfcd5a67a425dd56efbd5f","\u0000web/src/features/publications/pick-parts.tsx":"100644 f1d1f5ff9e68e118c9b2f701a1b2a6b1b84c63ecdc4eecde3e36891ba0e1b746","\u0000web/src/features/publications/publications-api.ts":"100644 ca78fe9168fb9c767b23ce1dfe8706db0c0ece0b32815f57a9450966171c1081","\u0000web/src/features/publications/publish-screen.tsx":"100644 072ec7825f3cfc9d9defe2f2c5d8f2115e6c14985773636d70674c5182583d1d","\u0000web/src/features/publications/publish-sources.ts":"100644 e2b539d31e53dd35040b68cfff73bbfb6e733d0cf4987d9fdd2b8a0920e17fa2","\u0000web/src/features/publications/publish-view.tsx":"100644 0ec1465fa1260da5f4d68d82fa47631af3a95354b05f35b12534f71046e1bd4e","\u0000web/src/lib/api-response.ts":"100644 084c8f7cc8b244cd27da2d358e9c7b1521b9566552ceaa9e2d20752ddcdbecf5","\u0000web/src/lib/member-navigation.ts":"100644 b3b5c4c7689122631e9f667f2f04e63a4c855d4dc042677e1c81d11080de9081","\u0000web/src/lib/routes.ts":"100644 9c63e00a1f617ce7a4fead32ad39fdd699e055a78e302582c41c7d50160f1ac7","\u0000web/test/api-response.test.mjs":"100644 672b04946c187a3ff8c866c4a3d082e40694b76bfd8cc98cca523211b84232d8","\u0000web/test/presets.test.mjs":"100644 251ab129ae1eef8a74477e627e6b559d025d4a3685137ae83d8be00c272dd4db","\u0000web/test/publish.test.mjs":"100644 14a29bc38e1e8f10278f088adedb47fde5287865c5d86a2b8b55b2a83cb11ae0","\u0000web/test/u9-recipient-claude.test.mjs":"100644 2af2617adef4cc0d50ccecd1873dc1c0c57e76afe8deddba7b0d0acfd7ef0407"}]}
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**User Input**: Approve
+**Person Reply**: Approve
+**Message Id**: 242d4da9
+**Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:180b67324eaafa7b28d935c9727aa129835b4f8d77b6a377876534c50099bf81","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:06c217cc95edff50fbbb6ed9b74a40328ddbf73d0fc2005a358d2f0ec13dd5c3"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-02","fingerprint":"sha256:35a896449cfe8224af0aeb34a6cb88230a42a2443ba849c81f5e90906269000a","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:06c217cc95edff50fbbb6ed9b74a40328ddbf73d0fc2005a358d2f0ec13dd5c3"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-03","fingerprint":"sha256:32e2b8ebed17eed06574911a4781f257f4f42bf618451919e753f478b44aeeba","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:06c217cc95edff50fbbb6ed9b74a40328ddbf73d0fc2005a358d2f0ec13dd5c3"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:38303c086db15d189c149bf53a4264d8ded060001f759a21c8bb5df556279ac7","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:6f46245771de858577130ca90b332a3c5e7c54282b7bd340f34c498eb78957f7","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-03","fingerprint":"sha256:142dce43dbb87aa43f5ccd607feb18cc6f61516610e8d0fd1812d531b3e77cb1","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-04","fingerprint":"sha256:191c42bf51ac6415b167f4bed380e8b6b78fd45d2e392f1d01cd33097bbd57da","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-05","fingerprint":"sha256:34855894306bb6a70fdabe1f7e13bf3cb5e7a49e92009fa8c2c97c92f9f4e46c","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-06","fingerprint":"sha256:cab8189e0e836ebbc91cca3c88c9642562d9b981a1c14edfdc482b6770bb89eb","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-07","fingerprint":"sha256:865eec3d3aa729c9905cbbec41d587a245293717cca51ca4e3dcea39c2e7212f","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md","id":"R-01","fingerprint":"sha256:db592d4c13b6e87aba8112486295a03874c0a0c54f6fa88c9a09a918c995084d","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:1cc6d7996981fce6cd0b772d1fbed9af14197e2233d864754abaddd466b093e8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md","id":"R-02","fingerprint":"sha256:bc31a40db52ddc016988d165154b452d4045c17f5eb0b3cbb7f51b283cf6341b","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:1cc6d7996981fce6cd0b772d1fbed9af14197e2233d864754abaddd466b093e8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md","id":"R-03","fingerprint":"sha256:1eb299604f917cebf326b6d27f75e3cedf5ecf6521b2a3169cfebb5a8bd035d7","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:1cc6d7996981fce6cd0b772d1fbed9af14197e2233d864754abaddd466b093e8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md","id":"R-04","fingerprint":"sha256:35715560d010879a2cff1ee9720b76fe3217b32bf9afe8277dd894dfe589632d","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:1cc6d7996981fce6cd0b772d1fbed9af14197e2233d864754abaddd466b093e8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/security-requirements.md","id":"R-01","fingerprint":"sha256:32ad280cb6801d503728ccd1076834de2c2715fc79443728e433d2def31e3794","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:42cba6ac2ef8689af568d5a54a100d9fdbfce453dd85c29e4bc5d62ccb626639"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/security-requirements.md","id":"R-02","fingerprint":"sha256:d7142d3d72ac946fe14978a3fefa9eaa1e19b6dfa05eef147f853dde02b0306d","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:42cba6ac2ef8689af568d5a54a100d9fdbfce453dd85c29e4bc5d62ccb626639"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/security-requirements.md","id":"R-03","fingerprint":"sha256:4d5c91265fbae5a8af3a4b4aaaf78d0b9b0e4773c7d72fda55128ede08130378","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:42cba6ac2ef8689af568d5a54a100d9fdbfce453dd85c29e4bc5d62ccb626639"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/security-requirements.md","id":"R-04","fingerprint":"sha256:e216c726486ac2df0355df524b330c70250964a5f14f96b95110bfe7fae7acbc","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:42cba6ac2ef8689af568d5a54a100d9fdbfce453dd85c29e4bc5d62ccb626639"}}]}
+
+---
