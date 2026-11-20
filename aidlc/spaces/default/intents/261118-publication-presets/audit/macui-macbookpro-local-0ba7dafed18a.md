@@ -15250,3 +15250,494 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
 
 ---
+
+## Unit Started
+**Timestamp**: 2026-11-20T00:11:30Z
+**Event**: UNIT_STARTED
+**Stage**: nfr-requirements
+**Unit**: u1-preset-contract
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:12:03Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/nfr-requirements-questions.md
+**Context**: construction > u1-preset-contract > nfr-requirements > nfr-requirements-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T00:12:04Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-requirements
+**Decision**: Q1
+**Options**: |Q1: A. 이유를 비우고 정상 응답|Q1: B. 이유 값 하나 더함
+**Unit**: u1-preset-contract
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T00:32:18Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["지금 본인 Catch 목록(owner-catch-response.ts 152~160행)과 발행처럼 서버 오류(500)로 둔다. 그런 Catch는 지금도 본인 Catch 목록 전체를 500으로 만들어 고르기 목록에 나올 수 없고, 보호 관측 행은 탈퇴 때만 지워져 정상 사용으로는 생기지 않는다. 새 이유 값·경고 로그·따로 짠 판정은 두지 않고 발행과 같은 판정 함수를 쓴다. 덧붙여 기능 설계 검토 review-01의 Minor R-02~R-08은 문서에 반영되지 않은 채 커밋됐으니 코드 생성에서 검토의 권장대로 반영한다(R-03은 작성자 상세에서도 isFirstCopy를 뺀다, R-04는 칸을 필수로 하고 시험 사본을 고친다, R-08은 같은 프리셋을 동시에 저장할 때의 500을 받아들인다)."]
+**Message Id**: eaabf00e
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T00:32:18Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: [안정성] Q1. 저장소 보호 관측이 없거나 원 분석 요청이 맞지 않는 Catch는 드물게 생기는 서버 기록 문제입니다. 지금은 발행하면 500으로 끝납니다. 프리셋 목록·상세·세기에서는 이런 Catch를 어떻게 다룰까요? 같은 판정을 그대로 쓰면 Catch 하나 때문에 목록 전체가 500이 됩니다.
+**Reply**: 지금 본인 Catch 목록(owner-catch-response.ts 152~160행)과 발행처럼 서버 오류(500)로 둔다. 그런 Catch는 지금도 본인 Catch 목록 전체를 500으로 만들어 고르기 목록에 나올 수 없고, 보호 관측 행은 탈퇴 때만 지워져 정상 사용으로는 생기지 않는다. 새 이유 값·경고 로그·따로 짠 판정은 두지 않고 발행과 같은 판정 함수를 쓴다. 덧붙여 기능 설계 검토 review-01의 Minor R-02~R-08은 문서에 반영되지 않은 채 커밋됐으니 코드 생성에서 검토의 권장대로 반영한다(R-03은 작성자 상세에서도 isFirstCopy를 뺀다, R-04는 칸을 필수로 하고 시험 사본을 고친다, R-08은 같은 프리셋을 동시에 저장할 때의 500을 받아들인다).
+**Options**: ["A. 이유 없이 정상 응답","B. 이유 값 하나 더함"]
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:32:28Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/answer-text/answer.txt
+**Context**: .aidlc-engine > answer-text > answer.txt
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T00:32:28Z
+**Event**: QUESTION_ANSWERED
+**Stage**: nfr-requirements
+**Details**: Q1: 지금 본인 Catch 목록(owner-catch-response.ts 152~160행)과 발행처럼 서버 오류(500)로 둔다. 그런 Catch는 지금도 본인 Catch 목록 전체를 500으로 만들어 고르기 목록에 나올 수 없고, 보호 관측 행은 탈퇴 때만 지워져 정상 사용으로는 생기지 않는다. 새 이유 값·경고 로그·따로 짠 판정은 두지 않고 발행과 같은 판정 함수를 쓴다. 덧붙여 기능 설계 검토 review-01의 Minor R-02~R-08은 문서에 반영되지 않은 채 커밋됐으니 코드 생성에서 검토의 권장대로 반영한다(R-03은 작성자 상세에서도 isFirstCopy를 뺀다, R-04는 칸을 필수로 하고 시험 사본을 고친다, R-08은 같은 프리셋을 동시에 저장할 때의 500을 받아들인다).
+**Unit**: u1-preset-contract
+**Person Reply**: 지금 본인 Catch 목록(owner-catch-response.ts 152~160행)과 발행처럼 서버 오류(500)로 둔다. 그런 Catch는 지금도 본인 Catch 목록 전체를 500으로 만들어 고르기 목록에 나올 수 없고, 보호 관측 행은 탈퇴 때만 지워져 정상 사용으로는 생기지 않는다. 새 이유 값·경고 로그·따로 짠 판정은 두지 않고 발행과 같은 판정 함수를 쓴다. 덧붙여 기능 설계 검토 review-01의 Minor R-02~R-08은 문서에 반영되지 않은 채 커밋됐으니 코드 생성에서 검토의 권장대로 반영한다(R-03은 작성자 상세에서도 isFirstCopy를 뺀다, R-04는 칸을 필수로 하고 시험 사본을 고친다, R-08은 같은 프리셋을 동시에 저장할 때의 500을 받아들인다).
+**Message Id**: eaabf00e
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T00:32:44Z
+**Event**: DECISION_RECORDED
+**Stage**: nfr-requirements
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/nfr-requirements-questions.md
+**Unit**: u1-preset-contract
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T00:34:27Z
+**Event**: HUMAN_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: e36bba46
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T00:34:28Z
+**Event**: QUESTION_REPLIED
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Question**: Does this all look correct before I generate the artifact?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-20T00:34:34Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: nfr-requirements
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/nfr-requirements-questions.md
+**Questions SHA-256**: 5df28653b548dacc2ca097d8397edef1393c46f61499243c9be976122d68372d
+**Hash Scope**: confirmed-content-v2
+**Unit**: u1-preset-contract
+**Message Id**: e36bba46
+**Person Reply**: Looks correct
+**Summary Authorization Id**: 15fcac607837847169e277b2f7b3d4b5a2e071e46b79ede74fafacba624850db
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:34:51Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/performance-requirements.md
+**Context**: construction > u1-preset-contract > nfr-requirements > performance-requirements.md
+**Summary Authorization Id**: 15fcac607837847169e277b2f7b3d4b5a2e071e46b79ede74fafacba624850db
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:35:09Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/security-requirements.md
+**Context**: construction > u1-preset-contract > nfr-requirements > security-requirements.md
+**Summary Authorization Id**: 15fcac607837847169e277b2f7b3d4b5a2e071e46b79ede74fafacba624850db
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:35:15Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/scalability-requirements.md
+**Context**: construction > u1-preset-contract > nfr-requirements > scalability-requirements.md
+**Summary Authorization Id**: 15fcac607837847169e277b2f7b3d4b5a2e071e46b79ede74fafacba624850db
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:35:36Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/reliability-requirements.md
+**Context**: construction > u1-preset-contract > nfr-requirements > reliability-requirements.md
+**Summary Authorization Id**: 15fcac607837847169e277b2f7b3d4b5a2e071e46b79ede74fafacba624850db
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:35:43Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/observability-requirements.md
+**Context**: construction > u1-preset-contract > nfr-requirements > observability-requirements.md
+**Summary Authorization Id**: 15fcac607837847169e277b2f7b3d4b5a2e071e46b79ede74fafacba624850db
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:35:50Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/tech-stack-decisions.md
+**Context**: construction > u1-preset-contract > nfr-requirements > tech-stack-decisions.md
+**Summary Authorization Id**: 15fcac607837847169e277b2f7b3d4b5a2e071e46b79ede74fafacba624850db
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:35:59Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/traceability.json
+**Context**: construction > u1-preset-contract > nfr-requirements > traceability.json
+**Summary Authorization Id**: 15fcac607837847169e277b2f7b3d4b5a2e071e46b79ede74fafacba624850db
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:36:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: 7d4b0b5d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/performance-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:36:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: 7d4b0b5d
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/performance-requirements.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:36:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: 566c96ca
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/security-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:36:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: 566c96ca
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/security-requirements.md
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:36:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: c92e10e8
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/scalability-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:36:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: c92e10e8
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/scalability-requirements.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:36:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: 2f8da7e8
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/reliability-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: 2f8da7e8
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/reliability-requirements.md
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: SENSOR_FIRED
+**Fire id**: 24202d58
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/observability-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: 24202d58
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/observability-requirements.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: SENSOR_FIRED
+**Fire id**: e74c5803
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/tech-stack-decisions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: e74c5803
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/tech-stack-decisions.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: SENSOR_FIRED
+**Fire id**: 33ca6455
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: 33ca6455
+**Sensor ID**: required-sections
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/traceability.json
+**Duration ms**: 80
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: SENSOR_FIRED
+**Fire id**: 3ee847c4
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/performance-requirements.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: 3ee847c4
+**Sensor ID**: upstream-coverage
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/performance-requirements.md
+**Duration ms**: 70
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: SENSOR_FIRED
+**Fire id**: 76256087
+**Sensor ID**: traceability
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: SENSOR_PASSED
+**Fire id**: 76256087
+**Sensor ID**: traceability
+**Stage slug**: nfr-requirements
+**Unit**: u1-preset-contract
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/traceability.json
+**Duration ms**: 76
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-20T00:36:02Z
+**Event**: REVIEW_REQUESTED
+**Stage**: nfr-requirements
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u1-preset-contract
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:d96e770c4db79833f91dfcf8eb81f9d6d044e96a8adc67869d4b0efeb1d1727b
+**Request Id**: review:7821973fe734637356eb176c0e2ab7a6
+**Review File**: .aidlc-engine/reviews/nfr-requirements/units/u1-preset-contract/aa555492f330bf5d/1.7821973fe734637356eb176c0e2ab7a6.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:36:10Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-20T00:36:21Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-20T00:36:32Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: nfr-requirements
+**Tool**: Bash
+**Details**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets (unit u1-preset-contract)
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T00:37:15Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviews/nfr-requirements/units/u1-preset-contract/aa555492f330bf5d/1.7821973fe734637356eb176c0e2ab7a6.review.md
+**Context**: .aidlc-engine > reviews > nfr-requirements > units > u1-preset-contract > aa555492f330bf5d > 1.7821973fe734637356eb176c0e2ab7a6.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T00:37:19Z
+**Event**: HOST_TURN
+**Session**: 1ee21219-82f9-487d-b5df-7f2664a353e2
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-20T00:37:19Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: a36dd3fd5c5afdfc2
+**Review File Digest**: .aidlc-engine/reviews/units-generation/stage/18dabf3da2f56bda/1.a5010d1a3dd0a8f252034f647bdd1f66.review.md=absent; .aidlc-engine/reviews/nfr-requirements/units/u1-preset-contract/aa555492f330bf5d/1.7821973fe734637356eb176c0e2ab7a6.review.md=bd5fea0c80ef6ce0295d08a8f60b12c21e58f31e26fdcbed6ebecbc800aff79b
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-20T00:37:25Z
+**Event**: REVIEW_COMPLETED
+**Stage**: nfr-requirements
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u1-preset-contract
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:d96e770c4db79833f91dfcf8eb81f9d6d044e96a8adc67869d4b0efeb1d1727b
+**Artifact Fingerprint**: sha256:d96e770c4db79833f91dfcf8eb81f9d6d044e96a8adc67869d4b0efeb1d1727b
+**Request Id**: review:7821973fe734637356eb176c0e2ab7a6
+**Review Record**: .aidlc-engine/reviews/nfr-requirements/units/u1-preset-contract/aa555492f330bf5d/1.json
+**Review Record Digest**: sha256:2467dd0c28c6e965ffde3f97293340f44db25de6c7b305985a6358d80299b41b
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-20T00:37:25Z
+**Event**: UNIT_COMPLETED
+**Stage**: nfr-requirements
+**Unit**: u1-preset-contract
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
