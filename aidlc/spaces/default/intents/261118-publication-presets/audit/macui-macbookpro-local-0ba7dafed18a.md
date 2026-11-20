@@ -19935,3 +19935,551 @@
 **Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:f7174f238bac1f9d70e4c93e29d8de1bb87b0924fcb4721d9d3489d81bbfc0d3","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:8d94cabc16da9f38414077beae61d8c82dec5d98235f682abc9bc13e0a758059"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/code-generation-plan.md","id":"R-02","fingerprint":"sha256:3f537edfd6fb37efc8555a2232bb314724eb6303a608ff84fd42a25430fba868","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:8d94cabc16da9f38414077beae61d8c82dec5d98235f682abc9bc13e0a758059"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/code-generation-plan.md","id":"R-03","fingerprint":"sha256:82656e2d9874a835327ea09d4252831667b79af6efc24e6e45a514ff90f71362","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:8d94cabc16da9f38414077beae61d8c82dec5d98235f682abc9bc13e0a758059"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:9e83c7987b94f947d32f457e0df59794e337e2ac5594e7c7ad25945d4659bf33","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:b60af9817497395f9920ca1096d2f5b441f3070ccddd58f084ff9acbcbf90011","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-03","fingerprint":"sha256:c3b1a23ae3d81f3c1d5297078b5d01309a382db6e2446447e53a9c641d49e8d0","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-04","fingerprint":"sha256:93cc64de5eb030492c1c98236dea127791700d0b0a96ea6b16ac4f0a2784adda","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-05","fingerprint":"sha256:70cac1c448b97bee8aa05466f400e90a5eef4da0a7f9593dfc8ec64fe4b686bb","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-06","fingerprint":"sha256:2b77760484d22e84ed15b08bdbb81e0a4df12aa52b56ce53275543c933266014","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-07","fingerprint":"sha256:2938e3c35b70f43bb11cc94ff1eb09574915abb61c9020995f6ca50c88f09e71","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md","id":"R-08","fingerprint":"sha256:99dc6ab66a7bd94bf56d7c3901cca1fbd92e76cbb66ec0f9051ebfd91b580245","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:de35fbebcf5c5b7c7447f828b7022a0d8ed9e62a4b2cf63be67d4d4e78bc0b28"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-01","fingerprint":"sha256:4c445bc64853fd3b54e503f501f12186709f7aeb66663332cfa41501bdb43698","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-02","fingerprint":"sha256:67b7327c6c37f0bb1ac5b84d3ef0316a36dde8652f316a75476f5f5a2d95ef98","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-03","fingerprint":"sha256:c178a7c5e2bf3807280204e923db301bad48a642d6d49b4136164c09f3f4fe5a","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-04","fingerprint":"sha256:42f43b9d4c4a472f2df20d1bca15c8192b6501d2ed641ef98a570d0d84b24447","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-05","fingerprint":"sha256:da2131ed31ade25fad007ee4e735bf3155884b2ef774c4a04933709393f497fb","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/security-design.md","id":"R-06","fingerprint":"sha256:8717dae6f3dd36e0e5b55e2f063b7610dcff456acaeddeb6833d50526c6b11cf","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:f28ff82fd853c4f9a161776390b89fb49786790821f7da4d63f35a65e6762d10"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/security-requirements.md","id":"R-01","fingerprint":"sha256:97159d29dba1ea2a14a31d5a2fe264a36b014acd4641441be3dcaaccd46c4bf3","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:2467dd0c28c6e965ffde3f97293340f44db25de6c7b305985a6358d80299b41b"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/security-requirements.md","id":"R-02","fingerprint":"sha256:d38640987a83e93cf896d7b56d534878bd6469008ad099caf2628ffe69b0a775","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:2467dd0c28c6e965ffde3f97293340f44db25de6c7b305985a6358d80299b41b"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-requirements/security-requirements.md","id":"R-03","fingerprint":"sha256:7fc2908354822a627af94e20e07a3d6c5e5a4031b2656412512550debd35e3fe","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u1-preset-contract/aa555492f330bf5d/1.json","digest":"sha256:2467dd0c28c6e965ffde3f97293340f44db25de6c7b305985a6358d80299b41b"}}]}
 
 ---
+
+## Human Turn
+**Timestamp**: 2026-11-20T04:00:38Z
+**Event**: HUMAN_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: person
+**Source**: picker
+**Picked**: ["Review each checkpoint"]
+**Message Id**: 99f04901
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T04:00:39Z
+**Event**: QUESTION_REPLIED
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Question**: 남은 단위(u4·U2·U3)는 어떻게 이어서 만들까요?
+**Reply**: Review each checkpoint
+**Options**: ["Continue automatically","Review each checkpoint"]
+
+---
+
+## Autonomy Mode Set
+**Timestamp**: 2026-11-20T04:00:42Z
+**Event**: AUTONOMY_MODE_SET
+**Mode**: gated
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T04:04:14Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-design-questions.md
+**Context**: construction > u4-privacy-policy > functional-design > functional-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T04:04:24Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: u4 Q1 저장 항목 표, Q2 하나씩 지우기 두 곳, Q3 보관 기간 줄
+**Options**: |Q1 A 13행에 넣기|Q1 B 새 줄|Q2 A 두 곳 모두|Q2 B 5번만|Q3 A 넣지 않음|Q3 B 넣음
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T05:18:48Z
+**Event**: HUMAN_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: person
+**Source**: picker
+**Picked**: ["13행에 넣기","두 곳 모두","넣음"]
+**Message Id**: c776409b
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T05:18:48Z
+**Event**: QUESTION_REPLIED
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Question**: Q1. 개인정보처리방침 저장 항목 표(1번)에 프리셋을 어떻게 넣을까요? 지금 13행은 「자료·JD를 올리고 발행할 때 | 직접 올린 글과 PDF, JD, 발행본과 공유 링크, … | 자료 관리, 발행본 공유, …」입니다.
+**Reply**: 13행에 넣기
+**Options**: ["13행에 넣기","새 줄 더하기"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T05:18:48Z
+**Event**: QUESTION_REPLIED
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Question**: Q2. 「하나씩 지우기」는 원문 두 곳(2번 둘째 줄, 5번)에 같은 내용이 있습니다. 어떻게 고칠까요?
+**Reply**: 두 곳 모두
+**Options**: ["두 곳 모두","5번만"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T05:18:48Z
+**Event**: QUESTION_REPLIED
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Question**: Q3. 보관 기간(2번 첫째 줄 「회원 정보와 올린 자료, Catch, 발행본은 탈퇴할 때까지 보관…」)에도 프리셋을 넣을까요? 프리셋은 탈퇴 때 회원과 함께 지워집니다. FR4.3은 표와 하나씩 지우기 문장만 말합니다.
+**Reply**: 넣음
+**Options**: ["넣지 않음","넣음"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T05:19:05Z
+**Event**: QUESTION_ANSWERED
+**Stage**: functional-design
+**Details**: Q1: A 13행에 넣기; Q2: A 두 곳 모두; Q3: B 넣음
+**Person Reply**: Review each checkpoint\n13행에 넣기\n두 곳 모두\n넣음
+**Message Id**: c776409b
+**Message Ids**: 99f04901,c776409b
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T05:19:07Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-design-questions.md
+**Context**: construction > u4-privacy-policy > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T05:19:09Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-design-questions.md
+**Context**: construction > u4-privacy-policy > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T05:19:12Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-design-questions.md
+**Context**: construction > u4-privacy-policy > functional-design > functional-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T05:19:13Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: u4 Q4 시행일과 변경, Q5 확정 문구 원문 출처
+**Options**: |Q4 A 변경 줄 더하기|Q4 B 시행일만 바꾸기|Q4 C 그대로|Q5 A #597 댓글|Q5 B #496 댓글|Q5 C 설계 문서
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T05:21:42Z
+**Event**: HUMAN_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: person
+**Source**: typed
+**Reply**: command
+**Message Id**: 144a390c
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-20T05:21:50Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: unknown
+**Agent ID**: a7889da558c7e80f1
+**Message**: 발행 프리셋 intent의 U1 코드 생성을 마쳐 커밋했고, 지금 단위 확인 명령을 다시 돌리고 있습니다. 끝나면 api·web 결과와 걸린 시간을 알려 드리고 U1 승인을 여쭙겠습니다.
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T05:22:45Z
+**Event**: HUMAN_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: person
+**Source**: typed
+**Message Id**: 38545302
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T05:22:50Z
+**Event**: QUESTION_ANSWERED
+**Stage**: functional-design
+**Details**: Q4: A 변경 줄 더하기, 문장은 「2026년 11월 ○○일: 처리하는 정보, 보관 기간, 하나씩 지우기에 프리셋(이름과 담은 자료 목록)을 더했습니다.」, 날짜는 main 배포일로 코드 생성 전에 팀장이 정함; Q5: C 설계 문서
+**Person Reply**: Q4 : A로 하되 변경 줄은 바꾼 곳에 맞춰 「2026년 11월 ○○일: 처리하는 정보, 보관 기간, 하나씩 지우기에 프리셋(이름과 담은 자료 목록)을 더했습니다.」로 쓴다. 날짜는 이 변경이 main에 배포되는 날로, 코드 생성 전에 팀장이 정해 알려 준다.\n\nQ5 : 3
+**Message Id**: 38545302
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T05:22:53Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-design-questions.md
+**Context**: construction > u4-privacy-policy > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T05:22:55Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-design-questions.md
+**Context**: construction > u4-privacy-policy > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T05:23:09Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-design-questions.md
+**Context**: construction > u4-privacy-policy > functional-design > functional-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T05:23:11Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-design-questions.md
+**Unit**: u4-privacy-policy
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T05:25:39Z
+**Event**: HUMAN_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: person
+**Source**: typed
+**Message Id**: d98775f4
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T05:35:54Z
+**Event**: HOST_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T05:38:54Z
+**Event**: HUMAN_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: 676b507e
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T05:38:54Z
+**Event**: QUESTION_REPLIED
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Question**: 문서를 만들기 전에, 위 답이 모두 맞나요?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T05:38:59Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-design-questions.md
+**Context**: construction > u4-privacy-policy > functional-design > functional-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-20T05:39:01Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: functional-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-design-questions.md
+**Questions SHA-256**: 988cf8fed7ea86b20e46fbb9212e98e8db21b19bd3b7eb8ec65a898e9c3a6558
+**Hash Scope**: confirmed-content-v2
+**Unit**: u4-privacy-policy
+**Message Id**: 676b507e
+**Message Ids**: d98775f4,676b507e
+**Person Reply**: 문서를 만들기 전에 먼저 origin/dev를 이 브랜치에 merge 커밋으로 합쳐 주세요(rebase 금지). 충돌 두 파일(api/docs/claude-mcp.md, api/test/claude-mcp/mcp-shared-text.test.cjs)은 dev의 dc3dc517(Claude가 받는 Catch 글의 네 가지)·#610 시험 줄과 U1의 앞선 사본 거르기를 둘 다 살리고, 충돌 없이 합쳐진 qna-sources.ts·mcp-shared-text.ts도 살핀 뒤 단위 확인 명령을 api와 web 시간을 나눠 재며 다시 돌려 주세요. 통과하면 그 merge 커밋을 origin의 api/publication-presets에 push하고, 이 U4 답 확인으로 돌아와 다시 물어 주세요.\nLooks correct
+**Summary Authorization Id**: ae2983af17b0cbb1193b31b96f4c7d10624cd127f1c4ed40e315dcaa2e7d6ead
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T05:40:10Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md
+**Context**: construction > u4-privacy-policy > functional-design > functional-spec.md
+**Summary Authorization Id**: ae2983af17b0cbb1193b31b96f4c7d10624cd127f1c4ed40e315dcaa2e7d6ead
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T05:40:20Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/frontend-components.md
+**Context**: construction > u4-privacy-policy > functional-design > frontend-components.md
+**Summary Authorization Id**: ae2983af17b0cbb1193b31b96f4c7d10624cd127f1c4ed40e315dcaa2e7d6ead
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T05:40:34Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/traceability.json
+**Context**: construction > u4-privacy-policy > functional-design > traceability.json
+**Summary Authorization Id**: ae2983af17b0cbb1193b31b96f4c7d10624cd127f1c4ed40e315dcaa2e7d6ead
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T05:40:36Z
+**Event**: SENSOR_FIRED
+**Fire id**: 1010cd91
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u4-privacy-policy
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T05:40:36Z
+**Event**: SENSOR_PASSED
+**Fire id**: 1010cd91
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u4-privacy-policy
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T05:40:36Z
+**Event**: SENSOR_FIRED
+**Fire id**: 7cbbf3d4
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u4-privacy-policy
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T05:40:36Z
+**Event**: SENSOR_PASSED
+**Fire id**: 7cbbf3d4
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u4-privacy-policy
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/traceability.json
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T05:40:36Z
+**Event**: SENSOR_FIRED
+**Fire id**: c25cec8a
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u4-privacy-policy
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/frontend-components.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T05:40:36Z
+**Event**: SENSOR_PASSED
+**Fire id**: c25cec8a
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u4-privacy-policy
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/frontend-components.md
+**Duration ms**: 81
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T05:40:37Z
+**Event**: SENSOR_FIRED
+**Fire id**: eb4ed45c
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: u4-privacy-policy
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T05:40:37Z
+**Event**: SENSOR_PASSED
+**Fire id**: eb4ed45c
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: u4-privacy-policy
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T05:40:37Z
+**Event**: SENSOR_FIRED
+**Fire id**: bade9708
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: u4-privacy-policy
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/traceability.json
+
+---
+
+## Sensor Failed
+**Timestamp**: 2026-11-20T05:40:37Z
+**Event**: SENSOR_FAILED
+**Fire id**: bade9708
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: u4-privacy-policy
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/traceability.json
+**Detail path**: aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/sensors/functional-design/traceability-bade9708.md
+**Findings count**: 3
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T05:41:04Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/rules.md
+**Context**: construction > u4-privacy-policy > functional-design > rules.md
+**Summary Authorization Id**: ae2983af17b0cbb1193b31b96f4c7d10624cd127f1c4ed40e315dcaa2e7d6ead
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T05:41:08Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/traceability.json
+**Context**: construction > u4-privacy-policy > functional-design > traceability.json
+**Summary Authorization Id**: ae2983af17b0cbb1193b31b96f4c7d10624cd127f1c4ed40e315dcaa2e7d6ead
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T05:41:10Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md
+**Context**: construction > u4-privacy-policy > functional-design > functional-spec.md
+**Summary Authorization Id**: ae2983af17b0cbb1193b31b96f4c7d10624cd127f1c4ed40e315dcaa2e7d6ead
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-20T05:41:12Z
+**Event**: REVIEW_REQUESTED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u4-privacy-policy
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:914d762552e445d3c716f508a776bbf4d31d75e35b82395145d7e242d6d45633
+**Request Id**: review:15a12d4bde7f2303c0feb8608d4268a0
+**Review File**: .aidlc-engine/reviews/functional-design/units/u4-privacy-policy/aa555492f330bf5d/1.15a12d4bde7f2303c0feb8608d4268a0.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T05:41:18Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-20T05:41:33Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T05:42:15Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviews/functional-design/units/u4-privacy-policy/aa555492f330bf5d/1.15a12d4bde7f2303c0feb8608d4268a0.review.md
+**Context**: .aidlc-engine > reviews > functional-design > units > u4-privacy-policy > aa555492f330bf5d > 1.15a12d4bde7f2303c0feb8608d4268a0.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T05:42:21Z
+**Event**: HOST_TURN
+**Session**: c8345015-44cb-4a70-8b34-287bb705950f
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-20T05:42:21Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: a639d72e9143d2fe9
+**Review File Digest**: .aidlc-engine/reviews/units-generation/stage/18dabf3da2f56bda/1.a5010d1a3dd0a8f252034f647bdd1f66.review.md=absent; .aidlc-engine/reviews/functional-design/units/u4-privacy-policy/aa555492f330bf5d/1.15a12d4bde7f2303c0feb8608d4268a0.review.md=f5956f6acd75543c4c424e289315a44da87cafa96e154711cd219953f7f64cb1
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-20T05:42:26Z
+**Event**: REVIEW_COMPLETED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u4-privacy-policy
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:914d762552e445d3c716f508a776bbf4d31d75e35b82395145d7e242d6d45633
+**Artifact Fingerprint**: sha256:914d762552e445d3c716f508a776bbf4d31d75e35b82395145d7e242d6d45633
+**Request Id**: review:15a12d4bde7f2303c0feb8608d4268a0
+**Review Record**: .aidlc-engine/reviews/functional-design/units/u4-privacy-policy/aa555492f330bf5d/1.json
+**Review Record Digest**: sha256:ec2e749a6086f51be62286e2ad5bf1dbb37bfabdf75d7339b0e383b2b44e9f54
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-20T05:42:37Z
+**Event**: UNIT_STARTED
+**Stage**: functional-design
+**Unit**: u4-privacy-policy
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-20T05:42:38Z
+**Event**: UNIT_COMPLETED
+**Stage**: functional-design
+**Unit**: u4-privacy-policy
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
