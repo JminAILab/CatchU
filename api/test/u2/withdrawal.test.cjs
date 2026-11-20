@@ -121,8 +121,8 @@ async function memberWithData(identity = `u2-withdraw-${randomUUID()}`) {
            ($5, $2, '합성 발행본', $6, $4, $4::timestamptz + interval '2160 hours', $7)`,
   [live, memberId, randomUUID(), publishedAt, stopped, randomUUID(), stoppedBefore]);
   for (const publicationId of [live, stopped]) {
-    await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot)
-      VALUES ($1, $2, 1, 'TEXT_MATERIAL', $3, '합성 자료', '{"body":"합성 본문"}')`, [randomUUID(), publicationId, textMaterialId]);
+    await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, preset_ordinal, preset_name)
+      VALUES ($1, $2, 1, 'TEXT_MATERIAL', $3, '합성 자료', '{"body":"합성 본문"}', 1, '합성 프리셋')`, [randomUUID(), publicationId, textMaterialId]);
   }
   const mcpClientId = randomUUID();
   await db.query(`INSERT INTO mcp_client (mcp_client_id, client_name, redirect_uris, registered_at, approved_at)

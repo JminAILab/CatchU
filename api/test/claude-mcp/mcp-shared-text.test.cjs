@@ -55,7 +55,7 @@ const { MCP_CURSOR_MAX_LENGTH, MCP_PAGE_CHARS } = require('../../dist/claude-mcp
 const { InvalidCursorError, encodeCursor } = require('../../dist/claude-mcp/mcp-page');
 const { extractLinkToken } = require('../../dist/claude-mcp/mcp-shared-link');
 const { SHARED_PUBLICATION_NOTICE, buildSharedPage, parseSharedCursor } = require('../../dist/claude-mcp/mcp-shared-page');
-const { CATCH_TEXT_LABELS, flattenPublishedItem } = require('../../dist/claude-mcp/mcp-shared-text');
+const { CATCH_TEXT_LABELS, flattenPublishedItem, sharedItemTexts } = require('../../dist/claude-mcp/mcp-shared-text');
 const { generateLinkToken } = require('../../dist/share-links/link-token');
 
 const WEB_SNAPSHOT_VIEW = join(__dirname, '..', '..', '..', 'web', 'src', 'features', 'publications', 'snapshot-view.tsx');
@@ -381,6 +381,29 @@ test('S15 cursor 범위: 없는 position·글 길이 이상 offset·서로게이
   const fromEmpty = buildSharedPage(src, { position: 2, offset: 0 });
   assert.deepEqual(fromEmpty.items, [{ position: 2, itemKind: 'TEXT_MATERIAL', title: '[합성] 항목 2', content: '' }]);
   assert.equal(fromEmpty.nextCursor, null);
+});
+
+// 발행 프리셋 U1 — 겹친 사본(BR4.4, P-5). 먼저 정한 시나리오(unit-test-instructions 「앞선 사본」):
+// - 첫 쪽이 1번 항목 끝에서 꼭 차고, 그 바로 뒤(2번)가 1번과 같은 원본의 겹친 사본이며, 3번이 다른 자료다.
+// - 기대: 다음 쪽은 2번을 건너뛰고 3번의 처음부터 이어진다(cursor는 {3, 0}, 모양 그대로). 2번은 어느 쪽에도 없고, 항목은 빠지지 않는다.
+// - 실패 조건: 겹친 사본이 나옴, 3번이 빠지거나 겹침.
+test('발행 프리셋 BR4.4: 쪽 경계 바로 뒤가 겹친 사본이면 다음 쪽은 그것을 건너뛰고 그다음 앞선 사본부터 이어진다', () => {
+  const snapshotItem = (position, body, isFirstCopy) => ({ publishedItemId: randomUUID(), position, itemKind: 'TEXT_MATERIAL',
+    title: `[합성] 항목 ${position}`, snapshot: { body }, pdfPages: null, presetOrdinal: position === 2 ? 2 : 1, presetName: '[합성] 프리셋', isFirstCopy });
+  const probe = { title: '[합성] 발행본', publishedAt: PUBLISHED_AT, expiresAt: EXPIRES_AT,
+    items: [{ position: 1, itemKind: 'TEXT_MATERIAL', title: '[합성] 항목 1' }, { position: 3, itemKind: 'TEXT_MATERIAL', title: '[합성] 항목 3' }] };
+  // 1번 글과 3번의 빈 머리 칸까지 넣으면 쪽 길이가 상한과 같아 3번의 코드 포인트 하나도 들지 않는다.
+  const fill = 'a'.repeat(MCP_PAGE_CHARS - headLength(probe, probe.items));
+  const later = '[합성] 셋째 자료 본문';
+  const items = [snapshotItem(1, fill, true), snapshotItem(2, fill, false), snapshotItem(3, later, true)];
+  const src = { title: '[합성] 발행본', publishedAt: PUBLISHED_AT, expiresAt: EXPIRES_AT, items: sharedItemTexts(items) };
+  assert.deepEqual(src.items.map((entry) => entry.position), [1, 3], '겹친 사본은 싣지 않는다');
+  const pages = readAll(src);
+  assert.deepEqual(pages.map((page) => page.items.map((chunk) => chunk.position)), [[1], [3]]);
+  assert.deepEqual(parseSharedCursor(pages[0].nextCursor), { position: 3, offset: 0 }, '다음 쪽은 3번 처음부터');
+  assert.equal(pages[1].items[0].content, later);
+  assert.equal('continued' in pages[1].items[0], false);
+  assertPaged(src, pages);
 });
 
 test('S19 같은 사본은 두 번 펴도 같은 글이고 같은 쪽이 된다', () => {

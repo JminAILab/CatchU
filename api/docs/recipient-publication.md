@@ -9,7 +9,7 @@
 
 | 경로 | 요청 | 성공 | 오류 |
 | --- | --- | --- | --- |
-| `GET /v1/public/links/{token}` | 머리글 `X-Link-Grant`(선택). 쿼리 없음 | 200 C-10 `PublishedSnapshot`(`title`·`publishedAt`·`expiresAt`·`items[]`, `Cache-Control: no-store`) | 401 `LINK_PASSWORD_REQUIRED`, 404 `LINK_UNAVAILABLE`, 400 `VALIDATION_FAILED`(정의 밖 쿼리, 10월 `limit`·`cursor` 포함), 500 `INTERNAL_ERROR` |
+| `GET /v1/public/links/{token}` | 머리글 `X-Link-Grant`(선택). 쿼리 없음 | 200 C-10 `PublishedSnapshot`(`title`·`publishedAt`·`expiresAt`·`items[]`, 항목마다 발행 프리셋 칸 `presetOrdinal`·`presetName`, `Cache-Control: no-store`) | 401 `LINK_PASSWORD_REQUIRED`, 404 `LINK_UNAVAILABLE`, 400 `VALIDATION_FAILED`(정의 밖 쿼리, 10월 `limit`·`cursor` 포함), 500 `INTERNAL_ERROR` |
 | `POST /v1/public/links/{token}/unlock` | 본문 `{ password }` | 200 `{ grant }` | 401 `LINK_PASSWORD_INVALID`, 404 `LINK_UNAVAILABLE`, 400 `INVALID_REQUEST`(비밀번호 없는 발행본)·`VALIDATION_FAILED`(본문), 429 `LINK_UNLOCK_LIMITED` + `Retry-After`, 500 |
 
 10월 `GET /v1/public/links/{token}/catches/{catchId}`·`POST/GET /v1/share-links`·`PUT /v1/share-links/{id}/stop`은 없다(등록되지 않은 경로의 공통 응답). `test/publications/app-routes.test.cjs`가 등록된 (메서드, 경로)에 중복이 없고 받은 사람 두 경로가 이 컨트롤러에만 있으며 10월 경로가 없음을 확인한다.
@@ -23,7 +23,7 @@
 | 1 | 토큰 형식(`isLinkTokenFormat`) 틀림, 발행본 없음(삭제 포함), 중지, 만료 | 404 `LINK_UNAVAILABLE`, 고정 문구, 구분 없음(BR6.1, NFR1.12) |
 | 2 | 작성자(소유 회원) 상태 — 1과 같은 스냅샷 | 비활성 → 1과 같은 404. 회원 행 없음 → 500 `INTERNAL_ERROR` 고정 본문(아래 「작성자 상태별 처리」) |
 | 3 | 비밀번호 발행본이면 이 발행본의 유효한 grant | 없음·다른 발행본·위조·만료 grant → 401 `LINK_PASSWORD_REQUIRED`. 비밀번호 없는 발행본은 머리글을 무시한다 |
-| 4 | 사본 읽기 | 200. `published_item`을 position 순으로, 원본 Catch·자료는 읽지 않는다 |
+| 4 | 사본 읽기 | 200. `published_item`을 position 순으로, 원본 Catch·자료는 읽지 않는다. 응답 항목은 api 안에서만 쓰는 `isFirstCopy`를 빼고(`snapshotResponse`, 발행 프리셋 BR4.5) 원본 ID(`source_id`)를 싣지 않는다. 같은 자료가 두 프리셋에 든 겹친 사본도 그대로 모두 보인다(탭 구분은 `presetOrdinal`·`presetName`) |
 
 **판정 뒤의 상태 변화**(#416 OQ-U4-NFR-5 결정 A 2026-11-04, OQ-U4-NFR-6 결정 2026-11-05; 열람 `GET` 기준이며 unlock은 아래 「작성자 상태별 처리」의 두 번 판정): 판정을 통과한 요청은 그 사이에 커밋된 중지·만료·삭제·작성자 비활성 때문에 취소되지 않는다. 이 경로는 판정과 사본 읽기가 같은 스냅샷이라 그 요청은 판정 시점의 사본을 돌려주고, 차단은 **다음 요청의 재판정**으로 한다. 삭제는 판정 뒤 읽을 사본이 없는 경우(`NotFound`)에만 그 요청도 404 `LINK_UNAVAILABLE`이다. 소비 Unit(U5·U10·U9)의 경로는 각자 매핑한다([발행 문서 「C-10 PublicationAccess」](publications.md#c-10-publicationaccess)의 「판정 뒤 상태 변경」). `test/publications/recipient-api.test.cjs`의 R-04 사례가 사본 읽기 직전에 중지·삭제·비활성을 커밋해 그 요청 200·다음 요청 404를 확인한다.
 

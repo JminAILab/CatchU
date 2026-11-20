@@ -6,7 +6,8 @@
 // P-c 복사 뒤 하루 한도 429 — 기대: deletePrefix 1회, 429 그대로, DB 없음(BR5.4). 실패 조건: 오류 코드 변경.
 // P-d chunk 예외 — 기대: 500, 정리 1회(BR5.4).
 // P-e 정리 실패 — 기대: 응답 코드 유지, `PREFIX_CLEANUP_FAILED` 로그(단계 번호, 접두어·키 값 없음)(BR5.5).
-// P-f PENDING/FAILED/시한 지난 PDF — 기대: 400 VALIDATION_FAILED extractionIncomplete(항목 위치), 복사 없음(BR4.1). 남의 것·없는 것은 404.
+// P-f PENDING/FAILED/시한 지난 PDF — 기대: 400 VALIDATION_FAILED extractionIncomplete, 막힌 PDF는 details.blockedSources(프리셋별)로(발행 프리셋 BR3.5),
+//     복사 없음(BR4.1). 남의 것은 404. 발행 프리셋 U1부터 자료는 프리셋에 담아 발행하므로(support.cjs presetBody) 없는 PDF는 프리셋에 담기지 않는다.
 // P-g 정상 — 기대: published_pdf_page 행 = pdf_page_text 행(읽을 수 없는 쪽 포함), pdf_copy_key = publishedPdfKey, snapshot { pageCount },
 //     이후 원본 쪽 변경·삭제에도 사본 불변(BR4.3·BR4.4).
 // P-h 잠금·재확인 — 기대: 발행 도중(복사 뒤·트랜잭션 전) 원본이 지워지면 404, DONE이 아니게 되면 400 extractionIncomplete, 둘 다 정리 1회·DB 무변경.
@@ -31,8 +32,8 @@ const { PDF_TEXT_TOTAL_MAX } = require('../../dist/pdf-extraction/pdf-extraction
 const { materialKey, publicationPrefix, publishedPdfKey } = require('../../dist/file-storage/file-storage');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
-  PUBLISH_SETTINGS, setEnv, startApp, expectError, eligibleCatch, insertTextMaterial, consent, fakeAiRun, fakeIndexWriter, bindFakes, body,
-  catchItem, textItem,
+  PUBLISH_SETTINGS, setEnv, startApp, expectError, eligibleCatch, insertTextMaterial, consent, fakeAiRun, fakeIndexWriter, bindFakes,
+  catchItem, textItem, presetBody,
 } = require('./support.cjs');
 
 let server, db, restore, aiRun, writer, files, unbind, savedFiles;
@@ -126,7 +127,7 @@ test('상수: api의 PDF 쪽 글 상한과 발행본 전체 글 상한은 같은
 test('P-a: PDF 없는 발행은 201이고 FileStorage를 한 번도 부르지 않는다', async () => {
   const a = await author();
   const materialId = await insertTextMaterial(db, a.memberId);
-  const response = await publish(a.token, body([textItem(materialId)]));
+  const response = await publish(a.token, await presetBody(db, a.memberId,[textItem(materialId)]));
   assert.equal(response.status, 201, response.text);
   assert.deepEqual(files.calls, []);
 });
@@ -137,7 +138,7 @@ test('P-g: PDF 발행은 position 순 복사 → 사본 항목(pdf_copy_key·pag
   const first = await insertPdf(a.memberId, ['[합성] 가 1쪽', '', '[합성] 가 3쪽'], { title: '[합성] 첫 PDF' });
   const second = await insertPdf(a.memberId, ['[합성] 나 1쪽'], { title: '[합성] 둘째 PDF' });
 
-  const response = await publish(a.token, body([pdfItem(first), textItem(materialId), pdfItem(second)]));
+  const response = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(first), textItem(materialId), pdfItem(second)]));
   assert.equal(response.status, 201, response.text);
   const publicationId = response.body.publicationId;
   const rows = await items(publicationId);
@@ -165,15 +166,19 @@ test('P-g: PDF 발행은 position 순 복사 → 사본 항목(pdf_copy_key·pag
   assert.equal((await items(publicationId)).length, 3);
 });
 
-test('P-f: 추출이 끝나지 않은 PDF(PENDING·FAILED·시한 지난 PENDING)는 400 extractionIncomplete(항목 위치)이고 복사·저장하지 않는다', async () => {
+test('P-f: 추출이 끝나지 않은 PDF(PENDING·FAILED·시한 지난 PENDING)는 400 extractionIncomplete(blockedSources)이고 복사·저장하지 않는다', async () => {
   const a = await author();
   const done = await insertPdf(a.memberId);
   const pending = await insertPdf(a.memberId, [], { state: 'PENDING' });
   const failed = await insertPdf(a.memberId, [], { state: 'FAILED' });
   const expired = await insertPdf(a.memberId, [], { state: 'PENDING', deadlineSeconds: -1 });
-  const response = await publish(a.token, body([pdfItem(done), pdfItem(pending), pdfItem(failed), pdfItem(expired)]));
+  const payload = await presetBody(db, a.memberId, [pdfItem(done), pdfItem(pending), pdfItem(failed), pdfItem(expired)]);
+  const response = await publish(a.token, payload);
   expectError(response, 400, 'VALIDATION_FAILED');
-  assert.deepEqual(response.body.details, { violations: [1, 2, 3].map((i) => ({ field: `items[${i}].sourceId`, reason: 'extractionIncomplete' })) });
+  assert.deepEqual(response.body.details, {
+    violations: [{ field: 'presetIds', reason: 'extractionIncomplete' }],
+    blockedSources: [pending, failed, expired].map((sourceId) => ({ presetId: payload.presetIds[0], kind: 'PDF_MATERIAL', sourceId })),
+  });
   assert.deepEqual(files.calls, []);
   assert.deepEqual(await publications(), []);
   // 시한 지난 PENDING은 사전 확인에서 FAILED(DEADLINE_EXCEEDED)로 확정된다(BR2.2).
@@ -181,14 +186,12 @@ test('P-f: 추출이 끝나지 않은 PDF(PENDING·FAILED·시한 지난 PENDING
   assert.deepEqual({ ...row }, { extraction_state: 'FAILED', extraction_failure_code: 'DEADLINE_EXCEEDED' });
 });
 
-test('P-f(404): 남의 PDF·없는 PDF는 U4와 같은 404이고 복사하지 않는다', async () => {
+test('P-f(404): 프리셋에 든 남의 PDF는 U4와 같은 404이고 복사하지 않는다', async () => {
   const a = await author();
   const b = await author();
   const others = await insertPdf(b.memberId);
-  for (const id of [others, randomUUID()]) {
-    const response = await publish(a.token, body([pdfItem(id)]));
-    expectError(response, 404, 'RESOURCE_UNAVAILABLE');
-  }
+  const response = await publish(a.token, await presetBody(db, a.memberId, [pdfItem(others)]));
+  expectError(response, 404, 'RESOURCE_UNAVAILABLE');
   assert.deepEqual(files.calls, []);
   assert.deepEqual(await publications(), []);
 });
@@ -202,7 +205,7 @@ test('P-b: 복사가 하나라도 실패하면 접두어를 한 번 정리하고
     files.calls.length = 0;
     files.failCopyAt = 2;
     files.failCopyName = name;
-    const response = await publish(a.token, body([pdfItem(first), pdfItem(second)]));
+    const response = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(first), pdfItem(second)]));
     expectError(response, 500, 'INTERNAL_ERROR');
     assert.deepEqual(response.body, { code: 'INTERNAL_ERROR', message: '처리 중 오류가 발생했습니다.' }, name);
     assert.deepEqual(ops(), ['copy', 'copy', 'deletePrefix'], name);
@@ -218,7 +221,7 @@ test('P-c·P-d: 복사 뒤 트랜잭션이 하루 한도 429·조각 예외 500�
   const a = await author();
   const pdf = await insertPdf(a.memberId);
   await db.query('INSERT INTO daily_execution_count (member_id, usage_date, count) VALUES ($1, $2, $3)', [a.memberId, koreanUsageDate(new Date()), DAILY_RUN_LIMIT]);
-  const limited = await publish(a.token, body([pdfItem(pdf)]));
+  const limited = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(pdf)]));
   expectError(limited, 429, 'DAILY_LIMIT_REACHED');
   assert.deepEqual(ops(), ['copy', 'deletePrefix']);
   assert.equal(files.calls[1][1], publicationPrefix(a.memberId, files.calls[0][2].split('/')[3]));
@@ -227,7 +230,7 @@ test('P-c·P-d: 복사 뒤 트랜잭션이 하루 한도 429·조각 예외 500�
   await db.query('DELETE FROM daily_execution_count WHERE member_id = $1', [a.memberId]);
   files.calls.length = 0;
   writer.fail = true;
-  const failed = await publish(a.token, body([pdfItem(pdf)]));
+  const failed = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(pdf)]));
   expectError(failed, 500, 'INTERNAL_ERROR');
   assert.deepEqual(ops(), ['copy', 'deletePrefix']);
   assert.deepEqual(await publications(), []);
@@ -239,11 +242,11 @@ test('P-e: 정리(deletePrefix)가 실패해도 응답 코드는 그대로이고
   const pdf = await insertPdf(a.memberId);
   files.failCopyAt = 1;
   files.failDelete = true;
-  const copyFailed = await publish(a.token, body([pdfItem(pdf)]));
+  const copyFailed = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(pdf)]));
   expectError(copyFailed, 500, 'INTERNAL_ERROR');
   files.failCopyAt = null;
   writer.fail = true;
-  const txFailed = await publish(a.token, body([pdfItem(pdf)]));
+  const txFailed = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(pdf)]));
   expectError(txFailed, 500, 'INTERNAL_ERROR');
   const cleanup = pdfLogs().filter(({ entry }) => entry.event === 'PREFIX_CLEANUP_FAILED');
   assert.deepEqual(cleanup.map(({ level, entry }) => [level, entry.stage, entry.errorType]), [['error', 3, 'StorageUnavailable'], ['error', 5, 'StorageUnavailable']]);
@@ -258,7 +261,7 @@ test('P-h: 발행 도중 원본이 지워지면 404, DONE이 아니게 되면 40
   const removed = await insertPdf(a.memberId);
   // 사전 확인·복사는 통과하고, 트랜잭션 재확인(FOR SHARE) 전에 원본이 사라진다.
   files.afterCopy = () => db.query('DELETE FROM pdf_material WHERE pdf_material_id = $1', [removed]);
-  const gone = await publish(a.token, body([pdfItem(removed)]));
+  const gone = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(removed)]));
   expectError(gone, 404, 'RESOURCE_UNAVAILABLE');
   assert.deepEqual(ops(), ['copy', 'deletePrefix']);
 
@@ -267,9 +270,11 @@ test('P-h: 발행 도중 원본이 지워지면 404, DONE이 아니게 되면 40
   const text = await insertTextMaterial(db, a.memberId);
   files.afterCopy = () => db.query(
     "UPDATE pdf_material SET extraction_state = 'FAILED', extraction_failure_code = 'UNREADABLE_FILE', page_count = NULL WHERE pdf_material_id = $1", [changed]);
-  const notDone = await publish(a.token, body([textItem(text), pdfItem(changed)]));
+  const changedBody = await presetBody(db, a.memberId, [textItem(text), pdfItem(changed)]);
+  const notDone = await publish(a.token, changedBody);
   expectError(notDone, 400, 'VALIDATION_FAILED');
-  assert.deepEqual(notDone.body.details, { violations: [{ field: 'items[1].sourceId', reason: 'extractionIncomplete' }] });
+  assert.deepEqual(notDone.body.details, { violations: [{ field: 'presetIds', reason: 'extractionIncomplete' }],
+    blockedSources: [{ presetId: changedBody.presetIds[0], kind: 'PDF_MATERIAL', sourceId: changed }] });
   assert.deepEqual(ops(), ['copy', 'deletePrefix']);
   assert.deepEqual(await publications(), []);
   assert.deepEqual(await db.query('SELECT 1 FROM published_pdf_page'), []);
@@ -299,7 +304,7 @@ test('P-h: 발행 트랜잭션 동안 PDF 원본은 잠겨 있어 밖에서 지�
     },
     async requestReindex() { return 'NOT_FAILED'; },
   } });
-  const response = await publish(a.token, body([pdfItem(pdf)]));
+  const response = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(pdf)]));
   assert.equal(response.status, 201, response.text);
   assert.equal(seen.pagesInside, 3);
   assert.equal(seen.deleteError, '55P03', '잠금 대기 초과(lock_not_available)');
@@ -311,7 +316,7 @@ test('쪽 사본 수가 쪽 수와 다르면(저장 불일치) 500이고 사본�
   const pdf = await insertPdf(a.memberId, ['[합성] 1쪽', '[합성] 2쪽', '[합성] 3쪽']);
   // DONE·쪽 수 3인데 쪽 행이 2개뿐인 깨진 원본(BR4.3 pageCount = 복사한 행 수).
   await db.query('DELETE FROM pdf_page_text WHERE pdf_material_id = $1 AND page_number = 3', [pdf]);
-  const response = await publish(a.token, body([pdfItem(pdf)]));
+  const response = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(pdf)]));
   expectError(response, 500, 'INTERNAL_ERROR');
   assert.deepEqual(ops(), ['copy', 'deletePrefix']);
   assert.deepEqual(await publications(), []);
@@ -324,15 +329,16 @@ test('동의가 없으면 PDF 사전 확인·복사 전에 403이고, Catch 자�
   const noConsent = await server.login(`u8-noconsent-${randomUUID()}`);
   const pendingPdf = await insertPdf(noConsent.memberId, [], { state: 'PENDING' });
   // 동의가 먼저다: 추출 전 PDF여도 400이 아니라 403이고 저장소를 부르지 않는다.
-  expectError(await publish(noConsent.token, body([pdfItem(pendingPdf)])), 403, 'AI_CONSENT_REQUIRED');
+  expectError(await publish(noConsent.token, await presetBody(db, noConsent.memberId,[pdfItem(pendingPdf)])), 403, 'AI_CONSENT_REQUIRED');
   assert.deepEqual(files.calls, []);
 
   const a = await author();
   const pdf = await insertPdf(a.memberId);
   const unconfirmed = await eligibleCatch(db, a.memberId, { confirmed: false });
-  const rejected = await publish(a.token, body([pdfItem(pdf), catchItem(unconfirmed)]));
+  const rejectedBody = await presetBody(db, a.memberId, [pdfItem(pdf), catchItem(unconfirmed)]);
+  const rejected = await publish(a.token, rejectedBody);
   expectError(rejected, 409, 'CONFIRMATION_REQUIRED');
-  assert.deepEqual(rejected.body.details, { catchIds: [unconfirmed] });
+  assert.deepEqual(rejected.body.details, { blockedSources: [{ presetId: rejectedBody.presetIds[0], kind: 'CATCH', sourceId: unconfirmed }] });
   assert.deepEqual(ops(), ['copy', 'deletePrefix']);
   assert.deepEqual(await publications(), []);
 });
@@ -340,14 +346,14 @@ test('동의가 없으면 PDF 사전 확인·복사 전에 403이고, Catch 자�
 test('전체 글: PDF 쪽 글(코드 포인트)을 합계에 넣어 정확히 60,000자는 201, 60,001자는 400 maxTotalLength이고 거부 때도 사본을 정리한다', async () => {
   const a = await author();
   const exact = await insertPdf(a.memberId, ['가'.repeat(30_000), '', 'a'.repeat(30_000)]);
-  const ok = await publish(a.token, body([pdfItem(exact)]));
+  const ok = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(exact)]));
   assert.equal(ok.status, 201, ok.text);
 
   files.calls.length = 0;
   const one = await insertTextMaterial(db, a.memberId, { body: 'x' });
-  const over = await publish(a.token, body([pdfItem(exact), textItem(one)]));
+  const over = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(exact), textItem(one)]));
   expectError(over, 400, 'VALIDATION_FAILED');
-  assert.deepEqual(over.body.details, { violations: [{ field: 'items', reason: 'maxTotalLength' }] });
+  assert.deepEqual(over.body.details, { violations: [{ field: 'presetIds', reason: 'maxTotalLength' }] });
   assert.deepEqual(ops(), ['copy', 'deletePrefix'], '트랜잭션 거부(5단계)도 복사한 사본을 정리한다');
   assert.equal((await publications()).length, 1, '앞의 201 발행만 남는다');
 });
@@ -360,21 +366,21 @@ test('전체 글: 각각 상한 안인 여러 PDF와 Catch·텍스트를 합쳐 
   const pdfB = await insertPdf(a.memberId, ['q'.repeat(20_000)]);
   const pdfC = await insertPdf(a.memberId, ['r'.repeat(20_001)]);
   // 15,000(Catch) + 5,000(텍스트) + 20,000 + 20,000 = 60,000
-  const exact = await publish(a.token, body([catchItem(catchId), textItem(text), pdfItem(pdfA), pdfItem(pdfB)]));
+  const exact = await publish(a.token, await presetBody(db, a.memberId,[catchItem(catchId), textItem(text), pdfItem(pdfA), pdfItem(pdfB)]));
   assert.equal(exact.status, 201, exact.text);
   // 15,000 + 5,000 + 20,000 + 20,001 = 60,001
-  const over = await publish(a.token, body([catchItem(catchId), textItem(text), pdfItem(pdfA), pdfItem(pdfC)]));
+  const over = await publish(a.token, await presetBody(db, a.memberId,[catchItem(catchId), textItem(text), pdfItem(pdfA), pdfItem(pdfC)]));
   expectError(over, 400, 'VALIDATION_FAILED');
-  assert.deepEqual(over.body.details, { violations: [{ field: 'items', reason: 'maxTotalLength' }] });
+  assert.deepEqual(over.body.details, { violations: [{ field: 'presetIds', reason: 'maxTotalLength' }] });
 });
 
 test('전체 글: 이모지는 UTF-16 2단위여도 1자로 세고, 읽을 수 없는 쪽은 0자다', async () => {
   const a = await author();
   const emoji = await insertPdf(a.memberId, ['😀'.repeat(59_999), '', '', '😀']);
   assert.equal('😀'.repeat(60_000).length, 120_000);
-  const ok = await publish(a.token, body([pdfItem(emoji)]));
+  const ok = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(emoji)]));
   assert.equal(ok.status, 201, ok.text);
   const one = await insertTextMaterial(db, a.memberId, { body: '😀' });
-  const over = await publish(a.token, body([pdfItem(emoji), textItem(one)]));
+  const over = await publish(a.token, await presetBody(db, a.memberId,[pdfItem(emoji), textItem(one)]));
   expectError(over, 400, 'VALIDATION_FAILED');
 });

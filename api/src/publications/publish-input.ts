@@ -3,23 +3,25 @@
 // 오류 응답에 입력값을 담지 않는다.
 import { createHash } from 'node:crypto';
 import { ApiError } from '../common/errors';
+import { codePointLength } from '../publishable-source/source-content';
+import type { SourceRef } from '../publishable-source/source-reader';
 import { PUBLICATION_LIMITS, PUBLICATION_PAGE } from './publications-config';
 
-/** 발행 항목 종류. PDF_MATERIAL은 U8이 더했다(C-17, U8 기능 명세 W3 1, 계획 8.1). 항목 수·중복 규칙은 U4 그대로다. */
-export const PUBLISH_ITEM_KINDS = ['CATCH', 'TEXT_MATERIAL', 'PDF_MATERIAL'] as const;
-export type PublishItemKind = (typeof PUBLISH_ITEM_KINDS)[number];
-
-export interface PublishItemInput {
-  kind: PublishItemKind;
-  /** 소문자 UUID */
-  sourceId: string;
+/**
+ * 프리셋을 편 발행 항목 하나(발행 프리셋 BR3.2). 배열 순서가 position이고(고른 프리셋 순서, 그 안에서 프리셋 안 자료 순서),
+ * presetOrdinal·presetName은 사본 칸으로, presetId는 막힘 응답(blockedSources)에만 쓴다. 같은 자료가 여러 프리셋에 있으면 항목도 여럿이다(BR3.7).
+ */
+export interface PublishItem extends SourceRef {
+  presetId: string;
+  presetOrdinal: number;
+  presetName: string;
 }
 
-/** 검증을 통과한 발행 명령(엔티티 문서 PublishCommand). 배열 순서가 position이다. */
+/** 검증을 통과한 발행 명령(엔티티 문서 PublishCommand). presetIds는 고른 순서이고 소문자 UUID다. 항목은 프리셋을 편 뒤에 정해진다. */
 export interface PublishInput {
   title: string;
   password?: string;
-  items: PublishItemInput[];
+  presetIds: string[];
 }
 
 export interface PublicationQuery {
@@ -36,9 +38,6 @@ const LONE_SURROGATE = /[\uD800-\uDFFF]/u;
 const CURSOR_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 
 export const isUuid = (value: unknown): value is string => typeof value === 'string' && UUID.test(value);
-
-/** 유니코드 코드 포인트 수(10월 share-create와 같음). `string.length`는 UTF-16 단위라 쓰지 않는다. */
-export const codePointLength = (value: string): number => [...value].length;
 
 const failed = (violations: Violation[]): ApiError => new ApiError('VALIDATION_FAILED', { details: { violations } });
 
@@ -75,52 +74,44 @@ function checkPassword(input: Record<string, unknown>, violations: Violation[]):
   return value;
 }
 
-function checkItems(input: Record<string, unknown>, violations: Violation[]): PublishItemInput[] {
-  const value = input.items;
+/** 프리셋 ID 1~5개, 같은 ID 두 번 안 됨(발행 프리셋 BR3.1, 기능 설계 검토 R-06의 field 이름). */
+function checkPresetIds(input: Record<string, unknown>, violations: Violation[]): string[] {
+  const value = input.presetIds;
   if (!Array.isArray(value)) {
-    violations.push({ field: 'items', reason: 'isArray' });
+    violations.push({ field: 'presetIds', reason: 'isArray' });
     return [];
   }
-  if (value.length < PUBLICATION_LIMITS.itemsMin) violations.push({ field: 'items', reason: 'arrayMinSize' });
-  if (value.length > PUBLICATION_LIMITS.itemsMax) violations.push({ field: 'items', reason: 'arrayMaxSize' });
-  const items: PublishItemInput[] = [];
-  const seen = new Set<string>();
+  if (value.length < PUBLICATION_LIMITS.presetIdsMin) violations.push({ field: 'presetIds', reason: 'arrayMinSize' });
+  if (value.length > PUBLICATION_LIMITS.presetIdsMax) violations.push({ field: 'presetIds', reason: 'arrayMaxSize' });
+  const presetIds: string[] = [];
   value.forEach((raw, index) => {
-    // 항목 안의 임의 필드 이름은 응답에 반사하지 않고 위치만 알린다.
-    const field = `items[${index}]`;
-    if (!isPlainObject(raw) || Object.keys(raw).some((key) => key !== 'kind' && key !== 'sourceId')) {
-      violations.push({ field, reason: 'isObject' });
+    const field = `presetIds[${index}]`;
+    if (!isUuid(raw)) {
+      violations.push({ field, reason: 'isUuid' });
       return;
     }
-    const kind = raw.kind;
-    const sourceId = raw.sourceId;
-    if (!PUBLISH_ITEM_KINDS.includes(kind as PublishItemKind)) violations.push({ field: `${field}.kind`, reason: 'isIn' });
-    if (!isUuid(sourceId)) violations.push({ field: `${field}.sourceId`, reason: 'isUuid' });
-    if (!PUBLISH_ITEM_KINDS.includes(kind as PublishItemKind) || !isUuid(sourceId)) return;
-    const item = { kind: kind as PublishItemKind, sourceId: sourceId.toLowerCase() };
-    const key = `${item.kind}:${item.sourceId}`;
-    if (seen.has(key)) violations.push({ field, reason: 'arrayUnique' });
-    seen.add(key);
-    items.push(item);
+    const presetId = raw.toLowerCase();
+    if (presetIds.includes(presetId)) violations.push({ field, reason: 'arrayUnique' });
+    else presetIds.push(presetId);
   });
-  return items;
+  return presetIds;
 }
 
 /**
- * `POST /publications` 본문 `{ title, password?, items: [{ kind, sourceId }] }`를 검사한다(BR4.1·BR4.5, NFR1.8·NFR4.2).
- * 정의하지 않은 필드는 거부한다. 실패하면 400 VALIDATION_FAILED이고 `details.violations`에 칸별 이유를 모두 담는다.
+ * `POST /publications` 본문 `{ title, password?, presetIds }`를 검사한다(BR4.1·BR4.5, 발행 프리셋 BR3.1, NFR1.8·NFR2.6·NFR4.2).
+ * 정의하지 않은 필드는 거부한다. 옛 `items` 칸도 정의 밖이라 400이다. 실패하면 400 VALIDATION_FAILED이고 `details.violations`에 칸별 이유를 모두 담는다.
  */
 export function publishInput(raw: unknown): PublishInput {
   if (!isPlainObject(raw)) throw failed([{ field: 'body', reason: 'isObject' }]);
   const violations: Violation[] = [];
-  if (Object.keys(raw).some((key) => !['title', 'password', 'items'].includes(key))) {
+  if (Object.keys(raw).some((key) => !['title', 'password', 'presetIds'].includes(key))) {
     violations.push({ field: 'body', reason: 'whitelistValidation' });
   }
   const title = checkTitle(raw, violations);
   const password = checkPassword(raw, violations);
-  const items = checkItems(raw, violations);
+  const presetIds = checkPresetIds(raw, violations);
   if (violations.length > 0 || title === null) throw failed(violations);
-  return password === undefined ? { title, items } : { title, password, items };
+  return password === undefined ? { title, presetIds } : { title, password, presetIds };
 }
 
 /** 정의하지 않은 쿼리를 거부한다(발행·상세·중지·삭제). */

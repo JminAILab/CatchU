@@ -2,6 +2,7 @@
 // 「받은 사람이 결과를 구분하기」, NFR1.3·NFR7.1, 계약 C-07 snapshot-shape·C-15 output). DB가 없는 순수 함수다.
 // 사본 값과 고정 문구에만 기대므로 같은 사본은 언제나 같은 글이 된다(BR3.5). aiDraft는 읽지 않고, 마크다운 기호를 쓰지 않는다.
 import { CatchSnapshot, PublishedPdfPage, PublishedSnapshotItem, TextMaterialSnapshot } from '../publications/published-snapshot';
+import type { SharedItemText } from './mcp-shared-page';
 
 /**
  * Catch 글의 머리말 넷과 빈 값 문구 셋(BR3.1). 값은 web `web/src/features/publications/snapshot-view.tsx`의 표지와 같고,
@@ -55,6 +56,16 @@ function flattenPdf(pages: readonly PublishedPdfPage[] | null): string {
     .sort((left, right) => left.pageNumber - right.pageNumber)
     .map((page) => (page.readable ? `[${page.pageNumber}쪽]\n${page.text}` : `[${page.pageNumber}쪽] 읽을 수 없음`))
     .join('\n\n');
+}
+
+/**
+ * 쪽 만들기에 넘길 항목 글(BR3.1·BR3.5). 앞선 사본만 position 순서대로 싣고 겹친 사본의 position은 건너뛴다(발행 프리셋 BR4.4, P-5).
+ * 프리셋 구분과 이름은 싣지 않는다(FR6.2, ADR-007). cursor는 실린 항목의 position을 가리키므로 모양이 그대로다.
+ */
+export function sharedItemTexts(items: readonly PublishedSnapshotItem[]): SharedItemText[] {
+  return items.filter((item) => item.isFirstCopy)
+    .sort((left, right) => left.position - right.position)
+    .map((item) => ({ position: item.position, itemKind: item.itemKind, title: item.title, content: flattenPublishedItem(item) }));
 }
 
 /** 사본 항목 하나를 글로 편다. 사본 모양은 itemKind가 정한다(C-07). */

@@ -11,7 +11,7 @@ import { PublicationState, publicationState } from './publication-state';
 import { Clock, PUBLICATIONS_CLOCK } from './publications-config';
 import { PublicationsLog } from './publications-log';
 import { PublicationQuery, isUuid, nextPublicationCursor, publicationQuery } from './publish-input';
-import { PublishedSnapshot } from './published-snapshot';
+import { PublishedSnapshotResponse, snapshotResponse } from './published-snapshot';
 
 /** 목록 항목(U4 기능 명세 「작성자 API」, C-09 합의 전이라 indexState 없음). 토큰은 `url` 안에만 있다. */
 export interface PublicationListItem {
@@ -29,13 +29,16 @@ export interface PublicationPage {
   page: { nextCursor: string | null };
 }
 
-/** 상세(「작성자 API」 표 그대로). 제목·발행·만료 시각은 snapshot 안에 있다. */
+/**
+ * 상세(「작성자 API」 표 그대로). 제목·발행·만료 시각은 snapshot 안에 있다. 사본 항목은 프리셋 칸 둘을 싣고
+ * 「앞선 사본인가」 값은 뺀다(발행 프리셋 기능 설계 검토 R-03, NFR4.3).
+ */
 export interface PublicationDetail {
   publicationId: string;
   url: string;
   state: PublicationState;
   passwordProtected: boolean;
-  snapshot: PublishedSnapshot;
+  snapshot: PublishedSnapshotResponse;
 }
 
 export interface StopResponse {
@@ -88,7 +91,7 @@ export class PublicationManageService {
       await assertMemberExists(manager, owner);
       const publication = publicationId === null ? null : await readOwnedPublication(manager, owner, publicationId);
       if (!publication) throw new NotFoundException();
-      const snapshot = await this.access.readSnapshotIn(manager, publication.publicationId);
+      const snapshot = snapshotResponse(await this.access.readSnapshotIn(manager, publication.publicationId));
       return {
         publicationId: publication.publicationId,
         url: buildRecipientLinkUrl(this.config.webBaseUrl, publication.linkTokenReference),
