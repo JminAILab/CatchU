@@ -89,7 +89,8 @@ const inOrder = (html, needles) => {
 
 const publication = () => ({
   title: "발행본 제목", publishedAt: "2026-11-05T03:04:05.000Z", expiresAt: "2027-02-03T03:04:05.000Z",
-  items: [{ publishedItemId: "m1", position: 1, itemKind: "TEXT_MATERIAL", title: "자료 m1", snapshot: { body: "본문 글" } }],
+  // 발행 프리셋 U3: 사본 항목마다 프리셋 칸(계약 P-3)이 있다.
+  items: [{ publishedItemId: "m1", position: 1, presetOrdinal: 1, presetName: "기본 프리셋", itemKind: "TEXT_MATERIAL", title: "자료 m1", snapshot: { body: "본문 글" } }],
 });
 const ok = () => ({ kind: "success", status: 200, data: publication() });
 const apiError = (status, code) => ({ kind: "api-error", status, code, message: "안내" });

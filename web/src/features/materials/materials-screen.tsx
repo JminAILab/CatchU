@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { useAiConsent } from "@/components/ai-consent/use-ai-consent";
 import { useUnsavedChanges } from "@/components/auth/use-unsaved-changes";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
+import { TabStrip } from "@/components/tab-strip/tab-strip";
 import { UNSAVED_MESSAGE, useUnsavedGuard } from "@/features/profile/use-unsaved-guard";
 import { accessTokenStore } from "@/lib/access-token";
 import { api } from "@/lib/api";
@@ -14,7 +15,7 @@ import {
   materialListErrorText, materialOpenErrorText, newMaterialState,
   type MaterialDraft, type MaterialEditState, type MaterialsApi, type TextMaterialItem,
 } from "./materials-api";
-import { MaterialEditorView, MaterialsListView, MaterialsTabs, type MaterialsTab } from "./materials-view";
+import { MATERIALS_TABS, MaterialEditorView, MaterialsListView, isMaterialsTab, type MaterialsTab } from "./materials-view";
 import { pdfHttp, pdfMaterialsApi } from "./pdf-clients";
 import type { PdfMaterialsApi } from "./pdf-materials-api";
 import { PdfMaterialsTab, type PdfConsentRunner } from "./pdf-materials-tab";
@@ -148,6 +149,14 @@ export function createMaterialsScreenModel(client: MaterialsApi, deps: ScreenDep
   };
 }
 
+export type MaterialsScreenModel = ReturnType<typeof createMaterialsScreenModel>;
+
+/**
+ * 텍스트 자료 지우기 확인 문장. 지운 자료는 그 자료를 담은 프리셋에서도 빠지고(발행 프리셋 U1 연쇄 삭제), 발행한 사본은 남는다.
+ * 끝 문장은 발행 프리셋 U3 BR5.2(AC4.1.1)이고 PDF 확인 문장(`PDF_DELETE_CONFIRM`)도 같은 말로 끝난다.
+ */
+export const MATERIAL_DELETE_CONFIRM = "이 자료를 삭제할까요? 이미 발행한 사본은 그대로 남고, 삭제한 자료는 되살릴 수 없습니다. 프리셋에 담겨 있으면 거기서도 빠집니다.";
+
 export type EditorLoad = "loading" | "ready" | { error: string };
 export type MaterialEditorState = { load: EditorLoad; edit: MaterialEditState; deleteState: "idle" | "deleting" | { error: string } };
 
@@ -223,7 +232,7 @@ export function createMaterialEditorModel(client: MaterialsApi, openId: string |
     const { edit, deleteState } = store.get();
     const id = edit.textMaterialId;
     if (id === null || deleteState === "deleting" || edit.status.kind === "saving") return;
-    if (!deps.confirm("이 자료를 삭제할까요? 이미 발행한 사본은 그대로 남고, 삭제한 자료는 되살릴 수 없습니다.")) return;
+    if (!deps.confirm(MATERIAL_DELETE_CONFIRM)) return;
     store.set((prev) => ({ ...prev, deleteState: "deleting" }));
     const session = deps.session();
     const result = await client.remove(id);
@@ -260,8 +269,22 @@ export function MaterialsPage() {
 }
 
 /**
+ * 탭 바꾸기 요청(발행 프리셋 U3 NFR 설계 Q1 A). 텍스트에서 PDF로 갈 때는 텍스트 편집기를 닫고 옮기며, 저장하지 않은 입력이 있으면
+ * 화살표·누름마다 묻는다(BR2.2와 같은 확인). 머무르기를 고르면 false라 탭과 초점이 「텍스트 자료」에 남는다. 같은 탭이나 텍스트로 갈 때는 true다.
+ */
+export function requestMaterialsTab(model: Pick<MaterialsScreenModel, "select">, current: MaterialsTab, next: MaterialsTab): boolean {
+  if (next === current || next === "text") return true;
+  return model.select(null);
+}
+
+const TEXT_LEAD = "포트폴리오·자기소개·이력 같은 글을 자료로 저장해 두고, 발행할 때 고를 수 있습니다.";
+const PDF_LEAD = "PDF를 올려 두면 쪽별 글을 추출하고, 발행할 때 고를 수 있습니다.";
+
+/**
  * 텍스트 자료 탭은 목록과 편집을 한 화면에 둔다(상태 전이는 `createMaterialsScreenModel`). PDF 탭은 `PdfMaterialsTab`(U8)이 맡는다.
- * 저장하지 않은 텍스트 입력이 있으면 PDF 탭으로 옮기기 전에 묻는다(BR2.2와 같은 확인). `pdf`를 넘기지 않으면 탭 없이 텍스트 자료만 보인다.
+ * 바깥 틀 하나에 h1·안내 문장을 열린 탭에 따라 바꿔 그리고, 그 아래 공용 탭 줄(「자료 종류」)이 두 탭과 두 패널을 그린다(발행 프리셋 U3 BR5.1).
+ * 열리지 않은 패널은 빈 채로 `hidden`이라 지금처럼 열린 탭의 내용만 그린다. 탭 이름·`data-testid`(`materials-tab-text`·`materials-tab-pdf`)는 그대로다.
+ * `pdf`를 넘기지 않으면 탭 줄 없이 텍스트 자료만 보인다.
  */
 export function MaterialsScreen({ api: client, deps, pdf }: { api: MaterialsApi; deps?: ScreenDeps; pdf?: PdfTabClients }) {
   const [model] = useState(() => createMaterialsScreenModel(client, deps));
@@ -270,46 +293,43 @@ export function MaterialsScreen({ api: client, deps, pdf }: { api: MaterialsApi;
   const [tab, setTab] = useState<MaterialsTab>("text");
   const consentHook = useAiConsent();
 
-  function changeTab(next: MaterialsTab) {
-    if (next === tab) return;
-    // 텍스트 편집기를 닫고 옮긴다. 미저장 입력이 있는데 머무르기를 고르면 탭을 바꾸지 않는다.
-    if (next === "pdf" && !model.select(null)) return;
-    setTab(next);
+  function changeTab(id: string): boolean {
+    if (!isMaterialsTab(id)) return false;
+    const accepted = requestMaterialsTab(model, tab, id);
+    if (accepted && id !== tab) setTab(id);
+    return accepted;
   }
 
   const { list, selection } = view;
   const selectedId = selection?.kind === "existing" ? selection.textMaterialId : null;
-  if (pdf && tab === "pdf") {
-    return (
-      <main className={styles.page}>
-        <h1>PDF 자료</h1>
-        <p className={styles.lead}>PDF를 올려 두면 쪽별 글을 추출하고, 발행할 때 고를 수 있습니다.</p>
-        <MaterialsTabs active={tab} onChange={changeTab} />
-        <div role="tabpanel" id="materials-panel-pdf" aria-labelledby="materials-tab-pdf">
-          <PdfMaterialsTab api={pdf.api} originalOf={pdf.originalOf} consent={pdf.consent ?? consentHook.run}
-            deps={deps ?? browserDeps} viewerDeps={pdf.viewerDeps} />
-        </div>
-        {consentHook.dialog}
-      </main>
-    );
-  }
+  const showingPdf = pdf !== undefined && tab === "pdf";
+  const textPanel = (
+    <div className={styles.layout}>
+      <MaterialsListView state={list.state} items={list.items} errorText={list.errorText}
+        hasMore={list.nextCursor !== null} moreState={view.moreState} selectedId={selectedId}
+        onRetry={() => { void model.load(); }}
+        onLoadMore={() => { void model.loadMore(); }}
+        onOpen={(id) => model.select({ kind: "existing", textMaterialId: id })}
+        onNew={() => model.select({ kind: "new" })} />
+      {selection && <MaterialEditor key={view.editorSession} api={client} deps={deps}
+        openId={selection.kind === "existing" ? selection.textMaterialId : null}
+        onDirtyChange={model.setDirty} onDeleted={model.deleted}
+        onSaved={(item, created) => model.saved(item, created, view.editorSession)} onClose={() => model.select(null)} />}
+    </div>
+  );
   return (
     <main className={styles.page}>
-      <h1>텍스트 자료</h1>
-      <p className={styles.lead}>포트폴리오·자기소개·이력 같은 글을 자료로 저장해 두고, 발행할 때 고를 수 있습니다.</p>
-      {pdf && <MaterialsTabs active={tab} onChange={changeTab} />}
-      <div className={styles.layout}>
-        <MaterialsListView state={list.state} items={list.items} errorText={list.errorText}
-          hasMore={list.nextCursor !== null} moreState={view.moreState} selectedId={selectedId}
-          onRetry={() => { void model.load(); }}
-          onLoadMore={() => { void model.loadMore(); }}
-          onOpen={(id) => model.select({ kind: "existing", textMaterialId: id })}
-          onNew={() => model.select({ kind: "new" })} />
-        {selection && <MaterialEditor key={view.editorSession} api={client} deps={deps}
-          openId={selection.kind === "existing" ? selection.textMaterialId : null}
-          onDirtyChange={model.setDirty} onDeleted={model.deleted}
-          onSaved={(item, created) => model.saved(item, created, view.editorSession)} onClose={() => model.select(null)} />}
-      </div>
+      <h1>{showingPdf ? "PDF 자료" : "텍스트 자료"}</h1>
+      <p className={styles.lead}>{showingPdf ? PDF_LEAD : TEXT_LEAD}</p>
+      {pdf ? (
+        <TabStrip label="자료 종류" idPrefix="materials" tabTestId="materials-tab" tabs={MATERIALS_TABS} active={tab} onChange={changeTab}
+          panels={{
+            text: textPanel,
+            pdf: <PdfMaterialsTab api={pdf.api} originalOf={pdf.originalOf} consent={pdf.consent ?? consentHook.run}
+              deps={deps ?? browserDeps} viewerDeps={pdf.viewerDeps} />,
+          }} />
+      ) : textPanel}
+      {showingPdf && consentHook.dialog}
     </main>
   );
 }

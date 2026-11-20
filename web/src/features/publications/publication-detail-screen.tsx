@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { pdfHttp } from "@/features/materials/pdf-clients";
-import { resolveEvidenceTarget, type EvidenceLocation, type EvidenceTarget } from "@/features/recipient/recipient-slots";
 import { accessTokenStore } from "@/lib/access-token";
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
@@ -15,7 +14,7 @@ import {
 } from "./publications-api";
 import { PublicationDetailView } from "./publication-detail-view";
 import type { PdfCopySource } from "./published-pdf-item";
-import { publishedItemDomId } from "./snapshot-view";
+import { useSnapshotJump } from "./snapshot-jump";
 import styles from "./publications.module.css";
 
 // api.member가 기준 주소·Bearer·401을 맡는다. 렌더마다 호출 객체를 새로 만들지 않는다.
@@ -105,9 +104,6 @@ export function PublicationDetailPage({ publicationId }: { publicationId: string
   return <PublicationDetailScreen api={publications} publicationId={publicationId} pdfSource={ownerPdfSource(publicationId)} />;
 }
 
-/** `snapshot-view.tsx`가 강조 범위에 그리는 `<mark>`. 항목 안에서 첫 번째를 스크롤 대상으로 삼는다. */
-const HIGHLIGHT_SELECTOR = 'mark[data-testid="snapshot-highlight"]';
-
 export function PublicationDetailScreen({ api: client, publicationId, deps, pdfSource }: {
   api: PublicationsApi; publicationId: string; deps?: DetailDeps; pdfSource?: (publishedItemId: string) => PdfCopySource;
 }) {
@@ -118,24 +114,9 @@ export function PublicationDetailScreen({ api: client, publicationId, deps, pdfS
   // 삭제 성공(204) 뒤에만 목록으로 옮긴다.
   useEffect(() => { if (view.deleteState === "deleted") router.replace(routes.publications); }, [view.deleteState, router]);
 
-  // 근거 위치 강조(C-11 evidence-highlight). 받은 사람 화면(`recipient-screen.tsx`)과 같은 규칙이다:
-  // 사본에 대조해 범위가 맞으면 첫 `<mark>`를, 아니면 항목 시작을 화면에 보이고 초점은 항목에 둔다. `seq`는 같은 위치를 다시 눌러도 다시 옮기게 한다.
-  const [target, setTarget] = useState<(EvidenceTarget & { seq: number }) | null>(null);
-  const showEvidence = useCallback((location: EvidenceLocation) => {
-    const current = model.store.get();
-    if (current.load !== "ready" || current.detail === null) return;
-    const resolved = resolveEvidenceTarget(current.detail.snapshot, location);
-    if (resolved === null) return;
-    setTarget((previous) => ({ ...resolved, seq: (previous?.seq ?? 0) + 1 }));
-  }, [model]);
-  useEffect(() => {
-    if (target === null) return;
-    const element = document.getElementById(publishedItemDomId(target.publishedItemId));
-    if (!element) return;
-    const mark = target.highlight === null ? null : element.querySelector<HTMLElement>(HIGHLIGHT_SELECTOR);
-    (mark ?? element).scrollIntoView({ block: mark === null ? "start" : "center" });
-    element.focus({ preventScroll: true });
-  }, [target]);
+  // 근거 위치 강조(C-11 evidence-highlight)와 발행본 자료의 프리셋 탭. 받은 사람 화면(`recipient-screen.tsx`)과 같은 `useSnapshotJump`를 쓴다(발행 프리셋 U3 흐름 3):
+  // 요약의 출처 단추는 대상 항목의 탭과 대상을 한 번에 바꾸고, 그린 뒤 첫 `<mark>`(없으면 항목 시작)를 보이며 초점은 항목에 둔다.
+  const jump = useSnapshotJump(view.load === "ready" && view.detail !== null ? view.detail.snapshot : null);
 
   return (
     <main className={styles.page}>
@@ -147,7 +128,8 @@ export function PublicationDetailScreen({ api: client, publicationId, deps, pdfS
           </div>
         ) : view.detail && (
           <PublicationDetailView detail={view.detail} stoppedAt={view.stoppedAt} stopState={view.stopState} deleteState={view.deleteState}
-            highlight={target?.highlight ?? null} showEvidence={showEvidence}
+            highlight={jump.highlight} showEvidence={jump.showEvidence}
+            activePreset={jump.activePreset} onPresetChange={jump.changePreset} tabNotice={jump.notice}
             onStop={() => { void model.stop(); }} onDelete={() => { void model.remove(); }} pdfSource={pdfSource} />
         )}
     </main>

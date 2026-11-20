@@ -55,7 +55,8 @@ const hooks = registerHooks({
     return nextLoad(url, context);
   },
 });
-const { MaterialsScreen, createMaterialsScreenModel, createMaterialEditorModel } = await import(screenUrl.href);
+const { MATERIAL_DELETE_CONFIRM, MaterialsScreen, createMaterialsScreenModel, createMaterialEditorModel, requestMaterialsTab } = await import(screenUrl.href);
+const { tabKeyAction } = await import(new URL("../src/components/tab-strip/tab-strip.tsx", import.meta.url).href);
 hooks.deregister();
 
 const AT = "2026-10-29T01:02:03.456Z";
@@ -219,6 +220,9 @@ test("편집기: 삭제는 확인을 거친다. 취소하면 요청하지 않고
   await e1.remove();
   assert.equal(api1.calls.some((c) => c.name === "remove"), false);
   assert.equal(cancelled.confirms.length, 1);
+  // 발행 프리셋 U3 BR5.2(AC4.1.1): 지금 문장 끝에 프리셋 말을 더한다.
+  assert.deepEqual(cancelled.confirms, [MATERIAL_DELETE_CONFIRM]);
+  assert.equal(MATERIAL_DELETE_CONFIRM, "이 자료를 삭제할까요? 이미 발행한 사본은 그대로 남고, 삭제한 자료는 되살릴 수 없습니다. 프리셋에 담겨 있으면 거기서도 빠집니다.");
 
   const api2 = fakeApi({ get: [ok(material())], remove: [failed("server"), ok(null)] });
   const deletedIds = [];
@@ -579,4 +583,70 @@ test("화면 렌더: 첫 화면은 제목과 목록 불러오기 상태를 보�
   assert.match(html, /<h1>텍스트 자료<\/h1>/);
   assert.match(html, /자료 목록을 불러오고 있습니다/);
   assert.doesNotMatch(html, /새 텍스트 자료/);
+  // 발행 프리셋 U3: PDF를 쓰지 않는 구성은 지금처럼 탭 줄 없이 텍스트만 그린다.
+  assert.doesNotMatch(html, /role="tablist"|role="tabpanel"|materials-tab-/);
+});
+
+// 발행 프리셋 U3 BR5.1·NFR 설계 Q1 A(US4.4, M7) — 「텍스트 자료」「PDF 자료」 탭을 공용 TabStrip으로 그린다.
+//   - 기대: 탭 줄 이름 「자료 종류」, 탭 이름·자리·id·data-testid(`materials-tab-text`·`materials-tab-pdf`) 그대로, 두 탭 모두 tabpanel(열리지 않은 쪽은 빈 hidden),
+//           열린 탭만 tabindex 0. 오른쪽·왼쪽·끝에서 돎·Home·End로 옮기면 바로 열리고 초점이 간다. 저장하지 않은 입력이 있는데 PDF로 옮기려다
+//           확인에서 머무르기를 고르면 탭·초점이 「텍스트 자료」에 그대로이고, 이동하기를 고르면 PDF 탭이 열린다. 확인은 화살표마다 묻는다.
+//   - 실패 조건: 텍스트 쪽 tabpanel 없음, 화살표로 안 열림, 거절했는데 초점이 PDF 탭으로 감, data-testid가 바뀜.
+const pdfClients = { api: {}, originalOf: () => async () => new Response(null, { status: 500 }) };
+const MATERIALS_IDS = ["text", "pdf"];
+
+test("U3 화면 렌더: PDF를 쓰는 구성은 「자료 종류」 탭 줄과 두 탭 패널을 그리고, 열리지 않은 PDF 패널은 빈 채로 hidden이다", () => {
+  const html = renderToStaticMarkup(createElement(MaterialsScreen, { api: fakeApi(), deps: deps(), pdf: pdfClients }));
+  assert.match(html, /<h1>텍스트 자료<\/h1>/);
+  assert.match(html, /<div role="tablist" aria-label="자료 종류">/);
+  assert.match(html, /<button type="button" role="tab" id="materials-tab-text" aria-selected="true" aria-controls="materials-panel-text" tabindex="0" data-testid="materials-tab-text">텍스트 자료<\/button>/);
+  assert.match(html, /<button type="button" role="tab" id="materials-tab-pdf" aria-selected="false" aria-controls="materials-panel-pdf" tabindex="-1" data-testid="materials-tab-pdf">PDF 자료<\/button>/);
+  assert.match(html, /<div role="tabpanel" id="materials-panel-text" aria-labelledby="materials-tab-text" tabindex="0"><div><section[^>]*data-testid="materials-list"/);
+  assert.match(html, /<div role="tabpanel" id="materials-panel-pdf" aria-labelledby="materials-tab-pdf" tabindex="0" hidden=""><\/div>/);
+  assert.ok(html.indexOf('role="tablist"') < html.indexOf('role="tabpanel"'));
+});
+
+test("U3 탭 키: 화살표·Home·End로 옆·처음·끝 탭이 열리고 초점이 가며, 끝에서 오른쪽이면 처음으로 돈다. 다루지 않는 키는 그대로 둔다", () => {
+  const screen = createMaterialsScreenModel(fakeApi(), deps());
+  const press = (from, key) => {
+    const opened = [];
+    const result = tabKeyAction({ ids: MATERIALS_IDS, from, active: from, key,
+      onChange: (id) => { const accepted = requestMaterialsTab(screen, from, id); if (accepted) opened.push(id); return accepted; } });
+    return { ...result, opened };
+  };
+  assert.deepEqual(press("text", "ArrowRight"), { handled: true, focus: "pdf", opened: ["pdf"] });
+  assert.deepEqual(press("pdf", "ArrowLeft"), { handled: true, focus: "text", opened: ["text"] });
+  assert.deepEqual(press("pdf", "ArrowRight"), { handled: true, focus: "text", opened: ["text"] }, "끝에서 오른쪽은 처음");
+  assert.deepEqual(press("text", "ArrowLeft"), { handled: true, focus: "pdf", opened: ["pdf"] }, "처음에서 왼쪽은 끝");
+  assert.deepEqual(press("pdf", "Home"), { handled: true, focus: "text", opened: ["text"] });
+  assert.deepEqual(press("text", "End"), { handled: true, focus: "pdf", opened: ["pdf"] });
+  assert.deepEqual(press("text", "Home"), { handled: true, focus: "text", opened: [] }, "이미 열린 탭이면 바꾸기를 요청하지 않는다");
+  assert.deepEqual(press("text", "Tab"), { handled: false, focus: null, opened: [] });
+});
+
+test("U3 탭 거절: 저장하지 않은 입력이 있는데 PDF로 화살표를 누르고 머무르기를 고르면 탭·초점·편집기가 그대로이고, 이동하기면 PDF 탭이 열린다", () => {
+  let answer = false;
+  const d = deps({ confirm: () => answer });
+  const screen = createMaterialsScreenModel(fakeApi(), d);
+  screen.select({ kind: "existing", textMaterialId: ID });
+  screen.setDirty(true);
+  const before = screen.store.get();
+  const press = () => tabKeyAction({ ids: MATERIALS_IDS, from: "text", active: "text", key: "ArrowRight",
+    onChange: (id) => requestMaterialsTab(screen, "text", id) });
+
+  assert.deepEqual(press(), { handled: true, focus: null }, "거절: 초점을 옮기지 않는다(열린 「텍스트 자료」 탭에 남음)");
+  assert.deepEqual(d.confirms, ["저장하지 않은 입력이 있습니다. 이동하시겠습니까?"]);
+  assert.deepEqual(screen.store.get().selection, before.selection);
+  assert.equal(screen.store.get().dirty, true);
+  assert.deepEqual(press(), { handled: true, focus: null });
+  assert.equal(d.confirms.length, 2, "화살표마다 묻는다");
+
+  answer = true;
+  assert.deepEqual(press(), { handled: true, focus: "pdf" }, "이동하기: PDF 탭이 열리고 초점이 간다");
+  assert.equal(screen.store.get().selection, null, "텍스트 편집기를 닫고 옮긴다");
+  assert.equal(screen.store.get().dirty, false);
+  // PDF에서 텍스트로, 같은 탭으로는 묻지 않는다.
+  assert.equal(requestMaterialsTab(screen, "pdf", "text"), true);
+  assert.equal(requestMaterialsTab(screen, "text", "text"), true);
+  assert.equal(d.confirms.length, 3);
 });

@@ -47,12 +47,16 @@ export type CatchSnapshot = {
   workLimits?: string[];
 };
 export type TextMaterialSnapshot = { body: string };
+/**
+ * 사본 항목. `presetOrdinal`(1~5, 고른 프리셋 순서)·`presetName`(발행 당시 프리셋 이름)은 발행 프리셋 계약 P-3 칸이다.
+ * `position`은 발행본 전체에 이어 매긴 순서다. 화면은 프리셋 순번으로 탭을 묶는다(발행 프리셋 U3 BR2.1).
+ */
 export type PublishedItem =
-  | { publishedItemId: string; position: number; itemKind: "CATCH"; title: string; snapshot: CatchSnapshot }
-  | { publishedItemId: string; position: number; itemKind: "TEXT_MATERIAL"; title: string; snapshot: TextMaterialSnapshot }
+  | { publishedItemId: string; position: number; presetOrdinal: number; presetName: string; itemKind: "CATCH"; title: string; snapshot: CatchSnapshot }
+  | { publishedItemId: string; position: number; presetOrdinal: number; presetName: string; itemKind: "TEXT_MATERIAL"; title: string; snapshot: TextMaterialSnapshot }
   /** PDF 자료(U8). `snapshot.pageCount`와 쪽별 사본 `pdfPages`(C-10 `readSnapshot`)를 쓴다. 쪽 사본이 없는 응답은 빈 목록으로 본다. */
-  | { publishedItemId: string; position: number; itemKind: "PDF_MATERIAL"; title: string; snapshot: Record<string, unknown>;
-      pdfPages?: PublishedPdfPage[] | null };
+  | { publishedItemId: string; position: number; presetOrdinal: number; presetName: string; itemKind: "PDF_MATERIAL"; title: string;
+      snapshot: Record<string, unknown>; pdfPages?: PublishedPdfPage[] | null };
 /** PDF 쪽 사본(C-07 `published_pdf_page`). 읽을 수 없는 쪽은 `readable=false`·빈 글이다. */
 export type PublishedPdfPage = { pageNumber: number; text: string; readable: boolean };
 export type PublishedSnapshot = { title: string; publishedAt: string; expiresAt: string; items: PublishedItem[] };
@@ -107,8 +111,18 @@ export function pdfPageCount(item: Extract<PublishedItem, { itemKind: "PDF_MATER
   return typeof count === "number" && Number.isInteger(count) && count >= 0 ? count : null;
 }
 
+/** 프리셋 순번은 정수 1~5(계약 P-3, 발행 요청의 프리셋 수 상한과 같다). */
+const presetOrdinal = (v: unknown) => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= PUBLISH_LIMITS.presets;
+/** 프리셋 이름은 앞뒤 공백을 뺀 길이가 1 이상인 글자다(발행 프리셋 U3 NFR 요구 검토 Minor 1). 값은 다듬지 않고 그대로 쓴다. */
+const presetName = (v: unknown) => typeof v === "string" && v.trim().length > 0;
+
+/**
+ * 사본 항목 검사. 작성자 상세(`isPublicationDetail`)와 받은 사람 열람(`readPublishedSnapshot`)이 `isPublishedSnapshot`으로 함께 쓴다.
+ * 프리셋 칸이 없거나 모양이 다르면 사본 전체를 응답 모양 어긋남으로 본다(발행 프리셋 U3 BR2.4).
+ */
 function isPublishedItem(value: unknown): value is PublishedItem {
   if (!record(value) || !text(value.publishedItemId) || !Number.isInteger(value.position) || typeof value.title !== "string") return false;
+  if (!presetOrdinal(value.presetOrdinal) || !presetName(value.presetName)) return false;
   if (value.itemKind === "CATCH") return isCatchSnapshot(value.snapshot);
   if (value.itemKind === "TEXT_MATERIAL") return record(value.snapshot) && typeof value.snapshot.body === "string";
   // 쪽 사본 칸은 없거나(null 포함) 쪽 모양의 배열이어야 한다. 모양이 다르면 사본 전체를 믿지 않는다.

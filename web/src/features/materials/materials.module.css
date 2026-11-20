@@ -32,9 +32,7 @@
 /* PDF 탭은 목록 줄 안에 화면 안 뷰어가 열리므로 목록을 넓게 둔다. */
 .pdfLayout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 24px; align-items: start; }
 @media (max-width: 860px) { .pdfLayout { grid-template-columns: minmax(0, 1fr); } }
-.tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--color-line); }
-.tab, .tabActive { min-height: 44px; padding: 10px 18px; border: 1px solid transparent; border-bottom: none; border-radius: 9px 9px 0 0; background: transparent; color: #34465e; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
-.tabActive { border-color: var(--color-line); background: var(--color-surface); color: var(--color-ink); }
+/* 「텍스트 자료」「PDF 자료」 탭 모양은 공용 탭 줄(components/tab-strip)로 옮겼다(발행 프리셋 U3). */
 .pdfRow { padding: 14px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-surface); }
 .pdfRowHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .pdfFailure { font-size: 13px; color: var(--color-danger); margin: 4px 0 0; }
