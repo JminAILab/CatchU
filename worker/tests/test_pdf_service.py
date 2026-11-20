@@ -392,6 +392,95 @@ def test_pdf_extraction_does_not_wait_for_running_analysis(
 
 
 @requires_redis
+def test_stalled_pdf_queue_does_not_cut_running_analysis(
+    prefix: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # #603: 한 큐에서 일을 가져오지 못해 프로세스를 끝낼 때, 종료 순서는 모든 큐의 처리 중인 작업을 끊는다.
+    # 그래서 PDF 큐가 멈춰도 처리 중인 분석이 끝난 뒤에 끝낸다. 분석 자식은 7초 일한 뒤 MOCK 처리한다.
+    monkeypatch.setenv("SLOW_CHILD_SECONDS", "7")
+
+    async def never_answers(*_: Any) -> Any:
+        await asyncio.Event().wait()
+
+    async def go() -> None:
+        # 분석의 총 상한은 넉넉히 둔다. 자식 띄우기가 느린 환경(Windows spawn)에서 7초짜리 분석이
+        # 기본 15초 상한에 걸리면 감시가 아니라 시간 상한 때문에 실패한다(PR #604 리뷰에서 관찰).
+        limits = replace(FAST, total=60, fetch_stall=3, fetch_watch_interval=0.2)
+        service = ConsumerService(
+            replace(_settings(prefix, _pdf_settings(tmp_path)), limits=limits),
+            port=_free_port(),
+            install_signals=False,
+            child_target=consumer_children.work_for_seconds,
+            worker_options={"drainDelay": 0.5},
+            hard_exit=_no_hard_exit,
+        )
+        async with _running(service) as task:
+            await _wait_state(service, "running", 20)
+            analysis = mock_request(new_attempt())
+            await _add_request(prefix, analysis)
+            await _until(
+                lambda: service.processor is not None and service.processor.spawned > 0,
+                20,
+                "분석 자식 시작",
+            )
+            # PDF 큐만 멈춘다: 다음 기다리기부터 응답이 오지 않는다(감시 시간 3초 < 분석 7초).
+            assert service.pdf_worker is not None
+            service.pdf_worker.backend.waitForJob = never_answers
+
+            assert await asyncio.wait_for(task, 30) == 1
+        state, job = await _job(prefix, queues.REQUEST_QUEUE, analysis["attemptId"])
+        assert state == "completed"
+        assert job.returnvalue == {"handled": "RESULT_SENT", "outcome": "SUCCEEDED"}
+
+    asyncio.run(go())
+
+
+@requires_redis
+def test_stalled_pdf_queue_ends_process_between_backlogged_analyses(
+    prefix: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # #603: 분석이 연달아 밀려 있어도, 하던 분석이 끝나고 다음을 가져오기 직전에 프로세스를 끝낸다.
+    # 주기 확인(여기서는 30초로 멀리 둠)에 기대지 않는다. 둘째 분석은 가져오지 않아 대기로 남는다.
+    monkeypatch.setenv("SLOW_CHILD_SECONDS", "5")
+
+    async def never_answers(*_: Any) -> Any:
+        await asyncio.Event().wait()
+
+    async def go() -> None:
+        limits = replace(FAST, total=60, fetch_stall=3, fetch_watch_interval=30)
+        service = ConsumerService(
+            replace(_settings(prefix, _pdf_settings(tmp_path)), limits=limits),
+            port=_free_port(),
+            install_signals=False,
+            child_target=consumer_children.work_for_seconds,
+            worker_options={"drainDelay": 0.5},
+            hard_exit=_no_hard_exit,
+        )
+        async with _running(service) as task:
+            await _wait_state(service, "running", 20)
+            first, second = mock_request(new_attempt()), mock_request(new_attempt())
+            await _add_request(prefix, first)
+            await _add_request(prefix, second)
+            await _until(
+                lambda: service.processor is not None and service.processor.spawned > 0,
+                20,
+                "분석 자식 시작",
+            )
+            assert service.pdf_worker is not None
+            service.pdf_worker.backend.waitForJob = never_answers
+
+            assert await asyncio.wait_for(task, 20) == 1
+        assert service.processor is not None and service.processor.spawned == 1
+        state, job = await _job(prefix, queues.REQUEST_QUEUE, first["attemptId"])
+        assert state == "completed"
+        assert job.returnvalue == {"handled": "RESULT_SENT", "outcome": "SUCCEEDED"}
+        state, _ = await _job(prefix, queues.REQUEST_QUEUE, second["attemptId"])
+        assert state == "waiting"
+
+    asyncio.run(go())
+
+
+@requires_redis
 def test_stop_while_pdf_child_hangs_fails_job_without_result(
     prefix: str, tmp_path: Path
 ) -> None:

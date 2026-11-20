@@ -10,8 +10,8 @@ import os
 import re
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Final, Literal, NoReturn
-from urllib.parse import urlsplit
+from typing import TYPE_CHECKING, Any, Final, Literal, NoReturn
+from urllib.parse import unquote, urlsplit
 
 from app.collection.credentials import AccessToken
 from app.request_context.settings import ContextApiSettings
@@ -98,6 +98,14 @@ class Limits:
     frame_max_bytes: int = 16 * 1024 * 1024
     lock_duration_ms: int = 30_000
     stalled_interval_ms: int = 30_000
+    # 큐 접속의 소켓 상한(#603). 응답 대기는 BullMQ가 서버에 맡기는 기다리기(최대 10초)보다 길어야 한다.
+    # 이 값이 없으면 큐 노드가 조용히 사라졌을 때 걸어 둔 기다리기 명령이 끝없이 응답을 기다린다.
+    queue_socket: float = 20
+    queue_connect: float = 10
+    # 처리 중이 아닌데 이 시간 동안 큐에서 일을 가져오는 시도가 한 번도 응답을 받지 못하면 프로세스를 끝낸다.
+    # 큐 장애 조치가 끝나 다시 붙는 시간(1~3분)보다 길게 둔다.
+    fetch_stall: float = 5 * 60
+    fetch_watch_interval: float = 5
 
 
 @dataclass(frozen=True)
@@ -230,6 +238,28 @@ def _queue_url(value: str | None, development: bool) -> QueueUrl | None:
             " (운영은 rediss://만, 개발·시험은 redis://도 받는다. 질의 문자열은 받지 않는다)"
         )
     return QueueUrl(value)
+
+
+def queue_connection(url: QueueUrl, limits: Limits) -> dict[str, Any]:
+    """BullMQ에 넘길 큐 접속 옵션. 주소 문자열 대신 풀어서 넘겨 소켓 상한을 함께 준다(#603).
+
+    BullMQ는 주소 문자열을 받으면 소켓 상한 없이 접속을 만들고, 주소의 질의 문자열은 TLS 검증을 끄는
+    옵션도 받으므로 쓰지 않는다. 나머지 값(주소·계정·DB 번호·TLS 검증)은 주소 문자열로 만든 접속과 같다
+    (시험이 대조한다). 비밀번호가 들어 있으므로 로그·오류에 내지 않는다.
+    """
+    parsed = urlsplit(url.reveal())
+    options: dict[str, Any] = {
+        "host": parsed.hostname,
+        "port": parsed.port or 6379,
+        "db": int(parsed.path.lstrip("/") or 0),
+        "username": unquote(parsed.username) if parsed.username else None,
+        "password": unquote(parsed.password) if parsed.password else None,
+        "socket_timeout": limits.queue_socket,
+        "socket_connect_timeout": limits.queue_connect,
+    }
+    if parsed.scheme == "rediss":
+        options["ssl"] = True
+    return options
 
 
 def _prefix(value: str | None) -> str:

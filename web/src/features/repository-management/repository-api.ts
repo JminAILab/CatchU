@@ -188,7 +188,8 @@ export type ConnectedLoad =
   | { kind: "connection"; github: Lookup<GitHubState> }
   | { kind: "failed"; listed?: true };
 
-const needsConnection = (result: Lookup<unknown>) =>
+/** `/me/repositories`의 403 `GITHUB_CONNECTION_REQUIRED`: GitHub 연결 없음·해제·재인증 필요. 조회 실패와 구분한다. */
+export const needsConnection = (result: Lookup<unknown>) =>
   result.kind === "api-error" && result.status === 403 && result.code === "GITHUB_CONNECTION_REQUIRED";
 
 /** `onChecking`은 `/me` 재조회를 시작할 때 한 번 부른다(확인 중 표시용). 취소된 조회는 재조회하지 않는다. */

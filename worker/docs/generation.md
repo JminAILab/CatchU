@@ -190,6 +190,6 @@ CR1이 더한 꼴(`*Test.*`·`androidTest`·모바일 설정·`.ipynb`)은 [재�
 
 | 남은 일 | 시작 조건 |
 |---|---|
-| 어댑터 쪽 남은 일([생성의 실제 제공자 「남은 확인」](generation-provider.md#남은-확인)). 실제 API 호출 확인과 모델 비교는 2026-10-16~18 로컬 시험대에서 했다 | 실제 회원 자료는 [#138](https://github.com/JminAILab/CatchU/issues/138) 고지와 [#37](https://github.com/JminAILab/CatchU/issues/37) 조건 뒤 |
+| 어댑터 쪽 남은 일([생성의 실제 제공자 「남은 확인」](generation-provider.md#남은-확인)). 실제 API 호출 확인과 모델 비교는 2026-10-16~18 로컬 시험대에서 했다 | 그 표의 줄마다 적혀 있다 |
 | 실제 api 조회·GitHub·Claude·E와 이은 처리 순서 확인(조립은 합성 검사까지) | [#121](https://github.com/JminAILab/CatchU/issues/121)(선행 #233·#252) |
 | 실제 결과의 품질 판정 | 허용 자료·모델의 실제 결과로 C01 영향을 평가하고 [#122](https://github.com/JminAILab/CatchU/issues/122) 검수와 연결 |

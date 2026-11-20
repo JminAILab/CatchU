@@ -326,7 +326,6 @@ test('U-4: 19벌이 있는 회원이 동시에 2건 올리면 회원 행 잠금 
   assert.deepEqual(await storedFiles(), [`${passed.body.pdfMaterialId}.pdf`]);
 });
 
-/** 횟수 창의 시계를 시험이 정한다. 돌려주는 함수로 시각을 옮긴다. */
 test('L-6: S3가 응답하지 않으면 업로드는 제한 시간 안에 500으로 끝나 행이 생기지 않고, 자리를 돌려줘 다음 업로드를 받는다(#420)', { timeout: 60_000 }, async (t) => {
   fixedClock(t);
   const member = await consentedMember();
@@ -363,6 +362,7 @@ test('L-6: S3가 응답하지 않으면 업로드는 제한 시간 안에 500으
   assert.equal(uploadGate.active, 0);
 });
 
+/** 횟수 창의 시계를 시험이 정한다. 돌려주는 함수로 시각을 옮긴다. */
 function fixedClock(t) {
   let at = Date.UTC(2026, 10, 16, 0, 0, 0);
   swap(t, uploadGate, 'now', () => new Date(at));
