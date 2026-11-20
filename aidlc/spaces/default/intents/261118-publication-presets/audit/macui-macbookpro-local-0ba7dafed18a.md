@@ -24800,3 +24800,483 @@
 **Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-01","fingerprint":"sha256:180b67324eaafa7b28d935c9727aa129835b4f8d77b6a377876534c50099bf81","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:06c217cc95edff50fbbb6ed9b74a40328ddbf73d0fc2005a358d2f0ec13dd5c3"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-02","fingerprint":"sha256:35a896449cfe8224af0aeb34a6cb88230a42a2443ba849c81f5e90906269000a","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:06c217cc95edff50fbbb6ed9b74a40328ddbf73d0fc2005a358d2f0ec13dd5c3"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-03","fingerprint":"sha256:32e2b8ebed17eed06574911a4781f257f4f42bf618451919e753f478b44aeeba","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:06c217cc95edff50fbbb6ed9b74a40328ddbf73d0fc2005a358d2f0ec13dd5c3"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-01","fingerprint":"sha256:38303c086db15d189c149bf53a4264d8ded060001f759a21c8bb5df556279ac7","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-02","fingerprint":"sha256:6f46245771de858577130ca90b332a3c5e7c54282b7bd340f34c498eb78957f7","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-03","fingerprint":"sha256:142dce43dbb87aa43f5ccd607feb18cc6f61516610e8d0fd1812d531b3e77cb1","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-04","fingerprint":"sha256:191c42bf51ac6415b167f4bed380e8b6b78fd45d2e392f1d01cd33097bbd57da","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-05","fingerprint":"sha256:34855894306bb6a70fdabe1f7e13bf3cb5e7a49e92009fa8c2c97c92f9f4e46c","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-06","fingerprint":"sha256:cab8189e0e836ebbc91cca3c88c9642562d9b981a1c14edfdc482b6770bb89eb","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md","id":"R-07","fingerprint":"sha256:865eec3d3aa729c9905cbbec41d587a245293717cca51ca4e3dcea39c2e7212f","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/functional-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:56e65a014a033824b1be4547342786d5c064280ff94994f9e56167cc2b4b06a8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md","id":"R-01","fingerprint":"sha256:db592d4c13b6e87aba8112486295a03874c0a0c54f6fa88c9a09a918c995084d","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:1cc6d7996981fce6cd0b772d1fbed9af14197e2233d864754abaddd466b093e8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md","id":"R-02","fingerprint":"sha256:bc31a40db52ddc016988d165154b452d4045c17f5eb0b3cbb7f51b283cf6341b","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:1cc6d7996981fce6cd0b772d1fbed9af14197e2233d864754abaddd466b093e8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md","id":"R-03","fingerprint":"sha256:1eb299604f917cebf326b6d27f75e3cedf5ecf6521b2a3169cfebb5a8bd035d7","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:1cc6d7996981fce6cd0b772d1fbed9af14197e2233d864754abaddd466b093e8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/security-design.md","id":"R-04","fingerprint":"sha256:35715560d010879a2cff1ee9720b76fe3217b32bf9afe8277dd894dfe589632d","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-design/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:1cc6d7996981fce6cd0b772d1fbed9af14197e2233d864754abaddd466b093e8"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/security-requirements.md","id":"R-01","fingerprint":"sha256:32ad280cb6801d503728ccd1076834de2c2715fc79443728e433d2def31e3794","status":"Accepted risk","decided_at_severity":"Major","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:42cba6ac2ef8689af568d5a54a100d9fdbfce453dd85c29e4bc5d62ccb626639"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/security-requirements.md","id":"R-02","fingerprint":"sha256:d7142d3d72ac946fe14978a3fefa9eaa1e19b6dfa05eef147f853dde02b0306d","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:42cba6ac2ef8689af568d5a54a100d9fdbfce453dd85c29e4bc5d62ccb626639"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/security-requirements.md","id":"R-03","fingerprint":"sha256:4d5c91265fbae5a8af3a4b4aaaf78d0b9b0e4773c7d72fda55128ede08130378","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:42cba6ac2ef8689af568d5a54a100d9fdbfce453dd85c29e4bc5d62ccb626639"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-requirements/security-requirements.md","id":"R-04","fingerprint":"sha256:e216c726486ac2df0355df524b330c70250964a5f14f96b95110bfe7fae7acbc","status":"Accepted risk","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/nfr-requirements/units/u2-applicant-screens/aa555492f330bf5d/1.json","digest":"sha256:42cba6ac2ef8689af568d5a54a100d9fdbfce453dd85c29e4bc5d62ccb626639"}}]}
 
 ---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T09:20:44Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: U3 기능 설계를 지금 시작할지, Bolt 계획 B3의 선행 조건(B2가 dev에 병합)을 위해 먼저 멈출지
+**Options**: U3 기능 설계를 지금 시작,여기서 멈추고 U2 dev PR을 먼저 연다
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T09:21:34Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["U3 기능 설계 지금 시작"]
+**Message Id**: 1a16f5f2
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T09:21:34Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: U3 기능 설계를 지금 시작할까요, 아니면 여기서 멈추고 U2 dev PR을 먼저 열까요? Bolt 계획 B3는 B2가 dev에 병합된 뒤 시작하도록 적혀 있습니다.
+**Reply**: U3 기능 설계 지금 시작
+**Options**: ["U3 기능 설계 지금 시작","멈추고 U2 PR 먼저"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T09:21:37Z
+**Event**: QUESTION_ANSWERED
+**Stage**: functional-design
+**Details**: U3 기능 설계 지금 시작
+**Person Reply**: U3 기능 설계 지금 시작
+**Message Id**: 1a16f5f2
+
+---
+
+## Unit Started
+**Timestamp**: 2026-11-20T09:22:02Z
+**Event**: UNIT_STARTED
+**Stage**: functional-design
+**Unit**: u3-reader-views
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T09:22:47Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-design-questions.md
+**Context**: construction > u3-reader-views > functional-design > functional-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T09:22:48Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Q1, Q2
+**Options**: Q1: A CSS 최대 폭 말줄임, B 글자 수로 자르기, X; Q2: A 열린 탭만 그림, B 모두 그리고 숨김, X
+**Unit**: u3-reader-views
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T11:30:11Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["A. CSS 최대 폭 (권장)","B로 하되, 화면 id는 지금처럼 publishedItemId로 쓴다(사본마다 이미 다르다). 탭을 오가도 PDF 뷰어가 받은 파일과 보던 쪽이 남아 다시 받지 않게 하려는 것이다. 출처 이동은 interaction-spec SourceJump 동작대로 한 번의 상태 바뀜에서 탭 바꾸기와 대상 정하기를 하고, 명세의 「다른 탭 항목은 그려져 있지 않다」 전제만 바뀐다고 기록한다."]
+**Message Id**: 72a649e1
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T11:30:11Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: [디자이너] Q1. 긴 탭 이름을 어떤 기준으로 줄일까요? 다듬은 화면은 「탭 너비를 넘으면 뒤를 …로」만 정했고, 줄여도 화면 낭독기에는 전체 이름이 읽혀야 합니다.
+**Reply**: A. CSS 최대 폭 (권장)
+**Options**: ["A. CSS 최대 폭 (권장)","B. 글자 수로 자르기"]
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T11:30:11Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: [개발자] Q2. 열리지 않은 탭의 자료를 화면에 그려 둘까요?
+**Reply**: B로 하되, 화면 id는 지금처럼 publishedItemId로 쓴다(사본마다 이미 다르다). 탭을 오가도 PDF 뷰어가 받은 파일과 보던 쪽이 남아 다시 받지 않게 하려는 것이다. 출처 이동은 interaction-spec SourceJump 동작대로 한 번의 상태 바뀜에서 탭 바꾸기와 대상 정하기를 하고, 명세의 「다른 탭 항목은 그려져 있지 않다」 전제만 바뀐다고 기록한다.
+**Options**: ["A. 열린 탭만 (권장)","B. 모두 그리고 숨김"]
+
+---
+
+## Question Answered
+**Timestamp**: 2026-11-20T11:30:30Z
+**Event**: QUESTION_ANSWERED
+**Stage**: functional-design
+**Details**: Q1: A; Q2: B로 하되, 화면 id는 지금처럼 publishedItemId로 쓴다(사본마다 이미 다르다). 탭을 오가도 PDF 뷰어가 받은 파일과 보던 쪽이 남아 다시 받지 않게 하려는 것이다. 출처 이동은 interaction-spec SourceJump 동작대로 한 번의 상태 바뀜에서 탭 바꾸기와 대상 정하기를 하고, 명세의 「다른 탭 항목은 그려져 있지 않다」 전제만 바뀐다고 기록한다.
+**Unit**: u3-reader-views
+**Person Reply**: A. CSS 최대 폭 (권장)\nB로 하되, 화면 id는 지금처럼 publishedItemId로 쓴다(사본마다 이미 다르다). 탭을 오가도 PDF 뷰어가 받은 파일과 보던 쪽이 남아 다시 받지 않게 하려는 것이다. 출처 이동은 interaction-spec SourceJump 동작대로 한 번의 상태 바뀜에서 탭 바꾸기와 대상 정하기를 하고, 명세의 「다른 탭 항목은 그려져 있지 않다」 전제만 바뀐다고 기록한다.
+**Message Id**: 72a649e1
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T11:30:32Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-design-questions.md
+**Context**: construction > u3-reader-views > functional-design > functional-design-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T11:30:35Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-design-questions.md
+**Context**: construction > u3-reader-views > functional-design > functional-design-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-20T11:30:43Z
+**Event**: DECISION_RECORDED
+**Stage**: functional-design
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-design-questions.md
+**Unit**: u3-reader-views
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-20T11:33:46Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: a034934d
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-20T11:33:47Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: Does this all look correct before I generate the artifact?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T11:33:51Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-design-questions.md
+**Context**: construction > u3-reader-views > functional-design > functional-design-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-20T11:33:52Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: functional-design
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-design-questions.md
+**Questions SHA-256**: 05e98f22acab459a74311523295d221b4149ee8c24e639ed0828e0c6b70b00d4
+**Hash Scope**: confirmed-content-v2
+**Unit**: u3-reader-views
+**Message Id**: a034934d
+**Person Reply**: Looks correct
+**Summary Authorization Id**: 60c152157d09808b273b75cb5102d181fc87824859f6736fdd567df5b8ab3849
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T11:34:49Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/rules.md
+**Context**: construction > u3-reader-views > functional-design > rules.md
+**Summary Authorization Id**: 60c152157d09808b273b75cb5102d181fc87824859f6736fdd567df5b8ab3849
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T11:35:37Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md
+**Context**: construction > u3-reader-views > functional-design > functional-spec.md
+**Summary Authorization Id**: 60c152157d09808b273b75cb5102d181fc87824859f6736fdd567df5b8ab3849
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T11:36:05Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/frontend-components.md
+**Context**: construction > u3-reader-views > functional-design > frontend-components.md
+**Summary Authorization Id**: 60c152157d09808b273b75cb5102d181fc87824859f6736fdd567df5b8ab3849
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T11:36:19Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/traceability.json
+**Context**: construction > u3-reader-views > functional-design > traceability.json
+**Summary Authorization Id**: 60c152157d09808b273b75cb5102d181fc87824859f6736fdd567df5b8ab3849
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T11:36:21Z
+**Event**: SENSOR_FIRED
+**Fire id**: 4e979c40
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/rules.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T11:36:21Z
+**Event**: SENSOR_PASSED
+**Fire id**: 4e979c40
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/rules.md
+**Duration ms**: 76
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T11:36:21Z
+**Event**: SENSOR_FIRED
+**Fire id**: da73e959
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T11:36:21Z
+**Event**: SENSOR_PASSED
+**Fire id**: da73e959
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/functional-spec.md
+**Duration ms**: 76
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T11:36:21Z
+**Event**: SENSOR_FIRED
+**Fire id**: 200b250b
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/traceability.json
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T11:36:21Z
+**Event**: SENSOR_PASSED
+**Fire id**: 200b250b
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/traceability.json
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T11:36:21Z
+**Event**: SENSOR_FIRED
+**Fire id**: 2b52ae0c
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/frontend-components.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T11:36:21Z
+**Event**: SENSOR_PASSED
+**Fire id**: 2b52ae0c
+**Sensor ID**: required-sections
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/frontend-components.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T11:36:21Z
+**Event**: SENSOR_FIRED
+**Fire id**: 10a06478
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/rules.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-20T11:36:21Z
+**Event**: SENSOR_PASSED
+**Fire id**: 10a06478
+**Sensor ID**: upstream-coverage
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/rules.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-20T11:36:22Z
+**Event**: SENSOR_FIRED
+**Fire id**: d33afed4
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/traceability.json
+
+---
+
+## Sensor Failed
+**Timestamp**: 2026-11-20T11:36:22Z
+**Event**: SENSOR_FAILED
+**Fire id**: d33afed4
+**Sensor ID**: traceability
+**Stage slug**: functional-design
+**Unit**: u3-reader-views
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/traceability.json
+**Detail path**: aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/sensors/functional-design/traceability-d33afed4.md
+**Findings count**: 2
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T11:36:31Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/functional-design/traceability.json
+**Context**: construction > u3-reader-views > functional-design > traceability.json
+**Summary Authorization Id**: 60c152157d09808b273b75cb5102d181fc87824859f6736fdd567df5b8ab3849
+
+---
+
+## Review Requested
+**Timestamp**: 2026-11-20T11:36:33Z
+**Event**: REVIEW_REQUESTED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u3-reader-views
+**Iteration**: 1
+**Artifact Fingerprint**: sha256:151efcde9aa7b234f52e611785f2ac18d0122be1ee3068cc98f7c9cd842e7c62
+**Request Id**: review:18aec979126e756c9d5c41416607572b
+**Review File**: .aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.18aec979126e756c9d5c41416607572b.review.md
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T11:36:42Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviewer-dispatch.json
+**Context**: .aidlc-engine > reviewer-dispatch.json
+
+---
+
+## Subagent Dispatched
+**Timestamp**: 2026-11-20T11:36:57Z
+**Event**: SUBAGENT_DISPATCHED
+**Agent Type**: aidlc-architecture-reviewer-agent
+
+---
+
+## Guard Stood Aside
+**Timestamp**: 2026-11-20T11:37:49Z
+**Event**: GUARD_STOOD_ASIDE
+**Guard**: reviewer-scope
+**Authority**: instruction
+**Grant**: none
+**Actor**: subagent
+**Stage**: functional-design
+**Tool**: Bash
+**Details**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets (unit u3-reader-views)
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-20T11:39:44Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/.aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.18aec979126e756c9d5c41416607572b.review.md
+**Context**: .aidlc-engine > reviews > functional-design > units > u3-reader-views > aa555492f330bf5d > 1.18aec979126e756c9d5c41416607572b.review.md
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-20T11:39:51Z
+**Event**: HOST_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: host
+**Reason**: claude agent message
+**Source**: template
+
+---
+
+## Subagent Completed
+**Timestamp**: 2026-11-20T11:39:51Z
+**Event**: SUBAGENT_COMPLETED
+**Agent Type**: aidlc-architecture-reviewer-agent
+**Agent ID**: af19fcd626b709b2a
+**Review File Digest**: .aidlc-engine/reviews/units-generation/stage/18dabf3da2f56bda/1.a5010d1a3dd0a8f252034f647bdd1f66.review.md=absent; .aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.18aec979126e756c9d5c41416607572b.review.md=7a01a26b9bca7ffc4be96572a2db5c4b537b3748c04c37bcc721ecbe6c4946bf
+
+---
+
+## Review Completed
+**Timestamp**: 2026-11-20T11:39:55Z
+**Event**: REVIEW_COMPLETED
+**Stage**: functional-design
+**Reviewer**: aidlc-architecture-reviewer-agent
+**Unit**: u3-reader-views
+**Iteration**: 1
+**Verdict**: READY
+**Review Verdict Dictated**: no
+**Request Fingerprint**: sha256:151efcde9aa7b234f52e611785f2ac18d0122be1ee3068cc98f7c9cd842e7c62
+**Artifact Fingerprint**: sha256:151efcde9aa7b234f52e611785f2ac18d0122be1ee3068cc98f7c9cd842e7c62
+**Request Id**: review:18aec979126e756c9d5c41416607572b
+**Review Record**: .aidlc-engine/reviews/functional-design/units/u3-reader-views/aa555492f330bf5d/1.json
+**Review Record Digest**: sha256:29c3c790113bc4c7300ffec365131909b60848d82dc2bdd475afc12792df1a1e
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-20T11:40:05Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/functional-design/memory.md
+**Context**: construction > functional-design > memory.md
+
+---
+
+## Unit Completed
+**Timestamp**: 2026-11-20T11:40:06Z
+**Event**: UNIT_COMPLETED
+**Stage**: functional-design
+**Unit**: u3-reader-views
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---

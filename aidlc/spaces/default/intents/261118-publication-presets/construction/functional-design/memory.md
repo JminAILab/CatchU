@@ -13,6 +13,7 @@
 
 ## Tradeoffs
 <!-- example: 2026-05-29T10:14:32Z — picked TDD over BDD this run; the team is unit-first and the domain is well-understood -->
+- 2026-11-20T11:40:00Z — [unit u3-reader-views] 팀장 Q2 B로 모든 탭 패널을 그려 두고 숨겨, interaction-spec SourceJump의 「다른 탭 항목은 그려져 있지 않다」 전제만 바뀌었다; PDF 뷰어 상태를 남기는 대신 처음 그리는 양이 는다. 검토 Major 둘(recipient-api.ts pickItem이 프리셋 칸을 버림, 자료 화면 탭 거부 때 초점)은 다음 단계 계획에 옮긴다.
 
 ## Open questions
 <!-- example: 2026-05-29T10:14:32Z — confirm the retention window with compliance before the next stage hardens the schema -->
