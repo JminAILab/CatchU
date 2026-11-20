@@ -20483,3 +20483,33 @@
 **Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
 
 ---
+
+## Unit Skipped
+**Timestamp**: 2026-11-20T05:43:26Z
+**Event**: UNIT_SKIPPED
+**Stage**: nfr-requirements
+**Unit**: u4-privacy-policy
+**Reason**: u4는 정적 개인정보 처리방침의 글자 다섯 곳만 바꾼다. 요구사항 NFR1~NFR6은 프리셋 화면·권한·이름 출력·로그·상태 표시·목록 수에 대한 것이라 이 단위에 걸리는 것이 없고, 기술 스택(web Next.js 지금 화면·시험)도 이미 정해져 있다(단계 조건: Skip if no NFR requirements and tech stack already determined).
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Unit Skipped
+**Timestamp**: 2026-11-20T05:43:47Z
+**Event**: UNIT_SKIPPED
+**Stage**: nfr-design
+**Unit**: u4-privacy-policy
+**Reason**: u4는 NFR 요구 단계를 건너뛰어 설계로 옮길 NFR이 없다. 정적 개인정보 처리방침의 글자 다섯 곳만 바꾸고 성능·보안·확장성·안정성·관측 장치를 새로 두지 않는다.
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
+
+## Unit Skipped
+**Timestamp**: 2026-11-20T05:44:20Z
+**Event**: UNIT_SKIPPED
+**Stage**: infrastructure-design
+**Unit**: u4-privacy-policy
+**Reason**: u4는 지금 web 화면 글자만 바꾼다. 새 인프라·관측·배포 경로가 없고, 배포는 기존 web 이미지와 자동 배포를 그대로 쓴다.
+**Run floor**: WORKFLOW_STARTED:2026-11-18T05:40:25Z#1
+
+---
