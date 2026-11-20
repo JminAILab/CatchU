@@ -1,4 +1,5 @@
 // U2 AI 게이트 입구 검사·공통 지시·기계 대조(기능 설계 W3·BR3.1~BR3.7, 시나리오 S7~S11·S17, 비기능 NFR2.1~2.3·NFR3.1·NFR4.2).
+// 인용 항목 대조(BR3.4·S8·S9)는 #581(2026-11-19 팀장 결정)로 버리지 않는 쪽으로 바뀌었다.
 // 기록한 응답 JSON을 시험용 fetch로 넘긴다. 전역 fetch를 바꾸지 않고 실제 Claude를 부르지 않는다.
 require('reflect-metadata');
 const assert = require('node:assert/strict');
@@ -62,33 +63,39 @@ test('SONNET은 QNA에만 쓰고 그 밖의 기능이면 호출하지 않는다.
   assert.deepEqual(body.messages[0].content.map((block) => block.type), ['document', 'text']);
 });
 
-test('S8 인용 원문에 없는 숫자를 쓴 인용 항목만 버리고 droppedCount에 더한다. 로그에는 이유별 수만 있고 글은 없다', async (t) => {
+// #581(2026-11-19 팀장 결정) — 인용 항목은 기계 대조로 버리지 않는다. 기대: 인용한 줄에 없는 숫자·PR 번호·영어 표기·
+// 다른 줄의 식별값을 써도 인용 항목은 남고, 버림은 인용 없는 AI 해석 항목에만 생긴다. 실패: 인용 항목이 하나라도 빠짐.
+test('S8 #581 인용 항목은 인용 원문에 없는 숫자를 써도 남고, 버림은 AI 해석 항목에만 있다. 로그에는 이유별 수만 있고 글은 없다', async (t) => {
   const logs = captureLogs(t);
   const text = 'SECRET_QUOTE 로그인 시험 12개를 추가했다\n배포 스크립트를 정리했다';
   const { gate } = gateWith([jsonResponse(messageBody([
     fragment('- 로그인 시험 12개를 추가했다', [blockCitation(0, 0, 1)]),
     fragment('\n- 로그인 시험 30개를 추가했다', [blockCitation(0, 0, 1)]),
     fragment('\n- 배포 스크립트를 정리했다', [blockCitation(0, 1, 2)]),
+    fragment('\n- 시험을 7번 꾸준히 늘렸다'),
   ]))]);
   const output = await gate.generate(request({ sources: [source({ text })] }));
-  assert.deepEqual(output.items.map((item) => item.text), ['로그인 시험 12개를 추가했다', '배포 스크립트를 정리했다']);
+  assert.deepEqual(output.items.map((item) => [item.kind, item.text]), [
+    ['CITED', '로그인 시험 12개를 추가했다'], ['CITED', '로그인 시험 30개를 추가했다'], ['CITED', '배포 스크립트를 정리했다']]);
   assert.equal(output.droppedCount, 1);
   const fields = resultLog(logs);
   assert.deepEqual({ itemCount: fields.itemCount, droppedCount: fields.droppedCount, dropReasons: fields.dropReasons },
-    { itemCount: 2, droppedCount: 1, dropReasons: { truncated: 0, location: 0, fact: 1, role: 0, outside_heading: 0 } });
-  assert.ok(!JSON.stringify(logs).includes('SECRET_QUOTE') && !JSON.stringify(logs).includes('30개'));
+    { itemCount: 3, droppedCount: 1, dropReasons: { truncated: 0, location: 0, fact: 1, role: 0, outside_heading: 0 } });
+  assert.ok(!JSON.stringify(logs).includes('SECRET_QUOTE') && !JSON.stringify(logs).includes('꾸준히 늘렸다'));
 });
 
-test('S9 인용 항목의 PR 번호는 인용 원문에 없어도 그 근거의 Catch PR 번호(/pull/n)면 남고, 아니면 버린다', async (t) => {
+test('S9 #581 인용 항목은 다른 줄의 식별값·Catch PR이 아닌 번호·인용한 줄에 없는 영어 표기를 써도 남는다', async (t) => {
   captureLogs(t);
-  const catchSource = source({ text: '로그인 오류를 고쳤다', catchEvidenceUrls: ['https://github.com/octo/app/pull/123'] });
+  const commit = source({ text: '커밋 a3f9c12b7d4e, 작성 시각 2026-11-05T03:34:56Z' });
+  const size = source({ text: '변경 파일 4개, 추가 120줄·삭제 30줄', catchEvidenceUrls: ['https://github.com/octo/app/pull/123'] });
   const { gate } = gateWith([jsonResponse(messageBody([
-    fragment('- PR #123에서 로그인 오류를 고쳤다', [blockCitation(0, 0, 1)]),
-    fragment('\n- PR #124에서 로그인 오류를 고쳤다', [blockCitation(0, 0, 1)]),
+    fragment('- 커밋 a3f9c12b7d4e는 파일 4개를 바꿔 120줄을 더하고 30줄을 지웠다', [blockCitation(1, 0, 1)]),
+    fragment('\n- PR #124에서 Redis 설정과 함께 바꿨다', [blockCitation(1, 0, 1)]),
   ]))]);
-  const output = await gate.generate(request({ sources: [catchSource] }));
-  assert.deepEqual(output.items.map((item) => item.text), ['PR #123에서 로그인 오류를 고쳤다']);
-  assert.equal(output.droppedCount, 1);
+  const output = await gate.generate(request({ sources: [commit, size] }));
+  assert.deepEqual(output.items.map((item) => item.text),
+    ['커밋 a3f9c12b7d4e는 파일 4개를 바꿔 120줄을 더하고 30줄을 지웠다', 'PR #124에서 Redis 설정과 함께 바꿨다']);
+  assert.equal(output.droppedCount, 0);
 });
 
 test('S10 AI 해석 항목에 숫자나 PR 번호가 있으면 버리고, 없으면 AI_INTERPRETATION으로 남긴다', async (t) => {

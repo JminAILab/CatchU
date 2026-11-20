@@ -33,7 +33,7 @@ interface GateLog {
   droppedCount: number;
   dropReasons: DropReasons;
   nonItemLineCount: number;
-  /** Claude 인용 대신 따옴표 인용을 붙인 항목 수(#528). 대조 전 수이고, 붙일 때 인용 대조를 미리 통과시켜 대조에서 버려지지 않는다. */
+  /** Claude 인용 대신 따옴표 인용을 붙인 항목 수(#528). 판정 전 수이고, 붙일 때 인용 대조를 통과한 것만 붙인다(인용 항목은 #581부터 버리지 않음). */
   quoteCitedCount: number;
   stopReason: string | null;
   inputTokens: number | null;
@@ -163,17 +163,17 @@ function withoutJdRole(item: GatedItem): GatedItem {
   return { ...item, jdRole: null };
 }
 
-/** BR3.4·BR3.5 항목 판정기. 발행본 글 낱말은 한 번만 뽑는다. */
+/** 항목 판정기(BR3.5, 인용 항목은 #581로 남김). 발행본 글 낱말은 한 번만 뽑는다. */
 class ItemChecker {
   factDropped = 0;
   private readonly publication: CheckTokens;
 
-  constructor(private readonly request: AiGenerationRequest) {
+  constructor(request: AiGenerationRequest) {
     this.publication = publicationTokens(request);
   }
 
   keep(item: GatedItem): boolean {
-    if (passesFactCheck(item, this.request, this.publication)) return true;
+    if (passesFactCheck(item, this.publication)) return true;
     this.factDropped += 1;
     return false;
   }

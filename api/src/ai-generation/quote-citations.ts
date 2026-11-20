@@ -91,7 +91,8 @@ const sameCitation = (a: ItemCitation, b: ItemCitation): boolean =>
  * Claude 인용이 없는 항목 글에 붙일 인용. 붙이지 않으면 빈 목록이고, 그 항목은 지금처럼 AI 해석 항목이다.
  * - 기본 요약·질의응답만 본다. 공백을 줄인 따옴표 글이 QUOTE_MIN_LENGTH자 이상인 것만 찾는다.
  * - 찾는 따옴표 글이 모두 작성자 자료 원문 한 곳씩에 있을 때만 붙인다. 하나라도 아니면 붙이지 않는다(추측하지 않는다).
- * - 붙인 항목이 인용 항목 대조(U2 BR3.4)를 통과할 때만 붙인다. 붙여서 버려지는 항목을 새로 만들지 않는다.
+ * - 붙인 항목이 인용 항목 대조(U2 BR3.4)를 통과할 때만 붙인다. 인용 항목은 #581부터 대조 없이 남으므로, 이 조건이 없으면
+ *   따옴표 글 밖에 다른 숫자·이름을 쓴 항목이 인용 항목이 되어 AI 해석 대조를 피한다.
  */
 export function quoteCitations(itemText: string, request: AiGenerationRequest, documents: readonly CitationDocument[]): ItemCitation[] {
   if (!QUOTE_FEATURES.has(request.feature)) return [];

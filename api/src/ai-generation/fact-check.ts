@@ -1,5 +1,7 @@
 // 기계 대조(U2 기능 설계 BR3.3~BR3.5, 계약 C-01 check-scope, 비기능 NFR2.3).
 // 대조 낱말은 항목 글과 대조 대상 글에 같은 나누기를 써서 게이트 안에서만 뽑는다. 대조는 낱말 단위 일치다.
+// 인용이 붙은 항목은 버리지 않는다(#581, 2026-11-19 팀장 결정). 버림 판정은 인용 없는 AI 해석 항목에만 남고,
+// 인용 대조(passesCitedCheck)는 따옴표 인용을 붙일지 정할 때(#528)만 쓴다.
 import type { AiGenerationRequest, AiSource, GatedItem } from './ai-generation.types';
 
 /** 영어 표기 대조에서 빼는 약어(BR3.3). 소문자로 비교한다. */
@@ -126,9 +128,12 @@ export function publicationTokens(request: AiGenerationRequest): CheckTokens {
   return extractCheckTokens(text);
 }
 
-/** BR3.4·BR3.5로 항목 하나를 판정한다(JD 역할이 없는 기본 요약·질의응답). */
-export function passesFactCheck(item: GatedItem, request: AiGenerationRequest, publication: CheckTokens): boolean {
-  const tokens = extractCheckTokens(item.text);
-  if (item.citations.length > 0) return passesCitedCheck(tokens, citedTarget(item, request));
-  return passesInterpretationCheck(tokens, publication);
+/**
+ * 항목 하나를 판정한다(JD 역할이 없는 기본 요약·질의응답). 인용 항목은 남기고(#581) AI 해석 항목만 BR3.5로 본다.
+ * 인용 항목은 근거 원문이 항목 바로 아래 보여 읽는 사람이 맞춰 볼 수 있다. 인용한 줄만 대조하면 같은 기록의
+ * 다른 줄(커밋 식별값과 변경 규모 등)을 함께 말한 맞는 항목이 버려진다.
+ */
+export function passesFactCheck(item: GatedItem, publication: CheckTokens): boolean {
+  if (item.citations.length > 0) return true;
+  return passesInterpretationCheck(extractCheckTokens(item.text), publication);
 }
