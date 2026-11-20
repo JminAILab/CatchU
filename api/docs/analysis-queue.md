@@ -18,7 +18,7 @@ api가 대기 중인 분석 시도를 큐(BullMQ)로 worker에 보내고, worker
 
 **시작과 실패 종료.** `main.ts`는 `listen` 뒤 `startAnalysisQueue(app)`로 `start(onFailure)`를 부른다. 받기가 예상 밖으로 멈추면 실행기가 보내기까지 멈추고(아래 「수명주기」) `onFailure`가 앱을 닫은 뒤 종료 코드 1로 프로세스를 끝낸다. 앱 닫기는 10초(`FAILURE_APP_CLOSE_TIMEOUT_MS`)까지만 기다리고, 넘으면 기다리지 않고 끝낸다. Nest는 종료 훅이 끝나야 HTTP 서버를 닫으므로, 다른 종료 훅(처리 시한 판정의 DB 조회 등)이 멎으면 `/health`가 계속 응답하며 남기 때문이다. 다시 띄우는 것은 실행 환경의 몫이다.
 
-**어디서 켜는가.** 개발 서버([#304](https://github.com/JminAILab/CatchU/issues/304))에서는 켜지 않는다. api가 운영 모드라 비밀번호가 든 `rediss://`만 받는데, 그 서버의 합성 큐는 평문이고 api는 큐 망 밖에 있다. 실제 서버에서는 11월 EKS([#276](https://github.com/JminAILab/CatchU/issues/276))의 api 실행 파일과 Secret에 큐 주소를 넣을 때 켠다. 실제 회원 접수([#323](https://github.com/JminAILab/CatchU/issues/323)) 전에는 LIVE 시도가 없다.
+**어디서 켜는가.** 현행 배포는 AWS EKS이며 [#276의 2026-11-18 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에서 실제 큐 연결·내부 조회·GitHub 연결과 LIVE 분석 결과 수신(`ACCEPTED`)을 확인했다. 설정은 [AWS 기능 켜기 안내](../../deploy/aws/features.md)를 따른다. 옛 EC2 개발 서버의 큐 미연결 제약을 현재 EKS에 적용하지 않는다. 큐 주소가 없는 로컬 환경에서는 위 조건대로 조립하지 않는다.
 
 ## worker 문서와의 대조
 
@@ -153,7 +153,7 @@ CATCHU_QUEUE_REDIS_URL=redis://127.0.0.1:6380 CATCHU_QUEUE_PREFIX=catchu-verify-
 - 보내기 연결이 붙은 직후 BullMQ의 첫 초기화(서버 정보 조회)가 실패하는 좁은 틈에 걸리면, 그 요청 큐는 api를 다시 띄울 때까지 명령마다 실패한다(`ANALYSIS_DISPATCH_PAUSED` `QUEUE_COMMAND_FAILED`가 계속 남는다).
 - 보호 공급자나 DB가 오래 멈추면 정상 종료가 각 단계 상한까지 길어지고, 상한 뒤에도 그 처리는 프로세스가 끝날 때까지 남는다(위 「수명주기」).
 - api를 여러 대 띄우면 진행 알림의 처리 순서가 보장되지 않는다([#277](https://github.com/JminAILab/CatchU/issues/277)은 한 대).
-- AWS 큐(ElastiCache Valkey)의 TLS 인증서 검증·비밀번호·재접속·`noeviction`은 확인하지 않았다([#276](https://github.com/JminAILab/CatchU/issues/276)·[#277](https://github.com/JminAILab/CatchU/issues/277)).
+- AWS 큐 장애 조치 뒤 api는 프로세스 재기동 없이 27초 만에 재연결·보내기를 재개했다([2026-11-18 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)). 같은 시험에서 worker는 새 요청을 받지 않아 재기동이 필요했으며 [#603](https://github.com/JminAILab/CatchU/issues/603)으로 구분했다. 이 결과를 TLS 인증서·비밀번호의 거부 사례나 `noeviction` 동작 시험까지 통과한 것으로 확대하지 않는다. 운영 설정·검증 범위는 [AWS 안내](../../deploy/aws/README.md)를 따른다.
 
 ## 하지 않는 것
 

@@ -2,6 +2,8 @@
 
 catchu.dev를 개발 서버(EC2 한 대, 앞단 Caddy)에서 EKS의 ALB로 옮기는 절차다([#276](https://github.com/JminAILab/CatchU/issues/276) 3단계). 시작 조건과 승인 지점은 [README.md](README.md) 「단계와 시작 조건」을 따른다. 개발 서버 자료는 옮기지 않는다(10/6 결정). 개발 서버는 앱만 멈춘 채 두었다가 4단계에서 지운다(README 「삭제 순서」 A).
 
+[2026-11-18 전환 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6971519828)에 따라 현재 `catchu.dev`는 EKS를 가리킨다. 아래는 전환·되돌리기 절차이며, 전환을 다시 실행하라는 뜻은 아니다.
+
 명령은 팀장이 직접 친다. **승인 ③은 DNS를 바꾸기 직전이다.** 개발 서버 앱을 멈춘 때부터 DNS가 바뀔 때까지 catchu.dev는 502를 돌려준다. 보통 3분 안팎이다(Route 53 반영이 대개 60초 안이고 기록 TTL이 60초다).
 
 | 때 | 할 일 | 여기서 멈추면 |
@@ -168,9 +170,9 @@ edge_check                                                         # EKS 칸. vi
 
 ## 전환 뒤
 
-- 배포 대상은 `none`으로 둔다. `dev-server`로 되돌리면 main 반영 때 개발 서버에 배포하고, 바깥 확인은 EKS를 보게 된다.
+- 배포 대상은 [11/19 결정](https://github.com/JminAILab/CatchU/issues/342#issuecomment-7001447651)으로 `eks`다. `dev-server`로 되돌리면 main 반영 때 개발 서버에 배포하고, 바깥 확인은 EKS를 보게 된다.
 - `none`인 동안에도 main에 반영된 판본의 이미지는 ECR에 올라간다. EKS에는 `git fetch origin main` 뒤 `bash deploy/aws/scripts/deploy.sh --commit <그 커밋>`으로 손으로 배포한다([k8s/README.md](k8s/README.md) 「앱 교체(deploy.sh)」).
-- main 병합이 EKS 교체까지 가게 하려면 배포 대상을 `eks`로 바꾼다([cd/README.md](cd/README.md) 「켜기와 멈추기」). 그 문서의 「아직 못 본 것」을 실제 클러스터에서 확인한 뒤에만 바꾼다.
+- 손으로 교체·설정 변경을 할 때는 `none`으로 멈추고, 마친 뒤 `eks`로 되돌린다([cd/README.md](cd/README.md) 「켜기와 멈추기」). 배포 경로의 실제 확인과 합성·모의 근거는 같은 문서의 「클러스터 확인과 한계」에 있다.
 - `none`에서는 이미지 올리기가 개발 서버 배포 역할 `catchu-github-deploy`와 GitHub environment `dev-server`로 돈다. 4단계에서 개발 서버를 지울 때 배포 대상이 아직 `none`이면 이 둘은 남긴다(README 「삭제 순서」 A의 6).
 - 48시간 동안 되돌릴 일이 없으면 4단계로 간다(README 「삭제 순서」 A).
 

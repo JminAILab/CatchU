@@ -4,10 +4,10 @@
 
 기준 문서: [계약 C-01](../../aidlc/spaces/default/intents/260925-intent-12/inception/contract-design/contract-summary.md), [U1 기능 명세](../../aidlc/spaces/default/intents/260925-intent-12/construction/u1-ai-generation-gate/functional-design/functional-spec.md)·[업무 규칙](../../aidlc/spaces/default/intents/260925-intent-12/construction/u1-ai-generation-gate/functional-design/rules.md), [U1 비기능 설계](../../aidlc/spaces/default/intents/260925-intent-12/construction/u1-ai-generation-gate/nfr-design/). 규칙 ID(BR·NFR)는 그 문서의 것이다.
 
-## 앱 미등록과 쓰는 조건
+## 제품 연결과 쓰는 조건
 
 - U1 게이트(`createAiGenerationGate`, `ClaudeAiGenerationGate`)는 U1 시험과 실제 호출 시험(S8)만 쓴다. **소비 Unit(U5·U10)은 아래 「U2 게이트」를 쓴다.** U2 게이트는 U1 경로에 방어 문구·입력 상한·기계 대조·JD 역할·스트림을 더한 것이다.
-- `AppModule`·`application.module.ts`에는 등록하지 않는다. 쓰는 Unit의 모듈이 `AiGenerationModule`을 `imports`에 넣는다. 키가 없거나 Claude가 멈춰도 api 기동과 다른 기능에는 영향이 없다.
+- `AppModule`에 직접 넣는 대신 U5·U10 등 소비 모듈이 `AiGenerationModule`을 `imports`에 넣어 제품에 연결한다. 키가 없거나 Claude가 멈춰도 api 기동과 다른 기능에는 영향이 없다.
 - 최소 연결이나 기록한 응답 시험의 통과를 U5·U10의 실제 처리 성공으로 보지 않는다.
 
 ## 구성 요소

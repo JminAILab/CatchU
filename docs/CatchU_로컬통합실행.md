@@ -74,16 +74,16 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:3001/v1/auth/d
 - 첫 줄: `HTTP/1.1 200 OK`와 `{"status":"ok"}`. 이 응답은 DB 상태를 보지 않는다. DB가 꺼져 있으면 api가 아예 켜지지 않는다.
 - 둘째 줄: `200`. 개발용 로그인이 켜져 있다는 뜻이다. 토큰은 출력하지 않는다. `403`이면 `.env`의 `DEV_LOGIN_ENABLED`와 `NODE_ENV`를 본다.
 
-**보호 경로 호출(선택).** 로그인이 필요한 제품 경로는 지금 공유 링크의 목록·발급·중단이다. 받은 토큰이 통하는지는 요청 내용이 필요 없는 내 링크 목록(`GET /v1/share-links`)으로 본다. 토큰은 변수에만 담는다.
+**보호 경로 호출(선택).** 받은 토큰이 통하는지는 요청 본문이 필요 없는 내 회원 정보(`GET /v1/me`)로 본다. [회원 정보 컨트롤러](../api/src/member-profile/member-profile.controller.ts)의 현행 경로이며, 10월 공유 링크 API(`/v1/share-links`)는 발행본 경로로 대체됐다. 토큰은 변수에만 담는다.
 
 ```sh
 TOKEN=$(curl -s -X POST http://127.0.0.1:3001/v1/auth/dev-login -H 'Content-Type: application/json' -d '{"memberId":"local-member-1"}' | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s).accessToken))")
-curl -s -w ' %{http_code}\n' http://127.0.0.1:3001/v1/share-links
-printf 'Authorization: Bearer %s\n' "$TOKEN" | curl -s -w ' %{http_code}\n' -H @- http://127.0.0.1:3001/v1/share-links
+curl -s -w ' %{http_code}\n' http://127.0.0.1:3001/v1/me
+printf 'Authorization: Bearer %s\n' "$TOKEN" | curl -s -w ' %{http_code}\n' -H @- http://127.0.0.1:3001/v1/me
 unset TOKEN
 ```
 
-토큰 없이는 `AUTH_REQUIRED` 본문과 `401`, 토큰을 붙이면 내 링크 목록과 `200`이 나온다(링크가 없으면 `{"items":[],"page":{"nextCursor":null}}`). 개발용 로그인은 입력한 문자열로 회원을 찾거나 만들어 그 회원의 UUID를 토큰에 넣으므로, 같은 문자열로 다시 로그인하면 같은 회원으로 들어간다. 토큰에 담긴 회원 UUID를 직접 보려면 [api 「검토자 재현」](../api/docs/auth-review.md)의 확인용 컨트롤러를 잠시 붙였다가 지운다.
+토큰 없이는 `AUTH_REQUIRED` 본문과 `401`, 토큰을 붙이면 내 회원 정보와 `200`이 나온다. 개발용 로그인은 입력한 문자열로 회원을 찾거나 만들어 그 회원의 UUID를 토큰에 넣으므로, 같은 문자열로 다시 로그인하면 같은 회원으로 들어간다. 토큰에 담긴 회원 UUID를 직접 보려면 [api 「검토자 재현」](../api/docs/auth-review.md)의 확인용 컨트롤러를 잠시 붙였다가 지운다.
 
 ### 3. worker
 
@@ -99,7 +99,7 @@ uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 curl -i http://127.0.0.1:8000/health
 ```
 
-`HTTP/1.1 200 OK`와 `{"status":"ok"}`가 나오면 된다. worker는 아직 환경변수가 없고 DB·api와 연결하지 않는다.
+`HTTP/1.1 200 OK`와 `{"status":"ok"}`가 나오면 된다. 이 단계의 `app.main:app`은 상태 확인용이며 DB·api와 연결하지 않는다. 실제 큐 소비자는 아래 「실제 분석까지 띄우기」의 설정·명령을 쓴다.
 
 ### 4. web
 
@@ -118,11 +118,11 @@ curl -s http://localhost:3000/ | grep -o 'id="landing-title"'
 ### 5. web에서 로그인해 api 부르기
 
 1. `api/.env`에 `CORS_ALLOWED_ORIGINS=http://localhost:3000`을 넣고 api를 다시 켠다. 개발용 로그인에는 `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development`가 필요하다.
-2. `web/.env.example`을 참고해 `web/.env.local`에 `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3001`과 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`를 넣는다. 기존 파일은 덮어쓰지 않는다. 값을 바꾸면 web을 다시 켠다.
+2. `web/.env.example`을 참고해 `web/.env.local`에 `NEXT_PUBLIC_API_BASE_URL=http://localhost:3001`과 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`를 넣는다. 기존 파일은 덮어쓰지 않는다. 값을 바꾸면 web을 다시 켠다. web과 API는 모두 `localhost`로 맞춘다. `127.0.0.1`과 섞으면 로그인 유지 쿠키가 실리지 않는다.
 3. `http://localhost:3000/login`에서 개발용 식별 문자열을 입력한다. api가 해당 회원을 찾거나 만들어 로그인하며, 요청 필드 이름은 `memberId`다. 성공하면 `/home`으로, 회원 경로에서 왔다면 검증된 `next`로 돌아간다.
-4. 새로고침하면 메모리 토큰이 사라져 다시 로그인한다. 로그아웃하면 `/`로 이동한다. 이름 미저장 회원의 최초 입력 이동은 `GET /v1/me`(#135) 연결 뒤 확인한다.
+4. 새로고침하면 Refresh 쿠키로 세션을 복원한다. 복원할 수 없으면 다시 로그인한다. 로그아웃은 서버 세션을 끝내고 `/`로 이동한다. 이름을 저장하지 않은 회원은 최초 입력 화면으로 이동한다([공통 인증](../web/src/features/auth-session/README.md)·[회원 진입](../web/src/features/member-entry/README.md)).
 
-기능 화면은 [web README 「API 호출」](../web/README.md#api-호출-106-pr②)의 `api.member`·`api.recipient`를 사용한다. 회원 호출만 Bearer 토큰을 첨부하고, 수신자 비밀번호 차단의 `Retry-After`는 `retryAfterSeconds`로 전달한다. 토큰 전달만 확인할 때는 2단계의 내 링크 목록 호출을 쓰며, 이것을 web 화면의 기능 연결 완료로 세지 않는다. 토큰 값을 화면·로그·공유 자료에 남기지 않는다.
+기능 화면은 [web README 「API 호출」](../web/README.md#api-호출-106-pr②)의 `api.member`·`api.recipient`를 사용한다. 회원 호출만 Bearer 토큰을 첨부하고, 수신자 비밀번호 차단의 `Retry-After`는 `retryAfterSeconds`로 전달한다. 토큰 전달만 확인할 때는 2단계의 내 회원 정보 호출을 쓰며, 이것을 web 화면의 기능 연결 완료로 세지 않는다. 토큰 값을 화면·로그·공유 자료에 남기지 않는다.
 
 ## 끄는 순서
 
@@ -137,7 +137,7 @@ docker stop catchu-db
 
 ## 서비스끼리 맞출 설정값
 
-이름은 각 서비스 `.env.example`과 같다. 아직 이름이 없는 설정은 정할 작업을 적었다.
+이름은 각 서비스 `.env.example`과 같다. 큐 연결 설정은 아래 실제 분석 절과 [worker 큐 소비자](../worker/docs/queue-consumer.md)를 따른다.
 
 | 설정 | 이름 | 쓰는 서비스 | 로컬 개발 값 | 비밀값 | 맞출 곳 |
 |---|---|---|---|---|---|
@@ -149,7 +149,7 @@ docker stop catchu-db
 | 개발용 로그인 | `DEV_LOGIN_ENABLED` · `NODE_ENV` | api | 이 안내는 `true` · `development` | 아님 | 배포에서는 `NODE_ENV=production`이라 켜지지 않는다 |
 | web이 부를 API 주소 | `NEXT_PUBLIC_API_BASE_URL` | web | api 주소와 같게 | 아님 | api의 `BIND_HOST`·`PORT` |
 | CORS 허용 주소 | `CORS_ALLOWED_ORIGINS` | api | web 주소(`http://localhost:3000`) | 아님 | web을 여는 주소 |
-| worker 주소 | 환경변수 없음. 실행 명령의 `--host`·`--port` | worker | `127.0.0.1` · `8000` | 아님 | api→worker 연결 설정은 큐 작업([#77][i77])에서 정한다 |
+| worker 상태 확인 주소 | 이 안내의 실행 인자 `--host`·`--port` | worker | `127.0.0.1` · `8000` | 아님 | api→worker 작업 전달은 HTTP가 아니라 큐를 사용한다([큐 규격](../worker/docs/queue-consumer.md#큐-규격-233과-공동)) |
 | web 포트 | 환경변수 없음. 실행 인자 `-p` | web | `3000` | 아님 | CORS 허용 주소. `.env`의 `PORT`는 적용되지 않는다 |
 | 링크 grant 서명 키 | `LINK_GRANT_SECRET`([#150][i150]) | api | 비우면 실행마다 임시 키(재시작하면 비밀번호 다시 입력). `NODE_ENV`가 `development`·`test`일 때만 비울 수 있다 | **비밀** | 없음. `AUTH_JWT_SECRET`과 다른 값. 그 밖(`production`·미지정 포함)에서 없으면 api 기동 실패 |
 | 공유 링크 기준 주소 | `SHARE_LINK_WEB_BASE_URL`([#147][i147]) | api | 비우면 `http://localhost:3000` | 아님 | web을 여는 주소. 배포(`NODE_ENV=production`)에서는 https 주소가 없으면 api 기동 실패 |

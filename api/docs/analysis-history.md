@@ -10,9 +10,9 @@
 - [공통 스키마](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml): `AnalysisStatus`, `PageInfo`
 - [계약 요약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md): 「분석 접수·상태·재요청」, [「M — 회원 API」](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#m--회원-api)의 회원 목록 규칙
 
-이슈에 연결된 9093d2e 판본과 현재 판본의 두 경로·`AnalysisStatus`·`PageInfo`는 같다. 상태 전이와 재요청 두 경우는 현재 [API 기능 설계](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md)를 따른다. 이 기준은 [#138 접수](analysis-intake.md), [PR #296](https://github.com/JminAILab/CatchU/pull/296)(닫힌 반영 실패 재요청), [#237 처리 시한 닫기](analysis-deadline.md)에 이미 반영돼 있다.
+두 조회 경로는 유지하며 현행 U7의 추가 관측 필드·재분석은 [U7 등록·분석](repository-analysis-u7.md)을 따른다. 10월의 [API 기능 설계](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md)와 [PR #296](https://github.com/JminAILab/CatchU/pull/296)의 실패 한정 재요청에서 확장됐다. [#424 결정](https://github.com/JminAILab/CatchU/issues/424)에 따라 최신 요청이 종료되고 진행·반영·복구가 남지 않았으면 결과와 관계없이 새 동의로 재분석한다.
 
-상태는 접수와 같은 `src/analysis-intake/analysis-status.ts`로 계산한다. 응답 필드·오류 코드·환경변수는 새로 두지 않는다. DB에는 목록 순서를 받치는 인덱스 하나만 더한다(마이그레이션 `1792640486167-AddAnalysisRequestHistoryIndex`). 로컬은 `npm run migration:run`, 배포는 [배포 안내 「migration」](../../deploy/README.md#migration)대로 적용한다. 다음은 이 범위가 아니다.
+상태는 접수와 같은 `src/analysis-intake/analysis-status.ts`로 계산한다. 조회는 접수와 같은 상태 응답을 반환하며 별도 환경변수를 두지 않는다. #140에서 목록 순서를 받치는 인덱스를 더했다(마이그레이션 `1792640486167-AddAnalysisRequestHistoryIndex`). 로컬은 `npm run migration:run`, 배포는 [배포 안내 「migration」](../../deploy/README.md#migration)대로 적용한다. 다음은 이 범위가 아니다.
 
 - 화면: #153·#154
 - B의 Catch 조회·상세
@@ -82,7 +82,7 @@
 | 정상 0건 | `processing=EMPTY`·`application=APPLIED`·`lifecycle=CLOSED`는 정상 완료다(등록 적합 후보 없음). 접수 직후의 `eligibleCandidateCount=0`(`QUEUED`·`ACTIVE`)과 다르다. 조회 실패는 0건 응답이 아니라 HTTP 오류로만 온다 |
 | 실패 안내 | `failures[]`의 `stage`·`code`·`message`를 쓴다. `PARTIAL_FAILED`에는 유효 결과가 함께 있을 수 있다. 처리 시한으로 닫힌 요청은 `code=PROCESSING_DEADLINE_EXCEEDED`다 |
 | 재요청 버튼 | `retry.allowed=true`일 때만 보인다. 새 `Idempotency-Key`, 현재 고지·범위에 대한 새 동의, `retryOfRequestId=<requestId>`로 `POST /v1/analysis-requests`를 보낸다([#138](analysis-intake.md#선행-이력과-실패-재요청)) |
-| 저장소 이름 | 응답 구조는 접수와 같다. `repositoryId`를 [`GET /v1/me/repositories`](member-repositories.md)의 `repositoryId`와 맞춰 이름을 붙인다. 지금 선정 목록에 없는 저장소의 이력도 그대로 온다 |
+| 저장소 이름 | 응답 구조는 접수와 같다. `repositoryId`를 [`GET /v1/me/repositories`](repository-analysis-u7.md)의 `repositoryId`와 맞춰 이름을 붙인다. 현재 목록에 없는 저장소의 이력도 그대로 온다 |
 | 조회 실패 | 401은 web 공통 인증(#286)이 세션을 갱신하고, 갱신에 실패하면 다시 로그인하게 한다. 404는 본인 요청이 아니거나 없음, 500은 일시 오류다. 화면은 상태를 바꾸거나 분석 실패로 표시하지 않고, 사용자가 [다시 불러오기]를 누르면 다시 조회한다 |
 
 `retry.reason`은 재요청을 판정한 사유일 뿐, 결과 유무나 실패 원인을 뜻하지 않는다. 화면 안내는 위 표의 필드로 만든다.
@@ -90,17 +90,16 @@
 | `retry.reason` | 언제 |
 |---|---|
 | `FAILURE_WITHOUT_RESULTS` | 재요청 가능(`allowed=true`). 아래 두 경우다 |
+| `ANALYSIS_FINISHED` | 재요청 가능(`allowed=true`). 종료·반영 완료 또는 닫힌 반영 실패이며 위 결과 없는 확정 실패 이외의 경우. 정상 0건·결과가 있는 요청도 포함한다 |
 | `IN_PROGRESS` | 이 요청이 진행 중이거나, 재요청 대상이지만 같은 회원의 다른 요청이 진행 중이다 |
 | `EXECUTION_UNCERTAIN` | 실행 여부를 알 수 없다 |
-| `APPLICATION_UNRESOLVED` | 반영 대기·반영 중·복구 중이거나, 반영 실패가 아직 닫히지 않았다(적합 후보가 없을 때) |
-| `RESULTS_EXIST` | 등록 연결(열람 준비 전 포함)이나 원 요청의 Catch 본체가 있다. 반영 실패로 닫히지 않은 요청에 적합 후보가 있을 때도 나온다. 열람할 Catch가 없어도 나올 수 있다 |
-| `NOT_FAILED` | 처리 실패지만 실패 항목이나 확정 근거(서버의 실패 확정 참조, E 수신 기록)가 없다 |
-| `REANALYSIS_DEFERRED` | 정상 완료·정상 0건처럼 재분석 대상이 아니거나, 같은 저장소에 더 최근 요청이 있다 |
+| `APPLICATION_UNRESOLVED` | 반영 대기·반영 중·복구 중이거나, 반영 실패가 아직 닫히지 않았다. 종료됐어도 반영 상태가 APPLIED/APPLY_FAILED가 아닌 경우도 포함한다 |
+| `REANALYSIS_DEFERRED` | 같은 저장소에 더 최근 요청이 있다. 정상 완료·정상 0건이라는 이유만으로 거부하지 않는다 |
 
 `FAILURE_WITHOUT_RESULTS`의 두 경우:
 
-1. **확정 실패.** `FAILED`/`APPLIED`/`CLOSED`이고 등록이 없으며 실패 확정 근거가 있다.
-2. **반영 실패로 닫힘.** `APPLY_FAILED`/`CLOSED`이고 등록이 없다. 처리 결과와 후보 수는 보지 않는다(PR #296).
+1. **확정 실패.** `FAILED`/`APPLIED`/`CLOSED`이고 등록·적합 후보가 0건이며 `ownerResultsReady=false`, 실패 항목과 실패 확정 근거가 있다.
+2. **반영 실패로 닫힘.** `APPLY_FAILED`/`CLOSED`이고 등록이 없으며 `ownerResultsReady=false`다. 처리 결과와 후보 수는 보지 않는다(PR #296).
 
 같은 요청이라도 판정은 조회 시점의 회원 이력에 따라 달라진다. 예를 들어 재요청할 수 있던 실패 요청도 다른 저장소의 요청이 진행 중이면 `IN_PROGRESS`가 된다. 재요청으로 새 요청이 생기면, 새 요청이 진행 중일 때는 `IN_PROGRESS`, 끝난 뒤에는 `REANALYSIS_DEFERRED`다.
 

@@ -23,7 +23,7 @@
 
 | 상태 | 위에서부터 |
 |---|---|
-| 판정 통과 | U4 h1(발행본 제목, `tabIndex={-1}`) → 0 `RecipientGuide`(U2, `showClaudeConnect={claudeConnectable(snapshot)}`) → 0.5 U9 `ClaudeAnalyzePanel`(같은 값이 참일 때만) → U4 고정 안내 「발행 시각 YYYY-MM-DD HH:mm:ss (KST)」 → 1 발행본 자료 → 2 `BaseSummaryPanel`(U5) → 3 `QnaPanel`(U5) → 4 자리(U10 `JdSummaryPanel` 제공 전 빈 자리, `data-logged-in`만) |
+| 판정 통과 | U4 h1(발행본 제목, `tabIndex={-1}`) → 0 `RecipientGuide`(U2, `showClaudeConnect={claudeConnectable(snapshot)}`) → 0.5 U9 `ClaudeAnalyzePanel`(같은 값이 참일 때만) → U4 고정 안내 「발행 시각 YYYY-MM-DD HH:mm:ss (KST)」 → 1 발행본 자료 → 2 `BaseSummaryPanel`(U5) → 3 `QnaPanel`(U5) → 4 `JdRecipientPanel`(U10 JD 요약 조립) |
 | 비밀번호 입력 | U4 h1 「비밀번호가 필요한 링크입니다」 → 입력. `RecipientGuide`·패널 없음 |
 | 접근 불가 | U4 h1 「이 링크는 열람할 수 없습니다.」만 |
 | 조회 실패 | 숨긴 h1 「발행본」 + 「발행본을 불러오지 못했습니다」·[다시 불러오기] |
@@ -49,7 +49,7 @@
 - **grant:** 성공한 unlock의 grant를 `catchu.recipient.grant:<token>` 키로 `sessionStorage`에 둔다. 다른 링크의 요청에는 그 링크의 grant만 쓴다. 401·404를 받으면 그 링크의 grant만 지운다. 저장소 오류 처리(메모리 우선·손상값 버림)는 10월과 같다(`recipient-grants.ts` 머리 주석).
 - **사본(1번 자리):** 항목을 `position` 순으로 그린다. Catch는 불일치 표지·AI 설명 초안·작성자 설명·기록(작업 사실·본인 기여·근거)을 서로 다른 표지로 나누고 위에서부터 이 순서로 둔다(#488, 면접관이 한 일과 그 이유를 먼저 본다). 기록 가운데 작업 사실은 펼쳐 두고, 본인 기여와 근거 목록은 「근거 자세히 보기」(`<details>`) 안에 처음엔 접어 둔다. 근거 목록 안 순서는 사본 그대로다. AI 설명 초안이 없으면 그 칸을 그리지 않는다(Catch 개편 CR3 BR7.1). 본문·작성자 설명·AI 초안은 React 텍스트로만 그리고(NFR1.10), 근거 원문과 본문·작성자 설명 안의 `https://github.com/…` 주소만 새 탭 링크(`rel="noopener noreferrer"`)다(`lib/github-source-url.ts`, #416 Q1 B, NFR1.11). AI 초안에는 링크를 만들지 않는다(OQ-U4-NFR-3). 작성자 설명은 글이 있는 칸만 h5 칸 제목과 함께 칸별로 보이고(「더 쓰기」만이거나 옛 글이면 h5 없이 글만), 그 안의 링크는 주소 전체 대신 「파일 · 줄 · 판본」 같은 이름으로 보이며 마우스를 올리면 주소 전체가 보인다. 텍스트 자료 본문 링크는 주소 전체 그대로다(새 Catch NC1, [발행 화면 README](../publications/README.md) 「발행본 목록·상세」).
 - **붙는 컴포넌트의 접근 상실(C-11 rule):** 패널이 401 `LINK_PASSWORD_REQUIRED`·404 `LINK_UNAVAILABLE`을 받아 `onAccessLost(code)`를 부르면 화면이 직접 받은 것과 같은 전환·grant 삭제를 하고, 진행 중이던 조회는 끊어 늦은 응답이 거부를 덮지 않게 한다.
-- **근거 강조(C-11 evidence-highlight):** 패널이 `showEvidence(location)`를 부르면 사본에 대조한다(`resolveEvidenceTarget`). 항목(`publishedItemId`)이 없으면 옮기지 않고, `fieldPath`(`workFacts[i]`·`subjectContribution`·`evidence[i].representedFacts[j]`·`authorDescription`·`body`)가 가리키는 문자열 안의 `[charStart, charEnd)`만 `<mark>`로 강조하며, 범위 밖·없는 경로(`aiDraft`·`pages[n]`)면 항목으로 옮기기만 한다. 강조가 접힌 「근거 자세히 보기」 안(`subjectContribution`·`evidence[i]…`)을 가리키면 같은 그리기 차례에 그 칸을 펼쳐 스크롤할 때 `<mark>`가 보인다. 사람이 다시 접을 수 있고, 같은 근거를 다시 누르면 다시 펼친다(#488). 옮길 때 강조 범위가 있으면 그 항목 안의 첫 `<mark>`가 화면에 보이도록(`block: "center"`) 스크롤하고, 범위가 없거나 강조 요소를 못 찾으면 그 항목(`id="published-item-<id>"`) 시작으로 스크롤한다. 초점은 두 경우 모두 항목에 두며(`preventScroll`), 같은 근거를 다시 눌러도 다시 옮긴다.
+- **근거 강조(C-11 evidence-highlight):** 패널이 `showEvidence(location)`를 부르면 사본에 대조한다(`resolveEvidenceTarget`). 항목(`publishedItemId`)이 없으면 옮기지 않고, `fieldPath`(`workFacts[i]`·`subjectContribution`·`evidence[i].representedFacts[j]`·`authorDescription`·`body`·PDF의 `pages[n]`)가 가리키는 문자열 안의 `[charStart, charEnd)`만 `<mark>`로 강조하며, 범위 밖·없는 경로(`aiDraft` 등)면 항목으로 옮기기만 한다. PDF의 `n`은 1부터 시작하는 쪽 번호다. 강조가 접힌 「근거 자세히 보기」 안(`subjectContribution`·`evidence[i]…`)을 가리키면 같은 그리기 차례에 그 칸을 펼쳐 스크롤할 때 `<mark>`가 보인다. 사람이 다시 접을 수 있고, 같은 근거를 다시 누르면 다시 펼친다(#488). 옮길 때 강조 범위가 있으면 그 항목 안의 첫 `<mark>`가 화면에 보이도록(`block: "center"`) 스크롤하고, 범위가 없거나 강조 요소를 못 찾으면 그 항목(`id="published-item-<id>"`) 시작으로 스크롤한다. 초점은 두 경우 모두 항목에 두며(`preventScroll`), 같은 근거를 다시 눌러도 다시 옮긴다.
 - **다시 조회:** 확정 거부(404·401)는 표시하던 사본을 지우고 해당 화면으로 바꾼다. 조회 실패는 같은 링크의 이미 표시한 화면만 유지하고 「최신 자료를 불러오지 못해 이전에 불러온 내용을 보여 주고 있습니다.」를 알린다. 열린 화면을 실시간으로 회수하지 않으며 자동 조회·전송을 하지 않는다. 늦게 도착한 응답(다시 조회·화면 해제 뒤)은 버린다.
 - **노출:** 토큰은 경로에만, 비밀번호는 본문으로만, grant는 `X-Link-Grant` 머리글로만 둔다. 404 사유를 드러내지 않는다.
 - **탭 제목·메신저 미리보기·검색 제외(#565):** `app/s/layout.tsx`가 `/s/` 아래 모든 주소에 같은 고정 문구를 내려 준다. 제목은 「지원자가 보낸 작업 자료 | CatchU」, 설명은 「지원자가 CatchU에서 골라 보낸 자료입니다. 발행할 때의 내용 그대로 보입니다.」이고 `og:title`·`og:description`도 같다. web 서버는 링크 토큰으로 API를 부르지 않으므로 발행본 제목·작성자·내용은 넣지 않고, 미리보기 그림도 없다. 열람 불가·비밀번호 화면도 같은 문구다. 검색 엔진에는 `noindex, nofollow`로 싣지 않게 표시한다. robots.txt로 `/s/`를 막으면 검색 엔진이 이 표시를 읽지 못하므로 robots.txt는 두지 않는다.
@@ -86,5 +86,5 @@
 
 ## 범위 밖·남은 것
 
-- 4번 자리(U10 `JdSummaryPanel`)는 U10이 제공한 뒤 단다. PDF 항목은 U8이 채웠다(위 「PDF 항목과 사본 열람 (U8)」).
+- 4번 자리의 JD 요약은 [U10 조립](../jd/README.md)을 사용하며, PDF 항목은 U8이 채웠다(위 「PDF 항목과 사본 열람 (U8)」). 각 기능의 검사·한계는 해당 안내를 따른다.
 - `indexState`·[검색 다시 준비]는 C-09 합의 뒤(OQ-U4-5). 실제 색인·LLM이 있는 환경의 요약·질의응답 동작은 U5 몫이다.
