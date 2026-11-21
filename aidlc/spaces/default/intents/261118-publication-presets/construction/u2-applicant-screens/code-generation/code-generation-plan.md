@@ -202,3 +202,52 @@
 
 - 받은 사람·작성자 상세의 탭, 자료 화면 탭(U3). 방침(U4, 끝남). 모양 다듬기와 드래그.
 - 확인 단계의 「작성자 설명이 없는 Catch N개」 안내(U1 응답이 바뀌어야 함, 기능 설계 열린 질문).
+
+## Build and Test 되돌아가기 고침(Loop-back 1, 2026-11-21)
+
+근거: `construction/build-and-test/test-results.md` 「Loop-Back Log」 Loop-back 1(팀장 브라우저 확인, 지시 2026-11-21). 위 Step 1~11은 그대로 두고, 아래 단계만 이번에 한다. api는 바꾸지 않는다.
+
+### 고칠 결함
+
+| 결함 | 원인 | 고침 |
+|---|---|---|
+| ① 첫 저장(201) 뒤 편집 화면이 빈 「새 프리셋」으로 다시 그려지고, 이어서 저장하면 프리셋이 또 생긴다(배포 빌드 두 번 재현) | `replaceUrl`(`window.history.replaceState`)로 주소가 바뀌면 회원 가드(`session-member-guard`)가 주소마다 회원을 다시 확인하며 화면을 내렸다 올린다. 새로 만든 화면은 `presetId: null`인 처음 상태다 | NFR 설계 Q1을 B로 바꾼다: 첫 저장 뒤 `router.replace(presetEditPath(presetId))`로 `/presets/{presetId}`에 옮긴다. 그 화면은 상세를 불러 고치기 상태(PUT, h1 「프리셋 고치기」, [프리셋 지우기])로 그린다. 「저장했습니다.」는 한 번 쓰고 버리는 표시로 넘긴다: 옮기기 전에 그 프리셋 ID와 함께 남기고, 새 화면의 모델이 같은 ID일 때 한 번 꺼내 쓰고 지운다. 다른 프리셋·새로 고침·다시 열기에서는 보이지 않는다 |
+| ② 개발 모드에서 저장·상세 결과가 버려지고 「저장하고 있습니다.」에 멈춘다 | React Strict Mode가 효과를 마운트→정리→마운트로 두 번 돌리는데, `dispose()`가 `disposed = true`로 바꾼 뒤 `open()`이 되살리지 않는다 | `open()`에서 `disposed = false`로 되살린다(`jd-management-model`의 `activate()`와 같은 방식). 고르기 목록·저장소 목록의 `dispose`는 세대 번호·중단만 해 다시 열 수 있으므로 그대로 둔다 |
+
+320px 폭 머리글 넘침은 U2 전부터 있던 문제라 고치지 않고 U2 PR 본문에 한계로 적는다(팀장 지시).
+
+### 함께 고칠 파일
+
+| 파일 | 고치는 것 |
+|---|---|
+| `web/src/features/presets/preset-editor-screen.tsx` | 의존 `replaceUrl`을 라우터 이동으로 바꿈, 한 번 쓰는 「저장했습니다.」 넘기기, `open()`에서 `disposed` 되살림, 머리 주석의 NFR 설계 Q1 A 문구 |
+| `web/test/presets.test.mjs` | 545행 「NFR 설계 Q1 A … replaceState」 시험을 Q1 B로 바꿈, ② 시험 더함, 118행 대역 |
+| `web/src/features/presets/README.md` | 38·39행(첫 저장 뒤 동작, 「저장했습니다.」) |
+| `construction/u2-applicant-screens/nfr-design/performance-design.md` | 41행 아래에 「2026-11-21 변경: Q1 B」 줄을 덧붙임(승인 때 문장은 지우지 않음) |
+| `construction/u2-applicant-screens/code-generation/code-summary.md` | 되돌아가기 고침 절 |
+
+### Step 12: 시나리오 먼저 — [x]
+
+- 아래 표를 `unit-test-instructions.md`의 시나리오와 함께 기준으로 삼는다(시험 파일 이름이 같아 명령은 그대로다).
+
+| 시나리오 | 기대 결과 | 실패 조건 |
+|---|---|---|
+| 새 프리셋 첫 저장 201 | 라우터 이동 한 번(`/presets/{id}`, replace), `replaceState` 없음 | 이동 없음·push·주소만 바꿈 |
+| 이동한 화면을 같은 ID로 만듦 | 상세를 불러 고치기 상태, 「저장했습니다.」가 한 번 보임 | 빈 새 프리셋, 안내 없음 |
+| 그 화면을 한 번 더 만듦(새로 고침·다시 열기), 다른 ID 화면 | 「저장했습니다.」 없음 | 안내가 또 보임 |
+| 이동한 화면에서 저장 | PUT, 프리셋 수 그대로 | POST로 하나 더 생김 |
+| 고치기 저장(PUT) | 이동 없음, 지금처럼 「저장했습니다.」와 다시 불러오기 | 이동함 |
+| `open()` → `dispose()` → `open()`(Strict Mode 흉내) 뒤 상세·저장 | 결과가 반영되어 상세가 그려지고 「저장했습니다.」 | 「저장하고 있습니다.」에 멈춤, 상세가 불러오는 중에 멈춤 |
+| 마지막 `dispose()` 뒤 늦게 온 결과 | 지금처럼 버림 | 정리된 뒤 상태가 바뀜 |
+
+### Step 13: 고침 — [x]
+
+- 위 「고칠 결함」 표대로 `preset-editor-screen.tsx`를 고친다. 「저장하지 않은 변경」 가드가 이동을 막지 않도록, 이동은 `dirty: false`로 바꾼 뒤에 한다.
+
+### Step 14: 시험과 문서 — [x]
+
+- `web/test/presets.test.mjs`에 Step 12 시나리오를 넣고, 위 「함께 고칠 파일」의 문서를 고친다.
+
+### Step 15: 이 단위 시험 — [x]
+
+- `unit-test-instructions.md`의 이 단위 web 명령과 `npm --prefix web run lint`·`typecheck`를 돌린다. 실패하면 고친다(시험 기대를 낮추지 않는다). 실제 브라우저 확인은 Build and Test를 다시 돌 때 팀장이 한다.

@@ -42,7 +42,7 @@ export const routes = {
   publicationNew: "/publications/new",
   /** 프리셋 목록(발행 프리셋 U2 M2). 「발행본」 주소 아래가 아니어서 메뉴의 「발행본」이 함께 켜지지 않는다(BR1.2). */
   presets: "/presets",
-  /** 새 프리셋(발행 프리셋 U2 M3). 첫 저장 뒤에는 주소만 `presetEditPath`로 바꾼다. */
+  /** 새 프리셋(발행 프리셋 U2 M3). 첫 저장 뒤에는 라우터의 replace로 `presetEditPath`에 옮긴다(NFR 설계 Q1 B). */
   presetNew: "/presets/new",
 } as const;
 

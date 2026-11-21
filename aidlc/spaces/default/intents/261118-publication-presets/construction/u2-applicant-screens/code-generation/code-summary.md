@@ -70,3 +70,38 @@
 
 - 확인 단계의 「작성자 설명이 없는 Catch N개」 안내는 설계대로 없앴다. 다시 넣으려면 U1 응답 칸이 바뀌어야 한다.
 - `pick-parts.tsx`는 효과 코드가 서버 렌더링으로 덮이지 않아 이 파일만 보면 줄 커버리지가 낮다(65%).
+
+## Build and Test 되돌아가기 고침(Loop-back 1, 2026-11-21)
+
+근거: 계획 「Build and Test 되돌아가기 고침」 Step 12~15, `construction/build-and-test/test-results.md` 「Loop-Back Log」(팀장 브라우저 확인). api는 바꾸지 않았다.
+
+| 결함 | 고침 |
+|---|---|
+| ① 첫 저장 뒤 회원 가드가 화면을 새로 만들어 빈 「새 프리셋」이 그려지고 다시 저장하면 프리셋이 또 생김 | 의존 `replaceUrl`(`replaceState`)을 없애고 `replace`(화면이 `router.replace`로 채움)와 `savedNotice`를 둠. 첫 저장(201)은 `presetId`·`dirty: false`·`saved`를 먼저 바꾼 뒤 `savedNotice.leave(id)` → `replace(presetEditPath(id))`. 그 자리에서 상세를 다시 부르지 않고 옮긴 화면이 연다. 고치기(PUT)는 옮기지 않고 지금처럼 다시 불러옴 |
+| ② Strict Mode에서 결과가 버려져 「저장하고 있습니다.」에 멈춤 | `open()`에서 `disposed = false`(`jd-management-model`의 `activate()`와 같음) |
+
+「저장했습니다.」 넘기기: 모듈 안 변수 하나(`createSavedNoticeHandOff`). `leave(id)`로 남기고, 편집 모델의 `open()`에서 `take(id)`로 한 번 꺼낸다. `take`는 늘 지우고 같은 ID일 때만 참이다. 주소·브라우저 저장소에 두지 않는다. 모델을 만들 때가 아니라 `open()`에서 꺼내, Strict Mode가 두 번 부르는 `useState` 초기화의 버려지는 모델이 먼저 가져가지 않게 했다.
+
+### 바꾼 파일
+
+- `web/src/features/presets/preset-editor-screen.tsx`, `web/test/presets.test.mjs`(Q1 A 시험을 Q1 B 시험 셋으로, ②·늦은 결과 시험), `web/src/features/presets/README.md`
+- 같은 옛 동작을 적은 곳(프로젝트 규칙): `web/src/lib/routes.ts` 주석, `web/src/app/(member)/presets/new/page.tsx` 주석, `web/README.md` 경로 표 `/presets/new` 줄(고친 뒤 35,722 B, 상한 36,000 B)
+- `construction/u2-applicant-screens/nfr-design/performance-design.md`에 「2026-11-21 변경: Q1 B」 줄을 덧붙임(승인 때 문장은 그대로)
+
+### 시험
+
+| 명령 | 결과 |
+|---|---|
+| 고치기 전 `(cd web && node --test test/presets.test.mjs test/publish.test.mjs test/api-response.test.mjs)` | 58건 통과 |
+| 고친 뒤 같은 명령 | 62건 통과, 0건 실패(조정자가 다시 돌려 같은 결과) |
+| `npm --prefix web test` | 1,131건 통과, 0건 실패 |
+| `npm --prefix web run lint`·`typecheck` | 오류 0 |
+
+바뀐 파일에 `console.` 0건.
+
+### 브라우저에서 볼 것(Build and Test)
+
+- 옮긴 화면에서 `role="status"` 칸이 「저장했습니다.」를 담은 채 상세 준비 렌더에 새로 생긴다. 이미 글이 든 채 생긴 칸은 화면 낭독기가 읽지 않을 수 있어 NFR 설계 §5(늘 그려 둔 칸의 글을 바꿈)와 어긋날 수 있다.
+- 옮긴 화면의 상세가 실패하면 「프리셋을 불러오지 못했습니다.」와 [다시 불러오기]만 보이고 「저장했습니다.」는 다시 불러오기에 성공하면 보인다(기능 설계의 「저장했습니다. 내용을 다시 불러오지 못했습니다.」와 다름).
+- 첫 저장 뒤 옮기기 전에 다른 화면으로 가면 안내가 메모리에 남고, 다음에 편집 화면을 열 때 지워진다. 같은 ID 화면을 처음 열 때만 한 번 보일 수 있다.
+- 320px 머리글 넘침은 U2 전부터 있던 문제라 고치지 않았다. U2 PR 본문에 한계로 적는다.

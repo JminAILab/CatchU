@@ -172,7 +172,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/publications` | 발행본 목록 | U4 | 필요 | 확정 | U4 담당 결정 D4(2026-11-03). 최신순 목록, [URL 복사], [링크 열기](`ACTIVE`만)([발행·발행본](src/features/publications/README.md)) |
 | `/publications/new` | 발행 | U4 | 필요 | 확정 | 프리셋 고르기·순서·제목·비밀번호 → 확인 → 발행 완료를 한 화면에 둔다(발행 프리셋 U2) |
 | `/presets` | 프리셋 목록 | 발행 프리셋 U2 | 필요 | 확정 | [발행 프리셋 U2 기능 설계](../aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md) BR1.2. 상단 메뉴 「프리셋」의 목적지. 50개까지 한 번에 보인다([프리셋](src/features/presets/README.md)) |
-| `/presets/new` | 새 프리셋 | 발행 프리셋 U2 | 필요 | 확정 | 첫 저장 뒤에는 화면을 새로 그리지 않고 주소만 `/presets/[presetId]`로 바꾼다(뒤로 가기 기록을 더하지 않음) |
+| `/presets/new` | 새 프리셋 | 발행 프리셋 U2 | 필요 | 확정 | 첫 저장 뒤에는 라우터의 replace로 `/presets/[presetId]`에 옮기고(뒤로 가기 기록을 더하지 않음), 옮긴 화면이 「저장했습니다.」를 한 번 보인다 |
 | `/presets/[presetId]` | 프리셋 고치기 | 발행 프리셋 U2 | 필요 | 확정 | 이름·담을 자료·순서 고치기와 지우기. 「발행본」 주소 아래가 아니어서 메뉴의 「발행본」이 함께 켜지지 않는다 |
 | `/publications/[publicationId]` | 발행본 상세 | U4 | 필요 | 확정 | 사본·상태·만료·링크 주소, 링크 중지·삭제. 기본 요약 패널(U5) 자리는 비워 둠 |
 | `/s/[token]` | 받은 사람 발행본 열람(U4 W4) | C | 불필요 | 제안 | 수신자 전용 헤더. 10월 `/links`·`/s/[token]/catches/[catchId]`는 U4 제출 3(W6)에서 없앴다 |

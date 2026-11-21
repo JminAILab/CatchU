@@ -35,15 +35,41 @@ const clients: PresetEditorClients = {
   pdfs: pdfMaterialsApi, repositories: createRepositoryApi(api.member),
 };
 
+/** 첫 저장 뒤 옮겨 간 편집 화면에 한 번만 넘기는 「저장했습니다.」(NFR 설계 Q1 B, 2026-11-21 변경). */
+export type SavedNoticeHandOff = {
+  /** 옮기기 전에 그 프리셋 ID와 함께 남긴다. */
+  leave: (presetId: string) => void;
+  /** 편집 화면을 열 때 한 번 꺼낸다. 꺼내면 늘 지우고, 남긴 ID와 같을 때만 참이다. */
+  take: (presetId: string | null) => boolean;
+};
+
 /**
- * 화면 밖 의존. 시험은 로그인 식별·확인 창·주소 바꾸기를 바꿔 끼운다.
- * `replaceUrl`은 라우터를 거치지 않고 주소만 바꾼다(첫 저장 뒤, NFR 설계 Q1 A). 화면은 다시 그려지지 않는다.
+ * 이 모듈 안 메모리에만 둔다. 주소·브라우저 저장소에 두지 않아 새로 고침·다시 열기·다른 프리셋에서는 보이지 않는다.
+ * 어느 편집 화면이든 열 때 꺼내 지우므로, 남긴 표시가 나중에 연 화면에 늦게 보이지 않는다.
  */
-export type PresetEditorDeps = { session: () => unknown; confirm: (message: string) => boolean; replaceUrl: (path: string) => void };
-const browserDeps: PresetEditorDeps = {
+export function createSavedNoticeHandOff(): SavedNoticeHandOff {
+  let pending: string | null = null;
+  return {
+    leave: (presetId) => { pending = presetId; },
+    take: (presetId) => { const matched = pending !== null && pending === presetId; pending = null; return matched; },
+  };
+}
+
+/**
+ * 화면 밖 의존. 시험은 로그인 식별·확인 창·이동·「저장했습니다.」 넘기기를 바꿔 끼운다.
+ * `replace`는 첫 저장(201) 뒤 고치기 주소로 옮긴다(뒤로 가기 기록을 더하지 않음, NFR 설계 Q1 B). 화면이 라우터의 `replace`를 넘긴다.
+ * 주소만 바꾸는 `history.replaceState`(Q1 A)는 회원 가드가 주소마다 회원을 다시 확인하며 화면을 새로 만들어 쓰지 않는다(Build and Test 되돌아가기 1).
+ */
+export type PresetEditorDeps = {
+  session: () => unknown;
+  confirm: (message: string) => boolean;
+  replace: (path: string) => void;
+  savedNotice: SavedNoticeHandOff;
+};
+const browserDeps: Omit<PresetEditorDeps, "replace"> = {
   session: () => accessTokenStore.get(),
   confirm: (message) => window.confirm(message),
-  replaceUrl: (path) => window.history.replaceState(null, "", path),
+  savedNotice: createSavedNoticeHandOff(),
 };
 
 export type PresetEditorStatus =
@@ -151,11 +177,13 @@ function createPickerLoader<T>(options: LoaderOptions<T>) {
  * - 열 때: 상세 1(고치기만) + 저장소 목록 1 + 고르기 목록 3 + 쪽마다 세기(최대 3)(NFR6.2, NFR 설계 performance 1).
  * - 담기·빼기·순서는 화면 안에서만 바뀌고 요청하지 않는다(NFR6.5).
  * - 저장 중에는 입력·단추를 모두 막는다. 실패하면 이름·담은 자료·순서를 그대로 둔다.
- * - 첫 저장(201) 뒤에는 `replaceUrl`로 주소만 바꾸고 화면 상태의 프리셋 ID를 바꿔, 다음 [저장]은 PUT이다(NFR 설계 Q1 A).
+ * - 첫 저장(201) 뒤에는 「저장했습니다.」를 그 프리셋 ID와 함께 남기고 `replace`로 고치기 주소에 옮긴다(NFR 설계 Q1 B).
+ *   옮긴 화면의 모델은 열 때 같은 ID면 그 표시를 한 번 꺼내 쓰고, 상세를 불러 고치기(PUT) 상태로 그린다.
+ * - 다시 열면(`open`) 정리 표시를 되살린다. React Strict Mode가 효과를 마운트→정리→마운트로 두 번 돌려도 결과를 버리지 않는다.
  * - 저장 뒤 상세를 다시 불러도 담긴 목록은 바꾸지 않고 같은 자료의 글자 수·이유만 맞춘다(NFR 설계 검토 R-04).
  * - 이름·제목·자료 ID를 로그에 남기지 않는다(NFR4.1).
  */
-export function createPresetEditorModel(client: PresetEditorClients, initialPresetId: string | null, deps: PresetEditorDeps = browserDeps) {
+export function createPresetEditorModel(client: PresetEditorClients, initialPresetId: string | null, deps: PresetEditorDeps) {
   const store = createViewStore<PresetEditorState>({
     presetId: initialPresetId, load: initialPresetId === null ? "ready" : "loading", name: "", savedName: "", items: [], dirty: false,
     nameError: false, status: { kind: "idle" }, catches: emptySourceList(), materials: emptySourceList(), pdfs: emptySourceList(),
@@ -325,8 +353,13 @@ export function createPresetEditorModel(client: PresetEditorClients, initialPres
       return;
     }
     const savedId = result.value.presetId;
-    if (presetId === null) deps.replaceUrl(presetEditPath(savedId));
     patch({ presetId: savedId, savedName: draft.name, dirty: false, status: { kind: "saved" } });
+    if (presetId === null) {
+      // 첫 저장: 「저장하지 않은 변경」을 끈 뒤에 옮긴다. 상세는 옮긴 화면이 열 때 불러오므로 여기서 다시 부르지 않는다.
+      deps.savedNotice.leave(savedId);
+      deps.replace(presetEditPath(savedId));
+      return;
+    }
     await reconcileAfterSave(savedId);
   }
 
@@ -349,8 +382,15 @@ export function createPresetEditorModel(client: PresetEditorClients, initialPres
   return {
     store,
     repositoryOptions,
-    /** 열 때 한 번: 상세(고치기만)·고르기 목록 셋·저장소 목록을 함께 부른다. */
-    open: () => Promise.all([loadDetail(), loadSources(), repositoryOptions.refresh()]).then(() => undefined),
+    /**
+     * 열 때 한 번: 상세(고치기만)·고르기 목록 셋·저장소 목록을 함께 부른다.
+     * 정리 뒤 다시 열면 정리 표시를 되살린다(`jd-management-model`의 `activate()`와 같은 방식). 첫 저장 뒤 옮겨 온 화면이면 「저장했습니다.」를 한 번 보인다.
+     */
+    open: () => {
+      disposed = false;
+      if (deps.savedNotice.take(store.get().presetId)) patch({ status: { kind: "saved" } });
+      return Promise.all([loadDetail(), loadSources(), repositoryOptions.refresh()]).then(() => undefined);
+    },
     loadDetail,
     loadSources,
     loadMoreCatches: catches.loadMore,
@@ -379,7 +419,8 @@ export function PresetEditorPage({ presetId }: { presetId: string | null }) {
 
 export function PresetEditorScreen({ api: client, presetId, deps }: { api: PresetEditorClients; presetId: string | null; deps?: PresetEditorDeps }) {
   const router = useRouter();
-  const [model] = useState(() => createPresetEditorModel(client, presetId, deps));
+  // 첫 저장 뒤 이동은 라우터의 replace다(NFR 설계 Q1 B). 지운 뒤 목록으로 가는 것과 같은 라우터를 쓴다.
+  const [model] = useState(() => createPresetEditorModel(client, presetId, deps ?? { ...browserDeps, replace: (path) => router.replace(path) }));
   const view = useSyncExternalStore(model.store.subscribe, model.store.get, model.store.get);
   const options = useSyncExternalStore(model.repositoryOptions.subscribe, model.repositoryOptions.getSnapshot, model.repositoryOptions.getSnapshot);
   useEffect(() => { void model.open(); return () => model.dispose(); }, [model]);

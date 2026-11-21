@@ -1,7 +1,8 @@
 // 발행 프리셋 U2 — 상단 메뉴·프리셋 목록·프리셋 편집 화면 시험(M1~M3, BR1~BR3, BR5.1의 web 쪽, NFR1·NFR3·NFR5·NFR6).
 //
 // 먼저 정한 시나리오·기대 결과·실패 조건은 unit-test-instructions.md 「시나리오」의 메뉴·목록·편집·저장·이탈·지우기 묶음이다(Step 2).
-// 세부 시험 코드는 구현 뒤 썼다(team.md Testing Posture: custom).
+// 세부 시험 코드는 구현 뒤 썼다(team.md Testing Posture: custom). Build and Test 되돌아가기 1(2026-11-21)의 시나리오는
+// code-generation-plan.md Step 12 표다(첫 저장 뒤 라우터 이동·「저장했습니다.」 한 번 넘기기, 다시 열기 뒤 결과 반영).
 // - 기대: 메뉴 순서와 「프리셋」만 현재 자리, 목록 한 번 부르기와 상태 넷, 편집 화면 요청 수 고정, 담기·빼기·순서·20개·60,000자 막힘,
 //         세기 실패는 막지 않음, 늦은 응답 버림, 저장 이름 검사·결과 표·첫 저장 뒤 PUT, 저장 중 모두 막힘, 지우기 확인·실패, 이름은 글자로만.
 // - 실패로 보는 것: 「발행본」이 함께 켜짐, 실패가 0개로 보임, 막히지 않음, 두 번 담김, 세기 실패로 단추가 모두 막힘, 옛 목록이 덮어씀,
@@ -39,7 +40,7 @@ const { createCatchApi } = await load("features/assets/catch-api.ts");
 const { MemberHeader } = await load("components/header/member-header.tsx");
 const { PresetsListView, presetSummaryLine } = await load("features/presets/presets-list-view.tsx");
 const { createPresetsListModel } = await load("features/presets/presets-list-screen.tsx");
-const { createPresetEditorModel } = await load("features/presets/preset-editor-screen.tsx");
+const { createPresetEditorModel, createSavedNoticeHandOff } = await load("features/presets/preset-editor-screen.tsx");
 const { PresetEditorView, LINK_NOTICE_TEXT, OVER_LIMIT_TEXT, LENGTH_UNKNOWN_TEXT } = await load("features/presets/preset-editor-view.tsx");
 const { UNSAVED_MESSAGE } = await load("features/profile/use-unsaved-guard.ts");
 
@@ -111,11 +112,12 @@ function fakeEditor(responses = {}) {
   };
 }
 
-function editorDeps({ answer = true } = {}) {
-  const d = { token: "session-a", answer, confirms: [], replaced: [] };
+/** 편집 화면 의존 대역. 이동(`replace`)은 기록만 하고, 「저장했습니다.」 넘기기는 시험마다 새로 만들어 시험끼리 섞이지 않는다. */
+function editorDeps({ answer = true, savedNotice = createSavedNoticeHandOff() } = {}) {
+  const d = { token: "session-a", answer, confirms: [], moves: [], savedNotice };
   d.session = () => d.token;
   d.confirm = (message) => { d.confirms.push(message); return d.answer; };
-  d.replaceUrl = (path) => { d.replaced.push(path); };
+  d.replace = (path) => { d.moves.push(path); };
   return d;
 }
 
@@ -542,36 +544,150 @@ test("BR3.1 빈 이름·공백만·51자는 요청하지 않고 이름 칸 아�
   assert.equal(model.store.get().nameError, false);
 });
 
-test("NFR 설계 Q1 A 새 프리셋 첫 저장(201)은 replaceState로 주소만 바꾸고 화면을 그대로 두며, 두 번째 저장은 PUT이고 프리셋이 늘지 않는다", async () => {
+// NFR 설계 Q1 B(2026-11-21 변경, Build and Test 되돌아가기 1): 첫 저장 뒤 라우터의 replace로 고치기 주소에 옮기고,
+// 「저장했습니다.」는 그 프리셋 ID와 함께 한 번만 넘긴다. 시나리오는 code-generation-plan.md Step 12 표다.
+
+/** 새 프리셋을 열어 이름·Catch 하나를 담고 첫 저장(201, P1)까지 한다. */
+async function firstSave(d) {
+  const first = await openEditor({ create: [{ kind: "ok", value: { presetId: P1 } }] }, { deps: d });
+  first.model.setName(" 지원용 ");
+  first.model.toggle("CATCH", C1);
+  await first.model.save();
+  return first;
+}
+
+test("NFR 설계 Q1 B 새 프리셋 첫 저장(201)은 「저장하지 않은 변경」을 끈 뒤 /presets/{id}로 한 번 옮기고(replace), 그 자리에서 상세를 다시 부르지 않으며 replaceState를 쓰지 않는다", async () => {
   const d = editorDeps();
-  const { api, model } = await openEditor({
-    create: [{ kind: "ok", value: { presetId: P1 } }], update: [{ kind: "ok", value: { presetId: P1 } }],
-    get: [detailOf([measured("CATCH", C1, 1234)], "지원용"), detailOf([measured("CATCH", C1, 1234)], "지원용")],
-  }, { deps: d });
+  const { api, model } = await openEditor({ create: [{ kind: "ok", value: { presetId: P1 } }] }, { deps: d });
   model.setName(" 지원용 ");
   model.toggle("CATCH", C1);
-  const listsBefore = ["catches", "materials", "pdfs"].map((name) => count(api, name));
+  let dirtyWhenMoved = null;
+  d.replace = (path) => { dirtyWhenMoved = model.isDirty(); d.moves.push(path); };
   await model.save();
   assert.deepEqual(api.calls.find((call) => call.name === "create").body, { name: "지원용", items: [{ kind: "CATCH", sourceId: C1 }] });
-  assert.deepEqual(d.replaced, [`/presets/${P1}`]);
+  assert.deepEqual(d.moves, [`/presets/${P1}`]);
+  assert.equal(dirtyWhenMoved, false, "옮기기 전에 「저장하지 않은 변경」이 꺼져 이탈 경고가 이동을 막지 않는다");
+  assert.equal(count(api, "get"), 0, "상세는 옮긴 화면이 열 때 부른다");
   const state = model.store.get();
-  assert.equal(state.presetId, P1);
-  assert.equal(state.dirty, false);
+  assert.equal(state.presetId, P1, "옮기기 전에 다시 눌러도 POST가 아니라 PUT이다");
   assert.equal(state.status.kind, "saved");
-  assert.equal(state.items[0].textLength, 1234, "저장 뒤 상세로 글자 수를 맞춘다");
-  assert.deepEqual(["catches", "materials", "pdfs"].map((name) => count(api, name)), listsBefore, "불러온 고르기 목록은 남는다");
-  let html = editorHtml(model);
+  // 화면은 라우터의 replace만 넘기고, 주소만 바꾸는 history.replaceState는 부르지 않는다.
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(new URL("../src/features/presets/preset-editor-screen.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /replaceState\(/);
+  assert.match(source, /replace: \(path\) => router\.replace\(path\)/);
+  assert.doesNotMatch(source, /router\.push\(/);
+});
+
+test("NFR 설계 Q1 B 옮긴 화면을 같은 ID로 만들면 상세를 불러 고치기 상태로 그리고 「저장했습니다.」를 한 번 보이며, 그 화면의 저장은 PUT·이동 없음·다시 불러오기다", async () => {
+  const d = editorDeps();
+  const first = await firstSave(d);
+  first.model.dispose();
+  const moved = await openEditor({
+    get: [detailOf([measured("CATCH", C1, 1234)], "지원용"), detailOf([measured("CATCH", C1, 1234), measured("TEXT_MATERIAL", M1, 77)], "지원용")],
+    update: [{ kind: "ok", value: { presetId: P1 } }],
+  }, { presetId: P1, deps: d });
+  let state = moved.model.store.get();
+  assert.equal(state.load, "ready");
+  assert.equal(state.name, "지원용");
+  assert.deepEqual(state.items.map((item) => [item.sourceId, item.textLength]), [[C1, 1234]]);
+  assert.equal(state.status.kind, "saved");
+  assert.equal(count(moved.api, "get"), 1);
+  let html = editorHtml(moved.model);
   assert.match(html, /<h1>프리셋 고치기<\/h1>/);
   assert.match(html, /<p role="status"[^>]*data-testid="preset-editor-status">저장했습니다\.<\/p>/);
   assert.match(html, /data-testid="preset-delete"/);
-  // 두 번째 저장: PUT, POST는 다시 가지 않는다. 주소도 다시 바꾸지 않는다.
-  model.toggle("TEXT_MATERIAL", M1);
-  html = editorHtml(model);
+  // 새로 고침·다시 열기: 같은 ID로 다시 만들어도 「저장했습니다.」는 없다.
+  const again = await openEditor({ get: [detailOf([measured("CATCH", C1, 1234)], "지원용")] }, { presetId: P1, deps: d });
+  assert.equal(again.model.store.get().status.kind, "idle");
+  assert.match(editorHtml(again.model), /data-testid="preset-editor-status"><\/p>/);
+  // 옮긴 화면에서 저장: PUT이고 POST는 가지 않으며, 다시 옮기지 않고 상세를 다시 불러 글자 수를 맞춘다.
+  moved.model.toggle("TEXT_MATERIAL", M1);
+  html = editorHtml(moved.model);
   assert.match(html, /data-testid="preset-editor-status"><\/p>/, "다음 변경이 생기면 「저장했습니다.」는 사라진다");
+  await moved.model.save();
+  assert.equal(count(moved.api, "create"), 0);
+  assert.deepEqual(moved.api.calls.filter((call) => call.name === "update").map((call) => call.presetId), [P1]);
+  assert.equal(count(first.api, "create"), 1, "프리셋은 한 번만 만들어진다");
+  assert.deepEqual(d.moves, [`/presets/${P1}`]);
+  assert.equal(count(moved.api, "get"), 2);
+  state = moved.model.store.get();
+  assert.equal(state.status.kind, "saved");
+  assert.equal(state.items[1].textLength, 77);
+});
+
+test("NFR 설계 Q1 B 「저장했습니다.」는 다른 프리셋 화면에 보이지 않고, 다른 편집 화면을 연 뒤에는 남긴 ID의 화면에서도 보이지 않는다", async () => {
+  const d = editorDeps();
+  await firstSave(d);
+  const other = await openEditor({ get: [detailOf([])] }, { presetId: P2, deps: d });
+  assert.equal(other.model.store.get().status.kind, "idle");
+  const late = await openEditor({ get: [detailOf([])] }, { presetId: P1, deps: d });
+  assert.equal(late.model.store.get().status.kind, "idle");
+  // 새 프리셋 화면을 열어도 지운다.
+  await firstSave(d);
+  await openEditor({}, { deps: d });
+  const afterNew = await openEditor({ get: [detailOf([])] }, { presetId: P1, deps: d });
+  assert.equal(afterNew.model.store.get().status.kind, "idle");
+});
+
+test("Build and Test 되돌아가기 1 ② open → dispose → open(Strict Mode 흉내) 뒤에도 상세가 그려지고, 넘겨받은 「저장했습니다.」가 남으며, 저장 결과가 반영된다", async () => {
+  const d = editorDeps();
+  d.savedNotice.leave(P1);
+  const lists = defaultLists();
+  const api = fakeEditor({
+    catches: [...lists.catches, ...defaultLists().catches], materials: [...lists.materials, ...defaultLists().materials],
+    pdfs: [...lists.pdfs, ...defaultLists().pdfs],
+    get: [detailOf([measured("CATCH", C1)]), detailOf([measured("CATCH", C1, 321)]), detailOf([measured("CATCH", C1, 321), measured("CATCH", C2)])],
+    update: [{ kind: "ok", value: { presetId: P1 } }],
+  });
+  const model = createPresetEditorModel(api, P1, d);
+  const firstOpen = model.open();
+  model.dispose();
+  await model.open();
+  await firstOpen;
+  assert.equal(api.calls.filter((call) => call.name === "get")[0].signal.aborted, true, "처음 연 상세 요청은 정리 때 끊긴다");
+  let state = model.store.get();
+  assert.equal(state.load, "ready", "「프리셋을 불러오고 있습니다.」에 멈추지 않는다");
+  assert.equal(state.items[0].textLength, 321);
+  assert.equal(state.status.kind, "saved", "처음 열 때 꺼낸 표시가 다시 열어도 남는다");
+  assert.equal(state.catches.state, "ready");
+  model.toggle("CATCH", C2);
   await model.save();
-  assert.equal(count(api, "create"), 1);
-  assert.deepEqual(api.calls.filter((call) => call.name === "update").map((call) => call.presetId), [P1]);
-  assert.deepEqual(d.replaced, [`/presets/${P1}`]);
+  state = model.store.get();
+  assert.equal(state.status.kind, "saved", "「저장하고 있습니다.」에 멈추지 않는다");
+  assert.equal(state.dirty, false);
+  assert.equal(count(api, "update"), 1);
+  assert.match(editorHtml(model), /data-testid="preset-editor-status">저장했습니다\.</);
+});
+
+test("마지막 dispose() 뒤 늦게 온 상세·저장 결과는 버리고 상태를 바꾸지 않으며, 첫 저장이면 옮기지도 표시를 남기지도 않는다", async () => {
+  const detail = deferred();
+  const api = fakeEditor({ ...defaultLists(), get: [detail] });
+  const model = createPresetEditorModel(api, P1, editorDeps());
+  const opening = model.open();
+  model.dispose();
+  detail.resolve(detailOf([measured("CATCH", C1)]));
+  await opening;
+  assert.equal(model.store.get().load, "loading");
+  const update = deferred();
+  const editing = await openEditor({ get: [detailOf([])], update: [update] }, { presetId: P1 });
+  const updating = editing.model.save();
+  editing.model.dispose();
+  update.resolve({ kind: "ok", value: { presetId: P1 } });
+  await updating;
+  assert.equal(editing.model.store.get().status.kind, "saving");
+  assert.equal(count(editing.api, "get"), 1, "버린 저장 뒤에는 상세를 다시 부르지 않는다");
+  const d = editorDeps();
+  const create = deferred();
+  const fresh = await openEditor({ create: [create] }, { deps: d });
+  fresh.model.setName("지원용");
+  const creating = fresh.model.save();
+  fresh.model.dispose();
+  create.resolve({ kind: "ok", value: { presetId: P1 } });
+  await creating;
+  assert.deepEqual(d.moves, []);
+  assert.equal(fresh.model.store.get().presetId, null);
+  assert.equal(d.savedNotice.take(P1), false, "표시를 남기지 않는다");
 });
 
 test("NFR 설계 security 4 저장 중에는 이름·고르기·순서·걸러 보기·저장·지우기를 모두 막고 「저장하고 있습니다.」를 보이며 입력이 바뀌지 않는다", async () => {
