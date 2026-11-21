@@ -194,6 +194,8 @@ export function createPresetEditorModel(client: PresetEditorClients, initialPres
   let detailRequest: AbortController | null = null;
   let detailGeneration = 0;
   let disposed = false;
+  /** 첫 저장 뒤 옮겨 온 화면이 넘겨받아 아직 보이지 않은 「저장했습니다.」. */
+  let handedNotice = false;
 
   /** 쪽 하나의 고를 수 있는 자료를 한 번에 센다. 고를 수 있는 자료가 없는 쪽은 부르지 않는다(NFR6.2). 실패하면 그 쪽은 글자 수를 모르는 채로 둔다. */
   async function measure(refs: PresetItemRef[], signal: AbortSignal, isCurrent: () => boolean) {
@@ -384,12 +386,23 @@ export function createPresetEditorModel(client: PresetEditorClients, initialPres
     repositoryOptions,
     /**
      * 열 때 한 번: 상세(고치기만)·고르기 목록 셋·저장소 목록을 함께 부른다.
-     * 정리 뒤 다시 열면 정리 표시를 되살린다(`jd-management-model`의 `activate()`와 같은 방식). 첫 저장 뒤 옮겨 온 화면이면 「저장했습니다.」를 한 번 보인다.
+     * 정리 뒤 다시 열면 정리 표시를 되살린다(`jd-management-model`의 `activate()`와 같은 방식). 첫 저장 뒤 옮겨 온 화면이면 넘겨받은
+     * 「저장했습니다.」를 쥐고 있다가 `showHandedNotice`로 보인다.
      */
     open: () => {
       disposed = false;
-      if (deps.savedNotice.take(store.get().presetId)) patch({ status: { kind: "saved" } });
+      if (deps.savedNotice.take(store.get().presetId)) handedNotice = true;
       return Promise.all([loadDetail(), loadSources(), repositoryOptions.refresh()]).then(() => undefined);
+    },
+    /**
+     * 넘겨받은 「저장했습니다.」를 한 번 보인다. 화면이 상세 준비 뒤 빈 `role="status"` 칸을 그린 다음(효과) 부른다.
+     * 글이 든 채 새로 생긴 칸은 화면 낭독기가 읽지 않을 수 있어, 빈 칸을 먼저 그리고 글을 넣는다(접근성 점검 A9).
+     */
+    showHandedNotice: () => {
+      const s = store.get();
+      if (!handedNotice || disposed || s.load !== "ready") return;
+      handedNotice = false;
+      if (s.status.kind === "idle") patch({ status: { kind: "saved" } });
     },
     loadDetail,
     loadSources,
@@ -425,6 +438,8 @@ export function PresetEditorScreen({ api: client, presetId, deps }: { api: Prese
   const options = useSyncExternalStore(model.repositoryOptions.subscribe, model.repositoryOptions.getSnapshot, model.repositoryOptions.getSnapshot);
   useEffect(() => { void model.open(); return () => model.dispose(); }, [model]);
   useEffect(() => { if (view.left) router.replace(routes.presets); }, [view.left, router]);
+  // 상세가 준비된 렌더에서 빈 상태 칸이 그려진 뒤에 넘겨받은 「저장했습니다.」를 넣는다(접근성 점검 A9).
+  useEffect(() => { if (view.load === "ready") model.showHandedNotice(); }, [view.load, model]);
 
   // 저장 실패·이름 오류 때 초점은 [저장]에 남는다(interaction-spec PresetEditorForm). 저장 중 막혔던 단추로 되돌린다.
   useEffect(() => {

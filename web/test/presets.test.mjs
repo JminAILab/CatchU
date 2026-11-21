@@ -577,6 +577,8 @@ test("NFR 설계 Q1 B 새 프리셋 첫 저장(201)은 「저장하지 않은 �
   assert.doesNotMatch(source, /replaceState\(/);
   assert.match(source, /replace: \(path\) => router\.replace\(path\)/);
   assert.doesNotMatch(source, /router\.push\(/);
+  // 접근성 점검 A9: 넘겨받은 「저장했습니다.」는 상세 준비 렌더 뒤 효과에서 넣는다.
+  assert.match(source, /useEffect\(\(\) => \{ if \(view\.load === "ready"\) model\.showHandedNotice\(\); \}, \[view\.load, model\]\);/);
 });
 
 test("NFR 설계 Q1 B 옮긴 화면을 같은 ID로 만들면 상세를 불러 고치기 상태로 그리고 「저장했습니다.」를 한 번 보이며, 그 화면의 저장은 PUT·이동 없음·다시 불러오기다", async () => {
@@ -591,14 +593,22 @@ test("NFR 설계 Q1 B 옮긴 화면을 같은 ID로 만들면 상세를 불러 �
   assert.equal(state.load, "ready");
   assert.equal(state.name, "지원용");
   assert.deepEqual(state.items.map((item) => [item.sourceId, item.textLength]), [[C1, 1234]]);
-  assert.equal(state.status.kind, "saved");
   assert.equal(count(moved.api, "get"), 1);
+  // 접근성 점검 A9: 상세가 준비된 첫 렌더의 상태 칸은 비어 있고, 그 뒤(화면 효과) 「저장했습니다.」가 들어간다.
+  assert.equal(state.status.kind, "idle");
   let html = editorHtml(moved.model);
+  assert.match(html, /<p role="status"[^>]*data-testid="preset-editor-status"><\/p>/);
+  moved.model.showHandedNotice();
+  assert.equal(moved.model.store.get().status.kind, "saved");
+  html = editorHtml(moved.model);
   assert.match(html, /<h1>프리셋 고치기<\/h1>/);
   assert.match(html, /<p role="status"[^>]*data-testid="preset-editor-status">저장했습니다\.<\/p>/);
   assert.match(html, /data-testid="preset-delete"/);
+  moved.model.showHandedNotice();
+  assert.equal(moved.model.store.get().status.kind, "saved", "두 번 불러도 한 번만 넣는다");
   // 새로 고침·다시 열기: 같은 ID로 다시 만들어도 「저장했습니다.」는 없다.
   const again = await openEditor({ get: [detailOf([measured("CATCH", C1, 1234)], "지원용")] }, { presetId: P1, deps: d });
+  again.model.showHandedNotice();
   assert.equal(again.model.store.get().status.kind, "idle");
   assert.match(editorHtml(again.model), /data-testid="preset-editor-status"><\/p>/);
   // 옮긴 화면에서 저장: PUT이고 POST는 가지 않으며, 다시 옮기지 않고 상세를 다시 불러 글자 수를 맞춘다.
@@ -620,13 +630,18 @@ test("NFR 설계 Q1 B 「저장했습니다.」는 다른 프리셋 화면에 �
   const d = editorDeps();
   await firstSave(d);
   const other = await openEditor({ get: [detailOf([])] }, { presetId: P2, deps: d });
+  other.model.showHandedNotice();
   assert.equal(other.model.store.get().status.kind, "idle");
   const late = await openEditor({ get: [detailOf([])] }, { presetId: P1, deps: d });
+  late.model.showHandedNotice();
   assert.equal(late.model.store.get().status.kind, "idle");
   // 새 프리셋 화면을 열어도 지운다.
   await firstSave(d);
-  await openEditor({}, { deps: d });
+  const fresh = await openEditor({}, { deps: d });
+  fresh.model.showHandedNotice();
+  assert.equal(fresh.model.store.get().status.kind, "idle");
   const afterNew = await openEditor({ get: [detailOf([])] }, { presetId: P1, deps: d });
+  afterNew.model.showHandedNotice();
   assert.equal(afterNew.model.store.get().status.kind, "idle");
 });
 
@@ -642,6 +657,8 @@ test("Build and Test 되돌아가기 1 ② open → dispose → open(Strict Mode
   });
   const model = createPresetEditorModel(api, P1, d);
   const firstOpen = model.open();
+  model.showHandedNotice();
+  assert.equal(model.store.get().status.kind, "idle", "상세가 준비되기 전에는 넣지 않는다");
   model.dispose();
   await model.open();
   await firstOpen;
@@ -649,6 +666,8 @@ test("Build and Test 되돌아가기 1 ② open → dispose → open(Strict Mode
   let state = model.store.get();
   assert.equal(state.load, "ready", "「프리셋을 불러오고 있습니다.」에 멈추지 않는다");
   assert.equal(state.items[0].textLength, 321);
+  model.showHandedNotice();
+  state = model.store.get();
   assert.equal(state.status.kind, "saved", "처음 열 때 꺼낸 표시가 다시 열어도 남는다");
   assert.equal(state.catches.state, "ready");
   model.toggle("CATCH", C2);
