@@ -29107,3 +29107,128 @@
 **Error**: Cannot start another review for "code-generation": its review receipt stands and the change is accepted, so no further review is owed. If the person asked for this review, run the same command again with --person-asked --message <id>, with <id> the id of the person's message that asked for it (ee5d7b6d, sent 2026-11-21T06:44:32Z). Otherwise run `aidlc engine orchestrate next` and follow the step it returns.
 
 ---
+
+## Change Accepted
+**Timestamp**: 2026-11-21T06:46:40Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: nfr-design
+**Unit**: u2-applicant-screens
+**Checkpoint**: review-receipt
+**Changed**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/performance-design.md
+**Recorded**: sha256:412d2f10bc16a7f1e0d3e6f9ecfe2fa6ef518df4dfddab04d4c0bda28277636b
+**Current**: sha256:8b995a48ebe715c582d12a54e34ab85019a1b55e08a7af649c4cba32664981a7
+**Details**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/nfr-design/performance-design.md changed after the applicant screens Unit was reviewed; carrying on.
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-11-21T06:46:40Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: code-generation
+**Unit**: u2-applicant-screens
+**Checkpoint**: review-receipt
+**Changed**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-summary.md
+**Recorded**: sha256:5f30152cda06d4c03f3c8b1503d8256a9a906286c2ea2c95878c837ebe737d48
+**Current**: sha256:65a08bf7eca19c70e848ea0d1bc60b54a31859ff37cf18c63beffd68f2bc1f73
+**Details**: aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-summary.md changed after the applicant screens Unit was reviewed; carrying on.
+
+---
+
+## Change Accepted
+**Timestamp**: 2026-11-21T06:46:40Z
+**Event**: CHANGE_ACCEPTED
+**Stage**: code-generation
+**Unit**: u2-applicant-screens
+**Checkpoint**: review-receipt
+**Changed**: web/src/features/presets/README.md, web/src/features/presets/preset-editor-screen.tsx, web/test/presets.test.mjs
+**Recorded**: sha256:828e4aeb81609d13cde46cfbcd2d166f224e0cb83abde0ddb7e2f601a8f6e303
+**Current**: sha256:9bb65e14c6dd4b0c7399937915cadf34cb6e1b3476265baa81002fd12a122b58
+**Details**: web/src/features/presets/README.md, web/src/features/presets/preset-editor-screen.tsx, web/test/presets.test.mjs changed after the applicant screens Unit was reviewed; carrying on.
+
+---
+
+## Checkpoint Verification Recorded
+**Timestamp**: 2026-11-21T06:54:39Z
+**Event**: CHECKPOINT_VERIFICATION_RECORDED
+**Unit**: u2-applicant-screens
+**Kind**: unit
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Verification Id**: c3aefd6e-16ee-4bdc-b105-87267929a637
+**Fingerprint**: sha256:e93563e10226a9bc9d55148d0dc9928941257c442af00d502e777cff9e6dca98
+**Command SHA-256**: 04ae577da37582954a9661cb87bf7a597ae64f8de628f5de9ed95311c7f13ffe
+**Exit Code**: 0
+**Verified**: true
+**Run floor**: GATE_REJECTED:2026-11-21T06:03:50Z#1
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-21T06:54:40Z
+**Event**: HOST_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-21T06:54:58Z
+**Event**: DECISION_RECORDED
+**Checkpoint**: Construction Unit Approval
+**Unit**: u2-applicant-screens
+**Kind**: unit
+**Stage**: code-generation
+**Fingerprint**: sha256:e93563e10226a9bc9d55148d0dc9928941257c442af00d502e777cff9e6dca98
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Options**: Approve,Request Changes
+**Asked Evidence**: {"functional-design":["sha256:334b5727f4158ecd4be6f9c055fda3a2cfbafc0d973e6d7ebe525efa1ab9240a",null],"nfr-requirements":["sha256:0284eaa08bbcff988f30b7bb81c2c71fc124ceb36d293556d2c35bfab97efe6e",null],"nfr-design":["sha256:412d2f10bc16a7f1e0d3e6f9ecfe2fa6ef518df4dfddab04d4c0bda28277636b",null],"code-generation":["sha256:5f30152cda06d4c03f3c8b1503d8256a9a906286c2ea2c95878c837ebe737d48","sha256:828e4aeb81609d13cde46cfbcd2d166f224e0cb83abde0ddb7e2f601a8f6e303"]}
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","code-generation":"GATE_REJECTED:2026-11-21T06:03:50Z#1"}
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-21T07:31:55Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: a73856d7
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-21T07:31:55Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: Verified with `npm --prefix api run lint && npm --prefix api run typecheck && npm --prefix api run test:coverage && npm --prefix web run lint && npm --prefix web run typecheck && npm --prefix web run test:coverage && npm --prefix web run build` (exit 0). Approve this completed u2-applicant-screens?
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-21T07:32:09Z
+**Event**: GATE_APPROVED
+**Unit**: u2-applicant-screens
+**Stage**: code-generation
+**Stages**: functional-design, nfr-requirements, nfr-design, infrastructure-design, code-generation
+**Gate Stages**: functional-design, nfr-requirements, nfr-design, code-generation
+**Gate Scope**: unit-end
+**Checkpoint**: construction-unit
+**Fingerprint**: sha256:e93563e10226a9bc9d55148d0dc9928941257c442af00d502e777cff9e6dca98
+**Run floor**: GATE_REJECTED:2026-11-21T06:03:50Z#1
+**Run floors**: {"functional-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-requirements":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","nfr-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","infrastructure-design":"WORKFLOW_STARTED:2026-11-18T05:40:25Z#1","code-generation":"GATE_REJECTED:2026-11-21T06:03:50Z#1"}
+**Verification Command SHA-256**: 04ae577da37582954a9661cb87bf7a597ae64f8de628f5de9ed95311c7f13ffe
+**Verification Id**: c3aefd6e-16ee-4bdc-b105-87267929a637
+**Approved Evidence**: {"functional-design":["sha256:334b5727f4158ecd4be6f9c055fda3a2cfbafc0d973e6d7ebe525efa1ab9240a",null],"nfr-requirements":["sha256:0284eaa08bbcff988f30b7bb81c2c71fc124ceb36d293556d2c35bfab97efe6e",null],"nfr-design":["sha256:412d2f10bc16a7f1e0d3e6f9ecfe2fa6ef518df4dfddab04d4c0bda28277636b",null],"code-generation":["sha256:5f30152cda06d4c03f3c8b1503d8256a9a906286c2ea2c95878c837ebe737d48","sha256:828e4aeb81609d13cde46cfbcd2d166f224e0cb83abde0ddb7e2f601a8f6e303"]}
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**User Input**: Approve
+**Person Reply**: 충전기를 연결했습니다. 확인 명령을 돌리기 전에 Minor 2를 고쳐 주세요: 옮긴 화면의 상태 칸(role="status")은 빈 채로 먼저 그리고 그린 뒤에 「저장했습니다.」를 넣어 화면 낭독기가 읽게 합니다(접근성 점검 A9). Minor 1·3은 받아들이고 U2 PR에 한계로 적습니다. 앞으로 안내는 한국어로 해 주세요.\nApprove
+**Message Id**: a73856d7
+**Message Ids**: ee5d7b6d,a73856d7
+**Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-04","fingerprint":"sha256:f99dd155c8caa0888dedeeffdecf9e69df18ce94b7721f5b77435dd4097987e7","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/f9ab9332625516f6/1.json","digest":"sha256:2a8477f00e1ddcb00f155cab16bc74e47d6b809ff55373be84b733546755269d"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-05","fingerprint":"sha256:1ae8ca92e5fc1ade68a6e11a64d0c22f565faf50ba4deddc1c60a7085e785e8d","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/f9ab9332625516f6/1.json","digest":"sha256:2a8477f00e1ddcb00f155cab16bc74e47d6b809ff55373be84b733546755269d"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-06","fingerprint":"sha256:c7f919baf47729f402df9725fa8552d65ec043d6637601ea9f9cd3231b67f143","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/f9ab9332625516f6/1.json","digest":"sha256:2a8477f00e1ddcb00f155cab16bc74e47d6b809ff55373be84b733546755269d"}}]}
+
+---
