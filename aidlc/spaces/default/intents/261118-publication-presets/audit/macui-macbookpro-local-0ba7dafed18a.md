@@ -29232,3 +29232,480 @@
 **Review Finding Dispositions**: {"version":1,"dispositions":[{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-04","fingerprint":"sha256:f99dd155c8caa0888dedeeffdecf9e69df18ce94b7721f5b77435dd4097987e7","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/f9ab9332625516f6/1.json","digest":"sha256:2a8477f00e1ddcb00f155cab16bc74e47d6b809ff55373be84b733546755269d"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-05","fingerprint":"sha256:1ae8ca92e5fc1ade68a6e11a64d0c22f565faf50ba4deddc1c60a7085e785e8d","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/f9ab9332625516f6/1.json","digest":"sha256:2a8477f00e1ddcb00f155cab16bc74e47d6b809ff55373be84b733546755269d"}},{"artifact":"aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md","id":"R-06","fingerprint":"sha256:c7f919baf47729f402df9725fa8552d65ec043d6637601ea9f9cd3231b67f143","status":"Changed after review","decided_at_severity":"Minor","reviewed_record":{"path":".aidlc-engine/reviews/code-generation/units/u2-applicant-screens/f9ab9332625516f6/1.json","digest":"sha256:2a8477f00e1ddcb00f155cab16bc74e47d6b809ff55373be84b733546755269d"}}]}
 
 ---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-21T07:32:31Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: code-generation
+**Next Stage**: build-and-test
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/code-generation-plan.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/unit-test-instructions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/code-summary.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-generation-plan.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/unit-test-instructions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/code-summary.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/code-generation-plan.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/unit-test-instructions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/code-summary.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/traceability.json=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/code-generation-plan.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/unit-test-instructions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/code-summary.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/traceability.json=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/code-generation/traceability.json=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/code-generation/traceability.json=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/code-generation/traceability.json=passed; traceability@aidlc/spaces/default/intents/261118-publication-presets/construction/u3-reader-views/code-generation/traceability.json=passed
+**Open Decisions**: 0
+**Source Work**: found in a source change since the stage started
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-21T07:32:42Z
+**Event**: GATE_APPROVED
+**Stage**: code-generation
+**Brief Digest**: none
+**Source Work**: found in a source change since the stage started
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-21T07:32:42Z
+**Event**: STAGE_COMPLETED
+**Stage**: code-generation
+**Validation Basis**: {"graphContract":"sha256:ac0ef7ae03ae2fcfab9e2a94500d84c4fe00d00384d1f8dcff92c96b2e1f50de","inputs":[{"artifact":"contract-summary","contentHash":"sha256:969a055f823e5d5c3d201f29a5a029e47686220278021532e22184c6d7219ad5","instanceCount":1,"presentCount":1,"producer":"contract-design","required":false,"structureHash":"sha256:417a9c95cbf71c3420f351802644e09c4adbca869534fa6fd0f8dfec64c14478"},{"artifact":"entities","contentHash":"sha256:915fb51dfeb3cf79ab0848652447723b1f629d65feceb7ee4e07ab0959a72f43","instanceCount":1,"presentCount":1,"producer":"functional-design","required":false,"structureHash":"sha256:d1048d21e1c859ab0f21efe3c99d5a25912c0752211ca85d9dd4e2ffa9c27432"},{"artifact":"functional-spec","contentHash":"sha256:f1965ada3c6411b522fb7bf0be5a8e4c624d4a4f630908a1d780cff747bf7822","instanceCount":4,"presentCount":4,"producer":"functional-design","required":false,"structureHash":"sha256:aeff350d873c6b563a5f1c2ef127122b15b421f1dbb6d64cba14d8b0a5dc6172"},{"artifact":"performance-design","contentHash":"sha256:705bb13af53761f13f689c030dfe5d1db543d63b22794142ad1f175f4fdfe8dc","instanceCount":3,"presentCount":3,"producer":"nfr-design","required":false,"structureHash":"sha256:994f30a9dbfd3f7d9495600c561b94e85dbadc23de83c327c5724a11082eb308"},{"artifact":"requirements","contentHash":"sha256:327801dee9c42f4e6c99b583852178b69dbc4db730b8fa23532a1b738538e6f5","instanceCount":1,"presentCount":1,"producer":"requirements-analysis","required":true,"structureHash":"sha256:1187e4396781cefb07161dfaec11ff291a14d6cd5bb9fe6064bc74244d4e5af4"},{"artifact":"rules","contentHash":"sha256:a021e5aa10ef964dd9cadf0dcdbb6e7d560b28c0f653a424e6987ba9a1170b1e","instanceCount":1,"presentCount":1,"producer":"functional-design","required":false,"structureHash":"sha256:15ef95621a5c7938500137c63cb8565e60fb7b5d8a146efcf3116faf3999a566"},{"artifact":"security-design","contentHash":"sha256:6508dded8a22c630ddb05d6868ed14a7555b049925ae9cc5991a6ede238a4ce9","instanceCount":3,"presentCount":3,"producer":"nfr-design","required":false,"structureHash":"sha256:8347e70dad4f1cd39065c2e4a121a5af4206bcdc7c805379446ae51eb0da5a6b"},{"artifact":"unit-of-work","contentHash":"sha256:e3e08909aab3f4aae7ebb80fafb497e1e70558cf93987723e90a60ae0fda4589","instanceCount":1,"presentCount":1,"producer":"units-generation","required":true,"structureHash":"sha256:73089697a6ea44278aef5f5486ffd13d31dbcae117bf0928c618846a17b1de2c"}],"outputs":[{"artifact":"code-generation-plan","contentHash":"sha256:84ca3fc4e8d2e5bdf14075439bbc61d35d380cc718a30691171d67eb3c7cf3ef","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:71611cbbd03c2bbac4f448a64a8abb006d10ec1f132c5c8d584c6fb26e33a2ac"},{"artifact":"code-summary","contentHash":"sha256:55db3a5a7458baad93134300481b0b7f6c7058dae4a2081a14534406325b0f59","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:bb3eb0b312134262fafeaf3689530211566399f73aa461d3114c86226f4404bd"},{"artifact":"traceability","contentHash":"sha256:6a772adecdda90568939649d7ef151ca98e2fbc7c9a56797f70e51f35f2e1ab9","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:bea5a200477f04e686e741ba7592394e6b5791d8833645f7e6b93fc889590776"},{"artifact":"unit-test-instructions","contentHash":"sha256:582a2b9cec6fd0db9f196d5803a4894d323c6194143f6b7721fcbf9accef756c","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:acbdf22ba54db633083fe0d7fbe40335ac3189da8aeff938739682e1c8dab382"}],"projectType":"brownfield","schema":3}
+**Details**: Stage Code Generation approved by gate
+**Tokens In**: 1823
+**Tokens Out**: 972385
+**Cache Read**: 342051123
+**Cache Write**: 5941985
+**Cost USD**: 122.04
+**By Model**: opus-5-5=119.11; sonnet-5-5=2.93; <synthetic>=null
+**By Agent**: main=52.11; aidlc-developer-agent=67.00; aidlc-architecture-reviewer-agent=2.93
+**Tokens By Model**: opus-5-5=1.7k/943k/337.4M/5.3M; sonnet-5-5=86/29.4k/4.6M/683.5k
+**Tokens By Agent**: main=763/292k/145.1M/2.2M; aidlc-developer-agent=974/651k/192.3M/3.1M; aidlc-architecture-reviewer-agent=86/29.4k/4.6M/683.5k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-21T07:32:43Z
+**Event**: STAGE_STARTED
+**Stage**: build-and-test
+**Agent**: aidlc-quality-agent
+**Answer Mode**: guide (reused from intent-capture)
+
+---
+
+## Host Turn
+**Timestamp**: 2026-11-21T07:41:47Z
+**Event**: HOST_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: host
+**Reason**: claude task notification
+**Source**: template
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-21T07:42:19Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md
+**Context**: construction > build-and-test > test-results.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-21T07:42:26Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md
+**Context**: construction > build-and-test > test-results.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-21T07:42:29Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md
+**Context**: construction > build-and-test > test-results.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-21T07:42:38Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md
+**Context**: construction > build-and-test > test-results.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-21T07:42:40Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-and-test-summary.md
+**Context**: construction > build-and-test > build-and-test-summary.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-21T07:42:54Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-and-test-summary.md
+**Context**: construction > build-and-test > build-and-test-summary.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:42:55Z
+**Event**: SENSOR_FIRED
+**Fire id**: 99b40884
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-instructions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:42:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: 99b40884
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-instructions.md
+**Duration ms**: 76
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:42:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: edd0826c
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-and-test-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:42:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: edd0826c
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-and-test-summary.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:42:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: 287f60dd
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:42:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: 287f60dd
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:42:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: 3adb04ec
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/cross-unit-traceability.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:42:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: 3adb04ec
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/cross-unit-traceability.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:42:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: 07e55987
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/integration-test-instructions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:42:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: 07e55987
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/integration-test-instructions.md
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:42:56Z
+**Event**: SENSOR_FIRED
+**Fire id**: 773a7304
+**Sensor ID**: upstream-coverage
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-instructions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:42:56Z
+**Event**: SENSOR_PASSED
+**Fire id**: 773a7304
+**Sensor ID**: upstream-coverage
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-instructions.md
+**Duration ms**: 73
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:43:00Z
+**Event**: SENSOR_FIRED
+**Fire id**: 91fd49a7
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-instructions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:43:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: 91fd49a7
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-instructions.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:43:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: f52652f8
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-and-test-summary.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:43:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: f52652f8
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-and-test-summary.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:43:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: e5fff620
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:43:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: e5fff620
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md
+**Duration ms**: 75
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:43:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: a1bafc4a
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/cross-unit-traceability.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:43:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: a1bafc4a
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/cross-unit-traceability.md
+**Duration ms**: 72
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:43:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: 8fcefa34
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/integration-test-instructions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:43:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: 8fcefa34
+**Sensor ID**: required-sections
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/integration-test-instructions.md
+**Duration ms**: 70
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-21T07:43:01Z
+**Event**: SENSOR_FIRED
+**Fire id**: f019f6b5
+**Sensor ID**: upstream-coverage
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-instructions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-21T07:43:01Z
+**Event**: SENSOR_PASSED
+**Fire id**: f019f6b5
+**Sensor ID**: upstream-coverage
+**Stage slug**: build-and-test
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-instructions.md
+**Duration ms**: 71
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-21T07:43:03Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: build-and-test
+**Next Stage**: ci-pipeline
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-instructions.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-and-test-summary.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/cross-unit-traceability.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/integration-test-instructions.md=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-instructions.md=passed
+**Open Decisions**: 0
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-22T02:26:47Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["승인합니다. 브라우저 확인(6c382740, 배포 빌드, 복사한 로컬 DB)은 이렇습니다: U2 첫 저장 뒤 /presets/{id}로 옮겨 「프리셋 고치기」·이름·담은 자료·[프리셋 지우기]·「저장했습니다.」가 보이고 두 번째 저장은 PUT이라 프리셋 수가 늘지 않음(통과), 순서 바꾼 뒤 초점 통과. U3 키보드 탭 이동·숨긴 패널 통과, PDF를 연 채 탭을 오가도 요청 1번·같은 뷰어 3쪽 유지(통과), 320px 탭 줄 통과. U4 /privacy 다섯 곳 통과. 확인 못 함: U3 다른 탭 출처 이동(로컬에 Claude 키 없음), 저장 알림의 화면 낭독기 읽힘. 320px 회원 머리글 넘침은 U2 전부터 있던 문제라 U2 PR에 한계로 적습니다."]
+**Message Id**: ffe3f773
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-22T02:26:47Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: Build and Test 결과를 승인할까요? 브라우저 확인을 마치셨으면 결과도 함께 적어 주세요.
+**Reply**: 승인합니다. 브라우저 확인(6c382740, 배포 빌드, 복사한 로컬 DB)은 이렇습니다: U2 첫 저장 뒤 /presets/{id}로 옮겨 「프리셋 고치기」·이름·담은 자료·[프리셋 지우기]·「저장했습니다.」가 보이고 두 번째 저장은 PUT이라 프리셋 수가 늘지 않음(통과), 순서 바꾼 뒤 초점 통과. U3 키보드 탭 이동·숨긴 패널 통과, PDF를 연 채 탭을 오가도 요청 1번·같은 뷰어 3쪽 유지(통과), 320px 탭 줄 통과. U4 /privacy 다섯 곳 통과. 확인 못 함: U3 다른 탭 출처 이동(로컬에 Claude 키 없음), 저장 알림의 화면 낭독기 읽힘. 320px 회원 머리글 넘침은 U2 전부터 있던 문제라 U2 PR에 한계로 적습니다.
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-22T02:27:03Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md
+**Context**: construction > build-and-test > test-results.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-22T02:27:07Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md
+**Context**: construction > build-and-test > test-results.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-22T02:27:10Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/test-results.md
+**Context**: construction > build-and-test > test-results.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-22T02:27:13Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/build-and-test/build-and-test-summary.md
+**Context**: construction > build-and-test > build-and-test-summary.md
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-22T02:27:20Z
+**Event**: GATE_APPROVED
+**Stage**: build-and-test
+**User Input**: Approve
+**Person Reply**: 승인합니다. 브라우저 확인(6c382740, 배포 빌드, 복사한 로컬 DB)은 이렇습니다: U2 첫 저장 뒤 /presets/{id}로 옮겨 「프리셋 고치기」·이름·담은 자료·[프리셋 지우기]·「저장했습니다.」가 보이고 두 번째 저장은 PUT이라 프리셋 수가 늘지 않음(통과), 순서 바꾼 뒤 초점 통과. U3 키보드 탭 이동·숨긴 패널 통과, PDF를 연 채 탭을 오가도 요청 1번·같은 뷰어 3쪽 유지(통과), 320px 탭 줄 통과. U4 /privacy 다섯 곳 통과. 확인 못 함: U3 다른 탭 출처 이동(로컬에 Claude 키 없음), 저장 알림의 화면 낭독기 읽힘. 320px 회원 머리글 넘침은 U2 전부터 있던 문제라 U2 PR에 한계로 적습니다.
+**Message Id**: ffe3f773
+**Brief Digest**: none
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-22T02:27:20Z
+**Event**: STAGE_COMPLETED
+**Stage**: build-and-test
+**Validation Basis**: {"graphContract":"sha256:1aed809bd5f1f235d6ab1b1495c41997dd8cc201478d4991c474c4f1638a2b55","inputs":[{"artifact":"code-generation-plan","contentHash":"sha256:84ca3fc4e8d2e5bdf14075439bbc61d35d380cc718a30691171d67eb3c7cf3ef","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:71611cbbd03c2bbac4f448a64a8abb006d10ec1f132c5c8d584c6fb26e33a2ac"},{"artifact":"code-summary","contentHash":"sha256:55db3a5a7458baad93134300481b0b7f6c7058dae4a2081a14534406325b0f59","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:bb3eb0b312134262fafeaf3689530211566399f73aa461d3114c86226f4404bd"},{"artifact":"unit-test-instructions","contentHash":"sha256:582a2b9cec6fd0db9f196d5803a4894d323c6194143f6b7721fcbf9accef756c","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:acbdf22ba54db633083fe0d7fbe40335ac3189da8aeff938739682e1c8dab382"}],"outputs":[{"artifact":"build-and-test-summary","contentHash":"sha256:fb8e696a95abcd85aa2cee22c7b2bb7a5c29fc47420ab2d32c03d6aa172af16e","instanceCount":1,"presentCount":1,"producer":"build-and-test","required":true,"structureHash":"sha256:0ed88892d4a0263e2040b59c80b50782bc12addfece87cde151da23c24607fbd"},{"artifact":"build-instructions","contentHash":"sha256:ff5402649cb1785ae85424d24207f92490ebef83553d273a825f50602b505c04","instanceCount":1,"presentCount":1,"producer":"build-and-test","required":true,"structureHash":"sha256:3ca94c13da00571fd164638b5aa8eba274fb37df8b75e7be212f56078ab9fc03"},{"artifact":"build-test-results","contentHash":"sha256:3523d2153d2ee8370d5ebca13475e989ed4cc052f1c9730f9eb4df1ed962af31","instanceCount":1,"presentCount":1,"producer":"build-and-test","required":true,"structureHash":"sha256:7200b7f03a3b995a1c3f9e1a4f3e79a2adcf2e24e72418f5e976326e61231eac"},{"artifact":"cross-unit-traceability","contentHash":"sha256:9f973716802ae63e3ac62de996b851af1f7a04d94f6a1b9fb0069f0012321eb4","instanceCount":1,"presentCount":1,"producer":"build-and-test","required":true,"structureHash":"sha256:42f72582a929a16ca6bfeea1daca6899192a3e900a592edbf18aca8c389551f8"},{"artifact":"integration-test-instructions","contentHash":"sha256:908a5c94da4c30e512e33bf77eac15f28acfa3f64e80e15c6130ea8059cc0044","instanceCount":1,"presentCount":1,"producer":"build-and-test","required":false,"structureHash":"sha256:1019db91e4a48b288fb7f0f1f4750e0268e2f80e4dfe663e547edd3571db18ad"}],"projectType":"brownfield","schema":3}
+**Details**: Stage Build and Test approved by gate
+**Tokens In**: 103
+**Tokens Out**: 38335
+**Cache Read**: 18358851
+**Cache Write**: 464240
+**Cost USD**: 8.15
+**By Model**: opus-5-5=8.15
+**By Agent**: main=8.15
+**Tokens By Model**: opus-5-5=103/38.3k/18.4M/464.2k
+**Tokens By Agent**: main=103/38.3k/18.4M/464.2k
+
+---
+
+## Stage Start
+**Timestamp**: 2026-11-22T02:27:20Z
+**Event**: STAGE_STARTED
+**Stage**: ci-pipeline
+**Agent**: aidlc-pipeline-deploy-agent
+**Answer Mode**: guide (reused from intent-capture)
+
+---
+
+## Memory Empty
+**Timestamp**: 2026-11-22T02:27:20Z
+**Event**: MEMORY_EMPTY
+**Stage**: build-and-test
+
+---
