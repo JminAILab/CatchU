@@ -90,12 +90,24 @@ function itemFields(item: PublishedSnapshotItem): { fields: Field[]; evidenceUrl
 }
 
 /**
- * 사본 → 근거 목록. 항목은 position 순서, 근거 ID는 `{publishedItemId}/{fieldPath}`, 위치는 그 필드 전체 범위(UTF-16 [0, 길이)).
+ * 앞선 사본만(발행 프리셋 BR4.3, P-4, ADR-006). 같은 자료가 두 프리셋에 있으면 position이 앞선 사본 하나만 근거가 된다.
+ * isFirstCopy는 필수 칸이라 참·거짓이 아니면 모양 오류다(NFR2.12). 프리셋 이름은 읽지 않는다(NFR4.4).
+ */
+export function firstCopyItems(snapshot: PublishedSnapshot): PublishedSnapshotItem[] {
+  return [...list(snapshot?.items, 'items')].map((value, i) => record(value, `items[${i}]`) as unknown as PublishedSnapshotItem)
+    .filter((item, i) => {
+      if (typeof item.isFirstCopy !== 'boolean') throw new SnapshotShapeError(`items[${i}].isFirstCopy`);
+      return item.isFirstCopy;
+    })
+    .sort((a, b) => a.position - b.position);
+}
+
+/**
+ * 사본 → 근거 목록. 항목은 앞선 사본만 position 순서, 근거 ID는 `{publishedItemId}/{fieldPath}`, 위치는 그 필드 전체 범위(UTF-16 [0, 길이)).
  * 공백만인 필드는 뺀다. Catch 항목의 근거에는 그 항목 evidence[].sourceUrl을 catchEvidenceUrls로 붙인다(C-01 caller-rule).
  */
 export function buildSummarySources(snapshot: PublishedSnapshot): AiSource[] {
-  const items = [...list(snapshot?.items, 'items')].map((value, i) => record(value, `items[${i}]`) as unknown as PublishedSnapshotItem)
-    .sort((a, b) => a.position - b.position);
+  const items = firstCopyItems(snapshot);
   return items.flatMap((item) => {
     if (typeof item.publishedItemId !== 'string') throw new SnapshotShapeError('publishedItemId');
     const { fields, evidenceUrls } = itemFields(item);

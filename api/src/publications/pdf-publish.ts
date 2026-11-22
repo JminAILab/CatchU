@@ -7,13 +7,17 @@ import { DataSource, EntityManager } from 'typeorm';
 import { ApiError } from '../common/errors';
 import { type FileStorage, materialKey, publicationPrefix, publishedPdfKey, storageFailureFields } from '../file-storage/file-storage';
 import { readPdfStatesForPublish } from '../materials/pdf-material-store';
-import type { PublishItemInput } from './publish-input';
+import type { PublishItem } from './publish-input';
 
-/** 발행할 PDF 항목 하나. position은 0부터인 요청 순서, publishedItemId는 1단계에서 미리 만든 값이다. */
+/**
+ * 발행할 PDF 항목 하나. position은 0부터인 편 항목 순서, publishedItemId는 1단계에서 미리 만든 값, presetId는 그 항목이 든 프리셋이다.
+ * 같은 PDF가 두 프리셋에 있으면 항목도 둘이고 사본 파일도 두 벌이다(발행 프리셋 BR3.7, C-17).
+ */
 export interface PdfPublishItem {
   position: number;
   sourceId: string;
   publishedItemId: string;
+  presetId: string;
 }
 
 /** 트랜잭션 안에서 잠그고 다시 읽은 PDF 원본. */
@@ -45,30 +49,36 @@ export class PdfCopyIntegrityError extends Error {
 
 const logger = new Logger('PdfPublish');
 
-/** PDF 항목만 고른다(요청 순서 유지). */
-export function pdfItems(items: readonly PublishItemInput[], publishedItemIds: readonly string[]): PdfPublishItem[] {
+/** PDF 항목만 고른다(편 항목 순서 유지). */
+export function pdfItems(items: readonly PublishItem[], publishedItemIds: readonly string[]): PdfPublishItem[] {
   return items.flatMap((item, position) => item.kind === 'PDF_MATERIAL'
-    ? [{ position, sourceId: item.sourceId, publishedItemId: publishedItemIds[position] }]
+    ? [{ position, sourceId: item.sourceId, publishedItemId: publishedItemIds[position], presetId: item.presetId }]
     : []);
 }
 
-/** 400 VALIDATION_FAILED extractionIncomplete(BR4.1). 새 오류 코드는 만들지 않는다. */
-function extractionIncomplete(positions: readonly number[]): ApiError {
+/**
+ * 400 VALIDATION_FAILED extractionIncomplete(BR4.1). 새 오류 코드는 만들지 않는다. 막힌 PDF는 항목 위치 대신 그 PDF가 든 프리셋마다
+ * blockedSources 한 줄로 알린다(발행 프리셋 BR3.5, 계약 P-2 승인 검토 R-03). violations는 이유 하나만 담는다.
+ */
+function extractionIncomplete(items: readonly PdfPublishItem[]): ApiError {
   return new ApiError('VALIDATION_FAILED', {
-    details: { violations: positions.map((position) => ({ field: `items[${position}].sourceId`, reason: 'extractionIncomplete' })) },
+    details: {
+      violations: [{ field: 'presetIds', reason: 'extractionIncomplete' }],
+      blockedSources: items.map((item) => ({ presetId: item.presetId, kind: 'PDF_MATERIAL', sourceId: item.sourceId })),
+    },
   });
 }
 
 /**
  * 사전 확인(W3 2, 발행 트랜잭션 밖·복사 전): 작성자 기준 시한 판정을 거친 상태가 모두 DONE이어야 한다. 없거나 남의 것은 U4와 같은 404,
- * DONE이 아닌 것이 있으면 400 extractionIncomplete(해당 항목 위치마다 하나). 시한 판정(PENDING → FAILED DEADLINE_EXCEEDED)은 목록·상세처럼
- * 커밋되어야 하므로 상태 읽기 트랜잭션을 먼저 끝낸 뒤 그 밖에서 판정한다.
+ * DONE이 아닌 것이 있으면 400 extractionIncomplete(막힌 항목마다 blockedSources 한 줄). 시한 판정(PENDING → FAILED DEADLINE_EXCEEDED)은
+ * 목록·상세처럼 커밋되어야 하므로 상태 읽기 트랜잭션을 먼저 끝낸 뒤 그 밖에서 판정한다.
  */
 export async function assertPdfsDone(dataSource: DataSource, owner: string, items: readonly PdfPublishItem[]): Promise<void> {
-  const ids = items.map((item) => item.sourceId);
+  const ids = [...new Set(items.map((item) => item.sourceId))];
   const states = await dataSource.transaction('READ COMMITTED', (manager) => readPdfStatesForPublish(manager, owner, ids));
   if (items.some((item) => !states.has(item.sourceId))) throw new NotFoundException();
-  const notDone = items.filter((item) => states.get(item.sourceId) !== 'DONE').map((item) => item.position);
+  const notDone = items.filter((item) => states.get(item.sourceId) !== 'DONE');
   if (notDone.length > 0) throw extractionIncomplete(notDone);
 }
 
@@ -109,7 +119,7 @@ export async function lockPdfsForPublish(
     WHERE member_id = $1 AND pdf_material_id = ANY($2::uuid[]) ORDER BY pdf_material_id ASC FOR SHARE`, [owner, ids]);
   const byId = new Map(rows.map((row) => [row.pdfMaterialId, row]));
   if (items.some((item) => !byId.has(item.sourceId))) throw new NotFoundException();
-  const notDone = items.filter((item) => byId.get(item.sourceId)!.state !== 'DONE').map((item) => item.position);
+  const notDone = items.filter((item) => byId.get(item.sourceId)!.state !== 'DONE');
   if (notDone.length > 0) throw extractionIncomplete(notDone);
   const lengths: { pdfMaterialId: string; textLength: string }[] = await manager.query(`
     SELECT pdf_material_id AS "pdfMaterialId", COALESCE(SUM(char_length(text)), 0) AS "textLength" FROM pdf_page_text

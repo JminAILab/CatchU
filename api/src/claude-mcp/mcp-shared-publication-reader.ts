@@ -9,7 +9,7 @@ import {
 import { PUBLICATION_ACCESS } from '../publications/publications-config';
 import { extractLinkToken } from './mcp-shared-link';
 import { SharedPage, buildSharedPage, parseSharedCursor } from './mcp-shared-page';
-import { flattenPublishedItem } from './mcp-shared-text';
+import { sharedItemTexts } from './mcp-shared-text';
 
 export type McpLinkDeniedCode = 'LINK_UNAVAILABLE' | 'LINK_PASSWORD_REQUIRED';
 
@@ -39,9 +39,8 @@ export class McpSharedPublicationReader {
     const position = cursor === undefined ? null : parseSharedCursor(cursor);
     const { publicationId } = await this.judge(token);
     const snapshot = await this.readSnapshot(publicationId);
-    const items = snapshot.items.map((item) => ({
-      position: item.position, itemKind: item.itemKind, title: item.title, content: flattenPublishedItem(item),
-    }));
+    // 앞선 사본만 싣는다(발행 프리셋 BR4.4). 겹친 사본은 cursor 범위에도 들지 않는다.
+    const items = sharedItemTexts(snapshot.items);
     return buildSharedPage({ title: snapshot.title, publishedAt: snapshot.publishedAt, expiresAt: snapshot.expiresAt, items }, position);
   }
 

@@ -21,6 +21,9 @@ const { SummaryController } = require('../../dist/rag-answer/summary.controller'
 const { startApp } = require('../u2/support.cjs');
 const { catchSnapshot, recordingLogger } = require('../published-index/support.cjs');
 
+/** 겹친 사본이 없는 1번 프리셋 항목의 사본 칸(발행 프리셋 U1 P-3·P-4). */
+const PRESET_FIELDS = Object.freeze({ presetOrdinal: 1, presetName: '[합성] 프리셋', isFirstCopy: true });
+
 /** 항목 하나(C-01 GatedItem). */
 function citedItem(text, sourceId = 'chunk-1') {
   return { kind: 'CITED', text, jdRole: null, citations: [{ sourceId, quote: '인용 원문',
@@ -139,10 +142,11 @@ function putPublication(access, overrides = {}) {
     publicationId, ownerMemberId: overrides.ownerMemberId ?? randomUUID(), token: overrides.token ?? `token-${randomUUID()}`,
     passwordProtected: false, title: '합성 발행본', publishedAt,
     expiresAt: new Date(publishedAt.getTime() + 2160 * 3600 * 1000), stoppedAt: null,
+    // 발행 프리셋 U1의 사본 칸 셋(presetOrdinal·presetName·isFirstCopy, NFR2.12)도 C-10 사본처럼 넣는다.
     items: [
-      { publishedItemId: randomUUID(), position: 1, itemKind: 'CATCH', title: '합성 Catch', snapshot: catchSnapshot(), pdfPages: null },
+      { publishedItemId: randomUUID(), position: 1, itemKind: 'CATCH', title: '합성 Catch', snapshot: catchSnapshot(), pdfPages: null, ...PRESET_FIELDS },
       { publishedItemId: randomUUID(), position: 2, itemKind: 'TEXT_MATERIAL', title: '합성 자료', snapshot: { body: '합성 자료 본문이다.' },
-        pdfPages: null },
+        pdfPages: null, ...PRESET_FIELDS },
     ],
     ...overrides,
   };
@@ -234,5 +238,5 @@ async function waitFor(check, timeoutMs = 3000) {
 
 module.exports = {
   ask, chunkHit, citedItem, counterSlot, fakeAiRun, fakeDailyRunLimit, fakeGate, fakeRewriter, fakeSearch, parseSse, putPublication,
-  startRagAnswerApp, waitFor,
+  startRagAnswerApp, waitFor, PRESET_FIELDS,
 };

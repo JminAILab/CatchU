@@ -4,6 +4,7 @@
 // 새 Catch NC2가 사본에 더한 선택 칸 넷(저장소 이름·작성 시점·작업 한계·근거별 본인 커밋)은 #589가 BR3.1의 줄 순서와 근거 줄 모양에 더했다.
 // 칸이 없으면 그 줄을 넣지 않으므로 이 변경 전 사본은 전과 글자까지 같은 글이 된다(새 Catch FR9.6).
 import { CatchSnapshot, PublishedPdfPage, PublishedSnapshotItem, TextMaterialSnapshot } from '../publications/published-snapshot';
+import type { SharedItemText } from './mcp-shared-page';
 
 /**
  * Catch 글의 머리말 넷과 빈 값 문구 셋(BR3.1). 값은 web `web/src/features/publications/snapshot-view.tsx`의 표지와 같고,
@@ -91,6 +92,16 @@ function flattenPdf(pages: readonly PublishedPdfPage[] | null): string {
     .sort((left, right) => left.pageNumber - right.pageNumber)
     .map((page) => (page.readable ? `[${page.pageNumber}쪽]\n${page.text}` : `[${page.pageNumber}쪽] 읽을 수 없음`))
     .join('\n\n');
+}
+
+/**
+ * 쪽 만들기에 넘길 항목 글(BR3.1·BR3.5). 앞선 사본만 position 순서대로 싣고 겹친 사본의 position은 건너뛴다(발행 프리셋 BR4.4, P-5).
+ * 프리셋 구분과 이름은 싣지 않는다(FR6.2, ADR-007). cursor는 실린 항목의 position을 가리키므로 모양이 그대로다.
+ */
+export function sharedItemTexts(items: readonly PublishedSnapshotItem[]): SharedItemText[] {
+  return items.filter((item) => item.isFirstCopy)
+    .sort((left, right) => left.position - right.position)
+    .map((item) => ({ position: item.position, itemKind: item.itemKind, title: item.title, content: flattenPublishedItem(item) }));
 }
 
 /** 사본 항목 하나를 글로 편다. 사본 모양은 itemKind가 정한다(C-07). */

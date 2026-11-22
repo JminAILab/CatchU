@@ -186,7 +186,7 @@ test('NC2 AC6.5.1·AC6.5.2 새 칸 넷과 본인 커밋 표지 글자는 조각�
 // 새 Catch NC3 — 다시 볼 곳 사실과 작업 시각은 사본·조각 재료가 아니다(BR6.3, S8·AC9.4.1·AC11.1.4).
 // 먼저 정한 실패 조건: 원본 행에 사실·시각이 있을 때 사본이나 조각 글에 사실 경로·커밋 식별값·시각 글자가 나옴.
 test('NC3 S8 원본 행에 다시 볼 곳 사실·작업 시각이 있어도 사본과 조각에 그 글자가 0건이다', () => {
-  const { buildCatchSnapshot } = require('../../dist/publications/snapshot-builder');
+  const { buildCatchSnapshot } = require('../../dist/publishable-source/source-content');
   const commit = (letter) => letter.repeat(40);
   const row = {
     catchId: CATCH_ID, title: 't', workFacts: ['[합성] 사실'], subjectContribution: '[합성] 기여', draftStatus: 'NOT_GENERATED',

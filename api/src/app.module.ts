@@ -18,6 +18,7 @@ import { PublishedIndexModule } from './published-index/published-index.module';
 import { ClaudeMcpModule } from './claude-mcp/claude-mcp.module';
 import { JdManagementModule } from './jd/jd.module';
 import { JdSummaryModule } from './jd-summary/jd-summary.module';
+import { PresetsModule } from './presets/presets.module';
 import { PUBLICATION_ACCESS, PublicationsModule } from './publications/publications.module';
 import { RagAnswerModule } from './rag-answer/rag-answer.module';
 
@@ -46,6 +47,8 @@ import { RagAnswerModule } from './rag-answer/rag-answer.module';
     // 10월 ShareLinksModule(공유 링크 발급·목록·중지)·RecipientModule(공개 프로필·Catch 목록·상세)은 제출 3(W6)에서 이 모듈로 대체했다
     // (docs/publications.md). share_link 표·엔티티는 OQ-U4-3 결정 전까지 남는다.
     PublicationsModule,
+    // 발행 프리셋 intent U1: 프리셋 저장·세기 경로(/v1/presets). 발행 모듈도 프리셋 펴기를 쓰려고 이 모듈을 가져온다(docs/presets.md).
+    PresetsModule,
     // 12월 intent U5: 질의응답(SSE)·AI 기본 요약 경로와 BASE_SUMMARY 처리기(기동 때 AiRun에 한 번 등록). C-10은 U4의 DB 구현을
     // 그 모듈이 내보낸 토큰으로 받는다. 메모리 가짜(in-memory-publication-access.ts)는 앱에 넣지 않는다(docs/rag-answer.md).
     RagAnswerModule.register({ imports: [PublicationsModule], publicationAccess: { useExisting: PUBLICATION_ACCESS } }),

@@ -54,12 +54,16 @@ export class Publication {
  * - 항목 수 상한은 DB 제약이 아니라 U4 API 검증이다. DB는 계약대로 `position >= 1`만 막는다.
  * - `unique(publicationId, publishedItemId)`는 U3 published_chunk의 복합 외래 키가 가리킬 부모 짝이다(C-06).
  * - PDF_MATERIAL 항목과 그 쪽 사본(published_pdf_page)은 U8이 만든다(후순위).
+ * - 발행 프리셋 U1(계약 P-3): position은 발행본 전체에 1부터 이어 매기고(고른 프리셋 순서, 그 안에서 프리셋 안 자료 순서),
+ *   `presetOrdinal`(고른 프리셋 순서 1~5)과 `presetName`(발행 당시 이름의 복사)을 둔다. 사본은 프리셋을 가리키지 않는다(BR3.8).
+ *   같은 발행본·같은 presetOrdinal이면 같은 presetName인 것은 발행 코드가 지키고 시험한다.
  */
 @Entity('published_item')
 @ForeignKey(() => Publication, ['publicationId'], ['publicationId'], deleteWithParent)
 @Unique(['publicationId', 'position'])
 @Unique(['publicationId', 'publishedItemId'])
 @Check('"position" >= 1')
+@Check('"preset_ordinal" BETWEEN 1 AND 5')
 @Check(inValues('item_kind', PUBLISHED_ITEM_KINDS))
 @Check(`("item_kind" = 'PDF_MATERIAL') = ("pdf_copy_key" IS NOT NULL)`)
 export class PublishedItem {
@@ -86,4 +90,10 @@ export class PublishedItem {
 
   @Column({ type: 'text', nullable: true })
   pdfCopyKey!: string | null;
+
+  @Column({ type: 'integer' })
+  presetOrdinal!: number;
+
+  @Column({ type: 'text' })
+  presetName!: string;
 }

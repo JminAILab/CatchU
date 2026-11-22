@@ -12,6 +12,9 @@
         "itemKind": "CATCH",
         "title": "합성 Catch",
         "pdfPages": null,
+        "presetOrdinal": 1,
+        "presetName": "합성 프리셋",
+        "isFirstCopy": true,
         "snapshot": {
           "workFacts": ["SYNTHETIC-GOLD 검색 결과 화면에 빈 목록 안내를 더했다.", "목록을 다시 불러오는 버튼을 만들었다."],
           "subjectContribution": "안내 문구와 버튼을 직접 만들고 리뷰를 반영했다.",
@@ -27,6 +30,9 @@
         "itemKind": "TEXT_MATERIAL",
         "title": "합성 자료",
         "pdfPages": null,
+        "presetOrdinal": 1,
+        "presetName": "합성 프리셋",
+        "isFirstCopy": true,
         "snapshot": { "body": "배포는 개발 서버에 먼저 올린다.\n\n시험은 합성 자료로만 한다. 시험은 합성 자료로만 한다." }
       }
     ]

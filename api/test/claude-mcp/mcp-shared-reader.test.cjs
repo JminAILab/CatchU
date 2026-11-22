@@ -45,17 +45,21 @@ const PUBLISHED_AT = new Date('2026-11-01T09:00:00.000Z');
 const EXPIRES_AT = new Date(PUBLISHED_AT.getTime() + 2160 * 60 * 60 * 1000);
 const DRAFT_MARKER = 'SYNTHETIC-DRAFT-MUST-NOT-LEAVE';
 
+/** 발행 프리셋 U1의 사본 칸 셋(C-10, NFR2.12). 이름은 받은 링크 읽기에 나오면 안 되는 표지 글자다(FR6.2). */
+const PRESET_MARKER = 'SYNTHETIC-PRESET-NAME-MUST-NOT-LEAVE';
+const FIRST = { presetOrdinal: 1, presetName: PRESET_MARKER, isFirstCopy: true };
+
 /** 판정을 통과한 발행본의 사본(C-10 readSnapshot 모양). Catch·텍스트 자료·PDF가 하나씩이다. */
 const SNAPSHOT = {
   title: '[합성] 받은 발행본',
   publishedAt: PUBLISHED_AT,
   expiresAt: EXPIRES_AT,
   items: [
-    { publishedItemId: randomUUID(), position: 1, itemKind: 'CATCH', title: '[합성] Catch', pdfPages: null, snapshot: {
+    { publishedItemId: randomUUID(), position: 1, itemKind: 'CATCH', title: '[합성] Catch', pdfPages: null, ...FIRST, snapshot: {
       workFacts: ['[합성] 사실'], subjectContribution: '[합성] 기여', evidence: [], authorDescription: null, aiDraft: DRAFT_MARKER, mismatch: false,
     } },
-    { publishedItemId: randomUUID(), position: 2, itemKind: 'TEXT_MATERIAL', title: '[합성] 자료', pdfPages: null, snapshot: { body: '[합성] 본문' } },
-    { publishedItemId: randomUUID(), position: 3, itemKind: 'PDF_MATERIAL', title: '[합성] PDF', snapshot: { pageCount: 2 },
+    { publishedItemId: randomUUID(), position: 2, itemKind: 'TEXT_MATERIAL', title: '[합성] 자료', pdfPages: null, ...FIRST, snapshot: { body: '[합성] 본문' } },
+    { publishedItemId: randomUUID(), position: 3, itemKind: 'PDF_MATERIAL', title: '[합성] PDF', snapshot: { pageCount: 2 }, ...FIRST,
       pdfPages: [{ pageNumber: 1, text: '[합성] 첫 쪽', readable: true }, { pageNumber: 2, text: '', readable: false }] },
   ],
 };
@@ -104,6 +108,16 @@ test('정상: 토큰으로 판정(grant null, 호출 때 시각)한 뒤 판정�
   assert.deepEqual(page.items, SNAPSHOT.items.map((item) => (
     { position: item.position, itemKind: item.itemKind, title: item.title, content: flattenPublishedItem(item) })));
   assert.equal(JSON.stringify(page).includes(DRAFT_MARKER), false, 'aiDraft 글이 없다');
+  assert.equal(JSON.stringify(page).includes(PRESET_MARKER), false, '프리셋 이름이 없다(발행 프리셋 FR6.2)');
+  assert.equal(page.nextCursor, null);
+});
+
+test('발행 프리셋 BR4.4: 겹친 사본은 싣지 않고 그 position을 건너뛰며, 프리셋 구분 칸이 없다', async () => {
+  const copy = { ...structuredClone(SNAPSHOT.items[0]), publishedItemId: randomUUID(), position: 4, presetOrdinal: 2, isFirstCopy: false };
+  const access = fakeAccess({ read: () => ({ ...structuredClone(SNAPSHOT), items: [...structuredClone(SNAPSHOT.items), copy] }) });
+  const page = await new McpSharedPublicationReader(access).readPage(generateLinkToken());
+  assert.deepEqual(page.items.map((item) => item.position), [1, 2, 3]);
+  assert.deepEqual(page.items.map((item) => Object.keys(item).sort()), page.items.map(() => ['content', 'itemKind', 'position', 'title']));
   assert.equal(page.nextCursor, null);
 });
 

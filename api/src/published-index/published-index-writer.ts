@@ -2,6 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import type { AiRun } from '../ai-run/ai-run';
+import { markFirstCopies } from '../publications/published-snapshot';
 import { buildChunkDrafts, type ChunkSourceItem, type ChunkSourcePdfPage } from './chunker';
 import { embeddingDeadline } from './embedding-config';
 import { PublicationIndex } from './publication-index.entity';
@@ -38,6 +39,7 @@ interface ItemRow {
   published_item_id: string;
   position: number;
   item_kind: string;
+  source_id: string;
   snapshot: unknown;
 }
 
@@ -91,11 +93,17 @@ export function createPublishedIndexWriter(deps: PublishedIndexWriterDeps): Publ
   };
 }
 
-/** 발행 항목을 position 순으로 읽는다. PDF 항목이 있을 때만 쪽 사본(published_pdf_page, U8)을 읽는다. */
+/**
+ * 발행 항목을 position 순으로 읽는다. PDF 항목이 있을 때만 쪽 사본(published_pdf_page, U8)을 읽는다.
+ * 발행 프리셋 U1(P-4, BR4.2): source_id를 더 읽어 사본 읽기와 같은 판정 함수(markFirstCopies)로 앞선 사본만 남긴다.
+ * 같은 원본이 두 프리셋에 있어도 조각은 한 벌이고, seq는 남은 조각에 1부터 이어 매긴다.
+ */
 async function readItems(manager: EntityManager, publicationId: string): Promise<ChunkSourceItem[]> {
-  const rows: ItemRow[] = await manager.query(
-    `SELECT published_item_id, position, item_kind, snapshot FROM published_item
+  const all: ItemRow[] = await manager.query(
+    `SELECT published_item_id, position, item_kind, source_id, snapshot FROM published_item
       WHERE publication_id = $1 ORDER BY position`, [publicationId]);
+  const firstCopies = markFirstCopies(all.map((row) => ({ itemKind: row.item_kind, sourceId: row.source_id, position: row.position })));
+  const rows = all.filter((_, index) => firstCopies[index]);
   const pages = rows.some((row) => row.item_kind === 'PDF_MATERIAL') ? await readPdfPages(manager, publicationId) : new Map();
   return rows.map((row) => ({
     publishedItemId: row.published_item_id,
