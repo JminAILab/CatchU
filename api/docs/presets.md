@@ -2,7 +2,7 @@
 
 지원자가 발행에 쓸 자료 묶음(프리셋)을 저장하고, 발행 때 프리셋 1~5개를 골라 탭으로 나눠 보이게 하는 api 안내다. 코드는 `src/presets/`(PresetLibrary: 경로·입력·저장소·로그)와 `src/publishable-source/`(PublishableSource: 발행과 같은 글자 셈·자격 판정·종류별 묶음 읽기)에 있다. `PresetsModule`은 `AppModule`에 등록하고, 발행 모듈(`PublicationsModule`)이 프리셋 펴기(`PresetStore.expand`)를 쓰려고 가져온다.
 
-기준 문서: [U1 기능 명세](../../aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md)·[업무 규칙](../../aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/rules.md) BR1~BR7·[엔티티](../../aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/entities.md), [U1 비기능 설계](../../aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/), [계약 요약](../../aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md) P-1~P-6. 규칙 ID는 그 문서의 것이다. 발행 요청과 사본 칸의 바뀐 점은 [발행본 문서](publications.md)에 있다.
+기준 문서: [U1 기능 명세](../../aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/functional-spec.md)·[업무 규칙](../../aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/rules.md) BR1\~BR7·[엔티티](../../aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/functional-design/entities.md), [U1 비기능 설계](../../aidlc/spaces/default/intents/261118-publication-presets/construction/u1-preset-contract/nfr-design/), [계약 요약](../../aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md) P-1\~P-6. 규칙 ID는 그 문서의 것이다. 발행 요청과 사본 칸의 바뀐 점은 [발행본 문서](publications.md)에 있다.
 
 ## 표
 
@@ -97,10 +97,11 @@ Nest `Logger('Presets')`(`src/presets/presets-log.ts`)로 저장·지우기마�
    diff <(grep '/materials/' before.txt | awk '{print $4}') <(grep '/materials/' after.txt | awk '{print $4}') && echo 원본 그대로
    ```
 
-6. **배포**: 바로 dev를 main에 병합한다. 자동 배포가 api·worker를 멈추고 종료를 확인한 뒤 마이그레이션 Pod를 돌리고, 그다음 새 api·worker·web을 띄운다([EKS 자동 배포](../../deploy/aws/cd/README.md)). 마이그레이션은 프리셋 표 둘을 만들고 `DELETE FROM publication`으로 변경 전 발행본을 모두 지운 뒤(항목·쪽 사본·조각·색인·요약·JD 요약 실행이 연쇄로 지워짐) 칸 둘을 더한다. 옛 링크는 지금의 접근 불가 화면(「이 링크는 열람할 수 없습니다.」)이 된다. `down`은 칸 둘과 표 둘을 지우고 지운 발행본은 되살리지 않는다.
+6. **배포**: 바로 dev를 main에 병합한다. 5번을 마친 뒤 병합이 늦어지면 병합 직전에 2\~5번을 다시 한다. 그사이 새로 발행된 사본도 7번처럼 남기 때문이다. 자동 배포가 api·worker를 멈추고 종료를 확인한 뒤 마이그레이션 Pod를 돌리고, 그다음 새 api·worker·web을 띄운다([EKS 자동 배포](../../deploy/aws/cd/README.md)). 마이그레이션은 프리셋 표 둘을 만들고 `DELETE FROM publication`으로 변경 전 발행본을 모두 지운 뒤(항목·쪽 사본·조각·색인·요약·JD 요약 실행이 연쇄로 지워짐) 칸 둘을 더한다. 옛 링크는 지금의 접근 불가 화면(「이 링크는 열람할 수 없습니다.」)이 된다. `down`은 칸 둘과 표 둘을 지우고 지운 발행본은 되살리지 않는다.
 7. **남을 수 있는 사본**: 4번부터 마이그레이션까지(최근 main 배포 10\~13분) 새로 발행하면 그 사본은 지워지지 않고 남는다. 마이그레이션이 그 발행본 행도 지우므로 어떤 링크로도 열리지 않고, 그 회원이 탈퇴하면 회원 파일과 함께 지워진다. 12월까지 이용자는 팀 관련자뿐이라 그동안 발행하지 말아 달라고 미리 알리고, 그래도 남는 사본은 받아들인다(2026-11-20 팀장 결정).
 8. **배포가 멈추면**: [EKS 자동 배포 「실패했을 때」](../../deploy/aws/cd/README.md#실패했을-때)대로 한다. main에 병합한 뒤에는 지우기를 다시 하지 않는다. 마이그레이션 뒤라면 새 사본까지 지워진다. 이미 지운 옛 사본 PDF는 열리지 않는다(버릴 발행본이라 받아들인다).
 9. **팀원 로컬**: 로컬 폴더에 남은 옛 사본은 가리키는 행이 없어 열리지 않으므로 지우기는 선택이다.
+10. **실행 기록**: 배포가 끝나면 [#597](https://github.com/JminAILab/CatchU/issues/597)에 남긴다. 지운 개수와 5번 원본 대조 결과, 각 확인 시각, 병합과 자동 배포 결과를 적는다. 지운 뒤 배포까지 발행이 있었는지와 남은 사본은 근거로 확인한 만큼만 적고, 확인하지 못한 것은 미확인으로 적는다. 목록 파일에는 회원·발행본 ID가 있어 붙이지 않고 개수만 적는다.
 
 ## 시험
 
