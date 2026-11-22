@@ -29709,3 +29709,423 @@
 **Stage**: build-and-test
 
 ---
+
+## Artifact Created
+**Timestamp**: 2026-11-22T02:28:07Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md
+**Context**: construction > ci-pipeline > ci-pipeline-questions.md
+
+---
+
+## Error Logged
+**Timestamp**: 2026-11-22T02:28:10Z
+**Event**: ERROR_LOGGED
+**Tool**: aidlc-log
+**Command**: aidlc-log engine log decision --stage ci-pipeline --questions-file aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md
+**Error**: Missing --decision <text> (or --decision-file <file>)
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-22T02:28:14Z
+**Event**: DECISION_RECORDED
+**Stage**: ci-pipeline
+**Decision**: Q1 커버리지 80% 바닥을 CI에서 막을지 질문
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-22T02:29:41Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["A. CI 그대로 (권장)"]
+**Message Id**: 59aed441
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-22T02:29:41Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: Q1. 커버리지 80% 바닥을 CI에서 막을까요? 지금 CI는 이번 intent의 시험을 PR마다 모두 돌리지만 커버리지는 재지 않습니다(이번에 잰 값: api 98.46%, web 92.87%).
+**Reply**: A. CI 그대로 (권장)
+**Options**: ["A. CI 그대로 (권장)","B. CI에 80% 문턱"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-22T02:29:45Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md
+**Context**: construction > ci-pipeline > ci-pipeline-questions.md
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-22T02:29:58Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md
+**Context**: construction > ci-pipeline > ci-pipeline-questions.md
+
+---
+
+## Decision Recorded
+**Timestamp**: 2026-11-22T02:30:00Z
+**Event**: DECISION_RECORDED
+**Stage**: ci-pipeline
+**Decision**: Does this all look correct before I generate the artifact?
+**Options**: Looks correct,Request changes
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-22T02:31:54Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["Looks correct"]
+**Message Id**: a94cf32d
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-22T02:31:54Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: Does this all look correct before I generate the artifact?
+**Reply**: Looks correct
+**Options**: ["Looks correct","Request changes"]
+
+---
+
+## Artifact Updated
+**Timestamp**: 2026-11-22T02:31:58Z
+**Event**: ARTIFACT_UPDATED
+**Tool**: Edit
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md
+**Context**: construction > ci-pipeline > ci-pipeline-questions.md
+
+---
+
+## Summary Confirmation Recorded
+**Timestamp**: 2026-11-22T02:31:59Z
+**Event**: SUMMARY_CONFIRMATION_RECORDED
+**Stage**: ci-pipeline
+**Details**: Looks correct
+**Checkpoint**: Consolidated Summary Confirmation
+**Questions File**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md
+**Questions SHA-256**: 9c2a2d794cb1a54248e2ceca509eeecee3b992883607c0358db5c21cb8da3c59
+**Hash Scope**: confirmed-content-v2
+**Message Id**: a94cf32d
+**Message Ids**: 59aed441,a94cf32d
+**Person Reply**: A. CI 그대로 (권장)\nLooks correct
+**Summary Authorization Id**: f2021d47c965c2e312da4693927feedab751b6e993eeee3b3422bd58c27b92bb
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-22T02:32:18Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-config.md
+**Context**: construction > ci-pipeline > ci-config.md
+**Summary Authorization Id**: f2021d47c965c2e312da4693927feedab751b6e993eeee3b3422bd58c27b92bb
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-22T02:32:27Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/quality-gates.md
+**Context**: construction > ci-pipeline > quality-gates.md
+**Summary Authorization Id**: f2021d47c965c2e312da4693927feedab751b6e993eeee3b3422bd58c27b92bb
+
+---
+
+## Artifact Created
+**Timestamp**: 2026-11-22T02:32:35Z
+**Event**: ARTIFACT_CREATED
+**Tool**: Write
+**File**: <project-dir>/aidlc/spaces/default/intents/261118-publication-presets/verification/phase-check-construction.md
+**Context**: verification > phase-check-construction.md
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-22T02:32:37Z
+**Event**: SENSOR_FIRED
+**Fire id**: 00e1cd6b
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-config.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-22T02:32:37Z
+**Event**: SENSOR_PASSED
+**Fire id**: 00e1cd6b
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-config.md
+**Duration ms**: 94
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-22T02:32:37Z
+**Event**: SENSOR_FIRED
+**Fire id**: f46a1750
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/quality-gates.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-22T02:32:37Z
+**Event**: SENSOR_PASSED
+**Fire id**: f46a1750
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/quality-gates.md
+**Duration ms**: 88
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-22T02:32:38Z
+**Event**: SENSOR_FIRED
+**Fire id**: 0e250522
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-22T02:32:38Z
+**Event**: SENSOR_PASSED
+**Fire id**: 0e250522
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md
+**Duration ms**: 86
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-22T02:32:38Z
+**Event**: SENSOR_FIRED
+**Fire id**: 002862e8
+**Sensor ID**: upstream-coverage
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-config.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-22T02:32:38Z
+**Event**: SENSOR_PASSED
+**Fire id**: 002862e8
+**Sensor ID**: upstream-coverage
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-config.md
+**Duration ms**: 83
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-22T02:32:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: d0a06d7e
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-config.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-22T02:32:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: d0a06d7e
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-config.md
+**Duration ms**: 82
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-22T02:32:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: 923fdbc1
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/quality-gates.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-22T02:32:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: 923fdbc1
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/quality-gates.md
+**Duration ms**: 76
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-22T02:32:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: 2302cbf1
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-22T02:32:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: 2302cbf1
+**Sensor ID**: required-sections
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md
+**Duration ms**: 86
+
+---
+
+## Sensor Fired
+**Timestamp**: 2026-11-22T02:32:43Z
+**Event**: SENSOR_FIRED
+**Fire id**: 4760a538
+**Sensor ID**: upstream-coverage
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-config.md
+
+---
+
+## Sensor Passed
+**Timestamp**: 2026-11-22T02:32:43Z
+**Event**: SENSOR_PASSED
+**Fire id**: 4760a538
+**Sensor ID**: upstream-coverage
+**Stage slug**: ci-pipeline
+**Output path**: aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-config.md
+**Duration ms**: 86
+
+---
+
+## Stage Awaiting Approval
+**Timestamp**: 2026-11-22T02:32:45Z
+**Event**: STAGE_AWAITING_APPROVAL
+**Stage**: ci-pipeline
+**Next Stage**: none
+**Brief Digest**: none
+**Sensor State**: required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-config.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/quality-gates.md=passed; required-sections@aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-pipeline-questions.md=passed; upstream-coverage@aidlc/spaces/default/intents/261118-publication-presets/construction/ci-pipeline/ci-config.md=passed
+**Open Decisions**: 0
+
+---
+
+## Human Turn
+**Timestamp**: 2026-11-22T04:38:08Z
+**Event**: HUMAN_TURN
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Origin**: person
+**Source**: picker
+**Picked**: ["Approve"]
+**Message Id**: 658b7b4e
+
+---
+
+## Question Replied
+**Timestamp**: 2026-11-22T04:38:08Z
+**Event**: QUESTION_REPLIED
+**Session**: d4aba788-0698-4d7c-aacb-a726218165b9
+**Question**: CI Pipeline을 승인할까요? 승인하면 이번 intent의 마지막 단계가 끝납니다.
+**Reply**: Approve
+**Options**: ["Approve","Request Changes"]
+
+---
+
+## Gate Approved
+**Timestamp**: 2026-11-22T04:38:26Z
+**Event**: GATE_APPROVED
+**Stage**: ci-pipeline
+**User Input**: Approve
+**Person Reply**: Approve
+**Message Id**: 658b7b4e
+**Brief Digest**: none
+
+---
+
+## Stage Completion
+**Timestamp**: 2026-11-22T04:38:26Z
+**Event**: STAGE_COMPLETED
+**Stage**: ci-pipeline
+**Validation Basis**: {"graphContract":"sha256:cf50c8b2fb3ea7495a9efd09328d978da763aab327fc8fe6b39fae75cdadfcd5","inputs":[{"artifact":"build-and-test-summary","contentHash":"sha256:fb8e696a95abcd85aa2cee22c7b2bb7a5c29fc47420ab2d32c03d6aa172af16e","instanceCount":1,"presentCount":1,"producer":"build-and-test","required":true,"structureHash":"sha256:0ed88892d4a0263e2040b59c80b50782bc12addfece87cde151da23c24607fbd"},{"artifact":"build-test-results","contentHash":"sha256:3523d2153d2ee8370d5ebca13475e989ed4cc052f1c9730f9eb4df1ed962af31","instanceCount":1,"presentCount":1,"producer":"build-and-test","required":true,"structureHash":"sha256:7200b7f03a3b995a1c3f9e1a4f3e79a2adcf2e24e72418f5e976326e61231eac"},{"artifact":"code-summary","contentHash":"sha256:55db3a5a7458baad93134300481b0b7f6c7058dae4a2081a14534406325b0f59","instanceCount":4,"presentCount":4,"producer":"code-generation","required":true,"structureHash":"sha256:bb3eb0b312134262fafeaf3689530211566399f73aa461d3114c86226f4404bd"}],"outputs":[{"artifact":"ci-config","contentHash":"sha256:fd98414ff71617ae3ad3ffc2ed169d6202b5837f55ce2d63265cc175e3cef230","instanceCount":1,"presentCount":1,"producer":"ci-pipeline","required":true,"structureHash":"sha256:1a40e1464c804fbce9bd5a758965c0847ed24d5e29aa1820c39e04d48f157ee7"},{"artifact":"ci-pipeline-questions","contentHash":"sha256:cd2a6e5f2aeb479c2cddac32444e93124319aa68a4565c69714747e18565ee51","instanceCount":1,"presentCount":1,"producer":"ci-pipeline","required":true,"structureHash":"sha256:dc456f5aec815260a5edc191fb63bfd6bb856cda4abce6cce002a61cc6b027fc"},{"artifact":"quality-gates","contentHash":"sha256:67da54d5fc5597678b166c13bbf4e5dcf042129f72dced06e479900444ba91cf","instanceCount":1,"presentCount":1,"producer":"ci-pipeline","required":true,"structureHash":"sha256:941132e09d0cfacc22afcd22f8d066574834760f630b30e11c6bb388d0f3bef8"}],"projectType":"brownfield","schema":3}
+**Details**: Stage CI Pipeline approved by gate
+**Tokens In**: 39
+**Tokens Out**: 15039
+**Cache Read**: 7256457
+**Cache Write**: 348513
+**Cost USD**: 4.54
+**By Model**: opus-5-5=4.54
+**By Agent**: main=4.54
+**Tokens By Model**: opus-5-5=39/15k/7.3M/348.5k
+**Tokens By Agent**: main=39/15k/7.3M/348.5k
+
+---
+
+## Phase Completion
+**Timestamp**: 2026-11-22T04:38:26Z
+**Event**: PHASE_COMPLETED
+**From phase**: construction
+**To phase**: (end)
+**Stages completed**: 22
+
+---
+
+## Phase Verification
+**Timestamp**: 2026-11-22T04:38:26Z
+**Event**: PHASE_VERIFIED
+**Phase boundary**: construction → end
+
+---
+
+## Workflow Completion
+**Timestamp**: 2026-11-22T04:38:26Z
+**Event**: WORKFLOW_COMPLETED
+**Scope**: mvp
+**Details**: Scope: mvp, 22 stages completed
+**Tokens In**: 4687
+**Tokens Out**: 2395475
+**Cache Read**: 947986806
+**Cache Write**: 19213311
+**Cost USD**: 352.89
+**By Model**: opus-5-5=333.55; sonnet-5-5=19.34; <synthetic>=null
+**By Agent**: main=249.60; aidlc-product-lead-agent=4.78; aidlc-developer-agent=79.03; aidlc-pipeline-deploy-agent=4.92; aidlc-architecture-reviewer-agent=14.56
+**Tokens By Model**: opus-5-5=4.1k/2.1M/917.2M/14.9M; sonnet-5-5=550/245.6k/30.8M/4.3M
+**Tokens By Agent**: main=2.9k/1.3M/685M/10.8M; aidlc-product-lead-agent=134/53k/5.2M/1.3M; aidlc-developer-agent=1.1k/805.9k/222.1M/3.7M; aidlc-pipeline-deploy-agent=116/45.3k/10.1M/398.8k; aidlc-architecture-reviewer-agent=416/192.6k/25.6M/3M
+
+---
+
+## Memory Empty
+**Timestamp**: 2026-11-22T04:38:26Z
+**Event**: MEMORY_EMPTY
+**Stage**: ci-pipeline
+
+---
