@@ -65,9 +65,10 @@
 .evidenceDetails > summary { display: inline-flex; align-items: center; min-height: 44px; color: #254e93; font-size: 14px; font-weight: 700; cursor: pointer; }
 .evidenceDetails > summary:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
 .freeText { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
-/* 긴 글 접기(#607 fold-text). 글자는 그대로 두고 보이는 높이만 줄인다. 줄 수를 높이로 세므로 틀 안 목록의 바깥 여백은 없앤다. */
-.foldBody { overflow: hidden; }
+/* 긴 글 접기(#607 fold-text). 글자는 그대로 두고 보이는 높이만 줄인다. 줄 수를 높이로 세므로 틀 안 목록의 바깥 여백은 없앤다.
+   넘치는 글은 접힌 동안에만 가린다. 늘 가리면 접히지 않은 글에서도 줄 첫머리·첫 줄·끝 줄 링크의 초점 테두리가 상자 밖으로 나가 잘린다(PR #633 리뷰). */
 .foldBody > ul { margin: 0; }
+.fold[data-folded="true"] > .foldBody { overflow: hidden; }
 /* 글 상자는 Tab 순서 밖이고, 폭이 넓어져 단추가 없어질 때만 초점을 넘겨받는다(#615 2026-11-23 팀장 결정). 키보드로 쓰던 중이면 초점 자리가 보이게 테두리를 그린다. */
 .foldBody:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
 .fold[data-folded="true"] > .foldBody { border-bottom: 1px dashed #9aa6b6; }

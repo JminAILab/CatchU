@@ -137,6 +137,12 @@ export function FoldText({ id, limit, reveal = null, label, children }: {
   const open = foldOpen(toggle, reveal);
   // 접고 편 결과가 그려진 바로 뒤(화면에 칠하기 전)에 할 화면 옮기기. 다음 그리기 차례를 기다리는 방식은 가려진 탭에서 돌지 않는다.
   const afterToggle = useRef<(() => void) | null>(null);
+  // 접힐 때마다 글 상자 안쪽을 맨 위로 되돌린다. 넘치는 글은 접힌 동안에만 가리므로(PR #633 리뷰) 펼친 동안에는 상자가 안쪽으로 밀리지 않는데,
+  // 접힌 채 밀렸던 위치를 브라우저가 기억했다가 다시 접힐 때 되살리면 첫 줄들이 아니라 뒷부분이 보인다. 아래 화면 옮기기보다 먼저 한다.
+  const folded = measured.needed && !open;
+  useLayoutEffect(() => {
+    if (folded && body.current) body.current.scrollTop = 0;
+  }, [folded]);
   useLayoutEffect(() => {
     const run = afterToggle.current;
     afterToggle.current = null;
