@@ -55,7 +55,7 @@ spec:
               value: http://api.catchu.svc.cluster.local:3001
             - name: WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP
               value: "true"
-            # PDF 글 추출의 원본 읽기 경로(worker/README.md 「PDF 글 추출 소비자」). api의 FILE_STORAGE_S3_BUCKET과 같은 버킷이다.
+            # PDF 글 추출의 원본 읽기 경로(worker/docs/pdf-extraction.md 「설정」). api의 FILE_STORAGE_S3_BUCKET과 같은 버킷이다.
             # 이 값이 없으면 PDF 추출 소비자가 뜨지 않아, 올린 PDF가 10분 뒤 실패로 보인다. 지역은 boto3가 읽는 값이다.
             - name: FILE_STORAGE_S3_BUCKET
               value: catchu-prod-files
