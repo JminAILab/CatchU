@@ -397,12 +397,15 @@ export function createPresetEditorModel(client: PresetEditorClients, initialPres
     /**
      * 넘겨받은 「저장했습니다.」를 한 번 보인다. 화면이 상세 준비 뒤 빈 `role="status"` 칸을 그린 다음(효과) 부른다.
      * 글이 든 채 새로 생긴 칸은 화면 낭독기가 읽지 않을 수 있어, 빈 칸을 먼저 그리고 글을 넣는다(접근성 점검 A9).
+     * 글을 넣었으면 참을 돌려준다. 화면은 그때 초점을 [저장]에 둔다.
      */
-    showHandedNotice: () => {
+    showHandedNotice: (): boolean => {
       const s = store.get();
-      if (!handedNotice || disposed || s.load !== "ready") return;
+      if (!handedNotice || disposed || s.load !== "ready") return false;
       handedNotice = false;
-      if (s.status.kind === "idle") patch({ status: { kind: "saved" } });
+      if (s.status.kind !== "idle") return false;
+      patch({ status: { kind: "saved" } });
+      return true;
     },
     loadDetail,
     loadSources,
@@ -439,7 +442,8 @@ export function PresetEditorScreen({ api: client, presetId, deps }: { api: Prese
   useEffect(() => { void model.open(); return () => model.dispose(); }, [model]);
   useEffect(() => { if (view.left) router.replace(routes.presets); }, [view.left, router]);
   // 상세가 준비된 렌더에서 빈 상태 칸이 그려진 뒤에 넘겨받은 「저장했습니다.」를 넣는다(접근성 점검 A9).
-  useEffect(() => { if (view.load === "ready") model.showHandedNotice(); }, [view.load, model]);
+  // 저장 결과의 초점은 [저장]이다(U2 기능 설계 「저장 결과」). 첫 저장 뒤 옮긴 화면은 새로 만들어져 초점이 사라지므로 여기서 둔다.
+  useEffect(() => { if (view.load === "ready" && model.showHandedNotice()) document.getElementById(SAVE_BUTTON_ID)?.focus(); }, [view.load, model]);
 
   // 저장 실패·이름 오류 때 초점은 [저장]에 남는다(interaction-spec PresetEditorForm). 저장 중 막혔던 단추로 되돌린다.
   useEffect(() => {
