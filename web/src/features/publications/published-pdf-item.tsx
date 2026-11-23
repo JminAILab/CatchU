@@ -3,6 +3,7 @@
 import { Fragment, useRef, type ReactNode } from "react";
 import { PdfViewerPanel, usePdfViewer, type PdfFetch, type PdfViewerDeps } from "../recipient/pdf-viewer-launcher.tsx";
 import type { LinkAccessCode } from "../recipient/recipient-slots.ts";
+import { FOLD_GENERATED, FoldText } from "./fold-text.tsx";
 import type { PublishedPdfPage } from "./publications-api.ts";
 import styles from "../recipient/pdf-viewer.module.css";
 
@@ -13,6 +14,7 @@ import styles from "../recipient/pdf-viewer.module.css";
  * - 쪽 수와 쪽 목록을 보인다. 쪽마다 "n쪽", 읽을 수 없는 쪽은 "읽을 수 없음" 표지, 읽을 수 있는 쪽은 사본의 글을 텍스트로만 그린다
  *   (추출한 글은 신뢰할 수 없는 자료라 마크업으로 해석하지 않는다, NFR1.8).
  * - 근거 위치(`pages[n]`, `[charStart, charEnd)`)가 오면 그 쪽 글의 범위만 `<mark>`로 감싼다.
+ * - 쪽 글이 12줄을 넘으면 6줄만 보이게 높이를 줄이고 「전체 보기 / 접기」를 둔다. 근거 위치가 가리키는 쪽은 펼친다(#607).
  * - [PDF 보기]·[새 탭에서 열기]·[원본 n쪽 열기]는 공용 PDF 뷰어를 쓴다. 뷰어가 열려 있으면 쪽만 옮기고, 닫혀 있으면 다시 요청한다.
  * - 뷰어는 쪽 목록 위에 있다. 아래쪽 쪽에서 [원본 n쪽 열기]를 누르면 뷰어 자리로 화면을 옮겨 연 쪽이 보이게 한다(#521 리뷰).
  */
@@ -42,7 +44,7 @@ function PageText({ text, highlight }: { text: string; highlight: PdfHighlight }
   );
 }
 
-export function PublishedPdfItem({ title, pageCount, pages, highlight = null, source }: {
+export function PublishedPdfItem({ title, pageCount, pages, highlight = null, source, foldId }: {
   /** iframe 접근성 이름에만 쓴다. 항목 제목은 부르는 쪽(`PublishedSnapshotView`)이 이미 보인다. */
   title: string;
   pageCount: number | null;
@@ -50,6 +52,8 @@ export function PublishedPdfItem({ title, pageCount, pages, highlight = null, so
   highlight?: PdfHighlight;
   /** 없으면 쪽 글만 보이고 PDF 열기 단추는 두지 않는다. */
   source?: PdfCopySource;
+  /** 접는 쪽 글 상자의 id 앞부분(#607). 없으면 React가 만든 id를 쓴다. */
+  foldId?: string;
 }) {
   const ordered = [...pages].sort((a, b) => a.pageNumber - b.pageNumber);
   const count = pageCount ?? ordered.length;
@@ -57,8 +61,8 @@ export function PublishedPdfItem({ title, pageCount, pages, highlight = null, so
     <div data-testid="snapshot-pdf">
       <p className={styles.meta} data-testid="snapshot-pdf-page-count">{count}쪽</p>
       {source
-        ? <PdfPagesWithViewer title={title} pages={ordered} highlight={highlight} source={source} />
-        : <PdfPages pages={ordered} highlight={highlight} onOpenPage={null} />}
+        ? <PdfPagesWithViewer title={title} pages={ordered} highlight={highlight} source={source} foldId={foldId} />
+        : <PdfPages title={title} pages={ordered} highlight={highlight} onOpenPage={null} foldId={foldId} />}
     </div>
   );
 }
@@ -83,8 +87,8 @@ export function openPdfPageAtViewer(
   void model.openInline(page);
 }
 
-function PdfPagesWithViewer({ title, pages, highlight, source }: {
-  title: string; pages: readonly PublishedPdfPage[]; highlight: PdfHighlight; source: PdfCopySource;
+function PdfPagesWithViewer({ title, pages, highlight, source, foldId }: {
+  title: string; pages: readonly PublishedPdfPage[]; highlight: PdfHighlight; source: PdfCopySource; foldId?: string;
 }) {
   const { model, state } = usePdfViewer(source.fetchPdf, source.onAccessLost, source.viewerDeps);
   const anchor = useRef<HTMLDivElement>(null);
@@ -93,17 +97,20 @@ function PdfPagesWithViewer({ title, pages, highlight, source }: {
       <div ref={anchor} className={styles.anchor} data-testid="snapshot-pdf-viewer-anchor">
         <PdfViewerPanel model={model} state={state} title={title} testId="snapshot-pdf-viewer" />
       </div>
-      <PdfPages pages={pages} highlight={highlight}
+      <PdfPages title={title} pages={pages} highlight={highlight} foldId={foldId}
         onOpenPage={state.loading !== null ? "busy" : (page) => { openPdfPageAtViewer(model, anchor.current, page); }} />
     </>
   );
 }
 
-function PdfPages({ pages, highlight, onOpenPage }: {
+function PdfPages({ title, pages, highlight, onOpenPage, foldId }: {
+  /** 접기 단추의 화면 낭독기 이름에만 쓴다. */
+  title: string;
   pages: readonly PublishedPdfPage[];
   highlight: PdfHighlight;
   /** null이면 단추 없음, "busy"면 요청 중이라 막는다. */
   onOpenPage: ((pageNumber: number) => void) | "busy" | null;
+  foldId?: string;
 }) {
   if (pages.length === 0) return <p className={styles.meta}>쪽 글이 없습니다.</p>;
   return (
@@ -121,7 +128,11 @@ function PdfPages({ pages, highlight, onOpenPage }: {
               )}
             </div>
             {page.readable
-              ? <p className={styles.pageText} data-testid="snapshot-pdf-page-text"><PageText text={page.text} highlight={own} /></p>
+              ? (
+                <FoldText id={foldId === undefined ? undefined : `${foldId}-page-${page.pageNumber}`} limit={FOLD_GENERATED} label={`${title} ${page.pageNumber}쪽`} reveal={own}>
+                  <p className={styles.pageText} data-testid="snapshot-pdf-page-text"><PageText text={page.text} highlight={own} /></p>
+                </FoldText>
+              )
               : <p className={styles.unreadable} data-testid="snapshot-pdf-page-unreadable">{UNREADABLE_PAGE_TEXT}</p>}
           </li>
         );

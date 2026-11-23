@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { splitSections, type Section } from "@/lib/author-description-sections";
 import { evidenceRepositoryOf, isOwnCommitLink, ownCommitsOf, type OwnCommit } from "@/lib/github-link-name";
 import { isGithubSourceUrl, splitGithubLinks, type TextSegment } from "@/lib/github-source-url";
+import { FOLD_AUTHORED, FOLD_GENERATED, FoldText } from "./fold-text";
 import { GithubLink } from "./github-link";
 import { orderedItems, pdfPageCount, type CatchSnapshot, type PublishedItem, type PublishedSnapshot, type TextMaterialSnapshot } from "./publications-api";
 import { PublishedPdfItem, type PdfCopySource } from "./published-pdf-item";
@@ -159,8 +160,10 @@ export const evidenceDetailsOpen = (toggle: EvidenceToggle, highlight: SnapshotH
  * 세 칸은 다른 표지로 나눈다(BR1.3·BR4.3·BR7.5). 기록 가운데 작업 사실은 펼쳐 두고, 본인 기여와 근거 목록은 「근거 자세히 보기」에 접는다.
  * 새 Catch NC2 선택 칸 셋(BR3.1~BR3.4)은 칸마다 따로 있는지 보고, 없으면(옛 사본) 그리지 않는다. 모두 React 텍스트로만 그린다(NFR5.1).
  * 저장소 줄은 이 부품 맨 위에 두어 제목(h3, `PublishedSnapshotView`) 바로 아래·불일치 표지 위에 온다.
+ * 긴 글은 높이만 줄여 접는다(#607): AI 설명 초안·작업 사실 목록은 12줄 초과 시 6줄, 작성자 설명은 18줄 초과 시 12줄. 강조가 가리키는 글은 펼친다.
+ * 「이 기록으로 알 수 없는 것」과 「근거 자세히 보기」는 접는 틀 밖에 그대로 둔다. `title`은 접기 단추의 화면 낭독기 이름에만, `foldId`는 접는 글 상자의 id 앞부분에만 쓴다.
  */
-function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; highlight: SnapshotHighlight | null }) {
+function CatchSnapshotView({ snapshot, highlight, title, foldId }: { snapshot: CatchSnapshot; highlight: SnapshotHighlight | null; title: string; foldId: string }) {
   const [toggle, setToggle] = useState<EvidenceToggle>(INITIAL_EVIDENCE_TOGGLE);
   const open = evidenceDetailsOpen(toggle, highlight);
   // 본인 커밋 목록은 사본을 받을 때 한 번 만들고 링크마다 견준다(NC2 성능 설계 「화면 계산」).
@@ -175,7 +178,9 @@ function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; h
       {snapshot.aiDraft !== null && (
         <section className={styles.snapshotSection} data-testid="snapshot-catch-ai-draft">
           <h4>AI 설명 초안</h4>
-          <p className={styles.freeText}>{snapshot.aiDraft}</p>
+          <FoldText id={`${foldId}-ai-draft`} limit={FOLD_GENERATED} label={`${title} AI 설명 초안`}>
+            <p className={styles.freeText}>{snapshot.aiDraft}</p>
+          </FoldText>
         </section>
       )}
       <section className={styles.snapshotSection} data-testid="snapshot-catch-description">
@@ -183,13 +188,19 @@ function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; h
         <h4>작성자 설명{snapshot.authorDescriptionEditedMonth !== undefined && (
           <>{" "}<span className={styles.small} data-testid="snapshot-catch-description-edited">{editedMonthText(snapshot.authorDescriptionEditedMonth)}</span></>
         )}</h4>
-        <AuthorDescriptionView text={snapshot.authorDescription} range={rangeFor(highlight, "authorDescription")}
-          evidenceRepository={evidenceRepositoryOf(snapshot.evidence.map((evidence) => evidence.sourceUrl))} ownCommits={ownCommits} />
+        <FoldText id={`${foldId}-description`} limit={FOLD_AUTHORED} label={`${title} 작성자 설명`} reveal={highlight?.fieldPath === "authorDescription" ? highlight : null}>
+          <AuthorDescriptionView text={snapshot.authorDescription} range={rangeFor(highlight, "authorDescription")}
+            evidenceRepository={evidenceRepositoryOf(snapshot.evidence.map((evidence) => evidence.sourceUrl))} ownCommits={ownCommits} />
+        </FoldText>
       </section>
       <section className={styles.snapshotSection} data-testid="snapshot-catch-facts">
         <h4>기록에서 확인한 내용</h4>
         {snapshot.workFacts.length > 0
-          ? <ul>{snapshot.workFacts.map((fact, index) => <li key={index}><PlainText text={fact} range={rangeFor(highlight, `workFacts[${index}]`)} /></li>)}</ul>
+          ? (
+            <FoldText id={`${foldId}-facts`} limit={FOLD_GENERATED} label={`${title} 기록에서 확인한 내용`} reveal={highlight?.fieldPath.startsWith("workFacts[") ? highlight : null}>
+              <ul>{snapshot.workFacts.map((fact, index) => <li key={index}><PlainText text={fact} range={rangeFor(highlight, `workFacts[${index}]`)} /></li>)}</ul>
+            </FoldText>
+          )
           : <p className={styles.muted}>{EMPTY_FACTS}</p>}
         {/* NC2 BR3.3: 작업 사실 바로 아래, 접힘 밖에 펼친 채 둔다. 항목은 사본 순서 그대로이고 PR 번호·식별값을 링크로 만들지 않는다. */}
         {snapshot.workLimits !== undefined && (
@@ -231,10 +242,13 @@ function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; h
   );
 }
 
-function TextMaterialSnapshotView({ snapshot, highlight }: { snapshot: TextMaterialSnapshot; highlight: SnapshotHighlight | null }) {
+/** 텍스트 자료 본문은 지원자가 쓴 글이라 18줄 초과 시 12줄로 접는다(#607). */
+function TextMaterialSnapshotView({ snapshot, highlight, title, foldId }: { snapshot: TextMaterialSnapshot; highlight: SnapshotHighlight | null; title: string; foldId: string }) {
   return (
     <div className={styles.snapshotBody}>
-      <LinkedText text={snapshot.body} testId="snapshot-text-body" range={rangeFor(highlight, "body")} />
+      <FoldText id={`${foldId}-body`} limit={FOLD_AUTHORED} label={`${title} 본문`} reveal={highlight?.fieldPath === "body" ? highlight : null}>
+        <LinkedText text={snapshot.body} testId="snapshot-text-body" range={rangeFor(highlight, "body")} />
+      </FoldText>
     </div>
   );
 }
@@ -260,14 +274,16 @@ export function PublishedSnapshotView({ snapshot, highlight = null, pdfSource }:
         <ol className={styles.snapshotItems}>
           {items.map((item) => {
             const own = highlight !== null && highlight.publishedItemId === item.publishedItemId ? highlight : null;
+            // 항목 요소의 id(`published-item-…`)와 앞부분이 겹치지 않게 따로 짓는다.
+            const foldId = `snapshot-fold-${item.publishedItemId}`;
             return (
               <li key={item.publishedItemId} id={publishedItemDomId(item.publishedItemId)} tabIndex={-1} className={styles.snapshotItem}
                 data-testid="snapshot-item" data-kind={item.itemKind} data-highlighted={own !== null || undefined}>
                 <h3 className={styles.snapshotTitle}><span className={styles.kindBadge}>{KIND_LABELS[item.itemKind]}</span> {item.title}</h3>
-                {item.itemKind === "CATCH" ? <CatchSnapshotView snapshot={item.snapshot} highlight={own} />
-                  : item.itemKind === "TEXT_MATERIAL" ? <TextMaterialSnapshotView snapshot={item.snapshot} highlight={own} />
+                {item.itemKind === "CATCH" ? <CatchSnapshotView snapshot={item.snapshot} highlight={own} title={item.title} foldId={foldId} />
+                  : item.itemKind === "TEXT_MATERIAL" ? <TextMaterialSnapshotView snapshot={item.snapshot} highlight={own} title={item.title} foldId={foldId} />
                   : <PublishedPdfItem title={item.title} pageCount={pdfPageCount(item)} pages={item.pdfPages ?? []} highlight={own}
-                    source={pdfSource?.(item.publishedItemId)} />}
+                    source={pdfSource?.(item.publishedItemId)} foldId={foldId} />}
               </li>
             );
           })}
