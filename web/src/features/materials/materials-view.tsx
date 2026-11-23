@@ -19,20 +19,13 @@ export type MaterialsListViewProps = {
 
 export type MaterialsTab = "text" | "pdf";
 
-const TABS: readonly { id: MaterialsTab; label: string }[] = [{ id: "text", label: "텍스트 자료" }, { id: "pdf", label: "PDF 자료" }];
+/**
+ * 자료 화면의 탭(U8 계획 10.1). 텍스트 자료(U4 W2)와 PDF 자료(U8 W1)를 오간다. 탭 이름·자리는 그대로이고,
+ * 탭 줄은 공용 `TabStrip`(이름 「자료 종류」)이 그린다(발행 프리셋 U3 BR5.1, 지운 `MaterialsTabs` 대신).
+ */
+export const MATERIALS_TABS: readonly { id: MaterialsTab; label: string }[] = [{ id: "text", label: "텍스트 자료" }, { id: "pdf", label: "PDF 자료" }];
 
-/** 자료 화면의 탭(U8 계획 10.1). 텍스트 자료(U4 W2)와 PDF 자료(U8 W1)를 오간다. */
-export function MaterialsTabs({ active, onChange }: { active: MaterialsTab; onChange: (tab: MaterialsTab) => void }) {
-  return (
-    <div role="tablist" aria-label="자료 종류" className={styles.tabs}>
-      {TABS.map((tab) => (
-        <button key={tab.id} type="button" role="tab" id={`materials-tab-${tab.id}`} aria-selected={active === tab.id}
-          aria-controls={`materials-panel-${tab.id}`} className={active === tab.id ? styles.tabActive : styles.tab}
-          data-testid={`materials-tab-${tab.id}`} onClick={() => onChange(tab.id)}>{tab.label}</button>
-      ))}
-    </div>
-  );
-}
+export const isMaterialsTab = (value: string): value is MaterialsTab => value === "text" || value === "pdf";
 
 const dateText = (value: string) => new Date(value).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" });
 

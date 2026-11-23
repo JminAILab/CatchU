@@ -34,7 +34,7 @@ const { PublicationManageService } = require('../../dist/publications/publicatio
 const { PublishedPdfViewService } = require('../../dist/publications/published-pdf-view.service');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
-  PUBLISH_SETTINGS, HOUR, setEnv, startApp, insertTextMaterial, consent, fakeAiRun, fakeIndexWriter, bindFakes, setClock, body,
+  PUBLISH_SETTINGS, HOUR, setEnv, startApp, insertTextMaterial, consent, fakeAiRun, fakeIndexWriter, bindFakes, setClock, presetBody,
   textItem, tokenOf, unlockRaw,
 } = require('./support.cjs');
 
@@ -120,7 +120,8 @@ const pdfItem = (sourceId) => ({ kind: 'PDF_MATERIAL', sourceId });
 /** 발행 API로 발행한다. 발행 빈도 제한(1분 10회)에 걸리지 않게 시계를 1분 넘게 옮긴다. 항목 ID는 작성자 상세에서 읽는다. */
 async function publish(member, items, { password } = {}) {
   now = new Date(now.getTime() + 61_000);
-  const response = await server.call('POST', '/publications', { token: member.token, body: body(items, password ? { password } : {}) });
+  const response = await server.call('POST', '/publications', {
+    token: member.token, body: await presetBody(db, member.memberId, items, password ? { password } : {}) });
   assert.equal(response.status, 201, response.text);
   const token = tokenOf(response.body.url);
   secrets.add(token);

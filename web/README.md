@@ -128,7 +128,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | 묶음 폴더 | 헤더 | 구성 (#55 10월 헤더 합의) |
 |---|---|---|
 | `src/app/(guest)/` | 비로그인 일반 | 왼쪽 로고(→ `/`) / 오른쪽 [Google로 시작하기](→ 로그인 진입). 내 자산·공유 링크·프로필은 없음 |
-| `src/app/(member)/` | 로그인 일반·발행자 | 왼쪽 로고(→ `/home`)·내 자산·텍스트 자료(U4)·발행본(U4)·JD 관리(U10) / 오른쪽 프로필. 10월의 [공유 링크]는 [발행본]으로 바뀌었고, 채용공고·알림은 뺐다(아래). 대표 구성 진입점은 없음 |
+| `src/app/(member)/` | 로그인 일반·발행자 | 왼쪽 로고(→ `/home`)·내 자산·텍스트 자료(U4)·프리셋(발행 프리셋 U2)·발행본(U4)·JD 관리(U10) / 오른쪽 프로필. 10월의 [공유 링크]는 [발행본]으로 바뀌었고, 채용공고·알림은 뺐다(아래). 대표 구성 진입점은 없음 |
 | `src/app/s/` | 공유 링크 수신자 | 이동 없는 CatchU 브랜드만. 로그인 여부와 무관하며 로그인·프로필 버튼 없음 |
 
 - **탭 아이콘:** `src/app/favicon.ico`(48px)와 `src/app/icon.png`를 Next가 모든 화면의 아이콘 링크로 내려 준다(#560). 바꾸려면 두 파일을 함께 바꾼다.
@@ -170,7 +170,10 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/materials` | 텍스트 자료 목록·편집 | U4 | 필요 | 확정 | U4 담당 결정 D3(2026-10-29, [U4 코드 요약](../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/code-generation/code-summary.md) 「구현 결정과 설계 후속 변경 기록」). 목록과 편집을 한 화면에 둔다([텍스트 자료](src/features/materials/README.md)) |
 | `/jds` | 본인 JD 관리 | U10 | 필요 | 확정 | 승인된 U10 구현 계획 Step 4의 내부 주소. [기능·연결 안내](src/features/jd/README.md) |
 | `/publications` | 발행본 목록 | U4 | 필요 | 확정 | U4 담당 결정 D4(2026-11-03). 최신순 목록, [URL 복사], [링크 열기](`ACTIVE`만)([발행·발행본](src/features/publications/README.md)) |
-| `/publications/new` | 발행 | U4 | 필요 | 확정 | 본인 Catch·텍스트 자료 고르기·순서·제목·비밀번호 → 확인 → 발행 완료를 한 화면에 둔다 |
+| `/publications/new` | 발행 | U4 | 필요 | 확정 | 프리셋 고르기·순서·제목·비밀번호 → 확인 → 발행 완료를 한 화면에 둔다(발행 프리셋 U2) |
+| `/presets` | 프리셋 목록 | 발행 프리셋 U2 | 필요 | 확정 | [발행 프리셋 U2 기능 설계](../aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md) BR1.2. 상단 메뉴 「프리셋」의 목적지. 50개까지 한 번에 보인다([프리셋](src/features/presets/README.md)) |
+| `/presets/new` | 새 프리셋 | 발행 프리셋 U2 | 필요 | 확정 | 첫 저장 뒤에는 라우터의 replace로 `/presets/[presetId]`에 옮기고(뒤로 가기 기록을 더하지 않음), 옮긴 화면이 「저장했습니다.」를 한 번 보인다 |
+| `/presets/[presetId]` | 프리셋 고치기 | 발행 프리셋 U2 | 필요 | 확정 | 이름·담을 자료·순서 고치기와 지우기. 「발행본」 주소 아래가 아니어서 메뉴의 「발행본」이 함께 켜지지 않는다 |
 | `/publications/[publicationId]` | 발행본 상세 | U4 | 필요 | 확정 | 사본·상태·만료·링크 주소, 링크 중지·삭제. 기본 요약 패널(U5) 자리는 비워 둠 |
 | `/s/[token]` | 받은 사람 발행본 열람(U4 W4) | C | 불필요 | 제안 | 수신자 전용 헤더. 10월 `/links`·`/s/[token]/catches/[catchId]`는 U4 제출 3(W6)에서 없앴다 |
 

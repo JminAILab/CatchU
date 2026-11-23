@@ -24,8 +24,15 @@ const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const nonEmpty = (value: unknown): value is string => typeof value === "string" && value.length > 0;
 
+/**
+ * 화면에 넘길 칸만 고른다. 발행 프리셋 칸(`presetOrdinal`·`presetName`, 계약 P-3)은 탭을 묶는 데 쓰므로 옮기고(발행 프리셋 U3 BR2.4),
+ * `isFirstCopy`·원본 ID 같은 그 밖의 칸은 와도 옮기지 않는다(U3 NFR4.1·NFR4.2).
+ */
 function pickItem(item: PublishedItem): PublishedItem {
-  const base = { publishedItemId: item.publishedItemId, position: item.position, title: item.title };
+  const base = {
+    publishedItemId: item.publishedItemId, position: item.position, title: item.title,
+    presetOrdinal: item.presetOrdinal, presetName: item.presetName,
+  };
   switch (item.itemKind) {
     case "CATCH": {
       const { workFacts, subjectContribution, evidence, authorDescription, aiDraft, mismatch, repositoryName, authorDescriptionEditedMonth, workLimits } = item.snapshot;

@@ -33,6 +33,13 @@ export class OwnerCatchStore {
       if (query.authorDescription !== undefined) {
         conditions.push(query.authorDescription === 'written' ? 'c.author_description IS NOT NULL' : 'c.author_description IS NULL');
       }
+      // 프리셋에 담을 수 있는 Catch만(발행 프리셋 U2 BR5.1): 발행 판정(eligibility.ts의 확인 필요 → 보호 → 비공개)과 같은 결과다.
+      // 보호 조건은 IS DISTINCT FROM으로 써서 보호 관측이 없는(NULL) Catch를 SQL에서 빼지 않는다. 그런 기록 문제는
+      // 지금처럼 응답을 만들 때 CatchReadIntegrityError(500)로 드러난다(U2 NFR 설계 검토 R-01).
+      if (query.publishable === true) {
+        conditions.push("c.visibility = 'PUBLIC'", 'c.work_facts_confirmed = true', 'c.contribution_confirmed = true',
+          "p.applied_restriction IS DISTINCT FROM 'SOURCE_PRIVATE'");
+      }
       // 다음 쪽 조건은 정렬(BR7.1)과 같은 순서의 고정 조각 둘 가운데 하나다. 값은 $n으로만 넘긴다(NC3 BR7.2).
       if (query.after !== undefined) {
         if (query.after.lastWorkAt === null) {

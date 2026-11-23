@@ -15,7 +15,7 @@
 
 | 함수 | 부르는 곳 | 하는 일 |
 |---|---|---|
-| `createPublishedIndexWriter({ dataSource, aiRun })` → `chunkInTransaction(manager, publicationId, now)` | U4 발행 트랜잭션 안(C-08 publish-sequence 3단계, 비공개 Catch 공개 전환 뒤·커밋 전) | 넘긴 manager로 `published_item`(PDF 항목이 있으면 `published_pdf_page`)을 읽어 `published_chunk`(임베딩 없음)와 `publication_index`(PENDING, 마감 = now + 10분)를 쓴다. 외부·큐 호출 없음. 예외면 U4가 트랜잭션을 되돌린다(발행 실패) |
+| `createPublishedIndexWriter({ dataSource, aiRun })` → `chunkInTransaction(manager, publicationId, now)` | U4 발행 트랜잭션 안(C-08 publish-sequence 3단계, 사본 쓰기 뒤·커밋 전. 발행 프리셋 U1부터 공개 전환 단계는 없다) | 넘긴 manager로 `published_item`(PDF 항목이 있으면 `published_pdf_page`)을 읽어 `published_chunk`(임베딩 없음)와 `publication_index`(PENDING, 마감 = now + 10분)를 쓴다. **앞선 사본만** 조각으로 만든다: `source_id`를 더 읽어 사본 읽기와 같은 판정 함수(`markFirstCopies`, 같은 원본에서 position이 가장 앞선 항목)로 거르고, seq는 남은 조각에 1부터 이어 매긴다(발행 프리셋 BR4.2, 계약 P-4). 같은 자료가 두 프리셋에 있어도 조각은 한 벌이라 질의응답·JD 요약 검색도 따른다. 외부·큐 호출 없음. 예외면 U4가 트랜잭션을 되돌린다(발행 실패) |
 | (U4) 커밋 뒤 `aiRun.enqueueAfterCommit('EMBED_PUBLICATION', 'EMBED_PUBLICATION-{publicationId}', { publicationId })` | U4 | 첫 임베딩 작업 등록 |
 | `requestReindex(publicationId, now)` → `REQUEUED \| NOT_FAILED` | U4 [검색 다시 준비](작성자 확인 뒤) | FAILED일 때만 PENDING·새 마감으로 돌리고 `EMBED_PUBLICATION-{publicationId}-{uuid}`로 다시 등록. 조각은 다시 나누지 않고 하루 실행 제한에 세지 않는다. 등록이 실패해도 `REQUEUED`(시한으로 FAILED 확정) |
 | `createEmbedPublicationHandler({ dataSource, provider })` | AiRun(U2)이 작업마다 부름 | 아래 「임베딩 작업」 |

@@ -16,6 +16,8 @@
 
 10월의 [정책 공급자](october-registration-policy.md)가 명시한 ‘관측 안 함·NONE’에도 위 공개 조건을 적용한다. NONE만으로 Catch를 공개하지 않고, 두 확인 항목과 별도의 PUBLIC 요청이 필요하다. 기존 SOURCE_PRIVATE 차단은 유지하고, 등록 뒤 원본의 비공개 전환은 10월에 자동 감지하지 않는다.
 
+발행은 Catch의 공개 상태를 바꾸지 않는다(발행 프리셋 intent U1 BR3.6). 12월 U4 발행은 고른 PRIVATE Catch를 PUBLIC으로 바꿨지만 이 전환은 없어졌고, 비공개 Catch가 든 발행은 `409 CATCH_PRIVATE`로 막힌다. 발행하려면 위 `PUT .../visibility`로 먼저 공개한다. 판정 순서와 응답은 [발행 API](publications.md#발행-api-제출-2)에 있다.
+
 ## C가 연결할 내부 조회
 
 C 모듈은 `CatchesModule`을 import하고 `PublicCatchStore`를 주입한다. C에서 **링크 유효성·만료·중단·비밀번호를 먼저 검증한 뒤**, 저장된 링크에서 얻은 소유자 ID로 호출한다. 수신자가 보낸 ownerId를 그대로 넘기면 안 된다. 이 서비스는 링크를 검증하지 않으며 별도 공개 HTTP 경로나 인증 예외를 만들지 않는다.

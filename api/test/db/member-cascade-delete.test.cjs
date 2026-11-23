@@ -68,6 +68,9 @@ const MEMBER_ROWS = {
   pdf_page_text: 'pdf_material_id IN (SELECT pdf_material_id FROM pdf_material WHERE member_id = $1)',
   published_pdf_page: `published_item_id IN (SELECT i.published_item_id FROM published_item i
     JOIN publication p ON p.publication_id = i.publication_id WHERE p.member_id = $1)`,
+  // 발행 프리셋 intent U1(계약 P-6, BR6.2): 프리셋(회원을 따라)·프리셋 항목(프리셋·Catch·텍스트 자료·PDF를 따라).
+  preset: 'member_id = $1',
+  preset_item: 'preset_id IN (SELECT preset_id FROM preset WHERE member_id = $1)',
 };
 // mcp_client(U6)는 회원을 가리키지 않아 탈퇴 뒤에도 남는다. 승인에 쓰인 등록은 정리 대상도 아니다(U6 기능 설계 BR2.4·S19).
 const SHARED_TABLES = ['allowed_scope_revision', 'repository_selection', 'mcp_client'];
@@ -156,8 +159,8 @@ async function memberWithAllData() {
     await m.query(`INSERT INTO publication (publication_id, member_id, title, link_token_reference, published_at, expires_at)
       VALUES ($1, $2, '합성 발행본', $3, now(), now() + interval '2160 hours')`, [publicationId, memberId, randomUUID()]);
     const publishedItemId = randomUUID();
-    await m.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot)
-      VALUES ($1, $2, 1, 'TEXT_MATERIAL', $3, '합성 자료', '{"body":"합성 본문"}')`, [publishedItemId, publicationId, textMaterialId]);
+    await m.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, preset_ordinal, preset_name)
+      VALUES ($1, $2, 1, 'TEXT_MATERIAL', $3, '합성 자료', '{"body":"합성 본문"}', 1, '합성 프리셋')`, [publishedItemId, publicationId, textMaterialId]);
     await m.query(`INSERT INTO publication_index (publication_id, status, deadline_at, updated_at)
       VALUES ($1, 'PENDING', now() + interval '10 minutes', now())`, [publicationId]);
     await m.query(`INSERT INTO published_chunk (chunk_id, publication_id, published_item_id, seq, field_path, char_start, char_end, source_kind, text)
@@ -174,11 +177,19 @@ async function memberWithAllData() {
     await m.query(`INSERT INTO pdf_page_text (pdf_page_text_id, pdf_material_id, page_number, text, readable)
       VALUES ($1, $2, 1, '합성 쪽 글', true)`, [randomUUID(), pdfMaterialId]);
     const pdfItemId = randomUUID();
-    await m.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, pdf_copy_key)
-      VALUES ($1, $2, 2, 'PDF_MATERIAL', $3, '합성 PDF', '{"pageCount":1}', $4)`,
+    await m.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, pdf_copy_key,
+        preset_ordinal, preset_name)
+      VALUES ($1, $2, 2, 'PDF_MATERIAL', $3, '합성 PDF', '{"pageCount":1}', $4, 1, '합성 프리셋')`,
     [pdfItemId, publicationId, pdfMaterialId, `members/${memberId}/publications/${publicationId}/${pdfItemId}.pdf`]);
     await m.query(`INSERT INTO published_pdf_page (published_pdf_page_id, published_item_id, page_number, text, readable)
       VALUES ($1, $2, 1, '합성 쪽 글', true)`, [randomUUID(), pdfItemId]);
+    // 발행 프리셋 U1: 그 회원의 Catch·텍스트 자료·PDF를 하나씩 담은 프리셋.
+    const presetId = randomUUID();
+    await m.query(`INSERT INTO preset (preset_id, member_id, name, created_at, updated_at) VALUES ($1, $2, '합성 프리셋', now(), now())`,
+      [presetId, memberId]);
+    await m.query(`INSERT INTO preset_item (preset_item_id, preset_id, position, catch_id, text_material_id, pdf_material_id)
+      VALUES ($1, $2, 1, $3, NULL, NULL), ($4, $2, 2, NULL, $5, NULL), ($6, $2, 3, NULL, NULL, $7)`,
+    [randomUUID(), presetId, output.application.registeredCatchIds[0], randomUUID(), textMaterialId, randomUUID(), pdfMaterialId]);
     const mcpClientId = randomUUID();
     await m.query(`INSERT INTO mcp_client (mcp_client_id, client_name, redirect_uris, registered_at, approved_at)
       VALUES ($1, '합성 Claude', ARRAY['https://claude.ai/api/mcp/auth_callback'], now(), now())`, [mcpClientId]);

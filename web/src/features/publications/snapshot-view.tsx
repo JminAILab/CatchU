@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { TabStrip } from "@/components/tab-strip/tab-strip";
 import { splitSections, type Section } from "@/lib/author-description-sections";
 import { evidenceRepositoryOf, isOwnCommitLink, ownCommitsOf, type OwnCommit } from "@/lib/github-link-name";
 import { isGithubSourceUrl, splitGithubLinks, type TextSegment } from "@/lib/github-source-url";
@@ -255,39 +256,93 @@ function TextMaterialSnapshotView({ snapshot, highlight, title, foldId }: { snap
 
 const KIND_LABELS: Record<PublishedItem["itemKind"], string> = { CATCH: "Catch", TEXT_MATERIAL: "텍스트 자료", PDF_MATERIAL: "PDF 자료" };
 
+/** 한 프리셋의 사본 묶음(탭 하나). */
+export type PresetGroup = { readonly ordinal: number; readonly name: string; readonly items: readonly PublishedItem[] };
+
 /**
- * 발행본 사본(C-10 `readSnapshot` 결과)을 항목 순서대로 보인다. 제목은 글자로만 그린다. 작성자 발행본 상세(W5)와 받은 사람 화면(W4)이 같은 표시를 쓴다.
- * `highlight`가 가리키는 항목만 강조 범위를 받고(`<mark>`), 항목마다 `id`·`tabIndex={-1}`을 두어 근거 위치로 옮길 수 있게 한다.
- * PDF 항목(U8)은 쪽 수·쪽 글을 보이고, `pdfSource`가 있으면 그 항목의 사본을 여는 단추를 둔다(받은 사람·작성자가 서로 다른 요청을 넘긴다).
+ * 사본 항목을 프리셋 순번(`presetOrdinal`) 오름차순으로 묶는다(발행 프리셋 U3 BR2.1). 묶음 안은 `position` 오름차순이고,
+ * 탭 이름은 묶음의 첫 항목(가장 작은 `position`) 이름이다. 같은 순번에 이름이 섞여 와도 응답을 거부하지 않고 첫 항목 이름을 쓴다(U3 NFR 요구 검토 Minor 1).
+ * 같은 자료의 사본이 두 프리셋에 있으면 두 묶음에 각각 든다(BR2.3, `publishedItemId`가 다르다).
  */
-export function PublishedSnapshotView({ snapshot, highlight = null, pdfSource }: {
+export function groupByPreset(snapshot: PublishedSnapshot): PresetGroup[] {
+  const byOrdinal = new Map<number, PublishedItem[]>();
+  for (const item of orderedItems(snapshot)) {
+    const items = byOrdinal.get(item.presetOrdinal);
+    if (items) items.push(item);
+    else byOrdinal.set(item.presetOrdinal, [item]);
+  }
+  // Map을 펼칠 때 `[...map]` 대신 Array.from을 쓴다(시험이 쓰는 기본 변환 대상에서는 펼침이 반복자를 읽지 않는다).
+  return Array.from(byOrdinal.entries()).sort(([a], [b]) => a - b).map(([ordinal, items]) => ({ ordinal, name: items[0].presetName, items }));
+}
+
+/** 출처 이동으로 탭이 바뀌었을 때의 알림(BR4.2). `seq`가 바뀌면 같은 글이어도 알림을 다시 그린다. */
+export type TabNotice = { readonly ordinal: number; readonly presetName: string; readonly seq: number };
+
+/** 탭 줄 `idPrefix`. 탭·패널 id는 `publication-snapshot-tab-(순번)`·`publication-snapshot-panel-(순번)`이고 이름을 넣지 않는다(NFR3.2). */
+const SNAPSHOT_TABS_ID = "publication-snapshot";
+
+function SnapshotItemView({ item, highlight, pdfSource }: {
+  item: PublishedItem; highlight: SnapshotHighlight | null; pdfSource?: (publishedItemId: string) => PdfCopySource;
+}) {
+  const own = highlight !== null && highlight.publishedItemId === item.publishedItemId ? highlight : null;
+  // 접는 글 상자의 id 앞부분(#607). 항목 요소의 id(`published-item-…`)와 앞부분이 겹치지 않게 따로 짓는다.
+  const foldId = `snapshot-fold-${item.publishedItemId}`;
+  return (
+    <li id={publishedItemDomId(item.publishedItemId)} tabIndex={-1} className={styles.snapshotItem}
+      data-testid="snapshot-item" data-kind={item.itemKind} data-highlighted={own !== null || undefined}>
+      <h3 className={styles.snapshotTitle}><span className={styles.kindBadge}>{KIND_LABELS[item.itemKind]}</span> {item.title}</h3>
+      {item.itemKind === "CATCH" ? <CatchSnapshotView snapshot={item.snapshot} highlight={own} title={item.title} foldId={foldId} />
+        : item.itemKind === "TEXT_MATERIAL" ? <TextMaterialSnapshotView snapshot={item.snapshot} highlight={own} title={item.title} foldId={foldId} />
+        : <PublishedPdfItem title={item.title} pageCount={pdfPageCount(item)} pages={item.pdfPages ?? []} highlight={own}
+          source={pdfSource?.(item.publishedItemId)} foldId={foldId} />}
+    </li>
+  );
+}
+
+/**
+ * 발행본 사본(C-10 `readSnapshot` 결과)을 프리셋 탭으로 나눠 보인다(발행 프리셋 U3 흐름 1, M5·M6). 작성자 발행본 상세와 받은 사람 화면이 같은 표시를 쓴다.
+ *
+ * - 「발행본 자료」 아래 알림 칸(`aria-live="polite"`, 출처 이동으로 탭이 바뀌었을 때만 글) → 탭 줄(이름 「발행본 자료」, 프리셋이 하나여도 있음, 개수 없음)
+ *   → 열린 탭의 패널(프리셋 이름 전체 → 항목들)이다. 탭 이름은 CSS로만 줄이고 이름은 모두 글자로만 그린다(BR1.5·BR2.2·BR2.5).
+ * - 모든 탭의 패널을 그려 두고 열리지 않은 패널은 `hidden`이다. 패널 key가 순번이라 탭을 오가도 PDF 뷰어가 받은 파일·보던 쪽이 남는다(BR1.4).
+ * - 열린 탭(`activePreset`)과 바꾸기(`onPresetChange`)·알림(`tabNotice`)은 부르는 화면이 `useSnapshotJump`로 넘긴다. 열린 탭이 없거나 사본에 없으면 첫 탭이다.
+ * - 항목 그리기는 그대로다: 제목은 글자로만, `highlight`가 가리키는 항목만 강조 범위를 받고(`<mark>`), 항목마다 `id`·`tabIndex={-1}`을 두어
+ *   근거 위치로 옮길 수 있게 한다. PDF 항목(U8)은 `pdfSource`가 있으면 그 항목의 사본을 여는 단추를 둔다(누를 때만 요청한다).
+ */
+export function PublishedSnapshotView({ snapshot, highlight = null, pdfSource, activePreset = null, onPresetChange, tabNotice = null }: {
   snapshot: PublishedSnapshot;
   highlight?: SnapshotHighlight | null;
   /** PDF 항목의 사본을 받는 방법. 항목 ID로 요청을 만든다. */
   pdfSource?: (publishedItemId: string) => PdfCopySource;
+  /** 열린 탭의 프리셋 순번. */
+  activePreset?: number | null;
+  /** 탭을 누르거나 화살표로 옮길 때. */
+  onPresetChange?: (ordinal: number) => void;
+  /** 출처 이동으로 탭이 바뀐 알림. 열린 탭과 같은 순번일 때만 보인다. */
+  tabNotice?: TabNotice | null;
 }) {
-  const items = orderedItems(snapshot);
+  const groups = groupByPreset(snapshot);
+  const open = groups.find((group) => group.ordinal === activePreset) ?? groups[0];
   return (
     <section className={styles.snapshot} aria-labelledby="publication-snapshot-title" data-testid="publication-snapshot">
       <h2 id="publication-snapshot-title">발행본 자료</h2>
-      {items.length === 0 ? <p className={styles.muted}>사본에 항목이 없습니다.</p> : (
-        <ol className={styles.snapshotItems}>
-          {items.map((item) => {
-            const own = highlight !== null && highlight.publishedItemId === item.publishedItemId ? highlight : null;
-            // 항목 요소의 id(`published-item-…`)와 앞부분이 겹치지 않게 따로 짓는다.
-            const foldId = `snapshot-fold-${item.publishedItemId}`;
-            return (
-              <li key={item.publishedItemId} id={publishedItemDomId(item.publishedItemId)} tabIndex={-1} className={styles.snapshotItem}
-                data-testid="snapshot-item" data-kind={item.itemKind} data-highlighted={own !== null || undefined}>
-                <h3 className={styles.snapshotTitle}><span className={styles.kindBadge}>{KIND_LABELS[item.itemKind]}</span> {item.title}</h3>
-                {item.itemKind === "CATCH" ? <CatchSnapshotView snapshot={item.snapshot} highlight={own} title={item.title} foldId={foldId} />
-                  : item.itemKind === "TEXT_MATERIAL" ? <TextMaterialSnapshotView snapshot={item.snapshot} highlight={own} title={item.title} foldId={foldId} />
-                  : <PublishedPdfItem title={item.title} pageCount={pdfPageCount(item)} pages={item.pdfPages ?? []} highlight={own}
-                    source={pdfSource?.(item.publishedItemId)} foldId={foldId} />}
-              </li>
-            );
-          })}
-        </ol>
+      {open === undefined ? <p className={styles.muted}>사본에 항목이 없습니다.</p> : (
+        <>
+          <p className={styles.small} aria-live="polite" data-testid="snapshot-tab-notice">
+            {tabNotice !== null && tabNotice.ordinal === open.ordinal && <span key={tabNotice.seq}>{tabNotice.presetName} 탭을 열었습니다</span>}
+          </p>
+          <TabStrip label="발행본 자료" idPrefix={SNAPSHOT_TABS_ID} tabTestId="snapshot-preset-tab" keepInactive truncateLabels
+            tabs={groups.map((group) => ({ id: String(group.ordinal), label: group.name }))} active={String(open.ordinal)}
+            onChange={(id) => onPresetChange?.(Number(id))}
+            panels={Object.fromEntries(groups.map((group) => [String(group.ordinal), (
+              <>
+                <p className={styles.presetName} data-testid="snapshot-preset-name">{group.name}</p>
+                <ol className={styles.snapshotItems}>
+                  {group.items.map((item) => <SnapshotItemView key={item.publishedItemId} item={item} highlight={highlight} pdfSource={pdfSource} />)}
+                </ol>
+              </>
+            )]))} />
+        </>
       )}
     </section>
   );

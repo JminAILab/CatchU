@@ -12,10 +12,13 @@ const PDF_ID = '66666666-6666-4666-8666-666666666666';
 function snapshot(items) {
   return { title: `${TITLE_MARKER} 발행본`, publishedAt: new Date(), expiresAt: new Date(), items };
 }
+// 발행 프리셋 U1의 사본 칸 셋(NFR2.12). 겹친 사본이 없는 사본은 모든 항목이 앞선 사본이다.
+const PRESET_MARKER = '[합성-프리셋-이름-c3]';
+const FIRST = { presetOrdinal: 1, presetName: PRESET_MARKER, isFirstCopy: true };
 const catchItem = (overrides = {}, position = 1) => ({ publishedItemId: CATCH_ID, position, itemKind: 'CATCH', title: `${TITLE_MARKER} 항목`,
-  snapshot: { ...catchSnapshot(), ...overrides }, pdfPages: null });
+  snapshot: { ...catchSnapshot(), ...overrides }, pdfPages: null, ...FIRST });
 const textItem = (body, position = 2) => ({ publishedItemId: TEXT_ID, position, itemKind: 'TEXT_MATERIAL', title: `${TITLE_MARKER} 자료`,
-  snapshot: { body }, pdfPages: null });
+  snapshot: { body }, pdfPages: null, ...FIRST });
 
 test('Catch는 workFacts → subjectContribution → evidence.representedFacts → authorDescription 순서, 텍스트는 body, 항목은 position 순서다', () => {
   const value = catchSnapshot();
@@ -59,7 +62,8 @@ test('빈 필드·공백만인 필드·null 작성자 설명은 빼고, UTF-16 �
 
 test('PDF는 읽을 수 있는 쪽만 pages[n](n 오름차순)으로, 위치에 pdfPage를 둔다', () => {
   const pdf = { publishedItemId: PDF_ID, position: 1, itemKind: 'PDF_MATERIAL', title: '자료', snapshot: { pageCount: 3 }, pdfPages: [
-    { pageNumber: 3, text: '셋째 쪽', readable: true }, { pageNumber: 1, text: '첫 쪽', readable: true }, { pageNumber: 2, text: '', readable: false }] };
+    { pageNumber: 3, text: '셋째 쪽', readable: true }, { pageNumber: 1, text: '첫 쪽', readable: true }, { pageNumber: 2, text: '', readable: false }],
+    ...FIRST };
   const sources = buildSummarySources(snapshot([pdf]));
   assert.deepEqual(sources.map((s) => [s.location.fieldPath, s.location.pdfPage, s.sourceKind, s.text]), [
     ['pages[1]', 1, 'AUTHOR_MATERIAL', '첫 쪽'], ['pages[3]', 3, 'AUTHOR_MATERIAL', '셋째 쪽']]);
@@ -74,6 +78,8 @@ test('사본 모양이 틀리면 TypeError로 멈춘다(처리기가 FAILED로 �
     { ...textItem('a'), snapshot: null },
     { ...textItem('a'), itemKind: 'VIDEO' },
     { ...textItem('a'), publishedItemId: 7 },
+    // 발행 프리셋 U1: isFirstCopy는 필수 칸이다(NFR2.12). 없는 사본을 앞선 사본으로 짐작하지 않는다.
+    { ...textItem('a'), isFirstCopy: undefined },
   ]) {
     assert.throws(() => buildSummarySources(snapshot([broken])), TypeError);
   }
@@ -99,4 +105,20 @@ test('NC2 AC6.5.1·AC6.5.2 새 칸 넷과 표지 글자는 요약 근거에 0건
     'workFacts[0]', 'workFacts[1]', 'subjectContribution', 'evidence[0].representedFacts[0]', 'evidence[0].representedFacts[1]', 'authorDescription']);
   const text = JSON.stringify(sources);
   for (const marker of ['REPOMARKER', 'LIMITMARKER', '2026-11', '이 작업의 본인 커밋', 'ownCommit']) assert.equal(text.includes(marker), false, marker);
+});
+
+// 발행 프리셋 U1 — 겹친 사본(BR4.3, ADR-006 팀장 결정). 먼저 정한 시나리오(unit-test-instructions 「앞선 사본」):
+// - 같은 Catch가 두 프리셋에 들어 사본 항목이 둘(앞선 사본 position 1, 겹친 사본 position 3)이다.
+// - 기대: 그 Catch의 근거는 앞선 사본의 것으로 한 번만 쓰이고, 겹친 사본 항목 ID의 근거는 0건이다. 프리셋 이름은 근거에 없다.
+// - 실패 조건: 같은 근거가 두 번 쓰임, 프리셋 이름이 근거에 나옴.
+test('발행 프리셋 BR4.3: 같은 Catch가 두 프리셋에 든 사본에서 그 근거는 요약 근거에 한 번만 쓰이고 프리셋 이름은 넣지 않는다', () => {
+  const COPY_ID = '77777777-7777-4777-8777-777777777777';
+  const first = catchItem({}, 1);
+  const copy = { ...catchItem({}, 3), publishedItemId: COPY_ID, presetOrdinal: 2, presetName: `${PRESET_MARKER} 둘째`, isFirstCopy: false };
+  const sources = buildSummarySources(snapshot([first, textItem('자료 본문', 2), copy]));
+  const single = buildSummarySources(snapshot([first, textItem('자료 본문', 2)]));
+  assert.deepEqual(sources, single, '겹친 사본이 없을 때와 근거가 같다');
+  assert.equal(sources.filter((s) => s.location.publishedItemId === COPY_ID).length, 0);
+  assert.equal(sources.filter((s) => s.location.fieldPath === 'workFacts[0]').length, 1, '같은 근거가 한 번만');
+  assert.equal(JSON.stringify(sources).includes(PRESET_MARKER), false, '프리셋 이름은 외부 AI에 보내지 않는다(NFR4.4)');
 });

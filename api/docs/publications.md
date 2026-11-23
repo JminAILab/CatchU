@@ -8,7 +8,7 @@
 
 | 계약 | 표·칸 | 위치 |
 | --- | --- | --- |
-| C-07 | `publication`, `published_item` | `src/publications/publication.entity.ts`, 사본 모양은 `published-snapshot.ts` |
+| C-07 | `publication`, `published_item`(발행 프리셋 P-3: `preset_ordinal` 1~5·`preset_name` 필수) | `src/publications/publication.entity.ts`, 사본 모양은 `published-snapshot.ts` |
 | C-13 | `text_material` | `src/materials/text-material.entity.ts` |
 | C-14 | `catch_asset.author_description`, `author_description_updated_at` | `src/catches/entities/catch-asset.entity.ts` |
 
@@ -18,6 +18,7 @@
 - `published_pdf_page`(U8)·`publication_index`·`published_chunk`(U3)는 각 제공 Unit이 만든다.
 - PDF 자료(업로드·추출·발행의 PDF 부분·PDF 사본 열람 경로)는 [PDF 자료 문서](pdf-materials.md)에 있다(U8).
 - 발행본 상태(ACTIVE·STOPPED·EXPIRED)는 저장하지 않고 `publication-state.ts`의 `publicationState`로 구한다. 중지가 만료보다 우선한다.
+- 발행 프리셋 U1 마이그레이션 `1795140270696-AddPublicationPresets`는 프리셋 표 둘([프리셋 문서](presets.md))을 만들고 **변경 전 발행본 행을 모두 지운 뒤** 프리셋 칸 둘을 기본값 없이 더한다(BR5.1). 옛 링크는 404 `LINK_UNAVAILABLE`, `down`은 지운 발행본을 되살리지 않는다. 사본 PDF 파일은 **배포 전에** 팀장이 지운다(BR5.2, [프리셋 문서 「배포」](presets.md#배포)).
 
 ## Catch 작성자 설명 API (C-14, 제출 1)
 
@@ -119,28 +120,30 @@ imports: `OwnerProfileReaderModule`(소유 회원 상태), U2 `AiRunModule`·`Da
 
 ## 발행 API (제출 2)
 
-`src/publications/publish.service.ts`·`publish-input.ts`·`snapshot-builder.ts`, 컨트롤러 `publications.controller.ts`. 전역 인증 Guard·오류 형식·`no-store`는 10월 공통 기반 그대로이고 `@Public()`을 붙이지 않는다.
+`src/publications/publish.service.ts`·`publish-input.ts`, 사본 내용·글자 수·자격 판정·잠금 SQL은 `src/publishable-source/`(프리셋 경로와 같은 규칙, 발행 프리셋 U1), 컨트롤러 `publications.controller.ts`. 전역 인증 Guard·오류 형식·`no-store`는 10월 공통 기반 그대로이고 `@Public()`을 붙이지 않는다.
 
 | 경로 | 요청 | 성공 | 오류 |
 | --- | --- | --- | --- |
-| `POST /v1/publications` | `{ title, password?, items: [{ kind: CATCH \| TEXT_MATERIAL, sourceId }] }` | 201 `{ publicationId, url, state: ACTIVE, publishedAt, expiresAt, passwordProtected }` | 400 `VALIDATION_FAILED`, 401, 403 `AI_CONSENT_REQUIRED`, 404 `RESOURCE_UNAVAILABLE`, 409 `CONFIRMATION_REQUIRED`·`SOURCE_RESTRICTED`(`details.catchIds`), 429 `RATE_LIMITED`(`Retry-After`)·`DAILY_LIMIT_REACHED`, 500 |
+| `POST /v1/publications` | `{ title, password?, presetIds: uuid[] }`(발행 프리셋 계약 P-2. 옛 `items` 칸은 정의 밖이라 400) | 201 `{ publicationId, url, state: ACTIVE, publishedAt, expiresAt, passwordProtected }` | 400 `VALIDATION_FAILED`(추출 미완료는 `details.blockedSources`도), 401, 403 `AI_CONSENT_REQUIRED`, 404 `RESOURCE_UNAVAILABLE`, 409 `CONFIRMATION_REQUIRED`·`SOURCE_RESTRICTED`·`CATCH_PRIVATE`(`details.blockedSources`), 429 `RATE_LIMITED`(`Retry-After`)·`DAILY_LIMIT_REACHED`, 500 |
 
-판정 순서(성능 설계 「판정 위치와 순서」, BR4.8→BR4.1·BR4.5→BR4.7→BR5.1):
+판정 순서(성능 설계 「판정 위치와 순서」, BR4.8→BR4.1·BR4.5→BR4.7→BR5.1, 발행 프리셋 기능 명세 W4):
 
 1. 회원별 발행 빈도(`PUBLISH_RATE_LIMIT`, 키는 회원 ID). 초과면 입력 검사 전에 429 `RATE_LIMITED`와 `Retry-After`(초). 거부한 요청은 세지 않는다.
-2. 입력: 제목은 앞뒤 공백을 지운 뒤 1~50자(코드 포인트), 비밀번호는 있으면 그대로 8~64자(trim·정규화 없음), 항목 1~20개, `kind`는 `CATCH`·`TEXT_MATERIAL`만, `sourceId`는 UUID, 같은 `(kind, sourceId)` 중복 불가, 정의 밖 필드·쿼리 거부. `details.violations`의 `field`는 `title`·`password`·`items`·`items[i]`·`items[i].kind`·`items[i].sourceId`·`body`이고 값은 담지 않는다.
+2. 입력: 제목은 앞뒤 공백을 지운 뒤 1~50자(코드 포인트), 비밀번호는 있으면 그대로 8~64자(trim·정규화 없음), `presetIds`는 1~5개·UUID·같은 ID 두 번 안 됨(BR3.1), 정의 밖 필드·쿼리 거부. `details.violations`의 `field`는 `title`·`password`·`presetIds`·`presetIds[i]`·`body`이고 값은 담지 않는다.
 3. 동의 `AiConsentGate.require` → 403(하루 횟수를 쓰지 않음).
-4. 트랜잭션 밖에서 토큰(`generateLinkToken`)과 scrypt 검증값(`hashLinkPassword`)을 만든다.
-5. READ COMMITTED 트랜잭션: 회원 행 `FOR KEY SHARE` → `DailyRunLimit.consume(작성자, 'BASE_SUMMARY', now, manager)`(`LIMIT_REACHED`면 되돌리고 429) → Catch를 `catch_id` 오름차순으로 `FOR NO KEY UPDATE`(10월 공개 전환과 같은 잠금), 그다음 텍스트 자료를 `text_material_id` 오름차순으로 `FOR UPDATE`로 잠그고 다시 읽음(남의 것·없음 404) → 자격: 미확인 Catch가 하나라도 있으면 409 `CONFIRMATION_REQUIRED`, 그다음 원 요청의 저장소 보호 관측을 `FOR SHARE`로 읽어 확인된 `SOURCE_PRIVATE`면 409 `SOURCE_RESTRICTED`(둘 다 `details.catchIds`에 해당 Catch만; 원 요청 불일치·관측 없음·불완전은 10월처럼 500, 비공개로 단정하지 않음 BR7.4) → 전체 글(SnapshotTextTotal: `workFacts`·`subjectContribution`·`evidence[].representedFacts`·`authorDescription`·`body`의 코드 포인트 합, 제목·`aiDraft`·주소 제외)이 60,000자를 넘으면 400 `{ field: 'items', reason: 'maxTotalLength' }` → `publication`(`published_at = now`, `expires_at = now + 2160시간`)·`published_item`(요청 순서 1..n, 사본은 C-07 모양, Catch 제목이 없으면 '제목 없는 Catch', `aiDraft`는 `draft_status = GENERATED`일 때만) 쓰기 → 고른 PRIVATE Catch를 PUBLIC으로 → `PublishedIndexWriter.chunkInTransaction(manager, publicationId, now)` → 커밋. 어느 단계든 실패하면 전부(하루 횟수 포함) 되돌아간다.
-6. 커밋 뒤 `AiRun.enqueueAfterCommit('EMBED_PUBLICATION', 'EMBED_PUBLICATION-{publicationId}', { publicationId })`와 `('BASE_SUMMARY', 'BASE_SUMMARY-{publicationId}', { publicationId })`를 **항상** 차례로 등록한다(C-08 publish-sequence 4, 팀장 결정 2026-11-03 1: 켜고 끄는 설정 없음). `ENQUEUE_FAILED`는 로그만 남기고 201이다(시한으로 실패 확정, C-02). 앱 기동 시 U5가 `BASE_SUMMARY` 처리기를 등록한다. 큐가 없어 작업이 실행되지 않으면 발행 후 10분부터 요약은 `FAILED`로 표시된다([rag-answer.md](rag-answer.md)).
+4. 프리셋 펴기(BR3.2): 트랜잭션 밖에서 요청 회원의 프리셋을 한 번 읽어(`PresetStore.expand`, 남의 것·없는 것 404) 고른 순서대로, 그 안에서 프리셋 안 자리 순서대로 잇는다. 그 뒤 프리셋이 바뀌어도 읽은 내용으로 발행한다. 항목 0개인 프리셋이 있으면 400 `{ field: 'presetIds[i]', reason: 'emptyPreset' }`(BR3.3), 편 항목이 20개를 넘으면 400 `{ field: 'presetIds', reason: 'maxItems' }`(BR3.4). 같은 자료가 두 프리셋에 있으면 항목도 둘이다.
+5. 트랜잭션 밖에서 토큰(`generateLinkToken`)과 scrypt 검증값(`hashLinkPassword`)을 만든다. PDF가 있으면 추출 확인과 편 항목마다 사본 복사(같은 PDF가 두 프리셋이면 두 벌, [PDF 자료 문서](pdf-materials.md)).
+6. READ COMMITTED 트랜잭션: 회원 행 `FOR KEY SHARE` → `DailyRunLimit.consume(작성자, 'BASE_SUMMARY', now, manager)`(`LIMIT_REACHED`면 되돌리고 429) → 종류별로 중복을 없앤 ID 집합으로 Catch를 `catch_id` 오름차순으로 `FOR NO KEY UPDATE`, 그다음 텍스트 자료를 `text_material_id` 오름차순으로 `FOR UPDATE`로 잠그고 다시 읽음(남의 것·없음 404) → 자격(`blockingCatches`, 처음 걸린 이유 하나): 미확인 Catch가 하나라도 있으면 409 `CONFIRMATION_REQUIRED` → 원 요청 불일치·보호 관측 없음·불완전은 10월처럼 500(비공개로 단정하지 않음 BR7.4) → 보호 관측을 `FOR SHARE`로 읽어 확인된 `SOURCE_PRIVATE`면 409 `SOURCE_RESTRICTED` → 비공개 Catch면 409 `CATCH_PRIVATE`(「비공개 Catch는 발행할 수 없습니다.」, BR3.5). 비공개 Catch를 공개로 바꾸는 쓰기는 없다(BR3.6, [Catch 공개 상태](catch-visibility.md)) → 전체 글(SnapshotTextTotal: `workFacts`·`subjectContribution`·`evidence[].representedFacts`·`authorDescription`·`body`·PDF 쪽 글의 코드 포인트 합, 제목·`aiDraft`·주소 제외)을 **편 항목마다** 더해(같은 자료·PDF가 두 프리셋이면 두 번) 60,000자를 넘으면 400 `{ field: 'presetIds', reason: 'maxTotalLength' }` → `publication`(`published_at = now`, `expires_at = now + 2160시간`)·`published_item`(편 순서 1..n, `preset_ordinal`·`preset_name`은 읽은 프리셋 순번·이름의 복사, 사본은 C-07 모양, Catch 제목이 없으면 '제목 없는 Catch', `aiDraft`는 `draft_status = GENERATED`일 때만) 쓰기 → `PublishedIndexWriter.chunkInTransaction(manager, publicationId, now)`(앞선 사본만 조각) → 커밋. 어느 단계든 실패하면 전부(하루 횟수 포함) 되돌아간다.
+7. 커밋 뒤 `AiRun.enqueueAfterCommit('EMBED_PUBLICATION', 'EMBED_PUBLICATION-{publicationId}', { publicationId })`와 `('BASE_SUMMARY', 'BASE_SUMMARY-{publicationId}', { publicationId })`를 **항상** 차례로 등록한다(C-08 publish-sequence 4, 팀장 결정 2026-11-03 1: 켜고 끄는 설정 없음). `ENQUEUE_FAILED`는 로그만 남기고 201이다(시한으로 실패 확정, C-02). 앱 기동 시 U5가 `BASE_SUMMARY` 처리기를 등록한다. 큐가 없어 작업이 실행되지 않으면 발행 후 10분부터 요약은 `FAILED`로 표시된다([rag-answer.md](rag-answer.md)).
 
 - 토큰은 응답 `url`(`buildRecipientLinkUrl(SHARE_LINK_WEB_BASE_URL, token)`) 안에만 있다. 비밀번호 원문은 저장·응답·로그에 없다.
 - 재전송·두 번 누르기 방지는 없다(BR4.9). web이 응답까지 버튼을 막는다.
-- 409의 `details.catchIds`를 위해 공통 오류 `ErrorDetails`(`src/common/errors/api-error.ts`)에 `catchIds?: string[]`(UUID만)을 더했다. 공통 필터가 UUID 형식이 아닌 값은 버린다. 계약 common.yaml의 `details` 허용 키(두 개) 바깥에 추가한 항목이다. 팀장 확인(#468).
+- 막힌 자료는 `details.blockedSources: [{ presetId, kind, sourceId }]`(그 자료가 든 프리셋마다 한 줄, 이름·내용 없음) 하나로만 알린다(P-2, NFR4.2). 공통 필터는 UUID·정해진 `kind`인 줄의 세 칸만 옮긴다. 12월 U4의 `details.catchIds`와 추출 미완료의 `items[i].sourceId` 위반은 없어졌고(R-03), 추출 미완료 400은 `violations: [{ field: 'presetIds', reason: 'extractionIncomplete' }]`도 싣는다.
+- 사본 항목은 `presetOrdinal`·`presetName`을 싣는다. api 안 사본 읽기(C-10)는 `isFirstCopy`(같은 원본에서 가장 앞선 사본만 참, `markFirstCopies`)도 싣고, 받은 사람·작성자 응답은 그 칸을 뺀다(`snapshotResponse`, BR4.5). 원본 ID는 어떤 사본에도 없다.
 
 ### 사본 선택 칸 넷 (새 Catch NC2, 계약 C3)
 
-새 Catch intent NC2([기능 설계](../../aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md) BR1.1~BR1.6)가 Catch 사본에 선택 칸 넷을 더했다. 발행 트랜잭션 안에서 위 5단계의 잠금·근거 읽기와 함께 정하고, 발행 뒤에는 바뀌지 않는다. 칸이 없는 사본(이 변경 전 사본)도 올바른 사본이다.
+새 Catch intent NC2([기능 설계](../../aidlc/spaces/default/intents/261109-new-catch/construction/nc2-snapshot-fields/functional-design/rules.md) BR1.1~BR1.6)가 Catch 사본에 선택 칸 넷을 더했다. 발행 트랜잭션 안에서 위 6단계의 잠금·근거 읽기와 함께 정하고, 발행 뒤에는 바뀌지 않는다. 칸이 없는 사본(이 변경 전 사본)도 올바른 사본이다.
 
 | 칸 | 값 | 없을 때 |
 | --- | --- | --- |
@@ -161,7 +164,7 @@ imports: `OwnerProfileReaderModule`(소유 회원 상태), U2 `AiRunModule`·`Da
 | 경로 | 요청 | 성공 | 오류 |
 | --- | --- | --- | --- |
 | `GET /v1/publications` | `cursor`·`limit`(1~100, 기본 20) | 200 `{ items: [{ publicationId, title, url, state, publishedAt, expiresAt, passwordProtected }], page: { nextCursor } }` | 400, 401 |
-| `GET /v1/publications/{id}` | — | 200 `{ publicationId, url, state, passwordProtected, snapshot: PublishedSnapshot }`(제목·발행·만료 시각은 `snapshot` 안) | 401, 404 |
+| `GET /v1/publications/{id}` | — | 200 `{ publicationId, url, state, passwordProtected, snapshot: PublishedSnapshot }`(제목·발행·만료 시각은 `snapshot` 안, 항목에 `presetOrdinal`·`presetName`, `isFirstCopy`는 뺌) | 401, 404 |
 | `PUT /v1/publications/{id}/stop` | 본문 없음 | 200 `{ state, stoppedAt }`: ACTIVE면 `STOPPED`와 지금 시각, 이미 STOPPED면 처음 시각 유지, EXPIRED면 `{ state: 'EXPIRED', stoppedAt: null }`(쓰지 않음) | 401, 404 |
 | `DELETE /v1/publications/{id}` | — | 204 | 401, 404, 500 `INTERNAL_ERROR`(접두어 삭제 실패, DB 유지) |
 
@@ -192,12 +195,14 @@ Nest `Logger('Publications')`(`src/publications/publications-log.ts`)로 사건�
 ## 시험
 
 - `test/publications/in-memory-publication-access.test.cjs`: 가짜 구현의 판정이 계약 C-10과 U4 설계의 판정 순서(삭제·중지·만료 → grant)와 같은지, 판정 뒤 중지·만료·삭제와 다음 요청 재판정(OQ-U4-NFR-5 경계)
-- `test/db/publication-tables.test.cjs`: 위 표의 DB 제약
+- `test/db/publication-tables.test.cjs`: 위 표의 DB 제약, 프리셋 칸 둘·프리셋 표 제약, 발행 프리셋 마이그레이션 up·down(변경 전 발행본 삭제·옛 링크 404, 한 트랜잭션 안에서 되돌림)
 - `test/db/member-cascade-delete.test.cjs`: 새 표도 회원 탈퇴 때 함께 지워지는지
 - `test/catches/author-description-api.test.cjs`(제출 1): S1(저장·두 번 저장·공백·4,000/4,001자·형식 거부·남의 Catch 404·로그 비노출)·S2(재분석 뒤 설명 유지, 새 Catch는 NULL). 격리 스키마(`catch-db-fixture`)와 실제 Catch 등록 코드를 쓴다
 - `test/materials/text-materials-api.test.cjs`(제출 1): S3(CRUD·경계값·회원 두 명 교차 접근 404·cursor·로그 비노출). 실제 `AppModule`과 개발 로그인 합성 회원을 쓴다
 - `test/publications/publication-access-db.test.cjs`(제출 2): C-10 DB 구현의 판정 순서(형식 오류 토큰·없음·중지·만료·삭제 404, grant 없음·위조·다른 발행본·만료 401, 중지가 grant보다 먼저, 비활성 소유자 404와 재활성, 회원 없음 500 대역), `resolveForOwner` 상태 우선순위·NotFound, `readSnapshot`, 판정 뒤 중지·만료·삭제·소유자 비활성과 다음 요청 재판정·같은 트랜잭션 변형(OQ-U4-NFR-5 경계)
-- `test/publications/publish-api.test.cjs`(제출 2): S4~S7, 빈도 429·`Retry-After`, 입력 400 칸별 이유, 동의 403, 404, 자격 409 `details.catchIds`·보호 관측 없음 500, 하루 한도 429·롤백, 조각 예외 500·롤백, 등록 실패 201, 전체 글 60,000/60,001자. NC2: 사본 선택 칸 넷(저장소 이름·한국 시간 작성 달·한계 고르기·소속 기록 `ownCommit`)과 안전망
+- `test/publications/publish-api.test.cjs`(제출 2): S4~S7, 빈도 429·`Retry-After`, 입력 400 칸별 이유(presetIds·옛 items), 동의 403, 404, 자격 409 `details.blockedSources`·`CATCH_PRIVATE`·보호 관측 없음 500, 하루 한도 429·롤백, 조각 예외 500·롤백, 등록 실패 201, 전체 글 60,000/60,001자. NC2: 사본 선택 칸 넷(저장소 이름·한국 시간 작성 달·한계 고르기·소속 기록 `ownCommit`)과 안전망(자료는 프리셋 하나에 담음)
+- `test/publications/publish-presets.test.cjs`(발행 프리셋 U1): 프리셋 순서·순번·이름 복사와 고정, 남의 프리셋 404, 빈 프리셋·21개, 같은 자료 두 프리셋(사본·PDF 두 벌, 두 번 셈), 막힘 넷과 프리셋별 `blockedSources`, 읽은 뒤 바뀐 프리셋
+- `test/publications/first-copy.test.cjs`(발행 프리셋 U1): `markFirstCopies`, api 안 사본의 `isFirstCopy`, 받은 사람·작성자 응답에 `isFirstCopy`·원본 ID 없음
 - `test/publications/work-limit-sentences.test.cjs`(NC2): 한계 고르기와 worker 원본 문장 대조·반례
 - `test/publications/publications-manage-api.test.cjs`(제출 2): 목록 cursor·`indexState` 없음, 상세 모양, S9(작성자 쪽)·S10~S13(접두어 삭제는 시험 전용 임시 폴더의 로컬 저장소, 실패는 가짜 `FileStorage`)
 - `test/publications/publications-logging.test.cjs`(제출 2): 결과 분류별 줄·칸, 등록 실패와 접두어 삭제 실패 구분, 합성 비밀값·본문 비노출. NC2: 안전망 경고 줄(커밋 뒤에만, 발행본마다 한 줄)

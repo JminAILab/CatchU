@@ -1,0 +1,31 @@
+{
+  "stage": "code-generation",
+  "unit": "u2-applicant-screens",
+  "version": 1,
+  "writes": [
+    { "path": "web/src/features/presets/" },
+    { "path": "web/src/app/(member)/presets/" },
+    { "path": "web/src/features/publications/pick-parts.tsx" },
+    { "path": "web/src/features/publications/publications-api.ts" },
+    { "path": "web/src/features/publications/publish-screen.tsx" },
+    { "path": "web/src/features/publications/publish-view.tsx" },
+    { "path": "web/src/features/publications/publish-sources.ts" },
+    { "path": "web/src/features/publications/README.md" },
+    { "path": "web/src/features/assets/catch-api.ts" },
+    { "path": "web/src/features/assets/README.md" },
+    { "path": "web/src/components/header/member-header.tsx" },
+    { "path": "web/src/lib/routes.ts" },
+    { "path": "web/src/lib/api-response.ts" },
+    { "path": "web/src/lib/member-navigation.ts" },
+    { "path": "web/README.md" },
+    { "path": "web/test/presets.test.mjs" },
+    { "path": "web/test/publish.test.mjs" },
+    { "path": "web/test/api-response.test.mjs" },
+    { "path": "web/test/u9-recipient-claude.test.mjs" },
+    { "path": "api/src/catches/owner-catch-input.ts" },
+    { "path": "api/src/catches/owner-catch-store.ts" },
+    { "path": "api/test/catches/publishable-filter.test.cjs" },
+    { "path": "api/test/catches/owner-catch-http.test.cjs" },
+    { "path": "api/docs/catch-owner-read-preparation.md" }
+  ]
+}

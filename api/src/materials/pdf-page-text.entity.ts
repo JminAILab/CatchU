@@ -9,7 +9,8 @@ import { PdfMaterial } from './pdf-material.entity';
  * - 추출 결과 수신(W2)이 한 트랜잭션에서 쪽 행을 전부 넣는다. 부분 저장은 없다(BR3.4).
  * - `readable = (text <> '')`: 글이 없는 쪽은 readable=false·빈 글이고(FR3.4), 글이 있는 쪽은 readable=true다.
  *   worker 판정(BR3.1: 공백·제어 문자만이면 빈 글)과 수신 검사(BR3.3)가 같은 규칙을 쓰고, DB가 마지막으로 막는다.
- * - `text`는 신뢰할 수 없는 입력이다. 가공 없이 두되 저장할 수 없는 NUL만 뺀다(BR3.5). 로그·오류에 싣지 않는다.
+ * - `text`는 신뢰할 수 없는 입력이다. worker가 저장할 수 없는 NUL을 빼고 줄바꿈·탭을 뺀 제어 문자를 공백으로 바꾼 것 말고는
+ *   가공하지 않는다(BR3.5, #627). 로그·오류에 싣지 않는다.
  * - 발행 때 이 행들을 복사해 published_pdf_page로 고정한다(BR4.3). 원본 삭제는 PDF 자료를 따라 연쇄된다.
  */
 @Entity('pdf_page_text')

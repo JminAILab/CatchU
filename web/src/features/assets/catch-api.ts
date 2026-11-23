@@ -12,8 +12,15 @@ export type MemberTransport = (path: string, request: MemberRequest) => Promise<
 export type CatchFailure = Exclude<ApiResult, { kind: "success" }>;
 export type CatchResult<T> = { kind: "success"; data: T } | CatchFailure;
 export type CatchPage = { items: readonly CatchAsset[]; page: { nextCursor: string | null } };
-/** 본인 목록 걸러 보기. 빈 `repositoryId`와 `all`은 조건을 보내지 않는다. 커서는 이 걸러 보기에 묶인다(새 Catch C1). */
-export type CatchListFilter = { readonly repositoryId: string; readonly authorDescription: AuthorDescriptionFilter };
+/**
+ * 본인 목록 걸러 보기. 빈 `repositoryId`와 `all`은 조건을 보내지 않는다. 커서는 이 걸러 보기에 묶인다(새 Catch C1).
+ * `publishable`은 프리셋 편집 화면만 켠다(발행 프리셋 U2 BR3.2). 없으면 쿼리는 지금 그대로다(내 자산 화면).
+ */
+export type CatchListFilter = {
+  readonly repositoryId: string;
+  readonly authorDescription: AuthorDescriptionFilter;
+  readonly publishable?: true;
+};
 export const ALL_CATCHES: CatchListFilter = Object.freeze({ repositoryId: "", authorDescription: "all" });
 
 const record = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -67,9 +74,14 @@ export function isCatch(value: unknown): value is CatchAsset {
     && revisitFacts(value.revisitFacts);
 }
 
-/** 걸러 보기와 맞지 않는 항목이 든 200은 성공으로 보지 않는다(`written`이면 모두 참, `unwritten`이면 모두 거짓). */
+/**
+ * 걸러 보기와 맞지 않는 항목이 든 200은 성공으로 보지 않는다(`written`이면 모두 참, `unwritten`이면 모두 거짓,
+ * `publishable`이면 모두 공개·확인됨·보호 아님).
+ */
 function matchesFilter(item: CatchAsset, filter: CatchListFilter): boolean {
   if (filter.repositoryId && item.repositoryId !== filter.repositoryId) return false;
+  if (filter.publishable && (item.visibility !== "PUBLIC" || item.restriction !== "NONE"
+    || !item.confirmation.workFactsConfirmed || !item.confirmation.contributionConfirmed)) return false;
   if (filter.authorDescription === "written") return item.hasAuthorDescription;
   if (filter.authorDescription === "unwritten") return !item.hasAuthorDescription;
   return true;
@@ -104,6 +116,7 @@ export function createCatchApi(transport: MemberTransport) {
       const query = new URLSearchParams({ limit: "20" });
       if (filter.repositoryId) query.set("repositoryId", filter.repositoryId);
       if (filter.authorDescription !== "all") query.set("authorDescription", filter.authorDescription);
+      if (filter.publishable) query.set("publishable", "true");
       if (cursor !== null) query.set("cursor", cursor);
       return request<CatchPage>(`/catches?${query}`, { method: "GET", cache: "no-store", signal },
         (v): v is CatchPage => record(v) && Array.isArray(v.items) && v.items.every(isCatch)

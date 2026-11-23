@@ -699,7 +699,11 @@ check "루트 인증서: 파일 해시가 lib/rds.sh의 값과 같음" "$(ok gre
 check "roles.sql: 비밀번호는 환경변수에서만 읽고(\\getenv) SQL에 글자로 적지 않음, 잠금 대기 상한은 앱 계정에만" \
   "$( { grep -q '^\\getenv app_password CATCHU_APP_PASSWORD$' "$HERE/../db/roles.sql" && ! grep -q -i "password '" "$HERE/../db/roles.sql" \
     && test "$(grep -c 'lock_timeout' "$HERE/../db/roles.sql")" = 1 && grep -q "^ALTER ROLE catchu_app SET lock_timeout = '3s';$" "$HERE/../db/roles.sql"; } > /dev/null 2>&1; echo $?)"
-check "새 실행 파일·SQL에 계정 번호(12자리 숫자)가 없음" "$(ok test "$(cat "$OPS"/*.yaml "$HERE/../db/roles.sql" | grep -c -E '[0-9]{12}')" = 0)"
+check "idle-in-transaction.sql: 앱 계정의 트랜잭션 안 유휴 상한 5분 한 줄만 바꾸고 비밀번호를 다루지 않음" \
+  "$( { test "$(grep -c '^ALTER ROLE' "$HERE/../db/idle-in-transaction.sql")" = 1 \
+    && grep -q "^ALTER ROLE catchu_app SET idle_in_transaction_session_timeout = '5min';$" "$HERE/../db/idle-in-transaction.sql" \
+    && ! grep -q -i 'password' "$HERE/../db/idle-in-transaction.sql"; } > /dev/null 2>&1; echo $?)"
+check "새 실행 파일·SQL에 계정 번호(12자리 숫자)가 없음" "$(ok test "$(cat "$OPS"/*.yaml "$HERE/../db/roles.sql" "$HERE/../db/idle-in-transaction.sql" | grep -c -E '[0-9]{12}')" = 0)"
 
 echo
 echo "통과 $pass, 실패 $fail"
