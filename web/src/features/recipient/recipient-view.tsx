@@ -8,7 +8,7 @@ import { itemTitleFinder, type ItemTitleOf } from "@/features/rag-answer/item-ti
 import { QnaPanel } from "@/features/rag-answer/qna-panel";
 import type { PdfCopySource } from "@/features/publications/published-pdf-item";
 import { JdRecipientPanel } from "@/features/jd/jd-recipient-panel";
-import { PublishedSnapshotView, type SnapshotHighlight } from "@/features/publications/snapshot-view";
+import { PublishedSnapshotView, type SnapshotHighlight, type TabNotice } from "@/features/publications/snapshot-view";
 import { ClaudeAnalyzePanel } from "@/features/recipient-claude/claude-analyze-panel";
 import { LINK_UNAVAILABLE_TEXT, LOOKUP_FAILED_TITLE, PASSWORD_REQUIRED_TITLE, publishedAtText, unlockMessage } from "./recipient-format";
 import type { RecipientSlotProps } from "./recipient-slots";
@@ -30,14 +30,19 @@ export type RecipientPublicationViewProps = {
   slotProps: RecipientSlotProps;
   /** 1번 자리 PDF 항목의 사본을 받는 방법(U8). 받은 사람 사본 경로에 grant를 머리로 싣고, 401·404는 `onAccessLost`로 넘긴다. */
   pdfSource?: (publishedItemId: string) => PdfCopySource;
+  /** 1번 자리의 열린 프리셋 탭·바꾸기·출처 이동 알림(발행 프리셋 U3, `useSnapshotJump`). 없으면 첫 탭이다. */
+  activePreset?: number | null;
+  onPresetChange?: (ordinal: number) => void;
+  tabNotice?: TabNotice | null;
 };
 
 /**
  * 받은 사람 발행본 화면 그리기(U4 제출 3 W4, 보안 설계 「받은 사람 화면 자리 (C-11)」). 상태와 동작은 `recipient-screen.tsx`가 넘긴다.
+ * 발행 프리셋 U3(BR3.1)에서 2번 자리(AI 요약)를 1번 자리(발행본 자료) 위로 올렸다. 자리 번호는 C-11 그대로이고 그리는 순서만 바뀌었다.
  *
  * | 상태 | 위에서부터 |
  * |---|---|
- * | 판정 통과 | U4 h1(발행본 제목) → 0 `RecipientGuide`(U2, `showClaudeConnect={claudeConnectable(snapshot)}`) → 0.5 `ClaudeAnalyzePanel`(U9, 같은 값이 참일 때만) → U4 고정 안내(발행 시각) → 1 발행본 자료 → 2 `BaseSummaryPanel`(U5) → 3 `QnaPanel`(U5) → 4 자리(U10) |
+ * | 판정 통과 | U4 h1(발행본 제목) → 0 `RecipientGuide`(U2, `showClaudeConnect={claudeConnectable(snapshot)}`) → 0.5 `ClaudeAnalyzePanel`(U9, 같은 값이 참일 때만) → U4 고정 안내(발행 시각) → 2 `BaseSummaryPanel`(U5) → 1 발행본 자료(프리셋 탭) → 3 `QnaPanel`(U5) → 4 자리(U10) |
  * | 비밀번호 입력 | U4 h1 → 비밀번호 안내·입력. `RecipientGuide` 없음 |
  * | 접근 불가 | U4 h1 「이 링크는 열람할 수 없습니다」. `RecipientGuide` 없음 |
  *
@@ -45,7 +50,9 @@ export type RecipientPublicationViewProps = {
  * 0.5번 패널에는 `slotProps.token`만 넘기고 grant·비밀번호·`getGrant`·`onAccessLost`는 넘기지 않는다.
  * 사본·설명·본문은 React 텍스트로만 그리고(NFR1.10) GitHub 근거 주소만 링크다(NFR1.11, `snapshot-view.tsx`).
  */
-export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlock, waitSeconds, highlight, slotProps, pdfSource }: RecipientPublicationViewProps) {
+export function RecipientPublicationView({
+  snapshot, headingRef, onRetry, onUnlock, waitSeconds, highlight, slotProps, pdfSource, activePreset, onPresetChange, tabNotice,
+}: RecipientPublicationViewProps) {
   switch (snapshot.view) {
     case "loading":
       return <LoadingState>발행본을 확인하고 있습니다.</LoadingState>;
@@ -68,6 +75,7 @@ export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlo
       );
     case "ready": {
       const connectable = claudeConnectable(snapshot);
+      const itemTitleOf = itemTitleFinder(snapshot.snapshot.items);
       return (
         <>
           {snapshot.refreshFailed && (
@@ -82,8 +90,10 @@ export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlo
           <RecipientGuide showClaudeConnect={connectable} />
           {connectable && <ClaudeAnalyzePanel token={slotProps.token} />}
           <p className={styles.notice} data-testid="recipient-published-at">{publishedAtText(snapshot.snapshot.publishedAt)}</p>
-          <PublishedSnapshotView snapshot={snapshot.snapshot} highlight={highlight} pdfSource={pdfSource} />
-          <RecipientSlots {...slotProps} itemTitleOf={itemTitleFinder(snapshot.snapshot.items)} />
+          <SummarySlot {...slotProps} itemTitleOf={itemTitleOf} />
+          <PublishedSnapshotView snapshot={snapshot.snapshot} highlight={highlight} pdfSource={pdfSource}
+            activePreset={activePreset} onPresetChange={onPresetChange} tabNotice={tabNotice} />
+          <QuestionSlots {...slotProps} itemTitleOf={itemTitleOf} />
         </>
       );
     }
@@ -91,18 +101,27 @@ export function RecipientPublicationView({ snapshot, headingRef, onRetry, onUnlo
 }
 
 /**
- * 2·3·4번 자리(C-11 slots). 2·3번은 U5 `BaseSummaryPanel`·`QnaPanel`(`features/rag-answer` README 「붙이는 방법」대로 `RecipientSlotProps`를
- * 그대로 넘기고 `key={token}`). 두 패널은 401·404를 스스로 처리하지 않고 `onAccessLost`를 부르며(C-11 rule), 근거 단추는 `showEvidence`를 부른다.
- * 2·3번에는 이 화면의 사본으로 만든 선택 `itemTitleOf`도 넘겨 출처 딱지 옆에 항목 제목을 보인다(#559 FR4.2). `RecipientSlotProps` 모양은 그대로다.
+ * 2번 자리(C-11 slots, AI 요약). U5 `BaseSummaryPanel`(`features/rag-answer` README 「붙이는 방법」대로 `RecipientSlotProps`를 그대로 넘기고 `key={token}`).
+ * 패널은 401·404를 스스로 처리하지 않고 `onAccessLost`를 부르며(C-11 rule), 근거 단추는 `showEvidence`를 부른다.
+ * 이 화면의 사본으로 만든 선택 `itemTitleOf`도 넘겨 출처 딱지 옆에 항목 제목을 보인다(#559 FR4.2). `RecipientSlotProps` 모양은 그대로다.
+ * 발행 프리셋 U3(BR3.1)에서 1번 자리 위로 올리려고 3·4번 자리(`QuestionSlots`)와 나눴다. 넘기는 값은 그대로다.
+ */
+function SummarySlot({ itemTitleOf, ...props }: RecipientSlotProps & { itemTitleOf: ItemTitleOf }) {
+  return (
+    <div data-testid="recipient-slot-2" data-slot="base-summary">
+      <BaseSummaryPanel key={props.token} token={props.token} getGrant={props.getGrant} onAccessLost={props.onAccessLost}
+        isLoggedIn={props.isLoggedIn} showEvidence={props.showEvidence} itemTitleOf={itemTitleOf} />
+    </div>
+  );
+}
+
+/**
+ * 3·4번 자리(C-11 slots). 3번은 U5 `QnaPanel`이고 2번과 같은 값(`itemTitleOf` 포함)을 받는다. 발행본 자료 탭 밖이라 탭을 바꿔도 대화가 남는다(U3 BR3.2).
  * 4번은 U10 `JdRecipientPanel`이 회원 호출을 연결하고 JD 로그인 안내·요약을 소유한다. U4 영역에 안내 문장을 두지 않는다(G6). 4번에는 제목 함수를 넘기지 않는다.
  */
-function RecipientSlots({ itemTitleOf, ...props }: RecipientSlotProps & { itemTitleOf: ItemTitleOf }) {
+function QuestionSlots({ itemTitleOf, ...props }: RecipientSlotProps & { itemTitleOf: ItemTitleOf }) {
   return (
     <>
-      <div data-testid="recipient-slot-2" data-slot="base-summary">
-        <BaseSummaryPanel key={props.token} token={props.token} getGrant={props.getGrant} onAccessLost={props.onAccessLost}
-          isLoggedIn={props.isLoggedIn} showEvidence={props.showEvidence} itemTitleOf={itemTitleOf} />
-      </div>
       <div data-testid="recipient-slot-3" data-slot="qna">
         <QnaPanel key={props.token} token={props.token} getGrant={props.getGrant} onAccessLost={props.onAccessLost}
           isLoggedIn={props.isLoggedIn} showEvidence={props.showEvidence} itemTitleOf={itemTitleOf} />

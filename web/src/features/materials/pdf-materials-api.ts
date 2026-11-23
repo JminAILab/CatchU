@@ -202,7 +202,8 @@ export function pdfDeleteErrorText(failure: SaveFailure): string {
   return "삭제되지 않았습니다. 다시 시도해 주세요.";
 }
 
-export const PDF_DELETE_CONFIRM = "이 PDF를 삭제할까요? 이미 발행한 사본은 그대로 남고, 삭제한 PDF는 되살릴 수 없습니다.";
+/** PDF 지우기 확인 문장. 끝 문장은 발행 프리셋 U3 BR5.2(AC4.1.4)이고 텍스트 자료 확인 문장(`MATERIAL_DELETE_CONFIRM`)도 같은 말로 끝난다. */
+export const PDF_DELETE_CONFIRM = "이 PDF를 삭제할까요? 이미 발행한 사본은 그대로 남고, 삭제한 PDF는 되살릴 수 없습니다. 프리셋에 담겨 있으면 거기서도 빠집니다.";
 
 /** 파일 크기 표시(목록). 1 MB 미만은 KB로 보인다. */
 export function fileSizeText(bytes: number): string {

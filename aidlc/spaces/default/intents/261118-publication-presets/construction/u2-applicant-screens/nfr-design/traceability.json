@@ -1,0 +1,25 @@
+{
+  "stage": "nfr-design",
+  "unit": "u2-applicant-screens",
+  "upstream_ids": ["NFR6.1","NFR6.2","NFR6.3","NFR6.4","NFR6.5","NFR6.6","NFR5.1","NFR5.2","NFR1.1","NFR2.1","NFR2.2","NFR2.3","NFR2.4","NFR3.1","NFR3.2","NFR4.1","NFR4.2","NFR4.3"],
+  "coverage": [
+    { "id": "NFR6.1", "status": "OK", "target": "performance-design 1: 목록·발행 화면은 GET /v1/presets 한 번" },
+    { "id": "NFR6.2", "status": "OK", "target": "performance-design 1: 열 때 상세 1 + 저장소 목록 1 + 목록 3 + 세기 최대 3(달라지는 곳에 저장소 목록 1을 적음)" },
+    { "id": "NFR6.3", "status": "OK", "target": "performance-design 1·2: [더 보기]·걸러 보기는 목록 1 + 세기 최대 1, 다음 쪽 요청은 한 번에 하나" },
+    { "id": "NFR6.4", "status": "OK", "target": "performance-design 1: 쪽(20개 이하)마다 고를 수 있는 자료만 세기" },
+    { "id": "NFR6.5", "status": "OK", "target": "performance-design 1: 담기·순서·발행 고르기는 화면 안 셈, 요청 0" },
+    { "id": "NFR6.6", "status": "OK", "target": "performance-design 1·2: 막힘 뒤 목록 1번, 겹치면 나중 요청만" },
+    { "id": "NFR5.1", "status": "OK", "target": "performance-design 3: 단추를 먼저 그리고 세기 뒤 글자 이유, 실패면 막지 않음" },
+    { "id": "NFR5.2", "status": "OK", "target": "performance-design 2: 세대 번호·AbortController로 늦은 응답 버림, 상태 글은 기능 설계 흐름 1~3" },
+    { "id": "NFR1.1", "status": "OK", "target": "performance-design 5와 security-design 5: role=status·alert, aria-live 칸을 늘 그려 둠, 키보드·이유 읽힘·색만 아님" },
+    { "id": "NFR2.1", "status": "OK", "target": "security-design 6: api.member만, 404는 찾을 수 없음 하나" },
+    { "id": "NFR2.2", "status": "OK", "target": "security-design 1: ownerCatchQuery만 publishable을 먼저 꺼내 검사, publicCatchQuery는 400" },
+    { "id": "NFR2.3", "status": "OK", "target": "security-design 1: 글자 true만, 받은 값을 오류에 싣지 않음" },
+    { "id": "NFR2.4", "status": "OK", "target": "security-design 1: 회원 조건 유지, 커서 범위에 publishable, PublishableSource와 같은 결과 시험" },
+    { "id": "NFR3.1", "status": "OK", "target": "security-design 2: React 글자로만, 태그 이름 시험" },
+    { "id": "NFR3.2", "status": "OK", "target": "security-design 2: 막힘 안내는 글자 조각, HTML 문자열 없음" },
+    { "id": "NFR4.1", "status": "OK", "target": "security-design 4: 만들거나 고치는 모든 파일에서 이름·제목·ID를 console·Logger에 넘기지 않음" },
+    { "id": "NFR4.2", "status": "OK", "target": "security-design 3: blockedSources 세 칸만, 정해진 kind만" },
+    { "id": "NFR4.3", "status": "OK", "target": "security-design 3: catchIds 처리 지움" }
+  ]
+}

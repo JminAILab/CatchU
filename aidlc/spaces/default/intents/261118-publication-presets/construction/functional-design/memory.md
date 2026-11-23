@@ -13,6 +13,9 @@
 
 ## Tradeoffs
 <!-- example: 2026-05-29T10:14:32Z — picked TDD over BDD this run; the team is unit-first and the domain is well-understood -->
+- 2026-11-20T11:40:00Z — [unit u3-reader-views] 팀장 Q2 B로 모든 탭 패널을 그려 두고 숨겨, interaction-spec SourceJump의 「다른 탭 항목은 그려져 있지 않다」 전제만 바뀌었다; PDF 뷰어 상태를 남기는 대신 처음 그리는 양이 는다. 검토 Major 둘(recipient-api.ts pickItem이 프리셋 칸을 버림, 자료 화면 탭 거부 때 초점)은 다음 단계 계획에 옮긴다.
 
 ## Open questions
 <!-- example: 2026-05-29T10:14:32Z — confirm the retention window with compliance before the next stage hardens the schema -->
+- 2026-11-20T07:31:44Z — [unit u2-applicant-screens] 발행 확인 단계의 「작성자 설명이 없는 Catch N개」 안내(새 Catch BR6.5)는 프리셋 목록 응답에 설명 여부가 없어 그리지 않기로 썼다; 남기려면 U1 응답 칸을 더해야 해 functional-spec 열린 질문으로 사람에게 올린다.
+- 2026-11-20T07:31:44Z — [unit u2-applicant-screens] 저장 실패(404·400 presetIds 등)·불러오기 실패·지우기 실패 글은 M3·M4에 없어 가장 짧은 글로 정했다; 다듬은 화면에 없는 글이라 검토에서 짚일 수 있다.

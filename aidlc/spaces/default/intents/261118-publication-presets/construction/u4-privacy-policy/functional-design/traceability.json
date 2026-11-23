@@ -1,0 +1,13 @@
+{
+  "stage": "functional-design",
+  "unit": "u4-privacy-policy",
+  "upstream_ids": ["AC4.3.1", "AC4.3.2"],
+  "coverage": [
+    { "id": "AC4.3.1", "status": "OK", "target": "BR1.1, BR1.5" },
+    { "id": "AC4.3.2", "status": "OK", "target": "BR1.2, BR1.5" }
+  ],
+  "reverse": [
+    { "id": "BR1.3", "status": "N/A", "target": "FR4.3 범위 밖 한 곳을 팀장이 더하기로 함(기능 설계 Q3 B)" },
+    { "id": "BR1.4", "status": "N/A", "target": "원문 9번의 바뀐 날짜와 내용 약속을 지키는 줄(기능 설계 Q4 A)" }
+  ]
+}

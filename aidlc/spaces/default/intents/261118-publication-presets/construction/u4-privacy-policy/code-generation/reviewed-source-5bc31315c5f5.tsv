@@ -1,0 +1,5 @@
+manifest	e0e4c4e7f2547acefa6c1b0bd784ffc8abd9c060230dfae060246dac097089b6	-
+	web/src/features/privacy/README.md	100644	4ba76199e9997d40a9dbda674217d0be93a86cf09a10ebb9e232a3a3e974f827
+	web/src/features/privacy/privacy-policy.md	100644	3224f6c899ea3a00506e920cb911c0beb7083c28f76afaa0af333c3b35eb9346
+	web/src/features/privacy/privacy-policy.tsx	100644	e18e1ed8dae2f270db192961202cdc0aac41e4b07ce1871b84e5c2742644be54
+	web/test/privacy-policy.test.mjs	100644	8a103eb5be2d38c7ef5b08cf67b7281be27b5dedd5bbe9f73276663834d55978

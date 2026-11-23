@@ -54,6 +54,8 @@
 .manualInput { padding: 6px 8px; border: 1px solid #c9d2df; border-radius: 6px; font: inherit; font-size: 13px; }
 .snapshot { margin-top: 24px; }
 .snapshotItems { margin: 0; padding-left: 22px; display: grid; gap: 18px; }
+/* 발행 프리셋 U3: 탭 줄 아래 열린 탭의 프리셋 이름 전체(M5). 긴 이름은 자르지 않고 줄을 바꾼다. */
+.presetName { font-weight: 700; overflow-wrap: anywhere; margin: 0 0 12px; }
 .snapshotItem { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: 14px; padding: 18px 22px; }
 .snapshotTitle { font-size: 17px; margin-bottom: 10px; }
 .snapshotBody { display: grid; gap: 12px; }

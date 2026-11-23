@@ -72,6 +72,7 @@ const { DELETE_CONFIRM_MESSAGE, PublicationDetailScreen, STOP_CONFIRM_MESSAGE, c
 const { PublicationDetailView } = await import(detailViewUrl.href);
 const { LinkedText, PublishedSnapshotView } = await import(snapshotViewUrl.href);
 const { copyUrl } = await import(new URL("../src/features/publications/publication-link-actions.tsx", import.meta.url).href);
+const { INITIAL_JUMP_STATE, jumpToEvidence } = await import(new URL("../src/features/publications/snapshot-jump.ts", import.meta.url).href);
 hooks.deregister();
 
 const AT = "2026-11-03T01:02:03.456Z";
@@ -82,8 +83,10 @@ const P2 = "99999999-9999-4999-8999-999999999992";
 const P3 = "99999999-9999-4999-8999-999999999993";
 const url = (n) => `https://web.example/s/synthetic-token-${n}000000000000000000000000000`;
 const link = (publicationId, state = "ACTIVE", title = "발행본") => ({ publicationId, title, url: url(publicationId.at(-1)), state, publishedAt: AT, expiresAt: EXPIRES, passwordProtected: false });
+// 발행 프리셋 U3: 사본 항목마다 프리셋 칸(계약 P-3)이 있다. 따로 정하지 않으면 모두 첫 프리셋이다.
+const PRESET = { presetOrdinal: 1, presetName: "기본 프리셋" };
 const catchItem = (overrides = {}) => ({
-  publishedItemId: "i1", position: 2, itemKind: "CATCH", title: "Catch https://github.com/o/r",
+  publishedItemId: "i1", position: 2, ...PRESET, itemKind: "CATCH", title: "Catch https://github.com/o/r",
   snapshot: {
     workFacts: ["사실 1"], subjectContribution: "기여",
     evidence: [{ sourceUrl: "https://github.com/o/r/pull/1", sourceRevision: "abc", representedFacts: ["사실 1"] }, { sourceUrl: "http://evil.example/x", sourceRevision: "def", representedFacts: [] }],
@@ -94,7 +97,7 @@ const catchItem = (overrides = {}) => ({
   },
 });
 const textItem = (body = "본문 https://github.com/o/r/blob/main/README.md 와 http://github.com/o/r") =>
-  ({ publishedItemId: "i2", position: 1, itemKind: "TEXT_MATERIAL", title: "자기소개 https://github.com/o/r", snapshot: { body } });
+  ({ publishedItemId: "i2", position: 1, ...PRESET, itemKind: "TEXT_MATERIAL", title: "자기소개 https://github.com/o/r", snapshot: { body } });
 const snapshot = (items = [catchItem(), textItem()]) => ({ title: "발행본 제목", publishedAt: AT, expiresAt: EXPIRES, items });
 const detail = (overrides = {}) => ({ publicationId: P1, url: url(1), state: "ACTIVE", passwordProtected: true, snapshot: snapshot(), ...overrides });
 const page = (items, nextCursor = null) => ({ items, page: { nextCursor } });
@@ -372,7 +375,7 @@ test("사본 화면: 항목 순서대로 보이고 Catch는 기록·작성자 �
   assert.ok(!empty.includes("snapshot-catch-ai-draft") && !empty.includes("AI 설명 초안"));
   assert.doesNotMatch(empty, /snapshot-catch-mismatch/);
   assert.ok(empty.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
-  const pdf = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: snapshot([{ publishedItemId: "p", position: 1, itemKind: "PDF_MATERIAL", title: "PDF", snapshot: {} }]) }));
+  const pdf = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: snapshot([{ publishedItemId: "p", position: 1, ...PRESET, itemKind: "PDF_MATERIAL", title: "PDF", snapshot: {} }]) }));
   // U8 계획 10.3으로 "준비 중" 자리가 PDF 항목 표시로 바뀌었다. 쪽 사본이 없는 응답은 0쪽으로 보이고, 요청 방법을 넘기지 않으면 열기 단추가 없다
   // (세부 표시는 recipient-pdf.test.mjs).
   assert.ok(!pdf.includes("준비 중"));
@@ -597,4 +600,37 @@ test("NC2 AC7.1.1·BR4.7 작성자 발행본 상세도 본인 커밋 링크 뒤 
   assert.ok(description.includes('>a.ts · L3 · 판본 ba6bba8<span class="visually-hidden"> (새 탭)</span></a><span data-testid="own-commit-mark">이 작업의 본인 커밋</span>'));
   const body = html.slice(html.indexOf('data-testid="snapshot-text-body"'));
   assert.doesNotMatch(body.slice(0, body.indexOf("</p>")), /own-commit-mark/);
+});
+
+// 발행 프리셋 U3 M6(US3.5, BR2.1·BR2.2·BR4.1~BR4.3) — 작성자 발행본 상세의 발행본 자료도 받은 사람 화면과 같은 탭 줄이다.
+//   - 기대: 같은 탭 줄(「발행본 자료」, 프리셋 이름, 열린 탭만 tabindex 0, 패널 tabindex 0·hidden), 요약이 위·자료가 아래인 순서는 그대로,
+//           요약의 출처가 다른 탭 항목이면 탭과 대상이 한 번에 바뀌고 알림 칸에 「(이름) 탭을 열었습니다」. 돌아가기 단추 없음.
+//   - 실패 조건: 탭 줄이 없음·받은 사람 화면과 다른 표시, 요약이 자료 아래, 출처가 탭만 바꿈, 돌아가기 단추.
+test("U3 M6 작성자 상세: 받은 사람 화면과 같은 프리셋 탭 줄이고, 요약 출처가 다른 탭이면 탭과 대상이 한 번에 바뀌어 그 패널이 열린다", () => {
+  const value = snapshot([
+    catchItem(), textItem(),
+    { ...textItem("둘째 프리셋 본문"), publishedItemId: "i3", position: 3, presetOrdinal: 2, presetName: "포트폴리오" },
+  ]);
+  const first = ownerView(value);
+  assert.match(first, /<div role="tablist" aria-label="발행본 자료">/);
+  assert.equal(first.split('role="tab"').length - 1, 2);
+  assert.match(first, /id="publication-snapshot-tab-1" aria-selected="true" aria-controls="publication-snapshot-panel-1" tabindex="0"/);
+  assert.match(first, /id="publication-snapshot-tab-2" aria-selected="false" aria-controls="publication-snapshot-panel-2" tabindex="-1"/);
+  assert.match(first, /id="publication-snapshot-panel-2" aria-labelledby="publication-snapshot-tab-2" tabindex="0" hidden="">/);
+  assert.ok(first.indexOf('data-testid="publication-summary-slot"') < first.indexOf('data-testid="publication-snapshot"'), "요약 위, 자료 아래(그대로)");
+  // 받은 사람 화면과 같은 부품이라 발행본 자료 부분이 같다.
+  assert.ok(first.includes(renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: value }))));
+
+  const state = jumpToEvidence(INITIAL_JUMP_STATE, value, { publishedItemId: "i3", fieldPath: "body", charStart: 0, charEnd: 2, pdfPage: null });
+  assert.equal(state.preset, 2);
+  const jumped = renderToStaticMarkup(createElement(PublicationDetailView, {
+    detail: detail({ snapshot: value }), stoppedAt: null, stopState: "idle", deleteState: "idle", onStop() {}, onDelete() {},
+    highlight: state.target.highlight, showEvidence() {}, activePreset: state.preset, tabNotice: state.notice,
+  }));
+  assert.match(jumped, /id="publication-snapshot-panel-2" aria-labelledby="publication-snapshot-tab-2" tabindex="0">/);
+  assert.match(jumped, /id="publication-snapshot-panel-1" aria-labelledby="publication-snapshot-tab-1" tabindex="0" hidden="">/);
+  assert.match(jumped, /<mark[^>]*>둘째<\/mark> 프리셋 본문/);
+  // 이름과 고정 글은 글자 조각으로 이어 그린다(서버 렌더링은 두 조각 사이에 빈 주석을 둔다).
+  assert.match(jumped.replaceAll("<!-- -->", ""), /data-testid="snapshot-tab-notice"><span>포트폴리오 탭을 열었습니다<\/span><\/p>/);
+  assert.doesNotMatch(jumped, /돌아가기/);
 });
