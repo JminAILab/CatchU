@@ -1,6 +1,6 @@
 # PDF 자료 — 12월 U8
 
-작성 회원이 PDF를 올리면 worker가 쪽별 글을 뽑고, 추출이 끝난 PDF를 발행본에 넣어 받은 사람이 사본을 여는 기능의 api 쪽 안내다. 화면은 [web PDF 자료 안내](../../web/src/features/materials/README.md#pdf-자료-탭-u8)와 [받은 사람 화면 안내](../../web/src/features/recipient/README.md#pdf-항목과-사본-열람-u8), 추출 소비자는 [worker README 「PDF 글 추출 소비자」](../../worker/README.md#pdf-글-추출-소비자)에 있다.
+작성 회원이 PDF를 올리면 worker가 쪽별 글을 뽑고, 추출이 끝난 PDF를 발행본에 넣어 받은 사람이 사본을 여는 기능의 api 쪽 안내다. 화면은 [web PDF 자료 안내](../../web/src/features/materials/README.md#pdf-자료-탭-u8)와 [받은 사람 화면 안내](../../web/src/features/recipient/README.md#pdf-항목과-사본-열람-u8), 추출 소비자는 [worker 「PDF 글 추출 소비자」](../../worker/docs/pdf-extraction.md)에 있다.
 
 기준 문서: [U8 기능 명세](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/functional-spec.md) W1~W5, [업무 규칙](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/rules.md) BR1~BR7, [보안 설계](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/nfr-design/security-design.md), [관측 설계](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/nfr-design/observability-design.md), [계약 요약](../../aidlc/spaces/default/intents/260925-intent-12/inception/contract-design/contract-summary.md) C-05·C-10·C-12·C-16·C-17. 구현 기록은 [U8 코드 요약](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/code-generation/code-summary.md)이다.
 

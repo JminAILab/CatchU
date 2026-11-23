@@ -2,8 +2,9 @@
 
 판정 순서: 파싱 실패 → UNREADABLE_FILE, 암호화 → ENCRYPTED(AES로 잠겨 여는 단계에서 pypdf가 암호 라이브러리를
 찾다 DependencyError를 내는 경우 포함), 쪽 수 0 → UNREADABLE_FILE, 쪽 수 > 50 →
-PAGE_LIMIT_EXCEEDED(쪽 글을 뽑기 전에), 아니면 쪽마다 extract_text. 뽑은 글은 NUL만 빼고 가공하지
-않으며, 공백·제어 문자만이면 그 쪽만 readable=false·text=''다. 어느 한 쪽이라도 쪽 읽기·글 추출에서 예외가
+PAGE_LIMIT_EXCEEDED(쪽 글을 뽑기 전에), 아니면 쪽마다 extract_text. 뽑은 글은 NUL을 빼고 줄바꿈·탭을 뺀
+제어 문자를 공백으로 바꾸는 것 말고는 가공하지 않으며(#627, 팀장 결정 2026-11-20), 공백·제어 문자만이면
+그 쪽만 readable=false·text=''다. 어느 한 쪽이라도 쪽 읽기·글 추출에서 예외가
 나면 BR3.2의 "파싱 예외"로 보아 파일 전체를 UNREADABLE_FILE로 끝낸다(D25, 담당자 결정 2026-11-10).
 MemoryError는 여기서 잡지 않고 올려 보내 자식(child.py)의 메모리 제한 분류를 따르게 한다. 결과는 순수 자료(dict)다.
 
@@ -25,10 +26,23 @@ logger = logging.getLogger(__name__)
 
 NUL: Final = "\x00"
 
+# NUL은 지우고, 줄바꿈(\n·\r)·탭을 뺀 제어 문자(Cc: U+0001~U+001F, U+007F~U+009F)는 공백 한 글자로 바꾼다.
+# 맥 Chrome으로 만든 PDF는 일부 글꼴에서 띄어쓰기를 U+0001(Apple SD Gothic Neo 등)·U+0008(Didot Bold) 같은
+# 제어 문자로 적는다. 그대로 두면 브라우저가 그리지 않아 화면과 AI 요약에서 낱말이 붙는다(#627).
+# 한 글자를 한 글자로 바꾸므로 쪽 글 합계(TEXT_LIMIT) 셈은 NUL을 뺀 것 말고는 그대로다.
+_CONTROL_TO_SPACE: Final = str.maketrans(
+    {NUL: None}
+    | {
+        chr(code): " "
+        for code in [*range(0x01, 0x20), *range(0x7F, 0xA0)]
+        if chr(code) not in "\t\n\r"
+    }
+)
+
 
 def normalize_page_text(raw: str) -> tuple[str, bool]:
-    """(text, readable). NUL만 제거하고, 남은 글이 공백·제어 문자(Cc)뿐이면 ('', False)."""
-    text = raw.replace(NUL, "")
+    """(text, readable). NUL은 지우고 줄바꿈·탭을 뺀 제어 문자는 공백으로 바꾼다. 남은 글이 공백·제어 문자(Cc)뿐이면 ('', False)."""
+    text = raw.translate(_CONTROL_TO_SPACE)
     if all(ch.isspace() or unicodedata.category(ch) == "Cc" for ch in text):
         return "", False
     return text, True
