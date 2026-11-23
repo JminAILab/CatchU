@@ -5,7 +5,7 @@ import { TabStrip } from "@/components/tab-strip/tab-strip";
 import { splitSections, type Section } from "@/lib/author-description-sections";
 import { evidenceRepositoryOf, isOwnCommitLink, ownCommitsOf, type OwnCommit } from "@/lib/github-link-name";
 import { isGithubSourceUrl, splitGithubLinks, type TextSegment } from "@/lib/github-source-url";
-import { FOLD_AUTHORED, FOLD_GENERATED, FoldText } from "./fold-text";
+import { FOLD_AUTHORED, FOLD_GENERATED, FoldText, FoldVisibleContext } from "./fold-text";
 import { GithubLink } from "./github-link";
 import { orderedItems, pdfPageCount, type CatchSnapshot, type PublishedItem, type PublishedSnapshot, type TextMaterialSnapshot } from "./publications-api";
 import { PublishedPdfItem, type PdfCopySource } from "./published-pdf-item";
@@ -305,6 +305,7 @@ function SnapshotItemView({ item, highlight, pdfSource }: {
  * - 「발행본 자료」 아래 알림 칸(`aria-live="polite"`, 출처 이동으로 탭이 바뀌었을 때만 글) → 탭 줄(이름 「발행본 자료」, 프리셋이 하나여도 있음, 개수 없음)
  *   → 열린 탭의 패널(프리셋 이름 전체 → 항목들)이다. 탭 이름은 CSS로만 줄이고 이름은 모두 글자로만 그린다(BR1.5·BR2.2·BR2.5).
  * - 모든 탭의 패널을 그려 두고 열리지 않은 패널은 `hidden`이다. 패널 key가 순번이라 탭을 오가도 PDF 뷰어가 받은 파일·보던 쪽이 남는다(BR1.4).
+ *   긴 글 접기(#607)는 숨긴 패널 안에서 줄 수를 셀 수 없어, 패널마다 열림 여부(`FoldVisibleContext`)를 넘겨 열리는 차례에 다시 세게 한다.
  * - 열린 탭(`activePreset`)과 바꾸기(`onPresetChange`)·알림(`tabNotice`)은 부르는 화면이 `useSnapshotJump`로 넘긴다. 열린 탭이 없거나 사본에 없으면 첫 탭이다.
  * - 항목 그리기는 그대로다: 제목은 글자로만, `highlight`가 가리키는 항목만 강조 범위를 받고(`<mark>`), 항목마다 `id`·`tabIndex={-1}`을 두어
  *   근거 위치로 옮길 수 있게 한다. PDF 항목(U8)은 `pdfSource`가 있으면 그 항목의 사본을 여는 단추를 둔다(누를 때만 요청한다).
@@ -335,12 +336,13 @@ export function PublishedSnapshotView({ snapshot, highlight = null, pdfSource, a
             tabs={groups.map((group) => ({ id: String(group.ordinal), label: group.name }))} active={String(open.ordinal)}
             onChange={(id) => onPresetChange?.(Number(id))}
             panels={Object.fromEntries(groups.map((group) => [String(group.ordinal), (
-              <>
+              // 열리지 않은 탭의 패널은 `hidden`이라 긴 글의 줄 수를 셀 수 없다. 패널이 열렸는지 넘겨, 열리는 차례에 다시 세게 한다(#607).
+              <FoldVisibleContext key={group.ordinal} value={group.ordinal === open.ordinal}>
                 <p className={styles.presetName} data-testid="snapshot-preset-name">{group.name}</p>
                 <ol className={styles.snapshotItems}>
                   {group.items.map((item) => <SnapshotItemView key={item.publishedItemId} item={item} highlight={highlight} pdfSource={pdfSource} />)}
                 </ol>
-              </>
+              </FoldVisibleContext>
             )]))} />
         </>
       )}

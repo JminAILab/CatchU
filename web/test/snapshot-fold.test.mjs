@@ -18,15 +18,21 @@
 //           사본에서는 Catch의 세 칸·텍스트 본문·읽을 수 있는 PDF 쪽마다 접는 틀이 하나씩 있고, 「이 기록으로 알 수 없는 것」과 「근거 자세히 보기」는 틀 밖이다.
 //           강조 `<mark>`는 접는 틀 안에 그대로 그려진다.
 //   - 실패 조건: 원문이 잘림, 기준 이하인데 단추가 있음, 근거 자세히 보기가 틀 안에 들어감.
+//   프리셋 탭(#629가 dev에 먼저 들어가 #607이 맞춘다, 2026-11-23 팀장 댓글)
+//   - 기대: 열리지 않은 탭의 패널(hidden) 안에도 접는 틀과 원문이 그대로 그려져 있어, 탭이 열릴 때 줄 수를 다시 셀 수 있다.
+//   - 실패 조건: 숨긴 패널에 접는 틀이 없음, 원문이 빠짐.
+//   단추가 없어질 때의 초점(폭이 넓어져 접을 만큼 길지 않게 됨)
+//   - 기대: 단추가 있었고 이제 접지 않으며 초점이 그 단추에 있을 때만 글 상자로 넘긴다. 글 상자는 tabindex=-1이라 Tab 순서에 들지 않는다.
+//   - 실패 조건: 초점이 다른 곳에 있는데 가져옴, 단추가 남는데 옮김, 글 상자가 Tab 순서에 듦.
 //
-// 원본 tsx는 u2-render.mjs로 변환해 불러온다. 실제 줄 수 재기·폭 변경·초점·화면 낭독은 DOM이 필요해 여기서 보지 않고 브라우저에서 확인한다.
+// 원본 tsx는 u2-render.mjs로 변환해 불러온다. 실제 줄 수 재기·폭 변경·탭을 열 때 다시 세기·초점 옮기기·화면 낭독은 DOM이 필요해 여기서 보지 않고 브라우저에서 확인한다.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { load } from "./u2-render.mjs";
 
-const { FOLD_AUTHORED, FOLD_GENERATED, FOLD_TEXT_SELECTOR, FoldFrame, INITIAL_FOLD_TOGGLE, countLines, foldNeeded, foldOpen, measureFold } = await load("features/publications/fold-text.tsx");
+const { FOLD_AUTHORED, FOLD_GENERATED, FOLD_TEXT_SELECTOR, FoldFrame, INITIAL_FOLD_TOGGLE, countLines, foldFocusHandoff, foldNeeded, foldOpen, measureFold } = await load("features/publications/fold-text.tsx");
 const { PublishedSnapshotView } = await load("features/publications/snapshot-view.tsx");
 
 // 본문 글자 16px × 줄 높이 1.6 = 25.6px. 브라우저의 scrollHeight는 정수라 반올림한 높이를 넣는다.
@@ -137,6 +143,13 @@ test("펼침 규칙: 강조가 가리키면 펼치고, 다시 접은 뒤 같은 
   assert.equal(foldOpen(INITIAL_FOLD_TOGGLE, null), false, "자동으로 펼쳤던 글은 강조가 떠나면 접힘으로 돌아감");
 });
 
+test("단추가 없어질 때: 초점이 그 단추에 있을 때만 글 상자로 넘긴다", () => {
+  assert.equal(foldFocusHandoff(true, false, true), true, "단추가 있었고 이제 접지 않으며 초점이 단추에 있음");
+  assert.equal(foldFocusHandoff(true, false, false), false, "초점이 다른 곳에 있으면 가져오지 않는다");
+  assert.equal(foldFocusHandoff(true, true, true), false, "단추가 남으면 옮기지 않는다");
+  assert.equal(foldFocusHandoff(false, false, false), false, "단추가 없었으면 넘길 초점도 없다");
+});
+
 const frame = (props) => renderToStaticMarkup(createElement(FoldFrame, { id: "fold-1", maxHeight: 153.6, label: "자료 A 본문", ...props }, "원문 글 전체"));
 
 test("접는 틀: 기준 이하면 단추가 없고 높이를 줄이지 않는다", () => {
@@ -145,6 +158,12 @@ test("접는 틀: 기준 이하면 단추가 없고 높이를 줄이지 않는�
   assert.equal(html.includes("max-height"), false);
   assert.equal(html.includes("data-folded"), false);
   assert.match(html, /원문 글 전체/);
+});
+
+test("접는 틀: 글 상자는 초점을 넘겨받을 수 있지만 Tab 순서에는 들지 않는다", () => {
+  for (const html of [frame({ needed: false, open: false }), frame({ needed: true, open: false }), frame({ needed: true, open: true })]) {
+    assert.match(html, /<div id="fold-1" class="foldBody" tabindex="-1"/);
+  }
 });
 
 test("접는 틀: 접힌 동안에는 「전체 보기」와 aria-expanded=false이고 원문은 그대로 있다", () => {
@@ -176,12 +195,12 @@ const LONG_PAGE = Array.from({ length: 40 }, (_, index) => `쪽 글 ${index + 1}
 const SNAPSHOT = {
   title: "발행본", publishedAt: "2026-11-05T03:04:05.000Z", expiresAt: "2027-02-03T03:04:05.000Z",
   items: [
-    { publishedItemId: "c1", position: 1, itemKind: "CATCH", title: "결제 재시도",
+    { publishedItemId: "c1", position: 1, presetOrdinal: 1, presetName: "백엔드", itemKind: "CATCH", title: "결제 재시도",
       snapshot: { workFacts: LONG_FACTS, workLimits: ["실제 장애 때의 동작"], subjectContribution: "본인 커밋 4개",
         evidence: [{ sourceUrl: "https://github.com/o/r/commit/abc", sourceRevision: "abc", representedFacts: ["파일 1개"] }],
         authorDescription: LONG_BODY, aiDraft: LONG_BODY, mismatch: false } },
-    { publishedItemId: "t1", position: 2, itemKind: "TEXT_MATERIAL", title: "자기소개서", snapshot: { body: LONG_BODY } },
-    { publishedItemId: "p1", position: 3, itemKind: "PDF_MATERIAL", title: "포트폴리오", snapshot: { pageCount: 2 },
+    { publishedItemId: "t1", position: 2, presetOrdinal: 1, presetName: "백엔드", itemKind: "TEXT_MATERIAL", title: "자기소개서", snapshot: { body: LONG_BODY } },
+    { publishedItemId: "p1", position: 3, presetOrdinal: 1, presetName: "백엔드", itemKind: "PDF_MATERIAL", title: "포트폴리오", snapshot: { pageCount: 2 },
       pdfPages: [{ pageNumber: 1, readable: true, text: LONG_PAGE }, { pageNumber: 2, readable: false, text: "" }] },
   ],
 };
@@ -206,7 +225,7 @@ test("사본: 「이 기록으로 알 수 없는 것」과 「근거 자세히 �
   const html = view();
   const facts = html.slice(html.indexOf('data-testid="snapshot-catch-facts"'), html.indexOf('data-kind="TEXT_MATERIAL"'));
   // 작업 사실의 틀은 목록(ul)만 감싸고 바로 닫힌다. 서버에서 그린 글은 재기 전이라 단추가 없다.
-  const fold = /<div class="fold" data-testid="snapshot-fold"><div id="[^"]*" class="foldBody"><ul>(?:<li>[^<]*<\/li>)+<\/ul><\/div><\/div>/.exec(facts);
+  const fold = /<div class="fold" data-testid="snapshot-fold"><div id="[^"]*" class="foldBody" tabindex="-1"><ul>(?:<li>[^<]*<\/li>)+<\/ul><\/div><\/div>/.exec(facts);
   assert.notEqual(fold, null);
   const after = facts.slice(fold.index + fold[0].length);
   assert.match(after, /^<div data-testid="snapshot-catch-work-limits">/);
@@ -217,7 +236,7 @@ test("사본: 「이 기록으로 알 수 없는 것」과 「근거 자세히 �
 test("사본: 강조는 접는 틀 안에 그대로 그려지고 「근거 자세히 보기」 안 강조는 그 칸을 펼친다", () => {
   const mark = (text) => `<mark class="highlight" data-testid="snapshot-highlight">${text}</mark>`;
   const fact = view({ publishedItemId: "c1", fieldPath: "workFacts[20]", charStart: 0, charEnd: 5 });
-  assert.match(fact, new RegExp(`class="foldBody"><ul>.*<li>${mark("작업 사실")} 21번</li>`));
+  assert.match(fact, new RegExp(`class="foldBody" tabindex="-1"><ul>.*<li>${mark("작업 사실")} 21번</li>`));
   const body = view({ publishedItemId: "t1", fieldPath: "body", charStart: LONG_BODY.length - 4, charEnd: LONG_BODY.length });
   assert.equal(body.includes(mark("0째 줄")), true, "긴 본문의 맨 끝도 강조한다");
   const page = view({ publishedItemId: "p1", fieldPath: "pages[1]", charStart: 0, charEnd: 3 });
@@ -231,4 +250,21 @@ test("사본: 접기 단추의 화면 낭독기 이름에 쓸 글 이름은 자�
   // 서버에서 그린 글은 재기 전이라 단추가 없다. 이름은 틀에 그려 확인한다.
   const html = renderToStaticMarkup(createElement(FoldFrame, { id: "x", needed: true, open: false, maxHeight: 1, label: "결제 재시도 AI 설명 초안" }, "글"));
   assert.match(html, /전체 보기<span class="visually-hidden"> \(결제 재시도 AI 설명 초안\)<\/span>/);
+});
+
+test("프리셋 탭: 열리지 않은 탭의 패널에도 접는 틀과 원문이 그대로 그려져 있다", () => {
+  const OTHER_BODY = Array.from({ length: 40 }, (_, index) => `다른 탭 본문 ${index + 1}째 줄`).join("\n");
+  const snapshot = { ...SNAPSHOT, items: [...SNAPSHOT.items,
+    { publishedItemId: "t2", position: 4, presetOrdinal: 2, presetName: "프론트엔드", itemKind: "TEXT_MATERIAL", title: "회고", snapshot: { body: OTHER_BODY } }] };
+  const html = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot, activePreset: 1 }));
+  const hidden = /<div role="tabpanel" id="publication-snapshot-panel-2"[^>]*hidden=""[^>]*>(.*?)<\/div><\/section>/s.exec(html);
+  assert.notEqual(hidden, null, "둘째 탭의 패널은 숨겨져 있다");
+  assert.equal(count(hidden[1], 'data-testid="snapshot-fold"'), 1);
+  assert.equal(count(hidden[1], OTHER_BODY), 1, "숨긴 패널의 원문도 잘리지 않는다");
+  assert.match(hidden[1], /<div id="snapshot-fold-t2-body" class="foldBody" tabindex="-1">/);
+  // 다른 탭의 글을 가리키는 강조도 그 패널 안에 그려진다(탭을 여는 것은 `useSnapshotJump`이고 reader-tabs.test.mjs가 본다).
+  const jumped = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot, activePreset: 2,
+    highlight: { publishedItemId: "t2", fieldPath: "body", charStart: OTHER_BODY.length - 4, charEnd: OTHER_BODY.length } }));
+  assert.match(jumped, /<div role="tabpanel" id="publication-snapshot-panel-1"[^>]*hidden=""/);
+  assert.equal(count(jumped, 'data-testid="snapshot-highlight"'), 1);
 });

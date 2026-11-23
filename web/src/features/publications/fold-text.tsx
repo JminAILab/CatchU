@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useLayoutEffect, useRef, useState, type ReactNode, type Ref, type UIEventHandler } from "react";
+import { createContext, useContext, useId, useLayoutEffect, useRef, useState, type ReactNode, type Ref, type UIEventHandler } from "react";
 import styles from "./publications.module.css";
 
 /**
@@ -49,6 +49,19 @@ export function measureFold(blocks: readonly TextBlock[], limit: FoldLimit): Fol
   return { lines, needed, height: needed ? height : 0 };
 }
 
+/**
+ * 접는 글이 든 영역이 지금 화면에 보이는지(#629 프리셋 탭). 열리지 않은 탭의 패널은 `hidden`이라 그 안의 글은 높이가 0이고 줄 수를 셀 수 없다.
+ * 탭을 그리는 쪽(`snapshot-view.tsx`)이 패널마다 열림 여부를 넘기면, 값이 참으로 바뀌는 그리기 차례에 `FoldText`가 줄 수를 다시 센다.
+ * 넘기지 않으면 늘 보이는 것으로 본다.
+ */
+export const FoldVisibleContext = createContext(true);
+
+/**
+ * 다시 잰 결과 단추가 없어질 때 초점을 글 상자로 넘길지. 단추가 있었고(`hadButton`) 이제 접을 만큼 길지 않으며 초점이 그 단추에 있을 때만이다.
+ * 넘기지 않으면 단추가 화면에서 빠지면서 초점이 문서 맨 위로 떨어져, 다음 Tab이 머리글부터 다시 시작한다.
+ */
+export const foldFocusHandoff = (hadButton: boolean, needed: boolean, buttonFocused: boolean): boolean => hadButton && !needed && buttonFocused;
+
 /** 사람이 마지막으로 접고 편 상태와 그때 이 글을 가리키던 강조. 처음에는 접혀 있다. */
 export type FoldToggle = { readonly open: boolean; readonly at: object | null };
 export const INITIAL_FOLD_TOGGLE: FoldToggle = { open: false, at: null };
@@ -67,8 +80,9 @@ export const foldOpen = (toggle: FoldToggle, reveal: object | null): boolean =>
  * `label`은 화면에 보이지 않고 화면 낭독기가 어느 글의 단추인지 읽는 데만 쓴다.
  * 펼친 글의 단추에 키보드 초점이 있는 동안에는 단추 줄이 화면 아래쪽에 붙는다(CSS). 긴 글을 펼치면 단추가 글 끝으로 내려가 화면 밖에 놓이는데,
  * 화면을 옮기지 않고(읽던 자리 그대로) 초점을 받은 단추가 보이게 하려는 것이다. 초점이 떠나거나 글 끝이 화면에 들어오면 제자리에 놓인다.
+ * 글 상자는 `tabIndex={-1}`이라 Tab 순서에는 들지 않고, 단추가 없어질 때 초점을 넘겨받는 자리로만 쓴다.
  */
-export function FoldFrame({ id, needed, open, maxHeight, label, onToggle, bodyRef, onBodyScroll, children }: {
+export function FoldFrame({ id, needed, open, maxHeight, label, onToggle, bodyRef, buttonRef, onBodyScroll, children }: {
   id: string;
   needed: boolean;
   open: boolean;
@@ -77,18 +91,19 @@ export function FoldFrame({ id, needed, open, maxHeight, label, onToggle, bodyRe
   label: string;
   onToggle?: () => void;
   bodyRef?: Ref<HTMLDivElement>;
+  buttonRef?: Ref<HTMLButtonElement>;
   onBodyScroll?: UIEventHandler<HTMLDivElement>;
   children: ReactNode;
 }) {
   const folded = needed && !open;
   return (
     <div className={styles.fold} data-testid="snapshot-fold" data-folded={folded || undefined}>
-      <div id={id} ref={bodyRef} className={styles.foldBody} style={folded ? { maxHeight } : undefined} onScroll={onBodyScroll}>
+      <div id={id} ref={bodyRef} className={styles.foldBody} tabIndex={-1} style={folded ? { maxHeight } : undefined} onScroll={onBodyScroll}>
         {children}
       </div>
       {needed && (
         <div className={styles.foldBar} data-open={open || undefined}>
-          <button type="button" className={styles.foldButton} aria-expanded={open} aria-controls={id} data-testid="snapshot-fold-toggle"
+          <button ref={buttonRef} type="button" className={styles.foldButton} aria-expanded={open} aria-controls={id} data-testid="snapshot-fold-toggle"
             onClick={onToggle}>
             {open ? "접기" : "전체 보기"}<span className="visually-hidden"> ({label})</span>
           </button>
@@ -101,6 +116,8 @@ export function FoldFrame({ id, needed, open, maxHeight, label, onToggle, bodyRe
 /**
  * 긴 글을 접는다. 줄 수는 그려진 뒤 화면에 칠하기 전에 본문 글줄(문단·목록 항목)만 재고, 폭이 바뀌어 줄바꿈이 달라지면(`ResizeObserver`) 다시 잰다.
  * 재기 전(서버에서 그린 글 포함)에는 접지 않는다. `reveal`은 이 글을 가리키는 강조이고, 가리키지 않으면 null이다.
+ * 열리지 않은 탭 안(`FoldVisibleContext`가 거짓)에서는 높이가 0이라 재지 않고 앞서 잰 판정을 그대로 두며, 탭이 열리는 그리기 차례에 화면에 칠하기 전에 다시 잰다(#629).
+ * 폭이 넓어져 접을 만큼 길지 않게 되면 단추가 없어진다. 그때 초점이 그 단추에 있었으면 단추가 빠지기 전에 글 상자로 넘긴다(`foldFocusHandoff`).
  * `id`는 단추가 가리키는 글 상자의 id다. 사본의 항목 id로 만들어 넘기면 그리는 자리와 상관없이 같은 값이고, 넘기지 않으면 React가 만든다.
  */
 export function FoldText({ id, limit, reveal = null, label, children }: {
@@ -111,7 +128,9 @@ export function FoldText({ id, limit, reveal = null, label, children }: {
   children: ReactNode;
 }) {
   const generatedId = useId();
+  const visible = useContext(FoldVisibleContext);
   const body = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
   const [measured, setMeasured] = useState({ needed: false, height: 0 });
   const [toggle, setToggle] = useState<FoldToggle>(INITIAL_FOLD_TOGGLE);
   const open = foldOpen(toggle, reveal);
@@ -127,6 +146,8 @@ export function FoldText({ id, limit, reveal = null, label, children }: {
     const element = body.current;
     if (!element || typeof ResizeObserver === "undefined") return;
     const measure = () => {
+      // 숨긴 탭 안에서는 상자가 그려지지 않아 높이가 모두 0이다. 0줄로 세어 판정을 지우지 않고, 탭이 열릴 때 다시 잰다.
+      if (element.getClientRects().length === 0) return;
       // 접힌 동안에도 가려진 덩어리의 자리와 높이는 그대로 잡힌다. 상자 안쪽이 밀려 있어도 맨 위 기준이 되게 scrollTop을 더한다.
       const origin = element.getBoundingClientRect().top - element.scrollTop;
       const found = element.querySelectorAll<HTMLElement>(FOLD_TEXT_SELECTOR);
@@ -135,17 +156,20 @@ export function FoldText({ id, limit, reveal = null, label, children }: {
         return { top: rect.top - origin, height: rect.height, lineHeight: Number.parseFloat(getComputedStyle(block).lineHeight) };
       });
       const { needed, height } = measureFold(blocks, limit);
+      // 단추가 없어질 참이고 초점이 그 단추에 있으면, 단추가 화면에서 빠지기 전에 글 상자로 넘긴다. 화면은 옮기지 않는다.
+      if (foldFocusHandoff(button.current !== null, needed, document.activeElement === button.current)) element.focus({ preventScroll: true });
       setMeasured((previous) => (previous.needed === needed && previous.height === height ? previous : { needed, height }));
     };
-    // 처음 한 번은 화면에 칠하기 전에 바로 잰다. 가려진 탭에서는 ResizeObserver의 첫 알림이 늦게 올 수 있다.
+    // 처음 한 번과 탭이 열릴 때(`visible`)는 화면에 칠하기 전에 바로 잰다. ResizeObserver의 알림은 그린 뒤에 오므로,
+    // 그것만 기다리면 접히지 않은 채 한 번 보이고 출처로 옮긴 자리도 접힌 뒤 어긋난다. 브라우저 창이 가려져 있으면 알림이 더 늦다.
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [limit]);
+  }, [limit, visible]);
 
   return (
-    <FoldFrame id={id ?? generatedId} needed={measured.needed} open={open} maxHeight={measured.height} label={label} bodyRef={body}
+    <FoldFrame id={id ?? generatedId} needed={measured.needed} open={open} maxHeight={measured.height} label={label} bodyRef={body} buttonRef={button}
       onToggle={() => {
         // 긴 글 아래쪽에서 접으면 글이 화면 위로 사라지므로, 접은 글이 보이는 자리로 필요한 만큼만 옮긴다.
         if (open) afterToggle.current = () => body.current?.parentElement?.scrollIntoView({ block: "nearest" });
