@@ -157,6 +157,6 @@ Node가 넣은 요청 옵션 시험은 큐 검증 키트의 Node BullMQ를 쓰�
 
 ## 배포에서 지킬 것
 
-- 같은 큐에 소비자를 둘 이상 띄우면 전체 동시 분석 수가 1이 아니다. 교체할 때는 새 worker가 뜨기 전에 옛 worker가 내려가야 한다(EKS 실행 파일의 업데이트 방식은 [#275](https://github.com/JminAILab/CatchU/issues/275)에서 정한다).
+- 같은 큐에 소비자를 여럿 띄우면 전체 동시 분석 수는 그 수다(EKS는 worker 3개, [#480](https://github.com/JminAILab/CatchU/issues/480)). 교체할 때는 옛 worker가 모두 내려간 뒤 새 worker가 떠야 한다(EKS는 `Recreate`·`deploy/aws/scripts/deploy.sh`).
 - 컨테이너 PID 1이 부모 프로세스이고, 부모가 자식을 직접 회수한다. 첫 분석 뒤에는 spawn이 띄우는 자원 추적 프로세스가 하나 더 남는다.
 - 동시 수는 지금 1만 받는다(10/15 팀장 결정). 2 이상이면 멈추기 직전에 꺼낸 작업 하나가 실패 기록 없이 active로 남을 수 있고(BullMQ가 멈춘 동안 가져온 작업을 닫을 때에야 처리한다), 분석과 LLM 호출이 겹친다. 올릴 때는 상한(`MAX_CONCURRENCY`)과 함께 이 틈을 고치고 시험한다. 동시 수 1에서는 이 틈이 생기지 않는다(시험으로 확인).

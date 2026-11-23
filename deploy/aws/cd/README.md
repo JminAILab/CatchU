@@ -68,8 +68,9 @@ EKS 교체 단계는 세 가지를 한다.
 
 - **켜기:** `gh variable set DEPLOY_TARGET --body eks`. 그다음 `main` push부터 EKS를 교체한다. 지금 `main` 판본을 바로 배포하려면 Actions에서 `deploy-dev-server`를 `main`으로 수동 실행한다.
 - **멈추기:** `gh variable set DEPLOY_TARGET --body none`. 이미지는 계속 올라가고 EKS는 바뀌지 않는다. 진행 중인 실행은 취소하지 말고 끝날 때까지 기다린다.
-- **`none`으로 둘 때:** 손으로 교체할 때, 노드 작업을 할 때, 손으로 적용하는 실행 파일·Secret을 바꿀 때, 그리고 **노드나 서비스가 정상이 아닐 때**다. `deploy.sh`는 세 서비스가 「1개 실행·준비」가 아니면 같은 커밋이어도 api·worker를 0으로 내리고 다시 띄운다. 노드가 응답하지 않는 동안 `main` 병합이 들어오면 살아나던 서비스까지 내려가고, 종료를 확인하지 못해 3으로 멈춘다.
+- **`none`으로 둘 때:** 손으로 교체할 때, 노드 작업을 할 때, 손으로 적용하는 실행 파일·Secret을 바꿀 때, 그리고 **노드나 서비스가 정상이 아닐 때**다. `deploy.sh`는 세 서비스가 「정한 수만큼 실행·준비」가 아니면 같은 커밋이어도 api·worker를 0으로 내리고 다시 띄운다. 노드가 응답하지 않는 동안 `main` 병합이 들어오면 살아나던 서비스까지 내려가고, 종료를 확인하지 못해 3으로 멈춘다.
 - 12/9 00:00 동결부터는 `none`으로 둔다.
+- 동료에게 서비스를 알린 직후처럼 분석이 몰리는 때에는 배포·api 재시작·DB 설정 변경·노드 작업을 하지 않는다. 교체 한 번에 끊기는 분석이 최대 worker 수(3)만큼이다([#480 11/06 결정](https://github.com/JminAILab/CatchU/issues/480#issuecomment-6680876515)).
 
 ## 되돌리기
 
@@ -86,7 +87,7 @@ Actions 화면에서 `deploy-dev-server`를 `main`으로 Run workflow하고, 되
 |---|---|---|
 | 배포 대상 확인·판본 확인·검사·kubectl 받기·빌드·올리기 | 바뀌지 않음 | 실행 기록을 보고 고친 뒤 `main`으로 수동 실행한다 |
 | EKS 교체, 종료 코드 2 | 바뀌지 않음 | 요약의 사유나 `deploy.sh` 출력의 「멈춤」 줄을 본다. 되돌리기 확인, 계정·클러스터·이미지·실행 파일 확인, 또는 지난 교체가 멈춘 채(api·worker 0)라서다 |
-| EKS 교체, 종료 코드 3~8 | api·worker가 0으로 멈춘 채 | [../k8s/README.md](../k8s/README.md) 「앱 교체(deploy.sh)」의 종료 코드 표대로 원인을 본 뒤, 이 컴퓨터에서 `bash deploy/aws/scripts/deploy.sh --commit <커밋> --resume`으로 이어 간다 |
+| EKS 교체, 종료 코드 3~8 | api·worker가 0으로 멈춘 채 | [../k8s/README.md](../k8s/README.md) 「앱 교체(deploy.sh)」의 종료 코드 표대로 원인을 본 뒤, 이 컴퓨터의 `main`을 최신으로 받은 작업 폴더에서 `bash deploy/aws/scripts/deploy.sh --commit <커밋> --resume`으로 이어 간다(옛 `deploy.sh`는 worker를 1개로 띄운다) |
 | 실행이 취소되거나 시간 초과 | 교체 도중일 수 있음 | `kubectl get deploy,pod`로 상태를 본 뒤 손으로 이어 간다 |
 
 3~8로 멈춘 뒤의 자동 실행은 모두 2로 멈춘다. 자동 배포는 `--resume`을 붙이지 않으므로, 사람이 결과를 확인하고 손으로 이어 가기 전에는 그 상태를 덮어쓰지 않는다. 이어 간 뒤에는 다음 `main` push부터 다시 자동으로 돈다.
