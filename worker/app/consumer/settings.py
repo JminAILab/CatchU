@@ -8,6 +8,7 @@
 
 import os
 import re
+import socket
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Final, Literal, NoReturn
@@ -102,6 +103,12 @@ class Limits:
     # 이 값이 없으면 큐 노드가 조용히 사라졌을 때 걸어 둔 기다리기 명령이 끝없이 응답을 기다린다.
     queue_socket: float = 20
     queue_connect: float = 10
+    # 큐 접속의 TCP keepalive(#603). 쉬던 접속이 큐 장애 조치로 조용히 죽으면 그 뒤 첫 쓰기(진행 알림·결과)가
+    # 응답을 기다리다 앱 상한(5초·10초)에 잘려 사라진다. 커널이 30초 쉰 접속을 확인하고 1초 간격 10번 답이 없으면
+    # 끊어 두므로, 조용히 죽은 뒤 길어도 약 40초 안에 끊기고 다음 쓰기는 새 접속으로 나간다. api(ioredis)와 같은 값이다.
+    queue_keepalive_idle: int = 30
+    queue_keepalive_interval: int = 1
+    queue_keepalive_count: int = 10
     # 처리 중이 아닌데 이 시간 동안 큐에서 일을 가져오는 시도가 한 번도 응답을 받지 못하면 프로세스를 끝낸다.
     # 큐 장애 조치가 끝나 다시 붙는 시간(1~3분)보다 길게 둔다.
     fetch_stall: float = 5 * 60
@@ -240,10 +247,27 @@ def _queue_url(value: str | None, development: bool) -> QueueUrl | None:
     return QueueUrl(value)
 
 
-def queue_connection(url: QueueUrl, limits: Limits) -> dict[str, Any]:
-    """BullMQ에 넘길 큐 접속 옵션. 주소 문자열 대신 풀어서 넘겨 소켓 상한을 함께 준다(#603).
+def queue_keepalive_options(limits: Limits) -> dict[int, int]:
+    """큐 접속의 TCP keepalive 값(유휴·간격·횟수). redis-py가 접속을 맺을 때마다 setsockopt로 건다.
 
-    BullMQ는 주소 문자열을 받으면 소켓 상한 없이 접속을 만들고, 주소의 질의 문자열은 TLS 검증을 끄는
+    유휴 시간 상수의 이름이 플랫폼마다 달라(리눅스·Windows는 TCP_KEEPIDLE, macOS는 TCP_KEEPALIVE) 있는 것을
+    고른다. 없는 상수를 그대로 쓰면 개발 환경에서 기동이 멈추고, 값을 빼면 커널 기본값(리눅스 2시간)이 걸린다.
+    """
+    idle = getattr(socket, "TCP_KEEPIDLE", None) or getattr(
+        socket, "TCP_KEEPALIVE", None
+    )
+    pairs = (
+        (idle, limits.queue_keepalive_idle),
+        (getattr(socket, "TCP_KEEPINTVL", None), limits.queue_keepalive_interval),
+        (getattr(socket, "TCP_KEEPCNT", None), limits.queue_keepalive_count),
+    )
+    return {constant: value for constant, value in pairs if constant is not None}
+
+
+def queue_connection(url: QueueUrl, limits: Limits) -> dict[str, Any]:
+    """BullMQ에 넘길 큐 접속 옵션. 주소 문자열 대신 풀어서 넘겨 소켓 상한과 TCP keepalive를 함께 준다(#603).
+
+    BullMQ는 주소 문자열을 받으면 소켓 상한·keepalive 없이 접속을 만들고, 주소의 질의 문자열은 TLS 검증을 끄는
     옵션도 받으므로 쓰지 않는다. 나머지 값(주소·계정·DB 번호·TLS 검증)은 주소 문자열로 만든 접속과 같다
     (시험이 대조한다). 비밀번호가 들어 있으므로 로그·오류에 내지 않는다.
     """
@@ -256,6 +280,8 @@ def queue_connection(url: QueueUrl, limits: Limits) -> dict[str, Any]:
         "password": unquote(parsed.password) if parsed.password else None,
         "socket_timeout": limits.queue_socket,
         "socket_connect_timeout": limits.queue_connect,
+        "socket_keepalive": True,
+        "socket_keepalive_options": queue_keepalive_options(limits),
     }
     if parsed.scheme == "rediss":
         options["ssl"] = True
