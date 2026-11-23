@@ -57,7 +57,8 @@ export function measureFold(blocks: readonly TextBlock[], limit: FoldLimit): Fol
 export const FoldVisibleContext = createContext(true);
 
 /**
- * 다시 잰 결과 단추가 없어질 때 초점을 글 상자로 넘길지. 단추가 있었고(`hadButton`) 이제 접을 만큼 길지 않으며 초점이 그 단추에 있을 때만이다.
+ * 다시 잰 결과 단추가 없어질 때 초점을 글 상자로 넘길지(#615 화면 초안의 초점 인계, 2026-11-23 팀장 결정으로 이 부품에 넣음).
+ * 단추가 있었고(`hadButton`) 이제 접을 만큼 길지 않으며 초점이 그 단추에 있을 때만이다. 단추가 다시 생겨도 초점을 되돌리지 않는다.
  * 넘기지 않으면 단추가 화면에서 빠지면서 초점이 문서 맨 위로 떨어져, 다음 Tab이 머리글부터 다시 시작한다.
  */
 export const foldFocusHandoff = (hadButton: boolean, needed: boolean, buttonFocused: boolean): boolean => hadButton && !needed && buttonFocused;

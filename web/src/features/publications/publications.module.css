@@ -68,14 +68,14 @@
 /* 긴 글 접기(#607 fold-text). 글자는 그대로 두고 보이는 높이만 줄인다. 줄 수를 높이로 세므로 틀 안 목록의 바깥 여백은 없앤다. */
 .foldBody { overflow: hidden; }
 .foldBody > ul { margin: 0; }
-/* 글 상자는 Tab 순서 밖이고, 폭이 넓어져 단추가 없어질 때만 초점을 넘겨받는다. 키보드로 쓰던 중이면 초점 자리가 보이게 테두리를 그린다. */
+/* 글 상자는 Tab 순서 밖이고, 폭이 넓어져 단추가 없어질 때만 초점을 넘겨받는다(#615 2026-11-23 팀장 결정). 키보드로 쓰던 중이면 초점 자리가 보이게 테두리를 그린다. */
 .foldBody:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
 .fold[data-folded="true"] > .foldBody { border-bottom: 1px dashed #9aa6b6; }
 /* 펼친 글의 「접기」에 키보드 초점이 있는 동안에만 단추 줄이 화면 아래쪽에 붙는다(글 끝이 보이면 제자리).
    마우스로 읽을 때와 초점이 다른 곳에 있을 때는 붙지 않아 본문을 가리지 않는다. 붙는 동안에는 바탕을 칠해 밑으로 지나가는 글과 겹쳐 보이지 않게 한다. */
-/* 단추 아래 8px을 비워 바로 아래 글·칸과 붙어 보이지 않게 한다. 화면 아래쪽에 붙는 동안에는 본문을 더 가리지 않게 뺀다. */
-.foldBar { padding-bottom: 8px; }
-.foldBar[data-open="true"]:has(.foldButton:focus-visible) { position: sticky; bottom: 0; z-index: 1; padding-bottom: 0; background: var(--color-surface); border-top: 1px dashed #9aa6b6; }
+/* 펼친 글의 단추 줄 아래 8px(#615 2026-11-23 팀장 결정): 「접기」가 바닥에 붙어 있을 때 초점 테두리(3px + 간격 3px)의 아래쪽이 잘리지 않게 한다. */
+.foldBar[data-open="true"] { padding-bottom: 8px; }
+.foldBar[data-open="true"]:has(.foldButton:focus-visible) { position: sticky; bottom: 0; z-index: 1; background: var(--color-surface); border-top: 1px dashed #9aa6b6; }
 .foldButton { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: #254e93; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 .foldButton::before { content: "▾" / ""; margin-right: 4px; }
 .foldButton[aria-expanded="true"]::before { content: "▴" / ""; }
