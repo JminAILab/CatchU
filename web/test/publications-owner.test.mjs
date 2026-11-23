@@ -475,8 +475,8 @@ const at = (authorDescription, needle, length = needle.length) => {
 };
 const marks = (html) => [...html.matchAll(/<mark[^>]*>([\s\S]*?)<\/mark>/g)].map((match) => match[1]);
 
-test("AC1.4.5 작성자 발행본 상세는 받은 사람 화면과 같은 칸 제목별 보기를 쓴다", () => {
-  const authorDescription = "【이 작업에서 정한 것】\n줄여 올리기로 했다.\n\n【맡은 부분】\n게시글 작성 화면\n\n【더 쓰기】\n덧붙임";
+test("AC1.4.5·#634 작성자 발행본 상세는 받은 사람 화면과 같은 칸 제목별 보기를 쓰고, 새 칸과 옛 칸이 함께 칸 제목으로 보인다", () => {
+  const authorDescription = "【이 작업에서 정한 것】\n줄여 올리기로 했다.\n\n【맡은 부분】\n게시글 작성 화면\n\n【어떻게 확인했고 무엇을 고쳤나】\n화면에서 확인했다.\n\n【더 쓰기】\n덧붙임";
   const value = snapshot([catchItem({ authorDescription })]);
   const owner = renderToStaticMarkup(createElement(PublicationDetailView, {
     detail: detail({ snapshot: value }), stoppedAt: null, stopState: "idle", deleteState: "idle", onStop() {}, onDelete() {}, highlight: null, showEvidence() {},
@@ -484,7 +484,8 @@ test("AC1.4.5 작성자 발행본 상세는 받은 사람 화면과 같은 칸 �
   const direct = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: value }));
   const section = (html) => html.slice(html.indexOf('data-testid="snapshot-catch-description"'), html.indexOf('data-testid="snapshot-catch-facts"'));
   assert.equal(section(owner), section(direct));
-  assert.deepEqual([...section(owner).matchAll(/<h5[^>]*>([^<]*)<\/h5>/g)].map((m) => m[1]), ["이 작업에서 정한 것", "맡은 부분", "덧붙인 말"]);
+  assert.deepEqual([...section(owner).matchAll(/<h5[^>]*>([^<]*)<\/h5>/g)].map((m) => m[1]), ["이 작업에서 정한 것", "맡은 부분", "어떻게 확인했고 무엇을 고쳤나", "덧붙인 말"]);
+  assert.doesNotMatch(section(owner), /【/);
 });
 
 test("AC2.2.9 같은 GitHub 링크라도 텍스트 자료 본문은 지금처럼 주소 전체이고 작성자 설명에서만 이름이다", () => {

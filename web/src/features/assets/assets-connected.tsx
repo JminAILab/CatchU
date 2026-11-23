@@ -101,8 +101,7 @@ export function AssetsConnected({ api, descriptionApi, repositories, repositoryN
           onChange={(change) => { void store.update(change); }}
           onReload={() => reloadDetail(store, catchId, (message) => window.confirm(message))} /> : null}
         descriptionEditor={detailMatches && snapshot.detail && descriptionApi
-          ? <AuthorDescriptionEditor key={snapshot.detail.catchId} catchId={snapshot.detail.catchId} api={descriptionApi}
-            evidenceUrls={snapshot.detail.evidence.map((evidence) => evidence.sourceUrl)} /> : null}
+          ? <AuthorDescriptionEditor key={snapshot.detail.catchId} catchId={snapshot.detail.catchId} api={descriptionApi} /> : null}
         detailNotice={<ModalReauthNotice />}
         selectedId={visibleCatchId}
         hasMore={listMatches && snapshot.nextCursor !== null} moreState={snapshot.moreState}

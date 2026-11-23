@@ -1018,6 +1018,22 @@ test("AC1.4.1 「맡은 부분」과 「더 쓰기」 두 칸이 저장된 발�
   }
 });
 
+test("#634 새 칸 「어떻게 확인했고 무엇을 고쳤나」에 쓴 발행본은 그 칸 제목으로 보이고, 옛 8칸 제목 글은 지금처럼 칸별로 「【칸 제목】」 글자 없이 보인다", () => {
+  const merged = "【이 작업에서 정한 것】\n정한 것\n\n【어떻게 확인했고 무엇을 고쳤나】\n화면에서 확인했다.\n둘째 줄";
+  const mergedView = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription: merged })])));
+  assert.deepEqual(h5s(mergedView), ["이 작업에서 정한 것", "어떻게 확인했고 무엇을 고쳤나"]);
+  assert.ok(mergedView.includes("화면에서 확인했다.\n둘째 줄"));
+  assert.doesNotMatch(mergedView, /【/);
+
+  const OLD = ["이 작업에서 정한 것", "맡은 부분", "무엇이 문제였나", "고른 것과 버린 것",
+    "어떻게 확인했나·결과", "AI가 낸 것 가운데 받아들이지 않았거나 고친 것", "짚어 볼 곳", "더 쓰기"];
+  const old = OLD.map((title, index) => `【${title}】\n${index + 1}번 칸 글`).join("\n\n");
+  const oldView = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription: old })])));
+  assert.deepEqual(h5s(oldView), [...OLD.slice(0, -1), "덧붙인 말"]);
+  for (const [index] of OLD.entries()) assert.ok(oldView.includes(`${index + 1}번 칸 글`), String(index + 1));
+  assert.doesNotMatch(oldView, /【/);
+});
+
 test("AC1.4.2 작성자 설명이 통째로 없거나 빈 글인 발행본은 「작성자 설명이 없습니다.」다", () => {
   for (const authorDescription of [null, ""]) {
     const description = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription })])));
