@@ -6,8 +6,10 @@
 # - 실행 파일: deploy.sh가 자리를 채워 적용한 Deployment·migration Pod·동의 기록 확인 Pod와 손으로 적용하는 파일을 Ruby(YAML→JSON)·jq로 읽어 조건을 본다.
 # 확인하지 못하는 것: 실제 API 서버의 스키마·승인 검사(Pod 보안 검사 restricted 포함), 노드에서의 실제 종료 코드와
 # 준비 시간, NetworkPolicy·ALB의 실제 동작. 이것은 2단계 실제 클러스터에서 본다(deploy/aws/k8s/README.md).
-# 필요한 것: bash·jq·git·ruby. 사용: bash deploy/aws/scripts/deploy.test.sh   (실패가 하나라도 있으면 종료 코드 1)
+# 필요한 것: bash·jq·git·ruby·shasum. 사용: bash deploy/aws/scripts/deploy.test.sh   (실패가 하나라도 있으면 종료 코드 1)
 set -uo pipefail
+# #480에서 정한 worker 실행 수. deploy.sh의 worker_replicas와 같아야 한다(한쪽만 바꾸면 시험이 실패한다). api·web은 1개다.
+WORKER_REPLICAS=3
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 for tool in jq git ruby shasum; do
@@ -100,13 +102,15 @@ set -- "${args[@]}"
 call() { printf '%s\n' "$*" >> "$S/calls"; }
 has() { case " ${2:-} " in *" $1 "*) return 0 ;; esac; return 1; }
 deployments() { # 이름… → Deployment 목록 JSON. 시작한 뒤(apply 뒤)에는 STUB_FINAL_UNREADY, 그 전에는 STUB_UNREADY가 준비 안 됨이다.
-  local n r ready items='' unready=${STUB_UNREADY:-}
-  ls "$S"/applied-* > /dev/null 2>&1 && unready=${STUB_FINAL_UNREADY:-}
+  # STUB_FINAL_READY="이름=수 …": 시작한 뒤 그 Deployment의 준비된 Pod 수(일부만 준비된 경우).
+  local n r ready pair items='' unready=${STUB_UNREADY:-} partial=''
+  ls "$S"/applied-* > /dev/null 2>&1 && unready=${STUB_FINAL_UNREADY:-} partial=${STUB_FINAL_READY:-}
   for n in "$@"; do
     [ -f "$S/deploy-$n" ] || continue
     r=$(cat "$S/deploy-$n")
     ready=$r
     has "$n" "$unready" && ready=0
+    for pair in $partial; do [ "${pair%%=*}" = "$n" ] && ready=${pair#*=}; done
     items="${items}${items:+,}{\"kind\":\"Deployment\",\"metadata\":{\"name\":\"$n\",\"generation\":2},\"spec\":{\"replicas\":$r},\"status\":{\"observedGeneration\":2,\"replicas\":$r,\"readyReplicas\":$ready,\"availableReplicas\":$ready,\"updatedReplicas\":$ready}}"
   done
   printf '{"kind":"List","items":[%s]}\n' "$items"
@@ -240,8 +244,11 @@ case "$*" in
     has "$n" "${STUB_APPLY_FAIL:-}" && { call "apply $n 실패"; echo "error: synthetic" >&2; exit 1; }
     cp "$3" "$S/applied-$n.yaml"
     call "apply $n"
-    echo 1 > "$S/deploy-$n"
-    case $n in api | worker) printf '%s-new\trunning\n' "$n" >> "$S/pods" ;; esac ;;
+    # 적용한 파일의 실행 수만큼 Deployment와 Pod를 만든다(실제 클러스터처럼).
+    r=$(sed -n 's/^  replicas: \([0-9][0-9]*\)$/\1/p' "$3")
+    echo "${r:-0}" > "$S/deploy-$n"
+    i=1
+    case $n in api | worker) while [ "$i" -le "${r:-0}" ]; do printf '%s-new-%s\trunning\n' "$n" "$i" >> "$S/pods"; i=$((i + 1)); done ;; esac ;;
   "rollout status deployment/"*)
     n=${3#deployment/}
     call "rollout $n"
@@ -301,8 +308,11 @@ clean() { # 알 수 없는 호출이 없고, 계정 번호가 출력에 없고, 
   [ ! -s "$S/unknown" ] && ! grep -q "$ACCOUNT" "$OUT" && [ -z "$(ls -A "$WORK/tmp")" ]
 }
 says() { grep -qF -- "$1" "$OUT"; }
+# REPLACE·RUNNING: 옛 실행이 worker 1개인 상태(#480 전 판본에서 처음 바꿀 때). STEADY·RUNNING3: worker가 이미 정한 수만큼 떠 있는 상태.
 REPLACE="STUB_DEPLOYS=api=1 worker=1 web=1"
 RUNNING="STUB_PODS=api-old:running worker-old:running"
+STEADY="STUB_DEPLOYS=api=1 worker=${WORKER_REPLICAS} web=1"
+RUNNING3="STUB_PODS=api-old:running worker-old-1:running worker-old-2:running worker-old-3:running"
 GUARD='create consent-guard,'
 START='apply api,rollout api,apply worker,rollout worker,apply web,rollout web,'
 
@@ -318,8 +328,10 @@ check "처음 설치: 네 저장소 모두 태그 main-<커밋 앞 12자>로 찾
 check "처음 설치: 기록에 클러스터·namespace·대상 DB를 남김" "$(ok says '대상: 클러스터 catchu, namespace catchu, DB catchu-db.synthetic.ap-northeast-2.rds.amazonaws.com')"
 for n in api worker web; do
   want="image: ${ACCOUNT}.dkr.ecr.ap-northeast-2.amazonaws.com/catchu-${n}@$(digest_of "catchu-${n}")"
-  check "적용한 ${n}: 그 커밋 태그의 digest·실행 수 1·커밋 표식, 남은 자리 없음" \
-    "$( { grep -qxF "          ${want}" "$S/applied-${n}.yaml" && grep -qx '  replicas: 1' "$S/applied-${n}.yaml" \
+  replicas=1
+  [ "$n" = worker ] && replicas=$WORKER_REPLICAS
+  check "적용한 ${n}: 그 커밋 태그의 digest·실행 수 ${replicas}·커밋 표식, 남은 자리 없음" \
+    "$( { grep -qxF "          ${want}" "$S/applied-${n}.yaml" && grep -qx "  replicas: ${replicas}" "$S/applied-${n}.yaml" \
       && grep -qF "catchu.io/source-revision: ${C1}" "$S/applied-${n}.yaml" && ! grep -q '__[A-Z]' "$S/applied-${n}.yaml"; } > /dev/null 2>&1; echo $?)"
 done
 check "처음 설치: 동의 기록 확인 Pod 이름은 catchu-consent-guard-<UTC 시각>, 커밋 표식, 남은 자리 없음" \
@@ -328,6 +340,7 @@ check "처음 설치: 동의 기록 확인 Pod 이름은 catchu-consent-guard-<U
 in_record() { awk -v s="$1" 'f && index($0, s) { found = 1 } /^교체 기록\(커밋/ { f = 1 } END { exit !found }' "$OUT"; }
 check "처음 설치: 교체 기록에 동의 기록 직접 삭제 권한 결과 줄을 남김(#276 증거)" \
   "$(ok in_record '동의 기록 직접 삭제 권한(catchu_app): 회수 전 있음, 회수 뒤 없음')"
+check "처음 설치: 교체 기록에 서비스별 실행 수를 남김(#480 증거)" "$(ok in_record "실행 수: api 1, worker ${WORKER_REPLICAS}, web 1")"
 cp "$S"/applied-*.yaml "$S/created.yaml" "$WORK/"
 cp "$S/guard.yaml" "$WORK/guard.yaml"
 
@@ -335,16 +348,26 @@ run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=143 worker-old=0" --commit "$C1
 check "교체: 옛 api·worker를 멈춘 뒤 migration, 그다음 새 실행" \
   "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}")"
 check "교체: 옛 실행의 종료 코드(143·0)를 기록에 남김" "$( { says 'api-old 종료 코드 143' && says 'worker-old 종료 코드 0' && says '교체 기록'; } > /dev/null 2>&1; echo $?)"
+check "교체: worker 1개였던 상태에서 정한 수만큼 띄움" "$(ok test "$(cat "$S/deploy-worker") $(grep -c '^worker-new-' "$S/pods")" = "${WORKER_REPLICAS} ${WORKER_REPLICAS}")"
+run_sut "$STEADY" "$RUNNING3" STUB_EXIT="api-old=143 worker-old-1=0 worker-old-2=0 worker-old-3=0" --commit "$C1"
+check "교체: 옛 worker가 여러 개여도 모두 멈추고 각 종료 코드를 확인한 뒤 새 실행" \
+  "$( { test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}" \
+    && says 'worker-old-1 종료 코드 0' && says 'worker-old-2 종료 코드 0' && says 'worker-old-3 종료 코드 0'; } > /dev/null 2>&1; echo $?)"
+run_sut "$STEADY" "$RUNNING3" STUB_EXIT="api-old=143 worker-old-1=0 worker-old-2=137 worker-old-3=0" --commit "$C1"
+check "옛 worker 여러 개 중 하나라도 강제 종료(137)됐으면 7, migration·새 실행 없음" \
+  "$( { test "$rc" = 7 -a "$(calls)" = "scale api 0,scale worker 0," && says '강제 종료(137)된 Pod가 있다(worker-old-2)'; } > /dev/null 2>&1; echo $?)"
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=143 worker-old=0" STUB_WATCH_LATE=1 --commit "$C1"
 check "교체: 마지막 종료 코드가 Pod가 없어진 뒤에 늦게 와도 기다려 받음" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}")"
 
 run_sut "$REPLACE" STUB_PODS="api-old:waiting worker-old:running" STUB_EXIT="worker-old=0" --commit "$C1"
 check "교체: 실행 중이 아니던 Pod(재시작 대기)는 종료 코드 없이 지워지기만 확인" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}")"
 
-run_sut "$REPLACE" STUB_DIFF=0 --commit "$C1"
+run_sut "$STEADY" STUB_DIFF=0 --commit "$C1"
 check "같은 판본·구성이 정상으로 돌면 아무것도 바꾸지 않음" "$(ok test "$rc" = 0 -a -z "$(calls)" -a "$(grep -c '바꿀 것 없음' "$OUT")" = 1)"
-run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_DIFF=0 STUB_UNREADY=worker --commit "$C1"
+run_sut "$STEADY" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_DIFF=0 STUB_UNREADY=worker --commit "$C1"
 check "같은 구성이어도 정상이 아니면 다시 띄움" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}")"
+run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_DIFF=0 --commit "$C1"
+check "판본·구성이 같아 보여도 worker가 정한 수만큼 떠 있지 않으면 다시 띄움" "$(ok test "$rc" = 0 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}")"
 
 # ---------- 시작 전 확인(아무것도 바꾸지 않음, 종료 코드 2) ----------
 untouched() { test "$rc" = 2 -a -z "$(calls)"; }
@@ -440,6 +463,10 @@ check "처음 설치에서 worker 적용이 실패하면 띄운 api를 다시 �
   "$(ok test "$rc" = 6 -a "$(calls)" = "create migration,${GUARD}apply api,rollout api,apply worker 실패,scale api 0,")"
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_FINAL_UNREADY=worker --commit "$C1"
 check "마지막 확인에서 하나라도 준비 상태가 아니면 6" "$(ok test "$rc" = 6 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}scale api 0,scale worker 0,")"
+run_sut "$STEADY" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_FINAL_READY="worker=$((WORKER_REPLICAS - 1))" --commit "$C1"
+check "마지막 확인에서 worker가 정한 수보다 적게 준비됐으면 6" \
+  "$( { test "$rc" = 6 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}${START}scale api 0,scale worker 0," \
+    && says "정한 실행 수(api 1, worker ${WORKER_REPLICAS}, web 1)"; } > /dev/null 2>&1; echo $?)"
 run_sut "$REPLACE" "$RUNNING" STUB_EXIT="api-old=0 worker-old=0" STUB_ROLLOUT_FAIL=api STUB_SCALE_FAIL=after-start --commit "$C1"
 check "새 실행 실패 뒤 다시 멈추기도 실패하면 3" "$(ok test "$rc" = 3 -a "$(calls)" = "scale api 0,scale worker 0,create migration,${GUARD}apply api,rollout api,scale api 실패,scale worker 실패,")"
 
@@ -474,8 +501,8 @@ for f in api worker web created guard; do
     "$(ok q "$file" "[.[0] | ${POD} | .containers[0].env[] | select(.name | test(\"SECRET|PASSWORD|_KEY$|REDIS_URL\"))
       | (.value == null and .valueFrom.secretKeyRef.name != null)] | all")"
 done
-check "api·worker: 한 개 실행·Recreate, 자동 확장 없음" \
-  "$(ok test "$(for f in api worker; do json "$WORK/applied-$f.yaml" | jq -r '.[0] | "\(.spec.replicas) \(.spec.strategy.type)"'; done | sort -u)" = '1 Recreate')"
+check "api: 한 개 실행·Recreate, worker: 정한 수(${WORKER_REPLICAS}개) 실행·Recreate, 자동 확장 없음" \
+  "$(ok test "$(for f in api worker; do json "$WORK/applied-$f.yaml" | jq -r '.[0] | "\(.spec.replicas) \(.spec.strategy.type)"'; done | tr '\n' ' ')" = "1 Recreate ${WORKER_REPLICAS} Recreate ")"
 check "web: 한 개 실행, 옛 web을 둔 채 새 web을 먼저 띄움" \
   "$(ok q "$WORK/applied-web.yaml" '.[0].spec | .replicas == 1 and .strategy.type == "RollingUpdate" and .strategy.rollingUpdate.maxUnavailable == 0')"
 check "api: 운영 모드·DB TLS 검증·Access 15분·같은 출처, 개발 로그인·CORS 값 없음, 앱 계정" \
