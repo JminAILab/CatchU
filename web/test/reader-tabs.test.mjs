@@ -77,9 +77,22 @@ test("BR1.4 keepInactive가 false면 열리지 않은 패널은 비어 있고, t
 test("BR1.5 탭 이름 말줄임은 선택이고 글자를 자르지 않으며, tabTestId를 주면 탭마다 data-testid가 붙는다", () => {
   const long = "아주".repeat(25);
   const truncated = strip({ tabs: [{ id: "a", label: long }], active: "a", panels: { a: "x" }, truncateLabels: true, tabTestId: "shot-tab" });
-  assert.ok(truncated.includes(`data-testid="shot-tab-a"><span class="truncated">${long}</span></button>`));
+  assert.ok(truncated.includes(`data-testid="shot-tab-a"><span class="truncated" data-tab-label="">${long}</span><span class="tip" aria-hidden="true">${long}</span></button>`));
   const plain = strip({});
-  assert.doesNotMatch(plain, /truncated|data-testid/);
+  assert.doesNotMatch(plain, /truncated|data-testid|class="tip"/);
+});
+
+// #632(2026-11-24 팀장 결정): 줄인 탭 이름은 마우스를 올리면 전체가 보이되, 화면 낭독기는 두 번 읽지 않는다.
+// - 기대: 전체 이름 말풍선은 aria-hidden이고 탭에 title이 없어, 탭의 읽히는 이름은 말줄임 글자 한 번뿐이다.
+// - 실패로 보는 것: 말풍선이 읽히는 글로 남음, title로 같은 이름이 설명으로 한 번 더 붙음.
+test("#632 줄인 탭 이름의 말풍선은 aria-hidden이고 title을 쓰지 않아 읽히는 이름은 한 번이다", () => {
+  const html = strip({ tabs: [{ id: "a", label: "긴 이름" }, { id: "b", label: "다른 이름" }], active: "a", panels: { a: "x", b: "y" }, truncateLabels: true });
+  assert.doesNotMatch(html, / title=/);
+  for (const name of ["긴 이름", "다른 이름"]) {
+    const shown = [...html.matchAll(new RegExp(`<span([^>]*)>${name}</span>`, "g"))].map((match) => match[1]);
+    assert.equal(shown.length, 2, name);
+    assert.equal(shown.filter((attrs) => !attrs.includes('aria-hidden="true"')).length, 1, `${name}: 읽히는 글은 하나`);
+  }
 });
 
 test("BR1.2 키: 오른쪽·왼쪽은 옆 탭이고 끝에서 돈다. Home·End는 처음·끝이고 다루지 않는 키와 빈 탭 줄은 null이다", () => {
@@ -151,13 +164,13 @@ test("NFR 요구 검토 Minor 1 같은 순번에 이름이 섞여 와도 응답�
   const value = snapshot([text("b", 2, 1, "나중 이름"), text("a", 1, 1, "처음 이름")]);
   assert.equal(isPublishedSnapshot(value), true);
   assert.equal(groupByPreset(value)[0].name, "처음 이름");
-  assert.match(view({ snapshot: value }), /<span class="truncated">처음 이름<\/span>/);
+  assert.match(view({ snapshot: value }), /<span class="truncated" data-tab-label="">처음 이름<\/span>/);
 });
 
 test("BR1.5·BR2.2 50자 이름은 탭에 글자 그대로(말줄임 클래스), 탭 아래에 이름 전체이고, 탭에 자료 개수가 없다", () => {
   const name = "가".repeat(50);
   const html = view({ snapshot: snapshot([text("a", 1, 1, name), text("b", 2, 1, name)]) });
-  assert.match(html, new RegExp(`data-testid="snapshot-preset-tab-1"><span class="truncated">${name}</span></button>`), "개수 없이 이름 글자만");
+  assert.match(html, new RegExp(`data-testid="snapshot-preset-tab-1"><span class="truncated" data-tab-label="">${name}</span><span class="tip" aria-hidden="true">${name}</span></button>`), "개수 없이 이름 글자만");
   assert.ok(html.includes(`<p class="presetName" data-testid="snapshot-preset-name">${name}</p>`));
   assert.doesNotMatch(html, /\(2\)|2개/);
 });
@@ -166,7 +179,9 @@ test("BR2.5·NFR3.1·NFR3.2 태그 꼴 이름은 탭·탭 아래 이름·알림�
   for (const name of ["<b>x</b>", "<img src=x onerror=alert(1)>"]) {
     const html = view({ snapshot: snapshot([text("a", 1, 1, "첫"), text("b", 2, 2, name)]), activePreset: 2, tabNotice: { ordinal: 2, presetName: name, seq: 1 } });
     const escaped = name.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-    assert.equal(count(html, escaped), 3, `${name}: 탭·이름 줄·알림`);
+    // 탭·탭의 말풍선(aria-hidden)·이름 줄·알림. 탭 아래 이름 줄에 「프리셋」 표시는 붙이지 않는다(#632).
+    assert.equal(count(html, escaped), 4, `${name}: 탭·말풍선·이름 줄·알림`);
+    assert.doesNotMatch(html, />프리셋</);
     assert.doesNotMatch(html, /<b>|<img/);
     for (const [, id] of html.matchAll(/ id="([^"]+)"/g)) assert.doesNotMatch(id, /[<>]|img|onerror/, id);
   }

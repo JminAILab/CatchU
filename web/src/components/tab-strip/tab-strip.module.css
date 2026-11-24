@@ -1,8 +1,15 @@
-/* 탭 줄(발행 프리셋 U3 TabStrip). 모양은 자료 화면의 탭(U8 계획 10.1) 그대로 옮겼고 다듬지 않는다(C-O4). 넘치면 다음 줄로 넘어간다(M5 「화면 크기」). */
+/* 탭 줄(발행 프리셋 U3 TabStrip). #632(2026-11-24 팀장 결정)에서 모양을 다듬었고, 이 부품을 쓰는 「발행본 자료」와 자료 화면의 「자료 종류」가 같은 모양이다.
+   넘치면 다음 줄로 넘어간다(M5 「화면 크기」). 키보드 조작과 전환 취소 동작은 tab-strip.tsx 그대로다. */
 /* 패널에는 클래스를 붙이지 않는다. display를 정하면 열리지 않은 패널의 hidden이 덮인다(U3 NFR 설계 Minor 2). */
-.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--color-line); }
-.tab, .tabActive { min-height: 44px; padding: 10px 18px; border: 1px solid transparent; border-bottom: none; border-radius: 9px 9px 0 0; background: transparent; color: #34465e; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
-.tabActive { border-color: var(--color-line); background: var(--color-surface); color: var(--color-ink); }
-.tab:focus-visible, .tabActive:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid var(--color-line); }
+/* 닫힌 탭은 보통 굵기, 열린 탭은 굵게(글꼴이 굵기 둘만 있어 600은 굵게 보이므로 쓰지 않는다). */
+.tab, .tabActive { position: relative; min-height: 44px; margin-bottom: -1px; padding: 10px 16px; border: 1px solid transparent; border-bottom: none; border-radius: 9px 9px 0 0; background: transparent; color: #46566d; font: inherit; font-size: 15px; font-weight: 400; cursor: pointer; }
+.tab:hover { background: var(--color-background); color: var(--color-ink); }
+/* 열린 탭: 색만이 아니라 굵기·위쪽 띠·테두리로도 구분한다. */
+.tabActive { border-color: var(--color-line); background: var(--color-surface); color: var(--color-accent); font-weight: 700; box-shadow: inset 0 3px 0 var(--color-accent); }
+.tab:focus-visible, .tabActive:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; z-index: 1; }
 /* 긴 탭 이름(BR1.5): 한 탭 최대 16em, 한 줄 말줄임. 글자는 자르지 않아 화면 낭독기에는 이름 전체가 읽힌다. */
 .truncated { display: inline-block; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+/* 줄어든 탭의 전체 이름 말풍선(#632). 화면 낭독기에는 숨긴다(aria-hidden). 좁은 화면에서 밖으로 나가지 않게 폭을 줄인다. */
+.tip { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 5; width: max-content; max-width: min(28em, calc(100vw - 32px)); padding: 4px 10px; border-radius: 6px; background: #1b2a48; color: #fff; font-size: 13px; font-weight: 400; line-height: 1.5; text-align: left; white-space: normal; overflow-wrap: anywhere; pointer-events: none; }
+[data-truncated="true"]:hover > .tip, [data-truncated="true"]:focus-visible > .tip { display: block; }

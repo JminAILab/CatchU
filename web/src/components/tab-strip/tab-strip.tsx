@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import styles from "./tab-strip.module.css";
 
 /**
@@ -16,6 +16,10 @@ import styles from "./tab-strip.module.css";
  * - `keepInactive`가 true면 열리지 않은 패널도 내용을 그린 채 `hidden`으로 숨겨, 탭을 오가도 패널 안 상태(PDF 뷰어 등)가 남는다.
  *   false면 열리지 않은 패널은 빈 채로 `hidden`이다. 패널에는 `display`를 정하는 클래스를 붙이지 않는다(`hidden`이 덮이지 않게).
  * - 탭 이름은 글자로만 그린다. `truncateLabels`면 한 탭이 최대 폭(16em)을 넘을 때 CSS로 뒤를 「…」로 줄이고 글자는 자르지 않는다.
+ *   줄어든 탭에 마우스를 올리거나 키보드 초점이 가면 전체 이름이 말풍선으로 보인다(#632). 말풍선은 `aria-hidden`이고 `title`을 쓰지 않아
+ *   화면 낭독기는 탭 이름을 한 번만 읽는다. 줄었는지는 그려진 폭으로 재고(`data-truncated`), 탭 줄의 폭이 바뀌면 다시 잰다.
+ * - 모양(#632, 2026-11-24 팀장 결정): 열린 탭은 위쪽 띠·굵기·색으로 구분하고 닫힌 탭은 마우스를 올리면 바탕이 바뀐다. 이 부품을 쓰는
+ *   「발행본 자료」와 자료 화면의 「자료 종류」가 같은 모양이다(모양 갈래를 두지 않는다).
  */
 
 export type TabItem = { readonly id: string; readonly label: string };
@@ -72,7 +76,27 @@ export function tabKeyAction(input: { ids: readonly string[]; from: string; acti
 
 export function TabStrip({ tabs, active, onChange, label, idPrefix, panels, keepInactive = false, tabTestId, truncateLabels = false }: TabStripProps) {
   const buttons = useRef(new Map<string, HTMLButtonElement>());
+  const listRef = useRef<HTMLDivElement>(null);
   const ids = tabs.map((tab) => tab.id);
+  const labelKey = tabs.map((tab) => tab.label).join("\u0000");
+
+  // 줄어든 탭에만 말풍선을 켠다. 이름이 바뀌거나 탭 줄의 폭이 바뀌면 다시 잰다.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!truncateLabels || !list) return;
+    const measure = () => {
+      for (const button of buttons.current.values()) {
+        const text = button.querySelector<HTMLElement>("[data-tab-label]");
+        if (text && text.scrollWidth > text.clientWidth + 1) button.dataset.truncated = "true";
+        else delete button.dataset.truncated;
+      }
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [truncateLabels, labelKey]);
   const tabId = (id: string) => `${idPrefix}-tab-${id}`;
   const panelId = (id: string) => `${idPrefix}-panel-${id}`;
 
@@ -91,7 +115,7 @@ export function TabStrip({ tabs, active, onChange, label, idPrefix, panels, keep
 
   return (
     <>
-      <div role="tablist" aria-label={label} className={styles.tabs}>
+      <div ref={listRef} role="tablist" aria-label={label} className={styles.tabs}>
         {tabs.map((tab) => {
           const selected = tab.id === active;
           return (
@@ -100,7 +124,10 @@ export function TabStrip({ tabs, active, onChange, label, idPrefix, panels, keep
               data-testid={tabTestId === undefined ? undefined : `${tabTestId}-${tab.id}`}
               ref={(element) => { if (element) buttons.current.set(tab.id, element); else buttons.current.delete(tab.id); }}
               onClick={(event) => click(tab.id, event)} onKeyDown={(event) => keyDown(tab.id, event)}>
-              {truncateLabels ? <span className={styles.truncated}>{tab.label}</span> : tab.label}
+              {truncateLabels ? <>
+                <span className={styles.truncated} data-tab-label="">{tab.label}</span>
+                <span className={styles.tip} aria-hidden="true">{tab.label}</span>
+              </> : tab.label}
             </button>
           );
         })}
