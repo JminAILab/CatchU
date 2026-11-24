@@ -95,7 +95,7 @@ export function TabStrip({ tabs, active, onChange, label, idPrefix, panels, keep
   const ids = tabs.map((tab) => tab.id);
   const labelKey = tabs.map((tab) => tab.label).join("\u0000");
 
-  // 줄어든 탭에만 말풍선을 켠다. 이름이 바뀌거나 탭 줄의 폭이 바뀌면 다시 잰다.
+  // 줄어든 탭에만 말풍선을 켠다. 이름이 바뀌거나 탭 줄의 폭이 바뀌면 다시 잰다. 선택된 탭은 글자가 굵어져 그때만 잘릴 수 있으므로 탭을 바꿀 때도 다시 잰다.
   useEffect(() => {
     const list = listRef.current;
     if (!truncateLabels || !list) return;
@@ -112,7 +112,7 @@ export function TabStrip({ tabs, active, onChange, label, idPrefix, panels, keep
     const observer = new ResizeObserver(measure);
     observer.observe(list);
     return () => observer.disconnect();
-  }, [truncateLabels, labelKey]);
+  }, [truncateLabels, labelKey, active]);
   const tabId = (id: string) => `${idPrefix}-tab-${id}`;
   const panelId = (id: string) => `${idPrefix}-panel-${id}`;
 

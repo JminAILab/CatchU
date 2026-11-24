@@ -98,7 +98,13 @@ export function ReorderList(props: ReorderListProps) {
     reveal.current = null;
     const scroller = scrollRef.current;
     const moved = shown === null ? undefined : [...(listRef.current?.querySelectorAll<HTMLElement>("[data-reorder-key]") ?? [])].find((element) => element.dataset.reorderKey === shown);
-    if (scroller && moved) scroller.scrollTop = revealScrollTop({ scrollTop: scroller.scrollTop, height: scroller.clientHeight }, moved.offsetTop, moved.offsetHeight);
+    if (scroller && moved) {
+      scroller.scrollTop = revealScrollTop({ scrollTop: scroller.scrollTop, height: scroller.clientHeight }, moved.offsetTop, moved.offsetHeight);
+      // 상자를 맞춘 뒤에도 줄이 화면 밖에 걸쳐 있으면(낮은 창에서는 목록이 페이지와 함께 길어진다) 페이지도 그만큼만 옮긴다.
+      const rect = moved.getBoundingClientRect();
+      const top = revealScrollTop({ scrollTop: window.scrollY, height: window.innerHeight }, rect.top + window.scrollY, rect.height);
+      if (Math.abs(top - window.scrollY) >= 1) window.scrollTo({ top, behavior: "instant" });
+    }
     const target = pending.current;
     pending.current = null;
     if (!target) return;
@@ -161,6 +167,7 @@ export function ReorderList(props: ReorderListProps) {
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* 잡을 포인터가 없으면 창의 듣기만으로 따라간다 */ }
     const entry = props.entries[from];
     const rowHeight = row.offsetHeight;
+    const pointerId = event.pointerId;
     const startY = event.clientY, startScroll = scroller.scrollTop, startWindowScroll = window.scrollY;
     const minShift = list.offsetTop - row.offsetTop, maxShift = list.offsetTop + list.offsetHeight - rowHeight - row.offsetTop;
     let x = event.clientX, y = event.clientY, slot = from, accepted = true, ended = false, lastTick = event.timeStamp;
@@ -237,9 +244,10 @@ export function ReorderList(props: ReorderListProps) {
       // 목록에서 멀리 벗어나 놓았거나 Esc로 그만두면 순서를 그대로 두고 그 사실을 알린다. 제자리에 놓은 것은 알리지 않는다.
       setStatus(!commit || !accepted ? ORDER_UNCHANGED_TEXT : "");
     };
-    const onMove = (e: PointerEvent) => { x = e.clientX; y = e.clientY; place(); };
-    const onUp = (e: PointerEvent) => finish(true, e);
-    const onCancel = () => finish(false);
+    // 끌기를 시작한 포인터만 따른다. 끄는 중 다른 손가락이 화면에 닿거나 떨어져도 자리와 확정에 끼어들지 않는다.
+    const onMove = (e: PointerEvent) => { if (e.pointerId !== pointerId) return; x = e.clientX; y = e.clientY; place(); };
+    const onUp = (e: PointerEvent) => { if (e.pointerId === pointerId) finish(true, e); };
+    const onCancel = (e: PointerEvent) => { if (e.pointerId === pointerId) finish(false); };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); } };
     window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp); window.addEventListener("pointercancel", onCancel);
     document.addEventListener("keydown", onKey, true);
