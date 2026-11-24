@@ -1,6 +1,6 @@
 # CatchU 큐 기술 검증 — api와 worker 사이 작업 전달에 BullMQ를 쓸 수 있는가
 
-> **지위: 제안** — 2026-10-02 큐 기술 검증의 판정·조건과 이후 구현을 안내한다. BullMQ 개발 채택과 앱 안 장애 복구를 두지 않는 범위는 [10/6 결정][d1006]을 따른다. 현재 api·worker는 BullMQ와 AWS ElastiCache Valkey를 사용한다([API 큐](../api/docs/analysis-queue.md)·[worker 큐 소비자](../worker/docs/queue-consumer.md)). 10/2 [실험 결과](CatchU_queue_verification_results.md)는 로컬 Docker·합성 자료 기록으로 보존하고, EKS 실제 확인과 미확인 장애 조건은 아래에서 구분한다. 승인된 계약과 후속 결정이 정본이며, 현재 메시지 판본은 [제품 계약](../api/contracts/repository-analysis/worker-messages.yaml)을 따른다. 추적 근거는 [#77][i77]이다.
+> **지위: 제안** — 2026-10-02 큐 기술 검증의 판정·조건과 이후 구현을 안내한다. BullMQ 개발 채택은 10/2 팀원 1 결정이고, 앱 안 장애 복구를 두지 않고 정체 복구를 0회로 하는 범위는 [10/6 팀장 결정][d1006]을 따른다. 현재 api·worker는 BullMQ와 AWS ElastiCache Valkey를 사용한다([API 큐](../api/docs/analysis-queue.md)·[worker 큐 소비자](../worker/docs/queue-consumer.md)). 10/2 [실험 결과](CatchU_queue_verification_results.md)는 로컬 Docker·합성 자료 기록으로 보존하고, 채택 완료는 배포 전 조건 3을 마친 뒤 기록한다. 조건 3은 [11/23 확인](https://github.com/JminAILab/CatchU/issues/603#issuecomment-7091499865)을 마쳤으며, 채택 완료를 기록했다는 뜻은 아니다. 승인된 계약과 후속 결정이 정본이며, 현재 메시지 판본은 [제품 계약](../api/contracts/repository-analysis/worker-messages.yaml)을 따른다. 추적 근거는 [#77][i77]이다.
 
 이 문서의 영역 이름: **E**는 api의 분석 요청·작업 상태(팀원 2), **F**는 worker의 수집·분석 결과 생성(팀원 1), **B**는 Catch 등록·자산(팀원 4), **H**는 배포·환경([#24][i24])이다.
 
@@ -8,7 +8,7 @@
 
 ## 결론
 
-**10/2 판정: 조건부 채택 가능. 현재는 제품에 연결돼 EKS에서 사용한다.** api(NestJS)에서 worker(Python)로 분석 요청을 보내고, worker가 진행 알림과 결과를 돌려보내는 데 BullMQ를 쓸 수 있다. 이 판정은 [#121][i121](worker 전달 연결)을 BullMQ로 **개발해도 된다**는 뜻이고, 팀원 1은 이에 따라 #121을 BullMQ로 개발하기로 2026-10-02에 정했다. [11/18 EKS 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에서 실제 접수·처리·결과 수신을 봤다. 큐 장애 조치 뒤 api는 재연결됐지만 worker는 다시 띄워야 했으므로 이 한계는 [#603](https://github.com/JminAILab/CatchU/issues/603)과 구분한다. 연결 자체는 문제가 없었다. Node `bullmq` 6.3.11과 Python `bullmq` 3.3.0은 Redis에서 실행하는 스크립트(Lua) 49개가 글자까지 같았고, 합성 요청·결과가 양쪽 방향으로 값 그대로 오갔다. 2026-10-02 당시 배포 대상이던 NCP가 새로 만들 수 있던 세 엔진(Redis 7.2.11, Valkey 7.2.11, Valkey 8.1.6)에서 47개 시나리오의 판정이 모두 같았다.
+**10/2 판정: 조건부 채택 가능. 현재는 제품에 연결돼 EKS에서 사용한다.** api(NestJS)에서 worker(Python)로 분석 요청을 보내고, worker가 진행 알림과 결과를 돌려보내는 데 BullMQ를 쓸 수 있다. 이 판정은 [#121][i121](worker 전달 연결)을 BullMQ로 **개발해도 된다**는 뜻이고, 팀원 1은 이에 따라 #121을 BullMQ로 개발하기로 2026-10-02에 정했다. [11/18 EKS 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에서 실제 접수·처리·결과 수신을 봤다. 11/18에는 장애 조치 뒤 worker를 다시 띄워야 했으나, [11/23 재확인](https://github.com/JminAILab/CatchU/issues/603#issuecomment-7091499865)에서는 재시작 없이 새 분석 결과를 api가 받았다. 그때 찾은 첫 진행 알림 누락과 keepalive 보완 범위는 [큐 소비자](../worker/docs/queue-consumer.md)에 구분한다. 연결 자체는 문제가 없었다. Node `bullmq` 6.3.11과 Python `bullmq` 3.3.0은 Redis에서 실행하는 스크립트(Lua) 49개가 글자까지 같았고, 합성 요청·결과가 양쪽 방향으로 값 그대로 오갔다. 2026-10-02 당시 배포 대상이던 NCP가 새로 만들 수 있던 세 엔진(Redis 7.2.11, Valkey 7.2.11, Valkey 8.1.6)에서 47개 시나리오의 판정이 모두 같았다.
 
 다만 두 가지는 큐가 해 주지 않는다. [10/6 팀장 결정][d1006]에 따라 앱 안에 복구 장치를 따로 두지 않고 아래처럼 다룬다.
 
@@ -34,7 +34,7 @@
 |---|---|---|---|
 | 1 | 두지 않는다 — 10/6 결정. 결과를 받은 뒤 등록 전에 멈춘 요청을 앱이 복구하지 않는다(결과 복구 1-가·1-나 모두). 반영 실패는 바로, 반영 대기는 처리 시한에 닫히고 사용자가 다시 요청한다([처리 시한 구현](../api/docs/analysis-deadline.md), [#237][i237]). 같은 결과를 두 번 반영하지 않는지는 [#233][i233] 완료 기준(같은 결과가 두 번 와도 수신 기록은 하나다)이 확인한다 | — | [10/6 결정][d1006] |
 | 2 | 두지 않는다 — 10/6 결정. F는 결과와 `UNCERTAIN` 알림을 보내면 끝이다. 결과 보존·주기 점검·재전송을 두지 않고, E가 거부한 결과(`REJECTED`)는 기록만 남긴다 | — | [10/6 결정][d1006] · 9/29 결과 보존 14일 결정 철회 |
-| 3 | AWS ElastiCache Valkey에서 `noeviction`·TLS·필요 명령과 실제 클라이언트 연결을 확인했다. 11/18 팀장 결정으로 키트 실행을 실제 api·worker 확인으로 갈음했다. 장애 조치 뒤 api 복귀는 확인했고, 당시 worker는 재시작이 필요했다. 수정 후 현장 확인은 #603의 증거를 따른다. 영속성은 참고 기록이며 관문이 아니다 | H([#24][i24]) | [2단계 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553), [5단계 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733) |
+| 3 | AWS ElastiCache Valkey의 `noeviction`·TLS·허용 명령·실제 클라이언트 연결과 장애 조치 뒤 api·worker 복귀를 확인했다. 11/18 팀장 결정으로 키트 실행을 실제 클라이언트 확인으로 갈음했으며, 11/23 worker 재시작 없이 새 분석 결과를 api가 받았다. 영속성은 참고 기록이며 관문이 아니다 | H([#24][i24]) | [2단계 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553), [11/23 재확인](https://github.com/JminAILab/CatchU/issues/603#issuecomment-7091499865) |
 | 4 | 결정됨 — 10/6 결정. 실행 중 → 실행 불명 전이(`RUNNING → UNCERTAIN`)는 더하지 않는다. 화면에는 "실행 중"으로 보이다가, 접수 후 60분 안에 끝나지 않으면 E가 실패로 닫는다([처리 시한 구현](../api/docs/analysis-deadline.md), [#237][i237]) | [#237][i237](E 리뷰) | 쟁점 1·2 |
 | 5 | 두지 않는다 — 10/6 결정. F에 실행 차단 기록이 없다. 닫힌 뒤 큐에서 꺼낸 오래된 작업은 worker가 요청 정보를 조회할 때([#232][i232]) 끝난 시도라 "모름"을 받아 분석하지 않는다([요청 정보 조회](../api/docs/worker-context.md)) | — | [10/6 결정][d1006] |
 | 6 | 배포 중에 옛 worker와 새 worker가 함께 돌지 않게 한다(새 worker는 앞 worker가 모두 끝난 뒤 시작. 실행 수는 [#480](https://github.com/JminAILab/CatchU/issues/480)에서 3). Kubernetes로 배포하면 배포 방식을 Recreate로 둬 앞 worker pod가 완전히 내려간 뒤 새 pod가 뜨게 한다(롤링 업데이트는 maxSurge 0이어도 종료 중인 pod와 겹칠 수 있다) | H·F | 시험한 범위가 worker 한 프로세스다(「[하지 않은 것과 한계](#하지-않은-것과-한계)」) |

@@ -50,7 +50,7 @@ EKS([#276](https://github.com/JminAILab/CatchU/issues/276))의 api에서 큐 연
   k exec deploy/api -- node -e "console.log(require('fs').readdirSync(process.env.GITHUB_CREDENTIAL_DIRECTORY).length)"
   ```
   다음 교체로 api가 다시 뜬 뒤에도 프로필이 연결됨으로 남는지 본다(볼륨이 Pod와 함께 없어지지 않는다는 확인).
-- **실제 분석 한 번:** 연결한 계정의 공개 저장소를 골라 분석을 요청하고 결과 화면까지 본다. api 로그의 `ANALYSIS_REQUEST_ENQUEUED`(큐에 넣음) → worker 로그의 처리 → api 로그의 `WORKER_RESULT_RECEIVED`(`disposition`이 `ACCEPTED`) 순서로 남는다. 접수가 403이면 GitHub 연결을, 요청이 60분 뒤 실패로 닫히면 큐 연결과 내부 조회를 본다. worker의 실제 메모리 사용량도 이때 재서 `worker.yaml`의 상한을 고친다(그 파일 머리말).
+- **실제 분석 한 번:** 연결한 계정의 공개 저장소를 골라 분석을 요청하고 결과 화면까지 본다. api 로그의 `ANALYSIS_REQUEST_ENQUEUED`(큐에 넣음) → worker 로그의 처리 → api 로그의 `WORKER_RESULT_RECEIVED`(`disposition`이 `ACCEPTED`) 순서로 남는다. 접수가 403이면 GitHub 연결을, 요청이 60분 뒤 실패로 닫히면 큐 연결과 내부 조회를 본다. worker의 실제 메모리 사용량도 재서 기록한다. 메모리 상한은 [#480](https://github.com/JminAILab/CatchU/issues/480)에서 정한다.
 
 ## GitHub 토큰 보관 볼륨
 
@@ -66,7 +66,7 @@ fill() { [[ $fs == fs-* && $ap == fsap-* ]] || { echo "EFS ID를 찾지 못했�
 ko() { kubectl --kubeconfig ~/.kube/catchu --namespace catchu-ops "$@"; }
 ```
 
-**마운트 시험**([README.md](README.md) 「1단계 만드는 순서」 4번이 GitHub 연결을 켤 때 하라고 한 것). 시험 Pod 세 개를 `catchu-ops`에 띄우고 2분쯤 뒤에 본다. Pod는 5분 한도가 있어 그 뒤에는 `Failed`로 바뀐다.
+**마운트 시험.** 시험 Pod 세 개를 `catchu-ops`에 띄우고 2분쯤 뒤에 본다. Pod는 5분 한도가 있어 그 뒤에는 `Failed`로 바뀐다.
 
 ```bash
 fill deploy/aws/k8s/ops/efs-mount-test.yaml | ko apply -f -
@@ -77,7 +77,7 @@ ko get events --field-selector reason=FailedMount -o custom-columns=POD:.involve
 
 | Pod | 기대 | 어긋나면 |
 |---|---|---|
-| `efs-test-ok`(접근점 + TLS) | `Completed`. 로그가 `folder 1000:1000 700`, `file 1000:1000 600`, `ok`, 남은 파일 수(처음에는 `0`) | 붙지 않으면 파일 시스템 정책의 접근점 조건이 IAM 없는 마운트에 맞지 않거나 드라이버 권한이 모자란 것이다. GitHub 연결 판본을 띄우지 않고 [README.md](README.md) 「1단계 만드는 순서」 4번대로 팀장과 정한다 |
+| `efs-test-ok`(접근점 + TLS) | `Completed`. 로그가 `folder 1000:1000 700`, `file 1000:1000 600`, `ok`, 남은 파일 수(처음에는 `0`) | 붙지 않으면 GitHub 연결 판본을 띄우지 않는다. 드라이버 권한이 모자라면 `efs-csi-controller-sa`에만 필요한 권한을 더한다. 그래도 붙지 않으면 팀장이 방법을 정한다 |
 | `efs-test-no-ap`(접근점 없음) | `ContainerCreating`에 머물고 `FailedMount` 사건이 남는다 | 붙어서 `Error`로 끝나면(로그에 「거부되지 않고 붙었다」) 정책이 막지 못한 것이다. 띄우지 않고 팀장과 정한다 |
 | `efs-test-no-tls`(접근점·TLS 없음) | 위와 같다 | 위와 같다 |
 

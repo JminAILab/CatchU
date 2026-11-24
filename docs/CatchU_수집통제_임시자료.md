@@ -93,7 +93,7 @@
 
 ## 5. 전달과 수신·등록의 구분
 
-[임시 자료와 전달(4~5절)](CatchU_collection_control_temp_data.md#5-전달과-수신등록의-구분)에 있다. 하위 절: [5.1 세 단계](CatchU_collection_control_temp_data.md#51-세-단계) · [5.2 재전달](CatchU_collection_control_temp_data.md#52-재전달) · [5.3 수신 후 반영 전 장애 — 지금 막히는 곳](CatchU_collection_control_temp_data.md#53-수신-후-반영-전-장애--지금-막히는-곳).
+[임시 자료와 전달(4~5절)](CatchU_collection_control_temp_data.md#5-전달과-수신등록의-구분)에 있다. 하위 절: [5.1 세 단계](CatchU_collection_control_temp_data.md#51-세-단계) · [5.2 재전달](CatchU_collection_control_temp_data.md#52-재전달) · [5.3 수신 후 반영 전 장애](CatchU_collection_control_temp_data.md#53-수신-후-반영-전-장애--지금-막히는-곳).
 
 ---
 
@@ -120,7 +120,7 @@
 | **C04 ③ = C05** 서비스 밖 저장소 자료 처리 전·시연 전에 실제 환경에서 통제 검사 | **충족(한계 기록)** — 2026-11-19 EKS에서 V-12(환경)·V-01·V-11의 실제 확인을 했고, 팀장이 한계를 기록하고 통과로 봤다([결과](https://github.com/JminAILab/CatchU/issues/37#issuecomment-7000321920)) | 없음. 한계: 허용은 주소 단위라 같은 대역의 다른 주소는 네트워크로 막히지 않는다. V-01은 부분 충족(로그에 호출 경로가 남지 않음)이고, V-11은 429·5xx가 오지 않아 관측되지 않았다. 실제 분석 3건이 이 기록보다 먼저 돌았다. 합성 검사는 실제 확인을 대신하지 않는다 |
 | **C04 Git 조항** 복제 채택 시 hook·diff/textconv·helper·config 통제 | **해당 없음** — [1.1](CatchU_collection_control_scope.md#11-수집-방식--api만-쓴다)의 2026-09-29 결정으로 복제를 쓰지 않는다 | 복제를 채택하면 [1.3](CatchU_collection_control_scope.md#13-git-복제를-채택한다면-추가로-필요한-통제)을 넣고 다시 본다 |
 | **C06** 서비스 생성 모델·이용 조건 | **이 문서 밖** | [#119][i119]에서 다뤘다 |
-| **C07** 동의·귀속·연결 | **적용** — 허용 범위 검사([1.2](CatchU_collection_control_scope.md#12-요청의-허용-범위를-적용하는-순서))와 본인 귀속에 필요한 GitHub 로그인 인계([3.2](CatchU_collection_control_scope.md#32-인계-내용--a가-주는-것))로 연결했다 | 실제 연동 방식은 [명세 OQ-A1][c180] |
+| **C07** 동의·귀속·연결 | **적용** — 허용 범위 검사([1.2](CatchU_collection_control_scope.md#12-요청의-허용-범위를-적용하는-순서))와 본인 귀속에 필요한 GitHub 로그인 인계([3.2](CatchU_collection_control_scope.md#32-인계-내용--a가-주는-것))로 연결했다 | OQ-A1은 10/14 계약과 #231 GitHub 연결 구현으로 구체화됐다([연결 안내](../api/docs/github-connection.md)). 이후 실제 확인 범위는 위 8절을 따른다 |
 | **과거 실험 자료 사용 금지** | **적용** — 이 문서는 승인 문서·계약·현재 코드만 읽고 썼다. 과거 실험 원문·발췌·응답을 열지 않았다 | 과거 실험 자료는 재사용하지 않는다. 일반 검사는 합성 자료를 쓰고, 실제 확인은 각 실행 이슈에서 허용한 자료·환경·범위로 구분한다 |
 
 **이 문서가 바꾸지 않는 것**: 실제 자료 처리의 허용 범위와 조건. #37의 확인 결과는 위 표의 범위·한계로 읽으며, 다른 자료·환경의 통제 확인으로 확대하지 않는다.

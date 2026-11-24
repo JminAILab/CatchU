@@ -29,7 +29,7 @@
 7. **재전달 규칙**: 두지 않는다 — 10/6 결정. 결과는 E에 한 번 보내면 끝이다. E가 거부한 결과(`REJECTED`)는 다시 보내지 않고 기록만 남긴다. [#116 「재전달」](CatchU_collection_control_temp_data.md#52-재전달)이 #77에 넘긴 항목의 답이다.
 8. **로그**: 작업 ID·`attemptId`·처리 결과(종결 결과 전송, `UNCERTAIN`, 처리 전 거부, 상한 초과, 수신 확인 종류)만 남기고 메시지 본문은 남기지 않는다([코딩 절차 「자료와 실행 로그」](CatchU_coding_procedures.md#자료와-실행-로그)).
 
-**받아들인 위험(10/6 결정).** 큐 자료가 사라지면 같은 시도가 한 번 더 실행될 수 있다. worker가 상한을 넘겨 멈춘 사이 재요청이 들어오면 분석이 두 번 돌 수 있다. 둘 다 드물고 분석 비용만 더 든다. 닫힌 뒤 큐에서 꺼낸 오래된 작업은 요청 정보 조회([#232](https://github.com/JminAILab/CatchU/issues/232))가 "모름"으로 답해 분석하지 않는다([현재 내부 조회](../api/docs/worker-context.md)). 닫힌 뒤 늦게 온 결과는 E 수신 코드가 거부해 Catch가 생기지 않는다. 이 범위는 worker README에 적는다(#121 완료 기준).
+**받아들인 위험(10/6 결정).** 큐 자료가 사라지면 같은 시도가 한 번 더 실행될 수 있다. worker가 상한을 넘겨 멈춘 사이 재요청이 들어오면 분석이 두 번 돌 수 있다. 둘 다 드물고 분석 비용만 더 든다. 닫힌 뒤 큐에서 꺼낸 오래된 작업은 요청 정보 조회([#232](https://github.com/JminAILab/CatchU/issues/232))가 "모름"으로 답해 분석하지 않는다([현재 내부 조회](../api/docs/worker-context.md)). 닫힌 뒤 늦게 온 결과는 E 수신 코드가 거부해 Catch가 생기지 않는다. 이 범위는 worker README에 적는다(#121 완료 기준). API는 접수부터, worker는 큐에서 꺼낸 때부터 60분을 재므로 큐 대기가 길면 API가 먼저 닫고 worker는 계속 돌 수 있다. 이때 회원이 다시 요청하면 분석이 겹칠 수 있으며, 이전 시도의 늦은 결과는 거부한다([U7 상한](../worker/docs/repository-analysis-u7.md)).
 
 ## 진행 알림과 실행 불명 판단 — #23 Q4·Q5 결정
 
@@ -59,7 +59,7 @@
 
 ## 배포 서버 적용 조건
 
-운영 큐는 AWS ElastiCache Valkey다([EKS 구성](../deploy/aws/README.md)). [11/18 팀장 결정](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553)으로 키트 실행을 실제 api·worker 클라이언트 확인으로 갈음했다. `noeviction`·TLS·필요 명령과 실제 처리는 확인했고, [장애 조치 뒤 api 복귀와 당시 worker 재시작 필요](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)는 구분한다. 아래는 확인 항목과 방법이며 worker 수정 후 현장 확인은 [#603](https://github.com/JminAILab/CatchU/issues/603)의 증거를 따른다.
+운영 큐는 AWS ElastiCache Valkey다([EKS 구성](../deploy/aws/README.md)). [11/18 결정](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553)으로 키트 실행을 실제 api·worker 확인으로 갈음했다. 채택 완료는 배포 전 조건 3을 마친 뒤 기록한다. `noeviction`·허용 명령·장애 조치 뒤 api·worker 복귀는 [11/23 확인](https://github.com/JminAILab/CatchU/issues/603#issuecomment-7091499865)을 마쳤다. 채택 완료를 기록했다는 뜻은 아니다. 당시 첫 진행 알림 누락과 keepalive 보완의 한계는 [큐 소비자](../worker/docs/queue-consumer.md)에 있다. 아래는 확인 항목과 방법이다.
 
 | 확인 | 왜 | 방법 |
 |---|---|---|

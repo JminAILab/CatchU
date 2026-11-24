@@ -96,6 +96,8 @@
 | `APPLICATION_UNRESOLVED` | 반영 대기·반영 중·복구 중이거나, 반영 실패가 아직 닫히지 않았다. 종료됐어도 반영 상태가 APPLIED/APPLY_FAILED가 아닌 경우도 포함한다 |
 | `REANALYSIS_DEFERRED` | 같은 저장소에 더 최근 요청이 있다. 정상 완료·정상 0건이라는 이유만으로 거부하지 않는다 |
 
+`RESULTS_EXIST`·`NOT_FAILED`도 계약 enum과 web의 `RETRY_REASONS`에는 남아 있지만 현행 판정은 반환하지 않는다. 이 표는 현재 api가 내는 사유다.
+
 `FAILURE_WITHOUT_RESULTS`의 두 경우:
 
 1. **확정 실패.** `FAILED`/`APPLIED`/`CLOSED`이고 등록·적합 후보가 0건이며 `ownerResultsReady=false`, 실패 항목과 실패 확정 근거가 있다.

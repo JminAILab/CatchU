@@ -90,15 +90,17 @@
 |---|---|
 | `api.github.com` | 수집 |
 | 설정한 생성 서비스 | 초안·질문 생성. 제공자·주소·운영 키 조건은 [생성 제공자](../worker/docs/generation-provider.md)를 따른다 |
+| OpenAI 판정 API | 재료·Catch 판정([제공자](../worker/docs/generation-provider.md)) |
+| 서울 리전 S3 | PDF 파일 읽기([EKS 파일 저장](../deploy/aws/s3.md)) |
 | 내부 api·큐 | 요청 수신·결과 전달 |
 | 그 밖의 모든 호스트 | 막는다 |
 
 - **코드 쪽**: HTTP 클라이언트를 한 곳에 두고 호출 직전에 호스트를 확인한다. 목록 밖은 호출 자체를 하지 않는다. 담당은 [#117][i117]이다.
-- **환경 쪽**: 배포 환경의 나가는 방향 제한은 H 범위이며 [#24][i24]에서 확인한다. 코드 검사만으로 환경 통제를 확인했다고 보고하지 않는다.
+- **환경 쪽**: 배포 환경의 나가는 방향 제한은 H 범위이며 [#37 C05 11/19 기록](https://github.com/JminAILab/CatchU/issues/37#issuecomment-7000321920)의 연결 성공·차단·미확인 범위를 따른다. 코드 검사만으로 환경 통제를 확인했다고 보고하지 않는다.
 
 ### 2.3 자원·시간 상한
 
-상한은 [#424의 2026-11-01 결정](https://github.com/JminAILab/CatchU/issues/424)과 [#450의 11-14 실측·결정](https://github.com/JminAILab/CatchU/issues/450#issuecomment-6858511860)으로 정했다. 이곳의 예전 제안 수치 표는 현재 안내에서 제거했다. 현재 수집 값은 [GitHub 수집 상한](../worker/docs/github-collection.md), 전체 처리 시한·생성 상한은 [U7 분석](../worker/docs/repository-analysis-u7.md)을 따른다. 동시 실행은 [#480](https://github.com/JminAILab/CatchU/issues/480) 결정에 따라 EKS worker 3개이며, 각 worker의 동시 수는 1이다.
+상한은 [#424의 2026-11-01 결정](https://github.com/JminAILab/CatchU/issues/424)과 [#450의 11-14 실측·결정](https://github.com/JminAILab/CatchU/issues/450#issuecomment-6858511860)으로 정했다. 이곳의 예전 제안 수치 표는 현재 안내에서 제거했다. 현재 수집 값은 [GitHub 수집 상한](../worker/docs/github-collection.md), 전체 처리 시한·생성 상한은 [U7 분석](../worker/docs/repository-analysis-u7.md)을 따른다. 동시 실행은 [#480](https://github.com/JminAILab/CatchU/issues/480) 결정에 따라 EKS 배포 스크립트의 worker 설정값은 3이며, 각 worker의 동시 수는 1이다.
 
 GitHub 호출 수는 실패를 포함한 실제 HTTP 요청 수다. REST 요청 1회와 GraphQL 묶음 요청 1회를 각각 1회로 더하고, GraphQL 점수는 별도 기록한다. 자동 외부 재시도·실패 묶음 분할·REST 대체 호출은 하지 않는다.
 

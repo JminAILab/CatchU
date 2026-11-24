@@ -1,6 +1,6 @@
 # CatchU 통합 검증표 — 첫 연결과 전체 MVP
 
-> **지위: 초안** · 승인된 API 명세 v1(`9093d2e`)의 파생 검증 기준. 계약과 어긋나면 계약이 이기고 [#23][i23]에 올린다. 담당 확인 범위는 「담당별 확인 기록」 절에 있다.
+> **지위: 기록** · 10월 MVP의 승인된 API 명세 v1(`9093d2e`)에서 파생한 검증 계획이다. M1 실행 기록은 [#114](https://github.com/JminAILab/CatchU/issues/114)·[#123](https://github.com/JminAILab/CatchU/issues/123), 전체 MVP 미실행 결정은 [10/26 #124](https://github.com/JminAILab/CatchU/issues/124#issuecomment-6409644939)에 있다. 전체 통과를 뜻하지 않는다. 당시 IV 행·선행·담당 확인 기록은 보존한다. 12월 제품 통합 확인은 [통합 확인](CatchU_통합확인.md)을 따른다.
 >
 > 2026-10-02 [#203](https://github.com/JminAILab/CatchU/issues/203)에서 AI가 잘리지 않고 읽게 절 단위로 나눴다(내용 변경 없음). 나눈 파일: [통합 검증 행 가~라(접수·수신·등록·조회)](CatchU_integration_rows_intake.md) · [통합 검증 행 마~사(확인·공개·링크·원본 보호)](CatchU_integration_rows_sharing.md). 옮긴 절의 제목과 새 위치는 제자리에 남겼다.
 

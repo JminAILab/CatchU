@@ -19,9 +19,9 @@
 | V-09 | 자료 안의 지시문 | 이슈 본문에 지시문 → 처리 순서가 바뀌지 않고, 생성 단계에도 자료로만 넘어간다 | [2.2](CatchU_collection_control_scope.md#22-외부-실행네트워크-제한) | 합성 | #117·#120 |
 | V-10 | 호출 수·시간 상한 초과 | → 멈추고 한계를 근거에 남긴다. 적합 후보가 있으면 부분 실패, 없으면 실패 | [BR3.3][wr] | 합성 | #117 |
 | V-11 | 호출 한도 응답(429)·서버 오류(5xx) | → **다시 부르지 않고** 수집 오류로 기록한다. 적합 후보가 있으면 부분 실패, 없으면 실패. 0건으로 바꾸지 않는다 | [명세 공통 오류·요청 안전성][c137] · [BR3.3][wr] | 합성 → 실제 | #117 |
-| V-12 | 허용 목록 밖 호스트 | 코드에서 다른 호스트 호출 시도 → 호출 전에 막힌다 | [2.2](CatchU_collection_control_scope.md#22-외부-실행네트워크-제한) | 합성(코드) · **실제**(환경) | #117 · #24 |
+| V-12 | 허용 목록 밖 호스트 | 코드에서 다른 호스트 호출 시도 → 호출 전에 막힌다 | [2.2](CatchU_collection_control_scope.md#22-외부-실행네트워크-제한) | 합성(코드) · **실제**(환경) | #117 · [#37 C05 11/19](https://github.com/JminAILab/CatchU/issues/37#issuecomment-7000321920) |
 | V-13 | 처리 끝 정리 | 성공·실패 모두 임시 입력이 남지 않는다 | [4.2](CatchU_collection_control_temp_data.md#42-수명표) | 합성 | #117·#121 |
-| V-14 | 정리 실패 | 삭제가 실패해도 결과 전달이 진행되고 기록이 남으며, 다음 기동이 지운다 | [4.3](CatchU_collection_control_temp_data.md#43-정리-실패프로세스-중단) | 합성 | #121 |
+| V-14 | 정리 실패 | 임시 파일을 도입할 때 적용할 조건: 삭제 실패를 기록하고 결과 전달을 계속하며 다음 기동에서 지운다. 현재는 파일을 만들지 않아 해당 없음 | [4.3](CatchU_collection_control_temp_data.md#43-정리-실패프로세스-중단) | 합성 | #121 |
 | V-15 | 보존 뒤 전달 | 두지 않는다 — 10/6 결정([#23][d23])으로 결과를 보존하지 않는다 | — | — | — |
 | V-16 | 전달 실패 | 수신 확인이 오지 않음 → 같은 결과를 다시 보내지 않고, 분석·생성도 다시 부르지 않는다 | [BR3.5][wr] · [5.2](CatchU_collection_control_temp_data.md#52-재전달) | 합성 | #121 |
 | V-17 | 같은 결과의 중복 수신 | 같은 결과가 E에 두 번 옴(큐의 중복 전달) → 수신 기록은 하나이고 두 번째는 중복 수신 확인이다. Catch가 두 개 생기면 실패 | [명세 B 등록·공개 경계][c93] | 합성(E와 함께) | [#233][i233] · E |
@@ -54,7 +54,7 @@
 | 외부 실행 금지, 자료 안 지시문 취급 | [#117][i117] F · 생성 쪽은 [#120][i120] F | 같은 PR | — |
 | 나가는 방향 제한(코드) | [#117][i117] F | 같은 PR | — |
 | 나가는 방향 제한(환경) | H(팀원 1) | 자동 검사 + 실제 환경 확인. **작성자 외 검토자 없음**([7.1](#71-검토자가-없을-때)) | [#37][i37] C05 |
-| 자원·시간 상한 | [#117][i117] F | 같은 PR | [10/16 로컬](https://github.com/JminAILab/CatchU/issues/121#issuecomment-6217635496)·[11/14 실측](https://github.com/JminAILab/CatchU/issues/450#issuecomment-6858511860) |
+| 자원·시간 상한 | [#117][i117] F | 같은 PR | [10/16 로컬](https://github.com/JminAILab/CatchU/issues/121#issuecomment-6217635496)·[11/14 로컬 실측](https://github.com/JminAILab/CatchU/issues/450#issuecomment-6858511860) |
 | 자격정보 참조 발급·수명·권한 최소화 | 권한 최소화는 [#231][i231], 참조 발급·수명은 worker용 내부 조회 [#232][i232](10/6 팀장 배치) | 각 PR | 추가 권한 없음과 만료형 토큰은 2026-10-14 명세에 정해졌고([명세 GitHub 연동 규칙][c1014gh]), #231 작성자 환경의 실제 연결 기록이 있다([GitHub 연결 기능 문서][gc]). 참조 발급·수명은 [worker 컨텍스트](../api/docs/worker-context.md)를 따르며 실제 처리 근거는 [EKS 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에 있다 |
 | 자격정보 맥락 검사·거부 | [#117][i117] F | 같은 PR | — |
 | 임시 입력 정리 | [#117][i117]·[#121][i121] F | 같은 PR | — |
@@ -64,7 +64,7 @@
 
 **[#117][i117]로 넘기는 것**: [1.2](CatchU_collection_control_scope.md#12-요청의-허용-범위를-적용하는-순서) 검사 순서, [2](CatchU_collection_control_scope.md#2-수집할-때-막는-것) 전체, [3.3](CatchU_collection_control_scope.md#33-f의-검사-순서와-거부) 검사 순서와 거부 코드, [4.2](CatchU_collection_control_temp_data.md#42-수명표)의 임시 입력 정리, 검증 사례 V-01~V-13·V-22.
 
-**[#121][i121]로 넘기는 것**: [4.3](CatchU_collection_control_temp_data.md#43-정리-실패프로세스-중단)의 기동 때 청소와 중단 처리, [5.2](CatchU_collection_control_temp_data.md#52-재전달)의 거부된 결과 기록, 검증 사례 V-13·V-14·V-16·V-18~V-20·V-22.
+**[#121][i121]로 넘기는 것**: [4.3](CatchU_collection_control_temp_data.md#43-정리-실패프로세스-중단)의 중단 처리와, 임시 파일을 도입할 때 적용할 기동 청소 조건(현재 파일 없음), [5.2](CatchU_collection_control_temp_data.md#52-재전달)의 거부된 결과 기록, 검증 사례 V-13·V-14·V-16·V-18~V-20·V-22.
 
 **[#233][i233]·[#237][i237]로 넘기는 것**: V-17은 #233, 처리 시한 닫기와 닫힌 요청의 재요청([5.3](CatchU_collection_control_temp_data.md#53-수신-후-반영-전-장애--지금-막히는-곳))과 V-20·V-21은 #237이다.
 
@@ -97,7 +97,7 @@
 | 임시 자료 위치·수명([4](CatchU_collection_control_temp_data.md#4-임시-자료의-위치수명삭제)) | **아니다** | 같은 OQ-F1의 "F 임시 결과 보존 위치/수명"이다. 10/6 결정으로 결과를 보존하지 않으므로 현행 [처리 시한 계약·구현](../api/docs/analysis-deadline.md)이 결과 미보존과 실패 닫기를 반영했다 |
 | F의 "요청 거부" 알림 메시지([2.4](CatchU_collection_control_scope.md#24-상한을-넘거나-실패했을-때)) | **그렇다** | 새 메시지가 필요하다. **이번에 제안하지 않는다.** 거부된 요청은 처리 시한에 닫는다(아래 행) |
 | 처리 시한이 지난 요청의 실패 확정, 반영 실패 요청 닫기, 닫힌 요청의 재요청([5.3](CatchU_collection_control_temp_data.md#53-수신-후-반영-전-장애--지금-막히는-곳)) | **그렇다** | 10/6 [결정][d23]은 [PR #292](https://github.com/JminAILab/CatchU/pull/292)의 계약과 [처리 시한 구현](../api/docs/analysis-deadline.md)에 반영됐다. 현재 회원 재분석은 [U7 규칙](../api/docs/repository-analysis-u7.md#기존-catch를-보존하는-재분석)을 따른다 |
-| 한 분석 안의 제목 고쳐 쓰기 재호출([2.3](CatchU_collection_control_scope.md#23-자원시간-상한)) | **그렇다** | 계약 요약의 재호출 금지 문장에 예외를 둔다. 문안은 [팀장 확인](ai-dlc-input-mvp/2026-10-08_catch-decisions.md#ai-dlc로-반영할-것)의 「AI-DLC로 반영할 것」(2026-10-09) |
+| 한 분석 안의 제목 고쳐 쓰기 재호출([2.3](CatchU_collection_control_scope.md#23-자원시간-상한)) | **그렇다** | 계약 요약의 재호출 금지 문장에 예외가 반영돼 있다. 결정 문안은 [팀장 확인](ai-dlc-input-mvp/2026-10-08_catch-decisions.md#ai-dlc로-반영할-것)의 「AI-DLC로 반영할 것」(2026-10-09) |
 
 [i37]: https://github.com/JminAILab/CatchU/issues/37
 [i77]: https://github.com/JminAILab/CatchU/issues/77

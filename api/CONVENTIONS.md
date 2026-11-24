@@ -33,7 +33,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/rag-answer/`                       | 12월 U5 받은 사람 질의응답(SSE·질문 다시 쓰기·링크당·작성자 합계 하루 질문 횟수)과 AI 기본 요약(`BASE_SUMMARY` 처리기·받은 사람/작성자 읽기·[다시 만들기]), `base_summary` 엔티티. 평가 스크립트는 `scripts/rag-eval/`([docs/rag-answer.md](docs/rag-answer.md)). 기본 앱에서 `RagAnswerModule.register`에 U4의 실제 `PUBLICATION_ACCESS`를 `useExisting`으로 전달 |
 | `src/claude-mcp/`                       | 12월 U6 Claude 본인 연결(C-15): 공식 SDK OAuth 라우터의 저장 단계, `/v1/mcp`와 조회 도구 둘, 회원 빈도 제한, 연결 상태·승인·전체 해제, `mcp_*` 표 넷([docs/claude-mcp.md](docs/claude-mcp.md)). 기본 앱에 등록 |
 | `src/publications/recipient-links.controller.ts` | 현행 받은 사람 경로(`/v1/public/links/...`). 발행본 접근 판정과 고정 사본 조회([docs/recipient-publication.md](docs/recipient-publication.md)). 옛 `src/recipient/`는 삭제됨 |
-| `src/member-repositories/` | 현행 U7의 회원별 저장소 등록·접수 확인과 `RegistrationContextSource`의 worker 컨텍스트 공급. `repository-selection.*.ts`와 #319 카탈로그는 10월 선정 기록·검사용([docs/repository-selection.md](docs/repository-selection.md)) |
+| `src/member-repositories/` | 현행 U7 회원별 등록·접수와 `RegistrationContextSource`. `repository-selection.source.ts`·`RepositorySelection` 엔티티·#319 카탈로그는 10월 전역 선정 경로이며 source·catalog provider는 코드에 남아 있다. `AllowedScopeRevision`은 현행 `repository-registration.service.ts`·`registration-context.source.ts`도 읽는다([선정 기록](docs/repository-selection.md)·[U7](docs/repository-analysis-u7.md)) |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
 | `src/auth/access-token.guard.ts`       | Bearer 토큰 검증 후 요청에 인증 회원 정보 저장 |
 | `src/auth/dev-login.guard.ts` / `dev-login.dto.ts` | 개발 로그인 실행 제한을 먼저 검사하고 기존 회원 ID 조건·추가 필드를 공통 입력 검증에 연결 |

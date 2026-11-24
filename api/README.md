@@ -6,9 +6,9 @@
 
 > 코드를 고치기 전에 [api 코딩 규약](CONVENTIONS.md), 이 문서, 맡은 기능의 `api/docs/<기능>.md`를 한 파일씩 따로 열어 읽는다(여러 파일을 한 번에 출력하면 가운데가 잘릴 수 있다). 기능별 안내는 이 README에 덧붙이지 않고 `api/docs/<기능>.md`로 쓴다.
 
-NestJS API 서버다. 인증·회원·프로필·GitHub 연동, 저장소 등록·분석, Catch·텍스트·PDF 관리, 발행본·받은 사람 접근, 검색·질의응답·JD 요약·Claude 본인 연결을 다룬다. 저장소 수집·분석과 PDF 추출은 worker와 연결한다. 세부 범위는 작업의 이슈와 승인 요구사항·기능 설계로 확인한다(위치는 [문서 안내](../docs/README.md#ai-dlc-산출물과의-관계)).
+NestJS API 서버다. 인증·회원·프로필·GitHub 연동, 저장소 등록·분석, Catch·텍스트·PDF 관리, 발행 프리셋·발행본·받은 사람 접근, 검색·질의응답·JD 요약·Claude 본인 연결을 다룬다. 저장소 수집·분석과 PDF 추출은 worker와 연결한다. 세부 범위는 작업의 이슈와 승인 요구사항·기능 설계로 확인한다(위치는 [문서 안내](../docs/README.md#ai-dlc-산출물과의-관계)).
 
-`GET /health`와 공통 인증·오류·DB 기반 위에 기능 모듈을 `AppModule`에서 조립한다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). 본인 회원·프로필은 [회원 안내](docs/member-profile.md), Catch는 [본인 조회](docs/catch-owner-read-preparation.md)·[공개 상태](docs/catch-visibility.md), 현행 발행·받은 사람 경로는 [발행본 안내](docs/publications.md)·[받은 사람 안내](docs/recipient-publication.md)를 따른다. 세션 유지·갱신·로그아웃은 [세션 안내](docs/auth-sessions.md)에 있다. `createApplicationModule()`은 내부 조회를 켰을 때 실제 등록 공급자를, 큐 주소가 있을 때 분석 큐와 DB 수신·Catch 반영을 연결한다([분석 큐](docs/analysis-queue.md)). 모듈별 위치와 조립 책임은 [코딩 규약](CONVENTIONS.md#파일-역할과-모듈-추가-위치)을 따른다.
+`GET /health`와 공통 인증·오류·DB 기반 위에 기능 모듈을 `AppModule`에서 조립한다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). 본인 회원·프로필은 [회원 안내](docs/member-profile.md), Catch는 [본인 조회](docs/catch-owner-read-preparation.md)·[공개 상태](docs/catch-visibility.md), 기본 앱에 등록된 `/v1/presets`는 [프리셋 안내](docs/presets.md), 현행 발행·받은 사람 경로는 [발행본 안내](docs/publications.md)·[받은 사람 안내](docs/recipient-publication.md)를 따른다. 세션 유지·갱신·로그아웃은 [세션 안내](docs/auth-sessions.md)에 있다. `createApplicationModule()`은 내부 조회를 켰을 때 실제 등록 공급자를, 큐 주소가 있을 때 분석 큐와 DB 수신·Catch 반영을 연결한다([분석 큐](docs/analysis-queue.md)). 모듈별 위치와 조립 책임은 [코딩 규약](CONVENTIONS.md#파일-역할과-모듈-추가-위치)을 따른다.
 
 Google 인증 코드 교환·회원 연결과 세션·쿠키의 동작·검사 범위는 [Google 로그인](docs/google-login.md)·[세션 안내](docs/auth-sessions.md)를 따른다. 로컬 재현과 실제 배포 확인을 구분하며, EKS의 GitHub 연결·분석 실행 확인은 [#276 실행 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에 있다.
 
@@ -105,7 +105,7 @@ DB를 멈추거나 자료를 지우는 명령의 영향:
 | `docker rm -f catchu-db` | 컨테이너만 지운다. 볼륨이 남아 있으면 같은 `docker run`으로 자료가 돌아온다 |
 | `docker volume rm catchu-db-data` | 개발 DB 자료 전체를 지운다. 되돌릴 수 없다. 다시 `docker run`과 `npm run migration:run`부터 한다 |
 
-PostgreSQL 주 버전: 로컬·테스트는 pgvector가 든 PostgreSQL 16(`pgvector/pgvector:0.8.7-pg16-trixie`, CI와 로컬 합성 DB는 같은 이미지를 digest로 고정)을 쓴다(#389). `postgres:16`으로 만든 `catchu-db-data` 볼륨은 그대로 쓸 수 있으니, `docker rm -f catchu-db` 뒤 위 `docker run`을 다시 하면 자료가 남은 채 이미지만 바뀐다. 배포는 AWS EKS·RDS PostgreSQL 16.15이며, `deploy/aws/scripts/create-rds.sh`·`deploy/aws/k8s/api.yaml`에 DB 판본과 `PGSSLMODE=verify-full`·CA 설정이 있다. 실제 접속 확인은 [#276 준비 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6950182407)과 [EKS 전환 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6971519828)을 따른다. 로컬 검사와 배포 검증은 구분한다.
+PostgreSQL 주 버전: 로컬·테스트는 pgvector가 든 PostgreSQL 16(`pgvector/pgvector:0.8.7-pg16-trixie`, CI와 로컬 합성 DB는 같은 이미지를 digest로 고정)을 쓴다(#389). `postgres:16`으로 만든 `catchu-db-data` 볼륨은 그대로 쓸 수 있으니, `docker rm -f catchu-db` 뒤 위 `docker run`을 다시 하면 자료가 남은 채 이미지만 바뀐다. 배포는 AWS EKS·RDS PostgreSQL 16.15이며, `deploy/aws/scripts/create-rds.sh`·`deploy/aws/k8s/api.yaml`에 DB 판본과 `PGSSLMODE=verify-full`·CA 설정이 있다. RDS 설정은 [#276 1단계](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6950182407), 실제 접속·TLS 확인은 [2단계](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553)를 따른다. 로컬 검사와 배포 검증은 구분한다.
 
 ## 개발 실행·응답 확인·종료
 
@@ -206,7 +206,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 선정 지원 저장소 조회 — #136
 
-[docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다. 실제 회원의 DB 선정 공급과 #323·#232 접점·초기화·갱신 절차(#252)는 [docs/repository-selection.md](docs/repository-selection.md)에 있다.
+[docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다. 현행 회원별 등록·접수·실행 공급은 [U7 안내](docs/repository-analysis-u7.md)에 있다. #252 전역 선정·초기화·갱신 절차는 [10월 선정 기록](docs/repository-selection.md)으로 구분한다.
 
 ## 분석 고지·접수·실패 재요청 — #138
 
@@ -230,7 +230,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## Worker 내부 분석 컨텍스트 — #232
 
-제품 기동 시 실제 DB 선정 공급자를 연결하는 조건, 서비스 인증과 검사 범위는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 비활성이며 `WORKER_CONTEXT_ENABLED=true`와 유효한 별도 서비스 키를 준비해야 내부 조회 경로를 등록한다.
+제품 기동 시 U7의 회원별 `RegistrationContextSource`를 연결하는 조건, 서비스 인증과 검사 범위는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 비활성이며 `WORKER_CONTEXT_ENABLED=true`와 유효한 별도 서비스 키를 준비해야 내부 조회 경로를 등록한다.
 
 ## E 수신 기록과 Catch 반영 연결 — #105
 

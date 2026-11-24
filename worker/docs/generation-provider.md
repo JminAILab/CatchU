@@ -107,6 +107,7 @@ CR3부터 생성 제공자 옆에 판정 공급자가 하나 더 붙는다. 판�
 | 남은 일 | 시작 조건 |
 |---|---|
 | 어댑터를 거친 실제 오류 응답(지출 상한·크레딧 소진·과부하)의 모양 확인. 응답 시간·토큰·설정 수용은 2026-10-16~18 로컬 실제 호출로 확인했다 | 팀장의 호출 허가(자료 범위·비용 한도) |
+| EKS worker 로그의 `판정 공급자 응답`·`판정 공급자 실패`로 실제 판정 호출 결과 확인. 11/6 FR10·11/14 실측은 로컬이며, EKS의 OpenAI 주소 443 연결 성공은 판정 응답 확인이 아니다 | EKS 판정 호출 로그 확인 |
 | Console 조직·작업 공간(미국 고정·지출 상한)·등급 확인 | 팀장(#119의 남은 조치) |
 
-운영 키 주입은 EKS Secret 설정과 [11/18 실제 생성](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)으로 확인했다. OpenAI 판정 설정도 EKS worker에 적용돼 있으나, [C05 기록](https://github.com/JminAILab/CatchU/issues/37#issuecomment-7000321920)의 해당 주소 연결 성공을 판정 응답 품질·오류 검증으로 넓혀 읽지 않는다. 실제 호출의 일반 성공과 위 오류·Console 확인은 별개다.
+운영 키 주입은 EKS Secret 설정과 [11/18 실제 생성](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)으로 확인했다. OpenAI 판정 설정도 EKS worker에 적용돼 있으나, [C05 기록](https://github.com/JminAILab/CatchU/issues/37#issuecomment-7000321920)의 해당 주소 연결 성공을 판정 응답 품질·오류 검증으로 넓혀 읽지 않는다. OpenAI 판정의 실제 호출은 11/6 FR10·[11/14 로컬 실측](https://github.com/JminAILab/CatchU/issues/450#issuecomment-6858511860)에서 봤다. EKS 판정 응답·실패와 위 오류·Console 확인은 별개다.

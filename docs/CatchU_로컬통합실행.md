@@ -1,6 +1,6 @@
 # CatchU 로컬 통합 실행 안내
 
-> **지위: 안내** · 한 컴퓨터에서 PostgreSQL·api·worker·web을 함께 띄우는 로컬 개발용 순서다. 작성자가 macOS에서, 작성자 외 1명이 Windows의 새 작업 폴더에서 1~4단계와 끄는 순서를 따라 해 확인했다([PR #174 리뷰][r174]). 5단계는 그 절을 추가한 [PR #185][p185]에서 Linux·Chromium으로 검증했고(「확인」), 안내 작성자가 macOS에서 따라 해 로그인 뒤 `/home` 이동, 새로고침 뒤 재로그인, 로그아웃을 확인했다([#107][i107]). 각 서비스의 설치·검사 상세는 서비스 README가 정본이다.
+> **지위: 안내** · 한 컴퓨터에서 PostgreSQL·api·worker·web을 함께 띄우는 로컬 개발용 순서다. 작성자가 macOS에서, 작성자 외 1명이 Windows의 새 작업 폴더에서 1~4단계와 끄는 순서를 따라 해 확인했다([PR #174 리뷰][r174]). 5단계는 그 절을 추가한 [PR #185][p185]에서 Linux·Chromium으로 검증했고(「확인」), 안내 작성자가 macOS에서 따라 해 로그인 뒤 `/home` 이동, 새로고침 뒤 재로그인, 로그아웃을 확인했다([#107][i107]). 위 재현은 PR #174·10/05 당시 판본의 기록이다. 이번에 바꾼 `/v1/me`·localhost·Refresh 안내 순서를 같은 환경에서 다시 실행한 증거는 아니다. 당시 새로고침 뒤 재로그인 동작과 현행 세션 복원은 구분한다. 각 서비스의 설치·검사 상세는 서비스 README가 정본이다.
 
 ## 한눈에 보기
 
@@ -118,11 +118,11 @@ curl -s http://localhost:3000/ | grep -o 'id="landing-title"'
 ### 5. web에서 로그인해 api 부르기
 
 1. `api/.env`에 `CORS_ALLOWED_ORIGINS=http://localhost:3000`을 넣고 api를 다시 켠다. 개발용 로그인에는 `DEV_LOGIN_ENABLED=true`와 `NODE_ENV=development`가 필요하다.
-2. `web/.env.example`을 참고해 `web/.env.local`에 `NEXT_PUBLIC_API_BASE_URL=http://localhost:3001`과 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`를 넣는다. 기존 파일은 덮어쓰지 않는다. 값을 바꾸면 web을 다시 켠다. web과 API는 모두 `localhost`로 맞춘다. `127.0.0.1`과 섞으면 로그인 유지 쿠키가 실리지 않는다.
+2. `web/.env.example`을 참고해 `web/.env.local`에 `NEXT_PUBLIC_API_BASE_URL=http://localhost:3001`과 `NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`를 넣는다. `.env.example`의 `127.0.0.1:3001`을 복사했다면 위 `localhost:3001`로 바꾼다. 기존 파일은 덮어쓰지 않는다. 값을 바꾸면 web을 다시 켠다. web과 API는 모두 `localhost`로 맞춘다. `127.0.0.1`과 섞으면 로그인 유지 쿠키가 실리지 않는다.
 3. `http://localhost:3000/login`에서 개발용 식별 문자열을 입력한다. api가 해당 회원을 찾거나 만들어 로그인하며, 요청 필드 이름은 `memberId`다. 성공하면 `/home`으로, 회원 경로에서 왔다면 검증된 `next`로 돌아간다.
 4. 새로고침하면 Refresh 쿠키로 세션을 복원한다. 복원할 수 없으면 다시 로그인한다. 로그아웃은 서버 세션을 끝내고 `/`로 이동한다. 이름을 저장하지 않은 회원은 최초 입력 화면으로 이동한다([공통 인증](../web/src/features/auth-session/README.md)·[회원 진입](../web/src/features/member-entry/README.md)).
 
-기능 화면은 [web README 「API 호출」](../web/README.md#api-호출-106-pr②)의 `api.member`·`api.recipient`를 사용한다. 회원 호출만 Bearer 토큰을 첨부하고, 수신자 비밀번호 차단의 `Retry-After`는 `retryAfterSeconds`로 전달한다. 토큰 전달만 확인할 때는 2단계의 내 회원 정보 호출을 쓰며, 이것을 web 화면의 기능 연결 완료로 세지 않는다. 토큰 값을 화면·로그·공유 자료에 남기지 않는다.
+기능 화면은 [web README 「API 호출」](../web/README.md#api-호출-106-pr)의 `api.member`·`api.recipient`를 사용한다. 회원 호출만 Bearer 토큰을 첨부하고, 수신자 비밀번호 차단의 `Retry-After`는 `retryAfterSeconds`로 전달한다. 토큰 전달만 확인할 때는 2단계의 내 회원 정보 호출을 쓰며, 이것을 web 화면의 기능 연결 완료로 세지 않는다. 토큰 값을 화면·로그·공유 자료에 남기지 않는다.
 
 ## 끄는 순서
 

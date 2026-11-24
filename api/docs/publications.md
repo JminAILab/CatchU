@@ -1,6 +1,6 @@
 # 발행본·텍스트 자료·Catch 설명 — 12월 U4
 
-12월 intent U4(발행·링크)의 api 안내다. 첫 경계 제출(#422)이 표 정의·마이그레이션과 C-10 인터페이스·가짜 구현을 넣었고([계약 요약](../../aidlc/spaces/default/intents/260925-intent-12/inception/contract-design/contract-summary.md) 「Contract ownership rules」의 첫 주 선합치), U4 본체 제출 1이 Catch 작성자 설명·텍스트 자료 API를(아래 「Catch 작성자 설명 API」·「텍스트 자료 API」), 제출 2가 C-10 DB 구현과 발행·작성자 발행본 관리 API(`src/publications/`의 `PublicationsModule`, `AppModule`에 등록)를 더했다(아래 「C-10 PublicationAccess」·「발행 API」·「작성자 발행본 관리 API」). 제출 3에서 받은 사람 경로도 발행본으로 교체했고, `ShareLinksModule`·`RecipientModule`과 `/v1/share-links` 경로는 제거했다. 현행 받은 사람 경로는 아래 「받은 사람 열람·비밀번호 통과 API (제출 3)」을 따른다.
+12월 intent U4(발행·링크)의 api 안내다. 첫 경계 제출 #422는 표·마이그레이션과 C-10 인터페이스·시험 가짜를 넣었다([계약 요약](../../aidlc/spaces/default/intents/260925-intent-12/inception/contract-design/contract-summary.md) 「Contract ownership rules」). 제출 1은 Catch 설명·텍스트 API, 제출 2는 C-10 DB 구현·발행·작성자 관리 API(`src/publications/`, 기본 앱 등록)를 더했다. 제출 3은 받은 사람 경로를 발행본으로 바꾸고 `ShareLinksModule`·`RecipientModule`·`/v1/share-links`를 없앴다. 각 API는 아래 해당 절에 있다.
 
 기준 문서: [U4 기능 명세](../../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/functional-design/functional-spec.md) W3·W5·「작성자 API」·[업무 규칙](../../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/functional-design/rules.md) BR4~BR8·BR10, [U4 비기능 설계](../../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/nfr-design/)(보안·신뢰성·성능·관측), 계약 C-02·C-03·C-04·C-05·C-07·C-08·C-10. 규칙 ID는 그 문서의 것이다.
 

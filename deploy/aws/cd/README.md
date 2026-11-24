@@ -19,7 +19,7 @@ EKS 교체 단계는 세 가지를 한다.
 3. **`deploy.sh --commit <커밋>`.** 옛 api·worker 종료 확인 → migration 일회 Pod → 동의 기록 삭제 권한 확인 → 새 api·worker·web 시작과 확인. 같은 판본·구성이 정상으로 돌고 있으면 아무것도 바꾸지 않는다. `--resume`은 붙이지 않는다.
 
 - **실행 기록:** 실행 요약에 커밋, 지금 판본과의 관계, 결과, `deploy.sh`의 교체 기록(이미지 digest 네 개, 옛 실행의 종료 코드, migration Pod의 결과)이 남는다. 계정 번호는 가린다.
-- **바깥 확인은 하지 않는다.** `deploy.sh`가 세 서비스의 준비(ALB 상태 확인 통과 포함)를 본 것으로 끝낸다. 개발 서버용 바깥 확인은 Caddy의 응답을 기대해 그대로 쓸 수 없다.
+- **바깥 확인은 하지 않는다.** `deploy.sh`가 세 서비스의 준비(ALB 상태 확인 통과 포함)를 본 것으로 끝낸다. 개발 서버용 바깥 확인은 #623에서 제거했다.
 - **중단:** api·worker는 옛 것을 내린 뒤 새 것을 띄우므로 교체하는 동안 로그인·분석이 멈춘다. [11/18 실측](https://github.com/JminAILab/CatchU/issues/342#issuecomment-6970235011)에서 api 중단은 migration을 건너뛴 교체 약 22초, migration을 돌린 되돌리기 약 50초였다. 같은 날 [기능을 켠 교체](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)는 약 62초였다. web도 교체 중 502가 한 번 관측됐다. 이 값은 당시 측정값이며 다음 교체 시간을 보장하지 않는다.
 - **시간:** 빌드·올리기는 약 5분이다(개발 서버 배포 실측). 교체는 각 단계의 대기 상한을 모두 채우면 약 36분이다. 임시 권한은 60분, `deploy` job의 상한도 60분이다.
 - 배포는 한 번에 하나만 돈다(같은 워크플로의 동시 실행 막기).
@@ -112,7 +112,7 @@ bash deploy/dev-server/cd/ci-images.test.sh
 |---|---|
 | 배포 권한·같은 판본·교체 기록 | 실제 environment가 `dev` 실행을 거부했고, `main` 수동 실행은 같은 판본을 그대로 뒀다. 새 교체는 커밋·digest·migration 기록을 남겼다 |
 | 되돌리기 | migration 차이가 없는 이전 판본으로 실제 교체했다. 차이가 있을 때 멈추는 동작은 `ci-deploy.test.sh`의 합성 시험 근거다 |
-| 멈춘 상태 보호 | 실제 실패 대신 api를 손으로 0으로 만든 뒤 자동 실행이 종료 코드 2로 멈추는 것을 확인했다. 손으로 `--resume`해 복귀했다 |
+| 멈춘 상태 보호 | 실제 실패 대신 api를 손으로 0으로 만든 뒤 수동으로 시작한 배포 워크플로 실행이 종료 코드 2로 멈추는 것을 확인했다. 손으로 `--resume`해 복귀했다 |
 | 배포 대상 `none`·빈 값 | `ci-target.test.sh`의 합성 시험으로 확인한다. 위 클러스터 실행에서는 직접 보지 않았다 |
 
 되돌리기 거부의 합성 시험과 손으로 만든 멈춤은 [11/19 팀장 결정](https://github.com/JminAILab/CatchU/issues/342#issuecomment-7001447651)에서 받아들인 증거다. 수동 실행 결과를 `main` push 배포의 성공으로 대신하지 않는다. push 실행 결과와 후속 확인은 [#342](https://github.com/JminAILab/CatchU/issues/342)에 실행 링크와 함께 기록한다.
