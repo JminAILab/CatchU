@@ -171,9 +171,14 @@ test("설명 영역: 조작 요소에 data-testid가 있고, 저장 중에는 �
   const savingFields = textareas(saving);
   assert.equal(savingFields.length, 4);
   assert.ok(savingFields.every((field) => /disabled=""/.test(field.attrs)), "저장 중에는 보이는 칸 모두 쓸 수 없다(BR4.5)");
-  assert.match(saving, /<button[^>]*data-testid="catch-author-description-save"[^>]*disabled=""/);
+  // #636 리뷰: 저장 단추는 `disabled`가 아니라 `aria-disabled`로 막아, 누른 단추에 초점이 남는다.
+  const saveButton = (html) => html.match(/<button[^>]*data-testid="catch-author-description-save"[^>]*>/)?.[0] ?? "";
+  assert.match(saveButton(saving), /aria-disabled="true"/);
+  assert.doesNotMatch(saveButton(saving), /\sdisabled=/, "저장 중에도 단추는 초점을 잃지 않는다");
+  assert.ok(saving.includes(">저장 중…</button>"));
   assert.doesNotMatch(saving, new RegExp(SAVED_TEXT + "<"));
   assert.ok(textareas(ready).every((field) => !/disabled/.test(field.attrs)));
+  assert.doesNotMatch(saveButton(ready), /disabled/);
 
   const failed = panel({ texts: texts({ [MERGED]: "쓰던 설명" }), status: { kind: "failed", failure: "login-expired" }, dirty: true });
   assert.ok(failed.includes(">쓰던 설명</textarea>"));

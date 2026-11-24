@@ -107,7 +107,9 @@ export function AuthorDescriptionPanel(props: AuthorDescriptionPanelProps) {
             data-testid="catch-author-description-status">
             {lines.lines.map((line) => <p key={line}>{line}</p>)}
           </div>}
-          <button type="submit" className={styles.primaryButton} data-testid="catch-author-description-save" disabled={saving}
+          {/* 저장 중에는 `disabled` 대신 `aria-disabled`로 막는다. 초점이 있던 단추가 `disabled`가 되면 브라우저가 초점을 body로 빼서
+              저장 뒤 Tab이 상세 창 맨 앞부터 다시 시작했다(#636 리뷰). 저장 중에 다시 눌러도 `AuthorDescriptionEditor`가 보내지 않는다. */}
+          <button type="submit" className={styles.primaryButton} data-testid="catch-author-description-save" aria-disabled={saving || undefined}
             aria-describedby={countId}>
             {saving ? "저장 중…" : "설명 저장"}
           </button>
