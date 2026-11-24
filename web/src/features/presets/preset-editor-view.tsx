@@ -13,8 +13,11 @@ import {
 import type { PresetEditorState, PresetEditorStatus } from "./preset-editor-screen";
 import { SourcePickerView } from "./source-picker-view";
 
-export const NAME_HELP_TEXT = `이 이름이 받은 사람 화면의 탭 이름으로 보입니다. (1~${PRESET_LIMITS.name}자)`;
-export const LINK_NOTICE_TEXT = "프리셋을 고쳐도 이미 보낸 링크는 바뀌지 않습니다.";
+export const NAME_HELP_TEXT = `1~${PRESET_LIMITS.name}자 · 받은 사람 화면의 탭 이름입니다.`;
+export const LINK_NOTICE_TEXT = "프리셋을 수정해도 이미 보낸 링크는 바뀌지 않습니다.";
+export const EDITOR_LEAD_TEXT = "기존 자료를 골라 묶고 순서를 정한 뒤 저장하세요.";
+/** 「담긴 자료와 순서」 아래 안내 두 줄(#632 v7). */
+export const ORDER_NOTES = ["손잡이를 드래그하거나 순서를 직접 지정할 수 있습니다.", "「빼기」로 빼면 왼쪽 선택도 해제됩니다. 원본은 남습니다."] as const;
 export const OVER_LIMIT_TEXT = `전체 글이 ${formatCount(PRESET_LIMITS.totalText)}자를 넘어 발행할 수 없습니다.`;
 export const LENGTH_UNKNOWN_TEXT = "글자 수를 세지 못했습니다";
 /** 저장 실패 뒤 초점을 되돌릴 [저장]의 id(interaction-spec PresetEditorForm). */
@@ -38,10 +41,14 @@ export function editorAlertText(status: PresetEditorStatus): string | null {
   return null;
 }
 
-/** 「담긴 자료와 순서 (항목 N개 · M자)」. 글자 수를 모르는 자료가 하나라도 있으면 M 대신 「글자 수를 세지 못했습니다」다. */
-export function itemsHeading(items: readonly EditorItem[]): string {
+/**
+ * 「담긴 자료와 순서」 아래 줄: 「항목 N개 / 20개 · M자 / 60,000자」(#632, 상한을 함께 보인다).
+ * 글자 수를 모르는 자료가 하나라도 있으면 「M자 / 60,000자」 대신 「글자 수를 세지 못했습니다」다.
+ */
+export function itemsMetaLine(items: readonly EditorItem[]): string {
   const total = itemsTotal(items);
-  return `담긴 자료와 순서 (항목 ${items.length}개 · ${total === null ? LENGTH_UNKNOWN_TEXT : `${formatCount(total)}자`})`;
+  const text = total === null ? LENGTH_UNKNOWN_TEXT : `${formatCount(total)}자 / ${formatCount(PRESET_LIMITS.totalText)}자`;
+  return `항목 ${items.length}개 / ${PRESET_LIMITS.items}개 · ${text}`;
 }
 
 export type PresetEditorViewProps = {
@@ -55,8 +62,7 @@ export type PresetEditorViewProps = {
   onMoreMaterials: () => void;
   onMorePdfs: () => void;
   onToggle: (kind: PresetItemKind, sourceId: string) => void;
-  onMoveUp: (index: number) => void;
-  onMoveDown: (index: number) => void;
+  onMove: (from: number, to: number) => void;
   onRemove: (index: number) => void;
   onSave: () => void;
   onDelete: () => void;
@@ -66,9 +72,9 @@ export type PresetEditorViewProps = {
 function NameField({ state, disabled, onName }: { state: PresetEditorState; disabled: boolean; onName: (name: string) => void }) {
   return (
     <section className={styles.panel} aria-labelledby="preset-name-title">
-      {/* 보이는 이름표 「이름」(interaction-spec PresetEditorForm). 도움말·오류는 aria-describedby로 칸에 잇는다. */}
-      <h2 id="preset-name-title"><label htmlFor="preset-name-input">이름</label></h2>
-      <div className={styles.field}>
+      {/* 보이는 이름표 「프리셋 이름」(#632, interaction-spec PresetEditorForm). 도움말·오류는 aria-describedby로 칸에 잇는다. */}
+      <h2 id="preset-name-title" className={styles.fieldTitle}><label htmlFor="preset-name-input">프리셋 이름</label></h2>
+      <div className={styles.fieldBox}>
         <input id="preset-name-input" data-testid="preset-name-input" value={state.name} disabled={disabled}
           aria-invalid={state.nameError} aria-describedby={state.nameError ? "preset-name-help preset-name-error" : "preset-name-help"}
           onChange={(event) => onName(event.target.value)} />
@@ -79,14 +85,27 @@ function NameField({ state, disabled, onName }: { state: PresetEditorState; disa
   );
 }
 
+/** 마지막 자료를 빼 목록이 비었을 때 초점을 둘 그 자료의 고르기 체크박스. 목록에 없거나 막혔으면 null이다. */
+function sourceCheckbox(sourceId: string): HTMLElement | null {
+  return [...document.querySelectorAll<HTMLInputElement>('[data-testid="preset-sources"] input[type="checkbox"][data-source-id]')]
+    .find((element) => element.dataset.sourceId === sourceId && !element.disabled) ?? null;
+}
+
+/**
+ * 「담긴 자료와 순서」(#632). 상한을 함께 보이는 줄, 순서 목록, 안내, 저장 결과 칸, 「목록으로」 링크와 [저장], [프리셋 지우기]를 한 상자에 둔다.
+ * 「목록으로」는 링크라 저장하지 않은 입력이 있으면 지금처럼 묻는다(`useUnsavedGuard`).
+ */
 function ItemsPanel({ props, disabled }: { props: PresetEditorViewProps; disabled: boolean }) {
-  const { items } = props.state;
+  const { state } = props;
+  const { items } = state;
+  const alert = editorAlertText(state.status);
   return (
     <section className={styles.panel} aria-labelledby="preset-items-title" data-testid="preset-items">
-      <h2 id="preset-items-title">{itemsHeading(items)}</h2>
+      <h2 id="preset-items-title">담긴 자료와 순서</h2>
+      <p className={styles.metaLine} data-testid="preset-items-meta">{itemsMetaLine(items)}</p>
       {knownTotal(items) > PRESET_LIMITS.totalText && <p className={styles.notice} data-testid="preset-over-limit">{OVER_LIMIT_TEXT}</p>}
-      {items.length === 0 ? <p data-testid="preset-items-empty">아직 담은 자료가 없습니다.</p> : (
-        <ReorderList testIdPrefix="preset" disabled={disabled} onMoveUp={props.onMoveUp} onMoveDown={props.onMoveDown} onRemove={props.onRemove}
+      {items.length === 0 ? <p className={styles.muted} data-testid="preset-items-empty">아직 담은 자료가 없습니다.</p> : (
+        <ReorderList testIdPrefix="preset" label="담긴 자료와 순서" disabled={disabled} onMove={props.onMove} onRemove={props.onRemove} emptyFocus={sourceCheckbox}
           entries={items.map((item) => ({
             key: selectionKey(item.kind, item.sourceId), sourceId: item.sourceId, title: item.title,
             body: <>
@@ -96,6 +115,26 @@ function ItemsPanel({ props, disabled }: { props: PresetEditorViewProps; disable
           }))} />
       )}
       <p className={styles.small} data-testid="preset-link-notice">{LINK_NOTICE_TEXT}</p>
+      <ul className={styles.orderNotes}>{ORDER_NOTES.map((line) => <li key={line}>{line}</li>)}</ul>
+      <div className={styles.editorFoot}>
+        <Link href={routes.presets} className={styles.secondaryButton} data-testid="preset-editor-list-link">목록으로</Link>
+        <p role="status" className={styles.footStatus} data-testid="preset-editor-status">{editorStatusText(state.status)}</p>
+        <button id={SAVE_BUTTON_ID} type="button" className={`${styles.primaryButton} ${styles.saveButton}`} data-testid="preset-save" disabled={disabled} onClick={props.onSave}>저장</button>
+      </div>
+      {state.status.kind === "saved-reload-failed" && (
+        <button type="button" className={styles.secondaryButton} data-testid="preset-editor-reload" onClick={props.onReloadAfterSave}>다시 불러오기</button>
+      )}
+      {alert !== null && (
+        <div role="alert" className={styles.error} data-testid="preset-editor-alert">
+          <p>{alert}</p>
+          {state.status.kind === "save-failed" && state.status.failure === "not-found" && <Link href={routes.presets}>프리셋 목록으로</Link>}
+        </div>
+      )}
+      {state.presetId !== null && (
+        <div className={styles.dangerRow}>
+          <button type="button" className={styles.dangerButton} data-testid="preset-delete" disabled={disabled} onClick={props.onDelete}>프리셋 지우기</button>
+        </div>
+      )}
     </section>
   );
 }
@@ -108,12 +147,14 @@ export function PresetEditorView(props: PresetEditorViewProps) {
   const { state } = props;
   const busy = state.status.kind === "saving" || state.status.kind === "deleting";
   const disabled = busy || state.left;
-  const alert = editorAlertText(state.status);
   const picked = new Set(state.items.map((item) => selectionKey(item.kind, item.sourceId)));
   return (
     <main className={styles.page}>
-      <h1>{state.presetId === null ? "새 프리셋" : "프리셋 고치기"}</h1>
-      <p><Link href={routes.presets} data-testid="preset-editor-back-link">프리셋 목록으로</Link></p>
+      <p className={styles.backLinkRow}>
+        <Link href={routes.presets} className={styles.backLink} data-testid="preset-editor-back-link"><span aria-hidden="true">←</span>프리셋 목록</Link>
+      </p>
+      <h1>{state.presetId === null ? "프리셋 만들기" : "프리셋 수정"}</h1>
+      <p className={styles.lead}>{EDITOR_LEAD_TEXT}</p>
       {state.load === "loading" ? <p role="status">프리셋을 불러오고 있습니다.</p>
         : state.load === "not-found" ? <p role="alert" data-testid="preset-editor-not-found">프리셋을 찾을 수 없습니다.</p>
         : state.load === "error" ? (
@@ -121,33 +162,19 @@ export function PresetEditorView(props: PresetEditorViewProps) {
             <p>프리셋을 불러오지 못했습니다.</p>
             <button type="button" className={styles.secondaryButton} data-testid="preset-editor-retry" onClick={props.onRetryDetail}>다시 불러오기</button>
           </div>
-        ) : <>
-          <NameField state={state} disabled={disabled} onName={props.onName} />
+        ) : (
           <div className={styles.layout}>
-            <SourcePickerView catches={state.catches} materials={state.materials} pdfs={state.pdfs} picked={picked}
-              blockReason={(kind, sourceId) => addBlockReason(state.items, state.lengths, { kind, sourceId })} disabled={disabled}
-              writtenOnly={state.writtenOnly} repositories={props.repositories} onWrittenOnly={props.onWrittenOnly}
-              onRetry={props.onRetrySources} onMoreCatches={props.onMoreCatches} onMoreMaterials={props.onMoreMaterials}
-              onMorePdfs={props.onMorePdfs} onToggle={props.onToggle} />
+            <div className={styles.column}>
+              <NameField state={state} disabled={disabled} onName={props.onName} />
+              <SourcePickerView catches={state.catches} materials={state.materials} pdfs={state.pdfs} picked={picked}
+                blockReason={(kind, sourceId) => addBlockReason(state.items, state.lengths, { kind, sourceId })} disabled={disabled}
+                writtenOnly={state.writtenOnly} repositories={props.repositories} onWrittenOnly={props.onWrittenOnly}
+                onRetry={props.onRetrySources} onMoreCatches={props.onMoreCatches} onMoreMaterials={props.onMoreMaterials}
+                onMorePdfs={props.onMorePdfs} onToggle={props.onToggle} />
+            </div>
             <ItemsPanel props={props} disabled={disabled} />
           </div>
-          <p role="status" className={styles.small} data-testid="preset-editor-status">{editorStatusText(state.status)}</p>
-          {state.status.kind === "saved-reload-failed" && (
-            <button type="button" className={styles.secondaryButton} data-testid="preset-editor-reload" onClick={props.onReloadAfterSave}>다시 불러오기</button>
-          )}
-          {alert !== null && (
-            <div role="alert" className={styles.error} data-testid="preset-editor-alert">
-              <p>{alert}</p>
-              {state.status.kind === "save-failed" && state.status.failure === "not-found" && <Link href={routes.presets}>프리셋 목록으로</Link>}
-            </div>
-          )}
-          <div className={styles.actions}>
-            <button id={SAVE_BUTTON_ID} type="button" className={styles.primaryButton} data-testid="preset-save" disabled={disabled} onClick={props.onSave}>저장</button>
-            {state.presetId !== null && (
-              <button type="button" className={styles.dangerButton} data-testid="preset-delete" disabled={disabled} onClick={props.onDelete}>프리셋 지우기</button>
-            )}
-          </div>
-        </>}
+        )}
     </main>
   );
 }

@@ -3,8 +3,8 @@
 // 먼저 정한 시나리오·기대 결과·실패 조건(U4 기능 명세 S4~S7의 작성자 쪽, 신뢰성 설계 「작성자 실패 안내」 NFR7.5,
 // 발행 프리셋 U2 unit-test-instructions 「시나리오」의 발행 묶음). 세부 시험 코드는 구현 뒤 쓴다.
 //
-// - 기대: 프리셋 목록을 한 번 불러 프리셋을 1~5개 고르고 위/아래로 순서를 정한다. 고를 수 없는 프리셋은 이유 하나(항목 0개 → 발행할 수 없는 자료
-//         → 항목 20개 → 60,000자)와 함께 막히고, 다섯 개를 고르면 안 고른 단추가 막히며 5개 안내는 목록 위에 한 번만 보인다(aria-live).
+// - 기대: 프리셋 목록을 한 번 불러 프리셋을 1~5개 고르고(#632부터 체크박스) 순서를 정한다(#632부터 드래그·「순서 직접 지정」, 모델은 move(from, to)). 고를 수 없는 프리셋은 이유 하나(항목 0개 → 발행할 수 없는 자료
+//         → 항목 20개 → 60,000자)와 함께 막히고, 다섯 개를 고르면 안 고른 체크박스가 막히며 5개 안내는 목록 위에 한 번만 보인다(aria-live).
 //         [다음]은 제목 1~50자·비밀번호 8~64자·프리셋 1~5개를 먼저 검사하고, 확인 단계는 제목·비밀번호 여부·90일 만료와 「고른 프리셋과 순서」를 보인다.
 //         발행 요청은 { title, password?, presetIds }(고른 순서)이고 items 칸은 없다. [발행]은 응답까지 버튼을 막고, 201과 응답 모양이 맞을 때만 완료 화면이다.
 // - 실패 조건(입력 유지): 409 CONFIRMATION_REQUIRED·SOURCE_RESTRICTED·CATCH_PRIVATE와 400 추출 미완료는 목록을 한 번 다시 불러와
@@ -130,7 +130,10 @@ const noop = () => {};
 const pickerHtml = (presets, selected = [], props = {}) => renderToStaticMarkup(createElement(PresetPickerView, {
   presets: { state: "ready", items: presets }, selected, disabled: false, onRetry: noop, onToggle: noop, ...props,
 }));
-const optionOf = (html, id) => new RegExp(`<button[^>]*data-preset-id="${id}"[^>]*>.*?</button>`, "s").exec(html)?.[0] ?? "";
+// #632: 고르기 한 줄은 이름표(label)로 감싼 체크박스다. 줄 전체(체크박스·이름·보조 줄·이유)를 꺼낸다.
+const optionOf = (html, id) => new RegExp(`<label[^>]*><input[^>]*data-preset-id="${id}"[^>]*/>.*?</label>`, "s").exec(html)?.[0] ?? "";
+/** 줄의 체크박스 태그. */
+const boxOf = (html, id) => /<input[^>]*\/>/.exec(optionOf(html, id))?.[0] ?? "";
 const chosen = (...entries) => entries.map(([presetId, name]) => ({ presetId, name }));
 
 test("API: 발행은 POST /publications에 { title, password?, presetIds }를 그대로 보내고, 201과 응답 모양이 맞을 때만 성공이다. 예외는 조회 실패로 돌려준다", async () => {
@@ -224,7 +227,7 @@ test("BR4.1 모델: 목록을 한 번 불러 프리셋 둘을 고르고 순서�
   assert.equal(count(api, "presets"), 1);
   model.togglePreset(P1);
   model.togglePreset(P2);
-  model.moveUp(1);
+  model.move(1, 0);
   model.setTitle(" 지원용 ");
   model.setUsePassword(true);
   model.setPassword("secret-pass-1");
@@ -243,7 +246,7 @@ test("BR4.1 모델: 목록을 한 번 불러 프리셋 둘을 고르고 순서�
   assert.equal(count(api, "presets"), 1, "새로 발행해도 목록은 다시 부르지 않는다");
 });
 
-test("BR4.3 다섯 개를 고르면 안 고른 단추가 모두 막히고 「프리셋은 5개까지 고를 수 있습니다.」가 목록 위 aria-live 칸에 한 번 보이며 6번째는 골라지지 않는다", async () => {
+test("BR4.3 다섯 개를 고르면 안 고른 체크박스가 모두 막히고 「프리셋은 5개까지 고를 수 있습니다.」가 목록 위 aria-live 칸에 한 번 보이며 6번째는 골라지지 않는다", async () => {
   const six = [P1, P2, P3, "44444444-4444-4444-8444-444444444444", "55555555-5555-4555-8555-555555555555", "66666666-6666-4666-8666-666666666666"]
     .map((id) => preset(id, { itemCount: 1, textLength: 100 }));
   const special = [preset("77777777-7777-4777-8777-777777777777", { itemCount: 0, textLength: 0 }), preset("88888888-8888-4888-8888-888888888888", { itemCount: 1, textLength: 70_000, overLimit: true })];
@@ -255,11 +258,14 @@ test("BR4.3 다섯 개를 고르면 안 고른 단추가 모두 막히고 「프
   const html = pickerHtml(model.store.get().presets.items, model.store.get().selected);
   assert.equal((html.match(/프리셋은 5개까지 고를 수 있습니다\./g) ?? []).length, 1);
   assert.match(html, new RegExp(`<p[^>]*aria-live="polite"[^>]*>${PRESETS_FULL_TEXT}</p>`));
-  assert.match(optionOf(html, six[5].presetId), /aria-pressed="false" disabled=""/);
+  assert.match(boxOf(html, six[5].presetId), /type="checkbox"/);
+  assert.doesNotMatch(boxOf(html, six[5].presetId), / checked=""/);
+  assert.match(boxOf(html, six[5].presetId), / disabled=""/);
   assert.doesNotMatch(optionOf(html, six[5].presetId), /publish-preset-reason/);
   assert.match(optionOf(html, special[0].presetId), /담긴 자료가 없어 고를 수 없습니다/, "항목 0개 이유는 그대로 보인다");
   assert.doesNotMatch(optionOf(html, special[1].presetId), /60,000자/, "상한 이유는 숨긴다");
-  assert.match(optionOf(html, six[0].presetId), /aria-pressed="true"(?![^>]*disabled)/, "고른 단추는 뺄 수 있다");
+  assert.match(boxOf(html, six[0].presetId), / checked=""/);
+  assert.doesNotMatch(boxOf(html, six[0].presetId), / disabled=""/, "고른 체크박스는 뺄 수 있다");
   // 4개면 안내 칸은 비어 있다(칸은 늘 있다).
   model.remove(0);
   assert.match(pickerHtml(model.store.get().presets.items, model.store.get().selected), /aria-live="polite" data-testid="publish-presets-full"><\/p>/);
@@ -304,6 +310,9 @@ test("BR4.5 확인 단계: 제목·비밀번호·만료와 「고른 프리셋�
   assert.doesNotMatch(html, /작성자 설명이 없는 Catch|publish-confirm-description-notice|publish-confirm-private-notice|항목 \(/);
   assert.ok(!html.includes(PRIVATE_CATCH_NOTICE));
   assert.match(html, /data-testid="publish-submit"(?![^>]*disabled)/);
+  // #632(2026-11-24 팀장 결정): 남는 「고치기」도 「수정」으로 바꿨다.
+  assert.match(html, /data-testid="publish-back"[^>]*>돌아가서 수정하기<\/button>/);
+  assert.doesNotMatch(html, /고치기/);
   const submitting = renderToStaticMarkup(createElement(PublishConfirmView, {
     presets: chosen([P1, "A"]), title: "t", usePassword: false, submitting: true, lockSeconds: 0, statusLines: null, onBack: noop, onSubmit: noop,
   }));
@@ -330,9 +339,10 @@ test("BR4.6 409 CATCH_PRIVATE blockedSources 한 줄: 목록을 한 번 다시 �
   assert.deepEqual(publishStatusLines(state.status, state.blockedLines), {
     tone: "alert", lines: [PUBLISH_FAILED_TEXT, "비공개 Catch는 발행할 수 없습니다.", "‘자기소개서’ 프리셋의 ‘Catch C’ 때문에 발행할 수 없습니다."],
   });
-  // 새 목록으로 단추 막힘도 다시 정한다. 고른 프리셋은 뺄 수 있게 막지 않는다.
+  // 새 목록으로 체크박스 막힘도 다시 정한다. 고른 프리셋은 뺄 수 있게 막지 않는다.
   const html = pickerHtml(state.presets.items, state.selected);
-  assert.match(optionOf(html, P1), /aria-pressed="true"(?![^>]*disabled)/);
+  assert.match(boxOf(html, P1), / checked=""/);
+  assert.doesNotMatch(boxOf(html, P1), / disabled=""/);
   const form = renderToStaticMarkup(createElement(PublishFormView, {
     title: state.title, usePassword: true, password: state.password, disabled: false, statusLines: publishStatusLines(state.status, state.blockedLines),
     onTitle: noop, onUsePassword: noop, onPassword: noop, onNext: noop,
@@ -510,24 +520,30 @@ test("완료 화면: [링크 열기]는 [URL 복사]와 같은 url을 새 탭 �
   }
 });
 
-test("고르기·고른 목록·입력 화면: 단추에 이름·「항목 N개 · M자」·이유가 글자로 있고 이름은 태그로 그리지 않으며, 순서 단추 이름은 「(이름) 위로」, 공개 전환 안내는 없다", () => {
+test("고르기·고른 목록·입력 화면: 체크박스 줄에 이름·「항목 N개 · M자」·이유가 글자로 있고 이름은 태그로 그리지 않으며, 순서 목록은 번호·[빼기]이고 「위로」「아래로」가 없으며, 공개 전환 안내는 없다", () => {
   const presets = [preset(P1, { name: "<b>자기소개서</b>", itemCount: 4, textLength: 12_300 }), preset(P2, { name: "빈 프리셋", itemCount: 0, textLength: 0 }),
     preset(P3, { name: "옛 프리셋", unpublishableCount: 1, unpublishableItems: [{ kind: "CATCH", sourceId: C1, title: "<img src=x onerror=alert(1)>", reason: "PRIVATE" }] })];
   const html = pickerHtml(presets, chosen([P1, "<b>자기소개서</b>"]));
   assert.match(html, /<h2 id="publish-presets-title">프리셋 고르기<\/h2>/);
-  assert.match(optionOf(html, P1), /aria-pressed="true".*&lt;b&gt;자기소개서&lt;\/b&gt;.*항목 4개 · 12,300자/s);
-  assert.match(optionOf(html, P2), /aria-pressed="false" disabled="".*항목 0개 · 0자.*data-testid="publish-preset-reason">담긴 자료가 없어 고를 수 없습니다</s);
+  // #632: 줄 전체가 이름표라 이름·보조 줄·막힌 이유가 체크박스의 읽히는 이름이 된다. 누르는 단추(aria-pressed)는 없다.
+  assert.doesNotMatch(html, /aria-pressed|<button/);
+  assert.match(optionOf(html, P1), /<input type="checkbox"[^>]* checked=""[^>]*\/>.*&lt;b&gt;자기소개서&lt;\/b&gt;.*항목 4개 · 12,300자/s);
+  assert.match(optionOf(html, P2), /<input type="checkbox"[^>]* disabled=""[^>]*\/>.*항목 0개 · 0자.*data-testid="publish-preset-reason">담긴 자료가 없어 고를 수 없습니다</s);
+  assert.doesNotMatch(boxOf(html, P2), / checked=""/);
   assert.ok(optionOf(html, P3).includes("발행할 수 없는 자료가 있습니다: &lt;img src=x onerror=alert(1)&gt;"));
   assert.doesNotMatch(html, /<b>|<img/);
   assert.ok(!html.includes(PRIVATE_CATCH_NOTICE));
   const selected = renderToStaticMarkup(createElement(SelectedPresetsView, {
-    presets: chosen([P1, "<b>자기소개서</b>"], [P2, "포트폴리오"]), disabled: false, onMoveUp: noop, onMoveDown: noop, onRemove: noop,
+    presets: chosen([P1, "<b>자기소개서</b>"], [P2, "포트폴리오"]), disabled: false, onMove: noop, onRemove: noop,
   }));
   assert.match(selected, /<h2 id="publish-selected-title">고른 프리셋과 순서 \(2\/5\)<\/h2>/);
-  assert.match(selected, /data-testid="publish-move-up"[^>]*disabled=""[^>]*aria-label="&lt;b&gt;자기소개서&lt;\/b&gt; 위로"/);
-  assert.match(selected, /data-testid="publish-move-down"[^>]*disabled=""[^>]*aria-label="포트폴리오 아래로"/);
+  assert.match(selected, /<ol[^>]*aria-label="고른 프리셋과 순서"/);
+  assert.doesNotMatch(selected, /publish-move-up|publish-move-down|위로|아래로/);
+  assert.match(selected, /data-testid="publish-order-grip"[^>]*>|<button[^>]*aria-hidden="true"[^>]*data-testid="publish-order-grip"/);
+  assert.match(selected, /aria-label="&lt;b&gt;자기소개서&lt;\/b&gt; 빼기"/);
   assert.match(selected, /aria-label="포트폴리오 빼기"/);
-  assert.match(renderToStaticMarkup(createElement(SelectedPresetsView, { presets: [], disabled: false, onMoveUp: noop, onMoveDown: noop, onRemove: noop })),
+  assert.match(selected, /data-testid="publish-order-direct"[^>]*>순서 직접 지정<\/button>/);
+  assert.match(renderToStaticMarkup(createElement(SelectedPresetsView, { presets: [], disabled: false, onMove: noop, onRemove: noop })),
     /고른 프리셋과 순서 \(0\/5\).*data-testid="publish-selected-empty">아직 고른 프리셋이 없습니다\./s);
   const form = renderToStaticMarkup(createElement(PublishFormView, {
     title: "제목", usePassword: true, password: "secret-pass-1", disabled: false, statusLines: null, onTitle: noop, onUsePassword: noop, onPassword: noop, onNext: noop,
@@ -546,7 +562,7 @@ test("발행 중에는 고르기·순서를 바꾸지 않고, 막힘 줄은 같�
   const submitting = model.submit();
   model.backToEdit();
   model.togglePreset(P3);
-  model.moveUp(1);
+  model.move(1, 0);
   model.remove(0);
   assert.deepEqual(model.store.get().selected.map((entry) => entry.presetId), [P1, P2]);
   pending.resolve(success(published()));
