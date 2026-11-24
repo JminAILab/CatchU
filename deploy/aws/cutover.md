@@ -43,7 +43,7 @@ edge_check() {
 - `zone`은 `/hostedzone/Z…` 하나, `ip`는 개발 서버 탄력적 IP 하나여야 한다. 아니면 멈춘다.
 - `dns_batch`는 지금 A 기록을 그대로 지우고(DELETE) 인자의 새 기록을 만드는(CREATE) 변경 묶음을 만든다. Route 53은 한 묶음을 모두 하거나 하나도 하지 않는다([API 안내](https://docs.aws.amazon.com/Route53/latest/APIReference/API_ChangeResourceRecordSets.html) 「Change Batches and Transactional Changes」). 그래서 묶음을 만든 뒤 기록이 바뀌었으면 아무것도 바뀌지 않고 `InvalidChangeBatch`로 실패한다. 그때는 `dns_rec`으로 다시 보고 묶음을 새로 만든다.
 - `dns_send`는 묶음을 보내고 바뀐 ID를 찍은 뒤(`$change_id`에도 남는다), 모든 Route 53 이름 서버에 반영될 때까지(`INSYNC`) 기다린다. 30초마다 보며 보통 1분 안에 끝난다.
-- `edge_check`는 개발 서버 자동 배포의 바깥 확인([../dev-server/cd/ci-check.sh](../dev-server/cd/ci-check.sh))과 같은 다섯 가지를 찍는다. 인자로 ALB 이름이나 IP를 주면 DNS와 관계없이 그곳에 붙는다(TLS 이름과 Host는 catchu.dev 그대로다). `000`은 연결이나 인증서 확인이 실패했다는 뜻이다(받은 인증서가 catchu.dev 것이 아니어도 그렇다).
+- `edge_check`는 지운 개발 서버 자동 배포의 바깥 확인([`ci-check.sh`, 판본 eaf9d976](https://github.com/JminAILab/CatchU/blob/eaf9d9769e6361651d885f8af47f69809421f90d/deploy/dev-server/cd/ci-check.sh))과 같은 다섯 가지를 찍는다. 인자로 ALB 이름이나 IP를 주면 DNS와 관계없이 그곳에 붙는다(TLS 이름과 Host는 catchu.dev 그대로다). `000`은 연결이나 인증서 확인이 실패했다는 뜻이다(받은 인증서가 catchu.dev 것이 아니어도 그렇다).
 
 | 줄 | EKS(ALB) | 개발 서버(Caddy) |
 |---|---|---|

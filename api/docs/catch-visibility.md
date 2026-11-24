@@ -16,6 +16,8 @@
 
 10월의 [정책 공급자](october-registration-policy.md)가 명시한 ‘관측 안 함·NONE’에도 위 공개 조건을 적용한다. NONE만으로 Catch를 공개하지 않고, 두 확인 항목과 별도의 PUBLIC 요청이 필요하다. 기존 SOURCE_PRIVATE 차단은 유지하고, 등록 뒤 원본의 비공개 전환은 10월에 자동 감지하지 않는다.
 
+발행은 Catch의 공개 상태를 바꾸지 않는다(발행 프리셋 intent U1 BR3.6). 12월 U4 발행은 고른 PRIVATE Catch를 PUBLIC으로 바꿨지만 이 전환은 없어졌고, 비공개 Catch가 든 발행은 `409 CATCH_PRIVATE`로 막힌다. 발행하려면 위 `PUT .../visibility`로 먼저 공개한다. 판정 순서와 응답은 [발행 API](publications.md#발행-api-제출-2)에 있다.
+
 ## 10월 C 내부 조회 기록
 
 아래 `PublicCatchStore`는 소스에 남아 있는 10월 내부 조회 경계다. 현행 받은 사람 HTTP 경로는 U4 [발행본 사본 조회](recipient-publication.md)로 교체됐으며 원본 Catch의 공개 변경을 이미 발행한 사본에 소급하지 않는다.

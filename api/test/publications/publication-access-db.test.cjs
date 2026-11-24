@@ -74,10 +74,13 @@ async function insertPublication(memberId, { password = false, publishedAt = new
   [publicationId, memberId, title, token, password ? 'scrypt$1$synthetic-verifier' : null, publishedAt, stoppedAt]);
   return { publicationId, token, expiresAt: new Date(publishedAt.getTime() + 2160 * HOUR) };
 }
-function insertItem(publicationId, position, kind, snapshot, title = `[합성] 항목 ${position}`) {
+/** 사본 항목 한 줄. 발행 프리셋 U1의 프리셋 칸 둘은 기본으로 1번 프리셋이다. sourceId를 같게 주면 겹친 사본이 된다. */
+function insertItem(publicationId, position, kind, snapshot, title = `[합성] 항목 ${position}`,
+  { sourceId = randomUUID(), presetOrdinal = 1, presetName = '[합성] 프리셋' } = {}) {
   const publishedItemId = randomUUID();
-  return db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)`, [publishedItemId, publicationId, position, kind, randomUUID(), title, JSON.stringify(snapshot)])
+  return db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, preset_ordinal, preset_name)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+  [publishedItemId, publicationId, position, kind, sourceId, title, JSON.stringify(snapshot), presetOrdinal, presetName])
     .then(() => publishedItemId);
 }
 const setState = (memberId, state) => db.query('UPDATE member_account SET account_state = $2 WHERE member_id = $1', [memberId, state]);
@@ -179,13 +182,20 @@ test('readSnapshot은 published_item만 position 순으로 읽어 사본을 만�
   const owner = await insertMember(db);
   const p = await insertPublication(owner, { title: '[합성] 제목' });
   const textId = await insertItem(p.publicationId, 2, 'TEXT_MATERIAL', { body: '[합성] 본문' });
-  const catchId = await insertItem(p.publicationId, 1, 'CATCH', CATCH_SNAPSHOT, '제목 없는 Catch');
+  const sourceId = randomUUID();
+  const catchId = await insertItem(p.publicationId, 1, 'CATCH', CATCH_SNAPSHOT, '제목 없는 Catch', { sourceId });
+  // 발행 프리셋 U1(P-3·P-4): 같은 원본이 둘째 프리셋에도 든 겹친 사본. 프리셋 칸 둘을 싣고, 앞선 사본만 isFirstCopy다. source_id는 싣지 않는다.
+  const copyId = await insertItem(p.publicationId, 3, 'CATCH', CATCH_SNAPSHOT, '제목 없는 Catch', { sourceId, presetOrdinal: 2, presetName: '[합성] 둘째' });
   const snapshot = await access.readSnapshot(p.publicationId);
+  const preset = { presetOrdinal: 1, presetName: '[합성] 프리셋' };
   assert.deepEqual(snapshot, {
     title: '[합성] 제목', publishedAt: new Date(NOW.getTime() - HOUR), expiresAt: p.expiresAt,
     items: [
-      { publishedItemId: catchId, position: 1, itemKind: 'CATCH', title: '제목 없는 Catch', snapshot: CATCH_SNAPSHOT, pdfPages: null },
-      { publishedItemId: textId, position: 2, itemKind: 'TEXT_MATERIAL', title: '[합성] 항목 2', snapshot: { body: '[합성] 본문' }, pdfPages: null },
+      { publishedItemId: catchId, position: 1, itemKind: 'CATCH', title: '제목 없는 Catch', snapshot: CATCH_SNAPSHOT, pdfPages: null, ...preset, isFirstCopy: true },
+      { publishedItemId: textId, position: 2, itemKind: 'TEXT_MATERIAL', title: '[합성] 항목 2', snapshot: { body: '[합성] 본문' }, pdfPages: null, ...preset,
+        isFirstCopy: true },
+      { publishedItemId: copyId, position: 3, itemKind: 'CATCH', title: '제목 없는 Catch', snapshot: CATCH_SNAPSHOT, pdfPages: null,
+        presetOrdinal: 2, presetName: '[합성] 둘째', isFirstCopy: false },
     ],
   });
   // 원본 표(catch_asset·text_material)에는 아무것도 없어도 사본은 읽힌다(사본만 읽는다).

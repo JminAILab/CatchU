@@ -1,14 +1,22 @@
 import { HttpException } from '@nestjs/common';
 import { DEFAULT_ERROR_MESSAGES, ERROR_STATUS, ErrorCode } from './error-codes';
 
+/** 발행 거부에서 막힌 자료 한 줄(발행 프리셋 계약 P-2 blockedSources). 같은 자료가 두 프리셋에 있으면 프리셋마다 한 줄이다. */
+export interface BlockedSource {
+  presetId: string;
+  kind: 'CATCH' | 'TEXT_MATERIAL' | 'PDF_MATERIAL';
+  sourceId: string;
+}
+
 /**
- * 명세 common.yaml Error.details 가 허용하는 두 키와, 12월 U4 발행 거부(409 CONFIRMATION_REQUIRED·SOURCE_RESTRICTED)가
- * 해당 Catch를 알리는 `catchIds`(U4 기능 설계 BR4.2, 신뢰성 설계 「작성자 실패 안내」)만 둔다. `catchIds`는 UUID 목록이며 자료 값을 담지 않는다.
+ * 명세 common.yaml Error.details 가 허용하는 두 키와, 발행 거부(400 extractionIncomplete, 409 CONFIRMATION_REQUIRED·SOURCE_RESTRICTED·
+ * CATCH_PRIVATE)가 막힌 자료를 알리는 `blockedSources`(발행 프리셋 계약 P-2, 기능 설계 BR3.5)만 둔다. `blockedSources`는 프리셋 ID와
+ * 자료 종류·ID만 담고 이름·내용을 담지 않는다(NFR4.2). 12월 U4의 `catchIds`는 이것으로 바뀌어 없어졌다(P-2 승인 검토 R-03).
  */
 export interface ErrorDetails {
   violations?: { field: string; reason: string }[];
   existingRequestId?: string;
-  catchIds?: string[];
+  blockedSources?: BlockedSource[];
 }
 
 export interface ErrorBody {

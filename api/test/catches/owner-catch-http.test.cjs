@@ -771,6 +771,8 @@ describe('본인 Catch HTTP·PostgreSQL', {
       'limit=0', 'limit=101', 'limit=-1', 'limit=1.5', 'limit=1e2', 'limit=01',
       'limit=true', 'limit=1&limit=2', 'repositoryId=', 'repositoryId=a&repositoryId=b',
       'sourceRequestId=', 'cursor=', 'cursor=not-a-cursor', 'cursor=abc%3D', 'unknown=value',
+      // 발행 프리셋 U2 BR5.1: publishable은 글자 true 하나만 받는다(NFR2.3). 거른 결과·커서는 publishable-filter.test.cjs가 본다.
+      'publishable=', 'publishable=false', 'publishable=TRUE', 'publishable=true&publishable=true',
     ];
     for (const query of badQueries) failure(await request(own.ownerId, '/v1/catches?' + query), 400, 'INVALID_REQUEST');
     failure(await request(own.ownerId, detailPath(own.catchId) + '?limit=1'), 400, 'INVALID_REQUEST');

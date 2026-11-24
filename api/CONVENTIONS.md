@@ -26,6 +26,8 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/file-storage/`                     | C-05 파일 저장 인터페이스·키·로컬 드라이버와 설정 검사([docs/file-storage.md](docs/file-storage.md)) |
 | `src/withdrawal/`                       | C-06 탈퇴 `DELETE /v1/me`의 1~4단계([docs/withdrawal.md](docs/withdrawal.md)). 기본 앱에 등록 |
 | `src/publications/`                     | 12월 U4 발행·링크: C-07 `publication`·`published_item` 엔티티와 사본 모양, C-10 `PublicationAccess` 인터페이스와 DB 구현(주입 토큰 `PUBLICATION_ACCESS`, 시험 전용 메모리 가짜는 시험만), 발행 `POST /v1/publications`와 작성자 발행본 목록·상세·중지·삭제([docs/publications.md](docs/publications.md)). 기본 앱에 등록. 받은 사람 경로도 이 모듈에 있으며 10월 공유 링크·수신자 모듈을 대체 |
+| `src/presets/`                          | 발행 프리셋 U1 프리셋 저장·세기: `preset`·`preset_item` 엔티티, `/v1/presets` 경로와 발행이 쓰는 프리셋 펴기(`PresetStore.expand`)([docs/presets.md](docs/presets.md)). 기본 앱에 등록 |
+| `src/publishable-source/`               | 발행 프리셋 U1 발행 판정 규칙: 사본 내용·글자 수(`source-content.ts`), 종류별 묶음 읽기와 발행 잠금 SQL(`source-reader.ts`), 미리 읽은 행만 받는 순수 판정 함수(`eligibility.ts`). 발행과 프리셋 경로가 같이 쓴다 |
 | `src/published-index/`                  | 12월 U3 발행본 색인·검색: C-08 `PublishedIndexWriter`(발행 트랜잭션 안 조각 나누기·[검색 다시 준비]), `EMBED_PUBLICATION` 처리기, C-09 `PublishedSearch`(색인 상태·발행본 하나 안 의미 검색), Voyage·합성 임베딩 제공자, `publication_index`·`published_chunk` 엔티티([docs/published-index.md](docs/published-index.md)). 기본 앱에 등록 |
 | `src/materials/`                        | 텍스트 자료 C-13과 PDF 업로드·조회·삭제 API·엔티티. 기본 앱에 등록([텍스트 자료](docs/publications.md), [PDF 자료](docs/pdf-materials.md)) |
 | `src/rag-answer/`                       | 12월 U5 받은 사람 질의응답(SSE·질문 다시 쓰기·링크당·작성자 합계 하루 질문 횟수)과 AI 기본 요약(`BASE_SUMMARY` 처리기·받은 사람/작성자 읽기·[다시 만들기]), `base_summary` 엔티티. 평가 스크립트는 `scripts/rag-eval/`([docs/rag-answer.md](docs/rag-answer.md)). 기본 앱에서 `RagAnswerModule.register`에 U4의 실제 `PUBLICATION_ACCESS`를 `useExisting`으로 전달 |
@@ -202,7 +204,7 @@ export class ExamplePublicController {
 
 ## 공통 오류 처리 — API 명세 v1
 
-정본은 [API 명세 v1 공통 오류·요청 안전성](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#공통-오류요청-안전성)과 [common.yaml의 Error](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml)다. 오류 본문은 `{code, message, details?}`이며 화면은 문구 대신 `code`로 분기한다. `details`는 `violations: [{field, reason}]`와 `existingRequestId`만 허용한다. 예외로 12월 발행 거부 409(`CONFIRMATION_REQUIRED`·`SOURCE_RESTRICTED`)는 해당 Catch의 UUID 목록 `catchIds`를 더 싣는다. 한 Unit 안 API 세부라 [U4 기능 설계](../aidlc/spaces/default/intents/260925-intent-12/construction/u4-publication-link/functional-design/functional-spec.md)가 정본이다(계약 요약 「Contract ownership rules」의 Unit 안 세부, #468에서 팀장 확인). 입력값·SQL·stack·토큰을 응답에 넣지 않는다.
+정본은 [API 명세 v1 공통 오류·요청 안전성](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#공통-오류요청-안전성)과 [common.yaml의 Error](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/common.yaml)다. 오류 본문은 `{code, message, details?}`이며 화면은 문구 대신 `code`로 분기한다. `details`는 `violations: [{field, reason}]`와 `existingRequestId`만 허용한다. 예외로 발행 거부(400 `extractionIncomplete`, 409 `CONFIRMATION_REQUIRED`·`SOURCE_RESTRICTED`·`CATCH_PRIVATE`)는 막힌 자료 목록 `blockedSources: [{ presetId, kind, sourceId }]`를 더 싣는다(UUID와 정해진 `kind`만, 공통 필터가 그 밖은 버린다). 정본은 [발행 프리셋 계약 P-2](../aidlc/spaces/default/intents/261118-publication-presets/inception/contract-design/contract-summary.md)와 U1 기능 설계다. 12월 U4가 #468에서 더한 `catchIds`는 이것으로 바뀌어 없어졌다. 입력값·SQL·stack·토큰을 응답에 넣지 않는다.
 
 | 기본 구분 | HTTP | 코드 |
 |---|---|---|
@@ -211,7 +213,7 @@ export class ExamplePublicController {
 | 권한·선행 조건·요청 출처 | 403 | GITHUB_CONNECTION_REQUIRED, REPOSITORY_NOT_ALLOWED, CONSENT_REQUIRED, AUTH_ORIGIN_FORBIDDEN, AI_CONSENT_REQUIRED(12월 U2, 외부 AI 첫 이용 동의 없음) |
 | 없음·열람 불가 | 404 | RESOURCE_UNAVAILABLE, LINK_UNAVAILABLE |
 | JD 입력 검증(12월 U10) | 422 | INVALID_INPUT, INPUT_TOO_LARGE ([docs/jd.md](docs/jd.md)). U10 경계의 직접 검사이며 전역 ValidationPipe의 400은 유지 |
-| 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED, INDEX_NOT_READY(12월 U5 질의응답·U10 JD 요약, 계약 C-09·C-12, 문구 "아직 쓸 수 없습니다". 화면 문구는 각 기능의 web 문구 표가 정함), MCP_CONSENT_REQUIRED(12월 U6 첫 연결 동의 없음, [docs/claude-mcp.md](docs/claude-mcp.md)) |
+| 충돌 | 409 | ANALYSIS_IN_PROGRESS, RETRY_NOT_ALLOWED, REANALYSIS_DEFERRED, IDEMPOTENCY_CONFLICT, CONFIRMATION_REQUIRED, SOURCE_RESTRICTED, LINK_TITLE_CONFLICT, LINK_LIMIT_REACHED, INDEX_NOT_READY(12월 U5 질의응답·U10 JD 요약, 계약 C-09·C-12, 문구 "아직 쓸 수 없습니다". 화면 문구는 각 기능의 web 문구 표가 정함), MCP_CONSENT_REQUIRED(12월 U6 첫 연결 동의 없음, [docs/claude-mcp.md](docs/claude-mcp.md)), PRESET_LIMIT_REACHED(발행 프리셋 U1 회원당 프리셋 50개, [docs/presets.md](docs/presets.md)), CATCH_PRIVATE(발행 프리셋 U1 비공개 Catch 발행 거부, [docs/publications.md](docs/publications.md)) |
 | 수신자 비밀번호 시도 제한 | 429 | LINK_UNLOCK_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('LINK_UNLOCK_LIMITED', { retryAfterSeconds })`) |
 | 회원 링크 발급 빈도 제한, PDF 업로드 상한 | 429 | RATE_LIMITED (남은 초는 `Retry-After` 헤더, `new ApiError('RATE_LIMITED', { retryAfterSeconds })`). PDF 업로드의 진행 중 수 초과에는 `Retry-After`가 없다([docs/pdf-materials.md](docs/pdf-materials.md#업로드)) |
 | 계정당 하루 실행 한도(12월 U2) | 429 | DAILY_LIMIT_REACHED (문구 "오늘 한도에 도달했습니다", 남은 횟수·`Retry-After` 없음, [docs/daily-run-limit.md](docs/daily-run-limit.md)) |

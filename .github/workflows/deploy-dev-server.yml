@@ -1,15 +1,16 @@
-# main 자동 배포(#313). main에 반영된 판본을 arm64로 빌드·검사해 ECR에 올리고 개발 서버(#304)나 EKS(#276)에서 교체한다.
-# 어디까지 할지는 저장소 변수 DEPLOY_TARGET으로 고른다(#342). dev-server면 개발 서버 교체, eks면 EKS 교체, none이면 ECR에 올리기까지만 한다.
+# main 자동 배포(#313). main에 반영된 판본을 arm64로 빌드·검사해 ECR에 올리고 EKS(#276)에서 교체한다.
+# 어디까지 할지는 저장소 변수 DEPLOY_TARGET으로 고른다(#342). eks면 EKS 교체, none이면 ECR에 올리기까지만 한다.
 # 값이 없거나 다른 값이면 plan에서 실패로 끝나고 아무것도 올리거나 바꾸지 않는다(deploy/dev-server/cd/ci-target.sh).
+# 개발 서버(#304)를 지우면서 개발 서버 교체 갈래와 dev-server 값을 뺐다(#342). 워크플로·폴더 이름은 그때 이름을 그대로 쓴다.
 # 수동 실행(Run workflow)은 main에서만 되고, 커밋을 넣으면 그 main 커밋을 다시 배포한다(되돌리기). 이미 올린 판본이면 빌드·검사를 건너뛴다.
 # 되돌릴 수 있는 커밋은 main의 first-parent 커밋(main에 반영된 판본)뿐이다. 반영된 PR 안의 중간 커밋은 승인된 최종 판본이 아니므로 받지 않는다.
-# 배포 도구(deploy/dev-server/cd/)는 늘 그 실행의 main 판본을 쓰고, 이미지·compose·교체 스크립트만 배포할 커밋에서 가져온다.
+# 배포 도구(deploy/dev-server/cd/·deploy/aws/cd/·deploy/aws/scripts/)는 늘 그 실행의 main 판본을 쓰고, 이미지와 EKS 실행 파일만 배포할 커밋에서 가져온다.
 # job은 셋이다. plan·deploy만 AWS 권한(OIDC)을 받고, 배포할 커밋의 코드를 러너에서 실행하는 이미지 검사(check)는 권한 없는 별도 러너에서 돈다.
-# AWS 역할은 배포 대상마다 따로다. eks면 environment eks, 그 밖에는 environment dev-server에서 돈 job만 믿는다(둘 다 배포 브랜치 main만).
+# AWS 역할은 environment eks(배포 브랜치 main만)에서 돈 job만 믿는다. none도 같은 역할로 이미지를 올리고, EKS 교체 단계는 건너뛴다.
 # 저장소에 AWS 키를 두지 않는다. EKS 배포 역할은 앱 이미지 올리기와 클러스터 조회만 하고, 클러스터 안 권한은 deploy/aws/k8s/deploy-rbac.yaml이 전부다.
-# 역할 주소·서버 ID는 environment 비밀값으로 읽는다. 키는 아니지만 계정 번호와 서버 ID가 실행 로그에 그대로 찍히지 않게 하려는 것이다.
+# 역할 주소는 environment 비밀값으로 읽는다. 키는 아니지만 계정 번호가 실행 로그에 그대로 찍히지 않게 하려는 것이다.
 # 배포는 한 번에 하나만 돈다. 진행 중에 main push가 여러 번 오면 기다리는 실행은 가장 나중 것 하나만 남는다.
-# 절차·끄는 법·되돌리기는 deploy/dev-server/cd/README.md, EKS 쪽은 deploy/aws/cd/README.md.
+# 공통 단계·배포 대상·되돌리기는 deploy/dev-server/cd/README.md, EKS 교체·권한·실패했을 때는 deploy/aws/cd/README.md.
 # 외부 action은 ci.yml과 같은 전체 커밋 SHA로 고정한다(#215). checkout 뒤 git 인증을 쓰지 않으므로 토큰을 남기지 않는다.
 name: deploy-dev-server
 
@@ -36,7 +37,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
     environment:
-      name: ${{ vars.DEPLOY_TARGET == 'eks' && 'eks' || 'dev-server' }}
+      name: eks
     permissions:
       contents: read
       id-token: write
@@ -75,7 +76,6 @@ jobs:
         id: deploy_target
         env:
           DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
-          DEV_SERVER_INSTANCE_ID: ${{ secrets.DEV_SERVER_INSTANCE_ID }}
         run: bash deploy/dev-server/cd/ci-target.sh
 
       - name: main에 반영된 판본인지 확인
@@ -130,13 +130,13 @@ jobs:
     name: deploy
     needs: [plan, check]
     # 검사가 필요 없어 건너뛴 경우(이미 올린 판본)에도 배포한다. 검사가 실패·취소되면 배포하지 않는다.
-    # 빌드·ECR 올리기는 배포 대상과 관계없이 돈다. 개발 서버 교체와 바깥 확인은 dev-server일 때만, kubectl 받기와 EKS 교체는 eks일 때만 돈다.
-    # environment는 plan이 정한 대상을 따른다(plan 뒤에 저장소 변수가 바뀌어도 한 실행 안에서 대상과 역할이 어긋나지 않는다).
+    # 빌드·ECR 올리기는 배포 대상과 관계없이 돈다. kubectl 받기와 EKS 교체는 plan이 정한 대상이 eks일 때만 돈다
+    # (plan 뒤에 저장소 변수가 바뀌어도 한 실행 안에서는 plan의 대상을 따른다).
     if: ${{ !cancelled() && needs.plan.result == 'success' && (needs.check.result == 'success' || needs.check.result == 'skipped') }}
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
     environment:
-      name: ${{ needs.plan.outputs.target == 'eks' && 'eks' || 'dev-server' }}
+      name: eks
       url: https://${{ vars.DEV_SERVER_DOMAIN }}
     permissions:
       contents: read
@@ -144,7 +144,6 @@ jobs:
     env:
       AWS_REGION: ap-northeast-2
       DEV_SERVER_DOMAIN: ${{ vars.DEV_SERVER_DOMAIN }}
-      DEV_SERVER_INSTANCE_ID: ${{ secrets.DEV_SERVER_INSTANCE_ID }}
     steps:
       # 작업 폴더는 plan과 같은 main 판본(배포 도구). 배포할 커밋은 따로 꺼낸다.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -190,21 +189,6 @@ jobs:
           SRC_DIR: ${{ steps.src.outputs.dir }}
           DEPLOY_TARGET: ${{ needs.plan.outputs.target }}
         run: bash deploy/dev-server/cd/ci-images.sh push
-
-      - name: 개발 서버 교체
-        if: needs.plan.outputs.target == 'dev-server'
-        env:
-          COMMIT: ${{ needs.plan.outputs.commit }}
-          WEB_DIGEST: ${{ steps.images.outputs.web }}
-          API_DIGEST: ${{ steps.images.outputs.api }}
-          MIGRATION_DIGEST: ${{ steps.images.outputs.migration }}
-          WORKER_DIGEST: ${{ steps.images.outputs.worker }}
-          FILES_DIGEST: ${{ steps.images.outputs.files }}
-        run: bash deploy/dev-server/cd/ci-deploy.sh
-
-      - name: 바깥 확인
-        if: needs.plan.outputs.target == 'dev-server'
-        run: bash deploy/dev-server/cd/ci-check.sh
 
       # 역할 주소는 계정 번호를 읽는 데만 쓴다(deploy.sh가 기대 계정과 실제 계정을 대조한다).
       - name: EKS 교체

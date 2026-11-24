@@ -47,7 +47,7 @@ const { PublicationManageService } = require('../../dist/publications/publicatio
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
   PUBLISH_SETTINGS, WEB_BASE_URL, HOUR, setEnv, startApp, expectError, eligibleCatch, insertTextMaterial, consent,
-  fakeAiRun, fakeIndexWriter, bindFakes, setClock, body, catchItem, textItem, tokenOf,
+  fakeAiRun, fakeIndexWriter, bindFakes, setClock, presetBody, catchItem, textItem, tokenOf,
 } = require('./support.cjs');
 
 let server, db, restore, fileRoot, unbind, manage, storage, now, unsetClock;
@@ -88,7 +88,7 @@ async function author(identity = `u4-owner-${randomUUID()}`) {
 /** 실제 발행 API로 발행본을 만든다. 시계를 1분씩 옮겨 발행 시각을 서로 다르게 한다. */
 async function publishOne(member, items, overrides = {}) {
   now = new Date(now.getTime() + 60_000);
-  const response = await server.call('POST', '/publications', { token: member.token, body: body(items, overrides) });
+  const response = await server.call('POST', '/publications', { token: member.token, body: await presetBody(db, member.memberId, items, overrides) });
   assert.equal(response.status, 201, response.text);
   return response.body;
 }
@@ -195,7 +195,7 @@ test('S9·S13: 중지는 처음 시각을 유지하고 만료 링크는 { EXPIRE
 
 test('S10: 발행 뒤 원본 설명·본문·공개 상태를 바꾸거나 자료를 지워도 사본은 발행 당시 그대로다', async () => {
   const a = await author();
-  const catchId = await eligibleCatch(db, a.memberId, { visibility: 'PRIVATE', authorDescription: '[합성] 발행 당시 설명', draftContent: '[합성] 초안' });
+  const catchId = await eligibleCatch(db, a.memberId, { visibility: 'PUBLIC', authorDescription: '[합성] 발행 당시 설명', draftContent: '[합성] 초안' });
   const material = await insertTextMaterial(db, a.memberId, { title: '[합성] 자료', body: '[합성] 발행 당시 본문' });
   const published = await publishOne(a, [catchItem(catchId), textItem(material)]);
   const before = (await detail(a.token, published.publicationId)).body;

@@ -37,7 +37,7 @@
 | 3 | AWS ElastiCache Valkey에서 `noeviction`·TLS·필요 명령과 실제 클라이언트 연결을 확인했다. 11/18 팀장 결정으로 키트 실행을 실제 api·worker 확인으로 갈음했다. 장애 조치 뒤 api 복귀는 확인했고, 당시 worker는 재시작이 필요했다. 수정 후 현장 확인은 #603의 증거를 따른다. 영속성은 참고 기록이며 관문이 아니다 | H([#24][i24]) | [2단계 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553), [5단계 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733) |
 | 4 | 결정됨 — 10/6 결정. 실행 중 → 실행 불명 전이(`RUNNING → UNCERTAIN`)는 더하지 않는다. 화면에는 "실행 중"으로 보이다가, 접수 후 60분 안에 끝나지 않으면 E가 실패로 닫는다([처리 시한 구현](../api/docs/analysis-deadline.md), [#237][i237]) | [#237][i237](E 리뷰) | 쟁점 1·2 |
 | 5 | 두지 않는다 — 10/6 결정. F에 실행 차단 기록이 없다. 닫힌 뒤 큐에서 꺼낸 오래된 작업은 worker가 요청 정보를 조회할 때([#232][i232]) 끝난 시도라 "모름"을 받아 분석하지 않는다([요청 정보 조회](../api/docs/worker-context.md)) | — | [10/6 결정][d1006] |
-| 6 | 배포 중에도 같은 큐를 받는 worker 실행이 하나만 돌게 한다(새 worker는 앞 worker가 끝난 뒤 시작). Kubernetes로 배포하면 배포 방식을 Recreate로 둬 앞 worker pod가 완전히 내려간 뒤 새 pod가 뜨게 한다(롤링 업데이트는 maxSurge 0이어도 종료 중인 pod와 겹칠 수 있다) | H·F | 시험한 범위가 worker 한 프로세스다(「[하지 않은 것과 한계](#하지-않은-것과-한계)」) |
+| 6 | 배포 중에 옛 worker와 새 worker가 함께 돌지 않게 한다(새 worker는 앞 worker가 모두 끝난 뒤 시작. 실행 수는 [#480](https://github.com/JminAILab/CatchU/issues/480)에서 3). Kubernetes로 배포하면 배포 방식을 Recreate로 둬 앞 worker pod가 완전히 내려간 뒤 새 pod가 뜨게 한다(롤링 업데이트는 maxSurge 0이어도 종료 중인 pod와 겹칠 수 있다) | H·F | 시험한 범위가 worker 한 프로세스다(「[하지 않은 것과 한계](#하지-않은-것과-한계)」) |
 
 ## 판정 기준과 #77 문구와의 차이
 

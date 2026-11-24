@@ -28,8 +28,31 @@ def _escape(text: str) -> str:
     return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
 
-def pdf_bytes(pages: list[str | None], *, password: str | None = None) -> bytes:
-    """쪽마다 글 한 줄(None이면 빈 쪽)을 둔 PDF. password가 있으면 RC4-128로 암호화한다."""
+def _space_cmap(space: str) -> bytes:
+    """띄어쓰기 코드(0x20)를 `space` 한 글자로, 나머지 ASCII는 제 글자로 대응시킨 ToUnicode.
+
+    맥 Chrome PDF가 일부 글꼴에서 띄어쓰기를 U+0001 같은 제어 문자로 적는 경우를 흉내 낸다(#627).
+    """
+    return (
+        "/CIDInit /ProcSet findresource begin 12 dict begin begincmap\n"
+        "/CMapName /CatchU-Space def /CMapType 2 def\n"
+        "1 begincodespacerange <00> <FF> endcodespacerange\n"
+        f"1 beginbfchar <20> <{ord(space):04X}> endbfchar\n"
+        "1 beginbfrange <21> <7E> <0021> endbfrange\n"
+        "endcmap CMapName currentdict /CMap defineresource pop end end\n"
+    ).encode("ascii")
+
+
+def pdf_bytes(
+    pages: list[str | None],
+    *,
+    password: str | None = None,
+    space_as: str | None = None,
+) -> bytes:
+    """쪽마다 글 한 줄(None이면 빈 쪽)을 둔 PDF. password가 있으면 RC4-128로 암호화한다.
+
+    space_as가 있으면 글꼴에 띄어쓰기를 그 글자로 읽게 하는 ToUnicode를 붙인다.
+    """
     writer = PdfWriter()
     font = DictionaryObject(
         {
@@ -38,6 +61,10 @@ def pdf_bytes(pages: list[str | None], *, password: str | None = None) -> bytes:
             NameObject("/BaseFont"): NameObject("/Helvetica"),
         }
     )
+    if space_as is not None:
+        cmap = DecodedStreamObject()
+        cmap.set_data(_space_cmap(space_as))
+        font[NameObject("/ToUnicode")] = writer._add_object(cmap)
     font_ref = writer._add_object(font)
     for text in pages:
         page = writer.add_blank_page(width=612, height=792)

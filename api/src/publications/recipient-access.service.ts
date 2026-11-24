@@ -13,7 +13,7 @@ import { UNLOCK_CONTROLS, UnlockControls } from '../share-links/unlock-policy';
 import { DbPublicationAccess, UnlockJudgement } from './db-publication-access';
 import { LinkPasswordRequired, LinkUnavailable, NotFound } from './publication-access';
 import { Clock, PUBLICATIONS_CLOCK } from './publications-config';
-import { PublishedSnapshot } from './published-snapshot';
+import { PublishedSnapshotResponse, snapshotResponse } from './published-snapshot';
 
 /** 없음·삭제·중지·만료·작성자 비활성을 구분하지 않는다. 문구는 공통 기본값, details 없음. PDF 사본 열람(U8)도 같은 응답을 쓴다. */
 export function unavailable(): ApiError {
@@ -49,15 +49,16 @@ export class RecipientAccessService {
    * 열람(GET /v1/public/links/{token}). 판정(`resolveForRecipientIn`)과 사본 읽기(`readSnapshotIn`)를 읽기 전용 REPEATABLE READ 트랜잭션
    * 하나에서 해 같은 스냅샷을 읽는다(R-04). 판정 뒤 커밋된 중지·만료·삭제·작성자 비활성은 이 요청에 보이지 않고 다음 요청의 재판정이 막는다.
    * 행 잠금은 잡지 않는다. 형식이 틀린 토큰은 트랜잭션을 열지 않고 404다.
+   * 응답은 프리셋 칸 둘을 싣고 「앞선 사본인가」 값은 뺀다(발행 프리셋 BR4.5, P-3). 원본 ID는 사본에 처음부터 없다.
    */
-  async read(token: string, grant: string | undefined): Promise<PublishedSnapshot> {
+  async read(token: string, grant: string | undefined): Promise<PublishedSnapshotResponse> {
     if (!isLinkTokenFormat(token)) throw unavailable();
     const now = this.clock();
     try {
       return await this.dataSource.transaction('REPEATABLE READ', async (manager) => {
         await manager.query('SET TRANSACTION READ ONLY');
         const access = await this.access.resolveForRecipientIn(manager, token, grant ?? null, now);
-        return this.access.readSnapshotIn(manager, access.publicationId);
+        return snapshotResponse(await this.access.readSnapshotIn(manager, access.publicationId));
       });
     } catch (error) {
       throw toApiError(error);

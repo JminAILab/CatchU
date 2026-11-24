@@ -75,6 +75,7 @@ Catch 상세 모달은 위에서부터 작업 사실·나의 기여 → 근거 �
 | 저장소 필터 | B의 제안은 `repositoryId`. 비어 있으면 전체, 값은 저장소 식별자다. 미리보기에서 이 이름으로 구현한다. |
 | 공개 상태 필터 | `visibility`. 비어 있으면 전체, 값은 Catch 응답의 `PUBLIC`·`PRIVATE`다. API 목록 조회에 보내지 않고 불러온 목록 안에서 거른다([#454](https://github.com/JminAILab/CatchU/issues/454)). |
 | 작성자 설명 필터 | `authorDescription`. 비어 있거나 모르는 값이면 전체, 값은 `written`·`unwritten`이다. 저장소처럼 목록 조회 조건으로 보내 서버에서 거르고(api C1), 커서도 이 조건에 묶인다(새 Catch NC3부터 `v: 3`, 화면은 커서를 읽지 않고 받은 글을 그대로 보낸다). 응답의 `hasAuthorDescription`이 조건과 맞지 않으면 조회 실패로 본다. 상세에서 설명을 저장해도 지금 쪽은 다시 부르지 않는다(BR5.6). [이 저장소 Catch 보기]는 공개 상태처럼 전체로 되돌린다(막 분석한 Catch는 설명이 없어 「씀」에 가려진다). |
+| 담을 수 있는 Catch만 | `catch-api.ts`의 걸러 보기 `publishable: true`는 쿼리 `publishable=true`를 보낸다(발행 프리셋 U2 BR5.1). 프리셋 편집 화면만 켜고 내 자산 화면은 켜지 않아, 이 화면의 쿼리와 커서는 지금 그대로다. 켰을 때 응답에 공개·확인됨·보호 아님이 아닌 Catch가 있으면 조회 실패로 본다. 주소 쿼리로는 받지 않는다. |
 | 상세 팝업 | B의 제안은 `catchId`. 닫으면 해당 파라미터만 제거하며 필터를 유지한다. |
 | 자산 종류 탭 | 두지 않는다(#416 팀장 요청, 2026-11-03). 예전 주소의 `tab`은 무시한다. 텍스트 자료는 `/materials`다. |
 | 저장소 연결 관리 | 제품 페이지는 `AssetsConnected.repositoryManagement`에 [#153](https://github.com/JminAILab/CatchU/issues/153)의 D 모달을 넣는다. 독립 미리보기의 자리 안내와 구분한다. |

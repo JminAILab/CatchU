@@ -15,6 +15,7 @@
 | [`ai-dlc-input-december/`](ai-dlc-input-december/README.md) | 12월 intent의 입력 — 12월 범위 보완과 요구사항 재승인 입력 | **입력** · 지금 기준 아님 |
 | [`ai-dlc-input-catch/`](ai-dlc-input-catch/README.md) | Catch 개편·새 Catch intent의 입력 | **입력** · 지금 기준 아님 |
 | [`ai-dlc-input-reorg/`](ai-dlc-input-reorg/README.md) | 문서 개편 intent의 입력 — 첫 화면과 AI 지침을 지금 기준으로 다시 묶는 팀장 결정 | **입력** · 지금 기준 아님 |
+| [`ai-dlc-input-preset/`](ai-dlc-input-preset/README.md) | 발행 프리셋 intent의 입력 — 발행 방식을 프리셋 등록으로 바꾸고 받은 사람 화면에서 탭으로 나눠 보이는 팀장 결정 | **입력** · 지금 기준 아님 |
 | [`verification/`](verification/u10-merge-final-2026-11-10.md) | U10(JD) PR 전 보완과 최신 통합 반영 뒤 로컬 검사 기록([보완](verification/u10-pr-fixes-2026-11-10.md) · [최종](verification/u10-merge-final-2026-11-10.md)) | **기록** (11-10) · 로컬 검사이며 개발 서버 확인이나 원격 CI 통과를 뜻하지 않음, 소급 수정하지 않음 |
 | [web 모의 시연 팀원 착수 안내](web-mock-demo/README.md) | 9/30 합성 시연의 승인 계획·검사 지침 공유본과 팀원별 첫 작업 | **기록** · 중단 (09-24 팀장 결정) · 09-21 승인 판본의 공유용 사본, 소급 수정하지 않음 |
 | [`CatchU_그라운드룰_2026-08-04.md`](CatchU_그라운드룰_2026-08-04.md) | 회의 운영·소통·작업 방식 등 팀이 합의한 운영 규칙 | 확정 (08-04) |

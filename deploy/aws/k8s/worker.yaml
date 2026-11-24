@@ -1,6 +1,6 @@
 # worker Deployment(#276). deploy.sh만 적용한다. 밑줄 두 개로 감싼 자리(이미지 digest·실행 수·커밋)를 채워서 쓴다.
 # 이 파일을 그대로 kubectl apply하면 실행 수 자리가 숫자가 아니어서 거부된다(운영 중인 판본을 자리표시 이미지로 덮지 않게).
-# 한 개만 띄우고(Recreate) 자동 확장은 두지 않는다. DB에는 붙지 않는다(DB 값을 주지 않고, NetworkPolicy가 5432를 막는다).
+# 실행 수는 deploy.sh의 worker_replicas다(#480, 각 worker는 한 번에 1건). Recreate로 옛 worker가 모두 내려간 뒤 새 worker를 띄우고 자동 확장은 두지 않는다. DB에는 붙지 않는다(DB 값을 주지 않고, NetworkPolicy가 5432를 막는다).
 # PDF 글 추출은 api가 S3 버킷에 올린 원본을 읽기만 한다. AWS 권한은 서비스 계정 worker에 붙인 읽기 전용 역할로 받는다(cluster.yaml).
 # 값의 뜻은 worker/docs/queue-consumer.md·request-context.md. 비밀값은 Secret catchu-worker에서 받는다(deploy/aws/k8s/README.md 「Secret과 ConfigMap」).
 # api 요청 정보 조회는 클러스터 안 서비스 주소를 http로 부른다(10/15 결정). 그 조건인 기본 차단 NetworkPolicy·Pod 보안 검사
@@ -55,7 +55,7 @@ spec:
               value: http://api.catchu.svc.cluster.local:3001
             - name: WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP
               value: "true"
-            # PDF 글 추출의 원본 읽기 경로(worker/README.md 「PDF 글 추출 소비자」). api의 FILE_STORAGE_S3_BUCKET과 같은 버킷이다.
+            # PDF 글 추출의 원본 읽기 경로(worker/docs/pdf-extraction.md 「설정」). api의 FILE_STORAGE_S3_BUCKET과 같은 버킷이다.
             # 이 값이 없으면 PDF 추출 소비자가 뜨지 않아, 올린 PDF가 10분 뒤 실패로 보인다. 지역은 boto3가 읽는 값이다.
             - name: FILE_STORAGE_S3_BUCKET
               value: catchu-prod-files

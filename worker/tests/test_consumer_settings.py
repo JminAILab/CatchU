@@ -2,6 +2,7 @@
 
 import logging
 import pickle
+import socket
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,7 @@ from app.consumer.settings import (
     QueueUrl,
     SettingsError,
     queue_connection,
+    queue_keepalive_options,
 )
 
 SECRET = "s3cr3t-queue-password"
@@ -479,11 +481,19 @@ def test_judgement_key_reaches_the_child_but_not_repr_or_environment(
         ("redis://user@127.0.0.1:1/0", "user", None),
     ],
 )
-def test_queue_connection_equals_url_connection_plus_socket_limits(
+def test_queue_connection_equals_url_connection_plus_socket_limits_and_keepalive(
     url: str, user: str | None, password: str | None
 ) -> None:
-    """주소를 풀어 넘겨도 주소 문자열로 만든 접속과 같고(주소·계정·DB 번호·TLS 검증), 소켓 상한만 더한다."""
-    options = queue_connection(QueueUrl(url), Limits(queue_socket=7, queue_connect=3))
+    """주소를 풀어 넘겨도 주소 문자열로 만든 접속과 같고(주소·계정·DB 번호·TLS 검증), 소켓 상한과 keepalive만
+    더한다."""
+    limits = Limits(
+        queue_socket=7,
+        queue_connect=3,
+        queue_keepalive_idle=11,
+        queue_keepalive_interval=2,
+        queue_keepalive_count=4,
+    )
+    options = queue_connection(QueueUrl(url), limits)
     # redis-py의 make_connection에는 형식 정보가 없어 Any로 받은 풀에서 부른다.
     url_pool: Any = redis_asyncio.from_url(url).connection_pool
     built_pool: Any = redis_asyncio.Redis(**options).connection_pool
@@ -503,6 +513,25 @@ def test_queue_connection_equals_url_connection_plus_socket_limits(
     # 주소 문자열로 만든 접속에는 소켓 상한이 없다. 큐 노드가 조용히 사라지면 응답을 끝없이 기다린다.
     assert (by_url.socket_timeout, by_url.socket_connect_timeout) == (None, None)
     assert (built.socket_timeout, built.socket_connect_timeout) == (7, 3)
+    # keepalive도 없다. 쉬던 접속이 큐 장애 조치로 조용히 죽으면 그 뒤 첫 쓰기가 응답을 기다리다 잘린다.
+    assert (by_url.socket_keepalive, by_url.socket_keepalive_options) == (False, {})
+    assert built.socket_keepalive is True
+    assert built.socket_keepalive_options == queue_keepalive_options(limits)
+
+
+def test_queue_keepalive_sets_idle_interval_and_count_on_this_platform() -> None:
+    """유휴·간격·횟수 세 값이 이 플랫폼의 상수로 모두 들어간다. 하나라도 빠지면 그 값은 커널 기본값(리눅스는 유휴
+    2시간)이 걸려, 쉬던 접속이 죽은 것을 장애 뒤 첫 쓰기 전에 알아채지 못한다. macOS는 유휴 상수 이름이 다르다."""
+    limits = Limits(
+        queue_keepalive_idle=11, queue_keepalive_interval=2, queue_keepalive_count=4
+    )
+    idle = getattr(socket, "TCP_KEEPIDLE", None) or getattr(
+        socket, "TCP_KEEPALIVE", None
+    )
+    interval = getattr(socket, "TCP_KEEPINTVL", None)
+    count = getattr(socket, "TCP_KEEPCNT", None)
+    assert None not in (idle, interval, count)
+    assert queue_keepalive_options(limits) == {idle: 11, interval: 2, count: 4}
 
 
 def test_queue_socket_limit_is_longer_than_the_blocking_wait() -> None:

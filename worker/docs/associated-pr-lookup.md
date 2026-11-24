@@ -112,7 +112,7 @@ HTTP 200도 `errors`가 있으면 성공이 아니다. `errors`와 일부 `data`
 
 **PR이 많은 묶음의 크기.** PR 한 건의 응답은 본문 없이 약 0.7 KB이고 본문만큼 커진다(TheMe의 PR 2건은 합쳐 약 13 KB). 커밋 100개가 PR을 하나씩 가지면 본문 2,000자일 때 약 0.3 MB(한글이면 0.7 MB), 10,000자 한글이면 약 3 MB로 10 MB 안이다. GitHub 본문 최대 길이(65,536자)의 한글 본문 PR이 한 묶음에 53건쯤 모이면 10 MB를 넘어 그 묶음 전체가 `LIMITED`가 된다. 이 크기는 합성 계산이고, PR이 많은 묶음의 처리 시간 여유는 실측하지 않았다(미검증).
 
-**자격정보 전제.** 일반 사용자 토큰의 기본 한도는 REST 시간당 5,000회, GraphQL 시간당 5,000점이고 둘은 따로 센다. GitHub App 설치 토큰은 저장소·사용자 수에 따라 5,000에서 12,500까지다([REST 한도](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), [GraphQL 한도](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api), 2026-10-12 확인). 요청 하나는 REST 한도의 최대 6%(300회)와 GraphQL 점수 10점 안팎(본인 커밋 500건이면 5~6점)을 쓴다. 분 단위 2차 한도는 GraphQL 분당 2,000점, 동시 요청 100건이고 지금은 분석을 한 번에 하나만 한다. A가 줄 토큰([PR #254](https://github.com/JminAILab/CatchU/pull/254), 추가 권한 없는 만료형 사용자 토큰 방향)이 사용자 토큰이 아니거나 이 쿼리를 실행할 수 없거나 한도가 다르면 이 계산을 다시 본다. 담당자 측정용 토큰의 성공은 A가 줄 토큰으로 된다는 증거가 아니다.
+**자격정보 전제.** 일반 사용자 토큰의 기본 한도는 REST 시간당 5,000회, GraphQL 시간당 5,000점이고 둘은 따로 센다. GitHub App 설치 토큰은 저장소·사용자 수에 따라 5,000에서 12,500까지다([REST 한도](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), [GraphQL 한도](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api), 2026-10-12 확인). 요청 하나는 REST 한도의 최대 6%(300회)와 GraphQL 점수 10점 안팎(본인 커밋 500건이면 5~6점)을 쓴다. 분 단위 2차 한도는 GraphQL 분당 2,000점, 동시 요청 100건이다. 한도는 회원 토큰마다 세고, 한 회원의 분석은 보통 한 번에 하나다(api가 진행 중 분석을 1건으로 막는다. 처리 시한으로 닫힌 분석이 아직 도는 사이 다시 요청하면 둘). A가 줄 토큰([PR #254](https://github.com/JminAILab/CatchU/pull/254), 추가 권한 없는 만료형 사용자 토큰 방향)이 사용자 토큰이 아니거나 이 쿼리를 실행할 수 없거나 한도가 다르면 이 계산을 다시 본다. 담당자 측정용 토큰의 성공은 A가 줄 토큰으로 된다는 증거가 아니다.
 
 ## 한계
 

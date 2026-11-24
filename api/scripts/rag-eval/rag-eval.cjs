@@ -111,6 +111,8 @@ function createSyntheticGate() {
   };
 }
 
+const SAMPLE_PRESET = Object.freeze({ presetOrdinal: 1, presetName: '합성 프리셋', isFirstCopy: true });
+
 /** 내장 합성 발행본(공개 가능한 합성 글). synthetic 입력에 snapshot이 없을 때 쓴다. */
 function sampleInput() {
   const catchId = '00000000-0000-4000-8000-000000000001';
@@ -120,13 +122,14 @@ function sampleInput() {
     snapshot: {
       title: '합성 발행본', publishedAt: '2026-11-01T00:00:00.000Z', expiresAt: '2027-01-30T00:00:00.000Z',
       items: [
-        { publishedItemId: catchId, position: 1, itemKind: 'CATCH', title: '합성 Catch', pdfPages: null, snapshot: {
+        // 발행 프리셋 U1의 사본 칸 셋(C-10, NFR2.12). 겹친 사본이 없으므로 모두 앞선 사본이다.
+        { publishedItemId: catchId, position: 1, itemKind: 'CATCH', title: '합성 Catch', pdfPages: null, ...SAMPLE_PRESET, snapshot: {
           workFacts: ['로그인 오류 문구를 한 파일로 모았다.', '네트워크 오류일 때 다시 시도 버튼을 보이게 했다.'],
           subjectContribution: '문구 목록 파일을 만들고 화면 세 곳이 그 파일을 쓰게 바꿨다.',
           evidence: [{ sourceUrl: 'https://github.com/synthetic-owner/synthetic-repo/pull/41', sourceRevision: 'abc1234',
             representedFacts: ['PR #41에서 messages.ts를 더했다.'] }],
           authorDescription: '문구가 화면마다 달라 사용자가 헷갈렸고 한곳에 모아 고쳤다.', aiDraft: '합성 초안', mismatch: false } },
-        { publishedItemId: textId, position: 2, itemKind: 'TEXT_MATERIAL', title: '합성 자료', pdfPages: null,
+        { publishedItemId: textId, position: 2, itemKind: 'TEXT_MATERIAL', title: '합성 자료', pdfPages: null, ...SAMPLE_PRESET,
           snapshot: { body: '배포는 개발 서버에 먼저 올리고 확인한 뒤 운영에 올린다.\n\n장애 기록: 큐가 멈춘 날 원인을 적었다.' } },
       ],
     },

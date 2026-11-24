@@ -9,7 +9,7 @@ import { CopyUrlButton, OpenLinkAnchor } from "./publication-link-actions";
 import { FIXED_COPY_NOTICE, PUBLICATION_STATE_LABELS, SOURCE_PRIVATE_NOTICE, formatKst, passwordText } from "./publication-format";
 import type { PublicationDetail, PublicationState } from "./publications-api";
 import type { PdfCopySource } from "./published-pdf-item";
-import { PublishedSnapshotView, type SnapshotHighlight } from "./snapshot-view";
+import { PublishedSnapshotView, type SnapshotHighlight, type TabNotice } from "./snapshot-view";
 import styles from "./publications.module.css";
 
 export type PublicationDetailViewProps = {
@@ -26,6 +26,10 @@ export type PublicationDetailViewProps = {
   showEvidence: (location: EvidenceLocation) => void;
   /** PDF 항목의 작성자 사본 요청(U8 W4). 중지·만료 뒤에도 열린다. */
   pdfSource?: (publishedItemId: string) => PdfCopySource;
+  /** 발행본 자료의 열린 프리셋 탭·바꾸기·출처 이동 알림(발행 프리셋 U3 M6, `useSnapshotJump`). 없으면 첫 탭이다. */
+  activePreset?: number | null;
+  onPresetChange?: (ordinal: number) => void;
+  tabNotice?: TabNotice | null;
 };
 
 function stateText(state: PublicationState, stoppedAt: string | null): string {
@@ -85,7 +89,9 @@ export function PublicationDetailView(props: PublicationDetailViewProps) {
         <BaseSummaryPanel key={detail.publicationId} publicationId={detail.publicationId} showEvidence={props.showEvidence}
           itemTitleOf={itemTitleFinder(detail.snapshot.items)} />
       </div>
-      <PublishedSnapshotView snapshot={detail.snapshot} highlight={props.highlight} pdfSource={props.pdfSource} />
+      {/* 발행본 자료는 받은 사람 화면과 같은 프리셋 탭으로 보인다(발행 프리셋 U3 M6). 요약이 위, 자료가 아래인 순서는 그대로다. */}
+      <PublishedSnapshotView snapshot={detail.snapshot} highlight={props.highlight} pdfSource={props.pdfSource}
+        activePreset={props.activePreset} onPresetChange={props.onPresetChange} tabNotice={props.tabNotice} />
     </article>
   );
 }

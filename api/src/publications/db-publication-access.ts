@@ -12,7 +12,9 @@ import {
 import { publicationState } from './publication-state';
 import { Clock, PUBLICATIONS_CLOCK } from './publications-config';
 import { isUuid } from './publish-input';
-import { ItemSnapshot, PublishedItemKind, PublishedPdfPage, PublishedSnapshot, PublishedSnapshotItem } from './published-snapshot';
+import {
+  ItemSnapshot, PublishedItemKind, PublishedPdfPage, PublishedSnapshot, PublishedSnapshotItem, markFirstCopies,
+} from './published-snapshot';
 
 /** publication 한 행. 토큰 원문(`linkTokenReference`)은 링크 주소를 만들 때만 쓰고 로그·오류·다른 응답 칸에 싣지 않는다(BR10.2). */
 export interface PublicationRow {
@@ -30,8 +32,12 @@ interface ItemRow {
   publishedItemId: string;
   position: number;
   itemKind: PublishedItemKind;
+  /** 앞선 사본 판정에만 쓰고 사본 객체에 싣지 않는다(BR4.5) */
+  sourceId: string;
   title: string;
   snapshot: ItemSnapshot;
+  presetOrdinal: number;
+  presetName: string;
 }
 
 interface PdfPageRow extends PublishedPdfPage {
@@ -157,6 +163,7 @@ export class DbPublicationAccess implements PublicationAccess {
    * 발행본 행이 없으면 빈 사본을 만들지 않고 NotFound로 실패한다(계약의 NotFound, #416 OQ-U4-NFR-5 결정 2026-11-04).
    * 상태(중지·만료·소유 회원)는 판정하지 않는다. 판정 뒤 커밋된 중지·만료는 다음 호출의 resolveForRecipient가 막는다.
    * PDF 항목(U8)이 있을 때만 쪽 사본 표를 읽는다. U4 항목의 pdfPages는 null이다.
+   * 발행 프리셋 U1(P-3·P-4): 프리셋 칸 둘을 싣고, item_kind·source_id로 markFirstCopies를 불러 isFirstCopy를 정한다. source_id는 싣지 않는다.
    */
   async readSnapshotIn(manager: EntityManager, publicationId: string): Promise<PublishedSnapshot> {
     if (!isUuid(publicationId)) throw new NotFound();
@@ -166,20 +173,25 @@ export class DbPublicationAccess implements PublicationAccess {
     const publication = rows[0];
     if (!publication) throw new NotFound();
     const items: ItemRow[] = await manager.query(`
-      SELECT published_item_id AS "publishedItemId", position, item_kind AS "itemKind", title, snapshot
+      SELECT published_item_id AS "publishedItemId", position, item_kind AS "itemKind", source_id AS "sourceId", title, snapshot,
+        preset_ordinal AS "presetOrdinal", preset_name AS "presetName"
       FROM published_item WHERE publication_id = $1 ORDER BY position ASC`, [id]);
     const pages = items.some((item) => item.itemKind === 'PDF_MATERIAL') ? await readPdfPages(manager, id) : new Map<string, PublishedPdfPage[]>();
+    const firstCopies = markFirstCopies(items);
     return {
       title: publication.title,
       publishedAt: new Date(publication.publishedAt),
       expiresAt: new Date(publication.expiresAt),
-      items: items.map((item): PublishedSnapshotItem => ({
+      items: items.map((item, index): PublishedSnapshotItem => ({
         publishedItemId: item.publishedItemId,
         position: item.position,
         itemKind: item.itemKind,
         title: item.title,
         snapshot: item.snapshot,
         pdfPages: item.itemKind === 'PDF_MATERIAL' ? pages.get(item.publishedItemId) ?? [] : null,
+        presetOrdinal: item.presetOrdinal,
+        presetName: item.presetName,
+        isFirstCopy: firstCopies[index],
       })),
     };
   }

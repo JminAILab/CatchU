@@ -15,6 +15,10 @@ export interface FakePublication {
   publishedAt: Date;
   expiresAt: Date;
   stoppedAt: Date | null;
+  /**
+   * DB 구현의 readSnapshot과 같은 칸의 사본 항목. 발행 프리셋 U1의 presetOrdinal·presetName·isFirstCopy도 시험이 정해 넣는다
+   * (DB 구현은 isFirstCopy를 markFirstCopies로 정한다, NFR 설계 검토 R-06).
+   */
   items: PublishedSnapshotItem[];
 }
 

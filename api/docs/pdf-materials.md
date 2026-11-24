@@ -1,6 +1,6 @@
 # PDF 자료 — 12월 U8
 
-작성 회원이 PDF를 올리면 worker가 쪽별 글을 뽑고, 추출이 끝난 PDF를 발행본에 넣어 받은 사람이 사본을 여는 기능의 api 쪽 안내다. 화면은 [web PDF 자료 안내](../../web/src/features/materials/README.md#pdf-자료-탭-u8)와 [받은 사람 화면 안내](../../web/src/features/recipient/README.md#pdf-항목과-사본-열람-u8), 추출 소비자는 [worker README 「PDF 글 추출 소비자」](../../worker/README.md#pdf-글-추출-소비자)에 있다.
+작성 회원이 PDF를 올리면 worker가 쪽별 글을 뽑고, 추출이 끝난 PDF를 발행본에 넣어 받은 사람이 사본을 여는 기능의 api 쪽 안내다. 화면은 [web PDF 자료 안내](../../web/src/features/materials/README.md#pdf-자료-탭-u8)와 [받은 사람 화면 안내](../../web/src/features/recipient/README.md#pdf-항목과-사본-열람-u8), 추출 소비자는 [worker 「PDF 글 추출 소비자」](../../worker/docs/pdf-extraction.md)에 있다.
 
 기준 문서: [U8 기능 명세](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/functional-spec.md) W1~W5, [업무 규칙](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/rules.md) BR1~BR7, [보안 설계](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/nfr-design/security-design.md), [관측 설계](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/nfr-design/observability-design.md), [계약 요약](../../aidlc/spaces/default/intents/260925-intent-12/inception/contract-design/contract-summary.md) C-05·C-10·C-12·C-16·C-17. 구현 기록은 [U8 코드 요약](../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/code-generation/code-summary.md)이다.
 
@@ -92,9 +92,9 @@
 
 `src/publications/pdf-publish.ts`를 U4 발행 서비스(`publish.service.ts`)가 부른다. 발행 API 전체는 [발행본 문서](publications.md#발행-api-제출-2)에 있고, 여기에는 PDF가 더하는 것만 적는다.
 
-- `POST /v1/publications`의 `items[].kind`에 `PDF_MATERIAL`을 받는다. 항목 수·중복 규칙은 U4 그대로다.
-- 고른 PDF가 모두 `DONE`이어야 한다. 아니면 400 `VALIDATION_FAILED`이고 `details.violations`에 해당 위치마다 `{ field: "items[i].sourceId", reason: "extractionIncomplete" }`가 들어간다. 없거나 남의 것은 U4와 같은 404다.
-- 순서: 사전 확인(트랜잭션 밖) → 발행본·항목 ID 선생성 → `position` 순으로 원본을 사본 키에 복사 → 발행 트랜잭션 안에서 PDF를 다시 잠가 `DONE` 재확인·쪽 글 합계 계산·쪽 사본 행 복사 → 커밋.
+- 발행 프리셋 U1부터 PDF는 프리셋 항목(`kind: PDF_MATERIAL`)으로 담겨 발행된다([프리셋 문서](presets.md)). 같은 PDF가 두 프리셋에 있으면 편 항목도 둘이고, 사본 파일·쪽 사본도 항목마다 따로 만들며 쪽 글 합계도 두 번 더한다(BR3.7·BR3.4). 다시 잠그는 PDF ID는 중복을 없앤 집합이다.
+- 고른 PDF가 모두 `DONE`이어야 한다. 아니면 400 `VALIDATION_FAILED`이고 `details.violations`는 `[{ field: "presetIds", reason: "extractionIncomplete" }]`, `details.blockedSources`에 막힌 PDF가 든 프리셋마다 `{ presetId, kind: "PDF_MATERIAL", sourceId }` 한 줄이다(발행 프리셋 BR3.5, 옛 `items[i].sourceId` 위반은 없어짐). 남의 것은 U4와 같은 404다.
+- 순서: 사전 확인(트랜잭션 밖) → 발행본·항목 ID 선생성 → 편 항목 순으로 원본을 사본 키에 복사 → 발행 트랜잭션 안에서 PDF를 다시 잠가 `DONE` 재확인·쪽 글 합계 계산·쪽 사본 행 복사 → 커밋.
 - 복사가 하나라도 실패하면 그 발행본 접두어를 한 번 지우고 500이다. 트랜잭션이 실패해도 접두어를 한 번 지우고 원래 오류를 낸다. 접두어 정리 실패는 로그만 남긴다.
 - 쪽 글 합계는 발행본 전체 글 상한 60,000자에 들어간다.
 - PDF 항목이 없는 발행은 저장소를 부르지 않고 U4 흐름 그대로다.

@@ -6,7 +6,7 @@ import type { AiSource } from '../ai-generation/ai-generation.types';
 import type { PublishedSnapshot, PublishedSnapshotItem } from '../publications/publication-access';
 import type { ChunkHit } from '../published-index/published-search';
 import { QNA_ATTACH_PER_CATCH_LIMIT, QNA_ITEM_CONTEXT_MAX_LENGTH, QNA_SOURCE_TOTAL_LIMIT } from './rag-answer-config';
-import { buildSummarySources } from './summary-sources';
+import { buildSummarySources, firstCopyItems } from './summary-sources';
 
 export interface QnaSources {
   /** 모델에 보낼 근거. 검색으로 맞은 줄은 늘 들어 있고, 전체는 QNA_SOURCE_TOTAL_LIMIT 이하다. */
@@ -80,9 +80,13 @@ function secondWorkFact(item: PublishedSnapshotItem): string | null {
   return typeof line === 'string' ? sanitizeItemContextLine(line) : null;
 }
 
-/** 발행 항목마다 머리글(itemContext). 표 글자는 position 순서로 매기고, 둘째 줄이 같은 Catch끼리는 표 글자를 붙여 가른다. */
+/**
+ * 발행 항목마다 머리글(itemContext). 표 글자는 position 순서로 매기고, 둘째 줄이 같은 Catch끼리는 표 글자를 붙여 가른다.
+ * 앞선 사본만 센다(발행 프리셋 BR4.3): 겹친 사본은 머리글이 없고, 표 글자를 건너뛰지 않으며, 둘째 줄의 같은 작업 수에 들지 않는다.
+ * 겹친 사본이 없으면 지금과 글자까지 같다. 프리셋 이름은 넣지 않는다(ADR-007, NFR4.4).
+ */
 export function buildItemContexts(snapshot: PublishedSnapshot): Map<string, string> {
-  const items = [...snapshot.items].sort((a, b) => a.position - b.position);
+  const items = firstCopyItems(snapshot);
   const seconds = new Map(items.map((item) => [item.publishedItemId, secondWorkFact(item)]));
   const counts = new Map<string, number>();
   for (const second of seconds.values()) if (second !== null) counts.set(second, (counts.get(second) ?? 0) + 1);

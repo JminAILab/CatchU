@@ -98,7 +98,7 @@
 
 ### 2.3 자원·시간 상한
 
-상한은 [#424의 2026-11-01 결정](https://github.com/JminAILab/CatchU/issues/424)과 [#450의 11-14 실측·결정](https://github.com/JminAILab/CatchU/issues/450#issuecomment-6858511860)으로 정했다. 이곳의 예전 제안 수치 표는 현재 안내에서 제거했다. 현재 수집 값은 [GitHub 수집 상한](../worker/docs/github-collection.md), 전체 처리 시한·생성 상한은 [U7 분석](../worker/docs/repository-analysis-u7.md)을 따른다. 동시 실행 수의 후속 판단은 [#480](https://github.com/JminAILab/CatchU/issues/480)에서 다룬다.
+상한은 [#424의 2026-11-01 결정](https://github.com/JminAILab/CatchU/issues/424)과 [#450의 11-14 실측·결정](https://github.com/JminAILab/CatchU/issues/450#issuecomment-6858511860)으로 정했다. 이곳의 예전 제안 수치 표는 현재 안내에서 제거했다. 현재 수집 값은 [GitHub 수집 상한](../worker/docs/github-collection.md), 전체 처리 시한·생성 상한은 [U7 분석](../worker/docs/repository-analysis-u7.md)을 따른다. 동시 실행은 [#480](https://github.com/JminAILab/CatchU/issues/480) 결정에 따라 EKS worker 3개이며, 각 worker의 동시 수는 1이다.
 
 GitHub 호출 수는 실패를 포함한 실제 HTTP 요청 수다. REST 요청 1회와 GraphQL 묶음 요청 1회를 각각 1회로 더하고, GraphQL 점수는 별도 기록한다. 자동 외부 재시도·실패 묶음 분할·REST 대체 호출은 하지 않는다.
 

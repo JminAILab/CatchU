@@ -326,6 +326,8 @@ test("삭제: 확인 창에서 머무르면 요청하지 않고, 204일 때만 �
   await kept.remove(ID);
   assert.deepEqual(cancel.state.confirms, [PDF_DELETE_CONFIRM]);
   assert.match(PDF_DELETE_CONFIRM, /이미 발행한 사본은 그대로 남고/);
+  // 발행 프리셋 U3 BR5.2(AC4.1.4): 지금 문장 끝에 프리셋 말을 더한다.
+  assert.equal(PDF_DELETE_CONFIRM, "이 PDF를 삭제할까요? 이미 발행한 사본은 그대로 남고, 삭제한 PDF는 되살릴 수 없습니다. 프리셋에 담겨 있으면 거기서도 빠집니다.");
   assert.equal(staying.count("remove"), 0);
 
   const api = fakeApi({ list: [rows], remove: [failed("server"), ok(true)] });

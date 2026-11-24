@@ -89,7 +89,8 @@ const inOrder = (html, needles) => {
 
 const publication = () => ({
   title: "발행본 제목", publishedAt: "2026-11-05T03:04:05.000Z", expiresAt: "2027-02-03T03:04:05.000Z",
-  items: [{ publishedItemId: "m1", position: 1, itemKind: "TEXT_MATERIAL", title: "자료 m1", snapshot: { body: "본문 글" } }],
+  // 발행 프리셋 U3: 사본 항목마다 프리셋 칸(계약 P-3)이 있다.
+  items: [{ publishedItemId: "m1", position: 1, presetOrdinal: 1, presetName: "기본 프리셋", itemKind: "TEXT_MATERIAL", title: "자료 m1", snapshot: { body: "본문 글" } }],
 });
 const ok = () => ({ kind: "success", status: 200, data: publication() });
 const apiError = (status, code) => ({ kind: "api-error", status, code, message: "안내" });
@@ -358,7 +359,8 @@ const formHtml = (usePassword) => renderToStaticMarkup(createElement(PublishForm
   title: "제목", usePassword, password: "", disabled: false, statusLines: null, onTitle() {}, onUsePassword() {}, onPassword() {}, onNext() {},
 }));
 const confirmHtml = (usePassword) => renderToStaticMarkup(createElement(PublishConfirmView, {
-  items: [{ kind: "TEXT_MATERIAL", sourceId: "44444444-4444-4444-8444-444444444444", title: "자기소개", visibility: null }],
+  // 발행 프리셋 U2(BR4.5): 확인 단계는 고른 자료 대신 고른 프리셋과 순서를 받는다.
+  presets: [{ presetId: "44444444-4444-4444-8444-444444444444", name: "자기소개" }],
   title: "지원용", usePassword, submitting: false, lockSeconds: 0, statusLines: null, onBack() {}, onSubmit() {},
 }));
 

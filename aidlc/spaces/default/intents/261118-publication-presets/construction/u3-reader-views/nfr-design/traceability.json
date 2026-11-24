@@ -1,0 +1,19 @@
+{
+  "stage": "nfr-design",
+  "unit": "u3-reader-views",
+  "upstream_ids": ["NFR5.1","NFR5.2","NFR5.3","NFR5.4","NFR5.5","NFR1.2","NFR3.1","NFR3.2","NFR4.1","NFR4.2","NFR4.3","NFR1.1"],
+  "coverage": [
+    { "id": "NFR5.1", "status": "OK", "target": "performance-design 1·4: 탭 바꿈·출처 이동에 요청 0, 주입한 호출 함수 수로 시험" },
+    { "id": "NFR5.2", "status": "OK", "target": "performance-design 1·4: 패널 key=presetOrdinal, hidden만 바꿈, 브라우저 확인은 Build and Test" },
+    { "id": "NFR5.3", "status": "OK", "target": "performance-design 1·4: 열리지 않은 탭 PDF는 누를 때만 요청" },
+    { "id": "NFR5.4", "status": "OK", "target": "performance-design 1: 최대 20개, hidden은 낭독기·찾기에서 빠짐" },
+    { "id": "NFR5.5", "status": "OK", "target": "performance-design 1·4: 같은 순번이면 열린 탭 유지, 순수 함수 시험" },
+    { "id": "NFR1.2", "status": "OK", "target": "performance-design 2: 탭과 대상을 한 상태로 바꾸고 그려진 뒤 초점" },
+    { "id": "NFR3.1", "status": "OK", "target": "security-design 2: 이름은 React 글자로만, 알림 글도 글자 조각" },
+    { "id": "NFR3.2", "status": "OK", "target": "security-design 2: id는 idPrefix와 presetOrdinal" },
+    { "id": "NFR4.1", "status": "OK", "target": "security-design 1: pickItem이 두 칸만 더 옮김" },
+    { "id": "NFR4.2", "status": "OK", "target": "security-design 1: 정수 1~5와 빈 글자 아닌 이름, 어긋나면 조회 실패, 이름이 섞이면 첫 항목 이름" },
+    { "id": "NFR4.3", "status": "OK", "target": "security-design 5: 바뀐 파일 전부에서 이름·제목을 기록에 넘기지 않음" },
+    { "id": "NFR1.1", "status": "OK", "target": "security-design 3과 performance-design 3: 역할·키보드·패널 tabIndex 0·알림, 거절되면 초점 그대로" }
+  ]
+}

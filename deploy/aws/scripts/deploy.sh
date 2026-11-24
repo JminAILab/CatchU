@@ -7,7 +7,8 @@
 #   이미지: ECR 네 저장소에서 태그 main-<커밋 앞 12자>(main 자동 배포가 붙인 태그)의 digest를 찾아 digest로 띄운다.
 #   실행 파일: 그 커밋의 deploy/aws/k8s/{api,worker,web}.yaml·migration-pod.yaml·consent-guard-pod.yaml을 git에서 읽어 자리를 채운다.
 #     namespace·NetworkPolicy·Service·Ingress는 적용하지 않는다(바뀔 때 손으로 적용한다).
-#   같은 판본·구성이 이미 정상으로 돌고 있으면 아무것도 바꾸지 않는다.
+#   실행 수: api·web은 1개, worker는 아래 worker_replicas만큼 띄운다. 배포할 커밋이 아니라 이 스크립트의 값을 쓴다.
+#   같은 판본·구성(실행 수 포함)이 이미 정상으로 돌고 있으면 아무것도 바꾸지 않는다.
 #   --resume: api·worker가 0으로 멈춰 있을 때(지난 교체가 멈췄거나 손으로 멈춤) 원인을 확인한 뒤 이어서 교체할 때만 붙인다.
 #
 # 종료 코드(deploy/scripts/replace-single.sh와 같은 뜻):
@@ -35,7 +36,14 @@ poll=3                # 상태를 다시 보는 간격(초)
 stop_tries=30         # 옛 api·worker가 없어지기를 기다리는 횟수(3초 × 30 = 90초, 종료 유예 30초보다 넉넉히)
 migration_tries=220   # migration이 끝나기를 기다리는 횟수(3초 × 220 = 11분, Pod 자체 한도 10분보다 길게)
 guard_tries=120       # 동의 기록 삭제 권한 확인이 끝나기를 기다리는 횟수(3초 × 120 = 6분, Pod 자체 한도 5분보다 길게)
-rollout_timeout=360s  # 새 실행 하나가 준비되기를 기다리는 시간(worker 시작 확인 5분 포함)
+rollout_timeout=360s  # 새 Deployment 하나(그 Pod 모두)가 준비되기를 기다리는 시간(worker 시작 확인 5분 포함)
+# worker 실행 수(#480 2026-11-06 결정). 각 worker는 지금처럼 한 번에 분석 1건만 하므로 서비스 전체 동시 분석 수가 이 값이다.
+# api·web은 1개로 둔다. 로그인·GitHub 연결 시작 기록과 공유 링크 제한을 Pod 메모리에 두어 여러 개면 어긋난다.
+# 바꿀 때는 이 줄과 deploy.test.sh의 WORKER_REPLICAS를 함께 고치는 PR로 한다.
+worker_replicas=3
+replicas_of() { # 서비스 이름 → 실행 수
+  if [ "$1" = worker ]; then echo "$worker_replicas"; else echo 1; fi
+}
 
 commit=''
 resume=0
@@ -118,10 +126,11 @@ note "이미지 digest: web ${digest_web}, api ${digest_api}, migration ${digest
 # 실행 파일: 배포할 커밋의 파일에 자리를 채운다. 채우지 않은 자리가 남으면 멈춘다.
 migration_pod="catchu-migrate-${commit:0:12}"
 render() { # 파일 이미지 [Pod 이름]
-  local file=$1 image=$2 pod=${3:-} text
+  local file=$1 image=$2 pod=${3:-} text replicas
+  replicas=$(replicas_of "${file%.yaml}")
   text=$(git -C "$repo" show "${commit}:deploy/aws/k8s/${file}" 2> /dev/null) ||
     catchu_die "커밋 ${commit:0:12}에 deploy/aws/k8s/${file}가 없다"
-  text=$(printf '%s\n' "$text" | sed -e "s|__IMAGE__|${image}|g" -e "s|__REPLICAS__|1|g" -e "s|__COMMIT__|${commit}|g" -e "s|__NAME__|${pod}|g")
+  text=$(printf '%s\n' "$text" | sed -e "s|__IMAGE__|${image}|g" -e "s|__REPLICAS__|${replicas}|g" -e "s|__COMMIT__|${commit}|g" -e "s|__NAME__|${pod}|g")
   if printf '%s\n' "$text" | grep -q '__[A-Z][A-Z_]*__'; then
     catchu_die "deploy/aws/k8s/${file}에 채우지 않은 자리가 있다"
   fi
@@ -143,6 +152,7 @@ db_config=$(k get configmap catchu-db -o json) ||
 db_host=$(jq -r 'if (.data.DB_HOST // "") != "" and (.data["ca.pem"] // "") != "" then .data.DB_HOST else "" end' <<< "$db_config")
 [ -n "$db_host" ] || catchu_die "ConfigMap catchu-db에 DB_HOST·ca.pem 값이 없다"
 note "대상: 클러스터 ${CATCHU_CLUSTER}, namespace ${namespace}, DB ${db_host}"
+note "실행 수: api $(replicas_of api), worker $(replicas_of worker), web $(replicas_of web)"
 
 deployments=$(k get deployment api worker web --ignore-not-found -o json) || catchu_die "Deployment를 조회하지 못했다"
 [ -n "$deployments" ] || deployments='{"items":[]}'
@@ -153,9 +163,11 @@ if [ -n "$stopped" ] && [ "$resume" = 0 ]; then
 fi
 
 # 같은 판본·구성이 정상으로 돌고 있으면 바꾸지 않는다. kubectl diff: 0 같음, 1 다름, 그 밖은 비교 실패.
-healthy() { # Deployment 조회 결과(JSON)에서 api·worker·web이 모두 1개 실행·준비·최신인지
-  jq -e "[${items} | select(.spec.replicas == 1 and .status.readyReplicas == 1 and .status.availableReplicas == 1
-    and .status.updatedReplicas == 1 and (.status.unavailableReplicas // 0) == 0
+healthy() { # Deployment 조회 결과(JSON)에서 api·worker·web이 모두 정한 실행 수만큼 실행·준비·최신인지
+  jq -e --argjson api "$(replicas_of api)" --argjson worker "$(replicas_of worker)" --argjson web "$(replicas_of web)" \
+    "[${items} | ({api: \$api, worker: \$worker, web: \$web}[.metadata.name]) as \$r
+    | select(\$r != null and .spec.replicas == \$r and .status.readyReplicas == \$r and .status.availableReplicas == \$r
+    and .status.updatedReplicas == \$r and (.status.unavailableReplicas // 0) == 0
     and .status.observedGeneration == .metadata.generation) | .metadata.name] | sort == [\"api\", \"web\", \"worker\"]" > /dev/null
 }
 same=1
@@ -368,7 +380,8 @@ for name in api worker web; do
   note "${name} 준비"
 done
 final=$(k get deployment api worker web -o json) || start_failed "세 서비스의 상태를 조회하지 못했다"
-healthy <<< "$final" || start_failed "세 서비스가 모두 1개 실행·준비 상태가 아니다"
+healthy <<< "$final" ||
+  start_failed "세 서비스가 정한 실행 수(api $(replicas_of api), worker $(replicas_of worker), web $(replicas_of web))만큼 실행·준비 상태가 아니다"
 
 note "교체 완료"
 printf '교체 기록(커밋 %s)\n%s' "$commit" "$record" >&2

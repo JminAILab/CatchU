@@ -30,13 +30,16 @@ export const PUBLISH_RATE_LIMIT: RateLimitOptions = Object.freeze({ maxRequests:
  */
 export const SNAPSHOT_TEXT_TOTAL_MAX = 60_000;
 
-/** 발행 요청 검증 상한(BR4.1·BR4.5, 10월 링크 제목·비밀번호 규칙 그대로). 길이는 유니코드 코드 포인트로 센다. */
+/**
+ * 발행 요청 검증 상한(BR4.1·BR4.5, 10월 링크 제목·비밀번호 규칙 그대로). 길이는 유니코드 코드 포인트로 센다.
+ * 발행 프리셋 U1: 요청은 프리셋 ID 1~5개이고(BR3.1), 항목 수 상한 20은 프리셋을 편 항목 모두로 센다(BR3.4). itemsMin은 쓰지 않는다
+ * (빈 프리셋은 따로 거부하고, 1개 이상의 프리셋이 모두 비지 않았으면 항목은 1개 이상이다).
+ */
 export const PUBLICATION_LIMITS = Object.freeze({
-  titleMax: 50, passwordMin: 8, passwordMax: 64, itemsMin: 1, itemsMax: 20,
+  titleMax: 50, passwordMin: 8, passwordMax: 64, itemsMax: 20, presetIdsMin: 1, presetIdsMax: 5,
 });
 
 /** 작성자 목록 쪽 크기(10월 목록 규칙, NFR4.11). */
 export const PUBLICATION_PAGE = Object.freeze({ defaultLimit: 20, maxLimit: 100 });
 
-/** Catch 제목이 없을 때의 사본 제목(BR5.3, 10월 화면 표기). */
-export const UNTITLED_CATCH_TITLE = '제목 없는 Catch';
+// Catch 제목이 없을 때의 사본 제목(UNTITLED_CATCH_TITLE)은 프리셋 경로와 함께 쓰려고 src/publishable-source/source-content.ts로 옮겼다.

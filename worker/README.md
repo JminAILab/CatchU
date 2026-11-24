@@ -167,47 +167,17 @@ uv run --locked python -m app.processing succeeded-one-candidate
 
 - **큐 자료가 사라지면 같은 시도가 한 번 더 실행될 수 있다.** 큐 서버가 자료 없이 다시 뜨면 api가 대기 시도를 다시 넣고, worker는 그것을 새 작업으로 받는다. 분석 비용이 한 번 더 든다.
 - **큐 서버 장애 중에는** 60분 상한의 실패 기록, 25초 안의 정상 종료(실패 기록 포함), 진행 알림·결과 전송을 보장하지 못한다. 상한·종료 자체는 지키지만(자식을 끝내고 프로세스를 끝낸다) 그 사실이 큐에 남지 않을 수 있다. 장애 중 잠금이 끝나면 큐는 그 작업을 실패로 보지만, 자식은 끝까지 돌아 결과를 보낼 수 있다.
-- **부모 프로세스가 죽은 작업**(강제 종료·노드 장애)은 소비자가 다시 떠서 정체 검사를 돌아야 큐에 실패로 남는다. 다시 실행하지는 않는다(정체 복구 0회). 그 사이 E의 요청은 대기·실행 중으로 보이다 처리 시한에 닫힌다.
-- **소비자 둘이 겹치면 동시 1건이 깨진다.** 교체 중 새 worker가 뜨기 전에 옛 worker가 내려가야 한다(실행 설정은 [#275](https://github.com/JminAILab/CatchU/issues/275)). worker가 상한을 넘겨 멈춘 사이 재요청이 오면 분석이 두 번 돌 수 있다.
+- **부모 프로세스가 죽은 작업**(강제 종료·노드 장애)은 같은 큐를 받는 다른 worker나 다시 뜬 소비자가 정체 검사를 돌아야 큐에 실패로 남는다. 다시 실행하지는 않는다(정체 복구 0회). 그 사이 E의 요청은 대기·실행 중으로 보이다 처리 시한에 닫힌다.
+- **교체 중 옛·새 worker가 겹치면 정한 동시 수가 깨진다.** 동시 분석 수는 worker 실행 수(EKS 3, [#480](https://github.com/JminAILab/CatchU/issues/480))이고 worker마다 한 번에 1건이다. 교체 중에는 옛 worker가 모두 내려간 뒤 새 worker가 떠야 한다(`Recreate`). worker가 상한을 넘겨 멈춘 사이 재요청이 오면 분석이 동시에 두 번 돌 수 있다.
 - **자식을 강제로 끝내도 이미 보낸 LLM 요청은 취소되지 않는다.** 비용이 중복될 수 있다.
 - **결과를 보낸 뒤의 수신·반영.** 결과는 한 번 보내면 끝이고 보존하지 않는다. 수신 확인을 못 봤거나 E가 거부(`REJECTED`)해도 다시 보내거나 분석을 다시 하지 않고 기록만 한다. 수신 확인 `ACCEPTED`는 E가 받았다는 뜻이지 회원 화면 반영 완료가 아니다. E가 처리하지 않은 결과 작업은 큐에 남는다(큐의 보관 정리는 다른 작업이 끝날 때 돈다).
-- **종료 25초를 넘기면** 남은 자식과 프로세스를 SIGKILL로 끝낸다(종료 코드 137). 그때 분석 중이던 작업의 실패 기록은 남지 않을 수 있고, 다음 기동의 정체 검사가 실패로 남긴다.
+- **종료 25초를 넘기면** 남은 자식과 프로세스를 SIGKILL로 끝낸다(종료 코드 137). 그때 분석 중이던 작업의 실패 기록은 남지 않을 수 있고, 다른 worker나 다음 기동의 정체 검사가 실패로 남긴다.
 
 큐 장애가 끝난 뒤 새 요청을 받는 것은 이 범위가 아니다([#603](https://github.com/JminAILab/CatchU/issues/603)). worker는 스스로 다시 붙고, 처리 중인 작업이 없는데 5분 동안 큐에서 일을 가져오지 못하면 프로세스를 끝내 실행 환경이 다시 띄우게 한다([큐 접속이 끊겼다 돌아올 때](docs/queue-consumer.md#큐-접속이-끊겼다-돌아올-때)).
 
 ## PDF 글 추출 소비자
 
-12월 U8. 작성 회원이 올린 PDF에서 쪽별 글을 뽑아 api로 돌려준다. 분석 요청 큐 소비자와 **같은 프로세스**(`python -m app.consumer`)에서 둘째 Worker로 돌며, 아래 읽기 경로 설정이 없으면 띄우지 않는다. 큐·메시지 규격, 수신 판정, 확인 범위는 [api PDF 자료 문서](../api/docs/pdf-materials.md)에 있다. 2026-11-19 합성 PDF 두 벌로 실제 S3·큐·worker 흐름을 확인했으며, Compose 전체 스택 확인과 구분한다.
-
-작업마다 자식 프로세스 하나가 원본을 읽기만 하고 pypdf로 쪽 글을 뽑는다(OCR 없음, 글 없는 쪽은 `readable: false`). 결과는 한 번만 보내고, 거부되거나 수신 확인을 못 봐도 다시 보내거나 다시 추출하지 않는다.
-
-| 경우 | 결과 |
-|---|---|
-| 요청 봉투 모양 오류 | 결과 없이 작업 실패(`PDF_REQUEST_INVALID`) |
-| 파싱 실패, 쪽 수 0, 어느 한 쪽의 추출 예외 | `FAILED`/`UNREADABLE_FILE` |
-| 암호화된 PDF | `FAILED`/`ENCRYPTED` |
-| 51쪽 이상 | `FAILED`/`PAGE_LIMIT_EXCEEDED` |
-| 쪽 글 합계 60,000자 초과 | `FAILED`/`TEXT_LIMIT_EXCEEDED` |
-| 자식의 시간·메모리 제한 초과, 원인 모를 자식 종료 | `FAILED`/`UNREADABLE_FILE` |
-| 저장소 장애, 자식 코드 결함, 내부 결과 손상 | 결과 없이 작업 실패. 자료는 api의 10분 시한으로 실패가 된다 |
-
-상한 값은 api와 같은 값이며 `app/pdf_extraction/settings.py`에 있다. 한쪽만 바꾸지 않는다.
-
-### 설정
-
-설명은 `.env.example`에 있다. 큐 주소·접두사는 분석 소비자 설정을 함께 쓴다([docs/queue-consumer.md](docs/queue-consumer.md) 「설정」).
-
-| 이름 | 기본 | 내용 |
-|---|---|---|
-| `PDF_FILE_ROOT` | 없음 | 로컬·시험용 읽기 경로. api의 `FILE_STORAGE_LOCAL_ROOT`와 같은 폴더의 절대 경로 |
-| `FILE_STORAGE_S3_BUCKET` | 없음 | 배포용 읽기 경로. api와 같은 버킷 이름. 접근 키 없이 역할을 쓰고 지역은 `AWS_DEFAULT_REGION` |
-| `CATCHU_WORKER_PDF_CONCURRENCY` | 1 | 동시 추출 수. 지금은 1만 받는다 |
-| `CATCHU_WORKER_PDF_CHILD_TIMEOUT_SECONDS` | 120 | 자식의 총 시간(1~600) |
-| `CATCHU_WORKER_PDF_CHILD_MEMORY_MB` | 512 | 자식 메모리 제한(64~16384, Linux에서만 적용) |
-
-- 두 읽기 경로 가운데 하나만 넣는다. 둘 다 넣거나, 읽기 경로 없이 나머지 값만 넣으면 기동하지 않는다.
-- 떴는지는 기동 로그의 `pdf=enabled(concurrency=1)`로 확인한다.
-- 시험: `uv run --locked pytest tests/test_pdf_extraction.py tests/test_pdf_consumer.py tests/test_pdf_service.py`. 로컬 합성 구성의 파일 볼륨 쓰는 법은 [deploy/compose.local-db.yaml](../deploy/compose.local-db.yaml)의 주석에 있다.
+[docs/pdf-extraction.md](docs/pdf-extraction.md)에 있다(실패 사유·쪽 글 다듬기·설정). 12월 U8로, 작성 회원이 올린 PDF에서 쪽별 글을 뽑아 api로 돌려준다.
 
 ## 변경 후 검사
 

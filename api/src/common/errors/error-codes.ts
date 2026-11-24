@@ -45,6 +45,9 @@ export const ERROR_STATUS = {
   // U10 기능 설계: JD 경계만 422. 공용 ValidationPipe의 400은 유지한다.
   INVALID_INPUT: 422,
   INPUT_TOO_LARGE: 422,
+  // 발행 프리셋 intent U1(계약 P-1·P-2, 기능 설계 BR1.3·BR3.5). 회원당 프리셋 50개 상한, 비공개 Catch 발행 거부.
+  PRESET_LIMIT_REACHED: 409,
+  CATCH_PRIVATE: 409,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_STATUS;
@@ -95,4 +98,7 @@ export const DEFAULT_ERROR_MESSAGES: Record<ErrorCode, string> = {
   MCP_AUTHORIZATION_INVALID: '연결 요청을 확인할 수 없습니다. Claude에서 다시 시작해 주세요.',
   INVALID_INPUT: '입력값을 확인해 주세요.',
   INPUT_TOO_LARGE: '입력 길이와 요구사항 수를 줄여 주세요.',
+  // 발행 프리셋 U1 기능 설계 BR1.3·BR3.5가 문구를 정했다. 막힌 자료는 details.blockedSources로만 알린다.
+  PRESET_LIMIT_REACHED: '프리셋은 50개까지 만들 수 있습니다.',
+  CATCH_PRIVATE: '비공개 Catch는 발행할 수 없습니다.',
 };
