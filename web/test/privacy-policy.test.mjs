@@ -110,10 +110,11 @@ test("주소는 /privacy이고 문서 제목은 원문 제목이다", () => {
   assert.equal(metadata.title, source.split("\n")[0].replace(/^# /, ""));
 });
 
-test("첫 화면 바닥글에 /privacy로 가는 [개인정보 처리방침] 링크가 한 줄 있고 가상 예시 안내는 그대로다", () => {
+test("첫 화면 바닥글에 /privacy로 가는 [개인정보 처리방침] 링크가 하나 있고 가상 예시 안내는 그대로다", () => {
   const html = renderToStaticMarkup(createElement(LandingPage));
   const footer = /<footer[^>]*>(.*?)<\/footer>/.exec(html)?.[1] ?? "";
-  assert.match(footer, /<p><a href="\/privacy">개인정보 처리방침<\/a><\/p>/);
-  assert.ok(footer.includes("<p>화면의 작업·계정은 설명을 위한 가상 예시이며 실제 분석 결과가 아닙니다.</p>"));
+  // 2026-11-24 확정 디자인에서 바닥글이 메뉴 묶음으로 바뀌어 링크는 「정책」 목록의 한 항목이다.
+  assert.match(footer, /<li><a href="\/privacy">개인정보 처리방침<\/a><\/li>/);
+  assert.ok(footer.includes("<span>화면의 작업·계정은 설명을 위한 가상 예시이며 실제 분석 결과가 아닙니다.</span>"));
   assert.equal(html.split('href="/privacy"').length - 1, 1);
 });
