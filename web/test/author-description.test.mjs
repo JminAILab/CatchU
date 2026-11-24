@@ -1,16 +1,19 @@
-// U4 제출 1 — Catch 상세의 작성자 설명 편집(W1) 시험. 새 Catch NC1에서 8칸 편집·링크 목록·안내 문구로 바꿨다.
+// U4 제출 1 — Catch 상세의 작성자 설명 편집(W1) 시험. 새 Catch NC1에서 8칸 편집·링크 목록·안내 문구로 바꿨고,
+// #634에서 늘 보이는 칸 셋(칸마다 안내 한 줄)과 글이 저장된 옛 칸으로 줄이고 링크 목록을 없앴다.
 //
-// 먼저 정한 시나리오·기대 결과·실패 조건(U4 기능 명세 S1, BR1.3·BR2.1~BR2.3, NFR7, 새 Catch US1.1·US1.2·US2.1·US2.3·US3.1·US3.2, BR1.5·BR3·BR4.3~BR4.5).
+// 먼저 정한 시나리오·기대 결과·실패 조건(U4 기능 명세 S1, BR1.3·BR2.1~BR2.3, NFR7, 새 Catch US1.1·US1.2·US2.1·US3.1·US3.2, BR1.5·BR4.3~BR4.5, #634 완료 기준).
 // 세부 시험 코드는 구현 뒤 쓴다.
 //
 // - 기대: 상세는 기록에서 확인한 내용·Catch 설명 초안·생각해 볼 질문 아래에 작성자 설명을 둔다. AI 초안은 설명 입력칸에 들어가지 않는다.
-//         편집 칸은 칸 제목 8개가 보이는 label인 3줄 글칸이고, 「짚어 볼 곳」 아래 안내 네 가지, h4 「발행하면 면접관에게 열릴 링크」 목록, 칸 제목 포함 합계 글자 줄이 있다.
+//         설명이 없으면 편집 칸은 「이 작업에서 정한 것」·「어떻게 확인했고 무엇을 고쳤나」·「짚어 볼 곳」 셋이 이 순서로 보이는 label인 3줄 글칸이다.
+//         앞 두 칸 아래 안내 한 줄을 그 글칸이 설명으로 읽고, 「짚어 볼 곳」 아래 안내 네 가지(「위 근거」 없음), 칸 제목 포함 합계 글자 줄이 있다.
+//         글이 저장된 옛 칸은 원래 자리에 원래 제목으로 보인다. Tab 순서는 보이는 글칸 → [설명 저장]이다.
 //         저장 응답이 200이고 모양이 맞을 때만 "저장됨"을 보인다. 합친 글 4,000자(코드 포인트)까지 저장을 보내고, 4,001자는 보내지 않고 안내한다.
 //         저장하지 않은 입력이 있으면 이탈 경고 대상(dirty)이다. 저장에 성공하면 dirty가 풀린다.
 // - 실패 조건(입력 유지): 5xx·연결 끊김·400·성공 형식 오류는 "저장되지 않았습니다"와 이유를 보이고 입력을 지우지 않는다.
 //         401 AUTH_REQUIRED·AUTH_INVALID는 로그인 만료 안내를 함께 보이고 입력을 남긴다. 실패한 뒤에도 dirty다.
-// - 실패로 보는 것: 요청 접수만으로 "저장됨", 실패 때 입력이 사라짐, 초안이 설명칸을 채움, 조작 요소에 data-testid 없음, 링크 목록이 알림 영역이거나 API를 부름,
-//         관련 커밋을 넣는 단추·목록이 있음, 칸 글의 태그 꼴 글이 HTML로 해석됨.
+// - 실패로 보는 것: 요청 접수만으로 "저장됨", 실패 때 입력이 사라짐, 초안이 설명칸을 채움, 조작 요소에 data-testid 없음,
+//         관련 커밋을 넣는 단추·목록이 있음, 칸 글의 태그 꼴 글이 HTML로 해석됨, 「발행하면 면접관에게 열릴 링크」가 남음, 저장된 옛 칸이 숨음.
 //
 // 합성 응답과 서버 렌더링만 쓴다. 실제 브라우저·서버 연결 검증이 아니다.
 import assert from "node:assert/strict";
@@ -23,7 +26,7 @@ import ts from "typescript";
 import {
   applyDescriptionSave, authorDescriptionInputError, createAuthorDescriptionApi, isAuthorDescription, isDescriptionDirty,
 } from "../src/features/assets/author-description-api.ts";
-import { SECTION_TITLES, sectionTexts } from "../src/lib/author-description-sections.ts";
+import { EDIT_TITLES, SECTION_TITLES, sectionTexts } from "../src/lib/author-description-sections.ts";
 import { LOGIN_EXPIRED_TEXT, SAVE_FAILED_TEXT, SAVED_TEXT, editStatusLines } from "../src/lib/save-outcome.ts";
 import { previewCatches } from "../src/features/assets/fixtures.ts";
 
@@ -54,7 +57,7 @@ const hooks = registerHooks({
     return nextLoad(url, context);
   },
 });
-const { AuthorDescriptionPanel, POINT_HINTS } = await import(new URL("../src/features/assets/author-description-panel.tsx", import.meta.url).href);
+const { AuthorDescriptionPanel, FIELD_GUIDES, POINT_HINTS } = await import(new URL("../src/features/assets/author-description-panel.tsx", import.meta.url).href);
 const { AssetsView } = await import(new URL("../src/features/assets/assets-view.tsx", import.meta.url).href);
 hooks.deregister();
 
@@ -62,7 +65,7 @@ const UPDATED_AT = "2026-10-29T01:02:03.456Z";
 const success = (data, status = 200) => ({ kind: "success", status, data });
 const apiError = (status, code) => ({ kind: "api-error", status, code, message: "합성 메시지" });
 const texts = (patch = {}) => ({ ...sectionTexts(null), ...patch });
-const EVIDENCE = ["https://github.com/o/r/commit/ba6bba8c0123456789abcdef0123456789abcdef"];
+const MERGED = "어떻게 확인했고 무엇을 고쳤나";
 
 function fakeMember(...responses) {
   const calls = [];
@@ -79,12 +82,13 @@ function fakeMember(...responses) {
 
 function panel(props) {
   return renderToStaticMarkup(createElement(AuthorDescriptionPanel, {
-    loadState: "ready", texts: texts(), status: { kind: "idle" }, dirty: false, evidenceUrls: EVIDENCE,
+    loadState: "ready", texts: texts(), savedTexts: texts(), status: { kind: "idle" }, dirty: false,
     onChange() {}, onSave() {}, onRetry() {}, ...props,
   }));
 }
 const textareas = (html) => [...html.matchAll(/<textarea([^>]*)>([\s\S]*?)<\/textarea>/g)].map((match) => ({ attrs: match[1], value: match[2] }));
 const attr = (attrs, name) => attrs.match(new RegExp(`${name}="([^"]*)"`))?.[1];
+const labelsOf = (html) => [...html.matchAll(/<label for="([^"]+)"[^>]*>([^<]+)<\/label>/g)].map((match) => ({ for: match[1], text: match[2] }));
 
 test("저장: 200과 맞는 모양일 때만 저장 성공이고, 경로·본문은 정한 그대로 보낸다", async () => {
   const value = { authorDescription: "  쓴 그대로  ", authorDescriptionUpdatedAt: UPDATED_AT };
@@ -124,7 +128,7 @@ test("저장 실패 구분: 로그인 만료·검증·없음·서버·연결 끊
   assert.deepEqual(await loaded.read("c"), { kind: "loaded", value: { authorDescription: null, authorDescriptionUpdatedAt: null } });
 });
 
-test("화면 값: 실패하면 8칸 입력을 그대로 두고 dirty가 남으며, 성공해야 저장됨이고 서버 값을 다시 나눠 공백 저장은 빈칸이 된다", () => {
+test("화면 값: 실패하면 칸 입력을 그대로 두고 dirty가 남으며, 성공해야 저장됨이고 서버 값을 다시 나눠 공백 저장은 빈칸이 된다", () => {
   const editing = { texts: texts({ "맡은 부분": "저장 전 입력" }), savedTexts: texts({ "더 쓰기": "예전 설명" }), status: { kind: "saving" } };
   assert.equal(isDescriptionDirty(editing), true);
   const failed = applyDescriptionSave(editing, { kind: "failed", failure: "server" });
@@ -154,24 +158,29 @@ test("길이 검사: 합친 글 4,000자(코드 포인트)는 보내고 4,001자
   assert.equal(isAuthorDescription({ authorDescription: "x", authorDescriptionUpdatedAt: "날짜 아님" }), false);
 });
 
-test("설명 영역: 조작 요소에 data-testid가 있고, 저장 중에는 8칸 모두와 버튼이 잠기며 실패 안내가 입력과 함께 보인다", () => {
-  const ready = panel({ texts: texts({ "더 쓰기": "쓰던 설명" }), dirty: true });
-  for (const id of ["catch-author-description", "catch-author-description-input", "catch-author-description-save", "catch-author-description-links"]) {
+test("설명 영역: 조작 요소에 data-testid가 있고, 저장 중에는 보이는 칸 모두와 버튼이 잠기며 실패 안내가 입력과 함께 보인다", () => {
+  const ready = panel({ texts: texts({ [MERGED]: "쓰던 설명" }), dirty: true });
+  for (const id of ["catch-author-description", "catch-author-description-input", "catch-author-description-save"]) {
     assert.ok(ready.includes(`data-testid="${id}"`), id);
   }
   assert.ok(ready.includes(">쓰던 설명</textarea>"));
   assert.ok(ready.includes("저장하지 않은 변경이 있습니다."));
   assert.ok(ready.includes("AI가 만든 「Catch 설명 초안」은 이 설명을 바꾸지 않습니다."));
 
-  const saving = panel({ texts: texts({ "더 쓰기": "쓰던 설명" }), status: { kind: "saving" }, dirty: true });
+  const saving = panel({ texts: texts({ [MERGED]: "쓰던 설명" }), savedTexts: texts({ "맡은 부분": "옛 칸 글" }), status: { kind: "saving" }, dirty: true });
   const savingFields = textareas(saving);
-  assert.equal(savingFields.length, 8);
-  assert.ok(savingFields.every((field) => /disabled=""/.test(field.attrs)), "저장 중에는 8칸 모두 쓸 수 없다(BR4.5)");
-  assert.match(saving, /<button[^>]*data-testid="catch-author-description-save"[^>]*disabled=""/);
+  assert.equal(savingFields.length, 4);
+  assert.ok(savingFields.every((field) => /disabled=""/.test(field.attrs)), "저장 중에는 보이는 칸 모두 쓸 수 없다(BR4.5)");
+  // #636 리뷰: 저장 단추는 `disabled`가 아니라 `aria-disabled`로 막아, 누른 단추에 초점이 남는다.
+  const saveButton = (html) => html.match(/<button[^>]*data-testid="catch-author-description-save"[^>]*>/)?.[0] ?? "";
+  assert.match(saveButton(saving), /aria-disabled="true"/);
+  assert.doesNotMatch(saveButton(saving), /\sdisabled=/, "저장 중에도 단추는 초점을 잃지 않는다");
+  assert.ok(saving.includes(">저장 중…</button>"));
   assert.doesNotMatch(saving, new RegExp(SAVED_TEXT + "<"));
   assert.ok(textareas(ready).every((field) => !/disabled/.test(field.attrs)));
+  assert.doesNotMatch(saveButton(ready), /disabled/);
 
-  const failed = panel({ texts: texts({ "더 쓰기": "쓰던 설명" }), status: { kind: "failed", failure: "login-expired" }, dirty: true });
+  const failed = panel({ texts: texts({ [MERGED]: "쓰던 설명" }), status: { kind: "failed", failure: "login-expired" }, dirty: true });
   assert.ok(failed.includes(">쓰던 설명</textarea>"));
   assert.ok(failed.includes(`<p>${SAVE_FAILED_TEXT}</p>`));
   assert.ok(failed.includes(LOGIN_EXPIRED_TEXT));
@@ -181,35 +190,80 @@ test("설명 영역: 조작 요소에 data-testid가 있고, 저장 중에는 8�
   assert.ok(error.includes('data-testid="catch-author-description-retry"'));
   assert.doesNotMatch(error, /<textarea/);
 
-  const script = panel({ texts: texts({ "맡은 부분": "<script>alert(1)</script>" }) });
+  const script = panel({ texts: texts({ "이 작업에서 정한 것": "<script>alert(1)</script>" }) });
   assert.ok(script.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
   assert.doesNotMatch(script, /<script>/);
 });
 
-test("AC1.1.4 칸 제목 8개가 위에서부터 각 글칸의 보이는 label이고 모두 펼쳐져 있으며 글칸은 3줄로 시작한다", () => {
+test("#634 설명이 없으면 글칸은 「이 작업에서 정한 것」·「어떻게 확인했고 무엇을 고쳤나」·「짚어 볼 곳」 셋만 이 순서로 보이는 label이고 3줄로 시작한다", () => {
   const html = panel({});
-  const labels = [...html.matchAll(/<label for="([^"]+)"[^>]*>([^<]+)<\/label>/g)].map((match) => ({ for: match[1], text: match[2] }));
-  assert.deepEqual(labels.map((label) => label.text), SECTION_TITLES);
+  const labels = labelsOf(html);
+  assert.deepEqual(labels.map((label) => label.text), ["이 작업에서 정한 것", "어떻게 확인했고 무엇을 고쳤나", "짚어 볼 곳"]);
   const fields = textareas(html);
-  assert.equal(fields.length, 8);
+  assert.equal(fields.length, 3);
   assert.deepEqual(fields.map((field) => attr(field.attrs, "id")), labels.map((label) => label.for));
-  assert.deepEqual(fields.map((field) => attr(field.attrs, "data-section")), SECTION_TITLES);
+  assert.deepEqual(fields.map((field) => attr(field.attrs, "data-section")), EDIT_TITLES);
   assert.ok(fields.every((field) => attr(field.attrs, "rows") === "3"));
   // 지금의 숨은 이름표 「작성자 설명」과 6줄 글칸, 접힌 칸은 없다.
   assert.doesNotMatch(html, /visually-hidden">작성자 설명|rows="6"|<details/);
 });
 
-test("BR4.5 공개 범위 안내는 첫 글칸이, 짚어 볼 곳 안내는 그 글칸이, 합계 글자 줄은 [설명 저장]이 aria-describedby로 가리킨다", () => {
+test("#634 앞 두 칸은 칸 제목과 글칸 사이에 정한 안내 한 줄이 보이고 「짚어 볼 곳」에는 칸 안내 줄이 없다", () => {
+  const html = panel({});
+  assert.deepEqual(FIELD_GUIDES, {
+    "이 작업에서 정한 것": "무엇이 문제였고 왜 이렇게 정했는지 적으세요. 버린 방법이나 팀에서 맡은 부분도 여기에 쓰면 됩니다.",
+    [MERGED]: "무엇으로 확인했고 결과는 어땠는지, AI가 낸 것 가운데 버리거나 고친 것이 있으면 함께 적으세요.",
+  });
+  const guides = [...html.matchAll(/<p id="[^"]+"[^>]*data-testid="catch-author-description-guide">([^<]*)<\/p>/g)].map((match) => match[1]);
+  assert.deepEqual(guides, [FIELD_GUIDES["이 작업에서 정한 것"], FIELD_GUIDES[MERGED]]);
+  for (const title of ["이 작업에서 정한 것", MERGED]) {
+    const label = html.indexOf(`>${title}</label>`);
+    const guide = html.indexOf(FIELD_GUIDES[title]);
+    const field = html.indexOf(`data-section="${title}"`);
+    assert.ok(label < guide && guide < field, `${title}: 칸 제목 → 안내 → 글칸`);
+  }
+});
+
+test("BR4.5·#634 첫 글칸은 공개 범위 안내와 자기 안내를, 둘째 글칸은 자기 안내를, 짚어 볼 곳은 그 안내를, [설명 저장]은 합계 줄을 aria-describedby로 가리킨다", () => {
   const html = panel({});
   const fields = textareas(html);
   const describedBy = fields.map((field) => attr(field.attrs, "aria-describedby"));
   const noticeId = html.match(/<p id="([^"]+)"[^>]*>이 글은 링크를 가진 누구나/)[1];
+  const guideIds = [...html.matchAll(/<p id="([^"]+)"[^>]*data-testid="catch-author-description-guide"/g)].map((match) => match[1]);
   const hintsId = html.match(/<ul id="([^"]+)"[^>]*data-testid="catch-author-description-hints"/)[1];
   const countId = html.match(/<p id="([^"]+)"[^>]*data-testid="catch-author-description-count"/)[1];
-  assert.equal(describedBy[0], noticeId);
-  assert.equal(describedBy[SECTION_TITLES.indexOf("짚어 볼 곳")], hintsId);
-  assert.equal(describedBy.filter(Boolean).length, 2);
+  assert.equal(guideIds.length, 2);
+  assert.deepEqual(describedBy, [`${noticeId} ${guideIds[0]}`, guideIds[1], hintsId]);
   assert.match(html, new RegExp(`<button[^>]*data-testid="catch-author-description-save"[^>]*aria-describedby="${countId}"`));
+  // 옛 칸은 안내 줄이 없어 가리키는 설명도 없다.
+  const old = textareas(panel({ savedTexts: texts({ "맡은 부분": "옛 글" }), texts: texts({ "맡은 부분": "옛 글" }) }));
+  assert.equal(attr(old.find((field) => attr(field.attrs, "data-section") === "맡은 부분").attrs, "aria-describedby"), undefined);
+});
+
+test("#634 Tab 순서는 세 글칸 → [설명 저장]이고 그 사이에 다른 조작 요소가 없다", () => {
+  const html = panel({});
+  const form = html.slice(html.indexOf("<form"), html.indexOf("</form>"));
+  const focusables = [...form.matchAll(/<(textarea|button|a|input|select)\b[^>]*>/g)].map((match) => match[1] === "textarea" ? attr(match[0], "data-section") : match[1]);
+  assert.deepEqual(focusables, [...EDIT_TITLES, "button"]);
+  assert.doesNotMatch(form, /tabindex/);
+});
+
+test("#634 글이 저장된 옛 칸은 원래 자리에 원래 제목으로 보이고, 지우는 도중에도 남으며, 저장된 글이 비면 보이지 않는다", () => {
+  const saved = texts({ "맡은 부분": "로그인 화면", "AI가 낸 것 가운데 받아들이지 않았거나 고친 것": "고친 것", "더 쓰기": "덧붙임" });
+  const shown = labelsOf(panel({ texts: saved, savedTexts: saved })).map((label) => label.text);
+  assert.deepEqual(shown, ["이 작업에서 정한 것", "맡은 부분", "AI가 낸 것 가운데 받아들이지 않았거나 고친 것", MERGED, "짚어 볼 곳", "더 쓰기"]);
+  assert.deepEqual(shown, SECTION_TITLES.filter((title) => shown.includes(title)), "읽기 목록 순서 자리");
+  // 지우는 도중(지금 글은 비었지만 저장된 글은 있음)과 저장 실패 뒤에도 칸이 남는다.
+  const clearing = labelsOf(panel({ texts: { ...saved, "맡은 부분": "" }, savedTexts: saved, dirty: true })).map((label) => label.text);
+  assert.ok(clearing.includes("맡은 부분"));
+  // 비우고 저장에 성공하면(저장된 글도 비면) 보이지 않는다.
+  const cleared = { ...saved, "맡은 부분": "" };
+  assert.ok(!labelsOf(panel({ texts: cleared, savedTexts: cleared })).some((label) => label.text === "맡은 부분"));
+  // 칸 제목 없는 옛 자유 글은 「더 쓰기」 칸에 열린다.
+  const free = sectionTexts("칸 제목 없는 옛 글");
+  const freeHtml = panel({ texts: free, savedTexts: free });
+  assert.ok(freeHtml.includes('data-section="더 쓰기"'));
+  assert.ok(freeHtml.includes(">칸 제목 없는 옛 글</textarea>"));
 });
 
 test("AC3.2.1·AC3.2.2 편집 안내 첫 문장과 공개 범위 안내가 있고 「경험의 맥락·판단·배운 점을 자유롭게 적어 주세요.」는 없다", () => {
@@ -222,16 +276,19 @@ test("AC3.2.1·AC3.2.2 편집 안내 첫 문장과 공개 범위 안내가 있�
   assert.doesNotMatch(html, /경험의 맥락·판단·배운 점을 자유롭게 적어 주세요/);
 });
 
-test("AC2.1.1·AC2.1.2 「짚어 볼 곳」 칸 아래에 커밋 화면 한 가지 방법의 안내 네 가지가 보이고, 관련 커밋을 넣는 단추나 목록은 없다", () => {
+test("AC2.1.1·AC2.1.2·#634 「짚어 볼 곳」 칸 아래에 커밋 화면 한 가지 방법의 안내 네 가지가 「위 근거」 없이 보이고, 관련 커밋을 넣는 단추나 목록은 없다", () => {
   const html = panel({});
   // Step 15 확인 중 팀장 발견(2026-11-10)으로 다섯 가지에서 넷으로 줄였다(Copy permalink·한글 파일 이름 안내를 빼고 메모 안내를 바꿈).
   assert.equal(POINT_HINTS.length, 4);
   const pointField = html.indexOf('data-section="짚어 볼 곳"');
   const hints = html.match(/data-testid="catch-author-description-hints">([\s\S]*?)<\/ul>/)[1];
   assert.ok(html.indexOf('data-testid="catch-author-description-hints"') > pointField);
-  assert.ok(html.indexOf('data-testid="catch-author-description-hints"') < html.indexOf('data-section="더 쓰기"'));
+  assert.ok(html.indexOf('data-testid="catch-author-description-hints"') < html.indexOf('data-testid="catch-author-description-count"'));
   assert.deepEqual([...hints.matchAll(/<li>([^<]*)<\/li>/g)].map((match) => match[1]), POINT_HINTS);
-  assert.ok(POINT_HINTS.some((hint) => hint.includes("바뀐 줄의 줄 번호를 누르세요")) && POINT_HINTS.at(-1) === "관련 커밋은 위 근거의 본인 커밋 주소를 붙이세요.");
+  // #634: 근거가 이 칸 위에만 있지 않게 될 배치(#635)에 맞춰 「위 근거」를 「근거」로 썼다.
+  assert.equal(POINT_HINTS[1], "근거의 본인 커밋을 열고, 바뀐 줄의 줄 번호를 누르세요(여러 줄이면 Shift를 누른 채 끝 줄 번호도 누르세요). 주소창의 주소를 그대로 붙이세요.");
+  assert.equal(POINT_HINTS[3], "관련 커밋은 근거의 본인 커밋 주소를 붙이세요.");
+  assert.doesNotMatch(hints, /위 근거/);
   assert.ok(POINT_HINTS.includes("메모에 파일 이름과 짚을 까닭을 적으세요."));
   assert.ok(!POINT_HINTS.some((hint) => hint.includes("Copy permalink") || hint.includes("한글")));
   // 버튼은 [설명 저장] 하나뿐이고 커밋을 고르는 선택 칸·체크 칸이 없다.
@@ -248,37 +305,18 @@ test("AC1.2.2 합계 글자 줄은 칸 제목 포함 합친 글의 글자 수이
   assert.equal((panel({ texts: two }).match(/칸 제목 포함/g) ?? []).length, 1, "합계 줄은 하나");
 });
 
-test("AC2.3.1·AC2.3.3·AC2.3.4 발행하면 열릴 링크 목록: 두 칸의 링크가 면접관 화면과 같은 이름으로 한 번씩 보이고 아래 안내가 붙는다", () => {
+test("#634 「발행하면 면접관에게 열릴 링크」 제목·목록·안내 줄이 없다(링크를 쓴 칸이 있어도)", () => {
   const commit = "https://github.com/o/r/commit/ba6bba8c0123456789abcdef0123456789abcdef";
-  const file = "https://github.com/o/r/blob/ba6bba8/src/CreateArticlePage.vue#L40-L58";
-  const other = "https://github.com/other/lib/commit/1a2b3c4d";
-  const html = panel({ texts: texts({ "맡은 부분": `커밋 ${commit}`, "짚어 볼 곳": `${file} 줄이는 곳\n${commit} 관련 커밋\n${other}` }) });
-  const links = html.match(/data-testid="catch-author-description-links">([\s\S]*?)<\/section>/)[1];
-  const names = [...links.matchAll(/<li data-testid="catch-author-description-link-name">([^<]*)<\/li>/g)].map((match) => match[1]);
-  assert.deepEqual(names, ["커밋 ba6bba8", "CreateArticlePage.vue · L40–58 · 판본 ba6bba8", "other/lib · 커밋 1a2b3c4"]);
-  assert.doesNotMatch(links, /<a |tabindex/, "목록 항목은 글자이고 Tab 순서에 들지 않는다(interaction-spec 2절)");
-  assert.ok(links.includes("이미 보낸 발행본에는 반영되지 않습니다. 고쳤다면 새로 발행하세요"));
-  assert.doesNotMatch(links, /링크가 없습니다/);
-});
-
-test("AC2.3.5·AC2.3.6 링크가 없으면 없다는 안내만 보이고, 목록은 h4 제목 아래이며 알림 영역(aria-live)이 아니다", () => {
-  const html = panel({ texts: texts({ "맡은 부분": "링크 없는 글 http://github.com/o/r" }) });
-  const links = html.match(/data-testid="catch-author-description-links">([\s\S]*?)<\/section>/)[0];
-  assert.ok(links.includes("<h4"));
-  assert.ok(links.includes(">발행하면 면접관에게 열릴 링크</h4>"));
-  assert.ok(links.includes("발행하면 면접관에게 열릴 링크가 없습니다."));
-  assert.doesNotMatch(links, /이미 보낸 발행본|<a /);
-  assert.doesNotMatch(links, /aria-live|role="status"|role="alert"/);
-  assert.doesNotMatch(panel({ texts: texts({ "짚어 볼 곳": "https://github.com/o/r/pull/1" }) }).match(/data-testid="catch-author-description-links">[\s\S]*?<\/section>/)[0], /aria-live/);
-  // 목록은 8칸 아래, 합계 줄 위에 있다.
-  assert.ok(html.indexOf('data-section="더 쓰기"') < html.indexOf("발행하면 면접관에게 열릴 링크</h4>"));
-  assert.ok(html.indexOf("발행하면 면접관에게 열릴 링크</h4>") < html.indexOf('data-testid="catch-author-description-count"'));
+  const html = panel({ texts: texts({ "짚어 볼 곳": `${commit} 관련 커밋` }) });
+  assert.doesNotMatch(html, /발행하면 면접관에게 열릴 링크|이미 보낸 발행본에는 반영되지 않습니다|<h4|catch-author-description-link/);
+  assert.ok(html.includes(`>${commit} 관련 커밋</textarea>`), "쓴 링크는 글칸에 그대로다");
 });
 
 test("AC3.1.1 Catch 상세: 기록 내용 → Catch 설명 초안 → 작성자 설명 순서이고, 초안은 설명칸에 들어가지 않는다", () => {
   const item = { ...previewCatches[0], draft: { status: "GENERATED", content: "[합성] AI가 만든 초안" } };
   const editor = createElement(AuthorDescriptionPanel, {
-    loadState: "ready", texts: texts({ "더 쓰기": "[합성] 작성자가 쓴 설명" }), status: { kind: "idle" }, dirty: false, evidenceUrls: [],
+    loadState: "ready", texts: texts({ "더 쓰기": "[합성] 작성자가 쓴 설명" }), savedTexts: texts({ "더 쓰기": "[합성] 작성자가 쓴 설명" }),
+    status: { kind: "idle" }, dirty: false,
     onChange() {}, onSave() {}, onRetry() {},
   });
   const html = renderToStaticMarkup(createElement(AssetsView, {

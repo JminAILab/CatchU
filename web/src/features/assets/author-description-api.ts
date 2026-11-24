@@ -31,12 +31,13 @@ export function authorDescriptionInputError(value: string): string | null {
 }
 
 /**
- * 편집 화면 값(새 Catch NC1). `texts`는 지금 8칸 글, `savedTexts`는 마지막으로 서버가 확인해 준 설명을 나눈 8칸이다.
+ * 편집 화면 값(새 Catch NC1). `texts`는 지금 칸 글, `savedTexts`는 마지막으로 서버가 확인해 준 설명을 나눈 칸 글이다.
+ * 글이 있는 옛 칸을 편집 화면에 보일지도 `savedTexts`로 정한다(#634).
  * 저장할 때는 `joinSections(texts)` 하나를 보낸다.
  */
 export type DescriptionEditState = { texts: SectionTexts; savedTexts: SectionTexts; status: EditStatus };
 
-/** 두 8칸 글이 칸마다 같은지. */
+/** 두 칸 글이 칸마다 같은지. */
 export function sameSectionTexts(a: Readonly<SectionTexts>, b: Readonly<SectionTexts>): boolean {
   return SECTION_TITLES.every((title) => a[title] === b[title]);
 }
@@ -50,7 +51,7 @@ export function isDescriptionDirty(state: Pick<DescriptionEditState, "texts" | "
 }
 
 /**
- * 저장 결과를 화면 값에 반영한다. 성공 응답일 때만 "저장됨"이고 8칸을 서버 값으로 다시 나눈다(공백만 쓴 칸은 빈칸, 모두 지우면 8칸이 빈칸).
+ * 저장 결과를 화면 값에 반영한다. 성공 응답일 때만 "저장됨"이고 칸 글을 서버 값으로 다시 나눈다(공백만 쓴 칸은 빈칸, 모두 지우면 모든 칸이 빈칸).
  * 실패하면 입력과 마지막 저장 값을 그대로 두고 실패 이유만 바꾼다(BR2.3).
  */
 export function applyDescriptionSave(state: DescriptionEditState, result: DescriptionSave): DescriptionEditState {
