@@ -5,6 +5,7 @@ import { TabStrip } from "@/components/tab-strip/tab-strip";
 import { splitSections, type Section } from "@/lib/author-description-sections";
 import { evidenceRepositoryOf, isOwnCommitLink, ownCommitsOf, type OwnCommit } from "@/lib/github-link-name";
 import { isGithubSourceUrl, splitGithubLinks, type TextSegment } from "@/lib/github-source-url";
+import { FOLD_AUTHORED, FOLD_GENERATED, FoldText, FoldVisibleContext } from "./fold-text";
 import { GithubLink } from "./github-link";
 import { orderedItems, pdfPageCount, type CatchSnapshot, type PublishedItem, type PublishedSnapshot, type TextMaterialSnapshot } from "./publications-api";
 import { PublishedPdfItem, type PdfCopySource } from "./published-pdf-item";
@@ -160,8 +161,10 @@ export const evidenceDetailsOpen = (toggle: EvidenceToggle, highlight: SnapshotH
  * 세 칸은 다른 표지로 나눈다(BR1.3·BR4.3·BR7.5). 기록 가운데 작업 사실은 펼쳐 두고, 본인 기여와 근거 목록은 「근거 자세히 보기」에 접는다.
  * 새 Catch NC2 선택 칸 셋(BR3.1~BR3.4)은 칸마다 따로 있는지 보고, 없으면(옛 사본) 그리지 않는다. 모두 React 텍스트로만 그린다(NFR5.1).
  * 저장소 줄은 이 부품 맨 위에 두어 제목(h3, `PublishedSnapshotView`) 바로 아래·불일치 표지 위에 온다.
+ * 긴 글은 높이만 줄여 접는다(#607): AI 설명 초안·작업 사실 목록은 12줄 초과 시 6줄, 작성자 설명은 18줄 초과 시 12줄. 강조가 가리키는 글은 펼친다.
+ * 「이 기록으로 알 수 없는 것」과 「근거 자세히 보기」는 접는 틀 밖에 그대로 둔다. `title`은 접기 단추의 화면 낭독기 이름에만, `foldId`는 접는 글 상자의 id 앞부분에만 쓴다.
  */
-function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; highlight: SnapshotHighlight | null }) {
+function CatchSnapshotView({ snapshot, highlight, title, foldId }: { snapshot: CatchSnapshot; highlight: SnapshotHighlight | null; title: string; foldId: string }) {
   const [toggle, setToggle] = useState<EvidenceToggle>(INITIAL_EVIDENCE_TOGGLE);
   const open = evidenceDetailsOpen(toggle, highlight);
   // 본인 커밋 목록은 사본을 받을 때 한 번 만들고 링크마다 견준다(NC2 성능 설계 「화면 계산」).
@@ -176,7 +179,9 @@ function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; h
       {snapshot.aiDraft !== null && (
         <section className={styles.snapshotSection} data-testid="snapshot-catch-ai-draft">
           <h4>AI 설명 초안</h4>
-          <p className={styles.freeText}>{snapshot.aiDraft}</p>
+          <FoldText id={`${foldId}-ai-draft`} limit={FOLD_GENERATED} label={`${title} AI 설명 초안`}>
+            <p className={styles.freeText}>{snapshot.aiDraft}</p>
+          </FoldText>
         </section>
       )}
       <section className={styles.snapshotSection} data-testid="snapshot-catch-description">
@@ -184,13 +189,19 @@ function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; h
         <h4>작성자 설명{snapshot.authorDescriptionEditedMonth !== undefined && (
           <>{" "}<span className={styles.small} data-testid="snapshot-catch-description-edited">{editedMonthText(snapshot.authorDescriptionEditedMonth)}</span></>
         )}</h4>
-        <AuthorDescriptionView text={snapshot.authorDescription} range={rangeFor(highlight, "authorDescription")}
-          evidenceRepository={evidenceRepositoryOf(snapshot.evidence.map((evidence) => evidence.sourceUrl))} ownCommits={ownCommits} />
+        <FoldText id={`${foldId}-description`} limit={FOLD_AUTHORED} label={`${title} 작성자 설명`} reveal={highlight?.fieldPath === "authorDescription" ? highlight : null}>
+          <AuthorDescriptionView text={snapshot.authorDescription} range={rangeFor(highlight, "authorDescription")}
+            evidenceRepository={evidenceRepositoryOf(snapshot.evidence.map((evidence) => evidence.sourceUrl))} ownCommits={ownCommits} />
+        </FoldText>
       </section>
       <section className={styles.snapshotSection} data-testid="snapshot-catch-facts">
         <h4>기록에서 확인한 내용</h4>
         {snapshot.workFacts.length > 0
-          ? <ul>{snapshot.workFacts.map((fact, index) => <li key={index}><PlainText text={fact} range={rangeFor(highlight, `workFacts[${index}]`)} /></li>)}</ul>
+          ? (
+            <FoldText id={`${foldId}-facts`} limit={FOLD_GENERATED} label={`${title} 기록에서 확인한 내용`} reveal={highlight?.fieldPath.startsWith("workFacts[") ? highlight : null}>
+              <ul>{snapshot.workFacts.map((fact, index) => <li key={index}><PlainText text={fact} range={rangeFor(highlight, `workFacts[${index}]`)} /></li>)}</ul>
+            </FoldText>
+          )
           : <p className={styles.muted}>{EMPTY_FACTS}</p>}
         {/* NC2 BR3.3: 작업 사실 바로 아래, 접힘 밖에 펼친 채 둔다. 항목은 사본 순서 그대로이고 PR 번호·식별값을 링크로 만들지 않는다. */}
         {snapshot.workLimits !== undefined && (
@@ -232,10 +243,13 @@ function CatchSnapshotView({ snapshot, highlight }: { snapshot: CatchSnapshot; h
   );
 }
 
-function TextMaterialSnapshotView({ snapshot, highlight }: { snapshot: TextMaterialSnapshot; highlight: SnapshotHighlight | null }) {
+/** 텍스트 자료 본문은 지원자가 쓴 글이라 18줄 초과 시 12줄로 접는다(#607). */
+function TextMaterialSnapshotView({ snapshot, highlight, title, foldId }: { snapshot: TextMaterialSnapshot; highlight: SnapshotHighlight | null; title: string; foldId: string }) {
   return (
     <div className={styles.snapshotBody}>
-      <LinkedText text={snapshot.body} testId="snapshot-text-body" range={rangeFor(highlight, "body")} />
+      <FoldText id={`${foldId}-body`} limit={FOLD_AUTHORED} label={`${title} 본문`} reveal={highlight?.fieldPath === "body" ? highlight : null}>
+        <LinkedText text={snapshot.body} testId="snapshot-text-body" range={rangeFor(highlight, "body")} />
+      </FoldText>
     </div>
   );
 }
@@ -271,14 +285,16 @@ function SnapshotItemView({ item, highlight, pdfSource }: {
   item: PublishedItem; highlight: SnapshotHighlight | null; pdfSource?: (publishedItemId: string) => PdfCopySource;
 }) {
   const own = highlight !== null && highlight.publishedItemId === item.publishedItemId ? highlight : null;
+  // 접는 글 상자의 id 앞부분(#607). 항목 요소의 id(`published-item-…`)와 앞부분이 겹치지 않게 따로 짓는다.
+  const foldId = `snapshot-fold-${item.publishedItemId}`;
   return (
     <li id={publishedItemDomId(item.publishedItemId)} tabIndex={-1} className={styles.snapshotItem}
       data-testid="snapshot-item" data-kind={item.itemKind} data-highlighted={own !== null || undefined}>
       <h3 className={styles.snapshotTitle}><span className={styles.kindBadge}>{KIND_LABELS[item.itemKind]}</span> {item.title}</h3>
-      {item.itemKind === "CATCH" ? <CatchSnapshotView snapshot={item.snapshot} highlight={own} />
-        : item.itemKind === "TEXT_MATERIAL" ? <TextMaterialSnapshotView snapshot={item.snapshot} highlight={own} />
+      {item.itemKind === "CATCH" ? <CatchSnapshotView snapshot={item.snapshot} highlight={own} title={item.title} foldId={foldId} />
+        : item.itemKind === "TEXT_MATERIAL" ? <TextMaterialSnapshotView snapshot={item.snapshot} highlight={own} title={item.title} foldId={foldId} />
         : <PublishedPdfItem title={item.title} pageCount={pdfPageCount(item)} pages={item.pdfPages ?? []} highlight={own}
-          source={pdfSource?.(item.publishedItemId)} />}
+          source={pdfSource?.(item.publishedItemId)} foldId={foldId} />}
     </li>
   );
 }
@@ -289,6 +305,7 @@ function SnapshotItemView({ item, highlight, pdfSource }: {
  * - 「발행본 자료」 아래 알림 칸(`aria-live="polite"`, 출처 이동으로 탭이 바뀌었을 때만 글) → 탭 줄(이름 「발행본 자료」, 프리셋이 하나여도 있음, 개수 없음)
  *   → 열린 탭의 패널(프리셋 이름 전체 → 항목들)이다. 탭 이름은 CSS로만 줄이고 이름은 모두 글자로만 그린다(BR1.5·BR2.2·BR2.5).
  * - 모든 탭의 패널을 그려 두고 열리지 않은 패널은 `hidden`이다. 패널 key가 순번이라 탭을 오가도 PDF 뷰어가 받은 파일·보던 쪽이 남는다(BR1.4).
+ *   긴 글 접기(#607)는 숨긴 패널 안에서 줄 수를 셀 수 없어, 패널마다 열림 여부(`FoldVisibleContext`)를 넘겨 열리는 차례에 다시 세게 한다.
  * - 열린 탭(`activePreset`)과 바꾸기(`onPresetChange`)·알림(`tabNotice`)은 부르는 화면이 `useSnapshotJump`로 넘긴다. 열린 탭이 없거나 사본에 없으면 첫 탭이다.
  * - 항목 그리기는 그대로다: 제목은 글자로만, `highlight`가 가리키는 항목만 강조 범위를 받고(`<mark>`), 항목마다 `id`·`tabIndex={-1}`을 두어
  *   근거 위치로 옮길 수 있게 한다. PDF 항목(U8)은 `pdfSource`가 있으면 그 항목의 사본을 여는 단추를 둔다(누를 때만 요청한다).
@@ -319,12 +336,13 @@ export function PublishedSnapshotView({ snapshot, highlight = null, pdfSource, a
             tabs={groups.map((group) => ({ id: String(group.ordinal), label: group.name }))} active={String(open.ordinal)}
             onChange={(id) => onPresetChange?.(Number(id))}
             panels={Object.fromEntries(groups.map((group) => [String(group.ordinal), (
-              <>
+              // 열리지 않은 탭의 패널은 `hidden`이라 긴 글의 줄 수를 셀 수 없다. 패널이 열렸는지 넘겨, 열리는 차례에 다시 세게 한다(#607).
+              <FoldVisibleContext key={group.ordinal} value={group.ordinal === open.ordinal}>
                 <p className={styles.presetName} data-testid="snapshot-preset-name">{group.name}</p>
                 <ol className={styles.snapshotItems}>
                   {group.items.map((item) => <SnapshotItemView key={item.publishedItemId} item={item} highlight={highlight} pdfSource={pdfSource} />)}
                 </ol>
-              </>
+              </FoldVisibleContext>
             )]))} />
         </>
       )}

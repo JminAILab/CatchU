@@ -9,6 +9,7 @@ import { groupByPreset, publishedItemDomId, type PresetGroup, type SnapshotHighl
  * - 열린 탭·옮길 대상·알림 글을 한 상태로 갖는다. 출처 단추(`showEvidence`)는 대상 항목의 탭과 대상을 한 번의 상태 바뀜에서 함께 바꾸고,
  *   탭이 바뀌었으면 「(프리셋 이름) 탭을 열었습니다」 알림을 낸다. 같은 탭이면 알림을 바꾸지 않는다. [답으로 돌아가기]는 없다.
  * - 모든 탭 패널이 그려져 있어, 그린 뒤의 효과에서 지금처럼 항목에 초점(`preventScroll`)을 두고 첫 강조나 항목 시작이 보이게 옮긴다.
+ *   옮기는 차례는 탭 열기 → 대상 글 펼치기와 그 패널의 긴 글 접기 판정(#607 `fold-text.tsx`) → 화면 옮기기다.
  * - 사본이 다시 와도(다시 조회) 같은 순번이 있으면 열린 탭을 그대로, 없으면 첫 탭을 연다. 탭을 바꿔도 요청을 보내지 않는다(NFR5.1).
  * - 프리셋 이름·자료 제목을 기록에 넘기지 않는다(NFR4.3).
  */
@@ -70,13 +71,21 @@ export function useSnapshotJump(snapshot: PublishedSnapshot | null): SnapshotJum
   const { target } = state;
   // 강조 범위가 있으면 항목 안 첫 `<mark>`를 화면 가운데에, 없거나 못 찾으면 항목 시작을 보이고, 초점은 항목에 두되 다시 튀지 않게 한다
   // (PR #482 리뷰). 탭과 대상이 한 번에 바뀌므로 이 효과가 돌 때 대상 항목의 패널은 이미 열려 있다.
+  // 다만 효과 안에서 바로 옮기지 않고 지금 그리기 묶음이 끝난 직후(화면에 칠하기 전)에 옮긴다(#607). 탭이 열리는 차례에는 그 패널의 긴 글이
+  // 아직 접히지 않았다. 숨긴 패널에서는 줄 수를 셀 수 없어, 패널이 열린 차례에 재고 곧바로 한 번 더 그려 접기 때문이다(`fold-text.tsx`).
+  // 그 전에 옮기면 위쪽 글들이 접히면서 강조 글의 자리가 어긋난다. 대상 글은 강조를 받은 차례에 이미 펼쳐져 있다.
   useEffect(() => {
     if (target === null) return;
-    const element = document.getElementById(publishedItemDomId(target.publishedItemId));
-    if (!element) return;
-    const mark = target.highlight === null ? null : element.querySelector<HTMLElement>(HIGHLIGHT_SELECTOR);
-    (mark ?? element).scrollIntoView({ block: mark === null ? "start" : "center" });
-    element.focus({ preventScroll: true });
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const element = document.getElementById(publishedItemDomId(target.publishedItemId));
+      if (!element) return;
+      const mark = target.highlight === null ? null : element.querySelector<HTMLElement>(HIGHLIGHT_SELECTOR);
+      (mark ?? element).scrollIntoView({ block: mark === null ? "start" : "center" });
+      element.focus({ preventScroll: true });
+    });
+    return () => { cancelled = true; };
   }, [target]);
   return {
     activePreset: presetAfterRefresh(groups, state.preset),
