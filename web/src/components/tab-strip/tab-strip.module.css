@@ -10,6 +10,6 @@
 .tab:focus-visible, .tabActive:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; z-index: 1; }
 /* 긴 탭 이름(BR1.5): 한 탭 최대 16em, 한 줄 말줄임. 글자는 자르지 않아 화면 낭독기에는 이름 전체가 읽힌다. */
 .truncated { display: inline-block; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
-/* 줄어든 탭의 전체 이름 말풍선(#632). 화면 낭독기에는 숨긴다(aria-hidden). 좁은 화면에서 밖으로 나가지 않게 폭을 줄인다. */
+/* 줄어든 탭의 전체 이름 말풍선(#632). 화면 낭독기에는 숨긴다(aria-hidden). 폭은 화면 폭에서 양쪽 여백을 뺀 값까지이고, 오른쪽으로 넘치면 tab-strip.tsx가 left를 옮겨 화면 안에 넣는다. */
 .tip { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 5; width: max-content; max-width: min(28em, calc(100vw - 32px)); padding: 4px 10px; border-radius: 6px; background: #1b2a48; color: #fff; font-size: 13px; font-weight: 400; line-height: 1.5; text-align: left; white-space: normal; overflow-wrap: anywhere; pointer-events: none; }
 [data-truncated="true"]:hover > .tip, [data-truncated="true"]:focus-visible > .tip { display: block; }

@@ -58,6 +58,19 @@ export function dropSlot(pointerY: number, others: readonly { readonly top: numb
   return slot < 0 ? others.length : slot;
 }
 
+/** 값을 범위 안으로 맞춘다. 범위가 뒤집혀 있으면(낮은 끝 > 높은 끝) 낮은 끝을 쓴다. */
+export const clamp = (value: number, low: number, high: number): number => Math.max(low, Math.min(Math.max(low, high), value));
+
+/**
+ * 스크롤되는 상자에서 줄 하나가 다 보이게 하는 스크롤 위치. 이미 다 보이면 지금 값을 그대로 돌려준다.
+ * `rowTop`은 상자 내용 기준의 줄 위쪽 자리다.
+ */
+export function revealScrollTop(view: { readonly scrollTop: number; readonly height: number }, rowTop: number, rowHeight: number): number {
+  if (rowTop < view.scrollTop) return Math.max(0, rowTop);
+  if (rowTop + rowHeight > view.scrollTop + view.height) return Math.max(0, rowTop + rowHeight - view.height);
+  return view.scrollTop;
+}
+
 /** 자동 스크롤 띠의 높이: 목록 위·아래 끝에서 줄 높이의 몇 배 안쪽인가. */
 export const SCROLL_BAND_ROWS = 1;
 /** 자동 스크롤 속도(초당 줄 수). 띠에 막 들어오면 시작 속도, 테두리에 닿거나 넘으면 최대 속도다. */

@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { SourceList } from "./publish-sources";
 import {
-  autoScrollSpeed, dropSlot, isDropAccepted, movedText, orderHintText, parseOrderInput, ORDER_DISCARDED_TEXT, ORDER_UNCHANGED_TEXT,
+  autoScrollSpeed, clamp, dropSlot, isDropAccepted, movedText, revealScrollTop, orderHintText, parseOrderInput, ORDER_DISCARDED_TEXT, ORDER_UNCHANGED_TEXT,
 } from "./reorder";
 import styles from "./publications.module.css";
 
@@ -73,6 +73,10 @@ export function ReorderList(props: ReorderListProps) {
   const committing = useRef(false);
   const latest = useRef(props);
   const stopDrag = useRef<(() => void) | null>(null);
+  /** 옮긴 뒤 스크롤 상자 안에 보이게 할 줄. */
+  const reveal = useRef<string | null>(null);
+  /** 마우스로 눌러 번호 칸에 들어오는 중인가. 눌렀다 떼며 전체 선택이 풀리지 않게 한다. */
+  const focusByMouse = useRef(false);
   const [directOn, setDirectOn] = useState(false);
   const [invalidKey, setInvalidKey] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -89,6 +93,12 @@ export function ReorderList(props: ReorderListProps) {
   useEffect(() => () => { stopDrag.current?.(); }, []);
   useEffect(() => {
     committing.current = false;
+    // 옮긴 줄이 스크롤 상자에 가려 있으면 보이는 곳으로 스크롤한다(끌어서 테두리 밖에 놓았을 때).
+    const shown = reveal.current;
+    reveal.current = null;
+    const scroller = scrollRef.current;
+    const moved = shown === null ? undefined : [...(listRef.current?.querySelectorAll<HTMLElement>("[data-reorder-key]") ?? [])].find((element) => element.dataset.reorderKey === shown);
+    if (scroller && moved) scroller.scrollTop = revealScrollTop({ scrollTop: scroller.scrollTop, height: scroller.clientHeight }, moved.offsetTop, moved.offsetHeight);
     const target = pending.current;
     pending.current = null;
     if (!target) return;
@@ -169,13 +179,18 @@ export function ReorderList(props: ReorderListProps) {
       const box = scroller.getBoundingClientRect();
       accepted = isDropAccepted({ x, y }, box, rowHeight);
       if (accepted) delete scroller.dataset.outside; else scroller.dataset.outside = "true";
+      // 포인터가 상자 테두리를 넘어도(받아 주는 거리 안) 끄는 줄과 놓을 자리 선이 상자에 가려지지 않게, 상자의 보이는 범위 안 자리로 센다.
+      // 놓으면 그 선이 가리키던 자리에 들어간다. 끝에 일부만 보이는 줄은 가운데가 보이는 범위 밖이면 그 줄 앞이다.
+      const inside = clamp(y, box.top, box.bottom);
       const rects = others().map((node) => node.getBoundingClientRect());
-      slot = dropSlot(y, rects);
+      slot = dropSlot(inside, rects);
       const edge = rects.length === 0 ? null : slot < rects.length ? rects[slot].top - 2 : rects[rects.length - 1].bottom + 1;
       line.style.display = accepted && slot !== from && edge !== null ? "block" : "none";
-      if (edge !== null) line.style.top = `${edge - box.top + scroller.scrollTop}px`;
-      const shift = y - startY + (scroller.scrollTop - startScroll) + (window.scrollY - startWindowScroll);
-      row.style.transform = `translateY(${Math.max(minShift, Math.min(maxShift, shift))}px)`;
+      const viewTop = scroller.scrollTop, viewBottom = scroller.scrollTop + scroller.clientHeight;
+      if (edge !== null) line.style.top = `${clamp(edge - box.top + scroller.scrollTop, viewTop + 1, viewBottom - 4)}px`;
+      const shift = inside - startY + (scroller.scrollTop - startScroll) + (window.scrollY - startWindowScroll);
+      const low = Math.max(minShift, viewTop - row.offsetTop), high = Math.min(maxShift, viewBottom - rowHeight - row.offsetTop);
+      row.style.transform = `translateY(${clamp(shift, low, high)}px)`;
     };
     const tick = () => {
       if (ended) return;
@@ -211,6 +226,7 @@ export function ReorderList(props: ReorderListProps) {
       const now = latest.current;
       if (commit && accepted && !now.disabled && slot !== from && now.entries[from]?.key === entry.key) {
         setStatus(movedText(entry.title, slot));
+        reveal.current = entry.key;
         now.onMove(from, slot);
         return;
       }
@@ -239,6 +255,10 @@ export function ReorderList(props: ReorderListProps) {
                 <input key={`${entry.key}:${index}`} className={styles.orderInput} type="text" inputMode="numeric" autoComplete="off" defaultValue={String(index + 1)}
                   data-testid={`${prefix}-order-input`} data-reorder-input="" disabled={props.disabled}
                   aria-label={`${entry.title} 순서, 1에서 ${count}까지`} aria-describedby={`${hintId} ${errorId}`} aria-invalid={invalidKey === entry.key || undefined}
+                  // 어떤 경로로든 새로 초점이 오면 안의 숫자를 전체 선택해, 친 숫자가 원래 숫자 뒤에 붙지 않고 대신하게 한다.
+                  onMouseDown={(event) => { focusByMouse.current = document.activeElement !== event.currentTarget; }}
+                  onFocus={(event) => event.currentTarget.select()}
+                  onMouseUp={(event) => { if (focusByMouse.current) { focusByMouse.current = false; event.preventDefault(); event.currentTarget.select(); } }}
                   onKeyDown={(event) => inputKeyDown(entry, index, event)} onBlur={(event) => inputBlur(entry, index, event.currentTarget)} />
               ) : <span className={styles.orderNumber} aria-hidden="true">{index + 1}</span>}
               <div className={styles.orderBody}>{entry.body}</div>

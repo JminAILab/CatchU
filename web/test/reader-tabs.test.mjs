@@ -24,7 +24,7 @@ import { createPublicationsApi, isPublishedSnapshot } from "../src/features/publ
 import { createRecipientApi, readPublishedSnapshot } from "../src/features/recipient/recipient-api.ts";
 import { load } from "./u2-render.mjs";
 
-const { TabStrip, isTabAccepted, tabForKey, tabKeyAction } = await load("components/tab-strip/tab-strip.tsx");
+const { TabStrip, isTabAccepted, tabForKey, tabKeyAction, tipShift, TIP_MARGIN } = await load("components/tab-strip/tab-strip.tsx");
 const { PublishedSnapshotView, groupByPreset } = await load("features/publications/snapshot-view.tsx");
 const { INITIAL_JUMP_STATE, choosePreset, jumpToEvidence, presetAfterRefresh } = await load("features/publications/snapshot-jump.ts");
 
@@ -77,7 +77,7 @@ test("BR1.4 keepInactive가 false면 열리지 않은 패널은 비어 있고, t
 test("BR1.5 탭 이름 말줄임은 선택이고 글자를 자르지 않으며, tabTestId를 주면 탭마다 data-testid가 붙는다", () => {
   const long = "아주".repeat(25);
   const truncated = strip({ tabs: [{ id: "a", label: long }], active: "a", panels: { a: "x" }, truncateLabels: true, tabTestId: "shot-tab" });
-  assert.ok(truncated.includes(`data-testid="shot-tab-a"><span class="truncated" data-tab-label="">${long}</span><span class="tip" aria-hidden="true">${long}</span></button>`));
+  assert.ok(truncated.includes(`data-testid="shot-tab-a"><span class="truncated" data-tab-label="">${long}</span><span class="tip" aria-hidden="true" data-tab-tip="">${long}</span></button>`));
   const plain = strip({});
   assert.doesNotMatch(plain, /truncated|data-testid|class="tip"/);
 });
@@ -170,7 +170,7 @@ test("NFR 요구 검토 Minor 1 같은 순번에 이름이 섞여 와도 응답�
 test("BR1.5·BR2.2 50자 이름은 탭에 글자 그대로(말줄임 클래스), 탭 아래에 이름 전체이고, 탭에 자료 개수가 없다", () => {
   const name = "가".repeat(50);
   const html = view({ snapshot: snapshot([text("a", 1, 1, name), text("b", 2, 1, name)]) });
-  assert.match(html, new RegExp(`data-testid="snapshot-preset-tab-1"><span class="truncated" data-tab-label="">${name}</span><span class="tip" aria-hidden="true">${name}</span></button>`), "개수 없이 이름 글자만");
+  assert.match(html, new RegExp(`data-testid="snapshot-preset-tab-1"><span class="truncated" data-tab-label="">${name}</span><span class="tip" aria-hidden="true" data-tab-tip="">${name}</span></button>`), "개수 없이 이름 글자만");
   assert.ok(html.includes(`<p class="presetName" data-testid="snapshot-preset-name">${name}</p>`));
   assert.doesNotMatch(html, /\(2\)|2개/);
 });
@@ -285,4 +285,12 @@ test("NFR4.1·NFR4.2 받은 사람 응답 해석은 프리셋 칸 둘을 옮기�
   assert.equal(item.presetOrdinal, 2);
   assert.equal(item.presetName, "  포트폴리오 ");
   assert.ok(!JSON.stringify(item).includes("원본"));
+});
+
+// #632 리뷰(2026-11-24): 줄 오른쪽의 긴 이름 탭에서 말풍선이 화면 밖으로 넘치지 않게 한다.
+test("tipShift: 오른쪽으로 넘친 말풍선은 넘친 만큼 왼쪽으로 옮기고, 화면 안이면 옮기지 않는다", () => {
+  assert.equal(tipShift({ left: 100, right: 400 }, 780), 0, "화면 안이면 그대로");
+  assert.equal(tipShift({ left: 500, right: 805 }, 780), -(805 - (780 - TIP_MARGIN)), "오른쪽 여백까지 왼쪽으로");
+  assert.equal(tipShift({ left: 20, right: 900 }, 780), -(20 - TIP_MARGIN), "왼쪽 여백보다 더 나가지 않는다");
+  assert.equal(tipShift({ left: 4, right: 200 }, 780), TIP_MARGIN - 4, "왼쪽으로 넘쳐 있으면 오른쪽으로");
 });

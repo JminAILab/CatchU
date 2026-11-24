@@ -14,7 +14,7 @@ import { load } from "./u2-render.mjs";
 
 const {
   moveItem, parseOrderInput, movedText, orderHintText, ORDER_DISCARDED_TEXT, ORDER_UNCHANGED_TEXT,
-  isDropAccepted, dropSlot, autoScrollSpeed, DROP_SLACK_ROWS, SCROLL_ROWS_PER_SECOND,
+  isDropAccepted, dropSlot, autoScrollSpeed, clamp, revealScrollTop, DROP_SLACK_ROWS, SCROLL_ROWS_PER_SECOND,
 } = await load("features/publications/reorder.ts");
 
 test("moveItem: from 자리의 항목을 to 자리에 넣고 사이를 민다. 범위 밖·같은 자리·정수 아님은 null이고 원래 배열은 바뀌지 않는다", () => {
@@ -87,4 +87,27 @@ test("autoScrollSpeed: 띠 밖은 0, 띠에 들어오면 초당 약 2줄에서 �
     assert.equal(autoScrollSpeed(list.top - row * 1.1, list, row), 0);
   }
   assert.equal(autoScrollSpeed(500, { top: 100, bottom: 600 }, 0), 0, "줄 높이를 모르면 움직이지 않는다");
+});
+
+// #632 리뷰(2026-11-24): 스크롤되는 목록에서 테두리 밖에 놓아도 끄는 줄·선·놓은 줄이 보이게 한다.
+test("clamp: 값을 범위 안으로 맞추고, 범위가 뒤집히면 낮은 끝을 쓴다", () => {
+  assert.equal(clamp(5, 0, 10), 5);
+  assert.equal(clamp(-3, 0, 10), 0);
+  assert.equal(clamp(30, 0, 10), 10);
+  assert.equal(clamp(5, 8, 2), 8);
+});
+
+test("테두리 밖 포인터는 상자의 보이는 끝 자리로 센다: 끝에 일부만 보이는 줄은 가운데가 밖이면 그 줄 앞이다", () => {
+  // 상자는 0~95만 보이고 줄은 40px씩이다. 셋째 줄(80~120)은 일부만 보이고 가운데(100)는 밖이다.
+  const rows = [{ top: 0, height: 40 }, { top: 40, height: 40 }, { top: 80, height: 40 }, { top: 120, height: 40 }];
+  assert.equal(dropSlot(130, rows), 3, "포인터 자리 그대로면 가려진 줄 뒤다");
+  assert.equal(dropSlot(clamp(130, 0, 95), rows), 2, "보이는 끝으로 세면 일부만 보이는 줄 앞이다");
+  assert.equal(dropSlot(clamp(-25, 0, 95), rows), 0);
+});
+
+test("revealScrollTop: 가려진 줄은 다 보이는 자리로 스크롤하고, 보이는 줄은 그대로 둔다", () => {
+  const view = { scrollTop: 100, height: 200 };
+  assert.equal(revealScrollTop(view, 150, 40), 100, "이미 보임");
+  assert.equal(revealScrollTop(view, 280, 40), 120, "아래에 가려짐");
+  assert.equal(revealScrollTop(view, 60, 40), 60, "위에 가려짐");
 });
