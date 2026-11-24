@@ -155,6 +155,14 @@ export function ReorderList(props: ReorderListProps) {
     const minShift = list.offsetTop - row.offsetTop, maxShift = list.offsetTop + list.offsetHeight - rowHeight - row.offsetTop;
     let x = event.clientX, y = event.clientY, slot = from, accepted = true, ended = false, lastTick = event.timeStamp;
     row.dataset.dragging = "true";
+    // 끄는 동안에만 글자 선택을 막는다. iOS Safari는 손잡이를 길게 눌러 끌 때 둘레 글자를 선택하고 돋보기·복사 메뉴를 띄운다.
+    // 끝나면 원래 값으로 되돌리므로 평소의 본문 선택과 스크롤은 그대로다.
+    const root = document.documentElement;
+    const rootSelect = { plain: root.style.getPropertyValue("user-select"), webkit: root.style.getPropertyValue("-webkit-user-select") };
+    root.style.setProperty("user-select", "none"); root.style.setProperty("-webkit-user-select", "none");
+    window.getSelection()?.removeAllRanges();
+    const onSelectStart = (e: Event) => e.preventDefault();
+    document.addEventListener("selectstart", onSelectStart);
     const others = () => [...list.children].filter((node): node is HTMLElement => node instanceof HTMLElement && node !== row);
 
     const place = () => {
@@ -187,6 +195,9 @@ export function ReorderList(props: ReorderListProps) {
       window.clearInterval(timer);
       window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onCancel);
       document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("selectstart", onSelectStart);
+      if (rootSelect.plain) root.style.setProperty("user-select", rootSelect.plain); else root.style.removeProperty("user-select");
+      if (rootSelect.webkit) root.style.setProperty("-webkit-user-select", rootSelect.webkit); else root.style.removeProperty("-webkit-user-select");
       delete row.dataset.dragging; delete scroller.dataset.outside;
       row.style.transform = ""; line.style.display = "none";
       stopDrag.current = null;
