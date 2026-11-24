@@ -79,10 +79,12 @@ export const SCROLL_ROWS_PER_SECOND = { start: 2, max: 6 } as const;
 /**
  * 자동 스크롤 속도(초당 px, 위쪽이면 음수). 띠 밖이면 0이다. 띠에 들어오면 초당 약 2줄에서 시작해 깊이 들어갈수록 빨라지고,
  * 테두리에 닿으면 초당 약 6줄이다. 테두리를 넘어 받아 주는 여유(`DROP_SLACK_ROWS`) 안에서는 최대 속도를 유지하고, 그 밖이면 멈춘다.
+ * 띠는 목록 높이의 절반을 넘지 않는다. 줄이 목록 절반보다 높으면 위·아래 띠가 겹쳐 아래쪽에서도 위로 스크롤되기 때문이다.
  */
 export function autoScrollSpeed(pointerY: number, list: { readonly top: number; readonly bottom: number }, rowHeight: number): number {
   if (!(rowHeight > 0)) return 0;
-  const band = rowHeight * SCROLL_BAND_ROWS;
+  const band = Math.min(rowHeight * SCROLL_BAND_ROWS, Math.max(0, list.bottom - list.top) / 2);
+  if (!(band > 0)) return 0;
   const slack = rowHeight * DROP_SLACK_ROWS;
   const speed = (depth: number) => {
     const ratio = Math.min(1, Math.max(0, depth / band));

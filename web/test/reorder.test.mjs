@@ -89,6 +89,17 @@ test("autoScrollSpeed: 띠 밖은 0, 띠에 들어오면 초당 약 2줄에서 �
   assert.equal(autoScrollSpeed(500, { top: 100, bottom: 600 }, 0), 0, "줄 높이를 모르면 움직이지 않는다");
 });
 
+test("autoScrollSpeed: 줄이 목록 절반보다 높아도 위·아래 띠가 겹치지 않아, 아래쪽에서는 아래로 위쪽에서는 위로 스크롤한다", () => {
+  const list = { top: 0, bottom: 220 };
+  const row = 240;
+  assert.ok(autoScrollSpeed(210, list, row) > 0, "아래쪽은 아래로");
+  assert.ok(autoScrollSpeed(10, list, row) < 0, "위쪽은 위로");
+  assert.equal(autoScrollSpeed(110, list, row), 0, "한가운데는 멈춘다");
+  assert.equal(autoScrollSpeed(220, list, row), 6 * row, "테두리에서는 최대 속도");
+  assert.equal(autoScrollSpeed(0, list, row), -6 * row);
+  assert.equal(autoScrollSpeed(100, { top: 50, bottom: 50 }, row), 0, "높이가 없는 목록은 움직이지 않는다");
+});
+
 // #632 리뷰(2026-11-24): 스크롤되는 목록에서 테두리 밖에 놓아도 끄는 줄·선·놓은 줄이 보이게 한다.
 test("clamp: 값을 범위 안으로 맞추고, 범위가 뒤집히면 낮은 끝을 쓴다", () => {
   assert.equal(clamp(5, 0, 10), 5);
