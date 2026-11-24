@@ -258,6 +258,20 @@ function run(page: HTMLElement, story: HTMLElement, scope: Scope, motion: Motion
     schedule();
   };
   buttons.forEach((button, index) => scope.listen(button, "click", () => jump(index)));
+  // 페이지 안 링크가 기능 하나를 가리키면(푸터의 「Catch란?」 → #evidence) 바로가기와 같은 방식으로 옮긴다.
+  // 고정 배치에서는 지금 기능이 아닌 것이 감춰져 있어, 브라우저의 기본 이동으로는 그 자리에 갈 수 없다.
+  scope.listen(page, "click", (event) => {
+    if (!(event instanceof MouseEvent) || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href^="#"]') : null;
+    const hash = link?.getAttribute("href") ?? "";
+    const index = features.findIndex((feature) => `#${feature.id}` === hash);
+    if (index < 0) return;
+    event.preventDefault();
+    if (window.location.hash !== hash) window.history.pushState(null, "", hash);
+    jump(index);
+    // 키보드로 왔으면 다음 Tab이 옮겨 간 자리에서 이어지게 한다.
+    buttons[index].focus({ preventScroll: true });
+  });
 
   // ── 영역과 설명의 등장 ────────────────────────────────────────────────
   const visible = (element: HTMLElement) => {
@@ -600,6 +614,11 @@ function run(page: HTMLElement, story: HTMLElement, scope: Scope, motion: Motion
     activate();
     const step: Step | undefined = steps[active];
     const player = step ? players[KEYS.indexOf(step.key)] : null;
+    // 재생 도중에 동작 줄이기가 켜지면 지금 단계도 결과 화면으로 바꾼다(단계를 새로 고를 때와 같다).
+    if (step && reduced() && !step.done) {
+      step.done = true;
+      step.elapsed = step.duration;
+    }
     // 새로 고른 장면은 한 번 그린 뒤에야 가림 여부로 재생을 막을 수 있다.
     const fresh = !!player && (remeasured || player.drawnStep !== active);
     const stageVisible = !!player && visible(player.stage);

@@ -113,6 +113,15 @@ test("확정 문구: 제목·기능 제목·면접관·마지막 안내", () => 
   assert.match(html, /<span class="title-white33" aria-hidden="true">근거<\/span>/);
 });
 
+// 푸터의 「Catch란?」은 기능 2(근거 확인)를 가리킨다. 고정 배치에서는 제어 코드가 이 링크를 바로가기처럼 옮기고
+// (story-controller.ts는 목적지가 기능 article의 id인 페이지 안 링크만 맡는다), 스크립트가 꺼지면 브라우저가 그대로 옮긴다.
+// 실패 조건: 링크가 기능 article이 아닌 곳을 가리켜 고정 배치에서 다시 움직이지 않게 됨. 실제 이동은 브라우저에서 확인한다.
+test("푸터의 「Catch란?」 링크는 기능 article의 id를 가리킨다", () => {
+  const footer = html.match(/<footer.*<\/footer>/s)?.[0] ?? "";
+  assert.match(footer, /<a href="#evidence">Catch란\?<\/a>/);
+  assert.match(html, /<article class="feature" id="evidence">/);
+});
+
 // 스크립트가 꺼진 화면: 기능 1~4는 설명과 결과 화면(.summary14)을 차례로 보인다(README 「재생 규칙」 마지막 항목).
 // 실패 조건: 결과 화면이 없는 기능이 생김, 정적 배치 규칙이 사라짐, 그 규칙이 스크립트가 켜진 화면(고정 배치)에도 걸림.
 // 실제로 보이는지는 브라우저에서 스크립트를 끄고 확인한다.
