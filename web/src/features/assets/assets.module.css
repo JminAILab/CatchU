@@ -65,59 +65,72 @@
 .secondaryButton:hover:not(:disabled) { background: #f1f5fc; border-color: #5b79ae; }
 .primaryButton:hover:not(:disabled):not([aria-disabled="true"]) { box-shadow: 0 3px 10px rgb(32 43 56 / 15%); }
 .dialog { --muted: var(--color-muted); --line: var(--color-line); --ink: var(--color-ink); color: var(--ink); background: var(--color-surface); font: inherit; padding: 28px 32px; width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); border: 1px solid #d3dbe6; border-radius: 20px; overscroll-behavior: contain; overflow-wrap: anywhere; }
-.catchDialog { width: min(880px, calc(100vw - 32px)); padding: 0 32px 28px; scroll-padding-top: 112px; }
 .dialog::backdrop { background: rgb(25 37 55 / 48%); }
-.dialogHeading { position: sticky; top: 0; z-index: 1; background: var(--color-surface); display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); margin: 0 -32px 24px; padding: 22px 32px 18px; }
-.dialogHeading h2 { font-size: 18px; margin-bottom: 0; }
-.dialogHeading > button { flex-shrink: 0; }
-/* 머리말 둘째 줄의 안내(#467 모달 안 재인증 안내). 안내가 없으면 줄을 만들지 않는다. */
-.dialogHeading:has(> .headingNotice:not(:empty)) { flex-wrap: wrap; row-gap: 12px; }
-.headingNotice { flex: 1 0 100%; min-width: 0; }
-.headingNotice:empty { display: none; }
-.detailTitle { font-size: 26px; line-height: 1.5; letter-spacing: -0.5px; margin-bottom: 16px; }
-.readOnlyNotice { font-size: 13px; line-height: 1.8; padding: 16px 18px; background: #f1f5fc; color: #496185; margin: 20px 0; border: 1px solid var(--line); border-radius: 10px; }
-.listOverview > .readOnlyNotice { margin: 20px 0 0; }
-.dialog > .readOnlyNotice { margin-top: 20px; }
-/* 실제 자료의 일반 안내만 보조 문장으로 낮춘다. 예시·합성 자료를 구분하는 안내는 상자를 유지한다. */
-.dialog > .readOnlyNotice.subtleNotice { background: transparent; border: 0; padding: 0; color: var(--muted); margin-top: -8px; }
-.factGrid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-top: 24px; }
-.factPanel { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--color-background); }
-.factPanel h3, .detailSection h3, .actionSection h3 { font-size: 17px; line-height: 1.5; margin: 0 0 14px; }
-.factPanel p, .factPanel li, .detailSection p, .detailSection li { font-size: 14px; line-height: 1.85; }
-.factPanel p:last-child, .factPanel ul:last-child, .detailSection p:last-child { margin-bottom: 0; }
-.factPanel ul, .detailSection ul { padding-left: 20px; margin: 0 0 12px; }
-.factPanel li + li, .detailSection li + li { margin-top: 8px; }
-.detailSection { margin-top: 30px; }
-.evidence { background: var(--color-surface); padding: 22px; margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; }
-.evidence h4 { margin-bottom: 8px; font-size: 14px; }
-.sourceUrl { overflow-wrap: anywhere; color: #466086; margin-bottom: 4px; }
-.small { font-size: 12px !important; font-weight: 400; color: var(--muted); }
-.draft { white-space: pre-wrap; border-left: 3px solid #9bb3db; padding: 18px 20px; border-radius: 0 10px 10px 0; background: #f8fafc; }
-.confirmations { display: flex; gap: 20px 32px; margin-top: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 12px; flex-wrap: wrap; }
-.confirmations dt { font-size: 12px; color: var(--muted); }
-.confirmations dd { margin: 2px 0 0; font-size: 14px; }
-.dialogFooter { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
 .previewFooter { text-align: center; color: #69798e; font-size: 12px; padding: 0 20px 28px; }
 
 .pagination { margin-top: 24px; text-align: center; }
 .preview button:disabled { opacity: 0.6; cursor: wait; }
-
-.actions { margin-top: 30px; padding-top: 6px; border-top: 1px solid var(--line); }
-.actions > p[role="status"] { padding: 14px 18px; background: #f1f5fc; border-radius: 10px; font-size: 14px; }
-.actionSection { margin-top: 18px; padding: 22px; border: 1px solid var(--line); border-radius: 14px; }
-.actionSection p { font-size: 14px; line-height: 1.8; }
-.actionSection p:last-child { margin-bottom: 0; }
-.actionSection label { display: flex; align-items: flex-start; gap: 10px; margin: 12px 0; font-size: 14px; }
-.actionSection button { margin: 8px 0; }
-.actionSection input { width: 18px; height: 18px; flex-shrink: 0; margin: 3px 0 0; accent-color: var(--color-accent); }
-.actionError { padding: 18px; background: #fff1dc; margin-top: 20px; border-radius: 12px; }
-/* 저장 중인 [설명 저장]은 초점이 남게 `aria-disabled`로 막고(#636 리뷰) `disabled`와 같은 모습으로 그린다. */
+/* 저장 중인 [설명 저장]과 결정 줄의 전환 단추는 초점이 남게 `aria-disabled`로 막고(#636 리뷰) `disabled`와 같은 모습으로 그린다. */
 .dialog button:disabled, .dialog button[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
-/* U4 작성자 설명 입력칸. AI 초안(.draft)과 다른 모양으로 둔다(BR1.3). */
-.descriptionInput { display: block; width: 100%; box-sizing: border-box; margin: 10px 0 4px; padding: 12px 14px; border: 1px solid #c9d2df; border-radius: 9px; font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; }
-.descriptionInput:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
+/* ── Catch 상세 창(#635). 한 줄 배치가 기본이고 넓은 화면의 두 칸 배치는 아래 미디어 쿼리다.
+   모양: 모서리 12·10·8·6px, 1px 선의 상자, 사실 목록 왼쪽 가는 선, 남색 결정 줄. 글꼴은 앱 글꼴(굵기 보통·굵게), 색은 앱 색만 쓴다(2026-11-24 팀장 결정).
+   가장 작은 글자는 12px이다. */
+.catchDialog { width: min(880px, calc(100vw - 32px)); padding: 0 32px; border-radius: 12px; scroll-padding-top: 96px; }
+/* 머리말은 한 줄이고 한 줄 배치에서는 스크롤해도 위에 붙는다. 재인증 안내(#467)는 그 안 둘째 줄이다. 안내가 없으면 줄을 만들지 않는다. */
+.dialogHeading { position: sticky; top: 0; z-index: 2; background: var(--color-surface); display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); margin: 0 -32px 22px; padding: 10px 32px; }
+.headingTitle { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.headingTitle .eyebrow { font-size: 12px; margin: 0; }
+.dialogHeading h2 { font-size: 18px; margin: 0; }
+.dialogHeading > button { flex-shrink: 0; }
+.dialogHeading:has(> .headingNotice:not(:empty)) { flex-wrap: wrap; row-gap: 10px; }
+.headingNotice { flex: 1 0 100%; min-width: 0; }
+.headingNotice:empty { display: none; }
+.detailState { padding-bottom: 28px; }
+.detailState .state { margin-top: 0; }
+
+/* 기록 칸 */
+.detailTitle { font-size: 23px; line-height: 1.42; letter-spacing: -0.5px; margin-bottom: 12px; }
+.readOnlyNotice { font-size: 13px; line-height: 1.8; padding: 16px 18px; background: #f1f5fc; color: #496185; margin: 20px 0; border: 1px solid var(--line); border-radius: 10px; }
+.listOverview > .readOnlyNotice { margin: 20px 0 0; }
+.readColumn > .readOnlyNotice { margin: 14px 0 0; padding: 12px 14px; border-radius: 8px; line-height: 1.7; }
+.factGrid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px 26px; margin-top: 24px; }
+.factPanel { min-width: 0; padding: 2px 0 2px 14px; border-left: 2px solid #9bb3db; }
+.factPanel h3, .detailSection h3 { font-size: 16px; line-height: 1.45; margin: 0 0 8px; }
+.factPanel p, .factPanel li, .detailSection p, .detailSection li { font-size: 14px; line-height: 1.8; }
+.factPanel p:last-child, .factPanel ul:last-child, .detailSection p:last-child { margin-bottom: 0; }
+.factPanel ul, .detailSection ul { padding-left: 18px; margin: 0 0 10px; }
+.factPanel li + li, .detailSection li + li { margin-top: 4px; }
+.detailSection { margin-top: 30px; }
+.evidence { background: var(--color-surface); padding: 14px 16px 16px; margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; }
+/* 머리 줄: 「근거 n · 판본 | 원본 근거 열기 ↗」. 좁으면 링크가 아래 줄로 내려간다. */
+.evidenceHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.evidenceId { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.evidence h4 { margin: 0; font-size: 14px; }
+.evidenceOpen { font-size: 13px; font-weight: 700; color: var(--color-accent); text-decoration: none; white-space: nowrap; border-radius: 4px; }
+.evidenceOpen:hover { text-decoration: underline; text-underline-offset: 3px; }
+.sourceUrl { overflow-wrap: anywhere; color: #466086; margin: 6px 0 0; }
+.detailSection .sourceUrl { font-size: 12px; }
+.evidence > ul { margin: 10px 0 0; }
+.evidence > p { margin: 8px 0 0; }
+.evidenceLimits { margin-top: 10px; padding: 10px 12px; background: var(--color-background); border-radius: 6px; font-size: 13px; }
+.evidenceLimits ul { margin: 2px 0 0; }
+.detailSection .evidenceLimits li { font-size: 13px; line-height: 1.7; }
+.small { font-size: 12px !important; font-weight: 400; color: var(--muted); }
+.draft { white-space: pre-wrap; border-left: 3px solid #9bb3db; padding: 12px 16px; border-radius: 0 8px 8px 0; background: #f8fafc; }
+
+/* 쓰기 칸. 한 줄 배치에서도 옅은 바탕으로 기록 칸과 구분한다. */
+.writeColumn { margin: 30px -32px 0; padding: 24px 32px 28px; background: var(--color-background); border-top: 1px solid var(--line); }
+.writeColumn > .detailSection:first-child { margin-top: 0; }
+/* 질문마다 상자 하나 */
+.detailSection .questions { list-style: none; padding: 0; margin: 0 0 8px; display: grid; gap: 8px; }
+.detailSection .questions li { margin: 0; padding: 11px 13px; border: 1px solid #d1ddee; border-radius: 8px; background: #f1f5fc; line-height: 1.65; }
+.actionError { padding: 12px 14px; background: #fff1dc; color: var(--ink); margin-top: 12px; border-radius: 8px; }
+/* U4 작성자 설명 입력칸. AI 초안(.draft)과 다른 모양으로 둔다(BR1.3). 테두리·모서리·초점 테두리는 앱의 다른 입력 칸과 같다(#632 결정). */
+.descriptionInput { display: block; width: 100%; box-sizing: border-box; margin: 10px 0 4px; padding: 10px 12px; border: 1px solid #c9d2df; border-radius: 9px; background: var(--color-surface); font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; }
+.descriptionInput:focus { outline: 2px solid var(--color-focus); outline-offset: 1px; }
 /* 작성자 설명 칸 편집(새 Catch NC1 BR4.5, #634): 칸 제목은 글칸 위의 보이는 label이고 글칸은 한 줄 전체를 쓴다. 3줄로 시작해 세로로 늘린다(.descriptionInput). */
-.descriptionField { margin-top: 18px; }
+.descriptionField { margin-top: 16px; }
 .descriptionField .descriptionInput { margin-top: 6px; }
 .descriptionLabel { display: block; font-size: 14px; font-weight: 700; }
 /* 늘 보이는 앞 두 칸의 칸 제목과 글칸 사이 안내 한 줄(#634). */
@@ -126,8 +139,60 @@
 .detailSection .descriptionHints li { font-size: 12px; line-height: 1.7; color: var(--muted); }
 .detailSection .descriptionHints li + li { margin-top: 4px; }
 
+/* 결정 줄: 불일치 표시·공개 선택과 [목록으로 돌아가기]. 남색 띠 위의 흰 상자다. 한 줄 배치에서는 창 내용 끝에 온다. */
+.decisionBar { margin: 0 -32px; padding: 20px 32px 24px; background: #254e93; color: #fff; }
+.decisionBar :focus-visible { outline-color: #fff; }
+.actions { display: grid; gap: 10px; }
+.actions :focus-visible { outline-color: var(--color-focus); }
+.actionStatus, .actions > .actionError { margin: 0; font-size: 13px; line-height: 1.6; }
+.actionStatus { padding: 8px 14px; background: var(--color-surface); color: var(--ink); border-radius: 8px; }
+/* 결과 불명: 오류 문장 둘과 [현재 상태 다시 불러오기]가 한 줄에 놓이고 좁으면 단추가 아래로 내려간다. */
+.actions > .actionError { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.actions > .actionError > div { flex: 1 1 260px; min-width: 0; }
+.actions > .actionError p { margin: 0; }
+/* 구역 하나: 제목 | 전환 단추, 그 아래 문장 */
+.actionSection { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: center; align-content: start; min-width: 0; padding: 10px 16px 12px; background: var(--color-surface); color: var(--ink); border-radius: 10px; }
+.actionSection h3 { grid-column: 1; grid-row: 1; margin: 0; font-size: 15px; line-height: 1.5; }
+.actionNote { grid-column: 1 / -1; grid-row: 2; }
+.actionNote p { margin: 2px 0 0; font-size: 13px; line-height: 1.6; }
+/* 전환 단추(role="switch"). 켜짐은 색만이 아니라 손잡이 자리와 옆의 상태 글로도 보인다. */
+.switch { grid-column: 2; grid-row: 1; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 4px; border: 0; border-radius: 8px; background: none; color: var(--ink); font-size: 13px; font-weight: 700; line-height: 1.4; }
+.switchTrack { position: relative; flex: none; width: 44px; height: 24px; border: 2px solid var(--muted); border-radius: 12px; background: var(--color-surface); transition: background-color 120ms ease, border-color 120ms ease; }
+.switchThumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: transform 120ms ease, background-color 120ms ease; }
+.switch[aria-checked="true"] .switchTrack { background: #254e93; border-color: #254e93; }
+.switch[aria-checked="true"] .switchThumb { transform: translateX(20px); background: var(--color-surface); }
+.switchState { min-width: 5em; text-align: left; white-space: nowrap; }
+/* 눌러서 저장 중인 단추는 막혀 있어도 덜 흐리게 둔다(누른 쪽으로 옮겨 보이는 중). */
+.dialog .switch[data-saving] { opacity: .85; cursor: progress; }
+.dialogFooter { display: flex; justify-content: flex-end; margin-top: 14px; }
+.decisionBar .dialogFooter .secondaryButton { background: transparent; border-color: rgb(255 255 255 / 60%); color: #fff; }
+.decisionBar .dialogFooter .secondaryButton:hover { background: rgb(255 255 255 / 12%); border-color: #fff; }
+
+/* 두 칸 배치(#635): 가로 1200px·세로 600px 이상. 폭·비율은 받은 사람 화면(#615)과 같은 값이다. assets-view.tsx의 WIDE_DETAIL_QUERY와 함께 고친다.
+   머리말·두 칸·결정 줄 세 줄이고 두 칸만 따로 스크롤한다. 결정 줄이 높아져 두 칸이 240px보다 낮아질 때만 창이 스크롤한다. */
+@media (min-width: 1200px) and (min-height: 600px) {
+  .catchDialog[open] { display: grid; grid-template-rows: auto minmax(240px, 1fr) auto; width: min(1440px, calc(100% - 48px)); max-width: none; height: calc(100dvh - 48px); max-height: none; padding: 0; }
+  .catchDialog .dialogHeading { position: static; margin: 0; padding: 8px 20px; }
+  .detailBody { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(400px, 1fr); min-height: 0; }
+  /* position: relative는 칸 안의 낭독기 전용 글자(절대 위치)가 칸 밖 창 스크롤을 만들지 않게 칸이 담으려는 것이다. */
+  .readColumn, .writeColumn, .detailState { position: relative; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 22px 26px 32px; }
+  .writeColumn { margin: 0; border-top: 0; border-left: 1px solid var(--line); }
+  .readColumn:focus-visible { outline: 3px solid var(--color-focus); outline-offset: -4px; }
+  .factGrid { grid-template-columns: 1fr; gap: 16px; margin-top: 22px; }
+  .decisionBar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; margin: 0; padding: 8px 14px 10px; }
+  .actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); min-width: 0; }
+  .actions > .actionStatus, .actions > .actionError { grid-column: 1 / -1; }
+  .actions > .actionStatus { padding: 4px 12px; }
+  .actions > .actionError { padding: 6px 12px; }
+  .dialogFooter { margin: 0; }
+}
+/* 세로가 760px 미만이면 바깥 여백을 12px로 줄인다. */
+@media (min-width: 1200px) and (min-height: 600px) and (max-height: 759.98px) {
+  .catchDialog[open] { height: calc(100dvh - 24px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .card { transition: none; }
+  .card, .switchTrack, .switchThumb { transition: none; }
 }
 
 @media (max-width: 760px) {
@@ -140,8 +205,9 @@
   .filters { flex-direction: column; }
   .filter { min-width: 0; }
   .dialog { padding: 22px; }
-  .catchDialog { padding: 0 20px 22px; }
-  .dialogHeading { margin: 0 -20px 22px; padding: 18px 20px; }
-  .detailTitle { font-size: 22px; }
-  .factPanel, .evidence, .actionSection { padding: 18px; }
+  .catchDialog { padding: 0 20px; }
+  .dialogHeading { margin: 0 -20px 20px; padding: 10px 20px; }
+  .detailTitle { font-size: 20px; }
+  .writeColumn { margin: 26px -20px 0; padding: 22px 20px 24px; }
+  .decisionBar { margin: 0 -20px; padding: 18px 20px 22px; }
 }

@@ -152,6 +152,19 @@ export function createAssetsStore(api: CatchApi) {
     detailTask = task;
     return task;
   }
+  /**
+   * 저장 요청을 보낸다. `confirmFirst`면 확인 요청을 먼저 보내고, 그 요청이 성공했을 때만 이어서 보낸다(#635).
+   * `confirmed`는 확인 요청이 성공했을 때 서버가 돌려준 Catch다. 뒤 요청의 결과와 상관없이 서버에는 확인이 반영돼 있다.
+   */
+  async function send(catchId: string, change: CatchChange, confirmFirst: boolean) {
+    let confirmed: CatchAsset | null = null;
+    if (confirmFirst) {
+      const first = await safely(() => api.update(catchId, { kind: "confirmation" }));
+      if (first.kind !== "success") return { result: first, confirmed };
+      confirmed = first.data;
+    }
+    return { result: await safely(() => api.update(catchId, change)), confirmed };
+  }
   function update(change: CatchChange): Promise<void> {
     if (writeTask) return writeTask;
     const item = state.detail;
@@ -160,12 +173,17 @@ export function createAssetsStore(api: CatchApi) {
     const catchId = item.catchId;
     const version = ++mutationVersion;
     emit({ mutation: { catchId, kind: change.kind, status: "saving", error: null } });
-    const task = safely(() => api.update(catchId, change)).then((result) => {
+    // 내용 확인을 공개에 합쳤다(#635, 2026-11-24 팀장 결정). 확인하지 않은 Catch를 공개로 바꿀 때는 확인 요청을 먼저 보낸다.
+    // 서버는 그대로라 확인 없는 공개 요청을 409로 거부한다. 이미 확인한 Catch는 공개 요청만 보낸다.
+    const confirmFirst = change.kind === "visibility" && change.visibility === "PUBLIC"
+      && !(item.confirmation.workFactsConfirmed && item.confirmation.contributionConfirmed);
+    const task = send(catchId, change, confirmFirst).then(({ result, confirmed }) => {
       if (version !== mutationVersion) return;
       // 서버가 처리하지 않은 요청은 진행 표시만 정리한다. 상세·목록과 진행 중인 조회는 그대로 두고 잠그지 않는다.
       // 반영하지 않은 응답(discarded)은 보낸 뒤라 반영됐을 수 있으므로 아래 결과 불명 처리로 간다.
       const outcome = result.kind === "success" ? "other" : memberMutationOutcome(result);
-      if (outcome === "renewed-rejected" || outcome === "not-sent") {
+      const notProcessed = outcome === "renewed-rejected" || outcome === "not-sent";
+      if (notProcessed && !confirmed) {
         emit({ mutation: { catchId, kind: change.kind, status: "not-processed", error: null, reason: outcome } });
         return;
       }
@@ -174,13 +192,16 @@ export function createAssetsStore(api: CatchApi) {
       const reloadList = state.listState === "loading" || pendingRefresh?.version === listVersion;
       ++listVersion; listAbort?.abort(); listAbort = new AbortController(); listTask = moreTask = undefined;
       pendingRefresh = undefined;
-      if (result.kind === "success") {
+      // 서버에 반영된 것으로 확인된 값. 확인만 반영되고 공개 요청은 처리되지 않았으면 확인된 Catch(미공개)를 쓴다.
+      const applied = result.kind === "success" ? result.data : notProcessed ? confirmed : null;
+      if (applied) {
         emit({
-          items: state.items.map((entry) => entry.catchId === catchId ? result.data : entry),
-          ...(state.selectedId === catchId ? { detail: result.data, detailState: "ready" as const, detailError: null } : {}),
-          moreState: "idle", mutation: { catchId, kind: change.kind, status: "success", error: null },
+          items: state.items.map((entry) => entry.catchId === catchId ? applied : entry),
+          ...(state.selectedId === catchId ? { detail: applied, detailState: "ready" as const, detailError: null } : {}),
+          moreState: "idle", mutation: result.kind === "success" ? { catchId, kind: change.kind, status: "success", error: null }
+            : { catchId, kind: change.kind, status: "not-processed", error: null, reason: outcome === "renewed-rejected" ? outcome : "not-sent" },
         });
-      } else {
+      } else if (result.kind !== "success") {
         emit({ moreState: "idle", mutation: { catchId, kind: change.kind, status: "error", error: result } });
         // 다시 열어 대기하던 화면에 이전 값을 끼워 넣지 않는다.
         if (state.selectedId === catchId && state.detailState === "loading") {

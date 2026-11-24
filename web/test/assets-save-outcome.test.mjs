@@ -239,26 +239,28 @@ hooks.deregister();
 const actionsMarkup = (target, mutation) => renderToStaticMarkup(createElement(CatchActions, {
   item: target, mutation, onChange: () => {}, onReload: () => {},
 }));
-const disabledButtons = (html) => (html.match(/<button[^>]*disabled=""/g) ?? []).length;
+// 결정 줄의 전환 단추(#635). 막을 때는 초점이 남게 disabled 대신 aria-disabled를 쓴다.
+const switches = (html) => [...html.matchAll(/<button[^>]*role="switch"[^>]*>/g)].map((match) => match[0]);
+const blockedSwitches = (html) => switches(html).filter((tag) => tag.includes('aria-disabled="true"')).length;
 
 test("화면: 로그인 연장 뒤 거부는 합의 문구로 안내하고 다시 누를 수 있게 둔다", () => {
   const target = item("c1", { confirmation: { workFactsConfirmed: false, contributionConfirmed: false } });
-  for (const kind of ["confirmation", "mismatch", "visibility"]) {
+  for (const kind of ["mismatch", "visibility"]) {
     const html = actionsMarkup(target, { catchId: "c1", kind, status: "not-processed", error: null, reason: "renewed-rejected" });
     assert.match(html, /로그인이 연장되었습니다\. 다시 눌러 주세요\./);
     assert.doesNotMatch(html, /현재 상태 다시 불러오기/, "재조회 잠금이 아니다");
     assert.doesNotMatch(html, /변경 내용을 저장했습니다|저장하고 있습니다/);
-    assert.equal((html.match(/<input[^>]*disabled=""/g) ?? []).length, 0, "확인 체크는 그대로 조작할 수 있다");
+    assert.equal(blockedSwitches(html), 0, "전환 단추는 그대로 누를 수 있다");
   }
 });
 
-test("화면: 보내지 않음은 확인(입력 있음)에서만 입력 유지를 덧붙이고, 다른 Catch의 안내는 보이지 않는다", () => {
+test("화면: 보내지 않음은 한 문장이고(체크 상자가 없어 입력 유지 문구는 없다), 다른 Catch의 안내는 보이지 않는다", () => {
   const target = item("c1", { confirmation: { workFactsConfirmed: false, contributionConfirmed: false } });
-  const confirmation = actionsMarkup(target, { catchId: "c1", kind: "confirmation", status: "not-processed", error: null, reason: "not-sent" });
-  assert.match(confirmation, /지금은 요청을 보내지 않았습니다\. 입력은 그대로 두었습니다\./);
-  const visibility = actionsMarkup(target, { catchId: "c1", kind: "visibility", status: "not-processed", error: null, reason: "not-sent" });
-  assert.match(visibility, /지금은 요청을 보내지 않았습니다\./);
-  assert.doesNotMatch(visibility, /입력은 그대로/);
+  for (const kind of ["mismatch", "visibility"]) {
+    const html = actionsMarkup(target, { catchId: "c1", kind, status: "not-processed", error: null, reason: "not-sent" });
+    assert.match(html, /<p role="alert">지금은 요청을 보내지 않았습니다\.<\/p>/);
+    assert.doesNotMatch(html, /입력은 그대로/);
+  }
   const other = actionsMarkup(target, { catchId: "c2", kind: "visibility", status: "not-processed", error: null, reason: "not-sent" });
   assert.doesNotMatch(other, /요청을 보내지 않았습니다|로그인이 연장되었습니다/);
 });
@@ -267,9 +269,73 @@ test("화면 회귀: 결과 불명은 재조회 안내와 함께 조작을 막�
   const target = item();
   const unknown = actionsMarkup(target, { catchId: "c1", kind: "visibility", status: "error", error: serverError() });
   assert.match(unknown, /현재 상태 다시 불러오기/);
-  assert.doesNotMatch(unknown, /로그인이 연장되었습니다/);
-  assert.equal(disabledButtons(unknown), 2, "불일치·공개 버튼을 막는다");
+  assert.match(unknown, /보이는 상태는 마지막으로 확인한 값입니다\. 현재 상태를 다시 불러온 뒤 진행해 주세요\./);
+  assert.doesNotMatch(unknown, /로그인이 연장되었습니다|아래 상태는/);
+  assert.equal(blockedSwitches(unknown), 2, "불일치·공개 전환 단추를 막는다");
   const saving = actionsMarkup(target, { catchId: "c1", kind: "visibility", status: "saving", error: null });
-  assert.match(saving, /저장하고 있습니다/);
-  assert.equal(disabledButtons(saving), 2);
+  assert.match(saving, /<p role="status">변경 내용을 저장하고 있습니다\.<\/p>/);
+  assert.doesNotMatch(saving, /창을 닫아도/);
+  assert.equal(blockedSwitches(saving), 2);
+  assert.doesNotMatch(unknown + saving, /<button[^>]*role="switch"[^>]* disabled=""/, "초점이 남게 disabled는 쓰지 않는다");
+});
+
+// #635 결정 줄: 「내용 확인」 구역이 없고 불일치·공개는 전환 단추 둘이다. 문장은 이슈 범위 3의 표 「바꾼 뒤」다.
+// 먼저 정한 실패 조건: 체크 상자·[확인 완료]·[지금 공개]·[숨기기]가 남음, 전환 단추에 이름·설명이 안 붙음, 확인 전 Catch의 공개 단추가 막힘,
+// 원본이 보호된 미공개 Catch에 문장이 둘 보이거나 단추가 눌림, 원본이 보호된 공개 Catch에 「지금은 공개할 수 없습니다」가 보임.
+const switchOf = (html, kind) => switches(html).find((tag) => tag.includes(`data-testid="catch-${kind}-switch"`)) ?? assert.fail(`${kind} 전환 단추가 있어야 한다`);
+const stateText = (html, kind) => html.slice(html.indexOf(`data-testid="catch-${kind}-switch"`)).match(/<span aria-hidden="true">([^<]+)<\/span><\/button>/)?.[1];
+const visibilityNote = (html) => html.match(/id="([^"]+-visibility-note)"[^>]*>([\s\S]*?)<\/div>/)?.[2] ?? assert.fail("공개 선택 문장이 있어야 한다");
+
+test("#635 결정 줄에는 내용 확인 구역과 옛 단추가 없고, 전환 단추 둘이 구역 제목을 이름으로, 문장을 설명으로 가진다", () => {
+  const html = actionsMarkup(item("c1", { confirmation: { workFactsConfirmed: false, contributionConfirmed: false } }), null);
+  assert.doesNotMatch(html, /내용 확인|확인 완료|확인만으로|<input|지금 공개|숨기기<|불일치 표시 해제/);
+  assert.equal(switches(html).length, 2);
+  assert.equal((html.match(/<button/g) ?? []).length, 2, "전환 단추 말고 다른 단추는 없다");
+  for (const [kind, title] of [["mismatch", "불일치 표시"], ["visibility", "공개 선택"]]) {
+    const tag = switchOf(html, kind);
+    const labelledBy = tag.match(/aria-labelledby="([^"]+)"/)[1];
+    const describedBy = tag.match(/aria-describedby="([^"]+)"/)[1];
+    assert.ok(html.includes(`<h3 id="${labelledBy}">${title}</h3>`), title);
+    assert.ok(html.includes(`<div id="${describedBy}">`), `${title} 설명`);
+    assert.match(tag, /type="button"/);
+  }
+  assert.ok(html.includes("<p>표시와 해제는 다음에 발행하는 발행본부터 반영됩니다.</p>"));
+});
+
+test("#635 확인하지 않은 미공개 Catch도 공개 전환 단추가 열려 있고 문장은 한 가지다", () => {
+  for (const confirmed of [false, true]) {
+    const html = actionsMarkup(item("c1", { confirmation: { workFactsConfirmed: confirmed, contributionConfirmed: confirmed } }), null);
+    assert.equal(visibilityNote(html), "<p>작업 사실과 나의 기여가 맞는지 본 뒤 공개하세요. 공개한 Catch만 발행할 수 있습니다.</p>");
+    assert.match(switchOf(html, "visibility"), /aria-checked="false"/);
+    assert.doesNotMatch(switchOf(html, "visibility"), /aria-disabled/);
+    assert.equal(stateText(html, "visibility"), "미공개");
+    assert.doesNotMatch(html, /먼저 확인해 주세요|공개할 준비가 되었다면/);
+  }
+});
+
+test("#635 전환 단추는 지금 상태를 aria-checked와 상태 글로 보인다", () => {
+  const off = actionsMarkup(item("c1"), null);
+  assert.match(switchOf(off, "mismatch"), /aria-checked="false"/);
+  assert.equal(stateText(off, "mismatch"), "표시 안 함");
+  const on = actionsMarkup(item("c1", { mismatch: true, visibility: "PUBLIC" }), null);
+  assert.match(switchOf(on, "mismatch"), /aria-checked="true"/);
+  assert.equal(stateText(on, "mismatch"), "표시됨");
+  assert.match(switchOf(on, "visibility"), /aria-checked="true"/);
+  assert.equal(stateText(on, "visibility"), "공개 설정");
+  assert.equal(visibilityNote(on), "<p>숨겨도 이미 발행한 발행본에는 그대로 남습니다. 제공을 끝내려면 발행본에서 링크를 중지하세요.</p>");
+});
+
+test("#635 원본이 보호된 미공개 Catch는 보호 문장 하나이고 공개 전환 단추만 막힌다. 보호된 공개 Catch는 지금 보호 문장과 숨기기 안내다", () => {
+  for (const confirmed of [false, true]) {
+    const html = actionsMarkup(item("c1", { restriction: "SOURCE_PRIVATE",
+      confirmation: { workFactsConfirmed: confirmed, contributionConfirmed: confirmed } }), null);
+    assert.equal(visibilityNote(html), "<p>원본 저장소가 보호되어 지금은 공개할 수 없습니다.</p>");
+    assert.match(switchOf(html, "visibility"), /aria-disabled="true"/);
+    assert.doesNotMatch(switchOf(html, "mismatch"), /aria-disabled/);
+  }
+  const shown = actionsMarkup(item("c1", { restriction: "SOURCE_PRIVATE", visibility: "PUBLIC" }), null);
+  assert.equal(visibilityNote(shown), "<p>원본 저장소가 보호되어 외부에서 열람할 수 없습니다.</p>"
+    + "<p>숨겨도 이미 발행한 발행본에는 그대로 남습니다. 제공을 끝내려면 발행본에서 링크를 중지하세요.</p>");
+  assert.doesNotMatch(shown, /지금은 공개할 수 없습니다/);
+  assert.doesNotMatch(switchOf(shown, "visibility"), /aria-disabled/, "보호된 공개 Catch는 숨길 수 있다");
 });
