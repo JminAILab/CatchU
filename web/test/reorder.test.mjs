@@ -14,7 +14,7 @@ import { load } from "./u2-render.mjs";
 
 const {
   moveItem, parseOrderInput, movedText, orderHintText, ORDER_DISCARDED_TEXT, ORDER_UNCHANGED_TEXT,
-  isDropAccepted, dropSlot, autoScrollSpeed, clamp, revealScrollTop, DROP_SLACK_ROWS, SCROLL_ROWS_PER_SECOND,
+  isDropAccepted, dropSlot, autoScrollSpeed, pageScrollStep, clamp, revealScrollTop, DROP_SLACK_ROWS, SCROLL_ROWS_PER_SECOND,
 } = await load("features/publications/reorder.ts");
 
 test("moveItem: from 자리의 항목을 to 자리에 넣고 사이를 민다. 범위 밖·같은 자리·정수 아님은 null이고 원래 배열은 바뀌지 않는다", () => {
@@ -121,4 +121,21 @@ test("revealScrollTop: 가려진 줄은 다 보이는 자리로 스크롤하고,
   assert.equal(revealScrollTop(view, 150, 40), 100, "이미 보임");
   assert.equal(revealScrollTop(view, 280, 40), 120, "아래에 가려짐");
   assert.equal(revealScrollTop(view, 60, 40), 60, "위에 가려짐");
+});
+
+// #632 리뷰: 낮은 창(높이 640px 이하)에서는 목록이 페이지와 함께 길어지므로 화면 끝에서 페이지를 스크롤한다.
+test("pageScrollStep: 화면 위·아래 끝 띠에서 목록이 화면 밖에 남은 만큼만 페이지를 움직이고, 가운데·목록이 다 보일 때·여유 밖은 0이다", () => {
+  const row = 50, view = 600, seconds = 0.1;
+  const long = { top: -300, bottom: 900 };
+  assert.equal(pageScrollStep(600, long, view, row, seconds), 6 * row * seconds, "아래 끝은 최대 속도로 아래로");
+  assert.equal(pageScrollStep(0, long, view, row, seconds), -6 * row * seconds, "위 끝은 최대 속도로 위로");
+  assert.equal(pageScrollStep(300, long, view, row, seconds), 0, "가운데는 멈춘다");
+  assert.ok(pageScrollStep(560, long, view, row, seconds) > 0 && pageScrollStep(560, long, view, row, seconds) < 6 * row * seconds, "띠 안은 느리게");
+  assert.equal(pageScrollStep(600, { top: -300, bottom: 610 }, view, row, seconds), 10, "남은 만큼만 내려간다");
+  assert.equal(pageScrollStep(0, { top: -4, bottom: 900 }, view, row, seconds), -4, "남은 만큼만 올라간다");
+  assert.equal(pageScrollStep(600, { top: 100, bottom: 500 }, view, row, seconds), 0, "목록이 다 보이면 움직이지 않는다");
+  assert.equal(pageScrollStep(0, { top: 100, bottom: 900 }, view, row, seconds), 0, "위쪽이 다 보이면 위로 가지 않는다");
+  assert.equal(pageScrollStep(600 + row * 1.1, long, view, row, seconds), 0, "받아 주는 여유 밖은 멈춘다");
+  assert.equal(pageScrollStep(600, long, 0, row, seconds), 0);
+  assert.equal(pageScrollStep(600, long, view, row, 0), 0);
 });

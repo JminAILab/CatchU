@@ -94,3 +94,18 @@ export function autoScrollSpeed(pointerY: number, list: { readonly top: number; 
   if (pointerY > list.bottom - band && pointerY <= list.bottom + slack) return speed(pointerY - (list.bottom - band));
   return 0;
 }
+
+/**
+ * 목록이 상자 안에서 스크롤되지 않고 페이지와 함께 길어질 때(창 높이 640px 이하) 페이지를 얼마나 스크롤할지(px, 위쪽이면 음수).
+ * 화면 위·아래 끝을 띠로 삼아 `autoScrollSpeed`와 같은 속도로 움직이고, 목록이 그 방향으로 화면 밖에 남아 있는 만큼만 간다.
+ * `list`는 화면 기준의 목록 위·아래 자리다.
+ */
+export function pageScrollStep(
+  pointerY: number, list: { readonly top: number; readonly bottom: number }, viewHeight: number, rowHeight: number, seconds: number,
+): number {
+  if (!(viewHeight > 0) || !(seconds > 0)) return 0;
+  const step = autoScrollSpeed(pointerY, { top: 0, bottom: viewHeight }, rowHeight) * seconds;
+  if (step < 0) return Math.max(step, Math.min(0, list.top));
+  if (step > 0) return Math.min(step, Math.max(0, list.bottom - viewHeight));
+  return 0;
+}

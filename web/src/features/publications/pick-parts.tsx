@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { SourceList } from "./publish-sources";
 import {
-  autoScrollSpeed, clamp, dropSlot, isDropAccepted, movedText, revealScrollTop, orderHintText, parseOrderInput, ORDER_DISCARDED_TEXT, ORDER_UNCHANGED_TEXT,
+  autoScrollSpeed, clamp, dropSlot, isDropAccepted, movedText, pageScrollStep, revealScrollTop, orderHintText, parseOrderInput, ORDER_DISCARDED_TEXT, ORDER_UNCHANGED_TEXT,
 } from "./reorder";
 import styles from "./publications.module.css";
 
@@ -201,6 +201,10 @@ export function ReorderList(props: ReorderListProps) {
       if (scroller.scrollHeight > scroller.clientHeight + 1 && isDropAccepted({ x, y }, box, rowHeight)) {
         const max = scroller.scrollHeight - scroller.clientHeight;
         scroller.scrollTop = Math.max(0, Math.min(max, scroller.scrollTop + autoScrollSpeed(y, box, rowHeight) * seconds));
+      } else if (scroller.scrollHeight <= scroller.clientHeight + 1 && isDropAccepted({ x, y }, box, rowHeight)) {
+        // 낮은 창에서는 목록이 상자 안에서 스크롤되지 않고 페이지와 함께 길어진다. 그때는 화면 끝에서 페이지를 스크롤한다.
+        const step = pageScrollStep(y, box, window.innerHeight, rowHeight, seconds);
+        if (step !== 0) window.scrollBy({ top: step, behavior: "instant" });
       }
       place();
     };
