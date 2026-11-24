@@ -90,7 +90,13 @@ export function ReorderList(props: ReorderListProps) {
 
   useEffect(() => { latest.current = props; });
   // 끄는 중에 화면을 떠나면 창에 걸어 둔 듣기를 푼다.
-  useEffect(() => () => { stopDrag.current?.(); }, []);
+  // 마지막 항목을 빼면 부모가 빈 목록 글로 바꾸면서 이 부품을 내리므로, 아래 효과가 돌지 못한다. 그때의 초점은 내려갈 때 옮긴다.
+  useEffect(() => () => {
+    stopDrag.current?.();
+    const target = pending.current;
+    pending.current = null;
+    if (target?.kind === "empty") latest.current.emptyFocus?.(target.sourceId)?.focus();
+  }, []);
   useEffect(() => {
     committing.current = false;
     // 옮긴 줄이 스크롤 상자에 가려 있으면 보이는 곳으로 스크롤한다(끌어서 테두리 밖에 놓았을 때).
