@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { readApiResponse } from "../../lib/api-response";
 import { AssetsConnected, type RepositoryManagementBindings } from "./assets-connected";
+import { createAuthorDescriptionApi } from "./author-description-api";
 import { createCatchApi } from "./catch-api";
 import { previewCatches, previewRepositories } from "./fixtures";
 import styles from "./assets.module.css";
@@ -50,6 +51,27 @@ const api = createCatchApi(async (path, options) => {
     : Response.json({ code: "RESOURCE_UNAVAILABLE", message: "열 수 없음" }, { status: 404 }));
 });
 
+// 작성자 설명 편집 확인용 합성 설명(#634). 첫 Catch는 옛 칸 제목으로 쓴 글, 둘째는 칸 제목 없는 옛 자유 글, 나머지는 설명이 없다.
+const descriptions = new Map<string, string>([
+  [previewCatches[0].catchId, "【이 작업에서 정한 것】\n[합성] 오류 종류별로 응답을 나누기로 했다.\n\n【맡은 부분】\n[합성] 오류 응답 분기와 그 검사\n\n"
+    + "【어떻게 확인했나·결과】\n[합성] 분기별 검사 두 개로 확인했다."],
+  [previewCatches[1].catchId, "[합성] 칸 제목 없이 쓴 옛 설명입니다."],
+]);
+const descriptionApi = createAuthorDescriptionApi(async (path, options = {}) => {
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  const mode = new URLSearchParams(window.location.search).get("failure");
+  const catchId = decodeURIComponent(path.split("/")[2] ?? "");
+  if (options.method === "PUT") {
+    if (mode === "save") return readApiResponse(Response.json({ code: "INTERNAL_ERROR", message: "모의 저장 실패" }, { status: 500 }));
+    if (mode === "login") return readApiResponse(Response.json({ code: "AUTH_INVALID", message: "모의 로그인 만료" }, { status: 401 }));
+    const body = options.body as { description?: unknown } | undefined;
+    const value = typeof body?.description === "string" ? body.description : "";
+    if (value.trim()) descriptions.set(catchId, value); else descriptions.delete(catchId);
+  }
+  const stored = descriptions.get(catchId) ?? null;
+  return readApiResponse(Response.json({ authorDescription: stored, authorDescriptionUpdatedAt: stored === null ? null : new Date().toISOString() }));
+});
+
 function ManagementPreview({ bindings }: { bindings: RepositoryManagementBindings }) {
   const [open, setOpen] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -72,8 +94,9 @@ export function AssetsApiPreview() {
   return <div className={`${styles.preview} ${styles.standalonePreview}`}>
     <aside className={styles.previewToolbar}><div><strong>내 자산 API 연결 동작 · 모의 응답</strong>
       <p>자료와 응답은 모두 예시입니다. 실제 로그인·API·DB 연결 검증 화면이 아닙니다.</p>
-      <p>조회 실패는 failure=all, 상세 실패는 failure=detail, 저장 실패는 failure=save로 확인합니다. 저장은 메모리의 합성 자료에만 적용되고 새로고침하면 초기화됩니다.</p></div></aside>
-    <AssetsConnected api={api} repositories={previewRepositories}
+      <p>조회 실패는 failure=all, 상세 실패는 failure=detail, 저장 실패는 failure=save로 확인합니다. 작성자 설명 저장의 로그인 만료는 failure=login입니다.
+        저장은 메모리의 합성 자료에만 적용되고 새로고침하면 초기화됩니다.</p></div></aside>
+    <AssetsConnected api={api} descriptionApi={descriptionApi} repositories={previewRepositories}
       repositoryManagement={(bindings) => <ManagementPreview bindings={bindings} />} />
   </div>;
 }

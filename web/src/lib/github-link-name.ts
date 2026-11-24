@@ -1,4 +1,4 @@
-import { isGithubSourceUrl, splitGithubLinks } from "./github-source-url.ts";
+import { isGithubSourceUrl } from "./github-source-url.ts";
 
 /**
  * 작성자 설명 속 GitHub 링크의 이름(새 Catch NC1 GithubLinkName, BR2.1~BR2.8, 계약 C7).
@@ -132,13 +132,4 @@ export function isOwnCommitLink(url: string, ownCommits: readonly OwnCommit[]): 
   const repository = `${parsed.owner}/${parsed.repository}`.toLowerCase();
   const prefix = revision.toLowerCase();
   return ownCommits.filter((commit) => commit.repository.toLowerCase() === repository && commit.commitId.startsWith(prefix)).length === 1;
-}
-
-/** 글 여러 개에서 GitHub 링크를 글 순서대로 모은다. 주소 글자가 같은 링크는 처음 것 하나만 둔다(BR3.1). */
-export function collectLinks(texts: readonly string[]): string[] {
-  const links = new Set<string>();
-  for (const text of texts) {
-    for (const segment of splitGithubLinks(text)) if (segment.kind === "link") links.add(segment.url);
-  }
-  return [...links];
 }
