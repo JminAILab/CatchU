@@ -4,7 +4,7 @@
 
 ## 근거
 
-- 글: 발행 프리셋([#597](https://github.com/JminAILab/CatchU/issues/597)) intent의 U4 기능 설계 `aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md` 「확정 문구」(2026-11-20). 아래 2026-11-12 확정 문구에 프리셋을 넣은 다섯 곳(C1~C5)만 바꾼 글이며, 9번에 바뀐 날짜(2026년 11월 30일)와 내용을 더했다. 표는 표로·제목 단계도 그대로 둔다.
+- 글: 발행 프리셋([#597](https://github.com/JminAILab/CatchU/issues/597)) intent의 U4 기능 설계 `aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md` 「확정 문구」(2026-11-20). 아래 2026-11-12 확정 문구에 프리셋을 넣은 다섯 곳(C1~C5)만 바꾼 글이며, 9번에 바뀐 날짜와 내용을 더했다. 바뀐 날짜는 기능 설계가 정한 대로 이 변경이 main에 배포된 날(2026년 11월 25일)이다. 표는 표로·제목 단계도 그대로 둔다.
 - 앞 판본의 기록: [#496 팀장 결정](https://github.com/JminAILab/CatchU/issues/496#issuecomment-6788199337)(2026-11-11)과 [고친 확정 문구](https://github.com/JminAILab/CatchU/issues/496#issuecomment-6810581294)(2026-11-12)의 「개인정보 처리방침 확정 문구(2026-11-12 수정)」 접힌 칸. 주소 `/privacy`는 이 결정대로다.
 - 같은 폴더의 `privacy-policy.md`가 위 기능 설계 「확정 문구」의 글을 글자 그대로 옮긴 원문 사본이다.
 
