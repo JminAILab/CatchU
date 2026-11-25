@@ -15,7 +15,7 @@
 | `publications-list-view.tsx` / `publications-list-screen.tsx` | 발행본 목록 그리기와 상태 전이(`createPublicationsListModel`) |
 | `publication-detail-view.tsx` / `publication-detail-screen.tsx` | 발행본 상세 그리기와 상태 전이(`createPublicationDetailModel`, 중지·삭제) |
 | `snapshot-view.tsx` | 사본(C-07 `PublishedSnapshot`) 그리기. 발행 프리셋 탭(`groupByPreset`, 공용 `components/tab-strip/`), 본문·작성자 설명의 GitHub 주소 링크(`LinkedText`), 작성자 설명 칸별 보기와 강조 범위 맞추기, 새 Catch NC2의 저장소 줄·작성 시점·「이 기록으로 알 수 없는 것」·본인 커밋 표지 |
-| `snapshot-jump.ts` | 열린 프리셋 탭·출처 이동 대상·탭 바뀜 알림(`useSnapshotJump`). 발행본 상세와 받은 사람 화면이 함께 쓴다(발행 프리셋 U3). 받은 사람 화면만 선택 값 `place`(자료 칸 안쪽만 옮기기)를 넘기고 `target`·`again`을 쓴다(#615, [받은 사람 화면 README](../recipient/README.md) 「넓은 화면 좌우 배치와 돌아가기」). 발행본 상세는 넘기지 않아 그대로다 |
+| `snapshot-jump.ts` | 열린 프리셋 탭·출처 이동 대상·탭 바뀜 알림(`useSnapshotJump`). 발행본 상세와 받은 사람 화면이 함께 쓴다(발행 프리셋 U3) |
 | `github-link.tsx` | 작성자 설명 속 GitHub 링크 하나(`GithubLink`): 이름 글자, `href`·`title`은 원래 주소, 숨은 「(새 탭)」 |
 | `fold-text.tsx` | 사본의 긴 글 접기(#607 `FoldText`): 접는 기준, 줄 수 세기, 펼침 규칙, 「전체 보기 / 접기」 단추, 탭이 열릴 때 다시 세기(`FoldVisibleContext`), 단추가 없어질 때 초점 넘기기. 받은 사람 화면과 발행본 상세가 `snapshot-view.tsx`·`published-pdf-item.tsx`로 함께 쓴다 |
 | `publication-link-actions.tsx` | [URL 복사]·[링크 열기] |
