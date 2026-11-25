@@ -11,7 +11,8 @@
 //
 // 화면 자리 G1~G4 (C-11 slot 0·guide-rule; 세 상태를 그려 확인)
 //   - 기대: 판정 통과 화면 = U4 h1(tabIndex={-1}, 첫 초점) → 0번 RecipientGuide(U2, showClaudeConnect={claudeConnectable(snapshot)}) 정확히 1개 → 0.5번 U9 패널
-//           (같은 값이 참일 때만, U9 #495·#506) → U4 고정 안내(발행 시각) → 1번 발행본 자료 → 2 BaseSummaryPanel(U5) → 3 QnaPanel(U5) → 4번 자리(U10).
+//           (같은 값이 참일 때만, U9 #495·#506) → U4 고정 안내(발행 시각) → 2 BaseSummaryPanel(U5) → 1번 발행본 자료 → 3 QnaPanel(U5) → 4번 자리(U10).
+//           (발행 프리셋 U3 BR3.1이 AI 요약을 발행본 자료 위로 올렸다. 발행본 자료는 프리셋 탭이다. 아래 「발행 프리셋 U3」 묶음.)
 //           grant 없이 연 판정 통과 화면(readWithoutGrant true)은 Claude 줄과 U9 패널이 하나씩, grant를 실어 연 판정 통과 화면(false)은 둘 다 0개다.
 //           비밀번호 입력 화면과 접근 불가 화면 = U4 h1(첫 초점)과 U4 안내만, RecipientGuide·U9 패널 0개(G1·G2).
 //           각 상태의 h1은 U4 것 하나뿐이고 RecipientGuide·U9 패널 안에 h1이 없다(G3). 상태가 바뀔 때 첫 초점은 U4 h1로 가고 RecipientGuide 안 요소로 가지 않는다(G4).
@@ -65,15 +66,17 @@ const PASSWORD = "secret-pass-1";
 const PUBLISHED_AT = "2026-11-05T03:04:05.000Z";
 const EXPIRES_AT = "2027-02-03T03:04:05.000Z";
 
+// 발행 프리셋 U3: 사본 항목마다 프리셋 칸(계약 P-3)이 있다. 따로 정하지 않으면 모두 첫 프리셋이다.
+const PRESET = { presetOrdinal: 1, presetName: "기본 프리셋" };
 const catchItem = (id, position, patch = {}) => ({
-  publishedItemId: id, position, itemKind: "CATCH", title: `Catch ${id}`,
+  publishedItemId: id, position, ...PRESET, itemKind: "CATCH", title: `Catch ${id}`,
   snapshot: {
     workFacts: [`사실 ${id}`, "둘째 사실"], subjectContribution: "본인 커밋",
     evidence: [{ sourceUrl: `https://github.com/o/r/commit/${id}`, sourceRevision: "abc", representedFacts: ["파일 1개"] }],
     authorDescription: `작성자 설명 https://github.com/o/r/pull/1 참고`, aiDraft: "AI 초안 글 https://github.com/o/r/issues/9", mismatch: false, ...patch,
   },
 });
-const textItem = (id, position, body = "본문 글") => ({ publishedItemId: id, position, itemKind: "TEXT_MATERIAL", title: `자료 ${id}`, snapshot: { body } });
+const textItem = (id, position, body = "본문 글") => ({ publishedItemId: id, position, ...PRESET, itemKind: "TEXT_MATERIAL", title: `자료 ${id}`, snapshot: { body } });
 const publication = (items = [catchItem("c1", 1)], patch = {}) => ({ title: "발행본 제목", publishedAt: PUBLISHED_AT, expiresAt: EXPIRES_AT, items, ...patch });
 const ok = (data, status = 200) => ({ kind: "success", status, data });
 const lookupFailed = { kind: "lookup-failed", status: null, code: "LOOKUP_FAILED" };
@@ -847,17 +850,17 @@ test("G1·G2·G3: 판정 통과 화면에만 RecipientGuide가 정확히 1개이
   assert.ok(failed.includes("다시 불러오기"));
 });
 
-test("판정 통과 화면 순서: h1 → 0 RecipientGuide → 0.5 U9 패널 → U4 고정 안내(발행 시각) → 1 발행본 자료 → 2 BaseSummaryPanel → 3 QnaPanel → 4 자리. 4번 자리는 isLoggedIn을 받는다", () => {
+test("판정 통과 화면 순서(발행 프리셋 U3 BR3.1): h1 → 0 RecipientGuide → 0.5 U9 패널 → U4 고정 안내(발행 시각) → 2 BaseSummaryPanel(AI 요약) → 1 발행본 자료 → 3 QnaPanel → 4 자리. 4번 자리는 isLoggedIn을 받는다", () => {
   const html = render(ready(), { slotProps: slotProps({ isLoggedIn: true }) });
-  const order = ["<h1", 'data-testid="recipient-guide"', 'data-testid="claude-analyze-panel"', 'data-testid="recipient-published-at"', 'data-testid="publication-snapshot"',
-    'data-testid="recipient-slot-2"', 'data-testid="recipient-slot-3"', 'data-testid="recipient-slot-4"'];
+  const order = ["<h1", 'data-testid="recipient-guide"', 'data-testid="claude-analyze-panel"', 'data-testid="recipient-published-at"',
+    'data-testid="recipient-slot-2"', 'data-testid="publication-snapshot"', 'data-testid="recipient-slot-3"', 'data-testid="recipient-slot-4"'];
   const positions = order.map((needle) => html.indexOf(needle));
   assert.ok(positions.every((position) => position >= 0), String(positions));
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, "위에서부터 정한 순서");
   assert.ok(html.includes('data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in="true"'));
   assert.ok(render(ready()).includes('data-logged-in="false"'));
   // 2·3번 자리에 U5 패널이 하나씩 있다. U10 연결 뒤 4번은 서버의 미복원 세션에서 로그인 안내를 그린다.
-  const slot2 = html.slice(html.indexOf('data-testid="recipient-slot-2"'), html.indexOf('data-testid="recipient-slot-3"'));
+  const slot2 = html.slice(html.indexOf('data-testid="recipient-slot-2"'), html.indexOf('data-testid="publication-snapshot"'));
   const slot3 = html.slice(html.indexOf('data-testid="recipient-slot-3"'), html.indexOf('data-testid="recipient-slot-4"'));
   assert.equal(count(slot2, 'data-testid="base-summary-panel"'), 1);
   assert.equal(count(slot3, 'data-testid="qna-panel"'), 1);
@@ -870,11 +873,13 @@ test("판정 통과 화면 순서: h1 → 0 RecipientGuide → 0.5 U9 패널 →
 
 test("G5·G6: U4 고정 안내는 발행 시각(KST)뿐이고, U4 영역에 U2 안내 문장(고정 사본 설명·링크 조건 등)을 되풀이하지 않으며 만료 시각 원문도 보이지 않는다", () => {
   const html = render(ready());
-  // U4 영역 = 전체에서 0번 안내(U2)와 2·3번 자리(U5)를 뺀 것
+  // U4 영역 = 전체에서 0번 안내(U2)와 2·3·4번 자리(U5·U10)를 뺀 것. 발행 프리셋 U3에서 2번 자리가 1번 자리(발행본 자료) 위로 올라왔다.
   const guideStart = html.indexOf('<section class="guide"');
   const guideEnd = html.indexOf("</section>", guideStart) + "</section>".length;
-  const slotsStart = html.indexOf('data-testid="recipient-slot-2"');
-  const u4Area = html.slice(0, guideStart) + html.slice(guideEnd, slotsStart);
+  const slot2Start = html.indexOf('data-testid="recipient-slot-2"');
+  const snapshotStart = html.indexOf('data-testid="publication-snapshot"');
+  const slot3Start = html.indexOf('data-testid="recipient-slot-3"');
+  const u4Area = html.slice(0, guideStart) + html.slice(guideEnd, slot2Start) + html.slice(snapshotStart, slot3Start);
   assert.ok(html.includes(`data-testid="recipient-published-at">${publishedAtText(PUBLISHED_AT)}</p>`));
   assert.equal(publishedAtText(PUBLISHED_AT), `${PUBLISHED_AT_LABEL} ${formatKst(PUBLISHED_AT)}`);
   assert.ok(!u4Area.includes(PUBLISHED_AT) && !u4Area.includes(EXPIRES_AT) && !u4Area.includes("2027-02-03"), "ISO 원문·만료 시각 없음");
@@ -1011,6 +1016,22 @@ test("AC1.4.1 「맡은 부분」과 「더 쓰기」 두 칸이 저장된 발�
   for (const title of ["이 작업에서 정한 것", "무엇이 문제였나", "고른 것과 버린 것", "어떻게 확인했나·결과", "짚어 볼 곳", "더 쓰기", "【"]) {
     assert.ok(!description.includes(title), title);
   }
+});
+
+test("#634 새 칸 「어떻게 확인했고 무엇을 고쳤나」에 쓴 발행본은 그 칸 제목으로 보이고, 옛 8칸 제목 글은 지금처럼 칸별로 「【칸 제목】」 글자 없이 보인다", () => {
+  const merged = "【이 작업에서 정한 것】\n정한 것\n\n【어떻게 확인했고 무엇을 고쳤나】\n화면에서 확인했다.\n둘째 줄";
+  const mergedView = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription: merged })])));
+  assert.deepEqual(h5s(mergedView), ["이 작업에서 정한 것", "어떻게 확인했고 무엇을 고쳤나"]);
+  assert.ok(mergedView.includes("화면에서 확인했다.\n둘째 줄"));
+  assert.doesNotMatch(mergedView, /【/);
+
+  const OLD = ["이 작업에서 정한 것", "맡은 부분", "무엇이 문제였나", "고른 것과 버린 것",
+    "어떻게 확인했나·결과", "AI가 낸 것 가운데 받아들이지 않았거나 고친 것", "짚어 볼 곳", "더 쓰기"];
+  const old = OLD.map((title, index) => `【${title}】\n${index + 1}번 칸 글`).join("\n\n");
+  const oldView = descriptionOf(render(ready([catchItem("c1", 1, { authorDescription: old })])));
+  assert.deepEqual(h5s(oldView), [...OLD.slice(0, -1), "덧붙인 말"]);
+  for (const [index] of OLD.entries()) assert.ok(oldView.includes(`${index + 1}번 칸 글`), String(index + 1));
+  assert.doesNotMatch(oldView, /【/);
 });
 
 test("AC1.4.2 작성자 설명이 통째로 없거나 빈 글인 발행본은 「작성자 설명이 없습니다.」다", () => {
@@ -1206,4 +1227,71 @@ test("NC2 BR4.4 강조가 표지 있는 링크와 겹치면 링크만 <mark>로 
   const body = render(ready([nc2Item("c1"), textItem("m1", 2, authorDescription)]));
   const m1 = body.slice(body.indexOf('id="published-item-m1"'));
   assert.equal(count(m1, "own-commit-mark"), 0, "텍스트 자료 본문에는 쓰지 않는다(BR4.7)");
+});
+
+// ── 발행 프리셋 U3: 받은 사람 화면의 프리셋 탭·대화·출처 이동 ──────────
+// 먼저 정한 시나리오(unit-test-instructions 「시나리오」: 탭 묶음·순서·대화·출처·갱신, BR2.1·BR2.2·BR3.1·BR3.2·BR4.1~BR4.3, NFR5.1).
+//   - 기대: 프리셋 둘이면 탭 둘(열린 탭은 화면이 넘긴 순번), 질문하기·JD 자리는 발행본 자료 밖이라 탭을 바꿔도 같은 마크업이다.
+//           출처 이동으로 탭이 바뀌면 탭 줄 근처 알림 칸에 「(이름) 탭을 열었습니다」, [답으로 돌아가기]는 없다. 탭 바꿈·출처 이동은 받은 사람 요청을 보내지 않는다.
+//   - 실패 조건: 질문 자리가 탭 패널 안에 있음, 탭을 바꾸면 대화 자리가 달라짐, 돌아가기 단추, 탭 바꿈에 요청.
+// 초점·스크롤 효과는 서버 렌더링에서 돌지 않아 브라우저 확인(Build and Test)에서 본다.
+const { choosePreset, jumpToEvidence, INITIAL_JUMP_STATE } = await load("features/publications/snapshot-jump.ts");
+const inPreset = (item, presetOrdinal, presetName) => ({ ...item, presetOrdinal, presetName });
+const twoPresets = () => [catchItem("c1", 1), textItem("m1", 2), inPreset(textItem("m2", 3, "포트폴리오 본문"), 2, "포트폴리오")];
+/** `start`에서 열린 `tag` 요소가 닫히는 곳(같은 태그가 안에 겹쳐 있어도 센다). */
+function elementEnd(html, start, tag) {
+  let depth = 0;
+  for (const match of html.slice(start).matchAll(new RegExp(`<${tag}[\\s>]|</${tag}>`, "g"))) {
+    depth += match[0].startsWith("</") ? -1 : 1;
+    if (depth === 0) return start + match.index + match[0].length;
+  }
+  return -1;
+}
+
+test("U3 AC3.1·AC3.3 받은 사람 화면: 프리셋 둘이면 탭 둘이고 열린 탭은 화면이 넘긴 순번이다. 질문하기·JD 자리는 탭 밖이라 탭을 바꿔도 마크업이 같다", () => {
+  const first = render(ready(twoPresets()), { activePreset: 1 });
+  const second = render(ready(twoPresets()), { activePreset: 2 });
+  for (const [html, open] of [[first, "1"], [second, "2"]]) {
+    assert.equal(count(html, 'role="tab"'), 2);
+    assert.match(html, new RegExp(`id="publication-snapshot-tab-${open}" aria-selected="true"`));
+    const snapshotStart = html.lastIndexOf("<section", html.indexOf('data-testid="publication-snapshot"'));
+    const snapshotEnd = elementEnd(html, snapshotStart, "section");
+    assert.ok(snapshotEnd > 0 && snapshotEnd < html.indexOf('data-testid="recipient-slot-3"'), "질문 자리는 발행본 자료 밖(BR3.2)");
+    assert.ok(html.indexOf('data-testid="recipient-slot-2"') < snapshotStart, "AI 요약은 발행본 자료 위(BR3.1)");
+  }
+  const questions = (html) => html.slice(html.indexOf('data-testid="recipient-slot-3"'));
+  assert.equal(questions(first), questions(second), "탭을 바꿔도 질문하기·JD 자리는 그대로");
+  assert.ok(!first.includes("답으로 돌아가기") && !second.includes("돌아가기"), "돌아가기 단추 없음(BR4.3)");
+});
+
+test("U3 BR4.2 출처 이동 알림: 탭이 바뀐 출처 이동이면 탭 줄 근처 알림 칸에 「(이름) 탭을 열었습니다」, 다른 탭의 알림이나 알림 없음이면 빈 칸이다", () => {
+  // 이름과 고정 글은 글자 조각으로 이어 그린다(서버 렌더링은 두 조각 사이에 빈 주석을 둔다).
+  const notice = (html) => /<p[^>]*aria-live="polite"[^>]*data-testid="snapshot-tab-notice"[^>]*>(.*?)<\/p>/s.exec(html)[1].replaceAll("<!-- -->", "");
+  assert.equal(notice(render(ready(twoPresets()), { activePreset: 2, tabNotice: { ordinal: 2, presetName: "포트폴리오", seq: 1 } })),
+    "<span>포트폴리오 탭을 열었습니다</span>");
+  assert.equal(notice(render(ready(twoPresets()), { activePreset: 1, tabNotice: { ordinal: 2, presetName: "포트폴리오", seq: 1 } })), "");
+  assert.equal(notice(render(ready(twoPresets()), { activePreset: 1 })), "");
+  const html = render(ready(twoPresets()));
+  assert.ok(html.indexOf('data-testid="snapshot-tab-notice"') < html.indexOf('role="tablist"'), "알림 칸은 탭 줄 바로 위");
+});
+
+test("U3 NFR5.1 받은 사람 화면에서 탭을 바꾸거나 출처로 다른 탭을 열어도 받은 사람 요청은 0이고, 출처 이동은 탭과 대상을 한 번에 바꾼다", async () => {
+  const { calls, queue, publicationStore } = setup();
+  queue.push(ok(publication(twoPresets())));
+  const store = publicationStore();
+  await store.load();
+  const current = store.getSnapshot();
+  assert.equal(current.view, "ready");
+  const before = calls.length;
+  let state = choosePreset(INITIAL_JUMP_STATE, 2);
+  state = choosePreset(state, 1);
+  state = jumpToEvidence(state, current.snapshot, { publishedItemId: "m2", fieldPath: "body", charStart: 0, charEnd: 5, pdfPage: null });
+  assert.equal(calls.length, before, "탭 바꿈·출처 이동에 요청 없음");
+  assert.equal(state.preset, 2);
+  assert.deepEqual(state.target, { publishedItemId: "m2", highlight: { publishedItemId: "m2", fieldPath: "body", charStart: 0, charEnd: 5 }, seq: 1 });
+  assert.deepEqual(state.notice, { ordinal: 2, presetName: "포트폴리오", seq: 1 });
+  const html = render({ ...current }, { activePreset: state.preset, highlight: state.target.highlight, tabNotice: state.notice });
+  const panel2 = html.slice(html.indexOf('id="publication-snapshot-panel-2"'));
+  assert.match(panel2, /^id="publication-snapshot-panel-2" aria-labelledby="publication-snapshot-tab-2" tabindex="0">/, "대상 탭 패널이 열림(hidden 없음)");
+  assert.match(panel2, /<mark[^>]*>포트폴리오<\/mark> 본문/);
 });

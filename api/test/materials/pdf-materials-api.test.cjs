@@ -747,8 +747,9 @@ test('U-11: 정상 삭제는 파일을 먼저 지우고(없는 키도 성공) �
   await db.query(`INSERT INTO publication (publication_id, member_id, title, link_token_reference, published_at, expires_at)
     VALUES ($1, $2, '합성 발행본', $3, now(), now() + interval '2160 hours')`, [publicationId, member.memberId, randomUUID()]);
   const publishedItemId = randomUUID();
-  await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, pdf_copy_key)
-    VALUES ($1, $2, 1, 'PDF_MATERIAL', $3, '합성 PDF', $4, $5)`,
+  await db.query(`INSERT INTO published_item (published_item_id, publication_id, position, item_kind, source_id, title, snapshot, pdf_copy_key,
+      preset_ordinal, preset_name)
+    VALUES ($1, $2, 1, 'PDF_MATERIAL', $3, '합성 PDF', $4, $5, 1, '합성 프리셋')`,
   [publishedItemId, publicationId, id, JSON.stringify({ pageCount: 2 }), `members/${member.memberId}/publications/${publicationId}/${publishedItemId}.pdf`]);
   await db.query(`INSERT INTO published_pdf_page (published_pdf_page_id, published_item_id, page_number, text, readable) VALUES ($1, $2, 1, '합성 쪽 글', true)`,
     [randomUUID(), publishedItemId]);

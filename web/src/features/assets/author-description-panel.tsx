@@ -2,9 +2,8 @@
 
 import { useId } from "react";
 import {
-  MAX_DESCRIPTION_LENGTH, SECTION_TITLES, countCodePoints, joinSections, type SectionTexts, type SectionTitle,
+  MAX_DESCRIPTION_LENGTH, SECTION_TITLES, countCodePoints, editSectionTitles, joinSections, type SectionTexts, type SectionTitle,
 } from "../../lib/author-description-sections.ts";
-import { collectLinks, evidenceRepositoryOf, githubLinkName } from "../../lib/github-link-name.ts";
 import { editStatusLines, type EditStatus } from "../../lib/save-outcome.ts";
 import styles from "./assets.module.css";
 
@@ -12,24 +11,32 @@ import styles from "./assets.module.css";
  * 「짚어 볼 곳」 칸 아래 안내(새 Catch BR4.4). 관련 커밋을 넣는 단추나 목록은 두지 않는다.
  * 줄 고정 주소(Copy permalink)는 얻기 어려워 커밋 화면 한 가지 방법으로 줄였다(Step 15 확인 중 팀장 발견, 2026-11-10).
  * 커밋 화면 주소에는 파일 이름이 없어 메모에 적게 하고, 파일 경로가 기호로 들어가 한글 앞에서 끊기지 않으므로 한글 파일 이름 안내는 뺐다.
+ * 근거가 이 칸 위에만 있지 않게 될 배치(#635)에 맞춰 「위 근거」를 「근거」로 썼다(#634).
  */
 export const POINT_HINTS = [
   "면접관이 설명을 청할 만한 줄(정한 것·고친 것이 드러나는 곳)을 고르세요.",
-  "위 근거의 본인 커밋을 열고, 바뀐 줄의 줄 번호를 누르세요(여러 줄이면 Shift를 누른 채 끝 줄 번호도 누르세요). 주소창의 주소를 그대로 붙이세요.",
+  "근거의 본인 커밋을 열고, 바뀐 줄의 줄 번호를 누르세요(여러 줄이면 Shift를 누른 채 끝 줄 번호도 누르세요). 주소창의 주소를 그대로 붙이세요.",
   "메모에 파일 이름과 짚을 까닭을 적으세요.",
-  "관련 커밋은 위 근거의 본인 커밋 주소를 붙이세요.",
+  "관련 커밋은 근거의 본인 커밋 주소를 붙이세요.",
 ] as const;
 
+/** 늘 보이는 앞 두 칸 아래 안내 한 줄(#634). 옛 칸에는 안내가 없다. */
+export const FIELD_GUIDES: Partial<Record<SectionTitle, string>> = {
+  "이 작업에서 정한 것": "무엇이 문제였고 왜 이렇게 정했는지 적으세요. 버린 방법이나 팀에서 맡은 부분도 여기에 쓰면 됩니다.",
+  "어떻게 확인했고 무엇을 고쳤나": "무엇으로 확인했고 결과는 어땠는지, AI가 낸 것 가운데 버리거나 고친 것이 있으면 함께 적으세요.",
+};
+
+const FIRST_TITLE: SectionTitle = "이 작업에서 정한 것";
 const POINT_TITLE: SectionTitle = "짚어 볼 곳";
 
 export type AuthorDescriptionPanelProps = {
   loadState: "loading" | "ready" | "error";
-  /** 지금 8칸 글. 저장 전 글도 링크 목록과 합계 글자 수에 쓴다. */
+  /** 지금 칸 글. 저장 전 글도 합계 글자 수에 쓴다. */
   texts: Readonly<SectionTexts>;
+  /** 마지막으로 저장에 성공한 칸 글. 글이 있는 옛 칸을 보일지 정한다(#634). */
+  savedTexts: Readonly<SectionTexts>;
   status: EditStatus;
   dirty: boolean;
-  /** 이 Catch 근거 주소. 링크 목록의 다른 저장소 앞붙임을 정한다(BR2.4). */
-  evidenceUrls: readonly string[];
   /** 불러오기 실패 이유(로그인 만료 등). */
   loadFailureText?: string;
   onChange: (title: SectionTitle, value: string) => void;
@@ -38,27 +45,8 @@ export type AuthorDescriptionPanelProps = {
 };
 
 /**
- * 「발행하면 면접관에게 열릴 링크」(BR3.1~BR3.3). 칸을 고칠 때마다 화면 안에서만 다시 계산하고 API를 부르지 않는다. 알림 영역이 아니다.
- * 항목은 면접관 화면과 같은 이름의 글자이고 누를 수 없어 Tab 순서에 들지 않는다(다듬은 화면 interaction-spec 2절).
- */
-function LinkPreview({ texts, evidenceUrls, headingId }: { texts: Readonly<SectionTexts>; evidenceUrls: readonly string[]; headingId: string }) {
-  const links = collectLinks(SECTION_TITLES.map((title) => texts[title]));
-  const evidenceRepository = evidenceRepositoryOf(evidenceUrls);
-  return (
-    <section className={styles.linkPreview} aria-labelledby={headingId} data-testid="catch-author-description-links">
-      <h4 id={headingId}>발행하면 면접관에게 열릴 링크</h4>
-      {links.length > 0 ? <>
-        <ul className={styles.linkList}>
-          {links.map((url) => <li key={url} data-testid="catch-author-description-link-name">{githubLinkName(url, evidenceRepository)}</li>)}
-        </ul>
-        <p className={styles.small}>이미 보낸 발행본에는 반영되지 않습니다. 고쳤다면 새로 발행하세요.</p>
-      </> : <p className={styles.small}>발행하면 면접관에게 열릴 링크가 없습니다.</p>}
-    </section>
-  );
-}
-
-/**
- * Catch 상세의 작성자 설명 영역(U4 W1, 새 Catch W1·BR4.3~BR4.5). 칸 제목 8개를 각 글칸의 보이는 `label`로 펼쳐 두고 [설명 저장] 하나로 합친 글을 저장한다.
+ * Catch 상세의 작성자 설명 영역(U4 W1, 새 Catch W1·BR4.3~BR4.5, #634). 늘 보이는 칸 셋(「이 작업에서 정한 것」·「어떻게 확인했고 무엇을 고쳤나」·「짚어 볼 곳」)과
+ * 글이 저장된 옛 칸을 칸 제목이 보이는 `label`인 글칸으로 펼쳐 두고 [설명 저장] 하나로 합친 글을 저장한다.
  * 기록에서 확인한 내용(위쪽)·Catch 설명 초안(위쪽)과 다른 제목으로 나눈다. AI 초안은 입력칸에 넣지 않는다. 입력은 React 텍스트로만 그린다(NFR1.10).
  * 상태와 저장은 `AuthorDescriptionEditor`가 맡고, 이 컴포넌트는 그리기만 한다.
  */
@@ -87,14 +75,21 @@ export function AuthorDescriptionPanel(props: AuthorDescriptionPanelProps) {
             onClick={props.onRetry}>다시 불러오기</button>
         </div>
         : <form onSubmit={(event) => { event.preventDefault(); props.onSave(); }} noValidate>
-          {SECTION_TITLES.map((title, index) => {
+          {editSectionTitles(props.savedTexts, texts).map((title) => {
+            // 글칸 id는 읽기 목록 순번이라, 옛 칸이 나타나거나 사라져도 다른 칸의 id가 바뀌지 않는다.
+            const index = SECTION_TITLES.indexOf(title);
             const fieldId = `${baseId}-field-${index}`;
+            const guide = FIELD_GUIDES[title];
+            const guideId = `${baseId}-guide-${index}`;
+            const describedBy = [title === FIRST_TITLE ? noticeId : null, guide ? guideId : null, title === POINT_TITLE ? hintsId : null]
+              .filter(Boolean).join(" ");
             return (
               <div key={title} className={styles.descriptionField}>
                 <label htmlFor={fieldId} className={styles.descriptionLabel}>{title}</label>
+                {guide && <p id={guideId} className={styles.descriptionGuide} data-testid="catch-author-description-guide">{guide}</p>}
                 <textarea id={fieldId} data-testid="catch-author-description-input" data-section={title}
                   className={styles.descriptionInput} value={texts[title]} rows={3} disabled={saving}
-                  aria-describedby={index === 0 ? noticeId : title === POINT_TITLE ? hintsId : undefined}
+                  aria-describedby={describedBy || undefined}
                   onChange={(event) => props.onChange(title, event.target.value)} />
                 {title === POINT_TITLE && (
                   <ul id={hintsId} className={styles.descriptionHints} data-testid="catch-author-description-hints">
@@ -104,7 +99,6 @@ export function AuthorDescriptionPanel(props: AuthorDescriptionPanelProps) {
               </div>
             );
           })}
-          <LinkPreview texts={texts} evidenceUrls={props.evidenceUrls} headingId={`${baseId}-links`} />
           <p id={countId} className={styles.small} data-testid="catch-author-description-count">
             {length.toLocaleString("ko-KR")} / {MAX_DESCRIPTION_LENGTH.toLocaleString("ko-KR")}자 (칸 제목 포함)
             {dirty && !saving ? " · 저장하지 않은 변경이 있습니다." : ""}
@@ -113,7 +107,9 @@ export function AuthorDescriptionPanel(props: AuthorDescriptionPanelProps) {
             data-testid="catch-author-description-status">
             {lines.lines.map((line) => <p key={line}>{line}</p>)}
           </div>}
-          <button type="submit" className={styles.primaryButton} data-testid="catch-author-description-save" disabled={saving}
+          {/* 저장 중에는 `disabled` 대신 `aria-disabled`로 막는다. 초점이 있던 단추가 `disabled`가 되면 브라우저가 초점을 body로 빼서
+              저장 뒤 Tab이 상세 창 맨 앞부터 다시 시작했다(#636 리뷰). 저장 중에 다시 눌러도 `AuthorDescriptionEditor`가 보내지 않는다. */}
+          <button type="submit" className={styles.primaryButton} data-testid="catch-author-description-save" aria-disabled={saving || undefined}
             aria-describedby={countId}>
             {saving ? "저장 중…" : "설명 저장"}
           </button>

@@ -1,9 +1,10 @@
 /**
- * U4 W1 Catch 작성자 설명 편집기(`author-description-editor.tsx`)의 상태 전이 시험. 새 Catch NC1에서 8칸 편집으로 바꿨다.
+ * U4 W1 Catch 작성자 설명 편집기(`author-description-editor.tsx`)의 상태 전이 시험. 새 Catch NC1에서 8칸 편집으로 바꿨고,
+ * #634에서 편집 화면이 늘 보이는 칸 셋과 글이 저장된 옛 칸만 그리게 됐다(옛 칸은 저장에 성공해 비어야 사라진다).
  *
  * 시나리오(코드 생성 계획 Step 2·S1, 2026-10-29 보완, 새 Catch US1.1~US1.3·US2.1·US2.3, BR1.4~BR1.6):
- * - 열 때 현재 설명을 읽어 8칸으로 나누고, 읽지 못하면 빈 설명으로 추정하지 않는다(로그인 만료는 이유를 보인다). 다시 불러오기로 열린다.
- * - 저장은 8칸을 합친 글 하나를 보낸다. 빈 칸은 칸 제목째 빠지고 「더 쓰기」만이면 칸 제목이 없다. 합친 글 4,001자는 보내지 않는다.
+ * - 열 때 현재 설명을 읽어 칸으로 나누고, 읽지 못하면 빈 설명으로 추정하지 않는다(로그인 만료는 이유를 보인다). 다시 불러오기로 열린다.
+ * - 저장은 칸 글을 합친 글 하나를 보낸다. 빈 칸은 칸 제목째 빠지고 「더 쓰기」만이면 칸 제목이 없다. 합친 글 4,001자는 보내지 않는다.
  * - 성공 응답 뒤에만 "저장됨"이고, 저장 중에 더 쓴 입력은 덮지 않는다. 실패하면 입력을 남긴다.
  * - 칸 제목 줄이 없는 옛 글·이은 칸이 있는 글을 열자마자 「저장하지 않은 변경」이 되지 않는다. 칸을 고치는 동안 API를 부르지 않는다.
  * - 늦게 온 불러오기 응답·로그인이 바뀐 뒤의 응답은 반영하지 않는다.
@@ -49,6 +50,7 @@ const hooks = registerHooks({
   },
 });
 const { AuthorDescriptionEditor, createDescriptionEditorModel } = await import(editorUrl.href);
+const { AuthorDescriptionPanel } = await import(new URL("../src/features/assets/author-description-panel.tsx", import.meta.url).href);
 hooks.deregister();
 
 const CATCH = "44444444-4444-4444-8444-444444444444";
@@ -70,7 +72,7 @@ const deps = () => { const d = { token: "a", session: () => d.token }; return d;
 const texts = (patch = {}) => ({ ...sectionTexts(null), ...patch });
 const FREE = "더 쓰기";
 
-test("설명 편집기: 현재 설명을 읽어 8칸으로 열고, 저장 성공 응답 뒤에만 저장됨이며 공백 저장은 빈칸이 된다", async () => {
+test("설명 편집기: 현재 설명을 읽어 칸으로 열고, 저장 성공 응답 뒤에만 저장됨이며 공백 저장은 빈칸이 된다", async () => {
   const api = fakeApi({ read: [{ kind: "loaded", value: described("기존 설명") }], save: [{ kind: "saved", value: described(null) }] });
   const model = createDescriptionEditorModel(CATCH, api, deps());
   await model.load();
@@ -180,8 +182,8 @@ test("AC1.1.1 두 칸만 쓰고 저장하면 저장 경로로 보내는 글에 �
   assert.deepEqual(sent, ["【이 작업에서 정한 것】\n줄여 올리기로 했다.\n\n【짚어 볼 곳】\nhttps://github.com/o/r/blob/ba6bba8/a.ts#L3 메모"]);
 });
 
-test("AC1.1.2 두 칸을 저장했다 다시 열면 칸 안 줄바꿈까지 그대로이고 나머지 여섯 칸은 비어 있으며 저장하지 않은 변경이 없다", async () => {
-  const written = { "맡은 부분": "화면 두 곳\n프로필 창", "짚어 볼 곳": "https://github.com/o/r/pull/1 첫째\nhttps://github.com/o/r/pull/2 둘째" };
+test("AC1.1.2 두 칸을 저장했다 다시 열면 칸 안 줄바꿈까지 그대로이고 나머지 칸은 비어 있으며 저장하지 않은 변경이 없다", async () => {
+  const written = { "어떻게 확인했고 무엇을 고쳤나": "화면 두 곳에서 확인\nAI가 낸 정규식은 버림", "짚어 볼 곳": "https://github.com/o/r/pull/1 첫째\nhttps://github.com/o/r/pull/2 둘째" };
   const { sent } = await saveSections(null, written);
   const reopened = createDescriptionEditorModel(CATCH, fakeApi({ read: [{ kind: "loaded", value: described(sent[0]) }] }), deps());
   await reopened.load();
@@ -189,7 +191,7 @@ test("AC1.1.2 두 칸을 저장했다 다시 열면 칸 안 줄바꿈까지 그�
   assert.equal(isDescriptionDirty(reopened.store.get().edit), false);
 });
 
-test("AC1.1.3 이전 설명이 있는 Catch에서 8칸을 모두 비우고 저장하면 빈 글을 보내 설명이 지워진다", async () => {
+test("AC1.1.3 이전 설명이 있는 Catch에서 보이는 칸을 모두 비우고 저장하면 빈 글을 보내 설명이 지워진다", async () => {
   const { model, sent } = await saveSections("【맡은 부분】\n있던 설명\n\n【더 쓰기】\n덧붙임", { "맡은 부분": "", [FREE]: "  " });
   assert.deepEqual(sent, [""]);
   assert.deepEqual(model.store.get().edit.texts, texts());
@@ -206,12 +208,12 @@ test("AC1.2.1 칸 제목을 포함한 합계가 4,001자면 저장 요청을 보
   const api = fakeApi({ read: [{ kind: "loaded", value: described(null) }] });
   const model = createDescriptionEditorModel(CATCH, api, deps());
   await model.load();
-  const heading = "【맡은 부분】\n".length;
-  model.change("맡은 부분", "가".repeat(4001 - heading));
+  const heading = "【이 작업에서 정한 것】\n".length;
+  model.change("이 작업에서 정한 것", "가".repeat(4001 - heading));
   await model.save();
   assert.equal(model.store.get().edit.status.kind, "invalid");
   assert.match(model.store.get().edit.status.message, /4,000자까지 쓸 수 있습니다\. 지금 4,001자입니다/);
-  assert.equal(model.store.get().edit.texts["맡은 부분"].length, 4001 - heading);
+  assert.equal(model.store.get().edit.texts["이 작업에서 정한 것"].length, 4001 - heading);
   assert.equal(api.calls.some((c) => c.name === "save"), false);
 });
 
@@ -258,4 +260,33 @@ test("AC2.3.7 링크를 쓰는 동안(칸을 고치는 동안) API 요청은 일
   }
   await tick();
   assert.equal(api.calls.length, before);
+});
+
+/** 편집기 상태로 그린 편집 화면의 글칸 칸 제목들(위에서부터). */
+function shownTitles(model) {
+  const { edit } = model.store.get();
+  const html = renderToStaticMarkup(createElement(AuthorDescriptionPanel, {
+    loadState: "ready", texts: edit.texts, savedTexts: edit.savedTexts, status: edit.status, dirty: isDescriptionDirty(edit),
+    onChange() {}, onSave() {}, onRetry() {},
+  }));
+  return [...html.matchAll(/<textarea[^>]*data-section="([^"]+)"/g)].map((match) => match[1]);
+}
+
+test("#634 옛 칸은 열면 원래 자리에 보이고, 비우고 저장했는데 저장되지 않으면(로그인 만료 포함) 남으며, 저장에 성공해야 사라진다", async () => {
+  const stored = "【맡은 부분】\n로그인 화면\n\n【짚어 볼 곳】\n메모";
+  for (const failure of ["login-expired", "server"]) {
+    const api = fakeApi({ read: [{ kind: "loaded", value: described(stored) }], save: [{ kind: "failed", failure }] });
+    const model = createDescriptionEditorModel(CATCH, api, deps());
+    await model.load();
+    assert.deepEqual(shownTitles(model), ["이 작업에서 정한 것", "맡은 부분", "어떻게 확인했고 무엇을 고쳤나", "짚어 볼 곳"]);
+    model.change("맡은 부분", "");
+    assert.ok(shownTitles(model).includes("맡은 부분"), "지우는 도중에도 남는다");
+    await model.save();
+    assert.deepEqual(model.store.get().edit.status, { kind: "failed", failure });
+    assert.ok(shownTitles(model).includes("맡은 부분"), `저장되지 않으면 남는다(${failure})`);
+  }
+  const { model, sent } = await saveSections(stored, { "맡은 부분": "" });
+  assert.deepEqual(sent, ["【짚어 볼 곳】\n메모"]);
+  assert.equal(model.store.get().edit.status.kind, "saved");
+  assert.deepEqual(shownTitles(model), ["이 작업에서 정한 것", "어떻게 확인했고 무엇을 고쳤나", "짚어 볼 곳"]);
 });

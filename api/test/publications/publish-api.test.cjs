@@ -3,23 +3,25 @@
 // 먼저 정한 시나리오·기대 결과·실패 조건(U4 기능 명세 「주요 시나리오와 확인」 S4~S7, 성능 설계 「판정 위치와 순서」,
 // 신뢰성 설계 「발행 트랜잭션 경계」·「작성자 실패 안내」, team.md Testing Posture). 세부 시험 코드는 구현 뒤 쓴다.
 //
+// 발행 프리셋 U1(기능 명세 W4, BR3.1~BR3.6)로 요청이 `{ title, password?, presetIds }`가 됐다. 이 파일의 시나리오는 자료 목록을 프리셋 하나에 담아
+// 그 프리셋으로 발행한다(support.cjs presetBody). 프리셋 여럿·겹친 자료·빈 프리셋·막힘 응답 blockedSources는 publish-presets.test.cjs가 본다.
 // 판정 순서(BR4.8·BR4.1·BR4.5·BR4.7·BR5.1): 인증(401) → 회원별 발행 빈도 1분 10회 임시값(429 RATE_LIMITED + Retry-After) →
-//   입력 검사(400 VALIDATION_FAILED: 제목 1~50자 코드 포인트·앞뒤 공백 제거, 비밀번호 8~64자 그대로, 항목 1~20개, (kind, sourceId) 중복,
-//   kind는 CATCH·TEXT_MATERIAL·PDF_MATERIAL(U8 계획 8.1, PDF 경로는 publish-pdf.test.cjs), 정의 밖 필드) → 동의(403 AI_CONSENT_REQUIRED) → 트랜잭션 밖 토큰·scrypt →
-//   트랜잭션(하루 횟수 consume → 원본 잠금·재읽기(404) → 자격(409) → 전체 글 60,000자 임시값(400) → 쓰기 → PRIVATE→PUBLIC →
-//   chunkInTransaction → 커밋) → 커밋 뒤 EMBED_PUBLICATION·BASE_SUMMARY 등록(실패는 로그만) → 201.
+//   입력 검사(400 VALIDATION_FAILED: 제목 1~50자 코드 포인트·앞뒤 공백 제거, 비밀번호 8~64자 그대로, presetIds 1~5개·UUID·중복, 정의 밖 필드(옛 items 포함))
+//   → 동의(403 AI_CONSENT_REQUIRED) → 프리셋 펴기(404) → 트랜잭션 밖 토큰·scrypt →
+//   트랜잭션(하루 횟수 consume → 원본 잠금·재읽기(404) → 자격(409, 비공개 Catch는 CATCH_PRIVATE) → 전체 글 60,000자 임시값(400) → 쓰기 →
+//   chunkInTransaction → 커밋) → 커밋 뒤 EMBED_PUBLICATION·BASE_SUMMARY 등록(실패는 로그만) → 201. 공개 전환 쓰기는 없다(BR3.6).
 //
-// S4 공개 Catch 1 + 비공개 Catch 1 + 텍스트 1 발행 (US4.1, BR4.1·BR4.4·BR5.1·BR5.3·BR5.4·BR5.5)
+// S4 공개 Catch 2 + 텍스트 1 발행 (US4.1, BR4.1·BR5.1·BR5.3·BR5.4·BR5.5)
 //   - 기대: 201 { publicationId, url, state: ACTIVE, publishedAt, expiresAt(=발행+2160시간), passwordProtected }. url에만 토큰이 있고
-//           다른 칸·로그에는 없다. published_item 3개가 요청 순서대로 position 1..3, Catch 사본은 workFacts·subjectContribution·
+//           다른 칸·로그에는 없다. published_item 3개가 프리셋 안 순서대로 position 1..3, Catch 사본은 workFacts·subjectContribution·
 //           evidence(position 순)·authorDescription·aiDraft(GENERATED일 때만)·mismatch를 구분해 담고 제목이 없으면 '제목 없는 Catch'.
-//           비공개 Catch가 PUBLIC으로 바뀐다. chunkInTransaction 가짜는 발행 트랜잭션의 manager(트랜잭션 활성)로 불리고 그 시점에 밖에서는
+//           프리셋 순번 1·이름이 항목마다 복사된다. chunkInTransaction 가짜는 발행 트랜잭션의 manager(트랜잭션 활성)로 불리고 그 시점에 밖에서는
 //           발행본이 보이지 않는다. 커밋 뒤 EMBED_PUBLICATION-{id}·BASE_SUMMARY-{id} 두 작업이 { publicationId }로 등록된다(등록 시점에 밖에서
 //           발행본이 보인다). 비밀번호를 주면 scrypt 검증값이 저장되고 원문은 저장·응답·로그에 없다.
 //   - 실패 조건: 순서 틀림, 등록이 커밋 전, 토큰이 url 밖에 노출, aiDraft가 작성자 설명과 섞임.
-// S5 미확인 Catch 또는 SOURCE_PRIVATE Catch를 넣어 발행 (US4.1, BR4.2·BR5.2·BR7.4)
-//   - 기대: 409 CONFIRMATION_REQUIRED 또는 409 SOURCE_RESTRICTED, details.catchIds에 해당 Catch만. 발행본·항목 행 없음, 함께 고른 다른
-//           비공개 Catch도 PRIVATE 그대로. 보호 관측이 없거나 불완전하면 10월처럼 500(비공개로 단정하지 않음).
+// S5 미확인 Catch·SOURCE_PRIVATE Catch·비공개 Catch를 넣어 발행 (US4.1, BR4.2·BR5.2·BR7.4, 발행 프리셋 BR3.5·BR3.6)
+//   - 기대: 409 CONFIRMATION_REQUIRED → SOURCE_RESTRICTED → CATCH_PRIVATE 순으로 처음 걸린 이유 하나, details.blockedSources에 해당 Catch만
+//           (catchIds 없음). 발행본·항목 행 없음, 비공개 Catch는 PRIVATE 그대로. 보호 관측이 없거나 불완전하면 10월처럼 500(비공개로 단정하지 않음).
 //   - 실패 조건: 일부만 저장·공개 전환.
 // S6 하루 횟수 LIMIT_REACHED, chunkInTransaction 예외 (US4.1, BR5.1·BR5.2, NFR5.1)
 //   - 기대: LIMIT_REACHED면 429 DAILY_LIMIT_REACHED(Retry-After 없음), 조각 예외면 500 INTERNAL_ERROR. 둘 다 발행본·항목 없음, 공개 전환 없음,
@@ -32,7 +34,7 @@
 //   RESOURCE_UNAVAILABLE, 전체 글 60,000/60,001자, 인증 없음 401.
 //
 // 작성자 실패 안내 표(신뢰성 설계 NFR7.5, web이 응답 코드로 분기한다):
-//   409 CONFIRMATION_REQUIRED/SOURCE_RESTRICTED(details.catchIds) → 해당 Catch 표시 | 404 RESOURCE_UNAVAILABLE → 목록 다시 불러오기 |
+//   409 CONFIRMATION_REQUIRED/SOURCE_RESTRICTED/CATCH_PRIVATE(details.blockedSources) → 해당 자료 표시 | 404 RESOURCE_UNAVAILABLE → 목록 다시 불러오기 |
 //   400 VALIDATION_FAILED → 칸별 이유 | 403 AI_CONSENT_REQUIRED → 공용 동의 창 | 429 DAILY_LIMIT_REACHED → "오늘 한도에 도달했습니다" |
 //   429 RATE_LIMITED + Retry-After → 남은 초 동안 버튼 잠금 | 500 → "발행되지 않았습니다"(입력 유지)
 //
@@ -48,12 +50,12 @@ const { verifyLinkPassword } = require('../../dist/share-links/link-password');
 const { PUBLICATION_TTL_HOURS } = require('../../dist/publications/publication.entity');
 const { SNAPSHOT_TEXT_TOTAL_MAX, PUBLISH_RATE_LIMIT } = require('../../dist/publications/publications-config');
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
-const { buildCatchSnapshot } = require('../../dist/publications/snapshot-builder');
+const { buildCatchSnapshot } = require('../../dist/publishable-source/source-content');
 const { WORK_LIMIT_PREFIXES, WORK_LIMIT_SENTENCES } = require('../../dist/publications/work-limit-sentences');
 const {
   PUBLISH_SETTINGS, WEB_BASE_URL, HOUR, setEnv, startApp, expectError, eligibleCatch, insertAnalysisRequest, insertCatch, insertTextMaterial,
   insertEvidence, insertCommitAssignment, insertProtection, hideRegistrationNames,
-  consent, fakeAiRun, fakeIndexWriter, bindFakes, setClock, body, catchItem, textItem, tokenOf,
+  consent, fakeAiRun, fakeIndexWriter, bindFakes, setClock, body, catchItem, textItem, tokenOf, insertPreset, presetBody,
 } = require('./support.cjs');
 
 let server, db, restore, aiRun, writer, unbind;
@@ -84,21 +86,22 @@ async function author(identity = `u4-author-${randomUUID()}`) {
 }
 const publications = () => db.query('SELECT publication_id, member_id, title, password_protection_reference, published_at, expires_at, stopped_at FROM publication');
 const items = (publicationId) => db.query(
-  'SELECT position, item_kind, source_id, title, snapshot, pdf_copy_key FROM published_item WHERE publication_id = $1 ORDER BY position', [publicationId]);
+  'SELECT position, item_kind, source_id, title, snapshot, pdf_copy_key, preset_ordinal, preset_name FROM published_item WHERE publication_id = $1 ORDER BY position',
+  [publicationId]);
 const visibility = async (catchId) => (await db.query('SELECT visibility FROM catch_asset WHERE catch_id = $1', [catchId]))[0].visibility;
 const dailyCount = async (memberId) => (await db.query('SELECT count FROM daily_execution_count WHERE member_id = $1', [memberId]))[0]?.count ?? null;
 /** 시험 쪽에서 따로 계산한 한국 시간 해·달(구현의 koreanMonth를 쓰지 않는다). */
 const kstMonth = (at) => new Date(new Date(at).getTime() + 9 * HOUR).toISOString().slice(0, 7);
 
-test('S4: 공개 Catch·비공개 Catch·텍스트 자료를 순서대로 사본에 담고, 비공개 Catch를 공개로 바꾸며, 커밋 뒤 두 작업을 등록한다', async () => {
+test('S4: 공개 Catch 둘·텍스트 자료를 프리셋 안 순서대로 사본에 담고, 공개 상태를 바꾸지 않으며, 커밋 뒤 두 작업을 등록한다', async () => {
   const a = await author();
   const publicCatch = await eligibleCatch(db, a.memberId, { title: null, visibility: 'PUBLIC', workFacts: ['[합성] 사실 1', '[합성] 사실 2'],
     subjectContribution: '[합성] 기여', authorDescription: '[합성] 작성자 설명', draftContent: '[합성] AI 초안', mismatch: true }, { evidence: 2 });
-  const privateCatch = await eligibleCatch(db, a.memberId, { title: '[합성] 비공개 Catch', visibility: 'PRIVATE' }, { repositoryId: 'synthetic-repository-2' });
+  const privateCatch = await eligibleCatch(db, a.memberId, { title: '[합성] 둘째 Catch', visibility: 'PUBLIC' }, { repositoryId: 'synthetic-repository-2' });
   const materialId = await insertTextMaterial(db, a.memberId, { title: '[합성] 자료', body: '  [합성] 본문\n둘째 줄  ' });
   const password = 'synthetic-password-1!';
 
-  const response = await publish(a.token, body([catchItem(publicCatch), catchItem(privateCatch), textItem(materialId)], { title: '  [합성] 제목  ', password }));
+  const response = await publish(a.token, await presetBody(db, a.memberId,[catchItem(publicCatch), catchItem(privateCatch), textItem(materialId)], { title: '  [합성] 제목  ', password }));
   assert.equal(response.status, 201, response.text);
   assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.deepEqual(Object.keys(response.body).sort(), ['expiresAt', 'passwordProtected', 'publicationId', 'publishedAt', 'state', 'url']);
@@ -121,10 +124,10 @@ test('S4: 공개 Catch·비공개 Catch·텍스트 자료를 순서대로 사본
   assert.equal((await db.query('SELECT link_token_reference AS t FROM publication'))[0].t, token);
 
   const stored = await items(row.publication_id);
-  assert.deepEqual(stored.map((item) => [item.position, item.item_kind, item.source_id, item.title, item.pdf_copy_key]), [
-    [1, 'CATCH', publicCatch, '제목 없는 Catch', null],
-    [2, 'CATCH', privateCatch, '[합성] 비공개 Catch', null],
-    [3, 'TEXT_MATERIAL', materialId, '[합성] 자료', null],
+  assert.deepEqual(stored.map((item) => [item.position, item.item_kind, item.source_id, item.title, item.pdf_copy_key, item.preset_ordinal, item.preset_name]), [
+    [1, 'CATCH', publicCatch, '제목 없는 Catch', null, 1, '[합성] 프리셋'],
+    [2, 'CATCH', privateCatch, '[합성] 둘째 Catch', null, 1, '[합성] 프리셋'],
+    [3, 'TEXT_MATERIAL', materialId, '[합성] 자료', null, 1, '[합성] 프리셋'],
   ]);
   // NC2(계약 C3): 저장소 이름·작성 달·근거별 ownCommit이 더해진다. PR 근거라 ownCommit은 거짓이고 한계가 없어 workLimits 칸은 없다.
   const [{ edited }] = await db.query('SELECT author_description_updated_at AS edited FROM catch_asset WHERE catch_id = $1', [publicCatch]);
@@ -142,7 +145,7 @@ test('S4: 공개 Catch·비공개 Catch·텍스트 자료를 순서대로 사본
     authorDescription: null, aiDraft: null, mismatch: false, repositoryName: 'synthetic-owner/synthetic-repository' }, '초안이 없으면 aiDraft null');
   assert.deepEqual(stored[2].snapshot, { body: '  [합성] 본문\n둘째 줄  ' }, '본문은 가공 없이 그대로');
   assert.equal(await visibility(publicCatch), 'PUBLIC');
-  assert.equal(await visibility(privateCatch), 'PUBLIC', '고른 비공개 Catch는 PUBLIC으로');
+  assert.equal(await visibility(privateCatch), 'PUBLIC');
 
   assert.deepEqual(writer.calls.map(({ publicationId, transactionActive, itemsInside, visibleOutside }) => ({ publicationId, transactionActive, itemsInside, visibleOutside })),
     [{ publicationId: row.publication_id, transactionActive: true, itemsInside: 3, visibleOutside: false }], '같은 manager, 커밋 전');
@@ -157,37 +160,38 @@ test('S4: 공개 Catch·비공개 Catch·텍스트 자료를 순서대로 사본
 test('S4: 비밀번호 없는 발행은 passwordProtected false이고 검증값이 NULL이다', async () => {
   const a = await author();
   const materialId = await insertTextMaterial(db, a.memberId);
-  const response = await publish(a.token, body([textItem(materialId)]));
+  const response = await publish(a.token, await presetBody(db, a.memberId,[textItem(materialId)]));
   assert.equal(response.status, 201, response.text);
   assert.equal(response.body.passwordProtected, false);
   assert.equal((await publications())[0].password_protection_reference, null);
 });
 
-test('입력 400: 제목·비밀번호·항목 규칙 위반은 칸별 이유를 담고 아무것도 저장하지 않는다', async (t) => {
+test('입력 400: 제목·비밀번호·presetIds 규칙 위반과 옛 items 칸은 칸별 이유를 담고 아무것도 저장하지 않는다', async (t) => {
   const a = await author();
   const materialId = await insertTextMaterial(db, a.memberId);
-  const ok = [textItem(materialId)];
+  const presetId = await insertPreset(db, a.memberId, [textItem(materialId)]);
+  const ok = [presetId];
   // 사례가 1분 10회(빈도 임시값)보다 많으므로 요청마다 시계를 1분 넘게 옮긴다.
   let now = new Date('2026-11-10T00:00:00Z');
   t.after(setClock(server.app, () => { now = new Date(now.getTime() + 61_000); return now; }));
   const cases = [
-    [{ title: ' '.repeat(3), items: ok }, [{ field: 'title', reason: 'isNotEmpty' }]],
-    [{ title: '가'.repeat(49) + '😀😀', items: ok }, [{ field: 'title', reason: 'maxLength' }]],
-    [{ title: 1, items: ok }, [{ field: 'title', reason: 'isString' }]],
-    [{ title: 'a\u0000', items: ok }, [{ field: 'title', reason: 'noNul' }]],
-    [{ title: 't', password: 'short12', items: ok }, [{ field: 'password', reason: 'minLength' }]],
-    [{ title: 't', password: 'p'.repeat(65), items: ok }, [{ field: 'password', reason: 'maxLength' }]],
-    [{ title: 't', password: '', items: ok }, [{ field: 'password', reason: 'isNotEmpty' }]],
-    [{ title: 't', password: null, items: ok }, [{ field: 'password', reason: 'isString' }]],
-    [{ title: 't' }, [{ field: 'items', reason: 'isArray' }]],
-    [{ title: 't', items: [] }, [{ field: 'items', reason: 'arrayMinSize' }]],
-    [{ title: 't', items: Array.from({ length: 21 }, () => textItem(randomUUID())) }, [{ field: 'items', reason: 'arrayMaxSize' }]],
-    [{ title: 't', items: [textItem(materialId), textItem(materialId.toUpperCase())] }, [{ field: 'items[1]', reason: 'arrayUnique' }]],
-    // PDF_MATERIAL은 U8 계획 8.1로 허용 종류가 됐다. 허용 밖 종류 거부는 다른 값으로 확인한다.
-    [{ title: 't', items: [{ kind: 'IMAGE', sourceId: materialId }] }, [{ field: 'items[0].kind', reason: 'isIn' }]],
-    [{ title: 't', items: [{ kind: 'CATCH', sourceId: 'not-a-uuid' }] }, [{ field: 'items[0].sourceId', reason: 'isUuid' }]],
-    [{ title: 't', items: [{ kind: 'CATCH', sourceId: materialId, extra: 1 }] }, [{ field: 'items[0]', reason: 'isObject' }]],
-    [{ title: 't', items: ok, extra: true }, [{ field: 'body', reason: 'whitelistValidation' }]],
+    [{ title: ' '.repeat(3), presetIds: ok }, [{ field: 'title', reason: 'isNotEmpty' }]],
+    [{ title: '가'.repeat(49) + '😀😀', presetIds: ok }, [{ field: 'title', reason: 'maxLength' }]],
+    [{ title: 1, presetIds: ok }, [{ field: 'title', reason: 'isString' }]],
+    [{ title: 'a\u0000', presetIds: ok }, [{ field: 'title', reason: 'noNul' }]],
+    [{ title: 't', password: 'short12', presetIds: ok }, [{ field: 'password', reason: 'minLength' }]],
+    [{ title: 't', password: 'p'.repeat(65), presetIds: ok }, [{ field: 'password', reason: 'maxLength' }]],
+    [{ title: 't', password: '', presetIds: ok }, [{ field: 'password', reason: 'isNotEmpty' }]],
+    [{ title: 't', password: null, presetIds: ok }, [{ field: 'password', reason: 'isString' }]],
+    [{ title: 't' }, [{ field: 'presetIds', reason: 'isArray' }]],
+    [{ title: 't', presetIds: [] }, [{ field: 'presetIds', reason: 'arrayMinSize' }]],
+    [{ title: 't', presetIds: Array.from({ length: 6 }, () => randomUUID()) }, [{ field: 'presetIds', reason: 'arrayMaxSize' }]],
+    [{ title: 't', presetIds: [presetId, presetId.toUpperCase()] }, [{ field: 'presetIds[1]', reason: 'arrayUnique' }]],
+    [{ title: 't', presetIds: ['not-a-uuid', 1] }, [{ field: 'presetIds[0]', reason: 'isUuid' }, { field: 'presetIds[1]', reason: 'isUuid' }]],
+    // 옛 요청 모양(자료 목록 items)은 정의 밖 칸이다(발행 프리셋 BR3.1).
+    [{ title: 't', items: [textItem(materialId)] }, [{ field: 'body', reason: 'whitelistValidation' }, { field: 'presetIds', reason: 'isArray' }]],
+    [{ title: 't', presetIds: ok, items: [textItem(materialId)] }, [{ field: 'body', reason: 'whitelistValidation' }]],
+    [{ title: 't', presetIds: ok, extra: true }, [{ field: 'body', reason: 'whitelistValidation' }]],
   ];
   for (const [payload, violations] of cases) {
     const response = await publish(a.token, payload);
@@ -228,44 +232,58 @@ test('빈도 429: 같은 회원의 11번째 요청은 입력 검사 전에 RATE_
 test('동의 403: 동의가 없으면 AI_CONSENT_REQUIRED이고 하루 횟수를 쓰지 않으며, 동의 뒤 같은 요청이 통과한다', async () => {
   const member = await server.login(`u4-no-consent-${randomUUID()}`);
   const materialId = await insertTextMaterial(db, member.memberId);
-  expectError(await publish(member.token, body([textItem(materialId)])), 403, 'AI_CONSENT_REQUIRED');
+  expectError(await publish(member.token, await presetBody(db, member.memberId,[textItem(materialId)])), 403, 'AI_CONSENT_REQUIRED');
   assert.equal(await dailyCount(member.memberId), null);
   assert.deepEqual(await publications(), []);
   await consent(server.app, member.memberId);
-  assert.equal((await publish(member.token, body([textItem(materialId)]))).status, 201);
+  assert.equal((await publish(member.token, await presetBody(db, member.memberId,[textItem(materialId)]))).status, 201);
   assert.equal(await dailyCount(member.memberId), 1);
 });
 
-test('404: 남의 Catch·남의 자료·없는 원본은 같은 RESOURCE_UNAVAILABLE이고 아무것도 저장하지 않는다. 인증 없으면 401', async () => {
+test('404: 프리셋에 든 남의 Catch·남의 자료, 남의 프리셋·없는 프리셋은 같은 RESOURCE_UNAVAILABLE이고 아무것도 저장하지 않는다. 인증 없으면 401', async () => {
   const a = await author();
   const b = await author();
   const bCatch = await eligibleCatch(db, b.memberId);
   const bMaterial = await insertTextMaterial(db, b.memberId);
   const own = await insertTextMaterial(db, a.memberId);
-  for (const list of [[catchItem(bCatch)], [textItem(bMaterial)], [textItem(own), catchItem(randomUUID())], [textItem(randomUUID()), textItem(own)]]) {
-    const response = await publish(a.token, body(list));
+  // 프리셋 항목의 외래 키는 원본의 존재만 지키므로 없는 원본은 프리셋에 담기지 않는다. 남의 원본은 발행 잠금의 회원 조건이 막는다(NFR2.5).
+  for (const list of [[catchItem(bCatch)], [textItem(bMaterial)], [textItem(own), catchItem(bCatch)]]) {
+    const response = await publish(a.token, await presetBody(db, a.memberId, list));
     expectError(response, 404, 'RESOURCE_UNAVAILABLE');
     assert.deepEqual(response.body, { code: 'RESOURCE_UNAVAILABLE', message: '현재 열람할 수 없는 자료입니다.' });
+  }
+  const bPreset = await insertPreset(db, b.memberId, [textItem(bMaterial)]);
+  const aPreset = await insertPreset(db, a.memberId, [textItem(own)]);
+  for (const presetIds of [[bPreset], [aPreset, randomUUID()]]) {
+    expectError(await publish(a.token, body(presetIds)), 404, 'RESOURCE_UNAVAILABLE');
   }
   assert.deepEqual(await publications(), []);
   assert.equal(await dailyCount(a.memberId), null, '되돌아간 트랜잭션은 횟수를 남기지 않는다');
   assert.equal(writer.calls.length, 0);
-  expectError(await publish(undefined, body([textItem(own)])), 401, 'AUTH_REQUIRED');
+  expectError(await publish(undefined, body([aPreset])), 401, 'AUTH_REQUIRED');
 });
 
-test('S5: 미확인 Catch는 409 CONFIRMATION_REQUIRED, 보호된 Catch는 409 SOURCE_RESTRICTED(details.catchIds)이고 다른 비공개 Catch는 그대로다', async () => {
+test('S5: 미확인 409 CONFIRMATION_REQUIRED → 보호 409 SOURCE_RESTRICTED → 비공개 409 CATCH_PRIVATE 순이고 details는 blockedSources뿐이며 공개 상태는 그대로다', async () => {
   const a = await author();
   const unconfirmed = await eligibleCatch(db, a.memberId, { confirmed: false, visibility: 'PUBLIC' });
   const keptPrivate = await eligibleCatch(db, a.memberId, { visibility: 'PRIVATE' }, { repositoryId: 'synthetic-repository-kept' });
   const restricted = await eligibleCatch(db, a.memberId, { visibility: 'PRIVATE' }, { repositoryId: 'synthetic-repository-private', protection: 'SOURCE_PRIVATE' });
   const materialId = await insertTextMaterial(db, a.memberId);
+  const line = (presetId, sourceId) => ({ presetId, kind: 'CATCH', sourceId });
 
-  const confirmation = await publish(a.token, body([textItem(materialId), catchItem(keptPrivate), catchItem(unconfirmed), catchItem(restricted)]));
+  const all = await presetBody(db, a.memberId, [textItem(materialId), catchItem(keptPrivate), catchItem(unconfirmed), catchItem(restricted)]);
+  const confirmation = await publish(a.token, all);
   expectError(confirmation, 409, 'CONFIRMATION_REQUIRED');
-  assert.deepEqual(confirmation.body.details, { catchIds: [unconfirmed] }, '확인 판정이 보호 판정보다 먼저');
-  const source = await publish(a.token, body([catchItem(keptPrivate), catchItem(restricted)]));
+  assert.deepEqual(confirmation.body.details, { blockedSources: [line(all.presetIds[0], unconfirmed)] }, '확인 판정이 보호 판정보다 먼저');
+  const two = await presetBody(db, a.memberId, [catchItem(keptPrivate), catchItem(restricted)]);
+  const source = await publish(a.token, two);
   expectError(source, 409, 'SOURCE_RESTRICTED');
-  assert.deepEqual(source.body.details, { catchIds: [restricted] });
+  assert.deepEqual(source.body.details, { blockedSources: [line(two.presetIds[0], restricted)] }, '보호 판정이 비공개 판정보다 먼저');
+  const hidden = await presetBody(db, a.memberId, [textItem(materialId), catchItem(keptPrivate)]);
+  const privateRejected = await publish(a.token, hidden);
+  expectError(privateRejected, 409, 'CATCH_PRIVATE');
+  assert.deepEqual(privateRejected.body, { code: 'CATCH_PRIVATE', message: '비공개 Catch는 발행할 수 없습니다.',
+    details: { blockedSources: [line(hidden.presetIds[0], keptPrivate)] } });
   assert.deepEqual(await publications(), []);
   assert.equal(await visibility(keptPrivate), 'PRIVATE');
   assert.equal(await visibility(restricted), 'PRIVATE');
@@ -274,40 +292,38 @@ test('S5: 미확인 Catch는 409 CONFIRMATION_REQUIRED, 보호된 Catch는 409 S
 
   // 보호 관측이 없거나 불완전하면 비공개로 단정하지 않고 10월처럼 서버 오류다(BR7.4).
   const noProtection = await eligibleCatch(db, a.memberId, {}, { repositoryId: 'synthetic-repository-none', protection: null });
-  expectError(await publish(a.token, body([catchItem(noProtection)])), 500, 'INTERNAL_ERROR');
+  expectError(await publish(a.token, await presetBody(db, a.memberId,[catchItem(noProtection)])), 500, 'INTERNAL_ERROR');
   const request = await insertAnalysisRequest(db, a.memberId, 'synthetic-repository-partial');
   await db.query(`INSERT INTO repository_protection (protection_id, owner_id, repository_id, applied_restriction) VALUES ($1, $2, $3, 'NONE')`,
     [randomUUID(), a.memberId, request.repositoryId]);
   const partial = await insertCatch(db, a.memberId, request.requestId);
-  expectError(await publish(a.token, body([catchItem(partial)])), 500, 'INTERNAL_ERROR');
+  expectError(await publish(a.token, await presetBody(db, a.memberId, [catchItem(partial)])), 500, 'INTERNAL_ERROR', '기록 문제가 비공개 판정보다 먼저');
   assert.deepEqual(await publications(), []);
   assert.equal(await visibility(partial), 'PRIVATE');
 });
 
 test('S6: 하루 횟수 LIMIT_REACHED는 429 DAILY_LIMIT_REACHED, 조각 나누기 예외는 500이며 둘 다 아무것도 남지 않는다', async () => {
   const a = await author();
-  const privateCatch = await eligibleCatch(db, a.memberId, { visibility: 'PRIVATE' });
+  const privateCatch = await eligibleCatch(db, a.memberId);
   const materialId = await insertTextMaterial(db, a.memberId);
   await db.query('INSERT INTO daily_execution_count (member_id, usage_date, count) VALUES ($1, $2, $3)', [a.memberId, koreanUsageDate(new Date()), DAILY_RUN_LIMIT]);
-  const limited = await publish(a.token, body([catchItem(privateCatch), textItem(materialId)]));
+  const limited = await publish(a.token, await presetBody(db, a.memberId,[catchItem(privateCatch), textItem(materialId)]));
   expectError(limited, 429, 'DAILY_LIMIT_REACHED');
   assert.equal(limited.headers.get('retry-after'), null);
   assert.equal(limited.body.message, '오늘 한도에 도달했습니다');
   assert.equal(await dailyCount(a.memberId), DAILY_RUN_LIMIT);
   assert.deepEqual(await publications(), []);
-  assert.equal(await visibility(privateCatch), 'PRIVATE');
   assert.equal(writer.calls.length, 0);
 
   await db.query('DELETE FROM daily_execution_count WHERE member_id = $1', [a.memberId]);
   writer.fail = true;
-  const failed = await publish(a.token, body([catchItem(privateCatch), textItem(materialId)]));
+  const failed = await publish(a.token, await presetBody(db, a.memberId,[catchItem(privateCatch), textItem(materialId)]));
   expectError(failed, 500, 'INTERNAL_ERROR');
   assert.deepEqual(failed.body, { code: 'INTERNAL_ERROR', message: '처리 중 오류가 발생했습니다.' });
   assert.equal(writer.calls.length, 1);
   assert.equal(writer.calls[0].itemsInside, 2, '조각 나누기 전에 항목이 써졌다가 함께 되돌아간다');
   assert.deepEqual(await publications(), []);
   assert.deepEqual(await db.query('SELECT 1 FROM published_item'), []);
-  assert.equal(await visibility(privateCatch), 'PRIVATE', '공개 전환도 되돌아간다');
   assert.equal(await dailyCount(a.memberId), null, '하루 횟수도 되돌아간다');
   assert.equal(aiRun.calls.length, 0, '실패한 발행은 작업을 등록하지 않는다');
 });
@@ -316,7 +332,7 @@ test('S7: 작업 등록이 모두 ENQUEUE_FAILED여도 201 발행 성공이고 �
   const a = await author();
   const materialId = await insertTextMaterial(db, a.memberId);
   aiRun.result = 'ENQUEUE_FAILED';
-  const response = await publish(a.token, body([textItem(materialId)]));
+  const response = await publish(a.token, await presetBody(db, a.memberId,[textItem(materialId)]));
   assert.equal(response.status, 201, response.text);
   assert.equal((await publications()).length, 1);
   assert.deepEqual(aiRun.calls.map((call) => call.kind), ['EMBED_PUBLICATION', 'BASE_SUMMARY']);
@@ -330,16 +346,16 @@ test('전체 글 60,000자(임시값)는 발행되고 60,001자는 400이며 되
   const draftOnly = await eligibleCatch(db, a.memberId, { workFacts: ['a'], subjectContribution: 'b', draftContent: '다'.repeat(5000), title: '라'.repeat(50) },
     { evidence: 0 });
 
-  const over = await publish(a.token, body([...full.map(textItem), textItem(one)]));
+  const over = await publish(a.token, await presetBody(db, a.memberId,[...full.map(textItem), textItem(one)]));
   expectError(over, 400, 'VALIDATION_FAILED');
-  assert.deepEqual(over.body.details, { violations: [{ field: 'items', reason: 'maxTotalLength' }] });
+  assert.deepEqual(over.body.details, { violations: [{ field: 'presetIds', reason: 'maxTotalLength' }] });
   assert.deepEqual(await publications(), []);
   assert.equal(await dailyCount(a.memberId), null);
 
-  assert.equal((await publish(a.token, body(full.map(textItem)))).status, 201, '정확히 60,000자');
+  assert.equal((await publish(a.token, await presetBody(db, a.memberId,full.map(textItem)))).status, 201, '정확히 60,000자');
   // Catch의 세는 필드는 2자뿐이라 59,998 + 2 = 60,000이다(초안 5,000자·제목은 세지 않는다).
   const almost = await insertTextMaterial(db, a.memberId, { body: '나'.repeat(SNAPSHOT_TEXT_TOTAL_MAX - 2) });
-  assert.equal((await publish(a.token, body([textItem(almost), catchItem(draftOnly)]))).status, 201);
+  assert.equal((await publish(a.token, await presetBody(db, a.memberId,[textItem(almost), catchItem(draftOnly)]))).status, 201);
   assert.equal((await publications()).length, 2);
 });
 
@@ -359,7 +375,7 @@ test('전체 글 60,000자(임시값)는 발행되고 60,001자는 400이며 되
 
 /** 고른 Catch들을 발행하고 저장된 사본을 요청 순서대로 돌려준다. */
 async function publishCatches(member, catchIds) {
-  const response = await publish(member.token, body(catchIds.map(catchItem)));
+  const response = await publish(member.token, await presetBody(db, member.memberId,catchIds.map(catchItem)));
   assert.equal(response.status, 201, response.text);
   return (await items(response.body.publicationId)).map((item) => item.snapshot);
 }
@@ -367,7 +383,8 @@ async function publishCatches(member, catchIds) {
 async function bareCatch(memberId, repositoryId, overrides = {}, repository = undefined) {
   const request = await insertAnalysisRequest(db, memberId, repositoryId, repository);
   await insertProtection(db, memberId, repositoryId, 'NONE');
-  return insertCatch(db, memberId, request.requestId, overrides);
+  // 발행 프리셋 U1부터 비공개 Catch는 발행되지 않으므로(BR3.6) 공개로 넣는다.
+  return insertCatch(db, memberId, request.requestId, { visibility: 'PUBLIC', ...overrides });
 }
 const sha = (character) => character.repeat(40);
 const commitUrl = (value, repository = 'nc2-owner/nc2-repo') => `https://github.com/${repository}/commit/${value}`;
@@ -399,7 +416,7 @@ test('NC2 AC6.2.2: 작성 달은 UTC가 아니라 한국 시간으로 정한다(
 test('NC2 AC6.2.4: 발행 뒤 작성자 설명을 고쳐도 저장된 사본의 설명과 작성 달은 발행 때 그대로다', async () => {
   const a = await author();
   const catchId = await eligibleCatch(db, a.memberId, { authorDescription: '[합성] 발행 때 설명', authorDescriptionUpdatedAt: new Date('2026-11-02T00:00:00Z') });
-  const response = await publish(a.token, body([catchItem(catchId)]));
+  const response = await publish(a.token, await presetBody(db, a.memberId,[catchItem(catchId)]));
   assert.equal(response.status, 201, response.text);
   await db.query(`UPDATE catch_asset SET author_description = '[합성] 고친 설명', author_description_updated_at = '2027-01-05T00:00:00Z' WHERE catch_id = $1`, [catchId]);
   const [stored] = await items(response.body.publicationId);

@@ -33,9 +33,10 @@ const pages = () => [
   { pageNumber: 2, text: "", readable: false },
   { pageNumber: 3, text: "셋째 쪽의 근거 문장이 여기 있다.", readable: true },
 ];
-const pdfItem = (patch = {}) => ({ publishedItemId: PDF_ID, position: 2, itemKind: "PDF_MATERIAL", title: "합성 PDF 제목",
+// 발행 프리셋 U3: 사본 항목마다 프리셋 칸(계약 P-3)이 있다. 텍스트 자료는 첫 프리셋, PDF는 둘째 프리셋이다.
+const pdfItem = (patch = {}) => ({ publishedItemId: PDF_ID, position: 2, presetOrdinal: 2, presetName: "포트폴리오", itemKind: "PDF_MATERIAL", title: "합성 PDF 제목",
   snapshot: { pageCount: 3 }, pdfPages: pages(), ...patch });
-const textItem = () => ({ publishedItemId: "t1", position: 1, itemKind: "TEXT_MATERIAL", title: "자료", snapshot: { body: "본문 글" } });
+const textItem = () => ({ publishedItemId: "t1", position: 1, presetOrdinal: 1, presetName: "자기소개서", itemKind: "TEXT_MATERIAL", title: "자료", snapshot: { body: "본문 글" } });
 const snapshot = (items = [textItem(), pdfItem()]) => ({ title: "발행본 제목", publishedAt: PUBLISHED_AT, expiresAt: EXPIRES_AT, items });
 const source = () => ({ fetchPdf: async () => new Response(null, { status: 500 }) });
 
@@ -69,8 +70,8 @@ test("F-9: 사본 응답의 PDF 항목은 쪽 수와 쪽 사본의 계약 칸만
     snapshot: { pageCount: 3, storageKey: "members/secret" }, pdfCopyKey: "members/secret/copy.pdf",
   }]);
   const read = readPublishedSnapshot(raw);
-  assert.deepEqual(read.items[1], { publishedItemId: PDF_ID, position: 2, title: "합성 PDF 제목", itemKind: "PDF_MATERIAL",
-    snapshot: { pageCount: 3 }, pdfPages: pages() }, "계약 밖 칸(저장 키·내부 ID)은 넘기지 않는다");
+  assert.deepEqual(read.items[1], { publishedItemId: PDF_ID, position: 2, title: "합성 PDF 제목", presetOrdinal: 2, presetName: "포트폴리오",
+    itemKind: "PDF_MATERIAL", snapshot: { pageCount: 3 }, pdfPages: pages() }, "계약 밖 칸(저장 키·내부 ID)은 넘기지 않는다");
   assert.ok(!JSON.stringify(read).includes("members/secret"));
   assert.equal(pdfPageCount(read.items[1]), 3);
   assert.equal(pdfPageCount({ ...read.items[1], snapshot: {} }), null);
@@ -189,6 +190,18 @@ test("화면 연결: 받은 사람 화면과 작성자 발행본 화면의 PDF �
   assert.match(owner, /data-testid="publication-detail"[^>]*data-state="STOPPED"/);
   assert.match(owner, /data-testid="snapshot-pdf-viewer-open"/);
   assert.match(owner, /data-testid="snapshot-pdf-page-count">3쪽</);
+});
+
+// 발행 프리셋 U3 BR1.4·NFR5.2·NFR5.3: PDF 항목이 열리지 않은 탭에 있어도 패널째 그려 두고(hidden) 사본은 누를 때만 받는다.
+// 실패 조건: 열리지 않은 탭의 PDF 항목이 그려지지 않음(탭을 열 때 뷰어가 새로 만들어짐), 처음 그릴 때 사본 요청.
+test("U3 열리지 않은 탭의 PDF 항목도 hidden 패널 안에 그려 두고, 처음 그릴 때 사본 요청은 0이다", () => {
+  let fetched = 0;
+  const counting = () => ({ fetchPdf: async () => { fetched += 1; return new Response(null, { status: 500 }); } });
+  const html = renderToStaticMarkup(createElement(PublishedSnapshotView, { snapshot: snapshot(), pdfSource: counting }));
+  const panel2 = html.slice(html.indexOf('id="publication-snapshot-panel-2"'));
+  assert.match(panel2, /^id="publication-snapshot-panel-2" aria-labelledby="publication-snapshot-tab-2" tabindex="0" hidden="">/);
+  assert.match(panel2, /data-testid="snapshot-pdf-viewer-open"/, "열리지 않은 탭의 PDF 항목도 그려져 있다");
+  assert.equal(fetched, 0, "처음 그릴 때 PDF 사본을 받지 않는다");
 });
 
 // #521 리뷰 4: 뷰어는 쪽 목록 위에 있어, 아래쪽 쪽에서 [원본 n쪽 열기]를 눌러도 화면이 그대로면 아무 일도 없어 보인다.

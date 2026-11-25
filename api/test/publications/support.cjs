@@ -96,11 +96,14 @@ function hideRegistrationNames(app) {
   return () => { publisher.dataSource = real; };
 }
 
-/** 발행 자격을 갖춘 Catch(확인됨·보호 NONE·근거 있음)를 만든다. 원 요청·보호 관측은 저장소마다 한 번 만든다. repository를 주면 등록 이름이 된다. */
+/**
+ * 발행 자격을 갖춘 Catch(확인됨·보호 NONE·공개·근거 있음)를 만든다. 원 요청·보호 관측은 저장소마다 한 번 만든다. repository를 주면 등록 이름이 된다.
+ * 발행 프리셋 U1부터 비공개 Catch는 발행에서 CATCH_PRIVATE로 막히므로(BR3.6) 기본 공개 상태는 PUBLIC이다. 비공개는 overrides로 준다.
+ */
 async function eligibleCatch(db, memberId, overrides = {}, { repositoryId = 'synthetic-repository', protection = 'NONE', evidence = 1, repository } = {}) {
   const request = await insertAnalysisRequest(db, memberId, repositoryId, repository);
   if (protection !== null) await insertProtection(db, memberId, repositoryId, protection);
-  const catchId = await insertCatch(db, memberId, request.requestId, overrides);
+  const catchId = await insertCatch(db, memberId, request.requestId, { visibility: 'PUBLIC', ...overrides });
   for (let position = 1; position <= evidence; position += 1) await insertEvidence(db, catchId, position);
   return catchId;
 }
@@ -165,11 +168,32 @@ function setClock(app, clock) {
   return () => targets.forEach((target, index) => { target.clock = saved[index]; });
 }
 
-function body(items, overrides = {}) {
-  return { title: '[합성] 발행본', items, ...overrides };
+/** 발행 요청 본문(발행 프리셋 U1 계약 P-2: `{ title, password?, presetIds }`). */
+function body(presetIds, overrides = {}) {
+  return { title: '[합성] 발행본', presetIds, ...overrides };
 }
 const catchItem = (sourceId) => ({ kind: 'CATCH', sourceId });
 const textItem = (sourceId) => ({ kind: 'TEXT_MATERIAL', sourceId });
+
+const ITEM_COLUMNS = { CATCH: 'catch_id', TEXT_MATERIAL: 'text_material_id', PDF_MATERIAL: 'pdf_material_id' };
+
+/**
+ * 프리셋 한 개를 표에 직접 넣는다(발행 프리셋 U1). items는 [{ kind, sourceId }]이고 배열 순서가 position(1부터)이다.
+ * 외래 키가 원본의 존재를 요구하므로 없는 원본은 넣을 수 없다. 주인 확인은 API 몫이라 남의 원본도 넣을 수 있다(그런 발행은 404).
+ */
+async function insertPreset(db, memberId, items, { presetId = randomUUID(), name = '[합성] 프리셋', createdAt = new Date() } = {}) {
+  await db.query('INSERT INTO preset (preset_id, member_id, name, created_at, updated_at) VALUES ($1, $2, $3, $4, $4)', [presetId, memberId, name, createdAt]);
+  for (const [index, item] of items.entries()) {
+    await db.query(`INSERT INTO preset_item (preset_item_id, preset_id, position, ${ITEM_COLUMNS[item.kind]}) VALUES ($1, $2, $3, $4)`,
+      [randomUUID(), presetId, index + 1, item.sourceId]);
+  }
+  return presetId;
+}
+
+/** 자료 목록으로 프리셋 하나를 만들고 그 프리셋 하나로 발행하는 본문을 돌려준다(이 변경 전 시험의 「자료 목록 발행」 자리). */
+async function presetBody(db, memberId, items, overrides = {}) {
+  return body([await insertPreset(db, memberId, items)], overrides);
+}
 
 /** 발행 응답 url에서 토큰을 꺼낸다(url 안에만 있어야 한다). */
 function tokenOf(url) {
@@ -184,7 +208,8 @@ function tokenOf(url) {
  */
 async function publishLink(server, db, member, { password, title = '[합성] 받은 사람 시험 발행본', items } = {}) {
   const chosen = items ?? [textItem(await insertTextMaterial(db, member.memberId, { title: '[합성] 자료', body: '[합성] 본문' }))];
-  const response = await server.call('POST', '/publications', { token: member.token, body: body(chosen, { title, ...(password ? { password } : {}) }) });
+  const payload = await presetBody(db, member.memberId, chosen, { title, ...(password ? { password } : {}) });
+  const response = await server.call('POST', '/publications', { token: member.token, body: payload });
   if (response.status !== 201) throw new Error(`발행 실패 ${response.status}: ${response.text}`);
   return { ...response.body, token: tokenOf(response.body.url), expiresAt: new Date(response.body.expiresAt), publishedAt: new Date(response.body.publishedAt) };
 }
@@ -210,6 +235,6 @@ const unlockRaw = (server, token, payload, headers = {}) => recipientCall(server
 module.exports = {
   APP_SETTINGS, PUBLISH_SETTINGS, WEB_BASE_URL, HOUR, setEnv, collectingLogger, startApp, insertMember, expectError,
   insertAnalysisRequest, insertProtection, insertCatch, insertEvidence, insertCommitAssignment, hideRegistrationNames, eligibleCatch, insertTextMaterial, consent,
-  fakeAiRun, fakeIndexWriter, bindFakes, setClock, body, catchItem, textItem, tokenOf,
+  fakeAiRun, fakeIndexWriter, bindFakes, setClock, body, catchItem, textItem, insertPreset, presetBody, tokenOf,
   publishLink, recipientCall, recipientGet, unlockRaw,
 };

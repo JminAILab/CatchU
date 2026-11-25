@@ -27,8 +27,8 @@ export type DescriptionEditorState = {
 /**
  * 작성자 설명 편집 상태 전이(U4 W1, BR1.1·BR1.2·BR2.1~BR2.3, 새 Catch W1·BR1.4~BR1.6).
  *
- * - 열 때 현재 설명을 읽어 8칸으로 나눈다. 읽지 못하면 빈 설명으로 추정하지 않고 다시 불러오기를 보인다. 늦게 온 응답은 버린다.
- * - 저장은 8칸을 합친 글 하나를 지금 경로로 보낸다. 합친 글이 4,000자를 넘으면 보내지 않는다.
+ * - 열 때 현재 설명을 읽어 칸으로 나눈다(편집 화면은 늘 보이는 칸 셋과 글이 저장된 옛 칸을 그린다, #634). 읽지 못하면 빈 설명으로 추정하지 않고 다시 불러오기를 보인다. 늦게 온 응답은 버린다.
+ * - 저장은 칸 글을 합친 글 하나를 지금 경로로 보낸다. 합친 글이 4,000자를 넘으면 보내지 않는다.
  * - 성공 응답 뒤에만 "저장됨"을 보인다. 실패하면 입력을 남기고 "저장되지 않았습니다"와 이유를 보인다.
  * - 저장 중에 더 쓴 입력은 서버 값으로 덮지 않는다. 로그인이 바뀐 뒤 도착한 응답은 반영하지 않는다.
  */
@@ -59,7 +59,7 @@ export function createDescriptionEditorModel(catchId: string, api: AuthorDescrip
     store.set({ load: "ready", edit: { texts: saved, savedTexts: saved, status: { kind: "idle" } } });
   }
 
-  /** 칸 하나를 바꾼다. 저장 중에는 화면이 8칸을 모두 막는다(BR4.5). */
+  /** 칸 하나를 바꾼다. 저장 중에는 화면이 보이는 칸을 모두 막는다(BR4.5). */
   function change(title: SectionTitle, value: string) {
     store.set((prev) => ({
       ...prev,
@@ -97,12 +97,9 @@ export function createDescriptionEditorModel(catchId: string, api: AuthorDescrip
   };
 }
 
-/**
- * Catch 상세의 작성자 설명 편집(U4 W1). 상세 모달 안에서 Catch마다 새로 마운트한다(key=catchId).
- * `evidenceUrls`는 이 Catch 근거 주소이고, 「발행하면 면접관에게 열릴 링크」의 다른 저장소 앞붙임을 정할 때만 쓴다(BR2.4).
- */
-export function AuthorDescriptionEditor({ catchId, api, deps, evidenceUrls = [] }: {
-  catchId: string; api: AuthorDescriptionApi; deps?: DescriptionEditorDeps; evidenceUrls?: readonly string[];
+/** Catch 상세의 작성자 설명 편집(U4 W1). 상세 모달 안에서 Catch마다 새로 마운트한다(key=catchId). */
+export function AuthorDescriptionEditor({ catchId, api, deps }: {
+  catchId: string; api: AuthorDescriptionApi; deps?: DescriptionEditorDeps;
 }) {
   const [model] = useState(() => createDescriptionEditorModel(catchId, api, deps));
   const view = useSyncExternalStore(model.store.subscribe, model.store.get, model.store.get);
@@ -113,8 +110,8 @@ export function AuthorDescriptionEditor({ catchId, api, deps, evidenceUrls = [] 
   useUnsavedTraverseGuard(dirty, UNSAVED_MESSAGE);
   useUnsavedChanges(dirty);
 
-  return <AuthorDescriptionPanel loadState={view.load} texts={view.edit.texts} status={view.edit.status} dirty={dirty}
-    evidenceUrls={evidenceUrls} loadFailureText={view.loadFailureText}
+  return <AuthorDescriptionPanel loadState={view.load} texts={view.edit.texts} savedTexts={view.edit.savedTexts}
+    status={view.edit.status} dirty={dirty} loadFailureText={view.loadFailureText}
     onChange={model.change}
     onSave={() => { void model.save(); }}
     onRetry={model.retry} />;

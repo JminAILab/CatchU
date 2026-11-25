@@ -124,7 +124,7 @@
    bash deploy/aws/scripts/create-s3.sh --apply     # s3.md
    ```
    큐는 장애 조치 같은 이벤트를 0단계에서 만든 SNS 주제 `catchu-alerts`로 보낸다.
-6. **Load Balancer Controller:** `install-lb-controller.sh --apply`. Secret·ConfigMap, DB 계정(앱 계정 `lock_timeout` 3초, `idle_in_transaction_session_timeout`은 #220에서 정할 값), 앱 실행 파일과 교체는 2단계에서 [k8s/README.md](k8s/README.md)대로 한다.
+6. **Load Balancer Controller:** `install-lb-controller.sh --apply`. Secret·ConfigMap, DB 계정(앱 계정 `lock_timeout` 3초, `idle_in_transaction_session_timeout` 5분), 앱 실행 파일과 교체는 2단계에서 [k8s/README.md](k8s/README.md)대로 한다.
 
 ## 생성이 중간에 멈췄을 때
 
@@ -162,7 +162,12 @@
    그 ID로 `aws ec2 terminate-instances --instance-ids <ID> …` → `aws ec2 wait instance-terminated --instance-ids <ID> …`. 루트 볼륨은 함께 지워진다.
 4. 개발 서버의 탄력적 IP(`aws ec2 describe-addresses … --filters Name=tag:Name,Values=catchu-dev-server --query 'Addresses[].AllocationId' --output text`)를 `aws ec2 release-address --allocation-id <ID> …`로 해제하고, 3에서 적은 보안 그룹을 지운다. 종료가 끝나기 전에는 의존이 남아 실패한다.
 5. IAM: 인스턴스 프로필에서 역할 `catchu-dev-server`를 빼고 → 관리형 정책 분리 → 인라인 정책 3개(`list-role-policies`로 확인) 삭제 → 역할·인스턴스 프로필 삭제. 버킷: `aws s3 rb s3://catchu-dev-server-files --force …`.
-6. SSM 문서 `catchu-dev-deploy`를 지운다. 배포 역할 `catchu-github-deploy`, GitHub environment `dev-server`, ECR `catchu-deploy-files`는 자동 배포의 이미지 올리기가 쓰는 동안 남긴다(#342).
+6. SSM 문서 `catchu-dev-deploy`를 지운다(`aws ssm delete-document --name catchu-dev-deploy …`). 개발 서버 배포 경로의 나머지 셋은 그 경로를 뺀 워크플로가 `main`에 반영되고 진행 중인 실행이 없을 때 이 순서로 지운다(#342). 그 전에는 배포 대상 `none`이 아직 배포 역할 `catchu-github-deploy`로 이미지를 올린다.
+   - 배포 역할 `catchu-github-deploy`: 인라인 정책 `catchu-github-deploy`를 지운 뒤 역할을 지우고, `aws iam get-role`이 NoSuchEntity인지 본다. environment보다 먼저 지운다. environment를 먼저 지우면 그 이름을 부르는 실행이 보호 규칙 없는 environment를 새로 만들어 이 역할을 받을 수 있다.
+   - GitHub environment `dev-server`: `gh api -X DELETE repos/JminAILab/CatchU/environments/dev-server`. 그 안의 secrets·variables도 함께 없어진다.
+   - ECR `catchu-deploy-files`(배포 파일 묶음): `aws ecr delete-repository --repository-name catchu-deploy-files --force …`.
+   - 확인: `aws ssm describe-document --name catchu-dev-deploy …`와 ECR 조회가 없다는 오류를 내고, `gh api repos/JminAILab/CatchU/environments`에 `eks`만 있다.
+   - OIDC 공급자는 EKS 배포 역할도 쓰므로 B의 12까지 남긴다.
 7. 확인(개발 서버 자원만): 이름 태그 `catchu-dev-server` 인스턴스가 terminated뿐, 그 이름의 탄력적 IP 0, 3에서 적은 보안 그룹 없음, 역할 `catchu-dev-server` 없음(`aws iam get-role`이 NoSuchEntity), 버킷 `catchu-dev-server-files` 없음, 상태 available인 볼륨 0, 자기 소유 스냅샷 0. EKS 노드와 NAT의 공인 IP는 B까지 남는 것이 정상이다. #276 완료 기준(개발 서버 삭제)의 증거다.
 
 **B. EKS 기간 자원(제출을 확인한 뒤 지원 기한 전)**
@@ -230,7 +235,7 @@ bash deploy/aws/scripts/logs.test.sh       # 위와 같음
 | API·migration만 DB 접속, worker·외부는 직접 접속 불가 | RDS 공개 접근 끔·보안 그룹(노드에서 5432만), 실제 Deployment Pod에서 한 NetworkPolicy 접속 시험 | 1·2 | `create-rds.sh`, `k8s/network-policy.yaml`(worker에는 5432가 없다) |
 | worker 나가는 연결을 허용 대상·경로로 제한 | 실제 worker Pod의 허용·거부 시험 | 2 | `k8s/network-policy.yaml` |
 | 앱·migration 계정 분리, 암호화·신뢰 CA·인증서·호스트명 검증 | RDS 확인 값(저장 암호화, CA `rds-ca-rsa2048-g1`), 파라미터(`rds.force_ssl=1`, TLS 1.2 이상), 계정 SQL 결과, `PGSSLMODE=verify-full` 접속 | 1·2 | `create-rds.sh`, `k8s/`(api는 `catchu_app`, migration은 `catchu_migrator`, 둘 다 `verify-full`), `db/roles.sql`(계정 SQL 결과 표), `db/rds-ca-rsa2048-g1.pem` |
-| 앱 계정 `lock_timeout`·`idle_in_transaction_session_timeout` 적용, 동의 기록 직접 삭제 권한 없음 | 앱 계정 새 연결의 `SHOW` 결과, `deploy.sh` 교체 기록의 동의 기록 줄 | 2 | `db/roles.sql`(`lock_timeout` 3초). `idle_in_transaction_session_timeout`은 #220에서 정하면 더한다(RDS 기본값 24시간). 동의 기록은 `deploy.sh`·`k8s/consent-guard-pod.yaml` |
+| 앱 계정 `lock_timeout`·`idle_in_transaction_session_timeout` 적용, 동의 기록 직접 삭제 권한 없음 | 앱 계정 새 연결의 `SHOW` 결과, `deploy.sh` 교체 기록의 동의 기록 줄 | 2 | `db/roles.sql`(`lock_timeout` 3초), `db/idle-in-transaction.sql`(`idle_in_transaction_session_timeout` 5분, 2026-11-19). 동의 기록은 `deploy.sh`·`k8s/consent-guard-pod.yaml` |
 | 큐 `noeviction`, 키트 시나리오, 재시작·장애 조치 뒤 재접속 | 큐 확인 값(`maxmemory-policy noeviction`, TLS·비밀번호·스냅샷 0), #77 키트 결과 | 1·2 | `create-queue.sh` |
 | ALB TLS 종료·80→443·사설 서비스 접근 제한·신뢰 프록시 대역 | `curl -sI http://catchu.dev/`가 https로 이동, TLS 1.1 접속 거부(`openssl s_client -tls1_1`), 바깥 확인(`/v1/INTERNAL/x`, `/v1/Internal/…`, `/V1/internal/x`, `/v1//internal/x`, `/v1/%69nternal/x` 모두 404), ALB 규칙 우선순위, 퍼블릭 서브넷 대역 | 2 | `create-certificate.sh`, `create-waf.sh`·`waf/`, `k8s/ingress.yaml` |
 | 관리형 DB 자동 백업·보관 기간·암호화·열람 권한 제한 | RDS 확인 값(백업 7일, 저장 암호화, 삭제 보호, 태그 스냅샷 복사), 스냅샷이 공개·공유되지 않음(`aws rds describe-db-snapshot-attributes`), AWS 권한을 가진 IAM 사용자가 팀장 한 명뿐임(`aws iam list-users`) | 1 | `create-rds.sh` |
@@ -238,4 +243,4 @@ bash deploy/aws/scripts/logs.test.sh       # 위와 같음
 | RDS·큐 장애 조치 뒤 api·worker 재연결, 가용 영역별 NAT 경로 | 「1단계 만드는 순서」의 NAT 경로 조회, `check-target.sh` 뒤 `aws rds reboot-db-instance --db-instance-identifier catchu-db --force-failover --profile catchu --region ap-northeast-2`와 `aws elasticache test-failover --replication-group-id catchu-queue --node-group-id 0001 --profile catchu --region ap-northeast-2`, 그 뒤 api·worker 상태 | 1·2 | `cluster.yaml`(NAT 2개), `create-rds.sh`(Multi-AZ), `create-queue.sh`(복제본·자동 장애 조치) |
 | EKS로 옮긴 뒤 개발 서버 삭제, 과금 자원 없음 | 「삭제 순서」 A의 7번 조회 결과 | 4 | 「삭제 순서」 |
 
-이 폴더가 다른 이슈에 주는 것: EKS에서 API 한 실행·worker 한 실행과 교체 중 겹침 방지(#275 완료 기준 4, `k8s/`·`deploy.sh`. 실제 확인은 2단계), Google 로그인 시작 경로의 앞단 제한(#277, `create-waf.sh`. 한 주소에서 1분 동안 60번 보내 2분 안에 429가 나오는지 시험. WAF는 요청 수를 근삿값으로 세고 감지가 늦어 정확히 21번째에 막히지 않는다), 운영 개발 로그인 거부·재배포 뒤 자료 유지 확인 스크립트(#277, 다음 PR), 두 API 실행 틀(#280, 다음 PR).
+이 폴더가 다른 이슈에 주는 것: EKS에서 API 한 실행·worker 3 실행(#275 기준 4는 1, #480)과 교체 중 겹침 방지(`k8s/`·`deploy.sh`. 실제 확인은 2단계), Google 로그인 시작 경로의 앞단 제한(#277, `create-waf.sh`. 한 주소에서 1분 동안 60번 보내 2분 안에 429가 나오는지 시험. WAF는 요청 수를 근삿값으로 세고 감지가 늦어 정확히 21번째에 막히지 않는다), 운영 개발 로그인 거부·재배포 뒤 자료 유지 확인 스크립트(#277, 다음 PR), 두 API 실행 틀(#280, 다음 PR).

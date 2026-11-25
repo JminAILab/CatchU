@@ -26,7 +26,7 @@ const { PUBLICATION_ACCESS, PublicationsModule } = require('../../dist/publicati
 const { openTestDataSource, resetTestDatabase } = require('../support/test-database.cjs');
 const {
   PUBLISH_SETTINGS, setEnv, startApp, expectError, eligibleCatch, insertTextMaterial, consent, hideRegistrationNames,
-  fakeAiRun, fakeIndexWriter, bindFakes, body, catchItem, textItem, tokenOf,
+  fakeAiRun, fakeIndexWriter, bindFakes, catchItem, textItem, tokenOf, presetBody,
 } = require('./support.cjs');
 
 const FIELDS = ['enqueue', 'errorCode', 'event', 'jobKind', 'memberId', 'publicationId'];
@@ -71,7 +71,7 @@ const allText = () => server.logs.map((log) => log.text).join('\n');
 test('발행 성공은 PUBLISH_SUCCEEDED 한 줄과 작업 종류별 ENQUEUE_RESULT 두 줄이며 칸은 정해진 여섯 개뿐이다', async () => {
   const a = await author();
   const material = await insertTextMaterial(db, a.memberId);
-  const response = await publish(a.token, body([textItem(material)]));
+  const response = await publish(a.token, await presetBody(db, a.memberId,[textItem(material)]));
   assert.equal(response.status, 201, response.text);
   const id = response.body.publicationId;
   const lines = publicationLogs();
@@ -88,17 +88,23 @@ test('발행 실패는 PUBLISH_FAILED 한 줄에 회원 ID·오류 코드만 남
   const noConsent = await server.login(`u4-log-noconsent-${randomUUID()}`);
   const material = await insertTextMaterial(db, a.memberId);
   const unconfirmed = await eligibleCatch(db, a.memberId, { confirmed: false });
+  const hidden = await eligibleCatch(db, a.memberId, { visibility: 'PRIVATE' }, { repositoryId: 'u4-log-hidden-repository' });
+  const otherMember = await server.login(`u4-log-other-${randomUUID()}`);
+  const othersMaterial = await insertTextMaterial(db, otherMember.memberId);
   const expected = [];
   expectError(await publish(a.token, { title: '' }), 400, 'VALIDATION_FAILED');
   expected.push([a.memberId, 'VALIDATION_FAILED']);
-  expectError(await publish(noConsent.token, body([textItem(material)])), 403, 'AI_CONSENT_REQUIRED');
+  expectError(await publish(noConsent.token, await presetBody(db, noConsent.memberId,[textItem(material)])), 403, 'AI_CONSENT_REQUIRED');
   expected.push([noConsent.memberId, 'AI_CONSENT_REQUIRED']);
-  expectError(await publish(a.token, body([catchItem(unconfirmed)])), 409, 'CONFIRMATION_REQUIRED');
+  expectError(await publish(a.token, await presetBody(db, a.memberId,[catchItem(unconfirmed)])), 409, 'CONFIRMATION_REQUIRED');
   expected.push([a.memberId, 'CONFIRMATION_REQUIRED']);
-  expectError(await publish(a.token, body([textItem(randomUUID())])), 404, 'RESOURCE_UNAVAILABLE');
+  // 발행 프리셋 U1(NFR4.6): 비공개 Catch 거부의 새 코드도 그대로 찍힌다. 막힌 Catch ID는 로그에 넣지 않는다.
+  expectError(await publish(a.token, await presetBody(db, a.memberId, [catchItem(hidden)])), 409, 'CATCH_PRIVATE');
+  expected.push([a.memberId, 'CATCH_PRIVATE']);
+  expectError(await publish(a.token, await presetBody(db, a.memberId, [textItem(othersMaterial)])), 404, 'RESOURCE_UNAVAILABLE');
   expected.push([a.memberId, 'RESOURCE_UNAVAILABLE']);
   writer.fail = true;
-  expectError(await publish(a.token, body([textItem(material)])), 500, 'INTERNAL_ERROR');
+  expectError(await publish(a.token, await presetBody(db, a.memberId,[textItem(material)])), 500, 'INTERNAL_ERROR');
   expected.push([a.memberId, 'INTERNAL_ERROR']);
   const lines = publicationLogs();
   assert.deepEqual(lines.map(({ level, entry }) => [level, entry.event, entry.publicationId, entry.memberId, entry.errorCode, entry.jobKind, entry.enqueue]),
@@ -109,7 +115,7 @@ test('작업 등록 실패(201)와 접두어 삭제 실패(500)는 다른 분류
   const a = await author();
   const material = await insertTextMaterial(db, a.memberId);
   aiRun.result = 'ENQUEUE_FAILED';
-  const response = await publish(a.token, body([textItem(material)]));
+  const response = await publish(a.token, await presetBody(db, a.memberId,[textItem(material)]));
   assert.equal(response.status, 201);
   const id = response.body.publicationId;
   assert.deepEqual(publicationLogs().slice(1), [
@@ -129,7 +135,7 @@ test('토큰·grant·비밀번호·제목·본문·설명은 어떤 로그 줄�
   const a = await author();
   const catchId = await eligibleCatch(db, a.memberId, { authorDescription: SECRETS.description, title: SECRETS.title });
   const material = await insertTextMaterial(db, a.memberId, { title: SECRETS.title, body: SECRETS.body });
-  const published = await publish(a.token, body([catchItem(catchId), textItem(material)], { title: SECRETS.title, password: SECRETS.password }));
+  const published = await publish(a.token, await presetBody(db, a.memberId,[catchItem(catchId), textItem(material)], { title: SECRETS.title, password: SECRETS.password }));
   assert.equal(published.status, 201, published.text);
   const token = tokenOf(published.body.url);
   const key = server.app.select(PublicationsModule).get(LINK_GRANT_KEY);
@@ -139,7 +145,7 @@ test('토큰·grant·비밀번호·제목·본문·설명은 어떤 로그 줄�
   await assert.rejects(access.resolveForRecipient(token, `${grant}x`, new Date()));
   expectError(await publish(a.token, { title: SECRETS.title, password: SECRETS.password, items: [textItem(material)], extra: SECRETS.body }), 400, 'VALIDATION_FAILED');
   writer.fail = true;
-  expectError(await publish(a.token, body([textItem(material)], { title: SECRETS.title, password: SECRETS.password })), 500, 'INTERNAL_ERROR');
+  expectError(await publish(a.token, await presetBody(db, a.memberId,[textItem(material)], { title: SECRETS.title, password: SECRETS.password })), 500, 'INTERNAL_ERROR');
   manage.files = { deletePrefix: async () => { throw new StorageUnavailable('IO_FAILED'); } };
   expectError(await server.call('DELETE', `/publications/${published.body.publicationId}`, { token: a.token }), 500, 'INTERNAL_ERROR');
 
@@ -167,7 +173,7 @@ test('NC2 안전망: 등록 이름을 뺀 Catch가 있는 발행이 성공하면
   const restoreNames = hideRegistrationNames(server.app);
   let response;
   try {
-    response = await publish(a.token, body([catchItem(first), catchItem(second)]));
+    response = await publish(a.token, await presetBody(db, a.memberId,[catchItem(first), catchItem(second)]));
   } finally {
     restoreNames();
   }
@@ -192,7 +198,7 @@ test('NC2 안전망: 롤백된 발행에는 경고 줄이 없고, 이름을 모�
   writer.fail = true;
   const restoreNames = hideRegistrationNames(server.app);
   try {
-    expectError(await publish(a.token, body([catchItem(catchId)])), 500, 'INTERNAL_ERROR');
+    expectError(await publish(a.token, await presetBody(db, a.memberId,[catchItem(catchId)])), 500, 'INTERNAL_ERROR');
   } finally {
     restoreNames();
   }
@@ -200,6 +206,6 @@ test('NC2 안전망: 롤백된 발행에는 경고 줄이 없고, 이름을 모�
 
   server.logs.length = 0;
   writer.fail = false;
-  assert.equal((await publish(a.token, body([catchItem(catchId)]))).status, 201);
+  assert.equal((await publish(a.token, await presetBody(db, a.memberId,[catchItem(catchId)]))).status, 201);
   assert.deepEqual(publicationLogs().map(({ entry }) => entry.event), ['PUBLISH_SUCCEEDED', 'ENQUEUE_RESULT', 'ENQUEUE_RESULT']);
 });

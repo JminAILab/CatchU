@@ -1,35 +1,48 @@
 # 코드 품질 평가 — CatchU
 
-> 기준: 2026-11-09 전체 다시 스캔(커밋 `a1d0fbb4`) 위에 2026-11-16 집중 스캔(커밋 `eb0d5a6c`)을 합쳤다. 시험·빌드·린트는 돌리지 않았다. 아래 숫자는 파일을 세고 읽은 결과이며 통과 여부가 아니다. 11-16에 다시 확인한 것은 「받은 사람 AI 시험」, 「기술 부채」의 11-16 줄, 「이 intent(#559)가 닿는 자리」다. 나머지는 11-09 글 그대로다.
+> 기준: 2026-11-09 전체 다시 스캔(커밋 `a1d0fbb4`) 위에 2026-11-16 집중 스캔(커밋 `eb0d5a6c`)과 2026-11-19 집중 스캔(커밋 `aa241a4c`)을 합쳤다. 시험·빌드·린트는 돌리지 않았다. 아래 숫자는 파일을 세고 읽은 결과이며 통과 여부가 아니다. 11-19에 다시 확인한 것은 「발행·사본·화면 시험」, 「기술 부채」의 11-19 줄, 「이 intent(#597)가 닿는 자리」, 「앞 intent(#559) 결과」, 그 앞 intent 절의 1·2단계 결과다. 나머지는 11-09·11-16 글 그대로다.
 
 ## 시험
 
 | 서비스 | 시험 위치 | 틀 | 파일 수 | 특징 |
 |---|---|---|---|---|
 | api | `api/test/**/*.test.cjs` | Node `node:test` | 168(도우미 포함, 11-09) | 빌드한 `dist/`를 시험. 실제 PostgreSQL 시험 DB 필요(`_test`로 끝나는 이름만), 두 줄(두 DB)로 나눠 돈다. 실제 Valkey 시험은 `CATCHU_TEST_REDIS_URL`이 있을 때만. 실제 외부 AI 시험(`live-*.test.cjs`)은 따로 |
-| web | `web/test/*.test.mjs` | Node `node:test` | 67(11-09) | `.ts`·`.tsx`를 바로 불러 화면 모델·검사기·문구를 시험. 브라우저 없이 그리기 결과 검사(`u2-render.mjs`) |
+| web | `web/test/*.test.mjs` | Node `node:test` | 84(11-19 목록, 도우미 `*.mjs` 포함) | `.ts`·`.tsx`를 바로 불러 화면 모델·검사기·문구를 시험. 브라우저 없이 그리기 결과 검사(`u2-render.mjs`) |
 | worker | `worker/tests/` | pytest 9.1.1 | 54(11-09) | 합성 GitHub, 실제 git 합성 저장소, 합성 제공자, 실제 Redis(CI는 Valkey로 늘 돈다) |
 | deploy | `deploy/**/*.test.sh` | bash | 6(11-09) | 생성·배포 스크립트의 안전 장치 시험 |
 
 - **커버리지**: 세 서비스 모두 명령은 있다(api `npm run test:coverage`, web `npm run test:coverage`, worker `pytest --cov`). CI는 재지 않는다. 팀 규칙은 「팀장이 넣은 서비스별 명령을 쓰고 Unit이 따로 도구를 들이지 않는다」(`team.md` 「Testing Posture」).
 - **시험 방식**: 팀 관행은 custom(시나리오·기대·실패 조건을 먼저 정하고 세부 시험은 구현 뒤). 시험 이름과 주석이 요구사항 ID(BR·NFR·FR)를 단다.
 
+### 발행·사본·화면 시험 (11-19 확인, 파일 이름만 — 내용은 열지 않음)
+
+| 대상 | 시험 파일 | 이 intent(#597)에서 |
+|---|---|---|
+| 발행 요청·트랜잭션 | `api/test/publications/publish-api.test.cjs`, `publish-pdf.test.cjs` | 요청 모양·순서 번호·거부 위치가 바뀌면 여기가 먼저 깨진다 |
+| 작성자 관리·C-10 | `publications-manage-api.test.cjs`, `publication-access-db.test.cjs`, `in-memory-publication-access.test.cjs`, `publications-module.test.cjs`, `app-routes.test.cjs` | 사본에 칸을 더하면 C-10 읽기 시험이 바뀐다. 경로를 더하면 `app-routes` |
+| 받은 사람 열람 | `recipient-api.test.cjs`, `recipient-pdf.test.cjs`, `recipient-unlock-policy.test.cjs` | 사본 모양 |
+| 조각·요약 근거·질의응답 근거 | `api/test/published-index/chunker.test.cjs`, `api/test/rag-answer/summary-sources.test.cjs`, `qna-sources.test.cjs`, `qna-controller.test.cjs`, `rag-eval.test.cjs` | `position`을 이어 매기면 그대로 통해야 한다. 새 사본 칸이 조각·근거에 0건인지 같은 꼴로 지킨다 |
+| 받은 링크 읽기 | `api/test/claude-mcp/mcp-shared-page.test.cjs`, `mcp-shared-reader.test.cjs`, `mcp-shared-text.test.cjs`, `mcp-shared-publication.test.cjs` | S9에서 프리셋 구분을 실으면 바뀐다 |
+| 탈퇴 | `api/test/claude-mcp/mcp-withdrawal.test.cjs`, `web/test/u2-withdrawal.test.mjs`, api `u2` 폴더 | 프리셋 표가 연쇄로 지워지는지 더할 자리 |
+| 자료 | `api/test/materials/`, `web/test/materials-screen.test.mjs`, `materials.test.mjs`, `pdf-materials-api.test.mjs` | 지우기 확인 문장·탭 부품 |
+| web 발행·사본 | `web/test/publish.test.mjs`, `publications-owner.test.mjs` | 발행 화면 모델이 프리셋 고르기로 바뀌면 크게 바뀐다 |
+| web 받은 사람·근거 이동 | `web/test/recipient.test.mjs`, `recipient-pdf.test.mjs`, `u9-recipient-claude.test.mjs` | 탭·출처의 탭 이동·돌아가기. `resolveEvidenceTarget`은 순수 함수라 시험하기 쉽다 |
+| web 패널 | `rag-answer-item-title.test.mjs`, `rag-answer-qna-panel.test.mjs`, `rag-answer-api.test.mjs`, `rag-answer-state.test.mjs`, `rag-answer-sse-reader.test.mjs` | 돌아가기에 필요한 「누른 자리」를 넘기면 바뀐다 |
+| 메뉴·방침 | `web/test/member-navigation.test.mjs`, `privacy-policy.test.mjs`(원문 SHA-256 대조) | 메뉴 「프리셋」, 방침 문구 |
+
 ### 받은 사람 AI 시험 (11-16 확인, 시험 이름과 검색 결과 줄만 읽음)
 
 | 대상 | 시험 파일 | 덮는 것 |
 |---|---|---|
-| 조각 나누기 | `api/test/published-index/chunker.test.cjs`(13개) | Catch 조각 6개의 칸 순서·출처 종류·근거 주소, `aiDraft` 조각 없음(37행), null 작성자 설명, 문단·줄·1,000자 나누기와 대리쌍, PDF 쪽, 항목·칸 순서(116행), 모양 오류(124행), NC2 새 칸 넷·본인 커밋 표지가 조각에 0건(166행), NC3 다시 볼 곳 사실·작업 시각이 0건(188행) |
-| 조각 저장·검색·임베딩 | `published-index-writer.test.cjs`, `published-search.test.cjs`(6), `embed-publication-handler.test.cjs`, `embedding-provider.test.cjs`, `queue-embedding.test.cjs`, `published-index-module.test.cjs`, `live-embedding.test.cjs`(실제 Voyage, 따로) | 트랜잭션 안 저장, 상태 전이, 검색 순서·범위, 처리기 실패·늦은 결과 |
-| 인용 요청 | `api/test/ai-generation/citation-request.test.cjs`(6) | 근거 없음 `SKIP`, 빈 줄 근거, 문서 = 줄마다 글 블록·`context`는 출처 종류 설명(28행), 시스템 지시 조립·`publicationText` 안 보냄(42행) |
-| 줄·응답·위치·따옴표 | `citation-lines.test.cjs`, `response-items.test.cjs`(11), `quote-citations.test.cjs`(10), `ai-generation-gate.test.cjs`(U1), `live-citation.test.cjs`(실제 Claude, 따로) | 항목 판정, 잘림, 위치 연결 실패, 따옴표 인용 |
-| 게이트 대조·스트림 | `api/test/u2/ai-gate-checks.test.cjs`(10), `ai-gate-stream.test.cjs`(6), `ai-gate-jd.test.cjs` | 대조로 버림과 `ai_gate_result`의 `dropReasons`(checks 77~78행), 스트림 항목 순서, 잘림, `REFUSED`·`NO_ITEMS`·`CALL_FAILED`(stream 73행), #528 따옴표 인용 |
-| 질의응답·요약 | `api/test/rag-answer/qna-controller.test.cjs`(14), `question-input.test.cjs`, `question-rewriter.test.cjs`, `question-counter.test.cjs`, `summary-sources.test.cjs`(6), `base-summary-handler.test.cjs`, `summary-controller.test.cjs`, `rag-answer-app.test.cjs`, `rag-eval.test.cjs`(9, 평가 스크립트), `rag-eval-input.json` | 확인 넷 순서, SSE 사건, 다시 쓰기, 요약 근거 칸 |
-| JD 요약(같은 검색·게이트) | `api/test/jd/jd-summary.test.cjs`, `jd-integration.test.cjs` | JD 요청 검사, 게이트 연결 |
-| web 질의응답·요약 | `web/test/rag-answer-api.test.mjs`(9), `rag-answer-state.test.mjs`(8), `rag-answer-sse-reader.test.mjs` | 응답 모양 검사, SSE 해석, `askDisplay`(`done` 항목 0개 → 근거 못 찾음 안내, 59행) |
-| web 근거 강조 | `web/test/recipient.test.mjs` 763~766행(`resolveEvidenceTarget`), `publications-owner.test.mjs` | 항목·칸·범위 대조 |
-| **시험 없음** | `web/src/features/rag-answer/gated-item-view.tsx`, `base-summary-panel.tsx`, `qna-panel.tsx` | 출처 딱지 그리기. 그 폴더 README 「시험」: `.tsx` 패널은 시험이 불러오지 않는다 |
+| 조각 나누기 | `api/test/published-index/chunker.test.cjs`(13개) | Catch 조각의 칸 순서·출처 종류·근거 주소, `aiDraft` 조각 없음, null 작성자 설명, 문단·줄·1,000자 나누기와 대리쌍, PDF 쪽, 항목·칸 순서, 모양 오류, NC2 새 칸 넷·본인 커밋 표지가 조각에 0건, NC3 다시 볼 곳 사실·작업 시각이 0건 |
+| 조각 저장·검색·임베딩 | `published-index-writer.test.cjs`, `published-search.test.cjs`, `embed-publication-handler.test.cjs`, `embedding-provider.test.cjs`, `queue-embedding.test.cjs`, `published-index-module.test.cjs`, `live-embedding.test.cjs`(실제 Voyage, 따로) | 트랜잭션 안 저장, 상태 전이, 검색 순서·범위, 처리기 실패·늦은 결과 |
+| 인용 요청 | `api/test/ai-generation/citation-request.test.cjs` | 근거 없음 `SKIP`, 빈 줄 근거, 문서 = 줄마다 글 블록·`context`, 시스템 지시 조립 |
+| 줄·응답·위치·따옴표 | `citation-lines.test.cjs`, `response-items.test.cjs`, `quote-citations.test.cjs`, `ai-generation-gate.test.cjs`(U1), `live-citation.test.cjs`(실제 Claude, 따로) | 항목 판정, 잘림, 위치 연결 실패, 따옴표 인용 |
+| 게이트 대조·스트림 | `api/test/u2/ai-gate-checks.test.cjs`, `ai-gate-stream.test.cjs`, `ai-gate-jd.test.cjs` | 대조로 버림과 `dropReasons`, 스트림 항목 순서, 잘림, `REFUSED`·`NO_ITEMS`·`CALL_FAILED` |
+| 질의응답·요약 | `api/test/rag-answer/*`(11-19 목록 13개, `qna-sources.test.cjs`·`live-question-counter.test.cjs` 포함) | 확인 넷과 사본 읽기 순서, SSE 사건, 다시 쓰기, 요약 근거 칸, 근거 붙이기 |
+| JD 요약 | `api/test/jd/jd-summary.test.cjs`, `jd-integration.test.cjs` | JD 요청 검사, 게이트 연결 |
 
-- 질의응답 품질은 시험이 아니라 평가 스크립트로 잰다: `npm run rag-eval`(`api/scripts/rag-eval/`, 질문 10개, 앞 5·8·12개 적중과 통과·버린 항목 수)과 기록 `api/docs/rag-evaluation/`(2026-11-12, 2026-11-12-528, 2026-11-14-text-header). 설명은 `api/docs/rag-answer.md` 「RAG 품질 평가(US19.3)」.
+- 질의응답 품질은 시험이 아니라 평가 스크립트로 잰다: `npm run rag-eval`(`api/scripts/rag-eval/`)과 기록 `api/docs/rag-evaluation/`. 평가 스크립트는 앱과 같은 `buildQnaSources`로 요청을 만든다(`qna-sources.ts` 2행, 11-19 확인).
 
 ## 린트·타입·서식 (11-09)
 
@@ -39,7 +52,7 @@
 | web | ESLint 9 + `eslint-config-next`(core-web-vitals·typescript), `tsc --noEmit` | `web/eslint.config.mjs`, `tsconfig.json` | 기본 |
 | worker | Ruff(E4·E7·E9·F·I·UP·B) + `ruff format`, mypy strict(`app`·`tests`) | `worker/pyproject.toml` | 엄격 |
 
-억제 표시는 worker 4곳뿐이다(`processing/collection_file.py` 45행 `type: ignore`, `processing/confirm.py` 390행 `noqa: E731`·430행 `type: ignore`, `consumer/parent.py` 422행 `type: ignore`). api·web 제품 코드에는 `eslint-disable`·`@ts-ignore`가 없다. TODO·FIXME·HACK 표시도 제품 코드에 없다(11-16에 네 폴더를 다시 읽었을 때도 없었다).
+억제 표시는 worker 4곳뿐이다(`processing/collection_file.py` 45행 `type: ignore`, `processing/confirm.py` 390행 `noqa: E731`·430행 `type: ignore`, `consumer/parent.py` 422행 `type: ignore`). api·web 제품 코드에는 `eslint-disable`·`@ts-ignore`가 없다. TODO·FIXME·HACK 표시도 제품 코드에 없다(11-19에 읽은 파일에도 없었다). `qna-sources.ts`는 `no-control-regex`에 걸리지 않게 정규식을 유니코드 속성으로 썼다고 주석에 적는다(29행).
 
 ## CI/CD (11-09)
 
@@ -53,104 +66,123 @@
 
 - 서비스 README 셋이 설치·실행·검사·환경변수를 자세히 적는다. 기능 안내는 `api/docs/`, `worker/docs/`, `web/src/features/*/README.md`에 나눴다. 코드 주석이 결정·요구사항 번호와 이유를 촘촘히 적는다(한국어).
 - 문서 크기 상한을 CI가 본다(`.github/scripts/check-doc-sizes.sh`). AI 도구가 큰 파일을 잘라 읽는 문제를 줄이려는 것이다(`api/README.md` 7행).
-- 위험: 같은 규칙이 코드 주석·`api/docs`·`worker/docs`·AI-DLC 기능 설계에 여러 번 적혀 있어 한 곳만 고치면 어긋난다(이 프로젝트의 learned 규칙도 같은 내용). 받은 사람 AI에서는 `context` 글자가 `citation-request.ts`와 `api/docs/ai-generation.md` 39행에, 질의응답 단계 순서가 `qna-service.ts`와 `api/docs/rag-answer.md` 48행에, 조각 칸 순서가 `chunker.ts`·`summary-sources.ts`·`recipient-slots.ts`·`api/docs/published-index.md` 「조각 나누기」에 함께 적혀 있다(11-16 확인).
+- 위험: 같은 규칙이 코드 주석·`api/docs`·`worker/docs`·web README·AI-DLC 기능 설계에 여러 번 적혀 있어 한 곳만 고치면 어긋난다(이 프로젝트의 learned 규칙도 같은 내용). 이 intent에서 같은 내용이 여러 곳에 있는 것(11-19 확인):
+  - 받은 사람 화면 순서: `recipient-view.tsx` 머리 주석(38~42행), `web/src/features/recipient/README.md` 「화면 순서(C-11 자리)」.
+  - 발행 화면 흐름·상한: `publish-screen.tsx` 머리 주석(125~135행), `web/src/features/publications/README.md` 「발행 (W3)」, `api/docs/publications.md`(이름만), `publications-config.ts`·`publications-api.ts` 14행.
+  - 패널 붙이는 방법·props: `web/src/features/rag-answer/README.md` 「붙이는 방법(U4)」, `recipient-slots.ts` 머리 주석, `recipient-view.tsx` 93~98행 주석.
+  - 탭: `web/src/features/materials/README.md` 「PDF 자료 탭 (U8)」.
+  - 저장·지우기 항목: `privacy-policy.md`·`privacy-policy.tsx`·시험 SHA-256, 자료 지우기 확인 문장 둘(`materials-screen.tsx` 226행, `pdf-materials-api.ts` 205행), 탈퇴 확인 문장(`withdrawal.ts` 13행).
 
 ## 품질 빠른 평가
 
 | 항목 | 평가 | 근거 |
 |---|---|---|
-| 이름 | good | 파일·함수 이름이 하는 일을 말한다(`buildCatchSnapshot`, `assertCatchesEligible`, `choose_record_text`, `buildChunkDrafts`, `buildCitationRequest`, `passesCitedCheck`). 한국어 주석이 업무 낱말을 맞춘다 |
-| 함수 크기 | fair | api는 대체로 짧다(받은 사람 AI 네 폴더의 함수도 대부분 30줄 안쪽, 11-16). worker 판정 파일은 한 파일에 단계가 많다(`grouping.py` 1,880줄, `relations.py` 1,584줄, `flow.py` 943줄, `build.py` 805줄, `generation/claude.py` 786줄) |
-| 오류 처리 | good | 무결성 오류를 전용 예외로 던지고 0건·성공으로 숨기지 않는다. 남의 것·없는 것은 같은 404. 비동기 접수와 완료를 나눈다. 다만 질의응답 스트림에서 모델 항목이 모두 버려지면 오류 없이 `done`이 되어 「근거를 못 찾음」과 구분되지 않는다(11-16, 아래 부채 표) |
-| 시험 있음 | good | 핵심 경로마다 시험 파일이 있다. DB·큐·git을 실제로 쓰는 시험이 많다. 받은 사람 화면의 항목 표시 부품(`gated-item-view.tsx`)은 시험이 없다(11-16) |
-| 중복 | fair | 사본 모양 검사·복사가 다섯 곳, 사본 칸 순서 목록이 세 곳(`chunker.ts`·`summary-sources.ts`·`recipient-slots.ts`, 11-16), `affectedRows`·`isForeignKeyViolation`·`findGuardedFetchError`가 모듈마다 따로(11-16), 회원 행 확인(`assertMemberExists`)이 모듈마다 따로, UUID 검사 정규식이 여러 파일에 있다 |
-| 죽은 코드 | fair | `PublicCatchStore`(제품에서 안 씀), `share_link` 표·엔티티, 10월 기록 문서·수동 확인 도구. U1 최소 게이트(`ClaudeAiGenerationGate`)는 시험과 실제 호출 시험만 쓴다(`ai-generation.gate.ts` 1~3행 주석, 11-16) |
+| 이름 | good | 파일·함수 이름이 하는 일을 말한다(`buildCatchSnapshot`, `assertCatchesEligible`, `buildChunkDrafts`, `buildQnaSources`, `resolveEvidenceTarget`, `createPublishModel`). 한국어 주석이 업무 낱말을 맞춘다 |
+| 함수 크기 | fair | api는 대체로 짧다. `PublishService.store`는 65줄로 한 트랜잭션의 단계를 순서대로 담는다(11-19). worker 판정 파일은 한 파일에 단계가 많다(`grouping.py` 1,880줄 등). web `createPublishModel`은 한 함수가 약 190줄이지만 안쪽 함수로 나뉜다(11-19) |
+| 오류 처리 | good | 무결성 오류를 전용 예외로 던지고 0건·성공으로 숨기지 않는다. 남의 것·없는 것은 같은 404. 발행 실패 때 PDF 접두어를 한 번 정리하고 원래 오류를 그대로 응답한다(`publish.service.ts` 168~175행). 다만 근거 이동은 항목 요소가 없으면 조용히 아무것도 하지 않는다(11-19, 아래 부채 표) |
+| 시험 있음 | good | 핵심 경로마다 시험 파일이 있다. DB·큐·git을 실제로 쓰는 시험이 많다. 화면 판단은 순수 함수로 빼 시험한다. `.tsx` 그리기는 시험이 덜 닿는다(`gated-item-view.tsx`·탭 부품) |
+| 중복 | fair | 사본 모양 검사·복사가 여섯 곳, 사본 칸 순서 목록이 세 곳(`chunker.ts`·`summary-sources.ts`·`recipient-slots.ts`), 근거 이동 코드가 두 화면에 같은 모양으로(11-19), `assertMemberExists`가 모듈마다 따로, UUID 검사 정규식이 여러 파일에, 같은 상한 값이 api·web·worker에 따로 있다 |
+| 죽은 코드 | fair | `PublicCatchStore`(제품에서 안 씀), `share_link` 표·엔티티, U1 최소 게이트(`ClaudeAiGenerationGate`)는 시험과 실제 호출 시험만 쓴다 |
 
 ## 기술 부채
 
 | 신호 | 자리 | 영향 |
 |---|---|---|
-| (11-16) 근거 하나의 기록 줄이 줄마다 따로 조각·근거 | `api/src/published-index/chunker.ts` 118~123행 | 같은 커밋·PR의 다른 줄은 검색 상위 8개에 같이 들 때만 모델에 간다. 모델은 줄 하나만 보고 답하거나, 다른 줄 낱말을 써서 대조로 버려진다 |
-| (11-16) 모델 문서 머리글이 자료 종류뿐 | `api/src/ai-generation/citation-request.ts` 22~26·52행 | 여러 Catch의 조각이 섞여도 모델이 어느 Catch 것인지 모른다. 문서 순서도 점수 순이라 항목 순서가 아니다 |
-| (11-16) 인용 대조가 인용한 줄만 본다 | `api/src/ai-generation/fact-check.ts` 113~121행 | 근거를 넓게 보내도 인용하지 않은 줄의 낱말은 대조 대상이 아니다 |
-| (11-16) 스트림 「모두 버림」이 정상 끝 | `api/src/ai-generation/checked-gate.ts` 204~218행, `api/src/rag-answer/qna-service.ts` 118~133행, `web/src/features/rag-answer/rag-answer-state.ts` 74~78행 | 화면은 「근거를 찾지 못했습니다」를 보이지만 실제로는 근거가 있었고 답이 버려진 경우다. 원인은 `ai_gate_result`에만 있다 |
-| (11-16) 실패 로그에 줄 수가 없다 | `checked-gate.ts` 140~145행(`ai_gate_failed`) | `NO_ITEMS` 때 모델이 항목 아닌 줄을 몇 줄 썼는지(형식을 안 지켰는지) 알 수 없다 |
-| (11-16) 조각을 다시 나누는 길이 없다 | `published-index-writer.ts` 21~25행 | 나누기를 바꿔도 이미 발행한 발행본은 옛 조각으로 답한다 |
-| (11-16) 항목 표시 부품 시험 없음 | `web/src/features/rag-answer/gated-item-view.tsx` | 딱지 옆 제목을 더할 때 그리기 결과를 확인할 시험이 없다 |
+| (11-19) 발행본 안에 묶음 개념이 없고 `position` 하나가 순서·조각·표 글자·cursor를 모두 맡는다 | `publication.entity.ts` 58~89행, `qna-sources.ts` 22~23·84행, `mcp-shared-page.ts` 11~15행 | 프리셋을 더할 때 `position`을 발행본 전체로 이어 매기지 않으면 여러 자리가 함께 깨진다 |
+| (11-19) 근거 이동이 DOM id로 항목을 찾고, 없으면 조용히 끝난다 | `recipient-screen.tsx` 66~73행, `publication-detail-screen.tsx` 131~138행 | 탭을 더하면 다른 탭의 항목을 가리킬 때 이동이 실패한다. 실패를 알 길이 없다 |
+| (11-19) 근거 이동 코드 두 벌 | 위 두 파일 | 탭 바꾸기·돌아가기를 두 번 고쳐야 한다 |
+| (11-19) 탭 부품이 자료 화면 상수에 묶였고 키보드 동작이 덜 됐다 | `materials-view.tsx` 20~35행, `materials-screen.tsx` 288·300행 | 다시 쓰려면 일반화가 먼저다. 텍스트 쪽 `aria-controls`가 없는 id를 가리킨다 |
+| (11-19) 출처 단추가 「누른 자리」를 넘기지 않는다 | `gated-item-view.tsx` 32~35행 | 「답으로 돌아가기」를 하려면 단추가 자기 자리(요소·답 번호)를 화면에 알려야 한다 |
+| (11-19) 발행 거부 응답에 묶음 위치가 없다 | `publish.service.ts` 319~338행, `pdf-publish.ts` 56~60행 | 「어느 프리셋의 어느 자료」(S6)는 web이 고른 프리셋으로 되짚어야 한다 |
+| (11-19) 행만 지우는 마이그레이션은 발행본 PDF 사본 파일을 남긴다 | `publication-manage.service.ts` 141~147행(작성자 삭제는 파일 먼저) | 기존 발행본 버리기(S8)를 SQL로 하면 파일 저장소에 고아 파일이 남는다. 탈퇴 때 회원 접두어로 지워지긴 한다(`withdrawal.service.ts` 49·53행) |
+| (11-19) 받은 사람 web이 계약 칸만 옮긴다 | `recipient-api.ts` 27~67행 | 사본에 칸을 더하고 여기를 빠뜨리면 받은 사람 화면에서만 칸이 사라진다(작성자 상세는 보임) |
+| (11-19) 같은 상한 값이 여러 곳 | `publications-config.ts` 31·34~36행, web `publications-api.ts` 14행, `pdf-extraction-spec.ts`, worker 설정 | 상한을 프리셋 단위로 바꾸면 모두 함께 바꿔야 한다 |
+| (11-16, #559에서 해소) 근거 하나의 기록 줄이 따로 모델에 감 | `qna-sources.ts` `attachGroups` | 맞은 Catch의 같은 근거 줄을 붙이게 됐다. 조각 나누기 자체는 그대로다 |
+| (11-16, #559에서 해소) 모델 문서 머리글이 자료 종류뿐 | `citation-request.ts` 35~37행 | `itemContext`가 붙는다 |
+| (11-16) 인용 대조가 인용한 줄만 본다 | `api/src/ai-generation/fact-check.ts` 113~121행 | 11-19에 다시 확인하지 않음 |
+| (11-16) 조각을 다시 나누는 길이 없다 | `published-index-writer.ts` 21~25행 | 기존 발행본을 버리면 이 intent에는 문제가 없다 |
 | 쓰지 않는 공개 조회 | `api/src/catches/public-catch-store.ts`, `catches.module.ts` 11~12행(11-09) | 「공개」의 뜻이 둘로 보인다 |
 | 남은 10월 표 | `api/src/share-links/share-link.entity.ts`, `share_link` 표(11-09) | 결정(OQ-U4-3) 전까지 남김 |
-| 만든 시각 없음 | `catch_asset`(마이그레이션 `1790600000000`, 11-09) | 목록이 무작위 UUID 순서다 |
-| 사본 모양이 흩어짐 | `published-snapshot.ts`, `snapshot-builder.ts`, `chunker.ts`, `summary-sources.ts`, `web/.../publications-api.ts`, `web/.../recipient-api.ts`(11-09) | 칸 하나에 여섯 파일 |
+| 사본 모양이 흩어짐 | `published-snapshot.ts`, `snapshot-builder.ts`, `chunker.ts`, `summary-sources.ts`, `mcp-shared-text.ts`, web `publications-api.ts`·`recipient-api.ts`(11-19) | 칸 하나에 일곱 파일 |
 | 계약 판본을 함께 받지 않음 | `worker-messages.yaml` 머리 주석(11-09) | 결과 칸을 더하면 api·worker를 같이 배포해야 한다 |
-| 임시값 | `publications-config.ts`(발행 빈도 1분 10회, 전체 글 60,000자, 11-09) | 회의 결정 대기(OQ-U4-2·OQ-U4-4) |
-| 시험용 구현이 `src`에 | `publications/in-memory-publication-access.ts`, `analysis-receiver/dev-analysis-injection.ts`, `rag-answer/question-rewriter.ts` `createSyntheticQuestionRewriter`(11-16) | 앱 모듈에 넣지 않게 주석으로만 막는다 |
+| 임시값 | `publications-config.ts`(발행 빈도 1분 10회, 11-19 확인) | 회의 결정 대기(OQ-U4-2). 전체 글 60,000자는 팀장 결정으로 닫혔다(OQ-U4-4, 26행 주석) |
+| 시험용 구현이 `src`에 | `publications/in-memory-publication-access.ts`, `analysis-receiver/dev-analysis-injection.ts`, `rag-answer/question-rewriter.ts` `createSyntheticQuestionRewriter` | 앱 모듈에 넣지 않게 주석으로만 막는다 |
 | 링크 판별의 한글 끊김 | `web/src/lib/github-source-url.ts` 15~18행(11-09) | 한글 파일 이름이 든 GitHub 주소는 한글 앞에서 끊긴다 |
 
-## 이 intent(#559)가 닿는 자리 (11-16 확인)
+## 이 intent(#597)가 닿는 자리 (11-19 확인)
 
-GitHub 이슈 #559(받은 사람 질의응답이 틀리게 답한 자리)의 계획 변경 다섯과 **함께 고칠 파일**이다. 같은 규칙을 적은 문서도 넣었다(프로젝트 규칙: 규칙을 바꾸면 같은 규칙을 적은 다른 문서를 모두 함께 고친다). 계약 원본(`aidlc/spaces/default/intents/260925-intent-12/inception/contract-design/contract-summary.md`)은 이번에 열지 않았고, 코드 주석이 그 번호를 가리키는 자리만 적었다.
+승인된 범위 문서의 묶음 S1~S9와 대략 화면 W1~W6에 대해, 지금 코드의 자리와 **함께 고칠 파일**이다. 같은 규칙을 적은 문서도 넣었다(프로젝트 규칙: 규칙을 바꾸면 같은 규칙을 적은 다른 문서를 모두 함께 고친다). 계약 원본(`aidlc/spaces/default/intents/260925-intent-12/inception/contract-design/contract-summary.md`)은 열지 않았고, 코드 주석이 그 번호를 가리키는 자리만 적었다. 어느 안을 고를지는 적지 않았다(설계 단계).
 
-| 바꿀 것 | 지금 자리 | 함께 고칠 파일 |
+| 묶음 | 지금 자리 | 함께 고칠 파일 |
 |---|---|---|
-| ① 같은 근거(커밋·PR)의 기록 줄을 함께 모델에 보내기 | `chunker.ts` `catchFields`(105~128행)가 `evidence[i].representedFacts[j]`마다 칸 하나로 고르고 `splitFieldRanges`가 칸 안에서만 나눈다. 검색(`published-search.ts` 124~144행)은 조각 8개를 점수 순으로만 준다. `chunkToSource`(`qna-service.ts` 48~57행)는 조각 하나를 근거 하나로 옮긴다 | 길 A(검색 단위는 그대로, 근거를 넓힘): `qna-service.ts`(맞은 조각의 같은 `evidence[i]` 다른 줄을 근거로 더함 — 그 글은 사본에 있으므로 C-10 `readSnapshot` 또는 조각 표 `fieldPath` 조회가 필요), 입력 상한 80,000자(`gate-policy.ts`)와 JD 쪽 6개·1,000자 검사(`jd-generation-request.ts` 32행)를 넘지 않는지. 길 B(조각을 근거 단위로 합침): `chunker.ts`, `published-chunk.entity.ts`(조각이 여러 칸에 걸치면 `fieldPath`·`charStart`·`charEnd` 한 벌로 위치를 못 적는다) + 마이그레이션, `citation-request.ts`·`citation-locator.ts`(블록마다 근거 칸을 대응), `quote-citations.ts`, `summary-sources.ts`(기본 요약도 같은 규칙인지), `jd-generation-request.ts`, web `recipient-slots.ts` `resolveEvidenceTarget`(칸 하나만 강조). 두 길 모두: `api/docs/published-index.md` 「조각 나누기」·「알려진 한계」, `api/docs/rag-answer.md` 「단계 순서」, `api/test/published-index/chunker.test.cjs`, `api/test/rag-answer/qna-controller.test.cjs`, 옛 발행본을 다시 나누는 길(`published-index-writer.ts`는 지금 다시 나누지 않음) |
-| ② 조각마다 어느 Catch의 것인지 검색·모델이 알게 하기 | 모델: `SOURCE_KIND_CONTEXT`(`citation-request.ts` 22~26행)를 `context`에 그대로 넣는다(52행). 검색: 임베딩 글은 조각 글 그대로(`embed-publication-handler.ts` 136~141행)이고 질문 임베딩과만 비교한다. 쓸 수 있는 값은 `ChunkHit.publishedItemId`, 항목 `position`, 사본 `repositoryName`(선택 칸), 근거 `sourceUrl`이다. Catch 제목·AI 초안은 넣지 않는다(FR6.4, `chunker.ts` 104행) | 모델 쪽: `citation-request.ts`(`AiSource`에 항목 표시를 실을 칸이 없다 — `ai-generation.types.ts` `AiSource`에 칸을 더하면 C-01 모양이 바뀐다), `qna-service.ts` `chunkToSource`, `summary-sources.ts`, `jd-generation-request.ts`(같은 게이트를 쓰므로 함께 받거나 빈 값), `api/docs/ai-generation.md` 39행, `api/test/ai-generation/citation-request.test.cjs` 28행. 검색 쪽(임베딩 글에 머리말을 붙이면): `embed-publication-handler.ts`, `published_chunk.text`는 사본 원문 그대로여야 하므로(위치 검사 BR1.2) 임베딩에만 붙이는 별도 글이 필요, 옛 발행본 벡터는 그대로. 인용 대조는 `context` 글자를 보지 않는다(`fact-check.ts`) |
-| ③ 질의응답 지시 `QNA_INSTRUCTION` 수정 | `rag-answer-config.ts` 43~45행. 끝 문장 `AUTHOR_MATERIAL_VOICE_INSTRUCTION`(40~41행)은 기본 요약(55행)·JD 요약(`jd-generation-request.ts` 7~8행)과 같은 상수다. 항목 형식 지시는 `citation-request.ts` `ITEM_FORMAT_INSTRUCTION`, 공통 방어 문구는 `gate-policy.ts` `COMMON_GUARD_INSTRUCTION`이 앞뒤로 붙는다 | 질의응답만 바꿀 때는 앞 문장만 바꾸고 상수는 그대로 둔다. `api/docs/rag-answer.md` 「값」, 확인은 `npm run rag-eval`(질문 10개)·`api/docs/rag-evaluation/`에 새 기록, `api/test/rag-answer/rag-eval.test.cjs`. 상수를 바꾸면 기본 요약·JD 요약도 바뀐다(상수 주석 37~39행: 바꾸면 질의응답 10개를 다시 잰다) |
-| ④ 출처 딱지 옆에 근거가 속한 항목 제목 | `gated-item-view.tsx` 23~31행: 인용마다 `<blockquote>` + `sourceLabel` 단추. 부품 props는 `items`·`showEvidence`·`testId`뿐이고 사본이 없다. 제목은 `PublishedSnapshotItem.title`(사본)에 있고, 사본은 받은 사람 `recipient-view.tsx` 84행·작성자 `publication-detail-view.tsx` 86행만 갖는다. 패널 props: 받은 사람 C-11 `RecipientSlotProps`(`recipient-slots.ts` 21~31행), 작성자 `{ publicationId, showEvidence }` | `gated-item-view.tsx`, `base-summary-panel.tsx`·`qna-panel.tsx`(props로 받아 넘김), `recipient-view.tsx` `RecipientSlots`(97~113행)·`recipient-screen.tsx`(slotProps 만들기 77~83행), `publication-detail-view.tsx` 84행, `recipient-slots.ts` `RecipientSlotProps`(C-11 모양을 바꾸면 자리 4 `JdRecipientPanel`도 같은 props를 받는다), `web/src/features/rag-answer/README.md` 「붙이는 방법」 props 표, `web/src/features/recipient/README.md`, 시험(지금 `gated-item-view.tsx` 시험 없음 — `web/test/rag-answer-*.test.mjs` 꼴의 순수 함수로 「위치 → 제목」을 빼면 시험할 수 있다). 사본에 없는 `publishedItemId`면 제목을 붙이지 않는다(`resolveEvidenceTarget`이 null을 주는 경우와 같다). 제목은 모델에 보내지 않는다 |
-| ⑤ 답 항목 0개 실패 원인 확인 | 세 길(`architecture.md` 「답 항목 0개의 세 길」): 조각 0개(`qna-service.ts` 112행), 모델 항목 0개 → `NO_ITEMS`(`checked-gate.ts` 217행, 로그 `ai_gate_failed`), 모두 버려짐 → 정상 `done`(로그 `ai_gate_result`의 `itemCount: 0`·`dropReasons`). 질의응답 끝 로그 `qna.completed`에는 `chunkCount`·`itemCount`·`outcome`·`failure`가 있다 | 로그 확인만이면 코드 변경 없음. 운영 로그에서 같은 요청의 `ai_gate_result`/`ai_gate_failed`와 `qna.completed`를 시각으로 짝지어 본다(두 로그에 공통 요청 ID가 없다 — `requestId`는 Claude 요청 ID라 `qna.completed`에 없음). 로그 칸을 더하면 `checked-gate.ts` `GateLog`·`fail`, `rag-answer-log.ts`, `api/docs/ai-generation.md` 「로그」, `api/docs/rag-answer.md` 「로그 사건」, `api/test/u2/ai-gate-stream.test.cjs` |
+| S1 프리셋 만들기·고치기·지우기 | 프리셋 표·경로·화면이 없다(`preset` 이름이 `api/src`·`web/src`에 없음). 고르기 재료는 있다: Catch 목록 `GET /v1/catches?authorDescription=written`(`owner-catch-input.ts`·`owner-catch-store.ts`), 텍스트 자료·PDF 목록, 고르기 부품 `SourcePickerView`·`createSourceLoader`·`catchSourceOf`·`pdfSourceOf`(`publish-view.tsx` 82~190행, `publish-screen.tsx` 91~123행, `publish-sources.ts`), 순서 단추 `SelectedListView`(195~230행) | 새 api 모듈(표 엔티티·마이그레이션·저장소·컨트롤러·입력 검사, 회원 행 `FOR KEY SHARE`·남의 것 404 관례), `app.module.ts`, web 새 기능 폴더(목록 W2·편집 W3)와 주소(`web/src/app/(member)/…`, `lib/routes.ts`, web README 「페이지 주소」), 옮겨 쓰는 발행 고르기 부품, `web/src/features/publications/README.md` 「발행 (W3)」. 확인이 필요한 Catch를 담게 하면 `catchSourceOf`의 `eligible` 판단(78행)을 프리셋 쪽에서는 표시로만 바꾼다 |
+| S2 프리셋으로 발행 | 요청은 `items[{kind, sourceId}]`뿐, 정의 밖 칸은 400(`publish-input.ts` 113~124행). 배열 순서 = `position`(`publish.service.ts` 243~249행). 항목 20·같은 원본 한 번·전체 글 60,000자는 발행본 전체(84~105행, `publish.service.ts` 232~236행). 화면은 `createPublishModel`의 `selected`·`add`·`move`·`buildRequest`(`publish-screen.tsx` 170~266행), 확인 단계 `PublishConfirmView`(`publish-view.tsx` 290~330행), 상한 `PUBLISH_LIMITS`(`publications-api.ts` 14행) | `publish-input.ts`(새 요청 모양), `publish.service.ts`(프리셋을 읽어 펼치면 잠금 순서에 프리셋 표 추가, 사본에 묶음 복사), `publications-config.ts`(프리셋 5개 상한), web `publish-screen.tsx`·`publish-view.tsx`·`publish-sources.ts`·`publications-api.ts`(`PublishRequest`·`publishDraftErrors`·`publishFailureLines`), `api/docs/publications.md`, 시험 `publish-api.test.cjs`·`publish-pdf.test.cjs`·`web/test/publish.test.mjs`. 같은 Catch가 두 프리셋에 있으면 지금 400 `arrayUnique`(입력 문서 §7 미결) |
+| S3 두 화면의 탭 | 사본은 한 목록으로 그린다(`snapshot-view.tsx` 249~278행). 사본에 묶음 칸이 없다(`published-snapshot.ts` 52~68행, `publication.entity.ts`). 탭 부품은 자료 화면에만(`materials-view.tsx` 20~35행) | 사본 모양(`published-snapshot.ts`, 표 또는 jsonb 칸 + 마이그레이션), `db-publication-access.ts` `readSnapshotIn`, `in-memory-publication-access.ts`, web `publications-api.ts` `isPublishedSnapshot`, `recipient-api.ts` `pickItem`·`readPublishedSnapshot`, `snapshot-view.tsx`(탭 줄, 누른 탭의 프리셋 이름 전체), 탭 부품 일반화(`materials-view.tsx`·`materials-screen.tsx` — 화살표 키, 텍스트 쪽 tabpanel), `materials.module.css`, 시험 `recipient.test.mjs`·`publications-owner.test.mjs`·`materials-screen.test.mjs`, README 셋(publications·recipient·materials) |
+| S4 요약·질의응답 배치 | 받은 사람 화면 순서는 자료 → 요약 → 질의응답 → JD(`recipient-view.tsx` 85~86·99~115행). 작성자 상세는 요약 → 자료(`publication-detail-view.tsx` 84~88행). 질의응답 대화는 `QnaPanel` 상태(`qna-panel.tsx` 41행) | `recipient-view.tsx`(요약을 자료 위로, 패널은 탭 밖 그대로), `recipient-view.tsx` 머리 주석 표, `web/src/features/recipient/README.md` 「화면 순서(C-11 자리)」. 패널 `key={token}`을 그대로 두면 탭을 바꿔도 대화가 남는다 |
+| S5 출처의 탭 이동·답으로 돌아가기 | `showEvidence(location)` → `resolveEvidenceTarget` → `target` → DOM id로 찾아 스크롤·초점(`recipient-screen.tsx` 55~75행, `publication-detail-screen.tsx` 121~138행, `recipient-slots.ts` 41~52행). 단추는 위치만 넘긴다(`gated-item-view.tsx` 32~35행). 돌아가기 없음 | 두 화면(열린 탭 상태를 화면이 갖고, 강조 대상을 정할 때 탭도 함께 바꿈, 돌아갈 자리 기록), `recipient-slots.ts`(위치 → 탭을 찾는 순수 함수를 둘 자리), `snapshot-view.tsx`([답으로 돌아가기] 자리, 옮겨 간 글 바로 위), `gated-item-view.tsx`·`base-summary-panel.tsx`·`qna-panel.tsx`(누른 단추를 알리는 길 — C-11 evidence-highlight 모양을 바꾸면 자리 4 JD 패널 props도 같은 형), `web/src/features/rag-answer/README.md` 「붙이는 방법」, 시험 `recipient.test.mjs`(`resolveEvidenceTarget` 763행 근처, 11-16 기록)·`rag-answer-*.test.mjs` |
+| S6 지원자에게 알리는 것 | 확인 필요·보호 이유는 `catchSourceOf`(`publish-sources.ts` 72~81행), 비공개 안내는 `PRIVATE_CATCH_NOTICE`(`publish-view.tsx` 125·207행), 항목 수·글자 수 안내는 지금 발행 화면에 없다(전체 글은 서버가 발행 때 셈, 화면은 상한 초과 문구만 `TOTAL_TEXT_LIMIT_TEXT`). 409 표시는 `flagged.catchIds`(`publish-screen.tsx` 285~288행). 「고쳐도 보낸 링크는 그대로」 비슷한 문구는 발행본 상세 `FIXED_COPY_NOTICE`(`publication-format.ts`, 이름만) | 프리셋 목록·편집 화면(표시·수·글자 수 — 글자 수는 서버의 `snapshotTextLength`와 같은 셈이어야 맞는다: Catch 조각 대상 칸 + 텍스트 본문 + PDF 쪽 글, 코드 포인트), 발행 화면 실패 문구(어느 프리셋의 어느 자료), `publications-api.ts` `publishFailureLines`·`CATCH_REJECTION_TEXT`. 프리셋 목록에서 글자 수를 보이려면 Catch 본문 길이를 줄 길이 필요(지금 Catch 목록은 작성자 설명 원문을 주지 않음 — `catch-reader.ts` 4행) |
+| S7 지우기·탈퇴·방침 | 텍스트 자료 행 삭제(`text-material-store.ts` 102~112행), PDF 파일 → 행(`pdf-materials.controller.ts` 144~157행), 확인 문장 둘(`materials-screen.tsx` 226행, `pdf-materials-api.ts` 205행). 탈퇴는 `member_account` 연쇄(`withdrawal.service.ts` 52행). 방침 문구(`privacy-policy.tsx` 47·75·136행) | 프리셋 표 외래 키(자료 쪽 `ON DELETE CASCADE`면 `materials` 코드 그대로, `member_account` 쪽 CASCADE면 탈퇴 코드 그대로), 확인 문장 둘과 그 시험, `privacy-policy.md`·`privacy-policy.tsx`·`web/test/privacy-policy.test.mjs`(SHA-256) — 문구는 팀장 확정 먼저(README 7·20행), 탈퇴 시험(`mcp-withdrawal.test.cjs`·u2) |
+| S8 기존 발행본 버리기 | 발행본 삭제는 파일 접두어 → 행(`publication-manage.service.ts` 126~152행). 행을 지우면 항목·쪽·조각·색인·요약·JD 실행이 연쇄로 지워진다 | 마이그레이션으로 지우면 발행본 PDF 사본 파일(`publicationPrefix`)이 남는다 — 파일까지 지우려면 api 코드 경로(작성자 삭제와 같은 순서)가 필요하다. 열리지 않게만 두면(`stopped_at`) 파일·행이 남고 사본 읽기 코드는 묶음 없는 행을 견뎌야 한다. JD 요약 실행(받은 사람 회원의 기록)도 사라진다 |
+| S9 받은 링크 읽기·JD 요약 | MCP는 `{ position, itemKind, title, content }`로 펴고 cursor가 `position`(`mcp-shared-publication-reader.ts` 42~45행, `mcp-shared-page.ts`). JD 요약은 조각만 씀(`jd-summary-processor.ts`) | `position`을 이어 매기면 두 기능 코드는 그대로다. 프리셋 구분을 실으면 `mcp-shared-page.ts`(`SharedPageItem`·`SharedPage`, C-15)·`mcp-shared-text.ts`·`mcp-shared-publication-reader.ts`와 시험 `mcp-shared-*.test.cjs`, 받은 링크 읽기 담당 리뷰(제약 C-O3) |
+| W1 상단 메뉴 | `navItems` 넷(`member-header.tsx` 15~20행), 현재 자리 앞부분 일치(31행) | `member-header.tsx`, `lib/routes.ts`, `member-navigation.test.mjs`. 프리셋 주소를 `/publications/` 아래에 두면 「발행본」도 켜진다 |
+| 외부 AI(C-R4) | 머리글에 Catch 제목·AI 초안·저장소 이름을 넣지 않는다(`qna-sources.ts` 4행). 요약 근거도 제목을 넣지 않는다(`summary-sources.ts` 2행) | 프리셋 이름을 머리글·근거에 넣으면 `qna-sources.ts`·`summary-sources.ts`·`citation-request.ts`(이번에 다시 읽지 않음), 방침 4절(`privacy-policy.tsx` 103행)·외부 AI 동의 고지, 평가 다시 재기. 넣지 않으면 닿지 않는다 |
 
 ### 지키고 있는 경계(바꾸면 안 되는 것)
 
-- 인용 위치는 사본 칸 하나 안의 UTF-16 범위다(C-01). 위치 = 근거 `location.charStart` + 줄 시작이고, 근거 `text`는 그 범위의 원문 그대로다(`citation-locator.ts`, `chunker.ts` `toDraft` 위치 검사).
-- Catch의 AI 설명 초안·제목은 검색 조각·모델 입력에 넣지 않는다(FR6.4). 시험이 지킨다(`chunker.test.cjs` 37·166·188행, `summary-sources.test.cjs`).
-- 받은 사람 질의응답은 그 발행본 조각만 찾는다. 범위를 넓히거나 자료를 빼는 인자가 없다(`published-search.ts` 119~123행 주석, NFR1.1).
-- JD 요약도 같은 조각·검색·게이트를 쓴다. 조각 모양을 바꾸면 JD 요청 검사(`jd-generation-request.ts`)가 먼저 깨진다.
+- 발행본은 발행 당시 자료를 고정한 사본이다. 원본과 외래 키가 없고, 받은 사람 경로는 사본만 읽는다(`db-publication-access.ts` 155~160행, FR4.3). 프리셋을 고치거나 지워도 발행본은 바뀌지 않아야 하므로 프리셋 이름·순서도 사본에 복사해야 한다.
+- 발행 때 권한·선택·크기를 트랜잭션 안에서 다시 확인한다(잠근 뒤 다시 읽은 원본으로 자격·전체 글, `publish.service.ts` 230~236행, FR4.7).
+- 고른 비공개 Catch는 발행이 커밋될 때만 공개로 바뀐다(254~257행, FR1.5).
+- 인용 위치는 사본 칸 하나 안의 UTF-16 범위다(C-01). Catch의 AI 설명 초안·제목은 검색 조각·모델 입력에 넣지 않는다(FR6.4). 시험이 지킨다(`chunker.test.cjs`, `summary-sources.test.cjs`).
+- 받은 사람 질의응답은 그 발행본 조각만 찾는다(NFR1.1). AI 요약·질의응답은 발행본 전체가 근거다(FR2.7·FR6.2) — 탭은 화면만 나눈다.
 - 질문·답·근거 글은 로그에 남기지 않는다(`rag-answer-log.ts`, `GateLog`).
+- 받은 사람 화면 글은 React 텍스트로만 그리고 GitHub 주소만 링크다(`snapshot-view.tsx` 41~92행, NFR1.10). 프리셋 이름도 같은 방식이어야 한다.
 
-## 앞 intent(261109-new-catch)가 닿던 자리 (11-09, 다시 확인하지 않음)
+## 앞 intent(#559) 결과 (11-19 확인)
 
-입력 문서(`docs/ai-dlc-input-catch/CatchU_새_Catch_입력.md`)와 승인된 대략 화면(`aidlc/spaces/default/intents/261109-new-catch/ideation/rough-mockups/wireframes.md`)의 1~3단계가 고칠 자리와 **함께 고칠 파일**이었다. 아래 글은 2026-11-09 기록이며, 그 뒤 들어간 변경은 다시 확인하지 않았다.
+11-16에 적은 계획 다섯 가운데 코드로 확인한 것:
 
-### 1단계 — 지원자 화면
+| 계획 | 11-19 코드 |
+|---|---|
+| ① 같은 근거 줄을 함께 보내기 | 조각 나누기는 그대로 두고 검색 뒤 사본에서 붙이는 길(11-16 「길 A」)로 했다. `buildQnaSources`가 맞은 Catch의 GitHub 기록 줄을 ① 같은 근거 → ② 작업 사실·나의 기여 → ③ 남은 근거 순으로 Catch마다 12·전체 40줄까지 붙인다(`qna-sources.ts` 107~196행). 질의응답이 질문마다 사본을 읽는다(`qna.controller.ts` 104행) |
+| ② 어느 Catch인지 알게 하기 | 근거마다 `itemContext`(표 글자 + 작업 사실 둘째 줄) 머리글, `context` 뒤에 붙음(`qna-sources.ts` 82~101행, `citation-request.ts` 35~37행). Catch 제목은 넣지 않았다 |
+| ③ `QNA_INSTRUCTION` | 앞 문장을 바꿨다(「첫 항목에는 질문에 대한 답」, 「찾은 자료에서는 확인되지 않는다」, `rag-answer-config.ts` 56~62행). 끝 상수는 그대로다 |
+| ④ 출처 딱지 옆 항목 제목 | `item-title.ts` + `GatedItemView` `itemTitleOf`(Tab 순서 밖 `<span>`), 받은 사람·작성자 화면이 사본으로 만들어 넘긴다. C-11 `RecipientSlotProps` 모양은 그대로 |
+| ⑤ 답 0개 원인 | 게이트 실패 로그와 평가 기록에 항목 아닌 줄 수·끝난 이유·버린 이유별 수(커밋 `126ae048`, 게이트 파일은 11-19에 다시 읽지 않음). 질의응답 끝 로그에 `unattachedLineCount` |
 
-| 바꿀 것 | 지금 자리 | 함께 고칠 파일 |
-|---|---|---|
-| 작성자 설명을 칸 제목별로 쓰고 보기(한 칸 4,000자 그대로) | `web/src/features/assets/author-description-panel.tsx`(textarea 하나), `author-description-editor.tsx`, `author-description-api.ts` | `web/src/features/publications/snapshot-view.tsx`(보기 나누기), `web/src/features/assets/README.md`, `api/docs/publications.md`(C-14 설명), `api/src/catches/author-description-input.ts`(상한은 그대로) |
-| 「설명 씀/안 씀」 걸러 보기. 저장소 걸러 보기처럼 목록 요청 조건으로 **서버에서 거르기로 정했다**(대략 화면 1절. 목록은 20개씩 오므로 받은 목록 안에서만 거르면 다음 쪽의 Catch가 빠진다) | `api/src/catches/owner-catch-input.ts` `ownerCatchQuery`(지금 받는 쿼리 칸은 `limit`·`repositoryId`·`sourceRequestId`·`cursor`뿐이고 그 밖 칸은 400)·`cursorScope`(커서가 회원·`repositoryId`·`sourceRequestId`를 함께 묶는다. 새 조건도 묶어야 다른 조건의 커서를 거부한다), `owner-catch-store.ts` `list`의 `conditions`(22~35행, 저장소 조건과 같은 꼴로 더한다), `catch-reader.ts` `READ_COLUMNS`(지금 작성자 설명 칸을 읽지 않는다), `owner-catch-response.ts`, `web/src/features/assets/types.ts`·`catch-api.ts` `list`(지금 쿼리는 `limit`·`repositoryId`·`cursor`, 62~68행)·`isCatch`. 「받은 목록 안에서만 거름」은 지금 **공개 상태** 걸러 보기의 설명이다(`assets-view.tsx` 9·113행, `web/src/features/assets/README.md` 70행) | `api/docs/catch-owner-read-preparation.md`(9행 목록 걸러 보기), `web/src/features/assets/README.md`(53·54·70행 걸러 보기 설명), `assets-view.tsx` 걸러 보기 칸과 빈 결과 안내, `assets-store.ts`·`assets-connected.tsx`(목록 요청과 주소의 걸러 보기 복원), `api/test/catches/owner-catch-*.test.cjs`, `web/test/assets-*.test.mjs` |
-| 생각해 볼 질문 옆 안내 문구 | `assets-view.tsx` 272~276행 | `web/test/assets-view.test.mjs` |
-| 상세 칸 순서 바꿈: Catch 설명 초안·생각해 볼 질문을 작성자 설명 위로 올리고, 근거 아래에 「다시 볼 곳」 자리를 둔다(대략 화면 2절) | `assets-view.tsx` `CatchDetail` 253~277행. 그때 순서는 근거(253행) → 작성자 설명 `{descriptionEditor}`(266행) → Catch 설명 초안(268행) → 생각해 볼 질문(272행) → 현재 확인 상태(277행)였다 | 같은 순서를 적은 곳: `assets-view.tsx` 21행 주석(「근거와 AI 초안 사이에 둔다(BR1.3)」), `web/src/features/assets/README.md` 27행, `web/test/assets-view.test.mjs` |
-| 발행 화면 「저장소마다 3~5개 권장」 | `web/src/features/publications/publish-view.tsx` `SourcePickerView` 63~65행 | `web/src/features/publications/README.md` |
-| 작성자 설명 안 GitHub 링크를 주소 전체 대신 「파일 · 줄 · 판본」 같은 이름으로 보이기(커밋·PR 이름, 다른 저장소면 「소유자/저장소 ·」 앞붙임 포함, 대략 화면 「GitHub 링크 이름」). 화면에서만 계산하고 API는 그대로 | `web/src/features/publications/snapshot-view.tsx` `LinkedText`·`linkedSegments`(그때 링크 글자로 주소 전체 `segment.url`을 보였다, 50~51행). 링크 찾기는 `web/src/lib/github-source-url.ts` `splitGithubLinks`(판별 규칙은 그대로 둔다) | 이름을 짓는 새 함수(`github-source-url.ts` 곁. 받은 사람 화면 `recipient-format.ts`가 같은 판별 함수를 다시 내보낸다), `web/test/publications-owner.test.mjs`(400행이 링크 글자 = 주소 전체를 검사), `web/src/features/publications/README.md` 16·21행, `web/src/features/recipient/README.md` 49행. 주의: `LinkedText`는 텍스트 자료 본문에도 쓴다(151행). 강조 위치는 원문 주소 길이로 세므로(`linkedSegments`의 offset) 보이는 이름이 짧아져도 원문 길이로 세야 한다. 다른 저장소인지는 사본 근거 `sourceUrl`과 견준다 |
-| 지원자 상세의 「발행하면 면접관에게 열릴 링크」 목록(h4 제목, 8칸 전체, 합계 글자 수 바로 위). 위 링크와 같은 판별·이름 규칙 | 없음. 편집 칸은 `web/src/features/assets/author-description-panel.tsx`(textarea 하나 46행, 글자 수 50행) | 위 줄과 같은 `splitGithubLinks`와 이름 함수를 함께 써야 면접관 화면과 이름이 어긋나지 않는다. `author-description-panel.tsx`, `web/test/author-description*.test.mjs` |
-| 발행 화면 Catch 항목의 저장소 이름과 「설명 안 씀」 | `publish-view.tsx` `SourcePickerView` 항목(85~89행: 제목, 공개·비공개와 불일치, 고를 수 없는 이유, 비공개 안내), `web/src/features/publications/publish-sources.ts` `CatchSource`(`catchId`·`title`·`visibility`·`mismatch`·`eligible`·`reason`만. `catchSourceOf`가 `CatchAsset`에서 뽑는다). 목록 응답에는 저장소 이름이 없고(`types.ts` 47행 주석) 작성자 설명이 있는지도 없다. 내 자산 화면은 따로 받은 저장소 목록(`RepositoryOption`)에서 이름을 찾지만 발행 화면은 저장소 목록을 불러오지 않는다 | `publish-sources.ts` `CatchSource`·`catchSourceOf`, 위 「설명 씀/안 씀」 줄과 같은 「작성자 설명이 있는지」 칸(`owner-catch-response.ts`·`types.ts`·`isCatch`), 저장소 이름을 얻는 길(저장소 목록을 함께 부르거나 응답에 칸을 더하거나 둘 중 하나), `web/src/features/publications/README.md` 「발행 (W3)」, `web/test/publish.test.mjs` |
-| 「작성자 설명을 쓴 Catch만 보기」 칸(처음 꺼짐, 1절과 같은 목록 요청 조건으로 서버에서 거름) | `web/src/features/publications/publish-screen.tsx` 121행의 목록 요청 `client.catches.list("", cursor, signal)`(저장소 조건 없이 20개씩, `createSourceLoader`가 첫 쪽·더 보기를 맡는다). `catch-api.ts` `list`는 내 자산 화면(`assets-store.ts` 70·101행)과 함께 쓴다 | `catch-api.ts` `list`의 새 조건(위 서버 걸러 보기 줄과 같은 쿼리 칸), `SourcePickerView`(체크 칸, 걸러 본 개수 알림), `publish-screen.tsx`(칸을 바꾸면 첫 쪽부터 다시 불러옴), `web/test/publish.test.mjs` |
-| 확인 단계 안내 「작성자 설명이 없는 Catch가 N개 있습니다」(발행은 막지 않음) | `publish-view.tsx` `PublishConfirmView` 225·245행이 비공개 Catch 수를 `SelectedItem.visibility`로 세어 같은 꼴 안내를 보인다. 확인 단계는 고르기 목록이 아니라 고른 자료(`SelectedItem[]`)만 받는다 | `publish-sources.ts` `SelectedItem`(그때 `kind`·`sourceId`·`title`·`visibility`)에 「작성자 설명이 있는지」를 `visibility`처럼 싣는다, `publish-screen.tsx` `toggleCatch`(161~168행, 고를 때 `CatchSource`에서 옮겨 담는다), `web/test/publish.test.mjs` |
-| 짚어 볼 곳 링크(한글 파일 이름) | `web/src/lib/github-source-url.ts` | 작성자 설명 안내 문구 |
+## 그 앞 intent(261109-new-catch)가 닿던 자리 (11-09 기록, 1·2단계만 11-19 확인)
 
-- **고른 자료는 고르기 목록과 따로 있다.** `publish-screen.tsx`의 화면 상태(`PublishScreenState`)는 고르기 목록(`catches`·`materials`)과 고른 자료(`selected`)를 따로 든다. 목록을 다시 불러와도 `selected`는 그대로다. 지원자가 빼는 동작(`remove`·`toggleCatch`) 말고 `selected`를 비우는 곳은 발행을 마친 뒤 완료 화면의 [새로 발행](`reset`, 240~243행, `step === "done"`일 때만)뿐이고, 발행이 실패하면 그대로 둔다(216행 주석). 그래서 「작성자 설명을 쓴 Catch만 보기」를 켜 목록에서 사라진 Catch도 고른 채로 남고, 확인 단계의 수 안내는 목록이 아니라 `selected`로 세야 한다.
+입력 문서(`docs/ai-dlc-input-catch/CatchU_새_Catch_입력.md`)와 승인된 대략 화면(`aidlc/spaces/default/intents/261109-new-catch/ideation/rough-mockups/wireframes.md`)의 1~3단계가 고칠 자리였다.
 
-### 2단계 — 면접관 화면
+### 1단계 — 지원자 화면 (11-19 결과 확인)
 
-| 바꿀 것 | 지금 자리 | 함께 고칠 파일 |
-|---|---|---|
-| 사본에 저장소 이름·작성 시점·조회 한계 | `published-snapshot.ts` `CatchSnapshot`, `snapshot-builder.ts` `buildCatchSnapshot`·`CatchSourceRow`, `publish.service.ts` `CATCH_LOCK_SQL`·`EVIDENCE_SQL` | `api/src/published-index/chunker.ts`(새 칸은 조각에서 빼야 함 — 코드는 모르는 칸을 무시. 11-16 확인: 빠져 있고 시험이 지킨다), `api/src/rag-answer/summary-sources.ts`(같음), `web/src/features/publications/publications-api.ts` `isCatchSnapshot`, `web/src/features/recipient/recipient-api.ts` `pickItem`(새 칸을 옮기지 않으면 사라짐), `snapshot-view.tsx`, `api/docs/publications.md`·`recipient-publication.md`·`published-index.md`·`rag-answer.md`, `api/test/publications/*`, `web/test/recipient.test.mjs`·`publications-owner.test.mjs` |
-| 옛 사본 견디기 | `db-publication-access.ts` `readSnapshotIn`은 jsonb를 그대로 돌려준다 | 위 다섯 읽는 곳이 칸 없음을 받아들여야 한다 |
-| 링크 표지 「이 작업의 본인 커밋」 | 그때 없음. 사본 근거 `sourceUrl`·`sourceRevision`(본인 커밋 최근 20건까지)과 비교 | `snapshot-view.tsx` `LinkedText` |
-| 요약·질의응답 지시(작성자 자료 옮기는 말) | `api/src/rag-answer/rag-answer-config.ts`(11-16 확인: `AUTHOR_MATERIAL_VOICE_INSTRUCTION`으로 들어갔다) | `api/docs/rag-answer.md` |
+11-09에 적은 「바꿀 것」 가운데 이번 범위에서 코드로 확인한 것:
 
-### 3단계 — 분석 쪽
+- 「설명 씀/안 씀」 서버 걸러 보기: `GET /v1/catches`가 `authorDescription=written|unwritten`을 받고 cursor 범위에 묶는다(`owner-catch-input.ts` 51~55·98행, `owner-catch-store.ts` 32~35행). 목록 응답에 `hasAuthorDescription`이 있다(`catch-reader.ts` 29행).
+- 발행 화면 「작성자 설명을 쓴 Catch만 보기」(처음 꺼짐, 켜면 첫 쪽부터 다시)와 작은 줄의 저장소 이름·「설명 안 씀」, 확인 단계 「작성자 설명이 없는 Catch가 N개 있습니다」: `publish-screen.tsx` 143~153·204~210행, `publish-view.tsx` 59~63·100~110·318행, `publish-sources.ts` 15~23·60~65행. 고른 자료는 고르기 목록과 따로 있어 걸러 보기로 사라져도 남는다(11-09 기록과 같음).
+- 발행 화면 「저장소마다 3~5개를 권합니다」: `publish-view.tsx` 93행.
+- 작성자 설명 칸 제목별 보기와 GitHub 링크 이름: `snapshot-view.tsx` 94~131행(`splitSections`, `GithubLink`), 11-19 확인. 지원자 상세 화면 쪽(`web/src/features/assets/`)은 다시 확인하지 않았다.
+- 본인 목록 정렬은 마지막 작업 시각순이 됐다(NC3, `owner-catch-store.ts` 50~53행).
+
+### 2단계 — 면접관 화면 (11-19 결과 확인)
+
+- 사본 선택 칸 `repositoryName`·`authorDescriptionEditedMonth`·`workLimits`·근거 `ownCommit`이 api(`published-snapshot.ts` 10~32행, `snapshot-builder.ts` 62~80행)와 web 검사·옮기기(`publications-api.ts` 87~94행, `recipient-api.ts` 31~49행), 그리기(`snapshot-view.tsx` 163~232행)에 들어가 있다. 칸이 없는 옛 사본도 올바르다.
+- 「이 작업의 본인 커밋」 표지: `snapshot-view.tsx` 52~60행.
+- 작성자 자료 옮기는 말: `AUTHOR_MATERIAL_VOICE_INSTRUCTION`(`rag-answer-config.ts` 52~53행).
+
+### 3단계 — 분석 쪽 (11-09, 다시 확인하지 않음)
 
 | 바꿀 것 | 지금 자리 | 함께 고칠 파일 |
 |---|---|---|
 | 다시 고친 줄·옮긴 파일·확장자 바꿈·되돌림 | 재료: `worker/app/collection/records.py`(patch·status·previous_path). 파일 내용 식별값은 그때 버렸다 | `worker/app/collection/normalize.py`(식별값 남기기), 새 판정 모듈, `worker/docs/candidate-text.md` |
 | 시험 파일 「있음」(좁은 분류) | `worker/app/generation/title.py` `classify`(재료 순서용, 그대로 둠) | 새 좁은 분류, `worker/docs/generation-material.md` |
-| 작업 시각(첫·마지막 본인 커밋) | `CommitRecord.authored_at`. 그때 Catch·사본·응답에 시각 칸 없음 | `worker/app/processing/generation.py`·`result.py`, `api/contracts/repository-analysis/worker-messages.yaml`(Result 판본), `api/src/analysis-receiver/receiver.types.ts`·`worker-message.validator.ts`, `api/src/catches/registration-batch.ts`·`new-catch-content.ts`·`entities/catch-asset.entity.ts` + 마이그레이션, `owner-catch-*`(정렬·cursor), `worker/fixtures/m1-synthetic/`, `api/docs/repository-analysis-u7.md`, `worker/docs/repository-analysis-u7.md` |
-| 「다시 볼 곳」의 커밋 링크(본인만 보는 새 칸) | 그때 없음. 상세의 근거 링크는 `assets-view.tsx` 257~258행, `safeEvidenceUrl`(292~294행) | `owner-catch-response.ts`·`types.ts`·`isCatch`, `assets-view.tsx` `CatchDetail`, `web/test/assets-view.test.mjs` |
+| 작업 시각(첫·마지막 본인 커밋) | `CommitRecord.authored_at`. 그때 Catch·사본·응답에 시각 칸 없음(11-19: `catch_asset.first_work_at`·`last_work_at`이 생겼다) | `worker/app/processing/generation.py`·`result.py`, `api/contracts/repository-analysis/worker-messages.yaml`(Result 판본), `api/src/analysis-receiver/receiver.types.ts`·`worker-message.validator.ts`, `api/src/catches/registration-batch.ts`·`new-catch-content.ts`·`entities/catch-asset.entity.ts` + 마이그레이션, `owner-catch-*`(정렬·cursor), `worker/fixtures/m1-synthetic/`, `api/docs/repository-analysis-u7.md`, `worker/docs/repository-analysis-u7.md` |
+| 「다시 볼 곳」의 커밋 링크(본인만 보는 새 칸) | 그때 없음(11-19: 본인 응답에 `revisitFacts`가 생겼다, `owner-catch-response.ts` 85~86행) | `owner-catch-response.ts`·`types.ts`·`isCatch`, `assets-view.tsx` `CatchDetail`, `web/test/assets-view.test.mjs` |
 | 고지 4절(결과 문장을 Catch에 남기면) | `api/src/analysis-intake/analysis-notice.ts`(`catchu-real-analysis-notice-v3`) | `api/docs/analysis-intake.md`, 팀장 PR 승인 |
 | 기존 Catch에 값 채우기 | 등록은 기존 Catch를 고치지 않음(`registration-service.ts` 206행), 소속 커밋은 재분석에서 빠짐 | DB 초기화 시점 결정 또는 「Catch 재생성」(입력 문서 §7) |
 
 ### 그때 지키던 경계
 
 - 작성자 설명은 결과 반영·등록 경로가 쓰지 않는다(엔티티 초기값 없음, 저장 경로 하나).
-- 사본의 `aiDraft`·제목은 받은 사람 AI 근거가 아니다(`chunker.ts` 104행 주석, `summary-sources.ts` 2행). 11-16에도 같다.
+- 사본의 `aiDraft`·제목은 받은 사람 AI 근거가 아니다(`chunker.ts` 104행 주석, `summary-sources.ts` 2행). 11-19에도 같다.
 - 작업 사실 문장에 CatchU가 센 숫자·날짜를 쓰지 않는다(`build.py` 27~36행).
-- 받은 사람 경로는 원본 Catch를 읽지 않는다(`db-publication-access.ts` 155~160행).
+- 받은 사람 경로는 원본 Catch를 읽지 않는다(`db-publication-access.ts` 155~160행). 11-19에도 같다.

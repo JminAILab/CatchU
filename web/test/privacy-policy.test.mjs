@@ -8,14 +8,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { load } from "./u2-render.mjs";
 
 // #496 개인정보 처리방침(`/privacy`)과 첫 화면 바닥글 링크.
-// 원문: 팀장 확정 문구(2026-11-12 수정, https://github.com/JminAILab/CatchU/issues/496#issuecomment-6810581294, 댓글 updated_at 2026-11-12T00:22:09Z)의
-//   접힌 칸. src/features/privacy/privacy-policy.md가 그 칸을 글자 그대로(줄 끝 LF) 옮긴 사본이고, SHA-256이 아래 값이다.
+// 원문: 발행 프리셋(#597) U4 기능 설계 aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md
+//   「확정 문구」(#496 2026-11-12 확정 문구에 C1~C5를 바꾼 글, C5 날짜는 main 배포일 2026년 11월 25일).
+//   src/features/privacy/privacy-policy.md가 그 글을 글자 그대로(줄 끝 LF) 옮긴 사본이고, SHA-256이 아래 값이다.
 // 기대: 화면이 사본과 같은 순서·글자로 제목 단계(# → h1, ## → h2)·문단·목록 항목·표(첫 줄은 th, 나머지는 td)·코드 표시를 그리고,
 //   표 칸 안의 <br>은 줄바꿈으로 그린다. 원문에 없는 글·링크·강조를 더하지 않는다. 첫 화면 바닥글은 /privacy로 링크한다.
 // 실패 조건: 글자·순서·제목 단계가 하나라도 다름, 표 칸이 빠지거나 줄이 합쳐짐, <br>이 글자로 보임, a·strong·em 같은 태그가 끼어듦,
 //   사본이 원문과 다름, 바닥글 링크가 없거나 다른 주소로 감.
 // 글을 바꿀 때(예: 시행일)는 팀장이 확정한 글로 사본과 privacy-policy.tsx를 함께 고치고, 위 출처와 아래 SHA-256도 고친다.
-const SOURCE_SHA256 = "83f9a28efb41f79b67c6b234490d93d26b6d7c3c737fdcd99474817727686c5d";
+const SOURCE_SHA256 = "fed79268d10859ab0a6f1731e073d989ef6c2cbb9ea0fb74de284fa30491bc38";
 
 // next/image는 Next 앱 밖에서 불러올 수 없다. 이 시험은 바닥글의 글·링크만 보므로 아무것도 그리지 않는 대역으로 바꾼다.
 registerHooks({
@@ -81,7 +82,7 @@ function renderedTokens(html) {
   return [...html.matchAll(pattern)].map((match) => (match[1] ? [match[1]] : [match[2], match[3]]));
 }
 
-test("원문 사본은 팀장 확정 문구의 접힌 칸 그대로다(SHA-256)", () => {
+test("원문 사본은 확정 문구 그대로다(SHA-256)", () => {
   assert.equal(createHash("sha256").update(source).digest("hex"), SOURCE_SHA256);
 });
 
@@ -89,9 +90,9 @@ test("방침 화면은 원문과 같은 차례·글자로 제목 단계·문단�
   const html = renderToStaticMarkup(createElement(PrivacyPage));
   const expected = expectedTokens(source);
   assert.deepEqual(renderedTokens(html), expected);
-  // 원문에서 뽑은 차례가 제목 1개·절 9개·표 2개(머리 3·4칸, 본문 8·4줄)·목록 8묶음 33항목·<br> 3곳·코드 1곳인지도 본다(뽑는 함수가 잘못돼 둘 다 비는 일을 막는다).
+  // 원문에서 뽑은 차례가 제목 1개·절 9개·표 2개(머리 3·4칸, 본문 8·4줄)·목록 8묶음 34항목·<br> 3곳·코드 1곳인지도 본다(뽑는 함수가 잘못돼 둘 다 비는 일을 막는다).
   const count = (tag) => expected.filter(([name]) => name === tag).length;
-  assert.deepEqual([count("h1"), count("h2"), count("table"), count("tr"), count("th"), count("ul"), count("li")], [1, 9, 2, 14, 7, 8, 33]);
+  assert.deepEqual([count("h1"), count("h2"), count("table"), count("tr"), count("th"), count("ul"), count("li")], [1, 9, 2, 14, 7, 8, 34]);
   assert.equal(html.split("<br/>").length - 1, 3);
   assert.equal(html.split("<code>openid profile</code>").length - 1, 1);
 });
@@ -109,10 +110,11 @@ test("주소는 /privacy이고 문서 제목은 원문 제목이다", () => {
   assert.equal(metadata.title, source.split("\n")[0].replace(/^# /, ""));
 });
 
-test("첫 화면 바닥글에 /privacy로 가는 [개인정보 처리방침] 링크가 한 줄 있고 가상 예시 안내는 그대로다", () => {
+test("첫 화면 바닥글에 /privacy로 가는 [개인정보 처리방침] 링크가 하나 있고 가상 예시 안내는 그대로다", () => {
   const html = renderToStaticMarkup(createElement(LandingPage));
   const footer = /<footer[^>]*>(.*?)<\/footer>/.exec(html)?.[1] ?? "";
-  assert.match(footer, /<p><a href="\/privacy">개인정보 처리방침<\/a><\/p>/);
-  assert.ok(footer.includes("<p>화면의 작업·계정은 설명을 위한 가상 예시이며 실제 분석 결과가 아닙니다.</p>"));
+  // 2026-11-24 확정 디자인에서 바닥글이 메뉴 묶음으로 바뀌어 링크는 「정책」 목록의 한 항목이다.
+  assert.match(footer, /<li><a href="\/privacy">개인정보 처리방침<\/a><\/li>/);
+  assert.ok(footer.includes("<span>화면의 작업·계정은 설명을 위한 가상 예시이며 실제 분석 결과가 아닙니다.</span>"));
   assert.equal(html.split('href="/privacy"').length - 1, 1);
 });

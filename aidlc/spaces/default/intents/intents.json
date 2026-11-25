@@ -51,5 +51,13 @@
     "scope": "bugfix",
     "status": "complete",
     "request": "614fdd47"
+  },
+  {
+    "uuid": "01a1ed2b-af69-71d6-abde-1e473e9a05b9",
+    "slug": "publication-presets",
+    "dirName": "261118-publication-presets",
+    "scope": "mvp",
+    "status": "complete",
+    "request": "953c8fd0"
   }
 ]

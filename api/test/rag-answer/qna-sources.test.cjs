@@ -19,6 +19,9 @@ const SECRET_DRAFT = 'AIDRAFT-SECRET 초안';
 const SECRET_REPO = 'secret-owner/secret-repo';
 
 const itemId = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+// 발행 프리셋 U1의 사본 칸 셋(NFR2.12). 겹친 사본 시험은 isFirstCopy·presetOrdinal만 바꾼다.
+const SECRET_PRESET = 'PRESET-SECRET 프리셋 이름';
+const FIRST = { presetOrdinal: 1, presetName: SECRET_PRESET, isFirstCopy: true };
 
 /**
  * 합성 Catch 항목. evidence는 근거마다 줄 수 목록이다(기본: 두 줄짜리 근거 셋).
@@ -26,7 +29,7 @@ const itemId = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
  */
 function catchItem(n, position, { label = `작업${n}`, workFacts, evidence = [2, 2, 2], authorDescription = null } = {}) {
   return {
-    publishedItemId: itemId(n), position, itemKind: 'CATCH', title: SECRET_TITLE, pdfPages: null,
+    publishedItemId: itemId(n), position, itemKind: 'CATCH', title: SECRET_TITLE, pdfPages: null, ...FIRST,
     snapshot: {
       workFacts: workFacts ?? [`${label} 첫 작업 사실`, `${label} 둘째 줄 제목`],
       subjectContribution: `${label} 나의 기여`,
@@ -39,9 +42,9 @@ function catchItem(n, position, { label = `작업${n}`, workFacts, evidence = [2
   };
 }
 const textItem = (n, position, body = '합성 텍스트 자료 본문이다.') => ({ publishedItemId: itemId(n), position, itemKind: 'TEXT_MATERIAL',
-  title: SECRET_TITLE, snapshot: { body }, pdfPages: null });
+  title: SECRET_TITLE, snapshot: { body }, pdfPages: null, ...FIRST });
 const pdfItem = (n, position) => ({ publishedItemId: itemId(n), position, itemKind: 'PDF_MATERIAL', title: SECRET_TITLE,
-  snapshot: { pageCount: 1 }, pdfPages: [{ pageNumber: 1, text: '합성 올린 문서 쪽 글이다.', readable: true }] });
+  snapshot: { pageCount: 1 }, pdfPages: [{ pageNumber: 1, text: '합성 올린 문서 쪽 글이다.', readable: true }], ...FIRST });
 const snapshotOf = (items) => ({ title: '합성 발행본', publishedAt: new Date('2026-11-16T00:00:00Z'), expiresAt: new Date('2027-02-14T00:00:00Z'), items });
 
 /** 사본 칸 하나의 글. fieldPath는 C-07 칸 이름(workFacts[i]·subjectContribution·evidence[i].representedFacts[j]·authorDescription·body·pages[n]). */
@@ -239,6 +242,29 @@ test('S7 머리글은 항목 종류마다 정한 꼴이고, 고정 글자에 숫
   assert.ok(QNA_ITEM_TAGS.every((tag) => !ASCII_LETTER_OR_DIGIT.test(tag)));
   assert.equal(itemTag(19), '버');
   assert.ok(!ASCII_LETTER_OR_DIGIT.test(itemTag(25)), '20개를 넘어도 숫자·영문자를 쓰지 않는다');
+});
+
+// 발행 프리셋 U1 — 겹친 사본(BR4.3, ADR-006 팀장 결정). 먼저 정한 시나리오(unit-test-instructions 「앞선 사본」):
+// - 같은 Catch가 두 프리셋에 들어 사본 항목이 둘이다(앞선 사본 position 2, 겹친 사본 position 4). 같은 둘째 줄의 다른 Catch가 position 3에 있다.
+// - 기대: 그 Catch의 근거는 한 번만 쓰이고, 겹친 사본은 머리글이 없으며, 표 글자는 앞선 사본만으로 건너뛰지 않고 이어진다.
+//         둘째 줄의 같은 작업 수에 겹친 사본은 들지 않는다. 프리셋 이름은 머리글·근거에 없다. 겹친 사본이 없으면 지금과 글자까지 같다.
+// - 실패 조건: 근거가 두 번, 표 글자가 빔(「가」「다」처럼 건너뜀), 겹친 사본 때문에 표 글자가 붙음.
+test('발행 프리셋 BR4.3: 같은 Catch가 두 프리셋에 든 사본에서 근거는 한 번, 머리글 표 글자는 이어지고, 같은 작업 수에 겹친 사본을 세지 않는다', () => {
+  const first = catchItem(41, 1, { workFacts: ['첫 줄', '알림 화면 고치기'] });
+  const repeated = catchItem(42, 2, { workFacts: ['첫 줄', '로그인 고치기'] });
+  const text = textItem(43, 3);
+  const copy = { ...catchItem(42, 4, { workFacts: ['첫 줄', '로그인 고치기'] }), publishedItemId: itemId(44), presetOrdinal: 2, isFirstCopy: false };
+  const contexts = buildItemContexts(snapshotOf([first, repeated, text, copy]));
+  assert.equal(contexts.get(itemId(42)), '이 줄이 속한 작업: 로그인 고치기', '겹친 사본은 같은 둘째 줄의 작업 수에 들지 않는다');
+  assert.equal(contexts.get(itemId(43)), '이 줄이 속한 자료: 「다」 텍스트 자료', '표 글자는 앞선 사본만으로 건너뛰지 않는다');
+  assert.equal(contexts.has(itemId(44)), false, '겹친 사본은 머리글이 없다');
+  assert.deepEqual(contexts, buildItemContexts(snapshotOf([first, repeated, text])), '겹친 사본이 없을 때와 글자까지 같다');
+
+  const { sources } = buildQnaSources([hitOf(repeated, 'workFacts[0]')], snapshotOf([first, repeated, text, copy]));
+  assert.equal(sources.filter((source) => source.location.publishedItemId === itemId(44)).length, 0, '겹친 사본의 근거는 붙지 않는다');
+  const keys = fieldKeys(sources);
+  assert.equal(new Set(keys).size, keys.length, '같은 근거가 두 번 쓰이지 않는다');
+  for (const value of [...contexts.values(), JSON.stringify(sources)]) assert.equal(value.includes(SECRET_PRESET), false, '프리셋 이름은 넣지 않는다');
 });
 
 test('S7 둘째 줄 다듬기는 200자(UTF-16)까지 자르되 서로게이트 쌍을 가운데서 자르지 않는다', () => {

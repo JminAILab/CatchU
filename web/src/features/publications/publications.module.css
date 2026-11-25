@@ -54,6 +54,8 @@
 .manualInput { padding: 6px 8px; border: 1px solid #c9d2df; border-radius: 6px; font: inherit; font-size: 13px; }
 .snapshot { margin-top: 24px; }
 .snapshotItems { margin: 0; padding-left: 22px; display: grid; gap: 18px; }
+/* 발행 프리셋 U3: 탭 줄 아래 열린 탭의 프리셋 이름 전체(M5). 긴 이름은 자르지 않고 줄을 바꾼다. */
+.presetName { font-weight: 700; overflow-wrap: anywhere; margin: 0 0 12px; }
 .snapshotItem { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: 14px; padding: 18px 22px; }
 .snapshotTitle { font-size: 17px; margin-bottom: 10px; }
 .snapshotBody { display: grid; gap: 12px; }
@@ -63,6 +65,22 @@
 .evidenceDetails > summary { display: inline-flex; align-items: center; min-height: 44px; color: #254e93; font-size: 14px; font-weight: 700; cursor: pointer; }
 .evidenceDetails > summary:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
 .freeText { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+/* 긴 글 접기(#607 fold-text). 글자는 그대로 두고 보이는 높이만 줄인다. 줄 수를 높이로 세므로 틀 안 목록의 바깥 여백은 없앤다.
+   넘치는 글은 접힌 동안에만 가린다. 늘 가리면 접히지 않은 글에서도 줄 첫머리·첫 줄·끝 줄 링크의 초점 테두리가 상자 밖으로 나가 잘린다(PR #633 리뷰). */
+.foldBody > ul { margin: 0; }
+.fold[data-folded="true"] > .foldBody { overflow: hidden; }
+/* 글 상자는 Tab 순서 밖이고, 폭이 넓어져 단추가 없어질 때만 초점을 넘겨받는다(#615 2026-11-23 팀장 결정). 키보드로 쓰던 중이면 초점 자리가 보이게 테두리를 그린다. */
+.foldBody:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.fold[data-folded="true"] > .foldBody { border-bottom: 1px dashed #9aa6b6; }
+/* 펼친 글의 「접기」에 키보드 초점이 있는 동안에만 단추 줄이 화면 아래쪽에 붙는다(글 끝이 보이면 제자리).
+   마우스로 읽을 때와 초점이 다른 곳에 있을 때는 붙지 않아 본문을 가리지 않는다. 붙는 동안에는 바탕을 칠해 밑으로 지나가는 글과 겹쳐 보이지 않게 한다. */
+/* 펼친 글의 단추 줄 아래 8px(#615 2026-11-23 팀장 결정): 「접기」가 바닥에 붙어 있을 때 초점 테두리(3px + 간격 3px)의 아래쪽이 잘리지 않게 한다. */
+.foldBar[data-open="true"] { padding-bottom: 8px; }
+.foldBar[data-open="true"]:has(.foldButton:focus-visible) { position: sticky; bottom: 0; z-index: 1; background: var(--color-surface); border-top: 1px dashed #9aa6b6; }
+.foldButton { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: #254e93; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.foldButton::before { content: "▾" / ""; margin-right: 4px; }
+.foldButton[aria-expanded="true"]::before { content: "▴" / ""; }
+.foldButton:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
 /* 새 Catch NC1 작성자 설명 칸별 보기(BR7.6): h5는 h4보다 한 단계 작고 굵으며 새 색이 없다. 링크 이름은 자르지 않고 줄을 바꾼다(BR2.7). */
 .descriptionSection + .descriptionSection { margin-top: 10px; }
 .sectionTitle { font-size: 13px; font-weight: 700; margin: 0 0 4px; }
@@ -79,3 +97,92 @@
 .highlight { background: #ffe58a; color: inherit; padding: 0 1px; border-radius: 2px; }
 .snapshotItem:focus { outline: none; }
 .snapshotItem:focus-visible, .snapshotItem[data-highlighted="true"] { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+
+/* 「보던 곳으로 돌아가기」 줄(#615, 2026-11-25 팀장 결정). 받은 사람 화면이 좁을 때(1200px 미만) 출처로 옮겨 간 항목의 맨 앞에만 그려진다.
+   그 항목이 화면에 있는 동안 화면 위쪽에 붙고, 항목을 벗어나면 함께 나간다. 펼친 글의 「접기」 줄은 아래쪽에 붙으므로 서로 겹치지 않는다.
+   붙어 있는 동안 밑으로 지나가는 글과 겹쳐 보이지 않게 바탕을 칠한다. 넓은 화면에서는 CSS로 숨기지 않고 화면이 그리지 않는다(초점을 먼저 넘기려고). */
+.returnBar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; margin: 0 0 10px; padding: 8px 0; background: var(--color-surface); border-bottom: 1px dashed #9aa6b6; }
+.returnButton { display: inline-flex; align-items: center; min-height: 44px; padding: 7px 13px; border: 1px solid #c9d2df; border-radius: 9px; background: var(--color-surface); color: #254e93; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.returnButton::before { content: "←" / ""; margin-right: 6px; }
+.returnButton:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+/* 줄이 붙어 있는 동안 그 항목 안의 조작 요소가 줄 밑에 가려지지 않게, 초점으로 보이는 자리에 옮겨질 때 위쪽에 줄 높이만큼 여유를 둔다.
+   화면 전체에 여유를 걸면 붙어 있는 돌아가기 단추가 그 안에 들어, Tab으로 그 단추에 갈 때 화면이 항목 맨 위까지 밀린다(#615 화면 초안 v9.5에서 확인). */
+.returnBar ~ * :is(button, a, summary) { scroll-margin-top: 76px; }
+
+/* ── #632 프리셋·발행 화면 다듬기(2026-11-24 팀장 결정, 화면 초안 v7). 새 라이브러리 없이 이 파일만 쓴다. */
+.leadTight { color: var(--color-muted); font-size: 15px; margin: 4px 0 0; }
+.backLinkRow { margin: 0 0 6px; }
+.backLink { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; color: var(--color-accent); font-size: 14px; font-weight: 700; text-decoration: none; }
+.backLink:hover { text-decoration: underline; }
+.metaLine { margin: -6px 0 12px; color: #34445b; font-size: 14px; }
+.fieldTitle { font-size: 14px; margin-bottom: 8px; }
+.fieldBox input { width: 100%; padding: 10px 12px; border: 1px solid #c9d2df; border-radius: 9px; font: inherit; line-height: 1.6; }
+.fieldBox input:focus { outline: 2px solid var(--color-focus); outline-offset: 1px; }
+.fieldBox input[aria-invalid="true"] { border-color: var(--color-danger); background: #fdf3f2; }
+.fieldBox input:disabled { background: var(--color-background); color: var(--color-muted); }
+.smallButton { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 6px 14px; border-radius: 8px; border: 1px solid #c9d2df; background: var(--color-surface); color: var(--color-accent); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.smallButton:hover { background: #f1f5fc; }
+.linkButton { min-height: 32px; padding: 4px 0; border: 0; background: none; color: var(--color-accent); font: inherit; font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.warnChip { display: inline-block; padding: 1px 8px; border-radius: 4px; background: #f6f1e3; color: #6f5d37; font-size: 12px; font-weight: 700; white-space: nowrap; }
+
+/* 프리셋 목록 */
+.presetRows { list-style: none; margin: 0; padding: 0; }
+.presetRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: center; padding: 14px 0; border-top: 1px solid var(--color-line); }
+.presetRowName { margin: 0; font-size: 16px; font-weight: 700; overflow-wrap: anywhere; line-height: 1.45; }
+.presetRowSummary { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 2px 0 0; color: #34445b; font-size: 14px; }
+
+/* 고르기 체크박스(편집의 자료 고르기, 발행의 프리셋 고르기). 줄 전체가 이름표다. */
+.picks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pick, .pickOn, .pickOff { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-surface); cursor: pointer; }
+.pick:hover { background: var(--color-background); }
+/* 고른 줄: 색만이 아니라 체크 표시와 굵은 테두리로도 구분한다. */
+.pickOn { border-color: var(--color-accent); background: #f1f5fc; box-shadow: inset 0 0 0 1px var(--color-accent); }
+/* 고를 수 없는 줄: 줄 전체를 흐리지 않고 이름만 옅게, 이유는 또렷하게 둔다. */
+.pickOff { background: var(--color-background); cursor: not-allowed; }
+.pickOff .itemTitle, .pickOff .subline { color: #6b7889; }
+.pickBox { width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--color-accent); }
+.pickBox:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.pickText { display: grid; gap: 2px; min-width: 0; }
+.pickReason { color: #6f5d37; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.groupHead { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; margin: 18px 0 4px; }
+.groupHead h3 { margin: 0; }
+.groupHead .check { margin-top: 0; }
+.pickScroll { max-height: max(320px, calc(100vh - 420px)); overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+
+/* 순서 목록(ReorderList): 손잡이 · 번호(또는 번호 칸) · 내용 · [빼기] */
+.order { margin-top: 4px; }
+.orderScroll { position: relative; max-height: max(220px, calc(100vh - 480px)); overflow-y: auto; overscroll-behavior: contain; }
+.orderList { list-style: none; margin: 0; padding: 4px; }
+.orderRow { position: relative; display: grid; grid-template-columns: 36px 40px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-top: 1px solid #edf1f5; border-radius: 6px; background: var(--color-surface); }
+.orderRow:first-child { border-top-color: transparent; }
+.orderRow[data-dragging="true"] { z-index: 3; background: #f8faff; box-shadow: 0 14px 25px -18px #243d5e70, inset 0 0 0 1px #8ba8d4; }
+.orderScroll[data-outside="true"] .orderRow[data-dragging="true"] { box-shadow: inset 0 0 0 1px #c98a84; opacity: .75; }
+.grip { width: 36px; height: 40px; display: grid; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #46566d; cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.grip:hover { border-color: #8ba8d4; background: #f1f5fc; color: var(--color-accent); }
+.orderRow[data-dragging="true"] .grip { cursor: grabbing; }
+.orderNumber { text-align: center; font-size: 15px; font-weight: 700; }
+.orderInput { width: 40px; height: 36px; padding: 0; border: 1px solid #c9d2df; border-radius: 9px; background: var(--color-surface); font: inherit; font-weight: 700; text-align: center; }
+.orderInput:focus { outline: 2px solid var(--color-focus); outline-offset: 1px; }
+.orderInput[aria-invalid="true"] { border-color: var(--color-danger); background: #fdf3f2; }
+.orderInput:disabled { background: var(--color-background); color: var(--color-muted); }
+.orderBody { min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.orderBody .flagged { margin: 2px 0 0; }
+.dropLine { position: absolute; left: 8px; right: 8px; height: 3px; border-radius: 2px; background: var(--color-accent); pointer-events: none; display: none; }
+.orderToggle { margin: 10px 0 0; }
+.orderStatus { margin: 4px 0 0; color: #34445b; font-size: 13px; }
+.order .flagged:empty, .orderStatus:empty { margin: 0; }
+.orderNotes { margin: 10px 0 0; padding-left: 18px; color: var(--color-muted); font-size: 13px; }
+.editorFoot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--color-line); }
+.footStatus { flex: 1; min-width: 120px; margin: 0; text-align: right; color: #34445b; font-size: 13px; }
+.saveButton { min-width: 150px; }
+.dangerRow { display: flex; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--color-line); }
+/* 좁은 폭: 종류 표시를 제목 윗줄로 올려 제목이 칸 폭을 다 쓰게 한다(#632 v7). */
+@media (max-width: 980px) { .orderBody > .kindBadge { display: table; margin-bottom: 2px; } }
+/* 화면이 낮으면 안쪽 스크롤 대신 페이지 스크롤을 쓴다. */
+@media (max-height: 640px) { .pickScroll, .orderScroll { max-height: none; overflow: visible; } }
+/* 터치 화면: 손잡이와 번호 칸을 44px로 키운다. 끌기는 손잡이에서만 시작하고 손잡이 밖은 평소처럼 스크롤된다. */
+@media (pointer: coarse) {
+  .orderRow { grid-template-columns: 44px 44px minmax(0, 1fr) auto; }
+  .grip { width: 44px; height: 44px; }
+  .orderInput { width: 44px; height: 44px; }
+}

@@ -7,6 +7,7 @@ import { AiRunModule } from '../ai-run/ai-run.module';
 import { DailyRunLimitModule } from '../daily-run-limit/daily-run-limit.module';
 import { FileStorageModule } from '../file-storage/file-storage.module';
 import { OwnerProfileReaderModule } from '../member-profile/owner-profile-reader.module';
+import { PresetsModule } from '../presets/presets.module';
 import { PublishedIndexModule } from '../published-index/published-index.module';
 import { LINK_GRANT_KEY, readLinkGrantKey } from '../share-links/link-grant';
 import { RequestRateLimiter } from '../share-links/request-rate-limiter';
@@ -34,10 +35,11 @@ export { PUBLICATION_ACCESS, PUBLICATIONS_CLOCK, PUBLISH_RATE_LIMITER } from './
  * - C-10 DB 구현은 `PUBLICATION_ACCESS` 토큰으로 내보낸다. U5는 `RagAnswerModule.register({ publicationAccess: PUBLICATION_ACCESS,
  *   imports: [PublicationsModule] })`처럼 받는다(docs/publications.md 「C-10 PublicationAccess」).
  * - imports: `OwnerProfileReaderModule`(소유 회원 상태, #416 OQ-U4-NFR-6 결정), U2 `AiRunModule`·`DailyRunLimitModule`·`AiConsentModule`·
- *   `FileStorageModule`, U3 `PublishedIndexModule`(`PUBLISHED_INDEX_WRITER`). TypeORM 엔티티는 앱의 DataSource가 `*.entity.ts`를 찾는다.
+ *   `FileStorageModule`, U3 `PublishedIndexModule`(`PUBLISHED_INDEX_WRITER`), 발행 프리셋 U1 `PresetsModule`(발행의 프리셋 펴기 `PresetStore.expand`).
+ *   TypeORM 엔티티는 앱의 DataSource가 `*.entity.ts`를 찾는다.
  */
 @Module({
-  imports: [OwnerProfileReaderModule, AiRunModule, DailyRunLimitModule, AiConsentModule, FileStorageModule, PublishedIndexModule],
+  imports: [OwnerProfileReaderModule, AiRunModule, DailyRunLimitModule, AiConsentModule, FileStorageModule, PublishedIndexModule, PresetsModule],
   controllers: [PublicationsController, RecipientLinksController],
   providers: [
     { provide: LINK_GRANT_KEY, useFactory: () => readLinkGrantKey() },

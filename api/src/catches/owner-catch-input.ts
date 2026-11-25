@@ -19,6 +19,11 @@ export interface OwnerCatchPosition {
 
 export interface OwnerCatchQuery extends CatchPageFilters {
   after?: OwnerCatchPosition;
+  /**
+   * 발행 프리셋에 담을 수 있는 Catch만(발행 프리셋 U2 BR5.1): 공개이고 작업 사실·기여가 확인됐고 원본 저장소가 보호되지 않은 것.
+   * 본인 목록에서만 받는다. 공개 목록은 공유 해석(`pageFilters`)이 모르는 키로 400을 낸다(NFR2.2).
+   */
+  publishable?: true;
 }
 
 /** 공개 Catch 목록 조회. 순서(catch_id)와 커서 모양은 그대로다(NC3 BR7.3). */
@@ -54,6 +59,17 @@ function cursorScope(memberId: string, query: Pick<CatchPageFilters, 'repository
   ])).digest('hex');
 }
 
+/**
+ * 본인 목록 커서 범위. `publishable`이 있을 때만 범위 배열 끝에 덧붙인다(발행 프리셋 U2 NFR 설계 검토 R-02).
+ * 없는 요청의 범위는 지금 배열 그대로라 이미 내준 커서(내 자산 화면)가 그대로 쓰이고, 조건이 다른 커서는 범위가 달라 400이다.
+ */
+function ownerCursorScope(memberId: string, query: OwnerCatchQuery): string {
+  if (query.publishable === undefined) return cursorScope(memberId, query);
+  return createHash('sha256').update(JSON.stringify([
+    memberId, query.repositoryId ?? null, query.sourceRequestId ?? null, query.authorDescription ?? null, 'publishable',
+  ])).digest('hex');
+}
+
 function encodeCursor(value: unknown): string {
   return Buffer.from(JSON.stringify(value)).toString('base64url');
 }
@@ -66,7 +82,7 @@ export function nextOwnerCatchCursor(
   memberId: string, query: OwnerCatchQuery, last: { catchId: string; lastWorkAt: Date | null },
 ): string {
   return encodeCursor({
-    v: OWNER_CURSOR_VERSION, scope: cursorScope(memberId, query),
+    v: OWNER_CURSOR_VERSION, scope: ownerCursorScope(memberId, query),
     after: { lastWorkAt: last.lastWorkAt === null ? null : last.lastWorkAt.toISOString(), catchId: last.catchId },
   });
 }
@@ -125,13 +141,33 @@ function ownerPosition(value: unknown): OwnerCatchPosition {
   return { lastWorkAt: cursorTime(after.lastWorkAt), catchId: after.catchId.toLowerCase() };
 }
 
+/** 문자열 `true`만 받는다. `false`·빈 값·같은 키 두 번(배열)·대소문자 다른 값은 400이고 받은 값은 오류에 싣지 않는다(U2 NFR2.3). */
+function publishableInput(value: unknown): true {
+  if (value !== 'true') throw new BadRequestException();
+  return true;
+}
+
+/**
+ * 본인 목록만 받는 `publishable`을 먼저 꺼내고 나머지를 공유 해석(`pageFilters`)에 넘긴다(U2 NFR2.2).
+ * 객체가 아닌 입력은 그대로 넘겨 `pageFilters`가 지금처럼 400을 낸다.
+ */
+function splitPublishable(input: unknown): { rest: unknown; publishable?: true } {
+  if (input === null || typeof input !== 'object' || Array.isArray(input) || !Object.hasOwn(input, 'publishable')) {
+    return { rest: input };
+  }
+  const { publishable, ...rest } = input as Record<string, unknown>;
+  return { rest, publishable: publishableInput(publishable) };
+}
+
 /** 본인 목록 조회 입력. 커서는 판본 3만 받는다. 판본·범위·꼴이 틀리면 400이고 받은 값은 오류에 싣지 않는다. */
 export function ownerCatchQuery(memberId: string, input: unknown): OwnerCatchQuery {
-  const { query, cursor } = pageFilters(input);
+  const { rest, publishable } = splitPublishable(input);
+  const { query: filters, cursor } = pageFilters(rest);
+  const query: OwnerCatchQuery = publishable === undefined ? filters : { ...filters, publishable };
   if (cursor === undefined) return query;
   try {
     const decoded = decodeCursor(cursor);
-    if (decoded.v !== OWNER_CURSOR_VERSION || decoded.scope !== cursorScope(memberId, query)) {
+    if (decoded.v !== OWNER_CURSOR_VERSION || decoded.scope !== ownerCursorScope(memberId, query)) {
       throw new BadRequestException();
     }
     return { ...query, after: ownerPosition(decoded.after) };

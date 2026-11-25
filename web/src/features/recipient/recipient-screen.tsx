@@ -1,16 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { pdfHttp } from "@/features/materials/pdf-clients";
 import type { PdfCopySource } from "@/features/publications/published-pdf-item";
-import { publishedItemDomId } from "@/features/publications/snapshot-view";
+import { useSnapshotJump } from "@/features/publications/snapshot-jump";
 import { accessTokenStore } from "@/lib/access-token";
 import { api } from "@/lib/api";
 import { createRecipientApi } from "./recipient-api";
 import { browserSessionStorage, createGrantStore } from "./recipient-grants";
-import { resolveEvidenceTarget, type EvidenceLocation, type EvidenceTarget, type RecipientSlotProps } from "./recipient-slots";
+import type { RecipientSlotProps } from "./recipient-slots";
 import { createRecipientPublicationStore } from "./recipient-store";
 import { RecipientPublicationView } from "./recipient-view";
+import { useEvidenceReturn, useWorkspaceLayout } from "./recipient-workspace";
 import styles from "./recipient.module.css";
 
 /** 회원 토큰을 붙이지 않는 받은 사람 호출(#106 `api.recipient`). */
@@ -38,8 +39,6 @@ function useFocusOnView(view: string): RefObject<HTMLHeadingElement | null> {
 }
 
 const serverLoggedIn = () => false;
-/** `snapshot-view.tsx`가 강조 범위에 그리는 `<mark>`(`data-testid="snapshot-highlight"`). 항목 안에서 첫 번째를 스크롤 대상으로 삼는다. */
-const HIGHLIGHT_SELECTOR = 'mark[data-testid="snapshot-highlight"]';
 
 function PublicationView({ token }: { token: string }) {
   const [store] = useState(() => createRecipientPublicationStore({ api: recipientApi, grants, token }));
@@ -52,34 +51,21 @@ function PublicationView({ token }: { token: string }) {
   // 로그인 여부(C-11 `isLoggedIn`). 이 탭의 회원 토큰이 있으면 true이며, 받은 사람 요청에는 그 토큰을 붙이지 않는다.
   const isLoggedIn = useSyncExternalStore(accessTokenStore.subscribe, () => accessTokenStore.get().token !== null, serverLoggedIn);
 
-  // 근거 위치 강조(C-11 evidence-highlight). `seq`는 같은 위치를 다시 눌러도 다시 옮기게 한다.
-  // 강조 범위가 있으면 항목 안의 첫 `<mark>`가 화면에 보이도록 옮기고, 범위가 없거나 강조 요소를 못 찾으면 항목 시작으로 옮긴다
-  // (PR #482 리뷰: 긴 자료의 뒷부분을 가리키면 항목 시작만 보여 강조가 화면 밖에 남았다). 초점은 항목에 두되 `preventScroll`로 다시 튀지 않게 한다.
-  const [target, setTarget] = useState<(EvidenceTarget & { seq: number }) | null>(null);
-  const showEvidence = useCallback((location: EvidenceLocation) => {
-    const current = store.getSnapshot();
-    if (current.view !== "ready") return;
-    const resolved = resolveEvidenceTarget(current.snapshot, location);
-    if (resolved === null) return;
-    setTarget((previous) => ({ ...resolved, seq: (previous?.seq ?? 0) + 1 }));
-  }, [store]);
-  useEffect(() => {
-    if (target === null) return;
-    const element = document.getElementById(publishedItemDomId(target.publishedItemId));
-    if (!element) return;
-    const mark = target.highlight === null ? null : element.querySelector<HTMLElement>(HIGHLIGHT_SELECTOR);
-    (mark ?? element).scrollIntoView({ block: mark === null ? "start" : "center" });
-    element.focus({ preventScroll: true });
-  }, [target]);
-  // 판정 통과 화면을 벗어나면 강조도 보이지 않는다(상태에서 파생).
-  const highlight = snapshot.view === "ready" && target !== null ? target.highlight : null;
+  // 근거 위치 강조(C-11 evidence-highlight)와 발행본 자료의 프리셋 탭(발행 프리셋 U3 흐름 1·3). 출처 단추는 대상 항목의 탭과 대상을 한 번에 바꾸고,
+  // 그린 뒤 첫 `<mark>`(없으면 항목 시작)를 보이며 초점은 항목에 둔다(`useSnapshotJump`). 판정 통과 화면이 아니면 사본을 넘기지 않아
+  // 출처 단추가 아무것도 하지 않고 강조도 보이지 않는다(상태에서 파생).
+  // 넓은 화면(1200px 이상)에서는 자료 칸 안쪽만 옮겨 오른쪽 칸의 답이 그대로 보이고, 좁은 화면에서는 옮겨 간 항목에 「보던 곳으로 돌아가기」를 둔다(#615).
+  const ready = snapshot.view === "ready";
+  const layout = useWorkspaceLayout(ready);
+  const jump = useSnapshotJump(ready ? snapshot.snapshot : null, layout.place);
+  const evidenceReturn = useEvidenceReturn(ready ? snapshot.snapshot : null, jump);
 
   const slotProps: RecipientSlotProps = {
     token,
     getGrant: () => grants.get(token),
     onAccessLost: (code) => store.accessLost(code),
     isLoggedIn,
-    showEvidence,
+    showEvidence: evidenceReturn.showEvidence,
   };
 
   // PDF 항목의 사본 요청(U8 W4). 호출마다 지금의 grant를 머리로 싣고 서버 판정을 다시 받는다. 401·404는 다른 패널과 같이 접근 상실이다.
@@ -89,8 +75,10 @@ function PublicationView({ token }: { token: string }) {
   });
 
   return (
-    <main className={styles.page}>
-      <RecipientPublicationView snapshot={snapshot} headingRef={headingRef} highlight={highlight} slotProps={slotProps} pdfSource={pdfSource}
+    <main className={ready ? `${styles.page} ${styles.pageReady}` : styles.page}>
+      <RecipientPublicationView snapshot={snapshot} headingRef={headingRef} highlight={jump.highlight} slotProps={slotProps} pdfSource={pdfSource}
+        activePreset={jump.activePreset} onPresetChange={jump.changePreset} tabNotice={jump.notice}
+        layout={layout} onWorkspaceClickCapture={evidenceReturn.onClickCapture} returnBar={evidenceReturn.returnBar}
         onRetry={() => { void store.load(); }}
         onUnlock={(password) => store.unlock(password)}
         waitSeconds={() => store.retryWaitSeconds()} />

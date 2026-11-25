@@ -7,7 +7,7 @@
 | 파일 | 역할 |
 | --- | --- |
 | `materials-api.ts` | API 호출(`createMaterialsApi(api.member)`), 응답 모양 확인, 보내기 전 길이 검사, 저장 결과 반영(`applyMaterialSave`)과 안내 문구. 화면과 분리해 시험한다 |
-| `materials-view.tsx` | 목록(`MaterialsListView`)·편집(`MaterialEditorView`) 그리기만 한다 |
+| `materials-view.tsx` | 목록(`MaterialsListView`)·편집(`MaterialEditorView`) 그리기와 탭 목록(`MATERIALS_TABS`)만 한다 |
 | `materials-screen.tsx` | 상태·요청·이탈 확인을 맡는 화면(`MaterialsPage`) |
 | `materials.module.css` | 화면 모양 |
 | `src/app/(member)/materials/page.tsx` | 주소 연결 |
@@ -23,7 +23,7 @@
 - 저장 중에는 입력·버튼을 잠근다. 새 자료를 처음 저장하면 편집기를 다시 열지 않고 그 자리에서 수정으로 이어 간다.
 - 저장·삭제를 기다리는 동안 미저장 확인을 거쳐 다른 자료로 옮겨도 보낸 요청은 취소하지 않는다. 늦게 온 성공은 목록에 반영하고(새 자료는 목록에 더함, 삭제는 목록에서 뺌), 지금 연 자료의 선택·입력은 바꾸지 않는다. 서버에 저장된 자료가 목록에서 빠져 같은 자료를 다시 만드는 일을 막기 위해서다. 불러오기 요청은 다른 자료를 열면 취소한다. 목록 조회 중에 저장·삭제가 끝나면 진행 중인 조회를 버리고 다시 읽어, 변경 전에 읽은 늦은 응답이 새 자료·제목·삭제를 덮지 않게 한다. 다시 읽은 목록이 실패하면 목록에만 실패와 다시 불러오기를 보이고 편집기의 “저장됨”·입력은 그대로 둔다. 목록을 다시 읽은 뒤 도착한 [더 보기] 응답은 새 목록에 붙이지 않는다.
 - 저장하지 않은 입력이 있으면 새로고침·창 닫기·링크 이동(`useUnsavedGuard`), 앱 안 브라우저 뒤로·앞으로 가기(`useUnsavedTraverseGuard`), 로그아웃·다시 로그인(`useUnsavedChanges`), 다른 자료 열기·[새 자료]·[목록으로] 전에 묻는다(BR2.2). 뒤로·앞으로 가기는 Navigation API를 지원하는 브라우저에서 브라우저가 취소를 허용하는 같은 문서 안 이동만 보호한다. 라우터보다 먼저 오는 `navigate`에서 묻고, 머무르면 이동을 취소해 주소·입력이 그대로다. 보호하지 않는 경우는 「한계」에 적었다.
-- 삭제는 확인 창 뒤 204일 때만 목록에서 뺀다. 실패하면 “삭제되지 않았습니다”와 이유를 보이고 편집 화면에 남긴다. 이미 발행한 사본은 남는다고 확인 창에 적는다(BR3.5).
+- 삭제는 확인 창 뒤 204일 때만 목록에서 뺀다. 실패하면 “삭제되지 않았습니다”와 이유를 보이고 편집 화면에 남긴다. 이미 발행한 사본은 남는다고 확인 창에 적는다(BR3.5). 확인 문장(`MATERIAL_DELETE_CONFIRM`)은 「이 자료를 삭제할까요? 이미 발행한 사본은 그대로 남고, 삭제한 자료는 되살릴 수 없습니다. 프리셋에 담겨 있으면 거기서도 빠집니다.」다. 끝 문장은 발행 프리셋 U3(BR5.2, AC4.1.1)가 더했고, 지운 자료가 프리셋에서 빠지는 일은 api가 한다(발행 프리셋 U1 연쇄 삭제).
 - 제목·본문은 React 텍스트로만 그린다(NFR1.10).
 - 이 편집 화면은 입력창만 있어 주소를 링크로 그리지 않는다.
 - 텍스트 자료 본문과 Catch 작성자 설명 안의 주소는 #416 팀장 결정(2026-10-29, Q1 B)과 NFR1.11에 따라 발행본을 보여 주는 화면(작성자 발행본 상세 W5, 받은 사람 화면 W4)에서 GitHub 주소만 새 탭 링크(`rel="noopener noreferrer"`)로 그리고, 그 밖의 주소는 글자로 둔다. 판정은 `isGithubSourceUrl`을 쓴다. 포트가 붙은 주소(OQ-U4-NFR-1)와 문장 안 주소의 끝 판정(OQ-U4-NFR-2)은 그 구현 전에 정한다.
@@ -44,12 +44,14 @@
 ## 시험
 
 - `node --test test/materials.test.mjs`: API 경로·성공 판정, 실패 구분, 길이 검사, 저장 결과 반영(입력 유지·dirty), 편집 화면의 민감 정보 안내·`data-testid`·실패 안내, 목록의 실패·0건 구분. 합성 응답만 쓴다.
-- `node --test test/materials-screen.test.mjs`: 화면 모델의 상태 전이. 첫 저장 회귀, 저장 중 추가 입력, 늦은 불러오기 응답, 저장 실패 입력 유지, 로그인 변경 뒤 응답 무시, 삭제 확인·실패, 목록·더 보기, 이탈 확인, 삭제·저장 경합(A 삭제 중 B 편집, 저장 중 다른 자료로 이동한 뒤 늦은 저장 성공, 목록 조회 중 끝난 저장·삭제, 자동 재조회 실패, [더 보기] 지연 중 변경·재조회). 합성 응답만 쓴다.
+- `node --test test/materials-screen.test.mjs`: 화면 모델의 상태 전이. 첫 저장 회귀, 저장 중 추가 입력, 늦은 불러오기 응답, 저장 실패 입력 유지, 로그인 변경 뒤 응답 무시, 삭제 확인(문장)·실패, 목록·더 보기, 이탈 확인, 삭제·저장 경합(A 삭제 중 B 편집, 저장 중 다른 자료로 이동한 뒤 늦은 저장 성공, 목록 조회 중 끝난 저장·삭제, 자동 재조회 실패, [더 보기] 지연 중 변경·재조회), 발행 프리셋 U3의 탭 줄(역할·두 패널·PDF를 쓰지 않는 구성)·탭 키·저장하지 않은 입력이 있을 때 탭 거절. 합성 응답만 쓴다.
 - `node --test test/unsaved-traverse-guard.test.mjs`: 뒤로·앞으로 가기 확인 판정(머무르면 취소, 계속하면 이동, 미저장 없음·다른 문서·취소할 수 없는 이동·같은 주소·기록 추가는 묻지 않음). 이벤트 대역만 쓴다.
 
 ## PDF 자료 탭 (U8)
 
-12월 intent U8(PDF 자료, #420)이 같은 주소 `/materials`에 탭을 더했다. [텍스트 자료]·[PDF 자료] 두 탭이며 텍스트 자료 탭의 동작은 위 그대로다. 기준: [U8 기능 명세](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/functional-spec.md) W1·W4, [화면 컴포넌트](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/frontend-components.md), [보안 설계](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/nfr-design/security-design.md) §2. api는 [PDF 자료 문서](../../../../api/docs/pdf-materials.md)에 있다.
+12월 intent U8(PDF 자료, #420)이 같은 주소 `/materials`에 탭을 더했다. [텍스트 자료]·[PDF 자료] 두 탭이며 텍스트 자료 탭의 동작은 위 그대로다.
+
+**탭 줄(발행 프리셋 U3 BR5.1, M7):** 두 탭은 공용 탭 줄([`components/tab-strip/`](../../components/tab-strip/tab-strip.tsx), 이름 「자료 종류」)이 그린다. 탭 이름·자리·id(`materials-tab-text`·`materials-tab-pdf`)·`data-testid`는 그대로이고, 두 탭 모두 `tabpanel`(`materials-panel-text`·`materials-panel-pdf`)이 있다. 열리지 않은 패널은 빈 채로 `hidden`이라 지금처럼 열린 탭의 내용만 그린다. 바깥 틀 하나에 h1·안내 문장을 열린 탭에 따라 바꿔 그린다. 왼쪽·오른쪽 화살표(끝에서 돎)·Home·End로 옮기면 바로 열리고 초점이 가며, 열린 탭만 Tab 순서에 있고 다시 Tab이면 열린 패널로 들어간다. 저장하지 않은 텍스트 입력이 있으면 PDF 탭으로 옮기기 전에 화살표·누름마다 묻고, 머무르기를 고르면 탭과 초점이 「텍스트 자료」에 남는다(U3 NFR 설계 Q1 A). PDF를 쓰지 않는 구성(`pdf`를 넘기지 않음)은 탭 줄 없이 텍스트 자료만 보인다. 탭 모양은 이 폴더 CSS에서 공용 탭 줄 CSS로 옮겼고, #632([#632 팀장 결정](https://github.com/JminAILab/CatchU/issues/632#issuecomment-7123841889))부터 「발행본 자료」의 프리셋 탭과 같은 새 모양이다(열린 탭은 위쪽 띠·굵기·색, 닫힌 탭은 마우스 올림 바탕). 키보드 조작과 전환 취소 때 탭·초점 유지는 그대로다. 기준: [U8 기능 명세](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/functional-spec.md) W1·W4, [화면 컴포넌트](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/functional-design/frontend-components.md), [보안 설계](../../../../aidlc/spaces/default/intents/260925-intent-12/construction/u8-pdf-materials/nfr-design/security-design.md) §2. api는 [PDF 자료 문서](../../../../api/docs/pdf-materials.md)에 있다.
 
 ### 파일
 
@@ -71,7 +73,7 @@
 - 201이고 응답 모양이 맞을 때만 목록 맨 위에 "글 추출 중"으로 더한다. 실패하면 "올리지 못했습니다"와 이유를 보이고 고른 파일·제목을 그대로 둔다. 올리는 중에는 다시 보내지 않는다.
 - 목록은 20개씩 읽고 [더 보기]로 잇는다. 줄마다 제목·크기·상태 배지(글 추출 중 / 완료 n쪽 / 실패 + 사유별 안내)를 보인다. 조회 실패를 0건으로 보이지 않는다.
 - **추출 상태는 자동으로 다시 읽지 않는다.** [새로고침]을 눌러야 바뀐다(폴링 없음). 실패한 PDF를 다시 추출하는 단추는 없고 새로 올린다.
-- [원본 보기]는 공용 PDF 뷰어로 화면 안에 연다. 삭제는 확인 뒤 204일 때만 목록에서 빼고, 실패하면 "삭제되지 않았습니다"와 이유를 그 줄에 보인다. 이미 발행한 사본은 남는다.
+- [원본 보기]는 공용 PDF 뷰어로 화면 안에 연다. 삭제는 확인 뒤 204일 때만 목록에서 빼고, 실패하면 "삭제되지 않았습니다"와 이유를 그 줄에 보인다. 이미 발행한 사본은 남는다. 확인 문장(`PDF_DELETE_CONFIRM`)은 「이 PDF를 삭제할까요? 이미 발행한 사본은 그대로 남고, 삭제한 PDF는 되살릴 수 없습니다. 프리셋에 담겨 있으면 거기서도 빠집니다.」다(끝 문장은 발행 프리셋 U3 BR5.2, AC4.1.4).
 - 회원 요청(올리기·원본·작성자 사본)의 토큰은 `api.member`와 같은 쪽을 쓴다. 공통 인증을 켠 빌드(제품 기본)는 공통 인증 상태의 실제 토큰을 붙이고, 회원 인증 401이면 세션을 한 번 갱신해 조회만 다시 보낸다(올리기는 다시 보내지 않는다). 응답을 기다리거나 갱신하는 사이 다른 계정으로 로그인했으면 갱신하지 않고 다시 보내지 않는다(`api.member`와 같은 인증 세대 비교, #537 리뷰). 끈 빌드는 메모리 토큰을 붙이고 401이면 그 토큰을 지운다. 켠 빌드의 메모리 토큰 저장소에는 실제 토큰이 아니라 회원 화면 범위 표시값이 들어 있으므로 그 값을 싣지 않는다(#536 리뷰). 토큰을 주소 쿼리에 넣지 않는다. 제목은 React 텍스트로만 그린다.
 - 추출이 끝난 PDF를 발행본에 넣는 것은 [발행 화면](../publications/README.md)에서 한다.
 

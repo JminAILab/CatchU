@@ -25,7 +25,8 @@ const TOKEN = "u10-c11-synthetic-link";
 const BASE = `/public/links/${TOKEN}`;
 const now = "2026-11-06T08:00:00.000Z";
 const publication = { title: "C11 합성 발행본", publishedAt: now, expiresAt: "2027-02-04T08:00:00.000Z",
-  items: [{ publishedItemId: ITEM, position: 0, itemKind: "TEXT_MATERIAL", title: "합성 자료", snapshot: { body: "앞말 합성 근거 뒷말" } }] };
+  // 발행 프리셋 U3: 사본 항목마다 프리셋 칸(계약 P-3)이 있다.
+  items: [{ publishedItemId: ITEM, position: 0, presetOrdinal: 1, presetName: "합성 프리셋", itemKind: "TEXT_MATERIAL", title: "합성 자료", snapshot: { body: "앞말 합성 근거 뒷말" } }] };
 const location = { publishedItemId: ITEM, fieldPath: "body", charStart: 3, charEnd: 8, pdfPage: null };
 const cited = { kind: "CITED", text: "자료에 표시된 합성 내용", jdRole: "EVIDENCE",
   citations: [{ sourceId: ITEM, sourceLabel: "합성 자료", quote: "합성 근거", location }] };
@@ -81,7 +82,8 @@ test("C11 4번 자리는 실제 U10 wrapper에 다섯 props를 전달하고 비�
   const s = setup({ loggedIn: false });
   const props = { ...s.context, showEvidence() {} };
   const tree = RecipientPublicationView(viewProps(ready(), props));
-  const slots = findElement(tree, (node) => typeof node.type === "function" && node.type.name === "RecipientSlots");
+  // 발행 프리셋 U3에서 자리 부품을 2번(SummarySlot)과 3·4번(QuestionSlots)으로 나눴다. 4번 자리는 QuestionSlots 안이다.
+  const slots = findElement(tree, (node) => typeof node.type === "function" && node.type.name === "QuestionSlots");
   const panel = findElement(slots.type(slots.props), (node) => node.type === JdRecipientPanel);
   for (const key of ["token", "getGrant", "onAccessLost", "isLoggedIn", "showEvidence"]) assert.equal(panel.props[key], props[key]);
   assert.equal(panel.key, TOKEN);

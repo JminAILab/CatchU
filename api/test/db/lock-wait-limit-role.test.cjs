@@ -15,7 +15,7 @@ const {
   APP_LOCK_TIMEOUT, APP_LOCK_TIMEOUT_MS, NO_ROLE_PRIVILEGE, assertCapWait, cleanUpLocks, createLockWaitRoles,
   holdAdvisory, holdRow, sleepUntil, summarize, timed, waitUntilBlocked, withAppAccount,
 } = require('../support/lock-wait-limit.cjs');
-const { consent, fakeAiRun, fakeIndexWriter, bindFakes, eligibleCatch, body, catchItem } = require('../publications/support.cjs');
+const { consent, fakeAiRun, fakeIndexWriter, bindFakes, eligibleCatch, presetBody, catchItem } = require('../publications/support.cjs');
 
 // #220: 앱 DB 계정에만 건 잠금 대기 상한(3초, 2026-10-16 합의)을 시험 전용 계정으로 재현한다. 그 계정으로 띄운 실제 앱에서
 // 발행·로그인·세션 갱신/로그아웃의 잠금 대기를 본다. 잠금을 쥐는 쪽은 상한 없는 테스트 DB 계정 연결이다.
@@ -139,14 +139,15 @@ test('시험 전용 계정은 지우면 계정과 DB별 설정이 남지 않는�
   assert.equal(await count('pg_db_role_setting', 'WHERE setrole = ANY($1::oid[])', [oids]), 0);
 });
 
-test('발행: 원본 Catch 행 잠금을 3초 안에 얻지 못하면 500 INTERNAL_ERROR이고 발행본·사본·공개 전환·하루 횟수가 남지 않으며 다시 보내면 201이다 — 앱 계정 3초', async t => {
+test('발행: 원본 Catch 행 잠금을 3초 안에 얻지 못하면 500 INTERNAL_ERROR이고 발행본·사본·하루 횟수가 남지 않으며 다시 보내면 201이다 — 앱 계정 3초', async t => {
   if (!ready(t)) return;
   const user = await login('lock-publish-member');
   await consent(app, user.memberId);
   const unbind = bindFakes(app, { aiRun: fakeAiRun(db), indexWriter: fakeIndexWriter(db) });
   t.after(unbind);
-  const catchId = await eligibleCatch(db, user.memberId, { visibility: 'PRIVATE' });
-  const payload = body([catchItem(catchId)]);
+  // 발행 프리셋 U1: 자료는 프리셋에 담아 발행하고(계약 P-2), 비공개 Catch는 발행되지 않으므로(BR3.6) 공개 Catch를 쓴다.
+  const catchId = await eligibleCatch(db, user.memberId, { visibility: 'PUBLIC' });
+  const payload = await presetBody(db, user.memberId, [catchItem(catchId)]);
   // 발행 트랜잭션은 고른 Catch 행을 FOR UPDATE로 잠근 뒤 사본을 쓴다(성능 설계 「트랜잭션을 짧게」). 그 행을 다른 연결이 쥐고 있다.
   const held = await holdRow(db, 'catch_asset', 'catch_id', catchId);
   let failed;
@@ -155,7 +156,7 @@ test('발행: 원본 Catch 행 잠금을 3초 안에 얻지 못하면 500 INTERN
   assertCapWait(failed.ms, '발행');
   assert.equal(await count('publication'), 0, '발행본이 남지 않는다');
   assert.equal(await count('published_item'), 0, '사본이 남지 않는다');
-  assert.equal((await db.query('SELECT visibility FROM catch_asset WHERE catch_id = $1', [catchId]))[0].visibility, 'PRIVATE', '공개 전환이 남지 않는다');
+  assert.equal((await db.query('SELECT visibility FROM catch_asset WHERE catch_id = $1', [catchId]))[0].visibility, 'PUBLIC', '공개 상태는 그대로다');
   assert.equal(await count('daily_execution_count'), 0, '같은 트랜잭션의 하루 횟수 차감이 되돌아간다');
   const logged = logs.join('\n');
   assert.match(logged, /→ 500 INTERNAL_ERROR/);

@@ -1,0 +1,32 @@
+{
+  "stage": "code-generation",
+  "unit": "u3-reader-views",
+  "version": 1,
+  "writes": [
+    { "path": "web/src/components/tab-strip/" },
+    { "path": "web/src/features/publications/snapshot-jump.ts" },
+    { "path": "web/src/features/publications/publications-api.ts" },
+    { "path": "web/src/features/publications/snapshot-view.tsx" },
+    { "path": "web/src/features/publications/publication-detail-screen.tsx" },
+    { "path": "web/src/features/publications/publication-detail-view.tsx" },
+    { "path": "web/src/features/publications/publications.module.css" },
+    { "path": "web/src/features/publications/README.md" },
+    { "path": "web/src/features/recipient/recipient-api.ts" },
+    { "path": "web/src/features/recipient/recipient-screen.tsx" },
+    { "path": "web/src/features/recipient/recipient-view.tsx" },
+    { "path": "web/src/features/recipient/README.md" },
+    { "path": "web/src/features/materials/materials-screen.tsx" },
+    { "path": "web/src/features/materials/materials-view.tsx" },
+    { "path": "web/src/features/materials/materials.module.css" },
+    { "path": "web/src/features/materials/pdf-materials-api.ts" },
+    { "path": "web/src/features/materials/README.md" },
+    { "path": "web/test/reader-tabs.test.mjs" },
+    { "path": "web/test/recipient.test.mjs" },
+    { "path": "web/test/recipient-pdf.test.mjs" },
+    { "path": "web/test/publications-owner.test.mjs" },
+    { "path": "web/test/materials-screen.test.mjs" },
+    { "path": "web/test/pdf-materials-api.test.mjs" },
+    { "path": "web/test/jd-recipient-binding.test.mjs" },
+    { "path": "web/test/u9-recipient-claude.test.mjs" }
+  ]
+}

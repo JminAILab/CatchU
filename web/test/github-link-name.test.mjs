@@ -5,7 +5,8 @@
 //
 // - 기대: 표의 꼴과 정확히 맞는 주소만 「파일 · 줄 · 판본」·「경로 끝 · 판본」·「커밋 xxxxxxx」·「PR #n」 이름이고, 다른 저장소면 앞에 그 저장소가 붙는다.
 //         질의는 이름에서 무시하고 링크 대상에는 남는다. 경로는 마디마다 풀어 이름에만 쓰고, 풀리지 않는 마디는 원문이며, 제어·서식 문자는 이름에서 지운다.
-//         링크 요소의 href·title은 원래 주소이고 새 탭 속성과 숨은 「(새 탭)」이 있다. 링크 모으기는 글 순서대로이고 같은 주소는 한 번이다.
+//         링크 요소의 href·title은 원래 주소이고 새 탭 속성과 숨은 「(새 탭)」이 있다.
+//         (#634) 편집 화면 링크 목록과 링크 모으기는 없앴다. 면접관 화면이 링크를 찾는 `splitGithubLinks`로 글 속 주소의 범위를 본다.
 // - 실패 조건: 이름이 원래 주소와 다른 곳을 가리킴(다른 저장소인데 앞붙임 없음), 이름에 제어·방향 바꿈 문자가 보임, 포트·표 밖 꼴 주소가 이름으로 바뀜,
 //         링크 대상에서 질의가 빠짐, 이름 계산이 입력 글을 바꿈.
 //
@@ -17,7 +18,11 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
-import { collectLinks, evidenceRepositoryOf, githubLinkName, isOwnCommitLink, ownCommitsOf } from "../src/lib/github-link-name.ts";
+import { evidenceRepositoryOf, githubLinkName, isOwnCommitLink, ownCommitsOf } from "../src/lib/github-link-name.ts";
+import { splitGithubLinks } from "../src/lib/github-source-url.ts";
+
+/** 면접관 화면(사본 보기)이 글에서 링크로 고르는 주소들. */
+const linksIn = (text) => splitGithubLinks(text).filter((segment) => segment.kind === "link").map((segment) => segment.url);
 
 const srcUrl = new URL("../src/", import.meta.url);
 const hooks = registerHooks({
@@ -121,7 +126,7 @@ test("커밋 화면 바뀐 줄 주소는 「커밋 앞 7자 · 바뀐 줄 시작
   assert.equal(name(`${COMMIT}${DIFF}L16-L23`), "커밋 0874001 · 이전 줄 16–23");
   assert.equal(name(`${COMMIT}${DIFF}L7`), "커밋 0874001 · 이전 줄 7");
   assert.equal(name(`${COMMIT}?w=1${DIFF}R16-R23`), "커밋 0874001 · 바뀐 줄 16–23", "질의는 이름에서 무시한다");
-  assert.deepEqual(collectLinks([`${COMMIT}${DIFF}R16-R23 SET_TOKEN.ts 토큰 저장 순서`]), [`${COMMIT}${DIFF}R16-R23`], "글 속 주소는 조각까지 한 링크다");
+  assert.deepEqual(linksIn(`${COMMIT}${DIFF}R16-R23 SET_TOKEN.ts 토큰 저장 순서`), [`${COMMIT}${DIFF}R16-R23`], "글 속 주소는 조각까지 한 링크다");
 });
 
 test("커밋 화면 주소라도 L·R이 섞인 범위, 줄 번호 없는 #diff-…, 64자가 아닌 파일 자리는 주소 전체다", () => {
@@ -152,23 +157,18 @@ test("근거 저장소는 GitHub 주소인 첫 근거 주소의 소유자/저장
   assert.equal(evidenceRepositoryOf(["https://github.com/o"]), null);
 });
 
-test("AC2.3.3 링크 모으기는 칸 순서대로이고 같은 주소는 한 번만 둔다", () => {
-  const commit = "https://github.com/o/r/commit/ba6bba8";
-  const file = "https://github.com/o/r/blob/ba6bba8/a.ts#L3";
-  assert.deepEqual(collectLinks([`맡은 부분 ${commit}`, "", `${file} 메모\n${commit} 관련 커밋.`]), [commit, file]);
-  assert.deepEqual(collectLinks(["링크 없음", "http://github.com/o/r"]), []);
-});
-
 test("AC2.3.2 한글 파일 이름을 인코딩하지 않은 주소는 한글 앞에서 끊겨 폴더까지의 이름으로 보인다", () => {
-  const [cut] = collectLinks(["https://github.com/o/r/blob/ba6bba8/src/한글.ts#L3"]);
+  const [cut] = linksIn("https://github.com/o/r/blob/ba6bba8/src/한글.ts#L3");
   assert.equal(cut, "https://github.com/o/r/blob/ba6bba8/src/");
   assert.equal(name(cut), "src · 판본 ba6bba8");
 });
 
-test("AC2.2.10(앞부분) 이름 계산과 링크 모으기는 입력 글을 바꾸지 않는다", () => {
+test("AC2.2.10(앞부분) 링크 찾기와 이름 계산은 입력 글을 바꾸지 않는다", () => {
   const texts = Object.freeze(["https://github.com/o/r/blob/ba6bba8/a.ts?plain=1#L3 와 https://github.com/other/lib/pull/1"]);
   const before = texts[0];
-  for (const url of collectLinks(texts)) githubLinkName(url, "o/r");
+  const links = linksIn(texts[0]);
+  assert.equal(links.length, 2);
+  for (const url of links) githubLinkName(url, "o/r");
   assert.equal(texts[0], before);
 });
 
