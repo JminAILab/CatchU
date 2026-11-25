@@ -71,7 +71,8 @@ export function ClaudeAnalyzePanelView({ expanded, sentence, copyResult, onPress
             {CLAUDE_ANALYZE_TEXT.steps.map((step) => <li key={step}>{step}</li>)}
           </ol>
           <p data-testid="claude-analyze-caution"><strong>{CLAUDE_ANALYZE_TEXT.caution}</strong></p>
-          <p><Link href={routes.profileClaude} data-testid="claude-analyze-profile-link">{CLAUDE_ANALYZE_TEXT.profileLink}</Link></p>
+          <p><Link href={routes.profileClaude} target="_blank" rel="noopener noreferrer" aria-label="Claude 연결 화면 열기 (새 탭에서 열림)"
+            data-testid="claude-analyze-profile-link">{CLAUDE_ANALYZE_TEXT.profileLink}</Link></p>
           <p data-testid="claude-analyze-sentence">{sentence}</p>
         </>
       )}

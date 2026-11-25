@@ -7,6 +7,7 @@ import { decideAuthGate, type ReauthNoticeProps } from "@/lib/auth-gate";
 import { authRuntime } from "@/lib/auth-runtime";
 import { loginPath, decideMemberEntry, safeNextPath } from "@/lib/member-navigation";
 import { routes } from "@/lib/routes";
+import { afterRecipientProfileSetup } from "@/lib/recipient-login-return";
 import { useAuth, useEnsureRestored, useLastScopeGeneration } from "./use-auth";
 import { useSessionMemberLookup } from "./use-session-member-lookup";
 import styles from "./auth.module.css";
@@ -40,7 +41,7 @@ export function SessionMemberGuard({ children, renderReauthNotice }: {
   useEffect(() => {
     if (gate.action === "to-login") router.replace(loginPath(`${pathname}${window.location.search}`));
     else if (gate.action === "to-landing") router.replace(routes.landing);
-    else if (redirectTo) router.replace(redirectTo);
+    else if (redirectTo) router.replace(pathname === routes.profileSetup && redirectTo === routes.home ? afterRecipientProfileSetup() : redirectTo);
   }, [gate.action, redirectTo, pathname, router]);
 
   if (gate.action === "relogin-only") {

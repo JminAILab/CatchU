@@ -2,6 +2,7 @@
 
 import { authRuntime } from "@/lib/auth-runtime";
 import { lookupMemberWithAuth } from "@/lib/member-lookup";
+import { afterRecipientAwareLogin, recipientRetryLoginPath } from "@/lib/recipient-login-return";
 import { GoogleCallbackScreen } from "./google-callback-screen";
 
 /**
@@ -14,6 +15,8 @@ export function SessionGoogleCallback() {
       readGoogleCallback={(query) => authRuntime().google.readGoogleCallback(query)}
       completeGoogleLogin={(input) => authRuntime().google.completeGoogleLogin(input)}
       lookupMember={() => lookupMemberWithAuth(authRuntime().api.member)}
+      afterLogin={afterRecipientAwareLogin}
+      retryLogin={recipientRetryLoginPath}
     />
   );
 }

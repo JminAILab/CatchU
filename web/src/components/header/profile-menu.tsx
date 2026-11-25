@@ -14,6 +14,8 @@ type ProfileMenuProps = {
   onLogout?: () => void;
   /** 로그아웃 진행 중이면 [로그아웃]을 막고 진행을 표시한다(#287). 주지 않으면 기존과 같다. */
   logoutPending?: boolean;
+  /** 결과를 확인하지 못한 로그아웃은 안내의 재시도로만 다시 보낸다(#638). */
+  logoutDisabled?: boolean;
 };
 
 /**
@@ -25,7 +27,7 @@ type ProfileMenuProps = {
  * - [로그아웃]을 누르면 메뉴를 닫고 [프로필] 버튼으로 초점을 돌린 뒤 로그아웃을 요청한다. 열린 메뉴가 로그아웃 실패·불명 안내의
  *   [다시 시도]를 가리지 않게 하기 위해서다(#287, [#311 리뷰](https://github.com/JminAILab/CatchU/pull/311#pullrequestreview-5543242144)).
  */
-export function ProfileMenu({ onLogout, logoutPending = false }: ProfileMenuProps) {
+export function ProfileMenu({ onLogout, logoutPending = false, logoutDisabled = false }: ProfileMenuProps) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -80,7 +82,7 @@ export function ProfileMenu({ onLogout, logoutPending = false }: ProfileMenuProp
                 buttonRef.current?.focus();
                 onLogout();
               }}
-              disabled={logoutPending}
+              disabled={logoutPending || logoutDisabled}
               aria-busy={logoutPending}
             >
               {logoutPending ? authScreenMessages.logoutPending : "로그아웃"}

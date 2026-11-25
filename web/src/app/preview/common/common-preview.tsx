@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { GuestHeader } from "@/components/header/guest-header";
 import { MemberHeader } from "@/components/header/member-header";
-import { RecipientHeader } from "@/components/header/recipient-header";
+import { RecipientHeaderView } from "@/components/header/recipient-header-view";
 import { EmptyState, LoadingState, LookupFailedState } from "@/components/status/status";
 import styles from "./preview.module.css";
 
@@ -33,8 +33,19 @@ export function CommonPreview() {
       </section>
 
       <section className={styles.section} aria-labelledby="preview-recipient">
-        <h2 id="preview-recipient">수신자 헤더 (로그인 여부 무관)</h2>
-        <RecipientHeader />
+        <h2 id="preview-recipient">수신자 헤더 — 모의 로그인 전</h2>
+        <RecipientHeaderView status="signed-out" onLogin={() => setLog("수신자 로그인 요청(모의)")} />
+      </section>
+
+      <section className={styles.section} aria-labelledby="preview-recipient-checking">
+        <h2 id="preview-recipient-checking">수신자 헤더 — 모의 로그인 확인 중</h2>
+        <RecipientHeaderView status="checking" onLogin={() => setLog("수신자 로그인 요청(모의)")} />
+      </section>
+
+      <section className={styles.section} aria-labelledby="preview-recipient-signed-in">
+        <h2 id="preview-recipient-signed-in">수신자 헤더 — 모의 로그인 뒤</h2>
+        <RecipientHeaderView status="signed-in" onLogin={() => setLog("수신자 로그인 요청(모의)")} onLogout={() => setLog("수신자 로그아웃 요청(모의)")} />
+        <p className={styles.caption}>세 상태 모두 실제 세션 확인·API 호출 없이 표시합니다. 마지막 동작: {log}</p>
       </section>
 
       <section className={styles.section} aria-labelledby="preview-status">
