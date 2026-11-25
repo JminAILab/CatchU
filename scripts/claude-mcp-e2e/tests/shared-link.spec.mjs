@@ -1,7 +1,8 @@
 // 흐름 나(받은 링크, U9). #594 완료 기준 「흐름 나」를 확인한다.
-// 회원 A가 화면에서 텍스트 자료를 비밀번호 없는 링크로 발행한다 → 받은 사람 화면의 「Claude에서 분석하기」가 링크 주소와
-// 지시를 따르지 말라는 문장을 복사한다 → 회원 B의 합성 Claude가 그 링크로 A의 본문을 읽는다 → A가 화면에서 링크를 중지한 뒤에는
-// 같은 호출이 LINK_UNAVAILABLE이다. Claude 자리는 공식 SDK로 만든 합성 MCP 클라이언트이며, 실제 Claude 연결의 증거가 아니다.
+// 회원 A가 화면에서 텍스트 자료를 저장하고, 프리셋 화면에서 그 자료를 담은 새 프리셋을 저장한 뒤, 발행 화면에서 그 프리셋을 골라 비밀번호 없는
+// 링크로 발행한다(발행은 프리셋으로만 한다, #597) → 받은 사람 화면의 「Claude에서 분석하기」가 링크 주소와 지시를 따르지 말라는 문장을 복사한다
+// → 회원 B의 합성 Claude가 그 링크로 A의 본문을 읽는다 → A가 화면에서 링크를 중지한 뒤에는 같은 호출이 LINK_UNAVAILABLE이다.
+// Claude 자리는 공식 SDK로 만든 합성 MCP 클라이언트이며, 실제 Claude 연결의 증거가 아니다.
 // 기대값을 비교할 때 토큰·링크 주소·응답 글을 출력하지 않는다(값 대신 참·거짓만 비교한다).
 import { expect, test } from '@playwright/test';
 import { connectWithSdk, sdkClient, toolErrorCode, toolJson } from '../lib/api-support.mjs';
@@ -19,6 +20,7 @@ test('흐름 나: A가 화면에서 발행한 링크를 B의 합성 Claude가 �
   const run = settings.runId;
   const materialTitle = `[합성] 받은 링크 자료 ${run}`;
   const materialBody = `[합성] 받은 링크 본문 ${run}\n이 글은 E2E 시험용 합성 자료입니다.`;
+  const presetName = `[합성] 받은 링크 프리셋 ${run}`;
   const publicationTitle = `[합성] 받은 링크 ${run}`;
   const authorContext = await browser.newContext();
   const recipientContext = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
@@ -41,13 +43,27 @@ test('흐름 나: A가 화면에서 발행한 링크를 B의 합성 Claude가 �
       await expect(author.getByRole('status').filter({ hasText: '저장됨' })).toBeVisible();
     });
 
-    await step('A가 그 자료를 비밀번호 없는 링크로 발행한다', async () => {
+    await step('A가 프리셋 화면에서 새 프리셋에 그 자료를 담아 저장한다', async () => {
+      await author.getByRole('navigation', { name: '주요 메뉴' }).getByRole('link', { name: '프리셋', exact: true }).click();
+      await expect(author.getByRole('heading', { level: 1, name: '프리셋', exact: true })).toBeVisible();
+      await author.getByRole('button', { name: '새 프리셋', exact: true }).click();
+      await expect(author.getByRole('heading', { level: 1, name: '프리셋 만들기', exact: true })).toBeVisible();
+      await author.getByRole('textbox', { name: '프리셋 이름', exact: true }).fill(presetName);
+      await author.getByRole('region', { name: '자료 구성하기', exact: true }).getByRole('checkbox', { name: materialTitle, exact: true }).check();
+      await author.getByRole('button', { name: '저장', exact: true }).click();
+      // 첫 저장 뒤에는 그 프리셋의 수정 주소로 옮겨, 「프리셋 수정」 화면에 「저장했습니다.」가 보인다.
+      await expect(author.getByRole('heading', { level: 1, name: '프리셋 수정', exact: true })).toBeVisible();
+      await expect(author.getByRole('status').filter({ hasText: '저장했습니다.' })).toBeVisible();
+    });
+
+    await step('A가 발행 화면의 「프리셋 고르기」에서 그 프리셋을 골라 비밀번호 없는 링크로 발행한다', async () => {
       await author.getByRole('navigation', { name: '주요 메뉴' }).getByRole('link', { name: '발행본', exact: true }).click();
       await author.getByRole('link', { name: '새로 발행', exact: true }).click();
       await expect(author.getByRole('heading', { level: 1, name: '발행', exact: true })).toBeVisible();
-      const option = author.getByRole('button', { name: materialTitle, exact: true });
-      await option.click();
-      await expect(option).toHaveAttribute('aria-pressed', 'true');
+      // 프리셋 체크박스는 줄 전체가 이름표라 접근 이름에 프리셋 이름 뒤 「항목 N개 · M자」까지 들어 있다(web pick-parts.tsx PickCheckbox).
+      // 그래서 프리셋 이름이 글자 그대로 보이는 줄을 찾아 그 줄의 체크박스를 고른다.
+      await author.getByRole('region', { name: '프리셋 고르기', exact: true }).getByRole('listitem')
+        .filter({ has: author.getByText(presetName, { exact: true }) }).getByRole('checkbox').check();
       await author.getByLabel('발행본 제목').fill(publicationTitle);
       await expect(author.getByRole('checkbox', { name: '비밀번호 사용' })).not.toBeChecked();
       await author.getByRole('button', { name: '다음: 발행 내용 확인' }).click();

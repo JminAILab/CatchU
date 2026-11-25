@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { presetEditPath, routes } from "@/lib/routes";
 import { useUnsavedTraverseGuard } from "@/lib/unsaved-traverse-guard";
 import { createViewStore } from "@/lib/view-store";
+import { moveItem } from "@/features/publications/reorder";
 import { createCatchApi, type CatchApi } from "@/features/assets/catch-api";
 import { createRepositoryOptionsStore } from "@/features/assets/repository-options-store";
 import { createMaterialsApi, type MaterialsApi } from "@/features/materials/materials-api";
@@ -300,14 +301,12 @@ export function createPresetEditorModel(client: PresetEditorClients, initialPres
       : { ...prev, items: prev.items.filter((_, i) => i !== index), dirty: true, status: changed(prev.status) });
   }
 
-  function move(index: number, delta: -1 | 1) {
+  /** 순서 목록의 드래그·「순서 직접 지정」(#632). `from` 자리의 자료를 `to` 자리로 옮긴다. 저장 중이거나 자리가 틀리면 그대로다. */
+  function move(from: number, to: number) {
     if (!editable()) return;
     store.set((prev) => {
-      const target = index + delta;
-      if (index < 0 || index >= prev.items.length || target < 0 || target >= prev.items.length) return prev;
-      const items = [...prev.items];
-      [items[index], items[target]] = [items[target], items[index]];
-      return { ...prev, items, dirty: true, status: changed(prev.status) };
+      const items = moveItem(prev.items, from, to);
+      return items === null ? prev : { ...prev, items, dirty: true, status: changed(prev.status) };
     });
   }
 
@@ -414,8 +413,7 @@ export function createPresetEditorModel(client: PresetEditorClients, initialPres
     loadMorePdfs: pdfs.loadMore,
     reloadAfterSave: async () => { const { presetId } = store.get(); if (presetId !== null) await reconcileAfterSave(presetId); },
     setWrittenOnly, setName, toggle, remove: removeItem,
-    moveUp: (index: number) => move(index, -1),
-    moveDown: (index: number) => move(index, 1),
+    move,
     save, deletePreset,
     isDirty: () => { const s = store.get(); return s.dirty && !s.left; },
     dispose: () => {
@@ -463,7 +461,7 @@ export function PresetEditorScreen({ api: client, presetId, deps }: { api: Prese
       onMoreCatches={() => { void model.loadMoreCatches(); }}
       onMoreMaterials={() => { void model.loadMoreMaterials(); }}
       onMorePdfs={() => { void model.loadMorePdfs(); }}
-      onToggle={model.toggle} onMoveUp={model.moveUp} onMoveDown={model.moveDown} onRemove={model.remove}
+      onToggle={model.toggle} onMove={model.move} onRemove={model.remove}
       onSave={() => { void model.save(); }} onDelete={() => { void model.deletePreset(); }}
       onReloadAfterSave={() => { void model.reloadAfterSave(); }} />
   );

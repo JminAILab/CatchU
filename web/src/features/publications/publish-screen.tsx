@@ -16,6 +16,7 @@ import {
   blockedSourceLines, createPublicationsApi, presetBlockReason, publishDraftErrors, publishFailureLines, publishOutcome, PUBLISH_LIMITS,
   type PublicationsApi, type PublishedLink, type PublishFailure, type PublishRequest,
 } from "./publications-api";
+import { moveItem } from "./reorder";
 import { PresetPickerView, PublishConfirmView, PublishDoneView, PublishFormView, SelectedPresetsView, type StatusLines } from "./publish-view";
 import styles from "./publications.module.css";
 
@@ -138,13 +139,12 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
       : { ...prev, selected: prev.selected.filter((_, i) => i !== index), status: clearInvalid(prev.status) });
   }
 
-  function move(index: number, delta: -1 | 1) {
+  /** 「고른 프리셋과 순서」의 드래그·「순서 직접 지정」(#632). 발행 중이거나 자리가 틀리면 그대로다. */
+  function move(from: number, to: number) {
     if (!editable()) return;
     store.set((prev) => {
-      const target = index + delta;
-      if (index < 0 || index >= prev.selected.length || target < 0 || target >= prev.selected.length) return prev;
-      const selected = [...prev.selected];
-      [selected[index], selected[target]] = [selected[target], selected[index]];
+      const selected = moveItem(prev.selected, from, to);
+      if (selected === null) return prev;
       return { ...prev, selected };
     });
   }
@@ -236,8 +236,7 @@ export function createPublishModel(client: PublishClients, consent: ConsentRunne
     open: () => loadPresets().then(() => undefined),
     loadPresets: () => loadPresets().then(() => undefined),
     togglePreset, remove,
-    moveUp: (index: number) => move(index, -1),
-    moveDown: (index: number) => move(index, 1),
+    move,
     setTitle: (title: string) => setField({ title }),
     setUsePassword: (usePassword: boolean) => setField(usePassword ? { usePassword } : { usePassword, password: "" }),
     setPassword: (password: string) => setField({ password }),
@@ -304,7 +303,7 @@ export function PublishScreen({ api: client, deps, consent }: { api: PublishClie
               onRetry={() => { void model.loadPresets(); }} onToggle={model.togglePreset} />
             <div className={styles.column}>
               <SelectedPresetsView presets={view.selected} disabled={submitting}
-                onMoveUp={model.moveUp} onMoveDown={model.moveDown} onRemove={model.remove} />
+                onMove={model.move} onRemove={model.remove} />
               <PublishFormView title={view.title} usePassword={view.usePassword} password={view.password} disabled={submitting} statusLines={statusLines}
                 onTitle={model.setTitle} onUsePassword={model.setUsePassword} onPassword={model.setPassword} onNext={() => { model.toConfirm(); }} />
             </div>

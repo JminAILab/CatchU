@@ -12,13 +12,17 @@ export type PresetsListViewProps = {
   onNew: () => void;
 };
 
-/** 목록 한 줄의 보조 줄(M2): 「항목 N개 · M자」, 발행할 수 없는 자료 수와 상한 넘음을 글자로 붙인다(BR2.1, NFR1). */
-export function presetSummaryLine(preset: PresetSummary): string {
+export const LIST_LEAD_TEXT = "저장한 묶음을 확인하고 발행에 사용할 구성을 관리하세요.";
+
+/**
+ * 목록 한 줄의 주의 표시(M2, BR2.1, NFR1): 발행할 수 없는 자료 수와 상한 넘음. #632부터 보조 줄 뒤에 주의 표시로 따로 그린다.
+ * 글자는 그대로이고 색만으로 구분하지 않는다.
+ */
+export function presetWarnings(preset: PresetSummary): string[] {
   return [
-    itemsLine(preset.itemCount, preset.textLength),
     preset.unpublishableCount > 0 ? `발행할 수 없는 자료 ${formatCount(preset.unpublishableCount)}개` : null,
     preset.overLimit ? "상한을 넘었습니다" : null,
-  ].filter((part): part is string => part !== null).join(" · ");
+  ].filter((part): part is string => part !== null);
 }
 
 /**
@@ -30,7 +34,10 @@ export function PresetsListView(props: PresetsListViewProps) {
   return (
     <main className={styles.page}>
       <div className={styles.listHeading}>
-        <h1>프리셋</h1>
+        <div>
+          <h1>프리셋</h1>
+          <p className={styles.leadTight}>{LIST_LEAD_TEXT}</p>
+        </div>
         <button type="button" className={styles.primaryButton} data-testid="presets-new-button" disabled={full}
           aria-describedby={full ? "presets-full-notice" : undefined} onClick={props.onNew}>새 프리셋</button>
       </div>
@@ -46,12 +53,17 @@ export function PresetsListView(props: PresetsListViewProps) {
           )
           : props.presets.length === 0 ? <p data-testid="presets-empty">아직 만든 프리셋이 없습니다. [새 프리셋]으로 만들어 보세요.</p>
           : (
-            <ul className={styles.items}>
+            <ul className={styles.presetRows}>
               {props.presets.map((preset) => (
-                <li key={preset.presetId} className={styles.row} data-testid="preset-row" data-preset-id={preset.presetId}>
-                  <p className={styles.itemTitle} data-testid="preset-row-name">{preset.name}</p>
-                  <p className={styles.small} data-testid="preset-row-summary">{presetSummaryLine(preset)}</p>
-                  <Link href={presetEditPath(preset.presetId)} aria-label={`${preset.name} 고치기`} data-testid="preset-row-edit">고치기</Link>
+                <li key={preset.presetId} className={styles.presetRow} data-testid="preset-row" data-preset-id={preset.presetId}>
+                  <div>
+                    <p className={styles.presetRowName} data-testid="preset-row-name">{preset.name}</p>
+                    <p className={styles.presetRowSummary} data-testid="preset-row-summary">
+                      <span>{itemsLine(preset.itemCount, preset.textLength)}</span>
+                      {presetWarnings(preset).map((text) => <span key={text} className={styles.warnChip} data-testid="preset-row-warning">{text}</span>)}
+                    </p>
+                  </div>
+                  <Link href={presetEditPath(preset.presetId)} className={styles.smallButton} aria-label={`${preset.name} 수정`} data-testid="preset-row-edit">수정</Link>
                 </li>
               ))}
             </ul>

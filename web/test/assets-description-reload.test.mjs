@@ -77,7 +77,7 @@ async function failedDetailWithEditor(typed) {
   };
   const editor = createDescriptionEditorModel(item.catchId, descriptions, { session: () => "session-a" });
   await editor.load();
-  // 새 Catch NC1: 편집은 8칸이다. 옛 글은 「더 쓰기」 칸에 열린다.
+  // 새 Catch NC1·#634: 칸 제목 줄이 없는 옛 글은 「더 쓰기」 칸에 열리고, 저장된 글이 있어 그 칸이 편집 화면에 보인다.
   if (typed !== undefined) editor.change("더 쓰기", typed);
   const registry = createUnsavedRegistry();
   registry.register(() => isDescriptionDirty(editor.store.get().edit));

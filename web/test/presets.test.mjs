@@ -38,10 +38,10 @@ const {
 } = presetsApi;
 const { createCatchApi } = await load("features/assets/catch-api.ts");
 const { MemberHeader } = await load("components/header/member-header.tsx");
-const { PresetsListView, presetSummaryLine } = await load("features/presets/presets-list-view.tsx");
+const { PresetsListView, presetWarnings, LIST_LEAD_TEXT } = await load("features/presets/presets-list-view.tsx");
 const { createPresetsListModel } = await load("features/presets/presets-list-screen.tsx");
 const { createPresetEditorModel, createSavedNoticeHandOff } = await load("features/presets/preset-editor-screen.tsx");
-const { PresetEditorView, LINK_NOTICE_TEXT, OVER_LIMIT_TEXT, LENGTH_UNKNOWN_TEXT } = await load("features/presets/preset-editor-view.tsx");
+const { PresetEditorView, LINK_NOTICE_TEXT, OVER_LIMIT_TEXT, LENGTH_UNKNOWN_TEXT, NAME_HELP_TEXT, EDITOR_LEAD_TEXT, ORDER_NOTES, itemsMetaLine } = await load("features/presets/preset-editor-view.tsx");
 const { UNSAVED_MESSAGE } = await load("features/profile/use-unsaved-guard.ts");
 
 const P1 = "11111111-1111-4111-8111-111111111111";
@@ -138,10 +138,13 @@ async function openEditor(responses = {}, { presetId = null, deps = editorDeps()
 const noop = () => {};
 const editorHtml = (model, repositories = []) => renderToStaticMarkup(createElement(PresetEditorView, {
   state: model.store.get(), repositories, onRetryDetail: noop, onName: noop, onWrittenOnly: noop, onRetrySources: noop, onMoreCatches: noop,
-  onMoreMaterials: noop, onMorePdfs: noop, onToggle: noop, onMoveUp: noop, onMoveDown: noop, onRemove: noop, onSave: noop, onDelete: noop,
+  onMoreMaterials: noop, onMorePdfs: noop, onToggle: noop, onMove: noop, onRemove: noop, onSave: noop, onDelete: noop,
   onReloadAfterSave: noop,
 }));
-const optionOf = (html, id) => new RegExp(`<button[^>]*data-source-id="${id}"[^>]*>.*?</button>`, "s").exec(html)?.[0] ?? "";
+// #632: 고르기 한 줄은 이름표(label)로 감싼 체크박스다. 줄 전체(체크박스·이름·보조 줄·이유)를 꺼낸다.
+const optionOf = (html, id) => new RegExp(`<label[^>]*><input[^>]*data-source-id="${id}"[^>]*/>.*?</label>`, "s").exec(html)?.[0] ?? "";
+/** 줄의 체크박스 태그. */
+const boxOf = (html, id) => /<input[^>]*\/>/.exec(optionOf(html, id))?.[0] ?? "";
 const listHtml = (state, presets = []) => renderToStaticMarkup(createElement(PresetsListView, { state, presets, onRetry: noop, onNew: noop }));
 
 // ── 프리셋 호출 ────────────────────────────────────────────────────────────────────────────────────────────
@@ -290,21 +293,26 @@ test("BR2.2 목록 화면: 불러오는 중·없음·실패를 다른 글로 보
   assert.match(failed, /<h1>프리셋<\/h1>/);
 });
 
-test("BR2.1·NFR1 목록 줄: 이름·「항목 N개 · M자」(쉼표)·발행할 수 없는 자료 수·상한 넘음을 글자로, <고치기>는 링크이고 읽히는 이름이 「(이름) 고치기」다", () => {
+test("BR2.1·NFR1 목록 줄: 이름·「항목 N개 · M자」(쉼표)와 발행할 수 없는 자료 수·상한 넘음 주의 표시를 글자로, <수정>은 링크이고 읽히는 이름이 「(이름) 수정」이다", () => {
   const presets = [
     summary(P1, { unpublishableCount: 1, unpublishableItems: [{ kind: "CATCH", sourceId: C1, title: "Catch C", reason: "PRIVATE" }] }),
     summary(P2, { name: "<b>x</b>", itemCount: 20, textLength: 61_200, overLimit: true }),
   ];
-  assert.equal(presetSummaryLine(presets[0]), "항목 4개 · 12,300자 · 발행할 수 없는 자료 1개");
-  assert.equal(presetSummaryLine(presets[1]), "항목 20개 · 61,200자 · 상한을 넘었습니다");
-  assert.equal(presetSummaryLine(summary(P1, { itemCount: 3, textLength: 8100 })), "항목 3개 · 8,100자");
+  assert.deepEqual(presetWarnings(presets[0]), ["발행할 수 없는 자료 1개"]);
+  assert.deepEqual(presetWarnings(presets[1]), ["상한을 넘었습니다"]);
+  assert.deepEqual(presetWarnings(summary(P1, { itemCount: 3, textLength: 8100 })), []);
   const html = listHtml("ready", presets);
-  assert.deepEqual([...html.matchAll(/data-testid="preset-row-summary">([^<]*)</g)].map((match) => match[1]),
-    ["항목 4개 · 12,300자 · 발행할 수 없는 자료 1개", "항목 20개 · 61,200자 · 상한을 넘었습니다"]);
-  assert.match(html, new RegExp(`<a href="/presets/${P1}" aria-label="자기소개서 고치기" data-testid="preset-row-edit">고치기</a>`));
+  // #632: 보조 줄 뒤에 주의 표시를 따로 그린다. 글자는 그대로이고 색만으로 구분하지 않는다.
+  assert.deepEqual([...html.matchAll(/data-testid="preset-row-summary">(.*?)<\/p>/g)].map((match) => match[1].replace(/<[^>]+>/g, "|").replace(/\|+/g, "|").replace(/^\||\|$/g, "")),
+    ["항목 4개 · 12,300자|발행할 수 없는 자료 1개", "항목 20개 · 61,200자|상한을 넘었습니다"]);
+  assert.equal((html.match(/data-testid="preset-row-warning"/g) ?? []).length, 2);
+  assert.match(html, new RegExp(`<a[^>]*href="/presets/${P1}"[^>]*aria-label="자기소개서 수정"[^>]*data-testid="preset-row-edit"[^>]*>수정</a>`));
   assert.ok(html.includes("&lt;b&gt;x&lt;/b&gt;"), "이름은 글자로만 그린다(BR3.11)");
   assert.doesNotMatch(html, /<b>x<\/b>/);
-  assert.match(html, /aria-label="&lt;b&gt;x&lt;\/b&gt; 고치기"/);
+  assert.match(html, /aria-label="&lt;b&gt;x&lt;\/b&gt; 수정"/);
+  assert.doesNotMatch(html, /고치기/, "#632: 「고치기」는 「수정」으로 바꿨다");
+  assert.ok(html.includes(LIST_LEAD_TEXT));
+  assert.equal(LIST_LEAD_TEXT, "저장한 묶음을 확인하고 발행에 사용할 구성을 관리하세요.");
 });
 
 test("BR2.3 50개면 [새 프리셋] 단추가 disabled이고 막힌 이유를 단추 설명으로 이어 보이며, 49개면 막지 않는다", () => {
@@ -320,7 +328,7 @@ test("BR2.3 50개면 [새 프리셋] 단추가 disabled이고 막힌 이유를 �
 
 // ── 편집: 열기·요청 수 ──────────────────────────────────────────────────────────────────────────────────
 
-test("NFR6.2 고치기 열기: 상세 1 + 저장소 목록 1 + 고르기 목록 3 + 세기 최대 3이고, Catch 목록은 publishable 조건이며 h1은 「프리셋 고치기」다", async () => {
+test("NFR6.2 수정 화면 열기: 상세 1 + 저장소 목록 1 + 고르기 목록 3 + 세기 최대 3이고, Catch 목록은 publishable 조건이며 h1은 「프리셋 수정」이다", async () => {
   const { api, model } = await openEditor({ get: [detailOf([measured("CATCH", C1, 400)])] }, { presetId: P1 });
   assert.deepEqual(["get", "repositories", "catches", "materials", "pdfs"].map((name) => count(api, name)), [1, 1, 1, 1, 1]);
   assert.equal(count(api, "measure"), 3);
@@ -334,22 +342,30 @@ test("NFR6.2 고치기 열기: 상세 1 + 저장소 목록 1 + 고르기 목록 
   assert.equal(state.name, "자기소개서");
   assert.equal(state.dirty, false);
   const html = editorHtml(model);
-  assert.match(html, /<h1>프리셋 고치기<\/h1>/);
+  assert.match(html, /<h1>프리셋 수정<\/h1>/);
   assert.match(html, /data-testid="preset-delete"[^>]*>프리셋 지우기</);
-  assert.match(html, /<a href="\/presets" data-testid="preset-editor-back-link">프리셋 목록으로<\/a>/);
+  // #632: 위쪽 「← 프리셋 목록」(화살표는 읽히지 않음)과 아래 「목록으로」는 둘 다 목록 주소 링크라 저장하지 않은 입력 확인이 걸린다.
+  assert.match(html, /<a[^>]*href="\/presets"[^>]*data-testid="preset-editor-back-link"><span aria-hidden="true">←<\/span>프리셋 목록<\/a>/);
+  assert.match(html, /<a[^>]*href="\/presets"[^>]*data-testid="preset-editor-list-link"[^>]*>목록으로<\/a>/);
+  assert.ok(html.includes(EDITOR_LEAD_TEXT));
   assert.ok(html.includes(LINK_NOTICE_TEXT));
+  assert.equal(LINK_NOTICE_TEXT, "프리셋을 수정해도 이미 보낸 링크는 바뀌지 않습니다.");
+  for (const line of ORDER_NOTES) assert.ok(html.includes(line), line);
+  assert.doesNotMatch(html, /고치기|고쳐/, "#632: 남는 「고치기」도 함께 바꿨다");
+  // 저장 결과 칸 → [저장] → [프리셋 지우기] 순서라 첫 저장 뒤 Tab은 지우기로 간다(#629 리뷰).
+  assert.match(html, /data-testid="preset-editor-list-link".*data-testid="preset-editor-status".*data-testid="preset-save".*data-testid="preset-delete"/s);
   // 담기·빼기·순서는 요청하지 않는다(NFR6.5).
   const before = api.calls.length;
-  model.toggle("CATCH", C2); model.moveUp(1); model.remove(0);
+  model.toggle("CATCH", C2); model.move(1, 0); model.remove(0);
   assert.equal(api.calls.length, before);
 });
 
-test("NFR6.2 새 프리셋 열기: 상세를 부르지 않고 h1은 「새 프리셋」, [프리셋 지우기]가 없으며 고를 수 있는 자료가 없는 쪽은 세지 않는다", async () => {
+test("NFR6.2 새 프리셋 열기: 상세를 부르지 않고 h1은 「프리셋 만들기」, [프리셋 지우기]가 없으며 고를 수 있는 자료가 없는 쪽은 세지 않는다", async () => {
   const { api, model } = await openEditor({ catches: [catchPage([])], pdfs: [pdfPage([pdf(PDF_PENDING, "PENDING")])] });
   assert.equal(count(api, "get"), 0);
   assert.equal(count(api, "measure"), 1, "텍스트 자료 쪽만 센다");
   const html = editorHtml(model);
-  assert.match(html, /<h1>새 프리셋<\/h1>/);
+  assert.match(html, /<h1>프리셋 만들기<\/h1>/);
   assert.doesNotMatch(html, /preset-delete/);
   assert.match(html, /data-testid="preset-items-empty">아직 담은 자료가 없습니다\./);
   assert.match(html, /data-testid="preset-catches-empty"/);
@@ -383,18 +399,18 @@ test("NFR5.2 상세 404는 「프리셋을 찾을 수 없습니다.」와 목록
 
 // ── 편집: 담기·막힘·순서 ───────────────────────────────────────────────────────────────────────────────
 
-test("BR3.3 같은 단추를 두 번 누르면 담겼다가 빠지고 aria-pressed가 바뀌며, 담긴 줄에 종류 표지와 제목이 보인다", async () => {
+test("BR3.3 같은 체크박스를 두 번 누르면 담겼다가 빠지고 체크 상태가 바뀌며, 담긴 줄에 종류 표지와 제목, 상한을 함께 보인 줄이 보인다", async () => {
   const { model } = await openEditor();
   model.toggle("CATCH", C1);
   model.toggle("TEXT_MATERIAL", M1);
   assert.deepEqual(model.store.get().items.map((item) => [item.kind, item.sourceId, item.textLength]), [["CATCH", C1, 1000], ["TEXT_MATERIAL", M1, 1000]]);
   assert.equal(model.store.get().dirty, true);
   let html = editorHtml(model);
-  assert.match(optionOf(html, C1), /aria-pressed="true"/);
-  assert.match(html, /<h2 id="preset-items-title">담긴 자료와 순서 \(항목 2개 · 2,000자\)<\/h2>/);
+  assert.match(boxOf(html, C1), /type="checkbox"[^>]* checked=""/);
+  assert.match(html, /<h2 id="preset-items-title">담긴 자료와 순서<\/h2><p[^>]*data-testid="preset-items-meta">항목 2개 \/ 20개 · 2,000자 \/ 60,000자<\/p>/);
   model.toggle("CATCH", C1);
   html = editorHtml(model);
-  assert.match(optionOf(html, C1), /aria-pressed="false"/);
+  assert.doesNotMatch(boxOf(html, C1), / checked=""/);
   assert.deepEqual(model.store.get().items.map((item) => item.sourceId), [M1]);
   // 추출 중 PDF와 목록에 없는 자료는 담기지 않는다.
   model.toggle("PDF_MATERIAL", PDF_PENDING);
@@ -402,7 +418,7 @@ test("BR3.3 같은 단추를 두 번 누르면 담겼다가 빠지고 aria-press
   assert.equal(model.store.get().items.length, 1);
 });
 
-test("BR3.4 20개를 담으면 안 담긴 단추가 모두 막히고 단추 안에 「항목은 20개까지 담을 수 있습니다」가 보이며 21개째는 담기지 않는다", async () => {
+test("BR3.4 20개를 담으면 안 담긴 체크박스가 모두 막히고 그 줄에 「항목은 20개까지 담을 수 있습니다」가 보이며 21개째는 담기지 않는다", async () => {
   const twenty = Array.from({ length: 20 }, (_, index) => catchAsset(`d${String(index).padStart(7, "0")}-0000-4000-8000-000000000000`));
   const { model } = await openEditor({ catches: [catchPage([...twenty, catchAsset(C1)])], lengths: {} });
   for (const item of twenty) model.toggle("CATCH", item.catchId);
@@ -414,7 +430,7 @@ test("BR3.4 20개를 담으면 안 담긴 단추가 모두 막히고 단추 안�
     assert.match(optionOf(html, id), /disabled=""/, id);
     assert.ok(optionOf(html, id).includes(ITEMS_FULL_TEXT), id);
   }
-  assert.doesNotMatch(optionOf(html, twenty[0].catchId), /disabled=""/, "담긴 단추는 빼야 하므로 막지 않는다");
+  assert.doesNotMatch(optionOf(html, twenty[0].catchId), /disabled=""/, "담긴 체크박스는 빼야 하므로 막지 않는다");
   assert.equal(ITEMS_FULL_TEXT, "항목은 20개까지 담을 수 있습니다");
 });
 
@@ -434,7 +450,7 @@ test("BR3.4 담으면 60,000자를 넘는 자료는 막히고 「전체 글이 6
   assert.doesNotMatch(optionOf(html, M1), /disabled=""/);
   assert.doesNotMatch(optionOf(html, M1), /preset-source-reason/);
   failed.model.toggle("TEXT_MATERIAL", M1);
-  assert.match(editorHtml(failed.model), new RegExp(`담긴 자료와 순서 \\(항목 2개 · ${LENGTH_UNKNOWN_TEXT}\\)`));
+  assert.match(editorHtml(failed.model), new RegExp(`data-testid="preset-items-meta">항목 2개 / 20개 · ${LENGTH_UNKNOWN_TEXT}<`));
 });
 
 test("NFR5.1 세기가 늦으면 단추를 먼저 그리고 글자 이유는 응답 뒤에 붙으며, 그 사이 담은 자료도 응답이 오면 글자 수를 안다", async () => {
@@ -488,18 +504,26 @@ test("NFR 요구 검토 R-02 걸러 보기를 바꾼 뒤 늦게 온 옛 목록�
   assert.equal(model.store.get().lengths[`CATCH:${C3}`], 5);
 });
 
-test("BR3.5 셋째의 [위로]는 둘째로 옮기고, 첫 [위로]·끝 [아래로]는 막히며 읽히는 이름은 「(제목) 위로」 꼴이다", async () => {
+// #632(2026-11-24 팀장 결정): [위로][아래로]를 없애고 손잡이 드래그와 「순서 직접 지정」으로 순서를 바꾼다. 모델은 move(from, to) 하나다.
+// - 기대: from의 자료를 to 자리에 넣는다(사이 자료는 한 칸씩 밀림). 범위 밖·같은 자리는 그대로이고 변경으로 치지 않는다.
+//         순서 목록에 「위로」「아래로」가 없고, 줄마다 손잡이(Tab 순서 밖·낭독기에 숨김)·번호·[빼기]가 있다.
+// - 실패로 보는 것: 두 자리만 맞바뀜, 범위 밖에서 바뀜, 「위로」「아래로」가 남음, 손잡이가 Tab 순서·낭독기에 들어옴.
+test("BR3.5 #632 move는 셋째를 첫째 자리에 넣고 사이 자료를 민다. 범위 밖·같은 자리는 그대로이고, 순서 목록에 「위로」「아래로」가 없다", async () => {
   const { model } = await openEditor();
   model.toggle("CATCH", C1); model.toggle("CATCH", C2); model.toggle("CATCH", C3);
-  model.moveUp(2);
-  assert.deepEqual(model.store.get().items.map((item) => item.sourceId), [C1, C3, C2]);
-  model.moveUp(0); model.moveDown(2);
-  assert.deepEqual(model.store.get().items.map((item) => item.sourceId), [C1, C3, C2], "끝에서 더 옮기지 않는다");
+  model.move(2, 0);
+  assert.deepEqual(model.store.get().items.map((item) => item.sourceId), [C3, C1, C2]);
+  model.move(0, 3); model.move(-1, 0); model.move(1, 1); model.move(0.5, 1);
+  assert.deepEqual(model.store.get().items.map((item) => item.sourceId), [C3, C1, C2], "범위 밖·같은 자리·정수 아님은 그대로다");
   const html = editorHtml(model);
-  assert.match(html, /<button[^>]*data-testid="preset-move-up"[^>]*disabled=""[^>]*aria-label="Catch c1 위로"/);
-  assert.match(html, /<button[^>]*data-testid="preset-move-down"[^>]*disabled=""[^>]*aria-label="Catch c2 아래로"/);
-  assert.match(html, /aria-label="Catch c3 위로"/);
-  assert.deepEqual([...html.matchAll(/data-testid="preset-selected-item" data-source-id="([^"]+)"/g)].map((match) => match[1]), [C1, C3, C2]);
+  assert.doesNotMatch(html, /preset-move-up|preset-move-down|위로|아래로/);
+  assert.match(html, /<ol[^>]*aria-label="담긴 자료와 순서"/);
+  assert.deepEqual([...html.matchAll(/data-testid="preset-selected-item" data-source-id="([^"]+)"/g)].map((match) => match[1]), [C3, C1, C2]);
+  assert.equal((html.match(/<button[^>]*tabindex="-1"[^>]*aria-hidden="true"[^>]*data-testid="preset-order-grip"/g) ?? []).length, 3, "손잡이는 Tab 순서 밖이고 낭독기에 숨긴다");
+  assert.match(html, /aria-label="Catch c3 빼기"/);
+  assert.match(html, /data-testid="preset-order-direct"[^>]*>순서 직접 지정<\/button>/);
+  assert.match(html, /<p role="status"[^>]*data-testid="preset-order-status"><\/p>/, "알림 칸은 늘 그려 둔다");
+  assert.match(html, /<p[^>]*role="alert"[^>]*data-testid="preset-order-error"><\/p>/, "오류 칸은 늘 그려 둔다");
 });
 
 test("BR3.6·BR3.7 상세의 이유 넷은 담긴 줄마다 글자로 남고, 글자 합 61,200이면 머리 안내를 보이되 [저장]은 막지 않는다", async () => {
@@ -515,7 +539,8 @@ test("BR3.6·BR3.7 상세의 이유 넷은 담긴 줄마다 글자로 남고, �
     "작업 사실과 나의 기여를 먼저 확인해야 발행할 수 있습니다", "글 추출이 끝나지 않아 발행할 수 없습니다",
   ]);
   assert.deepEqual(Object.keys(UNPUBLISHABLE_REASON_TEXT).sort(), ["CONFIRMATION_REQUIRED", "EXTRACTION_INCOMPLETE", "PRIVATE", "SOURCE_RESTRICTED"]);
-  assert.match(html, /담긴 자료와 순서 \(항목 4개 · 61,200자\)/);
+  assert.match(html, /data-testid="preset-items-meta">항목 4개 \/ 20개 · 61,200자 \/ 60,000자</);
+  assert.equal(itemsMetaLine([]), "항목 0개 / 20개 · 0자 / 60,000자");
   assert.match(html, new RegExp(`data-testid="preset-over-limit">${OVER_LIMIT_TEXT}<`));
   assert.match(html, /data-testid="preset-save"(?![^>]*disabled)/);
 });
@@ -535,8 +560,9 @@ test("BR3.1 빈 이름·공백만·51자는 요청하지 않고 이름 칸 아�
   const html = editorHtml(model);
   assert.match(html, /<input id="preset-name-input"[^>]*aria-invalid="true"[^>]*aria-describedby="preset-name-help preset-name-error"/);
   assert.match(html, /id="preset-name-error" role="alert"[^>]*>이름을 1~50자로 써 주세요\.</);
-  assert.match(html, /<h2 id="preset-name-title"><label for="preset-name-input">이름<\/label><\/h2>/);
-  assert.match(html, /id="preset-name-help"[^>]*>이 이름이 받은 사람 화면의 탭 이름으로 보입니다\. \(1~50자\)</);
+  assert.match(html, /<h2 id="preset-name-title"[^>]*><label for="preset-name-input">프리셋 이름<\/label><\/h2>/);
+  assert.match(html, /id="preset-name-help"[^>]*>1~50자 · 받은 사람 화면의 탭 이름입니다\.</);
+  assert.equal(NAME_HELP_TEXT, "1~50자 · 받은 사람 화면의 탭 이름입니다.");
   // 앞뒤 공백을 빼고 1~50자(코드 포인트)면 보낸다. 이름은 앞뒤 공백을 뺀 글로 보낸다.
   model.setName(` ${"😀".repeat(50)} `);
   await model.save();
@@ -602,7 +628,7 @@ test("NFR 설계 Q1 B 옮긴 화면을 같은 ID로 만들면 상세를 불러 �
   assert.equal(moved.model.showHandedNotice(), true, "글을 넣었으면 참이라 화면이 [저장]에 초점을 둔다");
   assert.equal(moved.model.store.get().status.kind, "saved");
   html = editorHtml(moved.model);
-  assert.match(html, /<h1>프리셋 고치기<\/h1>/);
+  assert.match(html, /<h1>프리셋 수정<\/h1>/);
   assert.match(html, /<p role="status"[^>]*data-testid="preset-editor-status">저장했습니다\.<\/p>/);
   assert.match(html, /data-testid="preset-delete"/);
   assert.equal(moved.model.showHandedNotice(), false, "두 번째는 넣지 않아 초점도 옮기지 않는다");
@@ -716,7 +742,7 @@ test("NFR 설계 security 4 저장 중에는 이름·고르기·순서·걸러 �
   model.toggle("CATCH", C2);
   const saving = model.save();
   assert.equal(model.store.get().status.kind, "saving");
-  model.setName("바꾸려 함"); model.toggle("CATCH", C3); model.moveUp(1); model.remove(0);
+  model.setName("바꾸려 함"); model.toggle("CATCH", C3); model.move(1, 0); model.remove(0);
   await model.setWrittenOnly(true);
   await model.deletePreset();
   await model.save();
@@ -726,7 +752,7 @@ test("NFR 설계 security 4 저장 중에는 이름·고르기·순서·걸러 �
   assert.equal(count(api, "remove"), 0);
   const html = editorHtml(model);
   assert.match(html, /data-testid="preset-editor-status">저장하고 있습니다\.</);
-  for (const id of ["preset-name-input", "preset-save", "preset-delete", "preset-written-only", "preset-move-up", "preset-remove"]) {
+  for (const id of ["preset-name-input", "preset-save", "preset-delete", "preset-written-only", "preset-order-grip", "preset-order-direct", "preset-remove"]) {
     assert.match(html, new RegExp(`data-testid="${id}"[^>]*disabled=""|disabled=""[^>]*data-testid="${id}"`), id);
   }
   assert.ok([C1, C2, C3, M1].every((id) => /disabled=""/.test(optionOf(html, id))));
@@ -824,7 +850,7 @@ test("BR3.9 지우기는 이름을 밝힌 확인을 거치고, 취소하면 그�
 
 test("BR3.10 이름·담기·순서를 바꾸면 저장하지 않은 변경이 되고 경고 글은 텍스트 자료 화면과 같으며, 저장하면 풀린다", async () => {
   assert.equal(UNSAVED_MESSAGE, "저장하지 않은 입력이 있습니다. 이동하시겠습니까?");
-  for (const change of [(m) => m.setName("새 이름"), (m) => m.toggle("CATCH", C1), (m) => m.moveUp(1)]) {
+  for (const change of [(m) => m.setName("새 이름"), (m) => m.toggle("CATCH", C1), (m) => m.move(1, 0)]) {
     const { model } = await openEditor({ get: [detailOf([measured("CATCH", C1), measured("CATCH", C2)])] }, { presetId: P1 });
     assert.equal(model.isDirty(), false);
     change(model);
@@ -836,7 +862,7 @@ test("BR3.10 이름·담기·순서를 바꾸면 저장하지 않은 변경이 �
   assert.equal(model.isDirty(), false);
 });
 
-test("NFR3.1·NFR1 편집 화면: <b>·<img onerror> 이름과 제목은 글자로만 그리고, 고르기는 aria-pressed 단추이며 막힘 이유는 단추 안 글자다", async () => {
+test("NFR3.1·NFR1 편집 화면: <b>·<img onerror> 이름과 제목은 글자로만 그리고, 고르기는 이름표로 감싼 체크박스이며 이름·보조 줄·막힘 이유가 이름표 안 글자다", async () => {
   const { model } = await openEditor({
     get: [detailOf([measured("CATCH", C1, 59_990, null, "<img src=x onerror=alert(1)>")], "<b>x</b>")],
     catches: [catchPage([catchAsset(C1, { title: "<img src=x onerror=alert(1)>" }), catchAsset(C2, { title: "<b>c</b>", hasAuthorDescription: false, mismatch: true })])],
@@ -847,16 +873,20 @@ test("NFR3.1·NFR1 편집 화면: <b>·<img onerror> 이름과 제목은 글자�
   assert.ok(html.includes("&lt;img src=x onerror=alert(1)&gt;"));
   assert.match(html, /value="&lt;b&gt;x&lt;\/b&gt;"/);
   const c2 = optionOf(html, C2);
-  assert.match(c2, /<button type="button"[^>]*aria-pressed="false" disabled=""/);
+  // #632: 진짜 체크박스이고 줄 전체가 이름표라 이름·보조 줄·막힌 이유가 체크박스의 읽히는 이름이 된다. 누르는 단추(aria-pressed)는 없다.
+  assert.match(c2, /^<label[^>]*><input type="checkbox"[^>]* disabled=""[^>]*\/>/);
+  assert.doesNotMatch(c2, / checked=""/);
+  assert.doesNotMatch(html, /aria-pressed/);
   assert.match(c2, /data-testid="preset-catch-subline">synthetic-owner\/TheMe · 설명 안 씀 · 불일치 표시됨</, "공개 상태 글은 뺀다(M3)");
   assert.ok(c2.includes(TOTAL_OVER_TEXT));
-  assert.match(optionOf(html, C1), /aria-pressed="true"/);
+  assert.match(boxOf(html, C1), / checked=""/);
   assert.doesNotMatch(html, /저장소마다 3~5개를 권합니다|최대 20개/, "M3에 없는 옛 머리 두 줄은 그리지 않는다");
-  assert.match(html, /<h2 id="preset-sources-title">담을 자료 고르기<\/h2>/);
+  assert.match(html, /<h2 id="preset-sources-title">자료 구성하기<\/h2>/);
+  assert.match(html, /data-testid="preset-catches-note">공개한 Catch 중에서 선택</);
   assert.match(html, /<h3>내 Catch<\/h3>.*<h3>내 텍스트 자료<\/h3>.*<h3>내 PDF 자료<\/h3>/s);
   assert.match(html, /글 추출이 완료된 PDF만 고를 수 있습니다\./);
   for (const id of ["preset-name-input", "preset-save", "preset-delete", "preset-written-only", "preset-catch-option", "preset-material-option",
-    "preset-pdf-option", "preset-move-up", "preset-move-down", "preset-remove", "preset-editor-back-link"]) {
+    "preset-pdf-option", "preset-order-grip", "preset-remove", "preset-editor-back-link", "preset-editor-list-link"]) {
     assert.ok(html.includes(`data-testid="${id}"`), id);
   }
 });
@@ -868,7 +898,9 @@ test("발행 화면에서 옮겨 온 고르기 동작: 추출 중 PDF는 상태�
   model.toggle("CATCH", C1);
   let html = editorHtml(model);
   const pending = optionOf(html, PDF_PENDING);
-  assert.match(pending, /data-state="PENDING" aria-pressed="false" disabled=""/);
+  assert.match(boxOf(html, PDF_PENDING), /data-state="PENDING"/);
+  assert.match(boxOf(html, PDF_PENDING), / disabled=""/);
+  assert.doesNotMatch(boxOf(html, PDF_PENDING), / checked=""/);
   assert.match(pending, /data-testid="preset-pdf-state">글 추출 중</);
   assert.match(pending, /data-testid="preset-source-reason">글 추출이 끝난 뒤 발행에 넣을 수 있습니다/);
   assert.match(optionOf(html, PDF_DONE), /data-testid="preset-pdf-state">완료 2쪽</);

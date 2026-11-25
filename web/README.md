@@ -131,7 +131,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `src/app/(member)/` | 로그인 일반·발행자 | 왼쪽 로고(→ `/home`)·내 자산·텍스트 자료(U4)·프리셋(발행 프리셋 U2)·발행본(U4)·JD 관리(U10) / 오른쪽 프로필. 10월의 [공유 링크]는 [발행본]으로 바뀌었고, 채용공고·알림은 뺐다(아래). 대표 구성 진입점은 없음 |
 | `src/app/s/` | 공유 링크 수신자 | 이동 없는 CatchU 브랜드만. 로그인 여부와 무관하며 로그인·프로필 버튼 없음 |
 
-- **탭 아이콘:** `src/app/favicon.ico`(48px)와 `src/app/icon.png`를 Next가 모든 화면의 아이콘 링크로 내려 준다(#560). 바꾸려면 두 파일을 함께 바꾼다.
+- **탭 아이콘:** `src/app/favicon.ico`(16·32px, 파란 원 안의 흰 U)와 `src/app/icon.png`(원형 U 심벌)를 Next가 모든 화면의 아이콘 링크로 내려 준다(#560). 바꾸려면 두 파일을 함께 바꾼다. `icon.png`는 소개 화면 마지막 안내의 심벌로도 쓴다.
 
 - **회원 화면 폭:** 창 폭 760px부터 지원한다. `(member)/layout.tsx`의 전용 CSS는 760px 미만에서만 헤더·본문 폭을 760px로 유지하고 문서 가로 스크롤을 허용한다. 760px 이상에서는 세로 스크롤바를 뺀 가용 폭에 맞추며, 헤더 메뉴는 글자 단위로 줄바꿈하지 않는다. 회원 화면 검증 폭은 760·1024·1536px이다. 비로그인·공유 링크 수신자 레이아웃에는 이 최소 폭을 적용하지 않는다([#412 회원 화면 범위](https://github.com/JminAILab/CatchU/issues/412)).
 - **채용공고·알림:** 두지 않는다. 10월에는 흐린 메뉴와 '개발 중인 기능입니다' 안내창을 두었는데(#55), 두 기능을 12월 요구사항에서 빼서 2026-11-16 팀장 결정으로 메뉴와 안내창(`src/components/notice-dialog/`)을 지웠다(#565).
@@ -172,8 +172,8 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/publications` | 발행본 목록 | U4 | 필요 | 확정 | U4 담당 결정 D4(2026-11-03). 최신순 목록, [URL 복사], [링크 열기](`ACTIVE`만)([발행·발행본](src/features/publications/README.md)) |
 | `/publications/new` | 발행 | U4 | 필요 | 확정 | 프리셋 고르기·순서·제목·비밀번호 → 확인 → 발행 완료를 한 화면에 둔다(발행 프리셋 U2) |
 | `/presets` | 프리셋 목록 | 발행 프리셋 U2 | 필요 | 확정 | [발행 프리셋 U2 기능 설계](../aidlc/spaces/default/intents/261118-publication-presets/construction/u2-applicant-screens/functional-design/functional-spec.md) BR1.2. 상단 메뉴 「프리셋」의 목적지. 50개까지 한 번에 보인다([프리셋](src/features/presets/README.md)) |
-| `/presets/new` | 새 프리셋 | 발행 프리셋 U2 | 필요 | 확정 | 첫 저장 뒤에는 라우터의 replace로 `/presets/[presetId]`에 옮기고(뒤로 가기 기록을 더하지 않음), 옮긴 화면이 「저장했습니다.」를 한 번 보인다 |
-| `/presets/[presetId]` | 프리셋 고치기 | 발행 프리셋 U2 | 필요 | 확정 | 이름·담을 자료·순서 고치기와 지우기. 「발행본」 주소 아래가 아니어서 메뉴의 「발행본」이 함께 켜지지 않는다 |
+| `/presets/new` | 프리셋 만들기 | 발행 프리셋 U2 | 필요 | 확정 | 첫 저장 뒤에는 라우터의 replace로 `/presets/[presetId]`에 옮기고(뒤로 가기 기록을 더하지 않음), 옮긴 화면이 「저장했습니다.」를 한 번 보인다 |
+| `/presets/[presetId]` | 프리셋 수정 | 발행 프리셋 U2 | 필요 | 확정 | 이름·담을 자료·순서 수정과 지우기. 「발행본」 주소 아래가 아니어서 메뉴의 「발행본」이 함께 켜지지 않는다 |
 | `/publications/[publicationId]` | 발행본 상세 | U4 | 필요 | 확정 | 사본·상태·만료·링크 주소, 링크 중지·삭제. U5 기본 요약 패널의 작성자 모드와 근거 강조를 연결함 |
 | `/s/[token]` | 받은 사람 발행본 열람(U4 W4) | C | 불필요 | 제안 | 수신자 전용 헤더. 10월 `/links`·`/s/[token]/catches/[catchId]`는 U4 제출 3(W6)에서 없앴다 |
 
