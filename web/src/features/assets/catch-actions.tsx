@@ -6,9 +6,13 @@ import type { CatchMutation } from "./assets-store";
 import type { CatchAsset } from "./types";
 import styles from "./assets.module.css";
 
-/** 서버가 처리하지 않은 저장의 안내(#286 후속, B 동의). 앞선 요청의 결과 불명은 재조회 전 저장을 막으므로 이 안내와 겹치지 않는다. */
+/**
+ * 서버가 처리하지 않은 저장의 안내(#286 후속, B 동의). 앞선 요청의 결과 불명은 재조회 전 저장을 막으므로 이 안내와 겹치지 않는다.
+ * 보내지 않은 요청의 문구는 이 창에서만 「저장되지 않았습니다. 다시 눌러 주세요.」다(2026-11-25 팀장 결정, #640 리뷰).
+ * 무슨 일이 있었고 무엇을 하면 되는지를 말하고 까닭은 단정하지 않는다. 로그인이 풀린 경우에는 머리말의 재인증 안내가 함께 보인다.
+ */
 function notProcessedText(mutation: CatchMutation): string {
-  return mutation.reason === "renewed-rejected" ? "로그인이 연장되었습니다. 다시 눌러 주세요." : "지금은 요청을 보내지 않았습니다.";
+  return mutation.reason === "renewed-rejected" ? "로그인이 연장되었습니다. 다시 눌러 주세요." : "저장되지 않았습니다. 다시 눌러 주세요.";
 }
 
 type SwitchKind = "mismatch" | "visibility";
@@ -17,6 +21,7 @@ type SwitchKind = "mismatch" | "visibility";
  * 결정 줄의 전환 단추(#635). 이름은 구역 제목이고(`aria-labelledby`) 켜짐·꺼짐은 `aria-checked`로 읽힌다. 옆의 상태 글은 눈으로 보는 표시다.
  * 막을 때는 `disabled` 대신 `aria-disabled`를 쓴다. 초점이 있던 단추가 `disabled`가 되면 브라우저가 초점을 body로 빼기 때문이다(#636 리뷰).
  * 원본 보호로 막힌 단추도 초점이 가야 낭독기로 이유(`aria-describedby`)를 들을 수 있다.
+ * 눌러서 저장 중인 단추에는 막힘 표시를 달지 않는다. 누르자마자 낭독기가 「사용불가」부터 읽기 때문이다(#640 리뷰). 다시 눌러도 보내지 않는 것은 같다.
  */
 function DecisionSwitch({ kind, titleId, noteId, on, onText, offText, blocked, saving, onToggle }: {
   kind: SwitchKind;
@@ -32,7 +37,7 @@ function DecisionSwitch({ kind, titleId, noteId, on, onText, offText, blocked, s
 }) {
   return (
     <button type="button" role="switch" className={styles.switch} data-testid={`catch-${kind}-switch`} data-saving={saving || undefined}
-      aria-checked={on} aria-labelledby={titleId} aria-describedby={noteId} aria-disabled={blocked || undefined}
+      aria-checked={on} aria-labelledby={titleId} aria-describedby={noteId} aria-disabled={(blocked && !saving) || undefined}
       onClick={() => { if (!blocked) onToggle(!on); }}>
       <span className={styles.switchTrack} aria-hidden="true"><span className={styles.switchThumb} /></span>
       <span className={styles.switchState} aria-hidden="true">{saving ? "저장 중…" : on ? onText : offText}</span>
@@ -64,8 +69,12 @@ export function CatchActions({ item, mutation, onChange, onReload }: {
   const toggle = (kind: SwitchKind, on: boolean, change: CatchChange) => { setPressed({ kind, on }); onChange(change); };
 
   return <section className={styles.actions} aria-label="불일치 표시와 공개 선택">
-    {saving && <p role="status" className={styles.actionStatus}>변경 내용을 저장하고 있습니다.</p>}
-    {current?.status === "success" && <p role="status" className={styles.actionStatus}>변경 내용을 저장했습니다.</p>}
+    {/* 저장 중·저장 완료 안내 자리. 낭독기는 지켜보던 자리의 글이 바뀔 때 읽으므로 자리는 늘 두고 글만 바꾼다.
+        안내와 함께 새로 끼워 넣은 자리는 NVDA가 읽지 않았다(#640 리뷰). 비어 있을 때 숨기는 것은 CSS가 맡는다. */}
+    <div role="status" className={styles.actionStatusRegion}>
+      {saving ? <p className={styles.actionStatus}>변경 내용을 저장하고 있습니다.</p>
+        : current?.status === "success" ? <p className={styles.actionStatus}>변경 내용을 저장했습니다.</p> : null}
+    </div>
     {current?.status === "not-processed" && <p role="alert" className={styles.actionError}>{notProcessedText(current)}</p>}
     {needsReload && <div role="alert" className={styles.actionError}>
       <div>

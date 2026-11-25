@@ -254,15 +254,15 @@ test("화면: 로그인 연장 뒤 거부는 합의 문구로 안내하고 다�
   }
 });
 
-test("화면: 보내지 않음은 한 문장이고(체크 상자가 없어 입력 유지 문구는 없다), 다른 Catch의 안내는 보이지 않는다", () => {
+test("화면: 보내지 않음은 「저장되지 않았습니다. 다시 눌러 주세요.」이고(2026-11-25 팀장 결정) 입력 유지 문구는 없으며, 다른 Catch의 안내는 보이지 않는다", () => {
   const target = item("c1", { confirmation: { workFactsConfirmed: false, contributionConfirmed: false } });
   for (const kind of ["mismatch", "visibility"]) {
     const html = actionsMarkup(target, { catchId: "c1", kind, status: "not-processed", error: null, reason: "not-sent" });
-    assert.match(html, /<p role="alert">지금은 요청을 보내지 않았습니다\.<\/p>/);
-    assert.doesNotMatch(html, /입력은 그대로/);
+    assert.match(html, /<p role="alert">저장되지 않았습니다\. 다시 눌러 주세요\.<\/p>/);
+    assert.doesNotMatch(html, /입력은 그대로|요청을 보내지 않았습니다/);
   }
   const other = actionsMarkup(target, { catchId: "c2", kind: "visibility", status: "not-processed", error: null, reason: "not-sent" });
-  assert.doesNotMatch(other, /요청을 보내지 않았습니다|로그인이 연장되었습니다/);
+  assert.doesNotMatch(other, /저장되지 않았습니다|요청을 보내지 않았습니다|로그인이 연장되었습니다/);
 });
 
 test("화면 회귀: 결과 불명은 재조회 안내와 함께 조작을 막고, 저장 중에는 모두 막는다", () => {
@@ -273,10 +273,31 @@ test("화면 회귀: 결과 불명은 재조회 안내와 함께 조작을 막�
   assert.doesNotMatch(unknown, /로그인이 연장되었습니다|아래 상태는/);
   assert.equal(blockedSwitches(unknown), 2, "불일치·공개 전환 단추를 막는다");
   const saving = actionsMarkup(target, { catchId: "c1", kind: "visibility", status: "saving", error: null });
-  assert.match(saving, /<p role="status">변경 내용을 저장하고 있습니다\.<\/p>/);
+  assert.match(saving, /<div role="status"><p>변경 내용을 저장하고 있습니다\.<\/p><\/div>/);
   assert.doesNotMatch(saving, /창을 닫아도/);
   assert.equal(blockedSwitches(saving), 2);
   assert.doesNotMatch(unknown + saving, /<button[^>]*role="switch"[^>]* disabled=""/, "초점이 남게 disabled는 쓰지 않는다");
+});
+
+// #640 리뷰(NVDA로 저장 완료 안내가 들리지 않음): 저장 안내 자리는 처음부터 하나 있고 글만 바뀐다. 안내와 함께 새로 생기는 자리는 낭독기가 놓친다.
+// 먼저 정한 실패 조건: 안내가 없을 때 자리도 없음, 저장 중과 저장 완료가 서로 다른 자리에 생김, 알림 자리가 둘 이상임.
+test("화면: 저장 안내 자리(role=status)는 늘 하나 있고 비어 있다가 저장 중·저장 완료 글만 바뀐다", () => {
+  const target = item();
+  const region = (html) => html.match(/<div role="status">(.*?)<\/div>/)?.[1] ?? assert.fail("저장 안내 자리가 있어야 한다");
+  const idle = actionsMarkup(target, null);
+  assert.equal(region(idle), "", "안내가 없을 때는 빈 자리다");
+  assert.equal(region(actionsMarkup(target, { catchId: "c1", kind: "visibility", status: "saving", error: null })), "<p>변경 내용을 저장하고 있습니다.</p>");
+  assert.equal(region(actionsMarkup(target, { catchId: "c1", kind: "visibility", status: "success", error: null })), "<p>변경 내용을 저장했습니다.</p>");
+  for (const status of ["error", "not-processed"]) {
+    const html = actionsMarkup(target, { catchId: "c1", kind: "visibility", status, error: status === "error" ? serverError() : null, reason: "not-sent" });
+    assert.equal(region(html), "", `${status}: 실패 안내는 알림(role=alert)으로 따로 보인다`);
+    assert.match(html, /role="alert"/);
+  }
+  for (const html of [idle, actionsMarkup(target, { catchId: "c1", kind: "visibility", status: "success", error: null })]) {
+    assert.equal((html.match(/role="status"/g) ?? []).length, 1);
+  }
+  // 저장 안내 자리는 전환 단추보다 앞에 있어 낭독·Tab 순서에서 구역 맨 앞이다.
+  assert.ok(idle.indexOf('<div role="status">') < idle.indexOf('role="switch"'));
 });
 
 // #635 결정 줄: 「내용 확인」 구역이 없고 불일치·공개는 전환 단추 둘이다. 문장은 이슈 범위 3의 표 「바꾼 뒤」다.

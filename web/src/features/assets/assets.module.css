@@ -144,6 +144,9 @@
 .decisionBar :focus-visible { outline-color: #fff; }
 .actions { display: grid; gap: 10px; }
 .actions :focus-visible { outline-color: var(--color-focus); }
+/* 저장 안내 자리는 비어 있어도 낭독기가 지켜보도록 남겨 둔다(display: none이면 접근성 트리에서 빠져, 글이 생길 때 새 자리로 취급된다).
+   비어 있을 때는 자리와 간격을 차지하지 않게 흐름에서 뺀다. */
+.actionStatusRegion:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .actionStatus, .actions > .actionError { margin: 0; font-size: 13px; line-height: 1.6; }
 .actionStatus { padding: 8px 14px; background: var(--color-surface); color: var(--ink); border-radius: 8px; }
 /* 결과 불명: 오류 문장 둘과 [현재 상태 다시 불러오기]가 한 줄에 놓이고 좁으면 단추가 아래로 내려간다. */
@@ -181,8 +184,8 @@
   .factGrid { grid-template-columns: 1fr; gap: 16px; margin-top: 22px; }
   .decisionBar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; margin: 0; padding: 8px 14px 10px; }
   .actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); min-width: 0; }
-  .actions > .actionStatus, .actions > .actionError { grid-column: 1 / -1; }
-  .actions > .actionStatus { padding: 4px 12px; }
+  .actions > .actionStatusRegion, .actions > .actionError { grid-column: 1 / -1; }
+  .actions .actionStatus { padding: 4px 12px; }
   .actions > .actionError { padding: 6px 12px; }
   .dialogFooter { margin: 0; }
 }
