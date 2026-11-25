@@ -33,7 +33,7 @@ export const demoConfig: Record<DemoKey, DemoConfig> = {
       "분석 완료 → 만들어진 Catch 보기",
       "상세 보기로 같은 작업의 내용·근거 확인 · 아직 미공개",
       "한 일의 요약과 연결된 근거 확인 · 원본은 GitHub 새 탭에서 엽니다",
-      "두 항목 확인 → 확인 완료 · 아직 미공개 → 공개는 따로 선택",
+      "Catch 내용이 맞는지 보기 → 공개 켜기 · 언제든 다시 숨기기",
       "링크 발행 → URL 복사 · 실제 발행·복사 없는 시연",
     ],
     actions: [
@@ -50,10 +50,7 @@ export const demoConfig: Record<DemoKey, DemoConfig> = {
       ],
       [],
       [
-        { target: "facts", start: 450, arrive: 840, click: 1050, end: 1320, kind: "click" },
-        { target: "contribution", start: 1620, arrive: 2010, click: 2250, end: 2520, kind: "click" },
-        { target: "confirm", start: 3240, arrive: 3630, click: 3900, end: 4170, kind: "click" },
-        { target: "publish-catch", start: 6720, arrive: 7110, click: 7440, end: 7710, kind: "click" },
+        { target: "publish-switch", start: 4400, arrive: 5100, click: 5900, end: 6350, kind: "click" },
       ],
       [
         { target: "issue", start: 300, arrive: 900, click: 1250, end: 1600, kind: "click" },
@@ -94,16 +91,14 @@ export const demoConfig: Record<DemoKey, DemoConfig> = {
     ],
   },
   verification: {
-    durations: [18000],
+    durations: [9000],
     captions: [
-      "두 항목 확인 → 확인 완료·미공개 → 지금 공개",
+      "Catch 내용이 맞는지 보기 → 공개 켜기",
     ],
     actions: [
       [
-        { target: "facts", start: 750, arrive: 1400, click: 1750, end: 2200, kind: "click" },
-        { target: "contribution", start: 2700, arrive: 3350, click: 3750, end: 4200, kind: "click" },
-        { target: "confirm", start: 5400, arrive: 6050, click: 6500, end: 6950, kind: "click" },
-        { target: "publish-catch", start: 11200, arrive: 11850, click: 12400, end: 12850, kind: "click" },
+        { target: "catch-read", start: 500, arrive: 1150, click: null, end: 4200, kind: "read" },
+        { target: "publish-switch", start: 5600, arrive: 6250, click: 6700, end: 7150, kind: "click" },
       ],
     ],
   },

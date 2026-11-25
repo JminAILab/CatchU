@@ -238,19 +238,21 @@ test("AC4.2.1 API 방식에서 저장 뒤 설명이 생긴 항목도 지금 쪽�
   assert.ok(html.includes(">불러온 2개의 Catch</p>"));
 });
 
-test("AC3.1.1·AC3.1.2 NC3 S3 상세 순서는 작업 사실·나의 기여 → 근거 → Catch 설명 초안 → 생각해 볼 질문 → 작성자 설명 → 현재 확인 상태이고 사실이 없으면 다시 볼 곳 제목·칸이 없다", () => {
+test("AC3.1.1·AC3.1.2 NC3 S3 상세 순서는 작업 사실·나의 기여 → 근거 → Catch 설명 초안 → 생각해 볼 질문 → 작성자 설명 → 결정 줄이고 「현재 확인 상태」 칸은 없으며(#635) 사실이 없으면 다시 볼 곳 제목·칸이 없다", () => {
   const item = previewCatches[0];
   assert.deepEqual(item.revisitFacts, []);
   const html = renderToStaticMarkup(createElement(AssetsView, {
     dataMode: "api", items: [item], detailItem: item, selectedId: item.catchId, repositories: [], repositoryId: "",
     listState: "ready", detailState: "ready", repositoryManagement: null,
     descriptionEditor: createElement("section", { "data-testid": "catch-author-description" }, "편집 자리"),
+    detailActions: createElement("section", { "data-testid": "catch-actions" }, "결정 자리"),
   }));
   const dialog = html.match(/<dialog\b[\s\S]*?<\/dialog>/)[0];
   const order = ["<h3>작업에서 확인된 사실</h3>", "<h3>나의 기여</h3>", "<h3>근거</h3>", "<h3>Catch 설명 초안</h3>", "<h3>생각해 볼 질문",
-    'data-testid="catch-author-description"', "<h3>현재 확인 상태</h3>"].map((needle) => dialog.indexOf(needle));
+    'data-testid="catch-author-description"', 'data-testid="catch-actions"', ">목록으로 돌아가기</button>"].map((needle) => dialog.indexOf(needle));
   assert.ok(order.every((position) => position >= 0), String(order));
   assert.deepEqual([...order].sort((x, y) => x - y), order);
+  assert.doesNotMatch(dialog, /현재 확인 상태|작업 사실<\/dt>|팝업을 열어도/);
   assert.doesNotMatch(dialog, /다시 볼 곳|revisit-facts/);
 });
 
@@ -291,7 +293,8 @@ test("NC3 BR9.3 상세의 저장소 이름이 불러와졌을 때만 커밋 링�
 
 test("AC3.1.3 질문 아래 문구는 「질문을 보고 아래 칸에 자기 말로 적어 보세요.」이고 답 저장 안내와 질문별 답 칸은 없다", () => {
   const html = detailMarkup(previewCatches[0]);
-  const questions = html.slice(html.indexOf("<h3>생각해 볼 질문"), html.indexOf("<h3>현재 확인 상태</h3>"));
+  const questions = html.slice(html.indexOf("<h3>생각해 볼 질문"), html.indexOf(">목록으로 돌아가기</button>"));
+  assert.ok(questions.length > 0);
   assert.ok(questions.includes("질문을 보고 아래 칸에 자기 말로 적어 보세요."));
   assert.doesNotMatch(html, /질문에 대한 답변을 저장하는 기능은 제공하지 않습니다/);
   assert.doesNotMatch(questions, /<textarea|<input/);
@@ -319,4 +322,80 @@ test("Catch 상세 머리말 안에 detailNotice(모달 안 재인증 안내 자
   heading(without);
   assert.doesNotMatch(without, /modal-reauth/);
   assert.match(without, />닫기<\/button><\/div>/, "안내가 없으면 닫기 뒤에 빈 자리를 두지 않는다");
+});
+
+// #635(2026-11-23·24 팀장 결정): 상세는 기록 칸·쓰기 칸 두 구역과 결정 줄이다. 구역 이름은 낭독기에만 읽히고, 확인 표지·「현재 확인 상태」·「내용 확인」은 없다.
+// 이 검사는 마크업과 글을 본다. 두 칸 배치·따로 스크롤·초점 테두리는 브라우저에서 확인한다.
+// 먼저 정한 실패 조건: 구역 이름이 화면 글자로 보임, 질문·작성자 설명이 기록 칸에 들어감, 확인 표지가 목록·상세에 남음,
+// 실제 자료 상세에 「확인과 공개 선택은 별도입니다.」가 남음, 근거 링크의 읽히는 이름이 바뀜, 불러오는 중에 결정 자리가 그려짐.
+const liveItem = { ...previewCatches[0], sourceMode: "LIVE" };
+const detailProps = (item, extra = {}) => ({
+  dataMode: "api", items: [item], detailItem: item, selectedId: item.catchId, repositories: [], repositoryId: "",
+  listState: "ready", detailState: "ready", repositoryManagement: null,
+  descriptionEditor: createElement("section", { "data-testid": "catch-author-description" }, "편집 자리"),
+  detailActions: createElement("section", { "data-testid": "catch-actions" }, "결정 자리"), ...extra,
+});
+const dialogOf = (props) => renderToStaticMarkup(createElement(AssetsView, props)).match(/<dialog\b[\s\S]*?<\/dialog>/)?.[0]
+  ?? assert.fail("Catch 상세가 렌더링되어야 한다");
+
+test("#635 상세는 「Catch 기록과 초안」·「질문과 작성자 설명」 두 구역이고 이름은 aria-label로만 있다", () => {
+  const dialog = dialogOf(detailProps(previewCatches[0]));
+  const readAt = dialog.indexOf('<section aria-label="Catch 기록과 초안">');
+  const writeAt = dialog.indexOf('<section aria-label="질문과 작성자 설명">');
+  const actionsAt = dialog.indexOf('data-testid="catch-actions"');
+  assert.ok(readAt > 0 && writeAt > readAt && actionsAt > writeAt, `${readAt} ${writeAt} ${actionsAt}`);
+  const read = dialog.slice(readAt, writeAt);
+  const write = dialog.slice(writeAt, actionsAt);
+  for (const needle of ["<h3>작업에서 확인된 사실</h3>", "<h3>나의 기여</h3>", "<h3>근거</h3>", "<h3>Catch 설명 초안</h3>"]) assert.ok(read.includes(needle), needle);
+  assert.doesNotMatch(read, /생각해 볼 질문|catch-author-description/);
+  assert.ok(write.includes("<h3>생각해 볼 질문") && write.includes('data-testid="catch-author-description"'));
+  assert.doesNotMatch(write, /<h3>근거<\/h3>|Catch 설명 초안/);
+  // 구역 이름은 속성에만 있고 화면 글자로는 없다. 넓은 화면 판정 전(서버 렌더)에는 기록 칸에 tabindex가 없다.
+  assert.doesNotMatch(dialog.replace(/<[^>]*>/g, " "), /Catch 기록과 초안|질문과 작성자 설명/);
+  assert.doesNotMatch(dialog, /tabindex/i);
+});
+
+test("#635 목록 카드와 상세에 확인 표지가 없고 공개·불일치·원본 보호 표지는 그대로다", () => {
+  const shown = { ...previewCatches[0], confirmation: { workFactsConfirmed: true, contributionConfirmed: true },
+    visibility: "PUBLIC", mismatch: true, restriction: "SOURCE_PRIVATE" };
+  for (const item of [previewCatches[0], shown, { ...shown, confirmation: { workFactsConfirmed: true, contributionConfirmed: false } }]) {
+    const html = renderToStaticMarkup(createElement(AssetsView, detailProps(item)));
+    assert.doesNotMatch(html.replace(/<[^>]*>/g, " "), /확인 전|확인 완료|일부 확인/);
+  }
+  const badges = dialogOf(detailProps(shown)).match(/<div aria-label="Catch 상태">([\s\S]*?)<\/div>/)?.[1] ?? assert.fail("상태 표지가 있어야 한다");
+  assert.equal(badges.replace(/<[^>]*>/g, "|"), "|공개 설정||불일치 표시됨||원본 비공개 · 외부 열람 제한|");
+});
+
+test("#635 실제 자료 상세에는 「확인과 공개 선택은 별도입니다.」가 없고, 합성·예시 자료 안내는 남는다", () => {
+  const live = dialogOf(detailProps(liveItem));
+  assert.doesNotMatch(live, /확인과 공개 선택은 별도입니다|합성 자료로 생성된|예시 자료입니다/);
+  assert.ok(live.includes("사실과 다르면 불일치를 표시하거나 공개하지 마세요."));
+  assert.ok(dialogOf(detailProps(previewCatches[0])).includes("<p>합성 자료로 생성된 Catch입니다. 실제 분석 결과와 구분해 확인해 주세요.</p>"));
+  const preview = dialogOf({ ...detailProps(previewCatches[0]), dataMode: "preview", items: previewCatches, detailItem: undefined });
+  assert.ok(preview.includes("<p>예시 자료입니다. 불일치·공개 설정은 바뀌지 않습니다.</p>"));
+});
+
+test("#635 근거 머리 줄은 「근거 n」·판본과 새 탭 링크 「원본 근거 열기」이고, 열 수 없는 근거는 주소를 글자로 보인다", () => {
+  const [evidence] = liveItem.evidence;
+  const linked = dialogOf(detailProps(liveItem));
+  assert.ok(linked.includes(`<h4>근거 1</h4><span>판본 ${evidence.sourceRevision}</span>`));
+  assert.ok(linked.includes(`<a href="${evidence.sourceUrl}" target="_blank" rel="noopener noreferrer">원본 근거 열기<span aria-hidden="true"> ↗</span></a>`));
+  assert.doesNotMatch(linked, new RegExp(`<p>${evidence.sourceUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}</p>`), "링크가 있으면 주소 글자는 없다");
+  const mock = dialogOf(detailProps(previewCatches[0]));
+  assert.ok(mock.includes(`<h4>근거 1</h4><span>가상 근거 주소 · 외부 연결 없음 · 판본 ${evidence.sourceRevision}</span>`));
+  assert.ok(mock.includes(`<p>${evidence.sourceUrl}</p>`));
+  assert.doesNotMatch(mock, /원본 근거 열기/);
+  // 위험한 주소(자격 증명이 든 주소)는 실제 자료여도 링크로 만들지 않는다.
+  const unsafe = { ...liveItem, evidence: [{ ...evidence, sourceUrl: "https://user:pass@example.invalid/x" }] };
+  assert.doesNotMatch(dialogOf(detailProps(unsafe)), /원본 근거 열기/);
+});
+
+test("#635 생각해 볼 질문은 질문마다 목록 항목 하나이고, 불러오는 중·실패 상세에는 결정 자리 없이 [목록으로 돌아가기]만 있다", () => {
+  const dialog = dialogOf(detailProps(previewCatches[0]));
+  assert.equal((dialog.slice(dialog.indexOf("<h3>생각해 볼 질문")).match(/<li>/g) ?? []).length, previewCatches[0].reflection.questions.length);
+  for (const detailState of ["loading", "error"]) {
+    const waiting = dialogOf(detailProps(previewCatches[0], { detailState }));
+    assert.doesNotMatch(waiting, /catch-actions|catch-author-description|aria-label="Catch 기록과 초안"/, detailState);
+    assert.match(waiting, />목록으로 돌아가기<\/button>/);
+  }
 });
