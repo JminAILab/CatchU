@@ -9,14 +9,14 @@ import { load } from "./u2-render.mjs";
 
 // #496 개인정보 처리방침(`/privacy`)과 첫 화면 바닥글 링크.
 // 원문: 발행 프리셋(#597) U4 기능 설계 aidlc/spaces/default/intents/261118-publication-presets/construction/u4-privacy-policy/functional-design/functional-spec.md
-//   「확정 문구」(#496 2026-11-12 확정 문구에 C1~C5를 바꾼 글, C5 날짜는 2026-11-20 팀장 답 2026년 11월 30일).
+//   「확정 문구」(#496 2026-11-12 확정 문구에 C1~C5를 바꾼 글, C5 날짜는 main 배포일 2026년 11월 25일).
 //   src/features/privacy/privacy-policy.md가 그 글을 글자 그대로(줄 끝 LF) 옮긴 사본이고, SHA-256이 아래 값이다.
 // 기대: 화면이 사본과 같은 순서·글자로 제목 단계(# → h1, ## → h2)·문단·목록 항목·표(첫 줄은 th, 나머지는 td)·코드 표시를 그리고,
 //   표 칸 안의 <br>은 줄바꿈으로 그린다. 원문에 없는 글·링크·강조를 더하지 않는다. 첫 화면 바닥글은 /privacy로 링크한다.
 // 실패 조건: 글자·순서·제목 단계가 하나라도 다름, 표 칸이 빠지거나 줄이 합쳐짐, <br>이 글자로 보임, a·strong·em 같은 태그가 끼어듦,
 //   사본이 원문과 다름, 바닥글 링크가 없거나 다른 주소로 감.
 // 글을 바꿀 때(예: 시행일)는 팀장이 확정한 글로 사본과 privacy-policy.tsx를 함께 고치고, 위 출처와 아래 SHA-256도 고친다.
-const SOURCE_SHA256 = "3224f6c899ea3a00506e920cb911c0beb7083c28f76afaa0af333c3b35eb9346";
+const SOURCE_SHA256 = "fed79268d10859ab0a6f1731e073d989ef6c2cbb9ea0fb74de284fa30491bc38";
 
 // next/image는 Next 앱 밖에서 불러올 수 없다. 이 시험은 바닥글의 글·링크만 보므로 아무것도 그리지 않는 대역으로 바꾼다.
 registerHooks({
