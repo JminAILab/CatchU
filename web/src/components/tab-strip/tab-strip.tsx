@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import styles from "./tab-strip.module.css";
 
 /**
@@ -16,6 +16,11 @@ import styles from "./tab-strip.module.css";
  * - `keepInactive`가 true면 열리지 않은 패널도 내용을 그린 채 `hidden`으로 숨겨, 탭을 오가도 패널 안 상태(PDF 뷰어 등)가 남는다.
  *   false면 열리지 않은 패널은 빈 채로 `hidden`이다. 패널에는 `display`를 정하는 클래스를 붙이지 않는다(`hidden`이 덮이지 않게).
  * - 탭 이름은 글자로만 그린다. `truncateLabels`면 한 탭이 최대 폭(16em)을 넘을 때 CSS로 뒤를 「…」로 줄이고 글자는 자르지 않는다.
+ *   줄어든 탭에 마우스를 올리거나 키보드 초점이 가면 전체 이름이 말풍선으로 보인다(#632). 말풍선은 `aria-hidden`이고 `title`을 쓰지 않아
+ *   화면 낭독기는 탭 이름을 한 번만 읽는다. 줄었는지는 그려진 폭으로 재고(`data-truncated`), 탭 줄의 폭이 바뀌면 다시 잰다.
+ *   말풍선은 탭 왼쪽에 맞춰 뜨되, 화면 오른쪽으로 넘치면 넘친 만큼 왼쪽으로 옮겨 전체가 화면 안에 보이게 한다(`tipShift`).
+ * - 모양(#632, 2026-11-24 팀장 결정): 열린 탭은 위쪽 띠·굵기·색으로 구분하고 닫힌 탭은 마우스를 올리면 바탕이 바뀐다. 이 부품을 쓰는
+ *   「발행본 자료」와 자료 화면의 「자료 종류」가 같은 모양이다(모양 갈래를 두지 않는다).
  */
 
 export type TabItem = { readonly id: string; readonly label: string };
@@ -56,6 +61,20 @@ export function tabForKey(ids: readonly string[], from: string, key: string): st
   }
 }
 
+/** 말풍선과 화면 가장자리 사이에 남길 여백(px). */
+export const TIP_MARGIN = 16;
+
+/**
+ * 말풍선을 화면 안에 넣으려면 가로로 얼마 옮겨야 하는가(px, 왼쪽이면 음수). `tip`은 옮기기 전 말풍선의 화면 자리다.
+ * 오른쪽으로 넘치면 넘친 만큼 왼쪽으로 옮기되 왼쪽 여백보다 더 나가지는 않는다. 왼쪽으로 넘쳐 있으면 오른쪽으로 옮긴다.
+ */
+export function tipShift(tip: { readonly left: number; readonly right: number }, viewportWidth: number): number {
+  const over = tip.right - (viewportWidth - TIP_MARGIN);
+  if (over > 0) return -Math.min(over, Math.max(0, tip.left - TIP_MARGIN));
+  if (tip.left < TIP_MARGIN) return TIP_MARGIN - tip.left;
+  return 0;
+}
+
 /** 키 하나를 처리한 결과. `handled`면 기본 동작(스크롤)을 막고, `focus`가 있으면 그 탭으로 초점을 옮긴다. */
 export type TabKeyResult = { readonly handled: boolean; readonly focus: string | null };
 
@@ -72,9 +91,40 @@ export function tabKeyAction(input: { ids: readonly string[]; from: string; acti
 
 export function TabStrip({ tabs, active, onChange, label, idPrefix, panels, keepInactive = false, tabTestId, truncateLabels = false }: TabStripProps) {
   const buttons = useRef(new Map<string, HTMLButtonElement>());
+  const listRef = useRef<HTMLDivElement>(null);
   const ids = tabs.map((tab) => tab.id);
+  const labelKey = tabs.map((tab) => tab.label).join("\u0000");
+
+  // 줄어든 탭에만 말풍선을 켠다. 이름이 바뀌거나 탭 줄의 폭이 바뀌면 다시 잰다. 선택된 탭은 글자가 굵어져 그때만 잘릴 수 있으므로 탭을 바꿀 때도 다시 잰다.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!truncateLabels || !list) return;
+    const measure = () => {
+      for (const button of buttons.current.values()) {
+        const text = button.querySelector<HTMLElement>("[data-tab-label]");
+        if (text && text.scrollWidth > text.clientWidth + 1) button.dataset.truncated = "true";
+        else delete button.dataset.truncated;
+        placeTip(button);
+      }
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [truncateLabels, labelKey, active]);
   const tabId = (id: string) => `${idPrefix}-tab-${id}`;
   const panelId = (id: string) => `${idPrefix}-panel-${id}`;
+
+  /** 보이는 말풍선을 화면 안으로 옮긴다. 마우스를 올리거나 초점이 올 때, 탭 줄 폭이 바뀔 때 부른다. 안 보이면 폭이 0이라 그대로 둔다. */
+  function placeTip(button: HTMLElement) {
+    const tip = button.querySelector<HTMLElement>("[data-tab-tip]");
+    if (!tip) return;
+    tip.style.left = "0px";
+    const box = tip.getBoundingClientRect();
+    if (box.width === 0) return;
+    tip.style.left = `${tipShift(box, document.documentElement.clientWidth)}px`;
+  }
 
   function keyDown(id: string, event: KeyboardEvent<HTMLButtonElement>) {
     const result = tabKeyAction({ ids, from: id, active, key: event.key, onChange });
@@ -91,7 +141,7 @@ export function TabStrip({ tabs, active, onChange, label, idPrefix, panels, keep
 
   return (
     <>
-      <div role="tablist" aria-label={label} className={styles.tabs}>
+      <div ref={listRef} role="tablist" aria-label={label} className={styles.tabs}>
         {tabs.map((tab) => {
           const selected = tab.id === active;
           return (
@@ -99,8 +149,13 @@ export function TabStrip({ tabs, active, onChange, label, idPrefix, panels, keep
               tabIndex={selected ? 0 : -1} className={selected ? styles.tabActive : styles.tab}
               data-testid={tabTestId === undefined ? undefined : `${tabTestId}-${tab.id}`}
               ref={(element) => { if (element) buttons.current.set(tab.id, element); else buttons.current.delete(tab.id); }}
+              onMouseEnter={truncateLabels ? (event) => placeTip(event.currentTarget) : undefined}
+              onFocus={truncateLabels ? (event) => placeTip(event.currentTarget) : undefined}
               onClick={(event) => click(tab.id, event)} onKeyDown={(event) => keyDown(tab.id, event)}>
-              {truncateLabels ? <span className={styles.truncated}>{tab.label}</span> : tab.label}
+              {truncateLabels ? <>
+                <span className={styles.truncated} data-tab-label="">{tab.label}</span>
+                <span className={styles.tip} aria-hidden="true" data-tab-tip="">{tab.label}</span>
+              </> : tab.label}
             </button>
           );
         })}

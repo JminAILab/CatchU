@@ -4,7 +4,7 @@ import Link from "next/link";
 import { AUTHOR_AI_NOTICE } from "@/features/recipient-claude/recipient-claude-text";
 import { itemsLine, type PresetSummary } from "@/features/presets/presets-api";
 import { publicationDetailPath, routes } from "@/lib/routes";
-import { ReorderList } from "./pick-parts";
+import { PickCheckbox, ReorderList } from "./pick-parts";
 import { CopyUrlButton, OpenLinkAnchor } from "./publication-link-actions";
 import { EXPIRY_NOTICE, PUBLICATION_STATE_LABELS, formatKst, passwordText } from "./publication-format";
 import { presetBlockReason, PRESETS_FULL_TEXT, PUBLISH_LIMITS, type PublishedLink } from "./publications-api";
@@ -33,8 +33,8 @@ export type PresetPickerViewProps = {
 };
 
 /**
- * 「프리셋 고르기」(M4, 발행 프리셋 U2 BR4.1~BR4.4, interaction-spec PresetPicker). 프리셋마다 누르는 단추 하나:
- * 이름, 「항목 N개 · M자」, 막혔으면 이유 하나(단추 안 글자라 이름과 함께 읽힌다). 다섯 개를 고르면 안 고른 단추를 모두 막고
+ * 「프리셋 고르기」(M4, 발행 프리셋 U2 BR4.1~BR4.4, interaction-spec PresetPicker). 프리셋마다 체크박스 하나(#632, `PickCheckbox`):
+ * 이름, 「항목 N개 · M자」, 막혔으면 이유 하나(이름표 안 글자라 이름과 함께 읽힌다). Space로만 고른다. 다섯 개를 고르면 안 고른 체크박스를 모두 막고
  * 5개 안내를 목록 위 `aria-live="polite"` 칸에 한 번만 보인다. 이름은 React 글자로만 그린다(BR3.11).
  * 고른 비공개 Catch를 공개로 바꾼다는 안내(`PRIVATE_CATCH_NOTICE`)는 그리지 않는다(BR4.7).
  */
@@ -57,19 +57,15 @@ export function PresetPickerView(props: PresetPickerViewProps) {
         : props.presets.items.length === 0 ? (
           <p data-testid="publish-presets-empty">아직 만든 프리셋이 없습니다. <Link href={routes.presets} data-testid="publish-presets-create-link">프리셋 만들러 가기</Link></p>
         ) : (
-          <ul className={styles.options}>
+          <ul className={styles.picks}>
             {props.presets.items.map((preset) => {
               const picked = props.selected.some((entry) => entry.presetId === preset.presetId);
               const reason = presetBlockReason(preset, chosen, full);
               return (
                 <li key={preset.presetId}>
-                  <button type="button" className={picked ? styles.optionActive : styles.option} data-testid="publish-preset-option"
-                    data-preset-id={preset.presetId} aria-pressed={picked}
-                    disabled={props.disabled || (!picked && (full || reason !== null))} onClick={() => props.onToggle(preset.presetId)}>
-                    <span className={styles.itemTitle}>{preset.name}</span>
-                    <span className={styles.subline}>{itemsLine(preset.itemCount, preset.textLength)}</span>
-                    {reason !== null && <span className={styles.small} data-testid="publish-preset-reason">{reason}</span>}
-                  </button>
+                  <PickCheckbox checked={picked} disabled={props.disabled || (!picked && (full || reason !== null))} onToggle={() => props.onToggle(preset.presetId)}
+                    title={preset.name} subline={itemsLine(preset.itemCount, preset.textLength)} reason={reason} reasonTestId="publish-preset-reason"
+                    inputProps={{ "data-testid": "publish-preset-option", "data-preset-id": preset.presetId }} />
                 </li>
               );
             })}
@@ -82,18 +78,23 @@ export function PresetPickerView(props: PresetPickerViewProps) {
 export type SelectedPresetsViewProps = {
   presets: readonly ChosenPreset[];
   disabled: boolean;
-  onMoveUp: (index: number) => void;
-  onMoveDown: (index: number) => void;
+  onMove: (from: number, to: number) => void;
   onRemove: (index: number) => void;
 };
 
-/** 「고른 프리셋과 순서 (n/5)」(M4). [위로][아래로][빼기]는 프리셋 편집과 같은 순서 부품이다(interaction-spec ReorderList). */
+/** 마지막 프리셋을 빼 목록이 비었을 때 초점을 둘 그 프리셋의 체크박스. 막혔으면 null이다. */
+function presetCheckbox(presetId: string): HTMLElement | null {
+  return [...document.querySelectorAll<HTMLInputElement>('input[data-testid="publish-preset-option"]')]
+    .find((element) => element.dataset.presetId === presetId && !element.disabled) ?? null;
+}
+
+/** 「고른 프리셋과 순서 (n/5)」(M4). 손잡이 드래그·「순서 직접 지정」·[빼기]는 프리셋 편집과 같은 순서 부품이다(#632 `ReorderList`). */
 export function SelectedPresetsView(props: SelectedPresetsViewProps) {
   return (
     <section className={styles.panel} aria-labelledby="publish-selected-title" data-testid="publish-selected">
       <h2 id="publish-selected-title">고른 프리셋과 순서 ({props.presets.length}/{PUBLISH_LIMITS.presets})</h2>
       {props.presets.length === 0 ? <p data-testid="publish-selected-empty">아직 고른 프리셋이 없습니다.</p> : (
-        <ReorderList testIdPrefix="publish" disabled={props.disabled} onMoveUp={props.onMoveUp} onMoveDown={props.onMoveDown} onRemove={props.onRemove}
+        <ReorderList testIdPrefix="publish" label="고른 프리셋과 순서" disabled={props.disabled} onMove={props.onMove} onRemove={props.onRemove} emptyFocus={presetCheckbox}
           entries={props.presets.map((preset) => ({
             key: preset.presetId, sourceId: preset.presetId, title: preset.name, body: <span className={styles.itemTitle}>{preset.name}</span>,
           }))} />
@@ -188,7 +189,7 @@ export function PublishConfirmView(props: PublishConfirmViewProps) {
       {!props.submitting && props.lockSeconds > 0 && <p role="status" data-testid="publish-lock">{props.lockSeconds}초 뒤에 [발행]을 누를 수 있습니다.</p>}
       <StatusBlock lines={props.statusLines} testId="publish-status" />
       <div className={styles.actions}>
-        <button type="button" className={styles.secondaryButton} data-testid="publish-back" disabled={props.submitting} onClick={props.onBack}>돌아가서 고치기</button>
+        <button type="button" className={styles.secondaryButton} data-testid="publish-back" disabled={props.submitting} onClick={props.onBack}>돌아가서 수정하기</button>
         <button type="button" className={styles.primaryButton} data-testid="publish-submit" disabled={locked} onClick={props.onSubmit}>
           {props.submitting ? "발행 중…" : "발행"}
         </button>
