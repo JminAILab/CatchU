@@ -14,6 +14,10 @@
 //   - 기대: 사본 표시에 돌아가기 줄 값을 넘기면 가리킨 항목의 첫 자식으로 「보던 곳으로 돌아가기」 단추 줄이 하나만 있고(이름은 하나), 넘기지 않으면 없다.
 //           작성자 발행본 상세는 그 값을 넘기지 않는다. 받은 사람 화면도 값이 없으면(넓은 화면·옮겨 간 적 없음) 그리지 않는다.
 //   - 실패 조건: 다른 항목에도 줄이 있음, 줄이 항목 제목 뒤에 있음, 작성자 화면이 값을 넘김, 닫는 단추가 있음.
+//   접근 상실 뒤의 돌아가기 줄 (PR #648 리뷰, 2026-11-25)
+//   - 기대: 출처로 옮겨 간 뒤 접근이 끊겨 사본이 화면에서 내려가면(비밀번호 입력·접근 불가·조회 실패) 돌아갈 자리를 지운다. 비밀번호를 다시 입력해 사본이
+//           다시 보여도 이전 항목에 줄이 없고, 새로 출처를 누르면 그 항목에 줄이 생기며 돌아가면 없어진다. 사본만 새로 받는 다시 조회는 줄을 지우지 않는다.
+//   - 실패 조건: 다시 열람한 화면에 돌아갈 곳 없는 줄이 다시 나옴, 다시 조회만으로 줄이 없어짐, 재인증 뒤 새 출처에서 줄이 생기지 않음.
 // 실제 배치(CSS)·스크롤·초점 이동·폭 바뀜은 DOM이 필요해 브라우저에서 확인한다. 화면 낭독기 낭독은 여기서 보지 않는다.
 
 import assert from "node:assert/strict";
@@ -28,7 +32,9 @@ process.env.NEXT_PUBLIC_API_BASE_URL ??= "http://127.0.0.1:3001";
 
 const { RecipientPublicationView } = await load("features/recipient/recipient-view.tsx");
 const { PublishedSnapshotView, RETURN_BUTTON_TEXT } = await load("features/publications/snapshot-view.tsx");
-const { EDGE_GAP, WIDE_QUERY, pageWheelDistance, paneScrollDistance, wheelPixels, workspaceTop } = await load("features/recipient/recipient-workspace.ts");
+const {
+  EDGE_GAP, WIDE_QUERY, initialReturnState, pageWheelDistance, paneScrollDistance, returnBarItemId, returnReducer, wheelPixels, workspaceTop,
+} = await load("features/recipient/recipient-workspace.ts");
 
 const PRESET = { presetOrdinal: 1, presetName: "기본 프리셋" };
 const textItem = (id, position, patch = {}) => ({ publishedItemId: id, position, ...PRESET, itemKind: "TEXT_MATERIAL", title: `자료 ${id}`, snapshot: { body: "본문 글" }, ...patch });
@@ -150,4 +156,38 @@ test("#615 돌아가기 줄: 받은 사람 화면은 화면이 넘긴 값이 있
     const code = src(path);
     assert.ok(!code.includes("returnBar") && !code.includes("recipient-workspace"), path);
   }
+});
+
+test("#648 리뷰: 접근 상실로 사본이 내려가면 돌아갈 자리를 지워, 다시 열람한 화면에 돌아갈 곳 없는 줄이 다시 나오지 않는다", () => {
+  const run = (state, ...events) => events.reduce(returnReducer, state);
+  const jumped = run(initialReturnState(true), { type: "jumped" });
+  assert.equal(returnBarItemId(jumped, "t1", false), "t1", "좁은 화면에서 출처로 옮겨 가면 그 항목에 줄");
+  // 접근 상실(비밀번호 입력 화면) → 비밀번호 재입력으로 다시 열람. 출처 이동 대상(t1)은 화면이 그대로 기억하고 있다.
+  const lost = run(jumped, { type: "snapshot", shown: false });
+  assert.equal(returnBarItemId(lost, "t1", false), null, "사본이 없는 동안 줄 없음");
+  const reopened = run(lost, { type: "snapshot", shown: true });
+  assert.equal(returnBarItemId(reopened, "t1", false), null, "다시 열람한 뒤 이전 항목에 줄이 다시 나오지 않는다");
+  assert.deepEqual(reopened, initialReturnState(true), "처음 연 화면과 같은 상태");
+  // 재인증 뒤 새 출처: 줄이 새 항목에 생기고 돌아가면 없어진다.
+  const again = run(reopened, { type: "jumped" });
+  assert.equal(returnBarItemId(again, "t3", false), "t3");
+  assert.equal(returnBarItemId(run(again, { type: "returned" }), "t3", false), null);
+});
+
+test("#648 리뷰: 다시 조회(사본만 새로 받음)·넓은 화면·사본 없는 동안의 출처 이동은 돌아갈 자리 규칙을 바꾸지 않는다", () => {
+  const run = (state, ...events) => events.reduce(returnReducer, state);
+  const jumped = run(initialReturnState(true), { type: "jumped" });
+  // 다시 조회: 사본이 계속 보이므로 줄을 지우지 않는다(같은 값이면 상태 객체도 그대로).
+  assert.equal(run(jumped, { type: "snapshot", shown: true }), jumped);
+  // 넓은 화면에서는 그리지 않고, 다시 좁아지면 다시 보인다(상태는 그대로).
+  assert.equal(returnBarItemId(jumped, "t1", true), null);
+  assert.equal(returnBarItemId(jumped, "t1", false), "t1");
+  // 옮겨 간 대상이 없으면 줄도 없다.
+  assert.equal(returnBarItemId(jumped, null, false), null);
+  // 돌아가지 않고 다른 출처를 눌러도 돌아갈 자리는 하나다.
+  assert.equal(run(jumped, { type: "jumped" }), jumped);
+  // 사본이 없는 화면(불러오는 중·비밀번호 입력)에서 온 출처 이동은 돌아갈 자리를 만들지 않는다.
+  const hidden = initialReturnState(false);
+  assert.equal(run(hidden, { type: "jumped" }), hidden);
+  assert.equal(returnBarItemId(run(hidden, { type: "snapshot", shown: true }), "t1", false), null, "처음 열린 화면에는 줄이 없다");
 });

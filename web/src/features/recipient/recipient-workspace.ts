@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type MouseEvent, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useSyncExternalStore, type MouseEvent, type RefObject } from "react";
 import { flushSync } from "react-dom";
 import type { PublishedSnapshot } from "../publications/publications-api.ts";
 import type { JumpPlace, SnapshotJump } from "../publications/snapshot-jump.ts";
@@ -159,6 +159,39 @@ const RETURN_BAR_SELECTOR = '[data-testid="snapshot-return-bar"]';
 /** 사람이 다시 입력하면 폭 바뀜 뒤의 자리 맞추기를 그만둔다. */
 const USER_INPUTS = ["keydown", "pointerdown", "wheel", "touchstart"] as const;
 
+/**
+ * 돌아갈 자리가 있는지의 상태. `shown`은 사본이 화면에 보이는지, `returnable`은 마지막 출처 이동에서 돌아갈 자리를 적어 두었는지다.
+ * 돌아갈 자리(눌렀던 단추)는 화면 요소라서 사본이 화면에서 내려가면(비밀번호 입력·접근 불가·조회 실패로 바뀜) 함께 없어진다.
+ * 그때 `returnable`을 함께 지우지 않으면, 비밀번호를 다시 입력해 사본이 다시 보일 때 이전 항목에 돌아갈 곳 없는 줄이 다시 나온다(PR #648 리뷰).
+ */
+export type ReturnState = { readonly shown: boolean; readonly returnable: boolean };
+export type ReturnEvent =
+  /** 사본이 화면에 보이는지가 바뀜. */
+  | { readonly type: "snapshot"; readonly shown: boolean }
+  /** 돌아갈 자리를 적어 둔 출처 이동. */
+  | { readonly type: "jumped" }
+  /** 돌아가기를 누름. */
+  | { readonly type: "returned" };
+
+export const initialReturnState = (shown: boolean): ReturnState => ({ shown, returnable: false });
+
+export function returnReducer(state: ReturnState, event: ReturnEvent): ReturnState {
+  switch (event.type) {
+    case "snapshot":
+      if (state.shown === event.shown) return state;
+      // 사본이 내려갈 때도, 다시 올라올 때도 돌아갈 자리는 없다(다시 조회로 사본만 새로 받는 것은 `shown`이 그대로라 여기 오지 않는다).
+      return { shown: event.shown, returnable: false };
+    case "jumped":
+      return state.shown && !state.returnable ? { ...state, returnable: true } : state;
+    case "returned":
+      return state.returnable ? { ...state, returnable: false } : state;
+  }
+}
+
+/** 돌아가기 줄을 둘 항목. 사본이 보이고, 돌아갈 자리가 있고, 좁은 화면이며, 옮겨 간 대상이 있을 때만이다. */
+export const returnBarItemId = (state: ReturnState, targetItemId: string | null, wide: boolean): string | null =>
+  state.shown && state.returnable && !wide ? targetItemId : null;
+
 export type EvidenceReturn = {
   /** 작업 칸에 다는 클릭 지켜보기. 패널을 고치지 않고 누른 출처 단추를 기억한다(키보드 Enter·Space도 click으로 온다). */
   readonly onClickCapture: (event: MouseEvent<HTMLElement>) => void;
@@ -177,12 +210,17 @@ export type EvidenceReturn = {
  * - 폭이 1200px 이상으로 넓어지면 줄을 그리지 않는다. 줄은 CSS로 숨기지 않고 여기서 그리지 않게 한다: CSS로 숨기면 폭 바뀜을 알기 전에
  *   단추가 초점을 잃어 초점이 페이지 본문으로 빠진다(2026-11-25 팀장 댓글). 폭이 바뀐 것을 안 그 자리에서 초점을 자료 항목으로 넘긴 뒤 줄을 지운다.
  *   초점이 그 항목이나 돌아가기 단추에 있었을 때만 새 배치에서 강조 글이 다시 보이게 자리를 맞추고, 다시 좁아지면 줄이 다시 보인다.
+ * - 사본이 화면에서 내려가면(접근 상실 뒤 비밀번호 입력 등) 돌아갈 자리를 모두 지운다. 다시 열람한 뒤에는 줄이 없고, 새로 출처를 눌러야 생긴다(`returnReducer`).
  */
 export function useEvidenceReturn(snapshot: PublishedSnapshot | null, jump: SnapshotJump): EvidenceReturn {
   const pressed = useRef<Origin | null>(null);
   const origin = useRef<Origin | null>(null);
-  const [returnable, setReturnable] = useState(false);
-  const itemId = snapshot !== null && returnable && jump.target !== null ? jump.target.publishedItemId : null;
+  const shown = snapshot !== null;
+  const [state, dispatch] = useReducer(returnReducer, shown, initialReturnState);
+  // 사본이 보이는지가 바뀐 그리기 차례에 바로 상태를 맞춘다(효과로 미루면 돌아갈 곳 없는 줄이 한 번 그려진다).
+  if (state.shown !== shown) dispatch({ type: "snapshot", shown });
+  // 폭과 상관없이 돌아갈 자리가 있는 항목. 폭이 바뀔 때의 초점 넘기기에 쓴다.
+  const itemId = returnBarItemId(state, jump.target?.publishedItemId ?? null, false);
   const { showEvidence: jumpTo, again } = jump;
 
   const onClickCapture = useCallback((event: MouseEvent<HTMLElement>) => {
@@ -197,7 +235,7 @@ export function useEvidenceReturn(snapshot: PublishedSnapshot | null, jump: Snap
     // 가리킨 항목이 사본에 없으면 옮겨 가지 않으므로 돌아갈 자리도 바꾸지 않는다.
     if (from !== null && snapshot !== null && resolveEvidenceTarget(snapshot, location) !== null) {
       origin.current = from;
-      setReturnable(true);
+      dispatch({ type: "jumped" });
     }
     jumpTo(location);
   }, [snapshot, jumpTo]);
@@ -249,7 +287,7 @@ export function useEvidenceReturn(snapshot: PublishedSnapshot | null, jump: Snap
     // 구역은 평소 초점을 받지 않는다. 단추가 없어진 드문 경우에만 받을 수 있게 한다.
     if (to !== null && !there && !to.hasAttribute("tabindex")) to.setAttribute("tabindex", "-1");
     to?.focus({ preventScroll: true });
-    flushSync(() => setReturnable(false));
+    flushSync(() => dispatch({ type: "returned" }));
     to?.scrollIntoView({ block: there ? "center" : "start" });
   }, []);
 
@@ -257,5 +295,6 @@ export function useEvidenceReturn(snapshot: PublishedSnapshot | null, jump: Snap
     if (snapshot === null) origin.current = null;
   }, [snapshot]);
 
-  return { onClickCapture, showEvidence, returnBar: itemId !== null && !wide ? { publishedItemId: itemId, onReturn } : null };
+  const barItemId = state.shown === shown ? returnBarItemId(state, jump.target?.publishedItemId ?? null, wide) : null;
+  return { onClickCapture, showEvidence, returnBar: barItemId !== null ? { publishedItemId: barItemId, onReturn } : null };
 }
