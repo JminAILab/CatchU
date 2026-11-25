@@ -48,16 +48,19 @@ test("보낸 링크: 검색 엔진에 싣지 않게 표시하고 소개 화면�
 });
 
 test("소개 화면: 탭 제목·설명이 지금 정의와 같다", () => {
-  assert.equal(landingRoute.metadata.title, "CatchU — GitHub 작업을 Catch로 골라 면접관에게");
-  assert.equal(landingRoute.metadata.description, "GitHub 작업을 분석해 Catch를 만들고, 고른 Catch를 링크로 면접관에게 보냅니다.");
+  // 2026-11-24 확정 디자인(60번 검토본)의 첫 제목과 첫 설명 문장을 그대로 쓴다. '골라·고른'은 화면 용어에 맞춰 '선택'으로 바뀌었다.
+  assert.equal(landingRoute.metadata.title, "CatchU — GitHub의 작업 기록을, 내 경험을 설명하는 근거로");
+  assert.equal(landingRoute.metadata.description, "GitHub 저장소를 분석해 Catch를 만들고, 직접 확인한 것만 선택해 면접관에게 링크로 공유합니다.");
 });
 
 test("소개 화면: 숨기면 보낸 링크에서 빠진다는 문장이 없고 발행본 고정 안내가 있다", () => {
   const text = plainText(renderToStaticMarkup(createElement(LandingPage)));
   assert.ok(!text.includes("이미 보낸 링크에서도 보이지 않습니다"));
   assert.ok(!text.includes("숨긴 Catch는 보이지 않습니다"));
-  assert.ok(text.includes("보낼 Catch를 골라 발행하면 링크가 만들어집니다. 링크에는 발행할 때의 내용이 그대로 남고, 그만 보이려면 링크를 중지합니다."));
-  assert.ok(text.includes("발행 시점 고정") && text.includes("발행할 때의 내용 그대로 보입니다."));
+  assert.ok(!text.includes("링크에서 빠집니다") && !text.includes("링크에서도 숨겨집니다"));
+  // 2026-11-24 확정 디자인의 문장. 뜻은 #565와 같다: 받은 사람은 발행 시점의 사본을 보고, 그만 보이려면 링크를 중지한다.
+  assert.ok(text.includes("공개한 Catch와 선택한 자료를 링크로 발행합니다. 받은 사람은 발행 시점의 사본을 읽고 질문할 수 있습니다. 공유를 끝내려면 링크를 중지하세요."));
+  assert.ok(text.includes("선택한 자료는 발행 시점의 사본으로 공유됩니다.") && text.includes("보이는 자료는 발행할 때 고정한 내용입니다."));
 });
 
 test("Catch 상세: 공개한 Catch의 [숨기기] 안내가 이미 발행한 발행본은 그대로라고 알린다", () => {
