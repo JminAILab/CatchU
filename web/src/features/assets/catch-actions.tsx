@@ -96,7 +96,11 @@ export function CatchActions({ item, mutation, onChange, onReload }: {
       <h3 id={`${baseId}-visibility`}>공개 선택</h3>
       <div id={`${baseId}-visibility-note`} className={styles.actionNote}>
         {isPublic ? <>
-          {restricted && <p>원본 저장소가 보호되어 외부에서 열람할 수 없습니다.</p>}
+          {/* 보호된 Catch는 끄면 보호가 풀릴 때까지 다시 켤 수 없다. 전환 단추는 다시 켤 수 있어 보이므로 끄기 전에 알린다(2026-11-25 팀장 결정, #640 리뷰). */}
+          {restricted && <>
+            <p>원본 저장소가 보호되어 외부에서 열람할 수 없습니다.</p>
+            <p>원본이 보호된 동안에는 숨긴 뒤 다시 공개할 수 없습니다.</p>
+          </>}
           <p>숨겨도 이미 발행한 발행본에는 그대로 남습니다. 제공을 끝내려면 발행본에서 링크를 중지하세요.</p>
         </> : <p>{restricted ? "원본 저장소가 보호되어 지금은 공개할 수 없습니다."
           : "작업 사실과 나의 기여가 맞는지 본 뒤 공개하세요. 공개한 Catch만 발행할 수 있습니다."}</p>}

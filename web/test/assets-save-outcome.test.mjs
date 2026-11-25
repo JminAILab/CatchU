@@ -346,7 +346,7 @@ test("#635 전환 단추는 지금 상태를 aria-checked와 상태 글로 보�
   assert.equal(visibilityNote(on), "<p>숨겨도 이미 발행한 발행본에는 그대로 남습니다. 제공을 끝내려면 발행본에서 링크를 중지하세요.</p>");
 });
 
-test("#635 원본이 보호된 미공개 Catch는 보호 문장 하나이고 공개 전환 단추만 막힌다. 보호된 공개 Catch는 지금 보호 문장과 숨기기 안내다", () => {
+test("#635 원본이 보호된 미공개 Catch는 보호 문장 하나이고 공개 전환 단추만 막힌다. 보호된 공개 Catch는 보호 문장·다시 공개할 수 없다는 문장·숨기기 안내다", () => {
   for (const confirmed of [false, true]) {
     const html = actionsMarkup(item("c1", { restriction: "SOURCE_PRIVATE",
       confirmation: { workFactsConfirmed: confirmed, contributionConfirmed: confirmed } }), null);
@@ -355,8 +355,11 @@ test("#635 원본이 보호된 미공개 Catch는 보호 문장 하나이고 공
     assert.doesNotMatch(switchOf(html, "mismatch"), /aria-disabled/);
   }
   const shown = actionsMarkup(item("c1", { restriction: "SOURCE_PRIVATE", visibility: "PUBLIC" }), null);
+  // 2026-11-25 팀장 결정(#640 리뷰): 끄면 보호가 풀릴 때까지 다시 켤 수 없다는 것을 끄기 전에 알린다. 보호되지 않은 공개 Catch에는 이 문장이 없다.
   assert.equal(visibilityNote(shown), "<p>원본 저장소가 보호되어 외부에서 열람할 수 없습니다.</p>"
+    + "<p>원본이 보호된 동안에는 숨긴 뒤 다시 공개할 수 없습니다.</p>"
     + "<p>숨겨도 이미 발행한 발행본에는 그대로 남습니다. 제공을 끝내려면 발행본에서 링크를 중지하세요.</p>");
+  assert.doesNotMatch(actionsMarkup(item("c1", { visibility: "PUBLIC" }), null), /다시 공개할 수 없습니다/);
   assert.doesNotMatch(shown, /지금은 공개할 수 없습니다/);
   assert.doesNotMatch(switchOf(shown, "visibility"), /aria-disabled/, "보호된 공개 Catch는 숨길 수 있다");
 });
