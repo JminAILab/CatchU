@@ -11,6 +11,7 @@ import { browserSessionStorage, createGrantStore } from "./recipient-grants";
 import type { RecipientSlotProps } from "./recipient-slots";
 import { createRecipientPublicationStore } from "./recipient-store";
 import { RecipientPublicationView } from "./recipient-view";
+import { useEvidenceReturn, useWorkspaceLayout } from "./recipient-workspace";
 import styles from "./recipient.module.css";
 
 /** 회원 토큰을 붙이지 않는 받은 사람 호출(#106 `api.recipient`). */
@@ -53,14 +54,18 @@ function PublicationView({ token }: { token: string }) {
   // 근거 위치 강조(C-11 evidence-highlight)와 발행본 자료의 프리셋 탭(발행 프리셋 U3 흐름 1·3). 출처 단추는 대상 항목의 탭과 대상을 한 번에 바꾸고,
   // 그린 뒤 첫 `<mark>`(없으면 항목 시작)를 보이며 초점은 항목에 둔다(`useSnapshotJump`). 판정 통과 화면이 아니면 사본을 넘기지 않아
   // 출처 단추가 아무것도 하지 않고 강조도 보이지 않는다(상태에서 파생).
-  const jump = useSnapshotJump(snapshot.view === "ready" ? snapshot.snapshot : null);
+  // 넓은 화면(1200px 이상)에서는 자료 칸 안쪽만 옮겨 오른쪽 칸의 답이 그대로 보이고, 좁은 화면에서는 옮겨 간 항목에 「보던 곳으로 돌아가기」를 둔다(#615).
+  const ready = snapshot.view === "ready";
+  const layout = useWorkspaceLayout(ready);
+  const jump = useSnapshotJump(ready ? snapshot.snapshot : null, layout.place);
+  const evidenceReturn = useEvidenceReturn(ready ? snapshot.snapshot : null, jump);
 
   const slotProps: RecipientSlotProps = {
     token,
     getGrant: () => grants.get(token),
     onAccessLost: (code) => store.accessLost(code),
     isLoggedIn,
-    showEvidence: jump.showEvidence,
+    showEvidence: evidenceReturn.showEvidence,
   };
 
   // PDF 항목의 사본 요청(U8 W4). 호출마다 지금의 grant를 머리로 싣고 서버 판정을 다시 받는다. 401·404는 다른 패널과 같이 접근 상실이다.
@@ -70,9 +75,10 @@ function PublicationView({ token }: { token: string }) {
   });
 
   return (
-    <main className={styles.page}>
+    <main className={ready ? `${styles.page} ${styles.pageReady}` : styles.page}>
       <RecipientPublicationView snapshot={snapshot} headingRef={headingRef} highlight={jump.highlight} slotProps={slotProps} pdfSource={pdfSource}
         activePreset={jump.activePreset} onPresetChange={jump.changePreset} tabNotice={jump.notice}
+        layout={layout} onWorkspaceClickCapture={evidenceReturn.onClickCapture} returnBar={evidenceReturn.returnBar}
         onRetry={() => { void store.load(); }}
         onUnlock={(password) => store.unlock(password)}
         waitSeconds={() => store.retryWaitSeconds()} />
