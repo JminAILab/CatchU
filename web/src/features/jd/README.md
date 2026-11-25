@@ -16,20 +16,24 @@
 
 `JdSummaryPanel`은 C-11의 `token`, `getGrant`, `onAccessLost`, `isLoggedIn`, `showEvidence`와 U10 `client`를 받는다. 공용 세션 세대로 로그인된 계정끼리의 전환도 확인한다. 해당 링크의 본인 실행 목록·새 접수·단건 결과·수동 새로고침을 제공하며 자동 폴링과 재접수는 없다. 요약 접수만 U2 `useAiConsent`와 `AiNoticeLine`을 사용하고 동의 뒤 한 번 재요청한다. 요청 동안 계정·링크가 바뀌면 이전 동의 창도 해제하고 재요청을 보내지 않는다.
 
+[#638](https://github.com/JminAILab/CatchU/issues/638)에 따라 로그인 상태를 복원하는 동안(복원 실패 표시 전)에는 확인 안내만 보이고 로그인 입구를 보이지 않는다. 확인 실패·재인증 필요·비로그인에는 JD와 결과가 실행자에게만 보인다는 안내와 로그인을 표시한다. 로그인은 받은 링크 상단 바와 같은 복귀 함수로 시작하고, 같은 탭의 sessionStorage에 유효한 링크 토큰만 30분 동안 보관해 로그인·최초 이름 입력 뒤 원래 링크로 돌아온다. 로그인 경로에는 토큰이 없는 `entry=recipient` 표시만 쓴다. 로그인 이동으로 질의응답 대화가 새로 시작된다는 안내는 이 JD 칸에만 둔다.
+
+`JD 관리 ↗`는 `noopener noreferrer`를 붙여 새 탭으로 열고, 화면 낭독기에도 새 탭이라고 알린다. 저장한 JD가 없으면 새 탭에서 저장한 뒤 받은 링크 탭의 `JD 새로고침`을 누르도록 안내한다. 받은 링크 탭을 떠나지 않아 기존 질의응답과 비밀번호 확인을 유지한다.
+
 원문 요구사항별 근거·자료로 확인되지 않는 점·면접 질문을 React 텍스트로 표시한다. `jdRole`, 서버 안내·AI 해석 구분, 출처 라벨·인용 원문을 보존한다. BR3.5의 검색 조각 없음 고정 `SERVER_NOTICE`는 원문 줄 옆에 한 번만 표시하고 세 칸에서 중복 표시하지 않는다. 다른 서버 안내는 원래 칸에 남기며, `EMPTY`만으로 검색 조각 없음을 추정하지 않는다. 근거 선택은 받은 `citation.location`을 그대로 `showEvidence`에 전달한다. 개별 생성 실패와 개별 호출 시간 초과는 `GENERATION_FAILED`의 “이 요구사항을 처리하지 못했습니다.”, 전체 시한은 `DEADLINE_EXCEEDED`의 “전체 처리 시한이 지나 완료하지 못했습니다.”로 최초 조회와 재열람에서 동일하게 표시한다. EMPTY와 일부 실패·기존 성공 결과는 함께 구분한다.
 
 [#482](https://github.com/JminAILab/CatchU/pull/482)의 실제 공유 화면 4번 자리에 `JdRecipientPanel`을 연결했다. wrapper는 `createMemberJdApi(api.member)`를 주입해 요약 접수·목록·상세에서 회원 Bearer와 요청 시점 `getGrant()`의 `X-Link-Grant`를 함께 전달한다. 수신자 전용 호출로 회원 인증을 생략하지 않는다. LINK 401은 회원 갱신을 하지 않고 `onAccessLost`로 전달하며, AUTH 401은 회원 인증 처리와 로그인 안내로 구분한다.
 
 API의 실제 C-10 등록은 #468 병합과 #416 OQ5·OQ6 결정에 따라 AppModule에 연결했다. U4 제출 3 병합판을 받은 뒤 사용자의 C-11 대기 해제에 따라 제공된 슬롯 composition만 수정했다. U4의 screen/store/grants/slots·강조 로직은 그대로 사용한다. `jd-recipient-binding.ts`는 같은 링크의 최신 콜백을 참조하되 함수 교체만으로 선택·결과를 초기화하지 않는다. grant 값은 보관하지 않는다. 링크 교체 시 wrapper 자식을 해제하며, 회원 세대 교체는 기존 `JdSummaryPanel` 경계를 따른다.
 
-공유 페이지 직접 진입은 회원 Guard를 거치지 않으므로 통합 전환이 켜져 있을 때 wrapper가 기존 `authRuntime.ensureRestored()`를 호출한다. 별도 토큰·갱신 정책을 만들거나 전환 설정을 바꾸지 않는다. 실제 브라우저의 접수·재열람·근거 강조·접근 상실 결과와 합성 HTTP 검사 결과는 코드 요약에서 구분한다. 화면 연결을 외부 AI 처리 완료로 보고하지 않는다.
+공유 페이지 직접 진입은 회원 Guard를 거치지 않으므로 통합 전환이 켜져 있을 때 받은 링크 상단 바와 wrapper가 기존 `authRuntime.ensureRestored()`를 호출한다. 공용 함수의 한 번 제한을 따르며 별도 토큰·갱신 정책을 만들거나 전환 설정을 바꾸지 않는다. 상단 바가 비밀번호 입력·열람 불가·조회 실패 화면에서도 복원을 시작한다. 실제 브라우저의 접수·재열람·근거 강조·접근 상실 결과와 합성 HTTP 검사 결과는 코드 요약에서 구분한다. 화면 연결을 외부 AI 처리 완료로 보고하지 않는다.
 
 ## 검사
 
 `web/`에서 기존 Node 24.21.0과 잠금 의존성을 사용한다.
 
 ```sh
-node --test test/jd-management.test.mjs test/jd-summary.test.mjs test/jd-member-binding.test.mjs test/jd-recipient-binding.test.mjs test/member-navigation.test.mjs
+node --test test/jd-management.test.mjs test/jd-summary.test.mjs test/jd-member-binding.test.mjs test/jd-recipient-binding.test.mjs test/jd-recipient-login.test.mjs test/member-navigation.test.mjs
 node --test --experimental-test-coverage --test-coverage-include="src/features/jd/**" test/jd-management.test.mjs test/jd-summary.test.mjs
 npm run check
 ```

@@ -8,7 +8,8 @@
 
 | 파일 | 역할 |
 |---|---|
-| `src/app/s/[token]/page.tsx` | 페이지. 수신자 전용 헤더는 `src/app/s/layout.tsx`가 붙인다 |
+| `src/app/s/[token]/page.tsx` | 페이지. 모든 열람 상태에 수신자 전용 헤더를 `src/app/s/layout.tsx`가 붙인다 |
+| `../../components/header/recipient-header.tsx` | 회원 로그인 복원·로그아웃과 받은 링크에서 시작하는 로그인. 표시만 맡는 `recipient-header-view.tsx`는 공통 미리보기에서도 실제 인증 없이 사용한다 |
 | `recipient-screen.tsx` | 상태 연결(`createRecipientPublicationStore`), 단계별 h1 초점, `isLoggedIn`, 붙는 자리 props. 열린 프리셋 탭과 `showEvidence`는 `../publications/snapshot-jump.ts`의 `useSnapshotJump`가 맡는다(발행 프리셋 U3) |
 | `recipient-view.tsx` | 상태별 그리기(발행본·비밀번호 입력·접근 불가·조회 실패)와 0~4번 자리 배치(2번 `SummarySlot`, 3·4번 `QuestionSlots`), 비밀번호 입력 |
 | `recipient-store.ts` | 발행본 상태. 응답 코드 분기·비밀번호 확인·시도 제한 대기·늦은 응답 버리기·`accessLost`, Claude 안내 표시 값(`readWithoutGrant`·`claudeConnectable`) |
@@ -37,6 +38,9 @@
 - 2·3번 자리는 [U5 README 「붙이는 방법」](../rag-answer/README.md)대로 `RecipientSlotProps`(`token`·`getGrant`·`onAccessLost`·`isLoggedIn`·`showEvidence`)를 그대로 넘기고 `key={token}`이다. 여기에 이 화면의 사본으로 만든 선택 `itemTitleOf`(`itemTitleFinder(snapshot.items)`, #559)를 더 넘겨 출처 딱지 옆에 항목 제목을 보인다. `RecipientSlotProps` 모양은 그대로이고 4번 자리에는 넘기지 않는다. `isLoggedIn`은 이 탭의 회원 토큰 유무이며 받은 사람 요청에는 그 토큰을 붙이지 않는다.
 
 ## 동작
+
+- **상단 바 로그인·프로필(#638):** 자료·비밀번호 입력·열람 불가·조회 실패 화면 모두 헤더가 회원 세션 복원을 시작한다. 확인 중에는 오른쪽을 비우고, 확인 실패·재인증 필요에는 [로그인], 확인된 회원에게는 기존 회원 [프로필] 메뉴를 보인다. 그 밖의 로그인 여부는 JD 요약과 같은 조건을 쓴다. 왼쪽 CatchU는 이동 없는 글자이며 작성자 메뉴는 두지 않는다. 로그아웃 진행·결과 불명에도 프로필은 남기고 메뉴의 로그아웃을 막는다. 실패·불명 안내와 가능한 재시도는 회원 화면과 같은 안내를 헤더 아래에 두며, 로그아웃이 끝나도 받은 링크에 머문다.
+- **로그인 복귀(#638):** 헤더 [로그인]은 이 탭에 30분 동안 유효한 돌아갈 곳을 저장하고 토큰 없는 진입 표시로 로그인 화면을 연다. 로그인·최초 이름 입력을 마치면 같은 링크로 돌아와 돌아갈 곳만 지운다. 기존 비밀번호 grant의 탭·수명·재확인 기준은 그대로이며 회원 로그인이 비밀번호 확인을 대신하지 않는다. 공통 미리보기는 표시용 헤더로 로그인 전·확인 중·로그인 뒤를 나란히 그려 실제 세션을 확인하지 않는다.
 
 - **응답 코드별 화면:** 판정은 서버가 하고 화면은 `code`로만 나눈다.
 
