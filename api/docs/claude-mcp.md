@@ -140,7 +140,7 @@ CATCHU_TEST_REDIS_URL=redis://127.0.0.1:6379 TEST_COVERAGE_INCLUDE='dist/claude-
   - U9가 세 번째 도구를 더하며 도구 목록을 고정한 U6 시험 네 곳(`mcp-endpoint`·`mcp-logs`·`mcp-rate-limit`·`mcp-tools`)만 도구 이름 셋·도구 수 3으로 고치고, 입력·설명 검사는 U6 두 도구에만 걸리게 좁혔다. 그 밖의 U6 기대는 그대로다.
 - 화면에서 도구 호출까지 이어서 도는 합성 E2E는 [`scripts/claude-mcp-e2e`](../../scripts/claude-mcp-e2e/README.md)다(#594). 브라우저가 승인·연결 관리·발행 화면을 누르고 위 합성 Claude(`connectWithSdk`)가 도구를 부른다. CI·`npm test`에 들지 않고 그 폴더에서 따로 부르는 명령(`npm run e2e`)이며, 합성 시험이라 실제 Claude 연결의 증거가 아니다.
 
-**이 시험은 합성이고 실제 Claude 연결의 증거가 아니다.** 실제 Claude 웹·Desktop 연결과 다른 계정이 시작한 연결의 확인(기능 명세 S22~S24)은 사람이 하고 결과를 [통합 확인](../../docs/CatchU_통합확인.md) 표에 통과·실패·미실행으로 남긴다. 승인 주소·`state`·토큰·응답 글은 이슈·PR·AI에 남기지 않고 결과만 적는다(NFR6.5). 받은 링크 도구의 실제 Claude 확인(U9 S23)은 U9가 `main`에 오른 뒤 개발 서버에서 하고, 링크를 중지한 뒤 다음 쪽이 막힐 때의 `mcp_link_denied`와 그때 큐 연결 여부(빈도 제한이 켜졌는지)를 함께 적는다.
+**이 시험은 합성이고 실제 Claude 연결의 증거가 아니다.** 실제 Claude 웹·Desktop 연결과 다른 계정이 시작한 연결의 확인(기능 명세 S22~S24)은 사람이 하고 결과를 [통합 확인](../../docs/CatchU_통합확인.md) 표에 통과·실패·미실행으로 남긴다. 승인 주소·`state`·토큰·응답 글은 이슈·PR·AI에 남기지 않고 결과만 적는다(NFR6.5). 받은 링크 도구의 실제 Claude 확인(U9 S23)은 U9가 `main`에 오른 뒤 EKS에서 하고, 링크를 중지한 뒤 다음 쪽이 막힐 때의 `mcp_link_denied`와 그때 큐 연결 여부(빈도 제한이 켜졌는지)를 함께 적는다.
 
 ## 받아들인 한계
 
