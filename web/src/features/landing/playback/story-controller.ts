@@ -31,8 +31,8 @@ const STEP_DEFS: ReadonlyArray<readonly [StoryKey, string, readonly Segment[], s
   ["evidence", "Catch 설명 읽기", [[0, 0, 0, 0]], "Catch 내용과 해당 근거 항목을 읽습니다."],
   ["evidence", "근거 열기·원본 확인", [[0, 2500, 4600, 2100], [1, 0, 0, 200]], "원본 근거 열기 → GitHub 새 탭. 시연 안의 탭 전환이며 실제 새 탭은 열지 않습니다."],
   ["evidence", "코드 패널 확대", [[1, 1800, 3100, 1300]], "GitHub 새 탭에서 변경 부분을 확인합니다. CatchU 안의 코드 화면이 아닙니다."],
-  ["verification", "내용 확인·미공개", [[0, 500, 7200, 6700]], "CatchU 탭으로 돌아와 두 항목을 확인합니다. 확인을 마쳐도 아직 미공개입니다."],
-  ["verification", "별도 공개 선택", [[0, 10800, 13200, 2400]], "공개는 「지금 공개」를 따로 눌러 선택합니다."],
+  ["verification", "맞는지 보기·미공개", [[0, 300, 4400, 4100]], "CatchU 탭으로 돌아와 Catch 내용이 맞는지 봅니다. 공개하기 전에는 나만 봅니다."],
+  ["verification", "공개 켜기", [[0, 5400, 7600, 2200]], "공개 전환 단추를 켜 공개합니다. 언제든 다시 숨길 수 있습니다."],
   ["publication", "자료 선택·순서", [[0, 500, 4700, 4200]], "자기소개 → Catch. 선택한 항목에 하나씩 추가됩니다."],
   ["publication", "제목 입력·발행 내용 확인", [[0, 6500, 9000, 2200], [0, 9000, 12500, 3500], [0, 12500, 14400, 700], [0, 14400, 16300, 1900], [1, 0, 0, 200]], "제목을 넣고 발행할 내용을 확인합니다. 아직 발행 전입니다."],
   ["publication", "발행·URL 복사", [[1, 2800, 5000, 2200], [1, 5000, 7400, 500], [2, 700, 3300, 2600]], "발행 → URL 복사. 실제 발행이나 클립보드를 사용하지 않습니다."],
@@ -386,17 +386,15 @@ function run(page: HTMLElement, story: HTMLElement, scope: Scope, motion: Motion
       player.root.style.removeProperty("--stage-height38");
       player.caption.style.minHeight = "0";
     }
-    for (const name of ["--stage-height37", "--caption-height37", "--notice-fit37", "--confirm-fit37", "--public-fit37", "--publication-fit37"]) story.style.removeProperty(name);
+    for (const name of ["--stage-height37", "--caption-height37", "--notice-fit37", "--public-fit37", "--publication-fit37"]) story.style.removeProperty(name);
     const base = getComputedStyle(story);
     const read = (name: string, fallback: number) => parseFloat(base.getPropertyValue(name)) || fallback;
     const baseline = read("--feature-stage-height", 616);
     const baseNotice = read("--notice-height", 152);
-    const baseConfirm = read("--confirm-height", 212);
     const basePublic = read("--public-height", 184);
     const basePublication = read("--publication-height", 454);
     const inset = read("--feature-inset", 14);
     let notice = 0;
-    let confirm = 0;
     let publicBlock = 0;
     let publication = 0;
     let maximum = 0;
@@ -418,8 +416,6 @@ function run(page: HTMLElement, story: HTMLElement, scope: Scope, motion: Motion
             const frame = player.frames[scene];
             const noticeBox = frame.querySelector<HTMLElement>(".notice-reserve21");
             if (noticeBox) notice = Math.max(notice, naturalHeight(noticeBox));
-            const confirmBox = frame.querySelector<HTMLElement>(".confirm-block");
-            if (confirmBox) confirm = Math.max(confirm, naturalHeight(confirmBox));
             const publicBox = frame.querySelector<HTMLElement>(".public-block");
             if (publicBox) publicBlock = Math.max(publicBlock, naturalHeight(publicBox));
             const edit = frame.querySelector<HTMLElement>(".publication-edit22");
@@ -439,7 +435,6 @@ function run(page: HTMLElement, story: HTMLElement, scope: Scope, motion: Motion
       }
       const reserve = (value: number, baseValue: number) => `${Math.ceil(compact ? value : Math.max(value, baseValue))}px`;
       story.style.setProperty("--notice-fit37", reserve(notice, baseNotice));
-      story.style.setProperty("--confirm-fit37", reserve(confirm, baseConfirm));
       story.style.setProperty("--public-fit37", reserve(publicBlock, basePublic));
       story.style.setProperty("--publication-fit37", reserve(publication, basePublication));
       for (const player of players) {
