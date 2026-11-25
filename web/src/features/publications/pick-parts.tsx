@@ -46,6 +46,36 @@ export type ReorderListProps = {
 
 type PendingFocus = { kind: "input" | "remove"; key: string } | { kind: "empty"; sourceId: string };
 
+/**
+ * 목록이 비었을 때의 초점 옮기기(#632). 바로 옮기지 않고 화면을 두 번 그린 뒤에 옮긴다.
+ * 체크 해제와 초점 이동이 한 번의 화면 갱신에 붙어 일어나면 Chrome+NVDA가 방금 풀린 체크박스를 「체크함」으로 읽었고, 이렇게 미루면 「체크 안 함」으로 읽혔다
+ * (PR #639 확인). 원인은 확인하지 못했다(낭독기가 갱신 전 상태를 읽는 것으로 추정한다).
+ * 미루는 사이 사용자가 초점을 다른 곳으로 옮겼으면 끌어오지 않는다: 누른 [빼기]가 사라져 초점이 갈 곳을 잃은 때에만 옮긴다.
+ * 화면을 떠나 옮길 곳이 없어졌으면(`find`가 못 찾으면) 아무것도 하지 않는다.
+ *
+ * 브라우저는 보이지 않는 창의 화면을 그리지 않아, 그리기만 기다리면 그런 창에서는 초점이 끝내 옮겨지지 않는다. 그래서 예비 타이머를 함께 걸고
+ * 먼저 온 쪽이 한 번만 옮긴 뒤 나머지 예약을 지운다. 보이지 않는 창에서는 브라우저가 타이머도 늦추므로, 예비 시간은 「이보다 빨리 옮기지는 않는다」는 뜻일 뿐
+ * 그 시간 안에 옮긴다는 약속이 아니다.
+ */
+function focusAfterPaint(find: () => HTMLElement | null | undefined) {
+  let settled = false;
+  let frame = 0;
+  const settle = () => {
+    if (settled) return;
+    settled = true;
+    cancelAnimationFrame(frame);
+    window.clearTimeout(timer);
+    const active = document.activeElement;
+    if (active !== null && active !== document.body) return;
+    find()?.focus();
+  };
+  const timer = window.setTimeout(settle, EMPTY_FOCUS_FALLBACK_MS);
+  frame = requestAnimationFrame(() => { frame = requestAnimationFrame(settle); });
+}
+
+/** 예비 타이머의 시간. 근거 있는 값이 아니라 제안값이다: 창이 보일 때 화면 두 번 그리기가 수십 ms 안에 끝난 것보다 넉넉하게 잡았다. */
+const EMPTY_FOCUS_FALLBACK_MS = 200;
+
 const GRIP_ICON = (
   <svg width="14" height="20" viewBox="0 0 14 20" fill="currentColor" aria-hidden="true">
     <circle cx="4" cy="4" r="1.7" /><circle cx="10" cy="4" r="1.7" /><circle cx="4" cy="10" r="1.7" />
@@ -61,7 +91,7 @@ const GRIP_ICON = (
  *   순서를 그대로 두고 알린다. 목록이 넘쳐 스크롤될 때는 위·아래 끝에서 스스로 스크롤한다(속도는 `reorder.ts`).
  * - **순서 직접 지정:** 번호 칸은 Enter로만 확정한다. 틀린 값은 고쳐 넣지 않고 이유를 알린다. Enter 없이 칸을 벗어나면 값을 버리고 알린다
  *   (칸을 지나가기만 해도 순서가 바뀌는 일이 없다).
- * - **초점:** 번호로 옮긴 뒤에는 옮긴 항목의 번호 칸, [빼기] 뒤에는 다음 줄(없으면 앞 줄)의 [빼기], 목록이 비면 `emptyFocus`가 준 곳이다.
+ * - **초점:** 번호로 옮긴 뒤에는 옮긴 항목의 번호 칸, [빼기] 뒤에는 다음 줄(없으면 앞 줄)의 [빼기], 목록이 비면 `emptyFocus`가 준 곳이다(화면을 두 번 그린 뒤 옮기고, 화면이 그려지지 않으면 예비 타이머가 옮긴다, `focusAfterPaint`).
  * - 알림 칸(`role="status"`)과 오류 칸(`role="alert"`)은 늘 그려 두어 화면 낭독기가 바뀐 글을 놓치지 않는다.
  */
 export function ReorderList(props: ReorderListProps) {
@@ -95,7 +125,7 @@ export function ReorderList(props: ReorderListProps) {
     stopDrag.current?.();
     const target = pending.current;
     pending.current = null;
-    if (target?.kind === "empty") latest.current.emptyFocus?.(target.sourceId)?.focus();
+    if (target?.kind === "empty") focusAfterPaint(() => latest.current.emptyFocus?.(target.sourceId));
   }, []);
   useEffect(() => {
     committing.current = false;
@@ -114,7 +144,7 @@ export function ReorderList(props: ReorderListProps) {
     const target = pending.current;
     pending.current = null;
     if (!target) return;
-    if (target.kind === "empty") { latest.current.emptyFocus?.(target.sourceId)?.focus(); return; }
+    if (target.kind === "empty") { focusAfterPaint(() => latest.current.emptyFocus?.(target.sourceId)); return; }
     const row = [...(listRef.current?.querySelectorAll<HTMLElement>("[data-reorder-key]") ?? [])].find((element) => element.dataset.reorderKey === target.key);
     const element = row?.querySelector<HTMLElement>(target.kind === "input" ? "[data-reorder-input]" : "[data-reorder-remove]");
     element?.focus();
