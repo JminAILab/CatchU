@@ -107,11 +107,7 @@ export function RecordsDemo() {
               <div className="app-panel">
                 <div className="row-meta">
                   <b>sample-project</b>
-                  <span>
-                    <span className="badge">확인 전</span>
-                    {" "}
-                    <span className="badge">미공개</span>
-                  </span>
+                  <span className="badge">미공개</span>
                 </div>
                 <h3>
                   <span className="title-action18">request-handler.ts 코드 수정</span>
@@ -140,11 +136,7 @@ export function RecordsDemo() {
               <div className="app-panel">
                 <div className="row-meta">
                   <b>sample-project</b>
-                  <span>
-                    <span className="badge">확인 전</span>
-                    {" "}
-                    <span className="badge">미공개</span>
-                  </span>
+                  <span className="badge">미공개</span>
                 </div>
                 <h3>
                   <span className="title-action18">request-handler.ts 코드 수정</span>

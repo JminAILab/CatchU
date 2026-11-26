@@ -98,6 +98,17 @@
 .snapshotItem:focus { outline: none; }
 .snapshotItem:focus-visible, .snapshotItem[data-highlighted="true"] { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 
+/* 「보던 곳으로 돌아가기」 줄(#615, 2026-11-25 팀장 결정). 받은 사람 화면이 좁을 때(1200px 미만) 출처로 옮겨 간 항목의 맨 앞에만 그려진다.
+   그 항목이 화면에 있는 동안 화면 위쪽에 붙고, 항목을 벗어나면 함께 나간다. 펼친 글의 「접기」 줄은 아래쪽에 붙으므로 서로 겹치지 않는다.
+   붙어 있는 동안 밑으로 지나가는 글과 겹쳐 보이지 않게 바탕을 칠한다. 넓은 화면에서는 CSS로 숨기지 않고 화면이 그리지 않는다(초점을 먼저 넘기려고). */
+.returnBar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; margin: 0 0 10px; padding: 8px 0; background: var(--color-surface); border-bottom: 1px dashed #9aa6b6; }
+.returnButton { display: inline-flex; align-items: center; min-height: 44px; padding: 7px 13px; border: 1px solid #c9d2df; border-radius: 9px; background: var(--color-surface); color: #254e93; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.returnButton::before { content: "←" / ""; margin-right: 6px; }
+.returnButton:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+/* 줄이 붙어 있는 동안 그 항목 안의 조작 요소가 줄 밑에 가려지지 않게, 초점으로 보이는 자리에 옮겨질 때 위쪽에 줄 높이만큼 여유를 둔다.
+   화면 전체에 여유를 걸면 붙어 있는 돌아가기 단추가 그 안에 들어, Tab으로 그 단추에 갈 때 화면이 항목 맨 위까지 밀린다(#615 화면 초안 v9.5에서 확인). */
+.returnBar ~ * :is(button, a, summary) { scroll-margin-top: 76px; }
+
 /* ── #632 프리셋·발행 화면 다듬기(2026-11-24 팀장 결정, 화면 초안 v7). 새 라이브러리 없이 이 파일만 쓴다. */
 .leadTight { color: var(--color-muted); font-size: 15px; margin: 4px 0 0; }
 .backLinkRow { margin: 0 0 6px; }

@@ -118,11 +118,7 @@ export function HeroDemo() {
               <div className="app-panel">
                 <div className="row-meta">
                   <b>sample-project</b>
-                  <span>
-                    <span className="badge">확인 전</span>
-                    {" "}
-                    <span className="badge">미공개</span>
-                  </span>
+                  <span className="badge">미공개</span>
                 </div>
                 <h3>
                   <span className="title-action18">request-handler.ts 코드 수정</span>
@@ -145,11 +141,7 @@ export function HeroDemo() {
               <h3>request-handler.ts 코드 수정</h3>
               <div className="row-meta">
                 <span className="badge">Catch</span>
-                <span>
-                  <span className="badge">확인 전</span>
-                  {" "}
-                  <span className="badge">미공개</span>
-                </span>
+                <span className="badge">미공개</span>
               </div>
               <div className="fact" data-read-from="500" data-read-until="2800">
                 <span className="inline-label">기록에서 확인한 내용</span>
@@ -178,44 +170,32 @@ export function HeroDemo() {
         <div aria-hidden="true" className="frame14" data-scene="5">
           <div className="app-window">
             <WindowChrome>
-              CatchU · 확인과 공개 / 가상 예시
+              CatchU · 공개 선택 / 가상 예시
             </WindowChrome>
             <div className="app-content">
               <h3>request-handler.ts 코드 수정</h3>
-              <div className="confirm-block">
-                <div className="panel-title">내용 확인</div>
-                <div data-from="0" data-until="4200">
-                  <div className="checkrow">
-                    <span className="check16" data-target="facts">
-                      <span data-from="1260">✓</span>
-                    </span>
-                    <span>근거를 보고 작업 사실을 확인했습니다.</span>
-                  </div>
-                  <div className="checkrow">
-                    <span className="check16" data-target="contribution">
-                      <span data-from="2460">✓</span>
-                    </span>
-                    <span>나의 기여 범위를 확인했습니다.</span>
-                  </div>
-                  <span className="action16" data-disable-before="2460" data-target="confirm">확인 완료</span>
+              <div className="catch-block">
+                <div className="fact" data-read-from="400" data-read-until="3200">
+                  <span className="inline-label">기록에서 확인한 내용</span>
+                  <p>요청 처리 파일과 테스트 파일의 변경이 기록돼 있습니다.</p>
                 </div>
-                <div data-from="4200">
-                  <span className="badge green">확인 완료</span>
-                  <p>작업 사실과 나의 기여를 확인했습니다.</p>
+                <div className="row-meta catch-meta">
+                  <span>근거 2개</span>
+                  <span>한 저장소 · 내가 기여한 기록</span>
                 </div>
               </div>
               <div className="public-block">
                 <div className="panel-title">공개 선택</div>
-                <div data-from="0" data-until="7680">
-                  <span className="badge">미공개</span>
-                  <p>확인만으로 공개되지 않습니다.</p>
-                  <span className="action16" data-disable-before="4200" data-target="publish-catch">지금 공개</span>
-                </div>
-                <div data-from="7680">
-                  <span className="badge green">공개</span>
-                  <p>공개를 별도로 선택했습니다.</p>
-                  <span className="secondary16">숨기기</span>
-                </div>
+                <p data-until="5900">작업 사실과 나의 기여가 맞는지 본 뒤 공개하세요. 공개하기 전에는 나만 봅니다.</p>
+                <p data-from="5900">공개한 Catch만 발행 · 언제든 다시 숨기기</p>
+                <span className="switch-row">
+                  <span className="switch-target" data-cursor-anchor="center" data-target="publish-switch">
+                    <span className="switch-track" data-until="5900" />
+                    <span className="switch-track on" data-from="5900" />
+                  </span>
+                  <span data-until="5900">미공개</span>
+                  <span data-from="5900">공개 설정</span>
+                </span>
               </div>
             </div>
           </div>
@@ -329,11 +309,9 @@ export function HeroDemo() {
               <div className="app-content mini-product22">
                 <b className="mini-catch-title22">request-handler.ts 코드 수정</b>
                 <p className="mini-state49">
-                  <span className="badge green">확인 완료</span>
-                  {" "}
                   <span className="badge green">공개</span>
                 </p>
-                <p className="mini-fact22">확인한 Catch 중 공개할 것을 직접 선택했습니다.</p>
+                <p className="mini-fact22">내용이 맞는 Catch만 직접 선택해 공개했습니다.</p>
                 <div className="mini-evidence22">
                   <b>공유 링크 · 가상 예시</b>
                   <span>https://catchu.dev/s/[예시 토큰]</span>

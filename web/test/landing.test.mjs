@@ -138,7 +138,8 @@ test("스크립트가 꺼진 화면: 기능 네 개에 설명과 결과 화면�
     assert.match(plainText(summary), /가상 예시/, "결과 화면에 가상 예시 표시가 없다");
   }
 
-  const css = readFileSync(new URL("../src/features/landing/landing.module.css", import.meta.url), "utf8");
+  // 작업 사본의 줄바꿈이 CRLF여도(Windows, core.autocrlf=true) 같은 규칙을 찾도록 LF로 맞춘 뒤 본다.
+  const css = readFileSync(new URL("../src/features/landing/landing.module.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   const block = css.match(/@media \(scripting: none\) \{\n(.*?)\n\}\n/s)?.[1] ?? "";
   assert.match(block, /#story:not\(\[data-layout\]\) \.story-stack36>\.feature\) \{\s*display: grid !important;/);
   assert.match(block, /#story:not\(\[data-layout\]\) \.scroll-demo36 \.summary14\) \{\s*display: grid !important;/);

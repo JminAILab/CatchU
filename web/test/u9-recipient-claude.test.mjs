@@ -143,7 +143,10 @@ test("S20 grant 없이 조회에 성공한 판정 통과 화면에 U9 패널과 
   assert.equal(count(html, "<h1"), 1, "패널은 h1을 더하지 않는다");
 
   // 패널에는 토큰만 넘긴다(grant·비밀번호·getGrant·onAccessLost 없음).
-  const children = RecipientPublicationView(viewProps(setup)).props.children;
+  // #615: 판정 통과 화면의 위쪽(h1·시작 안내·U9 패널·발행 시각)은 첫 자식인 안내 묶음 안에 있다.
+  const [intro] = RecipientPublicationView(viewProps(setup)).props.children;
+  assert.equal(intro.props["data-testid"], "recipient-intro");
+  const children = intro.props.children;
   const panels = children.filter((child) => child?.type === ClaudeAnalyzePanel);
   assert.equal(panels.length, 1);
   assert.deepEqual(Object.keys(panels[0].props), ["token"]);

@@ -830,7 +830,7 @@
 .page :global(.demo14 .checkrow) {
   font-size: 15px;
 }
-.page :global(.confirm-block),
+.page :global(.catch-block),
 .page :global(.public-block) {
   border: 1px solid #d8e1ec;
   padding: 17px;
@@ -1104,7 +1104,7 @@
   .page :global(.demo14 .checkrow) {
     font-size: 14px;
   }
-  .page :global(.confirm-block),
+  .page :global(.catch-block),
   .page :global(.public-block) {
     padding: 14px;
   }
@@ -1325,9 +1325,6 @@
   line-height: 19px;
   font-weight: 750;
 }
-.page :global(.demo16 .confirm-block) {
-  min-height: 235px;
-}
 .page :global(.demo16 .public-block) {
   min-height: 170px;
   margin-top: 15px;
@@ -1472,9 +1469,6 @@
     font-size: 16px;
     min-height: 106px;
   }
-  .page :global(.demo16 .confirm-block) {
-    min-height: 265px;
-  }
   .page :global(.demo16 .public-block) {
     min-height: 190px;
   }
@@ -1515,9 +1509,6 @@
   }
   .page :global(.demo16 .app-content h3) {
     font-size: 20px;
-  }
-  .page :global(.demo16 .confirm-block) {
-    min-height: 285px;
   }
   .page :global(.demo16 .public-block) {
     min-height: 200px;
@@ -2878,7 +2869,6 @@
   --feature-stage-height: 616px;
   --feature-inset: 14px;
   --notice-height: 152px;
-  --confirm-height: 212px;
   --public-height: 184px;
   --publication-height: 454px;
 }
@@ -2899,9 +2889,6 @@
 .page :global(#story .demo16[data-player="records"] .request-reserve21) {
   height: calc(var(--notice-height) + 64px);
 }
-.page :global(#story .demo16[data-player="verification"] .confirm-block) {
-  min-height: var(--confirm-height);
-}
 .page :global(#story .demo16[data-player="verification"] .public-block) {
   min-height: var(--public-height);
 }
@@ -2921,7 +2908,6 @@
   .page :global(#story) {
     --feature-stage-height: 600px;
     --notice-height: 196px;
-    --confirm-height: 202px;
     --public-height: 178px;
     --publication-height: 432px;
   }
@@ -2930,7 +2916,6 @@
   .page :global(#story) {
     --feature-stage-height: 620px;
     --notice-height: 220px;
-    --confirm-height: 230px;
     --publication-height: 476px;
   }
 }
@@ -3547,9 +3532,6 @@
 .page :global(#story .scroll-demo36[data-player="records"] .request-reserve21) {
   height: calc(var(--notice-fit37, var(--notice-height)) + 64px);
 }
-.page :global(#story .scroll-demo36[data-player="verification"] .confirm-block) {
-  min-height: var(--confirm-fit37, var(--confirm-height));
-}
 .page :global(#story .scroll-demo36[data-player="verification"] .public-block) {
   min-height: var(--public-fit37, var(--public-height));
 }
@@ -3563,7 +3545,7 @@
   padding-top: 8px;
   padding-bottom: 8px;
 }
-.page :global(#story[data-compact37="true"] .scroll-demo36 .confirm-block),
+.page :global(#story[data-compact37="true"] .scroll-demo36 .catch-block),
 .page :global(#story[data-compact37="true"] .scroll-demo36 .public-block) {
   padding: 14px;
 }
@@ -3811,7 +3793,7 @@
     padding-top: 5px;
     padding-bottom: 5px;
   }
-  .page :global(#story .scroll-demo36 .confirm-block),
+  .page :global(#story .scroll-demo36 .catch-block),
   .page :global(#story .scroll-demo36 .public-block) {
     padding: 10px;
   }
@@ -4069,7 +4051,7 @@
     padding-top: 4px;
     padding-bottom: 4px;
   }
-  .page :global(#story .scroll-demo36 .confirm-block),
+  .page :global(#story .scroll-demo36 .catch-block),
   .page :global(#story .scroll-demo36 .public-block) {
     padding-top: 8px;
     padding-bottom: 8px;
@@ -4478,9 +4460,6 @@
   padding-top: 18px;
   padding-bottom: 18px;
 }
-.page :global(.hero14 [data-scene="5"] .confirm-block) {
-  min-height: 208px;
-}
 .page :global(.hero14 .share-step49) {
   margin-top: 14px;
 }
@@ -4731,6 +4710,65 @@
 }
 .page :global(#story[data-layout="static"] .scroll-demo36 .demo-label14 span:last-child) {
   display: none;
+}
+/* 기능 3과 대표 시연의 「공개 선택」(#635): 앱에서 내용 확인을 공개에 합쳐, 위에는 읽을 Catch 내용(.catch-block), 아래에는 전환 단추 그림 하나만 둔다.
+ * 전환 단추는 누를 수 없는 그림이다. 켜짐·꺼짐은 시간표(data-from·data-until)가 두 그림 중 하나를 보여 정한다. */
+.page :global(.catch-block .fact) {
+  margin-top: 0;
+}
+.page :global(.catch-meta) {
+  margin-top: 12px;
+  color: #627389;
+}
+.page :global(.demo16:not(.recipient14) .catch-block.aim16) {
+  border-color: #8ba8d4;
+  background: #f4f8ff;
+}
+.page :global(.switch-row) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  color: #243d60;
+  font-size: 13px;
+  font-weight: 650;
+}
+.page :global(.switch-target) {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+}
+.page :global(.switch-track) {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: #9bacbe;
+}
+.page :global(.switch-track)::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+}
+.page :global(.switch-track.on) {
+  background: #244ea3;
+}
+.page :global(.switch-track.on)::after {
+  left: 21px;
+}
+.page :global(.demo16 .switch-target.aim16) {
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px #698dc8;
+}
+.page :global(.demo16 .switch-target.pressed16) {
+  transform: translateY(1px);
 }
 /* 서버가 그린 직후, 움직임이 켜지기 전의 짧은 순간: 켜지자마자 아래에서 들어올 요소를 미리 감춰 한 번 보였다 다시 들어오는 깜빡임을 막는다.
  * 움직임이 켜지면(.motion16-ready) 이 규칙은 더 걸리지 않는다. 스크립트가 켜지지 못해도 2.5초 뒤에는 그대로 보인다.
