@@ -15,6 +15,7 @@ import { planFit, readViewport, viewportGutter } from "./viewport-fit";
  * - 영역이 화면 높이에 들어가지 않으면 영역 안쪽을 스크롤하게 하고 안내 문구를 보인다.
  * - 바로가기 버튼은 그 기능의 첫 단계로 옮기고 그 기능을 처음부터 다시 보여 준다. 휠·터치 입력은 가로채지 않는다.
  * - 동작 줄이기에서는 재생 없이 각 단계의 결과 화면을 바로 보인다.
+ * - 지금 기능이 아닌 것은 화면에서만 가린다. 제목과 설명은 화면 낭독기가 기능 순서대로 읽는다(landing.module.css의 낭독용 규칙).
  * 서버 호출·클립보드·포커스 이동·실제 입력·저장이 없다.
  */
 const KEYS = ["records", "evidence", "verification", "publication"] as const;
@@ -222,10 +223,9 @@ function run(page: HTMLElement, story: HTMLElement, scope: Scope, motion: Motion
     if (shownKey !== key) {
       features.forEach((feature, i) => {
         const on = KEYS[i] === key;
+        // 지금 기능이 아닌 것도 보조기기에서는 빼지 않는다(hidden·aria-hidden·inert를 달지 않는다).
+        // 화면에서는 CSS가 가리고 제목·설명만 낭독 순서에 남겨, 위에서부터 읽으면 기능 1→2→3→4가 차례로 읽힌다(#641).
         feature.classList.toggle("active36", on);
-        feature.hidden = !on;
-        feature.setAttribute("aria-hidden", String(!on));
-        feature.inert = !on;
       });
       shownKey = key;
     }
