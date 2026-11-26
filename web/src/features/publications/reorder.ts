@@ -2,6 +2,7 @@
  * 순서 목록(`ReorderList`)의 계산(#632). 화면과 나눠 시험한다. DOM을 읽지 않고 숫자만 받는다.
  *
  * - 「순서 직접 지정」: 1부터 항목 수까지의 정수만 받는다. 빈 값·글자·소수·범위 밖 값은 고쳐 넣지 않고 이유를 돌려준다.
+ *   번호 칸과 같은 줄의 [적용]이 하나의 입력 구역이고, 확정 없이 구역 밖으로 나가면 값을 버린다(2026-11-26 팀장 결정).
  * - 드래그: 놓을 자리, 목록을 조금 벗어나 놓아도 받아 주는 여유, 자동 스크롤 속도. 여유와 속도는 px로 고정하지 않고 줄 높이를 기준으로 잡는다
  *   (2026-11-24 팀장 결정: 줄 하나 높이쯤까지 받아 주고, 자동 스크롤은 초당 약 2줄에서 시작해 최대 초당 약 6줄).
  */
@@ -31,9 +32,16 @@ export function parseOrderInput(raw: string, count: number): OrderInput {
 /** 옮긴 뒤 알림. 이름 끝 글자에 따라 조사가 달라지지 않게 쓴다. */
 export const movedText = (title: string, index: number): string => `‘${title}’ 자리: ${index + 1}번째로 옮겼습니다.`;
 export const ORDER_UNCHANGED_TEXT = "순서를 바꾸지 않았습니다.";
-export const ORDER_DISCARDED_TEXT = "Enter를 누르지 않아 순서를 바꾸지 않았습니다.";
+export const ORDER_DISCARDED_TEXT = "Enter나 [적용]을 누르지 않아 순서를 바꾸지 않았습니다.";
 export const orderHintText = (count: number): string =>
-  `1~${count} 사이의 숫자를 넣고 Enter를 누르세요. Enter를 누르지 않고 칸을 벗어나면 넣은 값은 버리고 순서는 그대로 둡니다.`;
+  `1~${count} 사이의 숫자를 넣고 Enter나 [적용]을 누르세요. 누르지 않고 번호 칸과 [적용] 밖으로 나가면 넣은 값은 버리고 순서는 그대로 둡니다.`;
+
+/**
+ * 번호 칸이나 [적용]에서 초점이 나갔을 때 입력 구역을 벗어난 것인가.
+ * - `staysInZone`: 초점이 같은 줄의 번호 칸이나 [적용]으로 옮겨 갔다.
+ * - `applying`: 그 줄의 [적용]을 누르는 중이다. Safari는 단추를 눌러도 초점이 단추로 가지 않아 초점이 갈 곳 없이 풀리는데, 이것은 벗어남이 아니다.
+ */
+export const leavesOrderZone = (blur: { readonly staysInZone: boolean; readonly applying: boolean }): boolean => !blur.staysInZone && !blur.applying;
 
 export type Box = { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number };
 
