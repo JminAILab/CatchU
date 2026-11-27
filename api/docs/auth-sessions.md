@@ -100,7 +100,7 @@ Origin 검사를 통과한 로그아웃은 쿠키 없음·알 수 없는/잘못�
 - Strict는 그대로 적용한다. 실제 브라우저에서 문제가 확인되면 근거와 함께 팀장이 허용한 Lax 전환을 검토한다. 현재 구현에는 자동 전환이나 None 완화가 없다. OAuth 복귀와 관련해 확인한 범위는 다음과 같다.
   - 실제 Google: [#251 11/2 실제 Google 검증](https://github.com/JminAILab/CatchU/issues/251#issuecomment-6571204101)(판본 `600f8019`의 로컬 검증 빌드에 통합 모드를 켜고 실제 Chrome)에서 로그인·계정 전환이 동작했다. 계정 전환 중 원인을 확인하지 못한 갱신 401이 1건 있었다. [#286 11/3 확인](https://github.com/JminAILab/CatchU/issues/286#issuecomment-6595012881)에서는 개발 서버(`catchu.dev`, main `9805502` 배포 기록 기준)에서 실제 Google 로그인 뒤 앱 내장 Chromium에 저장된 Refresh 쿠키를 직접 확인했고 `SameSite=Strict`였다.
   - GitHub 대역 왕복·세션 복원: [PR #409](https://github.com/JminAILab/CatchU/pull/409) 「확인」의 대역 왕복은 head `e8e0960f`의 통합 모드를 켠 빌드를 헤드리스 Chrome 156으로 확인했다. GitHub 인증 화면·토큰 교환·계정 조회는 대역이며, 브라우저에는 github.com에서 돌아오는 이동으로 보인다. 이 경로에서 다른 사이트에서 돌아온 직후 `SameSite=Strict` Refresh 쿠키로 세션이 복원됐다. PR #409는 Chrome 밖 브라우저를 보지 않았다.
-  - 실제 GitHub 승인 전체 왕복: 실제 승인·토큰 교환을 포함한 전체 왕복은 [#253 합의](https://github.com/JminAILab/CatchU/issues/253#issuecomment-6484686338)로 추가 검증을 생략해 미검증이다.
+  - 실제 GitHub 승인 전체 왕복: #253 당시 추가 검증을 생략한 [합의](https://github.com/JminAILab/CatchU/issues/253#issuecomment-6484686338)와 별도로, [11/18 EKS 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에서 실제 연결·토큰 저장·API 재기동 후 보존·분석 접수까지 확인했다. 이 기록은 여러 브라우저·세션 응답 유실 등 아래의 모든 경계 검사를 뜻하지 않는다.
 
 설정 전체 목록은 [환경변수](environment.md), 설치·DB 준비는 [README](../README.md)를 따른다. 기존 .env·전역 설정·다른 DB는 변경하지 않는다.
 
@@ -127,7 +127,7 @@ Remove-Variable login,me,renewed,ended,browser
 
 2026-10-08의 실제 Google 로그인·반복 로그인·프로필 보존 사용자 재현은 #249/PR #257의 이전 판본 기록이다. 이번 세션/쿠키 연결 판본의 실제 Google 로그인·브라우저 쿠키·다중 탭 재검증 결과로 확대하지 않는다. [기존 제품 판본의 CI 기록](https://github.com/JminAILab/CatchU/actions/runs/38128565848)은 API·문서 크기 통과와 경로 조건으로 생략된 web·worker·의존성 검사를 구분한다. dev 통합 후 직접 검사와 새 HEAD CI 결과는 [PR #269 검사 기록](https://github.com/JminAILab/CatchU/pull/269)에서 실행 판본과 함께 확인한다.
 
-실제 브라우저 검증은 다음 준비와 순서가 필요하다. 아래는 실행 계획이며 통과 기록이 아니다.
+아래는 #269 당시 작성한 브라우저 검증 계획으로 통과 기록이 아니다. 1번의 고정 판본은 당시 web 상태이며 현행 연결 상태는 [web 인증 안내](../../web/src/features/auth-session/README.md)와 위 실제 확인 기록을 따른다.
 
 1. 위 접점 합의를 기준으로 API·web 담당자가 검증할 판본과 남은 세부 접점·세션 식별 미결을 확인한다. [확인한 dev의 web 판본](https://github.com/JminAILab/CatchU/tree/4c50c44900074a70d43417d38a053a42c1a86ff1/web)은 Google 진입 연결 전, `credentials: "omit"`, 회원 인증 401에서 토큰 제거, 토큰 변경 때 자산·링크 화면 재생성 방식이다. 이후 판본은 해당 코드를 다시 확인하며 API만 연결해 전체 #251 동작이 구현됐다고 보지 않는다.
 2. 전용 검증 DB와 앱을 분리해 준비한다. 이번 세션 마이그레이션이 적용된 API와 #251 연결 web을 사용하고, 기존 DB·.env·서명 키·다른 작업 서버를 덮어쓰지 않는다. 자동 검사를 재실행할 때도 전용 TEST_DB를 사용한다.

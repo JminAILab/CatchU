@@ -4,15 +4,15 @@ worker가 분석 `attemptId`로 접수 기록(요청·회원·동의·허용 범
 
 ## 조립 조건과 후속 공급자
 
-`main.ts`가 기동할 때 `createApplicationModule()`로 제품 앱을 조립한다. `WORKER_CONTEXT_ENABLED=true`와 유효한 별도 서비스 키가 있으면 #252의 실제 `DatabaseRepositorySelectionSource`([선정 공급](repository-selection.md#worker-선정--232))를 `WorkerContextModule.register({ selectionSource })`에 전달한다. 비활성이면 내부 조회 모듈을 등록하지 않는다. 이 모듈은 실제 PostgreSQL과 `GitHubConnectionModule`을 쓰며, 공급자가 없으면 조립을 거부한다. 기본 `AppModule`은 독립 시험에도 쓰므로 그대로 두고 제품 조립 함수에서만 연결한다. 합성 공급자를 자동 대입하거나 `consentedScope`의 `synthetic: true`·자료 종류 목록을 전체 저장소 동의로 추정하지 않는다.
+`main.ts`가 기동할 때 `createApplicationModule()`로 제품 앱을 조립한다. `WORKER_CONTEXT_ENABLED=true`와 유효한 별도 서비스 키가 있으면 실제 `RegistrationContextSource`(`src/member-repositories/registration-context.source.ts`)를 `WorkerContextModule.register({ selectionSource })`에 전달한다. 현행은 회원별 등록과 접수 당시 여섯 칸 동의 사본을 대조하며 #252의 전역 선정 공급자를 제품에 넣지 않는다([U7 안내](repository-analysis-u7.md)). 비활성이면 내부 조회 모듈을 등록하지 않는다. 이 모듈은 실제 PostgreSQL과 `GitHubConnectionModule`을 쓰며, 공급자가 없으면 조립을 거부한다. 기본 `AppModule`은 독립 시험에도 쓰므로 제품 조립 함수에서만 연결한다. 합성 공급자를 자동 대입하거나 자료 종류 목록만으로 전체 저장소 동의를 추정하지 않는다.
 
 `WorkerRepositorySelectionSource.resolve(manager, context, { lock })`는 접수 기록의 attemptId·requestId·memberId·repositoryId·scopeRevision·consentedScope를 받아 아래를 확인해야 한다.
 
-- 현재 선정된 공개 저장소의 ID·좌표와 범위 판본이 접수 기록과 일치한다.
+- 본인 등록의 저장소 ID·현재 범위 판본과 접수 기록이 일치한다. 좌표는 이름 변경과 무관하게 동의 당시 사본을 사용한다.
 - 저장된 동의가 해당 저장소의 전체 선정임을 명시적으로 뜻한다. 알 수 없는 구조·부분 선정·철회·미지원 판본은 `null`이다.
 - 반환값은 같은 attemptId·requestId·memberId·repositoryId·scopeRevision, `repository: { owner, name }`, `wholeRepository: true`다. 토큰을 받거나 반환하지 않는다.
 
-제공받은 `EntityManager`로 조회하고 외부 통신을 하지 않는다. 자격정보 조회 전에는 `lock: null`, 최종 트랜잭션 안에서는 `lock: 'pessimistic_read'`로 호출한다. 최종 공급자는 선정 여부·판본·좌표 등 판정 근거 행을 같은 manager로 읽기 잠금한 뒤 최신 자료를 판정하고, 트랜잭션 종료까지 잠금을 유지해야 한다. 여러 근거 행은 일관된 순서로 잠근다. 서비스는 분석 요청 → 분석 시도를 별도 SQL로 순서대로 잠근 뒤 회원·동의 → 선정 근거 → GitHub 연결을 잠근다. 수신·결과 반영과 요청·시도 잠금 순서를 맞춰 교착을 막는다. 조회 장애는 예외로 전달해 `500 INTERNAL_ERROR`로 남긴다. 서비스는 공급자 반환 식별자와 좌표 형식도 검사한다. #252의 실제 공급자는 DB 선정 근거로 이 인터페이스를 구현하고 같은 잠금·경쟁 검증(`test/db/repository-selection-worker-api.test.cjs`)을 통과한다. 테스트 공급자를 앱에 등록해서는 안 된다.
+제공받은 `EntityManager`로 조회하고 외부 통신을 하지 않는다. 자격정보 조회 전에는 `lock: null`, 최종 트랜잭션 안에서는 `lock: 'pessimistic_read'`로 호출한다. 현행 공급자는 회원·등록 행을 같은 manager로 읽기 잠금하고 요청의 등록 참조·불변 범위 정의를 대조한다. 서비스는 교착을 피하려고 수신·반영 경로와 같은 분석 요청 → 분석 시도 순서로 잠근 뒤 회원·동의 → 등록 근거 → GitHub 연결을 읽기 잠금한다. 공급자는 반환 근거 행의 읽기 잠금을 트랜잭션 끝까지 유지하고, 여러 행을 잠그면 고정된 순서를 지켜야 한다. 조회 장애는 `500 INTERNAL_ERROR`로 전달하며 반환 식별자와 좌표 형식도 검사한다. #252의 전역 선정 공급자·잠금 검사는 10월 경로로 남아 있으며 현재 회원별 등록 검사와 구분한다. 테스트 공급자를 앱에 등록해서는 안 된다.
 
 제품 실행은 `api/`에서 필요한 `DB_*`·회원 인증 설정·GitHub 연결 설정을 준비하고 `npm run build` 후 `npm start`다. worker는 같은 서비스 키와 내부 API 주소로 기존 조회 제공자를 사용한다([worker 설정](../../worker/docs/request-context.md#설정)). #323의 LIVE 접수·#233의 큐 시작은 이 조립에 포함되지 않는다. 테스트에서 명시적 공급자를 넣는 `WorkerContextModule.register`는 제품 진입점과 별개다.
 
@@ -84,8 +84,9 @@ npm test -- test/worker-context-auth.test.cjs test/db/worker-context-api.test.cj
 |---|---|---|
 | `worker-context-auth.test.cjs` | 활성화·키 형식·다른 키 재사용, 회원 JWT 혼용 거부, 잘못된 키의 main 기동 실패와 로그 비노출 | 설정·인증 함수와 실제 main, 외부 호출 없음 |
 | `runtime/bootstrap.test.cjs` | 제품 main의 활성·비활성에 따른 내부 경로 등록, 설정·기동·종료 | 실제 main·HTTP·PostgreSQL, 외부 호출 없음 |
-| `db/worker-context-application.test.cjs` | main과 같은 제품 조립의 실제 선정 공급, 두 저장소의 동의·좌표, 서비스 인증, 제외·동의 불일치·연결 해제·종결 거부 | 실제 HTTP·PostgreSQL·암호문 보관·DB 선정 공급, 외부 GitHub 응답만 합성 |
-| `db/repository-selection-worker-api.test.cjs` | 최종 확인 전 선정 제외·범위/좌표 판본 변경 거부, 최종 잠금 뒤 변경의 커밋 대기 | 실제 HTTP·PostgreSQL·DB 선정 공급, GitHub 응답과 경쟁 시점 제어만 시험 대역 |
+| `db/worker-context-application.test.cjs` | main과 같은 제품 조립의 회원 등록 공급, 저장 동의·좌표, 서비스 인증, 전역 선정 제외와 독립적인 실행, 동의 불일치·연결 해제·종결 거부 | 실제 HTTP·PostgreSQL·암호문 보관·DB 등록 공급, 외부 GitHub 응답만 합성 |
+| `u7-worker-context.test.cjs` | 여섯 칸 동의·등록 참조, 표시명 변경 뒤 당시 좌표 보존, 삭제된 회원·등록·요청과 빠진 범위 정의 거부 | 실제 공급 함수·명시적 DB 대역 |
+| `db/repository-selection-worker-api.test.cjs` | 10월 전역 선정 공급의 최종 확인 전 제외·범위/좌표 판본 변경 거부, 잠금 뒤 변경의 커밋 대기 | 실제 HTTP·PostgreSQL·10월 DB 선정 공급, GitHub 응답과 경쟁 시점 제어만 시험 대역 |
 | `db/worker-context-api.test.cjs` | 접수 기록·404 이유, LIVE/MOCK·세션·회원·동의, 해제·재연결·종결 경쟁, 수신 잠금 순서, 오류·로그 비노출 | 실제 HTTP·PostgreSQL·암호문 보관, GitHub 응답·선정 공급은 합성 대역 |
 
 조회 모름의 실패 결과를 E 수신에 넣는 검사는 `test/integration/receiver-registration.test.cjs`에 있다. 위 검사는 실제 Google/GitHub 승인, 큐·worker 왕복, 운영 내부 네트워크 검증을 대신하지 않는다.

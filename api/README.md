@@ -6,11 +6,11 @@
 
 > 코드를 고치기 전에 [api 코딩 규약](CONVENTIONS.md), 이 문서, 맡은 기능의 `api/docs/<기능>.md`를 한 파일씩 따로 열어 읽는다(여러 파일을 한 번에 출력하면 가운데가 잘릴 수 있다). 기능별 안내는 이 README에 덧붙이지 않고 `api/docs/<기능>.md`로 쓴다.
 
-NestJS로 만드는 첫 MVP의 API 서버다. 인증·회원·프로필·GitHub 연동, 분석 요청·작업 상태, 본인 자산 조회·공개/숨김, 공유 링크·수신자 접근을 다룬다. 수집·분석 처리는 worker와 연결한다. 세부 범위는 작업의 이슈와 승인 요구사항·기능 설계로 확인한다(위치는 [문서 안내](../docs/README.md#ai-dlc-산출물과의-관계)).
+NestJS API 서버다. 인증·회원·프로필·GitHub 연동, 저장소 등록·분석, Catch·텍스트·PDF 관리, 발행 프리셋·발행본·받은 사람 접근, 검색·질의응답·JD 요약·Claude 본인 연결을 다룬다. 저장소 수집·분석과 PDF 추출은 worker와 연결한다. 세부 범위는 작업의 이슈와 승인 요구사항·기능 설계로 확인한다(위치는 [문서 안내](../docs/README.md#ai-dlc-산출물과의-관계)).
 
-현재 구현은 `GET /health`, [#87 API 인증 기반](https://github.com/JminAILab/CatchU/issues/87), [#88 공통 오류 처리](https://github.com/JminAILab/CatchU/issues/88), [#86 DB 연결·마이그레이션 기반](https://github.com/JminAILab/CatchU/issues/86)이다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). [#139 분석 메시지 수신 모듈](https://github.com/JminAILab/CatchU/issues/139)은 독립 수신 로직과 필수 공급자를 받는 실제 DB/E·B 조립을 제공하며 `AppModule`에는 자동 등록하지 않는다. [#104 회원·분석 선행 테이블](https://github.com/JminAILab/CatchU/issues/104)과 개발 회원·합성 연동·공통 멱등 처리를 제공한다. 기능 API는 [#135 본인 회원 조회·프로필 저장](docs/member-profile.md)(`GET /v1/me`, `PUT /v1/me/profile`), [#147 공유 링크 발급](https://github.com/JminAILab/CatchU/issues/147)(`POST /v1/share-links`)과 [#148 목록·중단](https://github.com/JminAILab/CatchU/issues/148)(`GET /v1/share-links`, `PUT /v1/share-links/{linkId}/stop`)이 있다([docs/share-links.md](docs/share-links.md)). 본인 Catch 조회·확인·불일치 API는 [docs/catch-owner-read-preparation.md](docs/catch-owner-read-preparation.md), 공개·숨김은 [docs/catch-visibility.md](docs/catch-visibility.md)를 따른다. 세션 유지·갱신·로그아웃은 [세션 안내 — #250](docs/auth-sessions.md)를 따른다. 실제 로그인 화면·나머지 기능 API·worker 연결은 후속 작업이다.
+`GET /health`와 공통 인증·오류·DB 기반 위에 기능 모듈을 `AppModule`에서 조립한다. 모든 API에 공통 인증 Guard를 적용하며, 명시한 공개 경로만 제외한다. api는 PostgreSQL에 연결된 상태로만 기동한다(「로컬 DB 준비」). 본인 회원·프로필은 [회원 안내](docs/member-profile.md), Catch는 [본인 조회](docs/catch-owner-read-preparation.md)·[공개 상태](docs/catch-visibility.md), 기본 앱에 등록된 `/v1/presets`는 [프리셋 안내](docs/presets.md), 현행 발행·받은 사람 경로는 [발행본 안내](docs/publications.md)·[받은 사람 안내](docs/recipient-publication.md)를 따른다. 세션 유지·갱신·로그아웃은 [세션 안내](docs/auth-sessions.md)에 있다. `createApplicationModule()`은 내부 조회를 켰을 때 실제 등록 공급자를, 큐 주소가 있을 때 분석 큐와 DB 수신·Catch 반영을 연결한다([분석 큐](docs/analysis-queue.md)). 모듈별 위치와 조립 책임은 [코딩 규약](CONVENTIONS.md#파일-역할과-모듈-추가-위치)을 따른다.
 
-Google 인증 코드 교환·회원 연결 API와 앱 등록·검사 절차는 [실제 Google 로그인 — #249](docs/google-login.md)를 따른다. 2026-10-08 사용자 직접 재현으로 실제 로그인·보호 API 호출·반복 로그인·저장된 프로필 보존을 확인했다. 수동 미검증 항목과 자동 검사와 실제 화면 연결의 후속 범위는 기능 문서에서 구분한다. #250의 세션·쿠키 연결 판본에서 실제 Google/브라우저 재현은 별도로 남아 있다.
+Google 인증 코드 교환·회원 연결과 세션·쿠키의 동작·검사 범위는 [Google 로그인](docs/google-login.md)·[세션 안내](docs/auth-sessions.md)를 따른다. 로컬 재현과 실제 배포 확인을 구분하며, EKS의 GitHub 연결·분석 실행 확인은 [#276 실행 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에 있다.
 
 ## 공통 오류 처리 — API 명세 v1
 
@@ -44,7 +44,7 @@ Google 인증 코드 교환·회원 연결 API와 앱 등록·검사 절차는 [
 
 직접 의존성은 `package.json`, 전이 의존성을 포함한 설치본은 `package-lock.json`으로 고정한다. 전역 Nest CLI나 루트 workspace는 필요하지 않다. typeorm 1.1.1의 선택 peer(ioredis 5)가 ioredis 6과 충돌하므로 `overrides`로 typeorm도 같은 ioredis를 쓰게 했다(api는 TypeORM 캐시를 쓰지 않는다).
 
-초기 NestJS 11 의존성에서 보고된 multer 취약점을 해소하기 위해 NestJS 12로 갱신했다. 그 뒤 multer `2.4.0`에도 취약점이 나왔으나 2026-10-26 기준 최신 platform-express(12.2.0)도 multer를 `2.4.0`으로 고정하므로, `overrides`로 고친 판본 `2.5.0`을 쓰게 했다(api는 파일 업로드를 쓰지 않는다). platform-express가 `2.5.0` 이상을 받게 되면 이 `overrides` 항목을 지운다. ESLint도 10으로 갱신하고 기존 flat config를 유지했다. Node.js 24.21.0과 TypeScript 5.9.3·typescript-eslint 8.73.0의 호환 범위를 확인했으며 실제 검사·실행 결과는 아래에 기록한다. `--force`·`--legacy-peer-deps`는 사용하지 않았다.
+초기 NestJS 11 의존성에서 보고된 multer 취약점을 해소하기 위해 NestJS 12로 갱신했다. 그 뒤 multer `2.4.0`에도 취약점이 나왔으나 2026-10-26 기준 최신 platform-express(12.2.0)도 multer를 `2.4.0`으로 고정하므로, `overrides`로 고친 판본 `2.5.0`을 쓰게 했다. 현재 [PDF 업로드](docs/pdf-materials.md#업로드)의 multipart 해석이 이 multer를 사용한다(`src/materials/pdf-material-input.ts`). platform-express가 `2.5.0` 이상을 받게 되면 이 `overrides` 항목을 지운다. ESLint도 10으로 갱신하고 기존 flat config를 유지했다. Node.js 24.21.0과 TypeScript 5.9.3·typescript-eslint 8.73.0의 호환 범위를 확인했으며 실제 검사·실행 결과는 아래에 기록한다. `--force`·`--legacy-peer-deps`는 사용하지 않았다.
 
 호환성 참고: [NestJS 마이그레이션](https://docs.nestjs.com/migration-guide), [ESLint 10 마이그레이션](https://eslint.org/docs/latest/use/migrate-to-10.0.0), [typescript-eslint 의존성 범위](https://typescript-eslint.io/users/dependency-versions/). NestJS 12는 ESM 배포이지만, 이 프로젝트는 지정 Node.js의 ESM 로딩 지원으로 CommonJS 빌드·실행을 유지한다.
 
@@ -63,7 +63,7 @@ npm ci
 
 환경변수 목록(구분·기본값·의미)은 [docs/environment.md](docs/environment.md)에 있다. 새 환경변수는 그 표에 더한다.
 
-실행 명령과 마이그레이션 명령이 `.env`를 읽으며, 이미 터미널 환경에 지정된 값이 우선한다. DB 값은 `.env.example`의 `DB_*` 줄을 `.env`에 옮기면 된다. 큐·worker 설정은 필요하지 않다. `.env`·의존성·빌드 결과를 제외하는 기존 `.gitignore`를 유지한다. 키를 바꾸면 이전 키로 발급한 토큰은 사용할 수 없다.
+실행 명령과 마이그레이션 명령이 `.env`를 읽으며, 이미 터미널 환경에 지정된 값이 우선한다. DB 값은 `.env.example`의 `DB_*` 줄을 `.env`에 옮기면 된다. 최소 API 기동에는 큐·worker 설정이 필요하지 않지만, 분석·백그라운드 AI 실행에는 해당 연결 설정이 필요하다. `.env`·의존성·빌드 결과를 제외하는 기존 `.gitignore`를 유지한다. 키를 바꾸면 이전 키로 발급한 토큰은 사용할 수 없다.
 
 PowerShell에서 로컬 검토용 설정을 준비하는 예시다. 생성한 키는 변수에만 받아 화면에 출력하지 않는다. `900`초는 #250 팀장 결정의 Access 수명 15분이며 다른 값이면 기동을 거부한다. 정확한 web 출처·쿠키 조건은 [세션 안내](docs/auth-sessions.md)를 따른다.
 
@@ -105,7 +105,7 @@ DB를 멈추거나 자료를 지우는 명령의 영향:
 | `docker rm -f catchu-db` | 컨테이너만 지운다. 볼륨이 남아 있으면 같은 `docker run`으로 자료가 돌아온다 |
 | `docker volume rm catchu-db-data` | 개발 DB 자료 전체를 지운다. 되돌릴 수 없다. 다시 `docker run`과 `npm run migration:run`부터 한다 |
 
-PostgreSQL 주 버전: 로컬·테스트는 pgvector가 든 PostgreSQL 16(`pgvector/pgvector:0.8.7-pg16-trixie`, CI와 로컬 합성 DB는 같은 이미지를 digest로 고정)을 쓴다(#389). `postgres:16`으로 만든 `catchu-db-data` 볼륨은 그대로 쓸 수 있으니, `docker rm -f catchu-db` 뒤 위 `docker run`을 다시 하면 자료가 남은 채 이미지만 바뀐다. 배포 대상은 AWS다(2026-10-06 NCP에서 변경, [레포 컨벤션 §1](../docs/CatchU_레포_컨벤션.md#1-레포-구조)). 배포 DB 서비스·주 버전과 TLS·서버 인증서 검증 등 접속 옵션은 AWS 배포 작업을 재개할 때 확인한다(「아직 필요한 입력」). 로컬 검사 통과만으로 배포 DB 호환성·접속 검증을 마쳤다고 보지 않는다.
+PostgreSQL 주 버전: 로컬·테스트는 pgvector가 든 PostgreSQL 16(`pgvector/pgvector:0.8.7-pg16-trixie`, CI와 로컬 합성 DB는 같은 이미지를 digest로 고정)을 쓴다(#389). `postgres:16`으로 만든 `catchu-db-data` 볼륨은 그대로 쓸 수 있으니, `docker rm -f catchu-db` 뒤 위 `docker run`을 다시 하면 자료가 남은 채 이미지만 바뀐다. 배포는 AWS EKS·RDS PostgreSQL 16.15이며, `deploy/aws/scripts/create-rds.sh`·`deploy/aws/k8s/api.yaml`에 DB 판본과 `PGSSLMODE=verify-full`·CA 설정이 있다. RDS 설정은 [#276 1단계](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6950182407), 실제 접속·TLS 확인은 [2단계](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553)를 따른다. 로컬 검사와 배포 검증은 구분한다.
 
 ## 개발 실행·응답 확인·종료
 
@@ -146,7 +146,7 @@ npm run build
 npm start
 ```
 
-빌드 후 실행도 개발 실행과 같은 주소·응답을 확인하고 같은 방법으로 종료한다. 개발 서버와 빌드 서버를 같은 포트에서 동시에 실행하지 않는다. 테스트는 실제 로컬 HTTP와 테스트 DB를 쓰며, 외부 서비스·제품 기능·소유권·worker 연결 검증은 포함하지 않는다. 테스트는 매번 무작위 키를 생성하므로 실제 비밀값이 필요하지 않고, `.env`에서는 `TEST_DB_*`만 읽는다.
+빌드 후 실행도 개발 실행과 같은 주소·응답을 확인하고 같은 방법으로 종료한다. 개발 서버와 빌드 서버를 같은 포트에서 동시에 실행하지 않는다. 테스트는 실제 로컬 HTTP·테스트 DB로 제품 기능·소유권·조립을 검사하고, 외부 서비스 응답은 합성 대역으로 구분한다. 큐 시험과 worker Python을 쓰는 U7 연결 시험의 준비 조건은 각 기능 문서를 따른다. 실제 외부 호출·배포 검증을 대신하지 않는다. 테스트는 무작위 키를 생성하며 `.env`에서는 `TEST_DB_*`만 읽는다.
 
 [#95 후속 참고](https://github.com/JminAILab/CatchU/pull/95)에 따라 기존 빌드를 유지하면서 하위 폴더까지 테스트 탐색을 확대했다. `test/runtime/bootstrap.test.cjs`는 실제 소스/빌드 진입점을 실행해 env 파일 적용, 터미널의 운영 환경 설정 우선, 필수 인증 설정 누락·공란·잘못된 수명, DB 비밀번호 누락·DB 접속 불가에 따른 실패 종료를 검사한다. `BIND_HOST`가 없으면 `127.0.0.1`에만, `::1`로 주면 그 주소에만 열리는지와 IP가 아닌 값의 실패 종료도 검사한다(IPv6 루프백이 없는 환경에서는 두 주소 비교 검사를 건너뛴다). 개발 watch의 자동 재시작은 검사 범위가 아니다.
 
@@ -206,7 +206,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## 선정 지원 저장소 조회 — #136
 
-[docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다. 실제 회원의 DB 선정 공급과 #323·#232 접점·초기화·갱신 절차(#252)는 [docs/repository-selection.md](docs/repository-selection.md)에 있다.
+[docs/member-repositories.md](docs/member-repositories.md)에서 합성 연결·페이지·오류 구분과 재현 방법을 확인한다. 현행 회원별 등록·접수·실행 공급은 [U7 안내](docs/repository-analysis-u7.md)에 있다. #252 전역 선정·초기화·갱신 절차는 [10월 선정 기록](docs/repository-selection.md)으로 구분한다.
 
 ## 분석 고지·접수·실패 재요청 — #138
 
@@ -230,7 +230,7 @@ DB를 쓰는 테스트를 추가할 때:
 
 ## Worker 내부 분석 컨텍스트 — #232
 
-제품 기동 시 실제 DB 선정 공급자를 연결하는 조건, 서비스 인증과 검사 범위는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 비활성이며 `WORKER_CONTEXT_ENABLED=true`와 유효한 별도 서비스 키를 준비해야 내부 조회 경로를 등록한다.
+제품 기동 시 U7의 회원별 `RegistrationContextSource`를 연결하는 조건, 서비스 인증과 검사 범위는 [docs/worker-context.md](docs/worker-context.md)를 따른다. 기본 비활성이며 `WORKER_CONTEXT_ENABLED=true`와 유효한 별도 서비스 키를 준비해야 내부 조회 경로를 등록한다.
 
 ## E 수신 기록과 Catch 반영 연결 — #105
 
@@ -279,20 +279,19 @@ JD 본인 관리(`/v1/jds`)와 개인 요약(C-12)의 입력·상태·삭제·�
 - 설치·도구 버전 오류: `node -v`, `npm -v`, 실행 경로와 `api/`에서 실행 중인지 확인한다.
 - `spawn EPERM`: 테스트·watch의 자식 프로세스 실행을 제한하는 환경인지 확인한다. 검사 설정을 약화하지 않고 실행 권한이 허용된 환경에서 같은 명령을 재실행한다.
 
-## 아직 필요한 입력
+## 연결 설정과 책임
 
-API↔worker의 메시지 형식은 [현행 메시지 스키마 v2](contracts/repository-analysis/worker-messages.yaml), 수신 확인·상태 의미는 [worker 메시지 계약](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#w--worker-메시지-계약)과 [수신 업무 흐름](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)·[상태 전이 정본](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본)을 따른다. 실제 전달 방식은 아래 검증이 남아 있지만 이 계약에 따른 독립 구현·MOCK 검사는 진행할 수 있다.
+API↔worker의 메시지 형식은 [현행 메시지 스키마](contracts/repository-analysis/worker-messages.yaml), 판본별 차이는 [U7 메시지 안내](docs/repository-analysis-u7.md#메시지와-결과), 수신 확인·상태 의미는 [worker 메시지 계약](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#w--worker-메시지-계약)과 [수신 업무 흐름](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)·[상태 전이 정본](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본)을 따른다. 전달은 BullMQ이며 실제 EKS 실행 근거는 [#276](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에 있다.
 
-| 필요한 입력                                               | 결정할 곳                                                                                        | 결정 전 가능한 작업                                                            |
+| 연결 항목 | 현재 기준 | 안내 |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| 배포 DB의 PostgreSQL 주 버전, SSL 등 관리형 DB 접속 옵션  | AWS 배포 작업 재개 때([#24](https://github.com/JminAILab/CatchU/issues/24))                      | 로컬·테스트는 pgvector가 든 PostgreSQL 16을 쓴다(「로컬 DB 준비」) |
-| 큐 선정·버전과 실제 전달 방식 | [#77 큐 기술 검증](https://github.com/JminAILab/CatchU/issues/77): Node·Python 호환성, 중복 전달·worker 중단 시 분석 재실행 방지, 배포 서버 제약과 실행 불명 처리 확인 후 결정 | BullMQ로 정했다. 큐 송수신 모듈(#233)은 있고 `AppModule` 등록은 #252 좌표 제공자·#105 근거 보존 수정 뒤 |
-| 현행 E·B·F 계약으로 해결되지 않는 연결 쟁점 | 기존 계약·기능 설계를 먼저 확인하고 실제 기능 담당자 사이에서 남은 쟁점을 조율 | 합의된 책임·반영 기준으로 독립 구현을 진행하고, 미결의 영향 범위만 보류. api 초기화 담당에게 자동 배정하지 않음 |
-| 인증·외부 서비스·큐의 개발·테스트 환경                    | 관련 계약과 공통 환경 준비 작업                                                                  | 필요한 설정·계정·실제 연결 검증 범위 정리                                      |
+| 배포 DB | RDS PostgreSQL 16.15, TLS·CA 검증 | 「로컬 DB 준비」와 [AWS 배포 안내](../deploy/aws/README.md) |
+| 큐·수신 연결 | BullMQ·Valkey. `createApplicationModule()`에서 설정에 따라 실제 제공자·수신 모듈 조립 | [분석 큐](docs/analysis-queue.md), [worker 컨텍스트](docs/worker-context.md) |
+| 인증·외부 서비스·로컬 환경 | 기능별 설정·계정·동의 조건을 확인 | [환경변수](docs/environment.md), [로컬 통합 실행](../docs/CatchU_로컬통합실행.md) |
 
 DB는 「로컬 DB 준비」·「DB 테스트」로 준비한다. web·api·worker·PostgreSQL을 함께 띄우는 순서와 서비스끼리 맞출 설정값은 [로컬 통합 실행 안내](../docs/CatchU_로컬통합실행.md)에 있다. 큐의 공통 준비 방법은 공통 환경 준비 작업에서 마련하고, api 쪽에서는 필요한 접속·실행 조건을 제공한다. 각 사용자는 그 안내로 자신의 환경을 준비한다. DB 모델·마이그레이션·메시지 처리 구현은 해당 기능의 책임과 계약에 따라 나눈다. 연결을 추가할 때 환경변수·공통 준비 안내·실제 및 모의 연결 범위와 자료 변경 명령의 영향을 문서화한다.
 
-서버 로그는 요청 처리·분석 작업 상태·결과 반영·실패를 구분해 확인할 수 있게 준비한다. 로깅 도구와 식별자 전달 형식은 후속 설정·계약에서 정하며, 기록·공유 시 자료 보호는 공통 작업관리를 따른다.
+서버 로그는 요청 처리·분석 작업 상태·결과 반영·실패를 구분한다. 공통 요청 식별자는 `src/common/http/request-id.ts`, 보안 사건은 [보안 사건 기록](docs/security-events.md), 큐 식별자·고정 오류 코드는 [분석 큐](docs/analysis-queue.md#로그)를 따른다. 새 연결 쟁점은 해당 기능 담당자와 기존 계약을 먼저 대조하고, 기록·공유 시 자료 보호는 공통 작업관리를 따른다.
 
 개발 준비 완료는 공통 작업관리의 확인 목록으로 판단한다. 확인한 사람·환경·기준 커밋, 작성자 외 재현 여부와 실제·모의 연결 범위는 초기화 이슈·PR에 남긴다. 로컬 실행 확인과 AWS 배포 검증은 각각 기록한다.
 

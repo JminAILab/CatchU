@@ -7,7 +7,7 @@
 ## 앱 등록 상태와 U4 순서
 
 - **기본 앱(`AppModule`)에 등록했다**(#441). U4 제출 2(PR #468)가 `PublicationsModule`과 C-10 DB 구현(`DbPublicationAccess`, 토큰 `PUBLICATION_ACCESS`)을 앱에 넣은 뒤라, `AppModule` `imports`에 `RagAnswerModule.register({ imports: [PublicationsModule], publicationAccess: { useExisting: PUBLICATION_ACCESS } })`를 둔다. `PUBLICATION_ACCESS`는 `src/publications/publications.module.ts`가 내보내는 U4 토큰이고, U5 안의 같은 이름 자리(`rag-answer-tokens.ts`)와는 다른 심볼이다.
-- 순서(#416 팀장 결정 2026-11-03): U4 제출 2가 먼저 합쳐지고 이 등록이 뒤따랐다. 그 사이에 큐가 있는 환경에서 발행한 발행본은 `BASE_SUMMARY`가 모르는 작업 종류로 실패 처리되어 10분 뒤 `FAILED`이고, 작성자가 [다시 만들기]로 복구한다. 개발 서버는 큐가 없어 이 경우가 생기지 않는다(등록 뒤에도 큐가 없으면 기본 요약은 시한으로 `FAILED`, [AiRun](ai-run.md)).
+- 당시 순서(#416 팀장 결정 2026-11-03): U4 제출 2가 먼저 합쳐지고 이 등록이 뒤따랐다. 그 사이 큐가 있는 환경에서 발행한 발행본은 `BASE_SUMMARY`가 모르는 작업 종류로 실패 처리되어 10분 뒤 `FAILED`이고, 작성자가 [다시 만들기]로 복구한다. 당시 EC2 개발 서버에는 큐가 없었다. 현행 앱은 처리기를 등록하며 EKS는 큐를 사용한다. 큐 없는 환경의 시한 실패 규칙은 [AiRun](ai-run.md)을 따른다.
 - 기동 조건은 바뀌지 않는다. 생성 키(`CATCHU_GENERATION_API_KEY`)가 없어도 api는 뜨고 다시 쓰기·게이트를 부를 때 `NOT_CONFIGURED`로 끝난다. 큐 주소(`CATCHU_QUEUE_REDIS_URL`)가 없으면 질문 횟수는 늘 통과하고, 틀리면 AiRun과 같이 기동이 멈춘다. 기동 시험은 `test/rag-answer/rag-answer-app.test.cjs`다.
 - 메모리 `PublicationAccess`(`src/publications/in-memory-publication-access.ts`)는 시험에서만 넣고 앱에는 어느 경우에도 넣지 않는다. 컨트롤러 시험(`test/rag-answer/support.cjs`)은 `AppModule`에서 U5 등록만 뺀 조립에 대역을 넣어 띄운다.
 - `base_summary` 마이그레이션(`1793348947970-CreateBaseSummaryTable`)은 등록과 관계없이 들어 있다.
@@ -51,7 +51,7 @@
 
 요약 읽기(W4·W5): 행이 없으면 `readSnapshot().publishedAt + 10분` 전이면 PENDING, 지났으면 FAILED로 보고 행을 만들지 않는다. 행이 PENDING이고 마감이 지났으면 `persistDeadlineFailure`로 그 자리에서 FAILED를 저장한다. 받은 사람에게는 DONE일 때만 항목을 준다. 작성자는 링크 중지·만료 뒤에도 보고 `canRegenerate = status != PENDING`을 받는다.
 
-[다시 만들기](W6): `resolveForOwner` → 한 트랜잭션(`consume(memberId, 'BASE_SUMMARY', now, manager)`, `LIMIT_REACHED`면 되돌리고 429, 아니면 행을 PENDING·빈 항목·`generated_at` 비움·`deadline_at = now + 10분`으로 upsert) → 커밋 뒤 `enqueueAfterCommit('BASE_SUMMARY', 'BASE_SUMMARY-{publicationId}-{uuid}', { publicationId })` → 결과와 관계없이 202. PENDING이어도 거부하지 않고 동의는 다시 확인하지 않는다.
+다시 만들기(W6): `resolveForOwner` → 한 트랜잭션(`consume(memberId, 'BASE_SUMMARY', now, manager)`, `LIMIT_REACHED`면 되돌리고 429, 아니면 행을 PENDING·빈 항목·`generated_at` 비움·`deadline_at = now + 10분`으로 upsert) → 커밋 뒤 `enqueueAfterCommit('BASE_SUMMARY', 'BASE_SUMMARY-{publicationId}-{uuid}', { publicationId })` → 결과와 관계없이 202. PENDING이어도 거부하지 않고 동의는 다시 확인하지 않는다.
 
 ## 값
 
@@ -184,9 +184,9 @@ npm --prefix api run rag-eval -- measure --input <파일> [--target <대상 버�
 
 - 정답 글귀마다 사본 필드에서 글자 그대로 나오는 모든 위치를 정답 위치로 삼는다. 한 곳도 없으면 질문 번호를 알리고 멈춘다(파일을 쓰지 않음).
 - 질문마다 `search(…, 12)` 한 번으로 앞 5·8·12개 적중(같은 항목·같은 fieldPath에서 범위가 겹치면 적중)을 판정하고, 앞 8개와 사본으로 앱과 같은 `buildQnaSources`(#559, 위 「질의응답 근거 — #559」)를 불러 질의응답과 같은 요청(근거·지시문·모델)을 만들어 `generate`로 부르고 통과·버린 항목 수를 모은다. 질문별 붙이지 못한 줄 수(`unattachedLineCount`, 숫자만)를 원문 결과와 기록에 남긴다. 3번·7번 같은 질문이 틀렸을 때 상한에 걸려서인지 가르는 데 쓴다. 8개 기준 비적중 질문은 앞 8개 조각 위치를 기록에 남긴다. 답이 0개(`NO_ITEMS`)인 질문은 앱처럼 「답 실패」로 그 질문 번호를 결과·기록·로그에 남기고 다음 질문으로 간다. 다른 생성 실패는 질문 번호를 로그에 알리고 멈춘다(파일을 쓰지 않음).
-- JD 비교: 빈 줄을 뺀 줄마다 검색 기반(조각 8개)과 전체 넣기(`published_chunk`를 `seq` 순으로 모두 읽기 전용으로 읽음) 두 번 `JD_SUMMARY`를 부른다. 전체 넣기가 80,000자를 넘으면 `INPUT_TOO_LARGE`로 적는다. U10은 아직 합쳐지지 않아 스크립트의 나누기·지시문을 쓰고 기록에 "스크립트"로 적는다. `published_chunk` 직접 읽기는 이 평가 스크립트의 읽기 전용 사용뿐이고 서비스 경로는 C-09만 쓴다.
+- JD 비교: 빈 줄을 뺀 줄마다 검색 기반(조각 8개)과 전체 넣기(`published_chunk`를 `seq` 순으로 모두 읽기 전용으로 읽음) 두 번 `JD_SUMMARY`를 부른다. 전체 넣기가 80,000자를 넘으면 `INPUT_TOO_LARGE`로 적는다. 줄 나누기는 스크립트의 `splitJdRequirements`를 사용하고 기록에 "스크립트"로 적으며, 지시문은 U10의 운영 상수 `JD_SUMMARY_INSTRUCTION`을 가져온다. `published_chunk` 직접 읽기는 이 평가 스크립트의 읽기 전용 사용뿐이고 서비스 경로는 C-09만 쓴다.
 - 저장소 기록에는 실행 날짜·대상 버전·모드, 적중률(5·8·12), 통과·버린 항목 수, 답 실패 질문 번호, 비적중 질문의 조각 위치, 질문별 게이트 로그 수 칸(#559 Step 4a)과 붙이지 못한 줄 수(#559), 요구사항마다 두 방식의 항목·버린 수, 빈 사람 판정 칸(남의 기여 오귀속, 근거 비뒷받침, 다른 곳의 맞는 근거 n건, 통과 여부, 조정 내용)만 있다. 질문·글귀·답 원문은 없다.
-- **`measure`의 사본 읽기는 앱과 같은 U4 DB 구현(`DbPublicationAccess.readSnapshot`)이다.** 실제 발행 경로로 만든 시연 발행본으로 한 번 잰다(BR10.1). 읽은 내용이 Claude·Voyage로 나가므로, 입력의 `memberId`(실행자 본인)가 그 발행본의 주인인지 작성자 화면과 같은 판정(`resolveForOwner`)으로 먼저 확인하고, 아니면 외부 호출 없이 멈춘다. 시연용 여부는 확인하지 않으니 `publicationId`에는 본인의 시연 발행본을 넣는다. 아직 재지 않았다(#441). 판정·조정·재측정은 BR10.6을 따른다.
+- **`measure`의 사본 읽기는 앱과 같은 U4 DB 구현(`DbPublicationAccess.readSnapshot`)이다.** 실제 발행 경로로 만든 시연 발행본으로 잰다(BR10.1). 읽은 내용이 Claude·Voyage로 나가므로, 입력의 `memberId`(실행자 본인)가 그 발행본의 주인인지 작성자 화면과 같은 판정(`resolveForOwner`)으로 먼저 확인하고, 아니면 외부 호출 없이 멈춘다. 시연용 여부는 확인하지 않으니 `publicationId`에는 본인의 시연 발행본을 넣는다. 실행한 판본·결과·한계는 [평가 기록](rag-evaluation/2026-11-19-581-remeasure.md)과 그 앞선 기록에서 구분한다. 판정·조정·재측정은 BR10.6을 따른다.
 
 ## 알려진 한계
 

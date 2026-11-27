@@ -2,7 +2,7 @@
 
 EKS(#276)에서 앱 로그를 CloudWatch에 모으는 설정과 설치·확인 순서다. 2026-10-29 팀장 결정(경보·로그는 MVP 수준)을 따른다. 단계·승인·처음 준비(프로필·kubeconfig)는 [../README.md](../README.md)를 따른다.
 
-**아직 설치하지 않았다.** 로그 그룹은 1단계에서 클러스터보다 먼저, 수집기는 클러스터를 만든 뒤 앱보다 먼저 설치한다.
+로그 그룹과 수집기는 [11/17에 설치했다](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6950182407). [11/18 실제 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553)에서 보존 14일, 표식 keep 한 줄 수신·가짜 토큰 두 줄 0건을 확인했다. 아래는 새로 설치하거나 설정을 바꿀 때의 절차다.
 
 ## 무엇을 어디에
 

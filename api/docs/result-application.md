@@ -1,6 +1,6 @@
 # E 수신 기록과 Catch 반영 연결 — #105
 
-`src/result-application/`은 검증된 결과 수신 이후 B의 Catch 등록과 E의 반영 완료 상태를 함께 저장하는 내부 서비스다. [PR #205](https://github.com/JminAILab/CatchU/pull/205)는 E 수신 기록 테이블·마이그레이션과 이 반영 서비스를 제공한다. [실제 수신 저장·호출 조립](receiver-registration.md)은 [E↔B 연결 #105](https://github.com/JminAILab/CatchU/issues/105)에서 제공하며, 실제 보호 관측 공급과 전송 호출자 연결은 남아 있다. [등록·반영 흐름](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)과 [수신·후보 연결 모델](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)이 구현 기준이다. 결과 본문 보관·자동 복구 계획은 아래 최신 결정으로 철회됐다.
+`src/result-application/`은 검증된 결과 수신 이후 B의 Catch 등록과 E의 반영 완료 상태를 함께 저장하는 내부 서비스다. [PR #205](https://github.com/JminAILab/CatchU/pull/205)는 E 수신 기록 테이블·마이그레이션과 이 반영 서비스를 제공한다. [실제 수신 저장·호출 조립](receiver-registration.md)은 제품 큐 모듈과 연결돼 있으며, 보호 공급은 ‘관측 안 함’을 명시하는 정책과 저장 당시 좌표를 사용한다. [등록·반영 흐름](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#업무-흐름)과 [수신·후보 연결 모델](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/entities.md)이 구현 기준이다. 결과 본문 보관·자동 복구 계획은 아래 최신 결정으로 철회됐다.
 
 ## 독립 구성과 B 연결
 
@@ -48,9 +48,9 @@ E는 READ COMMITTED 트랜잭션에서 요청 → 현재 시도 → 수신 기�
 - 실제 E·B 결합: 현재 저장소의 실제 E 반영 서비스와 B 등록 코드·마이그레이션을 함께 사용한다. `npm test`에 기본 포함되며, 별도 테스트 DB에서 `npm test -- test/integration/result-application-b.test.cjs`로 이 검사만 실행할 수도 있다.
 - 결합 검사에서는 실제 B 함수·마이그레이션으로 신규 PRIVATE 저장, 같은 작업·결과의 Catch ID 유지와 기존 본문/공개 상태 보존, 전체 롤백·수신 보존·별도 실패 기록·커밋 오류·실패 기록 오류·동시 반영을 대조한다. 보호 관찰과 수신 기록은 시험 준비물이다. 기존 B 시험의 E 상태 대역과 신규 실제 E 호출 검사는 구분한다.
 
-## 후속 작업의 범위
+## 제품 연결과 제외 범위
 
-- **실제 공급·전송 연결 — [#105](https://github.com/JminAILab/CatchU/issues/105):** DB 어댑터와 B/E 조립·LIVE 주소 검사는 [수신 연결 문서](receiver-registration.md)에서 설명한다. 최초 보호 판단의 실제 공급 값·책임과 [#233 큐 호출자](https://github.com/JminAILab/CatchU/issues/233)는 남은 검토/연결 사항이다. 공급이 없거나 실패하면 NONE·열람 준비 완료로 보정하지 않는다.
+- **실제 공급·전송 연결 — [#105](https://github.com/JminAILab/CatchU/issues/105):** DB 어댑터와 B/E 조립·LIVE 주소 검사는 [수신 연결 문서](receiver-registration.md)에서 설명한다. 제품 `createApplicationModule()`이 정책·좌표 공급자를 명시해 [큐 호출자](analysis-queue.md)와 연결한다. 공급이 없거나 실패하면 NONE·열람 준비 완료로 보정하지 않는다. 실제 GitHub 공개 관측을 추가한 것은 아니다.
 - **자동 복구 철회·실패 종료:** [10/6 최신 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)으로 [#234 결과 본문 보관·자동 복구](https://github.com/JminAILab/CatchU/issues/234#issuecomment-6028927385)는 철회됐다. worker 결과 14일 보관도 구현하지 않는다. [#237 처리 시한·실패 종료](https://github.com/JminAILab/CatchU/issues/237)는 [PR #295](https://github.com/JminAILab/CatchU/pull/295)로 구현돼 주기 작업이 요청을 닫는다([규칙](analysis-deadline.md)). 이번 수신 연결 자체는 시간만으로 실패 종료·사용자 재요청을 허용하지 않는다.
 
 위 기존 자체·결합 검사는 수신 기록과 보호 판단을 시험 준비물로 공급한다. 새 [수신 연결 검사](receiver-registration.md#검사와-한계)는 실제 DB 수신 저장부터 Catch 등록까지 실행하지만 보호 관측은 합성 공급 대역이다. 실제 공급·전송을 포함한 #105 전체 완료와 구분한다.

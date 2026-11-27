@@ -6,10 +6,10 @@
 ## 현재 상태: 연결 시작은 공통 인증 통합 시험 전환을 켰을 때만
 
 - 시작·완료·상태 조회 API와 화면 동작은 연결했다. 기본 검사(`npm test`)는 함수 대역·가짜 fetch 시험이고, 실제 api·DB 연결은 명시 실행 통합 검사로 확인한다(아래 「검사」).
-- 외부 인증은 같은 탭에서 github.com으로 전체 이동한다. **기본 인증(메모리 토큰, #106)에서는 GitHub에 다녀오면 로그인이 사라진다.** 콜백 화면에서 회원 가드가 `/login`으로 보내고, 콜백 주소는 `next`에 싣지 않으므로(`safeNextPath`가 회원 경로만 허용) 받은 code는 쓰이지 않고 버려진다.
+- 외부 인증은 같은 탭에서 github.com으로 전체 이동한다. **통합 시험 전환을 끈 기존 인증(메모리 토큰, #106)에서는 GitHub에 다녀오면 로그인이 사라진다.** 콜백 화면에서 회원 가드가 `/login`으로 보내고, 콜백 주소는 `next`에 싣지 않으므로(`safeNextPath`가 회원 경로만 허용) 받은 code는 쓰이지 않고 버려진다.
 - 왕복 뒤 로그인 유지는 공통 인증(#286, [PR #308](https://github.com/JminAILab/CatchU/pull/308))의 세션 복원을 쓴다. 통합 시험 전환(`NEXT_PUBLIC_AUTH_SESSION_INTEGRATION=true`)을 켜면 가드가 Refresh 쿠키로 복원을 마친 뒤에만 콜백 화면을 그린다. 토큰을 브라우저 저장소에 넣는 별도 우회는 만들지 않는다.
 - **그래서 연결 시작은 이 전환을 켰을 때만 연다.** 전환을 끄면 연동 화면의 [GitHub 연결]·[다시 연결]과 홈 안내(#155)의 [프로필에서 GitHub 연결]·[GitHub 다시 연결]을 누를 수 없게 두고, 버튼 아래에 같은 이유('GitHub 인증 뒤 로그인을 유지하는 기능이 준비 중이라 아직 GitHub 연결을 시작할 수 없습니다.')를 보인다(`githubStartBlockedReason`). 연결 상태 조회, 연결됨의 [내 자산에서 저장소 연결 관리], 상세 프로필의 [GitHub 연결 상태]는 그대로다. 제품 기본은 켜짐이며(2026-11-11 팀장 승인, [#467](https://github.com/JminAILab/CatchU/issues/467#issuecomment-6784442435)), 켠 빌드에서는 연결 시작도 함께 열린다.
-- api의 기본값은 GitHub 연결 꺼짐(`GITHUB_CONNECTION_ENABLED=false`)이다. 전환을 켠 web에서 [GitHub 연결]을 누르면 '지금은 GitHub 연결을 사용할 수 없습니다'를 보이고 이동하지 않는다.
+- api 설정을 생략하면 GitHub 연결이 꺼진다(`GITHUB_CONNECTION_ENABLED=false`). api에서 기능을 꺼 둔 경우에는 전환을 켠 web에서도 [GitHub 연결]을 누르면 '지금은 GitHub 연결을 사용할 수 없습니다'를 보이고 이동하지 않는다. 운영 설정은 [EKS 기능 연결 안내](../../../../deploy/aws/features.md)를 따른다.
 
 ## 파일
 
@@ -41,7 +41,7 @@
 - 통합 시험 전환을 끈 환경에서는 버튼을 누를 수 없고 시작 API를 부르지 않는다(위 「현재 상태」). 이유는 버튼 아래에 두고 `aria-describedby`로 잇는다.
 - 누르면 바로 막고 'GitHub 연결을 진행하고 있습니다'를 보이며 시작 API를 한 번 부른다. 연타는 무시한다.
 - 응답의 인증 주소가 `https://github.com/login/oauth/authorize`이고 응답 state와 같은 state를 하나만 실을 때만 이동한다. 다른 주소는 시작 실패로 본다.
-- 기능 꺼짐(403 `GITHUB_CONNECTION_REQUIRED`)과 그 밖의 실패를 다른 문구로 안내하고 버튼을 다시 연다. CatchU 인증 오류(401)는 안내하지 않고 공통 인증 흐름(가드의 로그인 이동)에 맡긴다.
+- 기능 꺼짐(403 `GITHUB_CONNECTION_REQUIRED`)과 그 밖의 실패를 다른 문구로 안내하고 버튼을 다시 연다. CatchU 인증 오류(401)는 전용 실패 문구 없이 공통 인증의 갱신·재인증 흐름에 맡긴다. 변경 요청은 인증 갱신 뒤에도 자동으로 다시 보내지 않는다.
 - GitHub에서 뒤로 가기로 이 화면이 그대로 복원되면(bfcache) 버튼을 다시 열고 상태를 다시 읽는다.
 
 **콜백**
@@ -55,7 +55,7 @@
 | GitHub 오류·형식 오류, 완료 거부(400 등) | 'GitHub 계정을 연결하지 못했습니다' + 현재 상태. 다음 행동은 상태를 읽은 뒤 실제 버튼에 맞춰 덧붙인다(`noticeNextStep`): 시작 버튼이 있으면 '연결하려면 [다시 연결]을 눌러 주세요.', 연결됨이면(콜백 재전송·이미 쓴 state) '기존 연결은 그대로입니다.', 시작을 막았으면 덧붙이지 않는다 |
 | 응답 유실(5xx·통신 실패·계약과 다른 성공 응답) | 성공·실패로 단정하지 않는다. 'GitHub 연결 결과를 확인하지 못했습니다' + 현재 상태 조회만. 연결됨으로 확인돼도 자동 이동하지 않는다 |
 | 기능 꺼짐(403) | '지금은 GitHub 연결을 사용할 수 없습니다' |
-| CatchU 인증 오류(401) | 안내 없음. 토큰이 지워져 가드가 로그인으로 보낸다. 다시 로그인한 뒤에는 연결 상태를 새로 읽는다 |
+| CatchU 인증 오류(401) | GitHub 전용 안내 없음. 제품 기본은 공통 인증의 갱신·필요 시 재인증 안내를 따르고 완료 POST를 자동 재전송하지 않는다. 전환을 끈 빌드만 토큰을 지우고 로그인으로 이동한다 |
 | 요청 중 CatchU 세션이 바뀜 | 결과를 쓰지 않고 지금 회원의 상태만 보인다 |
 | 값 없음(주소를 지운 뒤 새로고침 등) | 안내 없이 현재 상태 |
 
@@ -80,7 +80,7 @@
 
 ## 남은 연결
 
-- 실제 GitHub 승인으로 하는 같은 탭 왕복(성공·취소·만료·다른 회원)은 확인하지 않았다. [#231의 실제 GitHub 연결 확인](https://github.com/JminAILab/CatchU/issues/231#issuecomment-6051939540)과 통합 시험 전환을 켠 대역 왕복(GitHub 인증 화면·토큰 교환·계정 조회를 합성, 결과는 PR #409)을 근거로 추가 확인은 생략하기로 D와 합의했다([D 리뷰](https://github.com/JminAILab/CatchU/pull/409#pullrequestreview-5665493550)). #308의 `memberMutationOutcome()`으로 보내지 않은 완료 요청을 따로 안내할지는 정하지 않았다. 지금은 응답 유실과 같이 상태 확인만 한다.
-- 연동 성공 뒤 저장소 연결 관리 모달 자동 열기와 그 주소 표현은 필요하면 #153(D) 후속에서 정한다. 지금은 쿼리 없는 `/assets`로만 가고 이전 필터·Catch 상세를 복원하지 않는다([D 답변](https://github.com/JminAILab/CatchU/pull/409#issuecomment-6432457026)·[B 답변](https://github.com/JminAILab/CatchU/pull/409#issuecomment-6433912541)).
+- [11/18 EKS 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에서 실제 GitHub 승인·같은 탭 복귀·연결 성공을 확인했다. 취소·만료·다른 회원 왕복은 미확인이다. 다음은 그 전 PR #409 당시의 확인 범위다. [#231의 실제 GitHub 연결 확인](https://github.com/JminAILab/CatchU/issues/231#issuecomment-6051939540)과 통합 시험 전환을 켠 대역 왕복(GitHub 인증 화면·토큰 교환·계정 조회를 합성, 결과는 PR #409)을 근거로 추가 확인은 생략하기로 D와 합의했다([D 리뷰](https://github.com/JminAILab/CatchU/pull/409#pullrequestreview-5665493550)). #308의 `memberMutationOutcome()`으로 보내지 않은 완료 요청을 따로 안내할지는 정하지 않았다. 지금은 응답 유실과 같이 상태 확인만 한다.
+- 연동 성공 뒤 저장소 연결 관리 모달은 자동으로 열지 않는다. 쿼리 없는 `/assets`로만 가고 이전 필터·Catch 상세를 복원하지 않는다([D 답변](https://github.com/JminAILab/CatchU/pull/409#issuecomment-6432457026)·[B 답변](https://github.com/JminAILab/CatchU/pull/409#issuecomment-6433912541)).
 - 외부 인증은 같은 탭 전체 이동으로 D와 합의했다(위 D 답변). 복귀 초점은 `/assets` 화면의 기본 초점을 따른다.
 - 이미 승인한 OAuth 앱이면 `/assets`에서 뒤로 가기로 GitHub 인증 주소에 돌아갔을 때 GitHub가 곧바로 다시 콜백으로 보낼 수 있다. 이미 쓴 state라 서버가 거부하므로 'GitHub 계정을 연결하지 못했습니다. 기존 연결은 그대로입니다.'와 현재 상태(연결됨)가 함께 보인다.
