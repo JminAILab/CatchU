@@ -49,7 +49,10 @@ const runtime = moduleUrl(`
     return { session: { logout: () => h.logout() } };
   };
 `);
-const headerReact = moduleUrl("export const useEffect = (fn) => { globalThis.__recipientHeaderHarness.effects.push(fn); };");
+const headerReact = moduleUrl(`
+  export const useEffect = (fn) => { globalThis.__recipientHeaderHarness.effects.push(fn); };
+  export const useState = (initial) => [typeof initial === 'function' ? initial() : initial, () => {}];
+`);
 const profileReact = moduleUrl(`
   import * as React from ${JSON.stringify(reactUrl)};
   export * from ${JSON.stringify(reactUrl)};
@@ -76,7 +79,7 @@ registerHooks({
 });
 
 const { RecipientHeader } = await load("components/header/recipient-header.tsx");
-const { RecipientHeaderView, shouldFocusLoginAfterLogout } = await load("components/header/recipient-header-view.tsx");
+const { createLogoutFocusRequest, RecipientHeaderView, shouldFocusLoginAfterLogout } = await load("components/header/recipient-header-view.tsx");
 const { CommonPreview } = await load("app/preview/common/common-preview.tsx");
 const { default: RecipientLayout } = await load("app/s/layout.tsx");
 const { MemberHeader } = await load("components/header/member-header.tsx");
@@ -108,10 +111,15 @@ beforeEach(() => {
   };
 });
 
-function currentView() {
+/** 한 번 그린 헤더의 표시 부품과 로그아웃 안내. 같은 그리기에서 나온 둘은 같은 로그아웃 기억을 쓴다. */
+function currentParts() {
   const wrapper = RecipientHeader();
-  const fragment = wrapper.type(wrapper.props);
-  return fragment.props.children[0];
+  const [view, notice] = wrapper.type(wrapper.props).props.children;
+  return { view, notice };
+}
+
+function currentView() {
+  return currentParts().view;
 }
 
 test("상단 바: 확인 중은 빈 자리, 복원 실패·재인증은 로그인, 확인된 회원은 프로필이다", () => {
@@ -201,6 +209,57 @@ test("이 탭에서 누른 로그아웃이 끝나면, 초점을 잃었거나 상
   assert.equal(shouldFocusLoginAfterLogout(true, outside, body, header), false, "기다리는 동안 옮긴 초점은 그대로 둔다");
   assert.equal(shouldFocusLoginAfterLogout(false, body, body, header), false, "다른 탭의 로그아웃은 옮기지 않는다");
   assert.equal(shouldFocusLoginAfterLogout(true, body, body, null), true, "상단 바를 아직 못 찾아도 본문으로 떨어진 초점은 옮긴다");
+});
+
+// #649 리뷰 2차: 실패·결과 불명으로 끝난 요청의 기억이 남아, 뒤이은 다른 탭 로그아웃이 이 탭의 초점을 「로그인」으로 옮기고 스크롤을 맨 위로 올렸다.
+// 기대: 완료 없이 끝난 요청은 기억을 지우고, 안내의 [다시 시도]는 메뉴의 [로그아웃]과 같은 기억을 다시 켠다.
+// 실패 조건: 실패·불명 뒤 take()가 true, [다시 시도] 완료 뒤 take()가 false.
+test("실패·결과 불명으로 끝난 로그아웃은 「로그인」 초점 기억을 지워, 뒤이은 다른 탭 로그아웃이 이 탭의 초점을 옮기지 않는다", async () => {
+  h.store.signedIn("member");
+  const { view, notice } = currentParts();
+  let request = view.props.onLogout();
+  h.finishLogout("failed");
+  await request;
+  assert.equal(view.props.focusRequest.take(), false, "실패 뒤 다른 탭이 로그아웃해도 옮기지 않는다");
+
+  request = notice.props.onRetry();
+  h.finishLogout("done");
+  await request;
+  assert.equal(view.props.focusRequest.take(), true, "[다시 시도]가 완료되면 「로그인」으로 옮긴다");
+  assert.equal(view.props.focusRequest.take(), false, "한 번 읽으면 지운다");
+});
+
+test("결과 불명으로 끝난 로그아웃도 「로그인」 초점 기억을 지운다", async () => {
+  h.store.signedIn("member");
+  const { view } = currentParts();
+  const request = view.props.onLogout();
+  h.finishLogout("unknown");
+  await request;
+  assert.equal(view.props.focusRequest.take(), false);
+});
+
+test("로그아웃 기억은 완료와 결과 없는 즉시 정리에만 남고, 머무름·보내지 않음·낡은 결과에는 지운다", async () => {
+  const cases = [
+    [{ kind: "settled", result: "done" }, true],
+    [undefined, true],
+    ["stayed", false],
+    [{ kind: "settled", result: "failed" }, false],
+    [{ kind: "not-started" }, false],
+    [{ kind: "discarded", sent: true }, false],
+  ];
+  for (const [result, expected] of cases) {
+    const focus = createLogoutFocusRequest();
+    focus.track(Promise.resolve(result));
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(focus.take(), expected, JSON.stringify(result) ?? "undefined");
+  }
+  const focus = createLogoutFocusRequest();
+  focus.track(Promise.resolve({ kind: "settled", result: "done" }));
+  focus.track(Promise.resolve("busy"));
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(focus.take(), true, "앞선 요청이 진행 중이라 거절된 요청은 앞선 결과를 따른다");
 });
 
 test("수신자 표시 부품은 작성자 메뉴·대화 초기화 안내 없이 기존 menuItem과 이동 없는 브랜드를 쓴다", () => {
