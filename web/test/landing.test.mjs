@@ -149,6 +149,42 @@ test("스크립트가 꺼진 화면: 기능 네 개에 설명과 결과 화면�
   assert.match(css, /#story\[data-layout="static"\] \.story-stack36>\.feature\) \{\s*display: grid !important;/);
 });
 
+// 고정 배치의 낭독 순서(#641): 지금 기능이 아닌 것도 제목·설명은 보조기기에 남아, 위에서부터 읽으면 기능 1→2→3→4 다음에 면접관 구간이 온다.
+// 실패 조건: 기능 순서가 바뀜, 지금 기능이 아닌 것을 다시 display: none·hidden·aria-hidden·inert로 보조기기에서 뺌,
+//   낭독용 규칙이 정적 배치나 크기 재는 동안에도 걸림, 지금 기능이 아닌 것의 시연 그림이 낭독에 섞임.
+// 실제 낭독은 브라우저의 접근성 트리와 화면 낭독기로 확인한다.
+test("낭독 순서: 고정 배치에서 지금 기능이 아닌 것도 제목과 설명은 보조기기에 남는다", () => {
+  const ids = [...html.matchAll(/<article class="feature" id="([^"]+)">/g)].map((match) => match[1]);
+  assert.deepEqual(ids, ["records", "evidence", "explanation", "sharing"]);
+  assert.ok(html.indexOf('id="sharing"') < html.indexOf('id="recipient"'));
+
+  const css = readFileSync(new URL("../src/features/landing/landing.module.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const inactive = '#story[data-layout="pinned"]:not([data-sizing37="true"]) .story-stack36>.feature:not(.active36)';
+  const rule = (selector) => css.split(`.page :global(${selector}) {\n`)[1]?.split("\n}")[0] ?? "";
+  const shown = rule(inactive);
+  assert.match(shown, /display: block !important;/);
+  assert.match(shown, /visibility: visible;/);
+  assert.match(shown, /position: absolute;/);
+  assert.match(shown, /width: 1px;\s*height: 1px;/);
+  assert.match(shown, /clip-path: inset\(50%\);/);
+  assert.match(rule(`${inactive} .feature-visual`), /display: none !important;/);
+  assert.match(rule(`${inactive} .caption14`), /display: none !important;/);
+
+  const controller = readFileSync(new URL("../src/features/landing/playback/story-controller.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(controller, /feature\.(hidden|inert)\s*=/);
+  assert.doesNotMatch(controller, /feature\.setAttribute\("aria-hidden"/);
+});
+
+// [일시정지]의 초점 테두리(#641): 파란 구역 위에서 기능 바로가기 버튼과 같은 테두리를 쓴다.
+// 실패 조건: 파란 구역용 규칙이 없어져 배경과 거의 같은 기본 테두리(#244ea3)로 돌아감, 바로가기와 값이 달라짐.
+test("초점 테두리: 파란 구역의 [일시정지]는 기능 바로가기와 같은 테두리를 쓴다", () => {
+  const css = readFileSync(new URL("../src/features/landing/landing.module.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const rule = (selector) => css.split(`.page :global(${selector}) {\n`)[1]?.split("\n}")[0] ?? "";
+  const pause = rule(".examples36 .catch-gallery-pause34:focus-visible");
+  assert.match(pause, /outline: 2px solid #FFD77E;/);
+  assert.equal(pause, rule("#story .feature-jump42:focus-visible"));
+});
+
 test("대표 시연 시계: 보일 때만 흐르고 3회 뒤 요약으로 바뀌어 멈춘다", () => {
   const { durations } = demoConfig.hero;
   const total = durations.reduce((a, b) => a + b, 0);
