@@ -76,7 +76,7 @@ registerHooks({
 });
 
 const { RecipientHeader } = await load("components/header/recipient-header.tsx");
-const { RecipientHeaderView } = await load("components/header/recipient-header-view.tsx");
+const { RecipientHeaderView, shouldFocusLoginAfterLogout } = await load("components/header/recipient-header-view.tsx");
 const { CommonPreview } = await load("app/preview/common/common-preview.tsx");
 const { default: RecipientLayout } = await load("app/s/layout.tsx");
 const { MemberHeader } = await load("components/header/member-header.tsx");
@@ -184,6 +184,23 @@ test("로그아웃 실패는 회원 안내와 재시도를 보이고, 성공하�
   await request;
   assert.equal(plain(html(RecipientHeader)), "CatchU로그인");
   assert.deepEqual(h.navigated, []);
+});
+
+// #649 리뷰: 받은 링크는 로그아웃 뒤에도 같은 화면에 머물러 [프로필]이 사라지면 초점이 문서 본문으로 떨어진다.
+// 기대: 이 탭에서 누른 로그아웃이 끝나면 초점을 잃었거나 상단 바 안에 있을 때만 「로그인」으로 옮긴다.
+// 실패 조건: 다른 탭의 로그아웃으로 초점이 옮겨짐, 기다리는 동안 사용자가 옮긴 초점을 빼앗음.
+// 실제 초점 이동은 브라우저에서 확인한다(정적 렌더링에서는 효과와 ref가 돌지 않는다).
+test("이 탭에서 누른 로그아웃이 끝나면, 초점을 잃었거나 상단 바 안에 있을 때만 「로그인」으로 초점을 옮긴다", () => {
+  const body = { name: "body" };
+  const inside = { name: "profile-button" };
+  const outside = { name: "question-input" };
+  const header = { contains: (element) => element === inside };
+  assert.equal(shouldFocusLoginAfterLogout(true, body, body, header), true, "[프로필]이 사라져 본문으로 떨어진 초점");
+  assert.equal(shouldFocusLoginAfterLogout(true, null, body, header), true, "초점 요소가 없음");
+  assert.equal(shouldFocusLoginAfterLogout(true, inside, body, header), true, "아직 상단 바 안의 초점");
+  assert.equal(shouldFocusLoginAfterLogout(true, outside, body, header), false, "기다리는 동안 옮긴 초점은 그대로 둔다");
+  assert.equal(shouldFocusLoginAfterLogout(false, body, body, header), false, "다른 탭의 로그아웃은 옮기지 않는다");
+  assert.equal(shouldFocusLoginAfterLogout(true, body, body, null), true, "상단 바를 아직 못 찾아도 본문으로 떨어진 초점은 옮긴다");
 });
 
 test("수신자 표시 부품은 작성자 메뉴·대화 초기화 안내 없이 기존 menuItem과 이동 없는 브랜드를 쓴다", () => {

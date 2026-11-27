@@ -86,12 +86,12 @@ function SessionLoginContents() {
     <main className={styles.page}>
       <div className={styles.panel}>
         <h1 className={styles.title}>CatchU 시작하기</h1>
-        {recipientReturn ? <>
-          <p className={styles.lead}>로그인하면 보던 받은 링크로 돌아가, 내 채용공고(JD)로 이 자료를 요약해 볼 수 있습니다.</p>
+        {recipientReturn ? <div className={styles.recipientLead}>
+          <p>로그인하면 보던 받은 링크로 돌아가, 내 채용공고(JD)로 이 자료를 요약해 볼 수 있습니다.</p>
           <p>처음이면 Google로 로그인할 때 가입되고, 표시 이름만 입력하면 됩니다. GitHub 연결은 필요 없습니다.</p>
           <p>지원자는 내 JD와 요약 결과를 볼 수 없습니다.</p>
-          <a href={recipientReturn}>로그인하지 않고 받은 링크로 돌아가기</a>
-        </> : <p className={styles.lead}>로그인하면 내 GitHub 기록으로 Catch를 만들 수 있습니다.</p>}
+          <p><a href={recipientReturn}>로그인하지 않고 받은 링크로 돌아가기</a></p>
+        </div> : <p className={styles.lead}>로그인하면 내 GitHub 기록으로 Catch를 만들 수 있습니다.</p>}
         {canLogin && <GoogleLoginButton startGoogleLogin={(next) => authRuntime().google.startGoogleLogin(prepareRecipientGoogleLogin(next))} />}
 
         {signedIn && me.state === "failed" && <LookupFailedState title="회원 정보를 불러오지 못했습니다" onRetry={retry} />}
