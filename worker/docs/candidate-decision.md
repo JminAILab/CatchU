@@ -10,7 +10,7 @@
 2026-10-08·09 팀장 결정([결정 문서](../../docs/ai-dlc-input-mvp/2026-10-08_catch-decisions.md))이 본인 기여의 뜻, 후보 문장의 숫자, 제목, 250건 넘는 PR을 정했다. Catch 개편 CR1(FR2.1)은 PR·병합 단위를 이슈 번호로 나누지 않고 나누기 글도 남기지 않는다(그 결정의 나누기를 대체). 이 문서와 기준 문서·결정 문서가 다르면 기준 문서·결정 문서를 따른다. 아래는 기준 문서가 #118에 맡긴 선택과, 코드가 기준을 옮긴 방법이다. 크기 상한 때문에 다음 둘은 따로 뒀다.
 
 - 후보 문장·근거·제목과 생성 단계(#120)가 이어 붙일 곳: [후보 문장과 근거](candidate-text.md)
-- 알려진 한계, 시험, 실제 자료로 확인할 것: [후보 판정의 한계와 검사](candidate-checks.md)
+- 알려진 한계, 시험, 실제 자료 확인 범위: [후보 판정의 한계와 검사](candidate-checks.md)
 
 이 문서에서 쓰는 말:
 
@@ -35,11 +35,11 @@
 - 재분석(Catch 개편 CR2): 단위를 정한 뒤 이미 다른 Catch에 속한 커밋의 변경을 빼고, 남은 새 변경으로만 후보를 만든다. 열쇠·묶음 설명·로그 두 숫자는 [소속 커밋 빼기](commit-assignment.md)에 있다.
 - 하지 않는 것: 제목·초안·질문, 이슈만으로 기여한 후보, 추가 기준 브랜치 값을 요청에서 받기(받을 칸이 없다), 총 처리 시간 측정.
 
-## 부르는 법과 아직 하지 않는 것
+## 부르는 법과 모듈 범위
 
 `app.candidates.build_candidates(request, outcome, assigned)`가 입구다(`assigned`는 맥락 조회의 소속 커밋 집합, 기본은 빈 집합). `outcome`은 `collect(..., relations=RelationOptions())`의 결과다([관계 조회](relation-collection.md)). 돌려주는 값은 결과 조합(`compose_result`)에 넘기는 `GenerationOutput`(적합 후보·`notProvided`·실패)이다. GitHub를 부르지 않고 토큰도 받지 않는다. 판정은 모두 수집한 관측에서 나온다. "같은 작업이다" 같은 결론을 밖에서 받지 않는다.
 
-처리 순서에 연결할 때([#121](https://github.com/JminAILab/CatchU/issues/121))는 다음 순서로 부른다. `tests/candidate_scenarios.py`의 `run_case`가 이 순서의 예다.
+후보 판정의 기본 순서는 다음과 같다. `tests/candidate_scenarios.py`의 `run_case`가 이 순서의 예이며, LIVE 조립은 후보 판정과 결과 조합 사이에 생성을 넣는다.
 
 1. `collect(request, …, relations=RelationOptions())`
 2. `build_candidates(request, outcome, assigned)`
@@ -47,7 +47,7 @@
 
 돌려준 `failures`에는 수집 실패(`outcome.stage_failures()`)가 이미 들어 있다. 다시 더하지 않는다.
 
-- 처리 순서에는 #121의 LIVE 조립(`app/processing/live.py`)으로 연결했다. 합성 자료로만 검사했고, 실제 요청을 받아 끝까지 돈 확인은 #121의 실제 연결 확인에서 한다.
+- LIVE 조립(`app/processing/live.py`)으로 연결했다. [10/16 로컬](https://github.com/JminAILab/CatchU/issues/121#issuecomment-6217635496)은 수동 접수·선정 대역으로, [11/18~19 EKS](https://github.com/JminAILab/CatchU/issues/37#issuecomment-7000321920)는 실제 접수·처리·수신으로 확인했다. 실제 자료 검수 범위는 [검수 기록](../../docs/CatchU_F실제결과_검수기록.md)을 따른다.
 - 초안·최소 질문은 만들지 않는다(`NOT_GENERATED`). 제목도 만들지 않는다([후보 문장과 근거](candidate-text.md#제목)).
 - 첫 호출 전 검사에서 멈춘 수집(저장소 없음)은 수집 실패만 돌려준다.
 - 다음은 부른 쪽이나 수집의 결함이라 `ValueError`를 낸다. 근거 부족이나 0건으로 숨기지 않는다.

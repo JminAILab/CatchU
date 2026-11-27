@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import type { AuthorDescriptionFilter, CatchAsset, RepositoryOption } from "./types";
 import { RevisitFacts } from "./revisit-facts";
 import styles from "./assets.module.css";
@@ -29,7 +29,7 @@ type AssetsViewProps = {
   dataMode?: "preview" | "api";
   detailItem?: CatchAsset;
   detailActions?: ReactNode;
-  /** 작성자 설명 편집 영역. 「생각해 볼 질문」 아래, 현재 확인 상태 위에 둔다(새 Catch BR4.1). 없으면 그리지 않는다. */
+  /** 작성자 설명 편집 영역. 쓰기 칸의 「생각해 볼 질문」 아래에 둔다(새 Catch BR4.1, #635). 없으면 그리지 않는다. */
   descriptionEditor?: ReactNode;
   /** Catch 상세 머리말 아래 줄에 둘 안내(#467: 모달 안 재인증 안내). 모달 밖 [다시 로그인]은 inert라 닿지 않는다. 없으면 그리지 않는다. */
   detailNotice?: ReactNode;
@@ -59,17 +59,10 @@ type AssetsViewProps = {
   onRetryDetail: () => void;
 };
 
-function confirmationLabel(item: CatchAsset) {
-  const { workFactsConfirmed, contributionConfirmed } = item.confirmation;
-  if (workFactsConfirmed && contributionConfirmed) return "확인 완료";
-  if (workFactsConfirmed || contributionConfirmed) return "일부 확인";
-  return "확인 전";
-}
-
+/** 목록 카드와 상세의 상태 표지. 확인 표지는 없다. 내용 확인을 공개에 합쳐 공개 표지가 그 뜻을 함께 가진다(#635). */
 function StatusBadges({ item }: { item: CatchAsset }) {
   return (
     <div className={styles.badges} aria-label="Catch 상태">
-      <span className={styles.badge}>{confirmationLabel(item)}</span>
       <span className={item.visibility === "PUBLIC" ? styles.publicBadge : styles.badge}>
         {visibilityLabels[item.visibility]}
       </span>
@@ -239,6 +232,23 @@ export function AssetsView(props: AssetsViewProps) {
   );
 }
 
+/** 두 칸 배치의 기준(#635, #615와 같은 폭). `assets.module.css`의 같은 미디어 쿼리와 함께 고친다. */
+const WIDE_DETAIL_QUERY = "(min-width: 1200px) and (min-height: 600px)";
+function subscribeWideDetail(onChange: () => void) {
+  const query = window.matchMedia(WIDE_DETAIL_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+/** 두 칸 배치인지. 배치 자체는 CSS가 정하고, 이 값은 따로 스크롤하는 기록 칸에 키보드 초점을 줄지에만 쓴다. */
+function useWideDetail() {
+  return useSyncExternalStore(subscribeWideDetail, () => window.matchMedia(WIDE_DETAIL_QUERY).matches, () => false);
+}
+
+/**
+ * Catch 상세 창(#635). 넓은 화면(가로 1200px·세로 600px 이상)에서는 왼쪽 기록 칸과 오른쪽 쓰기 칸이 따로 스크롤하고
+ * 머리말과 바닥 결정 줄은 움직이지 않는다. 그보다 좁거나 낮으면 같은 마크업이 한 줄로 흐르고 창 전체가 스크롤한다.
+ * 마크업 순서는 기록 칸 → 쓰기 칸 → 결정 줄이라 Tab·낭독 순서가 보이는 순서와 같다. 배치를 넘나들어도 요소가 그대로라 쓰던 글이 남는다.
+ */
 function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode = "preview", errorMessage, actions, descriptionEditor, notice }: {
   dataMode?: "preview" | "api";
   errorMessage?: string;
@@ -252,31 +262,37 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
   onRetry: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const wide = useWideDetail();
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     dialog.showModal();
     return () => dialog.close();
   }, []);
+  const ready = state === "ready" && item !== undefined;
 
   return (
     <dialog ref={dialogRef} className={`${styles.dialog} ${styles.catchDialog}`} aria-labelledby="catch-detail-title"
       onCancel={(event) => { event.preventDefault(); onClose(); }}>
       {/* 머리말은 스크롤해도 위에 붙으므로 안내도 그 안 둘째 줄에 둔다. 재인증 안내의 초점 여백은 이 머리말 전체 높이로 잡는다. */}
       <div className={styles.dialogHeading} data-reauth-sticky-container="">
-        <div><p className={styles.eyebrow}>CATCH DETAIL{dataMode === "preview" ? " · 임시 데이터" : ""}</p><h2 id="catch-detail-title">Catch 상세</h2></div>
+        <div className={styles.headingTitle}><p className={styles.eyebrow}>CATCH DETAIL{dataMode === "preview" ? " · 임시 데이터" : ""}</p><h2 id="catch-detail-title">Catch 상세</h2></div>
         <button className={styles.secondaryButton} autoFocus onClick={onClose}>닫기</button>
         {notice && <div className={styles.headingNotice}>{notice}</div>}
       </div>
-      {state === "loading" ? <StateMessage title="상세 내용을 불러오고 있습니다">근거와 설명을 확인하고 있어요.</StateMessage>
-        : state === "error" ? <StateMessage title="상세 내용을 불러오지 못했습니다" retry={onRetry}>{errorMessage ?? "현재는 결과를 확인할 수 없습니다. 다시 불러와 주세요."}</StateMessage>
-        : !item ? <StateMessage title="이 Catch를 열 수 없습니다">목록으로 돌아가 확인할 Catch를 다시 선택해 주세요.</StateMessage>
-        : <>
+      {!ready ? <div className={styles.detailState}>
+        {state === "loading" ? <StateMessage title="상세 내용을 불러오고 있습니다">근거와 설명을 확인하고 있어요.</StateMessage>
+          : state === "error" ? <StateMessage title="상세 내용을 불러오지 못했습니다" retry={onRetry}>{errorMessage ?? "현재는 결과를 확인할 수 없습니다. 다시 불러와 주세요."}</StateMessage>
+          : <StateMessage title="이 Catch를 열 수 없습니다">목록으로 돌아가 확인할 Catch를 다시 선택해 주세요.</StateMessage>}
+      </div> : <div className={styles.detailBody}>
+        {/* 기록 칸. 누를 것이 없는 Catch도 키보드로 내릴 수 있게 두 칸 배치에서만 초점을 받는다. 구역 이름은 낭독기에만 읽힌다. */}
+        <section className={styles.readColumn} aria-label="Catch 기록과 초안" tabIndex={wide ? 0 : undefined}>
           <p className={styles.repository}>{repositoryName ?? "저장소 정보 없음"}</p>
           {item.title !== null && <h3 className={styles.detailTitle}>{item.title}</h3>}
           <StatusBadges item={item} />
           <GeneratedContentNotice item={item} />
-          <p className={dataMode === "preview" || item.sourceMode === "MOCK" ? styles.readOnlyNotice : `${styles.readOnlyNotice} ${styles.subtleNotice}`}>{dataMode === "preview" ? "예시 자료입니다. 확인·불일치·공개 설정은 바뀌지 않습니다." : item.sourceMode === "MOCK" ? "합성 자료로 생성된 Catch입니다. 실제 분석 결과와 구분해 확인해 주세요." : "확인과 공개 선택은 별도입니다."}</p>
+          {(dataMode === "preview" || item.sourceMode === "MOCK") && <p className={styles.readOnlyNotice}>
+            {dataMode === "preview" ? "예시 자료입니다. 불일치·공개 설정은 바뀌지 않습니다." : "합성 자료로 생성된 Catch입니다. 실제 분석 결과와 구분해 확인해 주세요."}</p>}
           <div className={styles.factGrid}>
             <section className={styles.factPanel}><h3>작업에서 확인된 사실</h3>
               {item.workFacts.length ? <ul>{item.workFacts.map((fact, index) => <li key={index}>{fact}</li>)}</ul> : <p>제공된 작업 사실이 없습니다.</p>}
@@ -284,19 +300,27 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
             <section className={styles.factPanel}><h3>나의 기여</h3><p>{item.subjectContribution || "제공된 기여 설명이 없습니다."}</p></section>
           </div>
           <section className={styles.detailSection}><h3>근거</h3>
-            {item.evidence.length === 0 ? <p>제공된 근거가 없습니다.</p> : item.evidence.map((evidence, index) => (
-              <article key={evidence.catchEvidenceId} className={styles.evidence}>
-                <h4>근거 {index + 1}</h4>
-                <p className={styles.sourceUrl}>{dataMode === "api" && item.sourceMode === "LIVE" && safeEvidenceUrl(evidence.sourceUrl)
-                  ? <a href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer">원본 근거 열기</a> : evidence.sourceUrl}</p>
-                <p className={styles.small}>{dataMode === "preview" || item.sourceMode === "MOCK" ? "가상 근거 주소 · 외부 연결 없음 · " : ""}판본 {evidence.sourceRevision}</p>
-                <ul>{evidence.representedFacts.map((fact, factIndex) => <li key={factIndex}>{fact}</li>)}</ul>
-                <p><strong>기여 범위:</strong> {evidence.contributionScope}</p>
-                {evidence.coverageLimits.length > 0 && <div><strong>이 근거로 알 수 없는 것</strong><ul>{evidence.coverageLimits.map((limit, limitIndex) => <li key={limitIndex}>{limit}</li>)}</ul></div>}
-              </article>
-            ))}
+            {item.evidence.length === 0 ? <p>제공된 근거가 없습니다.</p> : item.evidence.map((evidence, index) => {
+              const linked = dataMode === "api" && item.sourceMode === "LIVE" && safeEvidenceUrl(evidence.sourceUrl);
+              return (
+                <article key={evidence.catchEvidenceId} className={styles.evidence}>
+                  {/* 머리 줄: 「근거 n · 판본 | 원본 근거 열기 ↗」. 링크로 열 수 없는 근거는 주소를 글자로 보인다. */}
+                  <div className={styles.evidenceHead}>
+                    <div className={styles.evidenceId}>
+                      <h4>근거 {index + 1}</h4>
+                      <span className={styles.small}>{dataMode === "preview" || item.sourceMode === "MOCK" ? "가상 근거 주소 · 외부 연결 없음 · " : ""}판본 {evidence.sourceRevision}</span>
+                    </div>
+                    {linked && <a className={styles.evidenceOpen} href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer">원본 근거 열기<span aria-hidden="true"> ↗</span></a>}
+                  </div>
+                  {!linked && <p className={styles.sourceUrl}>{evidence.sourceUrl}</p>}
+                  <ul>{evidence.representedFacts.map((fact, factIndex) => <li key={factIndex}>{fact}</li>)}</ul>
+                  <p><strong>기여 범위:</strong> {evidence.contributionScope}</p>
+                  {evidence.coverageLimits.length > 0 && <div className={styles.evidenceLimits}><strong>이 근거로 알 수 없는 것</strong><ul>{evidence.coverageLimits.map((limit, limitIndex) => <li key={limitIndex}>{limit}</li>)}</ul></div>}
+                </article>
+              );
+            })}
           </section>
-          {/* 새 Catch BR4.1: 근거 → 다시 볼 곳(NC3) → Catch 설명 초안 → 생각해 볼 질문 → 작성자 설명 → 현재 확인 상태. 초안과 질문을 보고 아래 칸에 쓴다. */}
+          {/* 새 Catch BR4.1: 근거 → 다시 볼 곳(NC3) → Catch 설명 초안 → 생각해 볼 질문 → 작성자 설명. 초안과 질문을 보고 쓰기 칸에 쓴다. */}
           {/* NC3 BR9.1: 사실이 없으면 칸을 그리지 않는다. 저장소 이름은 이 상세가 이미 불러온 값이다(새 요청 없음). */}
           <RevisitFacts item={item} dataMode={dataMode} repositoryName={repositoryName} />
           {/* CR3 BR7.1: 설명 초안이 NOT_GENERATED면 칸(제목·안내 글)을 그리지 않는다. FAILED·GENERATED는 그대로다. */}
@@ -304,23 +328,21 @@ function CatchDetail({ item, state, repositoryName, onClose, onRetry, dataMode =
             {hasGeneratedDraft(item) ? <p className={styles.draft}>{item.draft.content}</p>
               : <p>{item.draft.status === "FAILED" ? "설명 초안을 생성하지 못했습니다. 위의 사실과 근거는 확인할 수 있습니다." : "생성된 설명 초안이 없습니다."}</p>}
           </section>}
+        </section>
+        <section className={styles.writeColumn} aria-label="질문과 작성자 설명">
           <section className={styles.detailSection}><h3>생각해 볼 질문 <span className={styles.small}>본인만 확인</span></h3>
-            {item.reflection.status === "GENERATED" && item.reflection.questions.length > 0 ? <ul>{item.reflection.questions.map((question, index) => <li key={index}>{question}</li>)}</ul>
+            {item.reflection.status === "GENERATED" && item.reflection.questions.length > 0 ? <ul className={styles.questions}>{item.reflection.questions.map((question, index) => <li key={index}>{question}</li>)}</ul>
               : <p>{item.reflection.status === "FAILED" ? "질문을 생성하지 못했습니다." : "생성된 질문이 없습니다."}</p>}
             <p className={styles.small}>질문을 보고 아래 칸에 자기 말로 적어 보세요.</p>
           </section>
           {descriptionEditor}
-          <section className={styles.detailSection}><h3>현재 확인 상태</h3>
-            <dl className={styles.confirmations}>
-              <div><dt>작업 사실</dt><dd>{item.confirmation.workFactsConfirmed ? "확인 완료" : "확인 전"}</dd></div>
-              <div><dt>나의 기여</dt><dd>{item.confirmation.contributionConfirmed ? "확인 완료" : "확인 전"}</dd></div>
-              <div><dt>불일치 표시</dt><dd>{item.mismatch ? "있음" : "없음"}</dd></div>
-            </dl>
-            <p className={styles.small}>내용 확인과 공개 선택은 별도입니다. 팝업을 열어도 확인 완료로 바뀌지 않습니다.</p>
-          </section>
-        </>}
-      {state === "ready" && item && actions}
-      <div className={styles.dialogFooter}><button className={styles.primaryButton} onClick={onClose}>목록으로 돌아가기</button></div>
+        </section>
+      </div>}
+      {/* 결정 줄: 불일치 표시·공개 선택(CatchActions)과 닫기. 두 칸 배치에서는 창 바닥에 늘 보인다. 「현재 확인 상태」 칸은 없다(#635). */}
+      <div className={styles.decisionBar}>
+        {ready && actions}
+        <div className={styles.dialogFooter}><button className={styles.secondaryButton} onClick={onClose}>목록으로 돌아가기</button></div>
+      </div>
     </dialog>
   );
 }

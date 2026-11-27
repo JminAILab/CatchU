@@ -29,7 +29,7 @@ EKS([#276](https://github.com/JminAILab/CatchU/issues/276))의 api에서 큐 연
 
 ## 켠 뒤 확인
 
-- **큐 연결:** api 로그에 `AnalysisQueue` 문맥의 오류(`ANALYSIS_QUEUE_ERROR`·`ANALYSIS_DISPATCH_PAUSED`)가 이어지지 않는지 본다: `k logs deploy/api | grep -E 'ANALYSIS_QUEUE_ERROR|ANALYSIS_DISPATCH_PAUSED'`. 아무것도 나오지 않으면 정상이다. 처음부터 붙으면 연결을 알리는 줄도 없다(`ANALYSIS_QUEUE_CONNECTED`는 오류 뒤 다시 붙었을 때만 남는다). 큐 장애 조치([README.md](README.md) 「완료 기준 대응」의 `test-failover`) 뒤 api가 다시 뜨지 않고 `ANALYSIS_QUEUE_ERROR` → `ANALYSIS_QUEUE_CONNECTED` 순서로 남는지, worker도 준비 상태로 돌아오는지 본다. 2단계의 장애 조치 확인은 api에 큐 연결이 없을 때 한 것이라 api 쪽은 이때 처음 본다.
+- **큐 연결:** api 로그에 `AnalysisQueue` 문맥의 오류(`ANALYSIS_QUEUE_ERROR`·`ANALYSIS_DISPATCH_PAUSED`)가 이어지지 않는지 본다: `k logs deploy/api | grep -E 'ANALYSIS_QUEUE_ERROR|ANALYSIS_DISPATCH_PAUSED'`. 아무것도 나오지 않으면 정상이다. 처음부터 붙으면 연결을 알리는 줄도 없다(`ANALYSIS_QUEUE_CONNECTED`는 오류 뒤 다시 붙었을 때만 남는다). 큐 장애 조치([README.md](README.md) 「완료 기준 대응」의 `test-failover`) 뒤 api가 다시 뜨지 않고 `ANALYSIS_QUEUE_ERROR` → `ANALYSIS_QUEUE_CONNECTED` 순서로 남는지, worker도 준비 상태로 돌아와 실제 작업을 받는지 본다. 연결 복귀만으로 작업 처리 복귀까지 확인했다고 보지 않는다.
 - **내부 조회:** worker Pod에서 없는 시도 ID로 불러 경로가 등록됐고 키가 맞는지 본다. 아래 명령은 키를 화면에 찍지 않고 응답만 낸다. `404`와 본문의 이유 `ATTEMPT_NOT_ACTIVE`가 나오면 정상이다(경로가 없을 때의 404에는 이유가 없다). 401이면 두 Secret의 키가 다르고, 시간 초과면 NetworkPolicy를 본다.
   ```bash
   k exec deploy/worker -- /app/worker/.venv/bin/python -c "import os,urllib.request,urllib.error
@@ -50,7 +50,7 @@ EKS([#276](https://github.com/JminAILab/CatchU/issues/276))의 api에서 큐 연
   k exec deploy/api -- node -e "console.log(require('fs').readdirSync(process.env.GITHUB_CREDENTIAL_DIRECTORY).length)"
   ```
   다음 교체로 api가 다시 뜬 뒤에도 프로필이 연결됨으로 남는지 본다(볼륨이 Pod와 함께 없어지지 않는다는 확인).
-- **실제 분석 한 번:** 연결한 계정의 공개 저장소를 골라 분석을 요청하고 결과 화면까지 본다. api 로그의 `ANALYSIS_REQUEST_ENQUEUED`(큐에 넣음) → worker 로그의 처리 → api 로그의 `WORKER_RESULT_RECEIVED`(`disposition`이 `ACCEPTED`) 순서로 남는다. 접수가 403이면 GitHub 연결을, 요청이 60분 뒤 실패로 닫히면 큐 연결과 내부 조회를 본다. worker의 실제 메모리 사용량도 이때 재서 `worker.yaml`의 상한을 고친다(그 파일 머리말).
+- **실제 분석 한 번:** 연결한 계정의 공개 저장소를 골라 분석을 요청하고 결과 화면까지 본다. api 로그의 `ANALYSIS_REQUEST_ENQUEUED`(큐에 넣음) → worker 로그의 처리 → api 로그의 `WORKER_RESULT_RECEIVED`(`disposition`이 `ACCEPTED`) 순서로 남는다. 접수가 403이면 GitHub 연결을, 요청이 60분 뒤 실패로 닫히면 큐 연결과 내부 조회를 본다. worker의 실제 메모리 사용량도 재서 기록한다. 메모리 상한은 [#480](https://github.com/JminAILab/CatchU/issues/480)에서 정한다.
 
 ## GitHub 토큰 보관 볼륨
 
@@ -66,7 +66,7 @@ fill() { [[ $fs == fs-* && $ap == fsap-* ]] || { echo "EFS ID를 찾지 못했�
 ko() { kubectl --kubeconfig ~/.kube/catchu --namespace catchu-ops "$@"; }
 ```
 
-**마운트 시험**([README.md](README.md) 「1단계 만드는 순서」 4번이 GitHub 연결을 켤 때 하라고 한 것). 시험 Pod 세 개를 `catchu-ops`에 띄우고 2분쯤 뒤에 본다. Pod는 5분 한도가 있어 그 뒤에는 `Failed`로 바뀐다.
+**마운트 시험.** 시험 Pod 세 개를 `catchu-ops`에 띄우고 2분쯤 뒤에 본다. Pod는 5분 한도가 있어 그 뒤에는 `Failed`로 바뀐다.
 
 ```bash
 fill deploy/aws/k8s/ops/efs-mount-test.yaml | ko apply -f -
@@ -77,7 +77,7 @@ ko get events --field-selector reason=FailedMount -o custom-columns=POD:.involve
 
 | Pod | 기대 | 어긋나면 |
 |---|---|---|
-| `efs-test-ok`(접근점 + TLS) | `Completed`. 로그가 `folder 1000:1000 700`, `file 1000:1000 600`, `ok`, 남은 파일 수(처음에는 `0`) | 붙지 않으면 파일 시스템 정책의 접근점 조건이 IAM 없는 마운트에 맞지 않거나 드라이버 권한이 모자란 것이다. GitHub 연결 판본을 띄우지 않고 [README.md](README.md) 「1단계 만드는 순서」 4번대로 팀장과 정한다 |
+| `efs-test-ok`(접근점 + TLS) | `Completed`. 로그가 `folder 1000:1000 700`, `file 1000:1000 600`, `ok`, 남은 파일 수(처음에는 `0`) | 붙지 않으면 GitHub 연결 판본을 띄우지 않는다. 드라이버 권한이 모자라면 `efs-csi-controller-sa`에만 필요한 권한을 더한다. 그래도 붙지 않으면 팀장이 방법을 정한다 |
 | `efs-test-no-ap`(접근점 없음) | `ContainerCreating`에 머물고 `FailedMount` 사건이 남는다 | 붙어서 `Error`로 끝나면(로그에 「거부되지 않고 붙었다」) 정책이 막지 못한 것이다. 띄우지 않고 팀장과 정한다 |
 | `efs-test-no-tls`(접근점·TLS 없음) | 위와 같다 | 위와 같다 |
 
@@ -98,13 +98,13 @@ kubectl --kubeconfig ~/.kube/catchu --namespace catchu get pvc github-credential
 
 암호화 키(`GITHUB_CREDENTIAL_ENCRYPTION_KEY`)를 바꾸면 보관된 토큰을 풀지 못해 회원이 GitHub를 다시 연결해야 한다([k8s/README.md](k8s/README.md) 「값을 바꿀 때」). 토큰은 8시간짜리라 EFS 백업은 꺼 두었다.
 
-## 아직 못 본 것
+## 실제 연결 확인과 한계
 
-실제 클러스터가 있어야 확인된다. 위 순서로 띄운 뒤 「켠 뒤 확인」에서 보고, 결과는 #276 댓글에 남긴다.
+실제 EKS에서 [11/18 준비 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6972639820)과 [기능 켜기 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)을 했다.
 
-- api가 실제 큐(ElastiCache)에 TLS·비밀번호로 붙는지와 장애 조치 뒤 다시 붙는지(worker는 2단계에서 봤다)
-- 실제 worker Pod에서 내부 조회가 닿고 키가 맞는지
-- EFS의 실제 마운트와 거부(위 마운트 시험)
-- 실제 계정으로 GitHub 연결을 끝까지 하고(전환 뒤) 실제 분석을 한 번 돌리는 것, 그때의 worker 메모리
+- api는 실제 큐에 붙었고 장애 조치 뒤 Pod 재시작 없이 27초 만에 다시 연결됐다. 같은 실행에서 worker는 재시작 전까지 새 요청을 받지 않았다. 연결 복귀와 작업 재개는 구분하며 후속 근거는 [#603](https://github.com/JminAILab/CatchU/issues/603)에서 본다.
+- worker Pod에서 내부 조회는 맞는 키로 `404 ATTEMPT_NOT_ACTIVE`, 키 없이 401이었다. 바깥 변형 주소 여섯 개는 모두 404였다.
+- 접근점·TLS EFS 마운트와 파일 쓰기·읽기·삭제는 성공했고, 접근점 없는 TLS 마운트와 접근점·TLS 없는 마운트는 거부됐다. 접근점이 있으면 드라이버가 TLS를 강제하므로 접근점을 둔 비TLS 연결만 따로 시험한 결과는 아니다.
+- 실제 GitHub 연결과 api 재시작 뒤 연결 유지를 확인했다. 실제 분석 1건은 31분 30초·후보 238개로 api 수신 `ACCEPTED`였으며, worker 결과는 되돌아보기 실패 4건을 포함한 `PARTIAL_FAILED`였다. 메모리 최고 약 496Mi, 상한 1,536Mi, OOM 0이었다. 이 한 건의 시간·메모리를 모든 저장소에 일반화하지 않는다.
 
 실행 파일의 형식과 Pod 보안 검사(`restricted`) 통과는 [`scripts/deploy.test.sh`](scripts/deploy.test.sh)가 조건을 보고, 이 문서를 처음 쓸 때 로컬 쿠버네티스 API 서버(1.37.1)에 올려 확인했다(노드와 EFS 드라이버가 없는 서버라 마운트는 보지 못한다).

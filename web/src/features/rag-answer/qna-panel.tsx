@@ -35,6 +35,7 @@ const ragAnswerApi = createRagAnswerApi({ client: api, baseUrl: process.env.NEXT
  *   버튼은 `aria-disabled`, 입력란은 `readOnly`로 막고, 빈 질문·중복 전송은 `ask`의 `canSendQuestion` 검사가 막는다.
  * - 알림: 패널 끝의 보이지 않는 `role="status"` 자리 하나에 처리 중·끝 안내를 넣는다. 답 목록과 답 자리 안내에는 알림 표시를
  *   붙이지 않아, 답 조각이 여러 번 와도 조각마다 읽히지 않고 같은 문장이 두 번 읽히지 않는다.
+ * - 버튼 글자: 보내는 동안 버튼에 「답변 만드는 중…」을 보인다. 알림 자리의 안내는 그대로 둔다.
  * - 답 찾기: 초점은 옮기지 않는다. 질문 글이 3단계 제목이라 버튼에서 "이전 제목"으로 가면 가장 최근 질문이고 그 아래가 답이다.
  */
 export function QnaPanel(props: QnaPanelProps) {
@@ -84,9 +85,12 @@ export function QnaPanel(props: QnaPanelProps) {
   }
 
   return (
-    <section className={styles.panel} aria-labelledby="qna-heading" data-testid="qna-panel">
-      <h2 id="qna-heading" className={styles.heading}>{RAG_ANSWER_MESSAGES.qnaHeading}</h2>
-      <div data-testid="qna-conversation">
+    <section className={styles.qnaPanel} aria-labelledby="qna-heading" data-testid="qna-panel">
+      <header className={styles.qnaHeader}>
+        <h2 id="qna-heading" className={styles.qnaHeading}>{RAG_ANSWER_MESSAGES.qnaHeading}</h2>
+        <p className={styles.qnaDescription} data-testid="qna-description">{RAG_ANSWER_MESSAGES.qnaDescription}</p>
+      </header>
+      <div className={styles.qnaConversation} data-testid="qna-conversation">
         {turns.map((turn, index) => (turn.role === "USER"
           ? <h3 key={index} className={styles.question} data-testid="qna-question">{turn.text}</h3>
           : (
@@ -98,14 +102,14 @@ export function QnaPanel(props: QnaPanelProps) {
             </div>
           )))}
       </div>
-      <form className={styles.form} onSubmit={ask} data-testid="qna-form">
-        <label htmlFor="qna-question-input">{RAG_ANSWER_MESSAGES.questionLabel}</label>
-        <textarea id="qna-question-input" className={styles.input} maxLength={QUESTION_MAX_LENGTH} value={text}
+      <form className={styles.qnaForm} onSubmit={ask} data-testid="qna-form">
+        <label htmlFor="qna-question-input" className={styles.qnaLabel}>{RAG_ANSWER_MESSAGES.questionLabel}</label>
+        <textarea id="qna-question-input" className={styles.qnaInput} maxLength={QUESTION_MAX_LENGTH} value={text}
           onChange={(event) => setText(event.target.value)} readOnly={sending} data-testid="qna-question-input" />
         <AiNoticeLine />
         {formNotice && <p className={styles.error} role="alert" data-testid="qna-form-notice">{formNotice}</p>}
-        <button type="submit" className={styles.submit} aria-disabled={!canSendQuestion(text, sending)} data-testid="qna-submit-button">
-          {RAG_ANSWER_MESSAGES.ask}
+        <button type="submit" className={styles.qnaSubmit} aria-disabled={!canSendQuestion(text, sending)} data-testid="qna-submit-button">
+          {sending ? RAG_ANSWER_MESSAGES.asking : RAG_ANSWER_MESSAGES.ask}
         </button>
       </form>
       <p role="status" className="visually-hidden" data-testid="qna-status">{announcement}</p>

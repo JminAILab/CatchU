@@ -9,14 +9,13 @@ E의 [PR #205](https://github.com/JminAILab/CatchU/pull/205)는
 ResultApplicationRecord 엔티티·마이그레이션, 외부 등록 함수 port, 반영 서비스를 제공하는 연결 입력이다.
 실제 수신 경로·보호 판단 공급·서비스 조립은 이 제공분에 포함되지 않는다.
 제공분을 갖춘 것만으로 실제 수신·반영 연결이 완료됐다고 판단하지 않는다.
-제공 내용과 검토 상태는 각 PR에서, 실제 결합과 남은 실행 작업은
-기존 [#105](https://github.com/JminAILab/CatchU/issues/105)에서 확인한다. 실패 요청 닫기는 [#237](https://github.com/JminAILab/CatchU/issues/237)에서 구현한다.
+제공 내용은 각 PR에, 실제 결합 기록은 [#105](https://github.com/JminAILab/CatchU/issues/105)에 있다. 현행 제품의 DB 수신·정책/좌표 공급·큐 호출 조립은 [수신 연결](receiver-registration.md)에 있고, 실패 요청 닫기는 [처리 시한 판정](analysis-deadline.md)에 구현돼 있다.
 
 B 등록 함수는 A/E의 회원·요청·시도·수신 테이블 관리,
 원문 fingerprint·동의·범위 검증, 반영 상태 처리와 요청 닫기를 대신하지 않는다.
 MemberAccount·AnalysisRequest·AnalysisAttempt는 [PR #184](https://github.com/JminAILab/CatchU/pull/184)의
 실제 기반을 참조한다. 결합 검사는 실제 E 수신 테이블·반영 서비스와 B 등록 함수를 사용한다.
-수신 저장 어댑터·보호 판단 공급·서비스 호출 조립은 실제 경로로 연결해야 한다.
+제품은 이 수신 저장 어댑터·보호 판단 공급·서비스 호출을 `createApplicationModule()`의 조건부 큐 조립으로 연결한다. 아래 합성 결합 검사와 실제 외부 실행 증거는 구분한다.
 
 ## 수신 저장과 반영 트랜잭션
 

@@ -56,10 +56,10 @@ GitHubConnection의 credentialReference에는 github-v1:UUID만 저장한다. �
 
 난수는 node:crypto.randomBytes(32)로 생성해 비밀 관리 수단이나 로컬 변수에만 받는다. 실제 값·전체 환경·HTTP 상세 출력·토큰 응답을 화면·이슈·PR에 출력하지 않는다. 기존 .env는 덮어쓰지 않으며 실제 비밀값은 문서·Git에 넣지 않는다. 설정 전체 목록은 [환경변수 표](environment.md)를 따른다.
 
-2026-10-08에는 작성자의 개발용 앱·로컬 비밀 설정·DB·API 준비와 실제 연결을 확인했다([검증 기록](https://github.com/JminAILab/CatchU/issues/231#issuecomment-6051939540)). 아래는 다른 검토자가 자기 환경에서 수행할 절차이며 자동 검사나 재현 완료 기록이 아니다. 운영 앱·콜백·보관 권한은 A와 H가 배포 전에 확인해야 한다. App 설정에서 만료형 Access Token을 켜되 추가 scope는 요청하지 않는다. 기존 만료 없는 토큰이 자동 변경되는 것은 아니므로 다시 연결한다.
+2026-10-08에는 작성자의 개발용 앱·로컬 비밀 설정·DB·API 준비와 실제 연결을 확인했다([검증 기록](https://github.com/JminAILab/CatchU/issues/231#issuecomment-6051939540)). 아래는 다른 검토자가 자기 환경에서 수행할 절차이며 자동 검사나 재현 완료 기록이 아니다. EKS의 운영 앱·web 콜백·보관과 재기동 후 보존은 [11/18 5단계](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에서 확인했다. 다른 환경에서는 적용값을 다시 확인한다. App 설정에서 만료형 Access Token을 켜되 추가 scope는 요청하지 않는다. 기존 만료 없는 토큰이 자동 변경되는 것은 아니므로 다시 연결한다.
 
 1. GitHub 앱 설정의 콜백·만료형 옵션을 확인하고 위 설정을 안전하게 준비한다. 로그·설정 전체를 공유하지 않는다.
-2. 기존 인증으로 authorization URL을 받아 브라우저에서 승인한다. web 연결이 아직 없으면 검토용 클라이언트가 code·state를 변수에 받아 완료 API를 호출한다. URL/코드도 기록·첨부하지 않는다.
+2. web의 GitHub 연결 관리에서 인증을 시작하고 브라우저에서 승인·복귀한다. API 경계만 따로 확인할 때는 검토용 클라이언트가 code·state를 변수에 받아 완료 API를 호출하되, 이를 web 왕복 검사로 기록하지 않는다. URL/코드도 기록·첨부하지 않는다.
 3. 완료가 200인지, GET /me가 CONNECTED·본인 GitHub 로그인인지 확인한다. 서버는 교환 응답의 빈 scope·양의 expires_in·/user의 빈 실제 권한 헤더를 검증한다.
 4. 내부 검토 코드에서 resolveCredential을 받아 공개 저장소 조회를 수행하되 토큰을 출력하지 않는다. 공개 저장소 자료가 조회되는지와 비공개 권한이 없는지를 확인한다. 이 함수 자체는 저장소 선정이나 분석 동의·소유권 허가를 대신하지 않는다.
 5. 실제 만료·GitHub 승인 폐기 후 함수가 null, 상태가 REAUTH_REQUIRED인지 확인한다. 재연결과 해제를 확인한다. CatchU 세션 유효 여부는 별도로 검사한다.
@@ -69,6 +69,8 @@ GitHubConnection의 credentialReference에는 github-v1:UUID만 저장한다. �
 test/github-client.test.cjs는 GitHub HTTP 응답 대역으로 scope·expires_in·PKCE 전달·신원·오류 비노출·설정 검증을 확인한다. HTTP 콜백은 development·test의 localhost·127.0.0.1·::1만 허용하며 production·미지정·공란·다른 환경과 비루프백 거부를 검사한다. test/db/github-connection-api.test.cjs는 실제 Nest HTTP·전용 PostgreSQL·암호문 파일로 연결·해제·만료·권한 경계·state 일회성·동시 완료·늦은 응답·암호문 무결성·보관/DB 저장/최종 커밋 실패를 확인한다. 파일 누락·키 불일치·암호문 변조는 회원 조회 200·REAUTH_REQUIRED·참조 제거·반복 미제공, 다른 보관 장애·DB 전환 실패는 500·CONNECTED 유지, 재연결 경쟁·인증 거부를 검사한다. GitHub 응답 대역과 실제 API·DB 범위를 구분하며 대역 시험을 실제 승인·철회 재현으로 해석하지 않는다.
 
 전체 API 회귀·정적 검사 결과는 [PR #254](https://github.com/JminAILab/CatchU/pull/254)의 실제 수행 판본에 기록한다. 2026-10-08 실제 검증은 제품 판본 c22b399의 작성자 환경에서 수행한 기록이다. 사용자 직접 최초 연결·해제·재연결과 최초 연결의 자격정보 제공·추가 scope 없음·유효 만료 정보·공개 저장소 조회를 확인했다. CLI 후속 검사는 재연결 후 제공·공개 저장소 조회, 사용자가 실제 앱 승인을 철회한 뒤 GitHub 401·REAUTH_REQUIRED·참조 제거·보관 정리·반복 미제공과 동일 검사 토큰의 회원 조회 200을 확인했다. 실제 시간 경과에 따른 만료·권한 변화·#232 내부 조회/worker 인계·실제 web·작성자 외 재현·배포 검증은 남아 있다. 이번 리뷰 보완의 대역 회귀 검사를 이전 실제 GitHub 검증의 재실행으로 확대하지 않는다.
+
+이후 [11/18 EKS 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에서 실제 web GitHub 연결·토큰 저장·API 재기동 후 보존·분석 접수와 worker 처리·결과 수신을 확인했다. 위 10/8 기록의 미확인 목록은 당시 범위이며, 시간 경과 만료·권한 변화 등의 검사를 이 EKS 기록으로 확대하지 않는다.
 
 ## 개발용 OAuth App 준비 순서
 
@@ -95,5 +97,5 @@ npm run start:dev
 
 기존 키가 있는 경우 위 생성 줄을 다시 실행하지 않는다. 키를 잃으면 기존 토큰을 복호화할 수 없다. 재시작 이후에도 같은 키를 비밀 관리 수단/무시된 로컬 설정에서 주입해야 한다. 보관 디렉터리와 키의 접근 권한은 본인/서비스 계정으로 제한하고 다른 사람과 공유하지 않는다.
 
-6. GitHub 연결 **화면과 콜백 페이지는 이 PR에 없다.** web이 /github/callback을 처리하지 않으면 돌아온 페이지가 404여도 OAuth code·state는 주소의 쿼리에 있을 수 있다. 이를 성공 화면으로 해석하지 않는다. 검토용 클라이언트가 같은 CatchU 로그인으로 authorization API → GitHub 브라우저 승인 → code·state를 connection API로 보내야 완료된다. 서버의 GET 콜백 API를 호출하는 방식이 아니다. 기존 CatchU JWT·OAuth code·state는 변수에만 받아 출력·기록하지 않는다. state는 URL을 발급한 동일 API 프로세스에서만 유효하다.
+6. 현행 web은 `/profile/github`와 `/github/callback`을 연결한다([화면 안내](../../web/src/features/github-connection/README.md)). 같은 탭에서 GitHub 승인 뒤 복귀해 완료 API를 부르고 쿼리 없는 `/assets`로 간다. [11/18 EKS](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에서 성공 경로를 확인했다. 서버 GET 콜백 방식이 아니며 code·state·토큰을 출력·기록하지 않는다. state는 URL을 발급한 동일 API 프로세스에서만 유효하다.
 7. 연결 완료와 공개 정보 조회·실제 권한·만료 응답 검증을 수행한 뒤, 비밀값 없이 앱의 설정 확인 여부·API 상태·검사한 판본만 PR에 남긴다. 10/8 작성자 검증과 이번 대역 검사는 구분하고, 새 검토자의 재현·남은 연결·배포 검증을 완료로 추정하지 않는다.

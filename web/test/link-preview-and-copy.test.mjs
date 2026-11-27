@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { test } from "node:test";
 import { createElement } from "react";
@@ -25,6 +26,7 @@ registerHooks({
 const linkLayout = await load("app/s/layout.tsx");
 const landingRoute = await load("app/(guest)/page.tsx");
 const { LandingPage } = await load("features/landing/landing-page.tsx");
+const { demoConfig } = await load("features/landing/playback/demo-config.ts");
 const { CatchActions } = await load("features/assets/catch-actions.tsx");
 const { MemberHeader } = await load("components/header/member-header.tsx");
 
@@ -63,7 +65,27 @@ test("소개 화면: 숨기면 보낸 링크에서 빠진다는 문장이 없고
   assert.ok(text.includes("선택한 자료는 발행 시점의 사본으로 공유됩니다.") && text.includes("보이는 자료는 발행할 때 고정한 내용입니다."));
 });
 
-test("Catch 상세: 공개한 Catch의 [숨기기] 안내가 이미 발행한 발행본은 그대로라고 알린다", () => {
+// #635(2026-11-24·25 팀장 결정): 내용 확인을 공개에 합쳐 앱에 확인을 따로 하는 단계와 확인 표지가 없다.
+// 소개 화면의 기능 3과 대표 시연도 Catch 내용을 읽고 「공개 선택」의 전환 단추를 켜는 흐름만 그린다(체크 상자·[확인 완료]·[지금 공개] 없음).
+// 실패 조건: 옛 흐름의 문장·표지가 화면이나 시연 자막·단계 안내에 남음, 전환 단추가 실제로 누를 수 있는 요소가 됨.
+test("소개 화면: 확인을 따로 하는 단계와 확인 표지를 그리지 않고 공개 전환 단추 하나로 보인다", () => {
+  const html = renderToStaticMarkup(createElement(LandingPage));
+  const text = plainText(html);
+  const scripts = ["demo-config.ts", "story-controller.ts"].map((name) => readFileSync(new URL(`../src/features/landing/playback/${name}`, import.meta.url), "utf8")).join("\n");
+  for (const gone of ["확인 완료", "확인 전", "확인만으로", "지금 공개", "두 항목", "확인한 Catch만 공개할 수 있습니다", "공개는 따로", "공개를 별도로",
+    "작업 사실을 확인했습니다", "기여 범위를 확인했습니다"]) {
+    assert.ok(!text.includes(gone), `화면에 「${gone}」이 남아 있다`);
+    assert.ok(!scripts.includes(gone), `자막·단계 안내에 「${gone}」이 남아 있다`);
+  }
+  for (const kept of ["확인한 Catch만,내가 선택해 공개.", "작업 사실과 내 기여가 맞는지 보고, 공개할 Catch를 직접 선택합니다. 언제든 다시 숨길 수 있습니다.",
+    "작업 사실과 나의 기여가 맞는지 본 뒤 공개하세요. 공개하기 전에는 나만 봅니다.", "공개한 Catch만 발행 · 언제든 다시 숨기기", "공개 설정"]) assert.ok(text.includes(kept), `「${kept}」이 없다`);
+  // 기능 3의 두 단계는 읽기와 전환 단추 하나다.
+  assert.deepEqual(demoConfig.verification.actions[0].map((action) => [action.target, action.kind]), [["catch-read", "read"], ["publish-switch", "click"]]);
+  assert.deepEqual(demoConfig.hero.actions[5].map((action) => action.target), ["publish-switch"]);
+  assert.ok(!html.includes('role="switch"'), "시연 속 전환 단추는 그림이다");
+});
+
+test("Catch 상세: 공개한 Catch의 숨기기 안내가 이미 발행한 발행본은 그대로라고 알린다", () => {
   const item = {
     catchId: "c1", visibility: "PUBLIC", restriction: "NONE", mismatch: false,
     confirmation: { workFactsConfirmed: true, contributionConfirmed: true },

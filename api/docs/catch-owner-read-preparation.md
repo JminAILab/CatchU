@@ -42,7 +42,7 @@ AppModule에 CatchesModule을 등록했다. /v1, 공통 오류 응답, 성공/�
 
 B 저장 테이블/등록은 #105(PR #143), A/E 회원·원 요청·시도는 #104, 공통 오류는 #88(PR #132), 공통 DB는 #86(PR #159)을 사용한다. 선행 저장 구현은 dev에 반영되었으며 이 문서는 본인 조회·확인·불일치 API만 설명한다.
 
-[`RepositoryProtection`](../src/catches/entities/repository-protection.entity.ts)과 [`CreateRepositoryProtection1790601000000`](../src/database/migrations/1790601000000-CreateRepositoryProtection.ts)은 B의 명시적인 보호 판단 저장 공간이다. 관측/판정이 없다고 NONE 행을 만들어 채우지 않는다. 같은 소유자·원 저장소의 보호 행과 확인 상태·출처·시각이 모두 있어야 조회할 수 있다. 행이나 관측 값이 없으면(JSON null 포함) 조회는 500으로 실패하고 확인·불일치 변경도 롤백한다. 이전 유효 관측이 있으면 최근 조회 실패 기록만으로 그 판단을 무효화하지 않는다. 이 초기 판단의 실제 공급과 원본 관측/복구는 후속 연결 사항이다. 테스트는 합성 관측을 명시해서 NONE/SOURCE_PRIVATE를 넣는다.
+[`RepositoryProtection`](../src/catches/entities/repository-protection.entity.ts)과 [`CreateRepositoryProtection1790601000000`](../src/database/migrations/1790601000000-CreateRepositoryProtection.ts)은 B의 명시적인 보호 판단 저장 공간이다. 관측/판정이 없다고 NONE 행을 만들어 채우지 않는다. 같은 소유자·원 저장소의 보호 행과 확인 상태·출처·시각이 모두 있어야 조회할 수 있다. 행이나 관측 값이 없으면(JSON null 포함) 조회는 500으로 실패하고 확인·불일치 변경도 롤백한다. 이전 유효 관측이 있으면 최근 조회 실패 기록만으로 그 판단을 무효화하지 않는다. 제품 수신·등록에는 [‘관측 안 함’ 정책 공급자](october-registration-policy.md)가 연결돼 있다. 이 정책은 원본의 공개 여부를 실제로 관측했다는 뜻이 아니며 원본 상태의 자동 관측·복구는 하지 않는다. 테스트는 합성 관측을 명시해서 NONE/SOURCE_PRIVATE를 넣는다.
 
 적용 순서는 #104 회원·분석 기반 → E 수신 기록 → B Catch·근거·후보 연결·보호 판단 테이블이다. #143에서 Catch 소유자·원 요청·보호 판단 소유자의 외래 키 메타데이터를 실제 회원·분석 엔티티와 연결했다. E 수신 기록도 실제 엔티티와 마이그레이션을 사용하며 후보 연결의 외부 FK를 유지한다. `migration:generate`의 FK 삭제 제안을 검토 없이 적용하지 않는다.
 

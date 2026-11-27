@@ -8,7 +8,7 @@
 
 - `PublishedIndexModule`(`published-index.module.ts`)을 기본 앱(`AppModule`)이 가져온다(#431). api 기동 때 한 번 아래 두 일이 돈다.
   - 임베딩 제공자를 만든다. [키 판정](#키와-합성-제공자-br61)이 여기서 돌므로 **운영(`production`)에서 `CATCHU_EMBEDDING_API_KEY`가 없으면 api가 기동하지 않는다.** 배포 환경에는 키(SSM)와 DB의 pgvector 확장이 먼저 있어야 한다.
-  - 모듈 초기화에서 `AiRun.registerHandler('EMBED_PUBLICATION', …)`를 부른다. AiRun은 앱 기동이 끝난 뒤 소비를 시작하므로 첫 작업보다 먼저 등록된다. 큐 주소가 없는 곳(개발 서버)에서는 작업이 큐에 들어가지 않아 색인은 처리 시한으로 FAILED가 된다([AiRun](ai-run.md)).
+  - 모듈 초기화에서 `AiRun.registerHandler('EMBED_PUBLICATION', …)`를 부른다. AiRun은 앱 기동이 끝난 뒤 소비를 시작하므로 첫 작업보다 먼저 등록된다. 큐 주소가 없는 환경에서는 작업이 큐에 들어가지 않아 색인은 처리 시한으로 FAILED가 된다. 현행 EKS는 큐를 사용한다([AiRun](ai-run.md)).
 - 쓰는 Unit(U4·U5·U10)은 자기 모듈 `imports`에 `PublishedIndexModule`을 넣고 `@Inject(PUBLISHED_INDEX_WRITER)`(C-08)·`@Inject(PUBLISHED_SEARCH)`(C-09)로 받는다. Nest는 같은 모듈을 한 번만 만들므로 여러 모듈이 가져와도 판정과 처리기 등록은 한 번이다. U4가 발행 커밋 뒤 부를 `enqueueAfterCommit`은 U4 모듈이 `AiRunModule`을 가져와 같은 AiRun에서 부른다.
 
 ## 공개 함수와 호출 순서
@@ -117,6 +117,6 @@ npm --prefix api test -- test/published-index/chunker.test.cjs test/published-in
 ## 알려진 한계
 
 - [검색 다시 준비] 직후 이전 작업이 늦게 끝나면 임베딩 호출이 1회 겹친다. 같은 조각·같은 모델이라 결과가 같아 막지 않는다. 이전 작업이 늦게 실패하면 새로 PENDING이 된 행을 FAILED로 만들 수 있고, 작성자가 한 번 더 눌러야 한다(BR2.6).
-- 작업 등록이 실패하거나 큐에서 사라지면 10분 동안 PENDING으로 보인 뒤 FAILED가 된다. 개발 서버에는 지금 큐 주소가 없어 백그라운드 임베딩은 처리 시한으로 FAILED가 된다([AiRun](ai-run.md)).
+- 작업 등록이 실패하거나 큐에서 사라지면 10분 동안 PENDING으로 보인 뒤 FAILED가 된다. 큐 주소를 설정하지 않은 환경에도 이 규칙이 적용된다([AiRun](ai-run.md)).
 - 시한이 지나 읽을 때 FAILED로 바꾸는 저장은 공용 도우미 `persistDeadlineFailure`(C-02)를 써서 `updated_at`을 고치지 않는다.
-- PDF 쪽 사본 표(`published_pdf_page`)는 U8이 만든다. 그 전에는 PDF 항목을 발행할 수 없으므로 PDF 조각 나누기는 순수 함수 시험으로만 확인했다.
+- PDF 쪽 사본 표(`published_pdf_page`)는 U8에서 제공하며, 발행 때 저장한 쪽 사본을 조각 나누기에 사용한다. 실제 PDF 발행·열람과 미검증 범위는 [PDF 자료](pdf-materials.md#확인-범위)를 따른다.

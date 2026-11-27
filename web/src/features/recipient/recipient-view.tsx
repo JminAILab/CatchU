@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent, type RefObject } from "react";
 import { RecipientGuide } from "@/components/recipient-guide/recipient-guide";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { BaseSummaryPanel } from "@/features/rag-answer/base-summary-panel";
@@ -8,7 +8,7 @@ import { itemTitleFinder, type ItemTitleOf } from "@/features/rag-answer/item-ti
 import { QnaPanel } from "@/features/rag-answer/qna-panel";
 import type { PdfCopySource } from "@/features/publications/published-pdf-item";
 import { JdRecipientPanel } from "@/features/jd/jd-recipient-panel";
-import { PublishedSnapshotView, type SnapshotHighlight, type TabNotice } from "@/features/publications/snapshot-view";
+import { PublishedSnapshotView, type SnapshotHighlight, type SnapshotReturnBar, type TabNotice } from "@/features/publications/snapshot-view";
 import { ClaudeAnalyzePanel } from "@/features/recipient-claude/claude-analyze-panel";
 import { LINK_UNAVAILABLE_TEXT, LOOKUP_FAILED_TITLE, PASSWORD_REQUIRED_TITLE, publishedAtText, unlockMessage } from "./recipient-format";
 import type { RecipientSlotProps } from "./recipient-slots";
@@ -34,7 +34,15 @@ export type RecipientPublicationViewProps = {
   activePreset?: number | null;
   onPresetChange?: (ordinal: number) => void;
   tabNotice?: TabNotice | null;
+  /** 넓은 화면 좌우 배치가 쓰는 요소 자리(#615, `useWorkspaceLayout`). 안내 묶음·작업 칸·자료 칸이다. */
+  layout?: { introRef: DivRef; workspaceRef: DivRef; materialsRef: DivRef };
+  /** 작업 칸의 클릭 지켜보기. 누른 출처 단추를 기억한다(#615, `useEvidenceReturn`). */
+  onWorkspaceClickCapture?: (event: MouseEvent<HTMLElement>) => void;
+  /** 좁은 화면에서 출처로 옮겨 간 항목의 「보던 곳으로 돌아가기」 줄(#615). */
+  returnBar?: SnapshotReturnBar | null;
 };
+
+type DivRef = RefObject<HTMLDivElement | null>;
 
 /**
  * 받은 사람 발행본 화면 그리기(U4 제출 3 W4, 보안 설계 「받은 사람 화면 자리 (C-11)」). 상태와 동작은 `recipient-screen.tsx`가 넘긴다.
@@ -42,16 +50,20 @@ export type RecipientPublicationViewProps = {
  *
  * | 상태 | 위에서부터 |
  * |---|---|
- * | 판정 통과 | U4 h1(발행본 제목) → 0 `RecipientGuide`(U2, `showClaudeConnect={claudeConnectable(snapshot)}`) → 0.5 `ClaudeAnalyzePanel`(U9, 같은 값이 참일 때만) → U4 고정 안내(발행 시각) → 2 `BaseSummaryPanel`(U5) → 1 발행본 자료(프리셋 탭) → 3 `QnaPanel`(U5) → 4 자리(U10) |
+ * | 판정 통과 | 안내 묶음[U4 h1(발행본 제목) → 0 `RecipientGuide`(U2, `showClaudeConnect={claudeConnectable(snapshot)}`) → 0.5 `ClaudeAnalyzePanel`(U9, 같은 값이 참일 때만) → U4 고정 안내(발행 시각)] → 작업 칸[2 `BaseSummaryPanel`(U5) → 1 발행본 자료(프리셋 탭) → 3 `QnaPanel`(U5) → 4 자리(U10)] |
  * | 비밀번호 입력 | U4 h1 → 비밀번호 안내·입력. `RecipientGuide` 없음 |
  * | 접근 불가 | U4 h1 「이 링크는 열람할 수 없습니다」. `RecipientGuide` 없음 |
  *
  * 판정 통과 분기는 `claudeConnectable(snapshot)`을 한 번 읽어 0번의 Claude 줄과 0.5번 패널에 함께 쓴다(C-11 claude-connect-rule, U9 BR6.1).
  * 0.5번 패널에는 `slotProps.token`만 넘기고 grant·비밀번호·`getGrant`·`onAccessLost`는 넘기지 않는다.
  * 사본·설명·본문은 React 텍스트로만 그리고(NFR1.10) GitHub 근거 주소만 링크다(NFR1.11, `snapshot-view.tsx`).
+ *
+ * 넓은 화면 좌우 배치(#615): 판정 통과 화면만 안내 묶음과 작업 칸으로 나눈다. 마크업 순서는 그대로 2 → 1 → 3 → 4이고, 1200px 이상에서 CSS가
+ * 왼쪽에 1번(발행본 자료), 오른쪽에 위에서부터 2 → 3 → 4번을 놓는다. 비밀번호 입력·접근 불가·조회 실패 화면은 묶지 않아 지금과 같다.
  */
 export function RecipientPublicationView({
   snapshot, headingRef, onRetry, onUnlock, waitSeconds, highlight, slotProps, pdfSource, activePreset, onPresetChange, tabNotice,
+  layout, onWorkspaceClickCapture, returnBar,
 }: RecipientPublicationViewProps) {
   switch (snapshot.view) {
     case "loading":
@@ -78,22 +90,29 @@ export function RecipientPublicationView({
       const itemTitleOf = itemTitleFinder(snapshot.snapshot.items);
       return (
         <>
-          {snapshot.refreshFailed && (
-            <div role="alert" className={styles.panel}>
-              <p className={styles.alert}>최신 자료를 불러오지 못해 이전에 불러온 내용을 보여 주고 있습니다.</p>
-              <button type="button" className={styles.secondary} onClick={onRetry}>다시 불러오기</button>
+          <div ref={layout?.introRef} className={styles.intro} data-testid="recipient-intro">
+            {snapshot.refreshFailed && (
+              <div role="alert" className={styles.panel}>
+                <p className={styles.alert}>최신 자료를 불러오지 못해 이전에 불러온 내용을 보여 주고 있습니다.</p>
+                <button type="button" className={styles.secondary} onClick={onRetry}>다시 불러오기</button>
+              </div>
+            )}
+            <section className={styles.panel} aria-labelledby="recipient-title" aria-busy={snapshot.refreshing || undefined} data-testid="recipient-ready">
+              <h1 id="recipient-title" ref={headingRef} tabIndex={-1} className={styles.title}>{snapshot.snapshot.title}</h1>
+            </section>
+            <RecipientGuide showClaudeConnect={connectable} />
+            {connectable && <ClaudeAnalyzePanel token={slotProps.token} />}
+            <p className={styles.notice} data-testid="recipient-published-at">{publishedAtText(snapshot.snapshot.publishedAt)}</p>
+          </div>
+          {/* 마크업 순서는 폭과 상관없이 AI 요약 → 발행본 자료 → 발행본에 질문하기 → JD 요약이다. 넓은 화면의 좌우 자리는 CSS가 정한다(#615). */}
+          <div ref={layout?.workspaceRef} className={styles.workspace} data-testid="recipient-workspace" onClickCapture={onWorkspaceClickCapture}>
+            <SummarySlot {...slotProps} itemTitleOf={itemTitleOf} />
+            <div ref={layout?.materialsRef} className={styles.materials} data-testid="recipient-materials">
+              <PublishedSnapshotView snapshot={snapshot.snapshot} highlight={highlight} pdfSource={pdfSource}
+                activePreset={activePreset} onPresetChange={onPresetChange} tabNotice={tabNotice} returnBar={returnBar} />
             </div>
-          )}
-          <section className={styles.panel} aria-labelledby="recipient-title" aria-busy={snapshot.refreshing || undefined} data-testid="recipient-ready">
-            <h1 id="recipient-title" ref={headingRef} tabIndex={-1} className={styles.title}>{snapshot.snapshot.title}</h1>
-          </section>
-          <RecipientGuide showClaudeConnect={connectable} />
-          {connectable && <ClaudeAnalyzePanel token={slotProps.token} />}
-          <p className={styles.notice} data-testid="recipient-published-at">{publishedAtText(snapshot.snapshot.publishedAt)}</p>
-          <SummarySlot {...slotProps} itemTitleOf={itemTitleOf} />
-          <PublishedSnapshotView snapshot={snapshot.snapshot} highlight={highlight} pdfSource={pdfSource}
-            activePreset={activePreset} onPresetChange={onPresetChange} tabNotice={tabNotice} />
-          <QuestionSlots {...slotProps} itemTitleOf={itemTitleOf} />
+            <QuestionSlots {...slotProps} itemTitleOf={itemTitleOf} />
+          </div>
         </>
       );
     }
@@ -108,7 +127,7 @@ export function RecipientPublicationView({
  */
 function SummarySlot({ itemTitleOf, ...props }: RecipientSlotProps & { itemTitleOf: ItemTitleOf }) {
   return (
-    <div data-testid="recipient-slot-2" data-slot="base-summary">
+    <div className={styles.summary} data-testid="recipient-slot-2" data-slot="base-summary">
       <BaseSummaryPanel key={props.token} token={props.token} getGrant={props.getGrant} onAccessLost={props.onAccessLost}
         isLoggedIn={props.isLoggedIn} showEvidence={props.showEvidence} itemTitleOf={itemTitleOf} />
     </div>
@@ -122,11 +141,11 @@ function SummarySlot({ itemTitleOf, ...props }: RecipientSlotProps & { itemTitle
 function QuestionSlots({ itemTitleOf, ...props }: RecipientSlotProps & { itemTitleOf: ItemTitleOf }) {
   return (
     <>
-      <div data-testid="recipient-slot-3" data-slot="qna">
+      <div className={styles.qna} data-testid="recipient-slot-3" data-slot="qna">
         <QnaPanel key={props.token} token={props.token} getGrant={props.getGrant} onAccessLost={props.onAccessLost}
           isLoggedIn={props.isLoggedIn} showEvidence={props.showEvidence} itemTitleOf={itemTitleOf} />
       </div>
-      <div data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in={props.isLoggedIn}>
+      <div className={styles.jd} data-testid="recipient-slot-4" data-slot="jd-summary" data-logged-in={props.isLoggedIn}>
         <JdRecipientPanel key={props.token} {...props} />
       </div>
     </>

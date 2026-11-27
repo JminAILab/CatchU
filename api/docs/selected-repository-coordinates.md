@@ -1,8 +1,16 @@
 # 실제 선정 저장소 좌표 연결 — #105·#252
 
+현행 U7의 `SelectedRepositoryRegistrationSource`는 `AnalysisRequest`·`AnalysisAttempt`·`AnalysisConsent`를 같은 DB 스냅샷으로 읽고, 여섯 칸 동의 사본의 등록 ID·저장소 ID·범위 판본을 대조한다. 활성 회원과 본인 `RepositoryRegistration`이 있어야 하며 좌표는 동의 당시 `repository.owner/name`에서 읽는다. 현재 이름으로 과거 좌표를 바꾸거나 결과 URL에서 추측하지 않는다(`src/analysis-receiver/selected-repository-registration.source.ts`).
+
+제품 `createApplicationModule()`은 큐 주소가 있으면 이 공급자를 `OctoberRepositoryObservationSource`에 넘겨 큐·DB 수신·Catch 반영을 조립한다. LIVE 전용이며 후보가 있는 MOCK 결과는 `CATCH_NOT_READY`로 끝난다. 현재 등록·고지는 [U7 안내](repository-analysis-u7.md), 조립·실행 근거는 [분석 큐](analysis-queue.md)를 따른다.
+
+## 10월 선정 카탈로그 연결 기록
+
+아래는 회원별 직접 등록 전 #252·#323의 선정 카탈로그·네 칸 동의 방식과 그 검사 범위다. 현행 제품의 새 등록·접수·좌표 공급 방식으로 사용하지 않는다.
+
 10/16 담당자 요청으로 아래 두 저장소를 **로그인한 모든 회원**의 선정 대상으로 등록한다.
 GitHub 연결과 유효한 분석 동의는 계속 필요하다. 이 문서는 좌표 보관과 Catch 등록 조회 접점이다.
-현재 선정과 실제 회원 목록 공급은 [#252 선정 공급](repository-selection.md)이 맡고, LIVE 분석 접수는 #323 범위다.
+당시 선정과 실제 회원 목록 공급은 [#252 선정 공급](repository-selection.md)이 맡고, LIVE 분석 접수는 #323 범위다.
 
 | 저장소 | repositoryId | 선정 좌표 판본 |
 |---|---|---|
@@ -12,18 +20,19 @@ GitHub 연결과 유효한 분석 동의는 계속 필요하다. 이 문서는 �
 GitHub 메타데이터의 고유 숫자 ID를 문자열로 쓴다. 두 저장소는 10/16 메타데이터 확인 당시 공개·비보관 상태였다.
 이 확인을 분석 시점의 공개 관측이나 분석 허가로 사용하지 않는다. 소스 내용은 수집하지 않았다.
 
-## 보관과 등록 조회
+### 10월 보관 방식
 
-`SelectedRepositoryCatalog`는 좌표 판본을 보관한다. 현재 선정은 #252의 DB 행이 정하므로 선정 제외는 그 행만 바꾸고,
-이름·소유자가 바뀌면 새 판본을 추가한다. 요청이 참조한 이전 판본을 수정·삭제하지 않는다.
+당시 `SelectedRepositoryCatalog`는 좌표 판본을 보관하고 #252 DB 행으로 현재 선정을 정했다. 선정 제외는 그 행만 바꾸고, 이름·소유자가 바뀌면 새 판본을 더하며 요청이 참조한 이전 판본은 보존하는 방식이었다.
+
+## 현행 등록 조회와 조립
 
 `SelectedRepositoryRegistrationSource`는 저장된 요청·시도·동의를 같은 DB 스냅샷으로 읽고 일곱 맥락을 대조한다.
-동의의 기존 `selectionReference`로 보관된 좌표를 읽는다. 새로운 동의 JSON 속성이나 DB 관계는 추가하지 않는다.
+현행 여섯 칸 동의 사본의 `repository.owner/name`으로 좌표를 읽는다. 10월의 `selectionReference`·카탈로그 조회와 구분한다.
 종결·닫힌 요청도 읽고, 현재 GitHub 연결·현재 선정 여부로 과거 좌표를 바꾸지 않는다.
 모르는 참조·합성 참조·불일치는 `null`, DB 장애는 예외다. 결과 URL에서 좌표를 추측하지 않는다.
 
 ```ts
-// LIVE 결과 등록용 예시. 수신 모듈 또는 큐 모듈 중 한 곳에서만 조립한다. AppModule에는 아직 등록하지 않는다.
+// LIVE 결과 등록용 예시. 제품은 createApplicationModule()이 큐 주소가 있으면 큐 모듈에서 조립한다.
 AnalysisReceiverModule.registerDatabase({
   contractDirectory,
   observationsFactory: db => new OctoberRepositoryObservationSource(
@@ -40,9 +49,9 @@ AnalysisReceiverModule.registerDatabase({
 이 선택은 한 개의 `observations` 또는 `observationsFactory` 안에서 조립하며, 두 옵션을 동시에 넘기지 않는다.
 별도 MOCK 공급은 이 구현에 포함되지 않는다. LIVE 좌표 조회 실패를 합성 좌표로 대체하지 않는다.
 
-## 분석 조회와 Catch 저장이 공유하는 판본
+## 10월 분석 조회와 Catch 저장의 판본 기록
 
-#252의 DB 행(`repository_selection`, [선정 공급](repository-selection.md))을 현재 선정·활성·범위 판본의 정본으로 사용한다. 카탈로그의 `listCurrent()`나 `ALL_AUTHENTICATED`만으로 목록·접수·실행을 허가하지 않는다.
+당시 #252의 DB 행(`repository_selection`, [선정 공급](repository-selection.md))을 현재 선정·활성·범위 판본의 정본으로 사용한다. 카탈로그의 `listCurrent()`나 `ALL_AUTHENTICATED`만으로 목록·접수·실행을 허가하지 않는다.
 
 | 값 | 연결 규칙 |
 |---|---|
@@ -55,7 +64,7 @@ AnalysisReceiverModule.registerDatabase({
 
 #252의 worker 선정 공급은 같은 카탈로그의 `resolve`로 #232에 넘길 좌표를 만든다. 그 좌표와 B의 `catalog.resolve(저장된 selectionReference)`가 같은지는 `test/integration/repository-selection-chain.test.cjs`가 대조하며, 실제 큐·worker 왕복은 검증하지 않았다. 전체 범위 허가·최종 DB 잠금은 [worker 컨텍스트 계약](worker-context.md)을 따른다.
 
-## 고지와 실제 실행 연결
+### 10월 고지와 실제 실행 연결 기록
 
 실제 분석 고지·판본은 [#322](https://github.com/JminAILab/CatchU/issues/322)에서 확정해 [PR #328](https://github.com/JminAILab/CatchU/pull/328)에 반영했다. 고지 제공과 LIVE 접수 활성화는 별개다.
 

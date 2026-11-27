@@ -1,10 +1,10 @@
 # worker — 수집·분석 처리
 
-현행 메시지 v2, 본인 커밋 관측·운영 상한·합성 경계는 [U7 본인 관측](docs/repository-analysis-u7.md)을 따른다. 원본 10월 계약은 보존하며 런타임 정본은 `api/contracts/repository-analysis`다.
+현행 메시지는 Request·ProcessingEvent·ResultReceipt v2, Result v4다. 본인 커밋 관측·운영 상한·합성 경계는 [U7 본인 관측](docs/repository-analysis-u7.md)을 따른다. 원본 10월 계약은 보존하며 런타임 정본은 `api/contracts/repository-analysis`다.
 
 > 기능별 동작·연결 안내는 이 README에 덧붙이지 않고 `worker/docs/<기능>.md`로 쓴다.
 
-분석 요청을 큐에서 받아 처리하는 worker다. 운영 실행은 분석 요청 큐 소비자(`python -m app.consumer`, [분석 요청 큐 소비자](#분석-요청-큐-소비자))이며, 같은 포트로 상태 확인 `GET /health`만 연다. LIVE 요청은 내부 api에 요청 정보를 한 번 조회한 뒤 허용 GitHub 자료 수집([허용 GitHub 자료 수집과 근거 정규화](docs/github-collection.md)) → 후보 묶음·작업 동일성 판별([후보 묶음과 작업 동일성](docs/candidate-decision.md)) → 설명 초안·질문·제목 생성([설명 초안·생각해볼 질문·Catch 제목 생성](docs/generation.md))으로 처리하고, MOCK 요청은 개발·시험 설정에서만 가짜 생성기로 처리한다([요청 검사와 합성 결과 생성](#요청-검사와-합성-결과-생성)). FastAPI 앱(`app.main`)은 HTTP 경로가 `GET /health`뿐이며 HTTP `200`과 `{"status":"ok"}`를 반환한다. LIVE 처리는 합성 조회 API·합성 GitHub 응답·합성 생성 제공자로만 검사했다. 실제 api·GitHub·Claude API와 이은 확인과 AWS 배포는 후속 작업이다([#121](https://github.com/JminAILab/CatchU/issues/121) 실제 연결 확인). 운영 이미지와 한 호스트 실행은 [배포 안내](../deploy/README.md)에 있다. worker 관련 파일(worker 폴더, 계약 폴더, 루트 `.gitignore`, CI 파일)이 바뀐 PR에서는 「변경 후 검사」의 명령을 CI가 실행한다.
+분석 요청을 큐에서 받아 처리하는 worker다. 운영 실행은 분석 요청 큐 소비자(`python -m app.consumer`, [분석 요청 큐 소비자](#분석-요청-큐-소비자))이며, 같은 포트로 상태 확인 `GET /health`만 연다. LIVE 요청은 내부 api에 요청 정보를 한 번 조회한 뒤 허용 GitHub 자료 수집([허용 GitHub 자료 수집과 근거 정규화](docs/github-collection.md)) → 후보 묶음·작업 동일성 판별([후보 묶음과 작업 동일성](docs/candidate-decision.md)) → 설명 초안·질문·제목 생성([설명 초안·생각해볼 질문·Catch 제목 생성](docs/generation.md))으로 처리하고, MOCK 요청은 개발·시험 설정에서만 가짜 생성기로 처리한다([요청 검사와 합성 결과 생성](#요청-검사와-합성-결과-생성)). FastAPI 앱(`app.main`)은 HTTP 경로가 `GET /health`뿐이며 HTTP `200`과 `{"status":"ok"}`를 반환한다. 실제 연결은 로컬 시험대와 EKS에서 확인했으며, 범위와 한계는 아래 「MOCK 범위와 실제 연결 확인」에 구분했다. 운영 이미지와 한 호스트 실행은 [배포 안내](../deploy/README.md)에 있다. worker 관련 파일(worker 폴더, 계약 폴더, 루트 `.gitignore`, CI 파일)이 바뀐 PR에서는 「변경 후 검사」의 명령을 CI가 실행한다.
 
 작업 범위는 [#84](https://github.com/JminAILab/CatchU/issues/84), 공통 착수·브랜치·검사·PR 기준은 [코딩 운영](../docs/CatchU_coding_procedures.md#코딩-운영)을 따른다. worker 초기화 담당이 이후 분석 기능과 공통 환경까지 자동으로 맡는 것은 아니다.
 
@@ -84,7 +84,7 @@ Windows PowerShell에서는 `curl.exe -i http://127.0.0.1:8000/health`를 사용
 {"status":"ok"}
 ```
 
-이 응답은 worker 앱이 응답한다는 뜻이다. DB·큐·외부 서비스 연결 상태를 검사하지 않는다. 로컬 API 문서는 [Swagger UI](http://127.0.0.1:8000/docs), [ReDoc](http://127.0.0.1:8000/redoc), [OpenAPI JSON](http://127.0.0.1:8000/openapi.json)에서 확인한다. 배포 환경에서 문서를 노출할지는 후속 배포 작업에서 결정한다.
+이 응답은 worker 앱이 응답한다는 뜻이다. DB·큐·외부 서비스 연결 상태를 검사하지 않는다. 로컬 API 문서는 [Swagger UI](http://127.0.0.1:8000/docs), [ReDoc](http://127.0.0.1:8000/redoc), [OpenAPI JSON](http://127.0.0.1:8000/openapi.json)에서 확인한다. 운영 큐 소비자의 상태 확인 앱(`app/consumer/health.py`)은 이 문서 경로를 열지 않는다.
 
 종료할 때는 **서버를 실행한 터미널에서 `Ctrl+C`**를 누른다. 종료 로그를 확인한 뒤에는 `/health`에 연결되지 않아야 한다. `--reload`는 코드 변경 시 개발 서버를 다시 띄우는 옵션이다.
 
@@ -97,14 +97,14 @@ Windows PowerShell에서는 `curl.exe -i http://127.0.0.1:8000/health`를 사용
 
 ## 요청 검사와 합성 결과 생성
 
-[#113](https://github.com/JminAILab/CatchU/issues/113)의 범위다. E가 보낸 분석 요청(`Request`)을 검사하고, 가짜 생성기로 [현행 메시지 스키마 v2](../api/contracts/repository-analysis/worker-messages.yaml)에 맞는 종결 결과(`Result`)를 만든다. 외부 호출·제공자 SDK·API 키가 없고 결과는 항상 `sourceMode: MOCK`이다. 공개 HTTP 경로나 큐 없이 `app.processing.process_request` 함수로 부른다.
+[#113](https://github.com/JminAILab/CatchU/issues/113)의 범위다. E가 보낸 분석 요청(`Request` v2)을 검사하고, 가짜 생성기로 [현행 메시지 스키마](../api/contracts/repository-analysis/worker-messages.yaml)에 맞는 종결 결과(`Result` v4)를 만든다. 외부 호출·제공자 SDK·API 키가 없고 결과는 항상 `sourceMode: MOCK`이다. 공개 HTTP 경로나 큐 없이 `app.processing.process_request` 함수로 부른다.
 
 1. **요청 검사**: 스키마 v2을 검사한 뒤 E가 접수한 기록(요청·현재 시도·회원·저장소·동의·허용 범위·`sourceMode`)과 필드마다 대조한다. 하나라도 다르면 생성기를 부르지 않고 거부한다. 거부는 사유와 어긋난 위치만 호출한 쪽에 돌려주며, 계약에 요청 거부 메시지가 없으므로 E에 보내는 메시지는 없다. 따라서 E의 요청은 접수 상태(`QUEUED`)로 남는다.
 2. **진행 알림**: 검사를 통과하면 `RECEIVED`, 생성 직전에 `RUNNING`을 알린다.
 3. **생성**: 생성기를 한 번 부른다. 생성기가 실행 여부를 확인하지 못했거나(상태 조회 오류) 시간이 초과되면 `UNCERTAIN`만 알리고 결과를 만들지 않는다. 실패로 확정하지 않고 다시 생성하지도 않는다. 이 `UNCERTAIN`은 항상 `RUNNING` 뒤에 가고, E의 [상태 전이 정본](../aidlc/spaces/default/intents/260914-catchu-october-mvp/construction/u2-api/functional-design/functional-spec.md#상태-전이-정본)에는 `RUNNING`에서 `UNCERTAIN`으로 가는 전이가 없으므로 E의 처리 상태는 `RUNNING`으로 남는다.
 4. **결과 조합**: 요청의 식별자·맥락을 그대로 옮긴다. 종결값은 후보와 실패의 수로 정한다(후보만 있으면 SUCCEEDED, 둘 다 없으면 EMPTY, 둘 다 있으면 PARTIAL_FAILED, 실패만 있으면 FAILED). 근거 부족·기준 미달은 `notProvided`, 수집·생성 오류는 `failures`에 넣는다. 생성이 실패해 초안·질문을 만들지 못해도 후보는 남기고 초안 본문은 `null`, 그 실패는 `failures`에 넣는다. 재료가 없어 만들지 않은 것(`NOT_GENERATED`)은 실패가 아니다([생성 「상태와 실패」](docs/generation.md#상태와-실패)). 후보에 제목이 없으면 대체값 없이 `title: null`로 보낸다. 빈 문자열·공백만인 제목도 null이다([후보 문장과 근거 「제목」](docs/candidate-text.md#제목)). 제목은 #118이 만들지 않고 생성 단계가 정한다. 쓸 만한 기록의 글(PR 제목·본인 커밋 첫 줄)이 있으면 그 글, 없으면 [#120](https://github.com/JminAILab/CatchU/issues/120) 생성 모듈의 조각 제목이다([생성 「제목」](docs/generation.md#제목)).
 
-1번 거부나 3번 실행 불명으로 E에 남은 요청은 E의 처리 시한(접수 후 60분)이 지나면 처리 `FAILED`로 닫힌다. worker는 이 요청을 다시 처리하지 않는다. 이 닫기는 처리 시한 계약 PR이 병합된 뒤 적용되며, 구현은 [#237](https://github.com/JminAILab/CatchU/issues/237)이다([10/6 팀장 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)).
+1번 거부나 3번 실행 불명으로 E에 남은 요청은 E의 처리 시한(접수 후 60분)이 지나면 처리 `FAILED`로 닫힌다. worker는 이 요청을 다시 처리하지 않는다. 구현은 api의 `analysis-deadline` 모듈이다([#237](https://github.com/JminAILab/CatchU/issues/237), [10/6 팀장 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)).
 
 `credentialContextReference`는 형식만 확인해 넘긴다. 이 값이 있다고 요청을 받아들이지 않으며, 해석과 대조는 수집 모듈이 첫 GitHub 호출 전에 한다([허용 GitHub 자료 수집과 근거 정규화](#허용-github-자료-수집과-근거-정규화)).
 
@@ -131,16 +131,15 @@ uv run --locked python -m app.processing succeeded-one-candidate
 - 처음 다섯 개는 [M1 합성 결과 세트](fixtures/m1-synthetic/README.md)의 같은 이름 템플릿과 결과가 같다. 개발용 실행에서는 `finishedAt`·`observedAt`만 실행 시각이다. 나머지는 `succeeded-one-candidate` 템플릿에서 한 부분만 바꿨다.
 - 요청 값은 `context.sample.json`을 쓰고, 표본에 없는 요청 필드(고지 판본·허용 자료 종류·선정 참조·자격정보 맥락 참조·시각)만 `app/processing/synthetic.py`의 합성 값으로 채운다.
 
-### MOCK 범위와 남은 실제 연결
+### MOCK 범위와 실제 연결 확인
 
 이 결과는 실제 분석 성공, 실제 자료 검증, Catch 저장·열람 준비 완료를 뜻하지 않는다. 수신 확인은 E, Catch 등록은 B가 판단한다.
 
-| 남은 실제 연결 | 이슈 |
-|---|---|
-| 후보 묶음·본인 기여 확인·작업 동일성 판별의 처리 순서 연결과 실제 자료 검수. 판별 모듈(`app/candidates/`)은 합성 검사까지 | [#118](https://github.com/JminAILab/CatchU/issues/118) · [#121](https://github.com/JminAILab/CatchU/issues/121) · [#122](https://github.com/JminAILab/CatchU/issues/122) |
-| 초안·질문·제목 생성의 실제 LLM 제공자 연결과 품질 확인. 생성 모듈(`app/generation/`)은 합성 제공자 검사까지 | [#119](https://github.com/JminAILab/CatchU/issues/119) · [#120](https://github.com/JminAILab/CatchU/issues/120) |
-| 큐 연결과 LIVE 처리 조립은 있음([분석 요청 큐 소비자](docs/queue-consumer.md), 합성 검사까지). 실제 api 조회·GitHub·Claude·E 수신과 이은 확인 | [#121](https://github.com/JminAILab/CatchU/issues/121) · [#233](https://github.com/JminAILab/CatchU/issues/233)(api 쪽) · [#252](https://github.com/JminAILab/CatchU/issues/252)(선정 공급자) · [#77](https://github.com/JminAILab/CatchU/issues/77) |
-| E 수신·개발용 주입, B 등록 | [#139](https://github.com/JminAILab/CatchU/issues/139) · [#105](https://github.com/JminAILab/CatchU/issues/105) |
+실제 연결의 근거는 다음과 같다. 합성 검사가 이 결과를 대신하지 않는다.
+
+- [2026-10-16 로컬 연결](https://github.com/JminAILab/CatchU/issues/121#issuecomment-6217635496): 실제 API·GitHub·Claude·로컬 큐로 수집부터 E 수신·B 등록까지 확인했다. 접수 행은 직접 넣고 선정 목록은 로컬 대역을 썼다.
+- [2026-10-19 실제 결과 검수](../docs/CatchU_F실제결과_검수기록.md): 저장소 5곳의 분석 8건으로 근거·귀속·묶음·실패 표시를 봤다. 12월 NFR3 전체 품질이나 사용자 유용성을 입증한 검사는 아니다.
+- [2026-11-18~19 EKS 실제 분석](https://github.com/JminAILab/CatchU/issues/37#issuecomment-7000321920): 3건 모두 수집 완료·api `ACCEPTED`였고, Catch 등록·상세 화면까지 본 것은 11/18 1건이다. 실제 오류 응답의 재호출 여부 등 미관측 항목은 기록의 한계를 따른다.
 
 ## 허용 GitHub 자료 수집과 근거 정규화
 

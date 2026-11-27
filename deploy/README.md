@@ -1,10 +1,10 @@
 # CatchU 배포 이미지와 단일 실행
 
-web·api·worker 운영 이미지를 만들고, 한 호스트에서 API 한 프로세스·worker 한 실행으로 띄우고 바꾸는 방법이다([#275](https://github.com/JminAILab/CatchU/issues/275)). AWS 실행 자원(EKS·DB·큐·공개 주소·비밀값 주입)은 [#276](https://github.com/JminAILab/CatchU/issues/276)에서 정하고, 실제 배포 결과는 [#277](https://github.com/JminAILab/CatchU/issues/277)에서 확인한다. 그 값이 필요한 운영 web 이미지는 아직 만들지 않았다(「#276에서 받을 값」). EKS 실행 파일과 교체 스크립트는 [aws/k8s/README.md](aws/k8s/README.md)에 있다.
+web·api·worker 운영 이미지를 만들고, 한 호스트에서 API 한 프로세스·worker 한 실행으로 띄우고 바꾸는 방법이다([#275](https://github.com/JminAILab/CatchU/issues/275)). 운영 web 이미지는 공개 출처 `https://catchu.dev`를 넣어 빌드한다. EKS 실행 파일과 교체 스크립트는 [aws/k8s/README.md](aws/k8s/README.md), 자동 배포는 [aws/cd/README.md](aws/cd/README.md)에 있다.
 
 명령은 모두 저장소 루트에서 실행한다. 서비스별 설치·개발 실행·검사는 각 서비스 README를 따른다.
 
-12월 전 개발 단계에는 이 한 호스트 실행을 AWS 서버 한 대에 올려 운영한다(앞단 Caddy 포함): [dev-server/README.md](dev-server/README.md). 11월부터 쓸 AWS 환경(EKS)의 설정·생성 명령·운영 순서는 [aws/README.md](aws/README.md)에 있다.
+2026-11-18에 `catchu.dev`를 EKS로 옮기고 개발 서버의 web·api·worker를 멈췄다([전환 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6971519828)). 현재 운영 환경은 [aws/README.md](aws/README.md)를 따른다. 아래 한 호스트 실행은 로컬 재현에 쓰며, 이전 개발 서버 경로의 정리는 [#276](https://github.com/JminAILab/CatchU/issues/276)에서 다룬다.
 
 ## 구성
 
@@ -44,13 +44,13 @@ docker build -f worker/Dockerfile --build-arg SOURCE_REVISION=$(git rev-parse HE
 ```
 
 - 빌드 맥락은 저장소 루트(`.`)다. `.dockerignore`가 전부 막고 Dockerfile이 복사하는 경로(잠금 파일·설정·`src`·web `public`·`app`·합성 자료·계약 YAML 두 개)만 연다. 서비스 폴더의 테스트·문서·다른 자료, `.git`, 하네스, 로컬 인계 파일은 들어가지 않고, 연 경로 안의 `.env*`·키·인증서·`node_modules`도 다시 뺀다. Dockerfile에서 새 경로를 복사하면 `.dockerignore`와 검사 스크립트의 허용 목록을 함께 고친다.
-- 빌드하는 컴퓨터의 아키텍처로 만들어진다. 운영 노드 아키텍처는 #276에서 받고, 그 아키텍처에서 빌드·기동을 다시 확인한다. 다른 아키텍처 이미지나 에뮬레이션 결과로 대신하지 않는다.
+- 빌드하는 컴퓨터의 아키텍처로 만들어진다. 운영 EKS는 arm64(`t4g.large`)이며 자동 배포도 arm64 러너에서 빌드·검사한다. 다른 아키텍처 이미지나 에뮬레이션 결과로 운영 기동 확인을 대신하지 않는다.
 - `docker buildx`의 기본 빌더가 `docker-container` 방식이면 `--load`를 붙여야 이미지가 로컬 목록에 들어온다.
 - 빌드 입력(`--build-arg`)은 이미지 기록에 남으므로 공개 값만 넣는다. 비밀값은 실행할 때 주입한다.
 
 **web은 공개 주소마다 다시 빌드한다.** `NEXT_PUBLIC_API_BASE_URL`과 보안 헤더(CSP `connect-src`·HSTS)가 빌드 결과에 굳고, 실행 환경변수로 바꿀 수 없다. 값은 web과 같은 공개 https 출처이며 경로를 붙이지 않는다(`/v1`은 호출 함수가 붙인다). 빌드 단계에서 값을 확인해, 비었거나 경로가 붙었거나 로컬이 아닌 http 주소면 빌드를 멈춘다. standalone 출력(`node server.js`)은 이미지 빌드에서만 켠다(`CATCHU_STANDALONE_BUILD=1`). 개발·CI의 `npm run build`·`npm run start`는 그대로다. 개발 로그인 표시(`NEXT_PUBLIC_DEV_LOGIN_ENABLED=true`)도 거부한다. 넣은 주소는 이미지 표식 `io.catchu.web.public-api-base-url`로 확인한다. `http://127.0.0.1:3001`로 만든 이미지는 로컬 검증용이며 운영에 올리지 않는다.
 
-**api 운영 이미지에는 운영 의존성만 있다.** `npm ci --omit=dev --omit=optional`로 설치한다. ts-node·typescript는 잠금 파일에서 TypeORM의 선택 의존성으로도 잡혀 있어 `--omit=dev`만으로는 남기 때문이다. 이 조합은 api 전용이며, web은 SWC·sharp가 선택 의존성이라 쓰지 않는다. 결과 수신 검증기가 읽을 계약 YAML은 `/app/aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/`에 둔다. 수신 모듈은 아직 앱에 연결돼 있지 않으므로 api가 떠도 YAML을 읽지는 않는다(연결은 #105·#233 범위).
+**api 운영 이미지에는 운영 의존성만 있다.** `npm ci --omit=dev --omit=optional`로 설치한다. ts-node·typescript는 잠금 파일에서 TypeORM의 선택 의존성으로도 잡혀 있어 `--omit=dev`만으로는 남기 때문이다. 이 조합은 api 전용이며, web은 SWC·sharp가 선택 의존성이라 쓰지 않는다. 결과 수신 검증기가 읽을 계약 YAML은 `/app/api/contracts/repository-analysis/`에 둔다. 큐 주소가 설정되면 제품 모듈이 `AnalysisQueueModule`과 그 안의 `AnalysisReceiverModule.registerDatabase`를 조립해 이 YAML을 읽는다([큐 연결](../api/docs/analysis-queue.md)).
 
 **worker 이미지는 `/app/worker`에서 실행한다.** 계약 YAML(위와 같은 경로)과 합성 자료(`/app/worker/fixtures/m1-synthetic`)를 저장소와 같은 상대 위치에 둔다. 개발 그룹(ruff·mypy·pytest 등)은 넣지 않는다. 기본 명령은 분석 요청 큐 소비자(`python -m app.consumer`, [#121](https://github.com/JminAILab/CatchU/issues/121))다. 운영 모드에서 큐 설정이 없거나 틀리면 기동하지 않는다(종료 코드 2). SIGTERM을 받으면 새 작업을 멈추고 분석 중인 작업을 실패로 남긴 뒤 끝난다. 25초를 넘기면 스스로 강제 종료하며 종료 코드가 137이라 교체 절차는 7로 멈춘다([worker 큐 소비자](../worker/docs/queue-consumer.md)). 합성 처리는 `docker run --rm <worker 이미지> .venv/bin/python -m app.processing <시나리오>`로 실행한다.
 
@@ -106,7 +106,7 @@ docker compose --env-file ~/catchu-local-env/compose.env -f deploy/compose.singl
 - 마지막 명령(`down -v`)은 이 구성의 컨테이너·망·합성 DB 볼륨과 로컬 파일 저장 볼륨(`files`, PDF 자료)만 지운다. 합성 환경 폴더는 직접 지운다.
 - 합성 CA·DB 서버 인증서는 만든 날부터 30일 뒤 만료된다. 만료되면 api가 DB에 접속하지 못해 교체가 종료 코드 6으로 멈춘다. 이어서 쓰려면 위 `down -v`, 환경 폴더 삭제, `make-local-env.sh`부터 다시 한다(합성 DB 자료도 새로 만든다).
 - 로컬 구성에는 web과 api를 같은 출처로 묶는 앞단이 없다. production 모드 api는 교차 출처 호출을 받지 않으므로, 브라우저 화면에서 api를 부르는 흐름은 같은 출처 경로 분배가 있는 AWS 환경(#276·#277)에서 확인한다. 합성 공유 링크 주소·로그인 출처(`https://catchu-single.invalid`)로는 링크를 열거나 로그인 유지(갱신·로그아웃)를 확인할 수 없다.
-- 합성 DB는 TLS 연결만 받고(평문 거부), migration 계정이 스키마를 소유하며 앱 계정은 자료 읽기·쓰기만 한다([`local-db/init-roles.sh`](local-db/init-roles.sh)). 운영 DB의 계정·권한(동의 기록 직접 삭제 불가, 시간 상한 포함)은 #276에서 정한다. worker는 DB 망에 연결하지 않는다.
+- 합성 DB는 TLS 연결만 받고(평문 거부), migration 계정이 스키마를 소유하며 앱 계정은 자료 읽기·쓰기만 한다([`local-db/init-roles.sh`](local-db/init-roles.sh)). 운영 DB의 계정·권한과 동의 기록 직접 삭제 권한 회수는 [EKS DB 관리·앱 교체](aws/k8s/README.md)를 따른다. worker는 DB 망에 연결하지 않는다.
 
 수동 교체(작성자 외 재현은 위 정상 확인 뒤, `stop` 전에 한다). 표식만 다른 api 이미지로 바꾼다. 같은 이미지면 같은 컨테이너를 다시 띄울 뿐이라 판본이 바뀌는 것을 볼 수 없다.
 
@@ -129,7 +129,7 @@ migration은 별도 이미지로 **한 번 실행하고 끝난다.** 앱은 기�
 - **실패하면** 실행 컨테이너를 남기고 멈춘다. 로그와 DB의 `migrations` 표·스키마를 확인하기 전에는 다시 실행하거나 새 api를 시작하지 않는다.
 - **결과가 불분명하면**(명령이 끊김, Docker 오류 등) 실행 상태와 DB 적용 이력을 예상 migration 목록과 대조하고 담당자가 판단한다. DB 세션이 없다는 것만으로 다시 실행해도 된다고 보지 않는다.
 - 자동 재실행·자동 되돌리기(`migration:revert`)는 하지 않는다. 운영 DB에서 시험 삼아 되돌리지 않는다.
-- EKS에서는(#276 확정 뒤) controller 없는 일회 Pod(`restartPolicy: Never`)를 배포별 고정 이름으로 `kubectl create`한다. cluster·namespace·이름·UID·소스 SHA·이미지 digest·대상 DB·migration 목록과 종료 코드를 기록한다. 응답이 끊기거나 `AlreadyExists`면 조회하고, 결과를 확인하기 전에는 지우거나 다른 이름으로 다시 만들지 않는다. Job은 대체 Pod를 만들 수 있어 쓰지 않는다.
+- EKS에서는 controller 없는 일회 Pod(`restartPolicy: Never`)를 배포별 고정 이름으로 `kubectl create`한다. cluster·namespace·이름·UID·소스 SHA·이미지 digest·대상 DB·migration 목록과 종료 코드를 기록한다. 응답이 끊기거나 `AlreadyExists`면 조회하고, 결과를 확인하기 전에는 지우거나 다른 이름으로 다시 만들지 않는다. Job은 대체 Pod를 만들 수 있어 쓰지 않는다.
 
 ## 계획 교체
 
@@ -147,8 +147,8 @@ deploy/scripts/replace-single.sh --env-file <환경 폴더>/compose.env [--local
 
 - 진행 중이던 요청·분석이 끝까지 처리된다고 보장하지 않는다. worker는 SIGTERM을 받으면 새 작업을 멈추고 분석 중인 작업을 끝내 큐에 실패로 남긴다(남은 일을 마치는 방식은 없다). 그 요청은 처리 시한에 닫히고 회원이 다시 요청한다. health·순간적인 큐 0건은 그 근거가 아니다.
 - api 재기동으로 메모리에 있던 요청 빈도 제한 기록과 진행 중인 Google 로그인 시도가 사라진다. DB에 있는 자료·공개 상태·링크는 남는다.
-- 중단된 분석을 처리 시한(접수 후 60분) 뒤 닫는 정책은 [계약](../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md) 「공통 오류·요청 안전성」에 정해졌고, 실제 적용은 [#237](https://github.com/JminAILab/CatchU/issues/237) 구현 뒤다. 지금 코드가 바로 실패로 닫는다고 보지 않는다. 컨테이너 재시작은 운영 복구로 허용하지만 중단된 분석을 다시 실행해도 된다는 뜻은 아니다.
-- 같은 호스트의 중복은 고정 컨테이너 이름과 위 3의 확인으로 막는다. 다른 호스트·다른 구성(EKS 포함)이 같은 DB·큐에 붙어 있는 것은 이 스크립트가 알 수 없다. **같은 운영 DB·큐에 Compose 실행과 EKS 실행을 동시에 연결하지 않는다.** 장애 때 자동으로 생기는 대체 실행(노드 장애 등)은 이 수동 규칙으로 막지 못하며 #276에서 구성·대체 정책을 정한다.
+- api의 [처리 시한 닫기](../api/docs/analysis-deadline.md)가 접수 후 60분을 넘긴 분석을 주기적으로 실패로 닫는다. 한 번의 판정이 끝난 뒤 1분 후 다시 확인하므로 재시작 순간에 모두 닫히는 것은 아니다. 컨테이너 재시작은 운영 복구로 허용하지만 중단된 분석을 다시 실행해도 된다는 뜻은 아니다.
+- 같은 호스트의 중복은 고정 컨테이너 이름과 위 3의 확인으로 막는다. 다른 호스트·다른 구성(EKS 포함)이 같은 DB·큐에 붙어 있는 것은 이 스크립트가 알 수 없다. **같은 운영 DB·큐에 Compose 실행과 EKS 실행을 동시에 연결하지 않는다.** 장애 때 자동으로 생기는 대체 실행(노드 장애 등)은 이 수동 규칙으로 막지 못하며 구성·대체 정책은 [#276](https://github.com/JminAILab/CatchU/issues/276)을 따른다.
 
 | `replace-single.sh` 종료 코드 | 상태와 다음 행동 |
 |---|---|
@@ -188,22 +188,17 @@ GitHub Actions의 `images` 워크플로가 같은 명령을 x86_64 러너에서 
 
 이 검사가 대신하지 않는 것: 운영 노드 아키텍처의 최종 이미지 기동, 운영 DB의 역할별 TLS·평문 거부, 실제 앞단의 같은 출처 경로·신뢰 프록시·연결 유지 시간, 운영 큐(TLS·비밀번호)와 api의 실제 큐 연결(#233)·실제 분석, 작성자 외 재현.
 
-## #276에서 받을 값과 남은 일
+## 운영 설정 확인 위치
 
-실제 값은 아직 받지 않았다. 받은 항목부터 반영하며, #276 전체 종료를 기다리지 않는다. 비밀값은 원문 대신 참조·주입 방식·권한을 받는다.
+EKS·DB·큐·EFS·S3는 [1단계 생성 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6950182407), 공개 주소 전환은 [3단계 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6971519828)에 근거한다. 비밀값 원문은 저장소에 두지 않는다.
 
-| 받을 값 | 반영할 곳 |
+| 설정 | 정본 |
 |---|---|
-| 노드 CPU 아키텍처·OS, EKS 판본, cluster·namespace, 리소스 범위 | 최종 이미지 빌드 플랫폼, EKS 실행 파일 |
-| 레지스트리 경로·push/pull 권한 | 이미지 게시(#275는 게시하지 않는다) |
-| 실제 공개 https 출처, `/v1` 경로 보존 분배 | 운영 web 빌드, `SHARE_LINK_WEB_BASE_URL`·`AUTH_WEB_ORIGIN` |
-| 앞단 대상 유형·`X-Forwarded-For` 처리·유휴 시간, 유입 차단·노드 종료 확인 경로 | `TRUST_PROXY_CIDRS`, 연결 유지 시간(web `KEEP_ALIVE_TIMEOUT`은 ms. api는 코드에 65초로 고정했다(#364). 둘 다 앞단 유휴 시간보다 길게 둔다. 짧으면 간헐 502가 날 수 있다), 교체 절차 2·3단계 |
-| worker→DB 차단과 나가는 연결 제한의 집행 수단(NetworkPolicy·보안 그룹·egress 규칙) | EKS 실행 파일, 운영 Compose 호스트의 망 구성. 공유 노드 보안 그룹이나 같은 호스트 IP만으로 분리됐다고 보지 않는다 |
-| DB 주소·판본, 앱·migration 계정과 비밀값 참조, CA 파일과 주입 방식 | `api.env`·`migration.env`·CA 파일 |
-| 큐 주소·비밀번호 참조(ElastiCache Valkey 8.1, TLS) | `worker.env`의 `CATCHU_QUEUE_REDIS_URL`(`rediss://`), api 실행 값(#233) |
-| worker의 요청 정보 조회 주소·키 참조, 생성 키(Claude API) 참조 | `worker.env`의 `WORKER_CONTEXT_API_URL`·`WORKER_CONTEXT_API_KEY`(api와 같은 값)·`CATCHU_GENERATION_API_KEY`, 클러스터 안 http면 `WORKER_CONTEXT_API_ALLOW_CLUSTER_HTTP=true` |
-| GitHub 연결의 자격정보 보관 폴더(`GITHUB_CREDENTIAL_DIRECTORY`)용 지속 volume·UID/GID·권한, 암호화 키·OAuth 값 참조, #232 내부 자격정보 경로·인증키 참조 | GitHub 연결 코드(PR #254)는 dev에 있고 기본은 꺼짐이다(`GITHUB_CONNECTION_ENABLED`, 값은 [api 환경변수](../api/docs/environment.md)). 서버 한 대 실행은 위 볼륨을 `GITHUB_CREDENTIAL_DIRECTORY`로 쓴다(#276). #232 내부 경로는 공개 `/v1/*` 분배에서 제외한다 |
+| 클러스터·노드·DB·큐·망과 삭제 순서 | [aws/README.md](aws/README.md) |
+| 공개 주소·프록시·연결 제한, Secret·CA 주입, 앱 교체 | [aws/k8s/README.md](aws/k8s/README.md) |
+| ECR 이미지 게시·배포 역할 | [aws/cd/README.md](aws/cd/README.md) |
+| 큐·내부 조회·GitHub 연결과 토큰 보관 볼륨 | [aws/features.md](aws/features.md) |
 
-EKS 실행 파일을 쓸 때 지킬 조건: api `replicas: 1`·worker는 `deploy.sh` 값, `Recreate`, 자동 확장(HPA) 없음, `runAsNonRoot`·`runAsUser: 1000`·`readOnlyRootFilesystem`과 `/tmp` 빈 볼륨, api·migration의 `PGSSLMODE=verify-full`·DB CA 파일 읽기 전용 mount·`NODE_EXTRA_CA_CERTS`, web의 `HOSTNAME=0.0.0.0` 명시, worker에서 DB로의 접근 차단, api·worker·DB·큐를 외부에 여는 Service 없음, worker health는 내부용(큐에 처음 붙기 전에는 503이므로 시작 확인 시간을 넉넉히 둔다), worker 종료 유예는 30초 이상(앱 안 종료 예산 25초), migration은 위 일회 Pod. worker가 api를 클러스터 안 http로 부르면 10/15 결정의 조건(NetworkPolicy 기본 차단과 worker 나가는 연결 제한, 호스트 망 금지·권한 전부 제거·네임스페이스 Pod Security `restricted`)을 함께 둔다([요청 정보 조회 「설정」](../worker/docs/request-context.md#설정)). `Recreate`는 업데이트 순서일 뿐 장애 때 대체 실행과의 중복을 막지 않는다. Google 로그인은 시작 경로의 앞단 보호를 #277에서 확인하기 전에는 켜지 않는다.
+EKS 실행 파일을 쓸 때 지킬 조건: api `replicas: 1`·worker는 `deploy.sh` 값, `Recreate`, 자동 확장(HPA) 없음, `runAsNonRoot`·`runAsUser: 1000`·`readOnlyRootFilesystem`과 `/tmp` 빈 볼륨, api·migration의 `PGSSLMODE=verify-full`·DB CA 파일 읽기 전용 mount·`NODE_EXTRA_CA_CERTS`, web의 `HOSTNAME=0.0.0.0` 명시, worker에서 DB로의 접근 차단, api·worker·DB·큐를 외부에 여는 Service 없음, worker health는 내부용(큐에 처음 붙기 전에는 503이므로 시작 확인 시간을 넉넉히 둔다), worker 종료 유예는 30초 이상(앱 안 종료 예산 25초), migration은 위 일회 Pod. worker가 api를 클러스터 안 http로 부르면 10/15 결정의 조건(NetworkPolicy 기본 차단과 worker 나가는 연결 제한, 호스트 망 금지·권한 전부 제거·네임스페이스 Pod Security `restricted`)을 함께 둔다([요청 정보 조회 「설정」](../worker/docs/request-context.md#설정)). `Recreate`는 업데이트 순서일 뿐 장애 때 대체 실행과의 중복을 막지 않는다.
 
-제공 판본이 나오면 실행 값·종료 방법을 다시 확인할 기능: 로그인 유지의 화면 연결(#251. api 쪽 #250은 `AUTH_WEB_ORIGIN`까지 반영), GitHub 연결 켜기와 내부 자격정보 조회(#231·#232), 결과 수신 공급(#105), api 쪽 큐 연결(#233)과 worker의 LIVE 처리(#121), 처리 시한 정리(#237).
+Google 로그인·앞단 제한은 [2단계 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553)과 [전환 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6971519828), 큐·내부 조회·GitHub 연결·실제 분석 수신은 [5단계 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에 있다. 로컬 합성 검사는 이 운영 확인을 대신하지 않는다.

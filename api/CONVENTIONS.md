@@ -19,21 +19,21 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/common/periodic-task.ts`           | api 안의 주기 실행 장치. 겹치지 않게 다음 실행 예약, 실패 뒤 계속, 종료 때 진행 중 실행 대기(#237) |
 | `src/common/redis-connection-errors.ts` | Redis 연결 오류 기록. 같은 끊김이 이어지면 첫 오류만 넘기고 다시 붙으면 초기화. AiRun 큐·U5 질문 횟수·U6 호출 빈도가 씀 |
 | `src/analysis-deadline/`                | 처리 시한을 넘긴 분석 요청과 반영 실패 요청을 닫는 판정과 그 주기 작업([docs/analysis-deadline.md](docs/analysis-deadline.md)) |
-| `src/analysis-queue/`                   | 대기 시도를 요청 큐로 보내고 worker의 진행 알림·결과를 받아 E 수신 경로로 넘기는 큐 연결과 그 연결·주기·종료(#233, [docs/analysis-queue.md](docs/analysis-queue.md)). 큐 규격 값은 `queue-spec.ts` 한곳. 기본 앱에는 미등록 |
-| `src/ai-generation/`                    | C-01 AI 생성 관문. U1 최소 경로(줄 나누기·Claude 인용 호출·항목 묶기·원문 위치·거부 사례)와 U2 게이트(입력 상한·공통 지시·기계 대조·JD 역할·스트림, `AiGenerationModule`·`AI_GENERATION_GATE`)([docs/ai-generation.md](docs/ai-generation.md)). 기본 앱에는 미등록, 쓰는 Unit이 모듈을 넣음 |
-| `src/ai-run/`                           | C-02 백그라운드 AI 실행(큐 `ai-run`)·상태 판정·늦은 결과 버림 도우미([docs/ai-run.md](docs/ai-run.md)). 기본 앱에는 미등록 |
+| `src/analysis-queue/`                   | 대기 시도를 요청 큐로 보내고 worker의 진행 알림·결과를 받아 E 수신 경로로 넘기는 큐 연결과 그 연결·주기·종료(#233, [docs/analysis-queue.md](docs/analysis-queue.md)). 큐 규격 값은 `queue-spec.ts` 한곳. `createApplicationModule()`에서 큐 주소가 있을 때 등록 |
+| `src/ai-generation/`                    | C-01 AI 생성 관문. U1 최소 경로와 U2 게이트(입력 상한·공통 지시·기계 대조·JD 역할·스트림, `AiGenerationModule`·`AI_GENERATION_GATE`). 제품의 U5·U10 모듈이 import해 사용([docs/ai-generation.md](docs/ai-generation.md)) |
+| `src/ai-run/`                           | C-02 백그라운드 AI 실행(큐 `ai-run`)·상태 판정·늦은 결과 버림 도우미([docs/ai-run.md](docs/ai-run.md)). 기본 앱의 색인·요약 등 소비 모듈이 가져와 함께 조립 |
 | `src/daily-run-limit/` / `src/ai-consent/` | C-03 계정당 하루 실행 제한, C-04 첫 이용 동의와 `GET/POST /v1/ai-consent`([docs/daily-run-limit.md](docs/daily-run-limit.md)). 동의 API는 기본 앱에 등록 |
 | `src/file-storage/`                     | C-05 파일 저장 인터페이스·키·로컬 드라이버와 설정 검사([docs/file-storage.md](docs/file-storage.md)) |
 | `src/withdrawal/`                       | C-06 탈퇴 `DELETE /v1/me`의 1~4단계([docs/withdrawal.md](docs/withdrawal.md)). 기본 앱에 등록 |
-| `src/publications/`                     | 12월 U4 발행·링크: C-07 `publication`·`published_item` 엔티티와 사본 모양, C-10 `PublicationAccess` 인터페이스와 DB 구현(주입 토큰 `PUBLICATION_ACCESS`, 시험 전용 메모리 가짜는 시험만), 발행 `POST /v1/publications`와 작성자 발행본 목록·상세·중지·삭제([docs/publications.md](docs/publications.md)). 기본 앱에 등록. 받은 사람 경로 교체와 10월 `share-links` 해제는 제출 3 |
+| `src/publications/`                     | 12월 U4 발행·링크: C-07 `publication`·`published_item` 엔티티와 사본 모양, C-10 `PublicationAccess` 인터페이스와 DB 구현(주입 토큰 `PUBLICATION_ACCESS`, 시험 전용 메모리 가짜는 시험만), 발행 `POST /v1/publications`와 작성자 발행본 목록·상세·중지·삭제([docs/publications.md](docs/publications.md)). 기본 앱에 등록. 받은 사람 경로도 이 모듈에 있으며 10월 공유 링크·수신자 모듈을 대체 |
 | `src/presets/`                          | 발행 프리셋 U1 프리셋 저장·세기: `preset`·`preset_item` 엔티티, `/v1/presets` 경로와 발행이 쓰는 프리셋 펴기(`PresetStore.expand`)([docs/presets.md](docs/presets.md)). 기본 앱에 등록 |
 | `src/publishable-source/`               | 발행 프리셋 U1 발행 판정 규칙: 사본 내용·글자 수(`source-content.ts`), 종류별 묶음 읽기와 발행 잠금 SQL(`source-reader.ts`), 미리 읽은 행만 받는 순수 판정 함수(`eligibility.ts`). 발행과 프리셋 경로가 같이 쓴다 |
-| `src/published-index/`                  | 12월 U3 발행본 색인·검색: C-08 `PublishedIndexWriter`(발행 트랜잭션 안 조각 나누기·[검색 다시 준비]), `EMBED_PUBLICATION` 처리기, C-09 `PublishedSearch`(색인 상태·발행본 하나 안 의미 검색), Voyage·합성 임베딩 제공자, `publication_index`·`published_chunk` 엔티티([docs/published-index.md](docs/published-index.md)). 기본 앱에는 미등록 |
-| `src/materials/`                        | 12월 U4 텍스트 자료 표 C-13 `text_material` 엔티티([docs/publications.md](docs/publications.md)) |
-| `src/rag-answer/`                       | 12월 U5 받은 사람 질의응답(SSE·질문 다시 쓰기·링크당·작성자 합계 하루 질문 횟수)과 AI 기본 요약(`BASE_SUMMARY` 처리기·받은 사람/작성자 읽기·[다시 만들기]), `base_summary` 엔티티. 평가 스크립트는 `scripts/rag-eval/`([docs/rag-answer.md](docs/rag-answer.md)). 기본 앱 등록은 U5 담당의 후속 PR(`RagAnswerModule.register({ publicationAccess: PUBLICATION_ACCESS, imports: [PublicationsModule] })`)에서 한다 |
+| `src/published-index/`                  | 12월 U3 발행본 색인·검색: C-08 `PublishedIndexWriter`(발행 트랜잭션 안 조각 나누기·[검색 다시 준비]), `EMBED_PUBLICATION` 처리기, C-09 `PublishedSearch`(색인 상태·발행본 하나 안 의미 검색), Voyage·합성 임베딩 제공자, `publication_index`·`published_chunk` 엔티티([docs/published-index.md](docs/published-index.md)). 기본 앱에 등록 |
+| `src/materials/`                        | 텍스트 자료 C-13과 PDF 업로드·조회·삭제 API·엔티티. 기본 앱에 등록([텍스트 자료](docs/publications.md), [PDF 자료](docs/pdf-materials.md)) |
+| `src/rag-answer/`                       | 12월 U5 받은 사람 질의응답(SSE·질문 다시 쓰기·링크당·작성자 합계 하루 질문 횟수)과 AI 기본 요약(`BASE_SUMMARY` 처리기·받은 사람/작성자 읽기·[다시 만들기]), `base_summary` 엔티티. 평가 스크립트는 `scripts/rag-eval/`([docs/rag-answer.md](docs/rag-answer.md)). 기본 앱에서 `RagAnswerModule.register`에 U4의 실제 `PUBLICATION_ACCESS`를 `useExisting`으로 전달 |
 | `src/claude-mcp/`                       | 12월 U6 Claude 본인 연결(C-15): 공식 SDK OAuth 라우터의 저장 단계, `/v1/mcp`와 조회 도구 둘, 회원 빈도 제한, 연결 상태·승인·전체 해제, `mcp_*` 표 넷([docs/claude-mcp.md](docs/claude-mcp.md)). 기본 앱에 등록 |
-| `src/recipient/`                        | 비로그인 수신자 조회(#151, [docs/recipient-read.md](docs/recipient-read.md)). #150 링크·소유 회원 판정·B 공개 Catch 조회·A `OwnerProfileReader`를 재사용. 기본 앱에 등록 |
-| `src/member-repositories/repository-selection.*.ts` | 현재 선정의 DB 정본(엔티티)과 목록·#323 접수 재확인·#232 worker 선정 공급(#252, [docs/repository-selection.md](docs/repository-selection.md)). 좌표는 같은 폴더의 #319 카탈로그에서 읽음 |
+| `src/publications/recipient-links.controller.ts` | 현행 받은 사람 경로(`/v1/public/links/...`). 발행본 접근 판정과 고정 사본 조회([docs/recipient-publication.md](docs/recipient-publication.md)). 옛 `src/recipient/`는 삭제됨 |
+| `src/member-repositories/` | 현행 U7 회원별 등록·접수와 `RegistrationContextSource`. `repository-selection.source.ts`·`RepositorySelection` 엔티티·#319 카탈로그는 10월 전역 선정 경로이며 source·catalog provider는 코드에 남아 있다. `AllowedScopeRevision`은 현행 `repository-registration.service.ts`·`registration-context.source.ts`도 읽는다([선정 기록](docs/repository-selection.md)·[U7](docs/repository-analysis-u7.md)) |
 | `src/auth/auth.module.ts`              | 인증 설정과 토큰 서비스, 전역 `APP_GUARD` 등록 |
 | `src/auth/access-token.guard.ts`       | Bearer 토큰 검증 후 요청에 인증 회원 정보 저장 |
 | `src/auth/dev-login.guard.ts` / `dev-login.dto.ts` | 개발 로그인 실행 제한을 먼저 검사하고 기존 회원 ID 조건·추가 필드를 공통 입력 검증에 연결 |
@@ -45,7 +45,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `src/analysis-receiver/receiver.types.ts` | 메시지 타입과 DB 연결용 `ReceiverStore` 트랜잭션 경계 |
 | `src/analysis-receiver/worker-message.validator.ts` | 계약 YAML에서 한 번 컴파일한 스키마 검사. 입력 보정·외부 참조 다운로드 없음 |
 | `src/analysis-receiver/dev-analysis-injection.ts` | 본인 MOCK 요청에 공용 템플릿 채움·내부 주입, 환경 차단 |
-| `src/analysis-receiver/analysis-receiver.module.ts` | 저장소와 계약 경로를 명시해 수신 모듈 조립. 기본 앱에는 미등록 |
+| `src/analysis-receiver/analysis-receiver.module.ts` | 저장소와 계약 경로를 명시해 수신 모듈 조립. 제품에서는 `AnalysisQueueModule`이 실제 DB 수신·등록 조립을 가져옴 |
 | `test/analysis/` / `test/helpers/receiver-harness.cjs` | 수신·인증 연결·주입 검사와 테스트 전용 메모리 저장소. 실제 DB 구현 아님 |
 | `test/health.test.cjs`                  | 빌드된 앱의 최소 HTTP 실행 검사                    |
 | `test/auth.test.cjs`                    | 테스트 안에만 보호 컨트롤러 구성, 인증 정상·거부·보안 사건 기록 및 로그 비노출 검사 |
@@ -62,7 +62,7 @@ api 코드를 고치기 전에 읽는 파일 배치·DB·트랜잭션·인증 �
 | `test/support/test-database.cjs`        | 테스트 DB 접속, `_test` 이름 확인, 테스트 사이 자료 초기화 |
 | `test/support/repository-selection.cjs` | 초기화로 지워진 #252 초기 선정 자료를 격리 스키마의 실제 마이그레이션 값으로 되돌림 |
 | `test/db/*.test.cjs`                    | DB 규약으로 생성되는 SQL, 시각 왕복, 테스트 DB 격리, 트랜잭션 전달, 재빌드 뒤 지운 마이그레이션 미탐색 검사 |
-| `test/worker-messages.test.cjs`         | M1 합성 결과 세트의 worker 메시지 스키마 v1 판정 검사 |
+| `test/worker-messages.test.cjs`         | M1 합성 결과 세트의 현행 worker 메시지 스키마 판정 검사 |
 | `test/helpers/queue-harness.cjs` / `scripts/verify-analysis-queue.cjs` | 큐 연결 시험의 접수 기록 픽스처·메모리 요청 큐·worker 형식 메시지 / 큐 검증 키트·실제 worker와 한 번 왕복하는 수동 검증(CI 미실행). 운영 코드에서 쓰지 않음 |
 | `test/helpers/worker-messages.cjs`      | 테스트 전용 메시지 검사 도우미. 계약 YAML·합성 세트를 원본 경로에서 읽음. 운영 코드에서 쓰지 않음 |
 | `tsconfig.json` / `tsconfig.build.json` | 엄격한 타입 검사, 데코레이터, 빌드 설정            |

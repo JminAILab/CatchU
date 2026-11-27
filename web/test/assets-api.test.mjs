@@ -64,7 +64,9 @@ for (const [change, savedFields] of [
   [{ kind: "visibility", visibility: "PUBLIC" }, { visibility: "PUBLIC" }],
 ]) {
   test(`${change.kind} 저장 성공 응답의 null 제목을 상세와 목록에 보존한다`, async () => {
-    const original = { ...item("untitled"), title: null };
+    // 공개 요청 하나만 보려고 확인을 마친 Catch로 시작한다. 확인하지 않은 Catch의 공개는 아래 #635 시험이 본다.
+    const original = { ...item("untitled"), title: null,
+      ...(change.kind === "visibility" ? { confirmation: { workFactsConfirmed: true, contributionConfirmed: true } } : {}) };
     const saved = { ...original, ...savedFields };
     const store = createAssetsStore(createCatchApi(async (url, options) => {
       if (options.method === "PUT") return success(saved);
@@ -397,16 +399,17 @@ test("서버가 다른 ID/요청과 다른 저장 상태를 200으로 보내도 
 
 test("저장 응답 전에는 공개로 바꾸지 않으며 연속 조작은 PUT 하나만 보낸다", async () => {
   const pending = deferred(); let writes = 0;
+  const confirmed = { ...item("c"), confirmation: { workFactsConfirmed: true, contributionConfirmed: true } };
   const store = createAssetsStore(createCatchApi(async (url, options) => {
     if (options.method === "PUT") { writes++; return pending.promise; }
-    return url.startsWith("/catches?") ? page([item("c")]) : success(item("c"));
+    return url.startsWith("/catches?") ? page([confirmed]) : success(confirmed);
   }));
   await store.refresh(f("repo-a")); await store.openDetail("c");
   const first = store.update({ kind: "visibility", visibility: "PUBLIC" });
   const second = store.update({ kind: "visibility", visibility: "PUBLIC" });
   assert.equal(first, second); assert.equal(writes, 1);
   assert.equal(store.getSnapshot().detail.visibility, "PRIVATE");
-  pending.resolve(success({ ...item("c"), visibility: "PUBLIC" })); await first;
+  pending.resolve(success({ ...confirmed, visibility: "PUBLIC" })); await first;
   assert.equal(store.getSnapshot().detail.visibility, "PUBLIC");
   assert.equal(store.getSnapshot().items[0].visibility, "PUBLIC");
   assert.equal(store.getSnapshot().mutation.status, "success");
@@ -428,6 +431,102 @@ test("공개 거부/저장 결과 불명은 이전 상태를 보존하고 재조
     assert.equal(store.getSnapshot().mutation, null);
     await store.update({ kind: "visibility", visibility: "PUBLIC" }); assert.equal(writes, 2);
   }
+});
+
+// #635(2026-11-24 팀장 결정): 내용 확인을 공개에 합쳤다. 확인하지 않은 Catch를 공개로 바꾸면 확인 요청을 먼저 보내고 이어서 공개 요청을 보낸다.
+// 먼저 정한 실패 조건: 확인 요청 없이 공개 요청만 감(서버가 409로 거부), 확인을 마친 Catch에도 확인 요청이 감, 확인 요청이 실패했는데 공개 요청이 감,
+// 확인만 반영된 뒤 다시 켰을 때 확인 요청이 또 감, 숨기기·불일치에 확인 요청이 붙음.
+const unconfirmed = () => ({ ...item("c"), confirmation: { workFactsConfirmed: false, contributionConfirmed: false }, visibility: "PRIVATE" });
+const confirmedOf = (base) => ({ ...base, confirmation: { workFactsConfirmed: true, contributionConfirmed: true } });
+/** 확인·공개 PUT을 서버처럼 처리하는 대역. `fail`에 경로 끝 이름을 주면 그 요청은 준 결과로 끝난다. 부른 경로 끝 이름을 순서대로 남긴다. */
+function publishServer(start, failures = {}) {
+  let current = start; const puts = [];
+  const transport = async (url, options) => {
+    if (options.method !== "PUT") return url.startsWith("/catches?") ? page([current]) : success(current);
+    const kind = url.split("/").at(-1); puts.push(kind);
+    if (failures[kind]) { const result = failures[kind]; delete failures[kind]; return typeof result === "function" ? result() : result; }
+    if (kind === "visibility" && options.body.visibility === "PUBLIC" && !current.confirmation.workFactsConfirmed) {
+      return { kind: "api-error", status: 409, code: "CONFIRMATION_REQUIRED", message: "확인 필요" };
+    }
+    current = kind === "confirmation" ? confirmedOf(current) : kind === "mismatch" ? { ...current, mismatch: options.body.mismatch }
+      : { ...current, visibility: options.body.visibility };
+    return success(current);
+  };
+  return { puts, transport, current: () => current };
+}
+
+test("#635 확인하지 않은 Catch를 공개로 바꾸면 확인 요청 다음에 공개 요청을 보내고 한 번에 공개가 된다", async () => {
+  const server = publishServer(unconfirmed());
+  const store = createAssetsStore(createCatchApi(server.transport));
+  await store.refresh(f("repo-a")); await store.openDetail("c");
+  await store.update({ kind: "visibility", visibility: "PUBLIC" });
+  assert.deepEqual(server.puts, ["confirmation", "visibility"]);
+  const { detail, items, mutation } = store.getSnapshot();
+  assert.deepEqual(mutation, { catchId: "c", kind: "visibility", status: "success", error: null });
+  assert.equal(detail.visibility, "PUBLIC");
+  assert.deepEqual(detail.confirmation, { workFactsConfirmed: true, contributionConfirmed: true });
+  assert.deepEqual(items, [detail]);
+});
+
+test("#635 확인을 마친 Catch의 공개, 숨기기, 불일치 표시는 요청 하나만 보낸다", async () => {
+  for (const [start, change, expected] of [
+    [confirmedOf(unconfirmed()), { kind: "visibility", visibility: "PUBLIC" }, ["visibility"]],
+    [{ ...confirmedOf(unconfirmed()), visibility: "PUBLIC" }, { kind: "visibility", visibility: "PRIVATE" }, ["visibility"]],
+    [unconfirmed(), { kind: "mismatch", mismatch: true }, ["mismatch"]],
+  ]) {
+    const server = publishServer(start);
+    const store = createAssetsStore(createCatchApi(server.transport));
+    await store.openDetail("c");
+    await store.update(change);
+    assert.deepEqual(server.puts, expected, change.kind);
+    assert.equal(store.getSnapshot().mutation.status, "success");
+  }
+});
+
+test("#635 확인 요청이 실패하면 공개 요청을 보내지 않고 결과 불명으로 잠근다", async () => {
+  const server = publishServer(unconfirmed(), { confirmation: fail });
+  const store = createAssetsStore(createCatchApi(server.transport));
+  await store.openDetail("c");
+  await store.update({ kind: "visibility", visibility: "PUBLIC" });
+  assert.deepEqual(server.puts, ["confirmation"]);
+  assert.equal(store.getSnapshot().mutation.status, "error");
+  assert.equal(store.getSnapshot().mutation.kind, "visibility");
+  assert.equal(store.getSnapshot().detail.visibility, "PRIVATE");
+  await store.update({ kind: "visibility", visibility: "PUBLIC" });
+  assert.deepEqual(server.puts, ["confirmation"], "다시 읽기 전에는 보내지 않는다");
+});
+
+test("#635 확인은 됐는데 공개 요청이 실패하면 미공개로 남고, 다시 읽은 뒤 켜면 공개 요청만 보낸다", async () => {
+  const server = publishServer(unconfirmed(), { visibility: fail });
+  const store = createAssetsStore(createCatchApi(server.transport));
+  await store.openDetail("c");
+  await store.update({ kind: "visibility", visibility: "PUBLIC" });
+  assert.deepEqual(server.puts, ["confirmation", "visibility"]);
+  assert.equal(store.getSnapshot().mutation.status, "error");
+  assert.equal(store.getSnapshot().detail.visibility, "PRIVATE");
+  await store.openDetail("c", true);
+  assert.equal(store.getSnapshot().mutation, null);
+  assert.equal(store.getSnapshot().detail.confirmation.workFactsConfirmed, true, "서버에는 확인이 반영돼 있다");
+  await store.update({ kind: "visibility", visibility: "PUBLIC" });
+  assert.deepEqual(server.puts, ["confirmation", "visibility", "visibility"]);
+  assert.equal(store.getSnapshot().detail.visibility, "PUBLIC");
+});
+
+test("#635 확인은 됐는데 공개 요청을 보내지 않았으면 잠그지 않고, 다시 켜면 공개 요청만 보낸다", async () => {
+  const notSent = { kind: "api-error", status: 401, code: "AUTH_INVALID", message: "m", authRenewal: "renewed" };
+  const server = publishServer(unconfirmed(), { visibility: notSent });
+  const store = createAssetsStore(createCatchApi(server.transport));
+  await store.refresh(f("repo-a")); await store.openDetail("c");
+  await store.update({ kind: "visibility", visibility: "PUBLIC" });
+  const { detail, items, mutation } = store.getSnapshot();
+  assert.deepEqual(mutation, { catchId: "c", kind: "visibility", status: "not-processed", error: null, reason: "renewed-rejected" });
+  assert.equal(detail.visibility, "PRIVATE");
+  assert.equal(detail.confirmation.workFactsConfirmed, true, "반영된 확인은 화면 자료에도 넣는다");
+  assert.deepEqual(items, [detail]);
+  await store.update({ kind: "visibility", visibility: "PUBLIC" });
+  assert.deepEqual(server.puts, ["confirmation", "visibility", "visibility"]);
+  assert.equal(store.getSnapshot().detail.visibility, "PUBLIC");
+  assert.equal(store.getSnapshot().mutation.status, "success");
 });
 
 test("불일치 표시 결과는 서버의 확인·공개 값을 보존한다", async () => {

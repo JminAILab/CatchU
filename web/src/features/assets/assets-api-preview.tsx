@@ -10,6 +10,11 @@ import styles from "./assets.module.css";
 
 // 합성 응답을 API 경계로 전달하는 개발 도구. 인증·실제 서버 연결을 가장하지 않는다.
 const records = new Map(previewCatches.map((item) => [item.catchId, structuredClone(item)]));
+// 「다시 볼 곳」 칸 확인용 합성 사실(#635). 고정 자료는 다른 미리보기도 쓰므로 이 화면의 사본 첫 Catch에만 넣는다. 합성 자료라 커밋은 링크가 아니라 글자로 보인다.
+records.set(previewCatches[0].catchId, { ...structuredClone(previewCatches[0]), revisitFacts: [
+  { kind: "REWORKED_LINES", paths: ["src/errors/error-response.ts"], commits: ["4f1c9a2e7b3d5c8a1f6e0b9d2c4a7e5f3b8d1c06", "a7d3e5f1c9b2d4e6f8a0c1b3d5e7f9a2c4b6d8e0"] },
+  { kind: "TEST_FILES_PRESENT", paths: ["test/errors/error-response.test.ts"], commits: ["c2e4f6a8b0d1e3f5a7c9b2d4e6f8a0c1e3b5d7f9"] },
+] });
 const api = createCatchApi(async (path, options) => {
   await new Promise((resolve) => setTimeout(resolve, 180));
   const mode = new URLSearchParams(window.location.search).get("failure");

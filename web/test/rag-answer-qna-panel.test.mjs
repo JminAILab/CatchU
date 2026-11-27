@@ -34,3 +34,12 @@ test("버튼과 입력란은 disabled로 끄지 않고, 빈 질문일 때 버튼
   assert.doesNotMatch(input, /readOnly|readonly/, "보내는 중이 아니면 입력할 수 있다");
   assert.match(input, /maxLength="500"/i);
 });
+
+// 질문 패널 모양 정리(2026-11-26): 제목 아래 설명 한 줄, 「질문」 라벨, 보내기 전 버튼 글자.
+// 보내는 동안의 버튼 글자(「답변 만드는 중…」)는 서버 렌더링으로 볼 수 없어 브라우저로 확인한다.
+test("제목 아래 설명이 있고, 입력란은 「질문」 라벨과 이어지며, 보내기 전 버튼 글자는 「질문하기」뿐이다", () => {
+  assert.match(html, /<h2 id="qna-heading"[^>]*>발행본에 질문하기<\/h2><p[^>]*data-testid="qna-description">공유된 자료를 바탕으로 AI가 답합니다\.<\/p>/);
+  assert.match(html, /<label for="qna-question-input"[^>]*>질문<\/label>/);
+  assert.match(html, /<button[^>]*data-testid="qna-submit-button"[^>]*>질문하기<\/button>/);
+  assert.match(html, /data-testid="ai-notice-line"/, "AI 전송 고지 한 줄은 그대로 둔다");
+});

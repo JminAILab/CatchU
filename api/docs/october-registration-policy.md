@@ -9,7 +9,7 @@ Catch는 기존 규칙대로 PRIVATE로 등록되고, 확인과 공개 선택은
 ## 연결 방법
 
 기존 `RepositoryObservationSource`를 구현하므로 수신 모듈의 `observations`에 명시적으로 넘긴다.
-정책 공급자를 기본값으로 등록하거나 제품 AppModule에서 자동 활성화하지 않는다.
+정책 공급자를 기본값으로 숨기지 않는다. 제품 `createApplicationModule()`은 큐 주소가 있을 때 실제 저장 좌표 공급자와 함께 명시적으로 조립한다([분석 큐](analysis-queue.md)).
 
 ```ts
 // repositories: RegistrationRepositorySource — 신뢰된 저장소 좌표 제공자
@@ -24,7 +24,7 @@ AnalysisReceiverModule.registerDatabase({ contractDirectory, observations });
 - `githubRepository: { owner, name }`: 허용된 GitHub 좌표 형식이어야 한다.
 - 해당 자료가 없으면 `null`, 조회에 실패하면 예외를 전달한다. 결과 메시지의 URL에서 좌표를 만들지 않는다.
 
-실제 좌표 조회 구현과 접수 측에 남은 연결은 [선정 저장소 좌표 연결](selected-repository-coordinates.md)을 따른다.
+실제 좌표 조회 구현과 접수 연결은 [저장소 좌표 연결](selected-repository-coordinates.md)을 따른다.
 **결과 수신 뒤에는 분석 처리가 종결된 상태이므로, 종결 뒤에도 같은 시도의 좌표를 읽을 수 있어야 한다.**
 진행 중에만 답하는 #232의 worker 요청 정보 API를 호출하거나 현재 저장소 이름으로 과거 좌표를 바꾸지 않는다.
 MOCK은 명시적인 합성 좌표 제공자를 연결하고, LIVE 조회 실패를 MOCK으로 대체하지 않는다.
@@ -50,12 +50,12 @@ MOCK은 명시적인 합성 좌표 제공자를 연결하고, LIVE 조회 실패
 등록 이후 원본이 비공개로 바뀌는 것은 10월에 감지하지 않으며, 사용자는 Catch를 직접 숨길 수 있다.
 나중에 실제 관측을 도입할 때는 공급자 교체와 함께 이전 ‘관측 안 함’ 기록의 재확인도 필요하다.
 
-## 실제 활성화 전 연결
+## 제품 연결
 
 이 파일은 정책 공급자의 구현 안내다. 다음 연결을 대체하지 않는다.
 
-- #252가 현재 선정·범위 정보를 공급하고, #323이 #322의 실제 고지와 판본을 대조해 [보관 좌표 판본](selected-repository-coordinates.md)의 참조를 동의에 저장한다.
-- #233의 큐 및 앱 조립에서 공급자를 명시적으로 전달하고 실제 왕복 검사를 한다.
+- U7은 본인 저장소 등록과 현재 고지·범위 판본을 대조하고 동의에 등록·당시 좌표를 저장한다([U7 안내](repository-analysis-u7.md)). #252·#323의 전역 선정은 10월 기록이다.
+- #233의 큐 및 제품 조립은 이 공급자를 명시적으로 전달한다. 실제 EKS 왕복과 합성 검사의 구분은 [분석 큐](analysis-queue.md)를 따른다.
 
 LIVE 근거 주소의 소유자·저장소 이름을 대소문자 구분 없이 대조하고 URL 원문을 보존하는 변경은 [PR #316](https://github.com/JminAILab/CatchU/pull/316)이다.
 기존 SOURCE_PRIVATE의 제한·상태·출처·시각을 보존하는 변경은 [PR #317](https://github.com/JminAILab/CatchU/pull/317)이다.

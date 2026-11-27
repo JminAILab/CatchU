@@ -4,7 +4,7 @@
 
 [#139 메시지 수신](https://github.com/JminAILab/CatchU/issues/139)의 `AnalysisReceiver` 검사·지문·중복 판정, [#205 E 반영](https://github.com/JminAILab/CatchU/pull/205)의 트랜잭션·실패 기록, [#143 B 등록](https://github.com/JminAILab/CatchU/pull/143)의 `registerCandidates`를 재사용한다. [수신 계약](../../aidlc/spaces/default/intents/260914-catchu-october-mvp/inception/contract-design/contract-summary.md#w--worker-메시지-계약)·[트랜잭션 규약](../CONVENTIONS.md#트랜잭션-규약)이 기준이다. 신규 엔티티·마이그레이션·HTTP 경로는 추가하지 않는다.
 
-`AnalysisReceiverModule.registerDatabase({ contractDirectory, observations })`는 실제 `DatabaseModule`을 사용해 `DatabaseReceiverStore`, `AnalysisReceiver`, `AnalysisRegistrationService`, `DevAnalysisInjection`을 제공한다. `contractDirectory`는 `worker-messages.yaml`·`common.yaml`이 있는 절대 경로이며, `observations`는 아래 필수 공급 인터페이스다. 기본 가짜 공급자는 없다. 실제 공급자가 없는 `AppModule`에는 이 모듈을 자동 활성화하지 않는다. 큐 연결 모듈(#233)이 이 조립을 안에서 한 번 불러오며 같은 이유로 `AppModule`에 등록하지 않았다.
+`AnalysisReceiverModule.registerDatabase({ contractDirectory, observations })`는 실제 `DatabaseModule`을 사용해 `DatabaseReceiverStore`, `AnalysisReceiver`, `AnalysisRegistrationService`, `DevAnalysisInjection`을 제공한다. `contractDirectory`는 `worker-messages.yaml`·`common.yaml`이 있는 절대 경로이며, `observations`는 아래 필수 공급 인터페이스다. 기본 가짜 공급자는 없다. 제품에서는 `createApplicationModule()`이 큐 주소가 있을 때 실제 좌표 공급자와 `AnalysisQueueModule`을 등록하고, 큐 모듈이 이 수신·등록 조립을 한 번 가져온다. `AppModule`에 중복 등록하지 않는다.
 
 ```ts
 // 내부 worker 전송 연결부에서 Nest가 제공한 service를 사용한다.
@@ -16,7 +16,7 @@ const outcome = await service.receiveResult(message, async receipt => {
 // 진행 이벤트에는 Receipt가 없고, 같은 서비스의 receiveProgress(message)를 사용한다.
 ```
 
-이 예시의 `transport`는 새 외부 API 계약을 의미하지 않는다. 실제 호출자는 [#233 큐 연결](analysis-queue.md#받기)의 결과 작업 소비자이며, 받은 Receipt를 변수에 담아 결과 작업의 반환값으로 돌려준다(큐 접근 통제가 전달 경로의 경계다). 그 모듈은 `AppModule`에 아직 등록하지 않았다. `receiveResult`는 수신 DB 커밋 → Receipt 알림 callback → 새 수락 결과만 보호 조회·반영 순서다. callback 실패 시 수신 기록은 남고 반영은 호출하지 않는다. 같은 결과 재전달은 `DUPLICATE`로 끝내며 자동 재반영하지 않는다. Receipt 수락은 Catch 등록 완료를 뜻하지 않는다.
+이 예시의 `transport`는 새 외부 API 계약을 의미하지 않는다. 실제 호출자는 [#233 큐 연결](analysis-queue.md#받기)의 결과 작업 소비자이며, 받은 Receipt를 변수에 담아 결과 작업의 반환값으로 돌려준다(큐 접근 통제가 전달 경로의 경계다). 제품 조립 조건은 위와 같다. `receiveResult`는 수신 DB 커밋 → Receipt 알림 callback → 새 수락 결과만 보호 조회·반영 순서다. callback 실패 시 수신 기록은 남고 반영은 호출하지 않는다. 같은 결과 재전달은 `DUPLICATE`로 끝내며 자동 재반영하지 않는다. Receipt 수락은 Catch 등록 완료를 뜻하지 않는다.
 
 개발 주입은 기존 `DevAnalysisInjection.inject`의 본인·MOCK·환경 제한을 유지한다. 위 DB 모듈에 등록된 주입은 실제 수신 저장과 E/B 반영을 호출한다. 결과는 `{ receipt, application? }`이며 원문 `accepted`를 외부에 반환하지 않는다. 이는 내부 반환값이고 새 공개 API 계약이 아니다. 개발 주입에서는 별도 전송이 없어 Receipt callback은 아무 동작도 하지 않는다. 운영 공개 주입 라우트는 만들지 않는다.
 
@@ -46,18 +46,18 @@ const outcome = await service.receiveResult(message, async receipt => {
 
 [10/4 팀장 조건](https://github.com/JminAILab/CatchU/issues/105#issuecomment-5975854918)에 따라 LIVE 후보의 모든 근거 주소는 공급자가 확인한 `https://github.com/<owner>/<repo>/`로 시작해야 한다. 파싱된 origin·정규화된 경로도 대조해 위장 호스트·다른 저장소·상위 경로 이동을 거부한다. [10/15 후속 결정](https://github.com/JminAILab/CatchU/issues/105#issuecomment-6189230335)에 따라 소유자·저장소 이름은 대소문자를 구분하지 않고 대조하며, 저장하는 근거 주소는 원문을 유지한다. 주소를 조회하거나 redirect를 따르지 않는다. 주소 불일치는 기존 B의 `INVALID_INPUT / evidence.sourceUrl` 분류다. MOCK의 `example.invalid` 합성 주소에는 이 대조를 적용하지 않는다.
 
-10월에는 [10월 정책 공급자](october-registration-policy.md)를 명시적으로 연결할 수 있다. 이 공급자는 GitHub를 조회하지 않고 ‘관측 안 함’ 출처와 NONE을 반환한다. 공급 실패를 NONE으로 보정하는 것이 아니며, 최초 PRIVATE와 별도 공개 선택은 그대로다. 실제 좌표 제공·앱 활성화의 남은 조건은 해당 문서에서 확인한다. 기존 비공개 근거 보존과 LIVE 주소 대조는 등록부에 반영돼 있다.
+제품 조립은 [10월 정책 공급자](october-registration-policy.md)를 명시적으로 연결한다. 이 공급자는 GitHub를 조회하지 않고 ‘관측 안 함’ 출처와 NONE을 반환한다. 공급 실패를 NONE으로 보정하는 것이 아니며, 최초 PRIVATE와 별도 공개 선택은 그대로다. 실제 좌표는 `SelectedRepositoryRegistrationSource`가 U7 접수 당시 동의의 등록·좌표 사본에서 읽는다. 기존 비공개 근거 보존과 LIVE 주소 대조는 등록부에 반영돼 있다.
 
 ## 실제 공급과 후속 경계
 
-[선정 저장소 좌표 연결](selected-repository-coordinates.md)은 기존 동의의 선정 참조와 보관 판본으로 당시 좌표를 읽는다.
+[저장소 좌표 연결](selected-repository-coordinates.md)은 현행 U7 동의의 여섯 칸 사본과 등록·회원·요청·시도를 대조해 당시 좌표를 읽는다. 10월의 선정 카탈로그 방식과 구분한다.
 DB를 사용하는 공급자는 `registerDatabase({ contractDirectory, observationsFactory: db => ... })`로 연결할 수 있다.
 기존 `observations` 객체와 공급 함수 중 하나를 명시해야 한다.
 
 #231의 GitHub 자격정보 및 #232의 실행 허가 조회는 종결 결과의 등록 조회와 다르다.
 실제 고지·판본은 [#322](https://github.com/JminAILab/CatchU/issues/322)에서 확정해 [PR #328](https://github.com/JminAILab/CatchU/pull/328)에 반영했다.
-[#252](https://github.com/JminAILab/CatchU/issues/252)는 현재 선정·범위 정보 공급을, [#323](https://github.com/JminAILab/CatchU/issues/323)은 실제 접수에서 고지·범위 판본을 대조하고 같은 선정 참조를 동의에 저장하는 연결을 맡는다.
-앱·큐 활성화와 실제 왕복은 [#233](https://github.com/JminAILab/CatchU/issues/233)의 별도 연결이며, LIVE 전용 예시에 MOCK 처리가 자동으로 붙지 않는다. MOCK 공급 조건은 [선정 저장소 좌표 연결](selected-repository-coordinates.md)을 따른다.
+현행 회원 등록·접수·고지는 [U7 안내](repository-analysis-u7.md)를 따른다. #252·#323의 전역 선정·네 칸 동의는 10월 구현 기록이다.
+앱·큐 연결은 [분석 큐](analysis-queue.md)에 구현돼 있으며 실제 EKS 왕복 근거도 그 문서에서 구분한다. LIVE 전용 공급에 MOCK 처리가 자동으로 붙지 않는다. MOCK 공급 조건은 [저장소 좌표 연결](selected-repository-coordinates.md)을 따른다.
 10월의 공개 관측 생략은 위 정책을 따르며, 이 좌표 제공자가 GitHub 공개 여부를 확인했다고 표시하지 않는다.
 
 [10/6 최신 결정](https://github.com/JminAILab/CatchU/issues/23#issuecomment-6011538296)과 [#234 철회 기록](https://github.com/JminAILab/CatchU/issues/234#issuecomment-6028927385)에 따라 결과 원문 보관·자동 재반영·worker 결과 14일 보관을 구현하지 않는다. 수신 커밋 후 중단·Receipt 전달 실패·공급 실패는 각각 `PENDING`/`APPLY_FAILED`에 남을 수 있다. [#237 처리 시한·실패 종료](https://github.com/JminAILab/CatchU/issues/237)는 [PR #295](https://github.com/JminAILab/CatchU/pull/295)로 구현돼 주기 작업이 시한을 넘긴 요청을 닫는다([규칙](analysis-deadline.md)). 이 수신·반영 서비스 자체는 시간만으로 요청을 닫거나 재요청을 허용하지 않는다. 결과 반영·실패 기록·시한 닫기의 기존 자식 잠금 순서는 요청 → 현재 시도로 유지한다. 수신은 그 앞에 회원·등록 읽기 잠금을 추가하며, 모든 서비스의 전체 잠금 순서가 같다는 의미는 아니다.

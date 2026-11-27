@@ -42,7 +42,7 @@ node summarize.cjs
 - 저장소의 `results/`는 2026-10-02 실행 기록이며 [결과 기록](../CatchU_queue_verification_results.md)의 근거다. 판본을 올려 다시 돌린 결과는 `results/`를 덮어 커밋하지 않고, 그 PR에 기록한다(코딩 절차 「검사 선택과 결과 보고」).
 - 중단 복구를 빨리 보려고 잠금 2초·정체 검사 1초로 줄였다. 제품 설정값이 아니다.
 
-실제 배포 서버(AWS, 큐 서비스 미정)에서 확인할 때는 큐 서버에 닿는 서버에서 `--engine` 없이 `Q77_REDIS_URL=redis://<주소>:<포트> node run.cjs A B C D G L`로 돌린다. 이때 P 시나리오는 건너뛴다(Docker가 필요하다). 확인할 항목은 [「배포 서버 적용 조건」](../CatchU_queue_requirements.md#배포-서버-적용-조건)에 있다.
+운영 큐는 AWS ElastiCache Valkey다. EKS에서는 [11/18 팀장 결정](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553)으로 이 키트를 실행하는 대신 실제 api·worker 클라이언트의 연결·허용 명령을 확인했다. 실제 처리·장애 조치 확인과 한계는 [배포 서버 적용 조건](../CatchU_queue_requirements.md#배포-서버-적용-조건)에 있다. 이 키트의 10/2 실험 기록은 그대로 보존한다.
 
 ## 시나리오
 

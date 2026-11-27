@@ -1,8 +1,8 @@
 # CatchU AWS 실행 환경(EKS)
 
-11월부터 12월 제출까지 서비스를 돌릴 AWS 환경의 설정 파일·생성 명령·운영 순서다([#276](https://github.com/JminAILab/CatchU/issues/276)). 구성의 정본은 #276 본문과 [2026-10-19 결정](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6260130109)이다. 이미지·한 호스트 실행은 [../README.md](../README.md), 지금 쓰는 개발 서버는 [../dev-server/README.md](../dev-server/README.md)에 있다.
+서비스를 운영하는 AWS 환경의 설정 파일·생성 명령·운영 순서다([#276](https://github.com/JminAILab/CatchU/issues/276)). 구성의 정본은 #276 본문과 [2026-10-19 결정](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6260130109)이다. 이미지·한 호스트 재현은 [../README.md](../README.md), 이전 개발 서버는 [../dev-server/README.md](../dev-server/README.md)에 있다.
 
-**EKS 자원은 아직 없다**(0단계의 경보 주제·인증서는 요금이 없다). 이 폴더의 생성 명령은 아래 「단계와 시작 조건」의 승인 지점마다 팀장 승인을 받은 뒤에만 실행한다. 비밀값과 계정 번호는 이 폴더에 적지 않는다.
+EKS 자원은 [2026-11-17에 만들었고](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6950182407), [11-18에 `catchu.dev`를 EKS로 옮겼다](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6971519828). 개발 서버의 web·api·worker는 멈췄으며 자원 삭제는 #276에서 다룬다. 아래 생성 명령은 새로 만들 때 쓰는 절차로, 「단계와 시작 조건」의 승인 지점마다 팀장 승인을 받은 뒤에만 실행한다. 비밀값과 계정 번호는 이 폴더에 적지 않는다.
 
 ## 파일
 
@@ -71,7 +71,7 @@
 
 | 단계 | 시작 조건 | 하는 일 | 승인 |
 |---|---|---|---|
-| 0 준비(비용 0) | 지금 | 이 폴더의 파일 PR, 자동 배포 대상 변경 PR(#342), 경보 이메일 수신 시험(`create-alert-topic.sh --apply` 뒤 `--test`), 인증서 발급(`create-certificate.sh`), 비밀값 목록 정리, 개발 서버에서 LIVE worker 메모리 측정(가능하면) | PR 병합 |
+| 0 준비(비용 0) | 자원 생성 전 | 이 폴더의 파일 PR, 자동 배포 대상 변경 PR(#342), 경보 이메일 수신 시험(`create-alert-topic.sh --apply` 뒤 `--test`), 인증서 발급(`create-certificate.sh`), 비밀값 목록 정리, 개발 서버에서 LIVE worker 메모리 측정(가능하면) | PR 병합 |
 | 1 생성 | ① 0단계 파일 PR이 dev에 병합됐다 ② 경보 수신 시험이 통과했다 ③ 생성 다음 날 확인할 시간이 있다 ④ 예산 한도 안이다 | 「1단계 만드는 순서」. **이때부터 하루 약 2.6만 원** | ① 생성 |
 | 2 확인 | 1단계 다음 날 | 빈 DB로 지금 main 판본을 띄운다([k8s/README.md](k8s/README.md)). DNS는 그대로 두고 `curl --resolve`로 확인한다. `create-alarms.sh --apply` 뒤 경보 하나를 `set-alarm-state`로 울려 메일을 확인한다. #276 완료 기준 증거(「완료 기준 대응」)를 남기고 EKS 배포를 1회 돌린다 | ② 전환 실행 |
 | 3 전환 | ① 2단계 확인이 모두 통과했다 ② 그 시각에 main 병합을 멈출 수 있다 ③ 팀장이 오전에 1~2시간을 낼 수 있다. 1단계 뒤 2~4일 안이 기본이다 | [cutover.md](cutover.md): 전날 A 기록 TTL 60초·정비 예정 조회, 당일 자동 배포 끄기 → 마지막 확인 → 개발 서버 앱 정지 → DNS를 ALB로 → 확인 | ③ DNS 직전 |
@@ -113,7 +113,7 @@
      aws ec2 describe-route-tables --profile catchu --region ap-northeast-2 --filters "Name=vpc-id,Values=${vpc}" --query 'RouteTables[].[join(`,`, Associations[].SubnetId || `[]`), Routes[?DestinationCidrBlock==`0.0.0.0/0`].NatGatewayId | [0], Routes[?DestinationCidrBlock==`0.0.0.0/0`].GatewayId | [0]]' --output text
      ```
    - 노드에 실제로 붙은 보안 그룹. RDS 5432·큐 6379·EFS 2049는 이 보안 그룹에서 오는 연결만 받는다. 하나면 스크립트가 알아서 쓰고, 둘 이상이면 스크립트가 멈추므로 쓸 것을 정해 여기에 적고 `CATCHU_NODE_SG=sg-…`로 넘긴다: `aws ec2 describe-instances --profile catchu --region ap-northeast-2 --filters Name=tag:eks:nodegroup-name,Values=app Name=instance-state-name,Values=running --query 'Reservations[].Instances[].NetworkInterfaces[].Groups'`
-   - EFS 드라이버 Pod가 AWS 권한 없이 Running인지: `kubectl --kubeconfig ~/.kube/catchu -n kube-system get pod -l app.kubernetes.io/name=aws-efs-csi-driver`. 실제 마운트 시험은 GitHub 연결을 켤 때 한다. 그때 접근점을 거친 TLS 마운트가 되는지와, 접근점 없이 마운트하거나 TLS 없이 마운트하면 거부되는지를 함께 본다. 드라이버 권한이 모자라 안 되면 `cluster.yaml`에 적은 대로 컨트롤러 서비스 계정에만 권한을 더한다. 접근점을 거친 마운트까지 거부되면 파일 시스템 정책의 접근점 조건이 IAM 없는 마운트에 맞지 않는 것이므로(문서로 확인하지 못한 부분) 그 조건을 어떻게 할지 팀장과 정한다.
+   - EFS 드라이버 Pod가 AWS 권한 없이 Running인지: `kubectl --kubeconfig ~/.kube/catchu -n kube-system get pod -l app.kubernetes.io/name=aws-efs-csi-driver`. 실제 마운트 방법과 한계는 [features.md](features.md) 「GitHub 토큰 보관 볼륨」을 따른다. [11/18 확인](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6972639820)에서 IAM 없는 접근점·TLS 마운트는 허용되고, 접근점 없는 TLS 마운트와 접근점·TLS 없는 마운트는 거부됐다. 접근점이 있으면 드라이버가 TLS를 강제하므로 접근점을 유지한 비TLS 마운트는 이 시험으로 만들 수 없다.
 5. **DB·큐·EFS·WAF·S3:** 각각 확인 모드로 먼저 돌려 찾은 VPC·서브넷·노드 보안 그룹을 보고, 그다음 `--apply`로 만든다. 끝에 찍히는 확인 값을 증거로 남긴다.
    ```bash
    bash deploy/aws/scripts/create-rds.sh            # 확인만
@@ -228,6 +228,8 @@ bash deploy/aws/scripts/logs.test.sh       # 위와 같음
 ## 완료 기준 대응
 
 #276 완료 기준마다 어떤 증거를 어디서 남기는지다. 증거는 단계를 마칠 때 #276 댓글이나 해당 PR에 남기고 계정 번호는 가린다.
+
+표의 큐 「키트 시나리오」 확인은 [2026-11-18 팀장 결정과 실행 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6970235553)에 따라 실제 api·worker 클라이언트의 연결·허용 명령 확인으로 갈음했다. 실제 분석·수신은 [5단계 기록](https://github.com/JminAILab/CatchU/issues/276#issuecomment-6979461733)에 있고, 장애 조치 뒤 worker가 새 작업을 받는 문제는 [#603](https://github.com/JminAILab/CatchU/issues/603)에서 별도로 확인한다.
 
 | #276 완료 기준 | 남길 증거 | 단계 | 이 폴더의 근거 |
 |---|---|---|---|

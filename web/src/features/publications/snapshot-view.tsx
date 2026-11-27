@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { TabStrip } from "@/components/tab-strip/tab-strip";
 import { splitSections, type Section } from "@/lib/author-description-sections";
 import { evidenceRepositoryOf, isOwnCommitLink, ownCommitsOf, type OwnCommit } from "@/lib/github-link-name";
@@ -281,8 +281,36 @@ export type TabNotice = { readonly ordinal: number; readonly presetName: string;
 /** 탭 줄 `idPrefix`. 탭·패널 id는 `publication-snapshot-tab-(순번)`·`publication-snapshot-panel-(순번)`이고 이름을 넣지 않는다(NFR3.2). */
 const SNAPSHOT_TABS_ID = "publication-snapshot";
 
-function SnapshotItemView({ item, highlight, pdfSource }: {
+/** 좁은 화면에서 출처로 옮겨 간 항목 맨 앞에 두는 돌아가기 줄(#615). 받은 사람 화면만 넘긴다. */
+export type SnapshotReturnBar = { readonly publishedItemId: string; readonly onReturn: () => void };
+
+export const RETURN_BUTTON_TEXT = "보던 곳으로 돌아가기";
+
+/**
+ * 「보던 곳으로 돌아가기」 줄(#615, 2026-11-25 팀장 결정). 옮겨 간 자료 항목의 첫 자식이라 항목에 놓인 초점에서 Tab 한 번에 닿고,
+ * 그 항목이 화면에 있는 동안 화면 위쪽에 붙는다(CSS). 「접기」 줄은 아래쪽에 붙으므로 서로 겹치지 않는다. 닫는 단추는 없다.
+ * 이름은 출발한 곳(AI 요약·질의응답·JD 요약)과 상관없이 하나다. 줄이 지워질 때 초점이 이 단추에 남아 있으면 항목으로 넘긴다:
+ * 넘기지 않으면 초점이 문서 맨 위로 떨어진다(폭이 넓어져 줄을 그리지 않게 될 때).
+ */
+function ReturnBar({ onReturn }: { onReturn: () => void }) {
+  const bar = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = bar.current;
+    return () => {
+      if (element !== null && element.contains(document.activeElement)) element.parentElement?.focus({ preventScroll: true });
+    };
+  }, []);
+  return (
+    <div ref={bar} className={styles.returnBar} data-testid="snapshot-return-bar">
+      <button type="button" className={styles.returnButton} onClick={onReturn}>{RETURN_BUTTON_TEXT}</button>
+    </div>
+  );
+}
+
+function SnapshotItemView({ item, highlight, pdfSource, onReturn }: {
   item: PublishedItem; highlight: SnapshotHighlight | null; pdfSource?: (publishedItemId: string) => PdfCopySource;
+  /** 이 항목이 돌아가기 줄을 둘 항목일 때만 있다. */
+  onReturn?: () => void;
 }) {
   const own = highlight !== null && highlight.publishedItemId === item.publishedItemId ? highlight : null;
   // 접는 글 상자의 id 앞부분(#607). 항목 요소의 id(`published-item-…`)와 앞부분이 겹치지 않게 따로 짓는다.
@@ -290,6 +318,7 @@ function SnapshotItemView({ item, highlight, pdfSource }: {
   return (
     <li id={publishedItemDomId(item.publishedItemId)} tabIndex={-1} className={styles.snapshotItem}
       data-testid="snapshot-item" data-kind={item.itemKind} data-highlighted={own !== null || undefined}>
+      {onReturn !== undefined && <ReturnBar onReturn={onReturn} />}
       <h3 className={styles.snapshotTitle}><span className={styles.kindBadge}>{KIND_LABELS[item.itemKind]}</span> {item.title}</h3>
       {item.itemKind === "CATCH" ? <CatchSnapshotView snapshot={item.snapshot} highlight={own} title={item.title} foldId={foldId} />
         : item.itemKind === "TEXT_MATERIAL" ? <TextMaterialSnapshotView snapshot={item.snapshot} highlight={own} title={item.title} foldId={foldId} />
@@ -309,8 +338,9 @@ function SnapshotItemView({ item, highlight, pdfSource }: {
  * - 열린 탭(`activePreset`)과 바꾸기(`onPresetChange`)·알림(`tabNotice`)은 부르는 화면이 `useSnapshotJump`로 넘긴다. 열린 탭이 없거나 사본에 없으면 첫 탭이다.
  * - 항목 그리기는 그대로다: 제목은 글자로만, `highlight`가 가리키는 항목만 강조 범위를 받고(`<mark>`), 항목마다 `id`·`tabIndex={-1}`을 두어
  *   근거 위치로 옮길 수 있게 한다. PDF 항목(U8)은 `pdfSource`가 있으면 그 항목의 사본을 여는 단추를 둔다(누를 때만 요청한다).
+ * - `returnBar`(#615)는 받은 사람 화면만 넘긴다. 가리킨 항목의 맨 앞에 「보던 곳으로 돌아가기」 줄을 그린다. 넘기지 않으면(작성자 발행본 상세) 그리지 않는다.
  */
-export function PublishedSnapshotView({ snapshot, highlight = null, pdfSource, activePreset = null, onPresetChange, tabNotice = null }: {
+export function PublishedSnapshotView({ snapshot, highlight = null, pdfSource, activePreset = null, onPresetChange, tabNotice = null, returnBar = null }: {
   snapshot: PublishedSnapshot;
   highlight?: SnapshotHighlight | null;
   /** PDF 항목의 사본을 받는 방법. 항목 ID로 요청을 만든다. */
@@ -321,6 +351,8 @@ export function PublishedSnapshotView({ snapshot, highlight = null, pdfSource, a
   onPresetChange?: (ordinal: number) => void;
   /** 출처 이동으로 탭이 바뀐 알림. 열린 탭과 같은 순번일 때만 보인다. */
   tabNotice?: TabNotice | null;
+  /** 좁은 화면에서 출처로 옮겨 간 항목과 돌아가기 동작. */
+  returnBar?: SnapshotReturnBar | null;
 }) {
   const groups = groupByPreset(snapshot);
   const open = groups.find((group) => group.ordinal === activePreset) ?? groups[0];
@@ -340,7 +372,10 @@ export function PublishedSnapshotView({ snapshot, highlight = null, pdfSource, a
               <FoldVisibleContext key={group.ordinal} value={group.ordinal === open.ordinal}>
                 <p className={styles.presetName} data-testid="snapshot-preset-name">{group.name}</p>
                 <ol className={styles.snapshotItems}>
-                  {group.items.map((item) => <SnapshotItemView key={item.publishedItemId} item={item} highlight={highlight} pdfSource={pdfSource} />)}
+                  {group.items.map((item) => (
+                    <SnapshotItemView key={item.publishedItemId} item={item} highlight={highlight} pdfSource={pdfSource}
+                      onReturn={returnBar !== null && returnBar.publishedItemId === item.publishedItemId ? returnBar.onReturn : undefined} />
+                  ))}
                 </ol>
               </FoldVisibleContext>
             )]))} />
