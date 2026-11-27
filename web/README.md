@@ -129,7 +129,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 |---|---|---|
 | `src/app/(guest)/` | 비로그인 일반 | 왼쪽 로고(→ `/`) / 오른쪽 [Google로 시작하기](→ 로그인 진입). 내 자산·공유 링크·프로필은 없음 |
 | `src/app/(member)/` | 로그인 일반·발행자 | 왼쪽 로고(→ `/home`)·내 자산·텍스트 자료(U4)·프리셋(발행 프리셋 U2)·발행본(U4)·JD 관리(U10) / 오른쪽 프로필. 10월의 [공유 링크]는 [발행본]으로 바뀌었고, 채용공고·알림은 뺐다(아래). 대표 구성 진입점은 없음 |
-| `src/app/s/` | 공유 링크 수신자 | 이동 없는 CatchU 브랜드 / 오른쪽 로그인·프로필. 확인 중에는 오른쪽을 비운다. 자료·비밀번호·열람 불가·조회 실패에 공통 적용([받은 사람 화면](src/features/recipient/README.md), #638) |
+| `src/app/s/` | 공유 링크 수신자 | 이동 없는 CatchU 브랜드 / 오른쪽 로그인·프로필(#638) |
 
 - **탭 아이콘:** `src/app/favicon.ico`(16·32px, 파란 원 안의 흰 U)와 `src/app/icon.png`(원형 U 심벌)를 Next가 모든 화면의 아이콘 링크로 내려 준다(#560). 바꾸려면 두 파일을 함께 바꾼다. `icon.png`는 소개 화면 마지막 안내의 심벌로도 쓴다.
 
@@ -144,7 +144,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | 프로필 메뉴 | [프로필] 버튼·Esc·바깥 클릭. [로그아웃]을 누르면 메뉴를 먼저 닫고 로그아웃을 요청한다(#287) | Esc·[로그아웃]으로 닫으면 [프로필] 버튼으로 돌아감. 바깥 클릭은 누른 요소의 동작·초점을 막지 않음 | 메뉴 안 클릭([로그아웃] 제외) |
 - **조회 상태:** `src/components/status/status.tsx`의 세 컴포넌트를 쓴다. 불러오는 중은 `LoadingState`, `readApiResponse`가 `lookup-failed`를 돌려주면 `LookupFailedState`, 성공 응답의 빈 목록일 때만 `EmptyState`다. 조회 실패를 0건으로, 요청 중을 성공으로 표시하지 않는다.
 - **스타일:** 컴포넌트 옆 CSS Modules(`*.module.css`)를 쓴다. 공통 색·폭은 `globals.css`의 `--color-*`·`--content-width` 변수를 쓴다. `globals.css`가 `body` 기본 여백을 없애므로 화면에서 여백을 되돌리는 음수 여백은 필요 없다.
-- **미리보기:** `npm run dev` 뒤 `http://localhost:3000/preview/common`에서 세 헤더와 상태 표시를 모의 상태로 확인한다. 로그인 헤더는 `onLogout`을 주지 않은 미리보기와 모의 로그아웃 연결을 나란히 보여 주고, 받은 사람 헤더는 로그인 전·확인 중·로그인 뒤를 보여 준다(#638). 제품의 두 회원 셸에는 로그아웃이 연결돼 있다. 실제 인증·API를 호출하지 않으며 배포용 실행에서는 404다. 미리보기 접속 주소는 `http://localhost:3000/preview/common`으로 통일한다.
+- **미리보기:** `npm run dev` 뒤 `http://localhost:3000/preview/common`에서 세 헤더와 상태 표시를 모의 상태로 확인한다. 로그인 헤더는 `onLogout`을 주지 않은 미리보기와 모의 로그아웃 연결을 나란히 보여 준다. 제품의 두 회원 셸에는 로그아웃이 연결돼 있다. 배포용 실행에서는 404다. 미리보기 접속 주소는 `http://localhost:3000/preview/common`으로 통일한다.
 
 ## 페이지 주소
 
@@ -157,7 +157,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/google/callback` | Google 로그인 콜백 | A | 불필요 | 확정 | api `GOOGLE_REDIRECT_URI`와 같은 주소(로컬 `http://localhost:3000/google/callback`). 통합 시험 전환을 켰을 때만 열고 끄면 404. 주소의 `code`·`state`·`error`는 해석 뒤 지운다([인증 화면](src/features/auth-screens/README.md)) |
 | `/privacy` | 개인정보 처리방침 | A | 불필요 | 확정 | [#496 팀장 결정](https://github.com/JminAILab/CatchU/issues/496#issuecomment-6788199337). 첫 화면 바닥글 링크의 목적지이며 Google 로그인 앱 Branding에 적는 방침 주소. 글은 팀장 확정 문구 그대로다([개인정보 처리방침](src/features/privacy/README.md)) |
 | `/home` | 로그인 후 홈 | D | 필요 | 제안 | CTA는 내 자산의 저장소 연결 관리로 이동(확정). GitHub 미연동·재연동 필요는 연동 화면(`/profile/github`)으로 이동하되, 공통 인증 통합 시험 전환을 끄면 비활성과 이유를 보인다([홈](src/features/home/README.md)) |
-| `/profile/setup` | 최초 프로필 입력 (W02) | A | 필요 | 제안 | 저장 성공 후 회원 정보를 다시 불러온 뒤 `/home`. 받은 링크에서 시작한 로그인은 같은 탭의 링크로 복귀(#638) |
+| `/profile/setup` | 최초 프로필 입력 (W02) | A | 필요 | 제안 | 저장 성공 후 회원 정보를 다시 불러온 뒤 `/home` |
 | `/profile` | 상세 프로필 (W02-P) | A | 필요 | 제안 | 프로필 메뉴 [프로필 보기]의 목적지. 수정(`/profile/edit`)·GitHub 연동(`/profile/github`)·Claude 연결(`/profile/claude`)로 진입하는 링크를 둔다 |
 | `/profile/edit` | 프로필 수정 (W02) | A | 필요 | 제안 | 저장 성공·취소 후 `/profile`로 복귀하고, 저장 실패 시 이 화면과 입력을 유지 |
 | `/profile/github` | GitHub 연동 (W02-G) | A | 필요 | 제안 | 성공 후 쿼리 없는 `/assets`로 복귀하며 저장소 관리 모달을 자동으로 열지 않는다. 연결 시작은 공통 인증 통합 시험 전환을 켰을 때만 하고, 끄면 상태 조회와 `/assets` 이동만 한다([GitHub 연동](src/features/github-connection/README.md)) |
@@ -175,7 +175,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 | `/presets/new` | 프리셋 만들기 | 발행 프리셋 U2 | 필요 | 확정 | 첫 저장 뒤에는 라우터의 replace로 `/presets/[presetId]`에 옮기고(뒤로 가기 기록을 더하지 않음), 옮긴 화면이 「저장했습니다.」를 한 번 보인다 |
 | `/presets/[presetId]` | 프리셋 수정 | 발행 프리셋 U2 | 필요 | 확정 | 이름·담을 자료·순서 수정과 지우기. 「발행본」 주소 아래가 아니어서 메뉴의 「발행본」이 함께 켜지지 않는다 |
 | `/publications/[publicationId]` | 발행본 상세 | U4 | 필요 | 확정 | 사본·상태·만료·링크 주소, 링크 중지·삭제. U5 기본 요약 패널의 작성자 모드와 근거 강조를 연결함 |
-| `/s/[token]` | 받은 사람 발행본 열람(U4 W4) | C | 불필요 | 제안 | 수신자 전용 헤더에서 로그인·프로필 제공. 열람 권한은 회원 로그인과 별개다. 10월 `/links`·`/s/[token]/catches/[catchId]`는 U4 제출 3(W6)에서 없앴다 |
+| `/s/[token]` | 받은 사람 발행본 열람(U4 W4) | C | 불필요 | 제안 | 수신자 전용 헤더. 10월 `/links`·`/s/[token]/catches/[catchId]`는 U4 제출 3(W6)에서 없앴다 |
 
 **주소 원칙(제안):** 이름 조회·회원 가드·로그인 이동을 연결했다. 현재 범위와 최초 프로필 저장 연결은 [회원 진입 연결](src/features/member-entry/README.md), 프로필 상세·수정은 [프로필 화면](src/features/profile/README.md)을 따른다.
 - 제품 기본은 회원 경로 진입 시 세션 복원을 먼저 시도한다. 회원 API의 `AUTH_REQUIRED`·`AUTH_INVALID`는 공통 인증이 갱신을 시도하며, 복원·갱신 결과에 따라 로그인 이동 또는 현재 화면의 재인증 안내로 처리한다. 수신자 비밀번호 401은 수신자 화면에서 처리한다.
@@ -183,7 +183,7 @@ PR 전에는 `npm run check`를 실행하고 결과를 PR 「확인」 칸에 �
 - 복귀 주소는 `/login?next=<인코딩한 경로>`로 넘기고 서비스 안 회원 경로만 허용한다. 토큰·grant는 주소에 넣지 않는다.
 - 이름이 저장된 회원만 로그인 후 `next`로 복귀한다. 유효하지 않은 `next`는 `/home`으로 보내며, 최초 프로필 입력(`/profile/setup`)을 거친 경우에도 `/home`으로 이동한다.
 - 최초 프로필 입력은 저장에 성공하면 회원 정보(`GET /v1/me`)를 다시 불러온 뒤 `/home`으로 이동한다. 저장 전의 빈 이름 응답 때문에 `/profile/setup`으로 되돌아가지 않게 하기 위해서다([#171 A 담당 검토](https://github.com/JminAILab/CatchU/pull/171#pullrequestreview-5349302819)).
-- 받은 링크(`/s/[token]`)에서 시작한 로그인은 위 두 항목의 `/home` 대신 같은 링크로 돌아간다(#638). 토큰 없는 진입 표시와 같은 탭의 30분 임시 저장값을 쓰며, 회원 `next`·Google 로그인 시도·인증 API에 링크 토큰을 넣지 않는다. 최초 이름 저장 뒤 복귀와 일반 로그인 진입 시 임시 값 제거는 [회원 진입 연결](src/features/member-entry/README.md)에 있다.
+- 받은 링크에서 시작한 로그인은 위 두 항목의 `/home` 대신 그 링크로 돌아간다(#638).
 - 저장소 연결 관리는 별도 주소 없이 `/assets` 안 모달이다. 모달 열림을 주소에 기록하지 않으며 GitHub 연동 복귀 때 자동으로 열지 않는다.
 
 ## 공통 응답 해석 (#88)
