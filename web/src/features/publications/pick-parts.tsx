@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { SourceList } from "./publish-sources";
 import {
-  autoScrollSpeed, clamp, dropSlot, isDropAccepted, movedText, pageScrollStep, revealScrollTop, orderHintText, parseOrderInput, ORDER_DISCARDED_TEXT, ORDER_UNCHANGED_TEXT,
+  autoScrollSpeed, clamp, dropSlot, isDropAccepted, leavesOrderZone, movedText, pageScrollStep, revealScrollTop, orderHintText, parseOrderInput, ORDER_DISCARDED_TEXT, ORDER_UNCHANGED_TEXT,
 } from "./reorder";
 import styles from "./publications.module.css";
 
 /**
  * 발행 화면과 프리셋 편집 화면이 함께 쓰는 고르기·순서 부품(발행 프리셋 U2 frontend-components 「옮기는 부품」).
  * [더 보기]와 순서 목록(`ReorderList`)이다. 순서 목록은 #632(2026-11-24 팀장 결정)부터 [위로][아래로] 대신 손잡이 드래그와
- * 「순서 직접 지정」(번호 칸)으로 순서를 바꾸고 [빼기]는 그대로다. 순서 계산은 `reorder.ts`에 있다.
+ * 「순서 직접 지정」(번호 칸)으로 순서를 바꾼다. [빼기]는 평소에만 있고, 「순서 직접 지정」을 켠 동안에는 그 자리에 [적용]이 온다
+ * (2026-11-26 팀장 결정). 순서 계산은 `reorder.ts`에 있다.
  */
 
 /** 목록 아래 [더 보기]. 다음 쪽을 부르는 동안에는 다시 누를 수 없어 같은 목록의 다음 쪽 요청은 한 번에 하나다. */
@@ -26,7 +27,7 @@ export function MoreButton({ list, testId, onMore, disabled }: { list: SourceLis
   );
 }
 
-/** 순서 목록의 한 줄. `title`은 번호 칸·[빼기]의 읽히는 이름과 옮긴 뒤 알림에 쓰고, `body`는 줄 안에 그릴 글이다. */
+/** 순서 목록의 한 줄. `title`은 번호 칸·[적용]·[빼기]의 읽히는 이름과 옮긴 뒤 알림에 쓰고, `body`는 줄 안에 그릴 글이다. */
 export type ReorderEntry = { key: string; sourceId: string; title: string; body: ReactNode };
 
 export type ReorderListProps = {
@@ -35,13 +36,15 @@ export type ReorderListProps = {
   testIdPrefix: string;
   /** 목록의 읽히는 이름(「담긴 자료와 순서」, 「고른 프리셋과 순서」). */
   label: string;
-  /** 저장·발행하는 중. 손잡이·번호 칸·[빼기]·「순서 직접 지정」을 모두 막고, 끌던 것도 놓을 때 반영하지 않는다. */
+  /** 저장·발행하는 중. 손잡이·번호 칸·[적용]·[빼기]·「순서 직접 지정」을 모두 막고, 끌던 것도 놓을 때 반영하지 않는다. */
   disabled: boolean;
   /** `from` 자리의 줄을 빼서 `to` 자리에 넣는다(0부터). */
   onMove: (from: number, to: number) => void;
   onRemove: (index: number) => void;
   /** 마지막 줄을 빼 목록이 비었을 때 초점을 둘 곳(그 자료의 고르기 체크박스). 없으면 초점을 옮기지 않는다. */
   emptyFocus?: (sourceId: string) => HTMLElement | null;
+  /** 「순서 직접 지정」을 켠 채로 처음 그린다. 화면은 쓰지 않고, 서버 렌더링 시험이 켠 모습(번호 칸·[적용])을 볼 때만 쓴다. */
+  defaultDirect?: boolean;
 };
 
 type PendingFocus = { kind: "input" | "remove"; key: string } | { kind: "empty"; sourceId: string };
@@ -76,6 +79,18 @@ function focusAfterFrames(find: () => HTMLElement | null | undefined) {
 /** 예비 타이머의 시간. 근거 있는 값이 아니라 제안값이다: 프레임 콜백이 실행될 때 두 번 기다리기가 수십 ms 안에 끝난 것보다 넉넉하게 잡았다. */
 const EMPTY_FOCUS_FALLBACK_MS = 200;
 
+/**
+ * [적용] 위에서 포인터를 뗀 뒤 click을 기다리는 시간. 그 안에 click이 오지 않으면 누르다 만 것으로 본다.
+ * 근거 있는 값이 아니라 제안값이다: 터치에서 click이 pointerup보다 늦게 오는 경우(옛 브라우저의 약 300ms)보다 넉넉하게 잡았다.
+ */
+const APPLY_CLICK_WAIT_MS = 500;
+
+/** 줄의 입력 구역: 번호 칸과 같은 줄의 [적용]. */
+function orderZone(element: Element): { input: HTMLInputElement | null; apply: HTMLButtonElement | null } {
+  const row = element.closest<HTMLElement>("[data-reorder-key]");
+  return { input: row?.querySelector<HTMLInputElement>("[data-reorder-input]") ?? null, apply: row?.querySelector<HTMLButtonElement>("[data-reorder-apply]") ?? null };
+}
+
 const GRIP_ICON = (
   <svg width="14" height="20" viewBox="0 0 14 20" fill="currentColor" aria-hidden="true">
     <circle cx="4" cy="4" r="1.7" /><circle cx="10" cy="4" r="1.7" /><circle cx="4" cy="10" r="1.7" />
@@ -84,13 +99,16 @@ const GRIP_ICON = (
 );
 
 /**
- * 순서 목록(#632). 손잡이를 끌거나 「순서 직접 지정」의 번호 칸에 자리를 넣어 순서를 바꾸고, [빼기]로 뺀다.
+ * 순서 목록(#632). 손잡이를 끌거나 「순서 직접 지정」의 번호 칸에 자리를 넣어 순서를 바꾸고, 평소에는 [빼기]로 뺀다.
  *
  * - **손잡이 드래그:** 손잡이에서만 끌기가 시작된다(터치도 같다. 손잡이 밖은 평소처럼 스크롤된다). 손잡이는 Tab 순서 밖이고 화면 낭독기에 숨긴다.
  *   끄는 줄이 따라오고 놓을 자리에 선이 보인다. 목록 테두리에서 줄 하나 높이쯤 벗어나 놓은 것까지는 받고, 그보다 멀리서 놓거나 Esc를 누르면
  *   순서를 그대로 두고 알린다. 목록이 넘쳐 스크롤될 때는 위·아래 끝에서 스스로 스크롤한다(속도는 `reorder.ts`).
- * - **순서 직접 지정:** 번호 칸은 Enter로만 확정한다. 틀린 값은 고쳐 넣지 않고 이유를 알린다. Enter 없이 칸을 벗어나면 값을 버리고 알린다
- *   (칸을 지나가기만 해도 순서가 바뀌는 일이 없다).
+ * - **순서 직접 지정:** 켠 동안에는 [빼기]를 숨기고 그 자리에 [적용]을 둔다(줄의 칸 수와 Tab 횟수가 평소와 같다). 번호 칸과 같은 줄의 [적용]이
+ *   하나의 입력 구역이다. Enter나 [적용]으로만 확정하고, 구역 안에서 오가는 동안에는 넣은 값이 남는다. 틀린 값은 고쳐 넣지 않고 이유를 알린다.
+ *   확정 없이 구역 밖으로 나가면 값을 버리고 알린다(칸을 지나가기만 해도 순서가 바뀌는 일이 없다).
+ *   Safari는 단추를 눌러도 초점이 단추로 가지 않아, [적용]을 누르는 순간 번호 칸의 초점이 갈 곳 없이 풀릴 수 있다. 그래서 [적용]을 누르는 동안에는
+ *   그 줄의 초점 풀림을 「벗어남」으로 읽지 않는다(`applying`).
  * - **초점:** 번호로 옮긴 뒤에는 옮긴 항목의 번호 칸, [빼기] 뒤에는 다음 줄(없으면 앞 줄)의 [빼기], 목록이 비면 `emptyFocus`가 준 곳이다(프레임 콜백을 두 번 기다린 뒤 옮기고, 콜백이 실행되지 않으면 예비 타이머가 옮긴다, `focusAfterFrames`).
  * - 알림 칸(`role="status"`)과 오류 칸(`role="alert"`)은 늘 그려 두어 화면 낭독기가 바뀐 글을 놓치지 않는다.
  */
@@ -107,7 +125,9 @@ export function ReorderList(props: ReorderListProps) {
   const reveal = useRef<string | null>(null);
   /** 마우스로 눌러 번호 칸에 들어오는 중인가. 눌렀다 떼며 전체 선택이 풀리지 않게 한다. */
   const focusByMouse = useRef(false);
-  const [directOn, setDirectOn] = useState(false);
+  /** [적용]을 누르는 중인 줄. 그동안 그 줄에서 나는 초점 풀림은 「벗어남」이 아니다(Safari는 단추를 눌러도 초점이 단추로 가지 않는다). */
+  const applying = useRef<{ readonly key: string } | null>(null);
+  const [directOn, setDirectOn] = useState(props.defaultDirect ?? false);
   const [invalidKey, setInvalidKey] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -155,9 +175,15 @@ export function ReorderList(props: ReorderListProps) {
   function commitNumber(entry: ReorderEntry, index: number, input: HTMLInputElement) {
     if (props.disabled) return;
     const parsed = parseOrderInput(input.value, count);
-    if (!parsed.ok) { setInvalidKey(entry.key); setError(parsed.message); setStatus(""); input.select(); return; }
+    // 틀린 값은 번호 칸에서 바로 고칠 수 있게 초점을 칸에 둔다([적용]으로 왔을 때도 같다).
+    if (!parsed.ok) { setInvalidKey(entry.key); setError(parsed.message); setStatus(""); input.focus(); input.select(); return; }
     clearNotes();
-    if (parsed.index === index) { setStatus(""); input.value = String(index + 1); return; }
+    if (parsed.index === index) {
+      setStatus(""); input.value = String(index + 1);
+      // [적용]을 눌렀는데 초점이 어디에도 없으면(Safari) 번호 칸으로 돌려놓는다.
+      if (document.activeElement === null || document.activeElement === document.body) input.focus();
+      return;
+    }
     committing.current = true;
     pending.current = { kind: "input", key: entry.key };
     setStatus(movedText(entry.title, parsed.index));
@@ -170,14 +196,57 @@ export function ReorderList(props: ReorderListProps) {
     commitNumber(entry, index, event.currentTarget);
   }
 
-  /** Enter 없이 칸을 벗어남: 넣은 값과 오류 표시를 버리고 지금 번호로 되돌린 뒤 알린다. */
-  function inputBlur(entry: ReorderEntry, index: number, input: HTMLInputElement) {
-    if (committing.current || !input.isConnected) return;
+  /** 넣은 값과 오류 표시를 버리고 지금 번호로 되돌린 뒤 알린다. 넣은 것이 없으면 아무것도 하지 않는다. */
+  function discard(index: number, input: HTMLInputElement) {
     const current = String(index + 1);
-    if (input.value === current && invalidKey !== entry.key) return;
+    if (input.value === current && input.getAttribute("aria-invalid") !== "true") return;
     input.value = current;
     clearNotes();
     setStatus(ORDER_DISCARDED_TEXT);
+  }
+
+  /** 번호 칸이나 [적용]에서 초점이 나감. 같은 줄의 입력 구역 안으로 옮겨 간 것이면 값을 두고, 확정 없이 구역 밖으로 나갔으면 버린다. */
+  function zoneBlur(entry: ReorderEntry, index: number, event: ReactFocusEvent<HTMLElement>) {
+    const { input, apply } = orderZone(event.currentTarget);
+    if (committing.current || !input?.isConnected) return;
+    const next = event.relatedTarget;
+    if (!leavesOrderZone({ staysInZone: next !== null && (next === input || next === apply), applying: applying.current?.key === entry.key })) return;
+    discard(index, input);
+  }
+
+  /**
+   * [적용]을 누르기 시작함. click이 올 때까지 이 줄의 초점 풀림을 「벗어남」으로 읽지 않는다.
+   * 단추 밖에서 떼거나 누르기가 취소되면 click이 오지 않으므로 그때 표시를 지우고, 초점이 구역 밖이면 값을 버린다.
+   * 단추 위에서 뗐는데도 click이 오지 않는 경우에 대비해 예비 타이머를 건다.
+   */
+  function applyPointerDown(entry: ReorderEntry, index: number, event: ReactPointerEvent<HTMLButtonElement>) {
+    if (props.disabled || event.button > 0) return;
+    const button = event.currentTarget;
+    const pointerId = event.pointerId;
+    const { input } = orderZone(button);
+    // 누를 때마다 새 표시를 만든다. 앞서 누른 것의 예비 타이머가 늦게 돌아도 지금 누르는 것의 표시를 지우지 못한다.
+    const press = { key: entry.key };
+    applying.current = press;
+    const settle = () => {
+      if (applying.current !== press) return;
+      applying.current = null;
+      const active = document.activeElement;
+      if (!input?.isConnected || active === input || active === button) return;
+      discard(index, input);
+    };
+    const release = (released: PointerEvent) => {
+      if (released.pointerId !== pointerId) return;
+      window.removeEventListener("pointerup", release); window.removeEventListener("pointercancel", release);
+      const onButton = released.type === "pointerup" && released.target instanceof Node && button.contains(released.target);
+      if (onButton) window.setTimeout(settle, APPLY_CLICK_WAIT_MS); else settle();
+    };
+    window.addEventListener("pointerup", release); window.addEventListener("pointercancel", release);
+  }
+
+  function applyClick(entry: ReorderEntry, index: number, button: HTMLButtonElement) {
+    applying.current = null;
+    const { input } = orderZone(button);
+    if (input) commitNumber(entry, index, input);
   }
 
   function remove(entry: ReorderEntry, index: number) {
@@ -306,12 +375,21 @@ export function ReorderList(props: ReorderListProps) {
                   // 어떤 경로로든 새로 초점이 오면 안의 숫자를 전체 선택해, 친 숫자가 원래 숫자 뒤에 붙지 않고 대신하게 한다.
                   onMouseDown={(event) => { focusByMouse.current = document.activeElement !== event.currentTarget; }}
                   onFocus={(event) => event.currentTarget.select()}
+                  // 새로 값을 넣기 시작하면 앞선 알림을 지운다. 알림 칸의 글이 그대로면 화면 낭독기가 다시 읽지 않아, 같은 취소 알림이 두 번째부터 전달되지 않는다.
+                  onInput={() => setStatus("")}
                   onMouseUp={(event) => { if (focusByMouse.current) { focusByMouse.current = false; event.preventDefault(); event.currentTarget.select(); } }}
-                  onKeyDown={(event) => inputKeyDown(entry, index, event)} onBlur={(event) => inputBlur(entry, index, event.currentTarget)} />
+                  onKeyDown={(event) => inputKeyDown(entry, index, event)} onBlur={(event) => zoneBlur(entry, index, event)} />
               ) : <span className={styles.orderNumber} aria-hidden="true">{index + 1}</span>}
               <div className={styles.orderBody}>{entry.body}</div>
-              <button type="button" className={styles.smallButton} data-testid={`${prefix}-remove`} data-reorder-remove="" disabled={props.disabled}
-                aria-label={`${entry.title} 빼기`} onClick={() => remove(entry, index)}>빼기</button>
+              {direct ? (
+                // 「순서 직접 지정」을 켠 동안에는 [빼기] 자리에 [적용]이 온다. 같은 모양·같은 두 글자라 자료 이름 폭과 줄마다 Tab 횟수가 그대로다.
+                <button type="button" className={styles.smallButton} data-testid={`${prefix}-order-apply`} data-reorder-apply="" disabled={props.disabled}
+                  aria-label={`${entry.title} 적용`} onPointerDown={(event) => applyPointerDown(entry, index, event)}
+                  onClick={(event) => applyClick(entry, index, event.currentTarget)} onBlur={(event) => zoneBlur(entry, index, event)}>적용</button>
+              ) : (
+                <button type="button" className={styles.smallButton} data-testid={`${prefix}-remove`} data-reorder-remove="" disabled={props.disabled}
+                  aria-label={`${entry.title} 빼기`} onClick={() => remove(entry, index)}>빼기</button>
+              )}
             </li>
           ))}
         </ol>
