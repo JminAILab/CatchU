@@ -375,6 +375,8 @@ export function ReorderList(props: ReorderListProps) {
                   // 어떤 경로로든 새로 초점이 오면 안의 숫자를 전체 선택해, 친 숫자가 원래 숫자 뒤에 붙지 않고 대신하게 한다.
                   onMouseDown={(event) => { focusByMouse.current = document.activeElement !== event.currentTarget; }}
                   onFocus={(event) => event.currentTarget.select()}
+                  // 새로 값을 넣기 시작하면 앞선 알림을 지운다. 알림 칸의 글이 그대로면 화면 낭독기가 다시 읽지 않아, 같은 취소 알림이 두 번째부터 전달되지 않는다.
+                  onInput={() => setStatus("")}
                   onMouseUp={(event) => { if (focusByMouse.current) { focusByMouse.current = false; event.preventDefault(); event.currentTarget.select(); } }}
                   onKeyDown={(event) => inputKeyDown(entry, index, event)} onBlur={(event) => zoneBlur(entry, index, event)} />
               ) : <span className={styles.orderNumber} aria-hidden="true">{index + 1}</span>}

@@ -203,3 +203,16 @@ test("순서 직접 지정: 항목이 하나면 켤 수 없어 [빼기]가 그�
   assert.ok(one.includes('data-testid="preset-remove"'));
   assert.ok(!one.includes("preset-order-apply") && !one.includes("preset-order-direct"));
 });
+
+// 2026-11-27 NVDA 확인(#632): 같은 줄에서 입력을 거듭 취소하면 값은 되돌아가는데 취소 알림은 처음 한 번만 읽혔다.
+// 알림 칸(role="status")의 글이 앞선 취소 알림과 같아 DOM이 바뀌지 않았기 때문이다.
+// - 기대: 번호 칸에 새로 값을 넣기 시작하면 앞선 알림을 지운다. 그래야 다음 취소 알림이 빈 칸에 새로 들어가 다시 읽힌다.
+// - 실패로 보는 것: 번호 칸이 입력 때 알림을 지우지 않음.
+// 서버 렌더링에는 이벤트가 없어 소스에 그 연결이 있는지만 본다. 실제 낭독은 NVDA로 따로 확인한다.
+test("순서 직접 지정: 번호 칸에 새로 값을 넣으면 앞선 알림을 지워, 같은 취소 알림이 거듭 전달된다", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(new URL("../src/features/publications/pick-parts.tsx", import.meta.url), "utf8");
+  const input = source.match(/<input key=\{`\$\{entry\.key\}:\$\{index\}`\}[\s\S]*?\/>/)?.[0] ?? "";
+  assert.ok(input.includes("data-reorder-input"), "번호 칸을 찾는다");
+  assert.match(input, /onInput=\{\(\) => setStatus\(""\)\}/);
+});
