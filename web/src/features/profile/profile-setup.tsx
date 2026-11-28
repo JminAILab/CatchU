@@ -1,10 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useUnsavedChanges } from "@/components/auth/use-unsaved-changes";
 import { accessTokenStore } from "@/lib/access-token";
 import { routes } from "@/lib/routes";
+import { authSessionIntegrationEnabled } from "@/lib/auth-integration";
+import { afterRecipientProfileSetup, recipientProfileReturnPath, subscribeRecipientReturn } from "@/lib/recipient-login-return";
 import { LoadingState, LookupFailedState } from "@/components/status/status";
 import { readProfile, completeProfileSetup, profileErrors, isUnprocessedSave, unprocessedSaveMessages, type Profile } from "./profile-api";
 import { ProfileFields } from "./profile-fields";
@@ -14,6 +16,8 @@ import styles from "@/components/auth/auth.module.css";
 
 export function ProfileSetup() {
   const router = useRouter();
+  const recipientReturn = useSyncExternalStore(subscribeRecipientReturn,
+    () => authSessionIntegrationEnabled ? recipientProfileReturnPath() : null, () => null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [initial, setInitial] = useState<Profile | null>(null);
   const [failed, setFailed] = useState(false);
@@ -72,7 +76,7 @@ export function ProfileSetup() {
       if (result === "refresh-failed") {
         setErrors(["저장은 완료됐지만 회원 정보를 확인하지 못했습니다. 다시 확인해 주세요."]); return;
       }
-      router.replace(routes.home);
+      router.replace(authSessionIntegrationEnabled ? afterRecipientProfileSetup() : routes.home);
     } catch {
       if (current()) {
         uncertain.current = true;
@@ -85,10 +89,11 @@ export function ProfileSetup() {
   return <main className={styles.page}><div className={styles.panel}>
     <h1 className={styles.title}>최초 프로필 입력</h1>
     <p className={styles.lead}>표시 이름을 입력해 주세요. 나머지 항목은 선택 사항입니다.</p>
+    {recipientReturn && <p>저장하면 보던 받은 링크로 돌아갑니다. 표시 이름만 넣고 나머지는 비워 두어도 됩니다.</p>}
     <form onSubmit={event => { event.preventDefault(); void submit(); }} noValidate>
       <ProfileFields profile={profile} disabled={busy || saved} onChange={setProfile} skillEditor={skillEditor} onSkillEditorChange={setSkillEditor} />
       {errors.length > 0 && <div className={styles.error} role="alert">{errors.map(message => <p key={message}>{message}</p>)}</div>}
-      <button className={styles.submit} type="submit" disabled={busy}>{busy ? "처리 중" : saved ? "회원 정보 다시 확인" : "저장하고 시작하기"}</button>
+      <button className={styles.submit} type="submit" disabled={busy}>{busy ? "처리 중" : saved ? "회원 정보 다시 확인" : recipientReturn ? "저장하고 받은 링크로 돌아가기" : "저장하고 시작하기"}</button>
     </form>
   </div></main>;
 }

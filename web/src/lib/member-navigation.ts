@@ -4,7 +4,7 @@ import { routes } from "./routes.ts";
  * 회원 화면 이동 판정(web README 「주소 원칙」). 화면·라우터와 분리해 테스트한다.
  */
 
-/** 로그인 후 돌아갈 수 있는 회원 경로. 로그인 진입·수신자·서비스 소개는 복귀 대상이 아니다. */
+/** next로 돌아갈 수 있는 회원 경로. 수신자 복귀(#638)는 token을 next에 넣지 않는 recipient-login-return.ts가 맡는다. */
 const MEMBER_PATH_PREFIXES = [routes.home, routes.profile, routes.assets, routes.materials, routes.presets, routes.jds, routes.publications];
 const PARSE_BASE = "http://catchu.invalid";
 const MAX_NEXT_LENGTH = 2048;
@@ -46,7 +46,8 @@ export type MemberEntryDecision =
  * 토큰이 있는 회원이 회원 경로에 들어올 때의 판정.
  * 조회 중에는 판단을 미루고, 실패는 다시 불러오기, 이름이 빈 문자열이면 최초 입력으로 보낸다.
  * 이미 최초 입력 화면이면 다시 보내지 않는다.
- * 최초 입력 화면은 이름이 빈 회원만 연다. 이름이 있으면 최초 입력을 거친 뒤와 같은 `/home`으로 보낸다
+ * 최초 입력 화면은 이름이 빈 회원만 연다. 이름이 있으면 기본 목적지 `/home`으로 보낸다.
+ * 공통 인증 가드는 받은 링크에서 시작한 최초 입력에 한해 별도 탭 저장값으로 복귀를 적용한다(#638).
  * (이름이 저장된 회원의 상세 `/profile`·수정 `/profile/edit`은 그대로 연다).
  *
  * 회원 경로 가드가 GET /v1/me 성공 결과로 호출한다.
@@ -62,8 +63,9 @@ export function decideMemberEntry(me: MeLookup, pathname: string): MemberEntryDe
 }
 
 /**
- * 로그인 직후 목적지. 이름이 저장된 회원만 검증된 `next`로 돌아가고, 아니면 `/home`.
- * 이름이 빈 문자열이면 최초 입력으로 보낸다. 최초 입력 저장 뒤에는 회원 정보를 다시 불러온 다음 `/home`으로 간다.
+ * 일반 로그인 직후 목적지. 이름이 저장된 회원만 검증된 `next`로 돌아가고, 아니면 `/home`.
+ * 이름이 빈 문자열이면 최초 입력으로 보낸다. 받은 링크에서 시작한 로그인·최초 입력의 복귀는
+ * recipient-login-return.ts가 이 기본 판정 바깥에서 처리하며 수신자 token은 next에 받지 않는다(#638).
  *
  * `displayName`을 모르면(#135 전) null을 넘긴다. 이때는 `next` 또는 `/home`으로 보낸다.
  */

@@ -128,17 +128,20 @@ export function createGoogleCallbackControl(deps: {
   readCallback(query: URLSearchParams): CallbackParse;
   completeGoogleLogin(input: GoogleCompletionInput): Promise<GoogleCompletionResult>;
   lookupMember(): Promise<MemberLookupOutcome>;
+  afterLogin?(displayName: string, next: string | null): string;
+  retryLogin?(next: string | null): string;
 }): GoogleCallbackControl {
   const store = createViewStore<GoogleCallbackView>({ phase: "checking" });
   let run: Promise<void> | null = null;
   let next: string | null = null;
+  const retryLogin = () => deps.retryLogin?.(next) ?? loginPath(next ?? undefined);
 
   function checkMember(): Promise<void> {
     store.set({ phase: "member-check" });
     return deps.lookupMember().then((me) => {
-      if (me.state === "loaded") store.set({ phase: "redirect", to: afterLoginPath(me.displayName, next) });
+      if (me.state === "loaded") store.set({ phase: "redirect", to: (deps.afterLogin ?? afterLoginPath)(me.displayName, next) });
       // 보내지 않은 조회는 실패로 안내하지 않는다. 인증 상태가 바뀐 경우라 이동하지 않고 로그인 진입만 둔다.
-      else if (me.state === "skipped") store.set({ phase: "ignored", loginHref: loginPath(next ?? undefined) });
+      else if (me.state === "skipped") store.set({ phase: "ignored", loginHref: retryLogin() });
       else store.set({ phase: "member-check-failed" });
     }, (error: unknown) => {
       // #261 조회 함수는 실패를 결과로 돌려준다. 예외는 예상 밖 오류이므로 다시 불러오기를 보이고 그대로 올린다.
@@ -150,7 +153,7 @@ export function createGoogleCallbackControl(deps: {
   function settle(result: GoogleCompletionResult): Promise<void> | void {
     if (result.kind === "signed-in") return checkMember();
     const notice = googleCompletionNotice(result);
-    const loginHref = loginPath(next ?? undefined);
+    const loginHref = retryLogin();
     store.set(notice === null ? { phase: "ignored", loginHref } : { phase: "notice", notice, loginHref });
   }
 
@@ -163,14 +166,14 @@ export function createGoogleCallbackControl(deps: {
       // 해석 결과를 보존한 뒤에 지운다. 이후에는 지금 주소에서 다시 해석하지 않는다.
       clearQuery();
       if (parsed.kind !== "complete") {
-        store.set({ phase: "notice", notice: googleCallbackNotice(parsed.kind), loginHref: loginPath() });
+        store.set({ phase: "notice", notice: googleCallbackNotice(parsed.kind), loginHref: retryLogin() });
         run = Promise.resolve();
         return run;
       }
       next = parsed.next;
       run = deps.completeGoogleLogin(parsed.input).then(settle, (error: unknown) => {
         // 공통 함수는 결과로 실패를 돌려준다. 예외는 예상 밖 오류이므로 새 로그인을 안내하고 그대로 올린다.
-        store.set({ phase: "notice", notice: authScreenMessages.callbackLoginFailed, loginHref: loginPath(next ?? undefined) });
+        store.set({ phase: "notice", notice: authScreenMessages.callbackLoginFailed, loginHref: retryLogin() });
         throw error;
       });
       return run;

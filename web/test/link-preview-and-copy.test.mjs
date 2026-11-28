@@ -14,7 +14,7 @@ import { load } from "./u2-render.mjs";
 // 실패 조건: 옛 문장이 남음, 새 문장이 표와 다름, `/s/` 문구가 요청마다 만들어짐(generateMetadata), 소개 화면에 검색 제외 표시가 붙음.
 
 // next/image와 next/navigation은 Next 앱 밖에서 불러올 수 없다. 글과 메뉴만 보므로 대역으로 바꾼다.
-const navigationStub = "data:text/javascript,export const usePathname = () => '/assets'; export const useRouter = () => ({});";
+const navigationStub = "data:text/javascript,export const usePathname = () => '/assets'; export const useRouter = () => ({}); export const useParams = () => ({});";
 registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier === "next/image") return { url: new URL("./next-image-stub.mjs", import.meta.url).href, shortCircuit: true, format: "module" };

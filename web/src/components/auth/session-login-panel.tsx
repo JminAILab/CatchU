@@ -1,15 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useId, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import type { ApiResult } from "@/lib/api-response";
 import { devLoginEnabled } from "@/lib/api";
 import { authRuntime } from "@/lib/auth-runtime";
-import { afterLoginPath } from "@/lib/member-navigation";
+import {
+  afterRecipientAwareLogin, prepareRecipientGoogleLogin, prepareRecipientLoginEntry,
+  recipientLoginEntryPath, subscribeRecipientReturn,
+} from "@/lib/recipient-login-return";
 import { GoogleLoginButton } from "./google-login-button";
 import { useAuth, useEnsureRestored, useLoginChangeDetected } from "./use-auth";
 import { useSessionMemberLookup } from "./use-session-member-lookup";
-import { LookupFailedState } from "@/components/status/status";
+import { LoadingState, LookupFailedState } from "@/components/status/status";
 import styles from "./auth.module.css";
 
 function devLoginErrorMessage(result: Exclude<ApiResult, { kind: "success" }>): string {
@@ -28,6 +31,17 @@ function devLoginErrorMessage(result: Exclude<ApiResult, { kind: "success" }>): 
  * 인증 상태는 공통 인증(#286)을 따른다. 들어오면 세션 복원을 한 번 시작하고, 로그인 상태가 확인되면 #261 흐름대로 이동한다.
  */
 export function SessionLoginPanel() {
+  return <Suspense fallback={<main className={styles.page}><LoadingState>로그인 상태를 확인하고 있습니다.</LoadingState></main>}>
+    <SessionLoginContents />
+  </Suspense>;
+}
+
+function SessionLoginContents() {
+  const query = useSearchParams().toString();
+  const recipientReturn = useSyncExternalStore(subscribeRecipientReturn, recipientLoginEntryPath, () => null);
+  // 진입 표시는 토큰이 없는 값이다. 일반 /login·회원 next·소개 화면의 진입은 남은 복귀 값을 지운다.
+  // 같은 /login에서 쿼리만 바뀌는 이동에도 적용한다(비로그인 상단 바의 Google로 시작하기 등).
+  useEffect(() => { prepareRecipientLoginEntry(new URLSearchParams(query)); }, [query]);
   useEnsureRestored();
   const router = useRouter();
   const auth = useAuth();
@@ -39,9 +53,9 @@ export function SessionLoginPanel() {
   const canLogin = !signedIn && !(auth.status === "restoring" && !auth.restoreUnconfirmed);
   useEffect(() => {
     if (signedIn && me.state === "loaded") {
-      router.replace(afterLoginPath(me.displayName, new URLSearchParams(window.location.search).get("next")));
+      router.replace(afterRecipientAwareLogin(me.displayName, new URLSearchParams(query).get("next")));
     }
-  }, [signedIn, me, router]);
+  }, [signedIn, me, router, query]);
   const inputId = useId();
   const [memberId, setMemberId] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -72,8 +86,13 @@ export function SessionLoginPanel() {
     <main className={styles.page}>
       <div className={styles.panel}>
         <h1 className={styles.title}>CatchU 시작하기</h1>
-        <p className={styles.lead}>로그인하면 내 GitHub 기록으로 Catch를 만들 수 있습니다.</p>
-        {canLogin && <GoogleLoginButton startGoogleLogin={(next) => authRuntime().google.startGoogleLogin(next)} />}
+        {recipientReturn ? <div className={styles.recipientLead}>
+          <p>로그인하면 보던 받은 링크로 돌아가, 내 채용공고(JD)로 이 자료를 요약해 볼 수 있습니다.</p>
+          <p>처음이면 Google로 로그인할 때 가입되고, 표시 이름만 입력하면 됩니다. GitHub 연결은 필요 없습니다.</p>
+          <p>지원자는 내 JD와 요약 결과를 볼 수 없습니다.</p>
+          <p><a href={recipientReturn}>로그인하지 않고 받은 링크로 돌아가기</a></p>
+        </div> : <p className={styles.lead}>로그인하면 내 GitHub 기록으로 Catch를 만들 수 있습니다.</p>}
+        {canLogin && <GoogleLoginButton startGoogleLogin={(next) => authRuntime().google.startGoogleLogin(prepareRecipientGoogleLogin(next))} />}
 
         {signedIn && me.state === "failed" && <LookupFailedState title="회원 정보를 불러오지 못했습니다" onRetry={retry} />}
         {signedIn && me.state === "loading" && <p role="status">회원 정보를 확인하고 있습니다.</p>}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { AiNoticeLine } from "../../components/ai-consent/ai-notice-line";
 import { useAiConsent } from "../../components/ai-consent/use-ai-consent";
 import { routes } from "../../lib/routes";
+import { beginRecipientLogin, recipientLoginHref } from "../../lib/recipient-login-return";
 import type { JdApi } from "./jd-api";
 import { JdRunResult } from "./jd-result-view";
 import { jdSessionDeps, useJdSession } from "./jd-session";
@@ -19,9 +20,9 @@ export function JdPicker({ state, model }: { state: JdSummaryState; model: JdSum
       </select>
     </label>
     {state.jdState === "loading" && <p role="status">JD를 불러오고 있습니다.</p>}
-    {state.jdState === "ready" && state.jds.length === 0 && <p>저장한 JD가 없습니다.</p>}
+    {state.jdState === "ready" && state.jds.length === 0 && <p>저장한 JD가 없습니다. [JD 관리 ↗]에서 JD를 저장한 뒤, 이 화면에서 [JD 새로고침]을 누르세요.</p>}
     <div className={styles.actions}>
-      <a data-testid="jd-manage-link" href={routes.jds}>JD 관리</a>
+      <a data-testid="jd-manage-link" href={routes.jds} target="_blank" rel="noopener noreferrer" aria-label="JD 관리 (새 탭에서 열림)">JD 관리 ↗</a>
       <button data-testid="jd-picker-refresh" type="button" disabled={state.jdState === "loading"} onClick={() => void model.loadJds()}>JD 새로고침</button>
       {state.jdCursor && <button data-testid="jd-picker-more" type="button" disabled={state.jdState === "loading"} onClick={() => void model.loadJds(true)}>다음 JD 보기</button>}
     </div>
@@ -59,7 +60,15 @@ export function JdSummaryPanel({ client, showEvidence, ...context }: JdRecipient
     else model.clear();
     return () => model.dispose();
   }, [model, isLoggedIn, session.loggedIn]);
-  if (!isLoggedIn || !session.loggedIn) return <section className={styles.card}><h2>JD 요약</h2><p>로그인 후 내 JD로 요약을 실행하고 기록을 볼 수 있습니다.</p><a data-testid="jd-summary-login" href={routes.login}>로그인</a></section>;
+  if (session.checking) return <section className={styles.card}><h2>JD 요약</h2><p role="status">로그인 상태를 확인하고 있습니다.</p></section>;
+  if (!isLoggedIn || !session.loggedIn) return <section className={styles.card}><h2>JD 요약</h2>
+    <p>로그인하면 내가 저장한 채용공고(JD)의 요구사항마다 이 자료를 견주어 요약해 볼 수 있습니다. 내 JD와 결과는 나만 보며, 지원자는 볼 수 없습니다.</p>
+    <a data-testid="jd-summary-login" href={recipientLoginHref} onClick={(event) => {
+      event.preventDefault();
+      window.location.assign(beginRecipientLogin(token));
+    }}>로그인</a>
+    <p className={styles.help}>로그인을 마치면 이 화면으로 돌아옵니다. 이 화면의 질의응답 대화는 새로 시작됩니다.</p>
+  </section>;
   if (state.accessLost) return <section className={styles.card}><h2>JD 요약</h2><p role="alert">{state.error ?? "접근 상태가 바뀌었습니다. 링크 또는 로그인을 다시 확인해 주세요."}</p></section>;
   return <JdSummaryContents key={model.viewId} model={model} state={state} showEvidence={showEvidence} />;
 }

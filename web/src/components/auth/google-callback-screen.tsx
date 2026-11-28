@@ -15,16 +15,20 @@ import styles from "./auth.module.css";
  * - 효과가 다시 실행돼도 다시 해석하거나 완료 요청을 다시 보내지 않는다. 화면을 떠나면 결과만 무시하고 요청은 중단하지 않는다.
  * - 세션 복원을 시작하지 않는다(`useEnsureRestored()`를 쓰지 않는다).
  */
-export function GoogleCallbackScreen({ readGoogleCallback, completeGoogleLogin, lookupMember }: {
+export function GoogleCallbackScreen({ readGoogleCallback, completeGoogleLogin, lookupMember, afterLogin, retryLogin }: {
   readGoogleCallback: (query: URLSearchParams) => CallbackParse;
   completeGoogleLogin: (input: GoogleCompletionInput) => Promise<GoogleCompletionResult>;
   lookupMember: () => Promise<MemberLookupOutcome>;
+  afterLogin?: (displayName: string, next: string | null) => string;
+  retryLogin?: (next: string | null) => string;
 }) {
   const router = useRouter();
   const [control] = useState(() => createGoogleCallbackControl({
     readCallback: readGoogleCallback,
     completeGoogleLogin,
     lookupMember,
+    afterLogin,
+    retryLogin,
   }));
   const view = useSyncExternalStore(control.subscribe, control.getView, control.getView);
 

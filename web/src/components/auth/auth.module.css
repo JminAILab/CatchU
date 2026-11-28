@@ -20,6 +20,21 @@
   font-size: 14px;
 }
 
+/* 받은 링크에서 연 로그인 화면의 안내 묶음(#638, #649 리뷰). 세 줄과 돌아가기 링크를 .lead와 같은 크기·색으로 두고, Google 단추와는 .lead만큼 띄운다. */
+.recipientLead {
+  margin: 0 0 24px;
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.recipientLead p {
+  margin: 0 0 8px;
+}
+
+.recipientLead p:last-child {
+  margin-bottom: 0;
+}
+
 .googleButton {
   display: flex;
   justify-content: center;

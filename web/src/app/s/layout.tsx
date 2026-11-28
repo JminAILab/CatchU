@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** 공유 링크 수신자 화면(`/s/...`). 로그인 여부와 관계없이 수신자 전용 헤더를 쓴다. */
+/** 공유 링크 수신자 화면(`/s/...`). 열람 상태와 관계없이 로그인·프로필을 확인하는 수신자 헤더를 쓴다(#638). */
 export default function RecipientLayout({ children }: { children: ReactNode }) {
   return (
     <>

@@ -64,9 +64,15 @@ test("1. 비로그인은 JD·실행을 조회하지 않으며 요청마다 현�
   const blocked = setup(); blocked.auth.logged = false;
   await blocked.model.loadJds(); await blocked.model.loadRuns(); assert.equal(blocked.calls.length, 0);
   const closed = renderToStaticMarkup(createElement(JdSummaryPanel, { ...blocked.context, isLoggedIn: false, client: blocked.api, showEvidence() {} }));
-  assert.match(closed, /로그인 후 내 JD/); assert.doesNotMatch(closed, /jd-summary-start/); assert.equal(blocked.calls.length, 0);
+  assert.match(closed, /로그인하면 내가 저장한 채용공고\(JD\)/);
+  assert.match(closed, /내 JD와 결과는 나만 보며, 지원자는 볼 수 없습니다/);
+  assert.match(closed, /href="\/login\?entry=recipient"/);
+  assert.match(closed, /로그인을 마치면 이 화면으로 돌아옵니다\. 이 화면의 질의응답 대화는 새로 시작됩니다\./);
+  assert.doesNotMatch(closed, /jd-summary-start/); assert.equal(blocked.calls.length, 0);
   const empty = renderToStaticMarkup(createElement(JdPicker, { state: { ...blocked.model.store.get(), jdState: "ready" }, model: blocked.model }));
-  assert.match(empty, /저장한 JD가 없습니다/); assert.match(empty, /href="\/jds"/);
+  assert.match(empty, /저장한 JD가 없습니다/);
+  assert.match(empty, /\[JD 관리 ↗\]에서 JD를 저장한 뒤, 이 화면에서 \[JD 새로고침\]을 누르세요\./);
+  assert.match(empty, /href="\/jds" target="_blank" rel="noopener noreferrer" aria-label="JD 관리 \(새 탭에서 열림\)">JD 관리 ↗<\/a>/);
   const originalSession = currentJdSession(); accessTokenStore.set("synthetic-member");
   assert.equal(currentJdSession().loggedIn, true); assert.notEqual(currentJdSession().identity, originalSession.identity); accessTokenStore.clear("logout");
   const active = setup(async (path) => path === "/jds" ? page([jdItem]) : page());
