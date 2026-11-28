@@ -214,6 +214,36 @@ test('S12 평가 스크립트는 앱과 같은 buildQnaSources로 질의응답 �
   assert.match(record, /## 질문별 붙이지 못한 같은 Catch 기록 줄 수\n\n\| 질문 \| 붙이지 못한 줄 \|\n\|---\|---\|\n\| 1 \| \d+ \|\n\| 2 \| \d+ \|\n\| 3 \| \d+ \|\n/);
 });
 
+// #653: 평가 스크립트도 앱처럼 게이트를 지난 질의응답 항목 글의 보낸 표 글자를 화면의 종류 표시로 바꿔 원문 결과에 남긴다.
+// 실패 조건: 원문 결과에 「X」가 남음(받은 사람이 보는 글과 다름), 통과·버린 수가 바뀜.
+test('#653 평가 스크립트는 질의응답 답 항목의 보낸 표 글자를 앱과 같은 replaceItemTags로 바꿔 원문 결과에 남기고, 항목 수·버린 수는 그대로다', async (t) => {
+  const { outDir, docsDir } = tempDirs(t);
+  const { input, deps } = synthetic();
+  const generate = deps.gate.generate.bind(deps.gate);
+  const sent = []; // 질문마다 { tag, items, dropped }: 게이트가 돌려준(바꾸기 전) 항목 수와 버린 수
+  deps.gate.generate = async (request) => {
+    const output = await generate(request);
+    if (request.feature !== 'QNA') return output;
+    const header = request.sources.map((source) => source.itemContext ?? '').find((context) => /「.」/.test(context));
+    const tag = header === undefined ? null : /「(.)」/.exec(header)[1];
+    const items = tag === null ? output.items
+      : [{ kind: 'AI_INTERPRETATION', text: `「${tag}」 자료를 보면 알 수 있다`, citations: [], jdRole: null }, ...output.items];
+    sent.push({ tag, items: items.length, dropped: output.droppedCount });
+    return { ...output, items };
+  };
+  const result = await runRagEval({ mode: 'synthetic', input, deps, outDir, docsDir, clock: CLOCK });
+  // 내장 합성 발행본은 Catch 다음에 텍스트 자료 하나라, 세 질문 모두 보낸 표 글자가 텍스트 자료의 「나」 하나다.
+  assert.deepEqual(sent.map((entry) => entry.tag), ['나', '나', '나']);
+  const raw = JSON.parse(readFileSync(result.rawPath, 'utf8'));
+  raw.questions.forEach((question, index) => {
+    assert.equal(question.items[0].text, '텍스트 자료를 보면 알 수 있다', `${index + 1}번 질문의 표 글자가 화면의 종류 표시로 바뀐다`);
+    assert.ok(!question.items.some((item) => item.text.includes('「나」')), `${index + 1}번 질문의 원문 결과에 표 글자가 없다`);
+    assert.equal(question.items.length, sent[index].items, `${index + 1}번 질문의 항목을 버리거나 더하지 않는다`);
+  });
+  assert.equal(result.summary.passedItems, sent.reduce((sum, entry) => sum + entry.items, 0), '통과 수는 게이트가 돌려준 항목 수 그대로다');
+  assert.equal(result.summary.droppedItems, sent.reduce((sum, entry) => sum + entry.dropped, 0), '버린 수는 게이트 값 그대로다');
+});
+
 test('S12 붙이지 못한 줄 수 표는 숫자만 쓰고, 모델을 부르지 않은 질문(null)·모양이 다른 값은 「-」다', () => {
   const summary = { date: '2026-12-01', targetVersion: 'x', mode: 'measure', questionCount: 3, hitRateAt5: null, hitRateAt8: null, hitRateAt12: null,
     passedItems: 0, droppedItems: 0, evidencePassRate: null, answerFailedQuestions: [], missedHitLocations: [], jd: null,

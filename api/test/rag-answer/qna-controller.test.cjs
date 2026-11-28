@@ -373,6 +373,24 @@ test('S11 맞은 Catch의 기록 줄을 머리글과 함께 붙여 보내고, qn
   assert.ok(!JSON.stringify(fakes.logger.entries).includes(fact), '로그에 근거 글이 없다');
 });
 
+// #653: 게이트가 통과시킨 항목의 글에서 그 요청이 보낸 머리글 표 글자만 화면의 종류 표시로 바꿔 SSE item으로 보낸다(U5 BR4.5의 예외, 2026-11-28 팀장 결정).
+// 실패 조건: 「나」가 받은 사람에게 그대로 감, 보내지 않은 표 글자·인용·종류가 바뀜, 항목 수가 달라짐.
+test('#653 SSE item 글의 보낸 표 글자는 화면의 종류 표시로 바뀌고, 인용·종류·항목 수와 보내지 않은 표 글자는 그대로다', async () => {
+  const { fakes } = app;
+  const [, textItem] = publication.items;
+  fakes.search.hits = [chunkHit(textItem.snapshot.body, { publishedItemId: textItem.publishedItemId })];
+  const cited = citedItem('「「나」 텍스트 자료」에 본문이 있다');
+  fakes.gate.items = [cited, { kind: 'AI_INTERPRETATION', text: '「나」와 「가」는 다른 자료다', citations: [], jdRole: null }];
+  const response = await ask(app.server.url, publication.token, { question: QUESTION, history: [] });
+  assert.equal(response.status, 200);
+  assert.equal(fakes.gate.streamRequests[0].sources[0].itemContext, '이 줄이 속한 자료: 「나」 텍스트 자료');
+  assert.deepEqual(response.events, [
+    { event: 'item', data: { ...cited, text: '「텍스트 자료」에 본문이 있다' } },
+    { event: 'item', data: { kind: 'AI_INTERPRETATION', text: '텍스트 자료와 「가」는 다른 자료다', citations: [], jdRole: null } },
+    { event: 'done', data: {} }]);
+  assert.equal(completed()[0].itemCount, 2, '바꾸기는 항목 수를 바꾸지 않는다');
+});
+
 test('S11 생성 단계 전에 끝난 질문의 qna.completed는 unattachedLineCount가 null이다', async () => {
   app.fakes.search.hits = [];
   await ask(app.server.url, publication.token, { question: '질문', history: [] });

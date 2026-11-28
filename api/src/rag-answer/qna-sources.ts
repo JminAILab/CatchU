@@ -2,7 +2,8 @@
 // 순수 함수다. 앱(qna-service.ts)과 평가 스크립트(scripts/rag-eval/rag-eval.cjs)가 같이 불러 같은 검색 결과에서 같은 근거 목록을 만든다.
 // 검색으로 맞은 줄은 그대로 보내고, 맞은 Catch의 GitHub 기록 줄을 발행 사본에서 정해진 순서와 상한으로 더 붙인 뒤 근거마다 머리글을 단다.
 // 사본 → 근거 바꾸기는 기본 요약과 같은 buildSummarySources를 쓴다. 머리글에 Catch 제목·AI 초안·저장소 이름을 넣지 않는다(12월 FR6.4).
-import type { AiSource } from '../ai-generation/ai-generation.types';
+// 머리글의 표 글자(「다」 등)는 받은 사람 화면에 없어서, 게이트를 지난 답 항목 글에서 화면의 자료 종류 표시로 바꾼다(#653, replaceItemTags).
+import type { AiSource, GatedItem } from '../ai-generation/ai-generation.types';
 import type { PublishedSnapshot, PublishedSnapshotItem } from '../publications/publication-access';
 import type { ChunkHit } from '../published-index/published-search';
 import { QNA_ATTACH_PER_CATCH_LIMIT, QNA_ITEM_CONTEXT_MAX_LENGTH, QNA_SOURCE_TOTAL_LIMIT } from './rag-answer-config';
@@ -13,7 +14,15 @@ export interface QnaSources {
   sources: AiSource[];
   /** 상한 때문에 붙이지 못한 줄 수(건너뛴 근거의 줄 포함, FR1.6). 로그·평가 기록에 수로만 남긴다. */
   unattachedLineCount: number;
+  /** 보낸 근거의 머리글에 실제로 든 표 글자 → 그 머리글의 꼴(#653). 답 항목 글을 replaceItemTags로 바꿀 때 쓴다. */
+  itemTags: ReadonlyMap<string, ItemTagForm>;
 }
+
+/**
+ * 표 글자를 단 머리글의 꼴(#653). 답에서 그 표 글자를 바꿀 화면 글자를 정한다.
+ * TEXT_MATERIAL·PDF_MATERIAL은 자료, CATCH_UNTITLED는 둘째 줄이 없는 Catch, CATCH_SHARED_SECOND는 둘째 줄이 같은 Catch다.
+ */
+export type ItemTagForm = 'TEXT_MATERIAL' | 'PDF_MATERIAL' | 'CATCH_UNTITLED' | 'CATCH_SHARED_SECOND';
 
 /**
  * 머리글에서 숫자 대신 쓰는 한글 한 글자(발행 순서). 머리글은 인용할 수 없어서 인용 없는 항목에 옮긴 숫자·영문자는
@@ -86,23 +95,84 @@ function secondWorkFact(item: PublishedSnapshotItem): string | null {
  * 겹친 사본이 없으면 지금과 글자까지 같다. 프리셋 이름은 넣지 않는다(ADR-007, NFR4.4).
  */
 export function buildItemContexts(snapshot: PublishedSnapshot): Map<string, string> {
+  return new Map([...itemHeaders(snapshot)].map(([publishedItemId, header]) => [publishedItemId, header.context]));
+}
+
+/** 항목 하나의 머리글. tag는 머리글에 넣은 표 글자(괄호 없이)이고, 표 글자가 없는 꼴이면 tag·form 모두 null이다. */
+interface ItemHeader {
+  context: string;
+  tag: string | null;
+  form: ItemTagForm | null;
+}
+
+/** buildItemContexts와 표 글자 표(#653)가 같이 쓰는 머리글 만들기. 두 쪽이 같은 반복에서 나와 표 글자가 어긋나지 않는다. */
+function itemHeaders(snapshot: PublishedSnapshot): Map<string, ItemHeader> {
   const items = firstCopyItems(snapshot);
   const seconds = new Map(items.map((item) => [item.publishedItemId, secondWorkFact(item)]));
   const counts = new Map<string, number>();
   for (const second of seconds.values()) if (second !== null) counts.set(second, (counts.get(second) ?? 0) + 1);
-  const contexts = new Map<string, string>();
+  const headers = new Map<string, ItemHeader>();
   items.forEach((item, index) => {
-    const tag = `「${itemTag(index)}」`;
+    const tag = itemTag(index);
     const second = seconds.get(item.publishedItemId) ?? null;
-    let context: string;
-    if (item.itemKind === 'TEXT_MATERIAL') context = `이 줄이 속한 자료: ${tag} 텍스트 자료`;
-    else if (item.itemKind === 'PDF_MATERIAL') context = `이 줄이 속한 자료: ${tag} 올린 문서`;
-    else if (second === null) context = `이 줄이 속한 작업: ${tag} 작업(기록 제목 없음)`;
-    else if ((counts.get(second) ?? 0) > 1) context = `이 줄이 속한 작업: ${tag} ${second}`;
-    else context = `이 줄이 속한 작업: ${second}`;
-    contexts.set(item.publishedItemId, context);
+    let header: ItemHeader;
+    if (item.itemKind === 'TEXT_MATERIAL') header = { context: `이 줄이 속한 자료: 「${tag}」 텍스트 자료`, tag, form: 'TEXT_MATERIAL' };
+    else if (item.itemKind === 'PDF_MATERIAL') header = { context: `이 줄이 속한 자료: 「${tag}」 올린 문서`, tag, form: 'PDF_MATERIAL' };
+    else if (second === null) header = { context: `이 줄이 속한 작업: 「${tag}」 작업(기록 제목 없음)`, tag, form: 'CATCH_UNTITLED' };
+    else if ((counts.get(second) ?? 0) > 1) header = { context: `이 줄이 속한 작업: 「${tag}」 ${second}`, tag, form: 'CATCH_SHARED_SECOND' };
+    else header = { context: `이 줄이 속한 작업: ${second}`, tag: null, form: null };
+    headers.set(item.publishedItemId, header);
   });
-  return contexts;
+  return headers;
+}
+
+/**
+ * 표 글자를 바꿀 화면 글자(#653). 받은 사람 화면의 종류 표시(web snapshot-view.tsx KIND_LABELS)와 같은 말이다.
+ * 표 글자(가~버)는 모두 받침이 없어 모델이 받침 없는 조사(가·는·를·와)를 붙인다. 그래서 바꾼 글도 받침 없이 끝나야 조사가 맞는다:
+ * 「텍스트 자료」·「PDF 자료」·「Catch」(캐치)는 받침이 없다. 「작업(기록 제목 없음)」(받침 꼴 조사)까지 바꿀 때는 받침이 있는 「Catch 작업」이다.
+ */
+const TAG_SCREEN_NAMES: Record<ItemTagForm, string> = {
+  TEXT_MATERIAL: '텍스트 자료', PDF_MATERIAL: 'PDF 자료', CATCH_UNTITLED: 'Catch', CATCH_SHARED_SECOND: 'Catch',
+};
+
+/**
+ * 표 글자 바로 뒤에 붙어 표 글자와 함께 한 이름으로 바꾸는 머리글 낱말(#653). 자료는 자료를 부르는 말, Catch는 작업을 부르는 말이다.
+ * 예: 「다」 텍스트 자료 → 텍스트 자료, 「가」 올린 문서 → PDF 자료, 「나」 작업(기록 제목 없음) → Catch 작업.
+ * 표 글자가 어느 항목인지 정하므로, 모델이 붙인 말이 그 항목 종류와 달라도(텍스트 자료를 「문서」라 함) 그 항목의 화면 글자로 바꾼다.
+ * 목록에 없는 말이 뒤에 오면 표 글자만 바꾸고 뒤 말은 그대로 둔다.
+ */
+const MATERIAL_WORDS: ReadonlySet<string> = new Set(['텍스트 자료', '올린 문서', '자료', '문서']);
+const CATCH_WORDS: ReadonlySet<string> = new Set(['작업(기록 제목 없음)', '작업']);
+
+/** 표 글자와 뒤 낱말을 함께 바꾼 글. 그 꼴이 받는 낱말이 아니면 null. */
+function tagWithWordName(form: ItemTagForm, word: string): string | null {
+  if (form === 'TEXT_MATERIAL' || form === 'PDF_MATERIAL') return MATERIAL_WORDS.has(word) ? TAG_SCREEN_NAMES[form] : null;
+  return CATCH_WORDS.has(word) ? 'Catch 작업' : null;
+}
+
+/** 표 글자 뒤 낱말 후보(긴 것 먼저). 고정 상수에서만 만든다(작성자 글·모델 글을 정규식에 넣지 않는다). */
+const TAG_SUFFIX_PATTERN = ['텍스트 자료', '올린 문서', '작업(기록 제목 없음)', '자료', '문서', '작업']
+  .map((word) => word.replace(/[()]/g, '\\$&')).join('|');
+/** 「표 글자」와 뒤에 이어진 머리글 낱말(빈칸 0~1개). 표 글자 자리는 한글 음절만 받고, 보낸 표 글자인지는 바꿀 때 본다. */
+const TAG_IN_TEXT = new RegExp(`「([가-힣]{1,2})」(?:( ?)(${TAG_SUFFIX_PATTERN}))?`, 'gu');
+
+/**
+ * 답 항목 글에서 그 요청이 모델에 준 표 글자를 화면의 자료 종류 표시로 바꾼다(#653, 팀장 결정 2026-11-28).
+ * 표 글자는 머리글에만 있고 받은 사람 화면에는 없어서, 답이 「「다」 텍스트 자료」처럼 가리키면 면접관이 그 자료를 찾지 못한다.
+ * 바꾸는 것은 itemTags에 든 표 글자(보낸 근거의 머리글에 실제로 들어간 것)뿐이고, 그 밖의 「…」 글은 그대로 둔다.
+ * 글만 바꾸고 kind·citations·jdRole은 그대로다. 인용은 항목 글 안의 위치를 가리키지 않아 어긋나지 않는다.
+ * 게이트의 사실 대조를 지난 뒤에 바꾸므로, 바꿔 넣은 영어 표기(PDF·Catch) 때문에 항목이 버려지지 않는다.
+ * 같은 종류가 둘 이상이면 같은 화면 글자로 바뀌어 둘을 가르지 못하고, 괄호 없이 쓴 표 글자는 찾지 않는다(알려진 한계).
+ */
+export function replaceItemTags(item: GatedItem, itemTags: ReadonlyMap<string, ItemTagForm>): GatedItem {
+  if (itemTags.size === 0) return item;
+  const text = item.text.replace(TAG_IN_TEXT, (match: string, tag: string, space: string | undefined, suffix: string | undefined) => {
+    const form = itemTags.get(tag);
+    if (form === undefined) return match;
+    if (suffix === undefined) return TAG_SCREEN_NAMES[form];
+    return tagWithWordName(form, suffix) ?? `${TAG_SCREEN_NAMES[form]}${space ?? ''}${suffix}`;
+  });
+  return text === item.text ? item : { ...item, text };
 }
 
 /** 같은 칸을 가르는 열쇠. 항목 ID가 uuid라 '/'가 섞이지 않는다. */
@@ -170,10 +240,11 @@ function matchedEvidenceIndexes(hits: ChunkHit[]): number[] {
  * 보내는 순서: Catch는 그 Catch의 가장 높은 순위 자리에 맞은 줄(순위 순) → 붙인 줄로 이어 두고, 그 밖의 맞은 줄은 자기 순위 자리다.
  * 붙인 줄의 위치는 그 칸 전체 범위다(C-01 그대로). 검색으로 맞은 칸은 다시 붙이지 않는다(맞은 줄이 남는다).
  * 사본에 없는 항목의 맞은 줄은 머리글 없이 그대로 보낸다. 사본 모양이 틀리면 buildSummarySources의 TypeError를 그대로 던진다.
+ * itemTags에는 보낸 근거의 머리글에 실제로 든 표 글자만 넣는다(#653). 보내지 않은 항목의 표 글자는 답에서 바꾸지 않는다.
  */
 export function buildQnaSources(hits: readonly ChunkHit[], snapshot: PublishedSnapshot): QnaSources {
   const snapshotSources = buildSummarySources(snapshot);
-  const contexts = buildItemContexts(snapshot);
+  const headers = itemHeaders(snapshot);
   const kinds = new Map(snapshot.items.map((item) => [item.publishedItemId, item.itemKind]));
   const hitFields = new Set(hits.map((hit) => fieldKey(hit.publishedItemId, hit.fieldPath)));
   const slots = slotsByRank(hits, kinds);
@@ -192,10 +263,13 @@ export function buildQnaSources(hits: readonly ChunkHit[], snapshot: PublishedSn
       totalLeft -= group.length;
     }
   }
+  const itemTags = new Map<string, ItemTagForm>();
   const withContext = (source: AiSource): AiSource => {
-    const itemContext = contexts.get(source.location.publishedItemId);
-    return itemContext === undefined ? source : { ...source, itemContext };
+    const header = headers.get(source.location.publishedItemId);
+    if (header === undefined) return source;
+    if (header.tag !== null && header.form !== null) itemTags.set(header.tag, header.form);
+    return { ...source, itemContext: header.context };
   };
   const sources = slots.flatMap((slot) => [...slot.hits.map(chunkToSource), ...slot.attached]).map(withContext);
-  return { sources, unattachedLineCount };
+  return { sources, unattachedLineCount, itemTags };
 }

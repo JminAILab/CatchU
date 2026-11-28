@@ -3,11 +3,12 @@
 // 질문·앞 대화·답 글은 결과에 담지 않는다(로그는 이 결과의 칸만 쓴다, BR1.4).
 // 검색 조각을 그대로 근거로 옮기던 일(C-09 note)은 #559부터 qna-sources.ts buildQnaSources가 한다. 검색으로 맞은 줄은 그대로 옮기고,
 // 맞은 Catch의 GitHub 기록 줄을 사본에서 더 붙인 뒤 근거마다 머리글(itemContext)을 단다.
+// 게이트가 통과시킨 항목은 글의 머리글 표 글자만 화면의 자료 종류 표시로 바꿔 내보낸다(#653, U5 BR4.5의 예외).
 import { type AiGenerationGate, type GatedItem } from '../ai-generation/ai-generation.types';
 import { errorName } from '../ai-run/ai-run-spec';
 import type { PublishedSnapshot } from '../publications/publication-access';
 import { type ChunkHit, IndexNotReady, type PublishedSearch } from '../published-index/published-search';
-import { buildQnaSources } from './qna-sources';
+import { buildQnaSources, replaceItemTags } from './qna-sources';
 import type { HistoryMessage } from './question-input';
 import type { QuestionRewriter } from './question-rewriter';
 import { QNA_INSTRUCTION, QNA_MODEL, QNA_SEARCH_LIMIT } from './rag-answer-config';
@@ -27,7 +28,7 @@ export interface QnaRunInput {
   history: HistoryMessage[];
   /** 받은 사람이 연결을 끊었으면 true(BR4.8). 단계 사이와 항목마다 본다. */
   isAborted: () => boolean;
-  /** 게이트가 통과시킨 항목 하나. 받는 대로 SSE item으로 쓴다(BR4.5). */
+  /** 게이트가 통과시킨 항목 하나. 표 글자만 바꾼 뒤 받는 대로 SSE item으로 쓴다(BR4.5, #653). */
   onItem: (item: GatedItem) => void;
 }
 
@@ -114,7 +115,7 @@ export async function answerQuestion(deps: QnaDeps, input: QnaRunInput): Promise
   try {
     // 검색 8개에 맞은 Catch의 기록 줄을 붙이고 머리글을 단다(#559 FR1·FR2). 평가 스크립트도 같은 함수로 요청을 만든다(FR7).
     // 사본 모양이 틀려 여기서 던지면 생성 실패로 끝난다.
-    const { sources, unattachedLineCount } = buildQnaSources(hits, input.snapshot);
+    const { sources, unattachedLineCount, itemTags } = buildQnaSources(hits, input.snapshot);
     result.unattachedLineCount = unattachedLineCount;
     const stream = deps.gate.generateStream({
       feature: 'QNA', instruction: QNA_INSTRUCTION, sources, userText: searchQuestion, publicationText, model: QNA_MODEL,
@@ -122,7 +123,8 @@ export async function answerQuestion(deps: QnaDeps, input: QnaRunInput): Promise
     for await (const item of stream) {
       // 끊겼으면 break로 게이트 스트림의 return을 부른다(게이트가 그 finally에서 Claude 스트림을 닫는다).
       if (input.isAborted()) break;
-      input.onItem(item);
+      // 머리글의 표 글자(「다」 등)는 화면에 없어서 화면의 자료 종류 표시로 바꾼다(#653). 사실 대조가 끝난 항목이라 다시 대조하지 않는다.
+      input.onItem(replaceItemTags(item, itemTags));
       result.itemCount += 1;
     }
   } catch (error) {
