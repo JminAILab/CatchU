@@ -9,6 +9,7 @@
 //   원문은 api/.rag-eval/에, 건수·위치·빈 판정 칸 기록은 api/docs/rag-evaluation/<날짜>.md에 쓴다.
 // - 두 모드 모두 질문마다 게이트 로그(ai_gate_result·ai_gate_failed)의 수와 이름 칸을 원문 결과와 기록에 남긴다(#559). 글은 받지 않는다.
 // - 질의응답 요청은 앱과 같은 buildQnaSources(api/src/rag-answer/qna-sources.ts)로 만들고, 질문별 붙이지 못한 줄 수를 숫자로 남긴다(#559 FR7).
+//   답 항목 글은 앱처럼 머리글 표 글자를 화면의 자료 종류 표시로 바꾼 뒤 원문 결과에 남긴다(replaceItemTags, #653).
 //   검색 적중률은 지금처럼 검색 12개로 잰다. JD 두 방식 비교는 JD 요약처럼 검색 조각을 그대로 근거로 옮긴다(chunkToSource).
 // 입력 파일 모양: { publicationId, memberId(measure만, 실행자 본인), questions: [{ question, goldQuotes: [글귀] }](measure는 10개), jd?: 문자열, targetVersion?,
 //   snapshot?: { title, publishedAt, expiresAt, items }(synthetic만, 없으면 내장 합성 발행본) }
@@ -22,7 +23,7 @@ const { assertGenerationRequest } = require('../../dist/ai-generation/gate-polic
 const { koreanUsageDate } = require('../../dist/daily-run-limit/daily-run-limit');
 const { buildChunkDrafts } = require('../../dist/published-index/chunker');
 const { syntheticEmbedding } = require('../../dist/published-index/synthetic-embedding-provider');
-const { buildQnaSources, chunkToSource } = require('../../dist/rag-answer/qna-sources');
+const { buildQnaSources, chunkToSource, replaceItemTags } = require('../../dist/rag-answer/qna-sources');
 const { QNA_INSTRUCTION, QNA_MODEL, QNA_SEARCH_LIMIT } = require('../../dist/rag-answer/rag-answer-config');
 const { JD_SUMMARY_INSTRUCTION } = require('../../dist/jd-summary/jd-generation-request');
 const { evidencePassRate, findGoldLocations, hitRate, isHitAt, locationOf } = require('./gold-locations.cjs');
@@ -186,12 +187,14 @@ function captureGateLogs() {
 /**
  * 질의응답 요청. 근거 목록은 앱(qna-service.ts)과 같은 buildQnaSources로 검색 상위 8개와 사본에서 만든다(#559 FR7.1).
  * 그래서 다시 재기가 앱이 보내는 근거(같은 Catch 줄 붙이기·머리글)를 그대로 잰다. 붙이지 못한 줄 수도 함께 돌려준다.
+ * 보낸 머리글의 표 글자(itemTags)도 돌려준다. 답 항목 글을 앱처럼 replaceItemTags로 바꿔 받은 사람이 보는 글을 잰다(#653).
  */
 function qnaRequest(hits, snapshot, publicationText, question) {
-  const { sources, unattachedLineCount } = buildQnaSources(hits, snapshot);
+  const { sources, unattachedLineCount, itemTags } = buildQnaSources(hits, snapshot);
   return {
     request: { feature: 'QNA', instruction: QNA_INSTRUCTION, sources, userText: question, publicationText, model: QNA_MODEL },
     unattachedLineCount,
+    itemTags,
   };
 }
 
@@ -248,7 +251,9 @@ async function runRagEval({ mode, input, deps, outDir = DEFAULT_OUT_DIR, docsDir
         if (top.length > 0) {
           const qna = qnaRequest(top, snapshot, result.publicationText, entry.question);
           unattachedLineCount = qna.unattachedLineCount;
-          output = await deps.gate.generate(qna.request);
+          const generated = await deps.gate.generate(qna.request);
+          // 앱(qna-service.ts)처럼 게이트를 지난 항목의 표 글자를 화면의 자료 종류 표시로 바꾼다(#653). 수(통과·버림)는 바뀌지 않는다.
+          output = { ...generated, items: generated.items.map((item) => replaceItemTags(item, qna.itemTags)) };
         }
       } catch (error) {
         // 답 0개(NO_ITEMS)는 앱에서도 「답 실패」로 끝나는 결과라 그 질문만 실패로 남기고 다음 질문으로 간다(새 Catch NC3 Build and Test, 팀장 결정 2026-11-12).

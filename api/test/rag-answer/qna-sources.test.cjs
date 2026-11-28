@@ -4,7 +4,7 @@
 require('reflect-metadata');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { buildQnaSources, buildItemContexts, itemTag, QNA_ITEM_TAGS, sanitizeItemContextLine } = require('../../dist/rag-answer/qna-sources');
+const { buildQnaSources, buildItemContexts, itemTag, QNA_ITEM_TAGS, replaceItemTags, sanitizeItemContextLine } = require('../../dist/rag-answer/qna-sources');
 const {
   AUTHOR_MATERIAL_VOICE_INSTRUCTION, BASE_SUMMARY_INSTRUCTION, QNA_ATTACH_PER_CATCH_LIMIT, QNA_INSTRUCTION, QNA_ITEM_CONTEXT_MAX_LENGTH,
   QNA_SEARCH_LIMIT, QNA_SOURCE_TOTAL_LIMIT,
@@ -343,4 +343,103 @@ test('S16 모델이 머리글의 고정 글자를 인용 항목·AI 해석 항�
   const result = logs.find((log) => log.args[0]?.event === 'ai_gate_result')?.args[0];
   assert.equal(result.dropReasons.fact, 0, '머리글 글자 때문에 버린 항목이 없다');
   assert.ok(!ASCII_LETTER_OR_DIGIT.test(output.items.map((item) => item.text).join('')), '옮겨 쓴 글에 숫자·영문자가 없다');
+});
+
+// ---- #653 답 글의 표 글자를 화면의 자료 종류 표시로 바꾸기 ------------------------------------------------------------------
+// 먼저 정한 시나리오(이슈 #653 완료 기준, 2026-11-28 팀장 결정 「답 글 후처리」):
+// - 이슈와 같은 구성(첫 탭 PDF·Catch, 둘째 탭 같은 Catch의 겹친 사본·텍스트 자료)에서 모델이 「「다」 텍스트 자료」·「가」처럼 쓴다.
+// - 기대: 받은 사람이 받는 글에는 보낸 표 글자가 없고, 그 자리에 화면의 종류 표시(텍스트 자료·PDF 자료·Catch)가 들어간다. 조사는 그대로 맞는다.
+//         항목 종류·인용·개수는 그대로이고, 보내지 않은 표 글자와 그 밖의 「…」 글은 바꾸지 않는다.
+// - 실패 조건: 「다」가 남음, 다른 따옴표 글을 바꿈, 인용·종류가 바뀜, 바꿔 넣은 영어 표기 때문에 항목이 버려짐.
+
+const answerItem = (text, kind = 'AI_INTERPRETATION') => ({ kind, text, citations: [], jdRole: null });
+const TAG_IN_BRACKETS = new RegExp(`「(${QNA_ITEM_TAGS.join('|')})」`);
+
+test('#653 이슈 구성: 보낸 머리글의 표 글자만 itemTags에 들고, 답의 「「다」 텍스트 자료」·「가」는 화면의 종류 표시로 바뀐다', () => {
+  const pdf = pdfItem(51, 1);
+  const work = catchItem(52, 2, { workFacts: ['첫 줄', '알림 화면 고치기'] });
+  const copy = { ...catchItem(52, 3, { workFacts: ['첫 줄', '알림 화면 고치기'] }), publishedItemId: itemId(53), presetOrdinal: 2, isFirstCopy: false };
+  const text = { ...textItem(54, 4, '배포 순서를 적은 자료다.'), presetOrdinal: 2 };
+  const { sources, itemTags } = buildQnaSources([hitOf(text, 'body'), hitOf(work, 'workFacts[0]'), hitOf(pdf, 'pages[1]')],
+    snapshotOf([pdf, work, copy, text]));
+  assert.equal(sources.find((source) => source.location.fieldPath === 'body').itemContext, '이 줄이 속한 자료: 「다」 텍스트 자료');
+  assert.deepEqual([...itemTags], [['다', 'TEXT_MATERIAL'], ['가', 'PDF_MATERIAL']], '표 글자가 없는 Catch 머리글은 넣지 않는다');
+
+  const cases = [
+    ['「「다」 텍스트 자료」에 배포 순서가 있다', '「텍스트 자료」에 배포 순서가 있다'],
+    ['「가」 올린 문서를 보면 「다」에 적힌 것과 같다', 'PDF 자료를 보면 텍스트 자료에 적힌 것과 같다'],
+    ['「다」는 배포를, 「가」는 이력을 적었다', '텍스트 자료는 배포를, PDF 자료는 이력을 적었다'],
+    ['「다」 문서와 「가」 자료에 같은 내용이 있다', '텍스트 자료와 PDF 자료에 같은 내용이 있다'],
+    ['「다」텍스트 자료에서 확인된다', '텍스트 자료에서 확인된다'],
+  ];
+  for (const [before, after] of cases) assert.equal(replaceItemTags(answerItem(before), itemTags).text, after, before);
+});
+
+test('#653 Catch 꼴: 둘째 줄 없는 Catch의 「작업(기록 제목 없음)」은 받침 꼴 그대로 「Catch 작업」, 그 밖은 「Catch」로 바뀐다', () => {
+  const untitled = catchItem(61, 1, { workFacts: ['한 줄뿐이다'] });
+  const sameA = catchItem(62, 2, { workFacts: ['첫 줄', '같은 둘째 줄'] });
+  const sameB = catchItem(63, 3, { workFacts: ['첫 줄', '같은 둘째 줄'] });
+  const { itemTags } = buildQnaSources([hitOf(untitled, 'workFacts[0]'), hitOf(sameA, 'workFacts[0]'), hitOf(sameB, 'workFacts[0]')],
+    snapshotOf([untitled, sameA, sameB]));
+  assert.deepEqual([...itemTags], [['가', 'CATCH_UNTITLED'], ['나', 'CATCH_SHARED_SECOND'], ['다', 'CATCH_SHARED_SECOND']]);
+  const cases = [
+    ['「가」 작업(기록 제목 없음)을 보면 알림을 고쳤다', 'Catch 작업을 보면 알림을 고쳤다'],
+    ['「가」 작업에서 고쳤다', 'Catch 작업에서 고쳤다'],
+    ['「나」 같은 둘째 줄과 「다」는 이름이 같다', 'Catch 같은 둘째 줄과 Catch는 이름이 같다'],
+  ];
+  for (const [before, after] of cases) assert.equal(replaceItemTags(answerItem(before), itemTags).text, after, before);
+});
+
+test('#653 보내지 않은 표 글자·다른 따옴표 글·괄호 없는 글자는 바꾸지 않고, 바꿀 것이 없으면 같은 항목을 돌려준다', () => {
+  const work = catchItem(71, 1, { workFacts: ['첫 줄', '하나뿐인 둘째 줄'] });
+  const text = textItem(72, 2);
+  const pdf = pdfItem(73, 3);
+  const onlyCatch = buildQnaSources([hitOf(work, 'workFacts[0]')], snapshotOf([work, text, pdf]));
+  assert.equal(onlyCatch.itemTags.size, 0, '근거를 보내지 않은 자료의 표 글자는 넣지 않는다');
+  const untouched = answerItem('「나」 텍스트 자료와 「다」 올린 문서');
+  assert.equal(replaceItemTags(untouched, onlyCatch.itemTags), untouched, '보낸 표 글자가 없으면 그대로다');
+
+  const { itemTags } = buildQnaSources([hitOf(text, 'body')], snapshotOf([work, text, pdf]));
+  assert.deepEqual([...itemTags], [['나', 'TEXT_MATERIAL']]);
+  const cases = [
+    ['작성자는 「네」라고 적었다', '작성자는 「네」라고 적었다'],
+    ['「다」 올린 문서는 보내지 않은 자료다', '「다」 올린 문서는 보내지 않은 자료다'],
+    ['나 자료에는 배포 순서가 있다', '나 자료에는 배포 순서가 있다'],
+    ['「나」 배포 순서', '텍스트 자료 배포 순서'],
+  ];
+  for (const [before, after] of cases) assert.equal(replaceItemTags(answerItem(before), itemTags).text, after, before);
+  const plain = answerItem('배포 순서를 적었다');
+  assert.equal(replaceItemTags(plain, itemTags), plain, '바꿀 것이 없으면 같은 항목이다');
+});
+
+// #653 완료 기준 (2)(3)의 근거: #559 다시 재기 발행본은 둘째 줄이 서로 다른 Catch 셋뿐이다(2026-11-19-581-remeasure.md의 workFacts[1] 위치).
+// 그 구성은 머리글에 표 글자가 없어 itemTags가 비고, 바꾸기는 어떤 답 글도 바꾸지 않는다. 그래서 그때 고친 것(Catch 섞임·첫 항목 답)은 이 변경과 관계없다.
+test('#653 #559 다시 재기 구성(둘째 줄이 서로 다른 Catch 셋)은 머리글에 표 글자가 없고, 바꾸기는 답 글을 바꾸지 않는다', () => {
+  const works = [catchItem(91, 1), catchItem(92, 2), catchItem(93, 3)];
+  const { sources, itemTags } = buildQnaSources(works.map((work) => hitOf(work, 'workFacts[0]')), snapshotOf(works));
+  assert.ok(sources.every((source) => !TAG_IN_BRACKETS.test(source.itemContext)), '머리글에 표 글자가 없다');
+  assert.equal(itemTags.size, 0);
+  const item = answerItem('「가」·「나」·「다」를 그대로 쓴 글');
+  assert.equal(replaceItemTags(item, itemTags), item, '보낸 표 글자가 없으면 같은 항목 그대로다');
+});
+
+test('#653 바꾸기는 글만 바꾸고 종류·인용·jdRole은 그대로다. 실제 게이트를 지난 항목에 적용해도 버린 항목이 없고 표 글자가 남지 않는다', async (t) => {
+  captureLogs(t);
+  const noSecond = catchItem(81, 1, { workFacts: ['알림 목록을 고쳤다'] });
+  const text = textItem(82, 2, '배포 순서를 적은 자료다.');
+  const pdf = pdfItem(83, 3);
+  const { sources, itemTags } = buildQnaSources([hitOf(noSecond, 'workFacts[0]'), hitOf(text, 'body'), hitOf(pdf, 'pages[1]')],
+    snapshotOf([noSecond, text, pdf]));
+  const request = { feature: 'QNA', instruction: QNA_INSTRUCTION, sources, userText: '무엇을 했나요?', publicationText: null, model: 'HAIKU' };
+  const { fetch } = recordingFetch([jsonResponse(messageBody([
+    fragment('- 「가」 작업(기록 제목 없음)에서 알림 목록을 고쳤다', [blockCitation(0, 0, 1)]),
+    fragment('\n- 「나」 텍스트 자료와 「다」 올린 문서는 따로 적은 자료로 보인다'),
+  ]))]);
+  const output = await createCheckedAiGenerationGate({ apiKey: FAKE_KEY, fetch }).generate(request);
+  assert.equal(output.droppedCount, 0);
+  const shown = output.items.map((item) => replaceItemTags(item, itemTags));
+  assert.deepEqual(shown.map((item) => item.text), ['Catch 작업에서 알림 목록을 고쳤다', '텍스트 자료와 PDF 자료는 따로 적은 자료로 보인다']);
+  const withoutText = (item) => ({ ...item, text: null });
+  assert.deepEqual(shown.map(withoutText), output.items.map(withoutText), '글 밖의 칸(종류·인용·jdRole)은 그대로다');
+  assert.ok(!shown.some((item) => TAG_IN_BRACKETS.test(item.text)), '받은 사람이 받는 글에 표 글자가 없다');
 });
