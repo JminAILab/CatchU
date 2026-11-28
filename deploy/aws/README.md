@@ -24,6 +24,7 @@ EKS 자원은 [2026-11-17에 만들었고](https://github.com/JminAILab/CatchU/i
 | [`k8s/`](k8s) | 쿠버네티스 실행 파일. namespace·NetworkPolicy·Service·Ingress(ALB)·GitHub 토큰 보관 볼륨은 손으로 적용하고, Deployment(web·api·worker)와 migration·동의 기록 확인 Pod 틀은 `deploy.sh`만 쓴다([k8s/README.md](k8s/README.md)) |
 | [`scripts/deploy.sh`](scripts/deploy.sh) | 앱 교체. 옛 api·worker 종료 확인 → migration 일회 Pod → 동의 기록 삭제 권한 확인·회수 → 새 api·worker·web 시작과 확인([k8s/README.md](k8s/README.md) 「앱 교체(deploy.sh)」). 자동 배포는 [cd/](cd/README.md) |
 | [`features.md`](features.md) | 5단계 기능 켜기. api에서 켠 기능과 값, 그 판본을 띄우는 순서, 켠 뒤 확인, GitHub 토큰 보관 볼륨과 EFS 마운트 시험 |
+| [`operations.md`](operations.md) | 운영 확인(#277). 확인한 판본·설정·완료 기준별 기대와 실제 결과, 확인하지 않은 것, main 배포 뒤 손으로 하는 확인 |
 | [`scripts/deploy.test.sh`](scripts/deploy.test.sh) | `deploy.sh` 회귀 시험과 실행 파일 조건 검사(AWS·클러스터에 닿지 않음, [k8s/README.md](k8s/README.md) 「시험」) |
 | [`scripts/make-secrets.sh`](scripts/make-secrets.sh)·[`put-parameter.sh`](scripts/put-parameter.sh) | 앱 Secret·ConfigMap 만들기와 SSM에 새 비밀값 넣기([k8s/README.md](k8s/README.md) 「Secret과 ConfigMap」) |
 | [`scripts/db-admin.sh`](scripts/db-admin.sh)·[`db/`](db)·[`k8s/ops/`](k8s/ops) | DB 관리용 psql 일회 Pod(namespace `catchu-ops`)와 RDS 계정 SQL·루트 인증서([k8s/README.md](k8s/README.md) 「DB 관리 Pod」). 공통 RDS 조회는 [`scripts/lib/rds.sh`](scripts/lib/rds.sh) |
@@ -245,4 +246,4 @@ bash deploy/aws/scripts/logs.test.sh       # 위와 같음
 | RDS·큐 장애 조치 뒤 api·worker 재연결, 가용 영역별 NAT 경로 | 「1단계 만드는 순서」의 NAT 경로 조회, `check-target.sh` 뒤 `aws rds reboot-db-instance --db-instance-identifier catchu-db --force-failover --profile catchu --region ap-northeast-2`와 `aws elasticache test-failover --replication-group-id catchu-queue --node-group-id 0001 --profile catchu --region ap-northeast-2`, 그 뒤 api·worker 상태 | 1·2 | `cluster.yaml`(NAT 2개), `create-rds.sh`(Multi-AZ), `create-queue.sh`(복제본·자동 장애 조치) |
 | EKS로 옮긴 뒤 개발 서버 삭제, 과금 자원 없음 | 「삭제 순서」 A의 7번 조회 결과 | 4 | 「삭제 순서」 |
 
-이 폴더가 다른 이슈에 주는 것: EKS에서 API 한 실행·worker 3 실행(#275 기준 4는 1, #480)과 교체 중 겹침 방지(`k8s/`·`deploy.sh`. 실제 확인은 2단계), Google 로그인 시작 경로의 앞단 제한(#277, `create-waf.sh`. 한 주소에서 1분 동안 60번 보내 2분 안에 429가 나오는지 시험. WAF는 요청 수를 근삿값으로 세고 감지가 늦어 정확히 21번째에 막히지 않는다), 운영 개발 로그인 거부·재배포 뒤 자료 유지 확인 스크립트(#277, 다음 PR), 두 API 실행 틀(#280, 다음 PR).
+이 폴더가 다른 이슈에 주는 것: EKS에서 API 한 실행·worker 3 실행(#275 기준 4는 1, #480)과 교체 중 겹침 방지(`k8s/`·`deploy.sh`. 실제 확인은 2단계), Google 로그인 시작 경로의 앞단 제한(#277, `create-waf.sh`. 한 주소에서 1분 동안 60번 보내 2분 안에 429가 나오는지 시험. WAF는 요청 수를 근삿값으로 세고 감지가 늦어 정확히 21번째에 막히지 않는다), 운영 개발 로그인 거부·재배포 뒤 자료 유지 확인(#277, 스크립트 없이 손으로 확인했다. 결과와 방법은 [operations.md](operations.md)), 두 API 실행 틀(#280, 다음 PR).
